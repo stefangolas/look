@@ -1,16 +1,45 @@
 # look
 
-`look` is a small native executable for rendering GLB and STL files quickly. It
-uses Rust and `wgpu` directly, supports deterministic camera and lighting
-configuration, and emits machine-readable results for agent workflows.
+`look` is a native command-line utility that turns GLB and STL models into PNG
+images. Its basic purpose is to let a person, script, or software agent inspect
+a 3D model without opening a full CAD application or browser-based viewer.
+
+## Quick example
+
+Render an automatically framed isometric view:
 
 ```console
-look model.glb --view iso --output render.png
+look model.glb --output render.png
 ```
 
-There is no browser, Electron shell, VTK scene layer, or import framework on the
-hot path. GLB and STL parsing, scene compilation, GPU upload, rendering, and PNG
-output live in one executable.
+That command loads `model.glb`, selects a technical material and lighting setup,
+fits the camera to the model, renders an isometric view, and writes `render.png`.
+No configuration file is required.
+
+`look` can also:
+
+- render named camera views with controllable lighting and materials;
+- combine several views into one atlas image for efficient agent inspection;
+- report mesh, triangle, material, texture, and bounds metadata as JSON;
+- execute repeatable YAML render jobs; and
+- keep a scene GPU-resident for multiple inspection passes.
+
+It uses Rust and `wgpu` directly and emits machine-readable results for agent
+workflows. There is no browser, Electron shell, VTK scene layer, or import
+framework on the hot path.
+
+## Command help
+
+Yes, every command has built-in help:
+
+```console
+look --help
+look render --help
+look persist --help
+look --version
+```
+
+`look help render` is equivalent to `look render --help`.
 
 ## Install
 
@@ -111,6 +140,22 @@ output:
 ```
 
 Unknown YAML fields are rejected instead of silently ignored.
+
+## Included test model
+
+The repository includes `tests/fixtures/triangle.stl`, a 162-byte ASCII STL
+used for CLI, package, parser, and render smoke tests:
+
+```console
+look tests/fixtures/triangle.stl --output triangle.png --json
+```
+
+The native GPU test also constructs a minimal embedded-buffer GLB at runtime,
+so the generated binary fixture cannot drift independently from the test that
+validates it. Larger Khronos models such as Damaged Helmet are benchmark inputs,
+not repository fixtures; they are kept under the ignored `target/bench/models`
+directory to avoid bloating normal clones and redistributing third-party assets
+without their model-specific license records.
 
 ## Current scope
 
