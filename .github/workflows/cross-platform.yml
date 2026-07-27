@@ -1,0 +1,31 @@
+name: cross-platform
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  core:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Rust
+        shell: bash
+        run: |
+          rustup toolchain install stable --profile minimal
+          rustup default stable
+      - name: Check formatting
+        run: cargo fmt --all -- --check
+      - name: Compile all targets
+        run: cargo check --all-targets
+      - name: Unit tests
+        run: cargo test
+

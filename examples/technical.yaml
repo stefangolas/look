@@ -1,0 +1,34 @@
+version: 1
+
+scene:
+  source: model.glb
+  up_axis: y
+
+render:
+  resolution: [1024, 1024]
+  background: "#252525"
+  base_color: "#b8c0c8"
+  material_mode: technical
+  antialias: false
+
+lighting:
+  ambient: 0.35
+  direction: [-1.0, -2.0, -3.0]
+  intensity: 0.85
+  color: "#ffffff"
+
+views:
+  - id: front
+    type: orthographic
+    direction: [0.0, 0.0, 1.0]
+    padding: 1.15
+
+  - id: iso
+    type: perspective
+    direction: [1.0, 1.0, 1.0]
+    fov_degrees: 35.0
+    padding: 1.15
+
+output:
+  directory: renders
+  naming: "{view}.png"

@@ -1,0 +1,36 @@
+name: gpu-metal-correctness
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "17 6 * * 1"
+
+permissions:
+  contents: read
+
+jobs:
+  render-smoke:
+    runs-on: macos-15-xlarge
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Rust
+        run: |
+          rustup toolchain install stable --profile minimal
+          rustup default stable
+      - name: Record Metal adapter
+        run: cargo run --release -- doctor --json | tee doctor.json
+      - name: Render GPU smoke fixture
+        run: cargo test --release --test gpu_smoke -- --ignored --nocapture
+      - name: Upload fingerprint and render
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: metal-correctness-${{ github.run_id }}
+          path: |
+            doctor.json
+            target/gpu-smoke/triangle.glb
+            target/gpu-smoke/triangle.png
+          if-no-files-found: warn
+          retention-days: 30
+
