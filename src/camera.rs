@@ -11,6 +11,7 @@ pub struct PreparedCamera {
     pub view_projection: Mat4,
     pub position: [f32; 3],
     pub target: [f32; 3],
+    pub up: [f32; 3],
 }
 
 pub fn prepare_camera(view: &ViewConfig, bounds: &Bounds, resolution: [u32; 2]) -> PreparedCamera {
@@ -91,6 +92,7 @@ pub fn prepare_camera(view: &ViewConfig, bounds: &Bounds, resolution: [u32; 2]) 
         view_projection: projection * view_matrix,
         position: position.to_array(),
         target: center.to_array(),
+        up: up.to_array(),
     }
 }
 

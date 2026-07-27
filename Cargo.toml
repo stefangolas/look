@@ -1,8 +1,8 @@
 [package]
-name = "v3"
+name = "look"
 version = "0.1.0"
 edition = "2024"
-description = "A fast, agent-oriented technical renderer for GLB scenes"
+description = "An ultrafast, agent-oriented renderer for GLB and STL scenes"
 license = "MIT OR Apache-2.0"
 
 [dependencies]

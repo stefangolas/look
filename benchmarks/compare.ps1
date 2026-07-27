@@ -1,5 +1,5 @@
 param(
-    [string]$V3 = (Join-Path $PSScriptRoot '..\target\release\v3.exe'),
+    [string]$Look = (Join-Path $PSScriptRoot '..\target\release\look.exe'),
     [string]$F3D = 'C:\Program Files\F3D\bin\f3d-console.exe',
     [string]$ModelDirectory = (Join-Path $PSScriptRoot '..\target\bench\models'),
     [string]$OutputDirectory = (Join-Path $PSScriptRoot '..\target\bench\outputs'),
@@ -79,17 +79,8 @@ function Get-Distribution([double[]]$Samples) {
 $outputRoot = Resolve-InWorkspace $OutputDirectory
 New-Item -ItemType Directory -Force -Path $outputRoot | Out-Null
 
-# F3D's Windows output resolution is expressed in DPI-virtualized logical
-# pixels. Compensate so both tools emit the same physical PNG dimensions.
-$appliedDpi = 96
-if ($env:OS -eq 'Windows_NT') {
-    $dpiSetting = Get-ItemProperty -LiteralPath 'HKCU:\Control Panel\Desktop\WindowMetrics' -Name AppliedDPI -ErrorAction SilentlyContinue
-    if ($null -ne $dpiSetting -and $dpiSetting.AppliedDPI -gt 0) {
-        $appliedDpi = [int]$dpiSetting.AppliedDPI
-    }
-}
-$f3dLogicalWidth = [int][math]::Ceiling($Width * 96 / $appliedDpi)
-$f3dLogicalHeight = [int][math]::Ceiling($Height * 96 / $appliedDpi)
+$f3dLogicalWidth = $Width
+$f3dLogicalHeight = $Height
 
 $models = Get-ChildItem -LiteralPath $ModelDirectory -Filter '*.glb' | Sort-Object Name
 if ($models.Count -eq 0) {
@@ -98,8 +89,8 @@ if ($models.Count -eq 0) {
 
 $tools = @(
     @{
-        name = 'v3'
-        executable = [System.IO.Path]::GetFullPath($V3)
+        name = 'look'
+        executable = [System.IO.Path]::GetFullPath($Look)
         arguments = {
             param($model, $output)
             @(
@@ -120,6 +111,7 @@ $tools = @(
             param($model, $output)
             @(
                 $model,
+                '--no-config',
                 '--output', $output,
                 '--resolution', "$f3dLogicalWidth,$f3dLogicalHeight",
                 '--camera-direction=-Z',
@@ -170,7 +162,7 @@ $report = [ordered]@{
         warmups = $Warmups
         resolution = @($Width, $Height)
         f3d_logical_resolution = @($f3dLogicalWidth, $f3dLogicalHeight)
-        windows_applied_dpi = $appliedDpi
+        f3d_user_config = 'disabled'
         camera = 'front orthographic, automatic fit'
         antialiasing = 'disabled'
         background = '#252525'

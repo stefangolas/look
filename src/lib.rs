@@ -5,4 +5,5 @@ pub mod config;
 pub mod output;
 pub mod renderer;
 pub mod scene;
+pub mod server;
 pub mod timing;

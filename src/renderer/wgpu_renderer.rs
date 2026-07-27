@@ -8,12 +8,13 @@ use std::{
 
 use anyhow::Context;
 use bytemuck::{Pod, Zeroable};
+use glam::Vec3;
 use wgpu::util::DeviceExt;
 
 use crate::{
     camera::PreparedCamera,
-    config::{LightingConfig, MaterialMode, RenderConfig, parse_hex_color},
-    renderer::{HardwareFingerprint, RenderBatch, RenderedImage, Renderer},
+    config::{LightingConfig, LightingPreset, MaterialMode, RenderConfig, parse_hex_color},
+    renderer::{HardwareFingerprint, RenderBatch, RenderedImage, RenderedTile, Renderer},
     scene::{
         AlphaMode, CompiledScene, SourceMaterial, SourceVertexAttributes, TextureWrap, Vertex,
     },
@@ -28,10 +29,11 @@ const COPY_ALIGNMENT: u32 = wgpu::COPY_BYTES_PER_ROW_ALIGNMENT;
 #[derive(Clone, Copy, Pod, Zeroable)]
 struct GlobalsRaw {
     view_projection: [[f32; 4]; 4],
-    light_direction_ambient: [f32; 4],
-    light_color_intensity: [f32; 4],
+    light_directions: [[f32; 4]; 5],
+    light_colors: [[f32; 4]; 5],
     base_color: [f32; 4],
     camera_position: [f32; 4],
+    ambient: [f32; 4],
 }
 
 #[repr(C)]
@@ -152,7 +154,7 @@ pub struct WgpuRenderer {
     pipeline_multisample: Option<wgpu::RenderPipeline>,
     source_single_sample: Option<SourcePipelines>,
     source_multisample: Option<SourcePipelines>,
-    cached_scene: Option<CachedGpuScene>,
+    cached_scenes: Vec<CachedGpuScene>,
     view_pool: Vec<ViewResources>,
     timestamp_queries: bool,
     initialization_timings: Timings,
@@ -179,7 +181,7 @@ impl WgpuRenderer {
         timings.record("gpu_adapter", adapter_started.elapsed());
 
         let device_started = Instant::now();
-        let memory_hints = match std::env::var("V3_MEMORY_HINT")
+        let memory_hints = match std::env::var("LOOK_MEMORY_HINT")
             .ok()
             .as_deref()
             .map(str::to_ascii_lowercase)
@@ -188,7 +190,7 @@ impl WgpuRenderer {
             Some("performance") => wgpu::MemoryHints::Performance,
             _ => wgpu::MemoryHints::MemoryUsage,
         };
-        let timestamp_queries = std::env::var_os("V3_GPU_TIMESTAMPS").is_some()
+        let timestamp_queries = std::env::var_os("LOOK_GPU_TIMESTAMPS").is_some()
             && adapter.features().contains(wgpu::Features::TIMESTAMP_QUERY);
         let required_features = if timestamp_queries {
             wgpu::Features::TIMESTAMP_QUERY
@@ -196,7 +198,7 @@ impl WgpuRenderer {
             wgpu::Features::empty()
         };
         let (device, queue) = pollster::block_on(adapter.request_device(&wgpu::DeviceDescriptor {
-            label: Some("v3 device"),
+            label: Some("look device"),
             required_features,
             required_limits: wgpu::Limits::default(),
             experimental_features: wgpu::ExperimentalFeatures::disabled(),
@@ -219,7 +221,7 @@ impl WgpuRenderer {
 
         let pipeline_started = Instant::now();
         let bind_group_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
-            label: Some("v3 globals layout"),
+            label: Some("look globals layout"),
             entries: &[wgpu::BindGroupLayoutEntry {
                 binding: 0,
                 visibility: wgpu::ShaderStages::VERTEX_FRAGMENT,
@@ -233,7 +235,7 @@ impl WgpuRenderer {
         });
         let material_bind_group_layout =
             device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
-                label: Some("v3 source material layout"),
+                label: Some("look source material layout"),
                 entries: &source_material_layout_entries(),
             });
         timings.record("gpu_layout", pipeline_started.elapsed());
@@ -248,7 +250,7 @@ impl WgpuRenderer {
             pipeline_multisample: None,
             source_single_sample: None,
             source_multisample: None,
-            cached_scene: None,
+            cached_scenes: Vec::new(),
             view_pool: Vec::new(),
             timestamp_queries,
             initialization_timings: timings,
@@ -280,13 +282,13 @@ impl WgpuRenderer {
                 let shader = self
                     .device
                     .create_shader_module(wgpu::ShaderModuleDescriptor {
-                        label: Some("v3 technical shader"),
+                        label: Some("look technical shader"),
                         source: wgpu::ShaderSource::Wgsl(include_str!("technical.wgsl").into()),
                     });
                 let layout = self
                     .device
                     .create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
-                        label: Some("v3 technical pipeline layout"),
+                        label: Some("look technical pipeline layout"),
                         bind_group_layouts: &[Some(&self.bind_group_layout)],
                         immediate_size: 0,
                     });
@@ -301,7 +303,7 @@ impl WgpuRenderer {
                 let shader = self
                     .device
                     .create_shader_module(wgpu::ShaderModuleDescriptor {
-                        label: Some("v3 source material shader"),
+                        label: Some("look source material shader"),
                         source: wgpu::ShaderSource::Wgsl(
                             include_str!("source_material.wgsl").into(),
                         ),
@@ -309,7 +311,7 @@ impl WgpuRenderer {
                 let layout = self
                     .device
                     .create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
-                        label: Some("v3 source material pipeline layout"),
+                        label: Some("look source material pipeline layout"),
                         bind_group_layouts: &[
                             Some(&self.bind_group_layout),
                             Some(&self.material_bind_group_layout),
@@ -406,7 +408,7 @@ impl WgpuRenderer {
             MaterialMode::Technical => {
                 self.device
                     .create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                        label: Some("v3 compact technical vertices"),
+                        label: Some("look compact technical vertices"),
                         contents: bytemuck::cast_slice(&vertices),
                         usage: wgpu::BufferUsages::VERTEX,
                     })
@@ -414,7 +416,7 @@ impl WgpuRenderer {
             MaterialMode::Source => {
                 self.device
                     .create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                        label: Some("v3 source vertices"),
+                        label: Some("look source vertices"),
                         contents: bytemuck::cast_slice(&source_vertices),
                         usage: wgpu::BufferUsages::VERTEX,
                     })
@@ -423,14 +425,14 @@ impl WgpuRenderer {
         let index_buffer = self
             .device
             .create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                label: Some("v3 indices"),
+                label: Some("look indices"),
                 contents: bytemuck::cast_slice(&indices),
                 usage: wgpu::BufferUsages::INDEX,
             });
         let instance_buffer = self
             .device
             .create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                label: Some("v3 instances"),
+                label: Some("look instances"),
                 contents: bytemuck::cast_slice(&instances),
                 usage: wgpu::BufferUsages::VERTEX,
             });
@@ -459,7 +461,7 @@ impl WgpuRenderer {
             let fallback = if texture.decoded.is_none() {
                 let decode_started = Instant::now();
                 let decoded = image::load_from_memory(&texture.encoded)
-                    .with_context(|| format!("failed to decode v3 texture {index}"))?
+                    .with_context(|| format!("failed to decode look texture {index}"))?
                     .to_rgba8();
                 timings.accumulate("texture_decode", decode_started.elapsed());
                 Some(crate::scene::DecodedTexture {
@@ -481,7 +483,7 @@ impl WgpuRenderer {
                 decoded.height,
                 &decoded.rgba,
                 texture.sampler,
-                &format!("v3 texture {index}"),
+                &format!("look texture {index}"),
             ));
             timings.accumulate("texture_upload", texture_started.elapsed());
         }
@@ -499,7 +501,7 @@ impl WgpuRenderer {
             1,
             &[255, 255, 255, 255],
             fallback_sampler,
-            "v3 white fallback",
+            "look white fallback",
         ));
         let normal_index = textures.len();
         textures.push(self.upload_rgba_texture(
@@ -507,7 +509,7 @@ impl WgpuRenderer {
             1,
             &[128, 128, 255, 255],
             fallback_sampler,
-            "v3 normal fallback",
+            "look normal fallback",
         ));
         let black_index = textures.len();
         textures.push(self.upload_rgba_texture(
@@ -515,7 +517,7 @@ impl WgpuRenderer {
             1,
             &[0, 0, 0, 255],
             fallback_sampler,
-            "v3 black fallback",
+            "look black fallback",
         ));
 
         let mut materials = Vec::with_capacity(scene.materials.len());
@@ -544,7 +546,7 @@ impl WgpuRenderer {
             let uniform = self
                 .device
                 .create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                    label: Some("v3 source material uniform"),
+                    label: Some("look source material uniform"),
                     contents: bytemuck::bytes_of(&raw),
                     usage: wgpu::BufferUsages::UNIFORM,
                 });
@@ -554,7 +556,7 @@ impl WgpuRenderer {
             let emissive = &textures[emissive_index];
             let occlusion = &textures[occlusion_index];
             let bind_group = self.device.create_bind_group(&wgpu::BindGroupDescriptor {
-                label: Some("v3 source material bind group"),
+                label: Some("look source material bind group"),
                 layout: &self.material_bind_group_layout,
                 entries: &[
                     wgpu::BindGroupEntry {
@@ -625,17 +627,17 @@ impl WgpuRenderer {
             },
         );
         let linear_view = texture.create_view(&wgpu::TextureViewDescriptor {
-            label: Some("v3 linear texture view"),
+            label: Some("look linear texture view"),
             format: Some(wgpu::TextureFormat::Rgba8Unorm),
             ..Default::default()
         });
         let srgb_view = texture.create_view(&wgpu::TextureViewDescriptor {
-            label: Some("v3 srgb texture view"),
+            label: Some("look srgb texture view"),
             format: Some(wgpu::TextureFormat::Rgba8UnormSrgb),
             ..Default::default()
         });
         let sampler = self.device.create_sampler(&wgpu::SamplerDescriptor {
-            label: Some("v3 glTF sampler"),
+            label: Some("look glTF sampler"),
             address_mode_u: address_mode(sampler.wrap_u),
             address_mode_v: address_mode(sampler.wrap_v),
             mag_filter: filter_mode(sampler.mag_linear),
@@ -650,6 +652,367 @@ impl WgpuRenderer {
             sampler,
         }
     }
+
+    fn render_atlas(
+        &self,
+        gpu_scene: &GpuScene,
+        cameras: &[PreparedCamera],
+        render: &RenderConfig,
+        lighting: &LightingConfig,
+        columns: u32,
+        timings: &mut Timings,
+    ) -> anyhow::Result<RenderedImage> {
+        let tile_width = render.resolution[0];
+        let tile_height = render.resolution[1];
+        let columns = columns.min(cameras.len() as u32).max(1);
+        let rows = (cameras.len() as u32).div_ceil(columns);
+        let width = tile_width
+            .checked_mul(columns)
+            .context("atlas width overflowed")?;
+        let height = tile_height
+            .checked_mul(rows)
+            .context("atlas height overflowed")?;
+        let limit = self.device.limits().max_texture_dimension_2d;
+        if width > limit || height > limit {
+            anyhow::bail!(
+                "atlas {}x{} exceeds GPU texture limit {} ({} columns of {}x{} tiles)",
+                width,
+                height,
+                limit,
+                columns,
+                tile_width,
+                tile_height
+            );
+        }
+
+        let sample_count = if render.antialias { 4 } else { 1 };
+        let background = parse_hex_color(&render.background)?;
+        let base_color = parse_hex_color(&render.base_color)?;
+        let light_color = parse_hex_color(&lighting.color)?;
+        let target_started = Instant::now();
+        let output_texture =
+            create_color_texture(&self.device, width, height, 1, "look atlas output");
+        let output_view = output_texture.create_view(&Default::default());
+        let multisample_texture = (sample_count > 1).then(|| {
+            create_color_texture(
+                &self.device,
+                width,
+                height,
+                sample_count,
+                "look atlas multisample color",
+            )
+        });
+        let multisample_view = multisample_texture
+            .as_ref()
+            .map(|texture| texture.create_view(&Default::default()));
+        let depth_texture = create_depth_texture(&self.device, width, height, sample_count);
+        let depth_view = depth_texture.create_view(&Default::default());
+        let padded_bytes_per_row = align_to(width * 4, COPY_ALIGNMENT);
+        let readback_size = u64::from(padded_bytes_per_row) * u64::from(height);
+        let readback = self.device.create_buffer(&wgpu::BufferDescriptor {
+            label: Some("look atlas readback"),
+            size: readback_size,
+            usage: wgpu::BufferUsages::COPY_DST | wgpu::BufferUsages::MAP_READ,
+            mapped_at_creation: false,
+        });
+        let uniforms = cameras
+            .iter()
+            .map(|camera| {
+                let globals = globals_raw(camera, lighting, base_color, light_color);
+                self.device
+                    .create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                        label: Some("look atlas camera and lighting"),
+                        contents: bytemuck::bytes_of(&globals),
+                        usage: wgpu::BufferUsages::UNIFORM,
+                    })
+            })
+            .collect::<Vec<_>>();
+        let bind_groups = uniforms
+            .iter()
+            .map(|uniform| {
+                self.device.create_bind_group(&wgpu::BindGroupDescriptor {
+                    label: Some("look atlas camera bind group"),
+                    layout: &self.bind_group_layout,
+                    entries: &[wgpu::BindGroupEntry {
+                        binding: 0,
+                        resource: uniform.as_entire_binding(),
+                    }],
+                })
+            })
+            .collect::<Vec<_>>();
+        timings.record("gpu_target_prepare", target_started.elapsed());
+
+        let technical_pipeline = if render.material_mode == MaterialMode::Technical {
+            Some(
+                if sample_count > 1 {
+                    self.pipeline_multisample.as_ref()
+                } else {
+                    self.pipeline_single_sample.as_ref()
+                }
+                .context("technical pipeline was not initialized")?,
+            )
+        } else {
+            None
+        };
+        let source_pipelines = if sample_count > 1 {
+            self.source_multisample.as_ref()
+        } else {
+            self.source_single_sample.as_ref()
+        };
+        let render_started = Instant::now();
+        let mut encoder = self
+            .device
+            .create_command_encoder(&wgpu::CommandEncoderDescriptor {
+                label: Some("look atlas render"),
+            });
+        {
+            let color_view = multisample_view.as_ref().unwrap_or(&output_view);
+            let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+                label: Some("look atlas render pass"),
+                color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+                    view: color_view,
+                    depth_slice: None,
+                    resolve_target: multisample_view.as_ref().map(|_| &output_view),
+                    ops: wgpu::Operations {
+                        load: wgpu::LoadOp::Clear(wgpu::Color {
+                            r: f64::from(background[0]),
+                            g: f64::from(background[1]),
+                            b: f64::from(background[2]),
+                            a: 1.0,
+                        }),
+                        store: wgpu::StoreOp::Store,
+                    },
+                })],
+                depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
+                    view: &depth_view,
+                    depth_ops: Some(wgpu::Operations {
+                        load: wgpu::LoadOp::Clear(1.0),
+                        store: wgpu::StoreOp::Discard,
+                    }),
+                    stencil_ops: None,
+                }),
+                timestamp_writes: None,
+                occlusion_query_set: None,
+                multiview_mask: None,
+            });
+            for (index, bind_group) in bind_groups.iter().enumerate() {
+                let column = index as u32 % columns;
+                let row = index as u32 / columns;
+                let x = column * tile_width;
+                let y = row * tile_height;
+                pass.set_viewport(
+                    x as f32,
+                    y as f32,
+                    tile_width as f32,
+                    tile_height as f32,
+                    0.0,
+                    1.0,
+                );
+                pass.set_scissor_rect(x, y, tile_width, tile_height);
+                pass.set_bind_group(0, bind_group, &[]);
+                draw_gpu_scene(
+                    &mut pass,
+                    gpu_scene,
+                    render.material_mode,
+                    technical_pipeline,
+                    source_pipelines,
+                )?;
+            }
+        }
+        encoder.copy_texture_to_buffer(
+            output_texture.as_image_copy(),
+            wgpu::TexelCopyBufferInfo {
+                buffer: &readback,
+                layout: wgpu::TexelCopyBufferLayout {
+                    offset: 0,
+                    bytes_per_row: Some(padded_bytes_per_row),
+                    rows_per_image: Some(height),
+                },
+            },
+            wgpu::Extent3d {
+                width,
+                height,
+                depth_or_array_layers: 1,
+            },
+        );
+        self.queue.submit([encoder.finish()]);
+        timings.record("gpu_encode_submit", render_started.elapsed());
+
+        let readback_started = Instant::now();
+        let (sender, receiver) = mpsc::sync_channel(1);
+        readback
+            .slice(..)
+            .map_async(wgpu::MapMode::Read, move |result| {
+                let _ = sender.send(result);
+            });
+        self.device
+            .poll(wgpu::PollType::wait_indefinitely())
+            .context("GPU atlas polling failed")?;
+        receiver
+            .recv()
+            .context("GPU atlas readback callback was dropped")?
+            .context("GPU atlas readback mapping failed")?;
+        let mapped = readback
+            .slice(..)
+            .get_mapped_range()
+            .context("failed to access mapped atlas")?;
+        let mut rgba = vec![0_u8; width as usize * height as usize * 4];
+        for row in 0..height as usize {
+            let source_start = row * padded_bytes_per_row as usize;
+            let source_end = source_start + width as usize * 4;
+            let target_start = row * width as usize * 4;
+            rgba[target_start..target_start + width as usize * 4]
+                .copy_from_slice(&mapped[source_start..source_end]);
+        }
+        drop(mapped);
+        readback.unmap();
+        timings.record("gpu_readback", readback_started.elapsed());
+
+        let tiles = cameras
+            .iter()
+            .enumerate()
+            .map(|(index, camera)| RenderedTile {
+                view: camera.id.clone(),
+                x: index as u32 % columns * tile_width,
+                y: index as u32 / columns * tile_height,
+                width: tile_width,
+                height: tile_height,
+            })
+            .collect();
+        Ok(RenderedImage {
+            view: "atlas".to_owned(),
+            width,
+            height,
+            rgba,
+            tiles,
+        })
+    }
+}
+
+fn globals_raw(
+    camera: &PreparedCamera,
+    lighting: &LightingConfig,
+    base_color: [f32; 4],
+    light_color: [f32; 4],
+) -> GlobalsRaw {
+    let (light_directions, light_colors, ambient) = match lighting.preset {
+        LightingPreset::Technical => {
+            let mut directions = [[0.0; 4]; 5];
+            let mut colors = [[0.0; 4]; 5];
+            directions[0] = [
+                lighting.direction[0],
+                lighting.direction[1],
+                lighting.direction[2],
+                0.0,
+            ];
+            colors[0] = [
+                light_color[0],
+                light_color[1],
+                light_color[2],
+                lighting.intensity,
+            ];
+            (directions, colors, lighting.ambient)
+        }
+        LightingPreset::F3dMatch => f3d_35_light_kit(camera, lighting.intensity),
+    };
+    GlobalsRaw {
+        view_projection: camera.view_projection.to_cols_array_2d(),
+        light_directions,
+        light_colors,
+        base_color,
+        camera_position: [
+            camera.position[0],
+            camera.position[1],
+            camera.position[2],
+            1.0,
+        ],
+        ambient: [ambient, 0.0, 0.0, 0.0],
+    }
+}
+
+/// Reproduces vtkLightKit's defaults as used by F3D 3.5. Camera-light angles
+/// are elevation/azimuth pairs and all five directions are stored as rays
+/// traveling from the light toward the model.
+fn f3d_35_light_kit(
+    camera: &PreparedCamera,
+    intensity_scale: f32,
+) -> ([[f32; 4]; 5], [[f32; 4]; 5], f32) {
+    let position = Vec3::from_array(camera.position);
+    let target = Vec3::from_array(camera.target);
+    let back = (position - target).normalize_or_zero();
+    let configured_up = Vec3::from_array(camera.up).normalize_or_zero();
+    let forward = -back;
+    let right = forward.cross(configured_up).normalize_or_zero();
+    let up = right.cross(forward).normalize_or_zero();
+    let ray = |elevation: f32, azimuth: f32| {
+        let elevation = elevation.to_radians();
+        let azimuth = azimuth.to_radians();
+        let toward_light = back * elevation.cos() * azimuth.cos()
+            + right * elevation.cos() * azimuth.sin()
+            + up * elevation.sin();
+        (-toward_light.normalize_or_zero()).extend(0.0).to_array()
+    };
+    let directions = [
+        // vtkLightKit adds the headlight first, followed by key, fill, backs.
+        (-back).extend(0.0).to_array(),
+        ray(50.0, 10.0),
+        ray(-75.0, -10.0),
+        ray(0.0, 110.0),
+        ray(0.0, -110.0),
+    ];
+    // Exact linear interpolation of vtkLightKit's 64-entry warmth table at
+    // warmth 0.5 (neutral), 0.6 (key), and 0.4 (fill).
+    let neutral = [0.9998, 0.9998, 0.9998];
+    let warm = [1.0, 0.97232, 0.90222];
+    let cool = [0.90824, 0.93314, 1.0];
+    let color =
+        |rgb: [f32; 3], intensity: f32| [rgb[0], rgb[1], rgb[2], intensity * intensity_scale];
+    let colors = [
+        color(neutral, 0.75 / 3.0),
+        color(warm, 0.75),
+        color(cool, 0.75 / 3.0),
+        color(neutral, 0.75 / 3.5),
+        color(neutral, 0.75 / 3.5),
+    ];
+    (directions, colors, 0.0)
+}
+
+fn draw_gpu_scene<'a>(
+    pass: &mut wgpu::RenderPass<'a>,
+    gpu_scene: &'a GpuScene,
+    material_mode: MaterialMode,
+    technical_pipeline: Option<&'a wgpu::RenderPipeline>,
+    source_pipelines: Option<&'a SourcePipelines>,
+) -> anyhow::Result<()> {
+    pass.set_vertex_buffer(0, gpu_scene.vertex_buffer.slice(..));
+    pass.set_vertex_buffer(1, gpu_scene.instance_buffer.slice(..));
+    pass.set_index_buffer(gpu_scene.index_buffer.slice(..), wgpu::IndexFormat::Uint32);
+    if material_mode == MaterialMode::Technical {
+        pass.set_pipeline(technical_pipeline.context("technical pipeline was not initialized")?);
+        for draw in &gpu_scene.draws {
+            pass.draw_indexed(draw.indices.clone(), 0, draw.instances.clone());
+        }
+    } else {
+        let source_pipelines =
+            source_pipelines.context("source material pipelines were not initialized")?;
+        for blend_phase in [false, true] {
+            for draw in &gpu_scene.draws {
+                let material = gpu_scene
+                    .materials
+                    .get(draw.material)
+                    .with_context(|| format!("material {} was not uploaded", draw.material))?;
+                if (material.alpha_mode == AlphaMode::Blend) != blend_phase {
+                    continue;
+                }
+                pass.set_pipeline(
+                    source_pipelines.select(material.alpha_mode, material.double_sided),
+                );
+                pass.set_bind_group(1, &material.bind_group, &[]);
+                pass.draw_indexed(draw.indices.clone(), 0, draw.instances.clone());
+            }
+        }
+    }
+    Ok(())
 }
 
 impl Renderer for WgpuRenderer {
@@ -668,7 +1031,6 @@ impl Renderer for WgpuRenderer {
             anyhow::bail!("render batch contains no cameras");
         }
         let mut timings = Timings::default();
-        timings.merge(&self.initialization_timings);
 
         let width = render.resolution[0];
         let height = render.resolution[1];
@@ -677,9 +1039,9 @@ impl Renderer for WgpuRenderer {
 
         let cache_started = Instant::now();
         let cached_scene = self
-            .cached_scene
-            .as_ref()
-            .filter(|cached| {
+            .cached_scenes
+            .iter()
+            .find(|cached| {
                 cached.source_hash == scene.source_hash
                     && cached.material_mode == render.material_mode
             })
@@ -692,13 +1054,34 @@ impl Renderer for WgpuRenderer {
             let uploaded =
                 Arc::new(self.upload_scene(scene, render.material_mode, &mut timings)?);
             timings.record("gpu_upload", upload_started.elapsed());
-            self.cached_scene = Some(CachedGpuScene {
+            self.cached_scenes.push(CachedGpuScene {
                 source_hash: scene.source_hash.clone(),
                 material_mode: render.material_mode,
                 scene: Arc::clone(&uploaded),
             });
+            // The daemon keeps a small multi-session GPU working set. A full
+            // byte-aware LRU can replace this bound without changing the
+            // renderer/session contract.
+            if self.cached_scenes.len() > 4 {
+                self.cached_scenes.remove(0);
+            }
             uploaded
         };
+
+        if let Some(columns) = render.atlas_columns {
+            let image = self.render_atlas(
+                gpu_scene.as_ref(),
+                cameras,
+                render,
+                lighting,
+                columns,
+                &mut timings,
+            )?;
+            return Ok(RenderBatch {
+                images: vec![image],
+                timings,
+            });
+        }
 
         let padded_bytes_per_row = align_to(width * 4, COPY_ALIGNMENT);
         let readback_size = u64::from(padded_bytes_per_row) * u64::from(height);
@@ -710,28 +1093,7 @@ impl Renderer for WgpuRenderer {
         let mut resources = Vec::with_capacity(cameras.len());
 
         for camera in cameras {
-            let globals = GlobalsRaw {
-                view_projection: camera.view_projection.to_cols_array_2d(),
-                light_direction_ambient: [
-                    lighting.direction[0],
-                    lighting.direction[1],
-                    lighting.direction[2],
-                    lighting.ambient,
-                ],
-                light_color_intensity: [
-                    light_color[0],
-                    light_color[1],
-                    light_color[2],
-                    lighting.intensity,
-                ],
-                base_color,
-                camera_position: [
-                    camera.position[0],
-                    camera.position[1],
-                    camera.position[2],
-                    1.0,
-                ],
-            };
+            let globals = globals_raw(camera, lighting, base_color, light_color);
             if let Some(index) = available_resources.iter().position(|resource| {
                 resource.width == width
                     && resource.height == height
@@ -745,7 +1107,8 @@ impl Renderer for WgpuRenderer {
                 continue;
             }
 
-            let output_texture = create_color_texture(&self.device, width, height, 1, "v3 output");
+            let output_texture =
+                create_color_texture(&self.device, width, height, 1, "look output");
             let output_view = output_texture.create_view(&Default::default());
             let multisample_texture = (sample_count > 1).then(|| {
                 create_color_texture(
@@ -753,7 +1116,7 @@ impl Renderer for WgpuRenderer {
                     width,
                     height,
                     sample_count,
-                    "v3 multisample color",
+                    "look multisample color",
                 )
             });
             let multisample_view = multisample_texture
@@ -762,7 +1125,7 @@ impl Renderer for WgpuRenderer {
             let depth_texture = create_depth_texture(&self.device, width, height, sample_count);
             let depth_view = depth_texture.create_view(&Default::default());
             let readback = self.device.create_buffer(&wgpu::BufferDescriptor {
-                label: Some("v3 readback"),
+                label: Some("look readback"),
                 size: readback_size,
                 usage: wgpu::BufferUsages::COPY_DST | wgpu::BufferUsages::MAP_READ,
                 mapped_at_creation: false,
@@ -770,12 +1133,12 @@ impl Renderer for WgpuRenderer {
             let uniform = self
                 .device
                 .create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                    label: Some("v3 camera and lighting"),
+                    label: Some("look camera and lighting"),
                     contents: bytemuck::bytes_of(&globals),
                     usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
                 });
             let bind_group = self.device.create_bind_group(&wgpu::BindGroupDescriptor {
-                label: Some("v3 camera and lighting bind group"),
+                label: Some("look camera and lighting bind group"),
                 layout: &self.bind_group_layout,
                 entries: &[wgpu::BindGroupEntry {
                     binding: 0,
@@ -804,7 +1167,7 @@ impl Renderer for WgpuRenderer {
         let timestamp_count = resources.len() as u32 * 2;
         let timestamp_query_set = self.timestamp_queries.then(|| {
             self.device.create_query_set(&wgpu::QuerySetDescriptor {
-                label: Some("v3 render timestamps"),
+                label: Some("look render timestamps"),
                 ty: wgpu::QueryType::Timestamp,
                 count: timestamp_count,
             })
@@ -812,7 +1175,7 @@ impl Renderer for WgpuRenderer {
         let timestamp_size = u64::from(timestamp_count) * mem::size_of::<u64>() as u64;
         let timestamp_resolve = timestamp_query_set.as_ref().map(|_| {
             self.device.create_buffer(&wgpu::BufferDescriptor {
-                label: Some("v3 timestamp resolve"),
+                label: Some("look timestamp resolve"),
                 size: timestamp_size,
                 usage: wgpu::BufferUsages::QUERY_RESOLVE | wgpu::BufferUsages::COPY_SRC,
                 mapped_at_creation: false,
@@ -820,7 +1183,7 @@ impl Renderer for WgpuRenderer {
         });
         let timestamp_readback = timestamp_query_set.as_ref().map(|_| {
             self.device.create_buffer(&wgpu::BufferDescriptor {
-                label: Some("v3 timestamp readback"),
+                label: Some("look timestamp readback"),
                 size: timestamp_size,
                 usage: wgpu::BufferUsages::COPY_DST | wgpu::BufferUsages::MAP_READ,
                 mapped_at_creation: false,
@@ -829,7 +1192,7 @@ impl Renderer for WgpuRenderer {
         let mut encoder = self
             .device
             .create_command_encoder(&wgpu::CommandEncoderDescriptor {
-                label: Some("v3 render batch"),
+                label: Some("look render batch"),
             });
         let technical_pipeline = if render.material_mode == MaterialMode::Technical {
             Some(
@@ -855,7 +1218,7 @@ impl Renderer for WgpuRenderer {
                 .unwrap_or(&resource.output_view);
             {
                 let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-                    label: Some("v3 render pass"),
+                    label: Some("look render pass"),
                     color_attachments: &[Some(wgpu::RenderPassColorAttachment {
                         view: color_view,
                         depth_slice: None,
@@ -1012,6 +1375,7 @@ impl Renderer for WgpuRenderer {
                 width,
                 height,
                 rgba,
+                tiles: Vec::new(),
             });
         }
         self.view_pool = resources;
@@ -1258,7 +1622,7 @@ fn create_source_pipeline(
         }),
     ];
     device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
-        label: Some("v3 source material pipeline"),
+        label: Some("look source material pipeline"),
         layout: Some(layout),
         vertex: wgpu::VertexState {
             module: shader,
@@ -1374,7 +1738,7 @@ fn create_pipeline(
         }),
     ];
     device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
-        label: Some("v3 technical pipeline"),
+        label: Some("look technical pipeline"),
         layout: Some(layout),
         vertex: wgpu::VertexState {
             module: shader,
@@ -1452,7 +1816,7 @@ fn create_depth_texture(
     sample_count: u32,
 ) -> wgpu::Texture {
     device.create_texture(&wgpu::TextureDescriptor {
-        label: Some("v3 depth"),
+        label: Some("look depth"),
         size: wgpu::Extent3d {
             width,
             height,

@@ -16,7 +16,7 @@ jobs:
     runs-on: macos-15
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - name: Install Rust
         run: |
           rustup toolchain install stable --profile minimal
@@ -24,10 +24,10 @@ jobs:
       - name: Record Metal adapter
         run: cargo run --release -- doctor --json | tee doctor.json
       - name: Render GPU smoke fixture
-        run: cargo test --release --test gpu_smoke -- --ignored --nocapture
+        run: cargo test --release --test gpu_smoke -- --ignored --nocapture --test-threads=1
       - name: Upload fingerprint and render
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: metal-correctness-${{ github.run_id }}
           path: |

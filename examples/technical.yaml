@@ -1,7 +1,7 @@
 version: 1
 
 scene:
-  source: model.glb
+  source: ../tests/fixtures/triangle.stl
   up_axis: y
 
 render:
@@ -10,8 +10,10 @@ render:
   base_color: "#b8c0c8"
   material_mode: technical
   antialias: false
+  atlas_columns: 2
 
 lighting:
+  preset: technical
   ambient: 0.35
   direction: [-1.0, -2.0, -3.0]
   intensity: 0.85

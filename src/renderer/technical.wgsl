@@ -1,9 +1,10 @@
 struct CameraLighting {
     view_projection: mat4x4<f32>,
-    light_direction_ambient: vec4<f32>,
-    light_color_intensity: vec4<f32>,
+    light_directions: array<vec4<f32>, 5>,
+    light_colors: array<vec4<f32>, 5>,
     base_color: vec4<f32>,
     camera_position: vec4<f32>,
+    ambient: vec4<f32>,
 };
 
 @group(0) @binding(0)
@@ -50,11 +51,15 @@ fn vertex_main(input: VertexInput) -> VertexOutput {
 @fragment
 fn fragment_main(input: VertexOutput) -> @location(0) vec4<f32> {
     let normal = normalize(input.world_normal);
-    let toward_light = normalize(-globals.light_direction_ambient.xyz);
-    let diffuse = max(dot(normal, toward_light), 0.0);
-    let ambient = globals.light_direction_ambient.w;
-    let intensity = globals.light_color_intensity.w;
-    let lighting = ambient + diffuse * intensity * globals.light_color_intensity.rgb;
+    var lighting = vec3<f32>(globals.ambient.x);
+    for (var index = 0u; index < 5u; index += 1u) {
+        if (globals.light_colors[index].w <= 0.0) {
+            continue;
+        }
+        let toward_light = normalize(-globals.light_directions[index].xyz);
+        let diffuse = max(dot(normal, toward_light), 0.0);
+        lighting += diffuse * globals.light_colors[index].w * globals.light_colors[index].rgb;
+    }
     let color = globals.base_color.rgb * lighting;
     return vec4<f32>(color, globals.base_color.a);
 }

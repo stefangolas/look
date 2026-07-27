@@ -22,6 +22,16 @@ pub enum MaterialMode {
     Source,
 }
 
+/// Named lighting/camera compatibility profiles. `F3dMatch` is pinned to the
+/// default vtkLightKit values used by F3D 3.5 rather than tracking an
+/// unspecified future F3D release.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, clap::ValueEnum)]
+#[serde(rename_all = "snake_case")]
+pub enum LightingPreset {
+    Technical,
+    F3dMatch,
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum NamedView {
@@ -118,6 +128,10 @@ pub struct RenderConfig {
     pub material_mode: MaterialMode,
     #[serde(default)]
     pub antialias: bool,
+    /// When set, pack all views into one GPU-rendered PNG atlas using this
+    /// many tile columns. Resolution remains the per-view tile size.
+    #[serde(default)]
+    pub atlas_columns: Option<u32>,
 }
 
 impl Default for RenderConfig {
@@ -128,6 +142,7 @@ impl Default for RenderConfig {
             base_color: default_base_color(),
             material_mode: default_material_mode(),
             antialias: false,
+            atlas_columns: None,
         }
     }
 }
@@ -135,6 +150,8 @@ impl Default for RenderConfig {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct LightingConfig {
+    #[serde(default = "default_lighting_preset")]
+    pub preset: LightingPreset,
     #[serde(default = "default_ambient")]
     pub ambient: f32,
     #[serde(default = "default_light_direction")]
@@ -148,6 +165,7 @@ pub struct LightingConfig {
 impl Default for LightingConfig {
     fn default() -> Self {
         Self {
+            preset: default_lighting_preset(),
             ambient: default_ambient(),
             direction: default_light_direction(),
             intensity: default_light_intensity(),
@@ -257,6 +275,9 @@ impl NormalizedConfig {
         if self.render.resolution[0] > 16_384 || self.render.resolution[1] > 16_384 {
             bail!("render resolution exceeds the 16384 pixel safety limit");
         }
+        if self.render.atlas_columns == Some(0) {
+            bail!("atlas column count must be positive");
+        }
         if self
             .views
             .iter()
@@ -339,6 +360,9 @@ fn default_material_mode() -> MaterialMode {
 }
 fn default_ambient() -> f32 {
     0.35
+}
+fn default_lighting_preset() -> LightingPreset {
+    LightingPreset::Technical
 }
 fn default_light_direction() -> [f32; 3] {
     [-1.0, -2.0, -3.0]

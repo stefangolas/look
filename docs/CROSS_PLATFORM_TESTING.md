@@ -8,13 +8,17 @@ Metal, or a useful range of physical GPUs.
 1. `cross-platform.yml` runs format, compile, parser, camera, cache, and unit tests
    on ordinary Windows, Linux, and macOS hosted runners for every change.
 2. `gpu-metal.yml` runs the ignored GPU smoke test on GitHub's Apple-silicon
-   `macos-15-xlarge` runner weekly and on demand. It captures `v3 doctor --json`
+   `macos-15` runner weekly and on demand. It captures `look doctor --json`
    and the rendered fixture as build artifacts. This is correctness coverage,
-   not a performance baseline.
+   not a performance baseline. The standard hosted runner is virtualized.
 3. A Linux Mesa/Lavapipe lane will provide deterministic software-Vulkan image
    comparisons once golden-image comparison is introduced.
 4. Dedicated bare-metal GPU runners provide publishable performance and driver
    coverage.
+
+`release.yml` separately compiles, tests, packages, and smoke-tests Linux,
+Windows, and macOS executables on x64 and ARM64. Those jobs prove distribution
+correctness; their timings are never performance results.
 
 ## Hardware runner labels
 
@@ -31,7 +35,7 @@ Every run must retain:
 
 - renderer commit and build profile
 - operating-system version
-- backend, adapter, vendor/device ID, and driver from `v3 doctor --json`
+- backend, adapter, vendor/device ID, and driver from `look doctor --json`
 - source fixture hash
 - resolved render configuration
 - image and machine-readable manifest
@@ -53,4 +57,3 @@ coverage.
 
 Self-hosted GPU runners must accept only trusted workflows. Do not expose them
 to arbitrary code from fork pull requests.
-

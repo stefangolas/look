@@ -146,7 +146,7 @@ pub fn prepare_source_textures(
                 for pending_index in (worker..pending.len()).step_by(worker_count) {
                     let index = pending[pending_index];
                     let decoded = image::load_from_memory(&textures[index].encoded)
-                        .with_context(|| format!("failed to decode v3 texture {index}"))?
+                        .with_context(|| format!("failed to decode look texture {index}"))?
                         .to_rgba8();
                     batch.push((
                         index,
@@ -386,10 +386,9 @@ fn parse_stl(bytes: &[u8]) -> anyhow::Result<(Vec<Vertex>, Vec<u32>)> {
         if let Some(expected) = triangle_count
             .checked_mul(50)
             .and_then(|payload| 84_usize.checked_add(payload))
+            && expected == bytes.len()
         {
-            if expected == bytes.len() {
-                return parse_binary_stl(bytes, triangle_count);
-            }
+            return parse_binary_stl(bytes, triangle_count);
         }
     }
     parse_ascii_stl(bytes)
@@ -446,7 +445,7 @@ fn parse_ascii_stl(bytes: &[u8]) -> anyhow::Result<(Vec<Vertex>, Vec<u32>)> {
             index += 1;
         }
     }
-    if positions.is_empty() || positions.len() % 3 != 0 {
+    if positions.is_empty() || !positions.len().is_multiple_of(3) {
         bail!("ASCII STL contains an incomplete triangle set");
     }
     if positions.len() > u32::MAX as usize {

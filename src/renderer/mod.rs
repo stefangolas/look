@@ -28,6 +28,16 @@ pub struct RenderedImage {
     pub width: u32,
     pub height: u32,
     pub rgba: Vec<u8>,
+    pub tiles: Vec<RenderedTile>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct RenderedTile {
+    pub view: String,
+    pub x: u32,
+    pub y: u32,
+    pub width: u32,
+    pub height: u32,
 }
 
 #[derive(Debug)]

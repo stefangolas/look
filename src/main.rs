@@ -1,6 +1,6 @@
 use std::process::ExitCode;
 
-use v3::cli::{Cli, Command};
+use look::cli::{Cli, Command};
 
 fn main() -> ExitCode {
     let cli = Cli::parse_normalized();
@@ -8,7 +8,7 @@ fn main() -> ExitCode {
     match run(cli) {
         Ok(()) => ExitCode::SUCCESS,
         Err(error) => {
-            eprintln!("v3: {error:#}");
+            eprintln!("look: {error:#}");
             ExitCode::from(1)
         }
     }
@@ -16,9 +16,14 @@ fn main() -> ExitCode {
 
 fn run(cli: Cli) -> anyhow::Result<()> {
     match cli.command {
-        Command::Render(args) => v3::cli::execute_render(args),
-        Command::Run(args) => v3::cli::execute_job(args),
-        Command::Inspect(args) => v3::cli::execute_inspect(args),
-        Command::Doctor(args) => v3::cli::execute_doctor(args),
+        Command::Render(args) => look::cli::execute_render(args),
+        Command::Run(args) => look::cli::execute_job(args),
+        Command::Inspect(args) => look::cli::execute_inspect(args),
+        Command::Doctor(args) => look::cli::execute_doctor(args),
+        Command::Persist(args) => look::cli::execute_persist(args),
+        Command::Sessions(args) => look::cli::execute_sessions(args),
+        Command::Close(args) => look::cli::execute_close(args),
+        Command::Server(args) => look::cli::execute_server_command(args),
+        Command::Serve => look::cli::execute_server_daemon(),
     }
 }

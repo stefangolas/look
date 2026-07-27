@@ -1,0 +1,198 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>look persistent Three.js benchmark</title>
+<style>html,body{margin:0;background:#252525}canvas{display:block}</style>
+<script type="importmap">
+{
+  "imports": {
+    "three": "/node_modules/three/build/three.module.js",
+    "three/webgpu": "/node_modules/three/build/three.webgpu.js",
+    "three/addons/": "/node_modules/three/examples/jsm/"
+  }
+}
+</script>
+<script type="module">
+const requestedBackend = new URLSearchParams(location.search).get('backend') ?? 'webgl2';
+const THREE = requestedBackend === 'webgpu' ? await import('three/webgpu') : await import('three');
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+
+const canvas = document.createElement('canvas');
+document.body.appendChild(canvas);
+const renderer = requestedBackend === 'webgpu'
+  ? new THREE.WebGPURenderer({ canvas, antialias: false, alpha: false, powerPreference: 'high-performance' })
+  : new THREE.WebGLRenderer({ canvas, antialias: false, alpha: false, powerPreference: 'high-performance' });
+if (requestedBackend === 'webgpu') await renderer.init();
+renderer.setPixelRatio(1);
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+renderer.toneMapping = THREE.NoToneMapping;
+renderer.shadowMap.enabled = false;
+renderer.setClearColor(0x252525, 1);
+renderer.autoClear = false;
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x252525);
+scene.add(new THREE.AmbientLight(0xffffff, 0.35));
+const key = new THREE.DirectionalLight(0xffffff, 0.85);
+key.position.set(1, 2, 3);
+key.target.position.set(0, 0, 0);
+scene.add(key, key.target);
+
+let bounds;
+let center;
+const cameras = new Map();
+const gl = requestedBackend === 'webgl2' ? renderer.getContext() : null;
+const timer = () => performance.now();
+
+async function submitScene(camera) {
+  if (requestedBackend === 'webgpu') await renderer.renderAsync(scene, camera);
+  else renderer.render(scene, camera);
+}
+
+async function finishGpu() {
+  if (requestedBackend === 'webgpu') {
+    const queue = renderer.backend?.device?.queue;
+    if (!queue) throw new Error('Three.js WebGPU backend did not expose its GPU queue');
+    await queue.onSubmittedWorkDone();
+  } else {
+    gl.finish();
+  }
+}
+
+function cameraFor(id, width, height) {
+  const key = `${id}:${width}:${height}`;
+  if (cameras.has(key)) return cameras.get(key);
+  const directions = {
+    front: new THREE.Vector3(0, 0, 1),
+    right: new THREE.Vector3(1, 0, 0),
+    top: new THREE.Vector3(0, 1, 0),
+    iso: new THREE.Vector3(1, 1, 1).normalize()
+  };
+  const direction = directions[id];
+  const up = Math.abs(direction.y) > 0.98 ? new THREE.Vector3(0, 0, -1) : new THREE.Vector3(0, 1, 0);
+  const forward = direction.clone().negate();
+  const right = new THREE.Vector3().crossVectors(forward, up).normalize();
+  const cameraUp = new THREE.Vector3().crossVectors(right, forward).normalize();
+  const corners = [];
+  for (const x of [bounds.min.x, bounds.max.x]) for (const y of [bounds.min.y, bounds.max.y]) for (const z of [bounds.min.z, bounds.max.z]) corners.push(new THREE.Vector3(x,y,z));
+  let halfWidth = 1e-4, halfHeight = 1e-4;
+  for (const corner of corners) {
+    const offset = corner.sub(center);
+    halfWidth = Math.max(halfWidth, Math.abs(offset.dot(right)));
+    halfHeight = Math.max(halfHeight, Math.abs(offset.dot(cameraUp)));
+  }
+  const aspect = width / height;
+  halfHeight = Math.max(halfHeight, halfWidth / aspect) * 1.1;
+  halfWidth = halfHeight * aspect;
+  const radius = Math.max(bounds.getSize(new THREE.Vector3()).length() * 0.5, 1e-3);
+  const camera = new THREE.OrthographicCamera(-halfWidth, halfWidth, halfHeight, -halfHeight, radius * 0.01, radius * 8);
+  camera.position.copy(center).addScaledVector(direction, radius * 3);
+  camera.up.copy(up);
+  camera.lookAt(center);
+  camera.updateMatrixWorld(true);
+  cameras.set(key, camera);
+  return camera;
+}
+
+function blobFromCanvas() {
+  return new Promise((resolve, reject) => canvas.toBlob(blob => blob ? resolve(blob) : reject(new Error('canvas PNG encode failed')), 'image/png'));
+}
+
+async function renderCase(viewIds, tileSize) {
+  const columns = viewIds.length === 1 ? 1 : 2;
+  const rows = Math.ceil(viewIds.length / columns);
+  const width = tileSize * columns;
+  const height = tileSize * rows;
+  renderer.setSize(width, height, false);
+  renderer.setScissorTest(true);
+  renderer.setViewport(0, 0, width, height);
+  renderer.setScissor(0, 0, width, height);
+  renderer.clear(true, true, true);
+  const gpuStart = timer();
+  for (let index = 0; index < viewIds.length; index++) {
+    const x = (index % columns) * tileSize;
+    // WebGL viewport origin is bottom-left; reverse rows so PNG tile metadata
+    // remains conventional top-left order.
+    const row = Math.floor(index / columns);
+    const y = height - (row + 1) * tileSize;
+    renderer.setViewport(x, y, tileSize, tileSize);
+    renderer.setScissor(x, y, tileSize, tileSize);
+    renderer.clearDepth();
+    await submitScene(cameraFor(viewIds[index], tileSize, tileSize));
+  }
+  await finishGpu();
+  const gpuMs = timer() - gpuStart;
+  const encodeStart = timer();
+  const blob = await blobFromCanvas();
+  const bytes = await blob.arrayBuffer();
+  return { gpu_ms: gpuMs, png_ms: timer() - encodeStart, total_ms: timer() - gpuStart, bytes: bytes.byteLength };
+}
+
+function distribution(samples, field) {
+  const ordered = samples.map(sample => sample[field]).sort((a,b) => a-b);
+  return {
+    samples_ms: samples.map(sample => sample[field]),
+    min_ms: ordered[0],
+    median_ms: ordered[Math.floor(ordered.length / 2)],
+    p95_ms: ordered[Math.round((ordered.length - 1) * 0.95)],
+    max_ms: ordered[ordered.length - 1]
+  };
+}
+
+window.initialize = async modelUrl => {
+  const webgpuProbe = requestedBackend === 'webgpu'
+    ? await navigator.gpu.requestAdapter({ powerPreference: 'high-performance' })
+    : null;
+  const loadStart = timer();
+  const gltf = await new GLTFLoader().loadAsync(modelUrl);
+  scene.add(gltf.scene);
+  bounds = new THREE.Box3().setFromObject(gltf.scene, true);
+  center = bounds.getCenter(new THREE.Vector3());
+  key.target.position.copy(center);
+  key.target.updateMatrixWorld(true);
+  const loadMs = timer() - loadStart;
+  const warmStart = timer();
+  renderer.setSize(1, 1, false);
+  const camera = cameraFor('front', 1, 1);
+  await renderer.compileAsync(scene, camera);
+  await submitScene(camera);
+  await finishGpu();
+  const warmMs = timer() - warmStart;
+  const debug = gl?.getExtension('WEBGL_debug_renderer_info');
+  const adapterInfo = renderer.backend?.adapter?.info;
+  return {
+    requested_backend: requestedBackend,
+    resolved_backend: renderer.backend?.isWebGPUBackend ? 'webgpu' : 'webgl2',
+    load_ms: loadMs,
+    warm_ms: warmMs,
+    renderer: adapterInfo?.device ?? (debug ? gl.getParameter(debug.UNMASKED_RENDERER_WEBGL) : gl?.getParameter(gl.RENDERER)),
+    vendor: adapterInfo?.vendor ?? (debug ? gl.getParameter(debug.UNMASKED_VENDOR_WEBGL) : gl?.getParameter(gl.VENDOR)),
+    architecture: adapterInfo?.architecture,
+    requested_adapter: webgpuProbe?.info,
+    webgl_version: gl?.getParameter(gl.VERSION)
+  };
+};
+
+window.runBenchmark = async iterations => {
+  // Untimed target-size conditioning removes resize/allocation from samples.
+  await renderCase(['front'], 512);
+  const single = [];
+  for (let i = 0; i < iterations; i++) single.push(await renderCase(['front'], 512));
+  await renderCase(['front','right','top','iso'], 512);
+  const atlas = [];
+  for (let i = 0; i < iterations; i++) atlas.push(await renderCase(['front','right','top','iso'], 512));
+  return {
+    single_512: {
+      gpu: distribution(single, 'gpu_ms'),
+      png: distribution(single, 'png_ms'),
+      total: distribution(single, 'total_ms'),
+      png_bytes: single.at(-1).bytes
+    },
+    atlas_4x512: {
+      gpu: distribution(atlas, 'gpu_ms'),
+      png: distribution(atlas, 'png_ms'),
+      total: distribution(atlas, 'total_ms'),
+      png_bytes: atlas.at(-1).bytes
+    }
+  };
+};
+</script>

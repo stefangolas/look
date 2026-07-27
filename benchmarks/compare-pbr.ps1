@@ -1,5 +1,5 @@
 param(
-    [string]$V3 = (Join-Path $PSScriptRoot '..\target\release\v3.exe'),
+    [string]$Look = (Join-Path $PSScriptRoot '..\target\release\look.exe'),
     [string]$F3D = 'C:\Program Files\F3D\bin\f3d-console.exe',
     [string]$ModelDirectory = (Join-Path $PSScriptRoot '..\target\bench\models'),
     [string]$OutputDirectory = (Join-Path $PSScriptRoot '..\target\bench\pbr'),
@@ -58,17 +58,10 @@ function Get-Distribution([double[]]$Samples) {
 
 $outputRoot = [IO.Path]::GetFullPath($OutputDirectory)
 New-Item -ItemType Directory -Force -Path $outputRoot | Out-Null
-$v3Executable = [IO.Path]::GetFullPath($V3)
+$lookExecutable = [IO.Path]::GetFullPath($Look)
 
-$appliedDpi = 96
-if ($env:OS -eq 'Windows_NT') {
-    $dpi = Get-ItemProperty -LiteralPath 'HKCU:\Control Panel\Desktop\WindowMetrics' -Name AppliedDPI -ErrorAction SilentlyContinue
-    if ($null -ne $dpi -and $dpi.AppliedDPI -gt 0) {
-        $appliedDpi = [int]$dpi.AppliedDPI
-    }
-}
-$f3dWidth = [int][math]::Ceiling($Width * 96 / $appliedDpi)
-$f3dHeight = [int][math]::Ceiling($Height * 96 / $appliedDpi)
+$f3dWidth = $Width
+$f3dHeight = $Height
 
 $results = @()
 foreach ($name in $Models) {
@@ -77,25 +70,24 @@ foreach ($name in $Models) {
         throw "Missing benchmark model: $model"
     }
     $outputs = @{
-        v3 = Join-Path $outputRoot "$name-v3.png"
+        look = Join-Path $outputRoot "$name-look.png"
         f3d = Join-Path $outputRoot "$name-f3d.png"
     }
     $arguments = @{
-        v3 = @(
+        look = @(
             'render', $model,
             '--view', 'front',
             '--camera', 'orthographic',
             '--resolution', "${Width}x${Height}",
             '--material-mode', 'source',
+            '--preset', 'f3d-match',
             '--background', '#252525',
-            '--ambient', '0.35',
-            '--light-direction=-1,-2,-3',
-            '--light-intensity', '0.85',
-            '--output', $outputs.v3,
+            '--output', $outputs.look,
             '--json'
         )
         f3d = @(
             $model,
+            '--no-config',
             '--output', $outputs.f3d,
             '--resolution', "$f3dWidth,$f3dHeight",
             '--camera-direction=-Z',
@@ -107,31 +99,31 @@ foreach ($name in $Models) {
             '--light-intensity', '1'
         )
     }
-    $executables = @{ v3 = $v3Executable; f3d = $F3D }
+    $executables = @{ look = $lookExecutable; f3d = $F3D }
 
     # One untimed launch per tool initializes OS file and driver caches. Each
     # measured invocation remains a new process. Alternating first position
     # prevents one renderer from systematically inheriting a warmer GPU.
-    foreach ($tool in @('v3', 'f3d')) {
+    foreach ($tool in @('look', 'f3d')) {
         [void](Invoke-TimedProcess $executables[$tool] $arguments[$tool] $outputs[$tool])
     }
 
-    $samples = @{ v3 = @(); f3d = @() }
+    $samples = @{ look = @(); f3d = @() }
     for ($iteration = 0; $iteration -lt $Iterations; $iteration++) {
-        $order = if ($iteration % 2 -eq 0) { @('v3', 'f3d') } else { @('f3d', 'v3') }
+        $order = if ($iteration % 2 -eq 0) { @('look', 'f3d') } else { @('f3d', 'look') }
         foreach ($tool in $order) {
             $samples[$tool] += Invoke-TimedProcess $executables[$tool] $arguments[$tool] $outputs[$tool]
         }
     }
 
-    $v3Distribution = Get-Distribution $samples.v3
+    $lookDistribution = Get-Distribution $samples.look
     $f3dDistribution = Get-Distribution $samples.f3d
     $results += [ordered]@{
         model = "$name.glb"
         bytes = (Get-Item -LiteralPath $model).Length
-        v3 = $v3Distribution
+        look = $lookDistribution
         f3d = $f3dDistribution
-        f3d_over_v3 = [math]::Round($f3dDistribution.median_ms / $v3Distribution.median_ms, 3)
+        f3d_over_look = [math]::Round($f3dDistribution.median_ms / $lookDistribution.median_ms, 3)
         outputs = $outputs
     }
 }
@@ -147,7 +139,7 @@ $report = [ordered]@{
         background = '#252525'
         iterations = $Iterations
         f3d_logical_resolution = @($f3dWidth, $f3dHeight)
-        windows_applied_dpi = $appliedDpi
+        f3d_user_config = 'disabled'
     }
     results = $results
 }

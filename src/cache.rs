@@ -30,7 +30,7 @@ pub struct MetadataCache {
 
 impl MetadataCache {
     pub fn platform_default() -> Option<Self> {
-        if let Some(path) = env::var_os("V3_CACHE_DIR") {
+        if let Some(path) = env::var_os("LOOK_CACHE_DIR") {
             return Some(Self::at(path));
         }
         #[cfg(target_os = "windows")]
@@ -39,7 +39,7 @@ impl MetadataCache {
         let root = env::var_os("XDG_CACHE_HOME")
             .map(PathBuf::from)
             .or_else(|| env::var_os("HOME").map(|home| PathBuf::from(home).join(".cache")));
-        root.map(|root| Self::at(root.join("v3").join("cache")))
+        root.map(|root| Self::at(root.join("look").join("cache")))
     }
 
     pub fn at(root: impl Into<PathBuf>) -> Self {

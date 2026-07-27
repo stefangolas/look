@@ -1,0 +1,14 @@
+{
+  "name": "look-threejs-benchmark",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "bench": "node benchmark.mjs",
+    "bench:webgl": "node benchmark.mjs",
+    "bench:webgpu": "node benchmark.mjs ../../target/bench/models/DamagedHelmet.glb 11 webgpu"
+  },
+  "dependencies": {
+    "playwright-core": "1.62.0",
+    "three": "0.185.1"
+  }
+}

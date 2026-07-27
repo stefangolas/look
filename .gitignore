@@ -1,4 +1,4 @@
 /target/
-/.v3/
+/.look/
 *.png
-
+/benchmarks/threejs/node_modules/

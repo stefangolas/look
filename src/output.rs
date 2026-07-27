@@ -9,10 +9,10 @@ use anyhow::Context;
 use crate::{config::OutputConfig, renderer::RenderedImage};
 
 pub fn output_path(config: &OutputConfig, view: &str, view_count: usize) -> PathBuf {
-    if view_count == 1 {
-        if let Some(path) = &config.single_file {
-            return path.clone();
-        }
+    if view_count == 1
+        && let Some(path) = &config.single_file
+    {
+        return path.clone();
     }
     config.directory.join(config.naming.replace("{view}", view))
 }

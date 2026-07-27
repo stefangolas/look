@@ -1,0 +1,9 @@
+solid look_triangle
+  facet normal 0 0 1
+    outer loop
+      vertex -1 -1 0
+      vertex 1 -1 0
+      vertex 0 1 0
+    endloop
+  endfacet
+endsolid look_triangle

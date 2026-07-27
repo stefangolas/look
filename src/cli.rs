@@ -12,17 +12,18 @@ use crate::{
     cache::MetadataCache,
     camera::{PreparedCamera, prepare_camera},
     config::{
-        CameraKind, LightingConfig, MaterialMode, NamedView, NormalizedConfig, OutputConfig,
-        RenderConfig, SceneConfig, UpAxis, ViewConfig, parse_resolution, parse_vec3,
+        CameraKind, LightingConfig, LightingPreset, MaterialMode, NamedView, NormalizedConfig,
+        OutputConfig, RenderConfig, SceneConfig, UpAxis, ViewConfig, parse_resolution, parse_vec3,
     },
     output::{output_path, write_png},
     renderer::{HardwareFingerprint, Renderer, WgpuRenderer},
     scene::{SceneStatistics, compile_scene, compile_scene_for_render, prepare_source_textures},
+    server,
     timing::Timings,
 };
 
 #[derive(Debug, Parser)]
-#[command(name = "v3", version, about, arg_required_else_help = true)]
+#[command(name = "look", version, about, arg_required_else_help = true)]
 pub struct Cli {
     #[command(subcommand)]
     pub command: Command,
@@ -45,7 +46,17 @@ fn should_imply_render(arguments: &[OsString]) -> bool {
     !first.starts_with('-')
         && !matches!(
             first,
-            "render" | "run" | "inspect" | "doctor" | "help" | "version"
+            "render"
+                | "run"
+                | "inspect"
+                | "doctor"
+                | "persist"
+                | "sessions"
+                | "close"
+                | "server"
+                | "__serve"
+                | "help"
+                | "version"
         )
 }
 
@@ -59,11 +70,26 @@ pub enum Command {
     Inspect(InspectArgs),
     /// Report the selected GPU backend and adapter.
     Doctor(DoctorArgs),
+    /// Load and GPU-warm a scene in the local session server.
+    Persist(PersistArgs),
+    /// List live persisted sessions.
+    Sessions(SessionsArgs),
+    /// Release a persisted scene session.
+    Close(CloseArgs),
+    /// Inspect or stop the local session server.
+    Server(ServerArgs),
+    #[command(name = "__serve", hide = true)]
+    Serve,
 }
 
 #[derive(Debug, Args)]
 pub struct RenderArgs {
-    pub scene: PathBuf,
+    #[arg(required_unless_present = "session", conflicts_with = "session")]
+    pub scene: Option<PathBuf>,
+
+    /// Render a GPU-resident scene created by `look persist`.
+    #[arg(long, conflicts_with = "scene")]
+    pub session: Option<String>,
 
     #[arg(
         long = "views",
@@ -79,14 +105,18 @@ pub struct RenderArgs {
     #[arg(long, value_parser = parse_resolution, default_value = "1024x1024")]
     pub resolution: [u32; 2],
 
-    #[arg(long, default_value = "#252525")]
-    pub background: String,
+    /// Use look defaults or the F3D 3.5/VTK compatibility profile.
+    #[arg(long, value_enum, default_value = "technical")]
+    pub preset: LightingPreset,
+
+    #[arg(long)]
+    pub background: Option<String>,
 
     #[arg(long, default_value = "#b8c0c8")]
     pub base_color: String,
 
-    #[arg(long, value_enum, default_value = "technical")]
-    pub material_mode: MaterialMode,
+    #[arg(long, value_enum)]
+    pub material_mode: Option<MaterialMode>,
 
     #[arg(long, default_value_t = 0.35)]
     pub ambient: f32,
@@ -94,14 +124,18 @@ pub struct RenderArgs {
     #[arg(long, value_parser = parse_vec3, default_value = "-1,-2,-3", allow_hyphen_values = true)]
     pub light_direction: [f32; 3],
 
-    #[arg(long, default_value_t = 0.85)]
-    pub light_intensity: f32,
+    #[arg(long)]
+    pub light_intensity: Option<f32>,
 
     #[arg(long, default_value = "#ffffff")]
     pub light_color: String,
 
     #[arg(long)]
     pub antialias: bool,
+
+    /// Pack all requested views into one PNG; optionally specify columns.
+    #[arg(long, num_args = 0..=1, default_missing_value = "0")]
+    pub atlas: Option<u32>,
 
     #[arg(long)]
     pub output: Option<PathBuf>,
@@ -126,7 +160,11 @@ pub struct RunArgs {
 
 #[derive(Debug, Args)]
 pub struct InspectArgs {
-    pub scene: PathBuf,
+    #[arg(required_unless_present = "session", conflicts_with = "session")]
+    pub scene: Option<PathBuf>,
+
+    #[arg(long, conflicts_with = "scene")]
+    pub session: Option<String>,
 
     #[arg(long, value_enum, default_value = "y")]
     pub up_axis: UpAxis,
@@ -139,6 +177,56 @@ pub struct InspectArgs {
 pub struct DoctorArgs {
     #[arg(long)]
     pub json: bool,
+}
+
+#[derive(Debug, Args)]
+pub struct PersistArgs {
+    pub scene: PathBuf,
+
+    #[arg(long, value_enum, default_value = "source")]
+    pub material_mode: MaterialMode,
+
+    #[arg(long, value_enum, default_value = "y")]
+    pub up_axis: UpAxis,
+
+    /// Idle lifetime in seconds; use `look close` for immediate release.
+    #[arg(long, default_value_t = 600)]
+    pub ttl: u64,
+
+    #[arg(long)]
+    pub json: bool,
+}
+
+#[derive(Debug, Args)]
+pub struct SessionsArgs {
+    #[arg(long)]
+    pub json: bool,
+}
+
+#[derive(Debug, Args)]
+pub struct CloseArgs {
+    pub session_id: String,
+
+    #[arg(long)]
+    pub json: bool,
+}
+
+#[derive(Debug, Args)]
+pub struct ServerArgs {
+    #[command(subcommand)]
+    pub command: ServerCommand,
+}
+
+#[derive(Debug, Subcommand)]
+pub enum ServerCommand {
+    Status {
+        #[arg(long)]
+        json: bool,
+    },
+    Stop {
+        #[arg(long)]
+        json: bool,
+    },
 }
 
 #[derive(Debug, Serialize)]
@@ -163,38 +251,78 @@ struct OutputResult {
     path: PathBuf,
     width: u32,
     height: u32,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    tiles: Vec<crate::renderer::RenderedTile>,
 }
 
 pub fn execute_render(args: RenderArgs) -> anyhow::Result<()> {
+    let f3d_match = args.preset == LightingPreset::F3dMatch;
+    let material_mode = args.material_mode.unwrap_or(if f3d_match {
+        MaterialMode::Source
+    } else {
+        MaterialMode::Technical
+    });
     let output = OutputConfig {
         directory: args.output_dir,
         naming: "{view}.png".to_owned(),
         single_file: args.output,
     };
+    let render = RenderConfig {
+        resolution: args.resolution,
+        background: args.background.unwrap_or_else(|| {
+            if f3d_match {
+                "#333333".to_owned()
+            } else {
+                "#252525".to_owned()
+            }
+        }),
+        base_color: args.base_color,
+        material_mode,
+        antialias: args.antialias,
+        atlas_columns: args.atlas.map(|columns| {
+            if columns == 0 {
+                (args.views.len() as f32).sqrt().ceil() as u32
+            } else {
+                columns
+            }
+        }),
+    };
+    let lighting = LightingConfig {
+        preset: args.preset,
+        ambient: args.ambient,
+        direction: args.light_direction,
+        intensity: args
+            .light_intensity
+            .unwrap_or(if f3d_match { 1.0 } else { 0.85 }),
+        color: args.light_color,
+    };
+    let views = args
+        .views
+        .into_iter()
+        .map(|view| {
+            let mut view = ViewConfig::named(view, args.camera);
+            if f3d_match {
+                // F3D 3.5's application default is a 0.9 camera zoom.
+                view.padding = 1.0 / 0.9;
+            }
+            view
+        })
+        .collect::<Vec<_>>();
+
+    if let Some(session_id) = args.session {
+        let result = server::render_session(session_id, render, lighting, views, output)?;
+        return print_server_result(result, args.json);
+    }
+    let scene = args.scene.context("scene path is required")?;
     let config = NormalizedConfig {
         scene: SceneConfig {
-            source: args.scene,
+            source: scene,
             up_axis: args.up_axis,
             units: None,
         },
-        render: RenderConfig {
-            resolution: args.resolution,
-            background: args.background,
-            base_color: args.base_color,
-            material_mode: args.material_mode,
-            antialias: args.antialias,
-        },
-        lighting: LightingConfig {
-            ambient: args.ambient,
-            direction: args.light_direction,
-            intensity: args.light_intensity,
-            color: args.light_color,
-        },
-        views: args
-            .views
-            .into_iter()
-            .map(|view| ViewConfig::named(view, args.camera))
-            .collect(),
+        render,
+        lighting,
+        views,
         output,
     };
     config.validate()?;
@@ -207,13 +335,18 @@ pub fn execute_job(args: RunArgs) -> anyhow::Result<()> {
 }
 
 pub fn execute_inspect(args: InspectArgs) -> anyhow::Result<()> {
-    require_supported_scene(&args.scene)?;
+    if let Some(session_id) = args.session {
+        let result = server::inspect_session(session_id)?;
+        return print_server_result(result, args.json);
+    }
+    let scene_path = args.scene.context("scene path is required")?;
+    require_supported_scene(&scene_path)?;
     let mut timings = Timings::default();
     let cache = MetadataCache::platform_default();
     let cache_started = Instant::now();
     let cached = cache
         .as_ref()
-        .and_then(|cache| cache.load(&args.scene, args.up_axis).ok().flatten());
+        .and_then(|cache| cache.load(&scene_path, args.up_axis).ok().flatten());
     timings.record("cache_lookup", cache_started.elapsed());
     if let Some(cached) = cached {
         if args.json {
@@ -222,21 +355,21 @@ pub fn execute_inspect(args: InspectArgs) -> anyhow::Result<()> {
                 serde_json::to_string_pretty(&serde_json::json!({
                     "status": "ok",
                     "cache": "hit",
-                    "source": args.scene,
+                    "source": scene_path,
                     "hash": cached.source_hash,
                     "statistics": cached.statistics,
                     "timings_ms": timings,
                 }))?
             );
         } else {
-            print_inspection(&args.scene, &cached.source_hash, &cached.statistics, true);
+            print_inspection(&scene_path, &cached.source_hash, &cached.statistics, true);
         }
         return Ok(());
     }
-    let scene = compile_scene(&args.scene, args.up_axis, &mut timings)?;
+    let scene = compile_scene(&scene_path, args.up_axis, &mut timings)?;
     if let Some(cache) = cache {
         let _ = cache.store(
-            &args.scene,
+            &scene_path,
             args.up_axis,
             &scene.source_hash,
             &scene.statistics,
@@ -248,14 +381,54 @@ pub fn execute_inspect(args: InspectArgs) -> anyhow::Result<()> {
             serde_json::to_string_pretty(&serde_json::json!({
                 "status": "ok",
                 "cache": "miss",
-                "source": args.scene,
+                "source": scene_path,
                 "hash": scene.source_hash,
                 "statistics": scene.statistics,
                 "timings_ms": timings,
             }))?
         );
     } else {
-        print_inspection(&args.scene, &scene.source_hash, &scene.statistics, false);
+        print_inspection(&scene_path, &scene.source_hash, &scene.statistics, false);
+    }
+    Ok(())
+}
+
+pub fn execute_persist(args: PersistArgs) -> anyhow::Result<()> {
+    require_supported_scene(&args.scene)?;
+    let result = server::persist_session(args.scene, args.up_axis, args.material_mode, args.ttl)?;
+    print_server_result(result, args.json)
+}
+
+pub fn execute_sessions(args: SessionsArgs) -> anyhow::Result<()> {
+    print_server_result(server::list_sessions()?, args.json)
+}
+
+pub fn execute_close(args: CloseArgs) -> anyhow::Result<()> {
+    print_server_result(server::close_session(args.session_id)?, args.json)
+}
+
+pub fn execute_server_command(args: ServerArgs) -> anyhow::Result<()> {
+    match args.command {
+        ServerCommand::Status { json } => print_server_result(server::server_status()?, json),
+        ServerCommand::Stop { json } => print_server_result(server::stop_server()?, json),
+    }
+}
+
+pub fn execute_server_daemon() -> anyhow::Result<()> {
+    server::run_server()
+}
+
+fn print_server_result(result: serde_json::Value, json: bool) -> anyhow::Result<()> {
+    if json {
+        println!(
+            "{}",
+            serde_json::to_string_pretty(&serde_json::json!({
+                "status": "ok",
+                "result": result,
+            }))?
+        );
+    } else {
+        println!("{}", serde_json::to_string_pretty(&result)?);
     }
     Ok(())
 }
@@ -317,6 +490,7 @@ fn execute_config(config: NormalizedConfig, json: bool) -> anyhow::Result<()> {
         .join()
         .map_err(|_| anyhow::anyhow!("GPU initialization thread panicked"))??;
     timings.record("gpu_init_join_wait", join_started.elapsed());
+    timings.merge(renderer.initialization_timings());
     let mut batch = renderer.render_views(&scene, &cameras, &config.render, &config.lighting)?;
     timings.merge(&batch.timings);
 
@@ -385,6 +559,7 @@ fn encode_output(
         path,
         width: image.width,
         height: image.height,
+        tiles: image.tiles,
     })
 }
 
@@ -430,13 +605,13 @@ mod tests {
 
     #[test]
     fn model_path_implies_render_command() {
-        let args = vec![OsString::from("v3"), OsString::from("part.glb")];
+        let args = vec![OsString::from("look"), OsString::from("part.glb")];
         assert!(should_imply_render(&args));
     }
 
     #[test]
     fn explicit_commands_are_not_rewritten() {
-        let args = vec![OsString::from("v3"), OsString::from("inspect")];
+        let args = vec![OsString::from("look"), OsString::from("inspect")];
         assert!(!should_imply_render(&args));
     }
 }

@@ -2,10 +2,11 @@ const PI: f32 = 3.141592653589793;
 
 struct CameraLighting {
     view_projection: mat4x4<f32>,
-    light_direction_ambient: vec4<f32>,
-    light_color_intensity: vec4<f32>,
+    light_directions: array<vec4<f32>, 5>,
+    light_colors: array<vec4<f32>, 5>,
     base_color: vec4<f32>,
     camera_position: vec4<f32>,
+    ambient: vec4<f32>,
 };
 
 struct MaterialParameters {
@@ -160,24 +161,30 @@ fn fragment_main(input: VertexOutput, @builtin(front_facing) front_facing: bool)
     let metallic = clamp(mr.b * material.metallic_roughness_normal_occlusion.x, 0.0, 1.0);
     let roughness = clamp(mr.g * material.metallic_roughness_normal_occlusion.y, 0.045, 1.0);
     let normal = mapped_normal(input, front_facing);
-    let toward_light = normalize(-globals.light_direction_ambient.xyz);
     let toward_camera = normalize(globals.camera_position.xyz - input.world_position);
-    let half_vector = normalize(toward_camera + toward_light);
-    let n_dot_l = max(dot(normal, toward_light), 0.0);
     let n_dot_v = max(dot(normal, toward_camera), 0.0);
-    let h_dot_v = max(dot(half_vector, toward_camera), 0.0);
 
     let f0 = mix(vec3<f32>(0.04), base.rgb, metallic);
-    let fresnel = fresnel_schlick(h_dot_v, f0);
-    let distribution = distribution_ggx(normal, half_vector, roughness);
-    let geometry = geometry_schlick_ggx(n_dot_v, roughness)
-        * geometry_schlick_ggx(n_dot_l, roughness);
-    let specular = distribution * geometry * fresnel / max(4.0 * n_dot_v * n_dot_l, 0.0001);
-    let diffuse_weight = (vec3<f32>(1.0) - fresnel) * (1.0 - metallic);
-    let direct = (diffuse_weight * base.rgb / PI + specular)
-        * globals.light_color_intensity.rgb
-        * globals.light_color_intensity.w
-        * n_dot_l;
+    var direct = vec3<f32>(0.0);
+    for (var index = 0u; index < 5u; index += 1u) {
+        if (globals.light_colors[index].w <= 0.0) {
+            continue;
+        }
+        let toward_light = normalize(-globals.light_directions[index].xyz);
+        let half_vector = normalize(toward_camera + toward_light);
+        let n_dot_l = max(dot(normal, toward_light), 0.0);
+        let h_dot_v = max(dot(half_vector, toward_camera), 0.0);
+        let fresnel = fresnel_schlick(h_dot_v, f0);
+        let distribution = distribution_ggx(normal, half_vector, roughness);
+        let geometry = geometry_schlick_ggx(n_dot_v, roughness)
+            * geometry_schlick_ggx(n_dot_l, roughness);
+        let specular = distribution * geometry * fresnel / max(4.0 * n_dot_v * n_dot_l, 0.0001);
+        let diffuse_weight = (vec3<f32>(1.0) - fresnel) * (1.0 - metallic);
+        direct += (diffuse_weight * base.rgb / PI + specular)
+            * globals.light_colors[index].rgb
+            * globals.light_colors[index].w
+            * n_dot_l;
+    }
 
     let occlusion_uv = selected_uv(
         material.occlusion_alpha_mode.x,
@@ -186,7 +193,7 @@ fn fragment_main(input: VertexOutput, @builtin(front_facing) front_facing: bool)
     );
     let sampled_occlusion = textureSample(occlusion_texture, occlusion_sampler, occlusion_uv).r;
     let occlusion = mix(1.0, sampled_occlusion, material.metallic_roughness_normal_occlusion.w);
-    let ambient = base.rgb * globals.light_direction_ambient.w * occlusion;
+    let ambient = base.rgb * globals.ambient.x * occlusion;
     let emissive_uv = selected_uv(material.tex_coord_sets.w, input.tex_coord_0, input.tex_coord_1);
     let emissive = textureSample(emissive_texture, emissive_sampler, emissive_uv).rgb
         * material.emissive_alpha_cutoff.rgb;

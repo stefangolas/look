@@ -1,0 +1,141 @@
+name: release-binaries
+
+on:
+  workflow_dispatch:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: ${{ matrix.asset }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-22.04
+            target: x86_64-unknown-linux-gnu
+            asset: linux-x86_64
+            archive: tar
+            deb_arch: amd64
+          - os: ubuntu-24.04-arm
+            target: aarch64-unknown-linux-gnu
+            asset: linux-aarch64
+            archive: tar
+            deb_arch: arm64
+          - os: windows-2025
+            target: x86_64-pc-windows-msvc
+            asset: windows-x86_64
+            archive: zip
+          - os: windows-11-arm
+            target: aarch64-pc-windows-msvc
+            asset: windows-aarch64
+            archive: zip
+          - os: macos-15-intel
+            target: x86_64-apple-darwin
+            asset: macos-x86_64
+            archive: tar
+          - os: macos-15
+            target: aarch64-apple-darwin
+            asset: macos-aarch64
+            archive: tar
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v6
+      - name: Install Rust
+        shell: bash
+        run: |
+          rustup toolchain install stable --profile minimal --target "${{ matrix.target }}"
+          rustup default stable
+      - name: Test
+        run: cargo test --locked --all-targets --target ${{ matrix.target }}
+      - name: Build release executable
+        run: cargo build --locked --release --target ${{ matrix.target }}
+      - name: Smoke packaged executable
+        if: runner.os != 'Windows'
+        shell: bash
+        run: |
+          "target/${{ matrix.target }}/release/look" --version
+          "target/${{ matrix.target }}/release/look" inspect tests/fixtures/triangle.stl --json
+      - name: Smoke packaged executable (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          & "target/${{ matrix.target }}/release/look.exe" --version
+          & "target/${{ matrix.target }}/release/look.exe" inspect tests/fixtures/triangle.stl --json
+      - name: Package Unix archive and Debian package
+        if: matrix.archive == 'tar'
+        shell: bash
+        env:
+          TARGET: ${{ matrix.target }}
+          ASSET: ${{ matrix.asset }}
+          DEB_ARCH: ${{ matrix.deb_arch }}
+        run: |
+          set -euo pipefail
+          version="${GITHUB_REF_NAME:-snapshot}"
+          package="look-${version}-${ASSET}"
+          mkdir -p "dist/${package}"
+          cp "target/${TARGET}/release/look" "dist/${package}/look"
+          cp README.md LICENSE-APACHE LICENSE-MIT "dist/${package}/"
+          if [[ "$RUNNER_OS" == "macOS" ]]; then codesign --force --sign - "dist/${package}/look"; fi
+          tar -C dist -czf "dist/${package}.tar.gz" "${package}"
+          if command -v sha256sum >/dev/null; then
+            (cd dist && sha256sum "${package}.tar.gz" > "${package}.tar.gz.sha256")
+          else
+            (cd dist && shasum -a 256 "${package}.tar.gz" > "${package}.tar.gz.sha256")
+          fi
+          if [[ "$RUNNER_OS" == "Linux" ]]; then
+            deb_version="${version#v}"
+            mkdir -p dist/deb/DEBIAN dist/deb/usr/bin
+            cp "target/${TARGET}/release/look" dist/deb/usr/bin/look
+            printf 'Package: look\nVersion: %s\nSection: graphics\nPriority: optional\nArchitecture: %s\nMaintainer: look contributors\nDescription: Ultrafast native GLB and STL renderer for agent workflows\n' "$deb_version" "$DEB_ARCH" > dist/deb/DEBIAN/control
+            dpkg-deb --build --root-owner-group dist/deb "dist/look_${deb_version}_${DEB_ARCH}.deb"
+            (cd dist && sha256sum "look_${deb_version}_${DEB_ARCH}.deb" > "look_${deb_version}_${DEB_ARCH}.deb.sha256")
+          fi
+          rm -rf "dist/${package}" dist/deb
+      - name: Package Windows archive
+        if: matrix.archive == 'zip'
+        shell: pwsh
+        env:
+          TARGET: ${{ matrix.target }}
+          ASSET: ${{ matrix.asset }}
+        run: |
+          $version = if ($env:GITHUB_REF_NAME) { $env:GITHUB_REF_NAME } else { 'snapshot' }
+          $package = "look-$version-$env:ASSET"
+          New-Item -ItemType Directory -Force "dist/$package" | Out-Null
+          Copy-Item "target/$env:TARGET/release/look.exe" "dist/$package/look.exe"
+          Copy-Item README.md, LICENSE-APACHE, LICENSE-MIT "dist/$package/"
+          Compress-Archive -Path "dist/$package" -DestinationPath "dist/$package.zip"
+          $hash = (Get-FileHash "dist/$package.zip" -Algorithm SHA256).Hash.ToLowerInvariant()
+          "$hash  $package.zip" | Set-Content "dist/$package.zip.sha256" -Encoding ascii
+          Remove-Item -LiteralPath "dist/$package" -Recurse -Force
+      - uses: actions/upload-artifact@v7
+        with:
+          name: look-${{ matrix.asset }}
+          path: |
+            dist/*.tar.gz
+            dist/*.zip
+            dist/*.deb
+            dist/*.sha256
+          if-no-files-found: error
+          retention-days: 14
+
+  release:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          pattern: look-*
+          path: release
+          merge-multiple: true
+      - name: Publish GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create "$GITHUB_REF_NAME" release/* --verify-tag --generate-notes --title "look $GITHUB_REF_NAME"
