@@ -2,7 +2,7 @@ use std::{
     collections::BTreeMap,
     mem,
     ops::Range,
-    sync::{Arc, mpsc},
+    sync::{Arc, Mutex, mpsc},
     time::Instant,
 };
 
@@ -83,9 +83,25 @@ struct Draw {
 
 struct GpuTexture {
     _texture: wgpu::Texture,
-    linear_view: wgpu::TextureView,
-    srgb_view: wgpu::TextureView,
+    view: wgpu::TextureView,
     sampler: wgpu::Sampler,
+}
+
+/// glTF fixes the color space of each material slot: base color and emissive
+/// are sRGB, while metallic-roughness, normal, and occlusion are raw data.
+#[derive(Clone, Copy, PartialEq, Eq, Hash)]
+enum ColorSpace {
+    Linear,
+    Srgb,
+}
+
+impl ColorSpace {
+    fn format(self) -> wgpu::TextureFormat {
+        match self {
+            ColorSpace::Linear => wgpu::TextureFormat::Rgba8Unorm,
+            ColorSpace::Srgb => wgpu::TextureFormat::Rgba8UnormSrgb,
+        }
+    }
 }
 
 struct GpuMaterial {
@@ -158,6 +174,7 @@ pub struct WgpuRenderer {
     view_pool: Vec<ViewResources>,
     timestamp_queries: bool,
     initialization_timings: Timings,
+    device_errors: Arc<Mutex<Vec<String>>>,
 }
 
 impl WgpuRenderer {
@@ -212,6 +229,19 @@ impl WgpuRenderer {
             trace: wgpu::Trace::Off,
         }))
         .context("failed to create GPU device")?;
+        // wgpu reports validation failures asynchronously and its default
+        // handler panics, which took the session server down with it. Record
+        // them instead so a render can fail with a message and a non-zero exit
+        // rather than aborting or silently producing a wrong image.
+        let device_errors = Arc::new(Mutex::new(Vec::new()));
+        {
+            let device_errors = Arc::clone(&device_errors);
+            device.on_uncaptured_error(Arc::new(move |error: wgpu::Error| {
+                if let Ok(mut errors) = device_errors.lock() {
+                    errors.push(error.to_string());
+                }
+            }));
+        }
         timings.record("gpu_device", device_started.elapsed());
 
         let info = adapter.get_info();
@@ -260,11 +290,27 @@ impl WgpuRenderer {
             view_pool: Vec::new(),
             timestamp_queries,
             initialization_timings: timings,
+            device_errors,
         })
     }
 
     pub fn initialization_timings(&self) -> &Timings {
         &self.initialization_timings
+    }
+
+    /// Fails if the device reported a validation error since the last check.
+    /// Call after work is submitted and awaited, so a backend that cannot run
+    /// what look asked for is reported rather than passed off as a good render.
+    fn check_device_errors(&self, stage: &str) -> anyhow::Result<()> {
+        let mut errors = match self.device_errors.lock() {
+            Ok(errors) => errors,
+            Err(poisoned) => poisoned.into_inner(),
+        };
+        if errors.is_empty() {
+            return Ok(());
+        }
+        let joined = mem::take(&mut *errors).join("; ");
+        anyhow::bail!("GPU reported an error during {stage}: {joined}");
     }
 
     fn ensure_pipeline(
@@ -478,8 +524,35 @@ impl WgpuRenderer {
         scene: &CompiledScene,
         timings: &mut Timings,
     ) -> anyhow::Result<(Vec<GpuMaterial>, Vec<GpuTexture>)> {
-        let mut textures = Vec::with_capacity(scene.textures.len() + 3);
+        // A glTF texture can be referenced from an sRGB slot by one material
+        // and a linear slot by another, so record which color spaces each one
+        // is actually sampled in and upload a copy for each.
+        let mut required = vec![[false; 2]; scene.textures.len()];
+        for material in &scene.materials {
+            let mut require = |reference: Option<crate::scene::TextureReference>, space| {
+                if let Some(reference) = reference
+                    && let Some(slot) = required.get_mut(reference.texture)
+                {
+                    slot[space as usize] = true;
+                }
+            };
+            require(material.base_color_texture, ColorSpace::Srgb);
+            require(material.emissive_texture, ColorSpace::Srgb);
+            require(material.metallic_roughness_texture, ColorSpace::Linear);
+            require(material.normal_texture, ColorSpace::Linear);
+            require(material.occlusion_texture, ColorSpace::Linear);
+        }
+
+        let mut textures = Vec::with_capacity(scene.textures.len() + 4);
+        let mut slots: BTreeMap<(usize, usize), usize> = BTreeMap::new();
         for (index, texture) in scene.textures.iter().enumerate() {
+            let spaces = [ColorSpace::Linear, ColorSpace::Srgb]
+                .into_iter()
+                .filter(|space| required[index][*space as usize])
+                .collect::<Vec<_>>();
+            if spaces.is_empty() {
+                continue;
+            }
             let fallback = if texture.decoded.is_none() {
                 let decode_started = Instant::now();
                 let decoded = image::load_from_memory(&texture.encoded)
@@ -500,13 +573,17 @@ impl WgpuRenderer {
                 .or(fallback.as_ref())
                 .with_context(|| format!("texture {index} was not decoded"))?;
             let texture_started = Instant::now();
-            textures.push(self.upload_rgba_texture(
-                decoded.width,
-                decoded.height,
-                &decoded.rgba,
-                texture.sampler,
-                &format!("look texture {index}"),
-            ));
+            for space in spaces {
+                slots.insert((index, space as usize), textures.len());
+                textures.push(self.upload_rgba_texture(
+                    decoded.width,
+                    decoded.height,
+                    &decoded.rgba,
+                    texture.sampler,
+                    space,
+                    &format!("look texture {index}"),
+                ));
+            }
             timings.accumulate("texture_upload", texture_started.elapsed());
         }
 
@@ -517,13 +594,25 @@ impl WgpuRenderer {
             wrap_u: TextureWrap::Repeat,
             wrap_v: TextureWrap::Repeat,
         };
-        let white_index = textures.len();
+        // White stands in for both an sRGB base color and linear
+        // metallic-roughness or occlusion, so it needs a copy per color space.
+        let white_srgb_index = textures.len();
         textures.push(self.upload_rgba_texture(
             1,
             1,
             &[255, 255, 255, 255],
             fallback_sampler,
+            ColorSpace::Srgb,
             "look white fallback",
+        ));
+        let white_linear_index = textures.len();
+        textures.push(self.upload_rgba_texture(
+            1,
+            1,
+            &[255, 255, 255, 255],
+            fallback_sampler,
+            ColorSpace::Linear,
+            "look white linear fallback",
         ));
         let normal_index = textures.len();
         textures.push(self.upload_rgba_texture(
@@ -531,6 +620,7 @@ impl WgpuRenderer {
             1,
             &[128, 128, 255, 255],
             fallback_sampler,
+            ColorSpace::Linear,
             "look normal fallback",
         ));
         let black_index = textures.len();
@@ -539,31 +629,37 @@ impl WgpuRenderer {
             1,
             &[0, 0, 0, 255],
             fallback_sampler,
+            ColorSpace::Srgb,
             "look black fallback",
         ));
 
         let mut materials = Vec::with_capacity(scene.materials.len());
         for material in &scene.materials {
-            let base_index = material
-                .base_color_texture
-                .map(|reference| reference.texture)
-                .unwrap_or(white_index);
-            let metallic_index = material
-                .metallic_roughness_texture
-                .map(|reference| reference.texture)
-                .unwrap_or(white_index);
-            let material_normal_index = material
-                .normal_texture
-                .map(|reference| reference.texture)
-                .unwrap_or(normal_index);
-            let emissive_index = material
-                .emissive_texture
-                .map(|reference| reference.texture)
-                .unwrap_or(black_index);
-            let occlusion_index = material
-                .occlusion_texture
-                .map(|reference| reference.texture)
-                .unwrap_or(white_index);
+            let slot = |reference: Option<crate::scene::TextureReference>,
+                        space: ColorSpace,
+                        fallback: usize| {
+                reference
+                    .and_then(|reference| slots.get(&(reference.texture, space as usize)).copied())
+                    .unwrap_or(fallback)
+            };
+            let base_index = slot(
+                material.base_color_texture,
+                ColorSpace::Srgb,
+                white_srgb_index,
+            );
+            let metallic_index = slot(
+                material.metallic_roughness_texture,
+                ColorSpace::Linear,
+                white_linear_index,
+            );
+            let material_normal_index =
+                slot(material.normal_texture, ColorSpace::Linear, normal_index);
+            let emissive_index = slot(material.emissive_texture, ColorSpace::Srgb, black_index);
+            let occlusion_index = slot(
+                material.occlusion_texture,
+                ColorSpace::Linear,
+                white_linear_index,
+            );
             let raw = material_raw(material);
             let uniform = self
                 .device
@@ -585,15 +681,15 @@ impl WgpuRenderer {
                         binding: 0,
                         resource: uniform.as_entire_binding(),
                     },
-                    texture_entry(1, &base.srgb_view),
+                    texture_entry(1, &base.view),
                     sampler_entry(2, &base.sampler),
-                    texture_entry(3, &metallic.linear_view),
+                    texture_entry(3, &metallic.view),
                     sampler_entry(4, &metallic.sampler),
-                    texture_entry(5, &normal.linear_view),
+                    texture_entry(5, &normal.view),
                     sampler_entry(6, &normal.sampler),
-                    texture_entry(7, &emissive.srgb_view),
+                    texture_entry(7, &emissive.view),
                     sampler_entry(8, &emissive.sampler),
-                    texture_entry(9, &occlusion.linear_view),
+                    texture_entry(9, &occlusion.view),
                     sampler_entry(10, &occlusion.sampler),
                 ],
             });
@@ -613,8 +709,14 @@ impl WgpuRenderer {
         height: u32,
         rgba: &[u8],
         sampler: crate::scene::TextureSampler,
+        color_space: ColorSpace,
         label: &str,
     ) -> GpuTexture {
+        // Storing the texture in the color space it will be sampled in keeps a
+        // single view per texture. Reinterpreting one texture through both a
+        // linear and an sRGB view instead needs the VIEW_FORMATS downlevel
+        // flag, which the GL backend does not provide.
+        let format = color_space.format();
         let texture = self.device.create_texture(&wgpu::TextureDescriptor {
             label: Some(label),
             size: wgpu::Extent3d {
@@ -625,9 +727,9 @@ impl WgpuRenderer {
             mip_level_count: 1,
             sample_count: 1,
             dimension: wgpu::TextureDimension::D2,
-            format: wgpu::TextureFormat::Rgba8Unorm,
+            format,
             usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
-            view_formats: &[wgpu::TextureFormat::Rgba8UnormSrgb],
+            view_formats: &[],
         });
         self.queue.write_texture(
             wgpu::TexelCopyTextureInfo {
@@ -648,14 +750,9 @@ impl WgpuRenderer {
                 depth_or_array_layers: 1,
             },
         );
-        let linear_view = texture.create_view(&wgpu::TextureViewDescriptor {
-            label: Some("look linear texture view"),
-            format: Some(wgpu::TextureFormat::Rgba8Unorm),
-            ..Default::default()
-        });
-        let srgb_view = texture.create_view(&wgpu::TextureViewDescriptor {
-            label: Some("look srgb texture view"),
-            format: Some(wgpu::TextureFormat::Rgba8UnormSrgb),
+        let view = texture.create_view(&wgpu::TextureViewDescriptor {
+            label: Some("look texture view"),
+            format: Some(format),
             ..Default::default()
         });
         let sampler = self.device.create_sampler(&wgpu::SamplerDescriptor {
@@ -669,8 +766,7 @@ impl WgpuRenderer {
         });
         GpuTexture {
             _texture: texture,
-            linear_view,
-            srgb_view,
+            view,
             sampler,
         }
     }
@@ -870,6 +966,14 @@ impl WgpuRenderer {
                     source_pipelines,
                 )?;
             }
+            // The multisample resolve runs when this pass ends. On GL that
+            // resolve is a scissor-clipped blit, so a leftover per-tile scissor
+            // would resolve only the final tile and leave every other tile
+            // unwritten. Restore full coverage before the pass closes.
+            if multisample_view.is_some() {
+                pass.set_viewport(0.0, 0.0, width as f32, height as f32, 0.0, 1.0);
+                pass.set_scissor_rect(0, 0, width, height);
+            }
         }
         encoder.copy_texture_to_buffer(
             output_texture.as_image_copy(),
@@ -954,6 +1058,7 @@ impl WgpuRenderer {
             timestamp_readback.unmap();
         }
         timings.record("gpu_readback", readback_started.elapsed());
+        self.check_device_errors("atlas render")?;
 
         let tiles = cameras
             .iter()
@@ -1141,6 +1246,9 @@ impl Renderer for WgpuRenderer {
             let uploaded =
                 Arc::new(self.upload_scene(scene, render.material_mode, &mut timings)?);
             timings.record("gpu_upload", upload_started.elapsed());
+            // Resource creation validates eagerly, so an unsupported texture or
+            // buffer is caught here rather than after a wrong image is written.
+            self.check_device_errors("scene upload")?;
             self.cached_scenes.push(CachedGpuScene {
                 source_hash: scene.source_hash.clone(),
                 material_mode: render.material_mode,
@@ -1482,6 +1590,7 @@ impl Renderer for WgpuRenderer {
             readback.unmap();
         }
         timings.record("gpu_readback", readback_started.elapsed());
+        self.check_device_errors("view render")?;
         Ok(RenderBatch { images, timings })
     }
 }
