@@ -1,17 +1,17 @@
 # look
 
+`look` is a native command-line utility that turns GLB and STL models into PNG
+images. Its basic purpose is to let a person, script, or software agent inspect
+a 3D model without opening a full CAD application or browser-based viewer.
+
 | `look` | F3D 3.5 |
 |---|---|
-| <img src="docs/images/damaged-helmet-look.png" width="420" alt="Damaged Helmet rendered by look"> | <img src="docs/images/damaged-helmet-f3d.png" width="420" alt="Damaged Helmet rendered by F3D 3.5"> |
+| <img src="docs/images/damaged-helmet-look.png" width="350" alt="Damaged Helmet rendered by look"> | <img src="docs/images/damaged-helmet-f3d.png" width="350" alt="Damaged Helmet rendered by F3D 3.5"> |
 
 Same Damaged Helmet model, 512x512 front orthographic camera, source PBR
 materials, background, and F3D-compatible light kit. Model credits: Copyright
 2018 ctxwing, CC BY 4.0; Copyright 2016 theblueturtle_, CC BY-NC 4.0.
 [Image license and exact render configuration](docs/images/README.md).
-
-`look` is a native command-line utility that turns GLB and STL models into PNG
-images. Its basic purpose is to let a person, script, or software agent inspect
-a 3D model without opening a full CAD application or browser-based viewer.
 
 ## Quick example
 
@@ -33,7 +33,7 @@ look model.glb --material-mode source \
   --resolution 384x384 --atlas 2 --output views.png --json
 ```
 
-<img src="docs/images/damaged-helmet-tileset.png" width="700" alt="Front, right, top, and isometric Damaged Helmet views packed into a two-by-two atlas by look">
+<img src="docs/images/damaged-helmet-tileset.png" width="560" alt="Front, right, top, and isometric Damaged Helmet views packed into a two-by-two atlas by look">
 
 In the persistent 512 px-tile benchmark on an NVIDIA RTX 5050 Laptop GPU, this
 four-view atlas took **8.94 ms** in `look`, versus **22.50 ms** in Three.js
