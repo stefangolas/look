@@ -34,7 +34,9 @@ pub fn write_png(path: &Path, image: &RenderedImage) -> anyhow::Result<()> {
     let mut encoder = png::Encoder::new(writer, image.width, image.height);
     encoder.set_color(png::ColorType::Rgba);
     encoder.set_depth(png::BitDepth::Eight);
-    encoder.set_compression(png::Compression::Fast);
+    // Fastest selects the ultra-fast DEFLATE path and a fixed Up filter,
+    // avoiding adaptive per-row filter searches on the output critical path.
+    encoder.set_compression(png::Compression::Fastest);
     let mut writer = encoder
         .write_header()
         .context("failed to write PNG header")?;

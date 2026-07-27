@@ -17,7 +17,7 @@ use crate::{
     },
     output::{output_path, write_png},
     renderer::{HardwareFingerprint, Renderer, WgpuRenderer},
-    scene::{SceneStatistics, compile_glb},
+    scene::{SceneStatistics, compile_glb, compile_glb_for_render, prepare_source_textures},
     timing::Timings,
 };
 
@@ -283,8 +283,17 @@ pub fn execute_doctor(args: DoctorArgs) -> anyhow::Result<()> {
 fn execute_config(config: NormalizedConfig, json: bool) -> anyhow::Result<()> {
     require_glb(&config.scene.source)?;
     let total_started = Instant::now();
+    let renderer_thread = std::thread::spawn(WgpuRenderer::new);
     let mut timings = Timings::default();
-    let scene = compile_glb(&config.scene.source, config.scene.up_axis, &mut timings)?;
+    let mut scene = compile_glb_for_render(
+        &config.scene.source,
+        config.scene.up_axis,
+        config.render.material_mode,
+        &mut timings,
+    )?;
+    if config.render.material_mode == MaterialMode::Source {
+        prepare_source_textures(&mut scene, &mut timings)?;
+    }
     if let Some(cache) = MetadataCache::platform_default() {
         let cache_started = Instant::now();
         let _ = cache.store(
@@ -303,23 +312,38 @@ fn execute_config(config: NormalizedConfig, json: bool) -> anyhow::Result<()> {
             .collect::<Vec<PreparedCamera>>()
     });
 
-    let mut renderer = WgpuRenderer::new()?;
+    let join_started = Instant::now();
+    let mut renderer = renderer_thread
+        .join()
+        .map_err(|_| anyhow::anyhow!("GPU initialization thread panicked"))??;
+    timings.record("gpu_init_join_wait", join_started.elapsed());
     let mut batch = renderer.render_views(&scene, &cameras, &config.render, &config.lighting)?;
     timings.merge(&batch.timings);
 
     let encode_started = Instant::now();
     let view_count = batch.images.len();
-    let mut outputs = Vec::with_capacity(view_count);
-    for image in batch.images.drain(..) {
-        let path = output_path(&config.output, &image.view, view_count);
-        write_png(&path, &image)?;
-        outputs.push(OutputResult {
-            view: image.view,
-            path,
-            width: image.width,
-            height: image.height,
-        });
-    }
+    let jobs = batch
+        .images
+        .drain(..)
+        .map(|image| {
+            let path = output_path(&config.output, &image.view, view_count);
+            (image, path)
+        })
+        .collect::<Vec<_>>();
+    let outputs = if jobs.len() <= 1 {
+        jobs.into_iter()
+            .map(|(image, path)| encode_output(image, path))
+            .collect::<anyhow::Result<Vec<_>>>()?
+    } else {
+        std::thread::scope(|scope| {
+            jobs.into_iter()
+                .map(|(image, path)| scope.spawn(move || encode_output(image, path)))
+                .collect::<Vec<_>>()
+                .into_iter()
+                .map(|handle| handle.join().expect("PNG encoder thread panicked"))
+                .collect::<anyhow::Result<Vec<_>>>()
+        })?
+    };
     timings.record("png_encode_write", encode_started.elapsed());
     timings.record("total", total_started.elapsed());
 
@@ -349,6 +373,19 @@ fn execute_config(config: NormalizedConfig, json: bool) -> anyhow::Result<()> {
         );
     }
     Ok(())
+}
+
+fn encode_output(
+    image: crate::renderer::RenderedImage,
+    path: PathBuf,
+) -> anyhow::Result<OutputResult> {
+    write_png(&path, &image)?;
+    Ok(OutputResult {
+        view: image.view,
+        path,
+        width: image.width,
+        height: image.height,
+    })
 }
 
 fn require_glb(path: &Path) -> anyhow::Result<()> {

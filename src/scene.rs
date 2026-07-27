@@ -5,13 +5,21 @@ use bytemuck::{Pod, Zeroable};
 use glam::{Mat3, Mat4, Vec3};
 use serde::{Deserialize, Serialize};
 
-use crate::{config::UpAxis, timing::Timings};
+use crate::{
+    config::{MaterialMode, UpAxis},
+    timing::Timings,
+};
 
 #[repr(C)]
 #[derive(Debug, Clone, Copy, PartialEq, Pod, Zeroable)]
 pub struct Vertex {
     pub position: [f32; 3],
     pub normal: [f32; 3],
+}
+
+#[repr(C)]
+#[derive(Debug, Clone, Copy, PartialEq, Pod, Zeroable)]
+pub struct SourceVertexAttributes {
     pub tex_coord_0: [f32; 2],
     pub tex_coord_1: [f32; 2],
     pub color: [f32; 4],
@@ -82,6 +90,7 @@ pub struct SourceMaterial {
 #[derive(Debug, Clone)]
 pub struct Geometry {
     pub vertices: Vec<Vertex>,
+    pub source_attributes: Option<Vec<SourceVertexAttributes>>,
     pub indices: Vec<u32>,
     pub hash: String,
     pub bounds: Bounds,
@@ -238,6 +247,29 @@ pub fn compile_glb(
     up_axis: UpAxis,
     timings: &mut Timings,
 ) -> anyhow::Result<CompiledScene> {
+    compile_glb_internal(path, up_axis, true, timings)
+}
+
+pub fn compile_glb_for_render(
+    path: &Path,
+    up_axis: UpAxis,
+    material_mode: MaterialMode,
+    timings: &mut Timings,
+) -> anyhow::Result<CompiledScene> {
+    compile_glb_internal(
+        path,
+        up_axis,
+        material_mode == MaterialMode::Source,
+        timings,
+    )
+}
+
+fn compile_glb_internal(
+    path: &Path,
+    up_axis: UpAxis,
+    include_source_materials: bool,
+    timings: &mut Timings,
+) -> anyhow::Result<CompiledScene> {
     let bytes = timings.measure("read", || {
         fs::read(path).with_context(|| format!("failed to read scene '{}'", path.display()))
     })?;
@@ -251,11 +283,18 @@ pub fn compile_glb(
         .context("GLB does not contain an embedded binary buffer")?;
 
     let compile_started = std::time::Instant::now();
-    let textures = compile_textures(&gltf, blob)?;
-    let mut materials = gltf
-        .materials()
-        .map(compile_material)
-        .collect::<anyhow::Result<Vec<_>>>()?;
+    let textures = if include_source_materials {
+        compile_textures(&gltf, blob)?
+    } else {
+        Vec::new()
+    };
+    let mut materials = if include_source_materials {
+        gltf.materials()
+            .map(compile_material)
+            .collect::<anyhow::Result<Vec<_>>>()?
+    } else {
+        Vec::new()
+    };
     let default_material = materials.len();
     materials.push(default_source_material());
     let mut geometries = Vec::<Geometry>::new();
@@ -308,21 +347,33 @@ pub fn compile_glb(
                 );
             }
 
-            let tex_coord_0 = reader
-                .read_tex_coords(0)
-                .map(|coordinates| coordinates.into_f32().collect::<Vec<_>>())
-                .unwrap_or_else(|| vec![[0.0, 0.0]; positions.len()]);
-            let tex_coord_1 = reader
-                .read_tex_coords(1)
-                .map(|coordinates| coordinates.into_f32().collect::<Vec<_>>())
-                .unwrap_or_else(|| vec![[0.0, 0.0]; positions.len()]);
-            let colors = reader
-                .read_colors(0)
-                .map(|colors| colors.into_rgba_f32().collect::<Vec<_>>())
-                .unwrap_or_else(|| vec![[1.0; 4]; positions.len()]);
-            if tex_coord_0.len() != positions.len()
-                || tex_coord_1.len() != positions.len()
-                || colors.len() != positions.len()
+            let tex_coord_0 = include_source_materials.then(|| {
+                reader
+                    .read_tex_coords(0)
+                    .map(|coordinates| coordinates.into_f32().collect::<Vec<_>>())
+                    .unwrap_or_else(|| vec![[0.0, 0.0]; positions.len()])
+            });
+            let tex_coord_1 = include_source_materials.then(|| {
+                reader
+                    .read_tex_coords(1)
+                    .map(|coordinates| coordinates.into_f32().collect::<Vec<_>>())
+                    .unwrap_or_else(|| vec![[0.0, 0.0]; positions.len()])
+            });
+            let colors = include_source_materials.then(|| {
+                reader
+                    .read_colors(0)
+                    .map(|colors| colors.into_rgba_f32().collect::<Vec<_>>())
+                    .unwrap_or_else(|| vec![[1.0; 4]; positions.len()])
+            });
+            if tex_coord_0
+                .as_ref()
+                .is_some_and(|values| values.len() != positions.len())
+                || tex_coord_1
+                    .as_ref()
+                    .is_some_and(|values| values.len() != positions.len())
+                || colors
+                    .as_ref()
+                    .is_some_and(|values| values.len() != positions.len())
             {
                 bail!(
                     "mesh {} primitive {} has mismatched vertex attribute counts",
@@ -337,17 +388,34 @@ pub fn compile_glb(
                 .map(|(index, position)| Vertex {
                     position: *position,
                     normal: normals[index],
-                    tex_coord_0: tex_coord_0[index],
-                    tex_coord_1: tex_coord_1[index],
-                    color: colors[index],
                 })
                 .collect::<Vec<_>>();
+            let source_attributes = include_source_materials.then(|| {
+                (0..positions.len())
+                    .map(|index| SourceVertexAttributes {
+                        tex_coord_0: tex_coord_0
+                            .as_ref()
+                            .map(|values| values[index])
+                            .unwrap_or([0.0, 0.0]),
+                        tex_coord_1: tex_coord_1
+                            .as_ref()
+                            .map(|values| values[index])
+                            .unwrap_or([0.0, 0.0]),
+                        color: colors
+                            .as_ref()
+                            .map(|values| values[index])
+                            .unwrap_or([1.0; 4]),
+                    })
+                    .collect::<Vec<_>>()
+            });
             let bounds = Bounds::from_positions(&positions);
-            let raw_hash = hash_geometry(&vertices, &indices);
+            let raw_hash = hash_geometry(&vertices, source_attributes.as_deref(), &indices);
 
             let existing = geometry_candidates.get(&raw_hash).and_then(|candidates| {
                 candidates.iter().copied().find(|index| {
-                    geometries[*index].vertices == vertices && geometries[*index].indices == indices
+                    geometries[*index].vertices == vertices
+                        && geometries[*index].source_attributes == source_attributes
+                        && geometries[*index].indices == indices
                 })
             });
             let geometry_index = if let Some(index) = existing {
@@ -357,6 +425,7 @@ pub fn compile_glb(
                 let index = geometries.len();
                 geometries.push(Geometry {
                     vertices,
+                    source_attributes,
                     indices,
                     hash: blake3::Hash::from_bytes(raw_hash).to_hex().to_string(),
                     bounds,
@@ -364,7 +433,11 @@ pub fn compile_glb(
                 geometry_candidates.entry(raw_hash).or_default().push(index);
                 index
             };
-            let material = primitive.material().index().unwrap_or(default_material);
+            let material = if include_source_materials {
+                primitive.material().index().unwrap_or(default_material)
+            } else {
+                default_material
+            };
             primitive_map.insert(
                 (mesh.index(), primitive.index()),
                 (geometry_index, material),
@@ -646,10 +719,17 @@ fn generate_normals(positions: &[[f32; 3]], indices: &[u32]) -> Vec<[f32; 3]> {
         .collect()
 }
 
-fn hash_geometry(vertices: &[Vertex], indices: &[u32]) -> [u8; 32] {
+fn hash_geometry(
+    vertices: &[Vertex],
+    source_attributes: Option<&[SourceVertexAttributes]>,
+    indices: &[u32],
+) -> [u8; 32] {
     let mut hasher = blake3::Hasher::new();
     hasher.update(&(vertices.len() as u64).to_le_bytes());
     hasher.update(bytemuck::cast_slice(vertices));
+    if let Some(attributes) = source_attributes {
+        hasher.update(bytemuck::cast_slice(attributes));
+    }
     hasher.update(&(indices.len() as u64).to_le_bytes());
     hasher.update(bytemuck::cast_slice(indices));
     *hasher.finalize().as_bytes()

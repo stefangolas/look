@@ -1,4 +1,4 @@
-use std::{collections::BTreeSet, mem, ops::Range, sync::mpsc, thread, time::Instant};
+use std::{collections::BTreeMap, mem, ops::Range, sync::mpsc, time::Instant};
 
 use anyhow::Context;
 use bytemuck::{Pod, Zeroable};
@@ -8,7 +8,9 @@ use crate::{
     camera::PreparedCamera,
     config::{LightingConfig, MaterialMode, RenderConfig, parse_hex_color},
     renderer::{HardwareFingerprint, RenderBatch, RenderedImage, Renderer},
-    scene::{AlphaMode, CompiledScene, SourceMaterial, TextureWrap, Vertex},
+    scene::{
+        AlphaMode, CompiledScene, SourceMaterial, SourceVertexAttributes, TextureWrap, Vertex,
+    },
     timing::Timings,
 };
 
@@ -38,9 +40,22 @@ struct MaterialRaw {
 
 #[repr(C)]
 #[derive(Clone, Copy, Pod, Zeroable)]
-struct TechnicalVertex {
+struct SourceVertex {
     position: [f32; 3],
     normal: [f32; 3],
+    tex_coord_0: [f32; 2],
+    tex_coord_1: [f32; 2],
+    color: [f32; 4],
+}
+
+fn source_vertex(vertex: Vertex, attributes: SourceVertexAttributes) -> SourceVertex {
+    SourceVertex {
+        position: vertex.position,
+        normal: vertex.normal,
+        tex_coord_0: attributes.tex_coord_0,
+        tex_coord_1: attributes.tex_coord_1,
+        color: attributes.color,
+    }
 }
 
 #[repr(C)]
@@ -283,12 +298,31 @@ impl WgpuRenderer {
         timings: &mut Timings,
     ) -> anyhow::Result<GpuScene> {
         let mut vertices = Vec::<Vertex>::new();
+        let mut source_vertices = Vec::<SourceVertex>::new();
         let mut indices = Vec::<u32>::new();
         let mut index_ranges = Vec::<Range<u32>>::with_capacity(scene.geometries.len());
         for geometry in &scene.geometries {
-            let vertex_base = vertices.len() as u32;
+            let vertex_base = match material_mode {
+                MaterialMode::Technical => vertices.len() as u32,
+                MaterialMode::Source => source_vertices.len() as u32,
+            };
             let index_start = indices.len() as u32;
-            vertices.extend_from_slice(&geometry.vertices);
+            match material_mode {
+                MaterialMode::Technical => vertices.extend_from_slice(&geometry.vertices),
+                MaterialMode::Source => {
+                    let attributes = geometry
+                        .source_attributes
+                        .as_deref()
+                        .context("source material geometry is missing UV/color attributes")?;
+                    source_vertices.extend(
+                        geometry
+                            .vertices
+                            .iter()
+                            .zip(attributes)
+                            .map(|(vertex, attributes)| source_vertex(*vertex, *attributes)),
+                    );
+                }
+            }
             indices.extend(
                 geometry
                     .indices
@@ -300,53 +334,43 @@ impl WgpuRenderer {
 
         let mut instances = Vec::<InstanceRaw>::new();
         let mut draws = Vec::<Draw>::new();
-        for (geometry_index, index_range) in index_ranges.into_iter().enumerate() {
-            let material_indices = scene
-                .instances
-                .iter()
-                .filter(|instance| instance.geometry == geometry_index)
-                .map(|instance| instance.material)
-                .collect::<BTreeSet<_>>();
-            for material in material_indices {
-                let instance_start = instances.len() as u32;
-                for instance in scene.instances.iter().filter(|instance| {
-                    instance.geometry == geometry_index && instance.material == material
-                }) {
-                    let normal = instance.normal_transform.to_cols_array_2d();
-                    instances.push(InstanceRaw {
-                        model: instance.transform.to_cols_array_2d(),
-                        normal_0: [normal[0][0], normal[0][1], normal[0][2], 0.0],
-                        normal_1: [normal[1][0], normal[1][1], normal[1][2], 0.0],
-                        normal_2: [normal[2][0], normal[2][1], normal[2][2], 0.0],
-                    });
-                }
-                let instance_end = instances.len() as u32;
-                if instance_end > instance_start {
-                    draws.push(Draw {
-                        indices: index_range.clone(),
-                        instances: instance_start..instance_end,
-                        material,
-                    });
-                }
+        let mut batches = BTreeMap::<(usize, usize), Vec<&crate::scene::Instance>>::new();
+        for instance in &scene.instances {
+            batches
+                .entry((instance.geometry, instance.material))
+                .or_default()
+                .push(instance);
+        }
+        for ((geometry, material), batch) in batches {
+            let instance_start = instances.len() as u32;
+            for instance in batch {
+                let normal = instance.normal_transform.to_cols_array_2d();
+                instances.push(InstanceRaw {
+                    model: instance.transform.to_cols_array_2d(),
+                    normal_0: [normal[0][0], normal[0][1], normal[0][2], 0.0],
+                    normal_1: [normal[1][0], normal[1][1], normal[1][2], 0.0],
+                    normal_2: [normal[2][0], normal[2][1], normal[2][2], 0.0],
+                });
             }
+            draws.push(Draw {
+                indices: index_ranges[geometry].clone(),
+                instances: instance_start..instances.len() as u32,
+                material,
+            });
         }
 
-        if vertices.is_empty() || indices.is_empty() || instances.is_empty() {
+        if (vertices.is_empty() && source_vertices.is_empty())
+            || indices.is_empty()
+            || instances.is_empty()
+        {
             anyhow::bail!("compiled scene contains no GPU data");
         }
         let vertex_buffer = match material_mode {
             MaterialMode::Technical => {
-                let compact_vertices = vertices
-                    .iter()
-                    .map(|vertex| TechnicalVertex {
-                        position: vertex.position,
-                        normal: vertex.normal,
-                    })
-                    .collect::<Vec<_>>();
                 self.device
                     .create_buffer_init(&wgpu::util::BufferInitDescriptor {
                         label: Some("v3 compact technical vertices"),
-                        contents: bytemuck::cast_slice(&compact_vertices),
+                        contents: bytemuck::cast_slice(&vertices),
                         usage: wgpu::BufferUsages::VERTEX,
                     })
             }
@@ -354,7 +378,7 @@ impl WgpuRenderer {
                 self.device
                     .create_buffer_init(&wgpu::util::BufferInitDescriptor {
                         label: Some("v3 source vertices"),
-                        contents: bytemuck::cast_slice(&vertices),
+                        contents: bytemuck::cast_slice(&source_vertices),
                         usage: wgpu::BufferUsages::VERTEX,
                     })
             }
@@ -393,56 +417,32 @@ impl WgpuRenderer {
         scene: &CompiledScene,
         timings: &mut Timings,
     ) -> anyhow::Result<(Vec<GpuMaterial>, Vec<GpuTexture>)> {
-        let decode_started = Instant::now();
-        let worker_count = scene.textures.len().min(
-            thread::available_parallelism()
-                .map(usize::from)
-                .unwrap_or(1),
-        );
-        let mut decoded_textures = Vec::with_capacity(scene.textures.len());
-        decoded_textures.resize_with(scene.textures.len(), || None);
-        if worker_count > 0 {
-            let decoded_batches = thread::scope(|scope| {
-                let mut handles = Vec::with_capacity(worker_count);
-                for worker in 0..worker_count {
-                    handles.push(scope.spawn(move || -> anyhow::Result<Vec<_>> {
-                        let mut batch = Vec::new();
-                        for index in (worker..scene.textures.len()).step_by(worker_count) {
-                            let texture = &scene.textures[index];
-                            let decoded = image::load_from_memory(&texture.encoded)
-                                .with_context(|| format!("failed to decode v3 texture {index}"))?
-                                .to_rgba8();
-                            batch.push((index, decoded));
-                        }
-                        Ok(batch)
-                    }));
-                }
-                handles
-                    .into_iter()
-                    .map(|handle| handle.join().expect("texture decoder thread panicked"))
-                    .collect::<anyhow::Result<Vec<_>>>()
-            })?;
-            for batch in decoded_batches {
-                for (index, decoded) in batch {
-                    decoded_textures[index] = Some(decoded);
-                }
-            }
-        }
-        timings.record("texture_decode", decode_started.elapsed());
-
         let mut textures = Vec::with_capacity(scene.textures.len() + 3);
-        for (index, (texture, decoded)) in scene
-            .textures
-            .iter()
-            .zip(decoded_textures.into_iter())
-            .enumerate()
-        {
-            let decoded = decoded.with_context(|| format!("texture {index} was not decoded"))?;
+        for (index, texture) in scene.textures.iter().enumerate() {
+            let fallback = if texture.decoded.is_none() {
+                let decode_started = Instant::now();
+                let decoded = image::load_from_memory(&texture.encoded)
+                    .with_context(|| format!("failed to decode v3 texture {index}"))?
+                    .to_rgba8();
+                timings.accumulate("texture_decode", decode_started.elapsed());
+                Some(crate::scene::DecodedTexture {
+                    width: decoded.width(),
+                    height: decoded.height(),
+                    rgba: decoded.into_raw(),
+                })
+            } else {
+                None
+            };
+            let decoded = texture
+                .decoded
+                .as_ref()
+                .or(fallback.as_ref())
+                .with_context(|| format!("texture {index} was not decoded"))?;
             let texture_started = Instant::now();
             textures.push(self.upload_rgba_texture(
-                decoded.width(),
-                decoded.height(),
-                decoded.as_raw(),
+                decoded.width,
+                decoded.height,
+                &decoded.rgba,
                 texture.sampler,
                 &format!("v3 texture {index}"),
             ));
@@ -1100,7 +1100,7 @@ fn create_source_pipeline(
     ];
     let buffers = [
         Some(wgpu::VertexBufferLayout {
-            array_stride: mem::size_of::<Vertex>() as u64,
+            array_stride: mem::size_of::<SourceVertex>() as u64,
             step_mode: wgpu::VertexStepMode::Vertex,
             attributes: &VERTEX_ATTRIBUTES,
         }),
@@ -1216,7 +1216,7 @@ fn create_pipeline(
     ];
     let vertex_buffers = [
         Some(wgpu::VertexBufferLayout {
-            array_stride: mem::size_of::<TechnicalVertex>() as u64,
+            array_stride: mem::size_of::<Vertex>() as u64,
             step_mode: wgpu::VertexStepMode::Vertex,
             attributes: &VERTEX_ATTRIBUTES,
         }),
