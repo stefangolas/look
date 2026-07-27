@@ -1,5 +1,14 @@
 # look
 
+| `look` | F3D 3.5 |
+|---|---|
+| <img src="docs/images/damaged-helmet-look.png" width="420" alt="Damaged Helmet rendered by look"> | <img src="docs/images/damaged-helmet-f3d.png" width="420" alt="Damaged Helmet rendered by F3D 3.5"> |
+
+Same Damaged Helmet model, 512x512 front orthographic camera, source PBR
+materials, background, and F3D-compatible light kit. Model credits: Copyright
+2018 ctxwing, CC BY 4.0; Copyright 2016 theblueturtle_, CC BY-NC 4.0.
+[Image license and exact render configuration](docs/images/README.md).
+
 `look` is a native command-line utility that turns GLB and STL models into PNG
 images. Its basic purpose is to let a person, script, or software agent inspect
 a 3D model without opening a full CAD application or browser-based viewer.
@@ -15,6 +24,35 @@ look model.glb --output render.png
 That command loads `model.glb`, selects a technical material and lighting setup,
 fits the camera to the model, renders an isometric view, and writes `render.png`.
 No configuration file is required.
+
+Render four camera views directly into one GPU-generated PNG:
+
+```console
+look model.glb --material-mode source \
+  --views front,right,top,iso --camera orthographic \
+  --resolution 384x384 --atlas 2 --output views.png --json
+```
+
+<img src="docs/images/damaged-helmet-tileset.png" width="700" alt="Front, right, top, and isometric Damaged Helmet views packed into a two-by-two atlas by look">
+
+In the persistent 512 px-tile benchmark on an NVIDIA RTX 5050 Laptop GPU, this
+four-view atlas took **8.94 ms** in `look`, versus **22.50 ms** in Three.js
+WebGL2 and **27.30 ms** in Three.js WebGPU: `look` was **2.52x** and **3.05x**
+faster, respectively. These figures measure render, readback, PNG encoding, and
+output-file replacement after each renderer has initialized; see the
+[benchmark methodology](docs/BENCHMARKS.md).
+
+Compared with F3D, `look` has a deliberately narrower GLB/STL pipeline: it
+avoids VTK's general-purpose data, scene, and application layers and compiles
+the model directly into compact GPU buffers and material batches. That means
+less startup work, scene traversal, allocation, and state conversion for the
+specific render jobs `look` supports.
+
+Compared with Three.js, `look` runs native Rust instead of a JavaScript object
+graph inside Chromium, then reuses the GPU device, pipelines, textures, and
+uploaded scene through persistent sessions. Its atlas path draws every view
+into one render target in one GPU pass, followed by one readback and one PNG,
+rather than paying per-view canvas and capture overhead.
 
 `look` can also:
 
