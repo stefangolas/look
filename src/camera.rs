@@ -48,11 +48,27 @@ pub fn prepare_camera(view: &ViewConfig, bounds: &Bounds, resolution: [u32; 2]) 
             )
         }
         CameraKind::Orthographic => {
-            let half_height = if aspect >= 1.0 {
-                radius * view.padding
-            } else {
-                radius * view.padding / aspect
-            };
+            let forward = -direction;
+            let right = forward.cross(up).try_normalize().unwrap_or(Vec3::X);
+            let camera_up = right.cross(forward).try_normalize().unwrap_or(Vec3::Y);
+            let min = Vec3::from_array(bounds.min);
+            let max = Vec3::from_array(bounds.max);
+            let mut projected_half_width = 0.0_f32;
+            let mut projected_half_height = 0.0_f32;
+            for x in [min.x, max.x] {
+                for y in [min.y, max.y] {
+                    for z in [min.z, max.z] {
+                        let offset = Vec3::new(x, y, z) - center;
+                        projected_half_width = projected_half_width.max(offset.dot(right).abs());
+                        projected_half_height =
+                            projected_half_height.max(offset.dot(camera_up).abs());
+                    }
+                }
+            }
+            let half_height = projected_half_height
+                .max(projected_half_width / aspect)
+                .max(1.0e-4)
+                * view.padding;
             let half_width = half_height * aspect;
             let distance = radius * 3.0;
             let position = center + direction * distance;
@@ -95,5 +111,22 @@ mod tests {
             [1024, 768],
         );
         assert!(camera.view_projection.is_finite());
+    }
+
+    #[test]
+    fn orthographic_fit_uses_projected_bounds_not_diagonal_radius() {
+        let bounds = Bounds {
+            min: [-0.5; 3],
+            max: [0.5; 3],
+        };
+        let camera = prepare_camera(
+            &ViewConfig::named(NamedView::Front, CameraKind::Orthographic),
+            &bounds,
+            [512, 512],
+        );
+        let corner = camera.view_projection * Vec3::new(0.5, 0.5, 0.5).extend(1.0);
+        let ndc = corner.truncate() / corner.w;
+        assert!((ndc.x - 1.0 / 1.1).abs() < 1.0e-4);
+        assert!((ndc.y - 1.0 / 1.1).abs() < 1.0e-4);
     }
 }

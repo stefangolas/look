@@ -264,6 +264,226 @@ pub fn compile_glb_for_render(
     )
 }
 
+pub fn compile_scene(
+    path: &Path,
+    up_axis: UpAxis,
+    timings: &mut Timings,
+) -> anyhow::Result<CompiledScene> {
+    match extension(path).as_str() {
+        "glb" => compile_glb(path, up_axis, timings),
+        "stl" => compile_stl(path, up_axis, true, timings),
+        other => bail!("unsupported scene extension '{other}'; expected GLB or STL"),
+    }
+}
+
+pub fn compile_scene_for_render(
+    path: &Path,
+    up_axis: UpAxis,
+    material_mode: MaterialMode,
+    timings: &mut Timings,
+) -> anyhow::Result<CompiledScene> {
+    match extension(path).as_str() {
+        "glb" => compile_glb_for_render(path, up_axis, material_mode, timings),
+        "stl" => compile_stl(
+            path,
+            up_axis,
+            material_mode == MaterialMode::Source,
+            timings,
+        ),
+        other => bail!("unsupported scene extension '{other}'; expected GLB or STL"),
+    }
+}
+
+fn extension(path: &Path) -> String {
+    path.extension()
+        .and_then(|value| value.to_str())
+        .unwrap_or_default()
+        .to_ascii_lowercase()
+}
+
+fn compile_stl(
+    path: &Path,
+    up_axis: UpAxis,
+    include_source_materials: bool,
+    timings: &mut Timings,
+) -> anyhow::Result<CompiledScene> {
+    let bytes = timings.measure("read", || {
+        fs::read(path).with_context(|| format!("failed to read scene '{}'", path.display()))
+    })?;
+    let source_hash = timings.measure("hash", || blake3::hash(&bytes).to_hex().to_string());
+    let parse_started = Instant::now();
+    let (vertices, indices) = parse_stl(&bytes)?;
+    timings.record("parse", parse_started.elapsed());
+
+    let compile_started = Instant::now();
+    let local_bounds = Bounds::from_positions(
+        &vertices
+            .iter()
+            .map(|vertex| vertex.position)
+            .collect::<Vec<_>>(),
+    );
+    let source_attributes = include_source_materials.then(|| {
+        vec![
+            SourceVertexAttributes {
+                tex_coord_0: [0.0; 2],
+                tex_coord_1: [0.0; 2],
+                color: [1.0; 4],
+            };
+            vertices.len()
+        ]
+    });
+    let raw_hash = hash_geometry(&vertices, source_attributes.as_deref(), &indices);
+    let geometry = Geometry {
+        vertices,
+        source_attributes,
+        indices,
+        hash: blake3::Hash::from_bytes(raw_hash).to_hex().to_string(),
+        bounds: local_bounds,
+    };
+    let transform = normalization_transform(up_axis);
+    let normal_transform = Mat3::from_mat4(transform).inverse().transpose();
+    let mut bounds = Bounds::empty();
+    bounds.include_transformed(&geometry.bounds, transform);
+    let triangles = geometry.indices.len() as u64 / 3;
+    let vertex_count = geometry.vertices.len() as u64;
+    let instance = Instance {
+        geometry: 0,
+        material: 0,
+        transform,
+        normal_transform,
+        node_name: path
+            .file_stem()
+            .and_then(|value| value.to_str())
+            .map(ToOwned::to_owned),
+    };
+    timings.record("compile", compile_started.elapsed());
+
+    Ok(CompiledScene {
+        source_hash,
+        geometries: vec![geometry],
+        instances: vec![instance],
+        materials: vec![default_source_material()],
+        textures: Vec::new(),
+        bounds,
+        statistics: SceneStatistics {
+            nodes: 1,
+            mesh_primitives: 1,
+            unique_geometries: 1,
+            instances: 1,
+            vertices: vertex_count,
+            triangles,
+            duplicate_geometries_removed: 0,
+            materials: 1,
+            textures: 0,
+            bounds,
+        },
+    })
+}
+
+fn parse_stl(bytes: &[u8]) -> anyhow::Result<(Vec<Vertex>, Vec<u32>)> {
+    if bytes.len() >= 84 {
+        let triangle_count = u32::from_le_bytes(bytes[80..84].try_into().unwrap()) as usize;
+        if let Some(expected) = triangle_count
+            .checked_mul(50)
+            .and_then(|payload| 84_usize.checked_add(payload))
+        {
+            if expected == bytes.len() {
+                return parse_binary_stl(bytes, triangle_count);
+            }
+        }
+    }
+    parse_ascii_stl(bytes)
+}
+
+fn parse_binary_stl(
+    bytes: &[u8],
+    triangle_count: usize,
+) -> anyhow::Result<(Vec<Vertex>, Vec<u32>)> {
+    let vertex_count = triangle_count
+        .checked_mul(3)
+        .context("STL vertex count overflowed")?;
+    if vertex_count > u32::MAX as usize {
+        bail!("STL contains too many vertices");
+    }
+    let mut vertices = Vec::with_capacity(vertex_count);
+    for triangle in 0..triangle_count {
+        let offset = 84 + triangle * 50;
+        let declared_normal = read_vec3_le(bytes, offset)?;
+        let positions = [
+            read_vec3_le(bytes, offset + 12)?,
+            read_vec3_le(bytes, offset + 24)?,
+            read_vec3_le(bytes, offset + 36)?,
+        ];
+        let normal = Vec3::from_array(declared_normal)
+            .try_normalize()
+            .unwrap_or_else(|| face_normal(positions));
+        vertices.extend(positions.into_iter().map(|position| Vertex {
+            position,
+            normal: normal.to_array(),
+        }));
+    }
+    let indices = (0..vertex_count as u32).collect();
+    Ok((vertices, indices))
+}
+
+fn parse_ascii_stl(bytes: &[u8]) -> anyhow::Result<(Vec<Vertex>, Vec<u32>)> {
+    let text = std::str::from_utf8(bytes).context("STL is neither valid binary nor UTF-8 ASCII")?;
+    let tokens = text.split_ascii_whitespace().collect::<Vec<_>>();
+    let mut positions = Vec::<[f32; 3]>::new();
+    let mut index = 0;
+    while index < tokens.len() {
+        if tokens[index].eq_ignore_ascii_case("vertex") {
+            let values = tokens
+                .get(index + 1..index + 4)
+                .context("ASCII STL vertex is incomplete")?;
+            positions.push([
+                values[0].parse().context("invalid ASCII STL vertex X")?,
+                values[1].parse().context("invalid ASCII STL vertex Y")?,
+                values[2].parse().context("invalid ASCII STL vertex Z")?,
+            ]);
+            index += 4;
+        } else {
+            index += 1;
+        }
+    }
+    if positions.is_empty() || positions.len() % 3 != 0 {
+        bail!("ASCII STL contains an incomplete triangle set");
+    }
+    if positions.len() > u32::MAX as usize {
+        bail!("STL contains too many vertices");
+    }
+    let mut vertices = Vec::with_capacity(positions.len());
+    for triangle in positions.chunks_exact(3) {
+        let points = [triangle[0], triangle[1], triangle[2]];
+        let normal = face_normal(points).to_array();
+        vertices.extend(
+            points
+                .into_iter()
+                .map(|position| Vertex { position, normal }),
+        );
+    }
+    let indices = (0..vertices.len() as u32).collect();
+    Ok((vertices, indices))
+}
+
+fn read_vec3_le(bytes: &[u8], offset: usize) -> anyhow::Result<[f32; 3]> {
+    let values = bytes
+        .get(offset..offset + 12)
+        .context("binary STL ended inside a triangle")?;
+    Ok([
+        f32::from_le_bytes(values[0..4].try_into().unwrap()),
+        f32::from_le_bytes(values[4..8].try_into().unwrap()),
+        f32::from_le_bytes(values[8..12].try_into().unwrap()),
+    ])
+}
+
+fn face_normal(positions: [[f32; 3]; 3]) -> Vec3 {
+    let a = Vec3::from_array(positions[0]);
+    let b = Vec3::from_array(positions[1]);
+    let c = Vec3::from_array(positions[2]);
+    (b - a).cross(c - a).try_normalize().unwrap_or(Vec3::Y)
+}
+
 fn compile_glb_internal(
     path: &Path,
     up_axis: UpAxis,
@@ -756,5 +976,33 @@ mod tests {
         target.include_transformed(&source, Mat4::from_translation(Vec3::splat(5.0)));
         assert_eq!(target.min, [4.0, 3.0, 2.0]);
         assert_eq!(target.max, [6.0, 7.0, 8.0]);
+    }
+
+    #[test]
+    fn parses_binary_stl_without_an_import_framework() {
+        let mut bytes = vec![0_u8; 84];
+        bytes[80..84].copy_from_slice(&1_u32.to_le_bytes());
+        for value in [
+            0.0_f32, 0.0, 1.0, // normal
+            0.0, 0.0, 0.0, // a
+            1.0, 0.0, 0.0, // b
+            0.0, 1.0, 0.0, // c
+        ] {
+            bytes.extend_from_slice(&value.to_le_bytes());
+        }
+        bytes.extend_from_slice(&0_u16.to_le_bytes());
+        let (vertices, indices) = parse_stl(&bytes).unwrap();
+        assert_eq!(vertices.len(), 3);
+        assert_eq!(indices, [0, 1, 2]);
+        assert_eq!(vertices[0].normal, [0.0, 0.0, 1.0]);
+    }
+
+    #[test]
+    fn parses_ascii_stl_case_insensitively() {
+        let bytes = b"SOLID part\nFACET normal 0 0 1\nOUTER LOOP\nVERTEX 0 0 0\nVERTEX 1 0 0\nVERTEX 0 1 0\nENDLOOP\nENDFACET\nENDSOLID";
+        let (vertices, indices) = parse_stl(bytes).unwrap();
+        assert_eq!(vertices.len(), 3);
+        assert_eq!(indices, [0, 1, 2]);
+        assert_eq!(vertices[2].position, [0.0, 1.0, 0.0]);
     }
 }

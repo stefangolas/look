@@ -1,14 +1,17 @@
 # v3
 
-`v3` is a small native renderer for producing deterministic, technically lit
-views of GLB scenes. The first version intentionally ignores textures and source
-materials: it parses geometry once, deduplicates equal mesh payloads, uploads a
-compact scene once, and renders all requested cameras through one GPU device.
+`v3` is a small native renderer for producing deterministic views of GLB and STL
+scenes. Technical mode skips source-material work completely; source mode uses
+glTF metallic-roughness materials, textures, normal maps, emissive, occlusion,
+alpha modes, and vertex colors. Equal geometry payloads are deduplicated and a
+renderer session reuses uploaded scenes, pipelines, and render resources.
 
 ## Commands
 
 ```powershell
 v3 render model.glb --view iso --output render.png
+v3 render model.glb --material-mode source --output source.png
+v3 render bracket.stl --view front --camera orthographic --output bracket.png
 v3 render model.glb --views front,right,top,iso --output-dir renders
 v3 run examples/technical.yaml
 v3 inspect model.glb --json
@@ -23,9 +26,11 @@ v3 model.glb --view iso --output render.png
 
 ## Current boundary
 
-- GLB with embedded geometry buffers
-- Static opaque triangle primitives
-- Position and optional normal attributes
+- GLB with embedded geometry and texture buffers
+- Binary and ASCII STL through a direct dependency-free parser
+- Technical and glTF source-material modes
+- Static triangle primitives, instancing, and equal-geometry deduplication
+- Position, normal, UV0/UV1, and vertex-color attributes
 - Perspective and orthographic cameras
 - Automatic bounds fitting
 - Ambient plus one directional light

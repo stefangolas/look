@@ -12,6 +12,14 @@ pub struct Timings {
 }
 
 impl Timings {
+    pub fn get(&self, stage: &str) -> Option<f64> {
+        self.stages_ms.get(stage).copied()
+    }
+
+    pub fn set_ms(&mut self, stage: impl Into<String>, milliseconds: f64) {
+        self.stages_ms.insert(stage.into(), milliseconds);
+    }
+
     pub fn record(&mut self, stage: impl Into<String>, elapsed: Duration) {
         self.stages_ms
             .insert(stage.into(), elapsed.as_secs_f64() * 1_000.0);

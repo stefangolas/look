@@ -36,9 +36,10 @@ fn renders_generated_glb_to_png() {
     };
     let view = ViewConfig::named(NamedView::Front, CameraKind::Orthographic);
     let camera = prepare_camera(&view, &scene.bounds, render.resolution);
+    let cameras = [camera];
     let mut renderer = WgpuRenderer::new().unwrap();
     let batch = renderer
-        .render_views(&scene, &[camera], &render, &LightingConfig::default())
+        .render_views(&scene, &cameras, &render, &LightingConfig::default())
         .unwrap();
     assert_eq!(batch.images.len(), 1);
     let image = &batch.images[0];
@@ -50,6 +51,14 @@ fn renders_generated_glb_to_png() {
 
     write_png(&output_path, image).unwrap();
     assert!(fs::metadata(output_path).unwrap().len() > 100);
+
+    let second = renderer
+        .render_views(&scene, &cameras, &render, &LightingConfig::default())
+        .unwrap();
+    assert!(
+        second.timings.get("gpu_upload").is_none(),
+        "second render should reuse the GPU-resident scene"
+    );
 }
 
 fn triangle_glb() -> Vec<u8> {

@@ -1,4 +1,10 @@
-use std::{collections::BTreeMap, mem, ops::Range, sync::mpsc, time::Instant};
+use std::{
+    collections::BTreeMap,
+    mem,
+    ops::Range,
+    sync::{Arc, mpsc},
+    time::Instant,
+};
 
 use anyhow::Context;
 use bytemuck::{Pod, Zeroable};
@@ -96,6 +102,12 @@ struct GpuScene {
     _textures: Vec<GpuTexture>,
 }
 
+struct CachedGpuScene {
+    source_hash: String,
+    material_mode: MaterialMode,
+    scene: Arc<GpuScene>,
+}
+
 struct SourcePipelines {
     opaque_culled: wgpu::RenderPipeline,
     opaque_double_sided: wgpu::RenderPipeline,
@@ -116,6 +128,9 @@ impl SourcePipelines {
 
 struct ViewResources {
     id: String,
+    width: u32,
+    height: u32,
+    sample_count: u32,
     output_texture: wgpu::Texture,
     output_view: wgpu::TextureView,
     _multisample_texture: Option<wgpu::Texture>,
@@ -124,7 +139,7 @@ struct ViewResources {
     depth_view: wgpu::TextureView,
     readback: wgpu::Buffer,
     bind_group: wgpu::BindGroup,
-    _uniform: wgpu::Buffer,
+    uniform: wgpu::Buffer,
 }
 
 pub struct WgpuRenderer {
@@ -137,6 +152,9 @@ pub struct WgpuRenderer {
     pipeline_multisample: Option<wgpu::RenderPipeline>,
     source_single_sample: Option<SourcePipelines>,
     source_multisample: Option<SourcePipelines>,
+    cached_scene: Option<CachedGpuScene>,
+    view_pool: Vec<ViewResources>,
+    timestamp_queries: bool,
     initialization_timings: Timings,
 }
 
@@ -161,12 +179,28 @@ impl WgpuRenderer {
         timings.record("gpu_adapter", adapter_started.elapsed());
 
         let device_started = Instant::now();
+        let memory_hints = match std::env::var("V3_MEMORY_HINT")
+            .ok()
+            .as_deref()
+            .map(str::to_ascii_lowercase)
+            .as_deref()
+        {
+            Some("performance") => wgpu::MemoryHints::Performance,
+            _ => wgpu::MemoryHints::MemoryUsage,
+        };
+        let timestamp_queries = std::env::var_os("V3_GPU_TIMESTAMPS").is_some()
+            && adapter.features().contains(wgpu::Features::TIMESTAMP_QUERY);
+        let required_features = if timestamp_queries {
+            wgpu::Features::TIMESTAMP_QUERY
+        } else {
+            wgpu::Features::empty()
+        };
         let (device, queue) = pollster::block_on(adapter.request_device(&wgpu::DeviceDescriptor {
             label: Some("v3 device"),
-            required_features: wgpu::Features::empty(),
+            required_features,
             required_limits: wgpu::Limits::default(),
             experimental_features: wgpu::ExperimentalFeatures::disabled(),
-            memory_hints: wgpu::MemoryHints::MemoryUsage,
+            memory_hints,
             trace: wgpu::Trace::Off,
         }))
         .context("failed to create GPU device")?;
@@ -214,6 +248,9 @@ impl WgpuRenderer {
             pipeline_multisample: None,
             source_single_sample: None,
             source_multisample: None,
+            cached_scene: None,
+            view_pool: Vec::new(),
+            timestamp_queries,
             initialization_timings: timings,
         })
     }
@@ -638,40 +675,41 @@ impl Renderer for WgpuRenderer {
         let sample_count = if render.antialias { 4 } else { 1 };
         self.ensure_pipeline(render.material_mode, sample_count, &mut timings);
 
-        let upload_started = Instant::now();
-        let gpu_scene = self.upload_scene(scene, render.material_mode, &mut timings)?;
-        timings.record("gpu_upload", upload_started.elapsed());
+        let cache_started = Instant::now();
+        let cached_scene = self
+            .cached_scene
+            .as_ref()
+            .filter(|cached| {
+                cached.source_hash == scene.source_hash
+                    && cached.material_mode == render.material_mode
+            })
+            .map(|cached| Arc::clone(&cached.scene));
+        timings.record("gpu_scene_cache_lookup", cache_started.elapsed());
+        let gpu_scene = if let Some(cached_scene) = cached_scene {
+            cached_scene
+        } else {
+            let upload_started = Instant::now();
+            let uploaded =
+                Arc::new(self.upload_scene(scene, render.material_mode, &mut timings)?);
+            timings.record("gpu_upload", upload_started.elapsed());
+            self.cached_scene = Some(CachedGpuScene {
+                source_hash: scene.source_hash.clone(),
+                material_mode: render.material_mode,
+                scene: Arc::clone(&uploaded),
+            });
+            uploaded
+        };
 
         let padded_bytes_per_row = align_to(width * 4, COPY_ALIGNMENT);
         let readback_size = u64::from(padded_bytes_per_row) * u64::from(height);
         let background = parse_hex_color(&render.background)?;
         let base_color = parse_hex_color(&render.base_color)?;
         let light_color = parse_hex_color(&lighting.color)?;
+        let target_started = Instant::now();
+        let mut available_resources = mem::take(&mut self.view_pool);
         let mut resources = Vec::with_capacity(cameras.len());
 
         for camera in cameras {
-            let output_texture = create_color_texture(&self.device, width, height, 1, "v3 output");
-            let output_view = output_texture.create_view(&Default::default());
-            let multisample_texture = (sample_count > 1).then(|| {
-                create_color_texture(
-                    &self.device,
-                    width,
-                    height,
-                    sample_count,
-                    "v3 multisample color",
-                )
-            });
-            let multisample_view = multisample_texture
-                .as_ref()
-                .map(|texture| texture.create_view(&Default::default()));
-            let depth_texture = create_depth_texture(&self.device, width, height, sample_count);
-            let depth_view = depth_texture.create_view(&Default::default());
-            let readback = self.device.create_buffer(&wgpu::BufferDescriptor {
-                label: Some("v3 readback"),
-                size: readback_size,
-                usage: wgpu::BufferUsages::COPY_DST | wgpu::BufferUsages::MAP_READ,
-                mapped_at_creation: false,
-            });
             let globals = GlobalsRaw {
                 view_projection: camera.view_projection.to_cols_array_2d(),
                 light_direction_ambient: [
@@ -694,12 +732,47 @@ impl Renderer for WgpuRenderer {
                     1.0,
                 ],
             };
+            if let Some(index) = available_resources.iter().position(|resource| {
+                resource.width == width
+                    && resource.height == height
+                    && resource.sample_count == sample_count
+            }) {
+                let mut resource = available_resources.swap_remove(index);
+                resource.id.clone_from(&camera.id);
+                self.queue
+                    .write_buffer(&resource.uniform, 0, bytemuck::bytes_of(&globals));
+                resources.push(resource);
+                continue;
+            }
+
+            let output_texture = create_color_texture(&self.device, width, height, 1, "v3 output");
+            let output_view = output_texture.create_view(&Default::default());
+            let multisample_texture = (sample_count > 1).then(|| {
+                create_color_texture(
+                    &self.device,
+                    width,
+                    height,
+                    sample_count,
+                    "v3 multisample color",
+                )
+            });
+            let multisample_view = multisample_texture
+                .as_ref()
+                .map(|texture| texture.create_view(&Default::default()));
+            let depth_texture = create_depth_texture(&self.device, width, height, sample_count);
+            let depth_view = depth_texture.create_view(&Default::default());
+            let readback = self.device.create_buffer(&wgpu::BufferDescriptor {
+                label: Some("v3 readback"),
+                size: readback_size,
+                usage: wgpu::BufferUsages::COPY_DST | wgpu::BufferUsages::MAP_READ,
+                mapped_at_creation: false,
+            });
             let uniform = self
                 .device
                 .create_buffer_init(&wgpu::util::BufferInitDescriptor {
                     label: Some("v3 camera and lighting"),
                     contents: bytemuck::bytes_of(&globals),
-                    usage: wgpu::BufferUsages::UNIFORM,
+                    usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
                 });
             let bind_group = self.device.create_bind_group(&wgpu::BindGroupDescriptor {
                 label: Some("v3 camera and lighting bind group"),
@@ -711,6 +784,9 @@ impl Renderer for WgpuRenderer {
             });
             resources.push(ViewResources {
                 id: camera.id.clone(),
+                width,
+                height,
+                sample_count,
                 output_texture,
                 output_view,
                 _multisample_texture: multisample_texture,
@@ -719,11 +795,37 @@ impl Renderer for WgpuRenderer {
                 depth_view,
                 readback,
                 bind_group,
-                _uniform: uniform,
+                uniform,
             });
         }
+        timings.record("gpu_target_prepare", target_started.elapsed());
 
         let render_started = Instant::now();
+        let timestamp_count = resources.len() as u32 * 2;
+        let timestamp_query_set = self.timestamp_queries.then(|| {
+            self.device.create_query_set(&wgpu::QuerySetDescriptor {
+                label: Some("v3 render timestamps"),
+                ty: wgpu::QueryType::Timestamp,
+                count: timestamp_count,
+            })
+        });
+        let timestamp_size = u64::from(timestamp_count) * mem::size_of::<u64>() as u64;
+        let timestamp_resolve = timestamp_query_set.as_ref().map(|_| {
+            self.device.create_buffer(&wgpu::BufferDescriptor {
+                label: Some("v3 timestamp resolve"),
+                size: timestamp_size,
+                usage: wgpu::BufferUsages::QUERY_RESOLVE | wgpu::BufferUsages::COPY_SRC,
+                mapped_at_creation: false,
+            })
+        });
+        let timestamp_readback = timestamp_query_set.as_ref().map(|_| {
+            self.device.create_buffer(&wgpu::BufferDescriptor {
+                label: Some("v3 timestamp readback"),
+                size: timestamp_size,
+                usage: wgpu::BufferUsages::COPY_DST | wgpu::BufferUsages::MAP_READ,
+                mapped_at_creation: false,
+            })
+        });
         let mut encoder = self
             .device
             .create_command_encoder(&wgpu::CommandEncoderDescriptor {
@@ -746,7 +848,7 @@ impl Renderer for WgpuRenderer {
         } else {
             self.source_single_sample.as_ref()
         };
-        for resource in &resources {
+        for (resource_index, resource) in resources.iter().enumerate() {
             let color_view = resource
                 .multisample_view
                 .as_ref()
@@ -779,7 +881,13 @@ impl Renderer for WgpuRenderer {
                         }),
                         stencil_ops: None,
                     }),
-                    timestamp_writes: None,
+                    timestamp_writes: timestamp_query_set.as_ref().map(|query_set| {
+                        wgpu::RenderPassTimestampWrites {
+                            query_set,
+                            beginning_of_pass_write_index: Some(resource_index as u32 * 2),
+                            end_of_pass_write_index: Some(resource_index as u32 * 2 + 1),
+                        }
+                    }),
                     occlusion_query_set: None,
                     multiview_mask: None,
                 });
@@ -834,6 +942,14 @@ impl Renderer for WgpuRenderer {
                 },
             );
         }
+        if let (Some(query_set), Some(resolve), Some(readback)) = (
+            timestamp_query_set.as_ref(),
+            timestamp_resolve.as_ref(),
+            timestamp_readback.as_ref(),
+        ) {
+            encoder.resolve_query_set(query_set, 0..timestamp_count, resolve, 0);
+            encoder.copy_buffer_to_buffer(resolve, 0, readback, 0, timestamp_size);
+        }
         self.queue.submit([encoder.finish()]);
         timings.record("gpu_encode_submit", render_started.elapsed());
 
@@ -849,6 +965,15 @@ impl Renderer for WgpuRenderer {
                 });
             receivers.push(receiver);
         }
+        let timestamp_receiver = timestamp_readback.as_ref().map(|readback| {
+            let (sender, receiver) = mpsc::sync_channel(1);
+            readback
+                .slice(..)
+                .map_async(wgpu::MapMode::Read, move |result| {
+                    let _ = sender.send(result);
+                });
+            receiver
+        });
         self.device
             .poll(wgpu::PollType::wait_indefinitely())
             .context("GPU polling failed")?;
@@ -857,6 +982,12 @@ impl Renderer for WgpuRenderer {
                 .recv()
                 .context("GPU readback callback was dropped")?
                 .context("GPU readback mapping failed")?;
+        }
+        if let Some(receiver) = timestamp_receiver {
+            receiver
+                .recv()
+                .context("GPU timestamp callback was dropped")?
+                .context("GPU timestamp mapping failed")?;
         }
 
         let mut images = Vec::with_capacity(resources.len());
@@ -882,6 +1013,22 @@ impl Renderer for WgpuRenderer {
                 height,
                 rgba,
             });
+        }
+        self.view_pool = resources;
+        if let Some(readback) = timestamp_readback {
+            let mapped = readback
+                .slice(..)
+                .get_mapped_range()
+                .context("failed to access GPU timestamps")?;
+            let timestamps = bytemuck::cast_slice::<u8, u64>(&mapped);
+            let ticks = timestamps
+                .chunks_exact(2)
+                .map(|pair| pair[1].saturating_sub(pair[0]))
+                .sum::<u64>();
+            let milliseconds = ticks as f64 * f64::from(self.queue.get_timestamp_period()) / 1.0e6;
+            timings.set_ms("gpu_render", milliseconds);
+            drop(mapped);
+            readback.unmap();
         }
         timings.record("gpu_readback", readback_started.elapsed());
         Ok(RenderBatch { images, timings })

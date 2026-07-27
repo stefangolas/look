@@ -17,7 +17,7 @@ use crate::{
     },
     output::{output_path, write_png},
     renderer::{HardwareFingerprint, Renderer, WgpuRenderer},
-    scene::{SceneStatistics, compile_glb, compile_glb_for_render, prepare_source_textures},
+    scene::{SceneStatistics, compile_scene, compile_scene_for_render, prepare_source_textures},
     timing::Timings,
 };
 
@@ -51,7 +51,7 @@ fn should_imply_render(arguments: &[OsString]) -> bool {
 
 #[derive(Debug, Subcommand)]
 pub enum Command {
-    /// Render one or more technical views of a GLB.
+    /// Render one or more views of a GLB or STL.
     Render(RenderArgs),
     /// Execute a declarative YAML render job.
     Run(RunArgs),
@@ -207,7 +207,7 @@ pub fn execute_job(args: RunArgs) -> anyhow::Result<()> {
 }
 
 pub fn execute_inspect(args: InspectArgs) -> anyhow::Result<()> {
-    require_glb(&args.scene)?;
+    require_supported_scene(&args.scene)?;
     let mut timings = Timings::default();
     let cache = MetadataCache::platform_default();
     let cache_started = Instant::now();
@@ -233,7 +233,7 @@ pub fn execute_inspect(args: InspectArgs) -> anyhow::Result<()> {
         }
         return Ok(());
     }
-    let scene = compile_glb(&args.scene, args.up_axis, &mut timings)?;
+    let scene = compile_scene(&args.scene, args.up_axis, &mut timings)?;
     if let Some(cache) = cache {
         let _ = cache.store(
             &args.scene,
@@ -281,11 +281,11 @@ pub fn execute_doctor(args: DoctorArgs) -> anyhow::Result<()> {
 }
 
 fn execute_config(config: NormalizedConfig, json: bool) -> anyhow::Result<()> {
-    require_glb(&config.scene.source)?;
+    require_supported_scene(&config.scene.source)?;
     let total_started = Instant::now();
     let renderer_thread = std::thread::spawn(WgpuRenderer::new);
     let mut timings = Timings::default();
-    let mut scene = compile_glb_for_render(
+    let mut scene = compile_scene_for_render(
         &config.scene.source,
         config.scene.up_axis,
         config.render.material_mode,
@@ -388,14 +388,14 @@ fn encode_output(
     })
 }
 
-fn require_glb(path: &Path) -> anyhow::Result<()> {
+fn require_supported_scene(path: &Path) -> anyhow::Result<()> {
     let extension = path
         .extension()
         .and_then(|value| value.to_str())
         .unwrap_or_default();
-    if !extension.eq_ignore_ascii_case("glb") {
+    if !extension.eq_ignore_ascii_case("glb") && !extension.eq_ignore_ascii_case("stl") {
         anyhow::bail!(
-            "unsupported scene '{}'; the MVP currently accepts GLB files only",
+            "unsupported scene '{}'; expected a GLB or STL file",
             path.display()
         );
     }

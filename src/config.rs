@@ -8,7 +8,7 @@ use serde::{Deserialize, Serialize};
 
 pub const CONFIG_VERSION: u32 = 1;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, clap::ValueEnum)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, clap::ValueEnum)]
 #[serde(rename_all = "snake_case")]
 pub enum CameraKind {
     Perspective,
@@ -356,7 +356,7 @@ fn default_fov() -> f32 {
     35.0
 }
 fn default_padding() -> f32 {
-    1.15
+    1.1
 }
 fn default_output_directory() -> PathBuf {
     PathBuf::from("renders")
