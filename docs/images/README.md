@@ -1,5 +1,9 @@
 # Third-party comparison images
 
+> The `*-look-vs-f3d.png` side-by-side comparisons are temporarily removed
+> pending regeneration on an isometric camera. The model credits and licenses
+> below still apply and are kept here for the replacements.
+
 `damaged-helmet-look.png`, `damaged-helmet-f3d.png`, and
 `damaged-helmet-tileset.png` are renderer outputs of the Khronos Damaged Helmet
 glTF sample and are not covered by this repository's MIT-or-Apache-2.0 software

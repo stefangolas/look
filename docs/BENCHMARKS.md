@@ -57,8 +57,6 @@ The same fresh-process harness was also run against two environment models.
 These are separate workloads and are not folded into the six-model Khronos
 geometric mean.
 
-<img src="images/nyc-boulevard-look-vs-f3d.png" width="900" alt="New York Boulevard rendered side by side by look and F3D 3.5">
-
 New York Boulevard contains 747,897 triangles, 650,951 compiled vertices, 11
 draw instances, and two source textures. At 4096x4096, seven measured launches
 produced:
@@ -74,8 +72,6 @@ honors that extension while the F3D-compatible lighting path produces visibly
 different shading, so this is a matched framing and output-work comparison,
 not a claim of pixel identity. Linear-RGB RMSE over the foreground union was
 0.0311 and alpha was identical.
-
-<img src="images/sponza-look-vs-f3d.png" width="900" alt="Intel Sponza rendered side by side by look and F3D 3.5">
 
 Intel's Sponza Base Scene contains 3,747,018 triangles, 1,945,350 compiled
 vertices, 405 draw instances, 29 materials, and 72 textures. The official
@@ -101,8 +97,6 @@ The Sponza derivative source hash was
 `e3e8fb573e1718cd5ea51b5ce948b040ca13fdcbcf735a6acb8dd20d1b7cb3f8`.
 
 #### Foliage stress scene
-
-<img src="images/sponza-foliage-look-vs-f3d.png" width="900" alt="Intel Sponza with Ivy and Trees rendered side by side by look and F3D 3.5">
 
 The official Sponza Base, Ivy, and Trees packages were merged into one GLB by
 `benchmarks/merge-gltf-scenes.py`. The composite contains 10,836,323 triangles,

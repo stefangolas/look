@@ -4,15 +4,11 @@
 images. Its basic purpose is to let a person, script, or software agent inspect
 a 3D model without opening a full CAD application or browser-based viewer.
 
-<img src="docs/images/sponza-foliage-look-vs-f3d.png" width="900" alt="Intel Sponza with Ivy and Trees rendered side by side by look and F3D 3.5">
-
 On the 10.8M-triangle Intel Sponza Base + Ivy + Trees scene, `look` completed a
 fresh-process 512x512 PNG in **8.49 s** median versus **50.47 s** for F3D 3.5:
 **5.94x faster** over three alternating launches. The same resident scene
 rendered a 4K fly-through with 4x MSAA in **7.58 ms median GPU time**.
 [Image license, raw samples, and exact configuration](docs/BENCHMARKS.md).
-
-<img src="docs/images/nyc-boulevard-look-vs-f3d.png" width="900" alt="New York Boulevard rendered side by side by look and F3D 3.5">
 
 The 748K-triangle New York Boulevard demo completed at 4096x4096 in **888 ms**
 median versus **1,777 ms** for F3D 3.5: **2.00x faster** over seven alternating
