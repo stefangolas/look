@@ -75,7 +75,11 @@ jobs:
           DEB_ARCH: ${{ matrix.deb_arch }}
         run: |
           set -euo pipefail
-          version="${GITHUB_REF_NAME:-snapshot}"
+          if [[ "${GITHUB_REF_TYPE:-}" == "tag" ]]; then
+            version="$GITHUB_REF_NAME"
+          else
+            version="snapshot-${GITHUB_SHA:0:8}"
+          fi
           package="look-${version}-${ASSET}"
           mkdir -p "dist/${package}"
           cp "target/${TARGET}/release/look" "dist/${package}/look"
@@ -88,7 +92,11 @@ jobs:
             (cd dist && shasum -a 256 "${package}.tar.gz" > "${package}.tar.gz.sha256")
           fi
           if [[ "$RUNNER_OS" == "Linux" ]]; then
-            deb_version="${version#v}"
+            if [[ "${GITHUB_REF_TYPE:-}" == "tag" ]]; then
+              deb_version="${version#v}"
+            else
+              deb_version="0.0.0~snapshot.${GITHUB_RUN_NUMBER}"
+            fi
             mkdir -p dist/deb/DEBIAN dist/deb/usr/bin
             cp "target/${TARGET}/release/look" dist/deb/usr/bin/look
             printf 'Package: look\nVersion: %s\nSection: graphics\nPriority: optional\nArchitecture: %s\nMaintainer: look contributors\nDescription: Ultrafast native GLB and STL renderer for agent workflows\n' "$deb_version" "$DEB_ARCH" > dist/deb/DEBIAN/control
@@ -103,7 +111,11 @@ jobs:
           TARGET: ${{ matrix.target }}
           ASSET: ${{ matrix.asset }}
         run: |
-          $version = if ($env:GITHUB_REF_NAME) { $env:GITHUB_REF_NAME } else { 'snapshot' }
+          $version = if ($env:GITHUB_REF_TYPE -eq 'tag') {
+            $env:GITHUB_REF_NAME
+          } else {
+            "snapshot-$($env:GITHUB_SHA.Substring(0, 8))"
+          }
           $package = "look-$version-$env:ASSET"
           New-Item -ItemType Directory -Force "dist/$package" | Out-Null
           Copy-Item "target/$env:TARGET/release/look.exe" "dist/$package/look.exe"
