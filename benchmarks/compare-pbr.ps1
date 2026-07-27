@@ -2,8 +2,9 @@ param(
     [string]$Look = (Join-Path $PSScriptRoot '..\target\release\look.exe'),
     [string]$F3D = 'C:\Program Files\F3D\bin\f3d-console.exe',
     [string]$ModelDirectory = (Join-Path $PSScriptRoot '..\target\bench\models'),
+    [string]$FixtureDirectory = (Join-Path $PSScriptRoot '..\tests\fixtures'),
     [string]$OutputDirectory = (Join-Path $PSScriptRoot '..\target\bench\pbr'),
-    [string[]]$Models = @('Box', 'DamagedHelmet', 'Avocado', 'BoomBox', 'MetalRoughSpheres', 'NormalTangentTest'),
+    [string[]]$Models = @('Box', 'DamagedHelmet', 'Avocado', 'BoomBox', 'MetalRoughSpheres', 'NormalTangentTest', 'AluminumBallBearing'),
     [int]$Iterations = 7,
     [int]$Width = 512,
     [int]$Height = 512
@@ -65,7 +66,11 @@ $f3dHeight = $Height
 
 $results = @()
 foreach ($name in $Models) {
-    $model = [IO.Path]::GetFullPath((Join-Path $ModelDirectory "$name.glb"))
+    $model = if ($name -eq 'AluminumBallBearing') {
+        [IO.Path]::GetFullPath((Join-Path $FixtureDirectory 'aluminum_ball_bearing.glb'))
+    } else {
+        [IO.Path]::GetFullPath((Join-Path $ModelDirectory "$name.glb"))
+    }
     if (-not (Test-Path -LiteralPath $model)) {
         throw "Missing benchmark model: $model"
     }

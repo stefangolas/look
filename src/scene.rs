@@ -82,6 +82,7 @@ pub struct SourceMaterial {
     pub occlusion_strength: f32,
     pub emissive_factor: [f32; 3],
     pub emissive_texture: Option<TextureReference>,
+    pub unlit: bool,
     pub alpha_mode: AlphaMode,
     pub alpha_cutoff: f32,
     pub double_sided: bool,
@@ -94,6 +95,8 @@ pub struct Geometry {
     pub indices: Vec<u32>,
     pub hash: String,
     pub bounds: Bounds,
+    pub bounding_center: [f32; 3],
+    pub bounding_radius: f32,
 }
 
 #[derive(Debug, Clone)]
@@ -113,6 +116,7 @@ pub struct CompiledScene {
     pub materials: Vec<SourceMaterial>,
     pub textures: Vec<SourceTexture>,
     pub bounds: Bounds,
+    pub fit_radius: f32,
     pub statistics: SceneStatistics,
 }
 
@@ -333,12 +337,15 @@ fn compile_stl(
         ]
     });
     let raw_hash = hash_geometry(&vertices, source_attributes.as_deref(), &indices);
+    let (bounding_center, bounding_radius) = bounding_sphere(&vertices, &local_bounds);
     let geometry = Geometry {
         vertices,
         source_attributes,
         indices,
         hash: blake3::Hash::from_bytes(raw_hash).to_hex().to_string(),
         bounds: local_bounds,
+        bounding_center,
+        bounding_radius,
     };
     let transform = normalization_transform(up_axis);
     let normal_transform = Mat3::from_mat4(transform).inverse().transpose();
@@ -356,6 +363,11 @@ fn compile_stl(
             .and_then(|value| value.to_str())
             .map(ToOwned::to_owned),
     };
+    let fit_radius = scene_fit_radius(
+        std::slice::from_ref(&geometry),
+        std::slice::from_ref(&instance),
+        &bounds,
+    );
     timings.record("compile", compile_started.elapsed());
 
     Ok(CompiledScene {
@@ -365,6 +377,7 @@ fn compile_stl(
         materials: vec![default_source_material()],
         textures: Vec::new(),
         bounds,
+        fit_radius,
         statistics: SceneStatistics {
             nodes: 1,
             mesh_primitives: 1,
@@ -628,6 +641,7 @@ fn compile_glb_internal(
                     .collect::<Vec<_>>()
             });
             let bounds = Bounds::from_positions(&positions);
+            let (bounding_center, bounding_radius) = bounding_sphere(&vertices, &bounds);
             let raw_hash = hash_geometry(&vertices, source_attributes.as_deref(), &indices);
 
             let existing = geometry_candidates.get(&raw_hash).and_then(|candidates| {
@@ -648,6 +662,8 @@ fn compile_glb_internal(
                     indices,
                     hash: blake3::Hash::from_bytes(raw_hash).to_hex().to_string(),
                     bounds,
+                    bounding_center,
+                    bounding_radius,
                 });
                 geometry_candidates.entry(raw_hash).or_default().push(index);
                 index
@@ -686,6 +702,7 @@ fn compile_glb_internal(
     if instances.is_empty() || scene_bounds.is_empty() {
         bail!("GLB scene contains no renderable triangle meshes");
     }
+    let fit_radius = scene_fit_radius(&geometries, &instances, &scene_bounds);
 
     timings.record("compile", compile_started.elapsed());
     let triangles = instances
@@ -716,8 +733,59 @@ fn compile_glb_internal(
         materials,
         textures,
         bounds: scene_bounds,
+        fit_radius,
         statistics,
     })
+}
+
+fn bounding_sphere(vertices: &[Vertex], bounds: &Bounds) -> ([f32; 3], f32) {
+    let center = bounds.center();
+    let radius = vertices
+        .iter()
+        .map(|vertex| Vec3::from_array(vertex.position).distance(center))
+        .fold(0.0_f32, f32::max)
+        .max(1.0e-4);
+    (center.to_array(), radius)
+}
+
+fn scene_fit_radius(geometries: &[Geometry], instances: &[Instance], bounds: &Bounds) -> f32 {
+    let scene_center = bounds.center();
+    instances
+        .iter()
+        .map(|instance| {
+            let geometry = &geometries[instance.geometry];
+            let center = instance
+                .transform
+                .transform_point3(Vec3::from_array(geometry.bounding_center));
+            let scale = conservative_maximum_scale(Mat3::from_mat4(instance.transform));
+            center.distance(scene_center) + geometry.bounding_radius * scale
+        })
+        .fold(0.0_f32, f32::max)
+        .max(1.0e-3)
+}
+
+fn conservative_maximum_scale(linear: Mat3) -> f32 {
+    let columns = [linear.x_axis, linear.y_axis, linear.z_axis];
+    let lengths = columns.map(|column| column.length());
+    let nearly_orthogonal = [(0, 1), (0, 2), (1, 2)]
+        .into_iter()
+        .all(|(a, b)| columns[a].dot(columns[b]).abs() <= lengths[a] * lengths[b] * 1.0e-5);
+    if nearly_orthogonal {
+        return lengths.into_iter().fold(0.0_f32, f32::max);
+    }
+
+    // For a matrix with shear, ||A||2 <= sqrt(||A||1 * ||A||inf). This keeps
+    // the cached sphere conservative without expanding ordinary glTF TRS
+    // transforms, whose basis columns are orthogonal and take the path above.
+    let columns = linear.to_cols_array_2d();
+    let norm_one = columns
+        .iter()
+        .map(|column| column.iter().map(|value| value.abs()).sum::<f32>())
+        .fold(0.0_f32, f32::max);
+    let norm_infinity = (0..3)
+        .map(|row| columns.iter().map(|column| column[row].abs()).sum::<f32>())
+        .fold(0.0_f32, f32::max);
+    (norm_one * norm_infinity).sqrt()
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -875,6 +943,7 @@ fn compile_material(material: gltf::Material<'_>) -> anyhow::Result<SourceMateri
         occlusion_strength: occlusion.map(|info| info.strength()).unwrap_or(1.0),
         emissive_factor: material.emissive_factor(),
         emissive_texture,
+        unlit: material.unlit(),
         alpha_mode: match material.alpha_mode() {
             gltf::material::AlphaMode::Opaque => AlphaMode::Opaque,
             gltf::material::AlphaMode::Mask => AlphaMode::Mask,
@@ -899,6 +968,7 @@ fn default_source_material() -> SourceMaterial {
         occlusion_strength: 1.0,
         emissive_factor: [0.0; 3],
         emissive_texture: None,
+        unlit: false,
         alpha_mode: AlphaMode::Opaque,
         alpha_cutoff: 0.5,
         double_sided: false,
@@ -1003,5 +1073,22 @@ mod tests {
         assert_eq!(vertices.len(), 3);
         assert_eq!(indices, [0, 1, 2]);
         assert_eq!(vertices[2].position, [0.0, 1.0, 0.0]);
+    }
+
+    #[test]
+    fn compiles_khr_materials_unlit() {
+        let gltf = gltf::Gltf::from_slice(
+            br#"{
+                "asset": { "version": "2.0" },
+                "extensionsUsed": ["KHR_materials_unlit"],
+                "materials": [{
+                    "extensions": { "KHR_materials_unlit": {} }
+                }]
+            }"#,
+        )
+        .unwrap();
+        let material = gltf.materials().next().unwrap();
+
+        assert!(compile_material(material).unwrap().unlit);
     }
 }

@@ -2,3 +2,4 @@
 /.look/
 *.png
 /benchmarks/threejs/node_modules/
+__pycache__/

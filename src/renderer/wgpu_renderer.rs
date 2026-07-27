@@ -197,10 +197,16 @@ impl WgpuRenderer {
         } else {
             wgpu::Features::empty()
         };
+        let mut required_limits = wgpu::Limits::default();
+        // wgpu's portable default is 256 MiB, but large photogrammetry and
+        // foliage scenes can legitimately need a larger packed vertex buffer.
+        // Request only the adapter's native buffer-size limit; keep every
+        // other portable default unchanged.
+        required_limits.max_buffer_size = adapter.limits().max_buffer_size;
         let (device, queue) = pollster::block_on(adapter.request_device(&wgpu::DeviceDescriptor {
             label: Some("look device"),
             required_features,
-            required_limits: wgpu::Limits::default(),
+            required_limits,
             experimental_features: wgpu::ExperimentalFeatures::disabled(),
             memory_hints,
             trace: wgpu::Trace::Off,
@@ -403,6 +409,22 @@ impl WgpuRenderer {
             || instances.is_empty()
         {
             anyhow::bail!("compiled scene contains no GPU data");
+        }
+        let vertex_bytes = match material_mode {
+            MaterialMode::Technical => vertices.len() * mem::size_of::<Vertex>(),
+            MaterialMode::Source => source_vertices.len() * mem::size_of::<SourceVertex>(),
+        };
+        for (label, bytes) in [
+            ("vertex", vertex_bytes),
+            ("index", indices.len() * mem::size_of::<u32>()),
+            ("instance", instances.len() * mem::size_of::<InstanceRaw>()),
+        ] {
+            if bytes as u64 > self.device.limits().max_buffer_size {
+                anyhow::bail!(
+                    "{label} buffer requires {bytes} bytes, exceeding the adapter limit of {} bytes",
+                    self.device.limits().max_buffer_size
+                );
+            }
         }
         let vertex_buffer = match material_mode {
             MaterialMode::Technical => {
@@ -760,6 +782,30 @@ impl WgpuRenderer {
             self.source_single_sample.as_ref()
         };
         let render_started = Instant::now();
+        let timestamp_query_set = self.timestamp_queries.then(|| {
+            self.device.create_query_set(&wgpu::QuerySetDescriptor {
+                label: Some("look atlas render timestamps"),
+                ty: wgpu::QueryType::Timestamp,
+                count: 2,
+            })
+        });
+        let timestamp_size = 2 * mem::size_of::<u64>() as u64;
+        let timestamp_resolve = timestamp_query_set.as_ref().map(|_| {
+            self.device.create_buffer(&wgpu::BufferDescriptor {
+                label: Some("look atlas timestamp resolve"),
+                size: timestamp_size,
+                usage: wgpu::BufferUsages::QUERY_RESOLVE | wgpu::BufferUsages::COPY_SRC,
+                mapped_at_creation: false,
+            })
+        });
+        let timestamp_readback = timestamp_query_set.as_ref().map(|_| {
+            self.device.create_buffer(&wgpu::BufferDescriptor {
+                label: Some("look atlas timestamp readback"),
+                size: timestamp_size,
+                usage: wgpu::BufferUsages::COPY_DST | wgpu::BufferUsages::MAP_READ,
+                mapped_at_creation: false,
+            })
+        });
         let mut encoder = self
             .device
             .create_command_encoder(&wgpu::CommandEncoderDescriptor {
@@ -791,7 +837,13 @@ impl WgpuRenderer {
                     }),
                     stencil_ops: None,
                 }),
-                timestamp_writes: None,
+                timestamp_writes: timestamp_query_set.as_ref().map(|query_set| {
+                    wgpu::RenderPassTimestampWrites {
+                        query_set,
+                        beginning_of_pass_write_index: Some(0),
+                        end_of_pass_write_index: Some(1),
+                    }
+                }),
                 occlusion_query_set: None,
                 multiview_mask: None,
             });
@@ -835,6 +887,14 @@ impl WgpuRenderer {
                 depth_or_array_layers: 1,
             },
         );
+        if let (Some(query_set), Some(resolve), Some(timestamp_readback)) = (
+            timestamp_query_set.as_ref(),
+            timestamp_resolve.as_ref(),
+            timestamp_readback.as_ref(),
+        ) {
+            encoder.resolve_query_set(query_set, 0..2, resolve, 0);
+            encoder.copy_buffer_to_buffer(resolve, 0, timestamp_readback, 0, timestamp_size);
+        }
         self.queue.submit([encoder.finish()]);
         timings.record("gpu_encode_submit", render_started.elapsed());
 
@@ -845,6 +905,15 @@ impl WgpuRenderer {
             .map_async(wgpu::MapMode::Read, move |result| {
                 let _ = sender.send(result);
             });
+        let timestamp_receiver = timestamp_readback.as_ref().map(|timestamp_readback| {
+            let (sender, receiver) = mpsc::sync_channel(1);
+            timestamp_readback
+                .slice(..)
+                .map_async(wgpu::MapMode::Read, move |result| {
+                    let _ = sender.send(result);
+                });
+            receiver
+        });
         self.device
             .poll(wgpu::PollType::wait_indefinitely())
             .context("GPU atlas polling failed")?;
@@ -852,6 +921,12 @@ impl WgpuRenderer {
             .recv()
             .context("GPU atlas readback callback was dropped")?
             .context("GPU atlas readback mapping failed")?;
+        if let Some(receiver) = timestamp_receiver {
+            receiver
+                .recv()
+                .context("GPU atlas timestamp callback was dropped")?
+                .context("GPU atlas timestamp mapping failed")?;
+        }
         let mapped = readback
             .slice(..)
             .get_mapped_range()
@@ -866,6 +941,18 @@ impl WgpuRenderer {
         }
         drop(mapped);
         readback.unmap();
+        if let Some(timestamp_readback) = timestamp_readback {
+            let mapped = timestamp_readback
+                .slice(..)
+                .get_mapped_range()
+                .context("failed to access GPU atlas timestamps")?;
+            let timestamps = bytemuck::cast_slice::<u8, u64>(&mapped);
+            let ticks = timestamps[1].saturating_sub(timestamps[0]);
+            let milliseconds = ticks as f64 * f64::from(self.queue.get_timestamp_period()) / 1.0e6;
+            timings.set_ms("gpu_render", milliseconds);
+            drop(mapped);
+            timestamp_readback.unmap();
+        }
         timings.record("gpu_readback", readback_started.elapsed());
 
         let tiles = cameras
@@ -1465,7 +1552,7 @@ fn material_raw(material: &SourceMaterial) -> MaterialRaw {
         occlusion_alpha_mode: [
             texture_set(material.occlusion_texture),
             alpha_mode,
-            0.0,
+            if material.unlit { 1.0 } else { 0.0 },
             0.0,
         ],
     }

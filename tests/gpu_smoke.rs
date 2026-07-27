@@ -38,6 +38,7 @@ fn renders_generated_glb_to_png() {
     let view = ViewConfig::named(NamedView::Front, CameraKind::Orthographic);
     let camera = prepare_camera(&view, &scene.bounds, render.resolution);
     let cameras = [camera];
+    unsafe { std::env::set_var("LOOK_GPU_TIMESTAMPS", "1") };
     let mut renderer = WgpuRenderer::new().unwrap();
     let batch = renderer
         .render_views(&scene, &cameras, &render, &LightingConfig::default())
@@ -87,6 +88,7 @@ fn renders_generated_glb_to_png() {
         )
         .unwrap();
     assert_eq!(atlas.images.len(), 1);
+    assert!(atlas.timings.get("gpu_render").is_some());
     assert_eq!([atlas.images[0].width, atlas.images[0].height], [256, 256]);
     assert_eq!(atlas.images[0].tiles.len(), 4);
     assert_eq!(

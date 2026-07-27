@@ -155,6 +155,9 @@ fn fragment_main(input: VertexOutput, @builtin(front_facing) front_facing: bool)
     if (alpha_mode < 1.5) {
         base.a = 1.0;
     }
+    if (material.occlusion_alpha_mode.z > 0.5) {
+        return base;
+    }
 
     let mr_uv = selected_uv(material.tex_coord_sets.y, input.tex_coord_0, input.tex_coord_1);
     let mr = textureSample(metallic_roughness_texture, metallic_roughness_sampler, mr_uv);

@@ -51,6 +51,84 @@ cargo build --release
 ./benchmarks/compare-pbr.ps1
 ```
 
+### Larger scenes
+
+The same fresh-process harness was also run against two environment models.
+These are separate workloads and are not folded into the six-model Khronos
+geometric mean.
+
+<img src="images/nyc-boulevard-look-vs-f3d.png" width="900" alt="New York Boulevard rendered side by side by look and F3D 3.5">
+
+New York Boulevard contains 747,897 triangles, 650,951 compiled vertices, 11
+draw instances, and two source textures. At 4096x4096, seven measured launches
+produced:
+
+| Renderer | Samples (ms) | Median |
+|---|---|---:|
+| look | 697.395, 887.887, 1029.659, 709.606, 1138.825, 684.565, 1146.297 | 887.887 ms |
+| F3D 3.5 | 2321.472, 1769.127, 2391.241, 1770.464, 1765.476, 1785.720, 1776.994 | 1776.994 ms |
+
+F3D / look was 2.001x. Foreground bounds were identical at
+`[213, 1655, 3878, 2438]`. The asset declares `KHR_materials_unlit`; `look`
+honors that extension while the F3D-compatible lighting path produces visibly
+different shading, so this is a matched framing and output-work comparison,
+not a claim of pixel identity. Linear-RGB RMSE over the foreground union was
+0.0311 and alpha was identical.
+
+<img src="images/sponza-look-vs-f3d.png" width="900" alt="Intel Sponza rendered side by side by look and F3D 3.5">
+
+Intel's Sponza Base Scene contains 3,747,018 triangles, 1,945,350 compiled
+vertices, 405 draw instances, 29 materials, and 72 textures. The official
+textures are 4096x4096. The comparison used a geometry-identical derivative
+with each texture resized to 2048x2048 so both renderers fit reliably on this
+laptop:
+
+| Renderer | Samples (ms) | Median |
+|---|---|---:|
+| look | 2832.891, 3262.294, 2770.226 | 2832.891 ms |
+| F3D 3.5 | 18220.546, 18233.087, 16625.062 | 18220.546 ms |
+
+F3D / look was 6.432x at 512x512. This is mainly a scene import, texture, and
+renderer initialization result: `look`'s measured GPU draw was about 1.1 ms.
+The full 4K-texture package did not complete reliably in source-material mode
+on this GPU, while technical mode succeeded because it intentionally skips
+source texture decode and upload. The reduced derivative SHA-256 is
+`b283303b7133df7ab6939229ac6492dcee3ee84ab9722041b2af5cf6bad79564`.
+
+The New York asset hash reported by `look` was
+`2238e481971910f248d66ea6796191d1dc4cb5f819940680b58760c270dd5235`.
+The Sponza derivative source hash was
+`e3e8fb573e1718cd5ea51b5ce948b040ca13fdcbcf735a6acb8dd20d1b7cb3f8`.
+
+#### Foliage stress scene
+
+<img src="images/sponza-foliage-look-vs-f3d.png" width="900" alt="Intel Sponza with Ivy and Trees rendered side by side by look and F3D 3.5">
+
+The official Sponza Base, Ivy, and Trees packages were merged into one GLB by
+`benchmarks/merge-gltf-scenes.py`. The composite contains 10,836,323 triangles,
+6,928,589 compiled vertices, 411 draw instances, 348 geometries, 34 materials,
+and 79 textures. Base textures were resized to 2048x2048; the foliage add-on
+textures remain at their official resolution.
+
+At 512x512, after one conditioning launch and with alternating launch order:
+
+| Renderer | Samples (ms) | Median |
+|---|---|---:|
+| look | 36244.279, 8491.023, 7533.588 | 8491.023 ms |
+| F3D 3.5 | 52770.050, 46137.207, 50466.004 | 50466.004 ms |
+
+F3D / look was 5.943x. The first `look` sample was a large outlier and is
+retained above. Foreground bounds matched at `[26, 130, 486, 382]`;
+linear-RGB RMSE over the foreground union was 0.0166 and alpha was identical.
+The combined source hash reported by `look` was
+`1c4c0098e9dbf5b21955a81d21b0e0bf1bfd4df9e0801c908b2a4183045c47f5`.
+
+This scene also exposed and fixed a real scale limit: `look` had requested
+wgpu's portable 256 MiB maximum buffer size even when the physical adapter
+supported larger buffers. It now requests the adapter's native buffer-size
+limit and reports an ordinary error if a packed scene buffer still exceeds it,
+instead of allowing a GPU validation panic.
+
 ## F3D visual compatibility
 
 The F3D match profile is pinned to F3D 3.5's VTK camera framing and default
@@ -120,6 +198,37 @@ npm run bench:webgpu
 ```
 
 Reports are written beneath `target/bench/threejs`.
+
+## Resident camera path
+
+`examples/camera_path_benchmark.rs` moves a perspective camera through the
+interior of a resident scene, reads every frame back, and writes four sampled
+keyframes as an atlas. Set `LOOK_GPU_TIMESTAMPS=1` to separate GPU execution
+from submission and readback:
+
+```console
+LOOK_GPU_TIMESTAMPS=1 cargo run --release --example camera_path_benchmark -- \
+  target/bench/models/Sponza-2k.glb 120 1024x1024
+```
+
+On base Sponza, the retained 120-frame 1024x1024 path measured 1.587 ms median
+GPU time (1.724 ms p95) and 4.999 ms median wall time including readback. The
+retained 30-frame 4096x4096 path with `--antialias` measured 4.661 ms median GPU
+time (6.337 ms p95) and 26.767 ms median wall time.
+
+Adding Ivy and Trees made the same 30-frame 4K, 4x-MSAA workload materially more
+demanding: 7.580 ms median GPU time, 10.039 ms p95, and 37.330 ms median wall
+time. A resident four-view 512px atlas measured 12.232 ms median GPU time.
+Three.js WebGL2 measured 9.9 ms for its GPU-finish interval on the same atlas
+and confirmed ANGLE D3D11 on the same RTX 5050; `look` therefore does not claim
+a pure-GPU win for that workload. End-to-end atlas medians were 38.05 ms for
+`look` and 42.5 ms for Three.js. Three.js WebGPU measured 17.0 ms, but Chrome
+withheld adapter identity, so it is not a proven same-adapter comparison.
+
+Atlas scaling provides a separate saturation lane. With 512px tiles and 4x
+MSAA, median GPU time was 9.525 ms for 8 views, 19.108 ms for 16, 38.850 ms for
+32, and 80.837 ms for 64. The 64-view pass submits 25,920 draws and transforms
+about 239.8 million triangles.
 
 ## Rules for publishable results
 

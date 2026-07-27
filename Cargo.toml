@@ -11,7 +11,7 @@ blake3 = "1.8"
 bytemuck = { version = "1.24", features = ["derive"] }
 clap = { version = "4.5", features = ["derive"] }
 glam = { version = "0.30", features = ["bytemuck", "serde"] }
-gltf = { version = "1.4", default-features = false, features = ["utils", "names"] }
+gltf = { version = "1.4", default-features = false, features = ["utils", "names", "KHR_materials_unlit"] }
 image = { version = "0.25", default-features = false, features = ["jpeg", "png"] }
 png = "0.18"
 pollster = "0.4"

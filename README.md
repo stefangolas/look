@@ -4,14 +4,19 @@
 images. Its basic purpose is to let a person, script, or software agent inspect
 a 3D model without opening a full CAD application or browser-based viewer.
 
-| `look` | F3D 3.5 |
-|---|---|
-| <img src="docs/images/damaged-helmet-look.png" width="350" alt="Damaged Helmet rendered by look"> | <img src="docs/images/damaged-helmet-f3d.png" width="350" alt="Damaged Helmet rendered by F3D 3.5"> |
+<img src="docs/images/sponza-foliage-look-vs-f3d.png" width="900" alt="Intel Sponza with Ivy and Trees rendered side by side by look and F3D 3.5">
 
-Same Damaged Helmet model, 512x512 front orthographic camera, source PBR
-materials, background, and F3D-compatible light kit. Model credits: Copyright
-2018 ctxwing, CC BY 4.0; Copyright 2016 theblueturtle_, CC BY-NC 4.0.
-[Image license and exact render configuration](docs/images/README.md).
+On the 10.8M-triangle Intel Sponza Base + Ivy + Trees scene, `look` completed a
+fresh-process 512x512 PNG in **8.49 s** median versus **50.47 s** for F3D 3.5:
+**5.94x faster** over three alternating launches. The same resident scene
+rendered a 4K fly-through with 4x MSAA in **7.58 ms median GPU time**.
+[Image license, raw samples, and exact configuration](docs/BENCHMARKS.md).
+
+<img src="docs/images/nyc-boulevard-look-vs-f3d.png" width="900" alt="New York Boulevard rendered side by side by look and F3D 3.5">
+
+The 748K-triangle New York Boulevard demo completed at 4096x4096 in **888 ms**
+median versus **1,777 ms** for F3D 3.5: **2.00x faster** over seven alternating
+fresh launches.
 
 ## Quick example
 
@@ -32,8 +37,6 @@ look model.glb --material-mode source \
   --views front,right,top,iso --camera orthographic \
   --resolution 384x384 --atlas 2 --output views.png --json
 ```
-
-<img src="docs/images/damaged-helmet-tileset.png" width="560" alt="Front, right, top, and isometric Damaged Helmet views packed into a two-by-two atlas by look">
 
 In the persistent 512 px-tile benchmark on an NVIDIA RTX 5050 Laptop GPU, this
 four-view atlas took **8.94 ms** in `look`, versus **22.50 ms** in Three.js
@@ -226,9 +229,12 @@ Chrome withheld WebGPU adapter identity, so that row is informative rather than
 a same-adapter performance claim.
 
 Against clean-config F3D 3.5 fresh processes on six glTF sample models, `look`
-was 1.11x to 1.57x faster with a 1.40x geometric-mean speedup. These are local
-results, not universal guarantees. Full commands, model hashes, fidelity
-metrics, and methodological limits are in [benchmarks](docs/BENCHMARKS.md).
+was 1.11x to 1.57x faster with a 1.40x geometric-mean speedup. It was 2.00x
+faster on New York Boulevard at 4K, 6.43x faster on the 3.75M-triangle Intel
+Sponza base scene, and 5.94x faster on the 10.8M-triangle Sponza foliage
+composite at 512px. These are local results, not universal guarantees. Full
+commands, raw samples, fidelity metrics, and methodological limits are in
+[benchmarks](docs/BENCHMARKS.md).
 
 ## Development
 

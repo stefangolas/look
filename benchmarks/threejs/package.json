@@ -5,7 +5,9 @@
   "scripts": {
     "bench": "node benchmark.mjs",
     "bench:webgl": "node benchmark.mjs",
-    "bench:webgpu": "node benchmark.mjs ../../target/bench/models/DamagedHelmet.glb 11 webgpu"
+    "bench:webgpu": "node benchmark.mjs ../../target/bench/models/DamagedHelmet.glb 11 webgpu",
+    "bench:ball:webgl": "node benchmark.mjs ../../tests/fixtures/aluminum_ball_bearing.glb 11 webgl2 ../../target/bench/ball-bearing/three-webgl2.json",
+    "bench:ball:webgpu": "node benchmark.mjs ../../tests/fixtures/aluminum_ball_bearing.glb 11 webgpu ../../target/bench/ball-bearing/three-webgpu.json"
   },
   "dependencies": {
     "playwright-core": "1.62.0",

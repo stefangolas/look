@@ -125,11 +125,15 @@ fn run_case(
     output: &PathBuf,
 ) -> anyhow::Result<serde_json::Value> {
     let mut samples = Vec::with_capacity(iterations);
+    let mut gpu_samples = Vec::with_capacity(iterations);
     let mut final_timings = Timings::default();
     for _ in 0..iterations {
         let started = Instant::now();
         let mut batch =
             renderer.render_views(scene, cameras, render, &LightingConfig::default())?;
+        if let Some(gpu_render) = batch.timings.get("gpu_render") {
+            gpu_samples.push(gpu_render);
+        }
         let image = batch.images.pop().context("renderer returned no image")?;
         write_png(output, &image)?;
         samples.push(started.elapsed().as_secs_f64() * 1_000.0);
@@ -145,7 +149,23 @@ fn run_case(
         "p95_ms": ordered[p95_index],
         "min_ms": ordered[0],
         "max_ms": ordered[ordered.len() - 1],
+        "gpu_render": distribution(&gpu_samples),
         "final_internal_timings_ms": final_timings,
         "output": output,
     }))
+}
+fn distribution(samples: &[f64]) -> serde_json::Value {
+    if samples.is_empty() {
+        return serde_json::Value::Null;
+    }
+    let mut ordered = samples.to_vec();
+    ordered.sort_by(f64::total_cmp);
+    let percentile = |value: f64| ordered[((ordered.len() - 1) as f64 * value).round() as usize];
+    json!({
+        "samples_ms": samples,
+        "min_ms": ordered[0],
+        "median_ms": percentile(0.5),
+        "p95_ms": percentile(0.95),
+        "max_ms": ordered[ordered.len() - 1],
+    })
 }
