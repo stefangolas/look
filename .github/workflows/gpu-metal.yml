@@ -1,4 +1,4 @@
-name: gpu-metal-correctness
+name: gpu-metal-correctness-virtual
 
 on:
   workflow_dispatch:
@@ -10,7 +10,10 @@ permissions:
 
 jobs:
   render-smoke:
-    runs-on: macos-15-xlarge
+    # Standard personal-account runner. It exposes an Apple M1/Metal device,
+    # but it is virtualized: correctness only, never publish its timings as
+    # bare-metal performance results.
+    runs-on: macos-15
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
@@ -33,4 +36,3 @@ jobs:
             target/gpu-smoke/triangle.png
           if-no-files-found: warn
           retention-days: 30
-
