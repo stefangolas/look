@@ -69,7 +69,9 @@ pub fn read(section: &DataSection) -> Option<(Vec<[f32; 3]>, Vec<u32>)> {
             } else {
                 *pnindex.get(usize::try_from(local).ok()?.checked_sub(1)?)?
             };
-            points.get(usize::try_from(coordinate).ok()?.checked_sub(1)?).copied()
+            points
+                .get(usize::try_from(coordinate).ok()?.checked_sub(1)?)
+                .copied()
         };
 
         let mut emit = |a: i64, b: i64, c: i64| {

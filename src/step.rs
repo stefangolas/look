@@ -7,6 +7,7 @@
 //! STEP. AP242 also allows a file to ship its mesh directly, which is handled
 //! by [`tessellated`].
 
+pub mod part21;
 mod tessellated;
 
 use std::time::Instant;
@@ -42,8 +43,15 @@ pub fn parse_step(
         .unwrap_or_else(|_| bytes.iter().map(|&b| b as char).collect::<String>().into());
 
     let parse_started = Instant::now();
-    let exchange = ruststep::parser::parse(&text)
-        .map_err(|error| anyhow::anyhow!("failed to parse STEP: {error}"))?;
+    // [`part21`] reads the exchange structure far faster than ruststep's nom
+    // grammar, but covers a little less of the standard. Whatever it turns
+    // down is handed to ruststep, so the fast reader can only add speed and
+    // never narrows what look accepts.
+    let exchange = match part21::parse(&text) {
+        Ok(exchange) => exchange,
+        Err(_) => ruststep::parser::parse(&text)
+            .map_err(|error| anyhow::anyhow!("failed to parse STEP: {error}"))?,
+    };
     timings.record("step_parse", parse_started.elapsed());
 
     let section = exchange

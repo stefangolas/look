@@ -115,33 +115,52 @@ warm-up:
 
 | Model | Size | Median | Triangles |
 |---|---:|---:|---:|
-| ctc_01 (AP203) | 0.22 MB | 524.9 ms | 1,200 |
-| ftc_06 (AP203) | 0.21 MB | 494.6 ms | 2,537 |
-| ctc_03 (AP242) | 0.64 MB | 503.0 ms | 1,164 |
-| ctc_02 (AP242) | 1.89 MB | 510.5 ms | 6,122 |
-| ftc_09 (AP242) | 5.83 MB | 715.0 ms | 1,766 |
-| stc_09 (AP242) | 5.04 MB | 933.0 ms | 1,708 |
+| ctc_01 (AP203) | 0.22 MB | 686.0 ms | 1,200 |
+| ftc_06 (AP203) | 0.21 MB | 659.8 ms | 2,537 |
+| ctc_03 (AP242) | 0.64 MB | 663.2 ms | 1,164 |
+| ctc_02 (AP242) | 1.89 MB | 687.7 ms | 6,122 |
+| ftc_09 (AP242) | 5.83 MB | 643.5 ms | 1,766 |
+| stc_09 (AP242) | 5.04 MB | 667.7 ms | 1,708 |
 
-Runtime tracks file size, not triangle count: `ctc_02` produces 3.6x the
-triangles of `stc_09` in half the time. The phase breakdown shows why.
+Runtime no longer tracks either file size or triangle count. It is flat within
+noise from 0.21 MB to 5.83 MB, a 28x range of input, because every model now
+finishes its CPU work before the GPU is ready and the render waits on adapter
+and device creation. The phase breakdown shows the remaining CPU cost.
 
-| Model | Parse | Tessellate | GPU init wait | Total |
-|---|---:|---:|---:|---:|
-| ftc_06 | 29.6 ms | 7.0 ms | 357.9 ms | 418.7 ms |
-| ctc_02 | 193.1 ms | 23.1 ms | 135.9 ms | 391.0 ms |
-| ftc_09 | 541.8 ms | 7.1 ms | 0.0 ms | 631.2 ms |
-| stc_09 | 729.9 ms | 5.2 ms | 0.0 ms | 821.1 ms |
+| Model | Parse | Table | Tessellate |
+|---|---:|---:|---:|
+| ftc_06 | 2.6 ms | 3.8 ms | 4.8 ms |
+| ctc_02 | 20.6 ms | 20.3 ms | 26.6 ms |
+| ftc_09 | 41.4 ms | 51.0 ms | 8.9 ms |
+| stc_09 | 54.3 ms | 67.2 ms | 10.0 ms |
 
-Two things follow. Tessellation is never the cost: it stays between 6 and 28 ms
-even on the largest models, so the boundary representation evaluation is not
-the bottleneck. Parsing ISO 10303-21 text is, reaching 88% of total runtime on
-the largest file, and it is the only phase worth optimizing further.
+These three phases are reported separately from the totals above because a loop
+that relaunches the same model back to back contends on the GPU adapter and
+inflates the wait; the CPU phases are unaffected by that and are stable across
+runs, while the totals come from `step-bench.ps1`, which warms up first.
 
-GPU initialization runs concurrently with scene loading, so on small models the
-render waits on the GPU while on large ones the GPU is ready before parsing
-finishes and the wait falls to zero. The floor of roughly 470 ms on a small
-model is process launch plus adapter and device creation, matching the GLB
-results above.
+Parsing used to be the whole story, reaching 88% of runtime on the largest file
+at 729.9 ms for `stc_09`. It is now 54.3 ms. `look` reads the exchange
+structure with its own Part 21 reader (`src/step/part21.rs`) rather than
+ruststep's nom grammar: every token in this grammar is identifiable from its
+first byte, so the reader dispatches on that byte and never backtracks, where
+the nom `alt` chains reached a number or a `#` reference only after trying and
+discarding the earlier alternatives, each of which allocated an error value on
+the way down. Throughput on `stc_09` went from about 6.4 MB/s to about 80 MB/s.
+
+The reader is held to producing exactly the syntax tree ruststep produces. The
+`part21_agrees_with_ruststep_across_a_corpus` test compares both trees outright
+over a corpus directory given in `LOOK_STEP_CORPUS`, and all 33 NIST files
+match. Anything the reader turns down falls back to ruststep, so it can only
+make parsing faster and never narrows what `look` accepts.
+
+Tessellation was never the cost and still is not, staying between 5 and 27 ms.
+Resolving the entity graph into a `Table` is now the same order of magnitude as
+parsing, which makes it the next candidate rather than the parser.
+
+The floor of roughly 650 ms is process launch plus adapter and device creation.
+It is the whole runtime for every model in this set, so no further STEP-side
+work will move these numbers; only cutting GPU initialization would.
 
 Run it with:
 
@@ -163,18 +182,29 @@ launches:
 
 | Model | Size | look | F3D 3.5 | F3D / look |
 |---|---:|---:|---:|---:|
-| ctc_01 (AP203) | 0.22 MB | 632.2 ms | 631.6 ms | 1.00x |
-| ftc_06 (AP203) | 0.21 MB | 609.5 ms | 610.6 ms | 1.00x |
-| ctc_03 (AP242) | 0.64 MB | 574.0 ms | 565.1 ms | 0.98x |
-| ctc_02 (AP242) | 1.89 MB | 569.4 ms | 1,081.9 ms | 1.90x |
-| ftc_09 (AP242) | 5.83 MB | 789.6 ms | 791.8 ms | 1.00x |
-| stc_09 (AP242) | 5.04 MB | 971.5 ms | 849.9 ms | 0.87x |
+| ctc_01 (AP203) | 0.22 MB | 696.1 ms | 693.0 ms | 1.00x |
+| ftc_06 (AP203) | 0.21 MB | 667.4 ms | 695.3 ms | 1.04x |
+| ctc_03 (AP242) | 0.64 MB | 681.3 ms | 694.0 ms | 1.02x |
+| ctc_02 (AP242) | 1.89 MB | 679.4 ms | 1,412.1 ms | 2.08x |
+| ftc_09 (AP242) | 5.83 MB | 730.3 ms | 957.7 ms | 1.31x |
+| stc_09 (AP242) | 5.04 MB | 706.9 ms | 989.6 ms | 1.40x |
 
-The geometric mean is 1.08x, which is parity. This is a different result from
-the glTF and large scene comparisons, and the phase table explains why: STEP
-runtime is dominated by parsing ISO 10303-21 text, not by rendering. F3D parses
-with a mature native OpenCASCADE reader, so a rendering advantage has little
-room to show. Parsing is where any further gain has to come from.
+The geometric mean is 1.26x. The previous measurement of this table was 1.08x,
+parity, taken when parsing ISO 10303-21 text dominated STEP runtime and left a
+rendering advantage no room to show. With the Part 21 reader above, the two
+files where F3D was level or ahead have moved: `ftc_09` from 1.00x to 1.31x and
+`stc_09` from 0.87x to 1.40x.
+
+The three small models sit at parity and cannot leave it. Both tools are pinned
+to their process and GPU initialization floor there, and on `ctc_01` that floor
+is 693 ms of F3D's 693 ms. The comparison only has room to separate on files
+large enough to do measurable work, which in this corpus means `ctc_02` and up.
+
+Both tools measured about 10% slower in this run than in the previous one on
+the same machine — F3D's `ctc_01` went from 631.6 ms to 693.0 ms — so the
+ratios carry the result and the absolute milliseconds should not be compared
+across the two runs. The whole STEP section was re-measured together for that
+reason rather than having the `look` column updated in place.
 
 Run it with:
 
