@@ -193,9 +193,18 @@ impl Bounds {
     }
 
     pub fn from_positions(positions: &[[f32; 3]]) -> Self {
+        Self::from_position_iter(positions.iter().copied())
+    }
+
+    /// Bounds of positions that are not already contiguous in memory.
+    ///
+    /// A tessellated assembly reaches millions of vertices, so collecting them
+    /// into a temporary just to measure their extent costs tens of megabytes
+    /// that are dropped immediately afterwards.
+    pub fn from_position_iter(positions: impl IntoIterator<Item = [f32; 3]>) -> Self {
         let mut bounds = Self::empty();
         for position in positions {
-            bounds.include(Vec3::from_array(*position));
+            bounds.include(Vec3::from_array(position));
         }
         bounds
     }
@@ -388,12 +397,7 @@ fn compile_triangle_mesh(
     timings: &mut Timings,
 ) -> anyhow::Result<CompiledScene> {
     let compile_started = Instant::now();
-    let local_bounds = Bounds::from_positions(
-        &vertices
-            .iter()
-            .map(|vertex| vertex.position)
-            .collect::<Vec<_>>(),
-    );
+    let local_bounds = Bounds::from_position_iter(vertices.iter().map(|vertex| vertex.position));
     let source_attributes = include_source_materials.then(|| {
         vec![
             SourceVertexAttributes {
@@ -1060,20 +1064,27 @@ fn normalization_transform(up_axis: UpAxis) -> Mat4 {
 }
 
 fn generate_normals(positions: &[[f32; 3]], indices: &[u32]) -> Vec<[f32; 3]> {
-    let mut normals = vec![Vec3::ZERO; positions.len()];
+    // Accumulated and normalized in one buffer. A tessellated assembly reaches
+    // millions of vertices, where collecting into a second full-size vector
+    // would keep both alive at once for no benefit.
+    let mut normals = vec![[0.0f32; 3]; positions.len()];
     for triangle in indices.chunks_exact(3) {
         let a = Vec3::from_array(positions[triangle[0] as usize]);
         let b = Vec3::from_array(positions[triangle[1] as usize]);
         let c = Vec3::from_array(positions[triangle[2] as usize]);
         let face = (b - a).cross(c - a);
         for index in triangle {
-            normals[*index as usize] += face;
+            let slot = &mut normals[*index as usize];
+            *slot = (Vec3::from_array(*slot) + face).to_array();
         }
     }
+    for normal in &mut normals {
+        *normal = Vec3::from_array(*normal)
+            .try_normalize()
+            .unwrap_or(Vec3::Y)
+            .to_array();
+    }
     normals
-        .into_iter()
-        .map(|normal| normal.try_normalize().unwrap_or(Vec3::Y).to_array())
-        .collect()
 }
 
 fn hash_geometry(

@@ -225,6 +225,13 @@ fn model_tolerance(diameter: f64) -> f64 {
 /// keep their own normals when the caller generates them.
 fn append_polygon(polygon: &PolygonMesh, positions: &mut Vec<[f32; 3]>, indices: &mut Vec<u32>) {
     let vertices = polygon.positions();
+    // The triangle count is known, and these buffers reach tens of megabytes
+    // on a large assembly. Growing them by doubling holds the old and the new
+    // allocation at once at every step, so the high-water mark ends up well
+    // above what the mesh actually needs.
+    let incoming = polygon.tri_faces().len() * 3;
+    positions.reserve(incoming);
+    indices.reserve(incoming);
     for face in polygon.tri_faces() {
         for vertex in face {
             let point = vertices[vertex.pos];

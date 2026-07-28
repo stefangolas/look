@@ -225,6 +225,12 @@ def main() -> None:
     args = parser.parse_args()
 
     check_path(args.exe, "--exe")
+    # Windows does not resolve a relative executable against the working
+    # directory the way a shell does, so a relative --exe fails with a bare
+    # "cannot find the file specified" that reads like a missing corpus.
+    args.exe = os.path.abspath(args.exe)
+    if not os.path.isfile(args.exe):
+        raise SystemExit(f"--exe does not exist: {args.exe}")
     if args.dir:
         check_path(args.dir, "--dir")
     for path in args.files:

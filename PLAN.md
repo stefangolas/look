@@ -62,6 +62,54 @@ The corpus matters more than the count. NIST is 33 curated files, uniformly
 millimetre-scale AP203/AP242. ABC is real Onshape output: metre-scale AP214, up
 to 540 MB. Every bug above was invisible to NIST by construction.
 
+## Method: audit the path before measuring it
+
+Read the whole relevant code path end to end and list the runtime complexity,
+storage complexity, and outright bugs, *before* reaching for a benchmark. This
+is not a nicety. Nearly every real finding so far came from reading:
+
+- `push_instance` is a flat 63-arm match doing one map insert each, which ruled
+  out the superlinear table cost that two rounds of timing had suggested.
+- Curve and surface subdivision were bounded only by recursion depth, and both
+  double per level, so the worst case is exponential. That was the
+  out-of-memory, and it was visible in twenty lines of code.
+- `OFFSET_SURFACE` simply has no arm, which no amount of timing would reveal.
+
+The timing runs, by contrast, mostly produced numbers that had to be caveated
+because the machine was short of memory. Measure to confirm a hypothesis or to
+size a win, not to find one.
+
+The audit covers: `src/step.rs`, `src/step/part21.rs`, `src/scene.rs`, the
+`truck-stepio` entity path, and the `truck-geotrait` tessellation algorithms.
+
+### Audit findings
+
+Fixed:
+
+- Curve and surface division had no bound on output size, only on depth.
+- `append_polygon` grew two multi-megabyte vectors from empty when the final
+  size is known, holding both allocations live at every doubling.
+- `generate_normals` collected into a second full-size buffer to normalize.
+- `compile_triangle_mesh` copied every position into a temporary purely to
+  measure the bounding box.
+
+Open, in rough order of size:
+
+- **The STEP index buffer is the identity permutation.** `append_polygon`
+  emits `indices[i] == i` for every vertex, so it is four bytes per vertex of
+  pure redundancy — 22 MB on a 1.9 M-triangle model. Eliding it needs a
+  non-indexed draw path in the renderer.
+- **Vertices are unwelded**, three per triangle, so a shared corner is stored
+  as many times as it is used. That is deliberate, to keep flat per-face
+  normals, but welding on the pair of position *and* normal would preserve
+  creases and still collapse the flat regions.
+- **`source_attributes` allocates a constant.** When source materials are on,
+  it fills one vector entry per vertex with the same default value, roughly
+  40 bytes per vertex, for triangle-soup sources that have no such attributes.
+- **The entity table builds around sixty typed maps** whether or not the model
+  needs them; presentation and styling entities are a measurable share of a
+  real file and are never read by the render path.
+
 ## Near-term goals, in order
 
 1. **Support `OFFSET_SURFACE`.** `truck-stepio` has no arm for it, so the entity
