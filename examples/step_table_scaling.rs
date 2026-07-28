@@ -27,22 +27,37 @@ const COUNTS: [usize; 6] = [125_000, 250_000, 500_000, 1_000_000, 1_500_000, 2_0
 
 fn main() {
     println!(
-        "{:>10} {:>10} {:>12} {:>10} {:>12} {:>10} {:>10} {:>10}",
-        "entities", "MB", "parse ms", "us/ent", "table ms", "us/ent", "peak MB", "freeMB"
+        "{:>10} {:>10} {:>12} {:>10} {:>12} {:>10} {:>9} {:>9} {:>9} {:>8}",
+        "entities",
+        "MB",
+        "parse ms",
+        "us/ent",
+        "table ms",
+        "us/ent",
+        "tree MB",
+        "tableMB",
+        "peak MB",
+        "freeMB"
     );
 
     for count in COUNTS {
         let text = generate(count);
         let megabytes = text.len() as f64 / 1.0e6;
 
+        let baseline = working_set_bytes();
         let started = Instant::now();
-        let exchange = part21::parse(&text).expect("generated STEP should parse");
+        let mut exchange = part21::parse(&text).expect("generated STEP should parse");
         let parse_ms = started.elapsed().as_secs_f64() * 1000.0;
+        // The text is still held here, so subtracting it leaves the tree.
+        let tree_bytes = working_set_bytes().saturating_sub(baseline);
 
-        let section = exchange.data.first().expect("one data section");
+        // Consuming the tree is what look does, so the peak reported here is
+        // the peak a render actually pays.
+        let section = exchange.data.swap_remove(0);
         let started = Instant::now();
-        let table = Table::from_data_section(section);
+        let table = Table::from_owned_data_section(section);
         let table_ms = started.elapsed().as_secs_f64() * 1000.0;
+        let table_bytes = working_set_bytes().saturating_sub(baseline + tree_bytes);
 
         // Keep the table alive across the measurement so nothing is optimised
         // away, and report a field to prove it was actually built.
@@ -51,19 +66,35 @@ fn main() {
 
         println!(
             "{count:>10} {megabytes:>10.1} {parse_ms:>12.1} {:>10.3} {table_ms:>12.1} {:>10.3} \
-             {:>10.0} {:>10.0}",
+             {:>9.0} {:>9.0} {:>9.0} {:>8.0}",
             parse_ms * 1000.0 / count as f64,
             table_ms * 1000.0 / count as f64,
+            tree_bytes as f64 / 1.0e6,
+            table_bytes as f64 / 1.0e6,
             peak_working_set_bytes() as f64 / 1.0e6,
             available_bytes() as f64 / 1.0e6
         );
     }
 }
 
+/// Current resident memory, used to separate what the syntax tree costs from
+/// what the table costs. Now that the tree is handed to the table rather than
+/// lent to it, the table column reads near zero: it is built out of storage
+/// the tree has already given back, which is the point.
+#[cfg(windows)]
+fn working_set_bytes() -> u64 {
+    memory_counters().1
+}
+
 /// Peak resident memory of this process, so the curve can be read against the
 /// point where the working set stops fitting.
 #[cfg(windows)]
 fn peak_working_set_bytes() -> u64 {
+    memory_counters().0
+}
+
+#[cfg(windows)]
+fn memory_counters() -> (u64, u64) {
     #[repr(C)]
     #[derive(Default)]
     struct ProcessMemoryCounters {
@@ -92,10 +123,13 @@ fn peak_working_set_bytes() -> u64 {
     };
     unsafe {
         if K32GetProcessMemoryInfo(GetCurrentProcess(), &mut counters, counters.cb) == 0 {
-            return 0;
+            return (0, 0);
         }
     }
-    counters.peak_working_set_size as u64
+    (
+        counters.peak_working_set_size as u64,
+        counters.working_set_size as u64,
+    )
 }
 
 /// Physical memory still available to the process.
@@ -131,6 +165,11 @@ fn available_bytes() -> u64 {
 
 #[cfg(not(windows))]
 fn peak_working_set_bytes() -> u64 {
+    0
+}
+
+#[cfg(not(windows))]
+fn working_set_bytes() -> u64 {
     0
 }
 

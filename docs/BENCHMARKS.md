@@ -162,6 +162,38 @@ The floor of roughly 650 ms is process launch plus adapter and device creation.
 It is the whole runtime for every model in this set, so no further STEP-side
 work will move these numbers; only cutting GPU initialization would.
 
+#### Reading a model much larger than NIST
+
+NIST tops out at 6 MB. The ABC dataset's Onshape exports reach 540 MB, which is
+a different regime: there the binding constraint is memory rather than time.
+`examples/step_table_scaling.rs` generates inputs differing only in entity count
+and reports both, because on real files neither question can be answered
+cleanly — file size is a poor proxy for entity count, the entity type mix varies
+between files, and a model that does not fit produces the same curve as a
+superlinear algorithm.
+
+It shows that reading is linear. Across a 16x range of entity count, parsing
+holds at 0.25 to 0.28 us per entity and table construction at 0.25 to 0.42 us.
+That matches the code: `Table::from_data_section` is `from_iter` calling
+`push_instance` once per entity, and `push_instance` is a flat match on the
+record name doing one map insert. There is no superlinear term to find, and a
+reading that appears to show one is measuring the machine.
+
+Memory is the real limit. For a 104 MB input the syntax tree is 795 MB, about
+eight times the file, and the table another 348 MB. Those used to be resident
+simultaneously, because building a table from a borrowed data section keeps the
+whole tree alive until it finishes. `look` now hands the tree over instead, so
+each entity's storage is reclaimed as it is converted and the table is built
+out of memory the tree has already released. Peak for that input fell from
+1,334 MB to 1,010 MB, a 24% reduction, at the cost of about 9% on table
+construction from the incremental drops.
+
+One consequence is deliberate: an AP242 file that ships its mesh directly needs
+the syntax tree after the table has been built and no longer has it, so those
+files are read a second time. They are rare and small, and parsing is no longer
+the expensive part of loading one — the re-read costs about 14 ms on the 2.1 MB
+NIST tessellated model.
+
 Run it with:
 
 ```powershell

@@ -12,7 +12,6 @@ mod tessellated;
 
 use std::time::Instant;
 
-use anyhow::Context;
 use rayon::prelude::*;
 use truck_meshalgo::prelude::*;
 use truck_stepio::r#in::Table;
@@ -43,32 +42,33 @@ pub fn parse_step(
         .unwrap_or_else(|_| bytes.iter().map(|&b| b as char).collect::<String>().into());
 
     let parse_started = Instant::now();
-    // [`part21`] reads the exchange structure far faster than ruststep's nom
-    // grammar, but covers a little less of the standard. Whatever it turns
-    // down is handed to ruststep, so the fast reader can only add speed and
-    // never narrows what look accepts.
-    let exchange = match part21::parse(&text) {
-        Ok(exchange) => exchange,
-        Err(_) => ruststep::parser::parse(&text)
-            .map_err(|error| anyhow::anyhow!("failed to parse STEP: {error}"))?,
-    };
+    let mut exchange = read_exchange(&text)?;
     timings.record("step_parse", parse_started.elapsed());
 
-    let section = exchange
-        .data
-        .first()
-        .context("STEP file contains no data section")?;
+    if exchange.data.is_empty() {
+        anyhow::bail!("STEP file contains no data section");
+    }
+    let section = exchange.data.swap_remove(0);
 
+    // Hand the syntax tree over rather than lending it. The tree is roughly
+    // eight times the size of the file and the table another three, so
+    // building the table from a borrowed tree keeps both fully resident and
+    // makes peak memory, not speed, the limit on how large a model will load.
     let table_started = Instant::now();
-    let table = Table::from_data_section(section);
+    let table = Table::from_owned_data_section(section);
     timings.record("step_table", table_started.elapsed());
 
     if table.shell.is_empty() {
         // AP242 lets a file ship its mesh directly instead of a boundary
         // representation, in which case there is nothing to evaluate and the
-        // triangles are read straight out of the syntax tree.
+        // triangles are read straight out of the syntax tree. That tree was
+        // consumed above, which is the right trade for the boundary
+        // representations that are almost every file; these have to read it
+        // again. They are rare and small, and parsing is no longer the
+        // expensive part of loading one.
         let tessellated_started = Instant::now();
-        let tessellated = tessellated::read(section);
+        let reread = read_exchange(&text)?;
+        let tessellated = reread.data.first().and_then(tessellated::read);
         timings.record("step_tessellated_read", tessellated_started.elapsed());
         if let Some((positions, indices)) = tessellated {
             return Ok((positions, indices));
@@ -144,6 +144,19 @@ pub fn parse_step(
     }
 
     Ok((positions, indices))
+}
+
+/// Read the exchange structure.
+///
+/// [`part21`] reads it far faster than ruststep's nom grammar, but covers a
+/// little less of the standard. Whatever it turns down is handed to ruststep,
+/// so the fast reader can only add speed and never narrows what look accepts.
+fn read_exchange(text: &str) -> anyhow::Result<ruststep::ast::Exchange> {
+    match part21::parse(text) {
+        Ok(exchange) => Ok(exchange),
+        Err(_) => ruststep::parser::parse(text)
+            .map_err(|error| anyhow::anyhow!("failed to parse STEP: {error}")),
+    }
 }
 
 /// Scale the chord tolerance to the model so that a millimetre part and a
