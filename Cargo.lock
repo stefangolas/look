@@ -1833,7 +1833,7 @@ dependencies = [
 [[package]]
 name = "truck-assembly"
 version = "0.1.0"
-source = "git+https://github.com/stefangolas/truck?rev=cfbf999a#cfbf999a0c0b73923cafdce6b44a85e4e0a3b10b"
+source = "git+https://github.com/stefangolas/truck?rev=2c648cf#2c648cfb6c52b985cfe40024122537db504f6fb7"
 dependencies = [
  "rayon",
  "truck-base",
@@ -1842,7 +1842,7 @@ dependencies = [
 [[package]]
 name = "truck-base"
 version = "0.5.0"
-source = "git+https://github.com/stefangolas/truck?rev=cfbf999a#cfbf999a0c0b73923cafdce6b44a85e4e0a3b10b"
+source = "git+https://github.com/stefangolas/truck?rev=2c648cf#2c648cfb6c52b985cfe40024122537db504f6fb7"
 dependencies = [
  "cgmath",
  "matext4cgmath",
@@ -1853,7 +1853,7 @@ dependencies = [
 [[package]]
 name = "truck-derivers"
 version = "0.1.0"
-source = "git+https://github.com/stefangolas/truck?rev=cfbf999a#cfbf999a0c0b73923cafdce6b44a85e4e0a3b10b"
+source = "git+https://github.com/stefangolas/truck?rev=2c648cf#2c648cfb6c52b985cfe40024122537db504f6fb7"
 dependencies = [
  "proc-macro-error",
  "proc-macro2",
@@ -1864,7 +1864,7 @@ dependencies = [
 [[package]]
 name = "truck-geometry"
 version = "0.5.0"
-source = "git+https://github.com/stefangolas/truck?rev=cfbf999a#cfbf999a0c0b73923cafdce6b44a85e4e0a3b10b"
+source = "git+https://github.com/stefangolas/truck?rev=2c648cf#2c648cfb6c52b985cfe40024122537db504f6fb7"
 dependencies = [
  "serde",
  "thiserror 2.0.19",
@@ -1875,7 +1875,7 @@ dependencies = [
 [[package]]
 name = "truck-geotrait"
 version = "0.4.0"
-source = "git+https://github.com/stefangolas/truck?rev=cfbf999a#cfbf999a0c0b73923cafdce6b44a85e4e0a3b10b"
+source = "git+https://github.com/stefangolas/truck?rev=2c648cf#2c648cfb6c52b985cfe40024122537db504f6fb7"
 dependencies = [
  "getrandom",
  "rand",
@@ -1887,7 +1887,7 @@ dependencies = [
 [[package]]
 name = "truck-meshalgo"
 version = "0.4.0"
-source = "git+https://github.com/stefangolas/truck?rev=cfbf999a#cfbf999a0c0b73923cafdce6b44a85e4e0a3b10b"
+source = "git+https://github.com/stefangolas/truck?rev=2c648cf#2c648cfb6c52b985cfe40024122537db504f6fb7"
 dependencies = [
  "array-macro",
  "derive_more 2.1.1",
@@ -1905,7 +1905,7 @@ dependencies = [
 [[package]]
 name = "truck-modeling"
 version = "0.6.0"
-source = "git+https://github.com/stefangolas/truck?rev=cfbf999a#cfbf999a0c0b73923cafdce6b44a85e4e0a3b10b"
+source = "git+https://github.com/stefangolas/truck?rev=2c648cf#2c648cfb6c52b985cfe40024122537db504f6fb7"
 dependencies = [
  "derive_more 2.1.1",
  "itertools 0.15.0",
@@ -1921,7 +1921,7 @@ dependencies = [
 [[package]]
 name = "truck-polymesh"
 version = "0.6.0"
-source = "git+https://github.com/stefangolas/truck?rev=cfbf999a#cfbf999a0c0b73923cafdce6b44a85e4e0a3b10b"
+source = "git+https://github.com/stefangolas/truck?rev=2c648cf#2c648cfb6c52b985cfe40024122537db504f6fb7"
 dependencies = [
  "array-macro",
  "bytemuck",
@@ -1936,7 +1936,7 @@ dependencies = [
 [[package]]
 name = "truck-stepio"
 version = "0.3.0"
-source = "git+https://github.com/stefangolas/truck?rev=cfbf999a#cfbf999a0c0b73923cafdce6b44a85e4e0a3b10b"
+source = "git+https://github.com/stefangolas/truck?rev=2c648cf#2c648cfb6c52b985cfe40024122537db504f6fb7"
 dependencies = [
  "chrono",
  "derive_more 2.1.1",
@@ -1954,7 +1954,7 @@ dependencies = [
 [[package]]
 name = "truck-topology"
 version = "0.6.0"
-source = "git+https://github.com/stefangolas/truck?rev=cfbf999a#cfbf999a0c0b73923cafdce6b44a85e4e0a3b10b"
+source = "git+https://github.com/stefangolas/truck?rev=2c648cf#2c648cfb6c52b985cfe40024122537db504f6fb7"
 dependencies = [
  "parking_lot",
  "rayon",

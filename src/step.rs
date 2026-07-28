@@ -14,9 +14,10 @@ use truck_stepio::r#in::Table;
 
 use crate::timing::Timings;
 
-/// truck refuses tolerances below this, and the adaptive value can fall
-/// through the floor on a small or degenerate shell.
-const MIN_TOLERANCE: f64 = 1.0e-6;
+/// Floor for the adaptive tolerance. truck asserts at 1e-6, and divides the
+/// tolerance by a placement's scale before checking, so this keeps three
+/// orders of magnitude of headroom for large-radius geometry.
+const MIN_TOLERANCE: f64 = 1.0e-3;
 
 /// Chord deviation as a fraction of a shell's diagonal. Scaling to the model
 /// keeps output density stable across files that use different units.
@@ -54,20 +55,42 @@ pub fn parse_step(
         anyhow::bail!("STEP file contains no shells to tessellate");
     }
 
-    // Shells are independent, so tessellation parallelizes cleanly. A shell
-    // that fails is reported rather than silently dropped, so a partial render
-    // never passes for a complete one.
+    // Resolve the entity graph first. Tolerance is derived from the whole
+    // model rather than per shell: a shell-local tolerance meshes a part split
+    // into many small shells far finer than the same part as one shell, and a
+    // degenerate shell has no extent to scale by at all.
     let mesh_started = Instant::now();
-    let meshed = table
+    let shells = table
         .shell
         .par_iter()
         .map(|(id, shell)| {
-            let shell = table
+            table
                 .to_compressed_shell(shell)
-                .map_err(|error| format!("shell #{id}: {error}"))?;
-            let tolerance = shell_tolerance(&shell);
-            let polygon = shell.robust_triangulation(tolerance).to_polygon();
-            Ok::<PolygonMesh, String>(polygon)
+                .map_err(|error| format!("shell #{id}: {error}"))
+        })
+        .collect::<Vec<_>>();
+
+    let mut model = BoundingBox::<Point3>::new();
+    for shell in shells.iter().flatten() {
+        for vertex in &shell.vertices {
+            model.push(*vertex);
+        }
+    }
+    let tolerance = model_tolerance(model.diameter());
+
+    // Shells are independent, so tessellation parallelizes cleanly. A shell
+    // that fails is reported rather than silently dropped, so a partial render
+    // never passes for a complete one.
+    let meshed = shells
+        .into_par_iter()
+        .map(|shell| {
+            let shell = shell?;
+            // A shell with no surface area carries nothing to render, and
+            // feeding it forward only risks degenerate arithmetic downstream.
+            if shell.vertices.len() < 3 || shell.faces.is_empty() {
+                return Ok(PolygonMesh::default());
+            }
+            Ok::<PolygonMesh, String>(shell.robust_triangulation(tolerance).to_polygon())
         })
         .collect::<Vec<_>>();
     timings.record("step_tessellate", mesh_started.elapsed());
@@ -102,11 +125,16 @@ pub fn parse_step(
     Ok((positions, indices))
 }
 
-/// Scale the chord tolerance to the shell so that a millimetre part and a
+/// Scale the chord tolerance to the model so that a millimetre part and a
 /// metre part mesh to comparable density.
-fn shell_tolerance<C, S>(shell: &truck_topology::compress::CompressedShell<Point3, C, S>) -> f64 {
-    let bounds: BoundingBox<Point3> = shell.vertices.iter().collect();
-    let scaled = bounds.diameter() * RELATIVE_TOLERANCE;
+///
+/// The floor is deliberately well above truck's own 1e-6 minimum. Curves are
+/// tessellated in their own parameter space, so a placement scales the
+/// tolerance down by its radius before the check happens; sitting exactly on
+/// the minimum leaves no headroom and any circle larger than unit radius
+/// pushes it under.
+fn model_tolerance(diameter: f64) -> f64 {
+    let scaled = diameter * RELATIVE_TOLERANCE;
     if scaled.is_finite() && scaled > MIN_TOLERANCE {
         scaled
     } else {
