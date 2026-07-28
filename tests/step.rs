@@ -128,7 +128,7 @@ fn tessellates_step_boundary_representation() {
 
     let geometry = &scene.geometries[0];
     assert!(
-        geometry.indices.len() % 3 == 0,
+        geometry.indices.len().is_multiple_of(3),
         "index buffer must be whole triangles, got {}",
         geometry.indices.len()
     );
@@ -175,6 +175,44 @@ fn tessellates_step_boundary_representation() {
             "normal should be unit length, got {length}"
         );
     }
+}
+
+/// A solid bounded entirely by full circles has three topological vertices,
+/// and look used to discard any shell with fewer than three as having no
+/// surface area. This washer is 74 entities, OCCT reads it without complaint,
+/// and it reached the user as "tessellation produced no triangles".
+///
+/// The vertex count also drives the tolerance: the washer's three vertices span
+/// a fraction of its real diameter, so measuring the model from vertices alone
+/// asks for a tolerance far finer than the part warrants.
+#[test]
+fn a_solid_bounded_by_circles_still_tessellates() {
+    let mut timings = Timings::default();
+    let scene = compile_scene(
+        &fixture("washer_circular_edges.step"),
+        UpAxis::Y,
+        &mut timings,
+    )
+    .expect("a washer bounded by circles should tessellate");
+
+    let geometry = &scene.geometries[0];
+    let triangles = geometry.indices.len() / 3;
+    // Two annular faces and two cylindrical walls. A few hundred triangles is
+    // the shape of a correct answer; the regression this guards produced zero.
+    assert!(
+        triangles > 100,
+        "expected the washer to mesh, got {triangles} triangles"
+    );
+
+    // Both radii must appear in the bounds. A washer that meshed only its bore
+    // or only its rim would still pass a triangle count.
+    let span = |axis: usize| scene.bounds.max[axis] - scene.bounds.min[axis];
+    assert!(
+        span(0) > 0.0 && span(2) > 0.0 && span(1) > 0.0,
+        "washer bounds are degenerate: {:?}..{:?}",
+        scene.bounds.min,
+        scene.bounds.max
+    );
 }
 
 #[test]

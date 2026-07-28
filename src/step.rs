@@ -27,6 +27,20 @@ const DEGENERATE_TOLERANCE: f64 = 1.0e-3;
 /// keeps output density stable across files that use different units.
 const RELATIVE_TOLERANCE: f64 = 0.001;
 
+/// How many points to sample along each edge when measuring the model.
+///
+/// Enough to catch the mid-span bulge of a circle or a spline, which is where
+/// a vertex-only box loses the most; more would not change the diameter.
+const EDGE_SAMPLES: u32 = 4;
+
+/// truck panics below this, and it is not a tolerance we could honour anyway.
+///
+/// This is not the millimetre-scale floor the comment on [`model_tolerance`]
+/// argues against: it is the hard minimum truck's own division asserts on. A
+/// model whose measured extent is tiny — or an isolated shell pulled out of a
+/// larger assembly — otherwise computes a tolerance below it and aborts.
+const MINIMUM_TOLERANCE: f64 = 1.0e-6;
+
 /// Tessellate every shell in a STEP file into one indexed triangle mesh.
 ///
 /// Positions carry no shared topology between faces, so each triangle brings
@@ -96,6 +110,21 @@ pub fn parse_step(
         for vertex in &shell.vertices {
             model.push(*vertex);
         }
+        // Vertices alone understate the model, often badly. A full circle
+        // carries a single topological vertex, so a disc or a cylinder adds
+        // almost nothing to the box while occupying real space: a washer whose
+        // three vertices span 0.2 mm measured as 0.2 mm across, and the whole
+        // submarine model measured 3.06 against rendered bounds of 7.33.
+        // Since the tolerance is a fraction of this diameter, understating it
+        // meshes every model finer than asked. Sampling each edge closes the
+        // gap for the cost of a few curve evaluations per edge.
+        for edge in &shell.edges {
+            let (start, end) = edge.curve.range_tuple();
+            for step in 0..=EDGE_SAMPLES {
+                let t = start + (end - start) * f64::from(step) / f64::from(EDGE_SAMPLES);
+                model.push(edge.curve.subs(t));
+            }
+        }
     }
     let tolerance = model_tolerance(model.diameter());
 
@@ -106,9 +135,13 @@ pub fn parse_step(
         .into_par_iter()
         .map(|shell| {
             let shell = shell?;
-            // A shell with no surface area carries nothing to render, and
-            // feeding it forward only risks degenerate arithmetic downstream.
-            if shell.vertices.len() < 3 || shell.faces.is_empty() {
+            // Only a shell with no faces carries nothing to render. Counting
+            // *vertices* was wrong: a disc or a cylinder is bounded by full
+            // circles, which have one topological vertex each, so this
+            // discarded valid solids in silence. A 74-entity washer that OCCT
+            // renders fine reached look as "tessellation produced no
+            // triangles" for exactly this reason.
+            if shell.faces.is_empty() {
                 return Ok((PolygonMesh::default(), FaceTally::default()));
             }
             let meshed = shell.robust_triangulation(tolerance);
@@ -214,7 +247,7 @@ fn read_exchange(text: &str) -> anyhow::Result<ruststep::ast::Exchange> {
 fn model_tolerance(diameter: f64) -> f64 {
     let scaled = diameter * RELATIVE_TOLERANCE;
     if scaled.is_finite() && scaled > 0.0 {
-        scaled
+        scaled.max(MINIMUM_TOLERANCE)
     } else {
         DEGENERATE_TOLERANCE
     }
