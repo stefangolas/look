@@ -104,7 +104,7 @@ The Sponza derivative source hash was
 
 ### STEP
 
-STEP files are CAD boundary representations, so `look` evaluates and
+STEP files are usually CAD boundary representations, so `look` evaluates and
 tessellates them on load rather than reading triangles. These runs come from
 the NIST MBE PMI validation set, which is freely redistributable and exported
 by several commercial CAD systems, so it exercises real exporter behaviour
@@ -150,9 +150,9 @@ cargo build --release
 ./benchmarks/step-bench.ps1 -Look target/release/look.exe -Nist <path-to-nist-files>
 ```
 
-Coverage on that corpus is 32 of 33 files. The remaining file stores its
-geometry as an AP242 tessellated solid rather than a boundary representation,
-which `look` does not yet read.
+Coverage on that corpus is 33 of 33 files, spanning AP203, AP242 editions 1
+through 3, and one model that ships an AP242 tessellated solid instead of a
+boundary representation.
 
 #### Foliage stress scene
 

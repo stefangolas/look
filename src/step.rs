@@ -1,9 +1,13 @@
 //! STEP (ISO 10303-21) tessellation.
 //!
-//! STEP files describe solids as boundary representations — trimmed analytic
-//! and NURBS surfaces — so there are no triangles to read out. Each shell is
-//! evaluated and meshed, then flattened into the same triangle soup the STL
-//! path produces, which lets the rest of the pipeline stay unaware of STEP.
+//! STEP files usually describe solids as boundary representations — trimmed
+//! analytic and NURBS surfaces — so there are no triangles to read out. Each
+//! shell is evaluated and meshed, then flattened into the same triangle soup
+//! the STL path produces, which lets the rest of the pipeline stay unaware of
+//! STEP. AP242 also allows a file to ship its mesh directly, which is handled
+//! by [`tessellated`].
+
+mod tessellated;
 
 use std::time::Instant;
 
@@ -52,7 +56,16 @@ pub fn parse_step(
     timings.record("step_table", table_started.elapsed());
 
     if table.shell.is_empty() {
-        anyhow::bail!("STEP file contains no shells to tessellate");
+        // AP242 lets a file ship its mesh directly instead of a boundary
+        // representation, in which case there is nothing to evaluate and the
+        // triangles are read straight out of the syntax tree.
+        let tessellated_started = Instant::now();
+        let tessellated = tessellated::read(section);
+        timings.record("step_tessellated_read", tessellated_started.elapsed());
+        if let Some((positions, indices)) = tessellated {
+            return Ok((positions, indices));
+        }
+        anyhow::bail!("STEP file contains no shells or tessellated faces");
     }
 
     // Resolve the entity graph first. Tolerance is derived from the whole
