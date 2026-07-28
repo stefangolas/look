@@ -35,9 +35,17 @@ revision: `stefangolas/truck` and `stefangolas/ruststep`.
 - **Memory handoff.** The syntax tree is given to the table rather than lent to
   it, so both are not resident at once. Peak fell 24% on a controlled
   measurement.
-- **Four correctness fixes** (see the failure taxonomy below), taking the ten
+- **Six correctness fixes** (see the failure taxonomy below), taking the ten
   largest ABC models from three rendering to eight.
+- **`OFFSET_SURFACE` is read.** It had no arm in the entity table, so a quarter
+  of real Onshape files silently lost every face that used one. Two ABC models
+  went from 246 and 205 unresolved references to none.
+- **Tessellation cannot run away.** Curve and surface division were bounded only
+  by recursion depth while each level doubles. A 102 MB model that died at
+  5.16 GB now renders at 990 MB.
 - **Face loss is now reported** instead of silent.
+- **A corpus harness that refuses to produce bad numbers**, in
+  `benchmarks/step_corpus.py`.
 
 ## The failure taxonomy
 
@@ -86,6 +94,7 @@ The audit covers: `src/step.rs`, `src/step/part21.rs`, `src/scene.rs`, the
 
 Fixed:
 
+- `OFFSET_SURFACE` was not read at all.
 - Curve and surface division had no bound on output size, only on depth.
 - `append_polygon` grew two multi-megabyte vectors from empty when the final
   size is known, holding both allocations live at every doubling.
@@ -112,31 +121,28 @@ Open, in rough order of size:
 
 ## Near-term goals, in order
 
-1. **Support `OFFSET_SURFACE`.** `truck-stepio` has no arm for it, so the entity
-   parses and is then never found by the face that references it: 728 of 11,822
-   faces (6.2%) missing on the largest ABC model. Present in **5 of 20 ABC files
-   and 0 of 33 NIST files** — it is a shelling primitive, everyday CAD, and the
-   curated corpus contains none of it. Highest-value correctness work
-   outstanding. Prefer a dedicated `StepOffsetSurface` implementing
-   `ParametricSurface3D` and `ParameterDivision2D` directly; the generic
-   `Offset<S, N>` needs `S: BoundedSurface`, which `Surface` cannot satisfy
-   because planes are unbounded in parameter space.
-2. **Diagnose the out-of-memory on `00009190`.** 5.16 GB peak from a 102 MB
-   file, roughly 50x where the norm is 7–9x. Not a tolerance regression: that
-   model's tolerance is 1.45, coarser than the floor that was removed.
-3. **Diagnose the two timeouts**, `00000414` and `00005641`. Size is not the
-   predictor: `00000414` has fewer entities than a file that renders in 3.5 s
-   but 15x the B-spline curve density, and `00005641`/`00005642` are near
-   identical siblings where one renders in 12 s and the other exceeds 300 s.
-   Possibly the same root cause as goal 2.
-4. **Decide on `panic = "abort"`.** `parse_step` is written to collect per-shell
-   failures and warn, and that code cannot run today. Any future assert in a
-   geometry library will again take down a whole render. This is a judgement
-   call for the owner, not a defect.
-5. **Shrink the syntax tree.** At roughly eight times the file it is the largest
-   remaining memory consumer and the only big lever left after the handoff. It
-   means changing ruststep's `Parameter` representation, a public type that
-   `truck-stepio` consumes, so it is a deliberate project rather than a tweak.
+1. **Finish the audit.** It has paid for itself every time it has been run and
+   has not yet covered `src/step/part21.rs`, `src/renderer/`, or the session
+   path. The open storage items below came out of a partial pass.
+2. **Elide the STEP index buffer.** It is the identity permutation, four bytes
+   per vertex of pure redundancy, 22 MB on a 1.9 M-triangle model. Needs a
+   non-indexed draw path in the renderer.
+3. **Weld vertices on position and normal.** Three vertices per triangle today;
+   welding on the pair keeps flat faces flat and creases sharp while collapsing
+   the interior of every planar region.
+4. **Find why some faces still produce no geometry.** `OFFSET_SURFACE` removed
+   every unresolved reference on the files that had them, yet 135 of 7,605 and
+   753 of 12,027 faces still mesh to nothing. That is now the largest known
+   correctness gap and its cause is unknown.
+5. **Two models still exceed five minutes**, `00000414` and `00005641`, and
+   `00009190` renders in 230 s. The subdivision bounds stopped the crash but
+   not the cost. Suspect the same pathological geometry.
+6. **Decide on `panic = "abort"`.** `parse_step` collects per-shell failures and
+   warns, and that code cannot run today. This is a judgement call for the
+   owner.
+7. **Shrink the syntax tree**, roughly eight times the file and the largest
+   remaining memory consumer. Means changing ruststep's `Parameter`
+   representation, so a deliberate project.
 
 ## How results are reported
 
