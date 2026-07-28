@@ -1,0 +1,87 @@
+﻿diff --git "a/C:\\Users\\stefa\\.cargo\\git\\checkouts\\truck-885f4dcc04f583da\\aba84d2\\truck-meshalgo\\src\\tessellation\\triangulation.rs" "b/C:\\Users\\stefa\\AppData\\Local\\Temp\\claude\\C--Users-stefa-look\\cbef5e89-f63a-4ef9-a538-e99de5ed5da9\\scratchpad\\truck-fork\\truck-meshalgo\\src\\tessellation\\triangulation.rs"
+index 55722db..bf5b74e 100644
+--- "a/C:\\Users\\stefa\\.cargo\\git\\checkouts\\truck-885f4dcc04f583da\\aba84d2\\truck-meshalgo\\src\\tessellation\\triangulation.rs"
++++ "b/C:\\Users\\stefa\\AppData\\Local\\Temp\\claude\\C--Users-stefa-look\\cbef5e89-f63a-4ef9-a538-e99de5ed5da9\\scratchpad\\truck-fork\\truck-meshalgo\\src\\tessellation\\triangulation.rs"
+@@ -561,10 +561,14 @@ fn spade_round(x: f64) -> f64 {
+ /// Tessellates one surface trimmed by polyline.
+ fn trimming_tessellation<S>(surface: &S, polyboundary: &PolyBoundary, tol: f64) -> PolygonMesh
+ where S: PreMeshableSurface {
++    let t0 = std::time::Instant::now();
+     let mut triangulation = Cdt::new();
+     let mut boundary_map = HashMap::<FixedVertexHandle, Point3>::default();
+     polyboundary.insert_to(&mut triangulation, &mut boundary_map);
++    let t1 = std::time::Instant::now();
+     insert_surface(&mut triangulation, surface, polyboundary, tol);
++    let t2 = std::time::Instant::now();
++    let vertex_count = triangulation.num_vertices();
+     let mut mesh = triangulation_into_polymesh(
+         triangulation.vertices(),
+         triangulation.inner_faces(),
+@@ -572,7 +576,24 @@ where S: PreMeshableSurface {
+         polyboundary,
+         &boundary_map,
+     );
++    let t3 = std::time::Instant::now();
+     mesh.make_face_compatible_to_normal();
++    let t4 = std::time::Instant::now();
++    if (t4 - t0).as_millis() > 200 {
++        let boundary_points: usize = polyboundary.0.iter().map(Vec::len).sum();
++        eprintln!(
++            "PROFILE face {} ms | boundary_insert {} ms | insert_surface {} ms | \
++             polymesh {} ms | normals {} ms | cdt vertices {} | boundary pts {} | tris {}",
++            (t4 - t0).as_millis(),
++            (t1 - t0).as_millis(),
++            (t2 - t1).as_millis(),
++            (t3 - t2).as_millis(),
++            (t4 - t3).as_millis(),
++            vertex_count,
++            boundary_points,
++            mesh.tri_faces().len(),
++        );
++    }
+     mesh
+ }
+ 
+@@ -677,6 +698,26 @@ fn triangulation_into_polymesh<'a>(
+     )
+ }
+ 
++/// Ceiling on how finely a synthetic boundary segment is sampled.
++///
++/// These segments are straight lines *in parameter space*, so every point they
++/// produce is collinear in `uv`. Both consumers work in `uv`: `PolyBoundary`
++/// walks the boundary to test point inclusion, and the constrained Delaunay
++/// triangulation is built on `uv` too. Collinear points therefore add nothing
++/// to either — they only make the boundary longer and seed degenerate slivers.
++///
++/// Their count, however, came from `parameter_division` on the *3D* curve, so
++/// a surface whose tolerance is unreachable ran to the 65,536-point curve cap.
++/// That turned `PolyBoundary::include`, which is linear in boundary length and
++/// runs once per candidate triangle, into a quadratic: one measured face spent
++/// 106 seconds in `triangulation_into_polymesh` filtering 131,000 triangles
++/// against a 65,000-point boundary to emit 84 triangles.
++///
++/// Some density is still wanted so the domain edge carries mesh resolution
++/// comparable to the interior grid, and that grid is itself bounded to 256 per
++/// axis by `MAX_DIVISION_CELLS`. Matching it is sufficient and bounded.
++const MAX_SYNTHETIC_BOUNDARY_POINTS: usize = 256;
++
+ fn polyline_on_surface(
+     surface: impl PreMeshableSurface,
+     p: SurfacePoint,
+@@ -687,8 +728,14 @@ fn polyline_on_surface(
+     let line = Line(p.uv, q.uv);
+     let pcurve = PCurve::new(line, &surface);
+     let (vec, _) = pcurve.parameter_division(pcurve.range_tuple(), tol);
++    // Keep the ends exactly, thin the middle. Decimating rather than
++    // re-dividing preserves the endpoints the caller stitches against.
++    let step = vec.len().div_ceil(MAX_SYNTHETIC_BOUNDARY_POINTS).max(1);
++    let last = vec.len().saturating_sub(1);
+     vec.into_iter()
+-        .map(|t| {
++        .enumerate()
++        .filter(|(index, _)| *index % step == 0 || *index == last)
++        .map(|(_, t)| {
+             let uv = line.subs(t);
+             (uv, surface.subs(uv.x, uv.y)).into()
+         })
