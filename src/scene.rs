@@ -93,7 +93,6 @@ pub struct Geometry {
     pub vertices: Vec<Vertex>,
     pub source_attributes: Option<Vec<SourceVertexAttributes>>,
     pub indices: Vec<u32>,
-    pub hash: String,
     pub bounds: Bounds,
     pub bounding_center: [f32; 3],
     pub bounding_radius: f32,
@@ -366,8 +365,13 @@ fn compile_step(
     timings.record("parse", parse_started.elapsed());
 
     // Tessellation emits unwelded triangles, so generated normals are flat per
-    // face, which is what a machined B-rep should look like.
-    let normals = generate_normals(&positions, &indices);
+    // face, which is what a machined B-rep should look like. That also means
+    // every vertex belongs to exactly one triangle, which [`soup_normals`]
+    // exploits; the general path stays for anything that does not hold.
+    let normals = match soup_normals(&positions, &indices) {
+        Some(normals) => normals,
+        None => generate_normals(&positions, &indices),
+    };
     let vertices = positions
         .into_iter()
         .zip(normals)
@@ -408,13 +412,16 @@ fn compile_triangle_mesh(
             vertices.len()
         ]
     });
-    let raw_hash = hash_geometry(&vertices, source_attributes.as_deref(), &indices);
+    // No geometry hash here. Hashing exists to deduplicate primitives against
+    // each other, and a triangle-soup source compiles to exactly one geometry
+    // with nothing to compare it to. On a tessellated assembly the hash was a
+    // full blake3 pass over every vertex, index, and source attribute —
+    // hundreds of megabytes — to fill a field nothing read.
     let (bounding_center, bounding_radius) = bounding_sphere(&vertices, &local_bounds);
     let geometry = Geometry {
         vertices,
         source_attributes,
         indices,
-        hash: blake3::Hash::from_bytes(raw_hash).to_hex().to_string(),
         bounds: local_bounds,
         bounding_center,
         bounding_radius,
@@ -732,7 +739,6 @@ fn compile_glb_internal(
                     vertices,
                     source_attributes,
                     indices,
-                    hash: blake3::Hash::from_bytes(raw_hash).to_hex().to_string(),
                     bounds,
                     bounding_center,
                     bounding_radius,
@@ -769,6 +775,7 @@ fn compile_glb_internal(
             &mut instances,
             &mut scene_bounds,
             &mut node_count,
+            0,
         )?;
     }
     if instances.is_empty() || scene_bounds.is_empty() {
@@ -860,6 +867,16 @@ fn conservative_maximum_scale(linear: Mat3) -> f32 {
     (norm_one * norm_infinity).sqrt()
 }
 
+/// How deep a node hierarchy may be.
+///
+/// Traversal recurses once per level and the file chooses how many there are.
+/// The glTF specification requires the node graph to be a tree, but nothing
+/// enforces it: `gltf` accepts a node that lists itself as its own child, and
+/// descending that recurses until the stack is gone. Under `panic = "abort"`
+/// that ends the process rather than the render. Real hierarchies are shallow —
+/// a deep CAD assembly is tens of levels, not hundreds.
+const MAX_NODE_DEPTH: usize = 256;
+
 #[allow(clippy::too_many_arguments)]
 fn visit_node(
     node: gltf::Node<'_>,
@@ -869,7 +886,15 @@ fn visit_node(
     instances: &mut Vec<Instance>,
     scene_bounds: &mut Bounds,
     node_count: &mut u64,
+    depth: usize,
 ) -> anyhow::Result<()> {
+    if depth >= MAX_NODE_DEPTH {
+        bail!(
+            "GLB node hierarchy is deeper than {MAX_NODE_DEPTH} levels at node {}; \
+             the node graph is probably cyclic",
+            node.index()
+        );
+    }
     *node_count += 1;
     let local = Mat4::from_cols_array_2d(&node.transform().matrix());
     let world = parent_transform * local;
@@ -903,6 +928,7 @@ fn visit_node(
             instances,
             scene_bounds,
             node_count,
+            depth + 1,
         )?;
     }
     Ok(())
@@ -1063,6 +1089,37 @@ fn normalization_transform(up_axis: UpAxis) -> Mat4 {
     }
 }
 
+/// Flat normals for an unwelded triangle soup, or `None` if it is not one.
+///
+/// The STEP path emits three vertices per triangle and shares no topology
+/// between faces, so the index buffer is the identity permutation and every
+/// vertex belongs to exactly one triangle. [`generate_normals`] cannot assume
+/// that: it zeroes a full-size accumulator, reaches each position through an
+/// index, and normalizes once per *vertex*. Here one normalization per
+/// *triangle* gives the identical answer for a third of the square roots and
+/// none of the accumulation.
+///
+/// The identity check is one linear pass over `u32`s, which costs nothing
+/// against the millions of square roots it decides.
+fn soup_normals(positions: &[[f32; 3]], indices: &[u32]) -> Option<Vec<[f32; 3]>> {
+    if indices.len() != positions.len() || !positions.len().is_multiple_of(3) {
+        return None;
+    }
+    if !indices
+        .iter()
+        .enumerate()
+        .all(|(slot, index)| *index as usize == slot)
+    {
+        return None;
+    }
+    let mut normals = Vec::with_capacity(positions.len());
+    for triangle in positions.chunks_exact(3) {
+        let normal = face_normal([triangle[0], triangle[1], triangle[2]]).to_array();
+        normals.extend_from_slice(&[normal; 3]);
+    }
+    Some(normals)
+}
+
 fn generate_normals(positions: &[[f32; 3]], indices: &[u32]) -> Vec<[f32; 3]> {
     // Accumulated and normalized in one buffer. A tessellated assembly reaches
     // millions of vertices, where collecting into a second full-size vector
@@ -1114,6 +1171,38 @@ mod tests {
         assert_eq!(normals, vec![[0.0, 0.0, 1.0]; 3]);
     }
 
+    /// The soup path must agree with the general one exactly, since it is only
+    /// a cheaper way to compute the same normals.
+    #[test]
+    fn soup_normals_agree_with_the_general_path() {
+        let positions = [
+            [0.0, 0.0, 0.0],
+            [1.0, 0.0, 0.0],
+            [0.0, 1.0, 0.0],
+            [0.0, 0.0, 0.0],
+            [0.0, 0.0, 1.0],
+            [1.0, 0.0, 0.0],
+        ];
+        let indices: Vec<u32> = (0..positions.len() as u32).collect();
+        assert_eq!(
+            soup_normals(&positions, &indices).expect("this is a soup"),
+            generate_normals(&positions, &indices)
+        );
+    }
+
+    /// A shared vertex means a vertex normal is the average of its faces, which
+    /// the soup shortcut would get wrong, so it has to decline.
+    #[test]
+    fn soup_normals_decline_a_welded_mesh() {
+        let positions = [
+            [0.0, 0.0, 0.0],
+            [1.0, 0.0, 0.0],
+            [0.0, 1.0, 0.0],
+            [0.0, 0.0, 1.0],
+        ];
+        assert!(soup_normals(&positions, &[0, 1, 2, 0, 3, 1]).is_none());
+    }
+
     #[test]
     fn transformed_bounds_include_all_corners() {
         let source = Bounds {
@@ -1152,6 +1241,40 @@ mod tests {
         assert_eq!(vertices.len(), 3);
         assert_eq!(indices, [0, 1, 2]);
         assert_eq!(vertices[2].position, [0.0, 1.0, 0.0]);
+    }
+
+    /// A node that is its own child is accepted by `gltf`, so traversal has to
+    /// be the thing that refuses it. Without a bound this recurses until the
+    /// stack is gone, which `panic = "abort"` turns into a dead process.
+    #[test]
+    fn a_cyclic_node_graph_is_refused_rather_than_fatal() {
+        let gltf = gltf::Gltf::from_slice(
+            br#"{
+                "asset": { "version": "2.0" },
+                "scenes": [{ "nodes": [0] }],
+                "scene": 0,
+                "nodes": [{ "children": [0] }]
+            }"#,
+        )
+        .unwrap();
+        let mut instances = Vec::new();
+        let mut bounds = Bounds::empty();
+        let mut nodes = 0;
+        let error = visit_node(
+            gltf.nodes().next().unwrap(),
+            Mat4::IDENTITY,
+            &HashMap::new(),
+            &[],
+            &mut instances,
+            &mut bounds,
+            &mut nodes,
+            0,
+        )
+        .expect_err("a cyclic hierarchy must be reported, not recursed into");
+        assert!(
+            error.to_string().contains("cyclic"),
+            "unexpected error: {error}"
+        );
     }
 
     #[test]

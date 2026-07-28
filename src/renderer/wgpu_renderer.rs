@@ -214,12 +214,14 @@ impl WgpuRenderer {
         } else {
             wgpu::Features::empty()
         };
-        let mut required_limits = wgpu::Limits::default();
         // wgpu's portable default is 256 MiB, but large photogrammetry and
         // foliage scenes can legitimately need a larger packed vertex buffer.
         // Request only the adapter's native buffer-size limit; keep every
         // other portable default unchanged.
-        required_limits.max_buffer_size = adapter.limits().max_buffer_size;
+        let required_limits = wgpu::Limits {
+            max_buffer_size: adapter.limits().max_buffer_size,
+            ..Default::default()
+        };
         let (device, queue) = pollster::block_on(adapter.request_device(&wgpu::DeviceDescriptor {
             label: Some("look device"),
             required_features,
