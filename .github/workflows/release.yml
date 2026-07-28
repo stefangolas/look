@@ -42,7 +42,9 @@ jobs:
             asset: macos-aarch64
             archive: tar
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 30
+    # The STEP path pulls in the truck CAD kernel, which is a large tree built
+    # with thin LTO and no dependency cache on these runners.
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v6
       - name: Install Rust
@@ -60,12 +62,16 @@ jobs:
         run: |
           "target/${{ matrix.target }}/release/look" --version
           "target/${{ matrix.target }}/release/look" inspect tests/fixtures/triangle.stl --json
+          # STEP is tessellated rather than read, so prove the packaged binary
+          # can actually do it rather than only that it links.
+          "target/${{ matrix.target }}/release/look" inspect tests/fixtures/bracket.step --json
       - name: Smoke packaged executable (Windows)
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
           & "target/${{ matrix.target }}/release/look.exe" --version
           & "target/${{ matrix.target }}/release/look.exe" inspect tests/fixtures/triangle.stl --json
+          & "target/${{ matrix.target }}/release/look.exe" inspect tests/fixtures/bracket.step --json
       - name: Package Unix archive and Debian package
         if: matrix.archive == 'tar'
         shell: bash
@@ -99,7 +105,7 @@ jobs:
             fi
             mkdir -p dist/deb/DEBIAN dist/deb/usr/bin
             cp "target/${TARGET}/release/look" dist/deb/usr/bin/look
-            printf 'Package: look\nVersion: %s\nSection: graphics\nPriority: optional\nArchitecture: %s\nMaintainer: look contributors\nDescription: Ultrafast native GLB and STL renderer for agent workflows\n' "$deb_version" "$DEB_ARCH" > dist/deb/DEBIAN/control
+            printf 'Package: look\nVersion: %s\nSection: graphics\nPriority: optional\nArchitecture: %s\nMaintainer: look contributors\nDescription: Ultrafast native GLB, STL, and STEP renderer for agent workflows\n' "$deb_version" "$DEB_ARCH" > dist/deb/DEBIAN/control
             dpkg-deb --build --root-owner-group dist/deb "dist/look_${deb_version}_${DEB_ARCH}.deb"
             (cd dist && sha256sum "look_${deb_version}_${DEB_ARCH}.deb" > "look_${deb_version}_${DEB_ARCH}.deb.sha256")
           fi
