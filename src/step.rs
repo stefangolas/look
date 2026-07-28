@@ -149,14 +149,25 @@ pub fn parse_step(
             // without comment, so count them here while the structure still
             // says which is which. Malformed geometry does reach this: a wire
             // that bounds nothing leaves its face untessellated.
-            let tally = FaceTally {
+            //
+            // There are two ways to lose a face and they do not have the same
+            // cause, so they are not summed. `None` is a surface that could not
+            // be produced at all, which on real files is mostly a spline
+            // failing to converge. `Some` holding no triangles is a surface
+            // that meshed to nothing, which happens to *planes* — a separate
+            // and unexplained defect. Counting only the first understated the
+            // loss on 00009190 by 118 faces, 276 against 394.
+            let mut tally = FaceTally {
                 total: meshed.faces.len(),
-                dropped: meshed
-                    .faces
-                    .iter()
-                    .filter(|face| face.surface.is_none())
-                    .count(),
+                ..FaceTally::default()
             };
+            for face in &meshed.faces {
+                match &face.surface {
+                    None => tally.unsurfaced += 1,
+                    Some(mesh) if mesh.faces().is_empty() => tally.empty += 1,
+                    Some(_) => {}
+                }
+            }
             Ok::<_, String>((meshed.to_polygon(), tally))
         })
         .collect::<Vec<_>>();
@@ -171,7 +182,8 @@ pub fn parse_step(
             Ok((polygon, tally)) => {
                 append_polygon(&polygon, &mut positions, &mut indices);
                 faces.total += tally.total;
-                faces.dropped += tally.dropped;
+                faces.unsurfaced += tally.unsurfaced;
+                faces.empty += tally.empty;
             }
             Err(error) => failures.push(error),
         }
@@ -193,14 +205,18 @@ pub fn parse_step(
             describe(&failures)
         );
     }
-    if faces.dropped > 0 {
+    if faces.lost() > 0 {
         // A shell can succeed while individual faces within it do not, and
         // those vanish from the mesh silently. Without this a model missing
-        // geometry is indistinguishable from a complete one.
+        // geometry is indistinguishable from a complete one. The split is
+        // reported because it points at which defect to chase.
         eprintln!(
             "warning: {} of {} STEP faces produced no geometry and are missing \
-             from the render",
-            faces.dropped, faces.total
+             from the render ({} had no surface, {} meshed to nothing)",
+            faces.lost(),
+            faces.total,
+            faces.unsurfaced,
+            faces.empty
         );
     }
 
@@ -208,10 +224,23 @@ pub fn parse_step(
 }
 
 /// How many faces a shell held, and how many of them yielded no mesh.
+///
+/// The two loss causes are kept apart because they are different bugs, and a
+/// single "dropped" number hid that. See the counting site for which is which.
 #[derive(Debug, Default, Clone, Copy)]
 struct FaceTally {
     total: usize,
-    dropped: usize,
+    /// No surface could be produced for the face at all.
+    unsurfaced: usize,
+    /// A surface was produced, and it meshed to no triangles.
+    empty: usize,
+}
+
+impl FaceTally {
+    /// Faces that reach the render carrying no geometry, however they got there.
+    fn lost(&self) -> usize {
+        self.unsurfaced + self.empty
+    }
 }
 
 /// Read the exchange structure.
