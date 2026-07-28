@@ -109,9 +109,22 @@ pub fn parse_step(
             // A shell with no surface area carries nothing to render, and
             // feeding it forward only risks degenerate arithmetic downstream.
             if shell.vertices.len() < 3 || shell.faces.is_empty() {
-                return Ok(PolygonMesh::default());
+                return Ok((PolygonMesh::default(), FaceTally::default()));
             }
-            Ok::<PolygonMesh, String>(shell.robust_triangulation(tolerance).to_polygon())
+            let meshed = shell.robust_triangulation(tolerance);
+            // A face that could not be meshed is dropped from the polygon
+            // without comment, so count them here while the structure still
+            // says which is which. Malformed geometry does reach this: a wire
+            // that bounds nothing leaves its face untessellated.
+            let tally = FaceTally {
+                total: meshed.faces.len(),
+                dropped: meshed
+                    .faces
+                    .iter()
+                    .filter(|face| face.surface.is_none())
+                    .count(),
+            };
+            Ok::<_, String>((meshed.to_polygon(), tally))
         })
         .collect::<Vec<_>>();
     timings.record("step_tessellate", mesh_started.elapsed());
@@ -119,9 +132,14 @@ pub fn parse_step(
     let mut positions = Vec::new();
     let mut indices = Vec::new();
     let mut failures = Vec::new();
+    let mut faces = FaceTally::default();
     for result in meshed {
         match result {
-            Ok(polygon) => append_polygon(&polygon, &mut positions, &mut indices),
+            Ok((polygon, tally)) => {
+                append_polygon(&polygon, &mut positions, &mut indices);
+                faces.total += tally.total;
+                faces.dropped += tally.dropped;
+            }
             Err(error) => failures.push(error),
         }
     }
@@ -142,8 +160,25 @@ pub fn parse_step(
             describe(&failures)
         );
     }
+    if faces.dropped > 0 {
+        // A shell can succeed while individual faces within it do not, and
+        // those vanish from the mesh silently. Without this a model missing
+        // geometry is indistinguishable from a complete one.
+        eprintln!(
+            "warning: {} of {} STEP faces produced no geometry and are missing \
+             from the render",
+            faces.dropped, faces.total
+        );
+    }
 
     Ok((positions, indices))
+}
+
+/// How many faces a shell held, and how many of them yielded no mesh.
+#[derive(Debug, Default, Clone, Copy)]
+struct FaceTally {
+    total: usize,
+    dropped: usize,
 }
 
 /// Read the exchange structure.
