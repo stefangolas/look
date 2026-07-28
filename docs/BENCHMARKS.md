@@ -115,22 +115,22 @@ warm-up:
 
 | Model | Size | Median | Triangles |
 |---|---:|---:|---:|
-| ctc_01 (AP203) | 0.22 MB | 526.7 ms | 1,200 |
-| ftc_06 (AP203) | 0.21 MB | 470.3 ms | 2,537 |
-| ctc_03 (AP242) | 0.64 MB | 531.6 ms | 1,164 |
-| ctc_02 (AP242) | 1.89 MB | 571.8 ms | 6,122 |
-| ftc_09 (AP242) | 5.83 MB | 874.7 ms | 1,766 |
-| stc_09 (AP242) | 5.04 MB | 1,148.3 ms | 1,708 |
+| ctc_01 (AP203) | 0.22 MB | 524.9 ms | 1,200 |
+| ftc_06 (AP203) | 0.21 MB | 494.6 ms | 2,537 |
+| ctc_03 (AP242) | 0.64 MB | 503.0 ms | 1,164 |
+| ctc_02 (AP242) | 1.89 MB | 510.5 ms | 6,122 |
+| ftc_09 (AP242) | 5.83 MB | 715.0 ms | 1,766 |
+| stc_09 (AP242) | 5.04 MB | 933.0 ms | 1,708 |
 
 Runtime tracks file size, not triangle count: `ctc_02` produces 3.6x the
 triangles of `stc_09` in half the time. The phase breakdown shows why.
 
 | Model | Parse | Tessellate | GPU init wait | Total |
 |---|---:|---:|---:|---:|
-| ftc_06 | 31.9 ms | 10.7 ms | 429.9 ms | 512.9 ms |
-| ctc_02 | 228.9 ms | 28.4 ms | 847.8 ms | 1,157.2 ms |
-| ftc_09 | 682.5 ms | 6.5 ms | 0.0 ms | 772.3 ms |
-| stc_09 | 907.5 ms | 5.8 ms | 0.0 ms | 1,034.4 ms |
+| ftc_06 | 29.6 ms | 7.0 ms | 357.9 ms | 418.7 ms |
+| ctc_02 | 193.1 ms | 23.1 ms | 135.9 ms | 391.0 ms |
+| ftc_09 | 541.8 ms | 7.1 ms | 0.0 ms | 631.2 ms |
+| stc_09 | 729.9 ms | 5.2 ms | 0.0 ms | 821.1 ms |
 
 Two things follow. Tessellation is never the cost: it stays between 6 and 28 ms
 even on the largest models, so the boundary representation evaluation is not
@@ -153,6 +153,34 @@ cargo build --release
 Coverage on that corpus is 33 of 33 files, spanning AP203, AP242 editions 1
 through 3, and one model that ships an AP242 tessellated solid instead of a
 boundary representation.
+
+#### Against F3D
+
+F3D reads STEP through its bundled OpenCASCADE plugin. It does not select that
+reader automatically for a `.stp` file, so `--force-reader=STEP` is required.
+Same settings as the fresh-process comparisons above, median of five measured
+launches:
+
+| Model | Size | look | F3D 3.5 | F3D / look |
+|---|---:|---:|---:|---:|
+| ctc_01 (AP203) | 0.22 MB | 632.2 ms | 631.6 ms | 1.00x |
+| ftc_06 (AP203) | 0.21 MB | 609.5 ms | 610.6 ms | 1.00x |
+| ctc_03 (AP242) | 0.64 MB | 574.0 ms | 565.1 ms | 0.98x |
+| ctc_02 (AP242) | 1.89 MB | 569.4 ms | 1,081.9 ms | 1.90x |
+| ftc_09 (AP242) | 5.83 MB | 789.6 ms | 791.8 ms | 1.00x |
+| stc_09 (AP242) | 5.04 MB | 971.5 ms | 849.9 ms | 0.87x |
+
+The geometric mean is 1.08x, which is parity. This is a different result from
+the glTF and large scene comparisons, and the phase table explains why: STEP
+runtime is dominated by parsing ISO 10303-21 text, not by rendering. F3D parses
+with a mature native OpenCASCADE reader, so a rendering advantage has little
+room to show. Parsing is where any further gain has to come from.
+
+Run it with:
+
+```powershell
+./benchmarks/step-vs-f3d.ps1 -Look target/release/look.exe -Nist <path-to-nist-files>
+```
 
 #### Foliage stress scene
 

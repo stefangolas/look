@@ -1547,7 +1547,7 @@ dependencies = [
 [[package]]
 name = "ruststep"
 version = "0.4.0"
-source = "git+https://github.com/stefangolas/ruststep?rev=cd89e5a7#cd89e5a7cd9a6baadcb456392a5888f4cbc6b707"
+source = "git+https://github.com/stefangolas/ruststep?rev=67f1f7c#67f1f7c3875abe05487d1650cc435b4609a3a341"
 dependencies = [
  "Inflector",
  "derive-new",
@@ -1562,7 +1562,7 @@ dependencies = [
 [[package]]
 name = "ruststep-derive"
 version = "0.4.0"
-source = "git+https://github.com/stefangolas/ruststep?rev=cd89e5a7#cd89e5a7cd9a6baadcb456392a5888f4cbc6b707"
+source = "git+https://github.com/stefangolas/ruststep?rev=67f1f7c#67f1f7c3875abe05487d1650cc435b4609a3a341"
 dependencies = [
  "Inflector",
  "proc-macro-crate",
