@@ -73,7 +73,7 @@ $outputs = @{
 $arguments = @{
     look = @(
         'render', $modelPath,
-        '--view', 'iso',
+        '--view', 'front',
         '--camera', 'orthographic',
         '--resolution', "${Width}x${Height}",
         '--material-mode', 'source',
@@ -87,9 +87,9 @@ $arguments = @{
         '--no-config',
         '--output', $outputs.f3d,
         '--resolution', "$Width,$Height",
-        # look places the iso camera at +1,+1,+1 looking back at the target,
-        # so F3D needs the opposite vector as its viewing direction.
-        '--camera-direction=-1,-1,-1',
+        # look's front camera sits at +Z looking back at the target, so F3D
+        # needs the opposite vector as its viewing direction.
+        '--camera-direction=-Z',
         '--camera-orthographic',
         '--anti-aliasing=none',
         '--ambient-occlusion=0',
@@ -125,7 +125,7 @@ $report = [ordered]@{
         model = $modelPath
         bytes = (Get-Item -LiteralPath $modelPath).Length
         material = 'glTF source PBR'
-        camera = 'isometric orthographic automatic fit'
+        camera = 'front orthographic automatic fit'
         resolution = @($Width, $Height)
         antialiasing = 'disabled'
         background = '#252525'
