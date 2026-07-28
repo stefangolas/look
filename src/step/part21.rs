@@ -78,10 +78,21 @@ pub fn parse(input: &str) -> Result<Exchange> {
     })
 }
 
+/// How deeply parameters may nest.
+///
+/// A parameter list holds parameters, so reading one recurses, and the input
+/// controls how far. Without a limit a file of nothing but open parentheses
+/// overflows the stack and takes the process with it — which is not a crash a
+/// renderer may have on a file it was handed. Real geometry nests a handful of
+/// levels: a B-spline surface's control points are a list of lists of points,
+/// which is three.
+const MAX_PARAMETER_DEPTH: usize = 256;
+
 struct Reader<'a> {
     text: &'a str,
     bytes: &'a [u8],
     position: usize,
+    depth: usize,
 }
 
 impl<'a> Reader<'a> {
@@ -90,6 +101,7 @@ impl<'a> Reader<'a> {
             text,
             bytes: text.as_bytes(),
             position: 0,
+            depth: 0,
         }
     }
 
@@ -282,6 +294,18 @@ impl<'a> Reader<'a> {
 
     fn parameter(&mut self) -> Result<Parameter> {
         self.skip_ignorable();
+        // Nesting is driven by the input, so it has to be bounded here rather
+        // than trusted to stay shallow.
+        if self.depth >= MAX_PARAMETER_DEPTH {
+            return Err(self.error("parameters nested too deeply"));
+        }
+        self.depth += 1;
+        let parameter = self.parameter_inner();
+        self.depth -= 1;
+        parameter
+    }
+
+    fn parameter_inner(&mut self) -> Result<Parameter> {
         let Some(byte) = self.peek() else {
             return Err(self.error("expected a parameter"));
         };
@@ -748,6 +772,36 @@ mod tests {
             "ISO-10303-21;\nHEADER;\nENDSEC;\nDATA;\n#1 = A(\"0F\");\nENDSEC;\nEND-ISO-10303-21;"
         )
         .is_err());
+    }
+
+    /// Nesting depth is chosen by the input, so a file of open parentheses
+    /// must be turned down rather than overflowing the stack and taking the
+    /// process with it.
+    #[test]
+    fn rejects_parameters_nested_too_deeply() {
+        let depth = MAX_PARAMETER_DEPTH + 10;
+        let text = format!(
+            "ISO-10303-21;
+HEADER;
+ENDSEC;
+DATA;
+#1 = A({}{});
+ENDSEC;
+END-ISO-10303-21;",
+            "(".repeat(depth),
+            ")".repeat(depth)
+        );
+        assert!(parse(&text).is_err());
+    }
+
+    /// The depth real geometry uses must still read: a B-spline surface's
+    /// control points are a list of lists of points.
+    #[test]
+    fn accepts_the_nesting_real_geometry_uses() {
+        assert_eq!(
+            parameters("#1 = A(((1.0,2.0,3.0),(4.0,5.0,6.0)));").len(),
+            1
+        );
     }
 
     #[test]
