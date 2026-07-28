@@ -194,6 +194,36 @@ files are read a second time. They are rare and small, and parsing is no longer
 the expensive part of loading one — the re-read costs about 14 ms on the 2.1 MB
 NIST tessellated model.
 
+#### Running a corpus
+
+`benchmarks/step_corpus.py` renders a directory of STEP files with either
+`look` or F3D and reports outcomes, phase timings, peak memory, and any
+warnings about incomplete geometry, then clusters failures by root cause. The
+value of a corpus run is the set of distinct failure modes, not the count of
+failing files.
+
+```console
+python benchmarks/step_corpus.py --tool look \
+    --exe target/release/look.exe --dir <corpus> --out look.json
+python benchmarks/step_corpus.py --tool f3d \
+    --exe "C:/Program Files/F3D/bin/f3d-console.exe" --dir <corpus> --out f3d.json
+python benchmarks/step_corpus.py --tool look --exe target/release/look.exe \
+    --dir <corpus> --baseline look.json
+```
+
+It refuses to run when free physical memory is below `--min-free-gb`. That is
+not fussiness: a short machine turns every timing into a measurement of the page
+file, and Windows trims peak working set under pressure, so peaks recorded in
+different machine states cannot be differenced. `--allow-low-memory` records
+anyway and marks every sample untrusted, and a baseline comparison then declines
+to compare timings at all.
+
+Two further guards exist because their absence already produced wrong results.
+Success is judged by whether an image was produced rather than by whether the
+timeout fired, because under paging a wait can overshoot its budget by minutes
+while the process still completes. And a POSIX-style path given to a Windows
+executable is rejected rather than silently failing.
+
 Run it with:
 
 ```powershell
