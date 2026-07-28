@@ -276,7 +276,8 @@ pub fn compile_scene(
     match extension(path).as_str() {
         "glb" => compile_glb(path, up_axis, timings),
         "stl" => compile_stl(path, up_axis, true, timings),
-        other => bail!("unsupported scene extension '{other}'; expected GLB or STL"),
+        "step" | "stp" => compile_step(path, up_axis, true, timings),
+        other => bail!("unsupported scene extension '{other}'; expected GLB, STL, or STEP"),
     }
 }
 
@@ -294,7 +295,13 @@ pub fn compile_scene_for_render(
             material_mode == MaterialMode::Source,
             timings,
         ),
-        other => bail!("unsupported scene extension '{other}'; expected GLB or STL"),
+        "step" | "stp" => compile_step(
+            path,
+            up_axis,
+            material_mode == MaterialMode::Source,
+            timings,
+        ),
+        other => bail!("unsupported scene extension '{other}'; expected GLB, STL, or STEP"),
     }
 }
 
@@ -319,6 +326,67 @@ fn compile_stl(
     let (vertices, indices) = parse_stl(&bytes)?;
     timings.record("parse", parse_started.elapsed());
 
+    compile_triangle_mesh(
+        path,
+        vertices,
+        indices,
+        source_hash,
+        up_axis,
+        include_source_materials,
+        timings,
+    )
+}
+
+/// Tessellate a STEP boundary representation and compile it like any other
+/// triangle source. STEP carries no textures or per-part materials through
+/// this path, so the scene gets the same default material as STL.
+fn compile_step(
+    path: &Path,
+    up_axis: UpAxis,
+    include_source_materials: bool,
+    timings: &mut Timings,
+) -> anyhow::Result<CompiledScene> {
+    let bytes = timings.measure("read", || {
+        fs::read(path).with_context(|| format!("failed to read scene '{}'", path.display()))
+    })?;
+    let source_hash = timings.measure("hash", || blake3::hash(&bytes).to_hex().to_string());
+
+    let parse_started = Instant::now();
+    let (positions, indices) = crate::step::parse_step(&bytes, timings)
+        .with_context(|| format!("failed to load STEP scene '{}'", path.display()))?;
+    timings.record("parse", parse_started.elapsed());
+
+    // Tessellation emits unwelded triangles, so generated normals are flat per
+    // face, which is what a machined B-rep should look like.
+    let normals = generate_normals(&positions, &indices);
+    let vertices = positions
+        .into_iter()
+        .zip(normals)
+        .map(|(position, normal)| Vertex { position, normal })
+        .collect::<Vec<_>>();
+
+    compile_triangle_mesh(
+        path,
+        vertices,
+        indices,
+        source_hash,
+        up_axis,
+        include_source_materials,
+        timings,
+    )
+}
+
+/// Shared tail for the triangle-soup sources (STL and STEP): one geometry, one
+/// instance, one default material.
+fn compile_triangle_mesh(
+    path: &Path,
+    vertices: Vec<Vertex>,
+    indices: Vec<u32>,
+    source_hash: String,
+    up_axis: UpAxis,
+    include_source_materials: bool,
+    timings: &mut Timings,
+) -> anyhow::Result<CompiledScene> {
     let compile_started = Instant::now();
     let local_bounds = Bounds::from_positions(
         &vertices

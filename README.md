@@ -1,8 +1,17 @@
 # look
 
-`look` is a native command-line utility that turns GLB and STL models into PNG
-images. Its basic purpose is to let a person, script, or software agent inspect
-a 3D model without opening a full CAD application or browser-based viewer.
+`look` is a native command-line utility that turns GLB, STL, and STEP models
+into PNG images. Its basic purpose is to let a person, script, or software agent
+inspect a 3D model without opening a full CAD application or browser-based
+viewer.
+
+STEP files are CAD boundary representations rather than meshes, so `look`
+tessellates them on load. That happens inside the binary — there is nothing to
+install and no converter to configure:
+
+```console
+look part.step --output part.png
+```
 
 On the 10.8M-triangle Intel Sponza Base + Ivy + Trees scene, `look` completed a
 fresh-process 512x512 PNG in **8.49 s** median versus **50.47 s** for F3D 3.5:

@@ -6,4 +6,5 @@ pub mod output;
 pub mod renderer;
 pub mod scene;
 pub mod server;
+pub mod step;
 pub mod timing;

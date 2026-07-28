@@ -568,9 +568,13 @@ fn require_supported_scene(path: &Path) -> anyhow::Result<()> {
         .extension()
         .and_then(|value| value.to_str())
         .unwrap_or_default();
-    if !extension.eq_ignore_ascii_case("glb") && !extension.eq_ignore_ascii_case("stl") {
+    const SUPPORTED: [&str; 4] = ["glb", "stl", "step", "stp"];
+    if !SUPPORTED
+        .iter()
+        .any(|candidate| extension.eq_ignore_ascii_case(candidate))
+    {
         anyhow::bail!(
-            "unsupported scene '{}'; expected a GLB or STL file",
+            "unsupported scene '{}'; expected a GLB, STL, or STEP file",
             path.display()
         );
     }

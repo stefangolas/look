@@ -5,6 +5,11 @@
   fixture with a 128x64 sphere mesh and embedded 1024x512 base-color,
   occlusion/roughness/metallic, and normal textures.
 
+- `bracket.step` is a repository-owned AP203 boundary representation: a block
+  with a cylindrical boss and a through bore, so tessellation must handle
+  planar and cylindrical trimmed faces rather than reading triangles. It exists
+  to keep the STEP path covered without depending on an external CAD corpus.
+
 Regenerate the ball bearing deterministically from the repository root:
 
 ```console
