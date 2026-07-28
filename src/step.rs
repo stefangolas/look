@@ -19,10 +19,10 @@ use truck_stepio::r#in::Table;
 
 use crate::timing::Timings;
 
-/// Floor for the adaptive tolerance. truck asserts at 1e-6, and divides the
-/// tolerance by a placement's scale before checking, so this keeps three
-/// orders of magnitude of headroom for large-radius geometry.
-const MIN_TOLERANCE: f64 = 1.0e-3;
+/// Tolerance for a model with no measurable extent, where there is nothing to
+/// scale against. Nothing renders from such a shell anyway; this only keeps a
+/// degenerate bounding box from producing a zero or non-finite tolerance.
+const DEGENERATE_TOLERANCE: f64 = 1.0e-3;
 
 /// Chord deviation as a fraction of a shell's diagonal. Scaling to the model
 /// keeps output density stable across files that use different units.
@@ -149,17 +149,26 @@ pub fn parse_step(
 /// Scale the chord tolerance to the model so that a millimetre part and a
 /// metre part mesh to comparable density.
 ///
-/// The floor is deliberately well above truck's own 1e-6 minimum. Curves are
-/// tessellated in their own parameter space, so a placement scales the
-/// tolerance down by its radius before the check happens; sitting exactly on
-/// the minimum leaves no headroom and any circle larger than unit radius
-/// pushes it under.
+/// This deliberately has no absolute floor. It used to be held at 1e-3 to stay
+/// clear of truck's own 1e-6 minimum, since curves are tessellated in their own
+/// parameter space and a placement scales the tolerance down by its radius
+/// before that check happens. But an absolute floor silently assumes the file
+/// is measured in millimetres. The NIST corpus is, uniformly, so the assumption
+/// held there and nowhere else: an Onshape export in metres puts a half
+/// millimetre fillet at a radius of 0.0005, well under a 1e-3 floor, which both
+/// meshed the part absurdly coarsely and asked truck to approximate a feature
+/// to worse than its own size.
+///
+/// The headroom the floor provided is already in the relative term. Against a
+/// radius bounded by the model, `diameter * 1e-3` sits three orders of
+/// magnitude above `diameter * 1e-6`, which is the same margin the floor was
+/// chosen to give — only expressed in the units the file actually uses.
 fn model_tolerance(diameter: f64) -> f64 {
     let scaled = diameter * RELATIVE_TOLERANCE;
-    if scaled.is_finite() && scaled > MIN_TOLERANCE {
+    if scaled.is_finite() && scaled > 0.0 {
         scaled
     } else {
-        MIN_TOLERANCE
+        DEGENERATE_TOLERANCE
     }
 }
 
@@ -182,5 +191,57 @@ fn describe(failures: &[String]) -> String {
         Some(first) if failures.len() == 1 => format!(": {first}"),
         Some(first) => format!(": {first} (and {} more)", failures.len() - 1),
         None => String::new(),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// A metre-scale export is the case an absolute floor got wrong. Onshape
+    /// writes `SI_UNIT($, .METRE.)`, so a part 100 mm across has a diameter of
+    /// 0.1 and its half-millimetre fillets have a radius of 0.0005. The old
+    /// 1e-3 floor exceeded both the model's own relative tolerance and those
+    /// radii, which meshed the part far too coarsely and asked truck to
+    /// approximate a sphere to worse than its own size.
+    #[test]
+    fn a_metre_scale_model_is_not_held_to_a_millimetre_floor() {
+        let tolerance = model_tolerance(0.1);
+        assert!(
+            tolerance < 0.0005,
+            "tolerance {tolerance} must stay under a half-millimetre feature"
+        );
+        assert_eq!(tolerance, 0.1 * RELATIVE_TOLERANCE);
+    }
+
+    /// The millimetre-scale corpus this was originally tuned against must mesh
+    /// exactly as it did before, since its tolerance was always the scaled term
+    /// rather than the floor.
+    #[test]
+    fn a_millimetre_scale_model_is_unchanged() {
+        assert_eq!(model_tolerance(200.0), 0.2);
+        assert_eq!(model_tolerance(6.0), 0.006);
+    }
+
+    /// Tolerance has to keep tracking the model across every unit a CAD system
+    /// might write, rather than flattening onto a constant at small scales.
+    #[test]
+    fn tolerance_tracks_the_model_across_unit_scales() {
+        for diameter in [1.0e-3, 1.0, 1.0e3, 1.0e6] {
+            assert_eq!(model_tolerance(diameter), diameter * RELATIVE_TOLERANCE);
+        }
+    }
+
+    /// A shell with no extent has nothing to scale against, and must not yield
+    /// a zero or non-finite tolerance for truck to divide by.
+    #[test]
+    fn a_degenerate_model_falls_back_to_a_usable_tolerance() {
+        for diameter in [0.0, -1.0, f64::NAN, f64::INFINITY] {
+            let tolerance = model_tolerance(diameter);
+            assert!(
+                tolerance.is_finite() && tolerance > 0.0,
+                "diameter {diameter} produced tolerance {tolerance}"
+            );
+        }
     }
 }

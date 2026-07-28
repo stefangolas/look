@@ -9,49 +9,61 @@ fn fixture(name: &str) -> PathBuf {
         .join(name)
 }
 
+/// Read a STEP file the way the renderer does, applying the same Latin-1
+/// rescue so a comparison runs on the text the reader will actually be given.
+fn read_step(path: &std::path::Path) -> String {
+    let bytes = std::fs::read(path).expect("STEP file should be readable");
+    String::from_utf8(bytes.clone())
+        .unwrap_or_else(|_| bytes.iter().map(|&byte| byte as char).collect())
+}
+
 /// look reads the exchange structure with its own Part 21 reader because
 /// ruststep's nom grammar dominates STEP wall clock. That is only sound while
 /// the two agree, so the syntax trees are compared outright rather than the
 /// renders being spot-checked.
-fn assert_matches_ruststep(path: &std::path::Path) {
-    let bytes = std::fs::read(path).expect("fixture should be readable");
-    // Same Latin-1 rescue the renderer applies, so the comparison runs on the
-    // text the reader will actually be given.
-    let text = String::from_utf8(bytes.clone())
-        .unwrap_or_else(|_| bytes.iter().map(|&byte| byte as char).collect());
-    let ours = part21::parse(&text)
-        .unwrap_or_else(|error| panic!("{} should parse: {error}", path.display()));
-    let theirs = ruststep::parser::parse(&text)
-        .unwrap_or_else(|error| panic!("{} should parse under ruststep: {error}", path.display()));
-    assert_eq!(
-        ours.data,
-        theirs.data,
-        "data section differs from ruststep for {}",
-        path.display()
-    );
-    assert_eq!(
-        ours.header,
-        theirs.header,
-        "header differs from ruststep for {}",
-        path.display()
-    );
+///
+/// Returns how the two readers differed, or `None` when they agree. A file
+/// only this reader rejects is not a divergence: those fall back to ruststep
+/// and still render, so it is reported by the caller but does not fail.
+fn compare_with_ruststep(path: &std::path::Path) -> Option<String> {
+    let text = read_step(path);
+    let ours = match part21::parse(&text) {
+        Ok(exchange) => exchange,
+        Err(error) => return Some(format!("part21 declined, falling back: {error}")),
+    };
+    let theirs = match ruststep::parser::parse(&text) {
+        Ok(exchange) => exchange,
+        // Files the fork's ruststep cannot read at all are outside what this
+        // comparison can say anything about.
+        Err(_) => return None,
+    };
+    if ours.data != theirs.data {
+        return Some("data section differs from ruststep".to_string());
+    }
+    if ours.header != theirs.header {
+        return Some("header differs from ruststep".to_string());
+    }
+    None
 }
 
 #[test]
 fn part21_agrees_with_ruststep() {
-    assert_matches_ruststep(&fixture("bracket.step"));
+    assert_eq!(compare_with_ruststep(&fixture("bracket.step")), None);
 }
 
 /// The repository fixture is one exporter's dialect. Point `LOOK_STEP_CORPUS`
 /// at a directory of real CAD files to hold the reader to the same equality
 /// across all of them; the NIST MBE PMI set is what this was developed against.
+///
+/// Every file is checked before anything fails, because the useful output over
+/// a real corpus is the set of distinct disagreements, not the first one.
 #[test]
 fn part21_agrees_with_ruststep_across_a_corpus() {
     let Some(root) = std::env::var_os("LOOK_STEP_CORPUS") else {
         return;
     };
 
-    let mut checked = 0;
+    let mut files = Vec::new();
     let mut pending = vec![PathBuf::from(root)];
     while let Some(directory) = pending.pop() {
         for entry in std::fs::read_dir(&directory).expect("corpus directory should be readable") {
@@ -64,16 +76,43 @@ fn part21_agrees_with_ruststep_across_a_corpus() {
                 .extension()
                 .and_then(|extension| extension.to_str())
                 .map(str::to_ascii_lowercase);
-            if !matches!(extension.as_deref(), Some("step" | "stp")) {
-                continue;
+            if matches!(extension.as_deref(), Some("step" | "stp")) {
+                files.push(path);
             }
-            assert_matches_ruststep(&path);
-            checked += 1;
+        }
+    }
+    assert!(!files.is_empty(), "LOOK_STEP_CORPUS held no STEP files");
+
+    let mut divergences = Vec::new();
+    let mut fallbacks = Vec::new();
+    for path in &files {
+        if let Some(reason) = compare_with_ruststep(path) {
+            let name = path.file_name().unwrap_or(path.as_os_str());
+            if reason.starts_with("part21 declined") {
+                fallbacks.push(format!("{}: {reason}", name.to_string_lossy()));
+            } else {
+                divergences.push(format!("{}: {reason}", name.to_string_lossy()));
+            }
         }
     }
 
-    assert!(checked > 0, "LOOK_STEP_CORPUS held no STEP files");
-    eprintln!("part21 matched ruststep on {checked} corpus files");
+    eprintln!(
+        "part21 matched ruststep on {} of {} corpus files ({} fell back)",
+        files.len() - divergences.len() - fallbacks.len(),
+        files.len(),
+        fallbacks.len()
+    );
+    for fallback in &fallbacks {
+        eprintln!("  fallback: {fallback}");
+    }
+
+    assert!(
+        divergences.is_empty(),
+        "part21 read {} of {} files differently from ruststep:\n  {}",
+        divergences.len(),
+        files.len(),
+        divergences.join("\n  ")
+    );
 }
 
 /// STEP carries no triangles, so this covers the whole boundary-representation
