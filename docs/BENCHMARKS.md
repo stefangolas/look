@@ -102,6 +102,58 @@ The New York asset hash reported by `look` was
 The Sponza derivative source hash was
 `e3e8fb573e1718cd5ea51b5ce948b040ca13fdcbcf735a6acb8dd20d1b7cb3f8`.
 
+### STEP
+
+STEP files are CAD boundary representations, so `look` evaluates and
+tessellates them on load rather than reading triangles. These runs come from
+the NIST MBE PMI validation set, which is freely redistributable and exported
+by several commercial CAD systems, so it exercises real exporter behaviour
+rather than synthetic geometry.
+
+Fresh process, 512x512, median of five measured launches after one unmeasured
+warm-up:
+
+| Model | Size | Median | Triangles |
+|---|---:|---:|---:|
+| ctc_01 (AP203) | 0.22 MB | 526.7 ms | 1,200 |
+| ftc_06 (AP203) | 0.21 MB | 470.3 ms | 2,537 |
+| ctc_03 (AP242) | 0.64 MB | 531.6 ms | 1,164 |
+| ctc_02 (AP242) | 1.89 MB | 571.8 ms | 6,122 |
+| ftc_09 (AP242) | 5.83 MB | 874.7 ms | 1,766 |
+| stc_09 (AP242) | 5.04 MB | 1,148.3 ms | 1,708 |
+
+Runtime tracks file size, not triangle count: `ctc_02` produces 3.6x the
+triangles of `stc_09` in half the time. The phase breakdown shows why.
+
+| Model | Parse | Tessellate | GPU init wait | Total |
+|---|---:|---:|---:|---:|
+| ftc_06 | 31.9 ms | 10.7 ms | 429.9 ms | 512.9 ms |
+| ctc_02 | 228.9 ms | 28.4 ms | 847.8 ms | 1,157.2 ms |
+| ftc_09 | 682.5 ms | 6.5 ms | 0.0 ms | 772.3 ms |
+| stc_09 | 907.5 ms | 5.8 ms | 0.0 ms | 1,034.4 ms |
+
+Two things follow. Tessellation is never the cost: it stays between 6 and 28 ms
+even on the largest models, so the boundary representation evaluation is not
+the bottleneck. Parsing ISO 10303-21 text is, reaching 88% of total runtime on
+the largest file, and it is the only phase worth optimizing further.
+
+GPU initialization runs concurrently with scene loading, so on small models the
+render waits on the GPU while on large ones the GPU is ready before parsing
+finishes and the wait falls to zero. The floor of roughly 470 ms on a small
+model is process launch plus adapter and device creation, matching the GLB
+results above.
+
+Run it with:
+
+```powershell
+cargo build --release
+./benchmarks/step-bench.ps1 -Look target/release/look.exe -Nist <path-to-nist-files>
+```
+
+Coverage on that corpus is 32 of 33 files. The remaining file stores its
+geometry as an AP242 tessellated solid rather than a boundary representation,
+which `look` does not yet read.
+
 #### Foliage stress scene
 
 The official Sponza Base, Ivy, and Trees packages were merged into one GLB by
