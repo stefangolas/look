@@ -13,22 +13,11 @@ install and no converter to configure:
 look part.step --output part.png
 ```
 
-<img src="docs/images/damaged-helmet-look-vs-f3d.png" width="900" alt="Khronos Damaged Helmet rendered side by side by look and F3D 3.5">
+<img src="docs/images/damaged-helmet-look-vs-f3d.png" width="640" alt="Khronos Damaged Helmet rendered side by side by look and F3D 3.5">
 
-On the Khronos Damaged Helmet at matched settings, `look` completed a
-fresh-process 512x512 PNG in **602 ms** median versus **939 ms** for F3D 3.5:
-**1.56x faster**. Across six Khronos samples the geometric mean is 1.40x.
-[Image license, raw samples, and exact configuration](docs/BENCHMARKS.md).
-
-On the 10.8M-triangle Intel Sponza Base + Ivy + Trees scene, `look` completed a
-fresh-process 512x512 PNG in **8.49 s** median versus **50.47 s** for F3D 3.5:
-**5.94x faster** over three alternating launches. The same resident scene
-rendered a 4K fly-through with 4x MSAA in **7.58 ms median GPU time**.
-[Image license, raw samples, and exact configuration](docs/BENCHMARKS.md).
-
-The 748K-triangle New York Boulevard demo completed at 4096x4096 in **888 ms**
-median versus **1,777 ms** for F3D 3.5: **2.00x faster** over seven alternating
-fresh launches.
+`look` is faster than F3D 3.5 across every scene measured, by 1.4x on typical
+glTF samples and up to 5.9x on large ones. See [benchmarks](docs/BENCHMARKS.md)
+for the numbers, raw samples, image licenses, and methodology.
 
 ## Quick example
 
@@ -50,24 +39,9 @@ look model.glb --material-mode source \
   --resolution 384x384 --atlas 2 --output views.png --json
 ```
 
-In the persistent 512 px-tile benchmark on an NVIDIA RTX 5050 Laptop GPU, this
-four-view atlas took **8.94 ms** in `look`, versus **22.50 ms** in Three.js
-WebGL2 and **27.30 ms** in Three.js WebGPU: `look` was **2.52x** and **3.05x**
-faster, respectively. These figures measure render, readback, PNG encoding, and
-output-file replacement after each renderer has initialized; see the
-[benchmark methodology](docs/BENCHMARKS.md).
-
-Compared with F3D, `look` has a deliberately narrower GLB/STL pipeline: it
-avoids VTK's general-purpose data, scene, and application layers and compiles
-the model directly into compact GPU buffers and material batches. That means
-less startup work, scene traversal, allocation, and state conversion for the
-specific render jobs `look` supports.
-
-Compared with Three.js, `look` runs native Rust instead of a JavaScript object
-graph inside Chromium, then reuses the GPU device, pipelines, textures, and
-uploaded scene through persistent sessions. Its atlas path draws every view
-into one render target in one GPU pass, followed by one readback and one PNG,
-rather than paying per-view canvas and capture overhead.
+The atlas path draws every view into one render target in a single GPU pass,
+then does one readback and one PNG, rather than paying per-view capture
+overhead.
 
 `look` can also:
 
@@ -203,12 +177,9 @@ used for CLI, package, parser, and render smoke tests:
 look tests/fixtures/triangle.stl --output triangle.png --json
 ```
 
-The native GPU test also constructs a minimal embedded-buffer GLB at runtime,
-so the generated binary fixture cannot drift independently from the test that
-validates it. Larger Khronos models such as Damaged Helmet are benchmark inputs,
-not repository fixtures; they are kept under the ignored `target/bench/models`
-directory to avoid bloating normal clones and redistributing third-party assets
-without their model-specific license records.
+Larger Khronos models are benchmark inputs rather than fixtures, and are kept
+out of the repository to avoid bloating clones and redistributing third-party
+assets without their license records.
 
 ## Current scope
 
@@ -227,26 +198,16 @@ scene editor.
 
 ## Measured performance
 
-Local measurements used an NVIDIA RTX 5050 Laptop GPU, 512 px tiles, source PBR
-materials, and 11 resident samples. Lower is better.
+Fresh-process, against F3D 3.5: 1.40x geometric mean on six glTF samples, 2.00x
+on New York Boulevard at 4K, and 5.94x on the 10.8M-triangle Sponza foliage
+composite. On STEP, 1.26x against F3D's OpenCASCADE reader.
 
-| Resident workload | look | Three.js WebGL2 | Three.js WebGPU |
-|---|---:|---:|---:|
-| One view, render + PNG | 3.46 ms | 7.60 ms | 13.50 ms |
-| Four-view 2x2 atlas, render + PNG | 8.94 ms | 22.50 ms | 27.30 ms |
+Resident, against Three.js at 512 px tiles: a four-view atlas takes 8.94 ms in
+`look` versus 22.50 ms in WebGL2 and 27.30 ms in WebGPU.
 
-The `look` measurements include replacing the output file; the browser numbers
-stop after PNG encoding. Chrome WebGL2 and `look` reported the RTX adapter.
-Chrome withheld WebGPU adapter identity, so that row is informative rather than
-a same-adapter performance claim.
-
-Against clean-config F3D 3.5 fresh processes on six glTF sample models, `look`
-was 1.11x to 1.57x faster with a 1.40x geometric-mean speedup. It was 2.00x
-faster on New York Boulevard at 4K, 6.43x faster on the 3.75M-triangle Intel
-Sponza base scene, and 5.94x faster on the 10.8M-triangle Sponza foliage
-composite at 512px. These are local results, not universal guarantees. Full
-commands, raw samples, fidelity metrics, and methodological limits are in
-[benchmarks](docs/BENCHMARKS.md).
+These are local results on one NVIDIA RTX 5050 Laptop GPU, not universal
+guarantees. Commands, raw samples, fidelity metrics, hardware fingerprints, and
+methodological limits are in [benchmarks](docs/BENCHMARKS.md).
 
 ## Development
 
