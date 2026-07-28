@@ -25,6 +25,12 @@ Shared settings:
 - seven measured launches per model
 - `look --preset f3d-match`
 
+<img src="images/damaged-helmet-look-vs-f3d.png" width="900" alt="Khronos Damaged Helmet rendered side by side by look and F3D 3.5">
+
+Both panels above come from the runs tabulated here. Shading differs slightly
+because F3D/VTK and `wgpu` do not share a material, sampling, and color
+pipeline; the pixel-space error for this model is tabulated further down.
+
 | Khronos glTF sample | look median | F3D median | F3D / look |
 |---|---:|---:|---:|
 | Box | 531.751 ms | 588.282 ms | 1.106x |

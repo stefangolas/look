@@ -1,8 +1,25 @@
 # Third-party comparison images
 
-> The `*-look-vs-f3d.png` side-by-side comparisons are temporarily removed
-> pending regeneration on an isometric camera. The model credits and licenses
-> below still apply and are kept here for the replacements.
+`damaged-helmet-look-vs-f3d.png` is the side-by-side comparison built from
+`damaged-helmet-look.png` and `damaged-helmet-f3d.png` by
+`benchmarks/make-comparison.py`. Regenerate it from the repository root:
+
+```console
+python benchmarks/make-comparison.py \
+  --left docs/images/damaged-helmet-look.png --left-label "look" \
+  --left-note "602 ms median" \
+  --right docs/images/damaged-helmet-f3d.png --right-label "F3D 3.5" \
+  --right-note "939 ms median" \
+  --title "Khronos Damaged Helmet - 1.56x faster, matched settings" \
+  --footer "6 fresh launches each - 512x512 front orthographic - source PBR - no AA/AO/tone mapping - #252525 background" \
+  --output docs/images/damaged-helmet-look-vs-f3d.png
+```
+
+The Sponza and New York Boulevard comparisons were withdrawn. F3D renders
+Intel Sponza black at every camera, lighting, tone mapping, and texture
+resolution tried, so a side-by-side there would show a failed render next to a
+working one rather than a difference in renderer quality. Their timing tables
+remain in `BENCHMARKS.md`, which is the honest form for that result.
 
 `damaged-helmet-look.png`, `damaged-helmet-f3d.png`, and
 `damaged-helmet-tileset.png` are renderer outputs of the Khronos Damaged Helmet

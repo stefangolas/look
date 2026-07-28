@@ -13,6 +13,13 @@ install and no converter to configure:
 look part.step --output part.png
 ```
 
+<img src="docs/images/damaged-helmet-look-vs-f3d.png" width="900" alt="Khronos Damaged Helmet rendered side by side by look and F3D 3.5">
+
+On the Khronos Damaged Helmet at matched settings, `look` completed a
+fresh-process 512x512 PNG in **602 ms** median versus **939 ms** for F3D 3.5:
+**1.56x faster**. Across six Khronos samples the geometric mean is 1.40x.
+[Image license, raw samples, and exact configuration](docs/BENCHMARKS.md).
+
 On the 10.8M-triangle Intel Sponza Base + Ivy + Trees scene, `look` completed a
 fresh-process 512x512 PNG in **8.49 s** median versus **50.47 s** for F3D 3.5:
 **5.94x faster** over three alternating launches. The same resident scene
