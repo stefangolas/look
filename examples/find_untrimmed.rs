@@ -69,6 +69,10 @@ fn single_face_shell(shell: &Cshell, index: usize) -> Cshell {
             boundaries,
             orientation: face.orientation,
             surface: face.surface.clone(),
+            // The isolated face keeps the provenance of the one it was lifted
+            // from, so a report about the extract still names the entity in the
+            // original file.
+            provenance: face.provenance,
         }],
     }
 }

@@ -453,6 +453,70 @@ are the template.
 
 ---
 
+## Plane-angle units: `ftc_07` FIXED (2026-07-29)
+
+**The first blob to be fixed, and it was not a geometry defect.**
+
+`nist_ftc_07_asme1_rd` declares plane angles in **degrees**, and the importer had
+**no unit handling of any kind**:
+
+```text
+#42  = (GEOMETRIC_REPRESENTATION_CONTEXT(3)
+        GLOBAL_UNIT_ASSIGNED_CONTEXT((#24,#28,#38)) ...)
+#24  = (CONVERSION_BASED_UNIT('DEGREE',#20) NAMED_UNIT(#19) PLANE_ANGLE_UNIT())
+#20  = PLANE_ANGLE_MEASURE_WITH_UNIT(PLANE_ANGLE_MEASURE(0.0174532925),#18)
+#686 = CONICAL_SURFACE('',#685,0.282184119986423,1.999999999999705)
+```
+
+That cone is 2°, read as 2 radians, and the value goes straight into `tan`:
+`tan(2°) = 0.0349` against `tan(2 rad) = −2.185`. **Wrong by 63× and inverted in
+sign**, so each corner draft face opens backwards at enormous angle. Those were
+the fans.
+
+**Why angles and not lengths.** The same file is in *inches* and always was, with
+no ill effect: a length unit is a uniform scale, the tolerance is relative, and
+nothing downstream cares. An angle is not scale-covariant. An angle in degrees
+beside lengths in inches is dimensionally inconsistent, and the error is a
+different *shape* rather than a different size. That asymmetry is why a total
+absence of unit handling stayed invisible for the whole life of the project and
+then produced a blob.
+
+| | before | after |
+|---|---:|---:|
+| `ftc_07` triangles | 2,501 | **2,140** |
+| escaping cone faces in the differential | 9 | **0** |
+| render vs. its AP242 twin | fans | **agrees** |
+
+**Corpus regression sweep, all 33 NIST models.** Seven change; every one of the
+seven declares degrees; five change imperceptibly (1–92 triangles) and none
+regress visually. ABC `00009190` is byte-identical — 604 of 24202, 214,211
+triangles, the same 10 blob shells — because it declares no degree units, which
+also means **this fixes none of the ABC blobs**.
+
+**The honest-refusal rule caught a bug in itself.** Resolution applies a factor
+only when every *independently assigned* declaration agrees, and warns rather
+than guessing otherwise. The first version refused every file it existed to fix,
+printing `plane angle units disagree (1 vs 0.0174532925)`: a degree unit is
+*defined* as a multiple of a radian unit, so every degree file necessarily also
+contains a radian `SI_UNIT` — referenced, not assigned. Conversion bases are now
+excluded rather than compared, and the regression test is named for it. Worth
+recording because the refusal is what made the mistake visible instead of
+silently converting by the wrong factor.
+
+**Still open on this front:** `PARAMETER_VALUE` trims on circles are angle-valued
+and are **not** converted. `ftc_07` contains none; **20 of 33 NIST files do**, and
+`ctc_05` is one — which is why `ctc_05` improved (2,230 → 2,196 triangles) but
+still renders its shaft as a funnel. That is the next concrete item.
+
+Also unresolved by design: resolution is file-global, where the correct rule is
+per-`GEOMETRIC_REPRESENTATION_CONTEXT`. Both of `ftc_07`'s two contexts declare
+degrees, so this is sufficient here; a file mixing radians for geometry with
+degrees for annotation gets a warning and no conversion.
+
+**Contracts:** `GEO-001`. The declared transform now includes the unit
+conversion, so converted geometry equals the transform of the source rather than
+of a reinterpretation of it.
+
 ## The NIST corpus renders two blobs, and neither is reported (2026-07-29)
 
 The NIST PMI set had only ever been checked computationally. It was rendered

@@ -78,6 +78,8 @@ fn single_face_shell(shell: &Cshell, index: usize) -> Cshell {
             boundaries,
             orientation: face.orientation,
             surface: face.surface.clone(),
+            // Keep the source identity of the face this was lifted from.
+            provenance: face.provenance,
         }],
     }
 }
