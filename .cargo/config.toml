@@ -1,0 +1,20 @@
+# Local truck iteration, disabled.
+#
+# `look` builds against `stefangolas/truck` pinned by exact revision in
+# Cargo.toml, so a build is reproducible from a clean clone. To iterate on the
+# fork instead, uncomment the block below and point it at a local checkout;
+# re-comment it and bump the rev before committing, because a path override is
+# invisible in `Cargo.lock` and a measurement taken through one is not a
+# measurement of anything that has been pushed.
+#
+# paths = [
+#     "../truck-fork/truck-base",
+#     "../truck-fork/truck-derivers",
+#     "../truck-fork/truck-geometry",
+#     "../truck-fork/truck-geotrait",
+#     "../truck-fork/truck-meshalgo",
+#     "../truck-fork/truck-modeling",
+#     "../truck-fork/truck-polymesh",
+#     "../truck-fork/truck-stepio",
+#     "../truck-fork/truck-topology",
+# ]

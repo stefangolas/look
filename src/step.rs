@@ -99,14 +99,19 @@ pub fn parse_step(
         .shell
         .par_iter()
         .map(|(id, shell)| {
+            // The declared count is read from the source holder, before
+            // conversion, because conversion is allowed to drop a face and
+            // nothing downstream can tell that it did.
+            let declared = shell.cfs_faces.len();
             table
                 .to_compressed_shell(shell)
+                .map(|compressed| (declared, compressed))
                 .map_err(|error| format!("shell #{id}: {error}"))
         })
         .collect::<Vec<_>>();
 
     let mut model = BoundingBox::<Point3>::new();
-    for shell in shells.iter().flatten() {
+    for (_, shell) in shells.iter().flatten() {
         for vertex in &shell.vertices {
             model.push(*vertex);
         }
@@ -134,7 +139,7 @@ pub fn parse_step(
     let meshed = shells
         .into_par_iter()
         .map(|shell| {
-            let shell = shell?;
+            let (declared, shell) = shell?;
             // Only a shell with no faces carries nothing to render. Counting
             // *vertices* was wrong: a disc or a cylinder is bounded by full
             // circles, which have one topological vertex each, so this
@@ -142,7 +147,16 @@ pub fn parse_step(
             // renders fine reached look as "tessellation produced no
             // triangles" for exactly this reason.
             if shell.faces.is_empty() {
-                return Ok((PolygonMesh::default(), FaceTally::default()));
+                // Still report what the file declared. A shell whose faces all
+                // failed to convert arrives here looking identical to a shell
+                // that genuinely holds none.
+                return Ok((
+                    PolygonMesh::default(),
+                    FaceTally {
+                        declared,
+                        ..FaceTally::default()
+                    },
+                ));
             }
             let meshed = shell.robust_triangulation(tolerance);
             // A face that could not be meshed is dropped from the polygon
@@ -158,6 +172,7 @@ pub fn parse_step(
             // and unexplained defect. Counting only the first understated the
             // loss on 00009190 by 118 faces, 276 against 394.
             let mut tally = FaceTally {
+                declared,
                 total: meshed.faces.len(),
                 ..FaceTally::default()
             };
@@ -181,6 +196,7 @@ pub fn parse_step(
         match result {
             Ok((polygon, tally)) => {
                 append_polygon(&polygon, &mut positions, &mut indices);
+                faces.declared += tally.declared;
                 faces.total += tally.total;
                 faces.unsurfaced += tally.unsurfaced;
                 faces.empty += tally.empty;
@@ -212,9 +228,11 @@ pub fn parse_step(
         // reported because it points at which defect to chase.
         eprintln!(
             "warning: {} of {} STEP faces produced no geometry and are missing \
-             from the render ({} had no surface, {} meshed to nothing)",
+             from the render ({} failed to convert, {} had no surface, \
+             {} meshed to nothing)",
             faces.lost(),
-            faces.total,
+            faces.declared,
+            faces.unconverted(),
             faces.unsurfaced,
             faces.empty
         );
@@ -225,10 +243,19 @@ pub fn parse_step(
 
 /// How many faces a shell held, and how many of them yielded no mesh.
 ///
-/// The two loss causes are kept apart because they are different bugs, and a
+/// The three loss causes are kept apart because they are different bugs, and a
 /// single "dropped" number hid that. See the counting site for which is which.
 #[derive(Debug, Default, Clone, Copy)]
 struct FaceTally {
+    /// Faces the STEP file names on this shell, before any conversion.
+    ///
+    /// This is the only denominator that cannot move. `total` counts what
+    /// survived the entity graph, so measuring loss against it lets a
+    /// conversion that drops faces outright *improve* the reported ratio while
+    /// deleting geometry — which is exactly what happened when bound conversion
+    /// was made all-or-nothing: 274 faces left the model and the warning got
+    /// quieter.
+    declared: usize,
     total: usize,
     /// No surface could be produced for the face at all.
     unsurfaced: usize,
@@ -237,9 +264,14 @@ struct FaceTally {
 }
 
 impl FaceTally {
+    /// Faces the file declared that never reached tessellation at all.
+    fn unconverted(&self) -> usize {
+        self.declared.saturating_sub(self.total)
+    }
+
     /// Faces that reach the render carrying no geometry, however they got there.
     fn lost(&self) -> usize {
-        self.unsurfaced + self.empty
+        self.unconverted() + self.unsurfaced + self.empty
     }
 }
 

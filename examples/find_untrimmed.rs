@@ -73,6 +73,34 @@ fn single_face_shell(shell: &Cshell, index: usize) -> Cshell {
     }
 }
 
+/// How many points to sample along each edge, matching `look`'s own measure.
+const EDGE_SAMPLES: u32 = 4;
+
+/// truck asserts on a tolerance below this.
+const MINIMUM_TOLERANCE: f64 = 1.0e-6;
+
+/// Measure a shell honestly: vertices *and* the curves between them.
+///
+/// Measuring from vertices alone is the very defect this tool exists to find,
+/// and it silently corrupted the tool's own answer. A shell bounded by full
+/// circles carries one topological vertex per circle, so shell 159184 — a
+/// washer — measured 0.0002 across against a true extent of 0.01. Every one of
+/// its faces then scored ~50x and was reported untrimmed, when the shell
+/// meshes perfectly correctly. A detector that measures the way the bug does
+/// reports the bug about itself.
+fn push_shell_extent(bounds: &mut BoundingBox<Point3>, shell: &Cshell) {
+    for vertex in &shell.vertices {
+        bounds.push(*vertex);
+    }
+    for edge in &shell.edges {
+        let (start, end) = edge.curve.range_tuple();
+        for step in 0..=EDGE_SAMPLES {
+            let t = start + (end - start) * f64::from(step) / f64::from(EDGE_SAMPLES);
+            bounds.push(edge.curve.subs(t));
+        }
+    }
+}
+
 fn diagonal(bounds: &BoundingBox<Point3>) -> f64 {
     if bounds.is_empty() {
         0.0
@@ -107,13 +135,11 @@ fn main() -> anyhow::Result<()> {
 
     let mut model_box = BoundingBox::<Point3>::new();
     for (_, shell) in &shells {
-        for vertex in &shell.vertices {
-            model_box.push(*vertex);
-        }
+        push_shell_extent(&mut model_box, shell);
     }
     let scaled = model_box.diameter() * RELATIVE_TOLERANCE;
     let tolerance = if scaled.is_finite() && scaled > 0.0 {
-        scaled
+        scaled.max(MINIMUM_TOLERANCE)
     } else {
         DEGENERATE_TOLERANCE
     };
@@ -129,6 +155,14 @@ fn main() -> anyhow::Result<()> {
     let mut per_shell: Vec<(u64, usize, usize, f64)> = Vec::new();
     let mut untrimmed_total = 0usize;
     let mut face_total = 0usize;
+    // Does the fallback fire on exactly the faces whose surface sense is
+    // reversed? `PolyBoundary::new` decides using `loop_orientation` on the raw
+    // uv loops, and never consults `face.orientation`. A reversed face has its
+    // boundaries traversed against the surface parameterization, so its outer
+    // loop *should* read as negative. If that is the mechanism, the untrimmed
+    // set is almost entirely orientation == false, and the trimmed set is not.
+    // [untrimmed][orientation as usize]
+    let mut orientation_split = [[0usize; 2]; 2];
 
     for (entity, shell) in &shells {
         let mut untrimmed = 0usize;
@@ -136,9 +170,7 @@ fn main() -> anyhow::Result<()> {
         // The solid this face belongs to. Its own vertices bound it honestly,
         // whatever the trimming code later decides.
         let mut shell_box = BoundingBox::<Point3>::new();
-        for vertex in &shell.vertices {
-            shell_box.push(*vertex);
-        }
+        push_shell_extent(&mut shell_box, shell);
         let shell_size = diagonal(&shell_box);
         if shell_size <= 0.0 {
             continue;
@@ -154,7 +186,10 @@ fn main() -> anyhow::Result<()> {
                 mesh.push(*point);
             }
             let ratio = diagonal(&mesh) / shell_size;
-            if ratio > UNTRIMMED_RATIO {
+            let untrimmed_here = ratio > UNTRIMMED_RATIO;
+            orientation_split[untrimmed_here as usize]
+                [shell.faces[index].orientation as usize] += 1;
+            if untrimmed_here {
                 untrimmed += 1;
                 untrimmed_total += 1;
                 worst = f64::max(worst, ratio);
@@ -170,6 +205,21 @@ fn main() -> anyhow::Result<()> {
          boundary, across {} shells",
         per_shell.len()
     );
+
+    let share = |count: usize, total: usize| match total {
+        0 => 0.0,
+        _ => 100.0 * count as f64 / total as f64,
+    };
+    for (untrimmed, label) in [(1usize, "untrimmed"), (0, "trimmed")] {
+        let [reversed, forward] = orientation_split[untrimmed];
+        let total = reversed + forward;
+        println!(
+            "  {label:>9}: {total:>6} faces, orientation false {reversed:>6} ({:.1}%), \
+             true {forward:>6} ({:.1}%)",
+            share(reversed, total),
+            share(forward, total)
+        );
+    }
 
     // Smallest affected shells first: the point is a fixture, so the best
     // candidate is the one with the fewest faces that still shows the bug.
