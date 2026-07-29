@@ -15,6 +15,7 @@ use std::time::Instant;
 use rayon::prelude::*;
 use truck_meshalgo::prelude::*;
 use truck_stepio::r#in::Table;
+use truck_topology::compress::FaceProvenance;
 
 use crate::timing::Timings;
 
@@ -40,6 +41,19 @@ const EDGE_SAMPLES: u32 = 4;
 /// model whose measured extent is tiny — or an isolated shell pulled out of a
 /// larger assembly — otherwise computes a tolerance below it and aborts.
 const MINIMUM_TOLERANCE: f64 = 1.0e-6;
+
+/// How many lost-face identities one shell contributes to the report.
+///
+/// Per-shell rather than global so a model whose loss is spread thinly still
+/// names faces from several shells instead of exhausting the budget on the
+/// first one that fails.
+const LOST_FACE_IDS_PER_SHELL: usize = 4;
+
+/// How many lost-face identities the warning prints in total.
+///
+/// A diagnostic that floods stderr gets piped to `/dev/null`, and then it
+/// diagnoses nothing. The count is always exact; only the naming is capped.
+const LOST_FACE_IDS_REPORTED: usize = 12;
 
 /// Tessellate every shell in a STEP file into one indexed triangle mesh.
 ///
@@ -156,6 +170,9 @@ pub fn parse_step(
                         declared,
                         ..FaceTally::default()
                     },
+                    // Nothing survived to carry an identity: these faces were
+                    // lost during conversion, before any face object existed.
+                    Vec::new(),
                 ));
             }
             let meshed = shell.robust_triangulation(tolerance);
@@ -176,14 +193,29 @@ pub fn parse_step(
                 total: meshed.faces.len(),
                 ..FaceTally::default()
             };
+            // The entity behind each loss, so the warning can name faces
+            // instead of only counting them. Capped: a model that loses
+            // thousands does not need thousands of ids on stderr to be
+            // diagnosed, and the cap keeps this bounded on the worst input
+            // rather than the typical one.
+            let mut lost_ids = Vec::new();
             for face in &meshed.faces {
-                match &face.surface {
-                    None => tally.unsurfaced += 1,
-                    Some(mesh) if mesh.faces().is_empty() => tally.empty += 1,
-                    Some(_) => {}
+                let lost = match &face.surface {
+                    None => {
+                        tally.unsurfaced += 1;
+                        true
+                    }
+                    Some(mesh) if mesh.faces().is_empty() => {
+                        tally.empty += 1;
+                        true
+                    }
+                    Some(_) => false,
+                };
+                if lost && lost_ids.len() < LOST_FACE_IDS_PER_SHELL && !face.provenance.is_empty() {
+                    lost_ids.push(face.provenance);
                 }
             }
-            Ok::<_, String>((meshed.to_polygon(), tally))
+            Ok::<_, String>((meshed.to_polygon(), tally, lost_ids))
         })
         .collect::<Vec<_>>();
     timings.record("step_tessellate", mesh_started.elapsed());
@@ -192,14 +224,18 @@ pub fn parse_step(
     let mut indices = Vec::new();
     let mut failures = Vec::new();
     let mut faces = FaceTally::default();
+    let mut lost_faces: Vec<FaceProvenance> = Vec::new();
     for result in meshed {
         match result {
-            Ok((polygon, tally)) => {
+            Ok((polygon, tally, lost_ids)) => {
                 append_polygon(&polygon, &mut positions, &mut indices);
                 faces.declared += tally.declared;
                 faces.total += tally.total;
                 faces.unsurfaced += tally.unsurfaced;
                 faces.empty += tally.empty;
+                if lost_faces.len() < LOST_FACE_IDS_REPORTED {
+                    lost_faces.extend(lost_ids);
+                }
             }
             Err(error) => failures.push(error),
         }
@@ -236,6 +272,37 @@ pub fn parse_step(
             faces.unsurfaced,
             faces.empty
         );
+        // Naming even a few of them turns "geometry is missing somewhere" into
+        // a place to start: every id here can be grepped straight out of the
+        // source file, and the chain says which layer is meant.
+        //
+        // Only *tessellation-stage* losses can appear. A face lost during
+        // conversion never became a face object, so nothing survives to carry
+        // its provenance — which is why the count below is deliberately split
+        // rather than presented as one total with a dozen examples. Saying "and
+        // N more" over a mixed population would imply every unnamed face
+        // reached the stage that could have named it.
+        if !lost_faces.is_empty() {
+            let named = faces.unsurfaced + faces.empty;
+            let shown = lost_faces
+                .iter()
+                .take(LOST_FACE_IDS_REPORTED)
+                .map(FaceProvenance::to_string)
+                .collect::<Vec<_>>()
+                .join("; ");
+            let unnamed = named.saturating_sub(lost_faces.len().min(LOST_FACE_IDS_REPORTED));
+            eprintln!("         of the {named} lost after conversion: {shown}");
+            if unnamed > 0 {
+                eprintln!("         and {unnamed} more not listed");
+            }
+            if faces.unconverted() > 0 {
+                eprintln!(
+                    "         the {} lost during conversion cannot be named yet \
+                     — no face object exists to carry their provenance",
+                    faces.unconverted()
+                );
+            }
+        }
     }
 
     Ok((positions, indices))
