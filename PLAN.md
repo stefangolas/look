@@ -453,6 +453,51 @@ are the template.
 
 ---
 
+## `VERTEX_LOOP` support: 604 → 396 on ABC, 0 on NIST (2026-07-29)
+
+STEP lets a face bound reference an `EDGE_LOOP` **or** a `VERTEX_LOOP`, and
+`bound_holder` checked only the first — with a comment admitting it: *"For now,
+we are going with the policy of accepting nothing but edgeloop."* Every
+`VERTEX_LOOP` therefore destroyed its whole face.
+
+A collapsed bound now contributes **no trim segment**. The apex is closed by the
+surface's own degeneracy, so nothing is the honest contribution — a synthesised
+zero-size loop would trim the face by an empty region and delete it just as
+thoroughly. `FaceBoundLoop` keeps the two kinds apart at the type level so that
+mistake is not expressible. A face whose bounds *all* collapse is still refused
+(`AllBoundsCollapsed`), because trimming by no boundary at all emits the entire
+unbounded surface — the blob failure mode.
+
+| | before | after |
+|---|---:|---:|
+| ABC `00009190` faces lost | 604 | **396** |
+| — failed to convert | 274 | **3** |
+| — meshed to nothing | 103 | 166 |
+| faces rendered | 23,598 | **23,806** |
+| triangles | 214,211 | **216,335** |
+| blob shells | 10 | 10 (ratios identical to 5 dp) |
+| NIST faces lost | 356 | **356** |
+
+**Necessary, and not sufficient.** Resolving the entity is done; the geometry is
+not. Of the 404 faces that now convert:
+
+- **ABC: +208 render, not +272.** 64 of the recovered apex faces convert and
+  then mesh to nothing.
+- **NIST: +0.** All 132 turned from `LoopReferenceUnresolved` into
+  `MeshedToNothing`. Spot-checked triangle counts are identical, so nothing
+  regressed — nothing improved either.
+
+Trimming a cone by its outer circle alone, with the apex closed by degeneracy,
+yields an **empty material region** for every NIST apex and a quarter of the ABC
+ones. That is domain semantics, not parsing: the classifier cannot infer which
+side is material from the one remaining loop, which is precisely what `DOM-003`
+(explicit base domain) and `QUO-005` (singular charts) exist for. `PLAN`'s PR 5
+note already says `closed.is_empty()` cannot be the final rule; this is that bill
+arriving.
+
+Faces carrying a collapsed bound are counted under `TRUCK_PROBE_SINGULAR`, since
+their domain now has a singular point nothing downstream is told about.
+
 ## The missing-face repair queue (2026-07-29)
 
 `examples/face_census.rs` attributes every lost face to a reason, taken from the
