@@ -507,8 +507,52 @@ chart (`QUO-005`): the bound has no edges, contributes no trim curve, and the
 parameter domain closes to a point there. Supporting it means deciding what the
 trimming domain of such a face is, not just resolving one more entity type.
 
-Second NIST category, unexplained: **216 cone faces produce no surface at
-tessellation**, against 1 on `00009190`. Not yet investigated.
+### The 216 cone failures are a *separate* defect, measured 2026-07-29
+
+It was worth asking whether they shared the apex/singularity cause, because that
+would have made one fix recover both. **They do not.** Three measurements:
+
+**Perfectly anti-correlated.** Across all 33 NIST models, every model with cone
+tessellation failures has **zero** `VERTEX_LOOP` entities, and every model with
+`VERTEX_LOOP` failures has **zero** cone failures. Not one model has both.
+
+| part | encoding | cone no-surface | `VERTEX_LOOP` in file | loop failures |
+|---|---|---:|---:|---:|
+| `ctc_02` | ap203geom | 148 | 0 | 0 |
+| `ctc_02` | ap203pmi | 0 | 74 | 74 |
+| `ctc_05` | ap203geom | 20 | 0 | 0 |
+| `ctc_05` | ap203pmi | 0 | 10 | 10 |
+| `ftc_07` | ap242 | 16 | 0 | 0 |
+
+The anti-correlation is an **encoding artifact, not a shared cause**: the two
+encodings of one part model the same features differently, so each file exhibits
+only one of the two defects. The tidy 2:1 ratio is a property of how each
+exporter splits those features and nothing more.
+
+**The failing cone faces are not collapsed boundaries.** Sampled face `#4932` of
+`ap203geom/ctc_05`:
+
+```text
+#4932 = ADVANCED_FACE('',(#4931),#4924,.F.)
+#4931 = FACE_OUTER_BOUND('',#4930,.F.)
+#4930 = EDGE_LOOP('',(#4926,#4928,#4929))      <- three real edges
+        two LINEs and a CIRCLE, three distinct vertices, none coincident
+```
+
+An ordinary trimmed cone patch. No degenerate edge, no apex vertex, nothing
+singular. `VERTEX_LOOP` support cannot touch it.
+
+**Nor is it the angle-unit bug.** It occurs in files that declare degrees *after*
+conversion (`ap203geom/ctc_02` at 59°) **and** in files that were always in
+radians (`ap242/ftc_07` at `1.0297442575` = the same 59°). A defect present on
+both sides of the unit fix is not a unit defect.
+
+So this is a **third independent family**: trimmed cone patches that convert
+correctly and then produce no triangles. Unexplained, untouched, and it will
+**not** be recovered by the `VERTEX_LOOP` work.
+
+**Consequence for the estimate.** Fixing `VERTEX_LOOP` should recover ~272 faces
+on `00009190` and ~132 across NIST — **404 faces, not 404 + 216.**
 
 ## Plane-angle units: `ftc_07` FIXED (2026-07-29)
 
