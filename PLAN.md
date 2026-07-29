@@ -453,6 +453,63 @@ are the template.
 
 ---
 
+## The missing-face repair queue (2026-07-29)
+
+`examples/face_census.rs` attributes every lost face to a reason, taken from the
+conversion that lost it — `to_compressed_shell` now delegates to
+`to_compressed_shell_with_losses`, so there is one conversion path and the census
+cannot drift from what the renderer does. It reproduces the renderer's own
+numbers exactly (272 + 2 = 274 conversion, 227 no-surface, 103 empty).
+
+**`00009190`, 604 of 24202 lost:**
+
+| stage | reason | surface | count | share |
+|---|---|---|---:|---:|
+| convert | `LoopReferenceUnresolved` | — | **272** | **45.0%** |
+| tessellate | `NoSurfaceProduced` | bspline | 112 | 18.5% |
+| tessellate | `NoSurfaceProduced` | nurbs | 70 | 11.6% |
+| tessellate | `MeshedToNothing` | plane | 53 | 8.8% |
+| tessellate | `NoSurfaceProduced` | cylinder | 44 | 7.3% |
+| tessellate | `MeshedToNothing` | cylinder | 20 | 3.3% |
+| convert | `EdgeCurveConversionFailed` | — | 2 | 0.3% |
+
+**All 33 NIST, 356 of 7902 lost** — two categories are 98% of it:
+
+| stage | reason | surface | count | share |
+|---|---|---|---:|---:|
+| tessellate | `NoSurfaceProduced` | cone | **216** | **60.7%** |
+| convert | `LoopReferenceUnresolved` | — | **132** | **37.1%** |
+
+Cross-checked against the pre-unit-fix sweep: `ap242 ftc_07` 16, `ftc_10` 16,
+`stc_07` 16, `stc_10` 8, `ctc_05` 10 — all unchanged, so both populations
+pre-date the angle fix.
+
+### Top item, root-caused: `VERTEX_LOOP` is unsupported
+
+`00009190` contains exactly **272 `VERTEX_LOOP` entities and exactly 272
+`LoopReferenceUnresolved` failures** — a 1:1 match. `FaceBoundHolder::bound_holder`
+resolves a bound only against `table.edge_loop`, so every `VERTEX_LOOP` kills its
+face:
+
+```text
+#45222  = ADVANCED_FACE( 'PARTBODY', ( #108199, #108200 ), #108201, .F. )
+#108199 = FACE_BOUND( '', #263343, .T. )        <- #263343 is a VERTEX_LOOP
+#108201 = CONICAL_SURFACE( '', #263345, 0.00166, 1.0297 )
+```
+
+A `VERTEX_LOOP` is a degenerate single-vertex bound — a cone apex or sphere pole,
+and the surface above is conical, so it is the apex. This is the **most
+consistent category across both corpora**: 45% of loss on `00009190`, 37% on
+NIST.
+
+**It is not a parsing gap to paper over.** A collapsed boundary is a singular
+chart (`QUO-005`): the bound has no edges, contributes no trim curve, and the
+parameter domain closes to a point there. Supporting it means deciding what the
+trimming domain of such a face is, not just resolving one more entity type.
+
+Second NIST category, unexplained: **216 cone faces produce no surface at
+tessellation**, against 1 on `00009190`. Not yet investigated.
+
 ## Plane-angle units: `ftc_07` FIXED (2026-07-29)
 
 **The first blob to be fixed, and it was not a geometry defect.**
