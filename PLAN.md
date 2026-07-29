@@ -453,6 +453,66 @@ are the template.
 
 ---
 
+## The NIST corpus renders two blobs, and neither is reported (2026-07-29)
+
+The NIST PMI set had only ever been checked computationally. It was rendered
+and **looked at** for the first time on 2026-07-29, all 33 files, iso view at
+512×512, contact-sheeted and inspected. Two are visually wrong.
+
+**This corpus is a metamorphic test that was sitting unused.** Most parts ship
+in three encodings — AP203 geometry-only, AP203 with PMI, AP242 — and the same
+part in three formats must render as the same shape. That makes disagreement
+self-evidencing: no reference renderer is needed, because the corpus disagrees
+with itself.
+
+| model | symptom | reported? |
+|---|---|---|
+| `ap203geom / nist_ftc_07_asme1_rd` | four corner fillets render as full revolved fans bursting out of the box, plus flared sheets along the top rim | **no warning at all** |
+| `ap203pmi / nist_ctc_05_asme1_ap203` | the cylindrical output shaft renders as a cone with a disc cap on the end | 10 of 156 faces, but not this |
+
+Both parts render correctly from their AP242 encoding, so the defect is in what
+`look` does with the AP203 file, not in the part.
+
+**`ftc_07` is the more valuable reproducer**: 2,501 triangles, no face loss, no
+error, and a picture that is obviously wrong. It is the smallest fully silent
+blob known, an order of magnitude smaller than `shell_160784`'s 20 faces in
+context, and it comes with a correct rendering of the same part to diff against.
+The corner-fan shape is the untrimmed-surface signature — a fillet whose trim
+was lost renders as the entire surface of revolution.
+
+### What the audit says about the detectors
+
+- **A cross-format extent check catches `ftc_07` and misses `ctc_05`.** Comparing
+  the largest bounding-box extent between encodings of one part flags `ftc_07` at
+  1.20×, entirely automatically. It says nothing about `ctc_05`, whose cone sits
+  *inside* the correct extent. A blob only inflates the bounding box when it
+  escapes the part.
+- **Beware 25.40.** Three parts show a 25.40× extent disagreement between AP203
+  and AP242. That is inches against millimetres, not a defect. A ratio detector
+  that does not special-case unit conversion will report four false positives
+  out of five findings.
+- **Face loss does not predict visual soundness in either direction.**
+  `ftc_07` loses zero faces and is wrong; `ap203geom/ctc_02` loses 148 of 664
+  and renders the right shape.
+
+### Consequences for the roadmap
+
+`00009190`'s 10 blob shells were the only visual evidence driving the
+architecture, and they are all in one file from one exporter. There are now
+independent reproducers from a different source, one of which is tiny and one of
+which has a correct twin. **PR 9's metamorphic harness should take the NIST
+multi-encoding property as a test family** — same part, three encodings, same
+bounding box up to a declared unit factor, and ideally same volume.
+
+Reproduce: extract `~/Downloads/NIST-PMI-STEP-Files.zip`, then
+
+```console
+look render nist_ftc_07_asme1_rd.stp   --views iso,front,top --atlas 3   # blobbed
+look render nist_ftc_07_asme1_ap242-e2.stp --views iso,front,top --atlas 3   # correct
+```
+
+---
+
 ## The open defect: 2 remaining blob shells
 
 Reproducers: `../look-trimming-residual/repro/blobs/` — `shell_160144.step`
@@ -541,7 +601,7 @@ Completion is measured on **four axes**, not one — see
 | Axis | What it asks | Status |
 |---|---|---|
 | Structural | no bare identity/index ambiguity, no silent topology loss, no unbounded derived allocation, no forgeable proof-bearing state | partial |
-| Corpus correctness | every model terminates, no unexplained aborts, blobs either fixed or failing at a named contract, no regressions, every missing face categorised | 6 of 20 models measured |
+| Corpus correctness | every model terminates, no unexplained aborts, blobs either fixed or failing at a named contract, no regressions, every missing face categorised | 6 of 20 ABC models measured; all 33 NIST rendered and inspected, 2 blob silently |
 | Performance | time, peak memory, persistent certificate memory, time to first usable image, against a pinned baseline | **no baseline pinned** |
 | Diagnostic quality | for each known reproducer, the first reported failed contract localises the defect to the right stage | not started |
 
