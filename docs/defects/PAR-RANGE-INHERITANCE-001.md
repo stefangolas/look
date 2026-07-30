@@ -73,6 +73,38 @@ Counterfactual `TRUCK_CONE_APEX_RANGE`:
 Blob shell `#161274` (ratio 30.3, 161 faces) disappears. Default path verified
 byte-identical with the flag off.
 
+### The per-model resolution, 2026-07-29 — much stronger evidence
+
+The NIST aggregate hides the real result. Resolved per model, the failing sets
+with the flag off and on are **disjoint**: every model that loses cone faces off
+loses **zero** on, and five previously-clean models lose 268 between them on.
+348 recovered, 268 different faces destroyed.
+
+One part in two encodings settles the interpretation:
+
+| | faces | lost off | lost on |
+|---|---:|---:|---:|
+| `AP203geom / nist_ctc_02_asme1_rc` | 664 | **148** | **0** |
+| `AP242 / nist_ctc_02_asme1_ap242-e2` | 637 | 2 | **150** (148 cone) |
+
+The same 148 cone faces of the same part; the flag flips which encoding loses
+them. `ctc_04` renders fully in both encodings off and loses exactly 56 in
+**both** on.
+
+**This is the obligation stated as a measurement.** Off, the window is
+[reference circle, +1 unit of generatrix]; on, it is [apex, 2R]. Both are
+fixed-size and chosen **without reference to the face**, so whether a face's
+material interval falls inside is decided by where its exporter happened to put
+the reference circle. Two encodings of one part differ in exactly that, and
+therefore disagree — which is why the counterfactual is causal evidence for the
+inheritance defect and **not** a partial fix. A production correction must
+derive the interval from the bounds; any constant window will keep trading one
+population for another.
+
+It also removes the reason this was thought to be blocked on the singular apex:
+see [`SNG-COLLAPSED-DIRECTION-001`](SNG-COLLAPSED-DIRECTION-001.md), whose
+52-face population was an aggregate artifact and has been withdrawn.
+
 ## First divergent checkpoint
 
 **I — material-domain construction.** The false input is set at **C — surface
@@ -103,12 +135,9 @@ retuning each surface to its faces. `From<&ConicalSurface>` has neither.
 
 **Experimental**: `truck` `7199cc90`, default off, spans apex → 2× reference
 radius. **Evidence, not a fix, and preserved as evidence** — it closes `U1`.
-Not on because (a) the factor of 2 is arbitrary and a taller cone falls outside
-again, unmeasured; (b) on NIST it moves 52 faces sideways,
-`NoSurfaceProduced/cone` 216 → 268 while `MeshedToNothing/cone` 132 → 0 — those
-faces trade an empty domain for a chart containing the rank-deficient apex.
-That is [`SNG-COLLAPSED-DIRECTION-001`](SNG-COLLAPSED-DIRECTION-001.md), `U2`
-arriving as predicted.
+Not on because (a) the factor of 2 is arbitrary — and this is no longer a
+theoretical objection: it is **measured**, in the 268 faces the constant window
+destroys; (b) the window is still face-independent, which is the defect itself.
 
 **Production**: none.
 

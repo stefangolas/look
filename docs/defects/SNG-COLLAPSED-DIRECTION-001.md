@@ -52,7 +52,12 @@ concrete step and has not been done.
 
 ## Measurement
 
-Under `TRUCK_CONE_APEX_RANGE`, NIST:
+> **Superseded, 2026-07-29. The "52 faces moved sideways" reading was an
+> aggregate artifact and is withdrawn.** See §Falsified below. This record's
+> status stays `Observed`, but it now has *less* evidence than it was recorded
+> with, not more.
+
+Aggregate, under `TRUCK_CONE_APEX_RANGE`, NIST (reproduced exactly):
 
 | terminal reason | off | on |
 |---|---:|---:|
@@ -60,9 +65,43 @@ Under `TRUCK_CONE_APEX_RANGE`, NIST:
 | `MeshedToNothing` / cone | 132 | **0** |
 | faces lost, total | 356 | **276** |
 
-All 132 collapsed-apex faces leave `MeshedToNothing`; 80 render, and **52 trade
-an empty domain for a chart that now contains the singular point.** The trade is
-the witness: same faces, same file, one flag.
+## Falsified: the 52 faces do not exist as a population
+
+Resolving the same census **per model** shows the two sets of failing faces are
+**disjoint by model**, so no face "trades an empty domain for a singular chart":
+
+| model | off | on |
+|---|---|---|
+| `geom/ctc_02` | `NoSurfaceProduced` 148 | **0** |
+| `geom/ctc_05` | `NoSurfaceProduced` 20 | **0** |
+| `242/ftc_07`, `242/ftc_10`, `242/stc_07` | `NoSurfaceProduced` 16 each | **0** |
+| `pmi/ctc_02` | `MeshedToNothing` 74 | **0** |
+| `pmi/ctc_04`, `pmi/ctc_05`, `242/ctc_05` | `MeshedToNothing` 22 / 10 / 10 | **0** |
+| `geom/ctc_01`, `geom/ftc_06`, `pmi/ctc_01`, `242/stc_06`, `242/stc_10` | `MeshedToNothing` 2–8 | **0** |
+| `geom/ctc_04` | — | **`NoSurfaceProduced` 56** |
+| `242/ctc_04` | — | **56** |
+| `242/ctc_02` | — | **148** |
+| `242/ctc_01`, `242/ftc_06` | — | **4 each** |
+
+**Every model that failed with the flag off succeeds with it on, and a
+different, previously-clean set of models fails with it on.** 348 faces
+recovered, 268 *different* faces destroyed. The net −80 that looked like partial
+progress is the difference between two unrelated populations.
+
+The decisive pair is one part in two encodings:
+
+| | faces | lost off | lost on |
+|---|---:|---:|---:|
+| `AP203geom / nist_ctc_02_asme1_rc` | 664 | **148** | **0** |
+| `AP242 / nist_ctc_02_asme1_ap242-e2` | 637 | 2 | **150** (148 cone) |
+
+Same part. Same 148 cone faces. The flag flips **which encoding loses them**.
+And `ctc_04` renders completely in both encodings with the flag off and loses
+exactly 56 in **both** with it on.
+
+This does not exonerate the singular apex — it removes the only measurement
+that was being used as evidence for it. Nothing here shows a rank-deficient
+chart rejecting a face.
 
 ## First divergent checkpoint
 
@@ -101,16 +140,26 @@ once.
 
 ## Claim status
 
-- **(D)** 52 NIST faces change terminal reason under the flag; 132 → 0
-  `MeshedToNothing`; 216 → 268 `NoSurfaceProduced`.
+- **(D)** The aggregate counts: 216 → 268 `NoSurfaceProduced`, 132 → 0
+  `MeshedToNothing`, 356 → 276 lost.
+- **(D)** The per-model resolution above, and the `ctc_02` encoding pair.
 - **(A)** That the apex is rank-deficient with non-unique angular inverse —
   standard geometry, not measured here.
-- **(A)** That the 52 fail *because of* the singularity. The correlation with
-  chart extension is exact, but **no per-face trace has been run**, and the
-  extended chart differs from the original in more than its inclusion of the
-  apex.
-- **(U)** Which pipeline stage rejects them. **This is the open question the
-  investigation now returns to.**
+- **~~(A)~~ Withdrawn**: that 52 faces fail *because of* the singularity. The
+  population does not exist; the failing sets are disjoint by model.
+- **(U)** Whether the singular apex causes **any** observed failure. This defect
+  is now `Observed` on the *mathematics* (the chart genuinely is rank-deficient
+  at $w^{*}$, and nothing represents that) and on **no measurement at all**. It
+  should not be worked until a witness exists.
+
+## Reduction, no longer valid
+
+`apex_only.stp` **recovers under the flag — 49 triangles.** It is therefore a
+witness for [`PAR-RANGE-INHERITANCE-001`](PAR-RANGE-INHERITANCE-001.md) and
+**not** for this defect. The full `nist_ctc_01_asme1_rd` goes from 2 lost to 0.
+Any witness for this defect must come from the newly-failing set —
+`geom/ctc_04` at 56 faces is the smallest coherent candidate — and reducing one
+is the prerequisite step, not a follow-up.
 
 ## Links
 

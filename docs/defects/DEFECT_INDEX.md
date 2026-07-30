@@ -86,7 +86,7 @@ Status vocabulary — not "open"/"fixed":
 | [QUO-EUCLIDEAN-CLOSURE-001](QUO-EUCLIDEAN-CLOSURE-001.md) | Periodic closure tested by lifted Euclidean equality | Mechanism established | OMISSION | `apex_only.stp`, gap = 2π = perimeter, `closed=false` |
 | [DOM-ARTIFICIAL-CLOSURE-001](DOM-ARTIFICIAL-CLOSURE-001.md) | Lone open trim closed against a parameter-range edge | Mechanism established | OMISSION | `apex_only.stp`, `in_open=1 loops=1` |
 | [DOM-ZERO-AREA-001](DOM-ZERO-AREA-001.md) | Artificial closure collapses a material region to zero area | Mechanism established | OMISSION, DEGENERATION | `apex_only.stp`, `areas=[+0.0000e0]`, 0 triangles vs. control's 46 |
-| [SNG-COLLAPSED-DIRECTION-001](SNG-COLLAPSED-DIRECTION-001.md) | Rank-deficient apex treated as an ordinary chart point | Observed | OMISSION *(cause asserted)* | 52 NIST faces changing terminal reason under `TRUCK_CONE_APEX_RANGE` |
+| [SNG-COLLAPSED-DIRECTION-001](SNG-COLLAPSED-DIRECTION-001.md) | Rank-deficient apex treated as an ordinary chart point | Observed in the mathematics; **its only measured witness was withdrawn 2026-07-29** | OMISSION *(withdrawn)* | **none.** The "52 faces moved sideways" population was an aggregate artifact — the failing sets are disjoint by model |
 
 The last five are one investigation, and its full record — geometry,
 measurements, and a claim-by-claim demonstrated / asserted / undemonstrated
@@ -111,7 +111,7 @@ them early is how the apex/ordinary-cone conflation nearly happened.
 
 | Tag | Population | What is known |
 |---|---|---|
-| `UNKNOWN-NIST-ORDINARY-CONE` | 216 NIST cone faces, `NoSurfaceProduced` | Ordinary non-collapsed three-edge bounds. **Measured to be distinct** from the 132 collapsed-apex `MeshedToNothing` cones: perfectly anti-correlated across all 33 models, and present in radian files as well as converted degree files, so neither `INC-VERTEX-LOOP-001` nor `SEM-UNIT-ANGLE-001` touches them. First divergent checkpoint never measured. (`FORMALISM.md` D11, U4) |
+| ~~`UNKNOWN-NIST-ORDINARY-CONE`~~ **→ folded into [`PAR-RANGE-INHERITANCE-001`](PAR-RANGE-INHERITANCE-001.md), 2026-07-29** | 216 NIST cone faces, `NoSurfaceProduced` | Ordinary non-collapsed three-edge bounds, and **measured to be distinct** from the 132 collapsed-apex `MeshedToNothing` cones — anti-correlated across all 33 models, present in radian as well as converted degree files. Both of those exclusions still stand. But **all 216 recover under `TRUCK_CONE_APEX_RANGE`** (`geom/ctc_02` 148, `geom/ctc_05` 20, `242/ftc_07` · `242/ftc_10` · `242/stc_07` 16 each → 0), so they are sensitive to the same face-independent domain window. Distinct *manifestation* and distinct *bound structure*, **same violated obligation.** `U4`'s first divergent checkpoint is now attributed, not merely unmeasured. |
 | `UNKNOWN-ABC-BSPLINE` | 112 bspline + 70 nurbs `NoSurfaceProduced` on ABC `00009190` | The largest untouched category. Never investigated at all. |
 | `UNKNOWN-CTC05-FUNNEL` | `ap203pmi/nist_ctc_05_asme1_ap203` renders its cylindrical shaft as a cone with a disc cap | Improved but not fixed by `SEM-UNIT-ANGLE-001` (2,230 → 2,196 triangles). Suspected: angular `PARAMETER_VALUE` trims on circles, which are not unit-converted; 20 of 33 NIST files contain them. Design rule already decided: **never assign a unit to `PARAMETER_VALUE` at parse time** — the dimension comes from the consuming entity and parameter slot. (`FORMALISM.md` U5) |
 
