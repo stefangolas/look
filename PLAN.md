@@ -870,6 +870,15 @@ not done.
 
 - `../look-untrimmed-bug` — the original complement defect: plain-English
   statement, both code paths (truck and OCCT) with real code, extraction tool.
+- `../look-collapsed-boundary` — **the cone-apex domain defect**, isolated to a
+  one-face reproducer that renders zero triangles beside a control face from the
+  same file that renders 46. `FORMALISM.md` gives the geometry, labels every
+  claim demonstrated / asserted / undemonstrated, and lists the seven open
+  questions. Pushed to `stefangolas/look-collapsed-boundary`. The measured
+  mechanism: `Line::parameter_range()` is `[0,1]` unconditionally, so a revolved
+  cone declares `[0,1] × [0,2π)` while its apex sits at `u* = −R/tanθ = −6.01`,
+  outside it — the base circle lands on the domain edge and stitches to a
+  **zero-area** loop.
 - `../look-trimming-residual` — formal treatment of the invariance fix and the
   residual scale defect, plus the isolated blob reproducers and renders.
 
