@@ -145,10 +145,7 @@ fn main() -> anyhow::Result<()> {
         } else {
             DEGENERATE_TOLERANCE
         };
-        println!(
-            "{} shells, tolerance {tolerance:.9}\n",
-            shells.len()
-        );
+        println!("{} shells, tolerance {tolerance:.9}\n", shells.len());
 
         for (shell_index, shell) in shells.iter().enumerate() {
             for index in 0..shell.faces.len() {

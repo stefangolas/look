@@ -65,7 +65,11 @@ struct FaceFingerprint {
 
 impl FaceFingerprint {
     fn extent(&self) -> f64 {
-        if self.aabb.is_empty() { 0.0 } else { self.aabb.diameter() }
+        if self.aabb.is_empty() {
+            0.0
+        } else {
+            self.aabb.diameter()
+        }
     }
 }
 
@@ -132,7 +136,11 @@ fn fingerprint(table: &Table, explicit_tolerance: Option<f64>) -> (Vec<FaceFinge
     for (_, shell) in &shells {
         push_shell_extent(&mut model_box, shell);
     }
-    let model_size = if model_box.is_empty() { 0.0 } else { model_box.diameter() };
+    let model_size = if model_box.is_empty() {
+        0.0
+    } else {
+        model_box.diameter()
+    };
     let scaled = model_size * RELATIVE_TOLERANCE;
     let tolerance = match explicit_tolerance {
         Some(explicit) => explicit,
@@ -144,7 +152,11 @@ fn fingerprint(table: &Table, explicit_tolerance: Option<f64>) -> (Vec<FaceFinge
     for (shell_index, (shell_entity, shell)) in shells.iter().enumerate() {
         // The kinds are read before tessellation, because tessellation replaces
         // the surface with its polygon and the kind is then unrecoverable.
-        let kinds: Vec<&'static str> = shell.faces.iter().map(|f| surface_kind(&f.surface)).collect();
+        let kinds: Vec<&'static str> = shell
+            .faces
+            .iter()
+            .map(|f| surface_kind(&f.surface))
+            .collect();
         let meshed = shell.robust_triangulation(tolerance);
         for (face_index, face) in meshed.faces.iter().enumerate() {
             let Some(mesh) = &face.surface else { continue };
@@ -184,7 +196,11 @@ fn fingerprint(table: &Table, explicit_tolerance: Option<f64>) -> (Vec<FaceFinge
                 provenance: face.provenance,
                 shell_entity: *shell_entity,
                 shell_index,
-                surface_kind: if face_index < kinds.len() { kinds[face_index] } else { "?" },
+                surface_kind: if face_index < kinds.len() {
+                    kinds[face_index]
+                } else {
+                    "?"
+                },
                 triangles,
                 vertices: positions.len(),
                 aabb,
@@ -212,7 +228,11 @@ fn median(values: &mut [f64]) -> f64 {
 /// a counterpart sitting in the same place with a similar size, and a blob face
 /// either has no counterpart at all or one far smaller than itself. Anything
 /// cleverer would need a correspondence the files do not provide.
-fn differential(bad: &[FaceFingerprint], good: &[FaceFingerprint], model_size: f64) -> Vec<(f64, usize, String)> {
+fn differential(
+    bad: &[FaceFingerprint],
+    good: &[FaceFingerprint],
+    model_size: f64,
+) -> Vec<(f64, usize, String)> {
     let mut good_extent: Vec<f64> = good.iter().map(FaceFingerprint::extent).collect();
     let mut good_area: Vec<f64> = good.iter().map(|f| f.area).collect();
     let mut good_edge: Vec<f64> = good.iter().map(|f| f.max_triangle_edge).collect();
@@ -227,7 +247,11 @@ fn differential(bad: &[FaceFingerprint], good: &[FaceFingerprint], model_size: f
         good_box.push(f.aabb.max());
         good_box.push(f.aabb.min());
     }
-    let good_diag = if good_box.is_empty() { model_size } else { good_box.diameter() };
+    let good_diag = if good_box.is_empty() {
+        model_size
+    } else {
+        good_box.diameter()
+    };
     let match_radius = good_diag * 0.02;
 
     let mut ranked = Vec::new();
@@ -317,7 +341,10 @@ fn differential(bad: &[FaceFingerprint], good: &[FaceFingerprint], model_size: f
 
 fn main() -> anyhow::Result<()> {
     let args: Vec<String> = env::args().collect();
-    let model = args.get(1).cloned().expect("usage: face_fingerprint MODEL.step [--against GOOD.step] [--csv]");
+    let model = args
+        .get(1)
+        .cloned()
+        .expect("usage: face_fingerprint MODEL.step [--against GOOD.step] [--csv]");
     let against = args
         .iter()
         .position(|a| a == "--against")
@@ -333,15 +360,23 @@ fn main() -> anyhow::Result<()> {
     let (bad, model_size, tol) = fingerprint(&table, tolerance);
 
     if csv {
-        println!("shell_entity,shell_index,use_id,definition_id,surface_id,kind,triangles,vertices,extent,area,max_edge,cx,cy,cz");
+        println!(
+            "shell_entity,shell_index,use_id,definition_id,surface_id,kind,triangles,vertices,extent,area,max_edge,cx,cy,cz"
+        );
         for f in &bad {
             println!(
                 "{},{},{},{},{},{},{},{},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6}",
                 f.shell_entity,
                 f.shell_index,
                 f.provenance.use_id.map(|i| i.get() as i64).unwrap_or(-1),
-                f.provenance.definition_id.map(|i| i.get() as i64).unwrap_or(-1),
-                f.provenance.surface_id.map(|i| i.get() as i64).unwrap_or(-1),
+                f.provenance
+                    .definition_id
+                    .map(|i| i.get() as i64)
+                    .unwrap_or(-1),
+                f.provenance
+                    .surface_id
+                    .map(|i| i.get() as i64)
+                    .unwrap_or(-1),
                 f.surface_kind,
                 f.triangles,
                 f.vertices,
@@ -367,10 +402,7 @@ fn main() -> anyhow::Result<()> {
         // one face that dwarfs its neighbours.
         let mut extents: Vec<f64> = bad.iter().map(FaceFingerprint::extent).collect();
         let med = median(&mut extents).max(f64::MIN_POSITIVE);
-        let mut ranked: Vec<_> = bad
-            .iter()
-            .map(|f| (f.extent() / med, f))
-            .collect();
+        let mut ranked: Vec<_> = bad.iter().map(|f| (f.extent() / med, f)).collect();
         ranked.sort_by(|a, b| b.0.partial_cmp(&a.0).unwrap());
         println!("\n  no oracle given; ranking by extent against this model's median face");
         for (ratio, f) in ranked.iter().take(15) {
@@ -396,11 +428,17 @@ fn main() -> anyhow::Result<()> {
         "  oracle {good_path}\n  {} faces meshed, model diameter {good_size:.5}, tolerance {good_tol:.6}",
         good.len()
     );
-    let scale = if good_size > 0.0 { model_size / good_size } else { 1.0 };
+    let scale = if good_size > 0.0 {
+        model_size / good_size
+    } else {
+        1.0
+    };
     println!("  size ratio bad/good = {scale:.5}  (25.4 or 1/25.4 means inch vs mm, not a defect)");
 
     let ranked = differential(&bad, &good, model_size);
-    println!("\n  ranked suspects (score = 50*escape + extents + area + edge + unmatched + twin ratio)\n");
+    println!(
+        "\n  ranked suspects (score = 50*escape + extents + area + edge + unmatched + twin ratio)\n"
+    );
     for (score, index, detail) in ranked.iter().take(20) {
         let f = &bad[*index];
         println!("  {score:>9.2}  shell #{:<8} {detail}", f.shell_entity);
@@ -410,14 +448,23 @@ fn main() -> anyhow::Result<()> {
     // magnitude more than the median suspect.
     let mut scores: Vec<f64> = ranked.iter().map(|(s, ..)| *s).collect();
     let med_score = median(&mut scores).max(f64::MIN_POSITIVE);
-    let suspects: Vec<&(f64, usize, String)> =
-        ranked.iter().filter(|(s, ..)| *s > med_score * 10.0).collect();
+    let suspects: Vec<&(f64, usize, String)> = ranked
+        .iter()
+        .filter(|(s, ..)| *s > med_score * 10.0)
+        .collect();
     println!(
         "\n  {} faces score >10x the median suspect; {} triangles of {} total ({:.1}%)",
         suspects.len(),
-        suspects.iter().map(|(_, i, _)| bad[*i].triangles).sum::<usize>(),
+        suspects
+            .iter()
+            .map(|(_, i, _)| bad[*i].triangles)
+            .sum::<usize>(),
         bad.iter().map(|f| f.triangles).sum::<usize>(),
-        100.0 * suspects.iter().map(|(_, i, _)| bad[*i].triangles).sum::<usize>() as f64
+        100.0
+            * suspects
+                .iter()
+                .map(|(_, i, _)| bad[*i].triangles)
+                .sum::<usize>() as f64
             / bad.iter().map(|f| f.triangles).sum::<usize>().max(1) as f64
     );
     let mut by_kind: HashMap<&str, usize> = HashMap::new();

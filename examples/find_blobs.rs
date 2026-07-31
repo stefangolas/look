@@ -49,7 +49,11 @@ fn push_shell_extent(bounds: &mut BoundingBox<Point3>, shell: &Cshell) {
 }
 
 fn diagonal(bounds: &BoundingBox<Point3>) -> f64 {
-    if bounds.is_empty() { 0.0 } else { bounds.diameter() }
+    if bounds.is_empty() {
+        0.0
+    } else {
+        bounds.diameter()
+    }
 }
 
 fn main() -> anyhow::Result<()> {

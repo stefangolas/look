@@ -141,7 +141,10 @@ fn census(table: &Table, into: &mut Census) {
         for edge in &shell.edges {
             let (a, b) = edge.curve.range_tuple();
             for i in 0..=EDGE_SAMPLES {
-                model.push(edge.curve.subs(a + (b - a) * f64::from(i) / f64::from(EDGE_SAMPLES)));
+                model.push(
+                    edge.curve
+                        .subs(a + (b - a) * f64::from(i) / f64::from(EDGE_SAMPLES)),
+                );
             }
         }
     }
@@ -154,18 +157,30 @@ fn census(table: &Table, into: &mut Census) {
 
     for shell in &converted {
         // Kinds are read before tessellation replaces the surface with a mesh.
-        let kinds: Vec<&'static str> = shell.faces.iter().map(|f| surface_kind(&f.surface)).collect();
+        let kinds: Vec<&'static str> = shell
+            .faces
+            .iter()
+            .map(|f| surface_kind(&f.surface))
+            .collect();
         let meshed = shell.robust_triangulation(tolerance);
         for (i, face) in meshed.faces.iter().enumerate() {
             let kind = if i < kinds.len() { kinds[i] } else { "?" };
             let example = face.provenance.best_id().map(|id| id.to_string());
             match &face.surface {
                 None => into.record(
-                    Bucket { stage: "tessellate", reason: "NoSurfaceProduced".into(), surface_kind: kind },
+                    Bucket {
+                        stage: "tessellate",
+                        reason: "NoSurfaceProduced".into(),
+                        surface_kind: kind,
+                    },
                     example,
                 ),
                 Some(mesh) if mesh.faces().is_empty() => into.record(
-                    Bucket { stage: "tessellate", reason: "MeshedToNothing".into(), surface_kind: kind },
+                    Bucket {
+                        stage: "tessellate",
+                        reason: "MeshedToNothing".into(),
+                        surface_kind: kind,
+                    },
                     example,
                 ),
                 Some(_) => into.rendered += 1,
@@ -234,7 +249,11 @@ fn main() -> anyhow::Result<()> {
                 bucket.surface_kind,
                 count,
                 100.0 * **count as f64 / lost.max(1) as f64,
-                total.examples.get(*bucket).map(|e| e.join(" ")).unwrap_or_default()
+                total
+                    .examples
+                    .get(*bucket)
+                    .map(|e| e.join(" "))
+                    .unwrap_or_default()
             );
         }
         return Ok(());
@@ -260,7 +279,11 @@ fn main() -> anyhow::Result<()> {
             bucket.surface_kind,
             count,
             100.0 * **count as f64 / lost.max(1) as f64,
-            total.examples.get(*bucket).map(|e| e.join(" ")).unwrap_or_default()
+            total
+                .examples
+                .get(*bucket)
+                .map(|e| e.join(" "))
+                .unwrap_or_default()
         );
     }
     Ok(())

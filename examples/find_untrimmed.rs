@@ -191,8 +191,8 @@ fn main() -> anyhow::Result<()> {
             }
             let ratio = diagonal(&mesh) / shell_size;
             let untrimmed_here = ratio > UNTRIMMED_RATIO;
-            orientation_split[untrimmed_here as usize]
-                [shell.faces[index].orientation as usize] += 1;
+            orientation_split[untrimmed_here as usize][shell.faces[index].orientation as usize] +=
+                1;
             if untrimmed_here {
                 untrimmed += 1;
                 untrimmed_total += 1;

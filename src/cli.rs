@@ -54,6 +54,7 @@ fn should_imply_render(arguments: &[OsString]) -> bool {
                 | "sessions"
                 | "close"
                 | "server"
+                | "ui"
                 | "__serve"
                 | "help"
                 | "version"
@@ -64,6 +65,8 @@ fn should_imply_render(arguments: &[OsString]) -> bool {
 pub enum Command {
     /// Render one or more views of a GLB or STL.
     Render(RenderArgs),
+    /// Export an interactive HTML 3D viewer with drag & scroll zoom controls.
+    Ui(UiArgs),
     /// Execute a declarative YAML render job.
     Run(RunArgs),
     /// Inspect geometry and scene statistics without initializing the GPU.
@@ -142,6 +145,23 @@ pub struct RenderArgs {
 
     #[arg(long, default_value = "renders")]
     pub output_dir: PathBuf,
+
+    #[arg(long, value_enum, default_value = "y")]
+    pub up_axis: UpAxis,
+
+    #[arg(long)]
+    pub html: Option<PathBuf>,
+
+    #[arg(long)]
+    pub json: bool,
+}
+
+#[derive(Debug, Args)]
+pub struct UiArgs {
+    pub scene: PathBuf,
+
+    #[arg(long, short)]
+    pub output: Option<PathBuf>,
 
     #[arg(long, value_enum, default_value = "y")]
     pub up_axis: UpAxis,
@@ -325,8 +345,65 @@ pub fn execute_render(args: RenderArgs) -> anyhow::Result<()> {
         views,
         output,
     };
+    if let Some(html_path) = args.html {
+        let mut timings = Timings::default();
+        let mut compiled = compile_scene(&config.scene.source, config.scene.up_axis, &mut timings)?;
+        prepare_source_textures(&mut compiled, &mut timings)?;
+        let html_content = crate::ui::generate_html_viewer(
+            &compiled,
+            &config.scene.source.display().to_string(),
+            &compiled.statistics.clone(),
+        )?;
+        std::fs::write(&html_path, html_content)
+            .with_context(|| format!("failed to write HTML viewer to {}", html_path.display()))?;
+    }
+
     config.validate()?;
-    execute_config(config, args.json)
+    let res = execute_config(config, args.json);
+    if std::env::var_os("TRUCK_PROBE_TAXONOMY").is_some() {
+        truck_meshalgo::print_taxonomy_summary();
+    }
+    res
+}
+
+pub fn execute_ui(args: UiArgs) -> anyhow::Result<()> {
+    let mut timings = Timings::default();
+
+    let mut scene = compile_scene(&args.scene, args.up_axis, &mut timings)?;
+
+    prepare_source_textures(&mut scene, &mut timings)?;
+
+    let html = crate::ui::generate_html_viewer(
+        &scene,
+        &args.scene.display().to_string(),
+        &scene.statistics.clone(),
+    )?;
+
+    let out_path = args.output.unwrap_or_else(|| {
+        let file_stem = args
+            .scene
+            .file_stem()
+            .and_then(|s| s.to_str())
+            .unwrap_or("model");
+        PathBuf::from(format!("{file_stem}_viewer.html"))
+    });
+
+    std::fs::write(&out_path, html)
+        .with_context(|| format!("failed to write HTML viewer to {}", out_path.display()))?;
+
+    if args.json {
+        let json_out = serde_json::json!({
+            "status": "ok",
+            "viewer_path": out_path,
+            "scene": args.scene,
+            "triangles": scene.instances.iter().map(|inst| scene.geometries[inst.geometry].indices.len() / 3).sum::<usize>(),
+        });
+        println!("{}", serde_json::to_string_pretty(&json_out)?);
+    } else {
+        println!("Interactive 3D viewer written to {}", out_path.display());
+    }
+
+    Ok(())
 }
 
 pub fn execute_job(args: RunArgs) -> anyhow::Result<()> {

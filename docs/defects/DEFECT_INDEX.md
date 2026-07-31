@@ -111,7 +111,18 @@ them early is how the apex/ordinary-cone conflation nearly happened.
 
 | Tag | Population | What is known |
 |---|---|---|
-| ~~`UNKNOWN-NIST-ORDINARY-CONE`~~ **→ folded into [`PAR-RANGE-INHERITANCE-001`](PAR-RANGE-INHERITANCE-001.md), 2026-07-29** | 216 NIST cone faces, `NoSurfaceProduced` | Ordinary non-collapsed three-edge bounds, and **measured to be distinct** from the 132 collapsed-apex `MeshedToNothing` cones — anti-correlated across all 33 models, present in radian as well as converted degree files. Both of those exclusions still stand. But **all 216 recover under `TRUCK_CONE_APEX_RANGE`** (`geom/ctc_02` 148, `geom/ctc_05` 20, `242/ftc_07` · `242/ftc_10` · `242/stc_07` 16 each → 0), so they are sensitive to the same face-independent domain window. Distinct *manifestation* and distinct *bound structure*, **same violated obligation.** `U4`'s first divergent checkpoint is now attributed, not merely unmeasured. |
+| `UNKNOWN-NIST-ORDINARY-CONE` — **localized to a checkpoint 2026-07-30, still its own defect** | 216 NIST cone faces, `NoSurfaceProduced` | Ordinary non-collapsed three-edge bounds; distinct from the 132 collapsed-apex `MeshedToNothing` cones (anti-correlated across all 33 models, present in radian as well as converted degree files). **Checkpoint now known**: `face.surface` is `None` exactly when `PolyBoundaryPiece::try_new` returns `None` for some wire, so the boundary could not be **projected onto its surface** and domain construction never ran. That is checkpoint **F/G**, not **I**. They recover under `TRUCK_CONE_APEX_RANGE` because it changes the cone's *parameterization* — the generatrix line — not because it changes a range. Witness available: `geom/ctc_05` (20 faces), face `#4932`. |
+
+> **Correction, 2026-07-30.** This row previously read "folded into
+> `PAR-RANGE-INHERITANCE-001`", on the evidence that all 216 recover under
+> `TRUCK_CONE_APEX_RANGE`. That inference was wrong: the flag changes two
+> things at once — the cone's generatrix *and*, consequently, which physical
+> band the inherited `[0,1]` covers — so recovery under it does not attribute
+> the defect to the range. The `TRUCK_FACE_DOMAIN` experiment separated them:
+> changing **only** the working rectangle leaves all 216 exactly unchanged.
+> Second time in this investigation that a population looked folded and was
+> not, and the same lesson each time — **a counterfactual that moves two
+> variables attributes nothing.**
 | `UNKNOWN-ABC-BSPLINE` | 112 bspline + 70 nurbs `NoSurfaceProduced` on ABC `00009190` | The largest untouched category. Never investigated at all. |
 | `UNKNOWN-CTC05-FUNNEL` | `ap203pmi/nist_ctc_05_asme1_ap203` renders its cylindrical shaft as a cone with a disc cap | Improved but not fixed by `SEM-UNIT-ANGLE-001` (2,230 → 2,196 triangles). Suspected: angular `PARAMETER_VALUE` trims on circles, which are not unit-converted; 20 of 33 NIST files contain them. Design rule already decided: **never assign a unit to `PARAMETER_VALUE` at parse time** — the dimension comes from the consuming entity and parameter slot. (`FORMALISM.md` U5) |
 
@@ -163,9 +174,20 @@ and preserve the counterexample and proof as a permanent indexed test.**
    quotient winding vector, Jacobian singular values, loop area, arrangement
    cell count, triangles produced, mesh area and AABB, last successful stage,
    typed terminal reason. `examples/face_census.rs` supplies the conversion
-   half of this today; the tessellation half is still two coarse buckets
-   (`NoSurfaceProduced`, `MeshedToNothing`) where it needs projection / domain
-   / arrangement / CDT terminal reasons.
+   half of this today; the tessellation half is still two coarse buckets where
+   it needs projection / domain / arrangement / CDT terminal reasons.
+
+   **The two buckets are two checkpoints, established 2026-07-30** by reading
+   `shell_create_polygon`:
+
+   | bucket | condition | checkpoint |
+   |---|---|---|
+   | `NoSurfaceProduced` | `PolyBoundaryPiece::try_new` returned `None` for some wire, so `PolyBoundary::new` never ran | **F/G** — curve–surface compatibility and inverse projection |
+   | `MeshedToNothing` | a domain was built and retained no triangle | **I–K** — material domain, arrangement, CDT |
+
+   This is worth more than it looks: it partitions the whole repair queue by
+   stage for free, and it is why a domain-model change cannot address a
+   `NoSurfaceProduced` population no matter how correct it is.
 2. **Find an intrinsic anomaly**, not a historical signature. *"Every face
    where the claimed geometric relationships do not commute"*, never *"every
    face that looks like the last blob"*.

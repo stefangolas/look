@@ -7,14 +7,15 @@
 # invisible in `Cargo.lock` and a measurement taken through one is not a
 # measurement of anything that has been pushed.
 #
-# paths = [
-#     "../truck-fork/truck-base",
-#     "../truck-fork/truck-derivers",
-#     "../truck-fork/truck-geometry",
-#     "../truck-fork/truck-geotrait",
-#     "../truck-fork/truck-meshalgo",
-#     "../truck-fork/truck-modeling",
-#     "../truck-fork/truck-polymesh",
-#     "../truck-fork/truck-stepio",
-#     "../truck-fork/truck-topology",
-# ]
+paths = [
+    "../truck-fork/truck-base",
+    "../truck-fork/truck-derivers",
+    "../truck-fork/truck-geometry",
+    "../truck-fork/truck-geotrait",
+    "../truck-fork/truck-meshalgo",
+    "../truck-fork/truck-modeling",
+    "../truck-fork/truck-polymesh",
+    "../truck-fork/truck-stepio",
+    "../truck-fork/truck-topology",
+]
+
