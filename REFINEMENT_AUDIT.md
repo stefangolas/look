@@ -50,21 +50,35 @@ when there is no half-edge type to label.
 
 ## 2. Transition audit
 
-| # | Transition | Required output contract | Proved? |
-|---|---|---|---|
-| T1 | `CompressedEdge.curve` → `PolylineCurve` (`tessellate_edge`) | chord deviation ≤ tol; samples lie on the source curve (GEO-003) | **No.** `from_curve` is trusted; a `len()<=2` result is rewritten by a 16-step fallback with no residual |
-| T2 | wire of `PolylineCurve` → `Vec<Point3>` (`try_new`) | traversal order and edge-use orientation agree with source incidence (TOP-005) | **No.** Orientation is applied geometrically (`curve.inverse()`); never composed or checked |
-| T3 | `Vec<Point3>` → lifted UV arc (`try_new`: `sp` + `get_mindiff` + refinement) | (a) each point lies on *this* surface (GEO-005); (b) the lift is continuous and a **simple** arc in the cover (FS Def. 7 embedding, Def. 9) | **No — and this is the earliest unproved transition.** See §3 |
-| T4 | arcs → closed loops (`PolyBoundary::new`) | closure modulo $\Lambda$ under the surface metric, winding retained (QUO-002) | **No.** Raw UV distance vs hard-coded 1e-3; no first fundamental form; winding discarded |
-| T5 | open arcs → stitched loops (`open.len()∈{1,2}`, empty-domain rectangle) | synthesized segments distinguished from source segments (DOM-001, FS §IX) | **No.** Stitched against the *primitive's* declared range (`PAR-RANGE-INHERITANCE-001`), enters as `PhysicalBoundary` |
-| T6 | loops → CDT constraints (`insert_to`) | every requested segment represented by a complete constrained chain (CDT-002) | **No.** Returns `bool`; no chain certificate. See §4 for what the Boolean *does* prove |
-| T7 | + sampling grid (`insert_surface`) | grid edges carry no material meaning (FS Def. 20) | **Yes, since A1** — `ConstraintRole::SurfaceSampling` |
-| T8 | CDT → material cells (parity flood) | $\mu$ satisfies the Def. 20 constraint system; Unique/Ambiguous/Inconsistent trichotomy (Def. 21) | **No.** Odd-even parity with implicit `Empty` base (DOM-003 unimplemented); `Ambiguous` is inexpressible |
-| T9 | cells → `PolygonMesh` | approximation level declared (MSH-002); orientation agrees (MSH-003) | **No** |
+| Stage | Formal input | Formal output | Implementation constructor | Obligation | Status |
+|---|---|---|---|---|---|
+| **Ambient construction** | surface syntax and geometry | certified ambient schema $(\Omega,\Lambda,N,\Sigma,S,C)$ | none — scattered `u_period()` / `v_period()` / `try_range_tuple()` at points of use | lattice / domain / strata consistency; period validity (QUO-001) | **absent** |
+| Edge sampling | `CompressedEdge.curve` | chord-bounded polyline with provenance | `tessellate_edge` | GEO-003 sampling fidelity | absent — `from_curve` trusted; a `len()<=2` result is rewritten by a 16-step fallback with no residual |
+| Wire assembly | ambient + source edge uses | oriented 3D walk | `try_new` (flat_map) | TOP-005 effective orientation vs source incidence | absent — orientation applied geometrically (`curve.inverse()`), never composed or checked |
+| **Boundary lifting** | ambient + source walks | deck-coherent lifted walks | `PolyBoundaryPiece::try_new` | global $\psi$ potential, cycle consistency, arc simplicity (FS Def. 7 embedding, Def. 9) | **violated** — see §3 |
+| Loop closure | lifted arcs | closed quotient loops, winding retained | `PolyBoundary::new` | QUO-002 closure under the surface metric | violated — raw UV distance vs hard-coded 1e-3, no first fundamental form, winding discarded |
+| Synthetic closure | open arcs + ambient | closures distinguished from source evidence | `open.len()∈{1,2}`, empty-domain rectangle | DOM-001, FS §IX edge kinds | violated — stitched against the *primitive's* declared range (`PAR-RANGE-INHERITANCE-001`); enters as `PhysicalBoundary` |
+| **Arrangement** | lifted walks | atomic role-labeled complex | none | intersection / overlap normalization (ARR-002, ARR-003) | **absent** |
+| **Material solve** | ambient + arrangement | Unique / Ambiguous / Inconsistent region | dual-parity BFS flood | FS Def. 20 constraints, Def. 21 trichotomy | restricted / incorrect — odd-even with implicit `Empty` base (DOM-003); `Ambiguous` inexpressible |
+| **CDT realization** | certified arrangement | realization bijection | direct Spade mutation via `insert_to` | preserve vertices, edges, roles (CDT-001, CDT-002) | **absent** — returns `bool`; see §4 |
+| Mesh realization | material region + CDT | surface mesh | `triangulation_into_polymesh_outcome` | selected cells exactly realized; MSH-002, MSH-003 | partial |
+
+Sampling-grid insertion is the one transition that now discharges its
+obligation: since A1, `ConstraintRole::SurfaceSampling` establishes that grid
+edges carry no material meaning (FS Def. 20).
+
+**Correction to an earlier draft of this document.** It named the lift as the
+earliest unproved transition. That is wrong by one stage: the lift consumes
+period, domain and stratum facts that no constructor establishes, so **ambient
+construction is earlier, and its status is worse — not "unproved" but
+"absent."** `domain/schema.rs::ParametricQuotient` and
+`domain/deck.rs::DeckPotentialUnionFind` are therefore not stray unused
+abstractions; they are partial implementations of exactly the first two missing
+semantic layers.
 
 ---
 
-## 3. The earliest unproved transition: T3, the lift
+## 3. The first *violated* transition: the lift
 
 **Contract required.** FS Def. 7 requires the induced map on the regular set to
 be an **embedding** over the certified face neighborhood, with every injectivity
@@ -98,7 +112,30 @@ only, no new instrumentation):
   have a periodic axis**, which is where `get_mindiff` can fold a loop.
 - Conflict provenance resolves directly in 4,038 of 4,043 cases.
 
-A single localized bad step in one loop, deleting the whole face.
+**What this proves, and what it does not.** It is a *negative* result about one
+mechanism, and negative results here are weaker than positive ones. It
+establishes that **independent whole-bound centroid normalization does not
+explain these witnesses** — the conflicting segments belong to the same bound,
+so they were shifted by the same $(k_u,k_v)$ and no lattice translation between
+bounds can separate them.
+
+It does **not** establish that these are genuine transverse intersections of
+well-formed boundaries. Every one of the following remains consistent with the
+evidence, and they are not distinguished:
+
+- an incorrect lift *within* one bound (`get_mindiff` folding a step);
+- discarded winding, so a period-wrapping loop reads as closed;
+- a projection branch or sheet jump inside `sp`;
+- synthetic closure segments crossing source segments in the same piece;
+- vertex welding at 1e-12 manufacturing a T-junction;
+- singular-coordinate collapse at a pole or apex.
+
+The correlation with periodic rank (92%) and the single-crossing profile are
+*suggestive* of a localized lift fold, which is why the lift is named as the
+first violated transition. They are not a proof of it, and this document does
+not claim one. A constructive witness — one affected face where applying the
+coherent lift removes the crossing — would settle it, and only stage 1 below
+can produce that witness.
 
 ---
 
@@ -126,10 +163,22 @@ pub fn add_constraint(&mut self, from, to) -> bool {
 ```
 
 It **splits**, and returns whether the count changed — so `false` means *already
-fully represented*, and ignoring it is correct. But after a split,
+fully represented*, and ignoring it is correct. After a split,
 `get_edge_from_neighbors(vi, vj)` returns `None`, which is precisely where A1's
-role table loses its 213 entries and where chain provenance is unrecoverable
-from outside the library.
+role table loses its 213 entries.
+
+**Qualification.** An earlier draft called this unrecoverable from outside the
+library. That is too strong. It is unrecoverable under the *current* design —
+request a long segment, then rediscover what Spade created. It becomes
+avoidable once `NormalizedArrangement` owns the atomic subdivision: if every
+arrangement edge already terminates at proper intersections, T-junctions,
+overlap endpoints and existing collinear vertices, then atomic edges are
+inserted individually and the bijection is retainable. If Spade still
+subdivides an allegedly atomic edge, that reveals either that the arrangement
+was not atomic relative to the CDT vertex set, or that Spade's public model
+cannot preserve the realization bijection. **Only the second would be an
+argument for vendoring or modifying Spade**, and nothing measured so far
+supports it.
 
 **Verdict.** The Boolean is a *faithful* certificate that some requested
 constraint is unrepresentable as stated — it is **not** overstrict in the
@@ -151,24 +200,43 @@ The repair is not "continue despite failure" and not "special-case the
 insertion." It is the missing certified stage, and it must be built in this
 order, because building it in any other order certifies the wrong segments:
 
-1. **`LiftedBoundaryComplex`** — ambient schema as a first-class object; lift
-   certified as a simple arc with $\delta$ and $\tau$ retained; global
-   $\psi$ potential solved (`DeckPotentialUnionFind` already exists).
-   Typed failures: `Inconsistent(DeckPotentialContradiction)`,
-   `Unresolved(AmbiguousLift)`. Absorbs A5, A7, A8.
-2. **`NormalizedArrangement`** — intersection classification, atomic
-   subdivision, incidence reconstruction, role and provenance aggregation.
-   Absorbs A1, A2, A4, A6, ARR-002/003.
-3. **`MaterialRegion`** — cell labeling by the FS Def. 20 constraint system,
-   yielding Unique/Ambiguous/Inconsistent. Absorbs A3, A9, A10.
+1. **`CertifiedParametricAmbient`** — lattice, periods, admissible domain,
+   native boundaries, collapsed strata, singular links, surface evaluation,
+   each with a certificate. Even the deck solve depends on these facts, which
+   is why this is first. `domain/schema.rs::ParametricQuotient` is the partial
+   implementation. Typed failure: `Unsupported(SchemaFailure)`.
+2. **`LiftedBoundaryComplex`** — lift certified as a simple arc with $\delta$
+   and $\tau$ retained; global $\psi$ potential solved
+   (`domain/deck.rs::DeckPotentialUnionFind` already exists). Typed failures:
+   `Inconsistent(DeckPotentialContradiction)`, `Unresolved(AmbiguousLift)`.
+   Absorbs A5, A7, A8.
+3. **`NormalizedArrangement`** — intersection and overlap classification,
+   atomic subdivision, incidence reconstruction, role and provenance
+   aggregation. Absorbs A1, A2, A4, A6, ARR-002/003.
+4. **`MaterialRegion`** — cell labeling by the FS Def. 20 constraint system,
+   yielding Unique / Ambiguous / Inconsistent. Absorbs A3, A9, A10.
+5. **`CdtRealization`** — the foreign `Cdt` never becomes the semantic object;
+   it stays contained inside a proof-carrying realization owned by this code:
 
-**The certified arrangement must own its CDT realization.** Constructing the
-triangulation from an already-atomized, crossing-free edge set with a retained
-bijection is the only way the proof survives the Spade boundary; "insert, then
-look up what happened" is what produced a side table with holes in it.
+```rust
+struct CdtRealization {
+    cdt: Cdt,
+    vertex_map: HashMap<ArrangementVertexId, FixedVertexHandle>,
+    edge_map: HashMap<ArrangementEdgeId, FixedUndirectedEdgeHandle>,
+}
+```
 
-An open question this audit does not settle: whether a correct T3 removes the
-self-crossings, or whether some are genuine transverse intersections of
-well-formed boundaries that stage 2 must handle regardless. Stage 2 is required
-either way; the answer only changes how much of the 4,048 stage 1 recovers on
-its own.
+Its constructor succeeds only if every arrangement vertex and every atomic edge
+has an exact realization. "Insert, then look up what happened" is what produced
+a side table with holes in it.
+
+**What this audit does not settle.** Whether a certified lift removes the
+self-crossings, or whether some survive as genuine transverse intersections.
+Stage 3 is required either way; the answer only changes how much of the 4,048
+stages 1–2 recover on their own. It is answerable only *after* stage 2 exists,
+as a constructive witness rather than another population study.
+
+**Which line to build from.** Not whichever revision renders the most faces —
+`79eaaf36`'s 23,806 is not a correctness oracle, since §4 shows it flood-fills
+across boundaries it failed to represent. Build from the reviewed semantic line
+containing A1 and excluding known-invalid experiments.
