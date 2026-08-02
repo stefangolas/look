@@ -240,3 +240,151 @@ as a constructive witness rather than another population study.
 `79eaaf36`'s 23,806 is not a correctness oracle, since §4 shows it flood-fills
 across boundaries it failed to represent. Build from the reviewed semantic line
 containing A1 and excluding known-invalid experiments.
+
+---
+
+# 6. Production-path ambient audit
+
+`ambient.rs` is frozen at truck-fork `5c659209`. It is a disconnected
+prototype: production still reads the raw accessors, so the architectural
+transition has **not** occurred. This section audits the executed path only.
+
+## 6.1 Which ambient facts production consumes
+
+Sites reached on a default run (no `TRUCK_*` set). Probe-gated and dead sites
+excluded.
+
+| # | Site | Fact consumed | Used for |
+|---|---|---|---|
+| 1 | `tessellate_edge` L230 | `curve.period()` | extend a zero-length edge whose endpoints coincide to one full period |
+| 2 | `try_new` L469-470 | `u_period`, `v_period`, **`try_range_tuple`** | the deck-copy normalisation at L648-655 |
+| 3 | `try_new` L617/L630 | `u_period` / `v_period` | dense re-synthesis of a degenerate bound |
+| 4 | `PolyBoundary::new` L1045 | **`try_range_tuple`** | `range`, the stitching rectangle |
+| 5 | `PolyBoundary::new` L1048-49 | periods | closure classification, `periodic_displacement` |
+| 6 | `PolyBoundary::new` L1115-1133 | periods | two-loop merge |
+| 7 | `PolyBoundary::new` L1153-57 | periods | collapsed-pair seam construction |
+| 8 | `insert_surface` L1906 | `parameter_division(range, tol)` | sampling grid; `range` is the **bbox of the lifted boundary** |
+| 9 | `triangulation_into_polymesh_outcome` L2000-01 | periods | seam vertex-role detection |
+| 10 | `CollapsedPeriodicBoundaryPair::try_classify` L2208 | periods | apex detection |
+
+`working_range` - the only face-derived extent in the file - is behind
+`TRUCK_FACE_DOMAIN` and **is not executed by default**.
+
+## 6.2 Where each fact originates, and whether the source establishes it
+
+`S` is instantiated exactly once, at `truck_modeling::Surface`, a four-variant
+enum. Dispatch happens *inside* each `ParametricSurface` method via a derive
+macro, so representation is erased at the first accessor call - but the enum
+itself is intact throughout meshalgo. **Meshalgo does not lose the
+representation; it cannot name it.**
+
+| Variant | `u_period` / `v_period` | `parameter_range` | Established? |
+|---|---|---|---|
+| `RevolutedCurve` (cylinder, cone, sphere, torus) | `v = 2pi` | `v = [0, 2pi)` | **Yes, exactly.** `subs(u,v)` applies `rotation_matrix(v)`; the period is a property of the map |
+| `RevolutedCurve`, generatrix axis | `u = curve.period()` | `u` from generatrix radii | **No.** An accessor result. For a revolved `Line`, `[0,1]` - one unit of generatrix at the exporter's reference radius |
+| `Plane` | none | **`[0,1] x [0,1]` unconditionally** | **No - fabricated.** A plane is unbounded; this rectangle describes nothing |
+| `BSplineSurface` / `NurbsSurface` | none | knot span | **Yes.** The surface is genuinely undefined outside its knots |
+| `Processor<S,T>` | forwards, **swapping on `orientation == false`** | forwards | inherits, plus the swap obligation |
+
+Three different qualities of evidence - exact, accessor-only, and fabricated -
+reach the same `try_range_tuple()` call site and are indistinguishable there.
+Site 4 consumes the fabricated `Plane` rectangle to build stitching corners;
+that is `DOM-ARTIFICIAL-CLOSURE-001` with its origin now named.
+
+**Correction accepted:** `PeriodWitness::InheritedFromGeneratrix` is *not* a
+certificate. It wraps `curve.period()` - an accessor result - in a stronger
+name, exactly the error the sampled variant made. It must not be routed into
+production as certified.
+
+## 6.3 The circularity, and its resolution
+
+```
+try_new  --consumes-->  (period, declared-range origin u0)
+   |                         L648: quot_u = floor((grav.x - u0) / up)
+   v
+lifted pieces
+   |
+   v
+working_range --derives--> the face's parameter extent
+```
+
+The lift consumes a domain origin; the face domain is derived from the lift.
+So face-domain evidence cannot be an input to the lift - which is precisely
+what the frozen prototype's `FaceContext` demands. **The prototype puts the
+domain on the wrong side of the boundary.**
+
+The circularity is not essential. Inspect what the domain is actually *for* at
+L648: `u0` is used only as the origin of a `floor()` - an **absolute anchor**
+for one bound's deck copy. Absolute anchoring is not required. FORMAL_SYSTEM
+section XII: choose one representative per connected component and translate
+its deck potential to zero. Under a relative rule the lift needs only the
+lattice, each bound receives a deck class relative to the anchored one, and the
+extent is *derived afterwards*.
+
+> **Resolution.** The domain is an **output** of lifting, not an input.
+> The lift's only ambient input is the certified lattice.
+
+This also removes the defect the relative rule was always going to fix:
+per-bound `floor()` against a primitive-declared origin is what places two
+bounds of one face in unrelated deck copies.
+
+## 6.4 Layering: where the adapter can live
+
+Verified dependency directions (normal dependencies only; dev-dependencies
+excluded):
+
+```
+truck-geotrait <- truck-geometry <- truck-modeling <- truck-stepio
+                        ^                                  ^
+                        +---- truck-meshalgo               |
+                                    ^                      |
+                                    +------- look ---------+
+```
+
+- `truck-meshalgo` and `truck-modeling` are mutually dev-only
+- `truck-stepio` depends on `truck-modeling`; its meshalgo dep is dev-only
+- **`look` is the only crate that sees both `Surface` and meshalgo's types**
+
+| | A: trait + evidence in `truck-geotrait` | B: adapter in `truck-modeling` | C: descriptor built before entering meshalgo |
+|---|---|---|---|
+| Dependency direction | works; geotrait is below everything | needs meshalgo to depend on modeling normally (no cycle, but inverts the mesher onto the kernel) | works today in `look`; in `stepio` only if meshalgo is promoted from dev-dep |
+| Enum dispatch | inside `Surface`'s impl, forwarding to variants | same | same |
+| Representation retained | yes | yes | yes |
+| Leakage | **high** - period witnesses, domain evidence and schema failures are the tessellator's formal system, not general geometry | moderate - evidence types must also sit in modeling or lower | **none** - meshalgo takes a descriptor parameter; the interpretation stays above |
+| Smallest production API change | new trait + bound on `PreMeshableSurface`; every surface type must implement | new dep edge + trait + bound | one new parameter on `MeshableShape::triangulation` / `robust_triangulation` |
+
+**A is the wrong home.** These are not general geometric concepts: a period
+*witness*, a domain *evidence class*, and `SchemaFailure` encode this project's
+formal system. Putting them in `truck-geotrait` would invert the abstraction to
+solve a dependency obstacle - the first obstacle encountered, not the deepest.
+
+**C is the recommendation**, with the adapter living where `Surface` is
+nameable and meshalgo taking the descriptor as data rather than as a bound.
+
+## 6.5 The minimum production type boundary
+
+Not `CertifiedParametricAmbient` as frozen. Section 6.3 moves the domain out of
+it.
+
+**Inputs** (all representation-derived, none face-derived):
+
+- the `Surface` variant, matched where it is nameable;
+- for `Processor`, its `orientation`, so the axis swap is applied.
+
+**The type carries only:** lattice rank; per-axis generator; per-axis witness,
+where the *only* production-admissible witness is `ExactRevolutionAngle`. An
+axis whose period rests on an accessor is `Uncertified` and carries the declared
+value for legacy use, marked as such.
+
+**Postcondition:** for every axis reported periodic, the period is exact by
+construction of the parameterisation, stated in the *caller's* axis convention.
+No claim about the parameter domain is made at all.
+
+**Which raw reads it retires:** sites 2, 3, 5, 6, 7, 9, 10 - every period read
+in the executed path. It does **not** retire sites 4 and 8, the
+`try_range_tuple` reads. Those are the fabricated-rectangle path, and they are
+retired by the *derived* domain of section 6.3, which belongs to stage 2.
+
+**What must not be claimed:** that this recovers faces. The negative deck result
+stands - the crossings are intra-bound. This boundary makes the lift's
+obligations statable; it does not discharge them.
