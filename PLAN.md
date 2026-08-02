@@ -31,6 +31,28 @@
 >
 > Item 11 has grown a second reason to happen: it is now what unblocks TOP-001
 > for faces, which item 4 could not reach.
+>
+> ### Superseded 2026-08-02 by the correctness map
+>
+> That sequence was written before the ingestion layer had been mapped against
+> the formal system end to end. It now has been:
+> [`CODEBASE_CORRECTNESS_MAP.md`](CODEBASE_CORRECTNESS_MAP.md) locates every
+> correctness-relevant concept in production code,
+> [`CORRECTNESS_GAP_REGISTER.md`](CORRECTNESS_GAP_REGISTER.md) merges the gaps by
+> root cause and orders them by dependency, and
+> [`MINIMUM_CORRECTNESS_CUT.md`](MINIMUM_CORRECTNESS_CUT.md) ranks them.
+> **Start there, not here.** The item list above is not wrong so much as
+> unordered: it names obligations without saying which must be discharged first,
+> and several of its items turn out to depend on gaps it does not mention.
+>
+> **Phases 0–1 landed 2026-08-02** (branch `fix/correctness-phase-0-1`, look
+> `edd46d5`, truck-fork `4f4426bb`): G8, G11, G5a, G5b, G2, G7a. See
+> "Correctness phases 0–1" in the roadmap below. **Next is Phase 2**, the lift
+> and domain spine, whose ordering is the opposite of the obvious one — see
+> there before starting.
+>
+> Item 12, "start citing contract IDs", is now in force: every commit in phases
+> 0–1 names the gaps and contracts it discharges.
 
 ## Design intent
 
@@ -434,12 +456,87 @@ bounds of one face. Each bound is currently lifted from `sp(surface, pt, None)`
 — an arbitrary principal value — so relative offsets between bounds were never
 controlled. Measured: two bounds of one face at `quot_v = −1` and `+1`.
 
-### PR 7 — Constraint provenance and conforming CDT
+### PR 7 — Constraint provenance and conforming CDT (LARGELY LANDED 2026-08-02)
 
-`insert_to` silently skips constraints it cannot add. Flood-fill labelling is
-`O(T+E)` versus the current `O(nm)` per-point ray cast, but a *missing*
-constraint leaks a label across a whole region, so it requires
-`requested == inserted` verification with per-face fallback.
+Superseded by G5a/G5b; see "Correctness phases 0–1" below.
+
+The premise here was slightly wrong. `insert_to` did not silently skip
+constraints — it returned a Boolean that the caller *did* check. What it could
+not do was say which edges Spade actually created, because
+`add_constraint` reports only that a count changed, and a request realized as a
+chain leaves `get_edge_from_neighbors(from, to)` empty. `try_add_constraint`
+returns the chain, which is the `requested == inserted` verification this item
+asked for, obtained from the library rather than reconstructed after the fact.
+
+Still open from this item: CDT-002 in full, which needs an atomic arrangement
+to verify against (G4, phase 3).
+
+### Correctness phases 0–1 (LANDED, MEASURED 2026-08-02)
+
+Six gaps, in dependency order. Measured on ABC `00009190`, 24,202 declared
+faces. Full detail in `CORRECTNESS_GAP_REGISTER.md`; the short version:
+
+| Gap | What it stopped doing | Evidence |
+|---|---|---|
+| G8 | erasing typed failures into empty meshes | totals reconcile exactly; `ContradictoryDualParity x143` visible for the first time |
+| G11 | forwarding a search hint on the wrong axis | commuting test, verified to fail without the fix |
+| G5a | losing constraint roles on split chains | `unresolved_at_flood` 213 → 0 |
+| G5b | guessing material semantics for unnameable edges | lands provably non-firing |
+| G2 | accepting an unresolved periodic branch | 71 faces; 31 had been rendering geometry from a coin-flip |
+| G7a | reporting "could not decide" as "outside" | 117,145 `Boundary`, 0 `Indeterminate` |
+
+**Face count fell, and that is the result, not a regression.** 4,457 → 4,486
+faces lost, 1,359,029 → 1,358,543 triangles. The system stopped claiming meshes
+it cannot justify. Per §"Acceptance criteria" and `REFINEMENT_AUDIT.md` §4,
+rendered-face count is not a correctness oracle and was not optimised for — the
+`79eaaf36` line renders more faces precisely because it flood-filled across
+boundaries it had failed to represent.
+
+Three findings worth not rediscovering:
+
+- **The A1 defect had returned by another route.** `insert_surface` used the
+  same lossy role lookup, so a *sampling grid* edge realized as a chain lost its
+  role and fell to the toggling default. Fixing it recovered 21 faces.
+- **`ConstraintOverlapUnsupported` and `ConstraintRoleMissing` were declared and
+  never constructed.** Both now are, on real faces (9 and 0 respectively).
+- **G11 cost 19 faces on its own** before the rest of phase 0 absorbed it. A
+  correct upstream fix perturbing an unjustified downstream heuristic is a
+  symptom of absent preconditions, not an argument against the fix.
+
+### PR 6 / Phase 2 — the lift and domain spine (NEXT)
+
+PR 6 as written below is a subset of this and is superseded by it.
+
+**The ordering is the opposite of the obvious one, and this was got wrong once.**
+The instinct is to derive a correct face domain first and then fix the lift. That
+is circular: `PolyBoundaryPiece::try_new` anchors `quot_u` on `u0` taken from
+`try_range_tuple()`, and `working_range` derives its extent from the *already
+normalised* pieces. An extent derived from a lift still anchored on the
+fabricated origin inherits the fabrication.
+
+Correct order:
+
+1. **Remove domain authority from lifting.** The lift's only ambient input is
+   the certified lattice; anchor one representative per connected component at
+   potential zero and keep transitions relative (FORMAL_SYSTEM §XII).
+2. **Solve face-level deck potentials.** `domain/deck.rs::DeckPotentialUnionFind`
+   is already the correct QUO-004 solver and has never been called, because the
+   `[k_u,k_v]` it consumes is computed in `PolyBoundary::new` and dropped.
+   Retain it; return a typed contradiction.
+3. **Derive the working cover extent** from the coherent lifted walks.
+4. **Carry source/synthetic origin and effective orientation on every segment at
+   creation** — not retrofitted afterwards.
+
+**A derived extent is computational support, not trim authority.** It may
+justify clipping, finite search, bounding boxes, and artificial cuts whose two
+sides are identified. It does not justify physical closure. The exit condition
+is therefore *not* "stitching reaches a derived rectangle" but:
+
+> No segment is assigned physical-boundary semantics merely because it lies on,
+> or was constructed from, the working cover extent.
+
+That is why step 4 cannot wait for step 1 to shrink the synthetic population:
+any synthetic segment that survives must already carry its origin.
 
 ### PR 8 — Certified face and shell meshes
 
