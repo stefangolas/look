@@ -62,8 +62,18 @@
     "cargo_lock_sha256": "605a4cd3db85e69bd7dda1712d49858963137e9f316f82223f8619ded103436b",
     "resolved_truck_meshalgo": {
       "cargo_tree": "truck-meshalgo v0.4.0 (C:\\Users\\stefa\\truck-fork\\truck-meshalgo)",
-      "resolution_mechanism": "[patch] path override, NOT a git rev pin",
-      "reproducibility_caveat": "the path override means the build depends on the state of the ../truck-fork checkout. It is reproducible only because that checkout is committed and clean at experimental_base_rev. Pinning by rev requires pushing audit/pre-a1-snapshot to the remote; not done."
+      "resolution_mechanism": ".cargo/config.toml `paths` override",
+      "correction": "an earlier draft of this manifest said the override was the [patch] table in Cargo.toml, for truck-meshalgo alone. That is wrong twice over. The live mechanism is a `paths = [...]` array in .cargo/config.toml, which takes precedence over [patch]; editing Cargo.toml has no effect while it is present, which is how the error was found. And it redirects NINE crates, not one.",
+      "overridden_crates": [
+        "truck-base", "truck-derivers", "truck-geometry", "truck-geotrait",
+        "truck-meshalgo", "truck-modeling", "truck-polymesh", "truck-stepio",
+        "truck-topology"
+      ],
+      "override_file_tracked": true,
+      "override_file_last_commit": "978d317",
+      "override_file_self_warning": "the file's own comment says the block is 'disabled' and warns that 'a path override is invisible in Cargo.lock and a measurement taken through one is not a measurement of anything that has been pushed'. The block is not commented out. It is live, and every truck crate in every measurement recorded here came through it.",
+      "reproducibility_caveat": "the eight non-meshalgo crates are content-identical to 79eaaf36 because ../truck-fork is committed and clean at experimental_base_rev, whose only delta to 79eaaf36 is in meshalgo. The measurements are therefore valid. Reproducing them from a clean clone still requires either removing the paths override and pinning by rev, or reproducing the checkout exactly.",
+      "bit_reproducibility": "rebuilding the A1 configuration after the historical detour produced binary sha256 374c6636b3212232e9ebb524... byte-identical to the first A1 build"
     },
     "binary": {
       "path": "target/x86_64-pc-windows-gnullvm/release/examples/face_census.exe",
@@ -140,8 +150,49 @@
           "convert/AllBoundsCollapsed": 1
         }
       },
-      "historical_baseline_79eaaf36": null,
-      "historical_baseline_note": "not yet measured; must be built in a separate worktree and reported as a third column, never as the A1 causal baseline"
+      "historical_baseline_79eaaf36": {
+        "rendered": 23806,
+        "lost": 396,
+        "lost_pct": 1.64,
+        "triangles": 1497348,
+        "failure_reasons": "none emitted; the TessellationOutcome/TessellationFailureReason machinery does not exist at this rev",
+        "worktree": "C:\\Users\\stefa\\truck-historical (git worktree of truck-fork at 79eaaf36)",
+        "binary_sha256_prefix": "94ff21fdd86a6d283d2b61ec",
+        "note": "third column, context only. NOT the A1 causal baseline. It also reconciles manifest v1.0's retired numbers: 23806/396 matches exactly, so v1.0 was measured against clean 79eaaf36 while its environment block claimed a build that had the delta."
+      },
+      "a1_result": {
+        "truck_rev": "628f39e7 (branch audit/a1-constraint-roles)",
+        "look_rev": "52cbc6c",
+        "binary_sha256": "374c6636b3212232e9ebb524...",
+        "rendered": 19745,
+        "lost": 4457,
+        "lost_pct": 18.42,
+        "triangles": 1359029,
+        "faces_gained": 364,
+        "faces_lost": 0,
+        "gained_by_surface_kind": {
+          "nurbs": 208, "bspline": 126, "torus": 16, "sphere": 7,
+          "cylinder": 5, "plane": 2
+        },
+        "failure_reasons": {
+          "ConstraintInsertionIncomplete": 4048,
+          "ContradictoryDualParity": 143,
+          "NoOddParityRegion": 1
+        },
+        "faces_rendered_in_both": 19381,
+        "of_those_triangle_count_changed": 6,
+        "triangles_gained_in_those": 12,
+        "triangles_lost_in_those": 0,
+        "constraint_edge_roles": {
+          "PhysicalBoundary": 1396530,
+          "SurfaceSampling": 10573,
+          "ArtificialCut": 0,
+          "NativeBoundary": 0,
+          "UnresolvedSyntheticClosure": 0,
+          "unresolved_at_flood": 213
+        },
+        "determinism": "two runs, sorted ledgers byte-identical"
+      }
     }
   ],
   "corpus_coverage_caveat": "one model. MF section 60a exists because 00009190 was clean on a build that aborted outright on 00000730. A1 conclusions drawn from this model alone are not corpus-wide.",
