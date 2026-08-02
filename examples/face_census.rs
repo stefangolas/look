@@ -194,13 +194,157 @@ fn census(table: &Table, into: &mut Census, ledger: bool) {
     }
 }
 
+/// Aggregates the step-0 `TRUCK_PROBE_EVIDENCE` records.
+///
+/// The probe writes one tab-separated line per face to stderr from inside a
+/// parallel tessellation, so records arrive interleaved and in no fixed order.
+/// This reads them back from a captured log and counts populations. Two runs'
+/// logs are not comparable byte-for-byte; their aggregates are.
+///
+/// ```console
+/// TRUCK_PROBE_EVIDENCE=1 face_census model.step 2> probe.log
+/// face_census --evidence-report probe.log
+/// ```
+///
+/// Remove with the probe once `SourceFaceInput` becomes the production input.
+fn evidence_report(path: &str) -> anyhow::Result<()> {
+    let text = std::fs::read_to_string(path)?;
+    let mut faces = 0usize;
+    let mut by_field: HashMap<(&'static str, String), usize> = HashMap::new();
+    let mut seen: std::collections::HashSet<String> = std::collections::HashSet::new();
+    let mut duplicates = 0usize;
+
+    for line in text.lines() {
+        let Some(rest) = line.strip_prefix("EVIDENCE\t") else {
+            continue;
+        };
+        let fields: HashMap<&str, &str> = rest
+            .split('\t')
+            .filter_map(|field| field.split_once('='))
+            .collect();
+        faces += 1;
+        // A face is identified by its document id when it has one, and only
+        // then by position — the same rule the ledger uses. A repeat means the
+        // log mixes runs, which would silently double every population.
+        let key = match fields.get("source_face_id") {
+            Some(&id) if id != "none" => format!("id:{id}"),
+            _ => format!("idx:{}", fields.get("declared_face_index").unwrap_or(&"-")),
+        };
+        if !seen.insert(key) {
+            duplicates += 1;
+        }
+        for name in [
+            "endpoint_ids_complete",
+            "endpoints_consistent",
+            "continuous_regular_bounds",
+            "computable_normalized_signs",
+            "bounds_degenerate",
+            "face_use_orientation",
+            "face_surface_history",
+            "declared_rank",
+            "certified_rank",
+            "adapter_error",
+        ] {
+            if let Some(value) = fields.get(name) {
+                let label: &'static str = name;
+                *by_field.entry((label, (*value).to_string())).or_default() += 1;
+            }
+        }
+    }
+
+    if faces == 0 {
+        anyhow::bail!("no EVIDENCE records in {path} — was TRUCK_PROBE_EVIDENCE set?");
+    }
+    // The two ratio fields are the quantitative result, so they are also
+    // totalled. Their per-face distribution stays in the table below, because
+    // "every face is 1/1" and "half are 2/2 and half are 0/2" have the same
+    // total and are not the same finding.
+    let mut totals: HashMap<&'static str, (u64, u64)> = HashMap::new();
+    for line in text.lines() {
+        let Some(rest) = line.strip_prefix("EVIDENCE\t") else {
+            continue;
+        };
+        let fields: HashMap<&str, &str> = rest
+            .split('\t')
+            .filter_map(|field| field.split_once('='))
+            .collect();
+        for (name, value) in &fields {
+            let (name, value) = (*name, *value);
+            let label: &'static str = match name {
+                "continuous_regular_bounds" => "continuous_regular_bounds",
+                "computable_normalized_signs" => "computable_normalized_signs",
+                // Per-factor counts, totalled against the face's edge-use
+                // count so an incremental repair is visible as a fraction.
+                "edge_curve_retained" => "edge_curve_retained",
+                "edge_curve_history_erased" => "edge_curve_history_erased",
+                "selected_curve_retained" => "selected_curve_retained",
+                "selected_curve_history_erased" => "selected_curve_history_erased",
+                _ => continue,
+            };
+            let uses: u64 = fields
+                .get("edge_uses")
+                .and_then(|value| value.parse().ok())
+                .unwrap_or(0);
+            let (n, d) = match value.split_once('/') {
+                Some((numerator, denominator)) => (
+                    numerator.parse::<u64>().ok(),
+                    denominator.parse::<u64>().ok(),
+                ),
+                None => (value.parse::<u64>().ok(), Some(uses)),
+            };
+            if let (Some(n), Some(d)) = (n, d) {
+                let slot = totals.entry(label).or_default();
+                slot.0 += n;
+                slot.1 += d;
+            }
+        }
+    }
+    let mut total_rows: Vec<(&str, (u64, u64))> = totals.into_iter().collect();
+    total_rows.sort();
+    for (name, (n, d)) in &total_rows {
+        let share = match d {
+            0 => 0.0,
+            _ => *n as f64 / *d as f64 * 100.0,
+        };
+        println!("  total {name:36} {n:>9} / {d:<9} {share:5.1}%");
+    }
+    if !total_rows.is_empty() {
+        println!();
+    }
+    println!("{faces} face records from {path}");
+    if duplicates > 0 {
+        println!(
+            "  WARNING: {duplicates} duplicate face keys — this log mixes runs, \
+             so every population below is inflated"
+        );
+    }
+    println!();
+    let mut rows: Vec<((&str, String), usize)> = by_field.into_iter().collect();
+    rows.sort_by(|a, b| a.0.0.cmp(b.0.0).then_with(|| b.1.cmp(&a.1)));
+    println!("  {:38} {:32} {:>7}  {:>6}", "field", "value", "faces", "share");
+    for ((field, value), count) in &rows {
+        let share = *count as f64 / faces as f64 * 100.0;
+        println!("  {field:38} {value:32} {count:>7}  {share:5.1}%");
+    }
+    Ok(())
+}
+
 fn main() -> anyhow::Result<()> {
     let args: Vec<String> = env::args().skip(1).collect();
     let csv = args.iter().any(|a| a == "--csv");
     let ledger = args.iter().any(|a| a == "--ledger");
+    if let Some(position) = args.iter().position(|a| a == "--evidence-report") {
+        let Some(path) = args.get(position + 1) else {
+            anyhow::bail!("usage: face_census --evidence-report PROBE.log");
+        };
+        return evidence_report(path);
+    }
     let models: Vec<&String> = args.iter().filter(|a| !a.starts_with("--")).collect();
     if models.is_empty() {
-        eprintln!("usage: face_census [--csv] MODEL.step [MORE.step ...]");
+        eprintln!(
+            "usage: face_census [--csv] [--ledger] MODEL.step [MORE.step ...]\n       \
+             face_census --evidence-report PROBE.log"
+        );
         return Ok(());
     }
 
