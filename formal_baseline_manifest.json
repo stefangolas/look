@@ -1,24 +1,157 @@
 {
-  "manifest_version": "1.0",
-  "created_at": "2026-07-31T19:02:15Z",
-  "environment": {
-    "truck_rev": "79eaaf365a42b05664c1d999698eebf832d58c96",
-    "look_rev": "a358d700346fbcf1dfb3eeefac00cfc242946c59",
-    "rustc_version": "1.97.1",
-    "target_os": "windows-x86_64",
+  "manifest_version": "2.0",
+  "created_at": "2026-08-02T10:04:00Z",
+  "supersedes": {
+    "manifest_version": "1.0",
+    "created_at": "2026-07-31T19:02:15Z",
+    "why": "v1.0 recorded truck_rev 79eaaf36 as the built artifact. That was never true: truck-meshalgo resolved through a [patch] path override to a working tree carrying +1270/-167 uncommitted lines against 79eaaf36, including the dual-parity flood that audit A1 concerns. v1.0 asserted a provenance the build did not have.",
+    "retired_numbers": {
+      "baseline_rendered": 23806,
+      "baseline_lost": 396,
+      "status": "NOT COMPARABLE to the v2.0 experimental baseline below (19381 rendered / 4821 lost). Two things differ at once: the truck working tree is unidentified in v1.0, and examples/face_census.rs itself was rewritten (+199 lines changed) between a358d70 and this snapshot, so the two figures may not count the same predicate. The discrepancy is recorded rather than reconciled; do not treat 396 as a regression target."
+    }
+  },
+
+  "revisions": {
+    "historical_base_rev": {
+      "repo": "stefangolas/truck",
+      "rev": "79eaaf365a42b05664c1d999698eebf832d58c96",
+      "role": "historical reference only. Filters triangles by polyline.include(centroid); has no dual-parity flood. NOT the causal baseline for A1 - comparing against it would confound the parity correction with every other change in the 1270-line delta."
+    },
+    "experimental_base_rev": {
+      "repo": "local C:\\Users\\stefa\\truck-fork",
+      "branch": "audit/pre-a1-snapshot",
+      "rev": "acab3af49ca566f6557b78bad1c17bd002d6fe1f",
+      "parent": "79eaaf365a42b05664c1d999698eebf832d58c96",
+      "delta_vs_parent": "+1270/-167 across tessellation/mod.rs and tessellation/triangulation.rs",
+      "worktree_dirty": false,
+      "role": "causal baseline for A1. WIP snapshot, unreviewed, not endorsed, not for merge to master.",
+      "pushed_to_remote": false
+    },
+    "look_experimental_rev": {
+      "repo": "local C:\\Users\\stefa\\look",
+      "branch": "audit/pre-a1-snapshot",
+      "rev": "538ada7a4b984c919c932c86ed17800cd4970613",
+      "tracked_worktree_dirty": false,
+      "untracked_excluded": [".probe_patch/", ".probe_runs/", ".singular_candidate/", "*.patch"],
+      "untracked_excluded_rationale": "experiment detritus, not build inputs",
+      "pushed_to_remote": false
+    },
+    "git_diff_check": {
+      "truck": "clean (exit 0)",
+      "look": "clean (exit 0)"
+    }
+  },
+
+  "build": {
+    "rustc_version": "1.97.1 (8bab26f4f 2026-07-14)",
+    "rustc_commit_hash": "8bab26f4f68e0e26f0bb7960be334d5b520ea452",
+    "llvm_version": "22.1.6",
+    "host_triple": "x86_64-pc-windows-gnullvm",
+    "target_triple": "x86_64-pc-windows-gnullvm",
+    "toolchain_invocation": "cargo +stable-x86_64-pc-windows-gnullvm build --release --target x86_64-pc-windows-gnullvm --example face_census",
+    "profile": "release",
+    "panic_strategy": "abort",
+    "lto": "thin",
+    "codegen_units": 1,
+    "strip": "symbols",
+    "cargo_features": {
+      "look": "default (no [features] table declared)",
+      "note": "no --features or --no-default-features passed"
+    },
+    "cargo_lock_sha256": "605a4cd3db85e69bd7dda1712d49858963137e9f316f82223f8619ded103436b",
+    "resolved_truck_meshalgo": {
+      "cargo_tree": "truck-meshalgo v0.4.0 (C:\\Users\\stefa\\truck-fork\\truck-meshalgo)",
+      "resolution_mechanism": "[patch] path override, NOT a git rev pin",
+      "reproducibility_caveat": "the path override means the build depends on the state of the ../truck-fork checkout. It is reproducible only because that checkout is committed and clean at experimental_base_rev. Pinning by rev requires pushing audit/pre-a1-snapshot to the remote; not done."
+    },
+    "binary": {
+      "path": "target/x86_64-pc-windows-gnullvm/release/examples/face_census.exe",
+      "sha256": "1e75542f0fdbd9afd349c7cb7d65a8bbf736e08bbf3887e8a15ee7a4a4764094",
+      "bytes": 1865728
+    },
+    "host_disk_free_at_build": "16 GB of 475 GB (97% used)",
+    "host_disk_caveat": "counts and identities are unaffected; any timing measured in this state is not trustworthy (see look-build-quirks)"
+  },
+
+  "semantic_environment": {
+    "policy": "whitelist of every variable the program reads semantically, enumerated from the source rather than dumped from the environment. Value <unset> is recorded explicitly. An environment dump is neither reproducible nor safe to publish.",
+    "source_of_whitelist": "grep for env::var/env::var_os across truck-fork/truck-meshalgo, truck-fork/truck-stepio, look/src, look/examples",
+    "variables": {
+      "TRUCK_COMPAT_FACTOR": "<unset>",
+      "TRUCK_FACE_DOMAIN": "<unset>",
+      "TRUCK_NO_INVERT": "<unset>",
+      "TRUCK_PROBE_ASSOC": "<unset>",
+      "TRUCK_PROBE_BOUNDARY": "<unset>",
+      "TRUCK_PROBE_COMPAT": "<unset>",
+      "TRUCK_PROBE_EDGE": "<unset>",
+      "TRUCK_PROBE_FACE_ID": "<unset>",
+      "TRUCK_PROBE_FAIL": "<unset>",
+      "TRUCK_PROBE_LIFT": "<unset>",
+      "TRUCK_PROBE_SINGULAR": "<unset>",
+      "TRUCK_PROBE_TAXONOMY": "<unset>",
+      "LOOK_CACHE_DIR": "<unset>",
+      "LOOK_GPU_TIMESTAMPS": "<unset>",
+      "LOOK_MEMORY_HINT": "<unset>"
+    },
+    "effective_constants_under_unset": {
+      "COMPATIBILITY_FACTOR": "f64::INFINITY (curve-on-surface residual gate OFF)",
+      "working_range_source": "surface.try_range_tuple() (declared primitive range; face-derived range OFF)"
+    },
+    "not_semantic": ["HOME", "LOCALAPPDATA", "XDG_CACHE_HOME"],
+    "not_semantic_rationale": "cache-location only; do not affect geometry"
+  },
+
+  "tolerance_policy": {
     "relative_tolerance": 0.001,
     "minimum_tolerance": 1e-6,
     "degenerate_tolerance": 0.001,
-    "edge_samples": 4
+    "edge_samples": 4,
+    "caveat": "audit A8: closure and weld thresholds inside triangulation.rs are hard-coded absolute UV literals (1e-3, 1e-4, 1e-12) unrelated to these values and to the model scale"
   },
+
   "corpus_models": [
     {
       "model_id": "00009190",
       "path": "C:\\Users\\stefa\\look-corpus\\abc\\00009190\\00009190_2d5c0c72cf8a49f59d60fb1b_step_000.step",
-      "sha256": "DDE7469A5B1C4FAB1BE8E2F400B0887CE8108324A811C91B08B12A694CE19BEA",
+      "sha256": "dde7469a5b1c4fab1be8e2f400b0887ce8108324a811c91b08b12a694ce19bea",
       "declared_faces": 24202,
-      "baseline_rendered": 23806,
-      "baseline_lost": 396
+      "experimental_baseline": {
+        "rendered": 19381,
+        "lost": 4821,
+        "lost_pct": 19.92,
+        "ledger_sha256": "dc1b2b39d43f592e1a73b391935bc092d91fe7806e4444b5588908ae21c75fe2",
+        "ledger_normalisation": "grep '^FACE' from stderr, then sort",
+        "loss_by_bucket": {
+          "tessellate/MeshedToNothing/cylinder": 2492,
+          "tessellate/MeshedToNothing/cone": 751,
+          "tessellate/MeshedToNothing/torus": 598,
+          "tessellate/MeshedToNothing/nurbs": 244,
+          "tessellate/MeshedToNothing/plane": 215,
+          "tessellate/MeshedToNothing/bspline": 198,
+          "tessellate/NoSurfaceProduced/bspline": 124,
+          "tessellate/NoSurfaceProduced/nurbs": 79,
+          "tessellate/NoSurfaceProduced/cylinder": 44,
+          "tessellate/MeshedToNothing/sphere": 34,
+          "tessellate/MeshedToNothing/extruded": 22,
+          "tessellate/NoSurfaceProduced/torus": 15,
+          "convert/EdgeCurveConversionFailed": 2,
+          "tessellate/MeshedToNothing/revolved": 2,
+          "convert/AllBoundsCollapsed": 1
+        }
+      },
+      "historical_baseline_79eaaf36": null,
+      "historical_baseline_note": "not yet measured; must be built in a separate worktree and reported as a third column, never as the A1 causal baseline"
     }
-  ]
+  ],
+  "corpus_coverage_caveat": "one model. MF section 60a exists because 00009190 was clean on a build that aborted outright on 00000730. A1 conclusions drawn from this model alone are not corpus-wide.",
+
+  "determinism": {
+    "method": "two identical runs of the same binary, same environment, byte-compared",
+    "per_face_verdicts": "DETERMINISTIC - sorted ledgers byte-identical, sha256 dc1b2b39d43f592e1a73b391935bc092d91fe7806e4444b5588908ae21c75fe2 on both runs",
+    "aggregate_counts": "DETERMINISTIC - every bucket count identical",
+    "raw_ledger_line_order": "NONDETERMINISTIC - shell.faces.par_iter() emission order varies between runs",
+    "aggregate_examples_column": "NONDETERMINISTIC - the per-bucket example face ids are first-encountered under par_iter and differ between runs",
+    "consequence_for_a1": "the A1 comparison must be made on the SORTED ledger and on bucket counts. Diffing raw stdout would report spurious change. This was established before A1 altered anything."
+  }
 }
