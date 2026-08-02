@@ -100,7 +100,7 @@ fn census(table: &Table, into: &mut Census, ledger: bool) {
                         .unwrap_or_else(|| "-".into());
                     eprintln!(
                         "FACE\tdeclared_face_index=-\tsource_face_id={id}\t\
-                         surface_kind=-\trendered=0\tstage=convert\treason={}",
+                         surface_kind=-\trendered=0\ttriangles=0\tstage=convert\treason={}",
                         loss.reason.tag()
                     );
                 }
@@ -154,6 +154,16 @@ fn census(table: &Table, into: &mut Census, ledger: bool) {
                 Some(mesh) if mesh.faces().is_empty() => (0, "MeshedToNothing"),
                 Some(_) => (1, "-"),
             };
+            // Audit A1 requires a per-face triangle delta, not only a
+            // rendered/lost flag: the material-parity defect is expected to
+            // change *which* triangles a face keeps far more often than it
+            // changes whether the face survives at all. A face that renders
+            // both before and after while retaining a different triangle count
+            // is invisible to `rendered`.
+            let triangles = face
+                .surface
+                .as_ref()
+                .map_or(0, |mesh| mesh.tri_faces().len());
             if rendered == 0 {
                 into.record(
                     Bucket {
@@ -174,7 +184,8 @@ fn census(table: &Table, into: &mut Census, ledger: bool) {
                     .unwrap_or_else(|| "-".into());
                 eprintln!(
                     "FACE\tdeclared_face_index={i}\tsource_face_id={id}\t\
-                     surface_kind={kind}\trendered={rendered}\tstage=tessellate\treason={reason}"
+                     surface_kind={kind}\trendered={rendered}\ttriangles={triangles}\t\
+                     stage=tessellate\treason={reason}"
                 );
             }
         }
