@@ -1,0 +1,24 @@
+{
+  "manifest_version": "1.0",
+  "created_at": "2026-07-31T19:02:15Z",
+  "environment": {
+    "truck_rev": "79eaaf365a42b05664c1d999698eebf832d58c96",
+    "look_rev": "a358d700346fbcf1dfb3eeefac00cfc242946c59",
+    "rustc_version": "1.97.1",
+    "target_os": "windows-x86_64",
+    "relative_tolerance": 0.001,
+    "minimum_tolerance": 1e-6,
+    "degenerate_tolerance": 0.001,
+    "edge_samples": 4
+  },
+  "corpus_models": [
+    {
+      "model_id": "00009190",
+      "path": "C:\\Users\\stefa\\look-corpus\\abc\\00009190\\00009190_2d5c0c72cf8a49f59d60fb1b_step_000.step",
+      "sha256": "DDE7469A5B1C4FAB1BE8E2F400B0887CE8108324A811C91B08B12A694CE19BEA",
+      "declared_faces": 24202,
+      "baseline_rendered": 23806,
+      "baseline_lost": 396
+    }
+  ]
+}

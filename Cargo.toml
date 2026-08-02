@@ -33,17 +33,21 @@ truck-polymesh = { git = "https://github.com/stefangolas/truck", rev = "79eaaf36
 truck-stepio = { git = "https://github.com/stefangolas/truck", rev = "79eaaf36" }
 truck-topology = { git = "https://github.com/stefangolas/truck", rev = "79eaaf36" }
 
+[patch."https://github.com/stefangolas/truck"]
+truck-meshalgo = { path = "../truck-fork/truck-meshalgo" }
+
 [patch.crates-io]
 ruststep = { git = "https://github.com/stefangolas/ruststep", rev = "67f1f7c" }
 truck-base = { git = "https://github.com/stefangolas/truck", rev = "79eaaf36" }
 truck-derivers = { git = "https://github.com/stefangolas/truck", rev = "79eaaf36" }
 truck-geometry = { git = "https://github.com/stefangolas/truck", rev = "79eaaf36" }
 truck-geotrait = { git = "https://github.com/stefangolas/truck", rev = "79eaaf36" }
-truck-meshalgo = { git = "https://github.com/stefangolas/truck", rev = "79eaaf36" }
+truck-meshalgo = { path = "../truck-fork/truck-meshalgo" }
 truck-modeling = { git = "https://github.com/stefangolas/truck", rev = "79eaaf36" }
 truck-polymesh = { git = "https://github.com/stefangolas/truck", rev = "79eaaf36" }
 truck-stepio = { git = "https://github.com/stefangolas/truck", rev = "79eaaf36" }
 truck-topology = { git = "https://github.com/stefangolas/truck", rev = "79eaaf36" }
+
 
 [dev-dependencies]
 tempfile = "3.20"
