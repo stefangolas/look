@@ -517,15 +517,39 @@ fabricated origin inherits the fabrication.
 Correct order:
 
 1. **Remove domain authority from lifting.** The lift's only ambient input is
-   the certified lattice; anchor one representative per connected component at
-   potential zero and keep transitions relative (FORMAL_SYSTEM §XII).
-2. **Solve face-level deck potentials.** `domain/deck.rs::DeckPotentialUnionFind`
+   the certified lattice.
+2. **Retain each arc's endpoint deck displacement** δ, and build relations only
+   from established endpoint, source-incidence or seam evidence.
+3. **Solve face-level deck potentials.** `domain/deck.rs::DeckPotentialUnionFind`
    is already the correct QUO-004 solver and has never been called, because the
    `[k_u,k_v]` it consumes is computed in `PolyBoundary::new` and dropped.
-   Retain it; return a typed contradiction.
-3. **Derive the working cover extent** from the coherent lifted walks.
-4. **Carry source/synthetic origin and effective orientation on every segment at
+4. **Return coherent components**, retained winding, **free gauges**, or a typed
+   contradiction. A free gauge is a result, not a failure — and not permission
+   to pick a placement.
+5. **Derive the working cover afterwards**, by finite candidate-translate
+   enumeration (FORMAL_SYSTEM Def. 16–17, Lemma 1) for whatever the solve left
+   free.
+6. **Carry source/synthetic origin and effective orientation on every segment at
    creation** — not retrofitted afterwards.
+
+**Measured 2026-08-02, before attempting any of this.** Two placements were
+built and both rejected; see `CORRECTNESS_GAP_REGISTER.md` "Phase 2".
+
+- Deleting the primitive-range anchoring **without replacing it** is worse:
+  4,486 → 4,583 faces lost, 1,358,543 → 1,351,456 triangles. The fabricated
+  origin is wrong but *load-bearing* — it was holding a face's bounds in one
+  deck copy. So step 1 cannot ship alone, and the placement must be replaced
+  rather than removed.
+- Anchoring every bound to the translate nearest the first bound's centroid
+  measures almost exactly neutral and is **still wrong**: it is a whole-component
+  gauge choice being passed off as the per-arc δ of FS Def. 9, it asserts a
+  relation between bounds that share no vertex, it makes STEP bound order
+  semantic, and near half a period it rounds silently — reintroducing the very
+  defect class G2 had just removed.
+
+The second point is the reason this phase needs metamorphic acceptance rather
+than a face count: no corpus number distinguishes a correct placement from a
+lucky one. Required witnesses are listed in the register.
 
 **A derived extent is computational support, not trim authority.** It may
 justify clipping, finite search, bounding boxes, and artificial cuts whose two

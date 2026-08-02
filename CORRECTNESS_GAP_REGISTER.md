@@ -118,6 +118,79 @@ Grid samples on a boundary are not an edge case here: an axis-aligned trim edge
 coincides with the sampling grid by construction. The population was previously
 invisible, silently reported as "outside".
 
+### Phase 2 — one measured negative result, nothing landed
+
+Two placements were built and both rejected. Neither is in the tree; the
+findings are the deliverable.
+
+**Removing primitive-range anchoring with nothing in its place is worse.**
+`PolyBoundaryPiece::try_new` anchored each bound at
+`quot_u = floor((grav.x - u0) / up)`, against the supporting primitive's
+declared origin. Deleting that and letting each bound stay where the lift left
+it costs, on ABC `00009190`:
+
+| | Phase 1 | anchoring removed |
+|---|---|---|
+| faces lost | 4,486 | **4,583** |
+| triangles | 1,358,543 | **1,351,456** |
+| `ConstraintInsertionIncomplete` | 4,015 | **4,127** |
+
+So the fabricated origin is **wrong but load-bearing**: it was doing real work
+holding a face's bounds in one deck copy. `REFINEMENT_AUDIT.md` §6.3 established
+that the domain must be an *output* of lifting; this establishes the
+complement — the placement it was providing has to be **replaced**, not deleted,
+and G1 therefore cannot land as an isolated change.
+
+**Centroid anchoring is not a valid replacement, despite measuring well.**
+Placing every bound in the lattice translate nearest the first bound's centroid
+measured almost exactly neutral (triangle count identical, 4 faces moved between
+reasons). It was still rejected, for reasons no measurement would have caught:
+
+- It is a whole-component **gauge choice**, not the per-arc deck displacement δ
+  of FS Def. 9 — `γ(1) = γ(0) + Lδ` is traversal evidence about one arc, whereas
+  `round((centroid_i − centroid_0)/P)` is a chosen translation of an entire
+  boundary component. Describing the second as the first is a category error.
+- It **asserts a relation it never established.** QUO-004's solver consumes
+  `ψ(j) − ψ(i) = δ_ij` from real adjacency. An outer loop and a hole typically
+  share no source vertex, so frequently *no* constraint relates them and the
+  correct result is a free gauge — not "the nearest copy".
+- FS §XII's "one representative per connected component" means *per solved
+  component*, after the relation graph is solved. Anchoring the whole face to
+  its first bound is a different rule.
+- `pieces.first()` makes **STEP bound order semantic**.
+- Near half a period the two translates are equidistant and `f64::round` picks
+  one silently — the same class of defect G2 had just removed from the lift, one
+  function away.
+
+**Consequences for the ordering.** The spine must land as one slice ending in
+*solved* components, and it must be able to return a free gauge as a result
+rather than as a failure or a licence to guess:
+
+1. remove primitive-range normalisation from the lift;
+2. retain each arc's endpoint deck displacement δ;
+3. build relations only from established endpoint / source-incidence / seam
+   evidence — do **not** translate components toward one another;
+4. solve with `domain/deck.rs::DeckPotentialUnionFind`;
+5. return coherent components, retained winding, free gauges, or a typed
+   contradiction;
+6. derive the working cover afterwards, by **finite candidate-translate
+   enumeration** (FS Def. 16-17, Lemma 1) for components the solve left free —
+   not by choosing a placement in advance.
+
+Step 6 is where the load-bearing work the old anchoring was doing actually
+belongs, and it overlaps G4: for disconnected gauge-free components there is no
+relation to solve, so their relative placement is an *arrangement* question.
+
+**Acceptance for the real spine** — metamorphic, since no face count can
+distinguish a correct placement from a lucky one. Reordering a face's bounds and
+translating any complete bound by a lattice vector must both preserve the
+canonical result; centroids separated by ~0, ~0.49P and ~0.98P, and exact
+half-period separations, must yield an explicit ambiguity unless another
+relation resolves them; outer and inner loops presented in copies +1 and −1 must
+reconcile; two disconnected essential cycles must retain nonzero winding; and
+identical geometry under a shifted or fabricated primitive range must give the
+same answer.
+
 Remedy categories are drawn from the fixed list: *local code correction*,
 *preserve existing evidence*, *production type boundary*, *constructor with
 checked postcondition*, *restricted-path guard*, *typed Unknown/Unsupported
