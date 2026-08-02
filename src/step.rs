@@ -198,6 +198,7 @@ pub fn parse_step(
                 tolerance,
                 lattice::lattice_of,
                 lattice::support_schema_of,
+                lattice::curve_schema_of,
             );
             let meshed = outcome.shell;
             // A face that could not be meshed is dropped from the polygon

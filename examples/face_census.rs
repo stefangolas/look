@@ -152,6 +152,7 @@ fn census(table: &Table, into: &mut Census, ledger: bool) {
                 tolerance,
                 look::step_lattice_of,
                 look::step_support_schema_of,
+                look::step_curve_schema_of,
             )
             .shell;
         for (i, face) in meshed.faces.iter().enumerate() {

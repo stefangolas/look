@@ -111,8 +111,10 @@ fn unevidenced_elementary(surface: &ElementarySurface) -> CertifiedLattice {
 // ---------------------------------------------------------------------------
 
 use truck_meshalgo::tessellation::formal::{
-    SchemaIdentificationFailure, SupportSurfaceSchema, identify_plane,
+    CurveSchema, CurveSchemaFailure, SchemaIdentificationFailure, SupportSurfaceSchema,
+    identify_line_segment, identify_plane, identify_polyline,
 };
+use truck_stepio::r#in::step_geometry::{Conic3D, Curve3D};
 
 /// The authoritative support-surface schema of one STEP surface.
 ///
@@ -163,6 +165,42 @@ pub fn support_schema_of(surface: &Surface) -> SupportSurfaceSchema {
         Surface::BSplineSurface(_) => unread("b_spline_surface"),
         Surface::NurbsSurface(_) => unread("rational_b_spline_surface"),
         Surface::OffsetSurface(_) => unread("offset_surface"),
+    }
+}
+
+/// The authoritative schema of one STEP edge curve.
+///
+/// The curve counterpart of [`support_schema_of`], and the input to Step 3's
+/// certificate-route decision. Only the two families whose planar projection is
+/// *exact* are read: a line segment and a polyline each map, segment for
+/// segment, to the 2D chain the plane's affine inverse produces, so the
+/// whole-interval curve-on-surface obligation is discharged by the
+/// representation rather than by a numerical bound.
+///
+/// A `Line` in `truck_stepio` is `Line(a, b)` on the parameter range `0..=1` —
+/// the representation *is* the trimmed segment — so there is no separate
+/// trimming to reconcile.
+///
+/// Everything else is refused by name. Circles and ellipses arrive as
+/// `Conic(Ellipse(..))` and need an analytic arc bound; splines need a
+/// whole-interval flatness certificate; a `PCurve` needs the source
+/// representation contract of Step 3's route A, which `truck-stepio` does not
+/// carry today. Each is a separate P2 expansion and the corpus ranks them.
+pub fn curve_schema_of(curve: &Curve3D) -> CurveSchema {
+    let unread = |representation| {
+        CurveSchema::not_structurally_identified(CurveSchemaFailure::NoStructuralReader {
+            representation,
+        })
+    };
+    match curve {
+        Curve3D::Line(line) => identify_line_segment(line),
+        Curve3D::Polyline(polyline) => identify_polyline(&polyline.0),
+        Curve3D::Conic(Conic3D::Ellipse(_)) => unread("circle_or_ellipse"),
+        Curve3D::Conic(Conic3D::Hyperbola(_)) => unread("hyperbola"),
+        Curve3D::Conic(Conic3D::Parabola(_)) => unread("parabola"),
+        Curve3D::BSplineCurve(_) => unread("b_spline_curve"),
+        Curve3D::NurbsCurve(_) => unread("rational_b_spline_curve"),
+        Curve3D::PCurve(_) => unread("pcurve"),
     }
 }
 
