@@ -118,7 +118,34 @@ Grid samples on a boundary are not an edge case here: an axis-aligned trim edge
 coincides with the sampling grid by construction. The population was previously
 invisible, silently reported as "outside".
 
-### Phase 2 — one measured negative result, nothing landed
+### Phase 2A — G6 landed: segment origin recorded at creation
+
+`PolyBoundary` was `Vec<Vec<SurfacePoint>>`, and `PolyBoundary::new` stitched
+synthesised closure and seam segments into the *same* vectors as source trim.
+After that no discriminant existed, so `insert_to` tagged every segment
+`PhysicalBoundary` — fabricated geometry included.
+
+The loop is now `BoundaryLoop { points, origins }` with `origins[i]` describing
+the segment from `points[i]`, set at each of the six construction sites rather
+than reconstructed afterwards. `insert_to` derives the constraint role from the
+origin.
+
+**Behaviour-preserving by construction**: `SegmentOrigin::role()` maps synthetic
+origins to `UnresolvedSyntheticClosure`, which already toggles material parity
+exactly as `PhysicalBoundary` did. Output is byte-identical — 1,358,543
+triangles, every failure count unchanged. What a synthesised segment *should* do
+to material state is a separate change requiring its own measurement.
+
+**Measured for the first time: 649 synthetic segments across 170 faces** were
+entering the material solve as physical boundary. That is the population A6
+predicted and could not size.
+
+This also fixes the ordering hazard: the origin is now attached where the
+segment is created, so it survives whatever step 2B does to the working cover,
+rather than needing to be inferred once source and synthetic geometry have
+merged.
+
+### Phase 2 — one measured negative result, nothing else landed
 
 Two placements were built and both rejected. Neither is in the tree; the
 findings are the deliverable.
