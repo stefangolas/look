@@ -329,10 +329,143 @@ fn evidence_report(path: &str) -> anyhow::Result<()> {
     Ok(())
 }
 
+/// Aggregates the step-1 `TRUCK_PROBE_AMBIENT` records.
+///
+/// Same reading discipline as [`evidence_report`]: the probe writes one
+/// tab-separated line per successfully converted face to stderr from inside a
+/// parallel tessellation, so records interleave and arrive in no fixed order.
+///
+/// ```console
+/// TRUCK_PROBE_AMBIENT=1 face_census model.step 2> ambient.log
+/// face_census --ambient-report ambient.log
+/// ```
+///
+/// **The formal-resolution histogram is not expected to equal the legacy
+/// `certified_rank` histogram, and is deliberately not forced to.** The legacy
+/// rank counts certified generators; a face with zero of them may be genuinely
+/// aperiodic *or* may have declared a period nothing certified. Separating
+/// those two populations is the entire point of the step, so a divergence here
+/// is the result, not a discrepancy to reconcile away.
+///
+/// The cross-tabulation at the end is the acceptance check: it shows what the
+/// formal model concludes for each legacy `(declared_rank, certified_rank)`
+/// cell, and in particular that no face in the `declared 2 / certified 0` or
+/// `declared 1 / certified 0` cells resolves as formal rank 0.
+fn ambient_report(path: &str) -> anyhow::Result<()> {
+    let text = std::fs::read_to_string(path)?;
+    let mut faces = 0usize;
+    let mut by_field: HashMap<(&'static str, String), usize> = HashMap::new();
+    // Legacy `(declared_rank, certified_rank)` against formal resolution and
+    // rank. Keyed as strings so a missing field is visible rather than zeroed.
+    let mut cross: HashMap<(String, String, String, String), usize> = HashMap::new();
+    let mut seen: std::collections::HashSet<String> = std::collections::HashSet::new();
+    let mut duplicates = 0usize;
+    let mut adapter_errors = 0usize;
+
+    for line in text.lines() {
+        let Some(rest) = line.strip_prefix("AMBIENT\t") else {
+            continue;
+        };
+        let fields: HashMap<&str, &str> = rest
+            .split('\t')
+            .filter_map(|field| field.split_once('='))
+            .collect();
+        faces += 1;
+        // A face is identified by its document id when it has one, and only
+        // then by shell and position — `declared_face_index` is per-shell and
+        // collides between shells, which is why the probe emits the ordinal.
+        let key = match fields.get("source_face_id") {
+            Some(&id) if id != "none" => format!("id:{id}"),
+            _ => format!(
+                "shell:{}/idx:{}",
+                fields.get("shell_ordinal").unwrap_or(&"-"),
+                fields.get("declared_face_index").unwrap_or(&"-")
+            ),
+        };
+        if !seen.insert(key) {
+            duplicates += 1;
+        }
+        if fields.get("adapter_error").is_some_and(|value| *value != "none") {
+            adapter_errors += 1;
+        }
+        for name in [
+            "u_state",
+            "v_state",
+            "declared_rank",
+            "legacy_certified_rank",
+            "formal_resolution",
+            "formal_rank",
+            "unresolved_reason",
+            "inconsistency_reason",
+            "unsupported_clause",
+            "authoritative_generator_count",
+            "diagnostic_hint_count",
+            "adapter_error",
+        ] {
+            if let Some(value) = fields.get(name) {
+                let label: &'static str = name;
+                *by_field.entry((label, (*value).to_string())).or_default() += 1;
+            }
+        }
+        let get = |name: &str| (*fields.get(name).unwrap_or(&"-")).to_string();
+        *cross
+            .entry((
+                get("declared_rank"),
+                get("legacy_certified_rank"),
+                get("formal_resolution"),
+                get("formal_rank"),
+            ))
+            .or_default() += 1;
+    }
+
+    if faces == 0 {
+        anyhow::bail!("no AMBIENT records in {path} — was TRUCK_PROBE_AMBIENT set?");
+    }
+    println!("{faces} face records from {path}");
+    if duplicates > 0 {
+        println!(
+            "  WARNING: {duplicates} duplicate face keys — this log mixes runs, \
+             so every population below is inflated"
+        );
+    }
+    println!("  adapter errors: {adapter_errors}");
+    println!();
+
+    let mut rows: Vec<((&str, String), usize)> = by_field.into_iter().collect();
+    rows.sort_by(|a, b| a.0.0.cmp(b.0.0).then_with(|| b.1.cmp(&a.1)));
+    println!("  {:34} {:34} {:>7}  {:>6}", "field", "value", "faces", "share");
+    for ((field, value), count) in &rows {
+        let share = *count as f64 / faces as f64 * 100.0;
+        println!("  {field:34} {value:34} {count:>7}  {share:5.1}%");
+    }
+
+    println!();
+    println!("  legacy lattice census against the formal resolution");
+    println!(
+        "  {:>8} {:>9}  {:20} {:>10} {:>7}",
+        "declared", "certified", "formal_resolution", "formal_rank", "faces"
+    );
+    let mut cross_rows: Vec<((String, String, String, String), usize)> =
+        cross.into_iter().collect();
+    cross_rows.sort_by(|a, b| a.0.cmp(&b.0));
+    for ((declared, certified, resolution, rank), count) in &cross_rows {
+        println!(
+            "  {declared:>8} {certified:>9}  {resolution:20} {rank:>10} {count:>7}"
+        );
+    }
+    Ok(())
+}
+
 fn main() -> anyhow::Result<()> {
     let args: Vec<String> = env::args().skip(1).collect();
     let csv = args.iter().any(|a| a == "--csv");
     let ledger = args.iter().any(|a| a == "--ledger");
+    if let Some(position) = args.iter().position(|a| a == "--ambient-report") {
+        let Some(path) = args.get(position + 1) else {
+            anyhow::bail!("usage: face_census --ambient-report PROBE.log");
+        };
+        return ambient_report(path);
+    }
     if let Some(position) = args.iter().position(|a| a == "--evidence-report") {
         let Some(path) = args.get(position + 1) else {
             anyhow::bail!("usage: face_census --evidence-report PROBE.log");
@@ -343,7 +476,8 @@ fn main() -> anyhow::Result<()> {
     if models.is_empty() {
         eprintln!(
             "usage: face_census [--csv] [--ledger] MODEL.step [MORE.step ...]\n       \
-             face_census --evidence-report PROBE.log"
+             face_census --evidence-report PROBE.log\n       \
+             face_census --ambient-report PROBE.log"
         );
         return Ok(());
     }
