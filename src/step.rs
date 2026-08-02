@@ -11,10 +11,12 @@ pub mod part21;
 pub mod lattice;
 mod tessellated;
 
+use std::collections::BTreeMap;
 use std::time::Instant;
 
 use rayon::prelude::*;
 use truck_meshalgo::prelude::*;
+use truck_meshalgo::tessellation::TessellationFailureReason;
 use truck_stepio::r#in::Table;
 use truck_topology::compress::FaceProvenance;
 
@@ -174,13 +176,27 @@ pub fn parse_step(
                     // Nothing survived to carry an identity: these faces were
                     // lost during conversion, before any face object existed.
                     Vec::new(),
+                    // And nothing reached the tessellator, so it has no verdict
+                    // to offer. An empty list here is not "no failures" — it is
+                    // "this loss happened upstream of the stage that names
+                    // reasons", which `unconverted()` already reports.
+                    Vec::new(),
                 ));
             }
             // Periodicity now reaches the tessellator as a descriptor built
             // from the concrete STEP representation, not as a bare accessor
             // result. See src/step/lattice.rs and REFINEMENT_AUDIT.md §6.
-            let meshed =
-                shell.robust_triangulation_with_lattice(tolerance, lattice::lattice_of);
+            //
+            // G8: through the outcome-preserving entry point. The tessellator
+            // builds a typed `TessellationFailure` for every face it refuses —
+            // including `ContradictoryDualParity`, which is a *proved*
+            // inconsistency — and the mesh-only entry point destroyed it one
+            // line after constructing it. The reasons now arrive beside the
+            // shell, so a face that produced nothing can say why rather than
+            // being inferred from the shape of its absence.
+            let outcome =
+                shell.robust_triangulation_with_lattice_outcome(tolerance, lattice::lattice_of);
+            let meshed = outcome.shell;
             // A face that could not be meshed is dropped from the polygon
             // without comment, so count them here while the structure still
             // says which is which. Malformed geometry does reach this: a wire
@@ -204,7 +220,13 @@ pub fn parse_step(
             // diagnosed, and the cap keeps this bounded on the worst input
             // rather than the typical one.
             let mut lost_ids = Vec::new();
-            for face in &meshed.faces {
+            // Why each lost face was lost, by reason. This replaces inference
+            // from the *shape* of the loss with the tessellator's own verdict;
+            // the `unsurfaced`/`empty` split is kept beside it because the two
+            // do not partition the same way — a face can be `Some(empty)` for
+            // several distinct reasons.
+            let mut reasons: Vec<TessellationFailureReason> = Vec::new();
+            for (face, failure) in meshed.faces.iter().zip(&outcome.face_failures) {
                 let lost = match &face.surface {
                     None => {
                         tally.unsurfaced += 1;
@@ -216,11 +238,14 @@ pub fn parse_step(
                     }
                     Some(_) => false,
                 };
+                if let Some(failure) = failure {
+                    reasons.push(failure.reason);
+                }
                 if lost && lost_ids.len() < LOST_FACE_IDS_PER_SHELL && !face.provenance.is_empty() {
                     lost_ids.push(face.provenance);
                 }
             }
-            Ok::<_, String>((meshed.to_polygon(), tally, lost_ids))
+            Ok::<_, String>((meshed.to_polygon(), tally, lost_ids, reasons))
         })
         .collect::<Vec<_>>();
     timings.record("step_tessellate", mesh_started.elapsed());
@@ -230,14 +255,18 @@ pub fn parse_step(
     let mut failures = Vec::new();
     let mut faces = FaceTally::default();
     let mut lost_faces: Vec<FaceProvenance> = Vec::new();
+    let mut reason_counts: BTreeMap<TessellationFailureReason, usize> = BTreeMap::new();
     for result in meshed {
         match result {
-            Ok((polygon, tally, lost_ids)) => {
+            Ok((polygon, tally, lost_ids, reasons)) => {
                 append_polygon(&polygon, &mut positions, &mut indices);
                 faces.declared += tally.declared;
                 faces.total += tally.total;
                 faces.unsurfaced += tally.unsurfaced;
                 faces.empty += tally.empty;
+                for reason in reasons {
+                    *reason_counts.entry(reason).or_insert(0) += 1;
+                }
                 if lost_faces.len() < LOST_FACE_IDS_REPORTED {
                     lost_faces.extend(lost_ids);
                 }
@@ -277,6 +306,20 @@ pub fn parse_step(
             faces.unsurfaced,
             faces.empty
         );
+        // G8: the tessellator's own reason for each refusal. Previously every
+        // one of these arrived as an empty mesh and the cause had to be guessed
+        // from which bucket the face fell into. Ordered by count so the largest
+        // population names itself first.
+        if !reason_counts.is_empty() {
+            let mut by_size: Vec<_> = reason_counts.iter().collect();
+            by_size.sort_by(|a, b| b.1.cmp(a.1).then(a.0.cmp(b.0)));
+            let summary = by_size
+                .iter()
+                .map(|(reason, count)| format!("{reason:?} x{count}"))
+                .collect::<Vec<_>>()
+                .join(", ");
+            eprintln!("         tessellation refused: {summary}");
+        }
         // Naming even a few of them turns "geometry is missing somewhere" into
         // a place to start: every id here can be grepped straight out of the
         // source file, and the chain says which layer is meant.
