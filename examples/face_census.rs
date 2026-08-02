@@ -361,6 +361,138 @@ fn evidence_report(path: &str) -> anyhow::Result<()> {
 /// formal model concludes for each legacy `(declared_rank, certified_rank)`
 /// cell, and in particular that no face in the `declared 2 / certified 0` or
 /// `declared 1 / certified 0` cells resolves as formal rank 0.
+/// The planar-holes obstruction funnel, from a `TRUCK_PROBE_SLICE` log.
+///
+/// The `SLICE` funnel reports every planar rank-0 candidate and collapses each
+/// multi-bound face into one `multiple_bounds_or_holes` bucket. This reads the
+/// `HOLES` records the same run emits and splits that bucket by the obstruction
+/// that actually stopped the face, which is what the next expansion is planned
+/// from. Representative face ids are printed for every bucket, because a
+/// population without an example cannot be investigated.
+fn holes_report(path: &str) -> anyhow::Result<()> {
+    let text = std::fs::read_to_string(path)?;
+    let mut faces = 0usize;
+    let mut by_exit: HashMap<(String, String), (usize, Vec<String>)> = HashMap::new();
+    let mut by_stage: HashMap<String, usize> = HashMap::new();
+    let mut by_shape: HashMap<String, (usize, Vec<String>)> = HashMap::new();
+    let mut recovered = 0usize;
+    let mut recovered_triangles = 0usize;
+    let mut seen: std::collections::HashSet<String> = std::collections::HashSet::new();
+    let mut duplicates = 0usize;
+
+    for line in text.lines() {
+        let Some(rest) = line.strip_prefix("HOLES\t") else {
+            continue;
+        };
+        let fields: HashMap<&str, &str> = rest
+            .split('\t')
+            .filter_map(|field| field.split_once('='))
+            .collect();
+        faces += 1;
+        let id = match fields.get("source_face_id") {
+            Some(&id) if id != "none" => format!("#{id}"),
+            _ => format!(
+                "shell:{}/idx:{}",
+                fields.get("shell_ordinal").unwrap_or(&"-"),
+                fields.get("declared_face_index").unwrap_or(&"-")
+            ),
+        };
+        if !seen.insert(id.clone()) {
+            duplicates += 1;
+        }
+        let get = |name: &str| (*fields.get(name).unwrap_or(&"-")).to_string();
+        let (stage, category, exit) = (get("stage"), get("category"), get("exit"));
+        *by_stage.entry(stage.clone()).or_default() += 1;
+
+        // The bucket is the exit reason, kept beside its category so an
+        // `Unsupported` refusal is never read as a defect and vice versa.
+        // The exit alone under-reports: "an unsupported curve" is different
+        // work depending on whether it sits on the authoritative outer bound or
+        // on a hole, so the attributed bound is part of the bucket key.
+        let role = get("obstruction_bound");
+        let bucket = match exit.as_str() {
+            "none" => ("resolved_and_recovered".to_string(), category.clone()),
+            other if role == "none" || role == "-" => (other.to_string(), category.clone()),
+            other => (format!("{other} [{role}]"), category.clone()),
+        };
+        let entry = by_exit.entry(bucket).or_default();
+        entry.0 += 1;
+        if entry.1.len() < 5 {
+            entry.1.push(id.clone());
+        }
+
+        // The bound shape, which says how much of the population one outer plus
+        // one inner would cover.
+        let inner = get("inner_bounds");
+        let shape = match inner.as_str() {
+            "1" => "one_outer_one_inner".to_string(),
+            "-" => "unknown".to_string(),
+            many => format!("one_outer_{many}_inner"),
+        };
+        let shape_entry = by_shape.entry(shape).or_default();
+        shape_entry.0 += 1;
+        if shape_entry.1.len() < 5 {
+            shape_entry.1.push(id.clone());
+        }
+
+        if exit == "none" && stage == "final_validity" {
+            recovered += 1;
+            recovered_triangles += get("triangles").parse::<usize>().unwrap_or(0);
+        }
+    }
+
+    if faces == 0 {
+        anyhow::bail!("no HOLES records in {path} — was TRUCK_PROBE_SLICE set?");
+    }
+    println!("{faces} multi-bound planar rank-0 candidates from {path}");
+    if duplicates > 0 {
+        println!(
+            "  WARNING: {duplicates} duplicate face keys — this log mixes runs, \
+             so every population below is inflated"
+        );
+    }
+    println!("  resolved and meshed: {recovered} ({recovered_triangles} triangles)");
+    println!();
+
+    println!("  bound shape");
+    let mut shapes: Vec<(String, (usize, Vec<String>))> = by_shape.into_iter().collect();
+    shapes.sort_by(|a, b| b.1 .0.cmp(&a.1 .0).then_with(|| a.0.cmp(&b.0)));
+    println!("  {:28} {:>7}  {:>6}  {}", "shape", "faces", "share", "examples");
+    for (shape, (count, examples)) in &shapes {
+        let share = *count as f64 / faces as f64 * 100.0;
+        println!(
+            "  {shape:28} {count:>7}  {share:5.1}%  {}",
+            examples.join(" ")
+        );
+    }
+    println!();
+
+    println!("  furthest stage reached");
+    let mut stages: Vec<(String, usize)> = by_stage.into_iter().collect();
+    stages.sort_by(|a, b| b.1.cmp(&a.1).then_with(|| a.0.cmp(&b.0)));
+    for (stage, count) in &stages {
+        let share = *count as f64 / faces as f64 * 100.0;
+        println!("  {stage:40} {count:>7}  {share:5.1}%");
+    }
+    println!();
+
+    println!("  obstruction funnel");
+    let mut rows: Vec<((String, String), (usize, Vec<String>))> = by_exit.into_iter().collect();
+    rows.sort_by(|a, b| b.1 .0.cmp(&a.1 .0).then_with(|| a.0.cmp(&b.0)));
+    println!(
+        "  {:40} {:18} {:>7}  {:>6}  {}",
+        "exit", "category", "faces", "share", "examples"
+    );
+    for ((exit, category), (count, examples)) in &rows {
+        let share = *count as f64 / faces as f64 * 100.0;
+        println!(
+            "  {exit:40} {category:18} {count:>7}  {share:5.1}%  {}",
+            examples.join(" ")
+        );
+    }
+    Ok(())
+}
+
 fn ambient_report(path: &str) -> anyhow::Result<()> {
     let text = std::fs::read_to_string(path)?;
     let mut faces = 0usize;
@@ -486,12 +618,19 @@ fn main() -> anyhow::Result<()> {
         };
         return evidence_report(path);
     }
+    if let Some(position) = args.iter().position(|a| a == "--holes-report") {
+        let Some(path) = args.get(position + 1) else {
+            anyhow::bail!("usage: face_census --holes-report PROBE.log");
+        };
+        return holes_report(path);
+    }
     let models: Vec<&String> = args.iter().filter(|a| !a.starts_with("--")).collect();
     if models.is_empty() {
         eprintln!(
             "usage: face_census [--csv] [--ledger] MODEL.step [MORE.step ...]\n       \
              face_census --evidence-report PROBE.log\n       \
-             face_census --ambient-report PROBE.log"
+             face_census --ambient-report PROBE.log
+                    face_census --holes-report PROBE.log"
         );
         return Ok(());
     }
