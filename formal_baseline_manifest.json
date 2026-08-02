@@ -73,7 +73,7 @@
       "override_file_last_commit": "978d317",
       "override_file_self_warning": "the file's own comment says the block is 'disabled' and warns that 'a path override is invisible in Cargo.lock and a measurement taken through one is not a measurement of anything that has been pushed'. The block is not commented out. It is live, and every truck crate in every measurement recorded here came through it.",
       "reproducibility_caveat": "the eight non-meshalgo crates are content-identical to 79eaaf36 because ../truck-fork is committed and clean at experimental_base_rev, whose only delta to 79eaaf36 is in meshalgo. The measurements are therefore valid. Reproducing them from a clean clone still requires either removing the paths override and pinning by rev, or reproducing the checkout exactly.",
-      "bit_reproducibility": "rebuilding the A1 configuration after the historical detour produced binary sha256 374c6636b3212232e9ebb524... byte-identical to the first A1 build"
+      "bit_reproducibility": "NOT established, and an earlier line here claimed it was. Rebuilding A1 immediately after the historical detour did reproduce sha256 374c6636b3212232e9ebb524. Rebuilding it again after a `cargo test` cycle that checked out the snapshot branch and back produced 19e704ca7b342a998fbaa98e from identical committed sources. Byte-identity therefore holds across some rebuilds and not others. Behavioural reproducibility does hold: the second binary produced a byte-identical sorted ledger. Compare ledgers, not binaries."
     },
     "binary": {
       "path": "target/x86_64-pc-windows-gnullvm/release/examples/face_census.exe",
