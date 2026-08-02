@@ -8,6 +8,7 @@
 //! by [`tessellated`].
 
 pub mod part21;
+pub mod lattice;
 mod tessellated;
 
 use std::time::Instant;
@@ -175,7 +176,11 @@ pub fn parse_step(
                     Vec::new(),
                 ));
             }
-            let meshed = shell.robust_triangulation(tolerance);
+            // Periodicity now reaches the tessellator as a descriptor built
+            // from the concrete STEP representation, not as a bare accessor
+            // result. See src/step/lattice.rs and REFINEMENT_AUDIT.md §6.
+            let meshed =
+                shell.robust_triangulation_with_lattice(tolerance, lattice::lattice_of);
             // A face that could not be meshed is dropped from the polygon
             // without comment, so count them here while the structure still
             // says which is which. Malformed geometry does reach this: a wire

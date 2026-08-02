@@ -10,3 +10,8 @@ pub mod server;
 pub mod step;
 pub mod timing;
 pub mod ui;
+
+/// The deck lattice of a STEP surface, read from its representation.
+///
+/// Re-exported so the census exercises exactly the path production does.
+pub use step::lattice::lattice_of as step_lattice_of;

@@ -145,7 +145,9 @@ fn census(table: &Table, into: &mut Census, ledger: bool) {
             .iter()
             .map(|f| surface_kind(&f.surface))
             .collect();
-        let meshed = shell.robust_triangulation(tolerance);
+        // Must exercise the same path production does, or it measures a
+        // build nobody ships (REFINEMENT_AUDIT.md section 6).
+        let meshed = shell.robust_triangulation_with_lattice(tolerance, look::step_lattice_of);
         for (i, face) in meshed.faces.iter().enumerate() {
             let kind = if i < kinds.len() { kinds[i] } else { "?" };
             let example = face.provenance.best_id().map(|id| id.to_string());
