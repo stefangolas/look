@@ -15,3 +15,4 @@ pub mod ui;
 ///
 /// Re-exported so the census exercises exactly the path production does.
 pub use step::lattice::lattice_of as step_lattice_of;
+pub use step::lattice::support_schema_of as step_support_schema_of;

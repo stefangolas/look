@@ -7,8 +7,8 @@
 //! STEP. AP242 also allows a file to ship its mesh directly, which is handled
 //! by [`tessellated`].
 
-pub mod part21;
 pub mod lattice;
+pub mod part21;
 mod tessellated;
 
 use std::collections::BTreeMap;
@@ -194,8 +194,11 @@ pub fn parse_step(
             // line after constructing it. The reasons now arrive beside the
             // shell, so a face that produced nothing can say why rather than
             // being inferred from the shape of its absence.
-            let outcome =
-                shell.robust_triangulation_with_lattice_outcome(tolerance, lattice::lattice_of);
+            let outcome = shell.robust_triangulation_with_schema_outcome(
+                tolerance,
+                lattice::lattice_of,
+                lattice::support_schema_of,
+            );
             let meshed = outcome.shell;
             // A face that could not be meshed is dropped from the polygon
             // without comment, so count them here while the structure still

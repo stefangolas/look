@@ -147,7 +147,13 @@ fn census(table: &Table, into: &mut Census, ledger: bool) {
             .collect();
         // Must exercise the same path production does, or it measures a
         // build nobody ships (REFINEMENT_AUDIT.md section 6).
-        let meshed = shell.robust_triangulation_with_lattice(tolerance, look::step_lattice_of);
+        let meshed = shell
+            .robust_triangulation_with_schema_outcome(
+                tolerance,
+                look::step_lattice_of,
+                look::step_support_schema_of,
+            )
+            .shell;
         for (i, face) in meshed.faces.iter().enumerate() {
             let kind = if i < kinds.len() { kinds[i] } else { "?" };
             let example = face.provenance.best_id().map(|id| id.to_string());
@@ -321,7 +327,10 @@ fn evidence_report(path: &str) -> anyhow::Result<()> {
     println!();
     let mut rows: Vec<((&str, String), usize)> = by_field.into_iter().collect();
     rows.sort_by(|a, b| a.0.0.cmp(b.0.0).then_with(|| b.1.cmp(&a.1)));
-    println!("  {:38} {:32} {:>7}  {:>6}", "field", "value", "faces", "share");
+    println!(
+        "  {:38} {:32} {:>7}  {:>6}",
+        "field", "value", "faces", "share"
+    );
     for ((field, value), count) in &rows {
         let share = *count as f64 / faces as f64 * 100.0;
         println!("  {field:38} {value:32} {count:>7}  {share:5.1}%");
@@ -385,7 +394,10 @@ fn ambient_report(path: &str) -> anyhow::Result<()> {
         if !seen.insert(key) {
             duplicates += 1;
         }
-        if fields.get("adapter_error").is_some_and(|value| *value != "none") {
+        if fields
+            .get("adapter_error")
+            .is_some_and(|value| *value != "none")
+        {
             adapter_errors += 1;
         }
         for name in [
@@ -433,7 +445,10 @@ fn ambient_report(path: &str) -> anyhow::Result<()> {
 
     let mut rows: Vec<((&str, String), usize)> = by_field.into_iter().collect();
     rows.sort_by(|a, b| a.0.0.cmp(b.0.0).then_with(|| b.1.cmp(&a.1)));
-    println!("  {:34} {:34} {:>7}  {:>6}", "field", "value", "faces", "share");
+    println!(
+        "  {:34} {:34} {:>7}  {:>6}",
+        "field", "value", "faces", "share"
+    );
     for ((field, value), count) in &rows {
         let share = *count as f64 / faces as f64 * 100.0;
         println!("  {field:34} {value:34} {count:>7}  {share:5.1}%");
@@ -449,9 +464,7 @@ fn ambient_report(path: &str) -> anyhow::Result<()> {
         cross.into_iter().collect();
     cross_rows.sort_by(|a, b| a.0.cmp(&b.0));
     for ((declared, certified, resolution, rank), count) in &cross_rows {
-        println!(
-            "  {declared:>8} {certified:>9}  {resolution:20} {rank:>10} {count:>7}"
-        );
+        println!("  {declared:>8} {certified:>9}  {resolution:20} {rank:>10} {count:>7}");
     }
     Ok(())
 }

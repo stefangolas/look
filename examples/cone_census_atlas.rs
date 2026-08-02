@@ -8,7 +8,9 @@ use std::collections::HashMap;
 use std::env;
 
 use truck_meshalgo::prelude::*;
-use truck_meshalgo::tessellation::domain::projection::{project_boundary_curve, TraversalSemantics};
+use truck_meshalgo::tessellation::domain::projection::{
+    TraversalSemantics, project_boundary_curve,
+};
 use truck_stepio::r#in::{
     Table,
     step_geometry::{ElementarySurface, Surface},
@@ -127,7 +129,10 @@ fn analyze_cone_face(
     let mut generator_sides = 0;
     let mut circular_arcs = 0;
 
-    let vp = face.surface.v_period().unwrap_or(2.0 * std::f64::consts::PI);
+    let vp = face
+        .surface
+        .v_period()
+        .unwrap_or(2.0 * std::f64::consts::PI);
 
     for wire in &face.boundaries {
         if wire.is_empty() {
@@ -179,7 +184,9 @@ fn analyze_cone_face(
 
         let first = points_uv[0];
         let last = points_uv[points_uv.len() - 1];
-        let is_closed = first.distance(last) < 1e-4 || (first.x - last.x).abs() < 1e-4 || traversal_full_period > 0;
+        let is_closed = first.distance(last) < 1e-4
+            || (first.x - last.x).abs() < 1e-4
+            || traversal_full_period > 0;
 
         if is_closed {
             closed_loops += 1;
@@ -215,7 +222,11 @@ fn analyze_cone_face(
     let has_apex = apex_info.is_some();
 
     // Atlas Cell Classification
-    let cell = if (closed_loops == 1 || traversal_full_period > 0) && open_chains == 0 && v_span >= 0.75 * vp && has_apex {
+    let cell = if (closed_loops == 1 || traversal_full_period > 0)
+        && open_chains == 0
+        && v_span >= 0.75 * vp
+        && has_apex
+    {
         AtlasCell::ApexDisk
     } else if v_span < 0.75 * vp && has_apex && generator_sides > 0 {
         AtlasCell::ApexSector
@@ -269,7 +280,9 @@ fn load_table(path: &str) -> anyhow::Result<Table> {
 fn main() -> anyhow::Result<()> {
     let args: Vec<String> = env::args().skip(1).collect();
     if args.is_empty() {
-        eprintln!("usage: cargo run --release --example cone_census_atlas -- MODEL.step [MORE.step ...]");
+        eprintln!(
+            "usage: cargo run --release --example cone_census_atlas -- MODEL.step [MORE.step ...]"
+        );
         return Ok(());
     }
 
@@ -327,7 +340,10 @@ fn main() -> anyhow::Result<()> {
     }
 
     println!("\n=== CONE MESHED-TO-NOTHING CANONICAL ATLAS CENSUS ===");
-    println!("Total failing cone faces analyzed: {}\n", failing_faces.len());
+    println!(
+        "Total failing cone faces analyzed: {}\n",
+        failing_faces.len()
+    );
 
     let mut total_full_period = 0;
     let mut total_ordinary = 0;
@@ -351,7 +367,10 @@ fn main() -> anyhow::Result<()> {
     println!("  Edges with FullPeriod Traversal: {}", total_full_period);
     println!("  Edges with Ordinary Traversal:   {}", total_ordinary);
     println!("  Edges with DegeneratePoint:      {}", total_degenerate);
-    println!("  Edges with Projection Failed:    {}", total_projection_failed);
+    println!(
+        "  Edges with Projection Failed:    {}",
+        total_projection_failed
+    );
     println!("  Total Deck Winding (+1/-1):      {}", total_deck_winding);
     println!("  Faces with Certified Cone Apex:  {}\n", total_has_apex);
 
@@ -366,7 +385,10 @@ fn main() -> anyhow::Result<()> {
         }
     }
 
-    println!("{:<25} {:<8} {:<8} {:<38} {:<20}", "Canonical Atlas Cell", "Count", "Share", "Missing Capability", "Representative Faces");
+    println!(
+        "{:<25} {:<8} {:<8} {:<38} {:<20}",
+        "Canonical Atlas Cell", "Count", "Share", "Missing Capability", "Representative Faces"
+    );
     println!("{}", "-".repeat(105));
 
     let total = failing_faces.len().max(1) as f64;

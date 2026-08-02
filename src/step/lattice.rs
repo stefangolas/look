@@ -20,9 +20,7 @@
 //! `try_range_tuple()` reads are deliberately untouched; they belong to the
 //! next stage.
 
-use truck_meshalgo::tessellation::domain::lattice::{
-    Axis, AxisPeriodStatus, CertifiedLattice,
-};
+use truck_meshalgo::tessellation::domain::lattice::{Axis, AxisPeriodStatus, CertifiedLattice};
 use truck_stepio::r#in::step_geometry::{ElementarySurface, Surface};
 
 /// The deck lattice of one STEP surface, established from its representation.
@@ -69,8 +67,7 @@ fn elementary_lattice(surface: &ElementarySurface) -> CertifiedLattice {
         // the wrong axis — an error the bare accessors could not express.
         ElementarySurface::CylindricalSurface(processor)
         | ElementarySurface::ConicalSurface(processor) => {
-            let lattice =
-                CertifiedLattice::revolution(Axis::V, AxisPeriodStatus::NonPeriodic);
+            let lattice = CertifiedLattice::revolution(Axis::V, AxisPeriodStatus::NonPeriodic);
             orient(lattice, processor.orientation())
         }
 
@@ -107,4 +104,113 @@ fn unevidenced(surface: &Surface) -> CertifiedLattice {
 fn unevidenced_elementary(surface: &ElementarySurface) -> CertifiedLattice {
     use truck_meshalgo::prelude::ParametricSurface;
     CertifiedLattice::from_unevidenced_accessors(surface.u_period(), surface.v_period())
+}
+
+// ---------------------------------------------------------------------------
+// Structural support-surface schema
+// ---------------------------------------------------------------------------
+
+use truck_meshalgo::tessellation::formal::{
+    SchemaIdentificationFailure, SupportSurfaceSchema, identify_plane,
+};
+
+/// The authoritative support-surface schema of one STEP surface.
+///
+/// The companion to [`lattice_of`], and the reason this module is in `look`
+/// rather than in the tessellator: this is the last layer that can still name
+/// the concrete representation. `lattice_of` answers "what periods does this
+/// surface have"; this answers "what *is* this surface", which is the question
+/// the formal system's analytic rules are stated against.
+///
+/// The two are not redundant. Step 1's census found `0 / 24,199` faces
+/// resolving to a certified ambient lattice, because
+/// `CertifiedLattice::NON_PERIODIC` — what `lattice_of` returns for a plane —
+/// is indistinguishable after construction from an accessor that returned
+/// nothing, and a torus reaching this module returns exactly that. Only the
+/// match arm below, on the entity type itself, separates them.
+///
+/// **Everything that is not a plane returns `NoStructuralReader`.** That is a
+/// statement about this function, not about the surface: cylinders, cones,
+/// spheres, tori, swept surfaces, offset surfaces and splines are all P2
+/// coverage work, and each needs its own representation-derived witness. Naming
+/// them individually rather than with a wildcard is what makes the obstruction
+/// histogram tell the corpus which one to add next.
+pub fn support_schema_of(surface: &Surface) -> SupportSurfaceSchema {
+    let unread = |representation| {
+        SupportSurfaceSchema::not_structurally_identified(
+            SchemaIdentificationFailure::NoStructuralReader { representation },
+        )
+    };
+    match surface {
+        Surface::ElementarySurface(elementary) => match elementary {
+            // The one structural reader that exists. `identify_plane` still
+            // refuses a basis whose axes it cannot separate — a plane with a
+            // degenerate basis has a genuinely periodic parameterisation, so
+            // the entity type alone does not establish aperiodicity.
+            ElementarySurface::Plane(plane) => identify_plane(plane),
+
+            // `Processor<RevolutedCurve<Line<Point3>>, Matrix4>`. The expected
+            // route is the revolved-surface schema plus the 2π angular
+            // generator plus straight-generatrix aperiodicity, giving formal
+            // rank 1. Not implemented; see `lattice_of` above, which already
+            // certifies the same 2π on the legacy side.
+            ElementarySurface::CylindricalSurface(_) => unread("cylindrical_surface"),
+            ElementarySurface::ConicalSurface(_) => unread("conical_surface"),
+            ElementarySurface::Sphere(_) => unread("spherical_surface"),
+            ElementarySurface::ToroidalSurface(_) => unread("toroidal_surface"),
+        },
+        Surface::SweptCurve(_) => unread("swept_surface"),
+        Surface::BSplineSurface(_) => unread("b_spline_surface"),
+        Surface::NurbsSurface(_) => unread("rational_b_spline_surface"),
+        Surface::OffsetSurface(_) => unread("offset_surface"),
+    }
+}
+
+#[cfg(test)]
+mod schema_tests {
+    use super::*;
+    use truck_meshalgo::prelude::{EuclideanSpace, Point3, Vector3};
+    use truck_stepio::r#in::step_geometry::{Plane, Processor, Torus};
+
+    fn a_plane() -> Surface {
+        Surface::ElementarySurface(ElementarySurface::Plane(Plane::new(
+            Point3::new(1.0, 2.0, 3.0),
+            Point3::new(2.0, 2.0, 3.0),
+            Point3::new(1.0, 3.0, 3.0),
+        )))
+    }
+
+    #[test]
+    fn a_step_plane_is_structurally_identified() {
+        let schema = support_schema_of(&a_plane());
+        let plane = schema.plane().expect("a STEP plane is a plane");
+        assert_eq!(plane.origin(), Point3::new(1.0, 2.0, 3.0));
+        assert_eq!(plane.u_axis(), Vector3::new(1.0, 0.0, 0.0));
+        assert_eq!(plane.v_axis(), Vector3::new(0.0, 1.0, 0.0));
+    }
+
+    /// The corpus case: a torus's legacy lattice is `NonPeriodic` on both axes
+    /// because its accessors return `None`, and it is doubly periodic all the
+    /// same. The schema reader is what keeps the two apart.
+    #[test]
+    fn a_torus_reports_no_structural_reader_though_its_lattice_looks_aperiodic() {
+        let torus = Surface::ElementarySurface(ElementarySurface::ToroidalSurface(Processor::new(
+            Torus::new(Point3::origin(), 2.0, 1.0),
+        )));
+        assert_eq!(
+            support_schema_of(&torus),
+            SupportSurfaceSchema::not_structurally_identified(
+                SchemaIdentificationFailure::NoStructuralReader {
+                    representation: "toroidal_surface"
+                }
+            )
+        );
+        // And the legacy lattice certifies nothing for it either way: this
+        // torus's accessors do return 2π, so it lands in `Uncertified` rather
+        // than `NonPeriodic` — but `certified_rank()` is 0 for both it and a
+        // plane, which is exactly the collapse the schema reader undoes.
+        assert_eq!(lattice_of(&torus).certified_rank(), 0);
+        assert_eq!(lattice_of(&a_plane()).certified_rank(), 0);
+        assert_eq!(lattice_of(&a_plane()), CertifiedLattice::NON_PERIODIC);
+    }
 }

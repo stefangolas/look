@@ -137,7 +137,11 @@ fn evaluate_correctness(
 
             let source_face = &shell.faces[face_idx];
             let skind = surface_kind(&source_face.surface);
-            let face_id_str = face.provenance.best_id().map(|id| id.to_string()).unwrap_or_else(|| format!("#{face_idx}"));
+            let face_id_str = face
+                .provenance
+                .best_id()
+                .map(|id| id.to_string())
+                .unwrap_or_else(|| format!("#{face_idx}"));
 
             // Compute face 3D bounding box and characteristic length L_face
             let mut face_bbox = BoundingBox::<Point3>::new();
@@ -166,8 +170,10 @@ fn evaluate_correctness(
                 let norm_res = raw_res / l_face;
 
                 // Role classification
-                let is_seam = (u_period.is_some() && (uv.x <= 1e-4 || (uv.x - u_period.unwrap()).abs() <= 1e-4))
-                    || (v_period.is_some() && (uv.y <= 1e-4 || (uv.y - v_period.unwrap()).abs() <= 1e-4));
+                let is_seam = (u_period.is_some()
+                    && (uv.x <= 1e-4 || (uv.x - u_period.unwrap()).abs() <= 1e-4))
+                    || (v_period.is_some()
+                        && (uv.y <= 1e-4 || (uv.y - v_period.unwrap()).abs() <= 1e-4));
                 let is_boundary = i < source_face.boundaries.len() * 4;
 
                 let (role_tag, gen_tag) = if is_seam {
@@ -190,7 +196,17 @@ fn evaluate_correctness(
                     writeln!(
                         residual_writer,
                         "{},{},{},{},{:.6e},{:.6e},{:.6},{:.6},{:.6},{:.6},{:.6}",
-                        face_id_str, skind, gen_tag, role_tag, raw_res, norm_res, uv.x, uv.y, pos.x, pos.y, pos.z
+                        face_id_str,
+                        skind,
+                        gen_tag,
+                        role_tag,
+                        raw_res,
+                        norm_res,
+                        uv.x,
+                        uv.y,
+                        pos.x,
+                        pos.y,
+                        pos.z
                     )?;
                 }
             }
@@ -216,7 +232,8 @@ fn evaluate_correctness(
                     report.nonfinite_triangle_normals += 1;
                 }
 
-                if tri[0].pos == tri[1].pos || tri[1].pos == tri[2].pos || tri[0].pos == tri[2].pos {
+                if tri[0].pos == tri[1].pos || tri[1].pos == tri[2].pos || tri[0].pos == tri[2].pos
+                {
                     report.exact_zero_area_triangles += 1;
                     continue;
                 }
@@ -249,7 +266,11 @@ fn evaluate_correctness(
                     }
                 }
 
-                for (a, b) in [(tri[0].pos, tri[1].pos), (tri[1].pos, tri[2].pos), (tri[2].pos, tri[0].pos)] {
+                for (a, b) in [
+                    (tri[0].pos, tri[1].pos),
+                    (tri[1].pos, tri[2].pos),
+                    (tri[2].pos, tri[0].pos),
+                ] {
                     let edge_key = if a < b { (a, b) } else { (b, a) };
                     *face_edges.entry(edge_key).or_default() += 1;
                 }
@@ -267,7 +288,14 @@ fn evaluate_correctness(
             writeln!(
                 topology_writer,
                 "{},{},{},{},{},{},{},{}",
-                face_id_str, skind, num_v, num_e, num_f, chi_cut, expected_chi, num_declared_boundaries
+                face_id_str,
+                skind,
+                num_v,
+                num_e,
+                num_f,
+                chi_cut,
+                expected_chi,
+                num_declared_boundaries
             )?;
 
             if chi_cut != expected_chi && chi_cut != 1 {
@@ -280,7 +308,9 @@ fn evaluate_correctness(
                 *report.topology_mismatch_categories.entry(cat).or_default() += 1;
             }
 
-            if !total_mesh_area.is_finite() || total_mesh_area > 1e6 * model_bbox.diameter() * model_bbox.diameter() {
+            if !total_mesh_area.is_finite()
+                || total_mesh_area > 1e6 * model_bbox.diameter() * model_bbox.diameter()
+            {
                 report.area_outlier_faces += 1;
             }
         }
@@ -300,16 +330,27 @@ fn main() -> anyhow::Result<()> {
     let topology_path = "C:\\Users\\stefa\\.gemini\\antigravity\\brain\\6e9f2891-3bf8-4254-bc19-36c6b2881766\\topology_trace.csv";
 
     let mut residual_writer = File::create(residual_path)?;
-    writeln!(residual_writer, "face_id,surface,generation,role,raw_residual,norm_residual,u,v,x,y,z")?;
+    writeln!(
+        residual_writer,
+        "face_id,surface,generation,role,raw_residual,norm_residual,u,v,x,y,z"
+    )?;
 
     let mut topology_writer = File::create(topology_path)?;
-    writeln!(topology_writer, "face_id,surface,V_cut,E_cut,F_cut,chi_cut,expected_chi,wires")?;
+    writeln!(
+        topology_writer,
+        "face_id,surface,V_cut,E_cut,F_cut,chi_cut,expected_chi,wires"
+    )?;
 
     let mut report = MeshInvariantsReport::default();
     for path in models {
         eprintln!("Analyzing correctness invariants & physical topology for model {path}...");
         let table = load_step(path)?;
-        evaluate_correctness(&table, &mut report, &mut residual_writer, &mut topology_writer)?;
+        evaluate_correctness(
+            &table,
+            &mut report,
+            &mut residual_writer,
+            &mut topology_writer,
+        )?;
     }
 
     println!("\n=== ROLE-BY-SURFACE RESIDUAL MATRIX ===");
@@ -323,26 +364,59 @@ fn main() -> anyhow::Result<()> {
         let stats = &report.matrix_stats[key];
         println!(
             "{:18} {:10} {:8} {:10} {:14.6e} {:14.6e} {:8}",
-            key.0, key.1, stats.count, stats.over_tol_count, stats.max_raw_residual, stats.max_norm_residual, stats.affected_faces.len()
+            key.0,
+            key.1,
+            stats.count,
+            stats.over_tol_count,
+            stats.max_raw_residual,
+            stats.max_norm_residual,
+            stats.affected_faces.len()
         );
     }
 
     println!("\n=== DISSECTED MESH CORRECTNESS & TOPOLOGY CENSUS ===");
-    println!("Total Rendered Faces Evaluated: {}", report.total_rendered_faces);
+    println!(
+        "Total Rendered Faces Evaluated: {}",
+        report.total_rendered_faces
+    );
     println!("\n1. Non-Finite Field Dissection:");
-    println!("   Non-Finite 3D Vertex Positions: {}", report.nonfinite_3d_positions);
-    println!("   Non-Finite UV Parameter Coords: {}", report.nonfinite_uv_coords);
-    println!("   Non-Finite Vertex Normals:      {}", report.nonfinite_vertex_normals);
-    println!("   Non-Finite Triangle Normals:    {}", report.nonfinite_triangle_normals);
+    println!(
+        "   Non-Finite 3D Vertex Positions: {}",
+        report.nonfinite_3d_positions
+    );
+    println!(
+        "   Non-Finite UV Parameter Coords: {}",
+        report.nonfinite_uv_coords
+    );
+    println!(
+        "   Non-Finite Vertex Normals:      {}",
+        report.nonfinite_vertex_normals
+    );
+    println!(
+        "   Non-Finite Triangle Normals:    {}",
+        report.nonfinite_triangle_normals
+    );
 
     println!("\n2. Triangle Validity:");
-    println!("   Exact Zero-Area Triangles: {}", report.exact_zero_area_triangles);
-    println!("   Near Zero-Area Triangles (<1e-12): {}", report.near_zero_area_triangles);
+    println!(
+        "   Exact Zero-Area Triangles: {}",
+        report.exact_zero_area_triangles
+    );
+    println!(
+        "   Near Zero-Area Triangles (<1e-12): {}",
+        report.near_zero_area_triangles
+    );
     println!("   Duplicate Triangles: {}", report.duplicate_triangles);
-    println!("   Extreme Aspect Ratio Triangles (>1000:1): {}", report.extreme_aspect_ratio_triangles);
+    println!(
+        "   Extreme Aspect Ratio Triangles (>1000:1): {}",
+        report.extreme_aspect_ratio_triangles
+    );
 
     println!("\n3. Physical Topology & Mismatches:");
-    println!("   Topology Mismatched Faces: {}", report.topology_mismatched_faces);
+    println!(
+        "   Topology Mismatched Faces: {}",
+        report.topology_mismatched_faces
+    );
     for (cat, count) in &report.topology_mismatch_categories {
         println!("     - {:30}: {}", cat, count);
     }
