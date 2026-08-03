@@ -87,10 +87,11 @@
 //!
 //! is an exact dyadic rational (an `f64` bit pattern), and `g00 - g11` and
 //! `g01` are each computed as a Shewchuk-style nonoverlapping floating-point
-//! *expansion* (`exact_arith` submodule below): `two_sum`/`two_product` are
-//! IEEE-754 error-free transformations, so accumulating their outputs never
-//! drops a bit, and the expansion's exact mathematical sum is *provably*
-//! zero iff every component is zero. This decides `g00 == g11` and `g01 ==
+//! *expansion* (`truck-meshalgo`'s [`Expansion`], the single implementation
+//! in the workspace): `two_sum`/`two_product` are IEEE-754 error-free
+//! transformations, so accumulating their outputs never drops a bit, and the
+//! expansion's exact mathematical sum is *provably* zero iff every component
+//! is zero. This decides `g00 == g11` and `g01 ==
 //! 0` outright — never a tolerance, and (unlike the ULP band above) never
 //! `Unresolved` either, because an exact equality test on exact inputs is
 //! always decidable. The same technique certifies the transform-orientation
@@ -112,151 +113,47 @@
 
 use truck_meshalgo::prelude::{BoundedCurve, InnerSpace, Matrix4, Point3, SquareMatrix, Transform, Vector3};
 use truck_meshalgo::tessellation::formal::numeric::{FiniteF64, PositiveFinite};
+use truck_meshalgo::tessellation::formal::{CertifiedSign, Expansion};
 use truck_stepio::r#in::step_geometry::Ellipse;
 
-/// Minimal Shewchuk-style exact floating-point expansion arithmetic.
+/// Exact 3-vector dot product, as a non-overlapping expansion over the shared
+/// Shewchuk arithmetic.
 ///
-/// Every primitive here (`two_sum`, `two_product`) is an IEEE-754
-/// *error-free transformation*: for finite `f64` inputs it returns a pair
-/// `(hi, lo)` such that `hi + lo` equals the exact mathematical sum/product
-/// with zero rounding error (this is a standard result, not a heuristic —
-/// see Shewchuk, *Adaptive Precision Floating-Point Arithmetic and Fast
-/// Robust Geometric Predicates*, 1997). An [`Expansion`] built entirely from
-/// these primitives is a nonoverlapping decomposition of an exact
-/// mathematical value: the value is exactly zero iff every stored component
-/// is zero, and otherwise its sign equals the sign of the expansion's
-/// largest-magnitude (last) component. This gives exact equality/inequality
-/// decisions on `f64` inputs without arbitrary-precision bignum.
-mod exact_arith {
-    /// `(a + b, err)` with `a + b == exact_sum` when rounded to `a+b`, and
-    /// `err` the exact rounding error: `a + b` (mathematical) `== (a+b) as
-    /// f64 + err`, both sides exact. Requires no ordering on `|a|`/`|b|`
-    /// (unlike `fast_two_sum`).
-    fn two_sum(a: f64, b: f64) -> (f64, f64) {
-        let x = a + b;
-        let bv = x - a;
-        let av = x - bv;
-        let br = b - bv;
-        let ar = a - av;
-        (x, ar + br)
-    }
+/// [`Expansion`] is the **one** Shewchuk implementation in the workspace,
+/// lifted into `truck-meshalgo` (see `exact.rs` there) and consumed here
+/// through the patch; this module has retired its private copy, so there is
+/// no second subtly different `Expansion`.
+fn exact_dot3(u: [f64; 3], v: [f64; 3]) -> Expansion {
+    let mut acc = Expansion::from_product(u[0], v[0]);
+    acc = acc.merge(&Expansion::from_product(u[1], v[1]));
+    acc = acc.merge(&Expansion::from_product(u[2], v[2]));
+    acc
+}
 
-    /// `(a * b, err)` with `a * b` (mathematical) `== (a*b) as f64 + err`,
-    /// both sides exact. Uses a fused multiply-add (correctly rounded, so
-    /// `a.mul_add(b, -(a*b))` is exactly the rounding error of `a*b`) rather
-    /// than Dekker's split — simpler and exact either way.
-    fn two_product(a: f64, b: f64) -> (f64, f64) {
-        let p = a * b;
-        let e = a.mul_add(b, -p);
-        (p, e)
-    }
+/// Exact 3x3 determinant (rows `m[i]`), as a non-overlapping expansion over
+/// the shared Shewchuk arithmetic:
+/// `m00(m11 m22 - m12 m21) - m01(m10 m22 - m12 m20) + m02(m10 m21 - m11 m20)`.
+/// Each product-of-products term is built by an exact expansion product of a
+/// two-term sub-expansion with the remaining factor (itself an exact product),
+/// then merged with the correct sign.
+fn exact_det3(m: [[f64; 3]; 3]) -> Expansion {
+    let cofactor = |a: f64, b: f64, c: f64, d: f64| -> Expansion {
+        // a*d - b*c, exact.
+        Expansion::from_product(a, d).merge(&Expansion::from_product(b, c).negate())
+    };
+    let scale = |e: &Expansion, s: f64| -> Expansion {
+        e.mul_expansion(&Expansion::zero().grow(s))
+    };
 
-    /// A nonoverlapping exact decomposition of a real value: `components`
-    /// sum, with zero rounding error, to the exact value represented.
-    #[derive(Debug, Clone, Default)]
-    pub struct Expansion {
-        components: Vec<f64>,
-    }
+    let c00 = cofactor(m[1][1], m[1][2], m[2][1], m[2][2]);
+    let c01 = cofactor(m[1][0], m[1][2], m[2][0], m[2][2]);
+    let c02 = cofactor(m[1][0], m[1][1], m[2][0], m[2][1]);
 
-    impl Expansion {
-        pub fn zero() -> Self {
-            Expansion { components: Vec::new() }
-        }
+    let t0 = scale(&c00, m[0][0]);
+    let t1 = scale(&c01, m[0][1]).negate();
+    let t2 = scale(&c02, m[0][2]);
 
-        /// Insert one exact scalar into the expansion (`grow_expansion`):
-        /// the result still sums, with zero error, to `self + b`.
-        pub fn grow(&self, b: f64) -> Self {
-            let mut components = Vec::with_capacity(self.components.len() + 1);
-            let mut q = b;
-            for &e in &self.components {
-                let (sum, err) = two_sum(q, e);
-                if err != 0.0 {
-                    components.push(err);
-                }
-                q = sum;
-            }
-            if q != 0.0 || components.is_empty() {
-                components.push(q);
-            }
-            Expansion { components }
-        }
-
-        /// Merge another expansion into this one exactly (repeated `grow`).
-        pub fn merge(&self, other: &Expansion) -> Self {
-            let mut result = self.clone();
-            for &c in &other.components {
-                result = result.grow(c);
-            }
-            result
-        }
-
-        /// The exact additive inverse.
-        pub fn negate(&self) -> Self {
-            Expansion {
-                components: self.components.iter().map(|c| -c).collect(),
-            }
-        }
-
-        /// Exact zero test: every component is (exactly) zero.
-        pub fn is_zero(&self) -> bool {
-            self.components.iter().all(|&c| c == 0.0)
-        }
-
-        /// The exact sign of the value this expansion represents: the sign
-        /// of the largest-magnitude (last) nonzero component, which for a
-        /// valid Shewchuk expansion is provably the sign of the exact sum.
-        pub fn sign(&self) -> super::CertifiedSign {
-            match self.components.last() {
-                None => super::CertifiedSign::Zero,
-                Some(&last) if last > 0.0 => super::CertifiedSign::Positive,
-                Some(&last) if last < 0.0 => super::CertifiedSign::Negative,
-                Some(_) => super::CertifiedSign::Zero,
-            }
-        }
-
-        /// `two_product(a, b)` folded straight into a fresh expansion.
-        pub fn from_product(a: f64, b: f64) -> Self {
-            let (hi, lo) = two_product(a, b);
-            Expansion::zero().grow(hi).grow(lo)
-        }
-    }
-
-    /// Exact dot product of two 3-vectors, as a nonoverlapping expansion.
-    pub fn exact_dot3(u: [f64; 3], v: [f64; 3]) -> Expansion {
-        let mut acc = Expansion::from_product(u[0], v[0]);
-        acc = acc.merge(&Expansion::from_product(u[1], v[1]));
-        acc = acc.merge(&Expansion::from_product(u[2], v[2]));
-        acc
-    }
-
-    /// Exact 3x3 determinant (rows `m[i]`), as a nonoverlapping expansion:
-    /// `m00(m11 m22 - m12 m21) - m01(m10 m22 - m12 m20) + m02(m10 m21 - m11 m20)`.
-    /// Each product-of-products term is built by scaling an exact
-    /// two-term sub-expansion by the remaining factor (itself an exact
-    /// product), then merged with the correct sign.
-    pub fn exact_det3(m: [[f64; 3]; 3]) -> Expansion {
-        let cofactor = |a: f64, b: f64, c: f64, d: f64| -> Expansion {
-            // a*d - b*c, exact.
-            Expansion::from_product(a, d).merge(&Expansion::from_product(b, c).negate())
-        };
-        let scale = |e: &Expansion, s: f64| -> Expansion {
-            let mut acc = Expansion::zero();
-            for &c in &e.components {
-                acc = acc.merge(&Expansion::from_product(c, s));
-            }
-            acc
-        };
-
-        let c00 = cofactor(m[1][1], m[1][2], m[2][1], m[2][2]);
-        let c01 = cofactor(m[1][0], m[1][2], m[2][0], m[2][2]);
-        let c02 = cofactor(m[1][0], m[1][1], m[2][0], m[2][1]);
-
-        let t0 = scale(&c00, m[0][0]);
-        let t1 = scale(&c01, m[0][1]).negate();
-        let t2 = scale(&c02, m[0][2]);
-
-        t0.merge(&t1).merge(&t2)
-    }
+    t0.merge(&t1).merge(&t2)
 }
 
 /// How many ULPs of chained floating-point error
@@ -296,15 +193,6 @@ pub const CIRCULARITY_UNRESOLVED_MARGIN: f64 = 1.0e6;
 /// for circularity.
 pub const ORIENTATION_CERTIFICATION_FLOOR: f64 = 1e-6;
 
-/// An exact sign, decided by [`exact_arith::Expansion::sign`] — never a
-/// tolerance-rounded approximation.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum CertifiedSign {
-    Negative,
-    Zero,
-    Positive,
-}
-
 /// Whether the authoritative affine transform preserves or reverses the
 /// source circle's parameterized (right-hand) orientation.
 ///
@@ -313,7 +201,7 @@ pub enum CertifiedSign {
 /// `dot(cross(A e_x, A e_y), A^{-T} e_z)` is exactly `sign(det(A))`. Because
 /// `T`'s homogeneous matrix has last row `(0, 0, 0, 1)`, expanding its
 /// determinant along that row gives `det(T) == det(A)` exactly. The *sign*
-/// is certified from an exact `exact_arith::exact_det3` expansion over the
+/// is certified from an exact `exact_det3` expansion over the
 /// same bit-exact column extractions (`basis_cos`, `basis_sin`, and the
 /// third column) used for the circularity Gram predicate; the floating
 /// `Matrix4::determinant()` is still read, but only for its *magnitude*, to
@@ -590,7 +478,7 @@ pub fn decode_transformed_circle(
     // Exact Gram predicate (P0 correction): `basis_cos`/`basis_sin` are
     // bit-exact column extractions (see module docs), so every finite input
     // below is an exact dyadic rational. `g00 - g11` and `g01` are each
-    // computed as a nonoverlapping expansion (`exact_arith`) that sums, with
+    // computed as a nonoverlapping expansion that sums, with
     // zero rounding error, to the true mathematical value — their exact sign
     // decides `g00 == g11` and `g01 == 0` outright. This is strictly
     // decidable (never `Unresolved`) and strictly stronger than any
@@ -598,9 +486,9 @@ pub fn decode_transformed_circle(
     // certified `NonCircularAffineImage`, not waved through as noise.
     let cos_arr = [basis_cos.x, basis_cos.y, basis_cos.z];
     let sin_arr = [basis_sin.x, basis_sin.y, basis_sin.z];
-    let g00 = exact_arith::exact_dot3(cos_arr, cos_arr);
-    let g11 = exact_arith::exact_dot3(sin_arr, sin_arr);
-    let g01 = exact_arith::exact_dot3(cos_arr, sin_arr);
+    let g00 = exact_dot3(cos_arr, cos_arr);
+    let g11 = exact_dot3(sin_arr, sin_arr);
+    let g01 = exact_dot3(cos_arr, sin_arr);
     let length_diff = g00.merge(&g11.negate());
     if !length_diff.is_zero() || !g01.is_zero() {
         return Err(CircularArcAdapterFailure::NonCircularAffineImage);
@@ -635,7 +523,7 @@ pub fn decode_transformed_circle(
     if relative_determinant < ORIENTATION_CERTIFICATION_FLOOR {
         return Err(CircularArcAdapterFailure::TransformOrientationUndecidable);
     }
-    let det_expansion = exact_arith::exact_det3([
+    let det_expansion = exact_det3([
         [basis_cos.x, basis_sin.x, basis_z.x],
         [basis_cos.y, basis_sin.y, basis_z.y],
         [basis_cos.z, basis_sin.z, basis_z.z],
