@@ -148,11 +148,14 @@ fn census(table: &Table, into: &mut Census, ledger: bool) {
         // Must exercise the same path production does, or it measures a
         // build nobody ships (REFINEMENT_AUDIT.md section 6).
         let meshed = shell
-            .robust_triangulation_with_schema_outcome(
+            .robust_triangulation_with_cylinder_outcome(
                 tolerance,
                 look::step_lattice_of,
                 look::step_support_schema_of,
                 look::step_curve_schema_of,
+                look::step_cylinder_of,
+                look::step_cylinder_curve_schema_of,
+                look::step_cylinder_curve_family_of,
             )
             .shell;
         for (i, face) in meshed.faces.iter().enumerate() {
