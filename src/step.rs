@@ -7,6 +7,8 @@
 //! STEP. AP242 also allows a file to ship its mesh directly, which is handled
 //! by [`tessellated`].
 
+pub mod circular_arc;
+pub mod cylinder;
 pub mod lattice;
 pub mod part21;
 mod tessellated;
@@ -194,11 +196,14 @@ pub fn parse_step(
             // line after constructing it. The reasons now arrive beside the
             // shell, so a face that produced nothing can say why rather than
             // being inferred from the shape of its absence.
-            let outcome = shell.robust_triangulation_with_schema_outcome(
+            let outcome = shell.robust_triangulation_with_cylinder_outcome(
                 tolerance,
                 lattice::lattice_of,
                 lattice::support_schema_of,
                 lattice::curve_schema_of,
+                cylinder::identify_source_cylinder_opt,
+                lattice::cylinder_curve_schema_of,
+                lattice::cylinder_curve_family_of,
             );
             let meshed = outcome.shell;
             // A face that could not be meshed is dropped from the polygon
