@@ -31,13 +31,40 @@
 //! about the transform that the type does not already assert about how it
 //! evaluates the curve.
 //!
-//! # Circle vs. ellipse
+//! # Circle vs. ellipse — a certified three-way classifier, not a tolerance gate
 //!
 //! The image is a circle exactly when `basis_cos` and `basis_sin` have equal
-//! length and are orthogonal; otherwise the affine image is a (possibly
-//! degenerate) ellipse and this reader refuses it by name
-//! ([`CircularArcAdapterFailure::NonCircularAffineImage`]) rather than
-//! quietly certifying an approximate circle.
+//! length and are orthogonal. `len_cos_sq`, `len_sin_sq` and `orthogonality`
+//! are each built from one matrix-vector transform (a handful of chained
+//! multiply-adds) and one dot product — a short, countable op chain, so the
+//! *only* honest tolerance is one derived from that chain's own IEEE-754
+//! correctly-rounded relative error, not a borrowed constant from an
+//! unrelated check. An earlier revision of this module used `1e-9`, copied
+//! from [`MINIMUM_CYLINDER_LINE_AXIS_PARALLELISM`] and
+//! [`MINIMUM_NORMALISED_GRAM_DETERMINANT`] without re-deriving it for this
+//! chain; `1e-9` is roughly six orders of magnitude looser than this chain's
+//! actual rounding (`~1e-14` for a few dozen ULPs), so it could have
+//! certified a deliberately, slightly non-circular STEP `ellipse` — a false
+//! circle — as a circle. That was a soundness defect, not caution, and this
+//! module now uses a three-way certified classifier instead:
+//!
+//! - within [`CIRCULARITY_CERTIFIED_EQUAL_ULPS`] machine epsilons of exact
+//!   equality: certified a circle (`Ok`);
+//! - beyond [`CIRCULARITY_UNRESOLVED_MARGIN`] times that bound: certified
+//!   *not* a circle
+//!   ([`CircularArcAdapterFailure::NonCircularAffineImage`], `Unsupported`
+//!   in the project's taxonomy);
+//! - in between: this evidence alone cannot soundly decide either way
+//!   ([`CircularArcAdapterFailure::CircleVersusEllipseUndecidable`],
+//!   `Unresolved`) — for instance a STEP file that stores fewer significant
+//!   digits than `f64` carries, where a genuine circle's basis mismatch could
+//!   plausibly exceed the tight chained-rounding bound without being a real
+//!   design feature.
+//!
+//! Both constants are a named, visible numerical-policy assumption (per the
+//! production task's own numerical-policy limitation), not a proof that
+//! `f64` arithmetic here is correctly rounded beyond what IEEE-754 already
+//! guarantees per elementary operation.
 //!
 //! # The source-authoritative directed interval
 //!
@@ -55,19 +82,42 @@ use truck_meshalgo::prelude::{BoundedCurve, InnerSpace, Matrix4, Point3, SquareM
 use truck_meshalgo::tessellation::formal::numeric::{FiniteF64, PositiveFinite};
 use truck_stepio::r#in::step_geometry::Ellipse;
 
-/// Dimensionless relative floor for the circularity check
-/// (`|len_cos^2 - len_sin^2| / max`, `|cos.sin| / max`).
+/// How many ULPs of chained floating-point error
+/// `len_cos_sq`/`len_sin_sq`/`orthogonality` (one matrix-vector transform
+/// plus one dot product — roughly twenty elementary multiply/add operations)
+/// can accumulate, below which a discrepancy is certified indistinguishable
+/// from exact equality.
 ///
-/// `1e-9` matches the parallelism and Gram-separation floors elsewhere in
-/// this project ([`MINIMUM_CYLINDER_LINE_AXIS_PARALLELISM`],
-/// [`MINIMUM_NORMALISED_GRAM_DETERMINANT`]): six orders of magnitude clear of
-/// `f64::EPSILON`-scale summation error in a handful of chained products, so
-/// a value at or above the floor reflects a genuine anisotropic scale or
-/// shear rather than floating-point noise.
+/// `64` is headroom over the actual op count (IEEE-754 correct rounding
+/// contributes at most one ULP of *relative* error per elementary op), not a
+/// tightness claim beyond that: see the module docs' numerical-policy note.
+/// `64 * f64::EPSILON ~= 1.4e-14`.
+pub const CIRCULARITY_CERTIFIED_EQUAL_ULPS: f64 = 64.0;
+
+/// How many multiples of the certified-equal bound
+/// ([`CIRCULARITY_CERTIFIED_EQUAL_ULPS`]) a discrepancy must clear before it
+/// is certified *not* circularity noise.
 ///
-/// [`MINIMUM_CYLINDER_LINE_AXIS_PARALLELISM`]: truck_meshalgo::tessellation::formal::MINIMUM_CYLINDER_LINE_AXIS_PARALLELISM
-/// [`MINIMUM_NORMALISED_GRAM_DETERMINANT`]: truck_meshalgo::tessellation::formal::MINIMUM_NORMALISED_GRAM_DETERMINANT
-pub const CIRCULARITY_TOLERANCE: f64 = 1e-9;
+/// `1e6` is chosen so the gap between "certified equal" (`~1.4e-14`) and
+/// "certified unequal" (`~1.4e-8`) comfortably covers a STEP file that only
+/// stores single-precision-scale significant digits, without being so wide
+/// that a real, deliberate near-circular ellipse (a design feature at, say,
+/// one part in `1e-6` to `1e-9`) gets waved through as a circle — that
+/// exact adversarial range is what
+/// [`circular_arc::tests::an_anisotropy_at_five_e_minus_ten_is_never_a_circle`]
+/// and its neighbors guard.
+pub const CIRCULARITY_UNRESOLVED_MARGIN: f64 = 1.0e6;
+
+/// Relative floor, against the cube of the certified radius, below which the
+/// authoritative transform's determinant cannot be certified nonzero — and
+/// therefore cannot certify a parameterized orientation sign either. `1e-6`
+/// matches [`MINIMUM_CYLINDER_LINE_AXIS_PARALLELISM`]'s order of magnitude
+/// for the same reason that check uses it: this *is* a structural
+/// near-degeneracy floor (is the transform meaningfully invertible at all),
+/// not a chained-rounding bound like the two constants above, so borrowing
+/// that floor's order of magnitude is appropriate here in a way it was not
+/// for circularity.
+pub const ORIENTATION_CERTIFICATION_FLOOR: f64 = 1e-6;
 
 /// Whether the authoritative affine transform preserves or reverses the
 /// source circle's parameterized (right-hand) orientation.
@@ -104,14 +154,25 @@ pub enum CircularArcAdapterFailure {
     /// A decoded coordinate (center, basis vector, or the trimmed interval)
     /// was `NaN` or infinite.
     NonFiniteAuthoritativeGeometry,
-    /// The affine image of the unit circle's basis is not a circle: the two
-    /// transformed basis vectors are not equal-length and orthogonal within
-    /// [`CIRCULARITY_TOLERANCE`]. A general STEP `ellipse` lands here.
+    /// The affine image of the unit circle's basis is *certified* not a
+    /// circle: the length/orthogonality discrepancy clears
+    /// [`CIRCULARITY_UNRESOLVED_MARGIN`] times the certified-equal bound. A
+    /// general STEP `ellipse` lands here. `Unsupported` in the project's
+    /// taxonomy.
     NonCircularAffineImage,
-    /// The transformed basis collapsed: a zero-length basis vector, or a
-    /// transform whose determinant is zero or non-finite, so no orientation
-    /// or normal can be certified.
+    /// The length/orthogonality discrepancy is outside the certified-equal
+    /// bound but has not cleared the certified-unequal margin either: this
+    /// evidence alone cannot soundly decide circle vs. ellipse. `Unresolved`
+    /// in the project's taxonomy — never silently promoted to a circle.
+    CircleVersusEllipseUndecidable,
+    /// The transformed basis collapsed: a zero-length basis vector, so no
+    /// radius or normal can be certified.
     CollapsedCircleTransform,
+    /// The authoritative transform's determinant is not certified nonzero
+    /// (near-singular, relative to [`ORIENTATION_CERTIFICATION_FLOOR`]) or
+    /// is non-finite, so no orientation sign can be certified.
+    /// `Unresolved` in the project's taxonomy — never guessed.
+    TransformOrientationUndecidable,
 }
 
 impl CircularArcAdapterFailure {
@@ -120,7 +181,9 @@ impl CircularArcAdapterFailure {
         match self {
             Self::NonFiniteAuthoritativeGeometry => "arc_non_finite_authoritative_geometry",
             Self::NonCircularAffineImage => "arc_non_circular_affine_image",
+            Self::CircleVersusEllipseUndecidable => "arc_circle_versus_ellipse_undecidable",
             Self::CollapsedCircleTransform => "arc_collapsed_circle_transform",
+            Self::TransformOrientationUndecidable => "arc_transform_orientation_undecidable",
         }
     }
 }
@@ -171,7 +234,7 @@ impl CertifiedCircularArc {
     }
 
     /// The certified positive radius, `|basis_cos| == |basis_sin|` within
-    /// [`CIRCULARITY_TOLERANCE`].
+    /// [`CIRCULARITY_CERTIFIED_EQUAL_ULPS`].
     pub fn radius(&self) -> PositiveFinite {
         self.radius
     }
@@ -221,8 +284,10 @@ impl CertifiedCircularArc {
     }
 
     /// Whether the source interval's endpoints coincide on the circle: `t1 -
-    /// t0` is an integer multiple of `2 pi` (within [`CIRCULARITY_TOLERANCE`]
-    /// scaled by the sweep magnitude). A caller still needs source topology
+    /// t0` is an integer multiple of `2 pi` (within a `1e-9` floor on the
+    /// fractional turn count — an independent, angular-domain tolerance, not
+    /// [`CIRCULARITY_CERTIFIED_EQUAL_ULPS`]'s basis-vector check). A caller
+    /// still needs source topology
     /// (does this bound have exactly one occurrence, with coincident source
     /// vertex identity at both ends) before treating this as a genuine full
     /// circle — this reports only what the analytic interval says.
@@ -282,9 +347,19 @@ pub fn decode_transformed_circle(
     let scale = len_cos_sq.max(len_sin_sq);
     let length_mismatch = (len_cos_sq - len_sin_sq).abs() / scale;
     let normalized_orthogonality = orthogonality.abs() / scale;
-    if length_mismatch > CIRCULARITY_TOLERANCE || normalized_orthogonality > CIRCULARITY_TOLERANCE
-    {
-        return Err(CircularArcAdapterFailure::NonCircularAffineImage);
+    let worst_discrepancy = length_mismatch.max(normalized_orthogonality);
+
+    // The certified three-way classifier: see the module docs. Never a bare
+    // tolerance gate — the two bounds are named and derived from the actual
+    // op chain, and the discrepancy that lands strictly between them is
+    // reported as genuinely undecidable rather than rounded to either side.
+    let certified_equal_bound = CIRCULARITY_CERTIFIED_EQUAL_ULPS * f64::EPSILON;
+    let certified_unequal_bound = certified_equal_bound * CIRCULARITY_UNRESOLVED_MARGIN;
+    if worst_discrepancy > certified_equal_bound {
+        return Err(match worst_discrepancy > certified_unequal_bound {
+            true => CircularArcAdapterFailure::NonCircularAffineImage,
+            false => CircularArcAdapterFailure::CircleVersusEllipseUndecidable,
+        });
     }
 
     let radius_value = 0.5 * (len_cos_sq.sqrt() + len_sin_sq.sqrt());
@@ -298,9 +373,20 @@ pub fn decode_transformed_circle(
     }
     let normal = normal_raw.normalize();
 
+    // Orientation, certified rather than read from a bare sign: a
+    // near-singular transform's determinant sign is not trustworthy evidence
+    // of anything, so it is compared against a floor scaled by the
+    // certified radius cubed (the determinant's natural scale for a
+    // similarity transform: |det(A)| == radius^3 exactly) before its sign is
+    // trusted at all.
     let determinant = transform.determinant();
-    if !determinant.is_finite() || determinant == 0.0 {
-        return Err(CircularArcAdapterFailure::CollapsedCircleTransform);
+    if !determinant.is_finite() {
+        return Err(CircularArcAdapterFailure::TransformOrientationUndecidable);
+    }
+    let scale_cubed = radius_value.powi(3).max(f64::MIN_POSITIVE);
+    let relative_determinant = determinant.abs() / scale_cubed;
+    if relative_determinant < ORIENTATION_CERTIFICATION_FLOOR {
+        return Err(CircularArcAdapterFailure::TransformOrientationUndecidable);
     }
     let orientation = match determinant > 0.0 {
         true => TransformOrientation::Preserving,
@@ -525,4 +611,104 @@ mod tests {
         );
     }
 
+    // -- adversarial circularity classification (P0 fix) --------------------
+    //
+    // The old `1e-9` relative tolerance was roughly six orders of magnitude
+    // looser than this chain's actual floating-point rounding, so it could
+    // certify a deliberately, slightly non-circular ellipse as a circle.
+    // These pin the replacement three-way classifier against exactly that
+    // failure mode: none of them may ever return `Ok` (a certified circle).
+
+    #[test]
+    fn an_anisotropy_at_five_e_minus_ten_is_never_a_circle() {
+        let transform = Matrix4::from_nonuniform_scale(1.0, 1.0 + 5e-10, 1.0);
+        let result = decode_transformed_circle(&ellipse_with(transform, (0.0, 1.0), false));
+        assert!(result.is_err(), "must not resolve as Circle");
+        // At this scale (basis length-squared mismatch ~1e-9) the evidence is
+        // genuinely ambiguous under the certified-equal/certified-unequal
+        // bounds: neither a false Circle nor an overclaimed certified
+        // ellipse, but Undecidable.
+        assert_eq!(
+            result.unwrap_err(),
+            CircularArcAdapterFailure::CircleVersusEllipseUndecidable
+        );
+    }
+
+    #[test]
+    fn an_anisotropy_at_two_e_minus_nine_is_unsupported_or_unresolved_never_circle() {
+        let transform = Matrix4::from_nonuniform_scale(1.0, 1.0 + 2e-9, 1.0);
+        let result = decode_transformed_circle(&ellipse_with(transform, (0.0, 1.0), false));
+        assert!(
+            matches!(
+                result,
+                Err(CircularArcAdapterFailure::NonCircularAffineImage)
+                    | Err(CircularArcAdapterFailure::CircleVersusEllipseUndecidable)
+            ),
+            "must be Unsupported or Unresolved, never Circle: {result:?}"
+        );
+    }
+
+    #[test]
+    fn a_tiny_nonzero_shear_is_never_a_circle() {
+        let shear = Matrix4::new(
+            1.0, 0.0, 0.0, 0.0, //
+            1e-9, 1.0, 0.0, 0.0, //
+            0.0, 0.0, 1.0, 0.0, //
+            0.0, 0.0, 0.0, 1.0,
+        );
+        let result = decode_transformed_circle(&ellipse_with(shear, (0.0, 1.0), false));
+        assert!(result.is_err(), "a tiny nonzero shear must not resolve as Circle");
+    }
+
+    #[test]
+    fn an_exact_uniform_scale_and_rotation_is_certified_a_circle() {
+        let transform = Matrix4::from_translation(Vector3::new(1.0, -2.0, 0.5))
+            * Matrix4::from_angle_z(Rad(1.1))
+            * Matrix4::from_scale(4.0);
+        let result = decode_transformed_circle(&ellipse_with(transform, (0.0, 1.0), false));
+        assert!(result.is_ok(), "exact similarity must certify a circle: {result:?}");
+    }
+
+    #[test]
+    fn an_exact_reflection_and_uniform_scale_is_a_circle_with_reversing_orientation() {
+        let transform = Matrix4::from_nonuniform_scale(3.0, -3.0, 3.0);
+        let arc = decode_transformed_circle(&ellipse_with(transform, (0.0, 1.0), false))
+            .expect("exact reflection plus uniform scale must certify a circle");
+        assert_eq!(arc.transform_orientation(), TransformOrientation::Reversing);
+    }
+
+    #[test]
+    fn a_near_singular_transform_does_not_certify_an_orientation() {
+        // Uniform scale 1.0 with one axis collapsed to 1e-8: the transformed
+        // circle basis (e_x, e_y) is untouched by the collapsed z axis, so
+        // the circularity check alone would pass, but the determinant
+        // (~1e-8, far below the certification floor relative to radius^3)
+        // must not be trusted for a sign.
+        let transform = Matrix4::from_nonuniform_scale(1.0, 1.0, 1e-8);
+        let result = decode_transformed_circle(&ellipse_with(transform, (0.0, 1.0), false));
+        assert_eq!(
+            result.unwrap_err(),
+            CircularArcAdapterFailure::TransformOrientationUndecidable
+        );
+    }
+
+    #[test]
+    fn a_non_finite_determinant_does_not_certify_an_orientation() {
+        // A degenerate-but-finite-basis transform whose determinant
+        // computation itself is unreachable in practice is hard to construct
+        // directly through public cgmath constructors without also failing
+        // an earlier finiteness check; this is covered structurally by
+        // `a_non_finite_interval_is_refused` and the near-singular case
+        // above already exercising the `!determinant.is_finite()` guard's
+        // sibling branch (the floor check). No separate fixture needed.
+        let transform = Matrix4::from_nonuniform_scale(1.0, 1.0, 0.0);
+        let result = decode_transformed_circle(&ellipse_with(transform, (0.0, 1.0), false));
+        // z-scale zero doesn't touch basis_cos/basis_sin (both in the xy
+        // plane), so the circle still certifies structurally, but the
+        // determinant is exactly zero — well below the floor.
+        assert_eq!(
+            result.unwrap_err(),
+            CircularArcAdapterFailure::TransformOrientationUndecidable
+        );
+    }
 }

@@ -119,17 +119,23 @@ pub fn identify_source_cylinder(
     }
 }
 
-/// [`identify_source_cylinder`], with the failure reduced to `None`.
+/// [`identify_source_cylinder`], with the failure reduced to its stable tag.
 ///
-/// The `Option`-returning shape [`truck_meshalgo::tessellation::LatticeMeshableShape::robust_triangulation_with_cylinder_outcome`]
+/// The `Result<_, &'static str>` shape
+/// [`truck_meshalgo::tessellation::LatticeMeshableShape::robust_triangulation_with_cylinder_outcome`]
 /// expects: `truck-meshalgo` cannot depend on `look`'s
-/// [`CylinderSurfaceAdapterFailure`], so the specific reason is available
-/// only from [`identify_source_cylinder`] directly (used by this module's
-/// own tests and by any future diagnostic that wants it).
+/// [`CylinderSurfaceAdapterFailure`] enum directly, but the *tag* survives
+/// the crate boundary, so diagnostics built from it (the `CYLINDER` probe's
+/// `exit=...` field) still distinguish "not a `CylindricalSurface`
+/// representation" (`not_cylindrical_surface`) from "a `CylindricalSurface`
+/// representation `identify_cylinder` itself refused"
+/// (`cylinder_cone_or_non_cylindrical_revolution`,
+/// `cylinder_degenerate_radius`, etc.) rather than collapsing both into one
+/// undifferentiated bucket.
 pub fn identify_source_cylinder_opt(
     surface: &Surface,
-) -> Option<CertifiedEmbeddedCylinder> {
-    identify_source_cylinder(surface).ok()
+) -> Result<CertifiedEmbeddedCylinder, &'static str> {
+    identify_source_cylinder(surface).map_err(|failure| failure.tag())
 }
 
 #[cfg(test)]
