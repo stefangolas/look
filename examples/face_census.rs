@@ -3,13 +3,40 @@
 use std::collections::HashMap;
 use std::env;
 
+use serde::Serialize;
 use truck_meshalgo::prelude::*;
+use truck_meshalgo::tessellation::diagnosis as face_diag;
 use truck_stepio::r#in::{Table, step_geometry::Surface};
 
 const RELATIVE_TOLERANCE: f64 = 0.001;
 const DEGENERATE_TOLERANCE: f64 = 1.0e-3;
 const MINIMUM_TOLERANCE: f64 = 1.0e-6;
 const EDGE_SAMPLES: u32 = 4;
+
+/// DIAG-001: one JSONL row per failed face, with an optional conversion-reason
+/// tag for faces lost before tessellation.
+#[derive(Serialize)]
+struct FaceDiagRow {
+    #[serde(flatten)]
+    diagnosis: face_diag::FailedFaceDiagnosis,
+    conversion_reason: Option<&'static str>,
+}
+
+fn surface_family_from_kind(kind: &str) -> face_diag::SurfaceFamily {
+    match kind {
+        "plane" => face_diag::SurfaceFamily::Plane,
+        "cylinder" => face_diag::SurfaceFamily::Cylinder,
+        "cone" => face_diag::SurfaceFamily::Cone,
+        "sphere" => face_diag::SurfaceFamily::Sphere,
+        "torus" => face_diag::SurfaceFamily::Torus,
+        "extruded" => face_diag::SurfaceFamily::Extruded,
+        "revolved" => face_diag::SurfaceFamily::Revolved,
+        "bspline" => face_diag::SurfaceFamily::Bspline,
+        "nurbs" => face_diag::SurfaceFamily::Nurbs,
+        "offset" => face_diag::SurfaceFamily::Offset,
+        _ => face_diag::SurfaceFamily::Unknown,
+    }
+}
 
 /// How a face ended up contributing nothing to the render.
 #[derive(Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
@@ -85,13 +112,35 @@ fn load(path: &str) -> anyhow::Result<Table> {
     Ok(Table::from_owned_data_section(section))
 }
 
-fn census(table: &Table, into: &mut Census, ledger: bool) {
+fn census(table: &Table, into: &mut Census, ledger: bool, model_id: &str, diag_rows: &mut Vec<FaceDiagRow>) {
+    let diag_enabled = face_diag::diag_enabled();
     let mut converted = Vec::new();
     for (_, shell) in table.shell.iter() {
         into.declared += shell.cfs_faces.len();
         if let Ok((cshell, losses)) = table.to_compressed_shell_with_losses(shell) {
             for loss in &losses {
                 let example = loss.provenance.best_id().map(|id| id.to_string());
+                if diag_enabled {
+                    diag_rows.push(FaceDiagRow {
+                        diagnosis: face_diag::FailedFaceDiagnosis {
+                            model_id: model_id.into(),
+                            source_face_id: loss.provenance.best_id().map(|id| id.get()),
+                            terminal_reason: TessellationFailureReason::BoundaryConstructionFailed,
+                            surface_family: face_diag::SurfaceFamily::Unknown,
+                            chart_rank: 0,
+                            periodic_axes: face_diag::PeriodicAxes { u: false, v: false },
+                            bound_count: 0,
+                            source_segment_count: 0,
+                            synthetic_segment_count: 0,
+                            lift_status: face_diag::ObservedLiftStatus::NotPeriodic,
+                            deck_status: face_diag::ObservedDeckStatus::Rank0,
+                            projection_status: face_diag::ObservedProjectionStatus::Unavailable,
+                            insertion_conflicts: Vec::new(),
+                            derived_bucket: face_diag::LossBucket::OtherTypedFailure,
+                        },
+                        conversion_reason: Some(loss.reason.tag()),
+                    });
+                }
                 if ledger {
                     let id = loss
                         .provenance
@@ -147,17 +196,16 @@ fn census(table: &Table, into: &mut Census, ledger: bool) {
             .collect();
         // Must exercise the same path production does, or it measures a
         // build nobody ships (REFINEMENT_AUDIT.md section 6).
-        let meshed = shell
-            .robust_triangulation_with_cylinder_outcome(
-                tolerance,
-                look::step_lattice_of,
-                look::step_support_schema_of,
-                look::step_curve_schema_of,
-                look::step_cylinder_of,
-                look::step_cylinder_curve_schema_of,
-                look::step_cylinder_curve_family_of,
-            )
-            .shell;
+        let outcome = shell.robust_triangulation_with_cylinder_outcome(
+            tolerance,
+            look::step_lattice_of,
+            look::step_support_schema_of,
+            look::step_curve_schema_of,
+            look::step_cylinder_of,
+            look::step_cylinder_curve_schema_of,
+            look::step_cylinder_curve_family_of,
+        );
+        let meshed = &outcome.shell;
         for (i, face) in meshed.faces.iter().enumerate() {
             let kind = if i < kinds.len() { kinds[i] } else { "?" };
             let example = face.provenance.best_id().map(|id| id.to_string());
@@ -199,6 +247,46 @@ fn census(table: &Table, into: &mut Census, ledger: bool) {
                      surface_kind={kind}\trendered={rendered}\ttriangles={triangles}\t\
                      stage=tessellate\treason={reason}"
                 );
+            }
+            // DIAG-001: collect structured diagnostic records for failed faces.
+            if diag_enabled && rendered == 0 {
+                if let Some(diag) = outcome.face_diagnoses.get(i).and_then(|d| d.as_ref()) {
+                    let mut d = diag.clone();
+                    d.model_id = model_id.into();
+                    d.surface_family = surface_family_from_kind(kind);
+                    diag_rows.push(FaceDiagRow {
+                        diagnosis: d,
+                        conversion_reason: None,
+                    });
+                } else if let Some(failure) =
+                    outcome.face_failures.get(i).cloned().flatten()
+                {
+                    let orig = &shell.faces[i].surface;
+                    let mut d = face_diag::FailedFaceDiagnosis {
+                        model_id: model_id.into(),
+                        source_face_id: face.provenance.best_id().map(|id| id.get()),
+                        terminal_reason: failure.reason,
+                        surface_family: surface_family_from_kind(kind),
+                        chart_rank: u8::from(orig.u_period().is_some())
+                            + u8::from(orig.v_period().is_some()),
+                        periodic_axes: face_diag::PeriodicAxes {
+                            u: orig.u_period().is_some(),
+                            v: orig.v_period().is_some(),
+                        },
+                        bound_count: face.boundaries.len(),
+                        source_segment_count: 0,
+                        synthetic_segment_count: 0,
+                        lift_status: face_diag::ObservedLiftStatus::Unavailable,
+                        deck_status: face_diag::ObservedDeckStatus::Unavailable,
+                        projection_status: face_diag::ObservedProjectionStatus::Unavailable,
+                        insertion_conflicts: Vec::new(),
+                        derived_bucket: face_diag::LossBucket::InsertionUnknown,
+                    };
+                    diag_rows.push(FaceDiagRow {
+                        diagnosis: d,
+                        conversion_reason: None,
+                    });
+                }
             }
         }
     }
@@ -639,9 +727,51 @@ fn main() -> anyhow::Result<()> {
     }
 
     let mut overall = Census::new();
+    let mut diag_rows: Vec<FaceDiagRow> = Vec::new();
     for path in &models {
         let table = load(path)?;
-        census(&table, &mut overall, ledger);
+        census(&table, &mut overall, ledger, path, &mut diag_rows);
+    }
+
+    // DIAG-001: when TRUCK_FACE_DIAG_JSONL is set, sort and write one JSONL
+    // row per failed face. Deterministic ordering independent of thread
+    // completion order: sort by model_id, source_face_id, terminal_reason.
+    if let Some(out_path) = env::var_os("TRUCK_FACE_DIAG_JSONL") {
+        diag_rows.sort_by(|a, b| {
+            a.diagnosis
+                .model_id
+                .cmp(&b.diagnosis.model_id)
+                .then_with(|| {
+                    a.diagnosis
+                        .source_face_id
+                        .cmp(&b.diagnosis.source_face_id)
+                })
+                .then_with(|| {
+                    format!("{:?}", a.diagnosis.terminal_reason)
+                        .cmp(&format!("{:?}", b.diagnosis.terminal_reason))
+                })
+        });
+        use std::io::Write;
+        let mut file = std::fs::File::create(&out_path)?;
+        for row in &diag_rows {
+            serde_json::to_writer(&mut file, row)?;
+            writeln!(file)?;
+        }
+        // Also write a small meta file for the aggregator's reconciliation.
+        if let Some(meta_path) = out_path.to_str().map(|s| format!("{s}.meta.json")) {
+            let meta = serde_json::json!({
+                "declared": overall.declared,
+                "rendered": overall.rendered,
+                "failed": overall.lost(),
+                "models": models.len(),
+            });
+            std::fs::write(&meta_path, serde_json::to_string_pretty(&meta)?)?;
+        }
+        eprintln!(
+            "DIAG-001: wrote {} diagnostic rows to {}",
+            diag_rows.len(),
+            out_path.to_string_lossy()
+        );
     }
 
     let mut rows: Vec<(Bucket, usize)> = overall.counts.clone().into_iter().collect();

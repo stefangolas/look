@@ -1935,6 +1935,7 @@ dependencies = [
  "rayon",
  "robust",
  "rustc-hash 2.1.3",
+ "serde",
  "spade",
  "truck-base 0.5.0",
  "truck-geometry 0.5.0",
