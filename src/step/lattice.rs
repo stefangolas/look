@@ -209,7 +209,7 @@ pub fn curve_schema_of(curve: &Curve3D) -> CurveSchema {
 // ---------------------------------------------------------------------------
 
 use crate::step::circular_arc::decode_transformed_circle;
-use truck_meshalgo::tessellation::formal::SourceCurveFamily;
+use truck_meshalgo::tessellation::formal::{CompleteCirclePlacement, SourceCurveFamily};
 
 /// The cylinder-only companion to [`curve_schema_of`]'s Step-2 admission
 /// gate.
@@ -268,8 +268,43 @@ pub fn cylinder_curve_family_of(curve: &Curve3D) -> Option<SourceCurveFamily> {
         Curve3D::Line(_) => Some(SourceCurveFamily::Line),
         Curve3D::Conic(Conic3D::Ellipse(ellipse)) => {
             let arc = decode_transformed_circle(ellipse).ok()?;
-            Some(SourceCurveFamily::CircularArc {
-                parameter_interval: arc.source_interval(),
+            let (t0, t1) = arc.source_interval();
+            if t0 != t1 {
+                return Some(SourceCurveFamily::CircularArc {
+                    parameter_interval: (t0, t1),
+                });
+            }
+            // A collapsed interval is not a declared zero sweep. The importer
+            // recovers an `edge_curve`'s trim by solving each of its two
+            // vertex points onto the curve
+            // (`truck_stepio::in::EdgeCurveHolder::sub_parse_curve3d`), and a
+            // full circle's edge uses *one* vertex for both ends — so the two
+            // solves return the identical parameter and the extent the source
+            // did declare, the circle's whole period, is gone. What survives
+            // is the circle's own placement, which is exactly what
+            // `SourceCurveFamily::CompleteCircle` carries. The occurrence's
+            // own source topology still has to close before that period is
+            // accepted as its extent; `identify_source_curve_witness` refuses
+            // it otherwise, so a genuinely zero-length circular edge between
+            // two *distinct* coincident vertices is never read as a full turn.
+            //
+            // `sweep_axis` folds the converted curve's parameter sense in
+            // exactly once, the same fold `source_interval` already carries
+            // for a non-degenerate arc and the one place the degenerate
+            // interval loses it: `Processor::orientation() == false` means
+            // walking the converted domain forward reads the entity's angle
+            // backward, so the axis about which *this* curve's parameter
+            // advances right-handedly is the entity normal negated.
+            let sweep_axis = match ellipse.orientation() {
+                true => arc.normal(),
+                false => -arc.normal(),
+            };
+            Some(SourceCurveFamily::CompleteCircle {
+                placement: CompleteCirclePlacement {
+                    center: arc.center(),
+                    sweep_axis,
+                    radius: arc.radius().get(),
+                },
             })
         }
         _ => None,
