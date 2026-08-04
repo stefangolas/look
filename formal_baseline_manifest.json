@@ -1,5 +1,5 @@
 {
-  "manifest_version": "2.0",
+  "manifest_version": "3.0",
   "created_at": "2026-08-02T10:04:00Z",
   "supersedes": {
     "manifest_version": "1.0",
@@ -204,5 +204,209 @@
     "raw_ledger_line_order": "NONDETERMINISTIC - shell.faces.par_iter() emission order varies between runs",
     "aggregate_examples_column": "NONDETERMINISTIC - the per-bucket example face ids are first-encountered under par_iter and differ between runs",
     "consequence_for_a1": "the A1 comparison must be made on the SORTED ledger and on bucket counts. Diffing raw stdout would report spurious change. This was established before A1 altered anything."
+  },
+
+  "v3_cylinder_band_recovery_baseline":{
+    "manifest_version": "3.0",
+    "created_at": "2026-08-04T21:52:25Z",
+    "role": "first clean-clone-reproducible cylinder-band recovery baseline",
+    "status": "current canonical recovery-enabled baseline",
+    "why": "Freeze the first reproducible production baseline containing the certified two-bound cylindrical-band recovery. The recovery adds no new atlas cell: it normalizes the malformed source pattern in which exactly two complete essential cylinder parallels are both declared FACE_OUTER_BOUND, but only after the face independently certifies as a CylinderEssentialBand. This version also closes the prior dependency-provenance caveat by pushing the complete truck history, pinning every truck crate to the pushed revision, removing local path patches, and reproducing the census from git-resolved dependencies alone.",
+    "relationship_to_v2_blocks": "the sibling top-level blocks of this document (supersedes, revisions, build, semantic_environment, tolerance_policy, corpus_models, corpus_coverage_caveat, determinism) are the retained v2.0 record and are deliberately left byte-unchanged. They remain evidence of the v1.0 false-revision claim and of the .cargo/config.toml path-override failure. Nothing in them is retracted here.",
+    "prior_measurement_standing": "the earlier measurements are not withdrawn and were not false. Their numerical result was valid against the local committed tree they were taken on; what they lacked was clean-clone dependency provenance. This entry records that the same result is now reproduced from the pushed and pinned dependency alone.",
+    "revisions": {
+      "truck_rev": "23d946aa9ad780297e44ca70ccbf5803e6becbe3",
+      "truck_repo": "https://github.com/stefangolas/truck.git",
+      "truck_branch": "fix/correctness-phase-0-1",
+      "truck_pushed_to_remote": true,
+      "truck_remote_head_at_freeze": "23d946aa9ad780297e44ca70ccbf5803e6becbe3",
+      "truck_worktree_dirty": false,
+      "truck_push_range": "693768b6..23d946aa (37 commits, previously unpushed)",
+      "look_rev": "11e3f425b696c0b8e96fdc56e509da97f7154ac0",
+      "look_branch": "fix/correctness-phase-0-1",
+      "look_tracked_worktree_dirty": false,
+      "look_tracked_modified_excluded": [
+        "HANDOFF.md"
+      ],
+      "look_tracked_modified_excluded_rationale": "narrative handoff document, not a build input; explicitly out of scope for this work",
+      "look_untracked_excluded": [
+        "opencode.json"
+      ],
+      "look_untracked_excluded_rationale": "editor configuration, not a build input"
+    },
+    "dependency_resolution": {
+      "all_truck_cargo_toml_revisions": "truck rev 23d946aa9ad780297e44ca70ccbf5803e6becbe3 (single distinct value across every truck crate in [dependencies] and [patch.crates-io])",
+      "cargo_lock": "git+https://github.com/stefangolas/truck?rev=23d946aa#23d946aa9ad780297e44ca70ccbf5803e6becbe3",
+      "cargo_lock_distinct_truck_sources": 1,
+      "local_path_override": "inactive",
+      "local_path_override_detail": ".cargo/config.toml `paths` array re-commented; grep -c '^paths' = 0",
+      "cargo_toml_truck_path_patches": "absent",
+      "cargo_lock_references_to_truck_fork": 0,
+      "cargo_tree_resolution": "truck-meshalgo v0.4.0 (https://github.com/stefangolas/truck?rev=23d946aa#23d946aa)",
+      "verification_method": "each value read from a command at freeze time, not copied from prose"
+    },
+    "build": {
+      "rustc_version": "1.97.1 (8bab26f4f 2026-07-14)",
+      "rustc_commit_hash": "8bab26f4f68e0e26f0bb7960be334d5b520ea452",
+      "llvm_version": "22.1.6",
+      "host_triple": "x86_64-pc-windows-gnullvm",
+      "target_triple": "x86_64-pc-windows-gnullvm",
+      "toolchain_invocation": "cargo +stable-x86_64-pc-windows-gnullvm build --release --target x86_64-pc-windows-gnullvm --example face_census",
+      "profile": "release",
+      "panic_strategy": "abort",
+      "lto": "thin",
+      "codegen_units": 1,
+      "strip": "symbols",
+      "clean_build_note": "all ten truck crates compiled from the git revision in this build; none resolved from a local path",
+      "cargo_lock_sha256": "b4d7e336da1395f9d2239da2fbe479b795fa1dd36f81e53e2ee645e1266b12a0",
+      "binary": {
+        "path": "target/x86_64-pc-windows-gnullvm/release/examples/face_census.exe",
+        "sha256": "fda8f21fd8bfaabce35595e993c539a5bac6780bbfa3c2a88c0b44f04b8a5d63",
+        "bytes": 2323456
+      },
+      "host_disk_free_at_build": "8.5 GB of 475 GB (99% used)",
+      "host_disk_caveat": "counts and identities are unaffected; any timing measured in this state is not trustworthy (see look-build-quirks)"
+    },
+    "model": {
+      "model_id": "00009190",
+      "path": "C:\\Users\\stefa\\look-corpus\\abc\\00009190\\00009190_2d5c0c72cf8a49f59d60fb1b_step_000.step",
+      "sha256": "dde7469a5b1c4fab1be8e2f400b0887ce8108324a811c91b08b12a694ce19bea",
+      "sha256_verified_at_freeze": true,
+      "declared_faces": 24202
+    },
+    "measurements": {
+      "ledger_normalisation": "grep '^FACE' from stderr, then sort",
+      "ledger_capture_caveat": "stderr must be captured without PowerShell redirection. PowerShell 5.1 wraps redirected native stderr at the console buffer width, which splits FACE records across physical lines and changes the ledger hash. These ledgers were captured through a POSIX shell with 2> redirection; each run emitted 24202 single-line FACE records.",
+      "gate_closed_control": {
+        "environment": "TRUCK_FORMAL_RECOVERY_BAND unset",
+        "declared": 24202,
+        "rendered": 19716,
+        "lost": 4486,
+        "lost_pct": 18.54,
+        "triangles": 1358543,
+        "ledger_sha256": "d05a64d18923426732a89787ceb72030cabc61a5d5f97d04058f7bd496e8ed55",
+        "loss_by_bucket": {
+          "tessellate/MeshedToNothing/cylinder": 2469,
+          "tessellate/MeshedToNothing/cone": 741,
+          "tessellate/MeshedToNothing/torus": 580,
+          "tessellate/MeshedToNothing/plane": 209,
+          "tessellate/NoSurfaceProduced/bspline": 124,
+          "tessellate/NoSurfaceProduced/nurbs": 79,
+          "tessellate/MeshedToNothing/bspline": 72,
+          "tessellate/NoSurfaceProduced/sphere": 58,
+          "tessellate/NoSurfaceProduced/cylinder": 48,
+          "tessellate/MeshedToNothing/nurbs": 36,
+          "tessellate/MeshedToNothing/extruded": 22,
+          "tessellate/MeshedToNothing/sphere": 19,
+          "tessellate/NoSurfaceProduced/torus": 15,
+          "tessellate/NoSurfaceProduced/cone": 9,
+          "tessellate/MeshedToNothing/revolved": 2,
+          "convert/EdgeCurveConversionFailed": 2,
+          "convert/AllBoundsCollapsed": 1
+        }
+      },
+      "cylinder_band_recovery_enabled": {
+        "environment": "TRUCK_FORMAL_RECOVERY_BAND=1",
+        "gate_scope": "standalone; deliberately NOT nested under TRUCK_FORMAL_RECOVERY, so the delta against the control is this route's own contribution and no other formal route is opened",
+        "declared": 24202,
+        "rendered": 21684,
+        "lost": 2518,
+        "lost_pct": 10.4,
+        "triangles": 1372017,
+        "ledger_sha256": "ee3581b60ea8cb3cdcb4ae5bda0d3ce1fe52002b38447afcde767c7c439465e4",
+        "loss_by_bucket": {
+          "tessellate/MeshedToNothing/cone": 741,
+          "tessellate/MeshedToNothing/torus": 580,
+          "tessellate/MeshedToNothing/cylinder": 501,
+          "tessellate/MeshedToNothing/plane": 209,
+          "tessellate/NoSurfaceProduced/bspline": 124,
+          "tessellate/NoSurfaceProduced/nurbs": 79,
+          "tessellate/MeshedToNothing/bspline": 72,
+          "tessellate/NoSurfaceProduced/sphere": 58,
+          "tessellate/NoSurfaceProduced/cylinder": 48,
+          "tessellate/MeshedToNothing/nurbs": 36,
+          "tessellate/MeshedToNothing/extruded": 22,
+          "tessellate/MeshedToNothing/sphere": 19,
+          "tessellate/NoSurfaceProduced/torus": 15,
+          "tessellate/NoSurfaceProduced/cone": 9,
+          "tessellate/MeshedToNothing/revolved": 2,
+          "convert/EdgeCurveConversionFailed": 2,
+          "convert/AllBoundsCollapsed": 1
+        }
+      },
+      "delta": {
+        "faces_gained": 1968,
+        "faces_lost": 0,
+        "triangles_gained": 13474,
+        "reconciliation": "1358543 + 13474 = 1372017, and 19716 + 1968 = 21684; the gained triangles are exactly the recovered annuli and no previously rendered face changed"
+      }
+    },
+    "cylinder_band": {
+      "eligible": 2296,
+      "recovered": 1968,
+      "refused": 328,
+      "recovery_tag": "malformed:two_outer_bounds_on_certified_band",
+      "recovered_triangle_count": 13474,
+      "recovered_triangles_min": 6,
+      "recovered_triangles_max": 20,
+      "result_description": "validated recovery from a narrowly classified malformed-source pattern",
+      "not_source_conforming": "this result is NOT source-conforming and must never be described as such. Every recovered mesh carries SourceConformance::RecoveredFromMalformedSource(TwoOuterBoundsOnCertifiedBand).",
+      "remaining_exits": {
+        "unsupported_curve_representation": {
+          "count": 318,
+          "representative_source_face_id": 27122
+        },
+        "lift_join_no_compatible_integer": {
+          "count": 10,
+          "representative_source_face_id": 27446
+        }
+      }
+    },
+    "source_authority_census": {
+      "population": 1968,
+      "method": "raw STEP source read directly: ADVANCED_FACE bound references resolved to their declaring entity type. No geometry, bound order, area, axial height, orientation, vertex count or tessellated coordinate consulted.",
+      "raw_source_has_exactly_one_face_outer_bound": 0,
+      "raw_source_has_no_face_outer_bound": 0,
+      "raw_source_has_multiple_face_outer_bound_declarations": 1968,
+      "imported_authority_declared_and_internally_consistent": 0,
+      "source_entity_kind_unrecoverable": 0,
+      "declared_bounds_per_face": 2,
+      "representative_source_face_id": 27124,
+      "representative_entity": "#27124 = ADVANCED_FACE( '', ( #77859, #77860 ), #77861, .F. ); #77859 and #77860 are both FACE_OUTER_BOUND, #77861 is a CYLINDRICAL_SURFACE",
+      "prior_exit_was_a_misreport": "the population previously reported as Patch(MissingOuterBoundAuthority). bounded_material_region collapsed every non-unique OuterBoundStanding into the missing-authority exit, so a face stating too much read as one stating nothing. Correcting the report is behaviour-neutral and was the precondition for identifying the real population."
+    },
+    "admission_rule": {
+      "multiple_outer_declarations_are_not_source_conforming": true,
+      "source_conformance_diagnosis": "MultipleOuterBoundsDeclared",
+      "recovery_admission": [
+        "exactly two malformed FACE_OUTER_BOUND qualifiers",
+        "complete CertifiedCylinderBand",
+        "distinct ordered carriers",
+        "compatible opposite winding",
+        "intrinsic band material authority",
+        "successful cut-open triangulation, reglue, and annulus validation"
+      ],
+      "normalization": "downgrade only the invalid outer-bound qualifiers; preserve loop identity, edge-use identity, traversal, homology, orientation, carrier identity, and source provenance.",
+      "enforcement_mechanism": "band_material_authority takes a &CertifiedCylinderBand, so the certificate cannot be skipped; cut_open requires the resulting BandMaterialAuthority token. The band reaches the shared material arithmetic through pub(super) bounded_material_region_of, which nothing outside the formal module can call.",
+      "adds_new_atlas_cell": false
+    },
+    "regression_protections": {
+      "missing_or_unretained_authority_still_refuses": true,
+      "three_declared_outer_bounds_still_refuse": true,
+      "incompatible_orientation_refuses_before_authority_normalization": true,
+      "coincident_carriers_refuse": true,
+      "generic_non_band_material_selection_unchanged": true,
+      "complete_circle_refusal_tests_green": true,
+      "seam_crossing_refusal_tests_green": true,
+      "library_tests_passing": 509,
+      "test_invocation": "cargo +stable-x86_64-pc-windows-gnullvm test --release --target x86_64-pc-windows-gnullvm -p truck-meshalgo --lib"
+    },
+    "determinism": {
+      "method": "two identical runs of the same binary, same environment, sorted ledgers byte-compared",
+      "per_face_verdicts": "DETERMINISTIC - sorted ledgers byte-identical across two band-enabled runs, sha256 ee3581b60ea8cb3cdcb4ae5bda0d3ce1fe52002b38447afcde767c7c439465e4 on both",
+      "raw_ledger_line_order": "NONDETERMINISTIC - par_iter emission order varies between runs; compare sorted ledgers only",
+      "aggregate_examples_column": "NONDETERMINISTIC - per-bucket example face ids are first-encountered under par_iter and differ between runs"
+    },
+    "reproducibility_caveat": "Clean-clone dependency reproducibility is confirmed at the census level: all truck crates resolved from the pushed git revision with no active path or patch override, and the resulting counts were byte-for-byte numerically identical to the earlier local-tree measurement. This entry covers ABC model 00009190 only and is not a corpus-wide completeness claim. Do not claim binary bit-reproducibility unless two clean builds produce the same recorded binary hash."
   }
 }
