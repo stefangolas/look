@@ -5,6 +5,7 @@ use std::env;
 
 use serde::Serialize;
 use truck_meshalgo::prelude::*;
+use truck_meshalgo::tessellation::CylinderBandAttempt;
 use truck_meshalgo::tessellation::diagnosis as face_diag;
 use truck_stepio::r#in::{Table, step_geometry::Surface};
 
@@ -66,11 +67,44 @@ fn surface_kind(surface: &Surface) -> &'static str {
     }
 }
 
+/// DIAG-001 for the formal cylinder-band fallback.
+///
+/// One counter per stage of the required reconciliation, plus the `BandExit`
+/// histogram keyed on the exit's own stable tag — the exits are reported as
+/// the algorithm names them, with no census-local taxonomy on top.
+#[derive(Default)]
+struct BandTally {
+    attempted: usize,
+    recovered: usize,
+    exits: HashMap<&'static str, usize>,
+    /// The lowest `source_face_id` seen for each exit tag, so the reported
+    /// representative is the same face on every run.
+    representatives: HashMap<&'static str, u64>,
+}
+
+impl BandTally {
+    fn record(&mut self, attempt: CylinderBandAttempt, source_face_id: Option<u64>) {
+        self.attempted += 1;
+        match attempt {
+            CylinderBandAttempt::Recovered { .. } => self.recovered += 1,
+            CylinderBandAttempt::Refused(exit) => {
+                let tag = exit.tag();
+                *self.exits.entry(tag).or_default() += 1;
+                if let Some(id) = source_face_id {
+                    let slot = self.representatives.entry(tag).or_insert(id);
+                    *slot = (*slot).min(id);
+                }
+            }
+        }
+    }
+}
+
 struct Census {
     declared: usize,
     rendered: usize,
     counts: HashMap<Bucket, usize>,
     examples: HashMap<Bucket, Vec<String>>,
+    band: BandTally,
 }
 
 impl Census {
@@ -80,6 +114,7 @@ impl Census {
             rendered: 0,
             counts: HashMap::new(),
             examples: HashMap::new(),
+            band: BandTally::default(),
         }
     }
 
@@ -236,16 +271,33 @@ fn census(table: &Table, into: &mut Census, ledger: bool, model_id: &str, diag_r
             } else {
                 into.rendered += 1;
             }
+            // DIAG-001: what the cylinder-band fallback did on this face. Read
+            // for every face, recovered or not, because the reconciliation
+            // needs both arms.
+            if let Some(Some(attempt)) = outcome.band_attempts.get(i) {
+                into.band
+                    .record(attempt, face.provenance.best_id().map(|id| id.get()));
+            }
             if ledger {
                 let id = face
                     .provenance
                     .best_id()
                     .map(|id| id.to_string())
                     .unwrap_or_else(|| "-".into());
+                // The band attempt travels on the face's own ledger line, so
+                // "which face was eligible, and what happened to it" is
+                // answerable per face and not only in aggregate.
+                let band = match outcome.band_attempts.get(i) {
+                    Some(Some(CylinderBandAttempt::Recovered { triangles })) => {
+                        format!("recovered:{triangles}")
+                    }
+                    Some(Some(CylinderBandAttempt::Refused(exit))) => exit.tag().to_string(),
+                    _ => "not_eligible".into(),
+                };
                 eprintln!(
                     "FACE\tdeclared_face_index={i}\tsource_face_id={id}\t\
                      surface_kind={kind}\trendered={rendered}\ttriangles={triangles}\t\
-                     stage=tessellate\treason={reason}"
+                     stage=tessellate\treason={reason}\tband={band}"
                 );
             }
             // DIAG-001: collect structured diagnostic records for failed faces.
@@ -815,6 +867,29 @@ fn main() -> anyhow::Result<()> {
                 "  {:11} {:28} {:10} {:5}  {:4.1}%  {}",
                 bucket.stage, bucket.reason, bucket.surface_kind, count, share, ex
             );
+        }
+    }
+
+    // DIAG-001: the cylinder-band fallback's own funnel. Printed only when the
+    // gate was open and something was eligible, so a run without it is byte-for
+    // byte the census it always was.
+    if overall.band.attempted > 0 {
+        let mut exits: Vec<(&&'static str, &usize)> = overall.band.exits.iter().collect();
+        exits.sort_by(|a, b| b.1.cmp(a.1).then_with(|| a.0.cmp(b.0)));
+        println!(
+            "\ncylinder band: {} eligible, {} recovered, {} refused",
+            overall.band.attempted,
+            overall.band.recovered,
+            overall.band.attempted - overall.band.recovered,
+        );
+        for (tag, count) in exits {
+            let representative = overall
+                .band
+                .representatives
+                .get(*tag)
+                .map(u64::to_string)
+                .unwrap_or_else(|| "-".into());
+            println!("  {:40} {:6}  e.g. source_face_id={representative}", tag, count);
         }
     }
 
