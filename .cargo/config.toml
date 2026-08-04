@@ -7,15 +7,19 @@
 # invisible in `Cargo.lock` and a measurement taken through one is not a
 # measurement of anything that has been pushed.
 #
-paths = [
-    "../truck-fork/truck-base",
-    "../truck-fork/truck-derivers",
-    "../truck-fork/truck-geometry",
-    "../truck-fork/truck-geotrait",
-    "../truck-fork/truck-meshalgo",
-    "../truck-fork/truck-modeling",
-    "../truck-fork/truck-polymesh",
-    "../truck-fork/truck-stepio",
-    "../truck-fork/truck-topology",
-]
-
+# The comment above said "disabled" while the block was live, and it stayed
+# that way for 37 unpushed truck commits — every census taken over them
+# measured a tree no clean clone could build. If you uncomment this, re-comment
+# it before reporting a number.
+#
+# paths = [
+#     "../truck-fork/truck-base",
+#     "../truck-fork/truck-derivers",
+#     "../truck-fork/truck-geometry",
+#     "../truck-fork/truck-geotrait",
+#     "../truck-fork/truck-meshalgo",
+#     "../truck-fork/truck-modeling",
+#     "../truck-fork/truck-polymesh",
+#     "../truck-fork/truck-stepio",
+#     "../truck-fork/truck-topology",
+# ]
