@@ -6,6 +6,9 @@ use std::env;
 use serde::Serialize;
 use truck_meshalgo::prelude::*;
 use truck_meshalgo::tessellation::CylinderBandAttempt;
+use truck_meshalgo::tessellation::formal::cylinder_band::{
+    NonconformantRepair, SourceConformance,
+};
 use truck_meshalgo::tessellation::diagnosis as face_diag;
 use truck_stepio::r#in::{Table, step_geometry::Surface};
 
@@ -72,10 +75,26 @@ fn surface_kind(surface: &Surface) -> &'static str {
 /// One counter per stage of the required reconciliation, plus the `BandExit`
 /// histogram keyed on the exit's own stable tag — the exits are reported as
 /// the algorithm names them, with no census-local taxonomy on top.
+/// A stable tag for a recovery's source-conformance verdict.
+///
+/// A mesh recovered from a malformed file is counted as a recovery and
+/// reported as malformed. Collapsing the two would let a nonconformant source
+/// read as a clean one, which is the whole reason the verdict is carried.
+fn conformance_tag(conformance: SourceConformance) -> &'static str {
+    match conformance {
+        SourceConformance::Conforming => "conforming",
+        SourceConformance::RecoveredFromMalformedSource(
+            NonconformantRepair::TwoOuterBoundsOnCertifiedBand,
+        ) => "malformed:two_outer_bounds_on_certified_band",
+    }
+}
+
 #[derive(Default)]
 struct BandTally {
     attempted: usize,
     recovered: usize,
+    /// Recoveries by source-conformance tag.
+    conformance: HashMap<&'static str, usize>,
     exits: HashMap<&'static str, usize>,
     /// The lowest `source_face_id` seen for each exit tag, so the reported
     /// representative is the same face on every run.
@@ -86,7 +105,13 @@ impl BandTally {
     fn record(&mut self, attempt: CylinderBandAttempt, source_face_id: Option<u64>) {
         self.attempted += 1;
         match attempt {
-            CylinderBandAttempt::Recovered { .. } => self.recovered += 1,
+            CylinderBandAttempt::Recovered { conformance, .. } => {
+                self.recovered += 1;
+                *self
+                    .conformance
+                    .entry(conformance_tag(conformance))
+                    .or_default() += 1;
+            }
             CylinderBandAttempt::Refused(exit) => {
                 let tag = exit.tag();
                 *self.exits.entry(tag).or_default() += 1;
@@ -288,8 +313,11 @@ fn census(table: &Table, into: &mut Census, ledger: bool, model_id: &str, diag_r
                 // "which face was eligible, and what happened to it" is
                 // answerable per face and not only in aggregate.
                 let band = match outcome.band_attempts.get(i) {
-                    Some(Some(CylinderBandAttempt::Recovered { triangles })) => {
-                        format!("recovered:{triangles}")
+                    Some(Some(CylinderBandAttempt::Recovered {
+                        triangles,
+                        conformance,
+                    })) => {
+                        format!("recovered:{triangles}:{}", conformance_tag(conformance))
                     }
                     Some(Some(CylinderBandAttempt::Refused(exit))) => exit.tag().to_string(),
                     _ => "not_eligible".into(),
@@ -882,6 +910,14 @@ fn main() -> anyhow::Result<()> {
             overall.band.recovered,
             overall.band.attempted - overall.band.recovered,
         );
+        // Recoveries split by what the source was, before the exits. A
+        // recovery from a malformed file counts, and says so.
+        let mut conformance: Vec<(&&'static str, &usize)> =
+            overall.band.conformance.iter().collect();
+        conformance.sort_by(|a, b| b.1.cmp(a.1).then_with(|| a.0.cmp(b.0)));
+        for (tag, count) in conformance {
+            println!("  {:40} {:6}  recovered", tag, count);
+        }
         for (tag, count) in exits {
             let representative = overall
                 .band
