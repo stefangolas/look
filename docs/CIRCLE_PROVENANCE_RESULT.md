@@ -45,7 +45,7 @@ no ellipse is reclassified however nearly circular it is.
 |---|---|---|---|
 | gate closed | 839,179 | 797,239 | 41,940 |
 | band enabled, before | 839,179 | 802,918 | 36,261 |
-| band enabled, after | 839,179 | **812,362** | **26,797** |
+| band enabled, after | 839,179 | **812,362** | **26,817** |
 
 ```text
 band eligible    16,622   unchanged
