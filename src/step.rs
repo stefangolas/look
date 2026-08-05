@@ -12,6 +12,7 @@ pub mod cone;
 pub mod cylinder;
 pub mod lattice;
 pub mod part21;
+pub mod spline_carrier;
 mod tessellated;
 pub mod torus_deck;
 
