@@ -24,3 +24,4 @@ pub use step::cone::identify_source_cone_opt as step_cone_of;
 pub use step::cylinder::identify_source_cylinder_opt as step_cylinder_of;
 pub use step::lattice::cylinder_curve_family_of as step_cylinder_curve_family_of;
 pub use step::lattice::cylinder_curve_schema_of as step_cylinder_curve_schema_of;
+pub use step::torus_deck::identify_source_torus_deck_opt as step_torus_deck_of;

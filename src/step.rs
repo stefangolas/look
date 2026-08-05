@@ -13,6 +13,7 @@ pub mod cylinder;
 pub mod lattice;
 pub mod part21;
 mod tessellated;
+pub mod torus_deck;
 
 use std::collections::BTreeMap;
 use std::time::Instant;
