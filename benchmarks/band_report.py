@@ -93,10 +93,35 @@ def main() -> int:
     parser.add_argument("--out", default="sweep-out")
     parser.add_argument("--corpus", default="C:/Users/stefa/look-corpus/abc")
     parser.add_argument("--json", default="")
+    parser.add_argument(
+        "--truck-rev",
+        default="",
+        help="which sweep to report when the cache holds more than one",
+    )
     args = parser.parse_args()
 
     out = Path(args.out).resolve()
     index = json.loads((out / "index.json").read_text())
+
+    # The cache is keyed on the truck revision, so after a bump it holds runs
+    # from both. Selecting on insertion order would report whichever landed
+    # first and label the result with the wrong revision -- which is exactly
+    # the class of mistake the cache key exists to prevent. Filter explicitly.
+    revisions = sorted({entry["truck_rev"] for entry in index.values()})
+    wanted = args.truck_rev
+    if not wanted:
+        if len(revisions) > 1:
+            print(
+                f"index holds runs from {len(revisions)} truck revisions "
+                f"({', '.join(revisions)}); pass --truck-rev to choose",
+                file=sys.stderr,
+            )
+            return 2
+        wanted = revisions[0]
+    index = {k: v for k, v in index.items() if v["truck_rev"] == wanted}
+    if not index:
+        print(f"no runs for truck_rev={wanted}", file=sys.stderr)
+        return 2
 
     runs = collections.defaultdict(dict)
     for entry in index.values():
@@ -207,6 +232,9 @@ def main() -> int:
                 unsupported.append(key)
             elif band == "lift_join_no_compatible_integer":
                 joins.append(key)
+        # Per-model exit counts, so a later revision can reconcile against
+        # this run face class by face class and not only in aggregate.
+        model_row["exits"] = dict(exits_by_model[model_id])
         model_row["unsupported_faces"] = len(unsupported)
         model_row["join_faces"] = len(joins)
         unsupported_faces_by_model[model_id] = len(unsupported)

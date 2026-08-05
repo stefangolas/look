@@ -431,8 +431,34 @@ pub fn shadow_classify_circularity(
     Ok(())
 }
 
+/// Which question the circularity check has to answer.
+///
+/// The two are not the same question, and conflating them is what cost the
+/// corpus 9,811 faces. Deciding *whether a representation is a circle at all*
+/// from a rounded transform demands an exact predicate, because a deliberately
+/// slightly non-circular `ellipse` must not pass. Verifying that *a transform
+/// applied to something the source already called a circle still preserves
+/// circles* is a different obligation, and an exact predicate is the wrong
+/// instrument for it: the transform is an ISO 10303-42 derived orthonormal
+/// basis times a uniform scale, a similarity in exact arithmetic that stops
+/// being bit-exact the moment the file's direction cosines are normalized and
+/// crossed in `f64`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum CircularityGate {
+    /// No source family: prove circularity outright, exactly.
+    Exact,
+    /// The source entity is a `circle`. Its family is authoritative; this
+    /// checks only that no non-similarity was composed onto it.
+    SourceDeclaredCircle,
+}
+
 /// Read a STEP `circle`/`ellipse` representation structurally and certify a
 /// transformed circular arc (Algorithms A-D).
+///
+/// Circularity is proved **exactly**, from the representation alone: this is
+/// the entry point for a representation carrying no source family, and a
+/// deliberately near-circular `ellipse` is refused here no matter how near.
+/// For a source-declared `circle` call [`decode_source_circle`] instead.
 ///
 /// Refuses (never fits or approximates):
 ///
@@ -445,6 +471,44 @@ pub fn shadow_classify_circularity(
 ///   determinant ([`CircularArcAdapterFailure::CollapsedCircleTransform`]).
 pub fn decode_transformed_circle(
     ellipse: &Ellipse<Point3, Matrix4>,
+) -> Result<CertifiedCircularArc, CircularArcAdapterFailure> {
+    decode_conic(ellipse, CircularityGate::Exact)
+}
+
+/// Certify a transformed circular arc from a representation the source
+/// declared to be a `circle` (`Conic3D::Circle`).
+///
+/// The family is taken from the source entity type, which is structural
+/// evidence and not something to be rediscovered from a matrix. What is still
+/// checked — and must be, because a `circle` can have a further transform
+/// composed onto it — is that the applied transform *preserves circles*: the
+/// basis stays equal-length and orthogonal to within
+/// [`CIRCULARITY_CERTIFIED_EQUAL_ULPS`] machine epsilons, the rounding a
+/// derived orthonormal basis and a uniform scale can accumulate in `f64`.
+///
+/// This is a defensive consistency check on an authorized representation, not
+/// a looser circle/ellipse classifier. A source `ellipse` never reaches it, so
+/// no ellipse is reclassified by it however nearly circular it is. A
+/// non-uniformly scaled circle misses the bound by many orders of magnitude
+/// and is refused [`CircularArcAdapterFailure::NonCircularAffineImage`]; a
+/// discrepancy in between is refused
+/// [`CircularArcAdapterFailure::CircleVersusEllipseUndecidable`], because a
+/// source that says "circle" over a transform that measurably is not a
+/// similarity is a contradiction, and the safe reading of a contradiction is
+/// to decline it.
+///
+/// Everything else — interval, orientation fold, placement, radius, normal,
+/// complete-circle semantics — is bit-for-bit the same computation
+/// [`decode_transformed_circle`] performs.
+pub fn decode_source_circle(
+    ellipse: &Ellipse<Point3, Matrix4>,
+) -> Result<CertifiedCircularArc, CircularArcAdapterFailure> {
+    decode_conic(ellipse, CircularityGate::SourceDeclaredCircle)
+}
+
+fn decode_conic(
+    ellipse: &Ellipse<Point3, Matrix4>,
+    gate: CircularityGate,
 ) -> Result<CertifiedCircularArc, CircularArcAdapterFailure> {
     let transform = *ellipse.transform();
     let trimmed = ellipse.entity();
@@ -484,14 +548,39 @@ pub fn decode_transformed_circle(
     // decidable (never `Unresolved`) and strictly stronger than any
     // tolerance: even a one-ULP anisotropy is provably nonzero here and is
     // certified `NonCircularAffineImage`, not waved through as noise.
-    let cos_arr = [basis_cos.x, basis_cos.y, basis_cos.z];
-    let sin_arr = [basis_sin.x, basis_sin.y, basis_sin.z];
-    let g00 = exact_dot3(cos_arr, cos_arr);
-    let g11 = exact_dot3(sin_arr, sin_arr);
-    let g01 = exact_dot3(cos_arr, sin_arr);
-    let length_diff = g00.merge(&g11.negate());
-    if !length_diff.is_zero() || !g01.is_zero() {
-        return Err(CircularArcAdapterFailure::NonCircularAffineImage);
+    match gate {
+        CircularityGate::Exact => {
+            let cos_arr = [basis_cos.x, basis_cos.y, basis_cos.z];
+            let sin_arr = [basis_sin.x, basis_sin.y, basis_sin.z];
+            let g00 = exact_dot3(cos_arr, cos_arr);
+            let g11 = exact_dot3(sin_arr, sin_arr);
+            let g01 = exact_dot3(cos_arr, sin_arr);
+            let length_diff = g00.merge(&g11.negate());
+            if !length_diff.is_zero() || !g01.is_zero() {
+                return Err(CircularArcAdapterFailure::NonCircularAffineImage);
+            }
+        }
+        // The source already established the family. This asks only whether
+        // the applied transform still preserves circles, against the rounding
+        // a derived orthonormal basis and a uniform scale can accumulate.
+        // Deliberately the same three-way banding
+        // `shadow_classify_circularity` documents, used here as a check on an
+        // authorized representation rather than as a classifier.
+        CircularityGate::SourceDeclaredCircle => {
+            let orthogonality = basis_cos.dot(basis_sin);
+            let scale = len_cos_sq.max(len_sin_sq);
+            let length_mismatch = (len_cos_sq - len_sin_sq).abs() / scale;
+            let worst_discrepancy = length_mismatch.max(orthogonality.abs() / scale);
+            let certified_equal_bound = CIRCULARITY_CERTIFIED_EQUAL_ULPS * f64::EPSILON;
+            if worst_discrepancy > certified_equal_bound {
+                let certified_unequal_bound =
+                    certified_equal_bound * CIRCULARITY_UNRESOLVED_MARGIN;
+                return Err(match worst_discrepancy > certified_unequal_bound {
+                    true => CircularArcAdapterFailure::NonCircularAffineImage,
+                    false => CircularArcAdapterFailure::CircleVersusEllipseUndecidable,
+                });
+            }
+        }
     }
 
     let radius_value = 0.5 * (len_cos_sq.sqrt() + len_sin_sq.sqrt());
@@ -579,6 +668,164 @@ mod tests {
 
     fn expect_arc(ellipse: &Ellipse<Point3, Matrix4>) -> CertifiedCircularArc {
         decode_transformed_circle(ellipse).expect("a circular affine image certifies")
+    }
+
+    /// The importer's own ISO 10303-42 derivation, in `f64`.
+    ///
+    /// `z` normalized, `x` projected off `z` and normalized, `y = z cross x`,
+    /// then a uniform scale — exactly what
+    /// `truck_stepio::in::Matrix4::from(&Axis2Placement3d)` builds for a
+    /// `circle`. The result is a similarity in exact arithmetic and is
+    /// orthonormal only to rounding once evaluated, which is the whole reason
+    /// the source family has to be carried rather than re-derived.
+    fn derived_placement(axis: Vector3, ref_direction: Vector3, radius: f64) -> Matrix4 {
+        let z = axis.normalize();
+        let x = (ref_direction - ref_direction.dot(z) * z).normalize();
+        let y = z.cross(x);
+        Matrix4::from_cols(
+            (x * radius).extend(0.0),
+            (y * radius).extend(0.0),
+            (z * radius).extend(0.0),
+            Vector3::new(0.0, 0.0, 0.0).extend(1.0),
+        )
+    }
+
+    /// A placement whose derived basis is provably not bit-exactly orthonormal.
+    fn rounding_level_placement(radius: f64) -> Matrix4 {
+        derived_placement(
+            Vector3::new(0.3, 0.5, 0.81),
+            Vector3::new(0.77, -0.13, 0.62),
+            radius,
+        )
+    }
+
+    #[test]
+    fn the_derived_placement_really_is_inexact_or_this_suite_proves_nothing() {
+        // Guards the fixture itself. If a future cgmath or a different
+        // rounding mode made this basis bit-exactly orthonormal, every test
+        // below would still pass while testing nothing at all.
+        let transform = rounding_level_placement(3.7);
+        let basis_cos = transform.transform_vector(Vector3::new(1.0, 0.0, 0.0));
+        let basis_sin = transform.transform_vector(Vector3::new(0.0, 1.0, 0.0));
+        let cos_arr = [basis_cos.x, basis_cos.y, basis_cos.z];
+        let sin_arr = [basis_sin.x, basis_sin.y, basis_sin.z];
+        let g01 = exact_dot3(cos_arr, sin_arr);
+        let length_diff = exact_dot3(cos_arr, cos_arr).merge(&exact_dot3(sin_arr, sin_arr).negate());
+        assert!(
+            !g01.is_zero() || !length_diff.is_zero(),
+            "fixture is bit-exactly circular, so it cannot exercise the gate"
+        );
+        // ...and inexact only at rounding scale, not geometrically.
+        let scale = basis_cos.dot(basis_cos).max(basis_sin.dot(basis_sin));
+        let worst = ((basis_cos.dot(basis_cos) - basis_sin.dot(basis_sin)).abs() / scale)
+            .max(basis_cos.dot(basis_sin).abs() / scale);
+        assert!(worst < CIRCULARITY_CERTIFIED_EQUAL_ULPS * f64::EPSILON);
+    }
+
+    #[test]
+    fn a_source_circle_with_finite_precision_orientation_is_retained_as_a_circle() {
+        let ellipse = ellipse_with(rounding_level_placement(3.7), (0.2, 1.9), false);
+        // The exact predicate refuses it, correctly and by design.
+        assert_eq!(
+            decode_transformed_circle(&ellipse),
+            Err(CircularArcAdapterFailure::NonCircularAffineImage)
+        );
+        // The source family admits it, and every decoded quantity survives.
+        let arc = decode_source_circle(&ellipse).expect("a source circle certifies");
+        assert!((arc.radius().get() - 3.7).abs() < 1e-12);
+        assert_eq!(arc.source_interval(), (0.2, 1.9));
+        assert_eq!(arc.transform_orientation(), TransformOrientation::Preserving);
+    }
+
+    #[test]
+    fn a_nearly_circular_ellipse_is_still_refused_by_the_exact_decoder() {
+        // A genuine `ellipse` whose semi-axes differ by one ULP. The whole
+        // soundness argument for the exact predicate is that this is refused;
+        // it never reaches `decode_source_circle`, because the importer never
+        // routes an `ellipse` to `Conic3D::Circle`.
+        let semi_axis = 1.0_f64;
+        let other = f64::from_bits(semi_axis.to_bits() + 1);
+        let transform = Matrix4::from_nonuniform_scale(semi_axis, other, semi_axis.min(other));
+        assert_eq!(
+            decode_transformed_circle(&ellipse_with(transform, (0.0, TAU), false)),
+            Err(CircularArcAdapterFailure::NonCircularAffineImage)
+        );
+    }
+
+    #[test]
+    fn a_nonuniformly_transformed_source_circle_is_not_admitted() {
+        // A `circle` with a non-similarity composed onto it is no longer a
+        // circle, and the source family is not permission to ignore that.
+        let transform =
+            Matrix4::from_nonuniform_scale(2.0, 1.0, 1.0) * rounding_level_placement(3.7);
+        assert_eq!(
+            decode_source_circle(&ellipse_with(transform, (0.0, TAU), false)),
+            Err(CircularArcAdapterFailure::NonCircularAffineImage)
+        );
+    }
+
+    #[test]
+    fn a_source_circle_whose_transform_is_measurably_not_a_similarity_is_undecided() {
+        // Between the two bounds: too far out to be rounding, too near to be
+        // certified a different shape. A source that says "circle" over a
+        // transform that is measurably not a similarity is a contradiction,
+        // and the safe reading of a contradiction is to decline it.
+        let skew = 1.0 + 1.0e-9;
+        let transform = Matrix4::from_nonuniform_scale(skew, 1.0, 1.0) * Matrix4::from_scale(2.0);
+        assert_eq!(
+            decode_source_circle(&ellipse_with(transform, (0.0, TAU), false)),
+            Err(CircularArcAdapterFailure::CircleVersusEllipseUndecidable)
+        );
+    }
+
+    #[test]
+    fn both_decoders_agree_wherever_the_exact_predicate_certifies() {
+        // The gate changes *which* representations are admitted, never what an
+        // admitted one decodes to. Every field must be bit-identical.
+        for range in [(0.0, TAU), (0.3, 1.7), (-PI, FRAC_PI_2)] {
+            for reversed in [false, true] {
+                let ellipse = ellipse_with(Matrix4::from_scale(2.0), range, reversed);
+                let exact = decode_transformed_circle(&ellipse).expect("exactly circular");
+                let sourced = decode_source_circle(&ellipse).expect("also admitted by family");
+                assert_eq!(exact.center(), sourced.center());
+                assert_eq!(exact.basis_cos(), sourced.basis_cos());
+                assert_eq!(exact.basis_sin(), sourced.basis_sin());
+                assert_eq!(exact.normal(), sourced.normal());
+                assert_eq!(exact.radius().get(), sourced.radius().get());
+                assert_eq!(exact.source_interval(), sourced.source_interval());
+                assert_eq!(exact.transform_orientation(), sourced.transform_orientation());
+            }
+        }
+    }
+
+    #[test]
+    fn the_source_circle_gate_folds_the_processor_orientation_exactly_once() {
+        let range = (0.4, 2.1);
+        let transform = rounding_level_placement(1.5);
+        let forward = decode_source_circle(&ellipse_with(transform, range, false))
+            .expect("a source circle certifies");
+        let reversed = decode_source_circle(&ellipse_with(transform, range, true))
+            .expect("a source circle certifies");
+        // Exactly once: the interval is swapped, and nothing else moves.
+        assert_eq!(forward.source_interval(), (0.4, 2.1));
+        assert_eq!(reversed.source_interval(), (2.1, 0.4));
+        assert_eq!(forward.basis_cos(), reversed.basis_cos());
+        assert_eq!(forward.basis_sin(), reversed.basis_sin());
+        assert_eq!(forward.normal(), reversed.normal());
+        assert_eq!(
+            forward.transform_orientation(),
+            reversed.transform_orientation()
+        );
+    }
+
+    #[test]
+    fn a_reflected_source_circle_still_reports_a_reversing_transform() {
+        // The transform-orientation certificate is independent of the gate.
+        let transform = Matrix4::from_nonuniform_scale(1.0, 1.0, -1.0)
+            * rounding_level_placement(2.0);
+        let arc = decode_source_circle(&ellipse_with(transform, (0.0, 1.0), false))
+            .expect("a reflected circle is still a circle");
+        assert_eq!(arc.transform_orientation(), TransformOrientation::Reversing);
     }
 
     #[test]

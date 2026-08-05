@@ -195,7 +195,11 @@ pub fn curve_schema_of(curve: &Curve3D) -> CurveSchema {
     match curve {
         Curve3D::Line(line) => identify_line_segment(line),
         Curve3D::Polyline(polyline) => identify_polyline(&polyline.0),
-        Curve3D::Conic(Conic3D::Ellipse(_)) => unread("circle_or_ellipse"),
+        // The planar rank-0 path refuses every conic exactly as before; the
+        // source family only makes the refusal say which entity it was.
+        // Admitting a circular arc here is Milestone B, not this change.
+        Curve3D::Conic(Conic3D::Circle(_)) => unread("circle"),
+        Curve3D::Conic(Conic3D::Ellipse(_)) => unread("ellipse"),
         Curve3D::Conic(Conic3D::Hyperbola(_)) => unread("hyperbola"),
         Curve3D::Conic(Conic3D::Parabola(_)) => unread("parabola"),
         Curve3D::BSplineCurve(_) => unread("b_spline_curve"),
@@ -208,7 +212,7 @@ pub fn curve_schema_of(curve: &Curve3D) -> CurveSchema {
 // Rank-1 cylinder curve classification (Task 2)
 // ---------------------------------------------------------------------------
 
-use crate::step::circular_arc::decode_transformed_circle;
+use crate::step::circular_arc::{decode_source_circle, decode_transformed_circle};
 use truck_meshalgo::tessellation::formal::{CompleteCirclePlacement, SourceCurveFamily};
 
 /// The cylinder-only companion to [`curve_schema_of`]'s Step-2 admission
@@ -235,6 +239,17 @@ pub fn cylinder_curve_schema_of(curve: &Curve3D) -> CurveSchema {
     match curve {
         Curve3D::Line(line) => identify_line_segment(line),
         Curve3D::Polyline(polyline) => identify_polyline(&polyline.0),
+        // A source `circle` is read on its own family's authority; a source
+        // `ellipse` still has to prove circularity exactly, and so never
+        // becomes an arc however nearly circular it is.
+        Curve3D::Conic(Conic3D::Circle(circle)) => match decode_source_circle(circle) {
+            Ok(_) => CurveSchema::CircularArc,
+            Err(cause) => CurveSchema::not_structurally_identified(
+                CurveSchemaFailure::NoStructuralReader {
+                    representation: cause.tag(),
+                },
+            ),
+        },
         Curve3D::Conic(Conic3D::Ellipse(ellipse)) => match decode_transformed_circle(ellipse) {
             Ok(_) => CurveSchema::CircularArc,
             Err(cause) => CurveSchema::not_structurally_identified(
@@ -266,8 +281,20 @@ pub fn cylinder_curve_schema_of(curve: &Curve3D) -> CurveSchema {
 pub fn cylinder_curve_family_of(curve: &Curve3D) -> Option<SourceCurveFamily> {
     match curve {
         Curve3D::Line(_) => Some(SourceCurveFamily::Line),
-        Curve3D::Conic(Conic3D::Ellipse(ellipse)) => {
-            let arc = decode_transformed_circle(ellipse).ok()?;
+        // Both conic families reach the same body; they differ only in which
+        // circularity obligation the decoder discharges. Splitting the *arms*
+        // rather than the bodies keeps the interval, sweep-axis fold and
+        // complete-circle rules below in one place, so a source `circle` and a
+        // source `ellipse` that both certify are treated identically from here
+        // on -- which is the point: the family decides admission, never
+        // semantics.
+        Curve3D::Conic(conic @ (Conic3D::Circle(_) | Conic3D::Ellipse(_))) => {
+            let (ellipse, decoded) = match conic {
+                Conic3D::Circle(circle) => (circle, decode_source_circle(circle)),
+                Conic3D::Ellipse(ellipse) => (ellipse, decode_transformed_circle(ellipse)),
+                _ => unreachable!("the arm pattern admits only the two conic families"),
+            };
+            let arc = decoded.ok()?;
             let (t0, t1) = arc.source_interval();
             if t0 != t1 {
                 return Some(SourceCurveFamily::CircularArc {
@@ -317,11 +344,136 @@ mod cylinder_curve_tests {
     use truck_meshalgo::prelude::Point3;
     use truck_stepio::r#in::step_geometry::{Line as StepLine, Processor, TrimmedCurve, UnitCircle};
 
+    /// A conic carrying *no* source family, so it must prove circularity
+    /// exactly. Deliberately still `Conic3D::Ellipse`: these tests are what
+    /// keeps the unauthorized path honest.
     fn circle_curve(range: (f64, f64)) -> Curve3D {
         Curve3D::Conic(Conic3D::Ellipse(Processor::new(TrimmedCurve::new(
             UnitCircle::new(),
             range,
         ))))
+    }
+
+    /// A conic the source declared to be a `circle`, under the importer's own
+    /// derived placement — orthonormal only to rounding, exactly as every real
+    /// `CIRCLE` in the corpus arrives.
+    fn source_circle_curve(range: (f64, f64)) -> Curve3D {
+        use truck_meshalgo::prelude::{InnerSpace, Matrix4, Vector3};
+        let z = Vector3::new(0.3, 0.5, 0.81).normalize();
+        let reference = Vector3::new(0.77, -0.13, 0.62);
+        let x = (reference - reference.dot(z) * z).normalize();
+        let y = z.cross(x);
+        let transform = Matrix4::from_cols(
+            x.extend(0.0),
+            y.extend(0.0),
+            z.extend(0.0),
+            Vector3::new(0.0, 0.0, 0.0).extend(1.0),
+        );
+        Curve3D::Conic(Conic3D::Circle(Processor::with_transform(
+            TrimmedCurve::new(UnitCircle::new(), range),
+            transform,
+        )))
+    }
+
+    #[test]
+    fn a_source_circle_with_finite_precision_orientation_is_admitted() {
+        let curve = source_circle_curve((0.2, 1.4));
+        // The same representation with its family erased is refused, which is
+        // what the corpus was hitting 20,388 times.
+        let erased = match &curve {
+            Curve3D::Conic(Conic3D::Circle(circle)) => {
+                Curve3D::Conic(Conic3D::Ellipse(*circle))
+            }
+            _ => unreachable!(),
+        };
+        assert!(!cylinder_curve_schema_of(&erased).is_structurally_identified());
+        assert!(cylinder_curve_family_of(&erased).is_none());
+
+        assert!(cylinder_curve_schema_of(&curve).is_structurally_identified());
+        let family = cylinder_curve_family_of(&curve).expect("a source circle classifies");
+        assert!(matches!(
+            family,
+            SourceCurveFamily::CircularArc {
+                parameter_interval: (t0, t1)
+            } if (t0 - 0.2).abs() < 1e-12 && (t1 - 1.4).abs() < 1e-12
+        ));
+    }
+
+    #[test]
+    fn a_nearly_circular_source_ellipse_is_still_not_a_circle() {
+        // One ULP of anisotropy, declared as an `ellipse`. No source family
+        // admits it and the exact predicate refuses it, so it stays an
+        // ellipse — the property the whole repair had to preserve.
+        let semi = 1.0_f64;
+        let other = f64::from_bits(semi.to_bits() + 1);
+        let transform =
+            truck_meshalgo::prelude::Matrix4::from_nonuniform_scale(semi, other, semi);
+        let curve = Curve3D::Conic(Conic3D::Ellipse(Processor::with_transform(
+            TrimmedCurve::new(UnitCircle::new(), (0.0, 1.0)),
+            transform,
+        )));
+        assert!(!cylinder_curve_schema_of(&curve).is_structurally_identified());
+        assert!(cylinder_curve_family_of(&curve).is_none());
+    }
+
+    #[test]
+    fn a_nonuniformly_transformed_source_circle_is_refused() {
+        let base = match source_circle_curve((0.0, 1.0)) {
+            Curve3D::Conic(Conic3D::Circle(circle)) => circle,
+            _ => unreachable!(),
+        };
+        let squashed = truck_meshalgo::prelude::Matrix4::from_nonuniform_scale(2.0, 1.0, 1.0)
+            * *base.transform();
+        let curve = Curve3D::Conic(Conic3D::Circle(Processor::with_transform(
+            TrimmedCurve::new(UnitCircle::new(), (0.0, 1.0)),
+            squashed,
+        )));
+        assert!(!cylinder_curve_schema_of(&curve).is_structurally_identified());
+        assert!(cylinder_curve_family_of(&curve).is_none());
+    }
+
+    #[test]
+    fn a_source_circle_with_a_collapsed_interval_is_still_a_complete_circle() {
+        // The complete-circle rule is unchanged by the repair: a collapsed
+        // interval means the importer solved one vertex twice, and what
+        // survives is the circle's placement. The source topology still has to
+        // close before that period is accepted as the extent — that check
+        // lives in `identify_source_curve_witness` and is untouched here.
+        let family = cylinder_curve_family_of(&source_circle_curve((0.7, 0.7)))
+            .expect("a collapsed source circle classifies");
+        let SourceCurveFamily::CompleteCircle { placement } = family else {
+            panic!("expected a complete circle, got {family:?}");
+        };
+        assert!((placement.radius - 1.0).abs() < 1e-12);
+    }
+
+    #[test]
+    fn a_source_circle_folds_the_curve_orientation_exactly_once() {
+        use truck_meshalgo::prelude::Invertible;
+        let mut reversed = match source_circle_curve((0.2, 1.4)) {
+            Curve3D::Conic(Conic3D::Circle(circle)) => circle,
+            _ => unreachable!(),
+        };
+        reversed.invert();
+        let family = cylinder_curve_family_of(&Curve3D::Conic(Conic3D::Circle(reversed)))
+            .expect("a reversed source circle classifies");
+        assert!(matches!(
+            family,
+            SourceCurveFamily::CircularArc {
+                parameter_interval: (t0, t1)
+            } if (t0 - 1.4).abs() < 1e-12 && (t1 - 0.2).abs() < 1e-12
+        ));
+    }
+
+    #[test]
+    fn the_planar_curve_schema_refuses_both_conic_families() {
+        // The planar rank-0 path is untouched by the repair. It refuses a
+        // source `circle` exactly as it refuses an unauthorized one; only the
+        // reported representation name distinguishes them.
+        for curve in [source_circle_curve((0.0, 1.0)), circle_curve((0.0, 1.0))] {
+            assert!(!curve_schema_of(&curve).is_structurally_identified());
+            assert!(cylinder_curve_schema_of(&curve).is_structurally_identified());
+        }
     }
 
     #[test]

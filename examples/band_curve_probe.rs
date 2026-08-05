@@ -71,15 +71,17 @@ fn circularity_discrepancy(ellipse: &truck_stepio::r#in::step_geometry::Ellipse<
 
 /// The imported `Curve3D` variant's own name.
 ///
-/// Deliberately the *imported* name and not the raw STEP entity type: the two
-/// disagree on real files, and that disagreement is the finding. `CIRCLE` and
-/// `ELLIPSE` both import as `Conic(Ellipse)`, so this cannot distinguish them
-/// and does not pretend to — `benchmarks/step_entity_chain.py` reads the raw
-/// entity for that.
+/// Still deliberately the *imported* name and not the raw STEP entity type:
+/// the two can disagree, and that disagreement is what this probe exists to
+/// surface. Since the source-family repair the importer keeps `CIRCLE` and
+/// `ELLIPSE` apart as `Conic(Circle)` / `Conic(Ellipse)`, so the two names now
+/// agree on conics — `benchmarks/step_entity_chain.py` still reads the raw
+/// entity, and the report cross-checks them rather than trusting either.
 fn imported_variant(curve: &Curve3D) -> &'static str {
     match curve {
         Curve3D::Line(_) => "Line",
         Curve3D::Polyline(_) => "Polyline",
+        Curve3D::Conic(Conic3D::Circle(_)) => "Conic(Circle)",
         Curve3D::Conic(Conic3D::Ellipse(_)) => "Conic(Ellipse)",
         Curve3D::Conic(Conic3D::Hyperbola(_)) => "Conic(Hyperbola)",
         Curve3D::Conic(Conic3D::Parabola(_)) => "Conic(Parabola)",
@@ -193,9 +195,9 @@ fn main() -> anyhow::Result<()> {
                     // report; every other refusal is a missing reader, not a
                     // near miss.
                     let (ulps, shadow) = match curve {
-                        Curve3D::Conic(Conic3D::Ellipse(ellipse)) => {
-                            circularity_discrepancy(ellipse)
-                        }
+                        Curve3D::Conic(
+                            Conic3D::Circle(ellipse) | Conic3D::Ellipse(ellipse),
+                        ) => circularity_discrepancy(ellipse),
                         _ => ("-".into(), "-"),
                     };
                     println!(
