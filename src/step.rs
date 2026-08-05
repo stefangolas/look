@@ -197,7 +197,7 @@ pub fn parse_step(
             // line after constructing it. The reasons now arrive beside the
             // shell, so a face that produced nothing can say why rather than
             // being inferred from the shape of its absence.
-            let outcome = shell.robust_triangulation_with_cylinder_outcome(
+            let outcome = shell.robust_triangulation_with_cone_outcome(
                 tolerance,
                 lattice::lattice_of,
                 lattice::support_schema_of,
@@ -205,6 +205,7 @@ pub fn parse_step(
                 cylinder::identify_source_cylinder_opt,
                 lattice::cylinder_curve_schema_of,
                 lattice::cylinder_curve_family_of,
+                cone::identify_source_cone_opt,
             );
             let meshed = outcome.shell;
             // A face that could not be meshed is dropped from the polygon

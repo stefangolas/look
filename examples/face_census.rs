@@ -5,11 +5,9 @@ use std::env;
 
 use serde::Serialize;
 use truck_meshalgo::prelude::*;
-use truck_meshalgo::tessellation::CylinderBandAttempt;
-use truck_meshalgo::tessellation::formal::cylinder_band::{
-    NonconformantRepair, SourceConformance,
-};
 use truck_meshalgo::tessellation::diagnosis as face_diag;
+use truck_meshalgo::tessellation::formal::cylinder_band::{NonconformantRepair, SourceConformance};
+use truck_meshalgo::tessellation::{ConeBandAttempt, CylinderBandAttempt};
 use truck_stepio::r#in::{Table, step_geometry::Surface};
 
 const RELATIVE_TOLERANCE: f64 = 0.001;
@@ -124,12 +122,54 @@ impl BandTally {
     }
 }
 
+/// The conical essential-band route's own reconciliation, kept separate from
+/// [`BandTally`] on purpose: the two cells have different exit vocabularies and
+/// different provenance, and one merged histogram could not say which cell a
+/// shared stage name came from.
+#[derive(Default)]
+struct ConeBandTally {
+    attempted: usize,
+    recovered: usize,
+    /// Recoveries by the nappe they were certified on.
+    nappe: HashMap<&'static str, usize>,
+    /// Recoveries by the source outer-bound standing they retained.
+    standing: HashMap<&'static str, usize>,
+    exits: HashMap<&'static str, usize>,
+    /// The lowest `source_face_id` seen for each exit tag, so the reported
+    /// representative is the same face on every run.
+    representatives: HashMap<&'static str, u64>,
+}
+
+impl ConeBandTally {
+    fn record(&mut self, attempt: ConeBandAttempt, source_face_id: Option<u64>) {
+        self.attempted += 1;
+        match attempt {
+            ConeBandAttempt::Recovered {
+                nappe, standing, ..
+            } => {
+                self.recovered += 1;
+                *self.nappe.entry(nappe.tag()).or_default() += 1;
+                *self.standing.entry(standing.tag()).or_default() += 1;
+            }
+            ConeBandAttempt::Refused(exit) => {
+                let tag = exit.tag();
+                *self.exits.entry(tag).or_default() += 1;
+                if let Some(id) = source_face_id {
+                    let slot = self.representatives.entry(tag).or_insert(id);
+                    *slot = (*slot).min(id);
+                }
+            }
+        }
+    }
+}
+
 struct Census {
     declared: usize,
     rendered: usize,
     counts: HashMap<Bucket, usize>,
     examples: HashMap<Bucket, Vec<String>>,
     band: BandTally,
+    cone_band: ConeBandTally,
 }
 
 impl Census {
@@ -140,6 +180,7 @@ impl Census {
             counts: HashMap::new(),
             examples: HashMap::new(),
             band: BandTally::default(),
+            cone_band: ConeBandTally::default(),
         }
     }
 
@@ -172,7 +213,13 @@ fn load(path: &str) -> anyhow::Result<Table> {
     Ok(Table::from_owned_data_section(section))
 }
 
-fn census(table: &Table, into: &mut Census, ledger: bool, model_id: &str, diag_rows: &mut Vec<FaceDiagRow>) {
+fn census(
+    table: &Table,
+    into: &mut Census,
+    ledger: bool,
+    model_id: &str,
+    diag_rows: &mut Vec<FaceDiagRow>,
+) {
     let diag_enabled = face_diag::diag_enabled();
     let mut converted = Vec::new();
     for (_, shell) in table.shell.iter() {
@@ -256,7 +303,7 @@ fn census(table: &Table, into: &mut Census, ledger: bool, model_id: &str, diag_r
             .collect();
         // Must exercise the same path production does, or it measures a
         // build nobody ships (REFINEMENT_AUDIT.md section 6).
-        let outcome = shell.robust_triangulation_with_cylinder_outcome(
+        let outcome = shell.robust_triangulation_with_cone_outcome(
             tolerance,
             look::step_lattice_of,
             look::step_support_schema_of,
@@ -264,6 +311,7 @@ fn census(table: &Table, into: &mut Census, ledger: bool, model_id: &str, diag_r
             look::step_cylinder_of,
             look::step_cylinder_curve_schema_of,
             look::step_cylinder_curve_family_of,
+            look::step_cone_of,
         );
         let meshed = &outcome.shell;
         for (i, face) in meshed.faces.iter().enumerate() {
@@ -303,6 +351,10 @@ fn census(table: &Table, into: &mut Census, ledger: bool, model_id: &str, diag_r
                 into.band
                     .record(attempt, face.provenance.best_id().map(|id| id.get()));
             }
+            if let Some(Some(attempt)) = outcome.cone_band_attempts.get(i) {
+                into.cone_band
+                    .record(attempt, face.provenance.best_id().map(|id| id.get()));
+            }
             if ledger {
                 let id = face
                     .provenance
@@ -322,10 +374,23 @@ fn census(table: &Table, into: &mut Census, ledger: bool, model_id: &str, diag_r
                     Some(Some(CylinderBandAttempt::Refused(exit))) => exit.tag().to_string(),
                     _ => "not_eligible".into(),
                 };
+                // The conical band travels in its own column, for the same
+                // reason it has its own tally: a reconciliation must be able to
+                // say which cell attempted a face, and a merged column could
+                // not.
+                let cone_band = match outcome.cone_band_attempts.get(i) {
+                    Some(Some(ConeBandAttempt::Recovered {
+                        triangles,
+                        nappe,
+                        standing,
+                    })) => format!("recovered:{triangles}:{}:{}", nappe.tag(), standing.tag()),
+                    Some(Some(ConeBandAttempt::Refused(exit))) => exit.tag().to_string(),
+                    _ => "not_eligible".into(),
+                };
                 eprintln!(
                     "FACE\tdeclared_face_index={i}\tsource_face_id={id}\t\
                      surface_kind={kind}\trendered={rendered}\ttriangles={triangles}\t\
-                     stage=tessellate\treason={reason}\tband={band}"
+                     stage=tessellate\treason={reason}\tband={band}\tcone_band={cone_band}"
                 );
             }
             // DIAG-001: collect structured diagnostic records for failed faces.
@@ -338,9 +403,7 @@ fn census(table: &Table, into: &mut Census, ledger: bool, model_id: &str, diag_r
                         diagnosis: d,
                         conversion_reason: None,
                     });
-                } else if let Some(failure) =
-                    outcome.face_failures.get(i).cloned().flatten()
-                {
+                } else if let Some(failure) = outcome.face_failures.get(i).cloned().flatten() {
                     let orig = &shell.faces[i].surface;
                     let mut d = face_diag::FailedFaceDiagnosis {
                         model_id: model_id.into(),
@@ -627,8 +690,11 @@ fn holes_report(path: &str) -> anyhow::Result<()> {
 
     println!("  bound shape");
     let mut shapes: Vec<(String, (usize, Vec<String>))> = by_shape.into_iter().collect();
-    shapes.sort_by(|a, b| b.1 .0.cmp(&a.1 .0).then_with(|| a.0.cmp(&b.0)));
-    println!("  {:28} {:>7}  {:>6}  {}", "shape", "faces", "share", "examples");
+    shapes.sort_by(|a, b| b.1.0.cmp(&a.1.0).then_with(|| a.0.cmp(&b.0)));
+    println!(
+        "  {:28} {:>7}  {:>6}  {}",
+        "shape", "faces", "share", "examples"
+    );
     for (shape, (count, examples)) in &shapes {
         let share = *count as f64 / faces as f64 * 100.0;
         println!(
@@ -649,7 +715,7 @@ fn holes_report(path: &str) -> anyhow::Result<()> {
 
     println!("  obstruction funnel");
     let mut rows: Vec<((String, String), (usize, Vec<String>))> = by_exit.into_iter().collect();
-    rows.sort_by(|a, b| b.1 .0.cmp(&a.1 .0).then_with(|| a.0.cmp(&b.0)));
+    rows.sort_by(|a, b| b.1.0.cmp(&a.1.0).then_with(|| a.0.cmp(&b.0)));
     println!(
         "  {:40} {:18} {:>7}  {:>6}  {}",
         "exit", "category", "faces", "share", "examples"
@@ -821,11 +887,7 @@ fn main() -> anyhow::Result<()> {
             a.diagnosis
                 .model_id
                 .cmp(&b.diagnosis.model_id)
-                .then_with(|| {
-                    a.diagnosis
-                        .source_face_id
-                        .cmp(&b.diagnosis.source_face_id)
-                })
+                .then_with(|| a.diagnosis.source_face_id.cmp(&b.diagnosis.source_face_id))
                 .then_with(|| {
                     format!("{:?}", a.diagnosis.terminal_reason)
                         .cmp(&format!("{:?}", b.diagnosis.terminal_reason))
@@ -925,7 +987,48 @@ fn main() -> anyhow::Result<()> {
                 .get(*tag)
                 .map(u64::to_string)
                 .unwrap_or_else(|| "-".into());
-            println!("  {:40} {:6}  e.g. source_face_id={representative}", tag, count);
+            println!(
+                "  {:40} {:6}  e.g. source_face_id={representative}",
+                tag, count
+            );
+        }
+    }
+
+    // The conical essential band's own funnel, on the identical shape and
+    // under the identical gate. Separate from the cylinder's above because the
+    // reconciliation is per cell: every eligible face must land in exactly one
+    // of recovered / refused-at-this-cell, and merging the two funnels would
+    // make that sum unreadable.
+    if overall.cone_band.attempted > 0 {
+        let mut exits: Vec<(&&'static str, &usize)> = overall.cone_band.exits.iter().collect();
+        exits.sort_by(|a, b| b.1.cmp(a.1).then_with(|| a.0.cmp(b.0)));
+        println!(
+            "
+conical band: {} eligible, {} recovered, {} refused",
+            overall.cone_band.attempted,
+            overall.cone_band.recovered,
+            overall.cone_band.attempted - overall.cone_band.recovered,
+        );
+        // Recoveries split by the nappe they were certified on and by what the
+        // source declared. Neither decided the material region; both are
+        // reported so a reader can see the population's shape.
+        let mut rows: Vec<(&&'static str, &usize)> = overall.cone_band.nappe.iter().collect();
+        rows.extend(overall.cone_band.standing.iter());
+        rows.sort_by(|a, b| b.1.cmp(a.1).then_with(|| a.0.cmp(b.0)));
+        for (tag, count) in rows {
+            println!("  {:40} {:6}  recovered", tag, count);
+        }
+        for (tag, count) in exits {
+            let representative = overall
+                .cone_band
+                .representatives
+                .get(*tag)
+                .map(u64::to_string)
+                .unwrap_or_else(|| "-".into());
+            println!(
+                "  {:40} {:6}  e.g. source_face_id={representative}",
+                tag, count
+            );
         }
     }
 
