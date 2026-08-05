@@ -20,6 +20,7 @@ pub use step::lattice::support_schema_of as step_support_schema_of;
 
 /// The rank-1 cylinder evidence readers, re-exported so the census exercises
 /// exactly the path production does (see the plain re-exports above).
+pub use step::cone::identify_source_cone_opt as step_cone_of;
 pub use step::cylinder::identify_source_cylinder_opt as step_cylinder_of;
 pub use step::lattice::cylinder_curve_family_of as step_cylinder_curve_family_of;
 pub use step::lattice::cylinder_curve_schema_of as step_cylinder_curve_schema_of;

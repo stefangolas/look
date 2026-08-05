@@ -8,6 +8,7 @@
 //! by [`tessellated`].
 
 pub mod circular_arc;
+pub mod cone;
 pub mod cylinder;
 pub mod lattice;
 pub mod part21;
