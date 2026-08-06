@@ -302,6 +302,13 @@ fn census(
                             lift_status: face_diag::ObservedLiftStatus::NotPeriodic,
                             deck_status: face_diag::ObservedDeckStatus::Rank0,
                             projection_status: face_diag::ObservedProjectionStatus::Unavailable,
+                            // The face never reached boundary construction, so
+                            // no piece was ever classified and there is no deck
+                            // evidence to report. Empty, not defaulted.
+                            seam_segment_count: 0,
+                            boundary_pieces: Vec::new(),
+                            two_loop_join: None,
+                            seam_mechanism: face_diag::SeamMechanism::NoSeamEvidence,
                             insertion_conflicts: Vec::new(),
                             derived_bucket: face_diag::LossBucket::OtherTypedFailure,
                         },
@@ -504,6 +511,10 @@ fn census(
                         lift_status: face_diag::ObservedLiftStatus::Unavailable,
                         deck_status: face_diag::ObservedDeckStatus::Unavailable,
                         projection_status: face_diag::ObservedProjectionStatus::Unavailable,
+                        seam_segment_count: 0,
+                        boundary_pieces: Vec::new(),
+                        two_loop_join: None,
+                        seam_mechanism: face_diag::SeamMechanism::NoSeamEvidence,
                         insertion_conflicts: Vec::new(),
                         derived_bucket: face_diag::LossBucket::InsertionUnknown,
                     };

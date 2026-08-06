@@ -1,5 +1,23 @@
 # Handoff — residual loss after WAVE-2C
 
+> **Superseded in part by WAVE-3A** (`docs/WAVE_3A_DECK_JOIN_AND_SEED.md`,
+> truck `562299a5`). Packages 1 and 2 below are built and measured:
+> **+3,790 faces**, 819,769 → 823,559, loss 2.31% → 1.86%, zero
+> `rendered -> lost`. Three corrections to what is written below:
+>
+> - Package 1's population is **3,087**, not 4,850. The `+1,779 source×seam`
+>   faces do not come from the two-loop join at all — 1,507 are
+>   `SeamWithoutTwoLoopJoin` and 269 carry no seam evidence. The DIAG-001
+>   extension §1 demands was built first and said so.
+> - Package 2 yields **+705**, not the 4,522 the family/reason cell suggests:
+>   a face needs *every* one of its failing boundary points fixed, so partial
+>   success recovers nothing.
+> - Package 3's prerequisite `GEN-001` A7 is **closed** (GEN-001E). It is not
+>   blocked — but it is a build, not a splice; see §3 of the WAVE-3A note.
+>
+> Package 2's instruction to re-measure the cylinder/torus `BoundaryProjectionFailed`
+> rows *after* package 1 is now due and has not been done.
+
 **State.** look `8eda7d3` on `integration/formal-atlas-wave-2`, pinned to truck
 `6f8153ea` on `feature/torus-rank2-cell`. Both pushed. No path override.
 
