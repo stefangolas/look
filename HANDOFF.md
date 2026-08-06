@@ -1,9 +1,14 @@
 # Handoff — recovering the most faces from here
 
-**State.** look `165e865` on `integration/formal-atlas-wave-2`, pinned to truck
-`562299a5` on `feature/deck-join-and-seeds`. Both pushed. Path override
+**State.** look `2e40130` on `integration/formal-atlas-wave-2`, pinned to truck
+`d9661022` on `feature/deck-join-and-seeds`. Both pushed. Path override
 disabled and the pinned build verified to reproduce the override build's census
 exactly.
+
+**WAVE-3B changed no geometry and recovered no faces.** It built the seam that
+develops a planar boundary arc analytically, and used it to falsify package 6's
+premise below. Read `docs/WAVE_3B_PLANAR_ARC_DEVELOPMENT.md` before planning any
+planar work: **Step 8A-arc, not the arrangement, is what recovers this cell.**
 
 **823,559 of 839,179 faces render (98.14%). 15,620 are lost.** WAVE-3A added
 +3,790 (`docs/WAVE_3A_DECK_JOIN_AND_SEED.md`); `docs/WAVE_2C_GATE_GRADUATION.md`
@@ -15,6 +20,57 @@ a third. The other 17 range from 0.17% to 11.79% loss.
 
 This document is about the 15,620, ordered by **how many faces you get for how
 much work**. Every number is freshly measured at the current pin, default-on.
+
+---
+
+## Start here — the fast path to a lot of faces
+
+Three packages sit in front of **~4,700 faces, 30% of the residual**, and none
+of them needs new theory. Do them in this order; each is independent, so a
+failure does not block the next.
+
+| # | package | faces | why it is fast |
+|---|---|---:|---|
+| A | cylinder parity (§2) | 1,422 | **one line.** Hypothesis stated, site named. |
+| B | analytic projection (§1) | 2,127 | Mechanism read off the source; first test defined, needs no new machinery. |
+| C | Step 8A-arc (§6) | ~1,163 | The analytic occurrences now exist. One new piece — a certified arc polygonalization — feeds both planar slices. **Build it in `planar_holes` too, or it is worth 64.** |
+
+**A and B before C.** A is an afternoon at most and settles a question deferred
+three waves running. B is the largest single mechanism in the residual and its
+first test is a measurement, not a build — if the residuals come back small the
+fix is a few lines in `Processor::search_nearest_parameter`. C is a real build,
+but it is the one WAVE-3B unblocked and its machinery is in place.
+
+### Your first twenty minutes
+
+```bash
+# Build (LLVM-MinGW only; there is no MSVC toolchain on this machine).
+cd ~/look && cargo +stable-x86_64-pc-windows-gnullvm build --release \
+      --target x86_64-pc-windows-gnullvm --example face_census
+
+# One model, with whichever probes the package needs.
+cd ~/look-corpus
+STEP=$(ls abc/00009190/*.step | head -1)
+TRUCK_PROBE_SLICE=1 TRUCK_PROBE_DEVELOPED=1 \
+  target/.../face_census.exe "$STEP" > census.txt 2> probe.txt
+```
+
+The binary at `~/look/target/x86_64-pc-windows-gnullvm/release/examples/face_census.exe`
+is built at this pin and works — the other target trees were deleted to reclaim
+disk, so `cargo test`/`cargo check` will rebuild cold once (~1–6 min).
+
+Tables and joins: `p1-out/slice_tab.py` (the `SliceExit` funnel against the lost
+faces), `p1-out/dev_tab.py` (the developed-arc verdict), `p1-out/reconcile.py`
+(the per-`source_face_id` regression gate — **use this before claiming a
+delta**).
+
+### What "recovering a face" requires
+
+A face renders only when *every* stage clears, so a package that clears one
+stage recovers nothing on a face blocked at another. This bit WAVE-3B: the
+planar funnel showed two sequential gates and the second was invisible until the
+first moved. Before scoping any planar package, cross the funnel against the
+stage you are fixing rather than assuming the population is the cell count.
 
 ---
 
@@ -41,8 +97,15 @@ route that does not help.
 collides. `p1-out/reconcile.py` does it correctly; reuse it.
 
 **Build first, then hypothesise.** Both WAVE-3A packages had a target from this
-file that measurement corrected — one by 36%, one by 84%. The DIAG-001 records
-are cheap to extend and have paid for themselves twice.
+file that measurement corrected — one by 36%, one by 84%. WAVE-3B then found
+package 6's target was wrong in kind, not degree: its named population could not
+be reached and its named mechanism does not exist. The DIAG-001 records are
+cheap to extend and have now paid for themselves three times.
+
+**A refusal reached at stage N says nothing about stage N+1.** Every planar
+funnel reading in the edition before this one was taken at the *first* gate a
+face hit, and two sequential gates hid everything behind them. When a cell's
+exits all sit at one stage, that is a sign the stage is a lens, not the cause.
 
 ---
 
@@ -78,6 +141,11 @@ Offset            8     27                                         35
 
 **The residual is concentrated.** Five reason/family cells hold 58% of it; ten
 hold 81%. There is no long tail worth chasing until those are gone.
+
+**The `Plane` row of that table is now explained and should not be read as
+2,947 crossings.** WAVE-3B showed the crossings are chord-approximation
+artefacts (§6): the boundary curves themselves do not intersect. The cell is
+real loss, but its mechanism is the arc approximation, not an arrangement.
 
 `ConstraintInsertionIncomplete` has changed character completely. The seam×seam
 class that dominated it before WAVE-3A is **2 faces**. What is left:
@@ -195,29 +263,108 @@ segment at all. The DIAG-001 witnesses already name both segments and their
 origins; a morning with them would probably produce a mechanism. Cheap to
 investigate, and 11% of the residual.
 
-### 6. Rank-0 plane crossings — 2,947 faces, but this one is a build
+### 6. Rank-0 plane crossings — **measured, and the premise was wrong**
 
-The single largest cell, 19% of the residual: physical boundary arcs properly
-crossing each other in a simply connected parameter domain. 2,250 inter-bound
-plus 697 same-bound, plus ~590 more on splines.
+This package said the 2,947 plane `ConstraintInsertionIncomplete` faces were
+"physical boundary arcs properly crossing each other", and that the work was an
+arrangement build: Step 7′ face extraction plus §X parity selection.
 
-Do not schedule this as a fix. Everything downstream of the planar slice's Step
-7 assumes a **simple** Jordan boundary — Step 8A's polygonal region, ear
-clipping "inserts no Steiner points and emits only interior triangles", Step
-8B's battery asserting "the mesh boundary equals the expected polygon cycle". A
-normalized arrangement is not a simple polygon. Splitting arcs at their
-certified intersections yields a planar *arrangement* whose faces must be
-extracted and whose material region must be selected by parity: a new Step 7′
-and a new material selection.
+WAVE-3B measured it (`docs/WAVE_3B_PLANAR_ARC_DEVELOPMENT.md`). Two corrections,
+both load-bearing:
 
-What exists to build it on: `formal/bezier_isect::intersect_bezier_pair`
-(certified roots, germs, transverse orientation, canonical pair-local
-identities), `formal/exact`, and the `SliceExit` variants that already isolate
-the population (`NonadjacentCrossing`, `BoundaryComponentsCross`).
-`ParameterEnclosure2` on the DIAG-001 witnesses is `None` everywhere and is the
-natural first observable.
+**The `SliceExit` variants did not isolate the population — nothing reached
+them.** All 3,251 planar lost faces exit at Step 2 or Step 3; none reach Step 7.
+The arrangement had an empty input.
 
-Take it on when packages 1–5 are done, and give it a session of its own.
+**The crossings are not real.** With arcs developed analytically and their
+intersections certified, 1,163 of the 1,164 faces that resolve carry **zero**
+crossings. On a plane the chart map is affine and preserves crossing exactly, so
+the legacy CDT's crossing was introduced by approximating arcs as chords before
+asking. **ARR-003 is owed to one face in the corpus.**
+
+#### What to build instead: Step 8A-arc
+
+A certified polygonal approximation of an arc within the caller's tolerance,
+feeding the existing ear clipping and the **unchanged** Step 8B battery.
+`certified_polygonal_region`'s `approximation_is_exact` guard was written for
+exactly this arrival: *"The first arc family that arrives will fail that guard
+and be forced through its own check rather than inheriting this one."*
+
+The math is elementary and needs no new certification machinery. For an arc of
+radius `r` split into `n` equal sub-arcs over sweep `|t1 − t0|`, the chord's
+maximum deviation is the sagitta
+
+```
+e(n) = r * (1 − cos(|t1 − t0| / (2n)))
+```
+
+so the smallest admissible `n` is a closed form in the caller's `tol`. The
+approximation error is then *bounded*, not zero, which is precisely the case the
+guard exists to distinguish — carry the bound into
+`Rank0DevelopedBoundary::approximation_is_exact`'s successor rather than
+asserting exactness.
+
+**The order that keeps it refinement-only.** Build against
+`formal::planar_developed`'s occurrences, gate it
+`TRUCK_FORMAL_RECOVERY_ARC` (default-on, nested under the master gate, per the
+regression discipline below), and enter it only where the legacy path already
+produced no mesh. Then it can replace nothing but a failure and
+`rendered -> lost = 0` is structural.
+
+**Build it in `planar_holes`, not only in `planar_slice`.** Crossing the
+developed-track verdict against the funnel (`p1-out/yield_tab.py`) over the
+1,163 faces whose boundary is developed, simple and crossing-free:
+
+```
+  1,065  delegated to the holes slice   <- multi-bound
+     64  only the arc family (the hole-free slice alone unblocks it)
+     34  blocked on outer-bound standing (29 of them declare one bound)
+```
+
+So Step 8A-arc landed in the hole-free slice alone is worth **64 faces**, not
+1,163. The population is overwhelmingly multi-bound. This is the same trap the
+preamble warns about — a package that clears one stage recovers nothing on a
+face blocked at another — and it is cheap to fall into here because the
+developed track surveys every bound and so looks like it has already cleared
+them.
+
+The good news is that the shared piece is the *only* new piece. Once an arc is
+polygonalized within a certified bound, `planar_holes`'s Steps 7H and 8H are
+polygon-based and work unchanged: `classify_components`, `point_strictly_inside`
+and `certify_region_with_holes` all consume cycles of `Point2`. So build the
+polygonalization once, against `DevelopedCurve2D`, and feed both slices from it.
+
+Adding the outer-bound derivation below takes the ceiling to the full 1,163.
+
+**Two obligations the developed track does *not* discharge**, and that Step 8A
+will need:
+
+- **Per-curve simplicity.** `survey_arrangement` skips intra-occurrence piece
+  pairs (two x-monotone pieces of one circle share support by construction) and
+  reports how many it skipped. That leaves `IndividualCurveNotSimple` unproved.
+  For a circular arc it is a one-liner — an arc is simple exactly when its sweep
+  is under a full turn — but it must be *asked*.
+- **Material selection.** The track surveys every bound and is deliberately
+  independent of outer-bound standing, because 1,120 planar lost faces have
+  none. Selecting the material region still needs it. See the item below.
+
+Two cheaper items fell out of the same measurement:
+
+- **431 single-bound faces** exit `missing_outer_bound_authority` while
+  declaring exactly one bound. A lone bound is the face's boundary; the standing
+  is derivable with no geometry and no containment test, and must be labelled
+  *derived* rather than source-declared. The cause is a real source class, not a
+  bug: `00007705` is 91% plain `FACE_SURFACE` rather than `ADVANCED_FACE`, and
+  those legitimately carry `FACE_BOUND` without `FACE_OUTER_BOUND` — 25,330
+  against 2,213. **Ship this with Step 8A-arc**, since material selection needs
+  the standing anyway. Of the arc-ready 1,163 only 34 are blocked on it (29
+  declaring one bound), so on *that* population it is a tail — its value is that
+  it also unblocks faces the arc work does not reach.
+- **1,956 `no_developable_curve`** — Step 2 cannot traverse the bound at all.
+  Splines. Their own family, unmeasured. This is the *largest* remaining planar
+  block and nothing is known about it beyond the count; a `curves=` histogram
+  over it (the `SliceRecord` now carries representations even on refusal) is an
+  hour and would size the next planar wave.
 
 ---
 
@@ -238,6 +385,13 @@ Take it on when packages 1–5 are done, and give it a session of its own.
 The top four hold 47% of all remaining loss, and three of them are dominated by
 a projection failure — package 1 or package 4, not the arrangement build.
 `00000414` is 68% NURBS projection failures on its own.
+
+**Good single-model targets.** `00003172` and `00000730` are the cleanest tests
+of package 1 (369 and 631 cylinder projection failures, nothing else large).
+`00009190` is the standard planar workbench — small enough to iterate on, and
+every planar number in this document and in `WAVE_3B` was developed on it first,
+then confirmed corpus-wide. `00005427` is package 3 nearly on its own (494 of
+its 723 are cone `AmbiguousLift`).
 
 ---
 
@@ -271,7 +425,12 @@ Traps that have each cost a session:
   Re-comment it, bump the rev, and confirm the pinned build reproduces the
   number before writing it down.
 - **Check free disk before timing anything.** A near-full disk once turned a
-  5.5 s workload into 136 s.
+  5.5 s workload into 136 s. It sat at **6.7 GB free** during WAVE-3B; the
+  stderr probes are 4–100 MB per model and a full corpus sweep of one is ~200 MB.
+  Delete them when the table is written.
+- **Probe stderr interleaves.** Face tessellation is parallel, so two runs'
+  probe output are never byte-identical. Compare them *sorted*, keyed on
+  `source_face_id` — a byte diff will report a difference that is not one.
 
 ---
 
@@ -281,6 +440,12 @@ Outside git, in `C:\Users\stefa\look-corpus\p1-out\`:
 
 - `diag-w3a/<id>.jsonl` — the current residual's DIAG-001 records, default-on
   at the pin, per model. **This is the file to start from.**
+- `dev-arc/<id>.dev.txt`, `dev_tab.py`, `slice_tab.py` — WAVE-3B's developed-arc
+  survey and the two tables in this file's package 6
+- `yield_tab.py`, `YIELD_TAB.txt` — the cross-tab that sizes Step 8A-arc: what
+  *else* stands between an arc-ready face and a mesh. Run it again after any
+  planar change; it is the check that keeps a package's claimed population
+  honest.
 - `w3a_tab.py`, `W3A_TAB.txt` — every table above
 - `deck_tab.py`, `DECK_TAB.txt` — the deck/seam cross-tab that decided WAVE-3A
 - `diag-w3a-sweep.sh`, `deck-join-sweep.sh`, `seed-sweep.sh`,
@@ -294,3 +459,24 @@ Build (there is no MSVC toolchain on this machine, only LLVM-MinGW):
 cargo +stable-x86_64-pc-windows-gnullvm build --release \
       --target x86_64-pc-windows-gnullvm --example face_census
 ```
+
+**Disk.** WAVE-3B ended by deleting `look/target/{debug,release}` and all of
+`truck-fork/target` — 6.2 GB free became 13 GB. The gnullvm tree was kept, so
+`face_census` is built and current at this pin; `cargo test` and `cargo check`
+will rebuild cold once. `~/.cargo/git` (3.1 GB) and `~/fastbrep/target`
+(310 MB) are further headroom if a link ever fails with
+`LLVM ERROR: No space left on device`, which is how this has always presented.
+
+### Probes
+
+| variable | what it emits |
+|---|---|
+| `TRUCK_FACE_DIAG_JSONL=<path>` | DIAG-001, one JSON row per lost face |
+| `TRUCK_PROBE_SLICE` | `SLICE` / `HOLES`: the rank-0 funnel, one line per face |
+| `TRUCK_PROBE_DEVELOPED` | `DEV`: the developed-arc survey, one line per bound |
+| `TRUCK_CENSUS_TOL_FACTOR=<f>` | scales the census tolerance, to ask whether a loss class is an approximation artefact |
+| `TRUCK_FORMAL_RECOVERY=0` | master kill switch; each route also has `_<ROUTE>=0` |
+
+`TRUCK_PROBE_DEVELOPED` costs an O(pieces²) certified pass per bound and is off
+by default for that reason. On the two 150k-face models a sweep with both probes
+on takes several minutes each.
