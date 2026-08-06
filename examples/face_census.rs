@@ -7,7 +7,7 @@ use serde::Serialize;
 use truck_meshalgo::prelude::*;
 use truck_meshalgo::tessellation::diagnosis as face_diag;
 use truck_meshalgo::tessellation::formal::cylinder_band::{NonconformantRepair, SourceConformance};
-use truck_meshalgo::tessellation::{ConeBandAttempt, CylinderBandAttempt};
+use truck_meshalgo::tessellation::{ConeBandAttempt, CylinderBandAttempt, TorusAnnulusAttempt};
 use truck_stepio::r#in::{Table, step_geometry::Surface};
 
 const RELATIVE_TOLERANCE: f64 = 0.001;
@@ -163,6 +163,64 @@ impl ConeBandTally {
     }
 }
 
+/// A stable tag for a torus recovery's source-conformance verdict.
+///
+/// The torus cell's `ConformanceTag` is a distinct type from the cylinder
+/// band's `SourceConformance` and carries a distinct malformation, so it gets
+/// its own reader rather than being folded into [`conformance_tag`].
+fn torus_conformance_tag(
+    conformance: truck_meshalgo::tessellation::formal::torus_cell::ConformanceTag,
+) -> &'static str {
+    use truck_meshalgo::tessellation::formal::torus_cell::ConformanceTag;
+    match conformance {
+        ConformanceTag::SourceClean => "conforming",
+        ConformanceTag::MalformedTwoOuterBoundsOnCertifiedTorusAnnulus => {
+            "malformed:two_outer_bounds_on_certified_torus_annulus"
+        }
+    }
+}
+
+/// The torus annulus route's own reconciliation.
+///
+/// Separate from [`BandTally`] and [`ConeBandTally`] for the reason those are
+/// separate from each other: the cell has its own exit vocabulary
+/// (`TorusAnnulusExit`) and its own conformance tag, and a merged histogram
+/// could not say which cell a shared stage name came from.
+#[derive(Default)]
+struct TorusTally {
+    attempted: usize,
+    recovered: usize,
+    /// Recoveries by the source-conformance tag the certified cell carried.
+    conformance: HashMap<&'static str, usize>,
+    exits: HashMap<&'static str, usize>,
+    /// The lowest `source_face_id` seen for each exit tag, so the reported
+    /// representative is the same face on every run.
+    representatives: HashMap<&'static str, u64>,
+}
+
+impl TorusTally {
+    fn record(&mut self, attempt: TorusAnnulusAttempt, source_face_id: Option<u64>) {
+        self.attempted += 1;
+        match attempt {
+            TorusAnnulusAttempt::Recovered { conformance, .. } => {
+                self.recovered += 1;
+                *self
+                    .conformance
+                    .entry(torus_conformance_tag(conformance))
+                    .or_default() += 1;
+            }
+            TorusAnnulusAttempt::Refused(exit) => {
+                let tag = exit.tag();
+                *self.exits.entry(tag).or_default() += 1;
+                if let Some(id) = source_face_id {
+                    let slot = self.representatives.entry(tag).or_insert(id);
+                    *slot = (*slot).min(id);
+                }
+            }
+        }
+    }
+}
+
 struct Census {
     declared: usize,
     rendered: usize,
@@ -170,6 +228,7 @@ struct Census {
     examples: HashMap<Bucket, Vec<String>>,
     band: BandTally,
     cone_band: ConeBandTally,
+    torus: TorusTally,
 }
 
 impl Census {
@@ -181,6 +240,7 @@ impl Census {
             examples: HashMap::new(),
             band: BandTally::default(),
             cone_band: ConeBandTally::default(),
+            torus: TorusTally::default(),
         }
     }
 
@@ -302,8 +362,14 @@ fn census(
             .map(|f| surface_kind(&f.surface))
             .collect();
         // Must exercise the same path production does, or it measures a
-        // build nobody ships (REFINEMENT_AUDIT.md section 6).
-        let outcome = shell.robust_triangulation_with_cone_outcome(
+        // build nobody ships (REFINEMENT_AUDIT.md section 6). That means the
+        // *torus* entry point, not the cone one: the cone form supplies no
+        // torus adapter, so the torus annulus route never runs under it and
+        // every toroidal face reports as lost no matter what its gate says.
+        // A census taken through the cone form understated torus recovery by
+        // the whole eligible population, which is not a small correction —
+        // toroidal faces are the largest single loss line on `00009190`.
+        let outcome = shell.robust_triangulation_with_torus_outcome(
             tolerance,
             look::step_lattice_of,
             look::step_support_schema_of,
@@ -312,6 +378,7 @@ fn census(
             look::step_cylinder_curve_schema_of,
             look::step_cylinder_curve_family_of,
             look::step_cone_of,
+            look::step::torus_deck::identify_source_torus_opt,
         );
         let meshed = &outcome.shell;
         for (i, face) in meshed.faces.iter().enumerate() {
@@ -355,6 +422,10 @@ fn census(
                 into.cone_band
                     .record(attempt, face.provenance.best_id().map(|id| id.get()));
             }
+            if let Some(Some(attempt)) = outcome.torus_band_attempts.get(i) {
+                into.torus
+                    .record(attempt, face.provenance.best_id().map(|id| id.get()));
+            }
             if ledger {
                 let id = face
                     .provenance
@@ -378,6 +449,16 @@ fn census(
                 // reason it has its own tally: a reconciliation must be able to
                 // say which cell attempted a face, and a merged column could
                 // not.
+                // The torus annulus travels in its own column, for the same
+                // reason it has its own tally.
+                let torus = match outcome.torus_band_attempts.get(i) {
+                    Some(Some(TorusAnnulusAttempt::Recovered {
+                        triangles,
+                        conformance,
+                    })) => format!("recovered:{triangles}:{}", torus_conformance_tag(conformance)),
+                    Some(Some(TorusAnnulusAttempt::Refused(exit))) => exit.tag().to_string(),
+                    _ => "not_eligible".into(),
+                };
                 let cone_band = match outcome.cone_band_attempts.get(i) {
                     Some(Some(ConeBandAttempt::Recovered {
                         triangles,
@@ -390,7 +471,8 @@ fn census(
                 eprintln!(
                     "FACE\tdeclared_face_index={i}\tsource_face_id={id}\t\
                      surface_kind={kind}\trendered={rendered}\ttriangles={triangles}\t\
-                     stage=tessellate\treason={reason}\tband={band}\tcone_band={cone_band}"
+                     stage=tessellate\treason={reason}\tband={band}\tcone_band={cone_band}\t\
+                     torus={torus}"
                 );
             }
             // DIAG-001: collect structured diagnostic records for failed faces.
@@ -1021,6 +1103,38 @@ conical band: {} eligible, {} recovered, {} refused",
         for (tag, count) in exits {
             let representative = overall
                 .cone_band
+                .representatives
+                .get(*tag)
+                .map(u64::to_string)
+                .unwrap_or_else(|| "-".into());
+            println!(
+                "  {:40} {:6}  e.g. source_face_id={representative}",
+                tag, count
+            );
+        }
+    }
+
+    // The torus annulus route's own funnel, on the identical shape and under
+    // the identical reconciliation discipline as the two above: every eligible
+    // face lands in exactly one of recovered / refused-at-this-cell.
+    if overall.torus.attempted > 0 {
+        let mut exits: Vec<(&&'static str, &usize)> = overall.torus.exits.iter().collect();
+        exits.sort_by(|a, b| b.1.cmp(a.1).then_with(|| a.0.cmp(b.0)));
+        println!(
+            "\ntorus annulus: {} eligible, {} recovered, {} refused",
+            overall.torus.attempted,
+            overall.torus.recovered,
+            overall.torus.attempted - overall.torus.recovered,
+        );
+        let mut conformance: Vec<(&&'static str, &usize)> =
+            overall.torus.conformance.iter().collect();
+        conformance.sort_by(|a, b| b.1.cmp(a.1).then_with(|| a.0.cmp(b.0)));
+        for (tag, count) in conformance {
+            println!("  {:40} {:6}  recovered", tag, count);
+        }
+        for (tag, count) in exits {
+            let representative = overall
+                .torus
                 .representatives
                 .get(*tag)
                 .map(u64::to_string)
