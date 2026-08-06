@@ -7,8 +7,8 @@
 //! from outside the crate, the way the integration owner will call it.
 
 use look::step::spline_carrier::{
-    certify_spline_carrier, CarrierQuery, CarrierWitness, CirclePlacement, InconsistencyWitness,
-    LinearCarrierCoordinate, SplineCarrierCertification, UnresolvedSplineReason,
+    CarrierQuery, CarrierWitness, CirclePlacement, InconsistencyWitness, LinearCarrierCoordinate,
+    SplineCarrierCertification, UnresolvedSplineReason, certify_spline_carrier,
 };
 use truck_meshalgo::prelude::{Point3, Vector3};
 use truck_stepio::r#in::step_geometry::{BSplineCurve, Curve3D, KnotVec, NurbsCurve};

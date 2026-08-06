@@ -111,7 +111,9 @@
 //! (the traversal's own composed sense) is a distinct, later fold that a
 //! consumer applies on top of this one; see [`CertifiedCircularArc::selected_interval`].
 
-use truck_meshalgo::prelude::{BoundedCurve, InnerSpace, Matrix4, Point3, SquareMatrix, Transform, Vector3};
+use truck_meshalgo::prelude::{
+    BoundedCurve, InnerSpace, Matrix4, Point3, SquareMatrix, Transform, Vector3,
+};
 use truck_meshalgo::tessellation::formal::numeric::{FiniteF64, PositiveFinite};
 use truck_meshalgo::tessellation::formal::{CertifiedSign, Expansion};
 use truck_stepio::r#in::step_geometry::Ellipse;
@@ -141,9 +143,8 @@ fn exact_det3(m: [[f64; 3]; 3]) -> Expansion {
         // a*d - b*c, exact.
         Expansion::from_product(a, d).merge(&Expansion::from_product(b, c).negate())
     };
-    let scale = |e: &Expansion, s: f64| -> Expansion {
-        e.mul_expansion(&Expansion::zero().grow(s))
-    };
+    let scale =
+        |e: &Expansion, s: f64| -> Expansion { e.mul_expansion(&Expansion::zero().grow(s)) };
 
     let c00 = cofactor(m[1][1], m[1][2], m[2][1], m[2][2]);
     let c01 = cofactor(m[1][0], m[1][2], m[2][0], m[2][2]);
@@ -402,7 +403,12 @@ pub fn shadow_classify_circularity(
 
     let finite = |v: f64| FiniteF64::new(v).is_ok();
     for coordinate in [
-        basis_cos.x, basis_cos.y, basis_cos.z, basis_sin.x, basis_sin.y, basis_sin.z,
+        basis_cos.x,
+        basis_cos.y,
+        basis_cos.z,
+        basis_sin.x,
+        basis_sin.y,
+        basis_sin.z,
     ] {
         if !finite(coordinate) {
             return Err(CircularArcAdapterFailure::NonFiniteAuthoritativeGeometry);
@@ -525,8 +531,18 @@ fn decode_conic(
     let basis_z = transform.transform_vector(Vector3::new(0.0, 0.0, 1.0));
 
     for coordinate in [
-        center.x, center.y, center.z, basis_cos.x, basis_cos.y, basis_cos.z, basis_sin.x,
-        basis_sin.y, basis_sin.z, basis_z.x, basis_z.y, basis_z.z,
+        center.x,
+        center.y,
+        center.z,
+        basis_cos.x,
+        basis_cos.y,
+        basis_cos.z,
+        basis_sin.x,
+        basis_sin.y,
+        basis_sin.z,
+        basis_z.x,
+        basis_z.y,
+        basis_z.z,
     ] {
         if !finite(coordinate) {
             return Err(CircularArcAdapterFailure::NonFiniteAuthoritativeGeometry);
@@ -573,8 +589,7 @@ fn decode_conic(
             let worst_discrepancy = length_mismatch.max(orthogonality.abs() / scale);
             let certified_equal_bound = CIRCULARITY_CERTIFIED_EQUAL_ULPS * f64::EPSILON;
             if worst_discrepancy > certified_equal_bound {
-                let certified_unequal_bound =
-                    certified_equal_bound * CIRCULARITY_UNRESOLVED_MARGIN;
+                let certified_unequal_bound = certified_equal_bound * CIRCULARITY_UNRESOLVED_MARGIN;
                 return Err(match worst_discrepancy > certified_unequal_bound {
                     true => CircularArcAdapterFailure::NonCircularAffineImage,
                     false => CircularArcAdapterFailure::CircleVersusEllipseUndecidable,
@@ -621,7 +636,7 @@ fn decode_conic(
         CertifiedSign::Positive => TransformOrientation::Preserving,
         CertifiedSign::Negative => TransformOrientation::Reversing,
         CertifiedSign::Zero => {
-            return Err(CircularArcAdapterFailure::TransformOrientationUndecidable)
+            return Err(CircularArcAdapterFailure::TransformOrientationUndecidable);
         }
     };
 
@@ -653,7 +668,11 @@ mod tests {
     use truck_meshalgo::prelude::{EuclideanSpace, Invertible, Rad};
     use truck_stepio::r#in::step_geometry::{Processor, TrimmedCurve, UnitCircle};
 
-    fn ellipse_with(transform: Matrix4, range: (f64, f64), reversed: bool) -> Ellipse<Point3, Matrix4> {
+    fn ellipse_with(
+        transform: Matrix4,
+        range: (f64, f64),
+        reversed: bool,
+    ) -> Ellipse<Point3, Matrix4> {
         let mut processor =
             Processor::with_transform(TrimmedCurve::new(UnitCircle::new(), range), transform);
         if reversed {
@@ -710,7 +729,8 @@ mod tests {
         let cos_arr = [basis_cos.x, basis_cos.y, basis_cos.z];
         let sin_arr = [basis_sin.x, basis_sin.y, basis_sin.z];
         let g01 = exact_dot3(cos_arr, sin_arr);
-        let length_diff = exact_dot3(cos_arr, cos_arr).merge(&exact_dot3(sin_arr, sin_arr).negate());
+        let length_diff =
+            exact_dot3(cos_arr, cos_arr).merge(&exact_dot3(sin_arr, sin_arr).negate());
         assert!(
             !g01.is_zero() || !length_diff.is_zero(),
             "fixture is bit-exactly circular, so it cannot exercise the gate"
@@ -734,7 +754,10 @@ mod tests {
         let arc = decode_source_circle(&ellipse).expect("a source circle certifies");
         assert!((arc.radius().get() - 3.7).abs() < 1e-12);
         assert_eq!(arc.source_interval(), (0.2, 1.9));
-        assert_eq!(arc.transform_orientation(), TransformOrientation::Preserving);
+        assert_eq!(
+            arc.transform_orientation(),
+            TransformOrientation::Preserving
+        );
     }
 
     #[test]
@@ -793,7 +816,10 @@ mod tests {
                 assert_eq!(exact.normal(), sourced.normal());
                 assert_eq!(exact.radius().get(), sourced.radius().get());
                 assert_eq!(exact.source_interval(), sourced.source_interval());
-                assert_eq!(exact.transform_orientation(), sourced.transform_orientation());
+                assert_eq!(
+                    exact.transform_orientation(),
+                    sourced.transform_orientation()
+                );
             }
         }
     }
@@ -821,8 +847,8 @@ mod tests {
     #[test]
     fn a_reflected_source_circle_still_reports_a_reversing_transform() {
         // The transform-orientation certificate is independent of the gate.
-        let transform = Matrix4::from_nonuniform_scale(1.0, 1.0, -1.0)
-            * rounding_level_placement(2.0);
+        let transform =
+            Matrix4::from_nonuniform_scale(1.0, 1.0, -1.0) * rounding_level_placement(2.0);
         let arc = decode_source_circle(&ellipse_with(transform, (0.0, 1.0), false))
             .expect("a reflected circle is still a circle");
         assert_eq!(arc.transform_orientation(), TransformOrientation::Reversing);
@@ -837,7 +863,10 @@ mod tests {
         assert!((arc.radius().get() - 1.0).abs() < 1e-12);
         assert_eq!(arc.source_interval(), (0.3, 1.7));
         assert!((arc.source_sweep() - 1.4).abs() < 1e-12);
-        assert_eq!(arc.transform_orientation(), TransformOrientation::Preserving);
+        assert_eq!(
+            arc.transform_orientation(),
+            TransformOrientation::Preserving
+        );
     }
 
     #[test]
@@ -863,7 +892,10 @@ mod tests {
         let transform = Matrix4::from_scale(3.0);
         let arc = expect_arc(&ellipse_with(transform, (0.0, TAU), false));
         assert!((arc.radius().get() - 3.0).abs() < 1e-9);
-        assert_eq!(arc.transform_orientation(), TransformOrientation::Preserving);
+        assert_eq!(
+            arc.transform_orientation(),
+            TransformOrientation::Preserving
+        );
     }
 
     #[test]
@@ -977,7 +1009,10 @@ mod tests {
         for t in [0.0_f64, 0.5, 2.1] {
             let expected = transform.transform_point(Point3::new(t.cos(), t.sin(), 0.0));
             let got = arc.evaluate(t);
-            assert!((got - expected).magnitude() < 1e-9, "t={t}: {got:?} vs {expected:?}");
+            assert!(
+                (got - expected).magnitude() < 1e-9,
+                "t={t}: {got:?} vs {expected:?}"
+            );
         }
     }
 
@@ -1074,10 +1109,22 @@ mod tests {
     #[test]
     fn a_one_ulp_shear_is_certified_non_circular() {
         let shear = Matrix4::new(
-            1.0, 0.0, 0.0, 0.0, //
-            f64::EPSILON, 1.0, 0.0, 0.0, //
-            0.0, 0.0, 1.0, 0.0, //
-            0.0, 0.0, 0.0, 1.0,
+            1.0,
+            0.0,
+            0.0,
+            0.0, //
+            f64::EPSILON,
+            1.0,
+            0.0,
+            0.0, //
+            0.0,
+            0.0,
+            1.0,
+            0.0, //
+            0.0,
+            0.0,
+            0.0,
+            1.0,
         );
         let result = decode_transformed_circle(&ellipse_with(shear, (0.0, 1.0), false));
         assert_eq!(
@@ -1093,7 +1140,10 @@ mod tests {
             * Matrix4::from_angle_z(Rad(1.1))
             * Matrix4::from_scale(4.0);
         let result = decode_transformed_circle(&ellipse_with(transform, (0.0, 1.0), false));
-        assert!(result.is_ok(), "exact similarity must certify a circle: {result:?}");
+        assert!(
+            result.is_ok(),
+            "exact similarity must certify a circle: {result:?}"
+        );
     }
 
     #[test]
@@ -1148,7 +1198,10 @@ mod tests {
         let transform = Matrix4::from_nonuniform_scale(1.0, 1.0, 1e-5);
         let arc = decode_transformed_circle(&ellipse_with(transform, (0.0, 1.0), false))
             .expect("a determinant clearing the conditioning floor must certify");
-        assert_eq!(arc.transform_orientation(), TransformOrientation::Preserving);
+        assert_eq!(
+            arc.transform_orientation(),
+            TransformOrientation::Preserving
+        );
     }
 
     // -- shadow-only classifier: preserved behavior, never used for production --

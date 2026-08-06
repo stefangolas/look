@@ -1077,8 +1077,8 @@ fn certify_straight_line_homogeneous(
         }
     }
     let _ = denom; // denominator sign is already certified; recorded for the
-                   // StraightLine witness is omitted (the line predicate does
-                   // not depend on it beyond non-vanishing).
+    // StraightLine witness is omitted (the line predicate does
+    // not depend on it beyond non-vanishing).
     SplineCarrierCertification::Certified(CarrierWitness::StraightLine {
         source_interval: trim,
         start_point,

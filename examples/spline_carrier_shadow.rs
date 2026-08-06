@@ -23,7 +23,7 @@ use truck_stepio::r#in::{
 };
 
 use look::step::spline_carrier::{
-    certify_spline_carrier, CarrierQuery, CirclePlacement, LinearCarrierCoordinate,
+    CarrierQuery, CirclePlacement, LinearCarrierCoordinate, certify_spline_carrier,
 };
 
 fn load_table(path: &str) -> anyhow::Result<Table> {
@@ -102,9 +102,7 @@ fn parallel_circle(info: &SurfaceInfo, point: Point3) -> CirclePlacement {
 fn main() -> anyhow::Result<()> {
     let args: Vec<String> = std::env::args().skip(1).collect();
     if args.is_empty() {
-        eprintln!(
-            "usage: cargo run --example spline_carrier_shadow -- MODEL.step [MORE.step ...]"
-        );
+        eprintln!("usage: cargo run --example spline_carrier_shadow -- MODEL.step [MORE.step ...]");
         return Ok(());
     }
 
@@ -153,8 +151,11 @@ fn main() -> anyhow::Result<()> {
                         let start = edge.curve.subs(t0);
                         let repr = spline_repr(&edge.curve);
 
-                        let straight =
-                            certify_spline_carrier(&edge.curve, CarrierQuery::StraightLine, (t0, t1));
+                        let straight = certify_spline_carrier(
+                            &edge.curve,
+                            CarrierQuery::StraightLine,
+                            (t0, t1),
+                        );
                         let coord = certify_spline_carrier(
                             &edge.curve,
                             CarrierQuery::ConstantLinearCoordinate(LinearCarrierCoordinate {

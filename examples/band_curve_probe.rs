@@ -45,10 +45,12 @@ use truck_stepio::r#in::step_geometry::{Conic3D, Curve3D, ElementarySurface, Sur
 /// `f64::EPSILON`, alongside that classifier's own three-way verdict. Both are
 /// observations. Neither is used to admit anything: the shadow classifier is
 /// documented as diagnostics-only and this is a diagnostics-only binary.
-fn circularity_discrepancy(ellipse: &truck_stepio::r#in::step_geometry::Ellipse<
-    truck_meshalgo::prelude::Point3,
-    truck_meshalgo::prelude::Matrix4,
->) -> (String, &'static str) {
+fn circularity_discrepancy(
+    ellipse: &truck_stepio::r#in::step_geometry::Ellipse<
+        truck_meshalgo::prelude::Point3,
+        truck_meshalgo::prelude::Matrix4,
+    >,
+) -> (String, &'static str) {
     let transform = *ellipse.transform();
     let basis_cos = transform.transform_vector(Vector3::new(1.0, 0.0, 0.0));
     let basis_sin = transform.transform_vector(Vector3::new(0.0, 1.0, 0.0));
@@ -195,9 +197,9 @@ fn main() -> anyhow::Result<()> {
                     // report; every other refusal is a missing reader, not a
                     // near miss.
                     let (ulps, shadow) = match curve {
-                        Curve3D::Conic(
-                            Conic3D::Circle(ellipse) | Conic3D::Ellipse(ellipse),
-                        ) => circularity_discrepancy(ellipse),
+                        Curve3D::Conic(Conic3D::Circle(ellipse) | Conic3D::Ellipse(ellipse)) => {
+                            circularity_discrepancy(ellipse)
+                        }
                         _ => ("-".into(), "-"),
                     };
                     println!(

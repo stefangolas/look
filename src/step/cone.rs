@@ -76,7 +76,7 @@
 
 use truck_meshalgo::prelude::{InnerSpace, Matrix4, Transform, Vector3};
 use truck_meshalgo::tessellation::formal::{
-    identify_cone, CertifiedEmbeddedCone, ConeIdentification, ConeIdentificationFailure,
+    CertifiedEmbeddedCone, ConeIdentification, ConeIdentificationFailure, identify_cone,
 };
 use truck_stepio::r#in::step_geometry::{ElementarySurface, Line, RevolutedCurve, Surface};
 
@@ -215,7 +215,7 @@ pub fn identify_source_cone_opt(surface: &Surface) -> Result<CertifiedEmbeddedCo
 #[cfg(test)]
 mod tests {
     use super::*;
-    use truck_meshalgo::prelude::{Invertible, InnerSpace, Point3, Vector3};
+    use truck_meshalgo::prelude::{InnerSpace, Invertible, Point3, Vector3};
     use truck_meshalgo::tessellation::formal::Nappe;
     use truck_stepio::r#in::step_geometry::{Processor, ToroidalSurface, Torus};
 
@@ -310,7 +310,7 @@ mod tests {
     #[test]
     fn a_non_uniform_scale_is_refused_before_a_circular_cone_is_certified() {
         use truck_meshalgo::prelude::{Matrix4, ParametricSurface};
-        use truck_meshalgo::tessellation::formal::{identify_cone, ConeIdentification};
+        use truck_meshalgo::tessellation::formal::{ConeIdentification, identify_cone};
         let revo = RevolutedCurve::by_revolution(
             Line(Point3::new(0.5, 0.0, 1.0), Point3::new(3.0, 0.0, 6.0)),
             Point3::new(0.0, 0.0, 0.0),
@@ -343,8 +343,7 @@ mod tests {
             "the squashed surface must genuinely leave the circular cone"
         );
 
-        let surface =
-            Surface::ElementarySurface(ElementarySurface::ConicalSurface(processor));
+        let surface = Surface::ElementarySurface(ElementarySurface::ConicalSurface(processor));
         assert_eq!(
             identify_source_cone(&surface).unwrap_err(),
             ConeSurfaceAdapterFailure::PlacementNotASimilarity
@@ -466,9 +465,8 @@ mod tests {
             Point3::new(0.0, 0.0, 0.0),
             Vector3::new(0.0, 0.0, 1.0),
         );
-        let surface = Surface::ElementarySurface(ElementarySurface::CylindricalSurface(
-            Processor::new(revo),
-        ));
+        let surface =
+            Surface::ElementarySurface(ElementarySurface::CylindricalSurface(Processor::new(revo)));
         assert_eq!(
             identify_source_cone(&surface).unwrap_err(),
             ConeSurfaceAdapterFailure::NotConicalSurface

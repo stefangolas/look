@@ -209,7 +209,9 @@ fn main() -> anyhow::Result<()> {
         // Synthetic segment presence.
         let synth_count = u64_field(row, "synthetic_segment_count") as usize;
         if synth_count > 0 {
-            *synthetic_presence_by_bucket.entry(bucket.clone()).or_default() += 1;
+            *synthetic_presence_by_bucket
+                .entry(bucket.clone())
+                .or_default() += 1;
             faces_with_synthetic_segments += 1;
         }
 
@@ -265,7 +267,8 @@ fn main() -> anyhow::Result<()> {
                 // Opportunity: source/synthetic and synthetic/synthetic.
                 let inc = origin_class(incoming_origin);
                 let blk = origin_class(blocking_origin);
-                if (inc == "source" && blk == "synthetic") || (inc == "synthetic" && blk == "source")
+                if (inc == "source" && blk == "synthetic")
+                    || (inc == "synthetic" && blk == "source")
                 {
                     source_synthetic_conflicts += 1;
                 }
@@ -299,8 +302,7 @@ fn main() -> anyhow::Result<()> {
         }
 
         // ARR-003 opportunity: source/source proper crossings.
-        if bucket == "SourceSourceSameBoundCrossing" || bucket == "SourceSourceInterBoundCrossing"
-        {
+        if bucket == "SourceSourceSameBoundCrossing" || bucket == "SourceSourceInterBoundCrossing" {
             if chart_rank == 0 {
                 arr003_rank0_ss += 1;
             } else {
@@ -423,7 +425,9 @@ fn main() -> anyhow::Result<()> {
     );
     eprintln!(
         "  successful + failed = declared: {} ({successful} + {failed} = {} vs {declared})",
-        summary.reconciliation.successful_plus_failed_equals_declared,
+        summary
+            .reconciliation
+            .successful_plus_failed_equals_declared,
         successful + failed,
     );
     eprintln!(

@@ -36,7 +36,9 @@
 //! the result, the identical checks a non-`Processor`-wrapped test fixture
 //! is held to.
 use truck_meshalgo::prelude::Transform;
-use truck_meshalgo::tessellation::formal::{identify_cylinder, CertifiedEmbeddedCylinder, CylinderIdentification};
+use truck_meshalgo::tessellation::formal::{
+    CertifiedEmbeddedCylinder, CylinderIdentification, identify_cylinder,
+};
 use truck_stepio::r#in::step_geometry::{ElementarySurface, Line, RevolutedCurve, Surface};
 
 /// Why a `Surface` was not certified as an embedded cylinder by this
@@ -142,7 +144,9 @@ pub fn identify_source_cylinder_opt(
 mod tests {
     use super::*;
     use truck_meshalgo::prelude::{InnerSpace, Point3, Vector3};
-    use truck_stepio::r#in::step_geometry::{Line, Processor, RevolutedCurve, ToroidalSurface, Torus};
+    use truck_stepio::r#in::step_geometry::{
+        Line, Processor, RevolutedCurve, ToroidalSurface, Torus,
+    };
 
     fn z_cylinder_surface(radius: f64, h: f64) -> Surface {
         let revo = RevolutedCurve::by_revolution(

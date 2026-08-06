@@ -866,7 +866,7 @@ pub fn identify_source_torus_deck_opt(
 // ---------------------------------------------------------------------------
 
 use truck_meshalgo::tessellation::formal::{
-    identify_torus_world, CertifiedEmbeddedTorus, TorusIdentification,
+    CertifiedEmbeddedTorus, TorusIdentification, identify_torus_world,
 };
 
 /// Read a `Surface` structurally and certify an embedded torus, when the
@@ -889,8 +889,7 @@ use truck_meshalgo::tessellation::formal::{
 pub fn identify_source_torus_opt(
     surface: &Surface,
 ) -> Result<CertifiedEmbeddedTorus, &'static str> {
-    let Surface::ElementarySurface(ElementarySurface::ToroidalSurface(processor)) = surface
-    else {
+    let Surface::ElementarySurface(ElementarySurface::ToroidalSurface(processor)) = surface else {
         return Err("surface_not_toroidal");
     };
     let entity = processor.entity();

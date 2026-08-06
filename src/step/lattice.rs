@@ -244,19 +244,19 @@ pub fn cylinder_curve_schema_of(curve: &Curve3D) -> CurveSchema {
         // becomes an arc however nearly circular it is.
         Curve3D::Conic(Conic3D::Circle(circle)) => match decode_source_circle(circle) {
             Ok(_) => CurveSchema::CircularArc,
-            Err(cause) => CurveSchema::not_structurally_identified(
-                CurveSchemaFailure::NoStructuralReader {
+            Err(cause) => {
+                CurveSchema::not_structurally_identified(CurveSchemaFailure::NoStructuralReader {
                     representation: cause.tag(),
-                },
-            ),
+                })
+            }
         },
         Curve3D::Conic(Conic3D::Ellipse(ellipse)) => match decode_transformed_circle(ellipse) {
             Ok(_) => CurveSchema::CircularArc,
-            Err(cause) => CurveSchema::not_structurally_identified(
-                CurveSchemaFailure::NoStructuralReader {
+            Err(cause) => {
+                CurveSchema::not_structurally_identified(CurveSchemaFailure::NoStructuralReader {
                     representation: cause.tag(),
-                },
-            ),
+                })
+            }
         },
         _ => curve_schema_of(curve),
     }
@@ -343,7 +343,9 @@ pub fn cylinder_curve_family_of(curve: &Curve3D) -> Option<SourceCurveFamily> {
 mod cylinder_curve_tests {
     use super::*;
     use truck_meshalgo::prelude::Point3;
-    use truck_stepio::r#in::step_geometry::{Line as StepLine, Processor, TrimmedCurve, UnitCircle};
+    use truck_stepio::r#in::step_geometry::{
+        Line as StepLine, Processor, TrimmedCurve, UnitCircle,
+    };
 
     /// A conic carrying *no* source family, so it must prove circularity
     /// exactly. Deliberately still `Conic3D::Ellipse`: these tests are what
@@ -382,9 +384,7 @@ mod cylinder_curve_tests {
         // The same representation with its family erased is refused, which is
         // what the corpus was hitting 20,388 times.
         let erased = match &curve {
-            Curve3D::Conic(Conic3D::Circle(circle)) => {
-                Curve3D::Conic(Conic3D::Ellipse(*circle))
-            }
+            Curve3D::Conic(Conic3D::Circle(circle)) => Curve3D::Conic(Conic3D::Ellipse(*circle)),
             _ => unreachable!(),
         };
         assert!(!cylinder_curve_schema_of(&erased).is_structurally_identified());
@@ -407,8 +407,7 @@ mod cylinder_curve_tests {
         // ellipse — the property the whole repair had to preserve.
         let semi = 1.0_f64;
         let other = f64::from_bits(semi.to_bits() + 1);
-        let transform =
-            truck_meshalgo::prelude::Matrix4::from_nonuniform_scale(semi, other, semi);
+        let transform = truck_meshalgo::prelude::Matrix4::from_nonuniform_scale(semi, other, semi);
         let curve = Curve3D::Conic(Conic3D::Ellipse(Processor::with_transform(
             TrimmedCurve::new(UnitCircle::new(), (0.0, 1.0)),
             transform,
@@ -479,7 +478,10 @@ mod cylinder_curve_tests {
 
     #[test]
     fn a_real_line_classifies_as_the_line_family() {
-        let line = Curve3D::Line(StepLine(Point3::new(0.0, 0.0, 0.0), Point3::new(1.0, 0.0, 0.0)));
+        let line = Curve3D::Line(StepLine(
+            Point3::new(0.0, 0.0, 0.0),
+            Point3::new(1.0, 0.0, 0.0),
+        ));
         assert!(matches!(
             cylinder_curve_family_of(&line),
             Some(SourceCurveFamily::Line)
@@ -519,7 +521,10 @@ mod cylinder_curve_tests {
             (0.0, 1.0),
         ))));
         assert!(cylinder_curve_family_of(&curve).is_none());
-        assert_eq!(cylinder_curve_schema_of(&curve).tag(), curve_schema_of(&curve).tag());
+        assert_eq!(
+            cylinder_curve_schema_of(&curve).tag(),
+            curve_schema_of(&curve).tag()
+        );
     }
 
     /// The planar path's own admission is unchanged: a circle is still

@@ -147,7 +147,9 @@ fn main() -> anyhow::Result<()> {
                 .unwrap_or_else(|| "-".into());
             let kind = surface_kind(&face.surface);
             let (standing, declared_count, outer_index) = outer_fields(face.provenance.outer_bound);
-            *by_standing.entry(face.provenance.outer_bound.tag()).or_default() += 1;
+            *by_standing
+                .entry(face.provenance.outer_bound.tag())
+                .or_default() += 1;
 
             // Periodicity, from the production classifier. `certified` counts
             // deck generators; `declared` counts what the accessors report. The
@@ -202,7 +204,11 @@ fn main() -> anyhow::Result<()> {
                 }
             }
             if face.boundaries.len() > BOUND_SIGNATURE_LIMIT {
-                let _ = write!(signature, ";+{}", face.boundaries.len() - BOUND_SIGNATURE_LIMIT);
+                let _ = write!(
+                    signature,
+                    ";+{}",
+                    face.boundaries.len() - BOUND_SIGNATURE_LIMIT
+                );
             }
             let multiset = families
                 .iter()
