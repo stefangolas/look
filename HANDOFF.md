@@ -1,241 +1,243 @@
-# Handoff — residual loss after WAVE-2C
+# Handoff — recovering the most faces from here
 
-> **Superseded in part by WAVE-3A** (`docs/WAVE_3A_DECK_JOIN_AND_SEED.md`,
-> truck `562299a5`). Packages 1 and 2 below are built and measured:
-> **+3,790 faces**, 819,769 → 823,559, loss 2.31% → 1.86%, zero
-> `rendered -> lost`. Three corrections to what is written below:
->
-> - Package 1's population is **3,087**, not 4,850. The `+1,779 source×seam`
->   faces do not come from the two-loop join at all — 1,507 are
->   `SeamWithoutTwoLoopJoin` and 269 carry no seam evidence. The DIAG-001
->   extension §1 demands was built first and said so.
-> - Package 2 yields **+705**, not the 4,522 the family/reason cell suggests:
->   a face needs *every* one of its failing boundary points fixed, so partial
->   success recovers nothing.
-> - Package 3's prerequisite `GEN-001` A7 is **closed** (GEN-001E). It is not
->   blocked — but it is a build, not a splice; see §3 of the WAVE-3A note.
->
-> Package 2's instruction to re-measure the cylinder/torus `BoundaryProjectionFailed`
-> rows *after* package 1 is now due and has not been done.
+**State.** look `165e865` on `integration/formal-atlas-wave-2`, pinned to truck
+`562299a5` on `feature/deck-join-and-seeds`. Both pushed. Path override
+disabled and the pinned build verified to reproduce the override build's census
+exactly.
 
-**State.** look `8eda7d3` on `integration/formal-atlas-wave-2`, pinned to truck
-`6f8153ea` on `feature/torus-rank2-cell`. Both pushed. No path override.
+**823,559 of 839,179 faces render (98.14%). 15,620 are lost.** WAVE-3A added
++3,790 (`docs/WAVE_3A_DECK_JOIN_AND_SEED.md`); `docs/WAVE_2C_GATE_GRADUATION.md`
+covers the wave before it.
 
-The five formal recovery routes are now **default-on** (WAVE-2C). Corpus-wide
-that took rendered from 797,239 to 819,769 (**+22,530**, loss 5.00% → 2.31%)
-with **zero** `rendered -> lost` regressions across 839,179 faces. See
-`docs/WAVE_2C_GATE_GRADUATION.md` for the graduation itself, its gate
-semantics, and the verification.
+**Two of the twenty models now render every face** — `00005642` (177,285) and
+`00009272` (146,520), the two largest in the corpus. `00009972` is 8 faces from
+a third. The other 17 range from 0.17% to 11.79% loss.
 
-This document is about the **19,410 faces still lost**, and what to do next.
+This document is about the 15,620, ordered by **how many faces you get for how
+much work**. Every number is freshly measured at the current pin, default-on.
 
 ---
 
 ## Read this before you plan anything
 
-**Measure the corpus, not `00009190`.** The previous edition of this file
-planned Priority 1 from a single model. That model is not representative, and
-planning from it produced a target that was 88% already-solved. I repeated the
-mistake in miniature this session: the two benchmark geometries
-(`00009190` + `00008001`) say the largest `ConstraintInsertionIncomplete` class
-is rank-0 planar arc crossings; the **corpus says it is seam×seam on periodic
-charts, by a wide margin**. Both statements are true of their sample. Only one
-is true of the product.
+**Measure the corpus, not one model.** Two editions of this file planned from a
+single model and named a target that was mostly already solved. The corpus and
+the benchmark geometries disagree about which class is largest, and only the
+corpus is the product.
 
-**Measure with the routes on.** Every number below is default-on. A census
-taken with `TRUCK_FORMAL_RECOVERY=0` describes a configuration nobody ships and
-will hand you a target that is mostly already recovered.
+**Measure with the routes on.** Everything below is default-on. A census taken
+with `TRUCK_FORMAL_RECOVERY=0` describes a configuration nobody ships.
 
 **Use production's entry point.** `face_census` must call
-`robust_triangulation_with_torus_outcome`. The cone form supplies no torus
-adapter and silently reports every toroidal face as lost. This bug hid 517
-faces on `00009190` alone. If a route's recovery count is suspiciously zero,
-check this first.
+`robust_triangulation_with_torus_outcome`. Each `robust_triangulation_with_*`
+takes one more adapter than the last; a caller that stops at the cone form has
+the torus route compiled in but unable to fire, and it fails *silently*. If a
+route's count is suspiciously zero, check this first. The same shape bit
+WAVE-3A in a second place: a defaulted trait method that the derive macros did
+not forward answers "nothing" for the production enum and reads exactly like a
+route that does not help.
 
 **Join on `source_face_id`.** `declared_face_index` resets per shell and
-collides. `p1-out/reconcile.py` does this correctly; reuse it.
+collides. `p1-out/reconcile.py` does it correctly; reuse it.
+
+**Build first, then hypothesise.** Both WAVE-3A packages had a target from this
+file that measurement corrected — one by 36%, one by 84%. The DIAG-001 records
+are cheap to extend and have paid for themselves twice.
 
 ---
 
-## The residual, corpus-wide
-
-19,402 of the 19,410 lost faces carry a DIAG-001 record (the remaining 8 are in
-one model whose diagnostic run is trivially re-creatable). Every one has
-exactly one terminal outcome; `InsertionUnknown` is 0.
+## The residual
 
 | terminal reason | faces | share |
 |---|---:|---:|
-| `ConstraintInsertionIncomplete` | 8,917 | 46.0% |
-| `BoundaryProjectionFailed` | 6,687 | 34.5% |
-| `AmbiguousLift` | 1,492 | 7.7% |
-| `ContradictoryDualParity` | 1,422 | 7.3% |
-| `ConstraintOverlapUnsupported` | 426 | 2.2% |
-| `NoOddParityRegion` | 330 | 1.7% |
-| `BoundaryConstructionFailed` | 127 | 0.7% |
+| `ConstraintInsertionIncomplete` | 5,988 | 38.3% |
+| `BoundaryProjectionFailed` | 5,825 | 37.3% |
+| `AmbiguousLift` | 1,492 | 9.6% |
+| `ContradictoryDualParity` | 1,422 | 9.1% |
+| `ConstraintOverlapUnsupported` | 427 | 2.7% |
+| `NoOddParityRegion` | 338 | 2.2% |
+| `BoundaryConstructionFailed` | 127 | 0.8% |
 | `ConstraintRoleMissing` | 1 | 0.0% |
 
-Cross-tabbed against surface family — the view that actually separates work:
+Cross-tabbed against surface family — the view that separates work:
 
 ```
-family        CII   Proj   Lift Parity   Ovlp  NoMat    Bnd   total
-Cylinder     2745   1072    426   1180    101                  5524
-Nurbs         352   3130             3      8      1           3494
-Plane        2947                         104    200           3251
-Torus        1163    939      3    122                         2227
-Bspline       427   1392                  69     129           2017
-Cone          813     85    673     81    136                  1788
-Sphere        252     31    380     28                          691
-Extruded      160     12      4      6      4                   186
-Revolved       50      7      6      2      4                    69
-Offset          8     27                                         35
-Unknown                                                 127     127
+family          CII   Proj   Lift Parity   Ovlp  NoMat    Bnd   total
+Cylinder       1238   1072    426   1180    101                  4017
+Plane          2947                         104    200           3251
+Nurbs           468   2472             3      9      1           2953
+Bspline         467   1180                   69    137           1854
+Torus           257    939      3    122                         1321
+Cone            303     85    673     81    136                  1278
+Sphere          130     31    380     28                          569
+Extruded        150     12      4      6      4                   176
+Unknown                                                   127     127
+Revolved         20      7      6      2      4                    39
+Offset            8     27                                         35
 ```
 
-`ConstraintInsertionIncomplete` splits: **5,045 on periodic charts, 3,872 at
-rank 0.** The two halves are different problems and must not be merged.
+**The residual is concentrated.** Five reason/family cells hold 58% of it; ten
+hold 81%. There is no long tail worth chasing until those are gone.
+
+`ConstraintInsertionIncomplete` has changed character completely. The seam×seam
+class that dominated it before WAVE-3A is **2 faces**. What is left:
+
+```
+2,519  SourceSourceInterBoundCrossing
+1,796  SourceSyntheticCrossing
+1,643  SourceSourceSameBoundCrossing
+   27  MixedConstraintConflict
+```
+
+by chart rank, 4,028 at rank 0 and 1,960 periodic.
 
 ---
 
-## Work packages, in yield order
+## Work packages, in yield-per-effort order
 
-### 1. Periodic seam×seam — 3,071 faces (+1,779 source×seam)
+### 1. Analytic surfaces are failing a projection they can solve in closed form — 2,127 faces
 
-The largest single class in the residual, and the original Priority 1 target.
-It survived the band routes because those routes admit only faces that are
-*complete two-circle bands*; everything else with a seam still fails.
+Cylinder 1,072, torus 939, cone 85, sphere 31 lost to
+`BoundaryProjectionFailed`. **These are not deck artifacts.** The previous
+edition said to re-measure them after the deck-join fix landed; that is done,
+and the cylinder and torus counts are *identical* to before it — 1,072 and 939,
+unchanged. Whatever this is, it is its own defect.
 
-```
-1499  Cylinder  SyntheticSyntheticCrossing
- 904  Torus     SyntheticSyntheticCrossing
- 504  Cone      SyntheticSyntheticCrossing
- 122  Sphere    SyntheticSyntheticCrossing
-1023  Cylinder  SourceSyntheticCrossing
- 198  Torus     SourceSyntheticCrossing
- 196  Cone      SourceSyntheticCrossing
-```
+**Where to look first (a hypothesis read off the source, not measured).** The
+STEP path represents these as `Processor<E, Matrix4>` — cylinder and cone are
+`Processor<RevolutedCurve<Line<Point3>>, Matrix4>`, torus is
+`Processor<Torus, Matrix4>`. `Processor`'s `search_nearest_parameter`
+(`truck-geometry/src/decorators/processor.rs:571`) asks the entity for its
+answer, then **uses it only as a hint** and returns
+`algo::surface::search_nearest_parameter(self, point, hint, trials)` — a
+generic Newton over the transformed surface. So when that Newton fails to
+converge, a closed-form answer that was already in hand is discarded and the
+projection fails.
 
-**Mechanism (read the code before trusting this).** In
-`triangulation.rs::PolyBoundary::new`, the two-closed-loop branch cuts each
-`periodic_source_walk` loop open, **reverses one**, and bridges the two with a
-pair of `SegmentOrigin::Seam` segments. It aligns the loops by *mean u* and
-never reconciles their **deck displacements**. The two boundary circles of a
-band carry opposite winding (`ku = +1` and `ku = −1`) — as they must, for the
-face boundary to be coherently oriented — so after the unconditional reverse
-they run *parallel* rather than antiparallel, and the two bridges become
-crossing diagonals instead of the two vertical cut edges of a rectangle. Spade
-refuses the second bridge, and the face dies as
-`ConstraintInsertionIncomplete` with both origins `Seam`.
+Two more absolute tolerances sit on the same path, neither scaled to the model
+or to the caller's `tol`:
 
-**The fix is a decidable equation, not a heuristic.** For a quotient-closed
-boundary walk, `Σδᵢ = Δ_walk`, and `Δ_walk = 0` for a contractible regular
-boundary. Traversing loop1 reversed contributes `−(−1) = +1`, giving
-`Σδ = +2 ≠ 0` — inconsistent, which is exactly what the crossing witnesses.
-Traversing it forward gives `Σδ = 0`. So:
+- `RevolutedCurve::search_parameter` (`decorators/revolved_curve.rs:~412`)
+  ends with `self.subs(t, ang).distance(point) <= 1.0e-5`;
+- `Torus::search_parameter` (`specifieds/torus.rs:157`) ends with
+  `self.subs(u, v).near(&point)`, which is truck's *global* `TOLERANCE`.
 
-- Solve the deck potential across both loops from the **source vertex
-  correspondence** carried by `SourceEdgeUseInput` (`source_vertices` /
-  `use_vertices`), not from mean-u proximity and not from `get_mindiff`.
-- Choose loop1's traversal direction and lattice translate to satisfy
-  `Σδ = Δ_walk`. Unique solution → resolved; none → `Inconsistent`; several →
-  `Unresolved`. Refuse with a typed exit in the latter two; do not guess.
-- The two cut copies are lattice translates of each other by exactly one
-  period. Hold that as a **certified cut-pair relation** — not as two
-  independent CDT constraint edges, which is what makes them crossable in the
-  first place.
+A millimetre-scale part at 500 mm can carry more rounding than either admits.
 
-`DeckPotentialUnionFind` (`domain/deck.rs`) and `CertifiedDeckLabel`
-(`formal/quotient.rs`) already exist and give typed `Unique`/`Ambiguous`/
-`Incompatible`/`Unresolved` outcomes. Use them; do not write a third solver.
+**First test, before writing any fix:** for these faces, evaluate the entity's
+closed-form inverse, transform it back, and record the residual. If the
+residuals are small and the Newton simply failed, the fix is to keep the
+entity's answer as a candidate and admit it on the caller's tolerance — which
+is the tolerance the pipeline validates against anyway. If the residuals are
+large, the hypothesis is wrong and the cause is upstream of projection.
 
-**Before you build anything**, extend DIAG-001 to record, per face: each
-boundary piece's `ku`/`kv`, its winding sign, the chosen fundamental-domain
-representative, and both seam endpoints. That turns `SyntheticSyntheticCrossing`
-into mechanism-level subtypes and will tell you what fraction of the 3,071 is
-actually the opposite-winding case versus something else. **I did not do this
-— the hypothesis above is read off the source, not measured.** Do not skip it.
+Highest confidence per unit of work in this document, and the cell group is
+14% of all remaining loss.
 
-Expected yield if the opposite-winding case dominates: low thousands. Verify
-the premise first.
+### 2. Cylinder parity — 1,422 faces, and the experiment is one line
 
-### 2. Spline projection — 4,522 faces
+`ContradictoryDualParity`, overwhelmingly cylindrical (1,180), with torus 122
+and cone 81. **Unchanged by WAVE-3A** — the prediction that it would shrink once
+seams stopped generating physical-boundary constraints is now falsified twice.
 
-NURBS 3,130 + B-spline 1,392 `BoundaryProjectionFailed`. The single largest
-*family/reason* cell in the whole residual, and the reason splines are 28% of
-remaining loss.
+The live question is still the one deferred two waves ago:
+`toggles_material` returns `Some(true)` for
+`ConstraintRole::UnresolvedSyntheticClosure`, generating `μ_L = 1, μ_R = 0`. An
+artificial cut should generate `μ_L = μ_R` (§X Definition 20, second bullet).
 
-`by_search_parameter` calls `surface.search_parameter(point, hint, 100)`, then
-retries with `None`, then declares failure. It is a numerical inverse problem
-failing to converge from one bad initial hint. Seed instead from **knot-span
-midpoints** — the knot vector already partitions the domain, and each span
-midpoint is a natural start. Only the initialisation changes; the iteration
-stays as it is.
+Flipping it changes material state for *every* face carrying synthetic
+segments, so measure it strictly on its own, and watch **triangles per face**,
+not just rendered/lost — the ledger carries `triangles=` for exactly this. A
+face that starts rendering with a wildly different triangle count is not a
+recovery.
 
-Do not accept a parameter merely because the search returned one. §VI
-Definition 13 requires a monotone traversal correspondence with endpoint and
-orientation agreement; check it before admitting the projection.
+Cheapest experiment on the list by a wide margin. Do it early even if it fails,
+because a falsified one-line hypothesis is worth more than another survey.
 
-Also note cylinder 1,072 and torus 939 `BoundaryProjectionFailed`. Those may be
-deck artifacts — if the boundary was lifted to the wrong period copy, the
-search looks in the wrong chart. **Re-measure them after package 1**, not
-before.
+### 3. Cone and sphere lift — 1,053 of the 1,492 `AmbiguousLift`
 
-### 3. Rank-0 arrangement (ARR-003) — 3,872 faces
+Cone 673, sphere 380, cylinder 426. `AMBIGUOUS_STEP_FRACTION = 0.45` bisection
+exhausting is the proximate cause; a certified per-family lift rule should clear
+most of it. Small and self-contained.
 
-Dominated by plane: 2,250 inter-bound + 697 same-bound source/source crossings,
-plus 590 on splines. Physical boundary arcs properly crossing each other in a
-simply connected parameter domain.
+`00005427` is 723 lost faces of which **494 are cone `AmbiguousLift`** — one
+model that this package alone would nearly clear, and one of the two models
+where the WAVE-2C routes fired zero times.
 
-This is `NormalizeIntersections(B)` (§IV.B, §IX Definition 18): compute the
-intersection with the existing certified predicates (`formal/bezier_isect`,
-`formal/exact`), populate `ParameterEnclosure2` (currently `None` in every
-witness), split both arcs at their certified parameters, and re-insert the
-sub-arcs. Sub-arcs sharing a vertex do not cross.
+### 4. Spline projection, the remainder — 3,652 faces
 
-Cleanest formally — no periodicity, no deck, no lift. `GEN-001` (the chord-side
-audit item) is named as the prerequisite; check its state before starting.
+NURBS 2,472 + B-spline 1,180. Still the largest family/reason group after the
+plane cell.
 
-### 4. Cylinder/cone parity — 1,422 faces
+WAVE-3A's knot-span seeding **proved the mechanism** — Newton from a single
+start on a piecewise surface — and cleared 705 faces with zero regressions and
+no effect on any other family. It did not clear more because a face is lost if
+*any one* of its boundary points fails to project, so partial success on a face
+recovers nothing.
 
-`ContradictoryDualParity`, and it is overwhelmingly cylindrical (1,180) with
-torus 122 and cone 81.
+**Measure this before adding seeds.** The record does not currently carry how
+many points failed per face. Extend DIAG-001 with a failing-point count and a
+sample of the failing 3D points. If the distribution is mostly one or two
+points per face, more or better starts will clear whole faces cheaply. If it is
+tens, the cause is not the initialisation and the seeds were treating a
+symptom.
 
-The old Priority 4 predicted this would shrink once seams stopped generating
-physical-boundary constraints. **It has not** — it is essentially unchanged. So
-the live question is the one that was deferred: `toggles_material` returns
-`Some(true)` for `ConstraintRole::UnresolvedSyntheticClosure`, generating
-`μ_L = 1, μ_R = 0`. An artificial cut should generate `μ_L = μ_R` (§X
-Definition 20, second bullet). Flipping it is one line and changes material
-state for *every* face with synthetic segments, so measure it strictly on its
-own, and watch triangle counts per face, not just rendered/lost — the ledger
-carries `triangles=` for exactly this.
+### 5. `SourceSyntheticCrossing` — 1,796 faces, and nobody has looked
 
-Sequence it **after** package 1: if seams become cut-pair relations rather than
-constraint edges, this population may change shape.
+Now the second-largest insertion bucket, and the only large class in this
+document with **no** hypothesis attached. WAVE-3A established that these do not
+come from the two-loop join: 1,507 are `SeamWithoutTwoLoopJoin` and 269 carry
+no seam evidence at all.
 
-### 5. Sphere lift — 380 faces
+So a real source trim segment is crossing a synthesised one. Either the
+synthetic segment is being placed wrongly, or the face needed no synthetic
+segment at all. The DIAG-001 witnesses already name both segments and their
+origins; a morning with them would probably produce a mechanism. Cheap to
+investigate, and 11% of the residual.
 
-Spheres own 380 of the 1,492 `AmbiguousLift`, and cone another 673. Together
-that is 71% of the class in two families. `AMBIGUOUS_STEP_FRACTION = 0.45`
-bisection exhausting is the proximate cause; a certified per-family lift rule
-should clear most of it. Small, self-contained, good warm-up task.
+### 6. Rank-0 plane crossings — 2,947 faces, but this one is a build
+
+The single largest cell, 19% of the residual: physical boundary arcs properly
+crossing each other in a simply connected parameter domain. 2,250 inter-bound
+plus 697 same-bound, plus ~590 more on splines.
+
+Do not schedule this as a fix. Everything downstream of the planar slice's Step
+7 assumes a **simple** Jordan boundary — Step 8A's polygonal region, ear
+clipping "inserts no Steiner points and emits only interior triangles", Step
+8B's battery asserting "the mesh boundary equals the expected polygon cycle". A
+normalized arrangement is not a simple polygon. Splitting arcs at their
+certified intersections yields a planar *arrangement* whose faces must be
+extracted and whose material region must be selected by parity: a new Step 7′
+and a new material selection.
+
+What exists to build it on: `formal/bezier_isect::intersect_bezier_pair`
+(certified roots, germs, transverse orientation, canonical pair-local
+identities), `formal/exact`, and the `SliceExit` variants that already isolate
+the population (`NonadjacentCrossing`, `BoundaryComponentsCross`).
+`ParameterEnclosure2` on the DIAG-001 witnesses is `None` everywhere and is the
+natural first observable.
+
+Take it on when packages 1–5 are done, and give it a session of its own.
 
 ---
 
-## Three models to look at directly
+## Where the loss lives
 
-Residual is not uniform. These three hold 7,664 faces — 39% of all remaining
-loss:
-
-| model | residual | note |
+| model | residual | biggest cell |
 |---|---:|---|
-| `00007705` | 3,727 | worst in corpus; recovered only 238 of 3,965 |
-| `00000414` | 2,184 | **recovered nothing at all** |
-| `00001075` | 1,753 | recovered 2,813, still the third worst |
+| `00007705` | 2,602 | 894 plane CII |
+| `00000414` | 1,733 | 1,175 NURBS projection |
+| `00003172` | 1,537 | 369 cylinder projection |
+| `00001075` | 1,458 | 363 NURBS projection |
+| `00000730` | 1,396 | 631 cylinder projection |
+| `00005760` | 1,363 | 515 plane CII |
+| `00009190` | 935 | 205 plane CII |
+| `00003902` | 828 | 682 torus projection |
+| `00005427` | 723 | 494 cone lift |
 
-`00000414` and `00005427` (723 residual) are the two models where the formal
-routes fired zero times. Whatever they are made of is not what the band routes
-were built for, and a look at either may be worth more than another corpus
-sweep.
+The top four hold 47% of all remaining loss, and three of them are dominated by
+a projection failure — package 1 or package 4, not the arrangement build.
+`00000414` is 68% NURBS projection failures on its own.
 
 ---
 
@@ -243,33 +245,52 @@ sweep.
 
 Any new route must:
 
-- be **refinement-only** — entered only where `failure.is_some()`, so it can
-  replace nothing but a failure. This is what makes `rendered -> lost = 0`
-  structural rather than lucky;
+- be **refinement-only** — entered only where the legacy path produced no mesh,
+  so it can replace nothing but a failure. This is what makes
+  `rendered -> lost = 0` structural rather than lucky. WAVE-3A's two routes
+  both achieve it by construction: one re-runs the ordinary tessellator on the
+  same pieces, the other is the last link of the projection chain;
 - ship behind `TRUCK_FORMAL_RECOVERY_<ROUTE>`, default-on, disabled by an
-  explicit `0`/`off`/`false`/`no`, nested under the master gate;
+  explicit `0`/`off`/`false`/`no`, nested under the master gate, so its own
+  contribution stays one subtraction;
 - keep the declared population fixed and be reconciled per `source_face_id`
-  against the previous pinned revision on all 20 models;
+  against the previous pin on all 20 models;
 - validate before replacing: constraint completeness, boundary preservation,
-  seam-pair consistency, connectedness, Euler characteristic, boundary-component
-  count, world-space tessellation tolerance.
+  seam-pair consistency, connectedness, Euler characteristic,
+  boundary-component count, world-space tessellation tolerance.
 
-Two traps that cost me time this session, both now in
-`docs/WAVE_2C_GATE_GRADUATION.md`:
+Traps that have each cost a session:
 
-- **Never batch benchmark configs.** All-of-A-then-all-of-B reported a 2.6×
-  slowdown that does not exist. Alternate and take the minimum of ≥5 reps.
+- **Never batch benchmark configs.** All-of-A-then-all-of-B once reported a
+  2.6× slowdown that does not exist. Alternate, and take the minimum of ≥5 reps.
 - **A fresh exe timestamp is not a fresh exe.** `cargo test` rebuilds examples
-  using whatever `Cargo.toml` said at the time. Wait for the build's own
+  using whatever the manifest said at the time. Wait for the build's own
   completion, then verify by behaviour.
+- **`.cargo/config.toml`'s path override is invisible in `Cargo.lock`.** A
+  measurement taken through it is not a measurement of anything pushed.
+  Re-comment it, bump the rev, and confirm the pinned build reproduces the
+  number before writing it down.
+- **Check free disk before timing anything.** A near-full disk once turned a
+  5.5 s workload into 136 s.
+
+---
 
 ## Artifacts
 
-Outside git, `C:\Users\stefa\look-corpus\p1-out\`:
+Outside git, in `C:\Users\stefa\look-corpus\p1-out\`:
 
-- `corpus-pinned/{off,on}_<id>.{census,ledger}.txt` — 20 models, both configs,
-  at the pinned revision; byte-identical to the override build
-- `diag/<id>.jsonl` — DIAG-001 residual records, default-on, per model
-- `reconcile.py`, `sweep.sh`, `sweep-pinned.sh`, `diag-sweep.sh`
-- `HANDOFF.superseded-2026-08-06.md` — the previous edition of this file,
-  preserved because it was uncommitted when this replaced it
+- `diag-w3a/<id>.jsonl` — the current residual's DIAG-001 records, default-on
+  at the pin, per model. **This is the file to start from.**
+- `w3a_tab.py`, `W3A_TAB.txt` — every table above
+- `deck_tab.py`, `DECK_TAB.txt` — the deck/seam cross-tab that decided WAVE-3A
+- `diag-w3a-sweep.sh`, `deck-join-sweep.sh`, `seed-sweep.sh`,
+  `sweep-pinned.sh` — the sweeps, all alternating configs per model
+- `deckjoin/`, `seed/`, `corpus-pinned/` — `{off,on}` census and ledger pairs
+- `reconcile.py` — the per-`source_face_id` regression gate
+
+Build (there is no MSVC toolchain on this machine, only LLVM-MinGW):
+
+```
+cargo +stable-x86_64-pc-windows-gnullvm build --release \
+      --target x86_64-pc-windows-gnullvm --example face_census
+```
