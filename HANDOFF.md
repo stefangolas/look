@@ -21,25 +21,80 @@ a third. The other 17 range from 0.17% to 11.79% loss.
 This document is about the 15,620, ordered by **how many faces you get for how
 much work**. Every number is freshly measured at the current pin, default-on.
 
+**Three sessions are planned out below**: A+B now, C next, and a third that the
+first two are asked to pre-size as they pass. Read "The plan" and then the
+package sections it names — the rest is reference.
+
 ---
 
-## Start here — the fast path to a lot of faces
+## The plan — three sessions
 
-Three packages sit in front of **~4,700 faces, 30% of the residual**, and none
-of them needs new theory. Do them in this order; each is independent, so a
-failure does not block the next.
+**This session: A and B.** Next session: C. The one after that is sized by two
+diagnostics that A/B and C are asked to collect on their way past, so it does
+not open with a survey.
 
-| # | package | faces | why it is fast |
+| session | package | faces in scope | shape |
 |---|---|---:|---|
-| A | cylinder parity (§2) | 1,422 | **one line.** Hypothesis stated, site named. |
-| B | analytic projection (§1) | 2,127 | Mechanism read off the source; first test defined, needs no new machinery. |
-| C | Step 8A-arc (§6) | ~1,163 | The analytic occurrences now exist. One new piece — a certified arc polygonalization — feeds both planar slices. **Build it in `planar_holes` too, or it is worth 64.** |
+| **1 — now** | **A** cylinder parity (§2) | 1,422 | one line |
+| **1 — now** | **B** analytic projection (§1) | 2,127 | measure, then a small fix |
+| 2 | **C** Step 8A-arc (§6) | ~1,163 | a real build |
+| 3 | the remaining ~10,900 | — | pre-sized by A/B's and C's ride-along diagnostics |
 
-**A and B before C.** A is an afternoon at most and settles a question deferred
-three waves running. B is the largest single mechanism in the residual and its
-first test is a measurement, not a build — if the residuals come back small the
-fix is a few lines in `Processor::search_nearest_parameter`. C is a real build,
-but it is the one WAVE-3B unblocked and its machinery is in place.
+Everything in session 1 needs **no new theory and no new machinery**. Do A
+first: it is an afternoon at most and settles a question deferred three waves
+running. Then B, which is the largest single mechanism in the residual and whose
+first step is a measurement, not a build — if the residuals come back small, the
+fix is a few lines in `Processor::search_nearest_parameter`.
+
+**Do not start C this session.** Its machinery is in place and its mechanism is
+the best understood of the three, but it is a full session on its own and
+splitting it across two is how the arc work gets half-landed. §6 has the build
+spec ready.
+
+### Measure A and B separately, always
+
+Each route ships behind its own `TRUCK_FORMAL_RECOVERY_<NAME>` gate, default-on,
+**so its own contribution stays one subtraction**. Landing both and taking one
+census gives one number that cannot be attributed. This project has already lost
+time to exactly that (the cylinder-band wave, where one gate covered two routes).
+Run the corpus with each route's gate at `0` in turn and diff on
+`source_face_id`.
+
+For A specifically: watch **triangles per face**, not just rendered/lost. The
+ledger carries `triangles=` for this. Flipping `toggles_material` changes
+material state for *every* face carrying synthetic segments, and a face that
+starts rendering with a wildly different triangle count is not a recovery.
+
+### Two diagnostics to collect while you are already there
+
+Both are close to free *if done in the session that is already in that code*,
+and expensive as their own survey later. They are what makes session 3 a build
+instead of a week of measurement.
+
+**In session 1, during B — the spline projection diagnostics.** B puts you
+inside the boundary projection path, which is exactly where package 4 (§4,
+splines, **3,652 faces — the largest post-C block**) is decided. §4 has the
+full four-field spec; the short version is: failed points *per face and as a
+ratio*, which link of the five-step chain failed, how many seeds were actually
+offered, and the best seed's residual.
+
+Do not shorten it to the bare failing-point count. Each of the other three
+guards against a specific wrong reading — a route that never ran, a route that
+offered one seed and so did nothing, and residuals that cluster just above
+tolerance and mean the class belongs to §1 rather than §4 at all. **This is the
+number that decides what session 3 is**, and the epistemics are currently good
+enough on §4 that a sloppy version would be worse than none.
+
+**In session 2, during C — the `no_developable_curve` histogram.** C puts you in
+the planar funnel. 1,956 planar lost faces exit there, the largest remaining
+planar block, and *nothing* is known about them beyond the count. The
+`SliceRecord` now carries curve representations even on refusal (WAVE-3B), so
+this is a tabulation over `curves=`, not new instrumentation — one command with
+`p1-out/slice_tab.py` adapted. It sizes the spline-on-planar-boundary work and
+will very likely merge with §4.
+
+Neither is a detour worth taking on its own. Both are ten minutes when you are
+already in the file.
 
 ### Your first twenty minutes
 
@@ -243,12 +298,62 @@ no effect on any other family. It did not clear more because a face is lost if
 *any one* of its boundary points fails to project, so partial success on a face
 recovers nothing.
 
-**Measure this before adding seeds.** The record does not currently carry how
-many points failed per face. Extend DIAG-001 with a failing-point count and a
-sample of the failing 3D points. If the distribution is mostly one or two
-points per face, more or better starts will clear whole faces cheaply. If it is
-tens, the cause is not the initialisation and the seeds were treating a
-symptom.
+#### The epistemic state, stated precisely
+
+- NURBS 2,472, B-spline 1,180.
+- Knot-span seeding recovered 705 faces with zero regressions and no effect on
+  any other family, so **initialisation is demonstrably one real cause**.
+- Recovery is **all-or-nothing per face**: a face is lost if *any one* boundary
+  point fails to project, so partial success recovers nothing.
+- **What the diagnostics do not say** is whether each remaining face has one
+  failed point or dozens. Everything about how to spend the next session on this
+  class turns on that, and nothing on disk answers it.
+
+#### The measurement spec — collect in session 1, during package B
+
+B already works inside the projection path, so this is instrumentation at a site
+you are editing anyway. Four fields, all cheap; the first is the decisive one
+and the rest are what stop a wrong reading of it.
+
+1. **`failed_points` and `boundary_points` per face.** The counter goes next to
+   the existing `return Err(BoundaryProjectionFailed)` in
+   `PolyBoundaryPiece::try_new`; the denominator is `bdry3d.len()`. Report the
+   *ratio* as well as the count — three failures out of 400 and three out of
+   five are different diagnoses.
+2. **Which link of the chain failed.** `by_search_nearest_parameter` tries five
+   things in order: `search_parameter(hint)`, `search_parameter(None)`,
+   `search_nearest_parameter(hint)`, `search_nearest_parameter(None)`, then
+   `by_structural_seeds`. Record the furthest link reached. "The seed route ran
+   and still failed" and "the seed route never ran" are opposite conclusions and
+   are currently indistinguishable.
+3. **Seed count actually offered.** `search_parameter_seeds` returns one start
+   per knot-span cell, so a surface with a single span offers **one** seed — the
+   route fires, does nothing different from the plain call, and looks like a
+   failed hypothesis rather than a no-op. Separate those two populations or the
+   705 will be misread.
+4. **Best-seed residual.** `by_structural_seeds` already computes
+   `surface.subs(uv).distance(point)` for every seed and keeps the best; emit it
+   on failure. This is what distinguishes *diverged* from *converged just
+   outside tolerance* — and if the residuals cluster just above `tol`, the class
+   is not an initialisation problem at all but the same
+   tolerance/compatibility-factor question package 1 is about, which would merge
+   §4 into §1 rather than into §5.
+
+Plus a sample of the failing 3D points, which are already in hand at the failure
+site — clustered on one edge (a bad edge curve) reads differently from scattered
+across the boundary.
+
+#### How to read it
+
+| result | what session 3 does |
+|---|---|
+| mostly 1–2 failed points/face, seeds ran, residuals large | **more or better starts.** §4 is the session; 3,652 faces plus whatever share of the 1,956 planar `no_developable_curve` is the same mechanism. |
+| seeds never ran, or offered one seed | the 705 understates the route. **Extend the seed source** before concluding anything — cheapest possible outcome. |
+| residuals cluster just above `tol` | not initialisation. Merges into §1's tolerance question, and package 1's fix may take this class with it. |
+| tens of failed points/face, seeds ran, residuals large | initialisation is dead as a hypothesis and the seeds were treating a symptom. Session 3 is **§5** instead. |
+
+**If only one ride-along survives the session, make it this one** — it is the
+number that decides what session 3 even is.
 
 ### 5. `SourceSyntheticCrossing` — 1,796 faces, and nobody has looked
 
@@ -365,6 +470,47 @@ Two cheaper items fell out of the same measurement:
   block and nothing is known about it beyond the count; a `curves=` histogram
   over it (the `SliceRecord` now carries representations even on refusal) is an
   hour and would size the next planar wave.
+
+---
+
+## After C — where the residual lives, and what session 3 opens with
+
+A, B and C together are **4,712 faces in scope**, leaving roughly **10,900**.
+"In scope" is not "recovered" — this file's history is that measurement corrects
+these targets, so treat 10,900 as a floor on what is left, not a forecast.
+
+Where it sits today, by mechanism rather than by cell:
+
+| block | faces | state going into session 3 |
+|---|---:|---|
+| **spline projection** (§4) — NURBS 2,472 + B-spline 1,180 | 3,652 | **The best epistemics of any remaining class**, and sized by session 1's ride-along. Seeding is a *demonstrated* cause (705 faces, zero regressions); what is unknown is only whether each face has one failed point or dozens. |
+| **`SourceSyntheticCrossing`** (§5) | 1,796 | The only large class with **no hypothesis**. Witnesses already exist in DIAG-001 — this needs a morning of reading, not instrumentation. |
+| **planar `no_developable_curve`** | 1,956 | **Sized by session 2's ride-along diagnostic.** Almost certainly splines on planar boundaries, in which case it merges with §4 and the two are one build. |
+| **cone + sphere lift** (§3) | 1,053 | Self-contained. `AMBIGUOUS_STEP_FRACTION` bisection exhausting; a certified per-family lift rule. `00005427` is 494 of them. |
+| **cylinder CII** | 1,238 | Untouched by every wave so far. No hypothesis. |
+| remainder | ~1,200 | Long tail across torus/extruded/revolved/offset. Not worth chasing until the above are gone. |
+
+**Read the overlaps carefully.** `SourceSyntheticCrossing` is a sub-bucket of
+`ConstraintInsertionIncomplete` and cuts *across* families, so it double-counts
+against the per-family CII rows in the residual table above. The family×reason
+cross-tab and the insertion-bucket histogram are two views of one population,
+not two populations.
+
+**What session 3 opens with**, assuming both ride-alongs were collected: §4's
+"How to read it" table maps the four possible diagnostic outcomes onto four
+different sessions — more seeds, a wider seed source, a merge into §1's
+tolerance question, or a pivot to §5. Three of those four make session 3 the
+largest wave since WAVE-2C; the fourth kills a hypothesis that would otherwise
+have cost a session to kill.
+
+**§4 is the default next target and deserves to be.** It is the only large class
+where a mechanism has been *demonstrated* rather than hypothesised — the 705
+faces are evidence, not a story — and the single open question is a counter, not
+a theory. §5 is bigger in ambition and emptier in evidence; take it only if the
+counter sends you there.
+
+Either way session 3 starts from a decision, not a survey. That is the whole
+point of collecting the counters en route.
 
 ---
 
