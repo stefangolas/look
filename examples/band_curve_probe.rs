@@ -121,7 +121,7 @@ fn verdict(schema: &CurveSchema) -> (&'static str, String) {
     match schema {
         CurveSchema::LineSegment(_) => ("line_segment", "-".into()),
         CurveSchema::Polyline(_) => ("polyline", "-".into()),
-        CurveSchema::CircularArc => ("circular_arc", "-".into()),
+        CurveSchema::CircularArc(_) => ("circular_arc", "-".into()),
         CurveSchema::NotStructurallyIdentified(failure) => (
             "not_structurally_identified",
             match failure {

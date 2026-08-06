@@ -181,11 +181,22 @@ pub fn support_schema_of(surface: &Surface) -> SupportSurfaceSchema {
 /// the representation *is* the trimmed segment — so there is no separate
 /// trimming to reconcile.
 ///
-/// Everything else is refused by name. Circles and ellipses arrive as
-/// `Conic(Ellipse(..))` and need an analytic arc bound; splines need a
-/// whole-interval flatness certificate; a `PCurve` needs the source
-/// representation contract of Step 3's route A, which `truck-stepio` does not
-/// carry today. Each is a separate P2 expansion and the corpus ranks them.
+/// A circle or ellipse arrives as `Conic(..)` and is read through the same
+/// certified decoders the rank-1 route uses ([`cylinder_curve_schema_of`]), so
+/// there is exactly one circle reader in the workspace and a source `ellipse`
+/// still has to prove circularity exactly. Reading it here **grants nothing to
+/// the polygonal path**: `CurveSchema::circular_arc()` and
+/// `CurveSchema::polygonal()` are disjoint accessors, and Step 3's polygonal
+/// route (`certified_planar_curves`) still exits
+/// `UnsupportedCurveRepresentation` on an arc. What changes is only that the
+/// refusal now happens at Step 3, where the face's curve families are known,
+/// instead of at Step 2's bare identification gate — which is what lets the
+/// developed-curve track see the arc at all.
+///
+/// Everything else is refused by name: splines need a whole-interval flatness
+/// certificate; a `PCurve` needs the source representation contract of Step 3's
+/// route A, which `truck-stepio` does not carry today. Each is a separate P2
+/// expansion and the corpus ranks them.
 pub fn curve_schema_of(curve: &Curve3D) -> CurveSchema {
     let unread = |representation| {
         CurveSchema::not_structurally_identified(CurveSchemaFailure::NoStructuralReader {
@@ -195,11 +206,8 @@ pub fn curve_schema_of(curve: &Curve3D) -> CurveSchema {
     match curve {
         Curve3D::Line(line) => identify_line_segment(line),
         Curve3D::Polyline(polyline) => identify_polyline(&polyline.0),
-        // The planar rank-0 path refuses every conic exactly as before; the
-        // source family only makes the refusal say which entity it was.
-        // Admitting a circular arc here is Milestone B, not this change.
-        Curve3D::Conic(Conic3D::Circle(_)) => unread("circle"),
-        Curve3D::Conic(Conic3D::Ellipse(_)) => unread("ellipse"),
+        Curve3D::Conic(Conic3D::Circle(circle)) => arc_schema(decode_source_circle(circle)),
+        Curve3D::Conic(Conic3D::Ellipse(ellipse)) => arc_schema(decode_transformed_circle(ellipse)),
         Curve3D::Conic(Conic3D::Hyperbola(_)) => unread("hyperbola"),
         Curve3D::Conic(Conic3D::Parabola(_)) => unread("parabola"),
         Curve3D::BSplineCurve(_) => unread("b_spline_curve"),
@@ -212,11 +220,39 @@ pub fn curve_schema_of(curve: &Curve3D) -> CurveSchema {
 // Rank-1 cylinder curve classification (Task 2)
 // ---------------------------------------------------------------------------
 
-use crate::step::circular_arc::{decode_source_circle, decode_transformed_circle};
-use truck_meshalgo::tessellation::formal::{CompleteCirclePlacement, SourceCurveFamily};
+use crate::step::circular_arc::{
+    CertifiedCircularArc, CircularArcAdapterFailure, decode_source_circle,
+    decode_transformed_circle,
+};
+use truck_meshalgo::tessellation::formal::{
+    CircularArcPlacement3, CompleteCirclePlacement, SourceCurveFamily,
+};
 
-/// The cylinder-only companion to [`curve_schema_of`]'s Step-2 admission
-/// gate.
+/// Turn a certified-circle decode into the schema, preserving the decoder's
+/// own refusal tag.
+///
+/// The single place a `CertifiedCircularArc` becomes a
+/// [`CircularArcPlacement3`]. A failed decode is `NoStructuralReader` carrying
+/// the decoder's cause, so "this ellipse is not exactly circular" and "no
+/// reader exists for this representation" stay distinguishable in the corpus
+/// histogram.
+fn arc_schema(decoded: Result<CertifiedCircularArc, CircularArcAdapterFailure>) -> CurveSchema {
+    match decoded {
+        Ok(arc) => CurveSchema::CircularArc(CircularArcPlacement3 {
+            center: arc.center(),
+            cos_basis: arc.basis_cos(),
+            sin_basis: arc.basis_sin(),
+            parameter_interval: arc.source_interval(),
+        }),
+        Err(cause) => {
+            CurveSchema::not_structurally_identified(CurveSchemaFailure::NoStructuralReader {
+                representation: cause.tag(),
+            })
+        }
+    }
+}
+
+/// The cylinder route's Step-2 admission gate.
 ///
 /// `regular_traversal`/`build_cylinder_face`'s traversal gate only asks
 /// whether *some* structural reader succeeded
@@ -224,42 +260,20 @@ use truck_meshalgo::tessellation::formal::{CompleteCirclePlacement, SourceCurveF
 /// content for the cylinder route, because
 /// [`truck_meshalgo::tessellation::formal::develop_traversal_from_source`]
 /// re-derives the curve family and signed sweep independently from
-/// [`cylinder_curve_family_of`]. So this function only needs to say "line",
-/// "certified circular arc", or "not admitted" — it does not need to carry
-/// the arc's numbers, unlike `cylinder_curve_family_of` below.
+/// [`cylinder_curve_family_of`].
 ///
-/// Kept separate from [`curve_schema_of`] rather than changing that
-/// function's `Conic` arm: the planar rank-0 path must keep refusing a
-/// circle/ellipse exactly as it does today (a certified circular arc is not
-/// yet a planar rank-0 witness — that is Milestone B), and folding this
-/// admission into the one function shared by both routes would let a
-/// planar-only caller silently admit a curve family its own downstream
-/// stage cannot use.
+/// This used to differ from [`curve_schema_of`]: the planar rank-0 path
+/// refused a circle at Step 2 and the cylinder path admitted one, so folding
+/// them together would have let a planar-only caller past a gate its own
+/// downstream stage could not honour. That is no longer the case —
+/// `curve_schema_of` reads the same certified decoders, and the planar path's
+/// polygonal Step 3 refuses an arc on the schema's *content*
+/// (`CurveSchema::polygonal()` is `None`) rather than on its identification.
+/// The two seams are therefore one function now. The name is kept because the
+/// tessellation entry point threads it as a distinct adapter, and collapsing
+/// that signature is a separate change.
 pub fn cylinder_curve_schema_of(curve: &Curve3D) -> CurveSchema {
-    match curve {
-        Curve3D::Line(line) => identify_line_segment(line),
-        Curve3D::Polyline(polyline) => identify_polyline(&polyline.0),
-        // A source `circle` is read on its own family's authority; a source
-        // `ellipse` still has to prove circularity exactly, and so never
-        // becomes an arc however nearly circular it is.
-        Curve3D::Conic(Conic3D::Circle(circle)) => match decode_source_circle(circle) {
-            Ok(_) => CurveSchema::CircularArc,
-            Err(cause) => {
-                CurveSchema::not_structurally_identified(CurveSchemaFailure::NoStructuralReader {
-                    representation: cause.tag(),
-                })
-            }
-        },
-        Curve3D::Conic(Conic3D::Ellipse(ellipse)) => match decode_transformed_circle(ellipse) {
-            Ok(_) => CurveSchema::CircularArc,
-            Err(cause) => {
-                CurveSchema::not_structurally_identified(CurveSchemaFailure::NoStructuralReader {
-                    representation: cause.tag(),
-                })
-            }
-        },
-        _ => curve_schema_of(curve),
-    }
+    curve_schema_of(curve)
 }
 
 /// Classify one real source edge's curve into the [`SourceCurveFamily`]
@@ -342,7 +356,7 @@ pub fn cylinder_curve_family_of(curve: &Curve3D) -> Option<SourceCurveFamily> {
 #[cfg(test)]
 mod cylinder_curve_tests {
     use super::*;
-    use truck_meshalgo::prelude::Point3;
+    use truck_meshalgo::prelude::{InnerSpace, Point3};
     use truck_stepio::r#in::step_geometry::{
         Line as StepLine, Processor, TrimmedCurve, UnitCircle,
     };
@@ -466,14 +480,43 @@ mod cylinder_curve_tests {
     }
 
     #[test]
-    fn the_planar_curve_schema_refuses_both_conic_families() {
-        // The planar rank-0 path is untouched by the repair. It refuses a
-        // source `circle` exactly as it refuses an unauthorized one; only the
-        // reported representation name distinguishes them.
+    fn the_planar_curve_schema_identifies_a_conic_without_making_it_polygonal() {
+        // Milestone B moved the refusal, not the admission. Both conic
+        // families are now *identified* — so Step 2's bare identification gate
+        // admits them and the developed-curve track can see the arc — while
+        // `polygonal()` stays `None`, which is what Step 3's polygonal route
+        // reads. A face bounded by arcs therefore still exits
+        // `UnsupportedCurveRepresentation`; it just does so at the stage that
+        // knows why.
         for curve in [source_circle_curve((0.0, 1.0)), circle_curve((0.0, 1.0))] {
-            assert!(!curve_schema_of(&curve).is_structurally_identified());
+            let schema = curve_schema_of(&curve);
+            assert!(schema.is_structurally_identified());
+            assert!(schema.polygonal().is_none());
+            assert!(schema.circular_arc().is_some());
             assert!(cylinder_curve_schema_of(&curve).is_structurally_identified());
         }
+    }
+
+    #[test]
+    fn the_planar_curve_schema_carries_the_arc_placement_the_source_declared() {
+        // The placement must be the source curve's own basis and its own
+        // trimmed interval, so that developing it into a planar chart is an
+        // affine map and nothing has to be re-derived from endpoints.
+        let schema = curve_schema_of(&circle_curve((0.2, 1.4)));
+        let placement = schema.circular_arc().expect("a circle carries a placement");
+        assert_eq!(placement.parameter_interval, (0.2, 1.4));
+        // `evaluate(t) == center + cos(t) * cos_basis + sin(t) * sin_basis`,
+        // checked at the interval's own start rather than at a canonical
+        // parameter, because the interval is the authoritative fact.
+        let t = placement.parameter_interval.0;
+        let evaluated =
+            placement.center + t.cos() * placement.cos_basis + t.sin() * placement.sin_basis;
+        let decoded = decode_transformed_circle(match &circle_curve((0.2, 1.4)) {
+            Curve3D::Conic(Conic3D::Ellipse(e)) => e,
+            _ => unreachable!("the fixture is a conic"),
+        })
+        .expect("the fixture decodes");
+        assert!((evaluated - decoded.evaluate(t)).magnitude2() < 1e-24);
     }
 
     #[test]
@@ -527,14 +570,22 @@ mod cylinder_curve_tests {
         );
     }
 
-    /// The planar path's own admission is unchanged: a circle is still
-    /// refused by `curve_schema_of` (Milestone B territory, not this
-    /// session), even though `cylinder_curve_schema_of` now admits it.
+    /// The two seams now read circles identically, so the cylinder route's
+    /// admission cannot drift from the planar one. This is the property that
+    /// replaced "the planar path refuses a circle": there is one circle reader
+    /// in the workspace, and both callers see its answer.
     #[test]
-    fn the_planar_curve_schema_still_refuses_a_circle() {
+    fn both_seams_read_a_circle_the_same_way() {
         let curve = circle_curve((0.0, 1.0));
-        assert!(!curve_schema_of(&curve).is_structurally_identified());
-        assert!(cylinder_curve_schema_of(&curve).is_structurally_identified());
+        assert!(curve_schema_of(&curve).is_structurally_identified());
+        assert_eq!(
+            curve_schema_of(&curve).tag(),
+            cylinder_curve_schema_of(&curve).tag()
+        );
+        assert_eq!(
+            curve_schema_of(&curve).circular_arc().copied(),
+            cylinder_curve_schema_of(&curve).circular_arc().copied()
+        );
     }
 }
 

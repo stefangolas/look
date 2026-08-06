@@ -361,6 +361,17 @@ fn census(
     } else {
         DEGENERATE_TOLERANCE
     };
+    // Diagnostic only. `TRUCK_CENSUS_TOL_FACTOR` multiplies the production
+    // tolerance so one run can ask whether a loss class is an artefact of the
+    // boundary's polyline approximation rather than of its geometry. Unset,
+    // this is exactly the production tolerance and the census is unchanged.
+    let tolerance = match env::var("TRUCK_CENSUS_TOL_FACTOR") {
+        Ok(raw) => match raw.parse::<f64>() {
+            Ok(factor) if factor.is_finite() && factor > 0.0 => tolerance * factor,
+            _ => tolerance,
+        },
+        Err(_) => tolerance,
+    };
 
     for shell in &converted {
         let kinds: Vec<&'static str> = shell
@@ -462,7 +473,10 @@ fn census(
                     Some(Some(TorusAnnulusAttempt::Recovered {
                         triangles,
                         conformance,
-                    })) => format!("recovered:{triangles}:{}", torus_conformance_tag(conformance)),
+                    })) => format!(
+                        "recovered:{triangles}:{}",
+                        torus_conformance_tag(conformance)
+                    ),
                     Some(Some(TorusAnnulusAttempt::Refused(exit))) => exit.tag().to_string(),
                     _ => "not_eligible".into(),
                 };
