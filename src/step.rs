@@ -21,7 +21,7 @@ use std::time::Instant;
 
 use rayon::prelude::*;
 use truck_meshalgo::prelude::*;
-use truck_meshalgo::tessellation::TessellationFailureReason;
+use truck_meshalgo::tessellation::{TessellationFailureReason, TorusAnnulusAttempt};
 use truck_stepio::r#in::Table;
 use truck_topology::compress::FaceProvenance;
 
@@ -186,6 +186,8 @@ pub fn parse_step(
                     // "this loss happened upstream of the stage that names
                     // reasons", which `unconverted()` already reports.
                     Vec::new(),
+                    // No torus outcomes: nothing reached the tessellator.
+                    BTreeMap::new(),
                 ));
             }
             // Periodicity now reaches the tessellator as a descriptor built
@@ -199,7 +201,7 @@ pub fn parse_step(
             // line after constructing it. The reasons now arrive beside the
             // shell, so a face that produced nothing can say why rather than
             // being inferred from the shape of its absence.
-            let outcome = shell.robust_triangulation_with_cone_outcome(
+            let outcome = shell.robust_triangulation_with_torus_outcome(
                 tolerance,
                 lattice::lattice_of,
                 lattice::support_schema_of,
@@ -208,6 +210,7 @@ pub fn parse_step(
                 lattice::cylinder_curve_schema_of,
                 lattice::cylinder_curve_family_of,
                 cone::identify_source_cone_opt,
+                torus_deck::identify_source_torus_opt,
             );
             let meshed = outcome.shell;
             // A face that could not be meshed is dropped from the polygon
@@ -258,7 +261,30 @@ pub fn parse_step(
                     lost_ids.push(face.provenance);
                 }
             }
-            Ok::<_, String>((meshed.to_polygon(), tally, lost_ids, reasons))
+            // Torus observer: count the typed outcome of each face the torus
+            // annulus route attempted. This runs in shadow (TRUCK_PROBE_TORUS)
+            // or recovery (TRUCK_FORMAL_RECOVERY_TORUS) mode; in shadow the
+            // mesh is not replaced, so the counts reproduce the corrected
+            // census without changing production output.
+            let mut torus_census: BTreeMap<&'static str, usize> = BTreeMap::new();
+            for attempt in &outcome.torus_band_attempts {
+                let tag = match attempt {
+                    Some(TorusAnnulusAttempt::Recovered {
+                        conformance, ..
+                    }) => match conformance {
+                        truck_meshalgo::tessellation::formal::ConformanceTag::SourceClean => {
+                            "recovered_clean"
+                        }
+                        truck_meshalgo::tessellation::formal::ConformanceTag::MalformedTwoOuterBoundsOnCertifiedTorusAnnulus => {
+                            "recovered_malformed"
+                        }
+                    },
+                    Some(TorusAnnulusAttempt::Refused(exit)) => exit.tag(),
+                    None => continue,
+                };
+                *torus_census.entry(tag).or_insert(0) += 1;
+            }
+            Ok::<_, String>((meshed.to_polygon(), tally, lost_ids, reasons, torus_census))
         })
         .collect::<Vec<_>>();
     timings.record("step_tessellate", mesh_started.elapsed());
@@ -269,9 +295,10 @@ pub fn parse_step(
     let mut faces = FaceTally::default();
     let mut lost_faces: Vec<FaceProvenance> = Vec::new();
     let mut reason_counts: BTreeMap<TessellationFailureReason, usize> = BTreeMap::new();
+    let mut torus_census_total: BTreeMap<&'static str, usize> = BTreeMap::new();
     for result in meshed {
         match result {
-            Ok((polygon, tally, lost_ids, reasons)) => {
+            Ok((polygon, tally, lost_ids, reasons, torus_census)) => {
                 append_polygon(&polygon, &mut positions, &mut indices);
                 faces.declared += tally.declared;
                 faces.total += tally.total;
@@ -279,6 +306,9 @@ pub fn parse_step(
                 faces.empty += tally.empty;
                 for reason in reasons {
                     *reason_counts.entry(reason).or_insert(0) += 1;
+                }
+                for (tag, count) in torus_census {
+                    *torus_census_total.entry(tag).or_insert(0) += count;
                 }
                 if lost_faces.len() < LOST_FACE_IDS_REPORTED {
                     lost_faces.extend(lost_ids);
@@ -364,6 +394,22 @@ pub fn parse_step(
                 );
             }
         }
+    }
+
+    // Torus observer census: the typed outcome of every face the torus annulus
+    // route attempted, across all shells. Printed unconditionally when the
+    // torus probe or recovery gate is active, so the census can be confirmed
+    // against the corrected expected counts.
+    if !torus_census_total.is_empty() {
+        let mut by_size: Vec<_> = torus_census_total.iter().collect();
+        by_size.sort_by(|a, b| b.1.cmp(a.1).then(a.0.cmp(b.0)));
+        let summary = by_size
+            .iter()
+            .map(|(tag, count)| format!("{tag}={count}"))
+            .collect::<Vec<_>>()
+            .join(", ");
+        let total: usize = torus_census_total.values().sum();
+        eprintln!("torus observer: {total} faces attempted, {summary}");
     }
 
     Ok((positions, indices))

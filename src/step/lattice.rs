@@ -331,6 +331,7 @@ pub fn cylinder_curve_family_of(curve: &Curve3D) -> Option<SourceCurveFamily> {
                     center: arc.center(),
                     sweep_axis,
                     radius: arc.radius().get(),
+                    curve_orientation: ellipse.orientation(),
                 },
             })
         }

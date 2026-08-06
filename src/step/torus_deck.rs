@@ -861,6 +861,60 @@ pub fn identify_source_torus_deck_opt(
     identify_source_torus_deck(surface).map_err(|failure| failure.tag())
 }
 
+// ---------------------------------------------------------------------------
+// Production torus adapter (returns the truck-side CertifiedEmbeddedTorus)
+// ---------------------------------------------------------------------------
+
+use truck_meshalgo::tessellation::formal::{
+    identify_torus_world, CertifiedEmbeddedTorus, TorusIdentification,
+};
+
+/// Read a `Surface` structurally and certify an embedded torus, when the
+/// representation is `ElementarySurface::ToroidalSurface`, returning the
+/// truck-side [`CertifiedEmbeddedTorus`] the production torus annulus route
+/// needs.
+///
+/// This is the torus analogue of
+/// [`crate::step::cylinder::identify_source_cylinder_opt`] and
+/// [`crate::step::cone::identify_source_cone_opt`]: it extracts the world-space
+/// torus parameters from the STEP `Processor<Torus, Matrix4>`, certifies the
+/// deck via [`identify_torus_world`], and packages the deck with the
+/// untransformed entity and placement transform so
+/// [`truck_meshalgo::tessellation::formal::realize_torus_annulus`] can evaluate
+/// `transform.transform_point(torus.subs(u, v))` during mesh realization.
+///
+/// Refuses: any non-toroidal surface, a non-similarity placement (under which
+/// the surface is not a torus), and a torus that fails certification (spindle,
+/// horn, degenerate, unverified period).
+pub fn identify_source_torus_opt(
+    surface: &Surface,
+) -> Result<CertifiedEmbeddedTorus, &'static str> {
+    let Surface::ElementarySurface(ElementarySurface::ToroidalSurface(processor)) = surface
+    else {
+        return Err("surface_not_toroidal");
+    };
+    let entity = processor.entity();
+    let transform = *processor.transform();
+
+    if !is_similarity(&transform) {
+        return Err("torus_placement_not_a_similarity");
+    }
+
+    let center = transform.transform_point(entity.center());
+    let axis = transform.transform_vector(Vector3::new(0.0, 0.0, 1.0));
+    let col_x = transform.transform_vector(Vector3::new(1.0, 0.0, 0.0));
+    let scale = col_x.magnitude();
+    let large = entity.large_radius() * scale;
+    let small = entity.small_radius() * scale;
+
+    match identify_torus_world(center, axis, large, small) {
+        TorusIdentification::Torus(deck) => {
+            Ok(CertifiedEmbeddedTorus::new(deck, *entity, transform))
+        }
+        TorusIdentification::NotATorus(_) => Err("torus_not_a_regular_ring_torus"),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
