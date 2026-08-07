@@ -11,7 +11,9 @@ pub mod circular_arc;
 pub mod cone;
 pub mod cylinder;
 pub mod lattice;
+pub mod meshing_policy;
 pub mod part21;
+pub mod policy_geometry;
 pub mod spline_carrier;
 mod tessellated;
 pub mod torus_deck;
@@ -154,6 +156,12 @@ pub fn parse_step(
         }
     }
     let tolerance = model_tolerance(model.diameter());
+    // The targeted linear-plus-angular meshing policy. The scalar `tolerance`
+    // remains the geometric-error bound Truck receives; the policy's angular
+    // floor is applied per feature by `policy_geometry`'s wrappers, which
+    // override only `parameter_division` and delegate everything else to
+    // Truck unchanged. See `step/meshing_policy.rs`.
+    let policy = meshing_policy::MeshingPolicy::DEFAULT;
 
     // Shells are independent, so tessellation parallelizes cleanly. A shell
     // that fails is reported rather than silently dropped, so a partial render
@@ -201,17 +209,24 @@ pub fn parse_step(
             // line after constructing it. The reasons now arrive beside the
             // shell, so a face that produced nothing can say why rather than
             // being inferred from the shape of its absence.
-            let outcome = shell.robust_triangulation_with_torus_outcome(
-                tolerance,
-                lattice::lattice_of,
-                lattice::support_schema_of,
-                lattice::curve_schema_of,
-                cylinder::identify_source_cylinder_opt,
-                lattice::cylinder_curve_schema_of,
-                lattice::cylinder_curve_family_of,
-                cone::identify_source_cone_opt,
-                torus_deck::identify_source_torus_opt,
-            );
+            let outcome = policy_geometry::wrap_shell(shell, policy)
+                .robust_triangulation_with_torus_outcome(
+                    tolerance,
+                    |s: &policy_geometry::PolicySurface| lattice::lattice_of(s.inner()),
+                    |s: &policy_geometry::PolicySurface| lattice::support_schema_of(s.inner()),
+                    |c: &policy_geometry::PolicyCurve| lattice::curve_schema_of(c.inner()),
+                    |s: &policy_geometry::PolicySurface| {
+                        cylinder::identify_source_cylinder_opt(s.inner())
+                    },
+                    |c: &policy_geometry::PolicyCurve| lattice::cylinder_curve_schema_of(c.inner()),
+                    |c: &policy_geometry::PolicyCurve| {
+                        lattice::cylinder_curve_family_of(c.inner())
+                    },
+                    |s: &policy_geometry::PolicySurface| cone::identify_source_cone_opt(s.inner()),
+                    |s: &policy_geometry::PolicySurface| {
+                        torus_deck::identify_source_torus_opt(s.inner())
+                    },
+                );
             let meshed = outcome.shell;
             // A face that could not be meshed is dropped from the polygon
             // without comment, so count them here while the structure still
@@ -480,7 +495,10 @@ fn read_exchange(text: &str) -> anyhow::Result<ruststep::ast::Exchange> {
 /// magnitude above `diameter * 1e-6`, which is the same margin the floor was
 /// chosen to give — only expressed in the units the file actually uses.
 fn model_tolerance(diameter: f64) -> f64 {
-    let scaled = diameter * RELATIVE_TOLERANCE;
+    // The linear deflection comes from the meshing policy so a policy edit is
+    // the single source of truth for the geometric-error bound (and so the
+    // cache identity, which keys on the policy, actually tracks it).
+    let scaled = diameter * meshing_policy::MeshingPolicy::DEFAULT.relative_linear_deflection;
     if scaled.is_finite() && scaled > 0.0 {
         scaled.max(MINIMUM_TOLERANCE)
     } else {

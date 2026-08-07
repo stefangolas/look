@@ -579,3 +579,137 @@ before the dispatcher.
 - §2E's `NoOddParityRegion` count of 342 is 402 at this baseline.
 - The `WindingParity` route records only when it runs, unlike the three band
   routes which record every dispatcher arm. Absence means not run.
+
+---
+
+## 11. What item 6 (PROJ-002) measured (2026-08-07)
+
+Pin: truck `f85cc3ff` + uncommitted PROJ-002 instrumentation
+(`diagnosis.rs`, `triangulation.rs`), `.cargo/config.toml` override live
+against the fork. Production acceptance unchanged: 839,179 declared, 12,368
+lost across the 20 ABC models — identical to the §10 baseline. Sweep:
+`p1-out/proj2-sweep.sh` over `look-corpus/abc/*/` (the 20-model set),
+`TRUCK_PROBE_PROJ_DEEP=1`, `TRUCK_FACE_DIAG_JSONL`. Aggregation:
+`p1-out/proj2_tab.py`.
+
+### Witness coverage
+
+**3,703 of 3,703 `BoundaryProjectionFailed` faces carry a deep witness; 0
+without.** The corrected gate (§2C: `projection_probe_enabled()` ORs in the
+deep gate; the walk site reads the shared helper, not the raw variable)
+produces a witness for every probed face. The first sweep was invalid for the
+reason the handoff records — `TRUCK_PROBE_PROJ_DEEP` armed the producer but
+the walk still checked raw `TRUCK_PROBE_PROJ`, so witnesses were silently
+empty — and is not repeated here.
+
+### The recoverable ceiling: 91.7%
+
+| best world residual | faces | share |
+|---|---:|---:|
+| ≤ 1 × tol | 3,396 | 91.7% |
+| ≤ 10 × tol | 3,460 | 93.4% |
+| ≤ 100 × tol | 3,585 | 96.8% |
+| > 100 × tol | 118 | 3.2% |
+
+For 91.7% of these failing faces the surface genuinely passes within tolerance
+of the boundary point. The face is lost to a search defect, not a geometric
+one. Only **30 faces (0.8%) are `NearestTooFar`** — a converged stationary
+point whose residual exceeds `tol`, a geometric statement that the boundary
+does not lie on the surface. The worst-point view (a face is lost by its worst
+point) is only slightly lower: 89.1% have every probed point within 1× tol.
+
+This is PROJ-001's unanswered column, answered. Production's
+`search_nearest_parameter` is `newton::solve(..).ok()`, so its `None` means
+**Newton did not converge**, not that the nearest point is far. The deep probe
+keeps the best iterate: 91.7% of those `None`s have a within-tolerance answer
+that was thrown away.
+
+### The dominant mechanism: ProductionMiss, not seeding
+
+| verdict | faces | share |
+|---|---:|---:|
+| ProductionMiss | 2,393 | 64.6% |
+| DomainOrContractIssue | 789 | 21.3% |
+| Inconclusive | 278 | 7.5% |
+| SeedBasinGap | 213 | 5.8% |
+| NearestTooFar | 30 | 0.8% |
+
+`ProductionMiss` — a start production already uses reached `residual ≤ tol`,
+in-domain, and Newton's `near2` convergence test rejected it — is 64.6% of the
+population. The winning route is a **production start on 89.2%** of faces
+(3,304); only 10.8% (399) are won by a structural seed. 3,423 faces (92.4%)
+had a trial-exhausted Newton search. **New seeds would fix only the 5.8%
+`SeedBasinGap` class; the dominant population needs the convergence gate
+changed, not the seed list.**
+
+`DomainOrContractIssue` (21.3%) is the second class: a within-tol solution
+exists but lies outside the declared parameter range — a domain/contract
+question, partially recoverable, and concentrated on BSpline (below).
+
+### BSpline vs NURBS
+
+| family | total | ProdMiss | Domain | SeedGap | Inconc | TooFar |
+|---|---:|---:|---:|---:|---:|---:|
+| Nurbs | 2,472 | 1,800 (72.8%) | 437 | 124 | 109 | 2 |
+| Bspline | 1,180 | 586 (49.7%) | 346 (29.3%) | 89 | 134 | 25 |
+| Offset | 27 | — | 6 | — | 21 | — |
+| Extruded | 12 | 2 | — | — | 10 | — |
+
+NURBS is the dominant family and is overwhelmingly a convergence-gate defect
+(72.8% ProductionMiss). BSpline is more mixed: half ProductionMiss, but
+`DomainOrContractIssue` is 29.3% — the out-of-domain mechanism is a real
+secondary story on BSpline, not on NURBS. The 51 faces offered zero seeds are
+the `Processor`-defaulted-empty families (Offset/Extruded/Torus/Revolved);
+they cannot be `SeedBasinGap`, and they are not — confirming §2C's note.
+
+### Caps and pathology
+
+- per-face point cap (8 points): 585 faces hit it.
+- per-point seed cap (24 seeds): 801 faces hit it.
+- degenerate-Jacobian stops: 526 faces.
+- trial-exhausted Newton searches: 3,423 faces (92.4%).
+
+The caps do not distort the verdict: a face that hit the point cap still has
+its probed points classified, and the cap is on points, not on the face
+verdict.
+
+### Per model
+
+`00000414` alone is 1,296 faces (35% of the population, 1,264 ProductionMiss)
+— the NURBS-heavy model. `00009190` is the exception: 182 faces,
+`Inconclusive`-dominant (88), a different mechanism profile that warrants a
+targeted look. `00003172` is the `DomainOrContractIssue` outlier (280 of 398).
+
+### The meshing-policy newly-lost cohort is orthogonal to projection
+
+The 520 faces the meshing policy newly loses (policy-on lost, policy-off
+rendered; the on/off pair was taken at `95d0df30`, and all 520 are still lost
+at the `f85cc3ff` baseline) are **zero `BoundaryProjectionFailed`**:
+
+| terminal reason | faces |
+|---|---:|
+| ConstraintInsertionIncomplete | 460 |
+| NoOddParityRegion | 60 |
+
+The policy densifies circular edges (the 24-segment angular floor); the damage
+is in the CDT constraint-insertion chain, not in projection. The projection
+witness population (3,703 BPF) and the policy-newly-lost cohort (520 CDT) are
+disjoint. This confirms `ACCURACY_FINDINGS.md` §7 / `policy_geometry.rs`: the
+density sensitivity is a triangulator effect, and it lands in the
+`insertion_failed` class that ARR-TAIL-001 will decompose — not here.
+
+### What this does not establish
+
+The 91.7% ceiling is a ceiling, not an estimate (§7.1): admitting the
+within-tol iterate on one point does not make the face survive, because a face
+is lost by its worst point and the boundary walk may still fail elsewhere.
+`ProductionMiss` says the iterate is good; it does not say the face is
+recoverable in isolation. The 278 `Inconclusive` (cap / non-finite numerics)
+are not classified and could move the ceiling either way; `00009190`'s
+Inconclusive-dominant profile is the largest unexamined block within them.
+
+Recovery is not implemented (per scope). The two candidate levers this
+characterization isolates: (a) admit the within-tolerance iterate that
+Newton's `near2` test discards — the `ProductionMiss` class; (b) relax or
+repair the parameter-domain contract on BSpline — the `DomainOrContractIssue`
+class. Both are ceiling-only until a recovery experiment measures them.

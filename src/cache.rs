@@ -19,6 +19,16 @@ pub struct CachedInspection {
     source_size: u64,
     source_modified_ns: u64,
     up_axis: UpAxis,
+    /// Identity of the meshing policy, tessellation algorithm revision, and
+    /// resolved Truck revision that produced these statistics. Folded into the
+    /// validity check so `look inspect` invalidates stale statistics when the
+    /// meshing inputs change — even without a package version bump, which is
+    /// exactly the case a tolerance or policy edit produces. `serde(default)`
+    /// lets a pre-existing entry (written before this field existed) deserialize
+    /// to an empty string, which then fails the validity check and falls back
+    /// to a fresh compile.
+    #[serde(default)]
+    tessellation_identity: String,
     pub source_hash: String,
     pub statistics: SceneStatistics,
 }
@@ -61,7 +71,8 @@ impl MetadataCache {
             && entry.source == signature.canonical
             && entry.source_size == signature.size
             && entry.source_modified_ns == signature.modified_ns
-            && entry.up_axis == up_axis;
+            && entry.up_axis == up_axis
+            && entry.tessellation_identity == crate::step::meshing_policy::current_identity();
         Ok(valid.then_some(entry))
     }
 
@@ -84,6 +95,7 @@ impl MetadataCache {
             source_size: signature.size,
             source_modified_ns: signature.modified_ns,
             up_axis,
+            tessellation_identity: crate::step::meshing_policy::current_identity(),
             source_hash: source_hash.to_owned(),
             statistics: statistics.clone(),
         };

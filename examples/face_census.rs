@@ -313,6 +313,7 @@ fn census(
                             overlap_conflicts: Vec::new(),
                             unattributed_overlaps: 0,
                             cdt_stages: face_diag::CdtStageVector::default(),
+                            projection_witness: None,
                             route_decisions: Vec::new(),
                             derived_bucket: face_diag::LossBucket::OtherTypedFailure,
                         },
@@ -561,6 +562,7 @@ fn census(
                         overlap_conflicts: Vec::new(),
                         unattributed_overlaps: 0,
                         cdt_stages: face_diag::CdtStageVector::default(),
+                        projection_witness: None,
                         route_decisions: Vec::new(),
                         derived_bucket: face_diag::LossBucket::InsertionUnknown,
                     };
