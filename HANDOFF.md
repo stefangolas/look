@@ -1,15 +1,111 @@
-# Handoff — PROJ-003: residual-certified projection recovery (Stage A landed) → Stage B/C + ARR-TAIL
+# Handoff — RECOVERY-WAVE-2 (PROJ-003B + PROJ-003C + ARR-TAIL-001)
 
 **State.** look on `integration/formal-atlas-wave-2`, pinned to truck
-`<new_fork_head>` on `feature/cone-apex-lift-recovery` (Stage A committed and
-pushed; see "Commit / pin" below). The `.cargo/config.toml` path override is
-RE-COMMENTED; the pinned build was verified to reproduce the override build.
+`67c19555` on `feature/cone-apex-lift-recovery` (Wave-2 committed and pushed;
+Stage A was `bcf676ee`). The `.cargo/config.toml` path override is
+RE-COMMENTED; the pinned build was verified via `cargo check --locked`.
 
-**Stage A is landed, default-on, measured.** Summary of the final ABC-20 /
-NIST numbers lives in `docs`-style prose below and in the packet report. The
-next packet implements PROJ-003B (structural-seed recovery), PROJ-003C
-(periodic/domain normalization), and ARR-TAIL (downstream terminal-reason
-diagnostics for admitted faces that still fail).
+**Stage A + B + C are all landed, default-on, measured.** Stage B (structural-
+seed residual recovery) and Stage C (domain/periodicity recovery) were built in
+this wave together with the ARR-TAIL mechanistic census. Headline ABC-19 (all
+of ABC-20 except `00007744`, which stalls the deep probe — see Known issue):
+
+```
+ABC-19: 827,149 declared, 817,838 rendered (98.87%), 9,311 lost
+vs Stage-A-off base: +2,549 rendered, 0 regressions, 0 triangle churn
+vs Stage-A-only:     +570 rendered (B+C), 0 regressions, 0 triangle churn
+Stage B admitted:  234 faces / 294 points
+Stage C admitted:  452 faces / 839 points (all BoundaryEpsilon)
+B/C admitted -> rendered 570, still lost 103
+NIST (33): 7,902 declared, 7,717 rendered; A+B+C +36 vs no-policy, B+C +0;
+  0 regressions, 0 churn
+```
+
+The PROJ-002 `213 SeedBasinGap` / `789 DomainOrContractIssue` ceilings were NOT
+forced: B recovered 234 faces and C 452, all under the existing caller
+tolerance (residual max ≈ 7e-6, none > 0.9·tol), with no clamping of arbitrary
+UVs.
+
+---
+
+## What this wave did
+
+- **Stage B** (`TRUCK_FORMAL_RECOVERY_PROJ_STAGE_B`, nested under the master
+  gate): promotes PROJ-002's diagnostic structural-seed nearest search into a
+  residual-certified recovery. On a point the whole legacy chain (including the
+  spline-seed `search_parameter` retry) and Stage A refused, the bounded
+  seed-nearest iterate (`seed_best`) is admitted under the identical Stage A
+  contract. `probe_structural_seeds` is the shared helper; the deep probe and
+  Stage B read the same candidate.
+- **Stage C** (`TRUCK_FORMAL_RECOVERY_PROJ_STAGE_C`): classifies
+  `DomainOrContractIssue` candidates by mechanism and recovers only the two
+  principled subclasses. Every admitted C point on the corpus was
+  `BoundaryEpsilon` (microscopically outside a closed knot-range boundary,
+  clamped and re-certified `|S|-P| <= tol`). `PeriodicEquivalent` (normalize by
+  a certified generator) is implemented and unit-tested but found no corpus
+  faces (splines have no certified generator). `RepresentationRangeMismatch`
+  and `TrueOutOfDomain` are diagnostic-only; no tolerance widening anywhere.
+- **ARR-TAIL-001**: `FailedFaceDiagnosis.arr` now carries a mechanistic
+  signature (failure_stage / material_stage / bound bucket / seam-deck / pair
+  relation / pair provenance / projection verdict); `ProjectionWitness` gains
+  per-point `point_evidence`. Diagnostic-only; with the gates closed geometry
+  is unchanged.
+
+---
+
+## ARR-TAIL dominant mechanisms (ABC-19 residual tail, 9,311 faces)
+
+54 distinct signatures; concentration **50% = 3 sigs, 75% = 8, 90% = 13,
+95% = 19**. Top 5:
+
+```
+1,921  CII  ConstraintIncomplete  b2  no-seam  ProperInteriorCrossing  SourceSource
+1,620  CII  ConstraintIncomplete  b1  no-seam  ProperInteriorCrossing  SourceSource
+1,408  CII  ConstraintIncomplete  b2  Seam     ProperInteriorCrossing  SourceSynthetic
+  773  COU  ConstraintRejected    b1  no-seam  DuplicateTraversal      SourceSource
+  420  CII  ConstraintIncomplete  b3  Seam     ProperInteriorCrossing  SourceSource
+```
+
+Marginals: terminal = ConstraintInsertionIncomplete 7,049 / Overlap 1,028 /
+BoundaryProjectionFailed 547 / NoOddParityRegion 407 / AmbiguousLift 145 /
+BoundaryConstructionFailed 116 / ContradictoryDualParity 18. Material stage:
+94.4% NotReached (failure is upstream of material), 4.3% MaterialDegenerated
+(the ~401 post-material-degeneracy `NoOddParityRegion`), 0.06% MaterialEmpty.
+Seam/deck: 33.2% involve a seam. Pair relation: 70.0% ProperInteriorCrossing,
+16.7% DuplicateTraversal. Pair provenance: 61.4% SourceSource, 22.9%
+SourceSynthetic, 13.3% none. Same-bound: 70.5% within one bound.
+
+Known populations segregate cleanly (no rediscovery as "unknown"):
+~7,049 ConstraintInsertionIncomplete, ~1,022 duplicate-traversal overlap,
+~547 unresolved projection, ~401 post-material degeneracy, ~145 residual
+singular-lift.
+
+**Recommended next implementation targets:**
+1. **Constraint-insertion incompleteness** (~7,049 faces; 3 signatures already
+   explain 53%, all `ConstraintInsertionIncomplete` + `ProperInteriorCrossing`
+   + `SourceSource`, b1/b2 with and without seam). The dominant single
+   signature is a b2 SourceSource ProperInteriorCrossing refusal.
+2. **Duplicate-traversal overlap** (~1,022 `ConstraintOverlapUnsupported`
+   `DuplicateTraversal`; already-witnessed at the `overlapping` test in
+   `insert_to`). Needs topology/provenance semantics, not a blanket normalize.
+3. **Post-material degeneracy** (~401 `NoOddParityRegion` with
+   `MaterialDegenerated`; `CdtStageVector.material_selected > final_valid`)
+   and the residual singular-lift (~145 `AmbiguousLift`) are smaller.
+
+---
+
+## Known issue: deep-probe stall on 00007744
+
+With `TRUCK_PROBE_PROJ_DEEP` set, `00007744` stalls: the per-point deep probe
+(≤8 points × ≤24 seeds × 100 Newton trials) runs without a per-face budget, and
+one face with a large number of failing boundary points takes unbounded time.
+The FACE ledger line only writes when the face finishes, so the model appears
+frozen. `00007744` is therefore EXCLUDED from this wave's ABC-20 numbers (19/20
+models). **Next session: add a per-face probe budget (e.g. cap total probe
+searches per face) or a time/point cap, then re-run `00007744`.** The stall is
+diagnosis-only — it does not affect rendering with the deep probe off.
+
+
 
 ---
 
@@ -230,12 +326,43 @@ All truck paths are under `truck-fork/`. Line numbers are current.
 
 ---
 
-## Commit / pin (must be finalised before any further work)
-1. Fork: `cargo test -p truck-meshalgo --lib` (605 pass) green; commit the four
-   files (`truck-geotrait/src/algo/surface.rs`, `truck-meshalgo/Cargo.toml`,
-   `truck-meshalgo/src/tessellation/diagnosis.rs`,
-   `truck-meshalgo/src/tessellation/triangulation.rs`); push.
-2. Look: re-comment `.cargo/config.toml` path override, bump every
-   `stefangolas/truck` rev in `Cargo.toml` to the new fork HEAD, `cargo check`,
-   verify the pinned build reproduces, commit (`.cargo/config.toml`,
-   `Cargo.toml`, `Cargo.lock`, this `handoff.md`).
+## Commit / pin (final for this wave)
+- Fork: `cargo test -p truck-meshalgo --lib` (615 pass) green; committed
+  `67c19555` "Land PROJ-003 Stage B/C ... + ARR-TAIL signature" (only
+  `diagnosis.rs` + `triangulation.rs`); pushed to `feature/cone-apex-lift-recovery`.
+  The `tessellation` integration-test failures (5) are pre-existing at `bcf676ee`
+  and unchanged by this wave.
+- Look: `.cargo/config.toml` override re-commented; every `stefangolas/truck`
+  rev in `Cargo.toml` bumped to `67c19555`; `Cargo.lock` re-resolved (only the
+  truck source entries changed); `examples/face_census.rs` gained the
+  `arr` field. Verified `cargo check --locked` + full wave below.
+- New gates: `TRUCK_FORMAL_RECOVERY_PROJ_STAGE_B`,
+  `TRUCK_FORMAL_RECOVERY_PROJ_STAGE_C` (both nested under `TRUCK_FORMAL_RECOVERY`).
+  B/C are default-on with explicit `=0` opt-out, like every formal route.
+- New/adjusted probe lines: `PROJ_RECOVER_B`, `PROJ_RECOVER_C` (each carry
+  `admitted`, `residual_min/max`, `tol`; C also `classes=<Class>=<n>,...`).
+
+## Wave-2 code locations
+- `truck-meshalgo/src/tessellation/triangulation.rs`
+  - `admit_outcome` (~:360) — the shared residual-certified contract (finite
+    UV, in-domain, finite eval, `|S|-P| <= tol`).
+  - `residual_certified_seed_recovery` / `_seed_admission` (~:490) — Stage B.
+  - `classify_domain_point` + `DOMAIN_BOUNDARY_EPSILON_REL` (~:520) — Stage C
+    classification (1e-6 of span).
+  - `residual_certified_domain_recovery` (~:610) — Stage C admission.
+  - `probe_structural_seeds` (~:270) — shared seed-nearest search.
+  - The `(None,false)` arm of `PolyBoundaryPiece::try_new` (~:4130) — the chain
+    `Stage A → Stage B → Stage C → fail`; per-face accumulators and the
+    `PROJ_RECOVER_B/C` emission (~:4370).
+  - `mod proj003_stage_a_tests` — 16 tests including the 11 new Stage B/C ones
+    (unit cylinder `RevolutedCurve<Line>` for periodic equivalence).
+- `truck-meshalgo/src/tessellation/diagnosis.rs`
+  - `DomainRecoveryClass`, `ProjectionPointEvidence` (witness `point_evidence`).
+  - `ArrFailureStage`, `ArrMaterialStage`, `ArrProvenanceClass`, `ArrSeamOrDeck`,
+    `CurvePairClass`, `ArrSignature` (`FailedFaceDiagnosis.arr`), and
+    `derive_arr_signature` (in `build_face_diagnosis`).
+  - Gates `proj_seed_recovery_enabled` / `proj_domain_recovery_enabled`.
+- Corpus harness: `look-corpus/p1-out/proj3/{sweep_abc,sweep_nist_abc,
+  run_remaining_abc}.ps1`, `abc/` and `nist/abc/` output, `analyze_abc.py`
+  (B/C + reconciliation), `arr_tail.py` (ranked signatures + concentration +
+  cross-tabs).

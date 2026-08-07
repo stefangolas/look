@@ -316,6 +316,7 @@ fn census(
                             projection_witness: None,
                             route_decisions: Vec::new(),
                             derived_bucket: face_diag::LossBucket::OtherTypedFailure,
+                            arr: face_diag::ArrSignature::default(),
                         },
                         conversion_reason: Some(loss.reason.tag()),
                     });
@@ -537,7 +538,7 @@ fn census(
                     });
                 } else if let Some(failure) = outcome.face_failures.get(i).cloned().flatten() {
                     let orig = &shell.faces[i].surface;
-                    let mut d = face_diag::FailedFaceDiagnosis {
+                    let d = face_diag::FailedFaceDiagnosis {
                         model_id: model_id.into(),
                         source_face_id: face.provenance.best_id().map(|id| id.get()),
                         terminal_reason: failure.reason,
@@ -565,6 +566,7 @@ fn census(
                         projection_witness: None,
                         route_decisions: Vec::new(),
                         derived_bucket: face_diag::LossBucket::InsertionUnknown,
+                        arr: face_diag::ArrSignature::default(),
                     };
                     diag_rows.push(FaceDiagRow {
                         diagnosis: d,
