@@ -310,6 +310,10 @@ fn census(
                             two_loop_join: None,
                             seam_mechanism: face_diag::SeamMechanism::NoSeamEvidence,
                             insertion_conflicts: Vec::new(),
+                            overlap_conflicts: Vec::new(),
+                            unattributed_overlaps: 0,
+                            cdt_stages: face_diag::CdtStageVector::default(),
+                            route_decisions: Vec::new(),
                             derived_bucket: face_diag::LossBucket::OtherTypedFailure,
                         },
                         conversion_reason: Some(loss.reason.tag()),
@@ -387,17 +391,41 @@ fn census(
         // A census taken through the cone form understated torus recovery by
         // the whole eligible population, which is not a small correction —
         // toroidal faces are the largest single loss line on `00009190`.
-        let outcome = shell.robust_triangulation_with_torus_outcome(
-            tolerance,
-            look::step_lattice_of,
-            look::step_support_schema_of,
-            look::step_curve_schema_of,
-            look::step_cylinder_of,
-            look::step_cylinder_curve_schema_of,
-            look::step_cylinder_curve_family_of,
-            look::step_cone_of,
-            look::step::torus_deck::identify_source_torus_opt,
-        );
+        //
+        // The shell is wrapped with the production meshing policy so this
+        // measures the same targeted angular-floor path `parse_step` ships,
+        // not the bare-scalar fallback. `LOOK_NO_POLICY` skips the wrap to
+        // reproduce the pre-policy baseline for A/B diagnosis.
+        use look::step::policy_geometry::{PolicyCurve, PolicySurface};
+        let outcome = if std::env::var_os("LOOK_NO_POLICY").is_some() {
+            shell.robust_triangulation_with_torus_outcome(
+                tolerance,
+                look::step_lattice_of,
+                look::step_support_schema_of,
+                look::step_curve_schema_of,
+                look::step_cylinder_of,
+                look::step_cylinder_curve_schema_of,
+                look::step_cylinder_curve_family_of,
+                look::step_cone_of,
+                look::step::torus_deck::identify_source_torus_opt,
+            )
+        } else {
+            look::step::policy_geometry::wrap_shell(
+                shell.clone(),
+                look::step::meshing_policy::MeshingPolicy::DEFAULT,
+            )
+            .robust_triangulation_with_torus_outcome(
+                tolerance,
+                |s: &PolicySurface| look::step_lattice_of(s.inner()),
+                |s: &PolicySurface| look::step_support_schema_of(s.inner()),
+                |c: &PolicyCurve| look::step_curve_schema_of(c.inner()),
+                |s: &PolicySurface| look::step_cylinder_of(s.inner()),
+                |c: &PolicyCurve| look::step_cylinder_curve_schema_of(c.inner()),
+                |c: &PolicyCurve| look::step_cylinder_curve_family_of(c.inner()),
+                |s: &PolicySurface| look::step_cone_of(s.inner()),
+                |s: &PolicySurface| look::step::torus_deck::identify_source_torus_opt(s.inner()),
+            )
+        };
         let meshed = &outcome.shell;
         for (i, face) in meshed.faces.iter().enumerate() {
             let kind = if i < kinds.len() { kinds[i] } else { "?" };
@@ -530,6 +558,10 @@ fn census(
                         two_loop_join: None,
                         seam_mechanism: face_diag::SeamMechanism::NoSeamEvidence,
                         insertion_conflicts: Vec::new(),
+                        overlap_conflicts: Vec::new(),
+                        unattributed_overlaps: 0,
+                        cdt_stages: face_diag::CdtStageVector::default(),
+                        route_decisions: Vec::new(),
                         derived_bucket: face_diag::LossBucket::InsertionUnknown,
                     };
                     diag_rows.push(FaceDiagRow {

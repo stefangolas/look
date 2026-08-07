@@ -1,4 +1,4 @@
-[package]
+﻿[package]
 name = "look"
 version = "0.1.0"
 edition = "2024"
@@ -28,22 +28,22 @@ wgpu = "30.0"
 # give us somewhere to land our own. Bump the revs deliberately, never track a
 # branch, so a build is always reproducible.
 ruststep = { git = "https://github.com/stefangolas/ruststep", rev = "67f1f7c" }
-truck-meshalgo = { git = "https://github.com/stefangolas/truck", rev = "9bae285a" }
-truck-polymesh = { git = "https://github.com/stefangolas/truck", rev = "9bae285a" }
-truck-stepio = { git = "https://github.com/stefangolas/truck", rev = "9bae285a" }
-truck-topology = { git = "https://github.com/stefangolas/truck", rev = "9bae285a" }
+truck-meshalgo = { git = "https://github.com/stefangolas/truck", rev = "f85cc3ff" }
+truck-polymesh = { git = "https://github.com/stefangolas/truck", rev = "f85cc3ff" }
+truck-stepio = { git = "https://github.com/stefangolas/truck", rev = "f85cc3ff" }
+truck-topology = { git = "https://github.com/stefangolas/truck", rev = "f85cc3ff" }
 
 [patch.crates-io]
 ruststep = { git = "https://github.com/stefangolas/ruststep", rev = "67f1f7c" }
-truck-base = { git = "https://github.com/stefangolas/truck", rev = "9bae285a" }
-truck-derivers = { git = "https://github.com/stefangolas/truck", rev = "9bae285a" }
-truck-geometry = { git = "https://github.com/stefangolas/truck", rev = "9bae285a" }
-truck-geotrait = { git = "https://github.com/stefangolas/truck", rev = "9bae285a" }
-truck-meshalgo = { git = "https://github.com/stefangolas/truck", rev = "9bae285a" }
-truck-modeling = { git = "https://github.com/stefangolas/truck", rev = "9bae285a" }
-truck-polymesh = { git = "https://github.com/stefangolas/truck", rev = "9bae285a" }
-truck-stepio = { git = "https://github.com/stefangolas/truck", rev = "9bae285a" }
-truck-topology = { git = "https://github.com/stefangolas/truck", rev = "9bae285a" }
+truck-base = { git = "https://github.com/stefangolas/truck", rev = "f85cc3ff" }
+truck-derivers = { git = "https://github.com/stefangolas/truck", rev = "f85cc3ff" }
+truck-geometry = { git = "https://github.com/stefangolas/truck", rev = "f85cc3ff" }
+truck-geotrait = { git = "https://github.com/stefangolas/truck", rev = "f85cc3ff" }
+truck-meshalgo = { git = "https://github.com/stefangolas/truck", rev = "f85cc3ff" }
+truck-modeling = { git = "https://github.com/stefangolas/truck", rev = "f85cc3ff" }
+truck-polymesh = { git = "https://github.com/stefangolas/truck", rev = "f85cc3ff" }
+truck-stepio = { git = "https://github.com/stefangolas/truck", rev = "f85cc3ff" }
+truck-topology = { git = "https://github.com/stefangolas/truck", rev = "f85cc3ff" }
 
 
 [dev-dependencies]

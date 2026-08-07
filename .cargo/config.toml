@@ -12,6 +12,15 @@
 # measured a tree no clean clone could build. If you uncomment this, re-comment
 # it before reporting a number.
 #
+# Re-commented 2026-08-07 after WAVE-5 items 2-4; rev bumped to f85cc3ff.
+#
+# The override also bites in the direction the note above does not mention: it
+# decouples the build from Cargo.toml's pin in *both* directions. During WAVE-5
+# the fork HEAD advanced while the pin stood still, and a diagnostics-only edit
+# appeared to recover 39 faces on 00009190 that were really a different truck
+# commit. If a change that cannot move geometry moves it, check
+# `git -C ../truck-fork log -1` before believing the diff.
+#
 # paths = [
 #     "../truck-fork/truck-base",
 #     "../truck-fork/truck-derivers",
