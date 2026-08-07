@@ -12,7 +12,7 @@
 # measured a tree no clean clone could build. If you uncomment this, re-comment
 # it before reporting a number.
 #
-# Re-commented 2026-08-07 after PROJ-002 landing; rev bumped to 8db73b07.
+# Re-commented 2026-08-07 after PROJ-003 Stage A landing; rev bumped to bcf676ee.
 #
 # The override also bites in the direction the note above does not mention: it
 # decouples the build from Cargo.toml's pin in *both* directions. During WAVE-5
