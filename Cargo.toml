@@ -53,4 +53,9 @@ tempfile = "3.20"
 lto = "thin"
 codegen-units = 1
 strip = "symbols"
-panic = "abort"
+# PLANAR-C: Spade's splitting API can panic on dense crossing networks that it
+# cannot planarize; those must be contained as per-face typed failures rather
+# than aborting the whole model census. `catch_unwind` is a no-op under
+# `panic = "abort"`, so unwind (the default) is required for the containment to
+# work. A contained face failure is strictly safer than a process abort.
+panic = "unwind"

@@ -21,6 +21,14 @@
 # commit. If a change that cannot move geometry moves it, check
 # `git -C ../truck-fork log -1` before believing the diff.
 #
+# TEMP-ENABLED 2026-08-07 (PLANAR-INFRA after-sweep): uncommented to measure the
+# local truck-fork working tree against the 001e0efb baseline. RE-COMMENT before
+# committing anything in this repo.
+#
+# Re-commented 2026-08-08 after PLANAR-C landing (truck 66f5b69b); the pin in
+# Cargo.toml still stands at 001e0efb, so a clean clone builds without PLANAR-C.
+# Re-enable only to iterate on the fork, and re-comment + bump the rev before
+# reporting a number.
 # paths = [
 #     "../truck-fork/truck-base",
 #     "../truck-fork/truck-derivers",
