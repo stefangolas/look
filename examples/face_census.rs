@@ -7,7 +7,9 @@ use serde::Serialize;
 use truck_meshalgo::prelude::*;
 use truck_meshalgo::tessellation::diagnosis as face_diag;
 use truck_meshalgo::tessellation::formal::cylinder_band::{NonconformantRepair, SourceConformance};
+use truck_meshalgo::tessellation::validity as face_validity;
 use truck_meshalgo::tessellation::{ConeBandAttempt, CylinderBandAttempt, TorusAnnulusAttempt};
+use truck_stepio::r#in::convert::FaceLossReason;
 use truck_stepio::r#in::{Table, step_geometry::Surface};
 
 const RELATIVE_TOLERANCE: f64 = 0.001;
@@ -224,6 +226,13 @@ impl TorusTally {
 struct Census {
     declared: usize,
     rendered: usize,
+    /// Faces certified intrinsically non-renderable by FACE-VALIDITY
+    /// (Detector A at conversion, Detector B after boundary construction).
+    rejected_intrinsic: usize,
+    /// Faces lost to an ambiguous lift (cone apex / sphere pole), which are
+    /// not invalid and are kept apart from both the rejected and the failed
+    /// populations.
+    rejected_ambiguous: usize,
     counts: HashMap<Bucket, usize>,
     examples: HashMap<Bucket, Vec<String>>,
     band: BandTally,
@@ -236,6 +245,8 @@ impl Census {
         Self {
             declared: 0,
             rendered: 0,
+            rejected_intrinsic: 0,
+            rejected_ambiguous: 0,
             counts: HashMap::new(),
             examples: HashMap::new(),
             band: BandTally::default(),
@@ -256,6 +267,12 @@ impl Census {
 
     fn lost(&self) -> usize {
         self.counts.values().sum()
+    }
+
+    /// Faces lost to something that is neither an intrinsic rejection nor an
+    /// ambiguous lift — genuine tessellation failures and unresolved losses.
+    fn failed(&self) -> usize {
+        self.lost() - self.rejected_intrinsic - self.rejected_ambiguous
     }
 }
 
@@ -287,6 +304,14 @@ fn census(
         if let Ok((cshell, losses)) = table.to_compressed_shell_with_losses(shell) {
             for loss in &losses {
                 let example = loss.provenance.best_id().map(|id| id.to_string());
+                // FACE-VALIDITY Detector A: every source bound collapsed to a
+                // `VERTEX_LOOP`, established from STEP topology at conversion.
+                // This is a certified intrinsic rejection, not a conversion
+                // failure: the source defines no 1D boundary geometry.
+                let collapsed = loss.reason == FaceLossReason::AllBoundsCollapsed;
+                if collapsed {
+                    into.rejected_intrinsic += 1;
+                }
                 if diag_enabled {
                     diag_rows.push(FaceDiagRow {
                         diagnosis: face_diag::FailedFaceDiagnosis {
@@ -314,8 +339,15 @@ fn census(
                             unattributed_overlaps: 0,
                             cdt_stages: face_diag::CdtStageVector::default(),
                             projection_witness: None,
+                            validity_certificate: collapsed.then(|| {
+                                face_validity::FaceValidityCertificate::all_bounds_collapsed(0)
+                            }),
                             route_decisions: Vec::new(),
-                            derived_bucket: face_diag::LossBucket::OtherTypedFailure,
+                            derived_bucket: if collapsed {
+                                face_diag::LossBucket::IntrinsicDegenerate
+                            } else {
+                                face_diag::LossBucket::OtherTypedFailure
+                            },
                             arr: face_diag::ArrSignature::default(),
                         },
                         conversion_reason: Some(loss.reason.tag()),
@@ -329,13 +361,14 @@ fn census(
                         .unwrap_or_else(|| "-".into());
                     eprintln!(
                         "FACE\tdeclared_face_index=-\tsource_face_id={id}\t\
-                         surface_kind=-\trendered=0\ttriangles=0\tstage=convert\treason={}",
+                         surface_kind=-\trendered=0\ttriangles=0\tstage={}\treason={}",
+                        if collapsed { "rejected" } else { "convert" },
                         loss.reason.tag()
                     );
                 }
                 into.record(
                     Bucket {
-                        stage: "convert",
+                        stage: if collapsed { "rejected" } else { "convert" },
                         reason: loss.reason.tag().to_string(),
                         surface_kind: "-",
                     },
@@ -448,9 +481,35 @@ fn census(
                 .as_ref()
                 .map_or(0, |mesh| mesh.tri_faces().len());
             if rendered == 0 {
+                // FACE-VALIDITY outcome semantics: a face lost to a certified
+                // intrinsic rejection is not a tessellation failure, and a
+                // face lost to an ambiguous lift is not invalid. Neither is
+                // counted as failed, and neither is rendered.
+                let failure_reason = outcome
+                    .face_failures
+                    .get(i)
+                    .cloned()
+                    .flatten()
+                    .map(|f| f.reason);
+                let rejected = failure_reason
+                    == Some(TessellationFailureReason::RejectedDegenerate);
+                let ambiguous =
+                    failure_reason == Some(TessellationFailureReason::AmbiguousLift);
+                let stage = if rejected {
+                    "rejected"
+                } else if ambiguous {
+                    "ambiguous"
+                } else {
+                    "tessellate"
+                };
+                if rejected {
+                    into.rejected_intrinsic += 1;
+                } else if ambiguous {
+                    into.rejected_ambiguous += 1;
+                }
                 into.record(
                     Bucket {
-                        stage: "tessellate",
+                        stage,
                         reason: reason.into(),
                         surface_kind: kind,
                     },
@@ -564,6 +623,7 @@ fn census(
                         unattributed_overlaps: 0,
                         cdt_stages: face_diag::CdtStageVector::default(),
                         projection_witness: None,
+                        validity_certificate: None,
                         route_decisions: Vec::new(),
                         derived_bucket: face_diag::LossBucket::InsertionUnknown,
                         arr: face_diag::ArrSignature::default(),
@@ -1047,7 +1107,10 @@ fn main() -> anyhow::Result<()> {
             let meta = serde_json::json!({
                 "declared": overall.declared,
                 "rendered": overall.rendered,
-                "failed": overall.lost(),
+                "rejected_intrinsic": overall.rejected_intrinsic,
+                "rejected_ambiguous": overall.rejected_ambiguous,
+                "failed": overall.failed(),
+                "lost": overall.lost(),
                 "models": models.len(),
             });
             std::fs::write(&meta_path, serde_json::to_string_pretty(&meta)?)?;
@@ -1078,13 +1141,38 @@ fn main() -> anyhow::Result<()> {
         }
     } else {
         println!(
-            "{} models, {} faces declared, {} rendered, {} lost ({:.2}%)\n",
+            "{} models, {} faces declared, {} rendered, {} lost ({:.2}%)",
             models.len(),
             overall.declared,
             overall.rendered,
             overall.lost(),
             overall.lost() as f64 / overall.declared as f64 * 100.0
         );
+        // FACE-VALIDITY outcome semantics: rejected and ambiguous faces are
+        // neither rendered nor generic failures, so the two render rates answer
+        // different questions and neither is falsified by the other.
+        let admitted = overall
+            .declared
+            .saturating_sub(overall.rejected_intrinsic + overall.rejected_ambiguous);
+        let rejected = overall.rejected_intrinsic + overall.rejected_ambiguous;
+        println!(
+            "  rejected_intrinsic={} rejected_ambiguous={} failed_renderable_or_unknown={}",
+            overall.rejected_intrinsic,
+            overall.rejected_ambiguous,
+            overall.failed(),
+        );
+        println!(
+            "  raw render rate = {:.4}%   admissible render rate = {:.4}%",
+            overall.rendered as f64 / overall.declared.max(1) as f64 * 100.0,
+            overall.rendered as f64 / admitted.max(1) as f64 * 100.0,
+        );
+        if rejected > 0 {
+            println!(
+                "  rejected = {rejected} ({:.2}% of declared), of which {} ambiguous (not invalid)",
+                rejected as f64 / overall.declared as f64 * 100.0,
+                overall.rejected_ambiguous,
+            );
+        }
         println!(
             "  {:11} {:28} {:10} {:5}   {:5}  examples",
             "stage", "reason", "surface", "count", "share"

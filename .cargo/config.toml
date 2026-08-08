@@ -29,6 +29,11 @@
 # Cargo.toml now points at 66f5b69b, so a clean clone builds WITH PLANAR-C.
 # Re-enable only to iterate on the fork, and re-comment + bump the rev before
 # reporting a number.
+#
+# Re-commented 2026-08-08 after FACE-VALIDITY landing (truck 018bd469); the pin
+# in Cargo.toml now points at 018bd469, so a clean clone builds WITH
+# FACE-VALIDITY. Re-enable only to iterate on the fork, and re-comment + bump
+# the rev before reporting a number.
 # paths = [
 #     "../truck-fork/truck-base",
 #     "../truck-fork/truck-derivers",
