@@ -26,7 +26,7 @@
 # committing anything in this repo.
 #
 # Re-commented 2026-08-08 after PLANAR-C landing (truck 66f5b69b); the pin in
-# Cargo.toml still stands at 001e0efb, so a clean clone builds without PLANAR-C.
+# Cargo.toml now points at 66f5b69b, so a clean clone builds WITH PLANAR-C.
 # Re-enable only to iterate on the fork, and re-comment + bump the rev before
 # reporting a number.
 # paths = [
