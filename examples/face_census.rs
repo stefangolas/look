@@ -344,6 +344,7 @@ fn census(
                                 face_validity::FaceValidityCertificate::all_bounds_collapsed(0)
                             }),
                             route_decisions: Vec::new(),
+                            cap_activation: None,
                             derived_bucket: if collapsed {
                                 face_diag::LossBucket::IntrinsicDegenerate
                             } else {
@@ -621,6 +622,7 @@ fn census(
                         projection_witness: None,
                         validity_certificate: None,
                         route_decisions: Vec::new(),
+                        cap_activation: None,
                         derived_bucket: face_diag::LossBucket::InsertionUnknown,
                         arr: face_diag::ArrSignature::default(),
                     };
