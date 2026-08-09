@@ -156,7 +156,17 @@ impl ParametricCurve for PolicyCurve {
     }
 }
 
-impl BoundedCurve for PolicyCurve {}
+impl BoundedCurve for PolicyCurve {
+    #[inline]
+    fn evaluation_range(&self) -> (f64, f64) {
+        self.inner.evaluation_range()
+    }
+
+    #[inline]
+    fn basis_is_partition_of_unity(&self, t: f64) -> bool {
+        self.inner.basis_is_partition_of_unity(t)
+    }
+}
 
 impl ParameterDivision1D for PolicyCurve {
     type Point = Point3;

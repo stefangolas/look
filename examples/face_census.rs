@@ -229,9 +229,10 @@ struct Census {
     /// Faces certified intrinsically non-renderable by FACE-VALIDITY
     /// (Detector A at conversion, Detector B after boundary construction).
     rejected_intrinsic: usize,
-    /// Faces lost to an ambiguous lift (cone apex / sphere pole), which are
-    /// not invalid and are kept apart from both the rejected and the failed
-    /// populations.
+    /// Faces rejected on a *certified* source-level singular ambiguity (P2):
+    /// only these may carry the `rejected_ambiguous` classification. An
+    /// ordinary `AmbiguousLift` is a tessellation outcome, not an ambiguity
+    /// certificate, and counts as an unresolved loss instead.
     rejected_ambiguous: usize,
     counts: HashMap<Bucket, usize>,
     examples: HashMap<Bucket, Vec<String>>,
@@ -482,9 +483,11 @@ fn census(
                 .map_or(0, |mesh| mesh.tri_faces().len());
             if rendered == 0 {
                 // FACE-VALIDITY outcome semantics: a face lost to a certified
-                // intrinsic rejection is not a tessellation failure, and a
-                // face lost to an ambiguous lift is not invalid. Neither is
-                // counted as failed, and neither is rendered.
+                // rejection -- intrinsic degenerate, or a certified
+                // singular-ambiguous lift (P2) -- is not a tessellation
+                // failure. An ordinary `AmbiguousLift` is only a tessellation
+                // outcome and counts as an unresolved loss, never as a
+                // rejection without a certificate.
                 let failure_reason = outcome
                     .face_failures
                     .get(i)
@@ -492,19 +495,12 @@ fn census(
                     .flatten()
                     .map(|f| f.reason);
                 let rejected = failure_reason
-                    == Some(TessellationFailureReason::RejectedDegenerate);
-                let ambiguous =
-                    failure_reason == Some(TessellationFailureReason::AmbiguousLift);
-                let stage = if rejected {
-                    "rejected"
-                } else if ambiguous {
-                    "ambiguous"
-                } else {
-                    "tessellate"
-                };
-                if rejected {
+                    == Some(TessellationFailureReason::RejectedDegenerate)
+                    || failure_reason == Some(TessellationFailureReason::RejectedAmbiguous);
+                let stage = if rejected { "rejected" } else { "tessellate" };
+                if failure_reason == Some(TessellationFailureReason::RejectedDegenerate) {
                     into.rejected_intrinsic += 1;
-                } else if ambiguous {
+                } else if failure_reason == Some(TessellationFailureReason::RejectedAmbiguous) {
                     into.rejected_ambiguous += 1;
                 }
                 into.record(
@@ -1168,7 +1164,7 @@ fn main() -> anyhow::Result<()> {
         );
         if rejected > 0 {
             println!(
-                "  rejected = {rejected} ({:.2}% of declared), of which {} ambiguous (not invalid)",
+                "  rejected = {rejected} ({:.2}% of declared), of which {} certified ambiguous",
                 rejected as f64 / overall.declared as f64 * 100.0,
                 overall.rejected_ambiguous,
             );

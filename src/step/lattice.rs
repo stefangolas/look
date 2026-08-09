@@ -72,11 +72,17 @@ fn elementary_lattice(surface: &ElementarySurface) -> CertifiedLattice {
         }
 
         // A sphere is `Processor<Sphere, Matrix4>` — not a revolved curve, so
-        // the revolution witness does not apply to it. Establishing its
-        // longitude period structurally means reading `Sphere`'s own
-        // parameterisation, which is not done here, and its poles are collapsed
-        // strata that this stage does not model at all. Carried as declared.
-        ElementarySurface::Sphere(_) => unevidenced_elementary(surface),
+        // the revolution witness does not apply to it. Its azimuth is a
+        // rotation about the polar axis by construction of `Sphere`'s
+        // parameterisation (`subs(u, v)` enters the azimuth only through
+        // `(cos v, sin v)`), so `2π` is read from the primitive, on the axis
+        // that parameterises it, and the polar (latitude) axis has no period.
+        // The `Processor` may be inverted, and `orient` restates every
+        // axis-indexed fact in the caller's convention.
+        ElementarySurface::Sphere(processor) => {
+            let lattice = CertifiedLattice::sphere_azimuth(Axis::U);
+            orient(lattice, processor.orientation())
+        }
 
         // A torus is `Processor<Torus, Matrix4>` and is doubly periodic. Both
         // periods are real, but recovering the second one by wrapping
@@ -635,5 +641,40 @@ mod schema_tests {
         assert_eq!(lattice_of(&torus).certified_rank(), 0);
         assert_eq!(lattice_of(&a_plane()).certified_rank(), 0);
         assert_eq!(lattice_of(&a_plane()), CertifiedLattice::NON_PERIODIC);
+    }
+
+    /// A sphere's azimuth is a rotation about the polar axis by construction
+    /// of the primitive, so `lattice_of` reads `2π` from the representation
+    /// rather than from an accessor. The polar axis carries no period.
+    #[test]
+    fn a_sphere_certifies_its_azimuth_as_a_generator() {
+        use truck_geometry::prelude::Sphere;
+        use truck_stepio::r#in::step_geometry::Sphere as StepSphere;
+        let sphere = Surface::ElementarySurface(ElementarySurface::Sphere(Processor::new(
+            StepSphere(Sphere::new(Point3::origin(), 1.0)),
+        )));
+        let lattice = lattice_of(&sphere);
+        // The stepio `Sphere` wrapper puts longitude on caller-`u`; an upright
+        // processor keeps it there.
+        assert_eq!(lattice.u_generator(), Some(std::f64::consts::PI * 2.0));
+        assert_eq!(lattice.v_generator(), None);
+        assert_eq!(lattice.certified_rank(), 1);
+    }
+
+    /// An inverted processor restates every axis-indexed fact in the caller's
+    /// convention: the certified azimuth moves to the caller's `v`.
+    #[test]
+    fn an_inverted_sphere_puts_the_certified_azimuth_on_v() {
+        use truck_geometry::prelude::Sphere;
+        use truck_stepio::r#in::step_geometry::Sphere as StepSphere;
+        let mut processor = Processor::new(StepSphere(Sphere::new(Point3::origin(), 1.0)));
+        use truck_meshalgo::prelude::Invertible;
+        processor.invert();
+        let sphere =
+            Surface::ElementarySurface(ElementarySurface::Sphere(processor));
+        let lattice = lattice_of(&sphere);
+        assert_eq!(lattice.v_generator(), Some(std::f64::consts::PI * 2.0));
+        assert_eq!(lattice.u_generator(), None);
+        assert_eq!(lattice.certified_rank(), 1);
     }
 }

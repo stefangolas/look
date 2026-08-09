@@ -34,6 +34,19 @@
 # in Cargo.toml now points at 018bd469, so a clean clone builds WITH
 # FACE-VALIDITY. Re-enable only to iterate on the fork, and re-comment + bump
 # the rev before reporting a number.
+#
+# TEMP-ENABLED 2026-08-08 (NIST-RECOVERY): uncommented to iterate on the local
+# truck-fork working tree (P1 closed-spline evaluation domain). RE-COMMENT and
+# bump the rev in Cargo.toml before committing anything in this repo.
+#
+# TEMP-ENABLED 2026-08-08 (EPISTEMIC-HARDENING): uncommented to iterate on the
+# local truck-fork working tree (basis-validity sampling domain + P2/P3b
+# epistemic fixes). RE-COMMENT and bump the rev in Cargo.toml before committing
+# anything in this repo.
+# Re-commented 2026-08-09 after truck-fork 7f8e4890 (epistemic hardening); the
+# pin in Cargo.toml now points at 7f8e4890, so a clean clone builds WITH the
+# basis-certified sampling domain, the unresolved P2 branch and the certified
+# sphere period.
 # paths = [
 #     "../truck-fork/truck-base",
 #     "../truck-fork/truck-derivers",
