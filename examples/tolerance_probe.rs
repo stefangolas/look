@@ -50,8 +50,8 @@ fn main() -> anyhow::Result<()> {
     let table = Table::from_owned_data_section(section);
 
     let mut converted = Vec::new();
-    for (_, shell) in table.shell.iter() {
-        if let Ok(cshell) = table.to_compressed_shell(shell) {
+    for (&shell_id, shell) in table.shell.iter() {
+        if let Ok(cshell) = table.to_compressed_shell(shell_id, shell) {
             converted.push(cshell);
         }
     }

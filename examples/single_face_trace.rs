@@ -230,8 +230,8 @@ fn main() -> anyhow::Result<()> {
     println!("Loading file: {model_path}");
     let table = load(model_path)?;
 
-    for (shell_idx, (_, shell)) in table.shell.iter().enumerate() {
-        let (cshell, losses) = match table.to_compressed_shell_with_losses(shell) {
+    for (shell_idx, (&shell_id, shell)) in table.shell.iter().enumerate() {
+        let (cshell, losses) = match table.to_compressed_shell_with_losses(shell_id, shell) {
             Ok(res) => res,
             Err(e) => {
                 eprintln!("Shell #{shell_idx} conversion error: {e}");

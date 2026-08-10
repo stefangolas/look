@@ -300,9 +300,9 @@ fn census(
 ) {
     let diag_enabled = face_diag::diag_enabled();
     let mut converted = Vec::new();
-    for (_, shell) in table.shell.iter() {
+    for (&shell_id, shell) in table.shell.iter() {
         into.declared += shell.cfs_faces.len();
-        if let Ok((cshell, losses)) = table.to_compressed_shell_with_losses(shell) {
+        if let Ok((cshell, losses)) = table.to_compressed_shell_with_losses(shell_id, shell) {
             for loss in &losses {
                 let example = loss.provenance.best_id().map(|id| id.to_string());
                 // FACE-VALIDITY Detector A: every source bound collapsed to a

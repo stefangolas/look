@@ -108,6 +108,7 @@ fn single_face_shell(shell: &Cshell, index: usize) -> Cshell {
             // Keep the source identity of the face this was lifted from.
             provenance: face.provenance,
         }],
+        source_geometric_uncertainty: None,
     }
 }
 
@@ -188,8 +189,8 @@ fn main() -> anyhow::Result<()> {
         let started = Instant::now();
         let shells = table
             .shell
-            .values()
-            .filter_map(|shell| table.to_compressed_shell(shell).ok())
+            .iter()
+            .filter_map(|(&shell_id, shell)| table.to_compressed_shell(shell_id, shell).ok())
             .collect::<Vec<_>>();
         println!(
             "resolved {} shells in {:.1} s",

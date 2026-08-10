@@ -473,5 +473,10 @@ pub fn wrap_shell(
                 provenance: face.provenance,
             })
             .collect(),
+        // The geometric uncertainty is a property of the source representation,
+        // not of the wrapped geometry; it must survive the wrap so the
+        // tessellator can judge source incidence under the source's own
+        // tolerance.
+        source_geometric_uncertainty: shell.source_geometric_uncertainty,
     }
 }

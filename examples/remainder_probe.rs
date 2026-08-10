@@ -134,8 +134,8 @@ fn main() -> anyhow::Result<()> {
     let mut faces = 0usize;
     let mut by_standing: BTreeMap<&'static str, usize> = BTreeMap::new();
 
-    for (_, shell) in table.shell.iter() {
-        let Ok((cshell, _losses)) = table.to_compressed_shell_with_losses(shell) else {
+    for (&shell_id, shell) in table.shell.iter() {
+        let Ok((cshell, _losses)) = table.to_compressed_shell_with_losses(shell_id, shell) else {
             continue;
         };
         for face in &cshell.faces {

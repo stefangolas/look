@@ -29,8 +29,8 @@ fn main() -> anyhow::Result<()> {
     let section = exchange.data.swap_remove(0);
     let table = Table::from_owned_data_section(section);
 
-    for (_, shell) in table.shell.iter() {
-        let Ok((cshell, losses)) = table.to_compressed_shell_with_losses(shell) else {
+    for (&shell_id, shell) in table.shell.iter() {
+        let Ok((cshell, losses)) = table.to_compressed_shell_with_losses(shell_id, shell) else {
             continue;
         };
         let _ = losses;

@@ -32,8 +32,8 @@ fn main() -> anyhow::Result<()> {
         .unwrap_or_else(|| vec![1954, 353]);
     let table = load(&path)?;
     let mut bbox = BoundingBox::<Point3>::new();
-    for (_, shell) in table.shell.iter() {
-        if let Ok((cshell, _)) = table.to_compressed_shell_with_losses(shell) {
+    for (&shell_id, shell) in table.shell.iter() {
+        if let Ok((cshell, _)) = table.to_compressed_shell_with_losses(shell_id, shell) {
             for v in &cshell.vertices {
                 bbox.push(*v);
             }
@@ -54,8 +54,8 @@ fn main() -> anyhow::Result<()> {
 
     let out_path = std::env::var("TRUCK_CAP_DUMP").ok();
     let mut whole = truck_meshalgo::prelude::PolygonMesh::default();
-    for (_, shell) in table.shell.iter() {
-        let Ok((cshell, _)) = table.to_compressed_shell_with_losses(shell) else {
+    for (&shell_id, shell) in table.shell.iter() {
+        let Ok((cshell, _)) = table.to_compressed_shell_with_losses(shell_id, shell) else {
             continue;
         };
         use look::step::policy_geometry::{PolicyCurve, PolicySurface};

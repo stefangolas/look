@@ -129,7 +129,7 @@ fn fingerprint(table: &Table, explicit_tolerance: Option<f64>) -> (Vec<FaceFinge
     let shells: Vec<(u64, Cshell)> = table
         .shell
         .iter()
-        .filter_map(|(id, shell)| table.to_compressed_shell(shell).ok().map(|cs| (*id, cs)))
+        .filter_map(|(id, shell)| table.to_compressed_shell(*id, shell).ok().map(|cs| (*id, cs)))
         .collect();
 
     let mut model_box = BoundingBox::<Point3>::new();

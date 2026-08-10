@@ -128,7 +128,7 @@ pub fn parse_step(
             // nothing downstream can tell that it did.
             let declared = shell.cfs_faces.len();
             table
-                .to_compressed_shell(shell)
+                .to_compressed_shell(*id, shell)
                 .map(|compressed| (declared, compressed))
                 .map_err(|error| format!("shell #{id}: {error}"))
         })

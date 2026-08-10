@@ -121,8 +121,8 @@ fn main() -> anyhow::Result<()> {
         };
 
         let mut shells = Vec::new();
-        for (_, shell) in table.shell.iter() {
-            if let Ok((cshell, _)) = table.to_compressed_shell_with_losses(shell) {
+        for (&shell_id, shell) in table.shell.iter() {
+            if let Ok((cshell, _)) = table.to_compressed_shell_with_losses(shell_id, shell) {
                 shells.push(cshell);
             }
         }
