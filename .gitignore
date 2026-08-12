@@ -8,3 +8,7 @@ viewer.html
 viewer_big.html
 viewer_big2.html
 test_viewer.html
+
+# Generated census artifacts
+no_odd_parity_census.csv
+
