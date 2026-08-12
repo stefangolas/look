@@ -356,6 +356,7 @@ pub struct CertifiedStage;
 /// Coarse typestate face wrapper parameterized by stage.
 #[derive(Debug)]
 pub struct FaceState<Stage> {
+    #[allow(dead_code)]
     entity_id: u32,
     _stage: PhantomData<Stage>,
 }

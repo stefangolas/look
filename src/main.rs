@@ -16,7 +16,7 @@ fn main() -> ExitCode {
 
 fn run(cli: Cli) -> anyhow::Result<()> {
     match cli.command {
-        Command::Render(args) => look::cli::execute_render(args),
+        Command::Render(args) => look::cli::execute_render(*args),
         Command::Ui(args) => look::cli::execute_ui(args),
         Command::Run(args) => look::cli::execute_job(args),
         Command::Inspect(args) => look::cli::execute_inspect(args),

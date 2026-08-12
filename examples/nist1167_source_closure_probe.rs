@@ -6,13 +6,8 @@
 
 use std::env;
 
-use truck_meshalgo::prelude::*;
 use truck_meshalgo::tessellation::domain::lattice::{AxisPeriodStatus, PeriodWitness};
 use truck_stepio::r#in::Table;
-use truck_stepio::r#in::step_geometry::{Curve3D, Surface};
-use truck_topology::compress::CompressedShell;
-
-type Cshell = CompressedShell<Point3, Curve3D, Surface>;
 
 fn load(path: &str) -> anyhow::Result<Table> {
     let bytes = std::fs::read(path)?;
@@ -49,16 +44,16 @@ fn main() -> anyhow::Result<()> {
             look::step::meshing_policy::MeshingPolicy::DEFAULT,
             &closure_map,
         );
-        if let Ok(ids) = std::env::var("PROBE_LIST_ALL") {
-            if ids == "1" {
-                for (face_idx, face) in wrapped.faces.iter().enumerate() {
-                    println!(
-                        "ALL face idx {face_idx}: best={:?} surface_id={:?} closure={:?}",
-                        face.provenance.best_id().map(|id| id.get()),
-                        face.provenance.surface_id.map(|id| id.get()),
-                        face.surface.source_closure(),
-                    );
-                }
+        if let Ok(ids) = std::env::var("PROBE_LIST_ALL")
+            && ids == "1"
+        {
+            for (face_idx, face) in wrapped.faces.iter().enumerate() {
+                println!(
+                    "ALL face idx {face_idx}: best={:?} surface_id={:?} closure={:?}",
+                    face.provenance.best_id().map(|id| id.get()),
+                    face.provenance.surface_id.map(|id| id.get()),
+                    face.surface.source_closure(),
+                );
             }
         }
         for (face_idx, face) in wrapped.faces.iter().enumerate() {

@@ -5,10 +5,7 @@
 use std::env;
 
 use truck_meshalgo::prelude::*;
-use truck_stepio::r#in::{
-    Table,
-    step_geometry::{Curve3D, Surface},
-};
+use truck_stepio::r#in::Table;
 
 fn load(path: &str) -> anyhow::Result<Table> {
     let bytes = std::fs::read(path)?;

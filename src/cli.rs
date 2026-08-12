@@ -64,7 +64,7 @@ fn should_imply_render(arguments: &[OsString]) -> bool {
 #[derive(Debug, Subcommand)]
 pub enum Command {
     /// Render one or more views of a GLB or STL.
-    Render(RenderArgs),
+    Render(Box<RenderArgs>),
     /// Export an interactive HTML 3D viewer with drag & scroll zoom controls.
     Ui(UiArgs),
     /// Execute a declarative YAML render job.

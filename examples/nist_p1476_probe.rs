@@ -6,9 +6,6 @@ use truck_stepio::r#in::{
     Table,
     step_geometry::{Curve3D, Surface},
 };
-use truck_topology::compress::{CompressedFace, CompressedShell};
-
-type Cshell = CompressedShell<Point3, Curve3D, Surface>;
 
 fn main() -> anyhow::Result<()> {
     let path = std::env::args().nth(1).expect("model path");
@@ -25,7 +22,7 @@ fn main() -> anyhow::Result<()> {
     let table = Table::from_owned_data_section(section);
 
     for (&shell_id, shell) in table.shell.iter() {
-        let Ok((cshell, losses)) = table.to_compressed_shell_with_losses(shell_id, shell) else {
+        let Ok((cshell, _losses)) = table.to_compressed_shell_with_losses(shell_id, shell) else {
             continue;
         };
         for (idx, face) in cshell.faces.iter().enumerate() {
@@ -46,7 +43,7 @@ fn main() -> anyhow::Result<()> {
             println!("surface range={:?}", s.try_range_tuple());
             for (bi, wire) in face.boundaries.iter().enumerate() {
                 println!("-- bound {bi}: {} edges", wire.len());
-                for (ei, idx_ref) in wire.iter().enumerate() {
+                for idx_ref in wire.iter() {
                     let curve = &cshell.edges[idx_ref.index].curve;
                     let range = curve.range_tuple();
                     println!(
@@ -197,25 +194,25 @@ fn print_proj(label: &str, s: &Surface, point: Point3, r: Option<(f64, f64)>) {
 /// chosen UV or a failure tag.
 fn chain(s: &Surface, point: Point3, hint: Option<(f64, f64)>) -> Result<(f64, f64), String> {
     let with_residual = |r: Option<(f64, f64)>| -> Option<(f64, f64, f64)> {
-        r.and_then(|(u, v)| {
+        r.map(|(u, v)| {
             let res = s.subs(u, v).distance(point);
-            Some((u, v, res))
+            (u, v, res)
         })
     };
     let r1 = with_residual(s.search_parameter(point, hint, 100));
-    if let Some((u, v, res)) = r1 {
+    if let Some((u, v, _res)) = r1 {
         return Ok((u, v));
     }
     let r2 = with_residual(s.search_parameter(point, None::<(f64, f64)>, 100));
-    if let Some((u, v, res)) = r2 {
+    if let Some((u, v, _res)) = r2 {
         return Ok((u, v));
     }
     let r3 = with_residual(s.search_nearest_parameter(point, hint, 100));
-    if let Some((u, v, res)) = r3 {
+    if let Some((u, v, _res)) = r3 {
         return Ok((u, v));
     }
     let r4 = with_residual(s.search_nearest_parameter(point, None::<(f64, f64)>, 100));
-    if let Some((u, v, res)) = r4 {
+    if let Some((u, v, _res)) = r4 {
         return Ok((u, v));
     }
     Err(format!("all 4 links failed (hint={hint:?})"))

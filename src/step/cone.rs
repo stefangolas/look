@@ -138,18 +138,27 @@ fn is_similarity(transform: &Matrix4) -> bool {
     ];
     let squared: Vec<f64> = columns.iter().map(|c| c.dot(*c)).collect();
     let scale = (squared[0] + squared[1] + squared[2]) / 3.0;
-    if !(scale > 0.0) || !scale.is_finite() {
+    if !scale.is_finite() || scale <= 0.0 {
         return false;
     }
     // Equal column lengths: a uniform scale.
     for value in &squared {
-        if !((value - scale).abs() <= SIMILARITY_RESIDUAL * scale) {
+        if (value - scale)
+            .abs()
+            .partial_cmp(&(SIMILARITY_RESIDUAL * scale))
+            .is_none_or(|o| !o.is_le())
+        {
             return false;
         }
     }
     // Mutually orthogonal columns: no shear.
     for (i, j) in [(0usize, 1usize), (0, 2), (1, 2)] {
-        if !(columns[i].dot(columns[j]).abs() <= SIMILARITY_RESIDUAL * scale) {
+        if columns[i]
+            .dot(columns[j])
+            .abs()
+            .partial_cmp(&(SIMILARITY_RESIDUAL * scale))
+            .is_none_or(|o| !o.is_le())
+        {
             return false;
         }
     }

@@ -36,6 +36,7 @@ const DEGENERATE_TOLERANCE: f64 = 1.0e-3;
 
 /// Chord deviation as a fraction of a shell's diagonal. Scaling to the model
 /// keeps output density stable across files that use different units.
+#[allow(dead_code)]
 const RELATIVE_TOLERANCE: f64 = 0.001;
 
 /// How many points to sample along each edge when measuring the model.

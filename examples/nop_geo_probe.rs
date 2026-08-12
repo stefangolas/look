@@ -25,9 +25,6 @@ use truck_stepio::r#in::{
     Table,
     step_geometry::{ElementarySurface, Surface},
 };
-use truck_topology::compress::CompressedShell;
-
-type Cshell = CompressedShell<Point3, truck_stepio::r#in::step_geometry::Curve3D, Surface>;
 
 fn surface_kind(surface: &Surface) -> &'static str {
     match surface {
@@ -90,7 +87,8 @@ fn world_rank_of(points: &[Point3]) -> (u8, f64, f64, f64) {
     }
 }
 
-fn load(path: &str) -> anyhow::Result<Table> {    let bytes = std::fs::read(path)?;
+fn load(path: &str) -> anyhow::Result<Table> {
+    let bytes = std::fs::read(path)?;
     let text = std::str::from_utf8(&bytes)
         .map(std::borrow::Cow::Borrowed)
         .unwrap_or_else(|_| bytes.iter().map(|&b| b as char).collect::<String>().into());
@@ -133,17 +131,17 @@ fn main() -> anyhow::Result<()> {
             let mut length = 0.0f64;
             let mut edge_uses = 0usize;
             let mut repeated = 0usize;
-            let mut distinct_3d: Vec<Point3> = Vec::new();
+            let _distinct_3d: Vec<Point3> = Vec::new();
             let mut uv_min = Point2::new(f64::INFINITY, f64::INFINITY);
             let mut uv_max = Point2::new(f64::NEG_INFINITY, f64::NEG_INFINITY);
-            let mut uv_edges: Vec<(Point2, Point2)> = Vec::new();
+            let _uv_edges: Vec<(Point2, Point2)> = Vec::new();
             for wire in &face.boundaries {
                 let mut seen: HashMap<(u32, bool), usize> = HashMap::new();
                 for edge in wire {
                     edge_uses += 1;
                     let key = (edge.index as u32, edge.orientation);
                     *seen.entry(key).or_insert(0) += 1;
-                    let Some(entry) = cshell.edges.get(edge.index as usize) else {
+                    let Some(entry) = cshell.edges.get(edge.index) else {
                         continue;
                     };
                     let curve = &entry.curve;
@@ -166,7 +164,8 @@ fn main() -> anyhow::Result<()> {
                         uv_max.x = uv_max.x.max(u);
                         uv_max.y = uv_max.y.max(v);
                     }
-                    if let Some((u2, v2)) = face.surface.search_parameter(curve.subs(t1), None, 100) {
+                    if let Some((u2, v2)) = face.surface.search_parameter(curve.subs(t1), None, 100)
+                    {
                         uv_min.x = uv_min.x.min(u2);
                         uv_min.y = uv_min.y.min(v2);
                         uv_max.x = uv_max.x.max(u2);
@@ -183,7 +182,7 @@ fn main() -> anyhow::Result<()> {
             let mut verts: Vec<Point3> = Vec::new();
             for wire in &face.boundaries {
                 for edge in wire {
-                    let Some(entry) = cshell.edges.get(edge.index as usize) else {
+                    let Some(entry) = cshell.edges.get(edge.index) else {
                         continue;
                     };
                     let (t0, t1) = entry.curve.range_tuple();
@@ -215,7 +214,7 @@ fn main() -> anyhow::Result<()> {
             let mut world_pts: Vec<Point3> = Vec::new();
             for wire in &face.boundaries {
                 for edge in wire {
-                    let Some(entry) = cshell.edges.get(edge.index as usize) else {
+                    let Some(entry) = cshell.edges.get(edge.index) else {
                         continue;
                     };
                     let curve = &entry.curve;

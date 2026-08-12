@@ -46,7 +46,7 @@ fn main() -> anyhow::Result<()> {
         }
     }
     let scaled = bbox.diameter() * 0.001;
-    let tolerance = scaled.max(1.0e-6).min(1.0e3);
+    let tolerance = scaled.clamp(1.0e-6, 1.0e3);
     println!(
         "model bbox={bbox:?} diameter={:.4} tolerance={tolerance:.6e}",
         bbox.diameter()

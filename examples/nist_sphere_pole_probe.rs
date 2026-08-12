@@ -114,7 +114,7 @@ fn edge_kind(curve: &Curve3D) -> &'static str {
 fn trace_face(
     cshell: &Cshell,
     face: &truck_topology::compress::CompressedFace<Surface>,
-    id: u64,
+    _id: u64,
     tol: f64,
 ) {
     let s = &face.surface;
@@ -137,12 +137,12 @@ fn trace_face(
             let edge = &cshell.edges[idx_ref.index];
             let curve = &edge.curve;
             let mut range = curve.evaluation_range();
-            if edge.vertices.0 == edge.vertices.1 && (range.1 - range.0).abs() < 1e-4 {
-                if let Some(period) = curve.period() {
-                    if period > 1e-4 {
-                        range = (range.0, range.0 + period);
-                    }
-                }
+            if edge.vertices.0 == edge.vertices.1
+                && (range.1 - range.0).abs() < 1e-4
+                && let Some(period) = curve.period()
+                && period > 1e-4
+            {
+                range = (range.0, range.0 + period);
             }
             let mut poly =
                 truck_meshalgo::rexport_polymesh::PolylineCurve::from_curve(curve, range, tol);
@@ -210,6 +210,7 @@ fn trace_face(
     let mut previous: Option<(f64, f64)> = None;
     let mut previous_pt: Option<Point3> = None;
     let mut origin: Option<(f64, f64, Point3)> = None;
+    #[allow(clippy::type_complexity)]
     let mut steps: Vec<(usize, Point3, Option<(f64, f64)>, bool)> = Vec::new();
     for (bi, point) in bdry3d.iter().enumerate() {
         let mut refinements = 0usize;
@@ -286,15 +287,15 @@ fn trace_face(
                         // incoming longitude: sample before the pole in bdry3d.
                         let pole_idx = bdry3d.iter().position(|q| q.distance(pp_pt) < 1e-3);
                         println!("    pole bdry3d idx={pole_idx:?}");
-                        if let Some(pi) = pole_idx {
-                            if pi > 0 {
-                                let prev_sample = bdry3d[pi - 1];
-                                if let Some((pu2, pv2)) = proj(s, prev_sample, None) {
-                                    println!(
-                                        "    incoming sample=({:.4},{:.4},{:.4}) proj=(u={pu2:.6},v={pv2:.6})",
-                                        prev_sample.x, prev_sample.y, prev_sample.z
-                                    );
-                                }
+                        if let Some(pi) = pole_idx
+                            && pi > 0
+                        {
+                            let prev_sample = bdry3d[pi - 1];
+                            if let Some((pu2, pv2)) = proj(s, prev_sample, None) {
+                                println!(
+                                    "    incoming sample=({:.4},{:.4},{:.4}) proj=(u={pu2:.6},v={pv2:.6})",
+                                    prev_sample.x, prev_sample.y, prev_sample.z
+                                );
                             }
                         }
                         // outgoing longitude: origin UV.
@@ -360,7 +361,7 @@ fn report_leaving_longitude(s: &Surface, bdry3d: &[Point3], bi: usize, pole: (&'
     match r {
         Some((u, v)) => {
             let res = s.subs(u, v).distance(next_pt);
-            let (lu, lv) = if pole.0 == "u" { (v, u) } else { (u, v) };
+            let (lu, _lv) = if pole.0 == "u" { (v, u) } else { (u, v) };
             println!(
                 "    leaving lon: next_pt=({:.4},{:.4},{:.4}) proj=(u={u:.6},v={v:.6}) \
                  residual={res:.3e} (collapsed axis {}; longitude axis pair={lu:.6})",

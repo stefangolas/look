@@ -21,12 +21,7 @@
 use std::env;
 
 use truck_meshalgo::prelude::*;
-use truck_stepio::r#in::{
-    Table,
-    step_geometry::{Curve3D, Surface},
-};
-
-type Cshell = truck_topology::compress::CompressedShell<Point3, Curve3D, Surface>;
+use truck_stepio::r#in::{Table, step_geometry::Surface};
 
 fn load(path: &str) -> anyhow::Result<Table> {
     let bytes = std::fs::read(path)?;
@@ -172,17 +167,17 @@ fn report_face(
             if far_out > 0 {
                 let mut shown = 0;
                 for (vi, v) in mesh.positions().iter().enumerate() {
-                    if let Some(uv) = mesh.uv_coords().get(vi) {
-                        if uv.y > 1.1 || uv.y < -0.1 || uv.x > 1.1 || uv.x < -0.1 {
-                            let (ux, uy) = (uv.x, uv.y);
-                            let (vx, vy, vz) = (v.x, v.y, v.z);
-                            println!(
-                                "  OOD[{shown}] uv=({ux:.4},{uy:.4}) pos=({vx:.4},{vy:.4},{vz:.4})"
-                            );
-                            shown += 1;
-                            if shown >= 6 {
-                                break;
-                            }
+                    if let Some(uv) = mesh.uv_coords().get(vi)
+                        && (uv.y > 1.1 || uv.y < -0.1 || uv.x > 1.1 || uv.x < -0.1)
+                    {
+                        let (ux, uy) = (uv.x, uv.y);
+                        let (vx, vy, vz) = (v.x, v.y, v.z);
+                        println!(
+                            "  OOD[{shown}] uv=({ux:.4},{uy:.4}) pos=({vx:.4},{vy:.4},{vz:.4})"
+                        );
+                        shown += 1;
+                        if shown >= 6 {
+                            break;
                         }
                     }
                 }

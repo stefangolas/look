@@ -153,17 +153,6 @@ const WINDING_UNRESOLVED_MARGIN: f64 = 1.0e6;
 // Exact 3x3 determinant (ported from circular_arc.rs — same algorithm)
 // ---------------------------------------------------------------------------
 
-/// Exact 3-vector dot product, as a non-overlapping expansion over the shared
-/// Shewchuk arithmetic. The same implementation as
-/// `circular_arc::exact_dot3`; kept local rather than imported because that
-/// function is private to its module.
-fn exact_dot3(u: [f64; 3], v: [f64; 3]) -> Expansion {
-    let mut acc = Expansion::from_product(u[0], v[0]);
-    acc = acc.merge(&Expansion::from_product(u[1], v[1]));
-    acc = acc.merge(&Expansion::from_product(u[2], v[2]));
-    acc
-}
-
 /// Exact 3×3 determinant, as a non-overlapping expansion. The sign of this
 /// expansion is an exact predicate for `sign(det(A))` over the `f64` columns
 /// of `A`. Ported from `circular_arc::exact_det3`.
@@ -665,16 +654,25 @@ fn is_similarity(transform: &Matrix4) -> bool {
     ];
     let squared: Vec<f64> = columns.iter().map(|c| c.dot(*c)).collect();
     let scale = (squared[0] + squared[1] + squared[2]) / 3.0;
-    if !(scale > 0.0) || !scale.is_finite() {
+    if !scale.is_finite() || scale <= 0.0 {
         return false;
     }
     for value in &squared {
-        if !((value - scale).abs() <= SIMILARITY_RESIDUAL * scale) {
+        if (value - scale)
+            .abs()
+            .partial_cmp(&(SIMILARITY_RESIDUAL * scale))
+            .is_none_or(|o| !o.is_le())
+        {
             return false;
         }
     }
     for (i, j) in [(0usize, 1usize), (0, 2), (1, 2)] {
-        if !(columns[i].dot(columns[j]).abs() <= SIMILARITY_RESIDUAL * scale) {
+        if columns[i]
+            .dot(columns[j])
+            .abs()
+            .partial_cmp(&(SIMILARITY_RESIDUAL * scale))
+            .is_none_or(|o| !o.is_le())
+        {
             return false;
         }
     }
@@ -727,12 +725,12 @@ pub fn identify_source_torus_deck(
             return Err(TorusDeckFailure::DegenerateTorusGeometry { cause });
         }
     }
-    if !(entity_large > 0.0) {
+    if entity_large.partial_cmp(&0.0).is_none_or(|o| !o.is_gt()) {
         return Err(TorusDeckFailure::DegenerateTorusGeometry {
             cause: NumericDomainError::Zero,
         });
     }
-    if !(entity_small > 0.0) {
+    if entity_small.partial_cmp(&0.0).is_none_or(|o| !o.is_gt()) {
         return Err(TorusDeckFailure::DegenerateTorusGeometry {
             cause: NumericDomainError::Zero,
         });
@@ -750,7 +748,7 @@ pub fn identify_source_torus_deck(
     let center = transform.transform_point(entity_center);
     let axis = col_z; // the revolution axis: structurally the entity's z.
     let axis_norm = axis.magnitude();
-    if !(axis_norm > 0.0) {
+    if axis_norm.partial_cmp(&0.0).is_none_or(|o| !o.is_gt()) {
         return Err(TorusDeckFailure::DegenerateTorusGeometry {
             cause: NumericDomainError::Zero,
         });

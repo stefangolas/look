@@ -4,7 +4,7 @@
 use std::env;
 
 use truck_meshalgo::prelude::*;
-use truck_stepio::r#in::{Table, step_geometry::Surface};
+use truck_stepio::r#in::Table;
 
 fn load(path: &str) -> anyhow::Result<Table> {
     let bytes = std::fs::read(path)?;
@@ -83,9 +83,9 @@ fn main() -> anyhow::Result<()> {
             // Largest edges
             let mut edges: Vec<(f64, usize, usize)> = Vec::new();
             for tri in mesh.tri_faces() {
-                let a = pos[tri[0].pos];
-                let b = pos[tri[1].pos];
-                let c = pos[tri[2].pos];
+                let _a = pos[tri[0].pos];
+                let _b = pos[tri[1].pos];
+                let _c = pos[tri[2].pos];
                 for (u, v) in [
                     (tri[0].pos, tri[1].pos),
                     (tri[1].pos, tri[2].pos),

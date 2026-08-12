@@ -7,9 +7,7 @@
 use look::step::torus_deck::{
     LatticeOrientation, MajorAxis, TorusDeckFailure, WindingFailure, identify_source_torus_deck,
 };
-use truck_meshalgo::prelude::{
-    EuclideanSpace, InnerSpace, Invertible, Matrix4, Point3, Rad, Vector3,
-};
+use truck_meshalgo::prelude::{InnerSpace, Invertible, Matrix4, Point3, Rad, Vector3};
 use truck_meshalgo::tessellation::formal::DeckVector2;
 use truck_stepio::r#in::step_geometry::{ElementarySurface, Processor, Surface, Torus};
 

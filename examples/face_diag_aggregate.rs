@@ -74,10 +74,6 @@ fn u64_field(row: &Value, key: &str) -> u64 {
     row.get(key).and_then(|v| v.as_u64()).unwrap_or(0)
 }
 
-fn bool_field(row: &Value, key: &str) -> bool {
-    row.get(key).and_then(|v| v.as_bool()).unwrap_or(false)
-}
-
 fn origin_class(origin: &str) -> &'static str {
     match origin {
         "Source" => "source",
@@ -104,7 +100,7 @@ fn main() -> anyhow::Result<()> {
         .iter()
         .position(|a| a == "--outdir")
         .and_then(|i| args.get(i + 1))
-        .map(|s| std::path::PathBuf::from(s))
+        .map(std::path::PathBuf::from)
         .unwrap_or_else(|| {
             std::path::Path::new(jsonl_path)
                 .parent()
@@ -127,7 +123,7 @@ fn main() -> anyhow::Result<()> {
     let file = std::fs::File::open(jsonl_path)?;
     let rows: Vec<Value> = std::io::BufReader::new(file)
         .lines()
-        .filter_map(|l| l.ok())
+        .map_while(Result::ok)
         .filter(|l| !l.trim().is_empty())
         .filter_map(|l| serde_json::from_str(&l).ok())
         .collect();

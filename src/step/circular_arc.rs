@@ -417,7 +417,9 @@ pub fn shadow_classify_circularity(
 
     let len_cos_sq = basis_cos.dot(basis_cos);
     let len_sin_sq = basis_sin.dot(basis_sin);
-    if !(len_cos_sq > 0.0) || !(len_sin_sq > 0.0) {
+    if len_cos_sq.partial_cmp(&0.0).is_none_or(|o| !o.is_gt())
+        || len_sin_sq.partial_cmp(&0.0).is_none_or(|o| !o.is_gt())
+    {
         return Err(CircularArcAdapterFailure::CollapsedCircleTransform);
     }
     let orthogonality = basis_cos.dot(basis_sin);
@@ -551,7 +553,9 @@ fn decode_conic(
 
     let len_cos_sq = basis_cos.dot(basis_cos);
     let len_sin_sq = basis_sin.dot(basis_sin);
-    if !(len_cos_sq > 0.0) || !(len_sin_sq > 0.0) {
+    if len_cos_sq.partial_cmp(&0.0).is_none_or(|o| !o.is_gt())
+        || len_sin_sq.partial_cmp(&0.0).is_none_or(|o| !o.is_gt())
+    {
         return Err(CircularArcAdapterFailure::CollapsedCircleTransform);
     }
 
@@ -604,7 +608,11 @@ fn decode_conic(
     };
 
     let normal_raw = basis_cos.cross(basis_sin);
-    if !(normal_raw.dot(normal_raw) > 0.0) {
+    if normal_raw
+        .dot(normal_raw)
+        .partial_cmp(&0.0)
+        .is_none_or(|o| !o.is_gt())
+    {
         return Err(CircularArcAdapterFailure::CollapsedCircleTransform);
     }
     let normal = normal_raw.normalize();
@@ -665,7 +673,7 @@ fn decode_conic(
 mod tests {
     use super::*;
     use std::f64::consts::{FRAC_PI_2, PI, TAU};
-    use truck_meshalgo::prelude::{EuclideanSpace, Invertible, Rad};
+    use truck_meshalgo::prelude::{Invertible, Rad};
     use truck_stepio::r#in::step_geometry::{Processor, TrimmedCurve, UnitCircle};
 
     fn ellipse_with(

@@ -199,10 +199,10 @@ fn extract_target_face(
     cshell: &Cshell,
     target_spec: &str,
 ) -> Option<(usize, CompressedFace<Surface>)> {
-    if let Ok(idx) = target_spec.parse::<usize>() {
-        if idx < cshell.faces.len() {
-            return Some((idx, cshell.faces[idx].clone()));
-        }
+    if let Ok(idx) = target_spec.parse::<usize>()
+        && idx < cshell.faces.len()
+    {
+        return Some((idx, cshell.faces[idx].clone()));
     }
     let target_str = target_spec.trim_start_matches('#');
     for (idx, face) in cshell.faces.iter().enumerate() {

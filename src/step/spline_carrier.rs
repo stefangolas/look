@@ -93,8 +93,8 @@
 //!   are structural, not interior samples).
 //! - A **denominator** that is not certified sign-definite (proof obligation
 //!   1) blocks every NURBS `Certified` outcome: mixed-sign weights can drive
-//!   `w(t)` through zero, and no carrier relation through a pole is a
-//!   parallel.
+//!      `w(t)` through zero, and no carrier relation through a pole is a
+//!      parallel.
 //!
 //! # Transform handling
 //!
@@ -700,13 +700,14 @@ struct Span {
 /// `(T[k], T[k+1])` with `T[k] < T[k+1]`, for `k` from `p` to `N - 1`. On
 /// such a span the `p + 1` active basis functions are `N_{k-p}, ..., N_k`,
 /// indices `[k-p ..= k]`, and they form a partition of unity there.
+#[allow(clippy::result_large_err)]
 fn enumerate_spans(
     knots: &KnotVec,
     degree: usize,
     trim: (f64, f64),
 ) -> Result<Vec<Span>, SplineCarrierCertification> {
     let (t0, t1) = trim;
-    if !(t0 < t1) {
+    if t0.partial_cmp(&t1).is_none_or(|o| !o.is_lt()) {
         return Err(SplineCarrierCertification::OperationalFailure(
             ResourceReport {
                 detail: "empty_or_inverted_trim",
@@ -728,7 +729,10 @@ fn enumerate_spans(
     let n = m - degree - 1; // control point count
     let domain_lo = knots[degree];
     let domain_hi = knots[n];
-    if !(domain_lo.is_finite() && domain_hi.is_finite()) || !(domain_hi > domain_lo) {
+    if !domain_lo.is_finite()
+        || !domain_hi.is_finite()
+        || domain_hi.partial_cmp(&domain_lo).is_none_or(|o| !o.is_gt())
+    {
         return Err(SplineCarrierCertification::OperationalFailure(
             ResourceReport {
                 detail: "degenerate_active_domain",
@@ -750,7 +754,7 @@ fn enumerate_spans(
     for k in degree..n {
         let klo = knots[k];
         let khi = knots[k + 1];
-        if !(khi > klo) {
+        if khi.partial_cmp(&klo).is_none_or(|o| !o.is_gt()) {
             continue; // degenerate span (knot multiplicity)
         }
         // Overlap of the open span (klo, khi) with the open trim (t0, t1);
@@ -796,8 +800,8 @@ fn certify_constant_coordinate_euclidean(
     let first = control_points[spans[0].first];
     let value = coord.at(first);
     for (idx, span) in spans.iter().enumerate() {
-        for i in span.first..=span.last {
-            let v = coord.at(control_points[i]);
+        for v in control_points.iter().take(span.last + 1).skip(span.first) {
+            let v = coord.at(*v);
             if v != value {
                 let discrepancy = if v > value {
                     CertifiedSign::Positive
@@ -882,8 +886,7 @@ fn certify_constant_coordinate_homogeneous(
     let w0 = h0.w;
     let w0_exp = Expansion::zero().grow(w0);
     for (idx, span) in spans.iter().enumerate() {
-        for i in span.first..=span.last {
-            let hi = &control_points[i];
+        for hi in control_points.iter().take(span.last + 1).skip(span.first) {
             let wi = hi.w;
             let numi = num_of(hi);
             // num_i * w0 - num0 * w_i  == 0  ?
@@ -940,8 +943,8 @@ fn certify_straight_line_euclidean(
     // Pick the first nonzero displacement as the reference direction.
     let mut dir: Option<Vector3> = None;
     for span in spans {
-        for i in span.first..=span.last {
-            let d = cps[i] - p0;
+        for p in cps.iter().take(span.last + 1).skip(span.first) {
+            let d = *p - p0;
             if d.magnitude2() > 0.0 {
                 dir = Some(d);
                 break;
@@ -961,8 +964,8 @@ fn certify_straight_line_euclidean(
     };
     let dir_arr = [dir.x, dir.y, dir.z];
     for (idx, span) in spans.iter().enumerate() {
-        for i in span.first..=span.last {
-            let d = cps[i] - p0;
+        for p in cps.iter().take(span.last + 1).skip(span.first) {
+            let d = *p - p0;
             let cross = exact_cross3_f64([d.x, d.y, d.z], dir_arr);
             if !cross.is_zero() {
                 return contradiction_collinear(spans.len().min(idx + 1), span, &cross);
@@ -1047,8 +1050,8 @@ fn certify_straight_line_homogeneous(
     // Pick a reference direction A_ref = first nonzero A_i.
     let mut a_ref: Option<[Expansion; 3]> = None;
     for span in spans {
-        for i in span.first..=span.last {
-            let a = a_of(&cps[i]);
+        for p in cps.iter().take(span.last + 1).skip(span.first) {
+            let a = a_of(p);
             let combined = a[0].clone().merge(&a[1].clone()).merge(&a[2].clone());
             if !combined.is_zero() {
                 a_ref = Some(a);
@@ -1068,8 +1071,8 @@ fn certify_straight_line_homogeneous(
         );
     };
     for (idx, span) in spans.iter().enumerate() {
-        for i in span.first..=span.last {
-            let a = a_of(&cps[i]);
+        for p in cps.iter().take(span.last + 1).skip(span.first) {
+            let a = a_of(p);
             let cross = cross_expansion3(&a, &a_ref);
             if !cross.is_zero() {
                 return contradiction_collinear(spans.len().min(idx + 1), span, &cross);
@@ -1187,8 +1190,7 @@ fn certify_circular_arc_homogeneous(
         let np1 = degree + 1;
         let mut s_xyz: Vec<[Expansion; 3]> = Vec::with_capacity(np1);
         let mut w_vals: Vec<f64> = Vec::with_capacity(np1);
-        for i in seg_first..=seg_last {
-            let h = &cps[i];
+        for h in cps.iter().take(seg_last + 1).skip(seg_first) {
             let xyz = h.truncate();
             let w = h.w;
             w_vals.push(w);
@@ -1232,7 +1234,7 @@ fn certify_circular_arc_homogeneous(
         }
         for k in 0..=2 * p {
             let mut ck = Expansion::zero();
-            let i_min = if k >= p { k - p } else { 0 };
+            let i_min = k.saturating_sub(p);
             let i_max = k.min(p);
             for i in i_min..=i_max {
                 let j = k - i;
@@ -1475,6 +1477,7 @@ fn check_finite_control_points_homogeneous(cps: &[Vector4]) -> Option<SplineCarr
     None
 }
 
+#[allow(clippy::result_large_err)]
 fn endpoint_images_euclidean(
     bsp: &BSplineCurve<Point3>,
     trim: (f64, f64),
@@ -1494,6 +1497,7 @@ fn endpoint_images_euclidean(
     Ok((start, end))
 }
 
+#[allow(clippy::result_large_err)]
 fn endpoint_images_homogeneous(
     nurbs: &NurbsCurve<Vector4>,
     trim: (f64, f64),

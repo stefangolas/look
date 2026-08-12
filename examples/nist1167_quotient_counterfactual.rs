@@ -27,10 +27,7 @@ use std::env;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
 use truck_meshalgo::prelude::*;
-use truck_stepio::r#in::{
-    Table,
-    step_geometry::{Curve3D, Surface},
-};
+use truck_stepio::r#in::{Table, step_geometry::Surface};
 use truck_topology::compress::CompressedShell;
 
 /// How many evaluator calls received a cover coordinate outside the native
@@ -342,7 +339,7 @@ fn report_face(
                     }
                     let (ux, uy) = (uv.x, uv.y);
                     let (vx, vy, vz) = (v.x, v.y, v.z);
-                    if ux > 1.05 || ux < -0.05 {
+                    if !(-0.05..=1.05).contains(&ux) {
                         proj_fail_uvs.push(format!(
                             "[{vi}] uv=({ux:.3},{uy:.3}) pos=({vx:.3},{vy:.3},{vz:.3})"
                         ));
@@ -592,9 +589,8 @@ fn main() -> anyhow::Result<()> {
                 faces: wrapped
                     .faces
                     .into_iter()
-                    .enumerate()
-                    .map(|(_f, face)| {
-                        let target = is_target(&face.surface.inner());
+                    .map(|face| {
+                        let target = is_target(face.surface.inner());
                         let (u_quot, v_quot) = match (target, apply_quotient) {
                             (true, true) => (None, Some(1.0)),
                             _ => (None, None),

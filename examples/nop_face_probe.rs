@@ -12,7 +12,6 @@
 //! ```
 
 use std::env;
-use std::path::Path;
 
 use truck_meshalgo::prelude::*;
 use truck_stepio::r#in::{
@@ -142,7 +141,9 @@ fn main() -> anyhow::Result<()> {
                 .unwrap_or(model_tol);
             let outcome = wrapped.robust_triangulation_with_torus_outcome(
                 tol,
-                |s: &PolicySurface| look::step_lattice_of_with_closure(s.inner(), s.source_closure()),
+                |s: &PolicySurface| {
+                    look::step_lattice_of_with_closure(s.inner(), s.source_closure())
+                },
                 |s: &PolicySurface| look::step_support_schema_of(s.inner()),
                 |c: &PolicyCurve| look::step_curve_schema_of(c.inner()),
                 |s: &PolicySurface| look::step_cylinder_of(s.inner()),
@@ -159,27 +160,32 @@ fn main() -> anyhow::Result<()> {
                 .map_or(0, |m| m.tri_faces().len());
             let failure_reason = outcome
                 .face_failures
-                .get(0)
+                .first()
                 .cloned()
                 .flatten()
                 .map(|f| f.reason);
-            let diag = outcome
-                .face_diagnoses
-                .get(0)
-                .and_then(|d| d.clone());
-            println!("FACE\tmodel={model}\tsource_face_id={idv}\tkind={}\tshell_entity={shell_entity}\tface_index={fi}\ttol={tol}\ttriangles={triangles}\tterminal={:?}",
-                surface_kind(&face.surface), failure_reason);
+            let diag = outcome.face_diagnoses.first().and_then(|d| d.clone());
+            println!(
+                "FACE\tmodel={model}\tsource_face_id={idv}\tkind={}\tshell_entity={shell_entity}\tface_index={fi}\ttol={tol}\ttriangles={triangles}\tterminal={:?}",
+                surface_kind(&face.surface),
+                failure_reason
+            );
             if let Some(d) = &diag {
-                println!("CDT\t{}", serde_json::to_string(&d.cdt_stages).unwrap_or_default());
+                println!(
+                    "CDT\t{}",
+                    serde_json::to_string(&d.cdt_stages).unwrap_or_default()
+                );
                 println!(
                     "DERIVED\t{}\tproj={:?}\tlift={:?}",
-                    serde_json::to_string(&d.derived_bucket)
-                        .unwrap_or_default(),
+                    serde_json::to_string(&d.derived_bucket).unwrap_or_default(),
                     d.projection_status,
                     d.lift_status
                 );
                 if let Some(cert) = &d.validity_certificate {
-                    println!("VALIDITY\t{}", serde_json::to_string(cert).unwrap_or_default());
+                    println!(
+                        "VALIDITY\t{}",
+                        serde_json::to_string(cert).unwrap_or_default()
+                    );
                 }
                 if !d.boundary_pieces.is_empty() {
                     let summary: Vec<String> = d
@@ -197,9 +203,20 @@ fn main() -> anyhow::Result<()> {
             }
         }
     }
-    let missing: Vec<u64> = targets.iter().copied().filter(|t| !found.contains(t)).collect();
+    let missing: Vec<u64> = targets
+        .iter()
+        .copied()
+        .filter(|t| !found.contains(t))
+        .collect();
     if !missing.is_empty() {
-        println!("MISSING\t{}", missing.iter().map(u64::to_string).collect::<Vec<_>>().join(","));
+        println!(
+            "MISSING\t{}",
+            missing
+                .iter()
+                .map(u64::to_string)
+                .collect::<Vec<_>>()
+                .join(",")
+        );
     }
     Ok(())
 }

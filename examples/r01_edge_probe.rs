@@ -6,13 +6,9 @@ use std::env;
 
 use truck_meshalgo::prelude::*;
 use truck_meshalgo::tessellation::source_edge::{
-    establish_source_edge_traversal, SourceEdgeTraversal,
+    SourceEdgeTraversal, establish_source_edge_traversal,
 };
 use truck_stepio::r#in::Table;
-use truck_stepio::r#in::step_geometry::{Curve3D, Surface};
-use truck_topology::compress::CompressedShell;
-
-type Cshell = CompressedShell<Point3, Curve3D, Surface>;
 
 fn load(path: &str) -> anyhow::Result<Table> {
     let bytes = std::fs::read(path)?;
@@ -51,12 +47,17 @@ fn main() -> anyhow::Result<()> {
             cshell.source_geometric_uncertainty
         );
         for (fi, face) in cshell.faces.iter().enumerate() {
-            let Some(id) = face.provenance.best_id() else { continue };
+            let Some(id) = face.provenance.best_id() else {
+                continue;
+            };
             let id_u64 = id.get();
             if !targets.contains(&id_u64) {
                 continue;
             }
-            println!("FACE #{id_u64} (idx {fi}) boundaries={}", face.boundaries.len());
+            println!(
+                "FACE #{id_u64} (idx {fi}) boundaries={}",
+                face.boundaries.len()
+            );
             for (bi, boundary) in face.boundaries.iter().enumerate() {
                 for edge_index in boundary {
                     let edge = &cshell.edges[edge_index.index];
@@ -101,20 +102,15 @@ fn main() -> anyhow::Result<()> {
                     // multi-root geometry from a strict-uniqueness false alarm.
                     let shared_probe = if matches!(verdict, SourceEdgeTraversal::Unresolved { .. })
                     {
-                        let (rt0, rt1) = edge.curve
-                            .try_range_tuple()
-                            .unwrap_or((range_lo, range_hi));
-                        let mut hints: Vec<String> = vec![format!(
-                            "declared=({rt0:.4},{rt1:.4})"
-                        )];
+                        let (rt0, rt1) =
+                            edge.curve.try_range_tuple().unwrap_or((range_lo, range_hi));
+                        let mut hints: Vec<String> = vec![format!("declared=({rt0:.4},{rt1:.4})")];
                         for (name, p) in [("start", start_pos), ("end", end_pos)] {
                             match edge.curve.search_parameter(p, None, 500) {
                                 Some(t) => {
                                     let res = edge.curve.subs(t).distance(p);
                                     let pu = edge.curve.basis_is_partition_of_unity(t);
-                                    hints.push(format!(
-                                        "{name}:t={t:.4} res={res:.3e} pu={pu}"
-                                    ));
+                                    hints.push(format!("{name}:t={t:.4} res={res:.3e} pu={pu}"));
                                 }
                                 None => hints.push(format!("{name}:no_search_root")),
                             }
@@ -132,7 +128,8 @@ fn main() -> anyhow::Result<()> {
                                     best_t = t;
                                 }
                             }
-                            hints.push(format!("{name}:in_domain_min_res={best:.3e}@t={best_t:.4}"));
+                            hints
+                                .push(format!("{name}:in_domain_min_res={best:.3e}@t={best_t:.4}"));
                             // Scan a 2% margin past each evaluator end, to see
                             // whether the vertex is realized just outside the
                             // domain (root just past the end) rather than off
@@ -141,14 +138,17 @@ fn main() -> anyhow::Result<()> {
                             let mut bestm = f64::INFINITY;
                             let mut bestm_t = 0.0f64;
                             for i in 0..=2000 {
-                                let t = range_lo - margin + (range_hi - range_lo + 2.0 * margin) * i as f64 / 2000.0;
+                                let t = range_lo - margin
+                                    + (range_hi - range_lo + 2.0 * margin) * i as f64 / 2000.0;
                                 let d = edge.curve.subs(t).distance(p);
                                 if d < bestm {
                                     bestm = d;
                                     bestm_t = t;
                                 }
                             }
-                            hints.push(format!("{name}:margined_min_res={bestm:.3e}@t={bestm_t:.4}"));
+                            hints.push(format!(
+                                "{name}:margined_min_res={bestm:.3e}@t={bestm_t:.4}"
+                            ));
                         }
                         let joined = hints.join(" | ");
                         format!("  [{joined}]")

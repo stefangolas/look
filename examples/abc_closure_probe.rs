@@ -8,9 +8,6 @@ use truck_stepio::r#in::{
     Table,
     step_geometry::{Curve3D, Surface},
 };
-use truck_topology::compress::CompressedShell;
-
-type Cshell = CompressedShell<Point3, Curve3D, Surface>;
 
 fn face_surface_kind(surface: &Surface) -> &'static str {
     match surface {
@@ -61,10 +58,9 @@ fn main() -> anyhow::Result<()> {
             let Some(id) = face.provenance.best_id().map(|id| id.get()) else {
                 continue;
             };
-            if id != target {
-                if !scan_all && !scan_targets.as_ref().is_some_and(|t| t.contains(&id)) {
-                    continue;
-                }
+            if id != target && !scan_all && !scan_targets.as_ref().is_some_and(|t| t.contains(&id))
+            {
+                continue;
             }
             if scan_all || scan_targets.is_some() {
                 // Compact scan mode: one line per closed spline edge.
@@ -111,7 +107,7 @@ fn main() -> anyhow::Result<()> {
             println!("=== FACE #{target} declared_face_index={idx} ===");
             for (bi, wire) in face.boundaries.iter().enumerate() {
                 println!("-- bound {bi}: {} edges", wire.len());
-                for (ei, idx_ref) in wire.iter().enumerate() {
+                for idx_ref in wire.iter() {
                     let curve = &cshell.edges[idx_ref.index].curve;
                     let verts = &cshell.edges[idx_ref.index].vertices;
                     let v0 = cshell.vertices[verts.0];

@@ -7,17 +7,12 @@
 //!   * admits deck-equivalent values on the certified quotient V axis
 //!     (`v=3.63`, `v=-0.37`, ...) because the quotient normalizes them during
 //!     evaluation;
-//! and that the same gate would NOT have applied these bounds to an ordinary
-//! spline with no certified quotient (legacy semantics).
+//!   * does NOT apply these bounds to an ordinary spline with no certified
+//!     quotient (legacy semantics).
 
 use std::env;
 
-use truck_meshalgo::prelude::*;
 use truck_stepio::r#in::Table;
-use truck_stepio::r#in::step_geometry::{Curve3D, Surface};
-use truck_topology::compress::CompressedShell;
-
-type Cshell = CompressedShell<Point3, Curve3D, Surface>;
 
 fn load(path: &str) -> anyhow::Result<Table> {
     let bytes = std::fs::read(path)?;

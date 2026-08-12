@@ -21,7 +21,6 @@ fn curve_family(c: &Curve3D) -> &'static str {
         Curve3D::Line(_) => "line",
         Curve3D::Polyline(_) => "polyline",
         Curve3D::PCurve(_) => "pcurve",
-        _ => "other",
     }
 }
 
@@ -78,10 +77,10 @@ fn main() -> anyhow::Result<()> {
                     if ei == 0 {
                         first = Some(va);
                     }
-                    if let Some(pv) = prev {
-                        if pv != va {
-                            closed = false;
-                        }
+                    if let Some(pv) = prev
+                        && pv != va
+                    {
+                        closed = false;
                     }
                     prev = Some(vb);
                     let curve = &edge.curve;
@@ -140,12 +139,11 @@ fn main() -> anyhow::Result<()> {
                         idx_ref.index, idx_ref.orientation, rt.0, rt.1, er.0, er.1
                     );
                 }
-                if let Some(fv) = first {
-                    if let Some(pv) = prev {
-                        if fv != pv {
-                            closed = false;
-                        }
-                    }
+                if let Some(fv) = first
+                    && let Some(pv) = prev
+                    && fv != pv
+                {
+                    closed = false;
                 }
                 println!("BOUND\tface={id}\tbound={bi}\tn_spline={n_spline}\tcloses={closed}");
             }

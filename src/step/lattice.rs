@@ -70,35 +70,35 @@ pub fn spline_closure_map(
     // The holder maps are keyed by entity id. Resolve each to its owned entity
     // to read the declaration. `get_owned` fails only on a dangling reference,
     // which would also have failed conversion.
-    for (&id, _) in &table.b_spline_surface_with_knots {
+    for &id in table.b_spline_surface_with_knots.keys() {
         if let Ok(owned) =
             EntityTable::<truck_stepio::r#in::BSplineSurfaceWithKnotsHolder>::get_owned(table, id)
         {
             read(id, owned.u_closed(), owned.v_closed());
         }
     }
-    for (&id, _) in &table.uniform_surface {
+    for &id in table.uniform_surface.keys() {
         if let Ok(owned) =
             EntityTable::<truck_stepio::r#in::UniformSurfaceHolder>::get_owned(table, id)
         {
             read(id, owned.u_closed(), owned.v_closed());
         }
     }
-    for (&id, _) in &table.quasi_uniform_surface {
+    for &id in table.quasi_uniform_surface.keys() {
         if let Ok(owned) =
             EntityTable::<truck_stepio::r#in::QuasiUniformSurfaceHolder>::get_owned(table, id)
         {
             read(id, owned.u_closed(), owned.v_closed());
         }
     }
-    for (&id, _) in &table.bezier_surface {
+    for &id in table.bezier_surface.keys() {
         if let Ok(owned) =
             EntityTable::<truck_stepio::r#in::BezierSurfaceHolder>::get_owned(table, id)
         {
             read(id, owned.u_closed(), owned.v_closed());
         }
     }
-    for (&id, _) in &table.rational_b_spline_surface {
+    for &id in table.rational_b_spline_surface.keys() {
         if let Ok(owned) =
             EntityTable::<truck_stepio::r#in::RationalBSplineSurfaceHolder>::get_owned(table, id)
         {
@@ -271,6 +271,9 @@ fn spline_seam_compatible(surface: &Surface, axis: Axis, (a, b): (f64, f64)) -> 
     Some(b - a)
 }
 
+/// One spline axis' native evaluator interval, when certified.
+pub type SplineAxisRange = Option<(f64, f64)>;
+
 /// The cover→native evaluator intervals of a converted spline, one per axis,
 /// certified exactly when the axis carries the `SourceDeclaredClosedSplineAxis`
 /// witness.
@@ -284,7 +287,7 @@ fn spline_seam_compatible(surface: &Surface, axis: Axis, (a, b): (f64, f64)) -> 
 pub fn spline_quotient_axes(
     surface: &Surface,
     closure: Option<SplineAxisClosure>,
-) -> (Option<(f64, f64)>, Option<(f64, f64)>) {
+) -> (SplineAxisRange, SplineAxisRange) {
     use truck_meshalgo::prelude::BoundedSurface;
     use truck_meshalgo::tessellation::domain::lattice::{AxisPeriodStatus, PeriodWitness};
 

@@ -6,10 +6,7 @@
 use std::env;
 
 use truck_meshalgo::prelude::*;
-use truck_stepio::r#in::{
-    Table,
-    step_geometry::{Curve3D, Surface},
-};
+use truck_stepio::r#in::Table;
 
 fn load(path: &str) -> anyhow::Result<Table> {
     let bytes = std::fs::read(path)?;
@@ -56,15 +53,17 @@ fn main() -> anyhow::Result<()> {
                     let pu0 = try_range.map(|(lo, _)| curve.basis_is_partition_of_unity(lo));
                     let pu1 = try_range.map(|(_, hi)| curve.basis_is_partition_of_unity(hi));
                     if is_self_loop {
-                        if let Some((rt_lo, _)) = try_range {
-                            if rt_lo < range.0 - 1e-12 && curve.basis_is_partition_of_unity(rt_lo) {
-                                range.0 = rt_lo;
-                            }
+                        if let Some((rt_lo, _)) = try_range
+                            && rt_lo < range.0 - 1e-12
+                            && curve.basis_is_partition_of_unity(rt_lo)
+                        {
+                            range.0 = rt_lo;
                         }
-                        if let Some((_, rt_hi)) = try_range {
-                            if rt_hi > range.1 + 1e-12 && curve.basis_is_partition_of_unity(rt_hi) {
-                                range.1 = rt_hi;
-                            }
+                        if let Some((_, rt_hi)) = try_range
+                            && rt_hi > range.1 + 1e-12
+                            && curve.basis_is_partition_of_unity(rt_hi)
+                        {
+                            range.1 = rt_hi;
                         }
                     }
                     let (r0, r1) = range;
@@ -112,7 +111,7 @@ fn main() -> anyhow::Result<()> {
                                 max_v = max_v.max(uv.1);
                                 ok += 1;
                                 // clean: raw projection
-                                let (mut cu, mut cv) = uv;
+                                let (cu, cv) = uv;
                                 if let Some((u0, _)) = prev_c {
                                     // no period -> no unwrap
                                     let _ = (u0, cu);
@@ -122,7 +121,7 @@ fn main() -> anyhow::Result<()> {
                                     chain_clean.push(format!("({:.3},{:.3})", cu, cv));
                                 }
                                 // wrapped: apply get_mindiff on v with period 1.0
-                                let (mut wu, mut wv) = uv;
+                                let (wu, mut wv) = uv;
                                 if let Some((_, v0)) = prev_w {
                                     wv = wv + f64::round((v0 - wv) / period) * period;
                                 }

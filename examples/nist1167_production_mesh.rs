@@ -8,13 +8,7 @@
 use std::env;
 
 use truck_meshalgo::prelude::*;
-use truck_stepio::r#in::{
-    Table,
-    step_geometry::{Curve3D, Surface},
-};
-use truck_topology::compress::CompressedShell;
-
-type Cshell = CompressedShell<Point3, Curve3D, Surface>;
+use truck_stepio::r#in::Table;
 
 fn load(path: &str) -> anyhow::Result<Table> {
     let bytes = std::fs::read(path)?;
@@ -147,11 +141,10 @@ fn main() -> anyhow::Result<()> {
                             let a = mesh.positions()[tri[0].pos];
                             let b = mesh.positions()[tri[1].pos];
                             let c = mesh.positions()[tri[2].pos];
-                            let d = (b - a)
+                            (b - a)
                                 .magnitude()
                                 .max((c - b).magnitude())
-                                .max((a - c).magnitude());
-                            d
+                                .max((a - c).magnitude())
                         })
                         .fold(0.0f64, f64::max);
                     // Vertex-on-surface residual: every emitted vertex must lie
@@ -183,7 +176,7 @@ fn main() -> anyhow::Result<()> {
                         vsum / nv as f64
                     );
                 }
-                Some(mesh) => {
+                Some(_) => {
                     println!("FACE {tag}: EMPTY (Some mesh, 0 triangles) failure={fail_str}");
                 }
                 None => {

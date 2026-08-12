@@ -38,10 +38,10 @@ fn extract_target_face<'a>(
     cshell: &'a Cshell,
     target_spec: &str,
 ) -> Option<(usize, &'a CompressedFace<Surface>)> {
-    if let Ok(idx) = target_spec.parse::<usize>() {
-        if idx < cshell.faces.len() {
-            return Some((idx, &cshell.faces[idx]));
-        }
+    if let Ok(idx) = target_spec.parse::<usize>()
+        && idx < cshell.faces.len()
+    {
+        return Some((idx, &cshell.faces[idx]));
     }
     let target_str = target_spec.trim_start_matches('#');
     for (idx, face) in cshell.faces.iter().enumerate() {
@@ -120,8 +120,7 @@ fn main() -> anyhow::Result<()> {
             // Control-net wrap: for a source-closed V axis, the first `vd`
             // columns should coincide with the last `vd` columns (or a
             // documented exporter subset thereof).
-            for i in 0..net.len() {
-                let row = &net[i];
+            for (i, row) in net.iter().enumerate() {
                 let ncols = row.len();
                 let wraps: Vec<String> = (1..=vd)
                     .map(|k| {

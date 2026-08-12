@@ -65,6 +65,7 @@ impl AtlasCell {
 }
 
 #[derive(Debug, Clone)]
+#[allow(dead_code)]
 struct FaceEvidence {
     face_id: String,
     closed_loops: usize,

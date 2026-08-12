@@ -900,10 +900,7 @@ fn holes_report(path: &str) -> anyhow::Result<()> {
     println!("  bound shape");
     let mut shapes: Vec<(String, (usize, Vec<String>))> = by_shape.into_iter().collect();
     shapes.sort_by(|a, b| b.1.0.cmp(&a.1.0).then_with(|| a.0.cmp(&b.0)));
-    println!(
-        "  {:28} {:>7}  {:>6}  {}",
-        "shape", "faces", "share", "examples"
-    );
+    println!("  {:28} {:>7}  {:>6}  examples", "shape", "faces", "share");
     for (shape, (count, examples)) in &shapes {
         let share = *count as f64 / faces as f64 * 100.0;
         println!(
@@ -923,11 +920,12 @@ fn holes_report(path: &str) -> anyhow::Result<()> {
     println!();
 
     println!("  obstruction funnel");
+    #[allow(clippy::type_complexity)]
     let mut rows: Vec<((String, String), (usize, Vec<String>))> = by_exit.into_iter().collect();
     rows.sort_by(|a, b| b.1.0.cmp(&a.1.0).then_with(|| a.0.cmp(&b.0)));
     println!(
-        "  {:40} {:18} {:>7}  {:>6}  {}",
-        "exit", "category", "faces", "share", "examples"
+        "  {:40} {:18} {:>7}  {:>6}  examples",
+        "exit", "category", "faces", "share"
     );
     for ((exit, category), (count, examples)) in &rows {
         let share = *count as f64 / faces as f64 * 100.0;

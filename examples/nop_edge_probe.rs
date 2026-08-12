@@ -16,9 +16,6 @@ use truck_stepio::r#in::{
     Table,
     step_geometry::{ElementarySurface, Surface},
 };
-use truck_topology::compress::{CompressedShell, FaceProvenance};
-
-type Cshell = CompressedShell<Point3, truck_stepio::r#in::step_geometry::Curve3D, Surface>;
 
 fn surface_kind(surface: &Surface) -> &'static str {
     match surface {
@@ -89,12 +86,22 @@ fn main() -> anyhow::Result<()> {
                     "  PLANE origin=({:.6},{:.6},{:.6}) u_axis=({:.6},{:.6},{:.6}) \
                      v_axis=({:.6},{:.6},{:.6}) |u|={:.6} |v|={:.6} |u x v|={:.3e} \
                      u.v={:.6} n=({:.6},{:.6},{:.6})",
-                    o.x, o.y, o.z, ua.x, ua.y, ua.z, va.x, va.y, va.z,
+                    o.x,
+                    o.y,
+                    o.z,
+                    ua.x,
+                    ua.y,
+                    ua.z,
+                    va.x,
+                    va.y,
+                    va.z,
                     ua.magnitude(),
                     va.magnitude(),
                     cross.magnitude(),
                     ua.dot(va),
-                    n.x, n.y, n.z,
+                    n.x,
+                    n.y,
+                    n.z,
                 );
             }
             let (urange, vrange) = face.surface.try_range_tuple();
@@ -103,7 +110,7 @@ fn main() -> anyhow::Result<()> {
             for (bi, wire) in face.boundaries.iter().enumerate() {
                 println!("  WIRE[{bi}] edge_uses={}", wire.len());
                 for (ui, edge_idx) in wire.iter().enumerate() {
-                    let Some(entry) = cshell.edges.get(edge_idx.index as usize) else {
+                    let Some(entry) = cshell.edges.get(edge_idx.index) else {
                         println!("    use[{ui}] index={} -> MISSING", edge_idx.index);
                         continue;
                     };
@@ -115,9 +122,7 @@ fn main() -> anyhow::Result<()> {
                     println!(
                         "    use[{ui}] index={} orientation={} verts=({va},{vb}) topo_closed={closed} \
                          range=[{t0:.9},{t1:.9}] p0=({:.6},{:.6},{:.6}) p1=({:.6},{:.6},{:.6})",
-                        edge_idx.index,
-                        edge_idx.orientation,
-                        a.x, a.y, a.z, b.x, b.y, b.z,
+                        edge_idx.index, edge_idx.orientation, a.x, a.y, a.z, b.x, b.y, b.z,
                     );
                 }
             }
@@ -125,7 +130,7 @@ fn main() -> anyhow::Result<()> {
             // Sample the boundary curves in world and project to the surface UV.
             for (bi, wire) in face.boundaries.iter().enumerate() {
                 for (ui, edge_idx) in wire.iter().enumerate() {
-                    let Some(entry) = cshell.edges.get(edge_idx.index as usize) else {
+                    let Some(entry) = cshell.edges.get(edge_idx.index) else {
                         continue;
                     };
                     let curve = &entry.curve;

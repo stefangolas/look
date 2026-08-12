@@ -681,8 +681,7 @@ impl Eligibility {
         let face_interior_eligible: Vec<bool> = shell
             .faces
             .iter()
-            .enumerate()
-            .map(|(f, face)| {
+            .map(|face| {
                 if !is_revolved_target(&face.surface) {
                     return false;
                 }
@@ -1077,11 +1076,8 @@ mod quotient_tests {
     #[test]
     fn analytic_periodic_surfaces_never_gain_a_quotient() {
         use truck_geometry::prelude::{Line, Sphere, Torus, Vector3};
-        use truck_meshalgo::prelude::{EuclideanSpace, Invertible, Point3};
-        use truck_stepio::r#in::step_geometry::{
-            ConicalSurface, CylindricalSurface, Plane, Processor, Sphere as StepSphere,
-            ToroidalSurface,
-        };
+        use truck_meshalgo::prelude::{EuclideanSpace, Point3};
+        use truck_stepio::r#in::step_geometry::{Processor, Sphere as StepSphere};
         let v_closed = Some(v_closed());
         let cylinder = Processor::new(truck_geometry::prelude::RevolutedCurve::by_revolution(
             Line(Point3::new(10.0, 0.0, 0.0), Point3::new(10.0, 0.0, 10.0)),

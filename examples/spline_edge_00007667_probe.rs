@@ -88,10 +88,10 @@ fn main() -> anyhow::Result<()> {
         }
         match curve {
             Curve3D::BSplineCurve(bsp) => {
-                dump_bsp(&bsp, rt, er);
+                dump_bsp(bsp, rt, er);
             }
             Curve3D::NurbsCurve(nurbs) => {
-                dump_nurbs(&nurbs, rt, er);
+                dump_nurbs(nurbs, rt, er);
             }
             _ => {}
         }
@@ -158,10 +158,10 @@ fn main() -> anyhow::Result<()> {
         // The faces that use this edge, and the other edges of each boundary.
         for (fi, face) in cshell.faces.iter().enumerate() {
             let id = face.provenance.best_id().map(|id| id.get()).unwrap_or(0);
-            if let Some(fid) = face_filter {
-                if id != fid {
-                    continue;
-                }
+            if let Some(fid) = face_filter
+                && id != fid
+            {
+                continue;
             }
             let uses: Vec<(usize, usize, bool)> = face
                 .boundaries
