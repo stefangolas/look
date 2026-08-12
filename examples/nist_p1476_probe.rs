@@ -38,7 +38,11 @@ fn main() -> anyhow::Result<()> {
             println!("=== FACE #1476 declared_face_index={idx} ===");
             println!("surface family via match");
             let s = &face.surface;
-            println!("surface u_period={:?} v_period={:?}", s.u_period(), s.v_period());
+            println!(
+                "surface u_period={:?} v_period={:?}",
+                s.u_period(),
+                s.v_period()
+            );
             println!("surface range={:?}", s.try_range_tuple());
             for (bi, wire) in face.boundaries.iter().enumerate() {
                 println!("-- bound {bi}: {} edges", wire.len());
@@ -92,9 +96,16 @@ fn main() -> anyhow::Result<()> {
             h(None);
             // Also: the surface at the corner, and its derivatives.
             println!("subs(0,0)={:?}", s.subs(0.0, 0.0));
-            println!("subs(0,0).dist(corner)={:?}", s.subs(0.0, 0.0).distance(corner));
+            println!(
+                "subs(0,0).dist(corner)={:?}",
+                s.subs(0.0, 0.0).distance(corner)
+            );
             let (u0, v0) = (0.0f64, 0.0f64);
-            println!("uder(0,0)={:?} vder(0,0)={:?}", s.uder(u0, v0), s.vder(u0, v0));
+            println!(
+                "uder(0,0)={:?} vder(0,0)={:?}",
+                s.uder(u0, v0),
+                s.vder(u0, v0)
+            );
             println!("uder(-0.03125,0.5)={:?}", s.uder(-0.03125, 0.5));
             println!("vder(-0.03125,0.5)={:?}", s.vder(-0.03125, 0.5));
             println!("subs(-0.03125,0.5)={:?}", s.subs(-0.03125, 0.5));
@@ -136,14 +147,22 @@ fn main() -> anyhow::Result<()> {
                 ((-0.0625, 1.0625), (0.0, 1.0)),
                 50,
             );
-            println!("raw presearch best cell = {best:?} subs={:?} dist={:?}", s.subs(best.0, best.1), s.subs(best.0, best.1).distance(seam));
+            println!(
+                "raw presearch best cell = {best:?} subs={:?} dist={:?}",
+                s.subs(best.0, best.1),
+                s.subs(best.0, best.1).distance(seam)
+            );
             let best2 = truck_meshalgo::prelude::algo::surface::presearch(
                 s,
                 seam,
                 ((0.0, 1.0), (0.0, 1.0)),
                 50,
             );
-            println!("true presearch best cell = {best2:?} subs={:?} dist={:?}", s.subs(best2.0, best2.1), s.subs(best2.0, best2.1).distance(seam));
+            println!(
+                "true presearch best cell = {best2:?} subs={:?} dist={:?}",
+                s.subs(best2.0, best2.1),
+                s.subs(best2.0, best2.1).distance(seam)
+            );
             let mut prev: Option<(f64, f64)> = None;
             for (i, p) in poly.iter().enumerate() {
                 let out = chain(s, *p, prev);
@@ -162,12 +181,7 @@ fn main() -> anyhow::Result<()> {
     Ok(())
 }
 
-fn print_proj(
-    label: &str,
-    s: &Surface,
-    point: Point3,
-    r: Option<(f64, f64)>,
-) {
+fn print_proj(label: &str, s: &Surface, point: Point3, r: Option<(f64, f64)>) {
     match r {
         Some((u, v)) => {
             let res = s.subs(u, v).distance(point);
@@ -204,7 +218,5 @@ fn chain(s: &Surface, point: Point3, hint: Option<(f64, f64)>) -> Result<(f64, f
     if let Some((u, v, res)) = r4 {
         return Ok((u, v));
     }
-    Err(format!(
-        "all 4 links failed (hint={hint:?})"
-    ))
+    Err(format!("all 4 links failed (hint={hint:?})"))
 }

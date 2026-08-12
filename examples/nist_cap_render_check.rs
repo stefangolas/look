@@ -99,10 +99,18 @@ fn main() -> anyhow::Result<()> {
             obj.push_str(&format!("v {} {} {}\n", p.x, p.y, p.z));
         }
         for f in whole.faces().tri_faces() {
-            obj.push_str(&format!("f {} {} {}\n", f[0].pos + 1, f[1].pos + 1, f[2].pos + 1));
+            obj.push_str(&format!(
+                "f {} {} {}\n",
+                f[0].pos + 1,
+                f[1].pos + 1,
+                f[2].pos + 1
+            ));
         }
         std::fs::write(&dest, obj)?;
-        println!("dumped mesh to {dest} ({} triangles)", whole.tri_faces().len());
+        println!(
+            "dumped mesh to {dest} ({} triangles)",
+            whole.tri_faces().len()
+        );
     }
     Ok(())
 }

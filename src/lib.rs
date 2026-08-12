@@ -16,6 +16,10 @@ pub use step::lattice::curve_schema_of as step_curve_schema_of;
 ///
 /// Re-exported so the census exercises exactly the path production does.
 pub use step::lattice::lattice_of as step_lattice_of;
+/// As [`step_lattice_of`], with the source-declared spline-axis closure the
+/// composition layer read from the STEP table. Production and the census both
+/// route through this once the closure map is attached.
+pub use step::lattice::lattice_of_with_closure as step_lattice_of_with_closure;
 pub use step::lattice::support_schema_of as step_support_schema_of;
 
 /// The rank-1 cylinder evidence readers, re-exported so the census exercises

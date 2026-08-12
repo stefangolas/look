@@ -22,6 +22,91 @@
 
 use truck_meshalgo::tessellation::domain::lattice::{Axis, AxisPeriodStatus, CertifiedLattice};
 use truck_stepio::r#in::step_geometry::{ElementarySurface, Surface};
+/// The source-declared closure of a spline surface's two parameter axes.
+///
+/// This is explicit provenance, not inference: STEP declares
+/// `B_SPLINE_SURFACE_WITH_KNOTS` (and the NURBS and uniform/quasi/bezier forms)
+/// with a `u_closed`/`v_closed` pair, and only an explicit `.T.` counts. The
+/// closure is *not* reconstructed from a periodic knot vector, a wrapped
+/// control net, coincident endpoints, or numerical seam agreement — the source
+/// declaration is the authority.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct SplineAxisClosure {
+    /// The source-declared closure of the `u` axis.
+    pub u_closed: bool,
+    /// The source-declared closure of the `v` axis.
+    pub v_closed: bool,
+}
+
+impl SplineAxisClosure {
+    /// Neither axis declared closed.
+    pub const OPEN: Self = Self {
+        u_closed: false,
+        v_closed: false,
+    };
+}
+
+/// Read the source-declared spline-axis closure of every spline surface entity
+/// a STEP table holds, keyed by surface entity id.
+///
+/// This is the provenance seam: the composition layer still holds the raw STEP
+/// table (`b_spline_surface_with_knots`, `uniform_surface`,
+/// `quasi_uniform_surface`, `bezier_surface`, and the NURBS wrapper), so the
+/// `u_closed`/`v_closed` declaration is nameable here and nowhere downstream.
+/// The converted `Surface` value the tessellator sees has erased it.
+///
+/// A `FaceProvenance.surface_id` (truck-topology) names the same entity id, so
+/// the composition layer can attach the closure to each face's surface by that
+/// id before the tessellator's lattice callback runs.
+pub fn spline_closure_map(
+    table: &truck_stepio::r#in::Table,
+) -> std::collections::HashMap<u64, SplineAxisClosure> {
+    use truck_stepio::r#in::ruststep::tables::EntityTable;
+
+    let mut closures = std::collections::HashMap::new();
+    let mut read = |id: u64, u_closed: bool, v_closed: bool| {
+        closures.insert(id, SplineAxisClosure { u_closed, v_closed });
+    };
+    // The holder maps are keyed by entity id. Resolve each to its owned entity
+    // to read the declaration. `get_owned` fails only on a dangling reference,
+    // which would also have failed conversion.
+    for (&id, _) in &table.b_spline_surface_with_knots {
+        if let Ok(owned) =
+            EntityTable::<truck_stepio::r#in::BSplineSurfaceWithKnotsHolder>::get_owned(table, id)
+        {
+            read(id, owned.u_closed(), owned.v_closed());
+        }
+    }
+    for (&id, _) in &table.uniform_surface {
+        if let Ok(owned) =
+            EntityTable::<truck_stepio::r#in::UniformSurfaceHolder>::get_owned(table, id)
+        {
+            read(id, owned.u_closed(), owned.v_closed());
+        }
+    }
+    for (&id, _) in &table.quasi_uniform_surface {
+        if let Ok(owned) =
+            EntityTable::<truck_stepio::r#in::QuasiUniformSurfaceHolder>::get_owned(table, id)
+        {
+            read(id, owned.u_closed(), owned.v_closed());
+        }
+    }
+    for (&id, _) in &table.bezier_surface {
+        if let Ok(owned) =
+            EntityTable::<truck_stepio::r#in::BezierSurfaceHolder>::get_owned(table, id)
+        {
+            read(id, owned.u_closed(), owned.v_closed());
+        }
+    }
+    for (&id, _) in &table.rational_b_spline_surface {
+        if let Ok(owned) =
+            EntityTable::<truck_stepio::r#in::RationalBSplineSurfaceHolder>::get_owned(table, id)
+        {
+            read(id, owned.u_closed(), owned.v_closed());
+        }
+    }
+    closures
+}
 
 /// The deck lattice of one STEP surface, established from its representation.
 ///
@@ -29,16 +114,36 @@ use truck_stepio::r#in::step_geometry::{ElementarySurface, Surface};
 /// of the parameterisation. Anything resting on an accessor result comes back
 /// `Uncertified`: it is still usable by the legacy path, and it can never be
 /// mistaken for a certified generator.
+///
+/// The composition layer that can name the concrete STEP surface should call
+/// [`lattice_of_with_closure`], which additionally certifies a
+/// source-declared-closed spline axis whose converted evaluator satisfies the
+/// seam identification. This bare form carries no source provenance and is the
+/// conservative fallback used by callers that only have the converted geometry.
 pub fn lattice_of(surface: &Surface) -> CertifiedLattice {
+    lattice_of_with_closure(surface, None)
+}
+
+/// As [`lattice_of`], with the source-declared spline-axis closure supplied by
+/// the composition layer.
+///
+/// The source closure is the authority; the evaluator seam compatibility check
+/// can only reject an incompatible conversion, never establish closure. See the
+/// stage-B theorem in the periodic-cover handoff.
+pub fn lattice_of_with_closure(
+    surface: &Surface,
+    closure: Option<SplineAxisClosure>,
+) -> CertifiedLattice {
     match surface {
         Surface::ElementarySurface(elementary) => elementary_lattice(elementary),
 
         // A B-spline or NURBS surface is periodic only if its source
-        // representation says so — a periodic knot vector and a wrapped control
-        // net. Neither is checked here, and `u_period()` on these types returns
-        // `None` regardless, so there is nothing to certify and nothing to
-        // preserve.
-        Surface::BSplineSurface(_) | Surface::NurbsSurface(_) => CertifiedLattice::NON_PERIODIC,
+        // representation says so. The source closure, when the composition
+        // layer supplies it, certifies a generator on exactly the declared
+        // axis, gated on the converted evaluator's seam compatibility.
+        // Without provenance the axis stays `NonPeriodic` — nothing is
+        // inferred from the knot vector or the control net.
+        Surface::BSplineSurface(_) | Surface::NurbsSurface(_) => spline_lattice(surface, closure),
 
         // A swept curve's periodicity follows from the swept profile and the
         // sweep, and an offset surface's from its basis. Reading either
@@ -46,6 +151,157 @@ pub fn lattice_of(surface: &Surface) -> CertifiedLattice {
         // forward as uncertified rather than silently promoted.
         Surface::SweptCurve(_) | Surface::OffsetSurface(_) => unevidenced(surface),
     }
+}
+
+/// Certify the source-declared closure of a converted spline surface.
+///
+/// The theorem, stated for one axis `A` with active interval `[a, b]`:
+///
+/// > the STEP source declares `A` closed, and the converted spline evaluator
+/// > satisfies the seam identification `S(·, a) == S(·, b)` (position and
+/// > first derivative) over the active interval; therefore `P = b - a` is a
+/// > valid topological lattice generator on `A`.
+///
+/// The source declaration is read from the composition layer's provenance, not
+/// inferred. The seam check is a *compatibility* test: it certifies nothing by
+/// itself and only declines to certify a conversion whose evaluator does not
+/// realise the source's closure. A declared axis whose seam check fails stays
+/// `NonPeriodic` rather than being silently promoted.
+fn spline_lattice(surface: &Surface, closure: Option<SplineAxisClosure>) -> CertifiedLattice {
+    use truck_meshalgo::prelude::BoundedSurface;
+
+    let Some(closure) = closure else {
+        return CertifiedLattice::NON_PERIODIC;
+    };
+
+    // The active interval of a converted spline is its basis-valid interior
+    // rectangle (`BoundedSurface::evaluation_range`), which can be strictly
+    // narrower than the declared knot range when STEP's end knots are not
+    // clamped. That is the domain the generic evaluator genuinely supports.
+    let ((u0, u1), (v0, v1)) = match surface {
+        Surface::BSplineSurface(spline) => BoundedSurface::evaluation_range(spline),
+        Surface::NurbsSurface(spline) => BoundedSurface::evaluation_range(spline),
+        _ => return CertifiedLattice::NON_PERIODIC,
+    };
+    let spline_axis = |axis: Axis, declared: bool, (a, b): (f64, f64)| {
+        match declared {
+        // Only an explicit source `.T.` reaches this arm. Without it the axis
+        // stays non-periodic even if the geometry happens to close numerically.
+        false => AxisPeriodStatus::NonPeriodic,
+        true => match spline_seam_compatible(surface, axis, (a, b)) {
+            Some(period) => AxisPeriodStatus::Exact {
+                period,
+                witness: truck_meshalgo::tessellation::domain::lattice::PeriodWitness::
+                    SourceDeclaredClosedSplineAxis,
+            },
+            // The source declared closure but the converted evaluator does not
+            // identify the seam — an incompatible conversion. Do not certify.
+            None => AxisPeriodStatus::NonPeriodic,
+        },
+    }
+    };
+    let u = spline_axis(Axis::U, closure.u_closed, (u0, u1));
+    let v = spline_axis(Axis::V, closure.v_closed, (v0, v1));
+    CertifiedLattice { u, v }
+}
+
+/// How many samples per axis the seam compatibility check evaluates.
+const SEAM_SAMPLES: usize = 8;
+/// A relative tolerance for the seam identification, as a fraction of the
+/// larger active-axis span.
+///
+/// The measured seam residuals for the corpus's source-closed splines are at
+/// machine precision (`S` ~ `7e-14`, `Sv` ~ `9e-13` on a 300-unit model), and
+/// this tolerance sits five orders above that while remaining five orders
+/// below the render chord tolerance — a genuinely incompatible conversion,
+/// whose seam gap is macroscopic, is rejected decisively.
+const SEAM_RELATIVE_TOLERANCE: f64 = 1.0e-8;
+
+/// Check the seam identification of a converted spline on one axis.
+///
+/// Evaluates `S` and its first derivative at `8` samples along the other axis,
+/// comparing the two seam endpoints. Returns `Some(period)` with
+/// `period = b - a` when every sample satisfies the position and derivative
+/// identification; `None` when the conversion does not realise the source's
+/// declared closure. The check is a *rejection* gate, never the source of the
+/// closure.
+fn spline_seam_compatible(surface: &Surface, axis: Axis, (a, b): (f64, f64)) -> Option<f64> {
+    use truck_meshalgo::prelude::{BoundedSurface, InnerSpace, ParametricSurface};
+
+    let (span, other) = match axis {
+        Axis::U => {
+            let ((_, _), (v0, v1)) = match surface {
+                Surface::BSplineSurface(spline) => BoundedSurface::evaluation_range(spline),
+                Surface::NurbsSurface(spline) => BoundedSurface::evaluation_range(spline),
+                _ => return None,
+            };
+            (b - a, (v0, v1))
+        }
+        Axis::V => {
+            let ((u0, u1), (_, _)) = match surface {
+                Surface::BSplineSurface(spline) => BoundedSurface::evaluation_range(spline),
+                Surface::NurbsSurface(spline) => BoundedSurface::evaluation_range(spline),
+                _ => return None,
+            };
+            (b - a, (u0, u1))
+        }
+    };
+    let tolerance = span.abs().max(1.0) * SEAM_RELATIVE_TOLERANCE;
+
+    let (o0, o1) = other;
+    for i in 0..=SEAM_SAMPLES {
+        let t = o0 + (o1 - o0) * (i as f64 / SEAM_SAMPLES as f64);
+        // Seam on `u`: `S(u0, v) == S(u1, v)`; seam on `v`:
+        // `S(u, v0) == S(u, v1)`.
+        let (p0, p1) = match axis {
+            Axis::U => (surface.subs(a, t), surface.subs(b, t)),
+            Axis::V => (surface.subs(t, a), surface.subs(t, b)),
+        };
+        if (p0 - p1).magnitude() > tolerance {
+            return None;
+        }
+        let (d0, d1) = match axis {
+            Axis::U => (surface.uder(a, t), surface.uder(b, t)),
+            Axis::V => (surface.vder(t, a), surface.vder(t, b)),
+        };
+        if (d0 - d1).magnitude() > tolerance {
+            return None;
+        }
+    }
+    Some(b - a)
+}
+
+/// The cover→native evaluator intervals of a converted spline, one per axis,
+/// certified exactly when the axis carries the `SourceDeclaredClosedSplineAxis`
+/// witness.
+///
+/// The quotient adapter needs, for each source-certified closed spline axis,
+/// the native *evaluation interval* `[a, b]` — not just the period `P = b - a`,
+/// because `a` need not be zero. This derives that once from the same lattice
+/// and the same `evaluation_range` the certification theorem used, so the
+/// evaluator map never re-derives periodicity numerically. Analytic surfaces
+/// and non-periodic axes return `None` on every axis.
+pub fn spline_quotient_axes(
+    surface: &Surface,
+    closure: Option<SplineAxisClosure>,
+) -> (Option<(f64, f64)>, Option<(f64, f64)>) {
+    use truck_meshalgo::prelude::BoundedSurface;
+    use truck_meshalgo::tessellation::domain::lattice::{AxisPeriodStatus, PeriodWitness};
+
+    let lattice = lattice_of_with_closure(surface, closure);
+    let ((u0, u1), (v0, v1)) = match surface {
+        Surface::BSplineSurface(spline) => BoundedSurface::evaluation_range(spline),
+        Surface::NurbsSurface(spline) => BoundedSurface::evaluation_range(spline),
+        _ => ((0.0, 0.0), (0.0, 0.0)),
+    };
+    let axis = |status: AxisPeriodStatus, (a, b): (f64, f64)| match status {
+        AxisPeriodStatus::Exact {
+            witness: PeriodWitness::SourceDeclaredClosedSplineAxis,
+            ..
+        } => Some((a, b)),
+        _ => None,
+    };
+    (axis(lattice.u, (u0, u1)), axis(lattice.v, (v0, v1)))
 }
 
 fn elementary_lattice(surface: &ElementarySurface) -> CertifiedLattice {
@@ -596,6 +852,134 @@ mod cylinder_curve_tests {
 }
 
 #[cfg(test)]
+mod source_closure_tests {
+    use super::*;
+    use truck_geometry::prelude::{BSplineSurface, KnotVec, Point3};
+    use truck_meshalgo::tessellation::domain::lattice::AxisPeriodStatus;
+
+    /// A degree-2 clamped spline over `[0,1]²` whose `v` direction is a
+    /// genuinely closed strip: the last control row equals the first, and the
+    /// penultimate row is the reflection `2·P0 − P1`, so position *and* first
+    /// derivative close exactly at the seam (measured seam residual ~1e-16).
+    ///
+    /// The source declaration of closure is *not* read from this geometry: the
+    /// caller supplies the declaration, and the evaluator seam check only has
+    /// to accept an actually-compatible conversion.
+    fn closed_v_spline() -> Surface {
+        let knots = (KnotVec::uniform_knot(2, 2), KnotVec::uniform_knot(2, 2));
+        let column = |r: f64, z: f64| {
+            let p0 = Point3::new(r, 0.0, z);
+            let p1 = Point3::new(r * 0.3, r, z);
+            let p2 = Point3::new(p0.x * 2.0 - p1.x, p0.y * 2.0 - p1.y, z);
+            vec![p0, p1, p2, p0]
+        };
+        let control_points = vec![
+            column(1.0, 0.0),
+            column(1.3, 0.5),
+            column(1.0, 1.0),
+            column(0.7, 1.5),
+        ];
+        Surface::BSplineSurface(BSplineSurface::new(knots, control_points))
+    }
+
+    /// A spline whose `v` knot structure is *not* clamped (the left end knot
+    /// has multiplicity 2 rather than `degree + 1`), so its basis-valid
+    /// `evaluation_range` is narrower than its declared range. Still source
+    /// open in the test's declaration.
+    fn unclamped_v_spline() -> Surface {
+        let knots = (
+            KnotVec::uniform_knot(2, 2),
+            KnotVec::from(vec![0.0, 0.0, 0.25, 0.5, 0.75, 1.0, 1.0]),
+        );
+        let column = |z: f64| {
+            vec![
+                Point3::new(1.0, 0.0, z),
+                Point3::new(0.0, 1.0, z),
+                Point3::new(-1.0, 0.0, z),
+                Point3::new(0.0, -1.0, z),
+            ]
+        };
+        let control_points = vec![column(0.0), column(0.5), column(1.0), column(1.5)];
+        Surface::BSplineSurface(BSplineSurface::new(knots, control_points))
+    }
+
+    fn v_closed() -> SplineAxisClosure {
+        SplineAxisClosure {
+            u_closed: false,
+            v_closed: true,
+        }
+    }
+
+    fn expect_exact_v_period(surface: &Surface, closure: SplineAxisClosure, period: f64) {
+        let lattice = lattice_of_with_closure(surface, Some(closure));
+        match lattice.v {
+            AxisPeriodStatus::Exact {
+                period: got,
+                witness: truck_meshalgo::tessellation::domain::lattice::PeriodWitness::
+                    SourceDeclaredClosedSplineAxis,
+            } => assert_eq!(got, period, "certified V period mismatch"),
+            other => panic!(
+                "expected exact V period {period} with SourceDeclaredClosedSplineAxis, got {other:?}"
+            ),
+        }
+    }
+
+    fn expect_v_non_periodic(surface: &Surface, closure: SplineAxisClosure) {
+        let lattice = lattice_of_with_closure(surface, Some(closure));
+        assert!(
+            matches!(lattice.v, AxisPeriodStatus::NonPeriodic),
+            "expected non-periodic V, got {lattice:?}"
+        );
+    }
+
+    /// A1 — explicit source V closed: the seam-compatible conversion certifies
+    /// the exact V period `b - a` with the spline witness.
+    #[test]
+    fn a1_source_closed_v_certifies_exact_v_period() {
+        expect_exact_v_period(&closed_v_spline(), v_closed(), 1.0);
+    }
+
+    /// A2 — explicit source V open: no period, even though the declared flag is
+    /// read. The declaration is the authority.
+    #[test]
+    fn a2_source_open_v_is_non_periodic() {
+        expect_v_non_periodic(&closed_v_spline(), SplineAxisClosure::OPEN);
+    }
+
+    /// A3 — source open + coincident seam geometry: the surface is genuinely
+    /// closed at its seam (the closure is not inferred from that).
+    #[test]
+    fn a3_source_open_with_coincident_seam_geometry_stays_open() {
+        expect_v_non_periodic(&closed_v_spline(), SplineAxisClosure::OPEN);
+    }
+
+    /// A4 — source open + repeated control net (first control row == last, the
+    /// geometric symptom of a wrapped net): still no period.
+    #[test]
+    fn a4_source_open_with_repeated_control_net_stays_open() {
+        expect_v_non_periodic(&closed_v_spline(), SplineAxisClosure::OPEN);
+    }
+
+    /// A5 — source open + unclamped knot structure: still no period.
+    #[test]
+    fn a5_source_open_with_unclamped_knots_stays_open() {
+        expect_v_non_periodic(&unclamped_v_spline(), SplineAxisClosure::OPEN);
+    }
+
+    /// A certified V period must never be fabricated from a source-open
+    /// declaration, and a source-closed declaration whose converted evaluator
+    /// does *not* identify the seam must not be promoted either. Both gates are
+    /// on the same declaration pair.
+    #[test]
+    fn a_declared_closure_with_an_incompatible_conversion_is_not_certified() {
+        // The unclamped spline's evaluator does not close its V seam (its basis
+        // domain is narrower than a full period), so even a source-closed
+        // declaration must decline the certification.
+        expect_v_non_periodic(&unclamped_v_spline(), v_closed());
+    }
+}
+
+#[cfg(test)]
 mod schema_tests {
     use super::*;
     use truck_meshalgo::prelude::{EuclideanSpace, Point3, Vector3};
@@ -670,8 +1054,7 @@ mod schema_tests {
         let mut processor = Processor::new(StepSphere(Sphere::new(Point3::origin(), 1.0)));
         use truck_meshalgo::prelude::Invertible;
         processor.invert();
-        let sphere =
-            Surface::ElementarySurface(ElementarySurface::Sphere(processor));
+        let sphere = Surface::ElementarySurface(ElementarySurface::Sphere(processor));
         let lattice = lattice_of(&sphere);
         assert_eq!(lattice.v_generator(), Some(std::f64::consts::PI * 2.0));
         assert_eq!(lattice.u_generator(), None);

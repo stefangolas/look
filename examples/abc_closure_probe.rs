@@ -8,7 +8,7 @@ use truck_stepio::r#in::{
     Table,
     step_geometry::{Curve3D, Surface},
 };
-use truck_topology::compress::{CompressedShell};
+use truck_topology::compress::CompressedShell;
 
 type Cshell = CompressedShell<Point3, Curve3D, Surface>;
 
@@ -62,9 +62,7 @@ fn main() -> anyhow::Result<()> {
                 continue;
             };
             if id != target {
-                if !scan_all
-                    && !scan_targets.as_ref().is_some_and(|t| t.contains(&id))
-                {
+                if !scan_all && !scan_targets.as_ref().is_some_and(|t| t.contains(&id)) {
                     continue;
                 }
             }
@@ -85,18 +83,18 @@ fn main() -> anyhow::Result<()> {
                         let (e0, e1) = er;
                         let q0 = curve.subs(e0);
                         let q1 = curve.subs(e1);
-                    let rt = curve.range_tuple();
-                    let p0 = curve.subs(rt.0);
-                    let er = curve.evaluation_range();
-                    println!(
-                        "     PRED: rt={rt:?} ev={er:?} p.o.u(-0.0625)={} p.o.u(-0.03)={} p.o.u(0)={} p.o.u(1)={} p.o.u(1.03)={} p.o.u(1.0625)={}",
-                        curve.basis_is_partition_of_unity(rt.0),
-                        curve.basis_is_partition_of_unity(-0.03),
-                        curve.basis_is_partition_of_unity(er.0),
-                        curve.basis_is_partition_of_unity(er.1),
-                        curve.basis_is_partition_of_unity(1.03),
-                        curve.basis_is_partition_of_unity(rt.1)
-                    );
+                        let rt = curve.range_tuple();
+                        let p0 = curve.subs(rt.0);
+                        let er = curve.evaluation_range();
+                        println!(
+                            "     PRED: rt={rt:?} ev={er:?} p.o.u(-0.0625)={} p.o.u(-0.03)={} p.o.u(0)={} p.o.u(1)={} p.o.u(1.03)={} p.o.u(1.0625)={}",
+                            curve.basis_is_partition_of_unity(rt.0),
+                            curve.basis_is_partition_of_unity(-0.03),
+                            curve.basis_is_partition_of_unity(er.0),
+                            curve.basis_is_partition_of_unity(er.1),
+                            curve.basis_is_partition_of_unity(1.03),
+                            curve.basis_is_partition_of_unity(rt.1)
+                        );
                         let origin_garbage = p0.to_vec().magnitude() < 1e-6;
                         let sliver = rt != er;
                         println!(
@@ -127,7 +125,9 @@ fn main() -> anyhow::Result<()> {
                     );
                     println!(
                         "     vertex0={:?} vertex1={:?} dist={:.3e}",
-                        v0, v1, v0.distance(v1)
+                        v0,
+                        v1,
+                        v0.distance(v1)
                     );
                     let (r0, r1) = rt;
                     let p0 = curve.subs(r0);
@@ -157,7 +157,13 @@ fn main() -> anyhow::Result<()> {
                     let q1 = curve.subs(e1);
                     println!(
                         "     eval ends: subs(eval.0)=({:.6},{:.6},{:.6}) subs(eval.1)=({:.6},{:.6},{:.6}) d={:.3e}",
-                        q0.x, q0.y, q0.z, q1.x, q1.y, q1.z, q0.distance(q1)
+                        q0.x,
+                        q0.y,
+                        q0.z,
+                        q1.x,
+                        q1.y,
+                        q1.z,
+                        q0.distance(q1)
                     );
                     println!(
                         "     d(subs(eval.0),vertex0)={:.3e} d(subs(eval.1),vertex0)={:.3e}",
@@ -178,7 +184,10 @@ fn main() -> anyhow::Result<()> {
                         );
                         for (i, p) in poly.iter().enumerate() {
                             if label == "range_tuple" && i % 8 == 0 || label == "evaluation_range" {
-                                println!("       [{label}][{i}] = ({:.5},{:.5},{:.5})", p.x, p.y, p.z);
+                                println!(
+                                    "       [{label}][{i}] = ({:.5},{:.5},{:.5})",
+                                    p.x, p.y, p.z
+                                );
                             }
                         }
                     }

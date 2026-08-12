@@ -43,8 +43,9 @@ fn main() -> anyhow::Result<()> {
         .unwrap_or_else(|_| bytes.iter().map(|&b| b as char).collect::<String>().into());
     let mut exchange = match look::step::part21::parse(&text) {
         Ok(exchange) => exchange,
-        Err(_) => ruststep::parser::parse(&text)
-            .map_err(|e| anyhow::anyhow!("parse failed: {e}"))?,
+        Err(_) => {
+            ruststep::parser::parse(&text).map_err(|e| anyhow::anyhow!("parse failed: {e}"))?
+        }
     };
     let section = exchange.data.swap_remove(0);
     let table = Table::from_owned_data_section(section);
@@ -106,7 +107,8 @@ fn main() -> anyhow::Result<()> {
                     let d_rt_hi = c_rt_hi.distance(pv_b);
                     // genuine loop diameter over the eval range
                     let mut lo = Point3::new(f64::INFINITY, f64::INFINITY, f64::INFINITY);
-                    let mut hi = Point3::new(f64::NEG_INFINITY, f64::NEG_INFINITY, f64::NEG_INFINITY);
+                    let mut hi =
+                        Point3::new(f64::NEG_INFINITY, f64::NEG_INFINITY, f64::NEG_INFINITY);
                     for i in 0..=64 {
                         let t = er.0 + (er.1 - er.0) * i as f64 / 64.0;
                         let p = curve.subs(t);
@@ -135,12 +137,7 @@ fn main() -> anyhow::Result<()> {
                          rt=({:.4},{:.4})\ter=({:.4},{:.4})\tsliver={has_sliver}\t\
                          rt_origin={origin_rt}\tres_er=({d_er_lo:.1e},{d_er_hi:.1e})\t\
                          res_rt=({d_rt_lo:.1e},{d_rt_hi:.1e})\tloop_diag={diag:.4e}\tclass={class}",
-                        idx_ref.index,
-                        idx_ref.orientation,
-                        rt.0,
-                        rt.1,
-                        er.0,
-                        er.1
+                        idx_ref.index, idx_ref.orientation, rt.0, rt.1, er.0, er.1
                     );
                 }
                 if let Some(fv) = first {

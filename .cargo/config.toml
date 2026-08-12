@@ -48,14 +48,24 @@
 # basis-certified sampling domain, the unresolved P2 branch and the certified
 # sphere period.
 #
-# TEMP-ENABLED 2026-08-09 (P1-SPLINE-PHASE2): uncommented to iterate on the
-# local truck-fork working tree (source-edge traversal for 00007667 edge #30).
-# RE-COMMENT and bump the rev in Cargo.toml before committing anything in this
-# repo.
-# Re-commented 2026-08-10 after truck-fork b4cebf05 (R01 source-edge traversal
-# under STEP source geometric uncertainty); the pin in Cargo.toml now points at
-# b4cebf05, so a clean clone builds WITH R01. Re-enable only to iterate on the
-# fork, and re-comment + bump the rev before reporting a number.
+# TEMP-ENABLED 2026-08-11 (NIST1167-QUOTIENT): uncommented to iterate on the
+# local truck-fork working tree (periodic-cover realization: spline closure
+# provenance, quotient-aware evaluation, deck-consistent routing, bounded
+# projection, seam-aware subdivision). RE-COMMENT and bump the rev in
+# Cargo.toml before committing anything in this repo.
+# Re-commented 2026-08-11 after truck-fork 6a2e5d50 (NIST1167 periodic-cover
+# realization: source closure provenance, certified spline quotient witness,
+# primary deck-consistent join); the pin in Cargo.toml now points at
+# 6a2e5d50, so a clean clone builds WITH the periodic-cover realization.
+# TEMP-ENABLED 2026-08-11 (R01-REG): uncommented to iterate on the local
+# truck-fork working tree (narrow R01 source-tolerance floor + caller-tol
+# endpoint acceptance). RE-COMMENT and bump the rev in Cargo.toml before
+# committing anything in this repo.
+# Re-commented 2026-08-12 after the NO_ODD_PARITY landing (truck 3f4982eb);
+# the pin in Cargo.toml now points at 3f4982eb, so a clean clone builds WITH
+# the degenerate-trim classification and the certified closed-loop re-lift.
+# Re-enable only to iterate on the fork, and re-comment + bump the rev before
+# reporting a number.
 # paths = [
 #     "../truck-fork/truck-base",
 #     "../truck-fork/truck-derivers",

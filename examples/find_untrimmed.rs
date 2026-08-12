@@ -135,7 +135,12 @@ fn main() -> anyhow::Result<()> {
     let shells = table
         .shell
         .iter()
-        .filter_map(|(id, shell)| table.to_compressed_shell(*id, shell).ok().map(|cs| (*id, cs)))
+        .filter_map(|(id, shell)| {
+            table
+                .to_compressed_shell(*id, shell)
+                .ok()
+                .map(|cs| (*id, cs))
+        })
         .collect::<Vec<_>>();
 
     let mut model_box = BoundingBox::<Point3>::new();

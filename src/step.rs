@@ -96,6 +96,12 @@ pub fn parse_step(
     let table = Table::from_owned_data_section(section);
     timings.record("step_table", table_started.elapsed());
 
+    // The source-declared spline-axis closure of every spline surface entity,
+    // read from the STEP table before conversion erases it. Keyed by surface
+    // entity id, the same id `FaceProvenance.surface_id` carries per face, so
+    // `wrap_shell_with_closure` can attach it to each face's `PolicySurface`.
+    let closure_map = lattice::spline_closure_map(&table);
+
     if table.shell.is_empty() {
         // AP242 lets a file ship its mesh directly instead of a boundary
         // representation, in which case there is nothing to evaluate and the
@@ -209,10 +215,12 @@ pub fn parse_step(
             // line after constructing it. The reasons now arrive beside the
             // shell, so a face that produced nothing can say why rather than
             // being inferred from the shape of its absence.
-            let outcome = policy_geometry::wrap_shell(shell, policy)
+            let outcome = policy_geometry::wrap_shell_with_closure(shell, policy, &closure_map)
                 .robust_triangulation_with_torus_outcome(
                     tolerance,
-                    |s: &policy_geometry::PolicySurface| lattice::lattice_of(s.inner()),
+                    |s: &policy_geometry::PolicySurface| {
+                        lattice::lattice_of_with_closure(s.inner(), s.source_closure())
+                    },
                     |s: &policy_geometry::PolicySurface| lattice::support_schema_of(s.inner()),
                     |c: &policy_geometry::PolicyCurve| lattice::curve_schema_of(c.inner()),
                     |s: &policy_geometry::PolicySurface| {

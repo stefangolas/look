@@ -299,6 +299,11 @@ fn census(
     diag_rows: &mut Vec<FaceDiagRow>,
 ) {
     let diag_enabled = face_diag::diag_enabled();
+    // The same source-closure provenance production reads: keyed by surface
+    // entity id and attached per face in `wrap_shell_with_closure`, so the
+    // census exercises the certified spline periodic lattice path, not the
+    // provenance-free fallback.
+    let closure_map = look::step::lattice::spline_closure_map(table);
     let mut converted = Vec::new();
     for (&shell_id, shell) in table.shell.iter() {
         into.declared += shell.cfs_faces.len();
@@ -447,13 +452,16 @@ fn census(
                 look::step::torus_deck::identify_source_torus_opt,
             )
         } else {
-            look::step::policy_geometry::wrap_shell(
+            look::step::policy_geometry::wrap_shell_with_closure(
                 shell.clone(),
                 look::step::meshing_policy::MeshingPolicy::DEFAULT,
+                &closure_map,
             )
             .robust_triangulation_with_torus_outcome(
                 tolerance,
-                |s: &PolicySurface| look::step_lattice_of(s.inner()),
+                |s: &PolicySurface| {
+                    look::step_lattice_of_with_closure(s.inner(), s.source_closure())
+                },
                 |s: &PolicySurface| look::step_support_schema_of(s.inner()),
                 |c: &PolicyCurve| look::step_curve_schema_of(c.inner()),
                 |s: &PolicySurface| look::step_cylinder_of(s.inner()),

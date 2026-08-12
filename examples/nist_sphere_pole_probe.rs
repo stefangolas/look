@@ -111,7 +111,12 @@ fn edge_kind(curve: &Curve3D) -> &'static str {
     }
 }
 
-fn trace_face(cshell: &Cshell, face: &truck_topology::compress::CompressedFace<Surface>, id: u64, tol: f64) {
+fn trace_face(
+    cshell: &Cshell,
+    face: &truck_topology::compress::CompressedFace<Surface>,
+    id: u64,
+    tol: f64,
+) {
     let s = &face.surface;
     println!(
         "surface u_period={:?} v_period={:?} range={:?}",
@@ -139,9 +144,8 @@ fn trace_face(cshell: &Cshell, face: &truck_topology::compress::CompressedFace<S
                     }
                 }
             }
-            let mut poly = truck_meshalgo::rexport_polymesh::PolylineCurve::from_curve(
-                curve, range, tol,
-            );
+            let mut poly =
+                truck_meshalgo::rexport_polymesh::PolylineCurve::from_curve(curve, range, tol);
             if poly.len() <= 2 && range.1 - range.0 > 1e-4 {
                 let mut pts = Vec::new();
                 const STEPS: usize = 16;
@@ -212,7 +216,10 @@ fn trace_face(cshell: &Cshell, face: &truck_topology::compress::CompressedFace<S
         let mut pending: Vec<(Point3, bool)> = vec![(*point, false)];
         while let Some((pt, synthetic)) = pending.pop() {
             let Some((mut u, mut v)) = proj(s, pt, previous) else {
-                println!("  [b{bi}] pt=({:.4},{:.4},{:.4}) PROJECTION FAILED", pt.x, pt.y, pt.z);
+                println!(
+                    "  [b{bi}] pt=({:.4},{:.4},{:.4}) PROJECTION FAILED",
+                    pt.x, pt.y, pt.z
+                );
                 continue;
             };
             let raw = (u, v);
@@ -230,7 +237,9 @@ fn trace_face(cshell: &Cshell, face: &truck_topology::compress::CompressedFace<S
             }
             if let (Some((u0, v0)), Some(pp)) = (previous, previous_pt) {
                 let ambiguous = |now: f64, before: f64, period: Option<f64>| {
-                    period.is_some_and(|period| f64::abs(now - before) >= AMBIGUOUS_STEP_FRACTION * period)
+                    period.is_some_and(|period| {
+                        f64::abs(now - before) >= AMBIGUOUS_STEP_FRACTION * period
+                    })
                 };
                 if ambiguous(u, u0, ups) || ambiguous(v, v0, vps) {
                     let pole = singular_pole_check(s, u, v, pt);
@@ -304,17 +313,15 @@ fn trace_face(cshell: &Cshell, face: &truck_topology::compress::CompressedFace<S
             previous_pt = Some(pt);
         }
     }
-    println!("  lift completed: {} lifted points (last {previous:?})", steps.len());
+    println!(
+        "  lift completed: {} lifted points (last {previous:?})",
+        steps.len()
+    );
 }
 
 /// Detect the pole singularity on the periodic axis. Returns a tag naming the
 /// collapsed axis and the sampled singular direction magnitude.
-fn singular_pole_check(
-    s: &Surface,
-    u: f64,
-    v: f64,
-    pt: Point3,
-) -> Option<(&'static str, f64)> {
+fn singular_pole_check(s: &Surface, u: f64, v: f64, pt: Point3) -> Option<(&'static str, f64)> {
     let ud = s.uder(u, v);
     let vd = s.vder(u, v);
     // The collapsed axis is the one whose derivative is so_small at the sample.
@@ -353,11 +360,7 @@ fn report_leaving_longitude(s: &Surface, bdry3d: &[Point3], bi: usize, pole: (&'
     match r {
         Some((u, v)) => {
             let res = s.subs(u, v).distance(next_pt);
-            let (lu, lv) = if pole.0 == "u" {
-                (v, u)
-            } else {
-                (u, v)
-            };
+            let (lu, lv) = if pole.0 == "u" { (v, u) } else { (u, v) };
             println!(
                 "    leaving lon: next_pt=({:.4},{:.4},{:.4}) proj=(u={u:.6},v={v:.6}) \
                  residual={res:.3e} (collapsed axis {}; longitude axis pair={lu:.6})",
