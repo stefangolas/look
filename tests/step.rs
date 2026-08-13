@@ -228,3 +228,97 @@ fn step_and_stp_extensions_are_both_accepted() {
 
     let _ = std::fs::remove_file(&alias);
 }
+
+/// STEP source face colours arrive as per-vertex attributes: a styled face's
+/// RGB is reproduced exactly, an inherited face takes the parent solid's
+/// colour, and the curve/annotation style stays out of the face map.
+#[test]
+fn step_face_colours_reach_the_renderer() {
+    let mut timings = Timings::default();
+    let scene = compile_scene(&fixture("styled_bracket.step"), UpAxis::Y, &mut timings)
+        .expect("styled_bracket.step should tessellate");
+
+    let geometry = &scene.geometries[0];
+    let attributes = geometry
+        .source_attributes
+        .as_deref()
+        .expect("source material attributes should be present");
+    let colors: Vec<[f32; 4]> = attributes.iter().map(|a| a.color).collect();
+
+    let has = |target: [f32; 4]| {
+        colors.iter().any(|color| {
+            (color[0] - target[0]).abs() < 1.0e-3
+                && (color[1] - target[1]).abs() < 1.0e-3
+                && (color[2] - target[2]).abs() < 1.0e-3
+        })
+    };
+
+    // Face #17 is styled red, face #134 blue.
+    assert!(has([1.0, 0.0, 0.0, 1.0]), "styled red face missing");
+    assert!(has([0.0, 0.0, 1.0, 1.0]), "styled blue face missing");
+    // The other faces inherit the MANIFOLD_SOLID_BREP's lavender parent style.
+    assert!(
+        has([0.8235294, 0.8235294, 1.0, 1.0]),
+        "inherited lavender parent style missing"
+    );
+    // The TRIMMED_CURVE was styled green; that must never colour a face.
+    assert!(
+        !has([0.0, 1.0, 0.0, 1.0]),
+        "curve styling leaked into face colour"
+    );
+    // And no vertex may carry an unmapped colour.
+    assert!(
+        colors.iter().all(|color| has(*color)),
+        "every vertex colour must come from the fixture"
+    );
+}
+
+/// An unstyled STEP file keeps the identity colour on every vertex, so the
+/// default material is untouched.
+#[test]
+fn unstyled_step_keeps_identity_vertex_colours() {
+    let mut timings = Timings::default();
+    let scene = compile_scene(&fixture("bracket.step"), UpAxis::Y, &mut timings)
+        .expect("bracket.step should tessellate");
+
+    let geometry = &scene.geometries[0];
+    let attributes = geometry
+        .source_attributes
+        .as_deref()
+        .expect("source material attributes should be present");
+    assert!(
+        attributes.iter().all(|a| a.color == [1.0, 1.0, 1.0, 1.0]),
+        "an unstyled STEP must keep identity vertex colours"
+    );
+}
+
+/// T9 — appearance is metadata only. The styled fixture differs from the plain
+/// one solely in its presentation records, so the tessellated geometry must be
+/// byte-identical.
+#[test]
+fn step_colours_do_not_change_the_geometry() {
+    let mut plain_timings = Timings::default();
+    let plain = compile_scene(&fixture("bracket.step"), UpAxis::Y, &mut plain_timings)
+        .expect("bracket.step should tessellate");
+    let mut styled_timings = Timings::default();
+    let styled = compile_scene(
+        &fixture("styled_bracket.step"),
+        UpAxis::Y,
+        &mut styled_timings,
+    )
+    .expect("styled_bracket.step should tessellate");
+
+    assert_eq!(
+        plain.geometries[0].vertices, styled.geometries[0].vertices,
+        "vertex positions and normals must not change with appearance"
+    );
+    assert_eq!(
+        plain.geometries[0].indices, styled.geometries[0].indices,
+        "triangle indices must not change with appearance"
+    );
+    assert_eq!(
+        plain.geometries[0].indices.len(),
+        styled.geometries[0].indices.len(),
+        "triangle count must not change with appearance"
+    );
+}
