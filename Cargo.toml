@@ -26,29 +26,32 @@ wgpu = "30.0"
 # revisions: upstream publishes to crates.io roughly every two years, and the
 # released versions cannot read AP242 at all. The forks carry the fixes and
 # give us somewhere to land our own. Bump the revs deliberately, never track a
-# branch, so a build is always reproducible.
+# branch, so a build is always reproducible. truck-assembly is the graph
+# resolver `Table::step_assy` builds; it must be pinned with the rest.
 ruststep = { git = "https://github.com/stefangolas/ruststep", rev = "67f1f7c" }
-truck-meshalgo = { git = "https://github.com/stefangolas/truck", rev = "52dbc2e7" }
-truck-polymesh = { git = "https://github.com/stefangolas/truck", rev = "52dbc2e7" }
-truck-stepio = { git = "https://github.com/stefangolas/truck", rev = "52dbc2e7" }
-truck-topology = { git = "https://github.com/stefangolas/truck", rev = "52dbc2e7" }
+truck-assembly = { git = "https://github.com/stefangolas/truck", rev = "7a017443" }
+truck-meshalgo = { git = "https://github.com/stefangolas/truck", rev = "7a017443" }
+truck-polymesh = { git = "https://github.com/stefangolas/truck", rev = "7a017443" }
+truck-stepio = { git = "https://github.com/stefangolas/truck", rev = "7a017443" }
+truck-topology = { git = "https://github.com/stefangolas/truck", rev = "7a017443" }
 
 [patch.crates-io]
 ruststep = { git = "https://github.com/stefangolas/ruststep", rev = "67f1f7c" }
-truck-base = { git = "https://github.com/stefangolas/truck", rev = "52dbc2e7" }
-truck-derivers = { git = "https://github.com/stefangolas/truck", rev = "52dbc2e7" }
-truck-geometry = { git = "https://github.com/stefangolas/truck", rev = "52dbc2e7" }
-truck-geotrait = { git = "https://github.com/stefangolas/truck", rev = "52dbc2e7" }
-truck-meshalgo = { git = "https://github.com/stefangolas/truck", rev = "52dbc2e7" }
-truck-modeling = { git = "https://github.com/stefangolas/truck", rev = "52dbc2e7" }
-truck-polymesh = { git = "https://github.com/stefangolas/truck", rev = "52dbc2e7" }
-truck-stepio = { git = "https://github.com/stefangolas/truck", rev = "52dbc2e7" }
-truck-topology = { git = "https://github.com/stefangolas/truck", rev = "52dbc2e7" }
+truck-assembly = { git = "https://github.com/stefangolas/truck", rev = "7a017443" }
+truck-base = { git = "https://github.com/stefangolas/truck", rev = "7a017443" }
+truck-derivers = { git = "https://github.com/stefangolas/truck", rev = "7a017443" }
+truck-geometry = { git = "https://github.com/stefangolas/truck", rev = "7a017443" }
+truck-geotrait = { git = "https://github.com/stefangolas/truck", rev = "7a017443" }
+truck-meshalgo = { git = "https://github.com/stefangolas/truck", rev = "7a017443" }
+truck-modeling = { git = "https://github.com/stefangolas/truck", rev = "7a017443" }
+truck-polymesh = { git = "https://github.com/stefangolas/truck", rev = "7a017443" }
+truck-stepio = { git = "https://github.com/stefangolas/truck", rev = "7a017443" }
+truck-topology = { git = "https://github.com/stefangolas/truck", rev = "7a017443" }
 
 
 [dev-dependencies]
 tempfile = "3.20"
-truck-geometry = { git = "https://github.com/stefangolas/truck", rev = "52dbc2e7" }
+truck-geometry = { git = "https://github.com/stefangolas/truck", rev = "7a017443" }
 
 [profile.release]
 lto = "thin"

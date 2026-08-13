@@ -371,10 +371,43 @@ fn compile_step(
     truck_meshalgo::tessellation::diagnosis::set_document_context(Some(
         path.to_string_lossy().into_owned(),
     ));
-    let (positions, indices, colors) = crate::step::parse_step(&bytes, timings)
+    let scene = crate::step::parse_step_scene(&bytes, timings)
         .with_context(|| format!("failed to load STEP scene '{}'", path.display()))?;
     timings.record("parse", parse_started.elapsed());
 
+    match scene {
+        crate::step::StepScene::Flat((positions, indices, colors)) => compile_step_flat(
+            path,
+            positions,
+            indices,
+            colors,
+            source_hash,
+            up_axis,
+            include_source_materials,
+            timings,
+        ),
+        crate::step::StepScene::Assembly(assembly) => compile_step_assembly(
+            path,
+            assembly,
+            source_hash,
+            up_axis,
+            include_source_materials,
+            timings,
+        ),
+    }
+}
+
+/// The single-part STEP compile tail: one geometry, one instance, unchanged.
+fn compile_step_flat(
+    path: &Path,
+    positions: Vec<[f32; 3]>,
+    indices: Vec<u32>,
+    colors: Vec<[f32; 4]>,
+    source_hash: String,
+    up_axis: UpAxis,
+    include_source_materials: bool,
+    timings: &mut Timings,
+) -> anyhow::Result<CompiledScene> {
     // Tessellation emits unwelded triangles, so generated normals are flat per
     // face, which is what a machined B-rep should look like. That also means
     // every vertex belongs to exactly one triangle, which [`soup_normals`]
@@ -401,6 +434,113 @@ fn compile_step(
         include_source_materials,
         timings,
     )
+}
+
+/// The assembly STEP compile tail: one geometry per unique definition, one
+/// instance per source occurrence.
+///
+/// Definition vertices stay definition-local; `occurrence.world` (Truck's
+/// `Path::matrix()`) is applied exactly once, in the instance transform, on top
+/// of the up-axis normalization.
+fn compile_step_assembly(
+    _path: &Path,
+    scene: crate::step::StepAssemblyScene,
+    source_hash: String,
+    up_axis: UpAxis,
+    include_source_materials: bool,
+    timings: &mut Timings,
+) -> anyhow::Result<CompiledScene> {
+    let compile_started = Instant::now();
+    let normalization = normalization_transform(up_axis);
+
+    let mut geometries = Vec::with_capacity(scene.definitions.len());
+    for definition in scene.definitions {
+        let (positions, indices, colors) = definition.soup;
+        let normals = match soup_normals(&positions, &indices) {
+            Some(normals) => normals,
+            None => generate_normals(&positions, &indices),
+        };
+        let vertices = positions
+            .into_iter()
+            .zip(normals)
+            .map(|(position, normal)| Vertex { position, normal })
+            .collect::<Vec<_>>();
+        let local_bounds =
+            Bounds::from_position_iter(vertices.iter().map(|vertex| vertex.position));
+        let source_attributes = include_source_materials.then(|| {
+            colors
+                .iter()
+                .map(|&color| SourceVertexAttributes {
+                    tex_coord_0: [0.0; 2],
+                    tex_coord_1: [0.0; 2],
+                    color,
+                })
+                .collect::<Vec<_>>()
+        });
+        let (bounding_center, bounding_radius) = bounding_sphere(&vertices, &local_bounds);
+        geometries.push(Geometry {
+            vertices,
+            source_attributes,
+            indices,
+            bounds: local_bounds,
+            bounding_center,
+            bounding_radius,
+        });
+    }
+
+    let mut instances = Vec::with_capacity(scene.occurrences.len());
+    let mut bounds = Bounds::empty();
+    for occurrence in scene.occurrences {
+        let transform = normalization * occurrence.world;
+        let linear = Mat3::from_mat4(transform);
+        let normal_transform = if linear.determinant().abs() > 1.0e-12 {
+            linear.inverse().transpose()
+        } else {
+            Mat3::IDENTITY
+        };
+        bounds.include_transformed(&geometries[occurrence.definition].bounds, transform);
+        instances.push(Instance {
+            geometry: occurrence.definition,
+            material: 0,
+            transform,
+            normal_transform,
+            node_name: Some(occurrence.node_name),
+        });
+    }
+    let fit_radius = scene_fit_radius(&geometries, &instances, &bounds);
+    let triangles = geometries
+        .iter()
+        .map(|geometry| geometry.indices.len() as u64 / 3)
+        .sum();
+    let vertex_count = geometries
+        .iter()
+        .map(|geometry| geometry.vertices.len() as u64)
+        .sum();
+    let geometry_count = geometries.len() as u64;
+    let instance_count = instances.len() as u64;
+    timings.record("compile", compile_started.elapsed());
+
+    Ok(CompiledScene {
+        source_hash,
+        geometries,
+        instances,
+        materials: vec![default_source_material()],
+        textures: Vec::new(),
+        bounds,
+        fit_radius,
+        statistics: SceneStatistics {
+            nodes: scene.nodes as u64,
+            mesh_primitives: instance_count,
+            unique_geometries: geometry_count,
+            instances: instance_count,
+            vertices: vertex_count,
+            triangles,
+            duplicate_geometries_removed: 0,
+            materials: 1,
+            textures: 0,
+            bounds,
+        },
+    })
 }
 
 /// An indexed triangle mesh plus per-vertex RGBA, as a triangle-soup source

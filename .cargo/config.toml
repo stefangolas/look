@@ -71,6 +71,11 @@
 # 2026-08-13), so a clean clone builds WITH constitutive failure diagnostics.
 # Re-enable only to iterate on the fork, and re-comment + bump the rev before
 # reporting a number.
+# Re-commented 2026-08-13 after ASSEMBLY-PLACEMENT landed: the pin in Cargo.toml
+# now points at 7a017443 (truck-fork feature/cone-apex-lift-recovery, pushed
+# 2026-08-13), so a clean clone builds WITH assembly definition geometry.
+# Re-enable only to iterate on the fork, and re-comment + bump the rev before
+# reporting a number.
 # paths = [
 #     "../truck-fork/truck-base",
 #     "../truck-fork/truck-derivers",
