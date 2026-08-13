@@ -39,16 +39,26 @@ pub fn generate_html_viewer(
     let mut flat_positions: Vec<f32> = Vec::new();
     let mut flat_normals: Vec<f32> = Vec::new();
     let mut flat_indices: Vec<u32> = Vec::new();
+    let mut flat_colors: Vec<f32> = Vec::new();
 
     for instance in &scene.instances {
         let geom = &scene.geometries[instance.geometry];
         let base_index = (flat_positions.len() / 3) as u32;
 
-        for v in &geom.vertices {
+        for (index, v) in geom.vertices.iter().enumerate() {
             let p = instance
                 .transform
                 .transform_point3(glam::Vec3::from(v.position));
             let n = (instance.normal_transform * glam::Vec3::from(v.normal)).normalize_or_zero();
+            // Per-vertex source colour when the geometry carries one (STEP face
+            // colours, glTF COLOR_0); identity otherwise, so the neutral base
+            // colour is left untouched.
+            let color = geom
+                .source_attributes
+                .as_deref()
+                .and_then(|attributes| attributes.get(index))
+                .map(|attributes| attributes.color)
+                .unwrap_or([1.0; 4]);
 
             flat_positions.push(p.x);
             flat_positions.push(p.y);
@@ -57,6 +67,11 @@ pub fn generate_html_viewer(
             flat_normals.push(n.x);
             flat_normals.push(n.y);
             flat_normals.push(n.z);
+
+            flat_colors.push(color[0]);
+            flat_colors.push(color[1]);
+            flat_colors.push(color[2]);
+            flat_colors.push(color[3]);
         }
 
         for idx in &geom.indices {
@@ -67,10 +82,12 @@ pub fn generate_html_viewer(
     let pos_bytes = bytemuck::cast_slice::<f32, u8>(&flat_positions);
     let norm_bytes = bytemuck::cast_slice::<f32, u8>(&flat_normals);
     let idx_bytes = bytemuck::cast_slice::<u32, u8>(&flat_indices);
+    let color_bytes = bytemuck::cast_slice::<f32, u8>(&flat_colors);
 
     let pos_b64 = base64_encode(pos_bytes);
     let norm_b64 = base64_encode(norm_bytes);
     let idx_b64 = base64_encode(idx_bytes);
+    let color_b64 = base64_encode(color_bytes);
 
     let num_triangles = flat_indices.len() / 3;
     let num_vertices = flat_positions.len() / 3;
@@ -255,6 +272,7 @@ pub fn generate_html_viewer(
         const posB64 = "{pos_b64}";
         const normB64 = "{norm_b64}";
         const idxB64 = "{idx_b64}";
+        const colorB64 = "{color_b64}";
 
         function b64ToFloat32Array(b64) {{
             const bin = atob(b64);
@@ -272,6 +290,7 @@ pub fn generate_html_viewer(
         const positions = b64ToFloat32Array(posB64);
         const normals = b64ToFloat32Array(normB64);
         const indices = b64ToUint32Array(idxB64);
+        const colors = b64ToFloat32Array(colorB64);
 
         const modelCenter = [{center_x}, {center_y}, {center_z}];
         const fitRadius = {fit_radius};
@@ -288,13 +307,16 @@ pub fn generate_html_viewer(
         const vsSource = `#version 300 es
             in vec3 aPosition;
             in vec3 aNormal;
+            in vec4 aColor;
             uniform mat4 uMVP;
             uniform mat4 uModel;
             out vec3 vNormal;
             out vec3 vFragPos;
+            out vec4 vColor;
             void main() {{
                 vNormal = mat3(uModel) * aNormal;
                 vFragPos = vec3(uModel * vec4(aPosition, 1.0));
+                vColor = aColor;
                 gl_Position = uMVP * vec4(aPosition, 1.0);
             }}
         `;
@@ -303,6 +325,7 @@ pub fn generate_html_viewer(
             precision highp float;
             in vec3 vNormal;
             in vec3 vFragPos;
+            in vec4 vColor;
             uniform vec3 uCameraPos;
             out vec4 fragColor;
             void main() {{
@@ -315,7 +338,7 @@ pub fn generate_html_viewer(
                 float ambient = 0.25;
 
                 vec3 baseColor = vec3(0.72, 0.75, 0.80);
-                vec3 col = baseColor * (ambient + diff1 * 0.75 + diff2);
+                vec3 col = baseColor * vColor.rgb * (ambient + diff1 * 0.75 + diff2);
 
                 vec3 viewDir = normalize(uCameraPos - vFragPos);
                 vec3 halfDir = normalize(lightDir1 + viewDir);
@@ -354,6 +377,13 @@ pub fn generate_html_viewer(
         const aNormLoc = gl.getAttribLocation(program, 'aNormal');
         gl.enableVertexAttribArray(aNormLoc);
         gl.vertexAttribPointer(aNormLoc, 3, gl.FLOAT, false, 0, 0);
+
+        const colorBuffer = gl.createBuffer();
+        gl.bindBuffer(gl.ARRAY_BUFFER, colorBuffer);
+        gl.bufferData(gl.ARRAY_BUFFER, colors, gl.STATIC_DRAW);
+        const aColorLoc = gl.getAttribLocation(program, 'aColor');
+        gl.enableVertexAttribArray(aColorLoc);
+        gl.vertexAttribPointer(aColorLoc, 4, gl.FLOAT, false, 0, 0);
 
         const idxBuffer = gl.createBuffer();
         gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, idxBuffer);
