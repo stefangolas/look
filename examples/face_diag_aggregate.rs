@@ -166,7 +166,13 @@ fn main() -> anyhow::Result<()> {
         let bucket = str_field(row, "derived_bucket");
         let chart_rank = u64_field(row, "chart_rank") as u8;
         let source_face_id = row.get("source_face_id").and_then(|v| v.as_u64());
-        let model_id = str_field(row, "model_id");
+        // DIAG-002: the stable field is `document_id`; `model_id` is read for
+        // compatibility with older records.
+        let model_id = row
+            .get("document_id")
+            .and_then(|v| v.as_str())
+            .map(str::to_string)
+            .unwrap_or_else(|| str_field(row, "model_id"));
 
         *terminal_reason_histogram.entry(reason.clone()).or_default() += 1;
         *derived_bucket_histogram.entry(bucket.clone()).or_default() += 1;

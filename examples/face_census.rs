@@ -22,7 +22,7 @@ const EDGE_SAMPLES: u32 = 4;
 #[derive(Serialize)]
 struct FaceDiagRow {
     #[serde(flatten)]
-    diagnosis: face_diag::FailedFaceDiagnosis,
+    diagnosis: face_diag::FaceDiagnosticRecord,
     conversion_reason: Option<&'static str>,
 }
 
@@ -320,14 +320,42 @@ fn census(
                 }
                 if diag_enabled {
                     diag_rows.push(FaceDiagRow {
-                        diagnosis: face_diag::FailedFaceDiagnosis {
-                            model_id: model_id.into(),
+                        diagnosis: face_diag::FaceDiagnosticRecord {
+                            schema_version: face_diag::DIAGNOSTIC_SCHEMA_VERSION,
+                            document_id: Some(model_id.into()),
                             source_face_id: loss.provenance.best_id().map(|id| id.get()),
+                            source_use_id: loss.provenance.use_id.map(|id| id.get()),
+                            disposition: face_diag::DiagnosticDisposition::Failed,
                             terminal_reason: TessellationFailureReason::BoundaryConstructionFailed,
+                            failure_stage: face_diag::FailureStage::StepConversion,
                             surface_family: face_diag::SurfaceFamily::Unknown,
-                            chart_rank: 0,
-                            periodic_axes: face_diag::PeriodicAxes { u: false, v: false },
                             bound_count: 0,
+                            edge_use_count: 0,
+                            distinct_vertex_count: 0,
+                            world_rank: None,
+                            world_bbox: None,
+                            world_diameter: None,
+                            approximate_world_area: None,
+                            periodic_axes: face_diag::PeriodicAxes { u: false, v: false },
+                            source_closed_axes: None,
+                            uv_rank: None,
+                            uv_bbox: None,
+                            tolerance: face_diag::ToleranceWitness {
+                                chord_tolerance: 0.0,
+                                source_geometric_uncertainty: None,
+                                incidence_tolerance: None,
+                                compatibility_factor: None,
+                            },
+                            source_edge: None,
+                            projection: None,
+                            lift: None,
+                            boundary: None,
+                            cdt_stages: face_diag::CdtStageVector::default(),
+                            validity_certificate: collapsed.then(|| {
+                                face_validity::FaceValidityCertificate::all_bounds_collapsed(0)
+                            }),
+                            route_decisions: Vec::new(),
+                            chart_rank: 0,
                             source_segment_count: 0,
                             synthetic_segment_count: 0,
                             lift_status: face_diag::ObservedLiftStatus::NotPeriodic,
@@ -343,12 +371,7 @@ fn census(
                             insertion_conflicts: Vec::new(),
                             overlap_conflicts: Vec::new(),
                             unattributed_overlaps: 0,
-                            cdt_stages: face_diag::CdtStageVector::default(),
                             projection_witness: None,
-                            validity_certificate: collapsed.then(|| {
-                                face_validity::FaceValidityCertificate::all_bounds_collapsed(0)
-                            }),
-                            route_decisions: Vec::new(),
                             cap_activation: None,
                             derived_bucket: if collapsed {
                                 face_diag::LossBucket::IntrinsicDegenerate
@@ -594,7 +617,7 @@ fn census(
             if diag_enabled && rendered == 0 {
                 if let Some(diag) = outcome.face_diagnoses.get(i).and_then(|d| d.as_ref()) {
                     let mut d = diag.clone();
-                    d.model_id = model_id.into();
+                    d.document_id = Some(model_id.into());
                     d.surface_family = surface_family_from_kind(kind);
                     diag_rows.push(FaceDiagRow {
                         diagnosis: d,
@@ -602,18 +625,44 @@ fn census(
                     });
                 } else if let Some(failure) = outcome.face_failures.get(i).cloned().flatten() {
                     let orig = &shell.faces[i].surface;
-                    let d = face_diag::FailedFaceDiagnosis {
-                        model_id: model_id.into(),
+                    let d = face_diag::FaceDiagnosticRecord {
+                        schema_version: face_diag::DIAGNOSTIC_SCHEMA_VERSION,
+                        document_id: Some(model_id.into()),
                         source_face_id: face.provenance.best_id().map(|id| id.get()),
+                        source_use_id: face.provenance.use_id.map(|id| id.get()),
+                        disposition: face_diag::DiagnosticDisposition::Failed,
                         terminal_reason: failure.reason,
+                        failure_stage: face_diag::failure_stage_for_reason(failure.reason),
                         surface_family: surface_family_from_kind(kind),
-                        chart_rank: u8::from(orig.u_period().is_some())
-                            + u8::from(orig.v_period().is_some()),
+                        bound_count: face.boundaries.len(),
+                        edge_use_count: face.boundaries.iter().map(|w| w.len()).sum(),
+                        distinct_vertex_count: 0,
+                        world_rank: None,
+                        world_bbox: None,
+                        world_diameter: None,
+                        approximate_world_area: None,
                         periodic_axes: face_diag::PeriodicAxes {
                             u: orig.u_period().is_some(),
                             v: orig.v_period().is_some(),
                         },
-                        bound_count: face.boundaries.len(),
+                        source_closed_axes: None,
+                        uv_rank: None,
+                        uv_bbox: None,
+                        tolerance: face_diag::ToleranceWitness {
+                            chord_tolerance: 0.0,
+                            source_geometric_uncertainty: None,
+                            incidence_tolerance: None,
+                            compatibility_factor: None,
+                        },
+                        source_edge: None,
+                        projection: None,
+                        lift: None,
+                        boundary: None,
+                        cdt_stages: face_diag::CdtStageVector::default(),
+                        validity_certificate: None,
+                        route_decisions: Vec::new(),
+                        chart_rank: u8::from(orig.u_period().is_some())
+                            + u8::from(orig.v_period().is_some()),
                         source_segment_count: 0,
                         synthetic_segment_count: 0,
                         lift_status: face_diag::ObservedLiftStatus::Unavailable,
@@ -626,10 +675,7 @@ fn census(
                         insertion_conflicts: Vec::new(),
                         overlap_conflicts: Vec::new(),
                         unattributed_overlaps: 0,
-                        cdt_stages: face_diag::CdtStageVector::default(),
                         projection_witness: None,
-                        validity_certificate: None,
-                        route_decisions: Vec::new(),
                         cap_activation: None,
                         derived_bucket: face_diag::LossBucket::InsertionUnknown,
                         arr: face_diag::ArrSignature::default(),
@@ -1088,12 +1134,12 @@ fn main() -> anyhow::Result<()> {
 
     // DIAG-001: when TRUCK_FACE_DIAG_JSONL is set, sort and write one JSONL
     // row per failed face. Deterministic ordering independent of thread
-    // completion order: sort by model_id, source_face_id, terminal_reason.
+    // completion order: sort by document_id, source_face_id, terminal_reason.
     if let Some(out_path) = env::var_os("TRUCK_FACE_DIAG_JSONL") {
         diag_rows.sort_by(|a, b| {
             a.diagnosis
-                .model_id
-                .cmp(&b.diagnosis.model_id)
+                .document_id
+                .cmp(&b.diagnosis.document_id)
                 .then_with(|| a.diagnosis.source_face_id.cmp(&b.diagnosis.source_face_id))
                 .then_with(|| {
                     format!("{:?}", a.diagnosis.terminal_reason)

@@ -24,8 +24,10 @@ use std::time::Instant;
 
 use rayon::prelude::*;
 use truck_meshalgo::prelude::*;
+use truck_meshalgo::tessellation::diagnosis as truck_diag;
 use truck_meshalgo::tessellation::{TessellationFailureReason, TorusAnnulusAttempt};
 use truck_stepio::r#in::Table;
+use truck_stepio::r#in::convert::FaceLossReason;
 use truck_topology::compress::{FaceProvenance, SourceEntityId};
 
 use crate::timing::Timings;
@@ -66,6 +68,98 @@ const LOST_FACE_IDS_PER_SHELL: usize = 4;
 /// A diagnostic that floods stderr gets piped to `/dev/null`, and then it
 /// diagnoses nothing. The count is always exact; only the naming is capped.
 const LOST_FACE_IDS_REPORTED: usize = 12;
+
+/// One structured, machine-readable record for a source face lost during STEP
+/// conversion, before it ever reached tessellation.
+///
+/// Component-owned by the import boundary (Look, not truck-meshalgo): it uses
+/// the same event conventions as truck's `FaceDiagnosticRecord` — the shared
+/// schema-versioning discipline, the default-stderr emission, the
+/// `TRUCK_FACE_DIAG_JSONL` redirect and the `TRUCK_FACE_DIAG=off` suppression —
+/// but is deliberately a conversion record, never a tessellation record. It is
+/// the answer to "this source face existed, and no output face carries its
+/// provenance".
+#[derive(Clone, Debug, serde::Serialize)]
+pub struct ImportDiagnosticRecord {
+    /// Schema version, matching truck's diagnostic schema version.
+    pub schema_version: u32,
+    /// The document/model identifier.
+    pub document_id: Option<String>,
+    /// The source face entity id, when the reference chain resolved that far.
+    pub source_face_id: Option<u64>,
+    /// The source face *use* id, when available.
+    pub source_use_id: Option<u64>,
+    /// The coarse entity kind the resolved reference named.
+    pub source_entity_type: Option<String>,
+    /// Which conversion stage the face was lost in.
+    pub conversion_stage: &'static str,
+    /// The coarse conversion failure kind.
+    pub conversion_failure_kind: &'static str,
+    /// The STEP shell entity the face belonged to.
+    pub representation_shell_context: Option<u64>,
+    /// The exact typed refusal, from the converter.
+    pub refusal_tag: String,
+    /// Whether any FaceProvenance was established before the loss.
+    pub provenance_established: bool,
+    /// Faces the shell declared before conversion.
+    pub declared_shell_faces: usize,
+    /// Faces that survived conversion.
+    pub surviving_shell_faces: usize,
+}
+
+/// The coarse conversion stage a [`FaceLossReason`] happened in.
+fn conversion_stage_of(reason: FaceLossReason) -> &'static str {
+    use FaceLossReason as R;
+    match reason {
+        R::FaceReferenceUnresolved => "face_lookup",
+        R::SurfaceConversionFailed => "surface_conversion",
+        R::BoundReferenceUnresolved | R::LoopReferenceUnresolved | R::AllBoundsCollapsed => {
+            "bound_conversion"
+        }
+        R::EdgeUseUnresolved | R::EdgeCurveConversionFailed | R::WireNotClosed => "edge_conversion",
+    }
+}
+
+/// The coarse entity kind a resolved face provenance names, when it names one.
+fn provenance_entity_type(provenance: &FaceProvenance) -> Option<String> {
+    if provenance.definition_id.is_some() {
+        Some("face".into())
+    } else if provenance.use_id.is_some() {
+        Some("oriented_face".into())
+    } else if provenance.surface_id.is_some() {
+        Some("surface".into())
+    } else {
+        None
+    }
+}
+
+/// Emit exactly one [`ImportDiagnosticRecord`] for one converted-away face,
+/// through truck's shared diagnostic sink.
+fn emit_import_diagnostic(
+    shell_id: u64,
+    declared: usize,
+    surviving: usize,
+    loss: &truck_stepio::r#in::convert::FaceLoss,
+) {
+    let line = match serde_json::to_string(&ImportDiagnosticRecord {
+        schema_version: truck_diag::DIAGNOSTIC_SCHEMA_VERSION,
+        document_id: truck_diag::document_context(),
+        source_face_id: loss.provenance.best_id().map(SourceEntityId::get),
+        source_use_id: loss.provenance.use_id.map(SourceEntityId::get),
+        source_entity_type: provenance_entity_type(&loss.provenance),
+        conversion_stage: conversion_stage_of(loss.reason),
+        conversion_failure_kind: "conversion_refusal",
+        representation_shell_context: Some(shell_id),
+        refusal_tag: loss.reason.tag().to_string(),
+        provenance_established: !loss.provenance.is_empty(),
+        declared_shell_faces: declared,
+        surviving_shell_faces: surviving,
+    }) {
+        Ok(line) => line,
+        Err(_) => return,
+    };
+    truck_diag::emit_json_line(&line);
+}
 
 /// Positions, indices, and per-vertex RGBA for one tessellated STEP model.
 ///
@@ -148,8 +242,19 @@ pub fn parse_step(bytes: &[u8], timings: &mut Timings) -> anyhow::Result<StepTri
             // nothing downstream can tell that it did.
             let declared = shell.cfs_faces.len();
             table
-                .to_compressed_shell(*id, shell)
-                .map(|compressed| (declared, compressed))
+                .to_compressed_shell_with_losses(*id, shell)
+                .map(|(compressed, losses)| {
+                    // DIAG-002: every face lost during conversion emits exactly
+                    // one import diagnostic. The hard invariant: a source face
+                    // that existed and produced no output face/provenance must
+                    // leave an explanation here, in the same sink the
+                    // tessellation records use.
+                    let surviving = compressed.faces.len();
+                    for loss in &losses {
+                        emit_import_diagnostic(*id, declared, surviving, loss);
+                    }
+                    (declared, compressed)
+                })
                 .map_err(|error| format!("shell #{id}: {error}"))
         })
         .collect::<Vec<_>>();
@@ -701,5 +806,63 @@ mod tests {
                 "diameter {diameter} produced tolerance {tolerance}"
             );
         }
+    }
+
+    /// D9: a source face lost during conversion emits exactly one
+    /// `ImportDiagnosticRecord` in the shared diagnostic sink.
+    ///
+    /// The hard invariant of the conversion-loss contract: a source face that
+    /// existed and produced no output face/provenance must leave an
+    /// explanation. This drives the emission path directly with a synthetic
+    /// converter loss, exactly as `parse_step` does per real loss.
+    #[test]
+    fn d9_conversion_loss_emits_one_import_record() {
+        let path =
+            std::env::temp_dir().join(format!("look_diag002_{}_d9.jsonl", std::process::id()));
+        let _ = std::fs::remove_file(&path);
+        // Rust 2024 makes env mutation unsafe; the test is single-threaded
+        // within this binary's scope.
+        unsafe {
+            std::env::set_var("TRUCK_FACE_DIAG_JSONL", &path);
+            std::env::remove_var("TRUCK_FACE_DIAG");
+        }
+        truck_diag::set_document_context(Some("d9.step".into()));
+
+        // A synthetic loss: face use #12 of face #7 lost when its edge curve
+        // failed to convert.
+        let loss = truck_stepio::r#in::convert::FaceLoss {
+            provenance: FaceProvenance {
+                use_id: Some(SourceEntityId::new(12)),
+                definition_id: Some(SourceEntityId::new(7)),
+                surface_id: None,
+                outer_bound: truck_topology::compress::OuterBoundStanding::NotRetained,
+            },
+            reason: FaceLossReason::EdgeCurveConversionFailed,
+        };
+        emit_import_diagnostic(100, 3, 2, &loss);
+
+        let text = std::fs::read_to_string(&path).unwrap_or_default();
+        unsafe { std::env::remove_var("TRUCK_FACE_DIAG_JSONL") };
+        truck_diag::set_document_context(None);
+        let _ = std::fs::remove_file(&path);
+
+        let rows: Vec<serde_json::Value> = text
+            .lines()
+            .filter(|line| !line.is_empty())
+            .filter_map(|line| serde_json::from_str(line).ok())
+            .collect();
+        assert_eq!(rows.len(), 1, "exactly one conversion record");
+        let row = &rows[0];
+        assert_eq!(row["schema_version"], 1);
+        assert_eq!(row["document_id"], "d9.step");
+        assert_eq!(row["source_face_id"], 7, "definition id survives");
+        assert_eq!(row["source_use_id"], 12, "use id survives");
+        assert_eq!(row["conversion_stage"], "edge_conversion");
+        assert_eq!(row["conversion_failure_kind"], "conversion_refusal");
+        assert_eq!(row["refusal_tag"], "EdgeCurveConversionFailed");
+        assert_eq!(row["representation_shell_context"], 100);
+        assert_eq!(row["provenance_established"], true);
+        assert_eq!(row["declared_shell_faces"], 3);
+        assert_eq!(row["surviving_shell_faces"], 2);
     }
 }

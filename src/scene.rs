@@ -365,6 +365,12 @@ fn compile_step(
     let source_hash = timings.measure("hash", || blake3::hash(&bytes).to_hex().to_string());
 
     let parse_started = Instant::now();
+    // DIAG-002: name the document for every tessellation and conversion
+    // diagnostic emitted below. Truck never interprets the value; it only
+    // carries it so a corpus can say which model a failure came from.
+    truck_meshalgo::tessellation::diagnosis::set_document_context(Some(
+        path.to_string_lossy().into_owned(),
+    ));
     let (positions, indices, colors) = crate::step::parse_step(&bytes, timings)
         .with_context(|| format!("failed to load STEP scene '{}'", path.display()))?;
     timings.record("parse", parse_started.elapsed());
