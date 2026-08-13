@@ -337,9 +337,11 @@ fn compile_stl(
 
     compile_triangle_mesh(
         path,
-        vertices,
-        indices,
-        vec![[1.0_f32; 4]; vertex_count],
+        TriangleSoup {
+            vertices,
+            indices,
+            colors: vec![[1.0_f32; 4]; vertex_count],
+        },
         source_hash,
         up_axis,
         include_source_materials,
@@ -383,9 +385,11 @@ fn compile_step(
 
     compile_triangle_mesh(
         path,
-        vertices,
-        indices,
-        colors,
+        TriangleSoup {
+            vertices,
+            indices,
+            colors,
+        },
         source_hash,
         up_axis,
         include_source_materials,
@@ -393,22 +397,32 @@ fn compile_step(
     )
 }
 
+/// An indexed triangle mesh plus per-vertex RGBA, as a triangle-soup source
+/// hands it to the shared compile tail.
+///
+/// `colors` is positionally aligned with `vertices`. A soup that carries no
+/// per-vertex colour uses identity entries, so the default material rules.
+struct TriangleSoup {
+    vertices: Vec<Vertex>,
+    indices: Vec<u32>,
+    colors: Vec<[f32; 4]>,
+}
+
 /// Shared tail for the triangle-soup sources (STL and STEP): one geometry, one
 /// instance, one default material.
 fn compile_triangle_mesh(
     path: &Path,
-    vertices: Vec<Vertex>,
-    indices: Vec<u32>,
-    colors: Vec<[f32; 4]>,
+    mesh: TriangleSoup,
     source_hash: String,
     up_axis: UpAxis,
     include_source_materials: bool,
     timings: &mut Timings,
 ) -> anyhow::Result<CompiledScene> {
     let compile_started = Instant::now();
-    let local_bounds = Bounds::from_position_iter(vertices.iter().map(|vertex| vertex.position));
+    let local_bounds =
+        Bounds::from_position_iter(mesh.vertices.iter().map(|vertex| vertex.position));
     let source_attributes = include_source_materials.then(|| {
-        colors
+        mesh.colors
             .iter()
             .map(|&color| SourceVertexAttributes {
                 tex_coord_0: [0.0; 2],
@@ -422,11 +436,11 @@ fn compile_triangle_mesh(
     // with nothing to compare it to. On a tessellated assembly the hash was a
     // full blake3 pass over every vertex, index, and source attribute —
     // hundreds of megabytes — to fill a field nothing read.
-    let (bounding_center, bounding_radius) = bounding_sphere(&vertices, &local_bounds);
+    let (bounding_center, bounding_radius) = bounding_sphere(&mesh.vertices, &local_bounds);
     let geometry = Geometry {
-        vertices,
+        vertices: mesh.vertices,
         source_attributes,
-        indices,
+        indices: mesh.indices,
         bounds: local_bounds,
         bounding_center,
         bounding_radius,

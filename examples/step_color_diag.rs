@@ -108,12 +108,7 @@ fn main() {
         "{:<10} {:<12} {:<24} {:<14}",
         "face_id", "definition_id", "effective_rgb", "matched"
     );
-    let mut shown = 0;
-    for &id in styled_ids.iter() {
-        if shown >= 20 {
-            println!("  ... and {} more styled faces", styled_ids.len() - shown);
-            break;
-        }
+    for &id in styled_ids.iter().take(20) {
         let color = map.get(&id).expect("in styled set").color;
         let matched = definition_set.contains(&id);
         let rgb = format!("({:.3}, {:.3}, {:.3})", color[0], color[1], color[2]);
@@ -124,7 +119,9 @@ fn main() {
             rgb,
             if matched { "yes" } else { "no" }
         );
-        shown += 1;
+    }
+    if styled_ids.len() > 20 {
+        println!("  ... and {} more styled faces", styled_ids.len() - 20);
     }
     println!("unresolved chains: {}", unresolved.len());
 }

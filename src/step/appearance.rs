@@ -394,14 +394,13 @@ fn shape_face_ids(table: &Table, shape_id: u64) -> Vec<u64> {
             collect_boundary_shell_face_ids(table, outer, &mut ids);
         }
         for void in &solid.voids {
-            if let Some(oriented_id) = resolved_ref_id(void) {
-                if let Some(shell_id) = table
+            if let Some(oriented_id) = resolved_ref_id(void)
+                && let Some(shell_id) = table
                     .oriented_shell
                     .get(&oriented_id)
                     .and_then(|oriented| resolved_ref_id(&oriented.shell_element))
-                {
-                    collect_shell_face_ids(table, shell_id, &mut ids);
-                }
+            {
+                collect_shell_face_ids(table, shell_id, &mut ids);
             }
         }
     }
@@ -423,10 +422,12 @@ fn shape_face_ids(table: &Table, shape_id: u64) -> Vec<u64> {
 fn collect_boundary_shell_face_ids(table: &Table, id: u64, ids: &mut Vec<u64>) {
     if table.shell.contains_key(&id) {
         collect_shell_face_ids(table, id, ids);
-    } else if let Some(oriented) = table.oriented_shell.get(&id) {
-        if let Some(shell_id) = resolved_ref_id(&oriented.shell_element) {
-            collect_shell_face_ids(table, shell_id, ids);
-        }
+    } else if let Some(shell_id) = table
+        .oriented_shell
+        .get(&id)
+        .and_then(|oriented| resolved_ref_id(&oriented.shell_element))
+    {
+        collect_shell_face_ids(table, shell_id, ids);
     }
 }
 
@@ -518,12 +519,13 @@ mod tests {
     #[test]
     fn adjacent_faces_keep_distinct_colours() {
         let table = table_of(&format!(
-            "DATA;\n{}\n{}\n{}\n{}\n{}\nENDSEC;",
+            "DATA;\n{}\n{}\n{}\n{}\n{}\n{}\nENDSEC;",
             styled_chain(1, 8, 100),
             rgb(8, 1.0, 0.0, 0.0),
             styled_chain(11, 18, 110),
             rgb(18, 0.0, 0.0, 1.0),
-            format!("{}\n{}", face(100, "faceA"), face(110, "faceB"))
+            face(100, "faceA"),
+            face(110, "faceB")
         ));
         let (map, _) = resolve_face_appearances(&table);
         assert_eq!(map.get(&100).expect("face #100").color, RED);
