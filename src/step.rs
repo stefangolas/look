@@ -7,6 +7,7 @@
 //! STEP. AP242 also allows a file to ship its mesh directly, which is handled
 //! by [`tessellated`].
 
+pub mod appearance;
 pub mod circular_arc;
 pub mod cone;
 pub mod cylinder;
@@ -25,7 +26,7 @@ use rayon::prelude::*;
 use truck_meshalgo::prelude::*;
 use truck_meshalgo::tessellation::{TessellationFailureReason, TorusAnnulusAttempt};
 use truck_stepio::r#in::Table;
-use truck_topology::compress::FaceProvenance;
+use truck_topology::compress::{FaceProvenance, SourceEntityId};
 
 use crate::timing::Timings;
 
@@ -73,7 +74,7 @@ const LOST_FACE_IDS_REPORTED: usize = 12;
 pub fn parse_step(
     bytes: &[u8],
     timings: &mut Timings,
-) -> anyhow::Result<(Vec<[f32; 3]>, Vec<u32>)> {
+) -> anyhow::Result<(Vec<[f32; 3]>, Vec<u32>, Vec<[f32; 4]>)> {
     let text = std::str::from_utf8(bytes)
         .map(std::borrow::Cow::Borrowed)
         // STEP is nominally ASCII, but exporters emit Latin-1 in comments and
@@ -103,6 +104,11 @@ pub fn parse_step(
     // `wrap_shell_with_closure` can attach it to each face's `PolicySurface`.
     let closure_map = lattice::spline_closure_map(&table);
 
+    // Effective face appearance, keyed by the source face entity id —
+    // `FaceProvenance.definition_id`. Resolved before any shell is converted so
+    // the per-face flatten below can attach colours without touching geometry.
+    let (face_appearances, unresolved_styles) = appearance::resolve_face_appearances(&table);
+
     if table.shell.is_empty() {
         // AP242 lets a file ship its mesh directly instead of a boundary
         // representation, in which case there is nothing to evaluate and the
@@ -116,7 +122,10 @@ pub fn parse_step(
         let tessellated = reread.data.first().and_then(tessellated::read);
         timings.record("step_tessellated_read", tessellated_started.elapsed());
         if let Some((positions, indices)) = tessellated {
-            return Ok((positions, indices));
+            // AP242 triangulated data carries no STEP presentation, so every
+            // vertex keeps the identity colour and the default material rules.
+            let colors = vec![[1.0_f32; 4]; positions.len()];
+            return Ok((positions, indices, colors));
         }
         anyhow::bail!("STEP file contains no shells or tessellated faces");
     }
@@ -187,23 +196,23 @@ pub fn parse_step(
                 // Still report what the file declared. A shell whose faces all
                 // failed to convert arrives here looking identical to a shell
                 // that genuinely holds none.
-                return Ok((
-                    PolygonMesh::default(),
-                    FaceTally {
+                return Ok(StepShellMesh {
+                    faces: Vec::new(),
+                    tally: FaceTally {
                         declared,
                         ..FaceTally::default()
                     },
                     // Nothing survived to carry an identity: these faces were
                     // lost during conversion, before any face object existed.
-                    Vec::new(),
+                    lost_ids: Vec::new(),
                     // And nothing reached the tessellator, so it has no verdict
                     // to offer. An empty list here is not "no failures" — it is
                     // "this loss happened upstream of the stage that names
                     // reasons", which `unconverted()` already reports.
-                    Vec::new(),
+                    reasons: Vec::new(),
                     // No torus outcomes: nothing reached the tessellator.
-                    BTreeMap::new(),
-                ));
+                    torus_census: BTreeMap::new(),
+                });
             }
             // Periodicity now reaches the tessellator as a descriptor built
             // from the concrete STEP representation, not as a bare accessor
@@ -308,13 +317,37 @@ pub fn parse_step(
                 };
                 *torus_census.entry(tag).or_insert(0) += 1;
             }
-            Ok::<_, String>((meshed.to_polygon(), tally, lost_ids, reasons, torus_census))
+            // Per-face polygons, kept with their source provenance and in the
+            // same order `MeshedShape::to_polygon` would merge them, so the
+            // flatten stage reproduces the identical triangle soup while
+            // attaching appearance per face.
+            let faces = meshed
+                .faces
+                .iter()
+                .filter_map(|face| {
+                    let surface = face.surface.as_ref()?;
+                    let polygon = if face.orientation {
+                        surface.clone()
+                    } else {
+                        surface.inverse()
+                    };
+                    Some((face.provenance, polygon))
+                })
+                .collect();
+            Ok::<_, String>(StepShellMesh {
+                faces,
+                tally,
+                lost_ids,
+                reasons,
+                torus_census,
+            })
         })
         .collect::<Vec<_>>();
     timings.record("step_tessellate", mesh_started.elapsed());
 
     let mut positions = Vec::new();
     let mut indices = Vec::new();
+    let mut colors = Vec::new();
     let mut failures = Vec::new();
     let mut faces = FaceTally::default();
     let mut lost_faces: Vec<FaceProvenance> = Vec::new();
@@ -322,20 +355,32 @@ pub fn parse_step(
     let mut torus_census_total: BTreeMap<&'static str, usize> = BTreeMap::new();
     for result in meshed {
         match result {
-            Ok((polygon, tally, lost_ids, reasons, torus_census)) => {
-                append_polygon(&polygon, &mut positions, &mut indices);
-                faces.declared += tally.declared;
-                faces.total += tally.total;
-                faces.unsurfaced += tally.unsurfaced;
-                faces.empty += tally.empty;
-                for reason in reasons {
+            Ok(mesh) => {
+                // One face at a time, still keyed by source provenance, so the
+                // effective appearance joins on `definition_id` without
+                // touching how the face was meshed. Faces absent from the map
+                // keep the identity colour and the default material.
+                for (provenance, polygon) in mesh.faces {
+                    let color = provenance
+                        .definition_id
+                        .map(SourceEntityId::get)
+                        .and_then(|id| face_appearances.get(&id))
+                        .map(|appearance| appearance.color)
+                        .unwrap_or([1.0; 4]);
+                    append_polygon(&polygon, color, &mut positions, &mut indices, &mut colors);
+                }
+                faces.declared += mesh.tally.declared;
+                faces.total += mesh.tally.total;
+                faces.unsurfaced += mesh.tally.unsurfaced;
+                faces.empty += mesh.tally.empty;
+                for reason in mesh.reasons {
                     *reason_counts.entry(reason).or_insert(0) += 1;
                 }
-                for (tag, count) in torus_census {
+                for (tag, count) in mesh.torus_census {
                     *torus_census_total.entry(tag).or_insert(0) += count;
                 }
                 if lost_faces.len() < LOST_FACE_IDS_REPORTED {
-                    lost_faces.extend(lost_ids);
+                    lost_faces.extend(mesh.lost_ids);
                 }
             }
             Err(error) => failures.push(error),
@@ -436,7 +481,56 @@ pub fn parse_step(
         eprintln!("torus observer: {total} faces attempted, {summary}");
     }
 
-    Ok((positions, indices))
+    // Presentation diagnostics: styled items that targeted a face or shape but
+    // whose style chain produced no colour. A model that mixes styled and
+    // unstyled faces is normal and silent; only an asserted style that could
+    // not be honoured is named.
+    if !unresolved_styles.is_empty() {
+        let shown = unresolved_styles
+            .iter()
+            .take(LOST_FACE_IDS_REPORTED)
+            .map(|unresolved| {
+                format!(
+                    "#{} ({}) {}",
+                    unresolved.entity_id, unresolved.kind, unresolved.reason
+                )
+            })
+            .collect::<Vec<_>>()
+            .join("; ");
+        let unnamed = unresolved_styles
+            .len()
+            .saturating_sub(LOST_FACE_IDS_REPORTED);
+        eprintln!(
+            "warning: {} STEP styled item chain(s) did not resolve to a face \
+             colour{}{}",
+            unresolved_styles.len(),
+            if shown.is_empty() {
+                String::new()
+            } else {
+                format!(": {shown}")
+            },
+            if unnamed > 0 {
+                format!("; and {unnamed} more not listed")
+            } else {
+                String::new()
+            }
+        );
+    }
+
+    Ok((positions, indices, colors))
+}
+
+/// One shell's meshed faces, still keyed by source provenance so the flatten
+/// stage can attach appearance without disturbing the geometry.
+#[derive(Debug)]
+struct StepShellMesh {
+    /// `(provenance, polygon)` for every face that produced geometry, in the
+    /// same order [`MeshedShape`] merges them.
+    faces: Vec<(FaceProvenance, PolygonMesh)>,
+    tally: FaceTally,
+    lost_ids: Vec<FaceProvenance>,
+    reasons: Vec<TessellationFailureReason>,
+    torus_census: BTreeMap<&'static str, usize>,
 }
 
 /// How many faces a shell held, and how many of them yielded no mesh.
@@ -517,8 +611,16 @@ fn model_tolerance(diameter: f64) -> f64 {
 
 /// Flatten a meshed shell, dropping the per-face indexing in favour of one
 /// flat vertex buffer. Triangles are emitted unwelded so that creased edges
-/// keep their own normals when the caller generates them.
-fn append_polygon(polygon: &PolygonMesh, positions: &mut Vec<[f32; 3]>, indices: &mut Vec<u32>) {
+/// keep their own normals when the caller generates them, and every vertex of
+/// one source face carries that face's effective colour — adjacent faces keep
+/// separate vertex records, so colour discontinuities survive naturally.
+fn append_polygon(
+    polygon: &PolygonMesh,
+    color: [f32; 4],
+    positions: &mut Vec<[f32; 3]>,
+    indices: &mut Vec<u32>,
+    colors: &mut Vec<[f32; 4]>,
+) {
     let vertices = polygon.positions();
     // The triangle count is known, and these buffers reach tens of megabytes
     // on a large assembly. Growing them by doubling holds the old and the new
@@ -527,11 +629,13 @@ fn append_polygon(polygon: &PolygonMesh, positions: &mut Vec<[f32; 3]>, indices:
     let incoming = polygon.tri_faces().len() * 3;
     positions.reserve(incoming);
     indices.reserve(incoming);
+    colors.reserve(incoming);
     for face in polygon.tri_faces() {
         for vertex in face {
             let point = vertices[vertex.pos];
             indices.push(positions.len() as u32);
             positions.push([point.x as f32, point.y as f32, point.z as f32]);
+            colors.push(color);
         }
     }
 }

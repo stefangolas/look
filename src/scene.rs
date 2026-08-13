@@ -333,11 +333,13 @@ fn compile_stl(
     let parse_started = Instant::now();
     let (vertices, indices) = parse_stl(&bytes)?;
     timings.record("parse", parse_started.elapsed());
+    let vertex_count = vertices.len();
 
     compile_triangle_mesh(
         path,
         vertices,
         indices,
+        vec![[1.0_f32; 4]; vertex_count],
         source_hash,
         up_axis,
         include_source_materials,
@@ -346,8 +348,9 @@ fn compile_stl(
 }
 
 /// Tessellate a STEP boundary representation and compile it like any other
-/// triangle source. STEP carries no textures or per-part materials through
-/// this path, so the scene gets the same default material as STL.
+/// triangle source. STEP carries no textures through this path, so the scene
+/// gets the same default material as STL; source face colours arrive as
+/// per-vertex attributes and tint that default where the file asserted one.
 fn compile_step(
     path: &Path,
     up_axis: UpAxis,
@@ -360,7 +363,7 @@ fn compile_step(
     let source_hash = timings.measure("hash", || blake3::hash(&bytes).to_hex().to_string());
 
     let parse_started = Instant::now();
-    let (positions, indices) = crate::step::parse_step(&bytes, timings)
+    let (positions, indices, colors) = crate::step::parse_step(&bytes, timings)
         .with_context(|| format!("failed to load STEP scene '{}'", path.display()))?;
     timings.record("parse", parse_started.elapsed());
 
@@ -382,6 +385,7 @@ fn compile_step(
         path,
         vertices,
         indices,
+        colors,
         source_hash,
         up_axis,
         include_source_materials,
@@ -395,6 +399,7 @@ fn compile_triangle_mesh(
     path: &Path,
     vertices: Vec<Vertex>,
     indices: Vec<u32>,
+    colors: Vec<[f32; 4]>,
     source_hash: String,
     up_axis: UpAxis,
     include_source_materials: bool,
@@ -403,14 +408,14 @@ fn compile_triangle_mesh(
     let compile_started = Instant::now();
     let local_bounds = Bounds::from_position_iter(vertices.iter().map(|vertex| vertex.position));
     let source_attributes = include_source_materials.then(|| {
-        vec![
-            SourceVertexAttributes {
+        colors
+            .iter()
+            .map(|&color| SourceVertexAttributes {
                 tex_coord_0: [0.0; 2],
                 tex_coord_1: [0.0; 2],
-                color: [1.0; 4],
-            };
-            vertices.len()
-        ]
+                color,
+            })
+            .collect::<Vec<_>>()
     });
     // No geometry hash here. Hashing exists to deduplicate primitives against
     // each other, and a triangle-soup source compiles to exactly one geometry
