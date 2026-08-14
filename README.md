@@ -234,6 +234,35 @@ assembly (9.1 MB, 5,623 tessellated faces): 2,005 ms in `look` versus 6,442 ms
 for OCCT through F3D 3.5 at 512x512. See [benchmarks](docs/BENCHMARKS.md) for
 raw samples.
 
+#### Reproducing the core_xy STEP comparison
+
+`core_xy.step` is a local reference model, not a repo fixture. Re-measure it by
+launching each renderer fresh and timing process start through a completed PNG.
+The settings below match `docs/BENCHMARKS.md` and the `--preset f3d-match`
+profile: 512x512, front orthographic, no AA/AO/tone-mapping, `#252525`
+background. `look` reads STEP with its own Part 21 parser and tessellator;
+F3D reads STEP through its bundled OpenCASCADE plugin, so `--force-reader=STEP`
+is required. Do one unmeasured launch per tool first so drivers and caches are
+warm, alternate launch order between samples, and take a median of five.
+
+```console
+# look (release build)
+look render core_xy.step --view front --camera orthographic --resolution 512x512 `
+  --preset f3d-match --background "#252525" --output corexy-look.png
+
+# OCCT through F3D 3.5 console
+f3d-console core_xy.step --no-config --force-reader=STEP --output corexy-f3d.png `
+  --resolution 512,512 "--camera-direction=-Z" --camera-orthographic `
+  --anti-aliasing=none --ambient-occlusion=0 --tone-mapping=0 `
+  --background-color "#252525"
+```
+
+Score a run only if a PNG was produced, and confirm the F3D PNG contains the
+model (compare foreground bounding boxes and luminance coverage against the
+`look` output) — a mis-served file can otherwise look like a successful render.
+The 3.21x above is one assembly on one RTX 5050 Laptop GPU, not a universal
+STEP claim.
+
 Resident, against Three.js at 512 px tiles: a four-view atlas takes 8.94 ms in
 `look` versus 22.50 ms in WebGL2 and 27.30 ms in WebGPU.
 

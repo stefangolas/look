@@ -108,15 +108,17 @@ The `core_xy.step` assembly in the home directory is a local reference model
 process and adapter startup floor. Do not quote that ratio as a universal STEP
 claim: it is one assembly on one GPU.
 
-To re-measure against OCCT, mirror `benchmarks/step-vs-f3d.ps1` exactly rather
-than improvising: one unmeasured conditioning launch per tool, alternating
-launch order, median of five measured launches, `look render --preset f3d-match`
-versus `f3d-console --no-config --force-reader=STEP`, 512x512 front orthographic,
+To re-measure against OCCT, use the exact commands in the README's
+"Reproducing the core_xy STEP comparison" section rather than improvising: one
+unmeasured conditioning launch per tool, alternating launch order, median of
+five measured launches, `look render --preset f3d-match` versus
+`f3d-console --no-config --force-reader=STEP`, 512x512 front orthographic,
 no AA/AO/tone-mapping, `#252525` background, and success judged by whether a PNG
-was produced. F3D reads STEP through its bundled OpenCASCADE plugin, so this
-compares whole pipelines (parse, tessellate, render). Confirm the F3D PNG
-contains the model — the F3D GUI start page can make a mis-served file look like
-a successful render.
+was produced. `benchmarks/step-vs-f3d.ps1` exists for the NIST corpus and is
+not wired to `core_xy.step`. F3D reads STEP through its bundled OpenCASCADE
+plugin, so this compares whole pipelines (parse, tessellate, render). Confirm
+the F3D PNG contains the model — the F3D GUI start page can make a mis-served
+file look like a successful render.
 
 Verify output fidelity alongside speed, not just timing: compare foreground
 bounding boxes and luminance coverage on the produced PNGs so a blank or
