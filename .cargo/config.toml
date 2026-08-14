@@ -71,11 +71,18 @@
 # 2026-08-13), so a clean clone builds WITH constitutive failure diagnostics.
 # Re-enable only to iterate on the fork, and re-comment + bump the rev before
 # reporting a number.
+# Re-commented 2026-08-14 after PARAMETER-FRONTIER-A landed: the pin in
+# Cargo.toml now points at 40212ece (truck-fork feature/cone-apex-lift-recovery,
+# pushed 2026-08-14), so a clean clone builds WITH the certified-axis deck-candidate
+# filtering and the constrained evaluator-domain admission.
 # Re-commented 2026-08-13 after ASSEMBLY-PLACEMENT landed: the pin in Cargo.toml
 # now points at 7a017443 (truck-fork feature/cone-apex-lift-recovery, pushed
 # 2026-08-13), so a clean clone builds WITH assembly definition geometry.
 # Re-enable only to iterate on the fork, and re-comment + bump the rev before
 # reporting a number.
+# Re-commented 2026-08-14 after FACE-LOCAL-CLOSURE landed (truck 09726a9e); the
+# pin in Cargo.toml now points at 09726a9e, so a clean clone builds WITH the
+# face-local synthetic boundary closure.
 # paths = [
 #     "../truck-fork/truck-base",
 #     "../truck-fork/truck-derivers",
