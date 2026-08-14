@@ -49,8 +49,9 @@ overhead.
 - render named camera views with controllable lighting and materials;
 - combine several views into one atlas image for efficient agent inspection;
 - report mesh, triangle, material, texture, and bounds metadata as JSON;
-- execute repeatable YAML render jobs; and
-- keep a scene GPU-resident for multiple inspection passes.
+- execute repeatable YAML render jobs;
+- keep a scene GPU-resident for multiple inspection passes; and
+- open an interactive HTML viewer in the default browser.
 
 It uses Rust and `wgpu` directly and emits machine-readable results for agent
 workflows. There is no browser, Electron shell, VTK scene layer, or import
@@ -141,6 +142,30 @@ Faces that cannot be tessellated are reported as machine-readable warnings on
 the `--json` output (for example `BoundaryProjectionFailed`) rather than
 silently dropped; incomplete assemblies stay visible, and the missing faces are
 named so they can be chased down.
+
+## Interactive GUI viewer
+
+`render --gui` opens an interactive, self-contained HTML 3D viewer in the
+default browser instead of writing a PNG. It applies the same lighting,
+background, and material arguments as a normal render, so the view matches the
+screenshot path:
+
+```console
+look model.glb --gui --material-mode source --view iso --output model_viewer.html --json
+look core_xy.step --gui --view iso --json
+```
+
+The viewer is a single HTML file with embedded geometry — drag to orbit, scroll
+to zoom — and works offline, with no server or browser extension. `--json`
+reports the viewer path, scene, and triangle count. `--gui` conflicts with
+`--session` (a session is a GPU-resident render loop, not an HTML view).
+
+To write the viewer file without opening a browser, use `ui` with an explicit
+output path:
+
+```console
+look ui core_xy.step --output core_xy_viewer.html --json
+```
 
 ## Reuse a loaded scene
 
