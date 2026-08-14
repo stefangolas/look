@@ -32,6 +32,17 @@ That command loads `model.glb`, selects a technical material and lighting setup,
 fits the camera to the model, renders an isometric view, and writes `render.png`.
 No configuration file is required.
 
+Render a tileset — several camera views in one GPU-generated atlas PNG — in a
+single pass. This works for GLB, STL, and STEP alike; STEP is tessellated on
+load inside the binary:
+
+```console
+look core_xy.step --views front,right,top,iso --atlas 2 --resolution 512x512 --output views.png --json
+```
+
+One process, one readback, one PNG: the whole tileset, from an unparsed STEP
+file to the finished image in roughly a second on a typical laptop.
+
 Render four camera views directly into one GPU-generated PNG:
 
 ```console
