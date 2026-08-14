@@ -1,5 +1,6 @@
 use anyhow::Result;
 
+use crate::config::{LightingConfig, parse_hex_color};
 use crate::scene::{CompiledScene, SceneStatistics};
 
 fn base64_encode(data: &[u8]) -> String {
@@ -31,10 +32,15 @@ fn base64_encode(data: &[u8]) -> String {
 }
 
 /// Generates a self-contained, interactive HTML 3D viewer for any `CompiledScene`.
+///
+/// Lighting follows the CLI `LightingConfig` (ambient, direction, intensity,
+/// colour) and `background` so a `--gui` view matches the `render` settings.
 pub fn generate_html_viewer(
     scene: &CompiledScene,
     title: &str,
     stats: &SceneStatistics,
+    lighting: &LightingConfig,
+    background: &str,
 ) -> Result<String> {
     let mut flat_positions: Vec<f32> = Vec::new();
     let mut flat_normals: Vec<f32> = Vec::new();
@@ -98,6 +104,56 @@ pub fn generate_html_viewer(
         (scene.bounds.min[2] + scene.bounds.max[2]) * 0.5,
     ];
     let fit_radius = scene.fit_radius.max(1.0e-3);
+
+    let direction = glam::Vec3::from_array(lighting.direction).normalize_or_zero();
+    let fill_direction =
+        glam::Vec3::new(-direction.x * 0.4, 0.5, -direction.z * 0.4).normalize_or_zero();
+    let light_color = parse_hex_color(&lighting.color)?;
+    let bg = parse_hex_color(background)?;
+
+    let fs_source = format!(
+        r#"#version 300 es
+            precision highp float;
+            in vec3 vNormal;
+            in vec3 vFragPos;
+            in vec4 vColor;
+            uniform vec3 uCameraPos;
+            out vec4 fragColor;
+            void main() {{
+                vec3 N = normalize(vNormal);
+                vec3 lightDir = normalize(vec3({lx}, {ly}, {lz}));
+                vec3 lightColor = vec3({lr}, {lg}, {lb});
+                float intensity = {intensity};
+                float ambient = {ambient};
+
+                vec3 fillDir = normalize(vec3({fx}, {fy}, {fz}));
+                float diff = max(dot(N, lightDir), 0.0);
+                float fill = max(dot(N, fillDir), 0.0) * 0.25;
+
+                vec3 col = vColor.rgb * (lightColor * (ambient + (diff + fill) * intensity));
+
+                vec3 viewDir = normalize(uCameraPos - vFragPos);
+                vec3 halfDir = normalize(lightDir + viewDir);
+                float spec = pow(max(dot(N, halfDir), 0.0), 32.0) * 0.25 * intensity;
+                col += vec3(spec) * lightColor;
+
+                fragColor = vec4(col, 1.0);
+            }}
+        "#,
+        lx = direction.x,
+        ly = direction.y,
+        lz = direction.z,
+        // Computed here rather than negated inside the shader source: a
+        // negative component would emit `--0.26` and fail to compile.
+        fx = fill_direction.x,
+        fy = fill_direction.y,
+        fz = fill_direction.z,
+        lr = light_color[0],
+        lg = light_color[1],
+        lb = light_color[2],
+        intensity = lighting.intensity,
+        ambient = lighting.ambient,
+    );
 
     let format_badge = if title.to_lowercase().ends_with(".step")
         || title.to_lowercase().ends_with(".stp")
@@ -321,38 +377,16 @@ pub fn generate_html_viewer(
             }}
         `;
 
-        const fsSource = `#version 300 es
-            precision highp float;
-            in vec3 vNormal;
-            in vec3 vFragPos;
-            in vec4 vColor;
-            uniform vec3 uCameraPos;
-            out vec4 fragColor;
-            void main() {{
-                vec3 N = normalize(vNormal);
-                vec3 lightDir1 = normalize(vec3(0.5, 0.8, 1.0));
-                vec3 lightDir2 = normalize(vec3(-0.5, -0.4, -0.6));
-                
-                float diff1 = max(dot(N, lightDir1), 0.0);
-                float diff2 = max(dot(N, lightDir2), 0.0) * 0.35;
-                float ambient = 0.25;
-
-                vec3 baseColor = vec3(0.72, 0.75, 0.80);
-                vec3 col = baseColor * vColor.rgb * (ambient + diff1 * 0.75 + diff2);
-
-                vec3 viewDir = normalize(uCameraPos - vFragPos);
-                vec3 halfDir = normalize(lightDir1 + viewDir);
-                float spec = pow(max(dot(N, halfDir), 0.0), 32.0) * 0.25;
-                col += vec3(spec);
-
-                fragColor = vec4(col, 1.0);
-            }}
-        `;
+        const fsSource = `{fs_source}`;
 
         function createShader(gl, type, source) {{
             const shader = gl.createShader(type);
             gl.shaderSource(shader, source);
             gl.compileShader(shader);
+            if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {{
+                const kind = type === gl.VERTEX_SHADER ? 'vertex' : 'fragment';
+                throw new Error(kind + ' shader failed to compile: ' + gl.getShaderInfoLog(shader));
+            }}
             return shader;
         }}
 
@@ -360,6 +394,9 @@ pub fn generate_html_viewer(
         gl.attachShader(program, createShader(gl, gl.VERTEX_SHADER, vsSource));
         gl.attachShader(program, createShader(gl, gl.FRAGMENT_SHADER, fsSource));
         gl.linkProgram(program);
+        if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {{
+            throw new Error('shader program failed to link: ' + gl.getProgramInfoLog(program));
+        }}
 
         const vao = gl.createVertexArray();
         gl.bindVertexArray(vao);
@@ -450,7 +487,7 @@ pub fn generate_html_viewer(
             }}
 
             gl.enable(gl.DEPTH_TEST);
-            gl.clearColor(0.05, 0.055, 0.07, 1.0);
+            gl.clearColor({bg_r}, {bg_g}, {bg_b}, 1.0);
             gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
 
             const camX = target[0] + distance * Math.cos(pitch) * Math.sin(yaw);
@@ -580,6 +617,10 @@ pub fn generate_html_viewer(
         center_y = center[1],
         center_z = center[2],
         fit_radius = fit_radius,
+        fs_source = fs_source,
+        bg_r = bg[0],
+        bg_g = bg[1],
+        bg_b = bg[2],
     );
 
     Ok(html)
@@ -654,13 +695,28 @@ mod tests {
         };
 
         let stats = scene.statistics.clone();
-        let html =
-            generate_html_viewer(&scene, "test_part.step", &stats).expect("should generate html");
+        let html = generate_html_viewer(
+            &scene,
+            "test_part.step",
+            &stats,
+            &LightingConfig::default(),
+            "#252525",
+        )
+        .expect("should generate html");
 
         assert!(html.contains("test_part.step"));
         assert!(html.contains("STEP B-REP"));
         assert!(html.contains("<canvas id=\"gl-canvas\">"));
         assert!(html.contains("Left Drag"));
         assert!(html.contains("Scroll Wheel"));
+
+        // The default light direction is [-1, -2, -3]. Negating a component
+        // inside the shader source emits `--0.26`, which is the decrement
+        // operator, and the fragment shader silently fails to compile.
+        assert!(
+            !html.contains("--0."),
+            "generated GLSL contains a double-negation literal"
+        );
+        assert!(html.contains("vec3 fillDir = normalize(vec3("));
     }
 }

@@ -16,7 +16,8 @@ look part.step --output part.png
 <img src="docs/images/damaged-helmet-look-vs-f3d.png" width="640" alt="Khronos Damaged Helmet rendered side by side by look and F3D 3.5">
 
 `look` is faster than F3D 3.5 across every scene measured, by 1.4x on typical
-glTF samples and up to 5.9x on large ones. See [benchmarks](docs/BENCHMARKS.md)
+glTF samples and up to 5.9x on large ones. On STEP it beats F3D's OpenCASCADE
+reader by 3.21x on the `core_xy` assembly. See [benchmarks](docs/BENCHMARKS.md)
 for the numbers, raw samples, image licenses, and methodology.
 
 ## Quick example
@@ -113,6 +114,34 @@ The profile matches F3D's default camera framing, background, and five-light
 kit. It is a compatibility preset, not a promise of pixel identity for every
 PBR material.
 
+### STEP
+
+STEP files are CAD boundary representations, so `look` evaluates and
+tessellates them on load. There is no separate converter or OCCT dependency to
+install:
+
+```console
+look core_xy.step --view iso --output core_xy.png --json
+```
+
+STEP renders take every flag a mesh render does — named views, atlases,
+material modes, lighting, and YAML jobs all work unchanged:
+
+```console
+look core_xy.step --views front,right,top,iso --atlas 2 --resolution 512x512 --output views.png --json
+look core_xy.step --material-mode source --antialias --view front --camera orthographic --output pbr.png
+```
+
+Use `--material-mode technical` (the default) when only geometry matters; it
+skips source texture decode and upload. Use `--material-mode source` when PBR
+fidelity and source colours matter. The glTF `source` mode also reads STEP
+styled-item colours where the chain resolves.
+
+Faces that cannot be tessellated are reported as machine-readable warnings on
+the `--json` output (for example `BoundaryProjectionFailed`) rather than
+silently dropped; incomplete assemblies stay visible, and the missing faces are
+named so they can be chased down.
+
 ## Reuse a loaded scene
 
 Repeated inspection should avoid parsing, texture decoding, shader creation,
@@ -200,7 +229,10 @@ scene editor.
 
 Fresh-process, against F3D 3.5: 1.40x geometric mean on six glTF samples, 2.00x
 on New York Boulevard at 4K, and 5.94x on the 10.8M-triangle Sponza foliage
-composite. On STEP, 1.26x against F3D's OpenCASCADE reader.
+composite. On STEP, 3.21x against F3D's OpenCASCADE reader on the `core_xy`
+assembly (9.1 MB, 5,623 tessellated faces): 2,005 ms in `look` versus 6,442 ms
+for OCCT through F3D 3.5 at 512x512. See [benchmarks](docs/BENCHMARKS.md) for
+raw samples.
 
 Resident, against Three.js at 512 px tiles: a four-view atlas takes 8.94 ms in
 `look` versus 22.50 ms in WebGL2 and 27.30 ms in WebGPU.

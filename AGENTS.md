@@ -15,6 +15,13 @@ For one render:
 look model.glb --view iso --output render.png --json
 ```
 
+For one STEP render, use the same flags; the STEP boundary representation is
+tessellated on load inside the binary:
+
+```console
+look core_xy.step --view iso --output render.png --json
+```
+
 For multiple views, prefer one atlas. `--resolution` is per tile:
 
 ```console
@@ -91,6 +98,29 @@ Optimize from timings and Amdahl's law. In the resident path PNG encoding and
 file output currently dominate; GPU draw submission is already sub-millisecond
 for the benchmark atlas. Validate any low-level change end to end rather than
 assuming fewer API calls improve wall time.
+
+### STEP vs OCCT
+
+The `core_xy.step` assembly in the home directory is a local reference model
+(9.1 MB, 5,670 faces). On this machine `look` renders it fresh in about 2.0 s at
+512x512 versus about 6.4 s for OCCT through F3D 3.5 (`--force-reader=STEP`), a
+3.2x gap, because the Part 21 parser and tessellation complete well inside the
+process and adapter startup floor. Do not quote that ratio as a universal STEP
+claim: it is one assembly on one GPU.
+
+To re-measure against OCCT, mirror `benchmarks/step-vs-f3d.ps1` exactly rather
+than improvising: one unmeasured conditioning launch per tool, alternating
+launch order, median of five measured launches, `look render --preset f3d-match`
+versus `f3d-console --no-config --force-reader=STEP`, 512x512 front orthographic,
+no AA/AO/tone-mapping, `#252525` background, and success judged by whether a PNG
+was produced. F3D reads STEP through its bundled OpenCASCADE plugin, so this
+compares whole pipelines (parse, tessellate, render). Confirm the F3D PNG
+contains the model — the F3D GUI start page can make a mis-served file look like
+a successful render.
+
+Verify output fidelity alongside speed, not just timing: compare foreground
+bounding boxes and luminance coverage on the produced PNGs so a blank or
+mis-framed OCCT render cannot be reported as a win.
 
 ## Releases
 

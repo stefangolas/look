@@ -152,6 +152,11 @@ pub struct RenderArgs {
     #[arg(long)]
     pub html: Option<PathBuf>,
 
+    /// Open the interactive HTML viewer in the default browser instead of
+    /// rendering a PNG. Applies the lighting, background, and material args.
+    #[arg(long, conflicts_with = "session")]
+    pub gui: bool,
+
     #[arg(long)]
     pub json: bool,
 }
@@ -353,9 +358,51 @@ pub fn execute_render(args: RenderArgs) -> anyhow::Result<()> {
             &compiled,
             &config.scene.source.display().to_string(),
             &compiled.statistics.clone(),
+            &config.lighting,
+            &config.render.background,
         )?;
         std::fs::write(&html_path, html_content)
             .with_context(|| format!("failed to write HTML viewer to {}", html_path.display()))?;
+    }
+
+    if args.gui {
+        let mut timings = Timings::default();
+        let mut compiled = compile_scene(&config.scene.source, config.scene.up_axis, &mut timings)?;
+        prepare_source_textures(&mut compiled, &mut timings)?;
+        let html = crate::ui::generate_html_viewer(
+            &compiled,
+            &config.scene.source.display().to_string(),
+            &compiled.statistics.clone(),
+            &config.lighting,
+            &config.render.background,
+        )?;
+        let out_path = config.output.single_file.clone().unwrap_or_else(|| {
+            let file_stem = config
+                .scene
+                .source
+                .file_stem()
+                .and_then(|value| value.to_str())
+                .unwrap_or("model");
+            PathBuf::from(format!("{file_stem}_viewer.html"))
+        });
+        std::fs::write(&out_path, html)
+            .with_context(|| format!("failed to write HTML viewer to {}", out_path.display()))?;
+        open_in_browser(&out_path)?;
+        if args.json {
+            let json_out = serde_json::json!({
+                "status": "ok",
+                "viewer_path": out_path,
+                "scene": config.scene.source,
+                "triangles": compiled.instances.iter().map(|inst| compiled.geometries[inst.geometry].indices.len() / 3).sum::<usize>(),
+            });
+            println!("{}", serde_json::to_string_pretty(&json_out)?);
+        } else {
+            println!(
+                "Interactive 3D viewer opened in the default browser: {}",
+                out_path.display()
+            );
+        }
+        return Ok(());
     }
 
     config.validate()?;
@@ -377,6 +424,8 @@ pub fn execute_ui(args: UiArgs) -> anyhow::Result<()> {
         &scene,
         &args.scene.display().to_string(),
         &scene.statistics.clone(),
+        &crate::config::LightingConfig::default(),
+        "#252525",
     )?;
 
     let out_path = args.output.unwrap_or_else(|| {
@@ -638,6 +687,33 @@ fn encode_output(
         height: image.height,
         tiles: image.tiles,
     })
+}
+
+fn open_in_browser(path: &Path) -> anyhow::Result<()> {
+    #[cfg(target_os = "windows")]
+    {
+        let command = format!("start \"\" \"{}\"", path.display());
+        std::process::Command::new("cmd")
+            .arg("/C")
+            .arg(&command)
+            .spawn()
+            .with_context(|| format!("failed to open {} in the default browser", path.display()))?;
+    }
+    #[cfg(target_os = "macos")]
+    {
+        std::process::Command::new("open")
+            .arg(path)
+            .spawn()
+            .with_context(|| format!("failed to open {} in the default browser", path.display()))?;
+    }
+    #[cfg(target_os = "linux")]
+    {
+        std::process::Command::new("xdg-open")
+            .arg(path)
+            .spawn()
+            .with_context(|| format!("failed to open {} in the default browser", path.display()))?;
+    }
+    Ok(())
 }
 
 fn require_supported_scene(path: &Path) -> anyhow::Result<()> {
