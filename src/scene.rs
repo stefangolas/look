@@ -398,6 +398,7 @@ fn compile_step(
 }
 
 /// The single-part STEP compile tail: one geometry, one instance, unchanged.
+#[allow(clippy::too_many_arguments)]
 fn compile_step_flat(
     path: &Path,
     positions: Vec<[f32; 3]>,
