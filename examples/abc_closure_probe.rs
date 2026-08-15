@@ -19,6 +19,9 @@ fn face_surface_kind(surface: &Surface) -> &'static str {
             truck_stepio::r#in::step_geometry::ElementarySurface::ConicalSurface(_) => "cone",
             truck_stepio::r#in::step_geometry::ElementarySurface::Sphere(_) => "sphere",
             truck_stepio::r#in::step_geometry::ElementarySurface::ToroidalSurface(_) => "torus",
+            truck_stepio::r#in::step_geometry::ElementarySurface::DegenerateToroidalSurface(_) => {
+                "torus_degen"
+            }
         },
         Surface::BSplineSurface(_) => "bspline",
         Surface::NurbsSurface(_) => "nurbs",

@@ -25,6 +25,7 @@ fn surface_kind(surface: &Surface) -> &'static str {
             ElementarySurface::CylindricalSurface(_) => "cylinder",
             ElementarySurface::ToroidalSurface(_) => "torus",
             ElementarySurface::ConicalSurface(_) => "cone",
+            ElementarySurface::DegenerateToroidalSurface(_) => "torus_degen",
         },
         Surface::SweptCurve(_) => "swept",
         Surface::BSplineSurface(_) => "bspline",
