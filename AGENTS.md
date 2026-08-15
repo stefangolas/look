@@ -79,6 +79,41 @@ cargo test --release --test gpu_smoke -- --ignored --nocapture --test-threads=1
 Do not update golden images or performance claims solely to make a test pass.
 First explain changes in framing, color, alpha, output dimensions, or adapter.
 
+## Build modes: fast inner loop vs authoritative release
+
+There are two build modes and they answer different questions.
+
+**Fast inner loop** for edit-rebuild-run cycles. Uses the `quick` profile, which
+keeps dev semantics/assertions, optimizes at `opt-level = 2`, disables LTO, uses
+`codegen-units = 256`, and turns on incremental compilation. Artifacts land in
+`target/quick/`, separate from release.
+
+```console
+cargo qcheck                      # check --profile quick --locked
+cargo qbuild                      # build --profile quick --locked
+cargo qtest                       # test --profile quick --tests --locked
+cargo test --profile quick --lib <filter> --locked   # narrow kernel test
+```
+
+`qtest` uses `--tests`, so it does not compile the `examples/` probe collection
+on every dev-test run.
+
+**Authoritative release** for measured performance and regression work. Its
+profile (`lto="thin"`, `codegen-units=1`) is fixed; never weaken it.
+
+```console
+cargo build --release --locked
+```
+
+`target/quick/look.exe` must never be used for recorded performance numbers.
+Quick runtime is not comparable to release runtime; the two artifact paths make
+a mix-up visible, but only if you keep pointing scripts at `target/release/`.
+
+On this machine the active host is `x86_64-pc-windows-gnullvm`. Ordinary native
+builds must not pass `--target x86_64-pc-windows-gnullvm`: it is the host, and
+specifying it creates a separate Cargo target-artifact tree and doubles
+proc-macro compilation.
+
 ## Performance work
 
 Benchmark release builds. Retain raw samples and the hardware fingerprint from

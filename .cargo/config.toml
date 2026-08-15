@@ -83,6 +83,10 @@
 # Re-commented 2026-08-14 after FACE-LOCAL-CLOSURE landed (truck 09726a9e); the
 # pin in Cargo.toml now points at 09726a9e, so a clean clone builds WITH the
 # face-local synthetic boundary closure.
+# TEMP-ENABLED 2026-08-14 (BUILD-SPEED): uncommented to measure the Truck-edit
+# rebuild loop (L2) for the build-speed optimization session. Re-commented after
+# the session; the L2 numbers in BUILD_SPEEDUP_RESULTS.md were measured with the
+# override live against truck-fork 09726a9e (matching the Cargo.toml pin).
 # paths = [
 #     "../truck-fork/truck-base",
 #     "../truck-fork/truck-derivers",
@@ -94,3 +98,17 @@
 #     "../truck-fork/truck-stepio",
 #     "../truck-fork/truck-topology",
 # ]
+
+# FAST INNER LOOP aliases. These drive the `quick` profile (target/quick/),
+# the development artifact. Release builds stay `cargo build --release --locked`
+# and remain the authoritative artifact (target/release/look.exe).
+#
+#   cargo qcheck   -> check --profile quick --locked
+#   cargo qbuild   -> build --profile quick --locked
+#   cargo qtest    -> test --profile quick --tests --locked
+#
+# Narrow kernel test: cargo test --profile quick --lib <filter> --locked
+[alias]
+qcheck = "check --profile quick --locked"
+qbuild = "build --profile quick --locked"
+qtest = "test --profile quick --tests --locked"

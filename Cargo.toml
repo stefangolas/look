@@ -63,3 +63,21 @@ strip = "symbols"
 # `panic = "abort"`, so unwind (the default) is required for the containment to
 # work. A contained face failure is strictly safer than a process abort.
 panic = "unwind"
+
+# Quick: the development loop profile. Optimized for edit-rebuild-run wall
+# time, not authoritative runtime. `target/quick/look.exe` is a
+# development/debugging/focused-validation artifact and must never be used for
+# recorded performance numbers — those come from `target/release/look.exe`.
+#
+# Semantics: `inherits = "dev"` keeps debug assertions and the unwind
+# behavior PLANAR-C relies on. `opt-level = 2` keeps per-model runtime within
+# ~2.5x of release so focused validation stays usable. `lto = "off"` and
+# `codegen-units = 256` trade final-binary speed for high codegen parallelism;
+# `incremental = true` caches per-file codegen between edits.
+[profile.quick]
+inherits = "dev"
+opt-level = 2
+debug = false
+lto = "off"
+incremental = true
+codegen-units = 256

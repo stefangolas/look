@@ -308,12 +308,48 @@ methodological limits are in [benchmarks](docs/BENCHMARKS.md).
 
 ## Development
 
+Two build modes serve different purposes. Pick by what you are doing.
+
+### Fast inner loop (quick profile)
+
+The `quick` profile trades runtime for iteration speed. It keeps dev
+semantics/assertions, uses `opt-level = 2` so focused validation stays usable,
+and disables LTO with high codegen parallelism plus incremental compilation.
+It builds to `target/quick/`, a separate artifact tree from release.
+
+```console
+cargo qcheck                      # check --profile quick --locked
+cargo qbuild                      # build --profile quick --locked
+cargo qtest                       # test --profile quick --tests --locked
+cargo test --profile quick --lib <filter> --locked   # narrow kernel test
+```
+
+`qtest` uses `--tests`, so a routine dev-test run does not compile the many
+`examples/` probe binaries. Run a probe deliberately when you need it.
+
+### Authoritative release
+
+`target/release/look.exe` is the authoritative performance and regression
+artifact. Its semantics are fixed and measured.
+
+```console
+cargo build --release --locked
+```
+
+`target/quick/look.exe` must never be used for recorded performance numbers:
+quick runtime is not comparable to release runtime.
+
+### Full gate
+
 ```console
 cargo fmt --all -- --check
 cargo check --locked --all-targets
 cargo test --locked --all-targets
 cargo test --release --test gpu_smoke -- --ignored --nocapture --test-threads=1
 ```
+
+`cargo check --locked --all-targets` and `cargo test --locked --all-targets` use
+the default (debug) profile and cover the full target set, including the probes.
 
 See [architecture](docs/ARCHITECTURE.md), [cross-platform testing](docs/CROSS_PLATFORM_TESTING.md),
 and [AGENTS.md](AGENTS.md). GitHub Actions builds and smoke-tests release
