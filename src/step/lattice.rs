@@ -350,6 +350,13 @@ fn elementary_lattice(surface: &ElementarySurface) -> CertifiedLattice {
         // uncertified until the nested revolved representation is read
         // structurally.
         ElementarySurface::ToroidalSurface(_) => unevidenced_elementary(surface),
+
+        // A degenerate torus is `Processor<DegenerateTorus, Matrix4>`: the
+        // azimuth axis `u` is `2π`-periodic by construction, while the sheet
+        // axis `v` is a bounded interval and carries no period. The ordinary
+        // torus gets the same accessor-level lattice, so this stays consistent
+        // with its sibling rather than inventing a stronger witness.
+        ElementarySurface::DegenerateToroidalSurface(_) => unevidenced_elementary(surface),
     }
 }
 
@@ -425,6 +432,9 @@ pub fn support_schema_of(surface: &Surface) -> SupportSurfaceSchema {
             ElementarySurface::ConicalSurface(_) => unread("conical_surface"),
             ElementarySurface::Sphere(_) => unread("spherical_surface"),
             ElementarySurface::ToroidalSurface(_) => unread("toroidal_surface"),
+            ElementarySurface::DegenerateToroidalSurface(_) => {
+                unread("degenerate_toroidal_surface")
+            }
         },
         Surface::SweptCurve(_) => unread("swept_surface"),
         Surface::BSplineSurface(_) => unread("b_spline_surface"),
