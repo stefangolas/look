@@ -29,29 +29,29 @@ wgpu = "30.0"
 # branch, so a build is always reproducible. truck-assembly is the graph
 # resolver `Table::step_assy` builds; it must be pinned with the rest.
 ruststep = { git = "https://github.com/stefangolas/ruststep", rev = "67f1f7c" }
-truck-assembly = { git = "https://github.com/stefangolas/truck", rev = "ab3fac4facb50f04954cab4bbae6bc1005250656" }
-truck-meshalgo = { git = "https://github.com/stefangolas/truck", rev = "ab3fac4facb50f04954cab4bbae6bc1005250656" }
-truck-polymesh = { git = "https://github.com/stefangolas/truck", rev = "ab3fac4facb50f04954cab4bbae6bc1005250656" }
-truck-stepio = { git = "https://github.com/stefangolas/truck", rev = "ab3fac4facb50f04954cab4bbae6bc1005250656" }
-truck-topology = { git = "https://github.com/stefangolas/truck", rev = "ab3fac4facb50f04954cab4bbae6bc1005250656" }
+truck-assembly = { git = "https://github.com/stefangolas/truck", rev = "c5f4b6e9778e0721a1d446f10568eb5e5594e8ed" }
+truck-meshalgo = { git = "https://github.com/stefangolas/truck", rev = "c5f4b6e9778e0721a1d446f10568eb5e5594e8ed" }
+truck-polymesh = { git = "https://github.com/stefangolas/truck", rev = "c5f4b6e9778e0721a1d446f10568eb5e5594e8ed" }
+truck-stepio = { git = "https://github.com/stefangolas/truck", rev = "c5f4b6e9778e0721a1d446f10568eb5e5594e8ed" }
+truck-topology = { git = "https://github.com/stefangolas/truck", rev = "c5f4b6e9778e0721a1d446f10568eb5e5594e8ed" }
 
 [patch.crates-io]
 ruststep = { git = "https://github.com/stefangolas/ruststep", rev = "67f1f7c" }
-truck-assembly = { git = "https://github.com/stefangolas/truck", rev = "ab3fac4facb50f04954cab4bbae6bc1005250656" }
-truck-base = { git = "https://github.com/stefangolas/truck", rev = "ab3fac4facb50f04954cab4bbae6bc1005250656" }
-truck-derivers = { git = "https://github.com/stefangolas/truck", rev = "ab3fac4facb50f04954cab4bbae6bc1005250656" }
-truck-geometry = { git = "https://github.com/stefangolas/truck", rev = "ab3fac4facb50f04954cab4bbae6bc1005250656" }
-truck-geotrait = { git = "https://github.com/stefangolas/truck", rev = "ab3fac4facb50f04954cab4bbae6bc1005250656" }
-truck-meshalgo = { git = "https://github.com/stefangolas/truck", rev = "ab3fac4facb50f04954cab4bbae6bc1005250656" }
-truck-modeling = { git = "https://github.com/stefangolas/truck", rev = "ab3fac4facb50f04954cab4bbae6bc1005250656" }
-truck-polymesh = { git = "https://github.com/stefangolas/truck", rev = "ab3fac4facb50f04954cab4bbae6bc1005250656" }
-truck-stepio = { git = "https://github.com/stefangolas/truck", rev = "ab3fac4facb50f04954cab4bbae6bc1005250656" }
-truck-topology = { git = "https://github.com/stefangolas/truck", rev = "ab3fac4facb50f04954cab4bbae6bc1005250656" }
+truck-assembly = { git = "https://github.com/stefangolas/truck", rev = "c5f4b6e9778e0721a1d446f10568eb5e5594e8ed" }
+truck-base = { git = "https://github.com/stefangolas/truck", rev = "c5f4b6e9778e0721a1d446f10568eb5e5594e8ed" }
+truck-derivers = { git = "https://github.com/stefangolas/truck", rev = "c5f4b6e9778e0721a1d446f10568eb5e5594e8ed" }
+truck-geometry = { git = "https://github.com/stefangolas/truck", rev = "c5f4b6e9778e0721a1d446f10568eb5e5594e8ed" }
+truck-geotrait = { git = "https://github.com/stefangolas/truck", rev = "c5f4b6e9778e0721a1d446f10568eb5e5594e8ed" }
+truck-meshalgo = { git = "https://github.com/stefangolas/truck", rev = "c5f4b6e9778e0721a1d446f10568eb5e5594e8ed" }
+truck-modeling = { git = "https://github.com/stefangolas/truck", rev = "c5f4b6e9778e0721a1d446f10568eb5e5594e8ed" }
+truck-polymesh = { git = "https://github.com/stefangolas/truck", rev = "c5f4b6e9778e0721a1d446f10568eb5e5594e8ed" }
+truck-stepio = { git = "https://github.com/stefangolas/truck", rev = "c5f4b6e9778e0721a1d446f10568eb5e5594e8ed" }
+truck-topology = { git = "https://github.com/stefangolas/truck", rev = "c5f4b6e9778e0721a1d446f10568eb5e5594e8ed" }
 
 
 [dev-dependencies]
 tempfile = "3.20"
-truck-geometry = { git = "https://github.com/stefangolas/truck", rev = "ab3fac4facb50f04954cab4bbae6bc1005250656" }
+truck-geometry = { git = "https://github.com/stefangolas/truck", rev = "c5f4b6e9778e0721a1d446f10568eb5e5594e8ed" }
 
 [profile.release]
 lto = "thin"
