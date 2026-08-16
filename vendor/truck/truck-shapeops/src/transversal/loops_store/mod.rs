@@ -165,9 +165,12 @@ enum ParameterKind {
 
 impl ParameterKind {
     fn try_new(t: f64, (t0, t1): (f64, f64)) -> Option<ParameterKind> {
-        if t0.near(&t) {
+        let ctx = ToleranceCtx::unscaled_legacy();
+        if ctx.is_small_ratio(t0 - t) {
+            // BG-TOL-001: param
             Some(ParameterKind::Front)
-        } else if t1.near(&t) {
+        } else if ctx.is_small_ratio(t1 - t) {
+            // BG-TOL-001: param
             Some(ParameterKind::Back)
         } else if t0 < t && t < t1 {
             Some(ParameterKind::Inner(t))
@@ -415,6 +418,7 @@ where
     C: ParametricCurve3D + SearchNearestParameter<D1, Point = Point3>,
     S: ParametricSurface3D + SearchNearestParameter<D2, Point = Point3>,
 {
+    let ctx = ToleranceCtx::unscaled_legacy();
     if trials == 0 {
         return None;
     }
@@ -422,7 +426,10 @@ where
     let pt0 = curve.subs(t);
     let (u, v) = surface.search_nearest_parameter(point, surface_hint, 10)?;
     let pt1 = surface.subs(u, v);
-    if point.near(&pt0) && point.near(&pt1) && pt0.near(&pt1) {
+    if ctx.near_pt(point, pt0) && ctx.near_pt(point, pt1) // BG-TOL-001: model
+        && ctx.near_pt(pt0, pt1)
+    // BG-TOL-001: model
+    {
         Some((point, t, Point2::new(u, v)))
     } else {
         let l = curve.der(t);
@@ -475,6 +482,7 @@ where
         + From<IntersectionCurve<PolylineCurve, S, S>>,
     S: ParametricSurface3D + SearchNearestParameter<D2, Point = Point3>,
 {
+    let ctx = ToleranceCtx::unscaled_legacy();
     let mut geom_loops_store0: LoopsStore<_, _> = geom_shell0.face_iter().collect();
     let mut poly_loops_store0: LoopsStore<_, _> = poly_shell0.face_iter().collect();
     let mut geom_loops_store1: LoopsStore<_, _> = geom_shell1.face_iter().collect();
@@ -506,7 +514,8 @@ where
                     (false, true) => (status, status),
                     (false, false) => (status.not(), status),
                 };
-                if polyline.front().near(&polyline.back()) {
+                if ctx.near_pt(polyline.front(), polyline.back()) {
+                    // BG-TOL-001: model
                     let poly_wire = create_independent_loop(polyline);
                     poly_loops_store0[face_index0]
                         .add_independent_loop(BoundaryWire::new(poly_wire.clone(), status0));

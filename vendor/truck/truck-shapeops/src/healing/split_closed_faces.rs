@@ -176,18 +176,21 @@ where
         }
     };
     let create_pre_divisor = move |(wire, poly_wire): ZippedWire<'_>| {
+        let ctx = ToleranceCtx::unscaled_legacy();
         let (urange, vrange) = surface.try_range_tuple();
         let (up, vp) = (surface.u_period(), surface.v_period());
         let p = poly_wire[0][0];
         let q = *poly_wire.last().unwrap().last().unwrap();
-        let vertices: Vec<(usize, f64)> = if p.x.near(&q.x) {
+        let vertices: Vec<(usize, f64)> = if ctx.is_small_ratio(p.x - q.x) {
+            // BG-TOL-001: param
             if let (Some(vp), Some((v0, _))) = (vp, vrange) {
                 let closure = find_nearest_to_ends(1, v0, vp);
                 Some(wire.iter().zip(poly_wire).map(closure).collect())
             } else {
                 None
             }
-        } else if p.y.near(&q.y) {
+        } else if ctx.is_small_ratio(p.y - q.y) {
+            // BG-TOL-001: param
             if let (Some(up), Some((u0, _))) = (up, urange) {
                 let closure = find_nearest_to_ends(0, u0, up);
                 Some(wire.iter().zip(poly_wire).map(closure).collect())
@@ -351,6 +354,7 @@ fn intersections_between_line_polyline(
     line: Line<Point2>,
     param_edge: &PolylineCurve<Point2>,
 ) -> Vec<f64> {
+    let ctx = ToleranceCtx::unscaled_legacy();
     let filter = |p: &[Point2]| {
         let (s, t, _) = line.intersection(Line(p[0], p[1]))?;
         let unit = 0.0..1.0;
@@ -363,10 +367,12 @@ fn intersections_between_line_polyline(
     if !vec.is_empty() {
         let first = *param_edge.first().unwrap();
         let last = *param_edge.last().unwrap();
-        if line.distance_to_point(first).so_small() {
+        if ctx.is_small_ratio(line.distance_to_point(first)) {
+            // BG-TOL-001: param
             vec.remove(0);
         }
-        if line.distance_to_point(last).so_small() {
+        if ctx.is_small_ratio(line.distance_to_point(last)) {
+            // BG-TOL-001: param
             vec.pop();
         }
     }
@@ -403,6 +409,7 @@ where
     C: ParametricCurve3D + SearchNearestParameter<D1, Point = Point3>,
     S: ParametricSurface3D,
 {
+    let ctx = ToleranceCtx::unscaled_legacy();
     let mut previous0 = t0;
     let mut previous1 = None;
     for _ in 0..100 {
@@ -411,7 +418,8 @@ where
         let q = curve.subs(t1);
         t0 = pcurve.search_nearest_parameter(q, t0, 100)?;
         if let Some(previous1) = previous1 {
-            if previous0.near(&t0) && previous1.near(&t1) {
+            if ctx.is_small_ratio(previous0 - t0) && ctx.is_small_ratio(previous1 - t1) {
+                // BG-TOL-001: param
                 return Some((t0, t1, pcurve.subs(t0)));
             }
         }
@@ -603,6 +611,7 @@ fn get_mindiff(u: f64, u0: f64, up: f64) -> f64 {
 }
 
 fn boundary_into_domain<S: ParametricSurface3D>(vec: &mut Vec<Point2>, surface: &S) {
+    let ctx = ToleranceCtx::unscaled_legacy();
     let (up, vp) = (surface.u_period(), surface.v_period());
     let (urange, vrange) = surface.try_range_tuple();
     let grav = vec.iter().fold(Point2::origin(), |g, p| g + p.to_vec()) / vec.len() as f64;
@@ -615,9 +624,13 @@ fn boundary_into_domain<S: ParametricSurface3D>(vec: &mut Vec<Point2>, surface: 
         vec.iter_mut().for_each(|p| p.y -= quot * vp);
     }
     let last = *vec.last().unwrap();
-    if !vec[0].near(&last) {
+    if !ctx.is_small_ratio((vec[0] - last).magnitude()) {
+        // BG-TOL-001: param
         let Point2 { x: u0, y: v0 } = last;
-        if surface.uder(u0, v0).so_small() || surface.vder(u0, v0).so_small() {
+        if ctx.is_small_len(surface.uder(u0, v0).magnitude()) // BG-TOL-001: model
+            || ctx.is_small_len(surface.vder(u0, v0).magnitude())
+        // BG-TOL-001: model
+        {
             vec.push(vec[0]);
         }
     }
@@ -650,6 +663,7 @@ fn enumerate_vertices_on_divisor<S: ParametricSurface>(
     param_vertices: &HashMap<usize, Point2>,
     surface: &S,
 ) -> Option<Vec<(f64, (usize, Point2))>> {
+    let ctx = ToleranceCtx::unscaled_legacy();
     let (v0, v1) = divisor;
     let (p, q) = (*param_vertices.get(&v0)?, *param_vertices.get(&v1)?);
     let periods = (surface.u_period(), surface.v_period());
@@ -658,7 +672,9 @@ fn enumerate_vertices_on_divisor<S: ParametricSurface>(
     let line = Line(p, q);
     let iter = param_vertices.iter().filter_map(move |(v, uv)| {
         periodic_iterator(*uv, periods)
-            .find(move |uv| line.distance_to_point_as_segment(*uv).so_small())
+            .find(move |uv| {
+                ctx.is_small_ratio(line.distance_to_point_as_segment(*uv)) // BG-TOL-001: param
+            })
             .map(move |uv| Some((line.search_nearest_parameter(uv, None, 1)?, (*v, uv))))
     });
     let mut vertices_on_divisor = iter.collect::<Option<Vec<_>>>()?;
