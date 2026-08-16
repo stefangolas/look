@@ -38,6 +38,71 @@ def find_opencode_launcher():
     return None
 
 
+CREATE_BREAKAWAY_FROM_JOB = 0x01000000
+
+
+def spawn_detached(argv, events_log, err_log, env, slot_root, tag='worker'):
+    """Start a long-running process that outlives us and streams to a file.
+
+    Two things went wrong with the obvious `Popen(argv, stdout=fh,
+    creationflags=DETACHED_PROCESS)` and both are recorded here because both
+    presented as silence rather than as an error.
+
+    **The redirect has to happen inside cmd, not in Popen.** `opencode` is a
+    .cmd shim, so the process doing the real work is a *grandchild*. Handing
+    Popen a file object redirects the shim's own stdout -- the last run proved
+    that much, the file received cmd.exe's `Terminate batch job (Y/N)?` -- but
+    the worker's JSON never arrived, while seven source files were being edited
+    in the worktree. A `>` written into a command file binds the whole command
+    chain, grandchildren included. It also leaves the slot holding the exact
+    command line that was run, which is worth having when a dispatch misbehaves.
+
+    **DETACHED_PROCESS is what silenced the worker, and it was there to detach
+    it.** Measured across eight flag combinations against a counting child:
+    every combination containing DETACHED_PROCESS produced zero bytes, and every
+    combination without it streamed (80 bytes at 3s, 143 at 5s). A batch file
+    with no console apparently cannot get its own child's output to an inherited
+    handle. Whatever the mechanism, the flag that was supposed to make the
+    worker independent is the one that made it invisible -- and since liveness
+    is inferred from that stream, invisible means reaped as stalled.
+
+    What actually gives independence is CREATE_BREAKAWAY_FROM_JOB. A harness
+    that runs its tools inside a Windows job kills every process in that job
+    when the tool call ends, which is how a Ctrl-C in the orchestrator reached a
+    worker that was supposed to be fire-and-forget; DETACHED_PROCESS never
+    addressed that at all. CREATE_NO_WINDOW keeps it out of sight without
+    taking the console away. Not every job permits breakaway, so failure falls
+    back and says so: a worker that dies with its parent is worse than one that
+    survives, but better than no worker.
+    """
+    runner = slot_root / f'{tag}-cmd.bat'
+    # No argument the loop passes contains a double quote (the prompt is fixed
+    # text and the packet itself goes via PACKET.md), so quoting spaces is
+    # enough; a quote in an argument would need escaping and is refused above.
+    for a in argv:
+        if '"' in a:
+            raise ValueError(f"argument contains a double quote, which this launcher cannot quote: {a!r}")
+    quoted = ' '.join(f'"{a}"' if ' ' in a else a for a in argv)
+    runner.write_text(
+        "@echo off\r\n"
+        f'{quoted} > "{events_log}" 2> "{err_log}"\r\n',
+        encoding='utf-8')
+
+    flags = (CREATE_NO_WINDOW | subprocess.CREATE_NEW_PROCESS_GROUP
+             | CREATE_BREAKAWAY_FROM_JOB)
+    try:
+        proc = subprocess.Popen(['cmd.exe', '/c', str(runner)], env=env,
+                                creationflags=flags, close_fds=True)
+    except OSError:
+        print("warning: this job forbids breakaway; the worker will not outlive a "
+              "kill of its parent")
+        proc = subprocess.Popen(
+            ['cmd.exe', '/c', str(runner)], env=env,
+            creationflags=CREATE_NO_WINDOW | subprocess.CREATE_NEW_PROCESS_GROUP,
+            close_fds=True)
+    return proc.pid
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument('--slot', type=int, required=True)
@@ -137,31 +202,18 @@ def main():
     if not launcher:
         sys.exit("cannot find an opencode.cmd or opencode.exe to launch")
 
-    events_fh = open(events_log, 'wb')
-    err_fh = open(err_log, 'wb')
-
     # Fire and forget. A worker runs for tens of minutes; anything that waits
     # on it is a long-lived process of its own, and when that waiter was
     # killed it took the worker with it mid-run. The orchestrator polls
     # slot_status.py instead -- short calls, no parent to lose -- and that is
     # also where the stall check lives now.
-    #
-    # DETACHED_PROCESS + CREATE_NEW_PROCESS_GROUP: the worker gets its own
-    # console and process group, so it is not a child of this Python process
-    # in any sense that matters -- this process exiting (or being killed) does
-    # not touch it.
-    proc = subprocess.Popen(
+    worker_pid = spawn_detached(
         [launcher, 'run', '--dir', str(wt), '-m', args.model, '--format', 'json', '--auto', packet_text],
-        stdout=events_fh, stderr=err_fh, env=env,
-        creationflags=subprocess.DETACHED_PROCESS | subprocess.CREATE_NEW_PROCESS_GROUP,
-        close_fds=True,
-    )
-    events_fh.close()
-    err_fh.close()
+        events_log, err_log, env, slot_root)
 
-    (slot_root / 'worker.pid').write_text(str(proc.pid), encoding='ascii')
+    (slot_root / 'worker.pid').write_text(str(worker_pid), encoding='ascii')
     (slot_root / 'worker.packet').write_text(args.packet, encoding='ascii')
-    print(f"started pid {proc.pid}; poll with loop/slot_status.py")
+    print(f"started pid {worker_pid}; poll with loop/slot_status.py")
     sys.exit(0)
 
 
