@@ -2,7 +2,8 @@
 
 Rewritten at the end of every session; the state above "Quick reference" is
 capped at ~120 lines, and the reference below it is stable and does not count
-against that. If you are picking this up cold, read **this file, then run
+against that. If you are picking this up cold, read **this file, then
+[`loop/ORCHESTRATOR.md`](ORCHESTRATOR.md) for how to run the loop, then
 `python loop/slot_status.py`** — nothing else. Do not read `LEDGER.jsonl` whole.
 
 Updated 2026-08-16, end of session 2. Branch: `integration/kernel-bg`. Nothing
@@ -42,11 +43,37 @@ here is scored, tuned, or sampled.
 
 ## Where we are
 
-The harness works end to end. Two packets have been dispatched to deepseek v4
-flash through opencode; **BG-S0-003 came back DONE and is in verification**,
-**BG-S0-002 is running in slot 0**. Session 2 was spent almost entirely on
-harness defects, every one of which was found by running a real packet through
-it rather than by reading the scripts.
+The harness works end to end and one contract is discharged through it.
+**BG-S0-003 was accepted on all nine gates and is merged** (`c8acab6`), the
+first packet to go the whole way. **BG-S0-002 was still running in slot 0 when
+session 2 ended** — see "Pick up here" below, that is the first thing to do.
+
+Session 2 was spent almost entirely on harness defects. Every one was found by
+running a real packet through the loop, none by reading the scripts. The worker
+got its packet right on the first attempt; six verification runs failed on the
+verifier and the dispatcher.
+
+## Pick up here
+
+1. `python loop/slot_status.py`. **Slot 0 holds a live worker on BG-S0-002**
+   (pid recorded in `loop/slots/0/worker.pid`), about 90 minutes in with 8 files
+   changed when session 2 ended. Three cases:
+   - **FINISHED** (RESULT.json present) — verify it:
+     `python loop/verify.py --slot 0 --packet loop/packets/BG-S0-002.md --base <the slot's fork point>`.
+     Pass `--base` explicitly; the default merge-base is wrong now that the
+     branch has moved. Then follow ORCHESTRATOR.md's verdict handling.
+   - **STALLED** — `python loop/slot_status.py --kill-stalled`, then
+     `python loop/run_packet.py --slot 0 --packet loop/packets/BG-S0-002.md --reset`.
+   - **RUNNING** — leave it and poll.
+2. When BG-S0-002 lands it releases `truck-base/src/evidence.rs` and unblocks
+   **BG-EVD-r3**, which is the neck of the entire graph.
+
+**`run_packet.py`'s detached launch has not been exercised end to end** — it was
+ported from working PowerShell and reviewed line by line, but no real dispatch
+has gone through the Python path yet, and the detach mechanism is precisely what
+failed twice in session 2 (a `.ps1` shim Start-Process could not run, then an
+8191-character command line). If the first dispatch produces an empty
+`events.jsonl` and an immediate exit, look there first, not at the worker.
 
 ## Landed
 
@@ -56,10 +83,14 @@ it rather than by reading the scripts.
 | `fddc62a` | vendored crates are workspace members — without this `cargo test -p <crate>` (V5) cannot run at all |
 | `65450b3` `ca22bc4` `a5660c3` | loop scaffolding, first packets, the 56-packet DAG |
 | `b06a535` | three baseline clippy defects fixed (see "the baseline is not clean" below) |
-| `ed35879` `e927384` `da1b174` `978b902` `d1f9c5b` | the verifier and dispatcher, made to actually work |
+| `ed35879` `e927384` `da1b174` `978b902` `d1f9c5b` `8dca941` | the verifier and dispatcher, made to actually work |
+| `c8acab6` | **BG-S0-003** — the first packet through the whole loop |
+| `4cc5aca` | harness ported to stdlib-only Python; the four `.ps1` scripts are gone |
 
-Contracts discharged: **BG-S0-001** only. It remains the reference answer every
-mechanical packet copies.
+Contracts discharged: **BG-S0-001** and **BG-S0-003**. BG-S0-001 remains the
+reference answer every mechanical packet copies; BG-S0-003 is the reference for
+what a completed packet run looks like end to end (`loop/packets/BG-S0-003.md`,
+`loop/results/BG-S0-003.json`, and its `LEDGER.jsonl` row).
 
 ## The commands
 
@@ -86,18 +117,16 @@ bash-shaped tools can drive it; the four `.ps1` scripts it replaced are gone.
 
 ## Next actions, in order
 
-1. Finish verifying BG-S0-003 in slot 1, then merge `packet/BG-S0-003` into
-   `integration/kernel-bg` and write the first `LEDGER.jsonl` row.
-2. Same for BG-S0-002 in slot 0 when it lands.
-3. **BG-EVD-r3** — design class, so Claude writes it, not deepseek. `Modulus`
-   becomes a struct with `domain` + shape-derived `is_subadditive` and a
-   `propagate` recurrence; `Refusal` gains `ForwardToleranceExceeded`;
-   `ModulusShape` gains `Pole`. It is the neck of the whole graph: everything
-   in W2 onward types against it. It cannot start until BG-S0-002 releases
-   `truck-base/src/evidence.rs`.
-4. Split the `truck-topology/src/**` shard of BG-TOL-001 by module. As one
+1. Land BG-S0-002 from slot 0 — see "Pick up here" above.
+2. **BG-EVD-r3** — design class, so the orchestrator writes it, not the worker
+   model. `Modulus` becomes a struct with `domain` + shape-derived
+   `is_subadditive` and a `propagate` recurrence; `Refusal` gains
+   `ForwardToleranceExceeded`; `ModulusShape` gains `Pole`. It is the neck of
+   the whole graph: everything in W2 onward types against it. It cannot start
+   until BG-S0-002 releases `truck-base/src/evidence.rs`.
+3. Split the `truck-topology/src/**` shard of BG-TOL-001 by module. As one
    packet it single-handedly blocks all eight BG-INV checkers.
-5. Write `gen_packet.py`, which must re-run every anchor's `rg` at generation
+4. Write `gen_packet.py`, which must re-run every anchor's `rg` at generation
    time and refuse to emit on a count mismatch.
 
 ## The parallelism picture
