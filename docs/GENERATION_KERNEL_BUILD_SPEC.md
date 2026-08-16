@@ -122,14 +122,24 @@ differential oracle can serve. A gated item without a margin sweep is not done.
 
 ## 1. Stage 0 — free wins
 
-Land first; independent of everything else. ~250 LOC total.
+Land first; independent of everything else. ~250 LOC total. BG-S0-001 is
+closed; BG-S0-002 and BG-S0-003 remain.
 
-### BG-S0-001 — `IncludeCurve` on `IntersectionCurve` must not abort
+### BG-S0-001 — ~~`IncludeCurve` on `IntersectionCurve` must not abort~~ DONE
 
-**Fixes** audit F-9.
+**Closed 2026-08-16**, landed in `da72cd5`. `Surface::include` returns
+`Outcome<bool>`, the sampling path lives in `include_intersection_curve`, the
+`ssi-carrier` and `leader-witness` certificates are emitted as specified, and
+`boolean_derived_face_consistency_returns` is the regression test.
+
+**The anchor below now yields 0 hits and is retained only as history** — under
+H-8 a count mismatch is a stop condition, so a work packet generated from the
+original text correctly halts on its first command rather than patching
+something else. See BG-S0-003 for the one site that remains.
+
+**Fixed** audit F-9.
 **Anchor** `truck-modeling/src/geometry.rs`, inside `impl IncludeCurve<Curve> for Surface`.
-**Locate** `rg -n 'Curve::IntersectionCurve\(_\) => unimplemented!\(\)' truck-modeling/src/geometry.rs` — **expect 6 hits** in that impl (a 7th lives in `impl ToSameGeometry<Surface> for ExtrudedCurve<Curve, Vector3>`; that one is the extrude case, handled separately below).
-**If the count differs, stop** — the code has moved on and this item needs re-scoping.
+**Located by** `rg -n 'Curve::IntersectionCurve\(_\) => unimplemented!\(\)' truck-modeling/src/geometry.rs` — **was 6 hits**, now 0.
 
 **Problem.** `Surface::include(curve)` is `unimplemented!()` for
 `Curve::IntersectionCurve` at six sites. `IntersectionCurve` is the variant
@@ -197,6 +207,47 @@ outcome naming at least the stage that failed.
 **Tests.** Radius > face curvature; contact curve running off the trimmed
 domain; fillet at a chart pole. All three must return, not abort. Assert the
 process survives — `catch_unwind` in the test asserting it was *not* needed.
+
+### BG-S0-003 — the extrude case BG-S0-001 left behind
+
+**Fixes** the residual of audit F-9. Split out of BG-S0-001 on 2026-08-16: that
+item's text said a 7th site "lives in `impl ToSameGeometry<Surface> for
+ExtrudedCurve<Curve, Vector3>`; that one is the extrude case, handled separately
+below" — and then never handled it below. It is still an abort.
+
+**Anchor** `truck-modeling/src/geometry.rs`, inside
+`impl ToSameGeometry<Surface> for ExtrudedCurve<Curve, Vector3>`, fn
+`to_same_geometry`.
+**Locate** `rg -n 'IntersectionCurve\(_\), Curve::IntersectionCurve\(_\)\) => unimplemented!' truck-modeling/src/geometry.rs` — **expect 1 hit**.
+**If the count differs, stop.**
+
+**Problem.** Extruding an `IntersectionCurve` — the variant Booleans produce —
+along a vector aborts the process. Extruding a Boolean result's edge is an
+ordinary modelling operation, so this is reachable from untrusted geometry and
+violates H-1.
+
+**Algorithm.** The pair arm is reached when *both* rail curves are intersection
+curves. There is no exact surface for the general case, so this is a refusal,
+not a construction:
+
+```
+to_same_geometry(self) -> Outcome<Surface>
+  (IntersectionCurve(_), IntersectionCurve(_)) ->
+      UnsupportedEnvelope(ExtrudedIntersectionCurve)
+```
+
+Note the signature change: `to_same_geometry` currently returns `Surface`, so
+this item carries the `Outcome` conversion for that trait (H-2) and its call
+sites — the same mechanical shape BG-S0-001 applied to `include`. Use that
+landed diff as the template; it is the reference answer for this exact move.
+
+**Contract BG-S0-003.** No `ExtrudedCurve` input reaches a panic.
+
+**Tests.**
+- Unit: extruding an ISC-railed curve returns `UnsupportedEnvelope`, not a
+  panic. `catch_unwind` asserting it was **not** needed.
+- Unit: every non-ISC pair still produces the surface it produced before,
+  bit-identically — this item must be semantically inert everywhere else.
 
 ---
 
@@ -1407,8 +1458,8 @@ is actually tested, and they are invisible to a clean corpus.
 Strict dependency order. Items on the same line are parallelisable.
 
 ```
-0.  P-1 .. P-6                               BEFORE ANY CODE (see §8)
-1.  BG-S0-001, BG-S0-002                     Stage 0, land immediately
+0.  P-1 .. P-6                               DONE (see §8)
+1.  BG-S0-002, BG-S0-003                     Stage 0; BG-S0-001 landed 2026-08-16
 2.  BG-EVD-001                               everything below returns Outcome
 3.  BG-TOL-001                               every signature below takes ctx
 4.  BG-CE-001, BG-CE-003, BG-CE-006          one breaking data-model release
