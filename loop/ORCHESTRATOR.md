@@ -100,6 +100,18 @@ answer the question only in the packet and leave the spec wrong.
 - **Anchors are `rg` patterns, never line numbers** (H-8), and a count mismatch
   is a stop condition. Re-run every anchor when you write a packet; the spec
   goes stale invisibly and has done so already.
+- **Every git command is `git -C <path>`, never a bare `git` after a `cd`.**
+  With four worktrees live a shell's cwd drifts, and a `commit --amend` in the
+  wrong worktree silently rewrites another branch's history. Session 5 came one
+  lucky coincidence away from doing exactly that.
+- **Bring a packet branch up to date by rebasing, never by merging integration
+  into it.** Every gate measures `base...HEAD`, so a merge drags the
+  orchestration commits into the packet's own diff and V1 rejects the packet for
+  files the orchestrator changed, not the worker.
+- **A worker's `RESULT.json` rides into the integration branch on merge.** Delete
+  it from the repo root after merging and keep the filed copy in
+  `loop/results/<ID>.json`; otherwise the next packet's V1 sees a stray file its
+  worker never wrote.
 - **Never run a bare `cargo test`** — it builds 56 examples. Always
   `-p <crate> --lib --tests`.
 - **Scheduling is on write-set disjointness, not waves.** Two packets can be
