@@ -201,21 +201,40 @@ if (-not $failedEarly) {
         Add-Gate 'V3 lint' 'FAIL' "cargo fmt --check failed; see out.txt"
         $failedEarly = $true
     } else {
-        Write-OutSection 'V3 lint: cargo clippy -D warnings'
+        # Diff-scoped, for the same reason kernel-gates.sh is: the vendored tree
+        # is nowhere near clippy-clean. truck-meshalgo alone carries ~93 lints
+        # and truck-modeling's own geometry.rs trips borrowed_box on a line
+        # BG-S0-001 landed. A whole-crate `-D warnings` gate therefore fails on
+        # every packet regardless of its work, which is the same as no gate --
+        # it cannot tell a worker's defect from the baseline's.
+        #
+        # So: no `-D warnings` (other crates' lints stay warnings and do not
+        # abort the run before ours is linted), --message-format=short for one
+        # greppable `path:line:col: level: msg` per finding, and a FAIL only
+        # when a finding names a file this packet actually changed.
+        Write-OutSection 'V3 lint: cargo clippy (diff-scoped)'
+        $lenBefore = (Get-Item $outFile).Length
         Push-Location $wt
         try {
-            # `--` written literally on a command line is eaten by PowerShell's
-            # end-of-parameters rule, so clippy would receive `-D warnings` as
-            # its own arguments and cargo would reject them. Splatting an array
-            # passes the separator through untouched.
-            $clippyArgs = @('cargo', 'clippy') + $pArgs + @('--all-targets', '--', '-D', 'warnings')
-            $clippyExit = Invoke-Native @clippyArgs
+            $clippyArgs = @('cargo', 'clippy') + $pArgs + @('--all-targets', '--message-format=short')
+            $null = Invoke-Native @clippyArgs
         } finally { Pop-Location }
-        if ($clippyExit -eq 0) {
-            Add-Gate 'V3 lint' 'PASS'
-        } else {
-            Add-Gate 'V3 lint' 'FAIL' "cargo clippy exit $clippyExit; see out.txt"
+
+        $clippyText = (Get-Content -Path $outFile -Raw)
+        if ($clippyText.Length -gt $lenBefore) { $clippyText = $clippyText.Substring($lenBefore) }
+        $changedSet = @($changed | ForEach-Object { ($_ -replace '\\', '/').ToLowerInvariant() })
+        $ourFindings = @()
+        foreach ($line in ($clippyText -split "\r?\n")) {
+            if ($line -notmatch '^(.+?):\d+:\d+:\s+(error|warning)') { continue }
+            $path = ($Matches[1] -replace '\\', '/').ToLowerInvariant()
+            if ($changedSet | Where-Object { $path.EndsWith($_) }) { $ourFindings += $line }
+        }
+
+        if ($ourFindings.Count -gt 0) {
+            Add-Gate 'V3 lint' 'FAIL' ("clippy findings in changed files: " + (($ourFindings | Select-Object -First 5) -join ' ; '))
             $failedEarly = $true
+        } else {
+            Add-Gate 'V3 lint' 'PASS' 'fmt clean; no clippy finding in any changed file'
         }
     }
 } else {
