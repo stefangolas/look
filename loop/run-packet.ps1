@@ -11,6 +11,7 @@ param(
     [Parameter(Mandatory)] [string]$Packet,
     [string]$Model = 'deepseek/deepseek-v4-flash',
     [int]$StallMinutes = 12,
+    [switch]$Reset,
     [switch]$DryRun
 )
 
@@ -27,6 +28,33 @@ if (-not (Test-Path $wt)) {
 }
 if (-not (Test-Path $Packet)) {
     throw "packet not found: $Packet"
+}
+
+# A worker that died mid-packet (V0 preflight: BLOCKED) leaves edits in the
+# worktree, and dispatching on top of them mixes a dead run's work into a live
+# one's diff. -Reset clears the slot, but never silently: the abandoned work is
+# written to a patch beside the slot first, because a run that got far enough to
+# edit files is evidence about the packet even when it is not usable code.
+# Deciding to discard work stays an explicit act, which is why this is a switch
+# and not the default.
+$dirty = @(git -C $wt status --porcelain |
+    Where-Object { $_ -ne '' -and $_ -notmatch '(?i)\s(PACKET\.md|worker\.(pid|err|packet))$' })
+
+if ($dirty.Count -gt 0) {
+    if (-not $Reset) {
+        throw ("slot $Slot has $($dirty.Count) uncommitted change(s) from an earlier run. " +
+               "Inspect them, or pass -Reset to archive and discard them before dispatching.")
+    }
+    $stamp   = (Get-Date).ToString('yyyyMMdd-HHmmss')
+    $archive = Join-Path $slotRoot "abandoned-$stamp.patch"
+    git -C $wt diff HEAD | Set-Content -Path $archive -Encoding utf8
+    $untracked = @(git -C $wt ls-files --others --exclude-standard)
+    if ($untracked.Count -gt 0) {
+        Add-Content -Path $archive -Value ("`n# untracked, not captured above:`n# " + ($untracked -join "`n# "))
+    }
+    Write-Host ("archived $($dirty.Count) abandoned change(s) to $archive")
+    git -C $wt reset --hard HEAD | Out-Null
+    git -C $wt clean -fd -e PACKET.md | Out-Null
 }
 
 # The packet is copied into the worktree and the prompt points at it, rather

@@ -1,8 +1,9 @@
 # Autobuild loop — STATE
 
-Rewritten at the end of every session. Capped at ~120 lines. If you are picking
-this up cold, read **this file, then run `loop\slot-status.ps1`** — nothing
-else. Do not read `LEDGER.jsonl` whole.
+Rewritten at the end of every session; the state above "Quick reference" is
+capped at ~120 lines, and the reference below it is stable and does not count
+against that. If you are picking this up cold, read **this file, then run
+`loop\slot-status.ps1`** — nothing else. Do not read `LEDGER.jsonl` whole.
 
 Updated 2026-08-16, end of session 2. Branch: `integration/kernel-bg`. Nothing
 from the loop has reached `main` and nothing has been pushed.
@@ -147,6 +148,48 @@ dependencies — are the binding constraint.
 - **CI gates are still vacuous.** `kernel-gates.sh` is diff-scoped and
   `origin/main` has no `vendor/truck/`, so CI passes on nothing. Packet
   verification is unaffected — its baseline is the branch tip.
+
+## Quick reference — enough to write and judge a packet without another file
+
+A packet is one markdown file whose YAML front block the verifier parses. Only
+these fields are read mechanically; everything else in the file is prose aimed
+at the worker.
+
+```yaml
+id:          BG-XX-000                     # contract item, one per packet
+class:       mechanical | design | wide-mechanical
+crates:      [truck-geometry, truck-base]  # cargo package names, not paths
+write_allow:                               # repo-relative; V1 fails on anything else
+  - vendor/truck/truck-geometry/src/specifieds/cone.rs
+read_allow:  [...]                         # advisory; not enforced
+tests_required:                            # V6 matches these against the diff
+  - cone_apex_refuses
+budget:      {turns: 40, ctx_tokens: 100000}
+```
+
+The prose sections that make a packet work, in the order they earn their keep:
+**Problem** (one paragraph, why this is reachable from untrusted geometry);
+**Anchors** (a table of `rg` patterns with exact expected counts, verified the
+day the packet is written — H-8); **decisions already made for you** (every
+judgement you can pre-make, so the worker churns rather than designs);
+**Template** (the nearest landed diff to copy — BG-S0-001's work in
+`truck-modeling/src/geometry.rs` is the house pattern); **Tests required**;
+**Done when** (the exact commands); **Forbidden**; **Stop conditions**
+(`ANCHOR_MISMATCH`, `SPEC_GAP`, `BLOCKED`) and the `RESULT.json` shape.
+
+The gates, in the order `verify.ps1` runs them:
+
+| gate | asks |
+|---|---|
+| V0 preflight | did the run finish at all — commit past base, clean tree, RESULT.json |
+| V1 scope | is every changed file in `write_allow` |
+| V2 build | `cargo check --locked -p <crates>` |
+| V3 lint | `cargo fmt --check`, then clippy findings **on the added lines only** |
+| V4 house rules | `scripts/kernel-gates.sh <base>` — H-1/H-3/H-4, diff-scoped |
+| V5 tests | `cargo test -p <crates> --lib --tests`; never a bare `cargo test` |
+| V6 test-reality | does every `tests_required` name appear as a real test fn in the diff |
+| V7 mutation | stub — always passes |
+| V8 no-regression | stub — always passes |
 
 ## Open questions
 
