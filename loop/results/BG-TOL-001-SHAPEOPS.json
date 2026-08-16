@@ -1,0 +1,20 @@
+{
+  "id": "BG-TOL-001-SHAPEOPS",
+  "status": "DONE",
+  "contracts": [
+    "BG-TOL-001"
+  ],
+  "tests_added": 2,
+  "sites_migrated": 16,
+  "unscaled_legacy_calls": 11,
+  "anchors_verified": {
+    "A1": 3,
+    "A2": 8,
+    "A3": 4,
+    "A4": 1,
+    "A5": 2
+  },
+  "notes": "unscaled_legacy_calls: 12, one ToleranceCtx::unscaled_legacy() per function/closure containing at least one site (ceiling is 20; 11 of the 12 are live, the 12th is inside commented-out text, see the 615 note). Anchors: rg is not on PATH on this machine, so counts were made with case-sensitive Select-String, which is equivalent to rg -c for the patterns used. A1=3, A2=8 (lines; line 620 carries two predicates), A3=4 (lines; line 425 carries three), A4=1, A6=1 (>=1). A5=2 counts the two `TOLERANCE` tokens on the single quantization line (polyline_construction/mod.rs:32, `pt.add_element_wise(TOLERANCE) / (2.0 * TOLERANCE)`), which is the reading the packet's out-of-scope item 2 documents ('This is why A5 expects 2'); the file contains no other TOLERANCE token and it is unchanged. Site 615 (fillet/mod.rs `!r0.near(&radius.subs(t0))`, class `model`) sits inside the `/* ... */` block comment enclosing the prototype `fillet_faces` (lines 497-658); it was migrated exactly as the site table requires (to `ctx.is_small_len(r0 - radius.subs(t0))` with a `// BG-TOL-001: model` marker, and a matching `let ctx = ...` inside that commented closure) so that sites_migrated is 17 as specified; it is comment text only and cannot affect the build. Existing tests whose behaviour moved: none. The two known pre-existing failures were confirmed at the base commit (HEAD 37a0503) before any edits and fail identically afterwards: tests::fillet::complex_surface (assertion `left == right`, left: Irregular, right: Closed, at tests/fillet.rs:417) and healing::tests::step_import (panics reading missing STEP data file at healing/tests.rs:1567, Os code 3 NotFound). `cargo test -p truck-shapeops --tests --no-fail-fast`: lib 20 passed / 1 failed (step_import), tests/fillet.rs 5 passed / 1 failed (complex_surface), tolerance_migration 2 passed. The Euclidean vs componentwise difference of near_pt did not perturb any passing test. Marking: every migrated site carries a `// BG-TOL-001: model`/`param` marker; rustfmt moves a trailing marker to its own line after `{` at several if-sites, so a marker sometimes sits on the line below its predicate; the count-equality test defined by the packet (predicate lines vs marker lines per file) passes on the formatted source, which is what the packet pins. H-3: no bare absolute literal added in kernel sources; the test file's literal lines carry `// H-3` comments naming the quantity. Cargo.toml does not set autotests=false, so tests/tolerance_migration.rs is picked up automatically (verified). Verification: cargo fmt --check -p truck-shapeops, cargo clippy -p truck-shapeops --all-targets --no-deps -- -D warnings, cargo test -p truck-shapeops --lib --test tolerance_migration --no-fail-fast, and cargo check --workspace --all-targets all pass apart from the two documented pre-existing test failures above.",
+  "amended_by": "orchestrator",
+  "amendment": "The packet's site table listed fillet/mod.rs:615 as a live site. It is not: lines 500-662 of that file are a /* */ block comment. The worker migrated it as instructed, said so plainly in its notes, and was right on both counts -- the packet was wrong and the orchestrator's anchor check counted the commented line. The orchestrator reverted that one hunk, so the file's two live sites are migrated and its dead text is untouched. sites_migrated goes 17 -> 16 and unscaled_legacy_calls 12 -> 11, which also removes a phantom the GATE-4 ratchet was counting, since git grep sees comment text."
+}
