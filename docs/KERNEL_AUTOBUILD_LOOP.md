@@ -373,15 +373,18 @@ exhaust the machine on the first wave.
 
 | item | size | note |
 |---|---:|---|
-| 3 × slot `CARGO_TARGET_DIR` | **7.5 GB** | budget 2.5 GB each. Measured reference: the repo's full `target/debug` is 3.9 GB, `target/quick` 0.67 GB; slots run `--profile quick`, `CARGO_INCREMENTAL=0`, `-p <crate>` scoped |
+| 3 × slot `CARGO_TARGET_DIR` | **2.7 GB** | **measured 2026-08-16**: slot 0 warmed with `cargo check --workspace --all-targets` under `CARGO_INCREMENTAL=0` is **0.90 GB in 1.2 min**, against the 2.5 GB / 20 min this table originally budgeted. The estimate was built from `target/debug` (3.9 GB), which carries codegen a check build never does. |
 | 3 × slot worktree source | **0.8 GB** | repo excl. `target/` is 386 MB; `git worktree` shares the object store, so this is working files only |
 | shared `~/.cargo/registry` | 1.5 GB | already present, not additional |
 | free-space floor (§7 rule 5) | **8 GB** | the orchestrator refuses to dispatch below this |
-| | **≈ 16.5 GB free required at start** | |
+| | **≈ 11.7 GB free required at start** | |
 
-Free space at design time: **19 GB**. That is nominally enough and practically
-not — the janitor would be firing on the first wave and the floor would trip
-mid-W4. §7.2 is therefore a precondition, not housekeeping.
+Free space at design time was **19 GB** and the first estimate put the
+requirement at 16.5 GB — nominally enough, practically not. Both numbers moved
+after §7.2 ran and slot 0 was measured: **43.9 GB free against a 11.7 GB
+requirement.** Disk has stopped being the binding constraint, and the cheap warm
+build (1.2 min) means a fourth slot is affordable if API throughput justifies
+it.
 
 ### 7.2 Reclaimed 2026-08-16 — **executed: 18.9 GB → 43.9 GB free (25.0 GB)**
 

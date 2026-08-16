@@ -1,0 +1,1 @@
+Non-DONE packet outputs land here, one file per packet: what was attempted, the exact ambiguity, and the readings the worker could not choose between. The arbiter turn reads this directory and amends the spec.

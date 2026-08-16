@@ -1,0 +1,3 @@
+{"id":"BG-S0-002","wave":"W1","class":"mechanical","status":"READY","depends_on":[],"crates":["truck-shapeops","truck-geometry"],"packet":"loop/packets/BG-S0-002.md","anchors_verified":"2026-08-16"}
+{"id":"BG-S0-003","wave":"W1","class":"mechanical","status":"SPECD","depends_on":[],"crates":["truck-modeling"],"packet":null,"anchors_verified":"2026-08-16"}
+{"id":"BG-EVD-r3","wave":"W0b","class":"design","status":"SPECD","depends_on":[],"crates":["truck-base"],"packet":null,"note":"Claude, not deepseek; blocks W2 onward"}
