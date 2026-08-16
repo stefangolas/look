@@ -608,7 +608,6 @@ where
     let mut prev_edge: Option<Edge<Point3, C>> = None;
     let mut prev_radius: Option<f64> = None;
     let closure = |(edge, &Fcte { side0, side1 }): (&Edge<Point3, C>, _)| {
-        let ctx = ToleranceCtx::unscaled_legacy();
         let curve = edge.oriented_curve();
         let range = curve.range_tuple();
         let surface0 = side0.oriented_surface();
@@ -616,7 +615,7 @@ where
 
         if let Some(r0) = prev_radius {
             let (t0, t1) = curve.range_tuple();
-            if !ctx.is_small_len(r0 - radius.subs(t0)) { // BG-TOL-001: model
+            if !r0.near(&radius.subs(t0)) {
                 return None;
             }
             prev_radius = Some(radius.subs(t1));
