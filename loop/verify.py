@@ -432,11 +432,35 @@ def main():
             # for one greppable `path:line:col: level: msg` per finding, and a
             # FAIL only when a finding names a file this packet actually
             # changed.
-            v.write_out_section('V3 lint: cargo clippy (diff-scoped)')
+            # --no-deps is load-bearing, not tidiness. The vendored crates are
+            # workspace path dependencies, so without it clippy lints them too
+            # -- and truck-meshalgo fails with 93 denied lints, which means
+            # cargo gives up before it ever reaches the packet's own crate.
+            # BG-S0-002 passed V3 that way: the run died in truck-modeling and
+            # truck-geometry, truck-shapeops was never linted at all, and an
+            # unused import the diff introduced went unseen until an editor
+            # pointed at it. This is the same shape as V5's fail-fast bug --
+            # a gate reporting PASS on something it never looked at.
+            v.write_out_section('V3 lint: cargo clippy (diff-scoped, --no-deps)')
             len_before = v.out_file.stat().st_size
-            v.invoke_native(['cargo', 'clippy', *p_args, '--all-targets', '--message-format=short'], v.wt)
+            v.invoke_native(['cargo', 'clippy', *p_args, '--all-targets',
+                             '--message-format=short', '--no-deps'], v.wt)
 
             clippy_text = v.out_file.read_bytes()[len_before:].decode('utf-8', errors='replace')
+
+            # Coverage, checked before findings: if clippy could not build a
+            # crate this packet owns, "no findings" means "nothing was looked
+            # at". A gate that cannot see must not report PASS.
+            unlinted = [c for c in crate_names
+                        if re.search(r'could not compile `' + re.escape(c) + '`', clippy_text)]
+            # A packet may also change a file in a crate it did not name, which
+            # -p never reaches. V1 allows it, so V3 has to notice it.
+            changed_crates = set()
+            for f in changed:
+                cm = re.match(r'vendor/truck/([^/]+)/', f.replace('\\', '/'))
+                if cm:
+                    changed_crates.add(cm.group(1))
+            unnamed = sorted(changed_crates - set(crate_names))
 
             # Scoped to added lines, not merely to touched files: a packet
             # that edits a file inheriting a lint would otherwise be rejected
@@ -468,11 +492,22 @@ def main():
                         our_findings.append(line)
                         break
 
-            if our_findings:
+            if unlinted or unnamed:
+                why = []
+                if unlinted:
+                    why.append("clippy could not build " + ', '.join(unlinted)
+                               + ", so findings in it were never produced")
+                if unnamed:
+                    why.append("packet changed " + ', '.join(unnamed)
+                               + " but does not name it in `crates`, so clippy never linted it")
+                v.add_gate('V3 lint', 'FAIL', '; '.join(why))
+                v.failed_early = True
+            elif our_findings:
                 v.add_gate('V3 lint', 'FAIL', "clippy findings in changed files: " + ' ; '.join(our_findings[:5]))
                 v.failed_early = True
             else:
-                v.add_gate('V3 lint', 'PASS', 'fmt clean; no clippy finding in any changed file')
+                v.add_gate('V3 lint', 'PASS',
+                           f"fmt clean; {', '.join(crate_names)} linted, no finding on any added line")
     else:
         v.add_gate('V3 lint', 'SKIP', 'earlier gate failed')
 

@@ -1,6 +1,6 @@
 use derive_more::From;
 use itertools::Itertools;
-use truck_base::evidence::{Certified, EnvelopeCase, Refusal, UnresolvedWitness};
+use truck_base::evidence::{Refusal, UnresolvedWitness};
 use truck_geometry::prelude::*;
 use truck_meshalgo::prelude::*;
 use truck_shapeops::fillet::*;
