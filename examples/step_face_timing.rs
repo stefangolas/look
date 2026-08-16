@@ -161,7 +161,14 @@ fn time_face_extent(
     tolerance: f64,
     policy: MeshingPolicy,
     closure_map: &HashMap<u64, look::step::lattice::SplineAxisClosure>,
-) -> (f64, String, usize, &'static str, usize, Option<(f64, f64, f64, f64, f64, f64)>) {
+) -> (
+    f64,
+    String,
+    usize,
+    &'static str,
+    usize,
+    Option<(f64, f64, f64, f64, f64, f64)>,
+) {
     let one = single_face_shell(shell, index);
     let kind = surface_kind(&shell.faces[index].surface);
     let bounds = shell.faces[index].boundaries.len();
@@ -334,12 +341,20 @@ fn trace_edges(face_id: u64, shell: &Cshell, index: usize, tolerance: f64) {
                 SourceEdgeTraversal::CanonicalByEvalRange { range } => {
                     let t1 = Instant::now();
                     let poly = PolylineCurve::from_curve(curve, *range, tolerance);
-                    (poly.len() as usize, t1.elapsed().as_secs_f64() * 1000.0, "eval_range")
+                    (
+                        poly.len() as usize,
+                        t1.elapsed().as_secs_f64() * 1000.0,
+                        "eval_range",
+                    )
                 }
                 SourceEdgeTraversal::CanonicalBySourceInterval { traversal, .. } => {
                     let t1 = Instant::now();
                     let poly = source_edge::sample_traversal(curve, traversal, tolerance);
-                    (poly.len() as usize, t1.elapsed().as_secs_f64() * 1000.0, "source_interval")
+                    (
+                        poly.len() as usize,
+                        t1.elapsed().as_secs_f64() * 1000.0,
+                        "source_interval",
+                    )
                 }
                 SourceEdgeTraversal::Unresolved { reason } => (0, 0.0, *reason),
             };
@@ -368,9 +383,7 @@ fn probe_pcurve(
     let wrapped = policy_geometry::wrap_shell_with_closure(one, policy, closure_map);
     let surface = &wrapped.faces[0].surface;
     let (urange, vrange) = surface.try_range_tuple();
-    eprintln!(
-        "PCURVE\tface={face_id}\tdeclared_urange={urange:?}\tdeclared_vrange={vrange:?}"
-    );
+    eprintln!("PCURVE\tface={face_id}\tdeclared_urange={urange:?}\tdeclared_vrange={vrange:?}");
     let (Some((u0, u1)), Some((v0, v1))) = (urange, vrange) else {
         eprintln!("PCURVE\tface={face_id}\tNO_RECT");
         return;
@@ -396,18 +409,11 @@ fn probe_pcurve(
             }
         }
     }
-    let corners = [
-        (u0, v0),
-        (u1, v0),
-        (u1, v1),
-        (u0, v1),
-    ];
+    let corners = [(u0, v0), (u1, v0), (u1, v1), (u0, v1)];
     for (i, from) in all.iter().enumerate().step_by(4).take(16) {
         let (steps, ms) = walk(*from, corners[0]);
         if steps > 4 {
-            eprintln!(
-                "PCURVE\tface={face_id}\tfrom_pt={i}->corner00\tsteps={steps}\tms={ms:.2}"
-            );
+            eprintln!("PCURVE\tface={face_id}\tfrom_pt={i}->corner00\tsteps={steps}\tms={ms:.2}");
         }
     }
     // Rectangle-edge walks, in both directions, plus endpoint-to-each-corner.
@@ -422,7 +428,10 @@ fn probe_pcurve(
     }
     // The open piece's endpoints: the pair across the big seam gap.
     let mut best = (0usize, 0.0f64);
-    for (from, to) in [(all[0], *all.last().unwrap()), (*all.last().unwrap(), all[0])] {
+    for (from, to) in [
+        (all[0], *all.last().unwrap()),
+        (*all.last().unwrap(), all[0]),
+    ] {
         let (steps, ms) = walk(from, to);
         if steps > best.0 {
             best = (steps, ms);
@@ -479,7 +488,9 @@ fn main() -> anyhow::Result<()> {
         }
     }
     if models.is_empty() {
-        anyhow::bail!("usage: step_face_timing MODEL.step [--faces id1,id2,..] [--budget SECS] [--top N]");
+        anyhow::bail!(
+            "usage: step_face_timing MODEL.step [--faces id1,id2,..] [--budget SECS] [--top N]"
+        );
     }
 
     let model = &models[0];
@@ -543,11 +554,10 @@ fn main() -> anyhow::Result<()> {
         };
         let mut lost = 0usize;
         for (&shell_id, shell) in table.shell.iter() {
-            let (converted, losses) =
-                match table.to_compressed_shell_with_losses(shell_id, shell) {
-                    Ok(res) => res,
-                    Err(_) => continue,
-                };
+            let (converted, losses) = match table.to_compressed_shell_with_losses(shell_id, shell) {
+                Ok(res) => res,
+                Err(_) => continue,
+            };
             for loss in &losses {
                 let face_def = loss.provenance.definition_id.map(|v| v.get());
                 let kind = face_def
@@ -567,12 +577,11 @@ fn main() -> anyhow::Result<()> {
                     });
                 eprintln!(
                     "LOST\tface={}\tshell={shell_id}\ttag={}\tsurface_kind={kind}\tsurface_entity={}",
-                    loss.provenance
-                        .best_id()
-                        .map(|v| v.get())
-                        .unwrap_or(0),
+                    loss.provenance.best_id().map(|v| v.get()).unwrap_or(0),
                     loss.reason.tag(),
-                    surface_entity.map(|e| e.to_string()).unwrap_or_else(|| "none".into())
+                    surface_entity
+                        .map(|e| e.to_string())
+                        .unwrap_or_else(|| "none".into())
                 );
             }
         }
@@ -610,7 +619,8 @@ fn main() -> anyhow::Result<()> {
                 .collect::<Vec<_>>();
             eprintln!(
                 "ASSY_NODE\t#{i}\tname='{}'\tshells={:?}",
-                node.entity().attrs.name, ids
+                node.entity().attrs.name,
+                ids
             );
         }
         return Ok(());
@@ -682,7 +692,10 @@ fn main() -> anyhow::Result<()> {
                         probe_pcurve(*id, &shells[s], f, tolerance, policy, &closure_map);
                         continue;
                     }
-                    eprintln!("BEGIN\tface={id}\tshell={s}\tidx={f}\tt_ms={:.1}", pass_started.elapsed().as_secs_f64() * 1000.0);
+                    eprintln!(
+                        "BEGIN\tface={id}\tshell={s}\tidx={f}\tt_ms={:.1}",
+                        pass_started.elapsed().as_secs_f64() * 1000.0
+                    );
                     if extent_flag {
                         let (ms, outcome, tris, kind, bounds, ext) =
                             time_face_extent(&shells[s], f, tolerance, policy, &closure_map);
@@ -691,8 +704,11 @@ fn main() -> anyhow::Result<()> {
                         );
                         records.push((*id, s, f, ms, outcome, tris, kind, bounds));
                     } else {
-                        let (ms, outcome, tris, kind, bounds) = time_face(&shells[s], f, tolerance, policy, &closure_map);
-                        eprintln!("END\tface={id}\tshell={s}\tidx={f}\telapsed_ms={ms:.2}\toutcome={outcome}\ttris={tris}");
+                        let (ms, outcome, tris, kind, bounds) =
+                            time_face(&shells[s], f, tolerance, policy, &closure_map);
+                        eprintln!(
+                            "END\tface={id}\tshell={s}\tidx={f}\telapsed_ms={ms:.2}\toutcome={outcome}\ttris={tris}"
+                        );
                         records.push((*id, s, f, ms, outcome, tris, kind, bounds));
                     }
                 }
@@ -720,7 +736,8 @@ fn main() -> anyhow::Result<()> {
                     "BEGIN\tface={id:?}\tshell={s}\tidx={f}\tt_ms={:.1}",
                     pass_started.elapsed().as_secs_f64() * 1000.0
                 );
-                let (ms, outcome, tris, kind, bounds) = time_face(&shells[s], f, tolerance, policy, &closure_map);
+                let (ms, outcome, tris, kind, bounds) =
+                    time_face(&shells[s], f, tolerance, policy, &closure_map);
                 eprintln!(
                     "END\tface={id:?}\tshell={s}\tidx={f}\telapsed_ms={ms:.2}\toutcome={outcome}\ttris={tris}\tkind={kind}\tbounds={bounds}"
                 );
@@ -791,7 +808,12 @@ fn main() -> anyhow::Result<()> {
     }
     impl Default for KindStat {
         fn default() -> Self {
-            Self { samples: Vec::new(), ms: 0.0, tris: 0, failures: 0 }
+            Self {
+                samples: Vec::new(),
+                ms: 0.0,
+                tris: 0,
+                failures: 0,
+            }
         }
     }
     let mut by_kind: HashMap<&'static str, KindStat> = HashMap::new();
@@ -809,7 +831,11 @@ fn main() -> anyhow::Result<()> {
         stat.samples
             .sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
     }
-    kinds.sort_by(|a, b| b.1.ms.partial_cmp(&a.1.ms).unwrap_or(std::cmp::Ordering::Equal));
+    kinds.sort_by(|a, b| {
+        b.1.ms
+            .partial_cmp(&a.1.ms)
+            .unwrap_or(std::cmp::Ordering::Equal)
+    });
     let quantile = |sorted: &[f64], q: f64| -> f64 {
         if sorted.is_empty() {
             return 0.0;
@@ -820,8 +846,17 @@ fn main() -> anyhow::Result<()> {
     eprintln!("BY_KIND");
     eprintln!(
         "HEAD\t{:<12} {:>6} {:>11} {:>7} {:>10} {:>10} {:>10} {:>10} {:>10} {:>9} {:>6}",
-        "kind", "faces", "total_ms", "share", "us/face", "med_us", "p95_us", "max_us", "tris",
-        "us/tri", "fail"
+        "kind",
+        "faces",
+        "total_ms",
+        "share",
+        "us/face",
+        "med_us",
+        "p95_us",
+        "max_us",
+        "tris",
+        "us/tri",
+        "fail"
     );
     for (kind, stat) in &kinds {
         let count = stat.samples.len().max(1);

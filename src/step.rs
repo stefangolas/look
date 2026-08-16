@@ -774,9 +774,24 @@ fn parse_step_table_assembly(
             anyhow::anyhow!("a STEP assembly edge transform is degenerate: {error}")
         })?;
     }
+    // The node keeps only its source shell ids. Truck's node shape also carries
+    // the converted `CompressedSolid`, but Look never reads it — every shell is
+    // re-converted from the table below, for the declared-face count and the
+    // DIAG-002 loss stream that conversion emits. Mapping to the ids alone
+    // keeps `Dag::map` from deep copying every solid in the assembly, vertices
+    // and curves and surfaces, to be dropped unread.
     let mapped = assy.map(
         |node: &NodeEntity<Vec<ProductShape>, PartAttrs>| NodeEntity {
-            shape: node.shape.clone(),
+            shape: node
+                .shape
+                .iter()
+                .filter_map(|shape| match shape {
+                    ProductShape::Solid(_, ids) | ProductShape::Shells(_, ids) => Some(ids),
+                    ProductShape::Matrix(_) => None,
+                })
+                .flatten()
+                .copied()
+                .collect::<Vec<u64>>(),
             attrs: node.attrs.clone(),
         },
         |edge: &EdgeEntity<NodeMatrix, PartAttrs>| EdgeEntity {
@@ -791,24 +806,22 @@ fn parse_step_table_assembly(
     let mut definition_shells = Vec::with_capacity(mapped.len());
     for node in mapped.all_nodes() {
         node_names.push(node.entity().attrs.name.clone());
-        let ids = node
-            .shape()
-            .iter()
-            .filter_map(|shape| match shape {
-                ProductShape::Solid(_, ids) | ProductShape::Shells(_, ids) => Some(ids),
-                ProductShape::Matrix(_) => None,
-            })
-            .flatten()
-            .copied()
-            .collect::<Vec<_>>();
-        definition_shells.push(ids);
+        definition_shells.push(node.shape().clone());
     }
 
-    let tasks = definition_shells
+    // One task per *unique* shell. Two definition nodes that name the same
+    // source shell are the same geometry both times, so converting and meshing
+    // it twice is duplicated work; the per-definition flatten below still
+    // appends it once per definition, so every soup and every tally is what it
+    // was. Only the conversion warnings and the DIAG-002 records change: a
+    // shell that fails now reports once, for the one conversion that ran.
+    let mut tasks = definition_shells
         .iter()
-        .enumerate()
-        .flat_map(|(definition, ids)| ids.iter().map(move |&shell_id| (definition, shell_id)))
-        .collect::<Vec<_>>();
+        .flatten()
+        .copied()
+        .collect::<Vec<u64>>();
+    tasks.sort_unstable();
+    tasks.dedup();
     if tasks.is_empty() {
         anyhow::bail!("STEP assembly declares occurrences but no definition geometry");
     }
@@ -820,9 +833,9 @@ fn parse_step_table_assembly(
     let mesh_started = Instant::now();
     let converted = tasks
         .par_iter()
-        .map(|&(definition, shell_id)| {
+        .map(|&shell_id| {
             convert_definition_shell(&table, shell_id)
-                .map(|(declared, shell)| (definition, declared, shell))
+                .map(|(declared, shell)| (shell_id, declared, shell))
         })
         .collect::<Vec<_>>();
 
@@ -831,7 +844,7 @@ fn parse_step_table_assembly(
     let mut converted_ok = Vec::with_capacity(converted.len());
     for entry in converted {
         match entry {
-            Ok((definition, declared, shell)) => {
+            Ok((shell_id, declared, shell)) => {
                 for vertex in &shell.vertices {
                     model.push(*vertex);
                 }
@@ -842,7 +855,7 @@ fn parse_step_table_assembly(
                         model.push(edge.curve.subs(t));
                     }
                 }
-                converted_ok.push((definition, declared, shell));
+                converted_ok.push((shell_id, declared, shell));
             }
             Err(error) => eprintln!("warning: {error}"),
         }
@@ -850,15 +863,17 @@ fn parse_step_table_assembly(
     let tolerance = model_tolerance(model.diameter());
     let policy = meshing_policy::MeshingPolicy::DEFAULT;
 
+    // Keyed by source shell id: the flatten below looks each definition's
+    // shells up directly, instead of rescanning every mesh once per definition.
     let meshed = converted_ok
         .into_par_iter()
-        .map(|(definition, declared, shell)| {
+        .map(|(shell_id, declared, shell)| {
             (
-                definition,
+                shell_id,
                 mesh_shell(declared, shell, tolerance, &closure_map, policy),
             )
         })
-        .collect::<Vec<_>>();
+        .collect::<HashMap<_, _>>();
     timings.record("step_tessellate", mesh_started.elapsed());
 
     // Flatten per definition, attaching face colours exactly as the flat path
@@ -883,10 +898,7 @@ fn parse_step_table_assembly(
         let mut positions = Vec::new();
         let mut indices = Vec::new();
         let mut colors = Vec::new();
-        for (_, mesh) in meshed
-            .iter()
-            .filter(|(node_index, _)| *node_index == definition_index)
-        {
+        for mesh in ids.iter().filter_map(|shell_id| meshed.get(shell_id)) {
             match mesh {
                 Ok(mesh) => {
                     for (provenance, polygon) in &mesh.faces {
