@@ -82,24 +82,16 @@ if (-not $launcher) {
     throw "cannot find an opencode.cmd or opencode.exe to launch (Get-Command opencode resolves to a .ps1 shim, which Start-Process cannot run)"
 }
 
-$proc = Start-Process -FilePath $launcher -PassThru -NoNewWindow `
+$proc = Start-Process -FilePath $launcher -PassThru -WindowStyle Hidden `
     -ArgumentList @('run', '--dir', $wt, '-m', $Model, '--format', 'json', '--auto', $packetText) `
     -RedirectStandardOutput $eventsLog -RedirectStandardError $errLog
 
-$stall = New-TimeSpan -Minutes $StallMinutes
-$lastLen = -1
-$lastMove = Get-Date
-while (-not $proc.HasExited) {
-    Start-Sleep -Seconds 20
-    $len = if (Test-Path $eventsLog) { (Get-Item $eventsLog).Length } else { 0 }
-    if ($len -ne $lastLen) {
-        $lastLen = $len
-        $lastMove = Get-Date
-    } elseif ((Get-Date) - $lastMove -gt $stall) {
-        Write-Host ("STALLED: no worker output for {0} min; killing pid {1}" -f $StallMinutes, $proc.Id)
-        Stop-Process -Id $proc.Id -Force -ErrorAction SilentlyContinue
-        exit 75   # EX_TEMPFAIL: retryable, distinct from the worker's own codes
-    }
-}
-
-exit $proc.ExitCode
+# Fire and forget. A worker runs for tens of minutes; anything that waits on it
+# is a long-lived process of its own, and when that waiter was killed it took
+# the worker with it mid-run. The orchestrator polls slot-status.ps1 instead --
+# short calls, no parent to lose -- and that is also where the stall check
+# lives now.
+Set-Content -Path (Join-Path $slotRoot 'worker.pid') -Value $proc.Id -Encoding ascii
+Set-Content -Path (Join-Path $slotRoot 'worker.packet') -Value $Packet -Encoding ascii
+Write-Host ("started pid {0}; poll with loop\slot-status.ps1" -f $proc.Id)
+exit 0
