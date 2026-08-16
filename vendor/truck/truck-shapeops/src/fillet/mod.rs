@@ -221,6 +221,12 @@ where
     PCurve<BSplineCurve<Point2>, S>: ToSameGeometry<C>,
     ApproxFilletSurface<S, S>: ToSameGeometry<S>,
 {
+    // H-5: the refinement loop inside `approx_rolling_ball_fillet` historically
+    // ran sixteen passes; this caller has no budget of its own, so fund exactly
+    // that many subdivisions. The Newton and depth counters are unused on this
+    // path.
+    let mut budget = Budget::new(16, 16, 16);
+
     let is_filleted_edge = move |edge: &Edge<Point3, C>| edge.id() == filleted_edge_id;
     let filleted_edge = face0
         .edge_iter()
@@ -287,7 +293,8 @@ where
     };
 
     let fillet_surface =
-        ApproxFilletSurface::approx_rolling_ball_fillet(&strict_surface, vrange, tol)?.value;
+        ApproxFilletSurface::approx_rolling_ball_fillet(&strict_surface, vrange, tol, &mut budget)?
+            .value;
 
     let (new_face0, fillet_edge0, (front_der0, back_der0)) = {
         let contact_curve = fillet_surface.side_pcurve0().to_same_geometry();
