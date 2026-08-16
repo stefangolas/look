@@ -501,6 +501,19 @@ discharged by the second**:
   context inward, deleting `unscaled_legacy()` calls as they go. This is what
   actually discharges BG-TOL-001 and BG-TOL-002.
 
+**Squared-order sites are out of Stage A's scope.** `near2` and `so_small2`
+compare against `TOLERANCE2 = TOLERANCE²  = 1e-12`, and `ToleranceCtx` has no
+squared-order predicate — `tau_rep` is first order and nothing on the type
+reproduces `1e-12`. There are **23 such sites** across the vendored tree
+(`rg -c '\.near2\(|\.so_small2\(|TOLERANCE2' vendor/truck`, 2026-08-16), and a
+shard that mapped them onto `tau_rep` would loosen every one of them by six
+orders of magnitude while appearing to migrate them. A shard therefore leaves
+them exactly as they are and marks each `FIXME(BG-TOL-001): squared order`.
+Deciding what a squared-order tolerance means in a scale-relative system — is
+it `(tau_rep · scale)²`, a distinct `tau` , or a squared-distance comparison
+that should have been a first-order one on the distance — is design work and is
+**BG-TOL-004**, which does not block any shard.
+
 `unscaled_legacy()` is a scaffold and is the obvious way to leave the job half
 done, so it is **ratcheted, not trusted**: `scripts/kernel-gates.sh` counts its
 occurrences against a recorded ceiling and fails when the count rises. The
