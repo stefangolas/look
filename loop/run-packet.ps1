@@ -29,9 +29,18 @@ if (-not (Test-Path $Packet)) {
     throw "packet not found: $Packet"
 }
 
-# The packet is passed as the literal prompt text, per S2 - the worker never
-# reads PACKETS.jsonl or the build spec, only this one file (S3a).
-$packetText = Get-Content -Path $Packet -Raw
+# The packet is copied into the worktree and the prompt points at it, rather
+# than being passed as the prompt itself (S2). A packet is ~9 KB and the
+# launcher is a .cmd shim, whose command line dies at 8191 characters with
+# "The command line is too long" -- which arrives as an empty event stream, not
+# as an error the worker can report. Handing over a file also leaves the slot
+# holding an exact record of what its worker was given.
+#
+# The worker still reads only this one file: not PACKETS.jsonl, not the build
+# spec (S3a).
+$packetCopy = Join-Path $wt 'PACKET.md'
+Copy-Item -Path $Packet -Destination $packetCopy -Force
+$packetText = "Read the file PACKET.md in the root of this repository and carry out the work packet it describes, exactly and completely. It is self-contained: do not read any other specification file. Follow its stop conditions, and finish by writing RESULT.json as it instructs."
 
 if ($DryRun) {
     Write-Host "DRY RUN -- would execute:"
@@ -60,7 +69,20 @@ Write-Host ("Running packet '{0}' in slot {1} (model={2})..." -f $Packet, $Slot,
 # from CPU time, since both are mostly waiting on the model.
 if (Test-Path $eventsLog) { Remove-Item -Force $eventsLog }
 $errLog = Join-Path $slotRoot "worker.err"
-$proc = Start-Process -FilePath 'opencode' -PassThru -NoNewWindow `
+
+# `opencode` on this machine is an npm shim (opencode.ps1 / opencode.cmd), not
+# an exe, so Start-Process cannot launch it directly -- it reports "%1 is not a
+# valid Win32 application". Prefer the .cmd shim, which is a real process
+# Windows can start and whose exit code propagates.
+$launcher = (Get-Command 'opencode.cmd' -ErrorAction SilentlyContinue).Source
+if (-not $launcher) {
+    $launcher = (Get-Command 'opencode.exe' -ErrorAction SilentlyContinue).Source
+}
+if (-not $launcher) {
+    throw "cannot find an opencode.cmd or opencode.exe to launch (Get-Command opencode resolves to a .ps1 shim, which Start-Process cannot run)"
+}
+
+$proc = Start-Process -FilePath $launcher -PassThru -NoNewWindow `
     -ArgumentList @('run', '--dir', $wt, '-m', $Model, '--format', 'json', '--auto', $packetText) `
     -RedirectStandardOutput $eventsLog -RedirectStandardError $errLog
 

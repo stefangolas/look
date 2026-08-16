@@ -157,7 +157,7 @@ $changed = @(git -C $wt diff --name-only "$Base...HEAD" | Where-Object { $_ -ne 
 # write_allow entries are repo-relative, the same form `git diff --name-only`
 # prints, so they compare directly once separators are normalised. RESULT.json
 # is the packet's own required output and is always in scope.
-$allowedRel = @(@($pkt.write_allow | ForEach-Object { ($_ -replace '\\', '/').Trim() }) + 'RESULT.json' + 'QUESTION.md')
+$allowedRel = @(@($pkt.write_allow | ForEach-Object { ($_ -replace '\\', '/').Trim() }) + 'RESULT.json' + 'QUESTION.md' + 'PACKET.md')
 
 $offenders = @($changed | Where-Object { ($_ -replace '\\', '/') -notin $allowedRel })
 
@@ -222,12 +222,36 @@ if (-not $failedEarly) {
 
         $clippyText = (Get-Content -Path $outFile -Raw)
         if ($clippyText.Length -gt $lenBefore) { $clippyText = $clippyText.Substring($lenBefore) }
-        $changedSet = @($changed | ForEach-Object { ($_ -replace '\\', '/').ToLowerInvariant() })
+
+        # Scoped to added lines, not merely to touched files: a packet that
+        # edits a file inheriting a lint would otherwise be rejected for its
+        # predecessor's work. BG-S0-003 was, on geometry.rs:294 -- a borrowed_box
+        # BG-S0-001 wrote and this packet never looked at.
+        $addedLines = @{}
+        foreach ($f in $changed) {
+            $key = ($f -replace '\\', '/').ToLowerInvariant()
+            $set = New-Object System.Collections.Generic.HashSet[int]
+            foreach ($h in (git -C $wt diff -U0 "$Base...HEAD" -- $f)) {
+                if ($h -match '^@@ -\S+ \+(\d+)(?:,(\d+))? @@') {
+                    $start = [int]$Matches[1]
+                    $count = if ($Matches[2]) { [int]$Matches[2] } else { 1 }
+                    for ($i = 0; $i -lt $count; $i++) { $null = $set.Add($start + $i) }
+                }
+            }
+            $addedLines[$key] = $set
+        }
+
         $ourFindings = @()
         foreach ($line in ($clippyText -split "\r?\n")) {
-            if ($line -notmatch '^(.+?):\d+:\d+:\s+(error|warning)') { continue }
+            if ($line -notmatch '^(.+?):(\d+):\d+:\s+(error|warning)') { continue }
             $path = ($Matches[1] -replace '\\', '/').ToLowerInvariant()
-            if ($changedSet | Where-Object { $path.EndsWith($_) }) { $ourFindings += $line }
+            $lineNo = [int]$Matches[2]
+            foreach ($key in $addedLines.Keys) {
+                if ($path.EndsWith($key) -and $addedLines[$key].Contains($lineNo)) {
+                    $ourFindings += $line
+                    break
+                }
+            }
         }
 
         if ($ourFindings.Count -gt 0) {
