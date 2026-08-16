@@ -48,15 +48,17 @@ here is scored, tuned, or sampled.
 
 ## Where we are
 
-**Seven contracts discharged**: BG-S0-001, BG-S0-002, BG-S0-003, BG-EVD-r3,
-BG-TOL-001-TYPE, BG-TOL-001-TYPE-r2, BG-NUM-001-FILLET. 7 of 58 packets.
+**Eight contracts discharged**: BG-S0-001, BG-S0-002, BG-S0-003, BG-EVD-r3,
+BG-TOL-001-TYPE, BG-TOL-001-TYPE-r2, BG-NUM-001-FILLET, BG-TOL-001-SHAPEOPS.
+8 of 58 packets.
 
-**The real state of BG-TOL-001 is lower than the packet count suggests.** The
-type exists and the scaffold exists; **0 of 184 call sites are migrated.** The
-first shard is running now. Two of the seven "discharged" items are partial
-against their contract: BG-NUM-001-FILLET budgeted 1 of the 14 unbounded loops
-the spec names, and the two BG-TOL-001 items built machinery and migrated
-nothing.
+**The real state of BG-TOL-001 is lower than the packet count suggests.**
+**16 sites migrated, 221 to go** (`python loop/census_tol_sites.py` is the
+burndown — truck-shapeops now reads 4 where it read 21). And Stage A does not
+fix anything on its own: all 16 still carry the legacy absolute epsilon, and
+GATE-4 is holding 11 scaffold calls at a ceiling that must reach zero.
+BG-NUM-001-FILLET is likewise partial — 1 of the 14 unbounded loops the spec
+names.
 
 Session 6 landed two contracts, fixed two gates, and **amended the spec twice —
 both times because writing a packet exposed something the spec had not decided.**
@@ -67,18 +69,13 @@ went DONE → ACCEPTED → merged in one attempt, one verify run, no amendment.
 ## Pick up here
 
 1. `python loop/slot_status.py`, then the last 3 rows of `LEDGER.jsonl`.
-2. **Slot 3 holds BG-TOL-001-SHAPEOPS, dispatched and unverified.** Verify with
-   `--base 37a0503` or whatever `git -C loop/slots/3/wt merge-base HEAD
-   integration/kernel-bg` reports. It is the **first Stage-A migration shard and
-   the template for six more**, so read its diff yourself even if it is
-   ACCEPTED — V7 and V8 are still stubs and this is the packet whose conventions
-   the other six inherit.
-3. **When it lands, lower the ceiling.** `scripts/unscaled_legacy_ceiling.txt`
-   is at **20** as a budget for that shard. Set it to the actual count from the
-   merged tree (`git grep -oh 'unscaled_legacy(' HEAD -- 'vendor/truck/*/src/*'
-   ':(exclude)vendor/truck/truck-base/src/tolerance.rs' | wc -l`) in its own
-   commit. A ceiling left at a budget is not a ratchet.
-4. **Then write the other six shards**, copying BG-TOL-001-SHAPEOPS. Size them
+2. **All four slots are idle and the frontier is clear.** BG-TOL-001-SHAPEOPS
+   merged at `d26cefb`; the ratchet ceiling is at its true value of 11.
+3. **Write the next shard. MODELING is the one to write**: 11 sites, and the
+   crate is small enough that a flaw in the Stage-A convention surfaces cheaply.
+   Copy `loop/packets/BG-TOL-001-SHAPEOPS.md` exactly — it is the template, and
+   it went DONE → ACCEPTED on its first verify run.
+4. **Then write the other five shards**, copying BG-TOL-001-SHAPEOPS. Size them
    with `python loop/census_tol_sites.py`, **not** with a raw grep — see the
    census note below. **Pre-make every model/param judgement yourself**; that is
    the whole value of a shard and it needs someone who reads the surrounding
@@ -232,6 +229,18 @@ reason is in the commit that made the change, and the code will not tell you.
 - **`truck_base::evidence`, not `truck_evidence`** — the module lives in
   truck-base to avoid a geotrait→evidence cycle.
 
+- **Dead text looks exactly like live code, and it reached a packet.** The
+  SHAPEOPS site table listed `fillet/mod.rs:615`, which sits inside a `/* */`
+  block spanning lines 500–662. The worker migrated a comment, as instructed,
+  and said so plainly — it was right and the packet was wrong. `git grep` and
+  the census both counted it, and GATE-4 counted the resulting phantom scaffold
+  call. The census now skips `/* */`; **a module declared out with a commented
+  `mod` statement still slips through** (`experiment.rs`, 5 sites), because
+  detecting that needs the declaration, not the file. Check the `mod` statement
+  before putting a file in a write set.
+- **A ceiling left at its dispatch budget is a licence, not a ratchet.**
+  GATE-4's ceiling was raised to 20 to dispatch SHAPEOPS and lowered to the
+  true 11 in the same session. Lower it in the commit that closes the packet.
 - **A raw grep for tolerance sites is off by 3x, in both directions.**
   `python loop/census_tol_sites.py` splits them: **238 production predicates**,
   plus 66 doc-comment examples, 4 `#[strategy = TOLERANCE..]` test-input bounds,
