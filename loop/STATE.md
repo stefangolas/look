@@ -1,12 +1,17 @@
 # Autobuild loop — STATE
 
-Rewritten at the end of every session; the state above "Quick reference" is
-capped at ~120 lines, and the reference below it is stable and does not count
-against that. If you are picking this up cold, read **this file, then
+Rewritten at the end of every session. The **volatile** part — everything from
+"Where we are" through "The parallelism picture" — is capped at ~120 lines and
+must be rewritten each time. "Traps" and everything below it is **stable and
+accumulates**: entries are added when something costs a session and removed only
+when they stop being true, never for length. (The old header claimed the cap
+covered everything above "Quick reference"; it never did, and pretending
+otherwise would eventually cost a trap.) If you are picking this up cold, read
+**this file, then
 [`loop/ORCHESTRATOR.md`](ORCHESTRATOR.md) for how to run the loop, then
 `python loop/slot_status.py`** — nothing else. Do not read `LEDGER.jsonl` whole.
 
-Updated 2026-08-16, end of session 3. Branch: `integration/kernel-bg`. Nothing
+Updated 2026-08-16, end of session 6. Branch: `integration/kernel-bg`. Nothing
 from the loop has reached `main` and nothing has been pushed.
 
 ## What this is, if you have never seen it
@@ -34,8 +39,8 @@ specific need arises rather than upfront:
   packet restates and every worker must obey. H-8 is the one that bites: anchors
   are `rg` patterns and symbol names, never line numbers, and a count mismatch
   is a stop condition, not a nuisance.
-- `loop/packets/BG-S0-002.md` and `BG-S0-003.md` — two worked examples. Copy
-  their shape; BG-S0-003 is the one that has been through the full loop.
+- `loop/packets/BG-TOL-001-SHAPEOPS.md` — the newest worked example and the
+  template the six remaining shards copy. `BG-S0-003.md` is the older one.
 
 The loop is a **build** loop, not a search loop: acceptance is mechanical and
 deterministic, so the verifier does the job an objective function would. Nothing
@@ -43,46 +48,44 @@ here is scored, tuned, or sampled.
 
 ## Where we are
 
-**Five contracts discharged**: BG-S0-001, BG-S0-002, BG-S0-003, BG-EVD-r3,
-BG-TOL-001-TYPE. BG-NUM-001-FILLET is verified-or-verifying in slot 3 — see
-"Pick up here".
+**Seven contracts discharged**: BG-S0-001, BG-S0-002, BG-S0-003, BG-EVD-r3,
+BG-TOL-001-TYPE, BG-TOL-001-TYPE-r2, BG-NUM-001-FILLET. 7 of 58 packets.
 
-**The frontier just opened from 2 to 10.** BG-TOL-001-TYPE landed the tolerance
-convention every migration shard copies, so six mutually write-disjoint
-wide-mechanical shards are dispatchable now. This is the point the dependency
-graph predicted in session 2: from here **slots, not dependencies, are the
-binding constraint**, and a warm slot costs 0.90 GB and 1.3 min.
+**The real state of BG-TOL-001 is lower than the packet count suggests.** The
+type exists and the scaffold exists; **0 of 184 call sites are migrated.** The
+first shard is running now. Two of the seven "discharged" items are partial
+against their contract: BG-NUM-001-FILLET budgeted 1 of the 14 unbounded loops
+the spec names, and the two BG-TOL-001 items built machinery and migrated
+nothing.
 
-Session 5 landed three contracts and spent the rest of its time on the harness.
-The pattern worth carrying: **the worker model has not been the bottleneck
-once.** Every packet this session came back DONE or stopped correctly on a bad
-anchor; every rejection traced to an orchestrator omission or a gate defect.
+Session 6 landed two contracts, fixed two gates, and **amended the spec twice —
+both times because writing a packet exposed something the spec had not decided.**
+That is the loop working as designed and it is where its value has actually come
+from. The worker model has still never been the bottleneck: BG-TOL-001-TYPE-r2
+went DONE → ACCEPTED → merged in one attempt, one verify run, no amendment.
 
 ## Pick up here
 
 1. `python loop/slot_status.py`, then the last 3 rows of `LEDGER.jsonl`.
-2. **Slot 3 holds BG-NUM-001-FILLET, REJECTED on V3 (`cargo fmt --check`).**
-   Branch `packet/BG-NUM-001-FILLET`, rebased onto `eaef04b`-era integration;
-   verify it with `--base eaa4c39` or whatever `git -C loop/slots/3/wt
-   merge-base HEAD integration/kernel-bg` reports.
-
-   **The worker's code is correct and has been since its first commit.** Five
-   rejections, none of them its work: a cross-crate ripple the packet's
-   allowlist did not cover, a YAML comment that silently truncated that
-   allowlist, a formatting miss caused by widening the packet's scope
-   mid-flight, a crate clippy could not build, and a merge where a rebase was
-   needed. The current one is formatting only. Run
-   `cargo fmt -p truck-geometry -p truck-shapeops` **inside
-   `loop/slots/3/wt`**, amend, re-verify. Do not redispatch — there is nothing
-   wrong with the worker's output.
-3. **Then dispatch the W2b shards.** `python loop/schedule.py --running <ids>`
-   gives the live frontier — 10 eligible, 6 write-disjoint. Recommended first
-   move: **two shards in parallel, MODELING and SHAPEOPS** (the smallest). No
-   wide-mechanical packet has ever been run and the
-   `// BG-TOL-001: {model|param}` convention is one packet old; if it has a
-   flaw, find it in two crates rather than six. Slot 2 is free.
-4. **Split `BG-TOL-001-TOPOLOGY` by module before running it.** It owns
-   `truck-topology/src/**` and alone blocks all eight BG-INV checkers.
+2. **Slot 3 holds BG-TOL-001-SHAPEOPS, dispatched and unverified.** Verify with
+   `--base 37a0503` or whatever `git -C loop/slots/3/wt merge-base HEAD
+   integration/kernel-bg` reports. It is the **first Stage-A migration shard and
+   the template for six more**, so read its diff yourself even if it is
+   ACCEPTED — V7 and V8 are still stubs and this is the packet whose conventions
+   the other six inherit.
+3. **When it lands, lower the ceiling.** `scripts/unscaled_legacy_ceiling.txt`
+   is at **20** as a budget for that shard. Set it to the actual count from the
+   merged tree (`git grep -oh 'unscaled_legacy(' HEAD -- 'vendor/truck/*/src/*'
+   ':(exclude)vendor/truck/truck-base/src/tolerance.rs' | wc -l`) in its own
+   commit. A ceiling left at a budget is not a ratchet.
+4. **Then write the other six shards**, copying BG-TOL-001-SHAPEOPS. Sites per
+   crate: modeling 34, topology 14, meshalgo 375, geometry ~128 split three
+   ways. **Pre-make every model/param judgement yourself** — that is the whole
+   value of a shard and it needs someone who reads the surrounding code.
+   MODELING next; MESHALGO's 375 needs splitting before it is written.
+5. **`BG-TOL-001-TOPOLOGY` blocks all eight BG-INV checkers** and is only 14
+   sites. Earlier sessions planned to split it by module; at 14 sites that is
+   probably unnecessary. Look before splitting.
 
 Highest-value harness work left: **V7 and V8 are always-pass stubs** — the two
 remaining gates where PASS means nothing. V8 is where "this packet broke a
@@ -96,17 +99,143 @@ pre-existing test" belongs; V5 only compares against its cached baseline.
 | `fddc62a` | vendored crates are workspace members — without this `cargo test -p <crate>` (V5) cannot run |
 | `65450b3` `ca22bc4` `a5660c3` | loop scaffolding, first packets, the 56-packet DAG |
 | `b06a535` | three baseline clippy defects fixed (the slot-0 fork point) |
-| `ed35879` `e927384` `da1b174` `978b902` `d1f9c5b` `8dca941` | the verifier and dispatcher, made to actually work |
+| `ed35879` … `8dca941` | the verifier and dispatcher, made to actually work |
 | `c8acab6` | **BG-S0-003** — the first packet through the whole loop |
 | `4cc5aca` | harness ported to stdlib-only Python; the four `.ps1` scripts are gone |
-| `baa2dfa` | **session 3:** V5 gains `--no-fail-fast`; BG-S0-002 test 3 deferred to **BG-S0-002-r2** (spec + packet amended to 3 tests) |
-| `88b93ee` | V5 compares against a cached baseline run at the base commit; V0 allow-lists `*.obj` instead of ignoring every untracked file |
-| `aa6e31a` | the dispatch actually streams and actually survives; `selftest_dispatch.py` proves it in 40s |
-| `fb697ea` | three counterweights to "ask whether the gate is wrong" in ORCHESTRATOR.md |
+| `baa2dfa` `88b93ee` `aa6e31a` `fb697ea` | V5 `--no-fail-fast` + cached baseline, V0 allow-lists `*.obj`, dispatch survives its parent, ORCHESTRATOR counterweights |
+| `5b68c78` `27ce4d7` | **BG-S0-002**, **BG-EVD-r3** |
+| `ec34aa0` | **session 6:** V3's fmt half was whole-crate — the same defect its clippy half already fixed |
+| `ce524fa` | **BG-NUM-001-FILLET**, merged unmodified after six verify runs |
+| `331633a` | spec: BG-TOL-001 never said where a call site gets its context |
+| `c53e3e6` | **GATE-4**, the `unscaled_legacy` ratchet |
+| `871e79f` | **BG-TOL-001-TYPE-r2** — the Stage-A scaffold |
+| `11aa0b9` | spec: squared-order sites deferred to BG-TOL-004; the SHAPEOPS packet |
 
-Contracts discharged: **BG-S0-001** and **BG-S0-003**. BG-S0-002 unlanded. **BG-S0-002-r2** filed (design class — the chart-pole runtime test;
-`create_pcurve_edge` called directly with a constructed degenerate surface, no
-dependency on hardening `rbf_surface/algo.rs`).
+## The two spec amendments session 6 paid for
+
+**BG-TOL-001 never said where a call site gets its `ToleranceCtx`.** It says
+migrate 184 sites and §9 says "every signature below takes ctx"; neither says
+how a site *obtains* one, and none of the 184 sits in a function that has one.
+Threading from the entry points inward changes public signatures in every crate
+at once, so it cannot be sharded per crate — which is exactly what the eight
+`BG-TOL-001-*` rows assume and what makes their write sets disjoint. The
+migration is now **two stages**: Stage A (the shards) classifies every site
+`model` or `param` through `ToleranceCtx::unscaled_legacy()`, moving no
+threshold and changing no signature; Stage B threads a real `model_scale` from
+each entry point and is what actually discharges the contract. **Stage A alone
+fixes nothing** — it buys the judgement, which is the half that cannot be done
+mechanically later. GATE-4 ratchets the scaffold so Stage A cannot quietly
+become the answer.
+
+**`near2`/`so_small2` cannot be migrated at all.** They compare against
+`TOLERANCE2` = 1e-12 and `ToleranceCtx` has no squared-order predicate; mapping
+them onto `tau_rep` loosens them by six orders of magnitude *while looking like
+a migration*. All 23 sites tree-wide are excluded from Stage A and deferred to
+**BG-TOL-004** (design, blocks nothing).
+
+## The parallelism picture
+
+58 packets: 37 mechanical, 12 design, 8 wide-mechanical + the two r2 items.
+Scheduling is on **write-set disjointness**, not waves — two packets can be
+logically independent and still collide on a file, and that collision surfaces
+at merge, after both workers have been paid for.
+
+The frontier is 10 eligible / 7 write-disjoint and stays there until the shards
+land; it opens to 22 at W4. From here **slots, not dependencies, are the binding
+constraint**: a warm slot costs 0.9–4.4 GB and 0.8–1.5 min, and free disk is
+~17 GB. **Six of the seven eligible shards have no packet written yet** — the
+binding constraint in practice is orchestrator packet-writing, not slots.
+
+## Traps, each one paid for
+
+- **A gate that fails on the untouched baseline is not a gate.** The vendored
+  tree is nowhere near clippy-clean (truck-meshalgo ~93 lints,
+  `revolved_curve.rs:694` "items after a test module") and **not rustfmt-clean
+  either** (`revolved_curve.rs:690`, a stray blank line, present at base). Its
+  test suite is not clean either (`healing::tests::step_import` needs an absent
+  STEP file; `tests/fillet.rs::complex_surface` triangulates to `Irregular`).
+  V3 is scoped to the **lines the diff added** (clippy) and the **files the diff
+  changed** (fmt); V5 to the **test fns the diff added**.
+- **The fmt half of V3 was whole-crate for five sessions** and cost
+  BG-NUM-001-FILLET its sixth rejection — on a file the packet never opened and
+  *could not have fixed*, because it was outside its own `write_allow`. That
+  combination is the signature of a gate defect: when the only way to get green
+  is to violate another gate, it is not the worker who is wrong. Fixed in
+  `ec34aa0`. **fmt is scoped by file, not by line** — rustfmt reports where its
+  diff *context* starts, several lines above the text it wants to change, so
+  intersecting those numbers with added lines both misses real findings and
+  invents absent ones.
+- **`git grep` exits 1 when it matches nothing, and under `set -o pipefail`
+  that kills the whole script.** GATE-4's first run on a clean tree exited 1
+  with **zero output** — every earlier gate unreported, indistinguishable from
+  a crash. The `|| true` inside the command substitution is load-bearing.
+- **`kernel-gates.sh` reads `HEAD`, not the worktree.** Staging a probe is not
+  enough to trip GATE-4; the negative test has to commit. This matches V4's
+  timing, which runs after the worker commits.
+- **Watch a gate fail before trusting it, and commit it first.** The negative
+  test for GATE-4 ended in `git reset --hard`, which reverted the *uncommitted
+  gate itself*. Commit the gate, then probe, then reset.
+- **rustfmt moves a trailing `// H-3` comment off a brace-opener line.** The
+  opt-out only works on the same line as the literal, so rustfmt silently
+  defeats it. Extract the literal onto its own statement line. (Worker-reported,
+  BG-TOL-001-TYPE-r2.)
+- **`rg` is not installed on this host.** H-8 anchors are still `rg` patterns
+  and workers check them with whatever grep they have. Verify anchors yourself
+  before dispatch; do not write a packet that shells out to `rg`.
+- **Dead code looks exactly like live code.** `truck-shapeops/src/fillet/
+  experiment.rs` holds 5 tolerance sites and is not compiled — `fillet/mod.rs`
+  carries `//mod experiment;`. A fifth of the SHAPEOPS shard would have been
+  unverifiable edits to a file nothing builds. Check that a module is actually
+  declared before putting it in a write set.
+- **Not every use of `TOLERANCE` is a predicate.**
+  `polyline_construction/mod.rs:32` uses it as a spatial-hash bucket pitch. It
+  compares nothing, so it has no `model`/`param` classification, and a
+  mechanical migration would have produced nonsense that still compiled.
+- **Legacy `.near()` is componentwise; `ToleranceCtx::near_pt` is Euclidean.**
+  Not the same predicate — Euclidean is stricter by up to `sqrt(3)`. Every Stage-A
+  shard is therefore a small deliberate tightening. A test that moves because of
+  it is a finding to report, never a tolerance to widen.
+- **A write set has to cover the ripple, not just the edit.** BG-NUM-001-FILLET
+  changed one function's signature and was rejected for touching its only
+  caller, in another crate. Grep for callers of anything whose signature a
+  packet changes before writing `write_allow`.
+- **A ceiling a packet can raise is not a ratchet.**
+  `scripts/unscaled_legacy_ceiling.txt` is deliberately outside every shard's
+  `write_allow`; the orchestrator raises it before dispatch and lowers it after.
+**Already fixed in the harness — do not undo these.** Each cost a session; the
+reason is in the commit that made the change, and the code will not tell you.
+
+- **V5 uses `--no-fail-fast`**: without it cargo stops at the first failing test
+  binary and never reaches the packet's own `tests/*.rs`, so it reported PASS on
+  something it never ran.
+- **V5 diffs a cached baseline** rather than scoping to added lines the way V3
+  does: a test failure is not located in the diff, and scoping it there
+  discards regression detection instead of noise.
+- **V0 allow-lists `*.obj` specifically** rather than ignoring untracked files —
+  `cargo test` drops mesh dumps into the worktree the verifier is judging, but
+  an uncommitted new `.rs` is exactly what V0 exists to catch.
+- **V0 exists because an interrupted run reads as a perfect one**: a worker that
+  dies mid-packet leaves its edits uncommitted, an empty diff that passes V1–V6.
+- **The dispatch uses `CREATE_NO_WINDOW | CREATE_NEW_PROCESS_GROUP |
+  CREATE_BREAKAWAY_FROM_JOB`, never `DETACHED_PROCESS`**, which silences the
+  worker it is meant to free, and writes its redirect into a command file
+  because `opencode` is a `.cmd` shim with an 8191-char command line. **Run
+  `python loop/selftest_dispatch.py` after touching any of this.**
+- **V4 hardcodes Git Bash** — a bare `bash` is the WSL stub.
+- **`slot_status.py --kill-stalled`** reaps anything silent for 12 min; only
+  `events.jsonl` growth distinguishes a hang from a worker thinking.
+- **`autotests = false` in truck-polymesh**: a new test file there needs an
+  explicit `[[test]]` entry or it silently never runs. V6 flags this.
+- **`truck_base::evidence`, not `truck_evidence`** — the module lives in
+  truck-base to avoid a geotrait→evidence cycle.
+
+- **The spec goes stale invisibly.** Re-run every anchor when you touch a packet.
+- **A spec gap is the loop's most valuable output, not a failure.** Session 6's
+  two amendments both came from writing a packet and finding the spec had not
+  decided something. Fix the spec *and* the packet; never only the packet.
+- **CI gates are still vacuous.** `kernel-gates.sh` is diff-scoped and
+  `origin/main` has no `vendor/truck/`, so CI passes on nothing. Packet
+  verification is unaffected — its baseline is the branch tip.
 
 ## The commands
 
@@ -319,13 +448,23 @@ The gates, in the order `verify.py` runs them:
 
 - V7 (mutation spot-check) and V8 (no-regression) are always-pass stubs. V7
   needs a packet field naming the negative test; V8 needs ledger state. V8 is
-  the right home for "a packet broke a pre-existing test" — V5 deliberately
+  the right home for "a packet broke a pre-existing test" -- V5 deliberately
   does not catch that, only added-test failures, so it never false-rejects on
   the baseline.
 - V6 matches test names by keyword overlap, not exactly. Tighten when
   `gen_packet.py` fixes a naming convention.
+- `gen_packet.py` is still unwritten. It must re-run every anchor's pattern at
+  generation time and refuse to emit on a count mismatch. Six shard packets are
+  about to be written by hand; this is the session to build it in.
+- GATE-4's ceiling is checked, but nothing checks that a Stage-A shard's
+  `// BG-TOL-001:` markers match its actual rewrites. The SHAPEOPS packet asks
+  the worker to write that test itself (`every_migrated_shapeops_site_is_marked`).
+  If that pattern holds up, hoist it into a gate rather than repeating it in
+  six packets.
+- BG-TOL-004 (what a squared-order tolerance means in a scale-relative system)
+  is named in the spec but unwritten. 23 sites wait on it. It blocks nothing.
+- BG-S0-002-r2 needs a constructed degenerate surface (a parametric pole where
+  `uder` is parallel to `vder`) to exercise `create_pcurve_edge` directly. The
+  fixture is design work; the orchestrator writes that packet.
 - `opencode/deepseek-v4-flash-free` would run W4's 23 packets at no API cost.
   Untested against concurrent workers.
-- BG-S0-002-r2 needs a constructed degenerate surface (a parametric pole where
-  `uder ∥ vder`) to exercise `create_pcurve_edge` directly. The fixture is
-  design work; the orchestrator writes that packet.
