@@ -103,6 +103,53 @@ if [ -n "$debug_hits" ]; then
     fail=1
 fi
 
+# ---------------------------------------------------------------------------
+# Gate 4 (BG-TOL-001): the unscaled_legacy ratchet.
+#
+# ToleranceCtx::unscaled_legacy() is the Stage-A migration scaffold: it returns
+# model_scale = 1.0, so a site migrated onto it keeps the legacy absolute
+# tolerance and buys only the model/param judgement. Stage B replaces each one
+# with a context carrying a real model scale. BG-TOL-001 is not discharged
+# until none are left.
+#
+# A scaffold nobody removes is a permanent absolute tolerance -- the exact bug
+# the item exists to kill -- so the count is ratcheted rather than trusted. It
+# may never exceed the recorded ceiling, and the ceiling only ever moves down,
+# which a Stage-B packet does explicitly in the same commit that removes the
+# calls. Banning the constructor outright is not an option: that would ban
+# Stage A, which is the only shardable way to make the judgement at all.
+#
+# Counted in production sources only (vendor/truck/*/src/**), excluding the
+# file that defines it -- its own definition, doc comments and unit tests are
+# not debt. Whole-tree at HEAD, deliberately not diff-scoped: the quantity
+# under control is the total, and a diff-scoped version could not see a packet
+# that added ten calls while another removed ten. HEAD, not the worktree, for
+# the same reason the other gates read commits: V4 runs after the worker has
+# committed, and an uncommitted call site is V0's business, not this gate's.
+# ---------------------------------------------------------------------------
+ceiling_file="scripts/unscaled_legacy_ceiling.txt"
+if [ -f "$ceiling_file" ]; then
+    ceiling=$(tr -cd '0-9' <"$ceiling_file")
+    : "${ceiling:=0}"
+    # `|| true` is load-bearing under `set -o pipefail`: git grep exits 1 when
+    # it matches nothing, which is the healthy state here, and without it the
+    # whole script died silently on a clean tree -- exit 1, no output, every
+    # earlier gate unreported.
+    legacy_count=$( { git grep -oh 'unscaled_legacy(' HEAD -- 'vendor/truck/*/src/*' \
+        ':(exclude)vendor/truck/truck-base/src/tolerance.rs' 2>/dev/null || true; } | wc -l | tr -d ' ')
+    : "${legacy_count:=0}"
+    if [ "$legacy_count" -gt "$ceiling" ]; then
+        echo "GATE-4 (BG-TOL-001): $legacy_count unscaled_legacy() call sites, ceiling is $ceiling." >&2
+        echo "  unscaled_legacy is Stage-A scaffolding carrying the legacy absolute tolerance." >&2
+        echo "  If this packet is a Stage-A migration shard, raise the ceiling in $ceiling_file" >&2
+        echo "  in the same commit and say in the message how many sites it covers." >&2
+        echo "  Otherwise thread a real model_scale instead -- the ceiling is not a target." >&2
+        fail=1
+    else
+        echo "kernel-gates: GATE-4 unscaled_legacy $legacy_count/$ceiling."
+    fi
+fi
+
 if [ "$fail" -eq 0 ]; then
     echo "kernel-gates: all P-3 gates pass."
 else
