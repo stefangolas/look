@@ -60,6 +60,7 @@ where
     C: FilletedCurve<S>,
     S: Clone,
 {
+    let ctx = ToleranceCtx::unscaled_legacy();
     let (front_edge, back_edge) = find_adjacent_edge(face, filleted_edge_id)?;
 
     let (new_front_edge, front_der) = {
@@ -73,7 +74,8 @@ where
         let (t0, t1) = search_intersection_parameter(&curve, &front_curve, hint, 100)?;
         let p = curve.subs(t0).midpoint(front_curve.subs(t1));
         let v0 = Vertex::new(p);
-        if !curve_hint.near(&t0) {
+        if !ctx.is_small_ratio(curve_hint - t0) {
+            // BG-TOL-001: param
             curve = curve.cut(t0);
         }
         let der = front_curve.der(t1);
@@ -95,7 +97,8 @@ where
         let (t0, t1) = search_intersection_parameter(&curve, &back_curve, hint, 100)?;
         let p = curve.subs(t0).midpoint(back_curve.subs(t1));
         let v1 = Vertex::new(p);
-        if !t0.near(&curve_hint) {
+        if !ctx.is_small_ratio(t0 - curve_hint) {
+            // BG-TOL-001: param
             curve.cut(t0);
         }
         let der = back_curve.der(t1);
@@ -605,6 +608,7 @@ where
     let mut prev_edge: Option<Edge<Point3, C>> = None;
     let mut prev_radius: Option<f64> = None;
     let closure = |(edge, &Fcte { side0, side1 }): (&Edge<Point3, C>, _)| {
+        let ctx = ToleranceCtx::unscaled_legacy();
         let curve = edge.oriented_curve();
         let range = curve.range_tuple();
         let surface0 = side0.oriented_surface();
@@ -612,7 +616,7 @@ where
 
         if let Some(r0) = prev_radius {
             let (t0, t1) = curve.range_tuple();
-            if !r0.near(&radius.subs(t0)) {
+            if !ctx.is_small_len(r0 - radius.subs(t0)) { // BG-TOL-001: model
                 return None;
             }
             prev_radius = Some(radius.subs(t1));

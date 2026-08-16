@@ -29,6 +29,7 @@ struct PointIndex([i64; 3]);
 impl From<Point3> for PointIndex {
     #[inline(always)]
     fn from(pt: Point3) -> PointIndex {
+        // FIXME(BG-TOL-001): quantization pitch, not a predicate
         let idx = pt.add_element_wise(TOLERANCE) / (2.0 * TOLERANCE);
         PointIndex(idx.cast::<i64>().unwrap().into())
     }
@@ -83,7 +84,9 @@ impl Graph {
     }
 
     fn add_edge(&mut self, line: (Point3, Point3)) {
-        if !line.0.near(&line.1) {
+        let ctx = ToleranceCtx::unscaled_legacy();
+        if !ctx.near_pt(line.0, line.1) {
+            // BG-TOL-001: model
             self.add_half_edge(line.0, line.1);
             self.add_half_edge(line.1, line.0);
         }

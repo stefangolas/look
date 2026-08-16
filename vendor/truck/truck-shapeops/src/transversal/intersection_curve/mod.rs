@@ -26,6 +26,7 @@ where
     S1: ParametricSurface3D + SearchNearestParameter<D2, Point = Point3>,
 {
     pub fn try_new(surface0: S0, surface1: S1, poly: PolylineCurve<Point3>) -> Option<Self> {
+        let ctx = ToleranceCtx::unscaled_legacy();
         let ic = IntersectionCurve::new(&surface0, &surface1, poly);
         let poly = ic.leader();
         let len = poly.len();
@@ -38,7 +39,8 @@ where
             params0.push(p0);
             params1.push(p1);
         }
-        let (q, p0, p1) = match poly[0].near(&poly[len - 1]) {
+        let (q, p0, p1) = match ctx.near_pt(poly[0], poly[len - 1]) {
+            // BG-TOL-001: model
             true => (polyline[0], params0[0], params1[0]),
             false => ic.search_triple((len - 1) as f64, 100)?,
         };
