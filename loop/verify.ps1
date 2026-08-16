@@ -150,6 +150,44 @@ $env:CARGO_INCREMENTAL = '0'
 $env:CARGO_TARGET_DIR = $targetDir
 
 # ---------------------------------------------------------------------------
+# V0 preflight — did a run actually finish? Every gate below reads the diff
+# between $Base and HEAD, so a worker that died mid-packet -- killed, out of
+# turns, or holding a connection that dropped -- leaves its edits uncommitted
+# and presents an EMPTY diff. Empty passes V1 through V6 on nothing at all and
+# reports ACCEPTED. A verifier that certifies an interrupted run is worse than
+# no verifier, so incompleteness is checked before anything is measured.
+#
+# BLOCKED, not REJECTED: nothing here is a judgement about the worker's code.
+# The packet is redispatchable as-is once the worktree is reset.
+# ---------------------------------------------------------------------------
+$commitsAhead = @(git -C $wt rev-list "$Base..HEAD" | Where-Object { $_ -ne '' }).Count
+$uncommitted  = @(git -C $wt status --porcelain |
+    Where-Object { $_ -ne '' -and $_ -notmatch '(?i)\s(PACKET\.md|worker\.(pid|err|packet))$' }).Count
+$hasResult    = Test-Path (Join-Path $wt 'RESULT.json')
+$hasQuestion  = Test-Path (Join-Path $wt 'QUESTION.md')
+
+$preflight = @()
+if ($commitsAhead -eq 0) { $preflight += "no commit since $($Base.Substring(0,7)) -- the worker never finished" }
+if ($uncommitted -gt 0)  { $preflight += "$uncommitted uncommitted change(s) left in the worktree" }
+if (-not $hasResult -and -not $hasQuestion) { $preflight += "no RESULT.json and no QUESTION.md" }
+
+if ($preflight.Count -gt 0) {
+    Add-Gate 'V0 preflight' 'FAIL' ($preflight -join '; ')
+    foreach ($n in 'V1 scope', 'V2 build', 'V3 lint', 'V4 house rules', 'V5 tests', 'V6 test-reality') {
+        Add-Gate $n 'SKIP' 'run incomplete'
+    }
+    Write-Host ''
+    Write-Host 'VERDICT: BLOCKED'
+    [pscustomobject]@{
+        packet = $Packet; slot = $Slot; crates = $crateNames; base = $Base
+        verdict = 'BLOCKED'; gates = $gates
+        timestamp = (Get-Date).ToUniversalTime().ToString('o')
+    } | ConvertTo-Json -Depth 6 | Set-Content -Path $verdictFile -Encoding utf8
+    exit 2
+}
+Add-Gate 'V0 preflight' 'PASS' ("{0} commit(s), worktree clean, {1} written" -f $commitsAhead, $(if ($hasResult) { 'RESULT.json' } else { 'QUESTION.md' }))
+
+# ---------------------------------------------------------------------------
 # V1 scope — git diff --name-only <base>...HEAD must be a subset of write_allow.
 # ---------------------------------------------------------------------------
 $changed = @(git -C $wt diff --name-only "$Base...HEAD" | Where-Object { $_ -ne '' })

@@ -4,11 +4,40 @@ Rewritten at the end of every session. Capped at ~120 lines. If you are picking
 this up cold, read **this file, then run `loop\slot-status.ps1`** — nothing
 else. Do not read `LEDGER.jsonl` whole.
 
-Design: [`docs/KERNEL_AUTOBUILD_LOOP.md`](../docs/KERNEL_AUTOBUILD_LOOP.md).
-Spec: [`docs/GENERATION_KERNEL_BUILD_SPEC.md`](../docs/GENERATION_KERNEL_BUILD_SPEC.md).
-
 Updated 2026-08-16, end of session 2. Branch: `integration/kernel-bg`. Nothing
 from the loop has reached `main` and nothing has been pushed.
+
+## What this is, if you have never seen it
+
+`vendor/truck/` is a vendored CAD kernel this repo owns. A formal specification,
+`docs/GENERATION_KERNEL_BUILD_SPEC.md`, lists ~56 numbered contract items
+(`BG-S0-*`, `BG-EVD-*`, `BG-TOL-*`, …) that harden it — replacing panics with
+refusals carrying evidence, giving tolerances a model, certifying enclosures.
+This loop discharges those items with LLM workers instead of by hand.
+
+**You are the orchestrator.** You write work packets, schedule them, adjudicate
+verification, and amend the spec. **You do not write the kernel code.** A packet
+is dispatched to a worker (deepseek v4 flash via opencode) that gets one file —
+the packet — and one git worktree, and gets no say in whether its work is
+accepted. `loop/verify.ps1` is the only acceptance authority; a worker's
+`RESULT.json` is a claim, never a verdict.
+
+Three documents define the rest, and you should read them in this order when a
+specific need arises rather than upfront:
+
+- [`docs/KERNEL_AUTOBUILD_LOOP.md`](../docs/KERNEL_AUTOBUILD_LOOP.md) — the loop
+  design: packet schema (§4), the V-gates (§5), context budget (§3), disk (§7).
+- [`docs/GENERATION_KERNEL_BUILD_SPEC.md`](../docs/GENERATION_KERNEL_BUILD_SPEC.md)
+  — the contract items themselves and **house rules H-1..H-8**, which every
+  packet restates and every worker must obey. H-8 is the one that bites: anchors
+  are `rg` patterns and symbol names, never line numbers, and a count mismatch
+  is a stop condition, not a nuisance.
+- `loop/packets/BG-S0-002.md` and `BG-S0-003.md` — two worked examples. Copy
+  their shape; BG-S0-003 is the one that has been through the full loop.
+
+The loop is a **build** loop, not a search loop: acceptance is mechanical and
+deterministic, so the verifier does the job an objective function would. Nothing
+here is scored, tuned, or sampled.
 
 ## Where we are
 
@@ -46,6 +75,11 @@ Dispatch is fire-and-forget by design: a worker runs for tens of minutes, and
 anything that waits on it is a long-lived process that can be killed — when one
 was, it took its worker down mid-run. Poll instead. Run `verify.ps1` in the
 background; it takes about four minutes on a warm slot.
+
+`verify.ps1` exits **0 ACCEPTED**, **1 REJECTED** (the work is wrong), or
+**2 BLOCKED** (the run never finished — reset the worktree and redispatch;
+nothing is implied about the worker's code). Environment: Windows, PowerShell
+5.1, `cargo`, and Git Bash at `C:\Program Files\Git\bin\bash.exe`.
 
 ## Next actions, in order
 
@@ -98,6 +132,12 @@ dependencies — are the binding constraint.
   returned, holding a slot and its write set, producing nothing. CPU time
   cannot tell that apart from a worker waiting on the model; only the growth of
   `events.jsonl` can.
+- **An interrupted run reads as a perfect one.** Every gate measures the diff
+  between the base and HEAD, and a worker that dies mid-packet leaves its edits
+  *uncommitted* — an empty diff, which passes V1 through V6 on nothing and
+  reports ACCEPTED. V0 preflight exists for exactly this and returns BLOCKED.
+  Workers survive a brief network drop on their own; they do not survive their
+  parent process being killed.
 - **The spec goes stale invisibly.** BG-S0-001 was already landed while the
   spec still listed it open with an anchor count of 6 that is now 0.
 - **`autotests = false` in truck-polymesh.** A new test file there needs an
