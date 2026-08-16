@@ -1,4 +1,8 @@
 use super::{rbf_surface::*, *};
+use truck_base::evidence::{
+    Budget, Certificate, Certified, Margin, Method, Modulus, Outcome, PropMap, Refusal,
+    UnresolvedWitness,
+};
 
 impl<S0, S1> ApproxFilletSurface<S0, S1> {
     /// Returns the first surface.
@@ -381,16 +385,34 @@ where
         fillet_surface: &RbfSurface<C, S0, S1, R>,
         edge_parameter_range: (f64, f64),
         tol: f64,
-    ) -> Option<Self>
+    ) -> Outcome<Self>
     where
         C: ParametricCurve3D,
         R: ScalarFunctionD1,
     {
         let (v0, v1) = edge_parameter_range;
         let v_5 = (v0 + v1) / 2.0;
-        let cc0 = fillet_surface.contact_circle(v0)?;
-        let cc_5 = fillet_surface.contact_circle(v_5)?;
-        let cc1 = fillet_surface.contact_circle(v1)?;
+        let cc0 = fillet_surface
+            .contact_circle(v0)
+            .ok_or(Refusal::NumericallyUnresolved {
+                // TODO(BG-NUM-001): thread the real budget
+                spent: Budget::new(0, 0, 0),
+                witness: UnresolvedWitness::ContactCurveNotFound,
+            })?;
+        let cc_5 = fillet_surface
+            .contact_circle(v_5)
+            .ok_or(Refusal::NumericallyUnresolved {
+                // TODO(BG-NUM-001): thread the real budget
+                spent: Budget::new(0, 0, 0),
+                witness: UnresolvedWitness::ContactCurveNotFound,
+            })?;
+        let cc1 = fillet_surface
+            .contact_circle(v1)
+            .ok_or(Refusal::NumericallyUnresolved {
+                // TODO(BG-NUM-001): thread the real budget
+                spent: Budget::new(0, 0, 0),
+                witness: UnresolvedWitness::ContactCurveNotFound,
+            })?;
         let mut ccs = vec![(v0, cc0), (v_5, cc_5), (v1, cc1)];
 
         for _i in 0..16 {
@@ -456,35 +478,57 @@ where
                 tangent_vecs1: tangent_curve1.destruct().1,
                 weights,
             };
-            let added_ccs = ccs
-                .windows(2)
-                .filter_map(|v| {
-                    let v = (v[0].0 + v[1].0) / 2.0;
-                    let cc = fillet_surface.contact_circle(v).unwrap();
-                    let is_far = |t: f64| approx.subs(t, v).distance2(cc.subs(t)) < tol * tol;
-                    match [0.0, 0.5, 1.0].into_iter().all(is_far) {
-                        true => None,
-                        false => Some((v, cc)),
-                    }
-                })
-                .collect::<Vec<_>>();
+            let added_ccs =
+                ccs.windows(2)
+                    .map(|v| {
+                        let v = (v[0].0 + v[1].0) / 2.0;
+                        let cc = fillet_surface.contact_circle(v).ok_or(
+                            Refusal::NumericallyUnresolved {
+                                // TODO(BG-NUM-001): thread the real budget
+                                spent: Budget::new(0, 0, 0),
+                                witness: UnresolvedWitness::ContactCurveNotFound,
+                            },
+                        )?;
+                        let is_far = |t: f64| approx.subs(t, v).distance2(cc.subs(t)) < tol * tol;
+                        Ok(match [0.0, 0.5, 1.0].into_iter().all(is_far) {
+                            true => None,
+                            false => Some((v, cc)),
+                        })
+                    })
+                    .collect::<std::result::Result<Vec<Option<(f64, ContactCircle)>>, Refusal>>()?
+                    .into_iter()
+                    .flatten()
+                    .collect::<Vec<_>>();
             if added_ccs.is_empty() {
-                return Some(Self {
-                    knot_vec: approx.knot_vec,
-                    surface0: S0::clone(approx.surface0),
-                    side_control_points0: approx.side_control_points0,
-                    tangent_vecs0: approx.tangent_vecs0,
-                    surface1: S1::clone(approx.surface1),
-                    side_control_points1: approx.side_control_points1,
-                    tangent_vecs1: approx.tangent_vecs1,
-                    weights: approx.weights,
-                });
+                return Ok(Certified::new(
+                    Self {
+                        knot_vec: approx.knot_vec,
+                        surface0: S0::clone(approx.surface0),
+                        side_control_points0: approx.side_control_points0,
+                        tangent_vecs0: approx.tangent_vecs0,
+                        surface1: S1::clone(approx.surface1),
+                        side_control_points1: approx.side_control_points1,
+                        tangent_vecs1: approx.tangent_vecs1,
+                        weights: approx.weights,
+                    },
+                    Certificate {
+                        props: PropMap::new(),
+                        method: Method::Float,
+                        budget_left: Budget::new(0, 0, 0),
+                        margin: Margin::UNBOUNDED,
+                        modulus: Modulus::Unbounded,
+                    },
+                ));
             }
             ccs.extend(added_ccs);
             ccs.sort_by(|(x, _), (y, _)| x.partial_cmp(y).unwrap());
         }
 
-        None
+        Err(Refusal::NumericallyUnresolved {
+            // TODO(BG-NUM-001): thread the real budget
+            spent: Budget::new(0, 0, 0),
+            witness: UnresolvedWitness::ContactCurveNotFound,
+        })
     }
 }
 

@@ -30,7 +30,8 @@ fn approx_fillet_between_two_spheres() {
     let instance = std::time::Instant::now();
     let approx =
         ApproxFilletSurface::approx_rolling_ball_fillet(&fillet, (PI * 0.1, PI * 1.9), 0.001)
-            .unwrap();
+            .unwrap()
+            .value;
     println!("fillet approximation: {}ms", instance.elapsed().as_millis());
 
     let instance = std::time::Instant::now();

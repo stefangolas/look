@@ -1,5 +1,9 @@
 use algo::curve::search_intersection_parameter;
 use itertools::Itertools;
+use truck_base::evidence::{
+    Budget, Certificate, Certified, EnvelopeCase, Margin, Method, Modulus, Outcome, PropMap,
+    Refusal, UnresolvedWitness,
+};
 use truck_geometry::prelude::*;
 use truck_topology::*;
 
@@ -134,36 +138,61 @@ fn create_pcurve_edge<C, S>(
     (v0, hint0, der0): (&Vertex<Point3>, (f64, f64), Vector3),
     (v1, hint1, der1): (&Vertex<Point3>, (f64, f64), Vector3),
     fillet_surface: S,
-) -> Option<Edge<Point3, C>>
+) -> Outcome<Edge<Point3, C>>
 where
     PCurve<BSplineCurve<Point2>, S>: ToSameGeometry<C>,
     S: ParametricSurface3D + SearchParameter<D2, Point = Point3> + Clone,
 {
     let uv0: Point2 = fillet_surface
-        .search_parameter(v0.point(), hint0, 100)?
+        .search_parameter(v0.point(), hint0, 100)
+        .ok_or(Refusal::NumericallyUnresolved {
+            // TODO(BG-NUM-001): thread the real budget
+            spent: Budget::new(0, 0, 0),
+            witness: UnresolvedWitness::ContactCurveNotFound,
+        })?
         .into();
     let uv1: Point2 = fillet_surface
-        .search_parameter(v1.point(), hint1, 100)?
+        .search_parameter(v1.point(), hint1, 100)
+        .ok_or(Refusal::NumericallyUnresolved {
+            // TODO(BG-NUM-001): thread the real budget
+            spent: Budget::new(0, 0, 0),
+            witness: UnresolvedWitness::ContactCurveNotFound,
+        })?
         .into();
     let dist = uv0.distance(uv1);
 
     let uder0 = fillet_surface.uder(uv0.x, uv0.y);
     let vder0 = fillet_surface.vder(uv0.x, uv0.y);
     let n0 = uder0.cross(vder0);
-    let uvder0 = Matrix3::from_cols(uder0, vder0, n0).invert().unwrap() * der0;
+    let uvder0 = Matrix3::from_cols(uder0, vder0, n0)
+        .invert()
+        .ok_or(Refusal::UnsupportedEnvelope(EnvelopeCase::ChartDegenerate))?
+        * der0;
     //debug_assert!(uvder0.z.so_small(), "{:?}", uvder0);
     let cp1 = uv0 + dist / 3.0 * uvder0.truncate().normalize();
 
     let uder1 = fillet_surface.uder(uv1.x, uv1.y);
     let vder1 = fillet_surface.vder(uv1.x, uv1.y);
     let n1 = uder1.cross(vder1).normalize();
-    let uvder1 = Matrix3::from_cols(uder1, vder1, n1).invert().unwrap() * der1;
+    let uvder1 = Matrix3::from_cols(uder1, vder1, n1)
+        .invert()
+        .ok_or(Refusal::UnsupportedEnvelope(EnvelopeCase::ChartDegenerate))?
+        * der1;
     //debug_assert!(uvder1.z.so_small(), "{:?}", uvder1);
     let cp2 = uv1 - dist / 3.0 * uvder1.truncate().normalize();
 
     let bsp = BSplineCurve::new(KnotVec::bezier_knot(3), vec![uv0, cp1, cp2, uv1]);
     let curve = PCurve::new(bsp, fillet_surface);
-    Some(Edge::new(v0, v1, curve.to_same_geometry()))
+    Ok(Certified::new(
+        Edge::new(v0, v1, curve.to_same_geometry()),
+        Certificate {
+            props: PropMap::new(),
+            method: Method::Float,
+            budget_left: Budget::new(0, 0, 0),
+            margin: Margin::UNBOUNDED,
+            modulus: Modulus::Unbounded,
+        },
+    ))
 }
 
 /// result of [`simple_fillet`]
@@ -184,7 +213,7 @@ pub fn simple_fillet<C, S, R>(
     filleted_edge_id: EdgeID<C>,
     radius: R,
     tol: f64,
-) -> Option<SimpleFillet<C, S>>
+) -> Outcome<SimpleFillet<C, S>>
 where
     C: FilletedCurve<S>,
     S: FilletedSurface<C>,
@@ -193,7 +222,10 @@ where
     ApproxFilletSurface<S, S>: ToSameGeometry<S>,
 {
     let is_filleted_edge = move |edge: &Edge<Point3, C>| edge.id() == filleted_edge_id;
-    let filleted_edge = face0.edge_iter().find(is_filleted_edge)?;
+    let filleted_edge = face0
+        .edge_iter()
+        .find(is_filleted_edge)
+        .ok_or(Refusal::Empty)?;
 
     let strict_surface = {
         let surface0 = face0.oriented_surface();
@@ -205,47 +237,77 @@ where
     let vrange = {
         let (t0, t1) = strict_surface.edge_curve().range_tuple();
 
-        let (front_edge0, back_edge0) = find_adjacent_edge(face0, filleted_edge_id)?;
+        let (front_edge0, back_edge0) =
+            find_adjacent_edge(face0, filleted_edge_id).ok_or(Refusal::Empty)?;
 
         let curve00 = front_edge0.oriented_curve();
         let (_, s00_hint) = curve00.range_tuple();
         let (_, _, v00, _) = strict_surface
             .search_contact_curve0_cross_point_with_adjacent_edge(t0, &curve00, s00_hint, 100)
-            .unwrap();
+            .ok_or(Refusal::NumericallyUnresolved {
+                // TODO(BG-NUM-001): thread the real budget
+                spent: Budget::new(0, 0, 0),
+                witness: UnresolvedWitness::ContactCurveNotFound,
+            })?;
 
         let curve10 = back_edge0.oriented_curve();
         let (s10_hint, _) = curve10.range_tuple();
         let (_, _, v10, _) = strict_surface
             .search_contact_curve0_cross_point_with_adjacent_edge(t1, &curve10, s10_hint, 100)
-            .unwrap();
+            .ok_or(Refusal::NumericallyUnresolved {
+                // TODO(BG-NUM-001): thread the real budget
+                spent: Budget::new(0, 0, 0),
+                witness: UnresolvedWitness::ContactCurveNotFound,
+            })?;
 
-        let (front_edge1, back_edge1) = find_adjacent_edge(face1, filleted_edge_id)?;
+        let (front_edge1, back_edge1) =
+            find_adjacent_edge(face1, filleted_edge_id).ok_or(Refusal::Empty)?;
 
         let curve11 = front_edge1.oriented_curve();
         let (_, s11_hint) = curve11.range_tuple();
         let (_, _, v11, _) = strict_surface
             .search_contact_curve1_cross_point_with_adjacent_edge(t1, &curve11, s11_hint, 100)
-            .unwrap();
+            .ok_or(Refusal::NumericallyUnresolved {
+                // TODO(BG-NUM-001): thread the real budget
+                spent: Budget::new(0, 0, 0),
+                witness: UnresolvedWitness::ContactCurveNotFound,
+            })?;
 
         let curve01 = back_edge1.oriented_curve();
         let (s01_hint, _) = curve01.range_tuple();
         let (_, _, v01, _) = strict_surface
             .search_contact_curve1_cross_point_with_adjacent_edge(t0, &curve01, s01_hint, 100)
-            .unwrap();
+            .ok_or(Refusal::NumericallyUnresolved {
+                // TODO(BG-NUM-001): thread the real budget
+                spent: Budget::new(0, 0, 0),
+                witness: UnresolvedWitness::ContactCurveNotFound,
+            })?;
 
         (v00.min(v01), v10.max(v11))
     };
 
     let fillet_surface =
-        ApproxFilletSurface::approx_rolling_ball_fillet(&strict_surface, vrange, tol)?;
+        ApproxFilletSurface::approx_rolling_ball_fillet(&strict_surface, vrange, tol)?.value;
 
     let (new_face0, fillet_edge0, (front_der0, back_der0)) = {
         let contact_curve = fillet_surface.side_pcurve0().to_same_geometry();
-        cut_face_by_curve(face0, contact_curve, filleted_edge.id())?
+        cut_face_by_curve(face0, contact_curve, filleted_edge.id()).ok_or(
+            Refusal::NumericallyUnresolved {
+                // TODO(BG-NUM-001): thread the real budget
+                spent: Budget::new(0, 0, 0),
+                witness: UnresolvedWitness::ContactCurveNotFound,
+            },
+        )?
     };
     let (new_face1, fillet_edge1, (front_der1, back_der1)) = {
         let contact_curve = fillet_surface.side_pcurve1().to_same_geometry();
-        cut_face_by_curve(face1, contact_curve.inverse(), filleted_edge.id())?
+        cut_face_by_curve(face1, contact_curve.inverse(), filleted_edge.id()).ok_or(
+            Refusal::NumericallyUnresolved {
+                // TODO(BG-NUM-001): thread the real budget
+                spent: Budget::new(0, 0, 0),
+                witness: UnresolvedWitness::ContactCurveNotFound,
+            },
+        )?
     };
 
     let surface = fillet_surface.to_same_geometry();
@@ -255,22 +317,33 @@ where
         (vertex0, (u0, v0), front_der0),
         (vertex3, (u1, v0), back_der1),
         surface.clone(),
-    )?;
+    )?
+    .value;
     let edge1 = create_pcurve_edge(
         (vertex2, (u1, v1), front_der1),
         (vertex1, (u0, v1), back_der0),
         surface.clone(),
-    )?;
+    )?
+    .value;
     let fillet = {
         let fillet_boundary = [fillet_edge0.inverse(), edge0, fillet_edge1.inverse(), edge1];
         Face::new(vec![fillet_boundary.into()], surface)
     };
 
-    Some(SimpleFillet {
-        face0: new_face0,
-        face1: new_face1,
-        fillet,
-    })
+    Ok(Certified::new(
+        SimpleFillet {
+            face0: new_face0,
+            face1: new_face1,
+            fillet,
+        },
+        Certificate {
+            props: PropMap::new(),
+            method: Method::Float,
+            budget_left: Budget::new(0, 0, 0),
+            margin: Margin::UNBOUNDED,
+            modulus: Modulus::Unbounded,
+        },
+    ))
 }
 
 /// result of [`fillet_with_side`].
@@ -346,7 +419,7 @@ pub fn fillet_with_side<C, S, R>(
     side1: Option<&Face<Point3, C, S>>,
     radius: R,
     tol: f64,
-) -> Option<FilletWithSide<C, S>>
+) -> Outcome<FilletWithSide<C, S>>
 where
     C: FilletedCurve<S>,
     S: FilletedSurface<C>,
@@ -355,19 +428,22 @@ where
     IntersectionCurve<C, S, S>: ToSameGeometry<C>,
     ApproxFilletSurface<S, S>: ToSameGeometry<S>,
 {
-    let simple_fillet = simple_fillet(face0, face1, filleted_edge_id, radius, tol)?;
+    let simple_fillet = simple_fillet(face0, face1, filleted_edge_id, radius, tol)?.value;
 
     let (front_edge0, back_edge0) = {
         let fillet_edge_id = simple_fillet.fillet.absolute_boundaries()[0][0].id();
-        find_adjacent_edge(&simple_fillet.face0, fillet_edge_id)?
+        find_adjacent_edge(&simple_fillet.face0, fillet_edge_id).ok_or(Refusal::Empty)?
     };
     let (front_edge1, back_edge1) = {
         let fillet_edge_id = simple_fillet.fillet.absolute_boundaries()[0][2].id();
-        find_adjacent_edge(&simple_fillet.face1, fillet_edge_id)?
+        find_adjacent_edge(&simple_fillet.face1, fillet_edge_id).ok_or(Refusal::Empty)?
     };
 
     let is_filleted_edge = |edge: &Edge<Point3, C>| edge.id() == filleted_edge_id;
-    let filleted_edge = face0.edge_iter().find(is_filleted_edge)?;
+    let filleted_edge = face0
+        .edge_iter()
+        .find(is_filleted_edge)
+        .ok_or(Refusal::Empty)?;
     let (v0, v1) = filleted_edge.ends();
 
     let fillet_surface = simple_fillet.fillet.surface();
@@ -393,11 +469,20 @@ where
             &back_edge0,
         )
     });
-    Some(FilletWithSide {
-        simple_fillet,
-        side0: new_side0,
-        side1: new_side1,
-    })
+    Ok(Certified::new(
+        FilletWithSide {
+            simple_fillet,
+            side0: new_side0,
+            side1: new_side1,
+        },
+        Certificate {
+            props: PropMap::new(),
+            method: Method::Float,
+            budget_left: Budget::new(0, 0, 0),
+            margin: Margin::UNBOUNDED,
+            modulus: Modulus::Unbounded,
+        },
+    ))
 }
 
 // The following is a prototype implementation for multiple fillets.

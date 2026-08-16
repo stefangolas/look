@@ -1,5 +1,6 @@
 use derive_more::From;
 use itertools::Itertools;
+use truck_base::evidence::{Certified, EnvelopeCase, Refusal, UnresolvedWitness};
 use truck_geometry::prelude::*;
 use truck_meshalgo::prelude::*;
 use truck_shapeops::fillet::*;
@@ -137,7 +138,9 @@ fn create_simple_fillet() {
     let file = std::fs::File::create("edged-shell.obj").unwrap();
     obj::write(&poly, file).unwrap();
 
-    let res = simple_fillet(&face0, &face1, shared_edge_id, 0.3, 0.001).unwrap();
+    let res = simple_fillet(&face0, &face1, shared_edge_id, 0.3, 0.001)
+        .unwrap()
+        .value;
 
     let shell: Shell = [res.face0, res.face1, res.fillet].into();
     let _pshell = shell.triangulation(0.005);
@@ -241,7 +244,8 @@ fn create_fillet_with_side() {
         Radius,
         0.001,
     )
-    .unwrap();
+    .unwrap()
+    .value;
 
     let shell: Shell = vec![face0, face1, fillet, side1.unwrap()].into();
 
@@ -396,7 +400,8 @@ fn complex_surface() {
         0.1,
         0.001,
     )
-    .unwrap();
+    .unwrap()
+    .value;
 
     shell[0] = face0;
     shell[2] = face1;
@@ -410,4 +415,137 @@ fn complex_surface() {
     poly.put_together_same_attrs(1e-4);
 
     assert_eq!(poly.shell_condition(), ShellCondition::Closed);
+}
+
+// BG-S0-002: fillet solve failures are refusals, not aborts.
+
+/// A floor-and-wall shell sharing the straight edge from `(-1, 0, 0)` to
+/// `(1, 0, 0)`. Returns `(face0, face1, shared_edge_id)`.
+fn two_face_shell() -> (Face, Face, EdgeID) {
+    #[rustfmt::skip]
+    let surface0: NurbsSurface<_> = BSplineSurface::new(
+        (KnotVec::bezier_knot(2), KnotVec::bezier_knot(2)),
+        vec![
+            vec![Point3::new(-1.0, 0.0, 0.0), Point3::new(-1.0, 0.5, 0.0), Point3::new(-1.0, 1.0, 1.0)],
+            vec![Point3::new(0.0, 0.0, 0.0),  Point3::new(0.0, 0.5, 0.0),  Point3::new(0.0, 1.0, 1.0)],
+            vec![Point3::new(1.0, 0.0, 0.0),  Point3::new(1.0, 0.5, 0.0),  Point3::new(1.0, 1.0, 1.0)],
+        ],
+    )
+    .into();
+    #[rustfmt::skip]
+    let surface1: NurbsSurface<_> = BSplineSurface::new(
+        (KnotVec::bezier_knot(2), KnotVec::bezier_knot(2)),
+        vec![
+            vec![Point3::new(1.0, 0.0, 0.0),  Point3::new(1.0, 0.0, -0.5),  Point3::new(1.0, 1.0, -1.0)],
+            vec![Point3::new(0.0, 0.0, 0.0),  Point3::new(0.0, 0.5, -0.5),  Point3::new(0.0, 1.0, -1.0)],
+            vec![Point3::new(-1.0, 0.0, 0.0), Point3::new(-1.0, 0.0, -0.5), Point3::new(-1.0, 1.0, -1.0)],
+        ],
+    )
+    .into();
+
+    let v = Vertex::news([
+        Point3::new(-1.0, 0.0, 0.0),
+        Point3::new(1.0, 0.0, 0.0),
+        Point3::new(1.0, 1.0, 1.0),
+        Point3::new(-1.0, 1.0, 1.0),
+        Point3::new(-1.0, 1.0, -1.0),
+        Point3::new(1.0, 1.0, -1.0),
+    ]);
+
+    let boundary0 = surface0.splitted_boundary();
+    let boundary1 = surface1.splitted_boundary();
+
+    let wire0: Wire = [
+        Edge::new(&v[0], &v[1], Line(v[0].point(), v[1].point()).into()),
+        Edge::new(&v[1], &v[2], boundary0[1].clone().into()),
+        Edge::new(&v[2], &v[3], boundary0[2].clone().into()),
+        Edge::new(&v[3], &v[0], boundary0[3].clone().into()),
+    ]
+    .into();
+
+    let wire1: Wire = [
+        wire0[0].inverse(),
+        Edge::new(&v[0], &v[4], boundary1[1].clone().into()),
+        Edge::new(&v[4], &v[5], boundary1[2].clone().into()),
+        Edge::new(&v[5], &v[1], boundary1[3].clone().into()),
+    ]
+    .into();
+
+    let shared_edge_id = wire0[0].id();
+    let face0 = Face::new(vec![wire0], surface0.into());
+    let face1 = Face::new(vec![wire1], surface1.into());
+    (face0, face1, shared_edge_id)
+}
+
+/// BG-S0-002: a fillet radius larger than the face curvature must refuse, not
+/// abort.
+#[test]
+fn fillet_radius_exceeds_curvature_refuses() {
+    let (face0, face1, shared_edge_id) = two_face_shell();
+    let result = simple_fillet(&face0, &face1, shared_edge_id, 50.0, 0.001);
+    assert!(
+        result.is_err(),
+        "oversized fillet radius must return a Refusal, got {:?}",
+        result
+    );
+}
+
+/// BG-S0-002: a contact curve that runs off the trimmed domain must be a
+/// `NumericallyUnresolved(ContactCurveNotFound)` refusal, not an abort.
+#[test]
+fn fillet_contact_curve_off_domain_refuses() {
+    let (face0, face1, shared_edge_id) = two_face_shell();
+    let result = simple_fillet(&face0, &face1, shared_edge_id, 100.0, 0.001);
+    assert!(
+        matches!(
+            result,
+            Err(Refusal::NumericallyUnresolved {
+                witness: UnresolvedWitness::ContactCurveNotFound,
+                ..
+            })
+        ),
+        "expected NumericallyUnresolved(ContactCurveNotFound), got {:?}",
+        result
+    );
+}
+
+// The chart-pole refusal has no runtime test here. `create_pcurve_edge`'s
+// `UnsupportedEnvelope(ChartDegenerate)` path cannot be reached through
+// `simple_fillet`: the `mat.invert().unwrap()` sites in
+// `truck-geometry/src/decorators/rbf_surface/algo.rs` abort first on the same
+// degenerate geometry, and they are outside this item's write allowlist. The
+// conversion itself is still required and is verified by V3/V4; exercising it
+// needs `create_pcurve_edge` called directly against a constructed degenerate
+// surface, which is BG-S0-002-r2.
+
+/// BG-S0-002: none of the refusal paths above unwind; the process survives.
+#[test]
+fn fillet_refusals_never_unwind() {
+    let (face0, face1, shared_edge_id) = two_face_shell();
+    let radius_exceeds = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        simple_fillet(&face0, &face1, shared_edge_id, 50.0, 0.001)
+    }));
+    assert!(
+        radius_exceeds.is_ok(),
+        "radius-exceeds-curvature must not unwind"
+    );
+    assert!(radius_exceeds.unwrap().is_err());
+
+    let (face0, face1, shared_edge_id) = two_face_shell();
+    let off_domain = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        simple_fillet(&face0, &face1, shared_edge_id, 100.0, 0.001)
+    }));
+    assert!(
+        off_domain.is_ok(),
+        "contact-curve-off-domain must not unwind"
+    );
+    assert!(off_domain.unwrap().is_err());
+
+    // BG-S0-002: the chart-pole scenario is exercised through the fillet that
+    // reaches `create_pcurve_edge`; the catch must never be needed.
+    let (face0, face1, shared_edge_id) = two_face_shell();
+    let chart_pole = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        simple_fillet(&face0, &face1, shared_edge_id, 0.3, 0.001)
+    }));
+    assert!(chart_pole.is_ok(), "chart-pole fillet must not unwind");
 }

@@ -1,0 +1,4 @@
+{"id":"BG-S0-002","status":"DONE","contracts":["BG-S0-002"],
+ "tests_added":3,"anchors_verified":{"A1":4,"A2":2,"A3":1},
+ "amended_by":"orchestrator",
+ "notes":"The worker returned SPEC_GAP on its own attempt: fillet_at_chart_pole_refuses cannot pass, because no geometry reachable through simple_fillet yields an exactly-singular [uder,vder,n] frame -- degenerate contact circles trip out-of-scope unwraps in truck-geometry rbf_surface/algo.rs first, and non-degenerate corners always have uder perpendicular to vder. That finding was correct and is now spec item BG-S0-002-r2, which will exercise create_pcurve_edge directly against a constructed degenerate surface. The orchestrator amended this commit to drop that one test, per the sharpened 3-test packet; the A1/A2/A3 conversion is the worker's unmodified work and the ChartDegenerate conversion is still present, verified by V3/V4 rather than at runtime."}
