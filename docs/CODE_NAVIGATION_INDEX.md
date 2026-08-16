@@ -158,7 +158,7 @@ Path prefixes:
 
 | Concept | File | Section |
 |---|---|---|
-| Ambient schema (Ω,Λ,N,Σ,S,C) | `[look] FORMAL_SYSTEM.md` | Def. 7, §III |
+| Ambient schema (Ω,Λ,N,Σ,S,C) | `[look] FORMAL_SYSTEM_STEP_INGESTION.md` | Def. 7, §III |
 | Admissible normalized arc | same | Def. 9 |
 | Orientation normalization, material-left axiom | same | §V, Def. 12 |
 | Curve-on-surface evidence precedence | same | §VI, Def. 13 |

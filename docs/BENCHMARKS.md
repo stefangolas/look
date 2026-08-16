@@ -235,6 +235,42 @@ Coverage on that corpus is 33 of 33 files, spanning AP203, AP242 editions 1
 through 3, and one model that ships an AP242 tessellated solid instead of a
 boundary representation.
 
+#### The regression corpus
+
+Larger real models live in a separate repository,
+[`look-corpus`](https://github.com/stefangolas/look-corpus), so they are not
+cloned with every checkout of `look`:
+
+| family      | file                        | size  | notes                              |
+|-------------|-----------------------------|-------|------------------------------------|
+| `ur10`      | `ur10/ur10.step`            | 28 MB | Universal Robots UR10 arm          |
+| `formula1`  | `formula1/formula1.step`    | 44 MB | CFD step geometry, renamed Formula 1 |
+| `core_xy`   | `core_xy/core_xy.step`      | 8.7 MB| CoreXY printer-style assembly      |
+| `jackhammer`| `jackhammer/jackhammer.step`| 43 MB | Hydraulic jackhammer assembly      |
+| `quadruped` | `quadruped/quadruped.step`  | 150 MB| Quadruped robot assembly           |
+| `nist`      | `nist/NIST-PMI-STEP-Files/` | 54 MB | NIST MBE PMI set (33 files)        |
+
+Set `LOOK_CORPUS` to a checkout of that repository when running the
+external-corpus regression gate, and run the corpus like any other model:
+
+```console
+git clone https://github.com/stefangolas/look-corpus
+$env:LOOK_CORPUS = "C:\path\to\look-corpus"
+python benchmarks/step_corpus.py --tool look \
+    --exe target/release/look.exe --dir $env:LOOK_CORPUS \
+    --baseline benchmarks/corpus_regression_baseline.json
+```
+
+`benchmarks/corpus_regression_baseline.json` is the current build's recording
+over the corpus (38 files): core_xy renders 668k triangles, formula1 renders
+366k, jackhammer renders 1.29M, quadruped renders 2.16M, ur10 renders 502k, all
+33 NIST files render, and every file completes within the timeout budget. The
+baseline was
+taken below the free-memory threshold, so its timings are untrusted; the
+regression signals are the per-file `outcome` and `triangles`, which
+`step_corpus.py --baseline` diffs against. Re-record the baseline deliberately
+after a change you intend to keep, never to make a diff go away.
+
 #### Against F3D
 
 F3D reads STEP through its bundled OpenCASCADE plugin. It does not select that

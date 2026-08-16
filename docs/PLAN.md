@@ -527,7 +527,7 @@ Correct order:
    contradiction. A free gauge is a result, not a failure — and not permission
    to pick a placement.
 5. **Derive the working cover afterwards**, by finite candidate-translate
-   enumeration (FORMAL_SYSTEM Def. 16–17, Lemma 1) for whatever the solve left
+   enumeration (FORMAL_SYSTEM_STEP_INGESTION Def. 16–17, Lemma 1) for whatever the solve left
    free.
 6. **Carry source/synthetic origin and effective orientation on every segment at
    creation** — not retrofitted afterwards.

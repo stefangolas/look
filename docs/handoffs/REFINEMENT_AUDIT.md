@@ -4,7 +4,7 @@
 realization, in `truck-meshalgo/src/tessellation/triangulation.rs`.
 **Method:** for each transformation, state the formal input contract, the formal
 output contract, the implementation representation, and whether the code
-*proves* the transition. Guided by `FORMAL_SYSTEM.md` and the contract registry
+*proves* the transition. Guided by `FORMAL_SYSTEM_STEP_INGESTION.md` and the contract registry
 in `MATHEMATICAL_FOUNDATION.md`.
 **Audited artifact:** truck-fork `628f39e7` (`audit/a1-constraint-roles`),
 look `7f315c7`. See `formal_baseline_manifest.json`.
@@ -39,7 +39,7 @@ missing check.
 | Constraint witness | MF CDT-002 | `bool` | **absent** |
 | Region complex $R=(A,G,\mu)$ | FS Def. 26 | — | **absent.** Collapses directly to `PolygonMesh` |
 
-**Structural conclusion.** Four of FORMAL_SYSTEM §IV's sorts — ambient term,
+**Structural conclusion.** Four of FORMAL_SYSTEM_STEP_INGESTION §IV's sorts — ambient term,
 boundary term, arrangement complex $G$, region term $R$ — are all represented by
 one type, `PolyBoundary(Vec<Vec<SurfacePoint>>)`. This is why every finding in
 this audit lands in one file and mostly one function: there is nowhere else for
@@ -315,8 +315,9 @@ domain on the wrong side of the boundary.**
 
 The circularity is not essential. Inspect what the domain is actually *for* at
 L648: `u0` is used only as the origin of a `floor()` - an **absolute anchor**
-for one bound's deck copy. Absolute anchoring is not required. FORMAL_SYSTEM
-section XII: choose one representative per connected component and translate
+for one bound's deck copy. Absolute anchoring is not required.
+FORMAL_SYSTEM_STEP_INGESTION section XII: choose one representative per
+connected component and translate
 its deck potential to zero. Under a relative rule the lift needs only the
 lattice, each bound receives a deck class relative to the anchored one, and the
 extent is *derived afterwards*.

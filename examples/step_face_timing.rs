@@ -554,7 +554,7 @@ fn main() -> anyhow::Result<()> {
         };
         let mut lost = 0usize;
         for (&shell_id, shell) in table.shell.iter() {
-            let (converted, losses) = match table.to_compressed_shell_with_losses(shell_id, shell) {
+            let (_converted, losses) = match table.to_compressed_shell_with_losses(shell_id, shell) {
                 Ok(res) => res,
                 Err(_) => continue,
             };
