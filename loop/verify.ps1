@@ -79,7 +79,7 @@ function Read-PacketFields {
     if ($ext -eq '.json') {
         $obj = $raw | ConvertFrom-Json
         return [pscustomobject]@{
-            crate          = $obj.crate
+            crates         = @($obj.crates)
             write_allow    = @($obj.write_allow)
             tests_required = @($obj.tests_required)
         }
@@ -90,38 +90,30 @@ function Read-PacketFields {
         $yamlText = $Matches[1]
     }
 
-    $crate = $null
-    if ($yamlText -match '(?m)^crate:\s*(.+?)\s*$') {
-        $crate = $Matches[1].Trim('"', "'", ' ')
-    }
-
     return [pscustomobject]@{
-        crate          = $crate
+        crates         = Get-YamlListField -Text $yamlText -Key 'crates'
         write_allow    = Get-YamlListField -Text $yamlText -Key 'write_allow'
         tests_required = Get-YamlListField -Text $yamlText -Key 'tests_required'
     }
 }
 
-$packet = Read-PacketFields -Path $Packet
-if (-not $packet.crate) {
-    throw "could not read 'crate' field from packet $Packet"
+$pkt = Read-PacketFields -Path $Packet
+if (-not $pkt.crates -or $pkt.crates.Count -eq 0) {
+    throw "could not read 'crates' field from packet $Packet"
 }
 
-# Path -> package name. The packet's `crate` field is a path
-# (vendor/truck/truck-evidence), but cargo -p wants the Cargo.toml [package]
-# name, which is not always identical to the directory.
-$crateCargoToml = Join-Path $wt ($packet.crate -replace '/', '\') | Join-Path -ChildPath 'Cargo.toml'
-if (-not (Test-Path $crateCargoToml)) {
-    throw "packet crate path '$($packet.crate)' has no Cargo.toml at $crateCargoToml"
+# `crates` holds cargo package names, not paths -- cargo -p wants the name and
+# the vendored directory happens to match it, so the directory is only used to
+# catch a typo'd package name before we spend a build on it.
+foreach ($c in $pkt.crates) {
+    $probe = Join-Path $wt "vendor\truck\$c\Cargo.toml"
+    if ($c -ne 'look' -and -not (Test-Path $probe)) {
+        throw "packet names crate '$c' but $probe does not exist"
+    }
 }
-$crateTomlText = Get-Content -Path $crateCargoToml -Raw
-$crateName = $null
-if ($crateTomlText -match '(?s)\[package\].*?name\s*=\s*"([^"]+)"') {
-    $crateName = $Matches[1]
-}
-if (-not $crateName) {
-    throw "could not read [package] name from $crateCargoToml"
-}
+$crateNames = @($pkt.crates)
+# Repeated as `-p a -p b ...` in every cargo invocation below.
+$pArgs = @($crateNames | ForEach-Object { '-p'; $_ })
 
 if (-not $Base) {
     $Base = (git -C $wt merge-base HEAD integration/kernel-bg 2>$null)
@@ -149,13 +141,12 @@ $env:CARGO_TARGET_DIR = $targetDir
 # ---------------------------------------------------------------------------
 $changed = @(git -C $wt diff --name-only "$Base...HEAD" | Where-Object { $_ -ne '' })
 
-$allowedRel = foreach ($entry in $packet.write_allow) {
-    $full = [System.IO.Path]::GetFullPath((Join-Path (Join-Path $wt ($packet.crate -replace '/', '\')) $entry))
-    $rel = $full.Substring($wt.Length).TrimStart('\', '/') -replace '\\', '/'
-    $rel
-}
+# write_allow entries are repo-relative, the same form `git diff --name-only`
+# prints, so they compare directly once separators are normalised. RESULT.json
+# is the packet's own required output and is always in scope.
+$allowedRel = @(@($pkt.write_allow | ForEach-Object { ($_ -replace '\\', '/').Trim() }) + 'RESULT.json' + 'QUESTION.md')
 
-$offenders = @($changed | Where-Object { $_ -notin $allowedRel })
+$offenders = @($changed | Where-Object { ($_ -replace '\\', '/') -notin $allowedRel })
 
 if ($offenders.Count -gt 0) {
     Add-Gate 'V1 scope' 'FAIL' ("out-of-allowlist paths: " + ($offenders -join ', '))
@@ -171,7 +162,7 @@ if (-not $failedEarly) {
     Write-OutSection 'V2 build: cargo check --locked -p'
     Push-Location $wt
     try {
-        cargo check --locked -p $crateName *>> $outFile
+        cargo check --locked @pArgs *>> $outFile
         $exit = $LASTEXITCODE
     } finally { Pop-Location }
     if ($exit -eq 0) {
@@ -191,7 +182,7 @@ if (-not $failedEarly) {
     Write-OutSection 'V3 lint: cargo fmt --check -p'
     Push-Location $wt
     try {
-        cargo fmt --check -p $crateName *>> $outFile
+        cargo fmt --check @pArgs *>> $outFile
         $fmtExit = $LASTEXITCODE
     } finally { Pop-Location }
 
@@ -202,7 +193,7 @@ if (-not $failedEarly) {
         Write-OutSection 'V3 lint: cargo clippy -D warnings'
         Push-Location $wt
         try {
-            cargo clippy -p $crateName --all-targets -- -D warnings *>> $outFile
+            cargo clippy @pArgs --all-targets -- -D warnings *>> $outFile
             $clippyExit = $LASTEXITCODE
         } finally { Pop-Location }
         if ($clippyExit -eq 0) {
@@ -243,7 +234,7 @@ if (-not $failedEarly) {
     Write-OutSection 'V5 tests: cargo test -p --lib --tests'
     Push-Location $wt
     try {
-        cargo test -p $crateName --lib --tests *>> $outFile
+        cargo test @pArgs --lib --tests *>> $outFile
         $testExit = $LASTEXITCODE
     } finally { Pop-Location }
     if ($testExit -eq 0) {
@@ -302,7 +293,7 @@ if (-not $failedEarly) {
     }
 
     $missingRequired = New-Object System.Collections.Generic.List[string]
-    foreach ($req in $packet.tests_required) {
+    foreach ($req in $pkt.tests_required) {
         $keywords = @(($req -replace '[^A-Za-z0-9 ]', ' ') -split '\s+' |
             Where-Object { $_.Length -ge 4 } | ForEach-Object { $_.ToLowerInvariant() })
         $hit = $false
@@ -318,14 +309,16 @@ if (-not $failedEarly) {
 
     # autotests=false precedent: new tests/*.rs files must be declared.
     $addedFiles = @(git -C $wt diff --name-only --diff-filter=A "$Base...HEAD")
-    $newTestFiles = @($addedFiles | Where-Object { $_ -match [regex]::Escape($packet.crate) -and $_ -match '[\\/]tests[\\/].+\.rs$' })
     $undeclared = New-Object System.Collections.Generic.List[string]
-    if ($crateTomlText -match 'autotests\s*=\s*false' -and $newTestFiles.Count -gt 0) {
+    foreach ($c in $crateNames) {
+        $ctoml = Join-Path $wt "vendor\truck\$c\Cargo.toml"
+        if (-not (Test-Path $ctoml)) { continue }
+        $ctext = Get-Content -Path $ctoml -Raw
+        if ($ctext -notmatch 'autotests\s*=\s*false') { continue }
+        $newTestFiles = @($addedFiles | Where-Object { $_ -match "truck/$c/" -and $_ -match '[\\/]tests[\\/].+\.rs$' })
         foreach ($f in $newTestFiles) {
             $baseName = [System.IO.Path]::GetFileNameWithoutExtension($f)
-            if ($crateTomlText -notmatch [regex]::Escape($baseName)) {
-                $undeclared.Add($f)
-            }
+            if ($ctext -notmatch [regex]::Escape($baseName)) { $undeclared.Add($f) }
         }
     }
 
@@ -340,7 +333,7 @@ if (-not $failedEarly) {
         Add-Gate 'V6 test-reality' 'FAIL' ($detailParts -join '; ')
         $failedEarly = $true
     } else {
-        Add-Gate 'V6 test-reality' 'PASS' ("{0} required test(s) matched, {1} test fn(s) found in diff" -f $packet.tests_required.Count, $testFnNames.Count)
+        Add-Gate 'V6 test-reality' 'PASS' ("{0} required test(s) matched, {1} test fn(s) found in diff" -f $pkt.tests_required.Count, $testFnNames.Count)
     }
 } else {
     Add-Gate 'V6 test-reality' 'SKIP' 'earlier gate failed'
@@ -373,13 +366,12 @@ $accepted = -not ($gates | Where-Object { $_.status -eq 'FAIL' })
 
 Write-Host ''
 Write-Host ("VERDICT: {0}" -f ($(if ($accepted) { 'ACCEPTED' } else { 'REJECTED' })))
-Write-Host ("packet={0} slot={1} crate={2} base={3}" -f $Packet, $Slot, $crateName, $Base)
+Write-Host ("packet={0} slot={1} crates={2} base={3}" -f $Packet, $Slot, ($crateNames -join ','), $Base)
 
 $verdict = [pscustomobject]@{
     packet    = $Packet
     slot      = $Slot
-    crate     = $crateName
-    crate_path = $packet.crate
+    crates    = $crateNames
     base      = $Base
     verdict   = $(if ($accepted) { 'ACCEPTED' } else { 'REJECTED' })
     gates     = $gates
