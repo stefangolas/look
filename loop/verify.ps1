@@ -38,6 +38,19 @@ function Write-OutSection {
     Add-Content -Path $outFile -Value ("`n===== $Header =====`n")
 }
 
+# Every gate below runs a native command that writes to stderr. Redirecting a
+# native command's stderr *inside* PowerShell 5.1 wraps each line in an
+# ErrorRecord, which under `$ErrorActionPreference = 'Stop'` aborts the run on
+# cargo's first "Checking truck-base" progress line -- a passing build reported
+# as a crash. Handing the redirect to cmd keeps stderr out of PowerShell
+# entirely, so the exit code is the only signal we read.
+function Invoke-Native {
+    param([Parameter(ValueFromRemainingArguments)] [string[]]$CmdArgs)
+    $line = ($CmdArgs | ForEach-Object { if ($_ -match '\s') { '"' + $_ + '"' } else { $_ } }) -join ' '
+    cmd /c "$line >> ""$outFile"" 2>&1"
+    return $LASTEXITCODE
+}
+
 # ---------------------------------------------------------------------------
 # Packet parsing. gen-packet.ps1 (§10 step 2) does not exist yet, so this
 # parser has to cope with a hand-written JSON or YAML/markdown packet: JSON
@@ -162,8 +175,7 @@ if (-not $failedEarly) {
     Write-OutSection 'V2 build: cargo check --locked -p'
     Push-Location $wt
     try {
-        cargo check --locked @pArgs *>> $outFile
-        $exit = $LASTEXITCODE
+        $exit = Invoke-Native cargo check --locked @pArgs
     } finally { Pop-Location }
     if ($exit -eq 0) {
         Add-Gate 'V2 build' 'PASS'
@@ -182,8 +194,7 @@ if (-not $failedEarly) {
     Write-OutSection 'V3 lint: cargo fmt --check -p'
     Push-Location $wt
     try {
-        cargo fmt --check @pArgs *>> $outFile
-        $fmtExit = $LASTEXITCODE
+        $fmtExit = Invoke-Native cargo fmt --check @pArgs
     } finally { Pop-Location }
 
     if ($fmtExit -ne 0) {
@@ -193,8 +204,12 @@ if (-not $failedEarly) {
         Write-OutSection 'V3 lint: cargo clippy -D warnings'
         Push-Location $wt
         try {
-            cargo clippy @pArgs --all-targets -- -D warnings *>> $outFile
-            $clippyExit = $LASTEXITCODE
+            # `--` written literally on a command line is eaten by PowerShell's
+            # end-of-parameters rule, so clippy would receive `-D warnings` as
+            # its own arguments and cargo would reject them. Splatting an array
+            # passes the separator through untouched.
+            $clippyArgs = @('cargo', 'clippy') + $pArgs + @('--all-targets', '--', '-D', 'warnings')
+            $clippyExit = Invoke-Native @clippyArgs
         } finally { Pop-Location }
         if ($clippyExit -eq 0) {
             Add-Gate 'V3 lint' 'PASS'
@@ -214,8 +229,7 @@ if (-not $failedEarly) {
     Write-OutSection 'V4 house rules: kernel-gates.sh'
     Push-Location $wt
     try {
-        bash scripts/kernel-gates.sh $Base *>> $outFile
-        $gatesExit = $LASTEXITCODE
+        $gatesExit = Invoke-Native bash scripts/kernel-gates.sh $Base
     } finally { Pop-Location }
     if ($gatesExit -eq 0) {
         Add-Gate 'V4 house rules' 'PASS'
@@ -234,8 +248,7 @@ if (-not $failedEarly) {
     Write-OutSection 'V5 tests: cargo test -p --lib --tests'
     Push-Location $wt
     try {
-        cargo test @pArgs --lib --tests *>> $outFile
-        $testExit = $LASTEXITCODE
+        $testExit = Invoke-Native cargo test @pArgs --lib --tests
     } finally { Pop-Location }
     if ($testExit -eq 0) {
         Add-Gate 'V5 tests' 'PASS'
