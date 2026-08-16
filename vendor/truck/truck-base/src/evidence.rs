@@ -68,6 +68,15 @@ pub enum Refusal {
     Contradictory(ContradictionWitness),
     /// The exact object collapsed (§5) — certified, but not a realisation.
     Collapsed(Collapse, Certificate),
+    /// A forward error bound exceeded what the operation could certify
+    /// (BG-EVD-004). Also raised when the split bound is requested for a chain
+    /// that has not been shown subadditive.
+    ForwardToleranceExceeded {
+        /// The bound that was computed.
+        bound: f64,
+        /// The largest bound that would have been acceptable.
+        allowed: f64,
+    },
 }
 
 /// The envelope case that refused an operation.
@@ -365,51 +374,193 @@ impl std::ops::Add for Margin {
     }
 }
 
-/// ω: modulus of continuity (§18).
+/// The shape of ω. Subadditivity is read off this and never declared.
 #[derive(Clone, Copy, Debug, PartialEq)]
-pub enum Modulus {
+pub enum ModulusShape {
     /// ω(ε) = k·ε.
     Lipschitz(f64),
-    /// ω(ε) = k·ε^p — tangency is p = 1/2.
+    /// ω(ε) = k·ε^p. Tangency is p = 1/2.
     Holder {
         /// The Lipschitz-type constant `k`.
         k: f64,
         /// The Hölder exponent `p` (`1/2` at tangency, §9.2).
         exponent: f64,
     },
-    /// May not participate in composition (OB-6).
+    /// ω(ε) = k·ε / (domain − ε): finite inside the domain, unbounded at its
+    /// edge. This is what a near-degenerate cell publishes instead of
+    /// `Unbounded` — an honest non-subadditive bound beats no bound at all.
+    Pole {
+        /// The leading constant `k`.
+        k: f64,
+    },
+    /// No bound is published.
     Unbounded,
 }
 
+/// ω: modulus of continuity, valid on `[0, domain)`.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct Modulus {
+    /// The shape, which decides subadditivity.
+    pub shape: ModulusShape,
+    /// ω is valid only on `[0, domain)`. `f64::INFINITY` for a global bound.
+    pub domain: f64,
+}
+
 impl Modulus {
-    /// Composition, ω₂ ∘ ω₁. `Lipschitz(a) ∘ Lipschitz(b) = Lipschitz(ab)`;
-    /// anything composed with `Unbounded` is `Unbounded`.
-    pub fn compose(&self, other: &Self) -> Self {
-        match (self, other) {
-            (Modulus::Unbounded, _) | (_, Modulus::Unbounded) => Modulus::Unbounded,
-            (Modulus::Lipschitz(a), Modulus::Lipschitz(b)) => Modulus::Lipschitz(a * b),
+    /// Compatibility with the 38 `Modulus::Unbounded` call sites the r2 shape
+    /// left behind; BG-EVD-r3b renames them and deletes this.
+    #[allow(non_upper_case_globals)] // deliberate: it stands in for a variant path
+    pub const Unbounded: Modulus = Modulus {
+        shape: ModulusShape::Unbounded,
+        domain: f64::INFINITY,
+    };
+
+    /// Whether ω is subadditive: ω(a+b) ≤ ω(a) + ω(b). Decided from the
+    /// shape, never declared by a caller (BG-EVD-004). ω with ω(0) = 0 is
+    /// subadditive when it is concave.
+    pub fn is_subadditive(&self) -> bool {
+        match self.shape {
+            ModulusShape::Lipschitz(_) => true,
+            ModulusShape::Holder { exponent, .. } => exponent <= 1.0,
+            ModulusShape::Pole { .. } => false,
+            ModulusShape::Unbounded => false,
+        }
+    }
+
+    /// ω(ε). Returns `f64::INFINITY` outside `[0, domain)` and for `Unbounded`:
+    /// "no bound available here" is a real answer, and a total function keeps
+    /// this on the right side of H-1.
+    pub fn eval(&self, eps: f64) -> f64 {
+        if eps.is_nan() || eps < 0.0 || eps >= self.domain {
+            return f64::INFINITY;
+        }
+        match self.shape {
+            ModulusShape::Lipschitz(k) => k * eps,
+            ModulusShape::Holder { k, exponent } => k * eps.powf(exponent),
+            ModulusShape::Pole { k } => k * eps / (self.domain - eps),
+            ModulusShape::Unbounded => f64::INFINITY,
+        }
+    }
+
+    /// One step of the forward-error recurrence: ω(incoming) + tau. Always
+    /// valid, subadditive or not.
+    pub fn propagate(&self, incoming: f64, tau: f64) -> f64 {
+        self.eval(incoming) + tau
+    }
+
+    /// Fold the recurrence over a chain of (modulus, tau) steps. Always valid.
+    pub fn propagate_chain(steps: &[(Modulus, f64)]) -> f64 {
+        steps
+            .iter()
+            .fold(0.0, |incoming, (m, tau)| m.propagate(incoming, *tau))
+    }
+
+    /// ω₂ ∘ ω₁, the split-bound fast path. Refuses unless BOTH operands are
+    /// subadditive (BG-EVD-004 M4): composing a non-subadditive operand would
+    /// publish a bound that may under-report the forward error.
+    pub fn compose(&self, other: &Self) -> Outcome<Modulus> {
+        if !self.is_subadditive() || !other.is_subadditive() {
+            return Err(Refusal::ForwardToleranceExceeded {
+                bound: composed_constant(self, other),
+                allowed: f64::INFINITY,
+            });
+        }
+        // Subadditive operands are `Lipschitz` or `Holder { p <= 1 }` only; the
+        // `Pole`/`Unbounded` arms below are unreachable and kept only to make
+        // the match exhaustive.
+        let shape = match (self.shape, other.shape) {
+            (ModulusShape::Lipschitz(a), ModulusShape::Lipschitz(b)) => {
+                ModulusShape::Lipschitz(a * b)
+            }
+            (ModulusShape::Lipschitz(a), ModulusShape::Holder { k, exponent }) => {
+                ModulusShape::Holder { k: a * k, exponent }
+            }
+            (ModulusShape::Holder { k, exponent }, ModulusShape::Lipschitz(a)) => {
+                ModulusShape::Holder { k: a * k, exponent }
+            }
             (
-                Modulus::Holder {
+                ModulusShape::Holder {
                     k: k1,
                     exponent: e1,
                 },
-                Modulus::Holder {
+                ModulusShape::Holder {
                     k: k2,
                     exponent: e2,
                 },
-            ) => Modulus::Holder {
+            ) => ModulusShape::Holder {
                 k: k1 * k2,
                 exponent: e1 * e2,
             },
-            (Modulus::Lipschitz(a), Modulus::Holder { k, exponent }) => Modulus::Holder {
-                k: a * k,
-                exponent: *exponent,
+            (ModulusShape::Pole { .. }, _)
+            | (_, ModulusShape::Pole { .. })
+            | (ModulusShape::Unbounded, _)
+            | (_, ModulusShape::Unbounded) => ModulusShape::Unbounded,
+        };
+        // A composite is valid only where both parts are.
+        let composed = Modulus {
+            shape,
+            domain: self.domain.min(other.domain),
+        };
+        Ok(Certified::new(
+            composed,
+            Certificate {
+                props: PropMap::new(),
+                // The composition is float arithmetic on the two constants
+                // (H-6): never `Exact`.
+                method: Method::Float,
+                budget_left: Budget::new(0, 0, 0),
+                margin: Margin::UNBOUNDED,
+                modulus: composed,
             },
-            (Modulus::Holder { k, exponent }, Modulus::Lipschitz(a)) => Modulus::Holder {
-                k: a * k,
-                exponent: *exponent,
-            },
+        ))
+    }
+
+    /// The tightest subadditive modulus that dominates this one on its domain,
+    /// so a caller holding a non-subadditive modulus can still reach the fast
+    /// path by paying for a looser bound.
+    pub fn concave_majorant(&self) -> Modulus {
+        match self.shape {
+            ModulusShape::Lipschitz(_) => *self,
+            ModulusShape::Holder { exponent, .. } if exponent <= 1.0 => *self,
+            ModulusShape::Holder { k, exponent } => {
+                // Convex Hölder (p > 1): the Lipschitz chord over [0, d] —
+                // through (0, 0) and (d, ω(d)) — has slope k·d^(p−1) and
+                // dominates the convex ω there. An infinite domain admits no
+                // finite chord, so no subadditive majorant is published.
+                let d = self.domain;
+                if d.is_finite() {
+                    let slope = k * d.powf(exponent - 1.0);
+                    Modulus {
+                        shape: ModulusShape::Lipschitz(slope),
+                        domain: d,
+                    }
+                } else {
+                    Modulus::Unbounded
+                }
+            }
+            ModulusShape::Pole { .. } => {
+                // Convex, and unbounded at its domain edge: the chord through
+                // (0, 0) and (d, ∞) has no finite slope, so no finite
+                // Lipschitz line dominates a Pole over [0, d). Publish nothing
+                // rather than a false bound.
+                Modulus::Unbounded
+            }
+            ModulusShape::Unbounded => *self,
         }
+    }
+}
+
+/// The characteristic constant of the would-be composite ω₂ ∘ ω₁, for the
+/// `bound` of a `ForwardToleranceExceeded` refusal. `f64::INFINITY` where no
+/// finite constant is defined (a `Pole` or `Unbounded` operand).
+fn composed_constant(self_: &Modulus, other: &Modulus) -> f64 {
+    match (self_.shape, other.shape) {
+        (ModulusShape::Lipschitz(a), ModulusShape::Lipschitz(b)) => a * b,
+        (ModulusShape::Lipschitz(a), ModulusShape::Holder { k, .. }) => a * k,
+        (ModulusShape::Holder { k, .. }, ModulusShape::Lipschitz(a)) => a * k,
+        (ModulusShape::Holder { k: k1, .. }, ModulusShape::Holder { k: k2, .. }) => k1 * k2,
+        (ModulusShape::Pole { .. }, _) | (_, ModulusShape::Pole { .. }) => f64::INFINITY,
+        (ModulusShape::Unbounded, _) | (_, ModulusShape::Unbounded) => f64::INFINITY,
     }
 }
 
@@ -421,7 +572,9 @@ impl Certificate {
     ///   certainty, so `Exact ⊓ Float = Float` and `None` dominates.
     /// - budget_left: the sum of the remainders.
     /// - margin: the minimum.
-    /// - modulus: ω₂ ∘ ω₁.
+    /// - modulus: ω₂ ∘ ω₁ where both parts compose (both subadditive);
+    ///   otherwise `Unbounded` — the honest conservative answer ("no bound
+    ///   published") rather than a bound that might under-report.
     pub fn accumulate(&self, other: &Self) -> Result<Certificate, ContradictionWitness> {
         let props = self.props.join(&other.props)?;
         // Method is ordered weakest → strongest in the enum declaration; the
@@ -433,7 +586,14 @@ impl Certificate {
             depth: self.budget_left.depth + other.budget_left.depth,
         };
         let margin = self.margin.min(other.margin);
-        let modulus = self.modulus.compose(&other.modulus);
+        let modulus = match self.modulus.compose(&other.modulus) {
+            Ok(composed) => composed.value,
+            Err(_) => {
+                // TODO(BG-EVD-r3b): thread propagate() through accumulation so a
+                // non-subadditive chain still publishes its real bound instead of Unbounded.
+                Modulus::Unbounded
+            }
+        };
         Ok(Certificate {
             props,
             method,
@@ -478,7 +638,10 @@ mod tests {
             method: Method::Exact,
             budget_left: Budget::new(10, 10, 10),
             margin: Margin::UNBOUNDED,
-            modulus: Modulus::Lipschitz(1.0),
+            modulus: Modulus {
+                shape: ModulusShape::Lipschitz(1.0),
+                domain: f64::INFINITY,
+            },
         };
         cert_a.props.set(Prop::AnalyticCarrier, Truth::True);
         let cert_b = Certificate {
@@ -486,7 +649,10 @@ mod tests {
             method: Method::Float,
             budget_left: Budget::new(5, 5, 5),
             margin: Margin::from_log2(1.0),
-            modulus: Modulus::Lipschitz(2.0),
+            modulus: Modulus {
+                shape: ModulusShape::Lipschitz(2.0),
+                domain: f64::INFINITY,
+            },
         };
         let out = cert_a.accumulate(&cert_b).unwrap();
         // Exact ⊓ Float = Float (H-6).
@@ -494,18 +660,50 @@ mod tests {
         // Margin: minimum.
         assert_eq!(out.margin.log2(), 1.0);
         // Modulus: Lipschitz(1)∘Lipschitz(2) = Lipschitz(2).
-        assert_eq!(out.modulus, Modulus::Lipschitz(2.0));
+        assert_eq!(
+            out.modulus,
+            Modulus {
+                shape: ModulusShape::Lipschitz(2.0),
+                domain: f64::INFINITY,
+            }
+        );
         // Budget: sum of remainders.
         assert_eq!(out.budget_left.subdiv, 15);
     }
 
     #[test]
     fn modulus_composition_matches_numeric_evaluation() {
-        let a = Modulus::Lipschitz(3.0);
-        let b = Modulus::Lipschitz(4.0);
-        assert_eq!(a.compose(&b), Modulus::Lipschitz(12.0));
-        assert_eq!(a.compose(&Modulus::Unbounded), Modulus::Unbounded);
-        assert_eq!(Modulus::Unbounded.compose(&a), Modulus::Unbounded);
+        let a = Modulus {
+            shape: ModulusShape::Lipschitz(3.0),
+            domain: f64::INFINITY,
+        };
+        let b = Modulus {
+            shape: ModulusShape::Lipschitz(4.0),
+            domain: f64::INFINITY,
+        };
+        let out = a.compose(&b).unwrap();
+        assert_eq!(
+            out.value,
+            Modulus {
+                shape: ModulusShape::Lipschitz(12.0),
+                domain: f64::INFINITY,
+            }
+        );
+        // The composite evaluates like the nested application, ω₂(ω₁(ε)).
+        let eps = 0.5;
+        assert!((out.value.eval(eps) - b.eval(a.eval(eps))).abs() < 1e-9); // H-3: float epsilon between two evaluations of one dimensionless modulus, not a length
+                                                                           // The composition is float arithmetic, never stamped `Exact` (H-6).
+        assert_eq!(out.cert.method, Method::Float);
+        // `Unbounded` is not subadditive: the fast path refuses rather than
+        // silently publishing the old "anything with Unbounded is Unbounded".
+        assert!(matches!(
+            a.compose(&Modulus::Unbounded),
+            Err(Refusal::ForwardToleranceExceeded { .. })
+        ));
+        assert!(matches!(
+            Modulus::Unbounded.compose(&a),
+            Err(Refusal::ForwardToleranceExceeded { .. })
+        ));
     }
 
     #[test]
@@ -514,5 +712,259 @@ mod tests {
         assert!(b.spend_subdiv(1).is_err());
         assert!(b.spend_newton(1).is_err());
         assert!(b.spend_depth().is_err());
+    }
+
+    #[test]
+    fn modulus_shape_decides_subadditivity() {
+        // The §2 table, every row: subadditivity is read off the shape.
+        let lip = Modulus {
+            shape: ModulusShape::Lipschitz(1.0),
+            domain: f64::INFINITY,
+        };
+        let holder_concave = Modulus {
+            shape: ModulusShape::Holder {
+                k: 1.0,
+                exponent: 0.5,
+            },
+            domain: f64::INFINITY,
+        };
+        let holder_linear = Modulus {
+            shape: ModulusShape::Holder {
+                k: 1.0,
+                exponent: 1.0,
+            },
+            domain: f64::INFINITY,
+        };
+        let holder_convex = Modulus {
+            shape: ModulusShape::Holder {
+                k: 1.0,
+                exponent: 1.5,
+            },
+            domain: 8.0,
+        };
+        let pole = Modulus {
+            shape: ModulusShape::Pole { k: 1.0 },
+            domain: 4.0,
+        };
+        let unbounded = Modulus::Unbounded;
+        assert!(lip.is_subadditive());
+        assert!(holder_concave.is_subadditive());
+        assert!(holder_linear.is_subadditive());
+        assert!(!holder_convex.is_subadditive());
+        assert!(!pole.is_subadditive());
+        assert!(!unbounded.is_subadditive());
+
+        // §5: the concave majorant restores subadditivity from the shape, and
+        // dominates the original at sampled points. The convex Hölder's
+        // majorant is the Lipschitz chord over [0, d].
+        let majorant = holder_convex.concave_majorant();
+        assert!(majorant.is_subadditive());
+        for i in 0..=63 {
+            let eps = 8.0 * (i as f64) / 64.0;
+            assert!(
+                majorant.eval(eps) >= holder_convex.eval(eps) - 1e-9, // H-3: float slack on a dominance check, not a length
+                "majorant under-reports at eps = {eps}"
+            );
+        }
+        // A Pole is unbounded at its domain edge (ω(d) = ∞), so no finite
+        // Lipschitz chord dominates it over [0, d); the majorant publishes
+        // nothing.
+        assert_eq!(pole.concave_majorant(), Modulus::Unbounded);
+    }
+
+    #[test]
+    fn propagate_never_exceeds_split_bound_on_subadditive_chains() {
+        // The recurrence is never looser than the split bound on subadditive
+        // chains; that is why it is safe as the default path.
+        let mut state: u64 = 0x5EED_2026_0816;
+        for _ in 0..2000 {
+            let len = 1 + lcg_next(&mut state) % 8;
+            let mut steps = Vec::new();
+            for _ in 0..len {
+                steps.push((
+                    random_subadditive_modulus(&mut state),
+                    random_tau(&mut state),
+                ));
+            }
+            let propagate = Modulus::propagate_chain(&steps);
+            let split = split_bound(&steps);
+            assert!(
+                propagate <= split + 1e-9, // H-3: float slack between two error bounds, not a length
+                "propagate {propagate} > split {split} on {steps:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn split_bound_under_reports_through_a_pole() {
+        // The test this whole item exists for: with a `Pole` in the chain, the
+        // split bound is STRICTLY smaller than the honest forward-error
+        // recurrence — using it would under-report the error. The Pole is
+        // convex, so the decoupling that subadditivity would justify runs the
+        // wrong way: ω(a + b) > ω(a) + ω(b).
+        let lip = Modulus {
+            shape: ModulusShape::Lipschitz(1.0),
+            domain: f64::INFINITY,
+        };
+        let pole = Modulus {
+            shape: ModulusShape::Pole { k: 1.0 },
+            domain: 4.0,
+        };
+        let steps = [(lip, 1.0), (lip, 1.0), (pole, 1.0)];
+        let propagate = Modulus::propagate_chain(&steps);
+        // The classic split bound, written out for this chain: each tolerance
+        // is amplified by the moduli after it. The first two tolerances are
+        // followed by the Pole (Lip(1) is the identity), the last by nothing.
+        //  E₃ = pole(2) + 1 = 2.0, split = pole(1) + pole(1) + 1 = 5/3.
+        let split = pole.eval(1.0) + pole.eval(1.0) + 1.0;
+        assert!(
+            split < propagate,
+            "split {split} must be strictly smaller than propagate {propagate}"
+        );
+    }
+
+    #[test]
+    fn compose_refuses_a_non_subadditive_operand() {
+        // Same chain as the under-report test: the fast path refuses rather
+        // than returning the under-reporting bound.
+        let lip = Modulus {
+            shape: ModulusShape::Lipschitz(1.0),
+            domain: f64::INFINITY,
+        };
+        let pole = Modulus {
+            shape: ModulusShape::Pole { k: 1.0 },
+            domain: 4.0,
+        };
+        // A `Pole` operand refuses in either position.
+        assert!(matches!(
+            lip.compose(&pole),
+            Err(Refusal::ForwardToleranceExceeded {
+                allowed,
+                ..
+            }) if allowed == f64::INFINITY
+        ));
+        assert!(matches!(
+            pole.compose(&lip),
+            Err(Refusal::ForwardToleranceExceeded { .. })
+        ));
+        // Folding the whole chain refuses at the step that meets the Pole.
+        let out = lip.compose(&lip).unwrap().value.compose(&pole);
+        assert!(matches!(out, Err(Refusal::ForwardToleranceExceeded { .. })));
+    }
+
+    #[test]
+    fn pole_modulus_is_finite_inside_its_domain() {
+        let pole = Modulus {
+            shape: ModulusShape::Pole { k: 2.0 },
+            domain: 4.0,
+        };
+        // Finite inside [0, domain).
+        assert!(pole.eval(0.0).is_finite());
+        assert!(pole.eval(1.0).is_finite());
+        assert!(pole.eval(3.999).is_finite());
+        assert!((pole.eval(1.0) - (2.0 * 1.0) / (4.0 - 1.0)).abs() < 1e-9); // H-3: float epsilon against a closed form, not a length
+                                                                            // INFINITY at and beyond the domain edge.
+        assert!(pole.eval(4.0).is_infinite());
+        assert!(pole.eval(5.0).is_infinite());
+        // INFINITY for negative and NaN input, without panicking.
+        assert!(pole.eval(-0.5).is_infinite());
+        assert!(pole.eval(f64::NAN).is_infinite());
+    }
+
+    /// Deterministic LCG so a failure is reproducible. Seeds the "random"
+    /// subadditive chains and tolerances of the split-bound test.
+    fn lcg_next(state: &mut u64) -> u64 {
+        *state = state
+            .wrapping_mul(6_364_136_223_846_793_005)
+            .wrapping_add(1_442_695_040_888_963_407);
+        *state
+    }
+
+    /// A subadditive modulus: `Lipschitz` or `Holder` with `exponent <= 1.0`,
+    /// published on an infinite (global) domain so every evaluation is finite.
+    fn random_subadditive_modulus(state: &mut u64) -> Modulus {
+        let kind = lcg_next(state) % 2;
+        let k = 0.1 + ((lcg_next(state) % 10_000) as f64 / 10_000.0) * 2.9;
+        let exponent = 0.1 + ((lcg_next(state) % 10_000) as f64 / 10_000.0) * 0.9;
+        let shape = match kind {
+            0 => ModulusShape::Lipschitz(k),
+            _ => ModulusShape::Holder { k, exponent },
+        };
+        Modulus {
+            shape,
+            domain: f64::INFINITY,
+        }
+    }
+
+    fn random_tau(state: &mut u64) -> f64 {
+        ((lcg_next(state) % 100_000) as f64 / 100_000.0) * 0.5
+    }
+
+    /// The classic decoupled ("split") bound: each per-step tolerance is
+    /// amplified by the moduli after it and the contributions are summed.
+    /// Subadditivity of every modulus is exactly what makes this an upper bound
+    /// on the recurrence (that is the theorem BG-EVD-004 leans on), and the
+    /// `Pole` at the end of the under-report test breaks it in the unsafe
+    /// direction.
+    fn split_bound(steps: &[(Modulus, f64)]) -> f64 {
+        let mut bound = 0.0;
+        // `composite` is the composition of the moduli after the current step,
+        // in chain order (ωₙ ∘ ... ∘ ωᵢ₊₁): later steps outermost. Built
+        // backwards so `compose_math` (self ∘ other) keeps chain order.
+        let mut composite: Option<Modulus> = None;
+        for (m, tau) in steps.iter().rev() {
+            bound += match composite {
+                Some(c) => c.eval(*tau),
+                None => *tau, // no moduli after this step: identity
+            };
+            composite = Some(match composite {
+                Some(c) => compose_math(&c, m),
+                None => *m,
+            });
+        }
+        bound
+    }
+
+    /// True function composition, self ∘ other: x ↦ self(other(x)), as a
+    /// `Modulus` shape. The code's `compose` fast path preserves the r2
+    /// arithmetic (Hölder constants multiply), which for Hölder is not the true
+    /// function composition; the split bound is the theorem's bound, so the
+    /// tests compose the functions themselves. Test-only: `Pole`/`Unbounded`
+    /// compositions are not single shapes and never arise in the subadditive
+    /// chains exercised here.
+    fn compose_math(self_: &Modulus, other: &Modulus) -> Modulus {
+        let domain = self_.domain.min(other.domain);
+        let shape = match (self_.shape, other.shape) {
+            (ModulusShape::Lipschitz(a), ModulusShape::Lipschitz(b)) => {
+                ModulusShape::Lipschitz(a * b)
+            }
+            (ModulusShape::Lipschitz(a), ModulusShape::Holder { k, exponent }) => {
+                ModulusShape::Holder { k: a * k, exponent }
+            }
+            (ModulusShape::Holder { k, exponent }, ModulusShape::Lipschitz(a)) => {
+                ModulusShape::Holder {
+                    k: k * a.powf(exponent),
+                    exponent,
+                }
+            }
+            (
+                ModulusShape::Holder {
+                    k: k1,
+                    exponent: e1,
+                },
+                ModulusShape::Holder {
+                    k: k2,
+                    exponent: e2,
+                },
+            ) => ModulusShape::Holder {
+                k: k1 * k2.powf(e1),
+                exponent: e1 * e2,
+            },
+            (ModulusShape::Pole { .. }, _) | (_, ModulusShape::Pole { .. }) => {
+                ModulusShape::Unbounded
+            }
+            (ModulusShape::Unbounded, _) | (_, ModulusShape::Unbounded) => ModulusShape::Unbounded,
+        };
+        Modulus { shape, domain }
     }
 }
