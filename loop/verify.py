@@ -7,6 +7,17 @@ Usage: python loop/verify.py --slot 0 --packet loop/packets/BG-S0-002.md [--base
 --base is the ref the diff is computed against (merge-base for a normal
 packet run). Defaults to where the slot branch diverged from
 integration/kernel-bg, matching how new_slot.py forks a slot branch.
+
+--only V3,V5 runs just those gates and reports the rest SKIP. This exists
+because the amend-and-verify path (amend a proven commit rather than pay for
+a fresh ~90-minute worker run) is now the common case, and a full verify is a
+4-6 minute cargo cycle even when only one gate's input changed. It can never
+produce ACCEPTED: a partial run's verdict is PARTIAL (exit 3), because
+nothing about re-checking one gate tells you the others still hold, and
+acceptance is a claim about the whole packet, not a subset of it. V0
+preflight always runs regardless of --only -- every other gate reads the
+diff between base and HEAD, so a verdict is meaningless if the run never
+finished.
 """
 import argparse
 import datetime
@@ -252,7 +263,23 @@ def main():
     ap.add_argument('--slot', type=int, required=True)
     ap.add_argument('--packet', required=True)
     ap.add_argument('--base')
+    ap.add_argument('--only', help='comma-separated gate ids (e.g. V3,V5) -- runs only these, '
+                                    'SKIPs the rest, and the verdict is PARTIAL, never ACCEPTED')
     args = ap.parse_args()
+
+    only_gates = None
+    if args.only:
+        only_gates = set(g.strip().upper() for g in args.only.split(',') if g.strip())
+        valid_ids = {f'V{n}' for n in range(1, 9)}
+        unknown = only_gates - valid_ids
+        if unknown:
+            sys.exit(f"--only names unknown gate id(s): {', '.join(sorted(unknown))} (valid: {', '.join(sorted(valid_ids))})")
+
+    def gate_wanted(gate_id):
+        return only_gates is None or gate_id in only_gates
+
+    def skip_not_requested(name):
+        v.add_gate(name, 'SKIP', f"not requested (--only {args.only})")
 
     v = Verifier(args.slot, args.packet, args.base)
 
@@ -293,6 +320,16 @@ def main():
     v.base = base
 
     diff_range = f"{base}...HEAD"
+
+    # Branch + exact commit this run judged, so a VERDICT.json can be traced
+    # back to the work it verified rather than reconstructed from prose in
+    # STATE.md (that reconstruction is exactly what happened landing
+    # BG-S0-002: the slot's branch had moved past what got verified, and
+    # nothing on disk said so).
+    branch_lines = git_lines(v.wt, 'rev-parse', '--abbrev-ref', 'HEAD')
+    branch = branch_lines[0] if branch_lines else '?'
+    commit_lines = git_lines(v.wt, 'rev-parse', 'HEAD')
+    commit_sha = commit_lines[0] if commit_lines else '?'
 
     # -----------------------------------------------------------------------
     # V0 preflight — did a run actually finish? Every gate below reads the
@@ -347,6 +384,20 @@ def main():
     has_result = (v.wt / 'RESULT.json').is_file()
     has_question = (v.wt / 'QUESTION.md').is_file()
 
+    # amended_by marks a RESULT.json the orchestrator rewrote on top of the
+    # worker's own claim -- e.g. dropping a test the worker correctly proved
+    # unreachable, once the spec was fixed to agree, rather than paying for a
+    # fresh dispatch. That's the cheap path landing BG-S0-002 took, and until
+    # now nothing recorded that the commit under verification wasn't the
+    # worker's unmodified output. Surfaced here so a verdict can never present
+    # amended work as untouched.
+    amended_by = None
+    if has_result:
+        try:
+            amended_by = json.loads((v.wt / 'RESULT.json').read_text(encoding='utf-8')).get('amended_by')
+        except (json.JSONDecodeError, OSError):
+            amended_by = None
+
     preflight = []
     if commits_ahead == 0:
         preflight.append(f"no commit since {base[:7]} -- the worker never finished")
@@ -364,6 +415,7 @@ def main():
         print('VERDICT: BLOCKED')
         verdict = {
             'packet': args.packet, 'slot': v.slot, 'crates': crate_names, 'base': base,
+            'branch': branch, 'commit': commit_sha, 'amended_by': amended_by,
             'verdict': 'BLOCKED', 'gates': v.gates,
             'timestamp': datetime.datetime.now(datetime.timezone.utc).isoformat().replace('+00:00', 'Z'),
         }
@@ -371,7 +423,8 @@ def main():
         sys.exit(2)
 
     v.add_gate('V0 preflight', 'PASS',
-               f"{commits_ahead} commit(s), worktree clean, {'RESULT.json' if has_result else 'QUESTION.md'} written")
+               f"{commits_ahead} commit(s), worktree clean, {'RESULT.json' if has_result else 'QUESTION.md'} written"
+               + (f"; RESULT.json amended_by={amended_by!r}" if amended_by else ''))
 
     # -----------------------------------------------------------------------
     # V1 scope — git diff --name-only <base>...HEAD must be a subset of write_allow.
@@ -385,7 +438,12 @@ def main():
 
     offenders = [f for f in changed if f.replace('\\', '/') not in allowed_rel]
 
-    if offenders:
+    # `changed` above is cheap (a name-only diff) and V3/V6 both read it, so
+    # it's always computed even when V1 itself isn't in --only -- only the
+    # gate verdict is conditional on being requested.
+    if not gate_wanted('V1'):
+        skip_not_requested('V1 scope')
+    elif offenders:
         v.add_gate('V1 scope', 'FAIL', "out-of-allowlist paths: " + ', '.join(offenders))
         v.failed_early = True
     else:
@@ -397,7 +455,9 @@ def main():
     # -----------------------------------------------------------------------
     # V2 build — cargo check --locked -p <crate>
     # -----------------------------------------------------------------------
-    if not v.failed_early:
+    if not gate_wanted('V2'):
+        skip_not_requested('V2 build')
+    elif not v.failed_early:
         v.write_out_section('V2 build: cargo check --locked -p')
         exit_code = v.invoke_native(['cargo', 'check', '--locked', *p_args], v.wt)
         if exit_code == 0:
@@ -411,7 +471,9 @@ def main():
     # -----------------------------------------------------------------------
     # V3 lint — cargo fmt --check, then cargo clippy -D warnings
     # -----------------------------------------------------------------------
-    if not v.failed_early:
+    if not gate_wanted('V3'):
+        skip_not_requested('V3 lint')
+    elif not v.failed_early:
         v.write_out_section('V3 lint: cargo fmt --check -p')
         fmt_exit = v.invoke_native(['cargo', 'fmt', '--check', *p_args], v.wt)
 
@@ -514,7 +576,9 @@ def main():
     # -----------------------------------------------------------------------
     # V4 house rules — scripts/kernel-gates.sh <base>, diff-scoped, H-1/H-3/H-4.
     # -----------------------------------------------------------------------
-    if not v.failed_early:
+    if not gate_wanted('V4'):
+        skip_not_requested('V4 house rules')
+    elif not v.failed_early:
         v.write_out_section('V4 house rules: kernel-gates.sh')
         bash = find_bash()
         if not bash:
@@ -569,7 +633,9 @@ def main():
     # tell those apart from cargo's text output alone, so this is a false
     # positive this gate can produce, not a case it silently misses.
     # -----------------------------------------------------------------------
-    if not v.failed_early:
+    if not gate_wanted('V5'):
+        skip_not_requested('V5 tests')
+    elif not v.failed_early:
         baseline = load_or_compute_baseline(base, crate_names, v.out_file)
 
         v.write_out_section('V5 tests: cargo test -p --lib --tests --no-fail-fast')
@@ -648,7 +714,9 @@ def main():
     # rubber-stamps when in doubt); tightening it to exact-name matching is
     # gen-packet.ps1's job, once it defines the naming convention it will emit.
     # -----------------------------------------------------------------------
-    if not v.failed_early:
+    if not gate_wanted('V6'):
+        skip_not_requested('V6 test-reality')
+    elif not v.failed_early:
         _, diff_text = git(v.wt, 'diff', diff_range, '--', '*.rs')
         added_lines_rs = [l for l in re.split(r'\r?\n', diff_text) if re.match(r'^\+[^+]', l)]
 
@@ -724,7 +792,10 @@ def main():
     # test and where the weakened-impl harness lives, and no packet has that
     # field yet (gen-packet.ps1 doesn't exist). Always passes until then.
     # -----------------------------------------------------------------------
-    v.add_gate('V7 mutation spot-check', 'PASS', 'TODO stub — always passes; see comment in verify.py')
+    if gate_wanted('V7'):
+        v.add_gate('V7 mutation spot-check', 'PASS', 'TODO stub — always passes; see comment in verify.py')
+    else:
+        skip_not_requested('V7 mutation spot-check')
 
     # -----------------------------------------------------------------------
     # V8 no-regression — TODO. Per §5: the previously accepted wave's tests still
@@ -732,11 +803,43 @@ def main():
     # "the previous wave" is and which crates it touched, which is orchestrator
     # state that doesn't exist yet. Always passes until then.
     # -----------------------------------------------------------------------
-    v.add_gate('V8 no-regression', 'PASS', 'TODO stub — always passes; see comment in verify.py')
+    if gate_wanted('V8'):
+        v.add_gate('V8 no-regression', 'PASS', 'TODO stub — always passes; see comment in verify.py')
+    else:
+        skip_not_requested('V8 no-regression')
 
     # -----------------------------------------------------------------------
     # Verdict
+    #
+    # --only forces PARTIAL no matter what the requested gates found. This is
+    # deliberate and not just a default: the whole point of the flag is to
+    # make re-checking one gate cheap, and the moment a partial run could
+    # report ACCEPTED, someone will land a packet on the strength of "V3
+    # passed" without V2/V5/the rest having been re-run against the amended
+    # commit. Exit code 3 (distinct from 0/1/2) so a caller can't mistake it
+    # for any full-run outcome by accident.
     # -----------------------------------------------------------------------
+    if only_gates is not None:
+        print()
+        print(f"VERDICT: PARTIAL (--only {args.only} -- not a substitute for a full run)")
+        print(f"packet={args.packet} slot={v.slot} crates={','.join(crate_names)} base={base}")
+
+        verdict = {
+            'packet': args.packet,
+            'slot': v.slot,
+            'crates': crate_names,
+            'base': base,
+            'branch': branch,
+            'commit': commit_sha,
+            'amended_by': amended_by,
+            'verdict': 'PARTIAL',
+            'only': sorted(only_gates),
+            'gates': v.gates,
+            'timestamp': datetime.datetime.now(datetime.timezone.utc).isoformat().replace('+00:00', 'Z'),
+        }
+        v.verdict_file.write_text(json.dumps(verdict, indent=4), encoding='utf-8')
+        sys.exit(3)
+
     accepted = not any(g['status'] == 'FAIL' for g in v.gates)
 
     print()
@@ -748,6 +851,9 @@ def main():
         'slot': v.slot,
         'crates': crate_names,
         'base': base,
+        'branch': branch,
+        'commit': commit_sha,
+        'amended_by': amended_by,
         'verdict': 'ACCEPTED' if accepted else 'REJECTED',
         'gates': v.gates,
         'timestamp': datetime.datetime.now(datetime.timezone.utc).isoformat().replace('+00:00', 'Z'),

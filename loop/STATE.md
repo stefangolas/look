@@ -106,6 +106,14 @@ dependency on hardening `rbf_surface/algo.rs`).
 
 ## The commands
 
+`slot_status.py` prints each slot's branch and short HEAD (`git=branch@sha`),
+flagged `(=base, no work)` when HEAD is still sitting at the slot's fork
+point -- so which branch actually holds a packet's best attempt is read off
+the slot, not reconstructed from prose the way BG-S0-002's attempt1 branch
+had to be. `run_packet.py` records the branch it dispatched onto in
+`loop/slots/<N>/worker.branch`, and `verify.py` records the branch and exact
+commit it judged in `VERDICT.json`.
+
 ```
 python loop/slot_status.py                     # what is every slot doing (poll this)
 python loop/slot_status.py --kill-stalled       # reap anything silent for 12 min
@@ -122,11 +130,23 @@ was, it took its worker down mid-run. Poll instead. Run `verify.py` with a long
 timeout (or in the background); it takes about four minutes on a warm slot, more
 with V5's `--no-fail-fast` running every test binary.
 
-`verify.py` exits **0 ACCEPTED**, **1 REJECTED** (the work is wrong), or
-**2 BLOCKED** (the run never finished — reset the worktree and redispatch;
-nothing is implied about the worker's code). Environment: Windows, `cargo`,
-and Git Bash at `C:\Program Files\Git\bin\bash.exe`. The harness itself is
-Python 3 stdlib-only (`loop/*.py`).
+`verify.py` exits **0 ACCEPTED**, **1 REJECTED** (the work is wrong), **2
+BLOCKED** (the run never finished — reset the worktree and redispatch;
+nothing is implied about the worker's code), or **3 PARTIAL** (`--only` was
+used — see below). Environment: Windows, `cargo`, and Git Bash at
+`C:\Program Files\Git\bin\bash.exe`. The harness itself is Python 3
+stdlib-only (`loop/*.py`).
+
+`verify.py --slot N --packet ... --base <ref> --only V3,V5` runs just those
+gates and reports the rest `SKIP`; V0 preflight always runs regardless,
+since every other gate reads the diff between base and HEAD and that's
+meaningless if the run didn't finish. This exists for the amend-and-verify
+path: editing one test file to re-check V5 used to pay for a full 4-6 minute
+cycle (V2, V3, V4, and the whole suite) even though nothing else changed. A
+partial run can never report ACCEPTED — its verdict is always `PARTIAL`
+(exit 3) no matter what the requested gates found, because acceptance is a
+claim about the whole packet and nothing about re-checking one gate tells
+you the others still hold.
 
 ## Next actions, in order
 
@@ -249,6 +269,22 @@ tests_required:                            # V6 matches these against the diff
   - cone_apex_refuses
 budget:      {turns: 40, ctx_tokens: 100000}
 ```
+
+`RESULT.json` is the worker's terminal claim, e.g.
+`{"id":"BG-S0-002","status":"DONE","contracts":[...],"tests_added":3,...}`.
+The orchestrator may amend it after the fact -- see `loop/results/BG-S0-002.json`
+for the real case: the worker returned `SPEC_GAP` correctly (one required test
+was unreachable through anything in write_allow), the spec and packet were
+sharpened to drop that test, and the orchestrator amended the worker's commit
+rather than paying for a fresh ~90-minute dispatch. Any such amendment **must**
+carry `"amended_by": "orchestrator"` and **must** keep the worker's original
+reasoning verbatim under `notes` rather than overwrite it -- that reasoning is
+often the only record of *why* a test or a behaviour is absent, and losing it
+to a tidied-up summary destroys the one thing a future reader needs.
+`verify.py` reads this field: when the worktree's `RESULT.json` carries
+`amended_by`, it appears in the V0 preflight detail line and at the top level
+of `VERDICT.json`, so a verdict can never silently present amended work as
+untouched worker output.
 
 The prose sections that make a packet work, in the order they earn their keep:
 **Problem** (one paragraph, why this is reachable from untrusted geometry);

@@ -213,6 +213,13 @@ def main():
 
     (slot_root / 'worker.pid').write_text(str(worker_pid), encoding='ascii')
     (slot_root / 'worker.packet').write_text(args.packet, encoding='ascii')
+    # Records which branch this dispatch actually landed on -- new_slot.py
+    # decides that, not this script, so this is a read of the worktree's
+    # current branch rather than a value this script chose. Without it, the
+    # only way to find a packet's attempt branch after the fact is prose in
+    # STATE.md, which is what happened landing BG-S0-002.
+    dispatch_branch = git_lines(wt, 'rev-parse', '--abbrev-ref', 'HEAD')
+    (slot_root / 'worker.branch').write_text(dispatch_branch[0] if dispatch_branch else '?', encoding='ascii')
     print(f"started pid {worker_pid}; poll with loop/slot_status.py")
     sys.exit(0)
 
