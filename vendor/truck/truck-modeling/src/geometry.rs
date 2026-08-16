@@ -291,7 +291,7 @@ impl Surface {
 /// conclusive: sampling cannot prove containment, so when every sample is
 /// within tolerance the answer is `NumericallyUnresolved`
 /// (`UncertifiedContainment`), never `Proven(true)`.
-fn plane_include_intersection_curve(plane: &Plane, leader: &Box<Curve>) -> Outcome<bool> {
+fn plane_include_intersection_curve(plane: &Plane, leader: &Curve) -> Outcome<bool> {
     let origin = plane.origin();
     let normal = plane.normal();
     // Bounded uniform sample of the leader (H-5: a documented bound, not a
@@ -305,7 +305,7 @@ fn plane_include_intersection_curve(plane: &Plane, leader: &Box<Curve>) -> Outco
     // (H-1): `IntersectionCurve::subs` unwraps its own projection search. A
     // nested intersection leader has no certified witness here, so refuse
     // rather than evaluate.
-    if matches!(**leader, Curve::IntersectionCurve(_)) {
+    if matches!(*leader, Curve::IntersectionCurve(_)) {
         return Err(Refusal::NumericallyUnresolved {
             spent: Budget::new(0, 0, 0),
             witness: UnresolvedWitness::UncertifiedContainment,
