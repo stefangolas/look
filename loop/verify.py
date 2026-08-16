@@ -486,11 +486,58 @@ def main():
     if not gate_wanted('V3'):
         skip_not_requested('V3 lint')
     elif not v.failed_early:
-        v.write_out_section('V3 lint: cargo fmt --check -p')
+        v.write_out_section('V3 lint: cargo fmt --check -p (scoped to changed files)')
+        len_before_fmt = v.out_file.stat().st_size
         fmt_exit = v.invoke_native(['cargo', 'fmt', '--check', *p_args], v.wt)
+        fmt_text = v.out_file.read_bytes()[len_before_fmt:].decode('utf-8', errors='replace')
 
-        if fmt_exit != 0:
-            v.add_gate('V3 lint', 'FAIL', "cargo fmt --check failed; see out.txt")
+        # Scoped to the files the diff changed, for the same reason the clippy
+        # half below is scoped to the lines it added: the vendored tree is not
+        # rustfmt-clean at the baseline. BG-NUM-001-FILLET was rejected five
+        # times, the last of them here, on
+        # truck-geometry/src/decorators/revolved_curve.rs:690 -- a stray blank
+        # line that is present at the base commit and that the packet never
+        # opened. A whole-crate fmt gate rejects every packet touching
+        # truck-geometry for a defect it inherited, which is the same as no
+        # gate. Formatting the file to get green is not available either: that
+        # file is outside the packet's write_allow, so the fix would be
+        # rejected by V1.
+        #
+        # File granularity, not line granularity, deliberately. rustfmt reports
+        # the line where its diff *context* starts, which routinely sits
+        # several lines above the text it actually wants to reformat, so
+        # intersecting those numbers with the diff's added lines would both
+        # miss real findings and invent absent ones. "Every file this packet
+        # touched is rustfmt-clean" is a property fmt can state exactly.
+        changed_keys = [f.replace('\\', '/').lower() for f in changed]
+        fmt_findings = []
+        for line in fmt_text.splitlines():
+            fm = re.match(r'^Diff in (.+?):(\d+)', line.strip())
+            if not fm:
+                continue
+            path = fm.group(1).replace('\\', '/').lower()
+            if any(path.endswith(k) for k in changed_keys):
+                fmt_findings.append(f"{fm.group(1)}:{fm.group(2)}")
+
+        # Coverage guard, the same shape as clippy's `unlinted` below: rustfmt
+        # exits 1 both when it found diffs and when it could not parse a file,
+        # and in the second case there are no `Diff in` lines to scope, so a
+        # scoped gate would report PASS on something it never read.
+        fmt_broke = [ln for ln in fmt_text.splitlines()
+                     if re.match(r'^\s*error(\[|:)', ln)]
+
+        if fmt_broke:
+            v.add_gate('V3 lint', 'FAIL',
+                       "cargo fmt could not read the tree, so nothing was checked: "
+                       + fmt_broke[0].strip())
+            v.failed_early = True
+        elif fmt_exit not in (0, 1):
+            v.add_gate('V3 lint', 'FAIL', f"cargo fmt exit {fmt_exit}; see out.txt")
+            v.failed_early = True
+        elif fmt_findings:
+            v.add_gate('V3 lint', 'FAIL',
+                       "cargo fmt --check wants changes in files this packet changed: "
+                       + ', '.join(sorted(set(fmt_findings))[:5]))
             v.failed_early = True
         else:
             # Diff-scoped, for the same reason kernel-gates.sh is: the vendored
@@ -581,7 +628,8 @@ def main():
                 v.failed_early = True
             else:
                 v.add_gate('V3 lint', 'PASS',
-                           f"fmt clean; {', '.join(crate_names)} linted, no finding on any added line")
+                           f"fmt clean in all {len(changed)} changed file(s); "
+                           f"{', '.join(crate_names)} linted, no finding on any added line")
     else:
         v.add_gate('V3 lint', 'SKIP', 'earlier gate failed')
 
