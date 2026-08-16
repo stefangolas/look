@@ -196,7 +196,15 @@ def main():
     # -----------------------------------------------------------------------
     commits_ahead = len(git_lines(v.wt, 'rev-list', f"{base}..HEAD"))
     porcelain = git_lines(v.wt, 'status', '--porcelain')
-    uncommitted = [l for l in porcelain if not re.search(r'(?i)\s(PACKET\.md|worker\.(pid|err|packet))$', l)]
+    # Untracked files (?? ...) are not "uncommitted changes" here: cargo test
+    # run by V5 (and the worker's own test runs) drops artifacts -- .obj mesh
+    # dumps, logs -- into the worktree, and PACKET.md/RESULT.json/QUESTION.md
+    # are expected outputs. V0 asks whether the worker committed its *edits*
+    # (tracked files still modified); an uncommitted new source file is caught
+    # downstream by V1/V6, which read the committed diff.
+    uncommitted = [l for l in porcelain
+                   if not l.startswith('?? ')
+                   and not re.search(r'(?i)\s(PACKET\.md|worker\.(pid|err|packet))$', l)]
     has_result = (v.wt / 'RESULT.json').is_file()
     has_question = (v.wt / 'QUESTION.md').is_file()
 
@@ -347,16 +355,81 @@ def main():
         v.add_gate('V4 house rules', 'SKIP', 'earlier gate failed')
 
     # -----------------------------------------------------------------------
-    # V5 tests — cargo test -p <crate> --lib --tests. Never bare `cargo test`.
+    # V5 tests — cargo test -p <crate> --lib --tests --no-fail-fast, diff-scoped
+    # to the test fns this packet added. Never bare `cargo test`.
+    #
+    # The whole-crate `--lib --tests` form catches pre-existing baseline
+    # failures the packet never touched -- truck-shapeops's
+    # healing::tests::step_import needs a STEP data file absent on this
+    # machine, and tests/fillet.rs::complex_surface triangulates to
+    # ShellCondition::Irregular -- and cargo's default fail-fast stops at the
+    # first failing binary before reaching the packet's own tests/*.rs (that
+    # is how BG-S0-002's first verify ran every crate except fillet.rs).
+    # --no-fail-fast runs every binary; the FAIL decision is then scoped to
+    # test fns the packet added (the same added-lines scoping V3 uses for
+    # clippy and V6 for test-reality), so pre-existing failures are noted but
+    # do not reject. Regression detection (a packet breaking a pre-existing
+    # test) is V8's job, not V5's; V8 is a stub, and that gap is recorded in
+    # STATE.md.
     # -----------------------------------------------------------------------
     if not v.failed_early:
-        v.write_out_section('V5 tests: cargo test -p --lib --tests')
-        test_exit = v.invoke_native(['cargo', 'test', *p_args, '--lib', '--tests'], v.wt)
-        if test_exit == 0:
-            v.add_gate('V5 tests', 'PASS')
-        else:
-            v.add_gate('V5 tests', 'FAIL', f"cargo test exit {test_exit}; see out.txt")
+        v.write_out_section('V5 tests: cargo test -p --lib --tests --no-fail-fast (diff-scoped)')
+        len_before = v.out_file.stat().st_size
+        v.invoke_native(['cargo', 'test', *p_args, '--lib', '--tests', '--no-fail-fast'], v.wt)
+        chunk = v.out_file.read_bytes()[len_before:].decode('utf-8', errors='replace')
+
+        # Added test fn names: #[test]-attributed fns in the added diff lines.
+        # Mirrors V6's scan verbatim so the two gates agree on what "added"
+        # means.
+        _, diff_text = git(v.wt, 'diff', diff_range, '--', '*.rs')
+        added_lines_rs = [l for l in re.split(r'\r?\n', diff_text) if re.match(r'^\+[^+]', l)]
+        added_test_fns = set()
+        pending_test_attr = False
+        for line in added_lines_rs:
+            body = line[1:]
+            if re.search(r'#\[\s*(test|proptest|test_case|tokio::test)', body):
+                pending_test_attr = True
+                continue
+            fm = re.search(r'fn\s+([A-Za-z0-9_]+)', body)
+            if fm:
+                if pending_test_attr:
+                    added_test_fns.add(fm.group(1))
+                    pending_test_attr = False
+                continue
+            if body.strip() != '' and not re.match(r'^\s*(#\[|//)', body):
+                pending_test_attr = False
+
+        # Failing test fns from cargo's "test <name> ... FAILED" lines. Strip
+        # the module path (healing::tests::step_import -> step_import) so the
+        # bare name compares against added_test_fns.
+        failing_added = []
+        failing_baseline = []
+        for line in chunk.splitlines():
+            fm = re.match(r'^test\s+(\S+)\s+\.\.\.\s+FAILED', line)
+            if not fm:
+                continue
+            full = fm.group(1)
+            bare = full.rsplit('::', 1)[-1]
+            if bare in added_test_fns:
+                failing_added.append(bare)
+            else:
+                failing_baseline.append(full)
+
+        compile_error = re.search(r'error\[E\d+\]|could not compile|error: no test target', chunk)
+
+        if compile_error:
+            v.add_gate('V5 tests', 'FAIL', 'test target(s) failed to compile; see out.txt')
             v.failed_early = True
+        elif failing_added:
+            v.add_gate('V5 tests', 'FAIL',
+                       'failing added test(s): ' + ', '.join(sorted(set(failing_added))) + '; see out.txt')
+            v.failed_early = True
+        else:
+            detail = 'all added tests pass'
+            if failing_baseline:
+                detail += (f"; {len(failing_baseline)} pre-existing baseline failure(s) ignored: "
+                           + ', '.join(sorted(set(failing_baseline))[:8]))
+            v.add_gate('V5 tests', 'PASS', detail)
     else:
         v.add_gate('V5 tests', 'SKIP', 'earlier gate failed')
 

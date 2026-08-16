@@ -205,8 +205,46 @@ call inside the refinement closure.
 outcome naming at least the stage that failed.
 
 **Tests.** Radius > face curvature; contact curve running off the trimmed
-domain; fillet at a chart pole. All three must return, not abort. Assert the
-process survives — `catch_unwind` in the test asserting it was *not* needed.
+domain. Both must return, not abort. Assert the process survives —
+`catch_unwind` in the test asserting it was *not* needed.
+
+The third failure mode — fillet at a chart pole returning
+`UnsupportedEnvelope(ChartDegenerate)` — is **deferred to BG-S0-002-r2**. The
+A2 mechanical conversion (`Matrix3::invert().unwrap()` → `?` propagating
+`UnsupportedEnvelope(ChartDegenerate)`) is required here and is verified by V3
+(it compiles) and V4 (H-1: no `unwrap` in the added lines), but its runtime
+reachability through `simple_fillet` is blocked: the contact-curve crossings
+that feed `create_pcurve_edge` are computed in
+`truck-geometry/src/decorators/rbf_surface/algo.rs`
+(`search_contact_curve{0,1}_cross_point_with_adjacent_edge`), which call
+`mat.invert().unwrap()` at lines 815/824/834/847/925/934/944/957 and abort on
+the same degenerate geometry that would singularize `create_pcurve_edge`'s
+`[uder, vder, n]` frame (det = `|uder × vder|²`, zero iff `uder ∥ vder`). A
+worker proved this empirically on the first attempt (QUESTION.md, 2026-08-16);
+the runtime test must call `create_pcurve_edge` directly with a constructed
+degenerate surface, which does not depend on that hardening and is filed as
+BG-S0-002-r2.
+
+### BG-S0-002-r2 — Direct unit test of the chart-pole refusal (deferred from BG-S0-002)
+
+**Splits** the runtime-test half of BG-S0-002's third failure mode out of
+BG-S0-002. Filed 2026-08-16 after a worker proved the A2 refusal path
+unreachable through `simple_fillet` (see BG-S0-002 "Tests"): degenerate
+geometry panics first in `rbf_surface/algo.rs`'s `mat.invert().unwrap()` sites,
+which are out of BG-S0-002's `write_allow`.
+
+**Depends on** BG-S0-002 (the `?` / `UnsupportedEnvelope(ChartDegenerate)`
+conversion must be in place). Does **not** depend on hardening
+`rbf_surface/algo.rs`: the test calls `create_pcurve_edge` directly with a
+surface whose `[uder, vder, n]` frame is singular at the search point
+(`uder ∥ vder`, a parametric pole), bypassing the contact-curve search.
+
+**Class.** design — the degenerate-surface fixture is a construction, not a
+mechanical edit. The orchestrator writes this packet.
+
+**Contract BG-S0-002-r2.** `create_pcurve_edge` returns
+`Refusal::UnsupportedEnvelope(EnvelopeCase::ChartDegenerate)` for a singular
+frame, without panicking.
 
 ### BG-S0-003 — the extrude case BG-S0-001 left behind
 
