@@ -52,9 +52,35 @@ untouched baseline is not a gate. If the gate is right, either redispatch with a
 sharpened packet (say explicitly what went wrong) or fix it yourself if it is a
 one-line mechanical miss. Record the attempt in the ledger either way.
 
+**Three counterweights, because that rule is easy to over-apply.** Session 3
+applied it correctly twice and still weakened the verifier both times.
+
+*Sometimes the gate is right and the harness is dirty.* V0 kept blocking on
+untracked `.obj` files — but those were dropped by the verifier's own `cargo
+test`. The gate was reporting a true fact about a mess the loop made. Fixing the
+gate to ignore all untracked files blinded it to exactly what it existed to
+catch. Ask where the noise comes from before you teach a gate to ignore it.
+
+*A gate you narrow must keep the property it was there for.* V5 was rescoped to
+fail only on tests the packet added, which fixed the baseline-noise problem and
+silently removed regression detection — handing it to V8, which is a stub that
+always passes. If narrowing a gate moves a property somewhere else, confirm that
+somewhere else exists. Scoping is only legitimate when it separates noise from
+signal; here it discarded the signal, because a failing test is not located in
+the diff the way a lint finding is.
+
+*Prefer amending proven work to redispatching.* When attempt 1 passes V1–V4 and
+fails on one test that turned out to be unachievable, the cheap path is to amend
+that commit and re-verify — minutes. Session 3 reset the slot and paid for a
+fresh ~90-minute worker run that redid work already proven correct. A rejection
+is rarely a reason to discard everything the worker got right; the branch is
+still there.
+
 **BLOCKED** — the run did not finish; nothing is implied about the code. Reset
 the slot (`run_packet.py --reset` archives the abandoned diff first) and
-redispatch the same packet unchanged.
+redispatch the same packet unchanged. Before you reset, look at what is in the
+worktree: an interrupted run often holds most of a correct answer, and the
+archive is a patch you can apply rather than a worker-hour you pay again.
 
 **`QUESTION.md` instead of `RESULT.json`** — the worker hit a genuine ambiguity.
 This is a *specification* defect and it is the loop's most valuable output. Fix
@@ -80,6 +106,16 @@ answer the question only in the packet and leave the spec wrong.
   logically independent and still collide on a file; that collision surfaces at
   merge, after both workers have been paid for. `schedule.py --running` is the
   authority.
+- **If you change a gate, watch it fail before you trust it.** Deliberately
+  break the thing it is supposed to catch and confirm it says so. A gate that
+  has only ever been observed passing is indistinguishable from a gate that
+  cannot fail, and the loop has already shipped two of those (V7 and V8 are
+  stubs that always pass — check whether they still are before you rely on one).
+- **Record a harness change in STATE.md's traps with the evidence that forced
+  it.** "V5 uses `--no-fail-fast`" is a fact anyone can read off the source.
+  "Without it cargo stopped at the first failing binary and never reached the
+  packet's own `tests/fillet.rs`, so the first verify never tested the thing
+  under test" is why, and that is what stops the next session from undoing it.
 
 ## Writing a packet
 
