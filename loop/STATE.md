@@ -78,14 +78,17 @@ went DONE → ACCEPTED → merged in one attempt, one verify run, no amendment.
    merged tree (`git grep -oh 'unscaled_legacy(' HEAD -- 'vendor/truck/*/src/*'
    ':(exclude)vendor/truck/truck-base/src/tolerance.rs' | wc -l`) in its own
    commit. A ceiling left at a budget is not a ratchet.
-4. **Then write the other six shards**, copying BG-TOL-001-SHAPEOPS. Sites per
-   crate: modeling 34, topology 14, meshalgo 375, geometry ~128 split three
-   ways. **Pre-make every model/param judgement yourself** — that is the whole
-   value of a shard and it needs someone who reads the surrounding code.
-   MODELING next; MESHALGO's 375 needs splitting before it is written.
-5. **`BG-TOL-001-TOPOLOGY` blocks all eight BG-INV checkers** and is only 14
-   sites. Earlier sessions planned to split it by module; at 14 sites that is
-   probably unnecessary. Look before splitting.
+4. **Then write the other six shards**, copying BG-TOL-001-SHAPEOPS. Size them
+   with `python loop/census_tol_sites.py`, **not** with a raw grep — see the
+   census note below. **Pre-make every model/param judgement yourself**; that is
+   the whole value of a shard and it needs someone who reads the surrounding
+   code. MODELING next: it is 11 sites, not the 34 a grep reports.
+5. **`BG-TOL-001-TOPOLOGY` blocks all eight BG-INV checkers** and is 4 sites.
+   Earlier sessions planned to split it by module. Do not — look first.
+6. **Three crates with production sites have no shard at all**: truck-stepio
+   (19), truck-polymesh (7), truck-geotrait (4). stepio is the STEP import and
+   export path — the most directly reachable-from-untrusted-geometry surface in
+   the tree, and exactly what BG-TOL-001's contract is about. Add the rows.
 
 Highest-value harness work left: **V7 and V8 are always-pass stubs** — the two
 remaining gates where PASS means nothing. V8 is where "this packet broke a
@@ -229,6 +232,15 @@ reason is in the commit that made the change, and the code will not tell you.
 - **`truck_base::evidence`, not `truck_evidence`** — the module lives in
   truck-base to avoid a geotrait→evidence cycle.
 
+- **A raw grep for tolerance sites is off by 3x, in both directions.**
+  `python loop/census_tol_sites.py` splits them: **238 production predicates**,
+  plus 66 doc-comment examples, 4 `#[strategy = TOLERANCE..]` test-input bounds,
+  2 in-src test assertions and 22 squared-order sites — none of which are
+  migration work. truck-modeling reads as 34 sites and has **11**; truck-topology
+  reads as 14 and has **4**; truck-meshalgo was recorded here as 375 and has
+  **45**, so it never needed the split earlier sessions planned. Size a shard
+  with the census, and note the production total is *higher* than the spec's
+  stated 184, not lower.
 - **The spec goes stale invisibly.** Re-run every anchor when you touch a packet.
 - **A spec gap is the loop's most valuable output, not a failure.** Session 6's
   two amendments both came from writing a packet and finding the spec had not
