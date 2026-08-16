@@ -43,46 +43,50 @@ here is scored, tuned, or sampled.
 
 ## Where we are
 
-The harness works end to end. **BG-S0-003 was accepted on all nine gates and is
-merged** (`c8acab6`), still the only packet through the whole loop. **BG-S0-002
-has a complete, V1–V4-clean conversion sitting on a branch** and is closer to
-landing than the contract count suggests — see "Pick up here".
+**Five contracts discharged**: BG-S0-001, BG-S0-002, BG-S0-003, BG-EVD-r3,
+BG-TOL-001-TYPE. BG-NUM-001-FILLET is verified-or-verifying in slot 3 — see
+"Pick up here".
 
-Session 3 landed no contract and was still worth it: it found that `cargo test`
-was stopping before it reached the packet's own test file, filed the loop's
-first spec follow-up (**BG-S0-002-r2**), and proved the dispatch path had been
-silently losing its event stream. Session 4 corrected two gates that session 3
-had weakened while fixing the first of those.
+**The frontier just opened from 2 to 10.** BG-TOL-001-TYPE landed the tolerance
+convention every migration shard copies, so six mutually write-disjoint
+wide-mechanical shards are dispatchable now. This is the point the dependency
+graph predicted in session 2: from here **slots, not dependencies, are the
+binding constraint**, and a warm slot costs 0.90 GB and 1.3 min.
+
+Session 5 landed three contracts and spent the rest of its time on the harness.
+The pattern worth carrying: **the worker model has not been the bottleneck
+once.** Every packet this session came back DONE or stopped correctly on a bad
+anchor; every rejection traced to an orchestrator omission or a gate defect.
 
 ## Pick up here
 
-**Slot 0 is IDLE.** Attempt 2 of BG-S0-002 was interrupted mid-run; its work is
-archived at `loop/slots/0/attempt2-interrupted.patch` (788 lines) and the
-worktree still holds it uncommitted at base `b06a535`.
+1. `python loop/slot_status.py`, then the last 3 rows of `LEDGER.jsonl`.
+2. **Slot 3 holds BG-NUM-001-FILLET, REJECTED on V3 (`cargo fmt --check`).**
+   Branch `packet/BG-NUM-001-FILLET`, rebased onto `eaef04b`-era integration;
+   verify it with `--base eaa4c39` or whatever `git -C loop/slots/3/wt
+   merge-base HEAD integration/kernel-bg` reports.
 
-The cheap path is not a third worker run. **Attempt 1 already passed V1-V4** and
-is preserved on branch `packet/BG-S0-002-attempt1` (commit `3c24608`, 718
-insertions across the six files): a complete, lint-clean, house-rule-clean
-mechanical conversion whose only defect was the fourth test, which the spec gap
-has since removed from the packet. Amending that commit to drop
-`fillet_at_chart_pole_refuses` and re-verifying is minutes of work against ~90
-for a fresh dispatch.
+   **The worker's code is correct and has been since its first commit.** Five
+   rejections, none of them its work: a cross-crate ripple the packet's
+   allowlist did not cover, a YAML comment that silently truncated that
+   allowlist, a formatting miss caused by widening the packet's scope
+   mid-flight, a crate clippy could not build, and a merge where a rebase was
+   needed. The current one is formatting only. Run
+   `cargo fmt -p truck-geometry -p truck-shapeops` **inside
+   `loop/slots/3/wt`**, amend, re-verify. Do not redispatch — there is nothing
+   wrong with the worker's output.
+3. **Then dispatch the W2b shards.** `python loop/schedule.py --running <ids>`
+   gives the live frontier — 10 eligible, 6 write-disjoint. Recommended first
+   move: **two shards in parallel, MODELING and SHAPEOPS** (the smallest). No
+   wide-mechanical packet has ever been run and the
+   `// BG-TOL-001: {model|param}` convention is one packet old; if it has a
+   flaw, find it in two crates rather than six. Slot 2 is free.
+4. **Split `BG-TOL-001-TOPOLOGY` by module before running it.** It owns
+   `truck-topology/src/**` and alone blocks all eight BG-INV checkers.
 
-1. Decide between amending `3c24608` and redispatching, then verify:
-   `python loop/verify.py --slot 0 --packet loop/packets/BG-S0-002.md --base b06a535`.
-   **Pass `--base b06a535` explicitly** — the slot is forked there and the
-   default merge-base now resolves to HEAD because the branch moved on.
-   V5 compares against a cached baseline run at `b06a535`, so pre-existing
-   failures (`healing::tests::step_import`, `tests/fillet.rs::complex_surface`)
-   are reported as ignored noise; a FAIL names a test that newly fails.
-2. On ACCEPTED: merge `packet/BG-S0-002` into `integration/kernel-bg` `--no-ff`,
-   move `RESULT.json` to `loop/results/BG-S0-002.json`, append the closing
-   ledger row, set `status: DONE` in `loop/PACKETS.jsonl`. That releases
-   `truck-base/src/evidence.rs` and unblocks **BG-EVD-r3**.
-3. Before dispatching anything, run `python loop/selftest_dispatch.py` (~40s).
-   The dispatch path has now broken in three different ways, each presenting as
-   silence rather than an error; that selftest is how you find out in forty
-   seconds instead of ninety minutes.
+Highest-value harness work left: **V7 and V8 are always-pass stubs** — the two
+remaining gates where PASS means nothing. V8 is where "this packet broke a
+pre-existing test" belongs; V5 only compares against its cached baseline.
 
 ## Landed
 

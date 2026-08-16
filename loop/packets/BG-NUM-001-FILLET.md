@@ -10,11 +10,15 @@ self-contained. If something you need is genuinely missing, that is a SPEC_GAP
 id:          BG-NUM-001-FILLET
 contract:    [BG-NUM-001]
 class:       mechanical
-crates:      [truck-geometry]
+crates:      [truck-geometry, truck-shapeops]
 depends_on:  []
 write_allow:
   - vendor/truck/truck-geometry/src/decorators/af_surface.rs
   - vendor/truck/truck-geometry/tests/af_surface.rs
+  # `approx_rolling_ball_fillet`'s signature change reaches its one caller, which
+  # lives in another crate. A signature is a cross-crate fact; its write set has
+  # to say so or V1 rejects the ripple the design itself requires.
+  - vendor/truck/truck-shapeops/src/fillet/mod.rs
 read_allow:
   - vendor/truck/truck-base/src/evidence.rs
 tests_required:
@@ -91,9 +95,11 @@ implies.
 ## The design — decided; implement it, do not re-litigate
 
 **1. `approx_rolling_ball_fillet` takes `&mut Budget`.** It becomes the last
-parameter. Every caller inside `write_allow` passes one through; a caller that
-has no budget of its own constructs one at its entry point rather than defaulting
-silently, and the value it constructs is stated in a comment.
+parameter. Its one caller is `simple_fillet` in
+`truck-shapeops/src/fillet/mod.rs` — a different crate, which is why that file
+is in the write allowlist. It has no budget of its own, so it constructs one at
+its entry point rather than defaulting silently, funding exactly the sixteen
+subdivisions the loop historically ran, with a comment saying so.
 
 **2. The refinement loop spends before each pass.**
 

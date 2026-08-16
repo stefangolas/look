@@ -223,7 +223,12 @@ def yaml_list_field(text, key):
             item = m.group(1).split('#')[0].strip().strip('"\'')
             if item != '':
                 items.append(item)
-        elif line.strip() == '':
+        elif line.strip() == '' or line.strip().startswith('#'):
+            # A comment inside the list is not the end of the list. Before this,
+            # a `#` line silently truncated write_allow at that point -- and a
+            # write set that is quietly shorter than it reads rejects the very
+            # edits the packet authorised, which is how BG-NUM-001-FILLET was
+            # rejected twice for a file its allowlist appeared to name.
             continue
         else:
             break

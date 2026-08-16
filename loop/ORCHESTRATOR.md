@@ -132,6 +132,13 @@ which is the only reason a flash-class model landed it in one attempt.
 Leave exactly one judgement to the worker if you must, name it explicitly, and
 require the reasoning in `RESULT.json` notes so a reviewer sees it.
 
+**A write set has to cover the ripple, not just the edit.** BG-NUM-001-FILLET
+changed one function's signature and was rejected by V1 for touching its only
+caller — which lived in another crate. The worker was right and the packet was
+wrong: a signature is a cross-crate fact. Before writing `write_allow`, grep for
+callers of anything whose signature the packet changes, and list `crates`
+accordingly, or V1 will reject the ripple the design itself requires.
+
 **Tell the worker the gates' escape hatches, or it will fail on them.** A packet
 that states a house rule without stating how to satisfy it deliberately is a
 packet that gets rejected for the orchestrator's omission. The one that has
