@@ -272,7 +272,16 @@ if (-not $failedEarly) {
     Write-OutSection 'V4 house rules: kernel-gates.sh'
     Push-Location $wt
     try {
-        $gatesExit = Invoke-Native bash scripts/kernel-gates.sh $Base
+        # Git Bash explicitly. A bare `bash` on PATH resolves to the WindowsApps
+        # WSL stub first, which fails with "execvpe(/bin/bash) failed" -- an
+        # exit 1 that reads as a house-rule violation rather than a missing
+        # interpreter.
+        $bash = @(
+            'C:\Program Files\Git\bin\bash.exe',
+            'C:\Program Files (x86)\Git\bin\bash.exe'
+        ) | Where-Object { Test-Path $_ } | Select-Object -First 1
+        if (-not $bash) { throw "no Git Bash found; V4 needs it to run scripts/kernel-gates.sh" }
+        $gatesExit = Invoke-Native $bash scripts/kernel-gates.sh $Base
     } finally { Pop-Location }
     if ($gatesExit -eq 0) {
         Add-Gate 'V4 house rules' 'PASS'
