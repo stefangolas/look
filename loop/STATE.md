@@ -3,7 +3,7 @@
 Rewritten at the end of every session; the state above "Quick reference" is
 capped at ~120 lines, and the reference below it is stable and does not count
 against that. If you are picking this up cold, read **this file, then run
-`loop\slot-status.ps1`** — nothing else. Do not read `LEDGER.jsonl` whole.
+`python loop/slot_status.py`** — nothing else. Do not read `LEDGER.jsonl` whole.
 
 Updated 2026-08-16, end of session 2. Branch: `integration/kernel-bg`. Nothing
 from the loop has reached `main` and nothing has been pushed.
@@ -20,7 +20,7 @@ This loop discharges those items with LLM workers instead of by hand.
 verification, and amend the spec. **You do not write the kernel code.** A packet
 is dispatched to a worker (deepseek v4 flash via opencode) that gets one file —
 the packet — and one git worktree, and gets no say in whether its work is
-accepted. `loop/verify.ps1` is the only acceptance authority; a worker's
+accepted. `loop/verify.py` is the only acceptance authority; a worker's
 `RESULT.json` is a claim, never a verdict.
 
 Three documents define the rest, and you should read them in this order when a
@@ -63,24 +63,26 @@ mechanical packet copies.
 
 ## The commands
 
-```powershell
-.\loop\slot-status.ps1                 # what is every slot doing (poll this)
-.\loop\slot-status.ps1 -KillStalled    # reap anything silent for 12 min
-.\loop\new-slot.ps1  -Slot N -Branch packet/BG-XXX
-.\loop\run-packet.ps1 -Slot N -Packet loop/packets/BG-XXX.md   # returns at once
-.\loop\verify.ps1    -Slot N -Packet loop/packets/BG-XXX.md    # the only authority
-python loop\schedule.py --running BG-A,BG-B                    # the frontier
+```
+python loop/slot_status.py                     # what is every slot doing (poll this)
+python loop/slot_status.py --kill-stalled       # reap anything silent for 12 min
+python loop/new_slot.py  --slot N --branch packet/BG-XXX
+python loop/run_packet.py --slot N --packet loop/packets/BG-XXX.md   # returns at once
+python loop/verify.py    --slot N --packet loop/packets/BG-XXX.md    # the only authority
+python loop/schedule.py --running BG-A,BG-B                          # the frontier
 ```
 
 Dispatch is fire-and-forget by design: a worker runs for tens of minutes, and
 anything that waits on it is a long-lived process that can be killed — when one
-was, it took its worker down mid-run. Poll instead. Run `verify.ps1` in the
+was, it took its worker down mid-run. Poll instead. Run `verify.py` in the
 background; it takes about four minutes on a warm slot.
 
-`verify.ps1` exits **0 ACCEPTED**, **1 REJECTED** (the work is wrong), or
+`verify.py` exits **0 ACCEPTED**, **1 REJECTED** (the work is wrong), or
 **2 BLOCKED** (the run never finished — reset the worktree and redispatch;
-nothing is implied about the worker's code). Environment: Windows, PowerShell
-5.1, `cargo`, and Git Bash at `C:\Program Files\Git\bin\bash.exe`.
+nothing is implied about the worker's code). Environment: Windows, `cargo`,
+and Git Bash at `C:\Program Files\Git\bin\bash.exe`. The harness itself is
+Python 3 stdlib-only (`loop/*.py`) so a non-Claude orchestrator with
+bash-shaped tools can drive it; the four `.ps1` scripts it replaced are gone.
 
 ## Next actions, in order
 
@@ -95,7 +97,7 @@ nothing is implied about the worker's code). Environment: Windows, PowerShell
    `truck-base/src/evidence.rs`.
 4. Split the `truck-topology/src/**` shard of BG-TOL-001 by module. As one
    packet it single-handedly blocks all eight BG-INV checkers.
-5. Write `gen-packet.ps1`, which must re-run every anchor's `rg` at generation
+5. Write `gen_packet.py`, which must re-run every anchor's `rg` at generation
    time and refuse to emit on a count mismatch.
 
 ## The parallelism picture
@@ -118,17 +120,22 @@ dependencies — are the binding constraint.
   `geometry.rs:294` trips `borrowed_box` on a line BG-S0-001 wrote. V3 is
   therefore scoped to the **lines the diff added** — file-level scoping is not
   enough, it rejects a packet for its predecessor's lint in a file it edits.
-- **PowerShell 5.1 silently breaks the verifier three ways.** A local named
-  `$packet` inherits the `[string]$Packet` parameter's type constraint and
-  stringifies the object assigned to it. `*>>` on a native command aborts the
-  run on cargo's first *progress* line under `ErrorActionPreference = 'Stop'`.
-  A literal `--` is eaten before cargo sees it.
 - **A bare `bash` is the WSL stub**, which fails with `execvpe(/bin/bash)` —
   an exit 1 that reads as a house-rule violation. V4 hardcodes Git Bash.
-- **`opencode` on PATH is a `.ps1` shim** that `Start-Process` cannot execute,
-  and the `.cmd` shim caps at 8191 characters, well under a 9 KB packet. The
-  packet is copied into the worktree as `PACKET.md` and the prompt points at
-  it. Both failures presented as an empty event stream and exit 0.
+- **`opencode` on PATH is a `.ps1` shim** that nothing outside a PowerShell
+  host can execute directly, and the `.cmd` shim caps its command line at
+  8191 characters, well under a 9 KB packet. The packet is copied into the
+  worktree as `PACKET.md` and the prompt points at it. Both failures
+  presented as an empty event stream and exit 0.
+- The loop was originally driven by four `.ps1` scripts; session 2 burned a
+  full session on three defects that were purely PowerShell 5.1 language
+  traps (a typed local silently stringifying an object, `*>>` on a native
+  command aborting the run on cargo's first *progress* line under
+  `$ErrorActionPreference = 'Stop'`, a literal `--` getting eaten before
+  cargo saw it). Session 3 ported the harness to stdlib-only Python
+  (`loop/*.py`), both so a non-Claude orchestrator without PowerShell
+  tooling can drive it and to remove that whole class of defect — none of
+  the three has a Python equivalent, and none should be reintroduced.
 - **Workers hang.** One sat 45 minutes mid-step on an API call that never
   returned, holding a slot and its write set, producing nothing. CPU time
   cannot tell that apart from a worker waiting on the model; only the growth of
@@ -177,7 +184,7 @@ judgement you can pre-make, so the worker churns rather than designs);
 **Done when** (the exact commands); **Forbidden**; **Stop conditions**
 (`ANCHOR_MISMATCH`, `SPEC_GAP`, `BLOCKED`) and the `RESULT.json` shape.
 
-The gates, in the order `verify.ps1` runs them:
+The gates, in the order `verify.py` runs them:
 
 | gate | asks |
 |---|---|
@@ -196,6 +203,6 @@ The gates, in the order `verify.ps1` runs them:
 - V7 (mutation spot-check) and V8 (no-regression) are always-pass stubs. V7
   needs a packet field naming the negative test; V8 needs ledger state.
 - V6 matches test names by keyword overlap, not exactly. Tighten when
-  `gen-packet.ps1` fixes a naming convention.
+  `gen_packet.py` fixes a naming convention.
 - `opencode/deepseek-v4-flash-free` would run W4's 23 packets at no API cost.
   Untested against concurrent workers.
