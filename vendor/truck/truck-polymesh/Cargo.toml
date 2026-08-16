@@ -12,6 +12,17 @@ keywords = ["truck", "graphics", "mesh", "obj", "stl"]
 categories = ["graphics"]
 exclude = ["examples/**/*.obj"]
 
+# autotests disabled: both integration test targets (tests/obj-io.rs,
+# tests/stl-io.rs) include_bytes! fixtures from a sibling `resources/`
+# directory (e.g. `../resources/obj/teapot.obj`) that upstream truck keeps
+# in a separate repo and that this vendor snapshot does not include. With
+# `[workspace] members` making this crate a real workspace member (rather
+# than an untested path dependency), `cargo check/test --all-targets` now
+# tries to compile them and fails with "file not found". Every test in both
+# files needs the missing fixtures, so there is nothing to re-enable via an
+# explicit [[test]] entry; the lib and its unit tests are unaffected.
+autotests = false
+
 [dependencies]
 array-macro = "2.1.8"
 bytemuck = { version = "1.25.2", features = ["derive"] }

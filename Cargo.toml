@@ -1,3 +1,25 @@
+# The vendored kernel crates are workspace members, not merely path
+# dependencies. A path dependency that is not a member cannot be tested --
+# `cargo test -p truck-evidence` fails with "requires dev-dependencies and is
+# not a member of the workspace" -- and per-crate testing is exactly what the
+# BG- build loop's verification gate runs (docs/KERNEL_AUTOBUILD_LOOP.md, V5).
+[workspace]
+members = [
+    ".",
+    "vendor/truck/truck-assembly",
+    "vendor/truck/truck-base",
+    "vendor/truck/truck-derivers",
+    "vendor/truck/truck-evidence",
+    "vendor/truck/truck-geometry",
+    "vendor/truck/truck-geotrait",
+    "vendor/truck/truck-meshalgo",
+    "vendor/truck/truck-modeling",
+    "vendor/truck/truck-polymesh",
+    "vendor/truck/truck-shapeops",
+    "vendor/truck/truck-stepio",
+    "vendor/truck/truck-topology",
+]
+
 [package]
 name = "look"
 version = "0.1.0"
