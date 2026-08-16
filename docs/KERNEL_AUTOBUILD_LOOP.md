@@ -87,33 +87,46 @@ changed.
 
 ---
 
-## 2. Model wiring (deepseek v4 flash)
+## 2. Model wiring — `opencode run` with deepseek v4 flash
 
-Claude Code speaks to an Anthropic-compatible endpoint, so the worker invocation
-is an env override, not a new harness:
+**Harness: `opencode run`, not `claude -p`.** Resolved 2026-08-16 — opencode is
+already installed and authenticated for deepseek, and its `run` subcommand has
+exactly the four things a worker needs:
 
 ```powershell
-$env:ANTHROPIC_BASE_URL  = 'https://api.deepseek.com/anthropic'
-$env:ANTHROPIC_AUTH_TOKEN = $env:DEEPSEEK_API_KEY
-$env:ANTHROPIC_MODEL      = 'deepseek-v4-flash'   # VERIFY: exact id, see §11
-claude -p (Get-Content $packet -Raw) `
-  --output-format json `
-  --settings loop/worker-settings.json `
-  --permission-mode acceptEdits `
-  --add-dir $slotPath
+opencode run --dir $slotPath `
+             -m deepseek/deepseek-v4-flash `
+             --agent kernel-worker `
+             --format json `
+             --auto `
+             (Get-Content $packet -Raw)
 ```
 
-Three things to verify before the first run (§11): the exact model id string,
-the advertised context window (the budget in §3 assumes **128k**), and whether
-this CLI build still honours a turn cap — `--max-turns` is **not** in
-`claude --help` on the installed version; `--max-budget-usd` is, but it is an
-Anthropic-billing concept and will not fire against a third-party endpoint. The
-turn cap therefore has to come from the hook in §3, which we need anyway.
+- `--dir` **is** the slot mechanism: the worker runs inside the slot worktree.
+- `--format json` gives machine-readable events for the ledger.
+- `--agent` selects a config-defined agent, which is where the tool allowlist
+  and permission restrictions live (`opencode.jsonc` `permission: {edit, bash}`).
+- `--auto` auto-approves non-denied permissions, so the run is unattended.
+- `--pure` is available if plugin noise becomes a problem.
 
-`loop/worker-settings.json` carries: the hooks below, a tool allowlist
-(`Read, Edit, Write, Grep, Glob, Bash(cargo *), Bash(git *), Bash(rg *)`), and
-`--setting-sources project` so a worker never inherits interactive-session
-config.
+**Credentials — already present, nothing to provision.** The deepseek key is in
+`~/.local/share/opencode/auth.json` (`type=api`, 35 chars, `sk-0a3…a691`),
+alongside a `zai` key. No `DEEPSEEK_API_KEY` env var is set and none is needed:
+opencode reads its own auth store. The earlier `claude -p` +
+`ANTHROPIC_BASE_URL` sketch is dropped — it existed only to reach deepseek
+through an Anthropic-compatibility shim, and going native avoids the shim
+entirely.
+
+**Model id confirmed: `deepseek/deepseek-v4-flash`.** `opencode models` also
+lists `deepseek/deepseek-v4-pro`, `deepseek/deepseek-chat`,
+`deepseek/deepseek-reasoner`, and — worth a look before the wide waves —
+`opencode/deepseek-v4-flash-free`, which would run W4's 23 packets at no API
+cost if its rate limits tolerate three concurrent workers.
+
+**What this costs us:** Claude Code's hooks. The `PostToolUse` token ledger and
+the `PreToolUse` hard cap in §3 were a Claude Code mechanism and do not exist
+here. See §3 — with the real context window they matter far less than they did
+under the assumed one.
 
 ### Division of labour: Claude orchestrates, deepseek codes
 
@@ -154,13 +167,33 @@ is mechanical; if it contains prose about what must not be conflated, it is not.
 
 ## 3. Context budget — keeping a worker under 40%
 
-Assume a 128k window. Then:
+**The context window is 1M, not the 128k this section originally assumed.** That
+changes the problem rather than shrinking it:
 
-| threshold | tokens (128k) | behaviour |
+| threshold | tokens (1M) | note |
 |---|---|---|
-| soft warn | 30% ≈ 38k | hook injects: "budget 30% — stop exploring, start writing" |
-| close-off | 36% ≈ 46k | hook injects: "finalize now — finish the current edit, run the gate, write RESULT.json + HANDOFF.md, stop" |
-| hard cap | 40% ≈ 51k | `PreToolUse` **denies** every tool except `Write` (RESULT/HANDOFF), `Bash(git add|commit)`; the session can only terminate |
+| soft warn | 30% ≈ 300k | |
+| close-off | 36% ≈ 360k | |
+| hard cap | 40% ≈ 400k | |
+
+**No packet built to the §4 envelope will come close to 400k.** A packet is one
+crate, ≤5 files, ≤600 changed lines, with the spec item inlined — call it 5–15k
+of prompt and, with cargo output kept out of the transcript, well under 50k at
+exit. The 40% ceiling stops being a survival constraint and becomes a **runaway
+detector**: a worker approaching even 100k has stopped doing the packet and
+started exploring, and the useful response is to kill it, not to warn it.
+
+So the thresholds stay, their purpose changes, and the mechanism changes with
+it. Since opencode gives us no `PreToolUse` hook to deny on, enforcement moves
+outward to the orchestrator: parse the `--format json` event stream, and abort
+the worker on whichever comes first — cumulative tokens past 100k, 40 assistant
+turns, or a wall-clock cap. That is coarser than a hook and entirely sufficient
+for a detector.
+
+The reason to keep packets tight is now **quality and cost, not survival**.
+A flash-class model given 400k of context does not use it well, and every token
+is billed; the structural rules below are what keep a packet at 15k instead of
+150k, and they are worth just as much as before.
 
 Enforcement is two mechanisms, and the first matters more:
 
@@ -183,15 +216,12 @@ Additional structural rules baked into every packet:
 - Packet size cap: **one crate, ≤5 files, ≤600 changed lines**. A packet that
   cannot be stated inside that envelope must be split by the generator.
 
-**(b) Mechanical — a token ledger hook.** `loop/hooks/ctx-budget.ps1` runs on
-`PostToolUse`, adds `len(tool_response)/4` to a per-session counter in
-`loop/slots/<n>/ctx.json`, and emits a `systemMessage` at each threshold. A
-`PreToolUse` variant reads the same counter and denies at the hard cap. The same
-script counts assistant turns and denies past **40 turns**, which is the turn
-cap the CLI no longer gives us.
-
-Approximation by bytes/4 is crude and biased low for code; set the thresholds as
-above and treat the structural rules as the real control.
+**(b) Mechanical — the orchestrator watches the event stream.** It reads
+opencode's JSON events, accumulates reported token usage per worker, and kills
+the process on the runaway conditions above, recording `CTX_EXHAUSTED` in the
+ledger. This is a supervisor, not a hook: it cannot warn the worker or shape its
+behaviour mid-run, only end it. Given that no compliant packet approaches the
+threshold, an abort is the correct response anyway.
 
 ---
 
@@ -513,12 +543,13 @@ sessions rediscovering that the document moved.
 
 ## 11. Where I am uncertain
 
-- **The deepseek model id and endpoint shape.** `deepseek-v4-flash` above is a
-  placeholder; there is no deepseek configuration anywhere in this repo today
-  and no `DEEPSEEK_API_KEY` in the environment (only `GEMINI_API_KEY` and
-  `buildabox_api_key` are set). Confirm the id, the Anthropic-compat base URL,
-  and the real context window before the 40%/30% numbers in §3 mean anything —
-  they are computed against an assumed 128k.
+- **~~The deepseek model id and endpoint shape~~ — resolved 2026-08-16.** The
+  harness is `opencode run`, the id is `deepseek/deepseek-v4-flash`, the key is
+  already in opencode's auth store, and the window is 1M. What remains open is
+  whether `opencode/deepseek-v4-flash-free` is usable for the wide waves, and
+  what opencode's JSON event stream actually reports for token usage — the
+  supervisor in §3 depends on that field existing.
+
 - **Whether a flash-class model can hold the H-rules while editing.** H-2
   (`Outcome` everywhere), H-3 (no literals in predicates) and H-6 (never record
   float as `Exact`) are the kind of standing constraint small models drop around
@@ -534,8 +565,8 @@ sessions rediscovering that the document moved.
   correlated (e.g. a shared helper that is called from both a model-space and a
   parameter-space context), the shard boundary is wrong and the fix is one
   bigger packet, not three retries.
-- **Turn caps.** `--max-turns` is absent from the installed CLI's help; the hook
-  fallback in §3 is untested against a third-party endpoint.
+- **Turn caps and aborts.** opencode exposes no per-run turn cap, so the
+  orchestrator-side supervisor of §3 is the only limit. Untested.
 - **Whether W6 belongs in the loop at all.** BG-FID-001/003/005 are the spec's
   root and its subtlest items (the `lfs_lower` naming discipline exists because
   a call site reading it as equality is a silent unsoundness). The honest read
