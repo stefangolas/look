@@ -45,44 +45,44 @@ here is scored, tuned, or sampled.
 
 The harness works end to end. **BG-S0-003 was accepted on all nine gates and is
 merged** (`c8acab6`), still the only packet through the whole loop. **BG-S0-002
-is on attempt 2**, RUNNING on slot 0 (pid 34028) with a sharpened 3-test packet.
-Attempt 1 was correct work rejected on two harness defects and one genuine spec
-gap — all three found by running a real packet through the loop and all fixed
-this session (commit `baa2dfa`). The worker's attempt-1 mechanical conversion
-(A1/A2/A3) passed V1–V4; only its test 3 was unachievable, and that is now the
-loop's first filed spec follow-up, **BG-S0-002-r2**.
+has a complete, V1–V4-clean conversion sitting on a branch** and is closer to
+landing than the contract count suggests — see "Pick up here".
 
-Session 3 did not land a contract. It fixed the two gates that were lying about
-BG-S0-002 and resolved the spec gap that stopped the worker. That is the work
-that unblocks BG-S0-002 itself.
+Session 3 landed no contract and was still worth it: it found that `cargo test`
+was stopping before it reached the packet's own test file, filed the loop's
+first spec follow-up (**BG-S0-002-r2**), and proved the dispatch path had been
+silently losing its event stream. Session 4 corrected two gates that session 3
+had weakened while fixing the first of those.
 
 ## Pick up here
 
-1. `python loop/slot_status.py`. **Slot 0 is RUNNING attempt 2 of BG-S0-002**
-   (pid 34028, dispatched end of session 3 against the sharpened packet, base
-   `b06a535`). A fillet run is ~90 min.
-   - **RUNNING** — poll. Do not wait on it.
-   - **FINISHED** — verify it:
-     `python loop/verify.py --slot 0 --packet loop/packets/BG-S0-002.md --base b06a535`.
-     **Pass `--base b06a535` explicitly** — the slot is forked there and the
-     default merge-base now resolves to HEAD because the branch moved. Then
-     follow ORCHESTRATOR.md's verdict handling. The gate is fixed (see "Traps"):
-     V5 is diff-scoped to *added* test fns and notes (does not reject on)
-     pre-existing baseline failures — `healing::tests::step_import` (missing
-     STEP data) and `tests/fillet.rs::complex_surface` (triangulates to
-     `Irregular`). If V5 FAILs it names the failing added test; that is the
-     worker's defect, not baseline noise. If V5 PASSes with a "pre-existing
-     baseline failure(s) ignored" note, that is expected.
-   - **STALLED** — `python loop/slot_status.py --kill-stalled`, then
-     `python loop/run_packet.py --slot 0 --packet loop/packets/BG-S0-002.md --reset`
-     (the packet is already sharpened; redispatch unchanged).
+**Slot 0 is IDLE.** Attempt 2 of BG-S0-002 was interrupted mid-run; its work is
+archived at `loop/slots/0/attempt2-interrupted.patch` (788 lines) and the
+worktree still holds it uncommitted at base `b06a535`.
+
+The cheap path is not a third worker run. **Attempt 1 already passed V1-V4** and
+is preserved on branch `packet/BG-S0-002-attempt1` (commit `3c24608`, 718
+insertions across the six files): a complete, lint-clean, house-rule-clean
+mechanical conversion whose only defect was the fourth test, which the spec gap
+has since removed from the packet. Amending that commit to drop
+`fillet_at_chart_pole_refuses` and re-verifying is minutes of work against ~90
+for a fresh dispatch.
+
+1. Decide between amending `3c24608` and redispatching, then verify:
+   `python loop/verify.py --slot 0 --packet loop/packets/BG-S0-002.md --base b06a535`.
+   **Pass `--base b06a535` explicitly** — the slot is forked there and the
+   default merge-base now resolves to HEAD because the branch moved on.
+   V5 compares against a cached baseline run at `b06a535`, so pre-existing
+   failures (`healing::tests::step_import`, `tests/fillet.rs::complex_surface`)
+   are reported as ignored noise; a FAIL names a test that newly fails.
 2. On ACCEPTED: merge `packet/BG-S0-002` into `integration/kernel-bg` `--no-ff`,
    move `RESULT.json` to `loop/results/BG-S0-002.json`, append the closing
    ledger row, set `status: DONE` in `loop/PACKETS.jsonl`. That releases
    `truck-base/src/evidence.rs` and unblocks **BG-EVD-r3**.
-3. Attempt 1's correct conversion is preserved on branch
-   `packet/BG-S0-002-attempt1` (commit `3c24608`) — reference if attempt 2
-   diverges; do not redo work the worker already proved.
+3. Before dispatching anything, run `python loop/selftest_dispatch.py` (~40s).
+   The dispatch path has now broken in three different ways, each presenting as
+   silence rather than an error; that selftest is how you find out in forty
+   seconds instead of ninety minutes.
 
 ## Landed
 
@@ -95,10 +95,12 @@ that unblocks BG-S0-002 itself.
 | `ed35879` `e927384` `da1b174` `978b902` `d1f9c5b` `8dca941` | the verifier and dispatcher, made to actually work |
 | `c8acab6` | **BG-S0-003** — the first packet through the whole loop |
 | `4cc5aca` | harness ported to stdlib-only Python; the four `.ps1` scripts are gone |
-| `baa2dfa` | **session 3:** V5 diff-scoped to added tests + `--no-fail-fast`; V0 ignores untracked artifacts; BG-S0-002 test 3 deferred to **BG-S0-002-r2** (spec + packet amended to 3 tests) |
+| `baa2dfa` | **session 3:** V5 gains `--no-fail-fast`; BG-S0-002 test 3 deferred to **BG-S0-002-r2** (spec + packet amended to 3 tests) |
+| `88b93ee` | V5 compares against a cached baseline run at the base commit; V0 allow-lists `*.obj` instead of ignoring every untracked file |
+| `aa6e31a` | the dispatch actually streams and actually survives; `selftest_dispatch.py` proves it in 40s |
+| `fb697ea` | three counterweights to "ask whether the gate is wrong" in ORCHESTRATOR.md |
 
-Contracts discharged: **BG-S0-001** and **BG-S0-003**. BG-S0-002 attempt 2 in
-flight. **BG-S0-002-r2** filed (design class — the chart-pole runtime test;
+Contracts discharged: **BG-S0-001** and **BG-S0-003**. BG-S0-002 unlanded. **BG-S0-002-r2** filed (design class — the chart-pole runtime test;
 `create_pcurve_edge` called directly with a constructed degenerate surface, no
 dependency on hardening `rbf_surface/algo.rs`).
 
@@ -111,6 +113,7 @@ python loop/new_slot.py  --slot N --branch packet/BG-XXX
 python loop/run_packet.py --slot N --packet loop/packets/BG-XXX.md   # returns at once
 python loop/verify.py    --slot N --packet loop/packets/BG-XXX.md [--base <ref>]
 python loop/schedule.py --running BG-A,BG-B                          # the frontier
+python loop/selftest_dispatch.py                # prove the dispatch works (~40s)
 ```
 
 Dispatch is fire-and-forget by design: a worker runs for tens of minutes, and
@@ -174,6 +177,27 @@ dependencies — are the binding constraint.
   as "uncommitted changes" and BLOCK the next verify run. V0 now ignores
   untracked files; an uncommitted new *source* file is still caught by V1/V6,
   which read the committed diff.
+- **`DETACHED_PROCESS` silences the very worker it is meant to free.** Measured
+  across eight flag combinations: every one containing it produced zero bytes of
+  output, every one without it streamed. A batch file with no console cannot get
+  its own child's output onto an inherited handle, and `opencode` is a `.cmd`
+  shim, so the process doing the work is always a grandchild. The dispatch uses
+  `CREATE_NO_WINDOW | CREATE_NEW_PROCESS_GROUP | CREATE_BREAKAWAY_FROM_JOB` and
+  writes its redirect into a command file, where `>` binds the whole chain.
+  Breakaway is what actually makes a worker outlive its parent — a harness kills
+  the tool call's *job*, which detachment never addressed. **Run
+  `python loop/selftest_dispatch.py` after touching any of this.**
+- **A test failure is not located in the diff.** V3 scopes clippy to added lines
+  because a lint finding sits on a line; applying the same move to V5 (fail only
+  on tests the packet added) does not filter the noise, it discards the signal,
+  and it hands regressions to V8, which is a stub. V5 instead runs the suite once
+  at the base commit, caches the result under `loop/baselines/`, and fails on
+  anything that newly fails, disappears, or becomes `#[ignore]`d.
+- **The verifier dirties the worktree it is judging.** `cargo test` drops `.obj`
+  mesh dumps in the worktree, which V0 then read as an unfinished run. The fix is
+  to allow-list that specific artifact, not to make V0 blind to untracked files —
+  an uncommitted new `.rs` is exactly what V0 exists to catch, and it is *not*
+  caught by V1/V6, which read the committed diff.
 - **A bare `bash` is the WSL stub**, which fails with `execvpe(/bin/bash)` —
   an exit 1 that reads as a house-rule violation. V4 hardcodes Git Bash.
 - **`opencode` on PATH is a `.ps1`/`.cmd` shim** whose command line caps at
