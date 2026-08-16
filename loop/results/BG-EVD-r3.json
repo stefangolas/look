@@ -1,0 +1,14 @@
+{
+  "id": "BG-EVD-r3",
+  "status": "DONE",
+  "contracts": ["BG-EVD-004"],
+  "tests_added": 5,
+  "anchors_verified": {"A1": 1, "A2": 1, "A3": 1, "A4": 3},
+  "notes": "Implemented: Modulus is now a shape+domain struct (ModulusShape decides is_subadditive(), never declared), eval is total (INFINITY outside [0, domain) and for Unbounded, no panic), propagate/propagate_chain are the unconditionally-valid default recurrence, compose is fallible (Outcome<Modulus>) refusing non-subadditive operands with Refusal::ForwardToleranceExceeded{allowed: INFINITY}, concave_majorant restores subadditivity (Lipschitz chord k*d^(p-1) for convex Holder on a finite domain; the Pole's majorant is Unbounded because omega(d)=INFINITY leaves no finite chord, per the packet's own 'no finite chord exists' rule), and the 38 Modulus::Unbounded call sites keep compiling via the documented associated const. Accumulate's conservative fallback (§7): where compose refuses, accumulation records Modulus::Unbounded (the honest 'no bound published') rather than a bound that might under-report, marked with the TODO(BG-EVD-r3b) comment; accumulate itself stays infallible. Input where the split bound under-reports through a Pole: chain [(Lipschitz(1),1), (Lipschitz(1),1), (Pole{k=1,domain=4},1)] — propagate_chain = 2.0 (E3 = pole(2)+1) while the classic split bound = pole(1)+pole(1)+1 = 5/3 ≈ 1.6667 < 2.0; compose on the same chain returns ForwardToleranceExceeded. The split bound in the tests is the classic decoupled bound (each tolerance amplified by the moduli after it, summed), which is exactly what subadditivity validates; test #2 uses true function composition (not the preserved r2 constants-multiply Holder arithmetic) so the 'propagate <= split' inequality holds for all subadditive chains.",
+  "gates": {
+    "cargo fmt --check -p truck-base": "PASS",
+    "cargo clippy -p truck-base --all-targets --no-deps -- -D warnings": "PASS",
+    "cargo test -p truck-base --lib --tests": "PASS (17 lib tests + integration)",
+    "cargo check --workspace --all-targets": "PASS"
+  }
+}
