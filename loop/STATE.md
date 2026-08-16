@@ -59,9 +59,11 @@ verifier and the dispatcher.
    (pid recorded in `loop/slots/0/worker.pid`), about 90 minutes in with 8 files
    changed when session 2 ended. Three cases:
    - **FINISHED** (RESULT.json present) — verify it:
-     `python loop/verify.py --slot 0 --packet loop/packets/BG-S0-002.md --base <the slot's fork point>`.
-     Pass `--base` explicitly; the default merge-base is wrong now that the
-     branch has moved. Then follow ORCHESTRATOR.md's verdict handling.
+     `python loop/verify.py --slot 0 --packet loop/packets/BG-S0-002.md --base b06a535`.
+     **Pass that `--base` explicitly** — `b06a535` is where slot 0 was forked,
+     and the default merge-base now resolves to HEAD because the branch moved
+     on without it, which would measure an empty diff. Then follow
+     ORCHESTRATOR.md's verdict handling.
    - **STALLED** — `python loop/slot_status.py --kill-stalled`, then
      `python loop/run_packet.py --slot 0 --packet loop/packets/BG-S0-002.md --reset`.
    - **RUNNING** — leave it and poll.
