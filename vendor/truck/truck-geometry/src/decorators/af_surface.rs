@@ -375,47 +375,63 @@ impl<S0, S1> From<ApproxFilletSurface<S0, S1>> for ApproxFilletSurface<Box<S0>, 
     }
 }
 
+/// What a call consumed: the budget at entry minus what remains. `Budget` is
+/// `Copy`; a refusal carries the difference, never the remainder (BG-NUM-001).
+fn budget_spent(initial: Budget, remaining: Budget) -> Budget {
+    Budget {
+        subdiv: initial.subdiv - remaining.subdiv,
+        newton: initial.newton - remaining.newton,
+        depth: initial.depth - remaining.depth,
+    }
+}
+
 impl<S0, S1> ApproxFilletSurface<S0, S1>
 where
     S0: ParametricSurface3D + SearchParameter<D2, Point = Point3>,
     S1: ParametricSurface3D + SearchParameter<D2, Point = Point3>,
 {
     /// approx fillet by `ApproxFilletSurface`.
+    ///
+    /// The contact-curve refinement spends one subdivision per pass from
+    /// `budget` (H-5). On success `budget` holds what remains; on refusal the
+    /// `spent` field reports what this call consumed.
     pub fn approx_rolling_ball_fillet<C, R>(
         fillet_surface: &RbfSurface<C, S0, S1, R>,
         edge_parameter_range: (f64, f64),
         tol: f64,
+        budget: &mut Budget,
     ) -> Outcome<Self>
     where
         C: ParametricCurve3D,
         R: ScalarFunctionD1,
     {
+        // `spent` on a refusal is the difference between the budget at entry
+        // and what remains: what this call consumed, not what the caller has
+        // left (BG-NUM-001).
+        let initial = *budget;
         let (v0, v1) = edge_parameter_range;
         let v_5 = (v0 + v1) / 2.0;
         let cc0 = fillet_surface
             .contact_circle(v0)
             .ok_or(Refusal::NumericallyUnresolved {
-                // TODO(BG-NUM-001): thread the real budget
-                spent: Budget::new(0, 0, 0),
+                spent: budget_spent(initial, *budget),
                 witness: UnresolvedWitness::ContactCurveNotFound,
             })?;
         let cc_5 = fillet_surface
             .contact_circle(v_5)
             .ok_or(Refusal::NumericallyUnresolved {
-                // TODO(BG-NUM-001): thread the real budget
-                spent: Budget::new(0, 0, 0),
+                spent: budget_spent(initial, *budget),
                 witness: UnresolvedWitness::ContactCurveNotFound,
             })?;
         let cc1 = fillet_surface
             .contact_circle(v1)
             .ok_or(Refusal::NumericallyUnresolved {
-                // TODO(BG-NUM-001): thread the real budget
-                spent: Budget::new(0, 0, 0),
+                spent: budget_spent(initial, *budget),
                 witness: UnresolvedWitness::ContactCurveNotFound,
             })?;
         let mut ccs = vec![(v0, cc0), (v_5, cc_5), (v1, cc1)];
 
-        for _i in 0..16 {
+        while budget.spend_subdiv(1).is_ok() {
             let mut vec = Vec::with_capacity(ccs.len() + 3);
             vec.extend([v0, v0, v0]);
             vec.extend({
@@ -484,8 +500,7 @@ where
                         let v = (v[0].0 + v[1].0) / 2.0;
                         let cc = fillet_surface.contact_circle(v).ok_or(
                             Refusal::NumericallyUnresolved {
-                                // TODO(BG-NUM-001): thread the real budget
-                                spent: Budget::new(0, 0, 0),
+                                spent: budget_spent(initial, *budget),
                                 witness: UnresolvedWitness::ContactCurveNotFound,
                             },
                         )?;
@@ -514,7 +529,7 @@ where
                     Certificate {
                         props: PropMap::new(),
                         method: Method::Float,
-                        budget_left: Budget::new(0, 0, 0),
+                        budget_left: *budget,
                         margin: Margin::UNBOUNDED,
                         modulus: Modulus::Unbounded,
                     },
@@ -525,8 +540,7 @@ where
         }
 
         Err(Refusal::NumericallyUnresolved {
-            // TODO(BG-NUM-001): thread the real budget
-            spent: Budget::new(0, 0, 0),
+            spent: budget_spent(initial, *budget),
             witness: UnresolvedWitness::ContactCurveNotFound,
         })
     }
