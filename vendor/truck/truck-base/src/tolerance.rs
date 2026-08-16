@@ -220,6 +220,42 @@ impl ToleranceCtx {
         Self::new(s, self.tau_in, self.tau_rep, self.tau_col)
     }
 
+    /// The migration scaffold for BG-TOL-001 Stage A: a context whose predicates
+    /// are numerically the legacy absolute ones.
+    ///
+    /// `model_scale` is 1.0 and `tau_rep` is [`TOLERANCE`], so `is_small_len` and
+    /// `is_small_ratio` use exactly the epsilon the legacy `Tolerance` trait used.
+    /// A site migrated onto this context therefore keeps its present behaviour;
+    /// what the migration buys is that the site now *states* whether it compares a
+    /// model-space length or a dimensionless quantity, which is the judgement that
+    /// cannot be made mechanically later.
+    ///
+    /// **This is scaffolding and is expected to reach zero uses.** A real
+    /// `model_scale` comes from the model, and every call here is a site whose
+    /// entry point has not yet been threaded (Stage B). `scripts/kernel-gates.sh`
+    /// counts these against a ceiling that only moves down; BG-TOL-001 is not
+    /// discharged until the count is zero. Do not call it from new code that has a
+    /// real scale available.
+    ///
+    /// Infallible by construction — every argument is a compile-time constant that
+    /// `new` accepts — so it returns `Self`, not `Outcome<Self>`. That is
+    /// deliberate: an `Outcome` here would force ~184 migration sites to handle an
+    /// error that cannot occur, and H-1 forbids the `unwrap` they would reach for.
+    ///
+    /// `near_pt` is deliberately the Euclidean predicate, not the legacy
+    /// componentwise one: a `(TOLERANCE, TOLERANCE, TOLERANCE)` difference has
+    /// magnitude `TOLERANCE * sqrt(3)` and is rejected here even though every
+    /// coordinate is within `TOLERANCE`, because a tolerance that depends on the
+    /// coordinate frame is not a tolerance.
+    pub fn unscaled_legacy() -> Self {
+        Self {
+            model_scale: 1.0, // H-3: a dimensionless scale of 1.0, so tau * scale is the legacy absolute epsilon
+            tau_in: TOLERANCE,
+            tau_rep: TOLERANCE,
+            tau_col: TOLERANCE,
+        }
+    }
+
     /// The declared characteristic length.
     pub fn model_scale(&self) -> f64 {
         self.model_scale

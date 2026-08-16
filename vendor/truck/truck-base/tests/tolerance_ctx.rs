@@ -11,7 +11,7 @@
 
 use truck_base::cgmath64::*;
 use truck_base::evidence::{EnvelopeCase, Refusal};
-use truck_base::tolerance::ToleranceCtx;
+use truck_base::tolerance::{Tolerance, ToleranceCtx, TOLERANCE};
 
 fn ctx(model_scale: f64) -> ToleranceCtx {
     match ToleranceCtx::new(model_scale, 0.000001, 0.000001, 0.000001) {
@@ -125,4 +125,81 @@ fn lcg(state: &mut u64) -> u64 {
 /// Uniform in `[0, 1)` from the deterministic LCG.
 fn rand(state: &mut u64) -> f64 {
     (lcg(state) % 1_000_000_000) as f64 / 1_000_000_000.0
+}
+
+#[test]
+fn unscaled_legacy_carries_the_legacy_epsilon() {
+    let c = ToleranceCtx::unscaled_legacy();
+    assert_eq!(c.model_scale(), 1.0); // H-3: a dimensionless scale of 1.0, so tau * scale is the legacy absolute epsilon
+    let just_under = TOLERANCE - 1.0e-12; // H-3: a guard gap below the legacy absolute epsilon, not a tolerance itself
+    let just_over = TOLERANCE + 1.0e-12; // H-3: a guard gap above the legacy absolute epsilon, not a tolerance itself
+    assert!(c.is_small_ratio(just_under));
+    assert!(c.is_small_len(just_under));
+    assert!(!c.is_small_ratio(just_over));
+    assert!(!c.is_small_len(just_over));
+}
+
+#[test]
+fn unscaled_legacy_is_never_looser_than_the_legacy_predicate() {
+    let c = ToleranceCtx::unscaled_legacy();
+    let origin = Point3::new(0.0, 0.0, 0.0); // H-3: the zero reference of the fixed pair set
+    let pairs = [
+        (origin, Point3::new(0.0, 0.0, 0.0)), // H-3: zero difference
+        (origin, Point3::new(TOLERANCE, 0.0, 0.0)), // H-3: zero off-axis components
+        (origin, Point3::new(0.5 * TOLERANCE, 0.5 * TOLERANCE, 0.0)), // H-3: half the legacy epsilon per axis
+        (origin, Point3::new(TOLERANCE, TOLERANCE, 0.0)), // H-3: zero off-axis component
+        (origin, Point3::new(TOLERANCE, TOLERANCE, TOLERANCE)),
+        (
+            origin,
+            Point3::new(1000.0 * TOLERANCE, 0.0, 0.0), // H-3: far beyond the legacy epsilon, so both reject
+        ),
+    ];
+    for (a, b) in pairs {
+        if c.near_pt(a, b) {
+            assert!(
+                a.near(&b),
+                "near_pt must never be true where the legacy componentwise predicate is false"
+            );
+        }
+    }
+    let corner = Point3::new(TOLERANCE, TOLERANCE, TOLERANCE);
+    assert!(
+        !c.near_pt(origin, corner),
+        "Euclidean magnitude is TOLERANCE * sqrt(3)"
+    );
+    assert!(
+        origin.near(&corner),
+        "every coordinate is exactly TOLERANCE, so the componentwise predicate accepts it"
+    );
+}
+
+#[test]
+fn unscaled_legacy_agrees_with_new_at_scale_one() {
+    let legacy = ToleranceCtx::unscaled_legacy();
+    let scale_one = 1.0; // H-3: a dimensionless scale of 1.0, so tau * scale is the legacy absolute epsilon
+    let fresh = match ToleranceCtx::new(scale_one, TOLERANCE, TOLERANCE, TOLERANCE) {
+        Ok(certified) => certified.value,
+        Err(_) => {
+            unreachable!("a finite positive scale with finite non-negative taus is always accepted")
+        }
+    };
+    assert_eq!(legacy.model_scale(), fresh.model_scale());
+    assert_eq!(legacy.tau_in, fresh.tau_in);
+    assert_eq!(legacy.tau_rep, fresh.tau_rep);
+    assert_eq!(legacy.tau_col, fresh.tau_col);
+    assert_eq!(legacy.sin_margin(), fresh.sin_margin());
+    assert_eq!(legacy.entity_tau(TOLERANCE), fresh.entity_tau(TOLERANCE));
+    let samples = [0.0, 0.5 * TOLERANCE, TOLERANCE, 2.0 * TOLERANCE]; // H-3: lengths/ratios spanning the legacy epsilon boundary
+    for x in samples {
+        assert_eq!(legacy.is_small_len(x), fresh.is_small_len(x));
+        assert_eq!(legacy.is_small_ratio(x), fresh.is_small_ratio(x));
+    }
+    let a = Point3::new(0.0, 0.0, 0.0); // H-3: the zero reference of the sample set
+    for b in [
+        Point3::new(TOLERANCE, 0.0, 0.0), // H-3: zero off-axis components
+        Point3::new(TOLERANCE, TOLERANCE, 0.0), // H-3: zero off-axis component
+        Point3::new(TOLERANCE, TOLERANCE, TOLERANCE),
+    ] {
+        assert_eq!(legacy.near_pt(a, b), fresh.near_pt(a, b));
+    }
 }
