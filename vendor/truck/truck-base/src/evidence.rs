@@ -92,6 +92,9 @@ pub enum UnresolvedWitness {
     RootNotIsolated,
     /// Krawczyk's operator proved neither existence nor absence (BG-NUM-003).
     KrawczykIndeterminate,
+    /// The fillet contact curve could not be located on the adjacent edge
+    /// within budget (BG-S0-002).
+    ContactCurveNotFound,
 }
 
 /// Where the composition margin ran out.
