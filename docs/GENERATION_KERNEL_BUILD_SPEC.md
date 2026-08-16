@@ -451,6 +451,11 @@ impl ToleranceCtx {
     pub fn near_pt(&self, a: Point3, b: Point3) -> bool;      // ||a-b|| <= tau_rep * model_scale
     pub fn is_small_len(&self, l: f64) -> bool;
     pub fn sin_margin(&self) -> f64;   // dimensionless δ floor — NOT scaled
+
+    // Migration scaffold, BG-TOL-001-TYPE-r2. Infallible; model_scale = 1.0 and
+    // tau_rep = TOLERANCE, so a Stage-A migrated predicate is numerically
+    // identical to the legacy one it replaced. Ratcheted by kernel-gates.sh.
+    pub fn unscaled_legacy() -> Self;
 }
 ```
 
@@ -467,6 +472,42 @@ the two cases must not be conflated:**
 Mark every migrated site with `// BG-TOL-001: {model|param}`. A site that is
 genuinely ambiguous gets a `FIXME(BG-TOL-001)` and is listed in the PR, not
 guessed.
+
+**Migration staging — where a call site gets its context.** Added 2026-08-16,
+after `BG-TOL-001-TYPE` landed and the first migration shard could not be
+written. The paragraph above says to migrate 184 sites and §9 says "every
+signature below takes ctx"; neither says how a site *obtains* a context, and
+the answer is not free. None of the 184 sites sits in a function that has one.
+Threading `ctx` from the public entry points inward is the end state, but it
+changes public signatures in every crate at once, so it cannot be sharded per
+crate — which is what the eight `BG-TOL-001-*` shards assume, and what makes
+them write-disjoint. Doing it as one packet is a twelve-crate breaking change
+with no intermediate state that compiles.
+
+The migration is therefore **two stages, and the contracts below are only
+discharged by the second**:
+
+- **Stage A — classify, per crate, behaviour-preserving.** Every site is
+  rewritten through a `ToleranceCtx` and marked `model` or `param`. The context
+  comes from `ToleranceCtx::unscaled_legacy()`, constructed at the top of each
+  function that contains sites. That constructor is infallible and returns
+  `model_scale = 1.0`, `tau_rep = TOLERANCE`, so **every migrated predicate
+  keeps exactly its present numeric behaviour**. Nothing is fixed at this
+  stage; what is bought is that the model/param judgement is made once, in
+  writing, by someone reading the code — and that judgement is the expensive
+  half. Public signatures do not change, so the shards stay disjoint.
+- **Stage B — thread the real scale, per entry point.** Each crate's public
+  entry points derive a real `model_scale` from their input and thread the
+  context inward, deleting `unscaled_legacy()` calls as they go. This is what
+  actually discharges BG-TOL-001 and BG-TOL-002.
+
+`unscaled_legacy()` is a scaffold and is the obvious way to leave the job half
+done, so it is **ratcheted, not trusted**: `scripts/kernel-gates.sh` counts its
+occurrences against a recorded ceiling and fails when the count rises. The
+ceiling only ever moves down, one Stage-B packet at a time, and BG-TOL-001 is
+not closed until it reaches zero. A gate that merely forbade the constructor
+would forbid Stage A; a ceiling permits Stage A exactly once per site and
+permits nothing after.
 
 **Contracts.**
 - **BG-TOL-001** No predicate reachable from a public entry point compares a
