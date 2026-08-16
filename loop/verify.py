@@ -11,12 +11,16 @@ integration/kernel-bg, matching how new_slot.py forks a slot branch.
 import argparse
 import datetime
 import json
+import os
 import re
+import shutil
 import subprocess
 import sys
+import tempfile
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
+BASELINES_DIR = REPO_ROOT / 'loop' / 'baselines'
 
 
 def git(wt, *args, check=False):
@@ -30,6 +34,114 @@ def git(wt, *args, check=False):
 def git_lines(wt, *args):
     _, out = git(wt, *args)
     return [l for l in out.splitlines() if l != '']
+
+
+# ---------------------------------------------------------------------------
+# V5 baseline comparison. A test failure has no location in the diff the way
+# a clippy finding or an added test fn does, so "regression" can only be
+# defined by comparing two full test runs -- the packet's HEAD against its
+# base commit -- not by scoping to lines the packet touched. See the V5 gate
+# below for why this replaced the added-tests-only scoping.
+# ---------------------------------------------------------------------------
+
+_TEST_LINE_RE = re.compile(r'^test\s+(\S+)\s+\.\.\.\s+(ok|FAILED|ignored)')
+_COMPILE_ERROR_RE = re.compile(r'error\[E\d+\]|could not compile|error: no test target')
+
+
+def parse_test_statuses(text):
+    """Map full test name (module::path::name, as cargo prints it -- distinct
+    test binaries can in principle reuse a bare name, so the full path is kept
+    rather than stripped) -> 'ok' | 'FAILED' | 'ignored', last line wins."""
+    statuses = {}
+    for line in text.splitlines():
+        m = _TEST_LINE_RE.match(line)
+        if m:
+            statuses[m.group(1)] = m.group(2)
+    return statuses
+
+
+def has_compile_error(text):
+    return _COMPILE_ERROR_RE.search(text) is not None
+
+
+def baseline_cache_path(base_sha, crate_names):
+    key = base_sha[:12] + '__' + '-'.join(sorted(crate_names))
+    safe_key = re.sub(r'[^A-Za-z0-9_.-]', '_', key)
+    return BASELINES_DIR / f"{safe_key}.json"
+
+
+def compute_baseline(base_sha, crate_names, out_file):
+    """Run `cargo test -p <crates> --lib --tests --no-fail-fast` at base_sha
+    in a throwaway worktree and return {'compile_ok': bool, 'tests': {name:
+    status}}. Never touches loop/slots/*; creates and removes its own
+    worktree and target dir under the system temp directory, so a baseline
+    run cannot collide with (or be mistaken for) a slot's own worktree."""
+    tmp_parent = Path(tempfile.mkdtemp(prefix='look-verify-baseline-'))
+    wt_path = tmp_parent / 'wt'
+    target_path = tmp_parent / 'target'
+    p_args = []
+    for c in crate_names:
+        p_args += ['-p', c]
+
+    with out_file.open('a', encoding='utf-8', newline='\n') as f:
+        f.write(f"\n===== V5 baseline: computing at {base_sha[:12]} (worktree {wt_path}) =====\n")
+
+    add_res = subprocess.run(
+        ['git', '-C', str(REPO_ROOT), 'worktree', 'add', '--detach', str(wt_path), base_sha],
+        capture_output=True, text=True
+    )
+    with out_file.open('a', encoding='utf-8', newline='\n') as f:
+        f.write(add_res.stdout)
+        f.write(add_res.stderr)
+    if add_res.returncode != 0:
+        shutil.rmtree(tmp_parent, ignore_errors=True)
+        raise RuntimeError(f"could not create baseline worktree at {base_sha}: {add_res.stderr}")
+
+    try:
+        env = dict(os.environ)
+        env['CARGO_INCREMENTAL'] = '0'
+        env['CARGO_TARGET_DIR'] = str(target_path)
+        test_res = subprocess.run(
+            ['cargo', 'test', *p_args, '--lib', '--tests', '--no-fail-fast'],
+            cwd=str(wt_path), capture_output=True, text=True, env=env
+        )
+        chunk = test_res.stdout + test_res.stderr
+        with out_file.open('a', encoding='utf-8', newline='\n') as f:
+            f.write(chunk)
+
+        compile_ok = not has_compile_error(chunk)
+        tests = parse_test_statuses(chunk) if compile_ok else {}
+        return {'compile_ok': compile_ok, 'tests': tests}
+    finally:
+        # Best-effort cleanup. `git worktree remove` first (keeps the repo's
+        # worktree list clean); if the target dir is still holding a file
+        # open on Windows, at least the git-level registration is gone and a
+        # leftover tmp_parent under the OS temp dir is harmless.
+        subprocess.run(['git', '-C', str(REPO_ROOT), 'worktree', 'remove', '--force', str(wt_path)],
+                        capture_output=True, text=True)
+        shutil.rmtree(tmp_parent, ignore_errors=True)
+
+
+def load_or_compute_baseline(base_sha, crate_names, out_file):
+    cache_path = baseline_cache_path(base_sha, crate_names)
+    if cache_path.is_file():
+        obj = json.loads(cache_path.read_text(encoding='utf-8'))
+        with out_file.open('a', encoding='utf-8', newline='\n') as f:
+            f.write(f"\n===== V5 baseline: loaded cache {cache_path.name} "
+                     f"(computed {obj.get('computed_at', '?')}) =====\n")
+        return obj
+
+    BASELINES_DIR.mkdir(parents=True, exist_ok=True)
+    result = compute_baseline(base_sha, crate_names, out_file)
+    obj = {
+        'base': base_sha,
+        'crates': sorted(crate_names),
+        'computed_at': datetime.datetime.now(datetime.timezone.utc).isoformat().replace('+00:00', 'Z'),
+        'compile_ok': result['compile_ok'],
+        'tests': result['tests'],
+    }
+    cache_path.write_text(json.dumps(obj, indent=2, sort_keys=True), encoding='utf-8')
+    return obj
 
 
 class Verifier:
@@ -196,15 +308,42 @@ def main():
     # -----------------------------------------------------------------------
     commits_ahead = len(git_lines(v.wt, 'rev-list', f"{base}..HEAD"))
     porcelain = git_lines(v.wt, 'status', '--porcelain')
-    # Untracked files (?? ...) are not "uncommitted changes" here: cargo test
-    # run by V5 (and the worker's own test runs) drops artifacts -- .obj mesh
-    # dumps, logs -- into the worktree, and PACKET.md/RESULT.json/QUESTION.md
-    # are expected outputs. V0 asks whether the worker committed its *edits*
-    # (tracked files still modified); an uncommitted new source file is caught
-    # downstream by V1/V6, which read the committed diff.
-    uncommitted = [l for l in porcelain
-                   if not l.startswith('?? ')
-                   and not re.search(r'(?i)\s(PACKET\.md|worker\.(pid|err|packet))$', l)]
+    # Untracked files used to be ignored wholesale here, on the claim that an
+    # uncommitted new source file "is still caught by V1/V6 via the committed
+    # diff." That's wrong on the facts: V1/V6 read `git diff <base>...HEAD`,
+    # which by construction only shows committed changes -- an uncommitted
+    # file is invisible to it. That is exactly the hole V0 exists to close: a
+    # worker that died after creating files but before committing.
+    #
+    # The real reason untracked files were blanket-ignored is that verify's
+    # own `cargo test` run (V5, below) drops build artifacts into the
+    # worktree it is about to judge -- confirmed by grepping the vendored
+    # tree: every hit is a relative std::fs::File::create("*.obj") in a
+    # tests/*.rs or src/**/tests.rs (truck-shapeops's fillet tests, mainly).
+    # No other extension turned up. Fixing the cause (stop those tests from
+    # writing into the worktree) would mean patching upstream-vendored test
+    # code outside any packet's write_allow, which is worse than the disease;
+    # narrowing the ignore list to exactly what's demonstrated to appear is
+    # the smaller, honest fix. If a future crate's tests drop some other
+    # artifact, that will show up here as a false BLOCKED and the pattern
+    # gets added then, with evidence, not preemptively.
+    def _ignorable_untracked(rel_path):
+        name = Path(rel_path).name
+        if name in ('PACKET.md', 'RESULT.json', 'QUESTION.md'):
+            return True
+        if rel_path.endswith('.obj'):
+            return True
+        return False
+
+    uncommitted = []
+    for l in porcelain:
+        if l.startswith('?? '):
+            rel = l[3:].strip().strip('"')
+            if _ignorable_untracked(rel):
+                continue
+            uncommitted.append(l)
+        elif not re.search(r'(?i)\s(PACKET\.md|worker\.(pid|err|packet))$', l):
+            uncommitted.append(l)
     has_result = (v.wt / 'RESULT.json').is_file()
     has_question = (v.wt / 'QUESTION.md').is_file()
 
@@ -212,7 +351,8 @@ def main():
     if commits_ahead == 0:
         preflight.append(f"no commit since {base[:7]} -- the worker never finished")
     if len(uncommitted) > 0:
-        preflight.append(f"{len(uncommitted)} uncommitted change(s) left in the worktree")
+        preflight.append(f"{len(uncommitted)} uncommitted change(s) left in the worktree: "
+                          + ', '.join(l.strip() for l in uncommitted[:8]))
     if not has_result and not has_question:
         preflight.append("no RESULT.json and no QUESTION.md")
 
@@ -252,7 +392,6 @@ def main():
         v.add_gate('V1 scope', 'PASS', f"{len(changed)} changed file(s), all within write_allow")
 
     env_extra = {'CARGO_INCREMENTAL': '0', 'CARGO_TARGET_DIR': str(v.target_dir)}
-    import os
     os.environ.update(env_extra)
 
     # -----------------------------------------------------------------------
@@ -355,8 +494,8 @@ def main():
         v.add_gate('V4 house rules', 'SKIP', 'earlier gate failed')
 
     # -----------------------------------------------------------------------
-    # V5 tests — cargo test -p <crate> --lib --tests --no-fail-fast, diff-scoped
-    # to the test fns this packet added. Never bare `cargo test`.
+    # V5 tests — cargo test -p <crate> --lib --tests --no-fail-fast, compared
+    # against a real baseline run at `base`. Never bare `cargo test`.
     #
     # The whole-crate `--lib --tests` form catches pre-existing baseline
     # failures the packet never touched -- truck-shapeops's
@@ -365,71 +504,95 @@ def main():
     # ShellCondition::Irregular -- and cargo's default fail-fast stops at the
     # first failing binary before reaching the packet's own tests/*.rs (that
     # is how BG-S0-002's first verify ran every crate except fillet.rs).
-    # --no-fail-fast runs every binary; the FAIL decision is then scoped to
-    # test fns the packet added (the same added-lines scoping V3 uses for
-    # clippy and V6 for test-reality), so pre-existing failures are noted but
-    # do not reject. Regression detection (a packet breaking a pre-existing
-    # test) is V8's job, not V5's; V8 is a stub, and that gap is recorded in
-    # STATE.md.
+    # --no-fail-fast runs every binary.
+    #
+    # This used to scope the FAIL decision to test fns the packet *added*,
+    # by analogy with V3's added-lines clippy scoping. That analogy doesn't
+    # hold: a clippy finding carries a file:line, so scoping to added lines
+    # filters noise precisely; a cargo test failure carries only a test name,
+    # which is not "located" anywhere in the diff, so scoping to added tests
+    # doesn't filter noise -- it throws away every regression a packet causes
+    # in a test it didn't write. That gap was handed to V8, a stub that
+    # always passes, i.e. handed to nobody.
+    #
+    # The real baseline comparison: run the same command at `base` once (see
+    # load_or_compute_baseline / compute_baseline above), cache the failing
+    # test names per (base, crate set) under loop/baselines/ so repeated
+    # packets against the same base don't pay for it again, and then apply
+    # three rules to this run's result:
+    #   - failed now, not failed (or absent) at base -> regression, FAIL.
+    #     Covers both "packet broke an existing test" and "packet's own new
+    #     test fails" -- the latter is just the base-absent case.
+    #   - failed at base and still fails -> pre-existing baseline noise,
+    #     reported but does not reject (unchanged from before).
+    #   - passed at base and is absent from this run's output entirely, or
+    #     present but now `ignored` -> also a regression (deleted or
+    #     #[ignore]d to get green, which the house rules forbid).
+    # Known blind spot: a test renamed (same behaviour, new name) is
+    # indistinguishable from delete-old-add-new by this method and will read
+    # as one disappearance + one new-test-pass; there is no reliable way to
+    # tell those apart from cargo's text output alone, so this is a false
+    # positive this gate can produce, not a case it silently misses.
     # -----------------------------------------------------------------------
     if not v.failed_early:
-        v.write_out_section('V5 tests: cargo test -p --lib --tests --no-fail-fast (diff-scoped)')
+        baseline = load_or_compute_baseline(base, crate_names, v.out_file)
+
+        v.write_out_section('V5 tests: cargo test -p --lib --tests --no-fail-fast')
         len_before = v.out_file.stat().st_size
         v.invoke_native(['cargo', 'test', *p_args, '--lib', '--tests', '--no-fail-fast'], v.wt)
         chunk = v.out_file.read_bytes()[len_before:].decode('utf-8', errors='replace')
 
-        # Added test fn names: #[test]-attributed fns in the added diff lines.
-        # Mirrors V6's scan verbatim so the two gates agree on what "added"
-        # means.
-        _, diff_text = git(v.wt, 'diff', diff_range, '--', '*.rs')
-        added_lines_rs = [l for l in re.split(r'\r?\n', diff_text) if re.match(r'^\+[^+]', l)]
-        added_test_fns = set()
-        pending_test_attr = False
-        for line in added_lines_rs:
-            body = line[1:]
-            if re.search(r'#\[\s*(test|proptest|test_case|tokio::test)', body):
-                pending_test_attr = True
-                continue
-            fm = re.search(r'fn\s+([A-Za-z0-9_]+)', body)
-            if fm:
-                if pending_test_attr:
-                    added_test_fns.add(fm.group(1))
-                    pending_test_attr = False
-                continue
-            if body.strip() != '' and not re.match(r'^\s*(#\[|//)', body):
-                pending_test_attr = False
-
-        # Failing test fns from cargo's "test <name> ... FAILED" lines. Strip
-        # the module path (healing::tests::step_import -> step_import) so the
-        # bare name compares against added_test_fns.
-        failing_added = []
-        failing_baseline = []
-        for line in chunk.splitlines():
-            fm = re.match(r'^test\s+(\S+)\s+\.\.\.\s+FAILED', line)
-            if not fm:
-                continue
-            full = fm.group(1)
-            bare = full.rsplit('::', 1)[-1]
-            if bare in added_test_fns:
-                failing_added.append(bare)
-            else:
-                failing_baseline.append(full)
-
-        compile_error = re.search(r'error\[E\d+\]|could not compile|error: no test target', chunk)
+        compile_error = has_compile_error(chunk)
 
         if compile_error:
             v.add_gate('V5 tests', 'FAIL', 'test target(s) failed to compile; see out.txt')
             v.failed_early = True
-        elif failing_added:
-            v.add_gate('V5 tests', 'FAIL',
-                       'failing added test(s): ' + ', '.join(sorted(set(failing_added))) + '; see out.txt')
-            v.failed_early = True
+        elif not baseline['compile_ok']:
+            # The baseline itself didn't compile -- we have no reliable
+            # failing-set to diff against. Conservative direction: treat
+            # every failure now as unexplained rather than silently passing.
+            now = parse_test_statuses(chunk)
+            failing_now = sorted(n for n, s in now.items() if s == 'FAILED')
+            if failing_now:
+                v.add_gate('V5 tests', 'FAIL',
+                            f"baseline at {base[:7]} would not compile, so no comparison is possible; "
+                            'failing test(s) now: ' + ', '.join(failing_now[:8]) + '; see out.txt')
+                v.failed_early = True
+            else:
+                v.add_gate('V5 tests', 'PASS',
+                            f"baseline at {base[:7]} would not compile (no comparison possible); "
+                            'no test failures in this run')
         else:
-            detail = 'all added tests pass'
-            if failing_baseline:
-                detail += (f"; {len(failing_baseline)} pre-existing baseline failure(s) ignored: "
-                           + ', '.join(sorted(set(failing_baseline))[:8]))
-            v.add_gate('V5 tests', 'PASS', detail)
+            now = parse_test_statuses(chunk)
+            base_tests = baseline['tests']
+
+            newly_failing = sorted(n for n, s in now.items()
+                                    if s == 'FAILED' and base_tests.get(n) != 'FAILED')
+            still_failing = sorted(n for n, s in now.items()
+                                    if s == 'FAILED' and base_tests.get(n) == 'FAILED')
+            disappeared = sorted(n for n, s in base_tests.items()
+                                  if s == 'ok' and n not in now)
+            newly_ignored = sorted(n for n, s in now.items()
+                                    if s == 'ignored' and base_tests.get(n) == 'ok')
+
+            regressions = newly_failing + disappeared + newly_ignored
+
+            if regressions:
+                parts = []
+                if newly_failing:
+                    parts.append('newly failing: ' + ', '.join(newly_failing[:8]))
+                if disappeared:
+                    parts.append('passed at base, absent now (deleted?): ' + ', '.join(disappeared[:8]))
+                if newly_ignored:
+                    parts.append('passed at base, #[ignore]d now: ' + ', '.join(newly_ignored[:8]))
+                v.add_gate('V5 tests', 'FAIL', '; '.join(parts) + '; see out.txt')
+                v.failed_early = True
+            else:
+                detail = f"no regressions vs baseline at {base[:7]}"
+                if still_failing:
+                    detail += (f"; {len(still_failing)} baseline failure(s) ignored (failed at base too): "
+                               + ', '.join(still_failing[:8]))
+                v.add_gate('V5 tests', 'PASS', detail)
     else:
         v.add_gate('V5 tests', 'SKIP', 'earlier gate failed')
 
