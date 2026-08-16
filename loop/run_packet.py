@@ -21,7 +21,7 @@ CREATE_NO_WINDOW = 0x08000000
 
 
 def git_lines(wt, *args):
-    res = subprocess.run(['git', '-C', str(wt), *args], capture_output=True, text=True)
+    res = subprocess.run(['git', '-C', str(wt), *args], capture_output=True, text=True, encoding='utf-8', errors='replace')
     return [l for l in res.stdout.splitlines() if l != '']
 
 
@@ -141,15 +141,15 @@ def main():
                       "Inspect them, or pass --reset to archive and discard them before dispatching.")
         stamp = datetime.datetime.now().strftime('%Y%m%d-%H%M%S')
         archive = slot_root / f"abandoned-{stamp}.patch"
-        diff_res = subprocess.run(['git', '-C', str(wt), 'diff', 'HEAD'], capture_output=True, text=True)
+        diff_res = subprocess.run(['git', '-C', str(wt), 'diff', 'HEAD'], capture_output=True, text=True, encoding='utf-8', errors='replace')
         with archive.open('w', encoding='utf-8', newline='\n') as f:
             f.write(diff_res.stdout)
             untracked = git_lines(wt, 'ls-files', '--others', '--exclude-standard')
             if untracked:
                 f.write("\n# untracked, not captured above:\n# " + "\n# ".join(untracked))
         print(f"archived {len(dirty)} abandoned change(s) to {archive}")
-        subprocess.run(['git', '-C', str(wt), 'reset', '--hard', 'HEAD'], capture_output=True, text=True)
-        subprocess.run(['git', '-C', str(wt), 'clean', '-fd', '-e', 'PACKET.md'], capture_output=True, text=True)
+        subprocess.run(['git', '-C', str(wt), 'reset', '--hard', 'HEAD'], capture_output=True, text=True, encoding='utf-8', errors='replace')
+        subprocess.run(['git', '-C', str(wt), 'clean', '-fd', '-e', 'PACKET.md'], capture_output=True, text=True, encoding='utf-8', errors='replace')
 
     # The packet is copied into the worktree and the prompt points at it,
     # rather than being passed as the prompt itself (S2). A packet is ~9 KB

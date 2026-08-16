@@ -33,7 +33,7 @@ def process_alive(pid):
 
 
 def git_status_count(wt):
-    res = subprocess.run(['git', '-C', str(wt), 'status', '--porcelain'], capture_output=True, text=True)
+    res = subprocess.run(['git', '-C', str(wt), 'status', '--porcelain'], capture_output=True, text=True, encoding='utf-8', errors='replace')
     return len([l for l in res.stdout.splitlines() if l != ''])
 
 
@@ -65,7 +65,7 @@ def git_branch_and_head(wt):
     still being "this slot's own tip".
     """
     def out(*args):
-        res = subprocess.run(['git', '-C', str(wt), *args], capture_output=True, text=True)
+        res = subprocess.run(['git', '-C', str(wt), *args], capture_output=True, text=True, encoding='utf-8', errors='replace')
         return res.stdout.strip()
 
     branch = out('rev-parse', '--abbrev-ref', 'HEAD') or '?'
@@ -74,7 +74,7 @@ def git_branch_and_head(wt):
 
     is_ancestor = subprocess.run(
         ['git', '-C', str(wt), 'merge-base', '--is-ancestor', 'HEAD', 'integration/kernel-bg'],
-        capture_output=True, text=True).returncode == 0
+        capture_output=True, text=True, encoding='utf-8', errors='replace').returncode == 0
 
     if is_ancestor:
         # Reachable from kernel-bg somehow -- check whether it's on the
@@ -149,7 +149,7 @@ def main():
             slot.name, state, Path(packet).name, pid_col, size, age_col, dirty, result, git_col))
 
         if state == 'STALLED' and args.kill_stalled:
-            subprocess.run(['taskkill', '/PID', str(worker_pid), '/F'], capture_output=True, text=True)
+            subprocess.run(['taskkill', '/PID', str(worker_pid), '/F'], capture_output=True, text=True, encoding='utf-8', errors='replace')
             print(f"  killed pid {worker_pid} after {age_min} min of silence")
 
 

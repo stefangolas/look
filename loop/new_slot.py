@@ -18,7 +18,7 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 
 
 def git(cwd, *args):
-    return subprocess.run(['git', '-C', str(cwd), *args], capture_output=True, text=True)
+    return subprocess.run(['git', '-C', str(cwd), *args], capture_output=True, text=True, encoding='utf-8', errors='replace')
 
 
 def main():

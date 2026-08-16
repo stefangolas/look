@@ -24,6 +24,14 @@ def overlaps(a, b):
     return False
 
 def frontier(done, running):
+    # A packet marked DONE in PACKETS.jsonl is done, whether or not the caller
+    # remembered to name it in --assume-done. Without this the ledger and the
+    # scheduler disagree the moment anything lands: after BG-EVD-r3 merged, the
+    # frontier read zero eligible packets because every W2 item still waited on
+    # a dependency the file already recorded as satisfied. --assume-done stays
+    # as the way to ask "what would open up if X landed", which is a question
+    # about the future, not a way to state the present.
+    done = set(done) | {r['id'] for r in ROWS if r['status'] == 'DONE'}
     out = []
     for r in ROWS:
         if r['id'] in done or r['status'] in ('RUNNING', 'DONE'):

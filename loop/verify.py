@@ -35,11 +35,18 @@ BASELINES_DIR = REPO_ROOT / 'loop' / 'baselines'
 
 
 def git(wt, *args, check=False):
-    """Run git -C <wt> <args> and return (returncode, stdout)."""
-    res = subprocess.run(['git', '-C', str(wt), *args], capture_output=True, text=True)
+    """Run git -C <wt> <args> and return (returncode, stdout).
+
+    UTF-8 with replacement, never the locale codec. A worker writing ω or ε in
+    a doc comment -- which the BG-EVD-r3 packet actively asked for -- produces
+    bytes cp1252 cannot decode, and the resulting UnicodeDecodeError surfaced
+    far away as `'NoneType' object has no attribute 'splitlines'` in the V3
+    hunk parser. stdout is coerced to '' so a git failure can never present as
+    that same None."""
+    res = subprocess.run(['git', '-C', str(wt), *args], capture_output=True, text=True, encoding='utf-8', errors='replace')
     if check and res.returncode != 0:
         raise RuntimeError(f"git {' '.join(args)} failed: {res.stderr}")
-    return res.returncode, res.stdout
+    return res.returncode, (res.stdout or '')
 
 
 def git_lines(wt, *args):
@@ -99,7 +106,7 @@ def compute_baseline(base_sha, crate_names, out_file):
 
     add_res = subprocess.run(
         ['git', '-C', str(REPO_ROOT), 'worktree', 'add', '--detach', str(wt_path), base_sha],
-        capture_output=True, text=True
+        capture_output=True, text=True, encoding='utf-8', errors='replace'
     )
     with out_file.open('a', encoding='utf-8', newline='\n') as f:
         f.write(add_res.stdout)
@@ -114,7 +121,7 @@ def compute_baseline(base_sha, crate_names, out_file):
         env['CARGO_TARGET_DIR'] = str(target_path)
         test_res = subprocess.run(
             ['cargo', 'test', *p_args, '--lib', '--tests', '--no-fail-fast'],
-            cwd=str(wt_path), capture_output=True, text=True, env=env
+            cwd=str(wt_path), capture_output=True, text=True, encoding='utf-8', errors='replace', env=env
         )
         chunk = test_res.stdout + test_res.stderr
         with out_file.open('a', encoding='utf-8', newline='\n') as f:
@@ -129,7 +136,7 @@ def compute_baseline(base_sha, crate_names, out_file):
         # open on Windows, at least the git-level registration is gone and a
         # leftover tmp_parent under the OS temp dir is harmless.
         subprocess.run(['git', '-C', str(REPO_ROOT), 'worktree', 'remove', '--force', str(wt_path)],
-                        capture_output=True, text=True)
+                        capture_output=True, text=True, encoding='utf-8', errors='replace')
         shutil.rmtree(tmp_parent, ignore_errors=True)
 
 
@@ -180,7 +187,7 @@ class Verifier:
         stdout/stderr capture (rather than PowerShell's stream redirection)
         has none of the ErrorRecord-wrapping hazard the PS1 comment
         describes, so this is a plain run-and-append."""
-        res = subprocess.run(args, cwd=str(cwd), capture_output=True, text=True)
+        res = subprocess.run(args, cwd=str(cwd), capture_output=True, text=True, encoding='utf-8', errors='replace')
         with self.out_file.open('a', encoding='utf-8', newline='\n') as f:
             f.write(res.stdout)
             f.write(res.stderr)

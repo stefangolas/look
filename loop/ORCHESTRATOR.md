@@ -132,6 +132,17 @@ which is the only reason a flash-class model landed it in one attempt.
 Leave exactly one judgement to the worker if you must, name it explicitly, and
 require the reasoning in `RESULT.json` notes so a reviewer sees it.
 
+**Tell the worker the gates' escape hatches, or it will fail on them.** A packet
+that states a house rule without stating how to satisfy it deliberately is a
+packet that gets rejected for the orchestrator's omission. The one that has
+already cost a round trip: H-3 forbids bare absolute literals, and float
+comparison epsilons in tests trip it — `kernel-gates.sh` accepts a `// H-3`
+opt-out, but only **on the same line**, not on the line above, and its own
+message ("mark the line") does not say so. Write that into any packet whose
+tests will compare floats. Likewise say where results go: a worker told only
+"write RESULT.json" may infer `loop/results/` from the repo and land outside its
+own allowlist, which is a V1 rejection for following a convention correctly.
+
 Class matters: **mechanical** packets go to the worker model; **design** packets
 (new types, new invariants, anything the rest of the graph types against) you
 write yourself. BG-EVD-r3 is design class.
