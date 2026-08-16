@@ -2,8 +2,8 @@ use super::*;
 use derive_more::{From, TryInto};
 use serde::{Deserialize, Serialize};
 use truck_base::evidence::{
-    Budget, Certificate, Certified, Margin, Method, Modulus, Outcome, PropMap, Refusal,
-    UnresolvedWitness,
+    Budget, Certificate, Certified, EnvelopeCase, Margin, Method, Modulus, Outcome, PropMap,
+    Refusal, UnresolvedWitness,
 };
 #[doc(hidden)]
 pub use truck_geometry::prelude::{algo, inv_or_zero};
@@ -425,8 +425,47 @@ impl ToSameGeometry<Surface> for ExtrudedCurve<Curve, Vector3> {
                 ))
                 .into()
             }
-            (Curve::IntersectionCurve(_), Curve::IntersectionCurve(_)) => unimplemented!(),
+            (Curve::IntersectionCurve(_), Curve::IntersectionCurve(_)) => {
+                // BG-S0-003: `to_same_geometry` has no error channel, and an
+                // intersection-curve carrier cannot be evaluated here without
+                // unwinding (`IntersectionCurve::subs` unwraps its own
+                // projection search, H-1), so no approximation path exists.
+                // The honest total behaviour is a documented degenerate
+                // surface: the returned plane's image does NOT claim to match
+                // the extrusion. The certified answer for this pair lives in
+                // `try_to_same_geometry`, which refuses with
+                // `UnsupportedEnvelope(NonCanonicalCarrier)`.
+                Surface::Plane(Plane::xy())
+            }
             _ => unreachable!(),
+        }
+    }
+
+    fn try_to_same_geometry(&self) -> Outcome<Surface> {
+        // BG-S0-003: the two section curves of an extrusion always share the
+        // entity curve's variant (`curve1` is `curve0` pushed by the
+        // extrusion vector), so an `IntersectionCurve` entity is exactly the
+        // `(IntersectionCurve, IntersectionCurve)` pair. That carrier is
+        // outside the canonical set (H-2): refuse rather than unwind.
+        //
+        // The non-ISC arm replicates the trait default's certificate because
+        // an override cannot call the trait's default without recursing into
+        // itself — the default body is shadowed by this override, not a
+        // callable sibling (BG-S0-003).
+        match self.entity_curve() {
+            Curve::IntersectionCurve(_) => Err(Refusal::UnsupportedEnvelope(
+                EnvelopeCase::NonCanonicalCarrier,
+            )),
+            _ => Ok(Certified::new(
+                self.to_same_geometry(),
+                Certificate {
+                    props: PropMap::new(),
+                    method: Method::Float,
+                    budget_left: Budget::new(0, 0, 0),
+                    margin: Margin::UNBOUNDED,
+                    modulus: Modulus::Unbounded,
+                },
+            )),
         }
     }
 }
@@ -593,5 +632,131 @@ mod include_intersection_curve_tests {
         // inconsistent — the point of the regression is that this returns
         // instead of aborting.
         assert!(!face.is_geometric_consistent());
+    }
+}
+
+#[cfg(test)]
+// BG-S0-003 tests. The certificates and surfaces are inspected on hand-built
+// witnesses — not paths reachable from untrusted geometry, so the H-1 deny
+// lints on unwrap/expect do not apply to the assertions here.
+#[allow(clippy::unwrap_used, clippy::expect_used)]
+mod extrude_intersection_curve_tests {
+    use super::*;
+
+    /// The plane z = 0 through the origin.
+    fn zx_plane() -> Plane {
+        Plane::new(
+            Point3::origin(),
+            Point3::new(1.0, 0.0, 0.0),
+            Point3::new(0.0, 1.0, 0.0),
+        )
+    }
+
+    /// The plane x = 0 through the origin.
+    fn yz_plane() -> Plane {
+        Plane::new(
+            Point3::origin(),
+            Point3::new(0.0, 1.0, 0.0),
+            Point3::new(0.0, 0.0, 1.0),
+        )
+    }
+
+    fn intersection_curve(surface0: Surface, surface1: Surface, leader: Curve) -> Curve {
+        Curve::IntersectionCurve(IntersectionCurve::new(
+            Box::new(surface0),
+            Box::new(surface1),
+            Box::new(leader),
+        ))
+    }
+
+    /// An `ExtrudedCurve` whose entity curve is an `IntersectionCurve` — the
+    /// pair Booleans produce. `to_same_geometry` previously aborted on it.
+    fn extruded_intersection_curve_pair() -> ExtrudedCurve<Curve, Vector3> {
+        let isc = intersection_curve(
+            Surface::Plane(zx_plane()),
+            Surface::Plane(yz_plane()),
+            Curve::Line(Line(
+                Point3::new(0.0, 0.0, -1.0),
+                Point3::new(0.0, 0.0, 1.0),
+            )),
+        );
+        ExtrudedCurve::by_extrusion(isc, Vector3::unit_z())
+    }
+
+    #[test]
+    fn extrude_intersection_curve_pair_refuses() {
+        // The certified path refuses the (ISC, ISC) pair instead of aborting:
+        // `UnsupportedEnvelope(NonCanonicalCarrier)`, never a panic.
+        let extruded = extruded_intersection_curve_pair();
+        let out: Outcome<Surface> = extruded.try_to_same_geometry();
+        assert!(
+            matches!(
+                out,
+                Err(Refusal::UnsupportedEnvelope(
+                    EnvelopeCase::NonCanonicalCarrier
+                ))
+            ),
+            "expected UnsupportedEnvelope(NonCanonicalCarrier), got {out:?}"
+        );
+    }
+
+    #[test]
+    fn extrude_intersection_curve_pair_does_not_unwind() {
+        // `to_same_geometry` is infallible, so the same input must come back
+        // through it without unwinding; the catch is asserted not to be
+        // needed.
+        let extruded = extruded_intersection_curve_pair();
+        let result: std::thread::Result<Surface> =
+            std::panic::catch_unwind(|| extruded.to_same_geometry());
+        assert!(
+            result.is_ok(),
+            "to_same_geometry unwound on an intersection-curve pair"
+        );
+    }
+
+    #[test]
+    fn extrude_non_isc_pairs_unchanged() {
+        // Every non-ISC pair must be semantically inert: `try_to_same_geometry`
+        // succeeds and its surface equals what `to_same_geometry` produced.
+        let vector = Vector3::unit_z();
+        let pairs = [
+            ExtrudedCurve::by_extrusion(
+                Curve::Line(Line(Point3::new(0.0, 0.0, 0.0), Point3::new(1.0, 0.0, 0.0))),
+                vector,
+            ),
+            ExtrudedCurve::by_extrusion(
+                Curve::BSplineCurve(BSplineCurve::new(
+                    KnotVec::bezier_knot(1),
+                    vec![Point3::new(0.0, 0.0, 0.0), Point3::new(1.0, 1.0, 0.0)],
+                )),
+                vector,
+            ),
+            ExtrudedCurve::by_extrusion(
+                Curve::NurbsCurve(NurbsCurve::new(BSplineCurve::new(
+                    KnotVec::bezier_knot(1),
+                    vec![
+                        Point3::new(0.0, 0.0, 0.0).to_vec().extend(1.0),
+                        Point3::new(1.0, 0.0, 0.0).to_vec().extend(1.0),
+                    ],
+                ))),
+                vector,
+            ),
+        ];
+        for extruded in pairs {
+            let certified: Certified<Surface> = extruded
+                .try_to_same_geometry()
+                .expect("non-ISC extrusion must not refuse");
+            let before: Surface = extruded.to_same_geometry();
+            for i in 0..=4 {
+                let u = i as f64 / 4.0;
+                for j in 0..=4 {
+                    let v = j as f64 / 4.0;
+                    assert!(
+                        certified.value.subs(u, v) == before.subs(u, v),
+                        "surface diverged from to_same_geometry at ({u}, {v})"
+                    );
+                }
+            }
+        }
     }
 }

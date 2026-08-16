@@ -1,5 +1,8 @@
 use std::ops::Bound;
 use truck_base::cgmath64::*;
+use truck_base::evidence::{
+    Budget, Certificate, Certified, Margin, Method, Modulus, Outcome, PropMap,
+};
 
 mod curve;
 pub use curve::*;
@@ -110,4 +113,23 @@ impl_transformed!(Point3, Matrix4);
 pub trait ToSameGeometry<T> {
     /// Obtain a curve or surface that gives the same image as a given curve or surface.
     fn to_same_geometry(&self) -> T;
+
+    /// The fallible form (BG-S0-003, H-2). Implementors whose conversion can
+    /// fail on admissible input override this; the default delegates, so every
+    /// existing impl keeps working unchanged.
+    fn try_to_same_geometry(&self) -> Outcome<T> {
+        // BG-S0-003, H-6: the concrete conversions are float arithmetic, so
+        // the default certifies `Float`, never `Exact`. A refusal-capable
+        // implementor overrides this method and supplies its own certificate.
+        Ok(Certified::new(
+            self.to_same_geometry(),
+            Certificate {
+                props: PropMap::new(),
+                method: Method::Float,
+                budget_left: Budget::new(0, 0, 0),
+                margin: Margin::UNBOUNDED,
+                modulus: Modulus::Unbounded,
+            },
+        ))
+    }
 }

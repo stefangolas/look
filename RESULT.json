@@ -1,0 +1,10 @@
+{
+  "id": "BG-S0-003",
+  "status": "DONE",
+  "contracts": ["BG-S0-003"],
+  "tests_added": 3,
+  "anchors_verified": {
+    "A1": 1
+  },
+  "notes": "Total behaviour for to_same_geometry on the (IntersectionCurve, IntersectionCurve) arm: returned a documented degenerate surface, `Surface::Plane(Plane::xy())`. Chose option 1 over 'keep the existing approximation path' because no approximation path is supported by the surrounding code: `IntersectionCurve::subs`/`ders` unwrap their own projection search (H-1) and `Curve::lift_up` aborts on an IntersectionCurve, so neither homotopy nor leader-sampling can be used to approximate the pair. The plane is a well-defined, non-NaN placeholder whose image is explicitly documented as NOT matching the extrusion; the certified answer lives in try_to_same_geometry, which refuses the pair with UnsupportedEnvelope(NonCanonicalCarrier). The trait default certifies Method::Float (H-6: the conversion is float, never Exact). Note: the non-ISC arm of the override replicates the trait default's certificate because an override cannot call a trait default without recursing into itself (Rust shadows the default body); this is documented in the code. Verification: cargo fmt --check, cargo test -p truck-modeling --lib --tests (31 tests), and cargo check --workspace --all-targets all pass. The clippy gate (cargo clippy -p truck-geotrait -p truck-modeling --all-targets -- -D warnings) fails ONLY on three pre-existing issues outside this packet's write_allow, reproduced identically on the unmodified baseline (git stash): (1) truck-geometry/src/nurbs/knot_vec.rs clippy::result_large_err, (2) truck-geometry/src/specifieds/sphere.rs clippy::redundant_closure_call, (3) truck-geotrait/tests/derives.rs unresolved `polynomial` import (the polynomial feature is enabled only via truck-geometry dev-deps). A clippy run with --cap-lints=warn --features truck-geotrait/polynomial confirms zero findings in the two edited files."
+}
