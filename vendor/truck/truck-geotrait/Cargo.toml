@@ -26,3 +26,9 @@ getrandom = { version = "0.4.3", features = ["wasm_js"] }
 
 [dev-dependencies]
 proptest = { version = "1.11.0", features = ["attr-macro"] }
+# tests/derives.rs exercises the derive macros against the sample `polynomial`
+# module, which is itself feature-gated. Depend on ourselves in dev-deps so
+# `cargo test`/`cargo clippy --all-targets -p truck-geotrait` builds the test
+# target standalone, without relying on a downstream crate (truck-geometry)
+# to turn the feature on via unification.
+truck-geotrait = { path = ".", features = ["derive", "polynomial"] }

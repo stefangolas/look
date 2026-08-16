@@ -139,18 +139,16 @@ impl IncludeCurve<BSplineCurve<Point3>> for Sphere {
 
 impl IncludeCurve<NurbsCurve<Vector4>> for Sphere {
     fn include(&self, curve: &NurbsCurve<Vector4>) -> Outcome<bool> {
-        let value = (|| {
-            let (knots, _) = curve.knot_vec().to_single_multi();
-            let degree = curve.degree() * 2;
-            knots
-                .windows(2)
-                .flat_map(move |window| (1..degree).map(move |i| (window, i)))
-                .all(move |(window, i)| {
-                    let t = i as f64 / degree as f64;
-                    let t = window[0] * (1.0 - t) + window[1] * t;
-                    self.include(curve.subs(t))
-                })
-        })();
+        let (knots, _) = curve.knot_vec().to_single_multi();
+        let degree = curve.degree() * 2;
+        let value = knots
+            .windows(2)
+            .flat_map(move |window| (1..degree).map(move |i| (window, i)))
+            .all(move |(window, i)| {
+                let t = i as f64 / degree as f64;
+                let t = window[0] * (1.0 - t) + window[1] * t;
+                self.include(curve.subs(t))
+            });
         Ok(Certified::new(
             value,
             Certificate {

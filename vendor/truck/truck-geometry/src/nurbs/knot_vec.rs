@@ -606,6 +606,10 @@ pub struct ValidatedKnotVector {
 
 impl ValidatedKnotVector {
     /// Validates raw spline knot inputs and constructs an obligation-carrying certificate
+    // Every error variant carries a SplineSourceWitness by design, so the raw
+    // inputs that failed validation survive for diagnostics; boxing it would
+    // hide that evidence behind an extra indirection for no real benefit.
+    #[allow(clippy::result_large_err)]
     pub fn validate(
         raw_knots: Vec<f64>,
         raw_multiplicities: Vec<usize>,
