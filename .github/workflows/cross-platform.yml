@@ -24,6 +24,11 @@ jobs:
           rustup default stable
       - name: Check formatting
         run: cargo fmt --all -- --check
+      - name: Kernel gates (H-1/H-3/H-4 on new code only)
+        shell: bash
+        run: |
+          git fetch --unshallow origin
+          scripts/kernel-gates.sh origin/main
       - name: Lint all targets
         run: cargo clippy --locked --all-targets -- -D warnings
       - name: Compile all targets

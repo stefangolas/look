@@ -22,36 +22,38 @@ serde_yaml = "0.9"
 thiserror = "2.0"
 wgpu = "30.0"
 
-# STEP support. These track forks of truck and ruststep pinned to exact
-# revisions: upstream publishes to crates.io roughly every two years, and the
-# released versions cannot read AP242 at all. The forks carry the fixes and
-# give us somewhere to land our own. Bump the revs deliberately, never track a
-# branch, so a build is always reproducible. truck-assembly is the graph
-# resolver `Table::step_assy` builds; it must be pinned with the rest.
+# STEP support. truck is vendored in-tree at vendor/truck (pinned rev
+# c5f4b6e9778e0721a1d446f10568eb5e5594e8ed) so agents can edit it and the
+# build is reproducible from a clean clone. ruststep remains a pinned git
+# fork: upstream publishes to crates.io roughly every two years, and the
+# released versions cannot read AP242 at all. Bump the ruststep rev
+# deliberately, never track a branch. truck-assembly is the graph resolver
+# `Table::step_assy` builds; it must move with the rest.
 ruststep = { git = "https://github.com/stefangolas/ruststep", rev = "67f1f7c" }
-truck-assembly = { git = "https://github.com/stefangolas/truck", rev = "c5f4b6e9778e0721a1d446f10568eb5e5594e8ed" }
-truck-meshalgo = { git = "https://github.com/stefangolas/truck", rev = "c5f4b6e9778e0721a1d446f10568eb5e5594e8ed" }
-truck-polymesh = { git = "https://github.com/stefangolas/truck", rev = "c5f4b6e9778e0721a1d446f10568eb5e5594e8ed" }
-truck-stepio = { git = "https://github.com/stefangolas/truck", rev = "c5f4b6e9778e0721a1d446f10568eb5e5594e8ed" }
-truck-topology = { git = "https://github.com/stefangolas/truck", rev = "c5f4b6e9778e0721a1d446f10568eb5e5594e8ed" }
+truck-assembly = { path = "vendor/truck/truck-assembly" }
+truck-meshalgo = { path = "vendor/truck/truck-meshalgo" }
+truck-polymesh = { path = "vendor/truck/truck-polymesh" }
+truck-stepio = { path = "vendor/truck/truck-stepio" }
+truck-topology = { path = "vendor/truck/truck-topology" }
 
 [patch.crates-io]
 ruststep = { git = "https://github.com/stefangolas/ruststep", rev = "67f1f7c" }
-truck-assembly = { git = "https://github.com/stefangolas/truck", rev = "c5f4b6e9778e0721a1d446f10568eb5e5594e8ed" }
-truck-base = { git = "https://github.com/stefangolas/truck", rev = "c5f4b6e9778e0721a1d446f10568eb5e5594e8ed" }
-truck-derivers = { git = "https://github.com/stefangolas/truck", rev = "c5f4b6e9778e0721a1d446f10568eb5e5594e8ed" }
-truck-geometry = { git = "https://github.com/stefangolas/truck", rev = "c5f4b6e9778e0721a1d446f10568eb5e5594e8ed" }
-truck-geotrait = { git = "https://github.com/stefangolas/truck", rev = "c5f4b6e9778e0721a1d446f10568eb5e5594e8ed" }
-truck-meshalgo = { git = "https://github.com/stefangolas/truck", rev = "c5f4b6e9778e0721a1d446f10568eb5e5594e8ed" }
-truck-modeling = { git = "https://github.com/stefangolas/truck", rev = "c5f4b6e9778e0721a1d446f10568eb5e5594e8ed" }
-truck-polymesh = { git = "https://github.com/stefangolas/truck", rev = "c5f4b6e9778e0721a1d446f10568eb5e5594e8ed" }
-truck-stepio = { git = "https://github.com/stefangolas/truck", rev = "c5f4b6e9778e0721a1d446f10568eb5e5594e8ed" }
-truck-topology = { git = "https://github.com/stefangolas/truck", rev = "c5f4b6e9778e0721a1d446f10568eb5e5594e8ed" }
+truck-assembly = { path = "vendor/truck/truck-assembly" }
+truck-base = { path = "vendor/truck/truck-base" }
+truck-derivers = { path = "vendor/truck/truck-derivers" }
+truck-geometry = { path = "vendor/truck/truck-geometry" }
+truck-geotrait = { path = "vendor/truck/truck-geotrait" }
+truck-meshalgo = { path = "vendor/truck/truck-meshalgo" }
+truck-modeling = { path = "vendor/truck/truck-modeling" }
+truck-polymesh = { path = "vendor/truck/truck-polymesh" }
+truck-stepio = { path = "vendor/truck/truck-stepio" }
+truck-topology = { path = "vendor/truck/truck-topology" }
 
 
 [dev-dependencies]
 tempfile = "3.20"
-truck-geometry = { git = "https://github.com/stefangolas/truck", rev = "c5f4b6e9778e0721a1d446f10568eb5e5594e8ed" }
+truck-geometry = { path = "vendor/truck/truck-geometry" }
+truck-evidence = { path = "vendor/truck/truck-evidence" }
 
 [profile.release]
 lto = "thin"

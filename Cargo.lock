@@ -562,6 +562,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "77ce24cb58228fbb8aa041425bb1050850ac19177686ea6e0f41a70416f56fdb"
 
 [[package]]
+name = "forward_ref"
+version = "1.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c8cbd1169bd7b4a0a20d92b9af7a7e0422888bd38a6f5ec29c1fd8c1558a272e"
+
+[[package]]
 name = "futures-core"
 version = "0.3.34"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -769,6 +775,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "inari"
+version = "2.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f4048200fd855870ab456160b71ebeefdf0d4c70e24e5242513a232cc4beb9f7"
+dependencies = [
+ "cfg-if",
+ "forward_ref",
+]
+
+[[package]]
 name = "indexmap"
 version = "2.14.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -957,6 +973,7 @@ dependencies = [
  "tempfile",
  "thiserror 2.0.20",
  "truck-assembly",
+ "truck-evidence",
  "truck-geometry",
  "truck-meshalgo",
  "truck-polymesh",
@@ -1835,7 +1852,6 @@ dependencies = [
 [[package]]
 name = "truck-assembly"
 version = "0.1.0"
-source = "git+https://github.com/stefangolas/truck?rev=c5f4b6e9778e0721a1d446f10568eb5e5594e8ed#c5f4b6e9778e0721a1d446f10568eb5e5594e8ed"
 dependencies = [
  "rayon",
  "truck-base",
@@ -1844,7 +1860,6 @@ dependencies = [
 [[package]]
 name = "truck-base"
 version = "0.5.0"
-source = "git+https://github.com/stefangolas/truck?rev=c5f4b6e9778e0721a1d446f10568eb5e5594e8ed#c5f4b6e9778e0721a1d446f10568eb5e5594e8ed"
 dependencies = [
  "cgmath",
  "matext4cgmath",
@@ -1855,7 +1870,6 @@ dependencies = [
 [[package]]
 name = "truck-derivers"
 version = "0.1.0"
-source = "git+https://github.com/stefangolas/truck?rev=c5f4b6e9778e0721a1d446f10568eb5e5594e8ed#c5f4b6e9778e0721a1d446f10568eb5e5594e8ed"
 dependencies = [
  "proc-macro-error",
  "proc-macro2",
@@ -1864,9 +1878,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "truck-evidence"
+version = "0.1.0"
+dependencies = [
+ "inari",
+ "truck-base",
+ "truck-geometry",
+ "truck-geotrait",
+]
+
+[[package]]
 name = "truck-geometry"
 version = "0.5.0"
-source = "git+https://github.com/stefangolas/truck?rev=c5f4b6e9778e0721a1d446f10568eb5e5594e8ed#c5f4b6e9778e0721a1d446f10568eb5e5594e8ed"
 dependencies = [
  "serde",
  "thiserror 2.0.20",
@@ -1877,7 +1900,6 @@ dependencies = [
 [[package]]
 name = "truck-geotrait"
 version = "0.4.0"
-source = "git+https://github.com/stefangolas/truck?rev=c5f4b6e9778e0721a1d446f10568eb5e5594e8ed#c5f4b6e9778e0721a1d446f10568eb5e5594e8ed"
 dependencies = [
  "getrandom",
  "rand",
@@ -1889,7 +1911,6 @@ dependencies = [
 [[package]]
 name = "truck-meshalgo"
 version = "0.4.0"
-source = "git+https://github.com/stefangolas/truck?rev=c5f4b6e9778e0721a1d446f10568eb5e5594e8ed#c5f4b6e9778e0721a1d446f10568eb5e5594e8ed"
 dependencies = [
  "array-macro",
  "derive_more 2.1.1",
@@ -1911,7 +1932,6 @@ dependencies = [
 [[package]]
 name = "truck-modeling"
 version = "0.6.0"
-source = "git+https://github.com/stefangolas/truck?rev=c5f4b6e9778e0721a1d446f10568eb5e5594e8ed#c5f4b6e9778e0721a1d446f10568eb5e5594e8ed"
 dependencies = [
  "derive_more 2.1.1",
  "itertools 0.15.0",
@@ -1927,7 +1947,6 @@ dependencies = [
 [[package]]
 name = "truck-polymesh"
 version = "0.6.0"
-source = "git+https://github.com/stefangolas/truck?rev=c5f4b6e9778e0721a1d446f10568eb5e5594e8ed#c5f4b6e9778e0721a1d446f10568eb5e5594e8ed"
 dependencies = [
  "array-macro",
  "bytemuck",
@@ -1942,13 +1961,13 @@ dependencies = [
 [[package]]
 name = "truck-stepio"
 version = "0.3.0"
-source = "git+https://github.com/stefangolas/truck?rev=c5f4b6e9778e0721a1d446f10568eb5e5594e8ed#c5f4b6e9778e0721a1d446f10568eb5e5594e8ed"
 dependencies = [
  "chrono",
  "derive_more 2.1.1",
  "ruststep",
  "serde",
  "truck-assembly",
+ "truck-base",
  "truck-derivers",
  "truck-geometry",
  "truck-geotrait",
@@ -1960,7 +1979,6 @@ dependencies = [
 [[package]]
 name = "truck-topology"
 version = "0.6.0"
-source = "git+https://github.com/stefangolas/truck?rev=c5f4b6e9778e0721a1d446f10568eb5e5594e8ed#c5f4b6e9778e0721a1d446f10568eb5e5594e8ed"
 dependencies = [
  "parking_lot",
  "rayon",

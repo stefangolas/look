@@ -1,0 +1,15 @@
+[package]
+name = "truck-evidence"
+version = "0.1.0"
+edition = "2021"
+description = "Certified evaluation substrate for the B-rep generation kernel: the evidence algebra (BG-EVD-001) and the enclosure interface (BG-ENC-001/002). Reference implementation per GENERATION_KERNEL_BUILD_SPEC.md P-6."
+license = "Apache-2.0"
+
+[dependencies]
+inari = { version = "2.0", default-features = false }
+truck-base = { version = "0.5.0", path = "../truck-base" }
+truck-geotrait = { version = "0.4.0", path = "../truck-geotrait" }
+truck-geometry = { version = "0.5.0", path = "../truck-geometry" }
+
+[dev-dependencies]
+proptest = { version = "1.11.0", features = ["attr-macro"] }

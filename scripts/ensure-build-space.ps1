@@ -16,8 +16,7 @@ if ($freeGB -ge $MinFreeGB) {
 }
 
 $targets = @(
-    "C:\Users\stefa\look\target",
-    "C:\Users\stefa\truck-fork\target"
+    "C:\Users\stefa\look\target"
 )
 
 foreach ($target in $targets) {

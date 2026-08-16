@@ -1,0 +1,433 @@
+use newton::Jacobian;
+
+use super::*;
+
+/// Divides the domain into equal parts, examines all the values, and returns `(u, v)` such that `surface.subs(u, v)` is closest to `point`.
+/// This method is useful to get an efficient hint of `search_nearest_parameter`.
+pub fn presearch<S>(
+    surface: &S,
+    point: S::Point,
+    (urange, vrange): ((f64, f64), (f64, f64)),
+    division: usize,
+) -> (f64, f64)
+where
+    S: ParametricSurface,
+    S::Point: MetricSpace<Metric = f64> + Copy,
+{
+    let mut res = (0.0, 0.0);
+    let mut min = f64::INFINITY;
+    let ((u0, u1), (v0, v1)) = (urange, vrange);
+    for i in 0..=division {
+        for j in 0..=division {
+            let p = i as f64 / division as f64;
+            let q = j as f64 / division as f64;
+            let u = u0 * (1.0 - p) + u1 * p;
+            let v = v0 * (1.0 - q) + v1 * q;
+            let dist = surface.subs(u, v).distance2(point);
+            if dist < min {
+                min = dist;
+                res = (u, v);
+            }
+        }
+    }
+    res
+}
+
+/// Vectors whose points returned by the surface that can be the target of [`search_nearest_parameter`].
+pub trait SsnpVector: InnerSpace<Scalar = f64> + Tolerance {
+    #[doc(hidden)]
+    type Point;
+    #[doc(hidden)]
+    type Matrix: Jacobian<Self>;
+    #[doc(hidden)]
+    fn subs<S>(surface: &S, point: Self::Point, param: Self) -> CalcOutput<Self, Self::Matrix>
+    where
+        S: ParametricSurface<Point = Self::Point, Vector = Self>;
+    #[doc(hidden)]
+    fn into_param(self) -> (f64, f64);
+    #[doc(hidden)]
+    fn from_param(param: (f64, f64)) -> Self;
+}
+
+impl SsnpVector for Vector2 {
+    type Point = Point2;
+    type Matrix = Matrix2;
+    fn subs<S>(
+        surface: &S,
+        point: Point2,
+        Vector2 { x: u, y: v }: Vector2,
+    ) -> CalcOutput<Self, Matrix2>
+    where
+        S: ParametricSurface<Point = Point2, Vector = Vector2>,
+    {
+        CalcOutput {
+            value: surface.subs(u, v) - point,
+            derivation: Matrix2::from_cols(surface.uder(u, v), surface.vder(u, v)),
+        }
+    }
+    fn into_param(self) -> (f64, f64) {
+        self.into()
+    }
+    fn from_param(param: (f64, f64)) -> Self {
+        param.into()
+    }
+}
+
+impl SsnpVector for Vector3 {
+    type Point = Point3;
+    type Matrix = Matrix3;
+    fn subs<S>(
+        surface: &S,
+        point: Self::Point,
+        Vector3 { x: u, y: v, z: w }: Vector3,
+    ) -> CalcOutput<Self, Self::Matrix>
+    where
+        S: ParametricSurface<Point = Self::Point, Vector = Self>,
+    {
+        let diff = surface.subs(u, v) - point;
+        let uder = surface.uder(u, v);
+        let vder = surface.vder(u, v);
+        let uuder = surface.uuder(u, v);
+        let uvder = surface.uvder(u, v);
+        let vvder = surface.vvder(u, v);
+        let uv_cross = uder.cross(vder);
+        CalcOutput {
+            value: diff + uv_cross * w,
+            derivation: Matrix3::from_cols(
+                uder + (uuder.cross(vder) + uder.cross(uvder)) * w,
+                vder + (uvder.cross(vder) + uder.cross(vvder)) * w,
+                uv_cross,
+            ),
+        }
+    }
+    fn into_param(self) -> (f64, f64) {
+        self.truncate().into()
+    }
+    fn from_param((u, v): (f64, f64)) -> Self {
+        Self::new(u, v, 0.0)
+    }
+}
+
+/// The outcome of a nearest-parameter search: Newton's convergence verdict
+/// and the best iterate the iteration actually reached.
+///
+/// The legacy [`search_nearest_parameter`] is `newton::solve(..).ok()`, so its
+/// `None` means only that the convergence test was not met — it says nothing
+/// about how close the surface actually came to the point. This keeps the
+/// iterate that the legacy API throws away, so a caller can distinguish a
+/// numerical convergence failure from a genuine geometric miss.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct NearestParameterOutcome {
+    /// The parameter where Newton met its own `near2` convergence test.
+    pub converged: Option<(f64, f64)>,
+    /// The best parameter reached by world residual, or the converged answer
+    /// when there is one.
+    pub best: (f64, f64),
+    /// The world residual `|surface(best) - point|`.
+    pub best_residual: f64,
+    /// Whether the iteration stopped on a singular Jacobian.
+    pub degenerate: bool,
+}
+
+/// Searches the parameter by Newton's method and reports what the iteration
+/// reached even when it did not converge.
+///
+/// The converged answer is taken **from the legacy [`search_nearest_parameter`]
+/// itself**, which is still `newton::solve(..).ok()`, so the legacy contract is
+/// preserved by construction rather than by a transcription of the loop. The
+/// best-iterate tracking is a separate pass over the identical iteration that
+/// records what `newton::solve`'s `Err(log)` discards.
+#[inline(always)]
+pub fn search_nearest_parameter_outcome<P, S>(
+    surface: &S,
+    point: P,
+    hint: (f64, f64),
+    trials: usize,
+) -> NearestParameterOutcome
+where
+    P: EuclideanSpace<Scalar = f64> + MetricSpace<Metric = f64>,
+    P::Diff: SsnpVector<Point = P>,
+    S: ParametricSurface<Point = P, Vector = P::Diff>,
+{
+    // Best-iterate pass: the identical stationarity system
+    // `S(u,v) - P + w (S_u × S_v) = 0`, the identical Newton step, and the
+    // identical `0..=trials` budget and `near2` test as `newton::solve`. It only
+    // records the best world-residual iterate; it never decides the answer.
+    let mut param = P::Diff::from_param(hint);
+    let function = move |p: P::Diff| SsnpVector::subs(surface, point, p);
+    let mut best = (hint, (surface.subs(hint.0, hint.1) - point).magnitude());
+    let mut degenerate = false;
+    let mut converged_at: Option<(f64, f64)> = None;
+    for _ in 0..=trials {
+        let CalcOutput { value, derivation } = function(param);
+        let (u, v) = param.into_param();
+        let residual = (surface.subs(u, v) - point).magnitude();
+        if residual.is_finite() && residual < best.1 {
+            best = ((u, v), residual);
+        }
+        let Some(inverse) = derivation.invert() else {
+            degenerate = true;
+            break;
+        };
+        let next = param - inverse * value;
+        if next.near2(&param) {
+            converged_at = Some(param.into_param());
+            break;
+        }
+        param = next;
+    }
+    // The converged answer comes from the real legacy solve. When the tracking
+    // pass observed a `near2` success it has run the identical iteration, so
+    // `newton::solve` converges too; asking it directly makes the contract
+    // structural. When the tracking pass exhausted, the identical iteration
+    // exhausts for `newton::solve` as well, so `None` is decided here without a
+    // second full solve.
+    let converged = match converged_at {
+        Some(_) => search_nearest_parameter(surface, point, hint, trials),
+        None => None,
+    };
+    // On convergence the converged answer is the answer, even if some
+    // intermediate iterate happened to sit marginally nearer.
+    let (best, best_residual) = match converged {
+        Some(uv) => {
+            let residual = (surface.subs(uv.0, uv.1) - point).magnitude();
+            (uv, residual)
+        }
+        None => (best.0, best.1),
+    };
+    NearestParameterOutcome {
+        converged,
+        best,
+        best_residual,
+        degenerate,
+    }
+}
+
+/// Searches the parameter by Newton's method.
+///
+/// Returns `None` when Newton's own convergence test is not met. For the best
+/// iterate the search actually reached — the difference between a numerical
+/// convergence failure and a genuine geometric miss — use
+/// [`search_nearest_parameter_outcome`].
+#[inline(always)]
+pub fn search_nearest_parameter<P, S>(
+    surface: &S,
+    point: P,
+    hint: (f64, f64),
+    trials: usize,
+) -> Option<(f64, f64)>
+where
+    P: EuclideanSpace<Scalar = f64> + MetricSpace<Metric = f64>,
+    P::Diff: SsnpVector<Point = P>,
+    S: ParametricSurface<Point = P, Vector = P::Diff>,
+{
+    let function = move |param: P::Diff| SsnpVector::subs(surface, point, param);
+    let res = newton::solve(function, P::Diff::from_param(hint), trials);
+    res.ok().map(P::Diff::into_param)
+}
+
+/// Vectors whose points returned by the surface that can be the target of [`search_parameter`].
+pub trait SspVector: InnerSpace<Scalar = f64> + Tolerance {
+    #[doc(hidden)]
+    type Point;
+    #[doc(hidden)]
+    fn subs<S>(surface: &S, point: Self::Point, param: Vector2) -> CalcOutput<Vector2, Matrix2>
+    where
+        S: ParametricSurface<Point = Self::Point, Vector = Self>;
+}
+
+impl SspVector for Vector2 {
+    type Point = Point2;
+    fn subs<S>(
+        surface: &S,
+        point: Point2,
+        Vector2 { x: u, y: v }: Vector2,
+    ) -> CalcOutput<Vector2, Matrix2>
+    where
+        S: ParametricSurface<Point = Point2, Vector = Vector2>,
+    {
+        CalcOutput {
+            value: surface.subs(u, v) - point,
+            derivation: Matrix2::from_cols(surface.uder(u, v), surface.vder(u, v)),
+        }
+    }
+}
+
+impl SspVector for Vector3 {
+    type Point = Point3;
+    fn subs<S>(
+        surface: &S,
+        point: Self::Point,
+        Vector2 { x: u, y: v }: Vector2,
+    ) -> CalcOutput<Vector2, Matrix2>
+    where
+        S: ParametricSurface<Point = Self::Point, Vector = Self>,
+    {
+        let diff = surface.subs(u, v) - point;
+        let (uder, vder) = (surface.uder(u, v), surface.vder(u, v));
+        let (uu, uv, vv) = (uder.dot(uder), uder.dot(vder), vder.dot(vder));
+        CalcOutput {
+            value: Vector2::new(uder.dot(diff), vder.dot(diff)),
+            derivation: Matrix2::new(uu, uv, uv, vv),
+        }
+    }
+}
+
+/// Searches the parameter by Newton's method.
+#[inline(always)]
+pub fn search_parameter<P, S>(
+    surface: &S,
+    point: P,
+    hint: (f64, f64),
+    trials: usize,
+) -> Option<(f64, f64)>
+where
+    P: EuclideanSpace<Scalar = f64> + MetricSpace<Metric = f64> + Tolerance,
+    P::Diff: SspVector<Point = P>,
+    S: ParametricSurface<Point = P, Vector = P::Diff>,
+{
+    let function = move |param: Vector2| SspVector::subs(surface, point, param);
+    let res = newton::solve(function, hint.into(), trials);
+    res.ok().and_then(
+        |Vector2 { x: u, y: v }| match surface.subs(u, v).near(&point) {
+            true => Some((u, v)),
+            false => None,
+        },
+    )
+}
+
+/// Searches the parameters of the intersection point of `surface` and `curve`.
+pub fn search_intersection_parameter<C, S>(
+    surface: &S,
+    hint0: (f64, f64),
+    curve: &C,
+    hint1: f64,
+    trials: usize,
+) -> Option<((f64, f64), f64)>
+where
+    C: ParametricCurve3D,
+    S: ParametricSurface3D,
+{
+    let function = move |Vector3 { x, y, z }| CalcOutput {
+        value: surface.subs(x, y) - curve.subs(z),
+        derivation: Matrix3::from_cols(surface.uder(x, y), surface.vder(x, y), -curve.der(z)),
+    };
+    let hint = Vector3::new(hint0.0, hint0.1, hint1);
+    let Vector3 { x, y, z } = newton::solve(function, hint, trials).ok()?;
+    match surface.subs(x, y).near(&curve.subs(z)) {
+        true => Some(((x, y), z)),
+        false => None,
+    }
+}
+
+/// Creates the surface division
+///
+/// # Panics
+///
+/// `tol` must be more than `TOLERANCE`.
+#[inline(always)]
+pub fn parameter_division<S>(
+    surface: &S,
+    (urange, vrange): ((f64, f64), (f64, f64)),
+    tol: f64,
+) -> (Vec<f64>, Vec<f64>)
+where
+    S: ParametricSurface,
+    S::Point: EuclideanSpace<Scalar = f64> + MetricSpace<Metric = f64> + HashGen<f64>,
+{
+    nonpositive_tolerance!(tol);
+    let (mut udiv, mut vdiv) = (vec![urange.0, urange.1], vec![vrange.0, vrange.1]);
+    sub_parameter_division(surface, (&mut udiv, &mut vdiv), tol, 100);
+    (udiv, vdiv)
+}
+
+/// Ceiling on the sample grid for a single face.
+///
+/// Subdivision splits every segment that misses the tolerance, so `udiv` and
+/// `vdiv` can each double per level and the grid is their product. Depth alone
+/// does not bound that: a surface whose tolerance is unreachable — a degenerate
+/// knot vector, a discontinuity, a fold — keeps flagging every segment and the
+/// grid grows geometrically until memory runs out, which is what a real CAD
+/// assembly did at 5 GB from a 102 MB file.
+///
+/// A single trimmed face needing more than this many samples is pathological
+/// rather than detailed; legitimate faces use orders of magnitude fewer. The
+/// bound trades exactness on such a face for finishing at all.
+const MAX_DIVISION_CELLS: usize = 1 << 16;
+
+fn sub_parameter_division<S>(
+    surface: &S,
+    (udiv, vdiv): (&mut Vec<f64>, &mut Vec<f64>),
+    tol: f64,
+    trials: usize,
+) where
+    S: ParametricSurface,
+    S::Point: EuclideanSpace<Scalar = f64> + MetricSpace<Metric = f64> + HashGen<f64>,
+{
+    if trials == 0 {
+        return;
+    }
+    if udiv.len().saturating_mul(vdiv.len()) >= MAX_DIVISION_CELLS {
+        return;
+    }
+    let mut divide_flag0 = vec![false; udiv.len() - 1];
+    let mut divide_flag1 = vec![false; vdiv.len() - 1];
+
+    for (u, ub) in udiv.windows(2).zip(&mut divide_flag0) {
+        for (v, vb) in vdiv.windows(2).zip(&mut divide_flag1) {
+            if *ub && *vb {
+                continue;
+            }
+            let (u_gen, v_gen) = ((u[0] + u[1]) / 2.0, (v[0] + v[1]) / 2.0);
+            let hash = HashGen::hash2(surface.subs(u_gen, v_gen));
+            let p = 0.5 + (0.2 * hash[0] - 0.1);
+            let q = 0.5 + (0.2 * hash[1] - 0.1);
+            let u0 = u[0] * (1.0 - p) + u[1] * p;
+            let v0 = v[0] * (1.0 - q) + v[1] * q;
+            let p0 = surface.subs(u0, v0);
+            let pt00 = surface.subs(u[0], v[0]);
+            let pt01 = surface.subs(u[0], v[1]);
+            let pt10 = surface.subs(u[1], v[0]);
+            let pt11 = surface.subs(u[1], v[1]);
+            let pt = S::Point::from_vec(
+                pt00.to_vec() * (1.0 - p) * (1.0 - q)
+                    + pt01.to_vec() * (1.0 - p) * q
+                    + pt10.to_vec() * p * (1.0 - q)
+                    + pt11.to_vec() * p * q,
+            );
+            if p0.distance2(pt) > tol * tol {
+                let delu = pt00.midpoint(pt01).distance(p0) + pt10.midpoint(pt11).distance(p0);
+                let delv = pt00.midpoint(pt10).distance(p0) + pt01.midpoint(pt11).distance(p0);
+                if delu > delv * 2.0 {
+                    *ub = true;
+                } else if delv > delu * 2.0 {
+                    *vb = true;
+                } else {
+                    (*ub, *vb) = (true, true);
+                }
+            }
+        }
+    }
+
+    let mut new_udiv = vec![udiv[0]];
+    for (u, ub) in udiv.windows(2).zip(divide_flag0) {
+        if ub {
+            new_udiv.push((u[0] + u[1]) / 2.0);
+        }
+        new_udiv.push(u[1]);
+    }
+
+    let mut new_vdiv = vec![vdiv[0]];
+    for (v, vb) in vdiv.windows(2).zip(divide_flag1) {
+        if vb {
+            new_vdiv.push((v[0] + v[1]) / 2.0);
+        }
+        new_vdiv.push(v[1]);
+    }
+
+    if udiv.len() != new_udiv.len() || vdiv.len() != new_vdiv.len() {
+        *udiv = new_udiv;
+        *vdiv = new_vdiv;
+        sub_parameter_division(surface, (udiv, vdiv), tol, trials - 1);
+    }
+}

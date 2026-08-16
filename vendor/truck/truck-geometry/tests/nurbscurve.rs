@@ -1,0 +1,125 @@
+use proptest::{prelude::*, property_test};
+use truck_geometry::prelude::*;
+
+#[test]
+fn nurbs_circle() {
+    let knot_vec = KnotVec::bezier_knot(2);
+    let control_points = vec![
+        Vector3::new(1.0, 0.0, 1.0),
+        Vector3::new(1.0, 1.0, 1.0),
+        Vector3::new(0.0, 2.0, 2.0),
+    ];
+    let curve = NurbsCurve::new(BSplineCurve::new(knot_vec, control_points));
+
+    const N: usize = 10;
+    for i in 0..=N {
+        let t = i as f64 / N as f64;
+        let p = curve.subs(t).to_vec();
+        assert_near!(p.magnitude(), 1.0);
+        let der = curve.der(t);
+        assert!(p.dot(der).so_small());
+    }
+}
+
+#[property_test]
+fn test_der_n(
+    #[strategy = 0f64..=1.0] t: f64,
+    #[strategy = 0usize..=4] n: usize,
+    #[strategy = 2usize..=6] degree: usize,
+    #[strategy = 1usize..=10] div: usize,
+    #[strategy = prop::array::uniform16(prop::array::uniform3(-10f64..=10.0))] pts: [[f64; 3]; 16],
+    #[strategy = prop::array::uniform16(0.5f64..=10.0)] weights: [f64; 16],
+) {
+    prop_assume!(degree > n + 1);
+    let knot_vec = KnotVec::uniform_knot(degree, div);
+    let control_points = pts[0..degree + div]
+        .iter()
+        .zip(weights)
+        .map(|(&p, w)| Vector4::new(p[0], p[1], p[2], w))
+        .collect::<Vec<_>>();
+    let bsp = NurbsCurve::new(BSplineCurve::new(knot_vec, control_points));
+
+    const EPS: f64 = 1.0e-4;
+    let der0 = bsp.der_n(n + 1, t);
+    let der1 = (bsp.der_n(n, t + EPS) - bsp.der_n(n, t - EPS)) / (2.0 * EPS);
+    prop_assert!((der0 - der1).magnitude() <= 0.01 * der0.magnitude());
+}
+
+#[property_test]
+fn test_ders(
+    #[strategy = 0f64..=1.0] t: f64,
+    #[strategy = 0usize..=6] n: usize,
+    #[strategy = 2usize..=6] degree: usize,
+    #[strategy = 1usize..=10] div: usize,
+    #[strategy = prop::array::uniform16(prop::array::uniform3(-10f64..=10.0))] pts: [[f64; 3]; 16],
+    #[strategy = prop::array::uniform16(0.5f64..=10.0)] weights: [f64; 16],
+) {
+    prop_assume!(degree > n + 1);
+    let knot_vec = KnotVec::uniform_knot(degree, div);
+    let control_points = pts[0..degree + div]
+        .iter()
+        .zip(weights)
+        .map(|(&p, w)| Vector4::new(p[0], p[1], p[2], w))
+        .collect::<Vec<_>>();
+    let bsp = NurbsCurve::new(BSplineCurve::new(knot_vec, control_points));
+
+    let ders0 = (0..=n).map(|i| bsp.der_n(i, t)).collect::<Vec<_>>();
+
+    let ders1 = bsp.ders(n, t);
+
+    prop_assert_eq!(ders0.len(), ders1.len());
+
+    let mut iter = ders0.into_iter().zip(&*ders1);
+    iter.try_for_each(|(v0, v1)| {
+        prop_assert_near!(v0, v1);
+        Ok(())
+    })?;
+}
+
+#[property_test]
+fn concat_positive_test(
+    #[strategy = prop::array::uniform8(prop::array::uniform3(-5f64..5f64))] v0: [[f64; 3]; 8],
+    #[strategy = prop::array::uniform8(0.5f64..=2f64)] v1: [f64; 8],
+    #[strategy = 0f64..=1f64] t: f64,
+    #[strategy = -5f64..=5f64] w: f64,
+) {
+    let mut part0 = NurbsCurve::new(BSplineCurve::new(
+        KnotVec::uniform_knot(4, 4),
+        v0.into_iter()
+            .zip(v1)
+            .map(|(v0, v1)| Vector3::from(v0).extend(v1))
+            .collect(),
+    ));
+    let mut part1 = part0.cut(t);
+    part1.transform_control_points(|vec| *vec *= w);
+    prop_assert_near!(part0.back(), part1.front());
+    concat_random_test(&part0, &part1, 10);
+}
+
+#[test]
+fn test_parameter_division() {
+    let knot_vec = KnotVec::uniform_knot(2, 3);
+    let ctrl_pts = vec![
+        Vector4::new(0.0, 0.0, 0.0, 1.0),
+        Vector4::new(2.0, 0.0, 0.0, 2.0),
+        Vector4::new(0.0, 3.0, 0.0, 3.0),
+        Vector4::new(0.0, 0.0, 2.0, 2.0),
+        Vector4::new(1.0, 1.0, 1.0, 1.0),
+    ];
+    let curve = NurbsCurve::new(BSplineCurve::new(knot_vec, ctrl_pts));
+    let tol = 0.01;
+    let (div, pts) = curve.parameter_division(curve.range_tuple(), tol * 0.5);
+    let knot_vec = curve.knot_vec();
+    assert_eq!(knot_vec[0], div[0]);
+    assert_eq!(knot_vec.range_length(), div.last().unwrap() - div[0]);
+    for i in 1..div.len() {
+        let pt0 = curve.subs(div[i - 1]);
+        assert_eq!(pt0, pts[i - 1]);
+        let pt1 = curve.subs(div[i]);
+        assert_eq!(pt1, pts[i]);
+        let value_middle = pt0.midpoint(pt1);
+        let param_middle = curve.subs((div[i - 1] + div[i]) / 2.0);
+        let dist = value_middle.distance(param_middle);
+        assert!(dist < tol, "large distance: {dist}");
+    }
+}
