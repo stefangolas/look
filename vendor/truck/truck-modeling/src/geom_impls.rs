@@ -76,6 +76,7 @@ fn take_one_axis_by_normal(n: Vector3) -> Vector3 {
 }
 
 pub(super) fn attach_plane(mut pts: Vec<Vec<Point3>>) -> Option<Plane> {
+    let ctx = ToleranceCtx::unscaled_legacy();
     let center = pts
         .iter()
         .flatten()
@@ -87,6 +88,7 @@ pub(super) fn attach_plane(mut pts: Vec<Vec<Point3>>) -> Option<Plane> {
         .fold(Vector3::zero(), |sum, (p0, p1)| {
             sum + (p0 - center).cross(p1 - center)
         });
+    // FIXME(BG-TOL-001): accumulated cross products, so the quantity is an area (length squared); neither predicate fits
     let n = match normal.so_small() {
         true => return None,
         false => normal.normalize(),
@@ -98,7 +100,8 @@ pub(super) fn attach_plane(mut pts: Vec<Vec<Point3>>) -> Option<Plane> {
         .for_each(|pt| *pt = mat.invert().unwrap().transform_point(*pt));
     let bnd_box: BoundingBox<Point3> = pts.iter().flatten().collect();
     let diag = bnd_box.diagonal();
-    if !diag[2].so_small() {
+    if !ctx.is_small_len(diag[2]) {
+        // BG-TOL-001: model
         return None;
     }
     let (max, min) = match closed_polyline_orientation(&pts) {

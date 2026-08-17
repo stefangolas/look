@@ -292,14 +292,15 @@ impl Surface {
 /// within tolerance the answer is `NumericallyUnresolved`
 /// (`UncertifiedContainment`), never `Proven(true)`.
 fn plane_include_intersection_curve(plane: &Plane, leader: &Curve) -> Outcome<bool> {
+    let ctx = ToleranceCtx::unscaled_legacy();
     let origin = plane.origin();
     let normal = plane.normal();
     // Bounded uniform sample of the leader (H-5: a documented bound, not a
     // bare loop; the count is a dimensionless sample budget, not a length).
     const LEADER_WITNESS_SAMPLES: usize = 32;
     // Dimensionless margin over the representation tolerance; named for the
-    // quantity it multiplies. `TOLERANCE` is the interim `tau_rep` until
-    // BG-TOL-001's `ToleranceCtx` replaces it (H-3).
+    // quantity it multiplies. `TOLERANCE` is now the `tau_rep` that
+    // BG-TOL-001's `ToleranceCtx` supplies via `length_margin()` (H-3).
     const LEADER_WITNESS_MARGIN: f64 = 8.0;
     // Evaluating the leader of an intersection curve via `subs` can panic
     // (H-1): `IntersectionCurve::subs` unwraps its own projection search. A
@@ -315,7 +316,8 @@ fn plane_include_intersection_curve(plane: &Plane, leader: &Curve) -> Outcome<bo
     for i in 0..LEADER_WITNESS_SAMPLES {
         let t = t0 + (t1 - t0) * (i as f64) / (LEADER_WITNESS_SAMPLES as f64);
         let signed = (leader.subs(t) - origin).dot(normal);
-        if signed.abs() > LEADER_WITNESS_MARGIN * TOLERANCE {
+        if signed.abs() > LEADER_WITNESS_MARGIN * ctx.length_margin() {
+            // BG-TOL-001: model
             return Ok(Certified::new(
                 false,
                 Certificate {
