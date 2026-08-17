@@ -25,6 +25,7 @@ for crate in sorted(os.listdir(ROOT)):
                 continue
             path = os.path.join(dirpath, fn)
             in_test = False
+            test_armed = False
             depth_at_test = None
             depth = 0
             in_block = False
@@ -50,11 +51,29 @@ for crate in sorted(os.listdir(ROOT)):
                 # crude but adequate brace tracking for #[cfg(test)] mod blocks
                 if re.match(r'#\[cfg\(test\)\]', s) or s.startswith('#[proptest'):
                     in_test = True
+                    test_armed = False
                     depth_at_test = depth
-                depth += line.count('{') - line.count('}')
-                if in_test and depth_at_test is not None and depth <= depth_at_test:
-                    in_test = False
-                    depth_at_test = None
+                # Braces inside string literals corrupt the depth count, and
+                # format strings are full of them -- `"{i} {t}"` reads as two
+                # opens. Strip literals before counting.
+                code = re.sub(r'"(?:[^"\\]|\\.)*"', '""', line)
+                code = re.sub(r"'(?:[^'\\]|\\.)*'", "''", code)
+                depth += code.count('{') - code.count('}')
+                # `test_armed` is the whole fix. The attribute and the `mod
+                # tests {` it applies to are on different lines, so on the
+                # attribute's own line depth is still equal to depth_at_test and
+                # a bare `depth <= depth_at_test` closed the region immediately
+                # -- every #[cfg(test)] module in the tree read as production.
+                # That is how truck-modeling reported 11 production sites when
+                # it has 5: six of them are proptest bodies below a
+                # #[cfg(test)] at geom_impls.rs:117. Only start looking for the
+                # closing brace once one has actually opened.
+                if in_test and depth_at_test is not None:
+                    if depth > depth_at_test:
+                        test_armed = True
+                    elif test_armed:
+                        in_test = False
+                        depth_at_test = None
                 if not PAT.search(line):
                     continue
                 if SQUARED.search(line):
