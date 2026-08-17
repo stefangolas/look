@@ -385,11 +385,25 @@ def main():
     # the smaller, honest fix. If a future crate's tests drop some other
     # artifact, that will show up here as a false BLOCKED and the pattern
     # gets added then, with evidence, not preemptively.
+    # The paragraph above said the next artifact would show up as a false
+    # BLOCKED and get added with evidence. BG-TOL-001-TOPO-MOD is that case:
+    # `vendor/truck/truck-stepio/tests/proptest-regressions/geometry.txt`,
+    # written by proptest when a property test fails. The worker hit it running
+    # the baseline suite this packet asked it to confirm, and the failure was
+    # one of truck-stepio's *pre-existing* ones -- nothing to do with its work.
+    #
+    # Worth knowing before removing this: proptest's own header recommends
+    # committing these files, and in a normal crate that is right. Here it is
+    # not, because the tree does not track a single one (`git ls-files` finds
+    # none) and the seed came from a failure the packet neither caused nor is
+    # allowed to fix.
     def _ignorable_untracked(rel_path):
         name = Path(rel_path).name
         if name in ('PACKET.md', 'RESULT.json', 'QUESTION.md'):
             return True
         if rel_path.endswith('.obj'):
+            return True
+        if 'proptest-regressions' in rel_path.replace('\\', '/').split('/'):
             return True
         return False
 
