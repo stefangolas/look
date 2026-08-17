@@ -102,6 +102,21 @@ def compute_baseline(base_sha, crate_names, out_file, test_args=None):
     status}}. Never touches loop/slots/*; creates and removes its own
     worktree and target dir under the system temp directory, so a baseline
     run cannot collide with (or be mistaken for) a slot's own worktree."""
+    # Same floor, and the same "refuse, don't flag" rule, as new_slot.py -- which
+    # had it and was not the problem. A baseline builds an entire extra
+    # workspace in a throwaway worktree, and nothing here checked disk before
+    # doing it. Session 6 ran baselines against three different base commits in
+    # an hour and took the machine from 40 GB free to 0.1 GB. Failing before
+    # touching disk is strictly better than failing partway through a 4-minute
+    # build and leaving the debris behind.
+    free_gb = shutil.disk_usage(str(REPO_ROOT.anchor or 'C:\\')).free / 2**30
+    if free_gb < 8.0:
+        raise RuntimeError(
+            f"refusing to compute a baseline: {free_gb:.1f} GB free, below the 8.0 GB floor. "
+            "Delete loop/slots/*/target (a slot re-warms in 1-3 min) and any "
+            "%TEMP%/look-verify-baseline-* left behind, then `git worktree prune`."
+        )
+
     tmp_parent = Path(tempfile.mkdtemp(prefix='look-verify-baseline-'))
     wt_path = tmp_parent / 'wt'
     target_path = tmp_parent / 'target'
