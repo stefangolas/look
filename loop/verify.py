@@ -917,7 +917,17 @@ def main():
     # they depend on an adapter that may not exist on the runner, and a gate
     # that fails for want of a GPU is noise, not signal.
     # -----------------------------------------------------------------------
-    GEOM_TESTS = ['--test', 'step', '--test', 'torus_deck', '--test', 'spline_carrier']
+    # geometry_fingerprint is the load-bearing one and the others are context.
+    # V9's first version ran only step/torus_deck/spline_carrier and PASSED with
+    # truck_base::TOLERANCE loosened from 1e-6 to 1e-1 -- a five-order-of-
+    # magnitude change on the covered path. Their assertions turned out to be
+    # structural (one geometry, one instance, indices a multiple of 3, a colour
+    # present) and torus_deck asserts on the *declared* torus parameters rather
+    # than on anything tessellated, so all of them hold for an arbitrarily wrong
+    # mesh. geometry_fingerprint asserts triangle count, vertex count and
+    # bounds, which is what actually moves.
+    GEOM_TESTS = ['--test', 'geometry_fingerprint', '--test', 'step',
+                  '--test', 'torus_deck', '--test', 'spline_carrier']
     if not gate_wanted('V9'):
         skip_not_requested('V9 geometry')
     elif not v.failed_early:
