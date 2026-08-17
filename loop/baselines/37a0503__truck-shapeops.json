@@ -1,0 +1,37 @@
+{
+  "base": "37a0503",
+  "compile_ok": true,
+  "computed_at": "2026-08-16T23:28:48.693345Z",
+  "crates": [
+    "truck-shapeops"
+  ],
+  "tests": {
+    "complex_surface": "FAILED",
+    "create_fillet_with_side": "ok",
+    "create_simple_fillet": "ok",
+    "fillet_contact_curve_off_domain_refuses": "ok",
+    "fillet_radius_exceeds_curvature_refuses": "ok",
+    "fillet_refusals_never_unwind": "ok",
+    "healing::tests::double_closed_boundary_cylinder": "ok",
+    "healing::tests::many_closed_boundary_cylinder": "ok",
+    "healing::tests::step_import": "FAILED",
+    "healing::tests::test_split_closed_edges": "ok",
+    "healing::tests::test_split_closed_face_cylinder_with_hole": "ok",
+    "healing::tests::test_split_closed_face_cylinder_with_rotated_hole": "ok",
+    "healing::tests::test_split_closed_face_simple_cylinder_case": "ok",
+    "healing::tests::too_simple_cylinder": "ok",
+    "transversal::divide_face::tests::divide_plane_test": "ok",
+    "transversal::divide_face::tests::independent_intersection": "ok",
+    "transversal::faces_classification::tests::independent_intersection": "ok",
+    "transversal::integrate::tests::punched_cube": "ok",
+    "transversal::intersection_curve::tests::collide_parabola": "ok",
+    "transversal::intersection_curve::tests::intersection_curve_sphere_case": "ok",
+    "transversal::loops_store::tests::crossing_edges": "ok",
+    "transversal::loops_store::tests::independent_intersection": "ok",
+    "transversal::loops_store::tests::rotated_intersection": "ok",
+    "transversal::polyline_construction::tests::construct_polylines_positive0": "ok",
+    "transversal::polyline_construction::tests::construct_polylines_positive1": "ok",
+    "transversal::polyline_construction::tests::construct_polylines_positive2": "ok",
+    "transversal::polyline_construction::tests::construct_polylines_positive3": "ok"
+  }
+}

@@ -1,0 +1,53 @@
+{
+  "base": "d566caa",
+  "compile_ok": true,
+  "computed_at": "2026-08-17T01:21:57.444795Z",
+  "crates": [
+    "truck-modeling",
+    "truck-topology"
+  ],
+  "test_args": [
+    "--lib",
+    "--tests"
+  ],
+  "tests": {
+    "builder::partial_torus::partial_torus": "ok",
+    "compress::compress_extract": "ok",
+    "edge_closed_sweep": "ok",
+    "edge_multi_sweep": "ok",
+    "edge_sweep": "ok",
+    "errors::print_messages": "ok",
+    "face::invert_mapped_face": "ok",
+    "face_closed_sweep": "ok",
+    "face_multi_sweep": "ok",
+    "face_sweep": "ok",
+    "geom_impls::test_geom_impl::test_attach_plane_with_multiple_boundary": "ok",
+    "geom_impls::test_geom_impl::test_attach_plane_with_single_boundary": "ok",
+    "geom_impls::test_geom_impl::test_circle_arc": "ok",
+    "geom_impls::test_geom_impl::test_circle_arc_tangent0": "ok",
+    "geom_impls::test_geom_impl::test_circle_arc_three_point": "ok",
+    "geom_impls::test_geom_impl::test_circum_center": "ok",
+    "geom_impls::test_geom_impl::test_take_one_axis_by_normal": "ok",
+    "geometry::extrude_intersection_curve_tests::extrude_intersection_curve_pair_does_not_unwind": "ok",
+    "geometry::extrude_intersection_curve_tests::extrude_intersection_curve_pair_refuses": "ok",
+    "geometry::extrude_intersection_curve_tests::extrude_non_isc_pairs_unchanged": "ok",
+    "geometry::include_intersection_curve_tests::boolean_derived_face_consistency_returns": "ok",
+    "geometry::include_intersection_curve_tests::isc_demonstrably_off_plane_is_proven_false": "ok",
+    "geometry::include_intersection_curve_tests::isc_of_other_surfaces_lying_in_plane_is_unresolved": "ok",
+    "geometry::include_intersection_curve_tests::ssi_carrier_shortcut_is_deferred_until_entity_id": "ok",
+    "main": "ignored",
+    "segment_test": "ok",
+    "shell_closed_sweep": "ok",
+    "shell_multi_sweep": "ok",
+    "shell_sweep": "ok",
+    "singular_vertices_in_certain_boundaries": "ok",
+    "solid::cube_test": "ok",
+    "solid_cut_edge": "ok",
+    "vertex_closed_sweep": "ok",
+    "vertex_multi_sweep": "ok",
+    "vertex_sweep": "ok",
+    "wire_closed_sweep": "ok",
+    "wire_multi_sweep": "ok",
+    "wire_sweep": "ok"
+  }
+}

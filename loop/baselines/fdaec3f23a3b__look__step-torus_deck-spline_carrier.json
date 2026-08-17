@@ -1,0 +1,17 @@
+{
+  "base": "fdaec3f23a3ba532dc5549ea5796e14b8de3e17f",
+  "compile_ok": false,
+  "computed_at": "2026-08-17T01:27:49.711806Z",
+  "crates": [
+    "look"
+  ],
+  "test_args": [
+    "--test",
+    "step",
+    "--test",
+    "torus_deck",
+    "--test",
+    "spline_carrier"
+  ],
+  "tests": {}
+}
