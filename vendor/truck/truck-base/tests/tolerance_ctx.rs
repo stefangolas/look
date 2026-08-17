@@ -203,3 +203,59 @@ fn unscaled_legacy_agrees_with_new_at_scale_one() {
         assert_eq!(legacy.near_pt(a, b), fresh.near_pt(a, b));
     }
 }
+
+#[test]
+fn one_sided_margins_match_the_legacy_threshold() {
+    let ctx = ToleranceCtx::unscaled_legacy();
+    assert_eq!(ctx.length_margin(), TOLERANCE);
+    assert_eq!(ctx.ratio_margin(), TOLERANCE);
+    let t0 = 0.5; // H-3: a dimensionless curve parameter, not a tolerance itself
+    for t in [
+        0.0,
+        0.1,
+        0.25,
+        t0 - 2.0 * TOLERANCE, // H-3: a guard gap below the threshold, not a tolerance itself
+        t0 - TOLERANCE,
+        t0,
+        t0 + TOLERANCE,
+        t0 + 2.0 * TOLERANCE, // H-3: a guard gap above the threshold, not a tolerance itself
+        1.0,
+    ] {
+        assert_eq!(t < t0 + ctx.ratio_margin(), t < t0 + TOLERANCE);
+        assert_eq!(t < t0 + ctx.length_margin(), t < t0 + TOLERANCE);
+    }
+    let far_below = 0.0; // H-3: a parameter far below t0, where the symmetric predicate answers differently
+    assert!(
+        far_below < t0 + ctx.ratio_margin(),
+        "the one-sided comparison is true for a parameter far below t0"
+    );
+    assert!(
+        !ctx.is_small_ratio(far_below - t0),
+        "the symmetric predicate takes an absolute value and is false there"
+    );
+}
+
+#[test]
+fn near_points_agrees_with_near_pt_on_point3() {
+    let ctx = ToleranceCtx::unscaled_legacy();
+    let origin = Point3::new(0.0, 0.0, 0.0); // H-3: the zero reference of the fixed pair set
+    let pairs = [
+        (origin, Point3::new(0.0, 0.0, 0.0)), // H-3: zero difference
+        (origin, Point3::new(0.5 * TOLERANCE, 0.0, 0.0)), // H-3: half the legacy epsilon per axis
+        (origin, Point3::new(TOLERANCE, 0.0, 0.0)), // H-3: exactly the legacy epsilon
+        (origin, Point3::new(2.0 * TOLERANCE, 0.0, 0.0)), // H-3: twice the legacy epsilon
+        (origin, Point3::new(TOLERANCE, TOLERANCE, 0.0)), // H-3: diagonal within the Euclidean epsilon
+        (origin, Point3::new(TOLERANCE, TOLERANCE, TOLERANCE)),
+    ];
+    for (a, b) in pairs {
+        assert_eq!(ctx.near_points(a, b), ctx.near_pt(a, b));
+    }
+}
+
+#[test]
+fn near_points_works_in_two_dimensions() {
+    let a = Point2::new(0.0, 0.0); // H-3: the zero reference of the fixed pair
+    let b = Point2::new(0.001, 0.0); // H-3: a model-space length of 0.001, not a tolerance itself
+    assert!(ctx(2000.0).near_points(a, b));
+    assert!(!ctx(100.0).near_points(a, b));
+}
