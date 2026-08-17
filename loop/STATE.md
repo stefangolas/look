@@ -48,17 +48,18 @@ here is scored, tuned, or sampled.
 
 ## Where we are
 
-**Eight contracts discharged**: BG-S0-001, BG-S0-002, BG-S0-003, BG-EVD-r3,
-BG-TOL-001-TYPE, BG-TOL-001-TYPE-r2, BG-NUM-001-FILLET, BG-TOL-001-SHAPEOPS.
-8 of 58 packets.
+**Ten packets DONE of 62**: BG-S0-001, BG-S0-002, BG-S0-003, BG-EVD-r3,
+BG-TOL-001-TYPE, -TYPE-r2, -TYPE-r3, BG-NUM-001-FILLET, -SHAPEOPS, and
+-TOPOLOGY + -MODELING (both closed by the combined `BG-TOL-001-TOPO-MOD`).
 
-**The real state of BG-TOL-001 is lower than the packet count suggests.**
-**16 sites migrated, 221 to go** (`python loop/census_tol_sites.py` is the
-burndown — truck-shapeops now reads 4 where it read 21). And Stage A does not
-fix anything on its own: all 16 still carry the legacy absolute epsilon, and
-GATE-4 is holding 11 scaffold calls at a ceiling that must reach zero.
-BG-NUM-001-FILLET is likewise partial — 1 of the 14 unbounded loops the spec
-names.
+**The real state of BG-TOL-001 is far lower than the packet count suggests.**
+**22 sites migrated, 193 to go** (`python loop/census_tol_sites.py` is the
+burndown). Stage A fixes nothing on its own: all 22 still carry the legacy
+absolute epsilon, and GATE-4 is holding **17** scaffold calls at a ceiling that
+must reach zero. **Stage B — threading a real `model_scale` from each entry
+point — is not in the graph at all**, and it is a cross-crate signature change,
+so the 62 understates the work. BG-NUM-001-FILLET is likewise partial: 1 of the
+14 unbounded loops the spec names.
 
 Session 6 landed two contracts, fixed two gates, and **amended the spec twice —
 both times because writing a packet exposed something the spec had not decided.**
@@ -119,6 +120,11 @@ pre-existing test" belongs; V5 only compares against its cached baseline.
 | `c53e3e6` | **GATE-4**, the `unscaled_legacy` ratchet |
 | `871e79f` | **BG-TOL-001-TYPE-r2** — the Stage-A scaffold |
 | `11aa0b9` | spec: squared-order sites deferred to BG-TOL-004; the SHAPEOPS packet |
+| `d26cefb` | **BG-TOL-001-SHAPEOPS** — 16 sites classified, the shard template |
+| `6e07e49` | **BG-TOL-001-TYPE-r3** — one-sided margins + generic point predicate |
+| `58de977` | **BG-TOL-001-TOPO-MOD** — closes both TOPOLOGY and MODELING |
+| `ba2b7be` | **V9** + `tests/geometry_fingerprint.rs` — see the V9 warning above |
+| `09fb2bf` | census fix: every `#[cfg(test)]` module was counted as production |
 
 ## The two spec amendments session 6 paid for
 
@@ -144,7 +150,7 @@ a migration*. All 23 sites tree-wide are excluded from Stage A and deferred to
 
 ## The parallelism picture
 
-58 packets: 37 mechanical, 12 design, 8 wide-mechanical + the two r2 items.
+62 packets: 38 mechanical, 13 design, 11 wide-mechanical. 52 remain (32/12/8).
 Scheduling is on **write-set disjointness**, not waves — two packets can be
 logically independent and still collide on a file, and that collision surfaces
 at merge, after both workers have been paid for.
