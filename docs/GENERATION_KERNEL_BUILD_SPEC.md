@@ -501,6 +501,28 @@ discharged by the second**:
   context inward, deleting `unscaled_legacy()` calls as they go. This is what
   actually discharges BG-TOL-001 and BG-TOL-002.
 
+**Canonical-space quantities are a third case, and `truck-geometry` is full of
+them.** Added 2026-08-16 while sizing the `specifieds` shard. The model/param
+dichotomy above assumes every length is a model-space length. It is not:
+`UnitCircle`, `UnitHyperbola`, `UnitParabola` and friends are *canonical*
+primitives whose geometry is expressed in their own normalized frame, where the
+radius is 1 by construction. A distance in that frame is a dimensionless
+multiple of the unit radius, so it must **not** scale by `model_scale` — but it
+is a distance, and reads exactly like a model-space one:
+
+```rust
+// UnitCircle<Point2>::search_parameter -- canonical frame, radius 1
+if v.magnitude().so_small() { return None; }
+```
+
+The rule is that **the frame the quantity lives in decides, not its type.** A
+site inside a canonical primitive is `param` even when it compares a magnitude;
+a site that has been transformed back into model space is `model` even when it
+compares a ratio-looking number. A shard covering `truck-geometry/src/**` must
+state this or it will classify by type and get the whole `specifieds` module
+backwards. Sites where the frame is genuinely unclear take `FIXME(BG-TOL-001)`
+as usual.
+
 **Squared-order sites are out of Stage A's scope.** `near2` and `so_small2`
 compare against `TOLERANCE2 = TOLERANCE²  = 1e-12`, and `ToleranceCtx` has no
 squared-order predicate — `tau_rep` is first order and nothing on the type
