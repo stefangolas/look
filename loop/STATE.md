@@ -69,13 +69,22 @@ went DONE → ACCEPTED → merged in one attempt, one verify run, no amendment.
 ## Pick up here
 
 1. `python loop/slot_status.py`, then the last 3 rows of `LEDGER.jsonl`.
-2. **All four slots are idle and the frontier is clear.** BG-TOL-001-SHAPEOPS
-   merged at `d26cefb`; the ratchet ceiling is at its true value of 11.
-3. **Write the next shard. MODELING is the one to write**: 11 sites, and the
-   crate is small enough that a flaw in the Stage-A convention surfaces cheaply.
-   Copy `loop/packets/BG-TOL-001-SHAPEOPS.md` exactly — it is the template, and
-   it went DONE → ACCEPTED on its first verify run.
-4. **Then write the other five shards**, copying BG-TOL-001-SHAPEOPS. Size them
+2. **FIRST: finish the V9 negative test. The gate has only ever been seen
+   passing.** V9's first version was watched failing and *didn't* — it passed
+   with `truck_base::TOLERANCE` loosened 1e-6 → 1e-1. `tests/geometry_fingerprint.rs`
+   was written to fix that and passes clean, but the negative run against the
+   loosened constant never completed (killed twice, then the disk filled). Until
+   it is seen failing, **treat V9 as unproven**. To redo it: commit
+   `TOLERANCE = 1.0e-1` in `truck-base`, point a slot at it, and run
+   `verify.py --only V9`. Expect `bracket triangle count moved`. Delete the
+   probe commit and branch afterwards, and **`git reset --hard` the main
+   worktree back** — a probe was left checked out in the repo root once.
+3. **All four slots are idle; all four `target/` dirs were deleted** to recover
+   disk (see the disk trap below). A slot re-warms in 1-3 min via `new_slot.py`.
+4. **`BG-TOL-001-GEOM-SPECIFIEDS` is written, anchors verified, not dispatched.**
+   22 sites, all judgements pre-made. Raise the ratchet ceiling from 17 by its
+   budget of 12 before dispatching, and lower it to the true count after.
+5. **Then write the other four shards**, copying BG-TOL-001-SHAPEOPS. Size them
    with `python loop/census_tol_sites.py`, **not** with a raw grep — see the
    census note below. **Pre-make every model/param judgement yourself**; that is
    the whole value of a shard and it needs someone who reads the surrounding
@@ -229,6 +238,23 @@ reason is in the commit that made the change, and the code will not tell you.
 - **`truck_base::evidence`, not `truck_evidence`** — the module lives in
   truck-base to avoid a geotrait→evidence cycle.
 
+- **This loop can eat 40 GB of disk in one session, and did.** Free space went
+  40 GB → **0.1 GB**. Two causes, both in the verifier. Every V9/V5 baseline
+  builds a *whole extra workspace* in a throwaway worktree under the system
+  temp dir, and `compute_baseline`'s cleanup is best-effort with a comment
+  calling a leftover "harmless" — it is not, each one is ~1.3 GB and they
+  accumulate per distinct (base, test-set) key. And a probe that edits
+  `truck-base` invalidates every downstream crate, so a slot's `target/` grew
+  4.4 → 12.9 GB across three negative-test runs. Recovery is easy and total:
+  delete `loop/slots/*/target` (a slot re-warms in 1-3 min) and any
+  `%TEMP%/look-verify-baseline-*`, then `git worktree prune`. **Check
+  `Get-PSDrive C` before a run of repeated verifies, not after.**
+- **A negative test leaves the repo on the broken commit.** Probing V9 meant
+  committing `TOLERANCE = 1.0e-1` on `integration/kernel-bg` in the *main*
+  worktree and pointing a slot at it. When the run was interrupted, the repo
+  root sat on that commit with the kernel's tolerance five orders of magnitude
+  wrong. Nothing downstream noticed, because nothing was watching. Reset the
+  main worktree and delete the probe branch as part of the probe, not after it.
 - **Dead text looks exactly like live code, and it reached a packet.** The
   SHAPEOPS site table listed `fillet/mod.rs:615`, which sits inside a `/* */`
   block spanning lines 500–662. The worker migrated a comment, as instructed,
@@ -467,19 +493,20 @@ The gates, in the order `verify.py` runs them:
 
 ## Open questions
 
-- **Nothing in this loop has been measured against real geometry.** Every gate
-  is a build, a lint, a house rule, or a unit test on a type. Nine contracts
-  have landed and not one has been shown to change what the kernel does to a
-  part — no corpus run, no file that used to fail and now does not, no
-  before/after face count. `benchmarks/` and the face-census tooling exist and
-  the loop has never invoked them. This is the loop's largest blind spot and it
-  gets larger with every packet: correctness is currently *asserted by gates*,
-  not *demonstrated on parts*, and the two come apart silently. The cheapest
-  fix is a V9 that runs one corpus file through the tessellation path and diffs
-  the face census against a cached baseline, on the same pattern V5 already
-  uses. **Stage A makes this urgent rather than optional**: it migrates sites
-  while deliberately changing no threshold, so a shard that quietly broke one
-  would look exactly like a shard that worked.
+- **V9 exists now but is unproven — see "Pick up here" item 2.** It was added
+  because nothing in this loop had ever been measured against real geometry.
+  Its first version ran `tests/step.rs`, `torus_deck.rs` and
+  `spline_carrier.rs`, **passed with `TOLERANCE` loosened 1e-6 → 1e-1**, and
+  the reason is worth keeping: those tests assert *structure*, not geometry —
+  one geometry, one instance, indices a multiple of 3, a colour present — and
+  `torus_deck` asserts the torus's *declared* parameters read back from the
+  source rather than anything tessellated. All of it holds for an arbitrarily
+  wrong mesh. `tests/geometry_fingerprint.rs` is the fix (triangle count,
+  vertex count, bounds) and passes clean, but has not been seen failing.
+- **The corpus tooling is still unused.** `benchmarks/` and the face-census
+  scripts have existed the whole time and the loop has never invoked them. V9
+  covers two fixtures; that is "these two parts still tessellate the same
+  way", not "the kernel is correct."
 - V7 (mutation spot-check) and V8 (no-regression) are always-pass stubs. V7
   needs a packet field naming the negative test; V8 needs ledger state. V8 is
   the right home for "a packet broke a pre-existing test" -- V5 deliberately
