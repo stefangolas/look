@@ -267,15 +267,53 @@ impl ToleranceCtx {
         (a - b).magnitude() <= self.tau_rep * self.model_scale
     }
 
+    /// MODEL-SPACE, generic over the point type. True when `a` and `b` are within
+    /// representation tolerance, scaled by the model.
+    ///
+    /// [`Self::near_pt`] is this specialised to `Point3` and is kept because it is
+    /// the common case and reads better at a call site. Generic code — the
+    /// topology crate is generic over its point type, and cannot name `Point3` —
+    /// uses this.
+    pub fn near_points<P>(&self, a: P, b: P) -> bool
+    where
+        P: MetricSpace<Metric = f64>,
+    {
+        a.distance(b) <= self.tau_rep * self.model_scale
+    }
+
     /// MODEL-SPACE. True when a length is negligible at this model's scale.
     pub fn is_small_len(&self, l: f64) -> bool {
         l.abs() <= self.tau_rep * self.model_scale
+    }
+
+    /// MODEL-SPACE. The absolute margin a length comparison uses at this model's
+    /// scale: `tau_rep * model_scale`.
+    ///
+    /// This exists for **one-sided** comparisons, which the symmetric predicates
+    /// cannot express. `a < b + ctx.length_margin()` asks whether `a` is at or
+    /// below `b` within tolerance; `is_small_len(a - b)` asks whether they are
+    /// close, and answers differently for every `a` far below `b`. Turning a
+    /// one-sided comparison into a symmetric one is a behaviour change disguised
+    /// as a migration.
+    pub fn length_margin(&self) -> f64 {
+        self.tau_rep * self.model_scale
     }
 
     /// DIMENSIONLESS — deliberately NOT scaled. A sine is a ratio; multiplying
     /// a ratio by a length is a category error. Callers comparing angles, knot
     /// values, normalized parameters or weights use this and nothing else.
     pub fn sin_margin(&self) -> f64 {
+        self.tau_rep
+    }
+
+    /// DIMENSIONLESS — deliberately NOT scaled. The one-sided counterpart of
+    /// [`Self::sin_margin`], named for what it bounds rather than for sines, since
+    /// most call sites comparing it are comparing curve parameters and knot values
+    /// rather than angles. Identical in value to `sin_margin`; both return
+    /// `tau_rep`. They are kept separate because they are named for different
+    /// quantities, and a later packet that gives angles their own tolerance will
+    /// change one and not the other.
+    pub fn ratio_margin(&self) -> f64 {
         self.tau_rep
     }
 
