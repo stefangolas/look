@@ -467,6 +467,19 @@ The gates, in the order `verify.py` runs them:
 
 ## Open questions
 
+- **Nothing in this loop has been measured against real geometry.** Every gate
+  is a build, a lint, a house rule, or a unit test on a type. Nine contracts
+  have landed and not one has been shown to change what the kernel does to a
+  part — no corpus run, no file that used to fail and now does not, no
+  before/after face count. `benchmarks/` and the face-census tooling exist and
+  the loop has never invoked them. This is the loop's largest blind spot and it
+  gets larger with every packet: correctness is currently *asserted by gates*,
+  not *demonstrated on parts*, and the two come apart silently. The cheapest
+  fix is a V9 that runs one corpus file through the tessellation path and diffs
+  the face census against a cached baseline, on the same pattern V5 already
+  uses. **Stage A makes this urgent rather than optional**: it migrates sites
+  while deliberately changing no threshold, so a shard that quietly broke one
+  would look exactly like a shard that worked.
 - V7 (mutation spot-check) and V8 (no-regression) are always-pass stubs. V7
   needs a packet field naming the negative test; V8 needs ledger state. V8 is
   the right home for "a packet broke a pre-existing test" -- V5 deliberately
