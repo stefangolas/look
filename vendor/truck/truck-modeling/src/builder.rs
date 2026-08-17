@@ -619,7 +619,8 @@ where
     T: ClosedSweep<Matrix4, ArcConnector, RevoluteConnector, Swept>,
     R: Into<Rad<f64>>,
 {
-    debug_assert!(axis.magnitude().near(&1.0));
+    let ctx = ToleranceCtx::unscaled_legacy();
+    debug_assert!(ctx.is_small_ratio(axis.magnitude() - 1.0)); // BG-TOL-001: param
     let angle = angle.into();
     let sign = f64::signum(angle.0);
     if angle.0.abs() >= 2.0 * PI.0 {
@@ -716,6 +717,7 @@ where
     Processor<TrimmedCurve<UnitCircle<Point3>>, Matrix4>: ToSameGeometry<C>,
     RevolutedCurve<C>: ToSameGeometry<S>,
 {
+    let ctx = ToleranceCtx::unscaled_legacy();
     let angle = angle.into();
     let closed = angle.0.abs() >= 2.0 * PI.0;
     let mut wire = wire.clone();
@@ -724,7 +726,7 @@ where
     }
     let pt0 = wire.front_vertex().unwrap().point();
     let pt1 = wire.back_vertex().unwrap().point();
-    let pt1_on_axis = (pt1 - pt0).cross(axis).so_small();
+    let pt1_on_axis = ctx.is_small_len((pt1 - pt0).cross(axis).magnitude()); // BG-TOL-001: model
     if wire.len() == 1 && pt1_on_axis {
         let edge = wire.pop_back().unwrap();
         let v0 = edge.front().clone();

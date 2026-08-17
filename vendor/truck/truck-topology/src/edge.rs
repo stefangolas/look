@@ -418,6 +418,7 @@ impl<P, C> Edge<P, C> {
         let geom_back = curve.back();
         let top_front = self.absolute_front().point.lock();
         let top_back = self.absolute_back().point.lock();
+        // FIXME(BG-TOL-001): generic P is bounded Tolerance, not MetricSpace; the bound change is cross-crate and belongs to Stage B
         geom_front.near(&*top_front) && geom_back.near(&*top_back)
     }
 
@@ -453,10 +454,12 @@ impl<P, C> Edge<P, C> {
         P: Clone,
         C: Cut<Point = P> + SearchParameter<D1, Point = P>,
     {
+        let ctx = ToleranceCtx::unscaled_legacy();
         let curve0 = self.curve();
         let t = curve0.search_parameter(vertex.point(), None, SEARCH_PARAMETER_TRIALS)?;
         let (t0, t1) = curve0.range_tuple();
-        if t < t0 + TOLERANCE || t1 - TOLERANCE < t {
+        if t < t0 + ctx.ratio_margin() || t1 - ctx.ratio_margin() < t {
+            // BG-TOL-001: param
             return None;
         }
         Some(self.pre_cut(vertex, curve0, t))
@@ -470,12 +473,15 @@ impl<P, C> Edge<P, C> {
         P: Clone + Tolerance,
         C: Cut<Point = P>,
     {
+        let ctx = ToleranceCtx::unscaled_legacy();
         let curve0 = self.curve();
+        // FIXME(BG-TOL-001): generic P is bounded Tolerance, not MetricSpace; the bound change is cross-crate and belongs to Stage B
         if !curve0.subs(t).near(&vertex.point()) {
             return None;
         }
         let (t0, t1) = curve0.range_tuple();
-        if t < t0 + TOLERANCE || t1 - TOLERANCE < t {
+        if t < t0 + ctx.ratio_margin() || t1 - ctx.ratio_margin() < t {
+            // BG-TOL-001: param
             return None;
         }
         Some(self.pre_cut(vertex, curve0, t))
