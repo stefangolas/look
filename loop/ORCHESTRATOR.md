@@ -87,6 +87,40 @@ This is a *specification* defect and it is the loop's most valuable output. Fix
 `docs/GENERATION_KERNEL_BUILD_SPEC.md` and the packet, then redispatch. Do not
 answer the question only in the packet and leave the spec wrong.
 
+## "You do not write kernel code" — where the line actually is
+
+**Off-limits to you: `vendor/truck/**`.** That is the kernel. It changes only
+through a packet, a worker, and `verify.py`. If you find yourself editing a
+`.rs` file under `vendor/truck/`, stop — the exception is amending a worker's
+own commit to remove something the packet wrongly asked for, which is an
+orchestrator amendment and must be recorded as one.
+
+**Yours: the harness and the repo's own tests.** `loop/*.py`,
+`scripts/kernel-gates.sh`, and `tests/*.rs` in the root `look` crate are
+orchestrator work, and writing them is not a violation — a gate you cannot
+implement is a gate you do not have. Session 6 wrote
+`tests/geometry_fingerprint.rs` because V9 had nothing real to measure, and
+that was correct. Say plainly in the commit that you wrote it.
+
+The distinction is not "who types" but **what the gates are allowed to be
+graded against.** Kernel code is the thing under test; harness code is the
+test. Blurring them means grading the work against something its own author
+tuned.
+
+## Before a session that will run many verifies: check disk
+
+`Get-PSDrive C`. Every V5/V9 baseline builds an *entire extra workspace* in a
+throwaway worktree, once per distinct (base commit, test set), and its cleanup
+is best-effort. A slot's `target/` also grows without bound when a probe edits
+`truck-base`, because that invalidates every downstream crate. Session 6 went
+from 40 GB free to 0.1 GB in one session this way.
+
+`new_slot.py` and `compute_baseline` both refuse below an 8 GB floor now, so
+you will get a clear error rather than a wedged machine — but the recovery is
+yours: delete `loop/slots/*/target` (a slot re-warms in 1-3 min), delete any
+`%TEMP%/look-verify-baseline-*`, then `git worktree prune`. None of that loses
+work.
+
 ## Rules that are not negotiable
 
 - **Never loosen a gate to get green.** Not a widened tolerance, not an
@@ -172,6 +206,20 @@ Rewrite `loop/STATE.md` — it is the next session's only cold-start read, and i
 being stale is the failure mode that matters most. It said "no packet has been
 dispatched" while two were in flight. Record what is running, what landed, what
 is next, and every trap you paid for with the reason it cost something.
+
+**Rewrite it last, and then check it against reality.** Session 6 wrote STATE at
+what looked like the end, kept working for two more hours, and left four numbers
+wrong — contracts, packet count, and the ratchet ceiling had all moved *in the
+session that wrote them*. Before you finish, re-run `slot_status.py`,
+`schedule.py` and whatever census the work uses, and diff the answers against
+what the file claims. A number in STATE that no command reproduces is the
+default outcome, not an unlucky one.
+
+**Leave nothing mid-probe.** If you deliberately broke something to watch a gate
+fail, reset the main worktree and delete the probe branch as part of the probe.
+Session 6 left `integration/kernel-bg` sitting on a commit with the kernel's
+tolerance wrong by five orders of magnitude, and nothing noticed, because
+nothing was watching.
 
 Commit messages carry the reasoning; STATE.md carries the conclusions. Both are
 load-bearing, because the next orchestrator may not be you.
