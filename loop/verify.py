@@ -82,13 +82,21 @@ def has_compile_error(text):
     return _COMPILE_ERROR_RE.search(text) is not None
 
 
-def baseline_cache_path(base_sha, crate_names):
+DEFAULT_TEST_ARGS = ['--lib', '--tests']
+
+
+def baseline_cache_path(base_sha, crate_names, test_args=None):
     key = base_sha[:12] + '__' + '-'.join(sorted(crate_names))
+    # The target selection is part of the cache identity: V5 and V9 both key on
+    # the same base and would otherwise share a file while measuring different
+    # test sets, so one would silently serve the other's answer.
+    if test_args and test_args != DEFAULT_TEST_ARGS:
+        key += '__' + '-'.join(a for a in test_args if a != '--test')
     safe_key = re.sub(r'[^A-Za-z0-9_.-]', '_', key)
     return BASELINES_DIR / f"{safe_key}.json"
 
 
-def compute_baseline(base_sha, crate_names, out_file):
+def compute_baseline(base_sha, crate_names, out_file, test_args=None):
     """Run `cargo test -p <crates> --lib --tests --no-fail-fast` at base_sha
     in a throwaway worktree and return {'compile_ok': bool, 'tests': {name:
     status}}. Never touches loop/slots/*; creates and removes its own
@@ -120,7 +128,7 @@ def compute_baseline(base_sha, crate_names, out_file):
         env['CARGO_INCREMENTAL'] = '0'
         env['CARGO_TARGET_DIR'] = str(target_path)
         test_res = subprocess.run(
-            ['cargo', 'test', *p_args, '--lib', '--tests', '--no-fail-fast'],
+            ['cargo', 'test', *p_args, *(test_args or DEFAULT_TEST_ARGS), '--no-fail-fast'],
             cwd=str(wt_path), capture_output=True, text=True, encoding='utf-8', errors='replace', env=env
         )
         chunk = test_res.stdout + test_res.stderr
@@ -140,20 +148,21 @@ def compute_baseline(base_sha, crate_names, out_file):
         shutil.rmtree(tmp_parent, ignore_errors=True)
 
 
-def load_or_compute_baseline(base_sha, crate_names, out_file):
-    cache_path = baseline_cache_path(base_sha, crate_names)
+def load_or_compute_baseline(base_sha, crate_names, out_file, test_args=None):
+    cache_path = baseline_cache_path(base_sha, crate_names, test_args)
     if cache_path.is_file():
         obj = json.loads(cache_path.read_text(encoding='utf-8'))
         with out_file.open('a', encoding='utf-8', newline='\n') as f:
-            f.write(f"\n===== V5 baseline: loaded cache {cache_path.name} "
+            f.write(f"\n===== baseline: loaded cache {cache_path.name} "
                      f"(computed {obj.get('computed_at', '?')}) =====\n")
         return obj
 
     BASELINES_DIR.mkdir(parents=True, exist_ok=True)
-    result = compute_baseline(base_sha, crate_names, out_file)
+    result = compute_baseline(base_sha, crate_names, out_file, test_args)
     obj = {
         'base': base_sha,
         'crates': sorted(crate_names),
+        'test_args': test_args or DEFAULT_TEST_ARGS,
         'computed_at': datetime.datetime.now(datetime.timezone.utc).isoformat().replace('+00:00', 'Z'),
         'compile_ok': result['compile_ok'],
         'tests': result['tests'],
@@ -282,7 +291,7 @@ def main():
     only_gates = None
     if args.only:
         only_gates = set(g.strip().upper() for g in args.only.split(',') if g.strip())
-        valid_ids = {f'V{n}' for n in range(1, 9)}
+        valid_ids = {f'V{n}' for n in range(1, 10)}
         unknown = only_gates - valid_ids
         if unknown:
             sys.exit(f"--only names unknown gate id(s): {', '.join(sorted(unknown))} (valid: {', '.join(sorted(valid_ids))})")
@@ -421,7 +430,8 @@ def main():
 
     if preflight:
         v.add_gate('V0 preflight', 'FAIL', '; '.join(preflight))
-        for n in ('V1 scope', 'V2 build', 'V3 lint', 'V4 house rules', 'V5 tests', 'V6 test-reality'):
+        for n in ('V1 scope', 'V2 build', 'V3 lint', 'V4 house rules', 'V5 tests',
+                  'V6 test-reality', 'V9 geometry'):
             v.add_gate(n, 'SKIP', 'run incomplete')
         print()
         print('VERDICT: BLOCKED')
@@ -867,6 +877,68 @@ def main():
         v.add_gate('V8 no-regression', 'PASS', 'TODO stub — always passes; see comment in verify.py')
     else:
         skip_not_requested('V8 no-regression')
+
+    # -----------------------------------------------------------------------
+    # V9 geometry — the root crate's integration tests, which are the only
+    # thing in this harness that touches a real part.
+    #
+    # Every other gate is a build, a lint, a house rule, or a unit test on a
+    # type. Nine contracts landed before this gate existed and not one had been
+    # shown to change what the kernel does to a STEP file. `tests/step.rs`,
+    # `tests/torus_deck.rs` and `tests/spline_carrier.rs` in the root `look`
+    # crate import real fixtures and drive them through import and
+    # tessellation -- and no packet has ever listed `look` in its `crates:`,
+    # so V5 has never once run them.
+    #
+    # This runs ALWAYS, regardless of which crates the packet names, because
+    # the packets that most need it are exactly the ones that do not think
+    # they touch geometry. The BG-TOL-001 Stage-A shards are the case in
+    # point: they migrate call sites while deliberately changing no threshold,
+    # so a shard that quietly broke one produces identical results on every
+    # other gate.
+    #
+    # Same baseline comparison as V5 -- run the same targets at `base`, cache,
+    # and fail only on what newly fails -- so a pre-existing failure in the
+    # tree is not charged to the packet. gpu_smoke and assembly are excluded:
+    # they depend on an adapter that may not exist on the runner, and a gate
+    # that fails for want of a GPU is noise, not signal.
+    # -----------------------------------------------------------------------
+    GEOM_TESTS = ['--test', 'step', '--test', 'torus_deck', '--test', 'spline_carrier']
+    if not gate_wanted('V9'):
+        skip_not_requested('V9 geometry')
+    elif not v.failed_early:
+        geom_base = load_or_compute_baseline(base, ['look'], v.out_file, GEOM_TESTS)
+        v.write_out_section('V9 geometry: cargo test -p look on real STEP fixtures')
+        len_before = v.out_file.stat().st_size
+        v.invoke_native(['cargo', 'test', '-p', 'look', *GEOM_TESTS, '--no-fail-fast'], v.wt)
+        geom_text = v.out_file.read_bytes()[len_before:].decode('utf-8', errors='replace')
+
+        if has_compile_error(geom_text):
+            v.add_gate('V9 geometry', 'FAIL',
+                       'the root crate\'s geometry tests failed to compile; see out.txt')
+        elif not geom_base['compile_ok']:
+            v.add_gate('V9 geometry', 'PASS',
+                       f"baseline at {base[:7]} would not compile, so no comparison is possible")
+        else:
+            now = parse_test_statuses(geom_text)
+            was = geom_base['tests']
+            newly = sorted(n for n, s in now.items()
+                           if s != 'ok' and was.get(n) == 'ok')
+            vanished = sorted(n for n, s in was.items()
+                              if s == 'ok' and n not in now)
+            if newly or vanished:
+                parts = []
+                if newly:
+                    parts.append('now failing on real geometry: ' + ', '.join(newly[:5]))
+                if vanished:
+                    parts.append('disappeared: ' + ', '.join(vanished[:5]))
+                v.add_gate('V9 geometry', 'FAIL', '; '.join(parts) + '; see out.txt')
+            else:
+                v.add_gate('V9 geometry', 'PASS',
+                           f"{len(now)} geometry test(s) on real STEP fixtures, "
+                           f"no regression vs baseline at {base[:7]}")
+    else:
+        v.add_gate('V9 geometry', 'SKIP', 'earlier gate failed')
 
     # -----------------------------------------------------------------------
     # Verdict
