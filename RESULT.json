@@ -1,0 +1,23 @@
+{
+  "id": "BG-TOL-001-MESHALGO",
+  "status": "DONE",
+  "contracts": [
+    "BG-TOL-001"
+  ],
+  "tests_added": 2,
+  "sites_migrated": 20,
+  "sites_deferred": 6,
+  "unscaled_legacy_calls": 11,
+  "anchors_verified": {
+    "A1": 6,
+    "A2": 1,
+    "A3": 2,
+    "A4": 1,
+    "A5": 8,
+    "A6": 43,
+    "A7": 41
+  },
+  "notes": "unscaled_legacy_calls: 11 (one per table function: normalize_normals, establish_source_edge_traversal, reconcile_singular_transition, try_new, singular_transition_branch, working_range, new_with_join, end_pts, on_boundary, include_along_ray, triangulation_into_polymesh_outcome). Existing tests that moved: none. The only failing tests are tessellation::triangulation::cone_topology_tests::duplicate_edge_creates_no_second_cdt_edge and test_parity_intersecting_constraints_rejected; I verified by stashing the whole diff and running them at the base commit that they fail identically there, so they are pre-existing and unrelated to this packet. Euclidean tightening (decisions 1/2): the componentwise legacy predicates became Euclidean where a Vector3 was compared. Sites affected: the four reconcile_singular_transition derivatives, try_new:5525 (u/v derivatives), singular_transition_branch:6379/6381, try_new:5523 (Point2 uv near -> distance), and triangulation_into_polymesh_outcome:10898 (normal magnitude). All are deliberate tightenings of up to sqrt(3); none moved a test. Formatting note: rustfmt moves a trailing marker after a `{` to its own line (the same layout the truck-modeling geom_impls.rs shard uses) and breaks lines over 100 columns; to keep every rewritten condition on a single line so the marker-count test stays balanced, I bound the four derivative magnitudes in reconcile_singular_transition to cur_uder/cur_vder/prev_uder/prev_vder and the two in try_new to u_der/v_der. The predicates are exactly the packet's given replacements; only the .magnitude() extraction moved to a let binding. Structural note: the end_pts sites (8278/8283) are physically inside PolyBoundary::new_with_join's `match open.len()` 2-armed block, immediately below the nested `fn end_pts` helper; to honor the exact-11 context budget and the table's end_pts row I introduced the 11th context as the first statement of that arm (shadowing new_with_join's context), used only by those two sites. No classification disagreed with the table. Deferred area sites: 6 FIXME(BG-TOL-001) added (collision 3, in_out_judge 1, point_cloud/mod 1, sort_end_points 1), original lines untouched, no ToleranceCtx in any deferred file.",
+  "amended_by": "orchestrator",
+  "amendment": "Added `#![deny(clippy::unwrap_used)]` as the first line of tests/tolerance_meshalgo.rs. GATE-1 (H-1) requires it of every new module under vendor/truck/, the two landed shards both carry it (truck-shapeops/tests/tolerance_migration.rs, truck-geometry/tests/analytic_carriers.rs), and THIS PACKET NEVER SAID SO -- 'unwrap_used' appears zero times in it. The worker could not have satisfied a rule it was never given, so this is the orchestrator's omission repaired in place rather than a redispatch. The file contains no unwrap/expect, so the attribute changes no behaviour. The worker's notes below are untouched."
+}

@@ -186,6 +186,7 @@ pub trait NormalFilters {
 
 impl NormalFilters for PolygonMesh {
     fn normalize_normals(&mut self) -> &mut Self {
+        let ctx = ToleranceCtx::unscaled_legacy();
         let mut mesh = self.debug_editor();
         let PolygonMeshEditor {
             attributes: StandardAttributes { normals, .. },
@@ -197,7 +198,8 @@ impl NormalFilters for PolygonMesh {
             .for_each(move |normal| *normal = normal.normalize());
         faces.face_iter_mut().flatten().for_each(|v| {
             if let Some(idx) = v.nor {
-                if !normals[idx].magnitude2().near(&1.0) {
+                if !ctx.is_small_ratio(normals[idx].magnitude2() - 1.0) {
+                    // BG-TOL-001: param
                     v.nor = None;
                 }
             }

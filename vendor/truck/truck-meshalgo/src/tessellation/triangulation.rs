@@ -4512,27 +4512,36 @@ fn reconcile_singular_transition<S: ParametricSurface3D>(
     tolerance: f64,
     output: &mut Vec<SurfacePoint>,
 ) {
+    let ctx = ToleranceCtx::unscaled_legacy();
     let represents =
         |uv: Point2, point: Point3| surface.subs(uv.x, uv.y).distance(point) <= tolerance;
-    if !previous_uv.x.near(&current_uv.x) && surface.uder(current_uv.x, current_uv.y).so_small() {
+    let cur_uder = surface.uder(current_uv.x, current_uv.y).magnitude();
+    let cur_vder = surface.vder(current_uv.x, current_uv.y).magnitude();
+    let prev_uder = surface.uder(previous_uv.x, previous_uv.y).magnitude();
+    let prev_vder = surface.vder(previous_uv.x, previous_uv.y).magnitude();
+    if !ctx.is_small_ratio(previous_uv.x - current_uv.x) && ctx.is_small_len(cur_uder) {
+        // BG-TOL-001: param+model
         let candidate = Point2::new(previous_uv.x, current_uv.y);
         if represents(candidate, current_point) {
             current_uv.x = previous_uv.x;
         }
     }
-    if !previous_uv.y.near(&current_uv.y) && surface.vder(current_uv.x, current_uv.y).so_small() {
+    if !ctx.is_small_ratio(previous_uv.y - current_uv.y) && ctx.is_small_len(cur_vder) {
+        // BG-TOL-001: param+model
         let candidate = Point2::new(current_uv.x, previous_uv.y);
         if represents(candidate, current_point) {
             current_uv.y = previous_uv.y;
         }
     }
-    if !previous_uv.x.near(&current_uv.x) && surface.uder(previous_uv.x, previous_uv.y).so_small() {
+    if !ctx.is_small_ratio(previous_uv.x - current_uv.x) && ctx.is_small_len(prev_uder) {
+        // BG-TOL-001: param+model
         let candidate = Point2::new(current_uv.x, previous_uv.y);
         if represents(candidate, previous_point) {
             output.push((candidate, previous_point).into());
         }
     }
-    if !previous_uv.y.near(&current_uv.y) && surface.vder(previous_uv.x, previous_uv.y).so_small() {
+    if !ctx.is_small_ratio(previous_uv.y - current_uv.y) && ctx.is_small_len(prev_vder) {
+        // BG-TOL-001: param+model
         let candidate = Point2::new(previous_uv.x, current_uv.y);
         if represents(candidate, previous_point) {
             output.push((candidate, previous_point).into());
@@ -4590,6 +4599,7 @@ impl PolyBoundaryPiece {
         tol: f64,
         lattice: &CertifiedLattice,
     ) -> std::result::Result<Self, TessellationFailureReason> {
+        let ctx = ToleranceCtx::unscaled_legacy();
         // Audit A-ambient: periodicity now arrives as a descriptor whose type
         // distinguishes exact from accessor-only evidence. `declared_period`
         // is what this path read before, so the boundary is introduced with no
@@ -5520,9 +5530,13 @@ impl PolyBoundaryPiece {
             );
         }
         let last = *vec.last().unwrap();
-        if !vec[0].near(&last) {
+        if !ctx.is_small_ratio(vec[0].uv.distance(last.uv)) {
+            // BG-TOL-001: param
             let Point2 { x: u0, y: v0 } = last.uv;
-            if surface.uder(u0, v0).so_small() || surface.vder(u0, v0).so_small() {
+            let u_der = surface.uder(u0, v0).magnitude();
+            let v_der = surface.vder(u0, v0).magnitude();
+            if ctx.is_small_len(u_der) || ctx.is_small_len(v_der) {
+                // BG-TOL-001: model
                 vec.push(vec[0]);
                 lifted_tags.push(lifted_tags[0]);
             }
@@ -6370,15 +6384,18 @@ fn singular_transition_branch<S>(
 where
     S: PreMeshableSurface,
 {
+    let ctx = ToleranceCtx::unscaled_legacy();
     // The pole is a chart point where the *periodic* axis's partial collapses
     // (at a sphere pole the longitude is undefined, so moving in it moves
     // nothing). Detecting the collapse on the periodic axis is what separates
     // this from a regular half-period step: a cylinder never reaches here, a
     // cone apex and sphere pole do.
     let collapsed_axis = |u: f64, v: f64| -> Option<LongitudeAxis> {
-        if vp.is_some() && surface.vder(u, v).so_small() {
+        if vp.is_some() && ctx.is_small_len(surface.vder(u, v).magnitude()) {
+            // BG-TOL-001: model
             Some(LongitudeAxis::V)
-        } else if up.is_some() && surface.uder(u, v).so_small() {
+        } else if up.is_some() && ctx.is_small_len(surface.uder(u, v).magnitude()) {
+            // BG-TOL-001: model
             Some(LongitudeAxis::U)
         } else {
             None
@@ -7194,6 +7211,7 @@ fn working_range(
     pieces: &[PolyBoundaryPiece],
     surface: &impl PreMeshableSurface,
 ) -> (Option<(f64, f64)>, Option<(f64, f64)>) {
+    let ctx = ToleranceCtx::unscaled_legacy();
     let (udeclared, vdeclared) = surface.try_range_tuple();
     // A face with no boundary at all takes its domain from the surface — the
     // closure rectangle `new_with_join` synthesises is that declared domain,
@@ -7217,7 +7235,7 @@ fn working_range(
                 hi = f64::max(hi, p[idx]);
             })
         });
-        (hi - lo > TOLERANCE).then_some((lo, hi))
+        (!ctx.is_small_ratio(hi - lo)).then_some((lo, hi)) // BG-TOL-001: param
     };
     (
         axis(0, surface.u_period(), udeclared),
@@ -7809,6 +7827,7 @@ impl PolyBoundary {
         lattice: &CertifiedLattice,
         join_policy: TwoLoopJoinPolicy,
     ) -> (Self, TwoLoopJoinOutcome) {
+        let ctx = ToleranceCtx::unscaled_legacy();
         let mut join_outcome = TwoLoopJoinOutcome::NotAttempted;
         let probe = std::env::var_os("TRUCK_PROBE_BOUNDARY").is_some();
         let had_source_pieces = !pieces.is_empty();
@@ -8201,7 +8220,8 @@ impl PolyBoundary {
                 let p = curve[0];
                 let q = curve[curve.len() - 1];
                 if let (Some((u0, u1)), Some((v0, v1))) = range {
-                    if p.x < q.x - TOLERANCE {
+                    if p.x < q.x - ctx.ratio_margin() {
+                        // BG-TOL-001: param
                         normalize_range(&mut curve, &mut curve_sources, 0, (u0, u1));
                         let p = curve[0];
                         let q = curve[curve.len() - 1];
@@ -8217,7 +8237,8 @@ impl PolyBoundary {
                             (vec2, untagged_sources(n2), SegmentOrigin::SyntheticClosure),
                             (curve, curve_sources, SegmentOrigin::Source),
                         ]));
-                    } else if q.x < p.x - TOLERANCE {
+                    } else if q.x < p.x - ctx.ratio_margin() {
+                        // BG-TOL-001: param
                         normalize_range(&mut curve, &mut curve_sources, 0, (u0, u1));
                         let p = curve[0];
                         let q = curve[curve.len() - 1];
@@ -8233,7 +8254,8 @@ impl PolyBoundary {
                             (vec2, untagged_sources(n2), SegmentOrigin::SyntheticClosure),
                             (curve, curve_sources, SegmentOrigin::Source),
                         ]));
-                    } else if p.y < q.y - TOLERANCE {
+                    } else if p.y < q.y - ctx.ratio_margin() {
+                        // BG-TOL-001: param
                         normalize_range(&mut curve, &mut curve_sources, 1, (v0, v1));
                         let p = curve[0];
                         let q = curve[curve.len() - 1];
@@ -8249,7 +8271,8 @@ impl PolyBoundary {
                             (vec2, untagged_sources(n2), SegmentOrigin::SyntheticClosure),
                             (curve, curve_sources, SegmentOrigin::Source),
                         ]));
-                    } else if q.y < p.y - TOLERANCE {
+                    } else if q.y < p.y - ctx.ratio_margin() {
+                        // BG-TOL-001: param
                         normalize_range(&mut curve, &mut curve_sources, 1, (v0, v1));
                         let p = curve[0];
                         let q = curve[curve.len() - 1];
@@ -8269,18 +8292,21 @@ impl PolyBoundary {
                 }
             }
             2 => {
+                let ctx = ToleranceCtx::unscaled_legacy();
                 let (mut curve1, mut curve1_sources) = open.pop().unwrap();
                 let (mut curve0, mut curve0_sources) = open.pop().unwrap();
                 fn end_pts<T: Copy>(vec: &[T]) -> (T, T) {
                     (vec[0], vec[vec.len() - 1])
                 }
                 let ((p0, p1), (q0, q1)) = (end_pts(&curve0), end_pts(&curve1));
-                if !p0.x.near(&p1.x) && !q0.x.near(&q1.x) {
+                if !ctx.is_small_ratio(p0.x - p1.x) && !ctx.is_small_ratio(q0.x - q1.x) {
+                    // BG-TOL-001: param
                     if let (Some(urange), _) = range {
                         normalize_range(&mut curve0, &mut curve0_sources, 0, urange);
                         normalize_range(&mut curve1, &mut curve1_sources, 0, urange);
                     }
-                } else if !p0.y.near(&p1.y) && !q0.y.near(&q1.y) {
+                } else if !ctx.is_small_ratio(p0.y - p1.y) && !ctx.is_small_ratio(q0.y - q1.y) {
+                    // BG-TOL-001: param
                     if let (_, Some(vrange)) = range {
                         normalize_range(&mut curve0, &mut curve0_sources, 1, vrange);
                         normalize_range(&mut curve1, &mut curve1_sources, 1, vrange);
@@ -8384,6 +8410,7 @@ impl PolyBoundary {
     /// computed and compared to `c`. This is what entitles [`Self::locate`] to
     /// report `Boundary` as a fact rather than as "the rays gave up".
     fn on_boundary(&self, c: Point2) -> bool {
+        let ctx = ToleranceCtx::unscaled_legacy();
         self.0
             .iter()
             .flat_map(|loop_| loop_.points.iter().circular_tuple_windows())
@@ -8395,12 +8422,13 @@ impl PolyBoundary {
                     true => 0.0,
                     false => ((c - a).dot(ab) / len2).clamp(0.0, 1.0),
                 };
-                (a + ab * t).distance2(c) <= TOLERANCE * TOLERANCE
+                ctx.is_small_ratio((a + ab * t).distance(c)) // BG-TOL-001: param
             })
     }
 
     /// One ray cast. `None` when this ray is degenerate against the boundary.
     fn include_along_ray(&self, c: Point2, attempt: u32) -> Option<bool> {
+        let ctx = ToleranceCtx::unscaled_legacy();
         // Offsetting the seed per attempt keeps successive rays unrelated
         // rather than merely rotated by a fixed step, which a boundary with
         // regularly spaced vertices could otherwise defeat repeatedly.
@@ -8417,7 +8445,8 @@ impl PolyBoundary {
                 let s1 = r.x * b.y - r.y * b.x; // v times b
                 let s2 = a.x * b.y - a.y * b.x; // a times b
                 let x = s2 / (s1 - s0);
-                if x.so_small() && s0 * s1 < 0.0 {
+                if ctx.is_small_ratio(x) && s0 * s1 < 0.0 {
+                    // BG-TOL-001: param
                     None
                 } else if x > 0.0 && ((s0 <= 0.0 && s1 > 0.0) || (s0 >= 0.0 && s1 < 0.0)) {
                     Some(crossings + 1)
@@ -10535,6 +10564,7 @@ fn triangulation_into_polymesh_outcome<S: ParametricSurface3D>(
     tol: f64,
     refine: bool,
 ) -> TessellationOutcome {
+    let ctx = ToleranceCtx::unscaled_legacy();
     use std::collections::HashMap as StdHashMap;
 
     // 1. Parity-labeled CDT dual traversal across domain-boundary constraint
@@ -10895,7 +10925,8 @@ fn triangulation_into_polymesh_outcome<S: ParametricSurface3D>(
     }
 
     for (i, norm) in normals.iter_mut().enumerate() {
-        if norm.so_small() || !norm.x.is_finite() {
+        if ctx.is_small_ratio(norm.magnitude()) || !norm.x.is_finite() {
+            // BG-TOL-001: param
             let inc = vertex_incident_normals[i];
             if inc.magnitude2() > 1e-12 {
                 *norm = inc.normalize();
