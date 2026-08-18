@@ -199,13 +199,14 @@ impl IncludeCurve<Line<Point3>> for Plane {
 impl IncludeCurve<BSplineCurve<Point3>> for Plane {
     #[inline(always)]
     fn include(&self, curve: &BSplineCurve<Point3>) -> Outcome<bool> {
+        let ctx = ToleranceCtx::unscaled_legacy();
         let origin = self.origin();
         let normal = self.normal();
         Ok(Certified::new(
             curve
                 .control_points()
                 .iter()
-                .all(|pt| (pt - origin).dot(normal).so_small()),
+                .all(|pt| ctx.is_small_len((pt - origin).dot(normal))), // BG-TOL-001: model
             Certificate {
                 props: PropMap::new(),
                 method: Method::Float,
@@ -219,19 +220,24 @@ impl IncludeCurve<BSplineCurve<Point3>> for Plane {
 
 impl IncludeCurve<NurbsCurve<Vector4>> for Plane {
     fn include(&self, curve: &NurbsCurve<Vector4>) -> Outcome<bool> {
+        let ctx = ToleranceCtx::unscaled_legacy();
         let value = (|| {
             let origin = self.origin();
             let normal = self.normal();
             let (s, e) = (curve.front(), curve.back());
-            if !(s - origin).dot(normal).so_small() || !(e - origin).dot(normal).so_small() {
+            if !ctx.is_small_len((s - origin).dot(normal))
+                || !ctx.is_small_len((e - origin).dot(normal))
+            {
+                // BG-TOL-001: model
                 return false;
             }
             curve.non_rationalized().control_points().iter().all(|pt| {
-                if pt[3].so_small() {
+                if ctx.is_small_ratio(pt[3]) {
+                    // BG-TOL-001: param
                     true
                 } else {
                     let pt = Point3::from_homogeneous(*pt);
-                    (pt - origin).dot(normal).so_small()
+                    ctx.is_small_len((pt - origin).dot(normal)) // BG-TOL-001: model
                 }
             })
         })();
@@ -281,8 +287,10 @@ impl SearchParameter<D2> for Plane {
         _: H,
         _: usize,
     ) -> Option<(f64, f64)> {
+        let ctx = ToleranceCtx::unscaled_legacy();
         let v = self.get_parameter(point);
-        match v[2].so_small() {
+        match ctx.is_small_len(v[2]) {
+            // BG-TOL-001: model
             true => Some((v[0], v[1])),
             false => None,
         }

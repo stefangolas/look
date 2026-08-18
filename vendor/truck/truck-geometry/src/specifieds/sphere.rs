@@ -23,7 +23,8 @@ impl Sphere {
     /// Returns whether the point `pt` is on sphere
     #[inline(always)]
     pub fn include(&self, pt: Point3) -> bool {
-        self.center.distance(pt).near(&self.radius)
+        let ctx = ToleranceCtx::unscaled_legacy();
+        ctx.is_small_len(self.center.distance(pt) - self.radius) // BG-TOL-001: model
     }
 }
 
@@ -169,7 +170,8 @@ impl ParameterDivision2D for Sphere {
         (urange, vrange): ((f64, f64), (f64, f64)),
         tol: f64,
     ) -> (Vec<f64>, Vec<f64>) {
-        let tol = tol.max(TOLERANCE);
+        let ctx = ToleranceCtx::unscaled_legacy();
+        let tol = tol.max(ctx.length_margin()); // BG-TOL-001: model
         nonpositive_tolerance!(tol);
         // A tolerance coarser than the sphere is a meaningful request rather
         // than a caller error: a tolerance derived from the extent of a whole
@@ -207,13 +209,16 @@ impl SearchParameter<D2> for Sphere {
         hint: H,
         _: usize,
     ) -> Option<(f64, f64)> {
+        let ctx = ToleranceCtx::unscaled_legacy();
         let radius = point - self.center;
+        // FIXME(BG-TOL-001): squared order -- both sides are length squared and tau_rep is first order
         if (self.radius * self.radius).near(&radius.magnitude2()) {
             let radius = radius.normalize();
             let u = f64::acos(radius[2]);
             let sinu = f64::sqrt(1.0 - radius[2] * radius[2]);
             let cosv = f64::clamp(radius[0] / sinu, -1.0, 1.0);
-            let v = if sinu.so_small() {
+            let v = if ctx.is_small_ratio(sinu) {
+                // BG-TOL-001: param
                 match hint.into() {
                     SPHint2D::Parameter(_, hint) => hint,
                     _ => 0.0,

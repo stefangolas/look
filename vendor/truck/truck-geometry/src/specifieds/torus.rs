@@ -139,6 +139,7 @@ impl SearchParameter<D2> for Torus {
         _: H,
         _: usize,
     ) -> Option<(f64, f64)> {
+        let ctx = ToleranceCtx::unscaled_legacy();
         let r = point - self.center();
         let rxy = Vector2::new(r.x, r.y);
         let v = f64::asin(f64::clamp(r.z / self.small_radius(), -1.0, 1.0));
@@ -154,7 +155,8 @@ impl SearchParameter<D2> for Torus {
             true => 2.0 * PI - u,
             false => u,
         };
-        match self.subs(u, v).near(&point) {
+        match ctx.near_pt(self.subs(u, v), point) {
+            // BG-TOL-001: model
             true => Some((u, v)),
             false => None,
         }
@@ -169,15 +171,18 @@ impl SearchNearestParameter<D2> for Torus {
         _: H,
         _: usize,
     ) -> Option<(f64, f64)> {
+        let ctx = ToleranceCtx::unscaled_legacy();
         let r = point - self.center();
         let rxy = Vector2::new(r.x, r.y);
-        if rxy.so_small() {
+        if ctx.is_small_len(rxy.magnitude()) {
+            // BG-TOL-001: model
             return None;
         }
         let rxy_n = rxy.normalize();
         let large_r = self.large_radius() * rxy_n.extend(0.0);
         let diff = r - large_r;
-        if diff.so_small() {
+        if ctx.is_small_len(diff.magnitude()) {
+            // BG-TOL-001: model
             return None;
         }
         let small_r = diff.normalize();

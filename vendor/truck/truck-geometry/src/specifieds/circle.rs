@@ -83,7 +83,8 @@ where
 {
     type Point = P;
     fn parameter_division(&self, range: (f64, f64), tol: f64) -> (Vec<f64>, Vec<P>) {
-        let tol = tol.max(TOLERANCE);
+        let ctx = ToleranceCtx::unscaled_legacy();
+        let tol = tol.max(ctx.ratio_margin()); // BG-TOL-001: param
         nonpositive_tolerance!(tol);
         let tol = f64::min(tol, 0.8);
         let delta = 2.0 * f64::acos(1.0 - tol);
@@ -107,8 +108,10 @@ impl SearchNearestParameter<D1> for UnitCircle<Point2> {
         hint: H,
         _: usize,
     ) -> Option<f64> {
+        let ctx = ToleranceCtx::unscaled_legacy();
         let v = pt.to_vec();
-        if v.magnitude().so_small() {
+        if ctx.is_small_ratio(v.magnitude()) {
+            // BG-TOL-001: param
             return None;
         }
         let v = v.normalize();
@@ -124,8 +127,10 @@ impl SearchNearestParameter<D1> for UnitCircle<Point2> {
 impl SearchParameter<D1> for UnitCircle<Point2> {
     type Point = Point2;
     fn search_parameter<H: Into<SPHint1D>>(&self, pt: Point2, hint: H, _: usize) -> Option<f64> {
+        let ctx = ToleranceCtx::unscaled_legacy();
         let v = pt.to_vec();
-        if !v.magnitude().near(&1.0) {
+        if !ctx.is_small_ratio(v.magnitude() - 1.0) {
+            // BG-TOL-001: param
             return None;
         }
         let v = v.normalize();
@@ -185,7 +190,9 @@ impl SearchNearestParameter<D1> for UnitCircle<Point3> {
 impl SearchParameter<D1> for UnitCircle<Point3> {
     type Point = Point3;
     fn search_parameter<H: Into<SPHint1D>>(&self, pt: Point3, _: H, _: usize) -> Option<f64> {
-        if !f64::abs(pt.z).so_small() {
+        let ctx = ToleranceCtx::unscaled_legacy();
+        if !ctx.is_small_ratio(pt.z) {
+            // BG-TOL-001: param
             return None;
         }
         UnitCircle::<Point2>::new().search_parameter(Point2::new(pt.x, pt.y), None, 0)
