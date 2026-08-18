@@ -17,6 +17,7 @@ import sys
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 CREATE_NO_WINDOW = 0x08000000
 
@@ -200,6 +201,22 @@ def main():
         sys.exit(f"packet not found: {args.packet}")
 
     check_unscaled_legacy_budget(packet_path, wt)
+
+    # Anchors and budget are claims about the tree, and both have shipped wrong:
+    # GEOM-SPECIFIEDS had three of seven anchor counts wrong on files that had
+    # not changed, and a budget estimated at 12 against a true 19. gen_packet
+    # runs them. A mismatch is a stop condition (H-8), so this refuses to
+    # dispatch rather than warning into a log nobody reads -- a worker told a
+    # wrong count stops with ANCHOR_MISMATCH, after the run has been paid for.
+    import gen_packet
+    _problems = gen_packet.check(packet_path, quiet=True)
+    if _problems:
+        _detail = "\n  ".join(_problems)
+        sys.exit(
+            "refusing to dispatch: this packet's claims no longer hold.\n  "
+            + _detail
+            + "\nFix the packet, or -- if the tree moved -- re-scope it."
+        )
 
     # A worker that died mid-packet (V0 preflight: BLOCKED) leaves edits in the
     # worktree, and dispatching on top of them mixes a dead run's work into a
