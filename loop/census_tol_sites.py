@@ -8,12 +8,14 @@ business. This splits them so a shard can be sized honestly.
 """
 import os
 import re
+import sys
 
 ROOT = r'C:\Users\stefa\look\vendor\truck'
 PAT = re.compile(r'\.near2?\(|\bso_small2?\(|\bTOLERANCE2?\b')
 SQUARED = re.compile(r'\.near2\(|\bso_small2\(|\bTOLERANCE2\b')
 
 rows = {}
+fns = {}
 for crate in sorted(os.listdir(ROOT)):
     src = os.path.join(ROOT, crate, 'src')
     if not os.path.isdir(src):
@@ -26,10 +28,14 @@ for crate in sorted(os.listdir(ROOT)):
             path = os.path.join(dirpath, fn)
             in_test = False
             test_armed = False
+            cur_fn = '<file scope>'
+            cur_fn_line = 0
+            lineno = 0
             depth_at_test = None
             depth = 0
             in_block = False
             for line in open(path, encoding='utf-8', errors='replace'):
+                lineno += 1
                 s = line.strip()
                 # Block comments are dead text and are NOT migration work. This
                 # cost BG-TOL-001-SHAPEOPS an amendment: the packet listed
@@ -48,6 +54,10 @@ for crate in sorted(os.listdir(ROOT)):
                     if PAT.search(line):
                         dead += 1
                     continue
+                m_fn = re.match(r'\s*(?:pub\s+)?(?:const\s+)?(?:async\s+)?(?:unsafe\s+)?fn\s+(\w+)', line)
+                if m_fn:
+                    cur_fn = m_fn.group(1)
+                    cur_fn_line = lineno
                 # crude but adequate brace tracking for #[cfg(test)] mod blocks
                 if re.match(r'#\[cfg\(test\)\]', s) or s.startswith('#[proptest'):
                     in_test = True
@@ -87,6 +97,14 @@ for crate in sorted(os.listdir(ROOT)):
                     test += 1
                 else:
                     prod += 1
+                    # A Stage-A shard's unscaled_legacy budget is one context
+                    # per FUNCTION containing at least one site, not one per
+                    # site -- so the number a packet must declare is this set's
+                    # size, and nothing printed it. BG-TOL-001-GEOM-SPECIFIEDS
+                    # was written with an estimated budget of 12 against a true
+                    # 19, the worker did the work correctly, hit GATE-4, and
+                    # returned SPEC_GAP. The estimate was the defect; measure it.
+                    fns.setdefault(crate, set()).add((path, cur_fn, cur_fn_line))
     if prod or doc or strat or test or squared or dead:
         rows[crate] = (prod, doc, strat, test, squared, dead)
 
@@ -101,6 +119,21 @@ print(f'production first-order predicates to migrate: {tot[0]}')
 print(f'excluded: {tot[1]} doc examples, {tot[2]} attributes, {tot[3]} in-src tests, '
       f'{tot[4]} squared-order, {tot[5]} inside block comments')
 print()
+print('functions containing at least one production site -- this is the number a')
+print('Stage-A shard must declare as unscaled_legacy_budget, one context each:')
+for c in sorted(fns, key=lambda k: -len(fns[k])):
+    print(f'  {c:24} {len(fns[c]):5}')
+print()
+# A shard's write set is a list of files, not a crate, so the crate total is the
+# wrong number for a packet whose allowlist covers part of one. Pass any path
+# fragment to get the count for just the files that match it.
+if len(sys.argv) > 1:
+    frag = sys.argv[1].replace('/', os.sep)
+    hits = sorted({t for v in fns.values() for t in v if frag in t[0]})
+    print(f'functions with a site under {sys.argv[1]!r}: {len(hits)}')
+    for path, fn, ln in hits:
+        print(f'  {os.path.relpath(path, ROOT).replace(os.sep, "/"):<52} {fn}:{ln}')
+    print()
 print('NOTE: `dead` counts only /* */ blocks. A module that is declared out --')
 print('truck-shapeops/src/fillet/experiment.rs, via a commented `//mod experiment;`')
 print('-- still counts as production here. Check the mod declaration before')

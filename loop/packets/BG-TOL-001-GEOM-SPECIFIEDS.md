@@ -31,7 +31,7 @@ budget:      {turns: 70, ctx_tokens: 150000}
 # Read by run_packet.py's dispatch preflight, which refuses to dispatch unless
 # GATE-4's current count plus this budget fits under the ceiling committed on
 # the slot's own branch. Keep it equal to the number stated under 'The ratchet'.
-unscaled_legacy_budget: 12
+unscaled_legacy_budget: 19
 ```
 
 **22 sites migrate, 1 is deliberately left with a `FIXME`.** Every judgement is
@@ -219,11 +219,13 @@ packet's job.
 
 `scripts/kernel-gates.sh` counts `unscaled_legacy(` call sites in
 `vendor/truck/*/src/**` and **fails when the total exceeds the ceiling** in
-`scripts/unscaled_legacy_ceiling.txt`. The ceiling stands at **29**: 17 call
-sites already in the tree plus **at most 12 new ones** for this packet. Exceed
-that and V4 rejects your commit. That file is **not** on your
-allowlist and you must not edit it. One context per function containing sites
-is about 12 here; if you need many more you have constructed one per site.
+`scripts/unscaled_legacy_ceiling.txt`. The ceiling stands at **36**: 17 call
+sites already in the tree plus **19 new ones** for this packet. Exceed that and
+V4 rejects your commit. That file is **not** on your allowlist and you must not
+edit it. 19 is the measured number of *functions* in the write set that contain
+at least one site — `python loop/census_tol_sites.py specifieds`
+prints it. One context per such function is exactly right; if you need 22 you
+have constructed one per site.
 
 ## House rules
 
@@ -303,7 +305,7 @@ threshold. Migrating `sphere.rs:211`. Widening a tolerance or adding
 ```json
 {"id":"BG-TOL-001-GEOM-SPECIFIEDS","status":"DONE","contracts":["BG-TOL-001"],
  "tests_added":2,"sites_migrated":22,"sites_fixmed":1,"unscaled_legacy_calls":0,
- "anchors_verified":{"A1":5,"A2":3,"A3":2,"A4":3,"A5":5,"A6":7,"A7":3},
+ "anchors_verified":{"A1":4,"A2":3,"A3":1,"A4":3,"A5":5,"A6":4,"A7":3},
  "notes":"set unscaled_legacy_calls to the number you actually introduced. Report the baseline test failures you confirmed, and any site where the canonical-vs-model-space call felt wrong to you -- that judgement is the whole point of this packet and a disagreement is worth more than a silent compliance."}
 ```
 
