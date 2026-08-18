@@ -136,6 +136,11 @@ finally proven.
    points) is still not in the graph at all. Do not grind all of these before
    item 3.
 
+6. **All four slots are idle and every `target/` was deleted at the end of
+   session 7** — free disk had fallen to 5.9 GB, below the loop's own 8 GB
+   floor, which would have blocked the first `new_slot.py`. 14.4 GB free
+   now; a slot re-warms cold in ~5.6 min.
+
 Highest-value harness work left: **V7 and V8 are always-pass stubs** — the two
 remaining gates where PASS means nothing. V8 is where "this packet broke a
 pre-existing test" belongs. V5 now has a demonstrated blind spot of its own: it
