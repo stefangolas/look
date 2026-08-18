@@ -71,7 +71,20 @@ finally proven.
 
 ## Pick up here
 
-1. **Slot 1 finished `BG-CE-006-CYL-CONE`: `status: DONE`, commit `4b0a83e`,
+1. **Slot 0 is running the first `class: survey` packet,
+   `BG-TOL-001-MESHALGO-SURVEY`** (branch `survey/BG-TOL-001-MESHALGO`, forked
+   at the session-7 tip). It proposes a `model`/`param`/`excluded` classification
+   for all 30 meshalgo sites and writes `SURVEY.json`; it has **no write access
+   to `vendor/truck/**`**. Verify it with the normal command — `verify.py`
+   detects `class: survey`, runs V0/V1/**V10** and SKIPs every cargo gate.
+   **Then review it before using it**: read every `confidence: low` row, and
+   spot-check a sample of the high-confidence ones against the source yourself.
+   V10 proves the sites are *real*, never that the classifications are *right*;
+   a survey you skim and paste into a packet has laundered a worker's guess into
+   your decision. If it survives review, write `BG-TOL-001-MESHALGO` from it —
+   that is the efficiency this was built to harvest, and the four other unwritten
+   shards each get the same treatment.
+2. **Slot 1 finished `BG-CE-006-CYL-CONE`: `status: DONE`, commit `4b0a83e`,
    6 tests, 4 contexts, all six anchors matching — unverified, nothing merged.**
    Its worker also answered the packet's one open question and **disagrees with
    the packet**: it says `Plane`'s `BoundedSurface` impl is not the defect the
@@ -86,7 +99,7 @@ finally proven.
    the new true count** — it declares a budget of 4 against a ceiling of 29 on
    its own branch, which passes there, but integration is at 36/36 and the merge
    would put it over. `bash scripts/kernel-gates.sh HEAD~1` prints the count.
-2. **Then the CE chain, which is the actual critical path to generation.**
+3. **Then the CE chain, which is the actual critical path to generation.**
    Seven of the nine BG-INV invariant checkers — the things that let the kernel
    say whether its own output is a valid solid — are gated on **one** packet,
    `BG-CE-003`, through `BG-CE-006-CYL-CONE -> BG-CE-006-ENUM -> BG-CE-001 ->
@@ -94,18 +107,18 @@ finally proven.
    writes them; that is the bottleneck, not worker throughput. Note
    `schedule.py` reads `needs`, and the rows also carry a stale, different
    `depends_on` — `needs` is the real graph.
-3. **`BG-TOL-001-STEPIO` is written, anchors verified, budget measured (15),
+4. **`BG-TOL-001-STEPIO` is written, anchors verified, budget measured (15),
    not dispatched.** All 19 predicates classified with the judgement pre-made,
    including the one pair worth arguing about (`geom_impls.rs` `include` is
    `param`, `to_same_geometry` is `model`, and they look identical). Raise the
    ceiling by 15 before dispatching.
-4. **The other four TOL shards are unwritten**: GEOM-NURBS, GEOM-DECORATORS,
+5. **The other four TOL shards are unwritten**: GEOM-NURBS, GEOM-DECORATORS,
    MESHALGO, POLYMESH, GEOTRAIT. Size each with
    `python loop/census_tol_sites.py <path-fragment>` — it prints both the site
    count and the function count. **This is breadth, not depth**: Stage A moves
    no threshold, and Stage B (threading a real `model_scale` from the entry
    points) is still not in the graph at all. Do not grind all of these before
-   item 2.
+   item 3.
 
 Highest-value harness work left: **V7 and V8 are always-pass stubs** — the two
 remaining gates where PASS means nothing. V8 is where "this packet broke a
