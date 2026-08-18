@@ -71,7 +71,14 @@ finally proven.
 
 ## Pick up here
 
-1. **Slot 1 is running `BG-CE-006-CYL-CONE` (or has finished).** It was
+1. **Slot 1 finished `BG-CE-006-CYL-CONE`: `status: DONE`, commit `4b0a83e`,
+   6 tests, 4 contexts, all six anchors matching — unverified, nothing merged.**
+   Its worker also answered the packet's one open question and **disagrees with
+   the packet**: it says `Plane`'s `BoundedSurface` impl is not the defect the
+   packet called it, because this tree's `Plane::parameter_range` is a bounded
+   `[0,1]^2`, so `range_tuple().expect` cannot fire. Check that before repeating
+   the claim in the next packet — if it is right, the trap belongs in the packet
+   as a correction, not as a warning. It was
    dispatched at `f9fa761`, which is now several commits back. To adjudicate:
    `git -C loop/slots/1/wt rebase <integration tip>`, then
    `python loop/verify.py --slot 1 --packet loop/packets/BG-CE-006-CYL-CONE.md
