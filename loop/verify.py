@@ -420,6 +420,17 @@ def main():
             return True
         if 'proptest-regressions' in rel_path.replace('\\', '/').split('/'):
             return True
+        # ...and the same artifact under its other name. proptest's
+        # FileFailurePersistence::SourceParallel wants the seed in a
+        # `proptest-regressions/` directory beside the source root, and when it
+        # cannot find lib.rs or main.rs to locate that root it falls back to a
+        # sibling file, `<test>.proptest-regressions`. truck-geometry's
+        # tests/bspcurve.rs takes the fallback, so the directory check above
+        # never matched: one flaky randomized failure then BLOCKED every later
+        # verify on that slot, including the re-run measuring whether the
+        # failure was real.
+        if name.endswith('.proptest-regressions'):
+            return True
         return False
 
     uncommitted = []
