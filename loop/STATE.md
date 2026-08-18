@@ -11,7 +11,7 @@ otherwise would eventually cost a trap.) If you are picking this up cold, read
 [`loop/ORCHESTRATOR.md`](ORCHESTRATOR.md) for how to run the loop, then
 `python loop/slot_status.py`** — nothing else. Do not read `LEDGER.jsonl` whole.
 
-Updated 2026-08-18, end of session 7. Branch: `integration/kernel-bg`. Nothing
+Updated 2026-08-18, end of session 8. Branch: `integration/kernel-bg`. Nothing
 from the loop has reached `main` and nothing has been pushed.
 
 ## What this is, if you have never seen it
@@ -39,8 +39,12 @@ specific need arises rather than upfront:
   packet restates and every worker must obey. H-8 is the one that bites: anchors
   are `rg` patterns and symbol names, never line numbers, and a count mismatch
   is a stop condition, not a nuisance.
-- `loop/packets/BG-TOL-001-SHAPEOPS.md` — the newest worked example and the
-  template the six remaining shards copy. `BG-S0-003.md` is the older one.
+- `loop/packets/BG-TOL-001-MESHALGO.md` — the newest worked example and the
+  template the remaining shards copy; it is the first packet written from a
+  reviewed survey rather than by hand. `BG-TOL-001-SHAPEOPS.md` is the older
+  hand-written one and `BG-S0-003.md` older still.
+- `loop/packets/BG-TOL-001-MESHALGO-SURVEY.md` — the `class: survey` template,
+  sharpened after its first run. Copy it to survey a new crate.
 
 The loop is a **build** loop, not a search loop: acceptance is mechanical and
 deterministic, so the verifier does the job an objective function would. Nothing
@@ -48,104 +52,103 @@ here is scored, tuned, or sampled.
 
 ## Where we are
 
-**Thirteen packets DONE of 62**: BG-S0-001, -002, -003, BG-EVD-r3,
-BG-TOL-001-TYPE, -TYPE-r2, -TYPE-r3, BG-NUM-001-FILLET, -SHAPEOPS,
--TOPOLOGY + -MODELING (both closed by `BG-TOL-001-TOPO-MOD`), and session 7's
-**-GEOM-SPECIFIEDS** and **BG-CE-006-CYLINDER + -CONE** (closed by the combined
-`BG-CE-006-CYL-CONE`).
+**Thirteen packets DONE of 62**, unchanged from session 7: BG-S0-001, -002,
+-003, BG-EVD-r3, BG-TOL-001-TYPE, -TYPE-r2, -TYPE-r3, BG-NUM-001-FILLET,
+-SHAPEOPS, -TOPOLOGY + -MODELING (both closed by `BG-TOL-001-TOPO-MOD`),
+-GEOM-SPECIFIEDS, and BG-CE-006-CYLINDER + -CONE (closed by
+`BG-CE-006-CYL-CONE`). **`BG-TOL-001-MESHALGO` is RUNNING in slot 0** as of the
+end of session 8, dispatched at `6ca37b2`; it has not been verified.
 
-**BG-TOL-001 burndown: 44 sites migrated, 175 to go** — and note the direction:
-it went *up* by 4 when `BG-CE-006-CYL-CONE` landed, because new carriers bring
-their own predicates. Stage A is a moving target while the kernel is still
-growing surfaces. — `python
-loop/census_tol_sites.py` is the authority and it now also prints, per crate and
-per path fragment, the number of **functions** containing a site. That second
-number is what a shard declares as `unscaled_legacy_budget`, and getting it
-wrong is what cost session 7 a round trip. GATE-4 sits at **40/40**: ceiling
-equals true count, so the ratchet is tight and the next shard must raise it by
-its own measured budget before dispatch.
+**The survey experiment came back positive, and the review was not a
+formality.** The first `class: survey` output was ACCEPTED on V0/V1/V10 and V10
+did its job perfectly — all 26 live expressions matched the tree byte for byte,
+so the half that had gone wrong twice before (invented anchors) did not go wrong
+here. The classifications needed **four corrections**, which moved the shard from
+26 sites / 16 contexts to **20 sites / 11 contexts**. Both halves of that
+sentence matter: a survey that needed no correction would mean the review could
+be skipped, and a survey whose sites were invented would be worse than none. This
+one was neither. **Keep the survey path; keep reading every row.**
 
-**Session 7 also changed the delegation architecture.** `class: survey` lets a
-worker read a crate and *propose* a `model`/`param` classification for every
-site with no write access to `vendor/truck/**`; `gen_packet.py --check` makes a
-packet's anchors and budget executable and `run_packet.py` refuses to dispatch
-on a mismatch; `land_packet.py` does the whole merge-file-ledger-ratchet
-sequence. The first survey ran and passed — reviewing it is item 1.
+**The survey also found two census defects and got them right**, which is the
+clearest evidence that delegating the reading is worth it: the census regex
+`\bTOLERANCE\b` cannot match `SOURCE_INCIDENCE_TOLERANCE` because `_` is a word
+character (3 hidden hits, one a live predicate), and its SQUARED regex misses a
+written-out `TOLERANCE * TOLERANCE`. Neither the census nor the survey covers the
+`RELATIVE_TOLERANCE = 1e-9` family in `tessellation/formal/*.rs` — **8 production
+predicates in no inventory at all.** The census's 175 is therefore a floor, not a
+count.
 
-Session 7's theme: **every defect found was in a packet or a gate, never in the
-worker's code.** The worker migrated 22 sites correctly and returned SPEC_GAP
-because the packet's budget could not hold its own recipe; it was right. The one
-V5 rejection was a flaky proptest. Two gates were fixed and one gate (V9) was
-finally proven.
+**BG-TOL-001 burndown: 44 sites migrated, 175 to go** by the census, which is now
+known to be wrong in both directions (see above). `python
+loop/census_tol_sites.py` is still the sizing tool; it is no longer the authority
+on what exists.
+
+**GATE-4 sits at 40/51.** The count is the one `scripts/kernel-gates.sh` takes
+(a `git grep -oh 'unscaled_legacy('` over `vendor/truck/*/src/*`, excluding
+`truck-base/src/tolerance.rs` where the constructor is defined — a plain grep
+reads 41 and is wrong by that one line). The ceiling was raised by MESHALGO's 11 measured
+contexts and **must be lowered to the true count in the commit that closes the
+packet** — a ceiling left at its dispatch budget is a licence, not a ratchet.
 
 ## Pick up here
 
-1. **Review `loop/surveys/BG-TOL-001-MESHALGO.json`, then write
-   `BG-TOL-001-MESHALGO` from it.** The first survey ran and was ACCEPTED
-   (V0/V1/V10). 104 rows accounting for every grep hit in 8 files: **15 model,
-   11 param, 78 excluded**. V10 proved every (file, line, expression) resolves
-   against the tree; it says **nothing** about whether the classifications are
-   right, and that is your job before any of it reaches a packet.
-   - **Read the 4 `confidence: low` rows first** — `triangulation.rs:4517,
-     4523, 4529, 4535` in `reconcile_singular_transition`. The worker reports
-     each of those source lines carries **two** predicates: a dimensionless
-     `!near` guard on uv parameters and a model-space `so_small()` on a surface
-     derivative magnitude. It classified the row `model` for the deciding test.
-     That is a real judgement call and it is the one to check yourself.
-   - **Reconcile the count**: the survey's 26 live sites against the census's
-     **30** production predicates for the crate. The worker attributes the gap
-     to 3 squared-order and 3 "production non-predicate" uses; confirm that,
-     because one of them is likely the spatial-hash bucket pitch and the rest
-     need a reason.
-   - Then `python loop/gen_packet.py --skeleton loop/surveys/BG-TOL-001-MESHALGO.json
-     --id BG-TOL-001-MESHALGO --crate truck-meshalgo` emits the front block,
-     write set, measured anchors and site table. **Write the prose yourself** —
-     Problem, Decisions-already-made, Stop conditions. The skeleton deliberately
-     omits them; they are what makes the worker churn instead of design.
-   - If the review holds up, the four other unwritten shards go the same way
-     and the orchestrator stops hand-reading call sites. **If it does not, say
-     so in STATE** — one survey is not yet evidence.
-2. **`BG-CE-006-CYL-CONE` LANDED** (`e9b4be4`, ACCEPTED on all ten gates,
-   landed by `land_packet.py`). Cylinder and Cone are first-class carriers now,
-   closing both `BG-CE-006-CYLINDER` and `-CONE`. **One thing to follow up:**
-   its worker disagreed with the packet and says `Plane`'s `BoundedSurface`
-   impl is *not* the panic-installing defect the packet called it, because this
-   tree's `Plane::parameter_range` is a bounded `[0,1]^2` so
-   `range_tuple().expect` cannot fire. If the worker is right — check it — the
-   claim needs correcting in STATE's traps and in any packet that repeats it,
-   and the same reasoning should be re-applied to whether Cylinder and Cone
-   ought to implement `BoundedSurface` after all.
-3. **Then the CE chain, which is the actual critical path to generation.**
-   Seven of the nine BG-INV invariant checkers — the things that let the kernel
-   say whether its own output is a valid solid — are gated on **one** packet,
+1. **Verify `BG-TOL-001-MESHALGO` (slot 0, base `6ca37b2`).** `python
+   loop/verify.py --slot 0 --packet loop/packets/BG-TOL-001-MESHALGO.md --base
+   6ca37b2`. Then merge `--no-ff`, file `RESULT.json`, ledger row, `status: DONE`
+   in `PACKETS.jsonl`, and **lower the ceiling to the true count**.
+   - The packet asks for something no earlier shard did: **six `FIXME` markers
+     and no rewrite** in four files, with an explicit test
+     (`deferred_area_sites_carry_a_fixme`) asserting those files contain **no**
+     `ToleranceCtx` at all. If the worker migrated one of the six area sites
+     anyway, that is a real rejection, not a gate defect.
+   - Watch for the one thing the packet leaves genuinely open: the four
+     `reconcile_singular_transition` lines each need **two** predicates migrated
+     and one context. If the worker introduces more than 11 `unscaled_legacy()`
+     calls it built one per site.
+
+2. **The other four TOL shards go the survey route: GEOM-NURBS,
+   GEOM-DECORATORS, POLYMESH, GEOTRAIT.** The survey packet
+   (`loop/packets/BG-TOL-001-MESHALGO-SURVEY.md`) has been **sharpened with the
+   four defects this review found** and is now the template — copy it, change
+   the crate and the site inventory. The additions are: the degree-2 exclusion,
+   the "a value is not a comparison" exclusion, `predicates_on_line` plus
+   `mixed_classification` so a two-predicate line can express itself, and the
+   instruction to grep for `_TOLERANCE\b` constants the inventory cannot see.
+   Size each with `python loop/census_tol_sites.py <path-fragment>` and remember
+   it is a floor.
+   - **`BG-TOL-001-STEPIO` is still written, checked and undispatched** (budget
+     15, now verified by `gen_packet --check` at 15 == 15). Raise the ceiling by
+     15 before dispatching it. It does not need a survey; it already has the
+     judgement.
+
+3. **`BG-CE-006-CYL-CONE`'s worker disagreed with its packet and may be right.**
+   It says `Plane`'s `BoundedSurface` impl is not the panic-installing defect the
+   packet called it, because this tree's `Plane::parameter_range` is a bounded
+   `[0,1]^2` so `range_tuple().expect` cannot fire. **Unchecked.** If it is
+   right, correct the claim in the traps below and in any packet that repeats it,
+   and re-apply the reasoning to whether Cylinder and Cone should implement
+   `BoundedSurface` after all. This is cheap and was carried over from session 7.
+
+4. **Then the CE chain, which is the actual critical path to generation.** Seven
+   of the nine BG-INV invariant checkers are gated on **one** packet,
    `BG-CE-003`, through `BG-CE-006-CYL-CONE -> BG-CE-006-ENUM -> BG-CE-001 ->
    BG-CE-003`. Three of those four are **design** class, so the orchestrator
-   writes them; that is the bottleneck, not worker throughput. Note
-   `schedule.py` reads `needs`, and the rows also carry a stale, different
-   `depends_on` — `needs` is the real graph.
-4. **`BG-TOL-001-STEPIO` is written, anchors verified, budget measured (15),
-   not dispatched.** All 19 predicates classified with the judgement pre-made,
-   including the one pair worth arguing about (`geom_impls.rs` `include` is
-   `param`, `to_same_geometry` is `model`, and they look identical). Raise the
-   ceiling by 15 before dispatching.
-5. **The other four TOL shards are unwritten**: GEOM-NURBS, GEOM-DECORATORS,
-   MESHALGO, POLYMESH, GEOTRAIT. Size each with
-   `python loop/census_tol_sites.py <path-fragment>` — it prints both the site
-   count and the function count. **This is breadth, not depth**: Stage A moves
-   no threshold, and Stage B (threading a real `model_scale` from the entry
-   points) is still not in the graph at all. Do not grind all of these before
-   item 3.
+   writes them; that is the bottleneck, not worker throughput. `schedule.py`
+   reads `needs`; the rows also carry a stale, different `depends_on`.
 
-6. **All four slots are idle and every `target/` was deleted at the end of
-   session 7** — free disk had fallen to 5.9 GB, below the loop's own 8 GB
-   floor, which would have blocked the first `new_slot.py`. 14.4 GB free
-   now; a slot re-warms cold in ~5.6 min.
+5. **Highest-value harness work left: V7 and V8 are still always-pass stubs** —
+   the two remaining gates where PASS means nothing. V8 is where "this packet
+   broke a pre-existing test" belongs. Note `gen_packet --check-all` now reports
+   two landed packets (`BG-CE-006-CYL-CONE`, `BG-TOL-001-GEOM-SPECIFIEDS`) as
+   having unverifiable budgets, because their site tables are not in a parseable
+   form. That is true and blocks nothing — `run_packet` checks only the packet
+   being dispatched — but it means neither of those budgets was ever checked
+   against anything.
 
-Highest-value harness work left: **V7 and V8 are always-pass stubs** — the two
-remaining gates where PASS means nothing. V8 is where "this packet broke a
-pre-existing test" belongs. V5 now has a demonstrated blind spot of its own: it
-compares one run of a randomized proptest suite against another and reads a
-flake as a regression.
+6. **Disk: 13 GB free** at the end of session 8, above the loop's 8 GB floor and
+   falling while slot 0 builds.
+   Slot 0 is warm; slots 1-3 had their `target/` deleted at the end of session 7
+   and re-warm cold in ~5.6 min.
 
 ## Landed
 
@@ -178,6 +181,7 @@ flake as a regression.
 | `aa2dadd` | V0 missed the proptest seed file under its fallback name |
 | `0a7c6fe` | **BG-TOL-001-GEOM-SPECIFIEDS** — 22 sites, 19 contexts, ACCEPTED on all ten gates |
 | `808d472` | the `BG-CE-006-CYL-CONE` packet |
+| `6ca37b2` | **session 8:** the first survey reviewed and corrected; `gen_packet` made usable end to end; the degree-2 exclusion written into the spec; the `BG-TOL-001-MESHALGO` packet |
 
 ## The spec and packet amendments the loop has paid for
 
@@ -203,23 +207,23 @@ a migration*. All 23 sites tree-wide are excluded from Stage A and deferred to
 
 ## The parallelism picture
 
-62 packets: 38 mechanical, 13 design, 11 wide-mechanical. 51 remain. The
-frontier reads **10 eligible, 10 write-disjoint** with nothing running, and
-session 7 demonstrated that two workers on write-disjoint packets run
-concurrently without interfering — slots 0 and 1 both edited `truck-geometry`,
-on disjoint files, at the same time.
+62 packets: 38 mechanical, 13 design, 11 wide-mechanical. 49 remain. With
+MESHALGO running the frontier reads **9 eligible, 8 dispatchable in parallel**
+(`schedule.py --running BG-TOL-001-MESHALGO`). Session 7
+demonstrated two workers on write-disjoint packets running concurrently without
+interfering.
 
-Scheduling is on **write-set disjointness**, not waves. Two of the declared
-write sets were wrong in the same way and it is worth checking for more:
-`BG-CE-006-CYLINDER` and `-CONE` each named only their own new file, when both
-must also declare their struct in `specifieds/mod.rs`, where every specified
-struct lives. As two packets they collide there; they were merged into one,
-`BG-CE-006-CYL-CONE`, the way TOPOLOGY and MODELING were.
+Scheduling is on **write-set disjointness**, not waves. Two of the declared write
+sets were wrong in the same way and it is worth checking for more:
+`BG-CE-006-CYLINDER` and `-CONE` each named only their own new file when both
+must also declare their struct in `specifieds/mod.rs`.
 
-**The binding constraint is orchestrator packet-writing, not slots or
-dependencies** — 12 of 62 packets have a file. Design-class packets are the
-sharpest form of it: three of the four on the critical path to the invariant
-checkers are design, and the orchestrator writes those.
+**The binding constraint is still orchestrator packet-writing** — 12 of 62
+packets have a file (12 files close 14 rows; CYL-CONE and TOPO-MOD each closed
+two). But the survey class is measurably eating into it: writing
+`BG-TOL-001-MESHALGO` from a reviewed survey took a fraction of what
+hand-reading `BG-TOL-001-STEPIO`'s 19 call sites cost, and the expensive part
+that remains is judgement, which is the part that should stay here.
 
 ## Traps, each one paid for
 
@@ -384,6 +388,97 @@ reason is in the commit that made the change, and the code will not tell you.
   but disjoint files). The open question about concurrency was about the *free*
   model tier and is still open.
 
+- **A survey's `proposed_rewrite` can be right about the class and wrong about
+  the code, and the schema is what lets it happen.** One row, one rewrite. When
+  a source line carries two predicates of different classes —
+  `if !previous_uv.x.near(&current_uv.x) && surface.uder(u, v).so_small()` — the
+  survey classified for the deciding test and proposed
+  `ctx.is_small_len(surface.uder(u, v).magnitude())`, which is the correct
+  migration of that predicate and **silently deletes the guard**. The worker knew
+  and said so in its own `reason`; it had nowhere else to put it. Four of the 26
+  rows were like this, and they are exactly the four it marked `confidence: low`
+  — the confidence field worked. The survey template now carries
+  `predicates_on_line` and `mixed_classification`, and requires
+  `proposed_rewrite` to replace the **whole condition**. **When reviewing a
+  survey, grep the source lines for a second predicate token before trusting any
+  rewrite.**
+- **`model` means degree ONE in length, and nothing enforces that.** A
+  cross-product magnitude is twice a triangle's area; a `Matrix3::determinant()`
+  of two displacements and a unit direction is a scalar triple product. Both
+  scale as `k²` while `ctx.length_margin()` scales as `k`, so
+  `ctx.is_small_len(area)` is exactly correct at Stage A — where `model_scale =
+  1.0` makes the two identical — and silently wrong the moment Stage B threads a
+  real scale. **That is worse than not migrating**, because Stage B sees a
+  migrated site and never looks again. Six such sites in `truck-meshalgo` were
+  proposed as `model`; a worker on an earlier shard had already hit the identical
+  problem unprompted and left `FIXME(BG-TOL-001)` at
+  `truck-modeling/src/geom_impls.rs:91`. The spec now records this as a third
+  exclusion class alongside squared-order. **The tell is in the reason text: if a
+  classification's own justification contains "area" or "length-squared", it is
+  not `model`.**
+- **Recognise a squared-order site by its CONSTANT, not by its shape.**
+  `d.distance2(c) <= TOLERANCE * TOLERANCE` is *not* the `near2` family — it is
+  algebraically `distance <= TOLERANCE`, an ordinary first-order predicate
+  written squared to skip a `sqrt`, and it migrates. What cannot migrate is a
+  comparison against `TOLERANCE2` = 1e-12, because nothing on `ToleranceCtx`
+  reproduces that number. The survey excluded a live site by getting this
+  backwards, and the census miscounts the same line in the other direction —
+  its SQUARED regex matches the `TOLERANCE2` *token* and not a written-out
+  `TOLERANCE * TOLERANCE`.
+- **A `const` item is never a migration site.** `pub const FOO: f64 = TOLERANCE;`
+  has no `ctx` in scope, so any `ctx.` rewrite proposed for one cannot compile.
+  Same for a `use` import, a `.max(TOLERANCE)` floor and a `+ TOLERANCE` offset:
+  they compare nothing, so they have no class. Their *consumers* are the sites.
+  This is the same family as the spatial-hash bucket pitch already recorded, and
+  it is much wider than that one instance — four of `truck-meshalgo`'s 30 census
+  "production predicates" are value computations, not predicates.
+- **`census_tol_sites.py` cannot see a constant whose name ends in
+  `_TOLERANCE`.** Its pattern needs a word boundary before `TOLERANCE` and `_` is
+  a word character, so `SOURCE_INCIDENCE_TOLERANCE` and `RELATIVE_TOLERANCE` are
+  invisible. The survey found three hits this way, one of them a live predicate
+  (`source_edge.rs:311`), and `tessellation/formal/*.rs` holds **8 more
+  production predicates on a hardcoded `RELATIVE_TOLERANCE = 1e-9` that are in no
+  inventory at all**. Treat the census's totals as a floor. (Not fixed: widening
+  the regex changes every crate's number under the shards already sized against
+  it, so do it deliberately, in its own commit, and re-size.)
+- **`--skeleton` and `--check` disagreed with each other, and `--check` won.**
+  `gen_packet --skeleton` computed `unscaled_legacy_budget` from the survey's live
+  rows (16) while `--check` validated it against the census function count (20),
+  and `run_packet.py` refuses to dispatch on the mismatch — so **no
+  survey-derived packet could be dispatched at all**. The census counts every
+  function holding a grep hit, including ones whose only hits a packet correctly
+  excludes, so the two numbers diverge by construction, not by error. The budget
+  is now checked against the packet's own site table, with the census kept as a
+  ceiling. **A gate whose two halves are computed from different sources is a
+  gate that will eventually reject correct work.**
+- **Resolve a packet's site table against the tree, not against its own text.**
+  The first version of that budget parser keyed on the function name and read
+  `BG-TOL-001-STEPIO` as 10 contexts against a true 15 — reproducing the exact
+  undercount already in the traps (five distinct `fmt` impls in
+  `truck-stepio/src/out/geometry.rs` collapsing to one). It was also brittle
+  across packet styles: MESHALGO's generated table states the class in the row
+  and STEPIO's states it in the section heading, so a regex tuned to one counts
+  zero rows in the other and reports a mismatch that is the parser's. Resolving
+  `(file, line)` to the enclosing `fn`'s definition line fixes both and checks
+  one more thing for free — a table line that lands outside any function does not
+  resolve, so an invented line number cannot pad a budget.
+- **A green line can state something false.** Watching the new budget gate fail
+  on "budget above the census ceiling" showed it printing
+  `budget 25 <= census ceiling 20  ok` — the comparison silently used the counted
+  value instead of the declared one. The real error was caught by the other half
+  of the same check, so nothing leaked; the message was wrong anyway, and a
+  wrong-but-green line is exactly what a later session reads and believes. **Read
+  what a gate prints on the negative test, not just its exit code.**
+- **`gen_packet --skeleton` writes UTF-8 through a cp1252 console.** Its em
+  dashes came back as `?` on screen and `--check` died with `UnicodeDecodeError`
+  reading back the file `--skeleton` had just produced. Fixed producer-side with
+  `sys.stdout.reconfigure(encoding='utf-8')`. Any new `loop/*.py` that prints
+  prose needs the same line.
+- **`new_slot.py` can exceed a two-minute tool timeout and still have
+  succeeded.** It warms a cold slot, which takes ~5.6 min. A timeout is not a
+  failure — check `slot_status.py` and `git worktree list` before re-running it,
+  or you will fork a second worktree onto the same branch.
+
 ## The commands
 
 `slot_status.py` prints each slot's branch and short HEAD (`git=branch@sha`),
@@ -511,9 +606,12 @@ The gates, in the order `verify.py` runs them:
   the baseline.
 - V6 matches test names by keyword overlap, not exactly. Tighten when
   `gen_packet.py` fixes a naming convention.
-- `gen_packet.py` is still unwritten. It must re-run every anchor's pattern at
-  generation time and refuse to emit on a count mismatch. Six shard packets are
-  about to be written by hand; this is the session to build it in.
+- `gen_packet.py` exists and works end to end as of session 8. What it still
+  does **not** do: `--skeleton` emits no prose, by design, and it has no notion
+  of a site that needs a `FIXME` rather than a rewrite — `BG-TOL-001-MESHALGO`'s
+  six deferred area sites had to be written by hand into a section the budget
+  parser deliberately stops at. If a third shard needs deferrals, teach the
+  survey schema an `action: fixme_marker` value and let the skeleton emit them.
 - GATE-4's ceiling is checked, but nothing checks that a Stage-A shard's
   `// BG-TOL-001:` markers match its actual rewrites. The SHAPEOPS packet asks
   the worker to write that test itself (`every_migrated_shapeops_site_is_marked`).

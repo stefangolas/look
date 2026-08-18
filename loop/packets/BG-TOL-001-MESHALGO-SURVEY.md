@@ -61,17 +61,46 @@ Worked examples, all from sites already migrated in this tree:
 | `kv.range_length().so_small()` | `param` | a knot range is parameter space |
 | `pt[3].so_small()` on a homogeneous coordinate | `param` | a weight |
 
-Two sites in `truck-meshalgo` are known **not** to be predicates at all and must
-be classified `excluded`:
+### Four things that are not `model` or `param`, and are not judgement calls
 
-- a `TOLERANCE` used as a **spatial-hash bucket pitch** — it compares nothing.
-- any `near2` / `so_small2` / `TOLERANCE2` site. These are **squared order**;
-  `ToleranceCtx` has no squared-order predicate, and mapping one onto the
-  first-order `tau_rep` loosens it by six orders of magnitude while looking like
-  a migration. They are deferred to BG-TOL-004. Mark `excluded` with the reason
-  `squared order`.
+Each of these has already cost the loop a round trip. Classify them `excluded`
+with the stated reason and do not agonise over them.
 
-Also `excluded`: anything inside a `#[cfg(test)]` module, a doc comment (`///`,
+**1. A quantity that is not a length at all.** `model` means degree **1** in
+length. If the quantity is degree 2 — a cross-product magnitude (twice a
+triangle's area), a scalar triple product, a `Matrix3::determinant()` of two
+displacements — then under a rescale by `k` it goes as `k²` while
+`ctx.length_margin()` goes as `k`, and `is_small_len` on it is a migration that
+is exactly right today and silently wrong the moment a real `model_scale` is
+threaded. There is no predicate for it. Mark `excluded`, reason
+`degree 2 in length (area)`, `proposed_rewrite` `null`. **If your own reason
+contains the words "squared", "area", or "length-squared", the classification is
+not `model`** — that sentence is the test, and a survey has already failed it by
+writing "a length-squared quantity that scales with the model" and then
+proposing `is_small_len` anyway.
+
+**2. A value, not a comparison.** A `const` item (`const FOO: f64 = TOLERANCE;`),
+a `use` import, a `.max(TOLERANCE)` floor, a `+ TOLERANCE` offset, a
+spatial-hash bucket pitch. These compare nothing, so they have no class. A
+`const` initializer in particular has no `ctx` in scope, so any `ctx.` rewrite
+you propose for one cannot compile. Mark `excluded`, reason `not a predicate:
+<what it is>`. Their *consumers* may well be sites; classify those.
+
+**3. Squared-order sites** — any `near2` / `so_small2` / `TOLERANCE2` site;
+`ToleranceCtx` has no squared-order predicate, and mapping one onto the
+first-order `tau_rep` loosens it by six orders of magnitude while looking like a
+migration. Deferred to BG-TOL-004; reason `squared order`.
+
+**But recognise a squared-order site by its CONSTANT, not by its shape.**
+`d.distance2(c) <= TOLERANCE * TOLERANCE` is *not* one: that is algebraically
+`distance <= TOLERANCE`, a perfectly ordinary first-order predicate written
+squared to skip a `sqrt`. It migrates, to `is_small_len` or `is_small_ratio` on
+the un-squared distance. What cannot migrate is a comparison against the
+*tighter* `TOLERANCE2` = 1e-12 token, because nothing on `ToleranceCtx`
+reproduces that number. One survey excluded a live site by getting this
+backwards.
+
+**4. Not code:** anything inside a `#[cfg(test)]` module, a doc comment (`///`,
 `//!`), or a `/* */` block. A test's own epsilon is the test's business, and a
 doc example is prose. **Check for these before classifying** — a previous packet
 listed a line inside a `/* */` block spanning 160 lines and a worker dutifully
@@ -139,11 +168,48 @@ One object, with a `sites` array. **Every field is required on every row.**
 - `confidence` is `high`, `medium` or `low`. **Use `low` freely** — a low-
   confidence row that names the ambiguity is worth more than a high-confidence
   guess, and the orchestrator reads the low ones first.
-- `proposed_rewrite` is the `ToleranceCtx` call you would use. For `excluded`,
-  write `null`.
+- `predicates_on_line` is how many tolerance predicates the source line
+  carries. Usually 1. Count them: `if !a.near(&b) && c.so_small()` is **2**.
+- `proposed_rewrite` is the **complete replacement for the whole condition**,
+  covering every predicate on the line — not just the one that decides the
+  branch. For `excluded`, write `null`.
+
+  **This is the field that has already gone wrong, and it is the reason a row
+  can be right and useless at the same time.** A survey met a line reading
+
+  ```rust
+  if !previous_uv.x.near(&current_uv.x) && surface.uder(u, v).so_small() {
+  ```
+
+  and proposed `ctx.is_small_len(surface.uder(u, v).magnitude())`. That is the
+  correct migration of the deciding predicate and it **deletes the guard**: a
+  worker applying it verbatim changes what the function does. The survey knew —
+  it said so in its own `reason` — and had nowhere to put it, because it was
+  writing one rewrite per row.
+
+  When the predicates on a line are of **different classes**, set
+  `classification` to the one that decides the branch, set
+  `mixed_classification` to `true`, and write both into `proposed_rewrite`:
+
+  ```json
+  "classification": "model",
+  "mixed_classification": true,
+  "predicates_on_line": 2,
+  "proposed_rewrite": "!ctx.is_small_ratio(previous_uv.x - current_uv.x) && ctx.is_small_len(surface.uder(u, v).magnitude())",
+  "reason": "the deciding test is the u-derivative magnitude (model-space length); the !near guard compares u parameters (dimensionless)"
+  ```
+
+  A row with `predicates_on_line` greater than 1 whose `proposed_rewrite`
+  migrates fewer of them than that is the single defect this packet most wants
+  you to avoid.
 
 Include a `"functions"` count and, if you find sites the inventory above missed,
-a `"not_in_inventory"` array naming them — that is a finding, not an error.
+a `"not_in_inventory"` array naming them — that is a finding, not an error, and
+the previous survey's three entries were all real. **Look for them deliberately**:
+the inventory is built by a regex requiring a word boundary before `TOLERANCE`,
+so a constant named `SOURCE_INCIDENCE_TOLERANCE` or `RELATIVE_TOLERANCE` is
+invisible to it. Grep your crate for `_TOLERANCE` and `TOLERANCE_` yourself
+and report what the inventory does not contain.
 
 ## Done when
 
