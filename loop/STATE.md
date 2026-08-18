@@ -48,20 +48,29 @@ here is scored, tuned, or sampled.
 
 ## Where we are
 
-**Eleven packets DONE of 62**: BG-S0-001, -002, -003, BG-EVD-r3,
+**Thirteen packets DONE of 62**: BG-S0-001, -002, -003, BG-EVD-r3,
 BG-TOL-001-TYPE, -TYPE-r2, -TYPE-r3, BG-NUM-001-FILLET, -SHAPEOPS,
--TOPOLOGY + -MODELING (both closed by `BG-TOL-001-TOPO-MOD`), and
-**-GEOM-SPECIFIEDS** (session 7).
+-TOPOLOGY + -MODELING (both closed by `BG-TOL-001-TOPO-MOD`), and session 7's
+**-GEOM-SPECIFIEDS** and **BG-CE-006-CYLINDER + -CONE** (closed by the combined
+`BG-CE-006-CYL-CONE`).
 
-**BG-TOL-001 burndown: 44 sites migrated, 171 to go** — `python
+**BG-TOL-001 burndown: 44 sites migrated, 175 to go** — and note the direction:
+it went *up* by 4 when `BG-CE-006-CYL-CONE` landed, because new carriers bring
+their own predicates. Stage A is a moving target while the kernel is still
+growing surfaces. — `python
 loop/census_tol_sites.py` is the authority and it now also prints, per crate and
 per path fragment, the number of **functions** containing a site. That second
 number is what a shard declares as `unscaled_legacy_budget`, and getting it
-wrong is what cost session 7 a round trip. GATE-4 sits at **36/36**: ceiling
+wrong is what cost session 7 a round trip. GATE-4 sits at **40/40**: ceiling
 equals true count, so the ratchet is tight and the next shard must raise it by
 its own measured budget before dispatch.
 
-**One worker was still running when session 7 ended** — see "Pick up here" 1.
+**Session 7 also changed the delegation architecture.** `class: survey` lets a
+worker read a crate and *propose* a `model`/`param` classification for every
+site with no write access to `vendor/truck/**`; `gen_packet.py --check` makes a
+packet's anchors and budget executable and `run_packet.py` refuses to dispatch
+on a mismatch; `land_packet.py` does the whole merge-file-ledger-ratchet
+sequence. The first survey ran and passed — reviewing it is item 1.
 
 Session 7's theme: **every defect found was in a packet or a gate, never in the
 worker's code.** The worker migrated 22 sites correctly and returned SPEC_GAP
@@ -71,34 +80,41 @@ finally proven.
 
 ## Pick up here
 
-1. **Slot 0 is running the first `class: survey` packet,
-   `BG-TOL-001-MESHALGO-SURVEY`** (branch `survey/BG-TOL-001-MESHALGO`, forked
-   at the session-7 tip). It proposes a `model`/`param`/`excluded` classification
-   for all 30 meshalgo sites and writes `SURVEY.json`; it has **no write access
-   to `vendor/truck/**`**. Verify it with the normal command — `verify.py`
-   detects `class: survey`, runs V0/V1/**V10** and SKIPs every cargo gate.
-   **Then review it before using it**: read every `confidence: low` row, and
-   spot-check a sample of the high-confidence ones against the source yourself.
-   V10 proves the sites are *real*, never that the classifications are *right*;
-   a survey you skim and paste into a packet has laundered a worker's guess into
-   your decision. If it survives review, write `BG-TOL-001-MESHALGO` from it —
-   that is the efficiency this was built to harvest, and the four other unwritten
-   shards each get the same treatment.
-2. **Slot 1 finished `BG-CE-006-CYL-CONE`: `status: DONE`, commit `4b0a83e`,
-   6 tests, 4 contexts, all six anchors matching — unverified, nothing merged.**
-   Its worker also answered the packet's one open question and **disagrees with
-   the packet**: it says `Plane`'s `BoundedSurface` impl is not the defect the
-   packet called it, because this tree's `Plane::parameter_range` is a bounded
-   `[0,1]^2`, so `range_tuple().expect` cannot fire. Check that before repeating
-   the claim in the next packet — if it is right, the trap belongs in the packet
-   as a correction, not as a warning. It was
-   dispatched at `f9fa761`, which is now several commits back. To adjudicate:
-   `git -C loop/slots/1/wt rebase <integration tip>`, then
-   `python loop/verify.py --slot 1 --packet loop/packets/BG-CE-006-CYL-CONE.md
-   --base <integration tip>`. **Before merging it, raise the GATE-4 ceiling to
-   the new true count** — it declares a budget of 4 against a ceiling of 29 on
-   its own branch, which passes there, but integration is at 36/36 and the merge
-   would put it over. `bash scripts/kernel-gates.sh HEAD~1` prints the count.
+1. **Review `loop/surveys/BG-TOL-001-MESHALGO.json`, then write
+   `BG-TOL-001-MESHALGO` from it.** The first survey ran and was ACCEPTED
+   (V0/V1/V10). 104 rows accounting for every grep hit in 8 files: **15 model,
+   11 param, 78 excluded**. V10 proved every (file, line, expression) resolves
+   against the tree; it says **nothing** about whether the classifications are
+   right, and that is your job before any of it reaches a packet.
+   - **Read the 4 `confidence: low` rows first** — `triangulation.rs:4517,
+     4523, 4529, 4535` in `reconcile_singular_transition`. The worker reports
+     each of those source lines carries **two** predicates: a dimensionless
+     `!near` guard on uv parameters and a model-space `so_small()` on a surface
+     derivative magnitude. It classified the row `model` for the deciding test.
+     That is a real judgement call and it is the one to check yourself.
+   - **Reconcile the count**: the survey's 26 live sites against the census's
+     **30** production predicates for the crate. The worker attributes the gap
+     to 3 squared-order and 3 "production non-predicate" uses; confirm that,
+     because one of them is likely the spatial-hash bucket pitch and the rest
+     need a reason.
+   - Then `python loop/gen_packet.py --skeleton loop/surveys/BG-TOL-001-MESHALGO.json
+     --id BG-TOL-001-MESHALGO --crate truck-meshalgo` emits the front block,
+     write set, measured anchors and site table. **Write the prose yourself** —
+     Problem, Decisions-already-made, Stop conditions. The skeleton deliberately
+     omits them; they are what makes the worker churn instead of design.
+   - If the review holds up, the four other unwritten shards go the same way
+     and the orchestrator stops hand-reading call sites. **If it does not, say
+     so in STATE** — one survey is not yet evidence.
+2. **`BG-CE-006-CYL-CONE` LANDED** (`e9b4be4`, ACCEPTED on all ten gates,
+   landed by `land_packet.py`). Cylinder and Cone are first-class carriers now,
+   closing both `BG-CE-006-CYLINDER` and `-CONE`. **One thing to follow up:**
+   its worker disagreed with the packet and says `Plane`'s `BoundedSurface`
+   impl is *not* the panic-installing defect the packet called it, because this
+   tree's `Plane::parameter_range` is a bounded `[0,1]^2` so
+   `range_tuple().expect` cannot fire. If the worker is right — check it — the
+   claim needs correcting in STATE's traps and in any packet that repeats it,
+   and the same reasoning should be re-applied to whether Cylinder and Cone
+   ought to implement `BoundedSurface` after all.
 3. **Then the CE chain, which is the actual critical path to generation.**
    Seven of the nine BG-INV invariant checkers — the things that let the kernel
    say whether its own output is a valid solid — are gated on **one** packet,
