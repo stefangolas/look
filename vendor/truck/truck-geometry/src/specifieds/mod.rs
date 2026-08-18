@@ -93,7 +93,23 @@ pub struct Torus {
     small_radius: f64,
 }
 
+/// cylinder of the given radius, around the `z` axis through `center`
+#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize, SelfSameGeometry)]
+pub struct Cylinder {
+    center: Point3,
+    radius: f64,
+}
+
+/// cone with its apex at `apex`, opening along `+z` with the given half angle
+#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize, SelfSameGeometry)]
+pub struct Cone {
+    apex: Point3,
+    half_angle: f64,
+}
+
 mod circle;
+mod cone;
+mod cylinder;
 mod hyperbola;
 mod line;
 mod parabola;
