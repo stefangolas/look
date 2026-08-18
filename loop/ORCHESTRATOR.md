@@ -196,6 +196,50 @@ tests will compare floats. Likewise say where results go: a worker told only
 "write RESULT.json" may infer `loop/results/` from the repo and land outside its
 own allowlist, which is a V1 rejection for following a convention correctly.
 
+## The survey class — delegating judgement without delegating decisions
+
+The orchestrator was the bottleneck long before the workers were. Two jobs were
+being done here and only one of them is orchestrator-grade:
+
+- **judgement** — what class is this site, what should the refusal be, is this
+  gate wrong;
+- **assembly** — running greps to verify anchors, counting functions for a
+  budget, boilerplate packet prose, ceiling bookkeeping, merge and ledger
+  mechanics.
+
+Assembly is most of the wall-clock and none of it needs a person. `class:
+survey` moves the largest single piece of it — reading every call site in a
+crate and proposing a classification — onto a worker, and `gen_packet.py` (still
+unwritten) is meant to take the rest.
+
+**A survey worker gets no write access to `vendor/truck/**` at all.** Its whole
+deliverable is `SURVEY.json`: one row per site with file, line, symbol, the
+expression, a proposed `model`/`param`/`excluded` classification, a one-sentence
+reason, and a confidence. `verify.py` runs V0, V1 and **V10 survey shape**, and
+skips every cargo gate, because a survey commits no Rust and running the others
+would manufacture a PASS that means nothing — the V7/V8 mistake.
+
+**V10 checks anchors, never judgements.** Every (file, line, expression) must
+resolve against the tree; an invented line number fails the packet. That split
+is the point: a classification cannot be graded mechanically, but the half that
+has actually gone wrong twice — GEOM-SPECIFIEDS shipped three of seven anchor
+counts wrong, SHAPEOPS listed a line inside a block comment — is exactly the
+half a gate can check. A survey whose sites are all real is cheap to review; one
+whose sites are invented is *worse* than no survey, because it reads as
+authoritative.
+
+**So the review is not optional.** A survey you skim and paste into a packet has
+converted a worker's guess into the orchestrator's decision without anyone
+deciding anything. Read every `confidence: low` row, spot-check a sample of the
+high-confidence ones against the source yourself, and treat a `SPEC_GAP` from a
+survey as the most valuable thing it can return.
+
+This does not contradict "pre-make every judgement so the worker churns rather
+than designs". That rule exists because a worker *designing unsupervised inside
+a write set* went badly. A worker *proposing under review with no write access*
+is a different risk profile, and until now the packet schema could not express
+the difference.
+
 Class matters: **mechanical** packets go to the worker model; **design** packets
 (new types, new invariants, anything the rest of the graph types against) you
 write yourself. BG-EVD-r3 is design class.

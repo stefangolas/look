@@ -276,10 +276,12 @@ def read_packet_fields(path):
     if m:
         yaml_text = m.group(1)
 
+    m_class = re.search(r"(?m)^class:\s*(\S+)", yaml_text)
     return {
         'crates': yaml_list_field(yaml_text, 'crates'),
         'write_allow': yaml_list_field(yaml_text, 'write_allow'),
         'tests_required': yaml_list_field(yaml_text, 'tests_required'),
+        'class': m_class.group(1).strip() if m_class else 'mechanical',
     }
 
 
@@ -510,6 +512,113 @@ def main():
         v.failed_early = True
     else:
         v.add_gate('V1 scope', 'PASS', f"{len(changed)} changed file(s), all within write_allow")
+
+    # -----------------------------------------------------------------------
+    # V10 survey shape — the acceptance gate for `class: survey`.
+    #
+    # A survey packet delegates the expensive half of writing a shard: reading
+    # every call site and proposing a classification for it. Its deliverable is
+    # SURVEY.json, a *proposal*, and it gets no write access to vendor/truck at
+    # all -- so nothing it says can reach the kernel except through a packet the
+    # orchestrator writes afterwards.
+    #
+    # A judgement cannot be graded mechanically. Its ANCHORS can, and that is
+    # exactly the half that has gone wrong twice: BG-TOL-001-GEOM-SPECIFIEDS
+    # shipped with three of seven anchor counts wrong, and the SHAPEOPS site
+    # table listed a line inside a /* */ block. So this gate checks that every
+    # (file, symbol, line) the survey names actually exists and that the quoted
+    # expression is really on that line, and leaves the classification to the
+    # orchestrator's review. A survey whose sites are real is cheap to review;
+    # one whose sites are invented is worse than nothing, because it reads as
+    # authoritative.
+    # -----------------------------------------------------------------------
+    if pkt['class'] == 'survey':
+        if not gate_wanted('V10'):
+            skip_not_requested('V10 survey shape')
+        else:
+            survey_path = v.wt / 'SURVEY.json'
+            problems = []
+            rows = []
+            if not survey_path.is_file():
+                problems.append('no SURVEY.json in the worktree root')
+            else:
+                try:
+                    doc = json.loads(survey_path.read_text(encoding='utf-8'))
+                    rows = doc['sites'] if isinstance(doc, dict) else doc
+                    if not isinstance(rows, list) or not rows:
+                        problems.append('SURVEY.json holds no sites')
+                        rows = []
+                except (json.JSONDecodeError, OSError, KeyError, TypeError) as e:
+                    problems.append(f'SURVEY.json does not parse as expected: {e}')
+                    rows = []
+
+            required = ('file', 'line', 'symbol', 'expression', 'classification', 'reason')
+            seen = 0
+            for i, r in enumerate(rows):
+                if not isinstance(r, dict):
+                    problems.append(f'site {i} is not an object')
+                    continue
+                missing = [k for k in required if k not in r]
+                if missing:
+                    problems.append(f"site {i} missing {','.join(missing)}")
+                    continue
+                if r['classification'] not in ('model', 'param', 'excluded'):
+                    problems.append(f"site {i} classification {r['classification']!r} "
+                                    "is not model|param|excluded")
+                src = v.wt / str(r['file']).replace('\\', '/')
+                if not src.is_file():
+                    problems.append(f"site {i} names a file that does not exist: {r['file']}")
+                    continue
+                try:
+                    lines = src.read_text(encoding='utf-8', errors='replace').splitlines()
+                except OSError as e:
+                    problems.append(f"site {i} file unreadable: {e}")
+                    continue
+                ln = r['line']
+                if not isinstance(ln, int) or ln < 1 or ln > len(lines):
+                    problems.append(f"site {i} line {ln} is outside {r['file']} (1..{len(lines)})")
+                    continue
+                # The expression has to be ON the line the survey claims. A
+                # fragment is enough -- whitespace and trailing comments differ
+                # -- but an invented line number will not match.
+                frag = ' '.join(str(r['expression']).split())[:40]
+                hay = ' '.join(lines[ln - 1].split())
+                if frag and frag not in hay:
+                    problems.append(f"site {i} expression not on {r['file']}:{ln} "
+                                    f"(line reads {hay[:60]!r})")
+                    continue
+                seen += 1
+
+            if problems:
+                v.add_gate('V10 survey shape', 'FAIL',
+                           f'{len(problems)} problem(s): ' + '; '.join(problems[:6]))
+            else:
+                v.add_gate('V10 survey shape', 'PASS',
+                           f'{seen} site(s), every file/line/expression verified against the tree; '
+                           'classifications are a proposal and are NOT verified here')
+    else:
+        v.add_gate('V10 survey shape', 'SKIP', 'not a survey packet')
+
+    # A survey commits no Rust, so every gate that shells out to cargo would be
+    # measuring an empty diff. Marking them SKIP is honest; running them would
+    # manufacture a PASS that means nothing, which is the V7/V8 mistake.
+    if pkt['class'] == 'survey':
+        for n in ('V2 build', 'V3 lint', 'V4 house rules', 'V5 tests',
+                  'V6 test-reality', 'V7 mutation spot-check', 'V8 no-regression',
+                  'V9 geometry'):
+            v.add_gate(n, 'SKIP', 'survey packet — no kernel code to build or test')
+        verdict_name = 'ACCEPTED' if all(
+            g['status'] in ('PASS', 'SKIP') for g in v.gates) else 'REJECTED'
+        print()
+        print(f'VERDICT: {verdict_name}')
+        verdict = {
+            'packet': args.packet, 'slot': v.slot, 'crates': crate_names, 'base': base,
+            'branch': branch, 'commit': commit_sha, 'amended_by': amended_by,
+            'class': 'survey', 'verdict': verdict_name, 'gates': v.gates,
+            'timestamp': datetime.datetime.now(datetime.timezone.utc).isoformat().replace('+00:00', 'Z'),
+        }
+        v.verdict_file.write_text(json.dumps(verdict, indent=4), encoding='utf-8')
+        sys.exit(0 if verdict_name == 'ACCEPTED' else 1)
 
     env_extra = {'CARGO_INCREMENTAL': '0', 'CARGO_TARGET_DIR': str(v.target_dir)}
     os.environ.update(env_extra)
