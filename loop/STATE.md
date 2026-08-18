@@ -11,7 +11,7 @@ otherwise would eventually cost a trap.) If you are picking this up cold, read
 [`loop/ORCHESTRATOR.md`](ORCHESTRATOR.md) for how to run the loop, then
 `python loop/slot_status.py`** — nothing else. Do not read `LEDGER.jsonl` whole.
 
-Updated 2026-08-16, end of session 6. Branch: `integration/kernel-bg`. Nothing
+Updated 2026-08-18, end of session 7. Branch: `integration/kernel-bg`. Nothing
 from the loop has reached `main` and nothing has been pushed.
 
 ## What this is, if you have never seen it
@@ -48,70 +48,63 @@ here is scored, tuned, or sampled.
 
 ## Where we are
 
-**Ten packets DONE of 62**: BG-S0-001, BG-S0-002, BG-S0-003, BG-EVD-r3,
-BG-TOL-001-TYPE, -TYPE-r2, -TYPE-r3, BG-NUM-001-FILLET, -SHAPEOPS, and
--TOPOLOGY + -MODELING (both closed by the combined `BG-TOL-001-TOPO-MOD`).
+**Eleven packets DONE of 62**: BG-S0-001, -002, -003, BG-EVD-r3,
+BG-TOL-001-TYPE, -TYPE-r2, -TYPE-r3, BG-NUM-001-FILLET, -SHAPEOPS,
+-TOPOLOGY + -MODELING (both closed by `BG-TOL-001-TOPO-MOD`), and
+**-GEOM-SPECIFIEDS** (session 7).
 
-**The real state of BG-TOL-001 is far lower than the packet count suggests.**
-**22 sites migrated, 193 to go** (`python loop/census_tol_sites.py` is the
-burndown). Stage A fixes nothing on its own: all 22 still carry the legacy
-absolute epsilon, and GATE-4 is holding **17** scaffold calls at a ceiling that
-must reach zero. **Stage B — threading a real `model_scale` from each entry
-point — is not in the graph at all**, and it is a cross-crate signature change,
-so the 62 understates the work. BG-NUM-001-FILLET is likewise partial: 1 of the
-14 unbounded loops the spec names.
+**BG-TOL-001 burndown: 44 sites migrated, 171 to go** — `python
+loop/census_tol_sites.py` is the authority and it now also prints, per crate and
+per path fragment, the number of **functions** containing a site. That second
+number is what a shard declares as `unscaled_legacy_budget`, and getting it
+wrong is what cost session 7 a round trip. GATE-4 sits at **36/36**: ceiling
+equals true count, so the ratchet is tight and the next shard must raise it by
+its own measured budget before dispatch.
 
-Session 6 landed two contracts, fixed two gates, and **amended the spec twice —
-both times because writing a packet exposed something the spec had not decided.**
-That is the loop working as designed and it is where its value has actually come
-from. The worker model has still never been the bottleneck: BG-TOL-001-TYPE-r2
-went DONE → ACCEPTED → merged in one attempt, one verify run, no amendment.
+**One worker was still running when session 7 ended** — see "Pick up here" 1.
+
+Session 7's theme: **every defect found was in a packet or a gate, never in the
+worker's code.** The worker migrated 22 sites correctly and returned SPEC_GAP
+because the packet's budget could not hold its own recipe; it was right. The one
+V5 rejection was a flaky proptest. Two gates were fixed and one gate (V9) was
+finally proven.
 
 ## Pick up here
 
-1. `python loop/slot_status.py`, then the last 3 rows of `LEDGER.jsonl`.
-2. **V9 is PROVEN. Session 7 watched it fail twice, on two different failure
-   modes, and the probes are torn down.** Do not redo this.
-   - *Hard break:* `truck_base::TOLERANCE` 1e-6 → 1e-1 on a throwaway branch ->
-     V9 FAIL, 5 tests, incl. both fingerprints. Mechanism is **not** a moved
-     mesh: `nonpositive_tolerance!` asserts `tol >= TOLERANCE` in
-     `truck-meshalgo/src/tessellation/mod.rs:627`, so the part never
-     tessellates at all and the tests panic. `tests/step.rs` fails here too --
-     so the *old* structural tests would also have caught this probe today,
-     which is worth knowing before concluding much from it.
-   - *Merely-different mesh:* that is what the fingerprint is for, so it was
-     probed separately -- `minimum_segments_per_revolution` 24 -> 32 in
-     `src/step/meshing_policy.rs`. V9 FAIL on exactly
-     `assertion left == right failed: bracket triangle count moved`. **Only
-     bracket moved; the washer passed** -- its circles already exceed 32
-     segments through the linear/angular terms, so on this class of change the
-     discrimination is carried by one fixture, not two. A third fixture whose
-     count moves under coarsening as well as densification would be worth
-     more than another structural test.
-   - Positive control: all 39 geometry tests pass at base `192a7f4` (the
-     cached baseline `loop/baselines/192a7f4__look__geometry_fingerprint-*`).
-3. **Slot 0 is warm and detached at `192a7f4`; slots 1-3 are idle with no
-   `target/`.** A slot re-warms in ~5.6 min from cold (measured session 7, not
-   the 1-3 min claimed earlier -- that figure was for a slot whose target
-   survived).
-4. **`BG-TOL-001-GEOM-SPECIFIEDS` is written, anchors verified, not dispatched.**
-   22 sites, all judgements pre-made. Raise the ratchet ceiling from 17 by its
-   budget of 12 before dispatching, and lower it to the true count after.
-5. **Then write the other four shards**, copying BG-TOL-001-SHAPEOPS. Size them
-   with `python loop/census_tol_sites.py`, **not** with a raw grep — see the
-   census note below. **Pre-make every model/param judgement yourself**; that is
-   the whole value of a shard and it needs someone who reads the surrounding
-   code. MODELING next: it is 11 sites, not the 34 a grep reports.
-5. **`BG-TOL-001-TOPOLOGY` blocks all eight BG-INV checkers** and is 4 sites.
-   Earlier sessions planned to split it by module. Do not — look first.
-6. **Three crates with production sites have no shard at all**: truck-stepio
-   (19), truck-polymesh (7), truck-geotrait (4). stepio is the STEP import and
-   export path — the most directly reachable-from-untrusted-geometry surface in
-   the tree, and exactly what BG-TOL-001's contract is about. Add the rows.
+1. **Slot 1 is running `BG-CE-006-CYL-CONE` (or has finished).** It was
+   dispatched at `f9fa761`, which is now several commits back. To adjudicate:
+   `git -C loop/slots/1/wt rebase <integration tip>`, then
+   `python loop/verify.py --slot 1 --packet loop/packets/BG-CE-006-CYL-CONE.md
+   --base <integration tip>`. **Before merging it, raise the GATE-4 ceiling to
+   the new true count** — it declares a budget of 4 against a ceiling of 29 on
+   its own branch, which passes there, but integration is at 36/36 and the merge
+   would put it over. `bash scripts/kernel-gates.sh HEAD~1` prints the count.
+2. **Then the CE chain, which is the actual critical path to generation.**
+   Seven of the nine BG-INV invariant checkers — the things that let the kernel
+   say whether its own output is a valid solid — are gated on **one** packet,
+   `BG-CE-003`, through `BG-CE-006-CYL-CONE -> BG-CE-006-ENUM -> BG-CE-001 ->
+   BG-CE-003`. Three of those four are **design** class, so the orchestrator
+   writes them; that is the bottleneck, not worker throughput. Note
+   `schedule.py` reads `needs`, and the rows also carry a stale, different
+   `depends_on` — `needs` is the real graph.
+3. **`BG-TOL-001-STEPIO` is written, anchors verified, budget measured (15),
+   not dispatched.** All 19 predicates classified with the judgement pre-made,
+   including the one pair worth arguing about (`geom_impls.rs` `include` is
+   `param`, `to_same_geometry` is `model`, and they look identical). Raise the
+   ceiling by 15 before dispatching.
+4. **The other four TOL shards are unwritten**: GEOM-NURBS, GEOM-DECORATORS,
+   MESHALGO, POLYMESH, GEOTRAIT. Size each with
+   `python loop/census_tol_sites.py <path-fragment>` — it prints both the site
+   count and the function count. **This is breadth, not depth**: Stage A moves
+   no threshold, and Stage B (threading a real `model_scale` from the entry
+   points) is still not in the graph at all. Do not grind all of these before
+   item 2.
 
 Highest-value harness work left: **V7 and V8 are always-pass stubs** — the two
 remaining gates where PASS means nothing. V8 is where "this packet broke a
-pre-existing test" belongs; V5 only compares against its cached baseline.
+pre-existing test" belongs. V5 now has a demonstrated blind spot of its own: it
+compares one run of a randomized proptest suite against another and reads a
+flake as a regression.
 
 ## Landed
 
@@ -137,8 +130,15 @@ pre-existing test" belongs; V5 only compares against its cached baseline.
 | `58de977` | **BG-TOL-001-TOPO-MOD** — closes both TOPOLOGY and MODELING |
 | `ba2b7be` | **V9** + `tests/geometry_fingerprint.rs` — see the V9 warning above |
 | `09fb2bf` | census fix: every `#[cfg(test)]` module was counted as production |
+| `bcc9139` | **session 7:** V9 watched failing, twice, on two failure modes — the gate is proven |
+| `52d4552` | dispatch preflight: a packet's GATE-4 claim is checked before a worker is paid |
+| `f9fa761` | GEOM-SPECIFIEDS' anchor counts were wrong when written; 3 of 7 |
+| `e90e9dc` | a shard's `unscaled_legacy` budget is a measurement now, not an estimate; ceiling 29 → 36 |
+| `aa2dadd` | V0 missed the proptest seed file under its fallback name |
+| `0a7c6fe` | **BG-TOL-001-GEOM-SPECIFIEDS** — 22 sites, 19 contexts, ACCEPTED on all ten gates |
+| `808d472` | the `BG-CE-006-CYL-CONE` packet |
 
-## The two spec amendments session 6 paid for
+## The spec and packet amendments the loop has paid for
 
 **BG-TOL-001 never said where a call site gets its `ToleranceCtx`.** It says
 migrate 184 sites and §9 says "every signature below takes ctx"; neither says
@@ -162,16 +162,23 @@ a migration*. All 23 sites tree-wide are excluded from Stage A and deferred to
 
 ## The parallelism picture
 
-62 packets: 38 mechanical, 13 design, 11 wide-mechanical. 52 remain (32/12/8).
-Scheduling is on **write-set disjointness**, not waves — two packets can be
-logically independent and still collide on a file, and that collision surfaces
-at merge, after both workers have been paid for.
+62 packets: 38 mechanical, 13 design, 11 wide-mechanical. 51 remain. The
+frontier reads **10 eligible, 10 write-disjoint** with nothing running, and
+session 7 demonstrated that two workers on write-disjoint packets run
+concurrently without interfering — slots 0 and 1 both edited `truck-geometry`,
+on disjoint files, at the same time.
 
-The frontier is 10 eligible / 7 write-disjoint and stays there until the shards
-land; it opens to 22 at W4. From here **slots, not dependencies, are the binding
-constraint**: a warm slot costs 0.9–4.4 GB and 0.8–1.5 min, and free disk is
-~17 GB. **Six of the seven eligible shards have no packet written yet** — the
-binding constraint in practice is orchestrator packet-writing, not slots.
+Scheduling is on **write-set disjointness**, not waves. Two of the declared
+write sets were wrong in the same way and it is worth checking for more:
+`BG-CE-006-CYLINDER` and `-CONE` each named only their own new file, when both
+must also declare their struct in `specifieds/mod.rs`, where every specified
+struct lives. As two packets they collide there; they were merged into one,
+`BG-CE-006-CYL-CONE`, the way TOPOLOGY and MODELING were.
+
+**The binding constraint is orchestrator packet-writing, not slots or
+dependencies** — 12 of 62 packets have a file. Design-class packets are the
+sharpest form of it: three of the four on the critical path to the invariant
+checkers are design, and the orchestrator writes those.
 
 ## Traps, each one paid for
 
@@ -302,6 +309,40 @@ reason is in the commit that made the change, and the code will not tell you.
   `origin/main` has no `vendor/truck/`, so CI passes on nothing. Packet
   verification is unaffected — its baseline is the branch tip.
 
+- **A packet's budget is a claim about the repo, and claims rot.** Session 7
+  found two in one packet: the anchor table was **wrong when written** (3 of 7
+  counts, on files unchanged since before the packet existed — so not drift),
+  and `unscaled_legacy_budget` was an estimate ("about 12 here") against a true
+  19. Both would have been caught by running a command instead of reading a
+  file. `run_packet.py` now refuses to dispatch when GATE-4's count plus the
+  declared budget exceeds the ceiling **committed on the slot's own branch** —
+  raising it on `integration/kernel-bg` after the slot forked does nothing.
+- **The budget is one context per FUNCTION with a site, not per site or per
+  file.** `census_tol_sites.py <path-fragment>` prints it. Keying those
+  functions by (file, name) undercounts: `truck-stepio/src/out/geometry.rs` has
+  five distinct `fmt` impls each holding a site, which collapsed to one and made
+  the crate read 11 instead of 15.
+- **V5 reads a flaky proptest as a regression.** It compares one run of a
+  randomized suite at base against one run at HEAD.
+  `truck-geometry/tests/bspcurve.rs::parameter_random_tests` fails
+  occasionally by ~3e-6 against a 1e-6 tolerance; it did so once during
+  GEOM-SPECIFIEDS' verify, in a file the packet never opened. 12 subsequent
+  runs — 6 at base, 6 on the branch, with the failing seed present — all
+  passed. **Before believing a V5 failure in a file the packet did not touch,
+  re-run it at both commits.**
+- **A gate that blocks its own retry turns a flake into a permanent
+  rejection.** That same proptest failure wrote
+  `tests/bspcurve.proptest-regressions`, and V0's ignore rule only matched a
+  *directory* of that name, so every later verify on the slot BLOCKED on the
+  artifact left by the run being re-measured. Fixed in `aa2dadd`.
+- **Backticks in a `git commit -m` message are command substitution.** A commit
+  message quoting a command name in backticks hung the shell for two minutes and
+  committed nothing. Write the message to a file and use `-F`.
+- **Two workers on write-disjoint packets run concurrently without trouble** —
+  first demonstrated in session 7 (slots 0 and 1, both editing `truck-geometry`
+  but disjoint files). The open question about concurrency was about the *free*
+  model tier and is still open.
+
 ## The commands
 
 `slot_status.py` prints each slot's branch and short HEAD (`git=branch@sha`),
@@ -345,110 +386,6 @@ partial run can never report ACCEPTED — its verdict is always `PARTIAL`
 (exit 3) no matter what the requested gates found, because acceptance is a
 claim about the whole packet and nothing about re-checking one gate tells
 you the others still hold.
-
-## Next actions, in order
-
-1. Land BG-S0-002 from slot 0 — see "Pick up here" above.
-2. **BG-EVD-r3** — design class, so the orchestrator writes it, not the worker
-   model. `Modulus` becomes a struct with `domain` + shape-derived
-   `is_subadditive` and a `propagate` recurrence; `Refusal` gains
-   `ForwardToleranceExceeded`; `ModulusShape` gains `Pole`. It is the neck of
-   the whole graph: everything in W2 onward types against it. It cannot start
-   until BG-S0-002 releases `truck-base/src/evidence.rs`.
-3. Split the `truck-topology/src/**` shard of BG-TOL-001 by module. As one
-   packet it single-handedly blocks all eight BG-INV checkers.
-4. Write `gen_packet.py`, which must re-run every anchor's `rg` at generation
-   time and refuse to emit on a count mismatch.
-5. Write the **BG-S0-002-r2** packet (design) — the deferred chart-pole runtime
-   test. It can be written any time after BG-S0-002 lands; it does not block
-   the graph.
-
-## The parallelism picture
-
-56 packets: 35 mechanical, 13 design, 8 wide-mechanical. Scheduling is on
-**write-set disjointness**, not waves — two packets can be logically independent
-and still collide on a file, and that collision surfaces at merge, after both
-workers have been paid for.
-
-The frontier is **1 packet wide until BG-EVD-r3 lands**, then opens to 22
-mutually disjoint packets at the W4 frontier. More slots buy nothing before
-that. A warm slot costs 0.90 GB and 1.2 min, so from W4 on, slots — not
-dependencies — are the binding constraint.
-
-## Traps, each one paid for
-
-- **A gate that fails on the untouched baseline is not a gate.** The vendored
-  tree is nowhere near clippy-clean (truck-meshalgo ~93 lints,
-  `revolved_curve.rs:694` "items after a test module", `geometry.rs:294`
-  `borrowed_box`), and its test suite is not clean either
-  (`healing::tests::step_import` needs a STEP data file absent on this machine;
-  `tests/fillet.rs::complex_surface` triangulates to `Irregular`). V3 is scoped
-  to the **lines the diff added**; V5 is now scoped to the **test fns the diff
-  added** (with `--no-fail-fast` so every binary runs). A whole-crate pass/fail
-  rejects every packet for the baseline's defects — the same as no gate.
-- **V5 must use `--no-fail-fast`.** Without it, cargo stops at the first failing
-  test binary and never reaches the packet's own `tests/*.rs` — BG-S0-002's
-  first verify ran every crate *except* `fillet.rs`, so it could not have
-  caught the packet's own tests failing.
-- **verify.py dirties its own worktree.** `cargo test` (V5) drops `.obj` mesh
-  dumps and logs into the worktree as untracked files. V0 used to count those
-  as "uncommitted changes" and BLOCK the next verify run. V0 now ignores
-  untracked files; an uncommitted new *source* file is still caught by V1/V6,
-  which read the committed diff.
-- **`DETACHED_PROCESS` silences the very worker it is meant to free.** Measured
-  across eight flag combinations: every one containing it produced zero bytes of
-  output, every one without it streamed. A batch file with no console cannot get
-  its own child's output onto an inherited handle, and `opencode` is a `.cmd`
-  shim, so the process doing the work is always a grandchild. The dispatch uses
-  `CREATE_NO_WINDOW | CREATE_NEW_PROCESS_GROUP | CREATE_BREAKAWAY_FROM_JOB` and
-  writes its redirect into a command file, where `>` binds the whole chain.
-  Breakaway is what actually makes a worker outlive its parent — a harness kills
-  the tool call's *job*, which detachment never addressed. **Run
-  `python loop/selftest_dispatch.py` after touching any of this.**
-- **A test failure is not located in the diff.** V3 scopes clippy to added lines
-  because a lint finding sits on a line; applying the same move to V5 (fail only
-  on tests the packet added) does not filter the noise, it discards the signal,
-  and it hands regressions to V8, which is a stub. V5 instead runs the suite once
-  at the base commit, caches the result under `loop/baselines/`, and fails on
-  anything that newly fails, disappears, or becomes `#[ignore]`d.
-- **The verifier dirties the worktree it is judging.** `cargo test` drops `.obj`
-  mesh dumps in the worktree, which V0 then read as an unfinished run. The fix is
-  to allow-list that specific artifact, not to make V0 blind to untracked files —
-  an uncommitted new `.rs` is exactly what V0 exists to catch, and it is *not*
-  caught by V1/V6, which read the committed diff.
-- **A bare `bash` is the WSL stub**, which fails with `execvpe(/bin/bash)` —
-  an exit 1 that reads as a house-rule violation. V4 hardcodes Git Bash.
-- **`opencode` on PATH is a `.ps1`/`.cmd` shim** whose command line caps at
-  8191 chars, under a 9 KB packet. The packet is copied into the worktree as
-  `PACKET.md` and the prompt points at it. Both failures presented as an empty
-  event stream and exit 0.
-- **Workers hang.** One sat 45 minutes mid-step on an API call that never
-  returned, holding a slot and its write set, producing nothing. CPU time
-  cannot tell that apart from a worker waiting on the model; only the growth of
-  `events.jsonl` can. `slot_status.py` reaps anything silent for 12 min.
-- **An interrupted run reads as a perfect one.** Every gate measures the diff
-  between base and HEAD, and a worker that dies mid-packet leaves its edits
-  *uncommitted* — an empty diff, which passes V1–V6 on nothing and reports
-  ACCEPTED. V0 preflight exists for exactly this. Workers survive a brief
-  network drop on their own; they do not survive their parent process killed.
-- **The spec goes stale invisibly.** BG-S0-001 was landed while the spec still
-  listed it open with an anchor count of 6 that is now 0. Re-run every anchor
-  when you touch a packet.
-- **A spec gap is the loop's most valuable output, not a failure.** BG-S0-002's
-  worker proved test 3 unreachable (`create_pcurve_edge`'s
-  `UnsupportedEnvelope(ChartDegenerate)` path is blocked by out-of-scope
-  `rbf_surface/algo.rs` `mat.invert().unwrap()` sites at lines 815/824/834/847/
-  925/934/944/957) and stopped with `QUESTION.md`. The fix was to amend the
-  spec (defer the runtime test to BG-S0-002-r2) and the packet (3 tests), not
-  to weaken the gate or fake the test. The A2 mechanical conversion stays
-  required and is verified by V3/V4.
-- **`autotests = false` in truck-polymesh.** A new test file there needs an
-  explicit `[[test]]` entry or it silently never runs. V6 flags this.
-- **`truck_base::evidence`, not `truck_evidence`.** The module lives in
-  truck-base to avoid a geotrait→evidence cycle; truck-evidence re-exports it.
-- **CI gates are still vacuous.** `kernel-gates.sh` is diff-scoped and
-  `origin/main` has no `vendor/truck/`, so CI passes on nothing. Packet
-  verification is unaffected — its baseline is the branch tip.
 
 ## Quick reference — enough to write and judge a packet without another file
 
