@@ -1,1052 +1,1154 @@
 {
-  "id": "BG-TOL-001-MESHALGO-SURVEY",
-  "crate": "truck-meshalgo",
-  "functions": 20,
-  "not_in_inventory": [
-    "tessellation/triangulation.rs:1718 (cshell_tessellation_inner) - .unwrap_or(source_edge::SOURCE_INCIDENCE_TOLERANCE); a production grep hit the census missed because its regex requires a word boundary before `TOLERANCE` and `SOURCE_INCIDENCE_TOLERANCE` has an underscore",
-    "tessellation/source_edge.rs:252 - let effective_source_tol = source_tolerance.max(SOURCE_INCIDENCE_TOLERANCE); a production tolerance-value computation the census regex missed for the same constant-name reason",
-    "tessellation/source_edge.rs:311 - let carrier_closed = subs_lo.distance(subs_hi) <= SOURCE_INCIDENCE_TOLERANCE; a genuine model-space length predicate the census missed for the same constant-name reason"
+ "id": "BG-TOL-001-MESHALGO-SURVEY",
+ "crate": "truck-meshalgo",
+ "functions": 20,
+ "not_in_inventory": [
+  "tessellation/triangulation.rs:1718 (cshell_tessellation_inner) - .unwrap_or(source_edge::SOURCE_INCIDENCE_TOLERANCE); a production grep hit the census missed because its regex requires a word boundary before `TOLERANCE` and `SOURCE_INCIDENCE_TOLERANCE` has an underscore",
+  "tessellation/source_edge.rs:252 - let effective_source_tol = source_tolerance.max(SOURCE_INCIDENCE_TOLERANCE); a production tolerance-value computation the census regex missed for the same constant-name reason",
+  "tessellation/source_edge.rs:311 - let carrier_closed = subs_lo.distance(subs_hi) <= SOURCE_INCIDENCE_TOLERANCE; a genuine model-space length predicate the census missed for the same constant-name reason"
+ ],
+ "sites": [
+  {
+   "file": "vendor/truck/truck-meshalgo/src/analyzers/collision.rs",
+   "line": 87,
+   "symbol": "sorted_endpoints",
+   "expression": ".filter(|(_, tri)| !(tri[1] - tri[0]).cross(tri[2] - tri[0]).so_small())",
+   "classification": "excluded",
+   "reason": "degree 2 in length: the quantity is an area (a cross-product magnitude or a scalar triple product), so it scales as k^2 while length_margin() scales as k. Neither `model` nor `param` fits and `is_small_len` on an area is a migration that looks right and is wrong once Stage B threads a real model_scale. Same treatment as truck-modeling/src/geom_impls.rs:91, which a previous shard's worker already left as FIXME(BG-TOL-001) for this exact reason. Deferred to BG-TOL-004; the packet asks for a FIXME marker, not a rewrite.",
+   "confidence": "high",
+   "proposed_rewrite": null,
+   "orchestrator_amendment": {
+    "original_classification": "model",
+    "original_reason": "the cross product of two triangle edge displacements has magnitude twice the triangle area, a length-squared quantity that scales with the model, used here to drop degenerate (zero-area) triangles",
+    "original_proposed_rewrite": "!ctx.is_small_len((tri[1] - tri[0]).cross(tri[2] - tri[0]).magnitude())",
+    "note": "survey said `model` with an `is_small_len` rewrite -- and its own reason for collision.rs:87 calls the quantity 'a length-squared quantity' while applying the length predicate anyway. That internal contradiction is the finding."
+   },
+   "defer_to": "BG-TOL-004",
+   "action": "fixme_marker"
+  },
+  {
+   "file": "vendor/truck/truck-meshalgo/src/analyzers/collision.rs",
+   "line": 93,
+   "symbol": "sorted_endpoints",
+   "expression": ".filter(|(_, tri)| !(tri[1] - tri[0]).cross(tri[2] - tri[0]).so_small())",
+   "classification": "excluded",
+   "reason": "degree 2 in length: the quantity is an area (a cross-product magnitude or a scalar triple product), so it scales as k^2 while length_margin() scales as k. Neither `model` nor `param` fits and `is_small_len` on an area is a migration that looks right and is wrong once Stage B threads a real model_scale. Same treatment as truck-modeling/src/geom_impls.rs:91, which a previous shard's worker already left as FIXME(BG-TOL-001) for this exact reason. Deferred to BG-TOL-004; the packet asks for a FIXME marker, not a rewrite.",
+   "confidence": "high",
+   "proposed_rewrite": null,
+   "orchestrator_amendment": {
+    "original_classification": "model",
+    "original_reason": "same degenerate-triangle filter as line 87 but applied to the second iterator; the magnitude is twice the triangle area and scales with the model",
+    "original_proposed_rewrite": "!ctx.is_small_len((tri[1] - tri[0]).cross(tri[2] - tri[0]).magnitude())",
+    "note": "survey said `model` with an `is_small_len` rewrite -- and its own reason for collision.rs:87 calls the quantity 'a length-squared quantity' while applying the length predicate anyway. That internal contradiction is the finding."
+   },
+   "defer_to": "BG-TOL-004",
+   "action": "fixme_marker"
+  },
+  {
+   "file": "vendor/truck/truck-meshalgo/src/analyzers/collision.rs",
+   "line": 153,
+   "symbol": "collide_seg_triangle",
+   "expression": "if nor.so_small() {",
+   "classification": "excluded",
+   "reason": "degree 2 in length: the quantity is an area (a cross-product magnitude or a scalar triple product), so it scales as k^2 while length_margin() scales as k. Neither `model` nor `param` fits and `is_small_len` on an area is a migration that looks right and is wrong once Stage B threads a real model_scale. Same treatment as truck-modeling/src/geom_impls.rs:91, which a previous shard's worker already left as FIXME(BG-TOL-001) for this exact reason. Deferred to BG-TOL-004; the packet asks for a FIXME marker, not a rewrite.",
+   "confidence": "high",
+   "proposed_rewrite": null,
+   "orchestrator_amendment": {
+    "original_classification": "model",
+    "original_reason": "nor is the triangle normal ab.cross(ca), a cross product of two edge displacements whose magnitude is twice the triangle area (length-squared), so the degeneracy test scales with the model",
+    "original_proposed_rewrite": "ctx.is_small_len(nor.magnitude())",
+    "note": "survey said `model` with an `is_small_len` rewrite -- and its own reason for collision.rs:87 calls the quantity 'a length-squared quantity' while applying the length predicate anyway. That internal contradiction is the finding."
+   },
+   "defer_to": "BG-TOL-004",
+   "action": "fixme_marker"
+  },
+  {
+   "file": "vendor/truck/truck-meshalgo/src/analyzers/collision.rs",
+   "line": 164,
+   "symbol": "collide_seg_triangle",
+   "expression": "if f64::signum(ab.cross(nor).dot(h - tri[0]) + TOLERANCE2)",
+   "classification": "excluded",
+   "reason": "squared order",
+   "confidence": "high",
+   "proposed_rewrite": null
+  },
+  {
+   "file": "vendor/truck/truck-meshalgo/src/analyzers/collision.rs",
+   "line": 165,
+   "symbol": "collide_seg_triangle",
+   "expression": "+ f64::signum(bc.cross(nor).dot(h - tri[1]) + TOLERANCE2)",
+   "classification": "excluded",
+   "reason": "squared order",
+   "confidence": "high",
+   "proposed_rewrite": null
+  },
+  {
+   "file": "vendor/truck/truck-meshalgo/src/analyzers/collision.rs",
+   "line": 166,
+   "symbol": "collide_seg_triangle",
+   "expression": "+ f64::signum(ca.cross(nor).dot(h - tri[2]) + TOLERANCE2)",
+   "classification": "excluded",
+   "reason": "squared order",
+   "confidence": "high",
+   "proposed_rewrite": null
+  },
+  {
+   "file": "vendor/truck/truck-meshalgo/src/analyzers/in_out_judge.rs",
+   "line": 23,
+   "symbol": "is_crossing",
+   "expression": "if mat.determinant().so_small() {",
+   "classification": "excluded",
+   "reason": "degree 2 in length: the quantity is an area (a cross-product magnitude or a scalar triple product), so it scales as k^2 while length_margin() scales as k. Neither `model` nor `param` fits and `is_small_len` on an area is a migration that looks right and is wrong once Stage B threads a real model_scale. Same treatment as truck-modeling/src/geom_impls.rs:91, which a previous shard's worker already left as FIXME(BG-TOL-001) for this exact reason. Deferred to BG-TOL-004; the packet asks for a FIXME marker, not a rewrite.",
+   "confidence": "high",
+   "proposed_rewrite": null,
+   "orchestrator_amendment": {
+    "original_classification": "model",
+    "original_reason": "the determinant is the scalar triple product a.(b x dir) of two model-space edge displacements and the unit ray direction, a length-squared quantity that vanishes when the ray grazes the triangle and scales with the model",
+    "original_proposed_rewrite": "ctx.is_small_len(mat.determinant().abs())",
+    "note": "survey said `model` with an `is_small_len` rewrite -- and its own reason for collision.rs:87 calls the quantity 'a length-squared quantity' while applying the length predicate anyway. That internal contradiction is the finding."
+   },
+   "defer_to": "BG-TOL-004",
+   "action": "fixme_marker"
+  },
+  {
+   "file": "vendor/truck/truck-meshalgo/src/analyzers/point_cloud/mod.rs",
+   "line": 12,
+   "symbol": "is_clung_to_by",
+   "expression": "/// `tol` must be greater than or equal to `TOLERANCE`.",
+   "classification": "excluded",
+   "reason": "a /// doc comment, prose not code",
+   "confidence": "high",
+   "proposed_rewrite": null
+  },
+  {
+   "file": "vendor/truck/truck-meshalgo/src/analyzers/point_cloud/mod.rs",
+   "line": 76,
+   "symbol": "distance2_point_triangle",
+   "expression": "if coef < 2.0 || nor.magnitude().so_small() {",
+   "classification": "excluded",
+   "reason": "degree 2 in length: the quantity is an area (a cross-product magnitude or a scalar triple product), so it scales as k^2 while length_margin() scales as k. Neither `model` nor `param` fits and `is_small_len` on an area is a migration that looks right and is wrong once Stage B threads a real model_scale. Same treatment as truck-modeling/src/geom_impls.rs:91, which a previous shard's worker already left as FIXME(BG-TOL-001) for this exact reason. Deferred to BG-TOL-004; the packet asks for a FIXME marker, not a rewrite.",
+   "confidence": "high",
+   "proposed_rewrite": null,
+   "orchestrator_amendment": {
+    "original_classification": "model",
+    "original_reason": "nor.magnitude() is |ab x ca|, twice the triangle area (a length-squared quantity), and the test guards the point-triangle formula against a degenerate triangle, so it scales with the model",
+    "original_proposed_rewrite": "ctx.is_small_len(nor.magnitude())",
+    "note": "survey said `model` with an `is_small_len` rewrite -- and its own reason for collision.rs:87 calls the quantity 'a length-squared quantity' while applying the length predicate anyway. That internal contradiction is the finding."
+   },
+   "defer_to": "BG-TOL-004",
+   "action": "fixme_marker"
+  },
+  {
+   "file": "vendor/truck/truck-meshalgo/src/analyzers/point_cloud/sort_end_points.rs",
+   "line": 55,
+   "symbol": "sorted_endpoints",
+   "expression": ".filter(|(_, tri)| !(tri[1] - tri[0]).cross(tri[2] - tri[0]).so_small())",
+   "classification": "excluded",
+   "reason": "degree 2 in length: the quantity is an area (a cross-product magnitude or a scalar triple product), so it scales as k^2 while length_margin() scales as k. Neither `model` nor `param` fits and `is_small_len` on an area is a migration that looks right and is wrong once Stage B threads a real model_scale. Same treatment as truck-modeling/src/geom_impls.rs:91, which a previous shard's worker already left as FIXME(BG-TOL-001) for this exact reason. Deferred to BG-TOL-004; the packet asks for a FIXME marker, not a rewrite.",
+   "confidence": "high",
+   "proposed_rewrite": null,
+   "orchestrator_amendment": {
+    "original_classification": "model",
+    "original_reason": "the cross product of two triangle edge displacements has magnitude twice the triangle area (length-squared), and this degeneracy filter scales with the model",
+    "original_proposed_rewrite": "!ctx.is_small_len((tri[1] - tri[0]).cross(tri[2] - tri[0]).magnitude())",
+    "note": "survey said `model` with an `is_small_len` rewrite -- and its own reason for collision.rs:87 calls the quantity 'a length-squared quantity' while applying the length predicate anyway. That internal contradiction is the finding."
+   },
+   "defer_to": "BG-TOL-004",
+   "action": "fixme_marker"
+  },
+  {
+   "file": "vendor/truck/truck-meshalgo/src/filters/normal_filters.rs",
+   "line": 32,
+   "symbol": "normalize_normals",
+   "expression": "/// assert!(mesh.normals()[0].magnitude().near(&1.0));",
+   "classification": "excluded",
+   "reason": "a /// doc example, prose not code",
+   "confidence": "high",
+   "proposed_rewrite": null
+  },
+  {
+   "file": "vendor/truck/truck-meshalgo/src/filters/normal_filters.rs",
+   "line": 71,
+   "symbol": "add_naive_normals",
+   "expression": "/// assert!(mesh.normals()[v0.nor.unwrap()].near(&Vector3::new(-2.0, 5.0, 0.0).normalize()));",
+   "classification": "excluded",
+   "reason": "a /// doc example, prose not code",
+   "confidence": "high",
+   "proposed_rewrite": null
+  },
+  {
+   "file": "vendor/truck/truck-meshalgo/src/filters/normal_filters.rs",
+   "line": 72,
+   "symbol": "add_naive_normals",
+   "expression": "/// assert!(mesh.normals()[v1.nor.unwrap()].near(&Vector3::new(2.0, 5.0, 0.0).normalize()));",
+   "classification": "excluded",
+   "reason": "a /// doc example, prose not code",
+   "confidence": "high",
+   "proposed_rewrite": null
+  },
+  {
+   "file": "vendor/truck/truck-meshalgo/src/filters/normal_filters.rs",
+   "line": 114,
+   "symbol": "add_smooth_normals",
+   "expression": "/// assert!(mesh.normals()[v0.nor.unwrap()].near(&Vector3::new(0.0, 1.0, 0.0)));",
+   "classification": "excluded",
+   "reason": "a /// doc example, prose not code",
+   "confidence": "high",
+   "proposed_rewrite": null
+  },
+  {
+   "file": "vendor/truck/truck-meshalgo/src/filters/normal_filters.rs",
+   "line": 115,
+   "symbol": "add_smooth_normals",
+   "expression": "/// assert!(mesh.normals()[v1.nor.unwrap()].near(&Vector3::new(0.0, 1.0, 0.0)));",
+   "classification": "excluded",
+   "reason": "a /// doc example, prose not code",
+   "confidence": "high",
+   "proposed_rewrite": null
+  },
+  {
+   "file": "vendor/truck/truck-meshalgo/src/filters/normal_filters.rs",
+   "line": 122,
+   "symbol": "add_smooth_normals",
+   "expression": "/// assert!(mesh.normals()[v0.nor.unwrap()].near(&Vector3::new(-2.0, 5.0, 0.0).normalize()));",
+   "classification": "excluded",
+   "reason": "a /// doc example, prose not code",
+   "confidence": "high",
+   "proposed_rewrite": null
+  },
+  {
+   "file": "vendor/truck/truck-meshalgo/src/filters/normal_filters.rs",
+   "line": 123,
+   "symbol": "add_smooth_normals",
+   "expression": "/// assert!(mesh.normals()[v1.nor.unwrap()].near(&Vector3::new(2.0, 5.0, 0.0).normalize()));",
+   "classification": "excluded",
+   "reason": "a /// doc example, prose not code",
+   "confidence": "high",
+   "proposed_rewrite": null
+  },
+  {
+   "file": "vendor/truck/truck-meshalgo/src/filters/normal_filters.rs",
+   "line": 200,
+   "symbol": "normalize_normals",
+   "expression": "if !normals[idx].magnitude2().near(&1.0) {",
+   "classification": "param",
+   "reason": "compares the squared magnitude of an already-normalized unit normal against 1.0; a unit vector's length is dimensionless and does not scale with the model",
+   "confidence": "high",
+   "proposed_rewrite": "ctx.is_small_ratio(normals[idx].magnitude2() - 1.0)"
+  },
+  {
+   "file": "vendor/truck/truck-meshalgo/src/tessellation/source_edge.rs",
+   "line": 65,
+   "symbol": "<file scope>",
+   "expression": "//! ([`SOURCE_INCIDENCE_TOLERANCE`]) as the fallback. It is deliberately not the",
+   "classification": "excluded",
+   "reason": "a //! module doc comment, prose not code",
+   "confidence": "high",
+   "proposed_rewrite": null
+  },
+  {
+   "file": "vendor/truck/truck-meshalgo/src/tessellation/source_edge.rs",
+   "line": 98,
+   "symbol": "SOURCE_INCIDENCE_TOLERANCE",
+   "expression": "/// This is `truck_base`'s own [`TOLERANCE`] (1e-6), the existing geometric",
+   "classification": "excluded",
+   "reason": "a /// doc comment on the SOURCE_INCIDENCE_TOLERANCE constant, prose not code",
+   "confidence": "high",
+   "proposed_rewrite": null
+  },
+  {
+   "file": "vendor/truck/truck-meshalgo/src/tessellation/source_edge.rs",
+   "line": 111,
+   "symbol": "<file scope>",
+   "expression": "pub const SOURCE_INCIDENCE_TOLERANCE: f64 = TOLERANCE;",
+   "classification": "excluded",
+   "reason": "not a predicate: it is a `const` item defining a tolerance *value*. A const cannot call `ctx.length_margin()` -- there is no ctx in a const initializer -- so the proposed rewrite does not compile. Its value is a model-space length and re-homing it on a threaded ctx is Stage B work, exactly like polyline_on_surface:11072 which this same survey excluded correctly.",
+   "confidence": "high",
+   "proposed_rewrite": null,
+   "orchestrator_amendment": {
+    "original_classification": "model",
+    "original_reason": "file-scope constant defining the fallback source-incidence tolerance, a model-space length: it is the threshold in distance and residual comparisons (e.g. carrier_closed at line 311) that decide how close a curve point must be to a source vertex, so it scales with the model",
+    "original_proposed_rewrite": "ctx.length_margin()",
+    "note": "survey said `model` with rewrite `ctx.length_margin()`. The two consumers (source_edge.rs:311, triangulation.rs:1718) are the predicates; the constant is not one."
+   }
+  },
+  {
+   "file": "vendor/truck/truck-meshalgo/src/tessellation/source_edge.rs",
+   "line": 206,
+   "symbol": "establish_source_edge_traversal",
+   "expression": "/// context, or [`SOURCE_INCIDENCE_TOLERANCE`] when the source declares none.",
+   "classification": "excluded",
+   "reason": "a /// doc comment, prose not code",
+   "confidence": "high",
+   "proposed_rewrite": null
+  },
+  {
+   "file": "vendor/truck/truck-meshalgo/src/tessellation/source_edge.rs",
+   "line": 220,
+   "symbol": "establish_source_edge_traversal",
+   "expression": "/// effective_source_tol = max(valid_declared_source_uncertainty, SOURCE_INCIDENCE_TOLERANCE)",
+   "classification": "excluded",
+   "reason": "a /// doc comment, prose not code",
+   "confidence": "high",
+   "proposed_rewrite": null
+  },
+  {
+   "file": "vendor/truck/truck-meshalgo/src/tessellation/source_edge.rs",
+   "line": 228,
+   "symbol": "establish_source_edge_traversal",
+   "expression": "/// [`SOURCE_INCIDENCE_TOLERANCE`], never the widened values.",
+   "classification": "excluded",
+   "reason": "a /// doc comment, prose not code",
+   "confidence": "high",
+   "proposed_rewrite": null
+  },
+  {
+   "file": "vendor/truck/truck-meshalgo/src/tessellation/source_edge.rs",
+   "line": 252,
+   "symbol": "establish_source_edge_traversal",
+   "expression": "let effective_source_tol = source_tolerance.max(SOURCE_INCIDENCE_TOLERANCE);",
+   "classification": "excluded",
+   "reason": "not a predicate: it selects the larger of two source-incidence length tolerances as a floor via f64::max and compares nothing, though the value is a model-space length that must scale in Stage B",
+   "confidence": "high",
+   "proposed_rewrite": null
+  },
+  {
+   "file": "vendor/truck/truck-meshalgo/src/tessellation/source_edge.rs",
+   "line": 311,
+   "symbol": "establish_source_edge_traversal",
+   "expression": "let carrier_closed = subs_lo.distance(subs_hi) <= SOURCE_INCIDENCE_TOLERANCE;",
+   "classification": "model",
+   "reason": "it compares the distance between two curve points (a model-space length) against the source-incidence length tolerance to decide whether the carrier closes at the evaluator seam, so it scales with the model",
+   "confidence": "high",
+   "proposed_rewrite": "ctx.is_small_len(subs_lo.distance(subs_hi))"
+  },
+  {
+   "file": "vendor/truck/truck-meshalgo/src/tessellation/source_edge.rs",
+   "line": 657,
+   "symbol": "source_edge_incidence_retains_declared_uncertainty",
+   "expression": "assert!(start.distance(end) > SOURCE_INCIDENCE_TOLERANCE);",
+   "classification": "excluded",
+   "reason": "inside the #[cfg(test)] tests module (mod tests at line 612); a test's own epsilon is the test's business",
+   "confidence": "high",
+   "proposed_rewrite": null
+  },
+  {
+   "file": "vendor/truck/truck-meshalgo/src/tessellation/source_edge.rs",
+   "line": 663,
+   "symbol": "source_edge_incidence_retains_declared_uncertainty",
+   "expression": "SOURCE_INCIDENCE_TOLERANCE,",
+   "classification": "excluded",
+   "reason": "inside the #[cfg(test)] tests module (mod tests at line 612); a test's own epsilon is the test's business",
+   "confidence": "high",
+   "proposed_rewrite": null
+  },
+  {
+   "file": "vendor/truck/truck-meshalgo/src/tessellation/source_edge.rs",
+   "line": 664,
+   "symbol": "source_edge_incidence_retains_declared_uncertainty",
+   "expression": "SOURCE_INCIDENCE_TOLERANCE,",
+   "classification": "excluded",
+   "reason": "inside the #[cfg(test)] tests module (mod tests at line 612); a test's own epsilon is the test's business",
+   "confidence": "high",
+   "proposed_rewrite": null
+  },
+  {
+   "file": "vendor/truck/truck-meshalgo/src/tessellation/source_edge.rs",
+   "line": 690,
+   "symbol": "source_edge_incidence_respects_declared_uncertainty",
+   "expression": "SOURCE_INCIDENCE_TOLERANCE,",
+   "classification": "excluded",
+   "reason": "inside the #[cfg(test)] tests module (mod tests at line 612); a test's own epsilon is the test's business",
+   "confidence": "high",
+   "proposed_rewrite": null
+  },
+  {
+   "file": "vendor/truck/truck-meshalgo/src/tessellation/source_edge.rs",
+   "line": 691,
+   "symbol": "source_edge_incidence_respects_declared_uncertainty",
+   "expression": "SOURCE_INCIDENCE_TOLERANCE,",
+   "classification": "excluded",
+   "reason": "inside the #[cfg(test)] tests module (mod tests at line 612); a test's own epsilon is the test's business",
+   "confidence": "high",
+   "proposed_rewrite": null
+  },
+  {
+   "file": "vendor/truck/truck-meshalgo/src/tessellation/source_edge.rs",
+   "line": 716,
+   "symbol": "open_curve_endpoint_incidence",
+   "expression": "SOURCE_INCIDENCE_TOLERANCE,",
+   "classification": "excluded",
+   "reason": "inside the #[cfg(test)] tests module (mod tests at line 612); a test's own epsilon is the test's business",
+   "confidence": "high",
+   "proposed_rewrite": null
+  },
+  {
+   "file": "vendor/truck/truck-meshalgo/src/tessellation/source_edge.rs",
+   "line": 717,
+   "symbol": "open_curve_endpoint_incidence",
+   "expression": "SOURCE_INCIDENCE_TOLERANCE,",
+   "classification": "excluded",
+   "reason": "inside the #[cfg(test)] tests module (mod tests at line 612); a test's own epsilon is the test's business",
+   "confidence": "high",
+   "proposed_rewrite": null
+  },
+  {
+   "file": "vendor/truck/truck-meshalgo/src/tessellation/source_edge.rs",
+   "line": 741,
+   "symbol": "open_curve_endpoint_incidence",
+   "expression": "assert!(start_pos.distance(end_pos) > SOURCE_INCIDENCE_TOLERANCE);",
+   "classification": "excluded",
+   "reason": "inside the #[cfg(test)] tests module (mod tests at line 612); a test's own epsilon is the test's business",
+   "confidence": "high",
+   "proposed_rewrite": null
+  },
+  {
+   "file": "vendor/truck/truck-meshalgo/src/tessellation/source_edge.rs",
+   "line": 747,
+   "symbol": "open_curve_endpoint_incidence",
+   "expression": "SOURCE_INCIDENCE_TOLERANCE,",
+   "classification": "excluded",
+   "reason": "inside the #[cfg(test)] tests module (mod tests at line 612); a test's own epsilon is the test's business",
+   "confidence": "high",
+   "proposed_rewrite": null
+  },
+  {
+   "file": "vendor/truck/truck-meshalgo/src/tessellation/source_edge.rs",
+   "line": 748,
+   "symbol": "open_curve_endpoint_incidence",
+   "expression": "SOURCE_INCIDENCE_TOLERANCE,",
+   "classification": "excluded",
+   "reason": "inside the #[cfg(test)] tests module (mod tests at line 612); a test's own epsilon is the test's business",
+   "confidence": "high",
+   "proposed_rewrite": null
+  },
+  {
+   "file": "vendor/truck/truck-meshalgo/src/tessellation/source_edge.rs",
+   "line": 768,
+   "symbol": "open_curve_endpoint_incidence",
+   "expression": "assert!(witness.start_residual < SOURCE_INCIDENCE_TOLERANCE);",
+   "classification": "excluded",
+   "reason": "inside the #[cfg(test)] tests module (mod tests at line 612); a test's own epsilon is the test's business",
+   "confidence": "high",
+   "proposed_rewrite": null
+  },
+  {
+   "file": "vendor/truck/truck-meshalgo/src/tessellation/source_edge.rs",
+   "line": 769,
+   "symbol": "open_curve_endpoint_incidence",
+   "expression": "assert!(witness.end_residual < SOURCE_INCIDENCE_TOLERANCE);",
+   "classification": "excluded",
+   "reason": "inside the #[cfg(test)] tests module (mod tests at line 612); a test's own epsilon is the test's business",
+   "confidence": "high",
+   "proposed_rewrite": null
+  },
+  {
+   "file": "vendor/truck/truck-meshalgo/src/tessellation/source_edge.rs",
+   "line": 789,
+   "symbol": "open_curve_endpoint_incidence",
+   "expression": "assert!(curve.subs(lo).distance(curve.subs(hi)) > SOURCE_INCIDENCE_TOLERANCE);",
+   "classification": "excluded",
+   "reason": "inside the #[cfg(test)] tests module (mod tests at line 612); a test's own epsilon is the test's business",
+   "confidence": "high",
+   "proposed_rewrite": null
+  },
+  {
+   "file": "vendor/truck/truck-meshalgo/src/tessellation/source_edge.rs",
+   "line": 796,
+   "symbol": "open_curve_endpoint_incidence",
+   "expression": "assert!(start_pos.distance(end_pos) > SOURCE_INCIDENCE_TOLERANCE);",
+   "classification": "excluded",
+   "reason": "inside the #[cfg(test)] tests module (mod tests at line 612); a test's own epsilon is the test's business",
+   "confidence": "high",
+   "proposed_rewrite": null
+  },
+  {
+   "file": "vendor/truck/truck-meshalgo/src/tessellation/source_edge.rs",
+   "line": 802,
+   "symbol": "open_curve_endpoint_incidence",
+   "expression": "SOURCE_INCIDENCE_TOLERANCE,",
+   "classification": "excluded",
+   "reason": "inside the #[cfg(test)] tests module (mod tests at line 612); a test's own epsilon is the test's business",
+   "confidence": "high",
+   "proposed_rewrite": null
+  },
+  {
+   "file": "vendor/truck/truck-meshalgo/src/tessellation/source_edge.rs",
+   "line": 803,
+   "symbol": "open_curve_endpoint_incidence",
+   "expression": "SOURCE_INCIDENCE_TOLERANCE,",
+   "classification": "excluded",
+   "reason": "inside the #[cfg(test)] tests module (mod tests at line 612); a test's own epsilon is the test's business",
+   "confidence": "high",
+   "proposed_rewrite": null
+  },
+  {
+   "file": "vendor/truck/truck-meshalgo/src/tessellation/source_edge.rs",
+   "line": 815,
+   "symbol": "open_curve_endpoint_incidence",
+   "expression": "assert!(witness.start_residual < SOURCE_INCIDENCE_TOLERANCE);",
+   "classification": "excluded",
+   "reason": "inside the #[cfg(test)] tests module (mod tests at line 612); a test's own epsilon is the test's business",
+   "confidence": "high",
+   "proposed_rewrite": null
+  },
+  {
+   "file": "vendor/truck/truck-meshalgo/src/tessellation/source_edge.rs",
+   "line": 816,
+   "symbol": "open_curve_endpoint_incidence",
+   "expression": "assert!(witness.end_residual < SOURCE_INCIDENCE_TOLERANCE);",
+   "classification": "excluded",
+   "reason": "inside the #[cfg(test)] tests module (mod tests at line 612); a test's own epsilon is the test's business",
+   "confidence": "high",
+   "proposed_rewrite": null
+  },
+  {
+   "file": "vendor/truck/truck-meshalgo/src/tessellation/source_edge.rs",
+   "line": 876,
+   "symbol": "source_edge_wraps_only_on_certified_closed_carrier",
+   "expression": "SOURCE_INCIDENCE_TOLERANCE,",
+   "classification": "excluded",
+   "reason": "inside the #[cfg(test)] tests module (mod tests at line 612); a test's own epsilon is the test's business",
+   "confidence": "high",
+   "proposed_rewrite": null
+  },
+  {
+   "file": "vendor/truck/truck-meshalgo/src/tessellation/source_edge.rs",
+   "line": 877,
+   "symbol": "source_edge_wraps_only_on_certified_closed_carrier",
+   "expression": "SOURCE_INCIDENCE_TOLERANCE,",
+   "classification": "excluded",
+   "reason": "inside the #[cfg(test)] tests module (mod tests at line 612); a test's own epsilon is the test's business",
+   "confidence": "high",
+   "proposed_rewrite": null
+  },
+  {
+   "file": "vendor/truck/truck-meshalgo/src/tessellation/source_edge.rs",
+   "line": 890,
+   "symbol": "source_edge_wraps_only_on_certified_closed_carrier",
+   "expression": "SOURCE_INCIDENCE_TOLERANCE,",
+   "classification": "excluded",
+   "reason": "inside the #[cfg(test)] tests module (mod tests at line 612); a test's own epsilon is the test's business",
+   "confidence": "high",
+   "proposed_rewrite": null
+  },
+  {
+   "file": "vendor/truck/truck-meshalgo/src/tessellation/source_edge.rs",
+   "line": 932,
+   "symbol": "source_edge_wraps_only_on_certified_closed_carrier",
+   "expression": "SOURCE_INCIDENCE_TOLERANCE,",
+   "classification": "excluded",
+   "reason": "inside the #[cfg(test)] tests module (mod tests at line 612); a test's own epsilon is the test's business",
+   "confidence": "high",
+   "proposed_rewrite": null
+  },
+  {
+   "file": "vendor/truck/truck-meshalgo/src/tessellation/source_edge.rs",
+   "line": 958,
+   "symbol": "source_edge_wraps_only_on_certified_closed_carrier",
+   "expression": "assert!(start_pos.distance(end_pos) > SOURCE_INCIDENCE_TOLERANCE);",
+   "classification": "excluded",
+   "reason": "inside the #[cfg(test)] tests module (mod tests at line 612); a test's own epsilon is the test's business",
+   "confidence": "high",
+   "proposed_rewrite": null
+  },
+  {
+   "file": "vendor/truck/truck-meshalgo/src/tessellation/source_edge.rs",
+   "line": 968,
+   "symbol": "source_edge_wraps_only_on_certified_closed_carrier",
+   "expression": "SOURCE_INCIDENCE_TOLERANCE,",
+   "classification": "excluded",
+   "reason": "inside the #[cfg(test)] tests module (mod tests at line 612); a test's own epsilon is the test's business",
+   "confidence": "high",
+   "proposed_rewrite": null
+  },
+  {
+   "file": "vendor/truck/truck-meshalgo/src/tessellation/source_edge.rs",
+   "line": 997,
+   "symbol": "source_edge_wraps_only_on_certified_closed_carrier",
+   "expression": "assert!(start_pos.distance(end_pos) > SOURCE_INCIDENCE_TOLERANCE);",
+   "classification": "excluded",
+   "reason": "inside the #[cfg(test)] tests module (mod tests at line 612); a test's own epsilon is the test's business",
+   "confidence": "high",
+   "proposed_rewrite": null
+  },
+  {
+   "file": "vendor/truck/truck-meshalgo/src/tessellation/source_edge.rs",
+   "line": 1004,
+   "symbol": "source_edge_wraps_only_on_certified_closed_carrier",
+   "expression": "SOURCE_INCIDENCE_TOLERANCE,",
+   "classification": "excluded",
+   "reason": "inside the #[cfg(test)] tests module (mod tests at line 612); a test's own epsilon is the test's business",
+   "confidence": "high",
+   "proposed_rewrite": null
+  },
+  {
+   "file": "vendor/truck/truck-meshalgo/src/tessellation/source_edge.rs",
+   "line": 1016,
+   "symbol": "source_edge_wraps_only_on_certified_closed_carrier",
+   "expression": "/// [`SOURCE_INCIDENCE_TOLERANCE`]: the source may declare *looser*",
+   "classification": "excluded",
+   "reason": "a /// doc comment inside the #[cfg(test)] tests module; prose not code",
+   "confidence": "high",
+   "proposed_rewrite": null
+  },
+  {
+   "file": "vendor/truck/truck-meshalgo/src/tessellation/source_edge.rs",
+   "line": 1025,
+   "symbol": "source_edge_wraps_only_on_certified_closed_carrier",
+   "expression": "assert!(start_pos.distance(end_pos) > SOURCE_INCIDENCE_TOLERANCE);",
+   "classification": "excluded",
+   "reason": "inside the #[cfg(test)] tests module (mod tests at line 612); a test's own epsilon is the test's business",
+   "confidence": "high",
+   "proposed_rewrite": null
+  },
+  {
+   "file": "vendor/truck/truck-meshalgo/src/tessellation/source_edge.rs",
+   "line": 1035,
+   "symbol": "source_edge_wraps_only_on_certified_closed_carrier",
+   "expression": "SOURCE_INCIDENCE_TOLERANCE,",
+   "classification": "excluded",
+   "reason": "inside the #[cfg(test)] tests module (mod tests at line 612); a test's own epsilon is the test's business",
+   "confidence": "high",
+   "proposed_rewrite": null
+  },
+  {
+   "file": "vendor/truck/truck-meshalgo/src/tessellation/source_edge.rs",
+   "line": 1061,
+   "symbol": "source_edge_wraps_only_on_certified_closed_carrier",
+   "expression": "assert!(end_pos.distance(curve.subs(hi)) > SOURCE_INCIDENCE_TOLERANCE);",
+   "classification": "excluded",
+   "reason": "inside the #[cfg(test)] tests module (mod tests at line 612); a test's own epsilon is the test's business",
+   "confidence": "high",
+   "proposed_rewrite": null
+  },
+  {
+   "file": "vendor/truck/truck-meshalgo/src/tessellation/source_edge.rs",
+   "line": 1070,
+   "symbol": "source_edge_wraps_only_on_certified_closed_carrier",
+   "expression": "SOURCE_INCIDENCE_TOLERANCE,",
+   "classification": "excluded",
+   "reason": "inside the #[cfg(test)] tests module (mod tests at line 612); a test's own epsilon is the test's business",
+   "confidence": "high",
+   "proposed_rewrite": null
+  },
+  {
+   "file": "vendor/truck/truck-meshalgo/src/tessellation/source_edge.rs",
+   "line": 1071,
+   "symbol": "source_edge_wraps_only_on_certified_closed_carrier",
+   "expression": "SOURCE_INCIDENCE_TOLERANCE,",
+   "classification": "excluded",
+   "reason": "inside the #[cfg(test)] tests module (mod tests at line 612); a test's own epsilon is the test's business",
+   "confidence": "high",
+   "proposed_rewrite": null
+  },
+  {
+   "file": "vendor/truck/truck-meshalgo/src/tessellation/source_edge.rs",
+   "line": 1082,
+   "symbol": "source_edge_wraps_only_on_certified_closed_carrier",
+   "expression": "SOURCE_INCIDENCE_TOLERANCE,",
+   "classification": "excluded",
+   "reason": "inside the #[cfg(test)] tests module (mod tests at line 612); a test's own epsilon is the test's business",
+   "confidence": "high",
+   "proposed_rewrite": null
+  },
+  {
+   "file": "vendor/truck/truck-meshalgo/src/tessellation/source_edge.rs",
+   "line": 1116,
+   "symbol": "source_edge_wraps_only_on_certified_closed_carrier",
+   "expression": "SOURCE_INCIDENCE_TOLERANCE,",
+   "classification": "excluded",
+   "reason": "inside the #[cfg(test)] tests module (mod tests at line 612); a test's own epsilon is the test's business",
+   "confidence": "high",
+   "proposed_rewrite": null
+  },
+  {
+   "file": "vendor/truck/truck-meshalgo/src/tessellation/source_edge.rs",
+   "line": 1130,
+   "symbol": "source_edge_wraps_only_on_certified_closed_carrier",
+   "expression": "SOURCE_INCIDENCE_TOLERANCE,",
+   "classification": "excluded",
+   "reason": "inside the #[cfg(test)] tests module (mod tests at line 612); a test's own epsilon is the test's business",
+   "confidence": "high",
+   "proposed_rewrite": null
+  },
+  {
+   "file": "vendor/truck/truck-meshalgo/src/tessellation/triangulation.rs",
+   "line": 1718,
+   "symbol": "cshell_tessellation_inner",
+   "expression": ".unwrap_or(source_edge::SOURCE_INCIDENCE_TOLERANCE);",
+   "classification": "excluded",
+   "reason": "not a predicate: it selects the source-incidence length tolerance as a fallback for a shell that declares no geometric uncertainty; nothing is compared, though the value is a model-space length that must scale in Stage B",
+   "confidence": "high",
+   "proposed_rewrite": null
+  },
+  {
+   "file": "vendor/truck/truck-meshalgo/src/tessellation/triangulation.rs",
+   "line": 4517,
+   "symbol": "reconcile_singular_transition",
+   "expression": "if !previous_uv.x.near(&current_uv.x) && surface.uder(current_uv.x, current_uv.y).so_small() {",
+   "classification": "model",
+   "reason": "the line carries two tolerance predicates: the deciding test is that the surface u-derivative magnitude is degenerate, which is a model-space length that scales with the model, but the `!near` guard compares u parameters (dimensionless), so a faithful migration needs one is_small_len and one is_small_ratio",
+   "confidence": "high",
+   "proposed_rewrite": "!ctx.is_small_ratio(previous_uv.x - current_uv.x) && ctx.is_small_len(surface.uder(current_uv.x, current_uv.y).magnitude())",
+   "orchestrator_amendment": {
+    "original_classification": "model",
+    "original_reason": "the line carries two tolerance predicates: the deciding test is that the surface u-derivative magnitude is degenerate, which is a model-space length that scales with the model, but the `!near` guard compares u parameters (dimensionless), so a faithful migration needs one is_small_len and one is_small_ratio",
+    "original_proposed_rewrite": "ctx.is_small_len(surface.uder(current_uv.x, current_uv.y).magnitude())",
+    "note": "classification upheld -- the deciding test is the derivative magnitude, and truck-shapeops/src/healing/split_closed_faces.rs:630 already migrated the identical uder/vder pattern as `model`. But the line carries TWO predicates and the survey's rewrite migrated only the so_small half, silently DELETING the `!near` guard and changing the behaviour. The worker said so in its own `reason` and could not say it in `proposed_rewrite`, which holds one expression per row. Both halves are now written out: the dimensionless uv guard as is_small_ratio, the derivative magnitude as is_small_len."
+   }
+  },
+  {
+   "file": "vendor/truck/truck-meshalgo/src/tessellation/triangulation.rs",
+   "line": 4523,
+   "symbol": "reconcile_singular_transition",
+   "expression": "if !previous_uv.y.near(&current_uv.y) && surface.vder(current_uv.x, current_uv.y).so_small() {",
+   "classification": "model",
+   "reason": "as line 4517: the deciding test is the v-derivative magnitude (a model-space length), while the `!near` guard compares v parameters (dimensionless); a faithful migration needs both an is_small_len and an is_small_ratio",
+   "confidence": "high",
+   "proposed_rewrite": "!ctx.is_small_ratio(previous_uv.y - current_uv.y) && ctx.is_small_len(surface.vder(current_uv.x, current_uv.y).magnitude())",
+   "orchestrator_amendment": {
+    "original_classification": "model",
+    "original_reason": "as line 4517: the deciding test is the v-derivative magnitude (a model-space length), while the `!near` guard compares v parameters (dimensionless); a faithful migration needs both an is_small_len and an is_small_ratio",
+    "original_proposed_rewrite": "ctx.is_small_len(surface.vder(current_uv.x, current_uv.y).magnitude())",
+    "note": "classification upheld -- the deciding test is the derivative magnitude, and truck-shapeops/src/healing/split_closed_faces.rs:630 already migrated the identical uder/vder pattern as `model`. But the line carries TWO predicates and the survey's rewrite migrated only the so_small half, silently DELETING the `!near` guard and changing the behaviour. The worker said so in its own `reason` and could not say it in `proposed_rewrite`, which holds one expression per row. Both halves are now written out: the dimensionless uv guard as is_small_ratio, the derivative magnitude as is_small_len."
+   }
+  },
+  {
+   "file": "vendor/truck/truck-meshalgo/src/tessellation/triangulation.rs",
+   "line": 4529,
+   "symbol": "reconcile_singular_transition",
+   "expression": "if !previous_uv.x.near(&current_uv.x) && surface.uder(previous_uv.x, previous_uv.y).so_small() {",
+   "classification": "model",
+   "reason": "as line 4517: the deciding test is the u-derivative magnitude (a model-space length), while the `!near` guard compares u parameters (dimensionless); a faithful migration needs both an is_small_len and an is_small_ratio",
+   "confidence": "high",
+   "proposed_rewrite": "!ctx.is_small_ratio(previous_uv.x - current_uv.x) && ctx.is_small_len(surface.uder(previous_uv.x, previous_uv.y).magnitude())",
+   "orchestrator_amendment": {
+    "original_classification": "model",
+    "original_reason": "as line 4517: the deciding test is the u-derivative magnitude (a model-space length), while the `!near` guard compares u parameters (dimensionless); a faithful migration needs both an is_small_len and an is_small_ratio",
+    "original_proposed_rewrite": "ctx.is_small_len(surface.uder(previous_uv.x, previous_uv.y).magnitude())",
+    "note": "classification upheld -- the deciding test is the derivative magnitude, and truck-shapeops/src/healing/split_closed_faces.rs:630 already migrated the identical uder/vder pattern as `model`. But the line carries TWO predicates and the survey's rewrite migrated only the so_small half, silently DELETING the `!near` guard and changing the behaviour. The worker said so in its own `reason` and could not say it in `proposed_rewrite`, which holds one expression per row. Both halves are now written out: the dimensionless uv guard as is_small_ratio, the derivative magnitude as is_small_len."
+   }
+  },
+  {
+   "file": "vendor/truck/truck-meshalgo/src/tessellation/triangulation.rs",
+   "line": 4535,
+   "symbol": "reconcile_singular_transition",
+   "expression": "if !previous_uv.y.near(&current_uv.y) && surface.vder(previous_uv.x, previous_uv.y).so_small() {",
+   "classification": "model",
+   "reason": "as line 4517: the deciding test is the v-derivative magnitude (a model-space length), while the `!near` guard compares v parameters (dimensionless); a faithful migration needs both an is_small_len and an is_small_ratio",
+   "confidence": "high",
+   "proposed_rewrite": "!ctx.is_small_ratio(previous_uv.y - current_uv.y) && ctx.is_small_len(surface.vder(previous_uv.x, previous_uv.y).magnitude())",
+   "orchestrator_amendment": {
+    "original_classification": "model",
+    "original_reason": "as line 4517: the deciding test is the v-derivative magnitude (a model-space length), while the `!near` guard compares v parameters (dimensionless); a faithful migration needs both an is_small_len and an is_small_ratio",
+    "original_proposed_rewrite": "ctx.is_small_len(surface.vder(previous_uv.x, previous_uv.y).magnitude())",
+    "note": "classification upheld -- the deciding test is the derivative magnitude, and truck-shapeops/src/healing/split_closed_faces.rs:630 already migrated the identical uder/vder pattern as `model`. But the line carries TWO predicates and the survey's rewrite migrated only the so_small half, silently DELETING the `!near` guard and changing the behaviour. The worker said so in its own `reason` and could not say it in `proposed_rewrite`, which holds one expression per row. Both halves are now written out: the dimensionless uv guard as is_small_ratio, the derivative magnitude as is_small_len."
+   }
+  },
+  {
+   "file": "vendor/truck/truck-meshalgo/src/tessellation/triangulation.rs",
+   "line": 5523,
+   "symbol": "try_new",
+   "expression": "if !vec[0].near(&last) {",
+   "classification": "param",
+   "reason": "SurfacePoint has no AbsDiffEq impl and Derefs to uv: Point2, so this `near` resolves to Point2::near and compares the first and last lifted boundary points' uv parameters (dimensionless), not their positions, deciding whether the loop endpoint uv closed",
+   "confidence": "high",
+   "proposed_rewrite": "!ctx.is_small_ratio(vec[0].uv.distance(last.uv))"
+  },
+  {
+   "file": "vendor/truck/truck-meshalgo/src/tessellation/triangulation.rs",
+   "line": 5525,
+   "symbol": "try_new",
+   "expression": "if surface.uder(u0, v0).so_small() || surface.vder(u0, v0).so_small() {",
+   "classification": "model",
+   "reason": "the surface u- and v-derivative magnitudes are model-space lengths (length per dimensionless parameter) and the test decides whether the loop closes on a collapsed direction, so it scales with the model",
+   "confidence": "high",
+   "proposed_rewrite": "ctx.is_small_len(surface.uder(u0, v0).magnitude()) || ctx.is_small_len(surface.vder(u0, v0).magnitude())"
+  },
+  {
+   "file": "vendor/truck/truck-meshalgo/src/tessellation/triangulation.rs",
+   "line": 6379,
+   "symbol": "singular_transition_branch",
+   "expression": "if vp.is_some() && surface.vder(u, v).so_small() {",
+   "classification": "model",
+   "reason": "the v-derivative magnitude is a model-space length (length per dimensionless parameter), and the test detects a collapsed periodic axis at a chart singularity, so it scales with the model",
+   "confidence": "high",
+   "proposed_rewrite": "ctx.is_small_len(surface.vder(u, v).magnitude())"
+  },
+  {
+   "file": "vendor/truck/truck-meshalgo/src/tessellation/triangulation.rs",
+   "line": 6381,
+   "symbol": "singular_transition_branch",
+   "expression": "} else if up.is_some() && surface.uder(u, v).so_small() {",
+   "classification": "model",
+   "reason": "the u-derivative magnitude is a model-space length (length per dimensionless parameter), and the test detects a collapsed periodic axis at a chart singularity, so it scales with the model",
+   "confidence": "high",
+   "proposed_rewrite": "ctx.is_small_len(surface.uder(u, v).magnitude())"
+  },
+  {
+   "file": "vendor/truck/truck-meshalgo/src/tessellation/triangulation.rs",
+   "line": 6494,
+   "symbol": "PointLocation",
+   "expression": "/// On a boundary segment within `TOLERANCE`, by direct test.",
+   "classification": "excluded",
+   "reason": "a /// doc comment on the PointLocation enum's Boundary variant, prose not code",
+   "confidence": "high",
+   "proposed_rewrite": null
+  },
+  {
+   "file": "vendor/truck/truck-meshalgo/src/tessellation/triangulation.rs",
+   "line": 6704,
+   "symbol": "PartJoin",
+   "expression": "/// testing `tail.uv.distance(next[0].uv) < TOLERANCE`, which is wrong twice",
+   "classification": "excluded",
+   "reason": "a /// doc comment on the PartJoin enum, prose not code",
+   "confidence": "high",
+   "proposed_rewrite": null
+  },
+  {
+   "file": "vendor/truck/truck-meshalgo/src/tessellation/triangulation.rs",
+   "line": 6910,
+   "symbol": "normalize_range",
+   "expression": "let tmp = f64::min(p[compidx], q[compidx]) + TOLERANCE;",
+   "classification": "excluded",
+   "reason": "not a predicate: TOLERANCE is added to a u/v parameter coordinate to place a range cut when normalizing the boundary loop in parameter space; nothing is compared",
+   "confidence": "high",
+   "proposed_rewrite": null
+  },
+  {
+   "file": "vendor/truck/truck-meshalgo/src/tessellation/triangulation.rs",
+   "line": 7220,
+   "symbol": "working_range",
+   "expression": "(hi - lo > TOLERANCE).then_some((lo, hi))",
+   "classification": "param",
+   "reason": "hi - lo is the span of the boundary's u (or v) parameter coordinate, so the comparison asks whether the parameter interval is non-degenerate and a parameter range is dimensionless",
+   "confidence": "high",
+   "proposed_rewrite": "!ctx.is_small_ratio(hi - lo)"
+  },
+  {
+   "file": "vendor/truck/truck-meshalgo/src/tessellation/triangulation.rs",
+   "line": 8204,
+   "symbol": "new_with_join",
+   "expression": "if p.x < q.x - TOLERANCE {",
+   "classification": "param",
+   "reason": "p.x and q.x are the u parameters of the open boundary's endpoints, so the one-sided margin comparison decides which parameter axis to cut on and is dimensionless",
+   "confidence": "high",
+   "proposed_rewrite": "p.x < q.x - ctx.ratio_margin()"
+  },
+  {
+   "file": "vendor/truck/truck-meshalgo/src/tessellation/triangulation.rs",
+   "line": 8220,
+   "symbol": "new_with_join",
+   "expression": "} else if q.x < p.x - TOLERANCE {",
+   "classification": "param",
+   "reason": "p.x and q.x are the u parameters of the open boundary's endpoints, so the one-sided margin comparison decides which parameter axis to cut on and is dimensionless",
+   "confidence": "high",
+   "proposed_rewrite": "q.x < p.x - ctx.ratio_margin()"
+  },
+  {
+   "file": "vendor/truck/truck-meshalgo/src/tessellation/triangulation.rs",
+   "line": 8236,
+   "symbol": "new_with_join",
+   "expression": "} else if p.y < q.y - TOLERANCE {",
+   "classification": "param",
+   "reason": "p.y and q.y are the v parameters of the open boundary's endpoints, so the one-sided margin comparison decides which parameter axis to cut on and is dimensionless",
+   "confidence": "high",
+   "proposed_rewrite": "p.y < q.y - ctx.ratio_margin()"
+  },
+  {
+   "file": "vendor/truck/truck-meshalgo/src/tessellation/triangulation.rs",
+   "line": 8252,
+   "symbol": "new_with_join",
+   "expression": "} else if q.y < p.y - TOLERANCE {",
+   "classification": "param",
+   "reason": "p.y and q.y are the v parameters of the open boundary's endpoints, so the one-sided margin comparison decides which parameter axis to cut on and is dimensionless",
+   "confidence": "high",
+   "proposed_rewrite": "q.y < p.y - ctx.ratio_margin()"
+  },
+  {
+   "file": "vendor/truck/truck-meshalgo/src/tessellation/triangulation.rs",
+   "line": 8278,
+   "symbol": "end_pts",
+   "expression": "if !p0.x.near(&p1.x) && !q0.x.near(&q1.x) {",
+   "classification": "param",
+   "reason": "p0.x, p1.x, q0.x, q1.x are u parameters of the two open curves' endpoints, so the comparison asks whether both curves need the same u-range normalization and is dimensionless",
+   "confidence": "high",
+   "proposed_rewrite": "!ctx.is_small_ratio(p0.x - p1.x) && !ctx.is_small_ratio(q0.x - q1.x)"
+  },
+  {
+   "file": "vendor/truck/truck-meshalgo/src/tessellation/triangulation.rs",
+   "line": 8283,
+   "symbol": "end_pts",
+   "expression": "} else if !p0.y.near(&p1.y) && !q0.y.near(&q1.y) {",
+   "classification": "param",
+   "reason": "p0.y, p1.y, q0.y, q1.y are v parameters of the two open curves' endpoints, so the comparison asks whether both curves need the same v-range normalization and is dimensionless",
+   "confidence": "high",
+   "proposed_rewrite": "!ctx.is_small_ratio(p0.y - p1.y) && !ctx.is_small_ratio(q0.y - q1.y)"
+  },
+  {
+   "file": "vendor/truck/truck-meshalgo/src/tessellation/triangulation.rs",
+   "line": 8381,
+   "symbol": "on_boundary",
+   "expression": "/// Whether `c` lies on a boundary segment, within `TOLERANCE`.",
+   "classification": "excluded",
+   "reason": "a /// doc comment on the on_boundary method, prose not code",
+   "confidence": "high",
+   "proposed_rewrite": null
+  },
+  {
+   "file": "vendor/truck/truck-meshalgo/src/tessellation/triangulation.rs",
+   "line": 8398,
+   "symbol": "on_boundary",
+   "expression": "(a + ab * t).distance2(c) <= TOLERANCE * TOLERANCE",
+   "classification": "param",
+   "reason": "parameter-space point-to-segment distance: `c` and the boundary loop points are Point2 in uv, so the predicate is dimensionless. It is first-order, not squared-order: `distance2 <= TOLERANCE * TOLERANCE` is algebraically `distance <= TOLERANCE` written squared to avoid a sqrt, unlike near2/so_small2 which compare a value against the *tighter* TOLERANCE2 = 1e-12 constant and therefore cannot be mapped onto a margin at all.",
+   "confidence": "high",
+   "proposed_rewrite": "ctx.is_small_ratio((a + ab * t).distance(c))",
+   "orchestrator_amendment": {
+    "original_classification": "excluded",
+    "original_reason": "squared order",
+    "original_proposed_rewrite": null,
+    "note": "survey said `excluded / squared order`. It is not the near2 family. The census also miscounts it in the other direction -- its SQUARED regex matches the TOLERANCE2 token and not a written-out `TOLERANCE * TOLERANCE`, so the census scored it a first-order production site, which is right here by accident."
+   }
+  },
+  {
+   "file": "vendor/truck/truck-meshalgo/src/tessellation/triangulation.rs",
+   "line": 8420,
+   "symbol": "include_along_ray",
+   "expression": "if x.so_small() && s0 * s1 < 0.0 {",
+   "classification": "param",
+   "reason": "x is the ratio s2 / (s1 - s0) of parameter-space cross products, the point where the ray crosses the boundary edge, so it is dimensionless",
+   "confidence": "high",
+   "proposed_rewrite": "ctx.is_small_ratio(x)"
+  },
+  {
+   "file": "vendor/truck/truck-meshalgo/src/tessellation/triangulation.rs",
+   "line": 10898,
+   "symbol": "triangulation_into_polymesh_outcome",
+   "expression": "if norm.so_small() || !norm.x.is_finite() {",
+   "classification": "param",
+   "reason": "norm is a vertex normal that was normalized to unit length earlier in the function (surface.normal(...).normalize()), so its magnitude is dimensionless and the test asks whether the unit normal is degenerate (zero), which does not scale with the model",
+   "confidence": "high",
+   "proposed_rewrite": "ctx.is_small_ratio(norm.magnitude())"
+  },
+  {
+   "file": "vendor/truck/truck-meshalgo/src/tessellation/triangulation.rs",
+   "line": 11072,
+   "symbol": "polyline_on_surface",
+   "expression": "let tol = tol.max(TOLERANCE);",
+   "classification": "excluded",
+   "reason": "not a predicate: it floors the tessellation chord tolerance (a model-space length) with f64::max and compares nothing, though the value is a length that must scale in Stage B",
+   "confidence": "high",
+   "proposed_rewrite": null
+  },
+  {
+   "file": "vendor/truck/truck-meshalgo/src/tessellation/triangulation.rs",
+   "line": 13108,
+   "symbol": "singular_transition_preserves_incidence_and_tessellates",
+   "expression": "assert!(singular_point.near(&Point3::new(0.0, 1.0, 0.0)));",
+   "classification": "excluded",
+   "reason": "inside the #[cfg(test)] mod singular_transition_tests (line 12956); a test's own epsilon is the test's business",
+   "confidence": "high",
+   "proposed_rewrite": null
+  },
+  {
+   "file": "vendor/truck/truck-meshalgo/src/tessellation/triangulation.rs",
+   "line": 13119,
+   "symbol": "singular_transition_preserves_incidence_and_tessellates",
+   "expression": "assert!(entering_uv.near(&uv(1.0, 0.0)));",
+   "classification": "excluded",
+   "reason": "inside the #[cfg(test)] mod singular_transition_tests (line 12956); a test's own epsilon is the test's business",
+   "confidence": "high",
+   "proposed_rewrite": null
+  },
+  {
+   "file": "vendor/truck/truck-meshalgo/src/tessellation/triangulation.rs",
+   "line": 13136,
+   "symbol": "singular_transition_preserves_incidence_and_tessellates",
+   "expression": "assert!(bridge.uv.near(&uv(1.0, 1.0)));",
+   "classification": "excluded",
+   "reason": "inside the #[cfg(test)] mod singular_transition_tests (line 12956); a test's own epsilon is the test's business",
+   "confidence": "high",
+   "proposed_rewrite": null
+  },
+  {
+   "file": "vendor/truck/truck-meshalgo/src/tessellation/triangulation.rs",
+   "line": 13137,
+   "symbol": "singular_transition_preserves_incidence_and_tessellates",
+   "expression": "assert!(bridge.point.near(&singular_point));",
+   "classification": "excluded",
+   "reason": "inside the #[cfg(test)] mod singular_transition_tests (line 12956); a test's own epsilon is the test's business",
+   "confidence": "high",
+   "proposed_rewrite": null
+  },
+  {
+   "file": "vendor/truck/truck-meshalgo/src/tessellation/triangulation.rs",
+   "line": 13184,
+   "symbol": "singular_transition_preserves_incidence_and_tessellates",
+   "expression": "assert!(singular_pt.near(&Point3::new(0.0, 1.0, 0.0)));",
+   "classification": "excluded",
+   "reason": "inside the #[cfg(test)] mod singular_transition_tests (line 12956); a test's own epsilon is the test's business",
+   "confidence": "high",
+   "proposed_rewrite": null
+  },
+  {
+   "file": "vendor/truck/truck-meshalgo/src/tessellation/triangulation.rs",
+   "line": 13195,
+   "symbol": "singular_transition_preserves_incidence_and_tessellates",
+   "expression": "enter_uv.near(&uv(1.0, 1.0)),",
+   "classification": "excluded",
+   "reason": "inside the #[cfg(test)] mod singular_transition_tests (line 12956); a test's own epsilon is the test's business",
+   "confidence": "high",
+   "proposed_rewrite": null
+  },
+  {
+   "file": "vendor/truck/truck-meshalgo/src/tessellation/triangulation.rs",
+   "line": 13212,
+   "symbol": "singular_transition_preserves_incidence_and_tessellates",
+   "expression": "rev_bridge.point.near(&singular_pt),",
+   "classification": "excluded",
+   "reason": "inside the #[cfg(test)] mod singular_transition_tests (line 12956); a test's own epsilon is the test's business",
+   "confidence": "high",
+   "proposed_rewrite": null
+  },
+  {
+   "file": "vendor/truck/truck-meshalgo/src/tessellation/triangulation.rs",
+   "line": 13239,
+   "symbol": "singular_transition_both_parameter_directions",
+   "expression": "assert!(singular_point.near(&Point3::new(0.0, 1.0, 0.0)));",
+   "classification": "excluded",
+   "reason": "inside the #[cfg(test)] mod singular_transition_tests (line 12956); a test's own epsilon is the test's business",
+   "confidence": "high",
+   "proposed_rewrite": null
+  },
+  {
+   "file": "vendor/truck/truck-meshalgo/src/tessellation/triangulation.rs",
+   "line": 13250,
+   "symbol": "singular_transition_both_parameter_directions",
+   "expression": "entering_uv.near(&uv(0.0, 1.0)),",
+   "classification": "excluded",
+   "reason": "inside the #[cfg(test)] mod singular_transition_tests (line 12956); a test's own epsilon is the test's business",
+   "confidence": "high",
+   "proposed_rewrite": null
+  },
+  {
+   "file": "vendor/truck/truck-meshalgo/src/tessellation/triangulation.rs",
+   "line": 13267,
+   "symbol": "singular_transition_both_parameter_directions",
+   "expression": "assert!(bridge.uv.near(&uv(1.0, 1.0)));",
+   "classification": "excluded",
+   "reason": "inside the #[cfg(test)] mod singular_transition_tests (line 12956); a test's own epsilon is the test's business",
+   "confidence": "high",
+   "proposed_rewrite": null
+  },
+  {
+   "file": "vendor/truck/truck-meshalgo/src/tessellation/triangulation.rs",
+   "line": 13268,
+   "symbol": "singular_transition_both_parameter_directions",
+   "expression": "assert!(bridge.point.near(&singular_point));",
+   "classification": "excluded",
+   "reason": "inside the #[cfg(test)] mod singular_transition_tests (line 12956); a test's own epsilon is the test's business",
+   "confidence": "high",
+   "proposed_rewrite": null
+  },
+  {
+   "file": "vendor/truck/truck-meshalgo/src/tessellation/triangulation.rs",
+   "line": 13284,
+   "symbol": "singular_transition_negative_case_rejects_non_reconstructing_candidate",
+   "expression": "// At u = 1 - delta the v-derivative has magnitude delta < TOLERANCE, so",
+   "classification": "excluded",
+   "reason": "a // comment inside the #[cfg(test)] mod singular_transition_tests (line 12956); prose not code",
+   "confidence": "high",
+   "proposed_rewrite": null
+  },
+  {
+   "file": "vendor/truck/truck-meshalgo/src/tessellation/triangulation.rs",
+   "line": 13285,
+   "symbol": "singular_transition_negative_case_rejects_non_reconstructing_candidate",
+   "expression": "// `so_small()` proposes a substitution, but the point still genuinely",
+   "classification": "excluded",
+   "reason": "a // comment inside the #[cfg(test)] mod singular_transition_tests (line 12956); prose not code",
+   "confidence": "high",
+   "proposed_rewrite": null
+  },
+  {
+   "file": "vendor/truck/truck-meshalgo/src/tessellation/triangulation.rs",
+   "line": 13294,
+   "symbol": "singular_transition_negative_case_rejects_non_reconstructing_candidate",
+   "expression": "assert!(surface.vder(raw_uv.x, raw_uv.y).so_small());",
+   "classification": "excluded",
+   "reason": "inside the #[cfg(test)] mod singular_transition_tests (line 12956); a test's own epsilon is the test's business",
+   "confidence": "high",
+   "proposed_rewrite": null
+  },
+  {
+   "file": "vendor/truck/truck-meshalgo/src/tessellation/triangulation.rs",
+   "line": 13314,
+   "symbol": "singular_transition_negative_case_rejects_non_reconstructing_candidate",
+   "expression": "current_uv.near(&raw_uv),",
+   "classification": "excluded",
+   "reason": "inside the #[cfg(test)] mod singular_transition_tests (line 12956); a test's own epsilon is the test's business",
+   "confidence": "high",
+   "proposed_rewrite": null
+  },
+  {
+   "file": "vendor/truck/truck-meshalgo/src/tessellation/triangulation.rs",
+   "line": 15607,
+   "symbol": "assert_continuous_longitude",
+   "expression": "|p: &SurfacePoint| p.uv.x.so_small() || (p.uv.x - std::f64::consts::PI).abs() < 1.0e-6;",
+   "classification": "excluded",
+   "reason": "inside the #[cfg(test)] mod sphere_pole_recovery_tests (line 15468); a test's own epsilon is the test's business",
+   "confidence": "high",
+   "proposed_rewrite": null
+  },
+  {
+   "file": "vendor/truck/truck-meshalgo/src/tessellation/triangulation.rs",
+   "line": 15628,
+   "symbol": "north_pole_great_circle_triangle_recovers",
+   "expression": "let pole = piece.0.iter().find(|p| p.uv.x.so_small());",
+   "classification": "excluded",
+   "reason": "inside the #[cfg(test)] mod sphere_pole_recovery_tests (line 15468); a test's own epsilon is the test's business",
+   "confidence": "high",
+   "proposed_rewrite": null
+  },
+  {
+   "file": "vendor/truck/truck-meshalgo/src/vtk.rs",
+   "line": 4,
+   "symbol": "<file scope>",
+   "expression": "use truck_base::tolerance::TOLERANCE;",
+   "classification": "excluded",
+   "reason": "a use import at file scope, not a predicate; the imported constant's only production use is the spatial-hash bucket pitch in hash_point, which compares nothing",
+   "confidence": "high",
+   "proposed_rewrite": null
+  },
+  {
+   "file": "vendor/truck/truck-meshalgo/src/vtk.rs",
+   "line": 195,
+   "symbol": "hash_point",
+   "expression": "(p / (TOLERANCE * 50.0) - Vector3::new(0.5, 0.5, 0.5))",
+   "classification": "excluded",
+   "reason": "TOLERANCE scales the spatial-hash bucket pitch that quantizes positions into hash cells (TOLERANCE * 50.0); it compares nothing",
+   "confidence": "high",
+   "proposed_rewrite": null
+  }
+ ],
+ "orchestrator_review": {
+  "reviewed": "2026-08-18, session 8",
+  "verdict": "ACCEPTED WITH CORRECTIONS -- the survey path works and the review was not a formality",
+  "amendments": 12,
+  "live_after_review": 20,
+  "fixme_after_review": 6,
+  "summary": [
+   "C1 triangulation.rs:8398 excluded->param (reinstated, 1 site)",
+   "C2 source_edge.rs:111 model->excluded (a const is not a predicate, -1 site)",
+   "C3 triangulation.rs:4517/4523/4529/4535 rewrite fixed to carry both predicates (0 sites)",
+   "C4 six degree-2 area/determinant sites model->excluded, FIXME(BG-TOL-004) (-6 sites)"
   ],
-  "sites": [
-    {
-      "file": "vendor/truck/truck-meshalgo/src/analyzers/collision.rs",
-      "line": 87,
-      "symbol": "sorted_endpoints",
-      "expression": ".filter(|(_, tri)| !(tri[1] - tri[0]).cross(tri[2] - tri[0]).so_small())",
-      "classification": "model",
-      "reason": "the cross product of two triangle edge displacements has magnitude twice the triangle area, a length-squared quantity that scales with the model, used here to drop degenerate (zero-area) triangles",
-      "confidence": "high",
-      "proposed_rewrite": "!ctx.is_small_len((tri[1] - tri[0]).cross(tri[2] - tri[0]).magnitude())"
-    },
-    {
-      "file": "vendor/truck/truck-meshalgo/src/analyzers/collision.rs",
-      "line": 93,
-      "symbol": "sorted_endpoints",
-      "expression": ".filter(|(_, tri)| !(tri[1] - tri[0]).cross(tri[2] - tri[0]).so_small())",
-      "classification": "model",
-      "reason": "same degenerate-triangle filter as line 87 but applied to the second iterator; the magnitude is twice the triangle area and scales with the model",
-      "confidence": "high",
-      "proposed_rewrite": "!ctx.is_small_len((tri[1] - tri[0]).cross(tri[2] - tri[0]).magnitude())"
-    },
-    {
-      "file": "vendor/truck/truck-meshalgo/src/analyzers/collision.rs",
-      "line": 153,
-      "symbol": "collide_seg_triangle",
-      "expression": "if nor.so_small() {",
-      "classification": "model",
-      "reason": "nor is the triangle normal ab.cross(ca), a cross product of two edge displacements whose magnitude is twice the triangle area (length-squared), so the degeneracy test scales with the model",
-      "confidence": "high",
-      "proposed_rewrite": "ctx.is_small_len(nor.magnitude())"
-    },
-    {
-      "file": "vendor/truck/truck-meshalgo/src/analyzers/collision.rs",
-      "line": 164,
-      "symbol": "collide_seg_triangle",
-      "expression": "if f64::signum(ab.cross(nor).dot(h - tri[0]) + TOLERANCE2)",
-      "classification": "excluded",
-      "reason": "squared order",
-      "confidence": "high",
-      "proposed_rewrite": null
-    },
-    {
-      "file": "vendor/truck/truck-meshalgo/src/analyzers/collision.rs",
-      "line": 165,
-      "symbol": "collide_seg_triangle",
-      "expression": "+ f64::signum(bc.cross(nor).dot(h - tri[1]) + TOLERANCE2)",
-      "classification": "excluded",
-      "reason": "squared order",
-      "confidence": "high",
-      "proposed_rewrite": null
-    },
-    {
-      "file": "vendor/truck/truck-meshalgo/src/analyzers/collision.rs",
-      "line": 166,
-      "symbol": "collide_seg_triangle",
-      "expression": "+ f64::signum(ca.cross(nor).dot(h - tri[2]) + TOLERANCE2)",
-      "classification": "excluded",
-      "reason": "squared order",
-      "confidence": "high",
-      "proposed_rewrite": null
-    },
-    {
-      "file": "vendor/truck/truck-meshalgo/src/analyzers/in_out_judge.rs",
-      "line": 23,
-      "symbol": "is_crossing",
-      "expression": "if mat.determinant().so_small() {",
-      "classification": "model",
-      "reason": "the determinant is the scalar triple product a.(b x dir) of two model-space edge displacements and the unit ray direction, a length-squared quantity that vanishes when the ray grazes the triangle and scales with the model",
-      "confidence": "high",
-      "proposed_rewrite": "ctx.is_small_len(mat.determinant().abs())"
-    },
-    {
-      "file": "vendor/truck/truck-meshalgo/src/analyzers/point_cloud/mod.rs",
-      "line": 12,
-      "symbol": "is_clung_to_by",
-      "expression": "/// `tol` must be greater than or equal to `TOLERANCE`.",
-      "classification": "excluded",
-      "reason": "a /// doc comment, prose not code",
-      "confidence": "high",
-      "proposed_rewrite": null
-    },
-    {
-      "file": "vendor/truck/truck-meshalgo/src/analyzers/point_cloud/mod.rs",
-      "line": 76,
-      "symbol": "distance2_point_triangle",
-      "expression": "if coef < 2.0 || nor.magnitude().so_small() {",
-      "classification": "model",
-      "reason": "nor.magnitude() is |ab x ca|, twice the triangle area (a length-squared quantity), and the test guards the point-triangle formula against a degenerate triangle, so it scales with the model",
-      "confidence": "high",
-      "proposed_rewrite": "ctx.is_small_len(nor.magnitude())"
-    },
-    {
-      "file": "vendor/truck/truck-meshalgo/src/analyzers/point_cloud/sort_end_points.rs",
-      "line": 55,
-      "symbol": "sorted_endpoints",
-      "expression": ".filter(|(_, tri)| !(tri[1] - tri[0]).cross(tri[2] - tri[0]).so_small())",
-      "classification": "model",
-      "reason": "the cross product of two triangle edge displacements has magnitude twice the triangle area (length-squared), and this degeneracy filter scales with the model",
-      "confidence": "high",
-      "proposed_rewrite": "!ctx.is_small_len((tri[1] - tri[0]).cross(tri[2] - tri[0]).magnitude())"
-    },
-    {
-      "file": "vendor/truck/truck-meshalgo/src/filters/normal_filters.rs",
-      "line": 32,
-      "symbol": "normalize_normals",
-      "expression": "/// assert!(mesh.normals()[0].magnitude().near(&1.0));",
-      "classification": "excluded",
-      "reason": "a /// doc example, prose not code",
-      "confidence": "high",
-      "proposed_rewrite": null
-    },
-    {
-      "file": "vendor/truck/truck-meshalgo/src/filters/normal_filters.rs",
-      "line": 71,
-      "symbol": "add_naive_normals",
-      "expression": "/// assert!(mesh.normals()[v0.nor.unwrap()].near(&Vector3::new(-2.0, 5.0, 0.0).normalize()));",
-      "classification": "excluded",
-      "reason": "a /// doc example, prose not code",
-      "confidence": "high",
-      "proposed_rewrite": null
-    },
-    {
-      "file": "vendor/truck/truck-meshalgo/src/filters/normal_filters.rs",
-      "line": 72,
-      "symbol": "add_naive_normals",
-      "expression": "/// assert!(mesh.normals()[v1.nor.unwrap()].near(&Vector3::new(2.0, 5.0, 0.0).normalize()));",
-      "classification": "excluded",
-      "reason": "a /// doc example, prose not code",
-      "confidence": "high",
-      "proposed_rewrite": null
-    },
-    {
-      "file": "vendor/truck/truck-meshalgo/src/filters/normal_filters.rs",
-      "line": 114,
-      "symbol": "add_smooth_normals",
-      "expression": "/// assert!(mesh.normals()[v0.nor.unwrap()].near(&Vector3::new(0.0, 1.0, 0.0)));",
-      "classification": "excluded",
-      "reason": "a /// doc example, prose not code",
-      "confidence": "high",
-      "proposed_rewrite": null
-    },
-    {
-      "file": "vendor/truck/truck-meshalgo/src/filters/normal_filters.rs",
-      "line": 115,
-      "symbol": "add_smooth_normals",
-      "expression": "/// assert!(mesh.normals()[v1.nor.unwrap()].near(&Vector3::new(0.0, 1.0, 0.0)));",
-      "classification": "excluded",
-      "reason": "a /// doc example, prose not code",
-      "confidence": "high",
-      "proposed_rewrite": null
-    },
-    {
-      "file": "vendor/truck/truck-meshalgo/src/filters/normal_filters.rs",
-      "line": 122,
-      "symbol": "add_smooth_normals",
-      "expression": "/// assert!(mesh.normals()[v0.nor.unwrap()].near(&Vector3::new(-2.0, 5.0, 0.0).normalize()));",
-      "classification": "excluded",
-      "reason": "a /// doc example, prose not code",
-      "confidence": "high",
-      "proposed_rewrite": null
-    },
-    {
-      "file": "vendor/truck/truck-meshalgo/src/filters/normal_filters.rs",
-      "line": 123,
-      "symbol": "add_smooth_normals",
-      "expression": "/// assert!(mesh.normals()[v1.nor.unwrap()].near(&Vector3::new(2.0, 5.0, 0.0).normalize()));",
-      "classification": "excluded",
-      "reason": "a /// doc example, prose not code",
-      "confidence": "high",
-      "proposed_rewrite": null
-    },
-    {
-      "file": "vendor/truck/truck-meshalgo/src/filters/normal_filters.rs",
-      "line": 200,
-      "symbol": "normalize_normals",
-      "expression": "if !normals[idx].magnitude2().near(&1.0) {",
-      "classification": "param",
-      "reason": "compares the squared magnitude of an already-normalized unit normal against 1.0; a unit vector's length is dimensionless and does not scale with the model",
-      "confidence": "high",
-      "proposed_rewrite": "ctx.is_small_ratio(normals[idx].magnitude2() - 1.0)"
-    },
-    {
-      "file": "vendor/truck/truck-meshalgo/src/tessellation/source_edge.rs",
-      "line": 65,
-      "symbol": "<file scope>",
-      "expression": "//! ([`SOURCE_INCIDENCE_TOLERANCE`]) as the fallback. It is deliberately not the",
-      "classification": "excluded",
-      "reason": "a //! module doc comment, prose not code",
-      "confidence": "high",
-      "proposed_rewrite": null
-    },
-    {
-      "file": "vendor/truck/truck-meshalgo/src/tessellation/source_edge.rs",
-      "line": 98,
-      "symbol": "SOURCE_INCIDENCE_TOLERANCE",
-      "expression": "/// This is `truck_base`'s own [`TOLERANCE`] (1e-6), the existing geometric",
-      "classification": "excluded",
-      "reason": "a /// doc comment on the SOURCE_INCIDENCE_TOLERANCE constant, prose not code",
-      "confidence": "high",
-      "proposed_rewrite": null
-    },
-    {
-      "file": "vendor/truck/truck-meshalgo/src/tessellation/source_edge.rs",
-      "line": 111,
-      "symbol": "<file scope>",
-      "expression": "pub const SOURCE_INCIDENCE_TOLERANCE: f64 = TOLERANCE;",
-      "classification": "model",
-      "reason": "file-scope constant defining the fallback source-incidence tolerance, a model-space length: it is the threshold in distance and residual comparisons (e.g. carrier_closed at line 311) that decide how close a curve point must be to a source vertex, so it scales with the model",
-      "confidence": "high",
-      "proposed_rewrite": "ctx.length_margin()"
-    },
-    {
-      "file": "vendor/truck/truck-meshalgo/src/tessellation/source_edge.rs",
-      "line": 206,
-      "symbol": "establish_source_edge_traversal",
-      "expression": "/// context, or [`SOURCE_INCIDENCE_TOLERANCE`] when the source declares none.",
-      "classification": "excluded",
-      "reason": "a /// doc comment, prose not code",
-      "confidence": "high",
-      "proposed_rewrite": null
-    },
-    {
-      "file": "vendor/truck/truck-meshalgo/src/tessellation/source_edge.rs",
-      "line": 220,
-      "symbol": "establish_source_edge_traversal",
-      "expression": "/// effective_source_tol = max(valid_declared_source_uncertainty, SOURCE_INCIDENCE_TOLERANCE)",
-      "classification": "excluded",
-      "reason": "a /// doc comment, prose not code",
-      "confidence": "high",
-      "proposed_rewrite": null
-    },
-    {
-      "file": "vendor/truck/truck-meshalgo/src/tessellation/source_edge.rs",
-      "line": 228,
-      "symbol": "establish_source_edge_traversal",
-      "expression": "/// [`SOURCE_INCIDENCE_TOLERANCE`], never the widened values.",
-      "classification": "excluded",
-      "reason": "a /// doc comment, prose not code",
-      "confidence": "high",
-      "proposed_rewrite": null
-    },
-    {
-      "file": "vendor/truck/truck-meshalgo/src/tessellation/source_edge.rs",
-      "line": 252,
-      "symbol": "establish_source_edge_traversal",
-      "expression": "let effective_source_tol = source_tolerance.max(SOURCE_INCIDENCE_TOLERANCE);",
-      "classification": "excluded",
-      "reason": "not a predicate: it selects the larger of two source-incidence length tolerances as a floor via f64::max and compares nothing, though the value is a model-space length that must scale in Stage B",
-      "confidence": "high",
-      "proposed_rewrite": null
-    },
-    {
-      "file": "vendor/truck/truck-meshalgo/src/tessellation/source_edge.rs",
-      "line": 311,
-      "symbol": "establish_source_edge_traversal",
-      "expression": "let carrier_closed = subs_lo.distance(subs_hi) <= SOURCE_INCIDENCE_TOLERANCE;",
-      "classification": "model",
-      "reason": "it compares the distance between two curve points (a model-space length) against the source-incidence length tolerance to decide whether the carrier closes at the evaluator seam, so it scales with the model",
-      "confidence": "high",
-      "proposed_rewrite": "ctx.is_small_len(subs_lo.distance(subs_hi))"
-    },
-    {
-      "file": "vendor/truck/truck-meshalgo/src/tessellation/source_edge.rs",
-      "line": 657,
-      "symbol": "source_edge_incidence_retains_declared_uncertainty",
-      "expression": "assert!(start.distance(end) > SOURCE_INCIDENCE_TOLERANCE);",
-      "classification": "excluded",
-      "reason": "inside the #[cfg(test)] tests module (mod tests at line 612); a test's own epsilon is the test's business",
-      "confidence": "high",
-      "proposed_rewrite": null
-    },
-    {
-      "file": "vendor/truck/truck-meshalgo/src/tessellation/source_edge.rs",
-      "line": 663,
-      "symbol": "source_edge_incidence_retains_declared_uncertainty",
-      "expression": "SOURCE_INCIDENCE_TOLERANCE,",
-      "classification": "excluded",
-      "reason": "inside the #[cfg(test)] tests module (mod tests at line 612); a test's own epsilon is the test's business",
-      "confidence": "high",
-      "proposed_rewrite": null
-    },
-    {
-      "file": "vendor/truck/truck-meshalgo/src/tessellation/source_edge.rs",
-      "line": 664,
-      "symbol": "source_edge_incidence_retains_declared_uncertainty",
-      "expression": "SOURCE_INCIDENCE_TOLERANCE,",
-      "classification": "excluded",
-      "reason": "inside the #[cfg(test)] tests module (mod tests at line 612); a test's own epsilon is the test's business",
-      "confidence": "high",
-      "proposed_rewrite": null
-    },
-    {
-      "file": "vendor/truck/truck-meshalgo/src/tessellation/source_edge.rs",
-      "line": 690,
-      "symbol": "source_edge_incidence_respects_declared_uncertainty",
-      "expression": "SOURCE_INCIDENCE_TOLERANCE,",
-      "classification": "excluded",
-      "reason": "inside the #[cfg(test)] tests module (mod tests at line 612); a test's own epsilon is the test's business",
-      "confidence": "high",
-      "proposed_rewrite": null
-    },
-    {
-      "file": "vendor/truck/truck-meshalgo/src/tessellation/source_edge.rs",
-      "line": 691,
-      "symbol": "source_edge_incidence_respects_declared_uncertainty",
-      "expression": "SOURCE_INCIDENCE_TOLERANCE,",
-      "classification": "excluded",
-      "reason": "inside the #[cfg(test)] tests module (mod tests at line 612); a test's own epsilon is the test's business",
-      "confidence": "high",
-      "proposed_rewrite": null
-    },
-    {
-      "file": "vendor/truck/truck-meshalgo/src/tessellation/source_edge.rs",
-      "line": 716,
-      "symbol": "open_curve_endpoint_incidence",
-      "expression": "SOURCE_INCIDENCE_TOLERANCE,",
-      "classification": "excluded",
-      "reason": "inside the #[cfg(test)] tests module (mod tests at line 612); a test's own epsilon is the test's business",
-      "confidence": "high",
-      "proposed_rewrite": null
-    },
-    {
-      "file": "vendor/truck/truck-meshalgo/src/tessellation/source_edge.rs",
-      "line": 717,
-      "symbol": "open_curve_endpoint_incidence",
-      "expression": "SOURCE_INCIDENCE_TOLERANCE,",
-      "classification": "excluded",
-      "reason": "inside the #[cfg(test)] tests module (mod tests at line 612); a test's own epsilon is the test's business",
-      "confidence": "high",
-      "proposed_rewrite": null
-    },
-    {
-      "file": "vendor/truck/truck-meshalgo/src/tessellation/source_edge.rs",
-      "line": 741,
-      "symbol": "open_curve_endpoint_incidence",
-      "expression": "assert!(start_pos.distance(end_pos) > SOURCE_INCIDENCE_TOLERANCE);",
-      "classification": "excluded",
-      "reason": "inside the #[cfg(test)] tests module (mod tests at line 612); a test's own epsilon is the test's business",
-      "confidence": "high",
-      "proposed_rewrite": null
-    },
-    {
-      "file": "vendor/truck/truck-meshalgo/src/tessellation/source_edge.rs",
-      "line": 747,
-      "symbol": "open_curve_endpoint_incidence",
-      "expression": "SOURCE_INCIDENCE_TOLERANCE,",
-      "classification": "excluded",
-      "reason": "inside the #[cfg(test)] tests module (mod tests at line 612); a test's own epsilon is the test's business",
-      "confidence": "high",
-      "proposed_rewrite": null
-    },
-    {
-      "file": "vendor/truck/truck-meshalgo/src/tessellation/source_edge.rs",
-      "line": 748,
-      "symbol": "open_curve_endpoint_incidence",
-      "expression": "SOURCE_INCIDENCE_TOLERANCE,",
-      "classification": "excluded",
-      "reason": "inside the #[cfg(test)] tests module (mod tests at line 612); a test's own epsilon is the test's business",
-      "confidence": "high",
-      "proposed_rewrite": null
-    },
-    {
-      "file": "vendor/truck/truck-meshalgo/src/tessellation/source_edge.rs",
-      "line": 768,
-      "symbol": "open_curve_endpoint_incidence",
-      "expression": "assert!(witness.start_residual < SOURCE_INCIDENCE_TOLERANCE);",
-      "classification": "excluded",
-      "reason": "inside the #[cfg(test)] tests module (mod tests at line 612); a test's own epsilon is the test's business",
-      "confidence": "high",
-      "proposed_rewrite": null
-    },
-    {
-      "file": "vendor/truck/truck-meshalgo/src/tessellation/source_edge.rs",
-      "line": 769,
-      "symbol": "open_curve_endpoint_incidence",
-      "expression": "assert!(witness.end_residual < SOURCE_INCIDENCE_TOLERANCE);",
-      "classification": "excluded",
-      "reason": "inside the #[cfg(test)] tests module (mod tests at line 612); a test's own epsilon is the test's business",
-      "confidence": "high",
-      "proposed_rewrite": null
-    },
-    {
-      "file": "vendor/truck/truck-meshalgo/src/tessellation/source_edge.rs",
-      "line": 789,
-      "symbol": "open_curve_endpoint_incidence",
-      "expression": "assert!(curve.subs(lo).distance(curve.subs(hi)) > SOURCE_INCIDENCE_TOLERANCE);",
-      "classification": "excluded",
-      "reason": "inside the #[cfg(test)] tests module (mod tests at line 612); a test's own epsilon is the test's business",
-      "confidence": "high",
-      "proposed_rewrite": null
-    },
-    {
-      "file": "vendor/truck/truck-meshalgo/src/tessellation/source_edge.rs",
-      "line": 796,
-      "symbol": "open_curve_endpoint_incidence",
-      "expression": "assert!(start_pos.distance(end_pos) > SOURCE_INCIDENCE_TOLERANCE);",
-      "classification": "excluded",
-      "reason": "inside the #[cfg(test)] tests module (mod tests at line 612); a test's own epsilon is the test's business",
-      "confidence": "high",
-      "proposed_rewrite": null
-    },
-    {
-      "file": "vendor/truck/truck-meshalgo/src/tessellation/source_edge.rs",
-      "line": 802,
-      "symbol": "open_curve_endpoint_incidence",
-      "expression": "SOURCE_INCIDENCE_TOLERANCE,",
-      "classification": "excluded",
-      "reason": "inside the #[cfg(test)] tests module (mod tests at line 612); a test's own epsilon is the test's business",
-      "confidence": "high",
-      "proposed_rewrite": null
-    },
-    {
-      "file": "vendor/truck/truck-meshalgo/src/tessellation/source_edge.rs",
-      "line": 803,
-      "symbol": "open_curve_endpoint_incidence",
-      "expression": "SOURCE_INCIDENCE_TOLERANCE,",
-      "classification": "excluded",
-      "reason": "inside the #[cfg(test)] tests module (mod tests at line 612); a test's own epsilon is the test's business",
-      "confidence": "high",
-      "proposed_rewrite": null
-    },
-    {
-      "file": "vendor/truck/truck-meshalgo/src/tessellation/source_edge.rs",
-      "line": 815,
-      "symbol": "open_curve_endpoint_incidence",
-      "expression": "assert!(witness.start_residual < SOURCE_INCIDENCE_TOLERANCE);",
-      "classification": "excluded",
-      "reason": "inside the #[cfg(test)] tests module (mod tests at line 612); a test's own epsilon is the test's business",
-      "confidence": "high",
-      "proposed_rewrite": null
-    },
-    {
-      "file": "vendor/truck/truck-meshalgo/src/tessellation/source_edge.rs",
-      "line": 816,
-      "symbol": "open_curve_endpoint_incidence",
-      "expression": "assert!(witness.end_residual < SOURCE_INCIDENCE_TOLERANCE);",
-      "classification": "excluded",
-      "reason": "inside the #[cfg(test)] tests module (mod tests at line 612); a test's own epsilon is the test's business",
-      "confidence": "high",
-      "proposed_rewrite": null
-    },
-    {
-      "file": "vendor/truck/truck-meshalgo/src/tessellation/source_edge.rs",
-      "line": 876,
-      "symbol": "source_edge_wraps_only_on_certified_closed_carrier",
-      "expression": "SOURCE_INCIDENCE_TOLERANCE,",
-      "classification": "excluded",
-      "reason": "inside the #[cfg(test)] tests module (mod tests at line 612); a test's own epsilon is the test's business",
-      "confidence": "high",
-      "proposed_rewrite": null
-    },
-    {
-      "file": "vendor/truck/truck-meshalgo/src/tessellation/source_edge.rs",
-      "line": 877,
-      "symbol": "source_edge_wraps_only_on_certified_closed_carrier",
-      "expression": "SOURCE_INCIDENCE_TOLERANCE,",
-      "classification": "excluded",
-      "reason": "inside the #[cfg(test)] tests module (mod tests at line 612); a test's own epsilon is the test's business",
-      "confidence": "high",
-      "proposed_rewrite": null
-    },
-    {
-      "file": "vendor/truck/truck-meshalgo/src/tessellation/source_edge.rs",
-      "line": 890,
-      "symbol": "source_edge_wraps_only_on_certified_closed_carrier",
-      "expression": "SOURCE_INCIDENCE_TOLERANCE,",
-      "classification": "excluded",
-      "reason": "inside the #[cfg(test)] tests module (mod tests at line 612); a test's own epsilon is the test's business",
-      "confidence": "high",
-      "proposed_rewrite": null
-    },
-    {
-      "file": "vendor/truck/truck-meshalgo/src/tessellation/source_edge.rs",
-      "line": 932,
-      "symbol": "source_edge_wraps_only_on_certified_closed_carrier",
-      "expression": "SOURCE_INCIDENCE_TOLERANCE,",
-      "classification": "excluded",
-      "reason": "inside the #[cfg(test)] tests module (mod tests at line 612); a test's own epsilon is the test's business",
-      "confidence": "high",
-      "proposed_rewrite": null
-    },
-    {
-      "file": "vendor/truck/truck-meshalgo/src/tessellation/source_edge.rs",
-      "line": 958,
-      "symbol": "source_edge_wraps_only_on_certified_closed_carrier",
-      "expression": "assert!(start_pos.distance(end_pos) > SOURCE_INCIDENCE_TOLERANCE);",
-      "classification": "excluded",
-      "reason": "inside the #[cfg(test)] tests module (mod tests at line 612); a test's own epsilon is the test's business",
-      "confidence": "high",
-      "proposed_rewrite": null
-    },
-    {
-      "file": "vendor/truck/truck-meshalgo/src/tessellation/source_edge.rs",
-      "line": 968,
-      "symbol": "source_edge_wraps_only_on_certified_closed_carrier",
-      "expression": "SOURCE_INCIDENCE_TOLERANCE,",
-      "classification": "excluded",
-      "reason": "inside the #[cfg(test)] tests module (mod tests at line 612); a test's own epsilon is the test's business",
-      "confidence": "high",
-      "proposed_rewrite": null
-    },
-    {
-      "file": "vendor/truck/truck-meshalgo/src/tessellation/source_edge.rs",
-      "line": 997,
-      "symbol": "source_edge_wraps_only_on_certified_closed_carrier",
-      "expression": "assert!(start_pos.distance(end_pos) > SOURCE_INCIDENCE_TOLERANCE);",
-      "classification": "excluded",
-      "reason": "inside the #[cfg(test)] tests module (mod tests at line 612); a test's own epsilon is the test's business",
-      "confidence": "high",
-      "proposed_rewrite": null
-    },
-    {
-      "file": "vendor/truck/truck-meshalgo/src/tessellation/source_edge.rs",
-      "line": 1004,
-      "symbol": "source_edge_wraps_only_on_certified_closed_carrier",
-      "expression": "SOURCE_INCIDENCE_TOLERANCE,",
-      "classification": "excluded",
-      "reason": "inside the #[cfg(test)] tests module (mod tests at line 612); a test's own epsilon is the test's business",
-      "confidence": "high",
-      "proposed_rewrite": null
-    },
-    {
-      "file": "vendor/truck/truck-meshalgo/src/tessellation/source_edge.rs",
-      "line": 1016,
-      "symbol": "source_edge_wraps_only_on_certified_closed_carrier",
-      "expression": "/// [`SOURCE_INCIDENCE_TOLERANCE`]: the source may declare *looser*",
-      "classification": "excluded",
-      "reason": "a /// doc comment inside the #[cfg(test)] tests module; prose not code",
-      "confidence": "high",
-      "proposed_rewrite": null
-    },
-    {
-      "file": "vendor/truck/truck-meshalgo/src/tessellation/source_edge.rs",
-      "line": 1025,
-      "symbol": "source_edge_wraps_only_on_certified_closed_carrier",
-      "expression": "assert!(start_pos.distance(end_pos) > SOURCE_INCIDENCE_TOLERANCE);",
-      "classification": "excluded",
-      "reason": "inside the #[cfg(test)] tests module (mod tests at line 612); a test's own epsilon is the test's business",
-      "confidence": "high",
-      "proposed_rewrite": null
-    },
-    {
-      "file": "vendor/truck/truck-meshalgo/src/tessellation/source_edge.rs",
-      "line": 1035,
-      "symbol": "source_edge_wraps_only_on_certified_closed_carrier",
-      "expression": "SOURCE_INCIDENCE_TOLERANCE,",
-      "classification": "excluded",
-      "reason": "inside the #[cfg(test)] tests module (mod tests at line 612); a test's own epsilon is the test's business",
-      "confidence": "high",
-      "proposed_rewrite": null
-    },
-    {
-      "file": "vendor/truck/truck-meshalgo/src/tessellation/source_edge.rs",
-      "line": 1061,
-      "symbol": "source_edge_wraps_only_on_certified_closed_carrier",
-      "expression": "assert!(end_pos.distance(curve.subs(hi)) > SOURCE_INCIDENCE_TOLERANCE);",
-      "classification": "excluded",
-      "reason": "inside the #[cfg(test)] tests module (mod tests at line 612); a test's own epsilon is the test's business",
-      "confidence": "high",
-      "proposed_rewrite": null
-    },
-    {
-      "file": "vendor/truck/truck-meshalgo/src/tessellation/source_edge.rs",
-      "line": 1070,
-      "symbol": "source_edge_wraps_only_on_certified_closed_carrier",
-      "expression": "SOURCE_INCIDENCE_TOLERANCE,",
-      "classification": "excluded",
-      "reason": "inside the #[cfg(test)] tests module (mod tests at line 612); a test's own epsilon is the test's business",
-      "confidence": "high",
-      "proposed_rewrite": null
-    },
-    {
-      "file": "vendor/truck/truck-meshalgo/src/tessellation/source_edge.rs",
-      "line": 1071,
-      "symbol": "source_edge_wraps_only_on_certified_closed_carrier",
-      "expression": "SOURCE_INCIDENCE_TOLERANCE,",
-      "classification": "excluded",
-      "reason": "inside the #[cfg(test)] tests module (mod tests at line 612); a test's own epsilon is the test's business",
-      "confidence": "high",
-      "proposed_rewrite": null
-    },
-    {
-      "file": "vendor/truck/truck-meshalgo/src/tessellation/source_edge.rs",
-      "line": 1082,
-      "symbol": "source_edge_wraps_only_on_certified_closed_carrier",
-      "expression": "SOURCE_INCIDENCE_TOLERANCE,",
-      "classification": "excluded",
-      "reason": "inside the #[cfg(test)] tests module (mod tests at line 612); a test's own epsilon is the test's business",
-      "confidence": "high",
-      "proposed_rewrite": null
-    },
-    {
-      "file": "vendor/truck/truck-meshalgo/src/tessellation/source_edge.rs",
-      "line": 1116,
-      "symbol": "source_edge_wraps_only_on_certified_closed_carrier",
-      "expression": "SOURCE_INCIDENCE_TOLERANCE,",
-      "classification": "excluded",
-      "reason": "inside the #[cfg(test)] tests module (mod tests at line 612); a test's own epsilon is the test's business",
-      "confidence": "high",
-      "proposed_rewrite": null
-    },
-    {
-      "file": "vendor/truck/truck-meshalgo/src/tessellation/source_edge.rs",
-      "line": 1130,
-      "symbol": "source_edge_wraps_only_on_certified_closed_carrier",
-      "expression": "SOURCE_INCIDENCE_TOLERANCE,",
-      "classification": "excluded",
-      "reason": "inside the #[cfg(test)] tests module (mod tests at line 612); a test's own epsilon is the test's business",
-      "confidence": "high",
-      "proposed_rewrite": null
-    },
-    {
-      "file": "vendor/truck/truck-meshalgo/src/tessellation/triangulation.rs",
-      "line": 1718,
-      "symbol": "cshell_tessellation_inner",
-      "expression": ".unwrap_or(source_edge::SOURCE_INCIDENCE_TOLERANCE);",
-      "classification": "excluded",
-      "reason": "not a predicate: it selects the source-incidence length tolerance as a fallback for a shell that declares no geometric uncertainty; nothing is compared, though the value is a model-space length that must scale in Stage B",
-      "confidence": "high",
-      "proposed_rewrite": null
-    },
-    {
-      "file": "vendor/truck/truck-meshalgo/src/tessellation/triangulation.rs",
-      "line": 4517,
-      "symbol": "reconcile_singular_transition",
-      "expression": "if !previous_uv.x.near(&current_uv.x) && surface.uder(current_uv.x, current_uv.y).so_small() {",
-      "classification": "model",
-      "reason": "the line carries two tolerance predicates: the deciding test is that the surface u-derivative magnitude is degenerate, which is a model-space length that scales with the model, but the `!near` guard compares u parameters (dimensionless), so a faithful migration needs one is_small_len and one is_small_ratio",
-      "confidence": "low",
-      "proposed_rewrite": "ctx.is_small_len(surface.uder(current_uv.x, current_uv.y).magnitude())"
-    },
-    {
-      "file": "vendor/truck/truck-meshalgo/src/tessellation/triangulation.rs",
-      "line": 4523,
-      "symbol": "reconcile_singular_transition",
-      "expression": "if !previous_uv.y.near(&current_uv.y) && surface.vder(current_uv.x, current_uv.y).so_small() {",
-      "classification": "model",
-      "reason": "as line 4517: the deciding test is the v-derivative magnitude (a model-space length), while the `!near` guard compares v parameters (dimensionless); a faithful migration needs both an is_small_len and an is_small_ratio",
-      "confidence": "low",
-      "proposed_rewrite": "ctx.is_small_len(surface.vder(current_uv.x, current_uv.y).magnitude())"
-    },
-    {
-      "file": "vendor/truck/truck-meshalgo/src/tessellation/triangulation.rs",
-      "line": 4529,
-      "symbol": "reconcile_singular_transition",
-      "expression": "if !previous_uv.x.near(&current_uv.x) && surface.uder(previous_uv.x, previous_uv.y).so_small() {",
-      "classification": "model",
-      "reason": "as line 4517: the deciding test is the u-derivative magnitude (a model-space length), while the `!near` guard compares u parameters (dimensionless); a faithful migration needs both an is_small_len and an is_small_ratio",
-      "confidence": "low",
-      "proposed_rewrite": "ctx.is_small_len(surface.uder(previous_uv.x, previous_uv.y).magnitude())"
-    },
-    {
-      "file": "vendor/truck/truck-meshalgo/src/tessellation/triangulation.rs",
-      "line": 4535,
-      "symbol": "reconcile_singular_transition",
-      "expression": "if !previous_uv.y.near(&current_uv.y) && surface.vder(previous_uv.x, previous_uv.y).so_small() {",
-      "classification": "model",
-      "reason": "as line 4517: the deciding test is the v-derivative magnitude (a model-space length), while the `!near` guard compares v parameters (dimensionless); a faithful migration needs both an is_small_len and an is_small_ratio",
-      "confidence": "low",
-      "proposed_rewrite": "ctx.is_small_len(surface.vder(previous_uv.x, previous_uv.y).magnitude())"
-    },
-    {
-      "file": "vendor/truck/truck-meshalgo/src/tessellation/triangulation.rs",
-      "line": 5523,
-      "symbol": "try_new",
-      "expression": "if !vec[0].near(&last) {",
-      "classification": "param",
-      "reason": "SurfacePoint has no AbsDiffEq impl and Derefs to uv: Point2, so this `near` resolves to Point2::near and compares the first and last lifted boundary points' uv parameters (dimensionless), not their positions, deciding whether the loop endpoint uv closed",
-      "confidence": "high",
-      "proposed_rewrite": "!ctx.is_small_ratio(vec[0].uv.distance(last.uv))"
-    },
-    {
-      "file": "vendor/truck/truck-meshalgo/src/tessellation/triangulation.rs",
-      "line": 5525,
-      "symbol": "try_new",
-      "expression": "if surface.uder(u0, v0).so_small() || surface.vder(u0, v0).so_small() {",
-      "classification": "model",
-      "reason": "the surface u- and v-derivative magnitudes are model-space lengths (length per dimensionless parameter) and the test decides whether the loop closes on a collapsed direction, so it scales with the model",
-      "confidence": "high",
-      "proposed_rewrite": "ctx.is_small_len(surface.uder(u0, v0).magnitude()) || ctx.is_small_len(surface.vder(u0, v0).magnitude())"
-    },
-    {
-      "file": "vendor/truck/truck-meshalgo/src/tessellation/triangulation.rs",
-      "line": 6379,
-      "symbol": "singular_transition_branch",
-      "expression": "if vp.is_some() && surface.vder(u, v).so_small() {",
-      "classification": "model",
-      "reason": "the v-derivative magnitude is a model-space length (length per dimensionless parameter), and the test detects a collapsed periodic axis at a chart singularity, so it scales with the model",
-      "confidence": "high",
-      "proposed_rewrite": "ctx.is_small_len(surface.vder(u, v).magnitude())"
-    },
-    {
-      "file": "vendor/truck/truck-meshalgo/src/tessellation/triangulation.rs",
-      "line": 6381,
-      "symbol": "singular_transition_branch",
-      "expression": "} else if up.is_some() && surface.uder(u, v).so_small() {",
-      "classification": "model",
-      "reason": "the u-derivative magnitude is a model-space length (length per dimensionless parameter), and the test detects a collapsed periodic axis at a chart singularity, so it scales with the model",
-      "confidence": "high",
-      "proposed_rewrite": "ctx.is_small_len(surface.uder(u, v).magnitude())"
-    },
-    {
-      "file": "vendor/truck/truck-meshalgo/src/tessellation/triangulation.rs",
-      "line": 6494,
-      "symbol": "PointLocation",
-      "expression": "/// On a boundary segment within `TOLERANCE`, by direct test.",
-      "classification": "excluded",
-      "reason": "a /// doc comment on the PointLocation enum's Boundary variant, prose not code",
-      "confidence": "high",
-      "proposed_rewrite": null
-    },
-    {
-      "file": "vendor/truck/truck-meshalgo/src/tessellation/triangulation.rs",
-      "line": 6704,
-      "symbol": "PartJoin",
-      "expression": "/// testing `tail.uv.distance(next[0].uv) < TOLERANCE`, which is wrong twice",
-      "classification": "excluded",
-      "reason": "a /// doc comment on the PartJoin enum, prose not code",
-      "confidence": "high",
-      "proposed_rewrite": null
-    },
-    {
-      "file": "vendor/truck/truck-meshalgo/src/tessellation/triangulation.rs",
-      "line": 6910,
-      "symbol": "normalize_range",
-      "expression": "let tmp = f64::min(p[compidx], q[compidx]) + TOLERANCE;",
-      "classification": "excluded",
-      "reason": "not a predicate: TOLERANCE is added to a u/v parameter coordinate to place a range cut when normalizing the boundary loop in parameter space; nothing is compared",
-      "confidence": "high",
-      "proposed_rewrite": null
-    },
-    {
-      "file": "vendor/truck/truck-meshalgo/src/tessellation/triangulation.rs",
-      "line": 7220,
-      "symbol": "working_range",
-      "expression": "(hi - lo > TOLERANCE).then_some((lo, hi))",
-      "classification": "param",
-      "reason": "hi - lo is the span of the boundary's u (or v) parameter coordinate, so the comparison asks whether the parameter interval is non-degenerate and a parameter range is dimensionless",
-      "confidence": "high",
-      "proposed_rewrite": "!ctx.is_small_ratio(hi - lo)"
-    },
-    {
-      "file": "vendor/truck/truck-meshalgo/src/tessellation/triangulation.rs",
-      "line": 8204,
-      "symbol": "new_with_join",
-      "expression": "if p.x < q.x - TOLERANCE {",
-      "classification": "param",
-      "reason": "p.x and q.x are the u parameters of the open boundary's endpoints, so the one-sided margin comparison decides which parameter axis to cut on and is dimensionless",
-      "confidence": "high",
-      "proposed_rewrite": "p.x < q.x - ctx.ratio_margin()"
-    },
-    {
-      "file": "vendor/truck/truck-meshalgo/src/tessellation/triangulation.rs",
-      "line": 8220,
-      "symbol": "new_with_join",
-      "expression": "} else if q.x < p.x - TOLERANCE {",
-      "classification": "param",
-      "reason": "p.x and q.x are the u parameters of the open boundary's endpoints, so the one-sided margin comparison decides which parameter axis to cut on and is dimensionless",
-      "confidence": "high",
-      "proposed_rewrite": "q.x < p.x - ctx.ratio_margin()"
-    },
-    {
-      "file": "vendor/truck/truck-meshalgo/src/tessellation/triangulation.rs",
-      "line": 8236,
-      "symbol": "new_with_join",
-      "expression": "} else if p.y < q.y - TOLERANCE {",
-      "classification": "param",
-      "reason": "p.y and q.y are the v parameters of the open boundary's endpoints, so the one-sided margin comparison decides which parameter axis to cut on and is dimensionless",
-      "confidence": "high",
-      "proposed_rewrite": "p.y < q.y - ctx.ratio_margin()"
-    },
-    {
-      "file": "vendor/truck/truck-meshalgo/src/tessellation/triangulation.rs",
-      "line": 8252,
-      "symbol": "new_with_join",
-      "expression": "} else if q.y < p.y - TOLERANCE {",
-      "classification": "param",
-      "reason": "p.y and q.y are the v parameters of the open boundary's endpoints, so the one-sided margin comparison decides which parameter axis to cut on and is dimensionless",
-      "confidence": "high",
-      "proposed_rewrite": "q.y < p.y - ctx.ratio_margin()"
-    },
-    {
-      "file": "vendor/truck/truck-meshalgo/src/tessellation/triangulation.rs",
-      "line": 8278,
-      "symbol": "end_pts",
-      "expression": "if !p0.x.near(&p1.x) && !q0.x.near(&q1.x) {",
-      "classification": "param",
-      "reason": "p0.x, p1.x, q0.x, q1.x are u parameters of the two open curves' endpoints, so the comparison asks whether both curves need the same u-range normalization and is dimensionless",
-      "confidence": "high",
-      "proposed_rewrite": "!ctx.is_small_ratio(p0.x - p1.x) && !ctx.is_small_ratio(q0.x - q1.x)"
-    },
-    {
-      "file": "vendor/truck/truck-meshalgo/src/tessellation/triangulation.rs",
-      "line": 8283,
-      "symbol": "end_pts",
-      "expression": "} else if !p0.y.near(&p1.y) && !q0.y.near(&q1.y) {",
-      "classification": "param",
-      "reason": "p0.y, p1.y, q0.y, q1.y are v parameters of the two open curves' endpoints, so the comparison asks whether both curves need the same v-range normalization and is dimensionless",
-      "confidence": "high",
-      "proposed_rewrite": "!ctx.is_small_ratio(p0.y - p1.y) && !ctx.is_small_ratio(q0.y - q1.y)"
-    },
-    {
-      "file": "vendor/truck/truck-meshalgo/src/tessellation/triangulation.rs",
-      "line": 8381,
-      "symbol": "on_boundary",
-      "expression": "/// Whether `c` lies on a boundary segment, within `TOLERANCE`.",
-      "classification": "excluded",
-      "reason": "a /// doc comment on the on_boundary method, prose not code",
-      "confidence": "high",
-      "proposed_rewrite": null
-    },
-    {
-      "file": "vendor/truck/truck-meshalgo/src/tessellation/triangulation.rs",
-      "line": 8398,
-      "symbol": "on_boundary",
-      "expression": "(a + ab * t).distance2(c) <= TOLERANCE * TOLERANCE",
-      "classification": "excluded",
-      "reason": "squared order",
-      "confidence": "high",
-      "proposed_rewrite": null
-    },
-    {
-      "file": "vendor/truck/truck-meshalgo/src/tessellation/triangulation.rs",
-      "line": 8420,
-      "symbol": "include_along_ray",
-      "expression": "if x.so_small() && s0 * s1 < 0.0 {",
-      "classification": "param",
-      "reason": "x is the ratio s2 / (s1 - s0) of parameter-space cross products, the point where the ray crosses the boundary edge, so it is dimensionless",
-      "confidence": "high",
-      "proposed_rewrite": "ctx.is_small_ratio(x)"
-    },
-    {
-      "file": "vendor/truck/truck-meshalgo/src/tessellation/triangulation.rs",
-      "line": 10898,
-      "symbol": "triangulation_into_polymesh_outcome",
-      "expression": "if norm.so_small() || !norm.x.is_finite() {",
-      "classification": "param",
-      "reason": "norm is a vertex normal that was normalized to unit length earlier in the function (surface.normal(...).normalize()), so its magnitude is dimensionless and the test asks whether the unit normal is degenerate (zero), which does not scale with the model",
-      "confidence": "high",
-      "proposed_rewrite": "ctx.is_small_ratio(norm.magnitude())"
-    },
-    {
-      "file": "vendor/truck/truck-meshalgo/src/tessellation/triangulation.rs",
-      "line": 11072,
-      "symbol": "polyline_on_surface",
-      "expression": "let tol = tol.max(TOLERANCE);",
-      "classification": "excluded",
-      "reason": "not a predicate: it floors the tessellation chord tolerance (a model-space length) with f64::max and compares nothing, though the value is a length that must scale in Stage B",
-      "confidence": "high",
-      "proposed_rewrite": null
-    },
-    {
-      "file": "vendor/truck/truck-meshalgo/src/tessellation/triangulation.rs",
-      "line": 13108,
-      "symbol": "singular_transition_preserves_incidence_and_tessellates",
-      "expression": "assert!(singular_point.near(&Point3::new(0.0, 1.0, 0.0)));",
-      "classification": "excluded",
-      "reason": "inside the #[cfg(test)] mod singular_transition_tests (line 12956); a test's own epsilon is the test's business",
-      "confidence": "high",
-      "proposed_rewrite": null
-    },
-    {
-      "file": "vendor/truck/truck-meshalgo/src/tessellation/triangulation.rs",
-      "line": 13119,
-      "symbol": "singular_transition_preserves_incidence_and_tessellates",
-      "expression": "assert!(entering_uv.near(&uv(1.0, 0.0)));",
-      "classification": "excluded",
-      "reason": "inside the #[cfg(test)] mod singular_transition_tests (line 12956); a test's own epsilon is the test's business",
-      "confidence": "high",
-      "proposed_rewrite": null
-    },
-    {
-      "file": "vendor/truck/truck-meshalgo/src/tessellation/triangulation.rs",
-      "line": 13136,
-      "symbol": "singular_transition_preserves_incidence_and_tessellates",
-      "expression": "assert!(bridge.uv.near(&uv(1.0, 1.0)));",
-      "classification": "excluded",
-      "reason": "inside the #[cfg(test)] mod singular_transition_tests (line 12956); a test's own epsilon is the test's business",
-      "confidence": "high",
-      "proposed_rewrite": null
-    },
-    {
-      "file": "vendor/truck/truck-meshalgo/src/tessellation/triangulation.rs",
-      "line": 13137,
-      "symbol": "singular_transition_preserves_incidence_and_tessellates",
-      "expression": "assert!(bridge.point.near(&singular_point));",
-      "classification": "excluded",
-      "reason": "inside the #[cfg(test)] mod singular_transition_tests (line 12956); a test's own epsilon is the test's business",
-      "confidence": "high",
-      "proposed_rewrite": null
-    },
-    {
-      "file": "vendor/truck/truck-meshalgo/src/tessellation/triangulation.rs",
-      "line": 13184,
-      "symbol": "singular_transition_preserves_incidence_and_tessellates",
-      "expression": "assert!(singular_pt.near(&Point3::new(0.0, 1.0, 0.0)));",
-      "classification": "excluded",
-      "reason": "inside the #[cfg(test)] mod singular_transition_tests (line 12956); a test's own epsilon is the test's business",
-      "confidence": "high",
-      "proposed_rewrite": null
-    },
-    {
-      "file": "vendor/truck/truck-meshalgo/src/tessellation/triangulation.rs",
-      "line": 13195,
-      "symbol": "singular_transition_preserves_incidence_and_tessellates",
-      "expression": "enter_uv.near(&uv(1.0, 1.0)),",
-      "classification": "excluded",
-      "reason": "inside the #[cfg(test)] mod singular_transition_tests (line 12956); a test's own epsilon is the test's business",
-      "confidence": "high",
-      "proposed_rewrite": null
-    },
-    {
-      "file": "vendor/truck/truck-meshalgo/src/tessellation/triangulation.rs",
-      "line": 13212,
-      "symbol": "singular_transition_preserves_incidence_and_tessellates",
-      "expression": "rev_bridge.point.near(&singular_pt),",
-      "classification": "excluded",
-      "reason": "inside the #[cfg(test)] mod singular_transition_tests (line 12956); a test's own epsilon is the test's business",
-      "confidence": "high",
-      "proposed_rewrite": null
-    },
-    {
-      "file": "vendor/truck/truck-meshalgo/src/tessellation/triangulation.rs",
-      "line": 13239,
-      "symbol": "singular_transition_both_parameter_directions",
-      "expression": "assert!(singular_point.near(&Point3::new(0.0, 1.0, 0.0)));",
-      "classification": "excluded",
-      "reason": "inside the #[cfg(test)] mod singular_transition_tests (line 12956); a test's own epsilon is the test's business",
-      "confidence": "high",
-      "proposed_rewrite": null
-    },
-    {
-      "file": "vendor/truck/truck-meshalgo/src/tessellation/triangulation.rs",
-      "line": 13250,
-      "symbol": "singular_transition_both_parameter_directions",
-      "expression": "entering_uv.near(&uv(0.0, 1.0)),",
-      "classification": "excluded",
-      "reason": "inside the #[cfg(test)] mod singular_transition_tests (line 12956); a test's own epsilon is the test's business",
-      "confidence": "high",
-      "proposed_rewrite": null
-    },
-    {
-      "file": "vendor/truck/truck-meshalgo/src/tessellation/triangulation.rs",
-      "line": 13267,
-      "symbol": "singular_transition_both_parameter_directions",
-      "expression": "assert!(bridge.uv.near(&uv(1.0, 1.0)));",
-      "classification": "excluded",
-      "reason": "inside the #[cfg(test)] mod singular_transition_tests (line 12956); a test's own epsilon is the test's business",
-      "confidence": "high",
-      "proposed_rewrite": null
-    },
-    {
-      "file": "vendor/truck/truck-meshalgo/src/tessellation/triangulation.rs",
-      "line": 13268,
-      "symbol": "singular_transition_both_parameter_directions",
-      "expression": "assert!(bridge.point.near(&singular_point));",
-      "classification": "excluded",
-      "reason": "inside the #[cfg(test)] mod singular_transition_tests (line 12956); a test's own epsilon is the test's business",
-      "confidence": "high",
-      "proposed_rewrite": null
-    },
-    {
-      "file": "vendor/truck/truck-meshalgo/src/tessellation/triangulation.rs",
-      "line": 13284,
-      "symbol": "singular_transition_negative_case_rejects_non_reconstructing_candidate",
-      "expression": "// At u = 1 - delta the v-derivative has magnitude delta < TOLERANCE, so",
-      "classification": "excluded",
-      "reason": "a // comment inside the #[cfg(test)] mod singular_transition_tests (line 12956); prose not code",
-      "confidence": "high",
-      "proposed_rewrite": null
-    },
-    {
-      "file": "vendor/truck/truck-meshalgo/src/tessellation/triangulation.rs",
-      "line": 13285,
-      "symbol": "singular_transition_negative_case_rejects_non_reconstructing_candidate",
-      "expression": "// `so_small()` proposes a substitution, but the point still genuinely",
-      "classification": "excluded",
-      "reason": "a // comment inside the #[cfg(test)] mod singular_transition_tests (line 12956); prose not code",
-      "confidence": "high",
-      "proposed_rewrite": null
-    },
-    {
-      "file": "vendor/truck/truck-meshalgo/src/tessellation/triangulation.rs",
-      "line": 13294,
-      "symbol": "singular_transition_negative_case_rejects_non_reconstructing_candidate",
-      "expression": "assert!(surface.vder(raw_uv.x, raw_uv.y).so_small());",
-      "classification": "excluded",
-      "reason": "inside the #[cfg(test)] mod singular_transition_tests (line 12956); a test's own epsilon is the test's business",
-      "confidence": "high",
-      "proposed_rewrite": null
-    },
-    {
-      "file": "vendor/truck/truck-meshalgo/src/tessellation/triangulation.rs",
-      "line": 13314,
-      "symbol": "singular_transition_negative_case_rejects_non_reconstructing_candidate",
-      "expression": "current_uv.near(&raw_uv),",
-      "classification": "excluded",
-      "reason": "inside the #[cfg(test)] mod singular_transition_tests (line 12956); a test's own epsilon is the test's business",
-      "confidence": "high",
-      "proposed_rewrite": null
-    },
-    {
-      "file": "vendor/truck/truck-meshalgo/src/tessellation/triangulation.rs",
-      "line": 15607,
-      "symbol": "assert_continuous_longitude",
-      "expression": "|p: &SurfacePoint| p.uv.x.so_small() || (p.uv.x - std::f64::consts::PI).abs() < 1.0e-6;",
-      "classification": "excluded",
-      "reason": "inside the #[cfg(test)] mod sphere_pole_recovery_tests (line 15468); a test's own epsilon is the test's business",
-      "confidence": "high",
-      "proposed_rewrite": null
-    },
-    {
-      "file": "vendor/truck/truck-meshalgo/src/tessellation/triangulation.rs",
-      "line": 15628,
-      "symbol": "north_pole_great_circle_triangle_recovers",
-      "expression": "let pole = piece.0.iter().find(|p| p.uv.x.so_small());",
-      "classification": "excluded",
-      "reason": "inside the #[cfg(test)] mod sphere_pole_recovery_tests (line 15468); a test's own epsilon is the test's business",
-      "confidence": "high",
-      "proposed_rewrite": null
-    },
-    {
-      "file": "vendor/truck/truck-meshalgo/src/vtk.rs",
-      "line": 4,
-      "symbol": "<file scope>",
-      "expression": "use truck_base::tolerance::TOLERANCE;",
-      "classification": "excluded",
-      "reason": "a use import at file scope, not a predicate; the imported constant's only production use is the spatial-hash bucket pitch in hash_point, which compares nothing",
-      "confidence": "high",
-      "proposed_rewrite": null
-    },
-    {
-      "file": "vendor/truck/truck-meshalgo/src/vtk.rs",
-      "line": 195,
-      "symbol": "hash_point",
-      "expression": "(p / (TOLERANCE * 50.0) - Vector3::new(0.5, 0.5, 0.5))",
-      "classification": "excluded",
-      "reason": "TOLERANCE scales the spatial-hash bucket pitch that quantizes positions into hash cells (TOLERANCE * 50.0); it compares nothing",
-      "confidence": "high",
-      "proposed_rewrite": null
-    }
+  "census_defects_the_survey_found": [
+   "census PAT `\\bTOLERANCE\\b` misses SOURCE_INCIDENCE_TOLERANCE -- `_` is a word char so the boundary never matches. 3 hits, one of them a live predicate (source_edge.rs:311).",
+   "census SQUARED regex misses a written-out `TOLERANCE * TOLERANCE` (triangulation.rs:8398).",
+   "neither census nor survey covers the RELATIVE_TOLERANCE = 1e-9 family in tessellation/formal/*.rs -- 8 production predicates in no inventory at all."
   ]
+ }
 }

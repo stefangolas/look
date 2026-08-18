@@ -536,6 +536,34 @@ it `(tau_rep · scale)²`, a distinct `tau` , or a squared-distance comparison
 that should have been a first-order one on the distance — is design work and is
 **BG-TOL-004**, which does not block any shard.
 
+**Quantities of degree ≠ 1 in length are out of Stage A's scope too, and
+this is a different exclusion from the squared-order one.** A squared-order
+site is recognised by its *constant* (`TOLERANCE2`); a degree-2 site is
+recognised by its *quantity*. `(b - a).cross(c - a).so_small()` compares twice a
+triangle's area against `TOLERANCE`; `Matrix3::from_cols(a, b, dir).determinant()
+.so_small()` compares a scalar triple product. Both are degree 2 in length, so
+under a model rescale by `k` the quantity scales as `k²` while
+`ctx.length_margin()` scales as `k`. Classifying such a site `model` and
+rewriting it `ctx.is_small_len(...)` is exactly correct at Stage A — where
+`model_scale = 1.0` makes the two identical — and silently wrong the moment
+Stage B threads a real scale. That is worse than not migrating it, because Stage
+B will then see a migrated site and never look again.
+
+A shard therefore leaves these exactly as they are and marks each
+`FIXME(BG-TOL-001): <quantity> is an area (length squared); neither predicate
+fits`. Deferred to **BG-TOL-004** with the squared-order family, which must
+decide whether `ToleranceCtx` grows a degree-aware predicate or whether these
+sites should compare a first-order quantity instead.
+
+This exclusion is written down because the loop has discovered it twice and
+paid for it twice. A worker on an earlier shard hit it unprompted at
+`truck-modeling/src/geom_impls.rs:91` and left the FIXME on its own judgement;
+the spec did not record it, so the `truck-meshalgo` survey a session later
+proposed `is_small_len` for six sites of the same shape — and its own stated
+reason for one of them called the quantity "a length-squared quantity" while
+applying the length predicate anyway. An exclusion that lives only in one
+worker's inline comment is an exclusion the next worker will not find.
+
 `unscaled_legacy()` is a scaffold and is the obvious way to leave the job half
 done, so it is **ratcheted, not trusted**: `scripts/kernel-gates.sh` counts its
 occurrences against a recorded ceiling and fails when the count rises. The

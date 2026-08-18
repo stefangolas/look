@@ -98,6 +98,73 @@ def census_functions(fragment):
     return int(m.group(1)) if m else None
 
 
+SITE_ROW = re.compile(r"^\|\s*`([^`]+)`\s*\|\s*(\d+)\s*\|")
+FILE_HEAD = re.compile(r"^\*\*`([^`]+)`\*\*")
+FN_DEF = re.compile(
+    r"^\s*(?:pub(?:\([^)]*\))?\s+)?(?:const\s+)?(?:async\s+)?(?:unsafe\s+)?"
+    r"(?:extern\s+\"[^\"]*\"\s+)?fn\s+(\w+)")
+
+
+def _enclosing_fn(path, line):
+    """The definition line of the fn containing `line`, or None."""
+    try:
+        src = path.read_text(encoding='utf-8', errors='replace').splitlines()
+    except OSError:
+        return None
+    if line > len(src):
+        return None
+    for i in range(line - 1, -1, -1):
+        if FN_DEF.match(src[i]):
+            return i + 1
+    return None
+
+
+def packet_contexts(text):
+    """Distinct functions holding a live site in the packet's table.
+
+    Resolved against the tree, not against the table's text. Two reasons, both
+    paid for. Keying on the function NAME undercounts: truck-stepio's
+    `src/out/geometry.rs` has five distinct `fmt` impls each holding a site and
+    they collapse to one, which is the same defect that made that crate read 11
+    contexts instead of 15. And keying on the table's own formatting is
+    brittle -- BG-TOL-001-MESHALGO's generated table states the class in the row
+    while BG-TOL-001-STEPIO's states it in the section heading, so a regex
+    tuned to one silently counts zero rows in the other and reports a budget
+    mismatch that is the parser's, not the packet's.
+
+    Resolving (file, line) to the enclosing fn's definition line handles both,
+    and checks something extra for free: a table line that lands outside any
+    function does not resolve, so an invented line number cannot pad a budget.
+    """
+    allow = re.findall(r"^\s*-\s*(vendor/\S+\.rs)\s*$", text, re.M)
+    paths = [REPO_ROOT / a for a in allow]
+    fns, unresolved, current = set(), [], None
+    seen_table = False
+    for line in text.splitlines():
+        stripped = line.strip()
+        # Sites listed after this heading are declared NOT migration work.
+        if re.match(r"^#+\s*(not in this packet|excluded)", stripped, re.I):
+            break
+        m_file = FILE_HEAD.match(stripped)
+        if m_file:
+            name = m_file.group(1).lstrip('`').strip()
+            cands = [p for p in paths if p.as_posix().endswith(name)]
+            current = cands[0] if len(cands) == 1 else None
+            continue
+        m = SITE_ROW.match(stripped)
+        if not m or current is None:
+            continue
+        seen_table = True
+        fn_line = _enclosing_fn(current, int(m.group(2)))
+        if fn_line is None:
+            unresolved.append(f"{current.name}:{m.group(2)}")
+        else:
+            fns.add((str(current), fn_line))
+    if not seen_table:
+        return None, []
+    return len(fns), unresolved
+
+
 def check(packet_path, quiet=False):
     """Returns a list of problems; empty means the packet's claims still hold."""
     text = Path(packet_path).read_text(encoding='utf-8')
@@ -123,20 +190,59 @@ def check(packet_path, quiet=False):
 
     m_budget = re.search(r"(?m)^unscaled_legacy_budget:\s*(\d+)", yaml_text)
     m_frag = re.search(r"(?m)^census_fragment:\s*(\S+)", yaml_text)
-    if m_budget and m_frag:
+    if m_budget:
         declared = int(m_budget.group(1))
-        measured = census_functions(m_frag.group(1).strip())
-        if measured is None:
-            problems.append(f"census produced no count for fragment {m_frag.group(1)!r}")
-        elif declared != measured:
+        # The budget is one context per function that actually RECEIVES a
+        # `ToleranceCtx::unscaled_legacy()`, and that is a property of this
+        # packet's site table, not of the census. The census counts every
+        # function holding a grep hit, including ones whose only hits the
+        # packet legitimately excludes -- a `use` import, a spatial-hash bucket
+        # pitch, a `const` item, a deferred degree-2 area test. Checking the
+        # declared budget against the census therefore rejects correct packets
+        # by construction: BG-TOL-001-MESHALGO's skeleton emitted 16 from the
+        # survey's live rows while the census measured 20, and `--check`
+        # rejected `--skeleton`'s own output on the same survey. The census is
+        # a real bound in one direction only -- a packet cannot need more
+        # contexts than there are functions with a site -- so it stays, as a
+        # ceiling.
+        counted, unresolved = packet_contexts(text)
+        if unresolved:
             problems.append(
-                f"unscaled_legacy_budget is {declared}, census measures {measured} "
-                f"function(s) with a site under {m_frag.group(1)!r}. The budget is one "
-                "context per function; an estimate here costs a whole dispatch.")
+                'site table line(s) that land outside any function: '
+                + ', '.join(unresolved[:6]))
+        if counted is None:
+            problems.append(
+                f"unscaled_legacy_budget is {declared} but the packet has no readable "
+                "site table (`| `fn` | line | code | class |` rows); the budget is "
+                "unverifiable. An estimate here costs a whole dispatch.")
+        elif declared != counted:
+            problems.append(
+                f"unscaled_legacy_budget is {declared}, the packet's own site table "
+                f"holds live sites in {counted} distinct function(s). The budget is one "
+                "context per function with a migrated site.")
         elif not quiet:
-            print(f"  budget {declared} == census {measured}  ok")
-    elif m_budget and not quiet:
-        print("  unscaled_legacy_budget declared without `census_fragment:` -- unchecked")
+            print(f"  budget {declared} == site table {counted}  ok")
+        if m_frag:
+            measured = census_functions(m_frag.group(1).strip())
+            if measured is None:
+                problems.append(f"census produced no count for fragment {m_frag.group(1)!r}")
+            elif max(declared, counted or 0) > measured:
+                # Report against the larger of the two: a declared budget above
+                # the ceiling is a defect even when the site table also
+                # disagrees, and printing "25 <= ceiling 20  ok" because the
+                # comparison silently used `counted` is how a green line comes
+                # to state something false.
+                over = max(declared, counted or 0)
+                problems.append(
+                    f"unscaled_legacy_budget {declared} (site table {counted}) exceeds the "
+                    f"census ceiling {measured} for {m_frag.group(1)!r}: {over} is more "
+                    "context(s) than there are functions with a site at all.")
+            elif not quiet and counted is not None:
+                gap = measured - counted
+                note = "" if not gap else f"  ({gap} function(s) excluded by this packet)"
+                print(f"  budget {declared} <= census ceiling {measured}  ok{note}")
+        elif not quiet:
+            print("  no `census_fragment:` -- budget checked against the site table only")
 
     return problems
 
@@ -200,6 +306,13 @@ def skeleton(survey_path, pid, crate):
 
 
 def main():
+    # --skeleton writes em dashes; on Windows stdout defaults to the console
+    # codepage and `--check` then dies with UnicodeDecodeError reading back
+    # the file `--skeleton` just produced. Producer-side fix.
+    try:
+        sys.stdout.reconfigure(encoding='utf-8')
+    except (AttributeError, OSError):
+        pass
     ap = argparse.ArgumentParser()
     ap.add_argument('--check')
     ap.add_argument('--check-all', action='store_true')
