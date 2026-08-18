@@ -70,18 +70,30 @@ went DONE → ACCEPTED → merged in one attempt, one verify run, no amendment.
 ## Pick up here
 
 1. `python loop/slot_status.py`, then the last 3 rows of `LEDGER.jsonl`.
-2. **FIRST: finish the V9 negative test. The gate has only ever been seen
-   passing.** V9's first version was watched failing and *didn't* — it passed
-   with `truck_base::TOLERANCE` loosened 1e-6 → 1e-1. `tests/geometry_fingerprint.rs`
-   was written to fix that and passes clean, but the negative run against the
-   loosened constant never completed (killed twice, then the disk filled). Until
-   it is seen failing, **treat V9 as unproven**. To redo it: commit
-   `TOLERANCE = 1.0e-1` in `truck-base`, point a slot at it, and run
-   `verify.py --only V9`. Expect `bracket triangle count moved`. Delete the
-   probe commit and branch afterwards, and **`git reset --hard` the main
-   worktree back** — a probe was left checked out in the repo root once.
-3. **All four slots are idle; all four `target/` dirs were deleted** to recover
-   disk (see the disk trap below). A slot re-warms in 1-3 min via `new_slot.py`.
+2. **V9 is PROVEN. Session 7 watched it fail twice, on two different failure
+   modes, and the probes are torn down.** Do not redo this.
+   - *Hard break:* `truck_base::TOLERANCE` 1e-6 → 1e-1 on a throwaway branch ->
+     V9 FAIL, 5 tests, incl. both fingerprints. Mechanism is **not** a moved
+     mesh: `nonpositive_tolerance!` asserts `tol >= TOLERANCE` in
+     `truck-meshalgo/src/tessellation/mod.rs:627`, so the part never
+     tessellates at all and the tests panic. `tests/step.rs` fails here too --
+     so the *old* structural tests would also have caught this probe today,
+     which is worth knowing before concluding much from it.
+   - *Merely-different mesh:* that is what the fingerprint is for, so it was
+     probed separately -- `minimum_segments_per_revolution` 24 -> 32 in
+     `src/step/meshing_policy.rs`. V9 FAIL on exactly
+     `assertion left == right failed: bracket triangle count moved`. **Only
+     bracket moved; the washer passed** -- its circles already exceed 32
+     segments through the linear/angular terms, so on this class of change the
+     discrimination is carried by one fixture, not two. A third fixture whose
+     count moves under coarsening as well as densification would be worth
+     more than another structural test.
+   - Positive control: all 39 geometry tests pass at base `192a7f4` (the
+     cached baseline `loop/baselines/192a7f4__look__geometry_fingerprint-*`).
+3. **Slot 0 is warm and detached at `192a7f4`; slots 1-3 are idle with no
+   `target/`.** A slot re-warms in ~5.6 min from cold (measured session 7, not
+   the 1-3 min claimed earlier -- that figure was for a slot whose target
+   survived).
 4. **`BG-TOL-001-GEOM-SPECIFIEDS` is written, anchors verified, not dispatched.**
    22 sites, all judgements pre-made. Raise the ratchet ceiling from 17 by its
    budget of 12 before dispatching, and lower it to the true count after.
@@ -499,7 +511,8 @@ The gates, in the order `verify.py` runs them:
 
 ## Open questions
 
-- **V9 exists now but is unproven — see "Pick up here" item 2.** It was added
+- **V9 was proven in session 7 — see "Pick up here" item 2** for both
+  negative tests and what each one does and does not establish. It was added
   because nothing in this loop had ever been measured against real geometry.
   Its first version ran `tests/step.rs`, `torus_deck.rs` and
   `spline_carrier.rs`, **passed with `TOLERANCE` loosened 1e-6 → 1e-1**, and
