@@ -79,11 +79,13 @@ impl SearchNearestParameter<D1> for UnitParabola<Point2> {
         _: H,
         _: usize,
     ) -> Option<f64> {
+        let ctx = ToleranceCtx::unscaled_legacy();
         let p = 2.0 - pt.x;
         let q = -pt.y;
         solver::pre_solve_cubic(p, q)
             .into_iter()
-            .filter_map(|x| match x.im.so_small() {
+            .filter_map(|x| match ctx.is_small_ratio(x.im) {
+                // BG-TOL-001: param
                 true => Some(x.re),
                 false => None,
             })
@@ -116,9 +118,11 @@ impl SearchParameter<D1> for UnitParabola<Point2> {
     type Point = Point2;
     #[inline]
     fn search_parameter<H: Into<SPHint1D>>(&self, pt: Point2, _: H, _: usize) -> Option<f64> {
+        let ctx = ToleranceCtx::unscaled_legacy();
         let t = pt.y / 2.0;
         let pt0 = self.subs(t);
-        match pt.near(&pt0) {
+        match ctx.is_small_ratio((pt - pt0).magnitude()) {
+            // BG-TOL-001: param
             true => Some(t),
             false => None,
         }
@@ -134,7 +138,9 @@ impl SearchParameter<D1> for UnitParabola<Point3> {
         _hint: H,
         _trials: usize,
     ) -> Option<f64> {
-        match pt.z.so_small() {
+        let ctx = ToleranceCtx::unscaled_legacy();
+        match ctx.is_small_ratio(pt.z) {
+            // BG-TOL-001: param
             true => UnitParabola::<Point2>::new().search_parameter(
                 Point2::new(pt.x, pt.y),
                 _hint,

@@ -75,13 +75,15 @@ impl SearchNearestParameter<D1> for UnitHyperbola<Point2> {
         _: H,
         _: usize,
     ) -> Option<f64> {
+        let ctx = ToleranceCtx::unscaled_legacy();
         let a = -p.y;
         let b = (p.y * p.y - p.x * p.x) / 4.0 + 1.0;
         let c = -p.y;
         let d = p.y * p.y / 4.0;
         let y = solver::solve_quartic(a, b, c, d)
             .into_iter()
-            .filter_map(|z| match z.im.so_small() {
+            .filter_map(|z| match ctx.is_small_ratio(z.im) {
+                // BG-TOL-001: param
                 true => Some(z.re),
                 false => None,
             })
@@ -113,8 +115,10 @@ impl SearchNearestParameter<D1> for UnitHyperbola<Point3> {
 impl SearchParameter<D1> for UnitHyperbola<Point2> {
     type Point = Point2;
     fn search_parameter<H: Into<SPHint1D>>(&self, p: Point2, _: H, _: usize) -> Option<f64> {
+        let ctx = ToleranceCtx::unscaled_legacy();
         let t = f64::asinh(p.y);
-        match p.near(&self.subs(t)) {
+        match ctx.is_small_ratio((p - self.subs(t)).magnitude()) {
+            // BG-TOL-001: param
             true => Some(t),
             false => None,
         }
@@ -124,8 +128,10 @@ impl SearchParameter<D1> for UnitHyperbola<Point2> {
 impl SearchParameter<D1> for UnitHyperbola<Point3> {
     type Point = Point3;
     fn search_parameter<H: Into<SPHint1D>>(&self, p: Point3, _: H, _: usize) -> Option<f64> {
+        let ctx = ToleranceCtx::unscaled_legacy();
         let t = f64::asinh(p.y);
-        match p.near(&self.subs(t)) {
+        match ctx.is_small_ratio((p - self.subs(t)).magnitude()) {
+            // BG-TOL-001: param
             true => Some(t),
             false => None,
         }

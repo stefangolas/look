@@ -181,9 +181,11 @@ where
     type Point = P;
     #[inline]
     fn search_parameter<H: Into<SPHint1D>>(&self, pt: P, _: H, _: usize) -> Option<f64> {
+        let ctx = ToleranceCtx::unscaled_legacy();
         let b = self.1 - self.0;
         let t = (pt - self.0).dot(b) / b.dot(b);
-        match self.subs(t).near(&pt) {
+        match ctx.is_small_len((self.subs(t) - pt).magnitude()) {
+            // BG-TOL-001: model
             true => Some(t),
             false => None,
         }
