@@ -80,26 +80,34 @@ every site is `param`. `line.rs`, `plane.rs`, `sphere.rs` and `torus.rs` are
 model-space → every site is `model` **except the two dimensionless quantities
 named in the table** (a homogeneous weight and a sine).
 
-## Anchors — verified 2026-08-16, counts are exact
+## Anchors — re-verified 2026-08-18, counts are exact
 
 Locate by running the pattern. **Never locate by line number.** `rg` is not
 installed on this machine; any case-sensitive literal search is equivalent.
 **If a count differs, STOP** and report `ANCHOR_MISMATCH`.
 
-Every count is of `\.near\(|so_small\(|TOLERANCE` in that file. They are raw
-counts and are **larger than the number of sites you migrate**, because they
-include doc-comment examples and `#[cfg(test)]` bodies. That is deliberate:
-matching the raw count confirms you are looking at the file this packet was
-written against.
+Every count below is the number of **matching lines** (not matches) for the
+pattern `\.near\(|so_small\(|TOLERANCE` in that file, i.e.
+
+```
+grep -cE '\.near\(|so_small\(|TOLERANCE' vendor/truck/truck-geometry/src/specifieds/<f>.rs
+```
+
+The distinction matters on `plane.rs`, whose line 226 carries **two**
+predicates on one line: 5 matching lines, 6 predicates. These are raw counts
+and are **larger than the number of sites you migrate**, because they include
+doc-comment examples, `#[cfg(test)]` bodies, and — in `sphere.rs` — one
+squared-order site this packet deliberately excludes. Matching the raw count
+confirms you are looking at the file this packet was written against.
 
 | # | file | expect |
 |---|---|---|
-| A1 | `specifieds/circle.rs` | **5** |
+| A1 | `specifieds/circle.rs` | **4** |
 | A2 | `specifieds/hyperbola.rs` | **3** |
-| A3 | `specifieds/line.rs` | **2** |
+| A3 | `specifieds/line.rs` | **1** |
 | A4 | `specifieds/parabola.rs` | **3** |
 | A5 | `specifieds/plane.rs` | **5** |
-| A6 | `specifieds/sphere.rs` | **7** |
+| A6 | `specifieds/sphere.rs` | **4** |
 | A7 | `specifieds/torus.rs` | **3** |
 | A8 | `truck-base/src/tolerance.rs`, pattern `length_margin` | **≥1** |
 
