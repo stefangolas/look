@@ -9,6 +9,7 @@ Usage: python loop/run_packet.py --slot 0 --packet loop/packets/BG-S0-002.md [--
 """
 import argparse
 import datetime
+import re
 import os
 import shutil
 import subprocess
@@ -103,6 +104,80 @@ def spawn_detached(argv, events_log, err_log, env, slot_root, tag='worker'):
     return proc.pid
 
 
+def gate4_state(wt):
+    """GATE-4's two numbers, read the way the gate itself reads them.
+
+    Both come from the SLOT's worktree at HEAD, not from the orchestrator's
+    checkout, and that is the whole point of the check. `scripts/kernel-gates.sh`
+    runs inside the worktree under verification, so the ceiling that will judge a
+    worker is the one committed on the branch it was forked onto -- raising the
+    ceiling on integration/kernel-bg *after* a slot was forked leaves the slot
+    with the old value and rejects the packet anyway. The count uses the gate's
+    own pathspec and exclusion so the two cannot drift apart.
+
+    Returns (count, ceiling); ceiling is None when the file is absent at HEAD.
+    """
+    res = subprocess.run(
+        ['git', '-C', str(wt), 'grep', '-oh', 'unscaled_legacy(', 'HEAD', '--',
+         'vendor/truck/*/src/*', ':(exclude)vendor/truck/truck-base/src/tolerance.rs'],
+        capture_output=True, text=True, encoding='utf-8', errors='replace')
+    # git grep exits 1 when it matches nothing, which is the healthy state here
+    # and not an error -- the same trap that killed kernel-gates.sh silently on
+    # a clean tree. The return code is deliberately not checked.
+    count = len([l for l in res.stdout.splitlines() if l.strip()])
+
+    show = subprocess.run(
+        ['git', '-C', str(wt), 'show', 'HEAD:scripts/unscaled_legacy_ceiling.txt'],
+        capture_output=True, text=True, encoding='utf-8', errors='replace')
+    if show.returncode != 0:
+        return count, None
+    digits = ''.join(c for c in show.stdout if c.isdigit())
+    return count, (int(digits) if digits else 0)
+
+
+def check_unscaled_legacy_budget(packet_path, wt):
+    """Refuse to dispatch a Stage-A shard whose ceiling has not been raised yet.
+
+    A packet states a fact about the repo -- "the ceiling has been raised to
+    cover at most 12 new call sites" -- and nothing checked that the fact was
+    true at the moment of dispatch, or had ever been. It is the same defect as
+    an anchor going stale, and it fails the same expensive way: the worker does
+    exactly what the packet told it to, GATE-4 (through V4) rejects the commit
+    for exceeding a ceiling nobody moved, and the rejection reads as a bad
+    worker rather than a bad dispatch. That costs a full worker run -- tens of
+    minutes -- to discover something two `git show`s settle here.
+
+    Opt-in: a packet with no `unscaled_legacy_budget:` in its front block is not
+    a Stage-A shard and is not checked.
+    """
+    text = packet_path.read_text(encoding='utf-8')
+    m = re.search(r"(?m)^unscaled_legacy_budget:\s*(\d+)", text)
+    if not m:
+        return
+    budget = int(m.group(1))
+
+    count, ceiling = gate4_state(wt)
+    if ceiling is None:
+        sys.exit("this packet declares unscaled_legacy_budget, but the slot's HEAD has no "
+                 "scripts/unscaled_legacy_ceiling.txt -- GATE-4 cannot be satisfied from here.")
+
+    if count + budget > ceiling:
+        sys.exit(
+            "refusing to dispatch: GATE-4 would reject this packet's own work.\n"
+            f"  unscaled_legacy() sites at the slot's HEAD: {count}\n"
+            f"  this packet is budgeted to add:             {budget}\n"
+            f"  ceiling committed on the slot's branch:     {ceiling}\n"
+            f"  {count} + {budget} = {count + budget} > {ceiling}\n"
+            f"Raise the ceiling to at least {count + budget} in "
+            "scripts/unscaled_legacy_ceiling.txt, commit it on the branch this slot forks\n"
+            "from, re-run new_slot.py so the raise is in the slot's HEAD, and lower the\n"
+            "ceiling to the true count in the commit that closes the packet. The ceiling\n"
+            "is a ratchet, not a target.")
+
+    print(f"GATE-4 preflight: {count} unscaled_legacy site(s) + {budget} budgeted "
+          f"<= ceiling {ceiling}, read from the slot's HEAD.")
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument('--slot', type=int, required=True)
@@ -124,6 +199,8 @@ def main():
     if not packet_path.is_file():
         sys.exit(f"packet not found: {args.packet}")
 
+    check_unscaled_legacy_budget(packet_path, wt)
+
     # A worker that died mid-packet (V0 preflight: BLOCKED) leaves edits in the
     # worktree, and dispatching on top of them mixes a dead run's work into a
     # live one's diff. --reset clears the slot, but never silently: the
@@ -132,7 +209,6 @@ def main():
     # when it is not usable code. Deciding to discard work stays an explicit
     # act, which is why this is a flag and not the default.
     porcelain = git_lines(wt, 'status', '--porcelain')
-    import re
     dirty = [l for l in porcelain if not re.search(r'(?i)\s(PACKET\.md|worker\.(pid|err|packet))$', l)]
 
     if dirty:

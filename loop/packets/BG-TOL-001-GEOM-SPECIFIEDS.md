@@ -28,6 +28,10 @@ tests_required:
   - canonical_sites_do_not_scale_with_the_model
   - model_space_sites_do_scale_with_the_model
 budget:      {turns: 70, ctx_tokens: 150000}
+# Read by run_packet.py's dispatch preflight, which refuses to dispatch unless
+# GATE-4's current count plus this budget fits under the ceiling committed on
+# the slot's own branch. Keep it equal to the number stated under 'The ratchet'.
+unscaled_legacy_budget: 12
 ```
 
 **22 sites migrate, 1 is deliberately left with a `FIXME`.** Every judgement is
@@ -207,8 +211,9 @@ packet's job.
 
 `scripts/kernel-gates.sh` counts `unscaled_legacy(` call sites in
 `vendor/truck/*/src/**` and **fails when the total exceeds the ceiling** in
-`scripts/unscaled_legacy_ceiling.txt`. The ceiling has been raised to cover
-**at most 12 new call sites** for this packet. That file is **not** on your
+`scripts/unscaled_legacy_ceiling.txt`. The ceiling stands at **29**: 17 call
+sites already in the tree plus **at most 12 new ones** for this packet. Exceed
+that and V4 rejects your commit. That file is **not** on your
 allowlist and you must not edit it. One context per function containing sites
 is about 12 here; if you need many more you have constructed one per site.
 
