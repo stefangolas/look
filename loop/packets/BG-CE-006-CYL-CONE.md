@@ -144,9 +144,25 @@ the same `Certificate` shape the `IncludeCurve` impls in `sphere.rs` use.
 **6. Do NOT implement `BoundedSurface` for either type.** Both are unbounded in
 `v`, and `BoundedSurface::range_tuple` calls `.expect(UNBOUNDED_ERROR)` on the
 range — implementing it would install a panic on a path reachable from imported
-geometry, which is an H-1 violation. `Plane` does implement it despite being
-unbounded; that is a pre-existing defect in this tree. **Do not copy it and do
+geometry, which is an H-1 violation. ~~`Plane` does implement it despite being
+unbounded; that is a pre-existing defect in this tree.~~ **Do not copy it and do
 not fix it here** — report it in your notes.
+
+> **Correction, session 8 — the struck sentence was wrong and the worker said
+> so.** This packet's worker reported that `Plane`'s `BoundedSurface` impl is
+> not a defect, and it was checked and is right.
+> `Plane::parameter_range` returns `(Bound::Included(0.0),
+> Bound::Included(1.0))` on **both** axes, so `try_range_tuple` yields
+> `(Some(..), Some(..))` and `range_tuple`'s `.expect(UNBOUNDED_ERROR)` cannot
+> fire. `impl BoundedSurface for Plane {}` is sound.
+>
+> The rest of decision 6 stands, and the check strengthens it: `Cylinder` and
+> `Cone` both return `(Bound::Unbounded, Bound::Unbounded)` for `v`, so
+> `try_range_tuple` yields `None` on that half and `range_tuple` **would**
+> panic. Giving either type a `BoundedSurface` impl installs exactly the defect
+> described above. So the mechanism was right and only the example was wrong —
+> and the answer to "should Cylinder and Cone implement it after all" is a
+> firmer **no** than when this packet was written.
 
 **7. The apex is a first-class point.** `Cone::subs(u, 0.0)` is the apex for
 every `u`, `uder` vanishes there, and `normal` is undefined there. Do **not**

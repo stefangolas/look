@@ -121,13 +121,17 @@ packet** — a ceiling left at its dispatch budget is a licence, not a ratchet.
      15 before dispatching it. It does not need a survey; it already has the
      judgement.
 
-3. **`BG-CE-006-CYL-CONE`'s worker disagreed with its packet and may be right.**
-   It says `Plane`'s `BoundedSurface` impl is not the panic-installing defect the
-   packet called it, because this tree's `Plane::parameter_range` is a bounded
-   `[0,1]^2` so `range_tuple().expect` cannot fire. **Unchecked.** If it is
-   right, correct the claim in the traps below and in any packet that repeats it,
-   and re-apply the reasoning to whether Cylinder and Cone should implement
-   `BoundedSurface` after all. This is cheap and was carried over from session 7.
+3. ~~`BG-CE-006-CYL-CONE`'s worker disagreed with its packet~~ — **checked and
+   closed in session 8; the worker was right.** `Plane::parameter_range` returns
+   `(Bound::Included(0.0), Bound::Included(1.0))` on both axes, so
+   `try_range_tuple` yields two `Some`s and `range_tuple`'s
+   `.expect(UNBOUNDED_ERROR)` cannot fire — `impl BoundedSurface for Plane {}` is
+   sound and the packet's "pre-existing defect" sentence was false. The packet is
+   annotated with the correction rather than silently edited. **The rest of that
+   decision got stronger, not weaker:** `Cylinder` and `Cone` both return
+   `(Bound::Unbounded, Bound::Unbounded)` for `v`, so `range_tuple` genuinely
+   would panic on them, and the answer to "should they implement `BoundedSurface`
+   after all" is a firmer **no**. Nothing to do here.
 
 4. **Then the CE chain, which is the actual critical path to generation.** Seven
    of the nine BG-INV invariant checkers are gated on **one** packet,
@@ -478,6 +482,18 @@ reason is in the commit that made the change, and the code will not tell you.
   succeeded.** It warms a cold slot, which takes ~5.6 min. A timeout is not a
   failure — check `slot_status.py` and `git worktree list` before re-running it,
   or you will fork a second worktree onto the same branch.
+
+- **"`Plane` implements `BoundedSurface` despite being unbounded" is false, and
+  it reached a packet as a stated fact.** `Plane::parameter_range` is
+  `(Bound::Included(0.0), Bound::Included(1.0))` on both axes; `range_tuple`'s
+  `.expect(UNBOUNDED_ERROR)` cannot fire on it. `Cylinder` and `Cone` are the
+  ones that are unbounded — `(Bound::Unbounded, Bound::Unbounded)` in `v` — so
+  the panic the claim described is real and lives on the other types. The worker
+  that was told this contradicted it in its `RESULT.json` notes and was right.
+  **The packet asked for that judgement explicitly** ("report whether Plane's
+  impl looked like a defect to you on reading it"), which is the only reason it
+  came back; a packet that states a fact without inviting disagreement gets
+  compliance instead of a correction.
 
 ## The commands
 
