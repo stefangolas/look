@@ -92,7 +92,38 @@ packet** — a ceiling left at its dispatch budget is a licence, not a ratchet.
 
 ## Pick up here
 
-1. **Verify `BG-TOL-001-MESHALGO` (slot 0, base `6ca37b2`).** `python
+0. **`BG-TOL-001-MESHALGO` is committed at `8cf0e92` and was verified REJECTED
+   on V3 ALONE — and the rejection is probably the gate's, not the worker's.**
+   V3's detail is *"clippy could not build truck-meshalgo, so findings in it were
+   never produced"* — that is a **build failure inside clippy, not a lint
+   finding**, and **V2 (`cargo check --locked`) PASSED on the same tree**. The
+   difference is `--all-targets`. **First thing to do: run
+   `cargo clippy -p truck-meshalgo --all-targets --no-deps` at base `6ca37b2`.**
+   If it fails there too, a gate that fails on the untouched baseline is not a
+   gate and the packet must not be redispatched for it. Everything else about
+   this packet checks out (see below), so do not discard the branch.
+   - **Evidence already gathered, do not re-measure:** the two failing
+     `cone_topology_tests` (`duplicate_edge_creates_no_second_cdt_edge`,
+     `test_parity_intersecting_constraints_rejected`) fail **identically at base**
+     — same assertions, `left: 5 / right: 3`, line numbers shifted by exactly 31.
+     Measured independently in slot 1 detached at `6ca37b2`, and the worker
+     reached the same answer by stashing its diff. **They have been broken since
+     `da72cd5` and no gate ever noticed**, because no packet before this one
+     listed truck-meshalgo in `crates:` and V8 is a stub.
+   - **The packet's budget of 11 contexts is wrong; it should be 10.**
+     `end_pts` is a two-line nested `fn` that closes at 8276; the sites at 8278
+     and 8283 sit *after* it, back in `new_with_join`'s `2 =>` arm.
+     **`census_tol_sites.py` and `gen_packet.py`'s `packet_contexts` share the
+     bug** — both scan upward for `fn <name>` without tracking braces, so both
+     attribute a site to a nested helper that has already closed. The worker
+     honoured the wrong 11 by introducing a context that **shadows
+     `new_with_join`'s** inside the match arm, and said so plainly. That shadow
+     is an orchestrator amendment to remove, not a worker defect.
+   - Worker cost for the whole packet: **$0.057**. All 49 remaining packets
+     extrapolate to **~$2.78**. Worker spend is not a constraint; orchestrator
+     time is. 75% of the worker's wall-clock was model latency, not cargo.
+
+1. ~~Verify `BG-TOL-001-MESHALGO`~~ — done, see item 0. **Original guidance:** `python
    loop/verify.py --slot 0 --packet loop/packets/BG-TOL-001-MESHALGO.md --base
    6ca37b2`. Then merge `--no-ff`, file `RESULT.json`, ledger row, `status: DONE`
    in `PACKETS.jsonl`, and **lower the ceiling to the true count**.
@@ -208,6 +239,23 @@ become the answer.
 them onto `tau_rep` loosens them by six orders of magnitude *while looking like
 a migration*. All 23 sites tree-wide are excluded from Stage A and deferred to
 **BG-TOL-004** (design, blocks nothing).
+
+### Queued and half-built (session 8 ran out of budget here)
+
+- **Three survey packets are generated but NOT dispatched**:
+  `BG-TOL-001-GEOM-NURBS-SURVEY` (35 fns), `-GEOM-DECORATORS-SURVEY` (16),
+  `-SMALL-SURVEY` (polymesh+geotrait combined, 11). They came from the new
+  `loop/gen_survey.py`. **Fix its site-count bug before dispatching**: it reports
+  `sum(len(functions per file))`, i.e. the *function* count, and labels it
+  "at least N production predicates". The phrasing stays true but the number is
+  far too low, and a worker told "at least 35" when the real count is higher may
+  stop early. Surveys are read-only and cannot collide, so all three can run
+  concurrently on slots 1-3.
+- **Not yet built, ranked by value:** (a) **V8** — the base-vs-HEAD comparison
+  was done by hand twice this session and is the gate that just waved through
+  two broken invariant tests; (b) `gen_packet --skeleton` should emit the
+  boilerplate prose — **43% of a packet is templatable** and only ~29% is real
+  judgement; (c) the brace-tracking fix for both context counters.
 
 ## The parallelism picture
 
