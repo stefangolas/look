@@ -64,7 +64,14 @@ tests_required:
   - the_deferred_dimension_site_carries_a_fixme
 budget:      {turns: 80, ctx_tokens: 170000}
 census_fragment: decorators
-unscaled_legacy_budget: 14
+# CORRECTED AFTER DISPATCH (session 9): this was 14. The two offset
+# `search_parameter` sites cannot take `ctx.near_points` -- both impls bound
+# `P: ControlPoint<f64, Diff = V> + Copy + Tolerance` with no
+# `MetricSpace<Metric = f64>`, so neither near_points nor .distance() exists
+# there. The worker returned SPEC_GAP and was right; the packet never ran the
+# bound check that the GEOM-NURBS packet ran over all twenty of its model
+# rows. Both sites deferred FIXME(BG-TOL-001, GENERIC_BOUND), 14 -> 12.
+unscaled_legacy_budget: 12
 anchors:
   - {id: A1, expect: 1, cmd: "grep -cE '\\.near\\(|so_small\\(|TOLERANCE' vendor/truck/truck-geometry/src/decorators/intersection_curve.rs"}
   - {id: A2, expect: 2, cmd: "grep -cE '\\.near\\(|so_small\\(|TOLERANCE' vendor/truck/truck-geometry/src/decorators/offset/curve.rs"}
@@ -231,7 +238,6 @@ Line numbers are provenance for a human reader; locate by the enclosing symbol.
 | enclosing fn | line | code | class and why | write instead |
 |---|---|---|---|---|
 | `period` | 42 | `(Some(x), Some(y)) if x.near(&y) => Some((x + y) / 2.0),` | **`param`** — x and y are curve periods, i.e. parameter-space increments after which the curve repeats, not model-space lengths | `(Some(x), Some(y)) if ctx.is_small_ratio(x - y) => Some((x + y) / 2.0),` |
-| `search_parameter` | 127 | `match self.subs(t).near(&point) {` | **`model`** — self.subs(t) is the point on the offset curve in model space and point is the query point, so this is the distance between two points in model space | `match ctx.near_points(self.subs(t), point) {` |
 
 **`surface.rs`**
 
@@ -239,7 +245,6 @@ Line numbers are provenance for a human reader; locate by the enclosing symbol.
 |---|---|---|---|---|
 | `u_period` | 54 | `(Some(x), Some(y)) if x.near(&y) => Some((x + y) / 2.0),` | **`param`** — x and y are surface u-periods, i.e. parameter-space increments in the u direction, not model-space lengths | `(Some(x), Some(y)) if ctx.is_small_ratio(x - y) => Some((x + y) / 2.0),` |
 | `v_period` | 61 | `(Some(x), Some(y)) if x.near(&y) => Some((x + y) / 2.0),` | **`param`** — x and y are surface v-periods, i.e. parameter-space increments in the v direction, not model-space lengths | `(Some(x), Some(y)) if ctx.is_small_ratio(x - y) => Some((x + y) / 2.0),` |
-| `search_parameter` | 170 | `match self.subs(u, v).near(&point) {` | **`model`** — self.subs(u, v) is the point on the offset surface in model space and point is the query point, so this is the distance between two points in model space | `match ctx.near_points(self.subs(u, v), point) {` |
 
 **`algo.rs`**
 
@@ -278,7 +283,18 @@ Line numbers are provenance for a human reader; locate by the enclosing symbol.
 | `search_parameter` | 379 | `} else if self.is_back_fixed() && self.curve.back().near(&point) {` | **`model`** — self.curve.back() is the back point of the entity curve in model space and point is the query point, so this is the distance between two points in model space | `} else if self.is_back_fixed() && ctx.near_pt(self.curve.back(), point) {` |
 | `search_nearest_parameter` | 434 | `op.cross(self.revolution.axis).so_small() && op.dot(normal) >= 0.0` | **`model`** — op = point - o is a displacement and self.revolution.axis is a unit vector, so the cross-product magnitude is |op| sin(theta), a length in model space; the trailing dot-product sign check is not a tolerance predicate **REVIEWED — orchestrator, session 8: `model` is CORRECT. RevolutedCurve::new normalizes its axis, so (p - origin).cross(axis) is |v| sin t -- degree ONE. The degree-2 heuristic flags this shape deliberately and cannot resolve it statically.** | `ctx.is_small_len(op.cross(self.revolution.axis).magnitude()) && op.dot(normal) >= 0.0` |
 
-## Not in this packet — 1 deferrals: a FIXME and nothing else
+## Not in this packet — 3 deferrals: a FIXME and nothing else
+
+**Two of these three were added by amendment after the worker reported them**
+(see the corrected budget above). `offset/curve.rs` `search_parameter` and
+`offset/surface.rs` `search_parameter` are `model` sites whose classification is
+correct and whose rewrite does not compile: the enclosing
+`impl<C, N, P, V> SearchParameter<D1> for Offset<C, N>` and
+`impl<S, N, P, V> SearchParameter<D2> for Offset<S, N>` both bound
+`P: ControlPoint<f64, Diff = V> + Copy + Tolerance`, which supplies no
+`MetricSpace<Metric = f64>`. Widening a public generic bound is cross-crate and
+is Stage B. Both take `// FIXME(BG-TOL-001, GENERIC_BOUND)` and no rewrite —
+the same treatment as the twelve in `BG-TOL-001-GEOM-NURBS`.
 
 These sites are real and their line numbers resolve. You **leave the code
 exactly as it is** and add one marker comment on the line above each. Do
