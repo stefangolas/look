@@ -1,0 +1,59 @@
+{
+  "id": "BG-TOL-001-GEOM-DECORATORS",
+  "status": "DONE",
+  "contracts": [
+    "BG-TOL-001"
+  ],
+  "tests_added": 2,
+  "sites_migrated": 26,
+  "sites_deferred": 3,
+  "unscaled_legacy_calls": 12,
+  "anchors_verified": {
+    "A1": 1,
+    "A2": 2,
+    "A3": 3,
+    "A4": 14,
+    "A5": 2,
+    "A6": 8
+  },
+  "deviations": [
+    {
+      "code": "MARKER_PLACEMENT",
+      "sites": [
+        "decorators/intersection_curve.rs:354",
+        "decorators/rbf_surface/algo.rs:669,676,679,712,722,752,835,849,863,940,954,963",
+        "decorators/rbf_surface/contact_circle.rs:62",
+        "decorators/revolved_curve.rs:157,160,166,169,376,382"
+      ],
+      "why": "rustfmt moves a trailing comment off any line that opens a brace, so the // BG-TOL-001: marker lands on the following line instead of the ctx. call line; the marking test counts lines, so predicate-count == marker-count is unaffected."
+    },
+    {
+      "code": "TEST_SHAPE",
+      "sites": [
+        "tests/tolerance_decorators.rs::the_deferred_dimension_site_carries_a_fixme"
+      ],
+      "why": "the packet's literal second half (\"the file contains no ToleranceCtx at all\") cannot hold because the packet's own site table migrates try_new in the same file, so the test asserts exactly one FIXME(BG-TOL-001, DIMENSION) and that the deferred next_point function carries no context instead."
+    }
+  ],
+  "disagreements": [
+    {
+      "code": "SITE_UNREACHABLE",
+      "site": "decorators/offset/curve.rs search_parameter (table line 127) and decorators/offset/surface.rs search_parameter (table line 170)",
+      "claim": "the packet asserts `ctx.near_points(self.subs(t), point)` migrates these model sites, but near_points is bounded P: MetricSpace<Metric = f64> and the enclosing `impl<C, N, P, V> SearchParameter<D1> for Offset<C, N>` / `impl<S, N, P, V> SearchParameter<D2> for Offset<S, N>` only bind P: ControlPoint<f64, Diff = V> + Copy + Tolerance, so the rewrite does not typecheck (E0277); widening the bound and substituting a different predicate are both forbidden, so both sites are left verbatim under FIXME(BG-TOL-001, GENERIC_BOUND)."
+    },
+    {
+      "code": "BUDGET_WRONG",
+      "site": "the two offset search_parameter functions",
+      "claim": "the packet asserts exactly 14 unscaled_legacy() contexts; the honest truth is 12, because the two offset search_parameter functions hold only their now-deferred GENERIC_BOUND site and a context in a function that has only deferrals is forbidden."
+    },
+    {
+      "code": "RULE_MISSING",
+      "site": "tests requirement #2 vs decorators/rbf_surface/contact_circle.rs try_new",
+      "claim": "the packet asserts the_deferred_dimension_site_carries_a_fixme can require contact_circle.rs to contain no ToleranceCtx at all (\"costs nothing against the ratchet\"), but its own site table migrates try_new in that file, which introduces one context; the two requirements are mutually inconsistent."
+    }
+  ],
+  "baseline_failures": [],
+  "notes": "All six anchors matched exactly before editing. 26 of the 28 table sites migrated onto ToleranceCtx::unscaled_legacy(); the two offset search_parameter near_points sites do not typecheck under the packet's rewrite (missing P: MetricSpace<Metric = f64> on the enclosing impl), which is the SPEC_GAP stop condition; they were deferred with FIXME(BG-TOL-001, GENERIC_BOUND), the exact pattern the GEOM-NURBS shard used for the identical bound problem (bspcurve.rs, bspsurface.rs). All four 'Done when' commands pass: cargo fmt --check -p truck-geometry, cargo clippy -p truck-geometry --all-targets --no-deps -- -D warnings, cargo test -p truck-geometry --lib --test tolerance_decorators --no-fail-fast (27 lib + 2 new tests pass), cargo check --workspace --all-targets. The decorator-exercising integration tests (offset, intersection_curve, revolved_curve, rbf_surface, edge_blend, pcurve, processor, af_surface) all pass, so the deliberate Euclidean tightening (decision 1) moved no existing test. Ratchet: 12 new unscaled_legacy() call sites, gate count at HEAD after commit is 75 + 12 = 87 against ceiling 111 (scripts/unscaled_legacy_ceiling.txt untouched). The unscaled_legacy_ceiling note in the packet says 50 already in the tree, but the actual count is 75 (excluding tolerance.rs); this is a packet prose staleness, not a gate failure.",
+  "amended_by": "orchestrator",
+  "amendment": "Status SPEC_GAP -> DONE. The gap the worker reported is real and is the PACKET's, not the code's: ctx.near_points<P> requires P: MetricSpace<Metric = f64>, and both offset search_parameter impls bound only P: ControlPoint<f64, Diff = V> + Copy + Tolerance -- checked against the tree, the worker's reading is exact. It deferred both with FIXME(BG-TOL-001, GENERIC_BOUND), which is the pattern BG-TOL-001-GEOM-NURBS established for the identical problem, and completed the other 26 sites. The packet has been corrected (budget 14 -> 12, both rows moved to the deferral section) rather than the code changed. Amended rather than redispatched: nothing the worker produced is wrong. This is the third shard where this bound has bitten and the first whose packet did not pre-check it; loop/check_metric_bound.py now makes the check mechanical. Worker's original reasoning kept verbatim below."
+}

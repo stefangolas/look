@@ -26,7 +26,8 @@ impl Revolution {
     }
     #[inline(always)]
     fn contains(self, p: Point3) -> bool {
-        (p - self.origin).cross(self.axis).so_small()
+        let ctx = ToleranceCtx::unscaled_legacy();
+        ctx.is_small_len((p - self.origin).cross(self.axis).magnitude()) // BG-TOL-001: model
     }
     #[inline(always)]
     fn proj_point(&self, p: Point3) -> Point2 {
@@ -151,20 +152,25 @@ impl<C: ParametricCurve3D> ParametricSurface for RevolutedCurve<C> {
 impl<C: ParametricCurve3D + BoundedCurve> ParametricSurface3D for RevolutedCurve<C> {
     #[inline(always)]
     fn normal(&self, u: f64, v: f64) -> Vector3 {
+        let ctx = ToleranceCtx::unscaled_legacy();
         let (u0, u1) = self.curve.range_tuple();
-        let (uder, vder) = if u.near(&u0) {
+        let (uder, vder) = if ctx.is_small_ratio(u - u0) {
+            // BG-TOL-001: param
             let pt = self.curve.subs(u);
             let radius = self.axis().cross(pt - self.origin());
-            if radius.so_small() {
+            if ctx.is_small_len(radius.magnitude()) {
+                // BG-TOL-001: model
                 let uder = self.curve.der(u);
                 (uder, self.axis().cross(uder))
             } else {
                 (self.uder(u, v), self.vder(u, v))
             }
-        } else if u.near(&u1) {
+        } else if ctx.is_small_ratio(u - u1) {
+            // BG-TOL-001: param
             let pt = self.curve.subs(u);
             let radius = self.axis().cross(pt - self.origin());
-            if radius.so_small() {
+            if ctx.is_small_len(radius.magnitude()) {
+                // BG-TOL-001: model
                 let uder = self.curve.der(u);
                 (uder, uder.cross(self.axis()))
             } else {
@@ -369,14 +375,17 @@ impl<C: ParametricCurve3D + BoundedCurve> SearchParameter<D2> for RevolutedCurve
         hint: H,
         trials: usize,
     ) -> Option<(f64, f64)> {
+        let ctx = ToleranceCtx::unscaled_legacy();
         let (t0, t1) = self.curve.range_tuple();
-        if self.is_front_fixed() && self.curve.front().near(&point) {
+        if self.is_front_fixed() && ctx.near_pt(self.curve.front(), point) {
+            // BG-TOL-001: model
             match hint.into() {
                 SPHint2D::Parameter(_, y) => Some((t0, y)),
                 SPHint2D::Range((_, y), _) => Some((t0, y)),
                 SPHint2D::None => Some((t0, 0.0)),
             }
-        } else if self.is_back_fixed() && self.curve.back().near(&point) {
+        } else if self.is_back_fixed() && ctx.near_pt(self.curve.back(), point) {
+            // BG-TOL-001: model
             match hint.into() {
                 SPHint2D::Parameter(_, y) => Some((t1, y)),
                 SPHint2D::Range(_, (_, y)) => Some((t1, y)),
@@ -428,10 +437,12 @@ impl<C: ParametricCurve3D + BoundedCurve> SearchNearestParameter<D2> for Revolut
         hint: H,
         trials: usize,
     ) -> Option<(f64, f64)> {
+        let ctx = ToleranceCtx::unscaled_legacy();
         let (t0, t1) = self.curve.range_tuple();
         let on_axis = move |o: Point3, normal: Vector3| {
             let op = point - o;
-            op.cross(self.revolution.axis).so_small() && op.dot(normal) >= 0.0
+            ctx.is_small_len(op.cross(self.revolution.axis).magnitude()) // BG-TOL-001: model
+                && op.dot(normal) >= 0.0
         };
         if self.is_front_fixed() && on_axis(self.curve.front(), self.normal(t0, 0.0)) {
             match hint.into() {
@@ -689,7 +700,6 @@ where
         (curve_division.0, circle_division)
     }
 }
-
 
 fn from_axis_angle_derivation(n: usize, axis: Vector3, angle: Rad<f64>) -> Matrix3 {
     let (s, c) = Rad::sin_cos(angle);

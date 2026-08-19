@@ -46,6 +46,7 @@ impl ContactCircle {
         surface1: &impl FilletableSurface,
         radius: f64,
     ) -> Option<Self> {
+        let ctx = ToleranceCtx::unscaled_legacy();
         let (p, der) = point_on_curve;
         let (mut p0, mut p1) = (p, p);
         let (mut u0, mut v0) = surface0.search_parameter(p0, None, 100)?;
@@ -58,7 +59,8 @@ impl ContactCircle {
         let center = (0..100).find_map(|_i| {
             let (n0, n1) = (surface0.normal(u0, v0), surface1.normal(u1, v1));
             let (c, q0, q1) = contact_points((p, der), (p0, n0), (p1, n1), signed_radius);
-            if p0.near(&q0) && p1.near(&q1) {
+            if ctx.near_pt(p0, q0) && ctx.near_pt(p1, q1) {
+                // BG-TOL-001: model
                 Some(c)
             } else {
                 (p0, (u0, v0)) = next_point(surface0, (u0, v0), (p0, q0), signed_radius);
@@ -164,6 +166,13 @@ fn next_point(
     let mat = Matrix3::from_cols(uder + n_uder, vder + n_vder, n);
     let vec = q - p;
     let del = mat.invert().unwrap() * vec;
+    // FIXME(BG-TOL-001, DIMENSION) — SPEC_GAP: del is the Newton solution of
+    // mat * (du, dv, del.z) = vec where the third matrix column is the
+    // unnormalized normal uder x vder (magnitude is a parametrization area,
+    // degree 2 in length), so del.z is dimensionally 1/length and scales as
+    // 1/k under a model rescale -- it is not a length and not dimensionless,
+    // so neither model nor param, and either rewrite changes the debug
+    // assertion's behaviour under a real model_scale.
     debug_assert!(del.z.so_small(), "{del:?}");
     let (u, v) = (u + del.x, v + del.y);
     (surface.subs(u, v), (u, v))
