@@ -217,9 +217,27 @@ class Verifier:
             f.write(res.stderr)
         return res.returncode
 
-    def add_gate(self, name, status, detail=''):
-        self.gates.append({'name': name, 'status': status, 'detail': detail})
-        print(f"{name} ... {status}")
+    def add_gate(self, name, status, detail='', code=''):
+        """Record a gate outcome.
+
+        `code` is a machine-readable reason, `detail` is the sentence a human
+        reads. Both, not one: the code is what an orchestrator branches on and
+        the detail is what tells it why.
+
+        The code exists because triaging one V3 rejection cost six tool calls --
+        read VERDICT.json, grep out.txt, extract the diff hunk ranges, check
+        whether the flagged line was added, read lib.rs for a deny attribute,
+        count error[E####] -- to arrive at a single fact: this was a lint abort,
+        not a build failure, and therefore the gate's fault rather than the
+        worker's. `LINT_ABORT` says that in one field. The rule that decides
+        what gets a code is: code what is branched on or counted, keep prose for
+        what is reasoned about.
+        """
+        row = {'name': name, 'status': status, 'detail': detail}
+        if code:
+            row['code'] = code
+        self.gates.append(row)
+        print(f"{name} ... {status}" + (f"  [{code}]" if code else ''))
 
 
 # ---------------------------------------------------------------------------
@@ -471,7 +489,7 @@ def main():
         preflight.append("no RESULT.json and no QUESTION.md")
 
     if preflight:
-        v.add_gate('V0 preflight', 'FAIL', '; '.join(preflight))
+        v.add_gate('V0 preflight', 'FAIL', '; '.join(preflight), code='RUN_INCOMPLETE')
         for n in ('V1 scope', 'V2 build', 'V3 lint', 'V4 house rules', 'V5 tests',
                   'V6 test-reality', 'V9 geometry'):
             v.add_gate(n, 'SKIP', 'run incomplete')
@@ -508,7 +526,7 @@ def main():
     if not gate_wanted('V1'):
         skip_not_requested('V1 scope')
     elif offenders:
-        v.add_gate('V1 scope', 'FAIL', "out-of-allowlist paths: " + ', '.join(offenders))
+        v.add_gate('V1 scope', 'FAIL', "out-of-allowlist paths: " + ', '.join(offenders), code='SCOPE_VIOLATION')
         v.failed_early = True
     else:
         v.add_gate('V1 scope', 'PASS', f"{len(changed)} changed file(s), all within write_allow")
@@ -634,7 +652,7 @@ def main():
         if exit_code == 0:
             v.add_gate('V2 build', 'PASS')
         else:
-            v.add_gate('V2 build', 'FAIL', f"cargo check exit {exit_code}; see out.txt")
+            v.add_gate('V2 build', 'FAIL', f"cargo check exit {exit_code}; see out.txt", code='BUILD_FAIL')
             v.failed_early = True
     else:
         v.add_gate('V2 build', 'SKIP', 'earlier gate failed')
@@ -691,7 +709,7 @@ def main():
                        + fmt_broke[0].strip())
             v.failed_early = True
         elif fmt_exit not in (0, 1):
-            v.add_gate('V3 lint', 'FAIL', f"cargo fmt exit {fmt_exit}; see out.txt")
+            v.add_gate('V3 lint', 'FAIL', f"cargo fmt exit {fmt_exit}; see out.txt", code='FMT_ERROR')
             v.failed_early = True
         elif fmt_findings:
             v.add_gate('V3 lint', 'FAIL',
@@ -801,10 +819,10 @@ def main():
                 if unnamed:
                     why.append("packet changed " + ', '.join(unnamed)
                                + " but does not name it in `crates`, so clippy never linted it")
-                v.add_gate('V3 lint', 'FAIL', '; '.join(why))
+                v.add_gate('V3 lint', 'FAIL', '; '.join(why), code='LINT_UNLINTED')
                 v.failed_early = True
             elif our_findings:
-                v.add_gate('V3 lint', 'FAIL', "clippy findings in changed files: " + ' ; '.join(our_findings[:5]))
+                v.add_gate('V3 lint', 'FAIL', "clippy findings in changed files: " + ' ; '.join(our_findings[:5]), code='LINT_FINDINGS_IN_DIFF')
                 v.failed_early = True
             else:
                 v.add_gate('V3 lint', 'PASS',
@@ -827,7 +845,7 @@ def main():
         if gates_exit == 0:
             v.add_gate('V4 house rules', 'PASS')
         else:
-            v.add_gate('V4 house rules', 'FAIL', f"kernel-gates.sh exit {gates_exit}; see out.txt")
+            v.add_gate('V4 house rules', 'FAIL', f"kernel-gates.sh exit {gates_exit}; see out.txt", code='HOUSE_RULES')
             v.failed_early = True
     else:
         v.add_gate('V4 house rules', 'SKIP', 'earlier gate failed')
@@ -886,7 +904,7 @@ def main():
         compile_error = has_compile_error(chunk)
 
         if compile_error:
-            v.add_gate('V5 tests', 'FAIL', 'test target(s) failed to compile; see out.txt')
+            v.add_gate('V5 tests', 'FAIL', 'test target(s) failed to compile; see out.txt', code='TEST_BUILD_FAIL')
             v.failed_early = True
         elif not baseline['compile_ok']:
             # The baseline itself didn't compile -- we have no reliable
@@ -926,7 +944,7 @@ def main():
                     parts.append('passed at base, absent now (deleted?): ' + ', '.join(disappeared[:8]))
                 if newly_ignored:
                     parts.append('passed at base, #[ignore]d now: ' + ', '.join(newly_ignored[:8]))
-                v.add_gate('V5 tests', 'FAIL', '; '.join(parts) + '; see out.txt')
+                v.add_gate('V5 tests', 'FAIL', '; '.join(parts) + '; see out.txt', code='ADDED_TEST_FAILED')
                 v.failed_early = True
             else:
                 detail = f"no regressions vs baseline at {base[:7]}"
@@ -1014,7 +1032,7 @@ def main():
                 detail_parts.append("no matching test fn for: " + ' | '.join(missing_required))
             if undeclared:
                 detail_parts.append("new test file(s) not declared as [[test]] under autotests=false: " + ', '.join(undeclared))
-            v.add_gate('V6 test-reality', 'FAIL', '; '.join(detail_parts))
+            v.add_gate('V6 test-reality', 'FAIL', '; '.join(detail_parts), code='TEST_MISSING')
             v.failed_early = True
         else:
             v.add_gate('V6 test-reality', 'PASS',
@@ -1112,7 +1130,7 @@ def main():
                     parts.append('now failing on real geometry: ' + ', '.join(newly[:5]))
                 if vanished:
                     parts.append('disappeared: ' + ', '.join(vanished[:5]))
-                v.add_gate('V9 geometry', 'FAIL', '; '.join(parts) + '; see out.txt')
+                v.add_gate('V9 geometry', 'FAIL', '; '.join(parts) + '; see out.txt', code='GEOMETRY_MOVED')
             else:
                 v.add_gate('V9 geometry', 'PASS',
                            f"{len(now)} geometry test(s) on real STEP fixtures, "

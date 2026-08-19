@@ -71,6 +71,15 @@ def main():
     ap.add_argument('--slot', type=int, required=True)
     ap.add_argument('--packet', required=True)
     ap.add_argument('--dry-run', action='store_true')
+    ap.add_argument('--fault', choices=['NONE', 'GATE', 'PACKET', 'WORKER', 'SPEC', 'HARNESS'],
+                    help='dominant cause of the round trips this packet took. NONE = accepted '
+                         'first time. GATE = a gate was wrong (it failed on the untouched '
+                         'baseline, or could not see what it claimed to check). PACKET = the '
+                         'orchestrator got a budget, anchor or house-rule instruction wrong. '
+                         'WORKER = the worker\'s code was actually wrong. SPEC = the '
+                         'specification had not decided something. HARNESS = dispatch/verify '
+                         'infrastructure, not a gate\'s judgement.')
+    ap.add_argument('--fault-note', help='one clause naming the specific defect')
     args = ap.parse_args()
 
     packet_path = Path(args.packet)
@@ -161,6 +170,24 @@ def main():
     }
     if len(all_ids) > 1:
         row['covers'] = all_ids[1:]
+
+    # Fault attribution. Two sessions running have concluded in PROSE that
+    # "every defect found was in a packet or a gate, never in the worker's
+    # code" -- BG-TOL-001-MESHALGO alone was rejected three times, for a budget
+    # this orchestrator measured wrong, a house rule its packet never stated,
+    # and a gate that could not pass on the untouched baseline. That is the
+    # number which says where to invest, and it has never been queryable
+    # because it lived in narrative. Coded, `--fault GATE` on one landing makes
+    # "what fraction of our rejections are self-inflicted" a grep.
+    #
+    # Recorded per LANDING, not per rejection, so it is the dominant cause of
+    # the round trips this packet took; `attempts` already carries the count.
+    if args.fault:
+        row['fault'] = args.fault
+    if args.fault_note:
+        row['fault_note'] = args.fault_note
+    if verdict.get('amended_by'):
+        row['amended_by'] = verdict['amended_by']
     with (REPO_ROOT / 'loop' / 'LEDGER.jsonl').open('a', encoding='utf-8', newline='\n') as f:
         f.write(json.dumps(row) + "\n")
 
