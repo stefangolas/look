@@ -12,8 +12,10 @@ Usage: python loop/slot_status.py [--stall-minutes 12] [--kill-stalled]
 import argparse
 import ctypes
 import datetime
+import shutil
 import subprocess
 import sys
+import tempfile
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
@@ -91,10 +93,48 @@ def git_branch_and_head(wt):
     return branch, head_short, no_work
 
 
+def any_cargo_running():
+    """Is any cargo/rustc process alive on this machine at all?
+
+    Used only to tell a live worker from an orphaned `cmd.exe` shim. Deliberately
+    machine-wide rather than per-slot: a worker's build is a grandchild of the
+    shim and the parentage is not reliable through the .cmd wrapper.
+    """
+    try:
+        res = subprocess.run(['tasklist', '/FI', 'IMAGENAME eq cargo.exe',
+                              '/FI', 'IMAGENAME eq rustc.exe'],
+                             capture_output=True, text=True, encoding='utf-8',
+                             errors='replace', timeout=20)
+    except (OSError, subprocess.SubprocessError):
+        return True  # cannot tell -> assume busy, never reap on ignorance
+    return 'cargo.exe' in res.stdout or 'rustc.exe' in res.stdout
+
+
+def slot_disk_gb(slot):
+    """(outer target GB, target INSIDE the worktree GB).
+
+    The second one is the trap: a worker creates `wt/target` despite
+    CARGO_TARGET_DIR pointing at the first, it is usually the larger of the
+    two, and every disk-recovery recipe in these docs names only the outer one.
+    """
+    out = []
+    for d in (slot / 'target', slot / 'wt' / 'target'):
+        try:
+            out.append(sum(f.stat().st_size for f in d.rglob('*') if f.is_file()) / 2**30
+                       if d.is_dir() else 0.0)
+        except OSError:
+            out.append(0.0)
+    return tuple(out)
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument('--stall-minutes', type=int, default=12)
     ap.add_argument('--kill-stalled', action='store_true')
+    ap.add_argument('--disk', action='store_true',
+                    help='also report both target dirs per slot, plus free space and any '
+                         'leaked baseline worktrees. Run this BEFORE a session of repeated '
+                         'verifies, not after.')
     args = ap.parse_args()
 
     slots_dir = REPO_ROOT / 'loop' / 'slots'
@@ -133,8 +173,18 @@ def main():
         dirty = git_status_count(wt) if wt.is_dir() else 0
         branch, head, no_work = git_branch_and_head(wt) if wt.is_dir() else ('-', '-', False)
 
+        # A dead worker can leave its `cmd.exe` shim alive, so `alive` alone
+        # says RUNNING for a run that stopped hours ago. Session 9 lost two
+        # workers that way and read them as busy. What separates them is
+        # whether any cargo/rustc exists at all: a live worker between model
+        # turns has none either, but a live worker's events.jsonl is growing,
+        # and one whose log has been silent for hours with no build running is
+        # a shim. DEAD? is a prompt to look, not a verdict -- reaping on a
+        # label is what the STALLED mis-calibration already cost an hour to.
+        toolchain_busy = any_cargo_running()
+
         if alive and age_min is not None and age_min > args.stall_minutes:
-            state = 'STALLED'
+            state = 'DEAD?' if not toolchain_busy and age_min > 60 else 'STALLED'
         elif alive:
             state = 'RUNNING'
         elif result != '-':
@@ -148,9 +198,23 @@ def main():
         print("slot {:<3} {:<9} packet={:<28} pid={:<7} events={:>8} bytes, {} min old  changed={}  {}  git={}".format(
             slot.name, state, Path(packet).name, pid_col, size, age_col, dirty, result, git_col))
 
+        if args.disk:
+            outer, inner = slot_disk_gb(slot)
+            note = '  <-- inside the worktree, missed by "rm loop/slots/*/target"' if inner else ''
+            print(f"     target {outer:5.2f} GB   wt/target {inner:5.2f} GB{note}")
+
         if state == 'STALLED' and args.kill_stalled:
             subprocess.run(['taskkill', '/PID', str(worker_pid), '/F'], capture_output=True, text=True, encoding='utf-8', errors='replace')
             print(f"  killed pid {worker_pid} after {age_min} min of silence")
+
+
+def _disk_footer():
+    free = shutil.disk_usage(str(REPO_ROOT.anchor) or 'C:').free / 2**30
+    leaked = [p for p in Path(tempfile.gettempdir()).glob('look-verify-baseline-*') if p.is_dir()]
+    print(f"free {free:.1f} GB (verify.py refuses to compute a baseline below 8.0)")
+    if leaked:
+        print(f"  {len(leaked)} leaked baseline worktree(s) from an interrupted verify: "
+              + ', '.join(p.name for p in leaked))
 
 
 if __name__ == '__main__':

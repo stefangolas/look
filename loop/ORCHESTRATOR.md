@@ -121,6 +121,81 @@ yours: delete `loop/slots/*/target` (a slot re-warms in 1-3 min), delete any
 `%TEMP%/look-verify-baseline-*`, then `git worktree prune`. None of that loses
 work.
 
+## The one rule that catches most of it
+
+> **Any claim a packet, a survey, or STATE.md makes about the tree must be
+> re-derived by running a command before you act on it.**
+
+Not "when it looks doubtful" — always, because these claims read as
+authoritative and are wrong often enough to matter. In session 9 three separate
+inputs were confidently wrong and only a command caught them:
+
+- **STATE's own handoff.** It recorded the NURBS generic-bound split as ten
+  migrating and ten deferred, naming nine specific lines. Resolving all twenty
+  `model` rows to their enclosing `impl` gave **twelve deferred and eight
+  migrating** — wrong in both directions. Two of the lines it listed as blocked
+  (`bspcurve.rs:1102`, `:1112`) sit in an impl that *does* carry
+  `MetricSpace<Metric = f64>`, and it missed four others entirely.
+- **A reviewed survey's proposed rewrite.** It offered `ctx.near_points(...)`
+  for `truck-geotrait/src/algo/curve.rs:66`, whose generic bound supplies no
+  `MetricSpace`. It would not have compiled. Its near-identical sibling in
+  `algo/surface.rs` takes that exact rewrite correctly.
+- **A packet's own budget**, twice — MESHALGO's 11-against-10, and this
+  session's two counters disagreeing with each other again.
+
+The failure mode is not writing bad packets. It is **accepting a plausible
+wrong answer**, and plausibility is exactly what a survey, a worker's
+`RESULT.json`, and the previous session's summary are all optimised for.
+
+## Recurring failure modes, each one hit more than once
+
+**A green line can be dropping rows, not just stating something false.**
+`packet_contexts` resolved a table's file heading with a bare-basename
+`endswith`, so `curve.rs` also matched `polyline_curve.rs`; two candidates made
+the heading ambiguous and **every row beneath it was silently skipped**, while
+the tool printed "all checked claims hold". Two packets read low by one and two
+contexts. Worse than a wrong count: rows that are skipped are never checked
+against the tree at all, which is the only thing that function is for. When a
+check's two halves are computed from different sources, assume they will
+eventually disagree — and when a count surprises you, confirm the checker saw
+every row before believing the number.
+
+**GATE-4 counts `unscaled_legacy(` anywhere in the file, comments included.**
+A `FIXME` that explains *why* a site cannot be migrated will mention the
+constructor by name, inflate the ratchet by one, and make a deferral read as a
+migration. Write the name without its parentheses in prose.
+
+**`cd` persists across a compound command, and `-F` paths resolve against it.**
+A `cd` into a slot worktree followed by `git commit -F scratch/msg.txt` looked
+for the message inside the worktree and died. Use `git -C <path>` and absolute
+paths for `-F`; the rule below about `cd` is not only about the wrong branch.
+
+**Never background a verify through a shell wrapper.** `nohup python
+loop/verify.py ... &` inside a backgrounded compound either never runs or is
+orphaned, the wrapper reports exit 0, and the stale `VERDICT.json` from the
+*previous* packet is still sitting in the slot ready to be misread as this
+one's. Check `VERDICT.json`'s `base` and `commit` fields match the run you
+think you are reading.
+
+**A dead worker can leave its shim alive.** Two workers died mid-run with
+`cmd.exe` still present under their recorded pid, so a pid check said "running".
+What distinguishes them is `events.jsonl` mtime plus whether any `cargo`/`rustc`
+process exists at all. `slot_status.py --kill-stalled` is still mis-calibrated
+in the other direction (see STATE) — confirm both ways before reaping.
+
+**An interrupted verify leaks its baseline worktree, and that is what actually
+fills the disk.** `compute_baseline`'s cleanup does not run when the process is
+killed. Two leaked baselines plus one live one took the machine from 9.4 GB to
+3.1 GB and forced this session to abandon a run. Before starting a verify,
+check `%TEMP%/look-verify-baseline-*` is empty — `verify.py` now warns, but the
+deletion is yours.
+
+**`loop/slots/*/target` is only half the disk the loop owns.** Workers create a
+*second* `target/` **inside** the worktree (`loop/slots/N/wt/target`) despite
+`CARGO_TARGET_DIR` pointing elsewhere, and it is the larger of the two — 1.9 GB
+in one slot against 0.9 GB outside. The recovery recipe everywhere in these
+docs names only the outer one and reclaims less than half of what is there.
+
 ## Rules that are not negotiable
 
 - **Never loosen a gate to get green.** Not a widened tolerance, not an

@@ -64,7 +64,14 @@ tests_required:
   - deferred_generic_bound_sites_carry_a_fixme
 budget:      {turns: 120, ctx_tokens: 240000}
 census_fragment: nurbs
-unscaled_legacy_budget: 26
+# CORRECTED AFTER DISPATCH (session 9): this was 26. nurbs/mod.rs's
+# `inv_or_zero` is a `pub const fn` and ToleranceCtx::unscaled_legacy() is not
+# const, so no context can exist in that body. Decision 7 told the worker to
+# write ctx.is_small_ratio(delta) there while Forbidden banned signature
+# changes; the two cannot both be satisfied, the worker said so, and the
+# PACKET was wrong. The site is now deferred FIXME(BG-TOL-001, CONST_FN) by
+# orchestrator amendment and the spec carries CONST_FN as an exclusion class.
+unscaled_legacy_budget: 25
 anchors:
   - {id: A1, expect: 17, cmd: "grep -cE '\\.near\\(|so_small\\(|TOLERANCE' vendor/truck/truck-geometry/src/nurbs/bspcurve.rs"}
   - {id: A2, expect: 34, cmd: "grep -cE '\\.near\\(|so_small\\(|TOLERANCE' vendor/truck/truck-geometry/src/nurbs/bspsurface.rs"}
@@ -284,7 +291,6 @@ Line numbers are provenance for a human reader; locate by the enclosing symbol.
 
 | enclosing fn | line | code | class and why | write instead |
 |---|---|---|---|---|
-| `inv_or_zero` | 186 | `if delta.abs() <= TOLERANCE {` | **`param`** — delta is a knot-span difference in parameter space used only as a division guard; the fn is const, so the rewrite needs the ctx threaded or the fn made non-const | `ctx.is_small_ratio(delta)` |
 
 **`nurbssurface.rs`**
 

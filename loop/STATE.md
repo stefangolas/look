@@ -52,7 +52,7 @@ here is scored, tuned, or sampled.
 
 ## Where we are
 
-**Thirteen packets DONE of 62**, unchanged from session 7: BG-S0-001, -002,
+**Fourteen packets DONE of 62** (session 8 landed BG-TOL-001-MESHALGO): BG-S0-001, -002,
 -003, BG-EVD-r3, BG-TOL-001-TYPE, -TYPE-r2, -TYPE-r3, BG-NUM-001-FILLET,
 -SHAPEOPS, -TOPOLOGY + -MODELING (both closed by `BG-TOL-001-TOPO-MOD`),
 -GEOM-SPECIFIEDS, and BG-CE-006-CYLINDER + -CONE (closed by
@@ -83,7 +83,7 @@ known to be wrong in both directions (see above). `python
 loop/census_tol_sites.py` is still the sizing tool; it is no longer the authority
 on what exists.
 
-**GATE-4 sits at 40/51.** The count is the one `scripts/kernel-gates.sh` takes
+**GATE-4 sits at 51/51** — at its ceiling, which is correct: the ceiling was lowered to the true count when MESHALGO landed. The count is the one `scripts/kernel-gates.sh` takes
 (a `git grep -oh 'unscaled_legacy('` over `vendor/truck/*/src/*`, excluding
 `truck-base/src/tolerance.rs` where the constructor is defined — a plain grep
 reads 41 and is wrong by that one line). The ceiling was raised by MESHALGO's 11 measured

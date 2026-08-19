@@ -600,6 +600,35 @@ reason for one of them called the quantity "a length-squared quantity" while
 applying the length predicate anyway. An exclusion that lives only in one
 worker's inline comment is an exclusion the next worker will not find.
 
+**A `const fn` cannot be migrated at Stage A at all.** Added 2026-08-19, from a
+worker's report on `BG-TOL-001-GEOM-NURBS`.
+`truck-geometry/src/nurbs/mod.rs:186` is
+
+```rust
+#[doc(hidden)]
+#[inline(always)]
+pub const fn inv_or_zero(delta: f64) -> f64 {
+    if delta.abs() <= TOLERANCE { 0.0 } else { 1.0 / delta }
+}
+```
+
+The predicate is an ordinary `param` site and its rewrite is trivial —
+`ctx.is_small_ratio(delta)` — but `ToleranceCtx::unscaled_legacy()` is **not a
+`const fn`**, so no context can exist in that body. The only ways through are to
+drop `const` from a public signature, to thread a `ctx` parameter, or to make
+`unscaled_legacy` const in `truck-base`. All three are signature or cross-crate
+changes and all three are Stage B; the first two are explicitly forbidden to a
+shard. A `const fn` site is therefore **excluded**, keeps its literal, and takes
+`FIXME(BG-TOL-001, CONST_FN): a const fn cannot obtain a ToleranceCtx`.
+
+The worker did drop `const`, reported the contradiction between the packet's
+site table and its own Forbidden clause in `disagreements`, and was right that
+the two could not both be satisfied. **That is the packet failing, not the
+worker.** Note what makes this exclusion different from the others: the site is
+correctly classified, the rewrite is correct, and the quantity is the right
+degree — it is the *enclosing item* that blocks it. Grep a shard's site list
+for `const fn` before writing the packet.
+
 `unscaled_legacy()` is a scaffold and is the obvious way to leave the job half
 done, so it is **ratcheted, not trusted**: `scripts/kernel-gates.sh` counts its
 occurrences against a recorded ceiling and fails when the count rises. The

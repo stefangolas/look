@@ -66,6 +66,50 @@ _TEST_LINE_RE = re.compile(r'^test\s+(\S+)\s+\.\.\.\s+(ok|FAILED|ignored)')
 _COMPILE_ERROR_RE = re.compile(r'error\[E\d+\]|could not compile|error: no test target')
 
 
+def reverse_dep_closure(wt, crate_names):
+    """Vendored crates that transitively depend on any of `crate_names`.
+
+    Read off the Cargo.toml files rather than `cargo metadata`: metadata needs
+    a resolve, which needs the network on a cold slot, and this has to be
+    cheap enough to run on every verify. A dependency here is a line naming
+    another vendored crate inside a `[*dependencies]` table -- including
+    dev-dependencies, because a dev-dependency is exactly how a downstream
+    crate's TESTS reach the code this packet changed, and tests are what V8
+    exists to run.
+
+    The packet's own crates are excluded from the result: V5 runs those.
+    """
+    root = Path(wt) / 'vendor' / 'truck'
+    if not root.is_dir():
+        return set()
+    names = {p.parent.name for p in root.glob('*/Cargo.toml')}
+    deps = {n: set() for n in names}
+    for n in names:
+        section = None
+        for line in (root / n / 'Cargo.toml').read_text(encoding='utf-8', errors='replace').splitlines():
+            s = line.strip()
+            if s.startswith('['):
+                section = s
+                continue
+            if not section or 'dependencies' not in section:
+                continue
+            m = re.match(r'([A-Za-z0-9_-]+)\s*=', s)
+            if m and m.group(1) in names and m.group(1) != n:
+                deps[n].add(m.group(1))
+    # Transitive closure, upward: who reaches the seed set.
+    out, frontier = set(), set(crate_names)
+    while frontier:
+        nxt = set()
+        for n in names:
+            if n in out or n in crate_names:
+                continue
+            if deps.get(n, set()) & frontier:
+                nxt.add(n)
+        out |= nxt
+        frontier = nxt
+    return out - set(crate_names)
+
+
 def parse_test_statuses(text):
     """Map full test name (module::path::name, as cargo prints it -- distinct
     test binaries can in principle reuse a bare name, so the full path is kept
@@ -96,6 +140,25 @@ def baseline_cache_path(base_sha, crate_names, test_args=None):
     return BASELINES_DIR / f"{safe_key}.json"
 
 
+def leaked_baselines():
+    """[(path, size_gb)] for baseline worktrees a killed verify left behind.
+
+    `compute_baseline` removes its own temp dir on the way out, which does not
+    happen when the process is killed. Each one is ~2.5 GB and they are
+    invisible to every disk recipe in these docs, which name loop/slots/*.
+    """
+    out = []
+    for p in Path(tempfile.gettempdir()).glob('look-verify-baseline-*'):
+        if not p.is_dir():
+            continue
+        try:
+            size = sum(f.stat().st_size for f in p.rglob('*') if f.is_file())
+        except OSError:
+            size = 0
+        out.append((p, size / 2**30))
+    return out
+
+
 def compute_baseline(base_sha, crate_names, out_file, test_args=None):
     """Run `cargo test -p <crates> --lib --tests --no-fail-fast` at base_sha
     in a throwaway worktree and return {'compile_ok': bool, 'tests': {name:
@@ -109,13 +172,27 @@ def compute_baseline(base_sha, crate_names, out_file, test_args=None):
     # an hour and took the machine from 40 GB free to 0.1 GB. Failing before
     # touching disk is strictly better than failing partway through a 4-minute
     # build and leaving the debris behind.
+    leaked = leaked_baselines()
     free_gb = shutil.disk_usage(str(REPO_ROOT.anchor or 'C:\\')).free / 2**30
     if free_gb < 8.0:
         raise RuntimeError(
-            f"refusing to compute a baseline: {free_gb:.1f} GB free, below the 8.0 GB floor. "
-            "Delete loop/slots/*/target (a slot re-warms in 1-3 min) and any "
-            "%TEMP%/look-verify-baseline-* left behind, then `git worktree prune`."
+            f"refusing to compute a baseline: {free_gb:.1f} GB free, below the 8.0 GB floor.\n"
+            + (f"  {len(leaked)} leaked baseline worktree(s) are holding "
+               f"{sum(g for _, g in leaked):.1f} GB: "
+               + ', '.join(p.name for p, _ in leaked) + "\n" if leaked else "")
+            + "Delete loop/slots/*/target AND loop/slots/*/wt/target -- workers create a "
+            "second target INSIDE the worktree despite CARGO_TARGET_DIR, and it is the "
+            "bigger of the two -- plus any %TEMP%/look-verify-baseline-*, then "
+            "`git worktree prune`. A slot re-warms in 1-3 min."
         )
+    if leaked:
+        # An interrupted verify does not run this function's cleanup, so its
+        # worktree stays. Two leaked baselines plus one live one took session 9
+        # from 9.4 GB to 3.1 GB and cost it a run. Warn while there is still
+        # room to act, not only at the floor.
+        print(f"WARNING: {len(leaked)} leaked baseline worktree(s) holding "
+              f"{sum(g for _, g in leaked):.1f} GB from an interrupted verify: "
+              + ', '.join(p.name for p, _ in leaked), file=sys.stderr)
 
     tmp_parent = Path(tempfile.mkdtemp(prefix='look-verify-baseline-'))
     wt_path = tmp_parent / 'wt'
@@ -1056,15 +1133,117 @@ def main():
         skip_not_requested('V7 mutation spot-check')
 
     # -----------------------------------------------------------------------
-    # V8 no-regression — TODO. Per §5: the previously accepted wave's tests still
-    # pass. Not implemented: this needs LEDGER.jsonl / PACKETS.jsonl to know what
-    # "the previous wave" is and which crates it touched, which is orchestrator
-    # state that doesn't exist yet. Always passes until then.
+    # V8 no-regression — the same base-vs-HEAD test comparison V5 makes, run
+    # over the crates DOWNSTREAM of the ones the packet names.
+    #
+    # V5 already compares against a real baseline, so the "a packet broke a
+    # pre-existing test" property the old stub comment promised is discharged
+    # there. What V5 cannot see is a crate the packet does not list: it runs
+    # `cargo test -p <pkt crates>` and nothing else. Every BG-TOL-001 shard
+    # tightens a predicate from componentwise `.near()` to Euclidean, in a
+    # crate the whole kernel depends on, and the test that notices lives
+    # downstream by construction.
+    #
+    # This is not hypothetical. Two `cone_topology_tests` invariant tests have
+    # been failing in truck-meshalgo since the tree was vendored at da72cd5,
+    # with every gate reporting green the whole time, for exactly this reason:
+    # no packet had ever listed truck-meshalgo in `crates:`, so no verify run
+    # ever executed them.
+    #
+    # Reverse dependencies are read from the vendored Cargo.toml files and
+    # closed transitively. The packet's own crates are removed -- V5 owns
+    # those, and running them twice would double the slowest gate for nothing.
+    # An empty downstream set is a PASS that says so, not a silent one.
     # -----------------------------------------------------------------------
-    if gate_wanted('V8'):
-        v.add_gate('V8 no-regression', 'PASS', 'TODO stub — always passes; see comment in verify.py')
-    else:
+    # V8 is OFF by default and must be asked for with `--only V8`.
+    #
+    # Not because it is optional -- because it has never been watched failing.
+    # "A gate that has only ever been observed passing is indistinguishable
+    # from a gate that cannot fail, and the loop has already shipped two of
+    # those." Turning this one on for acceptance before its negative test has
+    # run would ship a third, and the negative test could not be run in the
+    # session that wrote it: a downstream baseline builds an entire extra
+    # workspace and the machine was at 6.5 GB free, under the harness's own
+    # 8 GB floor. Run it deliberately with `--only V8` (whose verdict is
+    # PARTIAL by construction and so cannot accept a packet on its own), watch
+    # it fail on a deliberate downstream break, and delete this branch in the
+    # commit that records that.
+    if only_gates is None:
+        v.add_gate('V8 no-regression', 'SKIP',
+                   'off by default until its negative test has been run; '
+                   'invoke with --only V8. See the comment in verify.py')
+    elif not gate_wanted('V8'):
         skip_not_requested('V8 no-regression')
+    elif v.failed_early:
+        v.add_gate('V8 no-regression', 'SKIP', 'earlier gate failed')
+    else:
+        downstream = sorted(reverse_dep_closure(v.wt, crate_names))
+        if not downstream:
+            v.add_gate('V8 no-regression', 'PASS',
+                       'no vendored crate depends on ' + ', '.join(crate_names)
+                       + '; V5 already covers everything this packet can reach')
+        else:
+            d_args = []
+            for c in downstream:
+                d_args += ['-p', c]
+            baseline8 = load_or_compute_baseline(base, downstream, v.out_file)
+            v.write_out_section('V8 no-regression: downstream crates ' + ', '.join(downstream))
+            len_before = v.out_file.stat().st_size
+            v.invoke_native(['cargo', 'test', *d_args, '--lib', '--tests', '--no-fail-fast'], v.wt)
+            chunk = v.out_file.read_bytes()[len_before:].decode('utf-8', errors='replace')
+
+            if has_compile_error(chunk):
+                # A downstream crate that no longer compiles is the loudest
+                # possible regression: the packet changed something its own
+                # V2 could not see because V2 only checks the packet's crates.
+                v.add_gate('V8 no-regression', 'FAIL',
+                           'downstream crate(s) failed to compile: ' + ', '.join(downstream)
+                           + '; see out.txt', code='DOWNSTREAM_BUILD_FAIL')
+                v.failed_early = True
+            elif not baseline8['compile_ok']:
+                now = parse_test_statuses(chunk)
+                failing_now = sorted(n for n, s in now.items() if s == 'FAILED')
+                if failing_now:
+                    v.add_gate('V8 no-regression', 'FAIL',
+                               f"downstream baseline at {base[:7]} would not compile, so no "
+                               'comparison is possible; failing now: '
+                               + ', '.join(failing_now[:8]) + '; see out.txt',
+                               code='DOWNSTREAM_REGRESSION')
+                    v.failed_early = True
+                else:
+                    v.add_gate('V8 no-regression', 'PASS',
+                               f"downstream baseline at {base[:7]} would not compile "
+                               '(no comparison possible); no failures now')
+            else:
+                now = parse_test_statuses(chunk)
+                base_tests = baseline8['tests']
+                newly_failing = sorted(n for n, s in now.items()
+                                       if s == 'FAILED' and base_tests.get(n) != 'FAILED')
+                still_failing = sorted(n for n, s in now.items()
+                                       if s == 'FAILED' and base_tests.get(n) == 'FAILED')
+                newly_ignored = sorted(n for n, s in now.items()
+                                       if s == 'ignored' and base_tests.get(n) == 'ok')
+                # `disappeared` is deliberately NOT a regression here. A packet
+                # cannot delete a downstream test -- V1 would have rejected the
+                # write -- so an absence downstream means cargo did not reach
+                # the binary, which is a harness fact and not the packet's.
+                regressions = newly_failing + newly_ignored
+                if regressions:
+                    parts = []
+                    if newly_failing:
+                        parts.append('newly failing downstream: ' + ', '.join(newly_failing[:8]))
+                    if newly_ignored:
+                        parts.append('passed at base, #[ignore]d now: ' + ', '.join(newly_ignored[:8]))
+                    v.add_gate('V8 no-regression', 'FAIL', '; '.join(parts) + '; see out.txt',
+                               code='DOWNSTREAM_REGRESSION')
+                    v.failed_early = True
+                else:
+                    detail = (f"{len(downstream)} downstream crate(s) unchanged vs baseline at "
+                              f"{base[:7]}: " + ', '.join(downstream))
+                    if still_failing:
+                        detail += (f"; {len(still_failing)} pre-existing failure(s) ignored: "
+                                   + ', '.join(still_failing[:8]))
+                    v.add_gate('V8 no-regression', 'PASS', detail)
 
     # -----------------------------------------------------------------------
     # V9 geometry — the root crate's integration tests, which are the only
