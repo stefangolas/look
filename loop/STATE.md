@@ -543,6 +543,55 @@ reason is in the commit that made the change, and the code will not tell you.
   came back; a packet that states a fact without inviting disagreement gets
   compliance instead of a correction.
 
+- **A crate that denies its own lints makes V3 unpassable, and "could not
+  compile" does not mean "was not linted".** `truck-meshalgo/src/lib.rs` carries
+  `#![deny(clippy::all, rust_2018_idioms)]`, so its ~93 pre-existing lints are
+  hard errors whatever V3 puts on the command line; cargo then reports "could not
+  compile ... due to 93 previous errors" and V3's coverage guard fired on that,
+  short-circuiting the added-line scoping which is the gate's whole purpose.
+  Every finding was in files the diff never opened and V2 passed on the same
+  tree. **The distinguishing marker is `error[E####]`** -- rustc gives a real
+  compile error a code and never gives one to a lint. Fixed; a crate counts as
+  unlinted only when an E-coded diagnostic is present, so the guard keeps its
+  property. Watched failing three ways first.
+- **GATE-1 requires `#![deny(clippy::unwrap_used)]` on every new module under
+  `vendor/truck/`, including `tests/*.rs`, and a packet that does not say so gets
+  rejected for the orchestrator's omission.** BG-TOL-001-MESHALGO's packet never
+  contained the string `unwrap_used`; both landed shards' test files carry the
+  attribute, so the convention existed and only the packet was missing it. Fixed
+  by amendment rather than redispatch. **Put this line in every packet that asks
+  for a new test file.**
+- **Do not read a verdict off a background wrapper's exit code.** A command of
+  the form `python loop/verify.py ... > log; echo "EXIT: $?" >> log` exits with
+  the *echo's* status, so the task notification says 0 while the log says
+  REJECTED. This was reported to the user as an acceptance before the log was
+  read. **Read `VERDICT.json` or the `VERDICT:` line, never the harness's exit
+  notification.**
+- **`kill -0 <pid>` in Git Bash cannot see a Windows PID and reports the process
+  dead.** A watch built on it fired instantly with "pid gone" while the worker
+  was alive and working. Use `tasklist //FI "PID eq N"`, or better,
+  `slot_status.py`'s own state.
+- **`slot_status.py`'s 12-minute STALLED threshold is mis-calibrated for this
+  worker.** Measured on BG-TOL-001-MESHALGO: **75% of the run's wall clock was
+  model latency**, in five gaps of 6-10 minutes, some of them followed by a
+  `grep` on a local file that takes milliseconds. A 12.9-minute gap tripped
+  STALLED on a worker that then resumed and finished normally. **`--kill-stalled`
+  on that label would have destroyed an hour of correct work.** Confirm with
+  `tasklist` and check whether cargo/rustc are running before reaping anything.
+- **A bash heredoc eats backslashes, and it has now corrupted three separate
+  Python patches in one session** -- `'\'` collapsing to `''` (unterminated
+  string), and `'\b'` arriving as a literal 0x08 backspace inside a regex that
+  then silently matched nothing. **Write Python patch scripts to a file and run
+  the file, or use the Edit tool; never pipe a patch containing regex escapes
+  through a heredoc.**
+- **Worker cost is not a constraint and orchestrator time is.** The whole
+  BG-TOL-001-MESHALGO run cost **$0.057**; all 49 remaining packets extrapolate
+  to about **$2.78**. Parallelism therefore buys wall-clock but never credits,
+  and it *raises* orchestrator load because every finished worker needs
+  adjudicating. **43% of a packet's text is templatable boilerplate and only
+  ~29% is real judgement** -- that ratio, not slot count, is where the leverage
+  is.
+
 ## The commands
 
 `slot_status.py` prints each slot's branch and short HEAD (`git=branch@sha`),

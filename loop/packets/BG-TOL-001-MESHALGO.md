@@ -322,8 +322,15 @@ to catch.
 
 ## Tests required
 
-New file `vendor/truck/truck-meshalgo/tests/tolerance_meshalgo.rs`. Each must be
-a named `#[test]` fn — the verifier checks the names appear in your diff.
+New file `vendor/truck/truck-meshalgo/tests/tolerance_meshalgo.rs`.
+
+**Its first line must be `#![deny(clippy::unwrap_used)]`.** GATE-1 (H-1)
+requires it of every new module under `vendor/truck/`, including test files, and
+`scripts/kernel-gates.sh` fails the packet without it. Both landed shards carry
+it -- see `truck-shapeops/tests/tolerance_migration.rs`. Write your tests so the
+attribute costs nothing: return `Result` or match rather than `unwrap`.
+
+Each test must be a named `#[test]` fn — the verifier checks the names appear in your diff.
 
 1. `every_migrated_meshalgo_site_is_marked` — read the three migrated source
    files (`filters/normal_filters.rs`, `tessellation/source_edge.rs`,
