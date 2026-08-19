@@ -703,7 +703,7 @@ two *different* pcurves — the case §1 says is otherwise impossible.
 
 **Implements** §20. **Fixes** audit D-2.
 
-**Problem.** Geometry lives in `Arc<Mutex<_>>` with 10 documented deadlock
+**Problem.** Geometry lives in `Arc<Mutex<_>>` with 12 documented deadlock
 hazards — `rg -n 'will result in a deadlock' truck-topology/src`, **expect 12**
 across `vertex.rs`, `edge.rs`, `wire.rs`, `face.rs`, `shell.rs`, `solid.rs` (the
 `mapped` / `try_mapped` family, 2 per file). `VertexID = ID<Mutex<P>>` is *allocation*
@@ -737,7 +737,7 @@ produces a new value and a *derived* id.
 - Unit: regenerating with a changed parameter maps every old id to exactly one
   variant; assert exhaustiveness by counting.
 - Thread test: build and query a shell from 8 rayon threads. Must not deadlock —
-  the direct regression for the 10 warnings above.
+  the direct regression for the 12 warnings above.
 
 ### BG-CE-006 — Canonical carrier set
 

@@ -11,7 +11,7 @@ otherwise would eventually cost a trap.) If you are picking this up cold, read
 [`loop/ORCHESTRATOR.md`](ORCHESTRATOR.md) for how to run the loop, then
 `python loop/slot_status.py`** — nothing else. Do not read `LEDGER.jsonl` whole.
 
-Updated 2026-08-18, end of session 8. Branch: `integration/kernel-bg`. Nothing
+Updated 2026-08-19, end of session 9. Branch: `integration/kernel-bg`. Nothing
 from the loop has reached `main` and nothing has been pushed.
 
 ## What this is, if you have never seen it
@@ -52,303 +52,146 @@ here is scored, tuned, or sampled.
 
 ## Where we are
 
-**Fourteen packets DONE of 62** (session 8 landed BG-TOL-001-MESHALGO): BG-S0-001, -002,
--003, BG-EVD-r3, BG-TOL-001-TYPE, -TYPE-r2, -TYPE-r3, BG-NUM-001-FILLET,
--SHAPEOPS, -TOPOLOGY + -MODELING (both closed by `BG-TOL-001-TOPO-MOD`),
--GEOM-SPECIFIEDS, and BG-CE-006-CYLINDER + -CONE (closed by
-`BG-CE-006-CYL-CONE`). **`BG-TOL-001-MESHALGO` is RUNNING in slot 0** as of the
-end of session 8, dispatched at `6ca37b2`; it has not been verified.
+**Fifteen packets DONE of 62** (session 9 landed `BG-TOL-001-GEOM-NURBS`):
+BG-S0-001, -002, -003, BG-EVD-r3, BG-TOL-001-TYPE, -TYPE-r2, -TYPE-r3,
+BG-NUM-001-FILLET, -SHAPEOPS, -TOPOLOGY + -MODELING (both closed by
+`BG-TOL-001-TOPO-MOD`), -GEOM-SPECIFIEDS, -MESHALGO, -GEOM-NURBS, and
+BG-CE-006-CYLINDER + -CONE (closed by `BG-CE-006-CYL-CONE`).
 
-**The survey experiment came back positive, and the review was not a
-formality.** The first `class: survey` output was ACCEPTED on V0/V1/V10 and V10
-did its job perfectly — all 26 live expressions matched the tree byte for byte,
-so the half that had gone wrong twice before (invented anchors) did not go wrong
-here. The classifications needed **four corrections**, which moved the shard from
-26 sites / 16 contexts to **20 sites / 11 contexts**. Both halves of that
-sentence matter: a survey that needed no correction would mean the review could
-be skipped, and a survey whose sites were invented would be worse than none. This
-one was neither. **Keep the survey path; keep reading every row.**
+**Nothing is running. Every slot is empty and every packet branch is merged or
+deleted.** 11 GB free, `git worktree list` shows only the main worktree.
 
-**The survey also found two census defects and got them right**, which is the
-clearest evidence that delegating the reading is worth it: the census regex
-`\bTOLERANCE\b` cannot match `SOURCE_INCIDENCE_TOLERANCE` because `_` is a word
-character (3 hidden hits, one a live predicate), and its SQUARED regex misses a
-written-out `TOLERANCE * TOLERANCE`. Neither the census nor the survey covers the
-`RELATIVE_TOLERANCE = 1e-9` family in `tessellation/formal/*.rs` — **8 production
-predicates in no inventory at all.** The census's 175 is therefore a floor, not a
-count.
+**BG-TOL-001 burndown, re-measured after the merge:** the census reads **100
+production first-order predicates left**, down from 156. GATE-4 sits at
+**75/75**, at its ceiling, which is correct. The big remaining pools are
+truck-geometry 46 (decorators 28 + a long tail), truck-stepio 18, and
+truck-meshalgo 11 (the `tessellation/formal` `RELATIVE_TOLERANCE` family the
+census still cannot see — its totals are a floor, see traps).
 
-**BG-TOL-001 burndown: 44 sites migrated, 175 to go** by the census, which is now
-known to be wrong in both directions (see above). `python
-loop/census_tol_sites.py` is still the sizing tool; it is no longer the authority
-on what exists.
+**Two packets are written, checked green, and undispatched.** Both were
+dispatched in session 9 and both workers died in an ~8-hour gap when the machine
+went away; neither is a rejection and nothing is implied about either packet.
 
-**GATE-4 sits at 51/51** — at its ceiling, which is correct: the ceiling was lowered to the true count when MESHALGO landed. The count is the one `scripts/kernel-gates.sh` takes
-(a `git grep -oh 'unscaled_legacy('` over `vendor/truck/*/src/*`, excluding
-`truck-base/src/tolerance.rs` where the constructor is defined — a plain grep
-reads 41 and is wrong by that one line). The ceiling was raised by MESHALGO's 11 measured
-contexts and **must be lowered to the true count in the commit that closes the
-packet** — a ceiling left at its dispatch budget is a licence, not a ratchet.
+| packet | sites | contexts | census ceiling | state |
+|---|---|---|---|---|
+| `BG-TOL-001-GEOM-DECORATORS` | 28 migrate + 1 deferral | 14 | 16 | `--check` green, ready |
+| `BG-TOL-001-SMALL` | 7 migrate | 7 | 11 | `--check` green, ready |
+| `BG-TOL-001-STEPIO` | 19 | 15 | 15 | green since session 8, never dispatched |
+
+The two abandoned worker diffs are archived at
+`scratch/slot3-decorators-abandoned.diff` (1039 lines, ~7 files, and it looked
+correct — `ctx.near_pt(...)` with `// BG-TOL-001:` markers and the context as the
+function's first statement) and `scratch/slot1-small-abandoned.diff`. Redispatch
+clean; the archives are insurance, not a starting point.
 
 ## Pick up here
 
-0. **`BG-TOL-001-MESHALGO` LANDED** as `69044f1` — ACCEPTED on all eleven gates,
-   14/62 packets DONE, GATE-4 at its true 51/51. It took **three rejections and
-   every one of them was the orchestrator's**, which is now the third session
-   running to reach that conclusion:
-   - **V3 could not pass on this crate at all.** `truck-meshalgo/src/lib.rs`
-     carries `#![deny(clippy::all, rust_2018_idioms)]`, so its ~93 pre-existing
-     lints are hard errors whatever V3 puts on the command line; cargo reports
-     "could not compile" and V3's coverage guard short-circuited the added-line
-     scoping that is the gate's whole purpose. **Fixed** (`bcbcc8d`): a crate
-     counts as unlinted only when an `error[E####]` is present, since rustc codes
-     a real compile error and never codes a lint. Watched failing three ways.
-   - **GATE-1 requires `#![deny(clippy::unwrap_used)]` on a new test file and the
-     packet never said so.** Repaired by orchestrator amendment (`897e238`,
-     `amended_by` recorded, worker notes verbatim), not a redispatch.
-   - **The budget of 11 should have been 10** — still true, still unfixed. See
-     the brace-tracking item below.
+1. **Raise the ceiling, then dispatch DECORATORS and SMALL.** They are
+   write-disjoint (`src/decorators/**` vs `truck-polymesh` + `truck-geotrait`)
+   so both can run at once. `scripts/unscaled_legacy_ceiling.txt` must go
+   **75 → 96** in a commit *before* the slots are forked — `run_packet.py` reads
+   the ceiling from the slot's own HEAD, so raising it after the fork does
+   nothing. Lower it to the true count as each one lands.
 
-   **Two things are deliberately left undone on it**, both cheap, both recorded
-   so they are not rediscovered:
-   - `new_with_join` holds a **shadow context** the worker created to obey the
-     wrong budget of 11. Removing it is an orchestrator amendment.
-   - **`census_tol_sites.py` and `gen_packet.py`'s `packet_contexts` share a
-     brace-tracking bug**: both scan upward for `fn <name>` without tracking
-     braces, so a site after a nested helper's closing brace is attributed to the
-     helper. `end_pts` is a two-line nested `fn` closing at 8276; the sites at
-     8278/8283 belong to `new_with_join`. **Fix the tools and the shadow in one
-     commit, and re-run `gen_packet --check` on every Stage-A packet after** —
-     the numbers move.
+2. **Then `BG-TOL-001-STEPIO`** (+15, ceiling accordingly). It needs no survey;
+   it already has the judgement.
 
-   **Evidence already gathered, do not re-measure:** the two failing
-   `cone_topology_tests` (`duplicate_edge_creates_no_second_cdt_edge`,
-   `test_parity_intersecting_constraints_rejected`) fail **identically at base** —
-   same assertions, `left: 5 / right: 3`, line numbers shifted by exactly 31.
-   Measured independently in a detached worktree, and the worker reached the same
-   answer by stashing its diff. **They have been broken since `da72cd5` and no
-   gate ever noticed**, because no packet before this one listed truck-meshalgo
-   in `crates:` and **V8 is a stub**. That is the strongest argument for building
-   V8 that this loop has produced.
+3. **V8 is built and is OFF.** `verify.py`'s V8 is no longer a stub: it runs
+   V5's exact base-vs-HEAD comparison over the **reverse-dependency closure** of
+   the packet's crates, which is the gap V5 structurally cannot see (V5 runs
+   `-p <the packet's crates>` and nothing else). `reverse_dep_closure` reads the
+   vendored `Cargo.toml`s, counts dev-dependencies deliberately — a
+   dev-dependency is how a downstream crate's *tests* reach the changed code —
+   and closes upward. For `truck-geometry` that is evidence, meshalgo, modeling,
+   shapeops, stepio.
 
-1. ~~Verify `BG-TOL-001-MESHALGO`~~ — done, see item 0. **Original guidance:** `python
-   loop/verify.py --slot 0 --packet loop/packets/BG-TOL-001-MESHALGO.md --base
-   6ca37b2`. Then merge `--no-ff`, file `RESULT.json`, ledger row, `status: DONE`
-   in `PACKETS.jsonl`, and **lower the ceiling to the true count**.
-   - The packet asks for something no earlier shard did: **six `FIXME` markers
-     and no rewrite** in four files, with an explicit test
-     (`deferred_area_sites_carry_a_fixme`) asserting those files contain **no**
-     `ToleranceCtx` at all. If the worker migrated one of the six area sites
-     anyway, that is a real rejection, not a gate defect.
-   - Watch for the one thing the packet leaves genuinely open: the four
-     `reconcile_singular_transition` lines each need **two** predicates migrated
-     and one context. If the worker introduces more than 11 `unscaled_legacy()`
-     calls it built one per site.
+   **It has never been watched failing, so it is `--only V8` opt-in and takes no
+   part in acceptance.** Session 9 could not run its negative test: a downstream
+   baseline builds an entire extra workspace and the machine was at 6.5 GB free,
+   under the harness's own 8 GB floor. **Do this first when there is disk.**
+   Break something in `truck-geometry` that a `truck-modeling` test catches,
+   confirm `DOWNSTREAM_REGRESSION`, then delete the opt-in branch in the commit
+   that records it. Note the reason V8 matters is concrete and already paid for:
+   two `cone_topology_tests` invariant tests have been failing in truck-meshalgo
+   since `da72cd5` with every gate green, purely because no packet had ever
+   listed truck-meshalgo in `crates:`.
 
-2. **The other four TOL shards go the survey route: GEOM-NURBS,
-   GEOM-DECORATORS, POLYMESH, GEOTRAIT.** The survey packet
-   (`loop/packets/BG-TOL-001-MESHALGO-SURVEY.md`) has been **sharpened with the
-   four defects this review found** and is now the template — copy it, change
-   the crate and the site inventory. The additions are: the degree-2 exclusion,
-   the "a value is not a comparison" exclusion, `predicates_on_line` plus
-   `mixed_classification` so a two-predicate line can express itself, and the
-   instruction to grep for `_TOLERANCE\b` constants the inventory cannot see.
-   Size each with `python loop/census_tol_sites.py <path-fragment>` and remember
-   it is a floor.
-   - **`BG-TOL-001-STEPIO` is still written, checked and undispatched** (budget
-     15, now verified by `gen_packet --check` at 15 == 15). Raise the ceiling by
-     15 before dispatching it. It does not need a survey; it already has the
-     judgement.
+4. **Then the CE chain, still the critical path to generation.** Seven of the
+   nine BG-INV checkers gate on `BG-CE-003` through
+   `BG-CE-006-CYL-CONE -> BG-CE-006-ENUM -> BG-CE-001 -> BG-CE-003`. Session 9
+   scoped `BG-CE-001` and `-003` against the tree; **the scoping is in "The CE
+   chain, scoped against the tree" below** rather than here, because it is
+   durable design and not session state.
 
-3. ~~`BG-CE-006-CYL-CONE`'s worker disagreed with its packet~~ — **checked and
-   closed in session 8; the worker was right.** `Plane::parameter_range` returns
-   `(Bound::Included(0.0), Bound::Included(1.0))` on both axes, so
-   `try_range_tuple` yields two `Some`s and `range_tuple`'s
-   `.expect(UNBOUNDED_ERROR)` cannot fire — `impl BoundedSurface for Plane {}` is
-   sound and the packet's "pre-existing defect" sentence was false. The packet is
-   annotated with the correction rather than silently edited. **The rest of that
-   decision got stronger, not weaker:** `Cylinder` and `Cone` both return
-   `(Bound::Unbounded, Bound::Unbounded)` for `v`, so `range_tuple` genuinely
-   would panic on them, and the answer to "should they implement `BoundedSurface`
-   after all" is a firmer **no**. Nothing to do here.
+5. **Disk is the binding constraint on this machine and it is not the loop's
+   fault.** C: is 98–99% full with ~11 GB free, of which the loop can use maybe
+   half before `compute_baseline` refuses at its 8 GB floor. **Run
+   `python loop/slot_status.py --disk` before a session of verifies, not
+   after** — it now reports both target dirs per slot plus leaked baselines.
+   Verifying serially and deleting between is what worked.
 
-4. **Then the CE chain, which is the actual critical path to generation.** Seven
-   of the nine BG-INV invariant checkers are gated on **one** packet,
-   `BG-CE-003`, through `BG-CE-006-CYL-CONE -> BG-CE-006-ENUM -> BG-CE-001 ->
-   BG-CE-003`. Three of those four are **design** class, so the orchestrator
-   writes them; that is the bottleneck, not worker throughput. `schedule.py`
-   reads `needs`; the rows also carry a stale, different `depends_on`.
+## Did the session-8 bet pay? Partly, and the limit is now visible
 
-5. **Highest-value harness work left: V7 and V8 are still always-pass stubs** —
-   the two remaining gates where PASS means nothing. V8 is where "this packet
-   broke a pre-existing test" belongs. Note `gen_packet --check-all` now reports
-   two landed packets (`BG-CE-006-CYL-CONE`, `BG-TOL-001-GEOM-SPECIFIEDS`) as
-   having unverifiable budgets, because their site tables are not in a parseable
-   form. That is true and blocks nothing — `run_packet` checks only the packet
-   being dispatched — but it means neither of those budgets was ever checked
-   against anything.
+Session 8 spent itself on orchestrator tooling on the argument that orchestrator
+time is the binding constraint. **One session is not evidence, so: the assembly
+savings are real and measured; the judgement cost is unchanged and is now the
+entire cost.**
 
-6. **Disk: 13 GB free** at the end of session 8, above the loop's 8 GB floor and
-   falling while slot 0 builds.
-   Slot 0 is warm; slots 1-3 had their `target/` deleted at the end of session 7
-   and re-warm cold in ~5.6 min.
+**For.** `BG-TOL-001-GEOM-NURBS` is the largest shard yet — 57 sites, 26
+contexts, 12 deferrals, six files, roughly 3x MESHALGO — and went through in
+**one dispatch and one orchestrator amendment**, against MESHALGO's three
+rejections. Its 43 KB packet was almost entirely generated from the reviewed
+survey. Whole-session worker cost: **$0.18**.
 
-## Landed
+**Against.** The tooling did not stop the orchestrator being wrong; it moved
+where the wrongness surfaced. NURBS's one round trip was a **PACKET** fault that
+no gate could have caught — decision 7 demanded `ctx.is_small_ratio(delta)`
+inside a `pub const fn` while Forbidden banned signature changes, and
+`unscaled_legacy()` is not const. **43% of a packet is templatable and the
+remaining 29% is exactly where the fault landed.** And the tooling shipped two
+defects of its own this session (see the dropped-rows trap), both found by
+running it rather than reading it.
 
-| commit | what |
-|---|---|
-| `da72cd5` | vendored truck at `vendor/truck/` (12 crates) + kernel gates + evidence module |
-| `fddc62a` | vendored crates are workspace members — without this `cargo test -p <crate>` (V5) cannot run |
-| `65450b3` `ca22bc4` `a5660c3` | loop scaffolding, first packets, the 56-packet DAG |
-| `b06a535` | three baseline clippy defects fixed (the slot-0 fork point) |
-| `ed35879` … `8dca941` | the verifier and dispatcher, made to actually work |
-| `c8acab6` | **BG-S0-003** — the first packet through the whole loop |
-| `4cc5aca` | harness ported to stdlib-only Python; the four `.ps1` scripts are gone |
-| `baa2dfa` `88b93ee` `aa6e31a` `fb697ea` | V5 `--no-fail-fast` + cached baseline, V0 allow-lists `*.obj`, dispatch survives its parent, ORCHESTRATOR counterweights |
-| `5b68c78` `27ce4d7` | **BG-S0-002**, **BG-EVD-r3** |
-| `ec34aa0` | **session 6:** V3's fmt half was whole-crate — the same defect its clippy half already fixed |
-| `ce524fa` | **BG-NUM-001-FILLET**, merged unmodified after six verify runs |
-| `331633a` | spec: BG-TOL-001 never said where a call site gets its context |
-| `c53e3e6` | **GATE-4**, the `unscaled_legacy` ratchet |
-| `871e79f` | **BG-TOL-001-TYPE-r2** — the Stage-A scaffold |
-| `11aa0b9` | spec: squared-order sites deferred to BG-TOL-004; the SHAPEOPS packet |
-| `d26cefb` | **BG-TOL-001-SHAPEOPS** — 16 sites classified, the shard template |
-| `6e07e49` | **BG-TOL-001-TYPE-r3** — one-sided margins + generic point predicate |
-| `58de977` | **BG-TOL-001-TOPO-MOD** — closes both TOPOLOGY and MODELING |
-| `ba2b7be` | **V9** + `tests/geometry_fingerprint.rs` — see the V9 warning above |
-| `09fb2bf` | census fix: every `#[cfg(test)]` module was counted as production |
-| `bcc9139` | **session 7:** V9 watched failing, twice, on two failure modes — the gate is proven |
-| `52d4552` | dispatch preflight: a packet's GATE-4 claim is checked before a worker is paid |
-| `f9fa761` | GEOM-SPECIFIEDS' anchor counts were wrong when written; 3 of 7 |
-| `e90e9dc` | a shard's `unscaled_legacy` budget is a measurement now, not an estimate; ceiling 29 → 36 |
-| `aa2dadd` | V0 missed the proptest seed file under its fallback name |
-| `0a7c6fe` | **BG-TOL-001-GEOM-SPECIFIEDS** — 22 sites, 19 contexts, ACCEPTED on all ten gates |
-| `808d472` | the `BG-CE-006-CYL-CONE` packet |
-| `6ca37b2` | **session 8:** the first survey reviewed and corrected; `gen_packet` made usable end to end; the degree-2 exclusion written into the spec; the `BG-TOL-001-MESHALGO` packet |
+**So:** further tooling investment has a much lower ceiling than session 8
+assumed. The next marginal hour goes to V8's negative test and the CE design,
+not to generating more prose.
 
-## The spec and packet amendments the loop has paid for
+## What the three surveys were worth, now that all three are used
 
-**BG-TOL-001 never said where a call site gets its `ToleranceCtx`.** It says
-migrate 184 sites and §9 says "every signature below takes ctx"; neither says
-how a site *obtains* one, and none of the 184 sits in a function that has one.
-Threading from the entry points inward changes public signatures in every crate
-at once, so it cannot be sharded per crate — which is exactly what the eight
-`BG-TOL-001-*` rows assume and what makes their write sets disjoint. The
-migration is now **two stages**: Stage A (the shards) classifies every site
-`model` or `param` through `ToleranceCtx::unscaled_legacy()`, moving no
-threshold and changing no signature; Stage B threads a real `model_scale` from
-each entry point and is what actually discharges the contract. **Stage A alone
-fixes nothing** — it buys the judgement, which is the half that cannot be done
-mechanically later. GATE-4 ratchets the scaffold so Stage A cannot quietly
-become the answer.
+104 live sites for $0.086, all three ACCEPTED on V0/V1/V10 with every anchor
+resolving — **the half a gate can check did not go wrong.** The half it cannot
+check went wrong three times, each caught only by resolving the claim against
+the tree:
 
-**`near2`/`so_small2` cannot be migrated at all.** They compare against
-`TOLERANCE2` = 1e-12 and `ToleranceCtx` has no squared-order predicate; mapping
-them onto `tau_rep` loosens them by six orders of magnitude *while looking like
-a migration*. All 23 sites tree-wide are excluded from Stage A and deferred to
-**BG-TOL-004** (design, blocks nothing).
-
-### Queued and half-built (session 8 ran out of budget here)
-
-- **Three survey packets are generated but NOT dispatched**:
-  `BG-TOL-001-GEOM-NURBS-SURVEY` (35 fns), `-GEOM-DECORATORS-SURVEY` (16),
-  `-SMALL-SURVEY` (polymesh+geotrait combined, 11). They came from the new
-  `loop/gen_survey.py`. **Fix its site-count bug before dispatching**: it reports
-  `sum(len(functions per file))`, i.e. the *function* count, and labels it
-  "at least N production predicates". The phrasing stays true but the number is
-  far too low, and a worker told "at least 35" when the real count is higher may
-  stop early. Surveys are read-only and cannot collide, so all three can run
-  concurrently on slots 1-3.
-- **Not yet built, ranked by value:** (a) **V8** — the base-vs-HEAD comparison
-  was done by hand twice this session and is the gate that just waved through
-  two broken invariant tests; (b) `gen_packet --skeleton` should emit the
-  boilerplate prose — **43% of a packet is templatable** and only ~29% is real
-  judgement; (c) the brace-tracking fix for both context counters.
-
-### The three surveys are in, reviewed, and one of them has a pre-resolved SPEC_GAP
-
-`loop/surveys/BG-TOL-001-{GEOM-NURBS,GEOM-DECORATORS,SMALL}.json`, all three
-ACCEPTED on V0/V1/V10, all three reviewed with `loop/review_survey.py`. 104 live
-sites for **$0.086 of worker time, three workers concurrently**.
-
-**Write the NURBS packet with this decided, or it will come back SPEC_GAP.**
-`ctx.near_points<P>` is bounded `P: MetricSpace<Metric = f64>`. Ten of NURBS's
-twenty `model` sites sit in impls bounded `P: ControlPoint<f64> + Tolerance`
-(`bspcurve.rs` 474/598/921/1037/1102/1112, `bspsurface.rs` 823/918/1581), and
-`ControlPoint` -- checked, `truck-base/src/cgmath_extend_traits.rs:9` -- requires
-arithmetic, `Copy`, `Debug` and `Index`, and **not** `MetricSpace`. Those ten
-cannot be migrated without widening a public generic bound, which is cross-crate
-and is Stage B. They get the FIXME `truck-topology/src/edge.rs:421` already uses
-verbatim. The other ten `model` sites are concrete and migrate normally.
-
-Adjudications already made, so do not redo them:
-- `revolved_curve.rs:29,434` -- `model` is CORRECT. `RevolutedCurve::new`
-  normalizes its axis, so `(p - origin).cross(axis)` is `|v| sin t`, degree ONE.
-  The degree-2 heuristic flags this shape deliberately and cannot resolve it
-  statically.
-- `rbf_surface/algo.rs:849,959` -- rewrite is CORRECT. The three unmigrated
-  predicates on those lines are `so_small2()`, squared order, excluded by rule.
-- `polyline_curve.rs:54,132` -- `param` is consistent with the ray-crossing
-  parameter already accepted at `triangulation.rs:8420`.
-- **Unresolved and genuinely open:** `rbf_surface/contact_circle.rs:167`, a
-  worker-reported SPEC_GAP -- `del.z` comes out of a Newton solve whose third
-  matrix column is an unnormalized `uder x vder`. Read it before writing
-  DECORATORS.
-
-**Two more census blind spots found, both real:** `truck-geotrait/src/algo/
-curve.rs:134` and `surface.rs:398` compare `dist2 < tol * tol` -- first-order
-predicates written squared, invisible to the census's `TOLERANCE2` token match.
-They are live sites in nobody's inventory. NURBS separately reports four
-`near2_as_curve`/`near2_as_surface` helpers, correctly squared-order.
-
-### New tooling, session 8 — all of it committed and exercised
-
-| command | what it removes from the orchestrator |
-|---|---|
-| `loop/review_survey.py <surveys...>` | the throwaway scripts a survey review needed. Flags mixed/multi-predicate rewrites, degree-2 candidates, non-predicates, live rows with no rewrite, every `confidence:low`. Takes several surveys at once. **Validated against the unreviewed MESHALGO survey: it independently found every defect the manual review found.** |
-| `loop/gen_survey.py --id .. --crates .. --fragment ..` | writing a survey packet by hand; the inventory is measured at generation time |
-| `loop/burn_report.py` | arguing about efficiency instead of measuring it |
-| `loop/new_slot.py --no-warm` | ~5.6 min and ~1 GB per survey slot — a survey never runs cargo |
-
-**Codes now carry what used to be prose**, on the rule *code what is branched on
-or counted, keep prose for what is reasoned about*:
-- `VERDICT.json` gates carry `code` (`LINT_UNLINTED`, `BUILD_FAIL`,
-  `SCOPE_VIOLATION`, `HOUSE_RULES`, `ADDED_TEST_FAILED`, …). Triaging one V3
-  rejection cost six tool calls to establish a fact one field now states.
-- `land_packet.py --fault {NONE,GATE,PACKET,WORKER,SPEC,HARNESS}` makes "whose
-  fault was this round trip" a query rather than a narrative.
-- Survey rows take `reason_code`; the packet's deferrals take
-  `FIXME(BG-TOL-001, DEGREE2)`; `RESULT.json` takes `deviations`,
-  `disagreements` and `baseline_failures` arrays. **`disagreements` is the
-  point**: the last worker's most valuable finding arrived as paragraph five of
-  a 2,000-character `notes` string and was nearly missed.
-
-**Measured, reproducible with `python loop/burn_report.py`:** read-payload per
-live classification fell **3053 → ~650 bytes (4.7x)** on the large shards. Note
-the attribution honestly — that came from `gen_survey`'s measured inventory
-(10% excluded rows vs 75%), **not** from the scope rule or reason codes, which
-have not run yet (`coded` is 0 everywhere). **The "~2x overall frontier burn"
-figure is an estimate with ±50% and nothing has verified it.**
+- **The session-8 handoff's own NURBS adjudication was wrong in both
+  directions.** It recorded ten deferred / ten migrating, naming nine lines; the
+  truth is **twelve deferred, eight migrating**. `bspcurve.rs:1102` and `:1112`
+  were listed as blocked and are not — their impl at `bspcurve.rs:1058` carries
+  `MetricSpace<Metric = f64>`. It missed `bspsurface.rs:652` (an
+  `impl<V: Tolerance>`) and the four NURBS wrappers, blocked through
+  `Homogeneous::Point: EuclideanSpace` supplying no `MetricSpace`.
+- **A survey rewrite would not have compiled.**
+  `truck-geotrait/src/algo/curve.rs:66` was given `ctx.near_points(...)`; its
+  bound is `C::Point: EuclideanSpace`, no `MetricSpace`. The form that compiles
+  is `ctx.is_small_len((curve.subs(t) - point).magnitude())`. Its sibling
+  `algo/surface.rs:292` *does* carry `MetricSpace` and takes `near_points`.
+  **Same fn name, same shape, different answers.**
+- **Adjudications now live in the survey JSONs**, as a top-level `review` block
+  and a per-row `review` string that `--skeleton` renders into the packet.
+  Holding them as prose here is how the NURBS one nearly got lost.
 
 ## The parallelism picture
 
-62 packets: 38 mechanical, 13 design, 11 wide-mechanical. 49 remain. With
-MESHALGO running the frontier reads **9 eligible, 8 dispatchable in parallel**
-(`schedule.py --running BG-TOL-001-MESHALGO`). Session 7
-demonstrated two workers on write-disjoint packets running concurrently without
-interfering.
+62 packets: 38 mechanical, 13 design, 11 wide-mechanical. 47 remain. Nothing is
+running, so the whole frontier is dispatchable — run `schedule.py` with no
+`--running`. DECORATORS and SMALL are write-disjoint and should go together.
 
-Scheduling is on **write-set disjointness**, not waves. Two of the declared write
-sets were wrong in the same way and it is worth checking for more:
-`BG-CE-006-CYLINDER` and `-CONE` each named only their own new file when both
-must also declare their struct in `specifieds/mod.rs`.
-
-**The binding constraint is still orchestrator packet-writing** — 12 of 62
-packets have a file (12 files close 14 rows; CYL-CONE and TOPO-MOD each closed
-two). But the survey class is measurably eating into it: writing
-`BG-TOL-001-MESHALGO` from a reviewed survey took a fraction of what
-hand-reading `BG-TOL-001-STEPIO`'s 19 call sites cost, and the expensive part
-that remains is judgement, which is the part that should stay here.
+**The binding constraint is now split.** Orchestrator packet-writing is no
+longer the whole story: 15 of 62 packets have a file, and the survey → skeleton
+path makes the next one cheap to *assemble*. What it does not make cheap is the
+judgement, and the CE chain is three **design**-class packets that the
+orchestrator writes entirely by hand. That, plus disk, is what actually gates
+the next session.
 
 ## Traps, each one paid for
 
@@ -665,6 +508,82 @@ reason is in the commit that made the change, and the code will not tell you.
   ~29% is real judgement** -- that ratio, not slot count, is where the leverage
   is.
 
+- **A checker can DROP rows rather than miscount them, and it prints green
+  either way.** `gen_packet.packet_contexts` resolved a site table's file
+  heading against `write_allow` with a bare-basename `endswith`, so a heading of
+  `curve.rs` also matched `polyline_curve.rs`; two candidates made the heading
+  ambiguous, `current` went `None`, and **every row beneath it was skipped
+  silently**. `BG-TOL-001-SMALL` read 6 contexts against a true 7 and
+  `BG-TOL-001-GEOM-DECORATORS` 12 against 14, while the tool printed "all
+  checked claims hold". This is strictly worse than a wrong count: a skipped row
+  is never resolved against the tree, which is the one thing that function
+  exists to do. Fixed — the suffix must land on a `/` boundary, headings are now
+  emitted as repo-relative paths, and an ambiguous heading is reported. **A
+  second bug hid the first:** the no-table path returned a hardcoded `[]` for
+  `unresolved`, so the new ambiguity report could not have fired even once it
+  existed. Watched firing.
+- **GATE-4 counts `unscaled_legacy(` anywhere in the file, comments included.**
+  A `FIXME` that explains why a site cannot be migrated will naturally name the
+  constructor, and doing so inflates the ratchet by one — making a *deferral*
+  read as a migration. The NURBS amendment's own FIXME did exactly this and held
+  GATE-4 at 76 when the tree had 75. Write the constructor's name without its
+  parentheses in prose.
+- **`const fn` blocks a migration completely, and the packet found out from the
+  worker.** `truck-geometry/src/nurbs/mod.rs:186`'s `inv_or_zero` is a
+  `pub const fn`; `ToleranceCtx::unscaled_legacy()` is not const, so no context
+  can exist in that body. The packet's site table demanded the rewrite while its
+  Forbidden clause banned signature changes. The worker dropped `const`, put
+  `BUDGET`-class reasoning in `disagreements`, and was right that both clauses
+  could not hold. Now a named exclusion class, `FIXME(BG-TOL-001, CONST_FN)`.
+  **Grep a shard's site list for `const fn` before writing the packet** — this
+  is the first exclusion where the classification and the rewrite are both
+  *correct* and it is the enclosing item that blocks them.
+- **An interrupted verify leaks its baseline worktree, and that is what actually
+  fills the disk.** `compute_baseline`'s cleanup does not run when the process
+  is killed. Two leaked baselines plus one live one took session 9 from 9.4 GB
+  to 3.1 GB and forced it to abandon a completed-but-for-V9 run. `verify.py`
+  now names them and their size, both in the 8 GB refusal and as a warning while
+  there is still room to act; the deletion is still yours.
+- **`loop/slots/*/target` is only half the disk the loop owns.** Workers create
+  a *second* `target/` **inside** the worktree — `loop/slots/N/wt/target` —
+  despite `CARGO_TARGET_DIR` pointing outside it, and it is the larger of the
+  two: 1.9 GB against 0.9 GB in one slot. Every disk-recovery recipe in these
+  documents named only the outer one and therefore reclaimed less than half of
+  what was there. `slot_status.py --disk` now reports both.
+- **A dead worker can leave its `cmd.exe` shim alive, so a pid check says
+  RUNNING.** Two workers died in an ~8-hour gap in session 9 with their recorded
+  pids still resolving. What separates them is `events.jsonl` mtime *plus*
+  whether any `cargo`/`rustc` exists on the machine at all. `slot_status.py` now
+  shows `DEAD?` when the log has been silent over an hour and no toolchain
+  process exists. **It is a prompt to look, never grounds to reap** — the
+  opposite mis-calibration on `STALLED` is recorded above and cost an hour of
+  correct work.
+- **Never background a verify through a shell wrapper.** `nohup python
+  loop/verify.py ... &` inside a backgrounded compound command either never runs
+  or is orphaned; the wrapper reports exit 0; and the **stale `VERDICT.json`
+  from the previous packet is still sitting in the slot**, ready to be read as
+  this one's. Session 9 read an ACCEPTED verdict for MESHALGO and nearly
+  believed it was NURBS's. Use the harness's own background mechanism, and check
+  `VERDICT.json`'s `base` and `commit` fields match the run you think you are
+  reading. This is the same family as the recorded "do not read a verdict off a
+  background wrapper's exit code" and is a second, sharper instance of it.
+- **`cd` persists across a compound command and `-F` resolves against it.** A
+  `cd` into a slot worktree followed by `git commit -F scratch/msg.txt` looked
+  for the message *inside the worktree* and died with "could not read log file".
+  The existing rule about always using `git -C` is not only about committing to
+  the wrong branch; use absolute paths for `-F` too.
+- **`git add -A` at the repo root sweeps in deliberately-untracked work.** This
+  repo carries a dozen untracked analysis documents, `benchmarks/` outputs and
+  all of `scratch/` — 196 files went into one commit before it was caught and
+  the commit rebuilt from `git add loop/ docs/ scripts/`. Stage the paths the
+  commit is actually about.
+- **`land_packet.py` must run BEFORE the stray `RESULT.json` is deleted.** It
+  reads `RESULT.json` from the repo root — where it arrives on the merge — and
+  files it. Deleting it first (correctly, per the rule two entries down) makes
+  `land_packet` die with `FileNotFoundError`. Order: merge, `land_packet`, then
+  delete. Recovering means copying the filed result back to the root, which
+  works but is silly.
+
 ## The commands
 
 `slot_status.py` prints each slot's branch and short HEAD (`git=branch@sha`),
@@ -767,6 +686,35 @@ The gates, in the order `verify.py` runs them:
 | V6 test-reality | does every `tests_required` name appear as a real test fn in the diff |
 | V7 mutation | stub — always passes |
 | V8 no-regression | stub — always passes |
+
+## The CE chain, scoped against the tree (session 9)
+
+Seven of the nine BG-INV checkers gate on `BG-CE-003` through
+`BG-CE-006-CYL-CONE -> BG-CE-006-ENUM -> BG-CE-001 -> BG-CE-003`. This is
+what the tree says about the last two, as opposed to what the spec says.
+
+- **`BG-CE-001` is mostly assembly and its design is already written.** The
+  spec gives the struct verbatim — add `pcurve: Option<PC>` beside the
+  existing per-use `orientation`, with `PC = ()` defaulting so `None`
+  reproduces today's behaviour. truck's `Edge` is *already* a coedge. The
+  work is a wide ripple: **25 files mention `Edge<` across six crates**
+  (topology 8, shapeops 6, modeling 6, meshalgo 2, assembly 2, stepio 1).
+  That write set is determinable now and getting it wrong is the single most
+  common cause of a V1 rejection in this loop.
+- **`BG-CE-002`'s certification is real math and is not assembly**:
+  `‖Γ_f(pc_u(t)) − c_e(φ_u(t))‖ ≤ τ_e` for **all** t by interval evaluation
+  over the whole span, gated on `BG-ENC-001`. Sampling is the classic false
+  pass and the spec says so.
+- **`BG-CE-003` is half-designed.** `EntityId` is spec'd as an enum, but
+  **`Selector`, `OpId` and `Op` are defined nowhere in the tree** — checked —
+  so `Sel { base, selector }` is a name, not a design. That algebra can be
+  built and property-tested as a standalone module with no truck code
+  involved, and that is where the design risk lives.
+- **One spec correction, found by running its own command:** BG-CE-003's
+  prose says "10 documented deadlock hazards" and its command says expect 12.
+  **12 is right** — exactly 2 each in `edge.rs`, `face.rs`, `shell.rs`,
+  `solid.rs`, `vertex.rs`, `wire.rs`. Fix the prose; a stale number in the
+  item seven checkers gate on will be believed.
 
 ## Open questions
 
