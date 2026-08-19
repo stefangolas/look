@@ -509,7 +509,9 @@ impl StepLength for ModelingCurve {
     fn step_length(&self) -> usize {
         match self {
             ModelingCurve::Line(_) => Line::<Point3>::LENGTH,
-            ModelingCurve::Circle(_) => Processor::<TrimmedCurve<UnitCircle<Point3>>, Matrix4>::LENGTH,
+            ModelingCurve::Circle(_) => {
+                Processor::<TrimmedCurve<UnitCircle<Point3>>, Matrix4>::LENGTH
+            }
             ModelingCurve::BSplineCurve(x) => x.step_length(),
             ModelingCurve::NurbsCurve(x) => x.step_length(),
             ModelingCurve::IntersectionCurve(x) => x.step_length(),
@@ -928,8 +930,85 @@ impl DisplayByStep for ModelingSurface {
                     }
                 }
             }
+            // A placed surface: for an analytic carrier, emit the entity with
+            // the carrier's own placement composed with the processor's matrix;
+            // for any other carrier, transform exactly and emit (BG-CE-006-r2).
+            ModelingSurface::Processor(processor) => {
+                let matrix = *processor.transform();
+                match processor.entity().as_ref() {
+                    ModelingSurface::Cylinder(entity) => fmt_placed_analytic(
+                        idx,
+                        f,
+                        "CYLINDRICAL_SURFACE",
+                        &FloatDisplay(entity.radius()),
+                        matrix.transform_point(entity.center()),
+                        matrix,
+                    ),
+                    ModelingSurface::Cone(entity) => fmt_placed_analytic(
+                        idx,
+                        f,
+                        "CONICAL_SURFACE",
+                        &FloatDisplay(entity.half_angle().tan()),
+                        matrix.transform_point(entity.apex()),
+                        matrix,
+                    ),
+                    ModelingSurface::Sphere(entity) => fmt_placed_analytic(
+                        idx,
+                        f,
+                        "SPHERICAL_SURFACE",
+                        &FloatDisplay(entity.radius()),
+                        matrix.transform_point(entity.center()),
+                        matrix,
+                    ),
+                    ModelingSurface::Torus(entity) => fmt_placed_analytic(
+                        idx,
+                        f,
+                        "TOROIDAL_SURFACE",
+                        &format!(
+                            "{}, {}",
+                            FloatDisplay(entity.large_radius()),
+                            FloatDisplay(entity.small_radius())
+                        ),
+                        matrix.transform_point(entity.center()),
+                        matrix,
+                    ),
+                    inner => {
+                        let transformed = inner.transformed(matrix);
+                        DisplayByStep::fmt(&transformed, idx, f)
+                    }
+                }
+            }
         }
     }
+}
+
+/// Emits an analytic surface entity with the carrier's own placement (axis z,
+/// reference x, location) composed with `matrix` (BG-CE-006-r2).
+///
+/// STEP's `AXIS2_PLACEMENT_3D` takes unit direction ratios, so the composed
+/// axes are normalized; the composition is exact for rigid motions and
+/// degenerate only under a non-uniform scaling matrix.
+fn fmt_placed_analytic(
+    idx: usize,
+    f: &mut Formatter<'_>,
+    entity: &str,
+    payload: &dyn Display,
+    location: Point3,
+    matrix: Matrix4,
+) -> Result {
+    let position_idx = idx + 1;
+    let location_idx = idx + 2;
+    let axis_idx = idx + 3;
+    let ref_direction_idx = idx + 4;
+    let axis = VectorAsDirection(matrix.transform_vector(Vector3::unit_z()).normalize());
+    let ref_direction = VectorAsDirection(matrix.transform_vector(Vector3::unit_x()).normalize());
+    f.write_fmt(format_args!(
+        "#{idx} = {entity}('', #{position_idx}, {payload});
+#{position_idx} = AXIS2_PLACEMENT_3D('', #{location_idx}, #{axis_idx}, #{ref_direction_idx});\n",
+    ))?;
+    DisplayByStep::fmt(&location, location_idx, f)?;
+    DisplayByStep::fmt(&axis, axis_idx, f)?;
+    DisplayByStep::fmt(&ref_direction, ref_direction_idx, f)
 }
 
 impl StepLength for ModelingSurface {
@@ -944,6 +1023,7 @@ impl StepLength for ModelingSurface {
             ModelingSurface::NurbsSurface(x) => x.step_length(),
             ModelingSurface::RevolutedCurve(x) => x.step_length(),
             ModelingSurface::ExtrudedCurve(x) => x.step_length(),
+            ModelingSurface::Processor(x) => x.entity().step_length(),
         }
     }
 }
@@ -981,7 +1061,8 @@ mod stepio_out_emits_analytic_entities_tests {
                 .value,
         );
         let sphere = ModelingSurface::Sphere(Sphere::new(Point3::origin(), UNIT_RADIUS));
-        let torus = ModelingSurface::Torus(Torus::new(Point3::origin(), LARGE_RADIUS, SMALL_RADIUS));
+        let torus =
+            ModelingSurface::Torus(Torus::new(Point3::origin(), LARGE_RADIUS, SMALL_RADIUS));
         assert!(step_text(&cylinder).contains("CYLINDRICAL_SURFACE"));
         assert!(step_text(&cone).contains("CONICAL_SURFACE"));
         assert!(step_text(&sphere).contains("SPHERICAL_SURFACE"));
@@ -992,5 +1073,29 @@ mod stepio_out_emits_analytic_entities_tests {
             Processor::new(trimmed);
         let circle: ModelingCurve = processor.to_same_geometry();
         assert!(step_text(&circle).contains("CIRCLE"));
+    }
+
+    #[test]
+    fn processor_cylinder_emits_cylindrical_surface_with_rotated_placement() {
+        // A rotated cylinder is a placed surface; STEP-out must emit the
+        // `CYLINDRICAL_SURFACE` entity with the carrier's own z axis rotated by
+        // the placement, not the identity axis the bare carrier emits.
+        let cylinder = ModelingSurface::Cylinder(
+            Cylinder::new(Point3::origin(), UNIT_RADIUS)
+                .expect("a unit radius is valid")
+                .value,
+        );
+        let rotation =
+            Matrix4::from_axis_angle(Vector3::unit_x(), Rad(std::f64::consts::FRAC_PI_2));
+        let placed = cylinder.transformed(rotation);
+        let ModelingSurface::Processor(_) = placed else {
+            panic!("a rotated cylinder must become a placed surface");
+        };
+        let text = step_text(&placed);
+        assert!(text.contains("CYLINDRICAL_SURFACE"));
+        // The z axis rotated by 90° about x points along −y; the tiny
+        // cos(π/2) residue is emitted in scientific notation, so the assertion
+        // checks the dominant direction.
+        assert!(text.contains("DIRECTION('', (0.0, -1.0"), "axis: {text}");
     }
 }

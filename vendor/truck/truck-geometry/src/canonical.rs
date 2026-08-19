@@ -206,11 +206,11 @@ impl Curve {
     pub fn lift_up(&self) -> BSplineCurve<Vector4> {
         match self {
             Curve::Line(curve) => Curve::BSplineCurve((*curve).into()).lift_up(),
-            Curve::Circle(processed) => ToSameGeometry::<NurbsCurve<Vector4>>::to_same_geometry(
-                processed,
-            )
-            .non_rationalized()
-            .clone(),
+            Curve::Circle(processed) => {
+                ToSameGeometry::<NurbsCurve<Vector4>>::to_same_geometry(processed)
+                    .non_rationalized()
+                    .clone()
+            }
             Curve::BSplineCurve(curve) => BSplineCurve::new(
                 curve.knot_vec().clone(),
                 curve
@@ -264,6 +264,20 @@ pub enum Surface {
     BSplineSurface(BSplineSurface<Point3>),
     /// 3-dimensional NURBS Surface
     NurbsSurface(NurbsSurface<Vector4>),
+    /// A placed surface: the inner carrier composed with an affine map.
+    /// Exact under affine; the honest home for a transformed z-canonical
+    /// carrier (BG-CE-006-r2).
+    ///
+    /// Center/apex-only transforms were rejected for the analytic carriers:
+    /// under a rotation they silently move the wrong point and produce a
+    /// surface that is not the transformed image. A rotation or general
+    /// affine map therefore wraps the carrier here, where every parameter
+    /// evaluation, derivative and inverse composes the map exactly.
+    ///
+    /// The inner carrier is boxed: `Processor` stores its entity inline, so
+    /// `Processor<Surface, Matrix4>` would be a recursive type of infinite
+    /// size (BG-CE-006-r2 deviation).
+    Processor(Processor<Box<Surface>, Matrix4>),
 }
 
 macro_rules! derive_surface_method {
@@ -278,22 +292,7 @@ macro_rules! derive_surface_method {
             Self::ExtrudedCurve(got) => $method(got, $($ver), *),
             Self::BSplineSurface(got) => $method(got, $($ver), *),
             Self::NurbsSurface(got) => $method(got, $($ver), *),
-        }
-    };
-}
-
-macro_rules! derive_surface_self_method {
-    ($surface: expr, $method: expr, $($ver: ident),*) => {
-        match $surface {
-            Self::Plane(got) => Self::Plane($method(got, $($ver), *)),
-            Self::Cylinder(got) => Self::Cylinder($method(got, $($ver), *)),
-            Self::Cone(got) => Self::Cone($method(got, $($ver), *)),
-            Self::Sphere(got) => Self::Sphere($method(got, $($ver), *)),
-            Self::Torus(got) => Self::Torus($method(got, $($ver), *)),
-            Self::RevolutedCurve(got) => Self::RevolutedCurve($method(got, $($ver), *)),
-            Self::ExtrudedCurve(got) => Self::ExtrudedCurve($method(got, $($ver), *)),
-            Self::BSplineSurface(got) => Self::BSplineSurface($method(got, $($ver), *)),
-            Self::NurbsSurface(got) => Self::NurbsSurface($method(got, $($ver), *)),
+            Self::Processor(got) => $method(got, $($ver), *),
         }
     };
 }
@@ -307,11 +306,97 @@ impl ParametricSurface3D for Surface {
 
 impl Transformed<Matrix4> for Surface {
     fn transform_by(&mut self, trans: Matrix4) {
-        derive_surface_method!(self, Transformed::transform_by, trans);
+        *self = self.transformed(trans);
     }
     fn transformed(&self, trans: Matrix4) -> Self {
-        derive_surface_self_method!(self, Transformed::transformed, trans)
+        match self {
+            // BG-CE-006-r2: the analytic carriers are placed exactly. A
+            // matrix whose linear part is exactly the identity is a
+            // translation: move the placement point and keep the scalars.
+            // Any other affine map is not representable by the bare carrier
+            // (a center/apex-only transform is silently wrong under
+            // rotation), so the carrier is placed instead.
+            Self::Cylinder(entity) => {
+                transform_analytic_carrier(*entity, trans, |cylinder, matrix| {
+                    Cylinder::new(matrix.transform_point(cylinder.center()), cylinder.radius())
+                        .map(|cylinder| cylinder.value)
+                })
+            }
+            Self::Cone(entity) => transform_analytic_carrier(*entity, trans, |cone, matrix| {
+                Cone::new(matrix.transform_point(cone.apex()), cone.half_angle())
+                    .map(|cone| cone.value)
+            }),
+            Self::Sphere(entity) => transform_analytic_carrier(*entity, trans, |sphere, matrix| {
+                Ok(Sphere::new(
+                    matrix.transform_point(sphere.center()),
+                    sphere.radius(),
+                ))
+            }),
+            Self::Torus(entity) => transform_analytic_carrier(*entity, trans, |torus, matrix| {
+                Ok(Torus::new(
+                    matrix.transform_point(torus.center()),
+                    torus.large_radius(),
+                    torus.small_radius(),
+                ))
+            }),
+            Self::Processor(processor) => Self::Processor(processor.transformed(trans)),
+            Self::Plane(entity) => Self::Plane(entity.transformed(trans)),
+            Self::RevolutedCurve(entity) => Self::RevolutedCurve(entity.transformed(trans)),
+            Self::ExtrudedCurve(entity) => Self::ExtrudedCurve(entity.transformed(trans)),
+            Self::BSplineSurface(entity) => Self::BSplineSurface(entity.transformed(trans)),
+            Self::NurbsSurface(entity) => Self::NurbsSurface(entity.transformed(trans)),
+        }
     }
+}
+
+/// Whether the 3×3 linear part of `matrix` is exactly the identity (no
+/// epsilon; a placement built from translations and z-rotations compares
+/// exactly, and an approximate match must not be trusted to keep the carrier
+/// intact).
+#[inline(always)]
+fn identity_linear_part(matrix: Matrix4) -> bool {
+    matrix[0][0] == 1.0
+        && matrix[0][1] == 0.0
+        && matrix[0][2] == 0.0
+        && matrix[1][0] == 0.0
+        && matrix[1][1] == 1.0
+        && matrix[1][2] == 0.0
+        && matrix[2][0] == 0.0
+        && matrix[2][1] == 0.0
+        && matrix[2][2] == 1.0
+}
+
+/// The transformed analytic carrier (BG-CE-006-r2).
+///
+/// Under a matrix with an identity linear part, `rebuild` moves the placement
+/// point and keeps the scalars; under any other affine map the carrier is
+/// placed — `Processor::with_transform(entity, matrix)` — where every
+/// evaluation composes the map exactly. The bare-carrier failure arm is for
+/// totality: a translated valid carrier cannot violate its scalar invariants.
+#[inline(always)]
+fn transform_analytic_carrier<E>(
+    entity: E,
+    matrix: Matrix4,
+    rebuild: impl FnOnce(E, Matrix4) -> std::result::Result<E, Refusal>,
+) -> Surface
+where
+    E: Copy + Into<Surface>,
+{
+    if identity_linear_part(matrix) {
+        match rebuild(entity, matrix) {
+            Ok(rebuilt) => rebuilt.into(),
+            Err(_) => placed_surface(entity.into(), matrix),
+        }
+    } else {
+        placed_surface(entity.into(), matrix)
+    }
+}
+
+/// A placed surface: the carrier composed with an affine map, boxed because
+/// `Processor` stores its entity inline (BG-CE-006-r2).
+#[inline(always)]
+fn placed_surface(surface: Surface, matrix: Matrix4) -> Surface {
+    Surface::Processor(Processor::with_transform(Box::new(surface), matrix))
 }
 
 // The analytic carriers are bare and stateless, so a `Matrix4` transform can
@@ -687,10 +772,17 @@ impl IncludeCurve<Curve> for Surface {
                 spent: Budget::new(0, 0, 0),
                 witness: UnresolvedWitness::UncertifiedContainment,
             }),
+            // A placed surface's containment question is its carrier's, which
+            // the analytic carriers refuse honestly for now; the spline
+            // carriers are reached through their own arms above, never wrapped
+            // here (BG-CE-006-r2).
+            Surface::Processor(_) => Err(Refusal::NumericallyUnresolved {
+                spent: Budget::new(0, 0, 0),
+                witness: UnresolvedWitness::UncertifiedContainment,
+            }),
         }
     }
 }
-
 impl Surface {
     /// BG-S0-001: `include` of an `IntersectionCurve` must not abort.
     ///
@@ -846,6 +938,9 @@ impl SearchNearestParameter<D2> for Surface {
                 };
                 algo::surface::search_nearest_parameter(rotted, point, hint, trials)
             }
+            Surface::Processor(processor) => {
+                processor.search_nearest_parameter(point, hint, trials)
+            }
         }
     }
 }
@@ -875,7 +970,12 @@ impl ToSameGeometry<Surface> for ExtrudedCurve<Curve, Vector3> {
                 // from z-rotations and translations and compare exactly), and
                 // any failure degrades to the homotopy NURBS — exactly the
                 // pre-packet behaviour for every circle.
-                let Matrix4 { x: m1, y: m2, z: m3, w: tw } = *c0.transform();
+                let Matrix4 {
+                    x: m1,
+                    y: m2,
+                    z: m3,
+                    w: tw,
+                } = *c0.transform();
                 let radius = m1.magnitude();
                 let t = tw.to_point();
                 if m1.z == 0.0
@@ -1323,6 +1423,50 @@ mod extruded_circle_tests {
                     continue;
                 }
                 assert_near!(a, b);
+            }
+        }
+    }
+}
+
+#[cfg(test)]
+// BG-CE-006-r2 tests. The carriers and transforms are hand-built witnesses —
+// not paths reachable from untrusted geometry — so the mandatory H-1 lints on
+// unwrap/expect/panic do not apply to the assertions here.
+#[allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
+mod placed_analytic_transform_tests {
+    use super::*;
+    use std::f64::consts::{FRAC_PI_2, TAU};
+
+    #[test]
+    fn placed_analytic_transform_goes_to_processor() {
+        // A translation has an exactly-identity linear part, so the bare
+        // carrier survives and its center moves.
+        let cylinder = Cylinder::new(Point3::origin(), 1.5)
+            .expect("a unit-scale radius is valid")
+            .value;
+        let translation = Matrix4::from_translation(Vector3::new(2.0, -3.0, 4.0));
+        let moved = Surface::Cylinder(cylinder).transformed(translation);
+        let Surface::Cylinder(moved) = moved else {
+            panic!("a translation must keep the bare cylinder");
+        };
+        assert_near!(moved.center(), Point3::new(2.0, -3.0, 4.0));
+        assert_near!(moved.radius(), 1.5);
+
+        // A rotation has a non-identity linear part, so the carrier must be
+        // placed rather than silently deformed: `Surface::Processor`, whose
+        // point set is the rotated original.
+        let rotation = Matrix4::from_axis_angle(Vector3::unit_z(), Rad(FRAC_PI_2));
+        let rotated = Surface::Cylinder(cylinder).transformed(rotation);
+        let Surface::Processor(placed) = rotated else {
+            panic!("a rotated cylinder must become a placed surface");
+        };
+        const SAMPLES: usize = 16;
+        for i in 0..=SAMPLES {
+            for j in 0..=SAMPLES {
+                let u = TAU * i as f64 / SAMPLES as f64;
+                let v = j as f64 / SAMPLES as f64;
+                let expected = rotation.transform_point(cylinder.subs(u, v));
+                assert_near!(placed.subs(u, v), expected);
             }
         }
     }

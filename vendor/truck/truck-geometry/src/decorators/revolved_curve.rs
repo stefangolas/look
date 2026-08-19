@@ -60,11 +60,23 @@ impl Revolution {
         let (p, q) = (p - self.origin, q - self.origin);
         let hp = (p - p.dot(self.axis) * self.axis).normalize();
         let hq = (q - q.dot(self.axis) * self.axis).normalize();
-        let t = f64::acos(f64::clamp(hp.dot(hq), -1.0, 1.0));
-        match hp.cross(hq).dot(self.axis) < 0.0 {
-            false => t,
-            true => 2.0 * PI - t,
-        }
+        // The signed angle from `hp` to `hq` about the axis, in (−π, π].
+        //
+        // The old `acos` + cross-product-sign test flipped between ~0 and 2π
+        // on the sign noise of a near-zero cross product: a point on the
+        // profile plane (v ≈ 0, the plane where `hp` and `hq` coincide) came
+        // back as ~0 or ~2π depending on rounding, so consecutive inverse
+        // lookups landed on opposite branches of the periodic parameter and
+        // flipped boundary orientation (BG-CE-006-r2). `atan2` measures the
+        // same angle continuously; a point near the profile plane returns ~0
+        // rather than ~2π. The result is negative for points ahead of the
+        // profile plane, which is a legitimate representative of a periodic
+        // parameter: `subs` is periodic, and `search_parameter` promises an
+        // inverse, not a branch.
+        f64::atan2(
+            hp.cross(hq).dot(self.axis),
+            f64::clamp(hp.dot(hq), -1.0, 1.0),
+        )
     }
 }
 
@@ -251,7 +263,8 @@ impl<C: ParametricCurve3D + BoundedCurve> SearchParameter<D1> for ProjectedCurve
         hint: H,
         trials: usize,
     ) -> Option<f64> {
-        let hint = match hint.into() {
+        let hint = hint.into();
+        let search_hint = match hint {
             SPHint1D::Parameter(t) => t,
             SPHint1D::Range(x, y) => {
                 algo::curve::presearch(self, point, (x, y), PRESEARCH_DIVISION)
@@ -267,7 +280,8 @@ impl<C: ParametricCurve3D + BoundedCurve> SearchParameter<D1> for ProjectedCurve
                 )
             }
         };
-        algo::curve::search_parameter(self, point, hint, trials)
+        algo::curve::search_parameter(self, point, search_hint, trials)
+            .map(|t| normalize_branch(t, self.curve.period(), self.range_tuple().0, hint))
     }
 }
 
@@ -279,7 +293,8 @@ impl<C: ParametricCurve3D + BoundedCurve> SearchNearestParameter<D1> for Project
         hint: H,
         trials: usize,
     ) -> Option<f64> {
-        let hint = match hint.into() {
+        let hint = hint.into();
+        let search_hint = match hint {
             SPHint1D::Parameter(t) => t,
             SPHint1D::Range(x, y) => {
                 algo::curve::presearch(self, point, (x, y), PRESEARCH_DIVISION)
@@ -295,7 +310,8 @@ impl<C: ParametricCurve3D + BoundedCurve> SearchNearestParameter<D1> for Project
                 )
             }
         };
-        algo::curve::search_nearest_parameter(self, point, hint, trials)
+        algo::curve::search_nearest_parameter(self, point, search_hint, trials)
+            .map(|t| normalize_branch(t, self.curve.period(), self.range_tuple().0, hint))
     }
 }
 
@@ -409,6 +425,7 @@ impl<C: ParametricCurve3D + BoundedCurve> SearchParameter<D2> for RevolutedCurve
                 SPHint2D::None => None,
             };
             let t = proj_curve.search_parameter(p, hint0, trials)?;
+            let t = normalize_branch(t, self.curve.period(), t0, hint0);
             let p_eval = self.curve.subs(t);
             let p_rad = p_eval - self.origin();
             let r_vec = p_rad - p_rad.dot(self.axis()) * self.axis();
@@ -468,6 +485,7 @@ impl<C: ParametricCurve3D + BoundedCurve> SearchNearestParameter<D2> for Revolut
                 SPHint2D::None => SPHint1D::None,
             };
             let t = proj_curve.search_nearest_parameter(p, hint0, trials)?;
+            let t = normalize_branch(t, self.curve.period(), t0, hint0);
             let p = self.curve.subs(t);
             Some((t, self.revolution.proj_angle(p, point)))
         }
@@ -701,6 +719,20 @@ where
     }
 }
 
+fn normalize_branch(t: f64, period: Option<f64>, t0: f64, hint: SPHint1D) -> f64 {
+    let Some(period) = period.filter(|p| *p > 0.0 && p.is_finite()) else {
+        return t;
+    };
+    match hint {
+        // No hint: fold the result into the profile's principal period.
+        SPHint1D::None => t0 + (t - t0).rem_euclid(period),
+        // A hint names the branch the caller is on: shift by whole periods to
+        // the copy nearest it.
+        SPHint1D::Parameter(hint) => t - ((t - hint) / period).round() * period,
+        SPHint1D::Range(hint0, _) => t - ((t - hint0) / period).round() * period,
+    }
+}
+
 fn from_axis_angle_derivation(n: usize, axis: Vector3, angle: Rad<f64>) -> Matrix3 {
     let (s, c) = Rad::sin_cos(angle);
     let (s, c) = match n % 4 {
@@ -784,5 +816,59 @@ mod parameter_division_bounds {
         assert!(circle.len() < 200, "too fine: {}", circle.len());
         assert_eq!(circle.first(), Some(&0.0));
         assert_eq!(circle.last(), Some(&(2.0 * PI)));
+    }
+}
+
+#[cfg(test)]
+// BG-CE-006-r2: the projection search on a periodic profile must return
+// branch-consistent parameters, or a sweep boundary's successive inverse
+// lookups land on arbitrary period copies and flip boundary orientation.
+mod periodic_profile_search_tests {
+    use super::*;
+    use std::f64::consts::TAU;
+
+    /// A revolved surface whose profile is a placed full-range unit circle at
+    /// radius two: periodic with period `TAU`, the profile that used to return
+    /// `−10π` and `11π` for the same point.
+    fn revolved_circle_profile() -> RevolutedCurve<Curve> {
+        let trimmed = TrimmedCurve::new(UnitCircle::<Point3>::new(), (0.0, TAU));
+        let placement = Matrix4::from_translation(Vector3::new(2.0, 0.0, 0.0));
+        let profile = Processor::with_transform(trimmed, placement).to_same_geometry();
+        RevolutedCurve::by_revolution(profile, Point3::origin(), Vector3::unit_z())
+    }
+
+    #[test]
+    fn search_parameter_is_branch_consistent_for_periodic_profiles() {
+        let surface = revolved_circle_profile();
+        let point = surface.subs(1.0, 2.0);
+
+        // With a hint in the principal branch, the result stays within half a
+        // period of it.
+        let (u, _) = surface
+            .search_parameter(point, (1.0, 2.0), 100)
+            .expect("the sample point is on the surface");
+        assert!(
+            (u - 1.0).abs() <= TAU / 2.0,
+            "hinted search drifted off branch: u = {u}"
+        );
+
+        // Without a hint, the result lies in the profile's principal period
+        // `[0, TAU)` instead of an arbitrary period copy.
+        let (u0, _) = surface
+            .search_parameter(point, None, 100)
+            .expect("the sample point is on the surface");
+        assert!(
+            (0.0..TAU).contains(&u0),
+            "hintless search left the principal period: u0 = {u0}"
+        );
+
+        // A hint on the found branch reproduces it.
+        let (u1, _) = surface
+            .search_parameter(point, Some((u0, 2.0)), 100)
+            .expect("the sample point is on the surface");
+        assert!(
+            (u1 - u0).abs() <= TAU / 2.0,
+            "search returned an inconsistent branch: u0 = {u0}, u1 = {u1}"
+        );
     }
 }

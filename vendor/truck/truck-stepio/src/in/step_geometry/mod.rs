@@ -444,7 +444,7 @@ pub enum Surface {
 
 impl truck_stepio::out::DisplayByStep for Surface {
     fn fmt(&self, idx: usize, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        use Surface::*;
+        use self::Surface::*;
         match self {
             ElementarySurface(x) => x.fmt(idx, f),
             SweptCurve(x) => x.fmt(idx, f),

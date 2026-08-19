@@ -886,8 +886,10 @@ mod tsweep_circle_tests {
         // conversion produced) at sampled parameters, within house tolerance.
         let trsl = Matrix4::from_translation(vector);
         let circle1 = circle.transformed(trsl);
-        let reference =
-            NurbsSurface::new(BSplineSurface::homotopy(circle.lift_up(), circle1.lift_up()));
+        let reference = NurbsSurface::new(BSplineSurface::homotopy(
+            circle.lift_up(),
+            circle1.lift_up(),
+        ));
         const SAMPLES: usize = 16;
         for i in 0..=SAMPLES {
             for j in 0..=SAMPLES {
@@ -910,5 +912,3 @@ mod tsweep_circle_tests {
         }
     }
 }
-
-
