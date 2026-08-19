@@ -733,6 +733,27 @@ def main():
             # at". A gate that cannot see must not report PASS.
             unlinted = [c for c in crate_names
                         if re.search(r'could not compile `' + re.escape(c) + '`', clippy_text)]
+            # ...but "could not compile" does NOT always mean "was not linted".
+            # truck-meshalgo's lib.rs carries `#![deny(clippy::all,
+            # rust_2018_idioms)]`, so its ~93 PRE-EXISTING lints are hard errors
+            # no matter what this gate puts on the command line, and cargo then
+            # reports "could not compile `truck-meshalgo` (lib) due to 93
+            # previous errors". The crate was linted -- exhaustively -- and every
+            # finding is right there in the output; the build merely aborted
+            # afterwards. Treating that as "never produced" made V3 unpassable
+            # for ANY packet touching this crate, at base or otherwise, which is
+            # the baseline-failure signature the whole gate design warns about:
+            # BG-TOL-001-MESHALGO was rejected this way with all 93 findings in
+            # files its diff never opened.
+            #
+            # The distinction that matters is lint-abort vs. genuine build
+            # failure, and rustc marks the difference: a real compile error
+            # carries an `error[E####]` code, a lint never does. So only treat a
+            # crate as unlinted when an E-coded diagnostic is present -- then
+            # "no findings" really does mean "nothing was looked at" and the
+            # coverage guard keeps doing its job.
+            if unlinted and not re.search(r'error\[E\d+\]', clippy_text):
+                unlinted = []
             # A packet may also change a file in a crate it did not name, which
             # -p never reaches. V1 allows it, so V3 has to notice it.
             changed_crates = set()

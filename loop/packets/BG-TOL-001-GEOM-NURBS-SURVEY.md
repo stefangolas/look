@@ -22,7 +22,7 @@ budget:      {turns: 60, ctx_tokens: 150000}
 
 ## What this is and why it is not a code change
 
-`truck-geometry` holds at least 35 tolerance predicates across 35 functions, and each one
+`truck-geometry` holds at least 69 tolerance predicates across 35 functions, and each one
 has to be classified **`model`** (a length in model space — it must scale when
 the model does) or **`param`** (dimensionless — a ratio, a sine, an angle, a
 normalized parameter, a weight, a scale factor — it must *not* scale). That
@@ -108,7 +108,7 @@ migrated a comment.
 
 ## Where the sites are
 
-**At least 35 production predicates across 35 functions.** This inventory is
+**At least 69 production predicates across 35 functions.** This inventory is
 generated from `loop/census_tol_sites.py` at the moment this packet was written.
 It is your **starting point, not your answer** -- and it is known to be a floor,
 not a count. Find every site yourself with

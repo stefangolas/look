@@ -43,12 +43,41 @@ def census(fragment):
         mm = re.match(r'\s{2}(\S+\.rs)\s+(\S+):(\d+)\s*$', line)
         if mm:
             files.setdefault(mm.group(1), []).append(mm.group(2))
-    # site totals come from the per-crate table
+    # Site totals cannot come from the per-crate table: a fragment like
+    # `nurbs` is a SUBTREE of truck-geometry, and the table reports the whole
+    # crate. Count the fragment's own production sites directly, with the same
+    # rules the census uses, so a subtree shard gets its own number. Counting
+    # functions and labelling them "predicates" (the first version of this)
+    # understates every shard -- a function may hold several sites -- and a
+    # worker told "at least 35" when the truth is higher may stop early.
     sites = 0
-    for line in out.splitlines():
-        row = re.match(r'^(truck-\S+)\s+(\d+)\s', line)
-        if row and any(row.group(1) in f for f in [fragment]) :
-            sites = int(row.group(2))
+    for dirpath, _, names in os.walk(REPO_ROOT / 'vendor' / 'truck'):
+        d = dirpath.replace(os.sep, '/')
+        if '/src' not in d:
+            continue
+        for n in names:
+            if not n.endswith('.rs'):
+                continue
+            full = os.path.join(dirpath, n)
+            if fragment not in full.replace(os.sep, '/'):
+                continue
+            in_block = False
+            for raw in open(full, encoding='utf-8', errors='replace'):
+                t = raw.strip()
+                was = in_block
+                if '/*' in t and '*/' not in t.split('/*', 1)[1]:
+                    in_block = True
+                elif '*/' in t and was:
+                    in_block = False
+                    continue
+                if was or in_block:
+                    continue
+                if t.startswith('//') or t.startswith('#['):
+                    continue
+                if re.search(r'\.near2\(|\bso_small2\(|\bTOLERANCE2\b', raw):
+                    continue
+                if re.search(r'\.near\(|\bso_small\(|\bTOLERANCE\b', raw):
+                    sites += 1
     return sites, nfun, files
 
 
@@ -71,13 +100,17 @@ def main():
     subs = [s.strip() for s in args.subtree.split(',') if s.strip()]
 
     total_fun = 0
+    site_counts = []
     inventory = collections.OrderedDict()
     for f in frags:
-        _, nfun, files = census(f)
+        nsite, nfun, files = census(f)
+        site_counts.append(nsite)
         total_fun += nfun
         for k, v in files.items():
             inventory.setdefault(k, []).extend(v)
-    total_sites = sum(len(v) for v in inventory.values())
+    # NOT sum(len(functions)) -- that is the function count wearing a
+    # predicate's label. Measured per fragment above.
+    total_sites = sum(site_counts)
 
     tpl = TEMPLATE.read_text(encoding='utf-8')
 
