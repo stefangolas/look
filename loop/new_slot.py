@@ -26,6 +26,10 @@ def main():
     ap.add_argument('--slot', type=int, required=True)
     ap.add_argument('--branch', required=True)
     ap.add_argument('--min-free-gb', type=float, default=8)
+    ap.add_argument('--no-warm', action='store_true',
+                    help='skip the cargo warm build. Use for a class: survey slot -- '
+                         'the worker never runs cargo and verify.py skips every cargo gate, '
+                         'so warming costs ~5.6 min and ~1 GB for nothing.')
     args = ap.parse_args()
 
     slot_root = REPO_ROOT / 'loop' / 'slots' / str(args.slot)
@@ -100,6 +104,21 @@ def main():
     env = dict(os.environ)
     env['CARGO_INCREMENTAL'] = '0'
     env['CARGO_TARGET_DIR'] = str(target_dir)
+
+    # A `class: survey` slot must not be warmed. A survey worker has no write
+    # access to vendor/truck/** and never invokes cargo at all -- it reads
+    # source and writes SURVEY.json -- so the warm build buys it nothing and
+    # costs ~5.6 min and ~0.8-2 GB of target/ per slot. Forking three survey
+    # slots warmed took free disk from 15 GB to 8.2 GB, exactly the floor below
+    # which new_slot itself refuses to run, for no benefit whatsoever. The
+    # verifier agrees by construction: verify.py runs only V0, V1 and V10 on a
+    # survey and skips every cargo gate.
+    if args.no_warm:
+        print(f"Slot {args.slot} ({wt}) ready, NOT warmed (--no-warm).")
+        print("  A survey slot needs no target/: the worker never runs cargo, and")
+        print("  verify.py skips every cargo gate for class: survey.")
+        print(f"Free disk: {shutil.disk_usage('C:\\\\').free / 2**30:.1f} GB")
+        return
 
     print(f"Warming slot {args.slot} ({wt}), target={target_dir} ...")
     start = time.monotonic()
