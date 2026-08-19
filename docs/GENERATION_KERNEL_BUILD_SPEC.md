@@ -470,6 +470,11 @@ the error changes at 1 and only one side is unsafe.
 - Unit: attempting `Proven` with a provisional token fails to compile (trybuild).
 - Property: `Modulus` composition matches numeric evaluation —
   `(ω₂∘ω₁)(ε) == ω₂(ω₁(ε))` within float tolerance, over random ε.
+- Property (added 2026-08-19): `compose` is **associative** on subadditive
+  chains — `(ω₁∘ω₂)∘ω₃` and `ω₁∘(ω₂∘ω₃)` evaluate equal over random ε, and
+  both equal the nested application. This pins the order-dependence of (M5)
+  to the constants, not to the grouping; an implementation that gets
+  associativity wrong is composing the wrong operand into the exponent.
 - **Property, BG-EVD-004 and the one that catches the r2 bug:** for random chains
   of subadditive moduli, `propagate` ≤ the split bound (the recurrence is never
   looser). For a chain containing a `Pole` modulus, assert the split bound can be
@@ -506,6 +511,21 @@ near-degenerate cell publishes — but that correspondence lives in prose.
   witness**, not as a naked enum. The pairing is the contract: a
   `Certified<Modulus>` whose certificate names the configuration it was derived
   from and the quantity that decided it.
+
+**The governing identity (recorded 2026-08-19 after external review).** The
+moduli are not a tolerance-propagation utility; they are the kernel's
+conditioning framework, and the whole error story is one equation:
+
+$$\varepsilon_{\text{out}} \;=\; \omega_{\text{op}}\big(\varepsilon_{\text{in}}\big) \;+\; \tau_{\text{rep}}$$
+
+— *result uncertainty = conditioning of the operation ∘ input uncertainty +
+representation error*. BG-EVD-004/005 make the $\omega_{\text{op}}$ factor
+honest (the algebra, then the geometric witness); BG-TOL-005 makes the
+$\varepsilon_{\text{in}}$ factor honest (the certified $J_S$ bridge, so input
+uncertainty is stated in model space, not in whatever units the chart
+happens to use); $\tau_{\text{rep}}$ is BG-TOL-001's budget. Items below that
+publish bounds should read against this identity: every term of it is either
+certified or the result is a refusal.
 - The intersection cells owe, at minimum, this table, each row backed by
   evidence rather than by the author's belief:
 
@@ -942,10 +962,27 @@ Torus.
 ```rust
 pub enum Surface {
     Plane(Plane), Cylinder(Cylinder), Cone(Cone), Sphere(Sphere), Torus(Torus),
-    Revolved(RevolutedCurve<Curve>), Extruded(ExtrudedCurve<Curve>),
-    BSpline(BSplineSurface<Point3>), Nurbs(NurbsSurface<Vector4>),
+    RevolutedCurve(RevolutedCurve<Curve>),
+    ExtrudedCurve(ExtrudedCurve<Curve, Vector3>),   // reserved; BG-CE-007 emits it
+    BSplineSurface(BSplineSurface<Point3>), NurbsSurface(NurbsSurface<Vector4>),
 }
 ```
+
+**Amendment (2026-08-19, session 10): payload-naming, not short names.** The
+sketch above originally read `Revolved/Extruded/BSpline/Nurbs`; the dispatched
+packet keeps payload-naming (`RevolvedCurve`, `ExtrudedCurve`,
+`BSplineSurface`, `NurbsSurface`) — the convention `Curve` already follows —
+so the one breaking release does not also churn every construction site.
+`RevolvedCurve`'s payload drops the legacy identity `Processor` wrapper (the
+sole construction site wrapped with `Processor::new`, i.e. identity;
+`RevolutedCurve` carries its own `origin`/`axis`). `ExtrudedCurve` is added
+**reserved**: no conversion emits it until BG-CE-007, so this is the last
+breaking data-model release. `Curve` gains
+`Circle(Processor<TrimmedCurve<UnitCircle<Point3>>, Matrix4>)` — exactly the
+type the existing circle conversion consumed and degraded to NURBS; the
+conversion now preserves it, and a representable (z-canonical placement,
+z-extrusion) circle pair extrudes to `Cylinder` rather than a homotopy
+B-spline.
 
 **Why this is Stage 1 and not later.** §16.1 needs cylinder→cylinder ($r \pm d$)
 and cone→cone (shifted apex) in closed form. Once code depends on a NURBS
@@ -1024,6 +1061,15 @@ the formal system is an enclosure over a box, so Stages 3+ are *unimplementable*
 without this — not merely uncertified.
 
 ### BG-ENC-001 — Enclosure traits
+
+**Status (2026-08-19).** The substrate **landed** with P-6 (2026-08-15) as
+`vendor/truck/truck-evidence/src/{enclosure,harness,plane}.rs` on `inari`
+(no-GMP), with the sampling soundness harness and the `Plane` carrier as the
+reference impl. It has no `PACKETS.jsonl` row because it predates the graph —
+a session-10 handoff calling BG-ENC-001 "unwritten" was stale. The open ENC
+work is the carriers: BG-ENC-002 (analytic), BG-ENC-003 (splines), BG-ENC-004
+(decorators), all of which gate on BG-CE-006-ENUM so enclosures are written
+against the canonical carrier set.
 
 **Design decision: a parallel interface, not a rewrite.** The existing `f64`
 traits survive untouched as the fast path. This is what production kernels do.
