@@ -184,6 +184,36 @@ crate. If you find one, that is an `ANCHOR_MISMATCH`.
 New file `vendor/truck/truck-stepio/tests/tolerance_stepio.rs`. Each must be a
 named `#[test]` fn.
 
+**Its first line must be `#![deny(clippy::unwrap_used)]`.** GATE-1 (H-1)
+requires it of every new module under `vendor/truck/`, including test files, and
+`scripts/kernel-gates.sh` fails the packet without it. Every landed shard's test
+file carries it -- see `truck-shapeops/tests/tolerance_migration.rs` and
+`truck-geometry/tests/tolerance_nurbs.rs`. Write your tests so the attribute
+costs nothing: return `Result` or match rather than `unwrap`. This line is
+called out because a previous shard's packet omitted it and the omission -- the
+orchestrator's, not the worker's -- cost a full round trip.
+
+## The ratchet -- read this before you commit
+
+`scripts/kernel-gates.sh` counts `unscaled_legacy(` call sites in
+`vendor/truck/*/src/**` and **fails when the total exceeds the ceiling** in
+`scripts/unscaled_legacy_ceiling.txt`. The ceiling has been raised to **111**,
+covering the 75 already in the tree plus this packet's 15 and the budgets of the
+two sibling shards dispatched alongside it. That file is **not** on your
+allowlist and you must not edit it -- a packet that can move its own ceiling is
+not constrained by anything.
+
+Fifteen is a budget and it is exact, not an allowance: one context per function
+containing a migrated site. **If you cannot reach it honestly, say so and
+stop.** A previous shard's packet demanded 11 contexts when the truth was 10 and
+its worker built a shadow `let ctx = ...` inside a `match` arm to satisfy the
+number. It was obeying a packet that was wrong. A `disagreements` entry with
+code `BUDGET_WRONG` is worth more here than a green gate.
+
+Note also that **GATE-4 counts the token `unscaled_legacy(` anywhere in the
+file, comments included** -- so do not write the constructor's name with its
+parentheses inside a comment, or you will inflate the ratchet by one.
+
 1. `every_migrated_stepio_site_is_marked` — read the five source files with
    `include_str!` and assert the number of `// BG-TOL-001:` markers equals the
    number of sites you migrated, and that no `.near(`/`so_small(`/`TOLERANCE`
