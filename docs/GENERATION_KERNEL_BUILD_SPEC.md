@@ -482,6 +482,138 @@ the error changes at 1 and only one side is unsafe.
 - Unit: `eval` past `domain` returns `None`, and `propagate` turns that into
   `CompositionMarginExhausted` naming the step index — not a saturated value.
 
+### BG-EVD-005 — A published modulus needs a geometric certificate
+
+**Implements** §18 alongside BG-EVD-004. **Raised by external review,
+2026-08-19.** Blocks nothing today and should not wait long.
+
+**Problem.** BG-EVD-004 constrains the modulus *algebra* — (M1) ω(0)=0, (M2)
+nondecreasing, (M3) validity on `[0, domain)`, (M4) subadditivity decided from
+the shape, (M5) the composition constants. Every one of those is a statement
+about arithmetic. **Nothing anywhere says a cell must publish the modulus its
+geometry actually has.** A tangential intersection may publish
+`Lipschitz(1.0)`, every gate stays green, and every bound downstream of it is
+wrong. Given that (M5) records the composition arithmetic itself being wrong for
+a whole revision without a test noticing, "cells publish honestly" being
+entirely unenforced is the larger exposure of the two.
+
+The shapes were chosen for specific geometric configurations — the `Holder`
+doc comment says "Tangency is p = 1/2" and `Pole` is documented as what a
+near-degenerate cell publishes — but that correspondence lives in prose.
+
+**Contract.**
+- **BG-EVD-005** An operation that publishes a `Modulus` publishes it **with a
+  witness**, not as a naked enum. The pairing is the contract: a
+  `Certified<Modulus>` whose certificate names the configuration it was derived
+  from and the quantity that decided it.
+- The intersection cells owe, at minimum, this table, each row backed by
+  evidence rather than by the author's belief:
+
+  | configuration | admissible modulus | the deciding quantity |
+  |---|---|---|
+  | transverse | `Lipschitz(k)` | a lower bound on the crossing angle / the transversality λ |
+  | near-tangent | `Pole { k }` with a finite domain | how close λ comes to zero, and where |
+  | tangency | `Holder { k, p = 1/2 }` | a nonzero Hessian eigenvalue at the tangency (§9.2.2) |
+  | coincident / non-identifiable | `Unbounded`, or a refusal | failure to separate the branches |
+
+- A cell that cannot produce the witness publishes `Unbounded` or refuses. It
+  does **not** publish a shape it cannot justify. `Unbounded` already means "no
+  bound is published" and is the honest fallback.
+- The rule this replaces is the one the loop keeps paying for in other forms:
+  **a claim that no gate can check is a claim that will eventually be false.**
+
+**Tests.**
+- Unit, one per row: build the configuration, assert the published shape is the
+  admissible one, and assert the witness is present and non-vacuous.
+- **Negative, and this is the point of the item:** a cell hand-built to publish
+  `Lipschitz` for a constructed tangency must be **rejected** by the checker.
+  A checker that accepts every shape is the failure mode here, exactly as it was
+  for the coedge-pairing checker in BG-CE-001.
+- Property: for a sampled family deforming transverse → tangent, the published
+  domain shrinks and the constant grows monotonically; the shape changes at most
+  once and only in the direction transverse → Pole → Hölder.
+
+### BG-TOL-005 — Parameter-space tolerance needs a certified UV↔model bridge
+
+**Implements** §2 (scale invariance) beyond what BG-TOL-001 reaches. **Raised by
+external review, 2026-08-19.** Design class; the orchestrator writes it.
+
+**Problem.** BG-TOL-001 splits every predicate into `model` (scales with
+`model_scale`) and `param` (does not). That split is real and the Stage-A shards
+have now classified most of the tree by it. It is also **not sufficient**, and
+the insufficiency is structural rather than a matter of unfinished work:
+`ratio_margin()` currently returns `tau_rep` for three different kinds of
+dimensionless quantity that do not behave the same way.
+
+| quantity | invariant under | example |
+|---|---|---|
+| genuinely intrinsic | everything | a sine, a cosine, a unit-vector magnitude, a weight |
+| parameter fraction | affine reparameterization only | a normalized knot value in `[0, 1]` |
+| **uv length** | **nothing** | `‖δp‖` between two `uv` points |
+
+`ToleranceCtx` today exposes `sin_margin()` and `ratio_margin()` and **both
+return `tau_rep`** — two names for one number, which is precisely where the
+distinction wants to live and does not yet.
+
+The consequence is that `is_small_ratio(δu) ⟺ |δu| ≤ tau_rep` is a universal
+claim that cannot hold. The same physical surface carried on `[0, 1]` and on
+`[0, 1000]` gives different answers to the same geometric question. Nothing in
+this document currently addresses what happens to any contract under
+`(u,v) ↦ (φ(u), ψ(v))`; `Jacobian` appears three times, twice as a *sign*
+condition for injectivity (BG-ENC-001) and once as a transversality λ, and never
+as a metric bridge. `reparameterisation` appears once, in BG-TEST-001's
+invariant list for boolean operations — a test on volumes, not a tolerance
+contract.
+
+The Stage-A shards have already produced the empirical shadow of this. Two
+sites were classified `param` only because "the frame settles it": a
+point-in-polygon test in `PolylineCurve<Point2>` compares a quantity that is
+arithmetically `area / length` — a **length** — and is `param` solely because
+that `Point2` is a `uv` point. Whether the tolerance on it is *correct* depends
+on `‖J_S‖`, which nothing records.
+
+**Contract.**
+- **BG-TOL-005** A `param` predicate declares which of the three kinds above it
+  compares. Intrinsic quantities keep `tau_rep` unconditionally. A **uv length**
+  must go through a bridge, never through `ratio_margin()`.
+- The forward bridge is a certified bound over the cell:
+
+  $$\|\delta x\| \le C_{\sup}\,\|J_S\|\,\|\delta p\|, \qquad
+    C_{\sup} = \sup_{\text{cell}} \sigma_{\max}(J_S)$$
+
+  so a uv displacement admissible at model tolerance `τ` is one with
+  `‖δp‖ ≤ τ / C_sup`. `C_sup` is an **upper** bound and must be certified over
+  the whole cell — the same interval-evaluation obligation BG-CE-002 carries,
+  and for the same reason: a sampled sup is the classic false pass.
+- The inverse direction — "this model-space displacement is at most this much
+  uv" — needs a **lower** bound on `σ_min(J_S)`, which is conditioning
+  information and is where near-singular parameterizations bite. A cell whose
+  `σ_min` lower bound reaches zero is **exactly** the `Pole` case of BG-EVD-004:
+  a chart singularity is not a special case to be handled separately, it is the
+  same object. Where `σ_min` cannot be bounded below, the inverse bridge refuses.
+- `sin_margin()` and `ratio_margin()` stop being aliases. Their divergence is
+  the observable signal that this item has landed.
+
+**Tests.**
+- Property, the one that fails today: take a surface, reparameterize it
+  `u ↦ 1000u`, and assert every `param` predicate's verdict is unchanged. An
+  intrinsic quantity passes trivially; a uv length passes only through the
+  bridge.
+- Property: `C_sup` certified over a cell dominates `σ_max(J_S)` at every
+  sampled interior point, with the sampling used only to *falsify*, never to
+  establish.
+- Unit: a chart singularity (`uder ∥ vder`) drives the `σ_min` lower bound to
+  zero and the inverse bridge refuses rather than returning a large number.
+- Unit: the `PolylineCurve<Point2>` point-in-polygon sites migrate from
+  `is_small_ratio` onto the bridge without changing behaviour at
+  `model_scale = 1` and identity parameterization.
+
+**Relationship to BG-TOL-001.** Stage A's `model`/`param` classification is
+*not* invalidated by this — every site it marked `param` is still not a
+model-space length. What this item adds is that a third of those sites need a
+bridge rather than a bare constant, and the classification the shards recorded
+is what makes it possible to find them.
+
 ### BG-TOL-001 — Scale-relative tolerance context
 
 **Implements** §0.1 (three budgets), §2 (scale invariance). **Fixes** audit S-2.
