@@ -34,6 +34,7 @@ impl out::StepSurface for Processor<DegenerateTorus, Matrix4> {
 
 impl out::DisplayByStep for Processor<DegenerateTorus, Matrix4> {
     fn fmt(&self, idx: usize, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let ctx = ToleranceCtx::unscaled_legacy();
         let carrier = self.entity();
         let torus = carrier.inner();
         let transform = self.transform();
@@ -45,7 +46,8 @@ impl out::DisplayByStep for Processor<DegenerateTorus, Matrix4> {
         let axis = out::VectorAsDirection(transform[2].truncate().normalize());
         let r0 = transform[0].magnitude();
         let r1 = transform[1].magnitude();
-        if !r0.near(&r1) {
+        if !ctx.is_small_ratio(r0 - r1) {
+            // BG-TOL-001: param
             f.write_str("The transform of degenerate torus includes non-uniform scale.")?;
             return Err(std::fmt::Error);
         }
