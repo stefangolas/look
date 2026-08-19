@@ -199,7 +199,8 @@
       "reason": "the deciding test is whether the contact point p0 lies on the adjacent curve (a model-space distance); dt and ds are edge/adjacent parameter increments (dimensionless) and dw is the normal-direction offset residual (a length), all three deferred to BG-TOL-004 as so_small2 squared-order sites",
       "confidence": "medium",
       "predicates_on_line": 4,
-      "proposed_rewrite": "if ctx.near_pt(p0, e) && dt.so_small2() && ds.so_small2() && dw.so_small2() {"
+      "proposed_rewrite": "if ctx.near_pt(p0, e) && dt.so_small2() && ds.so_small2() && dw.so_small2() {",
+      "review": "orchestrator, session 8: the partial rewrite is CORRECT. The three unmigrated predicates on the line are so_small2(), squared order, excluded by rule -- the rewrite drops no guard."
     },
     {
       "file": "vendor/truck/truck-geometry/src/decorators/rbf_surface/algo.rs",
@@ -233,7 +234,8 @@
       "reason": "the deciding test is whether the contact point p1 lies on the adjacent curve (a model-space distance); dt and ds are edge/adjacent parameter increments (dimensionless) and dw is the normal-direction offset residual (a length), all three deferred to BG-TOL-004 as so_small2 squared-order sites",
       "confidence": "medium",
       "predicates_on_line": 4,
-      "proposed_rewrite": "if ctx.near_pt(p1, e) && dt.so_small2() && ds.so_small2() && dw.so_small2() {"
+      "proposed_rewrite": "if ctx.near_pt(p1, e) && dt.so_small2() && ds.so_small2() && dw.so_small2() {",
+      "review": "orchestrator, session 8: the partial rewrite is CORRECT. The three unmigrated predicates on the line are so_small2(), squared order, excluded by rule -- the rewrite drops no guard."
     },
     {
       "file": "vendor/truck/truck-geometry/src/decorators/rbf_surface/contact_circle.rs",
@@ -255,7 +257,10 @@
       "reason": "SPEC_GAP: del is the Newton solution of mat * (du, dv, del.z) = vec where the third matrix column is the unnormalized normal uder x vder (magnitude is a parametrization area, degree 2 in length), so del.z is dimensionally 1/length and scales as 1/k under a model rescale -- it is not a length and not dimensionless, so neither model nor param, and either rewrite changes the debug assertion's behaviour under a real model_scale",
       "confidence": "low",
       "predicates_on_line": 1,
-      "proposed_rewrite": null
+      "proposed_rewrite": null,
+      "action": "fixme",
+      "reason_code": "DIMENSION",
+      "review": "orchestrator, session 9: ADJUDICATED, the worker was right to stop. mat = [uder + n_uder, vder + n_vder, uder x vder]; the first two columns are degree 1 in length and the third is degree 2, so solving against the length (q - p) gives dimensionless del.x/del.y (used as parameter increments on the next line) and a del.z of dimension 1/length. is_small_len is wrong, is_small_ratio is wrong, and under a rescale del.z moves OPPOSITE to length_margin. Excluded, marked FIXME(BG-TOL-001, DIMENSION), deferred to BG-TOL-004. That it is a debug_assert! does not change the answer: at Stage A model_scale = 1.0 so a wrong migration is free today and lands entirely on Stage B, which sees a migrated site and never looks again. Spec amended."
     },
     {
       "file": "vendor/truck/truck-geometry/src/decorators/revolved_curve.rs",
@@ -266,7 +271,8 @@
       "reason": "p - self.origin is a displacement and self.axis is a unit vector, so the cross-product magnitude is |displacement| sin(theta), which still carries length units",
       "confidence": "high",
       "predicates_on_line": 1,
-      "proposed_rewrite": "ctx.is_small_len((p - self.origin).cross(self.axis).magnitude())"
+      "proposed_rewrite": "ctx.is_small_len((p - self.origin).cross(self.axis).magnitude())",
+      "review": "orchestrator, session 8: `model` is CORRECT. RevolutedCurve::new normalizes its axis, so (p - origin).cross(axis) is |v| sin t -- degree ONE. The degree-2 heuristic flags this shape deliberately and cannot resolve it statically."
     },
     {
       "file": "vendor/truck/truck-geometry/src/decorators/revolved_curve.rs",
@@ -343,9 +349,19 @@
       "reason": "op = point - o is a displacement and self.revolution.axis is a unit vector, so the cross-product magnitude is |op| sin(theta), a length in model space; the trailing dot-product sign check is not a tolerance predicate",
       "confidence": "high",
       "predicates_on_line": 1,
-      "proposed_rewrite": "ctx.is_small_len(op.cross(self.revolution.axis).magnitude()) && op.dot(normal) >= 0.0"
+      "proposed_rewrite": "ctx.is_small_len(op.cross(self.revolution.axis).magnitude()) && op.dot(normal) >= 0.0",
+      "review": "orchestrator, session 8: `model` is CORRECT. RevolutedCurve::new normalizes its axis, so (p - origin).cross(axis) is |v| sin t -- degree ONE. The degree-2 heuristic flags this shape deliberately and cannot resolve it statically."
     }
   ],
   "functions": 16,
-  "not_in_inventory": []
+  "not_in_inventory": [],
+  "review": {
+    "by": "orchestrator",
+    "session": 9,
+    "date": "2026-08-19",
+    "notes": [
+      "contact_circle.rs:167 was the one genuinely open question in the three surveys. Adjudicated: excluded, FIXME(BG-TOL-001, DIMENSION). The spec now illustrates degree -1 alongside degree 2 under the degree != 1 exclusion.",
+      "The other three flagged rows were adjudicated in session 8 and stand."
+    ]
+  }
 }

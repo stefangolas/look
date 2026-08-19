@@ -11,7 +11,8 @@
       "reason": "x is the ray-crossing parameter s2/(s1-s0): the signed distance from the query point c to the boundary edge along the unit hash ray. Its dimension follows the caller's Point2 coordinate space, which this generic public API cannot know: in the tessellation context where this identical algorithm was reviewed (truck-meshalgo include_along_ray) the boundary lives in uv parameter space and x is dimensionless, but for a model-space polygon x scales linearly with the model and the predicate's absolute TOLERANCE window would change under a metre/mm export. Genuinely ambiguous; classified param to match the reviewed sibling.",
       "confidence": "low",
       "predicates_on_line": 1,
-      "proposed_rewrite": "ctx.is_small_ratio(x) && s0 * s1 < 0.0"
+      "proposed_rewrite": "ctx.is_small_ratio(x) && s0 * s1 < 0.0",
+      "review": "orchestrator, session 9: `param` CONFIRMED, and the reason is the frame, not the arithmetic. x = s2/(s1 - s0) is (area)/(length) = a LENGTH in the coordinates of the enclosing `impl PolylineCurve<Point2>` -- and that Point2 is a uv parameter point, not a model point, so the length does not scale with model_scale. Consistent with the ray-crossing parameter already accepted at triangulation.rs:8420. Dimensional reasoning alone gets this one backwards, which is why it came back confidence: low."
     },
     {
       "file": "vendor/truck/truck-polymesh/src/polyline_curve.rs",
@@ -22,7 +23,8 @@
       "reason": "x is the ray-crossing parameter s2/(s1-s0): the signed distance from the query point c to the boundary edge along the unit hash ray. Its dimension follows the caller's Point2 coordinate space, which this generic public API cannot know: in the tessellation context where this identical algorithm was reviewed (truck-meshalgo include_along_ray) the boundary lives in uv parameter space and x is dimensionless, but for a model-space polygon x scales linearly with the model. Genuinely ambiguous; classified param to match the reviewed sibling.",
       "confidence": "low",
       "predicates_on_line": 1,
-      "proposed_rewrite": "ctx.is_small_ratio(x) && s0 * s1 < 0.0"
+      "proposed_rewrite": "ctx.is_small_ratio(x) && s0 * s1 < 0.0",
+      "review": "orchestrator, session 9: `param` CONFIRMED, and the reason is the frame, not the arithmetic. x = s2/(s1 - s0) is (area)/(length) = a LENGTH in the coordinates of the enclosing `impl PolylineCurve<Point2>` -- and that Point2 is a uv parameter point, not a model point, so the length does not scale with model_scale. Consistent with the ray-crossing parameter already accepted at triangulation.rs:8420. Dimensional reasoning alone gets this one backwards, which is why it came back confidence: low."
     },
     {
       "file": "vendor/truck/truck-polymesh/src/polyline_curve.rs",
@@ -44,7 +46,8 @@
       "reason": "h = a - b*t where a = point - p[0] and b = p[1] - p[0] is the edge vector, so h is the perpendicular displacement from the query point to the segment and its magnitude is the shortest model-space distance from the point to the segment; the test decides whether the point lies on the segment, so it scales with the model.",
       "confidence": "high",
       "predicates_on_line": 1,
-      "proposed_rewrite": "ctx.is_small_len(h.magnitude())"
+      "proposed_rewrite": "ctx.is_small_len(h.magnitude())",
+      "review": "orchestrator, session 9: checked to compile. h: P::Diff is bounded InnerSpace<Scalar = f64> + Tolerance in the enclosing impl, so .magnitude() applies."
     },
     {
       "file": "vendor/truck/truck-polymesh/src/polyline_curve.rs",
@@ -88,7 +91,8 @@
       "reason": "the scrutinee compares the curve position curve.subs(t) with the query point's position, so the predicate is the model-space distance between two points and it scales with the model",
       "confidence": "high",
       "predicates_on_line": 1,
-      "proposed_rewrite": "match ctx.near_points(curve.subs(t), point) {"
+      "proposed_rewrite": "match ctx.is_small_len((curve.subs(t) - point).magnitude()) {",
+      "review": "orchestrator, session 9: class stands, REWRITE CORRECTED. The survey proposed ctx.near_points(curve.subs(t), point), which does not compile here: search_parameter<C> bounds C::Point with EuclideanSpace, not MetricSpace, so near_points does not apply. C::Vector is InnerSpace<Scalar = f64>, so the difference has .magnitude() and is_small_len is the form that compiles. Same predicate, same Euclidean tightening as everywhere else. Note algo/surface.rs :292 does carry MetricSpace<Metric = f64> and keeps near_points -- these two look identical and are not."
     },
     {
       "file": "vendor/truck/truck-geotrait/src/algo/curve.rs",
@@ -203,5 +207,14 @@
       "predicates_on_line": 1,
       "proposed_rewrite": "if p0.distance(pt) > tol {"
     }
-  ]
+  ],
+  "review": {
+    "by": "orchestrator",
+    "session": 9,
+    "date": "2026-08-19",
+    "notes": [
+      "The two not_in_inventory rows (algo/curve.rs:134, algo/surface.rs:398) are a real census blind spot and are NOT migration work: both compare against the CALLER's runtime `tol`, not against TOLERANCE, so no ToleranceCtx predicate is involved and there is nothing for Stage A to move. They are recorded in the packet as found-and-not-work so a later session does not rediscover them as missing.",
+      "Nothing in this survey is deferred; there are no FIXME rows."
+    ]
+  }
 }

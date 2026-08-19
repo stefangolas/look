@@ -550,10 +550,46 @@ Stage B threads a real scale. That is worse than not migrating it, because Stage
 B will then see a migrated site and never look again.
 
 A shard therefore leaves these exactly as they are and marks each
-`FIXME(BG-TOL-001): <quantity> is an area (length squared); neither predicate
-fits`. Deferred to **BG-TOL-004** with the squared-order family, which must
-decide whether `ToleranceCtx` grows a degree-aware predicate or whether these
-sites should compare a first-order quantity instead.
+`FIXME(BG-TOL-001, DEGREE2): <quantity> is an area (length squared); neither
+predicate fits`. Deferred to **BG-TOL-004** with the squared-order family, which
+must decide whether `ToleranceCtx` grows a degree-aware predicate or whether
+these sites should compare a first-order quantity instead.
+
+**The heading says degree ≠ 1 and it means it: degree −1 happens too.** Added
+2026-08-19, adjudicating a worker-reported SPEC_GAP at
+`truck-geometry/src/decorators/rbf_surface/contact_circle.rs:167`. Everything
+above illustrates the exclusion with areas, so a worker reading it looks for a
+cross product and finds nothing:
+
+```rust
+// next_point -- mat's third column is the UNNORMALIZED normal uder x vder
+let del = mat.invert().unwrap() * (q - p);
+debug_assert!(del.z.so_small(), "{del:?}");
+```
+
+`mat`'s first two columns are surface derivatives (degree 1 in length) and its
+third is `uder × vder` (degree 2). `q - p` is a length. So `del.x` and `del.y`
+come out dimensionless — they are parameter increments, and the next line uses
+them as exactly that — while `del.z` is a length divided by an area and
+therefore scales as `1/k`. It is not a length, so `is_small_len` is wrong; it is
+not dimensionless, so `is_small_ratio` is wrong; and it moves in the *opposite*
+direction from `length_margin()` under a rescale, which is worse than the
+degree-2 case rather than better. **The worker was right to stop.**
+
+Such a site is `excluded` and takes `FIXME(BG-TOL-001, DIMENSION): <quantity> is
+<dimension>; neither predicate fits`, deferred to **BG-TOL-004** with the rest.
+The code is `DIMENSION` rather than `DEGREE2` because `DEGREE2` is already in
+the tree on the area sites and a marker that names the wrong dimension is worse
+than a generic one. The general rule, which both codes are instances of: **a
+`model` site's quantity must be degree ONE in length and a `param` site's must
+be degree ZERO. Any other degree is BG-TOL-004's problem, not a shard's.**
+
+That the site is a `debug_assert!` does not change the answer and is worth
+saying, because it is the argument someone will reach for. At Stage A
+`model_scale = 1.0` and every rewrite here is a no-op, so the cost of migrating
+it is zero *today* and the whole cost lands on Stage B, which sees a migrated
+site and never looks again. A cheap wrong migration is the failure mode this
+exclusion exists to prevent.
 
 This exclusion is written down because the loop has discovered it twice and
 paid for it twice. A worker on an earlier shard hit it unprompted at

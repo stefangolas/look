@@ -162,9 +162,22 @@ def packet_contexts(text):
             break
         m_file = FILE_HEAD.match(stripped)
         if m_file:
-            name = m_file.group(1).lstrip('`').strip()
-            cands = [p for p in paths if p.as_posix().endswith(name)]
+            name = m_file.group(1).lstrip('`').strip().lstrip('/')
+            # The suffix must land on a path boundary. Without the '/', a
+            # heading of `curve.rs` also matches `polyline_curve.rs`, the two
+            # candidates make it ambiguous, and every row under that heading is
+            # then SILENTLY DROPPED from the budget -- BG-TOL-001-SMALL read 6
+            # contexts against a true 7 and BG-TOL-001-GEOM-DECORATORS 12
+            # against 14. Dropping a row is worse than miscounting one: an
+            # invented line number under an ambiguous heading was never checked
+            # against the tree at all, which is the one thing this function
+            # exists to do.
+            cands = [p for p in paths
+                     if p.as_posix() == name or p.as_posix().endswith('/' + name)]
             current = cands[0] if len(cands) == 1 else None
+            if current is None and cands:
+                unresolved.append(f"ambiguous file heading `{name}` "
+                                  f"({len(cands)} files in write_allow match it)")
             continue
         m = SITE_ROW.match(stripped)
         if not m or current is None:
@@ -176,7 +189,11 @@ def packet_contexts(text):
         else:
             fns.add((str(current), fn_line))
     if not seen_table:
-        return None, []
+        # `unresolved`, not `[]`. When every row sits under an ambiguous file
+        # heading there is no table to count AND a reason why, and returning the
+        # reason as an empty list reports only "no readable site table" -- true,
+        # unhelpful, and pointing at the wrong thing to fix.
+        return None, unresolved
     return len(fns), unresolved
 
 
@@ -238,7 +255,13 @@ def check(packet_path, quiet=False):
         elif not quiet:
             print(f"  budget {declared} == site table {counted}  ok")
         if m_frag:
-            measured = census_functions(m_frag.group(1).strip())
+            # A shard can span two crates -- BG-TOL-001-SMALL covers truck-polymesh
+            # and truck-geotrait -- and checking its whole budget against one
+            # crate's ceiling compares a number against the wrong thing. Comma-
+            # separated fragments are summed.
+            frags = [f.strip() for f in m_frag.group(1).split(',') if f.strip()]
+            counts = [census_functions(f) for f in frags]
+            measured = None if any(c is None for c in counts) else sum(counts)
             if measured is None:
                 problems.append(f"census produced no count for fragment {m_frag.group(1)!r}")
             elif max(declared, counted or 0) > measured:
@@ -262,13 +285,41 @@ def check(packet_path, quiet=False):
     return problems
 
 
+def _heading(f):
+    """A file heading `packet_contexts` can resolve unambiguously.
+
+    A bare basename cannot: `curve.rs` matches `polyline_curve.rs` too, and an
+    ambiguous heading silently drops every row beneath it from the budget.
+    """
+    return f.replace('vendor/truck/', '')
+
+
 def skeleton(survey_path, pid, crate):
     doc = json.loads(Path(survey_path).read_text(encoding='utf-8'))
     sites = doc['sites'] if isinstance(doc, dict) else doc
-    live = [s for s in sites if s.get('classification') in ('model', 'param')]
-    files = sorted({s['file'] for s in live})
-    fns = {(s['file'], s['symbol']) for s in live}
+
+    # `action: fixme` is a row that is REAL, whose class may even be known, and
+    # that a shard still must not rewrite -- a generic bound it cannot widen, a
+    # degree-2 quantity, a dimension neither predicate models. It was the open
+    # question after BG-TOL-001-MESHALGO, whose six deferrals had to be written
+    # by hand into a section the budget parser stops at. A deferral costs no
+    # context: a FIXME is a comment.
+    deferred = [s for s in sites if s.get('action') == 'fixme']
+    live = [s for s in sites
+            if s.get('classification') in ('model', 'param') and s.get('action') != 'fixme']
+    excluded = [s for s in sites
+                if s.get('classification') == 'excluded' and s.get('action') != 'fixme']
+    files = sorted({s['file'] for s in live} | {s['file'] for s in deferred})
     low = [s for s in sites if s.get('confidence') == 'low']
+
+    # The budget is resolved against the TREE, by the same code `--check` uses.
+    # Keying it on (file, symbol) here while `--check` resolved (file, line) to
+    # an enclosing fn is how the two halves came to disagree, and a disagreement
+    # between them means no survey-derived packet can be dispatched at all.
+    fns = set()
+    for s in live:
+        fl = _enclosing_fn(REPO_ROOT / s['file'], int(s['line']))
+        fns.add((s['file'], fl if fl is not None else f"?{s['symbol']}"))
 
     print(f"# WORK PACKET {pid} — Stage-A tolerance migration, {crate}\n")
     print("<!-- SKELETON. The prose is not generated and must be written: Problem,")
@@ -300,18 +351,47 @@ def skeleton(survey_path, pid, crate):
     print(f"## The sites — {len(live)} migrate, {len(fns)} contexts\n")
     print("Line numbers are provenance for a human reader; locate by the enclosing symbol.\n")
     for f in files:
+        rows = [x for x in live if x['file'] == f]
+        if not rows:
+            continue
         print(f"**`{f.split('/')[-1]}`**\n")
-        print("| enclosing fn | line | code | class |")
-        print("|---|---|---|---|")
-        for s in [x for x in live if x['file'] == f]:
+        print("| enclosing fn | line | code | class and why | write instead |")
+        print("|---|---|---|---|---|")
+        for s in rows:
             expr = str(s['expression']).replace('|', '\\|').strip()
-            flag = ' **(low confidence — REVIEW)**' if s.get('confidence') == 'low' else ''
+            # A row a human has reviewed carries the decision in `review`, and a
+            # worker that cannot see it will relitigate what the review settled.
+            # `confidence: low` is a question; a review is its answer, so the
+            # flag is dropped once one exists.
+            note = s.get('review')
+            flag = (f" **REVIEWED — {note}**" if note else
+                    ' **(low confidence — REVIEW)**' if s.get('confidence') == 'low' else '')
+            rw = str(s.get('proposed_rewrite') or '').replace('|', '\\|').strip()
+            rw = f"`{rw}`" if rw else '(see the decisions above)'
             print(f"| `{s['symbol']}` | {s['line']} | `{expr}` | **`{s['classification']}`**"
-                  f" — {s.get('reason', '')}{flag} |")
+                  f" — {s.get('reason', '')}{flag} | {rw} |")
         print()
-    excluded = [s for s in sites if s.get('classification') == 'excluded']
+
+    # Everything below is after the heading `packet_contexts` stops at, so no
+    # row here can pad a budget. That is deliberate and load-bearing.
+    if deferred:
+        print(f"## Not in this packet — {len(deferred)} deferrals: a FIXME and nothing else\n")
+        print("These sites are real and their line numbers resolve. You **leave the code")
+        print("exactly as it is** and add one marker comment on the line above each. Do")
+        print("not introduce a `ToleranceCtx` for a function that has only deferrals —")
+        print("a FIXME is a comment and costs no context.\n")
+        for f in sorted({s['file'] for s in deferred}):
+            print(f"**`{f.split('/')[-1]}`**\n")
+            print("| enclosing fn | line | code | marker |")
+            print("|---|---|---|---|")
+            for s in [x for x in deferred if x['file'] == f]:
+                expr = str(s['expression']).replace('|', '\\|').strip()
+                code = s.get('reason_code', 'DEFERRED')
+                print(f"| `{s['symbol']}` | {s['line']} | `{expr}` | "
+                      f"`// FIXME(BG-TOL-001, {code})` — {s.get('reason', '')} |")
+            print()
     if excluded:
-        print(f"## Not in this packet — {len(excluded)} excluded\n")
+        print(f"## Not in this packet — {len(excluded)} excluded, no marker\n")
         for s in excluded:
             print(f"- `{s['file'].split('/')[-1]}:{s['line']}` — {s.get('reason','')}")
         print()

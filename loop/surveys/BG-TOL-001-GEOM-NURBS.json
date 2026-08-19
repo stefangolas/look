@@ -107,10 +107,13 @@
       "symbol": "is_const",
       "expression": ".all(move |vec| vec.near(&self.control_points[0]))",
       "classification": "model",
-      "reason": "compares control-point vectors in model space; a constant-curve check must scale with the model",
+      "reason": "ctx.near_points<P> is bounded P: MetricSpace<Metric = f64> and this impl does not supply it. Widening a public generic bound is cross-crate and is Stage B, so the site is left exactly as it is. Enclosing impl: `impl<P: ControlPoint<f64> + Tolerance> BSplineCurve<P>`.",
       "confidence": "high",
       "predicates_on_line": 1,
-      "proposed_rewrite": ".all(move |vec| ctx.is_small_len(vec.distance(&self.control_points[0])))"
+      "proposed_rewrite": null,
+      "action": "fixme",
+      "reason_code": "GENERIC_BOUND",
+      "review": "orchestrator, session 9: deferred, generic bound"
     },
     {
       "file": "vendor/truck/truck-geometry/src/nurbs/bspcurve.rs",
@@ -129,10 +132,13 @@
       "symbol": "try_remove_knot",
       "expression": "if !new_points.last().unwrap().near(self.control_point(idx)) {",
       "classification": "model",
-      "reason": "compares control points in model space; knot removal must keep the rebuilt point within model-scaled tolerance",
+      "reason": "ctx.near_points<P> is bounded P: MetricSpace<Metric = f64> and this impl does not supply it. Widening a public generic bound is cross-crate and is Stage B, so the site is left exactly as it is. Enclosing impl: `impl<P: ControlPoint<f64> + Tolerance> BSplineCurve<P>`.",
       "confidence": "high",
       "predicates_on_line": 1,
-      "proposed_rewrite": "!ctx.is_small_len(new_points.last().unwrap().distance(self.control_point(idx)))"
+      "proposed_rewrite": null,
+      "action": "fixme",
+      "reason_code": "GENERIC_BOUND",
+      "review": "orchestrator, session 9: deferred, generic bound"
     },
     {
       "file": "vendor/truck/truck-geometry/src/nurbs/bspcurve.rs",
@@ -206,10 +212,13 @@
       "symbol": "near_as_curve",
       "expression": "self.sub_near_as_curve(other, 1, |x, y| x.near(y))",
       "classification": "model",
-      "reason": "compares curve sample points in model space; near-as-curve must scale with the model",
+      "reason": "ctx.near_points<P> is bounded P: MetricSpace<Metric = f64> and this impl does not supply it. Widening a public generic bound is cross-crate and is Stage B, so the site is left exactly as it is. Enclosing impl: `impl<P: ControlPoint<f64> + Tolerance> BSplineCurve<P>`.",
       "confidence": "high",
       "predicates_on_line": 1,
-      "proposed_rewrite": "self.sub_near_as_curve(other, 1, |x, y| ctx.is_small_len(x.distance(y)))"
+      "proposed_rewrite": null,
+      "action": "fixme",
+      "reason_code": "GENERIC_BOUND",
+      "review": "orchestrator, session 9: deferred, generic bound"
     },
     {
       "file": "vendor/truck/truck-geometry/src/nurbs/bspcurve.rs",
@@ -261,10 +270,13 @@
       "symbol": "try_concat",
       "expression": "if !front.near(back) {",
       "classification": "model",
-      "reason": "compares boundary control points in model space to decide whether the curves join continuously",
+      "reason": "ctx.near_points<P> is bounded P: MetricSpace<Metric = f64> and this impl does not supply it. Widening a public generic bound is cross-crate and is Stage B, so the site is left exactly as it is. Enclosing impl: `impl<P: ControlPoint<f64> + Tolerance> Concat<..> for BSplineCurve<P>`.",
       "confidence": "high",
       "predicates_on_line": 1,
-      "proposed_rewrite": "!ctx.is_small_len(front.distance(back))"
+      "proposed_rewrite": null,
+      "action": "fixme",
+      "reason_code": "GENERIC_BOUND",
+      "review": "orchestrator, session 9: deferred, generic bound"
     },
     {
       "file": "vendor/truck/truck-geometry/src/nurbs/bspcurve.rs",
@@ -275,7 +287,8 @@
       "reason": "compares two curve sample points in model space to check the arc shares an endpoint",
       "confidence": "high",
       "predicates_on_line": 1,
-      "proposed_rewrite": "!ctx.is_small_len(self.subs(knots[0]).distance(curve.subs(hint)))"
+      "proposed_rewrite": "if !ctx.near_points(self.subs(knots[0]), curve.subs(hint)) {",
+      "review": "orchestrator, session 9: MIGRATES. The session-8 handoff listed this among the generic-bound deferrals and that was wrong -- the enclosing `impl<P> BSplineCurve<P>` at bspcurve.rs:1058 bounds P with `MetricSpace<Metric = f64>` explicitly, so near_points applies."
     },
     {
       "file": "vendor/truck/truck-geometry/src/nurbs/bspcurve.rs",
@@ -286,7 +299,8 @@
       "reason": "compares a curve sample point to the reference point in model space; hint <= res is a plain parameter ordering, not a tolerance predicate",
       "confidence": "high",
       "predicates_on_line": 1,
-      "proposed_rewrite": "res.map(|res| hint <= res && ctx.is_small_len(curve.subs(res).distance(pt)))"
+      "proposed_rewrite": "let flag = res.map(|res| hint <= res && ctx.near_points(curve.subs(res), pt));",
+      "review": "orchestrator, session 9: MIGRATES. The session-8 handoff listed this among the generic-bound deferrals and that was wrong -- the enclosing `impl<P> BSplineCurve<P>` at bspcurve.rs:1058 bounds P with `MetricSpace<Metric = f64>` explicitly, so near_points applies."
     },
     {
       "file": "vendor/truck/truck-geometry/src/nurbs/bspsurface.rs",
@@ -327,10 +341,13 @@
       "symbol": "is_const",
       "expression": "if !vec.near(&self.control_points[0][0]) {",
       "classification": "model",
-      "reason": "compares control-point vectors in model space; a constant-surface check must scale with the model",
+      "reason": "ctx.near_points<P> is bounded P: MetricSpace<Metric = f64> and this impl does not supply it. Widening a public generic bound is cross-crate and is Stage B, so the site is left exactly as it is. Enclosing impl: `impl<V: Tolerance> BSplineSurface<V> -- not even ControlPoint`.",
       "confidence": "high",
       "predicates_on_line": 1,
-      "proposed_rewrite": "!ctx.is_small_len(vec.distance(&self.control_points[0][0]))"
+      "proposed_rewrite": null,
+      "action": "fixme",
+      "reason_code": "GENERIC_BOUND",
+      "review": "orchestrator, session 9: deferred, generic bound"
     },
     {
       "file": "vendor/truck/truck-geometry/src/nurbs/bspsurface.rs",
@@ -349,10 +366,13 @@
       "symbol": "try_remove_uknot",
       "expression": "if !pt0.near(pt1) {",
       "classification": "model",
-      "reason": "compares control points in model space; uknot removal must keep the rebuilt column within model-scaled tolerance",
+      "reason": "ctx.near_points<P> is bounded P: MetricSpace<Metric = f64> and this impl does not supply it. Widening a public generic bound is cross-crate and is Stage B, so the site is left exactly as it is. Enclosing impl: `impl<P: ControlPoint<f64> + Tolerance> BSplineSurface<P>`.",
       "confidence": "high",
       "predicates_on_line": 1,
-      "proposed_rewrite": "!ctx.is_small_len(pt0.distance(pt1))"
+      "proposed_rewrite": null,
+      "action": "fixme",
+      "reason_code": "GENERIC_BOUND",
+      "review": "orchestrator, session 9: deferred, generic bound"
     },
     {
       "file": "vendor/truck/truck-geometry/src/nurbs/bspsurface.rs",
@@ -371,10 +391,13 @@
       "symbol": "try_remove_vknot",
       "expression": "if !pt0.near(pt1) {",
       "classification": "model",
-      "reason": "compares control points in model space; vknot removal must keep the rebuilt row within model-scaled tolerance",
+      "reason": "ctx.near_points<P> is bounded P: MetricSpace<Metric = f64> and this impl does not supply it. Widening a public generic bound is cross-crate and is Stage B, so the site is left exactly as it is. Enclosing impl: `impl<P: ControlPoint<f64> + Tolerance> BSplineSurface<P>`.",
       "confidence": "high",
       "predicates_on_line": 1,
-      "proposed_rewrite": "!ctx.is_small_len(pt0.distance(pt1))"
+      "proposed_rewrite": null,
+      "action": "fixme",
+      "reason_code": "GENERIC_BOUND",
+      "review": "orchestrator, session 9: deferred, generic bound"
     },
     {
       "file": "vendor/truck/truck-geometry/src/nurbs/bspsurface.rs",
@@ -481,10 +504,13 @@
       "symbol": "near_as_surface",
       "expression": "self.sub_near_as_surface(other, 1, |x, y| x.near(y))",
       "classification": "model",
-      "reason": "compares surface sample points in model space; near-as-surface must scale with the model",
+      "reason": "ctx.near_points<P> is bounded P: MetricSpace<Metric = f64> and this impl does not supply it. Widening a public generic bound is cross-crate and is Stage B, so the site is left exactly as it is. Enclosing impl: `impl<P: ControlPoint<f64> + Tolerance> BSplineSurface<P>`.",
       "confidence": "high",
       "predicates_on_line": 1,
-      "proposed_rewrite": "self.sub_near_as_surface(other, 1, |x, y| ctx.is_small_len(x.distance(y)))"
+      "proposed_rewrite": null,
+      "action": "fixme",
+      "reason_code": "GENERIC_BOUND",
+      "review": "orchestrator, session 9: deferred, generic bound"
     },
     {
       "file": "vendor/truck/truck-geometry/src/nurbs/bspsurface.rs",
@@ -690,10 +716,13 @@
       "symbol": "is_const",
       "expression": ".all(move |vec| vec.to_point().near(&pt))",
       "classification": "model",
-      "reason": "compares rationalized control points in model space; a constant-curve check must scale with the model",
+      "reason": "ctx.near_points<P> is bounded P: MetricSpace<Metric = f64> and this impl does not supply it. Widening a public generic bound is cross-crate and is Stage B, so the site is left exactly as it is. Enclosing impl: `impl<V: Homogeneous + ControlPoint<f64, Diff = V>> where V::Point: Tolerance`.",
       "confidence": "high",
       "predicates_on_line": 1,
-      "proposed_rewrite": ".all(move |vec| ctx.near_points(vec.to_point(), pt))"
+      "proposed_rewrite": null,
+      "action": "fixme",
+      "reason_code": "GENERIC_BOUND",
+      "review": "orchestrator, session 9: deferred, generic bound"
     },
     {
       "file": "vendor/truck/truck-geometry/src/nurbs/nurbscurve.rs",
@@ -712,10 +741,13 @@
       "symbol": "near_as_curve",
       "expression": ".sub_near_as_curve(&other.0, 2, move |x, y| x.to_point().near(&y.to_point()))",
       "classification": "model",
-      "reason": "compares rationalized curve sample points in model space; near-as-curve must scale with the model",
+      "reason": "ctx.near_points<P> is bounded P: MetricSpace<Metric = f64> and this impl does not supply it. Widening a public generic bound is cross-crate and is Stage B, so the site is left exactly as it is. Enclosing impl: `impl<V: Homogeneous + ControlPoint<f64, Diff = V>> where V::Point: Tolerance`.",
       "confidence": "high",
       "predicates_on_line": 1,
-      "proposed_rewrite": ".sub_near_as_curve(&other.0, 2, move |x, y| ctx.near_points(x.to_point(), y.to_point()))"
+      "proposed_rewrite": null,
+      "action": "fixme",
+      "reason_code": "GENERIC_BOUND",
+      "review": "orchestrator, session 9: deferred, generic bound"
     },
     {
       "file": "vendor/truck/truck-geometry/src/nurbs/nurbscurve.rs",
@@ -778,10 +810,13 @@
       "symbol": "is_const",
       "expression": "if !vec.to_point().near(&pt) {",
       "classification": "model",
-      "reason": "compares rationalized control points in model space; a constant-surface check must scale with the model",
+      "reason": "ctx.near_points<P> is bounded P: MetricSpace<Metric = f64> and this impl does not supply it. Widening a public generic bound is cross-crate and is Stage B, so the site is left exactly as it is. Enclosing impl: `impl<V: Homogeneous + ControlPoint<f64, Diff = V>> where V::Point: Tolerance`.",
       "confidence": "high",
       "predicates_on_line": 1,
-      "proposed_rewrite": "!ctx.near_points(vec.to_point(), pt)"
+      "proposed_rewrite": null,
+      "action": "fixme",
+      "reason_code": "GENERIC_BOUND",
+      "review": "orchestrator, session 9: deferred, generic bound"
     },
     {
       "file": "vendor/truck/truck-geometry/src/nurbs/nurbssurface.rs",
@@ -800,10 +835,13 @@
       "symbol": "near_as_surface",
       "expression": ".sub_near_as_surface(&other.0, 2, move |x, y| x.to_point().near(&y.to_point()))",
       "classification": "model",
-      "reason": "compares rationalized surface sample points in model space; near-as-surface must scale with the model",
+      "reason": "ctx.near_points<P> is bounded P: MetricSpace<Metric = f64> and this impl does not supply it. Widening a public generic bound is cross-crate and is Stage B, so the site is left exactly as it is. Enclosing impl: `impl<V: Homogeneous + ControlPoint<f64, Diff = V>> where V::Point: Tolerance`.",
       "confidence": "high",
       "predicates_on_line": 1,
-      "proposed_rewrite": ".sub_near_as_surface(&other.0, 2, move |x, y| ctx.near_points(x.to_point(), y.to_point()))"
+      "proposed_rewrite": null,
+      "action": "fixme",
+      "reason_code": "GENERIC_BOUND",
+      "review": "orchestrator, session 9: deferred, generic bound"
     },
     {
       "file": "vendor/truck/truck-geometry/src/nurbs/nurbssurface.rs",
@@ -1021,5 +1059,17 @@
     "bspsurface.rs: sub_near_as_surface (lines 523, 530), near2_as_surface (line 1608)",
     "nurbscurve.rs: near2_as_curve (line 229)",
     "nurbssurface.rs: near2_as_surface (line 358)"
-  ]
+  ],
+  "review": {
+    "by": "orchestrator",
+    "session": 9,
+    "date": "2026-08-19",
+    "notes": [
+      "12 of the 20 model rows are deferred GENERIC_BOUND, not ten. Every one of the 20 was resolved to its enclosing impl and the bound read off the tree; the session-8 count of ten was an estimate over a partial list.",
+      "bspcurve.rs:1102 and :1112 migrate -- their impl at :1058 does carry MetricSpace<Metric = f64>.",
+      "bspsurface.rs:652 is deferred for a WEAKER reason than the others: its impl is `impl<V: Tolerance>` and supplies no ControlPoint either.",
+      "The survey proposed `ctx.is_small_len(x.distance(y))` for several of the deferred rows. That does not compile for the same reason near_points does not: `distance` is MetricSpace. Rewrites on deferred rows are cleared.",
+      "not_in_inventory holds four near2_as_curve/near2_as_surface helpers, correctly squared-order and correctly excluded."
+    ]
+  }
 }
