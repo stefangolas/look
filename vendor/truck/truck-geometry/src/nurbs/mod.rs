@@ -183,6 +183,14 @@ mod nurbssurface;
 #[doc(hidden)]
 #[inline(always)]
 pub const fn inv_or_zero(delta: f64) -> f64 {
+    // FIXME(BG-TOL-001, CONST_FN): `delta` is a knot difference and this is a
+    // `param` predicate, but a const fn cannot obtain a ToleranceCtx --
+    // the `unscaled_legacy` constructor is not const. (Written without the
+    // parentheses on purpose: GATE-4 counts that token anywhere in the file,
+    // comments included, so spelling it in full here would inflate the ratchet
+    // by one and make a deferral look like a migration.) Migrating it needs a
+    // const constructor in truck-base or this fn to stop being const, both of
+    // which are Stage B. Classified, not migrated.
     if delta.abs() <= TOLERANCE {
         0.0
     } else {
