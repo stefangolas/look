@@ -1155,24 +1155,22 @@ def main():
     # those, and running them twice would double the slowest gate for nothing.
     # An empty downstream set is a PASS that says so, not a silent one.
     # -----------------------------------------------------------------------
-    # V8 is OFF by default and must be asked for with `--only V8`.
+    # V8 is ON by default since 2026-08-19, when its negative test ran.
     #
-    # Not because it is optional -- because it has never been watched failing.
-    # "A gate that has only ever been observed passing is indistinguishable
-    # from a gate that cannot fail, and the loop has already shipped two of
-    # those." Turning this one on for acceptance before its negative test has
-    # run would ship a third, and the negative test could not be run in the
-    # session that wrote it: a downstream baseline builds an entire extra
-    # workspace and the machine was at 6.5 GB free, under the harness's own
-    # 8 GB floor. Run it deliberately with `--only V8` (whose verdict is
-    # PARTIAL by construction and so cannot accept a packet on its own), watch
-    # it fail on a deliberate downstream break, and delete this branch in the
-    # commit that records that.
-    if only_gates is None:
-        v.add_gate('V8 no-regression', 'SKIP',
-                   'off by default until its negative test has been run; '
-                   'invoke with --only V8. See the comment in verify.py')
-    elif not gate_wanted('V8'):
+    # The probe: `RevolutedCurve::subs` offset by 1e-3 on branch
+    # probe/V8-negative (base 3ca4518), one commit plus a RESULT.json stub.
+    # V8 FAILed with DOWNSTREAM_REGRESSION naming eight tests across
+    # truck-modeling and truck-shapeops -- builder::partial_torus::
+    # partial_torus, geometry::{conical_surface, cylindrical_surface,
+    # surface_of_revolution}, healing::tests::{double_closed_boundary_cylinder,
+    # many_closed_boundary_cylinder, ...} -- none of which V5 can reach,
+    # because V5 runs only the packet's own crates. The gate has been
+    # watched failing; the opt-in branch is deleted in the commit that
+    # records this. The disk caution stands: a downstream baseline builds
+    # an entire extra workspace, and verify still refuses below the 8 GB
+    # floor, so a run of repeated verifies still starts at Get-PSDrive C.
+    # -----------------------------------------------------------------------
+    if not gate_wanted('V8'):
         skip_not_requested('V8 no-regression')
     elif v.failed_early:
         v.add_gate('V8 no-regression', 'SKIP', 'earlier gate failed')
