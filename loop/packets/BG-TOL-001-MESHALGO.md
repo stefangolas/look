@@ -62,7 +62,14 @@ tests_required:
   - deferred_area_sites_carry_a_fixme
 budget:      {turns: 70, ctx_tokens: 150000}
 census_fragment: truck-meshalgo
-unscaled_legacy_budget: 11
+# CORRECTED AFTER LANDING (session 9): this was 11 and the true count is 10.
+# `end_pts` is a two-line nested helper closing at triangulation.rs:8299; the
+# sites after it belong to `new_with_join`. Both counters that produced the 11
+# scanned upward for `fn` without tracking braces. The worker built a shadow
+# context in a `match` arm to reach 11, which was the right response to a wrong
+# packet; the shadow is removed and the ceiling is 50. Left as a corrected
+# annotation rather than a silent edit -- see loop/results/BG-TOL-001-MESHALGO.json.
+unscaled_legacy_budget: 10
 anchors:
   - {id: A1, expect: 6, cmd: "grep -cE '\\.near\\(|so_small\\(|TOLERANCE' vendor/truck/truck-meshalgo/src/analyzers/collision.rs"}
   - {id: A2, expect: 1, cmd: "grep -cE '\\.near\\(|so_small\\(|TOLERANCE' vendor/truck/truck-meshalgo/src/analyzers/in_out_judge.rs"}

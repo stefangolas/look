@@ -36,6 +36,9 @@ import subprocess
 import sys
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import rustscan  # noqa: E402  -- sibling module, loop/ is not a package
+
 REPO_ROOT = Path(__file__).resolve().parent.parent
 BASH = r'C:\Program Files\Git\bin\bash.exe'
 
@@ -100,23 +103,35 @@ def census_functions(fragment):
 
 SITE_ROW = re.compile(r"^\|\s*`([^`]+)`\s*\|\s*(\d+)\s*\|")
 FILE_HEAD = re.compile(r"^\*\*`([^`]+)`\*\*")
-FN_DEF = re.compile(
-    r"^\s*(?:pub(?:\([^)]*\))?\s+)?(?:const\s+)?(?:async\s+)?(?:unsafe\s+)?"
-    r"(?:extern\s+\"[^\"]*\"\s+)?fn\s+(\w+)")
+
+_FN_MAP_CACHE = {}
+
+
+def _fn_map(path):
+    """{lineno: fn def line or None} for a file, via the brace-tracking scanner."""
+    key = str(path)
+    if key not in _FN_MAP_CACHE:
+        try:
+            text = path.read_text(encoding='utf-8', errors='replace')
+        except OSError:
+            _FN_MAP_CACHE[key] = None
+            return None
+        _FN_MAP_CACHE[key] = {i.lineno: (i.fn_line or None) for i in rustscan.scan(text)}
+    return _FN_MAP_CACHE[key]
 
 
 def _enclosing_fn(path, line):
-    """The definition line of the fn containing `line`, or None."""
-    try:
-        src = path.read_text(encoding='utf-8', errors='replace').splitlines()
-    except OSError:
-        return None
-    if line > len(src):
-        return None
-    for i in range(line - 1, -1, -1):
-        if FN_DEF.match(src[i]):
-            return i + 1
-    return None
+    """The definition line of the fn containing `line`, or None.
+
+    This used to scan UPWARD for the nearest `fn`, which cannot see that a
+    function has closed: a site sitting after a nested helper's closing brace
+    was attributed to the helper. `triangulation.rs` has a two-line nested `fn
+    end_pts` inside `new_with_join`, and that defect is why
+    `BG-TOL-001-MESHALGO` shipped with a budget of 11 against a true 10 -- the
+    gate and the claim shared a counter. See `loop/rustscan.py`.
+    """
+    m = _fn_map(path)
+    return None if m is None else m.get(line)
 
 
 def packet_contexts(text):

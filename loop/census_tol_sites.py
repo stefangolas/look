@@ -10,6 +10,9 @@ import os
 import re
 import sys
 
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import rustscan  # noqa: E402  -- sibling module, loop/ is not a package
+
 ROOT = r'C:\Users\stefa\look\vendor\truck'
 PAT = re.compile(r'\.near2?\(|\bso_small2?\(|\bTOLERANCE2?\b')
 SQUARED = re.compile(r'\.near2\(|\bso_small2\(|\bTOLERANCE2\b')
@@ -28,47 +31,38 @@ for crate in sorted(os.listdir(ROOT)):
             path = os.path.join(dirpath, fn)
             in_test = False
             test_armed = False
-            cur_fn = '<file scope>'
-            cur_fn_line = 0
-            lineno = 0
             depth_at_test = None
-            depth = 0
-            in_block = False
-            for line in open(path, encoding='utf-8', errors='replace'):
-                lineno += 1
-                s = line.strip()
+            text = open(path, encoding='utf-8', errors='replace').read()
+            # Line facts -- brace depth, block comments, and above all WHICH
+            # FUNCTION a line is in -- come from loop/rustscan.py now. The
+            # attribution used to be "the last `fn` seen", which never notices
+            # that a function has closed, so a site after a nested helper's
+            # closing brace was credited to the helper and two contexts read as
+            # one. That is the defect that put a budget of 11 in
+            # BG-TOL-001-MESHALGO's packet against a true 10.
+            for info in rustscan.scan(text):
+                lineno, line, s = info.lineno, info.raw, info.raw.strip()
+                cur_fn, cur_fn_line = info.fn_name, info.fn_line
                 # Block comments are dead text and are NOT migration work. This
                 # cost BG-TOL-001-SHAPEOPS an amendment: the packet listed
                 # fillet/mod.rs:615 as a live site and it sits inside a /* */
                 # spanning lines 500-662, so the worker dutifully rewrote a
                 # comment. Counting it as a site is how that reached the packet.
-                was_in_block = in_block
-                if '/*' in s and '*/' not in s.split('/*', 1)[1]:
-                    in_block = True
-                elif '*/' in s and was_in_block:
-                    in_block = False
-                    if PAT.search(line):
+                # The test is now "the token survives comment and literal
+                # stripping", which also catches a token in a trailing `//` and
+                # one inside a string -- neither is a predicate either.
+                raw_hit = PAT.search(line)
+                if raw_hit and not PAT.search(info.code):
+                    if s.startswith('//'):
+                        doc += 1
+                    else:
                         dead += 1
                     continue
-                if was_in_block or in_block:
-                    if PAT.search(line):
-                        dead += 1
-                    continue
-                m_fn = re.match(r'\s*(?:pub\s+)?(?:const\s+)?(?:async\s+)?(?:unsafe\s+)?fn\s+(\w+)', line)
-                if m_fn:
-                    cur_fn = m_fn.group(1)
-                    cur_fn_line = lineno
-                # crude but adequate brace tracking for #[cfg(test)] mod blocks
                 if re.match(r'#\[cfg\(test\)\]', s) or s.startswith('#[proptest'):
                     in_test = True
                     test_armed = False
-                    depth_at_test = depth
-                # Braces inside string literals corrupt the depth count, and
-                # format strings are full of them -- `"{i} {t}"` reads as two
-                # opens. Strip literals before counting.
-                code = re.sub(r'"(?:[^"\\]|\\.)*"', '""', line)
-                code = re.sub(r"'(?:[^'\\]|\\.)*'", "''", code)
-                depth += code.count('{') - code.count('}')
+                    depth_at_test = info.depth_before
+                depth = info.depth_after
                 # `test_armed` is the whole fix. The attribute and the `mod
                 # tests {` it applies to are on different lines, so on the
                 # attribute's own line depth is still equal to depth_at_test and
@@ -84,7 +78,7 @@ for crate in sorted(os.listdir(ROOT)):
                     elif test_armed:
                         in_test = False
                         depth_at_test = None
-                if not PAT.search(line):
+                if not raw_hit:
                     continue
                 if SQUARED.search(line):
                     squared += 1

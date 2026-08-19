@@ -8292,7 +8292,6 @@ impl PolyBoundary {
                 }
             }
             2 => {
-                let ctx = ToleranceCtx::unscaled_legacy();
                 let (mut curve1, mut curve1_sources) = open.pop().unwrap();
                 let (mut curve0, mut curve0_sources) = open.pop().unwrap();
                 fn end_pts<T: Copy>(vec: &[T]) -> (T, T) {
