@@ -1849,6 +1849,7 @@ impl<P: for<'a> From<&'a CartesianPoint>> TryFrom<&BSplineCurveWithKnots> for BS
     type Error = StepConvertingError;
     #[inline(always)]
     fn try_from(curve: &BSplineCurveWithKnots) -> Result<Self, StepConvertingError> {
+        let ctx = ToleranceCtx::unscaled_legacy();
         let knots = curve.knots.clone();
         let multi = curve
             .knot_multiplicities
@@ -1876,7 +1877,8 @@ impl<P: for<'a> From<&'a CartesianPoint>> TryFrom<&BSplineCurveWithKnots> for BS
         // approximation. `ValidatedKnotVector::validate` has already proved
         // the active domain is nonzero (it rejects `<= 1e-12`), so `transform`
         // never divides by a zero range here.
-        if kv.range_length().so_small() {
+        if ctx.is_small_ratio(kv.range_length()) {
+            // BG-TOL-001: param
             let range = kv.range_length();
             kv.transform(1.0 / range, -kv[0] / range);
         }
@@ -3163,6 +3165,7 @@ impl EdgeCurve {
         q: Point2,
         same_sense: bool,
     ) -> Result<Curve2D, StepConvertingError> {
+        let ctx = ToleranceCtx::unscaled_legacy();
         let mut curve = match curve {
             CurveAny::Line(line) => {
                 let line = truck::Line::<Point2>::from(line.as_ref());
@@ -3187,7 +3190,8 @@ impl EdgeCurve {
                             .search_nearest_parameter(q, None, 0)
                             .ok_or_else(|| "the point is not on circle".to_string())?,
                     );
-                    if v < u - TOLERANCE {
+                    if v < u - ctx.ratio_margin() {
+                        // BG-TOL-001: param
                         v += 2.0 * PI;
                     }
                     let circle = TrimmedCurve::new(UnitCircle::<Point2>::new(), (u, v));
@@ -3210,7 +3214,8 @@ impl EdgeCurve {
                             .search_nearest_parameter(q, None, 0)
                             .ok_or_else(|| "the point is not on circle".to_string())?,
                     );
-                    if v < u - TOLERANCE {
+                    if v < u - ctx.ratio_margin() {
+                        // BG-TOL-001: param
                         v += 2.0 * PI;
                     }
                     let circle = TrimmedCurve::new(UnitCircle::<Point2>::new(), (u, v));
@@ -3287,6 +3292,7 @@ impl EdgeCurve {
         q: Point3,
         same_sense: bool,
     ) -> Result<Curve3D, StepConvertingError> {
+        let ctx = ToleranceCtx::unscaled_legacy();
         let mut curve = match curve {
             CurveAny::Line(_) => Curve3D::Line(Line(p, q)),
             CurveAny::BoundedCurve(b) => b.as_ref().try_into()?,
@@ -3306,7 +3312,8 @@ impl EdgeCurve {
                             .search_nearest_parameter(q, None, 0)
                             .ok_or_else(|| format!("the point is not on circle: {q:?}"))?,
                     );
-                    if v < u - TOLERANCE {
+                    if v < u - ctx.ratio_margin() {
+                        // BG-TOL-001: param
                         v += 2.0 * PI;
                     }
                     let circle = TrimmedCurve::new(UnitCircle::<Point3>::new(), (u, v));
@@ -3338,7 +3345,8 @@ impl EdgeCurve {
                             .search_nearest_parameter(q, None, 0)
                             .ok_or_else(|| format!("the point is not on circle: {q:?}"))?,
                     );
-                    if v < u - TOLERANCE {
+                    if v < u - ctx.ratio_margin() {
+                        // BG-TOL-001: param
                         v += 2.0 * PI;
                     }
                     let circle = TrimmedCurve::new(UnitCircle::<Point3>::new(), (u, v));
@@ -3413,7 +3421,8 @@ impl EdgeCurve {
                 Curve3D::PCurve(truck::PCurve::new(Box::new(curve2d), Box::new(surface)))
             }
             CurveAny::SurfaceCurve(c) => {
-                if p.near(&q) {
+                if ctx.near_pt(p, q) {
+                    // BG-TOL-001: model
                     return Self::sub_parse_curve3d(&c.curve_3d, p, q, same_sense);
                 }
                 use PreferredSurfaceCurveRepresentation::*;

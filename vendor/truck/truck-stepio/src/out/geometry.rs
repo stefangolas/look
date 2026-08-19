@@ -245,6 +245,7 @@ impl<V> StepCurve for NurbsCurve<V> {}
 
 impl DisplayByStep for Processor<TrimmedCurve<UnitCircle<Point2>>, Matrix3> {
     fn fmt(&self, idx: usize, f: &mut Formatter<'_>) -> Result {
+        let ctx = ToleranceCtx::unscaled_legacy();
         let transform = *self.transform();
         let position_idx = idx + 1;
         let location_idx = idx + 2;
@@ -253,7 +254,8 @@ impl DisplayByStep for Processor<TrimmedCurve<UnitCircle<Point2>>, Matrix3> {
         let r1 = transform[1].magnitude();
         let ref_direction = VectorAsDirection(transform[0].truncate() / r0);
         let location = transform[2].to_point();
-        if r0.near(&r1) {
+        if ctx.is_small_ratio(r0 - r1) {
+            // BG-TOL-001: param
             let r = FloatDisplay(r0);
             f.write_fmt(format_args!("#{idx} = CIRCLE('', #{position_idx}, {r});\n"))?;
         } else {
@@ -273,6 +275,7 @@ impl_const_step_length!(Processor<TrimmedCurve<UnitCircle<Point2>>, Matrix3>, 4)
 
 impl DisplayByStep for Processor<TrimmedCurve<UnitCircle<Point3>>, Matrix4> {
     fn fmt(&self, idx: usize, f: &mut Formatter<'_>) -> Result {
+        let ctx = ToleranceCtx::unscaled_legacy();
         let transform = self.transform();
         let position_idx = idx + 1;
         let location_idx = idx + 2;
@@ -283,7 +286,8 @@ impl DisplayByStep for Processor<TrimmedCurve<UnitCircle<Point3>>, Matrix4> {
         let r0 = transform[0].magnitude();
         let r1 = transform[1].magnitude();
         let ref_direction = VectorAsDirection(transform[0].truncate() / r0);
-        if r0.near(&r1) {
+        if ctx.is_small_ratio(r0 - r1) {
+            // BG-TOL-001: param
             let r = FloatDisplay(r0);
             f.write_fmt(format_args!("#{idx} = CIRCLE('', #{position_idx}, {r});\n"))?;
         } else {
@@ -535,6 +539,7 @@ impl StepSurface for Plane {}
 
 impl DisplayByStep for Processor<Sphere, Matrix4> {
     fn fmt(&self, idx: usize, f: &mut Formatter<'_>) -> Result {
+        let ctx = ToleranceCtx::unscaled_legacy();
         let sphere = *self.entity();
         let transform = self.transform();
         let position_idx = idx + 1;
@@ -545,7 +550,8 @@ impl DisplayByStep for Processor<Sphere, Matrix4> {
         let axis = VectorAsDirection(transform[2].truncate().normalize());
         let r0 = transform[0].magnitude();
         let r1 = transform[1].magnitude();
-        if !r0.near(&r1) {
+        if !ctx.is_small_ratio(r0 - r1) {
+            // BG-TOL-001: param
             f.write_str("The transform of sphere includes non-uniform scale.")?;
             return ERR;
         }
@@ -572,6 +578,7 @@ impl StepSurface for Sphere {}
 
 impl DisplayByStep for Processor<Torus, Matrix4> {
     fn fmt(&self, idx: usize, f: &mut Formatter<'_>) -> Result {
+        let ctx = ToleranceCtx::unscaled_legacy();
         let torus = *self.entity();
         let transform = self.transform();
         let position_idx = idx + 1;
@@ -582,7 +589,8 @@ impl DisplayByStep for Processor<Torus, Matrix4> {
         let axis = VectorAsDirection(transform[2].truncate().normalize());
         let r0 = transform[0].magnitude();
         let r1 = transform[1].magnitude();
-        if !r0.near(&r1) {
+        if !ctx.is_small_ratio(r0 - r1) {
+            // BG-TOL-001: param
             f.write_str("The transform of sphere includes non-uniform scale.")?;
             return ERR;
         }
@@ -801,6 +809,7 @@ where
     C: StepLength + Transformed<Matrix4> + DisplayByStep,
 {
     fn fmt(&self, idx: usize, f: &mut Formatter<'_>) -> Result {
+        let ctx = ToleranceCtx::unscaled_legacy();
         let surface = self.entity();
         let transform = self.transform();
         let (k, a, _) = match transform.iwasawa_decomposition() {
@@ -810,7 +819,10 @@ where
                 return ERR;
             }
         };
-        if !a[0][0].near(&a[1][1]) || !a[1][1].near(&a[2][2]) {
+        if !ctx.is_small_ratio(a[0][0] - a[1][1]) // BG-TOL-001: param
+            || !ctx.is_small_ratio(a[1][1] - a[2][2])
+        // BG-TOL-001: param
+        {
             f.write_str("Transform contains non-uniform scale.")?;
             return ERR;
         }

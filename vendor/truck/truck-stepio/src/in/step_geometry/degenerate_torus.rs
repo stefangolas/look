@@ -94,6 +94,7 @@ impl DegenerateTorus {
     /// Closed-form inverse for a point on the outer sheet, in the carrier's
     /// local frame (the torus centre at the origin, the axis along `z`).
     fn inverse_outer(&self, point: Point3) -> Option<(f64, f64)> {
+        let ctx = ToleranceCtx::unscaled_legacy();
         let r = point - self.inner.center();
         let rxy = Vector2::new(r.x, r.y);
         let rho = rxy.magnitude();
@@ -102,7 +103,8 @@ impl DegenerateTorus {
         if !(v >= v0 && v <= v1) {
             return None;
         }
-        let u = if rxy.so_small() {
+        let u = if ctx.is_small_len(rxy.magnitude()) {
+            // BG-TOL-001: model
             0.0
         } else {
             let rxy_n = rxy.normalize();
@@ -121,6 +123,7 @@ impl DegenerateTorus {
     /// point's azimuth is `u + π`, so `u` is recovered from `atan2(-y, -x)` and
     /// `v` from `atan2(z, -(ρ + R))`.
     fn inverse_inner(&self, point: Point3) -> Option<(f64, f64)> {
+        let ctx = ToleranceCtx::unscaled_legacy();
         let r = point - self.inner.center();
         let rxy = Vector2::new(r.x, r.y);
         let rho = rxy.magnitude();
@@ -138,7 +141,8 @@ impl DegenerateTorus {
         if !(v >= v0 && v <= v1) {
             return None;
         }
-        let u = if rxy.so_small() {
+        let u = if ctx.is_small_len(rxy.magnitude()) {
+            // BG-TOL-001: model
             0.0
         } else {
             let u = f64::atan2(-r.y, -r.x);
@@ -227,11 +231,13 @@ impl SearchParameter<D2> for DegenerateTorus {
         _: H,
         _trials: usize,
     ) -> Option<(f64, f64)> {
+        let ctx = ToleranceCtx::unscaled_legacy();
         let (u, v) = match self.select_outer {
             true => self.inverse_outer(point),
             false => self.inverse_inner(point),
         }?;
-        match self.subs(u, v).near(&point) {
+        match ctx.near_pt(self.subs(u, v), point) {
+            // BG-TOL-001: model
             true => Some((u, v)),
             false => None,
         }
@@ -247,8 +253,10 @@ impl SearchNearestParameter<D2> for DegenerateTorus {
         trials: usize,
     ) -> Option<(f64, f64)> {
         // An on-sheet point answers in closed form.
+        let ctx = ToleranceCtx::unscaled_legacy();
         if let Some(uv) = self.search_parameter(point, SPHint2D::None, trials) {
-            if self.subs(uv.0, uv.1).near(&point) {
+            if ctx.near_pt(self.subs(uv.0, uv.1), point) {
+                // BG-TOL-001: model
                 return Some(uv);
             }
         }
