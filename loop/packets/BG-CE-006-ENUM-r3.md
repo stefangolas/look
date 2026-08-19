@@ -47,71 +47,66 @@ anchors:
   - {id: A5, expect: 1, cmd: "grep -c 'mod integrate' vendor/truck/truck-shapeops/src/transversal/mod.rs"}
 ```
 
-## Problem — with the bisection already done for you
+## Problem — root cause FOUND (probes, 2026-08-19)
 
-`truck-shapeops/src/transversal/integrate/tests.rs::punched_cube` builds a
-cube, punches it with a swept circle (`rsweep` → arc wire → `try_attach_plane`
-→ `tsweep` → `not()` → `and`), and fails at `crate::and(...).unwrap()`:
-**the boolean returns `None`**. The orchestrator bisected this to root-cause
-candidate level by direct experiment on this branch's tip:
+`truck-shapeops/src/transversal/integrate/tests.rs::punched_cube` fails at
+`crate::and(...).unwrap()`: the boolean returns `None`. Bisection (all
+verified by direct experiment on this branch's tip):
 
-1. Reverting **only** `truck-geometry/src/decorators/revolved_curve.rs` to the
-   pre-r2 state does **not** fix it — r2's branch normalization is not the
-   cause.
-2. Restoring **only** the old circle→NURBS degradation inside
-   `impl ToSameGeometry<Curve> for Processor<TrimmedCurve<UnitCircle<Point3>, Matrix4>>`
-   in `canonical.rs` **makes it pass** — the preserved `Curve::Circle`
-   representation is the cause.
-3. Changing the punch's sweep from an over-wrapping `Rad(7.0)` to an
-   under-wrapping `Rad(6.0)` still fails — **every** preserved circle breaks
-   the engine, not just over-wrapping trims.
+1. Reverting **only** `revolved_curve.rs` to the pre-r2 state does not fix it.
+2. Restoring **only** the old circle→NURBS degradation in `canonical.rs`
+   makes it pass — the preserved `Curve::Circle` is the cause.
+3. The failure is at `divide_face::create_parameter_boundary`, located by
+   running the test under instrumentation: the punch cylinder's wall face has
+   parameter domain `(u = angle ∈ [0, 2π), v = height)`, the boundary wire's
+   circle edges carry **over-wrapping ranges (e.g. `(0.0, 8.0)`)**, and
+   `create_parameter_boundary` maps each polyline point through
+   `surface.search_parameter(q, Some(p.into()), 100)` — which returns
+   **principal-branch** angles. Consecutive points at circle-parameters 6.2
+   and 6.3 therefore map to angles ~6.2 and ~0.02: the mapped boundary
+   teleports across the seam, the 2D "polygon" self-crosses, the domain
+   decomposition degenerates (`pre_faces=0`, `negative_wires=3`), and
+   `divide_faces` returns `None`. The old NURBS degrade never hit this
+   because its parameterization was non-periodic, so an over-wrap was a
+   simple polygon in parameter space.
 
-So: somewhere in `process_one_pair_of_shells` (in
-`transversal/integrate/mod.rs`), the pipeline returns `None` when an input edge
-is a `Curve::Circle`. The candidate give-up points, in the order the code calls
-them: `Shell::triangulation` → `loops_store::create_loops_stores` →
-`divide_face::divide_faces` → `cls.and_or_unknown` / `signed_crossing_faces` →
-`altshell_to_shell`'s `BSplineCurve::quadratic_approximation(...)`. Note the
-engine is **generic** over the curve type — it never names `Curve::Circle`;
-whatever breaks is a behavior difference of the circle payload through a trait
-the engine already uses (`ParameterDivision1D`, `SearchParameter`, `Cut`,
-`SearchNearestParameter` on `Processor<TrimmedCurve<UnitCircle<Point3>, Matrix4>>`).
+This is the same branch-consistency contract r2 applied to `RevolutedCurve`,
+missing at the engine's surface-parameter mapping.
 
 ## Decisions already made for you
 
-1. **The fix direction is to make the engine correct on the preserved circle,
-   not to re-degrade circles.** Restoring the old conversion globally is
-   forbidden — it is the regression of the whole point of this branch. If,
-   after diagnosis, you conclude the only sane fix is a **localized**
-   representation change *inside the engine's own machinery* (e.g. the engine
-   pre-mapping `Curve::Circle` edges to their spline approximation at its
-   boundary while leaving the input shell untouched), that is admissible
-   **only** if the *result* shell keeps analytic identity where the input had
-   it on edges the engine did not cut, and only if you say so in RESULT.json
-   deviations with the reason. A global or caller-visible degrade is not.
-2. **Diagnose first, then fix minimally.** Add temporary eprintln/instrument
-   runs as you need (they are probes — remove them before your final commit).
-   Find the exact `None`. Fix the minimal cause. Do not rewrite the engine.
-3. **Likely suspects, checked or not by the orchestrator** (you verify):
-   - `ParameterDivision1D` of `UnitCircle`/`TrimmedCurve<UnitCircle>` yielding
-     a different point distribution than the old NURBS path did — e.g. a
-     duplicate or near-duplicate point at the seam/period boundary that the
-     polyline machinery (spatial hash, polyline intersection) cannot digest.
-   - `SearchParameter`/`SearchNearestParameter` on the circle payload
-     returning branch-inconsistent values into
-     `loops_store`/`divide_faces` (r2 fixed `RevolutedCurve`'s searches; the
-     circle payload's own searches were not audited).
-   - `Cut` on `TrimmedCurve<UnitCircle>` producing a trim representation the
-     engine's edge re-assembly rejects.
+1. **The fix: periodic-domain parameter unwrapping in
+   `create_parameter_boundary`.** When the face's surface reports a `u_period`
+   (`ParametricSurface::u_period()` — already implemented; the analytic
+   carriers return `Some(2π)`), each parameter returned by
+   `search_parameter` must be **unwrapped relative to the previous point's
+   parameter**: shifted by integer multiples of the period so that the jump
+   from the previous point is at most half a period in absolute value. The
+   initial point (`search_parameter(pt, None, 100)`) stays on the principal
+   branch. Apply the same treatment anywhere else in the transversal engine
+   that chains `search_parameter` results into a parameter-space polyline
+   (grep the module for other `search_parameter` uses; fix what chains,
+   leave what does not).
+2. **Check the reverse path.** If the engine maps parameter-domain results
+   back through `subs(u, v)` or re-emits curves cut at these parameters,
+   over-wrapped u values must survive that round trip (they are legitimate
+   parameters of a periodic domain). Say in RESULT.json whether the reverse
+   path needed anything.
+3. **The fix direction is unwrap-in-the-engine, not re-degrade circles.**
+   Restoring the old conversion globally is forbidden — it is the regression
+   of the whole point of this branch.
 4. **Regression test:** `circle_boundary_is_processable_by_transversal_engine`
-   — a focused unit test in `transversal/integrate/tests.rs` (or beside the
-   stage you fix, your judgement) that exercises the exact failing stage with a
-   circle-bearing boundary, so the fix is pinned at the level it was made.
+   — a focused test exercising `create_parameter_boundary` (or the smallest
+   public seam above it) with an over-wrapping circle edge on a
+   `Cylinder`-surface face, asserting the mapped boundary is seam-continuous
+   (no jump exceeds half a period between consecutive points).
    `punched_cube` passing is also required and V5 will enforce it.
 5. **Nothing else moves.** `builder::partial_torus` and
    `tsweep_circle_yields_cylinder` must stay green (V5 runs truck-modeling).
-   No behavior change may be reachable for boundary curves that are not
-   circles.
+   No behavior change may be reachable for boundary curves on
+   non-periodic-domain surfaces.
+6. **The prior attempt's instrumentation is archived, not yours to restore.**
+   If you add probes of your own, remove them before the final commit.
 
 ## Done when — run these, all must pass
 
