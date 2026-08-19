@@ -175,6 +175,13 @@ large file into context at once.
     out = re.sub(r'```yaml\n.*?\n```', lambda _: front, tpl, count=1, flags=re.S)
     out = re.sub(r'## Where the sites are\n.*?(?=\n## Your output)', where, out,
                  count=1, flags=re.S)
+    # The commit subject was NOT parameterised in the first version, so every
+    # generated shard told its worker to commit "survey(meshalgo): classify 30
+    # tolerance sites" -- and two of them did, landing truck-geometry and
+    # truck-polymesh surveys under a truck-meshalgo subject with a count that
+    # belonged to another crate. A ledger is only as good as its subjects.
+    shard = args.id.replace('BG-TOL-001-', '').replace('-SURVEY', '').lower()
+    out = out.replace('__SHARD__', shard).replace('__NSITES__', str(total_sites))
     out = out.replace('BG-TOL-001-MESHALGO-SURVEY', args.id)
     out = out.replace('`truck-meshalgo` holds 30 tolerance predicates across 20 functions',
                       '`%s` holds at least %d tolerance predicates across %d functions'

@@ -103,11 +103,22 @@ def review(path, sample):
                     flag('MIXED/MULTI PREDICATE -- rewrite may drop a guard', s,
                          '%d predicates on the line, rewrite migrates %d' % (n, migrated))
 
+        # Deliberately noisy in one direction only. `v.cross(axis)` is degree 2
+        # when both operands are displacements and degree 1 -- |v| sin t -- when
+        # one is a UNIT vector, and nothing in the text says which; RevolutedCurve
+        # normalizes its axis in the constructor, so `(p - origin).cross(axis)`
+        # is a genuine length and `model` is right there. Static detection is not
+        # possible, so this flags the shape and tells the reviewer what to check.
+        # A false positive costs one glance; a false negative ships an area
+        # compared against a length margin, which is correct at Stage A and
+        # wrong at Stage B.
         if cls == 'model' and (DEG2.search(s.get('expression', '') or '')
-                               or 'area' in reason or 'squared' in reason
+                               or 'area' in reason or 'triple product' in reason
                                or 'length-squared' in reason):
-            flag('DEGREE-2? -- an area compared with a length margin', s,
-                 'expression or reason suggests degree 2 in length')
+            flag('DEGREE-2? -- check the operands', s,
+                 'if BOTH cross operands are displacements this is an area (degree 2) and '
+                 'belongs in BG-TOL-004; if one is a unit vector it is |v|sin(t), degree 1, '
+                 'and `model` is correct')
 
         if raw and NONPRED.search(raw) and cls in ('model', 'param'):
             flag('NOT A PREDICATE? -- a value, not a comparison', s,

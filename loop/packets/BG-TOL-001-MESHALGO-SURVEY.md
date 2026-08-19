@@ -290,4 +290,4 @@ Committing to `main`.
 status also write `QUESTION.md` beside it.
 
 Commit on the current branch with subject
-`survey(meshalgo): classify 30 tolerance sites model or param (BG-TOL-001-MESHALGO-SURVEY)`.
+`survey(__SHARD__): classify __NSITES__ tolerance sites model or param (BG-TOL-001-MESHALGO-SURVEY)`.

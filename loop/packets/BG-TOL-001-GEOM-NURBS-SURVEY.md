@@ -101,7 +101,23 @@ reproduces that number. One survey excluded a live site by getting this
 backwards.
 
 **4. Not code:** anything inside a `#[cfg(test)]` module, a doc comment (`///`,
-`//!`), or a `/* */` block. A test's own epsilon is the test's business, and a
+`//!`), or a `/* */` block.
+
+### Do NOT emit a row for exclusion 4
+
+This is a change from the first survey and it matters. Exclusion 4 is decided by
+a **deterministic rule that already exists in `loop/census_tol_sites.py`** -- it
+needs no judgement, and the inventory above is already filtered by it. The first
+survey emitted a row for every grep hit and **54 of its 104 rows were "inside
+`#[cfg(test)]`" or "a doc example"**, 34 of them repeating one identical
+sentence. That is more than half the payload spent restating a rule the
+orchestrator can run in a second, and every one of those rows had to be read.
+
+So: **emit rows only for sites the inventory lists**, plus anything you find that
+it missed. If you believe an inventory row is test or doc code, emit it as
+`excluded` with reason code `NOT_CODE` and one short sentence -- that is a
+disagreement with the census and is worth reporting. Silence on the other
+hundreds of grep hits is expected and correct. A test's own epsilon is the test's business, and a
 doc example is prose. **Check for these before classifying** — a previous packet
 listed a line inside a `/* */` block spanning 160 lines and a worker dutifully
 migrated a comment.
@@ -157,6 +173,7 @@ One object, with a `sites` array. **Every field is required on every row.**
       "symbol": "sorted_endpoints",
       "expression": "if t.so_small() {",
       "classification": "param",
+      "reason_code": "PARAM_RATIO",
       "reason": "t is a normalized ray parameter in [0,1], not a distance",
       "confidence": "high",
       "proposed_rewrite": "ctx.is_small_ratio(t)"
@@ -170,9 +187,30 @@ One object, with a `sites` array. **Every field is required on every row.**
   tree — an invented line number fails the packet.
 - `expression` is the source line, trimmed. It may be a fragment.
 - `classification` is exactly one of `model`, `param`, `excluded`.
-- `reason` says what the quantity physically is, in one sentence. "It is a
-  length" is not a reason; "it is the distance from the sample point to the
-  triangle plane" is.
+- `reason_code` is one of the codes below. `reason` is free text and is
+  **required only when the code is `OTHER`, or when you want to add something
+  the code does not carry** -- for every other row leave it out or keep it to a
+  clause. In the first survey `reason` was 24% of the whole file and **8.5 KB of
+  it was duplicated text**, six rows repeating one 400-character paragraph. That
+  duplication is not just waste: it is how a *wrong* rationale hid, because the
+  six identical copies read as six independent judgements when they were one.
+
+  | code | meaning |
+  |---|---|
+  | `MODEL_LEN` | a length in model space |
+  | `MODEL_DIST` | a distance between two model-space points |
+  | `PARAM_UV` | a `uv` or curve parameter, dimensionless |
+  | `PARAM_RATIO` | a ratio, sine, weight or scale factor |
+  | `PARAM_UNIT` | magnitude of an already-normalized vector |
+  | `DEGREE2` | an area or triple product -- degree 2 in length (exclusion 1) |
+  | `NOT_A_PREDICATE` | a const, import, floor or offset (exclusion 2) |
+  | `SQUARED_ORDER` | compares against `TOLERANCE2` (exclusion 3) |
+  | `NOT_CODE` | test or doc code (exclusion 4) |
+  | `OTHER` | anything else -- `reason` then required |
+
+  When you do write `reason`, say what the quantity physically **is**. "It is a
+  length" is not a reason; "the distance from the sample point to the triangle
+  plane" is.
 - `confidence` is `high`, `medium` or `low`. **Use `low` freely** — a low-
   confidence row that names the ambiguity is worth more than a high-confidence
   guess, and the orchestrator reads the low ones first.
@@ -260,4 +298,4 @@ Committing to `main`.
 status also write `QUESTION.md` beside it.
 
 Commit on the current branch with subject
-`survey(meshalgo): classify 30 tolerance sites model or param (BG-TOL-001-GEOM-NURBS-SURVEY)`.
+`survey(geom-nurbs): classify 69 tolerance sites model or param (BG-TOL-001-GEOM-NURBS-SURVEY)`.
