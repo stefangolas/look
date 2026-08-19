@@ -1,0 +1,31 @@
+{
+  "base": "af21c35",
+  "compile_ok": true,
+  "computed_at": "2026-08-19T15:07:43.375856Z",
+  "crates": [
+    "truck-geotrait",
+    "truck-polymesh"
+  ],
+  "test_args": [
+    "--lib",
+    "--tests"
+  ],
+  "tests": {
+    "derive_build_test_is_running": "ok",
+    "faces::faces_from_iter": "ok",
+    "polycurve_closest_point": "ok",
+    "polycurve_division": "ok",
+    "polycurve_intersection_point": "ok",
+    "polycurve_presearch": "ok",
+    "polycurve_snp_on_curve": "ok",
+    "polycurve_test": "ok",
+    "polyline_curve::polyline_test": "ok",
+    "polysurface": "ok",
+    "polysurface_division": "ok",
+    "polysurface_intersection_point": "ok",
+    "polysurface_presearch": "ok",
+    "polysurface_snp_on_surface": "ok",
+    "polysurface_sp_on_surface": "ok",
+    "test_composite": "ok"
+  }
+}
