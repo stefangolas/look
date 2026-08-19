@@ -1005,11 +1005,24 @@ def main():
             newly_failing = sorted(n for n, s in now.items()
                                     if s == 'FAILED' and base_tests.get(n) != 'FAILED')
             still_failing = sorted(n for n, s in now.items()
-                                    if s == 'FAILED' and base_tests.get(n) == 'FAILED')
+                                   if s == 'FAILED' and base_tests.get(n) == 'FAILED')
             disappeared = sorted(n for n, s in base_tests.items()
                                   if s == 'ok' and n not in now)
+            # A disappeared full path whose leaf test fn passes elsewhere in
+            # this run is a MOVE (e.g. a test module crossing crates in a
+            # stacked packet), not a deletion. Deleting-to-cheat does not
+            # re-add the name anywhere; a move must. This keeps the property
+            # the disappearance charge exists for -- you cannot delete or
+            # #[ignore] your way to green -- while not charging moves, which
+            # the comment above already recorded as this gate's known false
+            # positive. First exercised live by BG-CE-006-ENUM-r2, whose six
+            # BG-S0-001/S0-003 tests moved from truck-modeling/src/geometry.rs
+            # to truck-geometry/src/canonical.rs and were charged as deleted.
+            leaf_now_ok = {n.rsplit('::', 1)[-1] for n, s in now.items() if s == 'ok'}
+            moved = [n for n in disappeared if n.rsplit('::', 1)[-1] in leaf_now_ok]
+            disappeared = [n for n in disappeared if n not in set(moved)]
             newly_ignored = sorted(n for n, s in now.items()
-                                    if s == 'ignored' and base_tests.get(n) == 'ok')
+                                   if s == 'ignored' and base_tests.get(n) == 'ok')
 
             regressions = newly_failing + disappeared + newly_ignored
 
