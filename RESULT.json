@@ -1,0 +1,12 @@
+{
+  "id": "BG-EVD-004-r2",
+  "status": "DONE",
+  "contracts": ["BG-EVD-004"],
+  "tests_added": 2,
+  "sites_migrated": 0,
+  "sites_deferred": 0,
+  "deviations": [],
+  "disagreements": [],
+  "baseline_failures": [],
+  "notes": "Corrected the two wrong Holder composition constants in Modulus::compose and in composed_constant. With self applied outside (self ∘ other), Holder{k,p} ∘ Lipschitz(a) now computes k*a^p (was k*a) and Holder{k1,p} ∘ Holder{k2,q} now computes k1*k2^p (was k1*k2). Doc comment above compose now states 'self ∘ other, self applied outside'; compose_math doc comment rewritten to state that the test reference now agrees with production arithmetic. Added composition_matches_nested_application_on_every_arm (all four arms, eps sampled across inner constants below and above 1, including Lipschitz(0.01) and Holder{0.01, 0.5}) and composition_constant_is_order_dependent (asserts k*a^p vs a*k directly and that they differ). Verbatim pre-existing test modulus_composition_matches_numeric_evaluation still passes. Verification: cargo fmt --check -p truck-base, cargo clippy -p truck-base --all-targets --no-deps -- -D warnings, cargo test -p truck-base --lib --no-fail-fast (19 passed), cargo check --workspace --all-targets all clean; truck-evidence tests also pass. No downstream bound shift observed (accumulate is not consumed outside truck-base's own tests). A pre-existing 'unnecessary qualification' warning in truck-meshalgo (lib test) is unrelated to this change."
+}

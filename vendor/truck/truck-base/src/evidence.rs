@@ -455,9 +455,10 @@ impl Modulus {
             .fold(0.0, |incoming, (m, tau)| m.propagate(incoming, *tau))
     }
 
-    /// ω₂ ∘ ω₁, the split-bound fast path. Refuses unless BOTH operands are
-    /// subadditive (BG-EVD-004 M4): composing a non-subadditive operand would
-    /// publish a bound that may under-report the forward error.
+    /// `self ∘ other` — `self` applied outside — the split-bound fast path.
+    /// Refuses unless BOTH operands are subadditive (BG-EVD-004 M4): composing
+    /// a non-subadditive operand would publish a bound that may under-report
+    /// the forward error.
     pub fn compose(&self, other: &Self) -> Outcome<Modulus> {
         if !self.is_subadditive() || !other.is_subadditive() {
             return Err(Refusal::ForwardToleranceExceeded {
@@ -476,7 +477,10 @@ impl Modulus {
                 ModulusShape::Holder { k: a * k, exponent }
             }
             (ModulusShape::Holder { k, exponent }, ModulusShape::Lipschitz(a)) => {
-                ModulusShape::Holder { k: a * k, exponent }
+                ModulusShape::Holder {
+                    k: k * a.powf(exponent),
+                    exponent,
+                }
             }
             (
                 ModulusShape::Holder {
@@ -488,7 +492,7 @@ impl Modulus {
                     exponent: e2,
                 },
             ) => ModulusShape::Holder {
-                k: k1 * k2,
+                k: k1 * k2.powf(e1),
                 exponent: e1 * e2,
             },
             (ModulusShape::Pole { .. }, _)
@@ -557,8 +561,14 @@ fn composed_constant(self_: &Modulus, other: &Modulus) -> f64 {
     match (self_.shape, other.shape) {
         (ModulusShape::Lipschitz(a), ModulusShape::Lipschitz(b)) => a * b,
         (ModulusShape::Lipschitz(a), ModulusShape::Holder { k, .. }) => a * k,
-        (ModulusShape::Holder { k, .. }, ModulusShape::Lipschitz(a)) => a * k,
-        (ModulusShape::Holder { k: k1, .. }, ModulusShape::Holder { k: k2, .. }) => k1 * k2,
+        (ModulusShape::Holder { k, exponent }, ModulusShape::Lipschitz(a)) => k * a.powf(exponent),
+        (
+            ModulusShape::Holder {
+                k: k1,
+                exponent: e1,
+            },
+            ModulusShape::Holder { k: k2, .. },
+        ) => k1 * k2.powf(e1),
         (ModulusShape::Pole { .. }, _) | (_, ModulusShape::Pole { .. }) => f64::INFINITY,
         (ModulusShape::Unbounded, _) | (_, ModulusShape::Unbounded) => f64::INFINITY,
     }
@@ -704,6 +714,65 @@ mod tests {
             Modulus::Unbounded.compose(&a),
             Err(Refusal::ForwardToleranceExceeded { .. })
         ));
+    }
+
+    #[test]
+    fn composition_matches_nested_application_on_every_arm() {
+        // BG-EVD-004: on every arm the composed modulus evaluates like the
+        // nested application with `self` outside: composed(ε) = outer(inner(ε)).
+        // The inner constant is sampled both below and above 1 — the old
+        // under-report only bites below 1, where the inner step contracts.
+        let tol = 1e-9; // H-3: float epsilon between two evaluations of one dimensionless modulus, not a length
+        let cases = [
+            (lipschitz(2.0), lipschitz(0.01)),
+            (lipschitz(2.0), lipschitz(4.0)),
+            (lipschitz(2.0), holder(0.01, 0.5)),
+            (lipschitz(2.0), holder(4.0, 0.5)),
+            (holder(3.0, 0.5), lipschitz(0.01)),
+            (holder(3.0, 0.5), lipschitz(4.0)),
+            (holder(3.0, 0.5), holder(0.01, 0.5)),
+            (holder(3.0, 0.5), holder(4.0, 0.5)),
+        ];
+        for (outer, inner) in cases {
+            let composed = outer.compose(&inner).unwrap().value;
+            for eps in [0.001, 0.01, 0.1, 0.5, 0.9] {
+                let nested = outer.eval(inner.eval(eps));
+                assert!(
+                    (composed.eval(eps) - nested).abs() < tol,
+                    "arm {outer:?} then {inner:?} disagrees with nested application at eps = {eps}"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn composition_constant_is_order_dependent() {
+        // Holder{k, p} ∘ Lipschitz(a) has constant k·a^p and Lipschitz(a) ∘
+        // Holder{k, p} has constant a·k; for a ≠ 1 these differ, so the
+        // constants do not simply multiply (BG-EVD-004).
+        let h_then_l = holder(3.0, 0.5).compose(&lipschitz(0.01)).unwrap().value;
+        let l_then_h = lipschitz(0.01).compose(&holder(3.0, 0.5)).unwrap().value;
+        assert_eq!(
+            h_then_l,
+            Modulus {
+                shape: ModulusShape::Holder {
+                    k: 3.0 * 0.01f64.powf(0.5),
+                    exponent: 0.5,
+                },
+                domain: f64::INFINITY,
+            }
+        );
+        assert_eq!(
+            l_then_h,
+            Modulus {
+                shape: ModulusShape::Holder {
+                    k: 0.01 * 3.0,
+                    exponent: 0.5,
+                },
+                domain: f64::INFINITY,
+            }
+        );
+        assert_ne!(h_then_l.shape, l_then_h.shape);
     }
 
     #[test]
@@ -880,6 +949,22 @@ mod tests {
         *state
     }
 
+    /// A `Lipschitz` modulus on an infinite domain.
+    fn lipschitz(a: f64) -> Modulus {
+        Modulus {
+            shape: ModulusShape::Lipschitz(a),
+            domain: f64::INFINITY,
+        }
+    }
+
+    /// A `Holder` modulus on an infinite domain.
+    fn holder(k: f64, exponent: f64) -> Modulus {
+        Modulus {
+            shape: ModulusShape::Holder { k, exponent },
+            domain: f64::INFINITY,
+        }
+    }
+
     /// A subadditive modulus: `Lipschitz` or `Holder` with `exponent <= 1.0`,
     /// published on an infinite (global) domain so every evaluation is finite.
     fn random_subadditive_modulus(state: &mut u64) -> Modulus {
@@ -926,12 +1011,12 @@ mod tests {
     }
 
     /// True function composition, self ∘ other: x ↦ self(other(x)), as a
-    /// `Modulus` shape. The code's `compose` fast path preserves the r2
-    /// arithmetic (Hölder constants multiply), which for Hölder is not the true
-    /// function composition; the split bound is the theorem's bound, so the
-    /// tests compose the functions themselves. Test-only: `Pole`/`Unbounded`
-    /// compositions are not single shapes and never arise in the subadditive
-    /// chains exercised here.
+    /// `Modulus` shape. Production `compose` now uses the same arithmetic
+    /// (a Hölder constant raised to the outer exponent: `k·a^p`, `k₁·k₂^p`),
+    /// so this helper and the production fast path agree. It remains the
+    /// reference implementation for the property tests. Test-only:
+    /// `Pole`/`Unbounded` compositions are not single shapes and never arise
+    /// in the subadditive chains exercised here.
     fn compose_math(self_: &Modulus, other: &Modulus) -> Modulus {
         let domain = self_.domain.min(other.domain);
         let shape = match (self_.shape, other.shape) {
