@@ -55,13 +55,37 @@ def main():
 
     slot_root.mkdir(parents=True, exist_ok=True)
 
+    # Refuse outright to operate on the main worktree. Everything below runs
+    # `checkout -B` and `reset --hard`, and pointing that at the repo root
+    # rewrites the orchestrator's own branch out from under it.
+    if wt.resolve() == REPO_ROOT.resolve():
+        sys.exit(f"refusing to treat the repo root as slot {args.slot}'s worktree")
+
     is_existing_worktree = False
     if wt.exists():
         # Confirm it's actually a live git worktree and not just a stray
         # directory (e.g. left behind by a manual rm that missed .git/worktrees).
-        res = git(wt, 'rev-parse', '--is-inside-work-tree')
+        #
+        # `rev-parse --is-inside-work-tree` CANNOT answer this: it returns true
+        # for ANY directory inside the main repo, and loop/slots/N/wt is inside
+        # the main repo by construction. Session 9 hit this with a stub `wt/`
+        # holding nothing but a leftover `vendor/`: the check said "live
+        # worktree", the idempotent path then ran `git -C wt checkout -B
+        # packet/... && reset --hard` which resolved to the MAIN worktree, and
+        # the orchestrator's own checkout was silently moved onto a packet
+        # branch. Nothing was lost only because every ref happened to sit on the
+        # same commit and the tree was clean; with work in flight it would have
+        # been a `reset --hard` over it.
+        #
+        # The question "is this path its own worktree root" is answered by
+        # comparing the toplevel git reports to the path itself.
+        res = git(wt, 'rev-parse', '--show-toplevel')
         if res.returncode == 0:
-            is_existing_worktree = True
+            try:
+                same = Path(res.stdout.strip()).resolve() == wt.resolve()
+            except OSError:
+                same = False
+            is_existing_worktree = same
 
     if is_existing_worktree:
         # Idempotent path: reuse the worktree and target dir, just repoint the
