@@ -39,10 +39,13 @@ specific need arises rather than upfront:
   packet restates and every worker must obey. H-8 is the one that bites: anchors
   are `rg` patterns and symbol names, never line numbers, and a count mismatch
   is a stop condition, not a nuisance.
-- `loop/packets/BG-TOL-001-MESHALGO.md` — the newest worked example and the
-  template the remaining shards copy; it is the first packet written from a
-  reviewed survey rather than by hand. `BG-TOL-001-SHAPEOPS.md` is the older
-  hand-written one and `BG-S0-003.md` older still.
+- `loop/packets/BG-TOL-001-GEOM-NURBS.md` — the newest and largest worked
+  example (57 sites, 26 contexts, 12 deferrals, six files), generated from a
+  reviewed survey by `gen_packet --skeleton` and landed in one dispatch.
+  `BG-TOL-001-MESHALGO.md` is the previous one, `BG-TOL-001-SHAPEOPS.md` the
+  older hand-written shard, and `BG-S0-003.md` older still.
+- `loop/packets/BG-EVD-004-r2.md` — written, checked and **undispatched**; the
+  worked example of a packet that fixes a defect rather than migrating sites.
 - `loop/packets/BG-TOL-001-MESHALGO-SURVEY.md` — the `class: survey` template,
   sharpened after its first run. Copy it to survey a new crate.
 
@@ -52,146 +55,135 @@ here is scored, tuned, or sampled.
 
 ## Where we are
 
-**Fifteen packets DONE of 62** (session 9 landed `BG-TOL-001-GEOM-NURBS`):
-BG-S0-001, -002, -003, BG-EVD-r3, BG-TOL-001-TYPE, -TYPE-r2, -TYPE-r3,
-BG-NUM-001-FILLET, -SHAPEOPS, -TOPOLOGY + -MODELING (both closed by
-`BG-TOL-001-TOPO-MOD`), -GEOM-SPECIFIEDS, -MESHALGO, -GEOM-NURBS, and
-BG-CE-006-CYLINDER + -CONE (closed by `BG-CE-006-CYL-CONE`).
+**Nineteen packets DONE of 62 (31%)**, and Stage A of BG-TOL-001 is nearly
+finished. Session 9 landed `BG-TOL-001-GEOM-NURBS`, `-GEOM-DECORATORS` and
+`-SMALL` (which closes both the `-POLYMESH` and `-GEOTRAIT` DAG rows).
+`BG-TOL-001-STEPIO` landed too, accepted on every gate at the first attempt.
 
-**Nothing is running. Every slot is empty and every packet branch is merged or
-deleted.** 11 GB free, `git worktree list` shows only the main worktree.
+**The BG-TOL-001 burndown moved further this session than in any previous one:**
+the census read **156** production first-order predicates at the start and reads
+**51** now. GATE-4 sits at **109/109**, at its ceiling, which is correct.
 
-**BG-TOL-001 burndown, re-measured after the merge:** the census reads **100
-production first-order predicates left**, down from 156. GATE-4 sits at
-**75/75**, at its ceiling, which is correct. The big remaining pools are
-truck-geometry 46 (decorators 28 + a long tail), truck-stepio 18, and
-truck-meshalgo 11 (the `tessellation/formal` `RELATIVE_TOLERANCE` family the
-census still cannot see — its totals are a floor, see traps).
+**What is left of Stage A** is `BG-TOL-004` (the 20 squared-order sites, design
+class, blocks nothing) plus whatever `census_tol_sites.py` still cannot see —
+its totals are a floor, not a count, and the `tessellation/formal`
+`RELATIVE_TOLERANCE` family is the known blind spot.
 
-**Two packets are written, checked green, and undispatched.** Both were
-dispatched in session 9 and both workers died in an ~8-hour gap when the machine
-went away; neither is a rejection and nothing is implied about either packet.
-
-| packet | sites | contexts | census ceiling | state |
-|---|---|---|---|---|
-| `BG-TOL-001-GEOM-DECORATORS` | 28 migrate + 1 deferral | 14 | 16 | `--check` green, ready |
-| `BG-TOL-001-SMALL` | 7 migrate | 7 | 11 | `--check` green, ready |
-| `BG-TOL-001-STEPIO` | 19 | 15 | 15 | green since session 8, never dispatched |
-
-The two abandoned worker diffs are archived at
-`scratch/slot3-decorators-abandoned.diff` (1039 lines, ~7 files, and it looked
-correct — `ctx.near_pt(...)` with `// BG-TOL-001:` markers and the context as the
-function's first statement) and `scratch/slot1-small-abandoned.diff`. Redispatch
-clean; the archives are insurance, not a starting point.
+**Worker cost for the whole session: $0.18.** Fault attribution now has enough
+rows to be worth reading: `PACKET 2, GATE 1, NONE 1` against `13 unrecorded` from before
+`--fault` existed. Both PACKET faults were the same *kind* of miss — a claim
+about the tree that the packet asserted without running a command.
 
 ## Pick up here
 
-1. **Raise the ceiling, then dispatch DECORATORS and SMALL.** They are
-   write-disjoint (`src/decorators/**` vs `truck-polymesh` + `truck-geotrait`)
-   so both can run at once. `scripts/unscaled_legacy_ceiling.txt` must go
-   **75 → 96** in a commit *before* the slots are forked — `run_packet.py` reads
-   the ceiling from the slot's own HEAD, so raising it after the fork does
-   nothing. Lower it to the true count as each one lands.
+1. **`BG-EVD-004-r2` is written, checked, and is the highest-value thing in the
+   queue.** It fixes a **live soundness defect** found by external review this
+   session: `Modulus::compose` publishes forward bounds that are **too small**
+   on two of four arms. The composite constant for ω_self ∘ ω_other is `a·b^p`,
+   not `a·b`; the code had `k·a` where it needs `k·a^p` and `k₁·k₂` where it
+   needs `k₁·k₂^p`. Under-reports by `a^(p−1)` whenever the inner constant is
+   below 1 — a contracting step — which is 10× at `a = 0.01` and 1000× at
+   1e-6. `Certificate::accumulate` calls it. See spec (M5). Mechanical, one
+   file, ~40 turns.
 
-2. **Then `BG-TOL-001-STEPIO`** (+15, ceiling accordingly). It needs no survey;
-   it already has the judgement.
+2. **Two new spec items came out of the same review and are unstarted:**
+   - **`BG-EVD-005`** — a published modulus needs a *geometric* certificate.
+     BG-EVD-004's M1–M5 constrain only the arithmetic; nothing obliges a cell to
+     publish the modulus its geometry actually has, so a tangency may publish
+     `Lipschitz` and every gate stays green. The item makes the
+     configuration→shape correspondence a contract with a witness, and its
+     negative test is the point: a cell hand-built to publish `Lipschitz` for a
+     constructed tangency must be **rejected**.
+   - **`BG-TOL-005`** — uv tolerance is not a generic dimensionless ratio.
+     `sin_margin()` and `ratio_margin()` both return `tau_rep` today: two names
+     for one number, covering three quantities that do not behave alike
+     (intrinsic / parameter fraction / uv length). Needs a certified
+     `‖δx‖ ≤ C_sup‖δp‖` bridge with `C_sup` an upper bound on `σ_max(J_S)` over
+     the cell, and a `σ_min` lower bound for the inverse direction. **The
+     observation that makes it fit the existing machinery:** a cell whose
+     `σ_min` bound reaches zero *is* BG-EVD-004's `Pole`. A chart singularity is
+     not a special case, it is the same object.
 
-3. **V8 is built and is OFF.** `verify.py`'s V8 is no longer a stub: it runs
-   V5's exact base-vs-HEAD comparison over the **reverse-dependency closure** of
-   the packet's crates, which is the gap V5 structurally cannot see (V5 runs
-   `-p <the packet's crates>` and nothing else). `reverse_dep_closure` reads the
-   vendored `Cargo.toml`s, counts dev-dependencies deliberately — a
-   dev-dependency is how a downstream crate's *tests* reach the changed code —
-   and closes upward. For `truck-geometry` that is evidence, meshalgo, modeling,
-   shapeops, stepio.
+   Both need certified interval evaluation, i.e. **`BG-ENC-001`**, which is also
+   what `BG-CE-002` waits on. That makes `BG-ENC-001` the single most
+   load-bearing unbuilt item in the spec.
 
-   **It has never been watched failing, so it is `--only V8` opt-in and takes no
-   part in acceptance.** Session 9 could not run its negative test: a downstream
-   baseline builds an entire extra workspace and the machine was at 6.5 GB free,
-   under the harness's own 8 GB floor. **Do this first when there is disk.**
-   Break something in `truck-geometry` that a `truck-modeling` test catches,
-   confirm `DOWNSTREAM_REGRESSION`, then delete the opt-in branch in the commit
-   that records it. Note the reason V8 matters is concrete and already paid for:
-   two `cone_topology_tests` invariant tests have been failing in truck-meshalgo
-   since `da72cd5` with every gate green, purely because no packet had ever
-   listed truck-meshalgo in `crates:`.
+3. **V8 is built, correct as far as anyone knows, and still OFF.** It runs V5's
+   base-vs-HEAD comparison over the **reverse-dependency closure** of a packet's
+   crates — the gap V5 structurally cannot see. It has never been watched
+   failing, so it is `--only V8` opt-in and takes no part in acceptance. **Do
+   its negative test first when disk allows:** break something in
+   `truck-geometry` that a `truck-modeling` test catches, confirm
+   `DOWNSTREAM_REGRESSION`, then delete the opt-in branch in the commit that
+   records it.
 
-4. **Then the CE chain, still the critical path to generation.** Seven of the
-   nine BG-INV checkers gate on `BG-CE-003` through
-   `BG-CE-006-CYL-CONE -> BG-CE-006-ENUM -> BG-CE-001 -> BG-CE-003`. Session 9
-   scoped `BG-CE-001` and `-003` against the tree; **the scoping is in "The CE
-   chain, scoped against the tree" below** rather than here, because it is
-   durable design and not session state.
+4. **Then the CE chain.** Unchanged from session 9's scoping, which is filed
+   below under "The CE chain, scoped against the tree".
 
-5. **Disk is the binding constraint on this machine and it is not the loop's
-   fault.** C: is 98–99% full with ~11 GB free, of which the loop can use maybe
-   half before `compute_baseline` refuses at its 8 GB floor. **Run
-   `python loop/slot_status.py --disk` before a session of verifies, not
-   after** — it now reports both target dirs per slot plus leaked baselines.
-   Verifying serially and deleting between is what worked.
+## What session 9 changed about how the loop runs
 
-## Did the session-8 bet pay? Partly, and the limit is now visible
+Five harness defects were found and fixed, **four of them by running a tool
+rather than reading it**. They are in Traps with the evidence; the short list:
 
-Session 8 spent itself on orchestrator tooling on the argument that orchestrator
-time is the binding constraint. **One session is not evidence, so: the assembly
-savings are real and measured; the judgement cost is unchanged and is now the
-entire cost.**
+- Both site counters attributed a line to the last `fn` seen without tracking
+  braces. `loop/rustscan.py` is the single implementation now, with
+  `loop/selftest_rustscan.py` watching the old scan fail on the same fixture.
+- `gen_packet` resolved a table's file heading by bare-basename `endswith`, so
+  `curve.rs` matched `polyline_curve.rs` and **every row under an ambiguous
+  heading was silently dropped** while printing "all checked claims hold".
+- `new_slot` used `rev-parse --is-inside-work-tree` to decide whether a path was
+  a live worktree. That is true for *any* directory inside the repo, so a stub
+  `wt/` was treated as live and `checkout -B` + `reset --hard` **ran against the
+  main worktree**. Nothing was lost, by luck.
+- `PACKET.md` and `RESULT.json` are worker scaffolding and were riding into the
+  integration branch on merge; `PACKET.md` then conflicts on the *next* merge,
+  because every slot's copy is a different packet.
+- **`loop/check_metric_bound.py` is the one worth keeping.** The
+  `near_points` bound has now bitten three shards. It resolves every `model` row
+  to its enclosing impl or free fn and reports MIGRATES / BLOCKED / CHECK.
+  Validated against all three shards whose answers were already known by hand —
+  DECORATORS 2, NURBS 12, SMALL 2 — **zero false negatives on 47 rows**. Run it
+  before writing any TOL packet.
 
-**For.** `BG-TOL-001-GEOM-NURBS` is the largest shard yet — 57 sites, 26
-contexts, 12 deferrals, six files, roughly 3x MESHALGO — and went through in
-**one dispatch and one orchestrator amendment**, against MESHALGO's three
-rejections. Its 43 KB packet was almost entirely generated from the reviewed
-survey. Whole-session worker cost: **$0.18**.
+## Did the session-8 tooling bet pay? Yes, with a visible ceiling
 
-**Against.** The tooling did not stop the orchestrator being wrong; it moved
-where the wrongness surfaced. NURBS's one round trip was a **PACKET** fault that
-no gate could have caught — decision 7 demanded `ctx.is_small_ratio(delta)`
-inside a `pub const fn` while Forbidden banned signature changes, and
-`unscaled_legacy()` is not const. **43% of a packet is templatable and the
-remaining 29% is exactly where the fault landed.** And the tooling shipped two
-defects of its own this session (see the dropped-rows trap), both found by
-running it rather than reading it.
+**For.** Three shards in one session, the largest of them 3× anything before it,
+for $0.18. `gen_packet --skeleton` produced the front block, anchors, both site
+tables, the deferral table and the budget from reviewed surveys; almost none of
+the three packets was typed by hand.
 
-**So:** further tooling investment has a much lower ceiling than session 8
-assumed. The next marginal hour goes to V8's negative test and the CE design,
-not to generating more prose.
+**Against, and this is the finding.** Every round trip this session was the
+orchestrator's, and none was of a kind a gate could have caught:
 
-## What the three surveys were worth, now that all three are used
+| packet | fault | what it was |
+|---|---|---|
+| NURBS | PACKET | demanded a rewrite inside a `pub const fn` while forbidding signature changes; `unscaled_legacy()` is not const |
+| DECORATORS | PACKET | never ran the `near_points` bound check over its model rows |
+| SMALL | GATE | verify handed a base from before the slot forked, so the orchestrator's own commit entered the packet's diff |
 
-104 live sites for $0.086, all three ACCEPTED on V0/V1/V10 with every anchor
-resolving — **the half a gate can check did not go wrong.** The half it cannot
-check went wrong three times, each caught only by resolving the claim against
-the tree:
-
-- **The session-8 handoff's own NURBS adjudication was wrong in both
-  directions.** It recorded ten deferred / ten migrating, naming nine lines; the
-  truth is **twelve deferred, eight migrating**. `bspcurve.rs:1102` and `:1112`
-  were listed as blocked and are not — their impl at `bspcurve.rs:1058` carries
-  `MetricSpace<Metric = f64>`. It missed `bspsurface.rs:652` (an
-  `impl<V: Tolerance>`) and the four NURBS wrappers, blocked through
-  `Homogeneous::Point: EuclideanSpace` supplying no `MetricSpace`.
-- **A survey rewrite would not have compiled.**
-  `truck-geotrait/src/algo/curve.rs:66` was given `ctx.near_points(...)`; its
-  bound is `C::Point: EuclideanSpace`, no `MetricSpace`. The form that compiles
-  is `ctx.is_small_len((curve.subs(t) - point).magnitude())`. Its sibling
-  `algo/surface.rs:292` *does* carry `MetricSpace` and takes `near_points`.
-  **Same fn name, same shape, different answers.**
-- **Adjudications now live in the survey JSONs**, as a top-level `review` block
-  and a per-row `review` string that `--skeleton` renders into the packet.
-  Holding them as prose here is how the NURBS one nearly got lost.
+**43% of a packet is templatable and the remaining 29% is exactly where all
+three landed.** Assembly is cheap now; judgement is the entire remaining cost.
+Two of the three are now mechanised anyway (`check_metric_bound.py`, and
+`--base` is a checkable fact), which is the right response — but the general
+lesson is that further *generation* tooling has a low ceiling, while tooling
+that **checks a claim against the tree** keeps paying.
 
 ## The parallelism picture
 
-62 packets: 38 mechanical, 13 design, 11 wide-mechanical. 47 remain. Nothing is
-running, so the whole frontier is dispatchable — run `schedule.py` with no
-`--running`. DECORATORS and SMALL are write-disjoint and should go together.
+62 packets: 38 mechanical, 13 design, 11 wide-mechanical. 43 remain, and the
+frontier is suddenly narrow: `schedule.py` reports **3 eligible**, and two of
+the three are design class (`BG-CE-006-ENUM`, `BG-TOL-004`). The one mechanical
+row is `BG-INV-107`. The wide-mechanical TOL seam that has carried the last four
+sessions is finished, so the loop's throughput is now bounded by design packets
+the orchestrator writes by hand. The distribution is the story: **ENC 14, INV 9, ANA 8, FID 4 are all at zero** —
+35 packets, 56% of the graph, none started. That is the certification half of
+the kernel. What has landed is the plumbing: a tolerance model with dimension in
+its type, an error-propagation algebra, a refusal taxonomy, budget accounting.
 
-**The binding constraint is now split.** Orchestrator packet-writing is no
-longer the whole story: 15 of 62 packets have a file, and the survey → skeleton
-path makes the next one cheap to *assemble*. What it does not make cheap is the
-judgement, and the CE chain is three **design**-class packets that the
-orchestrator writes entirely by hand. That, plus disk, is what actually gates
-the next session.
+Three concurrent workers on write-disjoint packets ran without interference for
+the first time this session. The constraint is no longer worker throughput or
+orchestrator packet-writing; it is **disk** (see Traps) and **design-class
+packets**, of which the CE chain alone is three.
 
 ## Traps, each one paid for
 
@@ -508,81 +500,107 @@ reason is in the commit that made the change, and the code will not tell you.
   ~29% is real judgement** -- that ratio, not slot count, is where the leverage
   is.
 
-- **A checker can DROP rows rather than miscount them, and it prints green
-  either way.** `gen_packet.packet_contexts` resolved a site table's file
-  heading against `write_allow` with a bare-basename `endswith`, so a heading of
-  `curve.rs` also matched `polyline_curve.rs`; two candidates made the heading
-  ambiguous, `current` went `None`, and **every row beneath it was skipped
-  silently**. `BG-TOL-001-SMALL` read 6 contexts against a true 7 and
-  `BG-TOL-001-GEOM-DECORATORS` 12 against 14, while the tool printed "all
-  checked claims hold". This is strictly worse than a wrong count: a skipped row
-  is never resolved against the tree, which is the one thing that function
-  exists to do. Fixed — the suffix must land on a `/` boundary, headings are now
-  emitted as repo-relative paths, and an ambiguous heading is reported. **A
-  second bug hid the first:** the no-table path returned a hardcoded `[]` for
-  `unresolved`, so the new ambiguity report could not have fired even once it
-  existed. Watched firing.
+- **`--base` is per-slot, not per-session, and slots forked at different moments
+  have different fork points.** Session 9 created slot 0, then committed a
+  harness fix, then created slots 2 and 4. Verifying slot 2 with slot 0's base
+  put `loop/new_slot.py` -- the orchestrator's own commit -- inside the packet's
+  diff, and V1 correctly rejected it for a file no worker touched. The gate was
+  right and the invocation was wrong. **Read the fork point off the slot**
+  (`git -C loop/slots/N/wt rev-parse HEAD~1` for a single-commit packet) rather
+  than reusing the base from the last verify.
+- **`PACKET.md` is worker scaffolding and must not reach the integration
+  branch.** `run_packet.py` writes it into each worktree root; a `--no-ff` merge
+  carries it in, and the *next* packet's merge then hits
+  `CONFLICT (content): PACKET.md`, because every slot's copy is a different
+  packet. It stopped two landings in a row before it was removed from tracking.
+  This is the same rule already recorded for `RESULT.json` and it applies for
+  the same reason: the authoritative packet is in `loop/packets/`, the
+  authoritative result in `loop/results/`, and neither belongs in the repo root.
+- **`git add -A` at the repo root sweeps in deliberately-untracked work.** This
+  repo carries a dozen untracked analysis documents, `benchmarks/` outputs and
+  all of `scratch/`. One `git add -A` put 196 files into a commit before it was
+  caught and the commit rebuilt from `git add loop/ docs/ scripts/`. Stage the
+  paths the commit is actually about.
+- **A `model` site can be correctly classified and still unmigratable, and it
+  has now cost three shards.** `ctx.near_points<P>` needs
+  `P: MetricSpace<Metric = f64>`; `P: ControlPoint<f64> + Tolerance` does not
+  supply it, and `Homogeneous::Point` is only `EuclideanSpace`. **Run
+  `python loop/check_metric_bound.py <survey.json>` before writing any TOL
+  packet.** It resolves every `model` row to its enclosing impl or free fn and
+  reports MIGRATES / BLOCKED / CHECK; validated against all three of session 9's
+  shards, whose answers were known by hand, with zero false negatives on 47
+  rows. Two sites with the *same function name and the same shape* can take
+  different rewrites -- `truck-geotrait`'s two `search_parameter`s do.
+- **`const fn` blocks a migration outright.** `nurbs/mod.rs`'s `inv_or_zero` is
+  a `pub const fn` and `ToleranceCtx::unscaled_legacy()` is not const, so no
+  context can exist in that body. The packet demanded the rewrite while its
+  Forbidden clause banned signature changes; the worker dropped `const`,
+  reported the contradiction, and was right that both could not hold. Now a
+  named exclusion class, `FIXME(BG-TOL-001, CONST_FN)`. **Grep a shard's site
+  list for `const fn` before writing the packet.** This is the first exclusion
+  where the classification and the rewrite are both *correct* and the enclosing
+  item is what blocks them.
 - **GATE-4 counts `unscaled_legacy(` anywhere in the file, comments included.**
-  A `FIXME` that explains why a site cannot be migrated will naturally name the
-  constructor, and doing so inflates the ratchet by one — making a *deferral*
-  read as a migration. The NURBS amendment's own FIXME did exactly this and held
-  GATE-4 at 76 when the tree had 75. Write the constructor's name without its
-  parentheses in prose.
-- **`const fn` blocks a migration completely, and the packet found out from the
-  worker.** `truck-geometry/src/nurbs/mod.rs:186`'s `inv_or_zero` is a
-  `pub const fn`; `ToleranceCtx::unscaled_legacy()` is not const, so no context
-  can exist in that body. The packet's site table demanded the rewrite while its
-  Forbidden clause banned signature changes. The worker dropped `const`, put
-  `BUDGET`-class reasoning in `disagreements`, and was right that both clauses
-  could not hold. Now a named exclusion class, `FIXME(BG-TOL-001, CONST_FN)`.
-  **Grep a shard's site list for `const fn` before writing the packet** — this
-  is the first exclusion where the classification and the rewrite are both
-  *correct* and it is the enclosing item that blocks them.
+  A `FIXME` explaining why a site cannot be migrated will naturally name the
+  constructor, inflating the ratchet by one and making a *deferral* read as a
+  *migration*. The NURBS amendment's own FIXME did exactly this and held GATE-4
+  at 76 when the tree had 75. Write the name without its parentheses in prose.
+- **A checker can DROP rows rather than miscount them, and print green either
+  way.** `gen_packet.packet_contexts` resolved a site table's file heading with
+  a bare-basename `endswith`, so `curve.rs` also matched `polyline_curve.rs`;
+  two candidates made the heading ambiguous and **every row beneath it was
+  skipped silently** while the tool printed "all checked claims hold". Two
+  packets read low by one and two contexts. A skipped row is never resolved
+  against the tree at all, which is the one thing that function exists to do.
+  A second bug hid the first: the no-table path returned a hardcoded `[]` for
+  `unresolved`, so the guard could not have reported it even once it existed.
+- **`git rev-parse --is-inside-work-tree` cannot tell a linked worktree from any
+  directory inside the repo, and `new_slot` used it to decide.** A stub
+  `loop/slots/N/wt/` holding a leftover `vendor/` was classified live, and the
+  idempotent path then ran `git -C wt checkout -B packet/<id>` and
+  `reset --hard` -- both repo-wide, both resolving to the **main worktree**,
+  which was silently moved onto a packet branch. Nothing was lost only because
+  every ref sat on the same commit and the tree was clean. The test is now
+  `rev-parse --show-toplevel` compared against the path itself, plus a flat
+  refusal to treat the repo root as a slot.
 - **An interrupted verify leaks its baseline worktree, and that is what actually
   fills the disk.** `compute_baseline`'s cleanup does not run when the process
   is killed. Two leaked baselines plus one live one took session 9 from 9.4 GB
-  to 3.1 GB and forced it to abandon a completed-but-for-V9 run. `verify.py`
-  now names them and their size, both in the 8 GB refusal and as a warning while
-  there is still room to act; the deletion is still yours.
+  to 3.1 GB and cost it a completed run. `verify.py` now names them and their
+  size both in the 8 GB refusal and as a warning while there is still room to
+  act; the deletion is still yours.
 - **`loop/slots/*/target` is only half the disk the loop owns.** Workers create
-  a *second* `target/` **inside** the worktree — `loop/slots/N/wt/target` —
-  despite `CARGO_TARGET_DIR` pointing outside it, and it is the larger of the
-  two: 1.9 GB against 0.9 GB in one slot. Every disk-recovery recipe in these
-  documents named only the outer one and therefore reclaimed less than half of
-  what was there. `slot_status.py --disk` now reports both.
+  a *second* `target/` **inside** the worktree -- `loop/slots/N/wt/target` --
+  despite `CARGO_TARGET_DIR` pointing elsewhere, and it is the larger of the
+  two: 1.9 GB against 0.9 GB in one slot. Every recovery recipe in these
+  documents named only the outer one. `slot_status.py --disk` reports both.
+- **Most of this machine's missing disk is not the loop's.** Session 9 found
+  **19 GB** of regenerable junk in `%TEMP%`: 118 `chrome-lite-*` throwaway
+  browser profiles at ~125 MB each (14.7 GB) and 28 `proc-macro-srv*`
+  rust-analyzer server copies (4.2 GB), all under three days old. Check those
+  before concluding the loop needs a smaller footprint.
 - **A dead worker can leave its `cmd.exe` shim alive, so a pid check says
-  RUNNING.** Two workers died in an ~8-hour gap in session 9 with their recorded
-  pids still resolving. What separates them is `events.jsonl` mtime *plus*
-  whether any `cargo`/`rustc` exists on the machine at all. `slot_status.py` now
-  shows `DEAD?` when the log has been silent over an hour and no toolchain
-  process exists. **It is a prompt to look, never grounds to reap** — the
-  opposite mis-calibration on `STALLED` is recorded above and cost an hour of
-  correct work.
+  RUNNING.** Two workers died in an ~8-hour gap with their recorded pids still
+  resolving. What separates them is `events.jsonl` mtime *plus* whether any
+  `cargo`/`rustc` process exists at all. `slot_status.py` shows `DEAD?` when the
+  log has been silent over an hour and no toolchain process exists. **It is a
+  prompt to look, never grounds to reap** -- the opposite mis-calibration on
+  `STALLED` is recorded above and cost an hour of correct work.
 - **Never background a verify through a shell wrapper.** `nohup python
-  loop/verify.py ... &` inside a backgrounded compound command either never runs
-  or is orphaned; the wrapper reports exit 0; and the **stale `VERDICT.json`
-  from the previous packet is still sitting in the slot**, ready to be read as
-  this one's. Session 9 read an ACCEPTED verdict for MESHALGO and nearly
-  believed it was NURBS's. Use the harness's own background mechanism, and check
-  `VERDICT.json`'s `base` and `commit` fields match the run you think you are
-  reading. This is the same family as the recorded "do not read a verdict off a
-  background wrapper's exit code" and is a second, sharper instance of it.
+  loop/verify.py ... &` inside a backgrounded compound either never runs or is
+  orphaned, the wrapper reports exit 0, and the **stale `VERDICT.json` from the
+  previous packet is still in the slot**, ready to be read as this one's.
+  Session 9 read an ACCEPTED verdict for MESHALGO and nearly believed it was
+  NURBS's. Check `VERDICT.json`'s `base` and `commit` match the run you think
+  you are reading.
 - **`cd` persists across a compound command and `-F` resolves against it.** A
   `cd` into a slot worktree followed by `git commit -F scratch/msg.txt` looked
-  for the message *inside the worktree* and died with "could not read log file".
-  The existing rule about always using `git -C` is not only about committing to
-  the wrong branch; use absolute paths for `-F` too.
-- **`git add -A` at the repo root sweeps in deliberately-untracked work.** This
-  repo carries a dozen untracked analysis documents, `benchmarks/` outputs and
-  all of `scratch/` — 196 files went into one commit before it was caught and
-  the commit rebuilt from `git add loop/ docs/ scripts/`. Stage the paths the
-  commit is actually about.
+  for the message *inside the worktree* and died. The `git -C` rule is not only
+  about committing to the wrong branch; use absolute paths for `-F` too.
 - **`land_packet.py` must run BEFORE the stray `RESULT.json` is deleted.** It
-  reads `RESULT.json` from the repo root — where it arrives on the merge — and
-  files it. Deleting it first (correctly, per the rule two entries down) makes
-  `land_packet` die with `FileNotFoundError`. Order: merge, `land_packet`, then
-  delete. Recovering means copying the filed result back to the root, which
-  works but is silly.
+  reads `RESULT.json` from the repo root -- where it arrives on the merge -- and
+  files it. Deleting it first makes `land_packet` die with `FileNotFoundError`.
+  Order: merge, `land_packet`, then delete.
 
 ## The commands
 
