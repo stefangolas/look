@@ -1,0 +1,1329 @@
+//! The canonical curve and surface model (BG-CE-006).
+//!
+//! `Curve` and `Surface` used to live in `truck-modeling`'s `geometry` module,
+//! where `Surface` silently dropped the analytic carriers (`Cylinder`, `Cone`,
+//! `Sphere`, `Torus`) from `specifieds` and degraded every analytic operation
+//! to splines. They now live here, owned by `truck-geometry`, with the analytic
+//! carriers as first-class variants; `truck-modeling`'s module is a re-export.
+
+#![deny(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::panic,
+    clippy::todo,
+    clippy::unimplemented,
+    clippy::indexing_slicing
+)]
+
+use crate::prelude::*;
+use serde::{Deserialize, Serialize};
+use truck_base::evidence::{
+    Budget, Certificate, Certified, EnvelopeCase, Margin, Method, Modulus, Outcome, PropMap,
+    Refusal, UnresolvedWitness,
+};
+
+/// 3-dimensional curve
+#[derive(
+    Clone,
+    Debug,
+    Serialize,
+    Deserialize,
+    ParametricCurve,
+    BoundedCurve,
+    ParameterDivision1D,
+    Cut,
+    Invertible,
+    SearchNearestParameterD1,
+    SearchParameterD1,
+)]
+pub enum Curve {
+    /// line
+    Line(Line<Point3>),
+    /// analytic circle: a placed (possibly full-range) trimmed unit circle
+    Circle(Processor<TrimmedCurve<UnitCircle<Point3>>, Matrix4>),
+    /// 3-dimensional B-spline curve
+    BSplineCurve(BSplineCurve<Point3>),
+    /// 3-dimensional NURBS curve
+    NurbsCurve(NurbsCurve<Vector4>),
+    /// intersection curve
+    IntersectionCurve(IntersectionCurve<Box<Curve>, Box<Surface>, Box<Surface>>),
+}
+
+macro_rules! derive_curve_method {
+    ($curve: expr, $method: expr, $($ver: ident),*) => {
+        match $curve {
+            Curve::Line(got) => $method(got, $($ver), *),
+            Curve::Circle(got) => $method(got, $($ver), *),
+            Curve::BSplineCurve(got) => $method(got, $($ver), *),
+            Curve::NurbsCurve(got) => $method(got, $($ver), *),
+            Curve::IntersectionCurve(got) => $method(got, $($ver), *),
+        }
+    };
+}
+
+macro_rules! derive_curve_self_method {
+    ($curve: expr, $method: expr, $($ver: ident),*) => {
+        match $curve {
+            Curve::Line(got) => Curve::Line($method(got, $($ver), *)),
+            Curve::Circle(got) => Curve::Circle($method(got, $($ver), *)),
+            Curve::BSplineCurve(got) => Curve::BSplineCurve($method(got, $($ver), *)),
+            Curve::NurbsCurve(got) => Curve::NurbsCurve($method(got, $($ver), *)),
+            Curve::IntersectionCurve(got) => Curve::IntersectionCurve($method(got, $($ver), *)),
+        }
+    };
+}
+
+impl Transformed<Matrix4> for Curve {
+    fn transform_by(&mut self, trans: Matrix4) {
+        derive_curve_method!(self, Transformed::transform_by, trans);
+    }
+    fn transformed(&self, trans: Matrix4) -> Self {
+        derive_curve_self_method!(self, Transformed::transformed, trans)
+    }
+}
+
+impl From<IntersectionCurve<BSplineCurve<Point3>, Surface, Surface>> for Curve {
+    fn from(c: IntersectionCurve<BSplineCurve<Point3>, Surface, Surface>) -> Curve {
+        let (surface0, surface1, leader) = c.destruct();
+        Curve::IntersectionCurve(IntersectionCurve::new(
+            Box::new(surface0),
+            Box::new(surface1),
+            Box::new(leader.into()),
+        ))
+    }
+}
+
+impl From<Line<Point3>> for Curve {
+    #[inline(always)]
+    fn from(x: Line<Point3>) -> Self {
+        Curve::Line(x)
+    }
+}
+
+impl From<Processor<TrimmedCurve<UnitCircle<Point3>>, Matrix4>> for Curve {
+    #[inline(always)]
+    fn from(x: Processor<TrimmedCurve<UnitCircle<Point3>>, Matrix4>) -> Self {
+        Curve::Circle(x)
+    }
+}
+
+impl From<BSplineCurve<Point3>> for Curve {
+    #[inline(always)]
+    fn from(x: BSplineCurve<Point3>) -> Self {
+        Curve::BSplineCurve(x)
+    }
+}
+
+impl From<NurbsCurve<Vector4>> for Curve {
+    #[inline(always)]
+    fn from(x: NurbsCurve<Vector4>) -> Self {
+        Curve::NurbsCurve(x)
+    }
+}
+
+impl From<IntersectionCurve<Box<Curve>, Box<Surface>, Box<Surface>>> for Curve {
+    #[inline(always)]
+    fn from(x: IntersectionCurve<Box<Curve>, Box<Surface>, Box<Surface>>) -> Self {
+        Curve::IntersectionCurve(x)
+    }
+}
+
+impl TryFrom<Curve> for Line<Point3> {
+    type Error = Curve;
+    fn try_from(value: Curve) -> std::result::Result<Self, Self::Error> {
+        match value {
+            Curve::Line(x) => Ok(x),
+            _ => Err(value),
+        }
+    }
+}
+
+impl TryFrom<Curve> for Processor<TrimmedCurve<UnitCircle<Point3>>, Matrix4> {
+    type Error = Curve;
+    fn try_from(value: Curve) -> std::result::Result<Self, Self::Error> {
+        match value {
+            Curve::Circle(x) => Ok(x),
+            _ => Err(value),
+        }
+    }
+}
+
+impl TryFrom<Curve> for BSplineCurve<Point3> {
+    type Error = Curve;
+    fn try_from(value: Curve) -> std::result::Result<Self, Self::Error> {
+        match value {
+            Curve::BSplineCurve(x) => Ok(x),
+            _ => Err(value),
+        }
+    }
+}
+
+impl TryFrom<Curve> for NurbsCurve<Vector4> {
+    type Error = Curve;
+    fn try_from(value: Curve) -> std::result::Result<Self, Self::Error> {
+        match value {
+            Curve::NurbsCurve(x) => Ok(x),
+            _ => Err(value),
+        }
+    }
+}
+
+impl TryFrom<Curve> for IntersectionCurve<Box<Curve>, Box<Surface>, Box<Surface>> {
+    type Error = Curve;
+    fn try_from(value: Curve) -> std::result::Result<Self, Self::Error> {
+        match value {
+            Curve::IntersectionCurve(x) => Ok(x),
+            _ => Err(value),
+        }
+    }
+}
+
+impl ToSameGeometry<Curve> for Line<Point3> {
+    #[inline]
+    fn to_same_geometry(&self) -> Curve {
+        Curve::from(*self)
+    }
+}
+
+impl ToSameGeometry<Curve> for Processor<TrimmedCurve<UnitCircle<Point3>>, Matrix4> {
+    #[inline]
+    fn to_same_geometry(&self) -> Curve {
+        // BG-CE-006: the placed circle stays analytic; the old conversion
+        // degraded it to a NURBS here.
+        Curve::Circle(*self)
+    }
+}
+
+impl ToSameGeometry<Curve> for BSplineCurve<Point3> {
+    #[inline]
+    fn to_same_geometry(&self) -> Curve {
+        Curve::from(self.clone())
+    }
+}
+
+impl Curve {
+    /// Into non-ratinalized 4-dimensional B-spline curve
+    pub fn lift_up(&self) -> BSplineCurve<Vector4> {
+        match self {
+            Curve::Line(curve) => Curve::BSplineCurve((*curve).into()).lift_up(),
+            Curve::Circle(processed) => ToSameGeometry::<NurbsCurve<Vector4>>::to_same_geometry(
+                processed,
+            )
+            .non_rationalized()
+            .clone(),
+            Curve::BSplineCurve(curve) => BSplineCurve::new(
+                curve.knot_vec().clone(),
+                curve
+                    .control_points()
+                    .iter()
+                    .map(|pt| pt.to_vec().extend(1.0))
+                    .collect(),
+            ),
+            Curve::NurbsCurve(curve) => curve.non_rationalized().clone(),
+            // `unimplemented!` is moved code, kept verbatim (BG-CE-006): the
+            // ISC carrier still has no homotopy lift, and `lift_up` has no
+            // error channel to refuse through. The `#[allow]` keeps the moved
+            // behaviour while the mandatory module lint denies the macro.
+            #[allow(clippy::unimplemented)]
+            Curve::IntersectionCurve(_) => {
+                unimplemented!("intersection curve cannot connect by homotopy")
+            }
+        }
+    }
+}
+
+/// 3-dimensional surfaces
+#[derive(
+    Clone,
+    Debug,
+    Serialize,
+    Deserialize,
+    ParametricSurface,
+    ParameterDivision2D,
+    Invertible,
+    SearchParameterD2,
+)]
+pub enum Surface {
+    /// Plane
+    Plane(Plane),
+    /// cylinder
+    Cylinder(Cylinder),
+    /// cone
+    Cone(Cone),
+    /// sphere
+    Sphere(Sphere),
+    /// torus
+    Torus(Torus),
+    /// revoluted curve
+    RevolutedCurve(RevolutedCurve<Curve>),
+    /// RESERVED: no conversion emits this yet (BG-CE-007 will); the variant
+    /// exists now so this release is the last breaking one. Tessellation and
+    /// STEP-out still handle it.
+    ExtrudedCurve(ExtrudedCurve<Curve, Vector3>),
+    /// 3-dimensional B-spline surface
+    BSplineSurface(BSplineSurface<Point3>),
+    /// 3-dimensional NURBS Surface
+    NurbsSurface(NurbsSurface<Vector4>),
+}
+
+macro_rules! derive_surface_method {
+    ($surface: expr, $method: expr, $($ver: ident),*) => {
+        match $surface {
+            Self::Plane(got) => $method(got, $($ver), *),
+            Self::Cylinder(got) => $method(got, $($ver), *),
+            Self::Cone(got) => $method(got, $($ver), *),
+            Self::Sphere(got) => $method(got, $($ver), *),
+            Self::Torus(got) => $method(got, $($ver), *),
+            Self::RevolutedCurve(got) => $method(got, $($ver), *),
+            Self::ExtrudedCurve(got) => $method(got, $($ver), *),
+            Self::BSplineSurface(got) => $method(got, $($ver), *),
+            Self::NurbsSurface(got) => $method(got, $($ver), *),
+        }
+    };
+}
+
+macro_rules! derive_surface_self_method {
+    ($surface: expr, $method: expr, $($ver: ident),*) => {
+        match $surface {
+            Self::Plane(got) => Self::Plane($method(got, $($ver), *)),
+            Self::Cylinder(got) => Self::Cylinder($method(got, $($ver), *)),
+            Self::Cone(got) => Self::Cone($method(got, $($ver), *)),
+            Self::Sphere(got) => Self::Sphere($method(got, $($ver), *)),
+            Self::Torus(got) => Self::Torus($method(got, $($ver), *)),
+            Self::RevolutedCurve(got) => Self::RevolutedCurve($method(got, $($ver), *)),
+            Self::ExtrudedCurve(got) => Self::ExtrudedCurve($method(got, $($ver), *)),
+            Self::BSplineSurface(got) => Self::BSplineSurface($method(got, $($ver), *)),
+            Self::NurbsSurface(got) => Self::NurbsSurface($method(got, $($ver), *)),
+        }
+    };
+}
+
+impl ParametricSurface3D for Surface {
+    #[inline(always)]
+    fn normal(&self, u: f64, v: f64) -> Vector3 {
+        derive_surface_method!(self, ParametricSurface3D::normal, u, v)
+    }
+}
+
+impl Transformed<Matrix4> for Surface {
+    fn transform_by(&mut self, trans: Matrix4) {
+        derive_surface_method!(self, Transformed::transform_by, trans);
+    }
+    fn transformed(&self, trans: Matrix4) -> Self {
+        derive_surface_self_method!(self, Transformed::transformed, trans)
+    }
+}
+
+// The analytic carriers are bare and stateless, so a `Matrix4` transform can
+// only be represented exactly by moving the placement point. A rotation or
+// non-uniform scale relative to the carrier's own frame is not representable
+// (BG-CE-006); the placement point is still transformed so translation and
+// rigid placement compose correctly. `Cylinder::new`/`Cone::new` validate their
+// scalar parameters, which are carried over unchanged, so they cannot refuse
+// here; the `Err` arms are for totality only.
+
+impl Transformed<Matrix4> for Cylinder {
+    fn transform_by(&mut self, trans: Matrix4) {
+        let center = trans.transform_point(self.center());
+        if let Ok(cylinder) = Cylinder::new(center, self.radius()) {
+            *self = cylinder.value;
+        }
+    }
+    fn transformed(&self, trans: Matrix4) -> Self {
+        let center = trans.transform_point(self.center());
+        match Cylinder::new(center, self.radius()) {
+            Ok(cylinder) => cylinder.value,
+            Err(_) => *self,
+        }
+    }
+}
+
+impl Transformed<Matrix4> for Cone {
+    fn transform_by(&mut self, trans: Matrix4) {
+        let apex = trans.transform_point(self.apex());
+        if let Ok(cone) = Cone::new(apex, self.half_angle()) {
+            *self = cone.value;
+        }
+    }
+    fn transformed(&self, trans: Matrix4) -> Self {
+        let apex = trans.transform_point(self.apex());
+        match Cone::new(apex, self.half_angle()) {
+            Ok(cone) => cone.value,
+            Err(_) => *self,
+        }
+    }
+}
+
+impl Transformed<Matrix4> for Sphere {
+    fn transform_by(&mut self, trans: Matrix4) {
+        *self = Sphere::new(trans.transform_point(self.center()), self.radius());
+    }
+    fn transformed(&self, trans: Matrix4) -> Self {
+        Sphere::new(trans.transform_point(self.center()), self.radius())
+    }
+}
+
+impl Transformed<Matrix4> for Torus {
+    fn transform_by(&mut self, trans: Matrix4) {
+        *self = Torus::new(
+            trans.transform_point(self.center()),
+            self.large_radius(),
+            self.small_radius(),
+        );
+    }
+    fn transformed(&self, trans: Matrix4) -> Self {
+        Torus::new(
+            trans.transform_point(self.center()),
+            self.large_radius(),
+            self.small_radius(),
+        )
+    }
+}
+
+impl<C: Transformed<Matrix4> + Clone> Transformed<Matrix4> for RevolutedCurve<C> {
+    fn transform_by(&mut self, trans: Matrix4) {
+        let curve = self.entity_curve().clone().transformed(trans);
+        let origin = trans.transform_point(self.origin());
+        let axis = transform_revolution_axis(trans, self.axis());
+        *self = RevolutedCurve::by_revolution(curve, origin, axis);
+    }
+    fn transformed(&self, trans: Matrix4) -> Self {
+        let curve = self.entity_curve().clone().transformed(trans);
+        let origin = trans.transform_point(self.origin());
+        let axis = transform_revolution_axis(trans, self.axis());
+        RevolutedCurve::by_revolution(curve, origin, axis)
+    }
+}
+
+/// The image of a revolution axis under `trans`, guarded against the
+/// degenerate zero/NaN image (a projection onto the axis plane).
+fn transform_revolution_axis(trans: Matrix4, axis: Vector3) -> Vector3 {
+    let axis = trans.transform_vector(axis);
+    let magnitude = axis.magnitude();
+    if magnitude.is_finite() && magnitude > 0.0 {
+        axis / magnitude
+    } else {
+        Vector3::unit_z()
+    }
+}
+
+// The analytic carriers carry no orientation, so inverting them is the
+// identity: the parametrization and the outward normal are unchanged. This is
+// the best a stateless `Copy` carrier can do (BG-CE-006); the former
+// `Processor` wrapper carried the orientation these types cannot.
+
+impl Invertible for Cylinder {
+    fn invert(&mut self) {}
+}
+
+impl Invertible for Cone {
+    fn invert(&mut self) {}
+}
+
+impl Invertible for Sphere {
+    fn invert(&mut self) {}
+}
+
+impl Invertible for Torus {
+    fn invert(&mut self) {}
+}
+
+impl From<Plane> for Surface {
+    #[inline(always)]
+    fn from(x: Plane) -> Self {
+        Surface::Plane(x)
+    }
+}
+
+impl From<Cylinder> for Surface {
+    #[inline(always)]
+    fn from(x: Cylinder) -> Self {
+        Surface::Cylinder(x)
+    }
+}
+
+impl From<Cone> for Surface {
+    #[inline(always)]
+    fn from(x: Cone) -> Self {
+        Surface::Cone(x)
+    }
+}
+
+impl From<Sphere> for Surface {
+    #[inline(always)]
+    fn from(x: Sphere) -> Self {
+        Surface::Sphere(x)
+    }
+}
+
+impl From<Torus> for Surface {
+    #[inline(always)]
+    fn from(x: Torus) -> Self {
+        Surface::Torus(x)
+    }
+}
+
+impl From<RevolutedCurve<Curve>> for Surface {
+    #[inline(always)]
+    fn from(x: RevolutedCurve<Curve>) -> Self {
+        Surface::RevolutedCurve(x)
+    }
+}
+
+impl From<ExtrudedCurve<Curve, Vector3>> for Surface {
+    #[inline(always)]
+    fn from(x: ExtrudedCurve<Curve, Vector3>) -> Self {
+        Surface::ExtrudedCurve(x)
+    }
+}
+
+impl From<BSplineSurface<Point3>> for Surface {
+    #[inline(always)]
+    fn from(x: BSplineSurface<Point3>) -> Self {
+        Surface::BSplineSurface(x)
+    }
+}
+
+impl From<NurbsSurface<Vector4>> for Surface {
+    #[inline(always)]
+    fn from(x: NurbsSurface<Vector4>) -> Self {
+        Surface::NurbsSurface(x)
+    }
+}
+
+impl TryFrom<Surface> for Plane {
+    type Error = Surface;
+    fn try_from(value: Surface) -> std::result::Result<Self, Self::Error> {
+        match value {
+            Surface::Plane(x) => Ok(x),
+            _ => Err(value),
+        }
+    }
+}
+
+impl TryFrom<Surface> for Cylinder {
+    type Error = Surface;
+    fn try_from(value: Surface) -> std::result::Result<Self, Self::Error> {
+        match value {
+            Surface::Cylinder(x) => Ok(x),
+            _ => Err(value),
+        }
+    }
+}
+
+impl TryFrom<Surface> for Cone {
+    type Error = Surface;
+    fn try_from(value: Surface) -> std::result::Result<Self, Self::Error> {
+        match value {
+            Surface::Cone(x) => Ok(x),
+            _ => Err(value),
+        }
+    }
+}
+
+impl TryFrom<Surface> for Sphere {
+    type Error = Surface;
+    fn try_from(value: Surface) -> std::result::Result<Self, Self::Error> {
+        match value {
+            Surface::Sphere(x) => Ok(x),
+            _ => Err(value),
+        }
+    }
+}
+
+impl TryFrom<Surface> for Torus {
+    type Error = Surface;
+    fn try_from(value: Surface) -> std::result::Result<Self, Self::Error> {
+        match value {
+            Surface::Torus(x) => Ok(x),
+            _ => Err(value),
+        }
+    }
+}
+
+impl TryFrom<Surface> for RevolutedCurve<Curve> {
+    type Error = Surface;
+    fn try_from(value: Surface) -> std::result::Result<Self, Self::Error> {
+        match value {
+            Surface::RevolutedCurve(x) => Ok(x),
+            _ => Err(value),
+        }
+    }
+}
+
+impl TryFrom<Surface> for ExtrudedCurve<Curve, Vector3> {
+    type Error = Surface;
+    fn try_from(value: Surface) -> std::result::Result<Self, Self::Error> {
+        match value {
+            Surface::ExtrudedCurve(x) => Ok(x),
+            _ => Err(value),
+        }
+    }
+}
+
+impl TryFrom<Surface> for BSplineSurface<Point3> {
+    type Error = Surface;
+    fn try_from(value: Surface) -> std::result::Result<Self, Self::Error> {
+        match value {
+            Surface::BSplineSurface(x) => Ok(x),
+            _ => Err(value),
+        }
+    }
+}
+
+impl TryFrom<Surface> for NurbsSurface<Vector4> {
+    type Error = Surface;
+    fn try_from(value: Surface) -> std::result::Result<Self, Self::Error> {
+        match value {
+            Surface::NurbsSurface(x) => Ok(x),
+            _ => Err(value),
+        }
+    }
+}
+
+impl IncludeCurve<Curve> for Surface {
+    fn include(&self, curve: &Curve) -> Outcome<bool> {
+        // BG-CE-006: a placed circle is routed through the NURBS the
+        // pre-packet conversion produced. Every carrier's certified include
+        // path was written against that curve shape; routing the circle back
+        // through it preserves the certified answers exactly, and the four
+        // analytic carriers keep their honest refusal below.
+        if let Curve::Circle(circle) = curve {
+            let nurbs = ToSameGeometry::<NurbsCurve<Vector4>>::to_same_geometry(circle);
+            return self.include(&Curve::NurbsCurve(nurbs));
+        }
+        match self {
+            Surface::BSplineSurface(surface) => match curve {
+                &Curve::Line(curve) => surface.include(&BSplineCurve::from(curve)),
+                Curve::BSplineCurve(curve) => surface.include(curve),
+                Curve::NurbsCurve(curve) => surface.include(curve),
+                Curve::IntersectionCurve(ic) => self.include_intersection_curve(ic),
+                Curve::Circle(_) => unreachable!("circles are degraded above"),
+            },
+            Surface::NurbsSurface(surface) => match curve {
+                &Curve::Line(curve) => surface.include(&BSplineCurve::from(curve)),
+                Curve::BSplineCurve(curve) => surface.include(curve),
+                Curve::NurbsCurve(curve) => surface.include(curve),
+                Curve::IntersectionCurve(ic) => self.include_intersection_curve(ic),
+                Curve::Circle(_) => unreachable!("circles are degraded above"),
+            },
+            Surface::Plane(surface) => match curve {
+                &Curve::Line(curve) => surface.include(&BSplineCurve::from(curve)),
+                Curve::BSplineCurve(curve) => surface.include(curve),
+                Curve::NurbsCurve(curve) => surface.include(curve),
+                Curve::IntersectionCurve(ic) => self.include_intersection_curve(ic),
+                Curve::Circle(_) => unreachable!("circles are degraded above"),
+            },
+            Surface::RevolutedCurve(surface) => match surface.entity_curve() {
+                &Curve::Line(curve) => {
+                    self.include(&Curve::BSplineCurve(BSplineCurve::from(curve)))
+                }
+                Curve::BSplineCurve(entity_curve) => {
+                    let surface = RevolutedCurve::by_revolution(
+                        entity_curve,
+                        surface.origin(),
+                        surface.axis(),
+                    );
+                    match curve {
+                        &Curve::Line(curve) => surface.include(&BSplineCurve::from(curve)),
+                        Curve::BSplineCurve(curve) => surface.include(curve),
+                        Curve::NurbsCurve(curve) => surface.include(curve),
+                        Curve::IntersectionCurve(ic) => self.include_intersection_curve(ic),
+                        Curve::Circle(_) => unreachable!("circles are degraded above"),
+                    }
+                }
+                Curve::NurbsCurve(entity_curve) => {
+                    let surface = RevolutedCurve::by_revolution(
+                        entity_curve,
+                        surface.origin(),
+                        surface.axis(),
+                    );
+                    match curve {
+                        &Curve::Line(curve) => surface.include(&BSplineCurve::from(curve)),
+                        Curve::BSplineCurve(curve) => surface.include(curve),
+                        Curve::NurbsCurve(curve) => surface.include(curve),
+                        Curve::IntersectionCurve(ic) => self.include_intersection_curve(ic),
+                        Curve::Circle(_) => unreachable!("circles are degraded above"),
+                    }
+                }
+                Curve::IntersectionCurve(_) => {
+                    // BG-S0-001: `self` is a surface of revolution whose
+                    // profile is itself an intersection curve. Its inclusion
+                    // question has no certified answer yet (no carrier-identity
+                    // mechanism, no enclosure machinery); refusal, not abort.
+                    Err(Refusal::NumericallyUnresolved {
+                        spent: Budget::new(0, 0, 0),
+                        witness: UnresolvedWitness::UncertifiedContainment,
+                    })
+                }
+                // A circle profile is the pre-packet NURBS arc: degrade it the
+                // same way the boundary curves above are degraded, so the
+                // certified revolution include path sees the curve shapes it
+                // was written against (BG-CE-006).
+                Curve::Circle(entity_curve) => {
+                    let entity_curve =
+                        ToSameGeometry::<NurbsCurve<Vector4>>::to_same_geometry(entity_curve);
+                    let surface = RevolutedCurve::by_revolution(
+                        &entity_curve,
+                        surface.origin(),
+                        surface.axis(),
+                    );
+                    match curve {
+                        &Curve::Line(curve) => surface.include(&BSplineCurve::from(curve)),
+                        Curve::BSplineCurve(curve) => surface.include(curve),
+                        Curve::NurbsCurve(curve) => surface.include(curve),
+                        Curve::IntersectionCurve(ic) => self.include_intersection_curve(ic),
+                        Curve::Circle(_) => unreachable!("circles are degraded above"),
+                    }
+                }
+            },
+            // Certified curve-in-analytic-surface containment is BG-CE-002 /
+            // BG-ENC work; the analytic carriers refuse honestly for now.
+            Surface::Cylinder(_)
+            | Surface::Cone(_)
+            | Surface::Sphere(_)
+            | Surface::Torus(_)
+            | Surface::ExtrudedCurve(_) => Err(Refusal::NumericallyUnresolved {
+                spent: Budget::new(0, 0, 0),
+                witness: UnresolvedWitness::UncertifiedContainment,
+            }),
+        }
+    }
+}
+
+impl Surface {
+    /// BG-S0-001: `include` of an `IntersectionCurve` must not abort.
+    ///
+    /// The spec's algorithm (surface-identity short-circuit, leader-polyline
+    /// sampling, `NumericallyUnresolved`) is deliberately narrowed here for
+    /// epistemic correctness:
+    ///
+    /// - The **ssi-carrier → `Proven(true, Exact)`** short-circuit is NOT
+    ///   taken. It requires carrier identity (BG-CE-004) and the `EntityId`
+    ///   mechanism of BG-CE-003, which are not yet implemented. Two
+    ///   independently constructed surfaces with identical parameters are
+    ///   distinct carriers; structural equality would manufacture a
+    ///   `Proven(true)` where the answer is not certified. The branch lands
+    ///   with BG-CE-003; until then the question is a refusal.
+    /// - The **leader-witness negative → `Proven(false)`** is taken only where
+    ///   exclusion is genuinely decidable: a `Plane` carrier, by signed normal
+    ///   distance beyond a margin over the representation tolerance. A
+    ///   numerical inverse-search failure on any other carrier is not proof of
+    ///   non-membership, so those negatives are deferred to the
+    ///   enclosure/certified-search machinery (BG-ENC, BG-NUM).
+    fn include_intersection_curve(
+        &self,
+        ic: &IntersectionCurve<Box<Curve>, Box<Surface>, Box<Surface>>,
+    ) -> Outcome<bool> {
+        match self {
+            Surface::Plane(plane) => plane_include_intersection_curve(plane, ic.leader()),
+            _ => Err(Refusal::NumericallyUnresolved {
+                spent: Budget::new(0, 0, 0),
+                witness: UnresolvedWitness::UncertifiedContainment,
+            }),
+        }
+    }
+}
+
+/// BG-S0-001: decide `Plane ∋ leader` by signed normal distance.
+///
+/// A negative is conclusive: if a sampled point of the leader lies off the
+/// plane by more than `LEADER_WITNESS_MARGIN × TOLERANCE`, the leader — and
+/// hence the intersection curve it carries — is provably not in the plane
+/// (`Proven(false)`, μ = Float, the "leader-witness" rule). A positive is NOT
+/// conclusive: sampling cannot prove containment, so when every sample is
+/// within tolerance the answer is `NumericallyUnresolved`
+/// (`UncertifiedContainment`), never `Proven(true)`.
+fn plane_include_intersection_curve(plane: &Plane, leader: &Curve) -> Outcome<bool> {
+    let ctx = ToleranceCtx::unscaled_legacy();
+    let origin = plane.origin();
+    let normal = plane.normal();
+    // Bounded uniform sample of the leader (H-5: a documented bound, not a
+    // bare loop; the count is a dimensionless sample budget, not a length).
+    const LEADER_WITNESS_SAMPLES: usize = 32;
+    // Dimensionless margin over the representation tolerance; named for the
+    // quantity it multiplies. `TOLERANCE` is now the `tau_rep` that
+    // BG-TOL-001's `ToleranceCtx` supplies via `length_margin()` (H-3).
+    const LEADER_WITNESS_MARGIN: f64 = 8.0;
+    // Evaluating the leader of an intersection curve via `subs` can panic
+    // (H-1): `IntersectionCurve::subs` unwraps its own projection search. A
+    // nested intersection leader has no certified witness here, so refuse
+    // rather than evaluate.
+    if matches!(*leader, Curve::IntersectionCurve(_)) {
+        return Err(Refusal::NumericallyUnresolved {
+            spent: Budget::new(0, 0, 0),
+            witness: UnresolvedWitness::UncertifiedContainment,
+        });
+    }
+    let (t0, t1) = leader.range_tuple();
+    for i in 0..LEADER_WITNESS_SAMPLES {
+        let t = t0 + (t1 - t0) * (i as f64) / (LEADER_WITNESS_SAMPLES as f64);
+        let signed = (leader.subs(t) - origin).dot(normal);
+        if signed.abs() > LEADER_WITNESS_MARGIN * ctx.length_margin() {
+            // BG-TOL-001: model
+            return Ok(Certified::new(
+                false,
+                Certificate {
+                    props: PropMap::new(),
+                    method: Method::Float,
+                    budget_left: Budget::new(0, 0, 0),
+                    margin: Margin::UNBOUNDED,
+                    modulus: Modulus::Unbounded,
+                },
+            ));
+        }
+    }
+    Err(Refusal::NumericallyUnresolved {
+        spent: Budget::new(0, 0, 0),
+        witness: UnresolvedWitness::UncertifiedContainment,
+    })
+}
+
+impl IncludeCurve<Curve> for Plane {
+    fn include(&self, curve: &Curve) -> Outcome<bool> {
+        match curve {
+            // BG-S0-001: the lifted control-point test below cannot touch an
+            // `IntersectionCurve` (`Curve::lift_up` aborts on it), so route it
+            // through the plane negative witness.
+            Curve::IntersectionCurve(ic) => plane_include_intersection_curve(self, ic.leader()),
+            _ => Ok(Certified::new(
+                curve.lift_up().control_points().iter().all(|v| {
+                    let p = v.to_point();
+                    self.search_parameter(p, None, 1).is_some()
+                }),
+                Certificate {
+                    props: PropMap::new(),
+                    method: Method::Float,
+                    budget_left: Budget::new(0, 0, 0),
+                    margin: Margin::UNBOUNDED,
+                    modulus: Modulus::Unbounded,
+                },
+            )),
+        }
+    }
+}
+
+impl ToSameGeometry<Surface> for Plane {
+    fn to_same_geometry(&self) -> Surface {
+        (*self).into()
+    }
+}
+
+impl ToSameGeometry<Surface> for RevolutedCurve<Curve> {
+    fn to_same_geometry(&self) -> Surface {
+        Surface::RevolutedCurve(self.clone())
+    }
+}
+
+impl SearchNearestParameter<D2> for Surface {
+    type Point = Point3;
+    fn search_nearest_parameter<H: Into<SPHint2D>>(
+        &self,
+        point: Point3,
+        hint: H,
+        trials: usize,
+    ) -> Option<(f64, f64)> {
+        match self {
+            Surface::Plane(plane) => plane.search_nearest_parameter(point, hint, trials),
+            Surface::Cylinder(surface) => surface.search_nearest_parameter(point, hint, trials),
+            Surface::Cone(surface) => surface.search_nearest_parameter(point, hint, trials),
+            Surface::Sphere(surface) => surface.search_nearest_parameter(point, hint, trials),
+            Surface::Torus(surface) => surface.search_nearest_parameter(point, hint, trials),
+            Surface::BSplineSurface(bspsurface) => {
+                bspsurface.search_nearest_parameter(point, hint, trials)
+            }
+            Surface::NurbsSurface(surface) => surface.search_nearest_parameter(point, hint, trials),
+            Surface::ExtrudedCurve(surface) => {
+                surface.search_nearest_parameter(point, hint, trials)
+            }
+            Surface::RevolutedCurve(rotted) => {
+                let hint = match hint.into() {
+                    SPHint2D::Parameter(hint0, hint1) => (hint0, hint1),
+                    SPHint2D::Range(x, y) => algo::surface::presearch(rotted, point, (x, y), 100),
+                    SPHint2D::None => {
+                        algo::surface::presearch(rotted, point, rotted.range_tuple(), 100)
+                    }
+                };
+                algo::surface::search_nearest_parameter(rotted, point, hint, trials)
+            }
+        }
+    }
+}
+
+impl ToSameGeometry<Surface> for HomotopySurface<Curve, Curve> {
+    fn to_same_geometry(&self) -> Surface {
+        let curve0 = self.curve0().clone().lift_up();
+        let curve1 = self.curve1().clone().lift_up();
+        NurbsSurface::new(BSplineSurface::homotopy(curve0, curve1)).into()
+    }
+}
+
+impl ToSameGeometry<Surface> for ExtrudedCurve<Curve, Vector3> {
+    fn to_same_geometry(&self) -> Surface {
+        let (curve0, vector) = (self.entity_curve(), self.extruding_vector());
+        let trsl = Matrix4::from_translation(vector);
+        let curve1 = self.entity_curve().transformed(trsl);
+        match (curve0, curve1) {
+            (Curve::Line(line), Curve::Line(_)) => {
+                Plane::new(line.0, line.1, line.0 + vector).into()
+            }
+            (Curve::Circle(c0), Curve::Circle(c1)) => {
+                // BG-CE-006: attempt the analytic cylinder. The placed circle
+                // is a cylinder only for an exact z-preserving uniform
+                // placement extruded along ±z; every condition below is an
+                // exact comparison (no epsilon — such placements are built
+                // from z-rotations and translations and compare exactly), and
+                // any failure degrades to the homotopy NURBS — exactly the
+                // pre-packet behaviour for every circle.
+                let Matrix4 { x: m1, y: m2, z: m3, w: tw } = *c0.transform();
+                let radius = m1.magnitude();
+                let t = tw.to_point();
+                if m1.z == 0.0
+                    && m2.z == 0.0
+                    && m3.x == 0.0
+                    && m3.y == 0.0
+                    && radius == m2.magnitude()
+                    && m1.dot(m2) == 0.0
+                    && radius > 0.0
+                    && vector.x == 0.0
+                    && vector.y == 0.0
+                {
+                    // `Cylinder::new` re-validates the radius (H-1); an exact
+                    // radius check passed above, so it cannot refuse here, but
+                    // the failure degrades rather than unwrapping.
+                    if let Ok(cylinder) = Cylinder::new(t, radius) {
+                        return Surface::Cylinder(cylinder.value);
+                    }
+                }
+                let curve0 = Curve::Circle(*c0).lift_up();
+                let curve1 = Curve::Circle(c1).lift_up();
+                NurbsSurface::new(BSplineSurface::homotopy(curve0, curve1)).into()
+            }
+            (Curve::BSplineCurve(curve0), Curve::BSplineCurve(curve1)) => {
+                BSplineSurface::homotopy(curve0.clone(), curve1.clone()).into()
+            }
+            (Curve::NurbsCurve(curve0), Curve::NurbsCurve(curve1)) => {
+                NurbsSurface::new(BSplineSurface::homotopy(
+                    curve0.non_rationalized().clone(),
+                    curve1.non_rationalized().clone(),
+                ))
+                .into()
+            }
+            (Curve::IntersectionCurve(_), Curve::IntersectionCurve(_)) => {
+                // BG-S0-003: `to_same_geometry` has no error channel, and an
+                // intersection-curve carrier cannot be evaluated here without
+                // unwinding (`IntersectionCurve::subs` unwraps its own
+                // projection search, H-1), so no approximation path exists.
+                // The honest total behaviour is a documented degenerate
+                // surface: the returned plane's image does NOT claim to match
+                // the extrusion. The certified answer for this pair lives in
+                // `try_to_same_geometry`, which refuses with
+                // `UnsupportedEnvelope(NonCanonicalCarrier)`.
+                Surface::Plane(Plane::xy())
+            }
+            // `curve1` is `curve0` pushed by the extrusion vector, so the two
+            // section curves always share the entity curve's variant; mixed
+            // pairs are impossible. The arm stays total (BG-CE-006) and
+            // degrades like every near-miss rather than aborting.
+            (curve0, curve1) => {
+                let curve0 = curve0.lift_up();
+                let curve1 = curve1.lift_up();
+                NurbsSurface::new(BSplineSurface::homotopy(curve0, curve1)).into()
+            }
+        }
+    }
+
+    fn try_to_same_geometry(&self) -> Outcome<Surface> {
+        // BG-S0-003: the two section curves of an extrusion always share the
+        // entity curve's variant (`curve1` is `curve0` pushed by the
+        // extrusion vector), so an `IntersectionCurve` entity is exactly the
+        // `(IntersectionCurve, IntersectionCurve)` pair. That carrier is
+        // outside the canonical set (H-2): refuse rather than unwind.
+        //
+        // The non-ISC arm replicates the trait default's certificate because
+        // an override cannot call the trait's default without recursing into
+        // itself — the default body is shadowed by this override, not a
+        // callable sibling (BG-S0-003).
+        match self.entity_curve() {
+            Curve::IntersectionCurve(_) => Err(Refusal::UnsupportedEnvelope(
+                EnvelopeCase::NonCanonicalCarrier,
+            )),
+            _ => Ok(Certified::new(
+                self.to_same_geometry(),
+                Certificate {
+                    props: PropMap::new(),
+                    method: Method::Float,
+                    budget_left: Budget::new(0, 0, 0),
+                    margin: Margin::UNBOUNDED,
+                    modulus: Modulus::Unbounded,
+                },
+            )),
+        }
+    }
+}
+
+#[cfg(test)]
+// BG-S0-001 tests. The certificates are inspected by pattern on hand-built
+// witnesses — not paths reachable from untrusted geometry, so the H-1 deny
+// lints on unwrap/expect do not apply to the assertions here.
+mod include_intersection_curve_tests {
+    use super::*;
+
+    /// The plane z = 0 through the origin.
+    fn zx_plane() -> Plane {
+        Plane::new(
+            Point3::origin(),
+            Point3::new(1.0, 0.0, 0.0),
+            Point3::new(0.0, 1.0, 0.0),
+        )
+    }
+
+    /// The plane x = 0 through the origin.
+    fn yz_plane() -> Plane {
+        Plane::new(
+            Point3::origin(),
+            Point3::new(0.0, 1.0, 0.0),
+            Point3::new(0.0, 0.0, 1.0),
+        )
+    }
+
+    /// The plane y = 0 through the origin.
+    fn xz_plane() -> Plane {
+        Plane::new(
+            Point3::origin(),
+            Point3::new(1.0, 0.0, 0.0),
+            Point3::new(0.0, 0.0, 1.0),
+        )
+    }
+
+    fn intersection_curve(surface0: Surface, surface1: Surface, leader: Curve) -> Curve {
+        Curve::IntersectionCurve(IntersectionCurve::new(
+            Box::new(surface0),
+            Box::new(surface1),
+            Box::new(leader),
+        ))
+    }
+
+    #[test]
+    fn ssi_carrier_shortcut_is_deferred_until_entity_id() {
+        // Spec test 1, interim: the ssi-carrier → `Proven(true, Exact)` branch
+        // requires carrier identity (BG-CE-004 / the `EntityId` of BG-CE-003),
+        // which is not implemented. Even though `surface0` IS the queried plane
+        // (structurally identical value), `include` must refuse rather than
+        // manufacture a `Proven(true)` from structural equality — two
+        // independently constructed planes with identical parameters are
+        // distinct carriers.
+        let plane = zx_plane();
+        let query = Surface::Plane(plane);
+        let leader = Curve::Line(Line(
+            Point3::new(-1.0, 0.0, 0.0),
+            Point3::new(1.0, 0.0, 0.0),
+        ));
+        let curve = intersection_curve(Surface::Plane(plane), Surface::Plane(yz_plane()), leader);
+        let out = query.include(&curve);
+        assert!(
+            matches!(
+                out,
+                Err(Refusal::NumericallyUnresolved {
+                    witness: UnresolvedWitness::UncertifiedContainment,
+                    ..
+                })
+            ),
+            "expected NumericallyUnresolved, got {out:?}"
+        );
+    }
+
+    #[test]
+    fn isc_demonstrably_off_plane_is_proven_false() {
+        // Spec test 2: an ISC lying off the plane → `Proven(false)`, μ = Float
+        // (the "leader-witness" signed normal distance beyond the margin).
+        let query = Surface::Plane(zx_plane());
+        let leader = Curve::Line(Line(
+            Point3::new(0.0, 0.0, -1.0),
+            Point3::new(0.0, 0.0, 1.0),
+        ));
+        let curve = intersection_curve(
+            Surface::Plane(xz_plane()),
+            Surface::Plane(yz_plane()),
+            leader,
+        );
+        let out = query.include(&curve);
+        assert!(
+            matches!(
+                out,
+                Ok(Certified {
+                    value: false,
+                    cert: Certificate {
+                        method: Method::Float,
+                        ..
+                    }
+                })
+            ),
+            "expected Proven(false, Float), got {out:?}"
+        );
+    }
+
+    #[test]
+    fn isc_of_other_surfaces_lying_in_plane_is_unresolved() {
+        // Spec test 3 (epistemically critical): an ISC of two *other* surfaces
+        // that happens to lie in the queried plane must be
+        // `NumericallyUnresolved`, NOT `Proven(true)` — sampling cannot prove
+        // containment. This is the test that catches a future "helpful"
+        // strengthening of the sampling path into a wrong-but-confident answer.
+        let query = Surface::Plane(zx_plane());
+        let leader = Curve::Line(Line(
+            Point3::new(-1.0, 0.0, 0.0),
+            Point3::new(1.0, 0.0, 0.0),
+        ));
+        // Two planes whose intersection line is the x-axis, which lies in the
+        // queried plane z = 0.
+        let surface0 = Surface::Plane(Plane::new(
+            Point3::origin(),
+            Point3::new(1.0, 0.0, 0.0),
+            Point3::new(0.0, 1.0, 1.0),
+        ));
+        let surface1 = Surface::Plane(Plane::new(
+            Point3::origin(),
+            Point3::new(1.0, 0.0, 0.0),
+            Point3::new(0.0, 1.0, -1.0),
+        ));
+        let curve = intersection_curve(surface0, surface1, leader);
+        let out = query.include(&curve);
+        assert!(
+            matches!(
+                out,
+                Err(Refusal::NumericallyUnresolved {
+                    witness: UnresolvedWitness::UncertifiedContainment,
+                    ..
+                })
+            ),
+            "expected NumericallyUnresolved, got {out:?}"
+        );
+    }
+}
+
+#[cfg(test)]
+// BG-S0-003 tests. The certificates and surfaces are inspected on hand-built
+// witnesses — not paths reachable from untrusted geometry, so the H-1 deny
+// lints on unwrap/expect do not apply to the assertions here.
+#[allow(clippy::unwrap_used, clippy::expect_used)]
+mod extrude_intersection_curve_tests {
+    use super::*;
+
+    /// The plane z = 0 through the origin.
+    fn zx_plane() -> Plane {
+        Plane::new(
+            Point3::origin(),
+            Point3::new(1.0, 0.0, 0.0),
+            Point3::new(0.0, 1.0, 0.0),
+        )
+    }
+
+    /// The plane x = 0 through the origin.
+    fn yz_plane() -> Plane {
+        Plane::new(
+            Point3::origin(),
+            Point3::new(0.0, 1.0, 0.0),
+            Point3::new(0.0, 0.0, 1.0),
+        )
+    }
+
+    fn intersection_curve(surface0: Surface, surface1: Surface, leader: Curve) -> Curve {
+        Curve::IntersectionCurve(IntersectionCurve::new(
+            Box::new(surface0),
+            Box::new(surface1),
+            Box::new(leader),
+        ))
+    }
+
+    /// An `ExtrudedCurve` whose entity curve is an `IntersectionCurve` — the
+    /// pair Booleans produce. `to_same_geometry` previously aborted on it.
+    fn extruded_intersection_curve_pair() -> ExtrudedCurve<Curve, Vector3> {
+        let isc = intersection_curve(
+            Surface::Plane(zx_plane()),
+            Surface::Plane(yz_plane()),
+            Curve::Line(Line(
+                Point3::new(0.0, 0.0, -1.0),
+                Point3::new(0.0, 0.0, 1.0),
+            )),
+        );
+        ExtrudedCurve::by_extrusion(isc, Vector3::unit_z())
+    }
+
+    #[test]
+    fn extrude_intersection_curve_pair_refuses() {
+        // The certified path refuses the (ISC, ISC) pair instead of aborting:
+        // `UnsupportedEnvelope(NonCanonicalCarrier)`, never a panic.
+        let extruded = extruded_intersection_curve_pair();
+        let out: Outcome<Surface> = extruded.try_to_same_geometry();
+        assert!(
+            matches!(
+                out,
+                Err(Refusal::UnsupportedEnvelope(
+                    EnvelopeCase::NonCanonicalCarrier
+                ))
+            ),
+            "expected UnsupportedEnvelope(NonCanonicalCarrier), got {out:?}"
+        );
+    }
+
+    #[test]
+    fn extrude_intersection_curve_pair_does_not_unwind() {
+        // `to_same_geometry` is infallible, so the same input must come back
+        // through it without unwinding; the catch is asserted not to be
+        // needed.
+        let extruded = extruded_intersection_curve_pair();
+        let result: std::thread::Result<Surface> =
+            std::panic::catch_unwind(|| extruded.to_same_geometry());
+        assert!(
+            result.is_ok(),
+            "to_same_geometry unwound on an intersection-curve pair"
+        );
+    }
+
+    #[test]
+    fn extrude_non_isc_pairs_unchanged() {
+        // Every non-ISC pair must be semantically inert: `try_to_same_geometry`
+        // succeeds and its surface equals what `to_same_geometry` produced.
+        let vector = Vector3::unit_z();
+        let pairs = [
+            ExtrudedCurve::by_extrusion(
+                Curve::Line(Line(Point3::new(0.0, 0.0, 0.0), Point3::new(1.0, 0.0, 0.0))),
+                vector,
+            ),
+            ExtrudedCurve::by_extrusion(
+                Curve::BSplineCurve(BSplineCurve::new(
+                    KnotVec::bezier_knot(1),
+                    vec![Point3::new(0.0, 0.0, 0.0), Point3::new(1.0, 1.0, 0.0)],
+                )),
+                vector,
+            ),
+            ExtrudedCurve::by_extrusion(
+                Curve::NurbsCurve(NurbsCurve::new(BSplineCurve::new(
+                    KnotVec::bezier_knot(1),
+                    vec![
+                        Point3::new(0.0, 0.0, 0.0).to_vec().extend(1.0),
+                        Point3::new(1.0, 0.0, 0.0).to_vec().extend(1.0),
+                    ],
+                ))),
+                vector,
+            ),
+        ];
+        for extruded in pairs {
+            let certified: Certified<Surface> = extruded
+                .try_to_same_geometry()
+                .expect("non-ISC extrusion must not refuse");
+            let before: Surface = extruded.to_same_geometry();
+            for i in 0..=4 {
+                let u = i as f64 / 4.0;
+                for j in 0..=4 {
+                    let v = j as f64 / 4.0;
+                    assert!(
+                        certified.value.subs(u, v) == before.subs(u, v),
+                        "surface diverged from to_same_geometry at ({u}, {v})"
+                    );
+                }
+            }
+        }
+    }
+}
+
+#[cfg(test)]
+// BG-CE-006 tests: the circle stays analytic through conversion, and a
+// non-canonical extrusion degrades to exactly the old homotopy NURBS.
+mod circle_conversion_tests {
+    use super::*;
+    use std::f64::consts::TAU;
+
+    /// The placed unit circle at radius `RADIUS` from the origin in the
+    /// xy-plane, full range.
+    const RADIUS: f64 = 2.0;
+
+    fn placed_circle() -> Processor<TrimmedCurve<UnitCircle<Point3>>, Matrix4> {
+        let trimmed = TrimmedCurve::new(UnitCircle::<Point3>::new(), (0.0, TAU));
+        let mat = Matrix4::from_translation(Vector3::new(RADIUS, 0.0, 0.0));
+        Processor::with_transform(trimmed, mat)
+    }
+
+    #[test]
+    fn circle_conversion_preserves_variant() {
+        let placed = placed_circle();
+        let curve: Curve = placed.to_same_geometry();
+        assert!(matches!(curve, Curve::Circle(_)));
+        // The old conversion: the NURBS of the same placed circle. Sample its
+        // own valid parameters and recover the angle on the placed circle, so
+        // the two curves are compared at the same geometric points. The
+        // full-range NURBS is degenerate at its midpoint parameter (w = 0), so
+        // those samples are skipped.
+        let nurbs: NurbsCurve<Vector4> =
+            ToSameGeometry::<NurbsCurve<Vector4>>::to_same_geometry(&placed);
+        if let Curve::Circle(processed) = &curve {
+            const SAMPLES: usize = 32;
+            for i in 0..=SAMPLES {
+                let s = i as f64 / SAMPLES as f64;
+                let p = nurbs.subs(s);
+                // The full-range NURBS is degenerate at its midpoint parameter
+                // (w = 0), so those samples are skipped.
+                if !p.x.is_finite() {
+                    continue;
+                }
+                // The placed circle is the exact carrier; the inverse search
+                // recovers the angle of every on-curve point.
+                if let Some(t) = processed.search_parameter(p, None, 100) {
+                    assert_near!(processed.subs(t), p);
+                }
+            }
+        }
+    }
+}
+
+#[cfg(test)]
+mod extruded_circle_tests {
+    use super::*;
+    use std::f64::consts::{FRAC_PI_6, TAU};
+
+    /// A placed circle whose plane is tilted `FRAC_PI_6` about the x axis:
+    /// not a z-preserving placement, so no cylinder may be produced.
+    fn tilted_circle() -> Processor<TrimmedCurve<UnitCircle<Point3>>, Matrix4> {
+        let trimmed = TrimmedCurve::new(UnitCircle::<Point3>::new(), (0.0, TAU));
+        let tilt = Matrix4::from_axis_angle(Vector3::unit_x(), Rad(FRAC_PI_6));
+        Processor::with_transform(trimmed, tilt)
+    }
+
+    #[test]
+    fn extruded_noncanonical_circle_degrades() {
+        let circle: Curve = tilted_circle().to_same_geometry();
+        // A non-z extrusion vector: the cylinder conditions require ±z.
+        let vector = Vector3::new(1.0, 0.0, 1.0).normalize();
+        let extruded = ExtrudedCurve::by_extrusion(circle.clone(), vector);
+        let surface: Surface = extruded.to_same_geometry();
+        assert!(
+            !matches!(surface, Surface::Cylinder(_)),
+            "a tilted circle must not become a cylinder"
+        );
+        // Today's behaviour: the homotopy NURBS of the lifted circles. Both
+        // surfaces share the construction, so the parametrizations agree and
+        // points can be compared at the same parameters.
+        let trsl = Matrix4::from_translation(vector);
+        let curve1 = circle.transformed(trsl);
+        let reference =
+            NurbsSurface::new(BSplineSurface::homotopy(circle.lift_up(), curve1.lift_up()));
+        const SAMPLES: usize = 16;
+        for i in 0..=SAMPLES {
+            for j in 0..=SAMPLES {
+                let s = i as f64 / SAMPLES as f64;
+                let t = j as f64 / SAMPLES as f64;
+                let a = surface.subs(s, t);
+                let b = reference.subs(s, t);
+                // The full-range circle's rational NURBS carries a weight
+                // double-zero at its midpoint parameter (w(s) = (2s-1)^2), so
+                // the old conversion itself evaluated to NaN there; skip the
+                // samples where it did.
+                if !a.x.is_finite() || !b.x.is_finite() {
+                    continue;
+                }
+                assert_near!(a, b);
+            }
+        }
+    }
+}
