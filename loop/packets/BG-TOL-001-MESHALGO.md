@@ -6,7 +6,41 @@ or any other spec file** — they are not on your allowlist and this packet is
 self-contained. If something you need is genuinely missing, that is a SPEC_GAP
 (see "Stop conditions"): you stop and report, you do not research it.
 
-```yaml
+```json
+{"id":"BG-TOL-001-MESHALGO","status":"DONE","contracts":["BG-TOL-001"],
+ "tests_added":2,"sites_migrated":20,"sites_deferred":6,"unscaled_legacy_calls":11,
+ "anchors_verified":{"A1":6,"A2":1,"A3":2,"A4":1,"A5":8,"A6":43,"A7":41},
+ "deviations":[
+   {"code":"EXTRA_BINDING","sites":["triangulation.rs:4517"],
+    "why":"one clause: what you did differently and why the packet's literal text did not work"}],
+ "disagreements":[
+   {"code":"BUDGET_WRONG","site":"triangulation.rs:8278",
+    "claim":"one sentence: what the packet asserts and what you found instead"}],
+ "baseline_failures":[
+   {"test":"module::path::name","fails_at_base":true}],
+ "notes":"free text for anything the fields above cannot carry"}
+```
+
+**Fill `deviations`, `disagreements` and `baseline_failures` as arrays, empty if
+empty.** They are not a nicer layout for the same prose -- they are the fields a
+reviewer reads first, and the reason they exist is that the last worker's single
+most valuable finding arrived as the fifth paragraph of a 2,000-character
+`notes` string and was nearly missed. Codes, so the vocabulary is closed:
+
+- `deviations` -- you did the work but not the way the packet literally said:
+  `EXTRA_BINDING` (hoisted a subexpression into a `let`), `MARKER_PLACEMENT`
+  (rustfmt moved a marker), `TEST_SHAPE` (a required test needed a different
+  form). Each needs `sites` and a one-clause `why`.
+- `disagreements` -- the packet asserts something you found to be untrue:
+  `BUDGET_WRONG`, `CLASSIFICATION_WRONG`, `ANCHOR_STALE`, `RULE_MISSING`,
+  `SITE_UNREACHABLE`. **This is the highest-value field in the file.** Do not
+  soften a disagreement into a note; a packet that is wrong and is obeyed
+  silently costs far more than one that is contradicted.
+- `baseline_failures` -- any pre-existing test that fails. Set `fails_at_base`
+  by actually running it at the base commit, and say so if you could not.
+
+`notes` stays free text on purpose: a genuinely novel observation has no code
+yet, and inventing one to fit is worse than a sentence.yaml
 id:          BG-TOL-001-MESHALGO
 contract:    [BG-TOL-001]
 class:       wide-mechanical
@@ -246,8 +280,23 @@ at `truck-modeling/src/geom_impls.rs:91`. Copy that form exactly: the original
 line untouched, and immediately above it
 
 ```rust
-// FIXME(BG-TOL-001): <quantity> is an area (length squared); neither predicate fits
+// FIXME(BG-TOL-001, DEGREE2): <quantity> is an area (length squared); neither predicate fits
 ```
+
+**The `DEGREE2` token is required and is not decoration.** A deferral carries a
+*class*, and the class is what a later pass filters on: `BG-TOL-004` has to find
+every site deferred for a squared-quantity reason without reading prose, and the
+marker test below counts by code. The vocabulary is closed:
+
+| code | meaning |
+|---|---|
+| `DEGREE2` | an area or triple product; degree 2 in length |
+| `SQUARED_ORDER` | compares against `TOLERANCE2` |
+| `GENERIC_BOUND` | the generic type parameter lacks the bound the recipe needs |
+| `NOT_A_PREDICATE` | a const, import, floor or offset |
+
+Every deferral in this packet is `DEGREE2`. If you believe a site needs one of
+the others, that is a `SPEC_GAP` -- say so rather than choosing a code yourself.
 
 | file | line | code |
 |---|---|---|

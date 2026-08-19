@@ -92,36 +92,44 @@ packet** — a ceiling left at its dispatch budget is a licence, not a ratchet.
 
 ## Pick up here
 
-0. **`BG-TOL-001-MESHALGO` is committed at `8cf0e92` and was verified REJECTED
-   on V3 ALONE — and the rejection is probably the gate's, not the worker's.**
-   V3's detail is *"clippy could not build truck-meshalgo, so findings in it were
-   never produced"* — that is a **build failure inside clippy, not a lint
-   finding**, and **V2 (`cargo check --locked`) PASSED on the same tree**. The
-   difference is `--all-targets`. **First thing to do: run
-   `cargo clippy -p truck-meshalgo --all-targets --no-deps` at base `6ca37b2`.**
-   If it fails there too, a gate that fails on the untouched baseline is not a
-   gate and the packet must not be redispatched for it. Everything else about
-   this packet checks out (see below), so do not discard the branch.
-   - **Evidence already gathered, do not re-measure:** the two failing
-     `cone_topology_tests` (`duplicate_edge_creates_no_second_cdt_edge`,
-     `test_parity_intersecting_constraints_rejected`) fail **identically at base**
-     — same assertions, `left: 5 / right: 3`, line numbers shifted by exactly 31.
-     Measured independently in slot 1 detached at `6ca37b2`, and the worker
-     reached the same answer by stashing its diff. **They have been broken since
-     `da72cd5` and no gate ever noticed**, because no packet before this one
-     listed truck-meshalgo in `crates:` and V8 is a stub.
-   - **The packet's budget of 11 contexts is wrong; it should be 10.**
-     `end_pts` is a two-line nested `fn` that closes at 8276; the sites at 8278
-     and 8283 sit *after* it, back in `new_with_join`'s `2 =>` arm.
-     **`census_tol_sites.py` and `gen_packet.py`'s `packet_contexts` share the
-     bug** — both scan upward for `fn <name>` without tracking braces, so both
-     attribute a site to a nested helper that has already closed. The worker
-     honoured the wrong 11 by introducing a context that **shadows
-     `new_with_join`'s** inside the match arm, and said so plainly. That shadow
-     is an orchestrator amendment to remove, not a worker defect.
-   - Worker cost for the whole packet: **$0.057**. All 49 remaining packets
-     extrapolate to **~$2.78**. Worker spend is not a constraint; orchestrator
-     time is. 75% of the worker's wall-clock was model latency, not cargo.
+0. **`BG-TOL-001-MESHALGO` LANDED** as `69044f1` — ACCEPTED on all eleven gates,
+   14/62 packets DONE, GATE-4 at its true 51/51. It took **three rejections and
+   every one of them was the orchestrator's**, which is now the third session
+   running to reach that conclusion:
+   - **V3 could not pass on this crate at all.** `truck-meshalgo/src/lib.rs`
+     carries `#![deny(clippy::all, rust_2018_idioms)]`, so its ~93 pre-existing
+     lints are hard errors whatever V3 puts on the command line; cargo reports
+     "could not compile" and V3's coverage guard short-circuited the added-line
+     scoping that is the gate's whole purpose. **Fixed** (`bcbcc8d`): a crate
+     counts as unlinted only when an `error[E####]` is present, since rustc codes
+     a real compile error and never codes a lint. Watched failing three ways.
+   - **GATE-1 requires `#![deny(clippy::unwrap_used)]` on a new test file and the
+     packet never said so.** Repaired by orchestrator amendment (`897e238`,
+     `amended_by` recorded, worker notes verbatim), not a redispatch.
+   - **The budget of 11 should have been 10** — still true, still unfixed. See
+     the brace-tracking item below.
+
+   **Two things are deliberately left undone on it**, both cheap, both recorded
+   so they are not rediscovered:
+   - `new_with_join` holds a **shadow context** the worker created to obey the
+     wrong budget of 11. Removing it is an orchestrator amendment.
+   - **`census_tol_sites.py` and `gen_packet.py`'s `packet_contexts` share a
+     brace-tracking bug**: both scan upward for `fn <name>` without tracking
+     braces, so a site after a nested helper's closing brace is attributed to the
+     helper. `end_pts` is a two-line nested `fn` closing at 8276; the sites at
+     8278/8283 belong to `new_with_join`. **Fix the tools and the shadow in one
+     commit, and re-run `gen_packet --check` on every Stage-A packet after** —
+     the numbers move.
+
+   **Evidence already gathered, do not re-measure:** the two failing
+   `cone_topology_tests` (`duplicate_edge_creates_no_second_cdt_edge`,
+   `test_parity_intersecting_constraints_rejected`) fail **identically at base** —
+   same assertions, `left: 5 / right: 3`, line numbers shifted by exactly 31.
+   Measured independently in a detached worktree, and the worker reached the same
+   answer by stashing its diff. **They have been broken since `da72cd5` and no
+   gate ever noticed**, because no packet before this one listed truck-meshalgo
+   in `crates:` and **V8 is a stub**. That is the strongest argument for building
+   V8 that this loop has produced.
 
 1. ~~Verify `BG-TOL-001-MESHALGO`~~ — done, see item 0. **Original guidance:** `python
    loop/verify.py --slot 0 --packet loop/packets/BG-TOL-001-MESHALGO.md --base
@@ -292,6 +300,35 @@ curve.rs:134` and `surface.rs:398` compare `dist2 < tol * tol` -- first-order
 predicates written squared, invisible to the census's `TOLERANCE2` token match.
 They are live sites in nobody's inventory. NURBS separately reports four
 `near2_as_curve`/`near2_as_surface` helpers, correctly squared-order.
+
+### New tooling, session 8 — all of it committed and exercised
+
+| command | what it removes from the orchestrator |
+|---|---|
+| `loop/review_survey.py <surveys...>` | the throwaway scripts a survey review needed. Flags mixed/multi-predicate rewrites, degree-2 candidates, non-predicates, live rows with no rewrite, every `confidence:low`. Takes several surveys at once. **Validated against the unreviewed MESHALGO survey: it independently found every defect the manual review found.** |
+| `loop/gen_survey.py --id .. --crates .. --fragment ..` | writing a survey packet by hand; the inventory is measured at generation time |
+| `loop/burn_report.py` | arguing about efficiency instead of measuring it |
+| `loop/new_slot.py --no-warm` | ~5.6 min and ~1 GB per survey slot — a survey never runs cargo |
+
+**Codes now carry what used to be prose**, on the rule *code what is branched on
+or counted, keep prose for what is reasoned about*:
+- `VERDICT.json` gates carry `code` (`LINT_UNLINTED`, `BUILD_FAIL`,
+  `SCOPE_VIOLATION`, `HOUSE_RULES`, `ADDED_TEST_FAILED`, …). Triaging one V3
+  rejection cost six tool calls to establish a fact one field now states.
+- `land_packet.py --fault {NONE,GATE,PACKET,WORKER,SPEC,HARNESS}` makes "whose
+  fault was this round trip" a query rather than a narrative.
+- Survey rows take `reason_code`; the packet's deferrals take
+  `FIXME(BG-TOL-001, DEGREE2)`; `RESULT.json` takes `deviations`,
+  `disagreements` and `baseline_failures` arrays. **`disagreements` is the
+  point**: the last worker's most valuable finding arrived as paragraph five of
+  a 2,000-character `notes` string and was nearly missed.
+
+**Measured, reproducible with `python loop/burn_report.py`:** read-payload per
+live classification fell **3053 → ~650 bytes (4.7x)** on the large shards. Note
+the attribution honestly — that came from `gen_survey`'s measured inventory
+(10% excluded rows vs 75%), **not** from the scope rule or reason codes, which
+have not run yet (`coded` is 0 everywhere). **The "~2x overall frontier burn"
+figure is an estimate with ±50% and nothing has verified it.**
 
 ## The parallelism picture
 
