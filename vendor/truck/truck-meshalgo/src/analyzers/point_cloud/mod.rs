@@ -73,6 +73,7 @@ fn distance2_point_triangle(point: Point3, triangle: [Point3; 3]) -> f64 {
     let coef = f64::signum(ab.cross(nor).dot(ap))
         + f64::signum(bc.cross(nor).dot(bp))
         + f64::signum(ca.cross(nor).dot(cp));
+    // FIXME(BG-TOL-001): the cross-product magnitude is an area (length squared); neither predicate fits
     if coef < 2.0 || nor.magnitude().so_small() {
         let a = (ap - ab * f64::clamp(ab.dot(ap) / ab.dot(ab), 0.0, 1.0)).magnitude2();
         let b = (bp - bc * f64::clamp(bc.dot(bp) / bc.dot(bc), 0.0, 1.0)).magnitude2();

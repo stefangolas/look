@@ -20,6 +20,7 @@ impl Triangle {
         let a = self[0] - self[1];
         let b = self[0] - self[2];
         let mat = Matrix3::from_cols(a, b, ray.direction);
+        // FIXME(BG-TOL-001): the 3x3 determinant of two model-space displacements and a unit direction is an area (length squared); neither predicate fits
         if mat.determinant().so_small() {
             false
         } else {

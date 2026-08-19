@@ -84,12 +84,14 @@ where
     let mut res: Vec<EndPoint> = iter0
         .into_iter()
         .enumerate()
+        // FIXME(BG-TOL-001): the triangle cross product is an area (length squared); neither predicate fits
         .filter(|(_, tri)| !(tri[1] - tri[0]).cross(tri[2] - tri[0]).so_small())
         .flat_map(|(i, tri)| EndPoint::from_seg(tri_to_seg(tri, unit), 0, i))
         .chain(
             iter1
                 .into_iter()
                 .enumerate()
+                // FIXME(BG-TOL-001): the triangle cross product is an area (length squared); neither predicate fits
                 .filter(|(_, tri)| !(tri[1] - tri[0]).cross(tri[2] - tri[0]).so_small())
                 .flat_map(|(i, tri)| EndPoint::from_seg(tri_to_seg(tri, unit), 1, i)),
         )
@@ -150,6 +152,7 @@ fn collide_seg_triangle(seg: [Point3; 2], tri: [Point3; 3]) -> Option<Point3> {
     let bc = tri[2] - tri[1];
     let ca = tri[0] - tri[2];
     let nor = ab.cross(ca);
+    // FIXME(BG-TOL-001): the cross-product magnitude is an area (length squared); neither predicate fits
     if nor.so_small() {
         return None;
     }

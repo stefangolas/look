@@ -237,6 +237,7 @@ pub fn establish_source_edge_traversal<C>(
 where
     C: PolylineableCurve,
 {
+    let ctx = ToleranceCtx::unscaled_legacy();
     let (lo, hi) = curve.evaluation_range();
     if !source_tolerance.is_finite() || source_tolerance <= 0.0 {
         return SourceEdgeTraversal::Unresolved {
@@ -308,7 +309,7 @@ where
     // "closed" carriers: an open fitted spline whose endpoints happen to be
     // within the uncertainty of each other is still an open curve, and wrapping
     // it would invent geometry across the gap.
-    let carrier_closed = subs_lo.distance(subs_hi) <= SOURCE_INCIDENCE_TOLERANCE;
+    let carrier_closed = ctx.is_small_len(subs_lo.distance(subs_hi)); // BG-TOL-001: model
 
     // Locate each source vertex at a unique parameter root of the evaluator
     // domain. Each is required to be uniquely established and to hold a
