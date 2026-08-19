@@ -257,6 +257,42 @@ a migration*. All 23 sites tree-wide are excluded from Stage A and deferred to
   boilerplate prose — **43% of a packet is templatable** and only ~29% is real
   judgement; (c) the brace-tracking fix for both context counters.
 
+### The three surveys are in, reviewed, and one of them has a pre-resolved SPEC_GAP
+
+`loop/surveys/BG-TOL-001-{GEOM-NURBS,GEOM-DECORATORS,SMALL}.json`, all three
+ACCEPTED on V0/V1/V10, all three reviewed with `loop/review_survey.py`. 104 live
+sites for **$0.086 of worker time, three workers concurrently**.
+
+**Write the NURBS packet with this decided, or it will come back SPEC_GAP.**
+`ctx.near_points<P>` is bounded `P: MetricSpace<Metric = f64>`. Ten of NURBS's
+twenty `model` sites sit in impls bounded `P: ControlPoint<f64> + Tolerance`
+(`bspcurve.rs` 474/598/921/1037/1102/1112, `bspsurface.rs` 823/918/1581), and
+`ControlPoint` -- checked, `truck-base/src/cgmath_extend_traits.rs:9` -- requires
+arithmetic, `Copy`, `Debug` and `Index`, and **not** `MetricSpace`. Those ten
+cannot be migrated without widening a public generic bound, which is cross-crate
+and is Stage B. They get the FIXME `truck-topology/src/edge.rs:421` already uses
+verbatim. The other ten `model` sites are concrete and migrate normally.
+
+Adjudications already made, so do not redo them:
+- `revolved_curve.rs:29,434` -- `model` is CORRECT. `RevolutedCurve::new`
+  normalizes its axis, so `(p - origin).cross(axis)` is `|v| sin t`, degree ONE.
+  The degree-2 heuristic flags this shape deliberately and cannot resolve it
+  statically.
+- `rbf_surface/algo.rs:849,959` -- rewrite is CORRECT. The three unmigrated
+  predicates on those lines are `so_small2()`, squared order, excluded by rule.
+- `polyline_curve.rs:54,132` -- `param` is consistent with the ray-crossing
+  parameter already accepted at `triangulation.rs:8420`.
+- **Unresolved and genuinely open:** `rbf_surface/contact_circle.rs:167`, a
+  worker-reported SPEC_GAP -- `del.z` comes out of a Newton solve whose third
+  matrix column is an unnormalized `uder x vder`. Read it before writing
+  DECORATORS.
+
+**Two more census blind spots found, both real:** `truck-geotrait/src/algo/
+curve.rs:134` and `surface.rs:398` compare `dist2 < tol * tol` -- first-order
+predicates written squared, invisible to the census's `TOLERANCE2` token match.
+They are live sites in nobody's inventory. NURBS separately reports four
+`near2_as_curve`/`near2_as_surface` helpers, correctly squared-order.
+
 ## The parallelism picture
 
 62 packets: 38 mechanical, 13 design, 11 wide-mechanical. 49 remain. With

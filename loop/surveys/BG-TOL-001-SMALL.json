@@ -1,0 +1,207 @@
+{
+  "id": "BG-TOL-001-SMALL-SURVEY",
+  "crate": "truck-polymesh, truck-geotrait",
+  "sites": [
+    {
+      "file": "vendor/truck/truck-polymesh/src/polyline_curve.rs",
+      "line": 54,
+      "symbol": "include",
+      "expression": "if x.so_small() && s0 * s1 < 0.0 {",
+      "classification": "param",
+      "reason": "x is the ray-crossing parameter s2/(s1-s0): the signed distance from the query point c to the boundary edge along the unit hash ray. Its dimension follows the caller's Point2 coordinate space, which this generic public API cannot know: in the tessellation context where this identical algorithm was reviewed (truck-meshalgo include_along_ray) the boundary lives in uv parameter space and x is dimensionless, but for a model-space polygon x scales linearly with the model and the predicate's absolute TOLERANCE window would change under a metre/mm export. Genuinely ambiguous; classified param to match the reviewed sibling.",
+      "confidence": "low",
+      "predicates_on_line": 1,
+      "proposed_rewrite": "ctx.is_small_ratio(x) && s0 * s1 < 0.0"
+    },
+    {
+      "file": "vendor/truck/truck-polymesh/src/polyline_curve.rs",
+      "line": 132,
+      "symbol": "include",
+      "expression": "if x.so_small() && s0 * s1 < 0.0 {",
+      "classification": "param",
+      "reason": "x is the ray-crossing parameter s2/(s1-s0): the signed distance from the query point c to the boundary edge along the unit hash ray. Its dimension follows the caller's Point2 coordinate space, which this generic public API cannot know: in the tessellation context where this identical algorithm was reviewed (truck-meshalgo include_along_ray) the boundary lives in uv parameter space and x is dimensionless, but for a model-space polygon x scales linearly with the model. Genuinely ambiguous; classified param to match the reviewed sibling.",
+      "confidence": "low",
+      "predicates_on_line": 1,
+      "proposed_rewrite": "ctx.is_small_ratio(x) && s0 * s1 < 0.0"
+    },
+    {
+      "file": "vendor/truck/truck-polymesh/src/polyline_curve.rs",
+      "line": 302,
+      "symbol": "cut",
+      "expression": "if t.near(&(n as f64)) {",
+      "classification": "param",
+      "reason": "t is the polyline's curve parameter, a dimensionless segment-index coordinate in [0, len] that does not change when the model is exported in a different unit; near() tests whether the cut parameter coincides with an integer knot, so the comparison is parameter space and must not scale.",
+      "confidence": "high",
+      "predicates_on_line": 1,
+      "proposed_rewrite": "ctx.is_small_ratio(t - n as f64)"
+    },
+    {
+      "file": "vendor/truck/truck-polymesh/src/polyline_curve.rs",
+      "line": 331,
+      "symbol": "search_parameter",
+      "expression": "if h.so_small() {",
+      "classification": "model",
+      "reason": "h = a - b*t where a = point - p[0] and b = p[1] - p[0] is the edge vector, so h is the perpendicular displacement from the query point to the segment and its magnitude is the shortest model-space distance from the point to the segment; the test decides whether the point lies on the segment, so it scales with the model.",
+      "confidence": "high",
+      "predicates_on_line": 1,
+      "proposed_rewrite": "ctx.is_small_len(h.magnitude())"
+    },
+    {
+      "file": "vendor/truck/truck-polymesh/src/polyline_curve.rs",
+      "line": 426,
+      "symbol": "polyline_test",
+      "expression": "assert!(polyline.der(t).dot(pt - polyline.subs(t)).so_small());",
+      "classification": "excluded",
+      "reason": "not code: inside #[test] fn polyline_test; a test's own epsilon is the test's business",
+      "confidence": "high",
+      "predicates_on_line": 1,
+      "proposed_rewrite": null
+    },
+    {
+      "file": "vendor/truck/truck-polymesh/src/stl.rs",
+      "line": 277,
+      "symbol": "signup_vector",
+      "expression": "((vector[i] as f64 + TOLERANCE * 0.25) / (TOLERANCE * 0.5)) as i64; 3];",
+      "classification": "excluded",
+      "reason": "not a predicate: TOLERANCE is a spatial quantization bucket pitch (offset TOLERANCE * 0.25 into a grid of cell size TOLERANCE * 0.5) for deduplicating f32 positions and normals; the line computes a hash code and compares nothing",
+      "confidence": "high",
+      "predicates_on_line": 0,
+      "proposed_rewrite": null
+    },
+    {
+      "file": "vendor/truck/truck-polymesh/src/stl.rs",
+      "line": 283,
+      "symbol": "decode_vector",
+      "expression": "array![i => code[i] as f64 * TOLERANCE * 0.5; 3].into()",
+      "classification": "excluded",
+      "reason": "not a predicate: the inverse of the quantization above, reconstructing a bucket centre as code * TOLERANCE * 0.5; a value computation that compares nothing",
+      "confidence": "high",
+      "predicates_on_line": 0,
+      "proposed_rewrite": null
+    },
+    {
+      "file": "vendor/truck/truck-geotrait/src/algo/curve.rs",
+      "line": 66,
+      "symbol": "search_parameter",
+      "expression": "match curve.subs(t).to_vec().near(&point.to_vec()) {",
+      "classification": "model",
+      "reason": "the scrutinee compares the curve position curve.subs(t) with the query point's position, so the predicate is the model-space distance between two points and it scales with the model",
+      "confidence": "high",
+      "predicates_on_line": 1,
+      "proposed_rewrite": "match ctx.near_points(curve.subs(t), point) {"
+    },
+    {
+      "file": "vendor/truck/truck-geotrait/src/algo/curve.rs",
+      "line": 77,
+      "symbol": "parameter_division",
+      "expression": "/// `tol` must be greater than or equal to `TOLERANCE`.",
+      "classification": "excluded",
+      "reason": "not code: a doc comment; a documented precondition is prose, not a predicate",
+      "confidence": "high",
+      "predicates_on_line": 0,
+      "proposed_rewrite": null
+    },
+    {
+      "file": "vendor/truck/truck-geotrait/src/algo/surface.rs",
+      "line": 173,
+      "symbol": "search_nearest_parameter_outcome",
+      "expression": "if next.near2(&param) {",
+      "classification": "excluded",
+      "reason": "squared order: near2 compares against the tighter TOLERANCE2 = 1e-12 token, which no ToleranceCtx predicate reproduces (mapping it onto tau_rep would loosen it by six orders of magnitude); deferred to BG-TOL-004",
+      "confidence": "high",
+      "predicates_on_line": 1,
+      "proposed_rewrite": null
+    },
+    {
+      "file": "vendor/truck/truck-geotrait/src/algo/surface.rs",
+      "line": 292,
+      "symbol": "search_parameter",
+      "expression": "|Vector2 { x: u, y: v }| match surface.subs(u, v).near(&point) {",
+      "classification": "model",
+      "reason": "the scrutinee compares the surface position surface.subs(u, v) with the query point's position, so the predicate is the model-space distance between two points and it scales with the model",
+      "confidence": "high",
+      "predicates_on_line": 1,
+      "proposed_rewrite": "|Vector2 { x: u, y: v }| match ctx.near_points(surface.subs(u, v), point) {"
+    },
+    {
+      "file": "vendor/truck/truck-geotrait/src/algo/surface.rs",
+      "line": 317,
+      "symbol": "search_intersection_parameter",
+      "expression": "match surface.subs(x, y).near(&curve.subs(z)) {",
+      "classification": "model",
+      "reason": "the scrutinee compares a surface point against a curve point, so the predicate is the model-space distance between two points and it scales with the model",
+      "confidence": "high",
+      "predicates_on_line": 1,
+      "proposed_rewrite": "match ctx.near_points(surface.subs(x, y), curve.subs(z)) {"
+    },
+    {
+      "file": "vendor/truck/truck-geotrait/src/algo/surface.rs",
+      "line": 327,
+      "symbol": "parameter_division",
+      "expression": "/// `tol` must be more than `TOLERANCE`.",
+      "classification": "excluded",
+      "reason": "not code: a doc comment; a documented precondition is prose, not a predicate",
+      "confidence": "high",
+      "predicates_on_line": 0,
+      "proposed_rewrite": null
+    },
+    {
+      "file": "vendor/truck/truck-geotrait/src/lib.rs",
+      "line": 28,
+      "symbol": "<file scope>",
+      "expression": "nonpositive_tolerance!($tol, TOLERANCE)",
+      "classification": "excluded",
+      "reason": "not a predicate: the nonpositive_tolerance! macro (a value floor, the .max(TOLERANCE) family) asserts that a caller-supplied tolerance parameter is at least the absolute TOLERANCE constant; it is a precondition guard on an input value, compares no geometric quantity, and a const-free rewrite cannot compile in the macro body",
+      "confidence": "high",
+      "predicates_on_line": 0,
+      "proposed_rewrite": null
+    },
+    {
+      "file": "vendor/truck/truck-geotrait/src/traits/curve.rs",
+      "line": 279,
+      "symbol": "parameter_division",
+      "expression": "/// `tol` must be greater than or equal to `TOLERANCE`.",
+      "classification": "excluded",
+      "reason": "not code: a doc comment; a documented precondition is prose, not a predicate",
+      "confidence": "high",
+      "predicates_on_line": 0,
+      "proposed_rewrite": null
+    },
+    {
+      "file": "vendor/truck/truck-geotrait/src/traits/surface.rs",
+      "line": 254,
+      "symbol": "parameter_division",
+      "expression": "/// `tol` must be greater than or equal to `TOLERANCE`.",
+      "classification": "excluded",
+      "reason": "not code: a doc comment; a documented precondition is prose, not a predicate",
+      "confidence": "high",
+      "predicates_on_line": 0,
+      "proposed_rewrite": null
+    }
+  ],
+  "functions": 11,
+  "not_in_inventory": [
+    {
+      "file": "vendor/truck/truck-geotrait/src/algo/curve.rs",
+      "line": 134,
+      "symbol": "sub_parameter_division",
+      "expression": "if dist2 < tol * tol || trials == 0 || *budget == 0 {",
+      "classification": "model",
+      "reason": "inventory blind spot: the TOLERANCE token never appears (the epsilon is the caller's runtime chord tolerance tol) and the comparison is written squared (dist2 = curve.subs(t).distance2(mid)), so the census regex cannot see it. It is first-order in content (curve-to-chord deviation |subs(t) - mid| < tol), a model-space length compared against a model-space tolerance; it scales with the model. Note: compare by constant, not shape - this is NOT a squared-order site.",
+      "confidence": "high",
+      "predicates_on_line": 1,
+      "proposed_rewrite": "if curve.subs(t).distance(mid) < tol || trials == 0 || *budget == 0 {"
+    },
+    {
+      "file": "vendor/truck/truck-geotrait/src/algo/surface.rs",
+      "line": 398,
+      "symbol": "sub_parameter_division",
+      "expression": "if p0.distance2(pt) > tol * tol {",
+      "classification": "model",
+      "reason": "inventory blind spot: the TOLERANCE token never appears (the epsilon is the caller's runtime chord tolerance tol) and the comparison is written squared (p0.distance2(pt)), so the census regex cannot see it. It is first-order in content (the deviation of the surface sample from the bilinear chord |p0 - pt| > tol), a model-space length compared against a model-space tolerance; it scales with the model. Note: compare by constant, not shape - this is NOT a squared-order site.",
+      "confidence": "high",
+      "predicates_on_line": 1,
+      "proposed_rewrite": "if p0.distance(pt) > tol {"
+    }
+  ]
+}
