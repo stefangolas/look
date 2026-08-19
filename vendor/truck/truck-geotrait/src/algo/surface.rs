@@ -286,10 +286,12 @@ where
     P::Diff: SspVector<Point = P>,
     S: ParametricSurface<Point = P, Vector = P::Diff>,
 {
+    let ctx = ToleranceCtx::unscaled_legacy();
     let function = move |param: Vector2| SspVector::subs(surface, point, param);
     let res = newton::solve(function, hint.into(), trials);
     res.ok().and_then(
-        |Vector2 { x: u, y: v }| match surface.subs(u, v).near(&point) {
+        |Vector2 { x: u, y: v }| match ctx.near_points(surface.subs(u, v), point) // BG-TOL-001: model
+        {
             true => Some((u, v)),
             false => None,
         },
@@ -308,13 +310,15 @@ where
     C: ParametricCurve3D,
     S: ParametricSurface3D,
 {
+    let ctx = ToleranceCtx::unscaled_legacy();
     let function = move |Vector3 { x, y, z }| CalcOutput {
         value: surface.subs(x, y) - curve.subs(z),
         derivation: Matrix3::from_cols(surface.uder(x, y), surface.vder(x, y), -curve.der(z)),
     };
     let hint = Vector3::new(hint0.0, hint0.1, hint1);
     let Vector3 { x, y, z } = newton::solve(function, hint, trials).ok()?;
-    match surface.subs(x, y).near(&curve.subs(z)) {
+    match ctx.near_points(surface.subs(x, y), curve.subs(z)) // BG-TOL-001: model
+    {
         true => Some(((x, y), z)),
         false => None,
     }

@@ -1,4 +1,4 @@
-# WORK PACKET BG-TOL-001-GEOM-NURBS — Stage-A tolerance migration, truck-geometry/src/nurbs
+# WORK PACKET BG-TOL-001-SMALL — Stage-A tolerance migration, truck-polymesh + truck-geotrait
 
 You are implementing one item from a formal kernel specification. Everything you
 need is in this document. **Do not read `docs/GENERATION_KERNEL_BUILD_SPEC.md`
@@ -7,8 +7,8 @@ self-contained. If something you need is genuinely missing, that is a SPEC_GAP
 (see "Stop conditions"): you stop and report, you do not research it.
 
 ```json
-{"id":"BG-TOL-001-GEOM-NURBS","status":"DONE","contracts":["BG-TOL-001"],
- "tests_added":2,"sites_migrated":57,"sites_deferred":12,"unscaled_legacy_calls":26,
+{"id":"BG-TOL-001-SMALL","status":"DONE","contracts":["BG-TOL-001"],
+ "tests_added":1,"sites_migrated":7,"sites_deferred":0,"unscaled_legacy_calls":7,
  "anchors_verified":{"A1":0},
  "deviations":[
    {"code":"EXTRA_BINDING","sites":["file.rs:123"],
@@ -44,55 +44,44 @@ string and was nearly missed. Codes, so the vocabulary is closed:
 yet, and inventing one to fit is worse than a sentence.
 
 ```yaml
-id:          BG-TOL-001-GEOM-NURBS
+id:          BG-TOL-001-SMALL
 contract:    [BG-TOL-001]
 class:       wide-mechanical
-crates:      [truck-geometry]
+crates:      [truck-polymesh, truck-geotrait]
 depends_on:  [BG-TOL-001-TYPE, BG-TOL-001-TYPE-r2, BG-TOL-001-TYPE-r3]
 write_allow:
-  - vendor/truck/truck-geometry/src/nurbs/bspcurve.rs
-  - vendor/truck/truck-geometry/src/nurbs/bspsurface.rs
-  - vendor/truck/truck-geometry/src/nurbs/knot_vec.rs
-  - vendor/truck/truck-geometry/src/nurbs/mod.rs
-  - vendor/truck/truck-geometry/src/nurbs/nurbscurve.rs
-  - vendor/truck/truck-geometry/src/nurbs/nurbssurface.rs
-  - vendor/truck/truck-geometry/tests/tolerance_nurbs.rs
+  - vendor/truck/truck-geotrait/src/algo/curve.rs
+  - vendor/truck/truck-geotrait/src/algo/surface.rs
+  - vendor/truck/truck-polymesh/src/polyline_curve.rs
+  - vendor/truck/truck-geotrait/tests/tolerance_small.rs
 read_allow:
   - vendor/truck/truck-base/src/tolerance.rs
 tests_required:
-  - every_migrated_nurbs_site_is_marked
-  - deferred_generic_bound_sites_carry_a_fixme
-budget:      {turns: 120, ctx_tokens: 240000}
-census_fragment: nurbs
-unscaled_legacy_budget: 26
+  - every_migrated_small_site_is_marked
+budget:      {turns: 50, ctx_tokens: 120000}
+census_fragment: truck-polymesh,truck-geotrait
+unscaled_legacy_budget: 7
 anchors:
-  - {id: A1, expect: 17, cmd: "grep -cE '\\.near\\(|so_small\\(|TOLERANCE' vendor/truck/truck-geometry/src/nurbs/bspcurve.rs"}
-  - {id: A2, expect: 34, cmd: "grep -cE '\\.near\\(|so_small\\(|TOLERANCE' vendor/truck/truck-geometry/src/nurbs/bspsurface.rs"}
-  - {id: A3, expect: 6, cmd: "grep -cE '\\.near\\(|so_small\\(|TOLERANCE' vendor/truck/truck-geometry/src/nurbs/knot_vec.rs"}
-  - {id: A4, expect: 1, cmd: "grep -cE '\\.near\\(|so_small\\(|TOLERANCE' vendor/truck/truck-geometry/src/nurbs/mod.rs"}
-  - {id: A5, expect: 7, cmd: "grep -cE '\\.near\\(|so_small\\(|TOLERANCE' vendor/truck/truck-geometry/src/nurbs/nurbscurve.rs"}
-  - {id: A6, expect: 21, cmd: "grep -cE '\\.near\\(|so_small\\(|TOLERANCE' vendor/truck/truck-geometry/src/nurbs/nurbssurface.rs"}
+  - {id: A1, expect: 2, cmd: "grep -cE '\\.near\\(|so_small\\(|TOLERANCE' vendor/truck/truck-geotrait/src/algo/curve.rs"}
+  - {id: A2, expect: 3, cmd: "grep -cE '\\.near\\(|so_small\\(|TOLERANCE' vendor/truck/truck-geotrait/src/algo/surface.rs"}
+  - {id: A3, expect: 5, cmd: "grep -cE '\\.near\\(|so_small\\(|TOLERANCE' vendor/truck/truck-polymesh/src/polyline_curve.rs"}
 ```
 
 ## Problem
 
-`truck-geometry/src/nurbs` is the B-spline and NURBS core: knot vectors,
-`BSplineCurve`, `BSplineSurface`, and their rational counterparts. It holds more
-tolerance predicates than any other module in the vendored tree, and they divide
-almost perfectly along the line this contract item cares about. A knot value, a
-curve parameter, a knot-span length, a `uv` hint — all dimensionless, all
-scale-free. A control point, a curve position, a surface position — all model
-lengths. The code compares both against the same absolute `TOLERANCE = 1e-6`
-and records nothing about which is which.
+This is the tail of the Stage-A migration: the seven remaining production
+predicates in `truck-polymesh` and `truck-geotrait`, which are too few to be
+worth a shard each. They are not incidental. `truck-geotrait::algo` holds the
+generic Newton solvers that *every* curve and surface type in the kernel calls
+to answer "is this point on this curve" — `search_parameter`,
+`search_intersection_parameter` — and each one ends with an absolute-tolerance
+acceptance test on a model-space distance. If those three sites are wrong about
+scale, every geometric search in the kernel is wrong about scale, whatever the
+concrete type.
 
-That is reachable from untrusted geometry directly. A STEP file names its own
-unit; the same spline imported in metres and in millimetres produces control
-points a thousand times apart, and `TOLERANCE` does not move. Knot degeneracy
-tests then behave identically (correctly — knots are parameters) while
-control-point coincidence tests behave completely differently (incorrectly — those
-are lengths). Today nothing in the source distinguishes the two cases, and the
-judgement cannot be recovered by a machine later, because it depends on what the
-quantity *means*.
+`truck-polymesh::PolylineCurve` supplies the other four, and they are the
+interesting half of the judgement: two of them are point-in-polygon tests in a
+**parameter** frame that read exactly like model-space distances.
 
 **Stage A, which is all this packet is.** Each site is rewritten through a
 `ToleranceCtx` obtained from `ToleranceCtx::unscaled_legacy()`, which carries
@@ -148,11 +137,11 @@ Mark every rewritten line with a trailing `// BG-TOL-001: model` or
 expression, put the marker on the line carrying the `ctx.` call.
 
 **One context per function, never one per site and never one per block.**
-26 functions in this packet hold a migrated site, so you should introduce
-exactly **26** `unscaled_legacy()` calls. See "The ratchet" — this number
+7 functions in this packet hold a migrated site, so you should introduce
+exactly **7** `unscaled_legacy()` calls. See "The ratchet" — this number
 is enforced by a gate, and it is a budget rather than an allowance.
 
-**If you cannot reach 26 honestly, say so and stop.** That instruction is
+**If you cannot reach 7 honestly, say so and stop.** That instruction is
 here because the previous shard could not: its packet demanded 11 contexts when
 the truth was 10, and the worker built a shadow `let ctx = ...` inside a `match`
 arm to satisfy the number. It was obeying a packet that was wrong, and the
@@ -184,211 +173,118 @@ table is marked **REVIEWED**, the same applies to that row.
    negative side. The `write instead` column of the site table already has the
    correct form for every such row — use it.
 
-4. **Twelve `model` sites are deferred for a generic bound, and this has been
-   checked impl by impl — do not try to migrate them.** `ctx.near_points<P>` is
-   declared `where P: MetricSpace<Metric = f64>`. Most of the `BSplineCurve` and
-   `BSplineSurface` methods live in impls bounded `P: ControlPoint<f64> +
-   Tolerance` (and one, `bspsurface.rs:652`, in `impl<V: Tolerance>`, weaker
-   still). `ControlPoint` — `truck-base/src/cgmath_extend_traits.rs:9` — requires
-   arithmetic, `Copy`, `Debug` and `Index`, and **not** `MetricSpace`. The NURBS
-   wrappers are worse: their bound is `V: Homogeneous + ControlPoint<f64, Diff =
-   V>` with `V::Point: Tolerance`, and `Homogeneous::Point` is only
-   `EuclideanSpace<Scalar = Self::Scalar>`, which again does not give
-   `MetricSpace`. Neither `ctx.near_points` nor `.distance()` is available in
-   any of them. **Widening a public generic bound is cross-crate and is Stage B**,
-   so those twelve get a `FIXME` and no rewrite. They are listed under
-   "Not in this packet".
+4. **`algo/curve.rs:66` and `algo/surface.rs:292` look identical and take
+   different rewrites. This is the whole judgement in this packet.** Both end a
+   Newton solve with an acceptance test on a point-to-point distance, both are
+   `model`, and the bounds differ:
 
-5. **`bspcurve.rs:1102` and `:1112` are NOT among them, and this is the one place
-   two nearly identical sites diverge.** Their enclosing `impl<P>
-   BSplineCurve<P>` at `bspcurve.rs:1058` bounds `P` with `MetricSpace<Metric =
-   f64>` explicitly. They migrate normally with `ctx.near_points`. If you find
-   yourself reasoning "`is_arc_of` is on `BSplineCurve<P>` so it must be blocked
-   like `try_concat`", read the impl header — the bound, not the type, decides.
+   - `algo/surface.rs`'s `search_parameter<P, S>` bounds
+     `P: EuclideanSpace<Scalar = f64> + MetricSpace<Metric = f64> + Tolerance`.
+     `MetricSpace` is there, so `ctx.near_points(surface.subs(u, v), point)`
+     applies.
+   - `algo/curve.rs`'s `search_parameter<C>` bounds
+     `C::Point: EuclideanSpace<Scalar = f64, Diff = C::Vector>` and
+     `C::Vector: InnerSpace<Scalar = f64> + Tolerance`. There is **no**
+     `MetricSpace`, so neither `ctx.near_points` nor `.distance()` compiles.
+     `C::Vector: InnerSpace<Scalar = f64>` does give `.magnitude()`, so the form
+     that compiles is
+     `ctx.is_small_len((curve.subs(t) - point).magnitude())`.
 
-6. **The `include` implementations repeat, and repetition is not a reason to
-   factor.** Six `IncludeCurve::include` impls across `bspsurface.rs` and
-   `nurbssurface.rs` carry the identical five-line shape: one `near`/`near_points`
-   on a surface point and four one-sided `TOLERANCE` margins on `uv` hints. Each
-   is a separate function and gets its own context. **Do not extract a shared
-   helper**; that is a signature change, it is outside this packet, and the six
-   impls have different concrete point types.
+   Same predicate, same tightening, different spelling. **Do not widen the bound
+   on `search_parameter<C>` to make the tidier form work** — that is a public
+   generic bound, it is cross-crate, and it is Stage B. The survey proposed
+   `near_points` for both and was corrected here.
 
-7. **`mod.rs:186`, `if delta.abs() <= TOLERANCE`, is `param` and keeps its
-   `.abs()` semantics for free.** `ctx.is_small_ratio(delta)` is already
-   `|delta| <= ratio_margin()`, so write `ctx.is_small_ratio(delta)` and drop the
-   explicit `.abs()`. This is the one row where the rewrite is shorter than the
-   original and still identical.
+5. **`polyline_curve.rs:54` and `:132` are `param`, and dimensional analysis
+   alone gets this backwards.** The quantity is `x = s2 / (s1 - s0)` where `s2`
+   is a cross product of two displacements (degree 2) and `s1 - s0` involves the
+   **unit** ray `r = (cos t, sin t)` (degree 1), so `x` is a *length* — it is the
+   distance along the ray to where it crosses the boundary edge. What settles it
+   is the frame, not the arithmetic: the enclosing impl is
+   `impl PolylineCurve<Point2>`, and that `Point2` is a `uv` parameter point.
+   A length measured in parameter coordinates does not scale with `model_scale`,
+   so `is_small_ratio` is right. This matches the identical algorithm already
+   accepted as `param` at `truck-meshalgo`'s `include_along_ray`. The survey
+   marked both `confidence: low` and was right to; the question is answered and
+   is not yours to reopen.
 
-## The sites — 57 migrate, 26 contexts
+6. **`polyline_curve.rs:331`'s `h` is a vector and `.magnitude()` is available.**
+   The enclosing impl bounds `P::Diff: InnerSpace<Scalar = f64> + Tolerance`, so
+   `ctx.is_small_len(h.magnitude())` compiles. This has been checked.
+
+7. **Nothing in this packet is deferred.** There is no `FIXME` to write. If you
+   conclude a site needs one, that is a `SPEC_GAP` and you say so rather than
+   writing a marker this packet did not ask for.
+
+## The sites — 7 migrate, 7 contexts
 
 Line numbers are provenance for a human reader; locate by the enclosing symbol.
 
-**`bspcurve.rs`**
+**`curve.rs`**
 
 | enclosing fn | line | code | class and why | write instead |
 |---|---|---|---|---|
-| `try_new` | 39 | `} else if knot_vec.range_length().so_small() {` | **`param`** — knot-vector range length in parameter space; zero-range detection must not scale with the model | `ctx.is_small_ratio(knot_vec.range_length())` |
-| `sub_near_as_curve` | 235 | `if delta.so_small() {` | **`param`** — delta is a knot-interval width in parameter space, used only to skip empty spans | `ctx.is_small_ratio(delta)` |
-| `try_remove_knot` | 589 | `if a.so_small() {` | **`param`** — a is the dimensionless knot-span ratio (knot[idx]-knot[i])/(knot[i+k+1]-knot[i]) used as a barycentric coordinate | `ctx.is_small_ratio(a)` |
-| `syncro_knots` | 773 | `if self.knot(i) - other.knot(j) > TOLERANCE {` | **`param`** — one-sided comparison of normalized knot values (dimensionless) deciding which knot to insert | `self.knot(i) - other.knot(j) > ctx.ratio_margin()` |
-| `syncro_knots` | 775 | `} else if other.knot(j) - self.knot(i) > TOLERANCE {` | **`param`** — one-sided comparison of normalized knot values (dimensionless) deciding which knot to insert | `other.knot(j) - self.knot(i) > ctx.ratio_margin()` |
-| `cut` | 977 | `let s = if t.near(&self.knot_vec[idx]) {` | **`param`** — compares the cut parameter t with a knot value; both are dimensionless parameters | `ctx.is_small_ratio(t - self.knot_vec[idx])` |
-| `is_arc_of` | 1102 | `if !self.subs(knots[0]).near(&curve.subs(hint)) {` | **`model`** — compares two curve sample points in model space to check the arc shares an endpoint **REVIEWED — orchestrator, session 9: MIGRATES. The session-8 handoff listed this among the generic-bound deferrals and that was wrong -- the enclosing `impl<P> BSplineCurve<P>` at bspcurve.rs:1058 bounds P with `MetricSpace<Metric = f64>` explicitly, so near_points applies.** | `if !ctx.near_points(self.subs(knots[0]), curve.subs(hint)) {` |
-| `is_arc_of` | 1112 | `let flag = res.map(\|res\| hint <= res && curve.subs(res).near(&pt));` | **`model`** — compares a curve sample point to the reference point in model space; hint <= res is a plain parameter ordering, not a tolerance predicate **REVIEWED — orchestrator, session 9: MIGRATES. The session-8 handoff listed this among the generic-bound deferrals and that was wrong -- the enclosing `impl<P> BSplineCurve<P>` at bspcurve.rs:1058 bounds P with `MetricSpace<Metric = f64>` explicitly, so near_points applies.** | `let flag = res.map(\|res\| hint <= res && ctx.near_points(curve.subs(res), pt));` |
+| `search_parameter` | 66 | `match curve.subs(t).to_vec().near(&point.to_vec()) {` | **`model`** — the scrutinee compares the curve position curve.subs(t) with the query point's position, so the predicate is the model-space distance between two points and it scales with the model **REVIEWED — orchestrator, session 9: class stands, REWRITE CORRECTED. The survey proposed ctx.near_points(curve.subs(t), point), which does not compile here: search_parameter<C> bounds C::Point with EuclideanSpace, not MetricSpace, so near_points does not apply. C::Vector is InnerSpace<Scalar = f64>, so the difference has .magnitude() and is_small_len is the form that compiles. Same predicate, same Euclidean tightening as everywhere else. Note algo/surface.rs :292 does carry MetricSpace<Metric = f64> and keeps near_points -- these two look identical and are not.** | `match ctx.is_small_len((curve.subs(t) - point).magnitude()) {` |
 
-**`bspsurface.rs`**
+**`surface.rs`**
 
 | enclosing fn | line | code | class and why | write instead |
 |---|---|---|---|---|
-| `try_new` | 51 | `} else if knot_vecs.0.range_length().so_small() \|\| knot_vecs.1.range_length().so_small() {` | **`param`** — both are knot-vector range lengths in parameter space, so zero-range detection must not scale with the model | `ctx.is_small_ratio(knot_vecs.0.range_length()) \|\| ctx.is_small_ratio(knot_vecs.1.range_length())` |
-| `sub_near_as_surface` | 523 | `if delta0.so_small() {` | **`param`** — delta0 is a u-knot-interval width in parameter space, used only to skip empty spans | `ctx.is_small_ratio(delta0)` |
-| `sub_near_as_surface` | 530 | `if delta1.so_small() {` | **`param`** — delta1 is a v-knot-interval width in parameter space, used only to skip empty spans | `ctx.is_small_ratio(delta1)` |
-| `try_remove_uknot` | 807 | `if a.so_small() {` | **`param`** — a is the dimensionless knot-span ratio used as a barycentric coordinate during uknot removal | `ctx.is_small_ratio(a)` |
-| `try_remove_vknot` | 905 | `if a.so_small() {` | **`param`** — a is the dimensionless knot-span ratio used as a barycentric coordinate during vknot removal | `ctx.is_small_ratio(a)` |
-| `syncro_uvknots` | 1083 | `if self.uknot(i) - self.vknot(j) > TOLERANCE {` | **`param`** — one-sided comparison of normalized u/v knot values (dimensionless) deciding which knot to insert | `self.uknot(i) - self.vknot(j) > ctx.ratio_margin()` |
-| `syncro_uvknots` | 1085 | `} else if self.vknot(j) - self.uknot(i) > TOLERANCE {` | **`param`** — one-sided comparison of normalized u/v knot values (dimensionless) deciding which knot to insert | `self.vknot(j) - self.uknot(i) > ctx.ratio_margin()` |
-| `ucut` | 1165 | `let s = if u.near(&self.uknot_vec()[idx]) {` | **`param`** — compares the cut parameter u with a u-knot value; both are dimensionless parameters | `ctx.is_small_ratio(u - self.uknot_vec()[idx])` |
-| `sectional_curve` | 1271 | `if !p[0].near(&bspsurface.uknot(0)) {` | **`param`** — p[0] is the u-coordinate of the parameter-space sectioning box, compared against a u-knot value | `!ctx.is_small_ratio(p[0] - bspsurface.uknot(0))` |
-| `sectional_curve` | 1274 | `if !q[0].near(&bspsurface.uknot(bspsurface.uknot_vec().len() - 1)) {` | **`param`** — q[0] is the u-coordinate of the parameter-space sectioning box, compared against a u-knot value | `!ctx.is_small_ratio(q[0] - bspsurface.uknot(bspsurface.uknot_vec().len() - 1))` |
-| `sectional_curve` | 1277 | `if !p[0].near(&bspsurface.vknot(0)) {` | **`param`** — p[0] (u-coordinate) compared against a v-knot value; the quantity is a parameter either way, though this looks like a typo for p[1] | `!ctx.is_small_ratio(p[0] - bspsurface.vknot(0))` |
-| `sectional_curve` | 1280 | `if !q[0].near(&bspsurface.vknot(bspsurface.vknot_vec().len() - 1)) {` | **`param`** — q[0] (u-coordinate) compared against a v-knot value; the quantity is a parameter either way, though this looks like a typo for q[1] | `!ctx.is_small_ratio(q[0] - bspsurface.vknot(bspsurface.vknot_vec().len() - 1))` |
-| `include` | 1844 | `if !ParametricSurface::subs(self, hint.0, hint.1).near(&pt)` | **`model`** — compares the surface point at the resolved parameter to the curve point in model space; this is the deciding predicate of the include test | `!ctx.near_points(ParametricSurface::subs(self, hint.0, hint.1), pt)` |
-| `include` | 1845 | `\|\| hint.0 < uknot_vec[0] - TOLERANCE` | **`param`** — one-sided check that the resolved u parameter stays above the u knot domain bottom | `\|\| hint.0 < uknot_vec[0] - ctx.ratio_margin()` |
-| `include` | 1846 | `\|\| hint.0 - uknot_vec[0] > uknot_vec.range_length() + TOLERANCE` | **`param`** — one-sided check that the resolved u parameter does not overshoot the u knot domain top | `\|\| hint.0 - uknot_vec[0] > uknot_vec.range_length() + ctx.ratio_margin()` |
-| `include` | 1847 | `\|\| hint.1 < vknot_vec[0] - TOLERANCE` | **`param`** — one-sided check that the resolved v parameter stays above the v knot domain bottom | `\|\| hint.1 < vknot_vec[0] - ctx.ratio_margin()` |
-| `include` | 1848 | `\|\| hint.1 - vknot_vec[0] > vknot_vec.range_length() + TOLERANCE` | **`param`** — one-sided check that the resolved v parameter does not overshoot the v knot domain top | `\|\| hint.1 - vknot_vec[0] > vknot_vec.range_length() + ctx.ratio_margin()` |
-| `include` | 1894 | `if !ParametricSurface::subs(self, hint.0, hint.1).near(&pt)` | **`model`** — compares the surface point at the resolved parameter to the curve point in model space; this is the deciding predicate of the include test | `!ctx.near_points(ParametricSurface::subs(self, hint.0, hint.1), pt)` |
-| `include` | 1895 | `\|\| hint.0 < uknot_vec[0] - TOLERANCE` | **`param`** — one-sided check that the resolved u parameter stays above the u knot domain bottom | `\|\| hint.0 < uknot_vec[0] - ctx.ratio_margin()` |
-| `include` | 1896 | `\|\| hint.0 - uknot_vec[0] > uknot_vec.range_length() + TOLERANCE` | **`param`** — one-sided check that the resolved u parameter does not overshoot the u knot domain top | `\|\| hint.0 - uknot_vec[0] > uknot_vec.range_length() + ctx.ratio_margin()` |
-| `include` | 1897 | `\|\| hint.1 < vknot_vec[0] - TOLERANCE` | **`param`** — one-sided check that the resolved v parameter stays above the v knot domain bottom | `\|\| hint.1 < vknot_vec[0] - ctx.ratio_margin()` |
-| `include` | 1898 | `\|\| hint.1 - vknot_vec[0] > vknot_vec.range_length() + TOLERANCE` | **`param`** — one-sided check that the resolved v parameter does not overshoot the v knot domain top | `\|\| hint.1 - vknot_vec[0] > vknot_vec.range_length() + ctx.ratio_margin()` |
-| `include` | 1944 | `if !ParametricSurface::subs(self, hint.0, hint.1).near(&pt)` | **`model`** — compares the surface point at the resolved parameter to the curve point in model space; this is the deciding predicate of the include test | `!ctx.near_points(ParametricSurface::subs(self, hint.0, hint.1), pt)` |
-| `include` | 1945 | `\|\| hint.0 < uknot_vec[0] - TOLERANCE` | **`param`** — one-sided check that the resolved u parameter stays above the u knot domain bottom | `\|\| hint.0 < uknot_vec[0] - ctx.ratio_margin()` |
-| `include` | 1946 | `\|\| hint.0 - uknot_vec[0] > uknot_vec.range_length() + TOLERANCE` | **`param`** — one-sided check that the resolved u parameter does not overshoot the u knot domain top | `\|\| hint.0 - uknot_vec[0] > uknot_vec.range_length() + ctx.ratio_margin()` |
-| `include` | 1947 | `\|\| hint.1 < vknot_vec[0] - TOLERANCE` | **`param`** — one-sided check that the resolved v parameter stays above the v knot domain bottom | `\|\| hint.1 < vknot_vec[0] - ctx.ratio_margin()` |
-| `include` | 1948 | `\|\| hint.1 - vknot_vec[0] > vknot_vec.range_length() + TOLERANCE` | **`param`** — one-sided check that the resolved v parameter does not overshoot the v knot domain top | `\|\| hint.1 - vknot_vec[0] > vknot_vec.range_length() + ctx.ratio_margin()` |
+| `search_parameter` | 292 | `\|Vector2 { x: u, y: v }\| match surface.subs(u, v).near(&point) {` | **`model`** — the scrutinee compares the surface position surface.subs(u, v) with the query point's position, so the predicate is the model-space distance between two points and it scales with the model | `\|Vector2 { x: u, y: v }\| match ctx.near_points(surface.subs(u, v), point) {` |
+| `search_intersection_parameter` | 317 | `match surface.subs(x, y).near(&curve.subs(z)) {` | **`model`** — the scrutinee compares a surface point against a curve point, so the predicate is the model-space distance between two points and it scales with the model | `match ctx.near_points(surface.subs(x, y), curve.subs(z)) {` |
 
-**`knot_vec.rs`**
+**`polyline_curve.rs`**
 
 | enclosing fn | line | code | class and why | write instead |
 |---|---|---|---|---|
-| `same_range` | 44 | `self[0].near(&other[0]) && self.range_length().near(&other.range_length())` | **`param`** — knot values and the knot-range span are parameter-space (dimensionless) quantities, so range equality must not scale with the model | `ctx.is_small_ratio(self[0] - other[0]) && ctx.is_small_ratio(self.range_length() - other.range_length())` |
-| `multiplicity` | 80 | `self.iter().filter(\|u\| self[i].near(u)).count()` | **`param`** — compares a knot value to its neighbours to count multiplicity; knots are dimensionless parameters | `self.iter().filter(\|u\| ctx.is_small_ratio(self[i] - *u)).count()` |
-| `try_bspline_basis_functions` | 242 | `if self[0].near(&self[n]) {` | **`param`** — compares first and last knot values to detect a zero-range knot vector; knots are dimensionless parameters | `ctx.is_small_ratio(self[0] - self[n])` |
-| `try_normalize` | 358 | `if range.so_small() {` | **`param`** — range is the knot-vector span in parameter space, so its zero-detection must not scale with the model | `ctx.is_small_ratio(range)` |
-| `try_concat` | 450 | `if front < back \|\| !front.near(back) {` | **`param`** — front/back are knot values compared for equality; the front < back clause is a plain ordering, not a tolerance predicate | `if front < back \|\| !ctx.is_small_ratio(front - back) {` |
-| `to_single_multi` | 510 | `if knot.near(next) {` | **`param`** — compares consecutive knot values to merge duplicates; knots are dimensionless parameters | `ctx.is_small_ratio(knot - *next)` |
+| `include` | 54 | `if x.so_small() && s0 * s1 < 0.0 {` | **`param`** — x is the ray-crossing parameter s2/(s1-s0): the signed distance from the query point c to the boundary edge along the unit hash ray. Its dimension follows the caller's Point2 coordinate space, which this generic public API cannot know: in the tessellation context where this identical algorithm was reviewed (truck-meshalgo include_along_ray) the boundary lives in uv parameter space and x is dimensionless, but for a model-space polygon x scales linearly with the model and the predicate's absolute TOLERANCE window would change under a metre/mm export. Genuinely ambiguous; classified param to match the reviewed sibling. **REVIEWED — orchestrator, session 9: `param` CONFIRMED, and the reason is the frame, not the arithmetic. x = s2/(s1 - s0) is (area)/(length) = a LENGTH in the coordinates of the enclosing `impl PolylineCurve<Point2>` -- and that Point2 is a uv parameter point, not a model point, so the length does not scale with model_scale. Consistent with the ray-crossing parameter already accepted at triangulation.rs:8420. Dimensional reasoning alone gets this one backwards, which is why it came back confidence: low.** | `ctx.is_small_ratio(x) && s0 * s1 < 0.0` |
+| `include` | 132 | `if x.so_small() && s0 * s1 < 0.0 {` | **`param`** — x is the ray-crossing parameter s2/(s1-s0): the signed distance from the query point c to the boundary edge along the unit hash ray. Its dimension follows the caller's Point2 coordinate space, which this generic public API cannot know: in the tessellation context where this identical algorithm was reviewed (truck-meshalgo include_along_ray) the boundary lives in uv parameter space and x is dimensionless, but for a model-space polygon x scales linearly with the model. Genuinely ambiguous; classified param to match the reviewed sibling. **REVIEWED — orchestrator, session 9: `param` CONFIRMED, and the reason is the frame, not the arithmetic. x = s2/(s1 - s0) is (area)/(length) = a LENGTH in the coordinates of the enclosing `impl PolylineCurve<Point2>` -- and that Point2 is a uv parameter point, not a model point, so the length does not scale with model_scale. Consistent with the ray-crossing parameter already accepted at triangulation.rs:8420. Dimensional reasoning alone gets this one backwards, which is why it came back confidence: low.** | `ctx.is_small_ratio(x) && s0 * s1 < 0.0` |
+| `cut` | 302 | `if t.near(&(n as f64)) {` | **`param`** — t is the polyline's curve parameter, a dimensionless segment-index coordinate in [0, len] that does not change when the model is exported in a different unit; near() tests whether the cut parameter coincides with an integer knot, so the comparison is parameter space and must not scale. | `ctx.is_small_ratio(t - n as f64)` |
+| `search_parameter` | 331 | `if h.so_small() {` | **`model`** — h = a - b*t where a = point - p[0] and b = p[1] - p[0] is the edge vector, so h is the perpendicular displacement from the query point to the segment and its magnitude is the shortest model-space distance from the point to the segment; the test decides whether the point lies on the segment, so it scales with the model. **REVIEWED — orchestrator, session 9: checked to compile. h: P::Diff is bounded InnerSpace<Scalar = f64> + Tolerance in the enclosing impl, so .magnitude() applies.** | `ctx.is_small_len(h.magnitude())` |
 
-**`mod.rs`**
+## Not in this packet — 9 excluded, no marker
 
-| enclosing fn | line | code | class and why | write instead |
-|---|---|---|---|---|
-| `inv_or_zero` | 186 | `if delta.abs() <= TOLERANCE {` | **`param`** — delta is a knot-span difference in parameter space used only as a division guard; the fn is const, so the rewrite needs the ctx threaded or the fn made non-const | `ctx.is_small_ratio(delta)` |
+- `polyline_curve.rs:426` — not code: inside #[test] fn polyline_test; a test's own epsilon is the test's business
+- `stl.rs:277` — not a predicate: TOLERANCE is a spatial quantization bucket pitch (offset TOLERANCE * 0.25 into a grid of cell size TOLERANCE * 0.5) for deduplicating f32 positions and normals; the line computes a hash code and compares nothing
+- `stl.rs:283` — not a predicate: the inverse of the quantization above, reconstructing a bucket centre as code * TOLERANCE * 0.5; a value computation that compares nothing
+- `curve.rs:77` — not code: a doc comment; a documented precondition is prose, not a predicate
+- `surface.rs:173` — squared order: near2 compares against the tighter TOLERANCE2 = 1e-12 token, which no ToleranceCtx predicate reproduces (mapping it onto tau_rep would loosen it by six orders of magnitude); deferred to BG-TOL-004
+- `surface.rs:327` — not code: a doc comment; a documented precondition is prose, not a predicate
+- `lib.rs:28` — not a predicate: the nonpositive_tolerance! macro (a value floor, the .max(TOLERANCE) family) asserts that a caller-supplied tolerance parameter is at least the absolute TOLERANCE constant; it is a precondition guard on an input value, compares no geometric quantity, and a const-free rewrite cannot compile in the macro body
+- `curve.rs:279` — not code: a doc comment; a documented precondition is prose, not a predicate
+- `surface.rs:254` — not code: a doc comment; a documented precondition is prose, not a predicate
 
-**`nurbssurface.rs`**
+<!-- 2 low-confidence row(s) above. Review each against the
+     source before dispatching; that is the half V10 cannot check. -->
 
-| enclosing fn | line | code | class and why | write instead |
-|---|---|---|---|---|
-| `include` | 722 | `if !self.subs(hint.0, hint.1).near(&pt)` | **`model`** — compares the surface point at the resolved parameter to the curve point in model space; this is the deciding predicate of the include test | `!ctx.near_points(self.subs(hint.0, hint.1), pt)` |
-| `include` | 723 | `\|\| hint.0 < uknot_vec[0] - TOLERANCE` | **`param`** — one-sided check that the resolved u parameter stays above the u knot domain bottom | `\|\| hint.0 < uknot_vec[0] - ctx.ratio_margin()` |
-| `include` | 724 | `\|\| hint.0 - uknot_vec[0] > uknot_vec.range_length() + TOLERANCE` | **`param`** — one-sided check that the resolved u parameter does not overshoot the u knot domain top | `\|\| hint.0 - uknot_vec[0] > uknot_vec.range_length() + ctx.ratio_margin()` |
-| `include` | 725 | `\|\| hint.1 < vknot_vec[0] - TOLERANCE` | **`param`** — one-sided check that the resolved v parameter stays above the v knot domain bottom | `\|\| hint.1 < vknot_vec[0] - ctx.ratio_margin()` |
-| `include` | 726 | `\|\| hint.1 - vknot_vec[0] > vknot_vec.range_length() + TOLERANCE` | **`param`** — one-sided check that the resolved v parameter does not overshoot the v knot domain top | `\|\| hint.1 - vknot_vec[0] > vknot_vec.range_length() + ctx.ratio_margin()` |
-| `include` | 769 | `if !self.subs(hint.0, hint.1).near(&pt)` | **`model`** — compares the surface point at the resolved parameter to the curve point in model space; this is the deciding predicate of the include test | `!ctx.near_points(self.subs(hint.0, hint.1), pt)` |
-| `include` | 770 | `\|\| hint.0 < uknot_vec[0] - TOLERANCE` | **`param`** — one-sided check that the resolved u parameter stays above the u knot domain bottom | `\|\| hint.0 < uknot_vec[0] - ctx.ratio_margin()` |
-| `include` | 771 | `\|\| hint.0 - uknot_vec[0] > uknot_vec.range_length() + TOLERANCE` | **`param`** — one-sided check that the resolved u parameter does not overshoot the u knot domain top | `\|\| hint.0 - uknot_vec[0] > uknot_vec.range_length() + ctx.ratio_margin()` |
-| `include` | 772 | `\|\| hint.1 < vknot_vec[0] - TOLERANCE` | **`param`** — one-sided check that the resolved v parameter stays above the v knot domain bottom | `\|\| hint.1 < vknot_vec[0] - ctx.ratio_margin()` |
-| `include` | 773 | `\|\| hint.1 - vknot_vec[0] > vknot_vec.range_length() + TOLERANCE` | **`param`** — one-sided check that the resolved v parameter does not overshoot the v knot domain top | `\|\| hint.1 - vknot_vec[0] > vknot_vec.range_length() + ctx.ratio_margin()` |
-| `include` | 816 | `if !self.subs(hint.0, hint.1).near(&pt)` | **`model`** — compares the surface point at the resolved parameter to the curve point in model space; this is the deciding predicate of the include test | `!ctx.near_points(self.subs(hint.0, hint.1), pt)` |
-| `include` | 817 | `\|\| hint.0 < uknot_vec[0] - TOLERANCE` | **`param`** — one-sided check that the resolved u parameter stays above the u knot domain bottom | `\|\| hint.0 < uknot_vec[0] - ctx.ratio_margin()` |
-| `include` | 818 | `\|\| hint.0 - uknot_vec[0] > uknot_vec.range_length() + TOLERANCE` | **`param`** — one-sided check that the resolved u parameter does not overshoot the u knot domain top | `\|\| hint.0 - uknot_vec[0] > uknot_vec.range_length() + ctx.ratio_margin()` |
-| `include` | 819 | `\|\| hint.1 < vknot_vec[0] - TOLERANCE` | **`param`** — one-sided check that the resolved v parameter stays above the v knot domain bottom | `\|\| hint.1 < vknot_vec[0] - ctx.ratio_margin()` |
-| `include` | 820 | `\|\| hint.1 - vknot_vec[0] > vknot_vec.range_length() + TOLERANCE` | **`param`** — one-sided check that the resolved v parameter does not overshoot the v knot domain top | `\|\| hint.1 - vknot_vec[0] > vknot_vec.range_length() + ctx.ratio_margin()` |
+### Two live predicates that are NOT this packet's work, recorded so they are not rediscovered
 
-## Not in this packet — 12 deferrals: a FIXME and nothing else
+The survey found two sites the site census structurally cannot see, at
+`truck-geotrait/src/algo/curve.rs:134` and `algo/surface.rs:398`. Both compare a
+squared distance against a squared tolerance — `dist2 < tol * tol` — with no
+`TOLERANCE` token anywhere on the line, which is why no inventory contains them.
+They are real first-order predicates and the survey was right to report them.
 
-These sites are real and their line numbers resolve. You **leave the code
-exactly as it is** and add one marker comment on the line above each. Do
-not introduce a `ToleranceCtx` for a function that has only deferrals —
-a FIXME is a comment and costs no context.
-
-**`bspcurve.rs`**
-
-| enclosing fn | line | code | marker |
-|---|---|---|---|
-| `is_const` | 474 | `.all(move \|vec\| vec.near(&self.control_points[0]))` | `// FIXME(BG-TOL-001, GENERIC_BOUND)` — ctx.near_points<P> is bounded P: MetricSpace<Metric = f64> and this impl does not supply it. Widening a public generic bound is cross-crate and is Stage B, so the site is left exactly as it is. Enclosing impl: `impl<P: ControlPoint<f64> + Tolerance> BSplineCurve<P>`. |
-| `try_remove_knot` | 598 | `if !new_points.last().unwrap().near(self.control_point(idx)) {` | `// FIXME(BG-TOL-001, GENERIC_BOUND)` — ctx.near_points<P> is bounded P: MetricSpace<Metric = f64> and this impl does not supply it. Widening a public generic bound is cross-crate and is Stage B, so the site is left exactly as it is. Enclosing impl: `impl<P: ControlPoint<f64> + Tolerance> BSplineCurve<P>`. |
-| `near_as_curve` | 921 | `self.sub_near_as_curve(other, 1, \|x, y\| x.near(y))` | `// FIXME(BG-TOL-001, GENERIC_BOUND)` — ctx.near_points<P> is bounded P: MetricSpace<Metric = f64> and this impl does not supply it. Widening a public generic bound is cross-crate and is Stage B, so the site is left exactly as it is. Enclosing impl: `impl<P: ControlPoint<f64> + Tolerance> BSplineCurve<P>`. |
-| `try_concat` | 1037 | `if !front.near(back) {` | `// FIXME(BG-TOL-001, GENERIC_BOUND)` — ctx.near_points<P> is bounded P: MetricSpace<Metric = f64> and this impl does not supply it. Widening a public generic bound is cross-crate and is Stage B, so the site is left exactly as it is. Enclosing impl: `impl<P: ControlPoint<f64> + Tolerance> Concat<..> for BSplineCurve<P>`. |
-
-**`bspsurface.rs`**
-
-| enclosing fn | line | code | marker |
-|---|---|---|---|
-| `is_const` | 652 | `if !vec.near(&self.control_points[0][0]) {` | `// FIXME(BG-TOL-001, GENERIC_BOUND)` — ctx.near_points<P> is bounded P: MetricSpace<Metric = f64> and this impl does not supply it. Widening a public generic bound is cross-crate and is Stage B, so the site is left exactly as it is. Enclosing impl: `impl<V: Tolerance> BSplineSurface<V> -- not even ControlPoint`. |
-| `try_remove_uknot` | 823 | `if !pt0.near(pt1) {` | `// FIXME(BG-TOL-001, GENERIC_BOUND)` — ctx.near_points<P> is bounded P: MetricSpace<Metric = f64> and this impl does not supply it. Widening a public generic bound is cross-crate and is Stage B, so the site is left exactly as it is. Enclosing impl: `impl<P: ControlPoint<f64> + Tolerance> BSplineSurface<P>`. |
-| `try_remove_vknot` | 918 | `if !pt0.near(pt1) {` | `// FIXME(BG-TOL-001, GENERIC_BOUND)` — ctx.near_points<P> is bounded P: MetricSpace<Metric = f64> and this impl does not supply it. Widening a public generic bound is cross-crate and is Stage B, so the site is left exactly as it is. Enclosing impl: `impl<P: ControlPoint<f64> + Tolerance> BSplineSurface<P>`. |
-| `near_as_surface` | 1581 | `self.sub_near_as_surface(other, 1, \|x, y\| x.near(y))` | `// FIXME(BG-TOL-001, GENERIC_BOUND)` — ctx.near_points<P> is bounded P: MetricSpace<Metric = f64> and this impl does not supply it. Widening a public generic bound is cross-crate and is Stage B, so the site is left exactly as it is. Enclosing impl: `impl<P: ControlPoint<f64> + Tolerance> BSplineSurface<P>`. |
-
-**`nurbscurve.rs`**
-
-| enclosing fn | line | code | marker |
-|---|---|---|---|
-| `is_const` | 170 | `.all(move \|vec\| vec.to_point().near(&pt))` | `// FIXME(BG-TOL-001, GENERIC_BOUND)` — ctx.near_points<P> is bounded P: MetricSpace<Metric = f64> and this impl does not supply it. Widening a public generic bound is cross-crate and is Stage B, so the site is left exactly as it is. Enclosing impl: `impl<V: Homogeneous + ControlPoint<f64, Diff = V>> where V::Point: Tolerance`. |
-| `near_as_curve` | 199 | `.sub_near_as_curve(&other.0, 2, move \|x, y\| x.to_point().near(&y.to_point()))` | `// FIXME(BG-TOL-001, GENERIC_BOUND)` — ctx.near_points<P> is bounded P: MetricSpace<Metric = f64> and this impl does not supply it. Widening a public generic bound is cross-crate and is Stage B, so the site is left exactly as it is. Enclosing impl: `impl<V: Homogeneous + ControlPoint<f64, Diff = V>> where V::Point: Tolerance`. |
-
-**`nurbssurface.rs`**
-
-| enclosing fn | line | code | marker |
-|---|---|---|---|
-| `is_const` | 299 | `if !vec.to_point().near(&pt) {` | `// FIXME(BG-TOL-001, GENERIC_BOUND)` — ctx.near_points<P> is bounded P: MetricSpace<Metric = f64> and this impl does not supply it. Widening a public generic bound is cross-crate and is Stage B, so the site is left exactly as it is. Enclosing impl: `impl<V: Homogeneous + ControlPoint<f64, Diff = V>> where V::Point: Tolerance`. |
-| `near_as_surface` | 329 | `.sub_near_as_surface(&other.0, 2, move \|x, y\| x.to_point().near(&y.to_point()))` | `// FIXME(BG-TOL-001, GENERIC_BOUND)` — ctx.near_points<P> is bounded P: MetricSpace<Metric = f64> and this impl does not supply it. Widening a public generic bound is cross-crate and is Stage B, so the site is left exactly as it is. Enclosing impl: `impl<V: Homogeneous + ControlPoint<f64, Diff = V>> where V::Point: Tolerance`. |
-
-## Not in this packet — 23 excluded, no marker
-
-- `bspcurve.rs:772` — squared order
-- `bspcurve.rs:852` — not code: doc comment
-- `bspcurve.rs:861` — not code: doc comment
-- `bspcurve.rs:898` — not code: doc comment
-- `bspcurve.rs:927` — not code: doc comment
-- `bspcurve.rs:931` — not code: doc comment
-- `bspcurve.rs:951` — squared order
-- `bspsurface.rs:1082` — squared order
-- `bspsurface.rs:1561` — not code: doc comment
-- `bspsurface.rs:1586` — not code: doc comment
-- `bspsurface.rs:1590` — not code: doc comment
-- `bspsurface.rs:1608` — squared order
-- `nurbscurve.rs:175` — not code: doc comment
-- `nurbscurve.rs:205` — not code: doc comment
-- `nurbscurve.rs:223` — not code: doc comment
-- `nurbscurve.rs:229` — squared order
-- `nurbscurve.rs:359` — not code: doc comment
-- `nurbscurve.rs:370` — not code: doc comment
-- `nurbssurface.rs:308` — not code: doc comment
-- `nurbssurface.rs:335` — not code: doc comment
-- `nurbssurface.rs:339` — not code: doc comment
-- `nurbssurface.rs:358` — squared order
-- `nurbssurface.rs:554` — not code: doc comment
+**They are still not migration work, and the reason is worth stating precisely:**
+the epsilon in both is the **caller's runtime `tol` argument**, not the absolute
+`TOLERANCE` constant. There is no absolute threshold to re-home, so there is
+nothing for a `ToleranceCtx` to carry. Re-homing a caller-supplied chord
+tolerance onto a threaded context is Stage-B work on the `parameter_division`
+API. Leave both lines exactly as they are and add no marker.
 
 ### Everything else in these files
 
-Leaving these alone is correct; migrating one is a rejection.
-
-1. **All doc comments and `#[cfg(test)]` code.** `nurbs` is heavily documented
-   with runnable examples and they account for most of the anchor counts. A doc
-   example is prose and a test's epsilon is the test's own business.
-2. **Anything using `.near2()` or `.so_small2()`.** The survey found six such
-   helpers — `sub_near_as_curve`/`sub_near_as_surface` and the
-   `near2_as_curve`/`near2_as_surface` family — and they are correctly
-   squared-order: they compare against `TOLERANCE2` = 1e-12, which nothing on
-   `ToleranceCtx` reproduces. Mapping them onto `tau_rep` would loosen them by
-   six orders of magnitude while looking like a migration. They are deferred to
-   BG-TOL-004 and are not your work.
-3. **Any `TOLERANCE` used as a value rather than a comparison** — a `.max()`
-   floor, a `+ TOLERANCE` offset, a `const` initializer, a `use` import. Such a
-   line compares nothing, so it has no `model`/`param` class, and there is no
-   `ctx` in scope for a `const` anyway. Its *consumers* are the sites.
+1. **All doc comments and `#[cfg(test)]` code**, including the four
+   `/// \`tol\` must be greater than or equal to \`TOLERANCE\`` precondition
+   comments and the assertion inside `polyline_test`.
+2. **`stl.rs` entirely.** Its two `TOLERANCE` uses are a spatial-hash
+   quantization pitch and its inverse — a value computation that compares
+   nothing. `stl.rs` is not on your allowlist.
+3. **`truck-geotrait/src/lib.rs:28`,** the `nonpositive_tolerance!` macro. It
+   asserts a caller-supplied tolerance is at least `TOLERANCE`; that is a
+   precondition check on an argument, not a geometric predicate.
+4. **`surface.rs:173`, `if next.near2(&param)`.** Squared order against
+   `TOLERANCE2`; deferred to BG-TOL-004.
 
 ## The ratchet — read this before you commit
 
@@ -402,7 +298,7 @@ packet that can move its own ceiling is not constrained by anything.
 
 Because two other shards are running concurrently against the same ceiling, a
 context you add that the budget did not account for is not merely over-budget;
-it can push a sibling's correct work over the line. Introduce 26 and no
+it can push a sibling's correct work over the line. Introduce 7 and no
 more.
 
 ## House rules
@@ -426,7 +322,7 @@ more.
 
 ## Tests required
 
-New file `vendor/truck/truck-geometry/tests/tolerance_nurbs.rs`.
+New file `vendor/truck/truck-geotrait/tests/tolerance_small.rs`.
 
 **Its first line must be `#![deny(clippy::unwrap_used)]`.** GATE-1 (H-1)
 requires it of every new module under `vendor/truck/`, including test files, and
@@ -440,29 +336,24 @@ worker, cost a round trip.
 Each test must be a named `#[test]` fn — the verifier checks the names appear in
 your diff, so the names below are exact.
 
-1. `every_migrated_nurbs_site_is_marked` — read the migrated source files from
+1. `every_migrated_small_site_is_marked` — read the migrated source files from
    `CARGO_MANIFEST_DIR` at runtime and assert that the number of lines
    containing `ctx.near_pt(`, `ctx.near_points(`, `ctx.is_small_len(`,
    `ctx.is_small_ratio(` or `ctx.ratio_margin()` equals the number containing a
    `// BG-TOL-001:` marker. This is what makes the marking checkable rather than
    a convention; without it the markers rot the first time someone edits a line.
-2. `deferred_generic_bound_sites_carry_a_fixme` — assert that `bspcurve.rs`, `bspsurface.rs`,
-   `nurbscurve.rs` and `nurbssurface.rs` contain exactly **4, 4, 2 and 2**
-   lines matching `FIXME(BG-TOL-001, GENERIC_BOUND)` respectively. Twelve
-   total. The count is the point: it is what stops a later reader from
-   "finishing the job" by widening a bound, and what proves none of the
-   twelve was quietly migrated instead.
 
 
-**The crate hosting the test file is `truck-geometry`, and that is a decision, not
-an accident.** It is the crate the migrated files live in and it has no `autotests = false`, so the file is picked up without touching `Cargo.toml` — which is not on your allowlist.
+**The crate hosting the test file is `truck-geotrait`, and that is a decision, not
+an accident.** `truck-polymesh/Cargo.toml` sets **`autotests = false`** — a new test file there silently never runs, and adding the `[[test]]` entry it would need means editing a `Cargo.toml` that is not on your allowlist. `truck-geotrait` has no such setting. Read `polyline_curve.rs` from there at runtime as `concat!(env!("CARGO_MANIFEST_DIR"), "/../truck-polymesh/src/polyline_curve.rs")`. If you find yourself wanting a test file under `truck-polymesh`, that is the trap this paragraph exists to close.
 
 ## Done when — run these, all must pass
 
 ```
-cargo fmt --check -p truck-geometry
-cargo clippy -p truck-geometry --all-targets --no-deps -- -D warnings
-cargo test -p truck-geometry --lib --test tolerance_nurbs --no-fail-fast
+cargo fmt --check -p truck-polymesh -p truck-geotrait
+cargo clippy -p truck-polymesh -p truck-geotrait --all-targets --no-deps -- -D warnings
+cargo test -p truck-geotrait --lib --test tolerance_small --no-fail-fast
+cargo test -p truck-polymesh --lib --no-fail-fast
 cargo check --workspace --all-targets
 ```
 
@@ -510,4 +401,4 @@ Use the shape at the top of this document. `status` is one of `DONE`,
 `QUESTION.md` beside it.
 
 Commit on the current branch with subject
-`refactor(geometry): classify every nurbs tolerance site model or param (BG-TOL-001-GEOM-NURBS)`.
+`refactor(polymesh,geotrait): classify every tolerance site model or param (BG-TOL-001-SMALL)`.

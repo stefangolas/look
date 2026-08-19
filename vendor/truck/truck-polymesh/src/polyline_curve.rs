@@ -40,6 +40,7 @@ impl PolylineCurve<Point2> {
     /// assert!(!hexagon.include(p1));
     /// ```
     pub fn include(&self, c: Point2) -> bool {
+        let ctx = ToleranceCtx::unscaled_legacy();
         let t = 2.0 * std::f64::consts::PI * HashGen::hash1(c);
         let r = Vector2::new(f64::cos(t), f64::sin(t));
         self.iter()
@@ -51,7 +52,8 @@ impl PolylineCurve<Point2> {
                 let s1 = r.x * b.y - r.y * b.x; // v times b
                 let s2 = a.x * b.y - a.y * b.x; // a times b
                 let x = s2 / (s1 - s0);
-                if x.so_small() && s0 * s1 < 0.0 {
+                if ctx.is_small_ratio(x) && s0 * s1 < 0.0 {
+                    // BG-TOL-001: param
                     None
                 } else if x > 0.0 && s0 <= 0.0 && s1 > 0.0 {
                     Some(counter + 1)
@@ -117,6 +119,7 @@ pub fn include<'a>(
     boundaries: impl IntoIterator<Item = &'a PolylineCurve<Point2>>,
     c: Point2,
 ) -> bool {
+    let ctx = ToleranceCtx::unscaled_legacy();
     let t = 2.0 * std::f64::consts::PI * HashGen::hash1(c);
     let r = Vector2::new(f64::cos(t), f64::sin(t));
     boundaries
@@ -129,7 +132,8 @@ pub fn include<'a>(
             let s1 = r.x * b.y - r.y * b.x; // v times b
             let s2 = a.x * b.y - a.y * b.x; // a times b
             let x = s2 / (s1 - s0);
-            if x.so_small() && s0 * s1 < 0.0 {
+            if ctx.is_small_ratio(x) && s0 * s1 < 0.0 {
+                // BG-TOL-001: param
                 None
             } else if x > 0.0 && s0 <= 0.0 && s1 > 0.0 {
                 Some(counter + 1)
@@ -291,6 +295,7 @@ impl<P: Clone> Invertible for PolylineCurve<P> {
 
 impl<P: ControlPoint<f64>> Cut for PolylineCurve<P> {
     fn cut(&mut self, t: f64) -> Self {
+        let ctx = ToleranceCtx::unscaled_legacy();
         if t < 0.0 {
             PolylineCurve(Vec::new())
         } else if t + 1.0 > self.len() as f64 {
@@ -299,7 +304,8 @@ impl<P: ControlPoint<f64>> Cut for PolylineCurve<P> {
             PolylineCurve(v)
         } else {
             let n = t as usize;
-            if t.near(&(n as f64)) {
+            if ctx.is_small_ratio(t - n as f64) {
+                // BG-TOL-001: param
                 let mut v = Vec::new();
                 v.extend(&self[n..]);
                 self.truncate(n + 1);
@@ -323,12 +329,14 @@ where
 {
     type Point = P;
     fn search_parameter<H: Into<SPHint1D>>(&self, point: P, _: H, _: usize) -> Option<f64> {
+        let ctx = ToleranceCtx::unscaled_legacy();
         for (i, p) in self.0.windows(2).enumerate() {
             let a = point - p[0];
             let b = p[1] - p[0];
             let t = f64::clamp(a.dot(b) / b.dot(b), 0.0, 1.0);
             let h = a - b * t;
-            if h.so_small() {
+            if ctx.is_small_len(h.magnitude()) {
+                // BG-TOL-001: model
                 return Some(t + i as f64);
             }
         }

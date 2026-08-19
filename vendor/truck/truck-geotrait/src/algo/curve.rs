@@ -54,6 +54,7 @@ where
     C::Point: EuclideanSpace<Scalar = f64, Diff = C::Vector>,
     C::Vector: InnerSpace<Scalar = f64> + Tolerance,
 {
+    let ctx = ToleranceCtx::unscaled_legacy();
     let function = move |t: f64| {
         let diff = curve.subs(t) - point;
         let der = curve.der(t);
@@ -63,7 +64,8 @@ where
         }
     };
     newton::solve(function, hint, trials).ok().and_then(|t| {
-        match curve.subs(t).to_vec().near(&point.to_vec()) {
+        match ctx.is_small_len((curve.subs(t) - point).magnitude()) // BG-TOL-001: model
+        {
             true => Some(t),
             false => None,
         }
