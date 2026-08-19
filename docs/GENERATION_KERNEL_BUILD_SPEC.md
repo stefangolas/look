@@ -416,6 +416,53 @@ pub fn propagate(eps: f64, m: &Modulus, tau_rep: f64, margin: Margin, step: u32)
   is right — the current table happens to be all-subadditive, which is a property
   of today's cells and not of the theorem.
 
+**(M5) The composition constants are order-dependent, and the r2 arithmetic was
+wrong.** Added 2026-08-19 after the defect below was found by reading the code
+against the algebra. For `self.compose(other)` = ω_self ∘ ω_other, i.e. `self`
+applied outside:
+
+$$\omega_1(\omega_2(\varepsilon)) = a\,(b\,\varepsilon^{q})^{p} = a\,b^{p}\,\varepsilon^{pq}$$
+
+so the composite constant is **a·b^p**, not a·b. It depends on which operand is
+outside. The full table, and each arm is a contract:
+
+| ω_self (outer) | ω_other (inner) | composite |
+|---|---|---|
+| `Lipschitz(a)` | `Lipschitz(b)` | `Lipschitz(a·b)` |
+| `Lipschitz(a)` | `Holder{k, q}` | `Holder{a·k, q}` |
+| `Holder{k, p}` | `Lipschitz(a)` | `Holder{k·a^p, p}` |
+| `Holder{k₁, p}` | `Holder{k₂, q}` | `Holder{k₁·k₂^p, p·q}` |
+
+**The implementation had rows 3 and 4 as `k·a` and `k₁·k₂`.** The exponents were
+right and the constants were not. The error is **not** conservative: for the
+subadditive Hölder that `compose` accepts (p ≤ 1) and an inner constant below 1 —
+a *contracting* step, which is what a well-conditioned projection or a
+normalisation is — the true constant `k·a^p` exceeds the published `k·a` by
+`a^(p-1)`, so the published bound **under-reports the forward error**. Measured:
+`Holder{1, ½} ∘ Lipschitz(0.01)` publishes `0.01·√ε` against a true `0.1·√ε`, a
+10× under-report at every ε; at an inner constant of 1e-6 the factor is 1000.
+Composing an outer tangency (p = ½) with an inner contraction is an ordinary
+chain, not a contrived one.
+
+**How it survived.** `compose` is live — `Certificate::accumulate` calls it — and
+every test that calls it uses `Lipschitz` or `Pole`/`Unbounded` operands only,
+which are exactly the arms where the two formulas agree or refuse. The test
+named for the property, `modulus_composition_matches_numeric_evaluation`,
+exercises `Lipschitz ∘ Lipschitz`. Worse, the test module carries a private
+helper `compose_math` that implements the **correct** table, with a comment
+saying production "preserves the r2 arithmetic ... which for Hölder is not the
+true function composition" — so the correct formula was known, written down, and
+used only to compute the tests' expected values. **A test named after a property,
+which does not test the property, sitting beside a correct implementation kept
+only for tests, is the strongest form of the failure mode H-8 and the "watch it
+fail" rule exist to prevent.**
+
+The required property in the Tests block below —
+`(ω₂∘ω₁)(ε) == ω₂(ω₁(ε))` over random ε — is therefore a real obligation and was
+never discharged for any Hölder operand. It must be run over all four arms, with
+the inner constant sampled **below** 1 as well as above, because the direction of
+the error changes at 1 and only one side is unsafe.
+
 **Tests.**
 - Property: accumulation is associative and commutative in `props` and `margin`.
 - Property: `method` is monotone non-increasing under accumulation.
