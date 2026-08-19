@@ -633,6 +633,7 @@ where
         hint: H,
         trials: usize,
     ) -> Option<(f64, f64)> {
+        let ctx = ToleranceCtx::unscaled_legacy();
         let Self {
             edge_curve,
             surface0,
@@ -668,22 +669,24 @@ where
 
             let (pp0, pp1, pc) = (p0 - point, p1 - point, c - point);
 
-            if pp0.so_small() {
+            if ctx.is_small_len(pp0.magnitude()) {
+                // BG-TOL-001: model
                 let cc0 = self.contact_curve0();
                 t = cc0.search_parameter(point, t, trials)?;
                 c = p0 + sign * radius.subs(t) * n0;
                 (u1, v1) = surface1.search_nearest_parameter(c, (u1, v1), trials)?;
                 return Some((p0, surface1.subs(u1, v1)));
             }
-            if pp1.so_small() {
+            if ctx.is_small_len(pp1.magnitude()) {
+                // BG-TOL-001: model
                 let cc1 = self.contact_curve1();
                 t = cc1.search_parameter(point, t, trials)?;
                 c = p1 + sign * radius.subs(t) * n1;
                 (u0, v0) = surface0.search_nearest_parameter(c, (u0, v0), trials)?;
                 return Some((surface0.subs(u0, v0), p1));
             }
-            let center_contact0 = (p0 + r * n0).near(&c);
-            let center_contact1 = (p1 + r * n1).near(&c);
+            let center_contact0 = ctx.near_pt(p0 + r * n0, c); // BG-TOL-001: model
+            let center_contact1 = ctx.near_pt(p1 + r * n1, c); // BG-TOL-001: model
             let same_plane = pp0.cross(pp1).dot(pc).so_small2();
             if center_contact0 && center_contact1 && same_plane {
                 return Some((p0, p1));
@@ -708,7 +711,10 @@ where
                 );
                 mat.invert().unwrap() * (c_next - PointVector3(p0 + r * n0, r_der * n0))
             };
-            debug_assert!(duv0.0.z.so_small() && duv0.1.z.so_small(), "{duv0:?}");
+            debug_assert!(
+                ctx.is_small_len(duv0.0.z) && ctx.is_small_len(duv0.1.z),
+                "{duv0:?}"
+            ); // BG-TOL-001: model
 
             let duv1 = {
                 let mat = Matrix3::from_cols(
@@ -718,7 +724,10 @@ where
                 );
                 mat.invert().unwrap() * (c_next - PointVector3(p1 + r * n1, r_der * n1))
             };
-            debug_assert!(duv1.0.z.so_small() && duv1.1.z.so_small(), "{duv1:?}");
+            debug_assert!(
+                ctx.is_small_len(duv1.0.z) && ctx.is_small_len(duv1.1.z),
+                "{duv1:?}"
+            ); // BG-TOL-001: model
 
             let dp0 = Matrix3::from_cols(uder0, vder0, n0) * duv0;
             let dp1 = Matrix3::from_cols(uder1, vder1, n1) * duv1;
@@ -743,7 +752,8 @@ where
         let (cp0, cp1, cp) = (p0 - c, p1 - c, point - c);
         let theta = cp.angle(cp0);
         let rot = Matrix3::from_axis_angle(cp0.cross(cp1).normalize(), theta);
-        match (rot * cp0).near(&cp) {
+        match ctx.is_small_len((rot * cp0 - cp).magnitude()) {
+            // BG-TOL-001: model
             true => Some((theta.0 / cp0.angle(cp1).0, t)),
             false => None,
         }
@@ -768,6 +778,7 @@ where
     where
         C0: ParametricCurve3D,
     {
+        let ctx = ToleranceCtx::unscaled_legacy();
         let Self {
             edge_curve,
             surface0,
@@ -823,7 +834,10 @@ where
                 );
                 mat.invert().unwrap() * (c_next - PointVector3(p0 + r * n0, r_der * n0))
             };
-            debug_assert!(duv0.0.z.so_small() && duv0.1.z.so_small(), "{duv0:?}");
+            debug_assert!(
+                ctx.is_small_len(duv0.0.z) && ctx.is_small_len(duv0.1.z),
+                "{duv0:?}"
+            ); // BG-TOL-001: model
 
             let duv1 = {
                 let mat = Matrix3::from_cols(
@@ -833,7 +847,10 @@ where
                 );
                 mat.invert().unwrap() * (c_next - PointVector3(p1 + r * n1, r_der * n1))
             };
-            debug_assert!(duv1.0.z.so_small() && duv1.1.z.so_small(), "{duv1:?}");
+            debug_assert!(
+                ctx.is_small_len(duv1.0.z) && ctx.is_small_len(duv1.1.z),
+                "{duv1:?}"
+            ); // BG-TOL-001: model
 
             let dp0 = Matrix3::from_cols(uder0, vder0, n0) * duv0;
 
@@ -846,7 +863,8 @@ where
                 z: ds,
             } = mat.invert().unwrap() * vec;
 
-            if p0.near(&e) && dt.so_small2() && ds.so_small2() && dw.so_small2() {
+            if ctx.near_pt(p0, e) && dt.so_small2() && ds.so_small2() && dw.so_small2() {
+                // BG-TOL-001: model
                 let contact_point0 = ContactPoint {
                     point: p0,
                     uv: (u0, v0).into(),
@@ -878,6 +896,7 @@ where
     where
         C0: ParametricCurve3D,
     {
+        let ctx = ToleranceCtx::unscaled_legacy();
         let Self {
             edge_curve,
             surface0,
@@ -933,7 +952,10 @@ where
                 );
                 mat.invert().unwrap() * (c_next - PointVector3(p0 + r * n0, r_der * n0))
             };
-            debug_assert!(duv0.0.z.so_small() && duv0.1.z.so_small(), "{duv0:?}");
+            debug_assert!(
+                ctx.is_small_len(duv0.0.z) && ctx.is_small_len(duv0.1.z),
+                "{duv0:?}"
+            ); // BG-TOL-001: model
 
             let duv1 = {
                 let mat = Matrix3::from_cols(
@@ -943,7 +965,10 @@ where
                 );
                 mat.invert().unwrap() * (c_next - PointVector3(p1 + r * n1, r_der * n1))
             };
-            debug_assert!(duv1.0.z.so_small() && duv1.1.z.so_small(), "{duv1:?}");
+            debug_assert!(
+                ctx.is_small_len(duv1.0.z) && ctx.is_small_len(duv1.1.z),
+                "{duv1:?}"
+            ); // BG-TOL-001: model
 
             let dp1 = Matrix3::from_cols(uder1, vder1, n1) * duv1;
 
@@ -956,7 +981,8 @@ where
                 z: ds,
             } = mat.invert().unwrap() * vec;
 
-            if p1.near(&e) && dt.so_small2() && ds.so_small2() && dw.so_small2() {
+            if ctx.near_pt(p1, e) && dt.so_small2() && ds.so_small2() && dw.so_small2() {
+                // BG-TOL-001: model
                 let contact_point0 = ContactPoint {
                     point: p0,
                     uv: (u0, v0).into(),

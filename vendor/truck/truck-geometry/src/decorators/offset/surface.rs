@@ -50,15 +50,17 @@ where
     }
     #[inline(always)]
     fn u_period(&self) -> Option<f64> {
+        let ctx = ToleranceCtx::unscaled_legacy();
         match (self.entity.u_period(), self.offset.u_period()) {
-            (Some(x), Some(y)) if x.near(&y) => Some((x + y) / 2.0),
+            (Some(x), Some(y)) if ctx.is_small_ratio(x - y) => Some((x + y) / 2.0), // BG-TOL-001: param
             _ => None,
         }
     }
     #[inline(always)]
     fn v_period(&self) -> Option<f64> {
+        let ctx = ToleranceCtx::unscaled_legacy();
         match (self.entity.v_period(), self.offset.v_period()) {
-            (Some(x), Some(y)) if x.near(&y) => Some((x + y) / 2.0),
+            (Some(x), Some(y)) if ctx.is_small_ratio(x - y) => Some((x + y) / 2.0), // BG-TOL-001: param
             _ => None,
         }
     }
@@ -167,6 +169,7 @@ where
         trials: usize,
     ) -> Option<(f64, f64)> {
         let (u, v) = self.entity.search_nearest_parameter(point, hint, trials)?;
+        // FIXME(BG-TOL-001, GENERIC_BOUND) — ctx.near_points<P> is bounded P: MetricSpace<Metric = f64> and this impl does not supply it (P: ControlPoint<f64, Diff = V> + Copy + Tolerance). Widening a public generic bound is cross-crate and is Stage B, so the site is left exactly as it is. Enclosing impl: `impl<S, N, P, V> SearchParameter<D2> for Offset<S, N>`.
         match self.subs(u, v).near(&point) {
             true => Some((u, v)),
             false => None,

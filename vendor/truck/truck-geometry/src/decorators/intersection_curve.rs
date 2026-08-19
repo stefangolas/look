@@ -346,11 +346,13 @@ where
         hint: H,
         trials: usize,
     ) -> Option<f64> {
+        let ctx = ToleranceCtx::unscaled_legacy();
         let t = self
             .leader()
             .search_nearest_parameter(point, hint, trials)?;
         let pt = self.subs(t);
-        match pt.near(&point) {
+        match ctx.near_pt(pt, point) {
+            // BG-TOL-001: model
             true => Some(t),
             false => None,
         }
