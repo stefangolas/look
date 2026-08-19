@@ -164,6 +164,7 @@ where
     /// ```
     pub fn is_const(&self) -> bool {
         let pt = self.0.control_points[0].to_point();
+        // FIXME(BG-TOL-001, GENERIC_BOUND) — ctx.near_points<P> is bounded P: MetricSpace<Metric = f64> and this impl does not supply it. Widening a public generic bound is cross-crate and is Stage B, so the site is left exactly as it is. Enclosing impl: `impl<V: Homogeneous + ControlPoint<f64, Diff = V>> where V::Point: Tolerance`.
         self.0
             .control_points
             .iter()
@@ -195,6 +196,7 @@ where
     /// ```
     #[inline(always)]
     pub fn near_as_curve(&self, other: &Self) -> bool {
+        // FIXME(BG-TOL-001, GENERIC_BOUND) — ctx.near_points<P> is bounded P: MetricSpace<Metric = f64> and this impl does not supply it. Widening a public generic bound is cross-crate and is Stage B, so the site is left exactly as it is. Enclosing impl: `impl<V: Homogeneous + ControlPoint<f64, Diff = V>> where V::Point: Tolerance`.
         self.0
             .sub_near_as_curve(&other.0, 2, move |x, y| x.to_point().near(&y.to_point()))
     }

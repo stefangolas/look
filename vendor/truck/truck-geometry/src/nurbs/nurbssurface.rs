@@ -295,6 +295,7 @@ where
     #[inline(always)]
     pub fn is_const(&self) -> bool {
         let pt = self.0.control_points[0][0].to_point();
+        // FIXME(BG-TOL-001, GENERIC_BOUND) — ctx.near_points<P> is bounded P: MetricSpace<Metric = f64> and this impl does not supply it. Widening a public generic bound is cross-crate and is Stage B, so the site is left exactly as it is. Enclosing impl: `impl<V: Homogeneous + ControlPoint<f64, Diff = V>> where V::Point: Tolerance`.
         for vec in self.0.control_points.iter().flat_map(|pts| pts.iter()) {
             if !vec.to_point().near(&pt) {
                 return false;
@@ -325,6 +326,7 @@ where
     /// ```
     #[inline(always)]
     pub fn near_as_surface(&self, other: &Self) -> bool {
+        // FIXME(BG-TOL-001, GENERIC_BOUND) — ctx.near_points<P> is bounded P: MetricSpace<Metric = f64> and this impl does not supply it. Widening a public generic bound is cross-crate and is Stage B, so the site is left exactly as it is. Enclosing impl: `impl<V: Homogeneous + ControlPoint<f64, Diff = V>> where V::Point: Tolerance`.
         self.0
             .sub_near_as_surface(&other.0, 2, move |x, y| x.to_point().near(&y.to_point()))
     }
@@ -700,6 +702,7 @@ where
 impl IncludeCurve<NurbsCurve<Vector3>> for NurbsSurface<Vector3> {
     #[inline(always)]
     fn include(&self, curve: &NurbsCurve<Vector3>) -> Outcome<bool> {
+        let ctx = ToleranceCtx::unscaled_legacy();
         let value = (|| {
             let pt = curve.subs(curve.knot_vec()[0]);
             let mut hint = match self.search_parameter(pt, None, INCLUDE_CURVE_TRIALS) {
@@ -719,11 +722,13 @@ impl IncludeCurve<NurbsCurve<Vector3>> for NurbsSurface<Vector3> {
                         Some(got) => got,
                         None => return false,
                     };
-                    if !self.subs(hint.0, hint.1).near(&pt)
-                        || hint.0 < uknot_vec[0] - TOLERANCE
-                        || hint.0 - uknot_vec[0] > uknot_vec.range_length() + TOLERANCE
-                        || hint.1 < vknot_vec[0] - TOLERANCE
-                        || hint.1 - vknot_vec[0] > vknot_vec.range_length() + TOLERANCE
+                    if !ctx.near_points(self.subs(hint.0, hint.1), pt)
+                        // BG-TOL-001: model
+                        || hint.0 < uknot_vec[0] - ctx.ratio_margin() // BG-TOL-001: param
+                        || hint.0 - uknot_vec[0] > uknot_vec.range_length() + ctx.ratio_margin() // BG-TOL-001: param
+                        || hint.1 < vknot_vec[0] - ctx.ratio_margin() // BG-TOL-001: param
+                        || hint.1 - vknot_vec[0] > vknot_vec.range_length() + ctx.ratio_margin()
+                    // BG-TOL-001: param
                     {
                         return false;
                     }
@@ -747,6 +752,7 @@ impl IncludeCurve<NurbsCurve<Vector3>> for NurbsSurface<Vector3> {
 impl IncludeCurve<BSplineCurve<Point3>> for NurbsSurface<Vector4> {
     #[inline(always)]
     fn include(&self, curve: &BSplineCurve<Point3>) -> Outcome<bool> {
+        let ctx = ToleranceCtx::unscaled_legacy();
         let value = (|| {
             let pt = curve.front();
             let mut hint = match self.search_parameter(pt, None, INCLUDE_CURVE_TRIALS) {
@@ -766,11 +772,13 @@ impl IncludeCurve<BSplineCurve<Point3>> for NurbsSurface<Vector4> {
                         Some(got) => got,
                         None => return false,
                     };
-                    if !self.subs(hint.0, hint.1).near(&pt)
-                        || hint.0 < uknot_vec[0] - TOLERANCE
-                        || hint.0 - uknot_vec[0] > uknot_vec.range_length() + TOLERANCE
-                        || hint.1 < vknot_vec[0] - TOLERANCE
-                        || hint.1 - vknot_vec[0] > vknot_vec.range_length() + TOLERANCE
+                    if !ctx.near_points(self.subs(hint.0, hint.1), pt)
+                        // BG-TOL-001: model
+                        || hint.0 < uknot_vec[0] - ctx.ratio_margin() // BG-TOL-001: param
+                        || hint.0 - uknot_vec[0] > uknot_vec.range_length() + ctx.ratio_margin() // BG-TOL-001: param
+                        || hint.1 < vknot_vec[0] - ctx.ratio_margin() // BG-TOL-001: param
+                        || hint.1 - vknot_vec[0] > vknot_vec.range_length() + ctx.ratio_margin()
+                    // BG-TOL-001: param
                     {
                         return false;
                     }
@@ -794,6 +802,7 @@ impl IncludeCurve<BSplineCurve<Point3>> for NurbsSurface<Vector4> {
 impl IncludeCurve<NurbsCurve<Vector4>> for NurbsSurface<Vector4> {
     #[inline(always)]
     fn include(&self, curve: &NurbsCurve<Vector4>) -> Outcome<bool> {
+        let ctx = ToleranceCtx::unscaled_legacy();
         let value = (|| {
             let pt = curve.front();
             let mut hint = match self.search_parameter(pt, None, INCLUDE_CURVE_TRIALS) {
@@ -813,11 +822,13 @@ impl IncludeCurve<NurbsCurve<Vector4>> for NurbsSurface<Vector4> {
                         Some(got) => got,
                         None => return false,
                     };
-                    if !self.subs(hint.0, hint.1).near(&pt)
-                        || hint.0 < uknot_vec[0] - TOLERANCE
-                        || hint.0 - uknot_vec[0] > uknot_vec.range_length() + TOLERANCE
-                        || hint.1 < vknot_vec[0] - TOLERANCE
-                        || hint.1 - vknot_vec[0] > vknot_vec.range_length() + TOLERANCE
+                    if !ctx.near_points(self.subs(hint.0, hint.1), pt)
+                        // BG-TOL-001: model
+                        || hint.0 < uknot_vec[0] - ctx.ratio_margin() // BG-TOL-001: param
+                        || hint.0 - uknot_vec[0] > uknot_vec.range_length() + ctx.ratio_margin() // BG-TOL-001: param
+                        || hint.1 < vknot_vec[0] - ctx.ratio_margin() // BG-TOL-001: param
+                        || hint.1 - vknot_vec[0] > vknot_vec.range_length() + ctx.ratio_margin()
+                    // BG-TOL-001: param
                     {
                         return false;
                     }

@@ -1,4 +1,4 @@
-# WORK PACKET BG-TOL-001-MESHALGO — Stage-A tolerance migration, truck-meshalgo
+# WORK PACKET BG-TOL-001-GEOM-NURBS — Stage-A tolerance migration, truck-geometry/src/nurbs
 
 You are implementing one item from a formal kernel specification. Everything you
 need is in this document. **Do not read `docs/GENERATION_KERNEL_BUILD_SPEC.md`
@@ -6,98 +6,136 @@ or any other spec file** — they are not on your allowlist and this packet is
 self-contained. If something you need is genuinely missing, that is a SPEC_GAP
 (see "Stop conditions"): you stop and report, you do not research it.
 
+```json
+{"id":"BG-TOL-001-GEOM-NURBS","status":"DONE","contracts":["BG-TOL-001"],
+ "tests_added":2,"sites_migrated":57,"sites_deferred":12,"unscaled_legacy_calls":26,
+ "anchors_verified":{"A1":0},
+ "deviations":[
+   {"code":"EXTRA_BINDING","sites":["file.rs:123"],
+     "why":"one clause: what you did differently and why the packet's literal text did not work"}],
+ "disagreements":[
+   {"code":"CLASSIFICATION_WRONG","site":"file.rs:123",
+     "claim":"one sentence: what the packet asserts and what you found instead"}],
+ "baseline_failures":[
+   {"test":"module::path::name","fails_at_base":true}],
+ "notes":"free text for anything the fields above cannot carry"}
+```
+
+**Fill `deviations`, `disagreements` and `baseline_failures` as arrays, empty if
+empty.** They are not a nicer layout for the same prose — they are the fields a
+reviewer reads first, and they exist because a previous worker's single most
+valuable finding arrived as the fifth paragraph of a 2,000-character `notes`
+string and was nearly missed. Codes, so the vocabulary is closed:
+
+- `deviations` — you did the work but not the way the packet literally said:
+  `EXTRA_BINDING` (hoisted a subexpression into a `let`), `MARKER_PLACEMENT`
+  (rustfmt moved a marker), `TEST_SHAPE` (a required test needed a different
+  form). Each needs `sites` and a one-clause `why`.
+- `disagreements` — the packet asserts something you found to be untrue:
+  `BUDGET_WRONG`, `CLASSIFICATION_WRONG`, `ANCHOR_STALE`, `RULE_MISSING`,
+  `SITE_UNREACHABLE`. **This is the highest-value field in the file.** Do not
+  soften a disagreement into a note; a packet that is wrong and is obeyed
+  silently costs far more than one that is contradicted. The last three shards
+  each contained an orchestrator error, and two of them were found this way.
+- `baseline_failures` — any pre-existing test that fails. Set `fails_at_base` by
+  actually running it at the base commit, and say so if you could not.
+
+`notes` stays free text on purpose: a genuinely novel observation has no code
+yet, and inventing one to fit is worse than a sentence.
+
 ```yaml
-id:          BG-TOL-001-MESHALGO
+id:          BG-TOL-001-GEOM-NURBS
 contract:    [BG-TOL-001]
 class:       wide-mechanical
-crates:      [truck-meshalgo]
+crates:      [truck-geometry]
 depends_on:  [BG-TOL-001-TYPE, BG-TOL-001-TYPE-r2, BG-TOL-001-TYPE-r3]
 write_allow:
-  - vendor/truck/truck-meshalgo/src/analyzers/collision.rs
-  - vendor/truck/truck-meshalgo/src/analyzers/in_out_judge.rs
-  - vendor/truck/truck-meshalgo/src/analyzers/point_cloud/mod.rs
-  - vendor/truck/truck-meshalgo/src/analyzers/point_cloud/sort_end_points.rs
-  - vendor/truck/truck-meshalgo/src/filters/normal_filters.rs
-  - vendor/truck/truck-meshalgo/src/tessellation/source_edge.rs
-  - vendor/truck/truck-meshalgo/src/tessellation/triangulation.rs
-  - vendor/truck/truck-meshalgo/tests/tolerance_meshalgo.rs
+  - vendor/truck/truck-geometry/src/nurbs/bspcurve.rs
+  - vendor/truck/truck-geometry/src/nurbs/bspsurface.rs
+  - vendor/truck/truck-geometry/src/nurbs/knot_vec.rs
+  - vendor/truck/truck-geometry/src/nurbs/mod.rs
+  - vendor/truck/truck-geometry/src/nurbs/nurbscurve.rs
+  - vendor/truck/truck-geometry/src/nurbs/nurbssurface.rs
+  - vendor/truck/truck-geometry/tests/tolerance_nurbs.rs
 read_allow:
   - vendor/truck/truck-base/src/tolerance.rs
 tests_required:
-  - every_migrated_meshalgo_site_is_marked
-  - deferred_area_sites_carry_a_fixme
-budget:      {turns: 70, ctx_tokens: 150000}
-census_fragment: truck-meshalgo
-unscaled_legacy_budget: 11
+  - every_migrated_nurbs_site_is_marked
+  - deferred_generic_bound_sites_carry_a_fixme
+budget:      {turns: 120, ctx_tokens: 240000}
+census_fragment: nurbs
+unscaled_legacy_budget: 26
 anchors:
-  - {id: A1, expect: 6, cmd: "grep -cE '\\.near\\(|so_small\\(|TOLERANCE' vendor/truck/truck-meshalgo/src/analyzers/collision.rs"}
-  - {id: A2, expect: 1, cmd: "grep -cE '\\.near\\(|so_small\\(|TOLERANCE' vendor/truck/truck-meshalgo/src/analyzers/in_out_judge.rs"}
-  - {id: A3, expect: 2, cmd: "grep -cE '\\.near\\(|so_small\\(|TOLERANCE' vendor/truck/truck-meshalgo/src/analyzers/point_cloud/mod.rs"}
-  - {id: A4, expect: 1, cmd: "grep -cE '\\.near\\(|so_small\\(|TOLERANCE' vendor/truck/truck-meshalgo/src/analyzers/point_cloud/sort_end_points.rs"}
-  - {id: A5, expect: 8, cmd: "grep -cE '\\.near\\(|so_small\\(|TOLERANCE' vendor/truck/truck-meshalgo/src/filters/normal_filters.rs"}
-  - {id: A6, expect: 43, cmd: "grep -cE '\\.near\\(|so_small\\(|TOLERANCE' vendor/truck/truck-meshalgo/src/tessellation/source_edge.rs"}
-  - {id: A7, expect: 41, cmd: "grep -cE '\\.near\\(|so_small\\(|TOLERANCE' vendor/truck/truck-meshalgo/src/tessellation/triangulation.rs"}
+  - {id: A1, expect: 17, cmd: "grep -cE '\\.near\\(|so_small\\(|TOLERANCE' vendor/truck/truck-geometry/src/nurbs/bspcurve.rs"}
+  - {id: A2, expect: 34, cmd: "grep -cE '\\.near\\(|so_small\\(|TOLERANCE' vendor/truck/truck-geometry/src/nurbs/bspsurface.rs"}
+  - {id: A3, expect: 6, cmd: "grep -cE '\\.near\\(|so_small\\(|TOLERANCE' vendor/truck/truck-geometry/src/nurbs/knot_vec.rs"}
+  - {id: A4, expect: 1, cmd: "grep -cE '\\.near\\(|so_small\\(|TOLERANCE' vendor/truck/truck-geometry/src/nurbs/mod.rs"}
+  - {id: A5, expect: 7, cmd: "grep -cE '\\.near\\(|so_small\\(|TOLERANCE' vendor/truck/truck-geometry/src/nurbs/nurbscurve.rs"}
+  - {id: A6, expect: 21, cmd: "grep -cE '\\.near\\(|so_small\\(|TOLERANCE' vendor/truck/truck-geometry/src/nurbs/nurbssurface.rs"}
 ```
-
-**This is a churn packet.** Every judgement has been made for you and is in the
-table below. Your job is to apply exactly those 20 rewrites, add exactly 6 FIXME
-comments, mark them, and keep the crate building and its tests passing. If you
-find yourself deciding whether a site is `model` or `param`, stop and re-read
-the table — it is already there. This packet's classifications were produced by
-a survey pass and then reviewed and corrected site by site; four of them were
-changed during that review, so do not assume a row is a guess.
 
 ## Problem
 
-Tolerance in this crate is a bare absolute constant: `TOLERANCE` (1e-6),
-`.near()`, `.so_small()`. A comparison against a **model-space length** — a
-distance between points, a radius, a surface derivative magnitude — is only
-meaningful relative to how big the model is; the same 1e-6 that is generous on a
-10mm bracket is meaningless on a 30m airframe. A comparison against a
-**dimensionless** quantity — a `uv` coordinate, a curve parameter, a unit
-normal's magnitude, a ratio — is already scale-free, and scaling it would be a
-new bug.
+`truck-geometry/src/nurbs` is the B-spline and NURBS core: knot vectors,
+`BSplineCurve`, `BSplineSurface`, and their rational counterparts. It holds more
+tolerance predicates than any other module in the vendored tree, and they divide
+almost perfectly along the line this contract item cares about. A knot value, a
+curve parameter, a knot-span length, a `uv` hint — all dimensionless, all
+scale-free. A control point, a curve position, a surface position — all model
+lengths. The code compares both against the same absolute `TOLERANCE = 1e-6`
+and records nothing about which is which.
 
-`truck-meshalgo` is where this matters most immediately, because it is the crate
-that turns a B-rep into triangles. A `param` predicate mistakenly scaled would
-change how a boundary loop is cut in `uv`; a `model` predicate left unscaled is
-why a large part tessellates differently from a small one. Today the code does
-not record which is which, and that judgement cannot be recovered mechanically
-later. This packet records it, for `truck-meshalgo`, without changing any
-threshold.
+That is reachable from untrusted geometry directly. A STEP file names its own
+unit; the same spline imported in metres and in millimetres produces control
+points a thousand times apart, and `TOLERANCE` does not move. Knot degeneracy
+tests then behave identically (correctly — knots are parameters) while
+control-point coincidence tests behave completely differently (incorrectly — those
+are lengths). Today nothing in the source distinguishes the two cases, and the
+judgement cannot be recovered by a machine later, because it depends on what the
+quantity *means*.
 
 **Stage A, which is all this packet is.** Each site is rewritten through a
 `ToleranceCtx` obtained from `ToleranceCtx::unscaled_legacy()`, which carries
 `model_scale = 1.0` and `tau_rep = TOLERANCE`. **No threshold moves and no
-signature changes.** A later Stage-B packet derives a real `model_scale` at the
-crate's entry points and threads it inward, deleting the `unscaled_legacy()`
-calls. That is what actually fixes the scale bug; this packet buys the
-judgement, which is the expensive half.
+signature changes** — every rewrite in this packet is behaviour-preserving today
+except for the deliberate Euclidean tightening in decision 1. A later Stage-B
+packet derives a real `model_scale` at the entry points and threads it inward,
+deleting the `unscaled_legacy()` calls. That is what actually fixes the scale
+bug; this packet buys the judgement, which is the expensive half and the half
+that cannot be recovered mechanically later.
 
-## Anchors — verified 2026-08-18, counts are exact
+## Anchors — verified 2026-08-19, counts are exact
 
 Locate by running the `grep` command. **Never locate by line number** — the line
-numbers in the table below are provenance for a human reader, not a way to find
+numbers in the tables below are provenance for a human reader, not a way to find
 anything. `rg` is not installed on this machine; use `grep -cE` exactly as
 written in the `anchors:` block above.
 
 If any count differs from the `expect:` value, the tree has moved since this
 packet was written. That is `ANCHOR_MISMATCH` and you stop — it is a stop
 condition, not a nuisance, because a packet whose counts are stale is a packet
-whose table may point at the wrong code.
+whose tables may point at the wrong code.
 
-Note that these counts cover **every** occurrence in each file, including doc
-comments and in-src tests. Only the 20 rows in the site table migrate. The
-anchor is a fingerprint of the file, not a work list.
+These counts cover **every** occurrence in each file, including doc comments and
+in-src tests. Only the rows in the site table migrate. An anchor is a fingerprint
+of the file, not a work list.
 
 ## The recipes — the only four rewrites you will make
 
 | class | shape of the quantity | rewrite |
 |---|---|---|
 | `model` | a length, against zero | `ctx.is_small_len(l)` |
-| `model` | two `Point3` | `ctx.near_pt(a, b)` |
+| `model` | two points that satisfy `MetricSpace<Metric = f64>` | `ctx.near_points(a, b)` |
 | `param` | a dimensionless value against zero, or a difference | `ctx.is_small_ratio(x)` |
 | `param` | a one-sided margin on a parameter | `ctx.ratio_margin()` |
+
+`ctx.near_pt(a, b)` is the `Point3`-only form of `near_points` and either is
+fine where both apply. The full surface of `ToleranceCtx` is `near_pt`,
+`near_points`, `is_small_len`, `is_small_ratio`, `length_margin`, `sin_margin`,
+`ratio_margin`, `entity_tau`, `model_scale`, `scaled`, `new`,
+`unscaled_legacy` — there is nothing else on it, and in particular **there is no
+squared-order and no area predicate**. If a site needs one, it is deferred, not
+approximated.
 
 Obtain the context once per function, as the first statement:
 
@@ -106,209 +144,275 @@ let ctx = ToleranceCtx::unscaled_legacy();
 ```
 
 Mark every rewritten line with a trailing `// BG-TOL-001: model` or
-`// BG-TOL-001: param` comment. Where the line is a multi-line expression, put
-the marker on the line carrying the `ctx.` call.
+`// BG-TOL-001: param` comment. Where the line is part of a multi-line
+expression, put the marker on the line carrying the `ctx.` call.
 
-**One context per function, never one per site.** Eleven functions in this
-packet hold a migrated site; you should introduce exactly **11**
-`unscaled_legacy()` calls. See "The ratchet" below — this number is enforced.
+**One context per function, never one per site and never one per block.**
+26 functions in this packet hold a migrated site, so you should introduce
+exactly **26** `unscaled_legacy()` calls. See "The ratchet" — this number
+is enforced by a gate, and it is a budget rather than an allowance.
+
+**If you cannot reach 26 honestly, say so and stop.** That instruction is
+here because the previous shard could not: its packet demanded 11 contexts when
+the truth was 10, and the worker built a shadow `let ctx = ...` inside a `match`
+arm to satisfy the number. It was obeying a packet that was wrong, and the
+orchestrator's counter had the same bug as the claim it was checking. A
+`disagreements` entry with code `BUDGET_WRONG` is worth more here than a green
+gate.
 
 ## Decisions already made for you
 
-Read these before the table. Each one is a judgement that has been made, checked
-against the tree, and is not yours to revisit.
+Read these before the tables. Each one is a judgement that has been made,
+checked against the tree, and is not yours to revisit. Where a row in the site
+table is marked **REVIEWED**, the same applies to that row.
 
-1. **`.near()` is componentwise; `ctx.near_pt` and `ctx.is_small_ratio` are
+1. **`.near()` is componentwise; `ctx.near_points` and `ctx.is_small_ratio` are
    Euclidean.** Not the same predicate — Euclidean is stricter by up to
    `sqrt(3)`. Every Stage-A shard is therefore a small deliberate tightening. If
-   an existing test moves because of it, **report it in your notes with the test
-   name and the reason**; do not widen a tolerance and do not put a site back to
-   componentwise to make it pass. A test that moves is a finding, not a bug in
-   this packet.
+   an existing test moves because of it, **report it in `baseline_failures` and
+   in your notes with the test name and the reason**; do not widen a tolerance,
+   do not add `#[ignore]`, and do not put a site back to componentwise to make it
+   pass. A test that moves is a finding, not a bug in this packet.
 
 2. **`so_small()` on a vector becomes `is_small_len(v.magnitude())`, not
    `is_small_len(v.x)`.** Same tightening as above, same rule about tests.
 
-3. **The four `reconcile_singular_transition` lines carry TWO predicates each,
-   of two different classes, and both must be migrated.** This is the one place
-   in this packet where a naive reading loses behaviour. Each line reads
+3. **A one-sided comparison keeps its shape.** `x - y > TOLERANCE` becomes
+   `x - y > ctx.ratio_margin()` (or `ctx.length_margin()` for a `model` site),
+   *not* a negated `is_small_ratio`. `is_small_ratio(d)` is `|d| <= margin` and
+   is two-sided; substituting it for a one-sided guard changes behaviour on the
+   negative side. The `write instead` column of the site table already has the
+   correct form for every such row — use it.
 
-   ```rust
-   if !previous_uv.x.near(&current_uv.x) && surface.uder(current_uv.x, current_uv.y).so_small() {
-   ```
+4. **Twelve `model` sites are deferred for a generic bound, and this has been
+   checked impl by impl — do not try to migrate them.** `ctx.near_points<P>` is
+   declared `where P: MetricSpace<Metric = f64>`. Most of the `BSplineCurve` and
+   `BSplineSurface` methods live in impls bounded `P: ControlPoint<f64> +
+   Tolerance` (and one, `bspsurface.rs:652`, in `impl<V: Tolerance>`, weaker
+   still). `ControlPoint` — `truck-base/src/cgmath_extend_traits.rs:9` — requires
+   arithmetic, `Copy`, `Debug` and `Index`, and **not** `MetricSpace`. The NURBS
+   wrappers are worse: their bound is `V: Homogeneous + ControlPoint<f64, Diff =
+   V>` with `V::Point: Tolerance`, and `Homogeneous::Point` is only
+   `EuclideanSpace<Scalar = Self::Scalar>`, which again does not give
+   `MetricSpace`. Neither `ctx.near_points` nor `.distance()` is available in
+   any of them. **Widening a public generic bound is cross-crate and is Stage B**,
+   so those twelve get a `FIXME` and no rewrite. They are listed under
+   "Not in this packet".
 
-   The `!near` guard compares **u parameters** and is `param`. The `so_small`
-   compares a **surface derivative magnitude** and is `model`. Migrating only
-   the `so_small` half deletes the guard and changes what the function does.
-   Write both. The exact replacements, in order, are:
+5. **`bspcurve.rs:1102` and `:1112` are NOT among them, and this is the one place
+   two nearly identical sites diverge.** Their enclosing `impl<P>
+   BSplineCurve<P>` at `bspcurve.rs:1058` bounds `P` with `MetricSpace<Metric =
+   f64>` explicitly. They migrate normally with `ctx.near_points`. If you find
+   yourself reasoning "`is_arc_of` is on `BSplineCurve<P>` so it must be blocked
+   like `try_concat`", read the impl header — the bound, not the type, decides.
 
-   | line | replacement condition |
-   |---|---|
-   | 4517 | `!ctx.is_small_ratio(previous_uv.x - current_uv.x) && ctx.is_small_len(surface.uder(current_uv.x, current_uv.y).magnitude())` |
-   | 4523 | `!ctx.is_small_ratio(previous_uv.y - current_uv.y) && ctx.is_small_len(surface.vder(current_uv.x, current_uv.y).magnitude())` |
-   | 4529 | `!ctx.is_small_ratio(previous_uv.x - current_uv.x) && ctx.is_small_len(surface.uder(previous_uv.x, previous_uv.y).magnitude())` |
-   | 4535 | `!ctx.is_small_ratio(previous_uv.y - current_uv.y) && ctx.is_small_len(surface.vder(previous_uv.x, previous_uv.y).magnitude())` |
+6. **The `include` implementations repeat, and repetition is not a reason to
+   factor.** Six `IncludeCurve::include` impls across `bspsurface.rs` and
+   `nurbssurface.rs` carry the identical five-line shape: one `near`/`near_points`
+   on a surface point and four one-sided `TOLERANCE` margins on `uv` hints. Each
+   is a separate function and gets its own context. **Do not extract a shared
+   helper**; that is a signature change, it is outside this packet, and the six
+   impls have different concrete point types.
 
-   These four lines are **one function and one context**, and the marker on a
-   mixed line is `// BG-TOL-001: param+model`.
+7. **`mod.rs:186`, `if delta.abs() <= TOLERANCE`, is `param` and keeps its
+   `.abs()` semantics for free.** `ctx.is_small_ratio(delta)` is already
+   `|delta| <= ratio_margin()`, so write `ctx.is_small_ratio(delta)` and drop the
+   explicit `.abs()`. This is the one row where the rewrite is shorter than the
+   original and still identical.
 
-4. **`try_new:5523`, `if !vec[0].near(&last)`, is `param` and compares `uv`
-   only.** `SurfacePoint` has no `AbsDiffEq` impl of its own and `#[deref]`s to
-   its `uv: Point2` field, so this `near` already resolves to `Point2::near` and
-   never looks at the `point: Point3`. Write the deref out explicitly:
-   `!ctx.is_small_ratio(vec[0].uv.distance(last.uv))`. Making the deref visible
-   is deliberate — the next reader should not have to know about the attribute
-   to know what is being compared.
-
-5. **`on_boundary:8398` becomes a first-order comparison and gains a `sqrt`.**
-   The line is `(a + ab * t).distance2(c) <= TOLERANCE * TOLERANCE`, which is
-   algebraically `distance <= TOLERANCE` written squared to avoid the square
-   root. `ToleranceCtx` has no squared-order predicate, so write
-   `ctx.is_small_ratio((a + ab * t).distance(c))`. **This is not the
-   `near2`/`so_small2` family** — those compare a value against the *tighter*
-   `TOLERANCE2` = 1e-12 constant and genuinely cannot be migrated; this one
-   compares against `TOLERANCE` squared and can. The `sqrt` per boundary segment
-   is accepted here as the price of a checkable classification; do not
-   micro-optimise it back and do not skip the site because of it.
-
-6. **`is_small_ratio` is the right predicate for a unit-normal degeneracy
-   test.** `triangulation_into_polymesh_outcome:10898` asks whether a normal
-   that has already been normalized is zero. A unit vector's magnitude is
-   dimensionless. This is `param` even though the vector lives in model space —
-   the classification is about the **quantity being compared**, not about where
-   the vector points.
-
-7. **A `const` item is never a site.** `source_edge.rs:111` is
-   `pub const SOURCE_INCIDENCE_TOLERANCE: f64 = TOLERANCE;`. A `const`
-   initializer has no `ctx` to call, so there is nothing to migrate; re-homing
-   that value onto a threaded context is Stage-B work. Its two *consumers* are
-   the predicates, and one of them (`source_edge.rs:311`) is in your table.
-   Leave line 111 exactly as it is.
-
-8. **Six sites compare an AREA and are deferred, not migrated.** See "Not in
-   this packet" below. They get a `FIXME` comment and no rewrite. Migrating one
-   of them is a rejection.
-
-## The sites — 20 migrate, 11 contexts
+## The sites — 57 migrate, 26 contexts
 
 Line numbers are provenance for a human reader; locate by the enclosing symbol.
 
-**`normal_filters.rs`**
+**`bspcurve.rs`**
 
-| enclosing fn | line | code | class |
+| enclosing fn | line | code | class and why | write instead |
+|---|---|---|---|---|
+| `try_new` | 39 | `} else if knot_vec.range_length().so_small() {` | **`param`** — knot-vector range length in parameter space; zero-range detection must not scale with the model | `ctx.is_small_ratio(knot_vec.range_length())` |
+| `sub_near_as_curve` | 235 | `if delta.so_small() {` | **`param`** — delta is a knot-interval width in parameter space, used only to skip empty spans | `ctx.is_small_ratio(delta)` |
+| `try_remove_knot` | 589 | `if a.so_small() {` | **`param`** — a is the dimensionless knot-span ratio (knot[idx]-knot[i])/(knot[i+k+1]-knot[i]) used as a barycentric coordinate | `ctx.is_small_ratio(a)` |
+| `syncro_knots` | 773 | `if self.knot(i) - other.knot(j) > TOLERANCE {` | **`param`** — one-sided comparison of normalized knot values (dimensionless) deciding which knot to insert | `self.knot(i) - other.knot(j) > ctx.ratio_margin()` |
+| `syncro_knots` | 775 | `} else if other.knot(j) - self.knot(i) > TOLERANCE {` | **`param`** — one-sided comparison of normalized knot values (dimensionless) deciding which knot to insert | `other.knot(j) - self.knot(i) > ctx.ratio_margin()` |
+| `cut` | 977 | `let s = if t.near(&self.knot_vec[idx]) {` | **`param`** — compares the cut parameter t with a knot value; both are dimensionless parameters | `ctx.is_small_ratio(t - self.knot_vec[idx])` |
+| `is_arc_of` | 1102 | `if !self.subs(knots[0]).near(&curve.subs(hint)) {` | **`model`** — compares two curve sample points in model space to check the arc shares an endpoint **REVIEWED — orchestrator, session 9: MIGRATES. The session-8 handoff listed this among the generic-bound deferrals and that was wrong -- the enclosing `impl<P> BSplineCurve<P>` at bspcurve.rs:1058 bounds P with `MetricSpace<Metric = f64>` explicitly, so near_points applies.** | `if !ctx.near_points(self.subs(knots[0]), curve.subs(hint)) {` |
+| `is_arc_of` | 1112 | `let flag = res.map(\|res\| hint <= res && curve.subs(res).near(&pt));` | **`model`** — compares a curve sample point to the reference point in model space; hint <= res is a plain parameter ordering, not a tolerance predicate **REVIEWED — orchestrator, session 9: MIGRATES. The session-8 handoff listed this among the generic-bound deferrals and that was wrong -- the enclosing `impl<P> BSplineCurve<P>` at bspcurve.rs:1058 bounds P with `MetricSpace<Metric = f64>` explicitly, so near_points applies.** | `let flag = res.map(\|res\| hint <= res && ctx.near_points(curve.subs(res), pt));` |
+
+**`bspsurface.rs`**
+
+| enclosing fn | line | code | class and why | write instead |
+|---|---|---|---|---|
+| `try_new` | 51 | `} else if knot_vecs.0.range_length().so_small() \|\| knot_vecs.1.range_length().so_small() {` | **`param`** — both are knot-vector range lengths in parameter space, so zero-range detection must not scale with the model | `ctx.is_small_ratio(knot_vecs.0.range_length()) \|\| ctx.is_small_ratio(knot_vecs.1.range_length())` |
+| `sub_near_as_surface` | 523 | `if delta0.so_small() {` | **`param`** — delta0 is a u-knot-interval width in parameter space, used only to skip empty spans | `ctx.is_small_ratio(delta0)` |
+| `sub_near_as_surface` | 530 | `if delta1.so_small() {` | **`param`** — delta1 is a v-knot-interval width in parameter space, used only to skip empty spans | `ctx.is_small_ratio(delta1)` |
+| `try_remove_uknot` | 807 | `if a.so_small() {` | **`param`** — a is the dimensionless knot-span ratio used as a barycentric coordinate during uknot removal | `ctx.is_small_ratio(a)` |
+| `try_remove_vknot` | 905 | `if a.so_small() {` | **`param`** — a is the dimensionless knot-span ratio used as a barycentric coordinate during vknot removal | `ctx.is_small_ratio(a)` |
+| `syncro_uvknots` | 1083 | `if self.uknot(i) - self.vknot(j) > TOLERANCE {` | **`param`** — one-sided comparison of normalized u/v knot values (dimensionless) deciding which knot to insert | `self.uknot(i) - self.vknot(j) > ctx.ratio_margin()` |
+| `syncro_uvknots` | 1085 | `} else if self.vknot(j) - self.uknot(i) > TOLERANCE {` | **`param`** — one-sided comparison of normalized u/v knot values (dimensionless) deciding which knot to insert | `self.vknot(j) - self.uknot(i) > ctx.ratio_margin()` |
+| `ucut` | 1165 | `let s = if u.near(&self.uknot_vec()[idx]) {` | **`param`** — compares the cut parameter u with a u-knot value; both are dimensionless parameters | `ctx.is_small_ratio(u - self.uknot_vec()[idx])` |
+| `sectional_curve` | 1271 | `if !p[0].near(&bspsurface.uknot(0)) {` | **`param`** — p[0] is the u-coordinate of the parameter-space sectioning box, compared against a u-knot value | `!ctx.is_small_ratio(p[0] - bspsurface.uknot(0))` |
+| `sectional_curve` | 1274 | `if !q[0].near(&bspsurface.uknot(bspsurface.uknot_vec().len() - 1)) {` | **`param`** — q[0] is the u-coordinate of the parameter-space sectioning box, compared against a u-knot value | `!ctx.is_small_ratio(q[0] - bspsurface.uknot(bspsurface.uknot_vec().len() - 1))` |
+| `sectional_curve` | 1277 | `if !p[0].near(&bspsurface.vknot(0)) {` | **`param`** — p[0] (u-coordinate) compared against a v-knot value; the quantity is a parameter either way, though this looks like a typo for p[1] | `!ctx.is_small_ratio(p[0] - bspsurface.vknot(0))` |
+| `sectional_curve` | 1280 | `if !q[0].near(&bspsurface.vknot(bspsurface.vknot_vec().len() - 1)) {` | **`param`** — q[0] (u-coordinate) compared against a v-knot value; the quantity is a parameter either way, though this looks like a typo for q[1] | `!ctx.is_small_ratio(q[0] - bspsurface.vknot(bspsurface.vknot_vec().len() - 1))` |
+| `include` | 1844 | `if !ParametricSurface::subs(self, hint.0, hint.1).near(&pt)` | **`model`** — compares the surface point at the resolved parameter to the curve point in model space; this is the deciding predicate of the include test | `!ctx.near_points(ParametricSurface::subs(self, hint.0, hint.1), pt)` |
+| `include` | 1845 | `\|\| hint.0 < uknot_vec[0] - TOLERANCE` | **`param`** — one-sided check that the resolved u parameter stays above the u knot domain bottom | `\|\| hint.0 < uknot_vec[0] - ctx.ratio_margin()` |
+| `include` | 1846 | `\|\| hint.0 - uknot_vec[0] > uknot_vec.range_length() + TOLERANCE` | **`param`** — one-sided check that the resolved u parameter does not overshoot the u knot domain top | `\|\| hint.0 - uknot_vec[0] > uknot_vec.range_length() + ctx.ratio_margin()` |
+| `include` | 1847 | `\|\| hint.1 < vknot_vec[0] - TOLERANCE` | **`param`** — one-sided check that the resolved v parameter stays above the v knot domain bottom | `\|\| hint.1 < vknot_vec[0] - ctx.ratio_margin()` |
+| `include` | 1848 | `\|\| hint.1 - vknot_vec[0] > vknot_vec.range_length() + TOLERANCE` | **`param`** — one-sided check that the resolved v parameter does not overshoot the v knot domain top | `\|\| hint.1 - vknot_vec[0] > vknot_vec.range_length() + ctx.ratio_margin()` |
+| `include` | 1894 | `if !ParametricSurface::subs(self, hint.0, hint.1).near(&pt)` | **`model`** — compares the surface point at the resolved parameter to the curve point in model space; this is the deciding predicate of the include test | `!ctx.near_points(ParametricSurface::subs(self, hint.0, hint.1), pt)` |
+| `include` | 1895 | `\|\| hint.0 < uknot_vec[0] - TOLERANCE` | **`param`** — one-sided check that the resolved u parameter stays above the u knot domain bottom | `\|\| hint.0 < uknot_vec[0] - ctx.ratio_margin()` |
+| `include` | 1896 | `\|\| hint.0 - uknot_vec[0] > uknot_vec.range_length() + TOLERANCE` | **`param`** — one-sided check that the resolved u parameter does not overshoot the u knot domain top | `\|\| hint.0 - uknot_vec[0] > uknot_vec.range_length() + ctx.ratio_margin()` |
+| `include` | 1897 | `\|\| hint.1 < vknot_vec[0] - TOLERANCE` | **`param`** — one-sided check that the resolved v parameter stays above the v knot domain bottom | `\|\| hint.1 < vknot_vec[0] - ctx.ratio_margin()` |
+| `include` | 1898 | `\|\| hint.1 - vknot_vec[0] > vknot_vec.range_length() + TOLERANCE` | **`param`** — one-sided check that the resolved v parameter does not overshoot the v knot domain top | `\|\| hint.1 - vknot_vec[0] > vknot_vec.range_length() + ctx.ratio_margin()` |
+| `include` | 1944 | `if !ParametricSurface::subs(self, hint.0, hint.1).near(&pt)` | **`model`** — compares the surface point at the resolved parameter to the curve point in model space; this is the deciding predicate of the include test | `!ctx.near_points(ParametricSurface::subs(self, hint.0, hint.1), pt)` |
+| `include` | 1945 | `\|\| hint.0 < uknot_vec[0] - TOLERANCE` | **`param`** — one-sided check that the resolved u parameter stays above the u knot domain bottom | `\|\| hint.0 < uknot_vec[0] - ctx.ratio_margin()` |
+| `include` | 1946 | `\|\| hint.0 - uknot_vec[0] > uknot_vec.range_length() + TOLERANCE` | **`param`** — one-sided check that the resolved u parameter does not overshoot the u knot domain top | `\|\| hint.0 - uknot_vec[0] > uknot_vec.range_length() + ctx.ratio_margin()` |
+| `include` | 1947 | `\|\| hint.1 < vknot_vec[0] - TOLERANCE` | **`param`** — one-sided check that the resolved v parameter stays above the v knot domain bottom | `\|\| hint.1 < vknot_vec[0] - ctx.ratio_margin()` |
+| `include` | 1948 | `\|\| hint.1 - vknot_vec[0] > vknot_vec.range_length() + TOLERANCE` | **`param`** — one-sided check that the resolved v parameter does not overshoot the v knot domain top | `\|\| hint.1 - vknot_vec[0] > vknot_vec.range_length() + ctx.ratio_margin()` |
+
+**`knot_vec.rs`**
+
+| enclosing fn | line | code | class and why | write instead |
+|---|---|---|---|---|
+| `same_range` | 44 | `self[0].near(&other[0]) && self.range_length().near(&other.range_length())` | **`param`** — knot values and the knot-range span are parameter-space (dimensionless) quantities, so range equality must not scale with the model | `ctx.is_small_ratio(self[0] - other[0]) && ctx.is_small_ratio(self.range_length() - other.range_length())` |
+| `multiplicity` | 80 | `self.iter().filter(\|u\| self[i].near(u)).count()` | **`param`** — compares a knot value to its neighbours to count multiplicity; knots are dimensionless parameters | `self.iter().filter(\|u\| ctx.is_small_ratio(self[i] - *u)).count()` |
+| `try_bspline_basis_functions` | 242 | `if self[0].near(&self[n]) {` | **`param`** — compares first and last knot values to detect a zero-range knot vector; knots are dimensionless parameters | `ctx.is_small_ratio(self[0] - self[n])` |
+| `try_normalize` | 358 | `if range.so_small() {` | **`param`** — range is the knot-vector span in parameter space, so its zero-detection must not scale with the model | `ctx.is_small_ratio(range)` |
+| `try_concat` | 450 | `if front < back \|\| !front.near(back) {` | **`param`** — front/back are knot values compared for equality; the front < back clause is a plain ordering, not a tolerance predicate | `if front < back \|\| !ctx.is_small_ratio(front - back) {` |
+| `to_single_multi` | 510 | `if knot.near(next) {` | **`param`** — compares consecutive knot values to merge duplicates; knots are dimensionless parameters | `ctx.is_small_ratio(knot - *next)` |
+
+**`mod.rs`**
+
+| enclosing fn | line | code | class and why | write instead |
+|---|---|---|---|---|
+| `inv_or_zero` | 186 | `if delta.abs() <= TOLERANCE {` | **`param`** — delta is a knot-span difference in parameter space used only as a division guard; the fn is const, so the rewrite needs the ctx threaded or the fn made non-const | `ctx.is_small_ratio(delta)` |
+
+**`nurbssurface.rs`**
+
+| enclosing fn | line | code | class and why | write instead |
+|---|---|---|---|---|
+| `include` | 722 | `if !self.subs(hint.0, hint.1).near(&pt)` | **`model`** — compares the surface point at the resolved parameter to the curve point in model space; this is the deciding predicate of the include test | `!ctx.near_points(self.subs(hint.0, hint.1), pt)` |
+| `include` | 723 | `\|\| hint.0 < uknot_vec[0] - TOLERANCE` | **`param`** — one-sided check that the resolved u parameter stays above the u knot domain bottom | `\|\| hint.0 < uknot_vec[0] - ctx.ratio_margin()` |
+| `include` | 724 | `\|\| hint.0 - uknot_vec[0] > uknot_vec.range_length() + TOLERANCE` | **`param`** — one-sided check that the resolved u parameter does not overshoot the u knot domain top | `\|\| hint.0 - uknot_vec[0] > uknot_vec.range_length() + ctx.ratio_margin()` |
+| `include` | 725 | `\|\| hint.1 < vknot_vec[0] - TOLERANCE` | **`param`** — one-sided check that the resolved v parameter stays above the v knot domain bottom | `\|\| hint.1 < vknot_vec[0] - ctx.ratio_margin()` |
+| `include` | 726 | `\|\| hint.1 - vknot_vec[0] > vknot_vec.range_length() + TOLERANCE` | **`param`** — one-sided check that the resolved v parameter does not overshoot the v knot domain top | `\|\| hint.1 - vknot_vec[0] > vknot_vec.range_length() + ctx.ratio_margin()` |
+| `include` | 769 | `if !self.subs(hint.0, hint.1).near(&pt)` | **`model`** — compares the surface point at the resolved parameter to the curve point in model space; this is the deciding predicate of the include test | `!ctx.near_points(self.subs(hint.0, hint.1), pt)` |
+| `include` | 770 | `\|\| hint.0 < uknot_vec[0] - TOLERANCE` | **`param`** — one-sided check that the resolved u parameter stays above the u knot domain bottom | `\|\| hint.0 < uknot_vec[0] - ctx.ratio_margin()` |
+| `include` | 771 | `\|\| hint.0 - uknot_vec[0] > uknot_vec.range_length() + TOLERANCE` | **`param`** — one-sided check that the resolved u parameter does not overshoot the u knot domain top | `\|\| hint.0 - uknot_vec[0] > uknot_vec.range_length() + ctx.ratio_margin()` |
+| `include` | 772 | `\|\| hint.1 < vknot_vec[0] - TOLERANCE` | **`param`** — one-sided check that the resolved v parameter stays above the v knot domain bottom | `\|\| hint.1 < vknot_vec[0] - ctx.ratio_margin()` |
+| `include` | 773 | `\|\| hint.1 - vknot_vec[0] > vknot_vec.range_length() + TOLERANCE` | **`param`** — one-sided check that the resolved v parameter does not overshoot the v knot domain top | `\|\| hint.1 - vknot_vec[0] > vknot_vec.range_length() + ctx.ratio_margin()` |
+| `include` | 816 | `if !self.subs(hint.0, hint.1).near(&pt)` | **`model`** — compares the surface point at the resolved parameter to the curve point in model space; this is the deciding predicate of the include test | `!ctx.near_points(self.subs(hint.0, hint.1), pt)` |
+| `include` | 817 | `\|\| hint.0 < uknot_vec[0] - TOLERANCE` | **`param`** — one-sided check that the resolved u parameter stays above the u knot domain bottom | `\|\| hint.0 < uknot_vec[0] - ctx.ratio_margin()` |
+| `include` | 818 | `\|\| hint.0 - uknot_vec[0] > uknot_vec.range_length() + TOLERANCE` | **`param`** — one-sided check that the resolved u parameter does not overshoot the u knot domain top | `\|\| hint.0 - uknot_vec[0] > uknot_vec.range_length() + ctx.ratio_margin()` |
+| `include` | 819 | `\|\| hint.1 < vknot_vec[0] - TOLERANCE` | **`param`** — one-sided check that the resolved v parameter stays above the v knot domain bottom | `\|\| hint.1 < vknot_vec[0] - ctx.ratio_margin()` |
+| `include` | 820 | `\|\| hint.1 - vknot_vec[0] > vknot_vec.range_length() + TOLERANCE` | **`param`** — one-sided check that the resolved v parameter does not overshoot the v knot domain top | `\|\| hint.1 - vknot_vec[0] > vknot_vec.range_length() + ctx.ratio_margin()` |
+
+## Not in this packet — 12 deferrals: a FIXME and nothing else
+
+These sites are real and their line numbers resolve. You **leave the code
+exactly as it is** and add one marker comment on the line above each. Do
+not introduce a `ToleranceCtx` for a function that has only deferrals —
+a FIXME is a comment and costs no context.
+
+**`bspcurve.rs`**
+
+| enclosing fn | line | code | marker |
 |---|---|---|---|
-| `normalize_normals` | 200 | `if !normals[idx].magnitude2().near(&1.0) {` | **`param`** — compares the squared magnitude of an already-normalized unit normal against 1.0; a unit vector's length is dimensionless and does not scale with the model |
+| `is_const` | 474 | `.all(move \|vec\| vec.near(&self.control_points[0]))` | `// FIXME(BG-TOL-001, GENERIC_BOUND)` — ctx.near_points<P> is bounded P: MetricSpace<Metric = f64> and this impl does not supply it. Widening a public generic bound is cross-crate and is Stage B, so the site is left exactly as it is. Enclosing impl: `impl<P: ControlPoint<f64> + Tolerance> BSplineCurve<P>`. |
+| `try_remove_knot` | 598 | `if !new_points.last().unwrap().near(self.control_point(idx)) {` | `// FIXME(BG-TOL-001, GENERIC_BOUND)` — ctx.near_points<P> is bounded P: MetricSpace<Metric = f64> and this impl does not supply it. Widening a public generic bound is cross-crate and is Stage B, so the site is left exactly as it is. Enclosing impl: `impl<P: ControlPoint<f64> + Tolerance> BSplineCurve<P>`. |
+| `near_as_curve` | 921 | `self.sub_near_as_curve(other, 1, \|x, y\| x.near(y))` | `// FIXME(BG-TOL-001, GENERIC_BOUND)` — ctx.near_points<P> is bounded P: MetricSpace<Metric = f64> and this impl does not supply it. Widening a public generic bound is cross-crate and is Stage B, so the site is left exactly as it is. Enclosing impl: `impl<P: ControlPoint<f64> + Tolerance> BSplineCurve<P>`. |
+| `try_concat` | 1037 | `if !front.near(back) {` | `// FIXME(BG-TOL-001, GENERIC_BOUND)` — ctx.near_points<P> is bounded P: MetricSpace<Metric = f64> and this impl does not supply it. Widening a public generic bound is cross-crate and is Stage B, so the site is left exactly as it is. Enclosing impl: `impl<P: ControlPoint<f64> + Tolerance> Concat<..> for BSplineCurve<P>`. |
 
-**`source_edge.rs`**
+**`bspsurface.rs`**
 
-| enclosing fn | line | code | class |
+| enclosing fn | line | code | marker |
 |---|---|---|---|
-| `establish_source_edge_traversal` | 311 | `let carrier_closed = subs_lo.distance(subs_hi) <= SOURCE_INCIDENCE_TOLERANCE;` | **`model`** — it compares the distance between two curve points (a model-space length) against the source-incidence length tolerance to decide whether the carrier closes at the evaluator seam, so it scales with the model |
+| `is_const` | 652 | `if !vec.near(&self.control_points[0][0]) {` | `// FIXME(BG-TOL-001, GENERIC_BOUND)` — ctx.near_points<P> is bounded P: MetricSpace<Metric = f64> and this impl does not supply it. Widening a public generic bound is cross-crate and is Stage B, so the site is left exactly as it is. Enclosing impl: `impl<V: Tolerance> BSplineSurface<V> -- not even ControlPoint`. |
+| `try_remove_uknot` | 823 | `if !pt0.near(pt1) {` | `// FIXME(BG-TOL-001, GENERIC_BOUND)` — ctx.near_points<P> is bounded P: MetricSpace<Metric = f64> and this impl does not supply it. Widening a public generic bound is cross-crate and is Stage B, so the site is left exactly as it is. Enclosing impl: `impl<P: ControlPoint<f64> + Tolerance> BSplineSurface<P>`. |
+| `try_remove_vknot` | 918 | `if !pt0.near(pt1) {` | `// FIXME(BG-TOL-001, GENERIC_BOUND)` — ctx.near_points<P> is bounded P: MetricSpace<Metric = f64> and this impl does not supply it. Widening a public generic bound is cross-crate and is Stage B, so the site is left exactly as it is. Enclosing impl: `impl<P: ControlPoint<f64> + Tolerance> BSplineSurface<P>`. |
+| `near_as_surface` | 1581 | `self.sub_near_as_surface(other, 1, \|x, y\| x.near(y))` | `// FIXME(BG-TOL-001, GENERIC_BOUND)` — ctx.near_points<P> is bounded P: MetricSpace<Metric = f64> and this impl does not supply it. Widening a public generic bound is cross-crate and is Stage B, so the site is left exactly as it is. Enclosing impl: `impl<P: ControlPoint<f64> + Tolerance> BSplineSurface<P>`. |
 
-**`triangulation.rs`**
+**`nurbscurve.rs`**
 
-| enclosing fn | line | code | class |
+| enclosing fn | line | code | marker |
 |---|---|---|---|
-| `reconcile_singular_transition` | 4517 | `if !previous_uv.x.near(&current_uv.x) && surface.uder(current_uv.x, current_uv.y).so_small() {` | **`param+model`** — see decision 3; both predicates migrate |
-| `reconcile_singular_transition` | 4523 | `if !previous_uv.y.near(&current_uv.y) && surface.vder(current_uv.x, current_uv.y).so_small() {` | **`param+model`** — see decision 3; both predicates migrate |
-| `reconcile_singular_transition` | 4529 | `if !previous_uv.x.near(&current_uv.x) && surface.uder(previous_uv.x, previous_uv.y).so_small() {` | **`param+model`** — see decision 3; both predicates migrate |
-| `reconcile_singular_transition` | 4535 | `if !previous_uv.y.near(&current_uv.y) && surface.vder(previous_uv.x, previous_uv.y).so_small() {` | **`param+model`** — see decision 3; both predicates migrate |
-| `try_new` | 5523 | `if !vec[0].near(&last) {` | **`param`** — `SurfacePoint` has no `AbsDiffEq` impl and derefs to `uv: Point2`, so this `near` resolves to `Point2::near` and compares the first and last lifted boundary points' uv parameters, not their positions. See decision 4 |
-| `try_new` | 5525 | `if surface.uder(u0, v0).so_small() \|\| surface.vder(u0, v0).so_small() {` | **`model`** — the surface u- and v-derivative magnitudes are model-space lengths (length per dimensionless parameter) and the test decides whether the loop closes on a collapsed direction. **Two** predicates on this line, both `model` |
-| `singular_transition_branch` | 6379 | `if vp.is_some() && surface.vder(u, v).so_small() {` | **`model`** — the v-derivative magnitude is a model-space length, and the test detects a collapsed periodic axis at a chart singularity |
-| `singular_transition_branch` | 6381 | `} else if up.is_some() && surface.uder(u, v).so_small() {` | **`model`** — the u-derivative magnitude is a model-space length, and the test detects a collapsed periodic axis at a chart singularity |
-| `working_range` | 7220 | `(hi - lo > TOLERANCE).then_some((lo, hi))` | **`param`** — `hi - lo` is the span of the boundary's u (or v) parameter coordinate, so the comparison asks whether the parameter interval is non-degenerate and a parameter range is dimensionless. One-sided: use `!ctx.is_small_ratio(hi - lo)` |
-| `new_with_join` | 8204 | `if p.x < q.x - TOLERANCE {` | **`param`** — `p.x`, `q.x` are u parameters of the open boundary's endpoints; a one-sided margin, so use `q.x - ctx.ratio_margin()` |
-| `new_with_join` | 8220 | `} else if q.x < p.x - TOLERANCE {` | **`param`** — same, mirrored |
-| `new_with_join` | 8236 | `} else if p.y < q.y - TOLERANCE {` | **`param`** — same, on v |
-| `new_with_join` | 8252 | `} else if q.y < p.y - TOLERANCE {` | **`param`** — same, mirrored, on v |
-| `end_pts` | 8278 | `if !p0.x.near(&p1.x) && !q0.x.near(&q1.x) {` | **`param`** — u parameters of the two open curves' endpoints; asks whether both curves need the same u-range normalization. **Two** predicates on this line, both `param` |
-| `end_pts` | 8283 | `} else if !p0.y.near(&p1.y) && !q0.y.near(&q1.y) {` | **`param`** — same, on v. **Two** predicates on this line, both `param` |
-| `on_boundary` | 8398 | `(a + ab * t).distance2(c) <= TOLERANCE * TOLERANCE` | **`param`** — parameter-space point-to-segment distance: `c` and the boundary loop points are `Point2` in uv. First-order, not squared-order. See decision 5 |
-| `include_along_ray` | 8420 | `if x.so_small() && s0 * s1 < 0.0 {` | **`param`** — `x` is `s2 / (s1 - s0)`, a ratio of parameter-space cross products locating where the ray crosses the boundary edge, so it is dimensionless. Migrate only the `so_small`; `s0 * s1 < 0.0` is a sign test, not a tolerance |
-| `triangulation_into_polymesh_outcome` | 10898 | `if norm.so_small() \|\| !norm.x.is_finite() {` | **`param`** — `norm` is an already-normalized vertex normal, so its magnitude is dimensionless. See decision 6. Migrate only the `so_small`; `is_finite` is not a tolerance |
+| `is_const` | 170 | `.all(move \|vec\| vec.to_point().near(&pt))` | `// FIXME(BG-TOL-001, GENERIC_BOUND)` — ctx.near_points<P> is bounded P: MetricSpace<Metric = f64> and this impl does not supply it. Widening a public generic bound is cross-crate and is Stage B, so the site is left exactly as it is. Enclosing impl: `impl<V: Homogeneous + ControlPoint<f64, Diff = V>> where V::Point: Tolerance`. |
+| `near_as_curve` | 199 | `.sub_near_as_curve(&other.0, 2, move \|x, y\| x.to_point().near(&y.to_point()))` | `// FIXME(BG-TOL-001, GENERIC_BOUND)` — ctx.near_points<P> is bounded P: MetricSpace<Metric = f64> and this impl does not supply it. Widening a public generic bound is cross-crate and is Stage B, so the site is left exactly as it is. Enclosing impl: `impl<V: Homogeneous + ControlPoint<f64, Diff = V>> where V::Point: Tolerance`. |
 
-## Not in this packet — the deferred and the excluded
+**`nurbssurface.rs`**
 
-### The six deferred area sites — add a FIXME, change nothing else
+| enclosing fn | line | code | marker |
+|---|---|---|---|
+| `is_const` | 299 | `if !vec.to_point().near(&pt) {` | `// FIXME(BG-TOL-001, GENERIC_BOUND)` — ctx.near_points<P> is bounded P: MetricSpace<Metric = f64> and this impl does not supply it. Widening a public generic bound is cross-crate and is Stage B, so the site is left exactly as it is. Enclosing impl: `impl<V: Homogeneous + ControlPoint<f64, Diff = V>> where V::Point: Tolerance`. |
+| `near_as_surface` | 329 | `.sub_near_as_surface(&other.0, 2, move \|x, y\| x.to_point().near(&y.to_point()))` | `// FIXME(BG-TOL-001, GENERIC_BOUND)` — ctx.near_points<P> is bounded P: MetricSpace<Metric = f64> and this impl does not supply it. Widening a public generic bound is cross-crate and is Stage B, so the site is left exactly as it is. Enclosing impl: `impl<V: Homogeneous + ControlPoint<f64, Diff = V>> where V::Point: Tolerance`. |
 
-These compare a quantity that is **degree 2 in length** — a cross-product
-magnitude (twice a triangle's area) or a 3×3 determinant of two model-space
-displacements and a unit direction. Under a model rescale by `k` such a quantity
-scales as `k²` while `ctx.length_margin()` scales as `k`. Neither `model` nor
-`param` fits, and `is_small_len` applied to an area is a migration that *looks*
-correct and is wrong the moment Stage B threads a real `model_scale` — worse
-than no migration, because Stage B would then see a migrated site and not look
-again. `ToleranceCtx` has no area predicate; adding one is out of scope here.
+## Not in this packet — 23 excluded, no marker
 
-This is the same treatment a previous shard already gave the identical problem
-at `truck-modeling/src/geom_impls.rs:91`. Copy that form exactly: the original
-line untouched, and immediately above it
+- `bspcurve.rs:772` — squared order
+- `bspcurve.rs:852` — not code: doc comment
+- `bspcurve.rs:861` — not code: doc comment
+- `bspcurve.rs:898` — not code: doc comment
+- `bspcurve.rs:927` — not code: doc comment
+- `bspcurve.rs:931` — not code: doc comment
+- `bspcurve.rs:951` — squared order
+- `bspsurface.rs:1082` — squared order
+- `bspsurface.rs:1561` — not code: doc comment
+- `bspsurface.rs:1586` — not code: doc comment
+- `bspsurface.rs:1590` — not code: doc comment
+- `bspsurface.rs:1608` — squared order
+- `nurbscurve.rs:175` — not code: doc comment
+- `nurbscurve.rs:205` — not code: doc comment
+- `nurbscurve.rs:223` — not code: doc comment
+- `nurbscurve.rs:229` — squared order
+- `nurbscurve.rs:359` — not code: doc comment
+- `nurbscurve.rs:370` — not code: doc comment
+- `nurbssurface.rs:308` — not code: doc comment
+- `nurbssurface.rs:335` — not code: doc comment
+- `nurbssurface.rs:339` — not code: doc comment
+- `nurbssurface.rs:358` — squared order
+- `nurbssurface.rs:554` — not code: doc comment
 
-```rust
-// FIXME(BG-TOL-001): <quantity> is an area (length squared); neither predicate fits
-```
-
-| file | line | code |
-|---|---|---|
-| `analyzers/collision.rs` | 87 | `.filter(\|(_, tri)\| !(tri[1] - tri[0]).cross(tri[2] - tri[0]).so_small())` |
-| `analyzers/collision.rs` | 93 | `.filter(\|(_, tri)\| !(tri[1] - tri[0]).cross(tri[2] - tri[0]).so_small())` |
-| `analyzers/collision.rs` | 153 | `if nor.so_small() {` |
-| `analyzers/in_out_judge.rs` | 23 | `if mat.determinant().so_small() {` |
-| `analyzers/point_cloud/mod.rs` | 76 | `if coef < 2.0 \|\| nor.magnitude().so_small() {` |
-| `analyzers/point_cloud/sort_end_points.rs` | 55 | `.filter(\|(_, tri)\| !(tri[1] - tri[0]).cross(tri[2] - tri[0]).so_small())` |
-
-These four files are on your allowlist **only** so you can add those comments.
-**Introduce no `ToleranceCtx` in any of them** — a context in a function with no
-migrated site is an unused binding, a clippy failure, and a wasted slot against
-the ratchet.
-
-### Everything else
+### Everything else in these files
 
 Leaving these alone is correct; migrating one is a rejection.
 
-1. **All doc comments and `#[cfg(test)]` code.** A doc example is prose and a
-   test's epsilon is the test's own business. This is most of the 43 hits in
-   `source_edge.rs` and the 8 in `normal_filters.rs`.
-2. **Anything using `.near2()` or `.so_small2()`,** including
-   `collision.rs:164`, `:165`, `:166`. These compare against `TOLERANCE2` =
-   1e-12 and `ToleranceCtx` has no squared-order predicate — mapping them onto
-   `tau_rep` would loosen them by six orders of magnitude while appearing to
-   migrate them. Leave them; they already have their own deferral.
-3. **`triangulation.rs:6910`,** `let tmp = f64::min(p[compidx], q[compidx]) + TOLERANCE;`
-   — a range-cut offset in parameter space. It compares nothing.
-4. **`triangulation.rs:11072`,** `let tol = tol.max(TOLERANCE);` — floors a
-   chord tolerance. It compares nothing. Its value is a model-space length and
-   re-homing it is Stage B.
-5. **`vtk.rs` entirely** — the `use` import at line 4 and the spatial-hash
-   bucket pitch at line 195, `(p / (TOLERANCE * 50.0) - ...)`. `TOLERANCE` is a
-   grid quantization pitch there, not a predicate. Not on your allowlist.
-6. **`source_edge.rs:111` and `:252`.** Line 111 is the `const` item (decision
-   7); line 252 is `source_tolerance.max(SOURCE_INCIDENCE_TOLERANCE)`, a value
-   computation that compares nothing.
-7. **`tessellation/formal/*.rs`** and its `RELATIVE_TOLERANCE` constant. Those
-   files are not on your allowlist and are not part of this contract item.
+1. **All doc comments and `#[cfg(test)]` code.** `nurbs` is heavily documented
+   with runnable examples and they account for most of the anchor counts. A doc
+   example is prose and a test's epsilon is the test's own business.
+2. **Anything using `.near2()` or `.so_small2()`.** The survey found six such
+   helpers — `sub_near_as_curve`/`sub_near_as_surface` and the
+   `near2_as_curve`/`near2_as_surface` family — and they are correctly
+   squared-order: they compare against `TOLERANCE2` = 1e-12, which nothing on
+   `ToleranceCtx` reproduces. Mapping them onto `tau_rep` would loosen them by
+   six orders of magnitude while looking like a migration. They are deferred to
+   BG-TOL-004 and are not your work.
+3. **Any `TOLERANCE` used as a value rather than a comparison** — a `.max()`
+   floor, a `+ TOLERANCE` offset, a `const` initializer, a `use` import. Such a
+   line compares nothing, so it has no `model`/`param` class, and there is no
+   `ctx` in scope for a `const` anyway. Its *consumers* are the sites.
 
 ## The ratchet — read this before you commit
 
 `scripts/kernel-gates.sh` counts `unscaled_legacy(` call sites in
 `vendor/truck/*/src/**` and **fails when the total exceeds the ceiling** in
-`scripts/unscaled_legacy_ceiling.txt`. The ceiling has been raised to **51** for
-this packet, covering the 40 already in the tree plus your 11. That file is
-**not** on your allowlist and you must not edit it — the ceiling exists to
-constrain this packet, and a packet that can move its own ceiling is not
-constrained by anything.
+`scripts/unscaled_legacy_ceiling.txt`. The ceiling has been raised to **97**,
+covering the 50 already in the tree plus the budgets of this packet and the two
+sibling shards dispatched alongside it. That file is **not** on your allowlist
+and you must not edit it — the ceiling exists to constrain this packet, and a
+packet that can move its own ceiling is not constrained by anything.
 
-Eleven is a budget and it is exact, not an allowance. One context per function
-containing a migrated site is eleven; if you need more, you have constructed one
-per site instead of one per function, which is the mistake this number is sized
-to catch.
+Because two other shards are running concurrently against the same ceiling, a
+context you add that the budget did not account for is not merely over-budget;
+it can push a sibling's correct work over the line. Introduce 26 and no
+more.
 
 ## House rules
 
 - **H-1** No `unwrap`, `expect`, `panic!`, `unimplemented!`, `todo!`, or
   out-of-range indexing on any line you add. `unscaled_legacy()` is infallible
-  and returns `Self`, so there is nothing to unwrap.
+  and returns `Self`, so there is nothing to unwrap. Note that several lines in
+  your table sit inside expressions that already contain an `unwrap()` —
+  **leave those exactly as they are**; the rule is about lines you add, and
+  rewriting an existing `unwrap` is out of scope and outside this packet.
 - **H-2** Fallible operations return `Outcome<T>`. You are not adding any.
 - **H-3** No absolute constants in predicates — that is the whole point of this
   packet. **`scripts/kernel-gates.sh` flags a bare float literal on any added
@@ -322,84 +426,88 @@ to catch.
 
 ## Tests required
 
-New file `vendor/truck/truck-meshalgo/tests/tolerance_meshalgo.rs`. Each must be
-a named `#[test]` fn — the verifier checks the names appear in your diff.
+New file `vendor/truck/truck-geometry/tests/tolerance_nurbs.rs`.
 
-1. `every_migrated_meshalgo_site_is_marked` — read the three migrated source
-   files (`filters/normal_filters.rs`, `tessellation/source_edge.rs`,
-   `tessellation/triangulation.rs`) from `CARGO_MANIFEST_DIR` at runtime and
-   assert that the number of lines containing `ctx.near_pt(`,
-   `ctx.is_small_len(`, `ctx.is_small_ratio(` or `ctx.ratio_margin()` equals the
-   number containing a `// BG-TOL-001:` marker. This is the test that makes the
-   marking checkable rather than a convention; without it the markers rot the
-   first time someone edits a line.
-2. `deferred_area_sites_carry_a_fixme` — read the four deferred files
-   (`analyzers/collision.rs`, `analyzers/in_out_judge.rs`,
-   `analyzers/point_cloud/mod.rs`, `analyzers/point_cloud/sort_end_points.rs`)
-   and assert each contains exactly the expected number of
-   `FIXME(BG-TOL-001)` lines — 3, 1, 1, 1 — and **no** `ToleranceCtx` at all.
-   The second half is the load-bearing one: it is what stops a later reader from
-   "finishing the job" by migrating an area site, and what proves those four
-   files cost nothing against the ratchet.
+**Its first line must be `#![deny(clippy::unwrap_used)]`.** GATE-1 (H-1)
+requires it of every new module under `vendor/truck/`, including test files, and
+`scripts/kernel-gates.sh` fails the packet without it. Every landed shard's test
+file carries it — see `truck-shapeops/tests/tolerance_migration.rs` and
+`truck-geometry/tests/analytic_carriers.rs`. Write your tests so the attribute
+costs nothing: return `Result` or match rather than `unwrap`. This line is
+called out because the last shard's packet omitted it and the omission, not the
+worker, cost a round trip.
 
-`truck-meshalgo` — **check `Cargo.toml` for `autotests = false` before you
-rely on the file being picked up.** `truck-polymesh` sets it and a new test file
-there silently never runs; if `truck-meshalgo` does the same you must add an
-explicit `[[test]]` entry, and `Cargo.toml` is then part of your write set —
-report that as a SPEC_GAP rather than editing a file this packet did not
-allowlist.
+Each test must be a named `#[test]` fn — the verifier checks the names appear in
+your diff, so the names below are exact.
+
+1. `every_migrated_nurbs_site_is_marked` — read the migrated source files from
+   `CARGO_MANIFEST_DIR` at runtime and assert that the number of lines
+   containing `ctx.near_pt(`, `ctx.near_points(`, `ctx.is_small_len(`,
+   `ctx.is_small_ratio(` or `ctx.ratio_margin()` equals the number containing a
+   `// BG-TOL-001:` marker. This is what makes the marking checkable rather than
+   a convention; without it the markers rot the first time someone edits a line.
+2. `deferred_generic_bound_sites_carry_a_fixme` — assert that `bspcurve.rs`, `bspsurface.rs`,
+   `nurbscurve.rs` and `nurbssurface.rs` contain exactly **4, 4, 2 and 2**
+   lines matching `FIXME(BG-TOL-001, GENERIC_BOUND)` respectively. Twelve
+   total. The count is the point: it is what stops a later reader from
+   "finishing the job" by widening a bound, and what proves none of the
+   twelve was quietly migrated instead.
+
+
+**The crate hosting the test file is `truck-geometry`, and that is a decision, not
+an accident.** It is the crate the migrated files live in and it has no `autotests = false`, so the file is picked up without touching `Cargo.toml` — which is not on your allowlist.
 
 ## Done when — run these, all must pass
 
 ```
-cargo fmt --check -p truck-meshalgo
-cargo clippy -p truck-meshalgo --all-targets --no-deps -- -D warnings
-cargo test -p truck-meshalgo --lib --test tolerance_meshalgo --no-fail-fast
+cargo fmt --check -p truck-geometry
+cargo clippy -p truck-geometry --all-targets --no-deps -- -D warnings
+cargo test -p truck-geometry --lib --test tolerance_nurbs --no-fail-fast
 cargo check --workspace --all-targets
 ```
 
 `--no-deps` matters: without it clippy lints the vendored path dependencies too
-and aborts before reaching your crate. Never run a bare `cargo test` — it builds
-56 examples. Send cargo output to a file and read the tail.
+and aborts before reaching your crate. **Never run a bare `cargo test`** — it
+builds 56 examples. Send cargo output to a file and read the tail.
 
-**This crate is not clippy-clean at the base commit** — around 93 pre-existing
-lints. They are not yours. The verifier scopes clippy to the lines your diff
-adds; you are responsible for those and nothing else. If a pre-existing test
-fails, **confirm it fails identically at the base commit and say so in your
-notes** — do not try to fix it and do not let it stop you.
+The vendored tree is **not clean at the base commit** — neither clippy-clean nor
+rustfmt-clean, and its test suite has pre-existing failures. Those are not
+yours. The verifier scopes clippy to the lines your diff adds, rustfmt to the
+files your diff changes, and test failures to the test functions your diff adds.
+If a pre-existing test fails, **confirm it fails identically at the base commit,
+record it in `baseline_failures`, and move on** — do not try to fix it and do
+not let it stop you.
 
 ## Forbidden
 
 Editing any file outside `write_allow` — in particular
 `scripts/unscaled_legacy_ceiling.txt`, `scripts/kernel-gates.sh`,
-`truck-base/src/tolerance.rs`, `src/vtk.rs`, `tessellation/formal/**`, and
-**`loop/` anything: your result file goes in the root of your worktree and
-nowhere else.** Changing any function signature. Adding a `ctx` parameter.
-Changing any threshold. Introducing a `ToleranceCtx` in any of the four deferred
-files. Migrating a site the "Not in this packet" section excludes. Widening a
-tolerance or adding `#[ignore]` to make a test pass. Committing to `main`.
+`vendor/truck/truck-base/src/tolerance.rs`, and **`loop/` anything: your result
+file goes in the root of your worktree and nowhere else.** Changing any function
+signature. Adding or widening a generic bound. Adding a `ctx` parameter.
+Changing any threshold. Introducing a `ToleranceCtx` in a function that has only
+deferrals. Migrating a site the "Not in this packet" section excludes. Widening
+a tolerance or adding `#[ignore]` to make a test pass. Committing to `main`.
 
 ## Stop conditions
 
 - an anchor count differs → `ANCHOR_MISMATCH`, naming the file and what you saw
-- a site in the table does not typecheck under its assigned recipe → `SPEC_GAP`,
-  naming the site and the actual types. **Do not reclassify it to make it
-  compile**; a `model` site that will not take `is_small_len` is telling you
-  something, and reporting that is worth more than a green build.
-- `truck-meshalgo/Cargo.toml` sets `autotests = false` → `SPEC_GAP`
+- a site in the table does not typecheck under the rewrite the table gives →
+  `SPEC_GAP`, naming the site and the actual types. **Do not reclassify it to
+  make it compile**, and do not reach for a different predicate because one
+  compiles: a `model` site that will not take its recipe is telling you
+  something, and reporting that is worth more than a green build. This packet's
+  deferrals exist because exactly that check was run in advance.
+- you cannot reach the context budget without constructing a context you would
+  not otherwise write → finish the honest work and report `BUDGET_WRONG` under
+  `disagreements`. Do not manufacture one.
 - three consecutive failed `cargo test` runs on the same error → `BLOCKED`
 
 ## Finish by writing `RESULT.json` in the root of your worktree
 
-```json
-{"id":"BG-TOL-001-MESHALGO","status":"DONE","contracts":["BG-TOL-001"],
- "tests_added":2,"sites_migrated":20,"sites_deferred":6,"unscaled_legacy_calls":11,
- "anchors_verified":{"A1":6,"A2":1,"A3":2,"A4":1,"A5":8,"A6":43,"A7":41},
- "notes":"set unscaled_legacy_calls to the number you actually introduced. Report every existing test whose behaviour moved, with the name and the reason, and anything the Euclidean/componentwise difference changed. If you disagree with a classification in the table, say so here with your reasoning rather than changing it."}
-```
-
-`status` is one of `DONE`, `ANCHOR_MISMATCH`, `SPEC_GAP`, `BLOCKED`. On any
-non-`DONE` status also write `QUESTION.md` beside it.
+Use the shape at the top of this document. `status` is one of `DONE`,
+`ANCHOR_MISMATCH`, `SPEC_GAP`, `BLOCKED`. On any non-`DONE` status also write
+`QUESTION.md` beside it.
 
 Commit on the current branch with subject
-`refactor(meshalgo): classify every tolerance site model or param (BG-TOL-001-MESHALGO)`.
+`refactor(geometry): classify every nurbs tolerance site model or param (BG-TOL-001-GEOM-NURBS)`.

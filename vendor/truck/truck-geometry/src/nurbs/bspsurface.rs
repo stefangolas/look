@@ -36,6 +36,7 @@ impl<P> BSplineSurface<P> {
         knot_vecs: (KnotVec, KnotVec),
         control_points: Vec<Vec<P>>,
     ) -> Result<BSplineSurface<P>> {
+        let ctx = ToleranceCtx::unscaled_legacy();
         if control_points.is_empty() || control_points[0].is_empty() {
             Err(Error::EmptyControlPoints)
         } else if knot_vecs.0.len() <= control_points.len() {
@@ -48,7 +49,10 @@ impl<P> BSplineSurface<P> {
                 knot_vecs.1.len(),
                 control_points[0].len(),
             ))
-        } else if knot_vecs.0.range_length().so_small() || knot_vecs.1.range_length().so_small() {
+        } else if ctx.is_small_ratio(knot_vecs.0.range_length()) // BG-TOL-001: param
+            || ctx.is_small_ratio(knot_vecs.1.range_length())
+        // BG-TOL-001: param
+        {
             Err(Error::ZeroRange)
         } else {
             let len = control_points[0].len();
@@ -506,6 +510,7 @@ impl<P: ControlPoint<f64>> BSplineSurface<P> {
         div_coef: usize,
         ord: F,
     ) -> bool {
+        let ctx = ToleranceCtx::unscaled_legacy();
         if !self.knot_vecs.0.same_range(&other.knot_vecs.0) {
             return false;
         }
@@ -520,14 +525,16 @@ impl<P: ControlPoint<f64>> BSplineSurface<P> {
 
         for i0 in 1..self.knot_vecs.0.len() {
             let delta0 = self.knot_vecs.0[i0] - self.knot_vecs.0[i0 - 1];
-            if delta0.so_small() {
+            if ctx.is_small_ratio(delta0) {
+                // BG-TOL-001: param
                 continue;
             }
             for j0 in 0..division0 {
                 let u = self.knot_vecs.0[i0 - 1] + delta0 * (j0 as f64) / (division0 as f64);
                 for i1 in 1..self.knot_vecs.1.len() {
                     let delta1 = self.knot_vecs.1[i1] - self.knot_vecs.1[i1 - 1];
-                    if delta1.so_small() {
+                    if ctx.is_small_ratio(delta1) {
+                        // BG-TOL-001: param
                         continue;
                     }
                     for j1 in 0..division1 {
@@ -648,6 +655,7 @@ impl<V: Tolerance> BSplineSurface<V> {
     /// ```
     #[inline(always)]
     pub fn is_const(&self) -> bool {
+        // FIXME(BG-TOL-001, GENERIC_BOUND) — ctx.near_points<P> is bounded P: MetricSpace<Metric = f64> and this impl does not supply it. Widening a public generic bound is cross-crate and is Stage B, so the site is left exactly as it is. Enclosing impl: `impl<V: Tolerance> BSplineSurface<V> -- not even ControlPoint`.
         for vec in self.control_points.iter().flat_map(|pts| pts.iter()) {
             if !vec.near(&self.control_points[0][0]) {
                 return false;
@@ -787,6 +795,7 @@ impl<P: ControlPoint<f64> + Tolerance> BSplineSurface<P> {
     /// assert!(bspsurface.near2_as_surface(&org_surface));
     /// ```
     pub fn try_remove_uknot(&mut self, idx: usize) -> Result<&mut Self> {
+        let ctx = ToleranceCtx::unscaled_legacy();
         let k = self.udegree();
         let knot_vec = self.uknot_vec();
         let n = self.control_points.len();
@@ -804,7 +813,8 @@ impl<P: ControlPoint<f64> + Tolerance> BSplineSurface<P> {
         for i in (idx - k)..idx {
             let delta = knot_vec[i + k + 1] - knot_vec[i];
             let a = inv_or_zero(delta) * (knot_vec[idx] - knot_vec[i]);
-            if a.so_small() {
+            if ctx.is_small_ratio(a) {
+                // BG-TOL-001: param
                 break;
             } else {
                 let vec = self
@@ -816,6 +826,7 @@ impl<P: ControlPoint<f64> + Tolerance> BSplineSurface<P> {
             }
         }
 
+        // FIXME(BG-TOL-001, GENERIC_BOUND) — ctx.near_points<P> is bounded P: MetricSpace<Metric = f64> and this impl does not supply it. Widening a public generic bound is cross-crate and is Stage B, so the site is left exactly as it is. Enclosing impl: `impl<P: ControlPoint<f64> + Tolerance> BSplineSurface<P>`.
         for (pt0, pt1) in self
             .ctrl_pts_column_iter(idx)
             .zip(new_points.last().unwrap())
@@ -885,6 +896,7 @@ impl<P: ControlPoint<f64> + Tolerance> BSplineSurface<P> {
     /// assert_eq!(bspsurface.vknot_vec().len(), org_surface.vknot_vec().len() + 1);
     /// ```
     pub fn try_remove_vknot(&mut self, idx: usize) -> Result<&mut Self> {
+        let ctx = ToleranceCtx::unscaled_legacy();
         let (_, k) = self.degrees();
         let knot_vec = self.vknot_vec();
         let n = self.control_points[0].len();
@@ -902,7 +914,8 @@ impl<P: ControlPoint<f64> + Tolerance> BSplineSurface<P> {
         for i in (idx - k)..idx {
             let delta = knot_vec[i + k + 1] - knot_vec[i];
             let a = inv_or_zero(delta) * (knot_vec[idx] - knot_vec[i]);
-            if a.so_small() {
+            if ctx.is_small_ratio(a) {
+                // BG-TOL-001: param
                 break;
             } else {
                 let vec = self
@@ -914,6 +927,7 @@ impl<P: ControlPoint<f64> + Tolerance> BSplineSurface<P> {
             }
         }
 
+        // FIXME(BG-TOL-001, GENERIC_BOUND) — ctx.near_points<P> is bounded P: MetricSpace<Metric = f64> and this impl does not supply it. Widening a public generic bound is cross-crate and is Stage B, so the site is left exactly as it is. Enclosing impl: `impl<P: ControlPoint<f64> + Tolerance> BSplineSurface<P>`.
         for (pt0, pt1) in self.ctrl_pts_row_iter(idx).zip(new_points.last().unwrap()) {
             if !pt0.near(pt1) {
                 return Err(Error::CannotRemoveKnot(idx));
@@ -1075,14 +1089,17 @@ impl<P: ControlPoint<f64> + Tolerance> BSplineSurface<P> {
     /// assert!(bspsurface.near2_as_surface(&org_surface));
     /// ```
     pub fn syncro_uvknots(&mut self) -> &mut Self {
+        let ctx = ToleranceCtx::unscaled_legacy();
         self.knot_vecs.0.normalize();
         self.knot_vecs.1.normalize();
         let mut i = 0;
         let mut j = 0;
         while !self.uknot(i).near2(&1.0) || !self.vknot(j).near2(&1.0) {
-            if self.uknot(i) - self.vknot(j) > TOLERANCE {
+            if self.uknot(i) - self.vknot(j) > ctx.ratio_margin() {
+                // BG-TOL-001: param
                 self.add_uknot(self.vknot(j));
-            } else if self.vknot(j) - self.uknot(i) > TOLERANCE {
+            } else if self.vknot(j) - self.uknot(i) > ctx.ratio_margin() {
+                // BG-TOL-001: param
                 self.add_vknot(self.uknot(i));
             }
             i += 1;
@@ -1149,6 +1166,7 @@ impl<P: ControlPoint<f64> + Tolerance> BSplineSurface<P> {
     /// }
     /// ```
     pub fn ucut(&mut self, mut u: f64) -> BSplineSurface<P> {
+        let ctx = ToleranceCtx::unscaled_legacy();
         let degree = self.udegree();
 
         let idx = match self.uknot_vec().floor(u) {
@@ -1162,7 +1180,8 @@ impl<P: ControlPoint<f64> + Tolerance> BSplineSurface<P> {
                 return bspline;
             }
         };
-        let s = if u.near(&self.uknot_vec()[idx]) {
+        let s = if ctx.is_small_ratio(u - self.uknot_vec()[idx]) {
+            // BG-TOL-001: param
             u = self.uknot_vec()[idx];
             self.uknot_vec().multiplicity(idx)
         } else {
@@ -1265,19 +1284,24 @@ impl<P: ControlPoint<f64> + Tolerance> BSplineSurface<P> {
     /// }
     /// ```
     pub fn sectional_curve(&self, bnd_box: BoundingBox<Vector2>) -> BSplineCurve<P> {
+        let ctx = ToleranceCtx::unscaled_legacy();
         let p = bnd_box.min();
         let q = bnd_box.max();
         let mut bspsurface = self.clone();
-        if !p[0].near(&bspsurface.uknot(0)) {
+        if !ctx.is_small_ratio(p[0] - bspsurface.uknot(0)) {
+            // BG-TOL-001: param
             bspsurface = bspsurface.ucut(p[0]);
         }
-        if !q[0].near(&bspsurface.uknot(bspsurface.uknot_vec().len() - 1)) {
+        if !ctx.is_small_ratio(q[0] - bspsurface.uknot(bspsurface.uknot_vec().len() - 1)) {
+            // BG-TOL-001: param
             bspsurface.ucut(q[0]);
         }
-        if !p[0].near(&bspsurface.vknot(0)) {
+        if !ctx.is_small_ratio(p[0] - bspsurface.vknot(0)) {
+            // BG-TOL-001: param
             bspsurface = bspsurface.vcut(p[1]);
         }
-        if !q[0].near(&bspsurface.vknot(bspsurface.vknot_vec().len() - 1)) {
+        if !ctx.is_small_ratio(q[0] - bspsurface.vknot(bspsurface.vknot_vec().len() - 1)) {
+            // BG-TOL-001: param
             bspsurface.vcut(q[1]);
         }
         bspsurface.syncro_uvdegrees();
@@ -1578,6 +1602,7 @@ impl<P: ControlPoint<f64> + Tolerance> BSplineSurface<P> {
     /// ```
     #[inline(always)]
     pub fn near_as_surface(&self, other: &BSplineSurface<P>) -> bool {
+        // FIXME(BG-TOL-001, GENERIC_BOUND) — ctx.near_points<P> is bounded P: MetricSpace<Metric = f64> and this impl does not supply it. Widening a public generic bound is cross-crate and is Stage B, so the site is left exactly as it is. Enclosing impl: `impl<P: ControlPoint<f64> + Tolerance> BSplineSurface<P>`.
         self.sub_near_as_surface(other, 1, |x, y| x.near(y))
     }
     /// Determines whether `self` and `other` is near in square order as the B-spline surfaces or not.
@@ -1818,6 +1843,7 @@ where
 
 impl IncludeCurve<BSplineCurve<Point2>> for BSplineSurface<Point2> {
     fn include(&self, curve: &BSplineCurve<Point2>) -> Outcome<bool> {
+        let ctx = ToleranceCtx::unscaled_legacy();
         let value = (|| {
             let pt = curve.front();
             let mut hint =
@@ -1841,11 +1867,13 @@ impl IncludeCurve<BSplineCurve<Point2>> for BSplineSurface<Point2> {
                             Some(got) => got,
                             None => return false,
                         };
-                    if !ParametricSurface::subs(self, hint.0, hint.1).near(&pt)
-                        || hint.0 < uknot_vec[0] - TOLERANCE
-                        || hint.0 - uknot_vec[0] > uknot_vec.range_length() + TOLERANCE
-                        || hint.1 < vknot_vec[0] - TOLERANCE
-                        || hint.1 - vknot_vec[0] > vknot_vec.range_length() + TOLERANCE
+                    if !ctx.near_points(ParametricSurface::subs(self, hint.0, hint.1), pt)
+                        // BG-TOL-001: model
+                        || hint.0 < uknot_vec[0] - ctx.ratio_margin() // BG-TOL-001: param
+                        || hint.0 - uknot_vec[0] > uknot_vec.range_length() + ctx.ratio_margin() // BG-TOL-001: param
+                        || hint.1 < vknot_vec[0] - ctx.ratio_margin() // BG-TOL-001: param
+                        || hint.1 - vknot_vec[0] > vknot_vec.range_length() + ctx.ratio_margin()
+                    // BG-TOL-001: param
                     {
                         return false;
                     }
@@ -1868,6 +1896,7 @@ impl IncludeCurve<BSplineCurve<Point2>> for BSplineSurface<Point2> {
 
 impl IncludeCurve<BSplineCurve<Point3>> for BSplineSurface<Point3> {
     fn include(&self, curve: &BSplineCurve<Point3>) -> Outcome<bool> {
+        let ctx = ToleranceCtx::unscaled_legacy();
         let value = (|| {
             let pt = curve.front();
             let mut hint =
@@ -1891,11 +1920,13 @@ impl IncludeCurve<BSplineCurve<Point3>> for BSplineSurface<Point3> {
                             Some(got) => got,
                             None => return false,
                         };
-                    if !ParametricSurface::subs(self, hint.0, hint.1).near(&pt)
-                        || hint.0 < uknot_vec[0] - TOLERANCE
-                        || hint.0 - uknot_vec[0] > uknot_vec.range_length() + TOLERANCE
-                        || hint.1 < vknot_vec[0] - TOLERANCE
-                        || hint.1 - vknot_vec[0] > vknot_vec.range_length() + TOLERANCE
+                    if !ctx.near_points(ParametricSurface::subs(self, hint.0, hint.1), pt)
+                        // BG-TOL-001: model
+                        || hint.0 < uknot_vec[0] - ctx.ratio_margin() // BG-TOL-001: param
+                        || hint.0 - uknot_vec[0] > uknot_vec.range_length() + ctx.ratio_margin() // BG-TOL-001: param
+                        || hint.1 < vknot_vec[0] - ctx.ratio_margin() // BG-TOL-001: param
+                        || hint.1 - vknot_vec[0] > vknot_vec.range_length() + ctx.ratio_margin()
+                    // BG-TOL-001: param
                     {
                         return false;
                     }
@@ -1918,6 +1949,7 @@ impl IncludeCurve<BSplineCurve<Point3>> for BSplineSurface<Point3> {
 
 impl IncludeCurve<NurbsCurve<Vector4>> for BSplineSurface<Point3> {
     fn include(&self, curve: &NurbsCurve<Vector4>) -> Outcome<bool> {
+        let ctx = ToleranceCtx::unscaled_legacy();
         let value = (|| {
             let pt = curve.subs(curve.knot_vec()[0]);
             let mut hint =
@@ -1941,11 +1973,13 @@ impl IncludeCurve<NurbsCurve<Vector4>> for BSplineSurface<Point3> {
                             Some(got) => got,
                             None => return false,
                         };
-                    if !ParametricSurface::subs(self, hint.0, hint.1).near(&pt)
-                        || hint.0 < uknot_vec[0] - TOLERANCE
-                        || hint.0 - uknot_vec[0] > uknot_vec.range_length() + TOLERANCE
-                        || hint.1 < vknot_vec[0] - TOLERANCE
-                        || hint.1 - vknot_vec[0] > vknot_vec.range_length() + TOLERANCE
+                    if !ctx.near_points(ParametricSurface::subs(self, hint.0, hint.1), pt)
+                        // BG-TOL-001: model
+                        || hint.0 < uknot_vec[0] - ctx.ratio_margin() // BG-TOL-001: param
+                        || hint.0 - uknot_vec[0] > uknot_vec.range_length() + ctx.ratio_margin() // BG-TOL-001: param
+                        || hint.1 < vknot_vec[0] - ctx.ratio_margin() // BG-TOL-001: param
+                        || hint.1 - vknot_vec[0] > vknot_vec.range_length() + ctx.ratio_margin()
+                    // BG-TOL-001: param
                     {
                         return false;
                     }

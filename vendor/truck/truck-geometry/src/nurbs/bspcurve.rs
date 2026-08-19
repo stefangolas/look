@@ -29,6 +29,7 @@ impl<P> BSplineCurve<P> {
     /// [`Error::TooShortKnotVector`]: errors/enum.Error.html#variant.TooShortKnotVector
     /// [`Error::ZeroRange`]: errors/enum.Error.html#variant.ZeroRange
     pub fn try_new(knot_vec: KnotVec, control_points: Vec<P>) -> Result<BSplineCurve<P>> {
+        let ctx = ToleranceCtx::unscaled_legacy();
         if control_points.is_empty() {
             Err(Error::EmptyControlPoints)
         } else if knot_vec.len() <= control_points.len() {
@@ -36,7 +37,8 @@ impl<P> BSplineCurve<P> {
                 knot_vec.len(),
                 control_points.len(),
             ))
-        } else if knot_vec.range_length().so_small() {
+        } else if ctx.is_small_ratio(knot_vec.range_length()) {
+            // BG-TOL-001: param
             Err(Error::ZeroRange)
         } else {
             Ok(BSplineCurve::new_unchecked(knot_vec, control_points))
@@ -225,6 +227,7 @@ impl<P: ControlPoint<f64>> BSplineCurve<P> {
         div_coef: usize,
         ord: F,
     ) -> bool {
+        let ctx = ToleranceCtx::unscaled_legacy();
         if !self.knot_vec.same_range(&other.knot_vec) {
             return false;
         }
@@ -232,7 +235,8 @@ impl<P: ControlPoint<f64>> BSplineCurve<P> {
         let division = std::cmp::max(self.degree(), other.degree()) * div_coef;
         for i in 0..(self.knot_vec.len() - 1) {
             let delta = self.knot_vec[i + 1] - self.knot_vec[i];
-            if delta.so_small() {
+            if ctx.is_small_ratio(delta) {
+                // BG-TOL-001: param
                 continue;
             }
 
@@ -469,6 +473,7 @@ impl<P: ControlPoint<f64> + Tolerance> BSplineCurve<P> {
     /// assert!(bspcurve.is_const());
     /// ```
     pub fn is_const(&self) -> bool {
+        // FIXME(BG-TOL-001, GENERIC_BOUND) — ctx.near_points<P> is bounded P: MetricSpace<Metric = f64> and this impl does not supply it. Widening a public generic bound is cross-crate and is Stage B, so the site is left exactly as it is. Enclosing impl: `impl<P: ControlPoint<f64> + Tolerance> BSplineCurve<P>`.
         self.control_points
             .iter()
             .all(move |vec| vec.near(&self.control_points[0]))
@@ -573,6 +578,7 @@ impl<P: ControlPoint<f64> + Tolerance> BSplineCurve<P> {
     /// assert_eq!(bspcurve.try_remove_knot(2), Err(Error::CannotRemoveKnot(2)));
     /// ```
     pub fn try_remove_knot(&mut self, idx: usize) -> Result<&mut BSplineCurve<P>> {
+        let ctx = ToleranceCtx::unscaled_legacy();
         let k = self.degree();
         let n = self.control_points.len();
         let knot_vec = &self.knot_vec;
@@ -586,7 +592,8 @@ impl<P: ControlPoint<f64> + Tolerance> BSplineCurve<P> {
         for i in (idx - k)..idx {
             let delta = knot_vec[i + k + 1] - knot_vec[i];
             let a = inv_or_zero(delta) * (knot_vec[idx] - knot_vec[i]);
-            if a.so_small() {
+            if ctx.is_small_ratio(a) {
+                // BG-TOL-001: param
                 break;
             } else {
                 let p = *new_points.last().unwrap();
@@ -595,6 +602,7 @@ impl<P: ControlPoint<f64> + Tolerance> BSplineCurve<P> {
             }
         }
 
+        // FIXME(BG-TOL-001, GENERIC_BOUND) — ctx.near_points<P> is bounded P: MetricSpace<Metric = f64> and this impl does not supply it. Widening a public generic bound is cross-crate and is Stage B, so the site is left exactly as it is. Enclosing impl: `impl<P: ControlPoint<f64> + Tolerance> BSplineCurve<P>`.
         if !new_points.last().unwrap().near(self.control_point(idx)) {
             return Err(Error::CannotRemoveKnot(idx));
         }
@@ -764,15 +772,18 @@ impl<P: ControlPoint<f64> + Tolerance> BSplineCurve<P> {
     /// assert!(bspcurve1.near2_as_curve(org_curve1.knot_normalize()));
     /// ```
     pub fn syncro_knots(&mut self, other: &mut BSplineCurve<P>) {
+        let ctx = ToleranceCtx::unscaled_legacy();
         self.knot_normalize();
         other.knot_normalize();
 
         let mut i = 0;
         let mut j = 0;
         while !self.knot(i).near2(&1.0) || !other.knot(j).near2(&1.0) {
-            if self.knot(i) - other.knot(j) > TOLERANCE {
+            if self.knot(i) - other.knot(j) > ctx.ratio_margin() {
+                // BG-TOL-001: param
                 self.add_knot(other.knot(j));
-            } else if other.knot(j) - self.knot(i) > TOLERANCE {
+            } else if other.knot(j) - self.knot(i) > ctx.ratio_margin() {
+                // BG-TOL-001: param
                 other.add_knot(self.knot(i));
             }
             i += 1;
@@ -918,6 +929,7 @@ impl<P: ControlPoint<f64> + Tolerance> BSplineCurve<P> {
     /// ```
     #[inline(always)]
     pub fn near_as_curve(&self, other: &BSplineCurve<P>) -> bool {
+        // FIXME(BG-TOL-001, GENERIC_BOUND) — ctx.near_points<P> is bounded P: MetricSpace<Metric = f64> and this impl does not supply it. Widening a public generic bound is cross-crate and is Stage B, so the site is left exactly as it is. Enclosing impl: `impl<P: ControlPoint<f64> + Tolerance> BSplineCurve<P>`.
         self.sub_near_as_curve(other, 1, |x, y| x.near(y))
     }
 
@@ -962,6 +974,7 @@ impl<P: ControlPoint<f64>> ParameterTransform for BSplineCurve<P> {
 
 impl<P: ControlPoint<f64> + Tolerance> Cut for BSplineCurve<P> {
     fn cut(&mut self, mut t: f64) -> BSplineCurve<P> {
+        let ctx = ToleranceCtx::unscaled_legacy();
         let degree = self.degree();
 
         let idx = match self.knot_vec.floor(t) {
@@ -974,7 +987,8 @@ impl<P: ControlPoint<f64> + Tolerance> Cut for BSplineCurve<P> {
                 return bspline;
             }
         };
-        let s = if t.near(&self.knot_vec[idx]) {
+        let s = if ctx.is_small_ratio(t - self.knot_vec[idx]) {
+            // BG-TOL-001: param
             t = self.knot_vec[idx];
             self.knot_vec.multiplicity(idx)
         } else {
@@ -1034,6 +1048,7 @@ impl<P: ControlPoint<f64> + Tolerance> Concat<BSplineCurve<P>> for BSplineCurve<
             })?;
         let front = curve0.control_points.last().unwrap();
         let back = curve1.control_points.first().unwrap();
+        // FIXME(BG-TOL-001, GENERIC_BOUND) — ctx.near_points<P> is bounded P: MetricSpace<Metric = f64> and this impl does not supply it. Widening a public generic bound is cross-crate and is Stage B, so the site is left exactly as it is. Enclosing impl: `impl<P: ControlPoint<f64> + Tolerance> Concat<..> for BSplineCurve<P>`.
         if !front.near(back) {
             return Err(ConcatError::DisconnectedPoints(*front, *back));
         }
@@ -1097,9 +1112,11 @@ where
     /// assert!(part.is_arc_of(&bspcurve, 0.6).is_none());
     /// ```
     pub fn is_arc_of(&self, curve: &BSplineCurve<P>, mut hint: f64) -> Option<f64> {
+        let ctx = ToleranceCtx::unscaled_legacy();
         let degree = std::cmp::max(self.degree(), curve.degree()) * 3 + 1;
         let (knots, _) = self.knot_vec.to_single_multi();
-        if !self.subs(knots[0]).near(&curve.subs(hint)) {
+        if !ctx.near_points(self.subs(knots[0]), curve.subs(hint)) {
+            // BG-TOL-001: model
             return None;
         }
 
@@ -1109,7 +1126,7 @@ where
                 let t = knots[i - 1] + range * (j as f64) / (degree as f64);
                 let pt = ParametricCurve::subs(self, t);
                 let res = curve.search_nearest_parameter(pt, Some(hint), 100);
-                let flag = res.map(|res| hint <= res && curve.subs(res).near(&pt));
+                let flag = res.map(|res| hint <= res && ctx.near_points(curve.subs(res), pt)); // BG-TOL-001: model
                 hint = match flag {
                     Some(true) => res.unwrap(),
                     _ => return None,

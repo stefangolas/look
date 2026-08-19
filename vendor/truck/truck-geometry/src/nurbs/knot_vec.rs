@@ -39,9 +39,12 @@ impl KnotVec {
     /// ```
     #[inline(always)]
     pub fn same_range(&self, other: &KnotVec) -> bool {
+        let ctx = ToleranceCtx::unscaled_legacy();
         match (self.is_empty(), other.is_empty()) {
             (false, false) => {
-                self[0].near(&other[0]) && self.range_length().near(&other.range_length())
+                ctx.is_small_ratio(self[0] - other[0]) && // BG-TOL-001: param
+                    ctx.is_small_ratio(self.range_length() - other.range_length())
+                // BG-TOL-001: param
             }
             (true, true) => true,
             _ => false,
@@ -77,7 +80,10 @@ impl KnotVec {
     /// ```
     #[inline(always)]
     pub fn multiplicity(&self, i: usize) -> usize {
-        self.iter().filter(|u| self[i].near(u)).count()
+        let ctx = ToleranceCtx::unscaled_legacy();
+        self.iter()
+            .filter(|u| ctx.is_small_ratio(self[i] - *u)) // BG-TOL-001: param
+            .count()
     }
 
     /// Adds a knot and return the index of the added knot.
@@ -238,8 +244,10 @@ impl KnotVec {
         der_rank: usize,
         t: f64,
     ) -> Result<BasisWindow> {
+        let ctx = ToleranceCtx::unscaled_legacy();
         let n = self.len() - 1;
-        if self[0].near(&self[n]) {
+        if ctx.is_small_ratio(self[0] - self[n]) {
+            // BG-TOL-001: param
             return Err(Error::ZeroRange);
         } else if n < degree {
             return Err(Error::TooLargeDegree(n + 1, degree));
@@ -354,8 +362,10 @@ impl KnotVec {
     /// assert_eq!(res, vec![0.0, 0.0, 0.25, 0.5, 0.75, 1.0, 1.0]);
     /// ```
     pub fn try_normalize(&mut self) -> Result<&mut Self> {
+        let ctx = ToleranceCtx::unscaled_legacy();
         let range = self.range_length();
-        if range.so_small() {
+        if ctx.is_small_ratio(range) {
+            // BG-TOL-001: param
             return Err(Error::ZeroRange);
         }
         Ok(self.transform(1.0 / range, -self[0] / range))
@@ -442,12 +452,14 @@ impl KnotVec {
     /// - If at least one of `self` or `other` is not clamped, returns [`Error::NotClampedKnotVector`]
     /// - If the last knot of `self` and the first knot of `other` are different, returns [`Error::DifferentBackFront`].
     pub fn try_concat(&mut self, other: &KnotVec, degree: usize) -> Result<&mut Self> {
+        let ctx = ToleranceCtx::unscaled_legacy();
         if !self.is_clamped(degree) || !other.is_clamped(degree) {
             return Err(Error::NotClampedKnotVector);
         }
         let back = self.0.last().unwrap();
         let front = other.0.first().unwrap();
-        if front < back || !front.near(back) {
+        if front < back || !ctx.is_small_ratio(front - back) {
+            // BG-TOL-001: param
             return Err(Error::DifferentBackFront(*back, *front));
         }
 
@@ -500,6 +512,7 @@ impl KnotVec {
     /// assert_eq!(mults, vec![3, 1, 4, 2]);
     /// ```
     pub fn to_single_multi(&self) -> (Vec<f64>, Vec<usize>) {
+        let ctx = ToleranceCtx::unscaled_legacy();
         let mut knots = Vec::new();
         let mut mults = Vec::new();
 
@@ -507,7 +520,8 @@ impl KnotVec {
         let mut mult = 1;
         while let Some(knot) = iter.next() {
             if let Some(next) = iter.peek() {
-                if knot.near(next) {
+                if ctx.is_small_ratio(knot - *next) {
+                    // BG-TOL-001: param
                     mult += 1;
                 } else {
                     knots.push(*knot);
