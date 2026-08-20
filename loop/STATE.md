@@ -149,12 +149,15 @@ over. The spec carries both corrections in the BG-ANA-001 amendment.
 
 ## State of the machine, as left
 
-- **The watchdog is STOPPED** at session end and `loop/watchdog.lock` is
-  removed. It was deliberately run at `LOOK_WATCHDOG_STAGNANT=3600` during
-  the session; if you restart it, use the same value. Slots 0 and 2 are
-  FINISHED and warm on their landed branches (`ae79659`, `69ad194`); their
-  rows read DONE and are safe to leave. Slot 1 held PARCYL at close — see
-  "Pick up here" item 2.
+- **The watchdog is RUNNING** with `LOOK_WATCHDOG_STAGNANT=3600` (pid in
+  `loop/watchdog.lock`) because PARCYL was genuinely in flight at close —
+  the session-12 "stop it, nothing in flight" rationale does not apply. It
+  will not touch slots 0/2 (rows DONE) or a finished PARCYL (its
+  RESULT.json guard). If PARCYL wedges it redispatches, budget 3; if you
+  find the session cold with PARCYL FINISHED, read its RESULT.json, verify
+  at the slot's fork point, land. **Stop the watchdog before reclaiming
+  anything.** Slots 0 and 2 are FINISHED and warm on their landed branches
+  (`ae79659`, `69ad194`).
 - **Disk ~36 GB free** at close. Three warm slot targets (~4.3 GB each) and
   no leaked `%TEMP%/look-verify-baseline-*` (checked). The `wt/target`
   duplicate-dirs that plagued session 12 did not recur this session.
