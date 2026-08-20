@@ -55,45 +55,65 @@ here is scored, tuned, or sampled.
 
 ## Where we are
 
-**Nineteen packets DONE of 62 (31%)**, and Stage A of BG-TOL-001 is nearly
-finished. Session 9 landed `BG-TOL-001-GEOM-NURBS`, `-GEOM-DECORATORS` and
-`-SMALL` (which closes both the `-POLYMESH` and `-GEOTRAIT` DAG rows).
-`BG-TOL-001-STEPIO` landed too, accepted on every gate at the first attempt.
+**Twenty-three packets DONE of 65 (35%).** Session 11 landed the whole
+**BG-CE-006-ENUM stack** — three commits on one branch (`60aee3f` the canonical
+`Curve`/`Surface` model, `a08fd8f` the placed-surface variant and
+branch-consistent revolution search, `b4a201d` the transversal engine's
+periodic-domain unwrap) merged as `1686390`, closing three registry rows at
+once via `covers:`. GATE-4 sits at **109/109**.
 
-**The BG-TOL-001 burndown moved further this session than in any previous one:**
-the census read **156** production first-order predicates at the start and reads
-**51** now. GATE-4 sits at **109/109**, at its ceiling, which is correct.
+That merge is the one the frontier was waiting on: `schedule.py` goes from
+**3 eligible to 17**, including the six `BG-ENC-002` carrier packets and the
+eight `BG-ANA-001` shards.
 
-**What is left of Stage A** is `BG-TOL-004` (the 20 squared-order sites, design
-class, blocks nothing) plus whatever `census_tol_sites.py` still cannot see —
-its totals are a floor, not a count, and the `tessellation/formal`
-`RELATIVE_TOLERANCE` family is the known blind spot.
+**BG-ENC-001 has landed** (it is the reference `EnclosureSurface for Plane` in
+`truck-evidence`), so the "single most load-bearing unbuilt item" note below
+from session 9 is discharged; what is unbuilt now is the *carriers*.
 
-**Worker cost for the whole session: $0.18.** Fault attribution now has enough
-rows to be worth reading: `PACKET 2, GATE 1, NONE 1` against `13 unrecorded` from before
-`--fault` existed. Both PACKET faults were the same *kind* of miss — a claim
-about the tree that the packet asserted without running a command.
+**Session 11 was not a code session.** Almost all of it went on establishing
+that three separate "regressions" charged to ENUM-r3 were the harness lying —
+see the last four traps, which are the durable output. The kernel change that
+landed had already passed V0–V7 before the session started.
 
 ## Pick up here
 
-1. **`BG-EVD-004-r2` is written, checked, and is the highest-value thing in the
-   queue.** It fixes a **live soundness defect** found by external review this
-   session: `Modulus::compose` publishes forward bounds that are **too small**
-   on two of four arms. The composite constant for ω_self ∘ ω_other is `a·b^p`,
-   not `a·b`; the code had `k·a` where it needs `k·a^p` and `k₁·k₂` where it
-   needs `k₁·k₂^p`. Under-reports by `a^(p−1)` whenever the inner constant is
-   below 1 — a contracting step — which is 10× at `a = 0.01` and 1000× at
-   1e-6. `Certificate::accumulate` calls it. See spec (M5). Mechanical, one
-   file, ~40 turns.
+1. **The ENC-002 carrier fan-out is dispatchable now and is the frontier.**
+   `BG-ENC-002-CIRCLE`, `-CYLINDER` and `-SPHERE` are written, their anchors
+   check, and their registry rows are wired to their files. `-LINE`, `-CONE`
+   and `-TORUS` still need writing; `plane.rs` is the template and the three
+   existing packets are the model to copy.
 
-2. **Two new spec items came out of the same review and are unstarted:**
+   **They are write-disjoint by construction as of `afba979`.** All six
+   carrier modules are already created and declared in
+   `truck-evidence/src/lib.rs`, so no carrier packet needs to touch `lib.rs` —
+   which is the one line they would otherwise all have edited, and the merge
+   conflict that would have surfaced at the *second* land. Any packet written
+   for a new carrier must inherit that: `lib.rs` in `read_allow`, never
+   `write_allow`, and say so in "Decisions already made for you" or the worker
+   will follow the `plane.rs` pattern and earn a V1 scope violation.
+
+2. **Disk, not the DAG, is what caps the fan-out.** 17 packets are eligible in
+   parallel and this machine holds about **one**. A warm slot target is
+   ~7 GB and free space is ~9 GB. Two concurrent workers plus a verify does not
+   fit and trying it is what produced session 11's corruption. Check
+   `Get-PSDrive C` before adding a slot, and reclaim
+   `%TEMP%/look-verify-baseline-*` rather than a warm target.
+
+3. **`BG-TOL-004`** (20 squared-order sites, design class, blocks nothing) and
+   **`BG-INV-107`** (design-blocked: no per-entity tau in the tree) are the
+   other eligible rows. `BG-TOL-001-SMALL` is in the registry as dispatchable
+   but `run_packet.py` refuses it — three of its anchor claims have rotted
+   against the tree (`A1: expected 2, tree has 1`). Re-anchor it before
+   re-dispatching; the watchdog burned its whole restart budget on retrying a
+   packet that could never dispatch.
+
+4. **Two spec items from session 10's external review are still unstarted:**
    - **`BG-EVD-005`** — a published modulus needs a *geometric* certificate.
-     BG-EVD-004's M1–M5 constrain only the arithmetic; nothing obliges a cell to
-     publish the modulus its geometry actually has, so a tangency may publish
-     `Lipschitz` and every gate stays green. The item makes the
-     configuration→shape correspondence a contract with a witness, and its
-     negative test is the point: a cell hand-built to publish `Lipschitz` for a
-     constructed tangency must be **rejected**.
+     BG-EVD-004's M1-M5 constrain only the arithmetic; nothing obliges a cell
+     to publish the modulus its geometry actually has, so a tangency may
+     publish `Lipschitz` and every gate stays green. Its negative test is the
+     point: a cell hand-built to publish `Lipschitz` for a constructed tangency
+     must be **rejected**.
    - **`BG-TOL-005`** — uv tolerance is not a generic dimensionless ratio.
      `sin_margin()` and `ratio_margin()` both return `tau_rep` today: two names
      for one number, covering three quantities that do not behave alike
@@ -104,20 +124,21 @@ about the tree that the packet asserted without running a command.
      `σ_min` bound reaches zero *is* BG-EVD-004's `Pole`. A chart singularity is
      not a special case, it is the same object.
 
-   Both need certified interval evaluation, i.e. **`BG-ENC-001`**, which is also
-   what `BG-CE-002` waits on. That makes `BG-ENC-001` the single most
-   load-bearing unbuilt item in the spec.
+   Both need the interval carriers item 1 is building.
 
-3. **V8 is built, correct as far as anyone knows, and still OFF.** It runs V5's
-   base-vs-HEAD comparison over the **reverse-dependency closure** of a packet's
-   crates — the gap V5 structurally cannot see. It has never been watched
-   failing, so it is `--only V8` opt-in and takes no part in acceptance. **Do
-   its negative test first when disk allows:** break something in
-   `truck-geometry` that a `truck-modeling` test catches, confirm
-   `DOWNSTREAM_REGRESSION`, then delete the opt-in branch in the commit that
-   records it.
+5. **V8 is ON, has been watched failing twice, and no longer builds a second
+   world.** It runs the full downstream suite at HEAD; if that is green the
+   base is never built at all; otherwise it asks the base only about the red
+   tests, one `-p <crate> --test <target> -- --exact <names>` per target, and
+   caches each answer in `loop/baselines/<base>__v8-observations.json`. The
+   negative test is recorded in `46accfb`/`5d86783`. **23 downstream tests are
+   red at base** in truck-meshalgo and truck-stepio and are correctly ignored;
+   two of them (`geometry::b_spline_curve_with_knots`,
+   `geometry::nurbs_curve_b_spline_curve_with_knots`) are a real importer defect
+   worth its own packet — the proptest draws knot increments down to 1e-3 and
+   the conversion dies with "The scalar 0 is not positive".
 
-4. **Then the CE chain.** Unchanged from session 9's scoping, which is filed
+6. **Then the CE chain.** Unchanged from session 9's scoping, which is filed
    below under "The CE chain, scoped against the tree".
 
 ## What session 9 changed about how the loop runs
