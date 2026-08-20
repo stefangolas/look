@@ -188,11 +188,16 @@ rather than reaching into private fields.
    sweep; a box entirely at `v < 0` (the far nappe); and a box whose `vv`
    **straddles zero**, which must still enclose correctly even though its
    normal cone is `None`. `assert_encloses_surface` with ≥ 20 samples per axis.
-2. `cone_trig_extrema_inside_interval` — the spec's mandated unit test: for
-   `uu = [0.4π, 0.6π]` and a `vv` bounded away from zero, the `x`-interval of
-   `enclose` must contain the interior extremum `cos(0.5π) = 0` scaled by the
-   cell, and must be strictly wider than the endpoint-only evaluation would
-   have been. State the check in terms of relations, not bit-equality.
+2. `cone_trig_extrema_inside_interval` — the spec's mandated unit test.
+   **Put it on the `y` coordinate, not `x`** (corrected 2026-08-20 after
+   BG-ENC-002-CONE's worker filed the disagreement that caught it): over
+   `uu = [0.4π, 0.6π]` the cosine has *no* interior extremum — its extrema are
+   at `kπ` — so the `x` hull is exactly the endpoint hull `[−0.309, +0.309]`
+   and the "strictly wider than endpoint evaluation" property is **false**
+   there. The interior extremum of that cell is `sin(0.5π) = 1`, which lands on
+   `y`: endpoint-only evaluation reaches only `sin(0.4π) = 0.951`, so the
+   `y`-interval must reach the full `s·vv.sup()` and be strictly wider than the
+   endpoint hull. State the check in terms of relations, not bit-equality.
 3. `cone_enclosure_converges_under_bisection` — `assert_converges` from a
    moderate box **bounded away from the apex**, depth ~20. Then, separately,
    assert that a box *containing* the apex does not need to converge to a

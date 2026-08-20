@@ -130,14 +130,14 @@ brace-opening lines).
    an arc crossing `π/2` (the trig-extremum direction), one spanning more than
    `π`, a full `2π` sweep, and a box with a `v` range of mixed sign. Use
    `assert_encloses_surface` with ≥ 20 samples per axis.
-2. `cylinder_trig_extrema_inside_interval` — the spec's mandated unit test:
-   for `uu = [0.4π, 0.6π]` on a unit cylinder at the origin, the `x`-interval
-   of `enclose` must contain `cos(0.5π) = 0` *in its interior or at a bound
-   strictly below* the endpoint values — concretely: assert
-   `box.x.sup() >= 0.0` **and** that a naive endpoint evaluation
-   (`[cos(0.6π), cos(0.4π)]`) would have under-estimated it, by asserting the
-   enclosure's sup is the endpoint-evaluation's max plus the interior bump
-   (`cos(0.5π) = 0 > cos(0.6π)`). State the check in terms of relations, not
+2. `cylinder_trig_extrema_inside_interval` — the spec's mandated unit test.
+   **Put it on the `y` coordinate, not `x`** (corrected 2026-08-20): over
+   `uu = [0.4π, 0.6π]` the cosine has no interior extremum — its extrema are at
+   `kπ` — so the `x` hull is exactly the endpoint hull and there is no
+   under-estimation to catch there. The interior extremum of that cell is
+   `sin(0.5π) = 1`, on `y`: endpoint-only evaluation reaches only
+   `sin(0.4π) = 0.951`, so the `y`-interval must reach `r` and be strictly
+   wider than the endpoint hull. State the check in terms of relations, not
    bit-equality.
 3. `cylinder_enclosure_converges_under_bisection` — `assert_converges` from a
    moderate box, depth ~20.
