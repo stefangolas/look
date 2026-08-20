@@ -1,0 +1,17 @@
+{
+    "id": "BG-ENC-002-LINE",
+    "status": "DONE",
+    "contracts": [
+        "BG-ENC-001",
+        "BG-ENC-002"
+    ],
+    "tests_added": 5,
+    "sites_migrated": 0,
+    "sites_deferred": 0,
+    "deviations": [],
+    "disagreements": [],
+    "baseline_failures": [],
+    "notes": "Implemented EnclosureCurve for Line<Point3> in vendor/truck/truck-evidence/src/line.rs. All five anchors matched (A1..A5). All four Done-when commands pass: cargo fmt --check -p truck-evidence, cargo clippy -p truck-evidence --all-targets --no-deps -- -D warnings, cargo test -p truck-evidence --lib --tests --no-fail-fast (13 lib + 3 plane_properties integration tests), and cargo check --workspace --all-targets. Plane tests pass unchanged. interval_at is copied from plane.rs (plane.rs is outside this packet's write set, so a shared pub(crate) definition was not an option; the sibling carrier packets copy it the same way). The harness assert_converges is written against EnclosureSurface and does not apply to a curve, so the bisection convergence test writes the loop locally as the packet directs, noting that a repeated view on a curve-level convergence helper would justify a harness addition later. No deviations, disagreements, or baseline failures.",
+    "amended_by": "orchestrator",
+    "amendment": "V4 GATE-2/H-3 rejection on first verify: the tangent-cone axis test compared two unit vectors with a bare 1.0e-12 and lacked its same-line // H-3 opt-out. Added the marker with the reason (a difference of unit directions is dimensionless, not a length). No other change; the assertion and its threshold are the worker's."
+}
