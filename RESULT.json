@@ -1,0 +1,14 @@
+{
+  "id": "BG-ENC-004-PCURVE",
+  "status": "DONE",
+  "contracts": ["BG-ENC-001", "BG-ENC-002"],
+  "tests_added": 8,
+  "sites_migrated": 0,
+  "sites_deferred": 0,
+  "deviations": [
+    "The impl is written `impl<S: EnclosureSurface<Vector = Vector3>> EnclosureCurve for PCurve<BSplineCurve<Point2>, S>` (decision 2's \"if the compiler asks for one more bound, add the minimum and record it\"): the carrier's own ParametricCurve impl requires `S::Point: ControlPoint<f64, Diff = S::Vector>` (which, with `S::Point = Point3`, forces `S::Vector = Vector3`) and `S::Vector: VectorSpace<Scalar = f64> + ElementWise`, none of which `EnclosureSurface` alone carries. Constraining the surface's vector to `Vector3` is the minimum that satisfies the trait bound; every landed surface carrier (Plane, Sphere, ExtrudedCurve, Processor) already has `Vector = Vector3`."
+  ],
+  "disagreements": [],
+  "baseline_failures": [],
+  "notes": "EnclosureCurve for PCurve<BSplineCurve<Point2>, S> landed in vendor/truck/truck-evidence/src/decorators/pcurve.rs. Pure composition, never a re-derivation: hull2_of runs bspline.rs's convex-hull case analysis verbatim (empty/non-finite tt -> (EMPTY, EMPTY); clamp into the knot range; lo > hi -> empty; lo == hi -> the point hull; else the sub-curve hull including the subs(lo)/subs(hi) boundary values), padded HULL_PAD (1 + |.|) with HULL_PAD = 64 EPSILON, over the Coord trait for Point2/Vector2 and returning a parameter box (uu, vv); enclose takes the inner surface's enclose over the hulled parameter image. The helper set is deliberately duplicated from bspline.rs per decision 3 (sibling write sets). enclose is total: empty/non-finite tt -> Box3::empty(); tt reaching outside the knot range -> the unbounded box returned directly (never forwarded to surface.enclose, whose behavior on unbounded boxes is not uniform); otherwise surface.enclose(uu, vv). enclose_der composes the chain rule in inari: D1 = S_10*cu + S_01*cv; D2 = S_20*cu^2 + S_11*2*cu*cv + S_02*cv^2 + S_10*cuu + S_01*cvv; D3 = S_30*cu^3 + S_21*3*cu^2*cv + S_12*3*cu*cv^2 + S_03*cv^3 + S_20*3*cuu*cu + S_11*3*(cuu*cv + cvv*cu) + S_02*3*cvv*cv + S_10*cuuu + S_01*cvvv, matching the carrier's der/der2/der3 term-for-term; scalar coefficients are folded in as f64 literals via interval_at (inari 2.0.0 has no Mul<f64> for Interval; interval_at is the landed convention in every sibling carrier). n >= 4 is the unbounded box (Faà di Bruno ceiling, documented). tangent_cone is the ball-around-midpoint cone off the n = 1 box with bspline.rs's exact guard order and ulp nudge. All 8 required tests pass; the existing suite (136 lib + 3 integration) passes unchanged. cargo fmt/clippy(-D warnings)/check and cargo check --workspace --all-targets are clean for truck-evidence (the sole workspace warning is a pre-existing unused_qualifications in truck-meshalgo, outside the write set)."
+}
