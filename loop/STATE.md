@@ -127,13 +127,8 @@ over. The spec carries both corrections in the BG-ANA-001 amendment.
    the shipped default (1200s) it killed two healthy workers mid-run during
    a model-latency storm (PP and PS, both ~23 min silent, both went on to
    pass verify after redispatch — the kills cost ~25 min wall clock each).
-   It also **failed to reap a genuinely dead slot for 25+ minutes past its
-   own deadline** (PARCYL, polls 95-100 logged no ACTION despite
-   `stagnant > 3600s`; it acted ~10 min later for reasons not investigated).
-   Do not trust it blindly in either direction; `slot_status.py` plus
-   `tasklist` on the recorded pid is the truth. Start it with
-   `LOOK_WATCHDOG_STAGNANT=3600` (see the new trap below for the exact
-   incantation — `Start-Process` cannot set env vars in PS 5.1).
+   Start it with `LOOK_WATCHDOG_STAGNANT=3600` (see the new trap below for
+   the exact incantation — `Start-Process` cannot set env vars in PS 5.1).
 
 6. **`BG-TOL-001-SMALL` is still unadjudicated** (unchanged from session 12):
    commit `72e2b89` safe on its branch, forked at `c75017d`, anchors stale,
@@ -193,14 +188,15 @@ orchestrator attention during latency storms is the real budget.
   `Start-Process` has no `-Environment` parameter** — launch through
   `cmd /c "set LOOK_WATCHDOG_STAGNANT=3600&& python loop/watchdog.py"` or the
   variable silently never reaches the child.
-- **The watchdog can also fail to reap a genuinely dead slot past its own
-  deadline.** PARCYL's first worker sat 67+ minutes silent with a live cmd
-  shim; polls 95-100 logged `stagnant > 3600s`-worth of silence yet no ACTION
-  line appeared until roughly ten minutes later, cause not investigated.
-  Trust `slot_status.py` + `tasklist` on the pid, not the watchdog's silence.
-  Related: a wedged worker keeps its `cmd.exe` shim alive, so a pid check
-  alone says RUNNING — the underlying `opencode run` node process is the one
-  that matters.
+- **The watchdog reaps on its own events-growth clock, not yours.** PARCYL's
+  first worker looked 67 minutes stale from outside, but the run_packet boot
+  touches the events file again after the worker's first write, so the
+  watchdog's 3600s clock started ~13 minutes later than the file mtime
+  suggested — and the reap fired at exactly `stagnant=3610s` (log,
+  14:24:10). A reap that looks hours late usually is not: read the log's
+  `stagnant Ns` field before concluding the timer failed. Related: a wedged
+  worker keeps its `cmd.exe` shim alive, so a pid check alone says RUNNING —
+  the underlying `opencode run` node process is the one that matters.
 - **Whether a worker commits `RESULT.json` varies, and it changes the landing
   dance.** Four of session 13's six left it uncommitted in the worktree (copy
   it to the repo root yourself before `land_packet.py`); two committed it, so
