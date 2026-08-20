@@ -7,6 +7,18 @@ use std::ops::Deref;
 use truck_meshalgo::prelude::*;
 use truck_topology::*;
 
+/// Shifts `value` by an integer multiple of `period` so that the signed jump
+/// from `previous` is at most half a period in absolute value. This unwraps
+/// parameters of a periodic surface domain across the seam: consecutive
+/// `search_parameter` results return principal-branch angles, and a boundary
+/// edge whose range over-wraps the period (e.g. a preserved `Curve::Circle`
+/// carrying `(0.0, 8.0)`) would otherwise teleport across the seam and
+/// self-cross its own parameter-space polygon (BG-CE-006-ENUM-r3).
+#[inline(always)]
+fn unwrap_periodic_parameter(previous: f64, value: f64, period: f64) -> f64 {
+    value + ((previous - value) / period).round() * period
+}
+
 fn create_parameter_boundary<P, C, S>(
     face: &Face<P, C, S>,
     wire: &Wire<P, C>,
@@ -16,9 +28,10 @@ fn create_parameter_boundary<P, C, S>(
 where
     P: Copy,
     C: BoundedCurve<Point = P> + ParameterDivision1D<Point = P>,
-    S: Clone + SearchParameter<D2, Point = P>,
+    S: Clone + SearchParameter<D2, Point = P> + ParametricSurface<Point = P>,
 {
     let surface = face.surface();
+    let u_period = surface.u_period();
     let pt = wire.front_vertex().unwrap().point();
     let p: Point2 = surface.search_parameter(pt, None, 100)?.into();
     let vec = wire.edge_iter().try_fold(vec![p], |mut vec, edge| {
@@ -29,7 +42,11 @@ where
         });
         let mut p = *vec.last().unwrap();
         let closure = |q: &P| -> Option<Point2> {
-            p = surface.search_parameter(*q, Some(p.into()), 100)?.into();
+            let mut uv: Point2 = surface.search_parameter(*q, Some(p.into()), 100)?.into();
+            if let Some(period) = u_period {
+                uv.x = unwrap_periodic_parameter(p.x, uv.x, period);
+            }
+            p = uv;
             Some(p)
         };
         let add: Option<Vec<Point2>> = match edge.orientation() {
@@ -56,7 +73,7 @@ fn divide_one_face<C, S>(
 ) -> Option<Vec<FaceWithShapesOpStatus<C, S>>>
 where
     C: BoundedCurve<Point = Point3> + ParameterDivision1D<Point = Point3>,
-    S: Clone + SearchParameter<D2, Point = Point3>,
+    S: Clone + SearchParameter<D2, Point = Point3> + ParametricSurface<Point = Point3>,
 {
     let (mut pre_faces, mut negative_wires) = (Vec::new(), Vec::new());
     let mut map = HashMap::default();
@@ -106,7 +123,7 @@ pub fn divide_faces<C, S>(
 ) -> Option<FacesClassification<Point3, C, S>>
 where
     C: BoundedCurve<Point = Point3> + ParameterDivision1D<Point = Point3>,
-    S: Clone + SearchParameter<D2, Point = Point3>,
+    S: Clone + SearchParameter<D2, Point = Point3> + ParametricSurface<Point = Point3>,
 {
     let mut res = FacesClassification::<Point3, C, S>::default();
     shell

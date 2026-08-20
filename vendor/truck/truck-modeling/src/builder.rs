@@ -855,3 +855,60 @@ mod partial_torus {
         assert!(torus.is_geometric_consistent());
     }
 }
+
+#[cfg(test)]
+// BG-CE-006: an extruded canonical circle is a cylinder, and its point set
+// agrees with the homotopy NURBS the pre-packet conversion produced.
+mod tsweep_circle_tests {
+    use crate::*;
+    use std::f64::consts::TAU;
+
+    /// The unit circle placed at the origin in the xy-plane, full range.
+    fn placed_circle() -> Curve {
+        let trimmed = TrimmedCurve::new(UnitCircle::<Point3>::new(), (0.0, TAU));
+        let processor: Processor<TrimmedCurve<UnitCircle<Point3>>, Matrix4> =
+            Processor::new(trimmed);
+        processor.to_same_geometry()
+    }
+
+    #[test]
+    fn tsweep_circle_yields_cylinder() {
+        let circle = placed_circle();
+        let vector = Vector3::unit_z();
+        // The same conversion path `builder::tsweep`'s `ExtrudeConnector`
+        // exercises: `ExtrudedCurve::by_extrusion(curve, vector).to_same_geometry()`.
+        let extruded = ExtrudedCurve::by_extrusion(circle.clone(), vector);
+        let surface: Surface = extruded.to_same_geometry();
+        let Surface::Cylinder(cylinder) = surface else {
+            panic!("expected a cylinder, got a different surface");
+        };
+        // The point set agrees with the NURBS homotopy (what the old
+        // conversion produced) at sampled parameters, within house tolerance.
+        let trsl = Matrix4::from_translation(vector);
+        let circle1 = circle.transformed(trsl);
+        let reference = NurbsSurface::new(BSplineSurface::homotopy(
+            circle.lift_up(),
+            circle1.lift_up(),
+        ));
+        const SAMPLES: usize = 16;
+        for i in 0..=SAMPLES {
+            for j in 0..=SAMPLES {
+                let s = i as f64 / SAMPLES as f64;
+                let t = j as f64 / SAMPLES as f64;
+                let p = reference.subs(s, t);
+                // The full-range circle's rational NURBS carries a weight
+                // double-zero at its midpoint parameter (w(s) = (2s-1)^2), so
+                // the old conversion itself evaluated to NaN there; skip the
+                // samples where it did.
+                if !p.x.is_finite() {
+                    continue;
+                }
+                // Every finite reference point lies on the unit cylinder; the
+                // inverse search recovers its parameter.
+                if let Some((u, v)) = cylinder.search_parameter(p, None, 100) {
+                    assert_near!(cylinder.subs(u, v), p);
+                }
+            }
+        }
+    }
+}

@@ -40,10 +40,15 @@ pub mod specifieds;
 /// Declares some decorators
 pub mod decorators;
 
+/// The canonical curve and surface model (BG-CE-006): `Curve` and `Surface`
+/// with first-class analytic carriers, owned by this crate.
+pub mod canonical;
+
 /// re-export all modules.
 pub mod prelude {
     use crate::*;
     pub use base::*;
+    pub use canonical::*;
     pub use decorators::*;
     pub use errors::*;
     pub use nurbs::*;

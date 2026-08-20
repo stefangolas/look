@@ -1,0 +1,23 @@
+﻿{
+    "id":  "BG-CE-006-ENUM-r3",
+    "status":  "DONE",
+    "contracts":  [
+                      "BG-CE-006"
+                  ],
+    "tests_added":  1,
+    "sites_migrated":  0,
+    "sites_deferred":  0,
+    "deviations":  [
+
+                   ],
+    "disagreements":  [
+
+                      ],
+    "baseline_failures":  [
+                              "truck-shapeops lib: `healing::tests::step_import` â€” fails identically at the branch base commit a08fd8f (verified in a detached-HEAD worktree): the STEP test fixtures under `vendor/truck/resources/step/` do not exist in this repo, so `read_to_string` errors with Os NotFound. Unrelated to the transversal boolean engine.",
+                              "truck-shapeops --test fillet: `complex_surface` â€” fails identically at the branch base commit a08fd8f (verified in a detached-HEAD worktree): `shell_condition()` returns `Regular` where the test asserts `Closed`. The fillet module does not touch the transversal engine."
+                          ],
+    "notes":  "The None came from `divide_face::create_parameter_boundary` in the transversal boolean engine: the punch cylinder\u0027s wall-face surface (a preserved `Curve::Circle` edge swept along z, `u_period = 2Ï€`) carried over-wrapping circle-edge ranges such as (0.0, 8.0), and each polyline point was inverse-mapped through `surface.search_parameter(q, Some(prev), 100)` to a principal-branch angle, so consecutive points straddling the 2Ï€ seam teleported (e.g. 6.3 -\u003e ~0.02), the parameter-space polygon self-crossed, the domain decomposition degenerated (`pre_faces=0`, `negative_wires=3`) and `divide_faces`/`crate::and(...)` returned None. Fix: `create_parameter_boundary` now unwraps each mapped u relative to the previous point by integer multiples of `surface.u_period()` (`value + round((previous - value)/period) * period`), so every consecutive jump is at most half a period; only surfaces that report a `u_period` are affected and non-periodic-domain surfaces are bit-identical. `punched_cube` passes again, and the new regression test `circle_boundary_is_processable_by_transversal_engine` (an over-wrapping (0.0, 8.0) preserved `Curve::Circle` edge on a `Cylinder` face driven through `create_parameter_boundary`, asserting no mapped jump exceeds half a period and the wrap survives) passes â€” it fails without the unwrap with an observed seam jump of 6.017 \u003e Ï€. This was the only `search_parameter` chain building a parameter-space polyline in the transversal engine; the 1D curve searches in loops_store and the intersection-curve search do not chain, so they were left untouched. Reverse path needed nothing: the over-wrapped u values are legitimate parameters of the periodic domain and are consumed only by the 2D parameter-polygon `area()`/`include()` decomposition â€” they never round-trip through `subs(u,v)` and never re-emit curves cut at those parameters, because the divided faces are rebuilt from the original 3D boundary wires. Done-when gates pass: `cargo fmt --check -p truck-geometry -p truck-shapeops`, `cargo clippy -p truck-geometry -p truck-shapeops --all-targets --no-deps -- -D warnings`, `cargo test -p truck-geometry --lib --tests --no-fail-fast`, `cargo test -p truck-shapeops --lib --tests --no-fail-fast` (only the two baseline failures above), `cargo test -p truck-modeling --lib --tests --no-fail-fast` (including `builder::partial_torus` and `tsweep_circle_yields_cylinder`), and `cargo check --workspace --all-targets`.",
+    "amended_by":  "orchestrator",
+    "amendment":  "V4 GATE-2/H-3 rejection on first verify: one bare 1e-6 comparison epsilon in the new regression test lacked its same-line // H-3 opt-out (the packet warns about exactly this). Added the opt-out comment; no other change."
+}

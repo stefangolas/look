@@ -100,7 +100,11 @@ fn special_cylinder_model() -> Shell {
         Point3::origin(),
         Vector3::unit_z(),
     );
-    let surface: Surface = Processor::new(surface_row).into();
+    // BG-CE-006-ENUM-r2: the fixture's processor transform is the identity, so
+    // the explicit construction is the bare carrier; the old
+    // `From<Processor<RevolutedCurve<Curve>, Matrix4>> for Surface` conversion
+    // is gone.
+    let surface: Surface = Surface::RevolutedCurve(surface_row);
 
     let face2 = Face::new(
         vec![vec![edge2, edge1.clone(), edge4.inverse(), edge0.inverse()].into()],
