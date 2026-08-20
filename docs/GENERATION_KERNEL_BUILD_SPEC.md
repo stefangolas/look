@@ -1361,6 +1361,37 @@ cross-product box straddles zero and `normal_cone` returns `None` on its own.
 The self-intersection does not need to be predicted analytically; it is the
 family's `None` again.
 
+**Amendment (2026-08-20, session 14: scaffolding PCURVE and ISC).** Two
+facts that section did not know, both found by reading the carriers before
+writing packets:
+
+**1. `PCurve` and `IntersectionCurve` are curves, not surfaces.** Both are
+`ParametricCurve` (a parameter-space B-spline composed with a surface; and a
+leader curve projected onto a surface-surface intersection). Their packets
+are `EnclosureCurve` impls in `decorators/pcurve.rs` and
+`decorators/intersection_curve.rs`. `PCURVE` is a pure composition — hull
+the parameter curve in 2D, take the inner surface's `enclose` over the
+parameter box, compose `der`/`der2`/`der3` by the chain rule over
+`enclose_der` boxes of the surface — and stays mechanical. Its module tree
+is scaffolded like the first four decorators'.
+
+**2. `ISC` is not mechanically dispatchable yet, and the reason is the same
+shape as OFFSET's.** The item's own rule — "enclose the leader, then
+inflate by the certified Newton residual bound" — presupposes a per-curve
+leader-vs-truth residual certificate. `IntersectionCurve::subs` is
+`search_triple`, an iterative double projection; the leader hull alone
+under-estimates by construction (the true point is the projection, not the
+leader point), and nothing in the BG-ENC-001 interface certifies the
+projection travel: `distance(point, surface)` has no interval-evaluable
+closed form for general parametric surfaces. That certificate is exactly
+**BG-CE-002's** whole-span deviation bound (or BG-NUM-003's Krawczyk
+operator). The registry row now `needs` BG-CE-002; the scaffold's doc
+comment records the blocker the offset.rs way. The `der` and `tangent_cone`
+halves *are* composable today (the cross-normal formula in intervals off
+the surfaces' `normal_cone`s and the leader's derivative hulls), so the
+eventual packet is mostly composition plus the one residual bound it waits
+for.
+
 ---
 
 ## 4. Stage 3 — fidelity and solvers
@@ -1809,6 +1840,67 @@ between-apexes sign region always contributes one and the outside region
 another. Single-nappe intuition is the error; the carrier's `v` is unbounded
 both ways. The landed COAX cell implements both corrections.
 
+**Amendment (2026-08-20, session 14: landing PARCYL and EQRCYL, adjudicating
+PCONE's SPEC_GAP).** Three more, same provenance — the packets pre-decided
+wrong and the workers proved it:
+
+**3. Equal-radius cylinders: the two ellipses are not mirror images.** The
+pre-decided "semi-major `r/cos(θ/2)`" is right only for the ellipse in the
+**external** bisector plane (spanned by `b̂− = a0 − a1`). The ellipse in the
+**internal** bisector plane (spanned by `b̂+ = a0 + a1`) has semi-major
+**`r/sin(θ/2)`**. One line of algebra: a point `q + x·b̂+ + y·û` has squared
+distance `x²·sin²(θ/2) + y²` to *each* axis, so the section is
+`sin²(θ/2)·x² + y² = r²`. The two semi-majors coincide only at `θ = π/2` —
+the Steinmetz case, which is exactly why the packet's own perpendicular
+verification passed while the formula was wrong. The landed EQRCYL cell
+carries the corrected pair, worker-derived and verified against the
+distance-to-both-axes oracle.
+
+**4. Plane × cone: the parabola family is not classifiable by a decisive
+`Δ2 = B² − 4AC`, and the family test moves to the primary parameters.** The
+2D-reduction discriminant is a multi-step polynomial in the plane normal's
+components; inari rounds every intermediate outward, so at the boundary the
+interval is `[−ε, 0]` or `[0, ε]` and never `[0, 0]` — `decisively_zero`
+cannot fire. No witness substitution fixes it inside that rule: no
+non-axis-aligned unit vector has dyadic components, so the intermediate
+products are never exactly representable (attempt 1's QUESTION.md carries
+the full impossibility argument and a direct inari probe:
+`Δ2 = [−6.66e-16, 0.0]` for the packet's own witness). The classification
+that **is** exactly decidable is the scale-free boundary invariant on the
+**raw** (unnormalized) normal `N = (p − o) × (q − o)` and the carrier's own
+slope `t = tan(half_angle)`, all in inari:
+
+```text
+three_way( [N.z]·[N.z],  ([t]·[t]) · ([N.x]·[N.x] + [N.y]·[N.y]) )
+  Some(Greater) → ellipse family    (|n̂.z| > sin α, plane steeper)
+  Some(Less)    → hyperbola family
+  Some(Equal)   → parabola family    (exactly on the boundary)
+  None          → refuse (NumericallyUnresolved)
+```
+
+(the equivalence `N.z² > t²(Nx²+Ny²) ⟺ |n̂.z| > sin α` is exact for
+`cos α > 0`). Exact decideness needs `N.z²`, `t²` and `N.x² + N.y²`
+exactly representable, which is achievable — construct plane points with
+**integer** differences so the raw cross is exact, and choose a **dyadic**
+slope: `tan α = 3/4` (`α = atan(3/4)`) is dyadic where
+`sin α = 3/5` is not; the witness asserts `half_angle().tan() == 0.75`
+(the `tan ∘ atan` round-trip holds on this host's libm and fails loudly
+elsewhere). The horizontal special case and the apex-degeneracy test
+`h = (p − o)·n̂` (computed in inari, component-wise) are unchanged; `Δ2`
+no longer classifies anything — the 2D reduction still *emits* the
+geometry (centre, axes, vertex), verified by sampling on both carriers.
+For the degenerate parabola arm (`TangentLine`) the generator azimuth is a
+double root and is computed by the vertex form `−b/2a`, not the
+discriminant formula.
+
+**5. Plane × cone: the in-plane horizontal axis is `normalize(n̂ × ẑ)`, not
+the triple product.** `ẑ × (n̂ × ẑ)` evaluates to the horizontal *projection
+of n̂* — `n̂ − (n̂·ẑ)ẑ` — which is not in the plane for any tilted plane.
+The horizontal direction lying **in** the plane is `n̂ × ẑ` (up to sign);
+with `v̂ = n̂ × û` the `(û, v̂)` frame spans the plane. Worker-found and
+recorded as a disagreement with the derivation; the third time in this
+family that a packet's formula survived review only because the worker
+re-derived it.
 
 **Not** closed form, and correctly deferred to the general solver: cylinder ×
 cylinder in general position, sphere × cylinder in general position, torus ×

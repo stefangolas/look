@@ -156,30 +156,61 @@ and parameter ranges before placing them.
    the cone's `der_mn` itself uses `half_angle().tan()`, so the carrier's own
    radial law is `ρ(z) = |z − p.z| · t`).
 
-   **Build the 2D reduction.** Choose plane axes: `û` = unit in-plane
-   perpendicular to the axis' horizontal shadow (concretely `û =
-   normalize(ẑ × (n̂ × ẑ))` when `n̂` is not parallel to ẑ — this is the
-   horizontal in-plane direction; if it is parallel, take `û = x̂`), and
-   `v̂ = n̂ × û`. A plane point is `o + u·û + v·v̂`. Substituting into the
-   cone equation `(x − p.x)² + (y − p.y)² = (z − p.z)² t²` gives the 2D
-   quadratic's coefficients **as exact symbolic expressions in the carrier
-   parameters** (each a polynomial in n̂'s, o's, p's coordinates and t;
-   compute each coefficient as an inari interval from the f64 parameters —
-   degree ≤ 2 polynomials, all inari arithmetic).
+    **Build the 2D reduction.** Choose plane axes: `û = normalize(n̂ × ẑ)`
+    when `n̂` is not parallel to ẑ — the horizontal direction lying **in**
+    the plane (`n̂ × ẑ` is horizontal and perpendicular to `n̂`; note that
+    `ẑ × (n̂ × ẑ)`, the formula this packet originally carried, is the
+    horizontal *projection of n̂* and is **not** in the plane for tilted
+    planes — attempt 1's worker caught it) — and if `n̂` is parallel to ẑ,
+    take `û = x̂`. Then `v̂ = n̂ × û`. A plane point is `o + u·û + v·v̂`.
+    Substituting into the cone equation
+    `(x − p.x)² + (y − p.y)² = (z − p.z)² t²` gives the 2D quadratic's
+    coefficients **as exact symbolic expressions in the carrier
+    parameters** (each a polynomial in n̂'s, o's, p's coordinates and t;
+    compute each coefficient as an inari interval from the f64 parameters —
+    degree ≤ 2 polynomials, all inari arithmetic).
 
-   **Classify in 2D, by the classical invariants**, all compared with the
-   interval helpers:
+    **Classify the family by the boundary invariant on the primary
+    parameters — NOT by the 2D discriminant.** With `N = (p − o) × (q − o)`
+    the raw (unnormalized) normal — each component computed in inari from
+    the stored points (three inari subtractions per difference, then the
+    cross formula's six inari multiplies and three inari subtractions;
+    never an f64 cross enclosed after the fact) — and
+    `t = cone.half_angle().tan()` (the carrier's own slope; `der_mn` itself
+    uses this value), classify:
 
-   - `Δ2 = B² − 4AC` — the **type** discriminant: decisively `< 0` → ellipse
-     family; decisively `> 0` → hyperbola family; decisively zero → parabola
-     family; else refuse.
-   - The **degeneracy**: the conic degenerates (to a point, one line, or two
-     lines) exactly when the full quadratic form's determinant vanishes —
-     equivalently here, when the **plane passes through the apex**: `h =
-     (p − o) · n̂` **in inari**; `decisively_zero` → degenerate; `excludes_zero`
-     → non-degenerate; else refuse. (For this carrier, apex-through is the
-     only degeneracy — say so in a comment; it is the classical result that a
-     plane through the apex of a non-degenerate cone degenerates the section.)
+    ```text
+    three_way( [N.z]·[N.z],  ([t]·[t]) · ([N.x]·[N.x] + [N.y]·[N.y]) )
+      Some(Greater) → ellipse family     (|n̂.z| > sin α, plane steeper)
+      Some(Less)    → hyperbola family
+      Some(Equal)   → parabola family    (exactly on the boundary)
+      None          → refuse (NumericallyUnresolved)
+    ```
+
+    The equivalence with the classical condition
+    (`N.z² > t²(Nx²+Ny²) ⟺ |n̂.z| > sin α` for `cos α > 0`) is exact.
+    **Do not classify by `Δ2 = B² − 4AC`**: it is a multi-step polynomial
+    in non-dyadic components, inari rounds every intermediate outward, and
+    at the parabola boundary it evaluates to `[−ε, 0]` or `[0, ε]` — never
+    the `[0, 0]` that `decisively_zero` requires. (Attempt 1 measured
+    `Δ2 = [−6.66e-16, 0.0]` on this packet's own parabola witness and
+    correctly stopped at SPEC_GAP; the spec amendment of 2026-08-20 records
+    the impossibility argument. The 2D reduction still *emits* the
+    geometry below — its quadratic classifies nothing.)
+    - The **degeneracy**: the conic degenerates (to a point, one line, or two
+      lines) exactly when the full quadratic form's determinant vanishes —
+      equivalently here, when the **plane passes through the apex**: `h =
+      (p − o) · n̂` **in inari** (computed component-wise —
+      `Σ interval_at(d.c) · interval_at(n̂.c)` over the displacement
+      components `d = apex − origin`; never an f64 dot product enclosed
+      after the fact, which would not contain the exact dot);
+      `decisively_zero` → degenerate; `excludes_zero` → non-degenerate;
+      else refuse. (For this carrier, apex-through is the only degeneracy —
+      say so in a comment; it is the classical result that a plane through
+      the apex of a non-degenerate cone degenerates the section. A plane
+      through the apex exactly — `o == apex` — gives the zero displacement
+      and `h = [0, 0]` regardless of n̂'s dyadicity; that is why the
+      through-apex witnesses below place `o` at the apex.)
 
    **Emit:**
 
@@ -209,8 +240,12 @@ and parameter ranges before placing them.
      solve which generators lie in the plane by requiring the direction to be
      perpendicular to `n̂` (a quadratic in the azimuth; solve in f64, verify
      decisively in inari, and derive both roots).
-   - Degenerate + parabola family → `TangentLine`: exactly one generator lies
-     in the plane; emit it as a `Line` through the apex.
+    - Degenerate + parabola family → `TangentLine`: exactly one generator lies
+      in the plane; emit it as a `Line` through the apex. The azimuth
+      quadratic has a **double root** here — solve it by the vertex form
+      `−b / (2a)`, not the discriminant formula (the discriminant is a
+      rounding-away-from-zero `±ε` in f64; the vertex form is the stable
+      solve for a double root).
    - The horizontal-plane special case (`n̂.z == ±1.0` exactly — a component
      test, no intervals) cuts a **circle** at height `o.z`: radius
      `|o.z − p.z| · t`, centre on the axis at `(p.x, p.y, o.z)`; if the plane
@@ -240,9 +275,14 @@ and parameter ranges before placing them.
 All in the `#[cfg(test)]` module of `plane_cone.rs`: named consts, and a
 same-line `// H-3:` comment wherever a bare float slack literal appears.
 Construct the cone through `Cone::new(apex, half_angle)` (an `Outcome` — no
-unwrap, H-1). Prefer a half angle with **dyadic** trigonometry: α with
-`sin α = 3/5, cos α = 4/5, tan α = 3/4` (`half_angle` value
-`(3.0f64 / 5.0f64).asin()` — computed, not a literal).
+unwrap, H-1). Use a half angle with a **dyadic slope**: `tan α = 3/4`
+(`half_angle` value `(3.0f64 / 4.0f64).atan()` — computed, not a literal),
+and **assert `half_angle().tan() == 0.75`** in every test that relies on the
+slope being exact — the `tan ∘ atan` round-trip holds on this host's libm,
+and the assertion fails loudly if a libm ever breaks it. `t = 3/4` dyadic is
+what makes the family invariant exact on integer raw normals; attempt 1's
+`sin α = 3/5` is **not** dyadic, and that is precisely why its parabola
+witness could not classify.
 
 1. `pcone_horizontal_planes_cut_circles` — cone apex at the origin, α as
    above; plane z = 2 (normal ±ẑ): circle centred (0, 0, 2) of radius
@@ -251,7 +291,8 @@ unwrap, H-1). Prefer a half angle with **dyadic** trigonometry: α with
    H-3-commented slack). Plane z = 0 through the apex → `TangentPoint(apex)`.
 2. `pcone_vertical_plane_through_axis_two_lines` — plane y = 0 through the
    z axis: `TwoCurves([Line, Line])`; the generators through the apex in
-   that plane have directions `(±3/5, 0, 4/5)`; assert the emitted lines'
+   that plane have directions `(±sin α, 0, cos α)` (with `tan α = 3/4`:
+   `sin α ≈ 3/5`, `cos α ≈ 4/5` in f64); assert the emitted lines'
    directions match (angle slack, H-3-commented) and sampled points satisfy
    both carriers.
 3. `pcone_vertical_plane_two_hyperbola_branches` — plane x = 1 (normal ±x̂):
@@ -264,16 +305,21 @@ unwrap, H-1). Prefer a half angle with **dyadic** trigonometry: α with
    come out exactly equal — they will not here). Sample and assert
    on-both-carriers.
 5. `pcone_boundary_parabola` — the parabola boundary is `|n̂.z| == sin α`
-   with the plane not through the apex. Dyadic witness: α as above
-   (`sin α = 3/5`), plane normal `n̂ = (4/5, 0, 3/5)` (unit, dyadic), plane
-   through `(0, 0, 5)` so it clears the apex: → `Parabola`. Sample and
-   assert on-both-carriers.
+   with the plane not through the apex. For the family invariant to be
+   decisive, the raw normal must satisfy `N.z² = t²(Nx²+Ny²)` exactly: with
+   `t = 3/4` that is the integer raw normal `N = (4, 0, 3)`
+   (`9 = (9/16)·16`). Construct the plane from integer differences so the
+   cross is exact: `o = (0, 0, 5)`, `p = (0, 1, 5)`, `q = (−3, 0, 5)` —
+   `(p − o) × (q − o) = (0,1,0) × (−3,0,4) = (4, 0, 3)` exactly, and the
+   plane clears the apex. → `Parabola`. Sample and assert on-both-carriers.
 6. `pcone_through_apex_degenerates` — the three degenerate arms: ellipse
    family through the apex → `TangentPoint`; hyperbola family through the
-   apex (e.g. plane y = 0) → two lines (test 2's assertion belongs there;
-   here assert the arm); parabola family through the apex (normal
-   `(4/5, 0, 3/5)`, plane through the origin) → `TangentLine`; sampled
-   points of the emitted line lie on the cone.
+   apex (e.g. plane y = 0 through the origin) → two lines (test 2's
+   assertion belongs there; here assert the arm); parabola family through
+   the apex (`o` = apex = origin, `p = (0, 1, 0)`, `q = (−3, 0, 4)` — the
+   same raw normal `(4, 0, 3)`, so `h = 0` exactly via the zero
+   displacement) → `TangentLine`; sampled points of the emitted line lie on
+   the cone.
 7. `pcone_certificate_is_exact` — for a circle, a two-lines, a hyperbola-pair
    and a parabola outcome: every `Ok` carries `method == Method::Exact` and
    the `AnalyticCarrier` prop set to `Truth::True`.
@@ -310,7 +356,7 @@ cargo check --workspace --all-targets
 ```
 
 Never run a bare `cargo test` — it builds 56 examples. Send cargo output to a
-file and read the tail. The existing 115 lib tests + 3 integration tests must
+file and read the tail. The existing 120 lib tests + 3 integration tests must
 keep passing unchanged.
 
 ## Forbidden
@@ -324,6 +370,8 @@ Adding `unscaled_legacy(` call sites. Committing to `main`.
 ## Stop conditions
 
 - an anchor count differs → `ANCHOR_MISMATCH`, naming the file and what you saw
+- the family invariant of decision 5 cannot be made decisive on the required
+  witnesses → `SPEC_GAP`, with the interval values you saw
 - the 2D reduction produces coefficients whose classification contradicts the
   closed-form witnesses above in a way you cannot correct within this design →
   `SPEC_GAP`, with the witness and the contradicting invariant values
