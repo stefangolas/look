@@ -20,6 +20,7 @@ diff between base and HEAD, so a verdict is meaningless if the run never
 finished.
 """
 import argparse
+import atexit
 import datetime
 import json
 import os
@@ -128,6 +129,197 @@ def has_compile_error(text):
 
 DEFAULT_TEST_ARGS = ['--lib', '--tests']
 
+# A cargo `Running <target source path> (<test exe>)` banner. Everything
+# printed after one of these, until the next, belongs to that test target.
+_RUNNING_RE = re.compile(r'^\s+Running\s+(.+?)\s+\((.+?)\)\s*$')
+_DOCTEST_RE = re.compile(r'^\s+Doc-tests\s+\S+')
+
+
+def _target_of_running(desc, exe, wt, crates):
+    """`(crate, target_flags)` for one cargo Running banner, or (None, None).
+
+    Attribution has to be exact, because it decides what V8 compiles at the
+    base commit: the whole point of the narrow base query is to build one
+    crate's one test target instead of the entire downstream workspace. Where
+    it cannot be made exact the caller falls back to the wide query rather
+    than guessing -- a mis-attributed test would be measured against the wrong
+    crate's base and could acquit a real regression.
+
+    The banner names the target path relative to its *package* directory, not
+    the workspace, so `tests\\geometry.rs` alone does not say whose it is. The
+    package is recovered from the filesystem instead: exactly one downstream
+    crate must own a file at that path.
+    """
+    root = Path(wt) / 'vendor' / 'truck'
+    desc = desc.replace('\\', '/')
+    if desc.startswith('unittests'):
+        # `unittests src/lib.rs (target/debug/deps/truck_stepio-HASH.exe)`.
+        # The lib test binary is named after the package with dashes turned
+        # into underscores, which is unambiguous across the workspace.
+        stem = Path(exe).name.rsplit('-', 1)[0]
+        for c in crates:
+            if c.replace('-', '_') == stem:
+                return c, ('--lib',) if desc.endswith('lib.rs') else ('--bin', stem)
+        return None, None
+    m = re.match(r'tests/([^/]+?)(?:\.rs|/main\.rs)$', desc)
+    if not m:
+        return None, None
+    name = m.group(1)
+    owners = [c for c in crates
+              if (root / c / 'tests' / f'{name}.rs').is_file()
+              or (root / c / 'tests' / name / 'main.rs').is_file()]
+    if len(owners) != 1:
+        return None, None
+    return owners[0], ('--test', name)
+
+
+def attribute_tests(text, wt, crates):
+    """{test name: {'status', 'crate', 'target'}} for one cargo test run.
+
+    `parse_test_statuses` answers "what happened"; this also answers "where",
+    which is what lets V8 ask the base commit about one test target instead of
+    rebuilding every downstream crate to re-derive an answer it already has
+    for all the passing ones.
+    """
+    out, crate, target = {}, None, None
+    for line in text.splitlines():
+        m = _RUNNING_RE.match(line)
+        if m:
+            crate, target = _target_of_running(m.group(1), m.group(2), wt, crates)
+            continue
+        if _DOCTEST_RE.match(line):
+            crate, target = None, None
+            continue
+        m = _TEST_LINE_RE.match(line)
+        if m:
+            out[m.group(1)] = {'status': m.group(2), 'crate': crate, 'target': target}
+    return out
+
+
+def observation_key(crate, target, test_name):
+    """Cache key for one base observation. The crate and target are part of
+    it because a bare `module::name` is not unique across test binaries, and
+    because a re-attributed test must be re-measured rather than served an
+    answer recorded against a different target."""
+    return f"{crate or '?'}|{'/'.join(target) if target else '?'}|{test_name}"
+
+
+def v8_observations_path(base_sha):
+    return BASELINES_DIR / f"{base_sha[:12]}__v8-observations.json"
+
+
+def load_v8_observations(base_sha):
+    p = v8_observations_path(base_sha)
+    if not p.is_file():
+        return {}
+    try:
+        return json.loads(p.read_text(encoding='utf-8')).get('observations', {})
+    except (json.JSONDecodeError, OSError):
+        return {}
+
+
+def save_v8_observations(base_sha, observations):
+    BASELINES_DIR.mkdir(parents=True, exist_ok=True)
+    v8_observations_path(base_sha).write_text(json.dumps({
+        'base': base_sha,
+        'computed_at': datetime.datetime.now(datetime.timezone.utc).isoformat().replace('+00:00', 'Z'),
+        'observations': observations,
+    }, indent=2, sort_keys=True), encoding='utf-8')
+
+
+# The narrow base query compiles one crate and its dependencies, not the whole
+# downstream workspace, so it needs nowhere near what `compute_baseline` does.
+# The floor is still real -- an ENOSPC part-way through a build is what
+# corrupts a Cargo target dir -- just proportional to the work.
+V8_QUERY_FLOOR_GB = 4.0
+
+
+def query_base_tests(base_sha, groups, out_file, wide_args):
+    """Run only the named tests at `base_sha`; return (statuses, unavailable).
+
+    `groups` maps `(crate, target_flags)` -> [test names]. Each group becomes
+    one `cargo test -p <crate> <target> -- --exact <names...>` inside a single
+    throwaway worktree, so the base side builds only what the failing tests
+    actually live in. A group keyed `(None, None)` could not be attributed and
+    falls back to `wide_args` (the full downstream crate set), which is the
+    old behaviour, kept as the escape hatch rather than the default path.
+
+    `statuses` maps observation key -> 'ok' | 'FAILED' | 'ignored' | 'absent'.
+    'absent' means the target built and ran but has no test by that name --
+    a real fact about the base, distinct from "we could not look".
+
+    `unavailable` lists the groups whose build failed. A base build failure is
+    an environment fact and never the packet's doing (the packet cannot break
+    a commit that predates it), so its output is returned separately and is
+    never written to the observation cache.
+    """
+    free_gb = shutil.disk_usage(str(REPO_ROOT.anchor or 'C:\\')).free / 2**30
+    leaked = leaked_baselines()
+    if free_gb < V8_QUERY_FLOOR_GB:
+        raise RuntimeError(
+            f"refusing to query the base: {free_gb:.1f} GB free, below the "
+            f"{V8_QUERY_FLOOR_GB:.1f} GB floor for a narrow base build.\n"
+            + (f"  {len(leaked)} leaked baseline worktree(s) are holding "
+               f"{sum(g for _, g in leaked):.1f} GB: "
+               + ', '.join(p.name for p, _ in leaked) + "\n" if leaked else "")
+            + "Reclaim %TEMP%/look-verify-baseline-* first and `git worktree prune`; "
+            "the slot's own target is warm and rebuilding it costs more than it frees."
+        )
+
+    tmp_parent = Path(tempfile.mkdtemp(prefix='look-verify-baseline-'))
+    wt_path = tmp_parent / 'wt'
+    target_path = tmp_parent / 'target'
+
+    with out_file.open('a', encoding='utf-8', newline='\n') as f:
+        f.write(f"\n===== V8 base query: {sum(len(t) for t in groups.values())} test(s) in "
+                f"{len(groups)} target(s) at {base_sha[:12]} (worktree {wt_path}) =====\n")
+
+    add_res = subprocess.run(
+        ['git', '-C', str(REPO_ROOT), 'worktree', 'add', '--detach', str(wt_path), base_sha],
+        capture_output=True, text=True, encoding='utf-8', errors='replace'
+    )
+    with out_file.open('a', encoding='utf-8', newline='\n') as f:
+        f.write(add_res.stdout)
+        f.write(add_res.stderr)
+    if add_res.returncode != 0:
+        shutil.rmtree(tmp_parent, ignore_errors=True)
+        raise RuntimeError(f"could not create base worktree at {base_sha}: {add_res.stderr}")
+
+    statuses, unavailable = {}, []
+    try:
+        env = dict(os.environ)
+        env['CARGO_INCREMENTAL'] = '0'
+        env['CARGO_TARGET_DIR'] = str(target_path)
+        for (crate, target), names in sorted(groups.items(), key=lambda kv: str(kv[0])):
+            if crate is None:
+                scope = list(wide_args) + list(DEFAULT_TEST_ARGS)
+            else:
+                scope = ['-p', crate] + list(target)
+            cmd = ['cargo', 'test', *scope, '--no-fail-fast', '--', '--exact', *sorted(names)]
+            with out_file.open('a', encoding='utf-8', newline='\n') as f:
+                f.write('\n$ ' + ' '.join(cmd) + '\n')
+            # stderr is MERGED into stdout, not captured beside it: cargo
+            # prints the `Running <target>` banners on stderr and the test
+            # lines on stdout, so two separate pipes hand back every banner
+            # after every test line and destroy the association between them.
+            res = subprocess.run(cmd, cwd=str(wt_path), stdout=subprocess.PIPE,
+                                 stderr=subprocess.STDOUT, text=True,
+                                 encoding='utf-8', errors='replace', env=env)
+            chunk = res.stdout
+            with out_file.open('a', encoding='utf-8', newline='\n') as f:
+                f.write(chunk)
+            if has_compile_error(chunk):
+                unavailable.append((crate, target))
+                continue
+            seen = parse_test_statuses(chunk)
+            for n in names:
+                statuses[observation_key(crate, target, n)] = seen.get(n, 'absent')
+        return statuses, unavailable
+    finally:
+        subprocess.run(['git', '-C', str(REPO_ROOT), 'worktree', 'remove', '--force', str(wt_path)],
+                        capture_output=True, text=True, encoding='utf-8', errors='replace')
+        shutil.rmtree(tmp_parent, ignore_errors=True)
+
 
 def baseline_cache_path(base_sha, crate_names, test_args=None):
     key = base_sha[:12] + '__' + '-'.join(sorted(crate_names))
@@ -221,9 +413,10 @@ def compute_baseline(base_sha, crate_names, out_file, test_args=None):
         env['CARGO_TARGET_DIR'] = str(target_path)
         test_res = subprocess.run(
             ['cargo', 'test', *p_args, *(test_args or DEFAULT_TEST_ARGS), '--no-fail-fast'],
-            cwd=str(wt_path), capture_output=True, text=True, encoding='utf-8', errors='replace', env=env
+            cwd=str(wt_path), stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True,
+            encoding='utf-8', errors='replace', env=env
         )
-        chunk = test_res.stdout + test_res.stderr
+        chunk = test_res.stdout
         with out_file.open('a', encoding='utf-8', newline='\n') as f:
             f.write(chunk)
 
@@ -259,7 +452,18 @@ def load_or_compute_baseline(base_sha, crate_names, out_file, test_args=None):
         'compile_ok': result['compile_ok'],
         'tests': result['tests'],
     }
-    cache_path.write_text(json.dumps(obj, indent=2, sort_keys=True), encoding='utf-8')
+    # Never cache evidence from a build that did not compile. A baseline whose
+    # cargo run died on `error[E0786] invalid metadata` or a half-written
+    # .fingerprint is not a measurement of the base commit, it is a
+    # measurement of the disk -- and once written it is indistinguishable from
+    # a real one and is trusted by every later verify against that base. The
+    # 2026-08-19 ENUM-r3 session lost hours to exactly one such file. Recompute
+    # is cheap; a poisoned baseline is not.
+    if result['compile_ok']:
+        cache_path.write_text(json.dumps(obj, indent=2, sort_keys=True), encoding='utf-8')
+    else:
+        with out_file.open('a', encoding='utf-8', newline='\n') as f:
+            f.write(f"\n===== baseline at {base_sha[:12]} did not compile: NOT cached =====\n")
     return obj
 
 
@@ -276,6 +480,34 @@ class Verifier:
         self.gates = []
         self.failed_early = False
 
+    # -- liveness ------------------------------------------------------------
+
+    def claim_slot(self):
+        """Announce, in the slot itself, that a verify is building here.
+
+        The slot's `worker.pid` goes away the moment the worker finishes, so
+        anything reading only that concludes the slot is idle -- while verify
+        is midway through a multi-gigabyte build in `target/`. On 2026-08-19
+        `loop/watchdog.py` did exactly that and `rmtree`d
+        `loop/slots/0/target` under a live cargo, three times; the resulting
+        `error[E0786] found invalid metadata files` and `failed to write
+        .fingerprint` were read as code regressions and cost the session its
+        evening. A pid file the reaper can check is the fix.
+        """
+        self.pid_file = self.slot_root / 'verify.pid'
+        try:
+            self.pid_file.write_text(str(os.getpid()), encoding='utf-8')
+            atexit.register(self.release_slot)
+        except OSError:
+            self.pid_file = None
+
+    def release_slot(self):
+        try:
+            if self.pid_file and self.pid_file.is_file():
+                self.pid_file.unlink()
+        except OSError:
+            pass
+
     # -- output capture -----------------------------------------------------
 
     def write_out_section(self, header):
@@ -283,15 +515,26 @@ class Verifier:
             f.write(f"\n===== {header} =====\n")
 
     def invoke_native(self, args, cwd):
-        """Run a native command, appending its combined stdout+stderr to
-        out.txt, and return its exit code. subprocess.run's own
-        stdout/stderr capture (rather than PowerShell's stream redirection)
-        has none of the ErrorRecord-wrapping hazard the PS1 comment
-        describes, so this is a plain run-and-append."""
-        res = subprocess.run(args, cwd=str(cwd), capture_output=True, text=True, encoding='utf-8', errors='replace')
+        """Run a native command, appending its interleaved output to out.txt,
+        and return its exit code. subprocess.run's own stdout/stderr capture
+        (rather than PowerShell's stream redirection) has none of the
+        ErrorRecord-wrapping hazard the PS1 comment describes, so this is a
+        plain run-and-append.
+
+        stderr is merged INTO stdout rather than captured beside it. Two
+        pipes concatenated after the fact put every line of stderr after
+        every line of stdout, and cargo splits test output across both: the
+        `Running <target> (<exe>)` banners go to stderr and the `test name
+        ... ok` lines to stdout. Reassembled that way, every banner lands
+        after every test line and nothing can tell which target a test came
+        from -- which is exactly what V8 needs in order to ask the base
+        commit about one test target instead of rebuilding the workspace.
+        """
+        res = subprocess.run(args, cwd=str(cwd), stdout=subprocess.PIPE,
+                             stderr=subprocess.STDOUT, text=True,
+                             encoding='utf-8', errors='replace')
         with self.out_file.open('a', encoding='utf-8', newline='\n') as f:
             f.write(res.stdout)
-            f.write(res.stderr)
         return res.returncode
 
     def add_gate(self, name, status, detail='', code=''):
@@ -418,6 +661,8 @@ def main():
 
     if not v.wt.is_dir():
         sys.exit(f"slot {v.slot} has no worktree at {v.wt}; run new_slot.py first")
+
+    v.claim_slot()
     packet_path = Path(args.packet)
     if not packet_path.is_file():
         sys.exit(f"packet not found: {args.packet}")
@@ -1179,9 +1424,35 @@ def main():
     # many_closed_boundary_cylinder, ...} -- none of which V5 can reach,
     # because V5 runs only the packet's own crates. The gate has been
     # watched failing; the opt-in branch is deleted in the commit that
-    # records this. The disk caution stands: a downstream baseline builds
-    # an entire extra workspace, and verify still refuses below the 8 GB
-    # floor, so a run of repeated verifies still starts at Get-PSDrive C.
+    # records this.
+    # -----------------------------------------------------------------------
+    # Base work is LAZY as of 2026-08-20. The gate used to build a second
+    # complete Cargo world at the base commit and run the entire downstream
+    # suite there, just to discover which of the downstream tests were already
+    # red. That is ~10 GB of transient disk for an answer that is only needed
+    # about the tests that are failing NOW, and it is what put the 2026-08-19
+    # session into repeated ENOSPC and corrupt-metadata rebuilds.
+    #
+    # The algorithm instead:
+    #   1. Run the FULL downstream suite at HEAD. Coverage is unchanged --
+    #      this is the half of V8 that catches things, and it is not narrowed.
+    #   2. Everything green -> PASS, and the base is never built at all. This
+    #      is the common case and it now costs nothing.
+    #   3. Otherwise interrogate the base about the failing (and newly
+    #      `ignored`) tests ONLY, one `cargo test -p <crate> --test <target>
+    #      -- --exact <names>` per target, so the base build is one crate's
+    #      dependency cone rather than the workspace.
+    #   4. Fails at both -> pre-existing, reported, not charged. Passes at
+    #      base -> a real regression, charged, same as before.
+    #   5. Each base observation is cached per (base, crate, target, test) in
+    #      loop/baselines/<base>__v8-observations.json, so a re-verify against
+    #      the same base pays nothing for a failure it has already explained.
+    #
+    # Two properties this must not lose, and does not: the HEAD suite is still
+    # the whole downstream closure, and a test that passes at base and fails
+    # here is still a FAIL. What it drops is only the work of re-measuring
+    # tests that are green at HEAD, whose base status cannot change any
+    # verdict.
     # -----------------------------------------------------------------------
     if not gate_wanted('V8'):
         skip_not_requested('V8 no-regression')
@@ -1197,7 +1468,6 @@ def main():
             d_args = []
             for c in downstream:
                 d_args += ['-p', c]
-            baseline8 = load_or_compute_baseline(base, downstream, v.out_file)
             v.write_out_section('V8 no-regression: downstream crates ' + ', '.join(downstream))
             len_before = v.out_file.stat().st_size
             v.invoke_native(['cargo', 'test', *d_args, '--lib', '--tests', '--no-fail-fast'], v.wt)
@@ -1211,50 +1481,98 @@ def main():
                            'downstream crate(s) failed to compile: ' + ', '.join(downstream)
                            + '; see out.txt', code='DOWNSTREAM_BUILD_FAIL')
                 v.failed_early = True
-            elif not baseline8['compile_ok']:
-                now = parse_test_statuses(chunk)
-                failing_now = sorted(n for n, s in now.items() if s == 'FAILED')
-                if failing_now:
-                    v.add_gate('V8 no-regression', 'FAIL',
-                               f"downstream baseline at {base[:7]} would not compile, so no "
-                               'comparison is possible; failing now: '
-                               + ', '.join(failing_now[:8]) + '; see out.txt',
-                               code='DOWNSTREAM_REGRESSION')
-                    v.failed_early = True
-                else:
-                    v.add_gate('V8 no-regression', 'PASS',
-                               f"downstream baseline at {base[:7]} would not compile "
-                               '(no comparison possible); no failures now')
             else:
-                now = parse_test_statuses(chunk)
-                base_tests = baseline8['tests']
-                newly_failing = sorted(n for n, s in now.items()
-                                       if s == 'FAILED' and base_tests.get(n) != 'FAILED')
-                still_failing = sorted(n for n, s in now.items()
-                                       if s == 'FAILED' and base_tests.get(n) == 'FAILED')
-                newly_ignored = sorted(n for n, s in now.items()
-                                       if s == 'ignored' and base_tests.get(n) == 'ok')
-                # `disappeared` is deliberately NOT a regression here. A packet
-                # cannot delete a downstream test -- V1 would have rejected the
-                # write -- so an absence downstream means cargo did not reach
-                # the binary, which is a harness fact and not the packet's.
-                regressions = newly_failing + newly_ignored
-                if regressions:
-                    parts = []
-                    if newly_failing:
-                        parts.append('newly failing downstream: ' + ', '.join(newly_failing[:8]))
-                    if newly_ignored:
-                        parts.append('passed at base, #[ignore]d now: ' + ', '.join(newly_ignored[:8]))
-                    v.add_gate('V8 no-regression', 'FAIL', '; '.join(parts) + '; see out.txt',
-                               code='DOWNSTREAM_REGRESSION')
-                    v.failed_early = True
+                attributed = attribute_tests(chunk, v.wt, downstream)
+                # Only a test that is FAILED or `ignored` at HEAD can possibly
+                # be a downstream regression. Everything else passed here and
+                # needs no opinion from the base, which is the whole saving:
+                # a green downstream suite costs zero base work.
+                suspects = {n: a for n, a in attributed.items()
+                            if a['status'] in ('FAILED', 'ignored')}
+                total_seen = len(attributed)
+
+                if not suspects:
+                    v.add_gate('V8 no-regression', 'PASS',
+                               f"{len(downstream)} downstream crate(s) green at HEAD "
+                               f"({total_seen} test(s)): " + ', '.join(downstream)
+                               + '; base not built (nothing to explain)')
                 else:
-                    detail = (f"{len(downstream)} downstream crate(s) unchanged vs baseline at "
-                              f"{base[:7]}: " + ', '.join(downstream))
-                    if still_failing:
-                        detail += (f"; {len(still_failing)} pre-existing failure(s) ignored: "
-                                   + ', '.join(still_failing[:8]))
-                    v.add_gate('V8 no-regression', 'PASS', detail)
+                    obs = load_v8_observations(base)
+                    groups = {}
+                    for n, a in sorted(suspects.items()):
+                        if observation_key(a['crate'], a['target'], n) in obs:
+                            continue
+                        groups.setdefault((a['crate'], a['target']), []).append(n)
+
+                    unavailable = []
+                    if groups:
+                        try:
+                            fresh, unavailable = query_base_tests(base, groups, v.out_file, d_args)
+                        except RuntimeError as exc:
+                            fresh, unavailable = {}, list(groups)
+                            v.write_out_section('V8 base query refused: ' + str(exc))
+                        if fresh:
+                            obs.update(fresh)
+                            save_v8_observations(base, obs)
+
+                    if unavailable:
+                        # The base commit predates the packet, so a base build
+                        # failure is never the packet's doing -- it is disk,
+                        # toolchain or a corrupt target dir. Rejecting the
+                        # worker for it is the exact mistake that cost the
+                        # 2026-08-19 session its evening. BLOCKED is the
+                        # verdict that says "ask the harness, not the worker".
+                        v.add_gate('V8 no-regression', 'SKIP',
+                                   'base unavailable for '
+                                   + ', '.join(f"{c or '?'} {' '.join(t) if t else ''}".strip()
+                                               for c, t in unavailable[:4])
+                                   + '; nothing cached; see out.txt')
+                        print()
+                        print('VERDICT: BLOCKED')
+                        verdict = {
+                            'packet': args.packet, 'slot': v.slot, 'crates': crate_names,
+                            'base': base, 'branch': branch, 'commit': commit_sha,
+                            'amended_by': amended_by, 'verdict': 'BLOCKED', 'gates': v.gates,
+                            'timestamp': datetime.datetime.now(datetime.timezone.utc)
+                                .isoformat().replace('+00:00', 'Z'),
+                        }
+                        v.verdict_file.write_text(json.dumps(verdict, indent=4), encoding='utf-8')
+                        sys.exit(2)
+
+                    newly_failing, still_failing, newly_ignored = [], [], []
+                    for n, a in sorted(suspects.items()):
+                        at_base = obs.get(observation_key(a['crate'], a['target'], n))
+                        if a['status'] == 'FAILED':
+                            # 'absent' -- the target built and ran at base and
+                            # has no such test -- is charged, exactly as the
+                            # old whole-suite comparison charged a name the
+                            # baseline had never seen. A packet cannot add a
+                            # downstream test (V1 forbids the write), so an
+                            # absence here is a claim that needs explaining.
+                            (still_failing if at_base == 'FAILED' else newly_failing).append(n)
+                        elif at_base == 'ok':
+                            newly_ignored.append(n)
+
+                    if newly_failing or newly_ignored:
+                        parts = []
+                        if newly_failing:
+                            parts.append('newly failing downstream: ' + ', '.join(newly_failing[:8]))
+                        if newly_ignored:
+                            parts.append('passed at base, #[ignore]d now: ' + ', '.join(newly_ignored[:8]))
+                        v.add_gate('V8 no-regression', 'FAIL', '; '.join(parts) + '; see out.txt',
+                                   code='DOWNSTREAM_REGRESSION')
+                        v.failed_early = True
+                    else:
+                        detail = (f"{len(downstream)} downstream crate(s) unchanged vs base "
+                                  f"{base[:7]} ({total_seen} test(s) at HEAD): "
+                                  + ', '.join(downstream))
+                        if still_failing:
+                            detail += (f"; {len(still_failing)} pre-existing failure(s) confirmed "
+                                       'at base: ' + ', '.join(still_failing[:8]))
+                        queried = sum(len(t) for t in groups.values())
+                        detail += (f"; {queried} base observation(s) measured, "
+                                   f"{len(suspects) - queried} served from cache")
+                        v.add_gate('V8 no-regression', 'PASS', detail)
 
     # -----------------------------------------------------------------------
     # V9 geometry — the root crate's integration tests, which are the only
