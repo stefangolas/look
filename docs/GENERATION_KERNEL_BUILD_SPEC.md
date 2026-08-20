@@ -1261,6 +1261,106 @@ inflate by the certified Newton residual bound. Never treat the leader as exact.
 **Tests.** Property: BG-ENC-001 for each decorator. Composition property:
 `enclose(Processor(s, M), box) ⊆ M · enclose(s, box)` inflated by rounding.
 
+**Amendment (2026-08-20, from writing the BG-ENC-004 fan-out).** Four things
+this section did not say, three of which a packet would otherwise have had to
+guess and one of which stops an item outright.
+
+**1. The family shares one construction, and it is not per-decorator case
+analysis.** Every decorator's normal cone and immersion margin come from the
+same three steps: enclose `S_u` and `S_v` as boxes via `enclose_der`, take the
+*interval cross product* componentwise, then read both answers off the resulting
+box `N`.
+
+    immersion_lower_bound = sqrt(mig(N.x)^2 + mig(N.y)^2 + mig(N.z)^2)
+    normal_cone           = Some { axis: mid(N).normalize(),
+                                   half_angle: asin(rho / ||mid(N)||) }
+                            when rho < ||mid(N)||, where rho = || halfwidths(N) ||
+                            None otherwise
+
+The mignitude norm is exactly the box's minimum norm, because each coordinate
+attains its mignitude independently; the cone is the ball-around-the-midpoint
+bound, `rho < ||c||` being precisely the condition for a ball at distance
+`||c||` to subtend less than a half-turn. Round `rho` up and `||c||` down.
+
+This is sound but loose: the cross product of two boxes encloses
+`{ p x q : p in a, q in b }`, which decorrelates `S_u` and `S_v` when in truth
+they are evaluated at the same point. That is acceptable (BG-ENC-001 permits
+over-estimation) and it buys something structural — **every singular locus in
+the family becomes the same `None`.** The tangent parallel to the extrusion
+vector, the profile curve meeting the axis of revolution, a degenerate
+placement: all of them are `rho >= ||c||`, detected numerically, with no
+per-carrier apex analysis of the kind BG-ENC-002's `Cone` needed. Use it for
+`PCurve` and `IntersectionCurve` too when they are written.
+
+**2. `enclose_der(0, 0, ..)` is the point box, not the zero box.** The trait
+documents `enclose_der` as enclosing `der_mn`, and `der_mn(0, 0)` returns
+`subs(u, v).to_vec()`. `line.rs`, `cone.rs`, `sphere.rs` and `torus.rs` follow
+that; `plane.rs` and `cylinder.rs` return the zero box and are the outliers.
+Both are *sound* -- neither under-estimates anything a caller asks for by that
+name only if the caller never asks -- but they are not the same function, and a
+composition that delegates to an inner carrier's `(0, 0)` inherits whichever
+convention that carrier chose. The point box is the contract. The two outliers
+are a defect to fix under their own item, not silently in a decorator packet.
+
+**3. `Processor`'s inversion swaps the parameters.** "Affine transform -- map
+the box corners" is only half of it, and the omitted half is a soundness bug
+waiting to happen. `Processor::subs` with `orientation == false` evaluates
+`entity.subs(v, u)`, and `der_mn` swaps both the orders and the arguments:
+`entity.der_mn(n, m, v, u)`. An enclosure that reads `orientation` as a normal
+flip returns a box that does not contain the surface. Resolve it once, by
+swapping `(uu, vv)` and `(m, n)` at the top of each method; the normal reversal
+then falls out of the generic cross product above rather than being applied by
+hand, and applying both is a double flip.
+
+Two further notes on it. Interval arithmetic on the affine map is *equally
+tight* as hulling the eight mapped corners -- each output coordinate is linear
+with every input interval appearing once, so there is no dependency loss -- and
+it gets outward rounding for free, so prefer it to the corner hull this section
+suggests. And `Transform<Point3> for Matrix4` is projective, not affine:
+`transform_point` goes through `from_homogeneous`, which divides by `w`, while
+`transform_vector` uses the linear part only. For the affine matrices the kernel
+constructs, `w` is exactly `1.0` and the divide is exact -- but the type does
+not promise it, so the enclosure carries the divide in intervals and returns the
+entire box when `w` straddles zero.
+
+**4. `Offset` cannot be written against BG-ENC-001 as it stands, and the reason
+is a type error rather than a curvature bound.** `Offset<T, N>` is not "a
+surface pushed along its normal by a distance". It is the pointwise sum
+`S(u, v) + N(u, v)`, and `truck-geometry`'s only `ParametricSurface` impl for it
+is bounded `N: ParametricSurface<Point = C::Vector>` -- the offset field is
+**vector**-valued. `EnclosureSurface` is bounded
+`ParametricSurface<Point = Point3>`. So for any `S` that is an
+`EnclosureSurface`, `N` has `Point = Vector3` and can never be one, and
+`impl<S, N> EnclosureSurface for Offset<S, N>` does not typecheck for any
+choice of the two.
+
+The classical normal offset is the concrete instance
+`Offset<S, NormalField<S, F>>`, and enclosing *that* needs two things this
+interface does not have:
+
+- an enclosure for the **unit normal field** `n = (S_u x S_v)/||S_u x S_v||` and
+  its partials. This is where curvature genuinely enters -- `n_u` and `n_v` are
+  the shape operator -- and it is derivable from what `EnclosureSurface` already
+  exposes, since `enclose_der` takes arbitrary `(m, n)` and `n_u` needs only
+  second partials of `S` and the existing `immersion_lower_bound` to bound the
+  normalising denominator away from zero. Deriving it is not the obstacle;
+  having nowhere to put it is.
+- an enclosure for `F: ScalarFunctionD2`, the variable offset distance. There is
+  no interval scalar-function trait in the crate at all.
+
+Both are **new interface surface in `enclosure.rs`**, which makes
+BG-ENC-004-OFFSET a *design* item and not a mechanical one. The registry row is
+`BLOCKED`, and `truck-evidence/src/decorators/offset.rs` is scaffolded with the
+same explanation so it is found from the code as well as from here. The
+resolution to decide when it is picked up: add an `EnclosureVectorField` (and a
+scalar sibling) alongside `EnclosureCurve`/`EnclosureSurface`, then `Offset`
+composes exactly as the other three decorators do. Note the geometric condition
+this buys automatically -- an offset surface is an immersion only while the
+offset distance stays under the base's radius of curvature, and past that the
+cross-product box straddles zero and `normal_cone` returns `None` on its own.
+The self-intersection does not need to be predicted analytically; it is the
+family's `None` again.
+
 ---
 
 ## 4. Stage 3 — fidelity and solvers

@@ -90,13 +90,33 @@ that, and V8 no longer builds a second Cargo world.
    `use crate::elementary::{cos, sin}` and `cos(uu)`. `uu.cos()` does not
    exist in this tree and never will.**
 
-2. **The frontier is 17 wide and disk holds one worker.** Eligible now:
-   `BG-CE-001` (design, W3c), the eight `BG-ANA-001` shards, `BG-ENC-003-BSPLINE`
-   and `-NURBS`, `BG-ENC-004-*` decorators, `BG-TOL-004`, `BG-INV-107`
-   (design-blocked). A warm slot target is ~4.3 GB and free space is ~10 GB, so
-   two concurrent workers plus a verify does not fit — trying it is what
-   produced this session's corruption. The ENC-002 six ran **sequentially** at
-   roughly 20-35 minutes each end to end.
+2. **The frontier is 14 wide and disk holds three workers.** Eligible now:
+   `BG-CE-001` (design, W3c), the eight `BG-ANA-001` shards, `BG-ENC-003-BSPLINE`,
+   `BG-ENC-004-PROCESSOR`/`-REVOLVED`/`-EXTRUDED`, `BG-TOL-004`.
+
+   **Corrected 2026-08-20, session 12 — the old text here said "disk holds one
+   worker" and budgeted against ~10 GB free. That is no longer true and acting
+   on it would serialise the loop for nothing.** `pagefile.sys` had auto-grown
+   to 39.2 GB against a peak use of 15.1 GB and has been capped at 20 GB, and
+   ~7 GB of temp garbage was cleared; free space is now ~53 GB. **Budget 8 GB
+   per worker and run three slots in parallel.** The ENC-002 six ran
+   *sequentially* at 20-35 minutes each only because of the old constraint.
+
+   Two things about that 8 GB that are decisions, not measurements to redo. A
+   warm slot target is ~4.3 GB, of which 2.12 GB is 92 test executables
+   averaging 23 MB, almost entirely debuginfo; exporting
+   `CARGO_PROFILE_DEV_DEBUG=line-tables-only` would halve a slot and **was
+   measured, proposed and declined** — headroom is worth more than 2 GB a slot,
+   and a worker debugging its own failing test is better served by full
+   debuginfo. Do not apply it as a tidy-up. The real waste is unexplained: a
+   worker sometimes creates a second `wt/target` **inside** its worktree despite
+   `CARGO_TARGET_DIR`, ~1.9 GB of exact duplicate, and nobody has found why.
+   That one is worth fixing.
+
+   Also corrected: the frontier count. `schedule.py` skipped only `RUNNING` and
+   `DONE`, so a `BLOCKED` row whose dependencies are satisfied listed as
+   eligible forever — `BG-INV-107` has done so since session 10, which is where
+   the old "17" came from. It honours `BLOCKED` now.
 
 3. **When you write the next kernel packet, copy two sections out of the ENC-002
    ones.** The H-3 section (three packets lost a verify to GATE-2 before it
