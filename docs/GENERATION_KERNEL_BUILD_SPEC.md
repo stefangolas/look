@@ -289,6 +289,80 @@ landed diff as the template; it is the reference answer for this exact move.
 
 ---
 
+### BG-S0-004 — STEP spline import: supplied knots convert or refuse, never synthesize
+
+**Raised 2026-08-20** by the failing `truck-stepio` `input` property tests
+(`b_spline_surface_with_knots`, `nurbs_surface_b_spline_surface_with_knots`,
+`nurbs_curve_b_spline_curve_with_knots` — all fail deterministically at the
+tree this item was written against). Not a loop defect: the behaviour arrived
+with the vendored tree in `da72cd5`. The curve-path tiny-interval
+reparameterization and the unsorted-knot refusal in the same file predate this
+loop and are hereby promoted from local decisions to a named contract that
+covers every spline import path.
+
+**Anchors** `vendor/truck/truck-stepio/src/in/mod.rs`.
+**Locate** `rg -c 'quasi_uniform_knots'` — **expect 7** (definition + 6 calls);
+`rg -c 'ValidatedKnotVector::validate\('` — **expect 3** (curve, surface u,
+surface v). **If either count differs, stop.**
+
+**Problem.** Every spline-with-explicit-knots import path
+(`BSplineCurveWithKnots`, `BSplineSurfaceWithKnots` u and v axes; the rational
+forms dispatch through these) validates the supplied knot vector with
+`ValidatedKnotVector::validate` and then handles validation failure — other
+than `UnsortedRawKnots` — by **substituting a synthesized quasi-uniform knot
+vector** for the source's. Two failures follow:
+
+1. *Silent wrong answer.* A source whose knots fail validation imports
+   "successfully" as different geometry: the control points are the source's
+   but the knot vector is invented, which changes the represented curve
+   (observed: a surface's first u-knot importing as `0.0` against a source
+   value of `73.7…`). This is precisely the class BG-EVD-001 exists to
+   eliminate: no evidence, no refusal, wrong geometry.
+2. *Panic.* The synthesis helper computes `num_ctrl - degree` and calls
+   `KnotVec::transform(division, 0.0)`; a source declaring `ctrl <= degree`
+   reaches the subtraction underflow (debug) or `transform`'s
+   `scalar > 0.0` assert with `division == 0` (release) — an H-1 violation
+   reachable from untrusted geometry.
+
+The triggering sources are ordinary STEP: any knot/multiplicity structure
+whose active domain `[T_degree, T_ctrl]` collapses (both endpoints inside one
+multiplicity run) or whose expanded knot count does not cover
+`ctrl + degree + 1`.
+
+**Contract BG-S0-004.** For spline entities that carry explicit knots:
+
+1. Validation failure of **any** variant — `UnsortedRawKnots`,
+   `DegenerateActiveDomain`, `ControlPointCountMismatch` — is a typed refusal
+   carrying the `SplineConstructionError` witness. It is never repaired by
+   knot substitution: no path may replace supplied knots with synthesized
+   ones.
+2. A knot vector whose **total** range is positive but below the parametric
+   tolerance may be normalized to `[0, 1]` before construction — an exact,
+   shape-preserving affine reparameterization (the curve path's landed rule,
+   now stated for every axis of every path, surfaces included). A true-zero or
+   structurally degenerate domain is never normalized; it refuses.
+3. Quasi-uniform synthesis is legitimate **only** for entity forms whose
+   semantics genuinely omit the knot list (`quasi_uniform_curve`,
+   `quasi_uniform_surface`, `uniform_*`), and there too `ctrl <= degree` is a
+   typed `ControlPointCountMismatch` refusal, never a panic.
+
+**Tests.** Unit tests on named witnesses per path (curve, surface-u,
+surface-v, quasi-uniform curve, quasi-uniform surface): degenerate active
+domain refuses; knot-count mismatch refuses (this one imports "successfully"
+with wrong knots today — the never-silently-replaced witness);
+`ctrl <= degree` on a quasi-uniform form refuses without panicking;
+tiny-but-nonzero span converts with the axis normalized to `[0, 1]` and the
+other axis untouched. Property round-trip tests generate only non-degenerate
+domains (a `prop_assume` guard mirroring `validate`'s condition) and keep
+asserting **faithful** conversion — the refusal cases are unit-tested, not
+folded into the round-trip property.
+
+**Known adjacent defect, out of scope here:** `BezierCurve`/`BezierSurface`
+import uses the panicking `new` constructor on unvalidated source counts —
+same H-1 class, different mechanism, to be discharged by its own item.
+
+---
+
 ## 2. Stage 1 — data model
 
 Everything downstream depends on these types. Build in the order given: BG-EVD
