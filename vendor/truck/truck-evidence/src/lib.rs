@@ -15,6 +15,10 @@
 //! - **BG-ENC-002 for `Plane`** (`plane`) — the reference carrier impl;
 //! - **BG-ENC-004** (`decorators`) — the compositional carriers, one submodule
 //!   per decorator;
+//! - **BG-ENC-003** (`bspline`, `nurbs`) — the spline carriers, by the
+//!   convex-hull property;
+//! - **BG-ANA-001** (`analytic`) — the exactly solvable surface pairs, one
+//!   submodule per family, speaking the shared `AnalyticIntersection`;
 //! - the shared sampling harness (`harness`) so BG-ENC-001's soundness test is
 //!   written once rather than once per carrier.
 //!
@@ -38,6 +42,12 @@ pub mod enclosure;
 pub mod harness;
 /// BG-EVD-001: the outcome/evidence algebra, re-exported from `truck-base`.
 pub use truck_base::evidence as outcome;
+/// BG-ANA-001: exactly solvable surface pairs. Scaffolded empty; the shared
+/// result type lands with the design commit.
+pub mod analytic;
+/// BG-ENC-003-BSPLINE: the spline carrier impl. Scaffolded empty; the packet
+/// fills it.
+pub mod bspline;
 /// BG-ENC-002-CIRCLE: the carrier impl. Scaffolded empty; the packet fills it.
 pub mod circle;
 /// BG-ENC-002-CONE: the carrier impl. Scaffolded empty; the packet fills it.
@@ -48,6 +58,9 @@ pub mod cylinder;
 pub mod decorators;
 /// BG-ENC-002-LINE: the carrier impl. Scaffolded empty; the packet fills it.
 pub mod line;
+/// BG-ENC-003-NURBS: the spline carrier impl. Scaffolded empty; the packet
+/// fills it. Blocked on BG-ENC-003-BSPLINE.
+pub mod nurbs;
 /// BG-ENC-002 reference: `EnclosureSurface for Plane`.
 pub mod plane;
 /// BG-ENC-002-SPHERE: the carrier impl. Scaffolded empty; the packet fills it.
