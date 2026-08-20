@@ -245,7 +245,7 @@ cargo check --workspace --all-targets
 ```
 
 Never run a bare `cargo test` — it builds 56 examples. Send cargo output to a
-file and read the tail. The existing 74 lib tests + 3 integration tests must
+file and read the tail. The existing 115 lib tests + 3 integration tests must
 keep passing unchanged.
 
 ## Forbidden
