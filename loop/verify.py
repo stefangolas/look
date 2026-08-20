@@ -133,6 +133,8 @@ DEFAULT_TEST_ARGS = ['--lib', '--tests']
 # printed after one of these, until the next, belongs to that test target.
 _RUNNING_RE = re.compile(r'^\s+Running\s+(.+?)\s+\((.+?)\)\s*$')
 _DOCTEST_RE = re.compile(r'^\s+Doc-tests\s+\S+')
+# libtest's own header for one test binary's run, on stdout.
+_RUNNING_COUNT_RE = re.compile(r'^running (\d+) tests?$')
 
 
 def _target_of_running(desc, exe, wt, crates):
@@ -173,26 +175,51 @@ def _target_of_running(desc, exe, wt, crates):
     return owners[0], ('--test', name)
 
 
-def attribute_tests(text, wt, crates):
+def attribute_tests(stdout, stderr, wt, crates):
     """{test name: {'status', 'crate', 'target'}} for one cargo test run.
 
     `parse_test_statuses` answers "what happened"; this also answers "where",
     which is what lets V8 ask the base commit about one test target instead of
     rebuilding every downstream crate to re-derive an answer it already has
     for all the passing ones.
+
+    The two streams cannot be interleaved without corrupting lines (see
+    `invoke_native`), so they are matched by POSITION instead: cargo runs test
+    binaries one after another, so the Nth `Running <target>` banner on stderr
+    is the Nth `running N tests` block on stdout.
+
+    That alignment is checked, not assumed. If the counts disagree, or a
+    block's declared test count does not match the number of test lines read
+    out of it, attribution for the affected block is dropped to (None, None)
+    and the caller falls back to the wide base query. Guessing here would be
+    worse than being slow: a test attributed to the wrong target is measured
+    against a base that has never heard of it, comes back 'absent', and gets
+    charged to the packet as a regression it did not cause.
     """
-    out, crate, target = {}, None, None
-    for line in text.splitlines():
-        m = _RUNNING_RE.match(line)
+    targets = [_target_of_running(m.group(1), m.group(2), wt, crates)
+               for m in (_RUNNING_RE.match(l) for l in stderr.splitlines()) if m]
+
+    blocks, cur = [], None
+    for line in stdout.splitlines():
+        m = _RUNNING_COUNT_RE.match(line)
         if m:
-            crate, target = _target_of_running(m.group(1), m.group(2), wt, crates)
-            continue
-        if _DOCTEST_RE.match(line):
-            crate, target = None, None
+            cur = {'declared': int(m.group(1)), 'tests': []}
+            blocks.append(cur)
             continue
         m = _TEST_LINE_RE.match(line)
-        if m:
-            out[m.group(1)] = {'status': m.group(2), 'crate': crate, 'target': target}
+        if m and cur is not None:
+            cur['tests'].append((m.group(1), m.group(2)))
+
+    aligned = len(blocks) == len(targets)
+    out = {}
+    for i, b in enumerate(blocks):
+        crate, target = (targets[i] if aligned else (None, None))
+        if len(b['tests']) != b['declared']:
+            # A line was lost or invented in this block -- do not trust its
+            # position either.
+            crate, target = None, None
+        for name, status in b['tests']:
+            out[name] = {'status': status, 'crate': crate, 'target': target}
     return out
 
 
@@ -298,20 +325,18 @@ def query_base_tests(base_sha, groups, out_file, wide_args):
             cmd = ['cargo', 'test', *scope, '--no-fail-fast', '--', '--exact', *sorted(names)]
             with out_file.open('a', encoding='utf-8', newline='\n') as f:
                 f.write('\n$ ' + ' '.join(cmd) + '\n')
-            # stderr is MERGED into stdout, not captured beside it: cargo
-            # prints the `Running <target>` banners on stderr and the test
-            # lines on stdout, so two separate pipes hand back every banner
-            # after every test line and destroy the association between them.
-            res = subprocess.run(cmd, cwd=str(wt_path), stdout=subprocess.PIPE,
-                                 stderr=subprocess.STDOUT, text=True,
+            # Streams kept apart: a test's stray stderr write would otherwise
+            # land inside a `test name ... ok` line and lose it. Statuses come
+            # off stdout; only compile errors need stderr.
+            res = subprocess.run(cmd, cwd=str(wt_path), capture_output=True, text=True,
                                  encoding='utf-8', errors='replace', env=env)
-            chunk = res.stdout
+            chunk = res.stdout + res.stderr
             with out_file.open('a', encoding='utf-8', newline='\n') as f:
                 f.write(chunk)
             if has_compile_error(chunk):
                 unavailable.append((crate, target))
                 continue
-            seen = parse_test_statuses(chunk)
+            seen = parse_test_statuses(res.stdout)
             for n in names:
                 statuses[observation_key(crate, target, n)] = seen.get(n, 'absent')
         return statuses, unavailable
@@ -413,15 +438,15 @@ def compute_baseline(base_sha, crate_names, out_file, test_args=None):
         env['CARGO_TARGET_DIR'] = str(target_path)
         test_res = subprocess.run(
             ['cargo', 'test', *p_args, *(test_args or DEFAULT_TEST_ARGS), '--no-fail-fast'],
-            cwd=str(wt_path), stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True,
+            cwd=str(wt_path), capture_output=True, text=True,
             encoding='utf-8', errors='replace', env=env
         )
-        chunk = test_res.stdout
+        chunk = test_res.stdout + test_res.stderr
         with out_file.open('a', encoding='utf-8', newline='\n') as f:
             f.write(chunk)
 
         compile_ok = not has_compile_error(chunk)
-        tests = parse_test_statuses(chunk) if compile_ok else {}
+        tests = parse_test_statuses(test_res.stdout) if compile_ok else {}
         return {'compile_ok': compile_ok, 'tests': tests}
     finally:
         # Best-effort cleanup. `git worktree remove` first (keeps the repo's
@@ -515,26 +540,37 @@ class Verifier:
             f.write(f"\n===== {header} =====\n")
 
     def invoke_native(self, args, cwd):
-        """Run a native command, appending its interleaved output to out.txt,
-        and return its exit code. subprocess.run's own stdout/stderr capture
-        (rather than PowerShell's stream redirection) has none of the
-        ErrorRecord-wrapping hazard the PS1 comment describes, so this is a
-        plain run-and-append.
+        """Run a native command, appending its output to out.txt, and return
+        its exit code. subprocess.run's own stdout/stderr capture (rather than
+        PowerShell's stream redirection) has none of the ErrorRecord-wrapping
+        hazard the PS1 comment describes, so this is a plain run-and-append.
 
-        stderr is merged INTO stdout rather than captured beside it. Two
-        pipes concatenated after the fact put every line of stderr after
-        every line of stdout, and cargo splits test output across both: the
-        `Running <target> (<exe>)` banners go to stderr and the `test name
-        ... ok` lines to stdout. Reassembled that way, every banner lands
-        after every test line and nothing can tell which target a test came
-        from -- which is exactly what V8 needs in order to ask the base
-        commit about one test target instead of rebuilding the workspace.
+        The two streams are captured SEPARATELY and kept that way in
+        `last_stdout` / `last_stderr`, because callers need two properties and
+        no single capture gives both:
+
+        - Merging them (`stderr=subprocess.STDOUT`) keeps the order but not
+          the lines. A test that writes to the process's stderr from outside
+          libtest's capture splices its text into the middle of libtest's own
+          stdout line -- `test foo ... ****** banner ******` -- and that test
+          then parses as absent. Tried on 2026-08-20; it made V5 reject r3 for
+          "deleting" decorators::processor::hint_axis_tests::
+          upright_processor_forwards_the_hint_unchanged, a truck-geometry test
+          the packet never touched.
+        - Concatenating them keeps the lines but not the order, and cargo
+          splits test output across both streams: the `Running <target>
+          (<exe>)` banners go to stderr, the `test name ... ok` lines to
+          stdout.
+
+        So both are kept, and `attribute_tests` lines them up by position
+        rather than by interleaving.
         """
-        res = subprocess.run(args, cwd=str(cwd), stdout=subprocess.PIPE,
-                             stderr=subprocess.STDOUT, text=True,
+        res = subprocess.run(args, cwd=str(cwd), capture_output=True, text=True,
                              encoding='utf-8', errors='replace')
+        self.last_stdout, self.last_stderr = res.stdout, res.stderr
         with self.out_file.open('a', encoding='utf-8', newline='\n') as f:
             f.write(res.stdout)
+            f.write(res.stderr)
         return res.returncode
 
     def add_gate(self, name, status, detail='', code=''):
@@ -1482,7 +1518,7 @@ def main():
                            + '; see out.txt', code='DOWNSTREAM_BUILD_FAIL')
                 v.failed_early = True
             else:
-                attributed = attribute_tests(chunk, v.wt, downstream)
+                attributed = attribute_tests(v.last_stdout, v.last_stderr, v.wt, downstream)
                 # Only a test that is FAILED or `ignored` at HEAD can possibly
                 # be a downstream regression. Everything else passed here and
                 # needs no opinion from the base, which is the whole saving:

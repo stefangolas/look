@@ -601,6 +601,45 @@ reason is in the commit that made the change, and the code will not tell you.
   reads `RESULT.json` from the repo root -- where it arrives on the merge -- and
   files it. Deleting it first makes `land_packet` die with `FileNotFoundError`.
   Order: merge, `land_packet`, then delete.
+- **A reaper that reads `worker.pid` thinks a verifying slot is idle.**
+  `worker.pid` disappears the moment the worker writes `RESULT.json`, but
+  `verify.py` then spends 10-30 minutes compiling in that same `target/`.
+  `watchdog.py`'s `guard_disk` read slot 0 as idle and `rmtree`d
+  `loop/slots/0/target` under a live cargo three times on 2026-08-19 (its own
+  log, `22:33:04 ACTION disk 3.4 GB free: reclaimed 3.7 GB`, and at 22:43:20 an
+  `Access is denied` on a `.dll` it was deleting while cargo held it open).
+  The resulting `error[E0786] found invalid metadata files for crate`,
+  `error[E0463] can't find crate for truck_stepio` and `failed to write
+  ...dep-lib-truck_meshalgo` were all diagnosed as **code regressions in the
+  packet under test**, on unchanged source, after repeated clean builds. Two
+  hypotheses died on that. `verify.py` now writes `loop/slots/<N>/verify.pid`
+  and the watchdog reclaims nothing while one is alive; it also takes leaked
+  `%TEMP%/look-verify-baseline-*` worktrees, which are pure garbage from killed
+  verifies, before any warm target. **Deleting a warm target is not a disk
+  strategy** -- it frees the same bytes and then charges the next verify a full
+  cold rebuild, which is how that session made every retry cost more than the
+  last.
+- **Never cache a baseline whose build did not compile.** Such a file measures
+  the disk, not the base commit, and afterwards it is indistinguishable from a
+  real one and is trusted by every later verify against that base. A cached
+  `a08fd8f` baseline recorded `geometry::b_spline_curve_with_knots = ok` while
+  the test failed 3/3 when run at that exact commit; V8 charged r3 for a
+  failure it had not caused, twice, and the session's response was to weaken
+  the gate (`bfb598b`, since reverted) on a flakiness theory that direct
+  measurement had already falsified. **Ask whether the evidence is real before
+  you ask whether the gate is wrong.**
+- **cargo splits test output across two streams and `stdout + stderr` destroys
+  the order.** The `Running <target> (<exe>)` banners go to stderr, the `test
+  name ... ok` lines to stdout; captured as two pipes and concatenated, every
+  banner lands after every test line and no test can be attributed to the
+  target it ran in. `invoke_native` and both baseline runners now merge stderr
+  into stdout (`stderr=subprocess.STDOUT`). V8's narrow base query depends on
+  that attribution: without it every failing test falls back to rebuilding the
+  whole downstream workspace at base, which is the cost the redesign removes.
+- **A base build failure is never the packet's fault.** The base commit
+  predates the packet; if it will not build, that is disk, toolchain or a
+  corrupt target dir. V8 now exits **BLOCKED** rather than REJECTED when it
+  cannot get an answer out of the base, and caches nothing from that run.
 
 ## The commands
 
