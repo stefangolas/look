@@ -72,14 +72,13 @@ pub enum AnalyticIntersection {
     /// One exact curve: the transverse case.
     Curve(ExactCurve),
     /// Two exact curves: the plane × cylinder line pair, the equal-radius
-    /// cylinders' two ellipses, the coaxial circle pair.
+    /// cylinders' two ellipses, the coaxial circle pair. Every analytic
+    /// family in the spec's BG-ANA-001 table meets in at most two curves:
+    /// the coaxial torus pairs look like they could reach four circles
+    /// (outer and inner contact at two heights each), but the outer and
+    /// inner branches are mutually exclusive for fixed carrier parameters
+    /// and share one squared equation — the algebra caps at two.
     TwoCurves([ExactCurve; 2]),
-    /// A family of exact curves whose *count* is itself data: the coaxial
-    /// cylinder × torus and sphere × torus families can meet in up to four
-    /// circles, decided by the same discriminant predicates. Use `Curve` /
-    /// `TwoCurves` when the pair family fixes the count; this arm is for when
-    /// the count is part of the answer.
-    Curves(Vec<ExactCurve>),
     /// Degenerate: the pair is tangent at a single point
     /// (plane × sphere, sphere × sphere, a plane meeting a cone at its apex).
     TangentPoint(Point3),
@@ -192,11 +191,6 @@ mod tests {
             AnalyticIntersection::TwoCurves([
                 ExactCurve::Line(line),
                 ExactCurve::Line(Line(Point3::origin(), Point3::new(1.0, 0.0, 0.0))),
-            ]),
-            AnalyticIntersection::Curves(vec![
-                ExactCurve::Line(line),
-                ExactCurve::Line(Line(Point3::origin(), Point3::new(1.0, 0.0, 0.0))),
-                ExactCurve::Line(Line(Point3::origin(), Point3::new(0.0, 1.0, 0.0))),
             ]),
             AnalyticIntersection::TangentPoint(Point3::origin()),
             AnalyticIntersection::TangentLine(line),
