@@ -11,7 +11,7 @@ otherwise would eventually cost a trap.) If you are picking this up cold, read
 [`loop/ORCHESTRATOR.md`](ORCHESTRATOR.md) for how to run the loop, then
 `python loop/slot_status.py`** — nothing else. Do not read `LEDGER.jsonl` whole.
 
-Updated 2026-08-20, end of session 12. Branch: `integration/kernel-bg`. Nothing
+Updated 2026-08-20, end of session 13. Branch: `integration/kernel-bg`. Nothing
 from the loop has reached `main` and nothing has been pushed.
 
 ## What this is, if you have never seen it
@@ -55,164 +55,162 @@ here is scored, tuned, or sampled.
 
 ## Where we are
 
-**Thirty-three packets DONE of 66 (50%).** Session 12 landed the **BG-ENC-004
-decorator fan-out**: `EXTRUDED`, `PROCESSOR`, `REVOLVED`, written, dispatched,
-verified and merged in one session, all three ACCEPTED on the first attempt with
-`fault: NONE`. `truck-evidence` now has **71 lib tests + 3 integration**, an
-analytic carrier per type and a decorator module. GATE-4 sits at **109/109**.
+**Thirty-nine packets DONE of 67 (58%).** Session 13 landed **six** packets:
+the keystone `BG-ENC-003-BSPLINE` (convex-hull enclosure for
+`BSplineCurve<Point3>` — it unblocked `-NURBS`, `-PCURVE`, `-ISC`) and the
+first **five** of the eight BG-ANA-001 analytic shards: `PP`, `PS`, `SS`,
+`PCYL`, `COAX`. All six ACCEPTED on the first verify, `fault: NONE`.
+`truck-evidence` now has **109 lib tests + 3 integration** (one of the three
+is currently flaky-red — see "Pick up here" item 1, which is the gate on
+dispatching anything else). GATE-4 sits at **109/109**.
 
-**Three workers ran genuinely in parallel for the first time and it worked.**
-The ENC-002 six ran sequentially because disk said one at a time; that
-constraint is gone (see "Pick up here" item 2) and the three ENC-004 workers ran
-concurrently start to finish in ~25 minutes wall clock total, against 20-35
-minutes *each* sequentially. Nothing about the parallelism went wrong. What went
-wrong was the *verification*, and only because the orchestrator ran it through a
-wrapper with a timeout — see the new traps.
+The session's design work preceded the fan-out, as intended: scaffolding
+commit `0b5e9d2` (module tree for all ten leaves so every write set is
+disjoint), the shared result type `AnalyticIntersection`/`ExactCurve` in
+`analytic/mod.rs` (`d660199`), then two amendments — `TangentCircle`
+(`47bfa36`, needed by the coaxial families) and `Curves(Vec)` added then
+dropped (`96f7a4c` → `2ae86bb`) when deriving the COAX algebra proved every
+family meets in at most two curves. The amendments are cheap before dispatch
+and impossible after; deriving each pair's algebra to the point where the
+enum arms are justified is what "design the result type" actually cost.
 
-**The fourth shard, `BG-ENC-004-OFFSET`, is BLOCKED and was never dispatched.**
-That is the session's most valuable finding and it is item 3 below.
+**Two workers corrected their packets and were right both times** — the
+packets asked them to verify the closed forms, and the verification found
+real errors: PP's line-point formula had the plane constants paired with the
+wrong normals (worker derived and validated the fix against 20k random
+pairs); BSPLINE's out-of-range rationale was false for truck's evaluator
+(the basis window extrapolates — `Interval::ENTIRE` for out-of-range boxes,
+not an origin union); COAX's cone rows were single-nappe intuition twice
+over. The spec carries both corrections in the BG-ANA-001 amendment.
 
 ## Pick up here
 
-1. **`BG-ENC-003-BSPLINE` is the next item and it is the keystone.** It unblocks
-   `-NURBS`, `BG-ENC-004-PCURVE` and `-ISC`, which is four packets behind one.
-   The spec is explicit that it is **not** naive interval arithmetic: use the
-   **convex-hull property** — over a knot span the curve lies in the hull of its
-   control points, and `BSplineCurve::roughly_bounding_box` in
-   `truck-geometry/src/nurbs/bspcurve.rs` is already a control-hull enclosure.
-   Extract the sub-curve over `tt` by knot insertion, then bound the control
-   points; the tangent cone comes off the hodograph. For NURBS the hull property
-   holds in **homogeneous** coordinates only, and the projection of a hull is not
-   the hull of the projection unless every weight is positive — assert positive
-   weights or refuse. The spec's BG-ENC-003 section has the pseudocode.
+1. **`plane_enclose_is_sound` is flaky-red on integration and it gates every
+   dispatch.** Observed 3/3 failures at `3e34112` with a 1-ulp y-sup escape
+   (`subs` point 6.353689651523687 vs box sup ...686), green on the same day
+   at `ae79659` and on every landed worker's branch. Pre-existing
+   (`plane.rs` + `tests/plane_properties.rs` untouched since before this
+   session); none of today's six packets caused it; the escape is a genuine
+   BG-ENC-001 under-estimation when it fires. The remaining undispatched
+   packets' Done-when says "the existing tests keep passing", so a worker
+   hitting the red draw will burn turns on a defect outside its write set.
+   **Fix plane.rs first** (orchestrator amendment or a small packet: pad the
+   enclosure endpoints outward the way `bspline.rs` does, and understand the
+   root cause — the interval-induction argument says a same-tree escape is
+   impossible, so something subtler than expression-tree mismatch is going
+   on), then re-run `cargo test -p truck-evidence --lib --tests` several
+   times before trusting green.
 
-2. **Disk holds three workers, and the frontier is 11.** Free space is ~42 GB
-   after this session (it was ~10 GB when session 11 wrote "disk holds one
-   worker"): `pagefile.sys` had auto-grown to 39.2 GB against a 15.1 GB peak and
-   is capped at 20 GB, and ~7 GB of temp was cleared. **Budget 8 GB per worker
-   and run three slots.** A warm slot target is ~4.3 GB, of which 2.12 GB is 92
-   test executables averaging 23 MB — almost entirely debuginfo. Exporting
-   `CARGO_PROFILE_DEV_DEBUG=line-tables-only` would halve a slot and **was
-   measured, proposed and declined**: headroom is worth more than 2 GB a slot,
-   and a worker debugging its own failing test is better served by full
-   debuginfo. Do not re-propose it. The real waste is still unexplained — a
-   worker sometimes creates a second `wt/target` **inside** its worktree despite
-   `CARGO_TARGET_DIR`, ~1.9 GB of exact duplicate, and nobody has found why.
+2. **`BG-ANA-001-PARCYL` was mid-flight at session end** — its first worker
+   wedged silent-from-boot for 67 minutes and was killed; the watchdog
+   redispatched it late in the session. If it finished and verified, it is
+   landed and this item is stale; if not, `run_packet.py --reset` slot 1 and
+   redispatch the same packet (it owns the margin-sweep test; base `34334c1`
+   if the branch is still there — **read the fork point off the slot**, do
+   not trust this number blindly).
 
-3. **`BG-ENC-004-OFFSET` is BLOCKED on an interface question, not on a worker.**
-   The session-11 handoff expected the obstacle to be a curvature bound. It is
-   one level lower and it is a **type error**. `Offset<T, N>` is not "a surface
-   pushed along its normal by a distance": it is the pointwise sum
-   `S(u, v) + N(u, v)`, and `truck-geometry`'s only `ParametricSurface` impl for
-   it is bounded `N: ParametricSurface<Point = C::Vector>` — the offset field is
-   **vector**-valued. `EnclosureSurface` is bounded
-   `ParametricSurface<Point = Point3>`. So for any `S` that is an
-   `EnclosureSurface`, `N` has `Point = Vector3` and can never be one:
-   `impl<S, N> EnclosureSurface for Offset<S, N>` does not typecheck for any
-   choice of the two, and no amount of curvature reasoning changes that.
+3. **`BG-ANA-001-PCONE` and `BG-ANA-001-EQRCYL` packets are written and
+   undispatched** (`loop/packets/…`). PCONE is the heaviest of the eight
+   (2D conic reduction; budget turns 45); EQRCYL refuses parallel/skew
+   placements as `NonCanonicalCarrier`. Both were held back only by the
+   close-out, not by any blocker.
 
-   The classical normal offset is the concrete `Offset<S, NormalField<S, F>>`,
-   and enclosing that needs two things the interface does not have: an enclosure
-   for the **unit normal field** (this is where curvature genuinely enters, and
-   it *is* derivable from `enclose_der` plus `immersion_lower_bound`) and one for
-   `F: ScalarFunctionD2`. Both are new surface in `enclosure.rs`, so **it is a
-   design item, not a mechanical one**. The full argument and the proposed
-   resolution — add an `EnclosureVectorField` and a scalar sibling — are in the
-   **BG-ENC-004 spec amendment**, and `decorators/offset.rs` carries a short
-   version so it is findable from the code.
+4. **BSPLINE landing unblocked `BG-ENC-003-NURBS`, `BG-ENC-004-PCURVE`,
+   `BG-ENC-004-ISC` and (with BG-NUM-001) `BG-NUM-002`** — the frontier is
+   8, and NURBS/PCURVE/ISC have no packets yet. NURBS inherits real design
+   constraints from BSPLINE's deviations: the homogeneous hull needs the
+   positive-weight refusal (`EnvelopeCase::NonPositiveNurbsWeight` exists
+   for it) and should reuse BSPLINE's landed pad conventions. PCURVE/ISC
+   use the shared cone construction from the BG-ENC-004 amendment.
 
-4. **The BG-ENC-004 family shares one construction. Reuse it for PCURVE and
-   ISC** rather than writing per-decorator case analysis: enclose `S_u` and
-   `S_v`, take the **interval cross product**, read `immersion_lower_bound` off
-   the mignitude norm and `normal_cone` off the ball around the box midpoint
-   (`None` when `‖halfwidths‖ >= ‖midpoint‖`). Sound but loose, and the looseness
-   buys something structural — **every singular locus in the family becomes the
-   same `None`**, with no apex analysis of the kind `Cone` needed in BG-ENC-002.
-   Spelled out in the BG-ENC-004 spec amendment, with three landed
-   implementations to copy from.
+5. **The watchdog's wedged-killer is set to 3600s and must stay there.** At
+   the shipped default (1200s) it killed two healthy workers mid-run during
+   a model-latency storm (PP and PS, both ~23 min silent, both went on to
+   pass verify after redispatch — the kills cost ~25 min wall clock each).
+   It also **failed to reap a genuinely dead slot for 25+ minutes past its
+   own deadline** (PARCYL, polls 95-100 logged no ACTION despite
+   `stagnant > 3600s`; it acted ~10 min later for reasons not investigated).
+   Do not trust it blindly in either direction; `slot_status.py` plus
+   `tasklist` on the recorded pid is the truth. Start it with
+   `LOOK_WATCHDOG_STAGNANT=3600` (see the new trap below for the exact
+   incantation — `Start-Process` cannot set env vars in PS 5.1).
 
-5. **`BG-TOL-001-SMALL` is still unadjudicated and is now further behind.**
-   `packet/BG-TOL-001-SMALL` holds `72e2b89` ("refactor(polymesh,geotrait):
-   classify every tolerance site model or param"), `RESULT.json` DONE, 7 sites
-   migrated, 1 test added, forked at **`c75017d`** — many landings behind. Its
-   worktree was reclaimed this session for the fan-out; **the commit is safe on
-   its branch and was verified present after the reset**, but no slot holds it
-   any more. Its anchors already fail against the tree (`A1: expected 2, tree has
-   1`), so `run_packet.py` refuses to re-dispatch the packet as written. Decide
-   between rebasing onto current integration and re-verifying from scratch, or
-   re-anchoring the packet and re-dispatching. Do not merge it without a full
-   verify against a current base. Its worker also reconstructed the worktree by
-   hand after the watchdog tore it down mid-run, which is worth reading in its
-   `notes` before trusting the diff.
+6. **`BG-TOL-001-SMALL` is still unadjudicated** (unchanged from session 12):
+   commit `72e2b89` safe on its branch, forked at `c75017d`, anchors stale,
+   worker rebuilt its worktree by hand mid-run. Decide rebase-and-reverify
+   vs re-anchor-and-redispatch; do not merge unverified.
 
-6. **Two spec items from session 10's review are still unstarted**, both now
-   unblocked by the carriers and both unchanged since session 10 wrote them.
-   **`BG-EVD-005`**: a published modulus needs a *geometric* certificate —
-   BG-EVD-004's M1-M5 constrain only the arithmetic, so a tangency may publish
-   `Lipschitz` and every gate stays green; the negative test is the point.
-   **`BG-TOL-005`**: `sin_margin()` and `ratio_margin()` both return `tau_rep`,
-   two names for one number covering three quantities that do not behave alike,
-   and the observation that makes it fit the existing machinery is that a cell
-   whose `σ_min` bound reaches zero *is* BG-EVD-004's `Pole`. Full statements
-   are in session 10's review and in the spec.
+7. **Design items queue**: `BG-ENC-004-OFFSET` (BLOCKED on the
+   `EnclosureVectorField` interface, spec amendment written), `BG-EVD-005`,
+   `BG-TOL-005`, `BG-CE-001`, `BG-TOL-004`. All have statements in the spec
+   and prior reviews; none started.
 
-7. **23 downstream tests are red at base** in truck-meshalgo and truck-stepio and
-   V8 correctly ignores them. Two are a real importer defect worth its own
-   packet: `geometry::b_spline_curve_with_knots` and
-   `geometry::nurbs_curve_b_spline_curve_with_knots` draw knot increments down to
-   1e-3 and the conversion dies with "The scalar 0 is not positive".
-
-8. **Then the CE chain**, unchanged from session 9's scoping, filed below under
-   "The CE chain, scoped against the tree".
+8. **Then the CE chain** (session 9's scoping, below).
 
 ## State of the machine, as left
 
-- **The watchdog is STOPPED**, deliberately. Nothing was in flight at session
-  end, and an unattended watchdog reclaims disk — which would delete the three
-  warm slot targets. `loop/watchdog.lock` is removed. **Start it before you
-  dispatch** (`Start-Process python loop/watchdog.py`, detached; it ignores
-  `--help` and simply runs, so do not "check its CLI" the way this session did)
-  and confirm it is alive and holding the lock before relying on it. Note the
-  `python` on PATH is a PyManager shim: `Start-Process` reports the shim's pid
-  and the real interpreter's pid is the one in the lock file and the log.
-- **All three slots are FINISHED and warm**, on their landed packet branches at
-  the commits that were merged. They are safe to leave: their registry rows read
-  DONE, and the watchdog does not redispatch a DONE row. Reset with `new_slot.py`
-  when you dispatch.
-- **No leaked baseline worktrees** and no stale `verify.pid` files; both were
-  checked at session end. `git worktree list` shows the main worktree plus the
-  three slots and nothing else.
+- **The watchdog is STOPPED** at session end and `loop/watchdog.lock` is
+  removed. It was deliberately run at `LOOK_WATCHDOG_STAGNANT=3600` during
+  the session; if you restart it, use the same value. Slots 0 and 2 are
+  FINISHED and warm on their landed branches (`ae79659`, `69ad194`); their
+  rows read DONE and are safe to leave. Slot 1 held PARCYL at close — see
+  "Pick up here" item 2.
+- **Disk ~36 GB free** at close. Three warm slot targets (~4.3 GB each) and
+  no leaked `%TEMP%/look-verify-baseline-*` (checked). The `wt/target`
+  duplicate-dirs that plagued session 12 did not recur this session.
+- **Six verifies ran, all ACCEPTED first try.** Baseline cache keys used:
+  `658033d`, `5ecebb4` (twice, sequential), `634519e`, `34c9cb3`, `56ac0bd`.
+- `loop/packets/` has **undispatched packets for PARCYL, PCONE, EQRCYL**
+  (registry rows point at them); their anchors were verified against the
+  tree at writing time.
 
 ## The parallelism picture
 
-66 packets: 40 mechanical, 15 design, 11 wide-mechanical. 33 remain, and the
-frontier reports **11 eligible, all 11 mutually write-disjoint**: `BG-CE-001`
-and `BG-TOL-004` (design), the eight `BG-ANA-001` shards, and
-`BG-ENC-003-BSPLINE`. The eight ANA shards are the widest mechanical fan-out
-left in the graph and they are ready now — three at a time is three sessions of
-throughput, or fewer if the disk budget above holds up under four.
+67 rows (one added: `BG-ENC-004-SHARED-CONE`, the cross_box consolidation,
+filed with `needs` on PCURVE+ISC so it lands exactly once, after them).
+**26 SPECD, 2 BLOCKED** (`BG-INV-107`, `BG-ENC-004-OFFSET`), frontier **8
+eligible**: PCONE, PARCYL, EQRCYL, NURBS, PCURVE, ISC (all mechanical, all
+write-disjoint), plus CE-001 and TOL-004 (design).
 
-**The bottleneck is no longer disk, worker throughput, or packet assembly.** All
-three moved this session: disk went from one worker to three, three workers ran
-concurrently without interference, and three packets were written from scratch in
-one session and all three landed first time. What remains is **orchestrator
-judgement on the design-class items** — the CE chain alone is three, plus
-`BG-EVD-005`, `BG-TOL-005` and now `BG-ENC-004-OFFSET`.
-
-The distribution still tells the story, though it has moved: **ENC is no longer
-at zero** — 10 of 15 ENC packets are done (15, not 14: session 11 added
-BG-ENC-005). INV 9, ANA 8 and FID 4 are all still at zero — 21 packets, and
-still the certification half of the kernel.
-
-**What the fan-out cost.** Three packets, one scaffolding commit, three
-workers, three verifies, three merges, **zero rejections**. Every judgement that
-would have become a round trip was paid *before* dispatch by reading the carrier
-source rather than the handoff — the `Processor` parameter swap, the `Offset`
-type error, the shared cone construction. That is the session-9 finding holding
-up: assembly is cheap, judgement is the whole cost, and the judgement is bought
-by reading the tree.
+Three concurrent workers ran cleanly for the second session running — the
+fan-out pattern (scaffolding commit → shared-type design commit → templated
+packets with per-pair decision tables → three at a time) is now proven and
+is the template for the remaining mechanical work. What cost time this
+session was not the loop, it was the **model endpoint**: multi-hour silent
+gaps from boot on three workers, one worker dead-on-arrival, one 60-minute
+mid-run silence that recovered. Worker cost is still noise (~$0.06/packet);
+orchestrator attention during latency storms is the real budget.
 
 ## Traps, each one paid for
+- **The watchdog's default 1200s wedged-killer kills healthy workers during a
+  model-latency storm.** Session 13's endpoint had 23-60+ minute silence gaps
+  from boot on three workers; the shipped default killed two of them mid-think
+  (both later passed verify after redispatch — the kills cost ~25 min each).
+  Start it with `LOOK_WATCHDOG_STAGNANT=3600`, and note **PowerShell 5.1's
+  `Start-Process` has no `-Environment` parameter** — launch through
+  `cmd /c "set LOOK_WATCHDOG_STAGNANT=3600&& python loop/watchdog.py"` or the
+  variable silently never reaches the child.
+- **The watchdog can also fail to reap a genuinely dead slot past its own
+  deadline.** PARCYL's first worker sat 67+ minutes silent with a live cmd
+  shim; polls 95-100 logged `stagnant > 3600s`-worth of silence yet no ACTION
+  line appeared until roughly ten minutes later, cause not investigated.
+  Trust `slot_status.py` + `tasklist` on the pid, not the watchdog's silence.
+  Related: a wedged worker keeps its `cmd.exe` shim alive, so a pid check
+  alone says RUNNING — the underlying `opencode run` node process is the one
+  that matters.
+- **Whether a worker commits `RESULT.json` varies, and it changes the landing
+  dance.** Four of session 13's six left it uncommitted in the worktree (copy
+  it to the repo root yourself before `land_packet.py`); two committed it, so
+  it arrived **tracked** on the merge and `land_packet.py` refused on the
+  dirty tree until `git checkout -- RESULT.json`. Read the merge stat: a
+  `create mode 100644 RESULT.json` line means the committed flavor.
+- **Derive every pair's algebra to the end before fixing shared enum arms.**
+  Session 13 added `Curves(Vec<ExactCurve>)` for coaxial torus families it
+  believed could meet in four circles, then proved — one line of algebra
+  later — that outer and inner contacts are mutually exclusive and share the
+  squared equation, capping every family at two. The arm was added and
+  dropped in two commits. Arms are cheap before dispatch and impossible
+  after; so is the algebra that justifies them.
 - **A verify launched through anything with a timeout is a verify you will
   kill, and killing one leaks its baseline worktree.** Session 12 ran three
   verifies inside a backgrounded shell wrapper whose harness cap is 600 s. A

@@ -1780,9 +1780,35 @@ BG-TOL-001 and BG-CE-006.
 | plane × cylinder | 2 lines / 1 tangent line / circle / ellipse | by axis-normal angle and distance |
 | plane × cone | conic section | this is the *definition* of a conic |
 | sphere × sphere | circle, tangent point, or empty | |
-| coaxial pairs (cyl/cone/sphere/torus) | circles or empty | |
+| coaxial pairs (cyl/cone/sphere/torus) | circles or empty | see the amendment below for the double-nappe cone rows |
 | parallel-axis cylinders | lines or empty | |
 | equal-radius cylinders, intersecting axes | **two ellipses**, rational | the classic exact case |
+
+**Amendment (2026-08-20, from landing BG-ENC-003-BSPLINE and the first five
+BG-ANA-001 shards).** Two corrections the packets pre-decided wrong and the
+workers proved:
+
+**1. BG-ENC-003: `subs` extrapolates outside the knot range; there is no
+origin union.** The hull-of-control-points ∪ {origin} reasoning applies to the
+mathematical Cox–de Boor basis, not to truck's evaluator: `der_n` clamps its
+basis window and extrapolates the boundary polynomial, so `subs(t)` is
+unbounded as |t| → ∞. The landed `enclose` returns the entire box for any `tt`
+extending beyond the knot range. Over-estimation is always acceptable
+(BG-ENC-001); the origin union would have under-estimated. Two further
+landed details: the hull endpoints are padded by `64·ε·(1+|coord|)` rather
+than one ulp (Boehm insertion and the source evaluation disagree by up to
+~10 ulps, measured), and the degree-0 hodograph's right-boundary evaluation
+makes `hull(sub-curve) ∪ {subs(lo), subs(hi)}` the sound hull.
+
+**2. BG-ANA-001 coaxial table: the cone rows are double-napped, twice
+over.** (a) Two same-slope coaxial cones with different apexes are **not**
+empty — they meet in **one circle** at the apex midpoint
+(`|z − za0| = |z − za1|` has the solution `z = (za0+za1)/2`). (b) Two
+different-slope coaxial cones meet in **two circles**, not "0, 1 or 2": the
+between-apexes sign region always contributes one and the outside region
+another. Single-nappe intuition is the error; the carrier's `v` is unbounded
+both ways. The landed COAX cell implements both corrections.
+
 
 **Not** closed form, and correctly deferred to the general solver: cylinder ×
 cylinder in general position, sphere × cylinder in general position, torus ×
