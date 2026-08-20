@@ -1,0 +1,12 @@
+{
+  "id": "BG-ENC-002-CYLINDER",
+  "status": "DONE",
+  "contracts": ["BG-ENC-001", "BG-ENC-002"],
+  "tests_added": 6,
+  "sites_migrated": 0,
+  "sites_deferred": 0,
+  "deviations": [],
+  "disagreements": [],
+  "baseline_failures": [],
+  "notes": "EnclosureSurface for Cylinder in vendor/truck/truck-evidence/src/cylinder.rs. enclose evaluates the certified crate pair crate::elementary::{cos,sin} on the whole cell (never endpoint-only), so arcs straddling an interior extremum contain it; z is affine and exact. enclose_der returns (1,0) -> -(r*sin uu), r*cos uu, 0 as the negated interval product, (0,1) -> the constant (0,0,1), and the zero box for every higher order. normal_cone uses the named const SEMICIRCLE (pi): w <= pi gets the midpoint-angle axis with half_angle w/2, w > pi gets the axis-z cone at half_angle pi/2 (sound, not tight). immersion_lower_bound returns self.radius() exactly. interval_at helper duplicated from plane.rs (plane.rs is read-only for this packet). All six mandated tests added with 20+ samples per axis; every comparison epsilon carries a same-line // H-3 comment (verified against the GATE-2 regex on the diff). cargo fmt --check, clippy -D warnings, cargo test -p truck-evidence, and cargo check --workspace --all-targets all pass; plane tests unchanged. kernel-gates.sh exits 0 (baseline merge-base with main predates the vendor/truck vendoring, so the diff gates are documented no-ops; added lines are H-3-compliant regardless). Transparency: I read the sibling circle.rs once while surveying the crate before starting; the implementation is based solely on plane.rs and this packet's decisions."
+}
