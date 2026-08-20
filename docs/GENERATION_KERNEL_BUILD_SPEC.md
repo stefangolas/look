@@ -984,6 +984,46 @@ conversion now preserves it, and a representable (z-canonical placement,
 z-extrusion) circle pair extrudes to `Cylinder` rather than a homotopy
 B-spline.
 
+**Amendment (2026-08-19, from the ENUM SPEC_GAP): the placed-surface variant.**
+`Surface` also carries
+
+```rust
+Processor(Processor<Surface, Matrix4>),   // a placed surface, exact under affine
+```
+
+and the `Transformed<Matrix4>` contract for the four z-canonical analytic
+carriers is: **translation-only** linear part (exactly identity) moves
+center/apex and keeps radius/half-angle; **any other transform** produces
+`Surface::Processor(Processor::with_transform(inner, M))` — never a
+silently-wrong carrier. (A rotation of a `Cylinder` is a real cylinder, but
+not a z-canonical one; moving only its center, as the first attempt did,
+publishes wrong geometry with a confident type. A tighter rule for `Sphere` —
+rotation about center is carrier-invariant — is allowed later.) This composes
+with BG-ENC-004-PROCESSOR, whose enclosure is exact for affine maps.
+
+**Two defects found by the ENUM packet's first dispatch (kept here so the
+next packet does not rediscover them):**
+
+1. **The pre-packet circle→NURBS degrade is unsound on full circles.** The
+   rational NURBS of a full `(0, 2π)` circle has a weight double-zero at its
+   midpoint parameter (`w(s) = (2s−1)²`), so the *old* conversion produced a
+   curve that evaluates to **NaN** at that parameter. Preserving the circle
+   as `Curve::Circle` is not just analytic hygiene; it removes a live NaN
+   from the sweep path.
+2. **`RevolutedCurve` parameter search is not branch-consistent for periodic
+   profiles.** With a periodic profile (the preserved `Circle`), the search
+   can return u values from different branches (observed `−10π` and `11π`
+   against hints near the principal branch), flipping boundary orientation
+   in downstream tests. The contract: when the entity curve has period T, a
+   returned parameter must be normalized by multiples of T to the branch
+   nearest the hint (and to the principal branch when no hint is given).
+   Impl obligations for new variants (`Invertible`, `Transformed`,
+   `ParameterDivision2D`, search traits) live with the enum; a no-op
+   `Invertible` on an orientation-free carrier is honest and must be
+   documented as such where it is written. `derive_more`'s `From`/`TryInto`
+   are hand-written in `truck-geometry` (dep boundary: derive_more is a
+   truck-modeling dependency).
+
 **Why this is Stage 1 and not later.** §16.1 needs cylinder→cylinder ($r \pm d$)
 and cone→cone (shifted apex) in closed form. Once code depends on a NURBS
 cylinder, every one of those call sites has to be found and changed.

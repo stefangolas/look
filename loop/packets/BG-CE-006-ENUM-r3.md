@@ -28,7 +28,10 @@ class:       mechanical
 crates:      [truck-geometry, truck-shapeops]
 depends_on:  [BG-CE-006-ENUM-r2]
 write_allow:
-  - vendor/truck/truck-shapeops/src/transversal/
+  - vendor/truck/truck-shapeops/src/transversal/divide_face/mod.rs
+  - vendor/truck/truck-shapeops/src/transversal/divide_face/tests.rs
+  - vendor/truck/truck-shapeops/src/transversal/integrate/mod.rs
+  - vendor/truck/truck-shapeops/src/transversal/integrate/tests.rs
   - vendor/truck/truck-geometry/src/canonical.rs
   - vendor/truck/truck-geometry/src/specifieds/circle.rs
 read_allow:
