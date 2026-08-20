@@ -1,0 +1,12 @@
+{
+  "id": "BG-ENC-003-NURBS",
+  "status": "DONE",
+  "contracts": ["BG-ENC-001", "BG-ENC-002"],
+  "tests_added": 8,
+  "sites_migrated": 0,
+  "sites_deferred": 0,
+  "deviations": [],
+  "disagreements": [],
+  "baseline_failures": [],
+  "notes": "EnclosureCurve for NurbsCurve<Vector4> landed in vendor/truck/truck-evidence/src/nurbs.rs. The convex-hull property is applied in homogeneous coordinates: the sub-curve over [lo, hi] is extracted by Boehm knot insertion, its control points (x, y, z, w) are hulled as a private Hull4, and the 3D box is the outward-rounded inari division of each coordinate interval by the weight interval. Positive-weight gate (decision 3) is the plain f64 comparison curve.control_points().iter().all(|v| v.weight() > 0.0); the trait impl is total (non-positive weight -> unbounded box / None cone) and the certified try_enclose refuses with Refusal::UnsupportedEnvelope(EnvelopeCase::NonPositiveNurbsWeight). enclose_der evaluates the box form of the Leibniz weighted-derivative recursion C^(n) = (A^(n)_xyz - sum binom(n,k) w^(k) C^(n-k)) / w over the k-fold homogeneous hodographs; sampled der_n lie inside for n in 1..=3 on the certificate-witness circle (mixed weights 1 and 2) and the rationalized polynomial. The four BG-ENC-003-BSPLINE deviations (out-of-range extrapolation, degenerate point box, HULL_PAD widening, degree-0 boundary union) are inherited as landed behavior per the packet. All 8 required tests pass; the existing suite (115 lib + 3 integration) passes unchanged. cargo fmt/clippy/check and the workspace check are clean for truck-evidence (the sole check warning is a pre-existing unused_qualifications in truck-meshalgo, outside the write set)."
+}
