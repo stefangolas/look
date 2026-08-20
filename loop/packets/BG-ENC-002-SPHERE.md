@@ -23,6 +23,7 @@ write_allow:
   - vendor/truck/truck-evidence/src/sphere.rs
 read_allow:
   - vendor/truck/truck-evidence/src/lib.rs
+  - vendor/truck/truck-evidence/src/elementary.rs
   - vendor/truck/truck-evidence/src/enclosure.rs
   - vendor/truck/truck-evidence/src/harness.rs
   - vendor/truck/truck-evidence/src/plane.rs
@@ -56,8 +57,18 @@ is, with `u` the **polar** angle from `+z` and `v` the **azimuth**:
 `Sphere::new` does not validate the radius (unlike `Cylinder`); a sphere with
 `r ≤ 0` or non-finite `r` has no sound enclosure — see decision 6.
 
-`inari::Interval` provides outward-rounded `sin()`/`cos()`; **use them, never
-endpoint-only evaluation**. Interval products (`[a,b]·[c,d]`) are also
+**Where the interval trig comes from.** `inari::Interval` has **no** `sin`/`cos`
+in this tree: they live in `inari`'s own `elementary` module behind its `gmp`
+feature, and `truck-evidence` takes `inari` with `default-features = false`.
+Use the crate's own certified pair instead —
+
+    use crate::elementary::{cos, sin};
+
+free functions from `inari::Interval` to `inari::Interval`, already
+outward-rounded and already accounting for the interior extrema at `kπ/2`.
+Write `cos(uu)`, never `uu.cos()`; the method does not exist and a design that
+needs it is a design that stops. **Never evaluate a trig function only at the
+interval endpoints.** Interval products (`[a,b]·[c,d]`) are also
 outward-rounded — soundness composes.
 
 ## Decisions already made for you
@@ -71,7 +82,7 @@ outward-rounded — soundness composes.
    you replace. Crate-level `#![deny(...)]` in `lib.rs` covers your module;
    do not add a second header. Follow `plane.rs` for structure and tone.
 
-2. **`enclose`**: `x = c.x + interval_at(r) * uu.sin() * vv.cos()` and cyclically
+2. **`enclose`**: `x = c.x + interval_at(r) * sin(uu) * cos(vv)` and cyclically
    (`y`: `sin u · sin v`, `z`: `cos u`). Pure inari arithmetic throughout.
 
 3. **`enclose_der(m, n)`**: compute the analytic partials (read them off

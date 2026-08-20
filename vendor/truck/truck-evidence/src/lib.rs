@@ -27,6 +27,9 @@
     clippy::indexing_slicing
 )]
 
+/// BG-ENC-005: certified sin/cos for interval arguments, which
+/// `inari` itself only provides behind its `gmp` feature.
+pub mod elementary;
 /// BG-ENC-001: the enclosure interface.
 pub mod enclosure;
 /// Shared sampling-soundness harness (BG-TEST of BG-ENC-001).

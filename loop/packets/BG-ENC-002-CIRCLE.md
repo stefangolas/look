@@ -23,6 +23,7 @@ write_allow:
   - vendor/truck/truck-evidence/src/circle.rs
 read_allow:
   - vendor/truck/truck-evidence/src/lib.rs
+  - vendor/truck/truck-evidence/src/elementary.rs
   - vendor/truck/truck-evidence/src/enclosure.rs
   - vendor/truck/truck-evidence/src/harness.rs
   - vendor/truck/truck-evidence/src/plane.rs
@@ -61,8 +62,20 @@ sin/−cos).
 (`BG-ENC-004-PROCESSOR` maps boxes through the matrix; trimming intersects
 domains) and are deliberately not yours.
 
-`inari::Interval` provides outward-rounded `sin()`/`cos()`; **use them, never
-endpoint-only evaluation.**
+**Where the interval trig comes from.** `inari::Interval` has **no** `sin`/`cos`
+in this tree: they live in `inari`'s own `elementary` module behind its `gmp`
+feature, and `truck-evidence` takes `inari` with `default-features = false`.
+Use the crate's own certified pair instead —
+
+    use crate::elementary::{cos, sin};
+
+free functions from `inari::Interval` to `inari::Interval`, already
+outward-rounded and already accounting for the interior extrema at `kπ/2`.
+Write `cos(uu)`, never `uu.cos()`; the method does not exist and a design that
+needs it is a design that stops. **Never evaluate a trig function only at the
+interval endpoints** — an interval spanning an interior extremum (e.g.
+`[0.4π, 0.6π]` for `cos`) must contain the extremal value, and endpoint
+evaluation is the historic under-estimation bug this item exists to prevent.
 
 ## Decisions already made for you
 
@@ -75,7 +88,7 @@ endpoint-only evaluation.**
    you replace. Crate-level `#![deny(...)]` in `lib.rs` covers it. Follow
    `plane.rs` for structure and tone.
 
-2. **`enclose`**: `x = tt.cos()`, `y = tt.sin()`, `z` the degenerate
+2. **`enclose`**: `x = cos(tt)`, `y = sin(tt)`, `z` the degenerate
    `interval_at(0.0)`.
 
 3. **`enclose_der(n, tt)`**: by `n % 4` exactly as `der_n` does —

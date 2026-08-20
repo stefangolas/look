@@ -27,6 +27,7 @@ write_allow:
   - vendor/truck/truck-evidence/src/cylinder.rs
 read_allow:
   - vendor/truck/truck-evidence/src/lib.rs
+  - vendor/truck/truck-evidence/src/elementary.rs
   - vendor/truck/truck-evidence/src/enclosure.rs
   - vendor/truck/truck-evidence/src/harness.rs
   - vendor/truck/truck-evidence/src/plane.rs
@@ -61,11 +62,20 @@ interval-trigonometry bug lives. The parameterization (read it off
 with normal `(cos u, sin u, 0)` and `Cylinder::new` refusing `r ≤ 0`, so
 **`r > 0` is an invariant you may rely on**.
 
-`inari::Interval` provides outward-rounded `sin()` and `cos()`. **Use them;
-never evaluate a trig function only at the interval endpoints** — an interval
-spanning an interior extremum (e.g. `[0.4π, 0.6π]` for `cos`) must contain the
-extremal value, and endpoint evaluation is the historic under-estimation bug
-this item exists to prevent.
+**Where the interval trig comes from.** `inari::Interval` has **no** `sin`/`cos`
+in this tree: they live in `inari`'s own `elementary` module behind its `gmp`
+feature, and `truck-evidence` takes `inari` with `default-features = false`.
+Use the crate's own certified pair instead —
+
+    use crate::elementary::{cos, sin};
+
+free functions from `inari::Interval` to `inari::Interval`, already
+outward-rounded and already accounting for the interior extrema at `kπ/2`.
+Write `cos(uu)`, never `uu.cos()`; the method does not exist and a design that
+needs it is a design that stops. **Never evaluate a trig function only at the
+interval endpoints** — an interval spanning an interior extremum (e.g.
+`[0.4π, 0.6π]` for `cos`) must contain the extremal value, and endpoint
+evaluation is the historic under-estimation bug this item exists to prevent.
 
 ## Decisions already made for you
 
@@ -80,8 +90,8 @@ this item exists to prevent.
    `interval_at` helper (copy it or reuse it via `pub(crate)` — your call, but
    one definition is better than two).
 
-2. **`enclose`**: `x = c.x + interval_at(r) * uu.cos()`, `y = c.y +
-   interval_at(r) * uu.sin()`, `z = c.z + vv` — all in `inari` arithmetic,
+2. **`enclose`**: `x = c.x + interval_at(r) * cos(uu)`, `y = c.y +
+   interval_at(r) * sin(uu)`, `z = c.z + vv` — all in `inari` arithmetic,
    which rounds outward for you. Affine in `v`, so the `z` bound is exact.
 
 3. **`enclose_der(m, n)`**: `(1,0)` → `(-r·sin u, r·cos u, 0)` componentwise

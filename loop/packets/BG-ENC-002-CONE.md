@@ -27,6 +27,7 @@ write_allow:
   - vendor/truck/truck-evidence/src/cone.rs
 read_allow:
   - vendor/truck/truck-evidence/src/lib.rs
+  - vendor/truck/truck-evidence/src/elementary.rs
   - vendor/truck/truck-evidence/src/enclosure.rs
   - vendor/truck/truck-evidence/src/harness.rs
   - vendor/truck/truck-evidence/src/plane.rs
@@ -70,11 +71,20 @@ for exactly this reason. Every other carrier in this family is an immersion on
 its whole domain and this one is not, so this is where the `Option<DirCone>`
 in the trait earns its existence.
 
-`inari::Interval` provides outward-rounded `sin()` and `cos()`. **Use them;
-never evaluate a trig function only at the interval endpoints** — an interval
-spanning an interior extremum (e.g. `[0.4π, 0.6π]` for `cos`) must contain the
-extremal value, and endpoint evaluation is the historic under-estimation bug
-this item exists to prevent.
+**Where the interval trig comes from.** `inari::Interval` has **no** `sin`/`cos`
+in this tree: they live in `inari`'s own `elementary` module behind its `gmp`
+feature, and `truck-evidence` takes `inari` with `default-features = false`.
+Use the crate's own certified pair instead —
+
+    use crate::elementary::{cos, sin};
+
+free functions from `inari::Interval` to `inari::Interval`, already
+outward-rounded and already accounting for the interior extrema at `kπ/2`.
+Write `cos(uu)`, never `uu.cos()`; the method does not exist and a design that
+needs it is a design that stops. **Never evaluate a trig function only at the
+interval endpoints** — an interval spanning an interior extremum (e.g.
+`[0.4π, 0.6π]` for `cos`) must contain the extremal value, and endpoint
+evaluation is the historic under-estimation bug this item exists to prevent.
 
 ## Decisions already made for you
 
@@ -99,8 +109,8 @@ this item exists to prevent.
    degenerate interval computed once, because `tan` is evaluated in `f64` and
    you must not pretend that is exact. Then
 
-       x = apex.x + s * vv * uu.cos()
-       y = apex.y + s * vv * uu.sin()
+       x = apex.x + s * vv * cos(uu)
+       y = apex.y + s * vv * sin(uu)
        z = apex.z + vv
 
    all in `inari` arithmetic, which rounds outward for you. `vv` is signed and

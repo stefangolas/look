@@ -27,6 +27,7 @@ write_allow:
   - vendor/truck/truck-evidence/src/torus.rs
 read_allow:
   - vendor/truck/truck-evidence/src/lib.rs
+  - vendor/truck/truck-evidence/src/elementary.rs
   - vendor/truck/truck-evidence/src/enclosure.rs
   - vendor/truck/truck-evidence/src/harness.rs
   - vendor/truck/truck-evidence/src/plane.rs
@@ -68,11 +69,20 @@ torus: the inner circle `R + r·cos v = 0` is a genuine singular circle where
 This is the same shape of obligation the cone has at its apex, and it is why the
 trait's `normal_cone` returns an `Option`.
 
-`inari::Interval` provides outward-rounded `sin()` and `cos()`. **Use them;
-never evaluate a trig function only at the interval endpoints** — an interval
-spanning an interior extremum (e.g. `[0.4π, 0.6π]` for `cos`) must contain the
-extremal value, and endpoint evaluation is the historic under-estimation bug
-this item exists to prevent.
+**Where the interval trig comes from.** `inari::Interval` has **no** `sin`/`cos`
+in this tree: they live in `inari`'s own `elementary` module behind its `gmp`
+feature, and `truck-evidence` takes `inari` with `default-features = false`.
+Use the crate's own certified pair instead —
+
+    use crate::elementary::{cos, sin};
+
+free functions from `inari::Interval` to `inari::Interval`, already
+outward-rounded and already accounting for the interior extrema at `kπ/2`.
+Write `cos(uu)`, never `uu.cos()`; the method does not exist and a design that
+needs it is a design that stops. **Never evaluate a trig function only at the
+interval endpoints** — an interval spanning an interior extremum (e.g.
+`[0.4π, 0.6π]` for `cos`) must contain the extremal value, and endpoint
+evaluation is the historic under-estimation bug this item exists to prevent.
 
 ## Decisions already made for you
 
@@ -88,16 +98,16 @@ this item exists to prevent.
    one definition is better than two).
 
 2. **Compute the tube radius interval once**: `rho = interval_at(R) +
-   interval_at(r) * vv.cos()`. Every coordinate and every partial is written in
+   interval_at(r) * cos(vv)`. Every coordinate and every partial is written in
    terms of `rho`, and doing it once is both clearer and tighter than inlining
    it three times. Note `rho` may straddle zero on a spindle torus; that is
    legal and `inari` handles it. Do **not** take an absolute value here.
 
 3. **`enclose`**:
 
-       x = center.x + rho * uu.cos()
-       y = center.y + rho * uu.sin()
-       z = center.z + interval_at(r) * vv.sin()
+       x = center.x + rho * cos(uu)
+       y = center.y + rho * sin(uu)
+       z = center.z + interval_at(r) * sin(vv)
 
    all in `inari` arithmetic, which rounds outward for you. This is a *box*
    over the two independent angle intervals: it is not tight (the true patch is
@@ -107,7 +117,7 @@ this item exists to prevent.
    - `(1,0)` → `rho * (−sin u, cos u, 0)`, `z` degenerate at `0.0`;
    - `(0,1)` → `interval_at(r) * (−sin v · cos u, −sin v · sin u, cos v)`;
    - `(2,0)` → `rho * (−cos u, −sin u, 0)`;
-   - `(1,1)` → `−interval_at(r) * vv.sin() * (−sin u, cos u, 0)`, i.e. the
+   - `(1,1)` → `−interval_at(r) * sin(vv) * (−sin u, cos u, 0)`, i.e. the
      `u`-derivative of `(0,1)`; derive it rather than guessing, and check it
      against `torus.rs`'s own higher partials if it has them;
    - `(0,2)` → `interval_at(r) * (−cos v · cos u, −cos v · sin u, −sin v)`.

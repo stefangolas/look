@@ -1154,6 +1154,60 @@ B-splines. Required for BG-NUM termination.
 **BG-ENC-003 (Outward rounding).** All interval arithmetic rounds outward. Never
 compile enclosure code with fast-math or FMA contraction that could round inward.
 
+### BG-ENC-005 — Certified elementary functions
+
+**Amendment (2026-08-20, from BG-ENC-002-CIRCLE's SPEC_GAP).** BG-ENC-002 below
+says to "propagate intervals through the parameterisation, being careful that
+`sin`/`cos` over an interval must account for the extrema at kπ/2 inside the
+interval". It never said where interval `sin`/`cos` come from, and in this tree
+they did not exist: `inari` defines `Interval::sin`/`::cos` in its `elementary`
+module behind `#[cfg(feature = "gmp")]`, and `truck-evidence` declares
+`inari = { version = "2.0", default-features = false }`. `Plane`, the reference
+carrier, is affine and never needed them, so the gap survived until the first
+curved carrier was dispatched and stopped on `E0599`.
+
+**The `gmp` route was measured and rejected**, not waved away: it pulls
+`gmp-mpfr-sys` and `rug`, which build GMP and MPFR from source through
+autotools. The build machine has neither `make` nor `m4`, and its active
+toolchain is `x86_64-pc-windows-gnullvm`, which `gmp-mpfr-sys` does not list as
+a supported target. Turning it on is a toolchain project, not a feature flag,
+and it would put a C build between the kernel and every certified evaluation.
+
+**So the substrate is built in-tree**, in `truck-evidence/src/elementary.rs`, on
+the part of `inari` that is not feature-gated — outward-rounded arithmetic,
+`sqr`, `floor`, and the correctly-rounded constants `PI` and `FRAC_PI_2`:
+
+    pub fn sin(xx: Interval) -> Interval
+    pub fn cos(xx: Interval) -> Interval
+
+Three obligations, each a theorem rather than an estimate, and each the reason a
+line of that module looks the way it does:
+
+1. **Enclosure comes from inclusion-monotone interval arithmetic.** Every
+   expression is evaluated on intervals, so it encloses its own range.
+2. **Truncation is bounded, not estimated.** The Taylor series of sin and cos
+   alternate with decreasing terms for |t| ≤ 1, so the error after n terms is at
+   most the magnitude of the first omitted term. The partial sum is inflated by
+   exactly that.
+3. **Argument reduction is an exact identity.** `sin(x) = ±sin(x − k·π/2)` or
+   `±cos(x − k·π/2)` for *every* integer k, so the choice of k cannot make the
+   answer wrong — only wide. The subtraction runs against the interval `π/2`
+   rather than a float, so the reduction's own rounding is carried. When
+   cancellation makes the reduced argument leave the series' domain, the
+   functions return `[-1, 1]`: loose, never wrong.
+
+**Tests.** Property: containment against a dense sweep of arguments across many
+periods, sampled through the quadrant boundaries where the reduction switches
+branch — a sign error in the quadrant table dies there and nowhere else. Unit:
+an interval spanning π/2 encloses `sin = 1` (the trig bug, at the primitive
+level rather than the carrier level). Property: `sin² + cos² ∋ 1`, which is
+independent of the reference implementation. Property: a degenerate argument
+gives a *narrow* answer — without it, every soundness test above passes on a
+function that returns `[-1, 1]` unconditionally.
+
+**Status.** Landed. It is logically prior to BG-ENC-002 and blocks every curved
+carrier there; `Line` and `Plane` are affine and do not depend on it.
+
 ### BG-ENC-002 — Analytic carriers
 
 Closed-form. For `Plane`, `Line`, `Circle`, `Cylinder`, `Cone`, `Sphere`,
