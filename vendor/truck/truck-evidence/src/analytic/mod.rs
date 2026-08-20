@@ -81,6 +81,13 @@ pub enum AnalyticIntersection {
     /// (plane × cylinder, tangent parallel-axis cylinders, a plane tangent to
     /// a cone along a generator).
     TangentLine(Line<Point3>),
+    /// Degenerate: the pair is tangent along a whole circle — a sphere or
+    /// torus tangent to a coaxial cylinder or cone (the counterbore and
+    /// fillet families BG-ANA-002 names). The circle is the entire contact
+    /// locus; distinguishing it from a transverse single circle is the
+    /// tangency classification, decided by the same exact discriminant
+    /// predicates that count the transverse circles.
+    TangentCircle(PlacedCircle),
     /// Degenerate: a parallel placement with no intersection — parallel
     /// planes, or parallel axes too far apart to touch. The parallelism is
     /// the classification, and it is exact.
@@ -182,6 +189,7 @@ mod tests {
             ]),
             AnalyticIntersection::TangentPoint(Point3::origin()),
             AnalyticIntersection::TangentLine(line),
+            AnalyticIntersection::TangentCircle(placed(1.0, 1.0, Point3::origin())),
             AnalyticIntersection::Parallel,
             AnalyticIntersection::Coincident,
             AnalyticIntersection::Empty,
