@@ -1,0 +1,259 @@
+# WORK PACKET BG-ANA-001-SS — exactly solvable pair: sphere × sphere
+
+You are implementing one item from a formal kernel specification. Everything you
+need is in this document. **Do not read `docs/GENERATION_KERNEL_BUILD_SPEC.md`
+or any other spec file** — they are not on your allowlist and this packet is
+self-contained. If something you need is genuinely missing, that is a SPEC_GAP
+(see "Stop conditions"): you stop and report, you do not research it.
+
+```json
+{"id":"BG-ANA-001-SS","status":"DONE","contracts":["BG-ANA-001","BG-ANA-002"],
+ "tests_added":5,"sites_migrated":0,"sites_deferred":0,
+ "deviations":[],"disagreements":[],"baseline_failures":[],
+ "notes":"free text"}
+```
+
+Fill `deviations`, `disagreements` and `baseline_failures` as arrays, empty if
+empty. `disagreements` is the highest-value field: if a decision below is wrong,
+say so rather than working around it.
+
+```yaml
+id:          BG-ANA-001-SS
+contract:    [BG-ANA-001, BG-ANA-002]
+class:       mechanical
+crates:      [truck-evidence]
+depends_on:  [BG-CE-006-ENUM]
+write_allow:
+  - vendor/truck/truck-evidence/src/analytic/sphere_sphere.rs
+read_allow:
+  - vendor/truck/truck-evidence/src/lib.rs
+  - vendor/truck/truck-evidence/src/analytic/mod.rs
+  - vendor/truck/truck-evidence/src/harness.rs
+  - vendor/truck/truck-base/src/evidence.rs
+  - vendor/truck/truck-geometry/src/specifieds/mod.rs
+  - vendor/truck/truck-geometry/src/specifieds/sphere.rs
+  - vendor/truck/truck-geometry/src/specifieds/circle.rs
+  - vendor/truck/truck-geometry/src/decorators/processor.rs
+  - vendor/truck/truck-geometry/src/decorators/trimmied_curve.rs
+tests_required:
+  - ss_circle_lies_on_both_spheres
+  - ss_tangent_points_classify_exactly
+  - ss_disjoint_contained_and_coincident_classify_exactly
+  - ss_undecidable_predicates_refuse
+  - ss_certificate_is_exact
+budget:      {turns: 32, ctx_tokens: 85000}
+anchors:
+  - {id: A1, expect: 1, cmd: "grep -c 'pub enum AnalyticIntersection' vendor/truck/truck-evidence/src/analytic/mod.rs"}
+  - {id: A2, expect: 1, cmd: "grep -c 'pub enum ExactCurve' vendor/truck/truck-evidence/src/analytic/mod.rs"}
+  - {id: A3, expect: 1, cmd: "grep -c 'pub type PlacedCircle' vendor/truck/truck-evidence/src/analytic/mod.rs"}
+  - {id: A4, expect: 1, cmd: "grep -c 'pub mod sphere_sphere' vendor/truck/truck-evidence/src/analytic/mod.rs"}
+  - {id: A5, expect: 1, cmd: "grep -c 'pub const fn new(center: Point3, radius: f64) -> Sphere' vendor/truck/truck-geometry/src/specifieds/sphere.rs"}
+  - {id: A6, expect: 1, cmd: "grep -c 'pub const fn center' vendor/truck/truck-geometry/src/specifieds/sphere.rs"}
+  - {id: A7, expect: 1, cmd: "grep -c 'pub const fn radius' vendor/truck/truck-geometry/src/specifieds/sphere.rs"}
+  - {id: A8, expect: 1, cmd: "grep -c 'pub const fn with_transform' vendor/truck/truck-geometry/src/decorators/processor.rs"}
+  - {id: A9, expect: 1, cmd: "grep -c 'impl ParametricCurve for UnitCircle<Point3>' vendor/truck/truck-geometry/src/specifieds/circle.rs"}
+```
+
+## Problem
+
+Two spheres meet in a circle, touch in a single point (externally or
+internally), are disjoint, sit one inside the other, or coincide. All of it is
+decided by one exact comparison family: the squared centre distance against
+`(r0 ± r1)²`. This packet classifies exactly and emits the closed-form circle.
+Read `analytic/mod.rs`'s module docs and `#[cfg(test)]` module first —
+`TrimmedCurve` does **not** remap its parameter; `subs(t)` takes the angle
+directly, and the module's own tests assert that convention.
+
+## Decisions already made for you
+
+1. **One existing file**, `vendor/truck/truck-evidence/src/analytic/sphere_sphere.rs`.
+   It is already created and already declared as `pub mod sphere_sphere;` in
+   `analytic/mod.rs`, itself declared in `lib.rs`. **Both `lib.rs` and
+   `analytic/mod.rs` are read-only for you** — editing either is a scope
+   violation that will get this packet rejected. The declarations and the
+   shared result type were landed up front by the orchestrator so the eight
+   sibling packets have disjoint write sets and can run in parallel; your file
+   currently holds only a scaffolding doc comment, which you replace. The
+   crate-level `#![deny(...)]` covers your module; do not add a second header.
+
+2. **The shared result type is `crate::analytic::AnalyticIntersection` with
+   `crate::analytic::{AnalyticOutcome, ExactCurve, PlacedCircle}` — read
+   `analytic/mod.rs` first.** You do NOT define any result type of your own.
+   Your public function is:
+
+   ```rust
+   pub fn sphere_sphere(sphere0: &Sphere, sphere1: &Sphere) -> AnalyticOutcome
+   ```
+
+3. **The exact predicates: interval computation, three-way comparison,
+   refusal.** Compute predicate quantities as `inari::Interval` (inari rounds
+   outward), with named private helpers written exactly this way:
+
+   - `decisively_zero(i) == (i.inf() == 0.0 && i.sup() == 0.0)`
+   - `excludes_zero(i) == (i.inf() > 0.0 || i.sup() < 0.0)`
+   - `three_way(a, b) -> Option<std::cmp::Ordering>`:
+     `Some(Less)` iff `a.sup() < b.inf()`; `Some(Greater)` iff `b.sup() <
+     a.inf()`; `Some(Equal)` iff both intervals are degenerate and identical;
+     `None` otherwise.
+
+   Why `decisively_zero` requires degeneracy: an inari enclosure of a quantity
+   that is exactly zero only through cancellation is a wide-ish `[-ulp, +ulp]`,
+   and claiming it proves zero is exactly the wrong-but-confident answer
+   BG-ANA-002 forbids. Dyadic-clean inputs produce degenerate intervals, so
+   exact classifications stay exact.
+
+   **Undecidable is a stop, not a guess:** return
+   `Err(Refusal::NumericallyUnresolved { spent: Budget::new(0, 0, 0), witness:
+   UnresolvedWitness::RootNotIsolated })`. Return `Ok` only when every
+   predicate that chose the returned arm was decisive.
+
+4. **Every `Ok` carries the exact certificate, field-by-field at every return
+   site** — deliberately no helper (BG-EVD-002):
+
+   ```rust
+   let mut props = PropMap::new();
+   props.set(Prop::AnalyticCarrier, Truth::True);
+   Certified::new(
+       value,
+       Certificate {
+           props,
+           method: Method::Exact,
+           budget_left: Budget::new(0, 0, 0),
+           margin: Margin::UNBOUNDED,
+           modulus: Modulus::Unbounded,
+       },
+   )
+   ```
+
+   Doc-comment what `Method::Exact` means here: the classification is exact
+   (decisive interval predicates on the f64 carrier parameters), and the
+   emitted curve is the closed-form intersection. Coordinates are computed in
+   f64; the spec's obligation is "lies on both carriers to machine precision",
+   asserted with an H-3-commented slack. No `τ_rep` anywhere.
+
+5. **The classification algorithm, pre-decided.** Let `c0, r0, c1, r1` be the
+   carriers' data. Compute **in inari**: `d2 = Σ (c1ᵢ − c0ᵢ)²` (interval sum
+   of interval squares), `Rp = r0 + r1`, `Rm = r0 − r1` (intervals of exact
+   f64 sums), and compare with `three_way`:
+
+   1. `three_way(d2, 0) == Some(Equal)` (same centre): `r0 == r1` (exact f64
+      equality — the radii ARE the parameters, no derived predicate) →
+      `Coincident`; else → `Empty` (concentric, different radii).
+   2. `three_way(d2, Rp²) == Some(Greater)` → `Empty` (disjoint, apart).
+   3. `three_way(d2, Rp²) == Some(Equal)` → `TangentPoint` at
+      `p = c0 + (r0 / (r0 + r1)) (c1 − c0)` (f64 closed form).
+   4. `three_way(d2, Rm²) == Some(Equal)` → `TangentPoint` — **internal**
+      tangency, at `p = c0 + (r0 / (r0 − r1)) (c1 − c0)`; mind the sign when
+      `r0 < r1` (the point lies on the far side of `c0` from `c1`; the
+      formula with signed `r0 − r1` handles it — verify numerically in the
+      test with a dyadic witness and record any correction in `deviations`).
+   5. `three_way(d2, Rm²) == Some(Less)` → `Empty` (one inside the other, no
+      contact).
+   6. Strictly between → **circle**: in f64, `d = |c1 − c0|`,
+      `x = (d² + r0² − r1²) / (2 d)` measured from `c0` toward `c1`;
+      circle centre `cc = c0 + x (c1 − c0)/d`, radius
+      `ρ = sqrt(r0² − x²)`, plane normal `n̂ = (c1 − c0)/d`. Choose in-plane
+      axes `u` (unit, ⊥ `n̂`, via the least-aligned-axis cross trick), `v =
+      n̂ × u`, and emit `ExactCurve::Circle` via the placement helper of
+      decision 6.
+   7. Any `None` from a comparison that the chosen arm depends on → refuse.
+
+6. **Placing circles** — write this private helper in your own file:
+
+   ```text
+   fn frame(u: Vector3, v: Vector3, n: Vector3, o: Point3, ru: f64, rv: f64) -> Matrix4
+   ```
+
+   = `Matrix4::from_cols(Vector4::new(u.x, u.y, u.z, 0.0), Vector4::new(v.x,
+   v.y, v.z, 0.0), Vector4::new(n.x, n.y, n.z, 0.0), Vector4::new(o.x, o.y,
+   o.z, 1.0)) * Matrix4::from_nonuniform_scale(ru, rv, 1.0)`.
+   A circle of radius `r` through `o` with in-plane unit axes `u`, `v`
+   (`n = u × v`) is `Processor::with_transform(TrimmedCurve::new(
+   UnitCircle::<Point3>::new(), (0.0, TAU)), frame(u, v, n, o, r, r))`.
+   Sibling shards write their own copy; that duplication is deliberate and
+   explicitly not a deviation — do not share it and do not report it.
+
+## Tests required
+
+All in the `#[cfg(test)]` module of `sphere_sphere.rs`: named consts, and a
+same-line `// H-3:` comment wherever a bare float slack literal appears.
+
+1. `ss_circle_lies_on_both_spheres` — dyadic witness: r0 = r1 = 5/2, centres
+   (0,0,0) and (3,0,0) → the circle at x = 3/2 of radius 2 (all dyadic).
+   Sample ≥ 30 points; assert `| |p − c0| − r0 | < slack` and
+   `| |p − c1| − r1 | < slack` (H-3-commented, dimensionless residuals of a
+   unit-scale witness).
+2. `ss_tangent_points_classify_exactly` — external: r0 = 2, r1 = 1, centres
+   (0,0,0), (3,0,0) → `TangentPoint` at (2,0,0). Internal: centres
+   (0,0,0), (1,0,0), same radii → `TangentPoint` at (2,0,0). Both dyadic.
+3. `ss_disjoint_contained_and_coincident_classify_exactly` — d > r0 + r1 →
+   `Empty`; d < |r0 − r1| → `Empty`; identical spheres → `Coincident`;
+   concentric different radii → `Empty`.
+4. `ss_undecidable_predicates_refuse` — unit-test the private comparator on
+   hand-built inari intervals (a `[-w, w]` interval is neither
+   decisively-zero nor excludes-zero; overlapping non-degenerate intervals
+   give `three_way == None`). Additionally try one bit-neighbour tangency
+   witness and report in `notes` whether a genuine straddle refusal was
+   constructible.
+5. `ss_certificate_is_exact` — for a circle, a tangent point and an empty
+   outcome: every `Ok` carries `method == Method::Exact` and the
+   `AnalyticCarrier` prop set to `Truth::True`.
+
+## H-3, which is what rejected three packets in this family
+
+GATE-2 fails any **added** line carrying a bare `1e-N` literal unless that same
+line ends with an `// H-3` comment. It is a text gate on the diff: it does not
+know your literal is an angle, and it does not care that the line is in a test.
+`BG-ENC-002-LINE` was rejected for one such line and `BG-ENC-002-CIRCLE` for
+six, both times on assertion epsilons in tests, both times costing a verify.
+
+So: **every comparison epsilon you write gets a same-line `// H-3:` comment
+naming the dimensionless quantity being compared.** The house form:
+
+    assert!((a - b).magnitude() < 1.0e-12, ...); // H-3: float slack between two unit direction vectors, not a length
+    assert!((h - expected).abs() < 1.0e-12, ...); // H-3: float slack between two half-angles in radians, not a length
+    assert!(cos_angle >= limit - 1.0e-12, ...);   // H-3: float slack between two direction cosines, not a length
+
+Directions, angles, direction cosines, parameter values, residuals of
+unit-scale witnesses and interval bounds are all dimensionless and all
+legitimate — the comment is what says so. A literal that really is a
+model-space *length* does not get an opt-out; it goes through `ToleranceCtx`
+instead. Run `bash scripts/kernel-gates.sh` yourself before you write
+`RESULT.json`; it is the same script V4 runs.
+
+## Done when — run these, all must pass
+
+```
+cargo fmt --check -p truck-evidence
+cargo clippy -p truck-evidence --all-targets --no-deps -- -D warnings
+cargo test -p truck-evidence --lib --tests --no-fail-fast
+cargo check --workspace --all-targets
+```
+
+Never run a bare `cargo test` — it builds 56 examples. Send cargo output to a
+file and read the tail. The existing 74 lib tests + 3 integration tests must
+keep passing unchanged.
+
+## Forbidden
+
+Editing any file outside `write_allow` — `lib.rs` and `analytic/mod.rs`
+especially. Defining a private result enum. Changing the shared types, the
+harness, or any carrier. Deciding a predicate by sampling the surfaces.
+Returning an `Ok` arm chosen by an undecidable predicate. Adding `#[ignore]`.
+Adding `unscaled_legacy(` call sites. Committing to `main`.
+
+## Stop conditions
+
+- an anchor count differs → `ANCHOR_MISMATCH`, naming the file and what you saw
+- `Sphere` accessors do not supply what decision 5 needs → `SPEC_GAP`, naming
+  exactly what is missing
+- `inari` lacks a primitive this design needs → `SPEC_GAP`, naming it
+- three consecutive failed `cargo test` runs on the same error → `BLOCKED`
+
+## Finish by writing `RESULT.json` in the root of your worktree
+
+`status` is one of `DONE`, `ANCHOR_MISMATCH`, `SPEC_GAP`, `BLOCKED`. On any
+non-`DONE` status also write `QUESTION.md` beside it.
+
+Commit on the current branch with subject
+`feat(evidence): exact sphere × sphere (BG-ANA-001-SS)`.
