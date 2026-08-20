@@ -231,7 +231,17 @@ singularity numerically. They are named here so you know what the case is.
 
          rho  = ‖h‖  computed in inari, take .sup()   (round UP)
          cn   = ‖c‖  computed in inari, take .inf()   (round DOWN)
-         if !(cn > rho) or either is not finite  ->  None
+         if !cn.is_finite() || !rho.is_finite() || cn <= rho  ->  None
+
+     Write the guard in that order and in that form. The natural phrasing
+     `!(cn > rho)` is what this packet said until BG-ENC-004-EXTRUDED and
+     -REVOLVED both reported it: clippy's `neg_cmp_op_on_partial_ord` rejects it
+     under `-D warnings`. The two are **not** interchangeable on their own --
+     `!(x > y)` is true for NaN and `x <= y` is false -- so the explicit
+     finiteness tests are what makes the clippy-clean form equivalent, and they
+     are load-bearing rather than defensive: an empty or entire cross-product
+     box yields a NaN or infinite `cn`, and without them it would return `Some`
+     with a garbage cone instead of `None`.
          axis       = c.normalize()
          half_angle = asin(rho / cn), nudged UP, clamped to at most PI
 
