@@ -84,6 +84,35 @@ def kill_tree(pid):
         return False
 
 
+def packet_is_done(packet_path):
+    """True if this packet's row in PACKETS.jsonl already reads DONE.
+
+    A landed slot looks exactly like a dead worker: `land_packet.py` moves
+    RESULT.json out of the worktree into loop/results/, the worker's pid is
+    long gone, and events.jsonl stopped growing when the worker finished. Rule
+    B then fires and redispatches a packet that is already merged. That
+    happened at 01:34 on 2026-08-20 to BG-ENC-002-LINE, minutes after it
+    landed: the redispatched worker rebuilt the slot, took a lock on
+    events.jsonl and blocked the next real dispatch.
+
+    The registry is the authority on what is finished, so ask it.
+    """
+    if not packet_path:
+        return False
+    stem = Path(packet_path).stem
+    registry = ROOT / "loop" / "PACKETS.jsonl"
+    try:
+        for line in registry.read_text(encoding="utf-8").splitlines():
+            if not line.strip():
+                continue
+            row = json.loads(line)
+            if row.get("id") == stem:
+                return row.get("status") == "DONE"
+    except (OSError, ValueError):
+        return False
+    return False
+
+
 def read_slot(slot_dir):
     """Return the observable state of one slot, or None if not a live slot."""
     pid_file = slot_dir / "worker.pid"
@@ -318,6 +347,13 @@ def main():
                     continue
                 if info["result"]:
                     # Finished run awaiting adjudication: never touch.
+                    continue
+                if packet_is_done(info["packet"]):
+                    # Already landed. The slot only *looks* dead because
+                    # land_packet.py took RESULT.json out of the worktree.
+                    # Redispatching here re-does merged work and, worse, takes
+                    # a lock on events.jsonl that blocks the next real
+                    # dispatch. Leave it for new_slot.py to repoint.
                     continue
                 alive = pid_alive(info["pid"])
                 if alive:
