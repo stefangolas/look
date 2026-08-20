@@ -6,16 +6,22 @@
 //! parameterisation directly, which is what separates this module from the
 //! analytic carriers in the crate root.
 //!
-//! Scaffolding only. Each submodule is the body of its own work packet and
-//! currently holds a doc comment; the modules are declared here, and this
-//! module in `lib.rs`, up front so that the sibling packets have disjoint
-//! write sets and can run in parallel without colliding on one `pub mod` line
-//! (the same reasoning as `afba979` for the six BG-ENC-002 carriers).
+//! Three submodules hold landed impls (extruded, processor, revolved); two
+//! hold scaffolding doc comments awaiting their packets (pcurve,
+//! intersection_curve); one is blocked (offset, see the module). The module
+//! tree — every `pub mod` line, and this module in `lib.rs` — was declared up
+//! front so that the sibling packets have disjoint write sets and can run in
+//! parallel without colliding on one `pub mod` line (the same reasoning as
+//! `afba979` for the six BG-ENC-002 carriers).
 
 /// BG-ENC-004-EXTRUDED: `EnclosureSurface` for `ExtrudedCurve`.
 pub mod extruded;
+/// BG-ENC-004-ISC: `EnclosureSurface` for `IntersectionCurve`.
+pub mod intersection_curve;
 /// BG-ENC-004-OFFSET: `EnclosureSurface` for `Offset`. Blocked; see the module.
 pub mod offset;
+/// BG-ENC-004-PCURVE: `EnclosureSurface` for `PCurve`.
+pub mod pcurve;
 /// BG-ENC-004-PROCESSOR: `EnclosureSurface` for `Processor`.
 pub mod processor;
 /// BG-ENC-004-REVOLVED: `EnclosureSurface` for `RevolutedCurve`.
