@@ -11,7 +11,7 @@ otherwise would eventually cost a trap.) If you are picking this up cold, read
 [`loop/ORCHESTRATOR.md`](ORCHESTRATOR.md) for how to run the loop, then
 `python loop/slot_status.py`** — nothing else. Do not read `LEDGER.jsonl` whole.
 
-Updated 2026-08-19, end of session 9. Branch: `integration/kernel-bg`. Nothing
+Updated 2026-08-20, end of session 12. Branch: `integration/kernel-bg`. Nothing
 from the loop has reached `main` and nothing has been pushed.
 
 ## What this is, if you have never seen it
@@ -55,185 +55,223 @@ here is scored, tuned, or sampled.
 
 ## Where we are
 
-**Thirty packets DONE of 66 (45%).** Session 11 landed the **BG-CE-006-ENUM
-stack** (three commits on one branch, closing three registry rows through
-`covers:`) and then the **whole BG-ENC-002 carrier fan-out**: `LINE`, `CIRCLE`,
-`CYLINDER`, `CONE`, `SPHERE`, `TORUS`. `truck-evidence` now has 56 passing tests
-and a carrier module per analytic type. GATE-4 sits at **109/109**.
+**Thirty-three packets DONE of 66 (50%).** Session 12 landed the **BG-ENC-004
+decorator fan-out**: `EXTRUDED`, `PROCESSOR`, `REVOLVED`, written, dispatched,
+verified and merged in one session, all three ACCEPTED on the first attempt with
+`fault: NONE`. `truck-evidence` now has **71 lib tests + 3 integration**, an
+analytic carrier per type and a decorator module. GATE-4 sits at **109/109**.
 
-It also added **BG-ENC-005**, which nobody had specified: certified interval
-`sin`/`cos`. See "Pick up here" item 1 — it is the reason the carriers could be
-built at all.
+**Three workers ran genuinely in parallel for the first time and it worked.**
+The ENC-002 six ran sequentially because disk said one at a time; that
+constraint is gone (see "Pick up here" item 2) and the three ENC-004 workers ran
+concurrently start to finish in ~25 minutes wall clock total, against 20-35
+minutes *each* sequentially. Nothing about the parallelism went wrong. What went
+wrong was the *verification*, and only because the orchestrator ran it through a
+wrapper with a timeout — see the new traps.
 
-**Two thirds of the session went on the harness, not the kernel**, and that is
-the durable output. Three separate "regressions" charged to ENUM-r3 were the
-harness lying: a reaper deleting a live build directory, a baseline cached from
-a corrupted build, and a gate weakened on a flakiness theory that direct
-measurement had already falsified. All four of the last traps below come from
-that, and V8 no longer builds a second Cargo world.
+**The fourth shard, `BG-ENC-004-OFFSET`, is BLOCKED and was never dispatched.**
+That is the session's most valuable finding and it is item 3 below.
 
 ## Pick up here
 
-1. **BG-ENC-005 is the load-bearing thing that did not exist.** `inari` puts
-   `Interval::sin`/`::cos` behind its `gmp` feature and `truck-evidence` takes
-   `inari` with `default-features = false`, so this crate had **no interval
-   trigonometry at all**; `plane.rs` is affine and never noticed.
-   `BG-ENC-002-CIRCLE` found it by stopping with a `SPEC_GAP`, which was the
-   correct call. The `gmp` route was measured and rejected: it builds GMP and
-   MPFR from source through autotools, this machine has neither `make` nor
-   `m4`, and the toolchain is `windows-gnullvm`, which `gmp-mpfr-sys` does not
-   support. `truck-evidence/src/elementary.rs` now provides
-   `sin(Interval) -> Interval` and `cos`, built on `inari`'s non-gated API
-   (outward-rounded arithmetic, `sqr`, `floor`, and the `PI`/`FRAC_PI_2`
-   constants) with an alternating-series truncation bound and an exact
-   reduction identity. **Any new packet touching a curved carrier must say
-   `use crate::elementary::{cos, sin}` and `cos(uu)`. `uu.cos()` does not
-   exist in this tree and never will.**
+1. **`BG-ENC-003-BSPLINE` is the next item and it is the keystone.** It unblocks
+   `-NURBS`, `BG-ENC-004-PCURVE` and `-ISC`, which is four packets behind one.
+   The spec is explicit that it is **not** naive interval arithmetic: use the
+   **convex-hull property** — over a knot span the curve lies in the hull of its
+   control points, and `BSplineCurve::roughly_bounding_box` in
+   `truck-geometry/src/nurbs/bspcurve.rs` is already a control-hull enclosure.
+   Extract the sub-curve over `tt` by knot insertion, then bound the control
+   points; the tangent cone comes off the hodograph. For NURBS the hull property
+   holds in **homogeneous** coordinates only, and the projection of a hull is not
+   the hull of the projection unless every weight is positive — assert positive
+   weights or refuse. The spec's BG-ENC-003 section has the pseudocode.
 
-2. **The frontier is 14 wide and disk holds three workers.** Eligible now:
-   `BG-CE-001` (design, W3c), the eight `BG-ANA-001` shards, `BG-ENC-003-BSPLINE`,
-   `BG-ENC-004-PROCESSOR`/`-REVOLVED`/`-EXTRUDED`, `BG-TOL-004`.
-
-   **Corrected 2026-08-20, session 12 — the old text here said "disk holds one
-   worker" and budgeted against ~10 GB free. That is no longer true and acting
-   on it would serialise the loop for nothing.** `pagefile.sys` had auto-grown
-   to 39.2 GB against a peak use of 15.1 GB and has been capped at 20 GB, and
-   ~7 GB of temp garbage was cleared; free space is now ~53 GB. **Budget 8 GB
-   per worker and run three slots in parallel.** The ENC-002 six ran
-   *sequentially* at 20-35 minutes each only because of the old constraint.
-
-   Two things about that 8 GB that are decisions, not measurements to redo. A
-   warm slot target is ~4.3 GB, of which 2.12 GB is 92 test executables
-   averaging 23 MB, almost entirely debuginfo; exporting
+2. **Disk holds three workers, and the frontier is 11.** Free space is ~42 GB
+   after this session (it was ~10 GB when session 11 wrote "disk holds one
+   worker"): `pagefile.sys` had auto-grown to 39.2 GB against a 15.1 GB peak and
+   is capped at 20 GB, and ~7 GB of temp was cleared. **Budget 8 GB per worker
+   and run three slots.** A warm slot target is ~4.3 GB, of which 2.12 GB is 92
+   test executables averaging 23 MB — almost entirely debuginfo. Exporting
    `CARGO_PROFILE_DEV_DEBUG=line-tables-only` would halve a slot and **was
-   measured, proposed and declined** — headroom is worth more than 2 GB a slot,
+   measured, proposed and declined**: headroom is worth more than 2 GB a slot,
    and a worker debugging its own failing test is better served by full
-   debuginfo. Do not apply it as a tidy-up. The real waste is unexplained: a
+   debuginfo. Do not re-propose it. The real waste is still unexplained — a
    worker sometimes creates a second `wt/target` **inside** its worktree despite
    `CARGO_TARGET_DIR`, ~1.9 GB of exact duplicate, and nobody has found why.
-   That one is worth fixing.
 
-   Also corrected: the frontier count. `schedule.py` skipped only `RUNNING` and
-   `DONE`, so a `BLOCKED` row whose dependencies are satisfied listed as
-   eligible forever — `BG-INV-107` has done so since session 10, which is where
-   the old "17" came from. It honours `BLOCKED` now.
+3. **`BG-ENC-004-OFFSET` is BLOCKED on an interface question, not on a worker.**
+   The session-11 handoff expected the obstacle to be a curvature bound. It is
+   one level lower and it is a **type error**. `Offset<T, N>` is not "a surface
+   pushed along its normal by a distance": it is the pointwise sum
+   `S(u, v) + N(u, v)`, and `truck-geometry`'s only `ParametricSurface` impl for
+   it is bounded `N: ParametricSurface<Point = C::Vector>` — the offset field is
+   **vector**-valued. `EnclosureSurface` is bounded
+   `ParametricSurface<Point = Point3>`. So for any `S` that is an
+   `EnclosureSurface`, `N` has `Point = Vector3` and can never be one:
+   `impl<S, N> EnclosureSurface for Offset<S, N>` does not typecheck for any
+   choice of the two, and no amount of curvature reasoning changes that.
 
-3. **When you write the next kernel packet, copy two sections out of the ENC-002
-   ones.** The H-3 section (three packets lost a verify to GATE-2 before it
-   existed; the two after it was added were accepted first time) and the
-   "module is pre-declared, `lib.rs` is read-only" wording, which is what made
-   six sibling packets write-disjoint.
+   The classical normal offset is the concrete `Offset<S, NormalField<S, F>>`,
+   and enclosing that needs two things the interface does not have: an enclosure
+   for the **unit normal field** (this is where curvature genuinely enters, and
+   it *is* derivable from `enclose_der` plus `immersion_lower_bound`) and one for
+   `F: ScalarFunctionD2`. Both are new surface in `enclosure.rs`, so **it is a
+   design item, not a mechanical one**. The full argument and the proposed
+   resolution — add an `EnclosureVectorField` and a scalar sibling — are in the
+   **BG-ENC-004 spec amendment**, and `decorators/offset.rs` carries a short
+   version so it is findable from the code.
 
-4. **`BG-TOL-001-SMALL` has finished work sitting unadjudicated in slot 1, on a
-   stale base.** `loop/slots/1/wt` holds `72e2b89`
-   ("refactor(polymesh,geotrait): classify every tolerance site model or
-   param"), `RESULT.json` DONE, 7 sites migrated, 1 test added — but its base is
-   **`c75017d`**, many landings behind `integration/kernel-bg`. Its worker also
-   reconstructed the worktree by hand after the watchdog tore it down mid-run,
-   which is worth reading in its `notes` before trusting the diff.
+4. **The BG-ENC-004 family shares one construction. Reuse it for PCURVE and
+   ISC** rather than writing per-decorator case analysis: enclose `S_u` and
+   `S_v`, take the **interval cross product**, read `immersion_lower_bound` off
+   the mignitude norm and `normal_cone` off the ball around the box midpoint
+   (`None` when `‖halfwidths‖ >= ‖midpoint‖`). Sound but loose, and the looseness
+   buys something structural — **every singular locus in the family becomes the
+   same `None`**, with no apex analysis of the kind `Cone` needed in BG-ENC-002.
+   Spelled out in the BG-ENC-004 spec amendment, with three landed
+   implementations to copy from.
 
-   It cannot simply be landed: every gate measures `base...HEAD`, and its
-   anchors already fail against the current tree (`A1: expected 2, tree has 1`),
-   which is why `run_packet.py` refuses to re-dispatch the packet. Decide
-   between **rebasing `packet/BG-TOL-001-SMALL` onto current integration and
-   re-verifying from scratch**, or re-anchoring the packet and re-dispatching it
-   fresh. Do not merge it without a full verify against a current base. The
-   watchdog burned its whole restart budget on it earlier.
+5. **`BG-TOL-001-SMALL` is still unadjudicated and is now further behind.**
+   `packet/BG-TOL-001-SMALL` holds `72e2b89` ("refactor(polymesh,geotrait):
+   classify every tolerance site model or param"), `RESULT.json` DONE, 7 sites
+   migrated, 1 test added, forked at **`c75017d`** — many landings behind. Its
+   worktree was reclaimed this session for the fan-out; **the commit is safe on
+   its branch and was verified present after the reset**, but no slot holds it
+   any more. Its anchors already fail against the tree (`A1: expected 2, tree has
+   1`), so `run_packet.py` refuses to re-dispatch the packet as written. Decide
+   between rebasing onto current integration and re-verifying from scratch, or
+   re-anchoring the packet and re-dispatching. Do not merge it without a full
+   verify against a current base. Its worker also reconstructed the worktree by
+   hand after the watchdog tore it down mid-run, which is worth reading in its
+   `notes` before trusting the diff.
 
-5. **Two spec items from session 10's review are still unstarted:**
-   - **`BG-EVD-005`** — a published modulus needs a *geometric* certificate.
-     BG-EVD-004's M1-M5 constrain only the arithmetic; nothing obliges a cell
-     to publish the modulus its geometry actually has, so a tangency may
-     publish `Lipschitz` and every gate stays green. Its negative test is the
-     point: a cell hand-built to publish `Lipschitz` for a constructed tangency
-     must be **rejected**.
-   - **`BG-TOL-005`** — uv tolerance is not a generic dimensionless ratio.
-     `sin_margin()` and `ratio_margin()` both return `tau_rep` today: two names
-     for one number, covering three quantities that do not behave alike
-     (intrinsic / parameter fraction / uv length). Needs a certified
-     `‖δx‖ ≤ C_sup‖δp‖` bridge with `C_sup` an upper bound on `σ_max(J_S)` over
-     the cell, and a `σ_min` lower bound for the inverse direction. **The
-     observation that makes it fit the existing machinery:** a cell whose
-     `σ_min` bound reaches zero *is* BG-EVD-004's `Pole`. A chart singularity is
-     not a special case, it is the same object.
+6. **Two spec items from session 10's review are still unstarted**, both now
+   unblocked by the carriers and both unchanged since session 10 wrote them.
+   **`BG-EVD-005`**: a published modulus needs a *geometric* certificate —
+   BG-EVD-004's M1-M5 constrain only the arithmetic, so a tangency may publish
+   `Lipschitz` and every gate stays green; the negative test is the point.
+   **`BG-TOL-005`**: `sin_margin()` and `ratio_margin()` both return `tau_rep`,
+   two names for one number covering three quantities that do not behave alike,
+   and the observation that makes it fit the existing machinery is that a cell
+   whose `σ_min` bound reaches zero *is* BG-EVD-004's `Pole`. Full statements
+   are in session 10's review and in the spec.
 
-   Both are now unblocked by the carriers item 1 and the ENC-002 six built.
-
-6. **23 downstream tests are red at base** in truck-meshalgo and truck-stepio
-   and V8 correctly ignores them. Two are a real importer defect worth its own
+7. **23 downstream tests are red at base** in truck-meshalgo and truck-stepio and
+   V8 correctly ignores them. Two are a real importer defect worth its own
    packet: `geometry::b_spline_curve_with_knots` and
-   `geometry::nurbs_curve_b_spline_curve_with_knots` draw knot increments down
-   to 1e-3 and the conversion dies with "The scalar 0 is not positive".
+   `geometry::nurbs_curve_b_spline_curve_with_knots` draw knot increments down to
+   1e-3 and the conversion dies with "The scalar 0 is not positive".
 
-7. **Then the CE chain**, unchanged from session 9's scoping, filed below under
+8. **Then the CE chain**, unchanged from session 9's scoping, filed below under
    "The CE chain, scoped against the tree".
 
-## What session 9 changed about how the loop runs
+## State of the machine, as left
 
-Five harness defects were found and fixed, **four of them by running a tool
-rather than reading it**. They are in Traps with the evidence; the short list:
-
-- Both site counters attributed a line to the last `fn` seen without tracking
-  braces. `loop/rustscan.py` is the single implementation now, with
-  `loop/selftest_rustscan.py` watching the old scan fail on the same fixture.
-- `gen_packet` resolved a table's file heading by bare-basename `endswith`, so
-  `curve.rs` matched `polyline_curve.rs` and **every row under an ambiguous
-  heading was silently dropped** while printing "all checked claims hold".
-- `new_slot` used `rev-parse --is-inside-work-tree` to decide whether a path was
-  a live worktree. That is true for *any* directory inside the repo, so a stub
-  `wt/` was treated as live and `checkout -B` + `reset --hard` **ran against the
-  main worktree**. Nothing was lost, by luck.
-- `PACKET.md` and `RESULT.json` are worker scaffolding and were riding into the
-  integration branch on merge; `PACKET.md` then conflicts on the *next* merge,
-  because every slot's copy is a different packet.
-- **`loop/check_metric_bound.py` is the one worth keeping.** The
-  `near_points` bound has now bitten three shards. It resolves every `model` row
-  to its enclosing impl or free fn and reports MIGRATES / BLOCKED / CHECK.
-  Validated against all three shards whose answers were already known by hand —
-  DECORATORS 2, NURBS 12, SMALL 2 — **zero false negatives on 47 rows**. Run it
-  before writing any TOL packet.
-
-## Did the session-8 tooling bet pay? Yes, with a visible ceiling
-
-**For.** Three shards in one session, the largest of them 3× anything before it,
-for $0.18. `gen_packet --skeleton` produced the front block, anchors, both site
-tables, the deferral table and the budget from reviewed surveys; almost none of
-the three packets was typed by hand.
-
-**Against, and this is the finding.** Every round trip this session was the
-orchestrator's, and none was of a kind a gate could have caught:
-
-| packet | fault | what it was |
-|---|---|---|
-| NURBS | PACKET | demanded a rewrite inside a `pub const fn` while forbidding signature changes; `unscaled_legacy()` is not const |
-| DECORATORS | PACKET | never ran the `near_points` bound check over its model rows |
-| SMALL | GATE | verify handed a base from before the slot forked, so the orchestrator's own commit entered the packet's diff |
-
-**43% of a packet is templatable and the remaining 29% is exactly where all
-three landed.** Assembly is cheap now; judgement is the entire remaining cost.
-Two of the three are now mechanised anyway (`check_metric_bound.py`, and
-`--base` is a checkable fact), which is the right response — but the general
-lesson is that further *generation* tooling has a low ceiling, while tooling
-that **checks a claim against the tree** keeps paying.
+- **The watchdog is STOPPED**, deliberately. Nothing was in flight at session
+  end, and an unattended watchdog reclaims disk — which would delete the three
+  warm slot targets. `loop/watchdog.lock` is removed. **Start it before you
+  dispatch** (`Start-Process python loop/watchdog.py`, detached; it ignores
+  `--help` and simply runs, so do not "check its CLI" the way this session did)
+  and confirm it is alive and holding the lock before relying on it. Note the
+  `python` on PATH is a PyManager shim: `Start-Process` reports the shim's pid
+  and the real interpreter's pid is the one in the lock file and the log.
+- **All three slots are FINISHED and warm**, on their landed packet branches at
+  the commits that were merged. They are safe to leave: their registry rows read
+  DONE, and the watchdog does not redispatch a DONE row. Reset with `new_slot.py`
+  when you dispatch.
+- **No leaked baseline worktrees** and no stale `verify.pid` files; both were
+  checked at session end. `git worktree list` shows the main worktree plus the
+  three slots and nothing else.
 
 ## The parallelism picture
 
-62 packets: 38 mechanical, 13 design, 11 wide-mechanical. 43 remain, and the
-frontier is suddenly narrow: `schedule.py` reports **3 eligible**, and two of
-the three are design class (`BG-CE-006-ENUM`, `BG-TOL-004`). The one mechanical
-row is `BG-INV-107`. The wide-mechanical TOL seam that has carried the last four
-sessions is finished, so the loop's throughput is now bounded by design packets
-the orchestrator writes by hand. The distribution is the story: **ENC 14, INV 9, ANA 8, FID 4 are all at zero** —
-35 packets, 56% of the graph, none started. That is the certification half of
-the kernel. What has landed is the plumbing: a tolerance model with dimension in
-its type, an error-propagation algebra, a refusal taxonomy, budget accounting.
+66 packets: 40 mechanical, 15 design, 11 wide-mechanical. 33 remain, and the
+frontier reports **11 eligible, all 11 mutually write-disjoint**: `BG-CE-001`
+and `BG-TOL-004` (design), the eight `BG-ANA-001` shards, and
+`BG-ENC-003-BSPLINE`. The eight ANA shards are the widest mechanical fan-out
+left in the graph and they are ready now — three at a time is three sessions of
+throughput, or fewer if the disk budget above holds up under four.
 
-Three concurrent workers on write-disjoint packets ran without interference for
-the first time this session. The constraint is no longer worker throughput or
-orchestrator packet-writing; it is **disk** (see Traps) and **design-class
-packets**, of which the CE chain alone is three.
+**The bottleneck is no longer disk, worker throughput, or packet assembly.** All
+three moved this session: disk went from one worker to three, three workers ran
+concurrently without interference, and three packets were written from scratch in
+one session and all three landed first time. What remains is **orchestrator
+judgement on the design-class items** — the CE chain alone is three, plus
+`BG-EVD-005`, `BG-TOL-005` and now `BG-ENC-004-OFFSET`.
+
+The distribution still tells the story, though it has moved: **ENC is no longer
+at zero** — 10 of 15 ENC packets are done (15, not 14: session 11 added
+BG-ENC-005). INV 9, ANA 8 and FID 4 are all still at zero — 21 packets, and
+still the certification half of the kernel.
+
+**What the fan-out cost.** Three packets, one scaffolding commit, three
+workers, three verifies, three merges, **zero rejections**. Every judgement that
+would have become a round trip was paid *before* dispatch by reading the carrier
+source rather than the handoff — the `Processor` parameter swap, the `Offset`
+type error, the shared cone construction. That is the session-9 finding holding
+up: assembly is cheap, judgement is the whole cost, and the judgement is bought
+by reading the tree.
 
 ## Traps, each one paid for
+- **A verify launched through anything with a timeout is a verify you will
+  kill, and killing one leaks its baseline worktree.** Session 12 ran three
+  verifies inside a backgrounded shell wrapper whose harness cap is 600 s. A
+  verify takes longer than that. The wrapper was killed mid-build, all three
+  child verifies died with it, and three baseline worktrees (~1.3 GB) and three
+  stale `loop/slots/N/verify.pid` files were left behind — the exact leak
+  ORCHESTRATOR.md already warns about, walked into anyway. **Launch a verify
+  detached** (`Start-Process` on Windows) so no caller's timeout can reach it,
+  and poll `loop/slots/N/VERDICT.json` for the result instead of waiting on the
+  process. Recovery, if it happens again: `git worktree remove --force` each
+  `%TEMP%/look-verify-baseline-*/wt`, `rm -rf` the parents, `git worktree
+  prune`, `rm -f loop/slots/*/verify.pid`. Nothing is lost — the packet branches
+  are untouched and the verify just re-runs.
+- **Never run two verifies at the same base concurrently.** They each build a
+  baseline keyed by (base commit, test set) and will race on it, and "a baseline
+  cached from a corrupted build" is already one of the three harness lies that
+  cost session 11. Session 12 dispatched three packets from two distinct bases
+  and ran the verifies **sequentially** for this reason. Related and harmless
+  but alarming the first time: concurrent verifies each report the *others'*
+  live baselines as "leaked worktrees", because the warning cannot distinguish a
+  concurrent baseline from an abandoned one. Under sequential runs it goes away.
+- **Read the carrier source; do not enclose the handoff's description of it.**
+  Session 12's handoff said `Processor`'s `orientation() == false` "flips the
+  normal cone axis". It does not: `Processor::subs` evaluates
+  `entity.subs(v, u)` and `der_mn` swaps the orders *and* the arguments, so the
+  parameters are transposed. A packet written to the description would have
+  produced an enclosure that does not contain its own surface — an
+  under-estimation, which BG-ENC-001 calls a silent wrong answer, and one that
+  the *sampling* test would have caught only if the test box were asymmetric.
+  The same ten minutes in `processor.rs` also turned up the projective divide in
+  `transform_point`, and the same habit applied to `offset/mod.rs` is what found
+  the `Offset` type error. This is the general rule ("re-derive every claim by
+  running a command") applied to prose about types, where it is easiest to skip
+  because the prose is confident and specific.
+- **A `grep 'pub fn '` misses `pub const fn` and will convince you a type has no
+  getters.** Every accessor `BG-ENC-004` needed — `Processor::entity`,
+  `transform`, `orientation`, `ExtrudedCurve::entity_curve`,
+  `extruding_vector`, `RevolutedCurve::origin`, `axis`, `Offset::entity`,
+  `offset` — is `pub const fn`. Grep `pub \(const \)\?fn`.
+- **Pseudocode in a packet must satisfy the lints the packet mandates.** Three
+  ENC-004 packets specified a guard as `if !(cn > rho)`, and the same packets
+  mandate `clippy -D warnings`, under which `neg_cmp_op_on_partial_ord` rejects
+  exactly that. Two workers rewrote it to `cn <= rho` and reported it in
+  `notes` — correctly, but the two forms **differ on NaN** (`!(x > y)` is true,
+  `x <= y` is false), so the rewrite is only safe because an explicit
+  `!cn.is_finite()` guard sits beside it. That was checked in the landed code
+  rather than taken from the notes, and it held in all three. The lesson is
+  cheap to apply: any comparison, cast or arithmetic a packet spells out will be
+  typed in verbatim by the worker and then linted, so spell it out in the form
+  that passes.
+- **`schedule.py` honours `BLOCKED` now, and did not before.** It skipped only
+  `RUNNING` and `DONE`, so a packet whose dependencies were all satisfied but
+  which had been found undispatchable listed as eligible **forever**.
+  `BG-INV-107` was reclassified BLOCKED in session 10 and was reported
+  dispatchable in every frontier from then until session 12 — that is where the
+  "17 eligible" and "16 eligible" counts came from, both inflated. Filing
+  `BG-ENC-004-OFFSET` BLOCKED made it two. A status the scheduler does not know
+  is a status that does not exist; putting the reason only in `note` does not
+  stop the next session from dispatching the row.
 
 - **A gate that fails on the untouched baseline is not a gate.** The vendored
   tree is nowhere near clippy-clean (truck-meshalgo ~93 lints,
