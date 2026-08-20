@@ -34,7 +34,13 @@ def frontier(done, running):
     done = set(done) | {r['id'] for r in ROWS if r['status'] == 'DONE'}
     out = []
     for r in ROWS:
-        if r['id'] in done or r['status'] in ('RUNNING', 'DONE'):
+        # BLOCKED is not "not yet reached": it is "reached, and found not to be
+        # dispatchable as written". BG-ENC-004-OFFSET is the first one -- its
+        # dependencies are all DONE, so a needs-only frontier lists it as
+        # eligible forever, and the next session dispatches a packet that
+        # cannot be written. A status the scheduler does not know is a status
+        # that does not exist, so it has to be here and not only in `note`.
+        if r['id'] in done or r['status'] in ('RUNNING', 'DONE', 'BLOCKED'):
             continue
         if any(n not in done for n in r['needs']):
             continue
