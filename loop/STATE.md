@@ -104,11 +104,21 @@ that, and V8 no longer builds a second Cargo world.
    "module is pre-declared, `lib.rs` is read-only" wording, which is what made
    six sibling packets write-disjoint.
 
-4. **`BG-TOL-001-SMALL` is dispatchable in the registry but `run_packet.py`
-   refuses it** — three anchor claims have rotted against the tree
-   (`A1: expected 2, tree has 1`). Re-anchor before re-dispatching. The
-   watchdog burned its whole restart budget retrying a packet that could never
-   dispatch.
+4. **`BG-TOL-001-SMALL` has finished work sitting unadjudicated in slot 1, on a
+   stale base.** `loop/slots/1/wt` holds `72e2b89`
+   ("refactor(polymesh,geotrait): classify every tolerance site model or
+   param"), `RESULT.json` DONE, 7 sites migrated, 1 test added — but its base is
+   **`c75017d`**, many landings behind `integration/kernel-bg`. Its worker also
+   reconstructed the worktree by hand after the watchdog tore it down mid-run,
+   which is worth reading in its `notes` before trusting the diff.
+
+   It cannot simply be landed: every gate measures `base...HEAD`, and its
+   anchors already fail against the current tree (`A1: expected 2, tree has 1`),
+   which is why `run_packet.py` refuses to re-dispatch the packet. Decide
+   between **rebasing `packet/BG-TOL-001-SMALL` onto current integration and
+   re-verifying from scratch**, or re-anchoring the packet and re-dispatching it
+   fresh. Do not merge it without a full verify against a current base. The
+   watchdog burned its whole restart budget on it earlier.
 
 5. **Two spec items from session 10's review are still unstarted:**
    - **`BG-EVD-005`** — a published modulus needs a *geometric* certificate.
