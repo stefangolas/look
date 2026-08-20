@@ -11,7 +11,7 @@ otherwise would eventually cost a trap.) If you are picking this up cold, read
 [`loop/ORCHESTRATOR.md`](ORCHESTRATOR.md) for how to run the loop, then
 `python loop/slot_status.py`** — nothing else. Do not read `LEDGER.jsonl` whole.
 
-Updated 2026-08-20, end of session 13. Branch: `integration/kernel-bg`. Nothing
+Updated 2026-08-20, end of session 14. Branch: `integration/kernel-bg`. Nothing
 from the loop has reached `main` and nothing has been pushed.
 
 ## What this is, if you have never seen it
@@ -55,131 +55,122 @@ here is scored, tuned, or sampled.
 
 ## Where we are
 
-**Thirty-nine packets DONE of 67 (58%).** Session 13 landed **six** packets:
-the keystone `BG-ENC-003-BSPLINE` (convex-hull enclosure for
-`BSplineCurve<Point3>` — it unblocked `-NURBS`, `-PCURVE`, `-ISC`) and the
-first **five** of the eight BG-ANA-001 analytic shards: `PP`, `PS`, `SS`,
-`PCYL`, `COAX`. All six ACCEPTED on the first verify, `fault: NONE`.
-`truck-evidence` now has **109 lib tests + 3 integration** (the flaky-red
-plane property test was root-caused and fixed at the top of session 14 —
-"Pick up here" item 1 is resolved). GATE-4 sits at **109/109**.
+**Forty-four packets DONE of 67 (66%).** Session 14 landed **five**:
+`BG-ANA-001-PARCYL`, `BG-ANA-001-EQRCYL`, `BG-ENC-003-NURBS`,
+`BG-ENC-004-PCURVE` (all ACCEPTED first try, `fault: NONE`) and
+`BG-ANA-001-PCONE` (ACCEPTED on attempt 2, `fault: PACKET` — the first
+attempt stopped at SPEC_GAP and was right to). That completes **all eight
+BG-ANA-001 analytic shards** and the whole BG-ENC-003 spline family.
+`truck-evidence` now has **143 lib tests + 3 integration** (measured at
+close). GATE-4 sits at **109/109**.
 
-The session's design work preceded the fan-out, as intended: scaffolding
-commit `0b5e9d2` (module tree for all ten leaves so every write set is
-disjoint), the shared result type `AnalyticIntersection`/`ExactCurve` in
-`analytic/mod.rs` (`d660199`), then two amendments — `TangentCircle`
-(`47bfa36`, needed by the coaxial families) and `Curves(Vec)` added then
-dropped (`96f7a4c` → `2ae86bb`) when deriving the COAX algebra proved every
-family meets in at most two curves. The amendments are cheap before dispatch
-and impossible after; deriving each pair's algebra to the point where the
-enum arms are justified is what "design the result type" actually cost.
+**The mechanical era is over.** `schedule.py` at close shows a frontier of
+exactly two eligible rows — `BG-CE-001` and `BG-TOL-004`, both **design**.
+Everything else is DONE or explicitly gated: ISC `needs` BG-CE-002 (this
+session's adjudication), SHARED-CONE `needs` PCURVE+ISC, OFFSET is BLOCKED
+on the `EnclosureVectorField` interface, BG-NUM-002's BSPLINE/NURBS
+dependencies are now satisfied. From here the loop is orchestrator-written
+design packets, and the workers stop being the bottleneck by construction.
 
-**Two workers corrected their packets and were right both times** — the
-packets asked them to verify the closed forms, and the verification found
-real errors: PP's line-point formula had the plane constants paired with the
-wrong normals (worker derived and validated the fix against 20k random
-pairs); BSPLINE's out-of-range rationale was false for truck's evaluator
-(the basis window extrapolates — `Interval::ENTIRE` for out-of-range boxes,
-not an origin union); COAX's cone rows were single-nappe intuition twice
-over. The spec carries both corrections in the BG-ANA-001 amendment.
+The session opened by root-causing the flaky plane gate (see "Pick up
+here" item 1, RESOLVED) — a test defect, not an enclosure defect; two
+sessions had misread it as a BG-ENC-001 under-estimation.
+
+**Workers corrected the orchestrator three times this session and were
+right all three times**, which is the packet-design principle working:
+EQRCYL's ellipses are not mirror images (internal-bisector semi-major is
+`r/sin(θ/2)`, not `r/cos(θ/2)` — they coincide only at θ = π/2, exactly the
+case the packet verified); PCONE attempt 1 proved the packet's
+Δ2-decisive-zero parabola rule structurally unreachable (inari never
+degenerates a multi-step polynomial at a boundary) and its QUESTION.md
+forced the redesign that attempt 2 landed; PCONE attempt 2 caught an
+arithmetic typo in the amended packet's own witness (`q = (−3, 0, 9)`, not
+`(−3, 0, 5)`). All are in the spec's BG-ANA-001 amendment (entries 3–5).
 
 ## Pick up here
 
-1. **`plane_enclose_is_sound` RESOLVED at the top of session 14** (orchestrator
-   amendment, both files come from the P-6 vendoring commit — no packet owns
-   them). Root cause, verified bit-exactly: **the enclosure was correct; the
-   test sampled one ulp OUTSIDE its own parameter box.** The grid's last
-   endpoint `u0 + (u1−u0)·20/20` is a multiply-then-divide round trip that
-   landed one ulp above `u1` (seed `e2369bfc`: 1.6356989675203588 →
-   1.635698967520359), and the point evaluated there escapes the correctly
-   rounded affine box by one ulp — legitimately, because BG-ENC-001 soundness
-   covers parameters *in* the box. The observed sup 6.353689651523686 was
-   exactly `round_up(u1·p_y)` (the exact product lies below its nearest f64),
-   so inari and `plane.rs` were blameless and the same-tree induction
-   argument never failed. The previous session's "genuine under-estimation"
-   theory was wrong. The same round-trip hazard was latent in the shared P-6
-   harness (`harness.rs`), masked only by every other carrier's slack; both
-   samplers now clamp into the box, and the proptest seed is committed so
-   every worktree replays the finding case. Green ×6 on the property test
-   (seed replays each run), ×3 on the full suite. Dispatch is unblocked.
+1. **`plane_enclose_is_sound` RESOLVED (session 14's first commit
+   `1dab417`)** — keep this entry one session for the root cause: **the
+   enclosure was correct; the test sampled one ulp outside its own
+   parameter box** (grid endpoint round-trip), so BG-ENC-001 was never
+   violated. Both samplers clamp now, the proptest seed is committed, and
+   the trap below ("sampling property test must clamp its grid") carries
+   the lesson. If the flake ever reappears, look for new unclamped grids,
+   not for the enclosure.
 
-2. **`BG-ANA-001-PARCYL` was mid-flight at session end** — its first worker
-   wedged silent-from-boot for 67 minutes and was killed; the watchdog
-   redispatched it late in the session. If it finished and verified, it is
-   landed and this item is stale; if not, `run_packet.py --reset` slot 1 and
-   redispatch the same packet (it owns the margin-sweep test; base `34334c1`
-   if the branch is still there — **read the fork point off the slot**, do
-   not trust this number blindly).
+2. **The B-spline importer defect packet is the next natural mechanical
+   item, and its design seed is already in the tree.** Reproduced at close:
+   `truck-stepio`'s `input` binary fails `nurbs_curve_b_spline_surface_with_knots`,
+   `nurbs_surface_b_spline_surface_with_knots`, `b_spline_surface_with_knots`
+   with "The scalar 0 is not positive" — knot increments collapsing to zero
+   under cumulative rounding in the STEP importer. The already-landed
+   `b_spline_curve_with_knots_tiny_knot_interval_converts` test in
+   `tests/input/geometry.rs` carries the fix shape (normalize the knot
+   vector to `[0, 1]` — an exact, shape-preserving reparameterization);
+   generalize it across the curve/surface/NURBS conversion paths and make
+   a true-zero increment a typed refusal. Root-cause
+   `truck-stepio/src/in/` before writing the packet (BG-EVD-004-r2 is the
+   defect-packet worked example).
 
-3. **`BG-ANA-001-PCONE` and `BG-ANA-001-EQRCYL` packets are written and
-   undispatched** (`loop/packets/…`). PCONE is the heaviest of the eight
-   (2D conic reduction; budget turns 45); EQRCYL refuses parallel/skew
-   placements as `NonCanonicalCarrier`. Both were held back only by the
-   close-out, not by any blocker.
+3. **The design queue is the whole frontier now**: `BG-CE-001` (25 files
+   mention `Edge<` across six crates — the write set is determinable now;
+   the spec carries the struct) and `BG-TOL-004` (squared-order tolerances
+   in a scale-relative system; 23 sites wait). Then `BG-EVD-005`,
+   `BG-TOL-005`, `BG-NUM-002` (now unblocked), and the CE chain — note the
+   new dependency edges: **CE-002 unlocks ISC, ISC+PCURVE unlock
+   SHARED-CONE**, so the CE chain now has a mechanical fan-out at its far
+   end again. OFFSET stays BLOCKED on `EnclosureVectorField`.
 
-4. **BSPLINE landing unblocked `BG-ENC-003-NURBS`, `BG-ENC-004-PCURVE`,
-   `BG-ENC-004-ISC` and (with BG-NUM-001) `BG-NUM-002`** — the frontier is
-   8, and NURBS/PCURVE/ISC have no packets yet. NURBS inherits real design
-   constraints from BSPLINE's deviations: the homogeneous hull needs the
-   positive-weight refusal (`EnvelopeCase::NonPositiveNurbsWeight` exists
-   for it) and should reuse BSPLINE's landed pad conventions. PCURVE/ISC
-   use the shared cone construction from the BG-ENC-004 amendment.
+4. **The watchdog is STOPPED at close** (nothing in flight; all rows DONE —
+   the session-12 rationale). If you dispatch, start it with
+   `LOOK_WATCHDOG_STAGNANT=3600` via the `cmd /c "set ... && python
+   loop/watchdog.py"` incantation (PS 5.1 `Start-Process` has no
+   `-Environment`). Do NOT start a second one if one is somehow alive —
+   check `loop/watchdog.lock` and the process list first.
 
-5. **The watchdog's wedged-killer is set to 3600s and must stay there.** At
-   the shipped default (1200s) it killed two healthy workers mid-run during
-   a model-latency storm (PP and PS, both ~23 min silent, both went on to
-   pass verify after redispatch — the kills cost ~25 min wall clock each).
-   Start it with `LOOK_WATCHDOG_STAGNANT=3600` (see the new trap below for
-   the exact incantation — `Start-Process` cannot set env vars in PS 5.1).
-
-6. **`BG-TOL-001-SMALL` is still unadjudicated** (unchanged from session 12):
-   commit `72e2b89` safe on its branch, forked at `c75017d`, anchors stale,
-   worker rebuilt its worktree by hand mid-run. Decide rebase-and-reverify
-   vs re-anchor-and-redispatch; do not merge unverified.
-
-7. **Design items queue**: `BG-ENC-004-OFFSET` (BLOCKED on the
-   `EnclosureVectorField` interface, spec amendment written), `BG-EVD-005`,
-   `BG-TOL-005`, `BG-CE-001`, `BG-TOL-004`. All have statements in the spec
-   and prior reviews; none started.
-
-8. **Then the CE chain** (session 9's scoping, below).
+5. **Slot 2's worktree sits on `packet/BG-TOL-001-SMALL@72e2b89`** — that is
+   a stale leftover branch, NOT unlanded work (see the new trap: the packet
+   landed as `8f4f04d` in session 12). The next `new_slot.py --slot 2`
+   re-forks it; nothing to adjudicate.
 
 ## State of the machine, as left
 
-- **The watchdog is RUNNING** with `LOOK_WATCHDOG_STAGNANT=3600` (pid in
-  `loop/watchdog.lock`) because PARCYL was genuinely in flight at close —
-  the session-12 "stop it, nothing in flight" rationale does not apply. It
-  will not touch slots 0/2 (rows DONE) or a finished PARCYL (its
-  RESULT.json guard). If PARCYL wedges it redispatches, budget 3; if you
-  find the session cold with PARCYL FINISHED, read its RESULT.json, verify
-  at the slot's fork point, land. **Stop the watchdog before reclaiming
-  anything.** Slots 0 and 2 are FINISHED and warm on their landed branches
-  (`ae79659`, `69ad194`).
-- **Disk ~36 GB free** at close. Three warm slot targets (~4.3 GB each) and
-  no leaked `%TEMP%/look-verify-baseline-*` (checked). The `wt/target`
-  duplicate-dirs that plagued session 12 did not recur this session.
-- **Six verifies ran, all ACCEPTED first try.** Baseline cache keys used:
-  `658033d`, `5ecebb4` (twice, sequential), `634519e`, `34c9cb3`, `56ac0bd`.
-- `loop/packets/` has **undispatched packets for PARCYL, PCONE, EQRCYL**
-  (registry rows point at them); their anchors were verified against the
-  tree at writing time.
+- **The watchdog is STOPPED** (killed pid 31172 + its PyManager shim 15388;
+  lock removed). All rows DONE, nothing in flight.
+- **Disk ~31 GB free** at close. Three warm slot targets (~4.3–4.5 GB
+  each); no leaked `%TEMP%/look-verify-baseline-*`.
+- **Five verifies ran, all ACCEPTED** (PCONE on its second attempt).
+  Baseline cache keys used: `34334c1` (PARCYL), `f33aff4` (EQRCYL and
+  PCONE-attempt-2, sequential), `ee7d977` (NURBS), `3b14e23` (PCURVE).
+- Slots 0 and 1 are FINISHED and warm on their landed branches
+  (`4618eee` PCURVE, `6ce3d26` PCONE); slot 2 on the stale SMALL branch
+  (see "Pick up here" item 5).
+- `loop/packets/` has **no undispatched mechanical packets** — PCURVE was
+  the last one written and it landed this session. The next packets to
+  exist are design-class or the importer-defect fix packet.
 
 ## The parallelism picture
 
-67 rows (one added: `BG-ENC-004-SHARED-CONE`, the cross_box consolidation,
-filed with `needs` on PCURVE+ISC so it lands exactly once, after them).
-**26 SPECD, 2 BLOCKED** (`BG-INV-107`, `BG-ENC-004-OFFSET`), frontier **8
-eligible**: PCONE, PARCYL, EQRCYL, NURBS, PCURVE, ISC (all mechanical, all
-write-disjoint), plus CE-001 and TOL-004 (design).
+67 rows. **Frontier: 2 eligible, both design** (`BG-CE-001` W3c,
+`BG-TOL-004` W2b) — measured by `schedule.py` at close, after all five of
+this session's landings. Open rows by class: 10 mechanical, 12 design,
+1 wide-mechanical — **every open mechanical row is gated, none eligible**:
+the six INV-1xx checkers wait on `BG-CE-003` (INV-104 on CE-001, INV-106 on
+FID-001), SHARED-CONE waits on PCURVE+ISC, ISC waits on CE-002, OFFSET and
+INV-107 are BLOCKED, CE-001-MIGRATE waits on CE-001. So the mechanical era
+is not permanently over — **the CE chain (CE-001 → CE-003, with CE-002 for
+ISC) re-opens a seven-packet mechanical fan-out at its far end**. The
+fan-out pattern (scaffolding → shared types → templated packets → 3
+concurrent workers) is fully proven — **ten consecutive first-try accepts**
+across sessions 13–14 (six + PARCYL, EQRCYL, NURBS, PCURVE), broken only by
+PCONE's packet-fault SPEC_GAP — and idles until that chain lands.
 
-Three concurrent workers ran cleanly for the second session running — the
-fan-out pattern (scaffolding commit → shared-type design commit → templated
-packets with per-pair decision tables → three at a time) is now proven and
-is the template for the remaining mechanical work. What cost time this
-session was not the loop, it was the **model endpoint**: multi-hour silent
-gaps from boot on three workers, one worker dead-on-arrival, one 60-minute
-mid-run silence that recovered. Worker cost is still noise (~$0.06/packet);
-orchestrator attention during latency storms is the real budget.
+What cost time this session was not the loop: the plane-flake root cause
+(worth it — the whole session gated on it), the PCONE SPEC_GAP round trip
+(the packet's fault, adjudicated into a spec amendment and a redesign),
+and one self-inflicted red-herring (the `--reset` re-fork mistake below).
+Worker cost stayed noise (~$0.06/packet); three workers ran concurrently
+without interference again.
 
 ## Traps, each one paid for
 - **The watchdog's default 1200s wedged-killer kills healthy workers during a
@@ -759,6 +750,67 @@ reason is in the commit that made the change, and the code will not tell you.
   committed, so the case replays in every worktree. **Every packet whose
   tests sample a computed grid against a tight enclosure must clamp (or pin
   exact endpoints) and say why in the test.**
+
+- **`run_packet.py --reset` clears the working tree; it does NOT re-fork the
+  branch.** After a SPEC_GAP or a dead run, resetting the slot with
+  `--reset` leaves the branch sitting on the old commits, so the next
+  worker builds on top of them (tracked QUESTION.md/RESULT.json ride into
+  the diff → V1 rejection) and measures against a stale base. The correct
+  redispatch sequence is `new_slot.py --slot N --branch packet/<ID>` (which
+  re-forks onto integration HEAD) **then** `run_packet.py` (no `--reset`
+  needed on a clean fresh fork). Session 14 paid one worker kill for
+  learning this — caught it only because `slot_status` showed the old
+  commit instead of `(=base, no work)` after the redispatch.
+
+- **A handoff's "loose ends" list rots as fast as any other prose.** Session
+  14's handoff said BG-TOL-001-SMALL was "still unadjudicated, not
+  mergeable unverified" — the registry and ledger said it was DONE two
+  sessions earlier (`8f4f04d`, ACCEPTED, merged as `901f0ac`, fault GATE).
+  The leftover branch ref `72e2b89` on the pre-landing base is what fooled
+  the handoff. **Read `PACKETS.jsonl` and `LEDGER.jsonl` for status, never
+  the handoff's own summary of them** — and never start a rebase/verify of
+  an "unadjudicated" packet without that check first.
+
+- **A decisive boundary classification needs dyadic data on the PRIMARY
+  parameters, and multi-step interval polynomials never degenerate.**
+  inari rounds every intermediate outward, so a polynomial expression of an
+  exact-zero quantity evaluates to `[−ε, 0]` or `[0, ε]`, never `[0, 0]` —
+  `decisively_zero` can only fire on short exactly-representable chains.
+  The PCONE parabola rule died on this (spec amendment entry 4). The
+  escape: classify on the primary parameters with a scale-free invariant,
+  and choose witnesses with **integer raw normals and a dyadic slope** —
+  `tan α = 3/4` is dyadic where `sin α = 3/5` is not, and no nontrivial
+  Pythagorean triple has a power-of-two hypotenuse, so no unit vector with
+  dyadic components exists at all. The same arithmetic limits apply to any
+  future "exactly on the boundary" witness.
+
+- **Verify a packet's own arithmetic with a command before dispatch.** The
+  amended PCONE packet stated a witness plane `q = (−3, 0, 5)` whose stated
+  cross product `(4, 0, 3)` belongs to `q = (−3, 0, 9)`; the worker caught
+  it (the fourth worker correction of the session, and the second one in a
+  packet the orchestrator wrote). Ten seconds of Python on the cross
+  product at packet-writing time would have caught it. The
+  "re-derive every claim" rule applies to claims YOU wrote, not just ones
+  you inherited.
+
+- **`Start-Process` with `-RedirectStandardOutput` holds the calling shell
+  until the tool's timeout, and the launched process survives the kill.**
+  Every verify launch this session "timed out" at the tool cap while the
+  verify ran to completion and wrote its verdict. The correct response is
+  to poll the artifact (`VERDICT.json`, `verify.out`), never to re-launch —
+  a second verify at the same base races the first on its baseline cache.
+
+- **Composing enclosures: never forward an unbounded parameter box into an
+  inner carrier's `enclose`.** The landed surface carriers' behavior on
+  non-finite input boxes is not uniform — `bspline.rs`'s `hull_of` returns
+  the EMPTY box for non-finite `tt` (its "non-finite → empty" rule reads
+  NaN and ENTIRE the same way), so a composition that forwards
+  `Interval::ENTIRE` inward can under-estimate the whole thing. Decide the
+  out-of-range answer yourself, at the composition boundary (PCURVE's
+  decision 4 encodes this; the landed `pcurve.rs` returns the unbounded
+  box directly). If a future packet hits a similar asymmetry, the
+  signature is a composition whose empty/unbounded cases disagree with the
+  inner carrier's own.
 
 ## The commands
 
