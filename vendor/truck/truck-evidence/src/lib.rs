@@ -13,6 +13,8 @@
 //! - **BG-ENC-001** — the enclosure interface (`enclosure`): `Interval`,
 //!   `Box3`, `DirCone` and the `EnclosureCurve`/`EnclosureSurface` traits;
 //! - **BG-ENC-002 for `Plane`** (`plane`) — the reference carrier impl;
+//! - **BG-ENC-004** (`decorators`) — the compositional carriers, one submodule
+//!   per decorator;
 //! - the shared sampling harness (`harness`) so BG-ENC-001's soundness test is
 //!   written once rather than once per carrier.
 //!
@@ -42,6 +44,8 @@ pub mod circle;
 pub mod cone;
 /// BG-ENC-002-CYLINDER: the carrier impl. Scaffolded empty; the packet fills it.
 pub mod cylinder;
+/// BG-ENC-004: enclosure impls for the decorators. Scaffolded empty.
+pub mod decorators;
 /// BG-ENC-002-LINE: the carrier impl. Scaffolded empty; the packet fills it.
 pub mod line;
 /// BG-ENC-002 reference: `EnclosureSurface for Plane`.
