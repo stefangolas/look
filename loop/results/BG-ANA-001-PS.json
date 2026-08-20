@@ -1,0 +1,12 @@
+{
+  "id": "BG-ANA-001-PS",
+  "status": "DONE",
+  "contracts": ["BG-ANA-001", "BG-ANA-002"],
+  "tests_added": 5,
+  "sites_migrated": 0,
+  "sites_deferred": 0,
+  "deviations": [],
+  "disagreements": [],
+  "baseline_failures": [],
+  "notes": "Implemented plane x sphere in vendor/truck/truck-evidence/src/analytic/plane_sphere.rs. Classification is decided by one exact interval comparison (signed distance h vs radius r, both as inari intervals) with three_way: Less -> circle (centre c - h_f*n, radius sqrt(r^2 - h_f^2), placed via frame(u, v, n, cc, rho, rho) on TrimmedCurve(UnitCircle::<Point3>, (0.0, TAU))), Equal -> TangentPoint at the foot, Greater -> Empty, None -> Refusal::NumericallyUnresolved{RootNotIsolated}. Every Ok carries the full field-by-field Certificate with method = Method::Exact and Prop::AnalyticCarrier = Truth::True (no constructor helper, BG-EVD-002). All 5 required tests added and passing; 74 pre-existing lib tests and 3 integration tests pass unchanged. Verification: cargo fmt --check -p truck-evidence, cargo clippy -p truck-evidence --all-targets --no-deps -- -D warnings, cargo test -p truck-evidence --lib --tests --no-fail-fast, cargo check --workspace --all-targets, and bash scripts/kernel-gates.sh (baseline HEAD^) all pass, including GATE-2/H-3. On the bit-neighbour witness (radius f64::from_bits-adjacent to the tangency value with the dyadic plane z=0 / sphere (0,0,1)) a genuine straddle was NOT constructible: h and r^2 are degenerate intervals, so the classification stays exactly decisive in both adjacent directions, exactly as the packet's degeneracy rationale predicts. A genuine straddle refusal WAS constructible and is asserted in ps_undecidable_predicates_refuse using a tilted plane (origin (0,0,0), p=(1,0,0), q=(0,1,0.1)) whose non-dyadic normal makes the h^2 interval non-degenerate, with the radius chosen as sqrt of a point strictly inside that interval, which plane_sphere refuses. Committed on branch packet/BG-ANA-001-PS with subject 'feat(evidence): exact plane x sphere (BG-ANA-001-PS)'."
+}
