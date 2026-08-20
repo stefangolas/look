@@ -1,0 +1,12 @@
+{
+  "id": "BG-ANA-001-PCYL",
+  "status": "DONE",
+  "contracts": ["BG-ANA-001", "BG-ANA-002"],
+  "tests_added": 6,
+  "sites_migrated": 0,
+  "sites_deferred": 0,
+  "deviations": [],
+  "disagreements": [],
+  "baseline_failures": [],
+  "notes": "Implemented plane x cylinder in the single write-allowed file. Perpendicular (a = n̂.z = +/-1) always yields the circle centred at the axis-plane pierce point; parallel (a = 0) decides δ² vs r² by three_way on outward-rounded inari enclosures (two lines / tangent line / empty / refuse); 0 < |a| < 1 yields the ellipse with minor r along û = normalize(n̂ × ẑ) and major r/|a| along v̂ = n̂ × û, placed via frame(v_hat, u_hat, n, cc, r/|a|, r) so the u-column (scaled by ru) carries the major axis. Ellipse orientation was verified numerically in pcyl_ellipse_when_tilted: subs(0) reads the major semi-axis √2·r, subs(π/2) the minor r, ratio √2 = 1/cos 45° within an H-3-commented slack — no correction needed, so no deviation. Every Ok returns the certificate field-by-field with method = Method::Exact (decisive predicates on f64 carrier parameters; the emitted curve is the closed-form intersection, coordinates in f64, 'lies on both carriers to machine precision' asserted with H-3-commented slacks) and Prop::AnalyticCarrier = True. Bit-neighbour parallel-offset witness (plane x = 1 ± 1 ulp, normal exactly (1,0,0)) stays decisive: δ is dyadic so its square is a degenerate interval, no straddle on the dyadic axis. A genuine straddle refusal WAS constructible: the parallel plane with non-dyadic normal normalize(ẑ × (0.6, 0.8, 0)) = (−0.8, 0.6000000000000001, 0) through o = (1, (0.8·1 − 1)/0.6, 0), placed tangent to the radius, has an offset enclosure that rounds outward to δ² = [1, 1+ε] strictly containing r² = [1,1], so three_way is None and plane_cylinder returns Refusal::NumericallyUnresolved { witness: RootNotIsolated }. Six tests added (pcyl_two_lines_when_the_plane_is_parallel_to_the_axis, pcyl_tangent_line_and_empty_when_parallel, pcyl_circle_when_the_plane_is_perpendicular, pcyl_ellipse_when_tilted, pcyl_undecidable_predicates_refuse, pcyl_certificate_is_exact); all pre-existing lib and integration tests keep passing. All four 'Done when' commands pass, and scripts/kernel-gates.sh (against HEAD~1) reports all P-3 gates pass (unscaled_legacy 109/109)."
+}
