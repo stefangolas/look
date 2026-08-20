@@ -1230,35 +1230,6 @@ def main():
                 base_tests = baseline8['tests']
                 newly_failing = sorted(n for n, s in now.items()
                                        if s == 'FAILED' and base_tests.get(n) != 'FAILED')
-                # Flake rule (2026-08-19, from the ENUM-r3 landing attempts):
-                # several truck-stepio import tests are randomized proptests
-                # that fail on SOME seeds at every commit in the tree's
-                # history -- a single-run baseline records whatever that run
-                # drew, so a flaky pass at base plus a flaky fail at HEAD
-                # reads as a regression. The V5 analogue of this rule is
-                # recorded practice ("re-run it at both commits before
-                # believing it"); here it is mechanical: a downstream
-                # failure only counts if it FAILS A SECOND RUN TOO.
-                # A deterministic regression fails twice; a flake does not.
-                # Deleting the proptest-regressions seed files (they look
-                # like stray artifacts) makes these tests seed-random and is
-                # what forced this rule -- do not delete them again.
-                if newly_failing:
-                    v.write_out_section(
-                        'V8 no-regression: re-run for flake rule on '
-                        + ', '.join(newly_failing[:8]))
-                    len2 = v.out_file.stat().st_size
-                    v.invoke_native(
-                        ['cargo', 'test', *d_args, '--lib', '--tests',
-                         '--no-fail-fast'], v.wt)
-                    chunk2 = v.out_file.read_bytes()[len2:].decode('utf-8', errors='replace')
-                    now2 = parse_test_statuses(chunk2)
-                    flakes = sorted(n for n in newly_failing
-                                    if now2.get(n) != 'FAILED')
-                    newly_failing = sorted(n for n in newly_failing
-                                           if now2.get(n) == 'FAILED')
-                else:
-                    flakes = []
                 still_failing = sorted(n for n, s in now.items()
                                        if s == 'FAILED' and base_tests.get(n) == 'FAILED')
                 newly_ignored = sorted(n for n, s in now.items()
@@ -1271,8 +1242,7 @@ def main():
                 if regressions:
                     parts = []
                     if newly_failing:
-                        parts.append('newly failing downstream (twice, not flakes): '
-                                     + ', '.join(newly_failing[:8]))
+                        parts.append('newly failing downstream: ' + ', '.join(newly_failing[:8]))
                     if newly_ignored:
                         parts.append('passed at base, #[ignore]d now: ' + ', '.join(newly_ignored[:8]))
                     v.add_gate('V8 no-regression', 'FAIL', '; '.join(parts) + '; see out.txt',
@@ -1281,10 +1251,6 @@ def main():
                 else:
                     detail = (f"{len(downstream)} downstream crate(s) unchanged vs baseline at "
                               f"{base[:7]}: " + ', '.join(downstream))
-                    if flakes:
-                        detail += ('; ' + str(len(flakes))
-                                   + ' flaky downstream test(s) acquitted by re-run: '
-                                   + ', '.join(flakes[:4]))
                     if still_failing:
                         detail += (f"; {len(still_failing)} pre-existing failure(s) ignored: "
                                    + ', '.join(still_failing[:8]))
