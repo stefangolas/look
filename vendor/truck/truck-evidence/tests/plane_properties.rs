@@ -50,11 +50,18 @@ proptest! {
         let (u0, u1) = (uu.inf(), uu.sup());
         let (v0, v1) = (vv.inf(), vv.sup());
         // Deterministic 21x21 grid: enough to catch under-estimation without
-        // making each proptest case heavy.
+        // making each proptest case heavy. Soundness covers parameters INSIDE
+        // the box only: the last grid point, computed as
+        // `u0 + (u1 - u0) * 20.0 / 20.0`, is a multiply-then-divide round
+        // trip that can land one ulp ABOVE u1 (persisted seed e2369bfc:
+        // u1 = 1.6356989675203588 samples at 1.635698967520359), and the
+        // point evaluated there may sit one ulp outside the correctly
+        // rounded enclosure. Clamp pins the rounded grid back into the box;
+        // interior points are a full grid step inside and never clamp.
         for i in 0..21 {
             for j in 0..21 {
-                let u = u0 + (u1 - u0) * (i as f64) / 20.0;
-                let v = v0 + (v1 - v0) * (j as f64) / 20.0;
+                let u = (u0 + (u1 - u0) * (i as f64) / 20.0).clamp(u0, u1);
+                let v = (v0 + (v1 - v0) * (j as f64) / 20.0).clamp(v0, v1);
                 let pt = plane.subs(u, v);
                 prop_assert!(box3.contains(pt), "({u},{v}) -> {pt:?} escaped {box3:?}");
             }

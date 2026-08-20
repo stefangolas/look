@@ -60,9 +60,9 @@ the keystone `BG-ENC-003-BSPLINE` (convex-hull enclosure for
 `BSplineCurve<Point3>` — it unblocked `-NURBS`, `-PCURVE`, `-ISC`) and the
 first **five** of the eight BG-ANA-001 analytic shards: `PP`, `PS`, `SS`,
 `PCYL`, `COAX`. All six ACCEPTED on the first verify, `fault: NONE`.
-`truck-evidence` now has **109 lib tests + 3 integration** (one of the three
-is currently flaky-red — see "Pick up here" item 1, which is the gate on
-dispatching anything else). GATE-4 sits at **109/109**.
+`truck-evidence` now has **109 lib tests + 3 integration** (the flaky-red
+plane property test was root-caused and fixed at the top of session 14 —
+"Pick up here" item 1 is resolved). GATE-4 sits at **109/109**.
 
 The session's design work preceded the fan-out, as intended: scaffolding
 commit `0b5e9d2` (module tree for all ten leaves so every write set is
@@ -85,21 +85,23 @@ over. The spec carries both corrections in the BG-ANA-001 amendment.
 
 ## Pick up here
 
-1. **`plane_enclose_is_sound` is flaky-red on integration and it gates every
-   dispatch.** Observed 3/3 failures at `3e34112` with a 1-ulp y-sup escape
-   (`subs` point 6.353689651523687 vs box sup ...686), green on the same day
-   at `ae79659` and on every landed worker's branch. Pre-existing
-   (`plane.rs` + `tests/plane_properties.rs` untouched since before this
-   session); none of today's six packets caused it; the escape is a genuine
-   BG-ENC-001 under-estimation when it fires. The remaining undispatched
-   packets' Done-when says "the existing tests keep passing", so a worker
-   hitting the red draw will burn turns on a defect outside its write set.
-   **Fix plane.rs first** (orchestrator amendment or a small packet: pad the
-   enclosure endpoints outward the way `bspline.rs` does, and understand the
-   root cause — the interval-induction argument says a same-tree escape is
-   impossible, so something subtler than expression-tree mismatch is going
-   on), then re-run `cargo test -p truck-evidence --lib --tests` several
-   times before trusting green.
+1. **`plane_enclose_is_sound` RESOLVED at the top of session 14** (orchestrator
+   amendment, both files come from the P-6 vendoring commit — no packet owns
+   them). Root cause, verified bit-exactly: **the enclosure was correct; the
+   test sampled one ulp OUTSIDE its own parameter box.** The grid's last
+   endpoint `u0 + (u1−u0)·20/20` is a multiply-then-divide round trip that
+   landed one ulp above `u1` (seed `e2369bfc`: 1.6356989675203588 →
+   1.635698967520359), and the point evaluated there escapes the correctly
+   rounded affine box by one ulp — legitimately, because BG-ENC-001 soundness
+   covers parameters *in* the box. The observed sup 6.353689651523686 was
+   exactly `round_up(u1·p_y)` (the exact product lies below its nearest f64),
+   so inari and `plane.rs` were blameless and the same-tree induction
+   argument never failed. The previous session's "genuine under-estimation"
+   theory was wrong. The same round-trip hazard was latent in the shared P-6
+   harness (`harness.rs`), masked only by every other carrier's slack; both
+   samplers now clamp into the box, and the proptest seed is committed so
+   every worktree replays the finding case. Green ×6 on the property test
+   (seed replays each run), ×3 on the full suite. Dispatch is unblocked.
 
 2. **`BG-ANA-001-PARCYL` was mid-flight at session end** — its first worker
    wedged silent-from-boot for 67 minutes and was killed; the watchdog
@@ -740,8 +742,23 @@ reason is in the commit that made the change, and the code will not tell you.
   whole downstream workspace at base, which is the cost the redesign removes.
 - **A base build failure is never the packet's fault.** The base commit
   predates the packet; if it will not build, that is disk, toolchain or a
-  corrupt target dir. V8 now exits **BLOCKED** rather than REJECTED when it
-  cannot get an answer out of the base, and caches nothing from that run.
+   corrupt target dir. V8 now exits **BLOCKED** rather than REJECTED when it
+   cannot get an answer out of the base, and caches nothing from that run.
+
+- **A sampling property test must clamp its grid into the box it quantifies
+  over.** `plane_enclose_is_sound` sampled `u0 + (u1-u0)*20/20` at the last
+  grid index — a multiply-then-divide round trip that landed one ulp ABOVE
+  `u1` (seed `e2369bfc`: 1.6356989675203588 → 1.635698967520359) — and the
+  point evaluated there escaped Plane's correctly-rounded affine box by one
+  ulp. The enclosure was sound the whole time; the same-tree
+  interval-induction argument never failed, and the "escape" was the test
+  asserting a false property (soundness outside the box). Two sessions
+  misread it as a BG-ENC-001 under-estimation. The shared P-6 harness
+  (`harness.rs`) carried the identical latent defect, masked only by every
+  other carrier's enclosure slack. Both samplers clamp now and the seed is
+  committed, so the case replays in every worktree. **Every packet whose
+  tests sample a computed grid against a tight enclosure must clamp (or pin
+  exact endpoints) and say why in the test.**
 
 ## The commands
 

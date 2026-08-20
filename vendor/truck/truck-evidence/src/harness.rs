@@ -28,7 +28,12 @@ pub fn assert_encloses_curve<C: EnclosureCurve>(c: &C, tt: Interval, samples: us
     let hi = tt.sup();
     let step = (hi - lo) / (samples as f64 - 1.0);
     for i in 0..samples {
-        let t = lo + step * (i as f64);
+        // Soundness covers parameters inside `tt` only: `lo + step * i` at
+        // the last index is a divide-then-multiply round trip that can land
+        // one ulp above `hi`, and a tight enclosure (Plane's affine box is
+        // correctly rounded) legitimately excludes a point evaluated there.
+        // Clamp keeps every sample inside the interval being enclosed.
+        let t = (lo + step * (i as f64)).clamp(lo, hi);
         let pt: Point3 = c.subs(t);
         assert!(
             box3.contains(pt),
@@ -57,7 +62,13 @@ pub fn assert_encloses_surface<S: EnclosureSurface>(
     let vs = (v1 - v0) / (samples as f64 - 1.0);
     for i in 0..samples {
         for j in 0..samples {
-            let (u, v) = (u0 + us * (i as f64), v0 + vs * (j as f64));
+            // Same rounding hazard as assert_encloses_curve: the last row
+            // and column can land one ulp outside the box. Clamp keeps the
+            // grid inside `uu x vv`, the domain the enclosure bounds.
+            let (u, v) = (
+                (u0 + us * (i as f64)).clamp(u0, u1),
+                (v0 + vs * (j as f64)).clamp(v0, v1),
+            );
             let pt: Point3 = s.subs(u, v);
             assert!(
                 box3.contains(pt),
