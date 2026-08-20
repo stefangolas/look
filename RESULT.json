@@ -1,27 +1,23 @@
-{
-  "id": "BG-CE-006-ENUM-r2",
-  "status": "DONE",
-  "contracts": ["BG-CE-006"],
-  "tests_added": 3,
-  "sites_migrated": 0,
-  "sites_deferred": 0,
-  "deviations": [
-    "Decision 4's literal variant `Processor(Processor<Surface, Matrix4>)` is a recursive type of infinite size (E0072): `Processor` stores its entity inline in decorators/mod.rs, which is not in write_allow. Used the compiler-suggested indirection `Processor(Processor<Box<Surface>, Matrix4>)` and documented it on the variant. Every trait the enum derives requires (`ParametricSurface`, `ParameterDivision2D`, `Invertible`, `SearchParameterD2`) plus the manual `SearchNearestParameter`/`Transformed`/`ParametricSurface3D` resolve through the existing blanket impls for `Box<T>`, so no delegating impls were needed.",
-    "Decision 2's literal port `Surface::RevolutedCurve(surface_row.entity().clone())` assumes `surface_row` is a `Processor`; in the meshalgo fixture `surface_row` is already the `RevolutedCurve<Curve>` (the `Processor::new(...)` wrapper was inline), so the explicit construction is `Surface::RevolutedCurve(surface_row)`. The fixture's processor transform is the identity, so the bare carrier is the correct arm.",
-    "Decision 3's u-branch normalization alone does not make `builder::partial_torus` pass: the same defect class sits in the revolution-angle (`v`) search. `Revolution::proj_angle`'s `acos` + cross-product-sign test flipped between ~0 and 2π on the sign noise of a near-zero cross product for points in the profile plane (observed 0.0 vs 6.283 for consecutive samples of one boundary edge). Replaced it with `atan2` returning the signed angle in (−π, π], which is branch-stable at the seam; documented on the function. Results are unchanged away from the seam, `partial_torus` now passes, and the full truck-geometry and truck-modeling suites stay green."
-  ],
-  "disagreements": [
-    "The 'Done when' `cargo clippy --all-targets --no-deps -- -D warnings` cannot pass in this toolchain (rustc/clippy 1.97.1): the vendored truck crates predate lints that clippy 1.97 includes in `clippy::all` (e.g. `too_many_arguments`, `large_enum_variant`, `type_complexity`). truck-stepio fails with 4 errors and truck-meshalgo with 152 errors, all in `src/` files untouched since vendoring and outside write_allow; truck-geometry and truck-modeling pass. No stop condition applies (everything compiles; the failures are lint, not compile).",
-    "Several runtime tests fail identically on the branch base commit 1d2a9f3 (trunk) and on this branch, i.e. they are pre-existing baseline failures, not regressions of this packet (verified in a worktree at 1d2a9f3): truck-stepio lib `geom_impls::builder` and its `input`/`io`/`output` integration suites; truck-meshalgo lib `cone_topology_tests` and its `tessellation` suite. The meshalgo `resources/shape/*.json` fixtures are absent on this machine."
-  ],
-  "baseline_failures": [
-    "truck-stepio lib: `in::step_geometry::geom_impls::builder` (shell_condition Oriented != Closed) — fails identically on trunk 1d2a9f3.",
-    "truck-stepio --test input: `geometry::b_spline_curve_with_knots`, `geometry::b_spline_surface_with_knots`, `geometry::nurbs_surface_b_spline_surface_with_knots`, `table::read`, `tessellate_shape::tessellate_shape`, `assy::occt_assy` — identical on trunk.",
-    "truck-stepio --test io: `ioi::ioi`, `ioi::assy_ioi`, `oi::oi` — identical on trunk.",
-    "truck-stepio --test output: `screenshot::cube`, `topology::parse_shell`, `topology::parse_solid` — identical on trunk.",
-    "truck-meshalgo lib: `cone_topology_tests::duplicate_edge_creates_no_second_cdt_edge`, `cone_topology_tests::test_parity_intersecting_constraints_rejected` — identical on trunk.",
-    "truck-meshalgo --test tessellation: `compare_occt_mesh`, `compare_occt_mesh_csolid`, `csolid_is_closed`, `large_number_meshing`, `solid_is_closed`, `special_cylinder`, `special_cylinder_csolid` — identical on trunk; several read the absent `resources/shape/` fixtures.",
-    "cargo clippy --all-targets --no-deps -- -D warnings: truck-stepio (4 errors, `in/convert.rs`, `in/mod.rs`) and truck-meshalgo (152 errors, `src/`) — clippy 1.97 lint-group drift on files untouched since vendoring (commits da72cd5, ce8a6f9)."
-  ],
-  "notes": "All four gaps closed. (1) stepio-in disambiguated with `use self::Surface::*;`. (2) meshalgo port is the explicit bare-carrier construction `Surface::RevolutedCurve(surface_row)`; the geometry is unchanged and the test's outcome is identical to trunk (it is a pre-existing baseline failure). (3) branch-consistent search: `normalize_branch` applied in all four `search_parameter`/`search_nearest_parameter` impls of revolved_curve.rs (periodic profiles fold to the branch nearest the hint, else the principal period), plus the atan2 seam-stable `proj_angle`; `builder::partial_torus` passes again and the new regression test passes. (4) `Surface::Processor` placed-surface variant with exact identity-linear-part translation handling and `Processor` composition for any other affine map; STEP-out emits analytic entities (`CYLINDRICAL_SURFACE`/`CONICAL_SURFACE`/`SPHERICAL_SURFACE`/`TOROIDAL_SURFACE`) with the carrier placement composed with the matrix and transforms spline inners exactly. The three required tests pass. cargo fmt --check passes; cargo check --workspace --all-targets passes; cargo test passes for truck-geometry and truck-modeling. All remaining done-when failures are pre-existing baselines outside write_allow, verified identical on the branch base commit."
+﻿{
+    "id":  "BG-CE-006-ENUM-r3",
+    "status":  "DONE",
+    "contracts":  [
+                      "BG-CE-006"
+                  ],
+    "tests_added":  1,
+    "sites_migrated":  0,
+    "sites_deferred":  0,
+    "deviations":  [
+
+                   ],
+    "disagreements":  [
+
+                      ],
+    "baseline_failures":  [
+                              "truck-shapeops lib: `healing::tests::step_import` â€” fails identically at the branch base commit a08fd8f (verified in a detached-HEAD worktree): the STEP test fixtures under `vendor/truck/resources/step/` do not exist in this repo, so `read_to_string` errors with Os NotFound. Unrelated to the transversal boolean engine.",
+                              "truck-shapeops --test fillet: `complex_surface` â€” fails identically at the branch base commit a08fd8f (verified in a detached-HEAD worktree): `shell_condition()` returns `Regular` where the test asserts `Closed`. The fillet module does not touch the transversal engine."
+                          ],
+    "notes":  "The None came from `divide_face::create_parameter_boundary` in the transversal boolean engine: the punch cylinder\u0027s wall-face surface (a preserved `Curve::Circle` edge swept along z, `u_period = 2Ï€`) carried over-wrapping circle-edge ranges such as (0.0, 8.0), and each polyline point was inverse-mapped through `surface.search_parameter(q, Some(prev), 100)` to a principal-branch angle, so consecutive points straddling the 2Ï€ seam teleported (e.g. 6.3 -\u003e ~0.02), the parameter-space polygon self-crossed, the domain decomposition degenerated (`pre_faces=0`, `negative_wires=3`) and `divide_faces`/`crate::and(...)` returned None. Fix: `create_parameter_boundary` now unwraps each mapped u relative to the previous point by integer multiples of `surface.u_period()` (`value + round((previous - value)/period) * period`), so every consecutive jump is at most half a period; only surfaces that report a `u_period` are affected and non-periodic-domain surfaces are bit-identical. `punched_cube` passes again, and the new regression test `circle_boundary_is_processable_by_transversal_engine` (an over-wrapping (0.0, 8.0) preserved `Curve::Circle` edge on a `Cylinder` face driven through `create_parameter_boundary`, asserting no mapped jump exceeds half a period and the wrap survives) passes â€” it fails without the unwrap with an observed seam jump of 6.017 \u003e Ï€. This was the only `search_parameter` chain building a parameter-space polyline in the transversal engine; the 1D curve searches in loops_store and the intersection-curve search do not chain, so they were left untouched. Reverse path needed nothing: the over-wrapped u values are legitimate parameters of the periodic domain and are consumed only by the 2D parameter-polygon `area()`/`include()` decomposition â€” they never round-trip through `subs(u,v)` and never re-emit curves cut at those parameters, because the divided faces are rebuilt from the original 3D boundary wires. Done-when gates pass: `cargo fmt --check -p truck-geometry -p truck-shapeops`, `cargo clippy -p truck-geometry -p truck-shapeops --all-targets --no-deps -- -D warnings`, `cargo test -p truck-geometry --lib --tests --no-fail-fast`, `cargo test -p truck-shapeops --lib --tests --no-fail-fast` (only the two baseline failures above), `cargo test -p truck-modeling --lib --tests --no-fail-fast` (including `builder::partial_torus` and `tsweep_circle_yields_cylinder`), and `cargo check --workspace --all-targets`.",
+    "amended_by":  "orchestrator",
+    "amendment":  "V4 GATE-2/H-3 rejection on first verify: one bare 1e-6 comparison epsilon in the new regression test lacked its same-line // H-3 opt-out (the packet warns about exactly this). Added the opt-out comment; no other change."
 }

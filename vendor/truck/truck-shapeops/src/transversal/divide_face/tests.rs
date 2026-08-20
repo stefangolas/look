@@ -4,6 +4,49 @@ use truck_geometry::prelude::*;
 use truck_topology::Vertex;
 const TOL: f64 = 0.05;
 
+#[test]
+fn circle_boundary_is_processable_by_transversal_engine() {
+    use std::f64::consts::TAU;
+
+    // A unit cylinder wall. The surface reports a `u_period` of `TAU`, so a
+    // boundary edge whose parameter range over-wraps the period is a
+    // legitimate periodic-domain parameter (BG-CE-006-ENUM-r3).
+    let surface = Cylinder::new(Point3::origin(), 1.0).unwrap().value;
+    // The preserved analytic circle (BG-CE-006) carrying an over-wrapping
+    // range `(0, 8) > (0, 2π)`: consecutive division points straddle the seam.
+    let trimmed = TrimmedCurve::new(UnitCircle::<Point3>::new(), (0.0, 8.0));
+    let mut circle: Curve = Processor::with_transform(trimmed, Matrix4::identity()).into();
+    let cut = circle.cut(4.0);
+    let v0 = Vertex::new(Point3::new(1.0, 0.0, 0.0));
+    let v1 = Vertex::new(cut.front());
+    let edge0 = Edge::new(&v0, &v1, circle);
+    let edge1 = Edge::new(&v1, &v0, cut);
+    let wire: Wire<Point3, Curve> = vec![edge0, edge1].into();
+    let face = Face::new(vec![wire.clone()], surface);
+
+    let mut polys = rustc_hash::FxHashMap::default();
+    let boundary = create_parameter_boundary(&face, &wire, &mut polys, 0.01).unwrap();
+
+    // Seam continuity: no mapped point may jump more than half a period from
+    // its predecessor, else the parameter-space polygon self-crosses and the
+    // domain decomposition degenerates (`pre_faces=0`, `divide_faces=None`).
+    let half_period = TAU / 2.0;
+    let points = &boundary.0;
+    for pair in points.windows(2) {
+        let jump = (pair[1].x - pair[0].x).abs();
+        assert!(
+            jump <= half_period + 1e-6, // H-3: dimensionless float-comparison epsilon in a test assertion, not a length
+            "mapped boundary teleported across the seam: jump {jump} > {half_period}"
+        );
+    }
+    // The over-wrapping range must survive as legitimate parameters of the
+    // periodic domain, not be truncated onto the principal branch.
+    assert!(
+        points.iter().any(|p| p.x > TAU),
+        "mapped boundary was truncated onto the principal branch"
+    );
+}
+
 fn line(v0: &Vertex<Point3>, v1: &Vertex<Point3>) -> Edge<Point3, BSplineCurve<Point3>> {
     let curve = BSplineCurve::new(KnotVec::bezier_knot(1), vec![v0.point(), v1.point()]);
     Edge::new(v0, v1, curve)
