@@ -77,11 +77,23 @@ landed had already passed V0–V7 before the session started.
 
 ## Pick up here
 
-1. **The ENC-002 carrier fan-out is dispatchable now and is the frontier.**
-   `BG-ENC-002-CIRCLE`, `-CYLINDER` and `-SPHERE` are written, their anchors
-   check, and their registry rows are wired to their files. `-LINE`, `-CONE`
-   and `-TORUS` still need writing; `plane.rs` is the template and the three
-   existing packets are the model to copy.
+1. **The ENC-002 carrier fan-out is the frontier and it is unblocked.** All
+   six packets are written, their anchors check, and their registry rows are
+   wired. `-LINE` has **landed** (the first `EnclosureCurve` impl). The five
+   curved ones are dispatchable.
+
+   **They were blocked for a while and the reason is worth knowing.**
+   `BG-ENC-002-CIRCLE` came back `SPEC_GAP` on its first dispatch, correctly:
+   this crate had no interval trigonometry at all. `inari` puts
+   `Interval::sin`/`::cos` behind its `gmp` feature and `truck-evidence` takes
+   `inari` with `default-features = false`; `plane.rs` is affine and never
+   noticed. The `gmp` route was measured and rejected — it builds GMP and MPFR
+   from source through autotools, this machine has neither `make` nor `m4`, and
+   the toolchain is `windows-gnullvm`, which `gmp-mpfr-sys` does not support.
+   **BG-ENC-005** (`truck-evidence/src/elementary.rs`) now provides certified
+   `sin`/`cos` on `inari`'s non-gated API. Every curved-carrier packet says
+   `use crate::elementary::{cos, sin}` and `cos(uu)`; **`uu.cos()` does not
+   exist and never will in this tree.**
 
    **They are write-disjoint by construction as of `afba979`.** All six
    carrier modules are already created and declared in
