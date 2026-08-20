@@ -55,71 +55,62 @@ here is scored, tuned, or sampled.
 
 ## Where we are
 
-**Twenty-three packets DONE of 65 (35%).** Session 11 landed the whole
-**BG-CE-006-ENUM stack** — three commits on one branch (`60aee3f` the canonical
-`Curve`/`Surface` model, `a08fd8f` the placed-surface variant and
-branch-consistent revolution search, `b4a201d` the transversal engine's
-periodic-domain unwrap) merged as `1686390`, closing three registry rows at
-once via `covers:`. GATE-4 sits at **109/109**.
+**Thirty packets DONE of 66 (45%).** Session 11 landed the **BG-CE-006-ENUM
+stack** (three commits on one branch, closing three registry rows through
+`covers:`) and then the **whole BG-ENC-002 carrier fan-out**: `LINE`, `CIRCLE`,
+`CYLINDER`, `CONE`, `SPHERE`, `TORUS`. `truck-evidence` now has 56 passing tests
+and a carrier module per analytic type. GATE-4 sits at **109/109**.
 
-That merge is the one the frontier was waiting on: `schedule.py` goes from
-**3 eligible to 17**, including the six `BG-ENC-002` carrier packets and the
-eight `BG-ANA-001` shards.
+It also added **BG-ENC-005**, which nobody had specified: certified interval
+`sin`/`cos`. See "Pick up here" item 1 — it is the reason the carriers could be
+built at all.
 
-**BG-ENC-001 has landed** (it is the reference `EnclosureSurface for Plane` in
-`truck-evidence`), so the "single most load-bearing unbuilt item" note below
-from session 9 is discharged; what is unbuilt now is the *carriers*.
-
-**Session 11 was not a code session.** Almost all of it went on establishing
-that three separate "regressions" charged to ENUM-r3 were the harness lying —
-see the last four traps, which are the durable output. The kernel change that
-landed had already passed V0–V7 before the session started.
+**Two thirds of the session went on the harness, not the kernel**, and that is
+the durable output. Three separate "regressions" charged to ENUM-r3 were the
+harness lying: a reaper deleting a live build directory, a baseline cached from
+a corrupted build, and a gate weakened on a flakiness theory that direct
+measurement had already falsified. All four of the last traps below come from
+that, and V8 no longer builds a second Cargo world.
 
 ## Pick up here
 
-1. **The ENC-002 carrier fan-out is the frontier and it is unblocked.** All
-   six packets are written, their anchors check, and their registry rows are
-   wired. `-LINE` has **landed** (the first `EnclosureCurve` impl). The five
-   curved ones are dispatchable.
-
-   **They were blocked for a while and the reason is worth knowing.**
-   `BG-ENC-002-CIRCLE` came back `SPEC_GAP` on its first dispatch, correctly:
-   this crate had no interval trigonometry at all. `inari` puts
+1. **BG-ENC-005 is the load-bearing thing that did not exist.** `inari` puts
    `Interval::sin`/`::cos` behind its `gmp` feature and `truck-evidence` takes
-   `inari` with `default-features = false`; `plane.rs` is affine and never
-   noticed. The `gmp` route was measured and rejected — it builds GMP and MPFR
-   from source through autotools, this machine has neither `make` nor `m4`, and
-   the toolchain is `windows-gnullvm`, which `gmp-mpfr-sys` does not support.
-   **BG-ENC-005** (`truck-evidence/src/elementary.rs`) now provides certified
-   `sin`/`cos` on `inari`'s non-gated API. Every curved-carrier packet says
-   `use crate::elementary::{cos, sin}` and `cos(uu)`; **`uu.cos()` does not
-   exist and never will in this tree.**
+   `inari` with `default-features = false`, so this crate had **no interval
+   trigonometry at all**; `plane.rs` is affine and never noticed.
+   `BG-ENC-002-CIRCLE` found it by stopping with a `SPEC_GAP`, which was the
+   correct call. The `gmp` route was measured and rejected: it builds GMP and
+   MPFR from source through autotools, this machine has neither `make` nor
+   `m4`, and the toolchain is `windows-gnullvm`, which `gmp-mpfr-sys` does not
+   support. `truck-evidence/src/elementary.rs` now provides
+   `sin(Interval) -> Interval` and `cos`, built on `inari`'s non-gated API
+   (outward-rounded arithmetic, `sqr`, `floor`, and the `PI`/`FRAC_PI_2`
+   constants) with an alternating-series truncation bound and an exact
+   reduction identity. **Any new packet touching a curved carrier must say
+   `use crate::elementary::{cos, sin}` and `cos(uu)`. `uu.cos()` does not
+   exist in this tree and never will.**
 
-   **They are write-disjoint by construction as of `afba979`.** All six
-   carrier modules are already created and declared in
-   `truck-evidence/src/lib.rs`, so no carrier packet needs to touch `lib.rs` —
-   which is the one line they would otherwise all have edited, and the merge
-   conflict that would have surfaced at the *second* land. Any packet written
-   for a new carrier must inherit that: `lib.rs` in `read_allow`, never
-   `write_allow`, and say so in "Decisions already made for you" or the worker
-   will follow the `plane.rs` pattern and earn a V1 scope violation.
+2. **The frontier is 17 wide and disk holds one worker.** Eligible now:
+   `BG-CE-001` (design, W3c), the eight `BG-ANA-001` shards, `BG-ENC-003-BSPLINE`
+   and `-NURBS`, `BG-ENC-004-*` decorators, `BG-TOL-004`, `BG-INV-107`
+   (design-blocked). A warm slot target is ~4.3 GB and free space is ~10 GB, so
+   two concurrent workers plus a verify does not fit — trying it is what
+   produced this session's corruption. The ENC-002 six ran **sequentially** at
+   roughly 20-35 minutes each end to end.
 
-2. **Disk, not the DAG, is what caps the fan-out.** 17 packets are eligible in
-   parallel and this machine holds about **one**. A warm slot target is
-   ~7 GB and free space is ~9 GB. Two concurrent workers plus a verify does not
-   fit and trying it is what produced session 11's corruption. Check
-   `Get-PSDrive C` before adding a slot, and reclaim
-   `%TEMP%/look-verify-baseline-*` rather than a warm target.
+3. **When you write the next kernel packet, copy two sections out of the ENC-002
+   ones.** The H-3 section (three packets lost a verify to GATE-2 before it
+   existed; the two after it was added were accepted first time) and the
+   "module is pre-declared, `lib.rs` is read-only" wording, which is what made
+   six sibling packets write-disjoint.
 
-3. **`BG-TOL-004`** (20 squared-order sites, design class, blocks nothing) and
-   **`BG-INV-107`** (design-blocked: no per-entity tau in the tree) are the
-   other eligible rows. `BG-TOL-001-SMALL` is in the registry as dispatchable
-   but `run_packet.py` refuses it — three of its anchor claims have rotted
-   against the tree (`A1: expected 2, tree has 1`). Re-anchor it before
-   re-dispatching; the watchdog burned its whole restart budget on retrying a
-   packet that could never dispatch.
+4. **`BG-TOL-001-SMALL` is dispatchable in the registry but `run_packet.py`
+   refuses it** — three anchor claims have rotted against the tree
+   (`A1: expected 2, tree has 1`). Re-anchor before re-dispatching. The
+   watchdog burned its whole restart budget retrying a packet that could never
+   dispatch.
 
-4. **Two spec items from session 10's external review are still unstarted:**
+5. **Two spec items from session 10's review are still unstarted:**
    - **`BG-EVD-005`** — a published modulus needs a *geometric* certificate.
      BG-EVD-004's M1-M5 constrain only the arithmetic; nothing obliges a cell
      to publish the modulus its geometry actually has, so a tangency may
@@ -136,22 +127,16 @@ landed had already passed V0–V7 before the session started.
      `σ_min` bound reaches zero *is* BG-EVD-004's `Pole`. A chart singularity is
      not a special case, it is the same object.
 
-   Both need the interval carriers item 1 is building.
+   Both are now unblocked by the carriers item 1 and the ENC-002 six built.
 
-5. **V8 is ON, has been watched failing twice, and no longer builds a second
-   world.** It runs the full downstream suite at HEAD; if that is green the
-   base is never built at all; otherwise it asks the base only about the red
-   tests, one `-p <crate> --test <target> -- --exact <names>` per target, and
-   caches each answer in `loop/baselines/<base>__v8-observations.json`. The
-   negative test is recorded in `46accfb`/`5d86783`. **23 downstream tests are
-   red at base** in truck-meshalgo and truck-stepio and are correctly ignored;
-   two of them (`geometry::b_spline_curve_with_knots`,
-   `geometry::nurbs_curve_b_spline_curve_with_knots`) are a real importer defect
-   worth its own packet — the proptest draws knot increments down to 1e-3 and
-   the conversion dies with "The scalar 0 is not positive".
+6. **23 downstream tests are red at base** in truck-meshalgo and truck-stepio
+   and V8 correctly ignores them. Two are a real importer defect worth its own
+   packet: `geometry::b_spline_curve_with_knots` and
+   `geometry::nurbs_curve_b_spline_curve_with_knots` draw knot increments down
+   to 1e-3 and the conversion dies with "The scalar 0 is not positive".
 
-6. **Then the CE chain.** Unchanged from session 9's scoping, which is filed
-   below under "The CE chain, scoped against the tree".
+7. **Then the CE chain**, unchanged from session 9's scoping, filed below under
+   "The CE chain, scoped against the tree".
 
 ## What session 9 changed about how the loop runs
 
