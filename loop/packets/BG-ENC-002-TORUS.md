@@ -201,6 +201,28 @@ brace-opening lines).
 — implement as a small test-local helper with a comment; a `half_angle` at the
 `π` clamp needs the `>=` with float tolerance to survive rounding.
 
+## H-3, which is what rejected the two carrier packets before yours
+
+GATE-2 fails any **added** line carrying a bare `1e-N` literal unless that same
+line ends with an `// H-3` comment. It is a text gate on the diff: it does not
+know your literal is an angle, and it does not care that the line is in a test.
+`BG-ENC-002-LINE` was rejected for one such line and `BG-ENC-002-CIRCLE` for
+six, both times on assertion epsilons in tests, both times costing a verify.
+
+So: **every comparison epsilon you write gets a same-line `// H-3:` comment
+naming the dimensionless quantity being compared.** The house form, from
+`truck-base/src/evidence.rs`:
+
+    assert!((a - b).magnitude() < 1.0e-12, ...); // H-3: float slack between two unit direction vectors, not a length
+    assert!((h - expected).abs() < 1.0e-12, ...); // H-3: float slack between two half-angles in radians, not a length
+    assert!(cos_angle >= limit - 1.0e-12, ...);   // H-3: float slack between two direction cosines, not a length
+
+Directions, angles, direction cosines, parameter values and interval bounds are
+all dimensionless and all legitimate — the comment is what says so. A literal
+that really is a model-space *length* does not get an opt-out; it goes through
+`ToleranceCtx` instead. Run `bash scripts/kernel-gates.sh` yourself before you
+write `RESULT.json`; it is the same script V4 runs.
+
 ## Done when — run these, all must pass
 
 ```

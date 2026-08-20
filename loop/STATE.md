@@ -634,6 +634,25 @@ reason is in the commit that made the change, and the code will not tell you.
   reads `RESULT.json` from the repo root -- where it arrives on the merge -- and
   files it. Deleting it first makes `land_packet` die with `FileNotFoundError`.
   Order: merge, `land_packet`, then delete.
+- **A carrier packet that does not spell out H-3 will be rejected for H-3.**
+  GATE-2 is a text gate on the diff: any *added* line with a bare `1e-N`
+  literal fails unless that line ends `// H-3`. It cannot tell an angle from a
+  length and it does not exempt tests. `BG-CE-006-ENUM-r3` lost a verify to one
+  such line, `BG-ENC-002-LINE` to one, and `BG-ENC-002-CIRCLE` to six — three
+  packets, three round trips, one cause. A packet that says "named consts; a
+  `// H-3` same-line opt-out if a bare float is ever unavoidable" in its test
+  section is **not** enough: it reads as a style note. The four remaining
+  carrier packets now carry a dedicated section with the house form copied out
+  and the instruction to run `scripts/kernel-gates.sh` before writing
+  RESULT.json. Copy that section into every new kernel packet.
+- **The watchdog cannot tell a landed slot from a dead worker.** After
+  `land_packet.py` moves RESULT.json out of the worktree, a finished slot has
+  no pid, no RESULT.json and no event growth — Rule B exactly. It redispatched
+  `BG-ENC-002-LINE` minutes after that packet merged, and the new worker took a
+  lock on `events.jsonl` that made the next real dispatch die with
+  `PermissionError: [WinError 32]`. Fixed by asking PACKETS.jsonl: a slot whose
+  packet row reads DONE is left alone. **Reset a slot with `new_slot.py`
+  promptly after landing** rather than leaving it looking abandoned.
 - **A reaper that reads `worker.pid` thinks a verifying slot is idle.**
   `worker.pid` disappears the moment the worker writes `RESULT.json`, but
   `verify.py` then spends 10-30 minutes compiling in that same `target/`.
