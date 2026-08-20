@@ -23,6 +23,7 @@ circle, and a previously-working boolean now fails.
 
 ```yaml
 id:          BG-CE-006-ENUM-r3
+covers:      [BG-CE-006-ENUM, BG-CE-006-ENUM-r2]
 contract:    [BG-CE-006]
 class:       mechanical
 crates:      [truck-geometry, truck-shapeops]
