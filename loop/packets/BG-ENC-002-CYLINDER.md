@@ -25,8 +25,8 @@ crates:      [truck-evidence]
 depends_on:  [BG-CE-006-ENUM]
 write_allow:
   - vendor/truck/truck-evidence/src/cylinder.rs
-  - vendor/truck/truck-evidence/src/lib.rs
 read_allow:
+  - vendor/truck/truck-evidence/src/lib.rs
   - vendor/truck/truck-evidence/src/enclosure.rs
   - vendor/truck/truck-evidence/src/harness.rs
   - vendor/truck/truck-evidence/src/plane.rs
@@ -69,10 +69,14 @@ this item exists to prevent.
 
 ## Decisions already made for you
 
-1. **One new file** `vendor/truck/truck-evidence/src/cylinder.rs`, wired with
-   one `pub mod cylinder;` line in `lib.rs` beside `pub mod plane;`. The
-   crate-level `#![deny(...)]` in `lib.rs` covers your module; do not add a
-   second header. Follow `plane.rs` for structure, doc tone, and the
+1. **One existing file**, `vendor/truck/truck-evidence/src/cylinder.rs`. It is
+   already created and already declared as `pub mod cylinder;` in `lib.rs`, and
+   `lib.rs` is **read-only for you** — it is not on your `write_allow` and
+   editing it is a scope violation. The declaration was made up front so the
+   six sibling carrier packets have disjoint write sets and can run in
+   parallel; the file currently holds only a scaffolding doc comment, which
+   you replace. Crate-level `#![deny(...)]` in `lib.rs` covers your module;
+   do not add a second header. Follow `plane.rs` for structure, doc tone, and the
    `interval_at` helper (copy it or reuse it via `pub(crate)` — your call, but
    one definition is better than two).
 

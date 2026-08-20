@@ -33,8 +33,20 @@ pub mod enclosure;
 pub mod harness;
 /// BG-EVD-001: the outcome/evidence algebra, re-exported from `truck-base`.
 pub use truck_base::evidence as outcome;
+/// BG-ENC-002-CIRCLE: the carrier impl. Scaffolded empty; the packet fills it.
+pub mod circle;
+/// BG-ENC-002-CONE: the carrier impl. Scaffolded empty; the packet fills it.
+pub mod cone;
+/// BG-ENC-002-CYLINDER: the carrier impl. Scaffolded empty; the packet fills it.
+pub mod cylinder;
+/// BG-ENC-002-LINE: the carrier impl. Scaffolded empty; the packet fills it.
+pub mod line;
 /// BG-ENC-002 reference: `EnclosureSurface for Plane`.
 pub mod plane;
+/// BG-ENC-002-SPHERE: the carrier impl. Scaffolded empty; the packet fills it.
+pub mod sphere;
+/// BG-ENC-002-TORUS: the carrier impl. Scaffolded empty; the packet fills it.
+pub mod torus;
 
 pub use enclosure::{Box3, DirCone, EnclosureCurve, EnclosureSurface, Interval};
 pub use truck_base::evidence::{Budget, Certificate, Certified, Outcome, Refusal};

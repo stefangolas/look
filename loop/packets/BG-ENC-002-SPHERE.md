@@ -21,8 +21,8 @@ crates:      [truck-evidence]
 depends_on:  [BG-CE-006-ENUM]
 write_allow:
   - vendor/truck/truck-evidence/src/sphere.rs
-  - vendor/truck/truck-evidence/src/lib.rs
 read_allow:
+  - vendor/truck/truck-evidence/src/lib.rs
   - vendor/truck/truck-evidence/src/enclosure.rs
   - vendor/truck/truck-evidence/src/harness.rs
   - vendor/truck/truck-evidence/src/plane.rs
@@ -62,9 +62,14 @@ outward-rounded — soundness composes.
 
 ## Decisions already made for you
 
-1. **One new file** `vendor/truck/truck-evidence/src/sphere.rs`, wired with one
-   `pub mod sphere;` in `lib.rs`. Crate-level `#![deny(...)]` in `lib.rs`
-   covers it; no second header. Follow `plane.rs` for structure and tone.
+1. **One existing file**, `vendor/truck/truck-evidence/src/sphere.rs`. It is
+   already created and already declared as `pub mod sphere;` in `lib.rs`, and
+   `lib.rs` is **read-only for you** — it is not on your `write_allow` and
+   editing it is a scope violation. The declaration was made up front so the
+   six sibling carrier packets have disjoint write sets and can run in
+   parallel; the file currently holds only a scaffolding doc comment, which
+   you replace. Crate-level `#![deny(...)]` in `lib.rs` covers your module;
+   do not add a second header. Follow `plane.rs` for structure and tone.
 
 2. **`enclose`**: `x = c.x + interval_at(r) * uu.sin() * vv.cos()` and cyclically
    (`y`: `sin u · sin v`, `z`: `cos u`). Pure inari arithmetic throughout.

@@ -21,8 +21,8 @@ crates:      [truck-evidence]
 depends_on:  [BG-CE-006-ENUM]
 write_allow:
   - vendor/truck/truck-evidence/src/circle.rs
-  - vendor/truck/truck-evidence/src/lib.rs
 read_allow:
+  - vendor/truck/truck-evidence/src/lib.rs
   - vendor/truck/truck-evidence/src/enclosure.rs
   - vendor/truck/truck-evidence/src/harness.rs
   - vendor/truck/truck-evidence/src/plane.rs
@@ -66,9 +66,14 @@ endpoint-only evaluation.**
 
 ## Decisions already made for you
 
-1. **One new file** `vendor/truck/truck-evidence/src/circle.rs`, wired with
-   one `pub mod circle;` in `lib.rs`. Crate-level `#![deny(...)]` in `lib.rs`
-   covers it. Follow `plane.rs` for structure and tone.
+1. **One existing file**, `vendor/truck/truck-evidence/src/circle.rs`. It is
+   already created and already declared as `pub mod circle;` in `lib.rs`, and
+   `lib.rs` is **read-only for you** — it is not on your `write_allow` and
+   editing it is a scope violation. The declaration was made up front so the
+   six sibling carrier packets have disjoint write sets and can run in
+   parallel; the file currently holds only a scaffolding doc comment, which
+   you replace. Crate-level `#![deny(...)]` in `lib.rs` covers it. Follow
+   `plane.rs` for structure and tone.
 
 2. **`enclose`**: `x = tt.cos()`, `y = tt.sin()`, `z` the degenerate
    `interval_at(0.0)`.
