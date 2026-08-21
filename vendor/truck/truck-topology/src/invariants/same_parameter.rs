@@ -224,8 +224,8 @@ mod tests {
 
     /// The dimensionless entity tolerance `entity_tau(TOLERANCE)` of the
     /// numerically-legacy context, built through the REAL constructor
-    /// `ToleranceCtx::new(1.0, TOLERANCE, TOLERANCE, TOLERANCE)` — not
-    /// `unscaled_legacy()`, whose constructor call sites GATE-4 ratchets. The
+    /// `ToleranceCtx::new(1.0, TOLERANCE, TOLERANCE, TOLERANCE)` — not the
+    /// legacy scaffold constructor, whose call sites GATE-4 ratchets. The
     /// constant arguments are valid by construction.
     fn legacy_tau() -> f64 {
         match ToleranceCtx::new(1.0, TOLERANCE, TOLERANCE, TOLERANCE) {
