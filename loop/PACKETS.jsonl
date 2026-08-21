@@ -34,7 +34,7 @@
 {"id": "BG-ANA-001-EQRCYL", "wave": "W4", "class": "mechanical", "status": "DONE", "needs": ["BG-CE-006-ENUM"], "writes": ["truck-evidence/src/analytic/equal_radius_cylinders.rs"], "packet": "loop/packets/BG-ANA-001-EQRCYL.md", "note": "exact; becomes the oracle for BG-NUM-003"}
 {"id": "BG-INV-101", "wave": "W4", "class": "mechanical", "status": "DONE", "needs": ["BG-CE-003"], "writes": ["truck-topology/src/invariants/coedge_pairing.rs"], "packet": "loop/packets/BG-INV-101.md"}
 {"id": "BG-INV-102", "wave": "W4", "class": "mechanical", "status": "DONE", "needs": ["BG-CE-003"], "writes": ["truck-topology/src/invariants/vertex_link.rs"], "packet": "loop/packets/BG-INV-102.md"}
-{"id": "BG-INV-103", "wave": "W4", "class": "mechanical", "status": "SPECD", "needs": ["BG-CE-003"], "writes": ["truck-topology/src/invariants/euler_poincare.rs"], "packet": "loop/packets/BG-INV-103.md"}
+{"id": "BG-INV-103", "wave": "W4", "class": "mechanical", "status": "DONE", "needs": ["BG-CE-003"], "writes": ["truck-topology/src/invariants/euler_poincare.rs"], "packet": "loop/packets/BG-INV-103.md"}
 {"id": "BG-INV-104", "wave": "W4", "class": "mechanical", "status": "SPECD", "needs": ["BG-CE-001", "BG-ENC-002-LINE", "BG-CE-002"], "writes": ["truck-topology/src/invariants/same_parameter.rs"], "packet": "loop/packets/BG-INV-104.md"}
 {"id": "BG-INV-105", "wave": "W4", "class": "mechanical", "status": "SPECD", "needs": ["BG-CE-003"], "writes": ["truck-topology/src/invariants/domain_boundary.rs"], "packet": "loop/packets/BG-INV-105.md"}
 {"id": "BG-INV-106", "wave": "W4", "class": "mechanical", "status": "SPECD", "needs": ["BG-FID-001"], "writes": ["truck-topology/src/invariants/representation.rs"], "packet": null}

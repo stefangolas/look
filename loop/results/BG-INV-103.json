@@ -1,0 +1,15 @@
+{
+  "id": "BG-INV-103",
+  "status": "DONE",
+  "contracts": ["BG-INV-103"],
+  "tests_added": 4,
+  "sites_migrated": 0,
+  "sites_deferred": 0,
+  "deviations": [],
+  "disagreements": [
+    "The packet's verbatim import `use crate::shell::Shell;` does not compile: `Shell` is defined at the crate root (lib.rs) and `crate::shell` only privately `use crate::*`, so `crate::shell::Shell` is a private import. Used `use crate::Shell;` (the compiler-suggested path) instead.",
+    "The packet's test-module opening `use truck_topology::*;` does not resolve inside the crate: a crate cannot import itself by name in a unit-test module (E0432). Used the in-crate equivalent `use crate::*;`. The doctest on `check` keeps `use truck_topology::*;` and compiles because doctests are external crates."
+  ],
+  "baseline_failures": [],
+  "notes": "Implemented the two public functions (check_counts, check) per packet decisions 1-3, with the verbatim refusal and the house certificate (props EulerPoincare=True, Method::None, Budget(0,0,0), Margin::UNBOUNDED, Modulus::Unbounded). Four tests added and one doctest on check (cube witness, is_ok). The pin test uses the singular_vertices doctest witness (two tetrahedra pinched at v0): its face-connected components are each a tetrahedron (V=4,E=6,F=4, chi=2), so per-component Euler-Poincare holds (check returns Ok) while v0's link is not a single cycle -- the whole-shell count would be V=7,E=12,F=8 (chi=3, odd) only because the pinch vertex is double-counted, which is exactly why the relation is per connected component; no witness adjustment was needed. All anchors A1-A8 matched the pre-implementation scaffold. Verification: cargo fmt --check -p truck-topology OK; cargo clippy -p truck-topology --all-targets --no-deps OK (zero findings); cargo test -p truck-topology --lib --tests --no-fail-fast 21 passed; cargo test -p truck-topology --doc 117 passed (116 baseline + 1 new); cargo check --workspace --all-targets OK (only a pre-existing truck-meshalgo unused_qualifications warning); bash scripts/kernel-gates.sh 49997d3 exit 0 (GATE-4 unscaled_legacy 110/110, all P-3 gates pass). Committed on packet/BG-INV-103 as 6403c8c with subject 'feat(topology): Euler–Poincare invariant checker (BG-INV-103)'."
+}
