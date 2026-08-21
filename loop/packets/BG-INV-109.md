@@ -83,7 +83,7 @@ The checkers module tree is already scaffolded and declared — read
 1. **The public API, verbatim:**
 
    ```rust
-   use crate::shell::Shell;
+   use crate::Shell;   // the struct lives at the crate root, NOT in ::shell
    use truck_base::cgmath64::{Point3, Vector3};
    use truck_base::evidence::{
        Budget, Certificate, Certified, ContradictionWitness, Margin, Method,
@@ -134,9 +134,11 @@ The checkers module tree is already scaffolded and declared — read
    - Build the edge→uses map: iterate `shell.face_iter()`, and within each
      face `face.boundary_iters()` (or `face.boundaries()` flattened — read
      `face.rs` and use what exists) collecting
-     `(EdgeID<C>, (face_index, orientation))` pairs into a
+     `(EdgeID<C>, face_index)` pairs into a
      `HashMap<EdgeID<C>, Vec<usize>>` (edge id → the indices of the faces
-     using it). `EdgeID` is `Hash + Eq` by construction.
+     using it). `EdgeID` is `Hash + Eq` by construction and lives at the
+     crate root (`use crate::EdgeID;` — it is a type alias there, not in
+     `edge.rs`).
    - For each edge id with exactly TWO using faces: run the wedge test of
      decision 3. One face or more than two: skip (documented).
    - First failure returns; all pass → the certificate of decision 4.

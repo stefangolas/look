@@ -110,9 +110,11 @@ The checkers module tree is already scaffolded and declared — read
    ```
 
 4. **Tests** — one `#[cfg(test)]` module opening with
-   `#![deny(clippy::unwrap_used)]`, `use super::*;` and
-   `use truck_topology::*;`. Build the witnesses with `P = C = S = ()` —
-   `Vertex::news`, `Edge::new`, `wire!`/`Wire::from`, `Face::new`:
+   `#![deny(clippy::unwrap_used)]`, `use super::*;` and `use crate::*;`
+   (**not** `use truck_topology::*;` — a crate cannot import itself by
+   name from a unit-test module, E0432). Build the witnesses with
+   `P = C = S = ()` — `Vertex::news`, `Edge::new`, `wire!`/`Wire::from`,
+   `Face::new`:
 
    - `domain_boundary_closed_wires_hold` — a triangle face (three vertices,
      three edges, one closed wire): `Ok` with
