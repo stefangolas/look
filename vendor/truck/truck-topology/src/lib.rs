@@ -123,10 +123,11 @@ pub struct Vertex<P> {
 /// assert_ne!(edge0.id(), edge1.id());
 /// ```
 #[derive(Debug)]
-pub struct Edge<P, C> {
+pub struct Edge<P, C, PC = ()> {
     vertices: (Vertex<P>, Vertex<P>),
-    orientation: bool,
-    curve: Arc<Mutex<C>>,
+    orientation: bool,    // existing per-use field
+    pcurve: Option<PC>,   // NEW per-use field: the parametric trace on the owning face
+    curve: Arc<Mutex<C>>, // shared entity geometry
 }
 
 /// Wire, a path or cycle which consists some edges.
