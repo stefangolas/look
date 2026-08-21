@@ -48,7 +48,7 @@ budget:      {turns: 40, ctx_tokens: 100000}
 anchors:
   - {id: A1, expect: 12, cmd: "grep -r 'will result in a deadlock' vendor/truck/truck-topology/src | wc -l"}
   - {id: A2, expect: 1, cmd: "grep -c 'pub type VertexID<P> = ID<Mutex<P>>' vendor/truck/truck-topology/src/lib.rs"}
-  - {id: A3, expect: 0, cmd: "grep -rc 'enum EntityId\\|struct EntityId' vendor/truck | wc -l"}
+  - {id: A3, expect: 0, cmd: "grep -r 'enum EntityId\\|struct EntityId' vendor/truck | wc -l"}
   - {id: A4, expect: 1, cmd: "grep -c 'pub struct SourceEntityId' vendor/truck/truck-topology/src/compress.rs"}
   - {id: A5, expect: 1, cmd: "grep -c 'pub mod errors' vendor/truck/truck-topology/src/lib.rs"}
   - {id: A6, expect: 1, cmd: "grep -c 'pub mod face' vendor/truck/truck-topology/src/lib.rs"}
@@ -59,14 +59,10 @@ anchors:
   - {id: A11, expect: 1, cmd: "grep -c 'use parking_lot::Mutex' vendor/truck/truck-topology/src/lib.rs"}
 ```
 
-(`grep -c` exits 1 on zero matches — that IS the expected count for A3 and A9,
-not a command failure. A3's `grep -rc ... | wc -l` form prints the count; note
-`grep -rc` emits one line per file including zero-count files, so expect 0
-total output lines when nothing matches... in fact `grep -rc` prints nothing
-for files with zero matches under some greps and `0`-lines under others — run
-`grep -r 'enum EntityId' vendor/truck | wc -l` (expect 0) and
-`grep -r 'struct EntityId' vendor/truck | wc -l` (expect 0) as two separate
-checks if the combined form misbehaves.)
+(`grep -c` and `grep -r` exit 1 on zero matches — that IS the expected count
+for A9, not a command failure. A3's `grep -r ... | wc -l` form counts matching
+LINES — zero when neither name exists yet; do NOT substitute `grep -rc` there,
+which prints one line per file regardless of matches.)
 
 ## Problem
 
