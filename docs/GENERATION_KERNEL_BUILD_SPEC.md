@@ -987,6 +987,27 @@ pub struct Edge<P, C, PC = ()> {
 exactly. Consumers opt in. This is broad (every `Edge<P, C>` mention across
 meshalgo, shapeops, modeling, stepio) but semantically inert.
 
+**Landed shape (2026-08-21, BG-CE-001 at `6625529`).** The migration turned out
+narrower than the mention set suggested — Rust applies defaulted type
+parameters in `impl` headers and every type position, so only the struct
+definition and the seven struct-literal sites in `edge.rs` changed; V8's
+downstream gating over all dependent crates discharged the migration row with
+zero edits outside `truck-topology`. Three deviations from this entry's sketch
+were forced by the compiler and landed: (1) the inherent impls split in two —
+`impl<P, C> Edge<P, C>` for the constructors and PC-free methods,
+`impl<P, C, PC> Edge<P, C, PC>` for the per-use payload methods, because a
+single generic block leaves `PC` unconstrained at every `Edge::new` call site
+(E0282); (2) `with_pcurve<Q>(self, pcurve: Q) -> Edge<P, C, Q>` — attaching a
+trace *changes the payload type parameter*, since every constructor returns
+`Edge<P, C, ()>` and a `-> Self` signature could never produce a non-`()`
+edge; (3) `is_same`, `PartialEq`, `Eq` and `Hash` take the other edge's `PC`
+as a separate type parameter, with comparison bodies byte-identical —
+identity remains the shared curve pointer plus orientation, and the pcurve
+remains per-use payload, never identity. `pre_cut` drops the trace on both
+halves (`pcurve: None`); restricting an arbitrary `PC` needs a `Cut` bound
+this item does not add, and the packet that wires real pcurves owns trace
+splitting.
+
 **What it unlocks immediately.** A seam edge is two handles, one shared curve,
 two *different* pcurves — the case §1 says is otherwise impossible.
 

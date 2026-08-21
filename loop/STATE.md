@@ -55,7 +55,7 @@ here is scored, tuned, or sampled.
 
 ## Where we are
 
-**Forty-six packets DONE of 69 (67%).** Session 15 (overnight) landed **two**:
+**Forty-eight packets DONE of 69 (70%).** Session 15 (overnight) landed **three**:
 `BG-S0-004` — the STEP spline importer now refuses invalid supplied knots
 instead of silently synthesizing quasi-uniform ones, with the surface-path
 tiny-range normalization added per axis. It came back `SPEC_GAP` on a real
@@ -74,7 +74,19 @@ adapted faithfully — recorded in its `disagreements`, filed verbatim in
 the spec; classes 1-3 are follow-up migration shards, class 4 stays open
 design.
 
-Still in flight at close (see "Pick up here" item 1): `BG-CE-001` only.
+And `BG-CE-001` — the keystone. First-try ACCEPTED (`6625529`, fault NONE),
+closing `BG-CE-001-MIGRATE` with it via `covers:`: V8 gated 981 downstream
+tests unchanged, so the semantically-inert migration held with zero edits
+outside truck-topology. **The worker corrected the packet six times and was
+right every time** — the single-impl-block design cannot compile (E0282
+unconstrained PC), the spec's `with_pcurve -> Self` signature can never
+produce a non-() edge (E0308), and "do not touch PartialEq" contradicted
+the packet's own first test. The landed shape (two inherent impl blocks,
+`with_pcurve<Q> -> Edge<P, C, Q>`, generic `is_same`/`PartialEq`/`Hash` with
+byte-identical bodies) is recorded in the spec's CE-001 entry. **Stage 1
+of the fan-out is now OPEN.**
+
+Nothing in flight at close.
 
 **One incident, fully recovered:** the watchdog redispatched the already
 landed `BG-ENC-004-PCURVE` at 01:53 (restart 1/3 in its log), because a PS
@@ -88,19 +100,20 @@ known-DONE row. Three new traps below carry the mechanisms.
 
 ## Pick up here
 
-1. **One packet in flight, needing verify + adjudication on wake.**
-   Slot 2 `BG-CE-001` (pid 7584, branch `packet/BG-CE-001`, base
-   `a377c0e`). When `RESULT.json` appears in its worktree: launch
-   `python loop/verify.py --slot 2 --packet loop/packets/BG-CE-001.md --base a377c0e`
-   **detached**, poll `VERDICT.json`, and check its `packet`/`commit` fields
-   match before trusting it. Land per the usual protocol — the packet
-   carries `covers: [BG-CE-001-MIGRATE]`, so its landing closes two rows.
-   The packet was baseline-clean (topology: 7 tests + 112 doctests, zero
-   clippy findings), so a V3 or V5 failure in an untouched file means the
-   gate or the environment, not the worker. If it returns SPEC_GAP, the
-   BG-S0-004 amendment precedent (this session) is the template: sharpen
-   the packet, amend the commit, re-verify. Slot 0 is warm and free for the
-   next dispatch the moment CE-001's verdict is in.
+1. **Stage 1 of the fan-out is open — three moves, in priority order.**
+   (a) Write the `BG-CE-002` design packet (whole-span leader-vs-carrier
+   deviation certificate by interval evaluation; unlocks ISC) and
+   (b) the `BG-CE-003` design packet — the risky one: the `EntityId`/
+   `Selector`/`OpId` algebra is half-designed, `Selector`/`OpId`/`Op` are
+   defined nowhere in the tree, and the standalone-algebra approach from
+   session 9's scoping notes still holds; both are dispatchable in
+   parallel. (c) `BG-INV-104` is eligible but **collides with CE-003 on
+   truck-topology's write set** (`schedule.py` says so) — dispatch it only
+   after CE-003 lands. Re-derive every anchor and dependency
+   against the live tree before writing either packet — CE-001 just proved
+   the rule again: the packet's construction-site census and its
+   impl-header claim were right, but its API sketches were wrong in three
+   ways a worker caught.
 
 2. **After CE-001 lands, stage 1 opens.** Dispatch `BG-INV-104`
    (mechanical, its deps are DONE) immediately; write the `BG-CE-002` and
@@ -135,11 +148,10 @@ known-DONE row. Three new traps below carry the mechanisms.
   in-flight workers. Restart budgets: BG-CE-001 1/3 used; the misdispatched
   PCURVE restart is recorded but moot (the registry's DONE protection is
   verified working again after the BOM fix).
-- **One worker in flight**: slot 2 `BG-CE-001` (pid 7584, attempt 2 —
-  attempt 1 was a machine-sleep false reap, its abandoned diff archived in
-  `loop/slots/2/abandoned-*.patch`). Slot 0 landed TOL-004 and sits FINISHED
-  on `packet/BG-TOL-004@28f00cc` (warm, free for the next `new_slot`); slot
-  1 idle on the landed PCONE leftover.
+- **Nothing in flight; all three slots FINISHED and warm** on their landed
+  branches (slot 0 `28f00cc` TOL-004, slot 1 `6ce3d26` PCONE leftover,
+  slot 2 `6625529` CE-001). CE-001's attempt 1 lives in
+  `loop/slots/2/abandoned-*.patch` (machine-sleep false reap).
 - **Disk ~17 GB free at close** (the TOL-004 verify's baseline and CE-001's
   builds consumed the session's headroom; both slot targets warm, no leaked
   `%TEMP%/look-verify-baseline-*` after the verify's cleanup). **Check
@@ -154,8 +166,10 @@ known-DONE row. Three new traps below carry the mechanisms.
 
 ## The parallelism picture
 
-69 rows. **In flight: 1** (`BG-CE-001` slot 2 — TOL-004, the other half of
-the session-14 frontier, landed at close). Open rows by class:
+69 rows. **Nothing in flight; the session-14 frontier is fully landed.**
+The new frontier is stage 1 of the CE chain: BG-INV-104 (mechanical,
+dispatchable now), BG-CE-002 and BG-CE-003 (design, orchestrator-written).
+Open rows by class:
 10 mechanical, 11 design, 1 wide-mechanical — every open mechanical row is
 still gated exactly as session 14 recorded: the six INV-1xx checkers wait on
 `BG-CE-003` (INV-104 on CE-001), SHARED-CONE on PCURVE+ISC, ISC on CE-002,
