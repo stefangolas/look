@@ -2307,6 +2307,7 @@ dependencies = [
 name = "truck-topology"
 version = "0.6.0"
 dependencies = [
+ "inari",
  "parking_lot",
  "rayon",
  "rclite",
@@ -2315,6 +2316,8 @@ dependencies = [
  "serde_json",
  "thiserror 2.0.20",
  "truck-base",
+ "truck-evidence",
+ "truck-geometry",
  "truck-geotrait",
 ]
 
