@@ -1,0 +1,28 @@
+{
+  "id": "BG-CE-001",
+  "status": "DONE",
+  "contracts": ["BG-CE-001"],
+  "tests_added": 4,
+  "sites_migrated": 0,
+  "sites_deferred": 0,
+  "deviations": [
+    "The single inherent impl header cannot be `impl<P, C, PC> Edge<P, C, PC>` (see disagreements #1); edge.rs now has two inherent impl blocks: `impl<P, C> Edge<P, C>` holding the four constructors plus every method that does not need generic PC, and `impl<P, C, PC> Edge<P, C, PC>` holding orientation, absolute_front, absolute_back, pcurve, with_pcurve, inverse, absolute_clone, is_same, id and pre_cut.",
+    "`with_pcurve` was implemented as `pub fn with_pcurve<Q>(self, pcurve: Q) -> Edge<P, C, Q>` instead of the packet's `pub fn with_pcurve(mut self, pcurve: PC) -> Self`, because the verbatim signature can never produce an edge with PC != () (see disagreements #2).",
+    "`is_same` was implemented as `pub fn is_same<Q>(&self, other: &Edge<P, C, Q>) -> bool` (see disagreements #4).",
+    "The `PartialEq`, `Eq` and `Hash` impl headers became `impl<P, C, PC> ... for Edge<P, C, PC>` with byte-identical bodies; the packet said 'do not touch' them but its own test 1 requires equality/hashing on `Edge<(), (), i32>` (see disagreements #3).",
+    "The `cut_drops_pcurve_on_both_halves` test's `TestCutCurve::cut` uses `self.clone()` instead of the packet skeleton's `*self`, which does not compile for a non-Copy newtype (E0507).",
+    "The four new tests call `Vertex::news([(), ()])` / `Vertex::news([0usize, 1usize])` (no leading `&`) because `clippy::all` (deny, crate-wide) flags `needless_borrow`; arrays implement `AsRef<[T]>` so the call is identical.",
+    "The struct literal in lib.rs keeps the packet's field order and comments; `cargo fmt` re-aligned the trailing comments (whitespace only).",
+    "`inverse` returns `Edge<P, C, PC>` (not `Edge<P, C>`) so the trace type is carried; for every existing caller PC = () so the observable signature is unchanged."
+  ],
+  "disagreements": [
+    "Decision 2 ('the inherent impl header becomes `impl<P, C, PC> Edge<P, C, PC>`') cannot build. With a single generic inherent impl, PC is unconstrained at every `Edge::new`/`try_new`/`new_unchecked`/`debug_new` call site and rustc emits E0282 -- in truck-topology's own test code (face.rs:1305, solid.rs:280) and, per the same mechanism, in other crates. The packet's own 'Verified fact' validates the opposite header (`impl<P, C> Edge<P, C>` still meaning `Edge<P, C, ()>`), not the generic one; 'the ripple is two files' and 'every signature compiles unchanged' do not hold for the generic header. Fixed with a second, separate generic inherent impl (see deviations).",
+    "Decision 6's `with_pcurve(mut self, pcurve: PC) -> Self` can never create an `Edge<P, C, PC>` with PC != (). Every constructor returns `Edge<P, C>` = `Edge<P, C, ()>`, and method resolution fixes the receiver's PC to `()` before the argument is checked, so `Edge::new(...).with_pcurve(42i32)` is an E0308. Yet decision 8's tests and the doctests require `Edge<(), (), i32>` values. Made `with_pcurve<Q>` return `Edge<P, C, Q>`.",
+    "Decision 4 says 'do not touch' the PartialEq/Eq/Hash impls, but decision 8 test 1 asserts `==` on two clones with different pcurves and one-element HashSet membership -- impossible unless the impls cover `Edge<P, C, i32>`. The impl headers gained `PC`; the comparison logic is unchanged (curve Arc pointer + orientation only).",
+    "The existing `is_same(&self, other: &Edge<P, C>)` (= `&Edge<P, C, ()>`) cannot express decision 8 test 2's `edge.is_same(&original)` where edge is `Edge<P, C, i32>` and original is `Edge<P, C, ()>`. Made the other edge's PC a separate method type parameter.",
+    "The packet's complete list of struct-literal construction sites omits that `cut` and `cut_with_parameter` route through `pre_cut`; because test 4 requires `pre_cut` on an `Edge<usize, TestCutCurve, i32>`, `pre_cut` had to be generic, and it pulls in `orientation`, `absolute_front` and `absolute_back` (its only non-field accesses). All remain in write_allow.",
+    "The test-curve skeleton's `fn cut(&mut self, _t: f64) -> Self { *self }` does not compile for the non-Copy `TestCutCurve` (E0507 cannot move out of `*self`); the geotrait tuple impl the packet says it mirrors has no `Cut` impl to copy from, so `self.clone()` was used."
+  ],
+  "baseline_failures": [],
+  "notes": "Anchors A1-A10 all verified before any edit (0/1/8/3/1/1/4/1/1/1). The struct field order is exactly as specified (vertices, orientation, pcurve, curve) with PC = () defaulting. Identity (PartialEq/Eq/Hash), DebugDisplay/Display and the constructors' signatures are unchanged in behavior; the four new tests and two new doctests pass; 114 doctests total (112 baseline + 2 new); clippy is zero-findings on the crate; `cargo check --workspace --all-targets` passes; scripts/kernel-gates.sh (baseline a377c0e, the parent of the BG-CE-001 commit) passes all P-3 gates including the H-3 GATE-2. The clippy needleless_borrow lints forced the four test bodies to pass arrays by value to Vertex::news. Deviations above are all within write_allow (vendor/truck/truck-topology/src/{lib.rs,edge.rs}); no file outside write_allow was edited."
+}
