@@ -1,0 +1,20 @@
+{
+  "id": "BG-CE-003",
+  "status": "DONE",
+  "contracts": ["BG-CE-003"],
+  "tests_added": 9,
+  "sites_migrated": 0,
+  "sites_deferred": 0,
+  "deviations": [
+    "lib.rs: the re-export `pub use entity_id::{End, EntityId, Op, OpId, OpKind, OpParams, Selector};` is placed after the inline `pub mod format { ... }` block (before `use format::*;`) rather than directly after `pub mod wire;`, because inserting it there would have stolen the `format` module's doc comment and introduced a new `missing_docs` warning on a baseline-clean crate.",
+    "entity_id.rs: `StableHasher` derives `Debug` in addition to `Default` (the sketch has only `Default`) to satisfy this crate's `missing_debug_implementations` warn lint; the packet's scratch crate did not carry that lint.",
+    "entity_id.rs tests: `&[x.clone()]` slices passed to `Op::output` were rewritten as `std::slice::from_ref(&x)` because the crate denies `clippy::all` and clippy's `cloned_ref_to_slice_refs` flags the clone-to-slice form.",
+    "No OpKind/Selector/OpParams arms were added or removed; the hash pipeline, constants and write order are exactly as specified and the three KAT constants reproduced unchanged."
+  ],
+  "disagreements": [
+    "The packet's literal insertion point for `pub mod entity_id;` (between `pub mod errors;` and `pub mod face;`) is not rustfmt-stable: with `reorder_modules` enabled by default, `cargo fmt --check` (a Done-when requirement) sorts `entity_id` before `errors`. The two packet requirements conflict; I followed the toolchain and placed the module before `errors`. All anchors still hold (A5=1, A6=1, A7 becomes 8 as the packet predicts).",
+    "The packet states the sketch compiles clean on this tree, but the verbatim `StableHasher` (`#[derive(Default)]` only) triggers this crate's `missing_debug_implementations` warning; the cleanliness claim only held in the packet's scratch crate without that lint."
+  ],
+  "baseline_failures": [],
+  "notes": "Landed the construction-DAG identity algebra in vendor/truck/truck-topology/src/entity_id.rs: the StableHasher (FNV-1a 64-bit over the Hash byte stream, fmix64 finalizer, little-endian integer writes), the EntityId / OpId / Op / OpKind / OpParams / End / Selector vocabulary (pure data, no geometry, no Mutex/Arc), manual bit-wise PartialEq/Eq/Hash on OpParams (f64 has neither Eq nor Hash in std), serde derives throughout, and the H-1 deny block copied from truck-evidence. lib.rs gains the module and the crate-root re-export; Cargo.toml gains the serde_json dev-dependency and Cargo.lock the corresponding edge (the package was already in the lock via sibling crates). The three KAT constants (fresh hasher finish 0xefd01f60ba992926; Sweep/Point op id 0xee38828cf99fd120; Transform/identity-matrix op id 0x2dc8dada62ef7c61) reproduced exactly, pinning the whole pipeline including std derive-Hash discriminant routing. Added the 9 required tests plus one doctest each on EntityId and Op. Verification: cargo fmt --check -p truck-topology clean; cargo clippy -p truck-topology --all-targets --no-deps clean; cargo test -p truck-topology --lib --tests --no-fail-fast green (lib 17 passed incl. the 9 new; the pre-existing #[ignore]d large-solid-torus test untouched); cargo test -p truck-topology --doc 116 passed; cargo check --workspace --all-targets green (the lone truck-meshalgo unused_qualifications warning is pre-existing and unrelated); bash scripts/kernel-gates.sh 68d8935: all P-3 gates pass (GATE-4 110/110). All 11 anchors matched the baseline before editing. Committed on the current branch as `feat(topology): construction-DAG identity algebra (BG-CE-003)`."
+}
