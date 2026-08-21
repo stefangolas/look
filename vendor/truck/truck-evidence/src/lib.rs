@@ -56,6 +56,8 @@ pub mod cone;
 pub mod cylinder;
 /// BG-ENC-004: enclosure impls for the decorators. Scaffolded empty.
 pub mod decorators;
+/// BG-CE-002: the whole-span leader-vs-carrier deviation certificate.
+pub mod deviation;
 /// BG-ENC-002-LINE: the carrier impl. Scaffolded empty; the packet fills it.
 pub mod line;
 /// BG-ENC-003-NURBS: the spline carrier impl. Scaffolded empty; the packet
@@ -68,5 +70,6 @@ pub mod sphere;
 /// BG-ENC-002-TORUS: the carrier impl. Scaffolded empty; the packet fills it.
 pub mod torus;
 
+pub use deviation::{certify_deviation, ParamMap};
 pub use enclosure::{Box3, DirCone, EnclosureCurve, EnclosureSurface, Interval};
 pub use truck_base::evidence::{Budget, Certificate, Certified, Outcome, Refusal};

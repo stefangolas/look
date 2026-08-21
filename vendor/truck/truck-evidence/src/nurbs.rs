@@ -93,16 +93,14 @@ impl Coord for Vector4 {
     }
 }
 
-/// The multiplicity of the knot value `x` in `bsp`'s knot vector, or 0 when
-/// `x` is not one of its knots. `floor(x)` gives the index of the last knot
-/// `≤ x`; the knot at that index equals `x` exactly iff `x` is present, so the
-/// tolerance-free `==` is the right comparison for the exact-raising loop.
-/// Copied from `bspline.rs`.
+/// The multiplicity of the knot value `x` in `bsp`'s knot vector, counted over
+/// **exact** knot equality. `KnotVec::multiplicity` matches by tolerance and
+/// would count a *different* knot value within the legacy tolerance of `x`,
+/// which under-inserts in the raising loop and extracts an over-wide sub-curve
+/// whenever `x` sits within tolerance of another knot (the terminal strip of
+/// every knot range). Copied from `bspline.rs`.
 fn knot_multiplicity<P: ControlPoint<f64>>(bsp: &BSplineCurve<P>, x: f64) -> usize {
-    match bsp.knot_vec().floor(x) {
-        Some(idx) if bsp.knot_vec().get(idx) == Some(&x) => bsp.knot_vec().multiplicity(idx),
-        _ => 0,
-    }
+    bsp.knot_vec().iter().filter(|&&k| k == x).count()
 }
 
 /// Raises the knot value `x` to full multiplicity `degree + 1` by repeated
@@ -516,6 +514,63 @@ mod tests {
     /// rather than panicking on a malformed bound.
     fn iv(lo: f64, hi: f64) -> Interval {
         Interval::try_from((lo, hi)).unwrap_or(Interval::EMPTY)
+    }
+
+    /// The terminal-strip widths, in descending powers of ten. Each probes the
+    /// last `w` of the knot range, where the tolerance-based knot count left
+    /// the hull plateaued at the whole-tail width (BG-ENC-002's convergence
+    /// violated in the strip). Copied from `bspline.rs`'s test module. Each
+    /// width is a dimensionless knot-range fraction, not a length.
+    const STRIP_W_2: f64 = 1.0e-2; // H-3: a dimensionless knot-range width probing the terminal strip, not a length
+    const STRIP_W_3: f64 = 1.0e-3; // H-3: a dimensionless knot-range width probing the terminal strip, not a length
+    const STRIP_W_4: f64 = 1.0e-4; // H-3: a dimensionless knot-range width probing the terminal strip, not a length
+    const STRIP_W_5: f64 = 1.0e-5; // H-3: a dimensionless knot-range width probing the terminal strip, not a length
+    const STRIP_W_6: f64 = 1.0e-6; // H-3: a dimensionless knot-range width probing the terminal strip, not a length
+    const STRIP_W_7: f64 = 1.0e-7; // H-3: a dimensionless knot-range width probing the terminal strip, not a length
+    const STRIP_W_8: f64 = 1.0e-8; // H-3: a dimensionless knot-range width probing the terminal strip, not a length
+    const STRIP_W_9: f64 = 1.0e-9; // H-3: a dimensionless knot-range width probing the terminal strip, not a length
+    const STRIP_W_10: f64 = 1.0e-10; // H-3: a dimensionless knot-range width probing the terminal strip, not a length
+    const STRIP_W_11: f64 = 1.0e-11; // H-3: a dimensionless knot-range width probing the terminal strip, not a length
+    const STRIP_W_12: f64 = 1.0e-12; // H-3: a dimensionless knot-range width probing the terminal strip, not a length
+    const STRIP_W_13: f64 = 1.0e-13; // H-3: a dimensionless knot-range width probing the terminal strip, not a length
+    const STRIP_WIDTHS: [f64; 12] = [
+        STRIP_W_2, STRIP_W_3, STRIP_W_4, STRIP_W_5, STRIP_W_6, STRIP_W_7, STRIP_W_8, STRIP_W_9,
+        STRIP_W_10, STRIP_W_11, STRIP_W_12, STRIP_W_13,
+    ];
+
+    /// The pad allowance in the convergence assertion: the two `HULL_PAD`
+    /// hull endpoints plus the boundary-value widening `hull_sub_curve` adds.
+    const STRIP_SLACK: f64 = 256.0 * f64::EPSILON;
+
+    #[test]
+    fn nurbs_hull_converges_into_the_terminal_strip() {
+        // A unit-weight rationalization of the parabola (t, t², 0): the
+        // homogeneous hull projects back to x = t exactly, so the true x-span
+        // over [1 − w, 1] is w. The sub-curve extraction must keep shrinking
+        // into the terminal strip; the tolerance-based knot count
+        // under-inserted next to the terminal knot and plateaued there.
+        let curve = NurbsCurve::new(BSplineCurve::new(
+            KnotVec::bezier_knot(2),
+            vec![
+                Vector4::new(0.0, 0.0, 0.0, 1.0),
+                Vector4::new(0.5, 0.0, 0.0, 1.0),
+                Vector4::new(1.0, 1.0, 0.0, 1.0),
+            ],
+        ));
+        let mut prev = f64::INFINITY;
+        for w in STRIP_WIDTHS {
+            let box3 = curve.enclose(iv(1.0 - w, 1.0));
+            let xw = box3.x.sup() - box3.x.inf();
+            assert!(
+                xw <= 4.0 * w + STRIP_SLACK,
+                "x-width {xw} exceeds 4w + slack at strip width {w}"
+            );
+            assert!(
+                xw < prev,
+                "x-width {xw} not strictly below the previous {prev} at strip width {w}"
+            );
+            prev = xw;
+        }
     }
 
     /// The NURBS unit circle on `[0, 1]`: the 9-control-point quadratic from

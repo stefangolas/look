@@ -104,6 +104,11 @@ pub enum UnresolvedWitness {
     /// The fillet contact curve could not be located on the adjacent edge
     /// within budget (BG-S0-002).
     ContactCurveNotFound,
+    /// A whole-span deviation bound (BG-CE-002) could not be certified within
+    /// the subdivision budget: interval evaluation left at least one cell whose
+    /// upper bound exceeds the tolerance and whose lower bound does not prove
+    /// violation.
+    DeviationUncertified,
 }
 
 /// Where the composition margin ran out.

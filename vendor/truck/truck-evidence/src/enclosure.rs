@@ -19,6 +19,8 @@
 
 pub use inari::Interval;
 use truck_base::cgmath64::{Point3, Vector3};
+use truck_geometry::nurbs::BSplineCurve;
+use truck_geometry::specifieds::Plane;
 use truck_geotrait::{ParametricCurve, ParametricSurface};
 
 /// An axis-aligned box in 3-space, each coordinate an outward-rounded interval.
@@ -88,6 +90,16 @@ pub trait EnclosureCurve: ParametricCurve<Point = Point3> {
     /// A cone of tangent directions, `None` when the derivative enclosure
     /// contains 0 (direction undefined).
     fn tangent_cone(&self, tt: Interval) -> Option<DirCone>;
+
+    /// This curve exactly represented as a `BSplineCurve<Point3>`, when it is one
+    /// — including by exact affine composition of a planar pcurve. `None` for any
+    /// curve whose exact representation is not a plain B-spline (circles, NURBS,
+    /// lines, general pcurves). Route 1 of BG-CE-002's deviation certificate
+    /// builds on this; the default keeps every other carrier on the generic
+    /// bisection route.
+    fn exact_spline(&self) -> Option<BSplineCurve<Point3>> {
+        None
+    }
 }
 
 /// Certified enclosure interface for parametric surfaces.
@@ -104,6 +116,13 @@ pub trait EnclosureSurface: ParametricSurface<Point = Point3> {
 
     /// A lower bound on ‖S_u × S_v‖ over the box (§10 immersion margin ι).
     fn immersion_lower_bound(&self, uu: Interval, vv: Interval) -> f64;
+
+    /// This surface exactly, when it is a `Plane` (the exact affine carrier).
+    /// `None` otherwise. Used by `PCurve`'s `exact_spline` to compose a planar
+    /// pcurve into a spline exactly.
+    fn as_plane(&self) -> Option<&Plane> {
+        None
+    }
 }
 
 #[cfg(test)]
