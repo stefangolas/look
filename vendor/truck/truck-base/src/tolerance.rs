@@ -322,10 +322,96 @@ impl ToleranceCtx {
         x.abs() <= self.tau_rep
     }
 
+    /// MODEL-SPACE, DEGREE 2 IN LENGTH. The absolute margin a squared-length
+    /// comparison uses at this model's scale: `(tau_rep * model_scale)^2`.
+    ///
+    /// The one-sided squared counterpart of [`Self::length_margin`], for
+    /// quantities that are degree two in length: squared distances, squared
+    /// magnitudes, twice a triangle's area. Under a model rescale by `k` such a
+    /// quantity scales as `k^2`, and so does this margin.
+    pub fn length2_margin(&self) -> f64 {
+        self.length_margin() * self.length_margin()
+    }
+
+    /// MODEL-SPACE, DEGREE 2 IN LENGTH. True when a quantity of degree two in
+    /// length is negligible at this model's scale: `q <= (tau_rep *
+    /// model_scale)^2`.
+    ///
+    /// This is the sqrt-free form of [`Self::is_small_len`] for squared
+    /// distances: `d.distance2(c) <= TOLERANCE2` migrates to
+    /// `ctx.is_small_len2(d.distance2(c))` with identical behaviour at Stage A
+    /// (`model_scale == 1.0` makes the margin exactly `TOLERANCE2`). At the
+    /// boundary it can differ from `is_small_len(q.sqrt())` by one ulp — the
+    /// squared form is the predicate, not an approximation of the sqrt form.
+    /// The argument must be non-negative by construction (a squared distance,
+    /// an area); `.abs()` is applied anyway so a stray negative is small
+    /// rather than silently never-small.
+    pub fn is_small_len2(&self, q: f64) -> bool {
+        q.abs() <= self.length2_margin()
+    }
+
+    /// DIMENSIONLESS, DEGREE ZERO — deliberately NOT scaled, and deliberately
+    /// the SQUARE of `ratio_margin`. The legacy family used `TOLERANCE2` as a
+    /// "much tighter than tau" floor for iteration convergence and
+    /// normalization checks on dimensionless quantities (knot values, Newton
+    /// parameters). Degree zero means scale-invariant: the tight floor is
+    /// correct at every model scale, and this predicate names it instead of
+    /// leaving the bare constant at the call site. It is a floor, not a derived
+    /// quantity — do not use it for anything that is genuinely a squared
+    /// length; that is [`Self::is_small_len2`].
+    pub fn is_small_ratio2(&self, x: f64) -> bool {
+        x.abs() <= self.ratio_margin() * self.ratio_margin()
+    }
+
     /// BG-TOL-003: an entity's tolerance may never be tighter than its
     /// boundary's. Returns the entity tolerance to use given a boundary
     /// tolerance, which is the larger of the two.
     pub fn entity_tau(&self, boundary_tau: f64) -> f64 {
         self.tau_rep.max(boundary_tau)
+    }
+}
+
+#[test]
+fn is_small_len2_reproduces_tolerance2_at_stage_a() {
+    let ctx = ToleranceCtx::unscaled_legacy();
+    assert!(ctx.is_small_len2(TOLERANCE2));
+    assert!(!ctx.is_small_len2(TOLERANCE2 * 2.0));
+}
+
+#[test]
+fn is_small_len2_scales_quadratically() {
+    let Ok(c) = ToleranceCtx::new(10.0, TOLERANCE, TOLERANCE, TOLERANCE) else {
+        unreachable!()
+    };
+    let ctx = c.value;
+    assert!(ctx.is_small_len2(50.0 * TOLERANCE2));
+    assert!(!ctx.is_small_len2(200.0 * TOLERANCE2));
+}
+
+#[test]
+fn is_small_ratio2_is_scale_invariant() {
+    let legacy = ToleranceCtx::unscaled_legacy();
+    let Ok(c) = ToleranceCtx::new(10.0, TOLERANCE, TOLERANCE, TOLERANCE) else {
+        unreachable!()
+    };
+    let scaled = c.value;
+    for ctx in [legacy, scaled] {
+        assert!(ctx.is_small_ratio2(TOLERANCE2));
+        assert!(!ctx.is_small_ratio2(TOLERANCE2 * 2.0));
+    }
+}
+
+#[test]
+fn length2_margin_is_the_square_of_length_margin() {
+    let legacy = ToleranceCtx::unscaled_legacy();
+    let Ok(c) = ToleranceCtx::new(10.0, TOLERANCE, TOLERANCE, TOLERANCE) else {
+        unreachable!()
+    };
+    let scaled = c.value;
+    for ctx in [legacy, scaled] {
+        assert_eq!(
+            ctx.length2_margin(),
+            ctx.length_margin() * ctx.length_margin()
+        );
     }
 }
