@@ -1,0 +1,15 @@
+{
+  "id": "BG-INV-105",
+  "status": "DONE",
+  "contracts": ["BG-INV-105"],
+  "tests_added": 4,
+  "sites_migrated": 0,
+  "sites_deferred": 0,
+  "deviations": [],
+  "disagreements": [
+    "Decision 4 says to build the witnesses with `Face::new`; the open-wire violating witness (two edges v0->v1, v1->v2 that do not loop) cannot be built with `Face::new`. `Face::try_new` rejects a non-closed wire (returns Error::NotClosedWire, face.rs:33) and `Face::new` unwraps it through `remove_try`, which panics (lib.rs:189). Built the violating witness with `Face::new_unchecked` (face.rs:60) instead; the checker's behavior is unchanged.",
+    "Decision 4's `Face::new(vec![], ())` for the no-boundaries witness does not type-check as written: the empty `vec![]` cannot be inferred as `Vec<Wire<P, C>>` because the empty face's type parameters are never constrained. Annotated as `Face::<(), (), ()>::new(vec![], ())`; it constructs the empty-boundary face without panicking (`try_new` passes on an empty boundary list)."
+  ],
+  "baseline_failures": [],
+  "notes": "Implemented the domain-boundary checker per decisions 1-5. Body: `face.boundaries()` empty -> Contradictory witness (prop DomainBoundary, left True, right False); else any wire failing `is_closed()` -> the same witness; else the house certificate (props DomainBoundary=True, Method::None, Budget::new(0,0,0), Margin::UNBOUNDED, Modulus::Unbounded). The pcurve-carrying half is documented as waiting on pcurve wiring in the doc comment, per the packet. Added the four required unit tests (closed triangle holds with DomainBoundary=True; two-edge open wire violates with the refusal's prop/left/right; no-boundaries face violates; certificate names the invariant, method None, budget (0,0,0), and claims only its own property -- CoedgePairing stays Unknown) and one doctest on check (triangle face, is_ok). Anchors pre-implementation: A1=1 (pub mod domain_boundary in invariants/mod.rs), A2=1 (pub mod invariants in lib.rs), A3=1 (pub fn boundaries in face.rs), A4=1 (pub fn is_closed in wire.rs), A5=1 (DomainBoundary in truck-base evidence.rs), A6=0 (scaffold empty of pub fn). is_closed() semantics verified against the wire! doctest examples (head-to-tail continuity plus cyclic closure), no SPEC_GAP. Verification: cargo fmt --check -p truck-topology OK; cargo clippy -p truck-topology --all-targets --no-deps OK (zero findings); cargo test -p truck-topology --lib --tests --no-fail-fast OK (33 lib tests passed including the 4 new; integration tests euler_operators 2 passed, extracases 1 passed, large-solid-torus 1 ignored); cargo test -p truck-topology --doc OK (120 passed including the new doctest, 119 at this tree's baseline HEAD 2ffea04); cargo check --workspace --all-targets OK (only a pre-existing truck-meshalgo unused_qualifications warning); bash scripts/kernel-gates.sh 2ffea04 exit 0 (all P-3 gates pass, GATE-4 unscaled_legacy 110/110). Committed on packet/BG-INV-105 as 1ea437b with subject 'feat(topology): domain-boundary invariant checker (BG-INV-105)'."
+}
