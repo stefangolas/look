@@ -294,7 +294,10 @@ landed diff as the template; it is the reference answer for this exact move.
 **Raised 2026-08-20** by the failing `truck-stepio` `input` property tests
 (`b_spline_surface_with_knots`, `nurbs_surface_b_spline_surface_with_knots`,
 `nurbs_curve_b_spline_curve_with_knots` — all fail deterministically at the
-tree this item was written against). Not a loop defect: the behaviour arrived
+tree this item was written against; a fourth, `b_spline_curve_with_knots`,
+fails on the same degenerate-active-domain class seed-dependently — found by
+the BG-S0-004 worker at dispatch, covered by the same generator guard). Not a
+loop defect: the behaviour arrived
 with the vendored tree in `da72cd5`. The curve-path tiny-interval
 reparameterization and the unsorted-knot refusal in the same file predate this
 loop and are hereby promoted from local decisions to a named contract that
