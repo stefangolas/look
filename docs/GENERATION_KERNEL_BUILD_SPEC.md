@@ -1270,6 +1270,27 @@ nesting_forest(components) -> Outcome<Vec<Solid>>
 Note the signature consequence: `and`/`or` must return `Vec<Solid>`, not
 `Option<Solid>`. Make that break now, in Stage 1, while the call sites are few.
 
+**Amendment (2026-08-21, scoping BG-INV-108's packet).** The break is
+**deferred to the BG-NUM-004 wiring**, and the checker lands first, pure. Two
+facts force the split:
+
+1. `nesting_forest`'s inside query is an oracle (the certified winding is
+   NUM-004's, still unwritten). The checker therefore takes the oracle as an
+   injected parameter — `nesting_forest(n_components, contains: Fn(usize,
+   usize) -> Option<bool>)` — and is a pure graph algorithm: build the
+   containment order, refuse on a cycle (`Contradictory` with
+   `Prop::ShellNesting`), return the forest of roots and their inner-shell
+   children, refuse undecided (`NumericallyUnresolved`). Tests exercise it
+   entirely on hand-built oracles.
+2. Breaking `and`/`or` to `Vec<Solid>` **without** the oracle would fix F-1 by
+   introducing its mirror: a boolean result with a cavity (cube minus inner
+   cube) has two *nested* components that a naive per-component partition
+   would return as two solids, breaking the cavity case that works today.
+   A lying break is worse than a deferred one; the signature change lands
+   with the oracle, in the NUM-004 wiring packet.
+
+The F-1 regression test itself moves with the wiring.
+
 **Tests.**
 - Unit (F-1 regression): union of two **disjoint** cubes ⇒ **two** solids, each
   with one boundary shell. Today this returns one solid with a phantom cavity.
