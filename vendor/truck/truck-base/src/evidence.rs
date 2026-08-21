@@ -218,6 +218,29 @@ pub enum Prop {
     Provisional,
     /// The exact result is analytic and preserved as such (BG-CE-007).
     AnalyticPreserved,
+    /// §1.1 invariant 1: coedge pairing — every non-degenerate edge has
+    /// exactly 2 uses of opposite sense, a declared even number, or a
+    /// declared 1 (BG-INV-101).
+    CoedgePairing,
+    /// §1.1 invariant 2: the vertex link is a single cycle (BG-INV-102).
+    VertexLink,
+    /// §1.1 invariant 3: the Euler–Poincaré relation holds (BG-INV-103).
+    EulerPoincare,
+    /// §1.1 invariant 4: same-parameter / same-range on every edge use
+    /// (BG-INV-104).
+    SameParameter,
+    /// §1.1 invariant 5: domain–boundary correspondence (BG-INV-105).
+    DomainBoundary,
+    /// §1.1 invariant 6: representation in $\mathcal{G}$ within tau_rep
+    /// (BG-INV-106).
+    Representation,
+    /// §1.1 invariant 7: tolerance monotonicity (BG-INV-107).
+    ToleranceMonotonicity,
+    /// §1.1 invariant 8: shell nesting is a forest (BG-INV-108).
+    ShellNesting,
+    /// §1.1 invariant 9: wedge non-degeneracy — dihedral bounded off 0 and
+    /// 2π (BG-INV-109).
+    WedgeNonDegeneracy,
 }
 
 /// π: the property map of a certificate.

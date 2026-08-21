@@ -395,6 +395,8 @@ pub mod entity_id;
 pub mod errors;
 /// Defines the boundary iterator.
 pub mod face;
+/// The §1.1 invariant checkers (BG-INV-001).
+pub mod invariants;
 /// classifies shell conditions and defines the face iterators.
 pub mod shell;
 mod solid;
