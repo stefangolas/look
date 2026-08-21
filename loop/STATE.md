@@ -144,10 +144,13 @@ known-DONE row. Three new traps below carry the mechanisms.
 
 ## State of the machine, as left
 
-- **Watchdog ALIVE, pid 29132** (`stagnant=3600s`, poll 60s) — covering both
-  in-flight workers. Restart budgets: BG-CE-001 1/3 used; the misdispatched
-  PCURVE restart is recorded but moot (the registry's DONE protection is
-  verified working again after the BOM fix).
+- **Watchdog STOPPED at close** (nothing in flight — the session-12/14
+  rationale; its log carries the STOP line). Restart it with
+  `LOOK_WATCHDOG_STAGNANT=3600` via the `cmd /c` incantation when dispatch
+  resumes, and **stop it before any machine sleep** (trap below). Restart
+  budgets: BG-CE-001 1/3 used; the misdispatched PCURVE restart is recorded
+  but moot (the registry's DONE protection is verified working again after
+  the BOM fix).
 - **Nothing in flight; all three slots FINISHED and warm** on their landed
   branches (slot 0 `28f00cc` TOL-004, slot 1 `6ce3d26` PCONE leftover,
   slot 2 `6625529` CE-001). CE-001's attempt 1 lives in
