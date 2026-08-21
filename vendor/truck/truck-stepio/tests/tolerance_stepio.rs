@@ -69,8 +69,8 @@ fn every_migrated_stepio_site_is_marked() {
         }
     }
     assert_eq!(
-        markers, 19,
-        "expected 19 migrated sites, found {markers} markers"
+        markers, 21,
+        "expected 21 migrated sites, found {markers} markers"
     );
 }
 

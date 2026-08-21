@@ -1,6 +1,6 @@
 #![allow(clippy::too_many_arguments)]
 
-use proptest::{property_test, *};
+use proptest::{property_test, test_runner::TestCaseError, *};
 use ruststep::{ast::DataSection, tables::*};
 use std::{f64::consts::PI, str::FromStr};
 use truck_geometry::prelude as truck;
@@ -300,7 +300,7 @@ fn exec_b_spline_curve_with_knots(
     knot_mults: Vec<usize>,
     degree: usize,
     ctrlpt_coords: Vec<[f64; 3]>,
-) {
+) -> std::result::Result<(), TestCaseError> {
     let mut s = 0.0;
     let vec = knot_mults
         .iter()
@@ -312,6 +312,9 @@ fn exec_b_spline_curve_with_knots(
         })
         .collect::<Vec<f64>>();
     let knots = KnotVec::from(vec);
+    // non-degenerate active domain; the refusal counterpart is
+    // b_spline_curve_with_knots_degenerate_active_domain_refuses
+    prop_assume!(knots[degree] < knots[knots.len() - degree - 1]);
     let cps = ctrlpt_coords
         .into_iter()
         .take(knots.len() - degree - 1)
@@ -331,6 +334,7 @@ fn exec_b_spline_curve_with_knots(
         .iter()
         .zip(bsp.control_points())
         .for_each(|(x, y)| assert_near!(x, y));
+    Ok(())
 }
 
 #[property_test]
@@ -342,7 +346,7 @@ fn b_spline_curve_with_knots(
     #[strategy = collection::vec(array::uniform3(-100.0f64..100.0f64), 80)] ctrlpt_coords: Vec<
         [f64; 3],
     >,
-) {
+) -> std::result::Result<(), TestCaseError> {
     exec_b_spline_curve_with_knots(knot_len, knot_incrs, knot_mults, degree, ctrlpt_coords)
 }
 
@@ -421,6 +425,82 @@ fn b_spline_curve_with_knots_unsorted_knots_still_refuse() {
     assert!(
         BSplineCurve::<Point3>::try_from(&bsp_step).is_err(),
         "an unsorted knot vector must still refuse",
+    );
+}
+
+/// A supplied knot vector whose active domain collapses to a single value is
+/// not a reparameterization of anything, so conversion must refuse rather than
+/// substitute synthesized knots for the source's.
+#[test]
+fn b_spline_curve_with_knots_degenerate_active_domain_refuses() {
+    let degree = 3;
+    let points: Vec<Point3> = vec![
+        Point3::new(0.0, 0.0, 0.0),
+        Point3::new(1.0, 2.0, -0.5),
+        Point3::new(2.0, 1.0, 0.25),
+        Point3::new(3.0, 3.0, 1.0),
+    ];
+    let (step_cps_indices, step_cps) = step_bsp_curve_ctrls(&points);
+    // `knot_multiplicities (5,3)` over `knots (0.0, 1.0)` expands to eight
+    // knots, but the active domain is `[T_3, T_4] = [0.0, 0.0]`.
+    let step_str = format!(
+        "DATA;
+#1 = B_SPLINE_CURVE_WITH_KNOTS('', {degree}, {step_cps_indices}, .UNSPECIFIED., .F., .F., (5,3), (0.0, 1.0), .UNSPECIFIED.);
+{step_cps}ENDSEC;"
+    );
+    let bsp_step = step_to_entity::<BSplineCurveWithKnotsHolder>(&step_str);
+    assert!(
+        BSplineCurve::<Point3>::try_from(&bsp_step).is_err(),
+        "a degenerate active domain must refuse",
+    );
+}
+
+/// A supplied knot vector whose expanded length is short of `N + degree + 1`
+/// must refuse instead of silently replacing the source knots.
+#[test]
+fn b_spline_curve_with_knots_knot_count_mismatch_refuses() {
+    let degree = 3;
+    let points: Vec<Point3> = vec![
+        Point3::new(0.0, 0.0, 0.0),
+        Point3::new(1.0, 2.0, -0.5),
+        Point3::new(2.0, 1.0, 0.25),
+        Point3::new(3.0, 3.0, 1.0),
+    ];
+    let (step_cps_indices, step_cps) = step_bsp_curve_ctrls(&points);
+    // `knot_multiplicities (2,2)` over `knots (0.0, 1.0)` expands to four
+    // knots, but `N = 4`, `degree = 3` need eight.
+    let step_str = format!(
+        "DATA;
+#1 = B_SPLINE_CURVE_WITH_KNOTS('', {degree}, {step_cps_indices}, .UNSPECIFIED., .F., .F., (2,2), (0.0, 1.0), .UNSPECIFIED.);
+{step_cps}ENDSEC;"
+    );
+    let bsp_step = step_to_entity::<BSplineCurveWithKnotsHolder>(&step_str);
+    assert!(
+        BSplineCurve::<Point3>::try_from(&bsp_step).is_err(),
+        "a knot-count mismatch must refuse",
+    );
+}
+
+/// `QUASI_UNIFORM_CURVE` has no source knot list, but a degree that exceeds the
+/// control-point count cannot be synthesized either; it must refuse.
+#[test]
+fn quasi_uniform_curve_degree_exceeds_control_points_refuses() {
+    let degree = 5;
+    let points: Vec<Point3> = vec![
+        Point3::new(0.0, 0.0, 0.0),
+        Point3::new(1.0, 2.0, -0.5),
+        Point3::new(2.0, 1.0, 0.25),
+    ];
+    let (step_cps_indices, step_cps) = step_bsp_curve_ctrls(&points);
+    let step_str = format!(
+        "DATA;
+#1 = QUASI_UNIFORM_CURVE('', {degree}, {step_cps_indices}, .UNSPECIFIED., .U., .U.);
+{step_cps}ENDSEC;"
+    );
+    let bsp_step = step_to_entity::<QuasiUniformCurveHolder>(&step_str);
+    assert!(
+        BSplineCurve::<Point3>::try_from(&bsp_step).is_err(),
+        "a degree exceeding the control-point count must refuse",
     );
 }
 
@@ -559,7 +639,7 @@ fn exec_nurbs_curve_b_spline_with_knots(
     mut weights: Vec<f64>,
     degree: usize,
     ctrlpt_coords: Vec<[f64; 3]>,
-) {
+) -> std::result::Result<(), TestCaseError> {
     let mut s = 0.0;
     let vec = knot_mults
         .iter()
@@ -571,6 +651,9 @@ fn exec_nurbs_curve_b_spline_with_knots(
         })
         .collect::<Vec<f64>>();
     let knots = KnotVec::from(vec);
+    // non-degenerate active domain; the refusal counterpart is
+    // b_spline_curve_with_knots_degenerate_active_domain_refuses
+    prop_assume!(knots[degree] < knots[knots.len() - degree - 1]);
     let cps = ctrlpt_coords
         .into_iter()
         .take(knots.len() - degree - 1)
@@ -592,6 +675,7 @@ fn exec_nurbs_curve_b_spline_with_knots(
         .iter()
         .zip(nurbs.control_points())
         .for_each(|(x, y)| assert_near!(x, y));
+    Ok(())
 }
 
 #[property_test]
@@ -604,7 +688,7 @@ fn nurbs_curve_b_spline_curve_with_knots(
     #[strategy = collection::vec(array::uniform3(-100.0f64..100.0f64), 80)] ctrlpt_coords: Vec<
         [f64; 3],
     >,
-) {
+) -> std::result::Result<(), TestCaseError> {
     exec_nurbs_curve_b_spline_with_knots(
         knot_len,
         knot_incrs,
@@ -1454,7 +1538,7 @@ fn exec_b_spline_surface_with_knots(
     vknot_incrs: Vec<f64>,
     vdegree: usize,
     ctrlpt_coords: Vec<Vec<[f64; 3]>>,
-) {
+) -> std::result::Result<(), TestCaseError> {
     let mut s = 0.0;
     let uvec = uknot_mults
         .iter()
@@ -1466,6 +1550,9 @@ fn exec_b_spline_surface_with_knots(
         })
         .collect::<Vec<f64>>();
     let uknots = KnotVec::from(uvec);
+    // non-degenerate active domain; the refusal counterpart is
+    // b_spline_surface_with_knots_degenerate_active_domain_refuses
+    prop_assume!(uknots[udegree] < uknots[uknots.len() - udegree - 1]);
     let mut s = 0.0;
     let vvec = vknot_mults
         .iter()
@@ -1477,6 +1564,9 @@ fn exec_b_spline_surface_with_knots(
         })
         .collect::<Vec<f64>>();
     let vknots = KnotVec::from(vvec);
+    // non-degenerate active domain; the refusal counterpart is
+    // b_spline_surface_with_knots_degenerate_active_domain_refuses
+    prop_assume!(vknots[vdegree] < vknots[vknots.len() - vdegree - 1]);
     let cps = coords_to_points(
         uknots.len() - udegree - 1,
         vknots.len() - vdegree - 1,
@@ -1487,6 +1577,7 @@ fn exec_b_spline_surface_with_knots(
     let bsp_step = step_to_entity::<BSplineSurfaceWithKnotsHolder>(&step_str);
     let res: BSplineSurface<Point3> = (&bsp_step).try_into().unwrap();
     compare_bsp_surfaces(&res, &bsp);
+    Ok(())
 }
 
 #[property_test]
@@ -1501,7 +1592,7 @@ fn b_spline_surface_with_knots(
     #[strategy = 2usize..6] vdegree: usize,
     #[strategy = collection::vec(collection::vec(array::uniform3(-100.0f64..100.0f64), 40), 40)]
     ctrlpt_coords: Vec<Vec<[f64; 3]>>,
-) {
+) -> std::result::Result<(), TestCaseError> {
     exec_b_spline_surface_with_knots(
         uknot_len,
         uknot_mults,
@@ -1535,6 +1626,194 @@ fn step_bsp_surface_ctrls(points: &[Vec<Point3>]) -> (String, String) {
             string + &display.to_string()
         });
     (step_cps_indices, step_cps)
+}
+
+/// A 4x4 grid of distinct control points with small coordinates.
+fn unit_grid_surface() -> Vec<Vec<Point3>> {
+    (0..4)
+        .map(|i| {
+            (0..4)
+                .map(|j| Point3::new(i as f64 * 0.25, j as f64 * 0.5, (i * j) as f64 * 0.125))
+                .collect()
+        })
+        .collect()
+}
+
+/// Asserts that `res` evaluates, on a clamped `[0,1]`-grid, exactly as the
+/// tensor-product cubic Bernstein surface the control grid `points` defines.
+/// Both knot axes are expected to be clamped-cubic `[0,0,0,0,1,1,1,1]` after
+/// import, so `subs` is the tensor product of cubic Bernstein basis functions.
+fn assert_tensor_cubic_bernstein(res: &BSplineSurface<Point3>, points: &[Vec<Point3>]) {
+    let bernstein = |u: f64| -> [f64; 4] {
+        let t = 1.0 - u;
+        [t * t * t, 3.0 * t * t * u, 3.0 * t * u * u, u * u * u]
+    };
+    for i in 0..=20 {
+        let s = i as f64 / 20.0;
+        let bs = bernstein(s);
+        for j in 0..=20 {
+            let t = j as f64 / 20.0;
+            let bt = bernstein(t);
+            let mut ans = Vector3::new(0.0, 0.0, 0.0);
+            for (ip, bi) in bs.iter().enumerate() {
+                for (jp, bj) in bt.iter().enumerate() {
+                    ans += points[ip][jp].to_vec() * *bi * *bj;
+                }
+            }
+            let got = res.subs(s, t).to_vec();
+            let slack = 1.0e-9; // H-3: float slack between two evaluations of one tensor-Bernstein point, not a length
+            assert!(
+                (got - ans).magnitude() < slack,
+                "s:{s} t:{t} got:{got:?} ans:{ans:?}"
+            );
+        }
+    }
+}
+
+/// A u-axis knot vector whose active domain collapses to a single value must
+/// refuse instead of silently substituting synthesized knots.
+#[test]
+fn b_spline_surface_with_knots_degenerate_active_domain_refuses() {
+    let u_degree = 3;
+    let v_degree = 3;
+    let points = unit_grid_surface();
+    let (step_cps_indices, step_cps) = step_bsp_surface_ctrls(&points);
+    // u: `u_multiplicities (5,3)` over `u_knots (0.0, 1.0)` expands to eight
+    // knots, but the active domain is `[T_3, T_4] = [0.0, 0.0]`; v is valid.
+    let step_str = format!(
+        "DATA;
+#1 = B_SPLINE_SURFACE_WITH_KNOTS('', {u_degree}, {v_degree}, {step_cps_indices}, .UNSPECIFIED., .F., .F., .F., (5,3), (4,4), (0.0, 1.0), (0.0, 1.0), .UNSPECIFIED.);
+{step_cps}ENDSEC;"
+    );
+    let bsp_step = step_to_entity::<BSplineSurfaceWithKnotsHolder>(&step_str);
+    assert!(
+        BSplineSurface::<Point3>::try_from(&bsp_step).is_err(),
+        "a degenerate u-axis active domain must refuse",
+    );
+}
+
+/// A u-axis knot vector whose expanded length is short of `N + degree + 1`
+/// must refuse instead of silently replacing the source knots.
+#[test]
+fn b_spline_surface_with_knots_knot_count_mismatch_refuses() {
+    let u_degree = 3;
+    let v_degree = 3;
+    let points = unit_grid_surface();
+    let (step_cps_indices, step_cps) = step_bsp_surface_ctrls(&points);
+    // u: `u_multiplicities (2,2)` over `u_knots (0.0, 1.0)` expands to four
+    // knots, but `N = 4`, `u_degree = 3` need eight; v is valid.
+    let step_str = format!(
+        "DATA;
+#1 = B_SPLINE_SURFACE_WITH_KNOTS('', {u_degree}, {v_degree}, {step_cps_indices}, .UNSPECIFIED., .F., .F., .F., (2,2), (4,4), (0.0, 1.0), (0.0, 1.0), .UNSPECIFIED.);
+{step_cps}ENDSEC;"
+    );
+    let bsp_step = step_to_entity::<BSplineSurfaceWithKnotsHolder>(&step_str);
+    assert!(
+        BSplineSurface::<Point3>::try_from(&bsp_step).is_err(),
+        "a u-axis knot-count mismatch must refuse",
+    );
+}
+
+/// `QUASI_UNIFORM_SURFACE` has no source knot list, but a degree that exceeds
+/// the control-point count cannot be synthesized either; it must refuse.
+#[test]
+fn quasi_uniform_surface_degree_exceeds_control_points_refuses() {
+    let u_degree = 2;
+    let v_degree = 5;
+    let points = (0..3)
+        .map(|i| {
+            (0..3)
+                .map(|j| Point3::new(i as f64, j as f64, (i * j) as f64))
+                .collect()
+        })
+        .collect::<Vec<Vec<Point3>>>();
+    let (step_cps_indices, step_cps) = step_bsp_surface_ctrls(&points);
+    let step_str = format!(
+        "DATA;
+#1 = QUASI_UNIFORM_SURFACE('', {u_degree}, {v_degree}, {step_cps_indices}, .UNSPECIFIED., .U., .U., .U.);
+{step_cps}ENDSEC;"
+    );
+    let bsp_step = step_to_entity::<QuasiUniformSurfaceHolder>(&step_str);
+    assert!(
+        BSplineSurface::<Point3>::try_from(&bsp_step).is_err(),
+        "a v-degree exceeding the control-point count must refuse",
+    );
+}
+
+/// A `b_spline_surface_with_knots` whose u-axis knot interval is nonzero but
+/// smaller than truck's `TOLERANCE` (absolute) must still convert. Normalizing
+/// the u knot vector to `[0, 1]` is an exact, shape-preserving
+/// reparameterization of the same surface; the v axis is untouched.
+#[test]
+fn b_spline_surface_with_knots_tiny_u_interval_converts() {
+    let u_degree = 3;
+    let v_degree = 3;
+    let points = unit_grid_surface();
+    let (step_cps_indices, step_cps) = step_bsp_surface_ctrls(&points);
+    // A u-axis knot span of 5e-7: below TOLERANCE, above a true zero range.
+    let step_str = format!(
+        "DATA;
+#1 = B_SPLINE_SURFACE_WITH_KNOTS('', {u_degree}, {v_degree}, {step_cps_indices}, .UNSPECIFIED., .F., .F., .F., (4,4), (4,4), (0.0, 5.0E-7), (0.0, 1.0), .UNSPECIFIED.);
+{step_cps}ENDSEC;"
+    );
+    let bsp_step = step_to_entity::<BSplineSurfaceWithKnotsHolder>(&step_str);
+    let res: BSplineSurface<Point3> = (&bsp_step)
+        .try_into()
+        .expect("a tiny u-axis range surface converts");
+    assert_eq!(res.uknot_vec().len(), 8, "u knot count preserved");
+    res.uknot_vec()
+        .iter()
+        .zip([0.0, 0.0, 0.0, 0.0, 1.0, 1.0, 1.0, 1.0])
+        .for_each(|(x, y)| assert_near!(*x, y, "u normalized to [0, 1]"));
+    assert_eq!(res.vknot_vec().len(), 8, "v knot count preserved");
+    res.vknot_vec()
+        .iter()
+        .zip([0.0, 0.0, 0.0, 0.0, 1.0, 1.0, 1.0, 1.0])
+        .for_each(|(x, y)| assert_near!(*x, y, "v knot vector untouched"));
+    assert_eq!(res.control_points().len(), points.len());
+    res.control_points()
+        .iter()
+        .flatten()
+        .zip(points.iter().flatten())
+        .for_each(|(x, y)| assert_near!(x, y, "control points preserved"));
+    assert_tensor_cubic_bernstein(&res, &points);
+}
+
+/// The mirror image of the tiny-u test: a tiny knot span on the v axis, an
+/// ordinary `[0, 1]` span on u; v normalizes and u is untouched.
+#[test]
+fn b_spline_surface_with_knots_tiny_v_interval_converts() {
+    let u_degree = 3;
+    let v_degree = 3;
+    let points = unit_grid_surface();
+    let (step_cps_indices, step_cps) = step_bsp_surface_ctrls(&points);
+    // A v-axis knot span of 5e-7: below TOLERANCE, above a true zero range.
+    let step_str = format!(
+        "DATA;
+#1 = B_SPLINE_SURFACE_WITH_KNOTS('', {u_degree}, {v_degree}, {step_cps_indices}, .UNSPECIFIED., .F., .F., .F., (4,4), (4,4), (0.0, 1.0), (0.0, 5.0E-7), .UNSPECIFIED.);
+{step_cps}ENDSEC;"
+    );
+    let bsp_step = step_to_entity::<BSplineSurfaceWithKnotsHolder>(&step_str);
+    let res: BSplineSurface<Point3> = (&bsp_step)
+        .try_into()
+        .expect("a tiny v-axis range surface converts");
+    assert_eq!(res.uknot_vec().len(), 8, "u knot count preserved");
+    res.uknot_vec()
+        .iter()
+        .zip([0.0, 0.0, 0.0, 0.0, 1.0, 1.0, 1.0, 1.0])
+        .for_each(|(x, y)| assert_near!(*x, y, "u knot vector untouched"));
+    assert_eq!(res.vknot_vec().len(), 8, "v knot count preserved");
+    res.vknot_vec()
+        .iter()
+        .zip([0.0, 0.0, 0.0, 0.0, 1.0, 1.0, 1.0, 1.0])
+        .for_each(|(x, y)| assert_near!(*x, y, "v normalized to [0, 1]"));
+    assert_eq!(res.control_points().len(), points.len());
+    res.control_points()
+        .iter()
+        .flatten()
+        .zip(points.iter().flatten())
+        .for_each(|(x, y)| assert_near!(x, y, "control points preserved"));
+    assert_tensor_cubic_bernstein(&res, &points);
 }
 
 fn exec_bezier_surface([udegree, vdegree]: [usize; 2], ctrlpt_coords: Vec<Vec<[f64; 3]>>) {
@@ -1644,7 +1923,7 @@ fn exec_nurbs_surface_b_spline_surface_with_knots(
     vdegree: usize,
     ctrlpt_coords: Vec<Vec<[f64; 3]>>,
     mut weights: Vec<Vec<f64>>,
-) {
+) -> std::result::Result<(), TestCaseError> {
     let mut s = 0.0;
     let uvec = uknot_mults
         .iter()
@@ -1656,6 +1935,9 @@ fn exec_nurbs_surface_b_spline_surface_with_knots(
         })
         .collect::<Vec<f64>>();
     let uknots = KnotVec::from(uvec);
+    // non-degenerate active domain; the refusal counterpart is
+    // b_spline_surface_with_knots_degenerate_active_domain_refuses
+    prop_assume!(uknots[udegree] < uknots[uknots.len() - udegree - 1]);
     let mut s = 0.0;
     let vvec = vknot_mults
         .iter()
@@ -1667,6 +1949,9 @@ fn exec_nurbs_surface_b_spline_surface_with_knots(
         })
         .collect::<Vec<f64>>();
     let vknots = KnotVec::from(vvec);
+    // non-degenerate active domain; the refusal counterpart is
+    // b_spline_surface_with_knots_degenerate_active_domain_refuses
+    prop_assume!(vknots[vdegree] < vknots[vknots.len() - vdegree - 1]);
     let cps = coords_to_points(
         uknots.len() - udegree - 1,
         vknots.len() - vdegree - 1,
@@ -1683,6 +1968,7 @@ fn exec_nurbs_surface_b_spline_surface_with_knots(
     let bsp_step = step_to_entity::<RationalBSplineSurfaceHolder>(&step_str);
     let res: NurbsSurface<Vector4> = (&bsp_step).try_into().unwrap();
     compare_nurbs_surfaces(&res, &ans);
+    Ok(())
 }
 
 #[property_test]
@@ -1700,7 +1986,7 @@ fn nurbs_surface_b_spline_surface_with_knots(
     #[strategy = collection::vec(collection::vec(0.01f64..100.0f64, 40), 40)] weights: Vec<
         Vec<f64>,
     >,
-) {
+) -> std::result::Result<(), TestCaseError> {
     exec_nurbs_surface_b_spline_surface_with_knots(
         uknot_len,
         uknot_mults,

@@ -1859,13 +1859,8 @@ impl<P: for<'a> From<&'a CartesianPoint>> TryFrom<&BSplineCurveWithKnots> for BS
         let ctrpts: Vec<P> = curve.control_points_list.iter().map(Into::into).collect();
         let degree = curve.degree as usize;
         let ctrl_count = ctrpts.len();
-        let mut kv = match ValidatedKnotVector::validate(knots, multi, degree, ctrl_count, None) {
-            Ok(v) => v.into_inner(),
-            Err(e @ truck_geometry::nurbs::SplineConstructionError::UnsortedRawKnots { .. }) => {
-                return Err(e.into())
-            }
-            Err(_) => quasi_uniform_knots(ctrl_count, degree),
-        };
+        let mut kv =
+            ValidatedKnotVector::validate(knots, multi, degree, ctrl_count, None)?.into_inner();
         // A STEP exporter may parameterize a perfectly valid curve over a tiny,
         // nonzero knot interval (measured: the six lost core_xy edge curves
         // span ~2e-8..6e-7). `BSplineCurve::try_new` treats any total range
@@ -1929,17 +1924,36 @@ impl<P: for<'a> From<&'a CartesianPoint>> TryFrom<&QuasiUniformCurve> for BSplin
     type Error = StepConvertingError;
     #[inline(always)]
     fn try_from(curve: &QuasiUniformCurve) -> Result<Self, StepConvertingError> {
-        let knots = quasi_uniform_knots(curve.control_points_list.len(), curve.degree as usize);
+        let knots = quasi_uniform_knots(curve.control_points_list.len(), curve.degree as usize)?;
         let ctrpts = curve.control_points_list.iter().map(Into::into).collect();
         Ok(Self::try_new(knots, ctrpts)?)
     }
 }
 
-fn quasi_uniform_knots(num_ctrl: usize, degree: usize) -> KnotVec {
+fn quasi_uniform_knots(num_ctrl: usize, degree: usize) -> Result<KnotVec, StepConvertingError> {
+    if num_ctrl <= degree {
+        // The synthesis path has no source knot list to preserve, so the
+        // witness carries the same shape `validate` uses for its
+        // length-mismatch arm: empty raw lists and a zeroed active domain.
+        let witness = truck_geometry::nurbs::SplineSourceWitness {
+            entity_id: None,
+            raw_knots: Vec::new(),
+            raw_multiplicities: Vec::new(),
+            degree,
+            control_point_count: num_ctrl,
+            expanded_knots: Vec::new(),
+            active_domain: (0.0, 0.0),
+            first_inversion_index: None,
+        };
+        return Err(
+            truck_geometry::nurbs::SplineConstructionError::ControlPointCountMismatch { witness }
+                .into(),
+        );
+    }
     let division = num_ctrl - degree;
     let mut knots = KnotVec::uniform_knot(degree, division);
     knots.transform(division as f64, 0.0);
-    knots
+    Ok(knots)
 }
 
 /// `uniform_curve`
@@ -2763,35 +2777,58 @@ impl TryFrom<&BSplineSurfaceWithKnots> for BSplineSurface<Point3> {
 
         let u_degree = surface.u_degree as usize;
         let u_ctrl_count = ctrls.len();
-        let u_kv = match ValidatedKnotVector::validate(
+        let ctx = ToleranceCtx::unscaled_legacy();
+        let mut u_kv = ValidatedKnotVector::validate(
             uknots.clone(),
             umulti.clone(),
             u_degree,
             u_ctrl_count,
             None,
-        ) {
-            Ok(v) => v.into_inner(),
-            Err(e @ truck_geometry::nurbs::SplineConstructionError::UnsortedRawKnots { .. }) => {
-                return Err(e.into())
-            }
-            Err(_) => quasi_uniform_knots(u_ctrl_count, u_degree),
-        };
+        )?
+        .into_inner();
+        // A STEP exporter may parameterize a perfectly valid surface over a
+        // tiny, nonzero knot interval on the u axis. `BSplineSurface::try_new`
+        // treats any total u-axis range under `TOLERANCE` (absolute) as zero
+        // and refuses it, even though the source surface is well-formed.
+        // Normalizing the u knot vector to `[0, 1]` is an exact,
+        // shape-preserving reparameterization of the same surface, so it is
+        // the faithful recovery of the source geometry rather than an
+        // approximation. `ValidatedKnotVector::validate` has already proved
+        // the active domain exceeds `1e-12`; // H-3: dimensionless parameter-space bound, not a model length
+        // the active domain is a subinterval of the total range, so `range` is
+        // strictly positive and `transform` never divides by zero here.
+        if ctx.is_small_ratio(u_kv.range_length()) {
+            // BG-TOL-001: param
+            let range = u_kv.range_length();
+            u_kv.transform(1.0 / range, -u_kv[0] / range);
+        }
 
         let v_degree = surface.v_degree as usize;
         let v_ctrl_count = if ctrls.is_empty() { 0 } else { ctrls[0].len() };
-        let v_kv = match ValidatedKnotVector::validate(
+        let mut v_kv = ValidatedKnotVector::validate(
             vknots.clone(),
             vmulti.clone(),
             v_degree,
             v_ctrl_count,
             None,
-        ) {
-            Ok(v) => v.into_inner(),
-            Err(e @ truck_geometry::nurbs::SplineConstructionError::UnsortedRawKnots { .. }) => {
-                return Err(e.into())
-            }
-            Err(_) => quasi_uniform_knots(v_ctrl_count, v_degree),
-        };
+        )?
+        .into_inner();
+        // A STEP exporter may parameterize a perfectly valid surface over a
+        // tiny, nonzero knot interval on the v axis. `BSplineSurface::try_new`
+        // treats any total v-axis range under `TOLERANCE` (absolute) as zero
+        // and refuses it, even though the source surface is well-formed.
+        // Normalizing the v knot vector to `[0, 1]` is an exact,
+        // shape-preserving reparameterization of the same surface, so it is
+        // the faithful recovery of the source geometry rather than an
+        // approximation. `ValidatedKnotVector::validate` has already proved
+        // the active domain exceeds `1e-12`; // H-3: dimensionless parameter-space bound, not a model length
+        // the active domain is a subinterval of the total range, so `range` is
+        // strictly positive and `transform` never divides by zero here.
+        if ctx.is_small_ratio(v_kv.range_length()) {
+            // BG-TOL-001: param
+            let range = v_kv.range_length();
+            v_kv.transform(1.0 / range, -v_kv[0] / range);
+        }
 
         Ok(Self::try_new((u_kv, v_kv), ctrls)?)
     }
@@ -2879,12 +2916,12 @@ impl TryFrom<&QuasiUniformSurface> for BSplineSurface<Point3> {
     #[inline(always)]
     fn try_from(surface: &QuasiUniformSurface) -> Result<Self, StepConvertingError> {
         let uknots =
-            quasi_uniform_knots(surface.control_points_list.len(), surface.u_degree as usize);
+            quasi_uniform_knots(surface.control_points_list.len(), surface.u_degree as usize)?;
         let first = surface
             .control_points_list
             .first()
             .ok_or("control points list is empty.")?;
-        let vknots = quasi_uniform_knots(first.len(), surface.v_degree as usize);
+        let vknots = quasi_uniform_knots(first.len(), surface.v_degree as usize)?;
         let ctrls = surface
             .control_points_list
             .iter()
