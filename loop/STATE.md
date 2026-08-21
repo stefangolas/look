@@ -11,7 +11,7 @@ otherwise would eventually cost a trap.) If you are picking this up cold, read
 [`loop/ORCHESTRATOR.md`](ORCHESTRATOR.md) for how to run the loop, then
 `python loop/slot_status.py`** — nothing else. Do not read `LEDGER.jsonl` whole.
 
-Updated 2026-08-20, end of session 14. Branch: `integration/kernel-bg`. Nothing
+Updated 2026-08-21, close of session 15. Branch: `integration/kernel-bg`. Nothing
 from the loop has reached `main` and nothing has been pushed.
 
 ## What this is, if you have never seen it
@@ -55,122 +55,133 @@ here is scored, tuned, or sampled.
 
 ## Where we are
 
-**Forty-four packets DONE of 67 (66%).** Session 14 landed **five**:
-`BG-ANA-001-PARCYL`, `BG-ANA-001-EQRCYL`, `BG-ENC-003-NURBS`,
-`BG-ENC-004-PCURVE` (all ACCEPTED first try, `fault: NONE`) and
-`BG-ANA-001-PCONE` (ACCEPTED on attempt 2, `fault: PACKET` — the first
-attempt stopped at SPEC_GAP and was right to). That completes **all eight
-BG-ANA-001 analytic shards** and the whole BG-ENC-003 spline family.
-`truck-evidence` now has **143 lib tests + 3 integration** (measured at
-close). GATE-4 sits at **109/109**.
+**Forty-five packets DONE of 69 (65%).** Session 15 (overnight) landed **one**:
+`BG-S0-004` — the STEP spline importer now refuses invalid supplied knots
+instead of silently synthesizing quasi-uniform ones, with the surface-path
+tiny-range normalization added per axis. It came back `SPEC_GAP` on a real
+packet defect: decision 2's `is_small_ratio` predicates drove TOL-001
+bookkeeping (marker total 19 -> 21, GATE-4 ceiling 109 -> 110) outside the
+dispatched `write_allow`. Adjudicated per the BG-S0-002 precedent — packet
+sharpened, worker's commit amended with exactly the two number updates,
+verify ACCEPTED (`bdd8980`), fault `PACKET`. Ceiling sits at 110/110.
 
-**The mechanical era is over.** `schedule.py` at close shows a frontier of
-exactly two eligible rows — `BG-CE-001` and `BG-TOL-004`, both **design**.
-Everything else is DONE or explicitly gated: ISC `needs` BG-CE-002 (this
-session's adjudication), SHARED-CONE `needs` PCURVE+ISC, OFFSET is BLOCKED
-on the `EnclosureVectorField` interface, BG-NUM-002's BSPLINE/NURBS
-dependencies are now satisfied. From here the loop is orchestrator-written
-design packets, and the workers stop being the bottleneck by construction.
+Session 15 also **wrote and dispatched two design packets**, both in flight
+and unadjudicated at close (see "Pick up here" item 1):
 
-The session opened by root-causing the flaky plane gate (see "Pick up
-here" item 1, RESOLVED) — a test defect, not an enclosure defect; two
-sessions had misread it as a BG-ENC-001 under-estimation.
+- `BG-CE-001` (slot 2, attempt 2) — the per-use `pcurve: Option<PC>` field on
+  `truck_topology::Edge`. The packet's key verified fact: Rust's defaulted
+  type params apply in `impl` headers, so the ripple is exactly two files
+  (`lib.rs` struct + seven construction sites in `edge.rs`), not the 26-file
+  mention set; `BG-CE-001-MIGRATE` is discharged by this packet via `covers:`
+  because V8 gates every downstream crate's tests. Attempt 1 was reaped by
+  the watchdog after a machine-sleep false positive (trap below); restart
+  budget 1/3 used.
+- `BG-TOL-004` (slot 0, attempt 1) — degree-aware squared margins on
+  `ToleranceCtx`: `is_small_len2`/`length2_margin` (degree-2-in-length
+  quantities) and `is_small_ratio2` (the named scale-invariant tight floor
+  for the dimensionless `near2` family). The 20 excluded sites split into
+  four classes; classes 1-3 get these predicates in follow-up shards, class 4
+  (degree-3 triple products, homogeneous points, the `1/k` residual) stays
+  excluded for per-site redesign — the adjudication must be written into the
+  spec amendment when this packet lands.
 
-**Workers corrected the orchestrator three times this session and were
-right all three times**, which is the packet-design principle working:
-EQRCYL's ellipses are not mirror images (internal-bisector semi-major is
-`r/sin(θ/2)`, not `r/cos(θ/2)` — they coincide only at θ = π/2, exactly the
-case the packet verified); PCONE attempt 1 proved the packet's
-Δ2-decisive-zero parabola rule structurally unreachable (inari never
-degenerates a multi-step polynomial at a boundary) and its QUESTION.md
-forced the redesign that attempt 2 landed; PCONE attempt 2 caught an
-arithmetic typo in the amended packet's own witness (`q = (−3, 0, 9)`, not
-`(−3, 0, 5)`). All are in the spec's BG-ANA-001 amendment (entries 3–5).
+**One incident, fully recovered:** the watchdog redispatched the already
+landed `BG-ENC-004-PCURVE` at 01:53 (restart 1/3 in its log), because a PS
+5.1 registry edit had left a UTF-8 BOM in `PACKETS.jsonl` that silently
+disabled `packet_is_done`, and a `new_slot.py`-without-`run_packet.py` had
+left slot 0's stale `worker.pid`/`worker.packet` behind. The bogus
+RESULT-only commit (`7d330d5`) was archived
+(`loop/slots/0/misdispatched-pcurve-20260821-RESULT.json`) and re-forked
+away; the BOM is removed and the watchdog's read path verified against a
+known-DONE row. Three new traps below carry the mechanisms.
 
 ## Pick up here
 
-1. **`plane_enclose_is_sound` RESOLVED (session 14's first commit
-   `1dab417`)** — keep this entry one session for the root cause: **the
-   enclosure was correct; the test sampled one ulp outside its own
-   parameter box** (grid endpoint round-trip), so BG-ENC-001 was never
-   violated. Both samplers clamp now, the proptest seed is committed, and
-   the trap below ("sampling property test must clamp its grid") carries
-   the lesson. If the flake ever reappears, look for new unclamped grids,
-   not for the enclosure.
+1. **Two packets in flight, both needing verify + adjudication on wake.**
+   Slot 0 `BG-TOL-004` (pid 29964, branch `packet/BG-TOL-004`, base
+   `a377c0e`), slot 2 `BG-CE-001` (pid 7584, branch `packet/BG-CE-001`, base
+   `a377c0e`). When `RESULT.json` appears in either worktree: launch
+   `python loop/verify.py --slot N --packet loop/packets/BG-XXX.md --base a377c0e`
+   **detached**, poll `VERDICT.json`, and check its `packet`/`commit` fields
+   match before trusting it. Land per the usual protocol — CE-001's packet
+   carries `covers: [BG-CE-001-MIGRATE]`, so its landing closes two rows.
+   Both packets were baseline-clean (topology: 7 tests + 112 doctests, zero
+   clippy findings; truck-base: clean suite, zero clippy findings), so a V3
+   or V5 failure in an untouched file means the gate or the environment, not
+   the worker. If either returns SPEC_GAP, the BG-S0-004 amendment precedent
+   (this session) is the template: sharpen the packet, amend the commit,
+   re-verify.
 
-2. **The B-spline importer defect packet is the next natural mechanical
-   item, and its design seed is already in the tree.** Reproduced at close:
-   `truck-stepio`'s `input` binary fails `nurbs_curve_b_spline_surface_with_knots`,
-   `nurbs_surface_b_spline_surface_with_knots`, `b_spline_surface_with_knots`
-   with "The scalar 0 is not positive" — knot increments collapsing to zero
-   under cumulative rounding in the STEP importer. The already-landed
-   `b_spline_curve_with_knots_tiny_knot_interval_converts` test in
-   `tests/input/geometry.rs` carries the fix shape (normalize the knot
-   vector to `[0, 1]` — an exact, shape-preserving reparameterization);
-   generalize it across the curve/surface/NURBS conversion paths and make
-   a true-zero increment a typed refusal. Root-cause
-   `truck-stepio/src/in/` before writing the packet (BG-EVD-004-r2 is the
-   defect-packet worked example).
+2. **After CE-001 lands, stage 1 opens.** Dispatch `BG-INV-104`
+   (mechanical, its deps are DONE) immediately; write the `BG-CE-002` and
+   `BG-CE-003` design packets. CE-003 is the risky one — the
+   `EntityId`/`Selector`/`OpId` algebra is half-designed (`Selector`, `OpId`
+   and `Op` are defined nowhere in the tree; the standalone-algebra approach
+   from session 9's scoping notes still holds). Re-derive every anchor and
+   dependency against the live tree before writing either packet — the
+   handoff rule that has been right every time it was checked.
 
-3. **The design queue is the whole frontier now**: `BG-CE-001` (25 files
-   mention `Edge<` across six crates — the write set is determinable now;
-   the spec carries the struct) and `BG-TOL-004` (squared-order tolerances
-   in a scale-relative system; 23 sites wait). Then `BG-EVD-005`,
-   `BG-TOL-005`, `BG-NUM-002` (now unblocked), and the CE chain — note the
-   new dependency edges: **CE-002 unlocks ISC, ISC+PCURVE unlock
-   SHARED-CONE**, so the CE chain now has a mechanical fan-out at its far
-   end again. OFFSET stays BLOCKED on `EnclosureVectorField`.
+3. **Stage 2 is the user's defined breakpoint**: after CE-003 lands, the
+   seven INV rows (`BG-INV-101/102/103/104/105/108/109`) across all three
+   slots, then STOP and close cleanly. Arithmetic at that point: 56/69
+   (81%), 57/69 with TOL-004 landed. The tail after the breakpoint is gated
+   on FID-001 and NUM-003 (the FID chain, TOL-005, EVD-005, NUM-002/004,
+   ISC, SHARED-CONE), not on the CE chain.
 
-4. **The watchdog is STOPPED at close** (nothing in flight; all rows DONE —
-   the session-12 rationale). If you dispatch, start it with
-   `LOOK_WATCHDOG_STAGNANT=3600` via the `cmd /c "set ... && python
-   loop/watchdog.py"` incantation (PS 5.1 `Start-Process` has no
-   `-Environment`). Do NOT start a second one if one is somehow alive —
-   check `loop/watchdog.lock` and the process list first.
+4. **If the machine will sleep, stop the watchdog first** (`loop/watchdog.lock`
+   holds its pid). The workers survive sleep and resume on wake; the
+   watchdog does not know sleep happened and reaps on wake (trap below;
+   it already cost CE-001 attempt 1). Restart it with
+   `LOOK_WATCHDOG_STAGNANT=3600` via the `cmd /c` incantation when work
+   resumes.
 
-5. **Slot 2's worktree sits on `packet/BG-TOL-001-SMALL@72e2b89`** — that is
-   a stale leftover branch, NOT unlanded work (see the new trap: the packet
-   landed as `8f4f04d` in session 12). The next `new_slot.py --slot 2`
-   re-forks it; nothing to adjudicate.
+5. **Slot 1 sits idle on the landed PCONE leftover** (FINISHED, RESULT.json
+   still in its worktree — harmless, the next `new_slot.py` re-forks it).
+   It is the third dispatch slot the moment stage 1 opens.
 
 ## State of the machine, as left
 
-- **The watchdog is STOPPED** (killed pid 31172 + its PyManager shim 15388;
-  lock removed). All rows DONE, nothing in flight.
-- **Disk ~31 GB free** at close. Three warm slot targets (~4.3–4.5 GB
-  each); no leaked `%TEMP%/look-verify-baseline-*`.
-- **Five verifies ran, all ACCEPTED** (PCONE on its second attempt).
-  Baseline cache keys used: `34334c1` (PARCYL), `f33aff4` (EQRCYL and
-  PCONE-attempt-2, sequential), `ee7d977` (NURBS), `3b14e23` (PCURVE).
-- Slots 0 and 1 are FINISHED and warm on their landed branches
-  (`4618eee` PCURVE, `6ce3d26` PCONE); slot 2 on the stale SMALL branch
-  (see "Pick up here" item 5).
-- `loop/packets/` has **no undispatched mechanical packets** — PCURVE was
-  the last one written and it landed this session. The next packets to
-  exist are design-class or the importer-defect fix packet.
+- **Watchdog ALIVE, pid 29132** (`stagnant=3600s`, poll 60s) — covering both
+  in-flight workers. Restart budgets: BG-CE-001 1/3 used; the misdispatched
+  PCURVE restart is recorded but moot (the registry's DONE protection is
+  verified working again after the BOM fix).
+- **Two workers in flight**: slot 0 `BG-TOL-004` (pid 29964), slot 2
+  `BG-CE-001` (pid 7584, attempt 2 — attempt 1 was a machine-sleep false
+  reap, its abandoned diff archived in `loop/slots/2/abandoned-*.patch`).
+  Slot 1 idle on the landed PCONE leftover.
+- **Disk ~17 GB free and falling while two workers build** (27 GB before
+  their builds started; both slot targets warm, 4.5-6.0 GB each; no leaked
+  `%TEMP%/look-verify-baseline-*` at last check). **Check `Get-PSDrive C`
+  before running any verify** — each V5/V9 baseline builds a whole extra
+  workspace. The machine slept 02:10-08:45 (the heartbeat gap in
+  `watchdog.log` is the signature).
+- Registry: **45 DONE / 2 RUNNING / 20 SPECD / 2 BLOCKED** (69 rows).
+  Registry edits this session are python-only now — see the BOM trap.
+- `loop/packets/` gained `BG-CE-001.md` and `BG-TOL-004.md` (both
+  anchor-checked at dispatch); the misdispatch artifact is archived in
+  `loop/slots/0/`.
 
 ## The parallelism picture
 
-67 rows. **Frontier: 2 eligible, both design** (`BG-CE-001` W3c,
-`BG-TOL-004` W2b) — measured by `schedule.py` at close, after all five of
-this session's landings. Open rows by class: 10 mechanical, 12 design,
-1 wide-mechanical — **every open mechanical row is gated, none eligible**:
-the six INV-1xx checkers wait on `BG-CE-003` (INV-104 on CE-001, INV-106 on
-FID-001), SHARED-CONE waits on PCURVE+ISC, ISC waits on CE-002, OFFSET and
-INV-107 are BLOCKED, CE-001-MIGRATE waits on CE-001. So the mechanical era
-is not permanently over — **the CE chain (CE-001 → CE-003, with CE-002 for
-ISC) re-opens a seven-packet mechanical fan-out at its far end**. The
-fan-out pattern (scaffolding → shared types → templated packets → 3
-concurrent workers) is fully proven — **ten consecutive first-try accepts**
-across sessions 13–14 (six + PARCYL, EQRCYL, NURBS, PCURVE), broken only by
-PCONE's packet-fault SPEC_GAP — and idles until that chain lands.
+69 rows. **In flight: 2** (`BG-CE-001` slot 2, `BG-TOL-004` slot 0 — the
+entire eligible frontier from session 14 is dispatched). Open rows by class:
+10 mechanical, 11 design, 1 wide-mechanical — every open mechanical row is
+still gated exactly as session 14 recorded: the six INV-1xx checkers wait on
+`BG-CE-003` (INV-104 on CE-001), SHARED-CONE on PCURVE+ISC, ISC on CE-002,
+OFFSET and INV-107 BLOCKED, CE-001-MIGRATE about to close with CE-001.
+**The CE chain re-opens the seven-packet mechanical fan-out at its far
+end** (CE-001 -> CE-003 -> INV wave), and stage 1 of that chain opens the
+moment CE-001 lands. The fan-out pattern (scaffolding -> shared types ->
+templated packets -> 3 concurrent workers) is fully proven; the bottleneck
+from here is orchestrator design time on CE-002/CE-003, exactly as
+predicted.
 
-What cost time this session was not the loop: the plane-flake root cause
-(worth it — the whole session gated on it), the PCONE SPEC_GAP round trip
-(the packet's fault, adjudicated into a spec amendment and a redesign),
-and one self-inflicted red-herring (the `--reset` re-fork mistake below).
-Worker cost stayed noise (~$0.06/packet); three workers ran concurrently
-without interference again.
+Session 15's cost picture: one landed packet (BG-S0-004, one dispatch, one
+amendment, first-try ACCEPT on the amended commit), two design packets
+written, one misdispatch paid for by a BOM and a half-finished slot reset
+(recovered with zero lost work — the PCURVE code was already landed), and
+one worker lost to a machine-sleep false reap. The lesson density of
+overnight unattended runs is high; the traps below are the receipts.
 
 ## Traps, each one paid for
 - **The watchdog's default 1200s wedged-killer kills healthy workers during a
@@ -811,6 +822,45 @@ reason is in the commit that made the change, and the code will not tell you.
   box directly). If a future packet hits a similar asymmetry, the
   signature is a composition whose empty/unbounded cases disagree with the
   inner carrier's own.
+
+- **PS 5.1 `Set-Content -Encoding UTF8` writes a BOM, and the watchdog's
+  `packet_is_done` dies on it silently.** Session 15's incident: a registry
+  edit made through PowerShell left `EF BB BF` at the head of
+  `PACKETS.jsonl`; `read_text(encoding="utf-8")` then prefixes line 1 with
+  U+FEFF, `json.loads` raises `ValueError`, and the `except` in
+  `packet_is_done` returns `False` — so **every packet reads not-DONE and
+  Rule B will redispatch a landed one.** At 01:53 it redispatched the
+  already-merged `BG-ENC-004-PCURVE` onto the freshly forked
+  `packet/BG-TOL-004` branch, where a worker dutifully re-verified the
+  landed code and committed a RESULT-only commit. Zero lost work (the code
+  was already in the tree), ~7 h of slot time and one worker run wasted.
+  The artifact is archived at
+  `loop/slots/0/misdispatched-pcurve-20260821-RESULT.json`. **Edit
+  `PACKETS.jsonl` only through python** (the loop scripts or a `python -c`
+  rewrite), and after any registry edit, run the watchdog's own read path
+  and confirm a known-DONE id still reads `True`:
+  `python -c "import json; rows={json.loads(l)['id']: json.loads(l)['status'] for l in open('loop/PACKETS.jsonl', encoding='utf-8') if l.strip()}; print(rows['BG-ENC-004-PCURVE'])"`
+- **`new_slot.py` alone leaves the slot looking like a dead worker.** It
+  resets the *worktree* but not `worker.pid` / `worker.packet` /
+  `worker.branch` in the slot root, so a forked-but-not-yet-dispatched slot
+  presents the previous packet's dead pid and stagnant events to the
+  watchdog — which Rule-B's the *previous* packet onto the *new* branch
+  (`run_packet.py` does not re-fork; that half is the older trap). The
+  PCURVE misdispatch needed both halves of this: stale slot files AND the
+  BOM-blinded DONE check — with the registry intact, `packet_is_done` would
+  have held. **Fork and dispatch in one motion; if a forked slot must be
+  left idle, delete its `worker.pid` / `worker.packet` / `worker.branch`
+  first.**
+- **Machine sleep reads as stagnation, and the watchdog reaps on wake.**
+  The watchdog's clock is wall time; sleep freezes `events.jsonl` but not
+  the clock, so a worker that slept 6.9 h (02:10–08:45, the heartbeat gap
+  in `watchdog.log` is the signature) presents exactly like a wedged one
+  and is killed and redispatched on the first poll after wake — CE-001
+  attempt 1 died this way having done nothing wrong. The workers
+  themselves survive sleep and resume fine. **If the machine will sleep
+  (lid close, overnight), stop the watchdog first** (pid in
+  `loop/watchdog.lock`) and restart it when the session resumes; restart
+  budgets absorb one such reap, but each one wastes a worker's progress.
 
 ## The commands
 
