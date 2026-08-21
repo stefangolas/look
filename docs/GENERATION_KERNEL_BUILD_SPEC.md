@@ -1019,6 +1019,42 @@ two *different* pcurves — the case §1 says is otherwise impossible.
   evaluation over the whole span** (BG-ENC-001), not by sampling. Sampling here
   is the classic false pass.
 
+**Design (2026-08-21, the packet).** `certify_deviation(leader, carrier, phi,
+tt, tau, budget) -> Outcome<f64>` in `truck-evidence/src/deviation.rs`, where
+`phi` is the affine `ParamMap { scale, offset }` (identity, flip, or a range
+map). Two routes, both measured against the real carriers before dispatch:
+
+- **Route 1 (the main path): the difference spline.** When both sides expose
+  themselves exactly as `BSplineCurve<Point3>` (new `EnclosureCurve::
+  exact_spline` default `None`, overridden for plain splines and — via the new
+  `EnclosureSurface::as_plane` — for the exactly-affine
+  `PCurve<BSplineCurve<Point2>, Plane>` composition) and `phi` is identity or a
+  flip, the certificate forms `leader∘phi − carrier` *as a spline* (affine knot
+  map, reversal at full-multiplicity endpoints, degree elevation to match,
+  exact-count knot merge, coefficientwise subtraction — cgmath point minus
+  point is a Vector, so differences are built coordinatewise) and hulls it by
+  the convex-hull property over the pre-raised span. This kills the interval
+  dependency problem: an exact-agreement pair certifies **one-shot** (measured
+  bound 2.5e-14 at tau = 1e-6, zero subdivisions), and a pair offset by 2·tau
+  refuses decisively one-shot (lower bound 2·tau). Subdivision by exact-cut
+  bisection, budgeted, handles everything between.
+- **Route 2 (the fallback): box-minus-box bisection.** For carriers with no
+  exact spline (lines, circles, NURBS, curved-surface pcurves), the residual
+  box per cell is `carrier.enclose(t) − leader.enclose(phi(t))` with per-axis
+  interval subtraction and a norm bound over the box; adaptive bisection under
+  `Budget` with a midpoint-representability floor. Honest but
+  `O((‖c'‖+‖l'‖)·span/tau)` cells — measured ~130 µs per cell for spline
+  carriers, minutes per edge at tau = 1e-6 — which is exactly why route 1
+  exists and why the budget is the contract.
+
+Refusals: `Empty` (empty/non-finite span), `ForwardToleranceExceeded { bound,
+allowed }` (a certified *lower* bound on some cell's deviation exceeds tau —
+the violation proof), `NumericallyUnresolved { spent, witness }` with the new
+`UnresolvedWitness::DeviationUncertified` when neither holds within budget.
+`tau` needs no validity guard: nonpositive or NaN tau is refused by the loop's
+own logic. The certificate carries `Method::Interval` and
+`Prop::SoundEnclosure`.
+
 **Tests.**
 - Unit: a full cylinder built by `rsweep` carries a seam edge with two uses whose
   pcurves differ by exactly the period.
@@ -1032,6 +1068,30 @@ two *different* pcurves — the case §1 says is otherwise impossible.
 ### BG-CE-003 — Immutable geometry, construction-derived identity
 
 **Implements** §20. **Fixes** audit D-2.
+
+**Scope split (2026-08-21, the packet).** The item lands in two rows. The
+**design head** is the standalone identity algebra — `EntityId`/`OpId`/`Op`/
+`OpKind`/`OpParams`/`Selector`/`End` in `truck-topology/src/entity_id.rs`,
+with no truck geometry types, no `Mutex`, no `Arc`, property-tested,
+serde-round-tripped, and one stable hasher (FNV-1a over the `Hash` byte
+stream finalized by MurmurHash3's `fmix64`, pinned by known-answer constants)
+so identity is a pure function of construction content. `OpId` is the stable
+content hash of an `Op { kind, params }`; `OpKind` is a closed vocabulary of
+the tree's real construction verbs (Primitive, Sweep, Loft, Attach, Boolean,
+Fillet, Offset, Transform); `OpParams` is a closed value language
+(Unit/Bool/Index/Scalar/Point/Matrix/List) with **bit-wise** float equality
+and hashing (`f64` implements neither `Eq` nor `Hash` in std; `-0.0` and
+`0.0` are different constructions, NaN is id-stable by bit pattern);
+`Selector` is a closed structural vocabulary (BoundaryWire, WireEdge, End,
+Seam, Apex, Pole) that carries no coordinates at all — the "never a geometric
+query" rule made structural. `truck-topology`'s pre-existing
+`compress::SourceEntityId` (STEP-import metadata, a different type for the
+same role) is fenced off, not wired. The **wide-mechanical tail** —
+`Arc<Mutex<G>>` → `Arc<G>`, the mapped/set_point replacement API, the 12
+documented deadlock warnings, and the 8-rayon-thread regression test — is
+**BG-CE-003-MIGRATE**, its own row, gated on the algebra landing.
+BG-CE-005's regeneration totality stays open design (it needs a regeneration
+subsystem, not just the algebra).
 
 **Problem.** Geometry lives in `Arc<Mutex<_>>` with 12 documented deadlock
 hazards — `rg -n 'will result in a deadlock' truck-topology/src`, **expect 12**
@@ -1281,6 +1341,21 @@ pub trait EnclosureSurface: ParametricSurface<Point = Point3> {
 **BG-ENC-002 (Convergence).** `width(enclose(box)) → 0` as `width(box) → 0`, at
 worst linearly for analytic carriers and quadratically under subdivision for
 B-splines. Required for BG-NUM termination.
+
+**Amendment (2026-08-21, found while writing BG-CE-002's packet).** The
+B-spline-backed carriers violated this in the **terminal strip** of every knot
+range: within `tau_rep` (1e-6 at the legacy scale) of a knot, the sub-curve
+extraction helper `knot_multiplicity` (one copy each in `bspline.rs`,
+`decorators/pcurve.rs`, `nurbs.rs`) counted neighbouring *distinct* knot values
+as copies of the cut parameter — `KnotVec::multiplicity` matches by tolerance —
+so `raise_to_full_multiplicity` under-inserted, the extracted "sub-curve"
+spanned a much larger piece, and the hull plateaued at the wide hull instead of
+converging (measured: the enclosure of `[1−w, 1]` stops shrinking for every
+`w < 1e-6`). Sound throughout — over-estimation, never under-estimation — but
+non-convergent, and nothing caught it because no landed test bisects into the
+strip. BG-CE-002's packet fixes all three copies (count exact matches only) and
+lands the regression tests. Any future consumer that subdivides enclosures is
+a consumer of this fix.
 
 **BG-ENC-003 (Outward rounding).** All interval arithmetic rounds outward. Never
 compile enclosure code with fast-math or FMA contraction that could round inward.
