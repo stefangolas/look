@@ -24,6 +24,10 @@ fn interval_at(x: f64) -> Interval {
 }
 
 impl EnclosureSurface for Plane {
+    fn as_plane(&self) -> Option<&Plane> {
+        Some(self)
+    }
+
     fn enclose(&self, uu: Interval, vv: Interval) -> Box3 {
         // S = o + u·a + v·b with a = p−o, b = q−o. Each coordinate is
         // o_c + uu·a_c + vv·b_c in interval arithmetic: affine, hence exact.
