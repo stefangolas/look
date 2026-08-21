@@ -55,7 +55,7 @@ here is scored, tuned, or sampled.
 
 ## Where we are
 
-**Forty-five packets DONE of 69 (65%).** Session 15 (overnight) landed **one**:
+**Forty-six packets DONE of 69 (67%).** Session 15 (overnight) landed **two**:
 `BG-S0-004` — the STEP spline importer now refuses invalid supplied knots
 instead of silently synthesizing quasi-uniform ones, with the surface-path
 tiny-range normalization added per axis. It came back `SPEC_GAP` on a real
@@ -65,25 +65,16 @@ dispatched `write_allow`. Adjudicated per the BG-S0-002 precedent — packet
 sharpened, worker's commit amended with exactly the two number updates,
 verify ACCEPTED (`bdd8980`), fault `PACKET`. Ceiling sits at 110/110.
 
-Session 15 also **wrote and dispatched two design packets**, both in flight
-and unadjudicated at close (see "Pick up here" item 1):
+`BG-TOL-004` — the degree-aware squared margins on `ToleranceCtx`
+(`is_small_len2` / `length2_margin` / `is_small_ratio2`), first-try ACCEPTED
+(`28f00cc`, fault NONE). The worker caught a one-ulp arithmetic error in the
+packet's own boundary test spec (the PCONE-witness trap, this time mine) and
+adapted faithfully — recorded in its `disagreements`, filed verbatim in
+`loop/results/BG-TOL-004.json`. The four-class site adjudication is now in
+the spec; classes 1-3 are follow-up migration shards, class 4 stays open
+design.
 
-- `BG-CE-001` (slot 2, attempt 2) — the per-use `pcurve: Option<PC>` field on
-  `truck_topology::Edge`. The packet's key verified fact: Rust's defaulted
-  type params apply in `impl` headers, so the ripple is exactly two files
-  (`lib.rs` struct + seven construction sites in `edge.rs`), not the 26-file
-  mention set; `BG-CE-001-MIGRATE` is discharged by this packet via `covers:`
-  because V8 gates every downstream crate's tests. Attempt 1 was reaped by
-  the watchdog after a machine-sleep false positive (trap below); restart
-  budget 1/3 used.
-- `BG-TOL-004` (slot 0, attempt 1) — degree-aware squared margins on
-  `ToleranceCtx`: `is_small_len2`/`length2_margin` (degree-2-in-length
-  quantities) and `is_small_ratio2` (the named scale-invariant tight floor
-  for the dimensionless `near2` family). The 20 excluded sites split into
-  four classes; classes 1-3 get these predicates in follow-up shards, class 4
-  (degree-3 triple products, homogeneous points, the `1/k` residual) stays
-  excluded for per-site redesign — the adjudication must be written into the
-  spec amendment when this packet lands.
+Still in flight at close (see "Pick up here" item 1): `BG-CE-001` only.
 
 **One incident, fully recovered:** the watchdog redispatched the already
 landed `BG-ENC-004-PCURVE` at 01:53 (restart 1/3 in its log), because a PS
@@ -97,20 +88,19 @@ known-DONE row. Three new traps below carry the mechanisms.
 
 ## Pick up here
 
-1. **Two packets in flight, both needing verify + adjudication on wake.**
-   Slot 0 `BG-TOL-004` (pid 29964, branch `packet/BG-TOL-004`, base
-   `a377c0e`), slot 2 `BG-CE-001` (pid 7584, branch `packet/BG-CE-001`, base
-   `a377c0e`). When `RESULT.json` appears in either worktree: launch
-   `python loop/verify.py --slot N --packet loop/packets/BG-XXX.md --base a377c0e`
+1. **One packet in flight, needing verify + adjudication on wake.**
+   Slot 2 `BG-CE-001` (pid 7584, branch `packet/BG-CE-001`, base
+   `a377c0e`). When `RESULT.json` appears in its worktree: launch
+   `python loop/verify.py --slot 2 --packet loop/packets/BG-CE-001.md --base a377c0e`
    **detached**, poll `VERDICT.json`, and check its `packet`/`commit` fields
-   match before trusting it. Land per the usual protocol — CE-001's packet
+   match before trusting it. Land per the usual protocol — the packet
    carries `covers: [BG-CE-001-MIGRATE]`, so its landing closes two rows.
-   Both packets were baseline-clean (topology: 7 tests + 112 doctests, zero
-   clippy findings; truck-base: clean suite, zero clippy findings), so a V3
-   or V5 failure in an untouched file means the gate or the environment, not
-   the worker. If either returns SPEC_GAP, the BG-S0-004 amendment precedent
-   (this session) is the template: sharpen the packet, amend the commit,
-   re-verify.
+   The packet was baseline-clean (topology: 7 tests + 112 doctests, zero
+   clippy findings), so a V3 or V5 failure in an untouched file means the
+   gate or the environment, not the worker. If it returns SPEC_GAP, the
+   BG-S0-004 amendment precedent (this session) is the template: sharpen
+   the packet, amend the commit, re-verify. Slot 0 is warm and free for the
+   next dispatch the moment CE-001's verdict is in.
 
 2. **After CE-001 lands, stage 1 opens.** Dispatch `BG-INV-104`
    (mechanical, its deps are DONE) immediately; write the `BG-CE-002` and
@@ -145,17 +135,18 @@ known-DONE row. Three new traps below carry the mechanisms.
   in-flight workers. Restart budgets: BG-CE-001 1/3 used; the misdispatched
   PCURVE restart is recorded but moot (the registry's DONE protection is
   verified working again after the BOM fix).
-- **Two workers in flight**: slot 0 `BG-TOL-004` (pid 29964), slot 2
-  `BG-CE-001` (pid 7584, attempt 2 — attempt 1 was a machine-sleep false
-  reap, its abandoned diff archived in `loop/slots/2/abandoned-*.patch`).
-  Slot 1 idle on the landed PCONE leftover.
-- **Disk ~17 GB free and falling while two workers build** (27 GB before
-  their builds started; both slot targets warm, 4.5-6.0 GB each; no leaked
-  `%TEMP%/look-verify-baseline-*` at last check). **Check `Get-PSDrive C`
-  before running any verify** — each V5/V9 baseline builds a whole extra
-  workspace. The machine slept 02:10-08:45 (the heartbeat gap in
-  `watchdog.log` is the signature).
-- Registry: **45 DONE / 2 RUNNING / 20 SPECD / 2 BLOCKED** (69 rows).
+- **One worker in flight**: slot 2 `BG-CE-001` (pid 7584, attempt 2 —
+  attempt 1 was a machine-sleep false reap, its abandoned diff archived in
+  `loop/slots/2/abandoned-*.patch`). Slot 0 landed TOL-004 and sits FINISHED
+  on `packet/BG-TOL-004@28f00cc` (warm, free for the next `new_slot`); slot
+  1 idle on the landed PCONE leftover.
+- **Disk ~17 GB free at close** (the TOL-004 verify's baseline and CE-001's
+  builds consumed the session's headroom; both slot targets warm, no leaked
+  `%TEMP%/look-verify-baseline-*` after the verify's cleanup). **Check
+  `Get-PSDrive C` before running any verify** — each V5/V9 baseline builds
+  a whole extra workspace. The machine slept 02:10-08:45 (the heartbeat gap
+  in `watchdog.log` is the signature).
+- Registry: **46 DONE / 1 RUNNING / 20 SPECD / 2 BLOCKED** (69 rows).
   Registry edits this session are python-only now — see the BOM trap.
 - `loop/packets/` gained `BG-CE-001.md` and `BG-TOL-004.md` (both
   anchor-checked at dispatch); the misdispatch artifact is archived in
@@ -163,8 +154,8 @@ known-DONE row. Three new traps below carry the mechanisms.
 
 ## The parallelism picture
 
-69 rows. **In flight: 2** (`BG-CE-001` slot 2, `BG-TOL-004` slot 0 — the
-entire eligible frontier from session 14 is dispatched). Open rows by class:
+69 rows. **In flight: 1** (`BG-CE-001` slot 2 — TOL-004, the other half of
+the session-14 frontier, landed at close). Open rows by class:
 10 mechanical, 11 design, 1 wide-mechanical — every open mechanical row is
 still gated exactly as session 14 recorded: the six INV-1xx checkers wait on
 `BG-CE-003` (INV-104 on CE-001), SHARED-CONE on PCURVE+ISC, ISC on CE-002,

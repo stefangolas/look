@@ -876,6 +876,39 @@ reason for one of them called the quantity "a length-squared quantity" while
 applying the length predicate anyway. An exclusion that lives only in one
 worker's inline comment is an exclusion the next worker will not find.
 
+**BG-TOL-004 adjudication (2026-08-21).** `ToleranceCtx` now carries the
+squared companions `length2_margin()` / `is_small_len2(q)` (degree-2-in-length
+quantities: `q <= (tau_rep * model_scale)^2`, the sqrt-free form of
+`is_small_len`, marginally different from it by one ulp at the boundary *by
+construction* — the squared form is the predicate, not an approximation) and
+`is_small_ratio2(x)` (the named tight floor `|x| <= tau_rep^2` for
+degree-ZERO quantities — knot-normalization and Newton-convergence checks —
+deliberately unscaled because degree zero is scale-invariant). The 20
+excluded sites adjudicate into four classes:
+
+1. **Squared-distance comparisons** (`distance2 <= TOLERANCE2`): first-order
+   predicates written squared to skip a `sqrt`; migrate to
+   `is_small_len2` / `length2_margin()`.
+2. **Genuine degree-2 quantities** (cross-product magnitudes, areas): same
+   predicate, `is_small_len2`.
+3. **Dimensionless tight floors** (`knot(i).near2(&1.0)`,
+   `next.near2(&param)`): degree zero, scale-invariant as written; migrate to
+   `is_small_ratio2` with behaviour preserved exactly (no loosening to
+   `is_small_ratio` without a per-site adjudication that accepts the 10^6
+   widening).
+4. **Dimensionally incoherent** (degree-3 triple products in
+   `meshalgo/analyzers/collision.rs`, homogeneous-point comparisons in the
+   nurbs `near2_as_curve` family, the `1/k` residual at
+   `rbf_surface/contact_circle.rs`): no single predicate fits; these stay
+   excluded for **per-site redesign** (normalize to a first-order quantity
+   first, or argue their case individually) and are not sharded until that
+   argument is made.
+
+Classes 1-3 are the follow-up migration shards' work; class 4 is design work
+that stays open. Recording the classes here is what stops a future shard from
+"migrating" a class-4 site onto a class-1 predicate — the failure mode this
+whole section exists to prevent.
+
 **A `const fn` cannot be migrated at Stage A at all.** Added 2026-08-19, from a
 worker's report on `BG-TOL-001-GEOM-NURBS`.
 `truck-geometry/src/nurbs/mod.rs:186` is
