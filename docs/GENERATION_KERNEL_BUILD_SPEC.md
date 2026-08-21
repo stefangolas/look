@@ -1302,6 +1302,16 @@ The F-1 regression test itself moves with the wiring.
   and assert the checker *fails*. A checker never exercised against a violator is
   assumed broken.
 
+**Amendment (2026-08-21, BG-INV-104 attempt 1's SPEC_GAP).** The same-parameter
+checker lives in `truck-topology/src/invariants/` but calls
+`truck-evidence`'s certificate — and truck-topology's manifest declared no such
+dependency. The edge `truck-topology → truck-evidence` (+ `inari`; and
+`truck-geometry` as a dev-dependency for the witnesses) is **acyclic**
+(truck-evidence depends on truck-base/geometry/geotrait, not on topology) and
+is wired by BG-INV-104's packet as its decision 0. Any future checker in the
+invariants tree that speaks interval certificates uses the same edge — it is
+the intended layering, not an accident.
+
 ---
 
 ## 3. Stage 2 — certified evaluation interface

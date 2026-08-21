@@ -24,6 +24,8 @@ class:       mechanical
 crates:      [truck-topology]
 write_allow:
   - vendor/truck/truck-topology/src/invariants/same_parameter.rs
+  - vendor/truck/truck-topology/Cargo.toml
+  - Cargo.lock
 read_allow:
   - vendor/truck/truck-topology/src/invariants/mod.rs
   - vendor/truck/truck-topology/src/edge.rs
@@ -47,10 +49,12 @@ anchors:
   - {id: A6, expect: 1, cmd: "grep -c 'pub struct ParamMap' vendor/truck/truck-evidence/src/deviation.rs"}
   - {id: A7, expect: 1, cmd: "grep -c 'SameParameter' vendor/truck/truck-base/src/evidence.rs"}
   - {id: A8, expect: 0, cmd: "grep -c 'pub fn' vendor/truck/truck-topology/src/invariants/same_parameter.rs"}
+  - {id: A9, expect: 0, cmd: "grep -c 'truck-evidence' vendor/truck/truck-topology/Cargo.toml"}
 ```
 
-(A8 pins the scaffold as EMPTY; `grep -c` exits 1 on zero matches, which IS
-the expected count.)
+(A8 pins the scaffold as EMPTY and A9 pins the manifest BEFORE the wiring;
+`grep -c` exits 1 on zero matches, which IS the expected count. Attempt 1
+verified all eight original anchors against this same tree.)
 
 ## Problem
 
@@ -75,7 +79,42 @@ budgeted bisection otherwise) and your checker is a thin adapter over it.
 
 ## Decisions already made for you
 
-1. **The public API, verbatim:**
+### 0. The dependency wiring — your FIRST change
+
+**This packet is the first invariant checker that needs crates truck-topology
+does not yet depend on** (found by attempt 1, whose worker implemented the
+whole checker, hit E0432 on `use truck_evidence::…` / `use inari::…`, and
+correctly stopped). The dependency edge is legal — truck-evidence does NOT
+depend on truck-topology, so no cycle — and it is yours to land, exactly this
+way:
+
+In `vendor/truck/truck-topology/Cargo.toml`, under `[dependencies]` (the
+versions and path style of the existing entries; keep alphabetical order,
+which is the file's convention):
+
+```toml
+inari = { version = "2.0", default-features = false }
+truck-evidence = { version = "0.1.0", path = "../truck-evidence" }
+```
+
+and under `[dev-dependencies]` (which currently holds the `serde_json`
+dev-dependency BG-CE-003 landed):
+
+```toml
+truck-geometry = { version = "0.5.0", path = "../truck-geometry" }
+```
+
+(Read the manifest FIRST and use each dependency's exact declared form —
+copy the version/path style from how truck-base declares its siblings in the
+same file; the versions above are what the sibling manifests use, verify by
+reading `vendor/truck/truck-evidence/Cargo.toml` and
+`vendor/truck/truck-geometry/Cargo.toml`.) Then run
+`cargo check -p truck-topology` ONCE WITHOUT `--locked` to update the root
+`Cargo.lock`, and commit the manifest and lock together — a `--locked` run
+before the lock is updated will refuse. The lock gains dependency edges for
+truck-topology; that is the expected diff.
+
+### 1. The public API, verbatim:
 
    ```rust
    use crate::Edge;
