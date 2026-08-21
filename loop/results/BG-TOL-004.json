@@ -1,0 +1,16 @@
+{
+  "id": "BG-TOL-004",
+  "status": "DONE",
+  "contracts": ["BG-TOL-004"],
+  "tests_added": 4,
+  "sites_migrated": 0,
+  "sites_deferred": 0,
+  "deviations": [
+    "is_small_len2_scales_quadratically: the packet specifies is_small_len2(100.0 * TOLERANCE2) == true at scale 10.0, but in double arithmetic the margin (TOLERANCE * 10.0)^2 rounds to 9.999999999999998e-11 while 100.0 * TOLERANCE2 rounds to 1e-10, so the boundary value is one ulp ABOVE the margin and the assertion is false as specified. Kept the test name and intent (scale-10 margin ~= 100 * TOLERANCE2, quadratic not linear) using 50.0 * TOLERANCE2 (strictly inside the margin) and 200.0 * TOLERANCE2 (strictly outside); assertions are exact."
+  ],
+  "disagreements": [
+    "The packet's claim 'is_small_len2(100.0 * TOLERANCE2) is true' at model_scale 10.0 does not hold against the tree's float arithmetic: length2_margin() is DEFINED as length_margin() * length_margin() and computes to 9.999999999999998e-11, which is one ulp below 100.0 * TOLERANCE2 (computed as 100.0 * (TOLERANCE * TOLERANCE)). This is the same ulp-boundary phenomenon the packet itself documents for is_small_len2 vs is_small_len(q.sqrt()). The three methods as specified are semantically correct and were implemented as written; only the exact boundary constant in that one test assertion is not reachable as true, so the test was adjusted and the deviation recorded. The 20 excluded sites were untouched."
+  ],
+  "baseline_failures": [],
+  "notes": "Added length2_margin, is_small_len2, is_small_ratio2 to impl ToleranceCtx immediately after is_small_ratio (before entity_tau), docs matching the house voice of is_small_len/length_margin, reworded only to avoid a bare 1e-12 literal (H-3). Four inline #[test] fns added to tolerance.rs. Verified: anchors A1-A6 matched at baseline (0,1,1,1,1,1); post-change A2-A6 unchanged, A1 now 17 from the new len2/length2 names. cargo fmt --check -p truck-base, cargo clippy -p truck-base --all-targets --no-deps, cargo test -p truck-base --lib --tests --no-fail-fast, and cargo check --workspace --all-targets all pass. scripts/kernel-gates.sh a377c0e passes; GATE-4 unscaled_legacy still 110/110 (unchanged), H-3 clean. Only vendor/truck/truck-base/src/tolerance.rs was edited; no call sites migrated."
+}
