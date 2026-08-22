@@ -39,19 +39,13 @@
 //!   (piecewise-constant) hodograph does not represent in its sub-curve; the
 //!   hull therefore also includes `subs(lo)` and `subs(hi)` themselves.
 
-use crate::enclosure::{Box3, DirCone, EnclosureCurve};
+use crate::enclosure::{midpoint_ball_cone, Box3, DirCone, EnclosureCurve};
 use inari::Interval;
 use truck_base::cgmath64::control_point::ControlPoint;
-use truck_base::cgmath64::{InnerSpace, Point3, Vector3};
+use truck_base::cgmath64::{Point3, Vector3};
 use truck_base::tolerance::Tolerance;
 use truck_geometry::nurbs::BSplineCurve;
 use truck_geotrait::{Cut, ParametricCurve};
-
-/// The largest half-angle a [`DirCone`] can report. `asin` saturates at π/2,
-/// but the ulp nudge that guards the cone against inward rounding can push a
-/// near-π/2 half-angle slightly past it, so the clamp keeps the half-angle
-/// within its meaning as an angle.
-const MAX_HALF_ANGLE: f64 = core::f64::consts::PI;
 
 /// The relative outward pad per hull endpoint, as a multiple of `EPSILON`
 /// (deviation from decision 4's single `next_down`/`next_up` step).
@@ -66,12 +60,6 @@ const MAX_HALF_ANGLE: f64 = core::f64::consts::PI;
 /// measured escapes with margin; the pad is proportional to the coordinate
 /// magnitude because the rounding it absorbs is proportional to it.
 const HULL_PAD: f64 = 64.0 * f64::EPSILON;
-
-/// A degenerate interval from a runtime `f64`. Finite coordinates always
-/// construct; a NaN widens to the empty interval rather than panicking (H-1).
-fn interval_at(x: f64) -> Interval {
-    Interval::try_from((x, x)).unwrap_or(Interval::EMPTY)
-}
 
 /// Coordinate access without `Index`, which H-1's `clippy::indexing_slicing`
 /// denial bans. Both `Point3` and `Vector3` are `ControlPoint<f64>` and carry
@@ -286,40 +274,12 @@ impl EnclosureCurve for BSplineCurve<Point3> {
     }
 
     fn tangent_cone(&self, tt: Interval) -> Option<DirCone> {
-        // The ball-around-midpoint cone off the first hodograph's hull, the
-        // same construction decorators/extruded.rs uses for normals with
-        // "tangent" substituted for "normal". Let c be the hull's midpoint
-        // vector and h its half-width vector; every element of the hull lies
-        // within rho = ‖h‖ of c, so if rho < cn = ‖c‖ every element makes an
-        // angle of at most asin(rho / cn) with c. rho >= cn is exactly the
-        // case where the hull may contain the zero vector or straddle enough
-        // directions that no cone bounds it — the derivative crossing zero (a
-        // cusp or an inflection with horizontal tangent) — so None is the
-        // contract. rho rounds UP (.sup()) and cn DOWN (.inf()); the ratio,
-        // the asin and the normalize() are then nudged up by a few ulps so
-        // none of them can round the cone too narrow. This is sound but loose
-        // the same way extruded.rs's is: it bounds the hull, not the true
-        // derivative set.
-        let b = hull_of(&self.derivation(), tt);
-        let c = Vector3::new(b.x.mid(), b.y.mid(), b.z.mid());
-        let h = Vector3::new(b.x.wid() / 2.0, b.y.wid() / 2.0, b.z.wid() / 2.0);
-        let norm = |x: Interval, y: Interval, z: Interval| (x.sqr() + y.sqr() + z.sqr()).sqrt();
-        let rho = norm(interval_at(h.x), interval_at(h.y), interval_at(h.z)).sup();
-        let cn = norm(interval_at(c.x), interval_at(c.y), interval_at(c.z)).inf();
-        // The guard in the packet's order and form; `!(cn > rho)` is rejected
-        // by clippy's neg_cmp_op_on_partial_ord, and the finiteness tests make
-        // the two equivalent (they differ only on NaN). The empty box or a
-        // hull containing the origin yields NaN or zero cn.
-        if !cn.is_finite() || !rho.is_finite() || cn <= rho {
-            return None;
-        }
-        let axis = c.normalize();
-        let half_angle = (rho / cn).asin();
-        let half_angle = half_angle * (1.0 + 8.0 * f64::EPSILON) + 8.0 * f64::EPSILON;
-        Some(DirCone {
-            axis,
-            half_angle: half_angle.min(MAX_HALF_ANGLE),
-        })
+        // The shared midpoint-ball cone off the first hodograph's hull, the
+        // same construction every carrier shares; the details (rounding
+        // directions, refusal condition, ulp nudge and clamp) live in
+        // `crate::enclosure::midpoint_ball_cone`. This is sound but loose: it
+        // bounds the hull, not the true derivative set.
+        midpoint_ball_cone(&hull_of(&self.derivation(), tt))
     }
 }
 
@@ -329,8 +289,9 @@ impl EnclosureCurve for BSplineCurve<Point3> {
 #[allow(clippy::unwrap_used, clippy::expect_used)]
 mod tests {
     use super::*;
+    use crate::enclosure::interval_at;
     use crate::harness::assert_encloses_curve;
-    use truck_base::cgmath64::Point3;
+    use truck_base::cgmath64::{InnerSpace, Point3};
     use truck_geometry::nurbs::KnotVec;
 
     /// Build a test interval, degrading to EMPTY (and failing its assertion)

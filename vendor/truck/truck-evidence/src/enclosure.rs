@@ -18,7 +18,7 @@
 //! FMA without fast-math, so float results remain bit-identical.)
 
 pub use inari::Interval;
-use truck_base::cgmath64::{Point3, Vector3};
+use truck_base::cgmath64::{InnerSpace, Point3, Vector3};
 use truck_geometry::nurbs::BSplineCurve;
 use truck_geometry::specifieds::Plane;
 use truck_geotrait::{ParametricCurve, ParametricSurface};
@@ -79,6 +79,75 @@ pub struct DirCone {
     pub half_angle: f64,
 }
 
+/// A degenerate interval from a runtime `f64`. Finite coordinates always
+/// construct; a NaN widens to the empty interval rather than panicking (H-1).
+pub(crate) fn interval_at(x: f64) -> Interval {
+    Interval::try_from((x, x)).unwrap_or(Interval::EMPTY)
+}
+
+/// The interval cross product of two boxes, written out componentwise.
+///
+/// Sound but loose: it encloses `{ p x q : p in a, q in b }`, a superset of
+/// `{ S_u(x) x S_v(x) : x in box }` because it lets `p` and `q` vary
+/// independently where in truth they are evaluated at the same parameter
+/// point. Over-estimation is always acceptable (BG-ENC-001).
+pub(crate) fn cross_box(a: &Box3, b: &Box3) -> Box3 {
+    Box3 {
+        x: a.y * b.z - a.z * b.y,
+        y: a.z * b.x - a.x * b.z,
+        z: a.x * b.y - a.y * b.x,
+    }
+}
+
+/// The midpoint-ball direction cone of a derivative box: `Some(cone)` iff
+/// every element of the box lies within a half-angle `asin(rho/cn)` of the
+/// box's midpoint direction, with `rho = ‖h‖` rounded up and `cn = ‖c‖`
+/// rounded down so the f64 arithmetic cannot make the cone too narrow.
+/// `None` when the box may contain the zero vector or straddle enough
+/// directions that no cone bounds it — including any singular locus. That
+/// arm is the contract, not a convenience.
+pub(crate) fn midpoint_ball_cone(n: &Box3) -> Option<DirCone> {
+    let c = Vector3::new(n.x.mid(), n.y.mid(), n.z.mid());
+    let h = Vector3::new(n.x.wid() / 2.0, n.y.wid() / 2.0, n.z.wid() / 2.0);
+    let norm = |x: Interval, y: Interval, z: Interval| (x.sqr() + y.sqr() + z.sqr()).sqrt();
+    let rho = norm(interval_at(h.x), interval_at(h.y), interval_at(h.z)).sup();
+    let cn = norm(interval_at(c.x), interval_at(c.y), interval_at(c.z)).inf();
+    // `cn <= rho` is the packet's `!(cn > rho)` in clippy-clean form; the
+    // NaN cases that would otherwise make the negated comparison fire are
+    // caught by the finiteness tests, so the two are equivalent.
+    if !cn.is_finite() || !rho.is_finite() || cn <= rho {
+        return None;
+    }
+    let axis = c.normalize();
+    let half_angle =
+        ((rho / cn).asin() * (1.0 + 8.0 * f64::EPSILON) + 8.0 * f64::EPSILON).min(MAX_HALF_ANGLE);
+    Some(DirCone { axis, half_angle })
+}
+
+/// The smallest `‖·‖` over a derivative box:
+/// `sqrt(mig_x² + mig_y² + mig_z²)` — each coordinate attains its mignitude
+/// independently, so this is exactly the box's minimum norm, and since the
+/// box contains the true set it is a valid lower bound on the true minimum.
+/// Computed in inari and read from the LOWER endpoint (a bound one rounding
+/// unit too large is a soundness bug, not a tightness one). An empty or
+/// overflowing box contributes nothing: `0.0`.
+pub(crate) fn immersion_lower_bound_box(n: &Box3) -> f64 {
+    let norm = (interval_at(n.x.mig()).sqr()
+        + interval_at(n.y.mig()).sqr()
+        + interval_at(n.z.mig()).sqr())
+    .sqrt();
+    let bound = norm.inf();
+    if bound.is_finite() {
+        bound
+    } else {
+        0.0
+    }
+}
+
+/// The whole-sphere clamp for computed half-angles; keeps an ulp-nudged
+/// value from exceeding PI.
+const MAX_HALF_ANGLE: f64 = core::f64::consts::PI;
+
 /// Certified enclosure interface for parametric curves.
 pub trait EnclosureCurve: ParametricCurve<Point = Point3> {
     /// An enclosure of `{ self.subs(t) : t ∈ tt }` (BG-ENC-001).
@@ -126,6 +195,9 @@ pub trait EnclosureSurface: ParametricSurface<Point = Point3> {
 }
 
 #[cfg(test)]
+// Test-only allow: H-1 bans unwrap/expect on paths reachable from untrusted
+// geometry. Unit-test assertions on hand-built witnesses are not such a path.
+#[allow(clippy::unwrap_used, clippy::expect_used)]
 mod tests {
     use super::*;
     use inari::const_interval;
@@ -147,5 +219,116 @@ mod tests {
         let b = Box3::point(Point3::new(1.0, 2.0, 3.0));
         assert_eq!(b.width(), 0.0);
         assert!(b.contains(Point3::new(1.0, 2.0, 3.0)));
+    }
+
+    /// Build a test interval, degrading to EMPTY (and failing its assertion)
+    /// rather than panicking on a malformed bound.
+    fn iv(lo: f64, hi: f64) -> Interval {
+        Interval::try_from((lo, hi)).unwrap_or(Interval::EMPTY)
+    }
+
+    #[test]
+    fn midpoint_ball_cone_contains_off_axis_directions() {
+        // A small box around (2, 1, 0.5), well clear of the origin: the cone
+        // exists, and every box-corner direction must lie within the reported
+        // half-angle of the axis. Compared via dot products against
+        // cos(half_angle), with a slack const for float rounding.
+        let n = Box3 {
+            x: iv(1.9, 2.1),
+            y: iv(0.9, 1.1),
+            z: iv(0.4, 0.6),
+        };
+        let cone = midpoint_ball_cone(&n).expect("an off-axis box has a cone");
+        let corners = [
+            Vector3::new(1.9, 0.9, 0.4),
+            Vector3::new(1.9, 0.9, 0.6),
+            Vector3::new(1.9, 1.1, 0.4),
+            Vector3::new(1.9, 1.1, 0.6),
+            Vector3::new(2.1, 0.9, 0.4),
+            Vector3::new(2.1, 0.9, 0.6),
+            Vector3::new(2.1, 1.1, 0.4),
+            Vector3::new(2.1, 1.1, 0.6),
+        ];
+        const CORNER_SLACK: f64 = 1.0e-12; // H-3: float slack between two direction cosines, not a length
+        for corner in corners {
+            let d = corner.normalize();
+            let cos_angle = cone.axis.dot(d);
+            assert!(
+                cos_angle >= cone.half_angle.cos() - CORNER_SLACK,
+                "corner direction {d:?} escaped the cone (cos {cos_angle})"
+            );
+        }
+    }
+
+    #[test]
+    fn midpoint_ball_cone_refuses_when_the_box_straddles_the_origin() {
+        // A box symmetric about the origin: the midpoint direction is zero, so
+        // cn = 0 <= rho and no cone bounds the directions.
+        let straddling = Box3 {
+            x: iv(-1.0, 1.0),
+            y: iv(-0.5, 0.5),
+            z: iv(-2.0, 2.0),
+        };
+        assert!(midpoint_ball_cone(&straddling).is_none());
+        // A box containing the origin off-centre still contains the zero
+        // vector, so every direction is in its span and no cone bounds it.
+        let containing = Box3 {
+            x: iv(-0.1, 0.2),
+            y: iv(0.0, 0.5),
+            z: iv(-0.3, 0.1),
+        };
+        assert!(midpoint_ball_cone(&containing).is_none());
+        // The empty box has no directions at all.
+        assert!(midpoint_ball_cone(&Box3::empty()).is_none());
+    }
+
+    #[test]
+    fn cross_box_encloses_the_componentwise_formula() {
+        // a = (x:[1,2], y:[0,1], z:[-1,1]) and b = (x:[0,1], y:[2,2], z:[1,1]):
+        // the exact cross product at every corner combination is enumerable by
+        // hand, and the interval cross product must contain all of them.
+        let a = Box3 {
+            x: iv(1.0, 2.0),
+            y: iv(0.0, 1.0),
+            z: iv(-1.0, 1.0),
+        };
+        let b = Box3 {
+            x: iv(0.0, 1.0),
+            y: iv(2.0, 2.0),
+            z: iv(1.0, 1.0),
+        };
+        let p = cross_box(&a, &b);
+        for ax in [1.0, 2.0] {
+            for ay in [0.0, 1.0] {
+                for az in [-1.0, 1.0] {
+                    for bx in [0.0, 1.0] {
+                        let (by, bz) = (2.0, 1.0);
+                        let cx = ay * bz - az * by;
+                        let cy = az * bx - ax * bz;
+                        let cz = ax * by - ay * bx;
+                        assert!(
+                            p.x.contains(cx) && p.y.contains(cy) && p.z.contains(cz),
+                            "corner cross product ({cx}, {cy}, {cz}) escaped the box"
+                        );
+                    }
+                }
+            }
+        }
+        // A degenerate input reproduces the schoolbook result exactly:
+        // (2,3,1) x (1,0,4) = (3·4 − 1·0, 1·1 − 2·4, 2·0 − 3·1) = (12, −7, −3).
+        let d = Box3 {
+            x: iv(2.0, 2.0),
+            y: iv(3.0, 3.0),
+            z: iv(1.0, 1.0),
+        };
+        let e = Box3 {
+            x: iv(1.0, 1.0),
+            y: iv(0.0, 0.0),
+            z: iv(4.0, 4.0),
+        };
+        let q = cross_box(&d, &e);
+        assert_eq!(q.x, iv(12.0, 12.0));
+        assert_eq!(q.y, iv(-7.0, -7.0));
+        assert_eq!(q.z, iv(-3.0, -3.0));
     }
 }

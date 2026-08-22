@@ -22,41 +22,13 @@
 //! the `0.0` case of `immersion_lower_bound`. `plane.rs` and `line.rs` are the
 //! reference pattern for structure and doc tone.
 
-use crate::enclosure::{Box3, DirCone, EnclosureCurve, EnclosureSurface};
+use crate::enclosure::{
+    cross_box, immersion_lower_bound_box, interval_at, midpoint_ball_cone, Box3, DirCone,
+    EnclosureCurve, EnclosureSurface,
+};
 use inari::Interval;
-use truck_base::cgmath64::{InnerSpace, Vector3};
+use truck_base::cgmath64::Vector3;
 use truck_geometry::decorators::ExtrudedCurve;
-
-/// The largest half-angle a [`DirCone`] can report. `asin` saturates at π/2,
-/// but the ulp nudge that guards the cone against inward rounding can push a
-/// near-π/2 half-angle slightly past it, so the clamp keeps the half-angle
-/// within its meaning as an angle.
-const MAX_HALF_ANGLE: f64 = core::f64::consts::PI;
-
-/// A degenerate interval from a runtime `f64`. Finite coordinates always
-/// construct; a NaN widens to the empty interval rather than panicking (H-1).
-/// Duplicated from `plane.rs` / `line.rs`, which are outside this packet's
-/// write set; the sibling carriers copy it the same way rather than coupling on
-/// one shared definition.
-fn interval_at(x: f64) -> Interval {
-    Interval::try_from((x, x)).unwrap_or(Interval::EMPTY)
-}
-
-/// The interval cross product of two boxes, written out componentwise.
-///
-/// This is sound but loose: it encloses `{ p × q : p ∈ a, q ∈ b }`, which is a
-/// superset of `{ S_u(x) × S_v(x) : x ∈ box }` because it lets `p` and `q` vary
-/// independently when in truth they are evaluated at the same parameter point.
-/// Over-estimation is always acceptable (BG-ENC-001); tightening is not this
-/// module's job. In this impl `b` is a *degenerate* box (the extrusion vector
-/// is constant), so the looseness is small.
-fn cross_box(a: &Box3, b: &Box3) -> Box3 {
-    Box3 {
-        x: a.y * b.z - a.z * b.y,
-        y: a.z * b.x - a.x * b.z,
-        z: a.x * b.y - a.y * b.x,
-    }
-}
 
 /// An enclosure of `{ S_u(u, v) × S_v(u, v) : u ∈ uu, v ∈ vv }` for the
 /// extruded surface: the interval cross product of the two derivative boxes.
@@ -115,55 +87,16 @@ impl<C: EnclosureCurve<Vector = Vector3>> EnclosureSurface for ExtrudedCurve<C, 
     }
 
     fn normal_cone(&self, uu: Interval, vv: Interval) -> Option<DirCone> {
-        // Let c be the cross-product box's midpoint vector and h its half-width
-        // vector. Every element of the box lies within rho = ‖h‖ of c, so if
-        // rho < cn = ‖c‖ every element makes an angle of at most
-        // asin(rho / cn) with c. rho >= cn is exactly the case where the box
-        // may contain the zero vector or straddle enough directions that no
-        // cone bounds it — including the singular locus — so the None arm is
-        // the contract, not a convenience. rho rounds UP (inari .sup()) and cn
-        // DOWN (.inf()); the ratio, the asin and the normalize() are then
-        // nudged up by a few ulps so none of them can round the cone too
-        // narrow.
-        let n = normal_box(self, uu, vv);
-        let c = Vector3::new(n.x.mid(), n.y.mid(), n.z.mid());
-        let h = Vector3::new(n.x.wid() / 2.0, n.y.wid() / 2.0, n.z.wid() / 2.0);
-        let norm = |x: Interval, y: Interval, z: Interval| (x.sqr() + y.sqr() + z.sqr()).sqrt();
-        let rho = norm(interval_at(h.x), interval_at(h.y), interval_at(h.z)).sup();
-        let cn = norm(interval_at(c.x), interval_at(c.y), interval_at(c.z)).inf();
-        // `cn <= rho` is the packet's `!(cn > rho)` in clippy-clean form; the
-        // NaN cases that would otherwise make the negated comparison fire are
-        // caught by the finiteness tests, so the two are equivalent.
-        if cn <= rho || !cn.is_finite() || !rho.is_finite() {
-            return None;
-        }
-        let axis = c.normalize();
-        let half_angle = (rho / cn).asin();
-        let half_angle = half_angle * (1.0 + 8.0 * f64::EPSILON) + 8.0 * f64::EPSILON;
-        Some(DirCone {
-            axis,
-            half_angle: half_angle.min(MAX_HALF_ANGLE),
-        })
+        // The shared midpoint-ball cone off the cross-product box; the
+        // construction (rounding directions, refusal condition, ulp nudge and
+        // clamp) lives in `crate::enclosure::midpoint_ball_cone`.
+        midpoint_ball_cone(&normal_box(self, uu, vv))
     }
 
     fn immersion_lower_bound(&self, uu: Interval, vv: Interval) -> f64 {
-        // The smallest ‖n‖ over the cross-product box is
-        // sqrt(mig(n.x)² + mig(n.y)² + mig(n.z)²): each coordinate attains its
-        // mignitude independently, so this is exactly the box's minimum norm,
-        // and since the box contains the true set it is a valid lower bound on
-        // the true minimum. Compute in inari and return .inf() — a value one
-        // rounding unit too large is a soundness bug, not a tightness one. An
-        // empty or overflowing box contributes nothing, so 0.0 is the answer.
-        let n = normal_box(self, uu, vv);
-        let (mx, my, mz) = (n.x.mig(), n.y.mig(), n.z.mig());
-        if !mx.is_finite() || !my.is_finite() || !mz.is_finite() {
-            return 0.0;
-        }
-        let norm = (interval_at(mx).sqr() + interval_at(my).sqr() + interval_at(mz).sqr()).sqrt();
-        if !norm.inf().is_finite() {
-            return 0.0;
-        }
-        norm.inf()
+        // The shared mignitude-immersion lower bound off the cross-product box
+        // (`crate::enclosure::immersion_lower_bound_box`).
+        immersion_lower_bound_box(&normal_box(self, uu, vv))
     }
 }
 

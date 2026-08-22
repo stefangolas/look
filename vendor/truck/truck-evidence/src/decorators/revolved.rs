@@ -47,20 +47,13 @@
 //! replaced by endpoint evaluation.
 
 use crate::elementary::{cos, sin};
-use crate::enclosure::{Box3, DirCone, EnclosureCurve, EnclosureSurface};
+use crate::enclosure::{
+    cross_box, immersion_lower_bound_box, interval_at, midpoint_ball_cone, Box3, DirCone,
+    EnclosureCurve, EnclosureSurface,
+};
 use inari::Interval;
-use truck_base::cgmath64::{InnerSpace, Point3, Vector3};
+use truck_base::cgmath64::{Point3, Vector3};
 use truck_geometry::decorators::RevolutedCurve;
-
-/// A direction cone's half-angle is capped at π: at that spread the cone is
-/// the whole sphere of directions, and no angle can be wider (H-3).
-const MAX_CONE_HALF_ANGLE: f64 = core::f64::consts::PI;
-
-/// A degenerate interval from a runtime `f64`. Finite values always construct;
-/// a NaN widens to the empty interval rather than panicking (H-1).
-fn interval_at(x: f64) -> Interval {
-    Interval::try_from((x, x)).unwrap_or(Interval::EMPTY)
-}
 
 /// The interval enclosure of the `n`-th `v`-derivative of the rotation matrix
 /// about `axis`, for `v ∈ vv`.
@@ -127,17 +120,18 @@ fn u_part<C: EnclosureCurve<Vector = Vector3>>(
     }
 }
 
-/// The interval cross product of two boxes: an enclosure of
-/// `{ a × b : a ∈ A, b ∈ B }`.
-///
-/// Sound but loose for the same decorrelation reason as the matrix-box
-/// product above.
-fn cross_box(a: &Box3, b: &Box3) -> Box3 {
-    Box3 {
-        x: a.y * b.z - a.z * b.y,
-        y: a.z * b.x - a.x * b.z,
-        z: a.x * b.y - a.y * b.x,
-    }
+/// The interval cross product of the two partial enclosures of `surface` over
+/// the box: a box that encloses every `S_u(x) × S_v(x)` there, via the shared
+/// `crate::enclosure::cross_box`.
+fn normal_box<C: EnclosureCurve<Vector = Vector3>>(
+    surface: &RevolutedCurve<C>,
+    uu: Interval,
+    vv: Interval,
+) -> Box3 {
+    cross_box(
+        &surface.enclose_der(1, 0, uu, vv),
+        &surface.enclose_der(0, 1, uu, vv),
+    )
 }
 
 impl<C: EnclosureCurve<Vector = Vector3>> EnclosureSurface for RevolutedCurve<C> {
@@ -174,67 +168,18 @@ impl<C: EnclosureCurve<Vector = Vector3>> EnclosureSurface for RevolutedCurve<C>
     }
 
     fn normal_cone(&self, uu: Interval, vv: Interval) -> Option<DirCone> {
-        // One interval cross product serves both this method and
-        // `immersion_lower_bound`: the box of `{ S_u × S_v }` over the cell,
-        // built from the two partial enclosures.
-        let n = cross_box(
-            &self.enclose_der(1, 0, uu, vv),
-            &self.enclose_der(0, 1, uu, vv),
-        );
-        let c = Vector3::new(n.x.mid(), n.y.mid(), n.z.mid());
-        let h = Vector3::new(n.x.wid() / 2.0, n.y.wid() / 2.0, n.z.wid() / 2.0);
-        // Every element of the box lies within distance rho = ‖h‖ of the
-        // midpoint c, so if rho < ‖c‖ every element makes an angle of at most
-        // asin(rho / ‖c‖) with c. rho rounds up and ‖c‖ rounds down: each is
-        // the bound that can only widen the cone.
-        let rho = (interval_at(h.x).sqr() + interval_at(h.y).sqr() + interval_at(h.z).sqr())
-            .sqrt()
-            .sup();
-        let cn = (interval_at(c.x).sqr() + interval_at(c.y).sqr() + interval_at(c.z).sqr())
-            .sqrt()
-            .inf();
-        // rho >= cn is exactly the case where the box may contain the zero
-        // vector or straddle too many directions for any cone to bound —
-        // including a cell that reaches the axis, where the surface has no
-        // normal. The None arm is the contract, not a convenience. Written as
-        // `cn <= rho` rather than the equivalent `!(cn > rho)` because the
-        // finite checks below make the two identical and the direct form
-        // reads cleanly on partially ordered f64 (H-1).
-        if cn <= rho || !cn.is_finite() || !rho.is_finite() {
-            return None;
-        }
-        let axis = c.normalize();
-        // Nudge the half-angle upward by a few ulps so the f64 asin and the
-        // normalize() cannot round the cone too narrow; the clamp keeps the
-        // rounding from ever exceeding the whole sphere.
-        let half_angle = ((rho / cn).asin() * (1.0 + 8.0 * f64::EPSILON) + 8.0 * f64::EPSILON)
-            .min(MAX_CONE_HALF_ANGLE);
-        Some(DirCone { axis, half_angle })
+        // The shared midpoint-ball cone off the interval cross product of the
+        // two partial enclosures; the construction (rounding directions,
+        // refusal condition, ulp nudge and clamp) lives in
+        // `crate::enclosure::midpoint_ball_cone`.
+        midpoint_ball_cone(&normal_box(self, uu, vv))
     }
 
     fn immersion_lower_bound(&self, uu: Interval, vv: Interval) -> f64 {
-        let n = cross_box(
-            &self.enclose_der(1, 0, uu, vv),
-            &self.enclose_der(0, 1, uu, vv),
-        );
-        // The box's minimum norm is sqrt(mig_x² + mig_y² + mig_z²): each
-        // coordinate attains its mignitude independently, so this is exactly
-        // the box's smallest ‖·‖, and since the box contains the true set it
-        // is a valid lower bound on the true minimum. Computed in interval
-        // arithmetic and read from the lower endpoint so the directed rounding
-        // rounds down: a bound one rounding unit too large is a soundness bug,
-        // not a tightness one. It falls to exactly 0.0 when the cell reaches
-        // the axis, which is the answer the immersion margin wants.
-        let norm = (interval_at(n.x.mig()).sqr()
-            + interval_at(n.y.mig()).sqr()
-            + interval_at(n.z.mig()).sqr())
-        .sqrt();
-        let bound = norm.inf();
-        if bound.is_finite() {
-            bound
-        } else {
-            0.0
-        }
+        // The shared mignitude-immersion lower bound off the interval cross
+        // product of the two partial enclosures
+        // (`crate::enclosure::immersion_lower_bound_box`).
+        immersion_lower_bound_box(&normal_box(self, uu, vv))
     }
 }
 
