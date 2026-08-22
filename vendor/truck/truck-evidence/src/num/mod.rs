@@ -1,8 +1,12 @@
 //! BG-NUM: the certified numerical substrate.
 //!
-//! Two modules, both consuming the evidence algebra (`truck_base::evidence`)
+//! Three modules, all consuming the evidence algebra (`truck_base::evidence`)
 //! and interval arithmetic (`crate::enclosure`):
 //!
+//! - **`cluster`** (BG-NUM-004) — certified ball-overlap clustering: connected
+//!   components of certified ball overlap, each carrying a certified enclosing
+//!   ball. Position-independent: never grid quantisation, never transitive
+//!   closure of a nearness predicate.
 //! - **`roots`** (BG-NUM-002) — certified univariate root isolation by
 //!   Bernstein/Descartes subdivision. Every returned interval contains
 //!   exactly one root; multiple roots (an even sign-change count that never
@@ -15,6 +19,8 @@
 //! Scaffolded empty (BG-ENC-004's offset.rs pattern): each module records its
 //! contract and waits for its packet. House rules H-1..H-8 apply.
 
+/// BG-NUM-004: certified ball-overlap clustering (topology-free core).
+pub mod cluster;
 /// BG-NUM-003: the Krawczyk existence/uniqueness operator. Scaffolded empty;
 /// the packet fills it.
 pub mod krawczyk;
