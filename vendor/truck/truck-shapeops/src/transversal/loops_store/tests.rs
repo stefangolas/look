@@ -773,3 +773,143 @@ fn crossing_edges() {
         geom_loops_store0.display(wire_id_format)
     );
 }
+
+#[test]
+fn intersection_edges_share_identity_across_stores() {
+    // The crossing_edges fixture: two parabola surfaces, two faces per shell
+    // sharing the middle edge. The face pairs produce non-closed intersection
+    // curves whose endpoints the later pairs re-replace in both stores. The
+    // mutation semantics carried ONE shared instance per endpoint and one
+    // replacement per shared edge id into both stores; attempt-1's per-store
+    // caches handed each store its own copy of a re-replaced intersection
+    // edge. r2 registers one canonical instance per endpoint and routes every
+    // replacement through the same per-curve cache, so the copies keep one id.
+    let arc00: AlternativeIntersection = NurbsCurve::new(BSplineCurve::new(
+        KnotVec::bezier_knot(2),
+        vec![
+            Vector4::new(1.0, 0.0, 1.0, 1.0),
+            Vector4::new(0.0, 1.0, 0.0, 0.0),
+            Vector4::new(-1.0, 0.0, 1.0, 1.0),
+        ],
+    ))
+    .into();
+    let arc01: AlternativeIntersection = NurbsCurve::new(BSplineCurve::new(
+        KnotVec::bezier_knot(2),
+        vec![
+            Vector4::new(-1.0, 0.0, 1.0, 1.0),
+            Vector4::new(0.0, -1.0, 0.0, 0.0),
+            Vector4::new(1.0, 0.0, 1.0, 1.0),
+        ],
+    ))
+    .into();
+    let arc02: AlternativeIntersection = NurbsCurve::new(BSplineCurve::new(
+        KnotVec::bezier_knot(2),
+        vec![
+            Vector4::new(1.0, 0.0, 1.0, 1.0),
+            Vector4::new(0.0, 0.0, -3.0, 1.0),
+            Vector4::new(-1.0, 0.0, 1.0, 1.0),
+        ],
+    ))
+    .into();
+    let arc10: AlternativeIntersection = NurbsCurve::new(BSplineCurve::new(
+        KnotVec::bezier_knot(2),
+        vec![
+            Vector4::new(1.0, 0.0, -1.0, 1.0),
+            Vector4::new(0.0, 1.0, 0.0, 0.0),
+            Vector4::new(-1.0, 0.0, -1.0, 1.0),
+        ],
+    ))
+    .into();
+    let arc11: AlternativeIntersection = NurbsCurve::new(BSplineCurve::new(
+        KnotVec::bezier_knot(2),
+        vec![
+            Vector4::new(-1.0, 0.0, -1.0, 1.0),
+            Vector4::new(0.0, -1.0, 0.0, 0.0),
+            Vector4::new(1.0, 0.0, -1.0, 1.0),
+        ],
+    ))
+    .into();
+    let arc12: AlternativeIntersection = NurbsCurve::new(BSplineCurve::new(
+        KnotVec::bezier_knot(2),
+        vec![
+            Vector4::new(1.0, 0.0, -1.0, 1.0),
+            Vector4::new(0.0, 0.0, 3.0, 1.0),
+            Vector4::new(-1.0, 0.0, -1.0, 1.0),
+        ],
+    ))
+    .into();
+    let (surface0, surface1) = parabola_surfaces();
+
+    let v00 = Vertex::new(Point3::new(1.0, 0.0, 1.0));
+    let v01 = Vertex::new(Point3::new(-1.0, 0.0, 1.0));
+    let edge00 = Edge::new(&v00, &v01, arc00);
+    let edge01 = Edge::new(&v01, &v00, arc01);
+    let edge02 = Edge::new(&v00, &v01, arc02);
+    let wire00: Wire<_, _> = vec![edge00, edge02.inverse()].into();
+    let wire01: Wire<_, _> = vec![edge01, edge02].into();
+    let face00 = Face::new(vec![wire00], surface0.clone());
+    let face01 = Face::new(vec![wire01], surface0);
+    let geom_shell0: Shell<_, _, _> = vec![face00.inverse(), face01.inverse()].into();
+
+    let v10 = Vertex::new(Point3::new(1.0, 0.0, -1.0));
+    let v11 = Vertex::new(Point3::new(-1.0, 0.0, -1.0));
+    let edge10 = Edge::new(&v10, &v11, arc10);
+    let edge11 = Edge::new(&v11, &v10, arc11);
+    let edge12 = Edge::new(&v10, &v11, arc12);
+    let wire10: Wire<_, _> = vec![edge10, edge12.inverse()].into();
+    let wire11: Wire<_, _> = vec![edge11, edge12].into();
+    let face10 = Face::new(vec![wire10], surface1.clone());
+    let face11 = Face::new(vec![wire11], surface1);
+    let geom_shell1: Shell<_, _, _> = vec![face10, face11].into();
+
+    let poly_shell0 = geom_shell0.triangulation(TOL);
+    let poly_shell1 = geom_shell1.triangulation(TOL);
+    let LoopsStoreQuadruple {
+        geom_loops_store0,
+        geom_loops_store1,
+        ..
+    } = create_loops_stores(&geom_shell0, &poly_shell0, &geom_shell1, &poly_shell1).unwrap();
+
+    // The intersection edges are the SecondType (IntersectionCurve) curves.
+    let intersection_ids = |store: &LoopsStore<Point3, AlternativeIntersection>| {
+        store
+            .iter()
+            .flat_map(|loops| loops.iter())
+            .flat_map(|wire| wire.iter())
+            .filter_map(|edge| match edge.curve() {
+                AlternativeIntersection::SecondType(_) => Some(edge.id()),
+                _ => None,
+            })
+            .collect::<std::collections::HashSet<_>>()
+    };
+    let ids0 = intersection_ids(&geom_loops_store0);
+    let ids1 = intersection_ids(&geom_loops_store1);
+    assert!(
+        !ids0.is_empty() && !ids1.is_empty(),
+        "the fixture must produce non-closed intersection curves"
+    );
+    // Both stores must agree on the full set of intersection edges: a later
+    // pair's re-replacement goes through the same per-curve cache, so no copy
+    // diverges. Before r2 the per-store caches split the copies.
+    assert_eq!(
+        ids0, ids1,
+        "the two stores' copies of a shared intersection edge diverged"
+    );
+    // The canonical endpoint instance is registered in both stores, so some
+    // Vertex id appears on both boundaries.
+    let vertex_ids = |store: &LoopsStore<Point3, AlternativeIntersection>| {
+        store
+            .iter()
+            .flat_map(|loops| loops.iter())
+            .flat_map(|wire| wire.iter())
+            .flat_map(|edge| [edge.absolute_front().id(), edge.absolute_back().id()])
+            .collect::<std::collections::HashSet<_>>()
+    };
+    let shared_vertices = vertex_ids(&geom_loops_store0)
+        .intersection(&vertex_ids(&geom_loops_store1))
+        .count();
+    assert!(
+        shared_vertices > 0,
+        "no endpoint vertex instance is shared between the two stores"
+    );
+}

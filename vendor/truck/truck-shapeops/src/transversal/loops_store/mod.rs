@@ -326,17 +326,32 @@ impl<P: Copy + Tolerance, C: Clone> LoopsStore<P, C> {
             .for_each(|loops| loops.swap_edge_into_wire(edge_id, new_wire))
     }
 
-    fn add_polygon_vertex(
+    // BG-CE-003-MIGRATE-r2: the pure search half of the former
+    // `add_polygon_vertex`: what its discovery computed before committing.
+    fn search_polygon_vertex(
+        &self,
+        loops_index: usize,
+        pt: P,
+    ) -> Option<(usize, usize, ParameterKind)>
+    where
+        C: BoundedCurve<Point = P> + SearchParameter<D1, Point = P>,
+    {
+        self[loops_index].search_parameter(pt)
+    }
+
+    // BG-CE-003-MIGRATE-r2: the commit half of the former `add_polygon_vertex`.
+    // Returns `None` only if an Inner cut fails, exactly like the baseline
+    // method it replaces.
+    fn commit_polygon_vertex(
         &mut self,
         loops_index: usize,
+        (wire_index, edge_index, kind): (usize, usize, ParameterKind),
         v: &Vertex<P>,
         emap: &mut HashMap<EdgeID<C>, Edge<P, C>>,
     ) -> Option<(usize, usize, ParameterKind)>
     where
-        C: Cut<Point = P> + SearchParameter<D1, Point = P>,
+        C: Cut<Point = P>,
     {
-        let pt = v.point();
-        let (wire_index, edge_index, kind) = self[loops_index].search_parameter(pt)?;
         match kind {
             ParameterKind::Front => {
                 let old_vertex = self[loops_index][wire_index][edge_index]
@@ -362,49 +377,116 @@ impl<P: Copy + Tolerance, C: Clone> LoopsStore<P, C> {
     }
 }
 
+// BG-CE-003-MIGRATE-r2: what a geom endpoint arm needs to know before any
+// registration mutates the store: the boundary vertex a Front/Back arm would
+// replace, the projected (point, parameter) an Inner arm would cut with, and
+// the point `set_point` would have written under the old mutation semantics.
+struct GeomEndpointDiscovery {
+    old_vertex: Option<Vertex<Point3>>,
+    cut: Option<(Point3, f64)>,
+    effective_point: Point3,
+}
+
 impl<C> LoopsStore<Point3, C> {
-    fn add_geom_vertex<S>(
-        &mut self,
-        (loops_index, wire_index, edge_index): (usize, usize, usize),
-        v: &Vertex<Point3>,
+    // BG-CE-003-MIGRATE-r2: pure geom-side discovery. Reads nothing but the
+    // boundary at `(face_index, wire_index, edge_index)` and the projection
+    // helper; mutates nothing. Returns `None` exactly where baseline's
+    // `add_geom_vertex` would have short-circuited.
+    fn discover_geom_endpoint<S>(
+        &self,
+        face_index: usize,
+        wire_index: usize,
+        edge_index: usize,
         kind: ParameterKind,
         another_surface: &S,
-        emap: &mut HashMap<EdgeID<C>, Edge<Point3, C>>,
-    ) -> Option<Vertex<Point3>>
+        query_point: Point3,
+    ) -> Option<GeomEndpointDiscovery>
     where
         C: Cut<Point = Point3, Vector = Vector3> + SearchNearestParameter<D1, Point = Point3>,
         S: ParametricSurface3D + SearchNearestParameter<D2, Point = Point3>,
     {
         match kind {
             ParameterKind::Front => {
-                let old_vertex = self[loops_index][wire_index][edge_index]
+                let old_vertex = self[face_index][wire_index][edge_index]
                     .absolute_front()
                     .clone();
-                let v2 = Vertex::new(old_vertex.point());
-                self.change_vertex(&old_vertex, &v2, emap);
-                Some(v2)
+                let effective_point = old_vertex.point();
+                Some(GeomEndpointDiscovery {
+                    old_vertex: Some(old_vertex),
+                    cut: None,
+                    effective_point,
+                })
             }
             ParameterKind::Back => {
-                let old_vertex = self[loops_index][wire_index][edge_index]
+                let old_vertex = self[face_index][wire_index][edge_index]
                     .absolute_back()
                     .clone();
-                let v2 = Vertex::new(old_vertex.point());
-                self.change_vertex(&old_vertex, &v2, emap);
-                Some(v2)
+                let effective_point = old_vertex.point();
+                Some(GeomEndpointDiscovery {
+                    old_vertex: Some(old_vertex),
+                    cut: None,
+                    effective_point,
+                })
             }
             ParameterKind::Inner(_) => {
-                let curve = self[loops_index][wire_index][edge_index].curve();
-                let (pt, t, _) =
-                    curve_surface_projection(&curve, None, another_surface, None, v.point(), 100)?;
-                let v2 = Vertex::new(pt);
-                let edge = self[loops_index][wire_index][edge_index].absolute_clone();
-                let edge_id = edge.id();
-                let (edge0, edge1) = edge.cut_with_parameter(&v2, t)?;
-                let new_wire: Wire<_, _> = vec![edge0, edge1].into();
-                self.swap_edge_into_wire(edge_id, &new_wire);
-                Some(v2)
+                let curve = self[face_index][wire_index][edge_index].curve();
+                let (pt, t, _) = curve_surface_projection(
+                    &curve,
+                    None,
+                    another_surface,
+                    None,
+                    query_point,
+                    100,
+                )?;
+                Some(GeomEndpointDiscovery {
+                    old_vertex: None,
+                    cut: Some((pt, t)),
+                    effective_point: pt,
+                })
             }
         }
+    }
+
+    // BG-CE-003-MIGRATE-r2: thin registration fn taking the pre-built
+    // canonical vertex. Front/Back re-point the boundary vertex straight onto
+    // the canonical instance; Inner cuts with a LOCAL vertex carrying the
+    // locally-projected point (cut_with_parameter refuses otherwise), then
+    // unifies the fresh halves onto the canonical instance through `emap`.
+    fn register_geom_endpoint(
+        &mut self,
+        face_index: usize,
+        wire_index: usize,
+        edge_index: usize,
+        discovery: &GeomEndpointDiscovery,
+        canonical: &Vertex<Point3>,
+        emap: &mut HashMap<EdgeID<C>, Edge<Point3, C>>,
+    ) -> Option<()>
+    where
+        C: Cut<Point = Point3, Vector = Vector3>,
+    {
+        if let Some(old_vertex) = &discovery.old_vertex {
+            self.change_vertex(old_vertex, canonical, emap);
+            return Some(());
+        }
+        let (pt, t) = discovery.cut?;
+        let vertex = Vertex::new(pt);
+        let edge = self[face_index][wire_index][edge_index].absolute_clone();
+        let edge_id = edge.id();
+        let (edge0, edge1) = edge.cut_with_parameter(&vertex, t)?;
+        let half0_id = edge0.id();
+        let half1_id = edge1.id();
+        let new_wire: Wire<_, _> = vec![edge0, edge1].into();
+        self.swap_edge_into_wire(edge_id, &new_wire);
+        self.change_vertex(&vertex, canonical, emap);
+        // BG-CE-003-MIGRATE-r2: the fresh halves are replaced by the unify
+        // sweep and dropped, so their ids must not linger as keys in the
+        // shared `emap`: an id is a raw Arc address, and a later store's
+        // fresh halves can be allocated at the very same address, where
+        // `or_insert_with` would then hand them the stale replacement (with
+        // this store's boundary vertices) instead of their own.
+        emap.remove(&half0_id);
+        emap.remove(&half1_id);
+        Some(())
     }
 }
 
@@ -531,82 +613,174 @@ where
                 } else {
                     let pv0 = Vertex::new(polyline.front());
                     let pv1 = Vertex::new(polyline.back());
-                    let mut gv0 = Vertex::new(polyline.front());
-                    let mut gv1 = Vertex::new(polyline.back());
                     let mut pemap0 = HashMap::default();
                     let mut pemap1 = HashMap::default();
                     let mut gemap0 = HashMap::default();
                     let mut gemap1 = HashMap::default();
-                    let mut gemap0b = HashMap::default();
-                    let mut gemap1b = HashMap::default();
-                    let idx00 =
-                        poly_loops_store0.add_polygon_vertex(face_index0, &pv0, &mut pemap0);
-                    if let Some((wire_index, edge_index, kind)) = idx00 {
-                        gv0 = geom_loops_store0.add_geom_vertex(
-                            (face_index0, wire_index, edge_index),
-                            &gv0,
+                    // BG-CE-003-MIGRATE-r2: one canonical vertex per endpoint,
+                    // born before any registration, then the SAME instance is
+                    // registered in both stores through the shared maps. This
+                    // restores the mutation semantics' cross-store identity:
+                    // one final point everywhere, one instance per endpoint,
+                    // and one replacement instance per shared edge id.
+                    // ----- front endpoint: polyline.front() -> gv0 -----
+                    let idx00 = poly_loops_store0
+                        .search_polygon_vertex(face_index0, polyline.front())
+                        .and_then(|loc| {
+                            poly_loops_store0.commit_polygon_vertex(
+                                face_index0,
+                                loc,
+                                &pv0,
+                                &mut pemap0,
+                            )
+                        });
+                    let idx10 = poly_loops_store1
+                        .search_polygon_vertex(face_index1, polyline.front())
+                        .and_then(|loc| {
+                            poly_loops_store1.commit_polygon_vertex(
+                                face_index1,
+                                loc,
+                                &pv0,
+                                &mut pemap0,
+                            )
+                        });
+                    let gd0 = idx00.and_then(|(wire_index, edge_index, kind)| {
+                        geom_loops_store0.discover_geom_endpoint(
+                            face_index0,
+                            wire_index,
+                            edge_index,
                             kind,
                             &surface1,
+                            polyline.front(),
+                        )
+                    });
+                    let query0 = match &gd0 {
+                        Some(d0) => d0.effective_point,
+                        None => polyline.front(),
+                    };
+                    let gd1 = idx10.and_then(|(wire_index, edge_index, kind)| {
+                        geom_loops_store1.discover_geom_endpoint(
+                            face_index1,
+                            wire_index,
+                            edge_index,
+                            kind,
+                            &surface0,
+                            query0,
+                        )
+                    });
+                    let p_canon0 = match (&gd1, &gd0) {
+                        (Some(d1), _) => d1.effective_point,
+                        (None, Some(d0)) => d0.effective_point,
+                        (None, None) => polyline.front(),
+                    };
+                    let gv0 = Vertex::new(p_canon0);
+                    if let (Some((wire_index, edge_index, _)), Some(discovery)) =
+                        (idx00, gd0.as_ref())
+                    {
+                        geom_loops_store0.register_geom_endpoint(
+                            face_index0,
+                            wire_index,
+                            edge_index,
+                            discovery,
+                            &gv0,
                             &mut gemap0,
                         )?;
+                    }
+                    if let (Some((wire_index, edge_index, _)), Some(discovery)) =
+                        (idx10, gd1.as_ref())
+                    {
+                        geom_loops_store1.register_geom_endpoint(
+                            face_index1,
+                            wire_index,
+                            edge_index,
+                            discovery,
+                            &gv0,
+                            &mut gemap0,
+                        )?;
+                    }
+                    if gd0.is_some() || gd1.is_some() {
                         let polyline = intersection_curve.leader_mut();
                         *polyline.first_mut().unwrap() = gv0.point();
                     }
-                    let idx01 =
-                        poly_loops_store0.add_polygon_vertex(face_index0, &pv1, &mut pemap1);
-                    if let Some((wire_index, edge_index, kind)) = idx01 {
-                        gv1 = geom_loops_store0.add_geom_vertex(
-                            (face_index0, wire_index, edge_index),
-                            &gv1,
+                    // ----- back endpoint: polyline.back() -> gv1 -----
+                    let idx01 = poly_loops_store0
+                        .search_polygon_vertex(face_index0, polyline.back())
+                        .and_then(|loc| {
+                            poly_loops_store0.commit_polygon_vertex(
+                                face_index0,
+                                loc,
+                                &pv1,
+                                &mut pemap1,
+                            )
+                        });
+                    let idx11 = poly_loops_store1
+                        .search_polygon_vertex(face_index1, polyline.back())
+                        .and_then(|loc| {
+                            poly_loops_store1.commit_polygon_vertex(
+                                face_index1,
+                                loc,
+                                &pv1,
+                                &mut pemap1,
+                            )
+                        });
+                    let gd0b = idx01.and_then(|(wire_index, edge_index, kind)| {
+                        geom_loops_store0.discover_geom_endpoint(
+                            face_index0,
+                            wire_index,
+                            edge_index,
                             kind,
                             &surface1,
+                            polyline.back(),
+                        )
+                    });
+                    let query1 = match &gd0b {
+                        Some(d0) => d0.effective_point,
+                        None => polyline.back(),
+                    };
+                    let gd1b = idx11.and_then(|(wire_index, edge_index, kind)| {
+                        geom_loops_store1.discover_geom_endpoint(
+                            face_index1,
+                            wire_index,
+                            edge_index,
+                            kind,
+                            &surface0,
+                            query1,
+                        )
+                    });
+                    let p_canon1 = match (&gd1b, &gd0b) {
+                        (Some(d1), _) => d1.effective_point,
+                        (None, Some(d0)) => d0.effective_point,
+                        (None, None) => polyline.back(),
+                    };
+                    let gv1 = Vertex::new(p_canon1);
+                    if let (Some((wire_index, edge_index, _)), Some(discovery)) =
+                        (idx01, gd0b.as_ref())
+                    {
+                        geom_loops_store0.register_geom_endpoint(
+                            face_index0,
+                            wire_index,
+                            edge_index,
+                            discovery,
+                            &gv1,
                             &mut gemap1,
                         )?;
-                        let polyline = intersection_curve.leader_mut();
-                        *polyline.last_mut().unwrap() = gv1.point();
                     }
-                    // BG-CE-003-MIGRATE: the effective store-0 endpoints. The
-                    // mutation semantics registered ONE shared vertex in both
-                    // stores, so its point (fixed by the store-1 calls) fed the
-                    // store-0 loops, the leader readback and the closing edge.
-                    // With construction each store's side constructs its own
-                    // effective vertex; the store-1 calls re-point the store-0
-                    // boundary at their own effective vertices below, and the
-                    // single closing edge then matches both stores.
-                    let gv0_store0 = gv0.clone();
-                    let gv1_store0 = gv1.clone();
-                    let mut gemap_store0 = HashMap::default();
-                    let idx10 =
-                        poly_loops_store1.add_polygon_vertex(face_index1, &pv0, &mut pemap0);
-                    if let Some((wire_index, edge_index, kind)) = idx10 {
-                        gv0 = geom_loops_store1.add_geom_vertex(
-                            (face_index1, wire_index, edge_index),
-                            &gv0,
-                            kind,
-                            &surface0,
-                            &mut gemap0b,
-                        )?;
-                        let polyline = intersection_curve.leader_mut();
-                        *polyline.first_mut().unwrap() = gv0.point();
-                    }
-                    let idx11 =
-                        poly_loops_store1.add_polygon_vertex(face_index1, &pv1, &mut pemap1);
-                    if let Some((wire_index, edge_index, kind)) = idx11 {
-                        gv1 = geom_loops_store1.add_geom_vertex(
-                            (face_index1, wire_index, edge_index),
+                    if let (Some((wire_index, edge_index, _)), Some(discovery)) =
+                        (idx11, gd1b.as_ref())
+                    {
+                        geom_loops_store1.register_geom_endpoint(
+                            face_index1,
+                            wire_index,
+                            edge_index,
+                            discovery,
                             &gv1,
-                            kind,
-                            &surface0,
-                            &mut gemap1b,
+                            &mut gemap1,
                         )?;
+                    }
+                    if gd0b.is_some() || gd1b.is_some() {
                         let polyline = intersection_curve.leader_mut();
                         *polyline.last_mut().unwrap() = gv1.point();
                     }
-                    // Re-point the store-0 boundary at the store-1 effective
-                    // vertices, replicating the shared instance whose final
-                    // point the mutation semantics left in both stores.
-                    geom_loops_store0.change_vertex(&gv0_store0, &gv0, &mut gemap_store0);
-                    geom_loops_store0.change_vertex(&gv1_store0, &gv1, &mut gemap_store0);
                     let pedge = Edge::new(&pv0, &pv1, polyline);
                     let gedge = Edge::new(&gv0, &gv1, intersection_curve.into());
                     poly_loops_store0[face_index0].add_edge(pedge.clone(), status0);
