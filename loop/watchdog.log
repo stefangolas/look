@@ -1,0 +1,418 @@
+2026-08-19T20:05:39 START watchdog pid 35764 stagnant=1200s poll=60s max_restarts=3
+2026-08-19T20:05:41 WARNING disk 2.6 GB free, below hard floor: would reclaim 3.9 GB at C:\Users\stefa\look\loop\slots\0\wt\target but a live worker may be building there; orchestrator must decide
+2026-08-19T20:07:05 WARNING disk 4.8 GB free, below hard floor: would reclaim 3.9 GB at C:\Users\stefa\look\loop\slots\0\wt\target but a live worker may be building there; orchestrator must decide
+2026-08-19T20:08:09 WARNING disk 4.8 GB free, below hard floor: would reclaim 3.9 GB at C:\Users\stefa\look\loop\slots\0\wt\target but a live worker may be building there; orchestrator must decide
+2026-08-19T20:09:15 WARNING disk 4.8 GB free, below hard floor: would reclaim 3.9 GB at C:\Users\stefa\look\loop\slots\0\wt\target but a live worker may be building there; orchestrator must decide
+2026-08-19T20:10:15 HEARTBEAT poll 5 disk=4.7GB
+2026-08-19T20:10:17 WARNING disk 4.7 GB free, below hard floor: would reclaim 3.9 GB at C:\Users\stefa\look\loop\slots\0\wt\target but a live worker may be building there; orchestrator must decide
+2026-08-19T20:11:21 WARNING disk 4.7 GB free, below hard floor: would reclaim 3.9 GB at C:\Users\stefa\look\loop\slots\0\wt\target but a live worker may be building there; orchestrator must decide
+2026-08-19T20:12:26 WARNING disk 4.7 GB free, below hard floor: would reclaim 3.9 GB at C:\Users\stefa\look\loop\slots\0\wt\target but a live worker may be building there; orchestrator must decide
+2026-08-19T20:13:34 WARNING disk 4.6 GB free, below hard floor: would reclaim 3.9 GB at C:\Users\stefa\look\loop\slots\0\wt\target but a live worker may be building there; orchestrator must decide
+2026-08-19T20:14:40 WARNING disk 4.7 GB free, below hard floor: would reclaim 3.9 GB at C:\Users\stefa\look\loop\slots\0\wt\target but a live worker may be building there; orchestrator must decide
+2026-08-19T20:15:40 HEARTBEAT poll 10 disk=4.5GB
+2026-08-19T20:16:18 WARNING disk 4.5 GB free, below hard floor: would reclaim 3.9 GB at C:\Users\stefa\look\loop\slots\0\wt\target but a live worker may be building there; orchestrator must decide
+2026-08-19T20:17:35 WARNING disk 4.3 GB free, below hard floor: would reclaim 3.9 GB at C:\Users\stefa\look\loop\slots\0\wt\target but a live worker may be building there; orchestrator must decide
+2026-08-19T20:18:42 WARNING disk 3.7 GB free, below hard floor: would reclaim 3.9 GB at C:\Users\stefa\look\loop\slots\0\wt\target but a live worker may be building there; orchestrator must decide
+2026-08-19T20:21:43 HEARTBEAT poll 15 disk=8.6GB
+2026-08-19T20:22:48 ACTION disk 8.6 GB free: reclaimed 12.4 GB at C:\Users\stefa\look\loop\slots\0\target
+2026-08-19T20:25:49 ACTION slot 1: hard death (pid 9428 gone, no RESULT.json, events stagnant 1209s); killing and redispatching loop/packets/BG-TOL-001-SMALL.md (restart 1/3)
+2026-08-19T20:26:03 ACTION slot 1: redispatch output: GATE-4 preflight: 0 unscaled_legacy site(s) + 7 budgeted <= ceiling 109, read from the slot's HEAD.
+2026-08-19T20:26:03 WARNING slot 1: run_packet exited 1: refusing to dispatch: this packet's claims no longer hold.
+  A1: expected 2, tree has 1  [grep -cE '\\.near\\(|so_small\\(|TOLERANCE' vendor/truck/truck-geotrai]
+  A2: expected 3, tree has 1  [grep -cE '\\.near\\(|so_small\\(|TOLERANCE' vendor/truck/truck-geotrai]
+  A3: expected 5, tree has 1  [grep
+2026-08-19T20:27:03 HEARTBEAT poll 20 disk=20.3GB
+2026-08-19T20:32:03 HEARTBEAT poll 25 disk=20.3GB
+2026-08-19T20:37:03 HEARTBEAT poll 30 disk=19.9GB
+2026-08-19T20:42:03 HEARTBEAT poll 35 disk=19.3GB
+2026-08-19T20:46:04 ACTION slot 1: hard death (pid 9428 gone, no RESULT.json, events stagnant 1200s); killing and redispatching loop/packets/BG-TOL-001-SMALL.md (restart 2/3)
+2026-08-19T20:46:32 ACTION slot 1: redispatch output: GATE-4 preflight: 0 unscaled_legacy site(s) + 7 budgeted <= ceiling 109, read from the slot's HEAD.
+2026-08-19T20:46:32 WARNING slot 1: run_packet exited 1: refusing to dispatch: this packet's claims no longer hold.
+  A1: expected 2, tree has 1  [grep -cE '\\.near\\(|so_small\\(|TOLERANCE' vendor/truck/truck-geotrai]
+  A2: expected 3, tree has 1  [grep -cE '\\.near\\(|so_small\\(|TOLERANCE' vendor/truck/truck-geotrai]
+  A3: expected 5, tree has 1  [grep
+2026-08-19T20:47:32 HEARTBEAT poll 40 disk=15.5GB
+2026-08-19T20:52:32 HEARTBEAT poll 45 disk=13.2GB
+2026-08-19T20:57:32 HEARTBEAT poll 50 disk=13.3GB
+2026-08-19T21:02:32 HEARTBEAT poll 55 disk=13.3GB
+2026-08-19T22:16:05 ACTION slot 1: hard death (pid 9428 gone, no RESULT.json, events stagnant 5373s); killing and redispatching loop/packets/BG-TOL-001-SMALL.md (restart 3/3)
+2026-08-19T22:16:16 ACTION slot 1: redispatch output: GATE-4 preflight: 0 unscaled_legacy site(s) + 7 budgeted <= ceiling 109, read from the slot's HEAD.
+2026-08-19T22:16:16 WARNING slot 1: run_packet exited 1: refusing to dispatch: this packet's claims no longer hold.
+  A1: expected 2, tree has 1  [grep -cE '\\.near\\(|so_small\\(|TOLERANCE' vendor/truck/truck-geotrai]
+  A2: expected 3, tree has 1  [grep -cE '\\.near\\(|so_small\\(|TOLERANCE' vendor/truck/truck-geotrai]
+  A3: expected 5, tree has 1  [grep
+2026-08-19T22:19:17 HEARTBEAT poll 60 disk=14.4GB
+2026-08-19T22:24:17 HEARTBEAT poll 65 disk=14.0GB
+2026-08-19T22:29:17 HEARTBEAT poll 70 disk=11.6GB
+2026-08-19T22:33:04 ACTION disk 3.4 GB free: reclaimed 3.7 GB at C:\Users\stefa\look\loop\slots\0\target
+2026-08-19T22:33:09 ACTION disk 7.1 GB free: reclaimed 0.7 GB at C:\Users\stefa\look\loop\slots\0\wt\target
+2026-08-19T22:35:10 HEARTBEAT poll 75 disk=7.7GB
+2026-08-19T22:37:12 CRITICAL slot 1: restart budget exhausted for loop/packets/BG-TOL-001-SMALL.md (3); leaving it for the orchestrator
+2026-08-19T22:40:15 HEARTBEAT poll 80 disk=7.8GB
+2026-08-19T22:43:20 WARNING could not reclaim C:\Users\stefa\look\loop\slots\0\target: [WinError 5] Access is denied: 'C:\\Users\\stefa\\look\\loop\\slots\\0\\target\\debug\\deps\\bytemuck_derive-9339432b1864a4be.dll'
+2026-08-19T23:40:38 CRITICAL slot 1: restart budget exhausted for loop/packets/BG-TOL-001-SMALL.md (3); leaving it for the orchestrator
+2026-08-19T23:40:38 ACTION disk 8.7 GB free: reclaimed 0.3 GB at C:\Users\stefa\look\loop\slots\0\target
+2026-08-19T23:41:38 HEARTBEAT poll 85 disk=9.0GB
+2026-08-19T23:46:38 HEARTBEAT poll 90 disk=18.4GB
+2026-08-19T23:51:38 HEARTBEAT poll 95 disk=15.8GB
+2026-08-19T23:56:38 HEARTBEAT poll 100 disk=15.6GB
+2026-08-20T00:00:39 CRITICAL slot 1: restart budget exhausted for loop/packets/BG-TOL-001-SMALL.md (3); leaving it for the orchestrator
+2026-08-20T00:01:39 HEARTBEAT poll 105 disk=12.5GB
+2026-08-20T00:06:39 HEARTBEAT poll 110 disk=12.2GB
+2026-08-20T00:52:49 START watchdog pid 34812 stagnant=1200s poll=60s max_restarts=3
+2026-08-20T00:56:49 HEARTBEAT poll 5 disk=10.1GB
+2026-08-20T01:01:49 HEARTBEAT poll 10 disk=9.7GB
+2026-08-20T01:06:49 HEARTBEAT poll 15 disk=9.6GB
+2026-08-20T01:11:50 HEARTBEAT poll 20 disk=9.1GB
+2026-08-20T01:13:56 ACTION disk 8.3 GB free: reclaimed 7.9 GB at C:\Users\stefa\look\loop\slots\0\target
+2026-08-20T01:13:58 ACTION disk 16.2 GB free: reclaimed 2.0 GB at C:\Users\stefa\look\loop\slots\0\wt\target
+2026-08-20T01:17:03 HEARTBEAT poll 25 disk=15.7GB
+2026-08-20T01:22:03 HEARTBEAT poll 30 disk=14.9GB
+2026-08-20T01:27:08 HEARTBEAT poll 35 disk=13.7GB
+2026-08-20T01:32:09 HEARTBEAT poll 40 disk=10.8GB
+2026-08-20T01:34:12 ACTION slot 0: hard death (pid 41648 gone, no RESULT.json, events stagnant 1220s); killing and redispatching loop/packets/BG-ENC-002-LINE.md (restart 1/3)
+2026-08-20T01:34:27 ACTION slot 0: redispatch output: started pid 13080; poll with loop/slot_status.py
+2026-08-20T01:40:28 START watchdog pid 65692 stagnant=1200s poll=60s max_restarts=3
+2026-08-20T01:44:28 HEARTBEAT poll 5 disk=9.9GB
+2026-08-20T01:49:28 HEARTBEAT poll 10 disk=9.9GB
+2026-08-20T01:53:29 WARNING disk 8.8 GB free but verify is live in 0 (pid 59584); reclaiming nothing -- deleting a target under a running cargo corrupts it and the orchestrator must decide
+2026-08-20T01:54:29 HEARTBEAT poll 15 disk=8.5GB
+2026-08-20T01:54:30 WARNING disk 8.5 GB free but verify is live in 0 (pid 59584); reclaiming nothing -- deleting a target under a running cargo corrupts it and the orchestrator must decide
+2026-08-20T01:55:31 WARNING disk 8.2 GB free but verify is live in 0 (pid 59584); reclaiming nothing -- deleting a target under a running cargo corrupts it and the orchestrator must decide
+2026-08-20T01:56:46 WARNING disk 6.6 GB free but verify is live in 0 (pid 59584); reclaiming nothing -- deleting a target under a running cargo corrupts it and the orchestrator must decide
+2026-08-20T01:57:47 WARNING disk 6.6 GB free but verify is live in 0 (pid 59584); reclaiming nothing -- deleting a target under a running cargo corrupts it and the orchestrator must decide
+2026-08-20T01:58:47 WARNING disk 6.6 GB free but verify is live in 0 (pid 59584); reclaiming nothing -- deleting a target under a running cargo corrupts it and the orchestrator must decide
+2026-08-20T01:59:47 HEARTBEAT poll 20 disk=9.9GB
+2026-08-20T02:04:47 HEARTBEAT poll 25 disk=9.6GB
+2026-08-20T02:09:47 HEARTBEAT poll 30 disk=9.5GB
+2026-08-20T02:14:47 HEARTBEAT poll 35 disk=9.0GB
+2026-08-20T02:14:50 WARNING disk 9.0 GB free but verify is live in 0 (pid 4020); reclaiming nothing -- deleting a target under a running cargo corrupts it and the orchestrator must decide
+2026-08-20T02:15:51 WARNING disk 8.6 GB free but verify is live in 0 (pid 4020); reclaiming nothing -- deleting a target under a running cargo corrupts it and the orchestrator must decide
+2026-08-20T02:16:52 WARNING disk 8.5 GB free but verify is live in 0 (pid 4020); reclaiming nothing -- deleting a target under a running cargo corrupts it and the orchestrator must decide
+2026-08-20T02:17:53 WARNING disk 8.2 GB free but verify is live in 0 (pid 4020); reclaiming nothing -- deleting a target under a running cargo corrupts it and the orchestrator must decide
+2026-08-20T02:18:54 WARNING disk 7.9 GB free but verify is live in 0 (pid 4020); reclaiming nothing -- deleting a target under a running cargo corrupts it and the orchestrator must decide
+2026-08-20T02:19:54 HEARTBEAT poll 40 disk=7.7GB
+2026-08-20T02:19:54 WARNING disk 7.7 GB free but verify is live in 0 (pid 4020); reclaiming nothing -- deleting a target under a running cargo corrupts it and the orchestrator must decide
+2026-08-20T02:20:55 WARNING disk 6.2 GB free but verify is live in 0 (pid 4020); reclaiming nothing -- deleting a target under a running cargo corrupts it and the orchestrator must decide
+2026-08-20T02:21:56 WARNING disk 6.2 GB free but verify is live in 0 (pid 4020); reclaiming nothing -- deleting a target under a running cargo corrupts it and the orchestrator must decide
+2026-08-20T02:22:56 WARNING disk 6.1 GB free but verify is live in 0 (pid 4020); reclaiming nothing -- deleting a target under a running cargo corrupts it and the orchestrator must decide
+2026-08-20T02:24:56 HEARTBEAT poll 45 disk=9.4GB
+2026-08-20T02:29:57 HEARTBEAT poll 50 disk=9.1GB
+2026-08-20T02:34:57 HEARTBEAT poll 55 disk=9.0GB
+2026-08-20T02:35:14 ACTION disk 9.0 GB free: reclaimed 1.3 GB at C:\Users\stefa\look\loop\slots\1\target
+2026-08-20T02:40:14 HEARTBEAT poll 60 disk=10.0GB
+2026-08-20T02:45:15 HEARTBEAT poll 65 disk=9.1GB
+2026-08-20T02:46:16 WARNING disk 8.9 GB free but verify is live in 0 (pid 28064); reclaiming nothing -- deleting a target under a running cargo corrupts it and the orchestrator must decide
+2026-08-20T02:47:17 WARNING disk 8.7 GB free but verify is live in 0 (pid 28064); reclaiming nothing -- deleting a target under a running cargo corrupts it and the orchestrator must decide
+2026-08-20T02:48:18 WARNING disk 8.3 GB free but verify is live in 0 (pid 28064); reclaiming nothing -- deleting a target under a running cargo corrupts it and the orchestrator must decide
+2026-08-20T02:49:18 WARNING disk 8.2 GB free but verify is live in 0 (pid 28064); reclaiming nothing -- deleting a target under a running cargo corrupts it and the orchestrator must decide
+2026-08-20T02:50:18 HEARTBEAT poll 70 disk=6.6GB
+2026-08-20T02:50:19 WARNING disk 6.6 GB free but verify is live in 0 (pid 28064); reclaiming nothing -- deleting a target under a running cargo corrupts it and the orchestrator must decide
+2026-08-20T02:51:19 WARNING disk 6.6 GB free but verify is live in 0 (pid 28064); reclaiming nothing -- deleting a target under a running cargo corrupts it and the orchestrator must decide
+2026-08-20T02:52:20 WARNING disk 6.6 GB free but verify is live in 0 (pid 28064); reclaiming nothing -- deleting a target under a running cargo corrupts it and the orchestrator must decide
+2026-08-20T02:55:20 HEARTBEAT poll 75 disk=10.7GB
+2026-08-20T03:00:20 HEARTBEAT poll 80 disk=10.5GB
+2026-08-20T03:05:20 HEARTBEAT poll 85 disk=10.5GB
+2026-08-20T03:10:20 HEARTBEAT poll 90 disk=10.5GB
+2026-08-20T03:15:20 HEARTBEAT poll 95 disk=10.5GB
+2026-08-20T03:19:21 ACTION slot 0: wedged (pid 52748 alive, events stagnant 1200s); killing and redispatching loop/packets/BG-ENC-002-CONE.md (restart 1/3)
+2026-08-20T03:19:27 ACTION slot 0: redispatch output: started pid 41156; poll with loop/slot_status.py
+2026-08-20T03:20:27 HEARTBEAT poll 100 disk=10.5GB
+2026-08-20T03:25:27 HEARTBEAT poll 105 disk=10.3GB
+2026-08-20T03:30:27 HEARTBEAT poll 110 disk=10.3GB
+2026-08-20T03:35:27 HEARTBEAT poll 115 disk=9.2GB
+2026-08-20T03:36:28 WARNING disk 8.9 GB free but verify is live in 0 (pid 62396); reclaiming nothing -- deleting a target under a running cargo corrupts it and the orchestrator must decide
+2026-08-20T03:37:29 WARNING disk 8.6 GB free but verify is live in 0 (pid 62396); reclaiming nothing -- deleting a target under a running cargo corrupts it and the orchestrator must decide
+2026-08-20T03:38:29 WARNING disk 7.0 GB free but verify is live in 0 (pid 62396); reclaiming nothing -- deleting a target under a running cargo corrupts it and the orchestrator must decide
+2026-08-20T03:39:30 WARNING disk 7.0 GB free but verify is live in 0 (pid 62396); reclaiming nothing -- deleting a target under a running cargo corrupts it and the orchestrator must decide
+2026-08-20T03:40:30 HEARTBEAT poll 120 disk=7.0GB
+2026-08-20T03:40:31 WARNING disk 7.0 GB free but verify is live in 0 (pid 62396); reclaiming nothing -- deleting a target under a running cargo corrupts it and the orchestrator must decide
+2026-08-20T03:45:31 HEARTBEAT poll 125 disk=10.2GB
+2026-08-20T03:50:31 HEARTBEAT poll 130 disk=10.1GB
+2026-08-20T03:55:31 HEARTBEAT poll 135 disk=10.2GB
+2026-08-20T03:59:32 WARNING disk 9.0 GB free but verify is live in 0 (pid 32468); reclaiming nothing -- deleting a target under a running cargo corrupts it and the orchestrator must decide
+2026-08-20T04:00:32 HEARTBEAT poll 140 disk=8.6GB
+2026-08-20T04:00:33 WARNING disk 8.6 GB free but verify is live in 0 (pid 32468); reclaiming nothing -- deleting a target under a running cargo corrupts it and the orchestrator must decide
+2026-08-20T04:01:34 WARNING disk 8.4 GB free but verify is live in 0 (pid 32468); reclaiming nothing -- deleting a target under a running cargo corrupts it and the orchestrator must decide
+2026-08-20T04:02:34 WARNING disk 6.9 GB free but verify is live in 0 (pid 32468); reclaiming nothing -- deleting a target under a running cargo corrupts it and the orchestrator must decide
+2026-08-20T04:03:35 WARNING disk 6.9 GB free but verify is live in 0 (pid 32468); reclaiming nothing -- deleting a target under a running cargo corrupts it and the orchestrator must decide
+2026-08-20T04:05:35 HEARTBEAT poll 145 disk=10.1GB
+2026-08-20T04:10:35 HEARTBEAT poll 150 disk=10.1GB
+2026-08-20T04:15:35 HEARTBEAT poll 155 disk=10.1GB
+2026-08-20T04:20:35 HEARTBEAT poll 160 disk=10.1GB
+2026-08-20T04:25:35 HEARTBEAT poll 165 disk=10.1GB
+2026-08-20T04:30:35 HEARTBEAT poll 170 disk=10.1GB
+2026-08-20T04:35:35 HEARTBEAT poll 175 disk=10.1GB
+2026-08-20T04:40:35 HEARTBEAT poll 180 disk=10.1GB
+2026-08-20T04:45:35 HEARTBEAT poll 185 disk=10.1GB
+2026-08-20T04:50:35 HEARTBEAT poll 190 disk=10.1GB
+2026-08-20T04:55:35 HEARTBEAT poll 195 disk=10.1GB
+2026-08-20T05:00:35 HEARTBEAT poll 200 disk=10.1GB
+2026-08-20T05:05:35 HEARTBEAT poll 205 disk=10.1GB
+2026-08-20T05:10:35 HEARTBEAT poll 210 disk=10.1GB
+2026-08-20T05:15:35 HEARTBEAT poll 215 disk=9.9GB
+2026-08-20T05:20:35 HEARTBEAT poll 220 disk=9.9GB
+2026-08-20T05:25:35 HEARTBEAT poll 225 disk=9.9GB
+2026-08-20T05:30:35 HEARTBEAT poll 230 disk=9.9GB
+2026-08-20T05:35:35 HEARTBEAT poll 235 disk=9.9GB
+2026-08-20T05:40:35 HEARTBEAT poll 240 disk=9.9GB
+2026-08-20T05:45:35 HEARTBEAT poll 245 disk=9.9GB
+2026-08-20T05:50:35 HEARTBEAT poll 250 disk=9.9GB
+2026-08-20T05:55:36 HEARTBEAT poll 255 disk=9.9GB
+2026-08-20T06:00:36 HEARTBEAT poll 260 disk=9.9GB
+2026-08-20T06:05:36 HEARTBEAT poll 265 disk=9.9GB
+2026-08-20T06:10:36 HEARTBEAT poll 270 disk=9.9GB
+2026-08-20T06:15:36 HEARTBEAT poll 275 disk=9.9GB
+2026-08-20T06:20:36 HEARTBEAT poll 280 disk=9.9GB
+2026-08-20T06:25:36 HEARTBEAT poll 285 disk=9.9GB
+2026-08-20T06:30:36 HEARTBEAT poll 290 disk=9.9GB
+2026-08-20T06:35:36 HEARTBEAT poll 295 disk=9.9GB
+2026-08-20T06:40:36 HEARTBEAT poll 300 disk=9.9GB
+2026-08-20T06:45:36 HEARTBEAT poll 305 disk=9.9GB
+2026-08-20T06:50:36 HEARTBEAT poll 310 disk=9.9GB
+2026-08-20T06:55:36 HEARTBEAT poll 315 disk=9.9GB
+2026-08-20T07:00:36 HEARTBEAT poll 320 disk=9.9GB
+2026-08-20T07:05:36 HEARTBEAT poll 325 disk=9.9GB
+2026-08-20T07:10:36 HEARTBEAT poll 330 disk=9.9GB
+2026-08-20T07:15:36 HEARTBEAT poll 335 disk=9.9GB
+2026-08-20T07:20:36 HEARTBEAT poll 340 disk=9.9GB
+2026-08-20T07:25:36 HEARTBEAT poll 345 disk=9.9GB
+2026-08-20T07:30:36 HEARTBEAT poll 350 disk=9.9GB
+2026-08-20T07:35:36 HEARTBEAT poll 355 disk=9.9GB
+2026-08-20T07:40:36 HEARTBEAT poll 360 disk=9.9GB
+2026-08-20T07:45:36 HEARTBEAT poll 365 disk=9.9GB
+2026-08-20T07:50:36 HEARTBEAT poll 370 disk=9.9GB
+2026-08-20T07:55:36 HEARTBEAT poll 375 disk=9.9GB
+2026-08-20T08:00:36 HEARTBEAT poll 380 disk=9.9GB
+2026-08-20T08:05:37 HEARTBEAT poll 385 disk=9.9GB
+2026-08-20T08:10:37 HEARTBEAT poll 390 disk=9.9GB
+2026-08-20T08:15:37 HEARTBEAT poll 395 disk=9.9GB
+2026-08-20T08:20:37 HEARTBEAT poll 400 disk=9.9GB
+2026-08-20T08:25:37 HEARTBEAT poll 405 disk=9.9GB
+2026-08-20T08:30:37 HEARTBEAT poll 410 disk=9.9GB
+2026-08-20T08:35:37 HEARTBEAT poll 415 disk=9.9GB
+2026-08-20T08:40:37 HEARTBEAT poll 420 disk=9.9GB
+2026-08-20T08:45:37 HEARTBEAT poll 425 disk=9.9GB
+2026-08-20T08:50:37 HEARTBEAT poll 430 disk=9.9GB
+2026-08-20T08:55:37 HEARTBEAT poll 435 disk=9.9GB
+2026-08-20T09:00:37 HEARTBEAT poll 440 disk=9.9GB
+2026-08-20T09:05:37 HEARTBEAT poll 445 disk=9.9GB
+2026-08-20T09:10:37 HEARTBEAT poll 450 disk=9.9GB
+2026-08-20T09:15:37 HEARTBEAT poll 455 disk=9.8GB
+2026-08-20T09:20:37 HEARTBEAT poll 460 disk=9.8GB
+2026-08-20T09:25:37 HEARTBEAT poll 465 disk=14.2GB
+2026-08-20T09:30:37 HEARTBEAT poll 470 disk=15.8GB
+2026-08-20T09:57:11 START watchdog pid 30852 stagnant=1200s poll=60s max_restarts=3
+2026-08-20T10:05:51 START watchdog pid 17748 stagnant=1200s poll=60s max_restarts=3
+2026-08-20T10:09:52 HEARTBEAT poll 5 disk=51.1GB
+2026-08-20T10:14:52 HEARTBEAT poll 10 disk=50.9GB
+2026-08-20T10:19:52 HEARTBEAT poll 15 disk=50.0GB
+2026-08-20T10:24:52 HEARTBEAT poll 20 disk=47.1GB
+2026-08-20T10:29:52 HEARTBEAT poll 25 disk=44.2GB
+2026-08-20T10:34:52 HEARTBEAT poll 30 disk=44.5GB
+2026-08-20T10:45:00 STOP watchdog (session 12 end; no work in flight, slots left warm deliberately)
+2026-08-20T10:48:47 START watchdog pid 11592 stagnant=1200s poll=60s max_restarts=3
+2026-08-20T10:52:47 HEARTBEAT poll 5 disk=43.9GB
+2026-08-20T10:57:47 HEARTBEAT poll 10 disk=43.9GB
+2026-08-20T11:02:47 HEARTBEAT poll 15 disk=43.8GB
+2026-08-20T11:07:47 HEARTBEAT poll 20 disk=43.8GB
+2026-08-20T11:12:51 HEARTBEAT poll 25 disk=43.8GB
+2026-08-20T11:17:51 HEARTBEAT poll 30 disk=43.8GB
+2026-08-20T11:22:51 HEARTBEAT poll 35 disk=43.8GB
+2026-08-20T11:27:51 HEARTBEAT poll 40 disk=43.8GB
+2026-08-20T11:32:51 HEARTBEAT poll 45 disk=43.8GB
+2026-08-20T11:37:51 HEARTBEAT poll 50 disk=43.8GB
+2026-08-20T11:42:51 HEARTBEAT poll 55 disk=43.7GB
+2026-08-20T11:47:51 HEARTBEAT poll 60 disk=43.7GB
+2026-08-20T11:52:51 ACTION slot 0: hard death (pid 13620 gone, no RESULT.json, events stagnant 1200s); killing and redispatching loop/packets/BG-ENC-003-BSPLINE.md (restart 1/3)
+2026-08-20T11:52:59 ACTION slot 0: redispatch output: started pid 30452; poll with loop/slot_status.py
+2026-08-20T11:52:59 HEARTBEAT poll 65 disk=43.7GB
+2026-08-20T12:20:44 ACTION slot 1: wedged (pid 16128 alive, events stagnant 1421s); killing and redispatching loop/packets/BG-ANA-001-PP.md (restart 1/3)
+2026-08-20T12:20:51 ACTION slot 1: redispatch output: started pid 32116; poll with loop/slot_status.py
+2026-08-20T12:20:52 ACTION slot 2: wedged (pid 25212 alive, events stagnant 1431s); killing and redispatching loop/packets/BG-ANA-001-PS.md (restart 1/3)
+2026-08-20T12:21:00 ACTION slot 2: redispatch output: started pid 31524; poll with loop/slot_status.py
+2026-08-20T12:21:00 HEARTBEAT poll 70 disk=43.1GB
+2026-08-20T12:26:00 HEARTBEAT poll 75 disk=34.7GB
+2026-08-20T12:26:46 START watchdog pid 31172 stagnant=3600s poll=60s max_restarts=3
+2026-08-20T12:30:46 HEARTBEAT poll 5 disk=38.9GB
+2026-08-20T12:35:47 HEARTBEAT poll 10 disk=35.9GB
+2026-08-20T12:40:47 HEARTBEAT poll 15 disk=42.7GB
+2026-08-20T12:45:47 HEARTBEAT poll 20 disk=41.5GB
+2026-08-20T12:50:47 HEARTBEAT poll 25 disk=41.1GB
+2026-08-20T12:55:47 HEARTBEAT poll 30 disk=30.6GB
+2026-08-20T13:00:47 HEARTBEAT poll 35 disk=36.6GB
+2026-08-20T13:05:47 HEARTBEAT poll 40 disk=36.3GB
+2026-08-20T13:10:47 HEARTBEAT poll 45 disk=29.6GB
+2026-08-20T13:26:58 ACTION slot 0: wedged (pid 30452 alive, events stagnant 3611s); killing and redispatching loop/packets/BG-ENC-003-BSPLINE.md (restart 2/3)
+2026-08-20T13:27:08 ACTION slot 0: redispatch output: started pid 26324; poll with loop/slot_status.py
+2026-08-20T13:28:08 HEARTBEAT poll 50 disk=31.0GB
+2026-08-20T13:33:08 HEARTBEAT poll 55 disk=16.2GB
+2026-08-20T13:38:08 HEARTBEAT poll 60 disk=30.7GB
+2026-08-20T13:43:08 HEARTBEAT poll 65 disk=30.9GB
+2026-08-20T13:48:08 HEARTBEAT poll 70 disk=31.0GB
+2026-08-20T13:53:08 HEARTBEAT poll 75 disk=30.3GB
+2026-08-20T13:58:08 HEARTBEAT poll 80 disk=34.8GB
+2026-08-20T14:03:09 HEARTBEAT poll 85 disk=21.6GB
+2026-08-20T14:08:09 HEARTBEAT poll 90 disk=38.0GB
+2026-08-20T14:13:09 HEARTBEAT poll 95 disk=36.9GB
+2026-08-20T14:18:09 HEARTBEAT poll 100 disk=36.4GB
+2026-08-20T14:23:09 HEARTBEAT poll 105 disk=36.4GB
+2026-08-20T14:24:10 ACTION slot 1: hard death (pid 32236 gone, no RESULT.json, events stagnant 3610s); killing and redispatching loop/packets/BG-ANA-001-PARCYL.md (restart 1/3)
+2026-08-20T14:24:21 ACTION slot 1: redispatch output: started pid 25092; poll with loop/slot_status.py
+2026-08-20T14:28:21 HEARTBEAT poll 110 disk=36.0GB
+2026-08-20T14:33:21 HEARTBEAT poll 115 disk=36.0GB
+2026-08-20T14:38:21 HEARTBEAT poll 120 disk=37.5GB
+2026-08-20T14:43:21 HEARTBEAT poll 125 disk=32.7GB
+2026-08-20T14:48:21 HEARTBEAT poll 130 disk=33.5GB
+2026-08-20T14:53:21 HEARTBEAT poll 135 disk=33.5GB
+2026-08-20T14:58:22 HEARTBEAT poll 140 disk=36.4GB
+2026-08-20T15:03:22 HEARTBEAT poll 145 disk=37.3GB
+2026-08-20T15:08:22 HEARTBEAT poll 150 disk=37.3GB
+2026-08-20T15:13:22 HEARTBEAT poll 155 disk=37.4GB
+2026-08-20T15:18:22 HEARTBEAT poll 160 disk=37.8GB
+2026-08-20T15:25:46 HEARTBEAT poll 165 disk=37.8GB
+2026-08-20T15:30:46 HEARTBEAT poll 170 disk=37.8GB
+2026-08-20T15:35:46 HEARTBEAT poll 175 disk=36.8GB
+2026-08-20T15:40:46 HEARTBEAT poll 180 disk=26.5GB
+2026-08-20T15:45:46 HEARTBEAT poll 185 disk=33.2GB
+2026-08-20T15:50:46 HEARTBEAT poll 190 disk=35.7GB
+2026-08-20T15:55:46 HEARTBEAT poll 195 disk=35.7GB
+2026-08-20T16:00:46 HEARTBEAT poll 200 disk=32.7GB
+2026-08-20T16:13:22 HEARTBEAT poll 205 disk=34.8GB
+2026-08-20T16:18:22 HEARTBEAT poll 210 disk=34.8GB
+2026-08-20T16:23:22 HEARTBEAT poll 215 disk=20.4GB
+2026-08-20T16:28:22 HEARTBEAT poll 220 disk=33.7GB
+2026-08-20T16:33:22 HEARTBEAT poll 225 disk=22.6GB
+2026-08-20T16:38:22 HEARTBEAT poll 230 disk=27.1GB
+2026-08-20T16:43:25 HEARTBEAT poll 235 disk=9.1GB
+2026-08-20T16:48:25 HEARTBEAT poll 240 disk=31.0GB
+2026-08-20T16:53:25 HEARTBEAT poll 245 disk=27.9GB
+2026-08-20T16:58:28 HEARTBEAT poll 250 disk=30.9GB
+2026-08-20T17:03:28 HEARTBEAT poll 255 disk=31.2GB
+2026-08-20T19:36:53 START watchdog pid 29048 stagnant=3600s poll=60s max_restarts=3
+2026-08-20T19:40:53 HEARTBEAT poll 5 disk=29.0GB
+2026-08-20T19:45:53 HEARTBEAT poll 10 disk=29.0GB
+2026-08-20T19:50:54 HEARTBEAT poll 15 disk=28.9GB
+2026-08-20T21:53:44 START watchdog pid 29132 stagnant=3600s poll=60s max_restarts=3
+2026-08-20T21:57:44 HEARTBEAT poll 5 disk=35.7GB
+2026-08-20T22:02:44 HEARTBEAT poll 10 disk=35.7GB
+2026-08-20T22:07:44 HEARTBEAT poll 15 disk=35.6GB
+2026-08-20T22:12:44 HEARTBEAT poll 20 disk=35.6GB
+2026-08-20T22:17:44 HEARTBEAT poll 25 disk=35.6GB
+2026-08-20T22:22:44 HEARTBEAT poll 30 disk=35.2GB
+2026-08-20T22:27:44 HEARTBEAT poll 35 disk=35.1GB
+2026-08-20T22:32:44 HEARTBEAT poll 40 disk=35.1GB
+2026-08-20T22:37:45 HEARTBEAT poll 45 disk=35.0GB
+2026-08-20T22:42:45 HEARTBEAT poll 50 disk=34.3GB
+2026-08-20T22:47:45 HEARTBEAT poll 55 disk=34.1GB
+2026-08-20T22:52:46 HEARTBEAT poll 60 disk=33.5GB
+2026-08-20T22:57:46 HEARTBEAT poll 65 disk=34.6GB
+2026-08-20T23:02:46 HEARTBEAT poll 70 disk=34.5GB
+2026-08-21T00:01:00 HEARTBEAT poll 75 disk=34.5GB
+2026-08-21T00:06:00 HEARTBEAT poll 80 disk=34.1GB
+2026-08-21T00:11:00 HEARTBEAT poll 85 disk=34.1GB
+2026-08-21T00:16:00 HEARTBEAT poll 90 disk=34.1GB
+2026-08-21T00:21:00 HEARTBEAT poll 95 disk=34.0GB
+2026-08-21T00:26:01 HEARTBEAT poll 100 disk=34.0GB
+2026-08-21T00:31:01 HEARTBEAT poll 105 disk=33.8GB
+2026-08-21T01:53:52 ACTION slot 0: hard death (pid 14256 gone, no RESULT.json, events stagnant 14406s); killing and redispatching loop/packets/BG-ENC-004-PCURVE.md (restart 1/3)
+2026-08-21T01:54:03 ACTION slot 0: redispatch output: started pid 33072; poll with loop/slot_status.py
+2026-08-21T01:56:04 HEARTBEAT poll 110 disk=25.7GB
+2026-08-21T02:01:04 HEARTBEAT poll 115 disk=31.7GB
+2026-08-21T02:06:04 HEARTBEAT poll 120 disk=31.5GB
+2026-08-21T08:49:06 ACTION slot 2: wedged (pid 4492 alive, events stagnant 24902s); killing and redispatching loop/packets/BG-CE-001.md (restart 1/3)
+2026-08-21T08:49:13 ACTION slot 2: redispatch output: started pid 7584; poll with loop/slot_status.py
+2026-08-21T08:50:13 HEARTBEAT poll 125 disk=32.9GB
+2026-08-21T08:55:13 HEARTBEAT poll 130 disk=32.5GB
+2026-08-21T09:00:14 HEARTBEAT poll 135 disk=28.9GB
+2026-08-21T09:05:14 HEARTBEAT poll 140 disk=18.1GB
+2026-08-21T09:10:14 HEARTBEAT poll 145 disk=27.9GB
+2026-08-21T09:15:15 HEARTBEAT poll 150 disk=14.9GB
+2026-08-21T09:20:15 HEARTBEAT poll 155 disk=22.4GB
+2026-08-21T09:25:15 HEARTBEAT poll 160 disk=21.1GB
+2026-08-21T09:30:15 HEARTBEAT poll 165 disk=20.4GB
+2026-08-21T09:35:15 HEARTBEAT poll 170 disk=26.6GB
+2026-08-21T09:40:15 HEARTBEAT poll 175 disk=26.7GB
+2026-08-21T09:45:15 HEARTBEAT poll 180 disk=26.6GB
+2026-08-21T09:50:16 HEARTBEAT poll 185 disk=23.7GB
+2026-08-21T09:55:16 HEARTBEAT poll 190 disk=24.0GB
+2026-08-21T09:59:15 STOP (orchestrator at session close: nothing in flight)
+2026-08-21T11:48:01 START watchdog pid 31004 stagnant=3600s poll=60s max_restarts=3
+2026-08-21T11:52:01 HEARTBEAT poll 5 disk=29.0GB
+2026-08-21T11:57:01 HEARTBEAT poll 10 disk=28.9GB
+2026-08-21T12:02:01 HEARTBEAT poll 15 disk=28.8GB
+2026-08-21T12:07:01 HEARTBEAT poll 20 disk=25.5GB
+2026-08-21T12:12:01 HEARTBEAT poll 25 disk=28.7GB
+2026-08-21T12:17:01 HEARTBEAT poll 30 disk=28.7GB
+2026-08-21T12:22:01 HEARTBEAT poll 35 disk=28.2GB
+2026-08-21T12:27:01 HEARTBEAT poll 40 disk=28.4GB
+2026-08-21T12:32:01 HEARTBEAT poll 45 disk=31.8GB
+2026-08-21T13:41:26 HEARTBEAT poll 50 disk=29.8GB
+2026-08-21T13:46:26 HEARTBEAT poll 55 disk=33.0GB
+2026-08-21T13:52:14 HEARTBEAT poll 60 disk=32.9GB
+2026-08-21T13:57:14 HEARTBEAT poll 65 disk=33.0GB
+2026-08-21T14:02:14 HEARTBEAT poll 70 disk=33.0GB
+2026-08-21T14:17:14 HEARTBEAT poll 75 disk=32.8GB
+2026-08-21T14:22:14 HEARTBEAT poll 80 disk=32.7GB
+2026-08-21T14:27:14 HEARTBEAT poll 85 disk=32.7GB
+2026-08-21T14:32:14 HEARTBEAT poll 90 disk=32.7GB
+2026-08-21T14:37:15 HEARTBEAT poll 95 disk=24.3GB
+2026-08-21T14:42:16 HEARTBEAT poll 100 disk=24.0GB
+2026-08-21T15:09:55 HEARTBEAT poll 105 disk=31.2GB
+2026-08-21T15:14:55 HEARTBEAT poll 110 disk=31.2GB
+2026-08-21T15:19:55 HEARTBEAT poll 115 disk=29.2GB
+2026-08-21T15:24:55 HEARTBEAT poll 120 disk=27.7GB
+2026-08-21T15:29:55 HEARTBEAT poll 125 disk=29.3GB
+2026-08-21T15:35:10 HEARTBEAT poll 130 disk=29.3GB
+2026-08-21T15:40:10 HEARTBEAT poll 135 disk=27.4GB
+2026-08-21T15:45:10 HEARTBEAT poll 140 disk=27.5GB
+2026-08-21T15:50:10 HEARTBEAT poll 145 disk=27.0GB
+2026-08-21T15:55:10 HEARTBEAT poll 150 disk=25.8GB
+2026-08-21T16:00:10 HEARTBEAT poll 155 disk=26.1GB
+2026-08-21T16:05:10 HEARTBEAT poll 160 disk=26.1GB
+2026-08-21T16:10:13 HEARTBEAT poll 165 disk=26.1GB
+2026-08-21T16:15:13 HEARTBEAT poll 170 disk=26.1GB
+2026-08-21T16:20:14 ACTION slot 2: hard death (pid 26256 gone, no RESULT.json, events stagnant 4218s); killing and redispatching loop/packets/BG-INV-103.md (restart 1/3)
+2026-08-21T16:20:26 ACTION slot 2: redispatch output: (none)
+2026-08-21T16:20:26 WARNING slot 2: run_packet exited 1: refusing to dispatch: this packet's claims no longer hold.
+  A8: expected 0, tree has 2  [grep -c 'pub fn' vendor/truck/truck-topology/src/invariants/euler_poin]
+Fix the packet, or -- if the tree moved -- re-scope it.
+2026-08-21T16:20:26 HEARTBEAT poll 175 disk=26.1GB
+2026-08-21T16:25:27 HEARTBEAT poll 180 disk=26.1GB
+2026-08-21T16:30:27 HEARTBEAT poll 185 disk=15.5GB
+2026-08-21T16:35:28 HEARTBEAT poll 190 disk=23.8GB
+2026-08-21T16:40:28 HEARTBEAT poll 195 disk=24.0GB
+2026-08-21T16:45:28 HEARTBEAT poll 200 disk=24.8GB
+2026-08-21T17:14:06 HEARTBEAT poll 205 disk=24.8GB
+2026-08-21T17:19:06 HEARTBEAT poll 210 disk=24.3GB
+2026-08-21T17:24:06 HEARTBEAT poll 215 disk=23.0GB
+2026-08-21T17:29:06 HEARTBEAT poll 220 disk=21.5GB
+2026-08-21T17:34:06 HEARTBEAT poll 225 disk=24.7GB
+2026-08-21T17:37:07 ACTION slot 0: hard death (pid 21536 gone, no RESULT.json, events stagnant 3758s); killing and redispatching loop/packets/BG-INV-104.md (restart 1/3)
+2026-08-21T17:37:21 ACTION slot 0: redispatch output: started pid 27456; poll with loop/slot_status.py
+2026-08-21T17:39:21 HEARTBEAT poll 230 disk=24.7GB
+2026-08-21T17:44:21 HEARTBEAT poll 235 disk=24.6GB
+2026-08-21T17:49:21 HEARTBEAT poll 240 disk=24.6GB
+2026-08-21T17:54:21 HEARTBEAT poll 245 disk=24.6GB
+2026-08-21T17:59:21 HEARTBEAT poll 250 disk=14.1GB
+2026-08-21T18:04:21 HEARTBEAT poll 255 disk=14.0GB
+2026-08-21T18:09:21 HEARTBEAT poll 260 disk=20.1GB
+2026-08-21T18:14:21 HEARTBEAT poll 265 disk=22.8GB
+2026-08-21T18:19:21 HEARTBEAT poll 270 disk=20.9GB
+2026-08-21T18:24:22 HEARTBEAT poll 275 disk=20.0GB
+2026-08-21T18:29:22 HEARTBEAT poll 280 disk=23.3GB
+2026-08-21T18:34:22 HEARTBEAT poll 285 disk=23.5GB
+2026-08-21T20:21:33 ACTION slot 1: hard death (pid 28068 gone, no RESULT.json, events stagnant 8051s); killing and redispatching loop/packets/BG-INV-108.md (restart 1/3)
+2026-08-21T20:21:40 ACTION slot 1: redispatch output: (none)
+2026-08-21T20:21:40 WARNING slot 1: run_packet exited 1: refusing to dispatch: this packet's claims no longer hold.
+  A5: expected 0, tree has 1  [grep -c 'pub fn' vendor/truck/truck-topology/src/invariants/shell_nest]
+Fix the packet, or -- if the tree moved -- re-scope it.
+2026-08-21T20:22:40 HEARTBEAT poll 290 disk=23.5GB
+2026-08-21T20:27:40 HEARTBEAT poll 295 disk=23.5GB
+2026-08-21T20:32:43 HEARTBEAT poll 300 disk=21.5GB
+2026-08-21T20:37:43 HEARTBEAT poll 305 disk=18.7GB
+2026-08-21T20:42:43 HEARTBEAT poll 310 disk=20.2GB
+2026-08-21T20:47:43 HEARTBEAT poll 315 disk=20.2GB
+2026-08-21T20:52:43 HEARTBEAT poll 320 disk=20.2GB
+2026-08-21T21:07:30 HEARTBEAT poll 325 disk=20.2GB
+2026-08-21T21:10:00 STOP (orchestrator at session-16 close: breakpoint reached, nothing in flight)

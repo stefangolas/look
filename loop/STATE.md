@@ -11,7 +11,7 @@ otherwise would eventually cost a trap.) If you are picking this up cold, read
 [`loop/ORCHESTRATOR.md`](ORCHESTRATOR.md) for how to run the loop, then
 `python loop/slot_status.py`** — nothing else. Do not read `LEDGER.jsonl` whole.
 
-Updated 2026-08-21, close of session 15. Branch: `integration/kernel-bg`. Nothing
+Updated 2026-08-21, close of session 16. Branch: `integration/kernel-bg`. Nothing
 from the loop has reached `main` and nothing has been pushed.
 
 ## What this is, if you have never seen it
@@ -55,141 +55,131 @@ here is scored, tuned, or sampled.
 
 ## Where we are
 
-**Forty-eight packets DONE of 69 (70%).** Session 15 (overnight) landed **three**:
-`BG-S0-004` — the STEP spline importer now refuses invalid supplied knots
-instead of silently synthesizing quasi-uniform ones, with the surface-path
-tiny-range normalization added per axis. It came back `SPEC_GAP` on a real
-packet defect: decision 2's `is_small_ratio` predicates drove TOL-001
-bookkeeping (marker total 19 -> 21, GATE-4 ceiling 109 -> 110) outside the
-dispatched `write_allow`. Adjudicated per the BG-S0-002 precedent — packet
-sharpened, worker's commit amended with exactly the two number updates,
-verify ACCEPTED (`bdd8980`), fault `PACKET`. Ceiling sits at 110/110.
+**Fifty-seven packets DONE of 70 (81%) — the user's defined breakpoint for
+this session, reached and closed cleanly.** Session 16 landed **nine**:
 
-`BG-TOL-004` — the degree-aware squared margins on `ToleranceCtx`
-(`is_small_len2` / `length2_margin` / `is_small_ratio2`), first-try ACCEPTED
-(`28f00cc`, fault NONE). The worker caught a one-ulp arithmetic error in the
-packet's own boundary test spec (the PCONE-witness trap, this time mine) and
-adapted faithfully — recorded in its `disagreements`, filed verbatim in
-`loop/results/BG-TOL-004.json`. The four-class site adjudication is now in
-the spec; classes 1-3 are follow-up migration shards, class 4 stays open
-design.
+The stage-1 CE pair, both first-try ACCEPTED (fault NONE):
+`BG-CE-002` — the whole-span leader-vs-carrier deviation certificate in
+`truck-evidence/src/deviation.rs`, TWO routes: the difference spline
+(one-shot for exact-spline pairs, including `PCurve<_, Plane>` flattened
+exactly; measured bound 2.5e-14 at tau=1e-6, zero subdivisions) and the
+budgeted box-diff bisection fallback. The packet also fixed a real defect
+the pre-dispatch scratch run found in the landed carriers:
+`knot_multiplicity` (3 copies) counted neighbouring distinct knots by
+tolerance, so sub-curve extraction stopped converging within 1e-6 of every
+knot (BG-ENC-002 violation, sound but non-convergent; spec amended).
 
-And `BG-CE-001` — the keystone. First-try ACCEPTED (`6625529`, fault NONE),
-closing `BG-CE-001-MIGRATE` with it via `covers:`: V8 gated 981 downstream
-tests unchanged, so the semantically-inert migration held with zero edits
-outside truck-topology. **The worker corrected the packet six times and was
-right every time** — the single-impl-block design cannot compile (E0282
-unconstrained PC), the spec's `with_pcurve -> Self` signature can never
-produce a non-() edge (E0308), and "do not touch PartialEq" contradicted
-the packet's own first test. The landed shape (two inherent impl blocks,
-`with_pcurve<Q> -> Edge<P, C, Q>`, generic `is_same`/`PartialEq`/`Hash` with
-byte-identical bodies) is recorded in the spec's CE-001 entry. **Stage 1
-of the fan-out is now OPEN.**
+`BG-CE-003` — the construction-DAG identity algebra
+(`EntityId/OpId/Op/OpKind/OpParams/Selector/End`) in
+`truck-topology/src/entity_id.rs`: standalone, no geometry, serde
+round-trip, bit-wise float equality (f64 has neither Eq nor Hash in std),
+stable FNV-1a+fmix64 hash pinned by three KAT constants that reproduced
+exactly. The `Arc<Mutex>->Arc` migration is the new row
+`BG-CE-003-MIGRATE` (SPECD, needs its own design packet for the
+replacement API first).
 
-Nothing in flight at close.
+Then the seven-packet INV wave, `BG-INV-101/102/103/104/105/108/109`, one
+new module each under `truck-topology/src/invariants/` behind orchestrator
+scaffolding (nine `Prop` arms + the module tree, landed up front for
+disjoint write sets): coedge pairing, vertex link, Euler–Poincaré,
+same-parameter (calling CE-002's certificate; attempt 1 was a SPEC_GAP —
+the worker correctly stopped on missing truck-evidence/inari/truck-
+geometry manifest deps, amended and re-dispatched), domain-boundary (the
+topological core; the pcurve half documented as waiting), the pure
+nesting-forest checker with an injectable inside-oracle (the NUM-004 seam;
+the and/or `Vec<Solid>` break is deferred with a spec amendment — a
+partition without a certified oracle mis-splits nested cavities), and
+wedge non-degeneracy (v1 midpoint-sampled, `Method::Float` honestly).
 
-**One incident, fully recovered:** the watchdog redispatched the already
-landed `BG-ENC-004-PCURVE` at 01:53 (restart 1/3 in its log), because a PS
-5.1 registry edit had left a UTF-8 BOM in `PACKETS.jsonl` that silently
-disabled `packet_is_done`, and a `new_slot.py`-without-`run_packet.py` had
-left slot 0's stale `worker.pid`/`worker.packet` behind. The bogus
-RESULT-only commit (`7d330d5`) was archived
-(`loop/slots/0/misdispatched-pcurve-20260821-RESULT.json`) and re-forked
-away; the BOM is removed and the watchdog's read path verified against a
-known-DONE row. Three new traps below carry the mechanisms.
+**One flake paid for and recovered:** BG-INV-102's first verify REJECTED
+on V8 via `geom_impls::test_circle_arc_tangent0` — a proptest that drew a
+near-degenerate case failing deterministically AT BASE too (4/4 with the
+seed pinned, replayed at base through the regression DIRECTORY). A latent
+property defect (missing precondition on t near 0/1), not a packet
+regression; artifact removed, re-verify ACCEPTED, fault NONE with a
+fault-note. The property itself needs a truck-modeling test fix packet
+some day — outside every current write set.
+
+Nothing in flight at close. GATE-4 at 110/110, untouched all session.
 
 ## Pick up here
 
-1. **Stage 1 of the fan-out is open — three moves, in priority order.**
-   (a) Write the `BG-CE-002` design packet (whole-span leader-vs-carrier
-   deviation certificate by interval evaluation; unlocks ISC) and
-   (b) the `BG-CE-003` design packet — the risky one: the `EntityId`/
-   `Selector`/`OpId` algebra is half-designed, `Selector`/`OpId`/`Op` are
-   defined nowhere in the tree, and the standalone-algebra approach from
-   session 9's scoping notes still holds; both are dispatchable in
-   parallel. (c) `BG-INV-104` is eligible but **collides with CE-003 on
-   truck-topology's write set** (`schedule.py` says so) — dispatch it only
-   after CE-003 lands. Re-derive every anchor and dependency
-   against the live tree before writing either packet — CE-001 just proved
-   the rule again: the packet's construction-site census and its
-   impl-header claim were right, but its API sketches were wrong in three
-   ways a worker caught.
-
-2. **After CE-001 lands, stage 1 opens.** Dispatch `BG-INV-104`
-   (mechanical, its deps are DONE) immediately; write the `BG-CE-002` and
-   `BG-CE-003` design packets. CE-003 is the risky one — the
-   `EntityId`/`Selector`/`OpId` algebra is half-designed (`Selector`, `OpId`
-   and `Op` are defined nowhere in the tree; the standalone-algebra approach
-   from session 9's scoping notes still holds). Re-derive every anchor and
-   dependency against the live tree before writing either packet — the
-   handoff rule that has been right every time it was checked.
-
-3. **Stage 2 is the user's defined breakpoint**: after CE-003 lands, the
-   seven INV rows (`BG-INV-101/102/103/104/105/108/109`) across all three
-   slots, then STOP and close cleanly. Arithmetic at that point: 56/69
-   (81%), 57/69 with TOL-004 landed. The tail after the breakpoint is gated
-   on FID-001 and NUM-003 (the FID chain, TOL-005, EVD-005, NUM-002/004,
-   ISC, SHARED-CONE), not on the CE chain.
-
+1. **The frontier is small and mechanical now.** `python loop/schedule.py`
+   at close: eligible = `BG-ENC-004-ISC` (mechanical, W5 — CE-002 landed,
+   so the residual certificate it waits for EXISTS as
+   `certify_deviation`; the der/tangent_cone halves were always composable)
+   and `BG-CE-003-MIGRATE` (wide-mechanical — but its note says it needs a
+   design packet first: the set_point/mapped replacement API shape is a
+   breaking design decision the orchestrator owns). ISC is the natural
+   next dispatch; MIGRATE's design packet is the next orchestrator design
+   task after that.
+2. **The tail after these two** is the FID chain the session-15 close
+   recorded: FID-001, NUM-003, TOL-005, EVD-005, NUM-002/004, ISC→…
+   NUM-004 also unlocks the INV-108 wiring (the and/or `Vec<Solid>` break
+   deferred with the spec amendment) and the certified oracle for the
+   nesting forest.
+3. **Known deferred work, recorded in the spec:** INV-105's pcurve-domain
+   half (waits on pcurve wiring into faces); INV-109's whole-span
+   certification (waits on pcurve parameter images feeding `normal_cone`);
+   the `test_circle_arc_tangent0` property fix (truck-modeling, missing
+   precondition on t near 0/1 — the seed is in this file's traps).
 4. **If the machine will sleep, stop the watchdog first** (`loop/watchdog.lock`
-   holds its pid). The workers survive sleep and resume on wake; the
-   watchdog does not know sleep happened and reaps on wake (trap below;
-   it already cost CE-001 attempt 1). Restart it with
-   `LOOK_WATCHDOG_STAGNANT=3600` via the `cmd /c` incantation when work
-   resumes.
-
-5. **Slot 1 sits idle on the landed PCONE leftover** (FINISHED, RESULT.json
-   still in its worktree — harmless, the next `new_slot.py` re-forks it).
-   It is the third dispatch slot the moment stage 1 opens.
+   holds its pid; it is STOPPED at close, STOP line in its log). Restart
+   with `LOOK_WATCHDOG_STAGNANT=3600` via the `cmd /c` incantation when
+   dispatch resumes.
+5. Disk was 20.2 GB at close — check `Get-PSDrive C` before the first
+   verify of the next session (each V8 baseline builds a throwaway
+   workspace; three slot targets sit at ~7 GB each and
+   `slot_status.py --disk` reports both target locations).
 
 ## State of the machine, as left
 
-- **Watchdog STOPPED at close** (nothing in flight — the session-12/14
-  rationale; its log carries the STOP line). Restart it with
-  `LOOK_WATCHDOG_STAGNANT=3600` via the `cmd /c` incantation when dispatch
-  resumes, and **stop it before any machine sleep** (trap below). Restart
-  budgets: BG-CE-001 1/3 used; the misdispatched PCURVE restart is recorded
-  but moot (the registry's DONE protection is verified working again after
-  the BOM fix).
-- **Nothing in flight; all three slots FINISHED and warm** on their landed
-  branches (slot 0 `28f00cc` TOL-004, slot 1 `6ce3d26` PCONE leftover,
-  slot 2 `6625529` CE-001). CE-001's attempt 1 lives in
-  `loop/slots/2/abandoned-*.patch` (machine-sleep false reap).
-- **Disk ~17 GB free at close** (the TOL-004 verify's baseline and CE-001's
-  builds consumed the session's headroom; both slot targets warm, no leaked
-  `%TEMP%/look-verify-baseline-*` after the verify's cleanup). **Check
-  `Get-PSDrive C` before running any verify** — each V5/V9 baseline builds
-  a whole extra workspace. The machine slept 02:10-08:45 (the heartbeat gap
-  in `watchdog.log` is the signature).
-- Registry: **46 DONE / 1 RUNNING / 20 SPECD / 2 BLOCKED** (69 rows).
-  Registry edits this session are python-only now — see the BOM trap.
-- `loop/packets/` gained `BG-CE-001.md` and `BG-TOL-004.md` (both
-  anchor-checked at dispatch); the misdispatch artifact is archived in
-  `loop/slots/0/`.
+- **Watchdog STOPPED at close** (process killed after its last HEARTBEAT
+  poll 325; the STOP line is appended to `watchdog.log`). Nothing was in
+  flight. Restart with `LOOK_WATCHDOG_STAGNANT=3600` via the `cmd /c`
+  incantation; stop before any machine sleep.
+- **All three slots IDLE on their landed branches** (slot 0 `2252117`
+  BG-INV-104, slot 1 `d22d9f7` BG-INV-108, slot 2 `c995935` BG-INV-109);
+  `new_slot.py` re-forks them for the next dispatch.
+- **Disk 20.2 GB at close.** The session's verifies and nine landings ran
+  comfortably; the three slot targets hold ~7/6/7 GB. Check
+  `Get-PSDrive C` before verify runs; `slot_status.py --disk` reports both
+  target locations per slot.
+- Registry: **57 DONE / 11 SPECD / 2 BLOCKED** (70 rows — one MORE than
+  session 15: `BG-CE-003-MIGRATE` was added at CE-003's re-scope).
+  Registry edits are python-only (the BOM trap).
+- GATE-4 ceiling **110/110**, never moved all session (every packet's
+  tests avoided `unscaled_legacy(` — the CE-002 worker's
+  `ToleranceCtx::new` adaptation set the pattern the INV-104 packet
+  mandated).
+- `loop/packets/` gained nine packets this session (BG-CE-002, BG-CE-003,
+  BG-INV-101/102/103/104/105/108/109); `loop/results/` holds their filed
+  RESULT.jsons; the ledger is at 52 rows.
 
 ## The parallelism picture
 
-69 rows. **Nothing in flight; the session-14 frontier is fully landed.**
-The new frontier is stage 1 of the CE chain: BG-INV-104 (mechanical,
-dispatchable now), BG-CE-002 and BG-CE-003 (design, orchestrator-written).
-Open rows by class:
-10 mechanical, 11 design, 1 wide-mechanical — every open mechanical row is
-still gated exactly as session 14 recorded: the six INV-1xx checkers wait on
-`BG-CE-003` (INV-104 on CE-001), SHARED-CONE on PCURVE+ISC, ISC on CE-002,
-OFFSET and INV-107 BLOCKED, CE-001-MIGRATE about to close with CE-001.
-**The CE chain re-opens the seven-packet mechanical fan-out at its far
-end** (CE-001 -> CE-003 -> INV wave), and stage 1 of that chain opens the
-moment CE-001 lands. The fan-out pattern (scaffolding -> shared types ->
-templated packets -> 3 concurrent workers) is fully proven; the bottleneck
-from here is orchestrator design time on CE-002/CE-003, exactly as
-predicted.
+70 rows. Nothing in flight; the CE chain's stage 1 AND the INV wave are
+fully landed. What remains by class: 10 mechanical, 9 design, 1
+wide-mechanical... (re-run `python loop/schedule.py` for the live counts —
+at close: eligible `BG-ENC-004-ISC` + `BG-CE-003-MIGRATE`, everything else
+gated on the FID/NUM chain or BLOCKED). The INV-106/107 rows wait on
+FID-001/TOL-001-TYPE; SHARED-CONE on PCURVE+ISC; OFFSET BLOCKED on the
+EnclosureSurface interface question. The next orchestrator design work,
+in order: the ISC packet (mostly composition — read
+`decorators/intersection_curve.rs`'s scaffold, it records the shape), the
+MIGRATE replacement-API design, then the FID chain.
 
-Session 15's cost picture: one landed packet (BG-S0-004, one dispatch, one
-amendment, first-try ACCEPT on the amended commit), two design packets
-written, one misdispatch paid for by a BOM and a half-finished slot reset
-(recovered with zero lost work — the PCURVE code was already landed), and
-one worker lost to a machine-sleep false reap. The lesson density of
-overnight unattended runs is high; the traps below are the receipts.
+Session 16's cost picture: nine packets landed for two SPEC_GAPs paid
+(zero redispatches beyond the amended 104), one flake appeased (INV-102,
+fault NONE with fault-note), one first-attempt dispatch refusal
+(`run_packet.py`'s own anchor check caught a broken `grep -rc` anchor
+before any worker was paid), and nine first-try verifies ACCEPTED out of
+ten (the one rejection was the flake). The pre-dispatch scratch-crate
+validation caught three design errors before dispatch (f64 lacks Eq/Hash;
+Hasher's unstable float methods; the carrier convergence defect) and the
+workers caught five packet errors the scratch could not see (the
+in-crate-vs-out-of-crate class) — the division of labor worked exactly as
+designed.
 
 ## Traps, each one paid for
 - **The watchdog's default 1200s wedged-killer kills healthy workers during a
@@ -869,6 +859,87 @@ reason is in the commit that made the change, and the code will not tell you.
   (lid close, overnight), stop the watchdog first** (pid in
   `loop/watchdog.lock`) and restart it when the session resumes; restart
   budgets absorb one such reap, but each one wastes a worker's progress.
+
+- **V8 reads a flaky proptest as a regression too — proven this session,
+  and the recovery has a path trap.** BG-INV-102's first verify REJECTED
+  on V8 via `truck-modeling/src/geom_impls.rs::test_circle_arc_tangent0`
+  (a `#[property_test]`). The packet changed one unreferenced leaf module —
+  impossible — and replaying the pinned seed at BASE proved it: the seed
+  (p0/p1 both on the z-axis, `t = 0.9999789572401523`, so p2 ≈ p1 and
+  `circum_center` is ill-conditioned) fails 4/4 at base too. The property
+  is missing a precondition on `t` near 0/1 — a latent truck-modeling
+  defect outside every write set. Recovery: delete the slot worktree's
+  `proptest-regressions/` artifact and re-verify (fresh seeds pass 8/8).
+  **THE PATH TRAP: the regression artifact is a DIRECTORY
+  (`proptest-regressions/geom_impls.txt`), not a flat file — copying it to
+  the flat path makes the replay run silently draw FRESH seeds and
+  "pass", invalidating the experiment.** Reproduce at the right path
+  before believing any pinned-seed result. Same disease family as the V5
+  bspcurve flake; V8 inherits it. The property fix is future work in
+  truck-modeling.
+
+- **The RESULT.json landing dance has three flavors, and over-cleaning
+  costs recoveries.** (a) Uncommitted: copy worktree → repo root BEFORE
+  `land_packet.py` (it reads the root after the worktree check). (b)
+  Committed: your untracked root copy BLOCKS the merge — remove it, land
+  (the merge brings RESULT.json in tracked), then delete the root copy
+  again. (c) If you delete the worktree copy too early: committed ones
+  restore with `git -C <slot wt> checkout -- RESULT.json`; UNCOMMITTED
+  ones are recoverable VERBATIM from the worker's session transcript —
+  `events.jsonl` records the write tool call with the full content
+  (`part.state.input.content`). **Never reconstruct a RESULT.json from
+  memory or from a truncated read — the worker's reasoning must stay
+  verbatim.** A land attempt that fails at the merge step has NOT filed
+  anything; re-run it after fixing the collision.
+
+- **API sketches validated OUTSIDE a crate do not type-check INSIDE it.**
+  Session 16's INV packets were designed from scratch-crate perspective and
+  all three wave-1 workers caught the same class: `Shell` takes THREE type
+  parameters (`Shell<P, C, S>`, no default), `Shell` lives at the crate
+  root (`use crate::Shell`, not `crate::shell::Shell` — shell.rs only
+  privately glob-imports it), `use truck_topology::*` is E0432 from inside
+  the crate (use `use crate::*`), and `#[derive(Default)]`-only types trip
+  `missing_debug_implementations` in truck-topology but not in a scratch
+  crate. The workers' `disagreements` field caught every one — packets that
+  name API signatures must invite disagreement explicitly, and the
+  orchestrator should write in-crate sketches as if from inside the module.
+
+- **A checker that calls another crate's API needs the manifest edge — and
+  nobody had landed it.** BG-INV-104 attempt 1 was a clean SPEC_GAP: the
+  worker implemented the whole checker, hit E0432 on `use
+  truck_evidence::…`, reverted to baseline and asked. The fix is
+  `truck-topology → truck-evidence` (+ `inari`; `truck-geometry` as
+  dev-dep) — acyclic, since evidence does not depend on topology — landed
+  by the amended packet as decision 0 (manifest + lock in write_allow, the
+  BG-CE-003 serde_json precedent). Spec amended: the edge is the intended
+  layering. Any future invariants-tree checker speaking interval
+  certificates uses the same edge.
+
+- **`run_packet.py` dying with `PermissionError: [WinError 32]` on
+  `events.jsonl` right after printing "Running packet" is BENIGN.** The
+  worker launched and opened the events log before run_packet's own
+  post-launch cleanup could reset it; the crash is orchestrator-side
+  bookkeeping only. Check `slot_status.py` — a fresh pid and growing
+  events means the dispatch took; do NOT re-run it.
+
+- **`grep -rc PATTERN dir | wc -l` counts FILES, not matches** (GNU grep
+  prints one line per file, zero-count files included) — two packet
+  anchors were written with it this session and one was caught by
+  `run_packet.py`'s own pre-dispatch anchor check (the A3 refusal, fixed
+  before any worker was paid), the other by manual verification. The
+  match-counting form is `grep -r PATTERN dir | wc -l`.
+
+- **The scratch-crate pre-validation found three errors a compile check
+  alone never would, and was worth every minute.** Session 16's CE-002
+  scratch RUN (not just compiled) the whole design: it found the carriers'
+  terminal-strip convergence defect (a BG-ENC-002 violation, spec
+  amended), measured the bisection cost model that forced the two-route
+  design (130 µs/cell → minutes per edge at tau=1e-6), and caught f64
+  having neither Eq nor Hash. The discipline for design packets: compile
+  it, then RUN the flagship witnesses and the cost, then write the packet
+  with the measured numbers in it. The one thing the scratch could NOT
+  cover was in-crate compilation (the trap above) — the workers covered
+  that half, exactly as the disagreements field was designed for.
 
 ## The commands
 
