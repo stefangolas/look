@@ -19,6 +19,13 @@
 >
 > **Synced to formal system revision 3.** Four items changed and one landed
 > artefact needs amending:
+> - **BG-FID-001a / bridge lemmas (session 19)** — the edge wedge term is now
+>   `chi_lower`, a certified bound on [CCSL09]'s χ_K derived from BG-INV-109's
+>   sine certificate (branch ambiguity and midpoint scope documented); CCS05
+>   T2.1/T2.2 named as the theorem BG-FID-003 instantiates, CONDITIONAL on
+>   L-TUBE, L-COVERING, L-SEPARATES (open proof obligations); Federer equality
+>   demoted to motivation pending L-FEDERER-PATCH; naming discipline until
+>   then: `tube_width_lower` / `chi_lower`, never bare `reach`/`lfs`.
 > - **BG-FID-008 (new)** — §6.2 gained a one-sheet condition (iv). (i)–(iii) give
 >   a covering of *some* degree, not a homeomorphism, so a checker implementing
 >   only them passes a double-cover input and voids everything above it. Consumed
@@ -1856,6 +1863,17 @@ type `LfsLowerBound`, not `lfs`; the naming is the enforcement, because a bare
 `lfs` invites a future call site to read it as an equality and compare in the
 wrong direction.
 
+**AMENDMENT (session 19, theorem grounding).** Two stricter naming rules hold
+until their theorem chains are discharged: (1) the face-interior three-way min
+ships as `tube_width_lower` — it certifies exactly what downstream eps budgets
+consume, but calling it reach or lfs claims L-FEDERER-PATCH, which is an OPEN
+proof obligation (see below), not a landed fact; (2) the edge row ships as
+`chi_lower`, a certified lower bound on the literature's critical-function
+quantity χ_K ([CCSL09] Def 4.3), not as a private `ϱ_wedge`. The scaffold's
+`LfsLowerBound` name attaches only after L-FEDERER-PATCH lands; consumers
+between now and then use the inequality form `q < c · bound` (BG-FID-007),
+which any conservative bound satisfies regardless of name.
+
 ```
 lfs_lower(x, stratum) = min( intrinsic_lower(stratum), separation_lower(x), wedge_lower(x) )
                       <= lfs(x, stratum)          # true value, never computed
@@ -1864,7 +1882,7 @@ lfs_lower(x, stratum) = min( intrinsic_lower(stratum), separation_lower(x), wedg
 | stratum | intrinsic (lower bound on reach) | separation | incident structure |
 |---|---|---|---|
 | face interior | `min(1/κ_max_upper, ½·σ_self_lower)` | lower bound on dist to non-incident strata | lower bound on dist to own boundary wires |
-| edge interior | lower bound on curve reach of `c_e` | as above | `ϱ_wedge(ψ)`, → 0 as ψ→0 or 2π |
+| edge interior | lower bound on curve reach of `c_e` | as above | `chi_lower` — certified lower bound on the critical-function quantity χ_K; see BG-FID-001a |
 | vertex | 0-dimensional | star separation | min incident edge length, min angular separation, min dihedral over star |
 
 **BG-FID-001.** `lfs_lower` is computed **per stratum**, never as a single global
@@ -1876,6 +1894,80 @@ the specific error §6.1 exists to correct, and it is easy to reintroduce.
 a crack (ψ→2π) drives `ϱ_wedge` to zero. Faces whose bound is 0 route to collapse
 (§5), not to a certificate.
 
+**BG-FID-001a (edge χ certificate — session 19 amendment).** The edge row's
+incident-structure term is a certified lower bound on the critical function
+χ_K of [CCSL09] (*A sampling theory for compact sets in Euclidean space*,
+Def 4.3), replacing the previously undefined `ϱ_wedge`. Derivation, to be
+carried as structured comments at the implementation site:
+
+- For a wedge whose two face normals at the edge make angle φ, the minimum
+  norm over the generalized gradient `conv{n_A, n_B}` is `cos(φ/2)`; this is
+  the local normalized-slope value the distance function takes on the
+  bisector region, and it dies correctly at BOTH knife degeneracies (folded
+  ψ→0 and crack ψ→2π both force antiparallel normals, φ→π).
+- BG-INV-109 certifies `|n_A × n_B| >= sin_margin`, i.e. a LOWER bound on
+  sin φ — which constrains φ away from BOTH 0 and π and cannot distinguish
+  the healthy-flat branch from the degenerate branches. The sound two-sided
+  consequence is therefore
+
+  ```
+  chi_lower = sqrt((1 - sqrt(1 - sin_margin^2)) / 2)
+  ```
+
+  monotone increasing in sin_margin: →0 exactly when no non-degeneracy is
+  certified (knife witnesses route to collapse, per BG-FID-002), and strictly
+  positive whenever INV-109 passes.
+- **Known limitation, documented not hidden:** this bound is weak by
+  construction (at sin_margin = 1 it still reports only 1/√2, because a sine
+  certificate cannot see branch identity). A branch-specific bound
+  (`cos(φ/2)` with certified φ near π) requires a SIGNED normal-alignment
+  certificate — e.g. `dot(n_A, n_B) <= -c` — which BG-INV-109 does not
+  currently provide. Extending INV-109 is future packet work, not FID-001
+  scope.
+- **Sampling scope:** BG-INV-109 v1 samples each edge's parameter midpoint,
+  so the edge χ certificate is scoped `MidpointCell` until BG-CE-001's pcurve
+  payloads enable whole-span normal enclosure. Consumers must not read it as
+  whole-edge.
+
+**Bridge lemmas for BG-FID-003 (session 19 amendment — proof obligations, not
+facts).** [CCS05] (*A condition for isotopic approximation*, Thms 2.1/2.2)
+gives isotopy from purely topological hypotheses: containment in a common
+topological thickening + side separation (+ homeomorphy for T2.1 alone). Its
+METRIC tube section assumes C² CLOSED surfaces; trimmed faces are ours to
+justify. BG-FID-003's conditions are DESIGNED TO discharge CCS05's hypotheses
+through three named bridge lemmas, each carrying statement + proof sketch or
+SPEC_GAP:
+
+```
+L-TUBE       eps < reach(X) => the closed eps-tube of a compact C²
+             surface-with-boundary is a topological thickening whose sides
+             are the offset sheets   (closed case = classical tubular
+             neighborhood theorem; the with-boundary restriction is OURS)
+L-COVERING   transversality/local-inverse (BG-FID-003 ii) + properness +
+             certified fibre multiplicity one (iv-a/b) => the fibre
+             projection is a ONE-SHEETED COVERING => homeomorphism.
+             ("degree one implies homeomorphism" is NOT the theorem; the
+             covering property from (i)-(iii) is what supplies properness.)
+L-SEPARATES  a continuous one-sheet SECTION of the product thickening —
+             a graph inside S×[0,1] — separates the thickening's sides;
+             the section property comes from L-COVERING's homeomorphism
+             inverse. Fibre-wise "met exactly once" alone does not close
+             this proof.
+Chain: (i)-(iii) + (iv) => local homeomorphism => covering => homeomorphism
+       => continuous section => side separation => CCS05 Thm 2.1 isotopy.
+```
+
+Additionally, L-FEDERER-PATCH is an OPEN obligation: given a cell at
+certified distance h from its trimmed boundary, curvature bounded above by K,
+and certified exclusion of non-incident sheets within radius r, prove the
+normal tube of radius min(1/K, r, h) is single-valued over the cell. Until it
+lands, Federer's closed-manifold equality is MOTIVATION for the decomposition,
+not a proof of it, and no API may claim reach semantics (see the naming rules
+above). Likewise L-COVERAGE: local per-stratum χ certificates do NOT compose
+into a global r_mu(K)/wfs(K) without certified coverage of all competing
+regions — that composition is an open obligation wherever a global quantity
+is claimed.
+
 **BG-FID-007 (bound direction, §6.1).** Every gate has the form `q < c ·
 lfs_lower`, so substituting a lower bound is conservative: it can refuse an
 instance the true value would admit, and can never admit one the true value would
@@ -1886,6 +1978,12 @@ refuse. Two consequences the code must respect:
   computed upper bound, and `σ_self_lower` is a computed lower bound on the
   bottleneck — so no API may return this quantity under a name asserting equality
   with reach, and no test may assert equality against a hand-computed reach.
+  **AMENDMENT (session 19):** the equality is demoted to MOTIVATION for the
+  decomposition's shape until L-FEDERER-PATCH (see BG-FID-001a's bridge-lemma
+  register) proves the trimmed-patch tube statement directly; the executable
+  contract is the three-way min shipped as `tube_width_lower`, whose semantics
+  are "certified single-valuedness radius of the normal tube over the cell",
+  never "reach".
 - **Refusals are epistemic.** `ReachLowerBoundTooSmall` asserts that the bound
   could not be certified large enough, **not** that the feature size is small.
   A diagnostic that says "feature too small" when the bound merely failed to
