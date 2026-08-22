@@ -50,10 +50,10 @@ isotopic in both M and M'.
 
 | | |
 |---|---|
-| Hypotheses | purely topological: containment + side-separation (+ homeomorphy for 2.1) |
+| Hypotheses | purely topological: containment + side-separation (+ homeomorphy for 2.1). NOTE (feedback): the paper's TOPOLOGICAL framework allows compact orientable surfaces WITH boundary — its thickening is S×[0,1] whose boundary contains ∂S×[0,1] — but its METRIC tubular-neighborhood section explicitly switches to "S is C²-smooth and closed", and only there states S^eps ≅ S×[-eps,eps] for eps < lfs(S). The closed-smooth metric tube is theirs; the trimmed-face version is OURS (L-TUBE below). |
 | Conclusion | ambient isotopy inside M |
-| Kernel certificate today | **BG-FID-003 (i)-(iv)** is exactly this, mechanized: (i) `d_H ≤ eps < rho_lower/2` puts X' inside the normal tube `M := {x : d(x,X) ≤ eps}` — which for `eps < reach` IS a topological thickening (disc bundle over X), sides = the two offset sheets. (iii)/(ii) make phi transverse to fibres; (iv-a/b) certify each fibre met once ⇒ along ANY fibre path from side to side, X' appears ⇒ **side separation holds by intermediate value on each fibre**. Homeomorphy for T2.1 comes free from (i)-(iii)'s covering property plus (iv-a) degree one: a degree-one proper covering is a homeomorphism. |
-| Missing certificate | (a) the spec never NAMES the theorem — soundness of isotopy_ok rests on prose; add citation + the one-line fibre-wise IVT argument to §6.2 so reviewers check the mapping, not a vibe. (b) the small lemma "**reach-tube thickening lemma**": for eps < reach(X), the closed eps-tube of a connected compact C² surface-with-boundary is a topological thickening whose sides are the offset sheets. Standard tubular-neighborhood theorem for CLOSED manifolds; the WITH-BOUNDARY case for trimmed faces is OUR adaptation and must be stated as kernel lemma L-TUBE (proof: restrict the disc bundle to the boundary-respecting subbundle; needs only reach > eps on the face interior stratum). |
+| Kernel certificate today | **BG-FID-003 (i)-(iv) is DESIGNED TO discharge CCS05 T2.1/T2.2; the equivalence is CONDITIONAL on the named bridge lemmas L-COVERING, L-SEPARATES and L-TUBE below** — it is not yet an identity, and no spec prose may claim it is. Mapping: (i) `d_H ≤ eps < rho_lower/2` puts X' inside the normal tube `M := {x : d(x,X) ≤ eps}`; (iii)/(ii) give transversality of phi to fibres; (iv-a/b) certify fibre multiplicity one. |
+| Missing certificate | THREE bridge lemmas, each a proof obligation carried in structured comments at the certificate site: **L-COVERING**: the certified fibre projection is a proper local homeomorphism (from transversality/local inverse), hence a finite covering (compact/proper); the certified fibre multiplicity establishes it is ONE-SHEETED; a one-sheeted covering is a homeomorphism. (The precise fact is "one-sheeted covering ⇒ homeomorphism", not bare "degree one implies homeomorphism".) **L-SEPARATES**: once the approximation is a continuous one-sheet SECTION of the product thickening — a graph S' = {(x, f(x)) : x ∈ S} inside S×[0,1] — any path from fibre coordinate 0 to fibre coordinate 1 crosses the graph by continuity. "Each fibre met once" in isolation does NOT complete this proof; the continuous-section property (from L-COVERING's homeomorphism inverse) is what makes it work. **L-TUBE**: for eps < reach(X), the closed eps-tube of a connected compact C² surface-WITH-boundary is a topological thickening whose sides are the offset sheets. Standard tubular-neighborhood theorem covers CLOSED manifolds only ([CCS05]'s own metric section assumes closed); the with-boundary case for trimmed faces is our adaptation (restrict the disc bundle to the boundary-respecting subbundle; needs reach > eps on the face interior stratum). Chain the structured comments encode: transversality/local-inverse + compact/proper + one sheet ⇒ local homeomorphism ⇒ covering ⇒ homeomorphism ⇒ continuous section ⇒ side separation ⟹ CCS05 isotopy. |
 
 ## Cluster 2 - metric corollaries of CCS05 (lfs enters)
 
@@ -71,17 +71,22 @@ eps may be while M stays a thickening** (Cluster 1's missing lemma L-TUBE).
 
 ## Cluster 3 - Federer reach decomposition (curvature vs bottleneck)
 
-For a CLOSED C² submanifold, reach = min(1/rho_max, mu_bottleneck) where
-rho_max = sup |k_n| (max absolute normal curvature) and mu_bottleneck = closest
-self-approach of distinct sheets (medial-axis distance). This is the split the
-spec's face-interior row already encodes: `min(1/rho_max_upper, mu_self_lower)`.
+For a CLOSED C² submanifold, reach is realized either by a bottleneck of size
+2tau or by curvature 1/tau (Aamari et al., *Estimating the Reach of a
+Manifold*, EJS 2019, state this for compact smooth boundaryless manifolds;
+Federer 1959 is the origin). **This decomposition is MOTIVATION for the
+implementation's shape; it is NOT yet the proof of it.** The exact quantity
+the literature calls the bottleneck term has NOT been matched to what our
+`mu_self_lower` would compute — until that match exists, the string
+`reach = min(1/rho_max, mu_bottleneck)` appears in NO executable contract,
+no packet decision, and no structured comment.
 
 | | |
 |---|---|
 | Hypotheses | CLOSED C² submanifold (no boundary!) — the spec/lfs.rs warning stands |
-| Conclusion | equality; used by us conservatively as inequality |
-| Kernel certificate today | `EnclosureSurface::enclose_der(2,·)` supplies interval II boxes; scratch-validated this session (see Scratch findings). mu_self_lower has NO implementation yet. |
-| Missing certificate | **L-FEDERER-PATCH (kernel lemma, smallest form):** for x on a face interior with d(x, ∂face) ≥ h, the reach of the face AT x is ≥ min(1/rho_max_upper(cell_x,h), mu_self_lower(...)) where cell terms are computed over the h-interior subdomain. Proof obligation: Federer's equality restricted to a compact subdomain with boundary stays an inequality (min of the two mechanisms still lower-bounds local reach); this is the "local Federer" adaptation and must carry its own proof sketch in the packet, NOT a citation. |
+| Conclusion | equality for the closed smooth case only |
+| Kernel certificate today | `EnclosureSurface::enclose_der(2,·)` supplies interval II boxes; scratch-validated sound this session. mu_self_lower has NO implementation AND no matched literature semantics yet. |
+| Missing certificate | **L-FEDERER-PATCH is a red-gate theorem packet of its own**, not a line item here. The statement we actually NEED (feedback-revised): given a parameter cell C lying at certified distance h from the trimmed boundary, curvature bounded above by K over C, and certified EXCLUSION of non-incident sheets inside radius r, prove that the normal tube of radius `min(1/K, r, h)` is single-valued over C. If that admits a direct quantitative inverse-function/tubular-neighborhood proof, we never lean on an informal "local Federer equality" at all. Until this lemma is proved, FID-001 may ship the three-way min ONLY as a certified lower bound on TUBE WIDTH (which is what FID-003(i)'s eps budget actually consumes), and must NOT name it "reach" or "lfs" in any API surface. |
 
 ### Sufficiency verdict on the curvature upper bound (user question)
 
@@ -99,31 +104,12 @@ sphere carrier (r=2, true sup|k_n| = 1/2):
   box straddles zero — refusal-driven subdivision alone certifies but with
   terrible constants (77x-409x) because moderately-wide cells answer badly;
   IF tightness ever matters, subdivision must be driven by a target bound,
-  not by refusal. Recorded as a design note; NOT needed for FID-003, whose
-  gates consume lfs_lower through inequalities where over-estimation of
-  rho_max merely costs eps budget (over-refusal = epistemic refusal, already
-  the spec's stated semantics).
+  not by refusal. Recorded as a design note; NOT needed unless a downstream
+  theorem inequality fails with the current bound.
 
 Every downstream gate has form `q < c · lfs_lower` (BG-FID-007): substituting
 a smaller certified value can refuse but cannot admit — the property that
 makes tightness irrelevant to correctness.
-
-### reach_lower = min(curvature_radius_lower, bottleneck_lower) route
-
-Adopt for smooth face interiors, structured as:
-
-```
-reach_lower(face interior point x)
-  = min( 1 / rho_max_upper(cell around x),
-         mu_self_lower(distance to non-incident sheets),
-         d_boundary_lower(x) )        # strata table's separation term
-```
-
-This is NOT Federer's equality claimed as equality — it is the conservative
-min-of-lower-bounds, valid because min(a,b,c) <= min(A,B,C) whenever each
-certified piece <= its true counterpart, and local reach >= min of the three
-mechanisms by L-FEDERER-PATCH. The three-way min (adding the boundary term)
-is what makes the patch lemma work without closedness.
 
 ## Cluster 4 - [CCSL09] critical function, wfs, mu-reach
 
@@ -163,29 +149,37 @@ The current lfs.rs table row "edge interior: theta_wedge(e), -> 0 as theta ->
 0 or 2pi" coins a quantity no paper defines. Replace the CONTRACT (not just
 the implementation): the edge/vertex rows must return **certified lower bounds
 on the critical function / mu-reach contribution**, built from two certificates
-we already plan:
+we already plan.
 
-- **L-WEDGE-SLOPE (kernel lemma, smallest form):** for a solid bounded by two
-  half-planes meeting at dihedral angle theta, the normalized slope of d_K
-  satisfies |grad-normalized| >= cos(min(theta, 2pi-theta)/2) on the bisector
-  region within distance s of the edge, with s = separation to non-incident
-  structure. Elementary geometry of wedges; proof is a direct computation in
-  the packet. Consequence: chi_K(t) >= cos(theta_worst/2) for t up to
-  s_edge-scale, hence r_mu(edge neighbourhood) >= s · (something explicit in
-  theta, mu) and wfs-contribution >= min over star of these.
-- Inputs: theta_wedge LOWER bound = BG-INV-109's certificate (exists as an
-  item; checker landed? INV-109 status: DONE per earlier registry waves —
-  verify at packet time); separation = BG-FID-001's own separation term.
+**L-WEDGE-SLOPE (kernel lemma, red-gate; the cos formula is SPECULATIVE until
+derived).** The candidate bound `chi_K >= cos(theta/2)` must remain untrusted:
+dihedral wedges carry MULTIPLE angle conventions (interior angle, exterior
+angle, angle between face normals, angle between distance gradients), and
+depending on which one BG-INV-109 supplies, the expression can become a sine
+or involve the supplementary angle. The derivation recipe, in order:
 
-This preserves published hypotheses exactly: we compute a lower bound on the
-PAPERS' quantity (chi_K / mu-reach), so downstream consumers (Stage 4 topology
-events, §16.3 generalized critical values) sit directly on CCSL09 statements.
-If our B-rep statement (stratified, trimmed, corners where three faces meet)
-is not literally covered by [CCSL09]'s compact-set setting — it is, B-rep
-boundaries ARE compact sets, but positivity of wfs for polyhedra-like sets is
-cited to [Chazal-Lieutier 05/07] — then the smallest adaptation is a cited
-positivity lemma ("piecewise analytic => wfs > 0", [CCSL09-CGTA] intro citing
-refs 6,7), not a new theory.
+1. define the wedge mathematically (two half-planes, chosen convention);
+2. write its two nearest-point gradients explicitly;
+3. compute the minimum norm of their convex hull (this is what the normalized
+   slope at a point equidistant from both sheets reduces to);
+4. express the result in EXACTLY the dihedral convention BG-INV-109's
+   certificate uses;
+5. test limiting behaviour at BOTH degeneracies: theta -> degenerate angle
+   (0 or 2pi per INV-109's convention) must give chi_lower -> 0.
+
+Inputs: theta_wedge LOWER bound = BG-INV-109's certificate (verify its landed
+state and numeric content at packet time); separation = FID-001's own term.
+
+**Globality caveat (feedback):** a local edge-neighbourhood bound on chi_K
+does NOT by itself establish a global r_mu(K) or wfs(K): chi_K takes an
+infimum over the relevant distance level/set. Converting local stratum
+certificates into the compact-set theorem's global critical function requires
+CERTIFIED COVERAGE of all competing regions and a certified minimum over them.
+The compact-set statement applies to a B-rep boundary read as one compact set;
+that conversion is OURS — name it **L-COVERAGE** and treat it as a proof
+obligation wherever a global quantity is claimed. Until it exists, edge/vertex
+rows return LOCAL contributions typed as such (`ChiLowerBound { scope: Cell }`),
+never a global r_mu/wfs.
 
 ---
 
@@ -209,37 +203,60 @@ edge/vertex intrinsic rows beyond the wedge lemma's chi_K bound (that is
 FID-002/§6.1 positivity routing and Stage 4's business), global wfs
 computation, mu-reach evaluation machinery, tight curvature refinement.
 
-**Revised FID-001 scope for the packet:**
+**Revised FID-001 scope for the packet** (feedback-incorporated):
 
-- `lfs_lower` API: stratified struct returning the three-way min per stratum,
-  typed `LfsLowerBound`, direction documented (BG-FID-007).
-- Face interior: `min(1/rho_max_upper, mu_self_lower, d_boundary_lower)`
+- **Naming discipline:** until L-FEDERER-PATCH and L-COVERAGE are proved, the
+  API ships quantities named for what they certify — `tube_width_lower`,
+  `chi_lower` — NOT `reach`/`lfs`. The `lfs_lower` name from the scaffold may
+  only attach once its theorem chain is discharged; otherwise the scaffold
+  doc comment is amended to record the deferral. (A bound that refuses more
+  than true lfs is still safe to consume under BG-FID-007's inequality form;
+  what is forbidden is CLAIMING it equals or lower-bounds reach without the
+  lemma.)
+- Face interior: three-way min shipped as `tube_width_lower =
+  min(1/rho_max_upper(cell), mu_self_lower(cell), d_boundary_lower(x))`,
   with rho_max_upper implemented EXACTLY as scratch-validated (enclose_der
-  II + iota normalization + refusal), mu_self_lower and d_boundary_lower
-  via Box3/enclosure distances between incident/non-incident cells.
-- Edge interior: `chi_contribution_lower = cos(theta/2)` form via L-WEDGE-
-  SLOPE consuming BG-INV-109's wedge certificate + separation; returned AS a
-  critical-function lower bound type (`ChiLowerBound`), not as "lfs".
-- Vertex: star separation min (mechanical), flagged as feeding the same
-  chi_K machinery.
+  II + iota normalization + refusal). mu_self_lower semantics must be
+  MATCHED to a literature quantity or explicitly defined as "certified
+  exclusion radius of non-incident sheets" feeding L-FEDERER-PATCH's r —
+  the packet picks the latter (it is what our Box3 distances actually give).
+- Edge interior: `chi_lower` via L-WEDGE-SLOPE following the five-step
+  derivation recipe, consuming BG-INV-109's certificate in ITS convention,
+  degeneracy limits asserted by test at both ends.
+- Vertex: star separation min (mechanical), typed as local chi contribution.
+- Bridge lemmas L-TUBE / L-COVERING / L-SEPARATES are FID-003's proof
+  obligations, not FID-001 code — but §6.2's spec amendment records them NOW
+  so isotopy_ok's soundness claim stops being prose. Each carries: statement,
+  hypotheses in the cited paper's own terms, proof sketch or SPEC_GAP.
+- Structured comments: every certificate site cites its theorem instance and
+  which hypothesis each input discharges, per the L-COVERING→L-SEPARATES
+  chain shape.
 - Tests per scaffold (cube unit with `<=` assertions; anti-global-reach;
   scale homogeneity; knife-edge zero) PLUS: sphere-carrier unit asserting
-  the curvature term matches the scratch numbers (soundness witnesses), and
-  the double-cover circle refused by any consumer-style use (ties to
-  BG-TEST-007).
-- Spec amendment BEFORE dispatch: name CCS05 T2.1/T2.2 in §6.2 with the
-  instantiation map above; replace the `theta_wedge` prose in §6.1 with the
-  chi_K-lower-bound framing; record L-TUBE / L-FEDERER-PATCH / L-WEDGE-SLOPE
-  as named kernel lemmas with their proof obligations.
+  the curvature term matches the scratch numbers; wedge degeneracy limits
+  (theta->0 and theta->2pi both drive chi_lower -> 0); double-cover circle
+  refused by consumer-style use (ties to BG-TEST-007).
+- Spec amendment BEFORE dispatch: §6.2 names CCS05 T2.1/T2.2 with the
+  conditional instantiation map and the three bridge lemmas; §6.1 replaces
+  the theta_wedge row with chi_K-lower-bound framing + globality caveat
+  (L-COVERAGE); Federer decomposition demoted to motivation until matched.
+
+**Stop conditions added to the packet:** any bridge lemma that cannot be
+justified from the cited theorem's actual hypotheses => SPEC_GAP naming the
+gap; do not invent the bridge. Resuming curvature-tightness work requires a
+downstream theorem inequality that FAILS with the current conservative bound.
 
 ## Open items carried to packet time
 
 - TRANSCRIBE-AT-PACKET-TIME: exact constants of [CCSL09-CGTA] Thm 4.2/4.3
   (fetch the PDF again and copy character-for-character); Federer's exact
-  equality statement if any gate cites it as more than motivation.
-- Verify BG-INV-109's landed state and what its wedge certificate returns
-  numerically (angle only? angle + witness?) before writing L-WEDGE-SLOPE.
-- Decide lfs_lower's locality granularity (per-point with cached per-cell
-  refinement) jointly with FID-003's consumption pattern in rep's refine
-  loop — the asin(eps/rho_lower) term wants rho_lower valid ON THE CELL BEING
-  EMITTED, which suggests lfs_lower should be callable per partition cell.
+  equality statement — now DEMOTED to motivation; no gate cites it.
+- Verify BG-INV-109's landed state and, critically, WHICH angle convention
+  its wedge certificate returns (interior/exterior/normal-normal) before
+  writing L-WEDGE-SLOPE's step 4.
+- Decide locality granularity jointly with FID-003's consumption pattern in
+  rep's refine loop (the asin(eps/rho_lower) term wants rho_lower valid ON
+  THE CELL BEING EMITTED).
+- L-FEDERER-PATCH and L-COVERAGE may each deserve their own red-gate theorem
+  packets rather than riding inside FID-001 — decide after the FID-001
+  packet's write set is fixed.
