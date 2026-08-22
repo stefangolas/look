@@ -1,0 +1,14 @@
+{
+  "id": "BG-INV-108",
+  "status": "DONE",
+  "contracts": ["BG-INV-108"],
+  "tests_added": 6,
+  "sites_migrated": 0,
+  "sites_deferred": 0,
+  "deviations": [],
+  "disagreements": [
+    "Packet decision 2 writes the depth recurrence as `depth(i) = 1 + max(depth(j))` over the j with `contains(j, i) == Some(true)`, while decision 1 defines `contains(i, j)` as \"i's witness point lies inside j\". Taken literally that recurrence counts depths inside-out (innermost = 0): for the nested pair (contains(1,0)=Some(true)) it yields depth(0)=1, depth(1)=0 and a partition of [(1, [])], contradicting the tests' [(0, [1])] and the prose \"component 2, at depth 2\". Per the stop condition I trusted the tests' algebra and implemented OUTSIDE-IN depths (outermost = 0; depth(i) = 1 + max(depth(j)) over the j that CONTAIN i, i.e. `contains(i, j) == Some(true)`). That algebra reproduces every partition the six tests assert, including the three-level [(0, [1]), (2, [])]."
+  ],
+  "baseline_failures": [],
+  "notes": "Implemented vendor/truck/truck-topology/src/invariants/shell_nesting.rs: the pure-graph BG-INV-108 checker. Queries every ordered pair at most once into a cached table (any None -> Refusal::NumericallyUnresolved with UncertifiedContainment, before any graph work); detects cycles (including the two-cycle) by peeling a Kahn topological order (any shortfall -> the decision-4 Contradictory refusal); computes outside-in nesting depths; takes the transitive reduction for immediate containment; and partitions every even-depth component into (outer, sorted immediate inner shells), returning a sorted partition under the decision-3 holds certificate (Prop::ShellNesting true, Method::None, Budget 0/0/0, Margin::UNBOUNDED, Modulus::Unbounded). Added six unit tests and one doctest per decisions 5-6. Verified: cargo fmt --check, cargo clippy --all-targets --no-deps, cargo test --lib --tests --no-fail-fast (39 pass), cargo test --doc (121 pass), cargo check --workspace --all-targets, and scripts/kernel-gates.sh 3818835 (all P-3 gates pass; unscaled_legacy 110/110). All five anchors match at baseline. Committed as d22d9f7 with the required subject."
+}
