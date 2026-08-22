@@ -1,0 +1,18 @@
+{
+  "id": "BG-NUM-003",
+  "status": "DONE",
+  "contracts": ["BG-NUM-003"],
+  "tests_added": 6,
+  "sites_migrated": 0,
+  "sites_deferred": 0,
+  "deviations": [],
+  "disagreements": [],
+  "baseline_failures": [
+    {
+      "gate": "cargo fmt --check -p truck-evidence",
+      "file": "vendor/truck/truck-evidence/src/lib.rs",
+      "finding": "At the base commit b10a86d the crate already fails the fmt gate: `pub mod num;` is declared after `pub mod nurbs;` while rustfmt's default reorder_modules wants it between `line` and `nurbs`. The out-of-order declaration was introduced by the BG-NUM-002 scaffold commit e69103e. lib.rs is outside this packet's write_allow (the packet explicitly forbids editing it), so the gate cannot be made green without a scope change. krawczyk.rs itself is fmt-clean; this is the only remaining fmt diff."
+    }
+  ],
+  "notes": "The Krawczyk operator is implemented in num/krawczyk.rs exactly per decisions 0-8: point-center F(m), row-major d = I - Y*J, strict-interior containment written as `k.inf() > q.inf() && k.sup() < q.sup()` with no empty k, bisect-on-None preconditioner (decision 4), widest-axis/tie-lowest bisection spending one subdivision each, spent reported as initial minus remaining (decision 2), and Refusal::Empty for empty/non-finite boxes. All six required tests pass (169 lib tests, 0 failures), clippy is clean, `cargo check --workspace --all-targets` passes, and `bash scripts/kernel-gates.sh b10a86d` reports all P-3 gates pass (unscaled_legacy 110/110, unchanged). The only failing Done-when gate is `cargo fmt --check -p truck-evidence`, caused by a pre-existing out-of-order `pub mod num;` in the read-only lib.rs (see baseline_failures); I did not edit lib.rs or any file outside write_allow. The BG-NUM-002 cross-validation property test (two independent methods must agree) is deliberately out of scope per the packet: num/roots.rs is still a scaffold with no implementation to compare against; it lands with BG-NUM-002 and was not stubbed, ignored, or approximated. The measured scratch outcomes all reproduce: x^2-2 on [1,2] certifies Unique one-shot with the budget untouched; x^2 on [-1,1] refuses NumericallyUnresolved/KrawczykIndeterminate with spent.subdiv == budget (64 and 3); Lin2 certifies one-shot; x^2+1 on [-2,2] proves NoRoot via the bisect-on-None calibration; the empty box refuses Empty."
+}
