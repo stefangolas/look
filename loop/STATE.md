@@ -11,161 +11,102 @@ otherwise would eventually cost a trap.) If you are picking this up cold, read
 [`loop/ORCHESTRATOR.md`](ORCHESTRATOR.md) for how to run the loop, then
 `python loop/slot_status.py`** — nothing else. Do not read `LEDGER.jsonl` whole.
 
-Updated 2026-08-22, close of session 18. Branch: `integration/kernel-bg`. Nothing
-from the loop has reached `main` and nothing has been pushed.
-
-## What this is, if you have never seen it
-
-`vendor/truck/` is a vendored CAD kernel this repo owns. A formal specification,
-`docs/GENERATION_KERNEL_BUILD_SPEC.md`, lists ~56 numbered contract items
-(`BG-S0-*`, `BG-EVD-*`, `BG-TOL-*`, ...) that harden it - replacing panics with
-refusals carrying evidence, giving tolerances a model, certifying enclosures.
-This loop discharges those items with LLM workers instead of by hand.
-
-**You are the orchestrator.** You write work packets, schedule them, adjudicate
-verification, and amend the spec. **You do not write the kernel code.** A packet
-is dispatched to a worker (deepseek v4 flash via opencode) that gets one file -
-the packet - and one git worktree, and gets no say in whether its work is
-accepted. `loop/verify.py` is the only acceptance authority; a worker's
-`RESULT.json` is a claim, never a verdict.
-
-Three documents define the rest, and you should read them in this order when a
-specific need arises rather than upfront:
-
-- [`docs/KERNEL_AUTOBUILD_LOOP.md`](../docs/KERNEL_AUTOBUILD_LOOP.md) - the loop
-  design: packet schema (§4), the V-gates (§5), context budget (§3), disk (§7).
-- [`docs/GENERATION_KERNEL_BUILD_SPEC.md`](../docs/GENERATION_KERNEL_BUILD_SPEC.md)
-  - the contract items themselves and **house rules H-1..H-8**, which every
-  packet restates and every worker must obey. H-8 is the one that bites: anchors
-  are `rg` patterns and symbol names, never line numbers, and a count mismatch
-  is a stop condition, not a nuisance.
-- `loop/packets/BG-TOL-001-GEOM-NURBS.md` - the newest and largest worked
-  example of a migration shard. `BG-NUM-003.md` is the newest worked example of
-  a from-scratch design packet whose every formula was scratch-run first;
-  `BG-NUM-002.md` shows the same shape (and its disagreements field shows what
-  the worker catches when you get a formula wrong anyway).
-- `loop/packets/BG-EVD-004-r2.md` - written, checked and **undispatched**; the
-  worked example of a packet that fixes a defect rather than migrating sites.
-- `loop/packets/BG-TOL-001-MESHALGO-SURVEY.md` - the `class: survey` template,
-  sharpened after its first run. Copy it to survey a new crate.
-
-The loop is a **build** loop, not a search loop: acceptance is mechanical and
-deterministic, so the verifier does the job an objective function would. Nothing
-here is scored, tuned, or sampled.
+Updated 2026-08-22, close of session 19. Branch: `integration/kernel-bg`. Nothing
 
 ## Where we are
 
-**Sixty-one packets DONE of 70 (87%). NOTHING is running; the watchdog is
-STOPPED.** Two design jobs are queued and both are yours before anything can
-dispatch: MIGRATE-r2 (see below) and FID-001's packet (scaffold landed).
+**Sixty-two packets DONE of 70 (89%). NOTHING is running; the watchdog IS
+running (started 2026-08-22 08:47, LOOK_WATCHDOG_STAGNANT=3600, pid in
+loop/watchdog.lock).** One design job gates the next dispatch: BG-FID-001,
+whose authoritative design input is `loop/packets/BG-FID-001-THEOREM-MAP.md`
+(committed, review-revised at `34b7485`). Do not design FID-001 from lfs.rs's
+scaffold prose alone.
 
-Session 18 in one line: three packets written, three landed first-try ACCEPTED,
-one honest REJECTED with the most valuable finding of the session.
+Session 19 in one line: MIGRATE-r2 landed with a worker-caught design flaw
+fixed correctly; the FID family got its theorem footing and three named
+bridge lemmas; two packet-authoring traps paid for.
 
-**BG-NUM-003 - LANDED first-try ACCEPTED** (`94ce3c7` merge). Every decision in
-the packet held: point-center F(m), strict-interior uniqueness, row-major
-Jacobian, bisect-on-None preconditioner, spent reported as initial-minus-
-remaining. The two scratch calibrations were amended into the spec first
-(`480c884`). GATE-4 untouched at 110/110 throughout the session.
+**BG-CE-003-MIGRATE-r2 - LANDED** (`3ad59d8` filing commit; worker commit
+`abcea79` on `packet/BG-CE-003-MIGRATE`; fault PACKET, one round trip).
+punched_cube passes on integration (run by hand at landing: ok). The worker's
+RESULT.json deviations field is mandatory reading before writing any packet
+that touches shared maps: my canonical-vertex design had a REAL flaw - the
+Inner-arm unify sweep leaves STALE KEYS in the shared emap (the cut halves
+die, their raw Arc addresses get reused by the allocator, and
+`or_insert_with` then hands one store's replacement edge to the OTHER store).
+Worker added the key-eviction fix (`emap.remove(&half0_id);
+emap.remove(&half1_id);`) with the correctness argument in deviations,
+proved the new identity test FAILS on attempt-1 code, kept all loops_store
+tests green. First verify REJECTED on V3 LINT_UNLINTED - MY defect (trap:
+narrowing `crates` on an r2 packet).
 
-**BG-ENC-004-SHARED-CONE - LANDED first-try ACCEPTED** (`cbc9a9d` merge, filed
-at `8005085`). The four duplicated helpers (`interval_at`, `cross_box`,
-`midpoint_ball_cone`, `immersion_lower_bound_box`) now live once in
-`enclosure.rs`; seven modules delegate to them; 418 lines of copies deleted.
-The worker's SPEC_GAP was NOT a gap in its work: it refused to call the seven
-copies "byte-identical" because two spell the guard clauses in a different
-order (behaviourally identical), and it was blocked by the lib.rs fmt defect
-below. Both positions were correct.
-
-**BG-NUM-002 - LANDED first-try ACCEPTED** (`f95dfd1` merge) **and the worker
-caught five errors in my packet** - all five witness coefficient sequences and
-test parameters were wrong in ways that would have made required tests
-impossible or meaningless (details as a trap below). Its disagreements field is
-the best reading in the loop's history; read it before writing another numeric
-packet.
-
-**BG-CE-003-MIGRATE attempt 1 - REJECTED, correctly** (worker commit `c5cb4c6`
-preserved on `packet/BG-CE-003-MIGRATE`; ledger row committed at `c25736a`,
-fault PACKET). V5 failed on exactly one test:
-`transversal::integrate::tests::punched_cube` - "This shell is not oriented and
-closed." The worker's QUESTION.md derives why: `add_geom_vertex` registered ONE
-shared mutable Vertex instance in BOTH stores, and it is the INSTANCE IDENTITY
-across later `change_vertex` re-replacements - not just the final point - that
-kept the cross-store intersection edge unified so the boolean shell closes.
-Immutable `Arc<G>` construction splits the instances; the packet's decision 7
-(single reassignment, one closing edge) cannot express it, and neither can the
-worker's faithful reconstruction (per-store effective vertices + re-pointing +
-per-store caches - loops_store's own tests pass, loops byte-identical, pipeline
-still open). Everything else in the migration is green and preserved on the
-branch: storage swap, replacement API, entity_id Replace arm, fillet order swap,
-meshalgo migration, six tests incl. the 8-rayon parallel query.
-
-**Registry fixes / scaffolds this session:** the fid module tree scaffolded
-(`2fc8c13`) carrying BG-FID-001's full contract in module docs; spec amended
-with the NUM-003 calibrations (`480c884`); lib.rs module-order fix (`726e9b3`,
-orchestrator amendment - my scaffold commit e69103e broke crate fmt and two
-workers found it).
+**FID theorem footing (committed `0a0eb4c`, revised per review `34b7485`):**
+`loop/packets/BG-FID-001-THEOREM-MAP.md`. Sources fetched and read this
+session: CCS05 Thm 2.1/2.2 verbatim (topological thickening -> isotopy;
+NOTE its metric tube section assumes C2 CLOSED - trimmed-face tubes are OURS),
+CCSL09 critical function / wfs / mu-reach. Load-bearing conclusions:
+- BG-FID-003 is DESIGNED TO discharge CCS05 T2.1/T2.2, CONDITIONAL on bridge
+  lemmas L-COVERING + L-SEPARATES + L-TUBE (explicit proof obligations).
+- L-FEDERER-PATCH is a red-gate theorem packet of its own; until it lands,
+  ship `tube_width_lower` / `chi_lower` names, NEVER "reach"/"lfs".
+- L-WEDGE-SLOPE's cos(theta/2) is SPECULATIVE until derived; five-step
+  recipe in the map; match BG-INV-109's angle convention first.
+- Local chi bounds != global r_mu/wfs: the conversion needs L-COVERAGE.
+- Curvature upper bound from the session scratch is SUFFICIENT as-is (sound +
+  honest refusal); NO tightness work unless a downstream inequality fails.
+- Scratch lives in %TEMP%/opencode/fid-scratch (inari endpoints are
+  .inf()/.sup(); iota normalization beats naive cross-box norm brackets;
+  refusal-driven subdivision certifies everywhere but with terrible constants
+  - tightness-driven subdivision only if ever needed).
 
 ## Pick up here
 
-1. **Write BG-CE-003-MIGRATE-r2 against the live code.** Read
-   `truck-shapeops/src/transversal/loops_store/mod.rs` and the worker's branch
-   diff FIRST - do not design from QUESTION.md's prose (the carrier-source
-   trap). The design question: how does cross-store instance identity survive
-   immutable construction? Candidates the QUESTION suggests but does not decide:
-   a SHARED replacement cache consulted by both stores' `change_vertex` paths
-   keyed by original EntityId (the worker tried per-store caches; a shared cache
-   is the untried variant), or a final reconciliation pass walking
-   `EntityId::replaced` chains. Whatever you decide must make punched_cube close
-   WITHOUT weakening any loops_store assertion. The archive patch at
-   `loop/slots/1/abandoned-20260822-020418.patch` holds uncommitted residue;
-   the real work is the commits on the branch.
-2. **FID-001's packet** - the scaffold `vendor/truck/truck-evidence/src/fid/`
-   carries the whole contract (strata table, naming rule, bound direction, test
-   list). Before writing the packet, scratch-validate the curvature term on ONE
-   analytic carrier (second fundamental form from `enclose_der(2, ·)` in
-   intervals) exactly the way ISC and NUM-003 did - both times that discipline
-   caught design errors pre-dispatch.
-3. Then the frontier is INV-106, NUM-004, FID-008 -> FID-003 -> FID-005 (the
-   unlock chain behind FID-001). INV-107 and OFFSET stay BLOCKED.
-4. Disk was 14 GB free at close with all slot targets warm (slot 0 ~12.4 GB,
-   slot 2 ~7 GB); `%TEMP%/look-verify-baseline-*` empty. Check `Get-PSDrive C`
-   before a verify run.
+1. **Write BG-FID-001's packet from THEOREM MAP as authoritative input.**
+   Scope section "Minimum FID-001 outputs"; naming discipline mandatory;
+   stop condition: any bridge lemma not justifiable from cited hypotheses =>
+   SPEC_GAP naming the gap; do not invent the bridge. Before writing: grep
+   what BG-INV-109 actually landed (vendor/truck/truck-topology/src/
+   invariants/) and which angle convention its wedge certificate returns.
+   The curvature term is DONE - do not re-scratch unless a downstream
+   inequality fails.
+2. Then the frontier: INV-106, NUM-004 (independent), then FID-008 ->
+   FID-003 -> FID-005 serially behind FID-001. INV-107 and OFFSET stay
+   BLOCKED.
+3. Slot 1 FINISHED+landed (abcea79) with stale worker files; slots 0/2 same.
+   Re-fork each with new_slot.py before its next dispatch.
+4. Disk ~23.5 GB free at close; no leaked verify baselines
+   (%TEMP%/look-verify-baseline-* empty).
 
 ## State of the machine, as left
 
-- **Watchdog STOPPED at close** (STOP line in `loop/watchdog.log`; lock released)
-  - nothing is running, deliberately. Restart it with
-  `LOOK_WATCHDOG_STAGNANT=3600` via the `cmd /c` incantation through
-  `Start-Process` if you dispatch anything.
-- **All three slots idle**: slot 0 finished+landed NUM-002 (`aa702bc`),
-  slot 1 reset onto `packet/BG-CE-003-MIGRATE@c5cb4c6` (rejected attempt's
-  preserved work), slot 2 finished+landed SHARED-CONE (`679d4c4`). `new_slot.py`
-  re-forks any of them.
-- Registry: **61 DONE / 7 SPECD / 2 BLOCKED** (70 rows). SPECD: MIGRATE-r2,
-  FID-001, INV-106, NUM-004, FID-008, FID-003, FID-005. HEAD `c9f40e9`,
-  tracked tree clean. GATE-4 at 110/110 (ceiling unchanged all session).
-- `loop/results/` gained BG-NUM-003.json, BG-ENC-004-SHARED-CONE.json,
-  BG-NUM-002.json; the ledger is at 57 rows (56 + the MIGRATE rejection).
+- **Watchdog RUNNING since 08:47** (`START watchdog pid ... stagnant=3600s`
+  in loop/watchdog.log). No reap events this session.
+- Registry: **62 DONE / 6 SPECD / 2 BLOCKED** (70 rows). SPECD: FID-001,
+  INV-106, NUM-004, FID-008, FID-003, FID-005. HEAD `34b7485`, tracked tree
+  clean. GATE-4 ceiling 110 -> 110 at landing (land_packet reset it to the
+  measured count).
+- loop/results/ gained BG-CE-003-MIGRATE-r2.json (worker deviations/
+  disagreements preserved verbatim - read before any shared-map work).
 
 ## The parallelism picture
 
-70 rows. At close nothing runs; eligible-after-writing: MIGRATE-r2 and FID-001
-(both blocked on MY design work, not slots), then INV-106, NUM-004, FID-008 ->
-FID-003 -> FID-005. The honest width constraint is still orchestrator design
-time: every remaining row needs either a redesign (MIGRATE r2) or a first
-design (FID family), and the FID chain is serial by dependency.
+70 rows, 62 DONE. Everything left is gated on orchestrator design time:
+FID-001's packet next, then INV-106 and NUM-004 (independent of the FID
+chain), then FID-008 -> FID-003 -> FID-005 serially. The FID chain may be
+faster than planned because contracts were fixed pre-dispatch via the
+theorem map - but L-FEDERER-PATCH and L-COVERAGE may each deserve their own
+red-gate theorem packets; budget for that when sizing follow-ups.
 
-Session 18's cost picture: three designed+dispatched+landed in one session each
-(the NUM pair validated by running the scratch first; SHARED-CONE was pure
-consolidation and went equally clean), one rejected with a finding that reopens
-a design question the mutation semantics had hidden for months, and one worker
-that earned its keep by recomputing every witness I handed it. The scratch-
-validation discipline is now 2-for-2 on landing first-try; the MIGRATE packet
-skipped it (loops_store could not be scratched cheaply) and paid - which is the
-pattern: validate what CAN run, and treat "could not be scratched" as a risk
-flag, not an exemption.
-
+Session 19's cost picture: one landing with one packet-defect round trip
+(V3 crates narrowing - mine, correctly caught by the gate); one worker
+finding worth more than the session's compute (stale emap keys + Arc address
+reuse - the mutation-semantics lesson EXTENDED: replacement maps carry
+instance identity too, and allocator address reuse makes stale map entries
+actively poisonous); and a theorem session that converted an undefined
+quantity (theta_wedge) into a literature-grounded certificate chain BEFORE
+any code was written. Scratch-validation discipline fired again: the
+curvature term ran before the packet exists, and its findings (iota route,
+refusal semantics) are already load-bearing decisions.
 ## Traps, each one paid for
 - **The watchdog's default 1200s wedged-killer kills healthy workers during a
   model-latency storm.** Session 13's endpoint had 23-60+ minute silence gaps
