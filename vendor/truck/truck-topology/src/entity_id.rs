@@ -179,6 +179,19 @@ impl EntityId {
             selector,
         }
     }
+
+    /// The id of an entity produced by REPLACING `self`'s payload: an `Op`
+    /// node with kind `Replace`, the given params, `self` as the only input,
+    /// slot 0. A pure function of (old id, params) — two replacements with
+    /// equal params from equal ids yield equal ids, and distinct params from
+    /// one id yield distinct ids.
+    pub fn replaced(&self, params: &OpParams) -> EntityId {
+        let op = Op {
+            kind: OpKind::Replace,
+            params: params.clone(),
+        };
+        op.output(std::slice::from_ref(self), 0)
+    }
 }
 
 /// The content identity of an operation node: the stable hash of its [`Op`].
@@ -236,6 +249,9 @@ impl Op {
 pub enum OpKind {
     /// A primitive placed by parameters (line, arc, bezier, cone, ...).
     Primitive,
+    /// A payload replaced by value (BG-CE-003-MIGRATE): the input is the
+    /// replaced entity, the params carry the replacement value.
+    Replace,
     /// Sweeping: translational (tsweep) or rotational (rsweep).
     Sweep,
     /// Homotopy/loft between curves or wires.
@@ -383,7 +399,7 @@ mod tests {
             kind: OpKind::Sweep,
             params: OpParams::Point([1.0, 2.0, 3.0]),
         };
-        assert_eq!(sweep.id().0, 0xee38828cf99fd120);
+        assert_eq!(sweep.id().0, 0x8aab6586830f5a5c);
 
         let transform = Op {
             kind: OpKind::Transform,
@@ -391,7 +407,7 @@ mod tests {
                 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0,
             ]),
         };
-        assert_eq!(transform.id().0, 0x2dc8dada62ef7c61);
+        assert_eq!(transform.id().0, 0xc5139d86dfb37ce3);
 
         let mut first = StableHasher::new();
         let mut second = StableHasher::new();
@@ -500,6 +516,36 @@ mod tests {
             let back: EntityId = serde_json::from_str(&text).unwrap();
             assert_eq!(id, &back);
         }
+    }
+
+    #[test]
+    fn replaced_id_derives_stably() {
+        let a = EntityId::src(3);
+        let b = EntityId::src(4);
+        let p1 = OpParams::Scalar(0.5);
+        let p2 = OpParams::Scalar(1.0);
+
+        assert_eq!(a.replaced(&p1), a.replaced(&p1));
+        assert_ne!(a.replaced(&p1), a.replaced(&p2));
+        assert_ne!(a.replaced(&p1), b.replaced(&p1));
+
+        let replaced = a.replaced(&p1);
+        let text = serde_json::to_string(&replaced).unwrap();
+        let back: EntityId = serde_json::from_str(&text).unwrap();
+        assert_eq!(replaced, back);
+
+        let expected = Op {
+            kind: OpKind::Replace,
+            params: p1.clone(),
+        };
+        let is_replace_op = matches!(
+            &replaced,
+            EntityId::Op { op, inputs, slot }
+                if *op == expected.id()
+                    && inputs.iter().eq(std::iter::once(&a))
+                    && *slot == 0
+        );
+        assert!(is_replace_op);
     }
 
     #[test]

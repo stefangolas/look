@@ -43,7 +43,7 @@ impl<P, C> Edge<P, C> {
             vertices: (front.clone(), back.clone()),
             orientation: true,
             pcurve: None,
-            curve: Arc::new(Mutex::new(curve)),
+            curve: Arc::new(curve),
         }
     }
 
@@ -159,31 +159,7 @@ impl<P, C> Edge<P, C> {
     where
         C: Clone,
     {
-        self.curve.lock().clone()
-    }
-
-    /// Set the curve.
-    /// # Examples
-    /// ```
-    /// use truck_topology::*;
-    /// let v = Vertex::news(&[(), ()]);
-    /// let edge0 = Edge::new(&v[0], &v[1], 0);
-    /// let edge1 = edge0.clone();
-    ///
-    /// // Two edges have the same content.
-    /// assert_eq!(edge0.curve(), 0);
-    /// assert_eq!(edge1.curve(), 0);
-    ///
-    /// // set the content
-    /// edge0.set_curve(1);
-    ///
-    /// // The contents of two edges are synchronized.
-    /// assert_eq!(edge0.curve(), 1);
-    /// assert_eq!(edge1.curve(), 1);
-    /// ```
-    #[inline(always)]
-    pub fn set_curve(&self, curve: C) {
-        *self.curve.lock() = curve;
+        (*self.curve).clone()
     }
 
     /// Returns how many same edges.
@@ -223,17 +199,38 @@ impl<P, C> Edge<P, C> {
         C: Clone + Invertible,
     {
         match self.orientation {
-            true => self.curve.lock().clone(),
-            false => self.curve.lock().inverse(),
+            true => (*self.curve).clone(),
+            false => (*self.curve).inverse(),
         }
     }
 
     /// Returns a new edge whose curve is mapped by `curve_mapping` and
     /// whose end points are mapped by `point_mapping`.
-    /// # Remarks
-    /// Accessing geometry elements directly in the closure will result in a deadlock.
-    /// So, this method does not appear to the document.
-    #[doc(hidden)]
+    /// # Examples
+    /// ```
+    /// use truck_topology::*;
+    /// let v0 = Vertex::new(0);
+    /// let v1 = Vertex::new(1);
+    /// let edge0 = Edge::new(&v0, &v1, 2);
+    /// // Reading the edge's own curve inside the closure is safe: geometry
+    /// // is immutable, so there is nothing to lock.
+    /// let edge1 = edge0
+    ///     .try_mapped(
+    ///         |i: &usize| {
+    ///             let _ = v0.point();
+    ///             Some(*i + 1)
+    ///         },
+    ///         |j: &usize| {
+    ///             let _ = edge0.curve();
+    ///             Some(*j + 1)
+    ///         },
+    ///     )
+    ///     .unwrap();
+    ///
+    /// assert_eq!(edge1.front().point(), 1);
+    /// assert_eq!(edge1.back().point(), 2);
+    /// assert_eq!(edge1.curve(), 3);
+    /// ```
     #[inline(always)]
     pub fn try_mapped<Q, D>(
         &self,
@@ -242,7 +239,7 @@ impl<P, C> Edge<P, C> {
     ) -> Option<Edge<Q, D>> {
         let v0 = self.absolute_front().try_mapped(&mut point_mapping)?;
         let v1 = self.absolute_back().try_mapped(&mut point_mapping)?;
-        let curve = curve_mapping(&*self.curve.lock())?;
+        let curve = curve_mapping(&*self.curve)?;
         let mut edge = Edge::debug_new(&v0, &v1, curve);
         if !self.orientation() {
             edge.invert();
@@ -258,19 +255,23 @@ impl<P, C> Edge<P, C> {
     /// let v0 = Vertex::new(0);
     /// let v1 = Vertex::new(1);
     /// let edge0 = Edge::new(&v0, &v1, 2);
+    /// // Reading the edge's own curve inside the closure is safe: geometry
+    /// // is immutable, so there is nothing to lock.
     /// let edge1 = edge0.mapped(
-    ///     &move |i: &usize| *i as f64 + 0.5,
-    ///     &move |j: &usize| *j as f64 + 0.5,
+    ///     |i: &usize| {
+    ///         let _ = v0.point();
+    ///         *i as f64 + 0.5
+    ///     },
+    ///     |j: &usize| {
+    ///         let _ = edge0.curve();
+    ///         *j as f64 + 0.5
+    ///     },
     /// );
     ///
     /// assert_eq!(edge1.front().point(), 0.5);
     /// assert_eq!(edge1.back().point(), 1.5);
     /// assert_eq!(edge1.curve(), 2.5);
     /// ```
-    /// # Remarks
-    /// Accessing geometry elements directly in the closure will result in a deadlock.
-    /// So, this method does not appear to the document.
-    #[doc(hidden)]
     #[inline(always)]
     pub fn mapped<Q, D>(
         &self,
@@ -279,7 +280,7 @@ impl<P, C> Edge<P, C> {
     ) -> Edge<Q, D> {
         let v0 = self.absolute_front().mapped(&mut point_mapping);
         let v1 = self.absolute_back().mapped(&mut point_mapping);
-        let curve = curve_mapping(&*self.curve.lock());
+        let curve = curve_mapping(&*self.curve);
         let mut edge = Edge::debug_new(&v0, &v1, curve);
         if edge.orientation() != self.orientation() {
             edge.invert();
@@ -295,13 +296,13 @@ impl<P, C> Edge<P, C> {
         P: Tolerance,
         C: BoundedCurve<Point = P>,
     {
-        let curve = self.curve.lock();
+        let curve = &*self.curve;
         let geom_front = curve.front();
         let geom_back = curve.back();
-        let top_front = self.absolute_front().point.lock();
-        let top_back = self.absolute_back().point.lock();
+        let top_front = &*self.absolute_front().point;
+        let top_back = &*self.absolute_back().point;
         // FIXME(BG-TOL-001): generic P is bounded Tolerance, not MetricSpace; the bound change is cross-crate and belongs to Stage B
-        geom_front.near(&*top_front) && geom_back.near(&*top_back)
+        geom_front.near(top_front) && geom_back.near(top_back)
     }
 
     /// Cuts the edge at `vertex`.
@@ -457,6 +458,43 @@ impl<P, C, PC> Edge<P, C, PC> {
         &self.vertices.1
     }
 
+    /// BG-CE-003: replacement, never in-place mutation. A fresh edge with the
+    /// same vertices (same handles — the topology is shared, not copied),
+    /// the same orientation and pcurve payload, and the given curve: a new id.
+    /// # Examples
+    /// ```
+    /// use truck_topology::*;
+    /// let v = Vertex::news(&[(), ()]);
+    /// let edge0 = Edge::new(&v[0], &v[1], 0);
+    /// let edge1 = edge0.with_curve(1);
+    ///
+    /// // The old handle keeps its curve; the replacement has a new id and
+    /// // the same end vertices.
+    /// assert_eq!(edge0.curve(), 0);
+    /// assert_eq!(edge1.curve(), 1);
+    /// assert_ne!(edge0.id(), edge1.id());
+    /// assert_eq!(edge0.front(), edge1.front());
+    /// assert_eq!(edge0.back(), edge1.back());
+    /// ```
+    #[inline(always)]
+    pub fn with_curve(&self, curve: C) -> Edge<P, C, PC>
+    where
+        PC: Clone,
+    {
+        Edge {
+            vertices: self.vertices.clone(),
+            orientation: self.orientation,
+            pcurve: self.pcurve.clone(),
+            curve: Arc::new(curve),
+        }
+    }
+
+    /// The shared entity curve by reference — no lock, no clone.
+    #[inline(always)]
+    pub fn shared_curve(&self) -> &C {
+        &self.curve
+    }
+
     /// Returns the parametric trace of this edge use on its owning face,
     /// if one has been attached.
     /// # Examples
@@ -598,13 +636,13 @@ impl<P, C, PC> Edge<P, C, PC> {
             vertices: (self.absolute_front().clone(), vertex.clone()),
             orientation: self.orientation,
             pcurve: None,
-            curve: Arc::new(Mutex::new(curve0)),
+            curve: Arc::new(curve0),
         };
         let edge1 = Edge {
             vertices: (vertex.clone(), self.absolute_back().clone()),
             orientation: self.orientation,
             pcurve: None,
-            curve: Arc::new(Mutex::new(curve1)),
+            curve: Arc::new(curve1),
         };
         match self.orientation {
             true => (edge0, edge1),
@@ -675,7 +713,7 @@ impl<P: Debug, C: Debug> Debug for DebugDisplay<'_, Edge<P, C>, EdgeDisplayForma
                         self.entity.back().display(vertex_format),
                     ),
                 )
-                .field("entity", &MutexFmt(&self.entity.curve))
+                .field("entity", &*self.entity.curve)
                 .finish(),
             EdgeDisplayFormat::VerticesTupleAndID { vertex_format } => f
                 .debug_struct("Edge")
@@ -697,7 +735,7 @@ impl<P: Debug, C: Debug> Debug for DebugDisplay<'_, Edge<P, C>, EdgeDisplayForma
                         self.entity.back().display(vertex_format),
                     ),
                 )
-                .field("entity", &MutexFmt(&self.entity.curve))
+                .field("entity", &*self.entity.curve)
                 .finish(),
             EdgeDisplayFormat::VerticesTupleStruct { vertex_format } => f
                 .debug_tuple("Edge")
@@ -709,9 +747,7 @@ impl<P: Debug, C: Debug> Debug for DebugDisplay<'_, Edge<P, C>, EdgeDisplayForma
                 self.entity.front().display(vertex_format),
                 self.entity.back().display(vertex_format),
             )),
-            EdgeDisplayFormat::AsCurve => {
-                f.write_fmt(format_args!("{:?}", MutexFmt(&self.entity.curve)))
-            }
+            EdgeDisplayFormat::AsCurve => f.write_fmt(format_args!("{:?}", *self.entity.curve)),
         }
     }
 }
@@ -789,6 +825,19 @@ mod coedge_tests {
         assert_eq!(edge.inverse().pcurve(), Some(&7i32));
         assert_eq!(edge.absolute_clone().pcurve(), Some(&7i32));
         assert_eq!(edge.clone().pcurve(), Some(&7i32));
+    }
+
+    #[test]
+    fn with_curve_preserves_topology() {
+        let v = Vertex::news([(), ()]);
+        let e = Edge::new(&v[0], &v[1], ());
+        let e2 = e.with_curve(());
+        assert_eq!(e.front().id(), e2.front().id());
+        assert_eq!(e.back().id(), e2.back().id());
+        assert_eq!(e.orientation(), e2.orientation());
+        assert_eq!(e.pcurve(), e2.pcurve());
+        assert_ne!(e.id(), e2.id());
+        assert_eq!(e.curve(), ());
     }
 
     #[test]

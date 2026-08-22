@@ -388,6 +388,13 @@ where
                 .map(move |(edge_idx, _)| (boundary_idx, edge_idx))
         },
     )?;
+    let side_surface = side.oriented_surface();
+    let fillet_surface = fillet_surface.clone();
+    // BG-CE-003-MIGRATE: replacement, never in-place mutation. The replaced
+    // edge must exist before the boundary insertions below use it, so the
+    // construction moves ahead of the boundary map.
+    let new_curve = IntersectionCurve::new(side_surface, fillet_surface, fillet_edge.curve());
+    let fillet_edge = fillet_edge.with_curve(new_curve.to_same_geometry());
     let new_boundaries = side
         .absolute_boundaries()
         .iter()
@@ -409,10 +416,6 @@ where
             new_boundary
         })
         .collect();
-    let side_surface = side.oriented_surface();
-    let fillet_surface = fillet_surface.clone();
-    let new_curve = IntersectionCurve::new(side_surface, fillet_surface, fillet_edge.curve());
-    fillet_edge.set_curve(new_curve.to_same_geometry());
     let mut new_face = Face::new(new_boundaries, side.surface());
     if !side.orientation() {
         new_face.invert();

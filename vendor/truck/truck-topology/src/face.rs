@@ -61,7 +61,7 @@ impl<P, C, S> Face<P, C, S> {
         Face {
             boundaries,
             orientation: true,
-            surface: Arc::new(Mutex::new(surface)),
+            surface: Arc::new(surface),
         }
     }
 
@@ -219,7 +219,7 @@ impl<P, C, S> Face<P, C, S> {
         S: Clone,
     {
         let surface = self.surface();
-        self.surface = Arc::new(Mutex::new(surface));
+        self.surface = Arc::new(surface);
     }
 
     /// Returns an iterator over the edges.
@@ -408,10 +408,34 @@ impl<P, C, S> Face<P, C, S> {
 
     /// Returns a new face whose surface is mapped by `surface_mapping`,
     /// curves are mapped by `curve_mapping` and points are mapped by `point_mapping`.
-    /// # Remarks
-    /// Accessing geometry elements directly in the closure will result in a deadlock.
-    /// So, this method does not appear to the document.
-    #[doc(hidden)]
+    /// # Examples
+    /// ```
+    /// use truck_topology::*;
+    /// let v = Vertex::news(&[0, 1, 2, 3, 4, 5, 6]);
+    /// let wire0 = Wire::from(vec![
+    ///     Edge::new(&v[0], &v[1], 100),
+    ///     Edge::new(&v[1], &v[2], 200),
+    ///     Edge::new(&v[2], &v[3], 300),
+    ///     Edge::new(&v[3], &v[0], 400),
+    /// ]);
+    /// let face0 = Face::new(vec![wire0], 10000);
+    /// // Reading the face's own surface inside the closure is safe: geometry
+    /// // is immutable, so there is nothing to lock.
+    /// let face1 = face0
+    ///     .try_mapped(
+    ///         &move |i: &usize| {
+    ///             let _ = v[0].point();
+    ///             Some(*i + 10)
+    ///         },
+    ///         &move |j: &usize| Some(*j + 1000),
+    ///         |k: &usize| {
+    ///             let _ = face0.surface();
+    ///             Some(*k + 100000)
+    ///         },
+    ///     )
+    ///     .unwrap();
+    /// assert_eq!(face0.surface() + 100000, face1.surface());
+    /// ```
     pub fn try_mapped<Q, D, T>(
         &self,
         mut point_mapping: impl FnMut(&P) -> Option<Q>,
@@ -423,7 +447,7 @@ impl<P, C, S> Face<P, C, S> {
             .iter()
             .map(|wire| wire.try_mapped(&mut point_mapping, &mut curve_mapping))
             .collect::<Option<Vec<_>>>()?;
-        let surface = surface_mapping(&*self.surface.lock())?;
+        let surface = surface_mapping(&*self.surface)?;
         let mut face = Face::debug_new(wires, surface);
         if !self.orientation() {
             face.invert();
@@ -480,10 +504,6 @@ impl<P, C, S> Face<P, C, S> {
     ///     }
     /// }
     /// ```
-    /// # Remarks
-    /// Accessing geometry elements directly in the closure will result in a deadlock.
-    /// So, this method does not appear to the document.
-    #[doc(hidden)]
     pub fn mapped<Q, D, T>(
         &self,
         mut point_mapping: impl FnMut(&P) -> Q,
@@ -495,7 +515,7 @@ impl<P, C, S> Face<P, C, S> {
             .iter()
             .map(|wire| wire.mapped(&mut point_mapping, &mut curve_mapping))
             .collect();
-        let surface = surface_mapping(&*self.surface.lock());
+        let surface = surface_mapping(&*self.surface);
         let mut face = Face::debug_new(wires, surface);
         if !self.orientation() {
             face.invert();
@@ -513,41 +533,52 @@ impl<P, C, S> Face<P, C, S> {
     }
 
     /// Returns the clone of surface of face.
+    ///
+    /// Geometry is immutable: to change the surface, construct a new face
+    /// with [`Face::with_surface`]; existing handles keep the old surface.
     #[inline(always)]
     pub fn surface(&self) -> S
     where
         S: Clone,
     {
-        self.surface.lock().clone()
+        (*self.surface).clone()
     }
 
-    /// Sets the surface of face.
+    /// BG-CE-003: replacement, never in-place mutation. A fresh face with the
+    /// same boundaries (same wire handles — the topology is shared, not
+    /// copied), the same orientation, and the given surface: a new id.
     /// # Examples
     /// ```
     /// use truck_topology::*;
     /// let v = Vertex::news(&[(), (), ()]);
     /// let wire = Wire::from(vec![
-    ///      Edge::new(&v[0], &v[1], ()),
-    ///      Edge::new(&v[1], &v[2], ()),
-    ///      Edge::new(&v[2], &v[0], ()),
+    ///     Edge::new(&v[0], &v[1], ()),
+    ///     Edge::new(&v[1], &v[2], ()),
+    ///     Edge::new(&v[2], &v[0], ()),
     /// ]);
     /// let face0 = Face::new(vec![wire], 0);
-    /// let face1 = face0.clone();
+    /// let face1 = face0.with_surface(1);
     ///
-    /// // Two faces have the same content.
+    /// // The old handle keeps its surface; the replacement has a new id and
+    /// // the same boundaries.
     /// assert_eq!(face0.surface(), 0);
-    /// assert_eq!(face1.surface(), 0);
-    ///
-    /// // Set surface
-    /// face0.set_surface(1);
-    ///
-    /// // The contents of two vertices are synchronized.
-    /// assert_eq!(face0.surface(), 1);
     /// assert_eq!(face1.surface(), 1);
+    /// assert_ne!(face0.id(), face1.id());
+    /// assert_eq!(face0.boundaries(), face1.boundaries());
     /// ```
     #[inline(always)]
-    pub fn set_surface(&self, surface: S) {
-        *self.surface.lock() = surface;
+    pub fn with_surface(&self, surface: S) -> Face<P, C, S> {
+        Face {
+            boundaries: self.boundaries.clone(),
+            orientation: self.orientation,
+            surface: Arc::new(surface),
+        }
+    }
+
+    /// The shared entity surface by reference — no lock, no clone.
+    #[inline(always)]
+    pub fn shared_surface(&self) -> &S {
+        &self.surface
     }
 
     /// Inverts the direction of the face.
@@ -898,7 +929,7 @@ impl<P, C, S> Face<P, C, S> {
         let mut face0 = Face {
             boundaries: self.boundaries.clone(),
             orientation: self.orientation,
-            surface: Arc::new(Mutex::new(self.surface())),
+            surface: Arc::new(self.surface()),
         };
         let boundary = &mut face0.boundaries[0];
         let i = boundary
@@ -921,7 +952,7 @@ impl<P, C, S> Face<P, C, S> {
         let face1 = Face {
             boundaries: vec![new_wire],
             orientation: self.orientation,
-            surface: Arc::new(Mutex::new(self.surface())),
+            surface: Arc::new(self.surface()),
         };
         Some((face0, face1))
     }
@@ -1023,7 +1054,7 @@ impl<P, C, S> Face<P, C, S> {
         Some(Face {
             boundaries,
             orientation: self.orientation(),
-            surface: Arc::new(Mutex::new(surface)),
+            surface: Arc::new(surface),
         })
     }
 
@@ -1098,8 +1129,8 @@ impl<P, C, S: Clone + Invertible> Face<P, C, S> {
     #[inline(always)]
     pub fn oriented_surface(&self) -> S {
         match self.orientation {
-            true => self.surface.lock().clone(),
-            false => self.surface.lock().inverse(),
+            true => (*self.surface).clone(),
+            false => (*self.surface).inverse(),
         }
     }
 }
@@ -1114,10 +1145,10 @@ where
     /// and the geometry of edge.
     #[inline(always)]
     pub fn is_geometric_consistent(&self) -> bool {
-        let surface = &*self.surface.lock();
+        let surface = &*self.surface;
         self.boundary_iters().into_iter().flatten().all(|edge| {
             let edge_consist = edge.is_geometric_consistent();
-            let curve = &*edge.curve.lock();
+            let curve = &*edge.curve;
             // BG-S0-001: `include` is now a certified predicate. An undecided
             // inclusion (`NumericallyUnresolved`) fails closed: a face whose
             // boundary containment could not be certified is not certified
@@ -1243,7 +1274,7 @@ impl<P: Debug, C: Debug, S: Debug> Debug for DebugDisplay<'_, Face<P, C, S>, Fac
                         .map(|wire| wire.display(wire_format))
                         .collect::<Vec<_>>(),
                 )
-                .field("entity", &MutexFmt(&self.entity.surface))
+                .field("entity", &*self.entity.surface)
                 .finish(),
             FaceDisplayFormat::BoundariesAndID { wire_format } => f
                 .debug_struct("Face")
@@ -1269,7 +1300,7 @@ impl<P: Debug, C: Debug, S: Debug> Debug for DebugDisplay<'_, Face<P, C, S>, Fac
                         .map(|wire| wire.display(wire_format))
                         .collect::<Vec<_>>(),
                 )
-                .field("entity", &MutexFmt(&self.entity.surface))
+                .field("entity", &*self.entity.surface)
                 .finish(),
             FaceDisplayFormat::LoopsListTuple { wire_format } => f
                 .debug_tuple("Face")
@@ -1291,11 +1322,25 @@ impl<P: Debug, C: Debug, S: Debug> Debug for DebugDisplay<'_, Face<P, C, S>, Fac
                         .map(|wire| wire.display(wire_format)),
                 )
                 .finish(),
-            FaceDisplayFormat::AsSurface => {
-                f.write_fmt(format_args!("{:?}", MutexFmt(&self.entity.surface)))
-            }
+            FaceDisplayFormat::AsSurface => f.write_fmt(format_args!("{:?}", *self.entity.surface)),
         }
     }
+}
+
+#[test]
+fn with_surface_preserves_boundaries() {
+    let v = Vertex::news([(), (), ()]);
+    let wire = Wire::from(vec![
+        Edge::new(&v[0], &v[1], ()),
+        Edge::new(&v[1], &v[2], ()),
+        Edge::new(&v[2], &v[0], ()),
+    ]);
+    let f0 = Face::new(vec![wire], ());
+    let f1 = f0.with_surface(());
+    assert_eq!(f0.boundaries(), f1.boundaries());
+    assert_eq!(f0.orientation(), f1.orientation());
+    assert_ne!(f0.id(), f1.id());
+    assert_eq!(f0.surface(), ());
 }
 
 #[test]

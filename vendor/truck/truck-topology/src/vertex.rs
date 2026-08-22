@@ -14,7 +14,7 @@ impl<P> Vertex<P> {
     #[inline(always)]
     pub fn new(point: P) -> Vertex<P> {
         Vertex {
-            point: Arc::new(Mutex::new(point)),
+            point: Arc::new(point),
         }
     }
 
@@ -35,48 +35,36 @@ impl<P> Vertex<P> {
     }
 
     /// Returns the point of vertex.
+    ///
+    /// Geometry is immutable: to change the point, construct a new vertex
+    /// with [`Vertex::new`]; existing handles keep the old point.
     #[inline(always)]
     pub fn point(&self) -> P
     where
         P: Clone,
     {
-        self.point.lock().clone()
+        (*self.point).clone()
     }
 
-    /// Sets the point of vertex.
+    /// Returns vertex whose point is converted by `point_mapping`.
     /// # Examples
     /// ```
     /// use truck_topology::*;
     /// let v0 = Vertex::new(0);
-    /// let v1 = v0.clone();
-    ///
-    /// // Two vertices have the same content.
-    /// assert_eq!(v0.point(), 0);
-    /// assert_eq!(v1.point(), 0);
-    ///
-    /// // set point
-    /// v0.set_point(1);
-    ///
-    /// // The contents of two vertices are synchronized.
-    /// assert_eq!(v0.point(), 1);
-    /// assert_eq!(v1.point(), 1);
+    /// // Reading a vertex's own point inside the closure is safe: geometry
+    /// // is immutable, so there is nothing to lock.
+    /// let v1 = v0.try_mapped(|p| {
+    ///     let _ = v0.point();
+    ///     Some(*p + 1)
+    /// });
+    /// assert_eq!(v1.map(|v| v.point()), Some(1));
     /// ```
-    #[inline(always)]
-    pub fn set_point(&self, point: P) {
-        *self.point.lock() = point;
-    }
-
-    /// Returns vertex whose point is converted by `point_mapping`.
-    /// # Remarks
-    /// Accessing geometry elements directly in the closure will result in a deadlock.
-    /// So, this method does not appear to the document.
-    #[doc(hidden)]
     #[inline(always)]
     pub fn try_mapped<Q>(
         &self,
         mut point_mapping: impl FnMut(&P) -> Option<Q>,
     ) -> Option<Vertex<Q>> {
-        Some(Vertex::new(point_mapping(&*self.point.lock())?))
+        Some(Vertex::new(point_mapping(&*self.point)?))
     }
 
     /// Returns vertex whose point is converted by `point_mapping`.
@@ -84,16 +72,17 @@ impl<P> Vertex<P> {
     /// ```
     /// use truck_topology::*;
     /// let v0 = Vertex::new(2);
-    /// let v1 = v0.mapped(|a| *a as f64 + 0.5);
+    /// // Reading a vertex's own point inside the closure is safe: geometry
+    /// // is immutable, so there is nothing to lock.
+    /// let v1 = v0.mapped(|p| {
+    ///     let _ = v0.point();
+    ///     *p as f64 + 0.5
+    /// });
     /// assert_eq!(v1.point(), 2.5);
     /// ```
-    /// # Remarks
-    /// Accessing geometry elements directly in the closure will result in a deadlock.
-    /// So, this method does not appear to the document.
-    #[doc(hidden)]
     #[inline(always)]
     pub fn mapped<Q>(&self, mut point_mapping: impl FnMut(&P) -> Q) -> Vertex<Q> {
-        Vertex::new(point_mapping(&*self.point.lock()))
+        Vertex::new(point_mapping(&*self.point))
     }
 
     /// Returns the id of the vertex.
@@ -192,18 +181,41 @@ impl<P: Debug> Debug for DebugDisplay<'_, Vertex<P>, VertexDisplayFormat> {
             VertexDisplayFormat::Full => f
                 .debug_struct("Vertex")
                 .field("id", &Arc::as_ptr(&self.entity.point))
-                .field("entity", &MutexFmt(&self.entity.point))
+                .field("entity", &*self.entity.point)
                 .finish(),
             VertexDisplayFormat::IDTuple => {
                 f.debug_tuple("Vertex").field(&self.entity.id()).finish()
             }
-            VertexDisplayFormat::PointTuple => f
-                .debug_tuple("Vertex")
-                .field(&MutexFmt(&self.entity.point))
-                .finish(),
-            VertexDisplayFormat::AsPoint => {
-                f.write_fmt(format_args!("{:?}", MutexFmt(&self.entity.point)))
+            VertexDisplayFormat::PointTuple => {
+                f.debug_tuple("Vertex").field(&*self.entity.point).finish()
             }
+            VertexDisplayFormat::AsPoint => f.write_fmt(format_args!("{:?}", *self.entity.point)),
         }
+    }
+}
+
+#[cfg(test)]
+mod vertex_tests {
+    #![deny(clippy::unwrap_used)]
+    use super::*;
+
+    #[test]
+    fn vertex_replacement_changes_id_not_old_handles() {
+        let v0 = Vertex::new(0);
+        let h = v0.clone();
+        let v2 = Vertex::new(1);
+        assert_ne!(v0.id(), v2.id());
+        assert_eq!(v0.point(), 0);
+        assert_eq!(h.point(), 0);
+    }
+
+    #[test]
+    fn mapped_closure_may_access_geometry() {
+        let v0 = Vertex::new(0);
+        let v1 = v0.mapped(|p| {
+            let _ = v0.point();
+            *p
+        });
+        assert_eq!(v1.point(), 0);
     }
 }
