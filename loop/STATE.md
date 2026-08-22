@@ -127,7 +127,7 @@ Nothing in flight at close. GATE-4 at 110/110, untouched all session.
    holds its pid; it is STOPPED at close, STOP line in its log). Restart
    with `LOOK_WATCHDOG_STAGNANT=3600` via the `cmd /c` incantation when
    dispatch resumes.
-5. Disk was 20.2 GB at close — check `Get-PSDrive C` before the first
+5. Disk was ~19 GB at close (18.7 by the final check) — check `Get-PSDrive C` before the first
    verify of the next session (each V8 baseline builds a throwaway
    workspace; three slot targets sit at ~7 GB each and
    `slot_status.py --disk` reports both target locations).
@@ -141,7 +141,7 @@ Nothing in flight at close. GATE-4 at 110/110, untouched all session.
 - **All three slots IDLE on their landed branches** (slot 0 `2252117`
   BG-INV-104, slot 1 `d22d9f7` BG-INV-108, slot 2 `c995935` BG-INV-109);
   `new_slot.py` re-forks them for the next dispatch.
-- **Disk 20.2 GB at close.** The session's verifies and nine landings ran
+- **Disk ~19 GB at close (18.7 by the final check).** The session's verifies and nine landings ran
   comfortably; the three slot targets hold ~7/6/7 GB. Check
   `Get-PSDrive C` before verify runs; `slot_status.py --disk` reports both
   target locations per slot.
