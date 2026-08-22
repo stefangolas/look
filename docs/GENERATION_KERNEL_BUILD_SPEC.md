@@ -2101,6 +2101,16 @@ re-implemented condition (i) and certified nothing new.
   partition depth it stays certified deeper; a test that finds otherwise has
   found an unsound fibre-block bound.
 
+**Amendment (2026-08-22, scoping BG-FID-008's packet).** BG-FID-008 v1 ships
+(iv-a) for CURVE components only, driven by NUM-003's Krawczyk operator on the
+univariate fibre equation `h(t) = <X'(t) − x, u>`, with disc-membership by
+certified box distance and geometric dedupe of closed-curve duplicate roots.
+The SURFACE negative test ("a double sheet inside one normal tube") moves to
+BG-FID-005 together with discharge (iv-b): the surface case needs 2D root
+certification in the normal bundle, and FID-005's emitter partition is where
+(iv-b) — the form the spec itself calls better for emitters — is free. The
+curve double-cover witness remains FID-008's flagship negative test verbatim.
+
 ### BG-FID-005 — The `rep` operator
 
 **Implements** §6.3, REP-CRV-001, REP-SRF-001.
