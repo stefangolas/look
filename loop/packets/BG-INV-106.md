@@ -38,8 +38,8 @@ anchors:
   - {id: A1, expect: 7, cmd: "grep -c '^pub mod' vendor/truck/truck-topology/src/invariants/mod.rs"}
   - {id: A2, expect: 1, cmd: "grep -c 'Representation,' vendor/truck/truck-base/src/evidence.rs"}
   - {id: A3, expect: 1, cmd: "grep -c 'NonCanonicalCarrier' vendor/truck/truck-base/src/evidence.rs"}
-  - {id: A4, expect: 1, cmd: "grep -c 'fn edge_iter' vendor/truck/truck-topology/src/shell.rs"}
-  - {id: A5, expect: 1, cmd: "grep -c 'fn face_iter' vendor/truck/truck-topology/src/shell.rs"}
+  - {id: A4, expect: 1, cmd: "grep -c 'pub fn edge_iter(' vendor/truck/truck-topology/src/shell.rs"}
+  - {id: A5, expect: 1, cmd: "grep -c 'pub fn face_iter(' vendor/truck/truck-topology/src/shell.rs"}
   - {id: A6, expect: 1, cmd: "grep -c 'pub fn curve' vendor/truck/truck-topology/src/edge.rs"}
   - {id: A7, expect: 1, cmd: "grep -c 'pub fn surface' vendor/truck/truck-topology/src/face.rs"}
   - {id: A8, expect: 0, cmd: "grep -c 'pub mod representation' vendor/truck/truck-topology/src/invariants/mod.rs"}
