@@ -1629,6 +1629,61 @@ the surfaces' `normal_cone`s and the leader's derivative hulls), so the
 eventual packet is mostly composition plus the one residual bound it waits
 for.
 
+**Amendment (2026-08-21, session 17: validating the ISC design in a scratch
+crate).** The ISC packet was designed by building and RUNNING the certification
+against the real carriers before dispatch. Four findings, one of them a design
+correction to this section's own prose:
+
+1. **The residual certificate is the spec's parenthetical alternative, not
+   `certify_deviation` itself.** `certify_deviation(leader, carrier, ...)` needs
+   both sides as `EnclosureCurve`s, and for the ISC the "truth" side *is* the
+   ISC — calling it from inside the impl's own `enclose` is circular (route 2
+   bisects by calling `carrier.enclose`). What CE-002 actually unlocked is the
+   *interface completeness*: `exact_spline` (for knot-aligned cells) and the
+   landed `EnclosureSurface` impls the operator composes over. The impl-side
+   residual is a **parametric Krawczyk operator** — this section's sanctioned
+   alternative — certifying, per knot-aligned t-cell, that for **every** t in
+   the cell the double-projection system has a unique solution inside a
+   parameter box Q. The 3D enclosure is then pure composition:
+   `midpoint(S0.enclose(Q0), S1.enclose(Q1))`. `certify_deviation` remains the
+   *consumer-side* certificate (an ISC carrier can now be the carrier argument,
+   INV-104-style); it is not called inside the impl.
+2. **The operator's center term is a point evaluation.**
+   `K = m − Y·F(m, t_mid) + (I − Y·J(Q, cell))·(Q − m)` — `F` at the float
+   point `(m, t_mid)` only. Evaluating the interval `F` over `Q` in the center
+   term drags the `p0 − p1` decorrelation (two copies of the solution arc's
+   width) into the center and doubles the linear part against the contraction
+   term; with it, no box ever certifies (measured: K ≥ 5·width(Q) at every
+   scale). With the point center, K's width is second order and certification
+   succeeds with wide margin.
+3. **Cells must not straddle a leader knot.** A degree-1 chord leader's
+   derivative jumps at each knot; the interval `L'` box over a straddling cell
+   spans the whole kink fan, decorrelates J's fourth row, and again no box
+   certifies. The impl reads the leader's knots through `exact_spline()` and
+   pre-splits the span there (a generic leader without an exact spline simply
+   pays bisection instead). Related, sound but loose: `bspline.rs`'s
+   `enclose_der` hull includes neighbouring-span hodograph control points
+   (~6% over-estimate on the witnesses); certification absorbs it.
+4. **`enclose_der` for n ≥ 2 is the unbounded box.** The carrier's `ders`
+   recursion differentiates the 4×4 system implicitly per order; composing
+   that in intervals is not derived, and an unsound widest box is the honest
+   answer (the PCURVE fourth-order precedent). n = 0 is `enclose`; n = 1
+   composes: `n_box = (S0_u × S0_v) × (S1_u × S1_v)` off the surfaces'
+   `enclose_der` boxes over the certified parameter images, scaled by the
+   carrier's own `k = (|L'|² − (c−L)·L'')/(n·L')` in intervals — the
+   division's divisor straddling zero widens to the unbounded box, which is
+   exactly the leader's tangent lying in the constraint plane, the family's
+   `None` condition arriving numerically.
+
+Measured on the witnesses (sphere-sphere unit circle, plane-sphere slice,
+8/16-segment chord leaders, dev profile): certification succeeds at 6–12 cells
+per span, 0.3–2.6 ms per `enclose` call, 0 containment escapes of `subs` on
+100-point grids, 0 float `search_triple` parameter escapes from the certified
+boxes on 200-point grids, and the degenerate negative (identical surfaces —
+the system rank-deficient everywhere) honestly returns the unbounded box.
+`tangent_cone` follows the family ball-around-midpoint construction off the
+n = 1 hull.
+
 ---
 
 ## 4. Stage 3 — fidelity and solvers
