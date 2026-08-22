@@ -11,7 +11,7 @@ otherwise would eventually cost a trap.) If you are picking this up cold, read
 [`loop/ORCHESTRATOR.md`](ORCHESTRATOR.md) for how to run the loop, then
 `python loop/slot_status.py`** — nothing else. Do not read `LEDGER.jsonl` whole.
 
-Updated 2026-08-21, close of session 16. Branch: `integration/kernel-bg`. Nothing
+Updated 2026-08-22, close of session 17. Branch: `integration/kernel-bg`. Nothing
 from the loop has reached `main` and nothing has been pushed.
 
 ## What this is, if you have never seen it
@@ -55,131 +55,127 @@ here is scored, tuned, or sampled.
 
 ## Where we are
 
-**Fifty-seven packets DONE of 70 (81%) — the user's defined breakpoint for
-this session, reached and closed cleanly.** Session 16 landed **nine**:
+**Fifty-seven packets DONE of 70 (81%), with two more teed up at close and
+a third designed-but-undispatched.** Session 17 opened the post-breakpoint
+frontier and it is WIDE — see "Pick up here" before touching anything,
+because two detached processes were left running on purpose.
 
-The stage-1 CE pair, both first-try ACCEPTED (fault NONE):
-`BG-CE-002` — the whole-span leader-vs-carrier deviation certificate in
-`truck-evidence/src/deviation.rs`, TWO routes: the difference spline
-(one-shot for exact-spline pairs, including `PCurve<_, Plane>` flattened
-exactly; measured bound 2.5e-14 at tau=1e-6, zero subdivisions) and the
-budgeted box-diff bisection fallback. The packet also fixed a real defect
-the pre-dispatch scratch run found in the landed carriers:
-`knot_multiplicity` (3 copies) counted neighbouring distinct knots by
-tolerance, so sub-curve extraction stopped converging within 1e-6 of every
-knot (BG-ENC-002 violation, sound but non-convergent; spec amended).
+**BG-ENC-004-ISC — worker DONE first-try, verify was IN FLIGHT at close.**
+The design was validated by RUNNING a parametric Krawczyk certification
+against the real carriers in a scratch crate before the packet was
+written; that run caught **three design errors pre-dispatch**: the
+carrier's S1 Jacobian columns negate only the 3-D part (negating all four
+makes the columns parallel, det ≈ 5.5e-17); the Krawczyk center term must
+be F at the POINT (m, t_mid) — the interval F over Q decorrelates the
+p0−p1 difference and no box ever certifies; and the interval J is stored
+column-major while the algebra is row-major (a silent transpose). The
+worker landed it in one commit (`bf2fd29`, 7 tests, 12/12 anchors), found
+one real bring-up bug itself (seed parameters DECREASE along the
+plane-sphere slice — Q must hull min/max, not widen ordered), and its
+deviations were all sound. Its RESULT.json triage: clean. **The verify
+was launched detached and had NOT written VERDICT.json at close** — poll
+`loop/slots/0/VERDICT.json`, check `packet=BG-ENC-004-ISC`,
+`commit=bf2fd29`, `base=ddcd706`, then land it (merge --no-ff, land_packet,
+ledger, DONE).
 
-`BG-CE-003` — the construction-DAG identity algebra
-(`EntityId/OpId/Op/OpKind/OpParams/Selector/End`) in
-`truck-topology/src/entity_id.rs`: standalone, no geometry, serde
-round-trip, bit-wise float equality (f64 has neither Eq nor Hash in std),
-stable FNV-1a+fmix64 hash pinned by three KAT constants that reproduced
-exactly. The `Arc<Mutex>->Arc` migration is the new row
-`BG-CE-003-MIGRATE` (SPECD, needs its own design packet for the
-replacement API first).
+**BG-CE-003-MIGRATE — worker RUNNING at close** (slot 1, forked at
+`ddcd706`, events past 1.17 MB and growing; expect finish 30–90 min after
+00:15). The design packet (`f1b4058`) pre-decided everything: `Vertex::new`
+IS the point replacement (no with_point — the id-stability doctest
+REVERSES), `Edge::with_curve`/`Face::with_surface` +
+`shared_curve`/`shared_surface`, `OpKind::Replace` + `EntityId::replaced`
+(additive; no exhaustive matches), 12 deadlock remarks + `#[doc(hidden)]`
+deleted, the 8-rayon test (rayon already a dep — no manifest edit), and
+the three live call sites: loops_store's cross-store mutation made
+explicit by RETURNING the effective vertex (the shared mutation was
+load-bearing across two store calls and the polyline readback), fillet's
+`set_curve` fixed by `with_curve` + construction-order swap, meshalgo's
+TEST-file set_curve. **The filed row's ripple was wrong in both
+directions** — modeling/integrate/meshalgo-src/stepio need NO edits;
+fillet/mod.rs, `truck-meshalgo/tests/tessellation/triangulation.rs` (the
+row named the src file), and `invariants/same_parameter.rs` were missed.
+Row corrected, spec amended.
 
-Then the seven-packet INV wave, `BG-INV-101/102/103/104/105/108/109`, one
-new module each under `truck-topology/src/invariants/` behind orchestrator
-scaffolding (nine `Prop` arms + the module tree, landed up front for
-disjoint write sets): coedge pairing, vertex link, Euler–Poincaré,
-same-parameter (calling CE-002's certificate; attempt 1 was a SPEC_GAP —
-the worker correctly stopped on missing truck-evidence/inari/truck-
-geometry manifest deps, amended and re-dispatched), domain-boundary (the
-topological core; the pcurve half documented as waiting), the pure
-nesting-forest checker with an injectable inside-oracle (the NUM-004 seam;
-the and/or `Vec<Solid>` break is deferred with a spec amendment — a
-partition without a certified oracle mis-splits nested cavities), and
-wedge non-degeneracy (v1 midpoint-sampled, `Method::Float` honestly).
+**BG-NUM-003 — designed and scratch-VALIDATED, packet not written** (the
+user called the close). Scratch at
+`C:\Users\stefa\AppData\Local\Temp\opencode\num3-scratch`: const-generic
+`KrawczykSystem<N>` trait (f_point / jacobian row-major / preconditioner —
+the SYSTEM supplies its own float inverse, so the operator needs none),
+x²−2 certifies Unique one-shot, x² tangential double root refuses
+`NumericallyUnresolved{KrawczykIndeterminate}` correctly, 2×2 linear
+one-shot. **Two design calibrations the scratch found:** (1) a None
+preconditioner at the box midpoint (x²+1 at 0 — vanishing derivative)
+must BISECT, not refuse; (2) the spec's budget-exhaustion test premise is
+wrong — x²−2 on [1,2] certifies one-shot even at Budget::new(0,0,0), so
+the exhaustion negative must use a case that actually bisects (the
+tangential one). The num/ module tree is scaffolded (`e69103e`) so the
+packet's write set is just `num/krawczyk.rs`; `KrawczykIndeterminate`
+and `RootNotIsolated` witnesses ALREADY EXIST in truck-base — no ripple.
 
-**One flake paid for and recovered:** BG-INV-102's first verify REJECTED
-on V8 via `geom_impls::test_circle_arc_tangent0` — a proptest that drew a
-near-degenerate case failing deterministically AT BASE too (4/4 with the
-seed pinned, replayed at base through the regression DIRECTORY). A latent
-property defect (missing precondition on t near 0/1), not a packet
-regression; artifact removed, re-verify ACCEPTED, fault NONE with a
-fault-note. The property itself needs a truck-modeling test fix packet
-some day — outside every current write set.
-
-Nothing in flight at close. GATE-4 at 110/110, untouched all session.
+**Registry fixes this session:** BG-NUM-002/003 listed `needs:
+BG-NUM-001` but the row id is `BG-NUM-001-FILLET` — dangling, invisible
+to the scheduler forever. Both fixed; `schedule.py` went from 2 to 4
+eligible. (A dangling `needs` entry is a status the scheduler cannot
+see — same family as the BLOCKED trap below.)
 
 ## Pick up here
 
-1. **The frontier is small and mechanical now.** `python loop/schedule.py`
-   at close: eligible = `BG-ENC-004-ISC` (mechanical, W5 — CE-002 landed,
-   so the residual certificate it waits for EXISTS as
-   `certify_deviation`; the der/tangent_cone halves were always composable)
-   and `BG-CE-003-MIGRATE` (wide-mechanical — but its note says it needs a
-   design packet first: the set_point/mapped replacement API shape is a
-   breaking design decision the orchestrator owns). ISC is the natural
-   next dispatch; MIGRATE's design packet is the next orchestrator design
-   task after that.
-2. **The tail after these two** is the FID chain the session-15 close
-   recorded: FID-001, NUM-003, TOL-005, EVD-005, NUM-002/004, ISC→…
-   NUM-004 also unlocks the INV-108 wiring (the and/or `Vec<Solid>` break
-   deferred with the spec amendment) and the certified oracle for the
-   nesting forest.
-3. **Known deferred work, recorded in the spec:** INV-105's pcurve-domain
-   half (waits on pcurve wiring into faces); INV-109's whole-span
-   certification (waits on pcurve parameter images feeding `normal_cone`);
-   the `test_circle_arc_tangent0` property fix (truck-modeling, missing
-   precondition on t near 0/1 — the seed is in this file's traps).
-4. **If the machine will sleep, stop the watchdog first** (`loop/watchdog.lock`
-   holds its pid; it is STOPPED at close, STOP line in its log). Restart
-   with `LOOK_WATCHDOG_STAGNANT=3600` via the `cmd /c` incantation when
-   dispatch resumes.
-5. Disk was ~19 GB at close (18.7 by the final check) — check `Get-PSDrive C` before the first
-   verify of the next session (each V8 baseline builds a throwaway
-   workspace; three slot targets sit at ~7 GB each and
-   `slot_status.py --disk` reports both target locations).
+1. **Collect the two in-flight items.** Check `python loop/slot_status.py`
+   FIRST (the watchdog is stopped; nothing reaps a wedged worker). Slot 0:
+   poll VERDICT.json, land ISC on ACCEPTED. Slot 1: when the worker
+   FINISHes, triage RESULT.json, then verify `--base ddcd706` **only after
+   slot 0's verify is done** (same base — sequential rule). Restart the
+   watchdog (`LOOK_WATCHDOG_STAGNANT=3600` via the `cmd /c` incantation)
+   if you dispatch anything new.
+2. **Write the NUM-003 packet from the validated scratch** (decisions
+   above; the packet's tests: transverse one-shot, the tangential refusal,
+   linear 2×2, no-root, exhaustion-via-tangential). Dispatch on the first
+   free slot.
+3. **Then the frontier is:** NUM-002 (roots.rs — same scaffold, the
+   double-root-refuses-not-empty-list negative), SHARED-CONE (mechanical,
+   unlocks the moment ISC lands), FID-001 (design — the critical path:
+   it unlocks INV-106, NUM-004, FID-008 → FID-003 → FID-005).
+4. **Disk dipped to 10.6 GB mid-verify and recovered to 18.7 GB at close**
+   (the ddcd706 baseline workspace is transient — a mid-verify reading is
+   NOT the close reading; record both). Slot targets: 0 = 12.3 GB, 2 =
+   7 GB; `%TEMP%/look-verify-baseline-*` was empty at close.
 
 ## State of the machine, as left
 
-- **Watchdog STOPPED at close** (process killed after its last HEARTBEAT
-  poll 325; the STOP line is appended to `watchdog.log`). Nothing was in
-  flight. Restart with `LOOK_WATCHDOG_STAGNANT=3600` via the `cmd /c`
-  incantation; stop before any machine sleep.
-- **All three slots IDLE on their landed branches** (slot 0 `2252117`
-  BG-INV-104, slot 1 `d22d9f7` BG-INV-108, slot 2 `c995935` BG-INV-109);
-  `new_slot.py` re-forks them for the next dispatch.
-- **Disk ~19 GB at close (18.7 by the final check).** The session's verifies and nine landings ran
-  comfortably; the three slot targets hold ~7/6/7 GB. Check
-  `Get-PSDrive C` before verify runs; `slot_status.py --disk` reports both
-  target locations per slot.
-- Registry: **57 DONE / 11 SPECD / 2 BLOCKED** (70 rows — one MORE than
-  session 15: `BG-CE-003-MIGRATE` was added at CE-003's re-scope).
-  Registry edits are python-only (the BOM trap).
-- GATE-4 ceiling **110/110**, never moved all session (every packet's
-  tests avoided `unscaled_legacy(` — the CE-002 worker's
-  `ToleranceCtx::new` adaptation set the pattern the INV-104 packet
-  mandated).
-- `loop/packets/` gained nine packets this session (BG-CE-002, BG-CE-003,
-  BG-INV-101/102/103/104/105/108/109); `loop/results/` holds their filed
-  RESULT.jsons; the ledger is at 52 rows.
+- **Watchdog STOPPED at close** (pid 16084 killed, STOP line in its log) —
+  deliberately, so a machine sleep cannot reap the healthy MIGRATE worker
+  mid-run. If the machine slept anyway, expect slot 1 wedged: confirm with
+  events mtime + tasklist before any reap, and recover via
+  `run_packet.py --reset` (the archive is a patch you can apply).
+- **Slot 0**: verify in flight at close (VERDICT.json pending). **Slot 1**:
+  MIGRATE worker RUNNING (pid 10952). **Slot 2**: IDLE on INV-109's landed
+  branch (`c995935`) — the DEAD? label is the known miscalibration for a
+  landed slot.
+- **Disk dipped to 10.6 GB mid-verify, 18.7 GB at close** (the verify
+  baseline is transient — see "Pick up here" 4).
+- Registry: **57 DONE / 11 SPECD / 2 BLOCKED** (70 rows). HEAD `f1b4058`,
+  tracked tree clean. GATE-4 at 110/110 (worker-reported; the pending
+  verify confirms).
+- `loop/packets/` gained BG-ENC-004-ISC and BG-CE-003-MIGRATE this
+  session; the ledger is at 52 rows (ISC's row lands with it).
 
 ## The parallelism picture
 
-70 rows. Nothing in flight; the CE chain's stage 1 AND the INV wave are
-fully landed. What remains by class: 10 mechanical, 9 design, 1
-wide-mechanical... (re-run `python loop/schedule.py` for the live counts —
-at close: eligible `BG-ENC-004-ISC` + `BG-CE-003-MIGRATE`, everything else
-gated on the FID/NUM chain or BLOCKED). The INV-106/107 rows wait on
-FID-001/TOL-001-TYPE; SHARED-CONE on PCURVE+ISC; OFFSET BLOCKED on the
-EnclosureSurface interface question. The next orchestrator design work,
-in order: the ISC packet (mostly composition — read
-`decorators/intersection_curve.rs`'s scaffold, it records the shape), the
-MIGRATE replacement-API design, then the FID chain.
+70 rows. At close: 4 eligible (ISC [verify pending], MIGRATE [running],
+NUM-002, NUM-003 [design packets: NUM-003's scratch is done]). When ISC
+and MIGRATE land: **59/70 (84%)**, and SHARED-CONE joins eligible. The
+honest width constraint is orchestrator design time, not slots: FID-001,
+NUM-002, SHARED-CONE's packet, and later FID-008/003/005 are all mine to
+write. INV-107 (needs TOL-001-TYPE) and OFFSET (the EnclosureVectorField
+question) stay BLOCKED.
 
-Session 16's cost picture: nine packets landed for two SPEC_GAPs paid
-(zero redispatches beyond the amended 104), one flake appeased (INV-102,
-fault NONE with fault-note), one first-attempt dispatch refusal
-(`run_packet.py`'s own anchor check caught a broken `grep -rc` anchor
-before any worker was paid), and nine first-try verifies ACCEPTED out of
-ten (the one rejection was the flake). The pre-dispatch scratch-crate
-validation caught three design errors before dispatch (f64 lacks Eq/Hash;
-Hasher's unstable float methods; the carrier convergence defect) and the
-workers caught five packet errors the scratch could not see (the
-in-crate-vs-out-of-crate class) — the division of labor worked exactly as
-designed.
+Session 17's cost picture: one packet landed-pending-verify (ISC), one
+designed+dispatched+running (MIGRATE), one designed+scratch-validated
+(NUM-003), two registry bugs found and fixed (the dangling needs, the
+MIGRATE ripple), and the ISC design's three scratch-caught errors — the
+validate-by-RUNNING discipline paid for itself before any worker saw the
+packet. The worker caught one error the scratch could not see (the
+in-crtc seed-ordering class), which is the division of labor working.
 
 ## Traps, each one paid for
 - **The watchdog's default 1200s wedged-killer kills healthy workers during a
@@ -659,6 +655,45 @@ reason is in the commit that made the change, and the code will not tell you.
   despite `CARGO_TARGET_DIR` pointing elsewhere, and it is the larger of the
   two: 1.9 GB against 0.9 GB in one slot. Every recovery recipe in these
   documents named only the outer one. `slot_status.py --disk` reports both.
+- **A scratch crate outside the repo needs the repo's `.cargo/config.toml`
+  rustflags** (`[target.'cfg(target_arch = "x86_64")']
+  rustflags = ["-Ctarget-feature=+avx,+fma"]`) or inari 2.0.0 fails to
+  compile with `cannot find function sub1_ru` — its directed-rounding SIMD
+  backend `compile_error!`s without AVX+FMA, and there is no per-crate
+  mechanism. Cost twenty minutes of misdiagnosis (the repo builds it
+  "somehow") before the config file was remembered.
+- **PowerShell has no `grep`, and anchor counts must be verified under the
+  same shell the worker uses** — write a small `.sh` and run it through
+  `"C:\Program Files\Git\bin\bash.exe"`; Select-String counts can silently
+  disagree with grep's on regex-escaping grounds. (PowerShell also mangles
+  inline `grep -c '...'` quoting entirely.)
+- **A multiline `python -c` through PowerShell mangles embedded quotes**
+  — the heredoc trap in its `-c` form, hit twice more this session. Write
+  patch scripts to files and run the files. ALWAYS.
+- **inari division by a zero-containing divisor returns the ENTIRE
+  interval, not EMPTY** (measured: `[-1,1]/[-1,1] = [-inf,inf]`) — safe to
+  rely on where a straddling divisor legitimately means "unbounded", but
+  an explicit `contains(0.0)` guard reads better and is what the ISC packet
+  mandates.
+- **`new_slot.py` surviving a tool timeout does NOT mean the warm build
+  finished** — session 17's slot-1 fork succeeded while the killed warm
+  build left the target at 0.72 GB. Harmless: dispatch anyway and let the
+  worker's first cargo pay the warm cost. The thing to check after a
+  timeout is `git worktree list` (no duplicate fork), not the target size.
+- **A grep-measured ripple list rots in BOTH directions.** The MIGRATE row
+  over-included (modeling/integrate/meshalgo-src: no edits needed — the
+  `mapped` signatures are unchanged) and under-included (a live `set_curve`
+  in `fillet/mod.rs`, the set_curve in meshalgo's TEST file where the row
+  named the src file, and the mutex-reach in `invariants/same_parameter.rs`
+  which landed after the row was filed). Re-derive every ripple against the
+  live tree; a row filed months ago is a hypothesis, not a fact.
+- **A dangling `needs` entry is invisible forever.** BG-NUM-002/003 listed
+  `BG-NUM-001` but the row's id is `BG-NUM-001-FILLET` — both rows were
+  permanently unschedulable and nothing reported it. When a row "should" be
+  eligible but `schedule.py` disagrees, print its `needs` against the actual
+  id set before assuming a scheduler bug. (A five-line python check now
+  exists in spirit — re-run one whenever the frontier looks too small.)
+
 - **Most of this machine's missing disk is not the loop's.** Session 9 found
   **19 GB** of regenerable junk in `%TEMP%`: 118 `chrome-lite-*` throwaway
   browser profiles at ~125 MB each (14.7 GB) and 28 `proc-macro-srv*`
