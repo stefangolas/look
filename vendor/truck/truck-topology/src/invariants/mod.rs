@@ -31,6 +31,7 @@
 pub mod coedge_pairing;
 pub mod domain_boundary;
 pub mod euler_poincare;
+pub mod representation;
 pub mod same_parameter;
 pub mod shell_nesting;
 pub mod vertex_link;
