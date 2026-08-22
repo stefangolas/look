@@ -1,0 +1,25 @@
+{
+  "id": "BG-CE-003-MIGRATE",
+  "status": "SPEC_GAP",
+  "contracts": ["BG-CE-003"],
+  "tests_added": 6,
+  "sites_migrated": 2,
+  "sites_deferred": 1,
+  "deviations": [
+    "truck-shapeops/src/transversal/loops_store/mod.rs: the packet's decision-7 reassignment (single gv0/gv1 pair reassigned after each store call, single closing edge) does not reproduce the mutation semantics. Under it the loops_store tests cross (crossing_edges, rotated_intersection) fail: the closing edge connects the store-1 effective vertices, which are not on the store-0 boundary, so add_edge cannot split the store-0 loops. The shipped version keeps the single closing edge but re-points the store-0 boundary at the store-1 effective vertices (two change_vertex passes with a dedicated cache) and gives each store its own geom replacement cache (gemap0b/gemap1b) instead of sharing one cache across the two stores. This is substantially more than the packet described and still does not make the boolean pipeline pass (see disagreements).",
+    "truck-topology/src/entity_id.rs: to keep the pinned stable_hasher_known_answer KAT passing, its two constants were updated (see disagreements)."
+  ],
+  "disagreements": [
+    "entity_id.rs KAT constants: the packet states 'the pinned KAT constants hash specific values and do not move'. Adding the Replace arm alphabetically (between Primitive and Sweep) changes the derived discriminants of Sweep and Transform, so the constants DO move: stable_hasher_known_answer now pins sweep.id() = 0x8aab6586830f5a5c (was 0xee38828cf99fd120) and transform.id() = 0xc5139d86dfb37ce3 (was 0x2dc8dada62ef7c61).",
+    "loops_store decision 7: the packet claims the reassignment 'uses the effective vertices, exactly as the mutation semantics did'. The mutation semantics registered ONE shared vertex instance in both stores: its point was overwritten by the store-1 calls, so both stores' boundaries referenced the same instance carrying the final point, a single closing edge matched both stores, and the boolean pipeline's cross-store edge identity (the same intersection edge appearing in both stores' loops) was preserved. With immutable Arc<G> construction the instances split, and the two stores' copies of the shared intersection edge diverge once a later pair's change_vertex re-replaces them. Result: truck-shapeops transversal::integrate::tests::punched_cube (the boolean AND pipeline) fails with 'This shell is not oriented and closed', even under the re-pointing reconstruction that passes the loops_store tests. The full flow the mutation carried -- a single mutable vertex whose final point and instance identity are shared across both stores -- cannot be expressed by construction.",
+    "Baseline cleanliness: the packet states the three crates are 'clean at baseline' and 'clippy is clean on the three crates'. At HEAD ddcd706 this tree is not: vendor/truck/resources/ is absent (drives several test failures), meshalgo cone_topology and tessellation shape tests fail, truck-shapeops healing::tests::step_import and tests/fillet.rs::complex_surface fail, and truck-meshalgo/src carries 153 pre-existing clippy errors (redundant field names, too_many_arguments, negated comparison, etc.)."
+  ],
+  "baseline_failures": [
+    "truck-meshalgo --lib: cone_topology_tests::duplicate_edge_creates_no_second_cdt_edge, cone_topology_tests::test_parity_intersecting_constraints_rejected (fail identically at baseline HEAD ddcd706).",
+    "truck-meshalgo --test tessellation: solid_is_closed, csolid_is_closed, compare_occt_mesh, compare_occt_mesh_csolid, large_number_meshing (missing resources/shape JSONs / ../obj/by_occt.obj), special_cylinder, special_cylinder_csolid (mesh shell condition Oriented vs Closed at baseline).",
+    "truck-shapeops --lib: healing::tests::step_import (missing resources/step files).",
+    "truck-shapeops --test fillet: complex_surface (shell condition Regular vs Closed at baseline).",
+    "truck-meshalgo clippy --all-targets --no-deps: 153 pre-existing errors in truck-meshalgo/src (present at baseline)."
+  ],
+  "notes": "The Arc<Mutex<G>> -> Arc<G> storage migration, the replacement API (Vertex::new, with_curve, with_surface, shared_curve, shared_surface), the un-hidden mapped/try_mapped family with doc examples, the entity_id Replace arm and replaced() derivation, the same_parameter shared_curve accessor, the fillet construction-order swap, the meshalgo robust_closed migration, and the six required tests (including the new tests/parallel_query.rs with 8 rayon threads) all land and pass. truck-topology and truck-shapeops are fmt- and clippy-clean; workspace check, doctests (129) and kernel-gates.sh pass. The loops_store call site is migrated as far as immutable construction allows (its three internal tests pass), but transversal::integrate::tests::punched_cube -- the boolean pipeline that the mutation semantics' shared mutable vertex underwrote -- fails. Reported SPEC_GAP per the packet's stop condition; see QUESTION.md."
+}

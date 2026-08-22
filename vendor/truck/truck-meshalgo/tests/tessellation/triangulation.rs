@@ -148,16 +148,56 @@ fn robust_closed() {
     };
 
     let o = Point3::new(0.5, 0.5, 0.5);
-    cube.edge_iter().for_each(|edge| {
-        let curve = edge.curve();
-
-        if let Curve::Line(line) = curve {
-            let m = line.subs(0.5);
-            let p = m + 0.2 * (o - m);
-            let bsp = BSplineCurve::new(KnotVec::bezier_knot(2), vec![line.0, p, line.1]);
-            edge.set_curve(bsp.into());
-        }
-    });
+    let edge_map: std::collections::HashMap<EdgeID, Edge> = cube
+        .edge_iter()
+        .map(|edge| {
+            let curve = edge.curve();
+            let curve = match curve {
+                Curve::Line(line) => {
+                    let m = line.subs(0.5);
+                    let p = m + 0.2 * (o - m);
+                    BSplineCurve::new(KnotVec::bezier_knot(2), vec![line.0, p, line.1]).into()
+                }
+                curve => curve,
+            };
+            (edge.id(), edge.with_curve(curve))
+        })
+        .collect();
+    let cube = {
+        let boundaries: Vec<Shell> = cube
+            .boundaries()
+            .iter()
+            .map(|shell| {
+                shell
+                    .face_iter()
+                    .map(|face| {
+                        let boundaries: Vec<Wire> = face
+                            .absolute_boundaries()
+                            .iter()
+                            .map(|wire| {
+                                wire.edge_iter()
+                                    .map(|edge| {
+                                        let replaced = edge_map.get(&edge.id()).unwrap().clone();
+                                        if edge.orientation() == replaced.orientation() {
+                                            replaced
+                                        } else {
+                                            replaced.inverse()
+                                        }
+                                    })
+                                    .collect()
+                            })
+                            .collect();
+                        let mut new_face = Face::new_unchecked(boundaries, face.surface());
+                        if !face.orientation() {
+                            new_face.invert();
+                        }
+                        new_face
+                    })
+                    .collect()
+            })
+            .collect();
+        Solid::new(boundaries)
+    };
 
     assert!(cube
         .triangulation(0.01)

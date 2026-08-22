@@ -370,7 +370,7 @@ impl<C> LoopsStore<Point3, C> {
         kind: ParameterKind,
         another_surface: &S,
         emap: &mut HashMap<EdgeID<C>, Edge<Point3, C>>,
-    ) -> Option<()>
+    ) -> Option<Vertex<Point3>>
     where
         C: Cut<Point = Point3, Vector = Vector3> + SearchNearestParameter<D1, Point = Point3>,
         S: ParametricSurface3D + SearchNearestParameter<D2, Point = Point3>,
@@ -380,29 +380,31 @@ impl<C> LoopsStore<Point3, C> {
                 let old_vertex = self[loops_index][wire_index][edge_index]
                     .absolute_front()
                     .clone();
-                v.set_point(old_vertex.point());
-                self.change_vertex(&old_vertex, v, emap);
+                let v2 = Vertex::new(old_vertex.point());
+                self.change_vertex(&old_vertex, &v2, emap);
+                Some(v2)
             }
             ParameterKind::Back => {
                 let old_vertex = self[loops_index][wire_index][edge_index]
                     .absolute_back()
                     .clone();
-                v.set_point(old_vertex.point());
-                self.change_vertex(&old_vertex, v, emap);
+                let v2 = Vertex::new(old_vertex.point());
+                self.change_vertex(&old_vertex, &v2, emap);
+                Some(v2)
             }
             ParameterKind::Inner(_) => {
                 let curve = self[loops_index][wire_index][edge_index].curve();
                 let (pt, t, _) =
                     curve_surface_projection(&curve, None, another_surface, None, v.point(), 100)?;
-                v.set_point(pt);
+                let v2 = Vertex::new(pt);
                 let edge = self[loops_index][wire_index][edge_index].absolute_clone();
                 let edge_id = edge.id();
-                let (edge0, edge1) = edge.cut_with_parameter(v, t)?;
+                let (edge0, edge1) = edge.cut_with_parameter(&v2, t)?;
                 let new_wire: Wire<_, _> = vec![edge0, edge1].into();
                 self.swap_edge_into_wire(edge_id, &new_wire);
+                Some(v2)
             }
         }
-        Some(())
     }
 }
 
@@ -529,16 +531,18 @@ where
                 } else {
                     let pv0 = Vertex::new(polyline.front());
                     let pv1 = Vertex::new(polyline.back());
-                    let gv0 = Vertex::new(polyline.front());
-                    let gv1 = Vertex::new(polyline.back());
+                    let mut gv0 = Vertex::new(polyline.front());
+                    let mut gv1 = Vertex::new(polyline.back());
                     let mut pemap0 = HashMap::default();
                     let mut pemap1 = HashMap::default();
                     let mut gemap0 = HashMap::default();
                     let mut gemap1 = HashMap::default();
+                    let mut gemap0b = HashMap::default();
+                    let mut gemap1b = HashMap::default();
                     let idx00 =
                         poly_loops_store0.add_polygon_vertex(face_index0, &pv0, &mut pemap0);
                     if let Some((wire_index, edge_index, kind)) = idx00 {
-                        geom_loops_store0.add_geom_vertex(
+                        gv0 = geom_loops_store0.add_geom_vertex(
                             (face_index0, wire_index, edge_index),
                             &gv0,
                             kind,
@@ -551,7 +555,7 @@ where
                     let idx01 =
                         poly_loops_store0.add_polygon_vertex(face_index0, &pv1, &mut pemap1);
                     if let Some((wire_index, edge_index, kind)) = idx01 {
-                        geom_loops_store0.add_geom_vertex(
+                        gv1 = geom_loops_store0.add_geom_vertex(
                             (face_index0, wire_index, edge_index),
                             &gv1,
                             kind,
@@ -561,15 +565,26 @@ where
                         let polyline = intersection_curve.leader_mut();
                         *polyline.last_mut().unwrap() = gv1.point();
                     }
+                    // BG-CE-003-MIGRATE: the effective store-0 endpoints. The
+                    // mutation semantics registered ONE shared vertex in both
+                    // stores, so its point (fixed by the store-1 calls) fed the
+                    // store-0 loops, the leader readback and the closing edge.
+                    // With construction each store's side constructs its own
+                    // effective vertex; the store-1 calls re-point the store-0
+                    // boundary at their own effective vertices below, and the
+                    // single closing edge then matches both stores.
+                    let gv0_store0 = gv0.clone();
+                    let gv1_store0 = gv1.clone();
+                    let mut gemap_store0 = HashMap::default();
                     let idx10 =
                         poly_loops_store1.add_polygon_vertex(face_index1, &pv0, &mut pemap0);
                     if let Some((wire_index, edge_index, kind)) = idx10 {
-                        geom_loops_store1.add_geom_vertex(
+                        gv0 = geom_loops_store1.add_geom_vertex(
                             (face_index1, wire_index, edge_index),
                             &gv0,
                             kind,
                             &surface0,
-                            &mut gemap0,
+                            &mut gemap0b,
                         )?;
                         let polyline = intersection_curve.leader_mut();
                         *polyline.first_mut().unwrap() = gv0.point();
@@ -577,16 +592,21 @@ where
                     let idx11 =
                         poly_loops_store1.add_polygon_vertex(face_index1, &pv1, &mut pemap1);
                     if let Some((wire_index, edge_index, kind)) = idx11 {
-                        geom_loops_store1.add_geom_vertex(
+                        gv1 = geom_loops_store1.add_geom_vertex(
                             (face_index1, wire_index, edge_index),
                             &gv1,
                             kind,
                             &surface0,
-                            &mut gemap1,
+                            &mut gemap1b,
                         )?;
                         let polyline = intersection_curve.leader_mut();
                         *polyline.last_mut().unwrap() = gv1.point();
                     }
+                    // Re-point the store-0 boundary at the store-1 effective
+                    // vertices, replicating the shared instance whose final
+                    // point the mutation semantics left in both stores.
+                    geom_loops_store0.change_vertex(&gv0_store0, &gv0, &mut gemap_store0);
+                    geom_loops_store0.change_vertex(&gv1_store0, &gv1, &mut gemap_store0);
                     let pedge = Edge::new(&pv0, &pv1, polyline);
                     let gedge = Edge::new(&gv0, &gv1, intersection_curve.into());
                     poly_loops_store0[face_index0].add_edge(pedge.clone(), status0);

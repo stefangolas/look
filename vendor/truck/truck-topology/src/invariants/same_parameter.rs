@@ -85,9 +85,10 @@ where
         return vacuous_holds();
     };
     // The `curve()` accessor lives on the `PC = ()` impl only; for a general
-    // pcurve payload the shared leader curve is behind the field's mutex.
-    let leader = edge.curve.lock();
-    pc.certify_trace(&*leader, phi, tau, budget)
+    // pcurve payload the shared leader curve is read through
+    // `Edge::shared_curve`, which works for every `PC`.
+    let leader = edge.shared_curve();
+    pc.certify_trace(leader, phi, tau, budget)
 }
 
 /// The vacuous-holds certificate: `method: Method::None` (nothing was

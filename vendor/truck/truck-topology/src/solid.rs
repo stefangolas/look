@@ -93,10 +93,58 @@ impl<P, C, S> Solid<P, C, S> {
 
     /// Returns a new solid whose surfaces are mapped by `surface_mapping`,
     /// curves are mapped by `curve_mapping` and points are mapped by `point_mapping`.
-    /// # Remarks
-    /// Accessing geometry elements directly in the closure will result in a deadlock.
-    /// So, this method does not appear to the document.
-    #[doc(hidden)]
+    /// # Examples
+    /// ```
+    /// use truck_topology::*;
+    /// let v = Vertex::news(&[0, 1, 2, 3, 4, 5, 6, 7]);
+    /// let edge = [
+    ///     Edge::new(&v[0], &v[1], 1),
+    ///     Edge::new(&v[1], &v[2], 2),
+    ///     Edge::new(&v[2], &v[3], 3),
+    ///     Edge::new(&v[3], &v[0], 4),
+    ///     Edge::new(&v[0], &v[4], 5),
+    ///     Edge::new(&v[1], &v[5], 6),
+    ///     Edge::new(&v[2], &v[6], 7),
+    ///     Edge::new(&v[3], &v[7], 8),
+    ///     Edge::new(&v[4], &v[5], 9),
+    ///     Edge::new(&v[5], &v[6], 10),
+    ///     Edge::new(&v[6], &v[7], 11),
+    ///     Edge::new(&v[7], &v[4], 12),
+    /// ];
+    /// let wire0 = wire![&edge[0], &edge[1], &edge[2], &edge[3]];
+    /// let wire1 = wire![&edge[4], &edge[8], &edge[5].inverse(), &edge[0].inverse()];
+    /// let wire2 = wire![&edge[5], &edge[9], &edge[6].inverse(), &edge[1].inverse()];
+    /// let wire3 = wire![&edge[6], &edge[10], &edge[7].inverse(), &edge[2].inverse()];
+    /// let wire4 = wire![&edge[7], &edge[11], &edge[4].inverse(), &edge[3].inverse()];
+    /// let wire5 = wire![
+    ///     &edge[11].inverse(),
+    ///     &edge[10].inverse(),
+    ///     &edge[9].inverse(),
+    ///     &edge[8].inverse(),
+    /// ];
+    /// let face = vec![
+    ///     Face::new(vec![wire0], 1),
+    ///     Face::new(vec![wire1], 1),
+    ///     Face::new(vec![wire2], 1),
+    ///     Face::new(vec![wire3], 1),
+    ///     Face::new(vec![wire4], 1),
+    ///     Face::new(vec![wire5], 1),
+    /// ];
+    /// let solid = Solid::new(vec![Shell::from(face)]);
+    /// // Reading a vertex's point inside the closure is safe: geometry is
+    /// // immutable, so there is nothing to lock.
+    /// let mapped = solid
+    ///     .try_mapped(
+    ///         &move |i: &usize| {
+    ///             let _ = v[0].point();
+    ///             Some(*i + 1)
+    ///         },
+    ///         &move |c: &usize| Some(*c + 1),
+    ///         &move |s: &usize| Some(*s + 1),
+    ///     )
+    ///     .unwrap();
+    /// assert_eq!(mapped.face_iter().count(), 6);
+    /// ```
     #[inline(always)]
     pub fn try_mapped<Q, D, T>(
         &self,
@@ -116,10 +164,54 @@ impl<P, C, S> Solid<P, C, S> {
 
     /// Returns a new solid whose surfaces are mapped by `surface_mapping`,
     /// curves are mapped by `curve_mapping` and points are mapped by `point_mapping`.
-    /// # Remarks
-    /// Accessing geometry elements directly in the closure will result in a deadlock.
-    /// So, this method does not appear to the document.
-    #[doc(hidden)]
+    /// # Examples
+    /// ```
+    /// use truck_topology::*;
+    /// let v = Vertex::news(&[0, 1, 2, 3, 4, 5, 6, 7]);
+    /// let edge = [
+    ///     Edge::new(&v[0], &v[1], 1),
+    ///     Edge::new(&v[1], &v[2], 2),
+    ///     Edge::new(&v[2], &v[3], 3),
+    ///     Edge::new(&v[3], &v[0], 4),
+    ///     Edge::new(&v[0], &v[4], 5),
+    ///     Edge::new(&v[1], &v[5], 6),
+    ///     Edge::new(&v[2], &v[6], 7),
+    ///     Edge::new(&v[3], &v[7], 8),
+    ///     Edge::new(&v[4], &v[5], 9),
+    ///     Edge::new(&v[5], &v[6], 10),
+    ///     Edge::new(&v[6], &v[7], 11),
+    ///     Edge::new(&v[7], &v[4], 12),
+    /// ];
+    /// let wire0 = wire![&edge[0], &edge[1], &edge[2], &edge[3]];
+    /// let wire1 = wire![&edge[4], &edge[8], &edge[5].inverse(), &edge[0].inverse()];
+    /// let wire2 = wire![&edge[5], &edge[9], &edge[6].inverse(), &edge[1].inverse()];
+    /// let wire3 = wire![&edge[6], &edge[10], &edge[7].inverse(), &edge[2].inverse()];
+    /// let wire4 = wire![&edge[7], &edge[11], &edge[4].inverse(), &edge[3].inverse()];
+    /// let wire5 = wire![
+    ///     &edge[11].inverse(),
+    ///     &edge[10].inverse(),
+    ///     &edge[9].inverse(),
+    ///     &edge[8].inverse(),
+    /// ];
+    /// let face = vec![
+    ///     Face::new(vec![wire0], 1),
+    ///     Face::new(vec![wire1], 1),
+    ///     Face::new(vec![wire2], 1),
+    ///     Face::new(vec![wire3], 1),
+    ///     Face::new(vec![wire4], 1),
+    ///     Face::new(vec![wire5], 1),
+    /// ];
+    /// let solid = Solid::new(vec![Shell::from(face)]);
+    /// let mapped = solid.mapped(
+    ///     &move |i: &usize| {
+    ///         let _ = v[0].point();
+    ///         *i + 1
+    ///     },
+    ///     &move |c: &usize| *c + 1,
+    ///     &move |s: &usize| *s + 1,
+    /// );
+    /// assert_eq!(mapped.face_iter().count(), 6);
+    /// ```
     #[inline(always)]
     pub fn mapped<Q, D, T>(
         &self,

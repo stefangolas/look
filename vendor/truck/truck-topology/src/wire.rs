@@ -39,8 +39,8 @@ impl<P, C> Wire<P, C> {
     #[inline(always)]
     pub fn edge_par_iter(&self) -> EdgeParallelIter<'_, P, C>
     where
-        P: Send,
-        C: Send,
+        P: Send + Sync,
+        C: Send + Sync,
     {
         self.par_iter()
     }
@@ -48,8 +48,8 @@ impl<P, C> Wire<P, C> {
     #[inline(always)]
     pub fn edge_par_iter_mut(&mut self) -> EdgeParallelIterMut<'_, P, C>
     where
-        P: Send,
-        C: Send,
+        P: Send + Sync,
+        C: Send + Sync,
     {
         self.par_iter_mut()
     }
@@ -57,8 +57,8 @@ impl<P, C> Wire<P, C> {
     #[inline(always)]
     pub fn edge_into_par_iter(self) -> EdgeParallelIntoIter<P, C>
     where
-        P: Send,
-        C: Send,
+        P: Send + Sync,
+        C: Send + Sync,
     {
         self.into_par_iter()
     }
@@ -428,10 +428,29 @@ impl<P, C> Wire<P, C> {
 
     /// Returns a new wire whose curves are mapped by `curve_mapping` and
     /// whose points are mapped by `point_mapping`.
-    /// # Remarks
-    /// Accessing geometry elements directly in the closure will result in a deadlock.
-    /// So, this method does not appear to the document.
-    #[doc(hidden)]
+    /// # Examples
+    /// ```
+    /// use truck_topology::*;
+    /// let v = Vertex::news(&[0, 1, 2, 3, 4]);
+    /// let wire0: Wire<usize, usize> = vec![
+    ///     Edge::new(&v[0], &v[1], 100),
+    ///     Edge::new(&v[2], &v[1], 110).inverse(),
+    ///     Edge::new(&v[3], &v[4], 120),
+    /// ].into();
+    /// // Reading a vertex's point inside the closure is safe: geometry is
+    /// // immutable, so there is nothing to lock.
+    /// let wire1 = wire0
+    ///     .try_mapped(
+    ///         &move |i: &usize| {
+    ///             let _ = v[0].point();
+    ///             Some(*i as f64 + 0.5)
+    ///         },
+    ///         &move |j: &usize| Some(*j as f64 + 1000.5),
+    ///     )
+    ///     .unwrap();
+    /// assert_eq!(wire1[0].back().point(), 1.5);
+    /// assert_eq!(wire1[0].curve(), 1100.5);
+    /// ```
     pub fn try_mapped<Q, D>(
         &self,
         mut point_mapping: impl FnMut(&P) -> Option<Q>,
@@ -477,7 +496,10 @@ impl<P, C> Wire<P, C> {
     ///     Edge::new(&v[4], &v[0], 130),
     /// ].into();
     /// let wire1 = wire0.mapped(
-    ///     &move |i: &usize| *i as f64 + 0.5,
+    ///     &move |i: &usize| {
+    ///         let _ = v[0].point();
+    ///         *i as f64 + 0.5
+    ///     },
     ///     &move |j: &usize| *j as f64 + 1000.5,
     /// );
     ///
@@ -502,10 +524,6 @@ impl<P, C> Wire<P, C> {
     /// assert_eq!(wire1[2].back(), wire1[3].front());
     /// assert_eq!(wire1[3].back(), wire1[0].front());
     /// ```
-    /// # Remarks
-    /// Accessing geometry elements directly in the closure will result in a deadlock.
-    /// So, this method does not appear to the document.
-    #[doc(hidden)]
     pub fn mapped<Q, D>(
         &self,
         mut point_mapping: impl FnMut(&P) -> Q,
@@ -585,7 +603,7 @@ where
         let vertex0 = vertex_map.entry_or_insert(vf).clone()?;
         let vb = edge.absolute_back();
         let vertex1 = vertex_map.entry_or_insert(vb).clone()?;
-        let curve = curve_mapping(&*edge.curve.lock())?;
+        let curve = curve_mapping(&*edge.curve)?;
         Some(Edge::debug_new(&vertex0, &vertex1, curve))
     }
 }
@@ -603,7 +621,7 @@ where
         let vertex0 = vertex_map.entry_or_insert(vf).clone();
         let vb = edge.absolute_back();
         let vertex1 = vertex_map.entry_or_insert(vb).clone();
-        let curve = curve_mapping(&*edge.curve.lock());
+        let curve = curve_mapping(&*edge.curve);
         Edge::debug_new(&vertex0, &vertex1, curve)
     }
 }
@@ -865,7 +883,7 @@ impl<P: Debug, C: Debug> Debug for DebugDisplay<'_, Wire<P, C>, WireDisplayForma
     }
 }
 
-impl<P: Send, C: Send> FromParallelIterator<Edge<P, C>> for Wire<P, C> {
+impl<P: Send + Sync, C: Send + Sync> FromParallelIterator<Edge<P, C>> for Wire<P, C> {
     fn from_par_iter<I>(par_iter: I) -> Self
     where
         I: IntoParallelIterator<Item = Edge<P, C>>,
@@ -874,7 +892,7 @@ impl<P: Send, C: Send> FromParallelIterator<Edge<P, C>> for Wire<P, C> {
     }
 }
 
-impl<P: Send, C: Send> IntoParallelIterator for Wire<P, C> {
+impl<P: Send + Sync, C: Send + Sync> IntoParallelIterator for Wire<P, C> {
     type Item = Edge<P, C>;
     type Iter = EdgeParallelIntoIter<P, C>;
     fn into_par_iter(self) -> Self::Iter {
@@ -882,7 +900,7 @@ impl<P: Send, C: Send> IntoParallelIterator for Wire<P, C> {
     }
 }
 
-impl<'a, P: Send + 'a, C: Send + 'a> IntoParallelRefIterator<'a> for Wire<P, C> {
+impl<'a, P: Send + Sync + 'a, C: Send + Sync + 'a> IntoParallelRefIterator<'a> for Wire<P, C> {
     type Item = &'a Edge<P, C>;
     type Iter = EdgeParallelIter<'a, P, C>;
     fn par_iter(&'a self) -> Self::Iter {
@@ -890,7 +908,7 @@ impl<'a, P: Send + 'a, C: Send + 'a> IntoParallelRefIterator<'a> for Wire<P, C> 
     }
 }
 
-impl<'a, P: Send + 'a, C: Send + 'a> IntoParallelRefMutIterator<'a> for Wire<P, C> {
+impl<'a, P: Send + Sync + 'a, C: Send + Sync + 'a> IntoParallelRefMutIterator<'a> for Wire<P, C> {
     type Item = &'a mut Edge<P, C>;
     type Iter = EdgeParallelIterMut<'a, P, C>;
     fn par_iter_mut(&'a mut self) -> Self::Iter {
@@ -898,7 +916,7 @@ impl<'a, P: Send + 'a, C: Send + 'a> IntoParallelRefMutIterator<'a> for Wire<P, 
     }
 }
 
-impl<P: Send, C: Send> ParallelExtend<Edge<P, C>> for Wire<P, C> {
+impl<P: Send + Sync, C: Send + Sync> ParallelExtend<Edge<P, C>> for Wire<P, C> {
     fn par_extend<I>(&mut self, par_iter: I)
     where
         I: IntoParallelIterator<Item = Edge<P, C>>,

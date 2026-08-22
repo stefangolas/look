@@ -81,7 +81,6 @@
     unused_qualifications
 )]
 
-use parking_lot::Mutex;
 use std::collections::VecDeque;
 use std::fmt::{Debug, Formatter};
 use std::hash::{Hash, Hasher};
@@ -107,7 +106,7 @@ const SEARCH_PARAMETER_TRIALS: usize = 100;
 /// ```
 #[derive(Debug)]
 pub struct Vertex<P> {
-    point: Arc<Mutex<P>>,
+    point: Arc<P>,
 }
 
 /// Edge, which consists two vertices.
@@ -125,9 +124,9 @@ pub struct Vertex<P> {
 #[derive(Debug)]
 pub struct Edge<P, C, PC = ()> {
     vertices: (Vertex<P>, Vertex<P>),
-    orientation: bool,    // existing per-use field
-    pcurve: Option<PC>,   // NEW per-use field: the parametric trace on the owning face
-    curve: Arc<Mutex<C>>, // shared entity geometry
+    orientation: bool,  // existing per-use field
+    pcurve: Option<PC>, // NEW per-use field: the parametric trace on the owning face
+    curve: Arc<C>,      // shared entity geometry
 }
 
 /// Wire, a path or cycle which consists some edges.
@@ -158,7 +157,7 @@ pub struct Wire<P, C> {
 pub struct Face<P, C, S> {
     boundaries: Vec<Wire<P, C>>,
     orientation: bool,
-    surface: Arc<Mutex<S>>,
+    surface: Arc<S>,
 }
 
 /// Shell, a connected compounded faces.
@@ -207,21 +206,17 @@ impl<T> RemoveTry<T> for Result<T> {
 /// entity_map.insert(v.clone(), 0); // v must be cloned for sign up the hashmap.
 /// id_map.insert(v_id, 0); // v_id is implemented Copy trait!
 /// ```
-/// The id does not changed even if the value of point changes.
+/// The id does not change even if the value of point changes: replacing a
+/// point constructs a new vertex with a new id, and existing handles keep
+/// the old geometry.
 /// ```
 /// use truck_topology::*;
 /// let v = Vertex::new(0);
-///
-/// let entity = v.point();
-/// let v_id: VertexID<usize> = v.id();
-///
-/// // Change the point!
-/// v.set_point(1);
-///
-/// assert_ne!(entity, v.point());
-/// assert_eq!(v_id, v.id());
+/// let v_id = v.id();
+/// let v2 = Vertex::new(1);
+/// assert_ne!(v_id, v2.id());
 /// ```
-pub type VertexID<P> = ID<Mutex<P>>;
+pub type VertexID<P> = ID<P>;
 
 /// The id that does not depend on the direction of the edge.
 /// # Examples
@@ -233,7 +228,7 @@ pub type VertexID<P> = ID<Mutex<P>>;
 /// assert_ne!(edge0, edge1);
 /// assert_eq!(edge0.id(), edge1.id());
 /// ```
-pub type EdgeID<C> = ID<Mutex<C>>;
+pub type EdgeID<C> = ID<C>;
 
 /// The id that does not depend on the direction of the face.
 /// # Examples
@@ -253,7 +248,7 @@ pub type EdgeID<C> = ID<Mutex<C>>;
 /// assert_eq!(face0.id(), face1.id());
 /// assert_ne!(face0.id(), face2.id());
 /// ```
-pub type FaceID<S> = ID<Mutex<S>>;
+pub type FaceID<S> = ID<S>;
 
 /// configuration for vertex display format.
 #[derive(Clone, Copy, Debug)]
@@ -406,23 +401,12 @@ pub mod wire;
 
 /// Display structs for debug or display topological elements
 pub mod format {
-    use crate::*;
-
     /// struct for debug formatting
     #[allow(missing_debug_implementations)]
     #[derive(Clone, Copy)]
     pub struct DebugDisplay<'a, T, Format> {
         pub(super) entity: &'a T,
         pub(super) format: Format,
-    }
-
-    #[derive(Clone)]
-    pub(super) struct MutexFmt<'a, T>(pub &'a Mutex<T>);
-
-    impl<T: Debug> Debug for MutexFmt<'_, T> {
-        fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-            f.write_fmt(format_args!("{:?}", self.0.lock()))
-        }
     }
 }
 /// The construction-DAG identity algebra's public types, re-exported at the

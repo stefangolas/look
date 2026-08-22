@@ -68,9 +68,9 @@ impl<P, C, S> Shell<P, C, S> {
     #[inline(always)]
     pub fn face_par_iter(&self) -> FaceParallelIter<'_, P, C, S>
     where
-        P: Send,
-        C: Send,
-        S: Send,
+        P: Send + Sync,
+        C: Send + Sync,
+        S: Send + Sync,
     {
         self.par_iter()
     }
@@ -79,9 +79,9 @@ impl<P, C, S> Shell<P, C, S> {
     #[inline(always)]
     pub fn face_par_iter_mut(&mut self) -> FaceParallelIterMut<'_, P, C, S>
     where
-        P: Send,
-        C: Send,
-        S: Send,
+        P: Send + Sync,
+        C: Send + Sync,
+        S: Send + Sync,
     {
         self.par_iter_mut()
     }
@@ -90,9 +90,9 @@ impl<P, C, S> Shell<P, C, S> {
     #[inline(always)]
     pub fn face_into_par_iter(self) -> FaceParallelIntoIter<P, C, S>
     where
-        P: Send,
-        C: Send,
-        S: Send,
+        P: Send + Sync,
+        C: Send + Sync,
+        S: Send + Sync,
     {
         self.into_par_iter()
     }
@@ -107,9 +107,9 @@ impl<P, C, S> Shell<P, C, S> {
     #[inline(always)]
     pub fn edge_par_iter(&self) -> impl ParallelIterator<Item = Edge<P, C>> + '_
     where
-        P: Send,
-        C: Send,
-        S: Send,
+        P: Send + Sync,
+        C: Send + Sync,
+        S: Send + Sync,
     {
         self.face_par_iter().flat_map(Face::boundaries).flatten()
     }
@@ -124,9 +124,9 @@ impl<P, C, S> Shell<P, C, S> {
     #[inline(always)]
     pub fn vertex_par_iter(&self) -> impl ParallelIterator<Item = Vertex<P>> + '_
     where
-        P: Send,
-        C: Send,
-        S: Send,
+        P: Send + Sync,
+        C: Send + Sync,
+        S: Send + Sync,
     {
         self.edge_par_iter().map(|edge| edge.front().clone())
     }
@@ -558,10 +558,37 @@ impl<P, C, S> Shell<P, C, S> {
 
     /// Returns a new shell whose surfaces are mapped by `surface_mapping`,
     /// curves are mapped by `curve_mapping` and points are mapped by `point_mapping`.
-    /// # Remarks
-    /// Accessing geometry elements directly in the closure will result in a deadlock.
-    /// So, this method does not appear to the document.
-    #[doc(hidden)]
+    /// # Examples
+    /// ```
+    /// use truck_topology::*;
+    /// let v = Vertex::news(&[0, 1, 2, 3, 4, 5, 6]);
+    /// let wire0 = Wire::from(vec![
+    ///     Edge::new(&v[0], &v[1], 100),
+    ///     Edge::new(&v[1], &v[2], 200),
+    ///     Edge::new(&v[2], &v[3], 300),
+    ///     Edge::new(&v[3], &v[0], 400),
+    /// ]);
+    /// let wire1 = Wire::from(vec![
+    ///     Edge::new(&v[4], &v[5], 500),
+    ///     Edge::new(&v[6], &v[5], 600).inverse(),
+    ///     Edge::new(&v[6], &v[4], 700),
+    /// ]);
+    /// let face0 = Face::new(vec![wire0, wire1], 10000);
+    /// let shell0 = Shell::from(vec![face0]);
+    /// // Reading a vertex's point inside the closure is safe: geometry is
+    /// // immutable, so there is nothing to lock.
+    /// let shell1 = shell0
+    ///     .try_mapped(
+    ///         &move |i: &usize| {
+    ///             let _ = v[0].point();
+    ///             Some(*i + 50)
+    ///         },
+    ///         &move |j: &usize| Some(*j + 5000),
+    ///         &move |k: &usize| Some(*k + 500000),
+    ///     )
+    ///     .unwrap();
+    /// assert_eq!(shell1[0].surface(), 510000);
+    /// ```
     pub fn try_mapped<Q, D, T>(
         &self,
         mut point_mapping: impl FnMut(&P) -> Option<Q>,
@@ -580,7 +607,7 @@ impl<P, C, S> Shell<P, C, S> {
                     .iter()
                     .map(|wire| wire.sub_try_mapped(&mut edge_map))
                     .collect::<Option<Vec<_>>>()?;
-                let surface = surface_mapping(&*face.surface.lock())?;
+                let surface = surface_mapping(&*face.surface)?;
                 let mut new_face = Face::debug_new(wires, surface);
                 if !face.orientation() {
                     new_face.invert();
@@ -615,7 +642,10 @@ impl<P, C, S> Shell<P, C, S> {
     /// );
     /// let shell0 = Shell::from(vec![face0, face1.inverse()]);
     /// let shell1 = shell0.mapped(
-    ///     &move |i: &usize| *i + 50,
+    ///     &move |i: &usize| {
+    ///         let _ = v[0].point();
+    ///         *i + 50
+    ///     },
     ///     &move |j: &usize| *j + 5000,
     ///     &move |k: &usize| *k + 500000,
     /// );
@@ -652,10 +682,6 @@ impl<P, C, S> Shell<P, C, S> {
     ///     }
     /// }
     /// ```
-    /// # Remarks
-    /// Accessing geometry elements directly in the closure will result in a deadlock.
-    /// So, this method does not appear to the document.
-    #[doc(hidden)]
     pub fn mapped<Q, D, T>(
         &self,
         mut point_mapping: impl FnMut(&P) -> Q,
@@ -674,7 +700,7 @@ impl<P, C, S> Shell<P, C, S> {
                     .iter()
                     .map(|wire| wire.sub_mapped(&mut edge_map))
                     .collect();
-                let surface = surface_mapping(&*face.surface.lock());
+                let surface = surface_mapping(&*face.surface);
                 let mut new_face = Face::debug_new(wires, surface);
                 if !face.orientation() {
                     new_face.invert();
@@ -1229,7 +1255,9 @@ impl<P: Debug, C: Debug, S: Debug> Debug for DebugDisplay<'_, Shell<P, C, S>, Sh
     }
 }
 
-impl<P: Send, C: Send, S: Send> FromParallelIterator<Face<P, C, S>> for Shell<P, C, S> {
+impl<P: Send + Sync, C: Send + Sync, S: Send + Sync> FromParallelIterator<Face<P, C, S>>
+    for Shell<P, C, S>
+{
     fn from_par_iter<I>(par_iter: I) -> Self
     where
         I: IntoParallelIterator<Item = Face<P, C, S>>,
@@ -1238,7 +1266,7 @@ impl<P: Send, C: Send, S: Send> FromParallelIterator<Face<P, C, S>> for Shell<P,
     }
 }
 
-impl<P: Send, C: Send, S: Send> IntoParallelIterator for Shell<P, C, S> {
+impl<P: Send + Sync, C: Send + Sync, S: Send + Sync> IntoParallelIterator for Shell<P, C, S> {
     type Item = Face<P, C, S>;
     type Iter = FaceParallelIntoIter<P, C, S>;
     fn into_par_iter(self) -> Self::Iter {
@@ -1246,7 +1274,9 @@ impl<P: Send, C: Send, S: Send> IntoParallelIterator for Shell<P, C, S> {
     }
 }
 
-impl<'a, P: Send + 'a, C: Send + 'a, S: Send + 'a> IntoParallelRefIterator<'a> for Shell<P, C, S> {
+impl<'a, P: Send + Sync + 'a, C: Send + Sync + 'a, S: Send + Sync + 'a> IntoParallelRefIterator<'a>
+    for Shell<P, C, S>
+{
     type Item = &'a Face<P, C, S>;
     type Iter = FaceParallelIter<'a, P, C, S>;
     fn par_iter(&'a self) -> Self::Iter {
@@ -1254,8 +1284,8 @@ impl<'a, P: Send + 'a, C: Send + 'a, S: Send + 'a> IntoParallelRefIterator<'a> f
     }
 }
 
-impl<'a, P: Send + 'a, C: Send + 'a, S: Send + 'a> IntoParallelRefMutIterator<'a>
-    for Shell<P, C, S>
+impl<'a, P: Send + Sync + 'a, C: Send + Sync + 'a, S: Send + Sync + 'a>
+    IntoParallelRefMutIterator<'a> for Shell<P, C, S>
 {
     type Item = &'a mut Face<P, C, S>;
     type Iter = FaceParallelIterMut<'a, P, C, S>;
@@ -1264,7 +1294,9 @@ impl<'a, P: Send + 'a, C: Send + 'a, S: Send + 'a> IntoParallelRefMutIterator<'a
     }
 }
 
-impl<P: Send, C: Send, S: Send> ParallelExtend<Face<P, C, S>> for Shell<P, C, S> {
+impl<P: Send + Sync, C: Send + Sync, S: Send + Sync> ParallelExtend<Face<P, C, S>>
+    for Shell<P, C, S>
+{
     fn par_extend<I>(&mut self, par_iter: I)
     where
         I: IntoParallelIterator<Item = Face<P, C, S>>,
