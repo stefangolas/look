@@ -63,11 +63,11 @@ pub mod decorators;
 pub mod deviation;
 /// BG-ENC-002-LINE: the carrier impl. Scaffolded empty; the packet fills it.
 pub mod line;
+/// BG-NUM-002/003: the certified numerical substrate. Scaffolded empty.
+pub mod num;
 /// BG-ENC-003-NURBS: the spline carrier impl. Scaffolded empty; the packet
 /// fills it. Blocked on BG-ENC-003-BSPLINE.
 pub mod nurbs;
-/// BG-NUM-002/003: the certified numerical substrate. Scaffolded empty.
-pub mod num;
 /// BG-ENC-002 reference: `EnclosureSurface for Plane`.
 pub mod plane;
 /// BG-ENC-002-SPHERE: the carrier impl. Scaffolded empty; the packet fills it.
