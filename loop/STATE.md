@@ -1129,4 +1129,35 @@ what the tree says about the last two, as opposed to what the spec says.
   declares the ripple list. This survives in the ledger fault note and the
   r2 row; it stays here because the next migration packet WILL be written by
   someone who has not read QUESTION.md.
+- **Stale keys in a shared replacement map are POISONOUS under allocator
+  address reuse, and the mutation semantics hid this for free.** Session 19:
+  the MIGRATE-r2 Inner-arm unify sweep creates fresh half-edges, registers
+  them in the shared emap, then DROPS them - their raw Arc addresses return
+  to the allocator, the next allocation (the other store's halves) can land
+  on the same address, and `emap.entry(id).or_insert_with` then hands that
+  store a replacement edge built from the WRONG store's vertices. Baseline
+  never died of this because its cut halves directly referenced the shared
+  mutable vertex. The worker's fix: after a sweep that consumes-and-drops
+  registered edges, EVICT their ids (`emap.remove(&half0_id)`). Any design
+  that registers short-lived edges in a map keyed by pointer identity owes an
+  eviction argument; see BG-CE-003-MIGRATE-r2 RESULT.json deviations.
+- **Narrowing `crates` in an r2/follow-up packet breaks V3, correctly.** The
+  r2 verify first came back LINT_UNLINTED because I set
+  `crates: [truck-shapeops]` while the diff ddcd706..HEAD still spans
+  attempt-1's truck-topology/truck-meshalgo changes - V3 refuses to pass a
+  diff containing crates clippy never linted. The gate is right: `crates`
+  must name the union of every crate the base..HEAD diff touches, which for
+  a branch-carrying follow-up is the ORIGINAL packet's crate list, not the
+  r2 edit's own footprint.
+- **gen_packet/run_packet anchor checks always run against the MAIN worktree**
+  (`run_anchor` uses cwd=REPO_ROOT), so anchors describing a dispatch slot's
+  branch tip fail at dispatch with confusing baseline-state counts. For any
+  packet dispatched onto a branch carrying prior work, pin each anchor to
+  that exact tip: `git show <sha>:<path> | grep -c '<pattern>'`. Measured
+  counts stay H-8 obligations either way.
+- **inari 2.0 endpoint accessors are `.inf()`/`.sup()`**, not `.lower()/
+  .upper()` (the latter cost one scratch compile cycle). Box3/interval code
+  outside vendor/ should copy the accessor spellings from
+  truck-evidence/src/enclosure.rs rather than guessing.
+
 
