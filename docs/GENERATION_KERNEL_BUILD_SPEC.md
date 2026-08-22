@@ -25,7 +25,9 @@
 >   T2.1/T2.2 named as the theorem BG-FID-003 instantiates, CONDITIONAL on
 >   L-TUBE, L-COVERING, L-SEPARATES (open proof obligations); Federer equality
 >   demoted to motivation pending L-FEDERER-PATCH; naming discipline until
->   then: `tube_width_lower` / `chi_lower`, never bare `reach`/`lfs`.
+>   then: `FaceScaleComponents.conservative_min()` and
+>   `WedgeSlopeLowerBound`, never bare `reach`/`lfs`/`TubeWidthLowerBound`/
+>   `ChiLowerBound`.
 > - **BG-FID-008 (new)** — §6.2 gained a one-sheet condition (iv). (i)–(iii) give
 >   a covering of *some* degree, not a homeomorphism, so a checker implementing
 >   only them passes a double-cover input and voids everything above it. Consumed
@@ -1863,16 +1865,25 @@ type `LfsLowerBound`, not `lfs`; the naming is the enforcement, because a bare
 `lfs` invites a future call site to read it as an equality and compare in the
 wrong direction.
 
-**AMENDMENT (session 19, theorem grounding).** Two stricter naming rules hold
-until their theorem chains are discharged: (1) the face-interior three-way min
-ships as `tube_width_lower` — it certifies exactly what downstream eps budgets
-consume, but calling it reach or lfs claims L-FEDERER-PATCH, which is an OPEN
-proof obligation (see below), not a landed fact; (2) the edge row ships as
-`chi_lower`, a certified lower bound on the literature's critical-function
-quantity χ_K ([CCSL09] Def 4.3), not as a private `ϱ_wedge`. The scaffold's
-`LfsLowerBound` name attaches only after L-FEDERER-PATCH lands; consumers
-between now and then use the inequality form `q < c · bound` (BG-FID-007),
-which any conservative bound satisfies regardless of name.
+**AMENDMENT (session 19, revised after review).** Two stricter naming rules hold
+until their theorem chains are discharged: (1) the face-interior three-way
+computation ships as `FaceScaleComponents { curvature_radius_lower,
+nonincident_separation_lower, boundary_distance_lower }` with a
+`conservative_min()` — NOT as any single bound named "tube width", because
+`q = conservative_min() <= true-normal-tube-radius` is exactly what
+L-FEDERER-PATCH has not yet established; a type named `TubeWidthLowerBound`
+may only be constructed by proof-bearing code once that lemma lands (the
+evidence architecture enforces this: the certificate type appears when its
+proposition exists). Empty exclusion sets are the identity element:
+`d(A, ∅) = +∞`, and `min(empty) = +∞`; extended-real values are permitted
+and intentional (a plane's curvature radius component is `+∞`). (2) The edge
+row ships as `WedgeSlopeLowerBound { value, scope: EdgeMidpointWitness }` — a
+local normalized-slope lower bound at INV-109's witnessed point. It is NOT a
+`ChiLowerBound`: χ_K(t) is an infimum over an entire distance locus, not one
+witness value; promotion to `ChiLowerBound` happens only via L-COVERAGE
+(type-level promotion, not prose). Consumers use the inequality form
+`q < c · bound` (BG-FID-007), which any conservative bound satisfies
+regardless of name.
 
 ```
 lfs_lower(x, stratum) = min( intrinsic_lower(stratum), separation_lower(x), wedge_lower(x) )
@@ -1919,11 +1930,13 @@ carried as structured comments at the implementation site:
   positive whenever INV-109 passes.
 - **Known limitation, documented not hidden:** this bound is weak by
   construction (at sin_margin = 1 it still reports only 1/√2, because a sine
-  certificate cannot see branch identity). A branch-specific bound
-  (`cos(φ/2)` with certified φ near π) requires a SIGNED normal-alignment
-  certificate — e.g. `dot(n_A, n_B) <= -c` — which BG-INV-109 does not
-  currently provide. Extending INV-109 is future packet work, not FID-001
-  scope.
+  certificate cannot see branch identity). Distinguishing the healthy
+  near-flat branch (φ≈0: `dot(n_A,n_B) >= c`) from the near-knife branch
+  (φ≈π: `dot(n_A,n_B) <= -c`) needs SIGNED normal-alignment evidence, which
+  BG-INV-109 does not provide; and note the direction of usefulness — to
+  improve a LOWER bound on `cos(φ/2)` one wants an UPPER bound on φ, i.e. a
+  LOWER bound on the dot product. Extending INV-109 with signed alignment is
+  future packet work, not FID-001 scope.
 - **Sampling scope:** BG-INV-109 v1 samples each edge's parameter midpoint,
   so the edge χ certificate is scoped `MidpointCell` until BG-CE-001's pcurve
   payloads enable whole-span normal enclosure. Consumers must not read it as
@@ -1981,9 +1994,10 @@ refuse. Two consequences the code must respect:
   **AMENDMENT (session 19):** the equality is demoted to MOTIVATION for the
   decomposition's shape until L-FEDERER-PATCH (see BG-FID-001a's bridge-lemma
   register) proves the trimmed-patch tube statement directly; the executable
-  contract is the three-way min shipped as `tube_width_lower`, whose semantics
-  are "certified single-valuedness radius of the normal tube over the cell",
-  never "reach".
+  contract is `FaceScaleComponents` with certified component directions and a
+  `conservative_min()`, whose semantics are "certified inputs to a tube-width
+  argument", never "tube width", "reach" or "lfs" — those names wait for the
+  lemma.
 - **Refusals are epistemic.** `ReachLowerBoundTooSmall` asserts that the bound
   could not be certified large enough, **not** that the feature size is small.
   A diagnostic that says "feature too small" when the bound merely failed to
