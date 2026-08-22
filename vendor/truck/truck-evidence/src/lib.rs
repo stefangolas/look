@@ -38,6 +38,9 @@
 pub mod elementary;
 /// BG-ENC-001: the enclosure interface.
 pub mod enclosure;
+/// BG-FID-001: the stratified feature-size substrate (the formal system's
+/// root). Scaffolded empty; the packet fills it.
+pub mod fid;
 /// Shared sampling-soundness harness (BG-TEST of BG-ENC-001).
 pub mod harness;
 /// BG-EVD-001: the outcome/evidence algebra, re-exported from `truck-base`.
