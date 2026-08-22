@@ -1093,6 +1093,49 @@ documented deadlock warnings, and the 8-rayon-thread regression test — is
 BG-CE-005's regeneration totality stays open design (it needs a regeneration
 subsystem, not just the algebra).
 
+**Amendment (2026-08-21, session 17: the MIGRATE design packet).** The
+replacement API is resolved, and the ripple was re-derived against the live
+tree (the row's original list was grep-measured before filing and is wrong in
+both directions):
+
+- **Vertex: `Vertex::new` IS the replacement.** No `with_point` — a fresh
+  allocation with the new point is the whole operation. The breaking part is
+  documentary: the crate's own doctest claimed "the id does not changed even
+  if the value of point changes" (`lib.rs`, `VertexID` docs) — that claim
+  reverses. Replacement produces a new allocation id; every existing handle
+  keeps the old geometry.
+- **Edge and Face gain `with_curve` / `with_surface`** — non-trivial
+  replacements that preserve vertices, boundaries, orientation and the pcurve
+  payload — plus **`shared_curve` / `shared_surface` → `&C` / `&S`**, the
+  generic accessors that replace reaching into the field's mutex (the one
+  live in-crate consumer is `invariants/same_parameter.rs`).
+- **The derived id is algebra-side, not stored.** Vertices carry no
+  `EntityId` (that is CE-005's subsystem). The replacement *event* derives:
+  `OpKind` gains a `Replace` arm (additive; no exhaustive `match` on `OpKind`
+  exists) and `EntityId::replaced(&self, params: &OpParams) -> EntityId`
+  constructs `Op { kind: Replace, params }` over the old id. The generic `P`
+  cannot produce `OpParams` (a closed f64 value language), so the derivation
+  helper takes `OpParams` directly — layering, not laziness.
+- **The corrected ripple.** No edits needed (signatures unchanged):
+  `truck-modeling/{sweep,multi_sweep,closed_sweep,mapped,builder}.rs`,
+  `truck-shapeops/transversal/integrate/mod.rs`, `truck-meshalgo/src/
+  tessellation/triangulation.rs`, all of `truck-stepio`. Edits required and
+  previously MISSED by the row: `truck-shapeops/src/fillet/mod.rs` (a live
+  `set_curve` at the rolling-ball edge, where shared mutation is load-bearing
+  — the boundary already holds the edge — and the fix is `with_curve` plus a
+  construction-order swap), `truck-meshalgo/tests/tessellation/
+  triangulation.rs` (a `set_curve` in a test; the row's `src/` path was the
+  wrong file), and `truck-topology/src/invariants/same_parameter.rs` (the
+  mutex-reach). `parking_lot` stays a declared dependency (the `nightly`
+  feature references it); only the `use` dies.
+- **The `mapped`/`try_mapped` family keeps its signatures, loses
+  `#[doc(hidden)]` and all 12 deadlock remarks**, and gains the closure
+  doctest the deadlock hazard made impossible: a closure that reads the
+  entity's own geometry while mapping it. `VertexID<P> = ID<P>` (likewise
+  Edge/Face) — every alias use is source-compatible. The 8-rayon-thread
+  regression test lands as `truck-topology/tests/parallel_query.rs`; `rayon`
+  is already a regular dependency of the crate, so no manifest change.
+
 **Problem.** Geometry lives in `Arc<Mutex<_>>` with 12 documented deadlock
 hazards — `rg -n 'will result in a deadlock' truck-topology/src`, **expect 12**
 across `vertex.rs`, `edge.rs`, `wire.rs`, `face.rs`, `shell.rs`, `solid.rs` (the
