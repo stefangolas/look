@@ -55,28 +55,24 @@ here is scored, tuned, or sampled.
 
 ## Where we are
 
-**Fifty-seven packets DONE of 70 (81%), with two more teed up at close and
-a third designed-but-undispatched.** Session 17 opened the post-breakpoint
-frontier and it is WIDE — see "Pick up here" before touching anything,
-because two detached processes were left running on purpose.
+**Fifty-eight packets DONE of 70 (83%), one worker still running, one
+designed-but-undispatched.** Session 17 opened the post-breakpoint
+frontier — see "Pick up here" before touching anything, because a detached
+worker was left running on purpose.
 
-**BG-ENC-004-ISC — worker DONE first-try, verify was IN FLIGHT at close.**
-The design was validated by RUNNING a parametric Krawczyk certification
-against the real carriers in a scratch crate before the packet was
-written; that run caught **three design errors pre-dispatch**: the
-carrier's S1 Jacobian columns negate only the 3-D part (negating all four
-makes the columns parallel, det ≈ 5.5e-17); the Krawczyk center term must
-be F at the POINT (m, t_mid) — the interval F over Q decorrelates the
-p0−p1 difference and no box ever certifies; and the interval J is stored
-column-major while the algebra is row-major (a silent transpose). The
-worker landed it in one commit (`bf2fd29`, 7 tests, 12/12 anchors), found
-one real bring-up bug itself (seed parameters DECREASE along the
-plane-sphere slice — Q must hull min/max, not widen ordered), and its
-deviations were all sound. Its RESULT.json triage: clean. **The verify
-was launched detached and had NOT written VERDICT.json at close** — poll
-`loop/slots/0/VERDICT.json`, check `packet=BG-ENC-004-ISC`,
-`commit=bf2fd29`, `base=ddcd706`, then land it (merge --no-ff, land_packet,
-ledger, DONE).
+**BG-ENC-004-ISC — LANDED, first-try ACCEPTED** (`98a25d4` merge,
+`9c281d0` filing; verdict clean, fault NONE). The design was validated by
+RUNNING a parametric Krawczyk certification against the real carriers in
+a scratch crate before the packet was written; that run caught **three
+design errors pre-dispatch**: the carrier's S1 Jacobian columns negate
+only the 3-D part (negating all four makes the columns parallel, det ≈
+5.5e-17); the Krawczyk center term must be F at the POINT (m, t_mid) —
+the interval F over Q decorrelates the p0−p1 difference and no box ever
+certifies; and the interval J is stored column-major while the algebra is
+row-major (a silent transpose). The worker landed it in one commit
+(`bf2fd29`, 7 tests, 12/12 anchors), found one real bring-up bug itself
+(seed parameters DECREASE along the plane-sphere slice — Q must hull
+min/max, not widen ordered), and its deviations were all sound.
 
 **BG-CE-003-MIGRATE — worker RUNNING at close** (slot 1, forked at
 `ddcd706`, events past 1.17 MB and growing; expect finish 30–90 min after
@@ -120,21 +116,22 @@ see — same family as the BLOCKED trap below.)
 
 ## Pick up here
 
-1. **Collect the two in-flight items.** Check `python loop/slot_status.py`
-   FIRST (the watchdog is stopped; nothing reaps a wedged worker). Slot 0:
-   poll VERDICT.json, land ISC on ACCEPTED. Slot 1: when the worker
-   FINISHes, triage RESULT.json, then verify `--base ddcd706` **only after
-   slot 0's verify is done** (same base — sequential rule). Restart the
-   watchdog (`LOOK_WATCHDOG_STAGNANT=3600` via the `cmd /c` incantation)
-   if you dispatch anything new.
+1. **Collect the MIGRATE worker** (slot 1). Check `python loop/slot_status.py`
+   FIRST (the watchdog is stopped; nothing reaps a wedged worker). When the
+   worker FINISHes: triage RESULT.json, then verify `--base ddcd706` (the
+   fork point; slot 0's ddcd706 verify is DONE, so no same-base conflict).
+   Restart the watchdog (`LOOK_WATCHDOG_STAGNANT=3600` via the `cmd /c`
+   incantation) if you dispatch anything new. Slot 0 is landed and idle —
+   `new_slot.py` re-forks it for the next dispatch.
 2. **Write the NUM-003 packet from the validated scratch** (decisions
    above; the packet's tests: transverse one-shot, the tangential refusal,
    linear 2×2, no-root, exhaustion-via-tangential). Dispatch on the first
-   free slot.
+   free slot. **SHARED-CONE also became eligible with ISC's landing** —
+   mechanical, but its packet is unwritten.
 3. **Then the frontier is:** NUM-002 (roots.rs — same scaffold, the
-   double-root-refuses-not-empty-list negative), SHARED-CONE (mechanical,
-   unlocks the moment ISC lands), FID-001 (design — the critical path:
-   it unlocks INV-106, NUM-004, FID-008 → FID-003 → FID-005).
+   double-root-refuses-not-empty-list negative), SHARED-CONE, FID-001
+   (design — the critical path: it unlocks INV-106, NUM-004, FID-008 →
+   FID-003 → FID-005).
 4. **Disk dipped to 10.6 GB mid-verify and recovered to 18.7 GB at close**
    (the ddcd706 baseline workspace is transient — a mid-verify reading is
    NOT the close reading; record both). Slot targets: 0 = 12.3 GB, 2 =
@@ -147,35 +144,37 @@ see — same family as the BLOCKED trap below.)
   mid-run. If the machine slept anyway, expect slot 1 wedged: confirm with
   events mtime + tasklist before any reap, and recover via
   `run_packet.py --reset` (the archive is a patch you can apply).
-- **Slot 0**: verify in flight at close (VERDICT.json pending). **Slot 1**:
-  MIGRATE worker RUNNING (pid 10952). **Slot 2**: IDLE on INV-109's landed
-  branch (`c995935`) — the DEAD? label is the known miscalibration for a
-  landed slot.
+- **Slot 0**: ISC LANDED; idle on `packet/BG-ENC-004-ISC@bf2fd29` — re-fork
+  with `new_slot.py` for the next dispatch. **Slot 1**: MIGRATE worker
+  RUNNING (pid 10952, forked at `ddcd706`). **Slot 2**: IDLE on INV-109's
+  landed branch (`c995935`) — the DEAD? label is the known miscalibration
+  for a landed slot.
 - **Disk dipped to 10.6 GB mid-verify, 18.7 GB at close** (the verify
   baseline is transient — see "Pick up here" 4).
-- Registry: **57 DONE / 11 SPECD / 2 BLOCKED** (70 rows). HEAD `f1b4058`,
-  tracked tree clean. GATE-4 at 110/110 (worker-reported; the pending
-  verify confirms).
+- Registry: **58 DONE / 10 SPECD / 2 BLOCKED** (70 rows). HEAD `9c281d0`,
+  tracked tree clean. GATE-4 at 110/110 (verify-confirmed).
 - `loop/packets/` gained BG-ENC-004-ISC and BG-CE-003-MIGRATE this
-  session; the ledger is at 52 rows (ISC's row lands with it).
+  session; `loop/results/` holds BG-ENC-004-ISC.json; the ledger is at 53
+  rows.
 
 ## The parallelism picture
 
-70 rows. At close: 4 eligible (ISC [verify pending], MIGRATE [running],
-NUM-002, NUM-003 [design packets: NUM-003's scratch is done]). When ISC
-and MIGRATE land: **59/70 (84%)**, and SHARED-CONE joins eligible. The
-honest width constraint is orchestrator design time, not slots: FID-001,
-NUM-002, SHARED-CONE's packet, and later FID-008/003/005 are all mine to
-write. INV-107 (needs TOL-001-TYPE) and OFFSET (the EnclosureVectorField
+70 rows. At close: MIGRATE running; eligible NUM-002, NUM-003 (design
+packets — NUM-003's scratch is done) and SHARED-CONE (unlocked by ISC's
+landing, packet unwritten). **58/70 (83%) landed.** The honest width
+constraint is orchestrator design time, not slots: FID-001, NUM-002,
+SHARED-CONE's packet, and later FID-008/003/005 are all mine to write.
+INV-107 (needs TOL-001-TYPE) and OFFSET (the EnclosureVectorField
 question) stay BLOCKED.
 
-Session 17's cost picture: one packet landed-pending-verify (ISC), one
+Session 17's cost picture: one landed first-try (ISC — designed,
+scratch-validated, dispatched, verified, merged in a single session), one
 designed+dispatched+running (MIGRATE), one designed+scratch-validated
 (NUM-003), two registry bugs found and fixed (the dangling needs, the
 MIGRATE ripple), and the ISC design's three scratch-caught errors — the
 validate-by-RUNNING discipline paid for itself before any worker saw the
 packet. The worker caught one error the scratch could not see (the
-in-crtc seed-ordering class), which is the division of labor working.
+in-crate seed-ordering class), which is the division of labor working.
 
 ## Traps, each one paid for
 - **The watchdog's default 1200s wedged-killer kills healthy workers during a
