@@ -11,42 +11,42 @@ otherwise would eventually cost a trap.) If you are picking this up cold, read
 [`loop/ORCHESTRATOR.md`](ORCHESTRATOR.md) for how to run the loop, then
 `python loop/slot_status.py`** — nothing else. Do not read `LEDGER.jsonl` whole.
 
-Updated 2026-08-22, close of session 17. Branch: `integration/kernel-bg`. Nothing
+Updated 2026-08-22, close of session 18. Branch: `integration/kernel-bg`. Nothing
 from the loop has reached `main` and nothing has been pushed.
 
 ## What this is, if you have never seen it
 
 `vendor/truck/` is a vendored CAD kernel this repo owns. A formal specification,
 `docs/GENERATION_KERNEL_BUILD_SPEC.md`, lists ~56 numbered contract items
-(`BG-S0-*`, `BG-EVD-*`, `BG-TOL-*`, …) that harden it — replacing panics with
+(`BG-S0-*`, `BG-EVD-*`, `BG-TOL-*`, ...) that harden it - replacing panics with
 refusals carrying evidence, giving tolerances a model, certifying enclosures.
 This loop discharges those items with LLM workers instead of by hand.
 
 **You are the orchestrator.** You write work packets, schedule them, adjudicate
 verification, and amend the spec. **You do not write the kernel code.** A packet
-is dispatched to a worker (deepseek v4 flash via opencode) that gets one file —
-the packet — and one git worktree, and gets no say in whether its work is
+is dispatched to a worker (deepseek v4 flash via opencode) that gets one file -
+the packet - and one git worktree, and gets no say in whether its work is
 accepted. `loop/verify.py` is the only acceptance authority; a worker's
 `RESULT.json` is a claim, never a verdict.
 
 Three documents define the rest, and you should read them in this order when a
 specific need arises rather than upfront:
 
-- [`docs/KERNEL_AUTOBUILD_LOOP.md`](../docs/KERNEL_AUTOBUILD_LOOP.md) — the loop
+- [`docs/KERNEL_AUTOBUILD_LOOP.md`](../docs/KERNEL_AUTOBUILD_LOOP.md) - the loop
   design: packet schema (§4), the V-gates (§5), context budget (§3), disk (§7).
 - [`docs/GENERATION_KERNEL_BUILD_SPEC.md`](../docs/GENERATION_KERNEL_BUILD_SPEC.md)
-  — the contract items themselves and **house rules H-1..H-8**, which every
+  - the contract items themselves and **house rules H-1..H-8**, which every
   packet restates and every worker must obey. H-8 is the one that bites: anchors
   are `rg` patterns and symbol names, never line numbers, and a count mismatch
   is a stop condition, not a nuisance.
-- `loop/packets/BG-TOL-001-GEOM-NURBS.md` — the newest and largest worked
-  example (57 sites, 26 contexts, 12 deferrals, six files), generated from a
-  reviewed survey by `gen_packet --skeleton` and landed in one dispatch.
-  `BG-TOL-001-MESHALGO.md` is the previous one, `BG-TOL-001-SHAPEOPS.md` the
-  older hand-written shard, and `BG-S0-003.md` older still.
-- `loop/packets/BG-EVD-004-r2.md` — written, checked and **undispatched**; the
+- `loop/packets/BG-TOL-001-GEOM-NURBS.md` - the newest and largest worked
+  example of a migration shard. `BG-NUM-003.md` is the newest worked example of
+  a from-scratch design packet whose every formula was scratch-run first;
+  `BG-NUM-002.md` shows the same shape (and its disagreements field shows what
+  the worker catches when you get a formula wrong anyway).
+- `loop/packets/BG-EVD-004-r2.md` - written, checked and **undispatched**; the
   worked example of a packet that fixes a defect rather than migrating sites.
-- `loop/packets/BG-TOL-001-MESHALGO-SURVEY.md` — the `class: survey` template,
+- `loop/packets/BG-TOL-001-MESHALGO-SURVEY.md` - the `class: survey` template,
   sharpened after its first run. Copy it to survey a new crate.
 
 The loop is a **build** loop, not a search loop: acceptance is mechanical and
@@ -55,126 +55,116 @@ here is scored, tuned, or sampled.
 
 ## Where we are
 
-**Fifty-eight packets DONE of 70 (83%), one worker still running, one
-designed-but-undispatched.** Session 17 opened the post-breakpoint
-frontier — see "Pick up here" before touching anything, because a detached
-worker was left running on purpose.
+**Sixty-one packets DONE of 70 (87%). NOTHING is running; the watchdog is
+STOPPED.** Two design jobs are queued and both are yours before anything can
+dispatch: MIGRATE-r2 (see below) and FID-001's packet (scaffold landed).
 
-**BG-ENC-004-ISC — LANDED, first-try ACCEPTED** (`98a25d4` merge,
-`9c281d0` filing; verdict clean, fault NONE). The design was validated by
-RUNNING a parametric Krawczyk certification against the real carriers in
-a scratch crate before the packet was written; that run caught **three
-design errors pre-dispatch**: the carrier's S1 Jacobian columns negate
-only the 3-D part (negating all four makes the columns parallel, det ≈
-5.5e-17); the Krawczyk center term must be F at the POINT (m, t_mid) —
-the interval F over Q decorrelates the p0−p1 difference and no box ever
-certifies; and the interval J is stored column-major while the algebra is
-row-major (a silent transpose). The worker landed it in one commit
-(`bf2fd29`, 7 tests, 12/12 anchors), found one real bring-up bug itself
-(seed parameters DECREASE along the plane-sphere slice — Q must hull
-min/max, not widen ordered), and its deviations were all sound.
+Session 18 in one line: three packets written, three landed first-try ACCEPTED,
+one honest REJECTED with the most valuable finding of the session.
 
-**BG-CE-003-MIGRATE — worker RUNNING at close** (slot 1, forked at
-`ddcd706`, events past 1.17 MB and growing; expect finish 30–90 min after
-00:15). The design packet (`f1b4058`) pre-decided everything: `Vertex::new`
-IS the point replacement (no with_point — the id-stability doctest
-REVERSES), `Edge::with_curve`/`Face::with_surface` +
-`shared_curve`/`shared_surface`, `OpKind::Replace` + `EntityId::replaced`
-(additive; no exhaustive matches), 12 deadlock remarks + `#[doc(hidden)]`
-deleted, the 8-rayon test (rayon already a dep — no manifest edit), and
-the three live call sites: loops_store's cross-store mutation made
-explicit by RETURNING the effective vertex (the shared mutation was
-load-bearing across two store calls and the polyline readback), fillet's
-`set_curve` fixed by `with_curve` + construction-order swap, meshalgo's
-TEST-file set_curve. **The filed row's ripple was wrong in both
-directions** — modeling/integrate/meshalgo-src/stepio need NO edits;
-fillet/mod.rs, `truck-meshalgo/tests/tessellation/triangulation.rs` (the
-row named the src file), and `invariants/same_parameter.rs` were missed.
-Row corrected, spec amended.
+**BG-NUM-003 - LANDED first-try ACCEPTED** (`94ce3c7` merge). Every decision in
+the packet held: point-center F(m), strict-interior uniqueness, row-major
+Jacobian, bisect-on-None preconditioner, spent reported as initial-minus-
+remaining. The two scratch calibrations were amended into the spec first
+(`480c884`). GATE-4 untouched at 110/110 throughout the session.
 
-**BG-NUM-003 — designed and scratch-VALIDATED, packet not written** (the
-user called the close). Scratch at
-`C:\Users\stefa\AppData\Local\Temp\opencode\num3-scratch`: const-generic
-`KrawczykSystem<N>` trait (f_point / jacobian row-major / preconditioner —
-the SYSTEM supplies its own float inverse, so the operator needs none),
-x²−2 certifies Unique one-shot, x² tangential double root refuses
-`NumericallyUnresolved{KrawczykIndeterminate}` correctly, 2×2 linear
-one-shot. **Two design calibrations the scratch found:** (1) a None
-preconditioner at the box midpoint (x²+1 at 0 — vanishing derivative)
-must BISECT, not refuse; (2) the spec's budget-exhaustion test premise is
-wrong — x²−2 on [1,2] certifies one-shot even at Budget::new(0,0,0), so
-the exhaustion negative must use a case that actually bisects (the
-tangential one). The num/ module tree is scaffolded (`e69103e`) so the
-packet's write set is just `num/krawczyk.rs`; `KrawczykIndeterminate`
-and `RootNotIsolated` witnesses ALREADY EXIST in truck-base — no ripple.
+**BG-ENC-004-SHARED-CONE - LANDED first-try ACCEPTED** (`cbc9a9d` merge, filed
+at `8005085`). The four duplicated helpers (`interval_at`, `cross_box`,
+`midpoint_ball_cone`, `immersion_lower_bound_box`) now live once in
+`enclosure.rs`; seven modules delegate to them; 418 lines of copies deleted.
+The worker's SPEC_GAP was NOT a gap in its work: it refused to call the seven
+copies "byte-identical" because two spell the guard clauses in a different
+order (behaviourally identical), and it was blocked by the lib.rs fmt defect
+below. Both positions were correct.
 
-**Registry fixes this session:** BG-NUM-002/003 listed `needs:
-BG-NUM-001` but the row id is `BG-NUM-001-FILLET` — dangling, invisible
-to the scheduler forever. Both fixed; `schedule.py` went from 2 to 4
-eligible. (A dangling `needs` entry is a status the scheduler cannot
-see — same family as the BLOCKED trap below.)
+**BG-NUM-002 - LANDED first-try ACCEPTED** (`f95dfd1` merge) **and the worker
+caught five errors in my packet** - all five witness coefficient sequences and
+test parameters were wrong in ways that would have made required tests
+impossible or meaningless (details as a trap below). Its disagreements field is
+the best reading in the loop's history; read it before writing another numeric
+packet.
+
+**BG-CE-003-MIGRATE attempt 1 - REJECTED, correctly** (worker commit `c5cb4c6`
+preserved on `packet/BG-CE-003-MIGRATE`; ledger row committed at `c25736a`,
+fault PACKET). V5 failed on exactly one test:
+`transversal::integrate::tests::punched_cube` - "This shell is not oriented and
+closed." The worker's QUESTION.md derives why: `add_geom_vertex` registered ONE
+shared mutable Vertex instance in BOTH stores, and it is the INSTANCE IDENTITY
+across later `change_vertex` re-replacements - not just the final point - that
+kept the cross-store intersection edge unified so the boolean shell closes.
+Immutable `Arc<G>` construction splits the instances; the packet's decision 7
+(single reassignment, one closing edge) cannot express it, and neither can the
+worker's faithful reconstruction (per-store effective vertices + re-pointing +
+per-store caches - loops_store's own tests pass, loops byte-identical, pipeline
+still open). Everything else in the migration is green and preserved on the
+branch: storage swap, replacement API, entity_id Replace arm, fillet order swap,
+meshalgo migration, six tests incl. the 8-rayon parallel query.
+
+**Registry fixes / scaffolds this session:** the fid module tree scaffolded
+(`2fc8c13`) carrying BG-FID-001's full contract in module docs; spec amended
+with the NUM-003 calibrations (`480c884`); lib.rs module-order fix (`726e9b3`,
+orchestrator amendment - my scaffold commit e69103e broke crate fmt and two
+workers found it).
 
 ## Pick up here
 
-1. **Collect the MIGRATE worker** (slot 1). Check `python loop/slot_status.py`
-   FIRST (the watchdog is stopped; nothing reaps a wedged worker). When the
-   worker FINISHes: triage RESULT.json, then verify `--base ddcd706` (the
-   fork point; slot 0's ddcd706 verify is DONE, so no same-base conflict).
-   Restart the watchdog (`LOOK_WATCHDOG_STAGNANT=3600` via the `cmd /c`
-   incantation) if you dispatch anything new. Slot 0 is landed and idle —
-   `new_slot.py` re-forks it for the next dispatch.
-2. **Write the NUM-003 packet from the validated scratch** (decisions
-   above; the packet's tests: transverse one-shot, the tangential refusal,
-   linear 2×2, no-root, exhaustion-via-tangential). Dispatch on the first
-   free slot. **SHARED-CONE also became eligible with ISC's landing** —
-   mechanical, but its packet is unwritten.
-3. **Then the frontier is:** NUM-002 (roots.rs — same scaffold, the
-   double-root-refuses-not-empty-list negative), SHARED-CONE, FID-001
-   (design — the critical path: it unlocks INV-106, NUM-004, FID-008 →
-   FID-003 → FID-005).
-4. **Disk dipped to 10.6 GB mid-verify and recovered to 18.7 GB at close**
-   (the ddcd706 baseline workspace is transient — a mid-verify reading is
-   NOT the close reading; record both). Slot targets: 0 = 12.3 GB, 2 =
-   7 GB; `%TEMP%/look-verify-baseline-*` was empty at close.
+1. **Write BG-CE-003-MIGRATE-r2 against the live code.** Read
+   `truck-shapeops/src/transversal/loops_store/mod.rs` and the worker's branch
+   diff FIRST - do not design from QUESTION.md's prose (the carrier-source
+   trap). The design question: how does cross-store instance identity survive
+   immutable construction? Candidates the QUESTION suggests but does not decide:
+   a SHARED replacement cache consulted by both stores' `change_vertex` paths
+   keyed by original EntityId (the worker tried per-store caches; a shared cache
+   is the untried variant), or a final reconciliation pass walking
+   `EntityId::replaced` chains. Whatever you decide must make punched_cube close
+   WITHOUT weakening any loops_store assertion. The archive patch at
+   `loop/slots/1/abandoned-20260822-020418.patch` holds uncommitted residue;
+   the real work is the commits on the branch.
+2. **FID-001's packet** - the scaffold `vendor/truck/truck-evidence/src/fid/`
+   carries the whole contract (strata table, naming rule, bound direction, test
+   list). Before writing the packet, scratch-validate the curvature term on ONE
+   analytic carrier (second fundamental form from `enclose_der(2, ·)` in
+   intervals) exactly the way ISC and NUM-003 did - both times that discipline
+   caught design errors pre-dispatch.
+3. Then the frontier is INV-106, NUM-004, FID-008 -> FID-003 -> FID-005 (the
+   unlock chain behind FID-001). INV-107 and OFFSET stay BLOCKED.
+4. Disk was 14 GB free at close with all slot targets warm (slot 0 ~12.4 GB,
+   slot 2 ~7 GB); `%TEMP%/look-verify-baseline-*` empty. Check `Get-PSDrive C`
+   before a verify run.
 
 ## State of the machine, as left
 
-- **Watchdog STOPPED at close** (pid 16084 killed, STOP line in its log) —
-  deliberately, so a machine sleep cannot reap the healthy MIGRATE worker
-  mid-run. If the machine slept anyway, expect slot 1 wedged: confirm with
-  events mtime + tasklist before any reap, and recover via
-  `run_packet.py --reset` (the archive is a patch you can apply).
-- **Slot 0**: ISC LANDED; idle on `packet/BG-ENC-004-ISC@bf2fd29` — re-fork
-  with `new_slot.py` for the next dispatch. **Slot 1**: MIGRATE worker
-  RUNNING (pid 10952, forked at `ddcd706`). **Slot 2**: IDLE on INV-109's
-  landed branch (`c995935`) — the DEAD? label is the known miscalibration
-  for a landed slot.
-- **Disk dipped to 10.6 GB mid-verify, 18.7 GB at close** (the verify
-  baseline is transient — see "Pick up here" 4).
-- Registry: **58 DONE / 10 SPECD / 2 BLOCKED** (70 rows). HEAD `9c281d0`,
-  tracked tree clean. GATE-4 at 110/110 (verify-confirmed).
-- `loop/packets/` gained BG-ENC-004-ISC and BG-CE-003-MIGRATE this
-  session; `loop/results/` holds BG-ENC-004-ISC.json; the ledger is at 53
-  rows.
+- **Watchdog STOPPED at close** (STOP line in `loop/watchdog.log`; lock released)
+  - nothing is running, deliberately. Restart it with
+  `LOOK_WATCHDOG_STAGNANT=3600` via the `cmd /c` incantation through
+  `Start-Process` if you dispatch anything.
+- **All three slots idle**: slot 0 finished+landed NUM-002 (`aa702bc`),
+  slot 1 reset onto `packet/BG-CE-003-MIGRATE@c5cb4c6` (rejected attempt's
+  preserved work), slot 2 finished+landed SHARED-CONE (`679d4c4`). `new_slot.py`
+  re-forks any of them.
+- Registry: **61 DONE / 7 SPECD / 2 BLOCKED** (70 rows). SPECD: MIGRATE-r2,
+  FID-001, INV-106, NUM-004, FID-008, FID-003, FID-005. HEAD `c9f40e9`,
+  tracked tree clean. GATE-4 at 110/110 (ceiling unchanged all session).
+- `loop/results/` gained BG-NUM-003.json, BG-ENC-004-SHARED-CONE.json,
+  BG-NUM-002.json; the ledger is at 57 rows (56 + the MIGRATE rejection).
 
 ## The parallelism picture
 
-70 rows. At close: MIGRATE running; eligible NUM-002, NUM-003 (design
-packets — NUM-003's scratch is done) and SHARED-CONE (unlocked by ISC's
-landing, packet unwritten). **58/70 (83%) landed.** The honest width
-constraint is orchestrator design time, not slots: FID-001, NUM-002,
-SHARED-CONE's packet, and later FID-008/003/005 are all mine to write.
-INV-107 (needs TOL-001-TYPE) and OFFSET (the EnclosureVectorField
-question) stay BLOCKED.
+70 rows. At close nothing runs; eligible-after-writing: MIGRATE-r2 and FID-001
+(both blocked on MY design work, not slots), then INV-106, NUM-004, FID-008 ->
+FID-003 -> FID-005. The honest width constraint is still orchestrator design
+time: every remaining row needs either a redesign (MIGRATE r2) or a first
+design (FID family), and the FID chain is serial by dependency.
 
-Session 17's cost picture: one landed first-try (ISC — designed,
-scratch-validated, dispatched, verified, merged in a single session), one
-designed+dispatched+running (MIGRATE), one designed+scratch-validated
-(NUM-003), two registry bugs found and fixed (the dangling needs, the
-MIGRATE ripple), and the ISC design's three scratch-caught errors — the
-validate-by-RUNNING discipline paid for itself before any worker saw the
-packet. The worker caught one error the scratch could not see (the
-in-crate seed-ordering class), which is the division of labor working.
+Session 18's cost picture: three designed+dispatched+landed in one session each
+(the NUM pair validated by running the scratch first; SHARED-CONE was pure
+consolidation and went equally clean), one rejected with a finding that reopens
+a design question the mutation semantics had hidden for months, and one worker
+that earned its keep by recomputing every witness I handed it. The scratch-
+validation discipline is now 2-for-2 on landing first-try; the MIGRATE packet
+skipped it (loops_store could not be scratched cheaply) and paid - which is the
+pattern: validate what CAN run, and treat "could not be scratched" as a risk
+flag, not an exemption.
 
 ## Traps, each one paid for
 - **The watchdog's default 1200s wedged-killer kills healthy workers during a
@@ -1149,3 +1139,53 @@ what the tree says about the last two, as opposed to what the spec says.
   fixture is design work; the orchestrator writes that packet.
 - `opencode/deepseek-v4-flash-free` would run W4's 23 packets at no API cost.
   Untested against concurrent workers.
+
+- **Hand-derived numbers in a packet must be machine-checked, not hand-checked.
+  Session 18 shipped five wrong witnesses in BG-NUM-002 and a worker caught
+  every one.** The Bernstein coefficients of `(2t-1)^2` are `[1, -1, 1]`, not
+  `[1, 0, 1]` - I had confused control points with node values (b1 comes from
+  `p(1/2) = 0.25*b0 + 0.5*b1 + 0.25*b2`, NOT from evaluating at a node). Same
+  fallacy family: the clustered-root middle coefficient was `-s^2 - 0.25`, not
+  `-s^2`. Beyond the algebra: a witness root exactly AT a dyadic bisection
+  midpoint produces endpoint-contact children that refuse under my own rules,
+  so `t - 0.5` on `[0, 1]` can never return Ok - pick domains where the root is
+  not a dyadic rational; same for a dyadic cluster half-width `2^-12`; and a
+  budget of `log2(1/s)` ignores the ~19 refinement levels tau=1e-6 needs, so
+  the "enough budget" test would have refused. Five for five caught by the
+  worker's disagreements field - the division of labor held - but each one cost
+  worker turns and risked a round trip against a weaker model. A ten-line
+  script that PRINTS the sequences (the num3-scratch pattern) catches all five
+  before dispatch. Run it on every numeric packet. Always.
+- **`run_packet.py --reset` is archive-and-DISPATCH, not reset-only** - there
+  is no flag combination that resets without spawning a worker, and dispatching
+  a known-flawed packet wastes a launch (cost: two killed dispatches on slot 1
+  tonight; harmless money, real noise). To reset only: kill the pid tree
+  (`taskkill /PID <pid> /T /F`), then manually `git -C loop/slots/N/wt reset
+  --hard HEAD && git -C loop/slots/N/wt clean -fd`, which is all the reset arm
+  does after archiving. Fixing the script (a `--reset-only`) is five minutes of
+  harness work someone should do.
+- **A scaffold commit that touches lib.rs must run `cargo fmt --check -p <crate>`
+  BEFORE landing.** e69103e inserted `pub mod num;` after `pub mod nurbs;`,
+  violating reorder_modules, and sat in the tree for a full session. Two
+  workers then found their done-when gate red at base on a file outside both
+  write sets - V3 is file-scoped so no verify failed, but both burned turns and
+  one reported SPEC_GAP for what was purely my defect (`726e9b3` fixes it;
+  labeled orchestrator amendment per house rule).
+- **Commit ledger rows BEFORE calling land_packet.py** - it refuses on a dirty
+  tracked tree, and the failure mode compounds: the followup command sequence
+  that deletes the stray RESULT.json unconditionally will then make the retry
+  die on FileNotFoundError (both halves hit tonight). Order: merge, copy
+  RESULT.json to root, commit any pending loop/ edits, land_packet, delete the
+  root copy.
+- **A migration's information flow includes INSTANCE IDENTITY, not just
+  values.** The CE-003 mutation semantics shared one mutable Vertex between two
+  loops_stores, and what closed the boolean shell was that both stores kept
+  referencing the SAME instance as later replacements re-pointed it - final
+  point AND identity together. Immutable `Arc<G>` construction preserves values
+  fine and identity not at all; loops byte-identical still produced an open
+  shell. Any packet migrating away from interior mutability must ask "who else
+  holds this handle, and do they need MY next write to be visible?" before it
+  declares the ripple list. This survives in the ledger fault note and the
+  r2 row; it stays here because the next migration packet WILL be written by
+  someone who has not read QUESTION.md.
+
