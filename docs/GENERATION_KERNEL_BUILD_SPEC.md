@@ -1798,6 +1798,20 @@ krawczyk(F, F', box, budget) -> Outcome<Root>
 containment. Anything else is not a proof — the common bug is accepting `K ⊆ box`
 (non-strict), which proves existence but not uniqueness.
 
+**Singular midpoint ⇒ bisect, never refuse** (measured calibration,
+2026-08-22): a `None` float preconditioner at the box midpoint — e.g. x²+1 at
+m = 0, a vanishing derivative — must take the BISECTION path. A vanishing
+midpoint derivative says nothing about the box; refusing there turns every
+symmetric no-root instance (x²+1 on [−2, 2]) into a spurious
+`NumericallyUnresolved`, and bisection costs nothing when the children prune.
+The same branch serves a float midpoint that rounds outside its own box.
+
+**Budget-exhaustion tests must use a case that actually bisects**: the
+transverse witness x²−2 on [1, 2] certifies one-shot even at a zero budget
+(certification needs no subdivision), so "zero budget refuses" is false for
+it. The tangential double root is the exhaustion case — it subdivides to
+budget and refuses carrying its spend.
+
 **Tests.** Unit: transverse intersection ⇒ unique root proven. Unit: tangential
 contact ⇒ never `Proven(unique)`, always refuse or bisect to budget. Property
 against BG-NUM-002 on univariate problems — two independent methods must agree.
