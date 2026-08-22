@@ -35,54 +35,34 @@
 //! `{ S_u(x) × S_v(x) : x ∈ box }`, because it lets `p` and `q` vary
 //! independently when in truth they are evaluated at the same point.
 //! Over-estimation is always acceptable (BG-ENC-001); tightening is not this
-//! packet's job. The helper is duplicated across the BG-ENC-004 sibling
-//! packets by design: the packets have disjoint write sets and run in
-//! parallel, and consolidating the copies is a later refactor.
+//! packet's job. The cross product and the normal-cone / immersion-bound
+//! constructions live once in `crate::enclosure` (`cross_box`,
+//! `midpoint_ball_cone`, `immersion_lower_bound_box`) and every BG-ENC-004
+//! carrier delegates to them (BG-ENC-004-SHARED-CONE).
 //!
 //! With the parameters swapped, `enclose_der(1, 0, ..)` already returns an
 //! enclosure of the *outer* `S_u`, which is the transformed inner `S_v`, and
 //! the cross product gets the reversed normal for free — no manual sign flip.
 
-use crate::enclosure::{Box3, DirCone, EnclosureSurface};
+use crate::enclosure::{
+    cross_box, immersion_lower_bound_box, interval_at, midpoint_ball_cone, Box3, DirCone,
+    EnclosureSurface,
+};
 use inari::Interval;
-use truck_base::cgmath64::{InnerSpace, Matrix4, Vector3};
+use truck_base::cgmath64::{Matrix4, Vector3};
 use truck_geometry::prelude::Processor;
-
-/// The largest valid half-angle: a cone of half-angle π contains every
-/// direction, and the `asin` construction can round up past it, so the clamp
-/// is named here with what it is.
-const MAX_HALF_ANGLE: f64 = core::f64::consts::PI;
-
-/// A degenerate interval from a runtime `f64`. Finite coordinates always
-/// construct; a NaN widens to the empty interval rather than panicking (H-1).
-/// The same helper as `plane.rs`, duplicated because `plane.rs` is reference
-/// code this packet may not edit.
-fn interval_at(x: f64) -> Interval {
-    Interval::try_from((x, x)).unwrap_or(Interval::EMPTY)
-}
-
-/// ‖v‖ in interval arithmetic: the coordinates are degenerate intervals, and
-/// the sum of squares and the sqrt round outward, so the result encloses the
-/// true norm.
-fn interval_norm(v: Vector3) -> Interval {
-    (interval_at(v.x).sqr() + interval_at(v.y).sqr() + interval_at(v.z).sqr()).sqrt()
-}
 
 /// The interval cross product of the two first-order derivative enclosures of
 /// `s` over the box: a box that encloses every `S_u(x) × S_v(x)` there. Sound
 /// but loose — the reasoning is in the module doc.
-fn cross_box<S: EnclosureSurface<Vector = Vector3>>(
+fn normal_box<S: EnclosureSurface<Vector = Vector3>>(
     s: &Processor<S, Matrix4>,
     uu: Interval,
     vv: Interval,
 ) -> Box3 {
     let a = s.enclose_der(1, 0, uu, vv);
     let b = s.enclose_der(0, 1, uu, vv);
-    Box3 {
-        x: a.y * b.z - a.z * b.y,
-        y: a.z * b.x - a.x * b.z,
-        z: a.x * b.y - a.y * b.x,
-    }
+    cross_box(&a, &b)
 }
 
 impl<S: EnclosureSurface<Vector = Vector3>> EnclosureSurface for Processor<S, Matrix4> {
@@ -167,45 +147,16 @@ impl<S: EnclosureSurface<Vector = Vector3>> EnclosureSurface for Processor<S, Ma
     }
 
     fn normal_cone(&self, uu: Interval, vv: Interval) -> Option<DirCone> {
-        let n = cross_box(self, uu, vv);
-        let c = Vector3::new(n.x.mid(), n.y.mid(), n.z.mid());
-        let h = Vector3::new(n.x.wid() / 2.0, n.y.wid() / 2.0, n.z.wid() / 2.0);
-        // Every element of the box lies within distance ‖h‖ of its midpoint
-        // `c`, so if ‖h‖ < ‖c‖ every element makes an angle of at most
-        // `asin(‖h‖ / ‖c‖)` with `c`. Round `rho` up and `cn` down so the f64
-        // arithmetic cannot make the cone too narrow.
-        let rho = interval_norm(h).sup();
-        let cn = interval_norm(c).inf();
-        if !cn.is_finite() || !rho.is_finite() || cn <= rho {
-            // `rho >= cn` is exactly the case where the box may contain the
-            // zero vector or straddle too many directions for any cone to
-            // bound — including a singular immersion. The `None` arm is the
-            // contract, not a convenience.
-            return None;
-        }
-        let axis = c.normalize();
-        // Nudge the half-angle up by a few ulps so the f64 `asin` and the
-        // `normalize()` cannot round the cone too narrow, then clamp at π.
-        let half_angle = ((rho / cn).asin() * (1.0 + 8.0 * f64::EPSILON) + 8.0 * f64::EPSILON)
-            .min(MAX_HALF_ANGLE);
-        Some(DirCone { axis, half_angle })
+        // The shared midpoint-ball cone off the cross-product box; the
+        // construction (rounding directions, refusal condition, ulp nudge and
+        // clamp) lives in `crate::enclosure::midpoint_ball_cone`.
+        midpoint_ball_cone(&normal_box(self, uu, vv))
     }
 
     fn immersion_lower_bound(&self, uu: Interval, vv: Interval) -> f64 {
-        let n = cross_box(self, uu, vv);
-        // Each coordinate attains its mignitude independently, so the sum of
-        // the squared mignitudes is exactly the box's minimum ‖·‖². The sqrt
-        // runs in inari so it rounds outward: returning a value one rounding
-        // unit too large is a soundness bug, not a tightness one.
-        let mag2 = interval_at(n.x.mig()).sqr()
-            + interval_at(n.y.mig()).sqr()
-            + interval_at(n.z.mig()).sqr();
-        let norm = mag2.sqrt();
-        if norm.is_empty() || !norm.inf().is_finite() {
-            0.0
-        } else {
-            norm.inf()
-        }
+        // The shared mignitude-immersion lower bound off the cross-product box
+        // (`crate::enclosure::immersion_lower_bound_box`).
+        immersion_lower_bound_box(&normal_box(self, uu, vv))
     }
 }
 

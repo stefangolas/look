@@ -39,20 +39,16 @@
 //! velocity vanishing (a cusp in parameter space) or both surface partials
 //! degenerating at a pole.
 
-use crate::enclosure::{Box3, DirCone, EnclosureCurve, EnclosureSurface};
+use crate::enclosure::{
+    interval_at, midpoint_ball_cone, Box3, DirCone, EnclosureCurve, EnclosureSurface,
+};
 use inari::Interval;
 use truck_base::cgmath64::control_point::ControlPoint;
-use truck_base::cgmath64::{InnerSpace, Point2, Point3, Vector2, Vector3};
+use truck_base::cgmath64::{Point2, Point3, Vector2, Vector3};
 use truck_base::tolerance::Tolerance;
 use truck_geometry::decorators::PCurve;
 use truck_geometry::nurbs::BSplineCurve;
 use truck_geotrait::{Cut, ParametricCurve};
-
-/// The largest half-angle a [`DirCone`] can report. `asin` saturates at π/2,
-/// but the ulp nudge that guards the cone against inward rounding can push a
-/// near-π/2 half-angle slightly past it, so the clamp keeps the half-angle
-/// within its meaning as an angle. Copied from `bspline.rs`.
-const MAX_HALF_ANGLE: f64 = core::f64::consts::PI;
 
 /// The relative outward pad per hull endpoint, as a multiple of `EPSILON`.
 /// Copied from `bspline.rs`: Boehm insertion and `cut` recompute control
@@ -60,12 +56,6 @@ const MAX_HALF_ANGLE: f64 = core::f64::consts::PI;
 /// relative to the source curve's by several ulps; `64 EPSILON (1 + magnitude)`
 /// covers the measured escapes with margin.
 const HULL_PAD: f64 = 64.0 * f64::EPSILON;
-
-/// A degenerate interval from a runtime `f64`. Finite coordinates always
-/// construct; a NaN widens to the empty interval rather than panicking (H-1).
-fn interval_at(x: f64) -> Interval {
-    Interval::try_from((x, x)).unwrap_or(Interval::EMPTY)
-}
 
 /// Coordinate access without `Index`, which H-1's `clippy::indexing_slicing`
 /// denial bans. Both `Point2` and `Vector2` are `ControlPoint<f64>` and carry
@@ -447,39 +437,13 @@ impl<S: EnclosureSurface<Vector = Vector3>> EnclosureCurve for PCurve<BSplineCur
     }
 
     fn tangent_cone(&self, tt: Interval) -> Option<DirCone> {
-        // The ball-around-midpoint cone off the n = 1 box, the same
-        // construction bspline.rs uses for the hodograph hull and extruded.rs
-        // for normals, with "tangent" substituted for "normal". Let c be the
-        // box's midpoint vector and h its half-width vector; every element of
-        // the box lies within rho = ‖h‖ of c, so if rho < cn = ‖c‖ every
-        // element makes an angle of at most asin(rho / cn) with c. rho >= cn
-        // is exactly the case where the box may contain the zero vector or
-        // straddle enough directions that no cone bounds it — the derivative
-        // crossing zero (a cusp in parameter space, or both surface partials
-        // degenerating at a pole) — so None is the contract. rho rounds UP
-        // (.sup()) and cn DOWN (.inf()); the ratio, the asin and the
-        // normalize() are then nudged up by a few ulps so none of them can
-        // round the cone too narrow.
-        let b = self.enclose_der(1, tt);
-        let c = Vector3::new(b.x.mid(), b.y.mid(), b.z.mid());
-        let h = Vector3::new(b.x.wid() / 2.0, b.y.wid() / 2.0, b.z.wid() / 2.0);
-        let norm = |x: Interval, y: Interval, z: Interval| (x.sqr() + y.sqr() + z.sqr()).sqrt();
-        let rho = norm(interval_at(h.x), interval_at(h.y), interval_at(h.z)).sup();
-        let cn = norm(interval_at(c.x), interval_at(c.y), interval_at(c.z)).inf();
-        // The guard in the packet's order and form; `!(cn > rho)` is rejected
-        // by clippy's neg_cmp_op_on_partial_ord, and the finiteness tests make
-        // the two equivalent (they differ only on NaN). The empty box or a
-        // hull containing the origin yields NaN or zero cn.
-        if !cn.is_finite() || !rho.is_finite() || cn <= rho {
-            return None;
-        }
-        let axis = c.normalize();
-        let half_angle = (rho / cn).asin();
-        let half_angle = half_angle * (1.0 + 8.0 * f64::EPSILON) + 8.0 * f64::EPSILON;
-        Some(DirCone {
-            axis,
-            half_angle: half_angle.min(MAX_HALF_ANGLE),
-        })
+        // The shared midpoint-ball cone off the n = 1 derivative box; the
+        // construction (rounding directions, refusal condition, ulp nudge and
+        // clamp) lives in `crate::enclosure::midpoint_ball_cone`. `None` is
+        // the derivative-hull-contains-zero case — the parameter curve's
+        // velocity vanishing (a cusp in parameter space) or both surface
+        // partials degenerating at a pole.
+        midpoint_ball_cone(&self.enclose_der(1, tt))
     }
 }
 
@@ -490,7 +454,7 @@ impl<S: EnclosureSurface<Vector = Vector3>> EnclosureCurve for PCurve<BSplineCur
 mod tests {
     use super::*;
     use crate::harness::assert_encloses_curve;
-    use truck_base::cgmath64::Point3;
+    use truck_base::cgmath64::{InnerSpace, Point3};
     use truck_geometry::decorators::ExtrudedCurve;
     use truck_geometry::nurbs::KnotVec;
     use truck_geometry::specifieds::{Plane, Sphere};

@@ -84,7 +84,9 @@
 //! }
 //! ```
 
-use crate::enclosure::{Box3, DirCone, EnclosureCurve, EnclosureSurface};
+use crate::enclosure::{
+    interval_at, midpoint_ball_cone, Box3, DirCone, EnclosureCurve, EnclosureSurface,
+};
 use inari::Interval;
 use truck_base::cgmath64::{InnerSpace, Matrix4, Point3, SquareMatrix, Vector3, Vector4};
 use truck_geometry::decorators::IntersectionCurve;
@@ -125,19 +127,6 @@ const MAX_CELLS: usize = 512; // H-3: the processed-cell worklist cap, a dimensi
 /// `64 EPSILON (1 + |mid|)` covers the measured ulp-class float-image drift —
 /// exactly `HULL_PAD`'s epistemic status in `bspline.rs`.
 const NEWTON_PAD: f64 = 64.0 * f64::EPSILON; // H-3: the dimensionless relative outward pad per box endpoint, not a length
-
-/// The largest half-angle a [`DirCone`] can report. `asin` saturates at π/2,
-/// but the ulp nudge that guards the cone against inward rounding can push a
-/// near-π/2 half-angle slightly past it, so the clamp keeps the half-angle
-/// within its meaning as an angle. Copied from `pcurve.rs`.
-const MAX_HALF_ANGLE: f64 = core::f64::consts::PI;
-
-/// A degenerate interval from a runtime `f64`. Finite coordinates always
-/// construct; a NaN widens to the empty interval rather than panicking (H-1).
-/// Duplicated from the sibling decorators, which have disjoint write sets.
-fn interval_at(x: f64) -> Interval {
-    Interval::try_from((x, x)).unwrap_or(Interval::EMPTY)
-}
 
 /// The interval `[lo, hi]`. A malformed pair (NaN or `lo > hi`) degrades to the
 /// empty interval rather than panicking (H-1).
@@ -871,38 +860,14 @@ where
     }
 
     fn tangent_cone(&self, tt: Interval) -> Option<DirCone> {
-        // The ball-around-midpoint cone off the n = 1 box (decision 5): let c
-        // be the box's midpoint vector and h its half-width vector; every
-        // element of the box lies within rho = ‖h‖ of c, so if rho < ‖c‖ every
-        // element makes an angle of at most asin(rho / ‖c‖) with c. rho >= ‖c‖
-        // is exactly the case where the box may contain the zero vector or
-        // straddle enough directions that no cone bounds it — the derivative
-        // crossing zero (a cusp, a transversal failure, or the k-degeneracy of
-        // decision 4) — so None is the contract. rho rounds UP (.sup()) and
-        // ‖c‖ DOWN (.inf()); the ratio, the asin and the normalize() are then
-        // nudged up by a few ulps so none of them can round the cone too
-        // narrow. `enclose_der(1, ·)` returning the unbounded box makes the
-        // hull contain 0 → None — correct by construction.
-        let b = self.enclose_der(1, tt);
-        let c = Vector3::new(b.x.mid(), b.y.mid(), b.z.mid());
-        let h = Vector3::new(b.x.wid() / 2.0, b.y.wid() / 2.0, b.z.wid() / 2.0);
-        let norm = |x: Interval, y: Interval, z: Interval| (x.sqr() + y.sqr() + z.sqr()).sqrt();
-        let rho = norm(interval_at(h.x), interval_at(h.y), interval_at(h.z)).sup();
-        let cn = norm(interval_at(c.x), interval_at(c.y), interval_at(c.z)).inf();
-        // The guard in the packet's order and form; `!(cn > rho)` is rejected
-        // by clippy's neg_cmp_op_on_partial_ord, and the finiteness tests make
-        // the two equivalent (they differ only on NaN). The empty box or a
-        // hull containing the origin yields NaN or zero cn.
-        if !cn.is_finite() || !rho.is_finite() || cn <= rho {
-            return None;
-        }
-        let axis = c.normalize();
-        let half_angle = (rho / cn).asin();
-        let half_angle = half_angle * (1.0 + 8.0 * f64::EPSILON) + 8.0 * f64::EPSILON;
-        Some(DirCone {
-            axis,
-            half_angle: half_angle.min(MAX_HALF_ANGLE),
-        })
+        // The shared midpoint-ball cone off the n = 1 box (decision 5); the
+        // construction (rounding directions, refusal condition, ulp nudge and
+        // clamp) lives in `crate::enclosure::midpoint_ball_cone`. `None` is
+        // the derivative-hull-contains-zero case — a cusp, a transversal
+        // failure, or the k-degeneracy of decision 4. `enclose_der(1, ·)`
+        // returning the unbounded box makes the hull contain 0 → None —
+        // correct by construction.
+        midpoint_ball_cone(&self.enclose_der(1, tt))
     }
 }
 
