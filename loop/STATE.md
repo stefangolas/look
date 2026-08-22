@@ -15,12 +15,13 @@ Updated 2026-08-22, close of session 19. Branch: `integration/kernel-bg`. Nothin
 
 ## Where we are
 
-**Sixty-two packets DONE of 70 (89%). NOTHING is running; the watchdog IS
-running (started 2026-08-22 08:47, LOOK_WATCHDOG_STAGNANT=3600, pid in
-loop/watchdog.lock).** One design job gates the next dispatch: BG-FID-001,
-whose authoritative design input is `loop/packets/BG-FID-001-THEOREM-MAP.md`
-(committed, review-revised at `34b7485`). Do not design FID-001 from lfs.rs's
-scaffold prose alone.
+**Sixty-two packets DONE of 70 (89%). BG-FID-001 DISPATCHED on slot 0**
+(pid 4168, base `ac2ee98`, REVISED packet after review — see below); **the
+watchdog IS running (started 2026-08-22 08:47, LOOK_WATCHDOG_STAGNANT=3600,
+pid in loop/watchdog.lock).** Design input for FID-001:
+`loop/packets/BG-FID-001-THEOREM-MAP.md` plus the review revisions recorded
+in the registry note and spec amendment `c7f6ae3`/`ac2ee98`. Do not design
+FID-001 follow-ups from lfs.rs's scaffold prose alone.
 
 Session 19 in one line: MIGRATE-r2 landed with a worker-caught design flaw
 fixed correctly; the FID family got its theorem footing and three named
