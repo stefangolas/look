@@ -1,0 +1,21 @@
+{
+  "id": "BG-INV-104",
+  "status": "DONE",
+  "contracts": ["BG-INV-104"],
+  "tests_added": 5,
+  "sites_migrated": 0,
+  "sites_deferred": 0,
+  "deviations": [
+    "Decision 1's `where PC: truck_evidence::EnclosureCurve` is unsatisfiable together with decision 4/5's required `Edge<_, _, ()>` call sites: `()` implements no `ParametricCurve`/`EnclosureCurve` anywhere in the vendored tree, and an orphan-rule/local-impl or blanket `impl<T: EnclosureCurve>` alongside an `impl for ()` is rejected by coherence. Adapter: `check_edge` bounds `PC` by a private local dispatch trait `PcurveTrace`, implemented for `()` (the vacuous path) and for `PCurve<C, S>: EnclosureCurve` (the attached path). The attached path carries exactly the `EnclosureCurve` bound the packet's body specifies, extracts the pcurve span, maps unbounded/inverted spans to `Refusal::Empty`, calls `certify_deviation(leader, carrier, ...)` with the leader = the edge's 3D curve and the carrier = the pcurve, and joins `Prop::SameParameter = True` onto a clone of the bound certificate's `PropMap` while keeping its `Method::Interval`/`budget_left`/margin/modulus.",
+    "truck-geometry was moved from `[dev-dependencies]` to `[dependencies]` in truck-topology's Cargo.toml: the attached `PcurveTrace` impl must name `PCurve` in the crate's non-test code, which requires truck-geometry as a regular dependency (the packet placed it under dev-dependencies).",
+    "The leader curve is read through the `edge.curve` field's mutex (`edge.curve.lock()`) rather than `edge.curve()`: the `curve()` accessor exists only on `impl<P, C> Edge<P, C>` (the `PC = ()` impl) and is unavailable for an edge carrying a general pcurve payload.",
+    "Added `use truck_geotrait::ParametricCurve;`: `parameter_range()` resolves through the `ParametricCurve` trait, which must be in scope even though `EnclosureCurve` implies it as a supertrait (decision 1's 'no separate ParametricCurve import' did not hold)."
+  ],
+  "disagreements": [
+    "Packet decision 1 requires `check_edge` to be bounded `PC: truck_evidence::EnclosureCurve`, but decision 4's `same_parameter_none_pcurve_is_vacuously_ok` and decision 5's doctest call it with `Edge<_, _, ()>`. `()` implements no `ParametricCurve`/`EnclosureCurve` in the tree (verified by search), so the two requirements contradict; the signature in the tree therefore cannot match the packet's literal where-clause (see deviations).",
+    "Packet decision 0 asserts truck-topology's Cargo.toml [dependencies] 'keep alphabetical order, which is the file's convention'. The baseline file was not alphabetical (serde, rayon, rustc-hash, truck-base, truck-geotrait, thiserror, parking_lot, rclite); the new entries were landed and the section sorted alphabetically.",
+    "Packet decision 2's body says 'Call `certify_deviation(&edge.curve(), pc, ...)`'. `Edge::curve()` is defined only on `impl<P, C> Edge<P, C>` (the `PC = ()` impl), so it does not exist for `Edge<P, C, PC>` with a general pcurve payload; the checker reads the leader from the private `edge.curve` field instead."
+  ],
+  "baseline_failures": [],
+  "notes": "Implemented the BG-INV-104 same-parameter/same-range checker (vendor/truck/truck-topology/src/invariants/same_parameter.rs) as a thin adapter over truck_evidence::certify_deviation (BG-CE-002), landed the decision-0 dependency wiring (inari + truck-evidence in [dependencies], truck-geometry promoted to a regular dependency for the dispatch trait), and added the five required tests plus the vacuous-case doctest on check_edge. All 'Done when' commands pass on commit 2252117: cargo fmt --check -p truck-topology; cargo clippy -p truck-topology --all-targets --no-deps (zero findings); cargo test -p truck-topology --lib --tests --no-fail-fast (34 lib + 2 + 1 integration tests pass); cargo test -p truck-topology --doc (120 doctests pass, including the new check_edge one); cargo check --workspace --all-targets; bash scripts/kernel-gates.sh 1010c95 (all P-3 gates pass, GATE-4 unscaled_legacy at 110/110). The route-2 tests use the sphere-pcurve carrier against a quadratic arc-interpolant leader offset by 4.0 * ROUTE2_TAU in z: the first cell is indeterminate (zero budget => NumericallyUnresolved with DeviationUncertified) while a generous budget bisects to the ForwardToleranceExceeded violation."
+}
