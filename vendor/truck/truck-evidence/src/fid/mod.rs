@@ -1,8 +1,13 @@
 //! Scaffold filled by BG-FID-001; bridge lemmas L-TUBE/L-COVERING/L-SEPARATES/L-FEDERER-PATCH/L-COVERAGE remain open.
 //! (iv-a) one-sheet on curves lands here (BG-FID-008); the whole-span
 //! isotopy conditions (i)-(iv-a) for curve components land here (BG-FID-003).
-//! The surface case and discharge (iv-b) wait on BG-FID-005.
+//! `rep` (BG-FID-005) lands here: the emitted geometry path that approximates
+//! one exact CURVE component and discharges (iv-b) on its own certified
+//! partition. The SURFACE case — the surface rep (REP-SRF-001), the surface
+//! (iv-b) discharge and the surface double-sheet negative test — waits on
+//! BG-FID-005-SRF, a separate packet; it is deferred, never stubbed.
 
 pub mod isotopy;
 pub mod lfs;
 pub mod one_sheet;
+pub mod rep;
