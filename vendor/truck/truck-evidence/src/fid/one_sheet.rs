@@ -29,11 +29,15 @@
 //! # Resolution limit
 //!
 //! The certificate is resolution-honest: distinct roots separated by less than
-//! [`WIDTH_FLOOR`] in parameter are counted once, and a root whose distance to
+//! [`width_floor`] in parameter are counted once, and a root whose distance to
 //! the disc boundary is below its floor-box image radius refuses as
 //! [`OneSheetError::SheetCountUnresolved`] rather than guessing a side. A
-//! certificate that states its own resolution is stricter than one that does
-//! not.
+//! floor-width box whose Krawczyk call cannot certify is retried ONCE on the
+//! box widened four next-float steps per endpoint (toward -inf below, toward
+//! +inf above): a root that sat within 1-2 ulps of the original floor-box
+//! edge becomes strictly interior with multi-ulp margins, and a second
+//! refusal is `SheetCountUnresolved` as before. A certificate that states its
+//! own resolution is stricter than one that does not.
 
 #![deny(clippy::unwrap_used)]
 
@@ -102,7 +106,7 @@ pub enum OneSheetError {
 /// sub-box — never "exactly one in the box" — so it ALWAYS subdivides (there
 /// is no width shortcut): the unexamined remainder is enumerated, and the same
 /// root re-found from adjacent sub-boxes merges by the overlap dedupe below.
-/// The only stop is the width floor: a floor-width box (`width <= WIDTH_FLOOR`)
+/// The only stop is the width floor: a floor-width box (`width <= width_floor(&tt)`)
 /// with a `Unique` proof contributes exactly one root at floor resolution, and
 /// its disc membership is decided by CONTAINMENT of its whole image `B`:
 /// `sup_distance(B, x) <= eps` (every point of `B` in the closed ball) counts
@@ -191,32 +195,15 @@ pub fn fibre_degree_one(
         match krawczyk(&system, &[tt], budget) {
             Ok(cert) => match cert.value {
                 KrawczykProof::Unique => {
-                    if width <= WIDTH_FLOOR {
+                    if width <= width_floor(&tt) {
                         // Terminal case: `tt` is at the resolution floor and
                         // holds a certified root (exactly one in some sub-box
                         // of `tt`, one root at floor resolution). Decide disc
                         // membership by CONTAINMENT of the whole image.
-                        if sup_distance(&image, x) <= eps {
-                            // Every point of the image is in the closed ball,
-                            // so the certified root (in `B`, with `h == 0` on
-                            // the normal plane) is in the disc.
-                            if !in_disc.iter().any(|pb| boxes_overlap(pb, &image)) {
-                                count += 1;
-                                if count > 1 {
-                                    return Ok(FibreMultiplicity::NotOne { count });
-                                }
-                                in_disc.push(image);
-                            }
-                        } else if box_distance(&image, &x_b) > eps {
-                            // Every point of the image is beyond the ball: the
-                            // root is outside the disc and does not count.
-                        } else {
-                            // The image straddles the sphere (sup > eps AND
-                            // inf <= eps): closed-ball membership for a point
-                            // on the sphere is not certifiable by interval
-                            // arithmetic; guessing a direction is exactly the
-                            // false pass this module refuses.
-                            return Err(OneSheetError::SheetCountUnresolved);
+                        if let Some(early) =
+                            decide_disc_membership(&image, x, &x_b, eps, &mut in_disc, &mut count)?
+                        {
+                            return Ok(early);
                         }
                     } else {
                         // `Unique` certifies a root in some sub-box of `tt`
@@ -230,10 +217,52 @@ pub fn fibre_degree_one(
                 KrawczykProof::NoRoot => {}
             },
             Err(_) => {
-                if width <= WIDTH_FLOOR {
-                    return Err(OneSheetError::SheetCountUnresolved);
+                if width <= width_floor(&tt) {
+                    // Terminal case, retry once: a root that lands within 1-2
+                    // ulps of a floor-box edge is outside krawczyk's
+                    // strict-interior reach, so before refusing, retry ONCE on
+                    // the box widened four next-float steps per endpoint.
+                    // Widening is sound: a `Unique` on the widened box still
+                    // certifies exactly one root in it (the operator's own
+                    // discipline cannot certify a box holding two), the dedupe
+                    // rule absorbs the slightly wider point-box, and a root on
+                    // the original box's edge is now strictly interior with
+                    // multi-ulp margins. A widened-box `Unique` follows the
+                    // same count/dedupe path as any other certified box; a
+                    // second `Err` is `SheetCountUnresolved` as before.
+                    let mut lo_w = tt.inf();
+                    lo_w = lo_w.next_down();
+                    lo_w = lo_w.next_down();
+                    lo_w = lo_w.next_down();
+                    lo_w = lo_w.next_down();
+                    let mut hi_w = tt.sup();
+                    hi_w = hi_w.next_up();
+                    hi_w = hi_w.next_up();
+                    hi_w = hi_w.next_up();
+                    hi_w = hi_w.next_up();
+                    let tt_w = Interval::try_from((lo_w, hi_w)).unwrap_or(Interval::EMPTY);
+                    match krawczyk(&system, &[tt_w], budget) {
+                        Ok(cert) => match cert.value {
+                            KrawczykProof::Unique => {
+                                let image_w = approx.enclose(tt_w);
+                                if let Some(early) = decide_disc_membership(
+                                    &image_w,
+                                    x,
+                                    &x_b,
+                                    eps,
+                                    &mut in_disc,
+                                    &mut count,
+                                )? {
+                                    return Ok(early);
+                                }
+                            }
+                            KrawczykProof::NoRoot => {}
+                        },
+                        Err(_) => return Err(OneSheetError::SheetCountUnresolved),
+                    }
+                } else {
+                    push_children(tt, &mut worklist, budget)?;
                 }
-                push_children(tt, &mut worklist, budget)?;
             }
         }
     }
@@ -317,6 +346,41 @@ fn sup_distance(a: &Box3, p: Point3) -> f64 {
     (dx * dx + dy * dy + dz * dz).sqrt()
 }
 
+/// The terminal disc-membership decision for a floor-width box that Krawczyk
+/// certified `Unique` (a widened-box retry included): whole-image containment
+/// in the closed ball counts the root, whole-image exclusion drops it, and a
+/// box whose image straddles the sphere refuses as `SheetCountUnresolved` —
+/// membership for a point on the sphere is not certifiable by interval
+/// arithmetic, and guessing a direction is exactly the false pass this module
+/// refuses. Returns `Some(early exit)` when the count already exceeds one.
+fn decide_disc_membership(
+    image: &Box3,
+    x: Point3,
+    x_b: &Box3,
+    eps: f64,
+    in_disc: &mut Vec<Box3>,
+    count: &mut usize,
+) -> Result<Option<FibreMultiplicity>, OneSheetError> {
+    if sup_distance(image, x) <= eps {
+        // Every point of the image is in the closed ball, so the certified
+        // root (in `B`, with `h == 0` on the normal plane) is in the disc.
+        if !in_disc.iter().any(|pb| boxes_overlap(pb, image)) {
+            *count += 1;
+            if *count > 1 {
+                return Ok(Some(FibreMultiplicity::NotOne { count: *count }));
+            }
+            in_disc.push(*image);
+        }
+    } else if box_distance(image, x_b) > eps {
+        // Every point of the image is beyond the ball: the root is outside
+        // the disc and does not count.
+    } else {
+        // The image straddles the sphere (sup > eps AND inf <= eps).
+        return Err(OneSheetError::SheetCountUnresolved);
+    }
+    Ok(None)
+}
+
 /// Shift a box by minus a point: `{ p - q : p in box }` for fixed `q`.
 fn box_minus_point(a: &Box3, p: Point3) -> Box3 {
     Box3 {
@@ -368,10 +432,16 @@ fn push_children(
     Ok(())
 }
 
-/// At or below this width a parameter box cannot subdivide further.
-/// H-3: 8 ulps of a unit-width parameter interval — a dimensionless width in
-/// parameter units, not a model-space length.
-const WIDTH_FLOOR: f64 = 8.0 * f64::EPSILON; // H-3: width floor, 8 ulps of a unit-width parameter interval
+/// At or below this width a parameter box cannot subdivide further. The
+/// floor is RELATIVE to the parameter magnitude: 8 ulps at the box's own
+/// scale, never below 8 ulps of a unit-width interval. An absolute floor is
+/// 16 ulps near the origin but only 2 ulps at t ~ 7 — too narrow for the
+/// interval K operator to contract strictly inside, which strands every
+/// descending root with |t| > 2 (measured on the double-cover witness).
+/// H-3: a dimensionless width in parameter units, not a model-space length.
+fn width_floor(tt: &Interval) -> f64 {
+    8.0 * f64::EPSILON * tt.inf().abs().max(tt.sup().abs()).max(1.0) // H-3: 8 ulps at the box magnitude
+}
 
 #[cfg(test)]
 mod tests {
@@ -402,6 +472,13 @@ mod tests {
     /// Decision 2) to keep every descending root off every float bisection
     /// edge down to the width floor.
     const WITNESS_T: f64 = 0.71; // H-3: witness parameter in radians, dimensionless (an angle, not a length)
+    /// Local witness parameter for the widening regression test (shadows
+    /// nothing): the r2 run's exact measured failure. At `t_x = 0.7` the
+    /// double-cover in-disc root at `t_x + 2π = 6.983185307179586` lands 1
+    /// ulp from its relative-floor box edge (margins 11/1), so the first
+    /// Krawczyk call refuses and the 4-ulp widening (margins 15/5) must
+    /// certify.
+    const EDGE_COINCIDENT_WITNESS_T: f64 = 0.7; // H-3: witness parameter in radians, dimensionless (an angle, not a length)
     /// The single-sheet approximant's radius `R + eps/2`: its crossing at
     /// `t_x` sits at a decidably in-disc distance `eps/2 = 0.025` from the
     /// witness point.
@@ -859,6 +936,31 @@ mod tests {
             &exact,
             &approx,
             WITNESS_T,
+            DISC_RADIUS,
+            &mut budget,
+        ));
+        assert_eq!(out, FibreMultiplicity::NotOne { count: 2 });
+    }
+
+    #[test]
+    fn edge_coincident_root_t07_certifies_after_widening() {
+        // The r2 run's exact measured failure, now passing through the
+        // widening retry: at t_x = 0.7 the second in-disc root at
+        // 6.983185307179586 lands 1 ulp from its relative-floor box edge
+        // (margins 11/1), so the first Krawczyk call refuses and the widened
+        // retry (margins 15/5) certifies. Expected `NotOne { count: 2 }`.
+        let exact = exact_circle();
+        let approx = DoubleCover {
+            r: RADIUS,
+            eps: DISC_RADIUS,
+            lo: 0.0,
+            hi: DOUBLE_SPAN,
+        };
+        let mut budget = Budget::new(TEST_BUDGET_SUBDIV, 0, 0);
+        let out = must(fibre_degree_one(
+            &exact,
+            &approx,
+            EDGE_COINCIDENT_WITNESS_T,
             DISC_RADIUS,
             &mut budget,
         ));
