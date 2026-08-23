@@ -454,8 +454,26 @@ const CERT_CONV: f64 = 0.01; // H-3: dimensionless certificate-change threshold
 
 /// A valid parameter interval from a runtime pair; a malformed pair degrades
 /// to the empty interval rather than panicking (H-1).
-fn interval(lo: f64, hi: f64) -> Interval {
+pub(crate) fn interval(lo: f64, hi: f64) -> Interval {
     Interval::try_from((lo, hi)).unwrap_or(Interval::EMPTY)
+}
+
+/// The uniform cell list over a finite span: the `2^depth` cells
+/// `[lo + k·h, lo + (k+1)·h]` with `h = (hi - lo)/2^depth`. BG-FID-005's
+/// emitter partition is exactly this list, so rep's (iv-b) discharge shares
+/// the exact curve's parameter space cell-for-cell (Decision 4 of the packet:
+/// the pairing is the identity and no search is needed).
+pub(crate) fn uniform_cells(lo: f64, hi: f64, depth: u32) -> Vec<Interval> {
+    let n = match 1usize.checked_shl(depth) {
+        Some(n) => n,
+        None => return Vec::new(),
+    };
+    let h = (hi - lo) / n as f64;
+    let mut cells = Vec::with_capacity(n);
+    for k in 0..n {
+        cells.push(interval(lo + (k as f64) * h, lo + ((k + 1) as f64) * h));
+    }
+    cells
 }
 
 /// At or below this width a parameter box cannot subdivide further. The
@@ -482,7 +500,7 @@ fn split(tt: Interval) -> (Interval, Interval) {
 /// The interval dot product of two boxes, an enclosure of
 /// `{ a · b : a in A, b in B }`. Duplicated locally exactly as `one_sheet.rs`
 /// duplicates it; `enclosure.rs` visibility stays untouched.
-fn dot_box(a: &Box3, b: &Box3) -> Interval {
+pub(crate) fn dot_box(a: &Box3, b: &Box3) -> Interval {
     a.x * b.x + a.y * b.y + a.z * b.z
 }
 
@@ -491,7 +509,7 @@ fn dot_box(a: &Box3, b: &Box3) -> Interval {
 /// Duplicated locally exactly as `one_sheet.rs` does; the point-box
 /// degenerate case (`b_lo == b_hi`) is what makes this the sibling of the
 /// sup form below.
-fn box_distance(a: &Box3, b: &Box3) -> f64 {
+pub(crate) fn box_distance(a: &Box3, b: &Box3) -> f64 {
     let gap = |lo_a: f64, hi_a: f64, lo_b: f64, hi_b: f64| (lo_b - hi_a).max(lo_a - hi_b).max(0.0);
     let dx = gap(a.x.inf(), a.x.sup(), b.x.inf(), b.x.sup());
     let dy = gap(a.y.inf(), a.y.sup(), b.y.inf(), b.y.sup());
@@ -505,7 +523,7 @@ fn box_distance(a: &Box3, b: &Box3) -> f64 {
 /// point box is the degenerate case `b_lo == b_hi`. Do NOT reuse
 /// `one_sheet::sup_distance`: that helper's second operand is a `Point3`
 /// (box-to-point), and the box operand needs this form.
-fn sup_distance_box(a: &Box3, b: &Box3) -> f64 {
+pub(crate) fn sup_distance_box(a: &Box3, b: &Box3) -> f64 {
     let farthest =
         |lo_a: f64, hi_a: f64, lo_b: f64, hi_b: f64| (lo_a - hi_b).abs().max((hi_a - lo_b).abs());
     let dx = farthest(a.x.inf(), a.x.sup(), b.x.inf(), b.x.sup());
@@ -515,7 +533,7 @@ fn sup_distance_box(a: &Box3, b: &Box3) -> f64 {
 }
 
 /// The smallest magnitude over an interval, `0.0` when it contains 0.
-fn abs_lower(i: Interval) -> f64 {
+pub(crate) fn abs_lower(i: Interval) -> f64 {
     if i.contains(0.0) {
         0.0
     } else {
@@ -529,38 +547,61 @@ fn abs_upper(i: Interval) -> f64 {
 }
 
 /// An upper bound on `‖v‖` over a box: the interval norm's upper endpoint.
-fn norm_sup(b: &Box3) -> f64 {
+pub(crate) fn norm_sup(b: &Box3) -> f64 {
     (b.x.sqr() + b.y.sqr() + b.z.sqr()).sqrt().sup()
 }
 
 /// A lower bound on `‖v‖` over a box: the interval norm's lower endpoint.
-fn norm_inf(b: &Box3) -> f64 {
+pub(crate) fn norm_inf(b: &Box3) -> f64 {
     (b.x.sqr() + b.y.sqr() + b.z.sqr()).sqrt().inf()
+}
+
+/// The per-pair tangent-box evaluation of condition (ii) in its PASS form:
+/// `abs_lower(dot)/(norm_sup · norm_sup)` for two first-derivative boxes
+/// (denominators only shrink, so a ratio above `s` is a certified pass).
+/// This is EXACTLY the `pass_ratio` of [`angle_check`]; rep measures its
+/// whole-partition `theta_now` as the minimum of this form over the identity
+/// pairings (BG-FID-005 Decision 3).
+pub(crate) fn angle_pass_form(da: &Box3, de: &Box3) -> f64 {
+    let na = norm_sup(da);
+    let ne = norm_sup(de);
+    if na == 0.0 || ne == 0.0 {
+        return 0.0;
+    }
+    abs_lower(dot_box(da, de)) / (na * ne)
 }
 
 /// A curve cell: its parameter box and its position enclosure.
 #[derive(Clone, Copy)]
-struct KdCell {
-    tt: Interval,
-    bb: Box3,
+pub(crate) struct KdCell {
+    /// The parameter box of the cell.
+    pub(crate) tt: Interval,
+    /// The position enclosure of the cell.
+    pub(crate) bb: Box3,
 }
 
 /// One node of the balanced binary tree over a curve's cells. A node carries
 /// the union position box and the union parameter range of its subtree, both
 /// used for pruning. Median split on the widest-interval axis.
-struct KdNode {
-    bb: Box3,
-    param_lo: f64,
-    param_hi: f64,
-    left: Option<Box<KdNode>>,
-    right: Option<Box<KdNode>>,
-    cell: Option<KdCell>,
+pub(crate) struct KdNode {
+    /// The union position box of the subtree.
+    pub(crate) bb: Box3,
+    /// The lower union parameter bound of the subtree.
+    pub(crate) param_lo: f64,
+    /// The upper union parameter bound of the subtree.
+    pub(crate) param_hi: f64,
+    /// The left child.
+    pub(crate) left: Option<Box<KdNode>>,
+    /// The right child.
+    pub(crate) right: Option<Box<KdNode>>,
+    /// The leaf cell, when this node is a leaf.
+    pub(crate) cell: Option<KdCell>,
 }
 
 /// Build the balanced spatial tree over a curve's cells. `cells` is
 /// non-empty at every call site (every span is a finite box); an empty input
 /// degrades to a leaf that never matches (defensive, H-1).
-fn build_tree(cells: &[KdCell]) -> Box<KdNode> {
+pub(crate) fn build_tree(cells: &[KdCell]) -> Box<KdNode> {
     let first = cells.first().copied().unwrap_or(KdCell {
         tt: Interval::EMPTY,
         bb: Box3::empty(),
@@ -617,7 +658,7 @@ fn build_tree(cells: &[KdCell]) -> Box<KdNode> {
 }
 
 /// Enclose every cell of a parameter partition and build the tree over them.
-fn build_curve_tree(cells: &[Interval], curve: &impl EnclosureCurve) -> Box<KdNode> {
+pub(crate) fn build_curve_tree(cells: &[Interval], curve: &impl EnclosureCurve) -> Box<KdNode> {
     let kd_cells: Vec<KdCell> = cells
         .iter()
         .map(|tt| KdCell {
@@ -631,7 +672,7 @@ fn build_curve_tree(cells: &[Interval], curve: &impl EnclosureCurve) -> Box<KdNo
 /// Whether the tree contains a leaf whose box is within `eps` (sup-distance)
 /// of the query box. Pruning: `box_distance > eps` implies `sup_distance >
 /// eps`, so no partner hides inside a pruned node.
-fn node_partner(node: &KdNode, query: &Box3, eps: f64) -> bool {
+pub(crate) fn node_partner(node: &KdNode, query: &Box3, eps: f64) -> bool {
     if box_distance(query, &node.bb) > eps {
         return false;
     }
@@ -653,7 +694,7 @@ fn node_partner(node: &KdNode, query: &Box3, eps: f64) -> bool {
 
 /// Collect into `out` the parameter box of every leaf whose box is within
 /// `eps` (sup-distance) of the query box.
-fn collect_partners(node: &KdNode, query: &Box3, eps: f64, out: &mut Vec<Interval>) {
+pub(crate) fn collect_partners(node: &KdNode, query: &Box3, eps: f64, out: &mut Vec<Interval>) {
     if box_distance(query, &node.bb) > eps {
         return;
     }
@@ -673,7 +714,7 @@ fn collect_partners(node: &KdNode, query: &Box3, eps: f64, out: &mut Vec<Interva
 
 /// Whether the query box is at certified distance > eps from EVERY leaf box
 /// of the tree (used at the width floor to certify a closeness violation).
-fn all_farther(node: &KdNode, query: &Box3, eps: f64) -> bool {
+pub(crate) fn all_farther(node: &KdNode, query: &Box3, eps: f64) -> bool {
     box_distance(query, &node.bb) > eps
 }
 
