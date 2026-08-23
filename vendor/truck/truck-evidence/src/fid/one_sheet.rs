@@ -31,12 +31,13 @@
 //! The certificate is resolution-honest: distinct roots separated by less than
 //! [`width_floor`] in parameter are counted once, and a root whose distance to
 //! the disc boundary is below its floor-box image radius refuses as
-//! [`OneSheetError::SheetCountUnresolved`] rather than guessing a side. A
-//! floor-width box whose Krawczyk call cannot certify is retried ONCE on the
+//! [`OneSheetError::SheetCountUnresolved`] rather than guessing a side. A box
+//! of ANY width whose Krawczyk call cannot certify is retried ONCE on the
 //! box widened four next-float steps per endpoint (toward -inf below, toward
-//! +inf above): a root that sat within 1-2 ulps of the original floor-box
-//! edge becomes strictly interior with multi-ulp margins, and a second
-//! refusal is `SheetCountUnresolved` as before. A certificate that states its
+//! +inf above): a root that sat within 1-2 ulps of the original box edge
+//! becomes strictly interior with multi-ulp margins, and a second
+//! refusal is `SheetCountUnresolved` as before (at the floor) or a
+//! subdivision (above it). A certificate that states its
 //! own resolution is stricter than one that does not.
 
 #![deny(clippy::unwrap_used)]
@@ -217,51 +218,67 @@ pub fn fibre_degree_one(
                 KrawczykProof::NoRoot => {}
             },
             Err(_) => {
-                if width <= width_floor(&tt) {
-                    // Terminal case, retry once: a root that lands within 1-2
-                    // ulps of a floor-box edge is outside krawczyk's
-                    // strict-interior reach, so before refusing, retry ONCE on
-                    // the box widened four next-float steps per endpoint.
-                    // Widening is sound: a `Unique` on the widened box still
-                    // certifies exactly one root in it (the operator's own
-                    // discipline cannot certify a box holding two), the dedupe
-                    // rule absorbs the slightly wider point-box, and a root on
-                    // the original box's edge is now strictly interior with
-                    // multi-ulp margins. A widened-box `Unique` follows the
-                    // same count/dedupe path as any other certified box; a
-                    // second `Err` is `SheetCountUnresolved` as before.
-                    let mut lo_w = tt.inf();
-                    lo_w = lo_w.next_down();
-                    lo_w = lo_w.next_down();
-                    lo_w = lo_w.next_down();
-                    lo_w = lo_w.next_down();
-                    let mut hi_w = tt.sup();
-                    hi_w = hi_w.next_up();
-                    hi_w = hi_w.next_up();
-                    hi_w = hi_w.next_up();
-                    hi_w = hi_w.next_up();
-                    let tt_w = Interval::try_from((lo_w, hi_w)).unwrap_or(Interval::EMPTY);
-                    match krawczyk(&system, &[tt_w], budget) {
-                        Ok(cert) => match cert.value {
-                            KrawczykProof::Unique => {
-                                let image_w = approx.enclose(tt_w);
-                                if let Some(early) = decide_disc_membership(
-                                    &image_w,
-                                    x,
-                                    &x_b,
-                                    eps,
-                                    &mut in_disc,
-                                    &mut count,
-                                )? {
-                                    return Ok(early);
-                                }
+                // A root that lands within 1-2 ulps of a box edge is outside
+                // krawczyk's strict-interior reach, and this engine calls
+                // krawczyk at EVERY descent level, so the refusal can fire
+                // far above the floor (measured on the double-cover witness
+                // at t_x = 0.7: first refusal at level 47 of 50, margins
+                // 100/1). Retry ONCE on the box widened four next-float
+                // steps per endpoint. Widening is sound: a `Unique` on the
+                // widened box still certifies exactly one root in it (the
+                // operator's own discipline cannot certify a box holding
+                // two), the dedupe rule absorbs the slightly wider
+                // point-box, and a root on the original box's edge is now
+                // strictly interior with multi-ulp margins. Counting the
+                // widened root is sound in the NotOne direction — a
+                // certified lower bound of two distinct in-disc roots is
+                // decisive even with an unexamined remainder — and when the
+                // count stays below two the remainder of `tt` still owes
+                // enumeration, so the box is subdivided (the re-found root
+                // merges by dedupe) unless it is already at the floor.
+                // [orchestrator amendment, BG-FID-008-r4: the packet scoped
+                // this retry to floor-width terminal boxes; the worker's
+                // controlled experiment measured the first refusal at level
+                // 47 (non-floor) consuming the whole budget before the
+                // terminal case is reached, and the every-Err retry
+                // certifying NotOne { count: 2 } with zero spend.]
+                let mut lo_w = tt.inf();
+                lo_w = lo_w.next_down();
+                lo_w = lo_w.next_down();
+                lo_w = lo_w.next_down();
+                lo_w = lo_w.next_down();
+                let mut hi_w = tt.sup();
+                hi_w = hi_w.next_up();
+                hi_w = hi_w.next_up();
+                hi_w = hi_w.next_up();
+                hi_w = hi_w.next_up();
+                let tt_w = Interval::try_from((lo_w, hi_w)).unwrap_or(Interval::EMPTY);
+                match krawczyk(&system, &[tt_w], budget) {
+                    Ok(cert) => match cert.value {
+                        KrawczykProof::Unique => {
+                            let image_w = approx.enclose(tt_w);
+                            if let Some(early) = decide_disc_membership(
+                                &image_w,
+                                x,
+                                &x_b,
+                                eps,
+                                &mut in_disc,
+                                &mut count,
+                            )? {
+                                return Ok(early);
                             }
-                            KrawczykProof::NoRoot => {}
-                        },
-                        Err(_) => return Err(OneSheetError::SheetCountUnresolved),
+                            if width > width_floor(&tt) {
+                                push_children(tt, &mut worklist, budget)?;
+                            }
+                        }
+                        KrawczykProof::NoRoot => {}
+                    },
+                    Err(_) => {
+                        if width <= width_floor(&tt) {
+                            return Err(OneSheetError::SheetCountUnresolved);
+                        }
+                        push_children(tt, &mut worklist, budget)?;
                     }
-                } else {
-                    push_children(tt, &mut worklist, budget)?;
                 }
             }
         }
