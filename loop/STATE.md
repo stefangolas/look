@@ -11,83 +11,98 @@ otherwise would eventually cost a trap.) If you are picking this up cold, read
 [`loop/ORCHESTRATOR.md`](ORCHESTRATOR.md) for how to run the loop, then
 `python loop/slot_status.py`** - nothing else. Do not read `LEDGER.jsonl` whole.
 
-Updated 2026-08-23, close of session 20. Branch: `integration/kernel-bg`.
+Updated 2026-08-23, close of session 21. Branch: `integration/kernel-bg`.
 
 ## Where we are
 
-**Seventy packets DONE of 74 rows (the 70-contract graph is 70/70 through the
-FID-008 chain; the 4 extra rows are FID-008's r2/r3/r4 tracking rows, all
-DONE). NOTHING is running; slots idle; watchdog STOPPED at close.**
+**Seventy-three packets DONE of 76 rows (the 70-contract graph is 70/70; the
+extra rows are the FID-008 r2/r3/r4 tracking rows, FID-003-r2, and
+BG-FID-005-SRF which is SPECD-unwritten). NOTHING is running; slots idle;
+watchdog RUNNING (pid 27032) and should be stopped at close or left running if
+the session resumes immediately.**
 
-Open work, all of it: **BG-FID-003 (packet WRITTEN and dispatch-ready)** ->
-**BG-FID-005 (packet unwritten - the rep operator, the last design work)** ->
-the two BLOCKED rows (INV-107, ENC-004-OFFSET, unchanged).
+Open work, all of it: **BG-FID-005-SRF (row exists, packet UNWRITTEN - the
+surface rep, see "Pick up here")** -> the two BLOCKED rows (INV-107,
+ENC-004-OFFSET, unchanged).
 
-Session 20 in two lines: three landings (BG-NUM-004 first-try, BG-NUM-003-r2
-first-try, BG-FID-008 via a four-attempt chain ending in an orchestrator
-amendment), one verify-ACCEPTED-but-adjudicated-REJECTED packet, and four
-harness speed levers implemented (see "State of the machine").
+Session 21 in three lines: BG-FID-003 attempt 1 was killed pre-commit when an
+orchestrator-side review found four packet defects (curvature-only tube bound,
+oriented-dot angle test, no boundary-kind input, box-to-point sup_distance
+formula on box operands) - the spec itself adjudicated all four against the
+packet; BG-FID-003-r2 landed with three worker-right disagreements (test-4
+arm, test-3 amplitude, parameter-gap min-vs-max soundness); BG-FID-005 landed
+first-try with two more worker-right disagreements (my eps_now formula was
+unsatisfiable box-diagonal semantics; my V-corner prose confused
+"contains both directions" with "contains the zero vector"). Two spec
+amendments landed with the packets. An API balance outage killed the first
+r2 resume silently at 11 events; the watchdog's hard-death redispatch ran a
+fresh session that completed the packet.
 
-**The FID-008 chain is the session's real content - read the r4 RESULT.json
-(loop/results/BG-FID-008-r4.json) before any FID work.** The original packet
-carried two soundness defects (disc membership prescribed as an infimum/
-intersect test; `KrawczykProof::Unique` misread as exactly-one-in-query-box).
-The FIRST worker diagnosed both in its disagreements field; the verify passed
-all gates anyway and the orchestrator rejected on certificate semantics. The
-amendment rounds then found: a witness root exactly on a float bisection edge
-(r3 BLOCKED), an ABSOLUTE width floor that starves at |t| > 2 (r4 BLOCKED),
-and krawczyk's degenerate-split budget burn (landed separately as
-BG-NUM-003-r2). The chain closed when the r4 worker's own controlled
-experiment (every-Err widened retry -> NotOne{2} in 7.82s) became the design
-basis for an orchestrator amendment; verify ACCEPTED with `amended_by`
-surfaced. Landed `fibre_degree_one` is now sound: containment disc membership,
-floor-complete enumeration, relative floor, widening retry.
+**The disagreements field earned its keep five times this session.** Both
+landed packets were packet-defective in ways the machine-check scripts did
+NOT catch (right numbers, wrong mandated formula; right witness, ambiguous
+prose) - read loop/results/BG-FID-003-r2.json and loop/results/BG-FID-005.json
+before writing any FID-005-SRF prose.
 
 ## Pick up here
 
-1. **Dispatch BG-FID-003 FIRST** (packet at loop/packets/BG-FID-003.md,
-   anchors pinned to 1c6bf97, witnesses machine-checked, Done-when already
-   lightened). Re-fork slot 0 or 1 with new_slot.py and dispatch in one
-   motion. It is the FIRST packet under the new harness - RECORD THE SPEED
-   MEASUREMENTS (time-to-first-edit and wall clock from events.jsonl, cargo
-   cycle count) against the r2/r3/r4 baselines in STATE at next close.
-2. **On the first amendment dispatch, use `--resume`** (first live test of
-   session resume; fall back to fresh if the session is gone).
-3. **Write BG-FID-005's packet** while FID-003's worker runs if orchestrator
-   time allows (rep operator: refine loop, (iv-b) on the emitter partition,
-   idempotence; consumes curve_isotopy_conditions + fibre_degree_one).
-4. INV-107 / ENC-004-OFFSET remain BLOCKED.
+1. **Write BG-FID-005-SRF's packet** (row: needs [BG-FID-005], writes
+   fid/rep.rs). Scope per the 2026-08-23 spec amendment in
+   GENERATION_KERNEL_BUILD_SPEC.md's BG-FID-005 section: REP-SRF-001 (surface
+   rep), the surface (iv-b) discharge, and the surface double-sheet negative
+   test ("a double sheet inside one normal tube, with correct tangent planes
+   on BOTH sheets"). The 2D Krawczyk operator is landed and generic-N
+   (krawczyk::<2>); the deferred design is the surface emitter (the curve
+   emitter's Hermite/Bezier pattern in rep.rs generalizes: tensor-product
+   Bezier hulls over 2D cells) and the bivariate normal-bundle fibre systems.
+   Consume curve_isotopy_conditions's pub(crate) cell/BVH machinery where the
+   2D analogue permits; machine-check every witness through the SURFACE
+   formulas before dispatch (the session-21 lesson: also check the mandated
+   FORMULA matches the numbers' semantics, not just the numbers).
+2. INV-107 / ENC-004-OFFSET remain BLOCKED.
+3. `--resume` is STILL effectively untested live: its only attempt
+   (BG-FID-003-r2, 01:06) died at 11 events on the API balance outage, and
+   the watchdog's redispatch does NOT use resume. The next amendment dispatch
+   anywhere is the first real test.
 
 ## State of the machine, as left
 
-- **Watchdog STOPPED at close** (taskkill on lock pid; lock file removed).
-  Restart with `LOOK_WATCHDOG_STAGNANT=3600` via the cmd /c pattern before
-  any dispatch.
-- Registry: **70 DONE / 2 SPECD-soon / 2 BLOCKED** (74 rows). HEAD at close:
-  `1c6bf97`. Tracked tree clean. GATE-4 ceiling 110 -> 110 through all
-  landings.
-- **Harness speed levers landed this session** (commit 3b983d3, selftest
-  PASS, ZERO live measurements yet - the first dispatch under the new regime
-  is the experiment): `run_packet.py --resume/--session-id` (amendments
-  continue the prior worker's opencode session); `gen_context.py` writes
-  CONTEXT.md beside PACKET.md (deterministic signature/caller/test bundle;
-  verify ignores it by name); `CARGO_INCREMENTAL=1` for workers; worker-fast
-  vs verifier-authoritative check split documented in ORCHESTRATOR.md.
-  Estimates: fresh packets ~1.7x, amendments ~3.5x. Revert is cheap; the
-  verifier changed not at all.
-- Slots 0/1/2 all FINISHED+landed with stale worker files; re-fork each
-  with new_slot.py before dispatch. Disk ~16 GB free.
-- loop/results/ gained BG-NUM-003-r2.json and BG-FID-008-r4.json (the
-  chain's story, worker words verbatim through the amendment).
+- **Watchdog RUNNING** (pid 27032, stagnant=3600s; started 00:33). Stop it
+  with taskkill on the lock pid + remove loop/watchdog.lock if the machine
+  will sleep; otherwise leave it guarding.
+- Registry: **73 DONE / 1 SPECD-unwritten (FID-005-SRF) / 2 BLOCKED**
+  (76 rows). HEAD at close: `f409385`. Tracked tree clean. GATE-4 ceiling
+  110 -> 110 through all landings.
+- **New-harness speed measurements (the session-20 duty), two fresh runs:**
+  BG-FID-003-r2 (1979-line isotopy.rs + 101-line one_sheet addition, 14
+  tests): **wall 48.2 min, time-to-first-edit 23.9 min, 96 tool calls, 17
+  cargo cycles**. BG-FID-005 (1873-line rep.rs + 85-line isotopy exposure,
+  10 tests): **wall 114.0 min, time-to-first-edit 16.7 min, 242 tool calls,
+  55 cargo cycles**. Caveats: no like-for-like pre-lever baseline exists
+  (session-20's FID-008-chain runs predate the levers and were amendment
+  chains, not fresh packets), and the r2 measurement is the watchdog's
+  REDISPATCH, not the --resume attempt (which died on balance at 20s). Do
+  not quote these as lever speedups; they are the first two data points of
+  a fresh-packet baseline under the new harness.
+- **API balance outages are a live failure mode.** The 01:06 --resume died
+  silently (worker.err EMPTY, events stop mid-step, slot reads STALLED); the
+  real error is only in `~/.local/share/opencode/log/opencode.log`
+  ("AI_APICallError: Insufficient Balance"). A balance death can ALSO land
+  with the work complete: the 03:14 death hit after the commit and
+  RESULT.json write, during the final `git add`. **Before diagnosing any
+  silent worker death, read that log; before redispatching a dead worker,
+  check the slot branch for commits - the work may already be there.**
+- Slots 0/2 reset clean (slot 0 landed FID-005 then was left FINISHED with
+  RESULT.json present; re-fork with new_slot.py before dispatch). Slot 1
+  FINISHED+landed with stale worker files (BG-NUM-004). Disk ~24 GB free.
+- loop/results/ gained BG-FID-003-r2.json and BG-FID-005.json (both carry
+  the worker's disagreements verbatim - the adjudication record).
 
 ## The parallelism picture
 
-The frontier is now strictly serial: FID-003 -> FID-005, then only the two
-BLOCKED rows. The only available parallelism is orchestrator-side (write
-FID-005's packet while FID-003's worker runs). Two write-disjoint workers in
-the SAME crate (krawczyk.rs vs one_sheet.rs, both truck-evidence) ran clean
-concurrently this session - extends the session-7 precedent - but verifies at
-the same base stay sequential.
+The frontier is strictly serial: FID-005-SRF (packet unwritten), then only
+the two BLOCKED rows. The only available parallelism is orchestrator-side
+(packet writing while a worker runs), which this session used as designed.
 
 ## Traps, each one paid for
 - **The watchdog's default 1200s wedged-killer kills healthy workers during a
@@ -1223,3 +1238,66 @@ what the tree says about the last two, as opposed to what the spec says.
   worker's instrumentation is admissible evidence - when a BLOCKED arrives
   with a controlled experiment in hand, consider amending before paying for
   another dispatch.
+
+- **A packet's mandated FORMULA must carry the same semantics as its
+  machine-checked numbers.** Session 21, BG-FID-005: the scratch script
+  measured TRUE radial error by dense sampling (0.3365/0.4292/0.0304) while
+  Decision 3 mandated `eps_now = max sup_distance(emitted hull box, exact
+  cell box)` - which is the BOX DIAGONAL, ~sqrt(2)x cell width, permanently
+  larger than the non-adjacent gap the (iv-b)(c) gate compares it against:
+  the literal loop refines forever and the packet's own test 1 is
+  unsatisfiable. The numbers were right; the formula was wrong; the
+  machine-check passed because it never ran the FORMULA. Generalizes the
+  FID-001 trap ("check WHICH variant produced the numbers"): a check must
+  evaluate the exact expression the packet mandates, in the exact box
+  semantics the gates will use, not a mathematically-equal-on-paper
+  surrogate.
+
+- **A witness whose deviation EQUALS the tolerance is uncertifiable by
+  design.** Session 21, BG-FID-003-r2 test 3: the FID-008 double-cover
+  witness `(R + eps*cos(t/2))e(t)` has max deviation EXACTLY eps; (i)'s
+  pairing demands sup_distance <= eps with interval padding, so the seam
+  cell can never certify and the check returns ClosenessUnresolved forever -
+  not a violation, just undecidable. Same family as the dyadic-root and
+  bisection-edge traps: **witnesses must sit strictly inside every
+  certification margin, and the machine-check must verify the MARGIN
+  (strictly less than the gate), not merely recompute the value.** The
+  worker's amplitude-halving fix preserves the property under test.
+
+- **"The tangent box contains both branch directions" is NOT "contains the
+  zero vector".** Session 21, BG-FID-005 test 4: two segments at a 60-degree
+  TURN have a corner tangent box that never straddles the origin, so
+  `curvature_radius_lower_span` happily certifies +inf (straight legs!) and
+  the collapse route never fires. The refusal needs the box hull to CONTAIN
+  THE ZERO VECTOR (antiparallel-ish branches) AND an off-dyadic corner (a
+  dyadic corner splits exactly at the kink and every cell is straight).
+  When a packet prose describes an enclosure property, spell the property
+  the code actually tests - "contains 0", not a geometric paraphrase.
+
+- **A mid-run packet review is cheapest acted on immediately.** Session 21:
+  the review of the dispatched BG-FID-003 found four design defects; the
+  worker was killed at 23 min with zero commits, the packet was amended to
+  r2, and the r2 landed clean. The FID-008 alternative (let it run, verify
+  ACCEPTS, orchestrator rejects on semantics, four-attempt chain) cost a
+  full session. Verify gates are mechanical: certificate-semantics defects
+  pass them. Killing a worker on a known-defective packet wastes minutes;
+  landing one wastes the chain.
+
+- **API balance deaths are silent, and can land POST-COMPLETION.** Session
+  21: the --resume dispatch died at 11 events with worker.err EMPTY and the
+  slot reading STALLED; the error exists only in
+  `~/.local/share/opencode/log/opencode.log` ("AI_APICallError: Insufficient
+  Balance"). The next death hit AFTER the worker committed its code and
+  wrote RESULT.json, during the final `git add` - the slot looked dead but
+  the work was complete. **Read the opencode log before diagnosing any
+  silent worker death, and read the slot branch for commits before
+  redispatching - a redispatch archives the worktree and a finished-but-
+  unlanded attempt can be lost to a redundant restart.**
+
+- **`Set-Content -Encoding ascii` mangles every non-ASCII character to '?',
+  three per em dash.** Session 21 turned 89 em dashes into '???' in one
+  packet file by re-encoding it through PowerShell (the known trap was the
+  UTF8 BOM; the ascii side is its sibling). Never rewrite a file through
+  PowerShell content cmdlets - use python (`io.open(..., 'w',
+  encoding='utf-8', newline='')`) or the Write tool, and after ANY script
+  passes over a packet file, re-check that its non-ASCII survived.
