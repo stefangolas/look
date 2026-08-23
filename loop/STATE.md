@@ -1,7 +1,7 @@
-# Autobuild loop — STATE
+# Autobuild loop - STATE
 
-Rewritten at the end of every session. The **volatile** part — everything from
-"Where we are" through "The parallelism picture" — is capped at ~120 lines and
+Rewritten at the end of every session. The **volatile** part - everything from
+"Where we are" through "The parallelism picture" - is capped at ~120 lines and
 must be rewritten each time. "Traps" and everything below it is **stable and
 accumulates**: entries are added when something costs a session and removed only
 when they stop being true, never for length. (The old header claimed the cap
@@ -9,92 +9,85 @@ covered everything above "Quick reference"; it never did, and pretending
 otherwise would eventually cost a trap.) If you are picking this up cold, read
 **this file, then
 [`loop/ORCHESTRATOR.md`](ORCHESTRATOR.md) for how to run the loop, then
-`python loop/slot_status.py`** — nothing else. Do not read `LEDGER.jsonl` whole.
+`python loop/slot_status.py`** - nothing else. Do not read `LEDGER.jsonl` whole.
 
-Updated 2026-08-22, close of session 19. Branch: `integration/kernel-bg`. Nothing
+Updated 2026-08-23, close of session 20. Branch: `integration/kernel-bg`.
 
 ## Where we are
 
-**Sixty-three packets DONE of 70 (90%). NOTHING is running; slots idle.**
-Next dispatchable: INV-106, NUM-004, FID-008 (schedule.py confirms all three
-eligible). The FID chain behind FID-008 is FID-003 -> FID-005.
+**Seventy packets DONE of 74 rows (the 70-contract graph is 70/70 through the
+FID-008 chain; the 4 extra rows are FID-008's r2/r3/r4 tracking rows, all
+DONE). NOTHING is running; slots idle; watchdog STOPPED at close.**
 
-Session 19 in two lines: MIGRATE-r2 landed with a worker-caught design flaw
-fixed correctly; BG-FID-001 went theorem-map -> review -> soundness-fix ->
-killed first dispatch -> revised packet -> landed first-try-verify ACCEPTED.
+Open work, all of it: **BG-FID-003 (packet WRITTEN and dispatch-ready)** ->
+**BG-FID-005 (packet unwritten - the rep operator, the last design work)** ->
+the two BLOCKED rows (INV-107, ENC-004-OFFSET, unchanged).
 
-**BG-CE-003-MIGRATE-r2 - LANDED** (`3ad59d8`; worker `abcea79`; fault PACKET,
-one V3 round trip - my crates narrowing). punched_cube passes on integration.
-Its RESULT.json deviations field documents the stale-emap-key/Arc-address-
-reuse flaw in my canonical-vertex design and the eviction fix - READ BEFORE
-ANY WORK TOUCHING SHARED REPLACEMENT MAPS.
+Session 20 in two lines: three landings (BG-NUM-004 first-try, BG-NUM-003-r2
+first-try, BG-FID-008 via a four-attempt chain ending in an orchestrator
+amendment), one verify-ACCEPTED-but-adjudicated-REJECTED packet, and four
+harness speed levers implemented (see "State of the machine").
 
-**BG-FID-001 - LANDED** (`95caa21`; worker `7fb5377` on `packet/BG-FID-001`;
-verify ACCEPTED first try on the revised packet; 7 fid tests re-run by hand at
-landing: ok). Ships PRIMITIVE EVIDENCE ONLY in truck-evidence/src/fid/lfs.rs:
-- `FaceScaleComponents { curvature_radius_lower, nonincident_separation_lower,
-  boundary_distance_lower }` + `conservative_min()` + extended-real (+inf)
-  semantics for empty exclusion sets and flat cells;
-- curvature term per the validated scratch (enclose_der II boxes, iota
-  normalization via immersion_lower_bound, typed refusals);
-- `WedgeSlopeLowerBound { value, scope: EdgeMidpointWitness }` from
-  BG-INV-109's sin certificate per spec amendment BG-FID-001a;
-- typed `FidRefusal` everywhere, never Option; `@feeds`/`@establishes`/
-  `@does-not-establish` annotations on every public item.
-NOT created, deliberately: TubeWidthLowerBound, ChiLowerBound, anything named
-reach/lfs. They require L-FEDERER-PATCH / L-COVERAGE (open proof obligations).
-
-**Design inputs committed:** `loop/packets/BG-FID-001-THEOREM-MAP.md`
-(CCS05 T2.1/2.2 verbatim; CCSL09 chi_K/wfs/mu-reach; bridge lemmas L-TUBE /
-L-COVERING / L-SEPARATES explicit; Federer demoted to motivation), spec
-amendments at `c7f6ae3` + revision `ac2ee98`. The review that killed the
-first dispatch found a SOUNDNESS REVERSAL in my curvature bracket
-(`F.sup^2` instead of `max(|F.inf|,|F.sup|)^2`) plus naming overclaims -
-see new trap below.
+**The FID-008 chain is the session's real content - read the r4 RESULT.json
+(loop/results/BG-FID-008-r4.json) before any FID work.** The original packet
+carried two soundness defects (disc membership prescribed as an infimum/
+intersect test; `KrawczykProof::Unique` misread as exactly-one-in-query-box).
+The FIRST worker diagnosed both in its disagreements field; the verify passed
+all gates anyway and the orchestrator rejected on certificate semantics. The
+amendment rounds then found: a witness root exactly on a float bisection edge
+(r3 BLOCKED), an ABSOLUTE width floor that starves at |t| > 2 (r4 BLOCKED),
+and krawczyk's degenerate-split budget burn (landed separately as
+BG-NUM-003-r2). The chain closed when the r4 worker's own controlled
+experiment (every-Err widened retry -> NotOne{2} in 7.82s) became the design
+basis for an orchestrator amendment; verify ACCEPTED with `amended_by`
+surfaced. Landed `fibre_degree_one` is now sound: containment disc membership,
+floor-complete enumeration, relative floor, widening retry.
 
 ## Pick up here
 
-1. **Frontier (all eligible):** INV-106, NUM-004, FID-008 -> FID-003 ->
-   FID-005. FID-003 can now cite the landed evidence types; its packet still
-   owes the bridge lemmas as SPEC_GAP-guarded obligations (THEOREM-MAP has
-   the statements). INV-107/OFFSET BLOCKED.
-2. **INV-109 signed-alignment extension** (candidate future packet):
-   wedge_slope_lower_from_sin_margin is branch-blind by construction
-   (1/sqrt(2) floor at s=1); a signed dot(n_A,n_B) certificate unlocks the
-   strong bound. Noted in spec BG-FID-001a.
-3. Slots 0/1/2 all FINISHED+landed with stale worker files; re-fork each
-   with new_slot.py before dispatch.
-4. Disk ~17.8 GB free at close; no leaked baselines.
+1. **Dispatch BG-FID-003 FIRST** (packet at loop/packets/BG-FID-003.md,
+   anchors pinned to 1c6bf97, witnesses machine-checked, Done-when already
+   lightened). Re-fork slot 0 or 1 with new_slot.py and dispatch in one
+   motion. It is the FIRST packet under the new harness - RECORD THE SPEED
+   MEASUREMENTS (time-to-first-edit and wall clock from events.jsonl, cargo
+   cycle count) against the r2/r3/r4 baselines in STATE at next close.
+2. **On the first amendment dispatch, use `--resume`** (first live test of
+   session resume; fall back to fresh if the session is gone).
+3. **Write BG-FID-005's packet** while FID-003's worker runs if orchestrator
+   time allows (rep operator: refine loop, (iv-b) on the emitter partition,
+   idempotence; consumes curve_isotopy_conditions + fibre_degree_one).
+4. INV-107 / ENC-004-OFFSET remain BLOCKED.
 
 ## State of the machine, as left
 
-- **Watchdog STOPPED at close** (STOP line in loop/watchdog.log; ran
-  08:47->17:55 with zero reaps). Restart with LOOK_WATCHDOG_STAGNANT=3600
-  via cmd /c through Start-Process before any dispatch.
-- Registry: **63 DONE / 5 SPECD / 2 BLOCKED** (70 rows). SPECD: INV-106,
-  NUM-004, FID-008, FID-003, FID-005. HEAD at close: see git log (filing
-  commit after `95caa21`). Tracked tree clean. GATE-4 ceiling 110 -> 110
-  through both landings.
-- loop/results/ gained BG-CE-003-MIGRATE-r2.json and BG-FID-001.json
-  (worker disagreements preserved verbatim).
-- Scratch crate for the FID curvature term lives outside the repo in
-  %TEMP%/opencode/fid-scratch (inari endpoints .inf()/.sup(); iota route;
-  NOTE its disc bracket predates the F-magnitude fix - trust the LANDED
-  lfs.rs code, not the scratch binary, for that term).
+- **Watchdog STOPPED at close** (taskkill on lock pid; lock file removed).
+  Restart with `LOOK_WATCHDOG_STAGNANT=3600` via the cmd /c pattern before
+  any dispatch.
+- Registry: **70 DONE / 2 SPECD-soon / 2 BLOCKED** (74 rows). HEAD at close:
+  `1c6bf97`. Tracked tree clean. GATE-4 ceiling 110 -> 110 through all
+  landings.
+- **Harness speed levers landed this session** (commit 3b983d3, selftest
+  PASS, ZERO live measurements yet - the first dispatch under the new regime
+  is the experiment): `run_packet.py --resume/--session-id` (amendments
+  continue the prior worker's opencode session); `gen_context.py` writes
+  CONTEXT.md beside PACKET.md (deterministic signature/caller/test bundle;
+  verify ignores it by name); `CARGO_INCREMENTAL=1` for workers; worker-fast
+  vs verifier-authoritative check split documented in ORCHESTRATOR.md.
+  Estimates: fresh packets ~1.7x, amendments ~3.5x. Revert is cheap; the
+  verifier changed not at all.
+- Slots 0/1/2 all FINISHED+landed with stale worker files; re-fork each
+  with new_slot.py before dispatch. Disk ~16 GB free.
+- loop/results/ gained BG-NUM-003-r2.json and BG-FID-008-r4.json (the
+  chain's story, worker words verbatim through the amendment).
 
 ## The parallelism picture
 
-70 rows, 63 DONE. Remaining: INV-106 + NUM-004 + FID-008 (independent,
-eligible now), then FID-003 -> FID-005 serially, then the two BLOCKED rows.
-The FID family is now evidence-grounded: contracts were fixed through the
-theorem map BEFORE workers were paid, twice over (map review + packet
-review). Width constraint remains orchestrator design time.
-
-Session 19 cost picture: two landings, one killed dispatch (pre-work, zero
-waste), zero gate round trips on the revised packet. The two most valuable
-outputs were both orchestrator-side catches by review: the F.sup^2 soundness
-reversal and the tube-width naming overclaim - either would have shipped
-unsound or overclaiming code that every test would have passed.
+The frontier is now strictly serial: FID-003 -> FID-005, then only the two
+BLOCKED rows. The only available parallelism is orchestrator-side (write
+FID-005's packet while FID-003's worker runs). Two write-disjoint workers in
+the SAME crate (krawczyk.rs vs one_sheet.rs, both truck-evidence) ran clean
+concurrently this session - extends the session-7 precedent - but verifies at
+the same base stay sequential.
 
 ## Traps, each one paid for
 - **The watchdog's default 1200s wedged-killer kills healthy workers during a
@@ -1184,3 +1177,49 @@ what the tree says about the last two, as opposed to what the spec says.
   name (`$wdpid`). Cost one failed taskkill line, nothing more, but it is
   the same class as every other PS 5.1 surprise above.
 
+
+- **Membership needs CONTAINMENT, not intersection.** `box_distance(A, B)
+  <= eps` (the infimum/gap distance) proves A *intersects* the eps-ball; a
+  certified root lying somewhere in A may be beyond eps. Inclusion needs the
+  SUP-distance (farthest corner) <= eps. Session 20 rejected a
+  verify-ACCEPTED FID-008 on exactly this: a coverage-violation crossing at
+  eps + 2e-5 inside a width-1e-4 decision box certified `ExactlyOne` with a
+  true count of zero. The failure mode is silent because every shipped
+  witness has margin.
+- **`KrawczykProof::Unique` means "at least one root, exactly one in SOME
+  sub-box" - never "exactly one in the query box".** The operator returns on
+  the first internal proof and does not enumerate the rest of the box.
+  Counting one and discarding the box loses a second root (a false
+  `ExactlyOne`); the sound structure enumerates to the width floor and
+  counts early only where a certified lower bound of >= 2 distinct roots is
+  decisive for `NotOne` regardless of the unexamined remainder.
+- **An ABSOLUTE width floor starves at large parameters.** `8 * EPS` is 16
+  ulps at t ~ 0.7 but 2 ulps at t ~ 7 - too narrow for the interval K
+  operator to contract strictly inside. Any resolution floor must scale with
+  the box magnitude (`width_floor(&tt)` in one_sheet.rs). One double-cover
+  crossing is structurally always at |t| >= 2pi, so no witness choice dodges
+  the large-t regime.
+- **A machine-check must model the engine's ACTUAL stopping behaviour.** The
+  FID-008-r3 check simulated the bisection descent and stopped AT the floor
+  box; the engine calls krawczyk THROUGH the floor box and split at exactly
+  the root. The check passed while proving a different algorithm than the
+  one that runs. When a packet mandates a machine-check of an engine's
+  arithmetic, the check must replicate where the engine actually invokes the
+  operator, not where the prose imagines it.
+- **Witness parameters must be checked against FLOAT BISECTION EDGES, not
+  just dyadic rationals.** t_x = 0.7 put the double-cover root at
+  t_x + 2pi = 6.983185307179586 exactly ON a box edge produced by
+  `0.5*lo + 0.5*hi` rounding; strict-interior Unique is unreachable from any
+  box born with that edge. Simulate the descent and require >= 2-ulp margins
+  to both edges of the terminal box (the landed engine retries on a widened
+  box, but do not pick a witness that needs it).
+- **`f64::next_after` does not exist on this toolchain (rustc 1.97); the
+  stable `next_up`/`next_down` do.** Spell the stable ones in packets.
+- **An orchestrator amendment can land a BLOCKED whose fix the worker already
+  proved by experiment.** The r4 BLOCKED's own controlled experiment (move
+  the packet's widening retry to every krawczyk Err -> NotOne{count:2} in
+  7.82s with zero spend) was the entire design basis for the ~40-line
+  amendment; verify ACCEPTED with `amended_by` surfaced in VERDICT.json. The
+  worker's instrumentation is admissible evidence - when a BLOCKED arrives
+  with a controlled experiment in hand, consider amending before paying for
+  another dispatch.

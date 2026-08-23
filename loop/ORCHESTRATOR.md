@@ -342,3 +342,38 @@ nothing was watching.
 
 Commit messages carry the reasoning; STATE.md carries the conclusions. Both are
 load-bearing, because the next orchestrator may not be you.
+
+## Amendment dispatches and the worker inner loop (session 20)
+
+Four speed levers, all measured against the FID-008 chain (three amendment
+round trips, each paying a fresh-context re-entry for code the prior worker
+had already read, built and instrumented):
+
+- **`run_packet.py --resume` / `--session-id`** continues the prior worker's
+  opencode session (`opencode run -s`) for an AMENDMENT dispatch instead of
+  starting cold. The session id is recovered from the slot's `events.jsonl`
+  (every event line carries `sessionID`). New packets stay fresh-context by
+  design; only amendments resume. If the session is gone, dispatch fresh.
+- **`gen_context.py`** writes `CONTEXT.md` beside `PACKET.md` at dispatch:
+  a deterministic bundle of the allow-listed files' signatures, doc
+  first-lines, caller sites and test names, plus an amendment diffstat when
+  `--context-diff <range>` is given. It is regenerated from the tree every
+  dispatch (cannot go stale), is never committed, and `verify.py` ignores it
+  by name like `PACKET.md`. The worker is told to use it to skip the initial
+  search but read anything it edits.
+- **Worker checks are fast; the verifier is authoritative.** Packets scope
+  their done-when to the affected crate (`cargo check -p`, `cargo test -p
+  <crate> --lib <module>`) instead of workspace-wide runs; V2/V5/V8/V9
+  re-establish build, tests, downstream and geometry authoritatively. A
+  worker running `cargo check --workspace --all-targets` on every iteration
+  is impersonating the verifier at its own expense. Exception: packets whose
+  write set changes a signature other crates consume keep the workspace
+  check -- a ripple is cheaper to catch at worker time than a verify round
+  trip.
+- **`CARGO_INCREMENTAL=1`** for workers (reverses the old `= 0`). A packet
+  performs 5-15 edit-rebuild cycles; incremental is the difference between a
+  one-second and a minute-scale inner loop. The verifier's builds are its
+  own, and slot targets are reclaimed on re-fork.
+
+`selftest_dispatch.py` covers the spawn path including the new flags'
+plumbing; run it after touching any of this.
