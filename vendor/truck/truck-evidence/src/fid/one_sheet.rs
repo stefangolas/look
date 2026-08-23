@@ -25,6 +25,15 @@
 //! The reduction to a single fibre is licensed ONLY by conditions (i)-(iii)
 //! already holding on this component; the function takes no (i)-(iii) data and
 //! its contract states that precondition verbatim.
+//!
+//! # Resolution limit
+//!
+//! The certificate is resolution-honest: distinct roots separated by less than
+//! [`WIDTH_FLOOR`] in parameter are counted once, and a root whose distance to
+//! the disc boundary is below its floor-box image radius refuses as
+//! [`OneSheetError::SheetCountUnresolved`] rather than guessing a side. A
+//! certificate that states its own resolution is stricter than one that does
+//! not.
 
 #![deny(clippy::unwrap_used)]
 
@@ -80,17 +89,34 @@ pub enum OneSheetError {
 /// The normal disc `{ p : <p - x, u> == 0, |p - x| <= eps }` is intersected
 /// with the approximant by isolating the roots of the univariate equation
 /// `h(t) = <approx.subs(t) - x, u> == 0` over the whole approximant parameter
-/// span, with `|approx.subs(t) - x| <= eps` as the disc-membership gate.
+/// span, with the disc-membership gate decided by CONTAINMENT of a certified
+/// root's whole image box in the closed ball — never by the infimum
+/// box-to-point distance, which proves only that the box intersects the ball.
 ///
 /// Root isolation is the Krawczyk operator (BG-NUM-003) on the N=1 system
 /// `f(t) = h(t)` over a bisection worklist: interval `h` prunes boxes whose
 /// plane interval excludes 0; the disc test prunes boxes whose whole image
-/// lies beyond `eps`; a box that survives runs Krawczyk, whose `Unique` proof
-/// certifies one root in the box. Certified roots whose point-boxes OVERLAP
+/// lies beyond `eps` (the infimum distance > eps proves every point of the
+/// box is beyond the ball); a box that survives runs Krawczyk. A `Unique`
+/// proof certifies at least one root in the box with exactly one in SOME
+/// sub-box — never "exactly one in the box" — so it ALWAYS subdivides (there
+/// is no width shortcut): the unexamined remainder is enumerated, and the same
+/// root re-found from adjacent sub-boxes merges by the overlap dedupe below.
+/// The only stop is the width floor: a floor-width box (`width <= WIDTH_FLOOR`)
+/// with a `Unique` proof contributes exactly one root at floor resolution, and
+/// its disc membership is decided by CONTAINMENT of its whole image `B`:
+/// `sup_distance(B, x) <= eps` (every point of `B` in the closed ball) counts
+/// the root, `box_distance(B, x) > eps` (every point of `B` beyond the ball)
+/// excludes it, and a box whose image straddles the sphere refuses as
+/// `SheetCountUnresolved` — membership for a point on the sphere is not
+/// certifiable by interval arithmetic, and guessing a direction is exactly the
+/// false pass this module refuses. Certified roots whose point-boxes OVERLAP
 /// are the same geometric point and count ONCE (a closed curve hits the same
-/// point at `t*` and `t* + period`). Count > 1 exits early as `NotOne`;
-/// worklist drained with count != 1 is `NotOne` (0 included); exactly one
-/// in-disc intersection is `ExactlyOne`.
+/// point at `t*` and `t* + period`; the overlap merge is sound at the floor
+/// because two non-overlapping floor-box images certify points farther apart
+/// than the floor image radius). Count > 1 exits early as `NotOne`; worklist
+/// drained with count != 1 is `NotOne` (0 included); exactly one in-disc
+/// intersection is `ExactlyOne`.
 ///
 /// A tangential contact (an even-multiplicity touch of the plane inside the
 /// ball) never yields `Unique` and drains to `SheetCountUnresolved` — that is
@@ -155,7 +181,9 @@ pub fn fibre_degree_one(
         if !h.contains(0.0) {
             continue;
         }
-        // Step 2: prune when the whole box image lies beyond the disc.
+        // Step 2: prune when the whole box image lies beyond the disc: the
+        // INFIMUM distance > eps proves every point of the box is beyond the
+        // ball, sound as written.
         if box_distance(&image, &x_b) > eps {
             continue;
         }
@@ -163,21 +191,39 @@ pub fn fibre_degree_one(
         match krawczyk(&system, &[tt], budget) {
             Ok(cert) => match cert.value {
                 KrawczykProof::Unique => {
-                    if width <= DISC_DECIDE_WIDTH {
-                        // A narrow box around the root: the disc-membership
-                        // decision is trustworthy, and the box is resolved.
-                        let d = box_distance(&image, &x_b);
-                        if d <= eps && !in_disc.iter().any(|pb| boxes_overlap(pb, &image)) {
-                            count += 1;
-                            if count > 1 {
-                                return Ok(FibreMultiplicity::NotOne { count });
+                    if width <= WIDTH_FLOOR {
+                        // Terminal case: `tt` is at the resolution floor and
+                        // holds a certified root (exactly one in some sub-box
+                        // of `tt`, one root at floor resolution). Decide disc
+                        // membership by CONTAINMENT of the whole image.
+                        if sup_distance(&image, x) <= eps {
+                            // Every point of the image is in the closed ball,
+                            // so the certified root (in `B`, with `h == 0` on
+                            // the normal plane) is in the disc.
+                            if !in_disc.iter().any(|pb| boxes_overlap(pb, &image)) {
+                                count += 1;
+                                if count > 1 {
+                                    return Ok(FibreMultiplicity::NotOne { count });
+                                }
+                                in_disc.push(image);
                             }
-                            in_disc.push(image);
+                        } else if box_distance(&image, &x_b) > eps {
+                            // Every point of the image is beyond the ball: the
+                            // root is outside the disc and does not count.
+                        } else {
+                            // The image straddles the sphere (sup > eps AND
+                            // inf <= eps): closed-ball membership for a point
+                            // on the sphere is not certifiable by interval
+                            // arithmetic; guessing a direction is exactly the
+                            // false pass this module refuses.
+                            return Err(OneSheetError::SheetCountUnresolved);
                         }
                     } else {
-                        // The certified root lives in some sub-box of `tt`; the
-                        // box may hold more roots, so keep subdividing to find
-                        // them (the dedupe rule re-merges the same point).
+                        // `Unique` certifies a root in some sub-box of `tt`
+                        // with an unexamined remainder; subdivide
+                        // unconditionally so the whole box is enumerated (the
+                        // dedupe rule re-merges the same root re-found from
+                        // adjacent sub-boxes).
                         push_children(tt, &mut worklist, budget)?;
                     }
                 }
@@ -260,6 +306,17 @@ fn box_distance(a: &Box3, b: &Box3) -> f64 {
     (dx * dx + dy * dy + dz * dz).sqrt()
 }
 
+/// An upper bound on the point-set distance from a point `p` to every point of
+/// a box: per axis `(lo - c).abs().max((hi - c).abs())`, squared, summed,
+/// `sqrt` — the farthest corner of the box from `p`.
+fn sup_distance(a: &Box3, p: Point3) -> f64 {
+    let farthest = |lo: f64, hi: f64, c: f64| (lo - c).abs().max((hi - c).abs());
+    let dx = farthest(a.x.inf(), a.x.sup(), p.x);
+    let dy = farthest(a.y.inf(), a.y.sup(), p.y);
+    let dz = farthest(a.z.inf(), a.z.sup(), p.z);
+    (dx * dx + dy * dy + dz * dz).sqrt()
+}
+
 /// Shift a box by minus a point: `{ p - q : p in box }` for fixed `q`.
 fn box_minus_point(a: &Box3, p: Point3) -> Box3 {
     Box3 {
@@ -316,13 +373,6 @@ fn push_children(
 /// parameter units, not a model-space length.
 const WIDTH_FLOOR: f64 = 8.0 * f64::EPSILON; // H-3: width floor, 8 ulps of a unit-width parameter interval
 
-/// Parameter width below which a certified root's box is narrow enough that
-/// the disc-membership decision (`box_distance <= eps`) is a decision about
-/// the root itself: the box's image spans at most `R * DISC_DECIDE_WIDTH` in
-/// model space, far under the disc radius the witnesses use.
-/// H-3: a dimensionless width in parameter units, not a model-space length.
-const DISC_DECIDE_WIDTH: f64 = 1.0e-4; // H-3: root-box width for the disc decision, parameter units
-
 #[cfg(test)]
 mod tests {
     // GATE-1: the fid module (including its test module) stays under the
@@ -343,8 +393,14 @@ mod tests {
     /// Witness parameter, off every dyadic bisection midpoint and off the
     /// domain endpoints of `[0, 2π]`.
     const WITNESS_T: f64 = 0.7; // H-3: witness parameter in radians, dimensionless (an angle, not a length)
-    /// The single-sheet approximant's radius `R + eps`.
-    const SINGLE_SHEET_RADIUS: f64 = RADIUS + DISC_RADIUS; // H-3: single-sheet radius, a model-space length
+    /// The single-sheet approximant's radius `R + eps/2`: its crossing at
+    /// `t_x` sits at a decidably in-disc distance `eps/2 = 0.025` from the
+    /// witness point.
+    const SINGLE_SHEET_RADIUS: f64 = RADIUS + 0.5 * DISC_RADIUS; // H-3: single-sheet radius, a model-space length
+    /// The boundary approximant's radius `R + eps`: its crossing at `t_x` sits
+    /// exactly ON the disc sphere, the one distance interval arithmetic cannot
+    /// decide.
+    const BOUNDARY_RADIUS: f64 = RADIUS + DISC_RADIUS; // H-3: boundary radius, a model-space length
     /// The offset approximant's radius `R + 3*eps`, exceeding the disc radius.
     const OFFSET_RADIUS: f64 = RADIUS + 3.0 * DISC_RADIUS; // H-3: offset-sheet radius, a model-space length
     /// The tangential approximant's touch curvature constant.
@@ -748,10 +804,14 @@ mod tests {
 
     #[test]
     fn single_sheet_circle_certifies_degree_one() {
-        // X' = (R + eps) * e(t) over [0, 2π]: the plane crossings at
-        // WITNESS_T (in-disc, distance exactly eps) and WITNESS_T + π
-        // (~2R + eps out, excluded by the disc test) leave exactly one
-        // in-disc point, so the fibre is degree one.
+        // X' = (R + eps/2) * e(t) over [0, 2π]: the plane crossing at
+        // WITNESS_T sits at distance exactly eps/2 = 0.025 — decidably in-disc
+        // (the old witness R + eps put the crossing exactly ON the sphere, the
+        // one distance interval arithmetic cannot decide; see
+        // boundary_root_on_disc_edge_is_unresolved) — and the antipodal
+        // crossing at WITNESS_T + π (~2R + eps/2 out, excluded by the
+        // infimum-distance prune) leaves exactly one in-disc point, so the
+        // fibre is degree one.
         let exact = exact_circle();
         let approx = Circle {
             r: SINGLE_SHEET_RADIUS,
@@ -844,6 +904,30 @@ mod tests {
         assert!(
             matches!(out, Err(OneSheetError::SheetCountUnresolved)),
             "a tangential contact must refuse as SheetCountUnresolved, got {out:?}"
+        );
+    }
+
+    #[test]
+    fn boundary_root_on_disc_edge_is_unresolved() {
+        // The OLD test-1 witness, now asserting the strict behaviour: circle of
+        // radius R + eps over [0, 2π], crossing at WITNESS_T at distance
+        // exactly eps. Every box around the crossing has sup > eps AND
+        // inf <= eps at every width, so the run must drain to
+        // Err(SheetCountUnresolved) — NEVER Ok. This is the regression test
+        // for Defect A: an implementation that decides inclusion by the
+        // infimum distance (inf <= eps) returns Ok(ExactlyOne) here and fails
+        // this test.
+        let exact = exact_circle();
+        let approx = Circle {
+            r: BOUNDARY_RADIUS,
+            lo: 0.0,
+            hi: FULL_SPAN,
+        };
+        let mut budget = Budget::new(TEST_BUDGET_SUBDIV, 0, 0);
+        let out = fibre_degree_one(&exact, &approx, WITNESS_T, DISC_RADIUS, &mut budget);
+        assert!(
+            matches!(out, Err(OneSheetError::SheetCountUnresolved)),
+            "a root at distance exactly eps must refuse as SheetCountUnresolved, got {out:?}"
         );
     }
 
