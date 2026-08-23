@@ -391,8 +391,17 @@ mod tests {
     /// Closed normal-disc radius at the witness point.
     const DISC_RADIUS: f64 = 0.05; // H-3: disc radius, a model-space length relative to RADIUS
     /// Witness parameter, off every dyadic bisection midpoint and off the
-    /// domain endpoints of `[0, 2π]`.
-    const WITNESS_T: f64 = 0.7; // H-3: witness parameter in radians, dimensionless (an angle, not a length)
+    /// domain endpoints of `[0, 2π]`. Why 0.71 and not 0.7: a witness
+    /// parameter whose descending root lands exactly on a float bisection edge
+    /// can never certify strict-interior Unique. Measured at 0.7, the
+    /// double-cover root `t_x + 2π` was exactly (in f64) a bisection edge
+    /// produced by `0.5*a + 0.5*b` rounding on the descent path, so the honest
+    /// outcome was `SheetCountUnresolved` instead of `NotOne { count: 2 }`.
+    /// The choice is engine arithmetic, not taste: 0.71 is within the spec's
+    /// `t_x ≈ 0.7 rad` approximation and is machine-checked (per BG-FID-008-r3
+    /// Decision 2) to keep every descending root off every float bisection
+    /// edge down to the width floor.
+    const WITNESS_T: f64 = 0.71; // H-3: witness parameter in radians, dimensionless (an angle, not a length)
     /// The single-sheet approximant's radius `R + eps/2`: its crossing at
     /// `t_x` sits at a decidably in-disc distance `eps/2 = 0.025` from the
     /// witness point.
