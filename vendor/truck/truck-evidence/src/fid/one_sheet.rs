@@ -291,6 +291,64 @@ pub fn fibre_degree_one(
     }
 }
 
+/// fibre_degree_one with the witness chosen for you: a deterministic
+/// ladder of exact-span points (midpoint first), stopping at the first
+/// ladder point whose call RETURNS (Ok or a non-witness error).
+///
+/// @feeds-open-lemma FID-L-COVERING      # degree-one fibre evidence, per component
+/// @establishes certified fibre cardinality on ONE witnessed normal disc
+/// @does-not-establish
+///   isotopy | homeomorphism | side separation | whole-span one-sheet
+///
+/// Ladder (fractions of the exact span (lo, hi)): 1/2, 1/4, 3/4, 1/8, 7/8,
+/// 1/3, 2/3, 1/6, 5/6 — computed as lo + f*(hi - lo), no RNG, stable
+/// order. Retry on `SheetCountUnresolved` AND on `InvalidWitness` (a
+/// midpoint whose tangent enclosure contains zero — e.g. a cusp at
+/// midspan — is a bad WITNESS, not bad input; eps validity has already
+/// been checked by then). If every rung refuses: return
+/// `SheetCountUnresolved` if any rung produced it, else `InvalidWitness`.
+/// Every rung spends from the SAME budget — a caller wanting per-rung
+/// isolation pre-reserves.
+pub fn fibre_degree_one_auto(
+    exact: &impl EnclosureCurve,
+    approx: &impl EnclosureCurve,
+    eps: f64,
+    budget: &mut Budget,
+) -> Result<FibreMultiplicity, OneSheetError> {
+    let Some((lo, hi)) = exact.try_range_tuple() else {
+        return Err(OneSheetError::InvalidWitness);
+    };
+    if !(lo.is_finite() && hi.is_finite()) {
+        return Err(OneSheetError::InvalidWitness);
+    }
+    // H-3: dimensionless ladder fractions of the exact span, not lengths.
+    const LADDER: [f64; 9] = [
+        0.5,
+        0.25,
+        0.75,
+        0.125,
+        0.875,
+        1.0 / 3.0,
+        2.0 / 3.0,
+        1.0 / 6.0,
+        5.0 / 6.0,
+    ];
+    let mut saw_unresolved = false;
+    for f in LADDER {
+        let t = lo + f * (hi - lo);
+        match fibre_degree_one(exact, approx, t, eps, budget) {
+            Ok(multiplicity) => return Ok(multiplicity),
+            Err(OneSheetError::SheetCountUnresolved) => saw_unresolved = true,
+            Err(OneSheetError::InvalidWitness) => {}
+        }
+    }
+    if saw_unresolved {
+        Err(OneSheetError::SheetCountUnresolved)
+    } else {
+        Err(OneSheetError::InvalidWitness)
+    }
+}
+
 /// The Krawczyk system whose single unknown is the fibre parameter `t` and
 /// whose residual is `f(t) = h(t) = <approx.subs(t) - x, u>`, with the
 /// constant unit normal `u` (the witness tangent) held fixed.
@@ -1097,5 +1155,48 @@ mod tests {
         let mut budget = Budget::new(TEST_BUDGET_SUBDIV, 0, 0);
         let out = fibre_degree_one(&Cusp, &Cusp, 0.0, DISC_RADIUS, &mut budget);
         assert_eq!(out, Err(OneSheetError::InvalidWitness));
+    }
+
+    #[test]
+    fn auto_witness_certifies_single_sheet() {
+        // The ladder's midpoint (t = pi) is a good witness for the
+        // single-sheet circle: the crossing at the witness point sits at
+        // distance eps/2 from it, so the auto wrapper certifies ExactlyOne.
+        let exact = exact_circle();
+        let approx = Circle {
+            r: SINGLE_SHEET_RADIUS,
+            lo: 0.0,
+            hi: FULL_SPAN,
+        };
+        let mut budget = Budget::new(TEST_BUDGET_SUBDIV, 0, 0);
+        let out = must(fibre_degree_one_auto(
+            &exact,
+            &approx,
+            DISC_RADIUS,
+            &mut budget,
+        ));
+        assert_eq!(out, FibreMultiplicity::ExactlyOne);
+    }
+
+    #[test]
+    fn auto_witness_double_cover_not_one() {
+        // The landed double-cover fixture is 2-to-1 over its whole span: at
+        // every good ladder witness the disc meets the approximant exactly
+        // twice, so the auto wrapper must certify NotOne { count: 2 }.
+        let exact = exact_circle();
+        let approx = DoubleCover {
+            r: RADIUS,
+            eps: DISC_RADIUS,
+            lo: 0.0,
+            hi: DOUBLE_SPAN,
+        };
+        let mut budget = Budget::new(TEST_BUDGET_SUBDIV, 0, 0);
+        let out = must(fibre_degree_one_auto(
+            &exact,
+            &approx,
+            DISC_RADIUS,
+            &mut budget,
+        ));
+        assert_eq!(out, FibreMultiplicity::NotOne { count: 2 });
     }
 }
