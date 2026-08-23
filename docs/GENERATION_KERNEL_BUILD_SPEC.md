@@ -2208,6 +2208,59 @@ pairs and a spurious face to the DCEL while satisfying every metric bound in
 sight — so the isomorphism fails *silently* and the transferred labels are wrong
 on a cell that looks certified.
 
+**AMENDMENT (2026-08-23, scoping BG-FID-005's packet).** Six decisions from
+designing the packet, one of them a scope split:
+
+1. **Scope split: REP-CRV-001 is BG-FID-005; REP-SRF-001, the surface (iv-b)
+   discharge and the surface double-sheet negative test move once more, to
+   BG-FID-005-SRF.** The 2026-08-22 amendment moved them "to BG-FID-005";
+   landing the curve rep first is the schedulable increment — the 2D Krawczyk
+   operator is generic-`N` and landed, so what is deferred is the surface
+   emitter and the bivariate normal-bundle systems, which is packet-sized on
+   its own. The curve double-cover witness stays FID-008's.
+2. **The emitted approximant is piecewise cubic Hermite in Bezier form.** Per
+   cell `[a,b]` (h = b−a): `p0 = X(a)`, `p3 = X(b)`, `p1 = p0 + (h/3)·T(a)`,
+   `p2 = p3 − (h/3)·T(b)`, with positions/tangents taken as the midpoints of
+   the exact endpoint enclosures (deterministic). Enclosures are the Bernstein
+   hull property: position = hull of the four control points, derivative =
+   hull of the three difference points, padded outward by the house
+   `64·ε·(1+|coord|)` (the BG-ENC-003 padding precedent). Error is O(h⁴)
+   (machine-verified: max radial error on the R=2 circle 0.3365 / 0.4292 /
+   0.0304 / 0.00196 at depths 0-3 — note depth 1 is WORSE than depth 0, the
+   long-cell tangent overshoot).
+3. **(iv-b)'s curve form, derived once for the worker.** The emitter shares
+   the exact curve's parameter space, so D_j = I_j and the pairing is the
+   identity. Per cell, with `s(t)` the projected exact parameter defined by
+   `<φ(t) − X(s), X'(s)> = 0`:
+   `s'(t) = <φ'(t), X'(s)> / (<X'(s), X'(s)> − <φ(t)−X(s), X''(s)>)`.
+   Given (ii) and the tube gate, the NUMERATOR is sign-definite (|cos| > s > 0
+   already excludes zero) and the DENOMINATOR is positive (`m² − eps·K > 0`
+   rearranges to `eps < ρ`): (iv-b)'s independent content is the knot-
+   projection correspondence (each knot's projected parameter lies in the
+   shared closure of its two cells) and the non-adjacent separation
+   (`box_distance(H_j, E_k) > eps` for k non-adjacent to j, wrap-inclusive on
+   Closed) — assertions on boxes the partition already computed. The refine
+   arm exists for both; the radial-tube misreading of (a) (the note above)
+   remains the trap.
+4. **`ReachTooSmall` maps to certification failure, not to a small bound.**
+   A small-but-positive `tube_scale_lower` NEVER refuses: refinement drives
+   eps under it (an R=0.08 circle at τ=0.05 EMITS at target 0.04 — recorded so
+   nobody re-institutes an immediate `2τ ≥ tube → refuse`, which over-refuses
+   refinable geometry). The refusal fires when the components cannot be
+   certified at all — the collapsing-geometry route: a corner's tangent
+   enclosure contains both branch directions at every refinement,
+   `curvature_radius_lower_span` returns its epistemic refusal, and rep
+   routes to §5 collapse via `UnsupportedEnvelope(ReachTooSmall)`.
+5. **Reuse, made concrete:** the cell/BVH/pairing machinery BG-FID-003 lands
+   is exposed `pub(crate)` and rep measures (eps, theta) with it — no
+   duplicated pairing code, honouring "no new subdivision structure".
+6. **`σ_cl` is not gated in v1**: standalone rep has no arrangement context;
+   BG-FID-006's consumer adds `ε < σ_cl/3` where it exists. Errors follow the
+   fid/ house pattern (typed local enum with an `into_refusal()` conversion to
+   the landed §4 `Refusal`, whose `EnvelopeCase::ReachTooSmall` arm is
+   documented for exactly this packet); `Refusal` itself has no invalid-input
+   arm and must not be stretched.
+
 **Tests.**
 - Property: for random analytic curves, `rep` output satisfies BG-FID-003 —
   all four conditions — at the certificate's declared `(ε, θ)`.
