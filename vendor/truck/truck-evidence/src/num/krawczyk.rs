@@ -44,10 +44,11 @@
 //! prunes (`K ∩ Q = ∅` on any axis → no root in this box), or bisects the
 //! widest axis (ties toward the lowest index, deterministically), spending one
 //! subdivision per bisection. The two terminal states: the worklist empties
-//! without certification → [`KrawczykProof::NoRoot`]; a bisection cannot spend
-//! or the box is a degenerate point → `Refusal::NumericallyUnresolved`
-//! carrying spend. Over-estimation never occurs silently: every non-proof exit
-//! is a typed [`Refusal`] carrying spend.
+//! without certification → [`KrawczykProof::NoRoot`]; a bisection cannot spend,
+//! the box is a degenerate point, or the widest axis cannot be bisected in f64
+//! (the midpoint rounds onto one of the box's own edges — it is at resolution)
+//! → `Refusal::NumericallyUnresolved` carrying spend. Over-estimation never
+//! occurs silently: every non-proof exit is a typed [`Refusal`] carrying spend.
 
 use std::array;
 
@@ -203,14 +204,30 @@ fn push_children<const N: usize>(
 ) -> Result<(), Refusal> {
     let mut axis = 0usize;
     let mut width = f64::NEG_INFINITY;
+    let mut a = 0.0;
+    let mut b = 0.0;
     for (i, c) in q.iter().enumerate() {
         let w = c.sup() - c.inf();
         if w.total_cmp(&width).is_gt() || (w.total_cmp(&width).is_eq() && i < axis) {
             axis = i;
             width = w;
+            (a, b) = (c.inf(), c.sup());
         }
     }
     if width == 0.0 {
+        return Err(Refusal::NumericallyUnresolved {
+            spent: spent(initial, budget),
+            witness: UnresolvedWitness::KrawczykIndeterminate,
+        });
+    }
+    // Split the widest axis at its midpoint as a convex combination, so the
+    // halves hull back to the original box even where `0.5·(inf + sup)` would
+    // overflow. A midpoint that rounds onto one of the axis's own edges means
+    // the widest axis cannot be bisected in f64: the box is at resolution, so
+    // refuse immediately — before spending — instead of pushing a zero-width
+    // child plus the parent and looping until the budget is exhausted.
+    let mid = 0.5 * a + 0.5 * b;
+    if mid == a || mid == b {
         return Err(Refusal::NumericallyUnresolved {
             spent: spent(initial, budget),
             witness: UnresolvedWitness::KrawczykIndeterminate,
@@ -222,14 +239,10 @@ fn push_children<const N: usize>(
             spent: spent(initial, budget),
             witness: UnresolvedWitness::KrawczykIndeterminate,
         })?;
-    // Split at the axis midpoint as a convex combination, so the halves hull
-    // back to the original box even where `0.5·(inf + sup)` would overflow.
     let mut lo = *q;
     let mut hi = *q;
     for (i, (l, h)) in lo.iter_mut().zip(hi.iter_mut()).enumerate() {
         if i == axis {
-            let (a, b) = (l.inf(), l.sup());
-            let mid = 0.5 * a + 0.5 * b;
             *l = Interval::try_from((a, mid)).unwrap_or(*l);
             *h = Interval::try_from((mid, b)).unwrap_or(*h);
         }
@@ -337,6 +350,16 @@ mod tests {
         Interval::try_from((lo, hi)).unwrap()
     }
 
+    /// `L`: the nonzero root of the witness `x·(x − L)` (`Quad(1.0, -L, 0.0)`).
+    /// H-3: a unit-magnitude root location in parameter units, not a
+    /// model-space length.
+    const ROOT_L: f64 = 1.0; // H-3: root L of Quad(1.0, -L, 0.0)
+
+    /// `w`: the half-width of the centered root box `[L − w, L + w]`, and the
+    /// right-edge offset of the left-edge box `[L, L + w]`.
+    /// H-3: a dimensionless parameter-unit offset, not a model-space length.
+    const ROOT_BOX_HALF_WIDTH: f64 = 4.0 * f64::EPSILON; // H-3: half-width w around the root
+
     #[test]
     fn transverse_quadratic_certifies_unique_one_shot() {
         let system = Quad(1.0, 0.0, -2.0);
@@ -413,5 +436,43 @@ mod tests {
         let mut budget = Budget::new(4, 0, 0);
         let err = krawczyk(&system, &start, &mut budget).unwrap_err();
         assert!(matches!(err, Refusal::Empty));
+    }
+
+    #[test]
+    fn unsplittable_box_refuses_without_burning_budget() {
+        // x·(x − L): the root sits exactly on the start box's left edge, so
+        // strict interior can never hold and the descent reaches a box of width
+        // ~1 ulp whose float midpoint rounds onto an edge. The widest axis
+        // cannot be bisected in f64, so push_children must refuse immediately
+        // instead of re-pushing the parent until the budget is exhausted.
+        let system = Quad(1.0, -ROOT_L, 0.0);
+        let start = [iv(ROOT_L, ROOT_L + ROOT_BOX_HALF_WIDTH)];
+        let mut budget = Budget::new(1024, 0, 0);
+        let err = krawczyk(&system, &start, &mut budget).unwrap_err();
+        assert!(matches!(
+            err,
+            Refusal::NumericallyUnresolved {
+                spent,
+                witness: UnresolvedWitness::KrawczykIndeterminate,
+            } if spent.subdiv < 16
+        ));
+        // The spend was refused, not consumed: the caller's shared budget keeps
+        // nearly everything for its other work.
+        assert!(budget.subdiv > 1000);
+    }
+
+    #[test]
+    fn centered_root_box_still_certifies() {
+        // Same witness, but the root is strictly interior to `[L − w, L + w]`:
+        // the operator certifies Unique one-shot with zero spend.
+        let system = Quad(1.0, -ROOT_L, 0.0);
+        let start = [iv(
+            ROOT_L - ROOT_BOX_HALF_WIDTH,
+            ROOT_L + ROOT_BOX_HALF_WIDTH,
+        )];
+        let mut budget = Budget::new(1024, 0, 0);
+        let out = krawczyk(&system, &start, &mut budget).unwrap();
+        assert_eq!(out.value, KrawczykProof::Unique);
+        assert_eq!(budget.subdiv, 1024);
     }
 }
