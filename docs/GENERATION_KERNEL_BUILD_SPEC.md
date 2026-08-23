@@ -2043,6 +2043,61 @@ current fillet check (the `is_far` closure in `approx_rolling_ball_fillet`)
 tests (i) at three sample points
 and never tests (ii) at all; that is exactly the shape of the bug.
 
+**AMENDMENT (2026-08-23, scoping BG-FID-003's packet after orchestrator review
+killed attempt 1 pre-commit).** Five decisions, each fixing a defect the first
+packet carried into dispatch:
+
+1. **`rho_lower` is composed, never curvature-only.** The §6.2 signature takes
+   `rho_lower` as a certified INPUT; a curvature radius lower bound alone does
+   not bound reach (`reach = min(1/κ_max, ½·bottleneck)`; a hairpin with a
+   gentle far-away turnaround has curvature radius ~10 and reach ~gap/2 —
+   curvature-only composition ADMITS it, the exact silent wrong answer this
+   stratified design exists to prevent). The curve-layer type is
+   `CurveScaleComponents { curvature_radius_lower, self_separation_lower }`,
+   named under the BG-FID-001 amendment's rules: no field, fn or type may claim
+   tube/reach/lfs semantics; promotion to a reach statement is L-FEDERER-PATCH
+   (open). `self_separation_lower` is the certified minimum of
+   `box_distance(X(I), X(J))` over cell pairs at certified PARAMETER gap ≥ G
+   (G an input; +∞ when no pair qualifies, the empty-set identity). The
+   Federer-motivation composition ships as
+   `tube_scale_lower() = min(curvature_radius_lower, ½·self_separation_lower)`
+   — the ½ is the motivation shape, NOT a proved reach equality. Gates use the
+   inequality form (BG-FID-007: substituting lower bounds is conservative).
+   `ReachLowerBoundTooSmall` fires when `2·eps >= tube_scale_lower()` and
+   keeps its epistemic reading (line above).
+2. **(ii) is an angle between tangent SPACES — unoriented.** The executable
+   form uses the absolute dot product: pass when
+   `abs_lower(dot_box(D',D)) / (‖D'‖sup·‖D‖sup) > s`, violate when
+   `abs_upper(dot_box(D',D)) / (‖D'‖inf·‖D‖inf) <= s`, with
+   `abs_lower(I) = 0 if 0 ∈ I else min(|lo|,|hi|)`,
+   `abs_upper(I) = max(|lo|,|hi|)`, `s = eps/tube_scale_lower()`. A signed-dot
+   form tests ORIENTED tangents and fails the same pair reversed; a
+   reversed-parameterization witness must pass identically (required test).
+3. **(iii) takes the boundary kind as explicit input.** `EnclosureCurve`
+   carries no topology; `CurveBoundary::{Closed, Open}` is supplied per curve
+   by the caller, who vouches for it (the carrier owns topology). Mixed kinds
+   are a `BoundaryMismatch` (a closed exact with an open approx at sub-eps
+   seam gap is circle-vs-interval — NOT isotopic — and no purely geometric
+   endpoint check can catch it). For both-Closed, each curve's own endpoint
+   enclosures must be within `2·eps` (a consistency gate on the carrier's
+   claim, never a closedness certificate — documented as such).
+4. **(iv-a)'s annotation must say what one witness establishes.** The module
+   establishes conditions (i)-(iii) plus (iv-a) on ONE witnessed disc; the
+   promotion of the single witness to whole-span (iv) is L-COVERING's
+   consequence of (i)-(iii) (the dependency the iv-a note at "Two sanctioned
+   discharges" already states) and MUST NOT appear in `@establishes`.
+5. **Distances and search.** Cell pairing uses BOX-BOX distances:
+   per coordinate the sup-distance term is `max(|a_lo−b_hi|, |a_hi−b_lo|)`
+   and the inf-distance term is `max(0, a_lo−b_hi, b_lo−a_hi)`; the landed
+   `one_sheet::sup_distance` is box-to-POINT and is never to be copied for
+   box operands. Partner search and separation minimisation run over a
+   pruned structure (BVH or paired worklist with bounding-box pruning);
+   O(N·M) whole-array scans are a review reject at the witnessed cell counts
+   (the ω=4000 sinusoid refines to ~1.6e4 cells). (ii) consumes exactly the
+   pairs (i) certified. Witness selection for the fibre check is
+   one_sheet-internal (`fibre_degree_one_auto`): callers never choose `t_x`
+   and carry no bisection-edge folklore.
+
 **BG-FID-004.** The bound is over the **whole span** by interval evaluation,
 never by point sampling. Sampling passes on precisely the inputs that matter.
 
