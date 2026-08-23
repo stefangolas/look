@@ -792,7 +792,7 @@ def main():
     # allowed to fix.
     def _ignorable_untracked(rel_path):
         name = Path(rel_path).name
-        if name in ('PACKET.md', 'RESULT.json', 'QUESTION.md'):
+        if name in ('PACKET.md', 'CONTEXT.md', 'RESULT.json', 'QUESTION.md'):
             return True
         if rel_path.endswith('.obj'):
             return True

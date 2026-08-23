@@ -179,6 +179,31 @@ def check_unscaled_legacy_budget(packet_path, wt):
           f"<= ceiling {ceiling}, read from the slot's HEAD.")
 
 
+def first_session_id(events_log):
+    """The sessionID of the run that wrote this events log (first event line).
+
+    opencode's JSON event stream carries `sessionID` on every line; the first
+    one names the session the whole run lived in, which `--resume` hands back
+    to `opencode run -s` so an amendment continues the worker that already
+    knows the code."""
+    try:
+        with events_log.open(encoding='utf-8', errors='replace') as f:
+            for line in f:
+                if not line.strip():
+                    continue
+                try:
+                    import json
+                    r = json.loads(line)
+                except ValueError:
+                    continue
+                sid = r.get('sessionID')
+                if sid:
+                    return str(sid)
+    except OSError:
+        pass
+    return None
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument('--slot', type=int, required=True)
@@ -187,6 +212,16 @@ def main():
     ap.add_argument('--stall-minutes', type=int, default=12)  # unused here; slot_status.py owns the stall check
     ap.add_argument('--reset', action='store_true')
     ap.add_argument('--dry-run', action='store_true')
+    ap.add_argument('--resume', action='store_true',
+                    help="resume the slot's previous worker session (opencode "
+                         "-s) instead of a fresh context -- the amendment "
+                         "path: the prior worker already knows the code, the "
+                         "packet and its own prior findings")
+    ap.add_argument('--session-id',
+                    help='explicit session id to resume (overrides --resume)')
+    ap.add_argument('--context-diff',
+                    help='git range (e.g. fc8925f..HEAD) whose log/diffstat '
+                         'CONTEXT.md should carry for an amendment dispatch')
     args = ap.parse_args()
 
     slot_root = REPO_ROOT / 'loop' / 'slots' / str(args.slot)
@@ -256,10 +291,42 @@ def main():
     # build spec (S3a).
     packet_copy = wt / 'PACKET.md'
     shutil.copyfile(packet_path, packet_copy)
-    packet_text = ("Read the file PACKET.md in the root of this repository and carry out the "
-                    "work packet it describes, exactly and completely. It is self-contained: do "
-                    "not read any other specification file. Follow its stop conditions, and "
-                    "finish by writing RESULT.json as it instructs.")
+
+    # CONTEXT.md: a deterministic bundle of the allow-listed files'
+    # signatures, callers and tests, generated from THIS tree at dispatch
+    # time (session 20). It cannot go stale because it is never committed;
+    # verify.py ignores it by name like PACKET.md. Failures to generate are
+    # non-fatal -- a dispatch without a bundle beats no dispatch.
+    try:
+        import gen_context
+        ctx = gen_context.generate(packet_path, wt, args.context_diff)
+        print(f"context bundle: {ctx.name} written ({len(ctx.read_text(encoding='utf-8').splitlines())} lines)")
+    except Exception as exc:  # noqa: BLE001 - deliberately best-effort
+        print(f"context bundle skipped: {exc}")
+
+    resume_session = None
+    if args.session_id:
+        resume_session = args.session_id.strip()
+    elif args.resume:
+        resume_session = first_session_id(events_log)
+        if not resume_session:
+            sys.exit('--resume: no sessionID in this slot\'s events.jsonl (the '
+                     'previous run never emitted an event, or the log was '
+                     'rotated away). Dispatch without --resume, or pass '
+                     '--session-id explicitly.')
+
+    lead = ("You are continuing your previous session in this repository; your "
+            "earlier work is committed on this branch and the packet amends "
+            "it. " if resume_session else "")
+    packet_text = (lead +
+                   "Read the files PACKET.md and CONTEXT.md in the root of this "
+                   "repository and carry out the work packet PACKET.md describes, "
+                   "exactly and completely. PACKET.md is self-contained: do not "
+                   "read any other specification file. CONTEXT.md is a "
+                   "machine-generated index of relevant signatures, callers and "
+                   "tests -- use it to skip the initial search, but read any file "
+                   "you actually edit. Follow the packet's stop conditions, and "
+                   "finish by writing RESULT.json as it instructs.")
 
     if args.dry_run:
         print("DRY RUN -- would execute:")
@@ -268,10 +335,15 @@ def main():
         print(f"  event stream teed to: {events_log}")
         sys.exit(0)
 
-    # CARGO_INCREMENTAL=0 / CARGO_TARGET_DIR so any cargo invocations the
-    # worker makes land in this slot's sticky target dir, per S7 rule 1/2.
+    # CARGO_TARGET_DIR keeps every cargo invocation in this slot's sticky
+    # target dir (S7 rule 1). CARGO_INCREMENTAL is deliberately ON for the
+    # worker (session 20, reversing the earlier `= 0`): a packet performs
+    # 5-15 edit-rebuild cycles and incremental compilation is the difference
+    # between a one-second and a minute-scale inner loop. The verifier does
+    # its own authoritative builds in separate baselines, a slot's target is
+    # reclaimed on re-fork anyway, and the watchdog only touches idle slots.
     env = dict(os.environ)
-    env['CARGO_INCREMENTAL'] = '0'
+    env['CARGO_INCREMENTAL'] = '1'
     env['CARGO_TARGET_DIR'] = str(target_dir)
 
     print(f"Running packet '{args.packet}' in slot {args.slot} (model={args.model})...")
@@ -300,12 +372,18 @@ def main():
     # killed it took the worker with it mid-run. The orchestrator polls
     # slot_status.py instead -- short calls, no parent to lose -- and that is
     # also where the stall check lives now.
-    worker_pid = spawn_detached(
-        [launcher, 'run', '--dir', str(wt), '-m', args.model, '--format', 'json', '--auto', packet_text],
-        events_log, err_log, env, slot_root)
+    worker_argv = [launcher, 'run', '--dir', str(wt), '-m', args.model,
+                   '--format', 'json', '--auto']
+    if resume_session:
+        worker_argv += ['-s', resume_session]
+    worker_argv.append(packet_text)
+    worker_pid = spawn_detached(worker_argv, events_log, err_log, env, slot_root)
 
     (slot_root / 'worker.pid').write_text(str(worker_pid), encoding='ascii')
     (slot_root / 'worker.packet').write_text(args.packet, encoding='ascii')
+    if resume_session:
+        (slot_root / 'worker.session').write_text(resume_session, encoding='ascii')
+        print(f'resuming worker session {resume_session}')
     # Records which branch this dispatch actually landed on -- new_slot.py
     # decides that, not this script, so this is a read of the worktree's
     # current branch rather than a value this script chose. Without it, the
