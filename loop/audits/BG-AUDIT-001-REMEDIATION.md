@@ -9,10 +9,10 @@ State vocabulary: `PENDING` `RUNNING` `WORKER_DONE` `VERIFIED` `LANDED`
 
 | finding | fix packet | state | worker commit | verifier | landed commit | regression |
 |---|---|---|---|---|---|---|
-| AUD-001 | BG-AUD-FIX-001 | PENDING | | | | |
-| AUD-016 | BG-AUD-FIX-001 | PENDING | | | | |
-| AUD-002 | BG-AUD-FIX-002 | PENDING | | | | |
-| AUD-003 | BG-AUD-FIX-003 | PENDING | | | | |
+| AUD-001 | BG-AUD-FIX-001 | RUNNING | | | | |
+| AUD-016 | BG-AUD-FIX-001 | RUNNING | | | | |
+| AUD-002 | BG-AUD-FIX-002 | RUNNING | | | | |
+| AUD-003 | BG-AUD-FIX-003 | RUNNING | | | | |
 | AUD-004 | BG-AUD-FIX-004 | PENDING | | | | |
 | AUD-007 | BG-AUD-FIX-005 | PENDING | | | | |
 | AUD-005 | BG-AUD-FIX-006 | PENDING | | | | |
