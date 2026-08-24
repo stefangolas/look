@@ -11,93 +11,139 @@ otherwise would eventually cost a trap.) If you are picking this up cold, read
 [`loop/ORCHESTRATOR.md`](ORCHESTRATOR.md) for how to run the loop, then
 `python loop/slot_status.py`** - nothing else. Do not read `LEDGER.jsonl` whole.
 
-Updated 2026-08-24, close of session 23. Branch: `integration/kernel-bg`.
+Updated 2026-08-24, close of session 24 (BG-AUDIT-001 remediation). Branch: `integration/kernel-bg`.
 
 ## Where we are
 
-**Seventy-five packets DONE of 76. BG-INV-107 landed FIRST-TRY** (verified
-ACCEPTED at `8b0cde3`, merged `f129536`, filed `b4697d8`): the BG-TOL-003
-sidecar store (`tolerance_store.rs`, 221 lines) and the monotonicity checker
-(`invariants/tolerance_monotonicity.rs`, 225 lines), 9 tests + 1 doctest,
-all gates PASS including V8's 984 downstream tests and V9's 39 geometry
-tests. **The only open row is BG-ENC-004-OFFSET (TODO, design, no packet
-yet)** — its owner-decision amendment records the architecture; the packet
-waits for scratch validation against real carriers. The watchdog is RUNNING
-(pid 40852, `LOOK_WATCHDOG_STAGNANT=3600`).
+**BG-AUDIT-001 remediation: 13/17 findings LANDED, 1 OWNER-BLOCKED, 3
+PENDING - the campaign is paused mid-way on API balance, not on code.** The
+whole-tree correctness audit (`loop/audits/BG-AUDIT-001.md/.json`, 17
+findings) was remediated via 11 write-disjoint repair packets
+(`loop/packets/BG-AUD-FIX-001..011.md`, registry rows in
+`loop/PACKETS.jsonl`, tracker `loop/audits/BG-AUDIT-001-REMEDIATION.md`).
 
-Session 23 in three lines: the owner decided both BLOCKED-row quandaries —
-per-entity tolerance is sidecar state (`EntityToleranceStore` keyed by
-`EntityId`, raise-only, `None`-not-zero) and the offset enclosure is
-composition over a new `EnclosureVectorField` (never `N: EnclosureSurface`)
-— and both amendments landed in the spec at `ce993fb` with the registry
-flipped through python; the INV-107 packet was written with its 24-scenario
-table machine-checked (`scratch/inv107_check.py`) and its serde design
-validated against the real `EntityId` (`scratch/inv107serde` — which found
-the pairs-sequence requirement); the worker landed it in ~15 min with one
-worker-right disagreement (the packet's `raise` sketch returned `Ok(())`,
-which cannot compile against `Outcome<()> = Result<Certified<()>, Refusal>`
-— the worker completed it with the house certificate and an empty PropMap,
-correctly reasoning that a mutation does not certify the invariant) and one
-deviation (a public `iter()` accessor the store needs for the checker — a
-packet omission, minimal fix). Verify: ~11 min detached; the first
-foreground attempt was killed by the tool timeout (the known trap, walked
-into anyway) and the detached relaunch pattern worked exactly as recorded.
+Landed (8 packets, 13 findings): FIX-001 (`1844cfe`: AUD-001+016),
+FIX-002 (`d734d2a`: AUD-002), FIX-003 (`70d98bb`: AUD-003),
+FIX-005 (`f98d441`: AUD-007), FIX-006 (`2bc77ee`: AUD-005+009),
+FIX-007 (`b452237`: AUD-006), FIX-009 (`4b071ac`: AUD-011+012),
+FIX-010 (`f1ed436`: AUD-010+013+017). Every verify ACCEPTED (each packet's
+fork point as `--base`). GATE-4 ceiling moved 110 -> 111 (FIX-010's sphere
+guard legitimately adds one `unscaled_legacy()` call; it sits at its true
+measured count). The truck-topology same_parameter suite was re-run green
+5/5 after FIX-002 landed (the audit's expected-consequence check - no
+same-parameter input actually changed).
+
+Owner-blocked (1): **AUD-004 (FIX-004)** - Phase A found NO real failing
+witness in the real crate: `certify_cell` builds Q as the widened hull of
+the endpoint seeds, so a cell certifies only when the parameter path is
+monotone in every surface parameter; non-monotone paths always refuse
+(764+ escaping cells across three real carrier families, 0 certified). The
+packet's explicit Phase-A-fails branch was followed - no forced center-term
+rewrite. Evidence: `loop/results/BG-AUD-FIX-004.json`. Owner accepts the
+invariant argument.
+
+PENDING (2 packets, 3 findings): **FIX-008** (AUD-008+015) and **FIX-011**
+(AUD-014). Both are written, validated, and registered. FIX-008's first
+worker died of API Insufficient Balance with NO work committed; the slot was
+reset clean. FIX-011 was never dispatched. **Do not dispatch either until API
+balance is restored** (see traps: a 402 kills the worker silently).
 
 ## Pick up here
 
-1. **Write BG-ENC-004-OFFSET's scratch, then its packet, then dispatch it.**
-   All three slots are idle with stale files or cleaned — re-fork with
-   `new_slot.py` before any dispatch. The amendment in the BG-ENC-004 spec
-   section is the complete design: `EnclosureVectorField` +
-   `EnclosureScalarField2` in enclosure.rs, `impl EnclosureSurface for
-   Offset<S, N>` bounded `S: ParametricSurface3D + EnclosureSurface,
-   N: EnclosureVectorField`, box-sum composition per method (mirroring
-   `Offset`'s own arithmetic), `NormalField<S, F>` implements the vector
-   trait (cross box / immersion bound / quotient rule for derivatives;
-   `impl EnclosureScalarField2 for f64` covers constant distance),
-   unit-ball fallback for the unit normal's position, `ENTIRE` for its
-   derivatives at a singular locus, cone `None` per family rule. The scratch
-   must RUN the flagship witnesses: Plane + constant d (flat), Sphere +
-   constant d (curved — the real quotient-rule path), and an inward-offset
-   cylinder past its radius (self-intersection → cross box straddles zero →
-   `normal_cone` None), with sampling soundness on the composition. Copy the
-   BG-INV-107 packet's shape (`loop/packets/BG-INV-107.md` is the freshest
-   worked example).
-2. **When it lands, the registry is FINISHED — 76/76.** What remains after
-   that is new spec items, Stage B threading (BG-TOL-004's 23 squared-order
-   sites are named in the spec but unwritten), and the open questions in
-   this file's "Open questions" section. The loop's charter — implement
-   decided spec — has no more decided-but-unimplemented items after
-   ENC-004-OFFSET.
-3. If the machine may sleep at any point, STOP the watchdog first (pid in
-   `loop/watchdog.lock`) and restart it with the cmd /c pattern on resume.
+1. **Restore API balance, then re-dispatch FIX-008** (fresh -
+   `new_slot.py --slot 1 --branch packet/BG-AUD-FIX-008`, then
+   `run_packet.py`) and **dispatch FIX-011** (`new_slot.py --slot 2 --branch
+   packet/BG-AUD-FIX-011`). Both are write-disjoint and validated
+   (`gen_packet.check` green). FIX-008: `is_simple` rejects edge-id reuse,
+   the Closed gate requires no per-face edge reuse, `vertex_link` requires
+   the closed precondition (the open-shell limitation tests update
+   accordingly). FIX-011: no-pcurve makes `SameParameter` stay `Unknown`
+   (not-applicable), never certified; `pre_cut`'s pcurve-drop is a decided
+   spec contract, untouched.
+2. **Verify at each packet's fork point** (`git -C loop/slots/N/wt
+   merge-base HEAD integration/kernel-bg`), land with `land_packet.py`,
+   update `BG-AUDIT-001-REMEDIATION.md`.
+3. **When all 17 are closed**, run the end-state validation (full verifier
+   suites + ALL retained audit regression witnesses + `slot_status.py` +
+   scheduler census + no live fix/verify processes), then rewrite STATE.md
+   LAST and compare against reality. Final summary format: findings total 17;
+   fixed+landed N; already fixed N; owner blocked N; every finding listed
+   exactly once.
+4. **Then resume the base loop's one open row: BG-ENC-004-OFFSET** (the only
+   non-DONE row of the original 76; design packet still unwritten - its
+   amendment is the complete design, scratch must run the three flagship
+   witnesses first). After it lands, the registry is FINISHED 76/76.
+5. Restart the watchdog on resume (`cmd /c "set LOOK_WATCHDOG_STAGNANT=3600&
+   python loop/watchdog.py"` - it is STOPPED at this handoff).
 
 ## State of the machine, as left
 
-- **Watchdog RUNNING** (pid 40852, launched 2026-08-24 11:43 with
-  `LOOK_WATCHDOG_STAGNANT=3600` via the cmd /c pattern). Its disk guard
-  behaved exactly as designed during the verify: it held off while the live
-  verify (pid-tracked) ran at 5.9 GB free, then reclaimed the leaked
-  baseline (2.0 GB) and slot 0's finished target (9.6 GB) after the verdict.
-- Registry: **75 DONE / 1 TODO (76 rows)**. HEAD at close: `b4697d8`.
-  Tracked tree clean. GATE-4 ceiling 110 -> 110 (INV-107 touches no
-  tolerance sites).
-- Slot 0: landed; worker.pid/packet/branch deleted, but the worktree still
-  holds the worker's (uncommitted, already-filed) RESULT.json copy — the
-  same stale state as slots 1/2, all three re-fork with new_slot.py before
-  dispatch. The watchdog leaves it alone: the row reads DONE.
-- Disk 15.4 GB free at close. loop/results/ gained BG-INV-107.json (the
-  worker's disagreement and deviation verbatim).
-- Speed datapoint: worker wall ~15 min, verify ~11 min detached — the
-  smallest design packet so far, consistent with "every judgement
-  pre-made" being the leverage.
+- **Watchdog STOPPED** at handoff (it was pid 40852; `loop/watchdog.lock`
+  deleted). The campaign paused with API balance exhausted; nothing should
+  dispatch until balance returns. Restart with the cmd /c pattern on resume.
+- Registry: 76 original rows + 11 AUD-FIX rows = 87. AUD-FIX statuses:
+  8 DONE (landed), 1 BLOCKED (FIX-004 owner), 2 TODO (FIX-008, FIX-011).
+  HEAD at close: `90105a5`. Tracked tree clean.
+- Slots 0/1/2 all idle/cleaned (worker + verify files removed); each worktree
+  holds a stale RESULT.json copy on a landed branch (harmless; re-fork with
+  `new_slot.py` before dispatch). Slot 1 sits on `packet/BG-AUD-FIX-008` at
+  base (=base, no work) ready to re-fork.
+- Disk 10.2 GB free at close (cleaned ~8.5 GB of `%TEMP%/proc-macro-srv*`
+  and the 8 GB idle repo-root `target/`).
+- GATE-4 ceiling 111 (true count). Landed 8 AUD-FIX packets; ledger and
+  `loop/results/` filed for all of them (plus the FIX-005 SPEC_GAP archive
+  `loop/results/BG-AUD-FIX-005-specgap-1.json` and FIX-004's owner record).
 
 ## The parallelism picture
 
-None running. BG-ENC-004-OFFSET is the only dispatchable row once its
-packet exists; nothing else is eligible.
-
+None running (watchdog stopped, no workers, no verifies). Dispatchable once
+balance returns: FIX-008 and FIX-011 (write-disjoint; the only other row is
+BG-ENC-004-OFFSET, which needs its packet written first).
 ## Traps, each one paid for
+### Session 24 (BG-AUDIT-001 remediation) - paid in full
+
+- **API balance deaths are silent and can land POST-COMMIT, and this session
+  they were the norm, not the exception.** Both workers that died showed
+  `APIError: Insufficient Balance` (402, non-retryable) only in the
+  `events.jsonl` tail - no error reaches the slot status. FIX-009's worker
+  committed the COMPLETE fix and ran all its Done-when gates (fmt/clippy/
+  tests/check/kernel-gates green, verified from the transcript) before dying
+  at the RESULT.json step; FIX-008's worker died before committing anything.
+  **Read the slot branch for commits BEFORE redispatching** - a committed fix
+  is proof the work is done and only the RESULT.json/verify/land remain.
+  Reconstruct a missing RESULT.json as an orchestrator record with
+  `amended_by: orchestrator` and the verbatim evidence from the transcript;
+  never from memory.
+- **`verify --base` is each packet's FORK POINT, read off the slot
+  (`git -C loop/slots/N/wt merge-base HEAD integration/kernel-bg`).** Two
+  mistakes: FIX-002's verify ran in a slot pointing at the WRONG branch
+  (V1 SCOPE_VIOLATION on files a different packet had touched) and a FIX-006
+  diff was measured against a non-ancestor commit, showing foreign changes
+  that were my wrong base. Same-base verifies must be sequential; one
+  concurrent run BLOCKED via leaked-baseline interference and relaunched
+  clean alone.
+- **inari 2.0.0 has no `Interval::asin`** (it is compiled only under the
+  `gmp` feature, which is off and not viable on this toolchain) **and no
+  `Interval * f64` / `Interval / f64`** (only `Interval * Interval`).
+  FIX-005's wedge-slope lower bound landed the series hybrid
+  (`s/2 + s^3/16 + 7 s^5/256`, all coefficients positive, scalars wrapped as
+  degenerate intervals, `.inf()`). The s^5 coefficient is 7/256 - a packet
+  that said 5/512 was machine-checked wrong.
+- **A fix that ADDS an `unscaled_legacy()` call must have
+  `scripts/unscaled_legacy_ceiling.txt` in the packet's `write_allow`.**
+  FIX-010's sphere guard raised the GATE-4 ceiling 110->111; the worker did it
+  correctly and documented it, but V1 would have rejected the ceiling file as
+  out of scope until the packet was amended. The ceiling at its true measured
+  count is a valid ratchet, not a licence.
+- **verify.py block-buffers redirected stdout** - the `verify-*.out` log is
+  EMPTY until near the end. An empty log is not a hang; poll `verify.pid`
+  and rustc processes.
+- **Disk: `%TEMP%/proc-macro-srv*` regrows (8.5 GB cleaned once, ~0.17 GB
+  each), and the repo-root `target/` was 8 GB of idle regenerable junk** -
+  deletable, the workers/verifies use their own targets and baselines. Check
+  `Get-PSDrive C` before every verify round; the watchdog holds its disk
+  guard during a live verify by design.
+
 - **The watchdog's default 1200s wedged-killer kills healthy workers during a
   model-latency storm.** Session 13's endpoint had 23-60+ minute silence gaps
   from boot on three workers; the shipped default killed two of them mid-think
