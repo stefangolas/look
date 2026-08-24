@@ -58,13 +58,13 @@ impl ContactCircle {
         };
         let center = (0..100).find_map(|_i| {
             let (n0, n1) = (surface0.normal(u0, v0), surface1.normal(u1, v1));
-            let (c, q0, q1) = contact_points((p, der), (p0, n0), (p1, n1), signed_radius);
+            let (c, q0, q1) = contact_points((p, der), (p0, n0), (p1, n1), signed_radius)?;
             if ctx.near_pt(p0, q0) && ctx.near_pt(p1, q1) {
                 // BG-TOL-001: model
                 Some(c)
             } else {
-                (p0, (u0, v0)) = next_point(surface0, (u0, v0), (p0, q0), signed_radius);
-                (p1, (u1, v1)) = next_point(surface1, (u1, v1), (p1, q1), signed_radius);
+                (p0, (u0, v0)) = next_point(surface0, (u0, v0), (p0, q0), signed_radius)?;
+                (p1, (u1, v1)) = next_point(surface1, (u1, v1), (p1, q1), signed_radius)?;
                 None
             }
         })?;
@@ -138,7 +138,7 @@ fn contact_points(
     // origin and normal
     plane1: (Point3, Vector3),
     signed_radius: f64,
-) -> (Point3, Point3, Point3) {
+) -> Option<(Point3, Point3, Point3)> {
     let ((p, der), (p0, n0), (p1, n1)) = (point_on_curve, plane0, plane1);
     let mat = Matrix3::from_cols(der, n0, n1).transpose();
     let vec = Vector3::new(
@@ -146,10 +146,10 @@ fn contact_points(
         n0.dot(p0.to_vec()) + signed_radius,
         n1.dot(p1.to_vec()) + signed_radius,
     );
-    let center = Point3::from_vec(mat.invert().unwrap() * vec);
+    let center = Point3::from_vec(mat.invert()? * vec);
     let q0 = center - signed_radius * n0;
     let q1 = center - signed_radius * n1;
-    (center, q0, q1)
+    Some((center, q0, q1))
 }
 
 fn next_point(
@@ -157,7 +157,7 @@ fn next_point(
     (u, v): (f64, f64),
     (p, q): (Point3, Point3),
     signed_radius: f64,
-) -> (Point3, (f64, f64)) {
+) -> Option<(Point3, (f64, f64))> {
     let ders = surface.ders(1, u, v);
     let (uder, vder) = (ders[1][0], ders[0][1]);
     let n = uder.cross(vder);
@@ -165,7 +165,7 @@ fn next_point(
     let n_vder = signed_radius * surface.normal_vder(u, v);
     let mat = Matrix3::from_cols(uder + n_uder, vder + n_vder, n);
     let vec = q - p;
-    let del = mat.invert().unwrap() * vec;
+    let del = mat.invert()? * vec;
     // FIXME(BG-TOL-001, DIMENSION) — SPEC_GAP: del is the Newton solution of
     // mat * (du, dv, del.z) = vec where the third matrix column is the
     // unnormalized normal uder x vder (magnitude is a parametrization area,
@@ -173,7 +173,22 @@ fn next_point(
     // 1/k under a model rescale -- it is not a length and not dimensionless,
     // so neither model nor param, and either rewrite changes the debug
     // assertion's behaviour under a real model_scale.
-    debug_assert!(del.z.so_small(), "{del:?}");
+    if !del.is_finite() {
+        return None;
+    }
     let (u, v) = (u + del.x, v + del.y);
-    (surface.subs(u, v), (u, v))
+    Some((surface.subs(u, v), (u, v)))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn contact_points_singular_frame_refuses() {
+        let p = Point3::new(1.0, 2.0, 3.0);
+        let der = Vector3::new(1.0, 0.0, 0.0);
+        let n = Vector3::new(1.0, 0.0, 0.0);
+        assert!(contact_points((p, der), (p, n), (p, n), 1.0).is_none());
+    }
 }
