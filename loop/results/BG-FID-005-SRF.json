@@ -1,0 +1,18 @@
+{
+  "id": "BG-FID-005-SRF",
+  "status": "DONE",
+  "contracts": ["BG-FID-005-SRF"],
+  "tests_added": 12,
+  "sites_migrated": 0,
+  "sites_deferred": 0,
+  "deviations": [
+    "Tests 5 and 11 are named surface_budget_exhaustion_refuses and surface_invalid_inputs_refuse: the packet's names budget_exhaustion_refuses / invalid_inputs_refuse already exist in this module as the landed curve rep's tests (a Rust module cannot hold two tests with the same name). Same intent, renamed.",
+    "Test 10 (double_cover_rep_never_emits) hands the loop the measured scale spend plus 2 subdivisions instead of the packet's literal budget 2^14, so the loop exhausts at a reachable grid (see disagreements: with 2^14 the loop cannot terminate). It still asserts rep_surface never returns Ok on the double sheet."
+  ],
+  "disagreements": [
+    "The packet's test-10 machine note ('separation certificate 0 -> tube 0 -> target 0 -> the stall guard returns Unresolved') does not reproduce for the specified algorithm. The double cover's eps is dominated by the box-width term (the interval enclosures shrink linearly, ~0.7x per refinement level), so the <1% relative stall criterion never fires until the ~1e-14 pad floor at depth ~45, and the 2^14 budget leaves 5462 loop subdivisions whose grids grow as 2^du * 2^dv (unreachable). The belt refinement walk matches the packet's machine values exactly (eps 4.51/1.85/1.24/0.95/0.63/0.47/0.32 over (0,0)..(2,4), emit at (4,5) with eps 0.118463 and spend 10; scale spends 5461/5461), so the loop is faithful to Decision 4; only the double cover's termination claim is the mismatch.",
+    "The double cover's curvature radius lower bound comes out 0.399465 against the packet's 0.399506 (0.01% lower, i.e. more conservative; the separation is exactly 0.0 as quoted). This is within the float slack of the outward-rounded interval fixtures (the Decision-7 Leibniz-table fixture uses elementary sin/cos); the tests do not assert the double cover curvature value."
+  ],
+  "baseline_failures": [],
+  "notes": "rep_surface, HermiteSurface (tensor-product bicubic Hermite in Bezier form over the certified uniform-per-axis grid), surface_curvature_radius_lower_span, surface_self_separation_lower_span, the per-cell surface_ivb_discharge (grid-vertex bivariate Krawczyk (b) + 2D-BVH non-adjacent separation (c)) and the 12 tests all land in rep.rs; fid/mod.rs changed only its module doc line (Decision 8). Decision 2's sliver routing is exercised by test 6's re-rep: without the u-difference-axis fix and the degenerate-last-knot overlap fix, the emission's curvature certificate collapsed to ~0.000187 (the packet's trap); with them it recovers to 0.506255 and the re-rep emits at (4,5) with eps 0.118461 (packet 0.118463). Machine-check (scratch script fid005srf-check.py, not part of the commit): the Decision-2 net reproduces all 16 corner data to 1.1e-15, the double-sheet min |cos| to the sphere normal is 0.999961, the sheets' separation vanishes where they cross, the belt/open/small-belt/double-cover targets match (0.253359/0.296673/0.038004/0), and the uniform-quad spend to level 7 is 5461; the interval-certified quantities (curvature/separation lower bounds, achieved eps/theta) are verified by running the module's own code paths (the tests assert the packet's values and pass). Verification: cargo fmt/clippy/check clean; 238 crate tests pass (51 in the fid module, incl. the 12 new surface tests); scripts/kernel-gates.sh is a no-op on this baseline (vendor/truck absent from the merge-base)."
+}
