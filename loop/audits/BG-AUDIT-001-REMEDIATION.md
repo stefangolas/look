@@ -12,12 +12,12 @@ State vocabulary: `PENDING` `RUNNING` `WORKER_DONE` `VERIFIED` `LANDED`
 | AUD-001 | BG-AUD-FIX-001 | LANDED | d1355c7 | ACCEPTED | 1844cfe | sphere_normal_cone_wide_azimuth_contains_all_normals |
 | AUD-016 | BG-AUD-FIX-001 | LANDED | d1355c7 | ACCEPTED | 1844cfe | sphere_immersion_lower_bound_is_directed |
 | AUD-002 | BG-AUD-FIX-002 | WORKER_DONE | | | | |
-| AUD-003 | BG-AUD-FIX-003 | WORKER_DONE | | | | |
+| AUD-003 | BG-AUD-FIX-003 | LANDED | 8bdf204 | ACCEPTED | 70d98bb | wedge_singular_midpoint_normal_refuses |
 | AUD-004 | BG-AUD-FIX-004 | OWNER_BLOCKED | b48e2b7 | Phase A: no witness | — | — |
-| AUD-007 | BG-AUD-FIX-005 | RUNNING | | | | |
+| AUD-007 | BG-AUD-FIX-005 | WORKER_DONE | | | | |
 | AUD-005 | BG-AUD-FIX-006 | PENDING | | | | |
 | AUD-009 | BG-AUD-FIX-006 | PENDING | | | | |
-| AUD-006 | BG-AUD-FIX-007 | RUNNING | | | | |
+| AUD-006 | BG-AUD-FIX-007 | WORKER_DONE | 44abfed | | | |
 | AUD-008 | BG-AUD-FIX-008 | PENDING | | | | |
 | AUD-015 | BG-AUD-FIX-008 | PENDING | | | | |
 | AUD-011 | BG-AUD-FIX-009 | PENDING | | | | |
