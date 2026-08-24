@@ -14,7 +14,7 @@ State vocabulary: `PENDING` `RUNNING` `WORKER_DONE` `VERIFIED` `LANDED`
 | AUD-002 | BG-AUD-FIX-002 | WORKER_DONE | | | | |
 | AUD-003 | BG-AUD-FIX-003 | LANDED | 8bdf204 | ACCEPTED | 70d98bb | wedge_singular_midpoint_normal_refuses |
 | AUD-004 | BG-AUD-FIX-004 | OWNER_BLOCKED | b48e2b7 | Phase A: no witness | — | — |
-| AUD-007 | BG-AUD-FIX-005 | WORKER_DONE | | | | |
+| AUD-007 | BG-AUD-FIX-005 | LANDED | 8f6f71e | ACCEPTED | f98d441 | wedge_slope_lower_bound_is_conservative_at_small_margins |
 | AUD-005 | BG-AUD-FIX-006 | RUNNING | | | | |
 | AUD-009 | BG-AUD-FIX-006 | RUNNING | | | | |
 | AUD-006 | BG-AUD-FIX-007 | WORKER_DONE | 44abfed | | | |
@@ -22,9 +22,9 @@ State vocabulary: `PENDING` `RUNNING` `WORKER_DONE` `VERIFIED` `LANDED`
 | AUD-015 | BG-AUD-FIX-008 | PENDING | | | | |
 | AUD-011 | BG-AUD-FIX-009 | PENDING | | | | |
 | AUD-012 | BG-AUD-FIX-009 | PENDING | | | | |
-| AUD-010 | BG-AUD-FIX-010 | PENDING | | | | |
-| AUD-013 | BG-AUD-FIX-010 | PENDING | | | | |
-| AUD-017 | BG-AUD-FIX-010 | PENDING | | | | |
+| AUD-010 | BG-AUD-FIX-010 | RUNNING | | | | |
+| AUD-013 | BG-AUD-FIX-010 | RUNNING | | | | |
+| AUD-017 | BG-AUD-FIX-010 | RUNNING | | | | |
 | AUD-014 | BG-AUD-FIX-011 | PENDING | | | | |
 
 ## Owner decisions made during this campaign (recorded in the packets)
