@@ -1,0 +1,10 @@
+{
+  "id": "BG-AUD-FIX-001",
+  "status": "DONE",
+  "contracts": ["AUD-001", "AUD-016"],
+  "tests_added": 3,
+  "deviations": [],
+  "disagreements": [],
+  "baseline_failures": [],
+  "notes": "AUD-001: normal_cone now emits the everything-cone at the top whenever the azimuth span vv.sup()-vv.inf() >= PI (u-edges are parallels, so the corner-hull cone under-encloses once the span reaches PI); the tight corner-hull path is unchanged for spans < PI and the existing >= PI/2 half-angle fallback still applies. AUD-016: immersion_lower_bound computes r*r*sin(uu) as a directed inari interval product and reads the lower endpoint, clamped at 0; a degenerate (NaN/zero/negative) radius returns 0.0 up front (Interval::EMPTY.inf() is +inf, so it is never used). Three regression tests added: sphere_normal_cone_wide_azimuth_contains_all_normals (AUD-001 witness uu=[0.5,0.6], vv=[0,3.6]; asserts half_angle == PI and 61x61 containment), sphere_normal_cone_azimuth_below_pi_stays_tight (same band, vv=[0,3]; asserts half_angle < PI/2 and 61x61 containment), sphere_immersion_lower_bound_is_directed (r=1.3, uu=[0.3,0.4], vv=[0,1]; asserts bit-equality with the downward-rounded interval product). Pre-existing sphere_normal_cone_over_patch (wide case vv=[0,PI] stays the everything-cone) and sphere_immersion_lower_bound_and_poles stay green unchanged. Verified: cargo fmt --check -p truck-evidence, cargo clippy -p truck-evidence --all-targets --no-deps, cargo test -p truck-evidence --lib --tests --no-fail-fast (241 lib + 3 integration tests pass), cargo check --workspace --all-targets, and scripts/kernel-gates.sh (all P-3 gates pass; GATE-4 110/110). Committed on packet/BG-AUD-FIX-001 as d1355c7."
+}
