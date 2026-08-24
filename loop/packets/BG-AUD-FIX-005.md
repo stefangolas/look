@@ -85,24 +85,33 @@ the `InvalidMargin` guard and the return shape unchanged):
 ```rust
 let tt = Interval::try_from((sin_margin, sin_margin)).unwrap_or(Interval::EMPTY);
 let one = Interval::try_from((1.0, 1.0)).unwrap_or(Interval::EMPTY);
+let two = Interval::try_from((2.0, 2.0)).unwrap_or(Interval::EMPTY);
+let sixteen = Interval::try_from((16.0, 16.0)).unwrap_or(Interval::EMPTY);
+let seven = Interval::try_from((7.0, 7.0)).unwrap_or(Interval::EMPTY);
+let two56 = Interval::try_from((256.0, 256.0)).unwrap_or(Interval::EMPTY);
 let value = if sin_margin < 1.0e-6 {
     // s/2 + s³/16 + 7s⁵/256, all terms positive (certified downward).
     let s2 = tt * tt;
     let s3 = tt * s2;
     let s5 = s3 * s2;
-    (tt / 2.0 + s3 / 16.0 + s5 * 7.0 / 256.0).inf()
+    (tt / two + s3 / sixteen + s5 * seven / two56).inf()
 } else {
-    let inner = (one - (one - tt * tt).sqrt()) / 2.0;
+    let inner = (one - (one - tt * tt).sqrt()) / two;
     inner.sqrt().inf()
 };
 ```
 
-`1.0e-6` and `2.0`/`16.0`/`256.0`/`7.0` are fine (the `1e-6` needs the
-same-line `// H-3` comment if it matches the gate pattern — check with
-`kernel-gates.sh`). The module has `#![deny(clippy::unwrap_used)]` at the top
-(lfs.rs:27); do NOT call `unwrap()` — the `unwrap_or(Interval::EMPTY)` form is
-mandatory. `Interval / f64` and `Interval * f64` compile (inari scales by a
-float).
+**Amendment 2 (2026-08-24, orchestrator):** inari 2.0.0 implements `Mul`/`Div`
+only for `Interval` against another `Interval` — there is no `impl Mul<f64>
+for Interval` or `impl Div<f64> for Interval` (the crate's own
+`intersection_curve.rs:189-193` documents this and wraps the scalar side as a
+degenerate interval). The scalars above are therefore wrapped as degenerate
+intervals (`1.0`/`2.0`/`16.0`/`7.0`/`256.0` are all exactly representable, so
+a degenerate-interval multiply/divide is exact outward-rounded scaling and the
+`.inf()` matches the intended value bit-for-bit). `1.0e-6` needs the same-line
+`// H-3` comment if the gate pattern matches it. The module has
+`#![deny(clippy::unwrap_used)]` at the top (lfs.rs:27); do NOT call
+`unwrap()` — the `unwrap_or(Interval::EMPTY)` form is mandatory.
 
 The existing tests stay green: `wedge_slope_monotone_and_knife_limit` samples
 `[0.1, 1.0]` (all in the closed-form branch → strictly increasing exactly as
