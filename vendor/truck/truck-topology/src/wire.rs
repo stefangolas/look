@@ -275,6 +275,7 @@ impl<P, C> Wire<P, C> {
 
     /// Returns whether simple or not.
     /// Here, "simple" means all the vertices in the wire are shared from only two edges at most.
+    /// A wire that reuses an edge id (e.g. `[e, e.inverse()]`) is not simple either.
     /// # Examples
     /// ```
     /// use truck_topology::*;
@@ -297,9 +298,11 @@ impl<P, C> Wire<P, C> {
     /// assert!(Wire::<(), ()>::new().is_simple());
     /// ```
     pub fn is_simple(&self) -> bool {
-        let mut set = HashSet::default();
+        let mut vertices = HashSet::default();
+        let mut edges = HashSet::default();
         self.vertex_iter()
-            .all(move |vertex| set.insert(vertex.id()))
+            .all(|vertex| vertices.insert(vertex.id()))
+            && self.edge_iter().all(|edge| edges.insert(edge.id()))
     }
 
     /// Determines whether all the wires in `wires` has no same vertices.
@@ -922,5 +925,18 @@ impl<P: Send + Sync, C: Send + Sync> ParallelExtend<Edge<P, C>> for Wire<P, C> {
         I: IntoParallelIterator<Item = Edge<P, C>>,
     {
         self.edge_list.par_extend(par_iter)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::*;
+
+    #[test]
+    fn wire_reusing_edge_id_is_not_simple() {
+        let v = Vertex::news([(), ()]);
+        let e = Edge::new(&v[0], &v[1], ());
+        let wire = wire![&e, &e.inverse()];
+        assert!(!wire.is_simple());
     }
 }
