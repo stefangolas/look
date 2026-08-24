@@ -1,0 +1,11 @@
+{
+  "id": "BG-AUD-FIX-009",
+  "status": "DONE",
+  "contracts": ["AUD-011", "AUD-012"],
+  "tests_added": 3,
+  "deviations": [],
+  "disagreements": [],
+  "baseline_failures": [],
+  "amended_by": "orchestrator",
+  "notes": "Orchestrator-written record, NOT the worker's own claim: the FIX-009 worker committed the complete fix (c0d9c7d) and ran its Done-when gates (cargo fmt, clippy, test, workspace check, kernel-gates all green; the events transcript shows 'test result: ok' across the crate suites) but DIED of API Insufficient Balance (402, in events.jsonl) before writing RESULT.json. The orchestrator reviewed the committed diff against the packet and the audit witnesses and filed this record. Repair delivered: AUD-011 - Torus::normal_uder z-component corrected to 0 (finite-difference regression torus_normal_uder_matches_finite_difference). AUD-012 - the audit-listed panics are typed refusals: approx_rolling_ball_fillet refuses a reversed edge range up front and converts the KnotVec::try_from unwrap, the two singular-frame mat.invert().unwrap()s, and the NaN-sort partial_cmp unwrap into NumericallyUnresolved (ContactCurveNotFound); contact_points/next_point return Option (singular mat.invert() and non-finite del -> None -> try_new -> None), and the dimensionally-wrong debug_assert is replaced by a non-finite guard. Regressions: contact_points_singular_frame_refuses, fillet_reversed_range_refuses, torus_normal_uder_matches_finite_difference. The packet's required pre-fix failing observations were recorded by the worker in its own session before the repair (the finite-difference z mismatch and the panic paths). Mechanical verification was the orchestrator's job after the death; the worker's own gate runs were green."
+}
