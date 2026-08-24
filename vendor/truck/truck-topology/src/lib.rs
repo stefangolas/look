@@ -395,6 +395,8 @@ pub mod invariants;
 /// classifies shell conditions and defines the face iterators.
 pub mod shell;
 mod solid;
+/// BG-TOL-003: per-entity tolerance sidecar state keyed by `EntityId`.
+pub mod tolerance_store;
 mod vertex;
 /// define the edge iterators and the vertex iterator.
 pub mod wire;
