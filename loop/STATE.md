@@ -11,64 +11,84 @@ otherwise would eventually cost a trap.) If you are picking this up cold, read
 [`loop/ORCHESTRATOR.md`](ORCHESTRATOR.md) for how to run the loop, then
 `python loop/slot_status.py`** - nothing else. Do not read `LEDGER.jsonl` whole.
 
-Updated 2026-08-24, close of session 22. Branch: `integration/kernel-bg`.
+Updated 2026-08-24, session 23 (in progress; BG-INV-107 dispatched on slot 0).
+Branch: `integration/kernel-bg`.
 
 ## Where we are
 
-**Seventy-four packets DONE of 76 rows. The dispatchable frontier is EMPTY:
-BG-FID-005-SRF landed first-try (verified ACCEPTED at fd07e15, landed as
-59a7348). The only open rows are INV-107 and ENC-004-OFFSET, both BLOCKED.
-Nothing is running; slots idle; watchdog STOPPED (pid removed at close).**
+**Seventy-four packets DONE of 76 rows — and both BLOCKED rows are now
+UNBLOCKED.** The owner decided both quandaries this session; the amendments
+landed at `ce993fb` (TOL: per-entity tolerance is sidecar state —
+`EntityToleranceStore` keyed by `EntityId`, raise-only, `None`-not-zero;
+ENC: the offset enclosure is composition over a new `EnclosureVectorField`,
+never `N: EnclosureSurface`). **BG-INV-107 is DISPATCHED** (slot 0, packet
+`loop/packets/BG-INV-107.md`, fork point `ce993fb`, model
+deepseek/deepseek-v4-flash). **BG-ENC-004-OFFSET is TODO, design class, and
+has NO packet yet** — its amendment records the architecture, but the packet
+waits for scratch validation against real carriers (the session-16/17
+discipline: compile it, run the flagship witnesses, then write the packet).
+The watchdog is RUNNING (pid 40852, `LOOK_WATCHDOG_STAGNANT=3600`).
 
-Session 22 in three lines: wrote BG-FID-005-SRF's packet (the surface rep —
-tensor-product bicubic Hermite emitter, surface scale components, per-axis
-refine loop, bivariate grid-vertex Krawczyk, 2D-BVH separation, the
-double-sheet negative test) with every witness machine-checked
-orchestrator-side — the check caught THREE design traps pre-dispatch (level
-cap vs linear convergence, false convergence on garbage-small coarse
-certificates, ulp-sliver derivative explosion). The worker landed it with
-two worker-right disagreements (the double-cover loop-termination note was
-wrong: the stall guard does not fire on an unreachable target — see traps)
-and fixed two of its own bugs found by the re-rep test (a derivative-net
-transpose and a degenerate-overlap miss producing NaN empty hulls). The
-machine slept overnight mid-run; the watchdog killed the worker on wake and
-started a fresh one; the 4h of uncommitted work was RECOVERED from the
-abandoned patch and the original session RESUMED (--resume's first live
-test — it works; recipe in traps).
+Session 23 in three lines: the owner picked refined-(b) for INV-107's storage
+(sidecar store, raise-only, value = length-valued upper bound on accumulated
+geometric uncertainty, never "the tolerance predicates use") and (a)-with-a-
+vector-field-trait for ENC-004-OFFSET (box-sum composition mirroring
+`Offset`'s own arithmetic; normal cones are an optional internal fast path);
+both amendments landed in the spec's BG-TOL-001 and BG-ENC-004 sections and
+the registry flipped through python (watchdog read path re-verified); the
+INV-107 packet was written with its scenario table machine-checked
+(`scratch/inv107_check.py` — 24 scenarios), its serde design validated
+against the real `EntityId` (`scratch/inv107serde` — the pairs-sequence
+finding below), all seven anchors verified, and the truck-topology baseline
+measured green (clippy zero, 59 lib + 4 test-binary tests) before dispatch.
 
 ## Pick up here
 
-1. **The registry graph is finished except the BLOCKED rows.** Any future
-   session starts by re-examining INV-107 and ENC-004-OFFSET (both blocked
-   on external design decisions, not on loop work) or by new spec items.
-2. Nothing else is pending. Loop/slots carry stale worker files (slot 0:
-   landed SRF; slots 1/2: older) — re-fork with new_slot.py before any
-   dispatch.
+1. **Adjudicate BG-INV-107 when slot 0 finishes** (`RESULT.json` in the
+   worktree; poll `slot_status.py`). Verify with
+   `python loop/verify.py --slot 0 --packet loop/packets/BG-INV-107.md --base ce993fb`
+   — the base is the fork point, which is the amendments commit; read it off
+   the slot if in doubt. Then the usual landing dance (ledger row BEFORE
+   land_packet, PACKET.md/RESULT.json never reach the integration branch).
+2. **Write BG-ENC-004-OFFSET's scratch, then its packet, then dispatch it**
+   (slot 1 or 2 — re-fork with new_slot.py first; stale worker files sit in
+   both). The amendment in the BG-ENC-004 spec section is the complete
+   design: `EnclosureVectorField` + `EnclosureScalarField2` in enclosure.rs,
+   `impl EnclosureSurface for Offset<S, N>` bounded
+   `S: ParametricSurface3D + EnclosureSurface, N: EnclosureVectorField`,
+   box-sum composition per method, `NormalField<S, F>` implements the vector
+   trait (cross box / immersion bound / quotient rule for derivatives;
+   `impl EnclosureScalarField2 for f64` covers constant distance), unit-ball
+   fallback for the unit normal's position, `ENTIRE` for its derivatives at
+   a singular locus, cone `None` per family rule. The scratch must RUN the
+   flagship witnesses: Plane + constant d (flat), Sphere + constant d
+   (curved — the real quotient-rule path), and an inward-offset cylinder
+   past its radius (self-intersection → cross box straddles zero →
+   `normal_cone` None) — with sampling soundness on the composition.
+3. If the machine may sleep at any point, STOP the watchdog first (pid in
+   `loop/watchdog.lock`) and restart it with the cmd /c pattern on resume.
 
 ## State of the machine, as left
 
-- **Watchdog STOPPED** (lock removed 11:02, 2026-08-24). Restart with the
-  cmd /c pattern and LOOK_WATCHDOG_STAGNANT=3600 before any dispatch.
-- Registry: **74 DONE / 2 BLOCKED (76 rows)**. HEAD at close: `59a7348`.
-  Tracked tree clean apart from this STATE commit. GATE-4 ceiling 110->110.
-- **BG-FID-005-SRF speed datapoint (caveated):** worker wall time = 3h43m
-  (attempt 1, pre-sleep) + ~1h20m (resumed finish) ≈ **5h03m excluding the
-  ~8.5h machine sleep**; the resumed session logged 424 events. NOT
-  comparable to the session-21 baselines (48/114 min): the packet is ~2x
-  the size (3,444 insertions in rep.rs, 12 tests), the run included the
-  machine-sleep kill + recovery, and the pre-sleep events transcript was
-  lost to the watchdog's redispatch (survives only in the opencode log).
-- Disk ~13 GB free at close (the watchdog reclaimed slot-2 targets at
-  22:48). loop/results/ gained BG-FID-005-SRF.json (the worker's
-  disagreements verbatim — includes the accepted loop-termination fix).
-- API balance: the worker (deepseek) ran clean throughout; one
-  "Insufficient balance" error in the opencode log at 00:31Z was the
-  ORCHESTRATOR's own session, pre-resume, and cleared on its own.
+- **Watchdog RUNNING** (pid 40852, launched 2026-08-24 with
+  `LOOK_WATCHDOG_STAGNANT=3600` via the cmd /c pattern). Disk was 9.3 GB free
+  after slot 0's warm — just above its 9 GB soft floor, so it will reclaim
+  idle slot targets (1 and 2); that is its job, not a fault.
+- Registry: **74 DONE / 2 TODO (76 rows)**, both TODO rows unblocked this
+  session. HEAD at dispatch: `ce993fb`. Tracked tree clean.
+- Slot 0: RUNNING BG-INV-107 (forked at `ce993fb`, warm build 0.4 min —
+  target carried over from FID-005-SRF). Slots 1/2: idle, stale worker
+  files, re-fork before any dispatch.
+- The two spec amendments, the registry flip, and the packet are all in
+  `ce993fb`; the scratch validations live in `scratch/inv107_check.py` and
+  `scratch/inv107serde/` (untracked, deliberately).
 
 ## The parallelism picture
 
-None. The frontier is empty; the loop's remaining rows are blocked on
-design decisions outside the loop's authority.
+BG-INV-107 in flight on slot 0 (truck-topology). BG-ENC-004-OFFSET is
+write-disjoint (truck-evidence) and could run in parallel once its packet
+exists — but its packet does not exist yet, and writing it well is a
+session's own scratch-validation job.
 
 ## Traps, each one paid for
 - **The watchdog's default 1200s wedged-killer kills healthy workers during a
@@ -1325,3 +1345,17 @@ what the tree says about the last two, as opposed to what the spec says.
   explosion BEFORE dispatch; the worker's disagreements/tests caught the
   derivative-net transpose and the degenerate-overlap miss AFTER. Neither
   half alone would have landed this packet.
+
+- **A `HashMap` keyed by a type that serializes as a map cannot round-trip
+  through serde_json — and the failure is deferred and data-dependent.**
+  Session 23, INV-107 pre-dispatch: a derived `HashMap<EntityId, _>`
+  Serialize compiles fine and serializes an EMPTY map as `{}`; the first
+  non-empty map fails at RUNTIME with "key must be a string" (serde_json
+  requires string keys, `EntityId` is externally tagged — a map). A
+  doctest or test that only round-trips an empty store would have passed
+  and shipped the defect. The fix is to serialize as a sequence of pairs
+  (`serializer.collect_seq(map.iter())`, deserialize a `Vec<(K, V)>` and
+  rebuild), which is also duplicate-tolerant (last wins). Caught by the
+  scratch-crate run against the real type (`scratch/inv107serde`), not by
+  compilation — the scratch discipline again. Any new keyed-by-EntityId
+  container owes the same check.
