@@ -1296,11 +1296,11 @@ impl<P: ControlPoint<f64> + Tolerance> BSplineSurface<P> {
             // BG-TOL-001: param
             bspsurface.ucut(q[0]);
         }
-        if !ctx.is_small_ratio(p[0] - bspsurface.vknot(0)) {
+        if !ctx.is_small_ratio(p[1] - bspsurface.vknot(0)) {
             // BG-TOL-001: param
             bspsurface = bspsurface.vcut(p[1]);
         }
-        if !ctx.is_small_ratio(q[0] - bspsurface.vknot(bspsurface.vknot_vec().len() - 1)) {
+        if !ctx.is_small_ratio(q[1] - bspsurface.vknot(bspsurface.vknot_vec().len() - 1)) {
             // BG-TOL-001: param
             bspsurface.vcut(q[1]);
         }
@@ -1811,6 +1811,42 @@ mod seed_tests {
             4,
             "the weights change the map, not the domain partition",
         );
+    }
+}
+
+#[cfg(test)]
+mod section_tests {
+    use super::*;
+
+    fn half_box_surface() -> BSplineSurface<Point3> {
+        let uknots = KnotVec::from(vec![0.0, 0.0, 0.0, 1.0, 1.0, 1.0]);
+        let vknots = KnotVec::from(vec![0.0, 0.0, 0.0, 1.0, 1.0, 1.0]);
+        let ctrl_pts = (0..3)
+            .map(|i| {
+                (0..3)
+                    .map(|j| Point3::new(i as f64, j as f64, (i * j) as f64))
+                    .collect()
+            })
+            .collect();
+        BSplineSurface::new((uknots, vknots), ctrl_pts)
+    }
+
+    #[test]
+    fn sectional_curve_vcut_u_half_box_does_not_panic() {
+        let surface = half_box_surface();
+        let bnd = BoundingBox::from_iter(&[Vector2::new(0.0, 0.0), Vector2::new(0.5, 1.0)]);
+        let curve = surface.sectional_curve(bnd);
+        assert_near2!(curve.subs(0.0), surface.subs(0.0, 0.0));
+        assert_near2!(curve.subs(1.0), surface.subs(0.5, 1.0));
+    }
+
+    #[test]
+    fn sectional_curve_vcut_returns_half_v_section() {
+        let surface = half_box_surface();
+        let bnd = BoundingBox::from_iter(&[Vector2::new(0.0, 0.0), Vector2::new(1.0, 0.5)]);
+        let curve = surface.sectional_curve(bnd);
+        assert_near2!(curve.subs(0.0), surface.subs(0.0, 0.0));
+        assert_near2!(curve.subs(1.0), surface.subs(1.0, 0.5));
     }
 }
 
