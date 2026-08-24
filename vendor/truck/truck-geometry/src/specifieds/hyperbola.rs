@@ -117,8 +117,8 @@ impl SearchParameter<D1> for UnitHyperbola<Point2> {
     fn search_parameter<H: Into<SPHint1D>>(&self, p: Point2, _: H, _: usize) -> Option<f64> {
         let ctx = ToleranceCtx::unscaled_legacy();
         let t = f64::asinh(p.y);
-        match ctx.is_small_ratio((p - self.subs(t)).magnitude()) {
-            // BG-TOL-001: param
+        match ctx.is_small_len((p - self.subs(t)).magnitude()) {
+            // BG-TOL-001: model
             true => Some(t),
             false => None,
         }
@@ -130,8 +130,8 @@ impl SearchParameter<D1> for UnitHyperbola<Point3> {
     fn search_parameter<H: Into<SPHint1D>>(&self, p: Point3, _: H, _: usize) -> Option<f64> {
         let ctx = ToleranceCtx::unscaled_legacy();
         let t = f64::asinh(p.y);
-        match ctx.is_small_ratio((p - self.subs(t)).magnitude()) {
-            // BG-TOL-001: param
+        match ctx.is_small_len((p - self.subs(t)).magnitude()) {
+            // BG-TOL-001: model
             true => Some(t),
             false => None,
         }
