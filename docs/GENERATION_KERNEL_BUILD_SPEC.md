@@ -974,6 +974,85 @@ permits nothing after.
 - Grep test in CI: no `1.0e-6` literal in any `src/**/*.rs` predicate outside
   `ToleranceCtx`'s own defaults.
 
+**Amendment (2026-08-24, owner decision: where an entity's tolerance lives).
+Unblocks BG-TOL-003 and BG-INV-107.** Three options were on the table: storage
+on the entities themselves (rejected — truck-topology entities are shared and
+`Arc`'d, and mutable per-entity storage reopens the identity-semantics
+problems the BG-CE-003 chain paid to close, see the stale-keys trap), a side
+table keyed by `EntityId` (chosen), and no per-entity storage at all with the
+invariant restated as a property of context composition (rejected — imported
+CAD and later Boolean/repair operations genuinely accumulate entity-specific
+geometric uncertainty, and invariant 7 needs somewhere to state it).
+
+**DECISION: per-entity tolerance is sidecar state keyed by `EntityId`.**
+
+1. **The store.** `EntityToleranceStore` lives in
+   `truck-topology/src/tolerance_store.rs`, beside `entity_id.rs` (it keys on
+   that type; truck-base cannot host it because the dependency edge points
+   the other way). Pure data — `HashMap<EntityId, EntityTolerance>` plus
+   serde — no truck geometry types, no `Mutex`, no `Arc`, no dependency
+   changes.
+2. **What the number means.** A *length-valued upper bound on accumulated
+   geometric uncertainty associated with that entity* — NOT "the tolerance all
+   predicates use". `ToleranceCtx` remains immutable global policy (the
+   scale and the three budgets) and is **not** the owner of entity state. A
+   predicate that wants to combine policy with an entity record does so
+   deliberately; that combination rule is future work and is not part of
+   BG-TOL-003.
+3. **Raise-only.** `get(id) -> Option<EntityTolerance>` and
+   `raise(id, candidate)`, which stores `max(old, candidate)`. There is no
+   arbitrary setter: monotonicity is the type's whole point. `raise` refuses
+   a non-finite or negative candidate with the typed refusal `ToleranceCtx::
+   new` already uses for the same class of invalid input
+   (`Refusal::UnsupportedEnvelope(EnvelopeCase::ChartDegenerate)` — the landed
+   precedent), never panics (H-1), and leaves the store unchanged on refusal.
+4. **`None` is not zero.** A missing record means *no entity-specific
+   uncertainty recorded*, never "τ = 0"; initial values are assigned
+   explicitly at construction/import. Structural comparisons (below) happen
+   only where both records exist.
+5. **Identity rules.** An identity-preserving operation keeps the `EntityId`
+   and may raise its record; a newly constructed entity gets a fresh
+   `EntityId` and a fresh record; deleting an entity leaves its record
+   unreachable garbage (pruning is an implementation detail that must never
+   observe a live id). Keys are construction-derived *values*, never
+   addresses, which is why the BG-CE-003-MIGRATE-r2 stale-key poisoning
+   (allocator address reuse) cannot recur here: two ids are equal iff their
+   constructions are equal. Corollary, and deliberate: re-executing an
+   identical construction yields the same id and inherits its record — sound
+   because the record only ever over-estimates.
+6. **v1 record shape.** `EntityTolerance` carries the value only. Provenance
+   is a recorded non-goal: add it by amendment when a consumer needs it; do
+   not invent one in a packet.
+7. **BG-TOL-003 restated as two halves, both now statable.**
+   *Temporal (storage) monotonicity*: for every `EntityId` preserved across
+   an operation, τ(k+1) ≥ τ(k). The raise-only API enforces it in memory;
+   what a checker can actually guard is the pair (before, after) an operation
+   claims to have produced — a buggy operation that rebuilds its store fresh
+   instead of carrying it decreases a record, and so does tampered
+   deserialised state.
+   *Structural (boundary) monotonicity*: for every recorded
+   `Sel { base, selector }` id whose base is also recorded,
+   record(base) ≥ record(sel) — invariant 7's "entity τ ≥ boundary τ", where
+   the boundary relation is exactly the `Selector` paths of the identity
+   algebra (BoundaryWire, WireEdge, End, Seam, Apex, Pole are all boundary
+   constituents of their base). This is a data well-formedness requirement,
+   checked rather than derived: an edge claiming tighter precision than the
+   face it bounds is malformed input. The admissibility half of invariant 7
+   (τ ≤ θ·lfs_σ) stays with BG-FID and is not moved by this amendment.
+8. **BG-INV-107 is the checker for both halves**, in
+   `truck-topology/src/invariants/tolerance_monotonicity.rs`: pure, over
+   hand-built id/raise sequences, certifying (a) validity of recorded values
+   (finite, nonnegative — deserialisation bypasses `raise` and can carry
+   anything), (b) structural monotonicity on `Sel` paths — violable through
+   the public API, since independent raises on a base and its selector can
+   leave the selector above the base, so the negative test is constructible
+   without any back door, and (c) temporal monotonicity across a supplied
+   transition. `Prop::ToleranceMonotonicity` already exists in truck-base, so
+   there is no cross-crate ripple. Wiring stores into operations — who
+   raises, when — is Stage B / CE-005 territory and deliberately NOT part of
+   this item: the store and the checker land as pure data modules first,
+   exactly as BG-INV-108 landed the nesting forest before the NUM-004 oracle.
+
 ### BG-CE-001 — Coedge: per-use payload on the edge handle
 
 **Implements** §1 (coedges first-class, pcurve on the use). **Fixes** audit S-1.
@@ -1735,6 +1814,103 @@ boxes on 200-point grids, and the degenerate negative (identical surfaces —
 the system rank-deficient everywhere) honestly returns the unbounded box.
 `tangent_cone` follows the family ball-around-midpoint construction off the
 n = 1 hull.
+
+**Amendment (2026-08-24, owner decision: the offset composition). Unblocks
+BG-ENC-004-OFFSET.** The 2026-08-20 item-4 analysis was right that the type
+contradiction is real, and the owner has now decided the resolution:
+**composition, not `N: EnclosureSurface`.** The three options were direct
+interval arithmetic over the offset map with a dedicated vector-field
+enclosure abstraction (chosen), a dedicated offset-enclosure lemma keyed on a
+normal-cone bound (rejected as stronger than necessary for a sound positional
+enclosure — a normal cone buys tightness, not soundness), and descending
+offset geometry from v1 enclosures (rejected outright).
+
+**DECISION: vector-valued parametric fields get their own enclosure
+contract; the offset enclosure is composition over it.**
+
+1. **Two new traits in `enclosure.rs`, mirroring the existing family:**
+
+   ```rust
+   pub trait EnclosureVectorField: ParametricSurface<Point = Vector3, Vector = Vector3> {
+       /// MUST contain { self.subs(u, v) : (u,v) ∈ uu×vv } (BG-ENC-001).
+       fn enclose(&self, uu: Interval, vv: Interval) -> Box3;
+       /// MUST contain { self.der_mn(m, n, u, v) : (u,v) ∈ uu×vv }.
+       fn enclose_der(&self, m: usize, n: usize, uu: Interval, vv: Interval) -> Box3;
+   }
+
+   pub trait EnclosureScalarField2 {
+       /// MUST contain { self.subs(u, v) : (u,v) ∈ uu×vv }.
+       fn enclose(&self, uu: Interval, vv: Interval) -> Interval;
+       /// MUST contain { self.der_mn(m, n, u, v) : (u,v) ∈ uu×vv }.
+       fn enclose_der(&self, m: usize, n: usize, uu: Interval, vv: Interval) -> Interval;
+   }
+   ```
+
+   The vector trait is `EnclosureSurface` minus the `Point3` bound — that
+   bound is precisely what `N` can never satisfy. No `direction_cone` method:
+   a cone over the field is derivable from its own enclosure box via the
+   existing shared `midpoint_ball_cone` helper whenever a tight path wants
+   one; the composition itself needs only the two methods.
+2. **The composition is the geometry's own arithmetic, method for method.**
+   `Offset::subs = entity.subs + offset.subs` and
+   `Offset::der_mn = entity.der_mn + offset.der_mn` (truck-geometry
+   `decorators/offset/surface.rs`), so with `S: EnclosureSurface` and
+   `N: EnclosureVectorField`:
+
+   ```text
+   enclose(Offset, U)           ⊇ enclose(S, U)           ⊕ enclose_vec(N, U)
+   enclose_der(Offset, m, n, U) ⊇ enclose_der(S, m, n, U) ⊕ enclose_der_vec(N, m, n, U)
+   ```
+
+   where `⊕` is componentwise outward-rounded interval addition. The owner's
+   factored statement — `S_offset(U) ⊆ enclosure(S,U) ⊕ d·enclosure(N,U)` —
+   is the constant-distance instance of the same inclusion. Because the bound
+   composes, `impl EnclosureSurface for Offset<S, N>` (bounded
+   `S: ParametricSurface3D + EnclosureSurface, N: EnclosureVectorField`)
+   typechecks and lands in `decorators/offset.rs` in the family's house form,
+   exactly as `ExtrudedCurve`, `Processor` and `RevolutedCurve` did; the
+   geometry type `Offset<T, N>` is unchanged. `normal_cone` and
+   `immersion_lower_bound` follow the family construction off the summed
+   derivative boxes' cross product — which is where the classical failure
+   arrives on its own: an offset past the base's radius of curvature makes
+   the cross box straddle zero and `normal_cone` returns `None`, the family's
+   singular-locus arm. The self-intersection is never predicted analytically.
+3. **Who implements the vector trait: `NormalField<S, F>`.** The canonical
+   displacement. Its position enclosure is the interval cross product of
+   `S`'s `enclose_der(1,0)`/`enclose_der(0,1)` boxes divided by a certified
+   positive lower bound of `‖S_u × S_v‖` (the existing family immersion
+   margin), then scaled by the scalar field's interval. Its derivative
+   enclosures are the quotient/product rules over `S`'s second-partial boxes
+   with the same immersion bound — this is where curvature (the shape
+   operator) genuinely enters, and where the earlier amendment said the
+   stronger machinery belongs; it still does not make `N` an
+   `EnclosureSurface`. The scalar sibling exists because
+   `NormalField::subs = normal · scalar.subs` carries `F` inside;
+   `impl ScalarFunctionD2 for f64` already exists in truck-geometry, so
+   `impl EnclosureScalarField2 for f64` (the degenerate interval) covers the
+   constant-distance case — the overwhelmingly common one — and is the only
+   scalar impl v1 ships. A variable-distance scalar field gets an impl when a
+   carrier needs one.
+4. **Degradation is honest, never sampling.** When the immersion lower bound
+   is zero the unit normal's *position* enclosure still exists (a unit vector
+   never leaves the unit ball — the `[-1, 1]³` fallback is always sound), but
+   its *derivative* enclosures widen to the unbounded box: curvature is
+   genuinely unbounded at a singular locus, and the honest answer is
+   `Interval::ENTIRE` per axis, the ISC/PCURVE precedent. Cones return
+   `None`. Typed refusals (`UnsupportedEnvelope` / `NumericallyUnresolved`)
+   surface at the certificate layer that consumes an infinite-width box;
+   nothing in this family ever samples to manufacture a finite answer.
+5. **Fast paths are internal, optional, and derived.** A normal-cone-derived
+   tight displacement box (direction-coordinate extrema of `d·n` for `n` in a
+   cone) may replace the generic interval product inside an impl that has the
+   evidence, in keeping with the fast-path architecture; it is not required
+   for the elementary inclusion claim and is not interface surface.
+
+BG-ENC-004-OFFSET remains a design item — the interval formulas above are the
+contract, and the packet is written only after they are validated in a
+scratch crate against the real carriers (the session-16/17 discipline:
+compile it, run the flagship witnesses, then write the packet with the
+measured numbers in it).
 
 ---
 
