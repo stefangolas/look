@@ -34,5 +34,6 @@ pub mod euler_poincare;
 pub mod representation;
 pub mod same_parameter;
 pub mod shell_nesting;
+pub mod tolerance_monotonicity;
 pub mod vertex_link;
 pub mod wedge;
