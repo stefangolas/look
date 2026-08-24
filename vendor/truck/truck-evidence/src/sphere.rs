@@ -116,14 +116,24 @@ impl EnclosureSurface for Sphere {
     fn normal_cone(&self, uu: Interval, vv: Interval) -> Option<DirCone> {
         // The normal is the unit vector (sin u cos v, sin u sin v, cos u) and
         // does not depend on the radius, so a degenerate radius cannot break
-        // this method. Corner rule: the axis is the normalized sum of the four
+        // this method. A u-edge maps to a parallel (small circle), not a
+        // geodesic, so when the azimuth span v1 − v0 reaches π the interior
+        // of the band bulges arbitrarily far from any corner-average axis and
+        // the corner-hull cone under-encloses (BG-ENC-001 forbids that): emit
+        // the everything-cone up front. For a narrower span the corner rule
+        // below is sound. A degenerate box (NaN corners) falls through to the
+        // corner path, whose non-finite sum emits the everything-cone.
+        let (u0, u1) = (uu.inf(), uu.sup());
+        let (v0, v1) = (vv.inf(), vv.sup());
+        if v1 - v0 >= core::f64::consts::PI {
+            return Some(everything_cone());
+        }
+        // Corner rule: the axis is the normalized sum of the four
         // corner directions and the half-angle is the largest corner angle
         // from it. While the half-angle is below π/2 the cone is geodesically
         // convex and the patch is the geodesic hull of its corners, so the
         // cone contains the whole patch. A wider patch, or a cancelling
         // corner set, gets the everything-cone instead: sound, not tight.
-        let (u0, u1) = (uu.inf(), uu.sup());
-        let (v0, v1) = (vv.inf(), vv.sup());
         let corners = [(u0, v0), (u0, v1), (u1, v0), (u1, v1)];
         let mut sum = Vector3::new(0.0, 0.0, 0.0);
         for &(u, v) in &corners {
@@ -152,13 +162,22 @@ impl EnclosureSurface for Sphere {
     }
 
     fn immersion_lower_bound(&self, uu: Interval, _vv: Interval) -> f64 {
-        // ‖S_u × S_v‖ = r²·sin u, so a lower bound is r²·sin(uu).inf clamped
-        // at 0: sin can interval-contain 0 when uu reaches a pole (u = 0 or
-        // π), and the honest answer there is exactly 0 — the parameterization
-        // is singular at the poles. The outer clamp also maps a degenerate
-        // radius (NaN) to the trivial answer 0.0.
-        let su = sin(uu).inf().max(0.0);
-        (self.radius() * self.radius() * su).max(0.0)
+        // ‖S_u × S_v‖ = r²·sin u, so a lower bound is the downward-rounded
+        // interval product r²·sin(uu) clamped at 0 (BG-ENC-003: a lower bound
+        // must never round up). The product is evaluated in inari so the final
+        // endpoint is directed; a round-to-nearest product can overshoot the
+        // true minimum by an ulp. sin(uu) can interval-contain 0 when uu
+        // reaches a pole (u = 0 or π), and the honest answer there is exactly
+        // 0 — the parameterization is singular at the poles. A degenerate
+        // (NaN/zero/negative) radius returns the trivial answer 0.0 up front:
+        // `Interval::EMPTY.inf()` is +inf, which would be an unsound "lower
+        // bound" for a non-finite radius.
+        let r = self.radius();
+        if !r.is_finite() || r <= 0.0 {
+            return 0.0;
+        }
+        let su = sin(uu);
+        (interval_at(r) * interval_at(r) * su).inf().max(0.0)
     }
 }
 
@@ -296,6 +315,65 @@ mod tests {
     }
 
     #[test]
+    fn sphere_normal_cone_wide_azimuth_contains_all_normals() {
+        // AUD-001 witness: same polar band as the tight case but the azimuth
+        // span 3.6 exceeds π, so the u-edges (parallels) bulge outside any
+        // corner-hull cone and the decided repair emits the everything-cone.
+        let s = unit_sphere();
+        let uu = const_interval!(0.5, 0.6);
+        let vv = const_interval!(0.0, 3.6);
+        let cone = s
+            .normal_cone(uu, vv)
+            .expect("wide-azimuth patch has a cone");
+        assert_eq!(cone.half_angle, core::f64::consts::PI);
+        const GRID: usize = 61;
+        for i in 0..GRID {
+            for j in 0..GRID {
+                let u = 0.5 + 0.1 * (i as f64) / (GRID as f64 - 1.0);
+                let v = 3.6 * (j as f64) / (GRID as f64 - 1.0);
+                let n = unit_normal(u, v);
+                let angle = n.dot(cone.axis).clamp(-1.0, 1.0).acos();
+                assert!(
+                    angle <= cone.half_angle + 1.0e-12, // H-3: float slack between two angles in radians, not a length
+                    "normal at ({u},{v}) escapes the everything-cone by angle {angle}"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn sphere_normal_cone_azimuth_below_pi_stays_tight() {
+        // The same polar band with azimuth span 3.0 < π: the corner-hull
+        // argument is sound there, so the cone must stay tight. Pins the
+        // threshold: the fix must not collapse every cone to the
+        // everything-cone.
+        let s = unit_sphere();
+        let uu = const_interval!(0.5, 0.6);
+        let vv = const_interval!(0.0, 3.0);
+        let cone = s
+            .normal_cone(uu, vv)
+            .expect("sub-pi azimuth patch has a cone");
+        assert!(
+            cone.half_angle < core::f64::consts::FRAC_PI_2,
+            "sub-pi azimuth patch must stay tight, got half_angle {}",
+            cone.half_angle
+        );
+        const GRID: usize = 61;
+        for i in 0..GRID {
+            for j in 0..GRID {
+                let u = 0.5 + 0.1 * (i as f64) / (GRID as f64 - 1.0);
+                let v = 3.0 * (j as f64) / (GRID as f64 - 1.0);
+                let n = unit_normal(u, v);
+                let angle = n.dot(cone.axis).clamp(-1.0, 1.0).acos();
+                assert!(
+                    angle <= cone.half_angle + 1.0e-12, // H-3: float slack between two angles in radians, not a length
+                    "normal at ({u},{v}) escapes the tight cone by angle {angle}"
+                );
+            }
+        }
+    }
+
+    #[test]
     fn sphere_immersion_lower_bound_and_poles() {
         let s = Sphere::new(Point3::new(0.0, 0.0, 0.0), 2.0);
         // Pole-free box: the bound equals r²·sin(u_min) up to float slack.
@@ -311,6 +389,24 @@ mod tests {
         // parameterization is singular at the pole.
         let uu = const_interval!(0.0, 0.2);
         assert_eq!(s.immersion_lower_bound(uu, vv), 0.0);
+    }
+
+    #[test]
+    fn sphere_immersion_lower_bound_is_directed() {
+        // AUD-016: the old round-to-nearest product r*r*sin(uu).inf could
+        // round up by an ulp, making the "lower bound" exceed the true
+        // minimum. The repaired body computes the product in interval
+        // arithmetic, so the result equals the downward-rounded interval
+        // product exactly.
+        let s = Sphere::new(Point3::new(0.0, 0.0, 0.0), 1.3);
+        let uu = const_interval!(0.3, 0.4);
+        let vv = const_interval!(0.0, 1.0);
+        let expected = (const_interval!(1.3, 1.3)
+            * const_interval!(1.3, 1.3)
+            * sin(const_interval!(0.3, 0.4)))
+        .inf()
+        .max(0.0);
+        assert_eq!(s.immersion_lower_bound(uu, vv), expected);
     }
 
     #[test]
