@@ -1,0 +1,16 @@
+{
+  "id": "BG-INV-107",
+  "status": "DONE",
+  "contracts": ["BG-TOL-003"],
+  "tests_added": 9,
+  "sites_migrated": 0,
+  "sites_deferred": 0,
+  "deviations": [
+    "EntityToleranceStore gains a public `iter()` accessor not present in the packet's store listing. The checkers in invariants/tolerance_monotonicity must enumerate records, but the verbatim store API (new/get/raise) exposes no enumeration route and the backing `values` map is private; without the accessor the checker functions in decision 3 cannot be implemented."
+  ],
+  "disagreements": [
+    "The packet's `raise` listing declares `-> Outcome<()>` and bodies the success path `Ok(())`. Against the real truck-base API `Outcome<T> = Result<Certified<T>, Refusal>` this does not compile: there is no coercion from `()` to `Certified<()>`. I return the house certificate instead (`Certified::new((), Certificate { props: PropMap::new(), method: Method::None, budget_left: Budget::new(0, 0, 0), margin: Margin::UNBOUNDED, modulus: Modulus::Unbounded })`), keeping the refusal shape and all raise semantics (max via strict `>`, insert-when-absent, store unchanged on refusal) exactly as specified. The property map is deliberately empty: `raise` mutates state and does not itself certify the invariant, so it must not stamp `ToleranceMonotonicity = True`; `Method::None` follows decision 4's rationale for order tests on recorded values. The packet also never specifies what a successful `raise` certificate is, so this is the minimal compilable completion."
+  ],
+  "baseline_failures": [],
+  "notes": "Landed the BG-TOL-003 sidecar store (vendor/truck/truck-topology/src/tolerance_store.rs) and the BG-INV-107 checker (vendor/truck/truck-topology/src/invariants/tolerance_monotonicity.rs), wired as `pub mod tolerance_store;` between `mod solid;` and `mod vertex;` in lib.rs and `pub mod tolerance_monotonicity;` between `shell_nesting` and `vertex_link` in invariants/mod.rs. Both new modules open with the house H-1 deny block (GATE-1). Serde is a pairs-sequence with duplicate-ids-last-wins. Nine tests and one doctest added (59+9=68 lib tests, 1+130=131 doctests, all green; 4 test binaries green, 1 pre-existing ignored). All verification green: cargo fmt --check -p truck-topology, cargo clippy -p truck-topology --all-targets --no-deps (zero findings), cargo test -p truck-topology --lib --tests --no-fail-fast, cargo test -p truck-topology --doc, cargo check --workspace --all-targets, and bash scripts/kernel-gates.sh ce993fb (all P-3 gates pass, unscaled_legacy 110/110). Wiring the store into operations (who raises, when) is untouched, per the packet. Committed on packet/BG-INV-107 as 8b0cde3 'feat(topology): per-entity tolerance store + monotonicity checker (BG-INV-107)'."
+}
