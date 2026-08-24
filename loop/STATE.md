@@ -11,84 +11,91 @@ otherwise would eventually cost a trap.) If you are picking this up cold, read
 [`loop/ORCHESTRATOR.md`](ORCHESTRATOR.md) for how to run the loop, then
 `python loop/slot_status.py`** - nothing else. Do not read `LEDGER.jsonl` whole.
 
-Updated 2026-08-24, session 23 (in progress; BG-INV-107 dispatched on slot 0).
-Branch: `integration/kernel-bg`.
+Updated 2026-08-24, close of session 23. Branch: `integration/kernel-bg`.
 
 ## Where we are
 
-**Seventy-four packets DONE of 76 rows — and both BLOCKED rows are now
-UNBLOCKED.** The owner decided both quandaries this session; the amendments
-landed at `ce993fb` (TOL: per-entity tolerance is sidecar state —
-`EntityToleranceStore` keyed by `EntityId`, raise-only, `None`-not-zero;
-ENC: the offset enclosure is composition over a new `EnclosureVectorField`,
-never `N: EnclosureSurface`). **BG-INV-107 is DISPATCHED** (slot 0, packet
-`loop/packets/BG-INV-107.md`, fork point `ce993fb`, model
-deepseek/deepseek-v4-flash). **BG-ENC-004-OFFSET is TODO, design class, and
-has NO packet yet** — its amendment records the architecture, but the packet
-waits for scratch validation against real carriers (the session-16/17
-discipline: compile it, run the flagship witnesses, then write the packet).
-The watchdog is RUNNING (pid 40852, `LOOK_WATCHDOG_STAGNANT=3600`).
+**Seventy-five packets DONE of 76. BG-INV-107 landed FIRST-TRY** (verified
+ACCEPTED at `8b0cde3`, merged `f129536`, filed `b4697d8`): the BG-TOL-003
+sidecar store (`tolerance_store.rs`, 221 lines) and the monotonicity checker
+(`invariants/tolerance_monotonicity.rs`, 225 lines), 9 tests + 1 doctest,
+all gates PASS including V8's 984 downstream tests and V9's 39 geometry
+tests. **The only open row is BG-ENC-004-OFFSET (TODO, design, no packet
+yet)** — its owner-decision amendment records the architecture; the packet
+waits for scratch validation against real carriers. The watchdog is RUNNING
+(pid 40852, `LOOK_WATCHDOG_STAGNANT=3600`).
 
-Session 23 in three lines: the owner picked refined-(b) for INV-107's storage
-(sidecar store, raise-only, value = length-valued upper bound on accumulated
-geometric uncertainty, never "the tolerance predicates use") and (a)-with-a-
-vector-field-trait for ENC-004-OFFSET (box-sum composition mirroring
-`Offset`'s own arithmetic; normal cones are an optional internal fast path);
-both amendments landed in the spec's BG-TOL-001 and BG-ENC-004 sections and
-the registry flipped through python (watchdog read path re-verified); the
-INV-107 packet was written with its scenario table machine-checked
-(`scratch/inv107_check.py` — 24 scenarios), its serde design validated
-against the real `EntityId` (`scratch/inv107serde` — the pairs-sequence
-finding below), all seven anchors verified, and the truck-topology baseline
-measured green (clippy zero, 59 lib + 4 test-binary tests) before dispatch.
+Session 23 in three lines: the owner decided both BLOCKED-row quandaries —
+per-entity tolerance is sidecar state (`EntityToleranceStore` keyed by
+`EntityId`, raise-only, `None`-not-zero) and the offset enclosure is
+composition over a new `EnclosureVectorField` (never `N: EnclosureSurface`)
+— and both amendments landed in the spec at `ce993fb` with the registry
+flipped through python; the INV-107 packet was written with its 24-scenario
+table machine-checked (`scratch/inv107_check.py`) and its serde design
+validated against the real `EntityId` (`scratch/inv107serde` — which found
+the pairs-sequence requirement); the worker landed it in ~15 min with one
+worker-right disagreement (the packet's `raise` sketch returned `Ok(())`,
+which cannot compile against `Outcome<()> = Result<Certified<()>, Refusal>`
+— the worker completed it with the house certificate and an empty PropMap,
+correctly reasoning that a mutation does not certify the invariant) and one
+deviation (a public `iter()` accessor the store needs for the checker — a
+packet omission, minimal fix). Verify: ~11 min detached; the first
+foreground attempt was killed by the tool timeout (the known trap, walked
+into anyway) and the detached relaunch pattern worked exactly as recorded.
 
 ## Pick up here
 
-1. **Adjudicate BG-INV-107 when slot 0 finishes** (`RESULT.json` in the
-   worktree; poll `slot_status.py`). Verify with
-   `python loop/verify.py --slot 0 --packet loop/packets/BG-INV-107.md --base ce993fb`
-   — the base is the fork point, which is the amendments commit; read it off
-   the slot if in doubt. Then the usual landing dance (ledger row BEFORE
-   land_packet, PACKET.md/RESULT.json never reach the integration branch).
-2. **Write BG-ENC-004-OFFSET's scratch, then its packet, then dispatch it**
-   (slot 1 or 2 — re-fork with new_slot.py first; stale worker files sit in
-   both). The amendment in the BG-ENC-004 spec section is the complete
-   design: `EnclosureVectorField` + `EnclosureScalarField2` in enclosure.rs,
-   `impl EnclosureSurface for Offset<S, N>` bounded
-   `S: ParametricSurface3D + EnclosureSurface, N: EnclosureVectorField`,
-   box-sum composition per method, `NormalField<S, F>` implements the vector
+1. **Write BG-ENC-004-OFFSET's scratch, then its packet, then dispatch it.**
+   All three slots are idle with stale files or cleaned — re-fork with
+   `new_slot.py` before any dispatch. The amendment in the BG-ENC-004 spec
+   section is the complete design: `EnclosureVectorField` +
+   `EnclosureScalarField2` in enclosure.rs, `impl EnclosureSurface for
+   Offset<S, N>` bounded `S: ParametricSurface3D + EnclosureSurface,
+   N: EnclosureVectorField`, box-sum composition per method (mirroring
+   `Offset`'s own arithmetic), `NormalField<S, F>` implements the vector
    trait (cross box / immersion bound / quotient rule for derivatives;
-   `impl EnclosureScalarField2 for f64` covers constant distance), unit-ball
-   fallback for the unit normal's position, `ENTIRE` for its derivatives at
-   a singular locus, cone `None` per family rule. The scratch must RUN the
-   flagship witnesses: Plane + constant d (flat), Sphere + constant d
-   (curved — the real quotient-rule path), and an inward-offset cylinder
-   past its radius (self-intersection → cross box straddles zero →
-   `normal_cone` None) — with sampling soundness on the composition.
+   `impl EnclosureScalarField2 for f64` covers constant distance),
+   unit-ball fallback for the unit normal's position, `ENTIRE` for its
+   derivatives at a singular locus, cone `None` per family rule. The scratch
+   must RUN the flagship witnesses: Plane + constant d (flat), Sphere +
+   constant d (curved — the real quotient-rule path), and an inward-offset
+   cylinder past its radius (self-intersection → cross box straddles zero →
+   `normal_cone` None), with sampling soundness on the composition. Copy the
+   BG-INV-107 packet's shape (`loop/packets/BG-INV-107.md` is the freshest
+   worked example).
+2. **When it lands, the registry is FINISHED — 76/76.** What remains after
+   that is new spec items, Stage B threading (BG-TOL-004's 23 squared-order
+   sites are named in the spec but unwritten), and the open questions in
+   this file's "Open questions" section. The loop's charter — implement
+   decided spec — has no more decided-but-unimplemented items after
+   ENC-004-OFFSET.
 3. If the machine may sleep at any point, STOP the watchdog first (pid in
    `loop/watchdog.lock`) and restart it with the cmd /c pattern on resume.
 
 ## State of the machine, as left
 
-- **Watchdog RUNNING** (pid 40852, launched 2026-08-24 with
-  `LOOK_WATCHDOG_STAGNANT=3600` via the cmd /c pattern). Disk was 9.3 GB free
-  after slot 0's warm — just above its 9 GB soft floor, so it will reclaim
-  idle slot targets (1 and 2); that is its job, not a fault.
-- Registry: **74 DONE / 2 TODO (76 rows)**, both TODO rows unblocked this
-  session. HEAD at dispatch: `ce993fb`. Tracked tree clean.
-- Slot 0: RUNNING BG-INV-107 (forked at `ce993fb`, warm build 0.4 min —
-  target carried over from FID-005-SRF). Slots 1/2: idle, stale worker
-  files, re-fork before any dispatch.
-- The two spec amendments, the registry flip, and the packet are all in
-  `ce993fb`; the scratch validations live in `scratch/inv107_check.py` and
-  `scratch/inv107serde/` (untracked, deliberately).
+- **Watchdog RUNNING** (pid 40852, launched 2026-08-24 11:43 with
+  `LOOK_WATCHDOG_STAGNANT=3600` via the cmd /c pattern). Its disk guard
+  behaved exactly as designed during the verify: it held off while the live
+  verify (pid-tracked) ran at 5.9 GB free, then reclaimed the leaked
+  baseline (2.0 GB) and slot 0's finished target (9.6 GB) after the verdict.
+- Registry: **75 DONE / 1 TODO (76 rows)**. HEAD at close: `b4697d8`.
+  Tracked tree clean. GATE-4 ceiling 110 -> 110 (INV-107 touches no
+  tolerance sites).
+- Slot 0: landed; worker.pid/packet/branch deleted, but the worktree still
+  holds the worker's (uncommitted, already-filed) RESULT.json copy — the
+  same stale state as slots 1/2, all three re-fork with new_slot.py before
+  dispatch. The watchdog leaves it alone: the row reads DONE.
+- Disk 15.4 GB free at close. loop/results/ gained BG-INV-107.json (the
+  worker's disagreement and deviation verbatim).
+- Speed datapoint: worker wall ~15 min, verify ~11 min detached — the
+  smallest design packet so far, consistent with "every judgement
+  pre-made" being the leverage.
 
 ## The parallelism picture
 
-BG-INV-107 in flight on slot 0 (truck-topology). BG-ENC-004-OFFSET is
-write-disjoint (truck-evidence) and could run in parallel once its packet
-exists — but its packet does not exist yet, and writing it well is a
-session's own scratch-validation job.
+None running. BG-ENC-004-OFFSET is the only dispatchable row once its
+packet exists; nothing else is eligible.
 
 ## Traps, each one paid for
 - **The watchdog's default 1200s wedged-killer kills healthy workers during a
@@ -1359,3 +1366,25 @@ what the tree says about the last two, as opposed to what the spec says.
   scratch-crate run against the real type (`scratch/inv107serde`), not by
   compilation — the scratch discipline again. Any new keyed-by-EntityId
   container owes the same check.
+
+- **The scratch must model the packet's EXACT signatures, not a
+  simplification of them.** Session 23: the INV-107 serde scratch validated
+  the store design with a `raise` returning `()` — but the packet's
+  `raise` returned `Outcome<()>` (= `Result<Certified<()>, Refusal>`), and
+  the packet's `Ok(())` success line does not compile against that alias.
+  The scratch's simplification hid exactly the bug the worker caught (and
+  fixed correctly, with an empty PropMap — a mutation does not certify the
+  invariant). Same family as "reference values must come from the SAME code
+  path the packet mandates": every fn a packet spells verbatim goes into
+  the scratch verbatim, return types included, or the scratch proves
+  something adjacent to what ships.
+
+- **The bash tool's own timeout cap is one of the "wrappers" that kill a
+  verify.** Session 23: a foreground `verify.py` with a 15-minute tool cap
+  was killed mid-baseline exactly as the session-12 trap predicts. The
+  recovery is already recorded (relaunch detached, poll `VERDICT.json`,
+  check its `packet`/`base`/`commit` fields before believing it) and worked
+  first try — the addition is only that the tool timeout is a live instance
+  of the wrapper, so verify NEVER runs in the foreground of a tool call
+  with a cap; launch it via `Start-Process cmd /c "... > out 2>&1"` and
+  poll.
