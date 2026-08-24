@@ -13,7 +13,7 @@ State vocabulary: `PENDING` `RUNNING` `WORKER_DONE` `VERIFIED` `LANDED`
 | AUD-016 | BG-AUD-FIX-001 | LANDED | d1355c7 | ACCEPTED | 1844cfe | sphere_immersion_lower_bound_is_directed |
 | AUD-002 | BG-AUD-FIX-002 | WORKER_DONE | | | | |
 | AUD-003 | BG-AUD-FIX-003 | WORKER_DONE | | | | |
-| AUD-004 | BG-AUD-FIX-004 | RUNNING | | | | |
+| AUD-004 | BG-AUD-FIX-004 | OWNER_BLOCKED | b48e2b7 | Phase A: no witness | — | — |
 | AUD-007 | BG-AUD-FIX-005 | RUNNING | | | | |
 | AUD-005 | BG-AUD-FIX-006 | PENDING | | | | |
 | AUD-009 | BG-AUD-FIX-006 | PENDING | | | | |
@@ -62,15 +62,27 @@ State vocabulary: `PENDING` `RUNNING` `WORKER_DONE` `VERIFIED` `LANDED`
   endpoint-magnitude refusal (the union alone leaves the piece hull spanning
   both values, pinning its norm infimum at 0 → NumericallyUnresolved, so the
   ForwardToleranceExceeded verdict needs the explicit endpoint check). Sound,
-  refuses-only. Verify queued.
+  refuses-only. **LANDED** at `d734d2a` (verify ACCEPTED at `e21cbeb`);
+  truck-topology same_parameter re-run 5/5 green post-merge. AUD-002 closed.
 - **BG-AUD-FIX-003** worker done (`8bdf204`): NaN guard (hand-computed normal
   magnitude refuses non-finite/zero), sampling at `t0`/`t_mid`/`t1`, scoped
   sampled-claim doc. Test-only delegating `Surface` enum to combine Cone+Plane
   in one shell. Verify queued.
-- **BG-AUD-FIX-005** attempt 1 = SPEC_GAP (worker right): `inari::Interval::asin`
-  is gmp-gated and the tree pins `default-features = false`; gmp not viable on
-  this toolchain. Packet amended (orchestrator) to the series hybrid:
-  `s/2 + s³/16 + 7s⁵/256` in interval arithmetic `.inf()` for `s < 1e-6`, the
-  interval closed form `.inf()` for `s >= 1e-6` (the s⁵ coefficient is 7/256,
-  machine-checked, not the packet's original 5/512). Re-dispatched with
-  `--resume`.
+- **BG-AUD-FIX-004** = **OWNER_BLOCKED** after Phase A (`b48e2b7`, no code).
+  No real failing witness exists: `certify_cell` builds Q as the widened hull
+  of the endpoint seeds, so a cell certifies only when the parameter path is
+  monotone in every surface parameter; non-monotone paths always refuse.
+  Evidence: 764+ cells with interior parameter escapes across three real
+  carrier families (tilted-plane/sphere, cylinder/sphere, full-circle tilted
+  leader) all refused; every certified cell enclosed its sampled points. The
+  packet's explicit Phase-A-fails branch was followed: no forced center-term
+  rewrite. Owner accepts the invariant argument; AUD-004 is closed as
+  OWNER-DESIGN-BLOCKED.
+- **BG-AUD-FIX-005** attempts 1-2 = SPEC_GAP (workers right): `inari::Interval::asin`
+  is gmp-gated (off in this tree, gmp not viable on this toolchain), and inari
+  has no `Interval * f64` / `Interval / f64`. Packet amended (orchestrator,
+  twice) to the series hybrid `s/2 + s³/16 + 7s⁵/256` (interval arithmetic,
+  `.inf()`) for `s < 1e-6` and the interval closed form for `s >= 1e-6`, with
+  scalars wrapped as degenerate intervals (s⁵ coefficient machine-checked to
+  7/256, not the packet's original 5/512). Attempt 3 = DONE (`8f6f71e`, fix +
+  1 test). Verify queued at base `03e1d0a`.
