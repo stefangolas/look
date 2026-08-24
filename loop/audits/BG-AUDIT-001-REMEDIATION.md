@@ -15,8 +15,8 @@ State vocabulary: `PENDING` `RUNNING` `WORKER_DONE` `VERIFIED` `LANDED`
 | AUD-003 | BG-AUD-FIX-003 | LANDED | 8bdf204 | ACCEPTED | 70d98bb | wedge_singular_midpoint_normal_refuses |
 | AUD-004 | BG-AUD-FIX-004 | OWNER_BLOCKED | b48e2b7 | Phase A: no witness | — | — |
 | AUD-007 | BG-AUD-FIX-005 | LANDED | 8f6f71e | ACCEPTED | f98d441 | wedge_slope_lower_bound_is_conservative_at_small_margins |
-| AUD-005 | BG-AUD-FIX-006 | RUNNING | | | | |
-| AUD-009 | BG-AUD-FIX-006 | RUNNING | | | | |
+| AUD-005 | BG-AUD-FIX-006 | WORKER_DONE | | | | |
+| AUD-009 | BG-AUD-FIX-006 | WORKER_DONE | | | | |
 | AUD-006 | BG-AUD-FIX-007 | WORKER_DONE | 44abfed | | | |
 | AUD-008 | BG-AUD-FIX-008 | PENDING | | | | |
 | AUD-015 | BG-AUD-FIX-008 | PENDING | | | | |
