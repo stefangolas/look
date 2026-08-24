@@ -77,8 +77,8 @@
 {"id": "BG-AUD-FIX-001", "wave": "AUD", "class": "design", "status": "RUNNING", "needs": [], "writes": [], "packet": "loop/packets/BG-AUD-FIX-001.md", "note": "BG-AUDIT-001 remediation: AUD-001, AUD-016 (truck-evidence)"}
 {"id": "BG-AUD-FIX-002", "wave": "AUD", "class": "mechanical", "status": "RUNNING", "needs": [], "writes": [], "packet": "loop/packets/BG-AUD-FIX-002.md", "note": "BG-AUDIT-001 remediation: AUD-002 (truck-evidence)"}
 {"id": "BG-AUD-FIX-003", "wave": "AUD", "class": "design", "status": "RUNNING", "needs": [], "writes": [], "packet": "loop/packets/BG-AUD-FIX-003.md", "note": "BG-AUDIT-001 remediation: AUD-003 (truck-topology)"}
-{"id": "BG-AUD-FIX-004", "wave": "AUD", "class": "design", "status": "TODO", "needs": [], "writes": [], "packet": "loop/packets/BG-AUD-FIX-004.md", "note": "BG-AUDIT-001 remediation: AUD-004 (truck-evidence)"}
-{"id": "BG-AUD-FIX-005", "wave": "AUD", "class": "mechanical", "status": "TODO", "needs": [], "writes": [], "packet": "loop/packets/BG-AUD-FIX-005.md", "note": "BG-AUDIT-001 remediation: AUD-007 (truck-evidence)"}
+{"id": "BG-AUD-FIX-004", "wave": "AUD", "class": "design", "status": "RUNNING", "needs": [], "writes": [], "packet": "loop/packets/BG-AUD-FIX-004.md", "note": "BG-AUDIT-001 remediation: AUD-004 (truck-evidence)"}
+{"id": "BG-AUD-FIX-005", "wave": "AUD", "class": "mechanical", "status": "RUNNING", "needs": [], "writes": [], "packet": "loop/packets/BG-AUD-FIX-005.md", "note": "BG-AUDIT-001 remediation: AUD-007 (truck-evidence)"}
 {"id": "BG-AUD-FIX-006", "wave": "AUD", "class": "design", "status": "TODO", "needs": [], "writes": [], "packet": "loop/packets/BG-AUD-FIX-006.md", "note": "BG-AUDIT-001 remediation: AUD-005, AUD-009 (truck-geometry)"}
 {"id": "BG-AUD-FIX-007", "wave": "AUD", "class": "mechanical", "status": "TODO", "needs": [], "writes": [], "packet": "loop/packets/BG-AUD-FIX-007.md", "note": "BG-AUDIT-001 remediation: AUD-006 (truck-geometry)"}
 {"id": "BG-AUD-FIX-008", "wave": "AUD", "class": "design", "status": "TODO", "needs": [], "writes": [], "packet": "loop/packets/BG-AUD-FIX-008.md", "note": "BG-AUDIT-001 remediation: AUD-008, AUD-015 (truck-topology)"}
