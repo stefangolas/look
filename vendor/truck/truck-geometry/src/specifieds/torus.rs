@@ -120,7 +120,7 @@ impl ParametricSurface3D for Torus {
     #[inline(always)]
     fn normal_uder(&self, u: f64, v: f64) -> Vector3 {
         let sv = Vector2::new(f64::cos(v), f64::sin(v));
-        Vector3::new(-sv.x * f64::sin(u), sv.x * f64::cos(u), sv.y)
+        Vector3::new(-sv.x * f64::sin(u), sv.x * f64::cos(u), 0.0)
     }
     #[inline(always)]
     fn normal_vder(&self, u: f64, v: f64) -> Vector3 {
@@ -214,5 +214,30 @@ impl ParameterDivision2D for Torus {
         let vtol = tol / self.small_radius();
         let (vdiv, _) = circle.parameter_division(vrange, vtol);
         (udiv, vdiv)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn torus_normal_uder_matches_finite_difference() {
+        let torus = Torus::new(Point3::origin(), 3.0, 1.0);
+        let v = 1.0;
+        let h = 1e-6; // H-3
+        let slack = 1e-5; // H-3
+        for u in [0.0, 0.3, 1.0, 2.0, 5.0] {
+            let analytic = torus.normal_uder(u, v);
+            let numeric = (torus.normal(u + h, v) - torus.normal(u - h, v)) / (2.0 * h);
+            let (ax, ay, az) = (analytic.x, analytic.y, analytic.z);
+            let (nx, ny, nz) = (numeric.x, numeric.y, numeric.z);
+            for (a, b) in [(ax, nx), (ay, ny), (az, nz)] {
+                assert!(
+                    (a - b).abs() < slack,
+                    "u={u}: analytic={analytic:?}, numeric={numeric:?}"
+                );
+            }
+        }
     }
 }
