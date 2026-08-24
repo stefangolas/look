@@ -9,10 +9,10 @@ State vocabulary: `PENDING` `RUNNING` `WORKER_DONE` `VERIFIED` `LANDED`
 
 | finding | fix packet | state | worker commit | verifier | landed commit | regression |
 |---|---|---|---|---|---|---|
-| AUD-001 | BG-AUD-FIX-001 | RUNNING | | | | |
-| AUD-016 | BG-AUD-FIX-001 | RUNNING | | | | |
-| AUD-002 | BG-AUD-FIX-002 | RUNNING | | | | |
-| AUD-003 | BG-AUD-FIX-003 | RUNNING | | | | |
+| AUD-001 | BG-AUD-FIX-001 | LANDED | d1355c7 | ACCEPTED | 1844cfe | sphere_normal_cone_wide_azimuth_contains_all_normals |
+| AUD-016 | BG-AUD-FIX-001 | LANDED | d1355c7 | ACCEPTED | 1844cfe | sphere_immersion_lower_bound_is_directed |
+| AUD-002 | BG-AUD-FIX-002 | WORKER_DONE | | | | |
+| AUD-003 | BG-AUD-FIX-003 | WORKER_DONE | | | | |
 | AUD-004 | BG-AUD-FIX-004 | RUNNING | | | | |
 | AUD-007 | BG-AUD-FIX-005 | RUNNING | | | | |
 | AUD-005 | BG-AUD-FIX-006 | PENDING | | | | |
@@ -54,3 +54,23 @@ State vocabulary: `PENDING` `RUNNING` `WORKER_DONE` `VERIFIED` `LANDED`
   0.4994291492576638 vs directed 0.4994291492576637).
 - 11 repair packets written and validated (`gen_packet.check` green) on
   2026-08-24.
+- **BG-AUD-FIX-001 LANDED** at `1844cfe` (worker `d1355c7`, verify ACCEPTED at
+  base `e21cbeb`). Everything-cone for azimuth span `>= π`; directed interval
+  immersion bound. AUD-001 + AUD-016 closed.
+- **BG-AUD-FIX-002** worker done (`794b4e1`): union of the original diff
+  spline's `subs(a)`/`subs(b)` into every piece hull PLUS a conservative
+  endpoint-magnitude refusal (the union alone leaves the piece hull spanning
+  both values, pinning its norm infimum at 0 → NumericallyUnresolved, so the
+  ForwardToleranceExceeded verdict needs the explicit endpoint check). Sound,
+  refuses-only. Verify queued.
+- **BG-AUD-FIX-003** worker done (`8bdf204`): NaN guard (hand-computed normal
+  magnitude refuses non-finite/zero), sampling at `t0`/`t_mid`/`t1`, scoped
+  sampled-claim doc. Test-only delegating `Surface` enum to combine Cone+Plane
+  in one shell. Verify queued.
+- **BG-AUD-FIX-005** attempt 1 = SPEC_GAP (worker right): `inari::Interval::asin`
+  is gmp-gated and the tree pins `default-features = false`; gmp not viable on
+  this toolchain. Packet amended (orchestrator) to the series hybrid:
+  `s/2 + s³/16 + 7s⁵/256` in interval arithmetic `.inf()` for `s < 1e-6`, the
+  interval closed form `.inf()` for `s >= 1e-6` (the s⁵ coefficient is 7/256,
+  machine-checked, not the packet's original 5/512). Re-dispatched with
+  `--resume`.
