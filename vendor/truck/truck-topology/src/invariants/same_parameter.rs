@@ -10,8 +10,9 @@
 //! checker takes it as a parameter.
 //!
 //! An edge whose `pcurve()` is `None` (the `PC = ()` default, today's every
-//! edge) is vacuously satisfied: there is no trace to disagree with the
-//! leader.
+//! edge) is NOT certified: the absence of a trace is not-applicable, not a
+//! hold. `check_edge` still returns `Ok` (nothing was violated — there is no
+//! trace to disagree), but `SameParameter` stays `Unknown`.
 
 use crate::Edge;
 use std::ops::Bound;
@@ -31,8 +32,9 @@ use truck_geotrait::ParametricCurve;
 /// parameter span, by BG-CE-002's whole-span certificate. The parameter
 /// correspondence `phi` is the attachment contract, supplied by the
 /// caller — the tree does not record it. An edge whose `pcurve()` is
-/// `None` (the `PC = ()` default, today's every edge) is vacuously
-/// satisfied: there is no trace to disagree with the leader.
+/// `None` (the `PC = ()` default, today's every edge) is NOT certified:
+/// the absence of a trace is not-applicable (nothing was violated — there
+/// is no trace to disagree), so `SameParameter` stays `Unknown`.
 ///
 /// Refusals: `ForwardToleranceExceeded { bound, allowed }` is the
 /// VIOLATION (a certified lower bound on the deviation exceeds `tau` —
@@ -60,8 +62,9 @@ use truck_geotrait::ParametricCurve;
 ///         Point3::new(1.0, 1.0, 2.0),
 ///     ],
 /// );
-/// // The vacuous case: the `PC = ()` default carries no pcurve, so there is
-/// // no trace to disagree with the leader.
+/// // The no-trace case: the `PC = ()` default carries no pcurve, so there is
+/// // no trace to disagree with the leader — the checker is not-applicable,
+/// // not certified.
 /// let edge: Edge<usize, BSplineCurve<Point3>, ()> = Edge::new(&v[0], &v[1], leader);
 /// let tau = match ToleranceCtx::new(1.0, TOLERANCE, TOLERANCE, TOLERANCE) {
 ///     Ok(ctx) => ctx.value.entity_tau(TOLERANCE),
@@ -91,16 +94,14 @@ where
     pc.certify_trace(leader, phi, tau, budget)
 }
 
-/// The vacuous-holds certificate: `method: Method::None` (nothing was
-/// computed), `SameParameter` `True` because there is no trace to disagree
-/// with the leader.
+/// The no-trace certificate: `method: Method::None` (nothing was computed),
+/// and `SameParameter` stays `Unknown` because the absence of a trace is NOT
+/// evidence that the parametric trace agrees with the leader.
 fn vacuous_holds() -> Outcome<()> {
-    let mut props = PropMap::new();
-    props.set(Prop::SameParameter, Truth::True);
     Ok(Certified::new(
         (),
         Certificate {
-            props,
+            props: PropMap::new(),
             method: Method::None,
             budget_left: Budget::new(0, 0, 0),
             margin: Margin::UNBOUNDED,
@@ -110,7 +111,7 @@ fn vacuous_holds() -> Outcome<()> {
 }
 
 /// Dispatches the attached-pcurve path by carrier type. `check_edge` needs no
-/// `PC: EnclosureCurve` to accept the vacuous `()` default; the impls below
+/// `PC: EnclosureCurve` to accept the trace-less `()` default; the impls below
 /// carry the bound where it is actually required. `certify_trace` extracts
 /// the pcurve's span and certifies the whole-span deviation against the
 /// leader by BG-CE-002.
@@ -384,9 +385,65 @@ mod tests {
         let mut budget = Budget::new(1 << 16, 0, 0);
         let certified = match check_edge(&edge, ParamMap::IDENTITY, tau, &mut budget) {
             Ok(certified) => certified,
-            Err(_) => unreachable!("the vacuous edge must hold"),
+            Err(_) => unreachable!("the no-trace edge must hold"),
         };
         assert_eq!(certified.cert.method, Method::None);
+        assert_eq!(
+            certified.cert.props.get(Prop::SameParameter),
+            Truth::Unknown
+        );
+    }
+
+    #[test]
+    fn same_parameter_none_pcurve_does_not_certify() {
+        let tau = legacy_tau();
+        let v = Vertex::news([0usize, 1usize]);
+        let edge: Edge<usize, BSplineCurve<Point3>, ()> = Edge::new(&v[0], &v[1], leader_witness());
+        let mut budget = Budget::new(1 << 16, 0, 0);
+        let certified = match check_edge(&edge, ParamMap::IDENTITY, tau, &mut budget) {
+            Ok(certified) => certified,
+            Err(_) => unreachable!("the no-trace edge must not refuse"),
+        };
+        assert_eq!(certified.cert.method, Method::None);
+        assert_eq!(
+            certified.cert.props.get(Prop::SameParameter),
+            Truth::Unknown
+        );
+    }
+
+    #[test]
+    fn same_parameter_pre_cut_half_does_not_certify() {
+        let tau = legacy_tau();
+        // The vertices carry Point3 so the public `cut_with_parameter` API
+        // (which needs `P: Tolerance` and `C: Cut<Point = P>`) is available.
+        let v = Vertex::news([Point3::new(0.0, 0.0, 0.0), Point3::new(1.0, 1.0, 2.0)]);
+        let edge: Edge<Point3, BSplineCurve<Point3>, ()> =
+            Edge::new(&v[0], &v[1], leader_witness());
+        let mid = Vertex::new(edge.shared_curve().subs(0.5));
+        let (half0, half1) = match edge.cut_with_parameter(&mid, 0.5) {
+            Some(pair) => pair,
+            None => unreachable!("the parameter cut at the midpoint must succeed"),
+        };
+        assert_eq!(
+            half0.pcurve(),
+            None,
+            "pre_cut drops the pcurve on both halves"
+        );
+        assert_eq!(
+            half1.pcurve(),
+            None,
+            "pre_cut drops the pcurve on both halves"
+        );
+        let mut budget = Budget::new(1 << 16, 0, 0);
+        let certified = match check_edge(&half0, ParamMap::IDENTITY, tau, &mut budget) {
+            Ok(certified) => certified,
+            Err(_) => unreachable!("the cut half with no trace must not refuse"),
+        };
+        assert_eq!(certified.cert.method, Method::None);
+        assert_eq!(
+            certified.cert.props.get(Prop::SameParameter),
+            Truth::Unknown
+        );
     }
 
     #[test]

@@ -1,0 +1,10 @@
+{
+  "id": "BG-AUD-FIX-011",
+  "status": "DONE",
+  "contracts": ["AUD-014"],
+  "tests_added": 2,
+  "deviations": [],
+  "disagreements": [],
+  "baseline_failures": [],
+  "notes": "Pre-fix observations on the buggy code (vacuous_holds set Prop::SameParameter = True with no trace): same_parameter_none_pcurve_does_not_certify FAILED (assertion left: True, right: Unknown at the props.get(Prop::SameParameter) == Truth::Unknown assertion); same_parameter_pre_cut_half_does_not_certify FAILED (same assertion; the public cut_with_parameter path dropped the pcurve on both halves and the vacuous arm re-certified SameParameter = True); the updated existing test same_parameter_none_pcurve_is_vacuously_ok also FAILED (left: True, right: Unknown). The other four same_parameter tests (exact pcurve holds, offset violates, route-2 offset violates, zero-budget unresolved) passed both before and after. After the fix all 7 same_parameter tests pass. Repaired in vendor/truck/truck-topology/src/invariants/same_parameter.rs: vacuous_holds() now returns an empty PropMap (SameParameter stays Unknown) with method Method::None, per the decided owner amendment that absence of a trace is not-applicable, not a hold; check_edge still returns Ok for the no-trace case (nothing was violated, no refusal). Updated the module doc, the check_edge doc and the doctest comment to describe the no-trace case as not-applicable/prop Unknown rather than vacuously-true. certify_trace (attached-pcurve path) unchanged. The pre-cut provenance was exercised through the real public API: Edge<Point3, BSplineCurve<Point3>, ()> built with the leader_witness() curve, cut at t=0.5 via cut_with_parameter, and one half check_edge'd. Verification: cargo fmt --check -p truck-topology, cargo clippy -p truck-topology --all-targets --no-deps, cargo test -p truck-topology --lib --tests --no-fail-fast, cargo test -p truck-topology --doc, cargo check --workspace --all-targets all pass; bash scripts/kernel-gates.sh 61baa58 passes (GATE-4 unscaled_legacy 111/111; added-line gates clean -- no added float literals, no unwrap in the new kernel code)."
+}
