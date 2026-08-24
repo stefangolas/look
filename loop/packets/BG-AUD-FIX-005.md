@@ -59,47 +59,80 @@ infimum, in the unsound direction for a gate bound.
 
 ## Repair
 
-Evaluate the same lower-bound quantity with directed arithmetic, rounded DOWN.
-inari 2.0.0 provides `Interval::asin` (directed) and the crate's own
-`elementary::sin` is a certified interval pair; the module already imports
-`crate::enclosure::Interval` (which re-exports `inari::Interval`) and `sin` is
-available as `crate::elementary::sin`. The decided form:
+**Amendment (2026-08-24, orchestrator, after the first dispatch returned a
+SPEC_GAP):** the pinned `inari = { version = "2.0", default-features = false }`
+does NOT expose `Interval::asin` — it is compiled only under the `gmp`
+feature, which is off in this tree (and `gmp` pulls `gmp-mpfr-sys`/`rug`,
+which need `make`/`m4` and do not support this toolchain). The decided repair
+is therefore the **series with directed rounding**, hybridised with the closed
+form for the non-cancelling regime:
+
+- `sin(asin(s)/2) = s/2 + s³/16 + 7s⁵/256 + …` — every coefficient positive
+  for `s > 0`, so any partial sum is a certified LOWER bound. At the audit's
+  witnesses (`1e-6`, `1e-8`) the 3-term series matches the true value to the
+  last bit (measured).
+- For `s < 1e-6` (the catastrophic-cancellation regime): evaluate the 3-term
+  series in interval arithmetic and take `.inf()`. Each interval op rounds
+  outward, so `.inf()` is a certified downward lower bound.
+- For `s >= 1e-6`: the closed form is accurate to ulps (measured relative
+  error `6.8e-9` at `1e-4`, `3e-11` at `1e-3`, decaying further), so evaluate
+  the closed form in interval arithmetic and take `.inf()` — sound, and within
+  `~2e-16` of the round-to-nearest closed form the existing tests pin.
+
+Concretely, replacing the body of `wedge_slope_lower_from_sin_margin` (keep
+the `InvalidMargin` guard and the return shape unchanged):
 
 ```rust
 let tt = Interval::try_from((sin_margin, sin_margin)).unwrap_or(Interval::EMPTY);
-let value = crate::elementary::sin(tt.asin() / 2.0).inf();
+let one = Interval::try_from((1.0, 1.0)).unwrap_or(Interval::EMPTY);
+let value = if sin_margin < 1.0e-6 {
+    // s/2 + s³/16 + 7s⁵/256, all terms positive (certified downward).
+    let s2 = tt * tt;
+    let s3 = tt * s2;
+    let s5 = s3 * s2;
+    (tt / 2.0 + s3 / 16.0 + s5 * 7.0 / 256.0).inf()
+} else {
+    let inner = (one - (one - tt * tt).sqrt()) / 2.0;
+    inner.sqrt().inf()
+};
 ```
 
-This is a certified downward lower bound on `sin(asin(s)/2)`: `asin` rounds
-outward, the halving and `sin` stay outward, and `.inf()` rounds the result
-down. It never exceeds the true infimum under the module's own arithmetic
-semantics. Keep the `InvalidMargin` guard (`!(sin_margin > 0.0 && sin_margin
-<= 1.0)`) exactly as it is, and keep the `scope`/return shape.
+`1.0e-6` and `2.0`/`16.0`/`256.0`/`7.0` are fine (the `1e-6` needs the
+same-line `// H-3` comment if it matches the gate pattern — check with
+`kernel-gates.sh`). The module has `#![deny(clippy::unwrap_used)]` at the top
+(lfs.rs:27); do NOT call `unwrap()` — the `unwrap_or(Interval::EMPTY)` form is
+mandatory. `Interval / f64` and `Interval * f64` compile (inari scales by a
+float).
 
-Note: `Interval::try_from` never fails for a finite in-range `sin_margin`;
-`.unwrap_or(Interval::EMPTY)` is for H-1 totality only. The module has
-`#![deny(clippy::unwrap_used)]` at the top (lfs.rs:27), so do NOT call
-`unwrap()`; the `unwrap_or` form is mandatory.
+The existing tests stay green: `wedge_slope_monotone_and_knife_limit` samples
+`[0.1, 1.0]` (all in the closed-form branch → strictly increasing exactly as
+before); `wedge_formula_matches_geometry` at `s ∈ {0.5, 1.0}` uses the
+closed-form branch whose `.inf()` is within `~2e-16` of the round-to-nearest
+closed form (the test's `1e-15` slack absorbs it, and the `cos(phi/2) + 1e-9`
+geometric claim holds with huge margin); the tiny-margin check at `s = 1e-4`
+uses the closed-form branch and stays `~5e-5 < 1e-3`.
 
 ## Regression test (exact name)
 
 `wedge_slope_lower_bound_is_conservative_at_small_margins` — in the existing
 `mod tests` of `lfs.rs`. For `s in [1e-6, 1e-8]` assert the certificate
-direction: the returned `value` must never exceed the true quantity computed
-with an independent upward-rounded evaluation,
+direction with an independent upward-slack reference computed WITHOUT inari's
+`asin` (which is gmp-gated and unavailable): the true value is
+`sin(asin(s)/2) = s/2 + s³/16 + …`, and `next_up(0.5*s + s³/16)` (f64,
+round-to-nearest then one ulp up) is an UPPER bound on the true value at these
+scales (measured: `ref >= true`). Assert:
 
 ```rust
-let tt = Interval::try_from((s, s)).unwrap_or(Interval::EMPTY);
-let true_sup = crate::elementary::sin(tt.asin() / 2.0).sup();
-assert!(bound.value <= true_sup, "s={s}: bound {} exceeds the true sup {true_sup}", bound.value);
+let ref_hi = (0.5 * s + s * s * s / 16.0).next_up();
+assert!(bound.value <= ref_hi, "s={s}: bound {} exceeds the true sup {ref_hi}", bound.value);
+assert!(bound.value > 0.0, "s={s}: bound collapsed to zero");
 ```
 
-(`.sup()` is an upward-rounded over-approximation of the true value, so a
-sound lower bound must satisfy `bound <= true_sup`; the old formula fails this
-at `s = 1e-8`.) Also assert `bound.value > 0.0` for `s = 1e-8` (the old formula
-collapses to `0.0` at `s = 1e-9`; the new form must not collapse at `1e-8`).
-The `1e-6`/`1e-8` literals need the same-line `// H-3` comment (see below). The
-existing tests `wedge_slope_monotone_and_knife_limit` and
+On the buggy code `s = 1e-8` gives `7.45e-9 > 5.000000000000001e-9` (fails) and
+`s = 1e-6` gives `5.000222e-7 > 5.000000000000001e-7` (fails); the series
+branch passes both with `bound > 0`. `next_up` is stable on this toolchain
+(rustc 1.97). The `1e-6`/`1e-8` literals need the same-line `// H-3` comment.
+The existing tests `wedge_slope_monotone_and_knife_limit` and
 `wedge_formula_matches_geometry` must stay green unchanged.
 
 ## H-3, the house rule that rejects bare float literals
@@ -131,10 +164,8 @@ the return type/shape. Widening a tolerance or adding slack. Adding `#[ignore]`.
 ## Stop conditions
 
 - an anchor count differs → `ANCHOR_MISMATCH`, naming the file and what you saw
-- `Interval::asin` is not available on the pinned `inari` (check the Cargo.lock
-  version) → `SPEC_GAP`, with the exact API difference and an alternative
-  directed construction (e.g. the power series `s/2 + s³/16 + 5s⁵/512 + …`
-  with each term rounded down, all terms positive)
+- the hybrid threshold (`1.0e-6`) or the interval arithmetic does not compile
+  against the pinned `inari` → `SPEC_GAP`, with the exact mismatch
 - three consecutive failed `cargo` runs on the same error → `BLOCKED`
 
 ## Finish by writing `RESULT.json` in the root of your worktree
