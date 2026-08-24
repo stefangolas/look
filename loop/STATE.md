@@ -11,98 +11,64 @@ otherwise would eventually cost a trap.) If you are picking this up cold, read
 [`loop/ORCHESTRATOR.md`](ORCHESTRATOR.md) for how to run the loop, then
 `python loop/slot_status.py`** - nothing else. Do not read `LEDGER.jsonl` whole.
 
-Updated 2026-08-23, close of session 21. Branch: `integration/kernel-bg`.
+Updated 2026-08-24, close of session 22. Branch: `integration/kernel-bg`.
 
 ## Where we are
 
-**Seventy-three packets DONE of 76 rows (the 70-contract graph is 70/70; the
-extra rows are the FID-008 r2/r3/r4 tracking rows, FID-003-r2, and
-BG-FID-005-SRF which is SPECD-unwritten). NOTHING is running; slots idle;
-watchdog RUNNING (pid 27032) and should be stopped at close or left running if
-the session resumes immediately.**
+**Seventy-four packets DONE of 76 rows. The dispatchable frontier is EMPTY:
+BG-FID-005-SRF landed first-try (verified ACCEPTED at fd07e15, landed as
+59a7348). The only open rows are INV-107 and ENC-004-OFFSET, both BLOCKED.
+Nothing is running; slots idle; watchdog STOPPED (pid removed at close).**
 
-Open work, all of it: **BG-FID-005-SRF (row exists, packet UNWRITTEN - the
-surface rep, see "Pick up here")** -> the two BLOCKED rows (INV-107,
-ENC-004-OFFSET, unchanged).
-
-Session 21 in three lines: BG-FID-003 attempt 1 was killed pre-commit when an
-orchestrator-side review found four packet defects (curvature-only tube bound,
-oriented-dot angle test, no boundary-kind input, box-to-point sup_distance
-formula on box operands) - the spec itself adjudicated all four against the
-packet; BG-FID-003-r2 landed with three worker-right disagreements (test-4
-arm, test-3 amplitude, parameter-gap min-vs-max soundness); BG-FID-005 landed
-first-try with two more worker-right disagreements (my eps_now formula was
-unsatisfiable box-diagonal semantics; my V-corner prose confused
-"contains both directions" with "contains the zero vector"). Two spec
-amendments landed with the packets. An API balance outage killed the first
-r2 resume silently at 11 events; the watchdog's hard-death redispatch ran a
-fresh session that completed the packet.
-
-**The disagreements field earned its keep five times this session.** Both
-landed packets were packet-defective in ways the machine-check scripts did
-NOT catch (right numbers, wrong mandated formula; right witness, ambiguous
-prose) - read loop/results/BG-FID-003-r2.json and loop/results/BG-FID-005.json
-before writing any FID-005-SRF prose.
+Session 22 in three lines: wrote BG-FID-005-SRF's packet (the surface rep —
+tensor-product bicubic Hermite emitter, surface scale components, per-axis
+refine loop, bivariate grid-vertex Krawczyk, 2D-BVH separation, the
+double-sheet negative test) with every witness machine-checked
+orchestrator-side — the check caught THREE design traps pre-dispatch (level
+cap vs linear convergence, false convergence on garbage-small coarse
+certificates, ulp-sliver derivative explosion). The worker landed it with
+two worker-right disagreements (the double-cover loop-termination note was
+wrong: the stall guard does not fire on an unreachable target — see traps)
+and fixed two of its own bugs found by the re-rep test (a derivative-net
+transpose and a degenerate-overlap miss producing NaN empty hulls). The
+machine slept overnight mid-run; the watchdog killed the worker on wake and
+started a fresh one; the 4h of uncommitted work was RECOVERED from the
+abandoned patch and the original session RESUMED (--resume's first live
+test — it works; recipe in traps).
 
 ## Pick up here
 
-1. **Write BG-FID-005-SRF's packet** (row: needs [BG-FID-005], writes
-   fid/rep.rs). Scope per the 2026-08-23 spec amendment in
-   GENERATION_KERNEL_BUILD_SPEC.md's BG-FID-005 section: REP-SRF-001 (surface
-   rep), the surface (iv-b) discharge, and the surface double-sheet negative
-   test ("a double sheet inside one normal tube, with correct tangent planes
-   on BOTH sheets"). The 2D Krawczyk operator is landed and generic-N
-   (krawczyk::<2>); the deferred design is the surface emitter (the curve
-   emitter's Hermite/Bezier pattern in rep.rs generalizes: tensor-product
-   Bezier hulls over 2D cells) and the bivariate normal-bundle fibre systems.
-   Consume curve_isotopy_conditions's pub(crate) cell/BVH machinery where the
-   2D analogue permits; machine-check every witness through the SURFACE
-   formulas before dispatch (the session-21 lesson: also check the mandated
-   FORMULA matches the numbers' semantics, not just the numbers).
-2. INV-107 / ENC-004-OFFSET remain BLOCKED.
-3. `--resume` is STILL effectively untested live: its only attempt
-   (BG-FID-003-r2, 01:06) died at 11 events on the API balance outage, and
-   the watchdog's redispatch does NOT use resume. The next amendment dispatch
-   anywhere is the first real test.
+1. **The registry graph is finished except the BLOCKED rows.** Any future
+   session starts by re-examining INV-107 and ENC-004-OFFSET (both blocked
+   on external design decisions, not on loop work) or by new spec items.
+2. Nothing else is pending. Loop/slots carry stale worker files (slot 0:
+   landed SRF; slots 1/2: older) — re-fork with new_slot.py before any
+   dispatch.
 
 ## State of the machine, as left
 
-- **Watchdog RUNNING** (pid 27032, stagnant=3600s; started 00:33). Stop it
-  with taskkill on the lock pid + remove loop/watchdog.lock if the machine
-  will sleep; otherwise leave it guarding.
-- Registry: **73 DONE / 1 SPECD-unwritten (FID-005-SRF) / 2 BLOCKED**
-  (76 rows). HEAD at close: `f409385`. Tracked tree clean. GATE-4 ceiling
-  110 -> 110 through all landings.
-- **New-harness speed measurements (the session-20 duty), two fresh runs:**
-  BG-FID-003-r2 (1979-line isotopy.rs + 101-line one_sheet addition, 14
-  tests): **wall 48.2 min, time-to-first-edit 23.9 min, 96 tool calls, 17
-  cargo cycles**. BG-FID-005 (1873-line rep.rs + 85-line isotopy exposure,
-  10 tests): **wall 114.0 min, time-to-first-edit 16.7 min, 242 tool calls,
-  55 cargo cycles**. Caveats: no like-for-like pre-lever baseline exists
-  (session-20's FID-008-chain runs predate the levers and were amendment
-  chains, not fresh packets), and the r2 measurement is the watchdog's
-  REDISPATCH, not the --resume attempt (which died on balance at 20s). Do
-  not quote these as lever speedups; they are the first two data points of
-  a fresh-packet baseline under the new harness.
-- **API balance outages are a live failure mode.** The 01:06 --resume died
-  silently (worker.err EMPTY, events stop mid-step, slot reads STALLED); the
-  real error is only in `~/.local/share/opencode/log/opencode.log`
-  ("AI_APICallError: Insufficient Balance"). A balance death can ALSO land
-  with the work complete: the 03:14 death hit after the commit and
-  RESULT.json write, during the final `git add`. **Before diagnosing any
-  silent worker death, read that log; before redispatching a dead worker,
-  check the slot branch for commits - the work may already be there.**
-- Slots 0/2 reset clean (slot 0 landed FID-005 then was left FINISHED with
-  RESULT.json present; re-fork with new_slot.py before dispatch). Slot 1
-  FINISHED+landed with stale worker files (BG-NUM-004). Disk ~24 GB free.
-- loop/results/ gained BG-FID-003-r2.json and BG-FID-005.json (both carry
-  the worker's disagreements verbatim - the adjudication record).
+- **Watchdog STOPPED** (lock removed 11:02, 2026-08-24). Restart with the
+  cmd /c pattern and LOOK_WATCHDOG_STAGNANT=3600 before any dispatch.
+- Registry: **74 DONE / 2 BLOCKED (76 rows)**. HEAD at close: `59a7348`.
+  Tracked tree clean apart from this STATE commit. GATE-4 ceiling 110->110.
+- **BG-FID-005-SRF speed datapoint (caveated):** worker wall time = 3h43m
+  (attempt 1, pre-sleep) + ~1h20m (resumed finish) ≈ **5h03m excluding the
+  ~8.5h machine sleep**; the resumed session logged 424 events. NOT
+  comparable to the session-21 baselines (48/114 min): the packet is ~2x
+  the size (3,444 insertions in rep.rs, 12 tests), the run included the
+  machine-sleep kill + recovery, and the pre-sleep events transcript was
+  lost to the watchdog's redispatch (survives only in the opencode log).
+- Disk ~13 GB free at close (the watchdog reclaimed slot-2 targets at
+  22:48). loop/results/ gained BG-FID-005-SRF.json (the worker's
+  disagreements verbatim — includes the accepted loop-termination fix).
+- API balance: the worker (deepseek) ran clean throughout; one
+  "Insufficient balance" error in the opencode log at 00:31Z was the
+  ORCHESTRATOR's own session, pre-resume, and cleared on its own.
 
 ## The parallelism picture
 
-The frontier is strictly serial: FID-005-SRF (packet unwritten), then only
-the two BLOCKED rows. The only available parallelism is orchestrator-side
-(packet writing while a worker runs), which this session used as designed.
+None. The frontier is empty; the loop's remaining rows are blocked on
+design decisions outside the loop's authority.
 
 ## Traps, each one paid for
 - **The watchdog's default 1200s wedged-killer kills healthy workers during a
@@ -1301,3 +1267,61 @@ what the tree says about the last two, as opposed to what the spec says.
   PowerShell content cmdlets - use python (`io.open(..., 'w',
   encoding='utf-8', newline='')`) or the Write tool, and after ANY script
   passes over a packet file, re-check that its non-ASCII survived.
+
+- **Machine sleep killed a healthy worker a SECOND time, and this time it
+  cost four hours of work — the recovery recipe is proven, use it.**
+  Session 22: the worker died mid-run at 23:47 when the machine slept; the
+  watchdog woke at 02:51, read 12195s of stagnation, killed it and
+  redispatched FRESH (the redispatch archives the uncommitted worktree as
+  `loop/slots/N/abandoned-<timestamp>.patch` — that archive is the
+  lifeline). Recovery that worked, first try: (1) stop the watchdog; (2)
+  kill the fresh worker it started; (3) `git -C wt reset --hard && clean
+  -fd`, then `git apply` the abandoned patch; (4) COMMIT the restored state
+  on the packet branch — run_packet REFUSES a dirty tree without `--reset`,
+  and `--reset` archives-and-discards, destroying the recovery;
+  (5) `run_packet.py --resume --session-id <old id>` (the old session id is
+  in the opencode provider log's stream lines, or worker.session if not yet
+  overwritten). The resumed session woke with its full debugging context
+  and finished in ~80 min. Also: the pre-sleep events.jsonl transcript is
+  LOST to the redispatch's reset — copy it aside before any recovery if the
+  transcript matters.
+
+- **A killed or timed-out test binary keeps its cargo file lock, and that
+  looks like a stalled worker.** Session 22: a zombie `truck_evidence-*`
+  test process from before the machine sleep burned 1463s CPU on the
+  pre-fix code and held the output binary; the resumed worker's cargo
+  commands sat at "permission denied" for 27+ min while its own kill
+  attempt missed. After ANY hard kill or timeout of a worker, `Get-Process
+  *truck_evidence*` and taskkill the stragglers before blaming the worker.
+
+- **The refine stall guard does not guard an unreachable target.** Session
+  22, worker-right disagreement: with `target_eps ~ 0` (a zero-scale exact
+  input, e.g. the double cover whose separation certificate is genuinely
+  0), eps improves ~30% per level FOREVER, so the "<1% relative improvement
+  twice" stall rule never fires and the loop refines into grids whose
+  measurement cost is the hang. The packet's own termination note was
+  wrong; the worker's fix (hand the loop the measured scale spend + 2
+  subdivisions so exhaustion fires on reachable grids) is the pattern for
+  any never-Ok test. If a future packet feeds zero-scale geometry to a rep
+  loop, an explicit target-reachability guard is a design decision to make
+  in the packet, not to discover in the test suite.
+
+- **A NaN/`[inf,-inf]` enclosure is the signature of a DEGENERATE-OVERLAP
+  MISS, not of bad arithmetic.** Session 22, worker bug found by the re-rep
+  test: its `cellOverlaps` port dropped the degenerate-inclusion clause, so
+  a degenerate query landing exactly ON a grid knot matched NO cell, the
+  hull of an empty point list is the `[inf,-inf]` box, every downstream
+  midpoint is NaN, and the loop hangs on NaN comparisons. When an enclosure
+  comes back empty/infinite, print the OVERLAP SET first. (Same family as
+  the curve's cellOverlaps rule — the per-axis port must carry the
+  degenerate clause.)
+
+- **The pre-dispatch machine-check caught three design traps and the worker
+  caught two more implementation traps — both halves are load-bearing.**
+  Session 22: the orchestrator-side interval scratch (scratch/fid005srf-
+  check.py, outward-rounded arithmetic through the exact mandated formulas)
+  caught the level-cap/linear-convergence explosion, the false convergence
+  on garbage-small coarse certificates, and the ulp-sliver derivative
+  explosion BEFORE dispatch; the worker's disagreements/tests caught the
+  derivative-net transpose and the degenerate-overlap miss AFTER. Neither
+  half alone would have landed this packet.
