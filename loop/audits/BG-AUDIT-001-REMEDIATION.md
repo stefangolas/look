@@ -23,9 +23,9 @@ State vocabulary: `PENDING` `RUNNING` `WORKER_DONE` `VERIFIED` `LANDED`
 | AUD-017 | BG-AUD-FIX-010 | LANDED | f893d9c | ACCEPTED | f1ed436 | conic_containment_scale_invariant |
 | AUD-011 | BG-AUD-FIX-009 | LANDED | c0d9c7d | ACCEPTED | 4b071ac | torus_normal_uder_matches_finite_difference |
 | AUD-012 | BG-AUD-FIX-009 | LANDED | c0d9c7d | ACCEPTED | 4b071ac | contact_points_singular_frame_refuses |
-| AUD-008 | BG-AUD-FIX-008 | PENDING | | | | |
-| AUD-015 | BG-AUD-FIX-008 | PENDING | | | | |
-| AUD-014 | BG-AUD-FIX-011 | PENDING | | | | |
+| AUD-008 | BG-AUD-FIX-008 | RUNNING | | | | |
+| AUD-015 | BG-AUD-FIX-008 | RUNNING | | | | |
+| AUD-014 | BG-AUD-FIX-011 | RUNNING | | | | |
 
 ## Owner decisions made during this campaign (recorded in the packets)
 
