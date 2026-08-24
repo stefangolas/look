@@ -4,8 +4,9 @@
 //! `rep` (BG-FID-005) lands here: the emitted geometry path that approximates
 //! one exact CURVE component and discharges (iv-b) on its own certified
 //! partition. The SURFACE case — the surface rep (REP-SRF-001), the surface
-//! (iv-b) discharge and the surface double-sheet negative test — waits on
-//! BG-FID-005-SRF, a separate packet; it is deferred, never stubbed.
+//! (iv-b) discharge and the surface double-sheet negative test — lands here
+//! with BG-FID-005-SRF (`rep_surface` + the per-cell surface (iv-b)
+//! discharge).
 
 pub mod isotopy;
 pub mod lfs;
