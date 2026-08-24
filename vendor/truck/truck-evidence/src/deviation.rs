@@ -44,13 +44,13 @@
 
 use crate::enclosure::{Box3, EnclosureCurve};
 use inari::Interval;
-use truck_base::cgmath64::Point3;
+use truck_base::cgmath64::{EuclideanSpace, InnerSpace, Point3};
 use truck_base::evidence::{
     Budget, Certificate, Certified, Margin, Method, Modulus, Outcome, Prop, PropMap, Refusal,
     Truth, UnresolvedWitness,
 };
 use truck_geometry::nurbs::{BSplineCurve, KnotVec};
-use truck_geotrait::Cut;
+use truck_geotrait::{Cut, ParametricCurve};
 
 /// The relative outward pad per hull endpoint, as a multiple of `EPSILON`.
 ///
@@ -218,18 +218,29 @@ fn merge_knots(a: &mut BSplineCurve<Point3>, b: &mut BSplineCurve<Point3>) -> bo
 }
 
 /// The per-axis control-point hull box of `bsp`, padded `HULL_PAD (1 + |.|)`
-/// outward per endpoint. The pad covers the ulp-class recomputations along the
-/// way (merge insertion, degree elevation, reversal, extraction).
-fn control_point_box(bsp: &BSplineCurve<Point3>) -> Box3 {
+/// outward per endpoint, and additionally unioning the two point values `a`,
+/// `b` into each axis. The pad covers the ulp-class recomputations along the
+/// way (merge insertion, degree elevation, reversal, extraction); the two
+/// point values cover the right-open endpoint semantics (BG-AUD-002): a
+/// degree-0 sub-piece carries only the value on `[lo, hi)`, so the value the
+/// source difference spline attains at the piece's right endpoint is cut away
+/// and must be supplied explicitly (the `hull_sub_curve` boundary pattern).
+fn control_point_box(bsp: &BSplineCurve<Point3>, a: Point3, b: Point3) -> Box3 {
     let hull = |i: usize| -> Interval {
+        let coord = |p: &Point3| match i {
+            0 => p.x,
+            1 => p.y,
+            _ => p.z,
+        };
         let mut mn = f64::INFINITY;
         let mut mx = f64::NEG_INFINITY;
         for p in bsp.control_points().iter() {
-            let c = match i {
-                0 => p.x,
-                1 => p.y,
-                _ => p.z,
-            };
+            let c = coord(p);
+            mn = mn.min(c);
+            mx = mx.max(c);
+        }
+        for p in [&a, &b] {
+            let c = coord(p);
             mn = mn.min(c);
             mx = mx.max(c);
         }
@@ -434,7 +445,20 @@ where
     let mut worklist: Vec<BSplineCurve<Point3>> = vec![piece];
     let mut sup_bound: f64 = 0.0;
     while let Some(piece) = worklist.pop() {
-        let (upper, lower) = norm_bounds(&control_point_box(&piece));
+        // The piece's knot-range span `[a, b]` in the ORIGINAL difference
+        // spline's parameter space (the pre-raised cuts leave a piece's knot
+        // range equal to its span). `subs` is right-open at interior knots
+        // (knot_vec.rs), so for a degree-0 piece the value `diff` attains at
+        // `b` lives in the NEXT span and is omitted by the piece's own control
+        // points; unioning `diff.subs(a)` and `diff.subs(b)` into the hull
+        // keeps the certificate sound at the right-open endpoints (BG-AUD-002,
+        // the `hull_sub_curve` boundary pattern). For degree >= 1 the endpoint
+        // values lie inside the piece hull up to rounding and change nothing.
+        let a = *piece.knot_vec().first()?;
+        let b = *piece.knot_vec().last()?;
+        let va = diff.subs(a);
+        let vb = diff.subs(b);
+        let (upper, lower) = norm_bounds(&control_point_box(&piece, va, vb));
         if upper <= tau {
             sup_bound = sup_bound.max(upper);
         } else if lower > tau {
@@ -443,10 +467,24 @@ where
                 allowed: tau,
             }));
         } else {
-            let lo = *piece.knot_vec().first()?;
-            let hi = *piece.knot_vec().last()?;
-            let mid = (lo + hi) / 2.0;
-            if !(lo < mid && mid < hi) {
+            // The hull is ambiguous, but the two unioned endpoint values are
+            // genuine parameters IN the certified span: `diff.subs(a)` and
+            // `diff.subs(b)` are the deviation at those parameters (right-open
+            // at `b`, which is the span's value there). A single parameter
+            // value with deviation exceeding `tau` refutes the whole-span
+            // claim, and for a degree-0 piece it is the only way the
+            // cut-away right-open endpoint can be proved out (the piece hull
+            // also contains the interior value, pinning its infimum at 0).
+            let da = va.to_vec().magnitude();
+            let db = vb.to_vec().magnitude();
+            if da > tau || db > tau {
+                return Some(Err(Refusal::ForwardToleranceExceeded {
+                    bound: da.max(db),
+                    allowed: tau,
+                }));
+            }
+            let mid = (a + b) / 2.0;
+            if !(a < mid && mid < b) {
                 return Some(Err(unresolved(initial, budget)));
             }
             if budget.spend_subdiv(1).is_err() {
@@ -826,5 +864,69 @@ mod tests {
                 out.value
             );
         }
+    }
+
+    #[test]
+    fn route1_degree0_half_span_endpoint_deviation_refuses() {
+        // BG-AUD-002 witness: carrier is the degree-0 spline with value 0 on
+        // [0, 0.5) and 1 on [0.5, 1], the leader is the identically-zero
+        // degree-0 spline on the same knots. The half span [0, 0.5] must
+        // refuse: the right-open endpoint convention (knot_vec.rs) evaluates
+        // subs(0.5) = 1, which the sub-piece [0, 0.5) omits, so the true
+        // deviation at t = 0.5 is 1 > tau = 0.5. Before the AUD-002 fix this
+        // half span certified a bound near zero — the cut-away hull.
+        let knots = KnotVec::try_from(vec![0.0, 0.5, 1.0]).expect("sorted");
+        let carrier = BSplineCurve::new(
+            knots.clone(),
+            vec![Point3::new(0.0, 0.0, 0.0), Point3::new(0.0, 0.0, 1.0)],
+        );
+        let leader = BSplineCurve::new(
+            knots,
+            vec![Point3::new(0.0, 0.0, 0.0), Point3::new(0.0, 0.0, 0.0)],
+        );
+        let mut budget = Budget::new(1 << 16, 0, 0);
+        let err = certify_deviation(
+            &leader,
+            &carrier,
+            ParamMap::IDENTITY,
+            iv(0.0, 0.5),
+            0.5,
+            &mut budget,
+        )
+        .expect_err("the degree-0 half span must refuse: the true endpoint deviation is 1");
+        assert!(
+            matches!(err, Refusal::ForwardToleranceExceeded { .. }),
+            "expected ForwardToleranceExceeded, got {err:?}"
+        );
+    }
+
+    #[test]
+    fn route1_degree0_exact_pair_still_certifies() {
+        // The same knots and span as the refusal witness, but with the leader
+        // equal to the carrier (both control points (0,0,0) and (0,0,1)): the
+        // exact degree-0 pair must still certify at tau = 0.5. The union fix
+        // adds the endpoint value (0,0,1) to the hull, which the zero
+        // difference spline's hull already contains, so the fix must not turn
+        // exact degree-0 pairs into refusals.
+        let knots = KnotVec::try_from(vec![0.0, 0.5, 1.0]).expect("sorted");
+        let carrier = BSplineCurve::new(
+            knots.clone(),
+            vec![Point3::new(0.0, 0.0, 0.0), Point3::new(0.0, 0.0, 1.0)],
+        );
+        let leader = BSplineCurve::new(
+            knots,
+            vec![Point3::new(0.0, 0.0, 0.0), Point3::new(0.0, 0.0, 1.0)],
+        );
+        let mut budget = Budget::new(1 << 16, 0, 0);
+        let out = certify_deviation(
+            &leader,
+            &carrier,
+            ParamMap::IDENTITY,
+            iv(0.0, 0.5),
+            0.5,
+            &mut budget,
+        )
+        .expect("the exact degree-0 pair certifies on the half span");
+        assert!(out.value <= 0.5);
     }
 }
