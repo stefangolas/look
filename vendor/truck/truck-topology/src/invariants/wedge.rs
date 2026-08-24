@@ -1,17 +1,23 @@
 //! BG-INV-109: wedge non-degeneracy (§1.1 invariant 9) at every interior
-//! edge, v1: sampled at each edge's parameter midpoint.
+//! edge, v1: sampled at each edge's parameter-range endpoints and midpoint.
 //!
 //! The dihedral angle at every interior edge of a valid solid boundary is
 //! bounded away from 0 and 2π — no folded (knife-edge) or doubled-back
 //! (crack) wedges. This is the condition local feature size needs to be
 //! positive (BG-FID-001).
 //!
-//! **v1 samples the edge's midpoint.** The whole-span version needs the edge's
-//! parameter image on each face — the pcurve (BG-CE-001's payload, unwired) —
-//! to feed the surfaces' `normal_cone`s. What v1 certifies: the wedge is
-//! non-degenerate AT the sampled point. **Interior edges only**: an edge used
-//! by one face (an open boundary) has no wedge; an edge used by more than two
-//! faces is BG-INV-101's violation, not this checker's — both are skipped.
+//! **v1 samples the edge at `t0`, `t_mid` and `t1` (the parameter-range
+//! endpoints and the midpoint).** This is still a float certificate,
+//! deliberately NOT a whole-edge interval certificate: what it certifies is
+//! that the wedge is non-degenerate AT THE SAMPLED parameters, not along the
+//! whole edge. A whole-span claim would need the edge's parameter image on
+//! each face — the pcurve (BG-CE-001's payload, unwired) — feeding the
+//! surfaces' `normal_cone`s, plus an interval-normal capability that `S`'s
+//! generic bounds (`ParametricSurface + ParametricSurface3D +
+//! SearchParameter`) do not provide (the API-bound limitation of this
+//! checker). **Interior edges only**: an edge used by one face (an open
+//! boundary) has no wedge; an edge used by more than two faces is
+//! BG-INV-101's violation, not this checker's — both are skipped.
 //!
 //! The self-contained `Line`/`Plane` witnesses below mirror
 //! `truck-geometry`'s types so the tests and doctest do not need a
@@ -201,24 +207,31 @@ impl SearchParameter<D2> for Plane {
 }
 
 /// BG-INV-109: wedge non-degeneracy (§1.1 invariant 9) at every interior
-/// edge, v1: sampled at each edge's parameter midpoint.
+/// edge, v1: sampled at each edge's parameter-range endpoints and midpoint.
 ///
-/// For each edge used by exactly two faces: take the curve's midpoint
-/// `p`, project `p` onto both faces' surfaces (`search_parameter`),
-/// take both unit normals there, and require
-/// `|n_A × n_B| >= sin_margin` — the sine of the normals' angle, zero
-/// exactly for the folded (normals parallel) and doubled-back (normals
-/// antiparallel) degenerate wedges. `sin_margin` is dimensionless; pass
-/// `ToleranceCtx::sin_margin()` for the house default.
+/// For each edge used by exactly two faces: take the curve at the parameter
+/// range endpoints `t0`, `t1` and the midpoint `t_mid`, project each point
+/// onto both faces' surfaces (`search_parameter`), take both unit normals
+/// there, and require `|n_A × n_B| >= sin_margin` at every sample — the sine
+/// of the normals' angle, zero exactly for the folded (normals parallel) and
+/// doubled-back (normals antiparallel) degenerate wedges. `sin_margin` is
+/// dimensionless; pass `ToleranceCtx::sin_margin()` for the house default.
+/// A non-finite normal (a singular surface point such as a cone apex or
+/// sphere pole) or a non-finite sine is a refusal, never a certificate.
 ///
-/// **v1 samples the midpoint only** — the whole-span certificate needs
-/// the pcurve parameter images (BG-CE-001's payload, unwired) feeding
-/// `normal_cone`. Edges used by one face (open boundary) are skipped;
-/// edges used by more than two faces are BG-INV-101's to catch, skipped
-/// here. A failed projection is `NumericallyUnresolved` (the point's
-/// containment in the surface could not be certified), never a
-/// violation. Localise: the refusal's `prop` names the invariant; the
-/// offending edge is the first in `edge_iter` order whose check fails.
+/// **v1 samples `t0`, `t_mid` and `t1` only** — the certificate's claim is
+/// the wedge condition AT the sampled parameters, not a whole-edge claim. A
+/// whole-span certificate needs the pcurve parameter images (BG-CE-001's
+/// payload, unwired) feeding `normal_cone`, and an interval-normal
+/// capability the generic `S` bounds
+/// (`ParametricSurface + ParametricSurface3D + SearchParameter`) cannot
+/// express — the API-bound limitation of this checker. Edges used by one face
+/// (open boundary) are skipped; edges used by more than two faces are
+/// BG-INV-101's to catch, skipped here. A failed projection is
+/// `NumericallyUnresolved` (the point's containment in the surface could not
+/// be certified), never a violation. Localise: the refusal's `prop` names the
+/// invariant; the offending edge is the first in `edge_iter` order whose
+/// check fails.
 ///
 /// ```
 /// use truck_topology::*;
@@ -301,9 +314,12 @@ where
     ))
 }
 
-/// The wedge test of one interior edge: sample the curve's parameter midpoint,
-/// project it onto both faces' surfaces and require the sine of the angle
-/// between the unit normals to clear `sin_margin`.
+/// The wedge test of one interior edge: sample the curve at the parameter
+/// range endpoints and the midpoint, project each point onto both faces'
+/// surfaces and require the sine of the angle between the unit normals to
+/// clear `sin_margin` at every sample. A non-finite sine (a singular normal
+/// slipping through a NaN cross product) is `NumericallyUnresolved`, never a
+/// certificate.
 fn test_edge<P, C, S>(
     edge: &Edge<P, C>,
     face_a: &Face<P, C, S>,
@@ -323,25 +339,33 @@ where
         None => return Err(unresolved()),
     };
     let t_mid = (t0 + t1) / 2.0;
-    let p = curve.subs(t_mid);
     let surface_a = face_a.surface();
     let surface_b = face_b.surface();
-    let n_a = surface_normal(&surface_a, p)?;
-    let n_b = surface_normal(&surface_b, p)?;
-    let sin_angle = n_a.cross(n_b).magnitude();
-    if sin_angle < sin_margin {
-        return Err(Refusal::Contradictory(ContradictionWitness {
-            prop: Prop::WedgeNonDegeneracy,
-            left: Truth::True,
-            right: Truth::False,
-        }));
+    for t in [t0, t_mid, t1] {
+        let p = curve.subs(t);
+        let n_a = surface_normal(&surface_a, p)?;
+        let n_b = surface_normal(&surface_b, p)?;
+        let sin_angle = n_a.cross(n_b).magnitude();
+        if !sin_angle.is_finite() {
+            return Err(unresolved());
+        }
+        if sin_angle < sin_margin {
+            return Err(Refusal::Contradictory(ContradictionWitness {
+                prop: Prop::WedgeNonDegeneracy,
+                left: Truth::True,
+                right: Truth::False,
+            }));
+        }
     }
     Ok(())
 }
 
 /// The unit normal of `surface` at the parameters `p` projects to, or
 /// `NumericallyUnresolved` when `p`'s containment in the surface cannot be
-/// certified.
+/// certified. A non-finite or zero normal (a singular surface point such as a
+/// cone apex, where `normal()` vanishes) is also `NumericallyUnresolved` —
+/// the magnitude is computed by hand so a zero/NaN vector refuses instead of
+/// producing a silent-pass `NaN` through `normalize()`.
 fn surface_normal<S>(surface: &S, p: Point3) -> Result<Vector3, Refusal>
 where
     S: ParametricSurface<Point = Point3>
@@ -353,7 +377,12 @@ where
         Some(uv) => uv,
         None => return Err(unresolved()),
     };
-    Ok(surface.normal(u, v).normalize())
+    let normal = surface.normal(u, v);
+    let magnitude = normal.magnitude();
+    if !magnitude.is_finite() || magnitude == 0.0 {
+        return Err(unresolved());
+    }
+    Ok(normal / magnitude)
 }
 
 /// The "could not certify" refusal shared by an unbounded curve parameter
@@ -382,6 +411,216 @@ mod tests {
 
     fn p(x: f64, y: f64, z: f64) -> Point3 {
         Point3::new(x, y, z)
+    }
+
+    /// The shared surface carrier for the two-face cone/plane shells. `check`'s
+    /// generic `S` is a single type for the whole shell, so the packet's
+    /// "face A = Cone mirror, face B = Plane mirror" is expressed through this
+    /// delegating wrapper — the underlying surfaces are exactly the `Plane`
+    /// and `Cone` witnesses.
+    #[derive(Clone, Debug)]
+    enum Surface {
+        Plane(Plane),
+        Cone(Cone),
+    }
+
+    impl ParametricSurface for Surface {
+        type Point = Point3;
+        type Vector = Vector3;
+
+        fn der_mn(&self, m: usize, n: usize, u: f64, v: f64) -> Vector3 {
+            match self {
+                Surface::Plane(s) => s.der_mn(m, n, u, v),
+                Surface::Cone(s) => s.der_mn(m, n, u, v),
+            }
+        }
+
+        fn subs(&self, u: f64, v: f64) -> Point3 {
+            match self {
+                Surface::Plane(s) => s.subs(u, v),
+                Surface::Cone(s) => s.subs(u, v),
+            }
+        }
+
+        fn uder(&self, u: f64, v: f64) -> Vector3 {
+            match self {
+                Surface::Plane(s) => s.uder(u, v),
+                Surface::Cone(s) => s.uder(u, v),
+            }
+        }
+
+        fn vder(&self, u: f64, v: f64) -> Vector3 {
+            match self {
+                Surface::Plane(s) => s.vder(u, v),
+                Surface::Cone(s) => s.vder(u, v),
+            }
+        }
+
+        fn uuder(&self, u: f64, v: f64) -> Vector3 {
+            match self {
+                Surface::Plane(s) => s.uuder(u, v),
+                Surface::Cone(s) => s.uuder(u, v),
+            }
+        }
+
+        fn uvder(&self, u: f64, v: f64) -> Vector3 {
+            match self {
+                Surface::Plane(s) => s.uvder(u, v),
+                Surface::Cone(s) => s.uvder(u, v),
+            }
+        }
+
+        fn vvder(&self, u: f64, v: f64) -> Vector3 {
+            match self {
+                Surface::Plane(s) => s.vvder(u, v),
+                Surface::Cone(s) => s.vvder(u, v),
+            }
+        }
+
+        fn parameter_range(&self) -> (ParameterRange, ParameterRange) {
+            match self {
+                Surface::Plane(s) => s.parameter_range(),
+                Surface::Cone(s) => s.parameter_range(),
+            }
+        }
+    }
+
+    impl ParametricSurface3D for Surface {
+        fn normal(&self, u: f64, v: f64) -> Vector3 {
+            match self {
+                Surface::Plane(s) => ParametricSurface3D::normal(s, u, v),
+                Surface::Cone(s) => ParametricSurface3D::normal(s, u, v),
+            }
+        }
+
+        fn normal_uder(&self, u: f64, v: f64) -> Vector3 {
+            match self {
+                Surface::Plane(s) => s.normal_uder(u, v),
+                Surface::Cone(s) => s.normal_uder(u, v),
+            }
+        }
+
+        fn normal_vder(&self, u: f64, v: f64) -> Vector3 {
+            match self {
+                Surface::Plane(s) => s.normal_vder(u, v),
+                Surface::Cone(s) => s.normal_vder(u, v),
+            }
+        }
+    }
+
+    impl SearchParameter<D2> for Surface {
+        type Point = Point3;
+
+        fn search_parameter<H: Into<SPHint2D>>(
+            &self,
+            point: Point3,
+            hint: H,
+            trials: usize,
+        ) -> Option<(f64, f64)> {
+            match self {
+                Surface::Plane(s) => s.search_parameter(point, hint, trials),
+                Surface::Cone(s) => s.search_parameter(point, hint, trials),
+            }
+        }
+    }
+
+    /// A right circular cone witness surface mirroring the packet's design:
+    /// `S(u, v) = apex + v·tan(α)·(cos u, sin u, 0) + (0, 0, v)` with `α` the
+    /// half-angle and the axis along `+z`. The apex (`v == 0.0`) is the
+    /// singular point the wedge checker must refuse: `normal(u, v)` vanishes
+    /// there. Mirrors the `Plane` witness's style; `truck-topology` has no
+    /// `truck-geometry` dependency.
+    #[derive(Clone, Debug)]
+    struct Cone {
+        apex: Point3,
+        tan_half_angle: f64,
+    }
+
+    impl Cone {
+        /// Creates the cone mirror with the given apex and half-angle.
+        fn new(apex: Point3, half_angle: f64) -> Cone {
+            Cone {
+                apex,
+                tan_half_angle: half_angle.tan(),
+            }
+        }
+    }
+
+    impl ParametricSurface for Cone {
+        type Point = Point3;
+        type Vector = Vector3;
+
+        fn der_mn(&self, m: usize, n: usize, u: f64, v: f64) -> Vector3 {
+            match (m, n) {
+                (0, 0) => self.subs(u, v).to_vec(),
+                (1, 0) => self.uder(u, v),
+                (0, 1) => self.vder(u, v),
+                (2, 0) => self.uuder(u, v),
+                (1, 1) => self.uvder(u, v),
+                (0, 2) => self.vvder(u, v),
+                _ => Vector3::zero(),
+            }
+        }
+
+        fn subs(&self, u: f64, v: f64) -> Point3 {
+            let r = v * self.tan_half_angle;
+            self.apex + Vector3::new(r * u.cos(), r * u.sin(), v)
+        }
+
+        fn uder(&self, u: f64, v: f64) -> Vector3 {
+            let r = v * self.tan_half_angle;
+            Vector3::new(-r * u.sin(), r * u.cos(), 0.0)
+        }
+
+        fn vder(&self, u: f64, _v: f64) -> Vector3 {
+            let t = self.tan_half_angle;
+            Vector3::new(t * u.cos(), t * u.sin(), 1.0)
+        }
+
+        fn uuder(&self, u: f64, v: f64) -> Vector3 {
+            let r = v * self.tan_half_angle;
+            Vector3::new(-r * u.cos(), -r * u.sin(), 0.0)
+        }
+
+        fn uvder(&self, u: f64, _v: f64) -> Vector3 {
+            let t = self.tan_half_angle;
+            Vector3::new(-t * u.sin(), t * u.cos(), 0.0)
+        }
+
+        fn vvder(&self, _u: f64, _v: f64) -> Vector3 {
+            Vector3::zero()
+        }
+
+        fn parameter_range(&self) -> (ParameterRange, ParameterRange) {
+            let range = (Bound::Included(0.0), Bound::Included(1.0));
+            (range, range)
+        }
+    }
+
+    impl ParametricSurface3D for Cone {
+        fn normal(&self, u: f64, v: f64) -> Vector3 {
+            if v == 0.0 {
+                return Vector3::zero();
+            }
+            self.uder(u, v).cross(self.vder(u, v)).normalize()
+        }
+    }
+
+    impl SearchParameter<D2> for Cone {
+        type Point = Point3;
+
+        fn search_parameter<H: Into<SPHint2D>>(
+            &self,
+            point: Point3,
+            _hint: H,
+            _trials: usize,
+        ) -> Option<(f64, f64)> {
+            let w = point - self.apex;
+            let radial = Vector3::new(w.x, w.y, 0.0);
+            let radius = radial.magnitude();
+            let u = if radius == 0.0 { 0.0 } else { w.y.atan2(w.x) };
+            Some((u, w.z))
+        }
     }
 
     /// The right-angle tent: shared edge on the x-axis from (0,0,0) to
@@ -549,6 +788,90 @@ mod tests {
                 })
             ),
             "a plane off the shared edge must be numerically unresolved, got {outcome:?}"
+        );
+    }
+
+    #[test]
+    fn wedge_singular_midpoint_normal_refuses() {
+        // Face A is the Cone mirror with the apex at the origin and half-angle
+        // 45° (tan = 1); the shared edge is the generator from (1,0,1) to
+        // (-1,0,-1), whose midpoint (0,0,0) is the apex, where the cone's
+        // normal vanishes. Face B is the plane through (1,0,1), (-1,0,-1) and
+        // (0,1,1), containing the whole shared edge but NOT tangent to the
+        // cone (the wedge sine ≈ 0.577 at the endpoints). The singular apex
+        // normal at the midpoint must REFUSE (NumericallyUnresolved), never
+        // certify a hold.
+        let v0 = Vertex::new(0usize);
+        let v1 = Vertex::new(1usize);
+        let v2 = Vertex::new(2usize);
+        let v3 = Vertex::new(3usize);
+        let p0 = p(1.0, 0.0, 1.0);
+        let p1 = p(-1.0, 0.0, -1.0);
+        let pa = p(0.0, 1.0, 1.0);
+        let pb = p(0.0, 1.0, 1.0);
+        let shared = Edge::new(&v0, &v1, Line(p0, p1));
+        let e1 = Edge::new(&v1, &v2, Line(p1, pa));
+        let e2 = Edge::new(&v2, &v0, Line(pa, p0));
+        let e3 = Edge::new(&v0, &v3, Line(p0, pb));
+        let e4 = Edge::new(&v3, &v1, Line(pb, p1));
+        let cone = Cone::new(p(0.0, 0.0, 0.0), std::f64::consts::FRAC_PI_4);
+        let face_a = Face::new(vec![wire![&shared, &e1, &e2]], Surface::Cone(cone));
+        let face_b = Face::new(
+            vec![wire![&shared.inverse(), &e3, &e4]],
+            Surface::Plane(Plane::new(p0, p1, pb)),
+        );
+        let shell = Shell::from(vec![face_a, face_b]);
+        let outcome = check(&shell, TEST_WEDGE_MARGIN);
+        assert!(
+            matches!(
+                &outcome,
+                Err(Refusal::NumericallyUnresolved {
+                    witness: UnresolvedWitness::UncertifiedContainment,
+                    ..
+                })
+            ),
+            "a singular apex midpoint must refuse, got {outcome:?}"
+        );
+    }
+
+    #[test]
+    fn wedge_singular_endpoint_with_finite_midpoint_refuses() {
+        // Face A is the Cone mirror again; the shared edge now runs from the
+        // apex (0,0,0) to the cone point (1,0,1). Its midpoint (0.5,0,0.5) is
+        // on the cone with a FINITE normal and a well-defined wedge (sine
+        // ≈ 0.577) against face B's plane — the old midpoint-only code would
+        // certify a hold here — but its t = 0 endpoint is the apex. Sampling
+        // the endpoints too must REFUSE (NumericallyUnresolved).
+        let v0 = Vertex::new(0usize);
+        let v1 = Vertex::new(1usize);
+        let v2 = Vertex::new(2usize);
+        let v3 = Vertex::new(3usize);
+        let p0 = p(0.0, 0.0, 0.0);
+        let p1 = p(1.0, 0.0, 1.0);
+        let pa = p(0.0, 1.0, 1.0);
+        let pb = p(0.0, 1.0, 1.0);
+        let shared = Edge::new(&v0, &v1, Line(p0, p1));
+        let e1 = Edge::new(&v1, &v2, Line(p1, pa));
+        let e2 = Edge::new(&v2, &v0, Line(pa, p0));
+        let e3 = Edge::new(&v0, &v3, Line(p0, pb));
+        let e4 = Edge::new(&v3, &v1, Line(pb, p1));
+        let cone = Cone::new(p(0.0, 0.0, 0.0), std::f64::consts::FRAC_PI_4);
+        let face_a = Face::new(vec![wire![&shared, &e1, &e2]], Surface::Cone(cone));
+        let face_b = Face::new(
+            vec![wire![&shared.inverse(), &e3, &e4]],
+            Surface::Plane(Plane::new(p0, p1, pb)),
+        );
+        let shell = Shell::from(vec![face_a, face_b]);
+        let outcome = check(&shell, TEST_WEDGE_MARGIN);
+        assert!(
+            matches!(
+                &outcome,
+                Err(Refusal::NumericallyUnresolved {
+                    witness: UnresolvedWitness::UncertifiedContainment,
+                    ..
+                })
+            ),
+            "a singular apex endpoint must refuse, got {outcome:?}"
         );
     }
 }
