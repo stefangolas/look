@@ -2279,6 +2279,110 @@ designing the packet, one of them a scope split:
   producing a DCEL with the extra face. This is the test that proves (iv) is
   wired through to the consumer and not merely computed and discarded.
 
+**AMENDMENT (2026-08-23, writing BG-FID-005-SRF's packet).** Eight decisions
+from designing the surface packet, each machine-checked through the mandated
+formulas before dispatch (outward-rounded interval arithmetic reproducing the
+gates' exact box semantics):
+
+1. **The emitted approximant is a tensor-product bicubic Hermite surface in
+   Bezier form.** Per cell `[a,b]×[c,d]` (hu = b−a, hv = d−c) the 4×4 control
+   net `Q[i][j]` (i u-index, j v-index) is built from the exact surface's
+   corner data — positions via `subs`, tangents and twists as midpoints of
+   degenerate enclosures (the curve packet's deterministic convention):
+   corners `Q[0][0]=S(a,c)` etc.; edge tangents
+   `Q[1][0]=P00+(hu/3)S_u(a,c)`, `Q[2][0]=P30−(hu/3)S_u(b,c)` and the v
+   analogues; interiors carry the twist with ALTERNATING signs —
+   `Q[1][1]=P00+(hu/3)U00+(hv/3)V00+(hu·hv/9)S_uv(a,c)`,
+   `Q[2][1]=P30−(hu/3)U30+(hv/3)V30−(hu·hv/9)S_uv(b,c)`,
+   `Q[1][2]=P03+(hu/3)U03−(hv/3)V03−(hu·hv/9)S_uv(a,d)`,
+   `Q[2][2]=P33−(hu/3)U33−(hv/3)V33+(hu·hv/9)S_uv(b,d)` (the mixed
+   second-difference relation fixes the signs; + at (a,c) and (b,d), − at
+   (b,c) and (a,d)). Enclosures are the Bernstein hull of the de
+   Casteljau-restricted net over the query box (split per axis, the curve
+   module's restrict logic), padded by the house `64ε(1+|coord|)`.
+2. **Sliver routing (a new enclosure rule, found by machine-check).** A query
+   box whose edge lands within ulps of an emitter grid knot produces
+   cell-intersection slivers of width ~1e-16; the restricted-net derivative
+   scaling divides by the intersection width and explodes (measured: the
+   re-`rep` of an emission collapsed its curvature certificate to ~0).
+   Intersections narrower than the house width floor (8 ulps at magnitude)
+   route through direct point evaluation (the degenerate-axis construction:
+   u-derivative column at the line, then the 1D v-curve machinery); the house
+   hull pad absorbs the O(sliver) variation. The curve module's `cellOverlaps`
+   rule ports per axis: a cell contributes on interior overlap, or when the
+   query is a degenerate point on the cell boundary lying inside the cell.
+3. **Surface scale components, with RELATIVE convergence and a level cap.**
+   `SurfaceScaleComponents { curvature_radius_lower, self_separation_lower }`
+   with `tube_scale_lower() = min(curvature, separation/2)` (the
+   Federer-motivation shape, never reach — L-FEDERER-PATCH open). Curvature:
+   the min over cells of `lfs::curvature_radius_lower` (landed, pub) under
+   uniform quad refinement. Separation: the min over QUALIFYING cell pairs of
+   `box_distance`, qualification by the Chebyshev point-gap — a pair qualifies
+   when `max(gap_u, gap_v) ≥ G` with per-axis FARTHEST gaps (wrapped per
+   closed direction via the closed form
+   `d_max` if `d_max ≤ P/2`, `P − d_min` if `d_min ≥ P/2`, else `P/2`); the
+   max-gap reading is the BG-FID-003-r2 soundness argument lifted to 2D (the
+   minimizer's own cell pair always qualifies). Both helpers stop at
+   RELATIVE convergence (level change < 5% of the certificate) OR a level
+   cap of 7: uniform quad refinement is 4^level cells and the lfs bound's
+   deficit is LINEAR in cell width (absolute-0.01 convergence needs level ~11
+   = 4M cells), and an absolute threshold FALSELY CONVERGES on the
+   garbage-small coarse-level certificates (measured: the R=0.3 belt's
+   level-3 certificate is ~0.001 against a converged ~0.076 — stopping
+   there would have driven the loop to an infeasible target). The capped
+   value is a certified, more conservative lower bound (BG-FID-007).
+4. **The refine loop refines ONE axis per step** (a 2D uniform grid squares
+   the cell count): the axis with the larger certified sub-image tangent
+   extent (max over sub-cells of sub-width × ‖S_axis‖sup; tie → u). On a
+   separation failure the refined axis is the one in which the failing pair's
+   index distance is ZERO (the non-separating axis — its extent inflates
+   cell_eps without widening that gap; measured: the belt's u-edges need
+   w_u ≲ w_v/2 to separate). A stall counter (2 consecutive < 1% eps
+   improvements above target) returns `Unresolved`.
+5. **The surface (ii) gate is the normal-box form:** the tangent-PLANE angle
+   via `angle_pass_form(cross_box(φ_u, φ_v), cross_box(S_u, S_v))` — the same
+   unoriented |cos| form as the curve, applied to normal boxes.
+6. **The surface (iv-b) discharge.** The emitter shares the exact surface's
+   parameter space, so the pairing is the identity grid. (a) own-cell
+   containment is the per-cell eps measurement (cell_eps[j] = max over
+   sub-cells; the (iv-b)(c) gate is per-cell as in the curve packet). (b) the
+   grid-vertex projection correspondence: at every interior grid vertex
+   (u*,v*), `φ(u*,v*) = S(u*,v*)` exactly (corner interpolation), so the
+   bivariate system `F(s,t) = [<φ−S(s,t), S_u>, <φ−S(s,t), S_v>]` has
+   (u*,v*) as a root; certify `KrawczykProof::Unique` via `krawczyk::<2>`
+   over the box `(u*±wu)×(v*±wv)` (per-axis adjacent cell widths). **The
+   first box must certify: once the operator bisects, the root sits exactly
+   on the children's shared edge and strict-interior uniqueness is
+   unreachable** (the BG-FID-008-r3 bisection-edge trap, 2D edition — the
+   split midpoint IS the vertex). A coarse grid's failure to certify is the
+   honest refine signal. (c) non-adjacent separation over whole-cell boxes
+   with Chebyshev-1 adjacency (index distance ≤ 1 in the max metric) PLUS
+   per-direction wrap adjacency when that direction is Closed; corner-sharing
+   cells share a fibre and MUST be exempt. Search runs over a 2D BVH local to
+   the module (median split on the widest position axis, union-box pruning —
+   the isotopy tree's shape with 2D parameter leaves); O(N²) scans are a
+   review reject. The typed outcome `MultiSheet { cells }` fires on a
+   certified non-adjacent overlap; `rep_surface`'s loop maps it to refine
+   (this spec's loop) — a GENUINE double sheet then exhausts the budget or
+   stalls to `Unresolved`, never `Ok`.
+7. **`SurfaceBoundary::{Open, ClosedU, ClosedV, ClosedUV}`** is caller-vouched
+   input per direction (the BG-FID-003-r2 boundary decision, lifted); it
+   drives wrap adjacency in separation and wrapped gaps in self-separation
+   ONLY — rep v1 runs no boundary-correspondence gate (the curve rep ran
+   none either; that condition belongs to the isotopy checker, which has no
+   surface form yet).
+8. **The surface double-sheet witness** (the spec's negative test):
+   `D(u,v) = (R + a·cos(u/2))·(sin v cos u, sin v sin u, cos v)` over
+   `u ∈ [0,4π]` (ClosedU — the azimuth is covered TWICE), `v ∈ [π/4, 3π/4]`,
+   `R = 2`, `a = eps/2` (the test-3 trap: the deviation is STRICTLY inside
+   eps, max = a, never = eps). Both sheets' tangent planes agree with the
+   sphere's (|cos| ≥ 0.999, machine-checked) — the surface case where (iv)
+   is least intuitive. The scale components CORRECTLY certify ~0
+   self-separation (the sheets coincide), so `rep_surface` refuses
+   (Unresolved, never Ok), and the DIRECT discharge call at a fixed
+   (du,dv)=(7,5) grid returns `MultiSheet` with the failing pair's u-index
+   distance ≈ n_u/2 (the two sheets).
+
 ---
 
 ## 5. Stage 4 — interfaces only
