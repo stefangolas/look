@@ -140,9 +140,20 @@ impl<P, C, S> Shell<P, C, S> {
     /// Determines the shell conditions: non-regular, regular, oriented, or closed.  
     /// The complexity increases in proportion to the number of edges.
     ///
+    /// A face whose boundary reuses an edge id (the same edge used more than
+    /// once by one face, e.g. `[e, e.inverse()]`) is an oriented but not
+    /// validly-closed boundary: it never reaches `Closed`.
+    ///
     /// Examples for each condition can be found on the page of
     /// [`ShellCondition`](./shell/enum.ShellCondition.html).
     pub fn shell_condition(&self) -> ShellCondition {
+        let reuses_edge_id_in_a_face = self.face_iter().any(|face| {
+            let mut ids = HashSet::default();
+            face.edge_iter().any(|edge| !ids.insert(edge.id()))
+        });
+        if reuses_edge_id_in_a_face {
+            return ShellCondition::Oriented;
+        }
         self.edge_iter().collect::<Boundaries<C>>().condition()
     }
 
@@ -1302,5 +1313,35 @@ impl<P: Send + Sync, C: Send + Sync, S: Send + Sync> ParallelExtend<Face<P, C, S
         I: IntoParallelIterator<Item = Face<P, C, S>>,
     {
         self.face_list.par_extend(par_iter)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::errors::Error;
+    use crate::invariants::coedge_pairing;
+    use crate::shell::ShellCondition;
+    use crate::*;
+    use truck_base::evidence::Refusal;
+
+    #[test]
+    fn single_face_edge_inverse_shell_is_not_closed() {
+        let v = Vertex::news([(), ()]);
+        let e = Edge::new(&v[0], &v[1], ());
+        // `Face::new` would refuse the degenerate `[e, e.inverse()]` wire via
+        // `is_simple`'s edge-id-reuse rule (BG-AUD-FIX-008 fix 1), so the
+        // degenerate face is built unchecked to exercise `shell_condition`'s
+        // per-face edge-id-reuse gate (fix 2).
+        let shell: Shell<(), (), ()> =
+            vec![Face::new_unchecked(vec![wire![&e, &e.inverse()]], ())].into();
+        assert_ne!(shell.shell_condition(), ShellCondition::Closed);
+        assert!(matches!(
+            coedge_pairing::check(&shell),
+            Err(Refusal::NumericallyUnresolved { .. }) | Err(Refusal::Contradictory(_))
+        ));
+        assert_eq!(
+            Solid::try_new(vec![shell.clone()]),
+            Err(Error::NotClosedShell)
+        );
     }
 }
