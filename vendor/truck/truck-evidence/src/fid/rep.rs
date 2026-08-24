@@ -57,8 +57,8 @@
 #![deny(clippy::unwrap_used)]
 
 use super::isotopy::{
-    angle_pass_form, box_distance, build_tree, curvature_radius_lower_span, interval,
-    norm_sup, self_separation_lower_span, sup_distance_box, uniform_cells, CurveBoundary,
+    angle_pass_form, box_distance, build_tree, curvature_radius_lower_span, interval, norm_sup,
+    self_separation_lower_span, sup_distance_box, uniform_cells, CurveBoundary,
     CurveScaleComponents, KdCell, KdNode,
 };
 use super::lfs::curvature_radius_lower;
@@ -1120,10 +1120,6 @@ struct HermiteCellSurface {
     net: [[Point3; 4]; 4],
 }
 
-/// The Bernstein factor `3!/(3-m)!` of a degree-3 Bezier's m-th derivative.
-/// H-3: dimensionless combinatorial factor of the derivative net.
-const FAC: [f64; 4] = [1.0, 3.0, 6.0, 6.0]; // H-3: 3!/(3-m)! for m = 0..=3, dimensionless
-
 /// The relative certificate-change threshold of the two surface span
 /// helpers: a level whose certificate moves by less than 5% of itself is
 /// converged (Decision 3).
@@ -1173,7 +1169,13 @@ fn lerp_vec(a: Vector3, b: Vector3, t: f64) -> Vector3 {
 fn bezier_eval_vec(pts: &[Vector3], s: f64) -> Vector3 {
     let mut cur: Vec<Vector3> = pts.to_vec();
     while cur.len() > 1 {
-        let next: Vec<Vector3> = cur.windows(2).map(|w| lerp_vec(w[0], w[1], s)).collect();
+        let next: Vec<Vector3> = cur
+            .windows(2)
+            .map(|w| match w {
+                [a, b] => lerp_vec(*a, *b, s),
+                _ => Vector3::zero(),
+            })
+            .collect();
         cur = next;
     }
     cur.first().copied().unwrap_or(Vector3::zero())
@@ -1198,11 +1200,12 @@ fn restrict_curve(p: [Point3; 4], a: f64, b: f64, lo: f64, hi: f64) -> [Point3; 
     let h = b - a;
     let s1 = (lo - a) / h;
     let s2 = (hi - a) / h;
+    let [p0, _, _, p3] = p;
     if s1 >= 1.0 {
-        return [p[3], p[3], p[3], p[3]];
+        return [p3, p3, p3, p3];
     }
     if s2 <= 0.0 {
-        return [p[0], p[0], p[0], p[0]];
+        return [p0, p0, p0, p0];
     }
     let (_, right) = bezier_split(p, s1);
     let t2 = (s2 - s1) / (1.0 - s1);
@@ -1215,11 +1218,12 @@ fn restrict_curve_vec(p: &[Vector3; 4], a: f64, b: f64, lo: f64, hi: f64) -> [Ve
     let h = b - a;
     let s1 = (lo - a) / h;
     let s2 = (hi - a) / h;
+    let [p0, _, _, p3] = p;
     if s1 >= 1.0 {
-        return [p[3], p[3], p[3], p[3]];
+        return [*p3, *p3, *p3, *p3];
     }
     if s2 <= 0.0 {
-        return [p[0], p[0], p[0], p[0]];
+        return [*p0, *p0, *p0, *p0];
     }
     let (_, right) = bezier_split_vec(*p, s1);
     let t2 = (s2 - s1) / (1.0 - s1);
@@ -1231,7 +1235,14 @@ fn restrict_curve_vec(p: &[Vector3; 4], a: f64, b: f64, lo: f64, hi: f64) -> [Ve
 /// v-column's successive rows are differenced, `n` rows in, `n-1` out.
 fn u_diff_once(rows: &[[Vector3; 4]]) -> Vec<[Vector3; 4]> {
     rows.windows(2)
-        .map(|w| std::array::from_fn(|j| w[1][j] - w[0][j]))
+        .map(|w| match w {
+            [a, b] => {
+                let [a0, a1, a2, a3] = a;
+                let [b0, b1, b2, b3] = b;
+                [*b0 - *a0, *b1 - *a1, *b2 - *a2, *b3 - *a3]
+            }
+            _ => [Vector3::zero(); 4],
+        })
         .collect()
 }
 
@@ -1239,14 +1250,10 @@ fn u_diff_once(rows: &[[Vector3; 4]]) -> Vec<[Vector3; 4]> {
 /// (`net[iu][iv]`), returning the `(4-m) x 4` vector net with the rows
 /// u-difference-indexed and each row v-indexed.
 fn u_diff_net(net: &[[Point3; 4]; 4], m: usize) -> Vec<[Vector3; 4]> {
-    let mut cur: Vec<[Vector3; 4]> = (0..4)
-        .map(|i| {
-            [
-                net[i][0].to_vec(),
-                net[i][1].to_vec(),
-                net[i][2].to_vec(),
-                net[i][3].to_vec(),
-            ]
+    let mut cur: Vec<[Vector3; 4]> = net
+        .iter()
+        .map(|row| match row {
+            [r0, r1, r2, r3] => [r0.to_vec(), r1.to_vec(), r2.to_vec(), r3.to_vec()],
         })
         .collect();
     for _ in 0..m {
@@ -1259,9 +1266,25 @@ fn u_diff_net(net: &[[Point3; 4]; 4], m: usize) -> Vec<[Vector3; 4]> {
 fn v_diff(row: &[Vector3; 4], n: usize) -> Vec<Vector3> {
     let mut cur: Vec<Vector3> = row.to_vec();
     for _ in 0..n {
-        cur = cur.windows(2).map(|w| w[1] - w[0]).collect();
+        cur = cur
+            .windows(2)
+            .map(|w| match w {
+                [a, b] => *b - *a,
+                _ => Vector3::zero(),
+            })
+            .collect();
     }
     cur
+}
+
+/// The Bernstein factor `3!/(3-m)!` for `m in 0..=3` (the `FAC` table, read
+/// without indexing; `m > 3` is unreachable at every call site).
+fn fac(m: usize) -> f64 {
+    match m {
+        0 => 1.0,
+        1 => 3.0,
+        _ => 6.0,
+    }
 }
 
 /// The m-th u- and n-th v-difference net of a 4x4 control net, scaled by the
@@ -1275,20 +1298,22 @@ fn derivative_net(
     n: usize,
 ) -> Vec<Vec<Vector3>> {
     let du = u_diff_net(net, m);
-    let scale = (FAC[m] / hu.powi(m as i32)) * (FAC[n] / hv.powi(n as i32));
-    (0..(4 - m))
-        .map(|i| v_diff(&du[i], n).into_iter().map(|x| x * scale).collect())
+    let scale = (fac(m) / hu.powi(m as i32)) * (fac(n) / hv.powi(n as i32));
+    du.iter()
+        .map(|row| v_diff(row, n).into_iter().map(|x| x * scale).collect())
         .collect()
 }
 
 /// Tensor-product Bernstein evaluation of a `(4-m) x (4-n)` vector net at the
 /// local parameters `(s, t)`.
 fn tensor_eval(net: &[Vec<Vector3>], s: f64, t: f64) -> Vector3 {
-    let n_rows = net.len();
     let n_cols = net.first().map(|r| r.len()).unwrap_or(0);
     let mut vpts: Vec<Vector3> = Vec::with_capacity(n_cols);
     for j in 0..n_cols {
-        let col: Vec<Vector3> = (0..n_rows).map(|i| net[i][j]).collect();
+        let col: Vec<Vector3> = net
+            .iter()
+            .map(|row| row.get(j).copied().unwrap_or(Vector3::zero()))
+            .collect();
         vpts.push(bezier_eval_vec(&col, s));
     }
     bezier_eval_vec(&vpts, t)
@@ -1304,7 +1329,7 @@ fn curve_machinery(p: &[Vector3; 4], a: f64, b: f64, lo: f64, hi: f64, k: usize)
         let t = (lo - a) / (b - a);
         let der: Vec<Vector3> = v_diff(p, k)
             .into_iter()
-            .map(|x| x * (FAC[k] / (b - a).powi(k as i32)))
+            .map(|x| x * (fac(k) / (b - a).powi(k as i32)))
             .collect();
         vec![bezier_eval_vec(&der, t)]
     } else {
@@ -1312,7 +1337,7 @@ fn curve_machinery(p: &[Vector3; 4], a: f64, b: f64, lo: f64, hi: f64, k: usize)
         let w = hi - lo;
         v_diff(&sub, k)
             .into_iter()
-            .map(|x| x * (FAC[k] / w.powi(k as i32)))
+            .map(|x| x * (fac(k) / w.powi(k as i32)))
             .collect()
     }
 }
@@ -1343,23 +1368,24 @@ impl HermiteCellSurface {
         let w30 = mid_box_der(&exact.enclose_der(1, 1, interval_at(b), interval_at(c)));
         let w03 = mid_box_der(&exact.enclose_der(1, 1, interval_at(a), interval_at(d)));
         let w33 = mid_box_der(&exact.enclose_der(1, 1, interval_at(b), interval_at(d)));
-        let mut net = [[Point3::new(0.0, 0.0, 0.0); 4]; 4];
-        net[0][0] = p00;
-        net[3][0] = p30;
-        net[0][3] = p03;
-        net[3][3] = p33;
-        net[1][0] = p00 + u00 * hu3;
-        net[2][0] = p30 - u30 * hu3;
-        net[1][3] = p03 + u03 * hu3;
-        net[2][3] = p33 - u33 * hu3;
-        net[0][1] = p00 + v00 * hv3;
-        net[0][2] = p03 - v03 * hv3;
-        net[3][1] = p30 + v30 * hv3;
-        net[3][2] = p33 - v33 * hv3;
-        net[1][1] = p00 + u00 * hu3 + v00 * hv3 + w00 * wh;
-        net[2][1] = p30 - u30 * hu3 + v30 * hv3 - w30 * wh;
-        net[1][2] = p03 + u03 * hu3 - v03 * hv3 - w03 * wh;
-        net[2][2] = p33 - u33 * hu3 - v33 * hv3 + w33 * wh;
+        // The Decision-2 4x4 net, written out as an array literal (the crate
+        // denies indexing): rows are u-indexed, columns v-indexed.
+        let net: [[Point3; 4]; 4] = [
+            [p00, p00 + v00 * hv3, p03 - v03 * hv3, p03],
+            [
+                p00 + u00 * hu3,
+                p00 + u00 * hu3 + v00 * hv3 + w00 * wh,
+                p03 + u03 * hu3 - v03 * hv3 - w03 * wh,
+                p03 + u03 * hu3,
+            ],
+            [
+                p30 - u30 * hu3,
+                p30 - u30 * hu3 + v30 * hv3 - w30 * wh,
+                p33 - u33 * hu3 - v33 * hv3 + w33 * wh,
+                p33 - u33 * hu3,
+            ],
+            [p30, p30 + v30 * hv3, p33 - v33 * hv3, p33],
+        ];
         HermiteCellSurface {
             a,
             b,
@@ -1374,18 +1400,34 @@ impl HermiteCellSurface {
     /// Restrict the cell's net to the sub-rectangle `[lo_u, hi_u] x
     /// [lo_v, hi_v]` (de Casteljau splits per axis).
     fn restrict_2d(&self, lo_u: f64, hi_u: f64, lo_v: f64, hi_v: f64) -> [[Point3; 4]; 4] {
+        // u-restrict each v-column (a cubic in u), then v-restrict each row.
         let mut mid = [[Point3::new(0.0, 0.0, 0.0); 4]; 4];
         for j in 0..4 {
-            let col = [self.net[0][j], self.net[1][j], self.net[2][j], self.net[3][j]];
+            let col = std::array::from_fn(|i| {
+                self.net
+                    .get(i)
+                    .and_then(|row| row.get(j))
+                    .copied()
+                    .unwrap_or(Point3::new(0.0, 0.0, 0.0))
+            });
             let r = restrict_curve(col, self.a, self.b, lo_u, hi_u);
             for i in 0..4 {
-                mid[i][j] = r[i];
+                let slot = mid.get_mut(i).and_then(|row| row.get_mut(j));
+                if let Some(slot) = slot {
+                    *slot = r.get(i).copied().unwrap_or(Point3::new(0.0, 0.0, 0.0));
+                }
             }
         }
         let mut out = [[Point3::new(0.0, 0.0, 0.0); 4]; 4];
         for i in 0..4 {
-            let row = [mid[i][0], mid[i][1], mid[i][2], mid[i][3]];
-            out[i] = restrict_curve(row, self.c, self.d, lo_v, hi_v);
+            let row = mid
+                .get(i)
+                .copied()
+                .unwrap_or([Point3::new(0.0, 0.0, 0.0); 4]);
+            let r = restrict_curve(row, self.c, self.d, lo_v, hi_v);
+            if let Some(slot) = out.get_mut(i) {
+                *slot = r;
+            }
         }
         out
     }
@@ -1419,10 +1461,13 @@ impl HermiteCellSurface {
             // the CELL u-span), then the 1D v-curve machinery over the v
             // intersection.
             let du = u_diff_net(&self.net, m);
-            let su = FAC[m] / self.hu.powi(m as i32);
+            let su = fac(m) / self.hu.powi(m as i32);
             let s_mid = (0.5 * (lo_u + hi_u) - self.a) / self.hu;
             let vcur: [Vector3; 4] = std::array::from_fn(|j| {
-                let col: Vec<Vector3> = (0..(4 - m)).map(|i| du[i][j] * su).collect();
+                let col: Vec<Vector3> = du
+                    .iter()
+                    .map(|row| row.get(j).copied().unwrap_or(Vector3::zero()) * su)
+                    .collect();
                 bezier_eval_vec(&col, s_mid)
             });
             curve_machinery(&vcur, self.c, self.d, lo_v, hi_v, n)
@@ -1431,16 +1476,17 @@ impl HermiteCellSurface {
             // (degree-(3-n) Bernstein evaluation of the v-difference net over
             // the CELL v-span), then the 1D u-curve machinery over the u
             // intersection.
-            let sv = FAC[n] / self.hv.powi(n as i32);
+            let sv = fac(n) / self.hv.powi(n as i32);
             let t_mid = (0.5 * (lo_v + hi_v) - self.c) / self.hv;
             let ucur: [Vector3; 4] = std::array::from_fn(|i| {
-                let row = [
-                    self.net[i][0].to_vec(),
-                    self.net[i][1].to_vec(),
-                    self.net[i][2].to_vec(),
-                    self.net[i][3].to_vec(),
-                ];
-                let scaled: Vec<Vector3> = v_diff(&row, n).into_iter().map(|x| x * sv).collect();
+                let row = self
+                    .net
+                    .get(i)
+                    .copied()
+                    .unwrap_or([Point3::new(0.0, 0.0, 0.0); 4]);
+                let [r0, r1, r2, r3] = row;
+                let row_v = [r0.to_vec(), r1.to_vec(), r2.to_vec(), r3.to_vec()];
+                let scaled: Vec<Vector3> = v_diff(&row_v, n).into_iter().map(|x| x * sv).collect();
                 bezier_eval_vec(&scaled, t_mid)
             });
             curve_machinery(&ucur, self.a, self.b, lo_u, hi_u, m)
@@ -1486,11 +1532,11 @@ impl HermiteSurface {
         let n_v = v_knots.len().saturating_sub(1);
         let mut cells = Vec::with_capacity(n_u * n_v);
         for iu in 0..n_u {
-            let a = u_knots[iu];
-            let b = u_knots[iu + 1];
+            let a = u_knots.get(iu).copied().unwrap_or(u_lo);
+            let b = u_knots.get(iu + 1).copied().unwrap_or(u_hi);
             for iv in 0..n_v {
-                let c = v_knots[iv];
-                let d = v_knots[iv + 1];
+                let c = v_knots.get(iv).copied().unwrap_or(v_lo);
+                let d = v_knots.get(iv + 1).copied().unwrap_or(v_hi);
                 cells.push(HermiteCellSurface::from_exact(exact, a, b, c, d));
             }
         }
@@ -1511,11 +1557,15 @@ impl HermiteSurface {
         let n_v = self.v_knots.len().saturating_sub(1);
         let iu = axis_cell_index(&self.u_knots, u);
         let iv = axis_cell_index(&self.v_knots, v);
-        let cell = &self.cells[iu * n_v + iv];
-        let s = (u - cell.a) / cell.hu;
-        let t = (v - cell.c) / cell.hv;
-        let net = derivative_net(&cell.net, cell.hu, cell.hv, m, n);
-        tensor_eval(&net, s, t)
+        match self.cells.get(iu * n_v + iv) {
+            Some(cell) => {
+                let s = (u - cell.a) / cell.hu;
+                let t = (v - cell.c) / cell.hv;
+                let net = derivative_net(&cell.net, cell.hu, cell.hv, m, n);
+                tensor_eval(&net, s, t)
+            }
+            None => Vector3::zero(),
+        }
     }
 }
 
@@ -1573,10 +1623,12 @@ fn overlapping_axis_range(knots: &[f64], q: Interval) -> (usize, usize) {
     }
     if q.inf() == q.sup() {
         // Degenerate point: the cells containing it (at most two, straddling
-        // a knot).
+        // a knot). `j - 1` may equal `n` (the point is the last knot), so the
+        // knot-index check must span the full knot list, not just the cells.
         let p = q.inf();
         let j = knots.partition_point(|k| *k <= p);
-        let lo = if j >= 1 && j.saturating_sub(1) < n && knots[j.saturating_sub(1)] == p {
+        let at_knot = j >= 1 && knots.get(j - 1).copied() == Some(p);
+        let lo = if at_knot {
             j.saturating_sub(2).min(n)
         } else {
             j.saturating_sub(1).min(n)
@@ -1584,7 +1636,10 @@ fn overlapping_axis_range(knots: &[f64], q: Interval) -> (usize, usize) {
         let hi = j.min(n);
         (lo, hi.max(lo))
     } else {
-        let lo = knots.partition_point(|k| *k <= q.inf()).saturating_sub(1).min(n);
+        let lo = knots
+            .partition_point(|k| *k <= q.inf())
+            .saturating_sub(1)
+            .min(n);
         let hi = knots.partition_point(|k| *k < q.sup()).min(n);
         (lo, hi.max(lo))
     }
@@ -1597,15 +1652,24 @@ impl EnclosureSurface for HermiteSurface {
         let (v_lo, v_hi) = overlapping_axis_range(&self.v_knots, vv);
         let mut acc = Box3::empty();
         for iu in u_lo..u_hi {
-            let lo_u = uu.inf().max(self.u_knots[iu]);
-            let hi_u = uu.sup().min(self.u_knots[iu + 1]);
+            let lo_u = uu
+                .inf()
+                .max(self.u_knots.get(iu).copied().unwrap_or(uu.inf()));
+            let hi_u = uu
+                .sup()
+                .min(self.u_knots.get(iu + 1).copied().unwrap_or(uu.sup()));
             for iv in v_lo..v_hi {
-                let lo_v = vv.inf().max(self.v_knots[iv]);
-                let hi_v = vv.sup().min(self.v_knots[iv + 1]);
-                let cell = &self.cells[iu * n_v + iv];
-                let sub = cell.restrict_2d(lo_u, hi_u, lo_v, hi_v);
-                let pts: Vec<Point3> = sub.iter().flatten().copied().collect();
-                acc = hull_join(&acc, &hull_box(&pts));
+                let lo_v = vv
+                    .inf()
+                    .max(self.v_knots.get(iv).copied().unwrap_or(vv.inf()));
+                let hi_v = vv
+                    .sup()
+                    .min(self.v_knots.get(iv + 1).copied().unwrap_or(vv.sup()));
+                if let Some(cell) = self.cells.get(iu * n_v + iv) {
+                    let sub = cell.restrict_2d(lo_u, hi_u, lo_v, hi_v);
+                    let pts: Vec<Point3> = sub.iter().flatten().copied().collect();
+                    acc = hull_join(&acc, &hull_box(&pts));
+                }
             }
         }
         acc
@@ -1624,14 +1688,23 @@ impl EnclosureSurface for HermiteSurface {
         let (v_lo, v_hi) = overlapping_axis_range(&self.v_knots, vv);
         let mut acc = Box3::empty();
         for iu in u_lo..u_hi {
-            let lo_u = uu.inf().max(self.u_knots[iu]);
-            let hi_u = uu.sup().min(self.u_knots[iu + 1]);
+            let lo_u = uu
+                .inf()
+                .max(self.u_knots.get(iu).copied().unwrap_or(uu.inf()));
+            let hi_u = uu
+                .sup()
+                .min(self.u_knots.get(iu + 1).copied().unwrap_or(uu.sup()));
             for iv in v_lo..v_hi {
-                let lo_v = vv.inf().max(self.v_knots[iv]);
-                let hi_v = vv.sup().min(self.v_knots[iv + 1]);
-                let cell = &self.cells[iu * n_v + iv];
-                let b = cell.derivative_enclosure(m, n, lo_u, hi_u, lo_v, hi_v);
-                acc = hull_join(&acc, &b);
+                let lo_v = vv
+                    .inf()
+                    .max(self.v_knots.get(iv).copied().unwrap_or(vv.inf()));
+                let hi_v = vv
+                    .sup()
+                    .min(self.v_knots.get(iv + 1).copied().unwrap_or(vv.sup()));
+                if let Some(cell) = self.cells.get(iu * n_v + iv) {
+                    let b = cell.derivative_enclosure(m, n, lo_u, hi_u, lo_v, hi_v);
+                    acc = hull_join(&acc, &b);
+                }
             }
         }
         acc
@@ -1717,7 +1790,9 @@ pub fn surface_curvature_radius_lower_span(
     let (Some((u0, u1)), Some((v0, v1))) = exact.try_range_tuple() else {
         return Err(SurfaceScaleError::InvalidMargin);
     };
-    if !(u0.is_finite() && u1.is_finite() && v0.is_finite() && v1.is_finite()) || u0 >= u1 || v0 >= v1
+    if !(u0.is_finite() && u1.is_finite() && v0.is_finite() && v1.is_finite())
+        || u0 >= u1
+        || v0 >= v1
     {
         return Err(SurfaceScaleError::InvalidMargin);
     }
@@ -1915,6 +1990,20 @@ fn surface_param_gap_max(a: &Interval, b_lo: f64, b_hi: f64, closed: bool, perio
     }
 }
 
+/// The per-axis closure, span and grid context shared by the surface
+/// separation helpers.
+#[derive(Clone, Copy)]
+struct SurfaceSepCtx {
+    /// Whether the u axis is closed.
+    closed_u: bool,
+    /// Whether the v axis is closed.
+    closed_v: bool,
+    /// The u span (the period on a closed u axis).
+    u_period: f64,
+    /// The v span (the period on a closed v axis).
+    v_period: f64,
+}
+
 /// One query cell's descent of the separation tree: prune nodes whose
 /// box-to-box distance to the query cannot lower `best`, prune nodes from
 /// which no leaf can satisfy the parameter-gap qualification, and update
@@ -1923,23 +2012,32 @@ fn surface_min_separation(
     node: &SurfaceKdNode,
     query: &SurfaceKdCell,
     gap: f64,
-    closed_u: bool,
-    closed_v: bool,
-    u_period: f64,
-    v_period: f64,
+    ctx: SurfaceSepCtx,
     best: &mut f64,
 ) {
     if box_distance(&query.bb, &node.bb) >= *best {
         return;
     }
-    let gu = surface_param_gap_max(&query.uu, node.u_lo, node.u_hi, closed_u, u_period);
-    let gv = surface_param_gap_max(&query.vv, node.v_lo, node.v_hi, closed_v, v_period);
+    let gu = surface_param_gap_max(&query.uu, node.u_lo, node.u_hi, ctx.closed_u, ctx.u_period);
+    let gv = surface_param_gap_max(&query.vv, node.v_lo, node.v_hi, ctx.closed_v, ctx.v_period);
     if gu < gap && gv < gap {
         return;
     }
     if let Some(cell) = node.cell {
-        let gu = surface_param_gap_max(&query.uu, cell.uu.inf(), cell.uu.sup(), closed_u, u_period);
-        let gv = surface_param_gap_max(&query.vv, cell.vv.inf(), cell.vv.sup(), closed_v, v_period);
+        let gu = surface_param_gap_max(
+            &query.uu,
+            cell.uu.inf(),
+            cell.uu.sup(),
+            ctx.closed_u,
+            ctx.u_period,
+        );
+        let gv = surface_param_gap_max(
+            &query.vv,
+            cell.vv.inf(),
+            cell.vv.sup(),
+            ctx.closed_v,
+            ctx.v_period,
+        );
         if gu.max(gv) >= gap {
             let d = box_distance(&query.bb, &cell.bb);
             if d < *best {
@@ -1949,10 +2047,10 @@ fn surface_min_separation(
         return;
     }
     if let Some(l) = &node.left {
-        surface_min_separation(l, query, gap, closed_u, closed_v, u_period, v_period, best);
+        surface_min_separation(l, query, gap, ctx, best);
     }
     if let Some(r) = &node.right {
-        surface_min_separation(r, query, gap, closed_u, closed_v, u_period, v_period, best);
+        surface_min_separation(r, query, gap, ctx, best);
     }
 }
 
@@ -1971,7 +2069,9 @@ pub fn surface_self_separation_lower_span(
     let (Some((u0, u1)), Some((v0, v1))) = exact.try_range_tuple() else {
         return Err(SurfaceScaleError::InvalidMargin);
     };
-    if !(u0.is_finite() && u1.is_finite() && v0.is_finite() && v1.is_finite()) || u0 >= u1 || v0 >= v1
+    if !(u0.is_finite() && u1.is_finite() && v0.is_finite() && v1.is_finite())
+        || u0 >= u1
+        || v0 >= v1
     {
         return Err(SurfaceScaleError::InvalidMargin);
     }
@@ -2006,18 +2106,15 @@ pub fn surface_self_separation_lower_span(
             })
             .collect();
         let tree = surface_build_tree(&kd_cells);
+        let ctx = SurfaceSepCtx {
+            closed_u,
+            closed_v,
+            u_period,
+            v_period,
+        };
         let mut best = f64::INFINITY;
         for q in kd_cells.iter() {
-            surface_min_separation(
-                &tree,
-                q,
-                gap,
-                closed_u,
-                closed_v,
-                u_period,
-                v_period,
-                &mut best,
-            );
+            surface_min_separation(&tree, q, gap, ctx, &mut best);
         }
         let cur = best;
         let change = if prev.is_infinite() || cur.is_infinite() {
@@ -2074,12 +2171,24 @@ fn surface_measure(
     let mut ext_v = 0.0;
     let mut cell_eps = Vec::with_capacity(n_u * n_v);
     for iu in 0..n_u {
-        let au = u_knots[iu];
-        let bu = u_knots[iu + 1];
+        let au = u_knots
+            .get(iu)
+            .copied()
+            .unwrap_or(u_knots.first().copied().unwrap_or(0.0));
+        let bu = u_knots
+            .get(iu + 1)
+            .copied()
+            .unwrap_or(u_knots.last().copied().unwrap_or(0.0));
         let hu = bu - au;
         for iv in 0..n_v {
-            let av = v_knots[iv];
-            let bv = v_knots[iv + 1];
+            let av = v_knots
+                .get(iv)
+                .copied()
+                .unwrap_or(v_knots.first().copied().unwrap_or(0.0));
+            let bv = v_knots
+                .get(iv + 1)
+                .copied()
+                .unwrap_or(v_knots.last().copied().unwrap_or(0.0));
             let hv = bv - av;
             let mut cell_max = 0.0;
             for su in 0..m {
@@ -2145,8 +2254,12 @@ impl<'a, C: EnclosureSurface> KrawczykSystem<2> for SurfaceKnotProjection<'a, C>
     fn f_point(&self, x: &[f64; 2]) -> [Interval; 2] {
         let [u0, v0] = *x;
         let s = self.exact.enclose(interval_at(u0), interval_at(v0));
-        let su = self.exact.enclose_der(1, 0, interval_at(u0), interval_at(v0));
-        let sv = self.exact.enclose_der(0, 1, interval_at(u0), interval_at(v0));
+        let su = self
+            .exact
+            .enclose_der(1, 0, interval_at(u0), interval_at(v0));
+        let sv = self
+            .exact
+            .enclose_der(0, 1, interval_at(u0), interval_at(v0));
         let d = box_minus_point(&s, self.phi);
         [dot_box(&d, &su), dot_box(&d, &sv)]
     }
@@ -2170,11 +2283,21 @@ impl<'a, C: EnclosureSurface> KrawczykSystem<2> for SurfaceKnotProjection<'a, C>
     fn preconditioner(&self, x: &[f64; 2]) -> Option<[[f64; 2]; 2]> {
         let [u0, v0] = *x;
         let s = self.exact.enclose(interval_at(u0), interval_at(v0));
-        let su = self.exact.enclose_der(1, 0, interval_at(u0), interval_at(v0));
-        let sv = self.exact.enclose_der(0, 1, interval_at(u0), interval_at(v0));
-        let suu = self.exact.enclose_der(2, 0, interval_at(u0), interval_at(v0));
-        let suv = self.exact.enclose_der(1, 1, interval_at(u0), interval_at(v0));
-        let svv = self.exact.enclose_der(0, 2, interval_at(u0), interval_at(v0));
+        let su = self
+            .exact
+            .enclose_der(1, 0, interval_at(u0), interval_at(v0));
+        let sv = self
+            .exact
+            .enclose_der(0, 1, interval_at(u0), interval_at(v0));
+        let suu = self
+            .exact
+            .enclose_der(2, 0, interval_at(u0), interval_at(v0));
+        let suv = self
+            .exact
+            .enclose_der(1, 1, interval_at(u0), interval_at(v0));
+        let svv = self
+            .exact
+            .enclose_der(0, 2, interval_at(u0), interval_at(v0));
         let d = box_minus_point(&s, self.phi);
         let m00 = (dot_box(&d, &suu) - dot_box(&su, &su)).mid();
         let m01 = (dot_box(&d, &suv) - dot_box(&su, &sv)).mid();
@@ -2236,38 +2359,63 @@ pub(crate) fn surface_separation_violation(
 ) -> Option<(usize, usize)> {
     let n_u = u_knots.len().saturating_sub(1);
     let n_v = v_knots.len().saturating_sub(1);
-    let closed_u = matches!(boundary, SurfaceBoundary::ClosedU | SurfaceBoundary::ClosedUV);
-    let closed_v = matches!(boundary, SurfaceBoundary::ClosedV | SurfaceBoundary::ClosedUV);
+    let closed_u = matches!(
+        boundary,
+        SurfaceBoundary::ClosedU | SurfaceBoundary::ClosedUV
+    );
+    let closed_v = matches!(
+        boundary,
+        SurfaceBoundary::ClosedV | SurfaceBoundary::ClosedUV
+    );
     let mut kd: Vec<SurfaceKdCell> = Vec::with_capacity(n_u * n_v);
     for iu in 0..n_u {
-        let uu = interval(u_knots[iu], u_knots[iu + 1]);
+        let uu = interval(
+            u_knots.get(iu).copied().unwrap_or(0.0),
+            u_knots.get(iu + 1).copied().unwrap_or(0.0),
+        );
         for iv in 0..n_v {
             let idx = iu * n_v + iv;
+            let vv = interval(
+                v_knots.get(iv).copied().unwrap_or(0.0),
+                v_knots.get(iv + 1).copied().unwrap_or(0.0),
+            );
+            let bb = exact_boxes.get(idx).copied().unwrap_or(Box3::empty());
             kd.push(SurfaceKdCell {
                 uu,
-                vv: interval(v_knots[iv], v_knots[iv + 1]),
-                bb: exact_boxes[idx],
+                vv,
+                bb,
                 index: idx,
             });
         }
     }
     let tree = surface_build_tree(&kd);
+    let scan_ctx = SurfaceScanCtx {
+        n_u,
+        n_v,
+        closed_u,
+        closed_v,
+    };
     for j in 0..emitted_boxes.len() {
         let eps_j = cell_eps.get(j).copied().unwrap_or(0.0);
-        if let Some(k) = surface_close_non_adjacent(
-            &tree,
-            &emitted_boxes[j],
-            eps_j,
-            j,
-            n_u,
-            n_v,
-            closed_u,
-            closed_v,
-        ) {
+        let qb = emitted_boxes.get(j).copied().unwrap_or(Box3::empty());
+        if let Some(k) = surface_close_non_adjacent(&tree, &qb, eps_j, j, scan_ctx) {
             return Some((j, k));
         }
     }
     None
+}
+
+/// The grid and closure context of the (iv-b)(c) separation scan.
+#[derive(Clone, Copy)]
+struct SurfaceScanCtx {
+    /// The number of u cells.
+    n_u: usize,
+    /// The number of v cells.
+    n_v: usize,
+    /// Whether the u axis is closed.
+    closed_u: bool,
+    /// Whether the v axis is closed.
+    closed_v: bool,
 }
 
 /// Whether any leaf of the tree with a box within `eps` of the query box is
@@ -2277,17 +2425,14 @@ fn surface_close_non_adjacent(
     query: &Box3,
     eps: f64,
     j: usize,
-    n_u: usize,
-    n_v: usize,
-    closed_u: bool,
-    closed_v: bool,
+    ctx: SurfaceScanCtx,
 ) -> Option<usize> {
     if box_distance(query, &node.bb) > eps {
         return None;
     }
     if let Some(cell) = node.cell {
         let k = cell.index;
-        if !surface_adjacent(j, k, n_u, n_v, closed_u, closed_v)
+        if !surface_adjacent(j, k, ctx.n_u, ctx.n_v, ctx.closed_u, ctx.closed_v)
             && box_distance(query, &cell.bb) <= eps
         {
             return Some(k);
@@ -2295,14 +2440,12 @@ fn surface_close_non_adjacent(
         return None;
     }
     if let Some(l) = &node.left {
-        if let Some(k) = surface_close_non_adjacent(l, query, eps, j, n_u, n_v, closed_u, closed_v)
-        {
+        if let Some(k) = surface_close_non_adjacent(l, query, eps, j, ctx) {
             return Some(k);
         }
     }
     if let Some(r) = &node.right {
-        if let Some(k) = surface_close_non_adjacent(r, query, eps, j, n_u, n_v, closed_u, closed_v)
-        {
+        if let Some(k) = surface_close_non_adjacent(r, query, eps, j, ctx) {
             return Some(k);
         }
     }
@@ -2334,10 +2477,14 @@ pub fn surface_ivb_discharge(
     // vertex (seam lines are NOT checked on closed directions).
     for iu in 1..n_u {
         for iv in 1..n_v {
-            let u_star = u_knots[iu];
-            let v_star = v_knots[iv];
-            let wu = (u_star - u_knots[iu - 1]).max(u_knots[iu + 1] - u_star);
-            let wv = (v_star - v_knots[iv - 1]).max(v_knots[iv + 1] - v_star);
+            let u_star = u_knots.get(iu).copied().unwrap_or(0.0);
+            let v_star = v_knots.get(iv).copied().unwrap_or(0.0);
+            let u_prev = u_knots.get(iu - 1).copied().unwrap_or(u_star);
+            let u_next = u_knots.get(iu + 1).copied().unwrap_or(u_star);
+            let v_prev = v_knots.get(iv - 1).copied().unwrap_or(v_star);
+            let v_next = v_knots.get(iv + 1).copied().unwrap_or(v_star);
+            let wu = (u_star - u_prev).max(u_next - u_star);
+            let wv = (v_star - v_prev).max(v_next - v_star);
             let start = [
                 interval(u_star - wu, u_star + wu),
                 interval(v_star - wv, v_star + wv),
@@ -2354,9 +2501,15 @@ pub fn surface_ivb_discharge(
     let mut emitted_boxes = Vec::with_capacity(n_u * n_v);
     let mut exact_boxes = Vec::with_capacity(n_u * n_v);
     for iu in 0..n_u {
-        let uu = interval(u_knots[iu], u_knots[iu + 1]);
+        let uu = interval(
+            u_knots.get(iu).copied().unwrap_or(0.0),
+            u_knots.get(iu + 1).copied().unwrap_or(0.0),
+        );
         for iv in 0..n_v {
-            let vv = interval(v_knots[iv], v_knots[iv + 1]);
+            let vv = interval(
+                v_knots.get(iv).copied().unwrap_or(0.0),
+                v_knots.get(iv + 1).copied().unwrap_or(0.0),
+            );
             emitted_boxes.push(approx.enclose(uu, vv));
             exact_boxes.push(exact.enclose(uu, vv));
         }
@@ -2402,7 +2555,9 @@ pub fn rep_surface(
     let (Some((u0, u1)), Some((v0, v1))) = exact.try_range_tuple() else {
         return Err(RepSurfaceError::InvalidMargin);
     };
-    if !(u0.is_finite() && u1.is_finite() && v0.is_finite() && v1.is_finite()) || u0 >= u1 || v0 >= v1
+    if !(u0.is_finite() && u1.is_finite() && v0.is_finite() && v1.is_finite())
+        || u0 >= u1
+        || v0 >= v1
     {
         return Err(RepSurfaceError::InvalidMargin);
     }
@@ -2433,9 +2588,11 @@ pub fn rep_surface(
 
     loop {
         // Decision 4: Budget's own exhaustion at the top of each attempt.
-        budget.spend_subdiv(1).map_err(|_| RepSurfaceError::Unresolved {
-            subdivisions: subdivisions_spent,
-        })?;
+        budget
+            .spend_subdiv(1)
+            .map_err(|_| RepSurfaceError::Unresolved {
+                subdivisions: subdivisions_spent,
+            })?;
         subdivisions_spent += 1;
 
         let u_cells = uniform_cells(u0, u1, du);
@@ -3557,11 +3714,7 @@ mod tests {
         }
 
         fn vder(&self, u: f64, v: f64) -> Vector3 {
-            Vector3::new(
-                -self.r * u.sin() * v.sin(),
-                self.r * u.sin() * v.cos(),
-                0.0,
-            )
+            Vector3::new(-self.r * u.sin() * v.sin(), self.r * u.sin() * v.cos(), 0.0)
         }
 
         fn uuder(&self, u: f64, v: f64) -> Vector3 {
@@ -3630,11 +3783,7 @@ mod tests {
             Box3 {
                 x: r * su * cv,
                 y: r * su * sv,
-                z: if n == 0 {
-                    r * cu
-                } else {
-                    interval_at(0.0)
-                },
+                z: if n == 0 { r * cu } else { interval_at(0.0) },
             }
         }
 
@@ -3815,11 +3964,7 @@ mod tests {
         fn sphere_der(&self, p: usize, q: usize, u: f64, v: f64) -> Vector3 {
             let sx = sphere_sin_der_m(v, q) * sphere_cos_der_m(u, p);
             let sy = sphere_sin_der_m(v, q) * sphere_sin_der_m(u, p);
-            let sz = if p == 0 {
-                sphere_cos_der_m(v, q)
-            } else {
-                0.0
-            };
+            let sz = if p == 0 { sphere_cos_der_m(v, q) } else { 0.0 };
             Vector3::new(sx, sy, sz)
         }
 
@@ -4069,8 +4214,7 @@ mod tests {
         for i in 0..N_SAMPLES {
             let u = (0.0 + (i as f64 + 0.5) / (N_SAMPLES as f64)) * DOUBLE_U_SPAN;
             for j in 0..N_SAMPLES {
-                let v = SURF_V_LO
-                    + (j as f64 + 0.5) / (N_SAMPLES as f64) * (SURF_V_HI - SURF_V_LO);
+                let v = SURF_V_LO + (j as f64 + 0.5) / (N_SAMPLES as f64) * (SURF_V_HI - SURF_V_LO);
                 let n = exact.uder(u, v).cross(exact.vder(u, v)).normalize();
                 let sphere_n = Vector3::new(v.sin() * u.cos(), v.sin() * u.sin(), v.cos());
                 let c = n.dot(sphere_n).abs();
@@ -4197,7 +4341,8 @@ mod tests {
         let _ = surface_curvature_radius_lower_span(&exact, &mut cb);
         let curv_spent = SURF_SCALE_BUDGET - cb.subdiv;
         let mut sb = Budget::new(SURF_SCALE_BUDGET, 0, 0);
-        let _ = surface_self_separation_lower_span(&exact, SurfaceBoundary::ClosedV, SURF_GAP, &mut sb);
+        let _ =
+            surface_self_separation_lower_span(&exact, SurfaceBoundary::ClosedV, SURF_GAP, &mut sb);
         let sep_spent = SURF_SCALE_BUDGET - sb.subdiv;
         let mut budget = Budget::new(curv_spent + sep_spent + 2, 0, 0);
         let out = rep_surface(
@@ -4306,9 +4451,15 @@ mod tests {
         let mut emitted_boxes = Vec::with_capacity(n_u * n_v);
         let mut exact_boxes = Vec::with_capacity(n_u * n_v);
         for iu in 0..n_u {
-            let uu = interval(u_knots[iu], u_knots[iu + 1]);
+            let uu = interval(
+                u_knots.get(iu).copied().unwrap_or(0.0),
+                u_knots.get(iu + 1).copied().unwrap_or(0.0),
+            );
             for iv in 0..n_v {
-                let vv = interval(v_knots[iv], v_knots[iv + 1]);
+                let vv = interval(
+                    v_knots.get(iv).copied().unwrap_or(0.0),
+                    v_knots.get(iv + 1).copied().unwrap_or(0.0),
+                );
                 emitted_boxes.push(surface.enclose(uu, vv));
                 exact_boxes.push(exact.enclose(uu, vv));
             }
@@ -4392,7 +4543,7 @@ mod tests {
         // The witness's own geometry: amplitude strictly inside eps, and
         // correct tangent planes on BOTH sheets.
         assert!(
-            DOUBLE_A < DOUBLE_EPS,
+            double_cover().a < DOUBLE_EPS,
             "the amplitude must be strictly inside the tolerance"
         );
         assert!(
@@ -4413,7 +4564,8 @@ mod tests {
         let _ = surface_curvature_radius_lower_span(&exact, &mut cb);
         let curv_spent = SURF_SCALE_BUDGET - cb.subdiv;
         let mut sb = Budget::new(SURF_SCALE_BUDGET, 0, 0);
-        let _ = surface_self_separation_lower_span(&exact, SurfaceBoundary::ClosedU, SURF_GAP, &mut sb);
+        let _ =
+            surface_self_separation_lower_span(&exact, SurfaceBoundary::ClosedU, SURF_GAP, &mut sb);
         let sep_spent = SURF_SCALE_BUDGET - sb.subdiv;
         let mut budget = Budget::new(curv_spent + sep_spent + 2, 0, 0);
         let out = rep_surface(
@@ -4496,37 +4648,5 @@ mod tests {
             "eps {} exceeds the family tolerance",
             output.certificate.eps_achieved
         );
-    }
-
-    #[test]
-    #[ignore]
-    fn scratch_rerep() {
-        let exact = belt();
-        let mut b1 = Budget::new(SURF_REP_BUDGET, 0, 0);
-        let e1 = must_surf(rep_surface(
-            &exact,
-            SurfaceBoundary::ClosedV,
-            SURF_TAU,
-            SURF_GAP,
-            0,
-            &mut b1,
-        ));
-        eprintln!(
-            "first rep ok at ({}, {})",
-            e1.certificate.depth_u, e1.certificate.depth_v
-        );
-        // scale spends of the emission
-        let mut cb = Budget::new(SURF_SCALE_BUDGET, 0, 0);
-        let t0 = std::time::Instant::now();
-        let curv = surface_curvature_radius_lower_span(&e1.surface, &mut cb);
-        eprintln!("re-rerep curvature = {curv:?} in {:.2}s", t0.elapsed().as_secs_f64());
-        let mut sb = Budget::new(SURF_SCALE_BUDGET, 0, 0);
-        let t1 = std::time::Instant::now();
-        let sep = surface_self_separation_lower_span(&e1.surface, SurfaceBoundary::ClosedV, SURF_GAP, &mut sb);
-        eprintln!("re-rerep separation = {sep:?} in {:.2}s", t1.elapsed().as_secs_f64());
-        let mut b3 = Budget::new(SURF_REP_BUDGET, 0, 0);
-        let t2 = std::time::Instant::now();
-        let rerun = rep_surface(&e1.surface, SurfaceBoundary::ClosedV, SURF_TAU, SURF_GAP, 0, &mut b3);
-        eprintln!("re-rerep total {:.2}s -> {rerun:?}", t2.elapsed().as_secs_f64());
     }
 }
