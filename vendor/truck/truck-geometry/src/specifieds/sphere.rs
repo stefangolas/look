@@ -244,7 +244,12 @@ impl SearchNearestParameter<D2> for Sphere {
         _: H,
         _: usize,
     ) -> Option<(f64, f64)> {
-        let radius = (point - self.center).normalize();
+        let ctx = ToleranceCtx::unscaled_legacy();
+        let radius = point - self.center;
+        if ctx.is_small_len(radius.magnitude()) {
+            return None;
+        }
+        let radius = radius.normalize();
         let u = f64::acos(f64::clamp(radius[2], -1.0, 1.0));
         let sinu = f64::sqrt(1.0 - radius[2] * radius[2]);
         let cosv = f64::clamp(radius[0] / sinu, -1.0, 1.0);
@@ -255,4 +260,15 @@ impl SearchNearestParameter<D2> for Sphere {
         };
         Some((u, v))
     }
+}
+
+#[test]
+fn sphere_search_nearest_parameter_center_is_none() {
+    let sphere = Sphere::new(Point3::origin(), 1.0);
+    assert!(
+        sphere
+            .search_nearest_parameter(Point3::origin(), None, 0)
+            .is_none(),
+        "the sphere center has no nearest parameter"
+    );
 }

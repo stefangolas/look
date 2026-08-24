@@ -51,7 +51,7 @@ impl Cone {
     pub fn include(&self, pt: Point3) -> bool {
         let r = pt - self.apex;
         let radial = Vector2::new(r.x, r.y).magnitude();
-        radial.near(&(r.z * self.half_angle.tan()))
+        radial.near(&(r.z.abs() * self.half_angle.tan()))
     }
 }
 
@@ -152,7 +152,7 @@ impl IncludeCurve<BSplineCurve<Point3>> for Cone {
         let r = curve.front() - self.apex();
         let radial = Vector2::new(r.x, r.y).magnitude();
         Ok(Certified::new(
-            curve.is_const() && ctx.is_small_len(radial - r.z * self.half_angle().tan()),
+            curve.is_const() && ctx.is_small_len(radial - r.z.abs() * self.half_angle().tan()),
             Certificate {
                 props: PropMap::new(),
                 method: Method::Float,
@@ -245,7 +245,7 @@ impl SearchParameter<D2> for Cone {
         let v = r.z;
         let rxy = Vector2::new(r.x, r.y);
         let radial = rxy.magnitude();
-        if !ctx.is_small_len(radial - v * self.half_angle().tan()) {
+        if !ctx.is_small_len(radial - r.z.abs() * self.half_angle().tan()) {
             return None;
         }
         let u = if ctx.is_small_len(radial) {
@@ -278,7 +278,7 @@ impl SearchNearestParameter<D2> for Cone {
         let r = point - self.apex();
         let rxy = Vector2::new(r.x, r.y);
         let radial = rxy.magnitude();
-        let u = if radial == 0.0 {
+        let azimuth = if radial == 0.0 {
             match hint.into() {
                 SPHint2D::Parameter(u, _) => u,
                 _ => 0.0,
@@ -293,7 +293,100 @@ impl SearchNearestParameter<D2> for Cone {
             }
         };
         let slope = self.half_angle().tan();
-        let v = (slope * radial + r.z) / (1.0 + slope * slope);
+        let denom = 1.0 + slope * slope;
+        // The double cone is `radial = |v| * slope` in the (radial, z) plane, so
+        // the squared distance is `(r_q - |v| * s)^2 + (z_q - v)^2` and the two
+        // one-sided stationary candidates are the v_plus (upper) and v_minus
+        // (lower) values below. At least one of them is always valid.
+        let v_plus = (slope * radial + r.z) / denom;
+        let v_minus = (r.z - slope * radial) / denom;
+        let (v, upper) = if v_plus >= 0.0 && v_minus <= 0.0 {
+            let d_plus = (radial - v_plus * slope).powi(2) + (r.z - v_plus).powi(2);
+            let d_minus = (radial + v_minus * slope).powi(2) + (r.z - v_minus).powi(2);
+            if d_plus <= d_minus {
+                (v_plus, true)
+            } else {
+                (v_minus, false)
+            }
+        } else if v_plus >= 0.0 {
+            (v_plus, true)
+        } else {
+            (v_minus, false)
+        };
+        // A lower-nappe point at parameter u sits at the azimuth u + PI, so the
+        // near-side azimuth is reached by shifting the query azimuth by PI there.
+        let u = if upper {
+            azimuth
+        } else {
+            let shifted = azimuth + PI;
+            if shifted >= 2.0 * PI {
+                shifted - 2.0 * PI
+            } else {
+                shifted
+            }
+        };
         Some((u, v))
     }
+}
+
+#[test]
+fn cone_include_holds_pointwise_on_both_nappes() {
+    let cone = match Cone::new(Point3::origin(), PI / 4.0) {
+        Ok(certified) => certified.value,
+        Err(_) => unreachable!("a finite half angle in the open interval is always accepted"),
+    };
+    let upper = BSplineCurve::new(KnotVec::bezier_knot(0), vec![cone.subs(0.7, 3.0)]);
+    let lower = BSplineCurve::new(KnotVec::bezier_knot(0), vec![cone.subs(0.7, -3.0)]);
+    assert!(
+        matches!(
+            IncludeCurve::include(&cone, &upper),
+            Ok(Certified { value: true, .. })
+        ),
+        "the upper nappe point must include"
+    );
+    assert!(
+        matches!(
+            IncludeCurve::include(&cone, &lower),
+            Ok(Certified { value: true, .. })
+        ),
+        "the lower nappe point must include"
+    );
+    let apex = BSplineCurve::new(KnotVec::bezier_knot(0), vec![cone.subs(0.0, 0.0)]);
+    assert!(
+        matches!(
+            IncludeCurve::include(&cone, &apex),
+            Ok(Certified { value: true, .. })
+        ),
+        "the apex must include"
+    );
+}
+
+#[test]
+fn cone_nearest_parameter_near_side_for_lower_nappe_query() {
+    let cone = match Cone::new(Point3::origin(), PI / 4.0) {
+        Ok(certified) => certified.value,
+        Err(_) => unreachable!("a finite half angle in the open interval is always accepted"),
+    };
+    let query = Point3::new(0.5, 0.0, -3.0);
+    let (u, v) = match cone.search_nearest_parameter(query, None, 0) {
+        Some((u, v)) => (u, v),
+        None => unreachable!("a nearest parameter always exists for a cone"),
+    };
+    // The double-cone nearest point on the lower nappe is sqrt(25/8) ~= 1.77 from
+    // the query; the single-nappe far side is sqrt(49/8) ~= 2.47 away, so a 2.0
+    // bound separates the near side from the far side.
+    assert!(
+        (cone.subs(u, v) - query).magnitude() < 2.0,
+        "the returned surface point must be the near side of the lower nappe"
+    );
+    let on_cone = cone.subs(0.7, -3.0);
+    let (u0, v0) = match cone.search_nearest_parameter(on_cone, None, 0) {
+        Some((u0, v0)) => (u0, v0),
+        None => unreachable!("a nearest parameter always exists for a cone"),
+    };
+    assert_near!(
+        cone.subs(u0, v0),
+        on_cone,
+        "an on-cone query must round-trip, not snap to the apex"
+    );
 }
