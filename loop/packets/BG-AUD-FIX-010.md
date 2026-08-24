@@ -25,6 +25,7 @@ write_allow:
   - vendor/truck/truck-geometry/src/specifieds/sphere.rs
   - vendor/truck/truck-geometry/src/specifieds/hyperbola.rs
   - vendor/truck/truck-geometry/src/specifieds/parabola.rs
+  - scripts/unscaled_legacy_ceiling.txt
 read_allow:
   - vendor/truck/truck-base/src/tolerance.rs
 tests_required:
@@ -97,7 +98,10 @@ non-unit scale. Record the pre-fix observations in `RESULT.json.notes`.
 - **`include`** (the `BSplineCurve<Point3>` impl, line 155): change the
   predicate to the double-nappe radial relation `radial ≈ |r.z|·slope`:
   `ctx.is_small_len(radial − r.z.abs() * self.half_angle().tan())`. This holds
-  pointwise on both nappes including the apex (`radial = r.z = 0`).
+  pointwise on both nappes including the apex (`radial = r.z = 0`). The
+  pointwise `Cone::include(&Point3)` (cone.rs:54) has the identical
+  single-nappe predicate and is what the `NurbsCurve` include delegates to —
+  fix it the same way (`radial.near(&(r.z.abs() * ...))`).
 - **`search_parameter`** (line 248): the same absolute-value predicate
   `radial − r.z.abs() * tan`.
 - **`search_nearest_parameter`**: derive the sign-aware double-nappe projection.
@@ -105,11 +109,22 @@ non-unit scale. Record the pre-fix observations in `RESULT.json.notes`.
   distance is `(r_q − |v|·s)² + (z_q − v)²`. The two one-sided stationary
   candidates are `v₊ = (s·r_q + z_q)/(1 + s²)` (valid when `v₊ ≥ 0`) and
   `v₋ = (z_q − s·r_q)/(1 + s²)` (valid when `v₋ ≤ 0`); pick the candidate with
-  the smaller squared distance. Keep the azimuth `u` from the query's horizontal
-  direction exactly as today (the cone is z-symmetric, so `u` is the same on
-  either nappe). The witness `(0.5, 0, −3)` must now return the near-side
-  parameter; `search_nearest_parameter(subs(0.7, −3.0))` must return `(0.7,
-  −3.0)`-class parameters (distance 0), not the apex.
+  the smaller squared distance. **Lower-nappe azimuth correction:** a
+  lower-nappe surface point at parameter `u` sits at the azimuth `u + π`, so
+  for a lower-nappe (`v < 0`) answer the returned `u` must be the query azimuth
+  shifted by `π` (mod `2π`); on the upper nappe return the query azimuth as-is.
+  The witness `(0.5, 0, −3)` must now return the near-side parameter;
+  `search_nearest_parameter(subs(0.7, −3.0))` must return
+  `(0.7, −3.0)`-class parameters (distance ~0), not the apex.
+
+## GATE-4 ceiling (orchestrator-owned, amended 2026-08-24)
+
+The AUD-013 guard below adds ONE `ToleranceCtx::unscaled_legacy()` call to
+`sphere.rs`, raising the GATE-4 ratchet count from `110` to `111`. The ceiling
+file `scripts/unscaled_legacy_ceiling.txt` is in `write_allow` for this
+packet: raise it `110 -> 111` in the same commit as the fix (GATE-4 counts the
+constructor; the ceiling at its true measured count is a correct ratchet, and
+`land_packet.py` re-measures it on landing). Do NOT raise it any further.
 
 ### sphere.rs
 
@@ -158,9 +173,14 @@ non-unit scale. Record the pre-fix observations in `RESULT.json.notes`.
    `ToleranceCtx::new(scale, ...)` and assert that a point ON the curve
    (`subs(t)` for a few `t`) is contained (`search_parameter` returns `Some`)
    while a point clearly OFF the curve by a scale-proportional offset is not.
-   This pins that the predicate scales correctly. The `ToleranceCtx::new`
-   arguments follow the `legacy_ctx()` pattern in the crate's other tests; a
-   non-unit `model_scale` is the point of the test.
+   Note: `search_parameter` on these carriers builds
+   `ToleranceCtx::unscaled_legacy()` internally (model_scale fixed at 1.0), so
+   the ratio-vs-length distinction is NOT observable through the public API at
+   non-unit scale — the test is a semantic guard that pins the containment
+   behaviour across scales, not a failing-then-passing regression. The SOURCE
+   fix (is_small_len instead of is_small_ratio) is still the decided repair;
+   the semantic-class defect becomes observable only when a real scale is
+   threaded in (Stage B). Document this in `RESULT.json`.
 
 ## H-3, the house rule that rejects bare float literals
 
