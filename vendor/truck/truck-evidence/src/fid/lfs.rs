@@ -248,7 +248,23 @@ pub fn wedge_slope_lower_from_sin_margin(
     if !(sin_margin > 0.0 && sin_margin <= 1.0) {
         return Err(FidRefusal::InvalidMargin);
     }
-    let value = ((1.0 - (1.0 - sin_margin * sin_margin).sqrt()) / 2.0).sqrt();
+    let tt = Interval::try_from((sin_margin, sin_margin)).unwrap_or(Interval::EMPTY);
+    let one = Interval::try_from((1.0, 1.0)).unwrap_or(Interval::EMPTY);
+    let two = Interval::try_from((2.0, 2.0)).unwrap_or(Interval::EMPTY);
+    let sixteen = Interval::try_from((16.0, 16.0)).unwrap_or(Interval::EMPTY);
+    let seven = Interval::try_from((7.0, 7.0)).unwrap_or(Interval::EMPTY);
+    let two56 = Interval::try_from((256.0, 256.0)).unwrap_or(Interval::EMPTY);
+    let series_cutoff = 1.0e-6; // H-3: dimensionless sine-margin cancellation threshold, not a length
+    let value = if sin_margin < series_cutoff {
+        // s/2 + s³/16 + 7s⁵/256, all terms positive (certified downward).
+        let s2 = tt * tt;
+        let s3 = tt * s2;
+        let s5 = s3 * s2;
+        (tt / two + s3 / sixteen + s5 * seven / two56).inf()
+    } else {
+        let inner = (one - (one - tt * tt).sqrt()) / two;
+        inner.sqrt().inf()
+    };
     Ok(WedgeSlopeLowerBound {
         value,
         scope: WedgeScope::EdgeMidpointWitness,
@@ -656,6 +672,26 @@ mod tests {
             ),
             "an antiparallel wedge's measured sin phi must refuse as InvalidMargin"
         );
+    }
+
+    #[test]
+    fn wedge_slope_lower_bound_is_conservative_at_small_margins() {
+        // The 3-term series branch (s below the cancellation threshold) must
+        // return a certified lower bound on sin(asin(s)/2): never above an
+        // independent upward-slack f64 reference, never collapsed to zero. The
+        // buggy closed form over-reports at the larger witness and collapses
+        // at smaller margins.
+        const SMALL_MARGINS: [f64; 2] = [1.0e-6, 1.0e-8]; // H-3: dimensionless sine margins in the cancellation regime
+        for &s in SMALL_MARGINS.iter() {
+            let bound = must(wedge_slope_lower_from_sin_margin(s));
+            let ref_hi = (0.5 * s + s * s * s / 16.0).next_up();
+            assert!(
+                bound.value <= ref_hi,
+                "s={s}: bound {} exceeds the true sup {ref_hi}",
+                bound.value
+            );
+            assert!(bound.value > 0.0, "s={s}: bound collapsed to zero");
+        }
     }
 
     #[test]
