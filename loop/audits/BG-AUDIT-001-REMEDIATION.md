@@ -17,11 +17,11 @@ State vocabulary: `PENDING` `RUNNING` `WORKER_DONE` `VERIFIED` `LANDED`
 | AUD-007 | BG-AUD-FIX-005 | LANDED | 8f6f71e | ACCEPTED | f98d441 | wedge_slope_lower_bound_is_conservative_at_small_margins |
 | AUD-005 | BG-AUD-FIX-006 | WORKER_DONE | | | | |
 | AUD-009 | BG-AUD-FIX-006 | WORKER_DONE | | | | |
-| AUD-006 | BG-AUD-FIX-007 | WORKER_DONE | 44abfed | | | |
+| AUD-006 | BG-AUD-FIX-007 | LANDED | 44abfed | ACCEPTED | b452237 | sectional_curve_vcut_u_half_box_does_not_panic | | | |
 | AUD-008 | BG-AUD-FIX-008 | PENDING | | | | |
 | AUD-015 | BG-AUD-FIX-008 | PENDING | | | | |
-| AUD-011 | BG-AUD-FIX-009 | PENDING | | | | |
-| AUD-012 | BG-AUD-FIX-009 | PENDING | | | | |
+| AUD-011 | BG-AUD-FIX-009 | RUNNING | | | | |
+| AUD-012 | BG-AUD-FIX-009 | RUNNING | | | | |
 | AUD-010 | BG-AUD-FIX-010 | RUNNING | | | | |
 | AUD-013 | BG-AUD-FIX-010 | RUNNING | | | | |
 | AUD-017 | BG-AUD-FIX-010 | RUNNING | | | | |

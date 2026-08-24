@@ -82,6 +82,6 @@
 {"id": "BG-AUD-FIX-006", "wave": "AUD", "class": "design", "status": "RUNNING", "needs": [], "writes": [], "packet": "loop/packets/BG-AUD-FIX-006.md", "note": "BG-AUDIT-001 remediation: AUD-005, AUD-009 (truck-geometry)"}
 {"id": "BG-AUD-FIX-007", "wave": "AUD", "class": "mechanical", "status": "DONE", "needs": [], "writes": [], "packet": "loop/packets/BG-AUD-FIX-007.md", "note": "BG-AUDIT-001 remediation: AUD-006 (truck-geometry)"}
 {"id": "BG-AUD-FIX-008", "wave": "AUD", "class": "design", "status": "TODO", "needs": [], "writes": [], "packet": "loop/packets/BG-AUD-FIX-008.md", "note": "BG-AUDIT-001 remediation: AUD-008, AUD-015 (truck-topology)"}
-{"id": "BG-AUD-FIX-009", "wave": "AUD", "class": "mechanical", "status": "TODO", "needs": [], "writes": [], "packet": "loop/packets/BG-AUD-FIX-009.md", "note": "BG-AUDIT-001 remediation: AUD-011, AUD-012 (truck-geometry)"}
+{"id": "BG-AUD-FIX-009", "wave": "AUD", "class": "mechanical", "status": "RUNNING", "needs": [], "writes": [], "packet": "loop/packets/BG-AUD-FIX-009.md", "note": "BG-AUDIT-001 remediation: AUD-011, AUD-012 (truck-geometry)"}
 {"id": "BG-AUD-FIX-010", "wave": "AUD", "class": "mechanical", "status": "RUNNING", "needs": [], "writes": [], "packet": "loop/packets/BG-AUD-FIX-010.md", "note": "BG-AUDIT-001 remediation: AUD-010, AUD-013, AUD-017 (truck-geometry)"}
 {"id": "BG-AUD-FIX-011", "wave": "AUD", "class": "design", "status": "TODO", "needs": [], "writes": [], "packet": "loop/packets/BG-AUD-FIX-011.md", "note": "BG-AUDIT-001 remediation: AUD-014 (truck-topology)"}
