@@ -341,6 +341,18 @@ impl Transformed<Matrix4> for Surface {
             }),
             Self::Processor(processor) => Self::Processor(processor.transformed(trans)),
             Self::Plane(entity) => Self::Plane(entity.transformed(trans)),
+            // AUD-005: the image of a surface of revolution under a
+            // non-uniform scale or shear is generally NOT a surface of
+            // revolution (a circular cylinder scaled by `diag(1, 2, 1)` is an
+            // elliptic cylinder), so a matrix whose linear part is not exactly
+            // the identity cannot rebuild the bare carrier. Such a map places
+            // the surface, composing it exactly at every evaluation — the same
+            // rule the analytic carriers use. Only a translation (identity
+            // linear part) keeps the bare carrier: its axis image is the axis,
+            // never degenerate.
+            Self::RevolutedCurve(entity) if !identity_linear_part(trans) => {
+                placed_surface(Surface::RevolutedCurve(entity.clone()), trans)
+            }
             Self::RevolutedCurve(entity) => Self::RevolutedCurve(entity.transformed(trans)),
             Self::ExtrudedCurve(entity) => Self::ExtrudedCurve(entity.transformed(trans)),
             Self::BSplineSurface(entity) => Self::BSplineSurface(entity.transformed(trans)),
@@ -467,28 +479,40 @@ impl Transformed<Matrix4> for Torus {
 
 impl<C: Transformed<Matrix4> + Clone> Transformed<Matrix4> for RevolutedCurve<C> {
     fn transform_by(&mut self, trans: Matrix4) {
+        // AUD-005: a degenerate axis image (a projection or zero matrix)
+        // cannot rebuild the carrier, so it is refused by identity — the
+        // surface is left unchanged. An arbitrary axis is never substituted.
+        let Some(axis) = transform_revolution_axis(trans, self.axis()) else {
+            return;
+        };
         let curve = self.entity_curve().clone().transformed(trans);
         let origin = trans.transform_point(self.origin());
-        let axis = transform_revolution_axis(trans, self.axis());
         *self = RevolutedCurve::by_revolution(curve, origin, axis);
     }
     fn transformed(&self, trans: Matrix4) -> Self {
-        let curve = self.entity_curve().clone().transformed(trans);
-        let origin = trans.transform_point(self.origin());
-        let axis = transform_revolution_axis(trans, self.axis());
-        RevolutedCurve::by_revolution(curve, origin, axis)
+        match transform_revolution_axis(trans, self.axis()) {
+            Some(axis) => {
+                let curve = self.entity_curve().clone().transformed(trans);
+                let origin = trans.transform_point(self.origin());
+                RevolutedCurve::by_revolution(curve, origin, axis)
+            }
+            // AUD-005: a degenerate axis image is refused by identity.
+            None => self.clone(),
+        }
     }
 }
 
-/// The image of a revolution axis under `trans`, guarded against the
-/// degenerate zero/NaN image (a projection onto the axis plane).
-fn transform_revolution_axis(trans: Matrix4, axis: Vector3) -> Vector3 {
+/// The normalized image of a revolution axis under `trans`, or `None` when the
+/// image is degenerate (zero or NaN — a projection onto the axis plane). A
+/// degenerate axis image cannot be represented by the bare carrier, so the
+/// caller must refuse rather than substitute an arbitrary axis (AUD-005).
+fn transform_revolution_axis(trans: Matrix4, axis: Vector3) -> Option<Vector3> {
     let axis = trans.transform_vector(axis);
     let magnitude = axis.magnitude();
     if magnitude.is_finite() && magnitude > 0.0 {
-        axis / magnitude
+        Some(axis / magnitude)
     } else {
-        Vector3::unit_z()
+        None
     }
 }
 
@@ -1375,6 +1399,33 @@ mod circle_conversion_tests {
             }
         }
     }
+
+    #[test]
+    fn full_circle_include_on_plane_is_true() {
+        // AUD-009: a full circle lying in a plane must include as `true`
+        // through `Surface::include(&Curve::Circle(_))`. The reachable arm is
+        // `Surface::Plane` → `IncludeCurve<NurbsCurve<Vector4>> for Plane`
+        // (the circle is routed through the NURBS conversion at the top of
+        // `Surface::include`), whose control-point test skips the
+        // weight-0-middle control points of the two half-circle spans. On the
+        // buggy tree the single-arc conversion degraded to NaN at the antipode
+        // and this answered `false`.
+        let trimmed = TrimmedCurve::new(UnitCircle::<Point3>::new(), (0.0, TAU));
+        let circle = Curve::Circle(Processor::with_transform(
+            trimmed,
+            Matrix4::from_translation(Vector3::new(0.0, 0.0, 1.0)),
+        ));
+        let plane = Surface::Plane(Plane::new(
+            Point3::new(0.0, 0.0, 1.0),
+            Point3::new(1.0, 0.0, 1.0),
+            Point3::new(0.0, 1.0, 1.0),
+        ));
+        let out = plane.include(&circle);
+        assert!(
+            matches!(out, Ok(Certified { value: true, .. })),
+            "a full circle in its plane must include as true, got {out:?}"
+        );
+    }
 }
 
 #[cfg(test)]
@@ -1467,6 +1518,37 @@ mod placed_analytic_transform_tests {
                 let v = j as f64 / SAMPLES as f64;
                 let expected = rotation.transform_point(cylinder.subs(u, v));
                 assert_near!(placed.subs(u, v), expected);
+            }
+        }
+    }
+
+    #[test]
+    fn revoluted_curve_nonconformal_transform_is_placed() {
+        // AUD-005: the image of a surface of revolution under a non-uniform
+        // scale is generally NOT a surface of revolution. A unit circular
+        // cylinder scaled by `diag(1, 2, 1)` is the elliptic cylinder
+        // `(cos v, 2 sin v, u)`; the transform must place the surface, never
+        // rebuild the bare revolved carrier on a wrong axis.
+        let cylinder = Surface::RevolutedCurve(RevolutedCurve::by_revolution(
+            Curve::Line(Line(Point3::new(1.0, 0.0, 0.0), Point3::new(1.0, 0.0, 1.0))),
+            Point3::origin(),
+            Vector3::unit_z(),
+        ));
+        let scale = Matrix4::from_nonuniform_scale(1.0, 2.0, 1.0);
+        let placed = cylinder.transformed(scale);
+        assert!(
+            !matches!(placed, Surface::RevolutedCurve(_)),
+            "a non-uniform scale must not come back as a bare revolved carrier"
+        );
+        let Surface::Processor(processor) = placed else {
+            panic!("a non-uniform scale of a revolved surface must be placed");
+        };
+        const SAMPLES: usize = 16;
+        for i in 0..=SAMPLES {
+            for j in 0..=SAMPLES {
+                let u = i as f64 / SAMPLES as f64;
+                let v = TAU * j as f64 / SAMPLES as f64;
+                assert_near!(processor.subs(u, v), Point3::new(v.cos(), 2.0 * v.sin(), u));
             }
         }
     }

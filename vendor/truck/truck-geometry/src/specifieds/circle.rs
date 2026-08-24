@@ -1,5 +1,5 @@
 use super::*;
-use std::f64::consts::TAU;
+use std::f64::consts::{PI, TAU};
 
 impl<P> UnitCircle<P> {
     /// constructor
@@ -219,20 +219,92 @@ impl ToSameGeometry<NurbsCurve<Vector3>> for TrimmedCurve<UnitCircle<Point2>> {
 impl ToSameGeometry<NurbsCurve<Vector4>> for TrimmedCurve<UnitCircle<Point3>> {
     fn to_same_geometry(&self) -> NurbsCurve<Vector4> {
         let (t0, t1) = self.range_tuple();
-        let bsp: NurbsCurve<Vector3> =
-            TrimmedCurve::new(UnitCircle::<Point2>::new(), (t0, t1)).to_same_geometry();
-        let (knot_vec, pts) = bsp.into_non_rationalized().destruct();
-        let mut curve = NurbsCurve::new(BSplineCurve::new_unchecked(
-            knot_vec,
-            vec![
-                Vector4::new(pts[0].x, pts[0].y, 0.0, pts[0].z),
-                Vector4::new(pts[1].x, pts[1].y, 0.0, pts[1].z),
-                Vector4::new(pts[2].x, pts[2].y, 0.0, pts[2].z),
-            ],
-        ));
-        curve.add_knot(0.25);
-        curve.add_knot(0.5);
-        curve.add_knot(0.75);
-        curve
+        let angle = t1 - t0;
+        if angle >= TAU {
+            // AUD-009: a single quadratic Bezier arc cannot represent a full
+            // circle: its middle weight `cos(angle / 2)` is `cos(π) = -1` for
+            // `angle = 2π`, and the evaluated weight hits exactly 0 at the
+            // antipode, so `subs` there is NaN and every include that routes
+            // the circle through this conversion answers false. Split the arc
+            // into `ceil(angle / π)` half-circle pieces (exactly two for a
+            // full circle), convert each piece through the half-circle path —
+            // weight-0-middle but never degenerate — and concatenate them into
+            // ONE curve on a shared knot vector (two quadratic Bezier spans
+            // for a full circle). The join keeps the endpoint/antipode
+            // geometry: every evaluated weight is strictly positive.
+            let n = (angle / PI).ceil() as usize;
+            let mut curve = arc_to_vector4(t0, t0 + PI);
+            let mut offset = 1.0;
+            for i in 1..n {
+                let start = t0 + i as f64 * PI;
+                let end = f64::min(start + PI, t1);
+                let mut piece = arc_to_vector4(start, end);
+                piece.knot_translate(offset);
+                curve = curve.concat(&piece);
+                offset += 1.0;
+            }
+            curve.knot_normalize();
+            curve
+        } else {
+            let mut curve = arc_to_vector4(t0, t1);
+            curve.add_knot(0.25);
+            curve.add_knot(0.5);
+            curve.add_knot(0.75);
+            curve
+        }
+    }
+}
+
+/// A circle arc (angle ≤ π) as a rational NURBS in `Vector4` form, lifted from
+/// the 2D homogeneous arc the `UnitCircle<Point2>` conversion produces.
+fn arc_to_vector4(start: f64, end: f64) -> NurbsCurve<Vector4> {
+    let bsp: NurbsCurve<Vector3> =
+        TrimmedCurve::new(UnitCircle::<Point2>::new(), (start, end)).to_same_geometry();
+    let (knot_vec, pts) = bsp.into_non_rationalized().destruct();
+    NurbsCurve::new(BSplineCurve::new_unchecked(
+        knot_vec,
+        pts.into_iter()
+            .map(|pt| Vector4::new(pt.x, pt.y, 0.0, pt.z))
+            .collect(),
+    ))
+}
+
+#[cfg(test)]
+mod full_circle_conversion_tests {
+    use super::*;
+    use std::f64::consts::TAU;
+
+    #[test]
+    fn full_circle_conversion_antipode_is_finite() {
+        // AUD-009: a full circle must convert to a NURBS whose every evaluated
+        // point is finite (the single-arc conversion hit a zero weight at the
+        // antipode) and whose evaluated weight is never zero.
+        let circle = TrimmedCurve::new(UnitCircle::<Point3>::new(), (0.0, TAU));
+        let nurbs = ToSameGeometry::<NurbsCurve<Vector4>>::to_same_geometry(&circle);
+        const SAMPLES: usize = 128;
+        let mut closest_to_antipode = f64::INFINITY;
+        for i in 0..=SAMPLES {
+            let t = i as f64 / SAMPLES as f64;
+            let p = nurbs.subs(t);
+            assert!(
+                p.x.is_finite() && p.y.is_finite() && p.z.is_finite(),
+                "subs({t}) is not finite: {p:?}"
+            );
+            let weight = nurbs.non_rationalized().subs(t).w;
+            assert!(
+                weight > 0.0,
+                "evaluated weight at {t} is not positive: {weight}"
+            );
+            closest_to_antipode =
+                closest_to_antipode.min((p - Point3::new(-1.0, 0.0, 0.0)).magnitude());
+        }
+        // The antipode of a circle starting at angle 0 is the point at angle
+        // π, found by evaluating the sweep; the piecewise knot vector puts the
+        // half-circle join (and hence the antipode) at parameter 0.5.
+        assert_near!(nurbs.subs(0.5), Point3::new(-1.0, 0.0, 0.0));
+        assert!(
+            closest_to_antipode < 1.0e-9, // H-3
+            "no sweep sample reached the antipode, closest distance {closest_to_antipode}"
+        );
     }
 }
