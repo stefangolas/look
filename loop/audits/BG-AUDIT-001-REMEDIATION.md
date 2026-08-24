@@ -23,9 +23,9 @@ State vocabulary: `PENDING` `RUNNING` `WORKER_DONE` `VERIFIED` `LANDED`
 | AUD-017 | BG-AUD-FIX-010 | LANDED | f893d9c | ACCEPTED | f1ed436 | conic_containment_scale_invariant |
 | AUD-011 | BG-AUD-FIX-009 | LANDED | c0d9c7d | ACCEPTED | 4b071ac | torus_normal_uder_matches_finite_difference |
 | AUD-012 | BG-AUD-FIX-009 | LANDED | c0d9c7d | ACCEPTED | 4b071ac | contact_points_singular_frame_refuses |
-| AUD-008 | BG-AUD-FIX-008 | RUNNING | | | | |
-| AUD-015 | BG-AUD-FIX-008 | RUNNING | | | | |
-| AUD-014 | BG-AUD-FIX-011 | RUNNING | | | | |
+| AUD-008 | BG-AUD-FIX-008 | LANDED | 20f6ee4 | ACCEPTED | f08db62 | single_face_edge_inverse_shell_is_not_closed |
+| AUD-015 | BG-AUD-FIX-008 | LANDED | 20f6ee4 | ACCEPTED | f08db62 | vertex_link_open_shell_refuses |
+| AUD-014 | BG-AUD-FIX-011 | LANDED | c3ff4f1 | ACCEPTED | 6375812 | same_parameter_pre_cut_half_does_not_certify |
 
 ## Owner decisions made during this campaign (recorded in the packets)
 
@@ -86,3 +86,22 @@ State vocabulary: `PENDING` `RUNNING` `WORKER_DONE` `VERIFIED` `LANDED`
   scalars wrapped as degenerate intervals (s⁵ coefficient machine-checked to
   7/256, not the packet's original 5/512). Attempt 3 = DONE (`8f6f71e`, fix +
   1 test). Verify queued at base `03e1d0a`.
+- **BG-AUD-FIX-008 LANDED** at `f08db62` (worker `20f6ee4`, verify ACCEPTED at
+  base `61baa58`). `Wire::is_simple` rejects edge-id reuse; `shell_condition()`
+  returns `Oriented` (not `Closed`) when a face reuses an edge id across its
+  boundary wires; `vertex_link::check` establishes the `Closed` precondition
+  before certifying, refusing open shells with
+  `NumericallyUnresolved{UncertifiedContainment}`. One deviation, worker-recorded
+  and justified: regression test 1 builds the degenerate `[e, e.inverse()]` face
+  via `Face::new_unchecked` because fix 1 makes `Face::new`→`try_new` refuse that
+  wire (gates on the new `is_simple`) — the closedness gate is still exercised,
+  all three assertions unchanged. AUD-008 + AUD-015 closed.
+- **BG-AUD-FIX-011 LANDED** at `6375812` (worker `c3ff4f1`, verify ACCEPTED at
+  base `61baa58`). `vacuous_holds` now returns an empty `PropMap` with
+  `method: Method::None` — `SameParameter` stays `Unknown` for a no-pcurve edge
+  (not-applicable, never certified); `check_edge` still returns `Ok`. The
+  pre-cut provenance was exercised through the real public API
+  (`cut_with_parameter` at 0.5). AUD-014 closed.
+- **Campaign complete: all 17 findings closed** — 13 landed via FIX-001/002/003/
+  005/006/007/008/009/010/011, 1 owner-blocked (AUD-004), 0 already-fixed at
+  audit time. Every landing verified ACCEPTED at its packet's fork point.
