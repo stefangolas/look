@@ -45,6 +45,13 @@ State vocabulary: `PENDING` `RUNNING` `WORKER_DONE` `VERIFIED` `LANDED`
   the pcurve is a decided spec contract and is untouched.
 - **AUD-016**: C1 hardening only (directed rounding); no false certificate was
   demonstrated.
+- **BG-ENC-004-OFFSET**: composition over new `EnclosureVectorField` /
+  `EnclosureScalarField2` traits (owner amendment 2026-08-24); the offset
+  normal equals the base normal for the constant-distance case (verified);
+  `NormalField` gains `entity()`/`scalar()` accessors (the scratch found the
+  fields were private — the truck-evidence impl cannot reach them without
+  them). Scratch `scratch/offsetscratch/` validated all three flagship
+  witnesses before dispatch.
 
 ## Campaign facts (append as they land)
 
