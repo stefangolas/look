@@ -93,3 +93,4 @@
 {"id": "BG-SOL-S2-EXTRUDE", "wave": "P2", "class": "design", "status": "DONE", "needs": ["BG-SOL-S1-ARRANGE", "BG-SOL-P0-REC"], "writes": ["truck-modeling/src/extrude.rs"], "packet": "loop/packets/BG-SOL-S2-EXTRUDE.md", "slot": 1}
 {"id": "BG-SOL-S2-ORIENT", "wave": "P2", "class": "design", "status": "DONE", "needs": ["BG-SOL-S2-EXTRUDE"], "writes": ["truck-modeling/src/extrude.rs"], "packet": "loop/packets/BG-SOL-S2-ORIENT.md"}
 {"id": "BG-SOL-S2-PCURVE", "wave": "P2", "class": "design", "status": "DONE", "needs": ["BG-SOL-S2-ORIENT"], "writes": ["truck-modeling/src/extrude.rs"], "packet": "loop/packets/BG-SOL-S2-PCURVE.md"}
+{"id": "BG-SOL-S3-CONTACT", "wave": "P3", "class": "design", "status": "READY", "needs": ["BG-SOL-P0-REC"], "writes": ["truck-evidence/src/contact.rs", "truck-base/src/evidence.rs"], "packet": "loop/packets/BG-SOL-S3-CONTACT.md"}

@@ -55,6 +55,9 @@ pub mod bspline;
 pub mod circle;
 /// BG-ENC-002-CONE: the carrier impl. Scaffolded empty; the packet fills it.
 pub mod cone;
+/// BG-SOL-S3-CONTACT: the Contact Layer skeleton. Scaffolded empty; the
+/// packet fills it.
+pub mod contact;
 /// BG-ENC-002-CYLINDER: the carrier impl. Scaffolded empty; the packet fills it.
 pub mod cylinder;
 /// BG-ENC-004: enclosure impls for the decorators. Scaffolded empty.
