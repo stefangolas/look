@@ -88,4 +88,4 @@
 {"id": "BG-SOL-P0-REC", "wave": "P0", "class": "design", "status": "DONE", "needs": [], "writes": ["truck-geometry/src/recognize.rs"], "packet": "loop/packets/BG-SOL-P0-REC.md", "slot": 0}
 {"id": "BG-SOL-P0-BVH", "wave": "P0", "class": "design", "status": "DONE", "needs": [], "writes": ["truck-base/src/bvh.rs"], "packet": "loop/packets/BG-SOL-P0-BVH.md", "slot": 1}
 {"id": "BG-SOL-P0-SPAN", "wave": "P0", "class": "design", "status": "RUNNING", "needs": [], "writes": ["truck-geometry/src/span.rs"], "packet": "loop/packets/BG-SOL-P0-SPAN.md", "slot": 2}
-{"id": "BG-SOL-P0-PRED", "wave": "P0", "class": "design", "status": "RUNNING", "needs": [], "writes": ["truck-base/src/pred.rs", "truck-base/src/contact.rs"], "packet": "loop/packets/BG-SOL-P0-PRED.md", "slot": 3}
+{"id": "BG-SOL-P0-PRED", "wave": "P0", "class": "design", "status": "DONE", "needs": [], "writes": ["truck-base/src/pred.rs", "truck-base/src/contact.rs"], "packet": "loop/packets/BG-SOL-P0-PRED.md", "slot": 3}

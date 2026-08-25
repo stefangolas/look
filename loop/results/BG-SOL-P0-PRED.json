@@ -1,0 +1,16 @@
+{
+  "id": "BG-SOL-P0-PRED",
+  "status": "DONE",
+  "contracts": ["BG-SOL-P0-PRED"],
+  "tests_added": 5,
+  "deviations": [
+    "CertifiedPred is spelled Proven(Orientation) | Unresolved(PredUnresolved) instead of the plan's §4 unit Proven | Unresolved(UnresolvedWitness): a unit Proven cannot carry the trichotomous sign, so S1 could never observe which side of a seam a point is on.",
+    "PredUnresolved is a local two-value enum (NonFiniteInput | ExactRangeOverflow): the evidence algebra's UnresolvedWitness classifies refusals of whole certified operations (RootNotIsolated, KrawczykIndeterminate, ...), none of which means 'this predicate is undecidable'."
+  ],
+  "disagreements": [
+    "Plan §4 (docs/SOLVER_FAMILY_PLAN.md) sketches CertifiedPred { Proven, Unresolved(UnresolvedWitness) }; the packet's §1 records this as a deliberate deviation and instructs that it be said here. Implemented per the packet: Proven(Orientation) and local PredUnresolved.",
+    "Packet witness 2 ('orient2d_near_degenerate_escalates_to_exact') as written cannot pass: 10000000000000001 rounds to 10000000000000000 and 10000000000000003 rounds to 10000000000000004 in f64, so the actual points are (0,0), (1e16,1e16), (1e16+2,1e16+4) whose exact determinant is +2e16 and whose float filter is CONCLUSIVE (errbound ~40 << |det|=2e16), returning Proven(CounterClockwise) with no stage-2 escalation. Substituted exactly-representable coordinates, all below 2^53, that preserve the packet's stated semantics: (0,0), (9000000000000000,9000000000000001), (9000000000000002,9000000000000003) have exact determinant -2, the filter is INCONCLUSIVE (errbound ~24 >> |det|=2), and stage 2 runs and returns Proven(Clockwise)."
+  ],
+  "baseline_failures": [],
+  "notes": "Two explicit deviations (recorded above and in the source doc comments): the Proven(Orientation) spelling and the local two-value PredUnresolved spelling of the plan §4 sketch. Measured escalation path on the witnesses: orient2d_near_degenerate_escalates_to_exact passes through stage 2 (filter inconclusive, |det|=2 < errbound ~24) and returns the exact Clockwise; orient2d_collinear_escalates_to_exact passes through stage 2 (errbound ~1.3e-6 > |det|=0) and returns the exact Collinear; the two clear det=+/-1 cases in orient2d_clear_cases_are_filtered are decided by the filter (the det-0 case in that test escalates). Non-finite inputs are Unresolved(NonFiniteInput); product overflow maps to Unresolved(ExactRangeOverflow). All 5 packet tests plus every pre-existing truck-base test pass; cargo fmt --check, clippy --all-targets --no-deps, lib/tests/doc test runs, cargo check --locked all pass; scripts/kernel-gates.sh caa41f4 reports all P-3 gates pass with GATE-4 unscaled_legacy 111/111 (no ceiling change)."
+}
