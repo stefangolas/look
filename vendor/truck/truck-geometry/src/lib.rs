@@ -44,6 +44,14 @@ pub mod decorators;
 /// with first-class analytic carriers, owned by this crate.
 pub mod canonical;
 
+/// BG-SOL-P0-REC: the structural recognizer (a witness, not a type).
+/// Scaffolded empty; the packet fills it.
+pub mod recognize;
+
+/// BG-SOL-P0-SPAN: the lazy rational-Bézier span cache. Scaffolded empty; the
+/// packet fills it.
+pub mod span;
+
 /// re-export all modules.
 pub mod prelude {
     use crate::*;

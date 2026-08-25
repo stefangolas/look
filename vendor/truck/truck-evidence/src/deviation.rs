@@ -105,62 +105,17 @@ fn raise_to_full_multiplicity(bsp: &mut BSplineCurve<Point3>, x: f64, degree: us
     }
 }
 
-/// The parameter correspondence phi between the carrier trace's parameter t
-/// and the leader curve's parameter: phi(t) = scale * t + offset, evaluated
-/// in outward-rounded interval arithmetic on every cell.
-///
-/// ```
-/// use truck_evidence::ParamMap;
-/// let phi = ParamMap::from_ranges(0.0, 1.0, 0.0, 2.0).expect("non-degenerate range");
-/// assert_eq!(phi.apply_f64(0.5), 1.0);
-/// assert_eq!(ParamMap::IDENTITY.apply_f64(0.5), 0.5);
-/// assert_eq!(ParamMap::flip(0.0, 1.0).apply_f64(0.25), 0.75);
-/// ```
-#[derive(Clone, Copy, Debug, PartialEq)]
-pub struct ParamMap {
-    /// The scale factor.
-    pub scale: f64,
-    /// The offset.
-    pub offset: f64,
-}
+/// The parameter correspondence phi: `phi(t) = scale * t + offset`. Moved to
+/// `truck_base::param_map` (BG-SOL-P0-REC) so the structural recognizer in
+/// truck-geometry can name it in its witness; re-exported here so
+/// `use truck_evidence::ParamMap` keeps resolving.
+pub use truck_base::param_map::ParamMap;
 
-impl ParamMap {
-    /// phi(t) = t.
-    pub const IDENTITY: Self = Self {
-        scale: 1.0,
-        offset: 0.0,
-    };
-
-    /// phi(t) = t0 + t1 - t, the orientation flip over [t0, t1].
-    pub const fn flip(t0: f64, t1: f64) -> Self {
-        Self {
-            scale: -1.0,
-            offset: t0 + t1,
-        }
-    }
-
-    /// The affine map sending [a0, a1] onto [b0, b1]; `None` when a0 == a1.
-    pub fn from_ranges(a0: f64, a1: f64, b0: f64, b1: f64) -> Option<Self> {
-        if a0 == a1 {
-            None
-        } else {
-            let scale = (b1 - b0) / (a1 - a0);
-            Some(Self {
-                scale,
-                offset: b0 - a0 * scale,
-            })
-        }
-    }
-
-    /// phi(t) in f64 (for sampling guards and tests, never for certification).
-    pub fn apply_f64(&self, t: f64) -> f64 {
-        self.scale * t + self.offset
-    }
-
-    /// phi(tt), outward-rounded.
-    pub fn apply(&self, tt: Interval) -> Interval {
-        interval_at(self.scale) * tt + interval_at(self.offset)
-    }
+/// phi(tt) applied in outward-rounded interval arithmetic — the certified
+/// application that the base `ParamMap` (plain f64) intentionally does not
+/// carry, because `truck-base` has no `inari` (BG-SOL-P0-REC).
+fn apply_param_map(phi: &ParamMap, tt: Interval) -> Interval {
+    interval_at(phi.scale) * tt + interval_at(phi.offset)
 }
 
 /// The leader under the flip correspondence: knots k -> offset - k (the
@@ -522,7 +477,7 @@ where
     let mut worklist: Vec<Interval> = vec![tt];
     while let Some(cell) = worklist.pop() {
         let carrier_box = carrier.enclose(cell);
-        let leader_box = leader.enclose(phi.apply(cell));
+        let leader_box = leader.enclose(apply_param_map(&phi, cell));
         let residual = Box3 {
             x: carrier_box.x - leader_box.x,
             y: carrier_box.y - leader_box.y,
