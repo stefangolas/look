@@ -42,7 +42,7 @@ anchors:
   - {id: A2, expect: 1, cmd: "grep -c 'pub fn orient2d' vendor/truck/truck-base/src/pred.rs"}
   - {id: A3, expect: 1, cmd: "grep -c 'pub enum ContactEventKind' vendor/truck/truck-base/src/contact.rs"}
   - {id: A4, expect: 1, cmd: "grep -c 'pub enum Surface' vendor/truck/truck-geometry/src/canonical.rs"}
-  - {id: A5, expect: 1, cmd: "grep -c 'clippy::unwrap_used' vendor/truck/truck-geometry/src/arrange.rs"}
+  - {id: A5, expect: 1, cmd: "grep -c '^#!\\[deny(' vendor/truck/truck-geometry/src/arrange.rs"}
 ```
 
 ## Problem
@@ -133,9 +133,12 @@ pub struct ArrHalfEdge {
 /// A face of the planar subdivision.
 #[derive(Clone, Debug, PartialEq)]
 pub struct ArrRegion {
-    /// The boundary half-edges in order (a closed cycle, CCW for bounded
-    /// faces).
-    pub boundary: Vec<usize>,
+    /// The region's boundary half-edge cycles, in order. A region with a
+    /// hole has MORE THAN ONE cycle: the first is the outer boundary (CCW),
+    /// the rest are the holes (CW). M1's plate is the canonical case:
+    /// `boundaries = [[outer rectangle cycle], [inner circle cycle]]`.
+    /// A region's total boundary is the union of its cycles.
+    pub boundaries: Vec<Vec<usize>>,
     /// The winding number of the region around any interior point.
     pub winding: i32,
     /// Whether the region is bounded (M1: the plate and the hole are
@@ -180,13 +183,17 @@ contradiction between the declared boundary and the actual geometry.
 **Stage 2 — pairwise intersections (exact where the vertices are exact).**
 For every ordered pair of distinct curves in the profile, compute their
 intersections:
-- **Line/Line** (`Line<Point2>` from `recognize` of the two curves): use
-  `truck_geometry::specifieds::line::Line::intersection` for the parameters,
-  and the exact crossing decision from `orient2d` (the four endpoint
-  configurations). The intersection point is dyadic when the endpoints are;
-  certify with a rational (Fraction-style) computation in `i128` after scaling
-  when the coordinates fit, else refuse `NumericallyUnresolved(RootNotIsolated)`.
-  For v1 the dyadic case is the contract.
+- **Line/Line** (`Line<Point2>` from `recognize` of the two curves): the exact
+  crossing decision from `orient2d` (the four endpoint configurations — a pair
+  of segments cross iff the endpoints of each straddle the other, decided
+  exactly). The intersection parameters and point are computed EXACTLY by
+  Cramer's rule in scaled integer arithmetic (`i128`) when the coordinates fit
+  — NOT from `Line::intersection`'s f64 result, which is a reference for the
+  algebra only. The vertex is exactly representable when the endpoints are
+  commensurate dyadic/rational values; refuse
+  `NumericallyUnresolved(RootNotIsolated)` when the scaled integer arithmetic
+  overflows (coordinates beyond ~1e18 or incommensurate scale). For v1 the
+  exactly-representable case is the contract.
 - **Line/Circle and Circle/Circle**: solve the quadratic exactly (the radical
   axis for Circle/Circle, the `(d·d)t² + 2(f·d)t + (f·f − r²)` for Line/Circle,
   both machine-checked before dispatch). When the discriminant is a perfect
@@ -197,11 +204,11 @@ intersections:
   spent: Budget::new(0, 0, 0) })` — the interval-certified vertex substrate
   (via `num::roots`/`num::krawczyk`) is the documented extension.
 - A pair of curves whose pieces overlap on an interval (e.g. two collinear
-  overlapping lines, or two coincident circles) → `Err(Refusal::Collapsed(
-  Collapse { reason: CollapseReason::KnifeEdge }, <an empty Certificate>))` —
-  the 2-D overlap case is S5.3 territory and out of v1 scope; refusing is the
-  honest answer. (Use `Refusal::Empty` if the evidence algebra makes the
-  `Collapsed` constructor awkward — record which in `disagreements`.)
+  overlapping lines, or two coincident circles) → `Err(Refusal::Empty)` — the
+  arrangement's domain (non-degenerate pairwise intersections) is violated; the
+  2-D overlap case is S5.3 territory and out of v1 scope. Record in
+  `disagreements` if the evidence algebra makes a different refusal read more
+  honestly.
 
 **Stage 3 — vertex and edge construction.** Collect every vertex: curve
 endpoints and interior intersection points. For each curve, sort its vertex
@@ -218,18 +225,23 @@ the first outgoing half-edge of its destination vertex that is CCW of the twin
 (the standard "turn left at the vertex" traversal). This produces the face
 cycles.
 
-**Stage 5 — region tracing and winding.** Walk every half-edge cycle once per
-face. For each face, pick a representative interior point (the midpoint of the
-cycle's bounding-box centroid and an on-cycle point offset by a certified
-epsilon — or a point strictly inside by the point-in-polygon winding test on a
-polygonization of the cycle) and compute its winding number over the profile
-loops (the standard ray-casting winding). Boundedness: a face whose boundary
-cycle is bounded and whose winding is nonzero is a material region; the
-exterior face has winding 0. Assign each face `bounded` and `winding`. For the
-M1 profile (outer rectangle + inner circle), this yields exactly three regions:
-the exterior (winding 0), the plate (winding 1, bounded), and the hole interior
-(winding 1, bounded) — the plate and hole are distinguished by nesting, not by
-winding (see the test).
+**Stage 5 — region tracing, grouping and winding.** Walk every half-edge
+cycle once per face (the "turn left at the vertex" traversal of Stage 4 yields
+each face cycle). Then GROUP the face cycles into regions by containment: a
+cycle C is a hole of region R when C lies strictly inside R's outer cycle and
+no other cycle lies between them. The containment test is a point-in-loop
+predicate (a point strictly inside C's cycle by the ray-casting winding test on
+a polygonization of the cycle) — exact for the dyadic witnesses. M1's
+rectangle + circle yields exactly the cycles `[rect loop, circle loop]` and the
+grouping gives three regions: the exterior (`boundaries = [[rect loop]]`,
+winding 0, unbounded), the plate (`boundaries = [[rect loop], [circle loop]]`,
+winding 1, bounded — the circle cycle is its HOLE), and the hole interior
+(`boundaries = [[circle loop]]`, winding 1, bounded). Winding is computed per
+region from its representative interior point over the profile loops (the
+standard ray-casting winding, driven by `orient2d` for the crossing decisions).
+Two bounded regions can share a winding number (the plate and the hole are
+both ±1) — they are distinguished by nesting, not by winding; the test asserts
+the nesting explicitly.
 
 **Stage 6 — the domain.** If `domain` is `Some`, clip the arrangement's region
 classification to it (a region wholly outside the domain is not reported); if
@@ -239,9 +251,10 @@ region. M1 passes `None`.
 ### 4. The certified-relationship contract
 
 Every vertex position, every crossing decision and every winding number is
-either exact (dyadic) or an honest refusal. No vertex is a float approximation
-of an algebraic point in v1. The tests below verify exactness by construction
-(the witness vertices are dyadic) and by value assertion.
+either exact (an exactly representable rational — dyadic for the packet's
+witnesses) or an honest refusal. No vertex is a float approximation of an
+algebraic point in v1. The tests below verify exactness by construction (the
+witness vertices are dyadic) and by value assertion.
 
 ## H-3, the house rule that rejects bare float literals
 
@@ -275,19 +288,22 @@ dyadic coordinates.
    rectangle as four `Curve::Line`s `(0,0)→(4,0)→(4,4)→(0,4)→(0,0)` and a
    `Curve::Circle` of radius 1 centered at `(2,2)` (full circle, trimmed range
    `(0, 2π)`). Assert: `arrange` returns `Ok`; there are exactly **three**
-   regions; exactly one is the exterior (winding 0, unbounded); the other two
-   are bounded with winding 1; the plate region's boundary contains all four
-   rectangle edges AND the full circle edge (the hole is a boundary of the
-   plate); the hole region's boundary is the circle only. Also assert the
-   vertex count: 4 rectangle corners + (the circle's x-monotone split adds 0
-   new vertices when the circle is represented as one full edge — if your
+   regions; exactly one is the exterior (winding 0, unbounded) with
+   `boundaries == [[the rectangle cycle]]`; the plate region is bounded,
+   winding ±1, with `boundaries` containing TWO cycles — the rectangle cycle
+   and the circle cycle (the circle is the plate's HOLE); the hole region is
+   bounded, winding ±1, with `boundaries == [[the circle cycle]]`. Assert the
+   vertex count is 5 in the canonical no-split case (4 rectangle corners + the
+   circle's single seam vertex — the full circle is one closed edge); if your
    implementation splits the circle for x-monotonicity, assert the split
-   vertices' coordinates instead).
+   vertices' coordinates instead and say so in `notes`.
 2. `arrange_crossing_lines_split_at_the_intersection` — two `Curve::Line`s
-   crossing at a dyadic point: `(0,0)→(2,2)` and `(0,2)→(2,0)`. Assert the
-   arrangement has a vertex at `(1,1)` exactly, the crossing vertex has four
-   incident half-edges, and the regions are four (the four quadrants of the
-   crossing, all bounded) plus the unbounded exterior — five total.
+   crossing at a dyadic point: `(0,0)→(2,2)` and `(0,2)→(2,0)`. Assert: the
+   arrangement has a vertex at `(1,1)` exactly; the crossing vertex has four
+   incident half-edges; and the arrangement has exactly **four** regions — the
+   four wedges of the crossing, each unbounded and winding 0 (the finite
+   segments form an X whose complement is four unbounded regions; there is NO
+   separate bounded "quadrant" face).
 3. `arrange_line_circle_crossing_is_dyadic_exact` — the machine-checked
    witness: line `(−1,0)→(3,0)` and circle center `(1,0)` radius 1. Assert the
    two intersection vertices at `(0,0)` and `(2,0)` exactly (dyadic — the
