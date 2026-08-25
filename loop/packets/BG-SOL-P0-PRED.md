@@ -266,7 +266,7 @@ Never run a bare `cargo test`.
 Editing any file outside `write_allow`. Adding a *finite* answer where the
 predicate is genuinely undecidable — `Unresolved` is the honest terminal state
 and there is no fallback guess. Guessing the sign inside the filter's
-uncertain band. Adding `#[ignore]`. Changing the GATE-4 ceiling. Adding
+uncertain band. Adding `#[ignore]`. Changing the GATE-4 ceiling. Running cargo check --workspace / cargo build --workspace / a bare cargo check (the crate-scoped -p <crate> checks in Done-when are the contract; a workspace-wide build on a shared machine with concurrent workers exhausts disk). Adding
 methods to the `CurveContact` types beyond the pub fields (S1 refines).
 
 ## Stop conditions

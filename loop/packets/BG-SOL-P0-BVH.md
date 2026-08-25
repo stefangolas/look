@@ -312,7 +312,7 @@ Editing any file outside `write_allow`. Editing `bounding_box.rs` — the
 be a pure function of its input). Using `HashSet` or any unordered collection
 for a query result (the output contract is sorted). Returning unsorted or
 deduplicated pairs. Calling `pieces[i].bbox()` more than once per piece during
-build. Adding `#[ignore]`. Changing the GATE-4 ceiling.
+build. Adding `#[ignore]`. Changing the GATE-4 ceiling. Running cargo check --workspace / cargo build --workspace / a bare cargo check (the crate-scoped -p <crate> checks in Done-when are the contract; a workspace-wide build on a shared machine with concurrent workers exhausts disk).
 
 ## Stop conditions
 

@@ -262,7 +262,7 @@ the span's image — under-estimation is a silent wrong answer; if a carrier's
 image bound cannot be certified, return EMPTY for that surface (honest), never
 a sampled guess. Sampling to manufacture a box. Hashing a `Surface` value to
 key the cache (the caller-owned key is the contract). Adding `#[ignore]`.
-Changing the GATE-4 ceiling.
+Changing the GATE-4 ceiling. Running cargo check --workspace / cargo build --workspace / a bare cargo check (the crate-scoped -p <crate> checks in Done-when are the contract; a workspace-wide build on a shared machine with concurrent workers exhausts disk).
 
 ## Stop conditions
 

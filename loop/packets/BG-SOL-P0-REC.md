@@ -329,7 +329,7 @@ Editing any file outside `write_allow`. Returning a `Derived` witness whose
 sampling is a regression witness, never the certification. Degrading a
 recognized analytic carrier to a spline in the witness (the carrier keeps the
 analytic arm). Spline→analytic detection in this packet (documented later).
-Adding `#[ignore]`. Changing the GATE-4 ceiling.
+Adding `#[ignore]`. Changing the GATE-4 ceiling. Running cargo check --workspace / cargo build --workspace / a bare cargo check (the crate-scoped -p <crate> checks in Done-when are the contract; a workspace-wide build on a shared machine with concurrent workers exhausts disk).
 
 ## Stop conditions
 
