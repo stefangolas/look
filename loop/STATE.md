@@ -11,99 +11,132 @@ otherwise would eventually cost a trap.) If you are picking this up cold, read
 [`loop/ORCHESTRATOR.md`](ORCHESTRATOR.md) for how to run the loop, then
 `python loop/slot_status.py`** - nothing else. Do not read `LEDGER.jsonl` whole.
 
-Updated 2026-08-25, close of session 27 (solver-family Phase 0 LANDED 4/4). Branch: `integration/kernel-bg`, HEAD `fa46e21`.
+Updated 2026-08-25, close of session 28 (M1 construction half LANDED: S1 arrange + S2 extrude). Branch: `integration/kernel-bg`, HEAD `d85d71c`.
 
 ## Where we are
 
-**Solver-family Phase 0 is DONE: the 4-wide substrate wave landed.** All four
-packets verified ACCEPTED and merged this session:
+**The solver family's M1 construction path is landed end to end.** Phase 0 (the
+4-wide substrate wave, session 27) plus this session's two packets:
 
-- **BG-SOL-P0-REC** (`truck-geometry/src/recognize.rs`) — the structural
-  recognizer: `CanonicalCarrierWitness { ExactCanonical | Derived |
-  Unrecognized }` over `CanonicalCarrier` (analytic arms + `Placed`), with the
-  certified parameter correspondence `CanonicalParamMap` (curve/surface pair).
-  `recognize_surface` canonicalizes `ExtrudedCurve(Line)`→Plane,
-  `ExtrudedCurve(Circle)`→Cylinder (exact cylinder test copied from
-  canonical.rs), `Processor`→Placed; splines/`RevolutedCurve` are
-  `Unrecognized` (documented later). Map checks measure 0.0 deviation.
-- **BG-SOL-P0-BVH** (`truck-base/src/bvh.rs`) — the broad-phase substrate:
-  `BoundedPiece` (`bbox`/`derivative_bounds`/`subdivide`), `DerivativeBounds`,
-  flat pre-order `Bvh<P>` with contiguous leaves, deterministic stable-sort
-  centroid build; `candidate_pairs`/`candidate_pairs_self`/`query` return
-  sorted pairs. The broad-phase box is `BoundingBox<Point3>` (truck-base has
-  no `inari`), not the plan's §4 `Box3`.
-- **BG-SOL-P0-SPAN** (`truck-geometry/src/span.rs`) — the lazy span cache:
-  per-knot-span `SpanRecord { bbox, derivative_hull, u_range, v_range }` via
-  full-multiplicity knot insertion, convex-hull boxes (BSpline/Nurbs) and
-  closed-form boxes (Plane/Sphere/Torus); Nurbs refuses on non-positive
-  weights; Cylinder/Cone/Revoluted/Extruded yield nothing (unbounded v /
-  non-canonical). Keyed cache takes a caller-owned `u64`.
-- **BG-SOL-P0-PRED** (`truck-base/src/pred.rs` + `contact.rs`) — certified
-  predicates: `orient2d` with a float filter (`CCDETERRBOUND`) escalating to
-  exact expansion arithmetic (two_product/two_diff/fast_expansion_sum_zeroelim)
-  for the trichotomy; `CertifiedPred::Proven(Orientation) | Unresolved(...)`.
-  Plus the 2-D `CurveContact` ontology (`ContactDimension`,
-  `ContactEventKind`, `CurveContact`) shared by S1 and the Contact Layer.
+- **BG-SOL-S1-ARRANGE** (`truck-geometry/src/arrange.rs`, 1823 lines) — the
+  certified planar arrangement: `Arrangement { vertices, half_edges, regions }`
+  with `ArrVertex { point, incident }`, `ArrHalfEdge { origin, twin, next,
+  prev, curve: usize, u_range }`, `ArrRegion { boundaries: Vec<Vec<usize>>,
+  winding: i32, bounded }`. Analytic Line/Circle profiles; exact dyadic
+  vertices (i128 Dyad substrate), exact orient2d-driven topology; algebraic
+  intersection points refuse honestly (`RootNotIsolated`). NOTE the landed
+  conventions: every merged cycle is normalized to its CCW representative
+  (so winding is orientation-unsigned), open profile walks are modeled as
+  separate unbounded regions, and the arrangement carries NO carrier geometry
+  (`curve` is an index into the profile slice).
+- **BG-SOL-S2-EXTRUDE** (`truck-modeling/src/extrude.rs`) — direct certified
+  extrude of an arrangement into a closed `Solid`: bottom/top caps (each with
+  the hole wire as an inner boundary), 4 planar rect side faces, and the hole
+  wall as a CYLINDER ANNULUS with two boundary wires (bottom + top circle
+  self-loops, NO seam edges; `Edge::new_unchecked` for the SameVertex
+  self-loops). Signature amended (SPEC_GAP): `extrude_profile(&[Curve],
+  &Arrangement, height)` — the booked `(&Arrangement, height)` was infeasible
+  because the arrangement carries no carriers. 7 faces, `Solid::try_new` Ok.
 
-Registry is 91 rows: **90 DONE, 1 BLOCKED** (BG-AUD-FIX-004, owner). The four
-new P0 rows are DONE. `schedule.py` reports eligible 0, dispatchable 0 —
-nothing is running except the watchdog.
+Registry is 93 rows: **92 DONE, 1 BLOCKED** (BG-AUD-FIX-004, owner).
+`schedule.py` reports eligible 0, dispatchable 0. Nothing is running except the
+watchdog.
 
-**The next program step is M1** — certified planar construction
-(`docs/SOLVER_FAMILY_PLAN.md` §7): rectangle − circle → 2-D arrangement
-(Phase 1 S1 `arrange`) → profile with hole → direct extrude → valid B-rep,
-no 3-D Boolean. ~8–9k LOC. The Contact Layer funnel (Phase 3) must NOT start
-until M1 is green. Phase 0 is green, so M1's packet can be written now.
+**M1 is NOT yet green**: the arrangement + extrude construction works, but the
+M1 milestone gate is the flagship differential test
+`Extrude(P−Q) ≅ Extrude(P)−Extrude(Q)`, whose RHS needs the 3-D Boolean
+(Phase 4). M1 also exercises material state and pcurves, and the S2 v1 sets
+`PC = ()`.
 
 ## Pick up here
 
-1. **Review and dispatch the M1-critical S1 packet** — `BG-SOL-S1-ARRANGE`
-   (`loop/packets/BG-SOL-S1-ARRANGE.md`, scaffolded at `1f3b202`). It is
-   WRITTEN but NOT dispatched: the orchestrator must review it (fresh eyes on a
-   large design packet) before forking and dispatching it. The arrangement
-   (`truck-geometry/src/arrange.rs`) consumes the LANDED Phase-0 API —
-   `orient2d` (exact crossing/winding), `CurveContact`, `BoundingBox<Point2>`,
-   `recognize`. v1 is analytic Line/Circle profiles with exactly-representable
-   (dyadic) vertices; algebraic intersection points refuse honestly. The plan's
-   §4 target signatures for Phase 0 are superseded by what landed — re-derive
-   from the tree (`loop/results/BG-SOL-P0-*.json`, the four module files).
-2. After S1 lands, S2 (`extrude_profile` on the `Arrangement` — Phase 2) is the
-   other M1 half; then the `Extrude(P−Q) ≅ Extrude(P)−Extrude(Q)` flagship.
+1. **Two known items gate M1's completion** (both flagged by the S2 worker and
+   verified against the tree):
+   - **Face-orientation normalization.** The landed plate solid is
+     combinatorially Closed (Solid::try_new passes) but the bottom cap's
+     geometric normal (+z) points INTO the material and the cylinder wall's
+     parametric normal (radial) points into the plate, not into the hole.
+     Normalize outward orientation (via Face orientation / Shell::inverse, the
+     truck `multi_sweep` precedent) before Phase 4's material-state Boolean
+     consumes the solid, or M2's inside/outside classification will be wrong.
+   - **Pcurves.** S2 v1 sets `Edge` pcurves to `()`. The plan lists pcurves as
+     part of S2; a follow-up adds them.
+2. **The M1 finish then needs the flagship differential test**, which is the
+   M2 cross-layer gate (needs the Contact Layer + Boundary Rewrite). Do NOT
+   start the Contact Layer funnel until M1's construction is fully green.
 3. **Recommended, NOT dispatched: the follow-up audit of
    `truck-evidence/src/fid/rep.rs`** (4362 lines; sole sanctioned exact→emitted
-   path; last touched by BG-FID-005 / BG-FID-005-SRF). Its own program, not a
-   solver-family packet.
+   path; last touched by BG-FID-005 / BG-FID-005-SRF). Its own program.
 4. Watchdog RUNNING (lock pid 20024, watchdog.py 37988, `stagnant=3600s`).
 
 ## State of the machine, as left
 
 - **Watchdog RUNNING** (lock `loop/watchdog.lock` = 20024; launcher shim
-  37988). Heartbeats current. It reclaimed `loop/slots/1/target` at 01:35 when
-  disk hit 3.3 GB during the verify-heavy phase (7.0 GB freed) — harmless, that
-  slot was already landed.
-- Registry: 91 rows = 76 original + 11 AUD-FIX + 4 SOL-P0. **90 DONE, 1
-  BLOCKED** (BG-AUD-FIX-004 owner). `schedule.py` eligible 0, dispatchable 0.
-- Slots 0/1/2/3 all FINISHED on landed branches (0 = REC @074bf04, 1 = BVH
-  @5ebaa55, 2 = SPAN @a557d09 + orchestrator amendment 14688e6, 3 = PRED
-  @7047f80); each holds a stale RESULT.json (harmless; re-fork with
-  `new_slot.py` before any next dispatch). **Slot targets deleted** to free
-  disk — a re-fork pays a cold warm (~1-3 min).
-- Disk ~21.7 GB free at close. No leaked `%TEMP%/look-verify-baseline-*`.
-  Verify baselines cached under `loop/baselines/`: caa41f4 (truck-base,
-  truck-geometry), c4f170f (truck-geometry).
+  37988). Heartbeats current.
+- Registry: 93 rows = 76 original + 11 AUD-FIX + 4 SOL-P0 + S1 + S2. **92 DONE,
+  1 BLOCKED** (BG-AUD-FIX-004 owner). `schedule.py` eligible 0, dispatchable 0.
+- Slots 0/1 FINISHED on landed branches (0 = S1 @f6d0e80, 1 = S2 @521aa86);
+  each holds a stale RESULT.json (harmless; re-fork with `new_slot.py`). Slot
+  targets deleted to free disk (re-fork pays a cold warm).
+- Disk ~20 GB free at close. No leaked `%TEMP%/look-verify-baseline-*`.
 - GATE-4 ceiling 111 (true count). `scripts/kernel-gates.sh HEAD` passes
-  111/111. No `unscaled_legacy()` calls added by any Phase-0 packet.
-- All four packets ledgered and filed under `loop/results/BG-SOL-P0-*.json`
-  (incl. the SPAN orchestrator amendment, `amended_by: orchestrator`).
+  111/111. No `unscaled_legacy()` calls added by any solver-family packet.
+- S1 and S2 ledgered and filed under `loop/results/` (S2 with its SPEC_GAP
+  round trip recorded).
 
 ## The parallelism picture
 
-Nothing running (watchdog only; no workers, no verifies). Next dispatchable
-work is M1 / Phase 1 S1 `arrange` once its packet is written; the fid/rep.rs
-audit stays a recommendation. `schedule.py` needs a new P0-row set (S1 etc.)
-before it can report the next wave.
+Nothing running (watchdog only; no workers, no verifies). Next work is the M1
+finish items (face orientation + pcurves) and then Phase 1/S1 hardening toward
+the flagship differential test; the fid/rep.rs audit stays a recommendation.
 
 ## Traps, each one paid for
+### Session 28 (M1 construction: S1 arrange + S2 extrude) - paid in full
+
+- **The plan's §4 target signatures are infeasible until validated against the
+  landed modules, and the SPEC_GAP is the cheap detector.** `extrude_profile(
+  &Arrangement, height)` was booked in the plan, but the landed S1 arrangement
+  carries no carrier geometry (`ArrHalfEdge.curve` is an index into the profile
+  slice, which the arrangement-only signature never receives) and a full circle
+  is not determined by its seam vertex plus a 2π window. The S2 worker returned
+  SPEC_GAP with the empirical proof (three unknowns, two constraints); the
+  amendment added the `&[Curve]` argument and the plan doc now records it.
+  Lesson: a Phase-N packet that consumes a Phase-(N−1) module must anchor the
+  CONSUMING signature against the landed API (the anchors did catch the types;
+  the signature's feasibility is the thing to double-check).
+- **S1 normalizes every loop to its CCW representative, so winding is
+  orientation-unsigned and cannot distinguish a hole from its plate.** The S2
+  packet's `winding == 1` material rule selected BOTH the plate and the hole
+  (reversing the circle changes nothing). The fix is a containment/nesting
+  rule: material = bounded `winding == 1` regions not strictly inside another
+  bounded `winding == 1` region's boundary cycle. Recorded here because any
+  future "winding decides materiality" assumption will hit the same wall.
+- **A single-wire face boundary containing a closed self-loop cannot close a
+  shell.** The packet's cylinder wall `[circle, seam up, top circle, seam down]`
+  is not simple (the seam vertex appears twice → `NotSimpleWire`) and its seam
+  edges occur once in the shell → `shell_condition() != Closed`. The correct
+  construction (worker-verified, `Solid::try_new` Ok with 7 faces): the hole
+  wall is an ANNULUS with two boundary wires (bottom + top circle self-loops)
+  and NO seam edges; each circle edge is shared by exactly two faces with
+  opposite orientations.
+- **`Wire::mapped` and `Edge::debug_new` PANIC in debug builds on a SameVertex
+  self-loop.** The closed circle edges must be built with
+  `Edge::new_unchecked(front, back, curve)` (the BG-TOL-001-MESHALGO precedent),
+  and the top cap's wires must be constructed explicitly, never by mapping the
+  bottom wires.
+- **The bspcurve proptest flake hit a third time, and the recovery is the
+  recorded one.** `truck-geometry/tests/bspcurve.rs::parameter_random_tests`
+  failed once in S2's first verify (a file the packet never touched); it passed
+  4/4 re-runs at the branch commit and the re-verify ACCEPTED. No
+  `proptest-regressions` artifact was persisted this time. Before believing a
+  V5 failure in a file the packet did not open, re-run at both commits.
+- **A packet's §1 "module NOT yet in the tree" prose goes stale the moment the
+  orchestrator scaffolds the module.** The S2 packet was written pre-scaffold,
+  then the module was scaffolded before dispatch; the worker correctly refused
+  to edit `lib.rs` (outside `write_allow`) and filled the existing file. When a
+  scaffold exists, the packet's §1 must say so and keep `lib.rs` out of the
+  write set.
+
 ### Session 27 (solver-family Phase 0) - paid in full
 
 - **Four cold workers on one disk is a uv_spawn massacre, and the symptom is
