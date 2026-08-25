@@ -52,6 +52,10 @@ pub mod recognize;
 /// packet fills it.
 pub mod span;
 
+/// BG-SOL-S1-ARRANGE: the certified planar arrangement over analytic profiles.
+/// Scaffolded empty; the packet fills it.
+pub mod arrange;
+
 /// re-export all modules.
 pub mod prelude {
     use crate::*;
