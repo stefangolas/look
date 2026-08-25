@@ -11,14 +11,15 @@ otherwise would eventually cost a trap.) If you are picking this up cold, read
 [`loop/ORCHESTRATOR.md`](ORCHESTRATOR.md) for how to run the loop, then
 `python loop/slot_status.py`** - nothing else. Do not read `LEDGER.jsonl` whole.
 
-Updated 2026-08-25, close of session 28 (M1 construction half LANDED: S1 arrange + S2 extrude). Branch: `integration/kernel-bg`, HEAD `d85d71c`.
+Updated 2026-08-25, close of session 29 (M1 construction GREEN: S1 arrange + S2 extrude + face-orientation). Branch: `integration/kernel-bg`, HEAD `a707bc3`.
 
 ## Where we are
 
-**The solver family's M1 construction path is landed end to end.** Phase 0 (the
-4-wide substrate wave, session 27) plus this session's two packets:
+**The solver family's M1 construction path is landed end to end and the two
+known defects that gated it are closed.** Phase 0 (4-wide substrate wave,
+session 27), S1 + S2 (session 28), and this session's ORIENT packet:
 
-- **BG-SOL-S1-ARRANGE** (`truck-geometry/src/arrange.rs`, 1823 lines) — the
+- **BG-SOL-S1-ARRANGE** (`truck-geometry/src/arrange.rs`, 1860 lines) — the
   certified planar arrangement: `Arrangement { vertices, half_edges, regions }`
   with `ArrVertex { point, incident }`, `ArrHalfEdge { origin, twin, next,
   prev, curve: usize, u_range }`, `ArrRegion { boundaries: Vec<Vec<usize>>,
@@ -37,33 +38,44 @@ Updated 2026-08-25, close of session 28 (M1 construction half LANDED: S1 arrange
   self-loops). Signature amended (SPEC_GAP): `extrude_profile(&[Curve],
   &Arrangement, height)` — the booked `(&Arrangement, height)` was infeasible
   because the arrangement carries no carriers. 7 faces, `Solid::try_new` Ok.
+- **BG-SOL-S2-ORIENT** (this session, `cb96f64`) — normalized outward face
+  orientation. The plate was combinatorially Closed but geometrically inward on
+  two faces. Fix is a coordinated re-orientation following the `multi_sweep`
+  precedent (`Shell::from(vec![self.inverse()])`): bottom cap stored INVERTED
+  (`orientation=false`, wires kept as-traced), top cap wires NO LONGER reversed
+  (`orientation=true`), side quad rewired from
+  `[be.inverse(), seam_o, te, seam_n.inverse()]` to
+  `[be, seam_n, te.inverse(), seam_o.inverse()]`, cylinder wall stored INVERTED
+  (`orientation=false`, wires kept). Final flags: bottom false, top true, 4
+  sides true, cylinder false. Shell still `Closed` under `Solid::try_new`;
+  regression test `extrude_all_face_normals_point_outward` (verified to fail
+  pre-fix, pass post-fix).
 
-Registry is 93 rows: **92 DONE, 1 BLOCKED** (BG-AUD-FIX-004, owner).
-`schedule.py` reports eligible 0, dispatchable 0. Nothing is running except the
-watchdog.
+Registry is 95 rows: **93 DONE, 1 BLOCKED** (BG-AUD-FIX-004, owner),
+**1 READY** (BG-SOL-S2-PCURVE). `schedule.py` reports eligible 1, dispatchable
+1 (PCURVE). Nothing is running except the watchdog.
 
-**M1 is NOT yet green**: the arrangement + extrude construction works, but the
-M1 milestone gate is the flagship differential test
-`Extrude(P−Q) ≅ Extrude(P)−Extrude(Q)`, whose RHS needs the 3-D Boolean
-(Phase 4). M1 also exercises material state and pcurves, and the S2 v1 sets
-`PC = ()`.
+**M1 is construction-GREEN but the milestone gate is NOT yet run**: the flagship
+differential test `Extrude(P−Q) ≅ Extrude(P)−Extrude(Q)` has an RHS that needs
+the 3-D Boolean (Phase 4). M1 also lists pcurves, and the S2 v1 sets `PC = ()`.
 
 ## Pick up here
 
-1. **Two known items gate M1's completion** (both flagged by the S2 worker and
-   verified against the tree):
-   - **Face-orientation normalization.** The landed plate solid is
-     combinatorially Closed (Solid::try_new passes) but the bottom cap's
-     geometric normal (+z) points INTO the material and the cylinder wall's
-     parametric normal (radial) points into the plate, not into the hole.
-     Normalize outward orientation (via Face orientation / Shell::inverse, the
-     truck `multi_sweep` precedent) before Phase 4's material-state Boolean
-     consumes the solid, or M2's inside/outside classification will be wrong.
-   - **Pcurves.** S2 v1 sets `Edge` pcurves to `()`. The plan lists pcurves as
-     part of S2; a follow-up adds them.
-2. **The M1 finish then needs the flagship differential test**, which is the
-   M2 cross-layer gate (needs the Contact Layer + Boundary Rewrite). Do NOT
-   start the Contact Layer funnel until M1's construction is fully green.
+1. **Dispatch BG-SOL-S2-PCURVE** (`loop/packets/BG-SOL-S2-PCURVE.md`, READY and
+   eligible). It is a SPEC_GAP probe written against the landed API. The
+   re-derived blocker is real and structural: `Wire<P,C>` holds
+   `Edge<P,C,()>` (the `PC` default), the prelude fixes `Edge = Edge<Point3,
+   Curve>` with `PC = ()`, and no pcurve-carrying `Wire` exists anywhere in the
+   tree — so a pcurve payload cannot ride on the returned `Solid`'s edges
+   without threading `PC` through `Wire`/`Face`/`Shell`/`Solid` (a cross-crate
+   topology program). Expected outcome: worker returns SPEC_GAP with the
+   empirical proof; then amend `docs/SOLVER_FAMILY_PLAN.md` §4 Phase 2 (and §7
+   M1) to record that "pcurves on the solid's edges" is deferred to that
+   topology-PC program, and decide whether M1's pcurve exercise is satisfied by
+   the carrier existing or re-scoped.
+2. **The M1 finish then needs the flagship differential test**, which is the M2
+   cross-layer gate (needs the Contact Layer + Boundary Rewrite). Do NOT start
+   the Contact Layer funnel until M1's construction is fully green.
 3. **Recommended, NOT dispatched: the follow-up audit of
    `truck-evidence/src/fid/rep.rs`** (4362 lines; sole sanctioned exact→emitted
    path; last touched by BG-FID-005 / BG-FID-005-SRF). Its own program.
@@ -73,24 +85,61 @@ M1 milestone gate is the flagship differential test
 
 - **Watchdog RUNNING** (lock `loop/watchdog.lock` = 20024; launcher shim
   37988). Heartbeats current.
-- Registry: 93 rows = 76 original + 11 AUD-FIX + 4 SOL-P0 + S1 + S2. **92 DONE,
-  1 BLOCKED** (BG-AUD-FIX-004 owner). `schedule.py` eligible 0, dispatchable 0.
-- Slots 0/1 FINISHED on landed branches (0 = S1 @f6d0e80, 1 = S2 @521aa86);
-  each holds a stale RESULT.json (harmless; re-fork with `new_slot.py`). Slot
-  targets deleted to free disk (re-fork pays a cold warm).
-- Disk ~20 GB free at close. No leaked `%TEMP%/look-verify-baseline-*`.
+- Registry: 95 rows = 76 original + 11 AUD-FIX + 4 SOL-P0 + S1 + S2 + ORIENT +
+  PCURVE. **93 DONE, 1 BLOCKED** (BG-AUD-FIX-004 owner), **1 READY**
+  (BG-SOL-S2-PCURVE). `schedule.py` eligible 1, dispatchable 1.
+- Slots 0/1 FINISHED on landed branches (0 = ORIENT @cb96f64, 1 = S2 @521aa86);
+  2/3 FINISHED on old landed branches. Slot 0 holds a stale RESULT.json
+  (harmless; re-fork with `new_slot.py`). Slot targets deleted to free disk
+  (re-fork pays a cold warm).
+- Disk ~12 GB free at close. No leaked `%TEMP%/look-verify-baseline-*`.
 - GATE-4 ceiling 111 (true count). `scripts/kernel-gates.sh HEAD` passes
   111/111. No `unscaled_legacy()` calls added by any solver-family packet.
-- S1 and S2 ledgered and filed under `loop/results/` (S2 with its SPEC_GAP
-  round trip recorded).
+- ORIENT ledgered and filed under `loop/results/` (verified ACCEPTED at
+  `cb96f64` against base `f1052ad`, all gates V0-V9 PASS).
 
 ## The parallelism picture
 
 Nothing running (watchdog only; no workers, no verifies). Next work is the M1
-finish items (face orientation + pcurves) and then Phase 1/S1 hardening toward
-the flagship differential test; the fid/rep.rs audit stays a recommendation.
+finish item PCURVE (dispatch the READY packet — expected SPEC_GAP, then amend
+the plan doc) and then S1 hardening toward the flagship differential test; the
+fid/rep.rs audit stays a recommendation.
 
 ## Traps, each one paid for
+### Session 29 (M1 finish: face orientation landed, pcurve probe written) - paid in full
+
+- **`land_packet.py` can crash AFTER a successful merge, and the fix is one
+  `Copy-Item` + one `Remove-Item`, in that order, never a re-run first.**
+  The ORIENT worker left `RESULT.json` UNCOMMITTED in the worktree (the
+  uncommitted flavor). `land_packet.py` merged `--no-ff` successfully, then died
+  at the filing step: it reads `REPO_ROOT / 'RESULT.json'`, which the merge
+  never created because the file wasn't tracked. Recovery: copy
+  `loop/slots/N/wt/RESULT.json` to the repo root, re-run `land_packet.py` (the
+  second merge is a no-op "Already up to date"), then `Remove-Item` the root
+  copy — the script's own `git rm -q RESULT.json` only removes TRACKED files, so
+  the untracked copy silently survives and would be the "untracked file would be
+  overwritten by merge" trap for the NEXT landing. Check whether the worker
+  committed RESULT.json (read the merge stat for a `create mode 100644
+  RESULT.json` line) before deciding whether to copy.
+- **`Set-Content -Encoding UTF8` in PowerShell writes a BOM, and
+  `loop/PACKETS.jsonl` breaks with `Unexpected UTF-8 BOM`.** Editing the
+  registry via PowerShell to flip a row's `status` field introduced a BOM that
+  made `schedule.py`'s `json.loads` die on line 1. Recover with
+  `[System.IO.File]::ReadAllText(...).TrimStart([char]0xFEFF)` and write back
+  with `UTF8Encoding($false)`. Prefer editing `PACKETS.jsonl` with the Edit tool
+  or a python one-liner that round-trips through `json.loads`/`json.dumps`,
+  never a PowerShell `Set-Content`.
+- **The origin-`z==0` face dispatch in a packet's suggested test is ambiguous in
+  a cap-and-prism solid: every side plane's origin is a bottom vertex at z=0,
+  and the y==0 side face's origin equals the bottom cap's origin `(0,0,0)`.**
+  The ORIENT packet's suggested face identification ("plane whose origin() has
+  z==0.0 / 2.0 or x/y==0.0 / 4.0") cannot tell the bottom cap from a side face
+  by origin alone. The worker disambiguated caps from sides by boundary-wire
+  count (caps carry 2 wires, sides 1) and recorded it in notes — correct, and
+  the packet's sample-point table was still usable once the dispatch is fixed.
+  When a packet tells a worker how to identify faces, dispatch on wire count or
+  surface type, not origin coordinates.
+
 ### Session 28 (M1 construction: S1 arrange + S2 extrude) - paid in full
 
 - **The plan's §4 target signatures are infeasible until validated against the
