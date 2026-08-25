@@ -90,6 +90,10 @@ pub enum EnvelopeCase {
     NonCanonicalCarrier,
     /// A NURBS weight was non-positive; the hull property fails (BG-ENC-003).
     NonPositiveNurbsWeight,
+    /// A stratum pair whose contact reduction (FE, EE, general validated FF,
+    /// singular event cells, or 2-D overlap) is not yet implemented in the
+    /// Contact Layer (plan §4 Phase 3).
+    ContactReductionDeferred,
 }
 
 /// Why a numerically unresolved result could not be certified.
