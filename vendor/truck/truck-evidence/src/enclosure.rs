@@ -194,6 +194,36 @@ pub trait EnclosureSurface: ParametricSurface<Point = Point3> {
     }
 }
 
+/// Certified enclosure interface for vector-valued parametric fields
+/// (`Point = Vector3`), the companion of [`EnclosureSurface`] for the
+/// `Offset<S, N>` decorator (BG-ENC-004-OFFSET). `N` in `Offset<T, N>` is
+/// *vector*-valued, so it can never satisfy `EnclosureSurface`'s
+/// `Point = Point3` bound; this trait is `EnclosureSurface` minus that bound.
+///
+/// A cone of directions is deliberately *not* part of the interface: whenever
+/// a tight path needs one it is derivable from the field's own enclosure box
+/// via [`midpoint_ball_cone`]. The composition needs only the two enclosure
+/// methods.
+pub trait EnclosureVectorField: ParametricSurface<Point = Vector3, Vector = Vector3> {
+    /// MUST contain `{ self.subs(u, v) : (u,v) ∈ uu×vv }` (BG-ENC-001).
+    fn enclose(&self, uu: Interval, vv: Interval) -> Box3;
+
+    /// MUST contain `{ self.der_mn(m, n, u, v) : (u,v) ∈ uu×vv }`.
+    fn enclose_der(&self, m: usize, n: usize, uu: Interval, vv: Interval) -> Box3;
+}
+
+/// Certified enclosure interface for two-variable scalar fields — the `F` in
+/// `NormalField<S, F>` (BG-ENC-004-OFFSET). No supertrait: the constant case
+/// (`f64`) is v1's only impl, and a variable-distance scalar field gets an
+/// impl only when a carrier needs one.
+pub trait EnclosureScalarField2 {
+    /// MUST contain `{ self.subs(u, v) : (u,v) ∈ uu×vv }`.
+    fn enclose(&self, uu: Interval, vv: Interval) -> Interval;
+
+    /// MUST contain `{ self.der_mn(m, n, u, v) : (u,v) ∈ uu×vv }`.
+    fn enclose_der(&self, m: usize, n: usize, uu: Interval, vv: Interval) -> Interval;
+}
+
 #[cfg(test)]
 // Test-only allow: H-1 bans unwrap/expect on paths reachable from untrusted
 // geometry. Unit-test assertions on hand-built witnesses are not such a path.

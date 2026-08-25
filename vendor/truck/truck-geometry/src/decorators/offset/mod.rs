@@ -25,6 +25,16 @@ impl<T, F> NormalField<T, F> {
     pub fn new(entity: T, scalar: F) -> Self {
         Self { entity, scalar }
     }
+    /// Returns the base entity geometry.
+    #[inline(always)]
+    pub const fn entity(&self) -> &T {
+        &self.entity
+    }
+    /// Returns the scalar field.
+    #[inline(always)]
+    pub const fn scalar(&self) -> &F {
+        &self.scalar
+    }
 }
 
 mod curve;
