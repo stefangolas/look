@@ -22,6 +22,11 @@
 //! - `Processor` recurses into its entity and pushes the affine map through
 //!   the boxes exactly (8-corner transform).
 //!
+//! `DerivativeBounds` is the shared broad-phase type from
+//! `truck_base::bvh` (packet BG-SOL-P0-BVH); orchestrator amendment a557d09
+//! replaced the packet's original local copy with the shared one after the
+//! BVH packet merged.
+//!
 //! The cache is keyed by a caller-owned `u64` (e.g. the B-rep face index);
 //! `Surface` is neither `Hash` nor `Eq` by design, so the caller guarantees
 //! key uniqueness per distinct surface. House rules H-1..H-8 apply.
@@ -38,6 +43,7 @@
 use std::collections::HashMap;
 
 use truck_base::bounding_box::BoundingBox;
+use truck_base::bvh::DerivativeBounds;
 use truck_base::cgmath64::*;
 use truck_geotrait::ParametricSurface;
 
@@ -45,26 +51,6 @@ use crate::canonical::Surface;
 use crate::decorators::Processor;
 use crate::nurbs::{BSplineSurface, KnotVec, NurbsSurface};
 use crate::specifieds::{Plane, Sphere, Torus};
-
-/// Conservative bounds on a span's partial derivatives.
-///
-/// The plan's `DerivativeBounds` (`truck-base/src/bvh.rs` scaffold, packet
-/// BG-SOL-P0-BVH) has not landed its types yet, so the span module defines it
-/// here; the BVH packet re-names or re-exports it when it fills its file.
-#[derive(Clone, Debug, Default, PartialEq)]
-pub struct DerivativeBounds {
-    /// Conservative box over the first partials; empty means unknown.
-    pub first: BoundingBox<Point3>,
-    /// Conservative box over the second partials; empty means unknown.
-    pub second: BoundingBox<Point3>,
-}
-
-impl DerivativeBounds {
-    /// Unknown derivative bounds: both boxes empty.
-    pub fn new() -> Self {
-        Self::default()
-    }
-}
 
 /// One extracted span of a carrier surface: a conservative box over the
 /// span's image, derivative bounds, and the span's parameter window.
