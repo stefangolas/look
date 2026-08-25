@@ -86,36 +86,39 @@ The module is NOT yet in the tree. This packet adds `pub mod extrude;` to
 
 ```rust
 /// Extrudes the material region(s) of a planar arrangement by `height` along
-/// +z into a closed solid. v1 scope: exactly ONE material region, and the
-/// profile's loops are oriented with material on the left (M1 passes the
-/// outer rectangle CCW and the hole circle REVERSED, so the plate's winding is
-/// +1 and the hole interior's is 0).
-pub fn extrude_profile(profile: &Arrangement, height: f64)
+/// +z into a closed solid. v1 scope: exactly ONE material region (the
+/// containment-based rule of section 3).
+pub fn extrude_profile(profile: &[Curve], arrangement: &Arrangement, height: f64)
     -> Outcome<Solid<Point3, Curve, Surface>>;
 ```
 
-`Solid<Point3, Curve, Surface>` is `truck_topology::Solid` with the canonical
-`Curve`/`Surface` enums. Re-derive the exact `Arrangement`/`ArrRegion`/
-`ArrVertex`/`ArrHalfEdge` field spellings from `arrange.rs` with grep before
-coding (the S1 packet's target spellings are authoritative only if they
-landed verbatim — record any difference in `disagreements`).
+**Booked-API amendment (SPEC_GAP, resolved):** the plan's §4 Phase 2 signature
+is `extrude_profile(profile: &Arrangement, height: f64)`. The landed S1
+`Arrangement` carries no carrier geometry — `ArrHalfEdge { origin, twin, next,
+prev, curve: usize, u_range }` has `curve` as an INDEX into the profile slice,
+which the arrangement-only signature never receives, and a full circle is not
+determined by its seam vertex plus a `2π` parameter window. The `&[Curve]` is
+therefore a second argument (the same slice the arrangement was built from);
+`ArrHalfEdge.curve` resolves against it. Record this amendment in
+`docs/SOLVER_FAMILY_PLAN.md` §4 Phase 2 (the §3 header already warns the booked
+API goes stale). `Solid<Point3, Curve, Surface>` is `truck_topology::Solid`
+with the canonical `Curve`/`Surface` enums. Re-derive the exact
+`Arrangement`/`ArrRegion`/`ArrVertex`/`ArrHalfEdge` field spellings from
+`arrange.rs` with grep before coding.
 
 ### 3. Material selection
 
-The material regions are the `ArrRegion`s with **`winding == 1`** (positive
-winding = material on the left, the standard convention). S1's landed winding
-is computed over each region's OWN boundary cycles (see the S1 RESULT notes):
-for the M1 profile with the hole circle REVERSED (CW), the plate winds +1
-(inside the rect, outside the reversed circle) and the hole interior winds −1
-(inside a CW loop) — so `winding == 1` selects exactly the plate and excludes
-the hole. v1 accepts exactly one material region (`Err(Refusal::Empty)`
-otherwise; a multi-region profile is v2). If a bounded region's winding is
-0 or −1 it is NOT material.
-
-Note the S1 v1 convention: open (non-closed) profile walks are modeled as
-separate unbounded regions, which is geometrically a single connected exterior
-for a finite crossing — M1 profiles are closed loops, so this does not affect
-M1; the S2 packet operates only on closed-loop arrangements.
+The material regions are the bounded `ArrRegion`s with **`winding == 1` that
+are NOT strictly inside another bounded `winding == 1` region's boundary
+cycle** (the containment/nesting rule — SPEC_GAP resolution). This is
+necessary because S1 normalizes every loop to its CCW representative, so the
+M1 hole interior winds +1 exactly like the plate (reversing the circle changes
+nothing). The containment test is point-in-cycle (a representative point of R
+inside a boundary cycle of S). For M1: the plate (bounded, winding 1, not
+inside any other bounded region's cycle) is material; the hole (bounded,
+winding 1, strictly inside the plate's circle cycle) is NOT; the exterior is
+unbounded. v1 accepts exactly one material region (`Err(Refusal::Empty)`
+otherwise; a multi-region profile is v2).
 
 ### 4. Vertex identity — the load-bearing rule
 
@@ -154,24 +157,35 @@ whose curve is a `Curve::Line` (the rectangle's edges), the side face is the
 quad `[bottom edge, up, top edge reversed, down]` on the surface
 `Surface::Plane(Plane::new(a, b, a + height·ẑ))` where `a→b` is the bottom
 edge — this is EXACTLY the recognizer's `ExtrudedCurve(Line)→Plane` mapping,
-constructed directly. For the `Curve::Circle` edge (the hole), ONE side face
-with boundary `[circle edge, vertical seam up, top circle edge reversed,
-vertical seam down]` on the surface `Surface::Cylinder(Cylinder::new(center,
-radius))` — the canonical cylinder, constructed directly (the circle satisfies
-the z-cylinder conditions because the profile is in z = 0; if `Cylinder::new`
-refuses, the input was not a valid M1 profile → `Err(Refusal::Empty)`).
+constructed directly.
 
-**The closed hole edge**: the circle edge's front and back vertices are the
-SAME bottom vertex. `Edge::try_new` refuses `SameVertex`; use
-`Edge::new_unchecked(front, back, curve)` for the circle edge (and its top
-copy), with a comment recording that the closed edge is the seam and the
-`new_unchecked` is the sanctioned construction for it (the BG-TOL-001-MESHALGO
-precedent). The vertical seam edges are ordinary `Edge::new`/`try_new` lines.
+**The hole wall (SPEC_GAP resolution — the packet's original single-wire
+construction does not close):** the hole's side face is an **ANNULUS with TWO
+boundary wires** — the bottom circle self-loop and the top circle self-loop —
+with **NO vertical seam edges**. Each circle edge is then shared by exactly two
+faces with opposite orientations (bottom: cap + cylinder; top: cap + cylinder),
+which is what closes the shell. The surface is
+`Surface::Cylinder(Cylinder::new(center, radius))` where `center`/`radius` are
+read from the profile's `Curve::Circle` carrier (`profile[edge.curve]`):
+`center = p.transform().w.to_point()`, `radius = p.transform().x.magnitude()`
+(the canonical.rs conventions). If `Cylinder::new` refuses, the input was not a
+valid M1 profile → `Err(Refusal::Empty)`.
 
-Every edge's curve is a `Curve` built from the arrangement edge's geometry:
-`Curve::Line(Line(a, b))` for line pieces, the `Curve::Circle` processor for
-the circle piece, `Curve::Line` for the vertical seams. The side faces share
-their boundary edges with the caps (instance identity, rule 4).
+**The closed circle edges**: the circle edge's front and back vertices are the
+SAME vertex. `Edge::try_new` refuses `SameVertex`, and `Wire::mapped` /
+`Edge::debug_new` PANIC in debug builds on a self-loop — use
+`Edge::new_unchecked(front, back, curve)` for the circle edges (bottom and top
+copies), with a comment recording that the closed edge is the seam and the
+`new_unchecked` is the sanctioned construction (the BG-TOL-001-MESHALGO
+precedent). The vertical rect-side edges are ordinary `Edge::new`/`try_new`
+lines. The top cap's wires must be constructed explicitly (translated + edge
+directions reversed), never by mapping the bottom wires (the self-loop panics).
+
+Every edge's curve is a `Curve` built from the profile: `Curve::Line(Line(a,
+b))` for line pieces (from the arrangement vertex points), the profile's
+`Curve::Circle` processor for the circle piece, `Curve::Line` for the vertical
+rect seams. The side faces share their boundary edges with the caps (instance
+identity, rule 4).
 
 ### 6. Assembly and validation
 
@@ -217,32 +231,35 @@ This packet adds NO `unscaled_legacy()` calls. Do not touch
 ## Regression tests (exact names)
 
 Put the tests in a `#[cfg(test)] mod tests` inside `extrude.rs` with
-`#[allow(clippy::unwrap_used, clippy::expect_used)]`. The M1 profile helper:
+`#[allow(clippy::unwrap_used, clippy::expect_used)]`. The M1 profile helper
+returns the profile slice AND its arrangement:
 
 ```rust
-fn plate_with_hole() -> Arrangement {
-    // rectangle 4x4 CCW, circle r=1 at (2,2) REVERSED (hole)
-    // build via `arrange` (S1) on the reversed profile
+fn plate_with_hole() -> (Vec<Curve>, Arrangement) {
+    // rectangle 4x4 CCW + circle r=1 at (2,2) (its natural parameterization);
+    // build the profile and call `arrange` (S1); the material selection in
+    // section 3 is containment-based, so the circle's orientation is NOT
+    // required to be reversed.
 }
 ```
 
-Reversing the circle: `Curve::Circle` processors are `Invertible` — build the
-profile with the circle `invert()`ed so its material side is the outside.
-
-1. `extrude_plate_with_hole_is_a_closed_solid` — `extrude_profile` on the M1
-   plate (height 2.0) → `Ok`; the solid passes `Solid::try_new` (it was built
-   through it); the shell is closed; a point in the plate material `(1,1,1)`
-   is inside the solid and a point in the hole's air column `(2,2,1)` (the hole
-   runs through the whole height) is NOT inside the solid — assert both, using
-   `Solid::contains_point` or a point-in-solid test if one exists, else a
-   closest-point-on-boundary distance comparison against a named tolerance.
+1. `extrude_plate_with_hole_is_a_closed_solid` — `extrude_profile(&profile,
+   &arrangement, 2.0)` on the M1 plate → `Ok`; the solid passes `Solid::try_new`
+   (it was built through it); the shell is closed; a point in the plate material
+   `(1,1,1)` is inside the solid and a point in the hole's air column `(2,2,1)`
+   (the hole runs through the whole height) is NOT inside the solid — assert
+   both, using `Solid::contains_point` or a point-in-solid test if one exists,
+   else a closest-point-on-boundary distance comparison against a named
+   tolerance.
 2. `extrude_plate_hole_wall_is_a_cylinder` — find the face whose surface is a
-   `Surface::Cylinder`; assert its center is `(2,2,0)` and radius 1.0, and
+   `Surface::Cylinder`; assert its center is `(2,2,0)` and radius 1.0 (read from
+   the profile's `Curve::Circle` carrier — the construction in section 5), and
    `recognize_surface(&that_surface)` returns the same `Cylinder` carrier.
 3. `extrude_face_and_edge_counts_are_exact` — assert 7 faces (1 bottom + 1 top
-   + 4 rect sides + 1 cylinder), and that the bottom/top faces each have 2
-   boundary wires (the outer rectangle wire with 4 edges and the inner circle
-   wire with 1 edge).
+   + 4 rect sides + 1 cylinder annulus), and that the bottom/top faces each
+   have 2 boundary wires (the outer rectangle wire with 4 edges and the inner
+   circle wire with 1 edge — the cylinder annulus has the same two circle
+   self-loops as its two boundary wires).
 4. `extrude_zero_or_negative_height_is_refused` — `height = 0.0` and
    `height = -1.0` → `Err`, never a panic.
 

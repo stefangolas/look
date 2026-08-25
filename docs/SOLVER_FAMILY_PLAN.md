@@ -452,8 +452,12 @@ Internal: x-monotone split → sweep → intersections → half-edge/DCEL → fa
 
 **Phase 2 — S2 direct B-rep constructors.** `truck-modeling` additions.
 ```rust
-pub fn extrude_profile(profile: &Arrangement, height: f64) -> Outcome<Solid<Point3, Curve, Surface>>;
-pub fn revolve_profile(profile: &Arrangement, axis: Line<Point3>, angle: f64) -> Outcome<Solid<Point3, Curve, Surface>>;
+// AMENDED (session 28, SPEC_GAP): the landed S1 `Arrangement` carries no
+// carrier geometry — ArrHalfEdge.curve is an index into the profile slice, and
+// a full circle is not determined by its seam vertex + 2pi window — so the
+// profile is a second argument. The §4 signature below is superseded.
+pub fn extrude_profile(profile: &[Curve], arrangement: &Arrangement, height: f64) -> Outcome<Solid<Point3, Curve, Surface>>;
+pub fn revolve_profile(profile: &[Curve], arrangement: &Arrangement, axis: Line<Point3>, angle: f64) -> Outcome<Solid<Point3, Curve, Surface>>;
 // canonicalization: recognize (circle × straight path) => Cylinder etc.
 ```
 No tool-body Boolean. n side faces + 1 top + 1 bottom + shared edges + pcurves.
