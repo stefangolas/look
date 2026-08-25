@@ -11,101 +11,129 @@ otherwise would eventually cost a trap.) If you are picking this up cold, read
 [`loop/ORCHESTRATOR.md`](ORCHESTRATOR.md) for how to run the loop, then
 `python loop/slot_status.py`** - nothing else. Do not read `LEDGER.jsonl` whole.
 
-Updated 2026-08-25, close of session 29 (M1 construction GREEN: S1 arrange + S2 extrude + face-orientation). Branch: `integration/kernel-bg`, HEAD `a707bc3`.
+Updated 2026-08-25, close of session 30 (M1 finish: PCURVE SPEC_GAP landed + plan amended; Contact Layer funnel STARTED, skeleton landed). Branch: `integration/kernel-bg`, HEAD `1155186`.
 
 ## Where we are
 
-**The solver family's M1 construction path is landed end to end and the two
-known defects that gated it are closed.** Phase 0 (4-wide substrate wave,
-session 27), S1 + S2 (session 28), and this session's ORIENT packet:
+**M1's construction is fully green AND its last open item is closed; the
+Contact Layer funnel is now running.** Two packets landed this session:
 
-- **BG-SOL-S1-ARRANGE** (`truck-geometry/src/arrange.rs`, 1860 lines) — the
-  certified planar arrangement: `Arrangement { vertices, half_edges, regions }`
-  with `ArrVertex { point, incident }`, `ArrHalfEdge { origin, twin, next,
-  prev, curve: usize, u_range }`, `ArrRegion { boundaries: Vec<Vec<usize>>,
-  winding: i32, bounded }`. Analytic Line/Circle profiles; exact dyadic
-  vertices (i128 Dyad substrate), exact orient2d-driven topology; algebraic
-  intersection points refuse honestly (`RootNotIsolated`). NOTE the landed
-  conventions: every merged cycle is normalized to its CCW representative
-  (so winding is orientation-unsigned), open profile walks are modeled as
-  separate unbounded regions, and the arrangement carries NO carrier geometry
-  (`curve` is an index into the profile slice).
-- **BG-SOL-S2-EXTRUDE** (`truck-modeling/src/extrude.rs`) — direct certified
-  extrude of an arrangement into a closed `Solid`: bottom/top caps (each with
-  the hole wire as an inner boundary), 4 planar rect side faces, and the hole
-  wall as a CYLINDER ANNULUS with two boundary wires (bottom + top circle
-  self-loops, NO seam edges; `Edge::new_unchecked` for the SameVertex
-  self-loops). Signature amended (SPEC_GAP): `extrude_profile(&[Curve],
-  &Arrangement, height)` — the booked `(&Arrangement, height)` was infeasible
-  because the arrangement carries no carriers. 7 faces, `Solid::try_new` Ok.
-- **BG-SOL-S2-ORIENT** (this session, `cb96f64`) — normalized outward face
-  orientation. The plate was combinatorially Closed but geometrically inward on
-  two faces. Fix is a coordinated re-orientation following the `multi_sweep`
-  precedent (`Shell::from(vec![self.inverse()])`): bottom cap stored INVERTED
-  (`orientation=false`, wires kept as-traced), top cap wires NO LONGER reversed
-  (`orientation=true`), side quad rewired from
-  `[be.inverse(), seam_o, te, seam_n.inverse()]` to
-  `[be, seam_n, te.inverse(), seam_o.inverse()]`, cylinder wall stored INVERTED
-  (`orientation=false`, wires kept). Final flags: bottom false, top true, 4
-  sides true, cylinder false. Shell still `Closed` under `Solid::try_new`;
-  regression test `extrude_all_face_normals_point_outward` (verified to fail
-  pre-fix, pass post-fix).
+- **BG-SOL-S2-PCURVE** (SPEC_GAP probe, `56184b2`, verified ACCEPTED at
+  `36d2e82`, merged `4f204d3`) — proved empirically that pcurves cannot ride on
+  the returned `Solid`'s edges: `Wire<P,C>` holds `VecDeque<Edge<P,C>>`
+  (`PC = ()` by default) and `with_pcurve<Q>` returns `Edge<P,C,Q>`, so a real
+  `PCurve` edge cannot enter a Wire (compile probe E0277). Plan amended (§2,
+  §4 Phase 2, §7 M1): pcurves on the solid's edges are deferred to a cross-crate
+  topology-PC program (BG-CE-001 anticipated it); M1's "exercises pcurves" is
+  recorded as satisfied by the S2 construction + the `PCurve<C,S>` carrier and
+  same-parameter invariant existing.
+- **BG-SOL-S3-CONTACT** (first Contact Layer packet, `e9ecd2a`, verified
+  ACCEPTED at `bc434d5`, merged `9eae9ae`) — the funnel's skeleton:
+  `BoundedStratum { Face/Edge/Vertex }` over **canonical carriers** (strata are
+  geometry-side: truck-evidence cannot name truck-topology), `ContactComplex`,
+  `ContactLocus`, and `contact(&lhs, &rhs, budget)` dispatching C0-C2 identity
+  (struct-equal canonical carriers → Coincident/IdenticalCarrier) then the FF
+  analytic table (plane_plane/plane_sphere/sphere_sphere/plane_cylinder/
+  plane_cone, both orientations). Everything else — FE/EE, cylinder×cylinder,
+  Torus/Placed, 2-D overlap — refuses honestly with the new
+  `EnvelopeCase::ContactReductionDeferred` arm. Signature deltas from the plan's
+  §4 booking are recorded in the plan doc (§4 Phase 3) and in the packet's
+  RESULT notes (by-value `BoundedStratum` infeasible; `CanonicalSurface` has no
+  `Unrecognized` arm, so spline refusals live at the `face_stratum` lift).
 
-Registry is 95 rows: **93 DONE, 1 BLOCKED** (BG-AUD-FIX-004, owner),
-**1 READY** (BG-SOL-S2-PCURVE). `schedule.py` reports eligible 1, dispatchable
-1 (PCURVE). Nothing is running except the watchdog.
-
-**M1 is construction-GREEN but the milestone gate is NOT yet run**: the flagship
-differential test `Extrude(P−Q) ≅ Extrude(P)−Extrude(Q)` has an RHS that needs
-the 3-D Boolean (Phase 4). M1 also lists pcurves, and the S2 v1 sets `PC = ()`.
+Registry is 96 rows: **95 DONE, 1 BLOCKED** (BG-AUD-FIX-004, owner), **0 READY**.
+`schedule.py` reports eligible 0, dispatchable 0. Nothing is running except the
+watchdog.
 
 ## Pick up here
 
-1. **Dispatch BG-SOL-S2-PCURVE** (`loop/packets/BG-SOL-S2-PCURVE.md`, READY and
-   eligible). It is a SPEC_GAP probe written against the landed API. The
-   re-derived blocker is real and structural: `Wire<P,C>` holds
-   `Edge<P,C,()>` (the `PC` default), the prelude fixes `Edge = Edge<Point3,
-   Curve>` with `PC = ()`, and no pcurve-carrying `Wire` exists anywhere in the
-   tree — so a pcurve payload cannot ride on the returned `Solid`'s edges
-   without threading `PC` through `Wire`/`Face`/`Shell`/`Solid` (a cross-crate
-   topology program). Expected outcome: worker returns SPEC_GAP with the
-   empirical proof; then amend `docs/SOLVER_FAMILY_PLAN.md` §4 Phase 2 (and §7
-   M1) to record that "pcurves on the solid's edges" is deferred to that
-   topology-PC program, and decide whether M1's pcurve exercise is satisfied by
-   the carrier existing or re-scoped.
-2. **The M1 finish then needs the flagship differential test**, which is the M2
-   cross-layer gate (needs the Contact Layer + Boundary Rewrite). Do NOT start
-   the Contact Layer funnel until M1's construction is fully green.
-3. **Recommended, NOT dispatched: the follow-up audit of
-   `truck-evidence/src/fid/rep.rs`** (4362 lines; sole sanctioned exact→emitted
-   path; last touched by BG-FID-005 / BG-FID-005-SRF). Its own program.
-4. Watchdog RUNNING (lock pid 20024, watchdog.py 37988, `stagnant=3600s`).
+The Contact Layer funnel is the active program; M1's construction is green and
+its pcurve item is closed. The funnel's dispatch stages, in plan order, and
+their current state:
+
+1. **C0-C2 identity/overlap + analytic FF** — LANDED (S3-CONTACT).
+2. **Strata reductions (FE, EE via curve machinery)** — the next packet
+   (FE: `Edge` × `Face`; EE: `Edge` × `Edge`). Write it against the landed
+   `contact` API (anchor the CONSUMING signature per the session-28 trap) and
+   the §4 Phase 3 amendment. It will consume `BoundedStratum` and extend the
+   `ContactLocus`/`ContactRecord` vocabulary with the bounded locus forms.
+3. **Cylinder×Cylinder and the remaining analytic-pair families** (parallel/
+   equal-radius/coaxial) — still `ContactReductionDeferred`; a follow-up packet
+   fills the table.
+4. **General validated FF → singular event cells → 2-D overlap (C3/C4, last)** —
+   the hard funnel, deliberately delayed.
+5. After the funnel: **Boundary Rewrite (Phase 4)** and then the M2 flagship
+   differential test `Extrude(P−Q) ≅ Extrude(P)−Extrude(Q)`.
+
+Recommended, NOT dispatched: the follow-up audit of
+`truck-evidence/src/fid/rep.rs` (4362 lines; sole sanctioned exact→emitted
+path; last touched by BG-FID-005 / BG-FID-005-SRF). Its own program.
 
 ## State of the machine, as left
 
-- **Watchdog RUNNING** (lock `loop/watchdog.lock` = 20024; launcher shim
-  37988). Heartbeats current.
-- Registry: 95 rows = 76 original + 11 AUD-FIX + 4 SOL-P0 + S1 + S2 + ORIENT +
-  PCURVE. **93 DONE, 1 BLOCKED** (BG-AUD-FIX-004 owner), **1 READY**
-  (BG-SOL-S2-PCURVE). `schedule.py` eligible 1, dispatchable 1.
-- Slots 0/1 FINISHED on landed branches (0 = ORIENT @cb96f64, 1 = S2 @521aa86);
-  2/3 FINISHED on old landed branches. Slot 0 holds a stale RESULT.json
-  (harmless; re-fork with `new_slot.py`). Slot targets deleted to free disk
-  (re-fork pays a cold warm).
-- Disk ~12 GB free at close. No leaked `%TEMP%/look-verify-baseline-*`.
+- **Watchdog RUNNING** (lock `loop/watchdog.lock`; heartbeat current,
+  `stagnant=3600s`).
+- Registry: 96 rows = 76 original + 11 AUD-FIX + 4 SOL-P0 + S1 + S2 + ORIENT +
+  PCURVE + S3-CONTACT. **95 DONE, 1 BLOCKED** (BG-AUD-FIX-004 owner), 0 READY.
+  `schedule.py` eligible 0, dispatchable 0.
+- Slots 0-3 FINISHED on landed branches. Slot 0 holds a stale RESULT.json
+  (harmless; re-fork with `new_slot.py`). No leaked
+  `%TEMP%/look-verify-baseline-*`.
+- Disk ~14 GB free at close. No leaked `%TEMP%/proc-macro-srv*` beyond
+  per-session regrowth.
 - GATE-4 ceiling 111 (true count). `scripts/kernel-gates.sh HEAD` passes
-  111/111. No `unscaled_legacy()` calls added by any solver-family packet.
-- ORIENT ledgered and filed under `loop/results/` (verified ACCEPTED at
-  `cb96f64` against base `f1052ad`, all gates V0-V9 PASS).
+  111/111. No `unscaled_legacy()` calls added by any solver-family packet
+  (PCURVE, S3-CONTACT both ceiling-neutral).
+- PCURVE and S3-CONTACT ledgered and filed under `loop/results/` (both verified
+  ACCEPTED at their fork points).
 
 ## The parallelism picture
 
-Nothing running (watchdog only; no workers, no verifies). Next work is the M1
-finish item PCURVE (dispatch the READY packet — expected SPEC_GAP, then amend
-the plan doc) and then S1 hardening toward the flagship differential test; the
+Nothing running (watchdog only; no workers, no verifies). Next work is the
+Contact Layer funnel (item 2 above: the FE/EE strata-reduction packet), then
+the remaining analytic-pair families, then the funnel stages, then Phase 4. The
 fid/rep.rs audit stays a recommendation.
 
 ## Traps, each one paid for
+### Session 30 (M1 finish: pcurve probe landed + plan amended; Contact Layer funnel started) - paid in full
+
+- **A V9 `look` baseline is NOT cached by the earlier V5/V8 baselines at the
+  same base, and its absence can kill a verify at the 8.0 GB disk floor even
+  when everything before it passed.** The S3-CONTACT verify's first run passed
+  V0-V8, then died computing the V9 `look` geometry baseline at `bc434d5`
+  (`RuntimeError: refusing to compute a baseline: 7.7 GB free`). The V5/V8
+  caches key on the packet's crates, not on `look`; the `look` baseline is a
+  separate key that only the V9 gate builds. The earlier repo-root `target/`
+  (5.75 GB of idle regenerable junk) plus `%TEMP%/proc-macro-srv*` were the
+  reclaim; after freeing to 27 GB the re-verify passed. Recovery is the usual
+  disk recipe, but the surprise was *when*: a verify can be almost done and
+  still die on disk. Check `Get-PSDrive C` before every verify, not only before
+  a run of several.
+- **A stale VERDICT.json from a previous packet on the same slot reads as a
+  fresh ACCEPTED if you do not check its `commit` field.** The ORIENT
+  VERDICT.json (base `f1052ad`, commit `cb96f64`) survived the S3-CONTACT
+  verify's early stage and my first poll read `verdict=ACCEPTED` from it while
+  the S3 verify was still running. The ORCHESTRATOR.md warning says check `base`
+  AND `commit`; the `base` alone (both were different commits) would have
+  passed. Always confirm `commit == the slot's HEAD` before trusting a verdict,
+  and delete the stale file between packets so the next poll cannot see it.
+- **The uncommitted-RESULT landing dance happened again (S3-CONTACT) and the
+  recovery is the recorded one, with one extra check.** The S3 worker left
+  RESULT.json uncommitted; `land_packet.py` would have died at the filing step.
+  Before copying, `git -C loop/slots/N/wt ls-files | Select-String RESULT.json`
+  told me it was untracked, so the copy-first dance applied: `Copy-Item
+  loop/slots/N/wt/RESULT.json` → repo root, re-run `land_packet.py`, then
+  `Remove-Item` the root copy (the script's `git rm` only removes tracked
+  files). The extra check (`ls-files`) is cheaper than reading the merge stat
+  and answers the same question.
+- **`land_packet.py` compares the packet path against the verdict's stored
+  `packet` field, which is stored with backslashes on Windows.** Passing
+  `loop/packets/...` (forward slashes) failed with "the verdict in slot 0 is
+  for 'loop\\packets\\...', not 'loop/packets/...'". The fix is to pass the
+  packet path with backslashes (`loop\packets\BG-SOL-S3-CONTACT.md`), matching
+  how verify.py recorded it. Worth one line in the landing instructions: on
+  this host, pass the Windows-form path to `land_packet.py`.
+
 ### Session 29 (M1 finish: face orientation landed, pcurve probe written) - paid in full
 
 - **`land_packet.py` can crash AFTER a successful merge, and the fix is one
