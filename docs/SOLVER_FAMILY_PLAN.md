@@ -476,14 +476,29 @@ program; it is not an S2 follow-up.
 
 **Phase 3 — Contact Layer.** New `truck-evidence` module `contact`.
 ```rust
-pub enum BoundedStratum { Face(..), Edge(..), Vertex(..) }   // tbd
-pub struct ContactComplex { /* canonical contacts, per-stratum */ }
-pub fn contact(lhs: BoundedStratum, rhs: BoundedStratum, budget: &mut Budget)
+// AMENDED (session 30, BG-SOL-S3-CONTACT): the landed strata are geometry-side
+// and take references — `contact` inspects both strata before constructing and
+// the Boundary Rewrite iterates every pair, so `&BoundedStratum` (the plan's
+// by-value booking was infeasible: CanonicalSurface is not Copy).
+// `BoundedStratum::Face` carries a `CanonicalSurface` (recognizer), which has
+// NO Unrecognized arm — an unrecognized/spline carrier is refused at the
+// `face_stratum` lift boundary, not in `contact()`. The deferral funnel uses a
+// new `EnvelopeCase::ContactReductionDeferred` arm.
+pub enum BoundedStratum { Face { surface: CanonicalSurface, u_range, v_range },
+    Edge { curve: CanonicalCurve, t_range }, Vertex { point: Point3 } }
+pub struct ContactComplex { pub contacts: Vec<ContactRecord> }   // ContactRecord { dimension, kind, locus }
+pub enum ContactLocus { Coincident, Analytic(AnalyticIntersection) }
+pub fn contact(lhs: &BoundedStratum, rhs: &BoundedStratum, budget: &mut Budget)
     -> Outcome<ContactComplex>;
 ```
 Dispatch: identity/overlap (C0-C2) → analytic pairs (exists, §3.3) → strata
 reductions (FE, EE via curve machinery) → general validated FF → singular
-event cells → 2-D overlap (C3/C4, last).
+event cells → 2-D overlap (C3/C4, last). Landed stages (session 30): C0-C2
+identity (struct-equal canonical carriers) + the FF analytic table
+(plane_plane/plane_sphere/sphere_sphere/plane_cylinder/plane_cone, both
+orientations). FE/EE, cylinder×cylinder and other analytic-pair families
+outside the table, Torus/Placed, and 2-D overlap all refuse with
+`ContactReductionDeferred`; the next packets fill the stages they own.
 
 **Phase 4 — Boundary Rewrite.** New `truck-shapeops` module; material-state
 heart (spec §13.1).
