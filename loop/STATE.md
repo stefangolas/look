@@ -11,72 +11,72 @@ otherwise would eventually cost a trap.) If you are picking this up cold, read
 [`loop/ORCHESTRATOR.md`](ORCHESTRATOR.md) for how to run the loop, then
 `python loop/slot_status.py`** - nothing else. Do not read `LEDGER.jsonl` whole.
 
-Updated 2026-08-24, close of session 25 (BG-AUDIT-001 remediation COMPLETE). Branch: `integration/kernel-bg`.
+Updated 2026-08-24, close of session 26 (base loop FINISHED 76/76). Branch: `integration/kernel-bg`.
 
 ## Where we are
 
-**BG-AUDIT-001 remediation: 17/17 findings CLOSED - the campaign is DONE.**
-The whole-tree correctness audit (`loop/audits/BG-AUDIT-001.md/.json`, 17
-findings) was remediated via 11 write-disjoint repair packets
-(`loop/packets/BG-AUD-FIX-001..011.md`, registry rows in
-`loop/PACKETS.jsonl`, tracker `loop/audits/BG-AUDIT-001-REMEDIATION.md`).
+**The base kernel loop is FINISHED: 76/76 original rows DONE.** The last
+open row, BG-ENC-004-OFFSET, was written, scratch-validated, dispatched,
+verified ACCEPTED, and landed this session. The full registry is 87 rows
+(76 original + 11 AUD-FIX): **86 DONE, 1 BLOCKED** (BG-AUD-FIX-004,
+owner). Nothing is dispatchable; `schedule.py` reports eligible 0.
 
-Landed (10 packets, 16 findings): FIX-001 (`1844cfe`: AUD-001+016),
-FIX-002 (`d734d2a`: AUD-002), FIX-003 (`70d98bb`: AUD-003),
-FIX-005 (`f98d441`: AUD-007), FIX-006 (`2bc77ee`: AUD-005+009),
-FIX-007 (`b452237`: AUD-006), FIX-009 (`4b071ac`: AUD-011+012),
-FIX-010 (`f1ed436`: AUD-010+013+017), FIX-008 (`f08db62`: AUD-008+015),
-FIX-011 (`6375812`: AUD-014). Every verify ACCEPTED at its packet's fork
-point. GATE-4 ceiling stayed 111 through the last two landings (neither
-packet adds an `unscaled_legacy()` call); the ratchet holds at the true
-count. End-state validation ran green: the full truck-geometry /
-truck-topology / truck-evidence lib+tests suites, `cargo check --locked
---all-targets`, `scripts/kernel-gates.sh HEAD` (GATE-4 111/111, all P-3
-gates), and every one of the 17 retained audit regression witnesses by name.
+**BG-AUDIT-001 remediation: 17/17 findings CLOSED** (unchanged, still
+true): 16 findings landed via 10 packets (every verify ACCEPTED at its
+packet's fork point), 1 owner-blocked (AUD-004/FIX-004 - `certify_cell`'s
+endpoint-seed hull makes non-monotone paths always refuse; no forced
+center-term rewrite). Tracker:
+`loop/audits/BG-AUDIT-001-REMEDIATION.md`.
 
-Owner-blocked (1): **AUD-004 (FIX-004)** - Phase A found NO real failing
-witness in the real crate: `certify_cell` builds Q as the widened hull of
-the endpoint seeds, so a cell certifies only when the parameter path is
-monotone in every surface parameter; non-monotone paths always refuse
-(764+ escaping cells across three real carrier families, 0 certified). The
-packet's explicit Phase-A-fails branch was followed - no forced center-term
-rewrite. Evidence: `loop/results/BG-AUD-FIX-004.json`. Owner accepts the
-invariant argument.
+**BG-ENC-004-OFFSET landed at `be9c6d9`** (merge `a8bddc5` of worker commit
+`948a513`; verify ACCEPTED at base `d67e57f` = the packet's fork point).
+Certified enclosure for `Offset<S,N>` via vector-field composition over two
+new interface traits (`EnclosureVectorField` = `EnclosureSurface` minus the
+`Point3` bound; `EnclosureScalarField2`); `NormalField` gained
+`entity()`/`scalar()` accessors; `enclose_der(0,0)` returns `enclose`, not
+the carriers' (0,0) composition. Scratch `scratch/offsetscratch/` validated
+all three flagship witnesses before dispatch. The packet adds NO
+`unscaled_legacy()` call, so GATE-4 ceiling stayed 111 (true count);
+`scripts/kernel-gates.sh HEAD` passes 111/111, all P-3 gates. End-state
+validation ran green: full truck-evidence / truck-geometry / truck-topology
+lib+tests suites, and all 19 retained witnesses by name (16 AUD regression
+tests + 3 OFFSET flagships).
 
 ## Pick up here
 
-1. **Resume the base loop's one open row: BG-ENC-004-OFFSET** (the only
-   non-DONE row of the original 76; the packet is still unwritten). Write
-   its scratch + packet first - the amendment is the complete design, and
-   the scratch must run the three flagship witnesses before dispatch. After
-   it lands, the registry is FINISHED 76/76.
-2. **Recommended, not dispatched: a follow-up audit of
-   `truck-evidence/src/fid/rep.rs`.** Recommend it; do not start it in the
-   same session as landing BG-ENC-004-OFFSET.
-3. Watchdog RUNNING (pid 20024, `stagnant=3600s`).
+1. **Recommended, NOT dispatched: a follow-up audit of
+   `truck-evidence/src/fid/rep.rs`** (4362 lines; the sole sanctioned path
+   from an exact result into the emitted geometry class; last touched by
+   BG-FID-005 / BG-FID-005-SRF). Recommend it; do not start it in the same
+   session.
+2. Watchdog RUNNING (lock pid 20024, watchdog.py 37988, `stagnant=3600s`).
 
 ## State of the machine, as left
 
-- **Watchdog RUNNING** (pid 20024; `loop/watchdog.lock` holds it). Started
-  with `cmd /c "set LOOK_WATCHDOG_STAGNANT=3600&& python loop/watchdog.py"`.
-  Its disk guard correctly reclaimed the idle slot-0 target when free space
-  briefly hit 0.7 GB; it skips slots with a live worker pid by design.
-- Registry: 76 original rows + 11 AUD-FIX rows = 87. AUD-FIX statuses:
-  10 DONE (landed), 1 BLOCKED (FIX-004 owner). The one remaining TODO is
-  `BG-ENC-004-OFFSET`. HEAD at close: `a7fb42e`. Tracked tree clean.
-- Slots 0/1/2 all FINISHED on landed branches (FIX-009/FIX-008/FIX-010/
-  FIX-011); each worktree holds a stale RESULT.json copy (harmless; re-fork
-  with `new_slot.py` before any next dispatch).
-- Disk ~19.5 GB free at close (verify baselines cached under
-  `loop/baselines/61baa58__*`; no leaked `%TEMP%/look-verify-baseline-*`).
-- GATE-4 ceiling 111 (true count). All 11 AUD-FIX packets ledgered and filed
-  under `loop/results/` (including the FIX-005 SPEC_GAP archive and FIX-004's
-  owner record).
+- **Watchdog RUNNING** (lock `loop/watchdog.lock` = 20024; launcher shim
+  37988). Started with `cmd /c "set LOOK_WATCHDOG_STAGNANT=3600&& python
+  loop/watchdog.py"`. Heartbeats current; disk guard idle this session
+  (26.9 -> 25.9 GB). It skips slots with a live worker pid by design.
+- Registry: 87 rows = 76 original + 11 AUD-FIX. **86 DONE, 1 BLOCKED**
+  (BG-AUD-FIX-004 owner). No TODO rows; `schedule.py` eligible 0,
+  dispatchable 0. HEAD at close: `be9c6d9`. Tracked tree clean.
+- Slots 0/1/2 all FINISHED on landed branches (0 = BG-ENC-004-OFFSET
+  @948a513, 1 = BG-AUD-FIX-008 @20f6ee4, 2 = BG-AUD-FIX-011 @c3ff4f1);
+  each worktree holds a stale RESULT.json copy (harmless; re-fork with
+  `new_slot.py` before any next dispatch). No worker or verify process
+  running; all `verify.pid` files cleaned up.
+- Disk ~24.2 GB free at close. Verify baseline `d67e57f__truck-evidence-
+  truck-geometry` cached under `loop/baselines/` (this session's verify);
+  no leaked `%TEMP%/look-verify-baseline-*`.
+- GATE-4 ceiling 111 (true count). All 11 AUD-FIX packets and
+  BG-ENC-004-OFFSET ledgered and filed under `loop/results/` (including the
+  FIX-005 SPEC_GAP archive and FIX-004's owner record).
 
 ## The parallelism picture
 
-Nothing running (watchdog only; no workers, no verifies). Dispatchable:
-BG-ENC-004-OFFSET once its packet is written.
+Nothing running (watchdog only; no workers, no verifies). Nothing is
+dispatchable - the registry is FINISHED. Remaining work is the recommended
+fid/rep.rs audit, which is a recommendation, not a dispatch.
 ## Traps, each one paid for
 ### Session 25 (BG-AUDIT-001 remediation close) - paid in full
 
