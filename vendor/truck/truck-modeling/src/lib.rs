@@ -103,6 +103,9 @@ pub mod builder;
 mod closed_sweep;
 /// declare errors
 pub mod errors;
+/// BG-SOL-S2-EXTRUDE: direct certified extrude of a planar arrangement.
+/// Scaffolded empty; the packet fills it.
+pub mod extrude;
 mod geom_impls;
 mod mapped;
 mod multi_sweep;
