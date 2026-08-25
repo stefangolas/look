@@ -57,19 +57,23 @@ until M1 is green. Phase 0 is green, so M1's packet can be written now.
 
 ## Pick up here
 
-1. **Write the M1 / Phase 1 S1 `arrange` packet** against the LANDED Phase-0
-   API (not the plan's §4 sketches — re-derive from the tree; the §3 header
-   warning applies doubly to the four modules that just landed, whose exact
-   signatures are in `loop/results/BG-SOL-P0-*.json` and the four files
-   above). S1 is the arrangement: `orient2d` (BG-SOL-P0-PRED) drives the
-   sweep; `CurveContact` is the event vocabulary; `BoundedPiece`/`Bvh`
-   (BG-SOL-P0-BVH) and `SpanRecord` (BG-SOL-P0-SPAN) feed the broad phase.
-   Follow the §5 graph: S1 needs nothing else from Phase 0.
-2. **Recommended, NOT dispatched: the follow-up audit of
+1. **Review and dispatch the M1-critical S1 packet** — `BG-SOL-S1-ARRANGE`
+   (`loop/packets/BG-SOL-S1-ARRANGE.md`, scaffolded at `1f3b202`). It is
+   WRITTEN but NOT dispatched: the orchestrator must review it (fresh eyes on a
+   large design packet) before forking and dispatching it. The arrangement
+   (`truck-geometry/src/arrange.rs`) consumes the LANDED Phase-0 API —
+   `orient2d` (exact crossing/winding), `CurveContact`, `BoundingBox<Point2>`,
+   `recognize`. v1 is analytic Line/Circle profiles with exactly-representable
+   (dyadic) vertices; algebraic intersection points refuse honestly. The plan's
+   §4 target signatures for Phase 0 are superseded by what landed — re-derive
+   from the tree (`loop/results/BG-SOL-P0-*.json`, the four module files).
+2. After S1 lands, S2 (`extrude_profile` on the `Arrangement` — Phase 2) is the
+   other M1 half; then the `Extrude(P−Q) ≅ Extrude(P)−Extrude(Q)` flagship.
+3. **Recommended, NOT dispatched: the follow-up audit of
    `truck-evidence/src/fid/rep.rs`** (4362 lines; sole sanctioned exact→emitted
    path; last touched by BG-FID-005 / BG-FID-005-SRF). Its own program, not a
    solver-family packet.
-3. Watchdog RUNNING (lock pid 20024, watchdog.py 37988, `stagnant=3600s`).
+4. Watchdog RUNNING (lock pid 20024, watchdog.py 37988, `stagnant=3600s`).
 
 ## State of the machine, as left
 
