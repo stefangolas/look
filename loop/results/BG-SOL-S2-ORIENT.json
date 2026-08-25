@@ -1,0 +1,10 @@
+{
+  "id": "BG-SOL-S2-ORIENT",
+  "status": "DONE",
+  "contracts": ["BG-SOL-S2-ORIENT"],
+  "tests_added": 1,
+  "deviations": [],
+  "disagreements": [],
+  "baseline_failures": [],
+  "notes": "Normalized outward face orientation of the extruded plate. Final face-by-face orientation flags: bottom cap = false, top cap = true, four rect side faces = true, cylinder wall = false. The shell is still Closed under Solid::try_new (extrude_plate_with_hole_is_a_closed_solid and the load-bearing in/out point_in_solid steps both pass). Edge::new_unchecked is still required for the circle self-loops (bottom and top) — the construction was left unchanged. Construction changes: bottom cap face inverted (Face::invert) with stored wires kept as the arrangement traced them; top cap no longer reverses its stored wires; the side quad wire changed from [be.inverse(), seam_o, te, seam_n.inverse()] to [be, seam_n, te.inverse(), seam_o.inverse()] on the same edge instances/surface; cylinder wall face inverted (Face::invert) with wire_bot=[be.inverse()], wire_top=[te] unchanged. Test extrude_all_face_normals_point_outward was verified to FAIL on the pre-fix construction (bottom cap reported normal +z instead of -z) and PASS after the fix. Implementation note: the packet's suggested face dispatch 'plane whose origin() has z == 0.0 / 2.0 or x/y == 0.0 / 4.0' is ambiguous because every side plane's origin is a bottom vertex (z == 0.0) and the y == 0 side face's origin equals the bottom cap's origin (0,0,0); the test therefore disambiguates caps from sides by boundary-wire count (caps carry 2 wires, sides 1). Anchors A1-A6 all matched. Gates: cargo fmt --check, cargo clippy -p truck-modeling --all-targets --no-deps, cargo test -p truck-modeling --lib --tests --no-fail-fast (33 tests, 0 failures), cargo check --locked -p truck-modeling --all-targets, and scripts/kernel-gates.sh f1052ad all pass; GATE-4 unscaled_legacy 111/111 (no calls added, ceiling untouched)."
+}
