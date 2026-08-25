@@ -25,8 +25,10 @@ owner). Nothing is dispatchable; `schedule.py` reports eligible 0.
 true): 16 findings landed via 10 packets (every verify ACCEPTED at its
 packet's fork point), 1 owner-blocked (AUD-004/FIX-004 - `certify_cell`'s
 endpoint-seed hull makes non-monotone paths always refuse; no forced
-center-term rewrite). Tracker:
-`loop/audits/BG-AUDIT-001-REMEDIATION.md`.
+center-term rewrite). Final summary: findings total 17; fixed+landed 16;
+already fixed 0; owner blocked 1; every finding listed exactly once in
+`loop/audits/BG-AUDIT-001-REMEDIATION.md`. Then the base loop is FINISHED
+76/76 (see above).
 
 **BG-ENC-004-OFFSET landed at `be9c6d9`** (merge `a8bddc5` of worker commit
 `948a513`; verify ACCEPTED at base `d67e57f` = the packet's fork point).
