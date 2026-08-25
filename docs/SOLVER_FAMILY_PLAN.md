@@ -500,6 +500,32 @@ orientations). FE/EE, cylinder×cylinder and other analytic-pair families
 outside the table, Torus/Placed, and 2-D overlap all refuse with
 `ContactReductionDeferred`; the next packets fill the stages they own.
 
+**AMENDED (session 31, BG-SOL-S4-FE-EE, the strata-reduction stage):** the FE
+(Edge×Face) and EE (Edge×Edge) stage dispatches from `contact()` and builds the
+**bounded locus forms** the skeleton deferred. Two new `ContactLocus` arms:
+`Point(Point3)` for isolated Point0 contacts (FE punctures, EE crossings) and
+`BoundedCurve { curve: ExactCurve, t_range: (f64, f64) }` for the Arc1
+coincident sub-arcs (an edge lying on a face, overlapping collinear edges),
+`t_range` in the curve's own parameterization. `ContactRecord { dimension,
+kind, locus }` is unchanged; parameter bookkeeping for edge/face splitting is
+the Boundary Rewrite's (Phase 4), not this stage's. Module shape: `contact.rs`
+becomes the directory module `contact/mod.rs` (vocabulary + dispatcher) with a
+new sibling `contact/fe_ee.rs` holding the FE/EE solvers, so later funnel
+packets extend the Contact Layer without colliding on the dispatcher file.
+The stage's analytic table (both orientations through one solver, satisfying
+the metamorphic `C(A,B) ≅ C(B,A)` test): FE `Line` edge × `Plane`/`Cylinder`
+face (linear / quadratic solves, decisive-interval predicates), FE `Circle`
+edge × `Plane` face (chord solve on the two planes' meet-line, or coincident
+Arc1 when the planes coincide, clipped to the face box), FE `Circle` edge ×
+`Cylinder` face **latitudinal-coincident only** (same-axis detection →
+Arc1), EE `Line` × `Line` (skew/parallel-empty/coplanar-point/coincident-arc),
+EE `Line` × `Circle` (transverse on-circle test or in-plane chord). Every
+reported point or arc is checked against BOTH strata's bounds (edge `t_range`
+and the face `(u, v)` box; cylinder u wraps into `[0, 2π)`). Everything else —
+FE `Line`×{Cone,Sphere}, `Circle`×{Cone,Sphere}, Circle×Cylinder transverse,
+EE Circle×Circle (3-D two-circle), Torus/Placed, vertex strata — keeps the
+`ContactReductionDeferred` refusal with its documented follow-up.
+
 **Phase 4 — Boundary Rewrite.** New `truck-shapeops` module; material-state
 heart (spec §13.1).
 ```rust
