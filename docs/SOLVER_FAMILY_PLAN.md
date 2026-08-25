@@ -63,10 +63,11 @@ dispatch.
   endpoint membership) are never naked f64 comparisons. Escalation discipline:
   `Certified<T> = Proven(T) | Unresolved(reason)`. S5 inherits it.
 - **S2 direct B-rep is the reference implementation of the Boundary Rewrite
-  Atlas output side.** `extrude(profile)` builds cap/side/shared-edge/pcurve
-  topology combinatorially (n side faces, 1 top, 1 bottom) with no tool-body
-  Boolean. If this is rock-solid before S6, a failed Boolean is provably about
-  contact, not assembly.
+  Atlas output side.** `extrude(profile)` builds cap/side/shared-edge topology
+  combinatorially (n side faces, 1 top, 1 bottom) with no tool-body Boolean.
+  Pcurves on the edges are NOT part of S2 — the topology erases `PC` at the
+  `Wire` boundary (see §4 Phase 2, AMENDED session 30). If this is rock-solid
+  before S6, a failed Boolean is provably about contact, not assembly.
 - **S5.0/S5.2/S5.3 are replaced by a Contact Layer:** `contact(lhs, rhs) ->
   Certified<ContactComplex>` over boundary strata — FF 0D/1D/2D, FE 0D/1D,
   EE 0D/1D. Boolean depends on ContactSolve being exhaustive over strata, not
@@ -460,7 +461,18 @@ pub fn extrude_profile(profile: &[Curve], arrangement: &Arrangement, height: f64
 pub fn revolve_profile(profile: &[Curve], arrangement: &Arrangement, axis: Line<Point3>, angle: f64) -> Outcome<Solid<Point3, Curve, Surface>>;
 // canonicalization: recognize (circle × straight path) => Cylinder etc.
 ```
-No tool-body Boolean. n side faces + 1 top + 1 bottom + shared edges + pcurves.
+No tool-body Boolean. n side faces + 1 top + 1 bottom + shared edges.
+
+**AMENDED (session 30, SPEC_GAP, BG-SOL-S2-PCURVE):** pcurves on the returned
+`Solid`'s edges are NOT deliverable by S2. The landed topology erases the
+pcurve payload at the Wire boundary: `Wire<P,C>` holds `VecDeque<Edge<P,C>>`
+(`PC = ()` by default), and `with_pcurve<Q>` returns `Edge<P,C,Q>`, so a real
+`PCurve` edge cannot enter a Wire (compile probe E0277). Delivering pcurves
+requires threading `PC` through `Wire`/`Face`/`Shell`/`Solid` — a cross-crate
+topology-wide type change touching every `Wire` use across meshalgo/shapeops/
+modeling/stepio, which the spec's BG-CE-001 record anticipated ("the packet
+that wires real pcurves owns trace splitting"). Deferred to that topology-PC
+program; it is not an S2 follow-up.
 
 **Phase 3 — Contact Layer.** New `truck-evidence` module `contact`.
 ```rust
@@ -543,8 +555,15 @@ funnel (S5.3 general FF + overlap) as long as possible.
 **M1 — Certified planar construction.** `rectangle − circle` → 2-D arrangement
 → profile with hole → direct extrude → valid B-rep (plate with cylindrical
 hole), with no 3-D Boolean at all. Exercises recognizer, predicates, analytic
-intersections, arrangement, material state, topology construction, pcurves,
-canonicalization. Establishes `Extrude(P−Q) ≅ Extrude(P)−Extrude(Q)` as the
+intersections, arrangement, material state, topology construction, canonicalization,
+and — since BG-SOL-S2-PCURVE (session 30) proved pcurves cannot ride on the
+returned `Solid`'s edges — the pcurve **carrier** and its invariant layer:
+`PCurve<C, S>` exists in truck-geometry and truck-topology's BG-INV-001
+same-parameter checker certifies pcurve-carrying edges on standalone edges.
+M1's "exercises pcurves" is recorded as satisfied by the S2 construction plus
+the pcurve carrier / same-parameter invariant existing; attaching real pcurves
+to a `Solid`'s edges is re-scoped to the future topology-PC program (see §4
+Phase 2). Establishes `Extrude(P−Q) ≅ Extrude(P)−Extrude(Q)` as the
 flagship differential test. ~8–9k LOC.
 
 **M2 — 3-D contact/Boolean.** `extruded_solid − cylinder` produces the same
