@@ -115,7 +115,10 @@ pub fn extrude_profile(
 
     // Bottom cap: surface Plane(origin, +x, +y), wires = the material region's
     // boundary cycles in order (outer first, holes after), as the arrangement
-    // traced them.
+    // traced them. The face is stored INVERTED (the multi_sweep seed-face
+    // convention): the plane's natural normal is +z, but the outward normal of
+    // the solid at z = 0 is −z. Inverting the face also flips its effective
+    // boundary edges, which is what the side faces and cylinder pair against.
     let bottom_surface = Surface::Plane(Plane::new(
         Point3::new(0.0, 0.0, 0.0),
         Point3::new(1.0, 0.0, 0.0),
@@ -125,13 +128,18 @@ pub fn extrude_profile(
     for edges in &cycle_bottom {
         bottom_wires.push(Wire::from(edges.clone()));
     }
-    faces.push(Face::try_new(bottom_wires, bottom_surface).map_err(|_| Refusal::Empty)?);
+    let mut bottom_face =
+        Face::try_new(bottom_wires, bottom_surface).map_err(|_| Refusal::Empty)?;
+    bottom_face.invert();
+    faces.push(bottom_face);
 
-    // Top cap: the SAME cycles translated to z = height, with each cycle's
-    // edge directions REVERSED (a wire is oriented by the face it bounds; the
-    // top cap's outward normal is +z, so its wires run opposite the bottom
-    // cap's). Built explicitly — never by mapping the bottom wires, because
-    // `Wire::mapped` panics on the circle self-loop in debug builds.
+    // Top cap: the SAME cycles translated to z = height, stored in the
+    // arrangement's traced direction (NOT reversed) with `orientation == true`,
+    // so its outward normal stays +z. The bottom cap is stored inverted, so the
+    // two caps' EFFECTIVE boundary edges run opposite — which is exactly what
+    // the Closed condition pairs. Built explicitly — never by mapping the
+    // bottom wires, because `Wire::mapped` panics on the circle self-loop in
+    // debug builds.
     let top_surface = Surface::Plane(Plane::new(
         Point3::new(0.0, 0.0, height),
         Point3::new(1.0, 0.0, height),
@@ -139,9 +147,7 @@ pub fn extrude_profile(
     ));
     let mut top_wires = Vec::new();
     for edges in &cycle_top {
-        let mut wire = Wire::from(edges.clone());
-        wire.invert();
-        top_wires.push(wire);
+        top_wires.push(Wire::from(edges.clone()));
     }
     faces.push(Face::try_new(top_wires, top_surface).map_err(|_| Refusal::Empty)?);
 
@@ -192,11 +198,13 @@ pub fn extrude_profile(
                         .ok_or(Refusal::Empty)?
                         .point;
                     let surface = Surface::Plane(Plane::new(a, b, a + height * Vector3::unit_z()));
-                    // The quad [bottom edge reversed, up, top edge, down] — the
-                    // edge instances are SHARED with the caps (bottom edge with
-                    // the bottom cap, top edge with the top cap) and the two
-                    // adjacent side faces share each seam (opposite orientation).
-                    let wire = Wire::from(vec![be.inverse(), seam_o, te.clone(), seam_n.inverse()]);
+                    // The quad [bottom edge, next seam up, top edge reversed,
+                    // origin seam down] — the edge instances are SHARED with
+                    // the caps (bottom edge with the bottom cap, top edge with
+                    // the top cap) and the two adjacent side faces share each
+                    // seam (opposite orientation). This pairing matches the
+                    // inverted bottom cap and the un-reversed top cap.
+                    let wire = Wire::from(vec![be.clone(), seam_n, te.inverse(), seam_o.inverse()]);
                     faces.push(Face::try_new(vec![wire], surface).map_err(|_| Refusal::Empty)?);
                 }
                 // A circle boundary edge is the hole wall: an ANNULUS with two
@@ -217,10 +225,16 @@ pub fn extrude_profile(
                     };
                     let wire_bot = Wire::from(vec![be.inverse()]);
                     let wire_top = Wire::from(vec![te.clone()]);
-                    faces.push(
+                    // The hole wall is stored INVERTED: the cylinder's natural
+                    // normal is +r (away from the axis) but the outward normal
+                    // of the solid at the hole wall is −r (into the hole).
+                    // Inverting the face also flips its effective boundary
+                    // edges so the caps' circle self-loops pair against them.
+                    let mut cylinder_face =
                         Face::try_new(vec![wire_bot, wire_top], Surface::Cylinder(cylinder))
-                            .map_err(|_| Refusal::Empty)?,
-                    );
+                            .map_err(|_| Refusal::Empty)?;
+                    cylinder_face.invert();
+                    faces.push(cylinder_face);
                 }
                 _ => return Err(Refusal::Empty),
             }
@@ -953,5 +967,59 @@ mod tests {
         let (profile, arrangement) = plate_with_hole();
         assert!(extrude_profile(&profile, &arrangement, 0.0).is_err());
         assert!(extrude_profile(&profile, &arrangement, -1.0).is_err());
+    }
+
+    #[test]
+    fn extrude_all_face_normals_point_outward() {
+        const EPS: f64 = 1.0e-3; // H-3: step from each face into/out of the material in the regression test
+        let (profile, arrangement) = plate_with_hole();
+        let solid = extrude_profile(&profile, &arrangement, 2.0).unwrap().value;
+        let mut checked = 0usize;
+        for face in solid.face_iter() {
+            let surface = face.surface();
+            // A strictly-interior sample point `q` of the face's domain and the
+            // direction the outward normal of the solid must take there.
+            let (q, expected) = match &surface {
+                Surface::Plane(plane) => {
+                    let o = plane.origin();
+                    let is_cap = face.boundaries().len() == 2;
+                    if is_cap && o.z == 0.0 {
+                        (Point3::new(1.0, 1.0, 0.0), Vector3::new(0.0, 0.0, -1.0))
+                    } else if is_cap && o.z == 2.0 {
+                        (Point3::new(1.0, 1.0, 2.0), Vector3::new(0.0, 0.0, 1.0))
+                    } else if o.x == 0.0 && o.y == 0.0 {
+                        (Point3::new(1.0, 0.0, 1.0), Vector3::new(0.0, -1.0, 0.0))
+                    } else if o.x == 4.0 && o.y == 0.0 {
+                        (Point3::new(4.0, 1.0, 1.0), Vector3::new(1.0, 0.0, 0.0))
+                    } else if o.x == 4.0 && o.y == 4.0 {
+                        (Point3::new(1.0, 4.0, 1.0), Vector3::new(0.0, 1.0, 0.0))
+                    } else if o.x == 0.0 && o.y == 4.0 {
+                        (Point3::new(0.0, 1.0, 1.0), Vector3::new(-1.0, 0.0, 0.0))
+                    } else {
+                        unreachable!("unrecognized plane face at origin {o:?}");
+                    }
+                }
+                Surface::Cylinder(_) => (Point3::new(3.0, 2.0, 1.0), Vector3::new(-1.0, 0.0, 0.0)),
+                _ => {
+                    unreachable!("unexpected surface {surface:?}");
+                }
+            };
+            let n_eff = if face.orientation() {
+                surface_normal_at(&surface, q)
+            } else {
+                -surface_normal_at(&surface, q)
+            };
+            assert!(
+                n_eff.dot(expected) > 0.9,
+                "face normal {n_eff:?} does not point outward; expected ~{expected:?}"
+            );
+            // The load-bearing check: stepping from the face INTO the material
+            // (along −n_eff) lands inside the solid; stepping OUT (along +n_eff)
+            // lands outside it.
+            assert!(point_in_solid(&solid, q - EPS * n_eff));
+            assert!(!point_in_solid(&solid, q + EPS * n_eff));
+            checked += 1;
+        }
+        assert_eq!(checked, 7);
     }
 }
