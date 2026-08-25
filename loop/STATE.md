@@ -11,83 +11,150 @@ otherwise would eventually cost a trap.) If you are picking this up cold, read
 [`loop/ORCHESTRATOR.md`](ORCHESTRATOR.md) for how to run the loop, then
 `python loop/slot_status.py`** - nothing else. Do not read `LEDGER.jsonl` whole.
 
-Updated 2026-08-24, close of session 26 (base loop FINISHED 76/76). Branch: `integration/kernel-bg`.
+Updated 2026-08-25, close of session 27 (solver-family Phase 0 LANDED 4/4). Branch: `integration/kernel-bg`, HEAD `fa46e21`.
 
 ## Where we are
 
-**The base kernel loop is FINISHED: 76/76 original rows DONE.** The last
-open row, BG-ENC-004-OFFSET, was written, scratch-validated, dispatched,
-verified ACCEPTED, and landed this session. The full registry is 87 rows
-(76 original + 11 AUD-FIX): **86 DONE, 1 BLOCKED** (BG-AUD-FIX-004,
-owner). Nothing is dispatchable; `schedule.py` reports eligible 0.
+**Solver-family Phase 0 is DONE: the 4-wide substrate wave landed.** All four
+packets verified ACCEPTED and merged this session:
 
-**BG-AUDIT-001 remediation: 17/17 findings CLOSED** (unchanged, still
-true): 16 findings landed via 10 packets (every verify ACCEPTED at its
-packet's fork point), 1 owner-blocked (AUD-004/FIX-004 - `certify_cell`'s
-endpoint-seed hull makes non-monotone paths always refuse; no forced
-center-term rewrite). Final summary: findings total 17; fixed+landed 16;
-already fixed 0; owner blocked 1; every finding listed exactly once in
-`loop/audits/BG-AUDIT-001-REMEDIATION.md`. Then the base loop is FINISHED
-76/76 (see above).
+- **BG-SOL-P0-REC** (`truck-geometry/src/recognize.rs`) — the structural
+  recognizer: `CanonicalCarrierWitness { ExactCanonical | Derived |
+  Unrecognized }` over `CanonicalCarrier` (analytic arms + `Placed`), with the
+  certified parameter correspondence `CanonicalParamMap` (curve/surface pair).
+  `recognize_surface` canonicalizes `ExtrudedCurve(Line)`→Plane,
+  `ExtrudedCurve(Circle)`→Cylinder (exact cylinder test copied from
+  canonical.rs), `Processor`→Placed; splines/`RevolutedCurve` are
+  `Unrecognized` (documented later). Map checks measure 0.0 deviation.
+- **BG-SOL-P0-BVH** (`truck-base/src/bvh.rs`) — the broad-phase substrate:
+  `BoundedPiece` (`bbox`/`derivative_bounds`/`subdivide`), `DerivativeBounds`,
+  flat pre-order `Bvh<P>` with contiguous leaves, deterministic stable-sort
+  centroid build; `candidate_pairs`/`candidate_pairs_self`/`query` return
+  sorted pairs. The broad-phase box is `BoundingBox<Point3>` (truck-base has
+  no `inari`), not the plan's §4 `Box3`.
+- **BG-SOL-P0-SPAN** (`truck-geometry/src/span.rs`) — the lazy span cache:
+  per-knot-span `SpanRecord { bbox, derivative_hull, u_range, v_range }` via
+  full-multiplicity knot insertion, convex-hull boxes (BSpline/Nurbs) and
+  closed-form boxes (Plane/Sphere/Torus); Nurbs refuses on non-positive
+  weights; Cylinder/Cone/Revoluted/Extruded yield nothing (unbounded v /
+  non-canonical). Keyed cache takes a caller-owned `u64`.
+- **BG-SOL-P0-PRED** (`truck-base/src/pred.rs` + `contact.rs`) — certified
+  predicates: `orient2d` with a float filter (`CCDETERRBOUND`) escalating to
+  exact expansion arithmetic (two_product/two_diff/fast_expansion_sum_zeroelim)
+  for the trichotomy; `CertifiedPred::Proven(Orientation) | Unresolved(...)`.
+  Plus the 2-D `CurveContact` ontology (`ContactDimension`,
+  `ContactEventKind`, `CurveContact`) shared by S1 and the Contact Layer.
 
-**BG-ENC-004-OFFSET landed at `be9c6d9`** (merge `a8bddc5` of worker commit
-`948a513`; verify ACCEPTED at base `d67e57f` = the packet's fork point).
-Certified enclosure for `Offset<S,N>` via vector-field composition over two
-new interface traits (`EnclosureVectorField` = `EnclosureSurface` minus the
-`Point3` bound; `EnclosureScalarField2`); `NormalField` gained
-`entity()`/`scalar()` accessors; `enclose_der(0,0)` returns `enclose`, not
-the carriers' (0,0) composition. Scratch `scratch/offsetscratch/` validated
-all three flagship witnesses before dispatch. The packet adds NO
-`unscaled_legacy()` call, so GATE-4 ceiling stayed 111 (true count);
-`scripts/kernel-gates.sh HEAD` passes 111/111, all P-3 gates. End-state
-validation ran green: full truck-evidence / truck-geometry / truck-topology
-lib+tests suites, and all 19 retained witnesses by name (16 AUD regression
-tests + 3 OFFSET flagships).
+Registry is 91 rows: **90 DONE, 1 BLOCKED** (BG-AUD-FIX-004, owner). The four
+new P0 rows are DONE. `schedule.py` reports eligible 0, dispatchable 0 —
+nothing is running except the watchdog.
+
+**The next program step is M1** — certified planar construction
+(`docs/SOLVER_FAMILY_PLAN.md` §7): rectangle − circle → 2-D arrangement
+(Phase 1 S1 `arrange`) → profile with hole → direct extrude → valid B-rep,
+no 3-D Boolean. ~8–9k LOC. The Contact Layer funnel (Phase 3) must NOT start
+until M1 is green. Phase 0 is green, so M1's packet can be written now.
 
 ## Pick up here
 
-1. **The next program is the solver family** — `docs/SOLVER_FAMILY_PLAN.md`.
-   Approved design, not yet dispatched. Phase 0 is a 4-wide packet wave
-   (structural recognizer, `BoundedPiece`/BVH, Bezier-span cache, certified
-   predicates + `CurveContact` types), then S1..S8 in the graph in that doc.
-   Per-packet detail is NOT yet written; the plan doc books the real existing
-   API surface (§3) so packets do not re-explore. First milestone M1 =
-   certified planar construction (2-D plate-with-hole, no 3-D Boolean).
-2. **Recommended, NOT dispatched: a follow-up audit of
-   `truck-evidence/src/fid/rep.rs`** (4362 lines; the sole sanctioned path
-   from an exact result into the emitted geometry class; last touched by
-   BG-FID-005 / BG-FID-005-SRF). Recommend it; do not start it inside
-   solver-family packets.
+1. **Write the M1 / Phase 1 S1 `arrange` packet** against the LANDED Phase-0
+   API (not the plan's §4 sketches — re-derive from the tree; the §3 header
+   warning applies doubly to the four modules that just landed, whose exact
+   signatures are in `loop/results/BG-SOL-P0-*.json` and the four files
+   above). S1 is the arrangement: `orient2d` (BG-SOL-P0-PRED) drives the
+   sweep; `CurveContact` is the event vocabulary; `BoundedPiece`/`Bvh`
+   (BG-SOL-P0-BVH) and `SpanRecord` (BG-SOL-P0-SPAN) feed the broad phase.
+   Follow the §5 graph: S1 needs nothing else from Phase 0.
+2. **Recommended, NOT dispatched: the follow-up audit of
+   `truck-evidence/src/fid/rep.rs`** (4362 lines; sole sanctioned exact→emitted
+   path; last touched by BG-FID-005 / BG-FID-005-SRF). Its own program, not a
+   solver-family packet.
 3. Watchdog RUNNING (lock pid 20024, watchdog.py 37988, `stagnant=3600s`).
 
 ## State of the machine, as left
 
 - **Watchdog RUNNING** (lock `loop/watchdog.lock` = 20024; launcher shim
-  37988). Started with `cmd /c "set LOOK_WATCHDOG_STAGNANT=3600&& python
-  loop/watchdog.py"`. Heartbeats current; disk guard idle this session
-  (26.9 -> 25.9 GB). It skips slots with a live worker pid by design.
-- Registry: 87 rows = 76 original + 11 AUD-FIX. **86 DONE, 1 BLOCKED**
-  (BG-AUD-FIX-004 owner). No TODO rows; `schedule.py` eligible 0,
-  dispatchable 0. HEAD at close: `be9c6d9`. Tracked tree clean.
-- Slots 0/1/2 all FINISHED on landed branches (0 = BG-ENC-004-OFFSET
-  @948a513, 1 = BG-AUD-FIX-008 @20f6ee4, 2 = BG-AUD-FIX-011 @c3ff4f1);
-  each worktree holds a stale RESULT.json copy (harmless; re-fork with
-  `new_slot.py` before any next dispatch). No worker or verify process
-  running; all `verify.pid` files cleaned up.
-- Disk ~24.2 GB free at close. Verify baseline `d67e57f__truck-evidence-
-  truck-geometry` cached under `loop/baselines/` (this session's verify);
-  no leaked `%TEMP%/look-verify-baseline-*`.
-- GATE-4 ceiling 111 (true count). All 11 AUD-FIX packets and
-  BG-ENC-004-OFFSET ledgered and filed under `loop/results/` (including the
-  FIX-005 SPEC_GAP archive and FIX-004's owner record).
+  37988). Heartbeats current. It reclaimed `loop/slots/1/target` at 01:35 when
+  disk hit 3.3 GB during the verify-heavy phase (7.0 GB freed) — harmless, that
+  slot was already landed.
+- Registry: 91 rows = 76 original + 11 AUD-FIX + 4 SOL-P0. **90 DONE, 1
+  BLOCKED** (BG-AUD-FIX-004 owner). `schedule.py` eligible 0, dispatchable 0.
+- Slots 0/1/2/3 all FINISHED on landed branches (0 = REC @074bf04, 1 = BVH
+  @5ebaa55, 2 = SPAN @a557d09 + orchestrator amendment 14688e6, 3 = PRED
+  @7047f80); each holds a stale RESULT.json (harmless; re-fork with
+  `new_slot.py` before any next dispatch). **Slot targets deleted** to free
+  disk — a re-fork pays a cold warm (~1-3 min).
+- Disk ~21.7 GB free at close. No leaked `%TEMP%/look-verify-baseline-*`.
+  Verify baselines cached under `loop/baselines/`: caa41f4 (truck-base,
+  truck-geometry), c4f170f (truck-geometry).
+- GATE-4 ceiling 111 (true count). `scripts/kernel-gates.sh HEAD` passes
+  111/111. No `unscaled_legacy()` calls added by any Phase-0 packet.
+- All four packets ledgered and filed under `loop/results/BG-SOL-P0-*.json`
+  (incl. the SPAN orchestrator amendment, `amended_by: orchestrator`).
 
 ## The parallelism picture
 
-Nothing running (watchdog only; no workers, no verifies). Nothing is
-dispatchable - the registry is FINISHED. Next dispatchable work is the solver
-family's Phase 0 wave (`docs/SOLVER_FAMILY_PLAN.md`), once its packets are
-written; the fid/rep.rs audit stays a recommendation, not a dispatch.
+Nothing running (watchdog only; no workers, no verifies). Next dispatchable
+work is M1 / Phase 1 S1 `arrange` once its packet is written; the fid/rep.rs
+audit stays a recommendation. `schedule.py` needs a new P0-row set (S1 etc.)
+before it can report the next wave.
+
 ## Traps, each one paid for
+### Session 27 (solver-family Phase 0) - paid in full
+
+- **Four cold workers on one disk is a uv_spawn massacre, and the symptom is
+  not the cause.** Dispatching the 4-wide wave with cold slots (and slot 0
+  still holding 9.5 GB of the previous packet's target residue) drove free
+  disk to 6.5 GB; three workers died with `EUNKNOWN: unknown error, uv_spawn`
+  in `events.jsonl` — a process-spawn failure from resource exhaustion, not an
+  API-balance death and not a code error. The recoveries worked (nothing was
+  committed, so `new_slot.py` + `run_packet.py` redelivered cleanly), but the
+  real fix is prophylactic: **delete a slot's old target residue at fork time,
+  forbid workspace-wide `cargo` commands in packets** (a cold `cargo check
+  --workspace --all-targets` is ~9 GB), and stagger or serialize the cold
+  builds when slots are cold.
+- **Verifies are also a disk risk, and different bases do NOT save you.**
+  V8 runs the whole downstream workspace into the slot target (truck-base
+  verify grew a target to 7.65 GB, truck-geometry to 5.84 GB). Two verifies at
+  DIFFERENT bases ran concurrently this session and still drove disk to 3.1 GB,
+  and the second (SPAN) died at `compute_baseline`'s 8.0 GB floor — a harness
+  refusal, not a verdict. Recovery was freeing the landed PRED slot's target
+  and re-running. **Run verifies sequentially always**, and free a landed
+  slot's target before launching the next verify.
+- **An anchor that counts occurrences of `clippy::unwrap_used` in the packet's
+  OWN target file cannot stay constant.** The H-1 deny header is one
+  occurrence; the packet-mandated test-module
+  `#[allow(clippy::unwrap_used, clippy::expect_used)]` is a second. Both REC
+  and BVH workers hit this; REC kept the count at 1 by writing unwrap/expect-
+  free tests, BVH let it become 2. The anchor's intent was "the H-1 header is
+  present", which is a presence check — count a stable string, or accept that
+  the anchor is a pre-dispatch-only scaffold check and say so in the packet.
+- **Machine-check witnesses for f64 REPRESENTABILITY, not just exact rational
+  arithmetic.** The orient2d escalation witness used `(1e16+1, 1e16+3)` as
+  integer literals; the exact-rational check computed det = −2 on the
+  MATHEMATICAL integers, but `1e16+1`/`1e16+3` round in f64 to `1e16`/`1e16+4`,
+  making the actual float determinant +2e16 and the filter CONCLUSIVE — the
+  test could not exercise the escalation path it existed for. The worker
+  caught it and substituted coordinates < 2^53 (all exactly representable)
+  preserving det = −2 and filter inconclusiveness. `Fraction`-checking the
+  integer literals is not enough; check the f64 values the literal parses to.
+- **A parallel wave needs its shared vocabulary scaffolded BEFORE the wave, or
+  the dependent packet defines its own copy and a post-merge amendment must
+  reconcile it.** The SPAN packet's `SpanRecord.derivative_hull` logically
+  depended on the BVH packet's `truck_base::bvh::DerivativeBounds`, but at the
+  SPAN worker's fork point the BVH types had not merged. The worker correctly
+  defined a local identical `DerivativeBounds` and documented it; after BVH
+  merged, an orchestrator amendment (`14688e6`) replaced the local copy with
+  the shared type (structurally identical, so the swap was a few lines and the
+  span tests stayed green). Two same-named public structs in one workspace is
+  the trap to avoid; scaffold shared types into the leaf crate before a wave
+  that consumes them.
+- **The watchdog's disk guard is load-bearing and it works.** At 3.3 GB free
+  during the verify phase it reclaimed `loop/slots/1/target` (7.0 GB) and the
+  machine kept breathing. The trap from session 25 ("reclaims nothing while a
+  verify.pid is alive") protected the live verify; the landed slot was fair
+  game.
+
 ### Session 25 (BG-AUDIT-001 remediation close) - paid in full
 
 - **The RESULT.json landing dance has a fourth flavor that is the first three
