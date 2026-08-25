@@ -11,27 +11,28 @@ otherwise would eventually cost a trap.) If you are picking this up cold, read
 [`loop/ORCHESTRATOR.md`](ORCHESTRATOR.md) for how to run the loop, then
 `python loop/slot_status.py`** - nothing else. Do not read `LEDGER.jsonl` whole.
 
-Updated 2026-08-24, close of session 24 (BG-AUDIT-001 remediation). Branch: `integration/kernel-bg`.
+Updated 2026-08-24, close of session 25 (BG-AUDIT-001 remediation COMPLETE). Branch: `integration/kernel-bg`.
 
 ## Where we are
 
-**BG-AUDIT-001 remediation: 13/17 findings LANDED, 1 OWNER-BLOCKED, 3
-PENDING - the campaign is paused mid-way on API balance, not on code.** The
-whole-tree correctness audit (`loop/audits/BG-AUDIT-001.md/.json`, 17
+**BG-AUDIT-001 remediation: 17/17 findings CLOSED - the campaign is DONE.**
+The whole-tree correctness audit (`loop/audits/BG-AUDIT-001.md/.json`, 17
 findings) was remediated via 11 write-disjoint repair packets
 (`loop/packets/BG-AUD-FIX-001..011.md`, registry rows in
 `loop/PACKETS.jsonl`, tracker `loop/audits/BG-AUDIT-001-REMEDIATION.md`).
 
-Landed (8 packets, 13 findings): FIX-001 (`1844cfe`: AUD-001+016),
+Landed (10 packets, 16 findings): FIX-001 (`1844cfe`: AUD-001+016),
 FIX-002 (`d734d2a`: AUD-002), FIX-003 (`70d98bb`: AUD-003),
 FIX-005 (`f98d441`: AUD-007), FIX-006 (`2bc77ee`: AUD-005+009),
 FIX-007 (`b452237`: AUD-006), FIX-009 (`4b071ac`: AUD-011+012),
-FIX-010 (`f1ed436`: AUD-010+013+017). Every verify ACCEPTED (each packet's
-fork point as `--base`). GATE-4 ceiling moved 110 -> 111 (FIX-010's sphere
-guard legitimately adds one `unscaled_legacy()` call; it sits at its true
-measured count). The truck-topology same_parameter suite was re-run green
-5/5 after FIX-002 landed (the audit's expected-consequence check - no
-same-parameter input actually changed).
+FIX-010 (`f1ed436`: AUD-010+013+017), FIX-008 (`f08db62`: AUD-008+015),
+FIX-011 (`6375812`: AUD-014). Every verify ACCEPTED at its packet's fork
+point. GATE-4 ceiling stayed 111 through the last two landings (neither
+packet adds an `unscaled_legacy()` call); the ratchet holds at the true
+count. End-state validation ran green: the full truck-geometry /
+truck-topology / truck-evidence lib+tests suites, `cargo check --locked
+--all-targets`, `scripts/kernel-gates.sh HEAD` (GATE-4 111/111, all P-3
+gates), and every one of the 17 retained audit regression witnesses by name.
 
 Owner-blocked (1): **AUD-004 (FIX-004)** - Phase A found NO real failing
 witness in the real crate: `certify_cell` builds Q as the widened hull of
@@ -42,64 +43,77 @@ packet's explicit Phase-A-fails branch was followed - no forced center-term
 rewrite. Evidence: `loop/results/BG-AUD-FIX-004.json`. Owner accepts the
 invariant argument.
 
-PENDING (2 packets, 3 findings): **FIX-008** (AUD-008+015) and **FIX-011**
-(AUD-014). Both are written, validated, and registered. FIX-008's first
-worker died of API Insufficient Balance with NO work committed; the slot was
-reset clean. FIX-011 was never dispatched. **Do not dispatch either until API
-balance is restored** (see traps: a 402 kills the worker silently).
-
 ## Pick up here
 
-1. **Restore API balance, then re-dispatch FIX-008** (fresh -
-   `new_slot.py --slot 1 --branch packet/BG-AUD-FIX-008`, then
-   `run_packet.py`) and **dispatch FIX-011** (`new_slot.py --slot 2 --branch
-   packet/BG-AUD-FIX-011`). Both are write-disjoint and validated
-   (`gen_packet.check` green). FIX-008: `is_simple` rejects edge-id reuse,
-   the Closed gate requires no per-face edge reuse, `vertex_link` requires
-   the closed precondition (the open-shell limitation tests update
-   accordingly). FIX-011: no-pcurve makes `SameParameter` stay `Unknown`
-   (not-applicable), never certified; `pre_cut`'s pcurve-drop is a decided
-   spec contract, untouched.
-2. **Verify at each packet's fork point** (`git -C loop/slots/N/wt
-   merge-base HEAD integration/kernel-bg`), land with `land_packet.py`,
-   update `BG-AUDIT-001-REMEDIATION.md`.
-3. **When all 17 are closed**, run the end-state validation (full verifier
-   suites + ALL retained audit regression witnesses + `slot_status.py` +
-   scheduler census + no live fix/verify processes), then rewrite STATE.md
-   LAST and compare against reality. Final summary format: findings total 17;
-   fixed+landed N; already fixed N; owner blocked N; every finding listed
-   exactly once.
-4. **Then resume the base loop's one open row: BG-ENC-004-OFFSET** (the only
-   non-DONE row of the original 76; design packet still unwritten - its
-   amendment is the complete design, scratch must run the three flagship
-   witnesses first). After it lands, the registry is FINISHED 76/76.
-5. Restart the watchdog on resume (`cmd /c "set LOOK_WATCHDOG_STAGNANT=3600&
-   python loop/watchdog.py"` - it is STOPPED at this handoff).
+1. **Resume the base loop's one open row: BG-ENC-004-OFFSET** (the only
+   non-DONE row of the original 76; the packet is still unwritten). Write
+   its scratch + packet first - the amendment is the complete design, and
+   the scratch must run the three flagship witnesses before dispatch. After
+   it lands, the registry is FINISHED 76/76.
+2. **Recommended, not dispatched: a follow-up audit of
+   `truck-evidence/src/fid/rep.rs`.** Recommend it; do not start it in the
+   same session as landing BG-ENC-004-OFFSET.
+3. Watchdog RUNNING (pid 20024, `stagnant=3600s`).
 
 ## State of the machine, as left
 
-- **Watchdog STOPPED** at handoff (it was pid 40852; `loop/watchdog.lock`
-  deleted). The campaign paused with API balance exhausted; nothing should
-  dispatch until balance returns. Restart with the cmd /c pattern on resume.
+- **Watchdog RUNNING** (pid 20024; `loop/watchdog.lock` holds it). Started
+  with `cmd /c "set LOOK_WATCHDOG_STAGNANT=3600&& python loop/watchdog.py"`.
+  Its disk guard correctly reclaimed the idle slot-0 target when free space
+  briefly hit 0.7 GB; it skips slots with a live worker pid by design.
 - Registry: 76 original rows + 11 AUD-FIX rows = 87. AUD-FIX statuses:
-  8 DONE (landed), 1 BLOCKED (FIX-004 owner), 2 TODO (FIX-008, FIX-011).
-  HEAD at close: `90105a5`. Tracked tree clean.
-- Slots 0/1/2 all idle/cleaned (worker + verify files removed); each worktree
-  holds a stale RESULT.json copy on a landed branch (harmless; re-fork with
-  `new_slot.py` before dispatch). Slot 1 sits on `packet/BG-AUD-FIX-008` at
-  base (=base, no work) ready to re-fork.
-- Disk 10.2 GB free at close (cleaned ~8.5 GB of `%TEMP%/proc-macro-srv*`
-  and the 8 GB idle repo-root `target/`).
-- GATE-4 ceiling 111 (true count). Landed 8 AUD-FIX packets; ledger and
-  `loop/results/` filed for all of them (plus the FIX-005 SPEC_GAP archive
-  `loop/results/BG-AUD-FIX-005-specgap-1.json` and FIX-004's owner record).
+  10 DONE (landed), 1 BLOCKED (FIX-004 owner). The one remaining TODO is
+  `BG-ENC-004-OFFSET`. HEAD at close: `a7fb42e`. Tracked tree clean.
+- Slots 0/1/2 all FINISHED on landed branches (FIX-009/FIX-008/FIX-010/
+  FIX-011); each worktree holds a stale RESULT.json copy (harmless; re-fork
+  with `new_slot.py` before any next dispatch).
+- Disk ~19.5 GB free at close (verify baselines cached under
+  `loop/baselines/61baa58__*`; no leaked `%TEMP%/look-verify-baseline-*`).
+- GATE-4 ceiling 111 (true count). All 11 AUD-FIX packets ledgered and filed
+  under `loop/results/` (including the FIX-005 SPEC_GAP archive and FIX-004's
+  owner record).
 
 ## The parallelism picture
 
-None running (watchdog stopped, no workers, no verifies). Dispatchable once
-balance returns: FIX-008 and FIX-011 (write-disjoint; the only other row is
-BG-ENC-004-OFFSET, which needs its packet written first).
+Nothing running (watchdog only; no workers, no verifies). Dispatchable:
+BG-ENC-004-OFFSET once its packet is written.
 ## Traps, each one paid for
+### Session 25 (BG-AUDIT-001 remediation close) - paid in full
+
+- **The RESULT.json landing dance has a fourth flavor that is the first three
+  combined, and it cost one merge refusal.** FIX-008's worker left RESULT.json
+  UNCOMMITTED in the worktree while FIX-011's worker COMMITTED it. Landing
+  FIX-008 first required copying `loop/slots/1/wt/RESULT.json` to the repo
+  root before `land_packet.py` (uncommitted flavor), and that root copy is
+  UNTRACKED, so `land_packet.py`'s `git rm -q RESULT.json` (which only removes
+  TRACKED files) silently did nothing and left it behind. The very next
+  `land_packet.py` for FIX-011 then failed its merge: `The following
+  untracked working tree files would be overwritten by merge: RESULT.json`,
+  because the committed flavor's merge needs to CREATE that file. Recovery was
+  one `Remove-Item RESULT.json`, but the ordering lesson is load-bearing: when
+  landing a MIXED pair (one uncommitted, one committed), delete the untracked
+  root copy after the first landing, BEFORE the second. **An untracked root
+  RESULT.json is invisible to `git rm` and lethal to the next merge that wants
+  to bring one in.**
+- **Two fresh dispatches can both die of balance after a session boundary and
+  the dead slots present as "clean, no work" - the read-before-redispatch rule
+  applies to slots that LOOK empty.** This session's handoff recorded FIX-008's
+  first worker dying of API Insufficient Balance with no commits; the slot was
+  reset and the fix redelivered cleanly this session. The rule is unchanged and
+  it saved nothing this time (the reset was already done) - recorded so the
+  next session does not re-derive it.
+- **This session's whole campaign close was the cheapest possible version of
+  the API-balance trap: the API was live again (this session itself is proof),
+  so the two pending packets dispatched, ran to DONE in ~30 min each, verified
+  ACCEPTED at the shared fork point `61baa58` sequentially, and landed without
+  a single rejection.** FIX-008's one deviation (regression test 1 builds the
+  degenerate `[e, e.inverse()]` face via `Face::new_unchecked` because fix 1
+  makes `Face::new`->`try_new` refuse that wire) was recorded by the worker and
+  judged correct: the closedness gate is still exercised, all three assertions
+  unchanged. FIX-011 needed zero deviations. Both packets needed NO
+  re-ranking, NO amendments, and NO round trips - the write-disjoint split and
+  the packets themselves were right on the first dispatch.
+
 ### Session 24 (BG-AUDIT-001 remediation) - paid in full
 
 - **API balance deaths are silent and can land POST-COMMIT, and this session
