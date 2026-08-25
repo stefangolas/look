@@ -7,6 +7,17 @@ image. Keep the hot path small. Do not add browser, GUI, plugin, conversion, or
 general scene-framework dependencies unless a measured user requirement needs
 them.
 
+## Kernel solver program
+
+The base kernel loop is FINISHED (76/76) and BG-AUDIT-001 closed (17/17). The
+next program is the certified solver family: `docs/SOLVER_FAMILY_PLAN.md` is
+the approved design and books the existing `truck-evidence`/`truck-shapeops`/
+`truck-geometry`/`truck-topology` API surface with real signatures so fresh
+packets do not re-explore it. Kernel code changes only through the packet /
+worker / `verify.py` loop (see `loop/ORCHESTRATOR.md`); `vendor/truck/**` is
+off-limits to direct editing. Solver-family packets are written against the
+plan doc's §3 booked API and §5 parallel graph.
+
 ## Use look efficiently
 
 For one render:

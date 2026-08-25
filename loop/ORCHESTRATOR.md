@@ -6,6 +6,16 @@ this, then run `python loop/slot_status.py`.
 
 You may not be the agent that wrote these. Nothing here depends on that.
 
+## The current program
+
+The base loop (76/76) and the BG-AUDIT-001 remediation (17/17) are FINISHED.
+The next program is the **solver family** — `docs/SOLVER_FAMILY_PLAN.md` is
+the approved design and books the existing API surface (real signatures) so
+packets do not re-explore. Its Phase 0 is a 4-wide parallel wave; M1 is
+certified planar construction. Write solver-family packets against the plan
+doc's booked signatures and the parallel graph in its §5; keep the scheduler's
+write-set-disjointness rule (each solver family gets its own module file).
+
 ## The one-sentence version
 
 Dispatch a packet to a worker, poll until it finishes, verify it mechanically,

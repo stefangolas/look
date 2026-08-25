@@ -46,12 +46,19 @@ tests + 3 OFFSET flagships).
 
 ## Pick up here
 
-1. **Recommended, NOT dispatched: a follow-up audit of
+1. **The next program is the solver family** — `docs/SOLVER_FAMILY_PLAN.md`.
+   Approved design, not yet dispatched. Phase 0 is a 4-wide packet wave
+   (structural recognizer, `BoundedPiece`/BVH, Bezier-span cache, certified
+   predicates + `CurveContact` types), then S1..S8 in the graph in that doc.
+   Per-packet detail is NOT yet written; the plan doc books the real existing
+   API surface (§3) so packets do not re-explore. First milestone M1 =
+   certified planar construction (2-D plate-with-hole, no 3-D Boolean).
+2. **Recommended, NOT dispatched: a follow-up audit of
    `truck-evidence/src/fid/rep.rs`** (4362 lines; the sole sanctioned path
    from an exact result into the emitted geometry class; last touched by
-   BG-FID-005 / BG-FID-005-SRF). Recommend it; do not start it in the same
-   session.
-2. Watchdog RUNNING (lock pid 20024, watchdog.py 37988, `stagnant=3600s`).
+   BG-FID-005 / BG-FID-005-SRF). Recommend it; do not start it inside
+   solver-family packets.
+3. Watchdog RUNNING (lock pid 20024, watchdog.py 37988, `stagnant=3600s`).
 
 ## State of the machine, as left
 
@@ -77,8 +84,9 @@ tests + 3 OFFSET flagships).
 ## The parallelism picture
 
 Nothing running (watchdog only; no workers, no verifies). Nothing is
-dispatchable - the registry is FINISHED. Remaining work is the recommended
-fid/rep.rs audit, which is a recommendation, not a dispatch.
+dispatchable - the registry is FINISHED. Next dispatchable work is the solver
+family's Phase 0 wave (`docs/SOLVER_FAMILY_PLAN.md`), once its packets are
+written; the fid/rep.rs audit stays a recommendation, not a dispatch.
 ## Traps, each one paid for
 ### Session 25 (BG-AUDIT-001 remediation close) - paid in full
 
