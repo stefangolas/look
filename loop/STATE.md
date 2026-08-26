@@ -11,63 +11,70 @@ otherwise would eventually cost a trap.) If you are picking this up cold, read
 [`loop/ORCHESTRATOR.md`](ORCHESTRATOR.md) for how to run the loop, then
 `python loop/slot_status.py`** - nothing else. Do not read `LEDGER.jsonl` whole.
 
-Updated 2026-08-26, close of session 32 (Contact Layer funnel unblocked: the
-flaky-proptest family got two durable fixes — BG-FIX-001 geotrait derivative
-asserts, BG-FIX-002 circle search parameter asserts — and BG-SOL-S5-CYLPAIR
-landed). Branch: `integration/kernel-bg`, HEAD `0f95484`.
+Updated 2026-08-26, close of session 33 (general validated FF: implicit
+substrate + branch-cover engine landed, after a real kernel-operator defect
+was found and fixed). Branch: `integration/kernel-bg`, HEAD `1230159`.
 
 ## Where we are
 
-**S5 is LANDED and the Contact Layer funnel is clear of blockers.** The
-session was supposed to be a coin-flip re-verify of S5; instead it turned into
-a flake-family extermination:
+**The general validated FF stage advanced two layers and exposed a latent
+defect in the kernel's foundational numeric operator.** What happened:
 
-- **BG-FIX-001** (`bdbb6fc` via merge `afb...`; verified ACCEPTED at `37bbbb1`)
-  — `truck-geotrait/src/traits/curve.rs`: new private helper
-  `assert_derivative_near` with the combined predicate
-  `|a-b| <= TOLERANCE * max(1, |a|, |b|)` swapped in for exactly six
-  derivative assertions in `parameter_transform_random_test` /
-  `concat_random_test`; additive `InnerSpace` bounds; all callers already
-  satisfied them. This is the durable fix for `concat_positive_test` (the S5
-  blocker) and the historical `bspcurve::parameter_random_tests` flake.
-  **Orchestrator amendment on the worker commit**: the packet spec itself
-  carried the defect `.max(TOLERANCE)` as the floor — an effective epsilon of
-  TOLERANCE² near zero, one million times STRICTER than legacy, contradicting
-  its own comment. Corrected to `.max(1.0)` before verify; recorded as
-  `amended_by: orchestrator` in RESULT.json (V0 surfaces that field).
-- **BG-FIX-002** (`0f95484`; verified ACCEPTED at `3686c8e`) —
-  `truck-geometry/tests/circle.rs`: all six `prop_assert_near2!(s, t)` lines
-  replaced with the same combined predicate. The proven failure was `t = 4π`
-  drifting 1.3e-12 against the absolute `TOLERANCE2 = 1e-12` window at
-  `|t| ≤ 100` ranges — relative error ~1e-13. Strategies deliberately kept at
-  full range.
-- **BG-SOL-S5-CYLPAIR** (worker code `ab1ef12`, rebased to `bbc6815` onto the
-  FIX-001 base, landed as `3360178`) — FF cylinder-family analytic pairs:
-  `(Cylinder,Cylinder)` coaxial-else-parallel; `(Cylinder,Cone)`/
-  `(Cylinder,Sphere)`/`(Cone,Cone)`/`(Cone,Sphere)` coaxial-else-deferred;
-  `equal_radius_cylinders` still unwired (unreachable cell, BG-NUM-003
-  oracle). Took three extra verify attempts to land — see traps: one real
-  fresh-baseline rejection (concat, pre-fix), then two more members of the
-  latent-flaky population surfacing one per verify.
+- **BG-SOL-S6-IMPLICIT** (`a8391b4`; verified ACCEPTED at `ae9cbf3`) —
+  `truck-evidence/src/contact/implicit.rs`: trait `ImplicitField {
+  implicit(&Box3) -> Interval, grad(&Box3) -> [Interval; 3], regular_on(&Box3)
+  -> bool }` over the FIVE BARE canonical carriers (Plane, Sphere, Cylinder,
+  Cone, Torus). Sign conventions: plane signed distance; quadrics negative
+  inside; cone `x'²+y'²−(z'·t)²` with apex ON the zero set (∇f=0 there);
+  torus via the sqrt-free quartic `g²−4R²h`. No `CanonicalSurface`/`Placed`
+  impls (scoped; dispatcher refuses Placed upstream). Worker caught a genuine
+  f64 defect in the packet's cone zero-witness: `tan(π/4)` never rounds to
+  exactly 1.0, so the "exact rational witness" wasn't — kept the test name,
+  asserted the honest SLACK property and an exact `(t,0,1)` witness with
+  `t = tan(π/4)`. Judged correct (BG-NUM-002 class).
+- **BG-SOL-S7-GFF-COVER** (`1230159`; verified ACCEPTED at `9fcf7a4` on the
+  r3 re-verify) — `truck-evidence/src/contact/gff.rs`: the branch-cover
+  engine `cover_branch(f1, f2, domain, tau, budget) -> Outcome<BranchCover>`
+  over two `ImplicitField`s: interval-exclusion pruning, determinant-based
+  singular screen, and a 2×2 z-slab Krawczyk probe `F(x,y) = [f1(x,y,z0),
+  f2(x,y,z0)]` with exact 2×2 closed-form inverse preconditioner. Landed only
+  after TWO SPEC_GAP attempts and a kernel-operator fix — see
+  BG-NUM-003-CONTRACT and the traps.
+- **BG-NUM-003-CONTRACT** (`64362d4`; verified ACCEPTED at `2d3cf66`) — the
+  REAL find of the session: `num/krawczyk.rs::k_image` computed the
+  **Hadamard** contraction `d[r][c] = δ(r,c) − y[r][c]·j[r][c]` instead of
+  the matrix product `d[r][c] = δ(r,c) − Σ_k y[r][k]·j[k][c]`. BG-NUM-003's
+  spec (line 148) literally encoded the wrong formula; it stayed latent
+  because every early user had a near-diagonal Jacobian. The general FF
+  stage's coupled slab systems exposed it: `Unique` became unreachable for
+  ANY coupled system regardless of budget (worker measured `I−Y∘J` row sums
+  1.1–3.9 > 1 at every box scale). Fixed to the true matrix product; the
+  change only strengthens certification (diagonal systems identical). The S7
+  worker's original "the operator is diagonal-only" diagnosis was actually
+  correct and I dismissed it once — re-read the source before doubting a
+  worker's numerical evidence a second time.
 
-Registry is 100 rows: **99 DONE, 1 BLOCKED** (BG-AUD-FIX-004 owner),
+Registry is 103 rows: **102 DONE, 1 BLOCKED** (BG-AUD-FIX-004 owner),
 **0 READY**. `schedule.py` eligible 0, dispatchable 0. Nothing running except
 the watchdog.
 
 ## Pick up here
 
-1. **The hard funnel, next stages in plan order** (docs/SOLVER_FAMILY_PLAN.md
-   §4 Phase 3): general validated FF → singular event cells → 2-D overlap
-   (C3/C4, last, deliberately delayed). Write packets against §3 booked API;
-   the dispatcher order and `ContactLocus` vocabulary are as booked, now with
-   the cylinder-family cells exhaustive.
-2. Then Phase 4 Boundary Rewrite and the M2 flagship differential test
-   `Extrude(P−Q) ≅ Extrude(P)−Extrude(Q)`.
+1. **Wire the branch cover into `contact()` for the offset mixed quadric
+   pairs** (the next funnel stage). The dispatcher's deferred cells
+   `(Cylinder,Cone)/(Cylinder,Sphere)/(Cone,Cone)/(Cone,Sphere)` non-coaxial,
+   both orientations, now have a certified engine. Design decision needed
+   FIRST: the cover produces a SET of certified points (BranchCover), not an
+   `ExactCurve` — the `ContactLocus` ontology has no arm for non-exact arcs.
+   The plan books `RegularContactArc` (certified arcs between event boxes)
+   for the eventual output; a pragmatic intermediate locus arm (e.g.
+   `ContactLocus::ValidatedPoints(Vec<Point3>)` or the BranchCover itself)
+   may be the right first wiring. Write against §3 booked API.
+2. Then singular event cells → 2-D overlap (C3/C4, last, deliberately
+   delayed). Then Phase 4 Boundary Rewrite, then M2.
 3. **Open latent flake, NOT fixed**: `truck-base/tests/newton.rs::
-   test_newton1` failed once during an S5 verify (Newton oscillation exits via
-   `Err(log)` with `log.degenerate()` false — a solver/test-contract question,
-   NOT a tolerance swap). It needs its own decision; do not paper over it by
-   loosening the assertion blindly.
+   test_newton1` (Newton basin contract question, not a tolerance swap). Its
+   own decision.
 4. Recommended, NOT dispatched: the follow-up audit of
    `truck-evidence/src/fid/rep.rs` (4362 lines; last touched by BG-FID-005 /
    BG-FID-005-SRF). Its own program.
@@ -75,25 +82,79 @@ the watchdog.
 ## State of the machine, as left
 
 - **Watchdog RUNNING** (lock `loop/watchdog.lock`, pid 20024).
-- Registry: 100 rows = 99 DONE + 1 BLOCKED (BG-AUD-FIX-004 owner), 0 READY.
+- Registry: 103 rows = 102 DONE + 1 BLOCKED (BG-AUD-FIX-004 owner), 0 READY.
   `schedule.py` eligible 0, dispatchable 0.
-- Slots: 0 FINISHED on landed `packet/BG-SOL-S5-CYLPAIR@bbc6815`; 1 FINISHED
-  on landed `packet/BG-FIX-002@3686c8e`; 2-3 FINISHED on long-landed branches.
-  All four re-forkable.
-- Disk ~13.9 GB free. No leaked `%TEMP%/look-verify-baseline-*`. Slot targets
-  were reclaimed mid-session for the V9 disk-floor trap and re-warmed.
+- Slots: 0 FINISHED on landed `packet/BG-SOL-S7-GFF-COVER@9fcf7a4`; 1 FINISHED
+  on landed `packet/BG-NUM-003-CONTRACT@2d3cf66`; 2-3 FINISHED on long-landed
+  branches. All four re-forkable. Slot 1 target was ~7.8 GB warm before the
+  final verify; slots 0/2/3 targets reclaimed for disk.
+- Disk ~9.75 GB free. No leaked `%TEMP%/look-verify-baseline-*`.
 - GATE-4 ceiling 111 (true count); `kernel-gates.sh HEAD` passes 111/111 at
-  `0f95484`. No `unscaled_legacy()` calls added by any of this session's
+  `1230159`. No `unscaled_legacy()` calls added by any of this session's
   packets.
-- Results filed: `loop/results/BG-FIX-001.json`, `loop/results/BG-FIX-002.json`,
-  `loop/results/BG-SOL-S5-CYLPAIR.json`.
+- Results filed: `loop/results/BG-SOL-S6-IMPLICIT.json`,
+  `loop/results/BG-SOL-S7-GFF-COVER.json`,
+  `loop/results/BG-NUM-003-CONTRACT.json`.
 
 ## The parallelism picture
 
-Nothing running (watchdog only). Next work is writing the funnel's next-stage
-packets (general validated FF first), then Phase 4 after C3/C4.
+Nothing running (watchdog only). Next work is the wiring packet (contact()
+consuming cover_branch for the offset mixed quadric cells), then singular
+events, then C3/C4, then Phase 4.
 
 ## Traps, each one paid for
+### Session 33 (implicit substrate, branch cover, and the Krawczyk contraction defect) - paid in full
+
+- **A packet-spec math formula can be wrong, faithful workers implement it,
+  and the operator it built stays wrong for years until a coupled system
+  arrives.** BG-NUM-003's spec line 148 wrote `d[r][c] = δ(r,c) −
+  y[r][c]·j[r][c]` — the Hadamard contraction — where standard Krawczyk
+  needs `δ(r,c) − Σ_k y[r][k]·j[k][c]`. Every early user (parametric
+  projections) had near-diagonal Jacobians where the two agree, so the defect
+  was invisible. This session's general FF slab system (a genuinely coupled
+  2×2) made `KrawczykProof::Unique` unreachable at ANY box scale and budget.
+  Two SPEC_GAP attempts of BG-SOL-S7-GFF-COVER pinned it down. The recovery
+  was a kernel-fix packet (BG-NUM-003-CONTRACT) that corrects the operator
+  and adds a coupled-system regression test asserting the OLD entrywise form
+  would NOT have certified. Lesson: an interval-operator implementation is
+  exactly the kind of code whose spec formula must be re-derived from first
+  principles — the matrix product is one tensor-index operation, and the
+  Hadamard form is what a hurried spec-writer produces.
+- **Dismissing a worker's numerical evidence because it contradicts your
+  read of the code costs you a full SPEC_GAP round.** In S7 r1 the worker
+  reported the operator "can only certify diagonal systems"; I re-read
+  `k_image`, misread the row-major indexing as a matrix product, and wrote an
+  amendment ("r2") asserting the worker was wrong and the operator was fine.
+  The worker then re-derived the entrywise contraction, produced a control
+  measurement (the operator's own `Lin2` witness certifies because its
+  `I−Y∘J` row sums are 0.4 < 1), and proved the slab system's row sums were
+  1.12/3.24 — the operator really is entrywise. The correct order of
+  operations: when a worker's numerical claim about kernel code contradicts
+  your code reading, write the tensor product out on paper BEFORE amending.
+  The `Σ_k` dropped out of the inner sum is one character and one session.
+- **A SPEC_GAP'd branch is not dead work: rebase it, re-verify it, land it.**
+  S7's r2 conversion (2×2 z-slab probe, exact 2×2 inverse, determinant
+  singular screen) was complete and correct — it failed ONLY on the operator
+  defect. After BG-NUM-003-CONTRACT landed, rebasing the two S7 commits onto
+  the fixed base and re-verifying ACCEPTED on the first try. The RESULT.json
+  for the re-verify was reconstructed as an orchestrator record
+  (`amended_by: orchestrator`, session-24 precedent), replacing the r1
+  SPEC_GAP RESULT that had been committed on the branch. V0 surfaces the
+  amended_by field so the re-verify can never pass as untouched worker work.
+- **A stale anchor bites when the packet's own history contradicts it.**
+  S7 r1's A3 pinned `grep -c 'gff' contact/mod.rs == 0`; by r2 the r1 commit
+  had added `pub mod gff;`, so the anchor could not pass simultaneously with
+  the conversion instruction — the worker reported ANCHOR_MISMATCH as a
+  disagreement. An amendment to a packet that keeps its anchors must re-derive
+  them against the WORKER'S branch, not against the pre-packet tree.
+- **Verbatim code in a packet must compile under the house lints.** The
+  CONTRACT packet's `dq` snippet had an unbound `qc` (leftover from the old
+  `.enumerate()` destructuring) and indexed into rows (`y[r][k]`) under a
+  crate that denies `clippy::indexing_slicing`. The worker fixed both
+  preserving the exact matrix product. A packet that quotes a replacement
+  block should quote the code that actually compiles, `.get()`-chains and
+  all.
+
 ### Session 32 (flake-family fixes + S5 lands) - paid in full
 
 - **A packet-spec bug is amended, not redispatched — but only because the
