@@ -11,59 +11,75 @@ otherwise would eventually cost a trap.) If you are picking this up cold, read
 [`loop/ORCHESTRATOR.md`](ORCHESTRATOR.md) for how to run the loop, then
 `python loop/slot_status.py`** - nothing else. Do not read `LEDGER.jsonl` whole.
 
-Updated 2026-08-25, close of session 30 (M1 finish: PCURVE SPEC_GAP landed + plan amended; Contact Layer funnel STARTED, skeleton landed). Branch: `integration/kernel-bg`, HEAD `1155186`.
+Updated 2026-08-26, close of session 31 (Contact Layer funnel: FE/EE strata reductions LANDED; cylinder-family FF worker-DONE but V5-blocked by the concat_positive_test flake). Branch: `integration/kernel-bg`, HEAD `5bcfa67`.
 
 ## Where we are
 
-**M1's construction is fully green AND its last open item is closed; the
-Contact Layer funnel is now running.** Two packets landed this session:
+**The Contact Layer funnel's second and third stages both ran; one landed and
+one is verified-correct but blocked by a known flaky proptest.** What happened
+this session:
 
-- **BG-SOL-S2-PCURVE** (SPEC_GAP probe, `56184b2`, verified ACCEPTED at
-  `36d2e82`, merged `4f204d3`) — proved empirically that pcurves cannot ride on
-  the returned `Solid`'s edges: `Wire<P,C>` holds `VecDeque<Edge<P,C>>`
-  (`PC = ()` by default) and `with_pcurve<Q>` returns `Edge<P,C,Q>`, so a real
-  `PCurve` edge cannot enter a Wire (compile probe E0277). Plan amended (§2,
-  §4 Phase 2, §7 M1): pcurves on the solid's edges are deferred to a cross-crate
-  topology-PC program (BG-CE-001 anticipated it); M1's "exercises pcurves" is
-  recorded as satisfied by the S2 construction + the `PCurve<C,S>` carrier and
-  same-parameter invariant existing.
-- **BG-SOL-S3-CONTACT** (first Contact Layer packet, `e9ecd2a`, verified
-  ACCEPTED at `bc434d5`, merged `9eae9ae`) — the funnel's skeleton:
-  `BoundedStratum { Face/Edge/Vertex }` over **canonical carriers** (strata are
-  geometry-side: truck-evidence cannot name truck-topology), `ContactComplex`,
-  `ContactLocus`, and `contact(&lhs, &rhs, budget)` dispatching C0-C2 identity
-  (struct-equal canonical carriers → Coincident/IdenticalCarrier) then the FF
-  analytic table (plane_plane/plane_sphere/sphere_sphere/plane_cylinder/
-  plane_cone, both orientations). Everything else — FE/EE, cylinder×cylinder,
-  Torus/Placed, 2-D overlap — refuses honestly with the new
-  `EnvelopeCase::ContactReductionDeferred` arm. Signature deltas from the plan's
-  §4 booking are recorded in the plan doc (§4 Phase 3) and in the packet's
-  RESULT notes (by-value `BoundedStratum` infeasible; `CanonicalSurface` has no
-  `Unrecognized` arm, so spline refusals live at the `face_stratum` lift).
+- **BG-SOL-S4-FE-EE** (strata reductions, `4f1cbb6`, verified ACCEPTED at the
+  fork `a99f2dd`, merged `3dde3aa`) — FE (`Edge`×`Face`) and EE (`Edge`×`Edge`)
+  with the two new bounded locus forms: `ContactLocus::Point(Point3)` and
+  `ContactLocus::BoundedCurve { curve: ExactCurve, t_range: (f64, f64) }`.
+  `contact.rs` became the directory module `contact/mod.rs` (vocabulary +
+  dispatcher) with the new `contact/fe_ee.rs` (per plan §6, so later funnel
+  packets extend the Contact Layer without colliding on the dispatcher file).
+  FE table: `Line`×`Plane`/`Cylinder` (linear/quadratic, decisive-interval
+  predicates, generator-coincident for axis-parallel lines), `Circle`×`Plane`
+  (chord + coincident arc clipped to the face box), `Circle`×`Cylinder`
+  (latitudinal coincident only). EE table: `Line`×`Line` (skew/parallel-empty/
+  coplanar-point/coincident-arc), `Line`×`Circle` (transverse or in-plane
+  chord). Every reported point/arc is checked against BOTH strata's bounds
+  (edge `t_range` and the face `(u,v)` box; cylinder u wraps into `[0, 2π)`).
+  The worker caught TWO geometrically infeasible witnesses in my packet (S5.2
+  test 1's example line never meets the unit wall; S6.2 test 5's example point
+  is off the unit circle) and corrected them — both verified numerically.
+- **BG-SOL-S5-CYLPAIR** (FF cylinder-family pairs, `ab1ef12`, worker DONE in
+  one ~20-min attempt) — the `parallel_cylinders`/`coaxial` cells wired into
+  `analytic_ff`: `(Cylinder,Cylinder)` → coaxial `CylCyl` on same-axis (exact
+  `(x,y)` equality, matching `CoaxialPair::validate`) else `parallel_cylinders`;
+  `(Cylinder,Cone)/(Cylinder,Sphere)/(Cone,Cone)/(Cone,Sphere)` (both
+  orientations) → the corresponding `CoaxialPair` cell on same-axis else
+  `ContactReductionDeferred`. `equal_radius_cylinders` deliberately NOT wired
+  (its intersecting-axes cell is unreachable from canonical z-aligned
+  carriers; stays the BG-NUM-003 oracle). **Verify REJECTED 3 times on V5 only**
+  — see the traps and the Pick-up-here item.
 
-Registry is 96 rows: **95 DONE, 1 BLOCKED** (BG-AUD-FIX-004, owner), **0 READY**.
-`schedule.py` reports eligible 0, dispatchable 0. Nothing is running except the
-watchdog.
+Registry is 98 rows: **96 DONE, 2 BLOCKED** (BG-AUD-FIX-004 owner;
+BG-SOL-S5-CYLPAIR flake-blocked), **0 READY**. `schedule.py` reports eligible 0,
+dispatchable 0. Nothing is running except the watchdog.
 
 ## Pick up here
 
-The Contact Layer funnel is the active program; M1's construction is green and
-its pcurve item is closed. The funnel's dispatch stages, in plan order, and
-their current state:
-
-1. **C0-C2 identity/overlap + analytic FF** — LANDED (S3-CONTACT).
-2. **Strata reductions (FE, EE via curve machinery)** — the next packet
-   (FE: `Edge` × `Face`; EE: `Edge` × `Edge`). Write it against the landed
-   `contact` API (anchor the CONSUMING signature per the session-28 trap) and
-   the §4 Phase 3 amendment. It will consume `BoundedStratum` and extend the
-   `ContactLocus`/`ContactRecord` vocabulary with the bounded locus forms.
-3. **Cylinder×Cylinder and the remaining analytic-pair families** (parallel/
-   equal-radius/coaxial) — still `ContactReductionDeferred`; a follow-up packet
-   fills the table.
-4. **General validated FF → singular event cells → 2-D overlap (C3/C4, last)** —
-   the hard funnel, deliberately delayed.
-5. After the funnel: **Boundary Rewrite (Phase 4)** and then the M2 flagship
-   differential test `Extrude(P−Q) ≅ Extrude(P)−Extrude(Q)`.
+1. **Resolve BG-SOL-S5-CYLPAIR first.** The worker's code is done and every
+   gate passes except V5, which fails ONLY on the known-flaky
+   `truck-geometry/tests/nurbscurve.rs::concat_positive_test` — a pre-existing
+   latent defect (an absolute `assert_near!` on unbounded-magnitude `der2` in
+   `truck-geotrait`'s `exec_concat_random_test`, curve.rs:547; documented in
+   BG-ENC-004-OFFSET's RESULT). This session it flipped from rare to
+   persistent (~all runs at both commits — reproduced 20/20 at BASE), and the
+   cached base baseline catching a lucky `ok` makes V5 keep mis-attributing it
+   as `newly failing`. The packet provably cannot affect it (only
+   `truck-evidence/src/contact/mod.rs` changed; truck-geometry has no
+   dependency on truck-evidence). Two clean exits:
+   a. **Re-verify when the flake clears** (the fresh-baseline run at 02:36
+      passed it, so it does pass sometimes). Delete the stale
+      `loop/baselines/a8eea8a__truck-base-truck-evidence-truck-geometry.json`
+      (it records a lucky `ok`) so a fresh base run decides, and re-verify.
+   b. **Dispatch a follow-up property-fix packet** (the INV-102 pattern) that
+      bounds `concat_positive_test`'s inputs or switches the assertion to a
+      relative tolerance — the durable fix for the documented flaky-proptest
+      family. Write set: `vendor/truck/truck-geometry/tests/nurbscurve.rs`
+      (and/or the shared helper in `truck-geotrait/src/traits/curve.rs`).
+   Either way the packet branch `packet/BG-SOL-S5-CYLPAIR`@`ab1ef12` is the
+   verified code; do not redispatch the worker.
+2. **The funnel's next stages**, in plan order:
+   - After S5 lands: **general validated FF → singular event cells → 2-D
+     overlap (C3/C4, last)** — the hard funnel, deliberately delayed.
+   - Then **Boundary Rewrite (Phase 4)** and the M2 flagship differential test
+     `Extrude(P−Q) ≅ Extrude(P)−Extrude(Q)`.
 
 Recommended, NOT dispatched: the follow-up audit of
 `truck-evidence/src/fid/rep.rs` (4362 lines; sole sanctioned exact→emitted
@@ -73,28 +89,76 @@ path; last touched by BG-FID-005 / BG-FID-005-SRF). Its own program.
 
 - **Watchdog RUNNING** (lock `loop/watchdog.lock`; heartbeat current,
   `stagnant=3600s`).
-- Registry: 96 rows = 76 original + 11 AUD-FIX + 4 SOL-P0 + S1 + S2 + ORIENT +
-  PCURVE + S3-CONTACT. **95 DONE, 1 BLOCKED** (BG-AUD-FIX-004 owner), 0 READY.
-  `schedule.py` eligible 0, dispatchable 0.
-- Slots 0-3 FINISHED on landed branches. Slot 0 holds a stale RESULT.json
-  (harmless; re-fork with `new_slot.py`). No leaked
-  `%TEMP%/look-verify-baseline-*`.
-- Disk ~14 GB free at close. No leaked `%TEMP%/proc-macro-srv*` beyond
-  per-session regrowth.
+- Registry: 98 rows = 96 DONE + 2 BLOCKED (BG-AUD-FIX-004 owner,
+  BG-SOL-S5-CYLPAIR flake-blocked), 0 READY. `schedule.py` eligible 0,
+  dispatchable 0.
+- Slots: 0 on `packet/BG-SOL-S5-CYLPAIR`@`ab1ef12` (worker DONE, RESULT.json in
+  worktree, verified-against-everything-but-V5; re-fork only to reuse the
+  slot after S5 lands). Slots 1-3 FINISHED on landed branches. No leaked
+  `%TEMP%/look-verify-baseline-*` (the S5 verifies cleaned their own).
+- Disk ~11 GB free at close (S4/S5 slot targets ~11.4 GB + wt/target warm).
+  No leaked `%TEMP%/proc-macro-srv*` beyond per-session regrowth.
 - GATE-4 ceiling 111 (true count). `scripts/kernel-gates.sh HEAD` passes
   111/111. No `unscaled_legacy()` calls added by any solver-family packet
-  (PCURVE, S3-CONTACT both ceiling-neutral).
-- PCURVE and S3-CONTACT ledgered and filed under `loop/results/` (both verified
-  ACCEPTED at their fork points).
+  (S4, S5 both ceiling-neutral).
+- S4 ledgered and filed under `loop/results/BG-SOL-S4-FE-EE.json` (ACCEPTED at
+  `4f1cbb6`). S5's RESULT is in the slot worktree, not yet filed.
+- Plan doc §4 Phase 3 amended twice this session (the S4 strata-reduction stage
+  design and the S5 cylinder-family design).
 
 ## The parallelism picture
 
-Nothing running (watchdog only; no workers, no verifies). Next work is the
-Contact Layer funnel (item 2 above: the FE/EE strata-reduction packet), then
-the remaining analytic-pair families, then the funnel stages, then Phase 4. The
-fid/rep.rs audit stays a recommendation.
+Nothing running (watchdog only; no workers, no verifies). Next work is the S5
+resolution (re-verify or the flake-fix packet), then the hard funnel stages,
+then Phase 4. The fid/rep.rs audit stays a recommendation.
 
 ## Traps, each one paid for
+### Session 31 (Contact Layer funnel: S4 landed, S5 flake-blocked) - paid in full
+
+- **A known flaky proptest can flip from rare to persistent, and then it blocks
+  the SAME packet three verifies while every other gate passes.** This session
+  `truck-geometry/tests/nurbscurve.rs::concat_positive_test` (already recorded
+  in BG-ENC-004-OFFSET's RESULT as "failed in one run, passed immediately on
+  re-run") went from rare to ~always-failing — reproduced 20/20 at BASE and 6/6
+  at the branch commit, on byte-identical sources. The V5 gate compares one
+  HEAD run against a CACHED base baseline; deleting the cache and recomputing
+  the baseline caught ANOTHER lucky pass, so V5 kept reporting `newly failing:
+  concat_positive_test` even though the base genuinely fails it too. The packet
+  provably cannot be the cause (it changed only `truck-evidence/src/contact/
+  mod.rs`; truck-geometry has no dependency on truck-evidence — verified by
+  hashing the crate sources identical at both commits and the lockfile
+  identical). **When a V5 rejection names a test in a crate the packet never
+  touched AND the failure reproduces at base, the recovery is not "re-verify
+  until the flake aligns" — it is to prove the base-level failure (done) and
+  either wait for the flake to clear or fix the latent test defect with a
+  property-fix packet.** Do not keep burning verifies on a persistent flake.
+- **A V5 baseline cache that caught a lucky pass is indistinguishable from
+  evidence.** The recomputed `a8eea8a` baseline recorded `concat_positive_test:
+  ok` minutes after I'd watched the same binary fail 20/20. `load_or_compute_
+  baseline` trusts the cache file, and the cache file cannot tell a lucky run
+  from a true one. Same disease family as the "never cache a baseline whose
+  build did not compile" trap: a baseline is evidence, and flaky-test evidence
+  is only trustworthy across multiple runs. For a flaky-proptest rejection,
+  re-run the named test at BOTH commits several times BEFORE deciding the
+  baseline is telling the truth.
+- **The worker caught two infeasible witnesses in my own packet prose, and both
+  were geometrically wrong in the same way (a line/point outside the carrier).**
+  S4's required test 1 example ("edge `(2,0,−1)→(2,0,2)` against the unit
+  cylinder") is axis-parallel at radial distance 2 and never meets the radius-1
+  wall; test 5's example ("vertical line `x=2, y=0` vs the unit circle") is off
+  the circle. The worker corrected both (keeping the required names and
+  assertions) and I machine-checked the corrections (the corrected witness
+  punctures at `t = √2/4`, point `(1/√2, 1/√2, 0)` — on the wall). This is the
+  BG-NUM-002 rule ("hand-derived numbers in a packet must be machine-checked")
+  applied to WITNESS GEOMETRY: a line/point is a predicate too, and a quick
+  distance-vs-radius python check at packet-writing time would have caught both.
+- **The `_` catch-all in `analytic_ff` became unreachable the moment the last
+  ordered (CanonicalSurface, CanonicalSurface) pair was dispatched, and rustc
+  flags it.** The S5 worker removed it and the match is now exhaustive; the
+  `(Torus, _) | (_, Torus) | (Placed, _) | (_, Placed)` deferred arm is
+  retained. A packet that extends a fully-dispatched match should say whether
+  the catch-all survives or must be deleted.
+
 ### Session 30 (M1 finish: pcurve probe landed + plan amended; Contact Layer funnel started) - paid in full
 
 - **A V9 `look` baseline is NOT cached by the earlier V5/V8 baselines at the
