@@ -542,6 +542,21 @@ needs `Placed` cylinders, which the funnel defers; the family stays the
 analytic-cell oracle for BG-NUM-003. `Torus` pairs stay deferred. All returned
 arms flow through the existing `analytic_records` mapping (no new locus forms).
 
+**AMENDED (session 32, BG-SOL-S6-IMPLICIT, the general-validated-FF substrate
+stage):** the general validated FF stage is split. Its first packet lands ONLY
+the shared primitive every later formulation needs:
+`contact/implicit.rs` in truck-evidence — trait `ImplicitField { implicit(&Box3)
+-> Interval, grad(&Box3) -> [Interval; 3], regular_on(&Box3) -> bool }` over
+the FIVE BARE carriers (Plane, Cylinder, Cone, Sphere, Torus) with documented
+sign conventions (plane: signed distance; quadrics: negative inside; cone via
+`x'²+y'²−(z't)²`, apex on the zero set with ∇f=0 there; torus via the
+sqrt-free quartic `(g)²−4R²h`). `regular_on` is deliberately one-sided
+(true = proven regular; false = not proven). No `CanonicalSurface`/`Placed`
+impl: the dispatcher refuses `Placed` upstream and the GFF solver will match
+the enum itself. The solver stages that consume it (offset mixed quadrics,
+Torus pairs, event finding + Krawczyk arc continuation, singular cells) are
+separate packets.
+
 **Phase 4 — Boundary Rewrite.** New `truck-shapeops` module; material-state
 heart (spec §13.1).
 ```rust
