@@ -170,6 +170,16 @@ intersection with the first patch retains positive y.
    `(1,0,0)`. Assert exactly
    `UnsupportedEnvelope(ContactReductionDeferred)`.
 
+### Verifier repair r2
+
+V5 correctly rejected the first worker commit because it renamed the
+pre-existing regression test
+`contact_ff_non_coaxial_curved_pair_refuses_deferred`. Preserve that exact test
+function name while updating its assertions to the new dispatch semantics; a
+passing test at the base may not disappear from the head test inventory. This
+is a one-line test-identity repair only: retain the implementation and the four
+new required tests unchanged.
+
 H-3 rejects an added bare `1e-N` unless that line has a same-line `// H-3`.
 
 ## Done when
