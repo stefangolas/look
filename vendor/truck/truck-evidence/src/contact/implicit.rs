@@ -225,7 +225,7 @@ mod tests {
 
     /// Generous containment slack for the central-difference comparison: the
     /// truncation error of a step-`FD_H` central difference on the quartic
-    /// torus form is ~1e-5 at the probed scale.
+    /// torus form is well under this at the probed scale.
     const FD_SLACK: f64 = 1.0e-4; // H-3: central-difference truncation slack on unit-scale values, not a length
 
     /// Whether the interval is the degenerate `[0, 0]`.
