@@ -11,98 +11,101 @@ otherwise would eventually cost a trap.) If you are picking this up cold, read
 [`loop/ORCHESTRATOR.md`](ORCHESTRATOR.md) for how to run the loop, then
 `python loop/slot_status.py`** - nothing else. Do not read `LEDGER.jsonl` whole.
 
-Updated 2026-08-26, close of session 33 (general validated FF: implicit
-substrate + branch-cover engine landed, after a real kernel-operator defect
-was found and fixed). Branch: `integration/kernel-bg`, HEAD `1230159`.
+Updated 2026-08-26, close of session 34 (validated mixed-quadric branch
+covers wired into the Contact Layer and verified). Branch:
+`integration/kernel-bg`, HEAD `9ddc985`.
 
 ## Where we are
 
-**The general validated FF stage advanced two layers and exposed a latent
-defect in the kernel's foundational numeric operator.** What happened:
+**The first general validated FF result now reaches the public Contact Layer.**
+BG-SOL-S7-GFF-WIRE landed at `9ddc985` (merge `81a64c2`, verified ACCEPTED at
+repaired worker commit `695796b` against explicit base `70a9c9b`). It:
 
-- **BG-SOL-S6-IMPLICIT** (`a8391b4`; verified ACCEPTED at `ae9cbf3`) —
-  `truck-evidence/src/contact/implicit.rs`: trait `ImplicitField {
-  implicit(&Box3) -> Interval, grad(&Box3) -> [Interval; 3], regular_on(&Box3)
-  -> bool }` over the FIVE BARE canonical carriers (Plane, Sphere, Cylinder,
-  Cone, Torus). Sign conventions: plane signed distance; quadrics negative
-  inside; cone `x'²+y'²−(z'·t)²` with apex ON the zero set (∇f=0 there);
-  torus via the sqrt-free quartic `g²−4R²h`. No `CanonicalSurface`/`Placed`
-  impls (scoped; dispatcher refuses Placed upstream). Worker caught a genuine
-  f64 defect in the packet's cone zero-witness: `tan(π/4)` never rounds to
-  exactly 1.0, so the "exact rational witness" wasn't — kept the test name,
-  asserted the honest SLACK property and an exact `(t,0,1)` witness with
-  `t = tan(π/4)`. Judged correct (BG-NUM-002 class).
-- **BG-SOL-S7-GFF-COVER** (`1230159`; verified ACCEPTED at `9fcf7a4` on the
-  r3 re-verify) — `truck-evidence/src/contact/gff.rs`: the branch-cover
-  engine `cover_branch(f1, f2, domain, tau, budget) -> Outcome<BranchCover>`
-  over two `ImplicitField`s: interval-exclusion pruning, determinant-based
-  singular screen, and a 2×2 z-slab Krawczyk probe `F(x,y) = [f1(x,y,z0),
-  f2(x,y,z0)]` with exact 2×2 closed-form inverse preconditioner. Landed only
-  after TWO SPEC_GAP attempts and a kernel-operator fix — see
-  BG-NUM-003-CONTRACT and the traps.
-- **BG-NUM-003-CONTRACT** (`64362d4`; verified ACCEPTED at `2d3cf66`) — the
-  REAL find of the session: `num/krawczyk.rs::k_image` computed the
-  **Hadamard** contraction `d[r][c] = δ(r,c) − y[r][c]·j[r][c]` instead of
-  the matrix product `d[r][c] = δ(r,c) − Σ_k y[r][k]·j[k][c]`. BG-NUM-003's
-  spec (line 148) literally encoded the wrong formula; it stayed latent
-  because every early user had a near-diagonal Jacobian. The general FF
-  stage's coupled slab systems exposed it: `Unique` became unreachable for
-  ANY coupled system regardless of budget (worker measured `I−Y∘J` row sums
-  1.1–3.9 > 1 at every box scale). Fixed to the true matrix product; the
-  change only strengthens certification (diagonal systems identical). The S7
-  worker's original "the operator is diagonal-only" diagnosis was actually
-  correct and I dismissed it once — re-read the source before doubting a
-  worker's numerical evidence a second time.
+- adds `ContactLocus::ValidatedBranchCover(BranchCover)`, an honest intermediate
+  that claims certified cross-sections but not connectivity/component order;
+- wires offset Cylinder/Cone, Cylinder/Sphere, Cone/Cone, and Cone/Sphere in
+  both orders through `gff::cover_branch` while preserving coaxial/exact paths;
+- derives the finite world domain from the intersection of the two certified
+  patch AABBs and uses scale-relative `tau = domain.width() / 128`;
+- returns a cover only when singular and unresolved lists are empty; singular
+  cells remain deferred and unresolved cells remain typed numerical refusals;
+- preserves the cover certificate and caller-owned budget, including an
+  untouched interval certificate for an early disjoint-AABB proof.
 
-Registry is 103 rows: **102 DONE, 1 BLOCKED** (BG-AUD-FIX-004 owner),
-**0 READY**. `schedule.py` eligible 0, dispatchable 0. Nothing running except
-the watchdog.
+The first verifier run correctly REJECTED the worker for renaming the existing
+`contact_ff_non_coaxial_curved_pair_refuses_deferred` test. Packet r2 required
+preserving that base test identity while updating its assertions. The resumed
+worker made exactly that one-line repair. The fresh verifier then passed V0-V9:
+4 required tests, no truck-evidence regressions, 1,068 downstream tests across
+five crates unchanged, and 39 real STEP geometry tests unchanged.
+
+Progress estimate, difficulty-weighted rather than registry-counted:
+
+- M2 critical path: about **58-62% complete**.
+- Entire approved solver family: about **42-47% complete**.
+- At the observed continuous pace, M2 is about **3-5 working days** away and
+  the complete solver family about **7-12 working days** away. With ordinary
+  pauses/machine interruptions, use **1-3 calendar weeks** for the full plan.
+- The registered count is not a denominator: future singular, overlap,
+  Boundary Rewrite, shell, fillet, sweep, and loft packets are not registered
+  yet, so the high DONE fraction would materially overstate completion.
+
+Registry is 104 rows: **103 DONE, 1 BLOCKED** (BG-AUD-FIX-004 owner),
+**0 READY**. `schedule.py` reports eligible 0, dispatchable 0. Nothing is
+running except the watchdog.
 
 ## Pick up here
 
-1. **Wire the branch cover into `contact()` for the offset mixed quadric
-   pairs** (the next funnel stage). The dispatcher's deferred cells
-   `(Cylinder,Cone)/(Cylinder,Sphere)/(Cone,Cone)/(Cone,Sphere)` non-coaxial,
-   both orientations, now have a certified engine. Design decision needed
-   FIRST: the cover produces a SET of certified points (BranchCover), not an
-   `ExactCurve` — the `ContactLocus` ontology has no arm for non-exact arcs.
-   The plan books `RegularContactArc` (certified arcs between event boxes)
-   for the eventual output; a pragmatic intermediate locus arm (e.g.
-   `ContactLocus::ValidatedPoints(Vec<Point3>)` or the BranchCover itself)
-   may be the right first wiring. Write against §3 booked API.
-2. Then singular event cells → 2-D overlap (C3/C4, last, deliberately
-   delayed). Then Phase 4 Boundary Rewrite, then M2.
-3. **Open latent flake, NOT fixed**: `truck-base/tests/newton.rs::
-   test_newton1` (Newton basin contract question, not a tolerance swap). Its
-   own decision.
-4. Recommended, NOT dispatched: the follow-up audit of
-   `truck-evidence/src/fid/rep.rs` (4362 lines; last touched by BG-FID-005 /
-   BG-FID-005-SRF). Its own program.
+1. **Design the singular-event stage before writing its packet.** The booked
+   Stage-4 contract requires the first split by contact-locus dimension:
+   isolated points, one-dimensional tangency loci, and coincident regions.
+   Do not reduce singular handling to a tangent-point special case. Re-derive
+   what the existing GFF singular boxes actually prove; they are currently
+   provable-or-suspected singular slabs, not isolated certified events.
+2. Then implement 2-D overlap (C3/C4, last), followed by Phase 4 Boundary
+   Rewrite and the M2 cross-layer Boolean witness.
+3. Parallel side branches after/alongside that critical path: S8 safe shell,
+   local fillet scoping, RMF sweep, and minimal-knot loft.
+4. Open latent flake, NOT fixed: `truck-base/tests/newton.rs::test_newton1`
+   (Newton basin contract question, not a tolerance swap). Its own packet.
+5. Recommended, NOT dispatched: follow-up audit of
+   `truck-evidence/src/fid/rep.rs` (4362 lines). Its own program.
 
 ## State of the machine, as left
 
-- **Watchdog RUNNING** (lock `loop/watchdog.lock`, pid 20024).
-- Registry: 103 rows = 102 DONE + 1 BLOCKED (BG-AUD-FIX-004 owner), 0 READY.
-  `schedule.py` eligible 0, dispatchable 0.
-- Slots: 0 FINISHED on landed `packet/BG-SOL-S7-GFF-COVER@9fcf7a4`; 1 FINISHED
-  on landed `packet/BG-NUM-003-CONTRACT@2d3cf66`; 2-3 FINISHED on long-landed
-  branches. All four re-forkable. Slot 1 target was ~7.8 GB warm before the
-  final verify; slots 0/2/3 targets reclaimed for disk.
-- Disk ~9.75 GB free. No leaked `%TEMP%/look-verify-baseline-*`.
-- GATE-4 ceiling 111 (true count); `kernel-gates.sh HEAD` passes 111/111 at
-  `1230159`. No `unscaled_legacy()` calls added by any of this session's
-  packets.
-- Results filed: `loop/results/BG-SOL-S6-IMPLICIT.json`,
-  `loop/results/BG-SOL-S7-GFF-COVER.json`,
-  `loop/results/BG-NUM-003-CONTRACT.json`.
+- Watchdog RUNNING (`loop/watchdog.lock`; previous recorded pid 20024).
+- Registry: 104 rows = 103 DONE + 1 BLOCKED, 0 READY; scheduler eligible 0,
+  dispatchable 0.
+- Slots 0-3 FINISHED. Slot 0 is the landed
+  `packet/BG-SOL-S7-GFF-WIRE@695796b`; all are re-forkable.
+- Disk about 8.78 GB free. No leaked `%TEMP%/look-verify-baseline-*`.
+- GATE-4 ceiling 111 (true count); `kernel-gates.sh HEAD` passes all P-3 gates
+  and 111/111 at `9ddc985`.
+- Result filed at `loop/results/BG-SOL-S7-GFF-WIRE.json`.
+- Root tracked tree clean. Numerous pre-existing untracked user/baseline/scratch
+  files remain and must be preserved.
 
 ## The parallelism picture
 
-Nothing running (watchdog only). Next work is the wiring packet (contact()
-consuming cover_branch for the offset mixed quadric cells), then singular
-events, then C3/C4, then Phase 4.
+Nothing running (watchdog only). The critical path is singular contact locus
+classification -> 2-D overlap -> Boundary Rewrite -> M2. The next packet does
+not yet exist because the singular ontology and proof boundary must be designed
+first.
 
 ## Traps, each one paid for
+### Session 34 (validated GFF wiring) - paid in full
+
+- **Renaming a pre-existing passing test is a regression even when its old
+  assertion is intentionally obsolete.** BG-SOL-S7-GFF-WIRE correctly changed
+  the offset-pair dispatch semantics but renamed
+  `contact_ff_non_coaxial_curved_pair_refuses_deferred`; V5 compared the base
+  and head test inventories and rejected the missing identity after a full
+  baseline/head run. The repair was one line: keep the exact base function
+  name and update its assertions in place, while adding separately named tests
+  for the new contract. Any packet that supersedes a regression test's expected
+  result must preserve the test identity unless the packet explicitly retires
+  it and the verifier contract permits retirement.
+
 ### Session 33 (implicit substrate, branch cover, and the Krawczyk contraction defect) - paid in full
 
 - **A packet-spec math formula can be wrong, faithful workers implement it,
