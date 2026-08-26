@@ -1,0 +1,13 @@
+{
+  "id": "BG-SOL-S7-GFF-COVER",
+  "status": "DONE",
+  "contracts": ["BG-SOL-S7-GFF-COVER"],
+  "tests_added": 0,
+  "sites_migrated": 0,
+  "sites_deferred": 0,
+  "deviations": [],
+  "disagreements": [],
+  "baseline_failures": [],
+  "amended_by": "orchestrator",
+  "notes": "Orchestrator record reconstructing RESULT.json for the re-verify of the r2 amendment (commits 1908443 + f353713, rebased onto the BG-NUM-003-CONTRACT fix 64362d4). Original worker RESULT (SPEC_GAP at 05fe95d) is archived in the ledger: the 2x2 z-slab probe (SlabFF KrawczykSystem<2>, exact 2x2 closed-form inverse preconditioner, determinant-based singular screen det = 4(y*cx - x*cy), nested (x,y) worklist per z-leaf, z-leaf bisection on lateral exhaustion) could not certify the transversal sphere/cylinder pair ONLY because the vendored krawczyk operator's k_image computed the Hadamard contraction (d[r][c] = delta - y[r][c]*j[r][c]) instead of the matrix product (I - YJ). BG-NUM-003-CONTRACT fixed the operator (landed 64362d4). This re-verify confirms the r2 cover now certifies. Deviations from the original r2 worker (kept verbatim from its RESULT): recorded point for a Unique verdict is the (x,y) box midpoint refined by float Newton steps toward the certified root (refine_point), not the raw midpoint; A3 anchor was stale (gff already declared by r1) and the worker reported ANCHOR_MISMATCH accordingly."
+}

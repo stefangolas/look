@@ -57,6 +57,7 @@ use truck_geometry::recognize::{
 /// (cylinder × cylinder, general validated FF, 2-D overlap) extend the Contact
 /// Layer without colliding on this dispatcher file.
 pub mod fe_ee;
+pub mod gff;
 pub mod implicit;
 
 /// One boundary stratum of a solid, lifted to the canonical-carrier level.
