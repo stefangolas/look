@@ -1,0 +1,15 @@
+{
+  "id": "BG-FIX-001",
+  "status": "DONE",
+  "contracts": [
+    "BG-FIX-001"
+  ],
+  "tests_added": 0,
+  "sites_migrated": 0,
+  "sites_deferred": 0,
+  "deviations": [],
+  "disagreements": [],
+  "baseline_failures": [],
+  "notes": "Only vendor/truck/truck-geotrait/src/traits/curve.rs changed: added assert_derivative_near (relative predicate, TOLERANCE imported by name, no float literals, H-3 clean), swapped exactly the six derivative assert_near! sites, added InnerSpace<Scalar=f64> bounds to parameter_transform_random_test/exec_parameter_transform_random_test (on the existing Mul<f64> vector bound) and Sub+InnerSpace bounds to concat_random_test/exec_concat_random_test. cut_random_test and every non-derivative assert_near! untouched. All done-when checks green: fmt, clippy -D warnings (via -p --all-targets --no-deps), workspace check, geotrait lib/tests, geometry nurbscurve+bspcurve, topology euler_operators. Stabilization done-bar: concat_positive_test passed 5/5 consecutive runs. ORCHESTRATOR AMENDMENT: the packet spec itself carried a defect in the helper floor (diff <= TOLERANCE * scale.max(TOLERANCE)); for scale < TOLERANCE that yields an effective epsilon of TOLERANCE^2 = 1e-12, i.e. one million times STRICTER than the legacy absolute tolerance it claimed to reproduce. Amended per ORCHESTRATOR.md (packet wrongly asked for it): floor corrected to scale.max(1.0), giving |a-b| <= TOLERANCE * max(1, |a|, |b|) - exactly the legacy absolute epsilon at or below unit magnitude, proportional above. Doc comment and assert message updated accordingly. The amended predicate is pointwise no tighter than the original everywhere, so the worker 5/5 stabilization holds a fortiori; fmt/clippy/geotrait/geometry tests re-run green post-amendment.",
+  "amended_by": "orchestrator"
+}
