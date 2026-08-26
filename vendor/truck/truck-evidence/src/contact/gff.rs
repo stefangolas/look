@@ -10,19 +10,20 @@
 //! curve points, proven-singular boxes, proven-empty regions, and
 //! honestly-typed unresolved remainder.
 //!
-//! The contact curve is `C = { p : f1(p) = 0, f2(p) = 0 }`. At any regular
-//! point the tangent direction is `t = ∇f1 × ∇f2`. The certified probe is a
-//! 3×3 augmented Krawczyk system: pick `m` (the box midpoint) and
-//! `g = ∇f1(m) × ∇f2(m)` (renormalized; degenerate → singular), and solve
+//! The contact curve is `C = { p : f1(p) = 0, f2(p) = 0 }`. The certified
+//! probe is a **2×2 z-slab Krawczyk system** (packet amendment r2): decompose
+//! the search box's z-range into leaves; for each z-leaf, at its mid-plane
+//! `z0`, solve
 //!
 //! ```text
-//! F(p) = [ f1(p), f2(p), g · (p − m) ]   over the box
+//! F(x, y) = [ f1(x, y, z0), f2(x, y, z0) ]   over the (x, y) box
 //! ```
 //!
-//! A `KrawczykProof::Unique` proves EXACTLY ONE point of C in the box that
-//! also lies in the plane `g·(p−m) = 0` — one certified crossing. Interval
-//! soundness comes from `ImplicitField`; existence/uniqueness from krawczyk;
-//! the composition decides nothing it cannot prove.
+//! A `KrawczykProof::Unique` proves EXACTLY ONE crossing of C through the
+//! slab's mid-plane. The Jacobian is the 2×2 `∂(f1,f2)/∂(x,y)`; for the
+//! z-aligned quadric pairs this stage exists for, its determinant is
+//! `4(y·cx − x·cy)`-type — non-singular exactly away from the singular locus.
+//! Slabs whose determinant enclosure contains zero classify as `Singular`.
 //!
 //! This writes no dispatcher logic and no `ContactLocus` arms — wiring the
 //! cover into `contact()` is the next packet's job.
@@ -42,7 +43,7 @@ use crate::enclosure::interval_at;
 use crate::enclosure::Box3;
 use crate::num::krawczyk::{krawczyk, KrawczykProof, KrawczykSystem};
 use inari::Interval;
-use truck_base::cgmath64::{InnerSpace, Point3, Vector3};
+use truck_base::cgmath64::Point3;
 use truck_base::evidence::{
     Budget, Certificate, Certified, Margin, Method, Modulus, Outcome, PropMap, Refusal,
     UnresolvedWitness,
@@ -55,11 +56,11 @@ use super::implicit::ImplicitField;
 pub enum CellVerdict {
     /// The box contains no point of C: some f_i enclosure excludes zero.
     Empty,
-    /// The box holds (part of) a singular locus: the gradient cross product
-    /// enclosure contains zero at the box midpoint AND neither field excludes
-    /// zero on the box. Not further classified here.
+    /// The box holds (part of) a singular locus: the slab Jacobian
+    /// determinant enclosure contains zero AND neither field excludes zero
+    /// on the box. Not further classified here.
     Singular,
-    /// Krawczyk proved exactly one crossing of C through the box's mid-plane.
+    /// Krawczyk proved exactly one crossing of C through the slab mid-plane.
     Point(Point3),
 }
 
@@ -93,81 +94,91 @@ pub fn cover_branch(
     let d1: &dyn ImplicitField = f1;
     let d2: &dyn ImplicitField = f2;
     let mut cover = BranchCover::default();
-    let mut stack: Vec<Box3> = vec![*domain];
-    while let Some(b) = stack.pop() {
+    // The outer worklist is z-leaves (intervals partitioning domain.z).
+    let mut z_stack: Vec<Interval> = vec![domain.z];
+    while let Some(z_leaf) = z_stack.pop() {
+        let z0 = z_leaf.mid();
+        let slab = Box3 {
+            x: domain.x,
+            y: domain.y,
+            z: z_leaf,
+        };
         // (a) Interval exclusion: some field enclosure excludes zero.
-        if excludes_zero(d1.implicit(&b)) || excludes_zero(d2.implicit(&b)) {
+        if excludes_zero(d1.implicit(&slab)) || excludes_zero(d2.implicit(&slab)) {
             continue;
         }
-        // (b) Singularity screen: the interval cross product of the gradient
-        // boxes over B. If every component contains zero the gradients may be
-        // parallel somewhere in the box (tangency/singularity), so the box
-        // classifies as singular instead of probing.
-        let c = box_midpoint(&b);
-        let [a0, a1, a2] = d1.grad(&b);
-        let [bb0, bb1, bb2] = d2.grad(&b);
-        let cross = Box3 {
-            x: a1 * bb2 - a2 * bb1,
-            y: a2 * bb0 - a0 * bb2,
-            z: a0 * bb1 - a1 * bb0,
-        };
-        if cross.x.contains(0.0) && cross.y.contains(0.0) && cross.z.contains(0.0) {
-            cover.singular_boxes.push(b);
+        // (b) Singularity screen: the 2×2 slab Jacobian determinant over the
+        // slab. If it contains zero the gradients may be parallel somewhere in
+        // the slab (tangency/singularity), so the slab classifies as singular
+        // instead of probing.
+        let [f1x, f1y, _] = d1.grad(&slab);
+        let [f2x, f2y, _] = d2.grad(&slab);
+        let det = f1x * f2y - f1y * f2x;
+        if det.contains(0.0) {
+            cover.singular_boxes.push(slab);
             continue;
         }
-        // (c) Probe: the augmented 3×3 system with m = c and g the normalized
-        // midpoint of the cross enclosure. A degenerate midpoint (or a
-        // non-finite one) treats the box as singular.
-        let mut g = Vector3::new(cross.x.mid(), cross.y.mid(), cross.z.mid());
-        if !g.x.is_finite() || !g.y.is_finite() || !g.z.is_finite() || g.magnitude() == 0.0 {
-            cover.singular_boxes.push(b);
-            continue;
-        }
-        g = g.normalize();
-        let sys = AugmentedFF {
-            f1: d1,
-            f2: d2,
-            g,
-            m: c,
-        };
-        let start = [b.x, b.y, b.z];
-        // (d) The Krawczyk outcome decides the leaf.
-        match krawczyk::<3>(&sys, &start, budget) {
-            Ok(Certified {
-                value: KrawczykProof::Unique,
-                ..
-            }) => {
-                // Exactly one crossing of C through the box's mid-plane. The
-                // recorded point is the box midpoint c refined to the
-                // certified root; the Krawczyk proof is the certificate.
-                cover.points.push(refine_point(&sys, c));
-            }
-            // NoRoot: no point of C in the box → Empty.
-            Ok(Certified {
-                value: KrawczykProof::NoRoot,
-                ..
-            }) => {}
-            // The probe could not certify: bisect the box widest-axis-first
-            // (ties toward the lowest index), spending budget. A leaf that
-            // cannot bisect (width ≤ tau on all axes, or f64 resolution) is
-            // the honest unresolved remainder.
-            Err(Refusal::NumericallyUnresolved { .. }) => {
-                if let Some((lo, hi)) = bisect_pair(&b, tau) {
-                    if budget.spend_subdiv(1).is_err() {
-                        return Err(Refusal::NumericallyUnresolved {
-                            spent: spent(&initial, budget),
-                            witness: UnresolvedWitness::KrawczykIndeterminate,
-                        });
-                    }
-                    stack.push(lo);
-                    stack.push(hi);
-                } else {
-                    cover.unresolved_boxes.push(b);
+        // (c) Probe: the nested (x, y) worklist for this z-leaf.
+        let sys = SlabFF { f1: d1, f2: d2, z0 };
+        let mut xy_stack: Vec<[Interval; 2]> = vec![[domain.x, domain.y]];
+        let mut z_bisected = false;
+        while let Some(q) = xy_stack.pop() {
+            // (d) The Krawczyk outcome decides this (x, y) leaf.
+            match krawczyk::<2>(&sys, &q, budget) {
+                Ok(Certified {
+                    value: KrawczykProof::Unique,
+                    ..
+                }) => {
+                    // Exactly one crossing of C through the slab mid-plane.
+                    // The recorded point is the (x, y) box midpoint refined to
+                    // the certified root; the Krawczyk proof is the
+                    // certificate.
+                    let [qx, qy] = q;
+                    let m = Point3::new(qx.mid(), qy.mid(), z0);
+                    cover.points.push(refine_point(&sys, m));
                 }
+                // NoRoot: no crossing through this slab leaf → Empty.
+                Ok(Certified {
+                    value: KrawczykProof::NoRoot,
+                    ..
+                }) => {}
+                // The probe could not certify: bisect the (x, y) box
+                // widest-axis-first (ties toward the lowest index), spending
+                // budget; when the (x, y) box is at resolution, bisect the
+                // z-leaf instead. A leaf that can bisect neither way is the
+                // honest unresolved remainder.
+                Err(Refusal::NumericallyUnresolved { .. }) => {
+                    if let Some((lo, hi)) = bisect_xy(&q, tau) {
+                        if budget.spend_subdiv(1).is_err() {
+                            return Err(Refusal::NumericallyUnresolved {
+                                spent: spent(&initial, budget),
+                                witness: UnresolvedWitness::KrawczykIndeterminate,
+                            });
+                        }
+                        xy_stack.push(lo);
+                        xy_stack.push(hi);
+                    } else if !z_bisected {
+                        if let Some((lo, hi)) = bisect_interval(z_leaf, tau) {
+                            if budget.spend_subdiv(1).is_err() {
+                                return Err(Refusal::NumericallyUnresolved {
+                                    spent: spent(&initial, budget),
+                                    witness: UnresolvedWitness::KrawczykIndeterminate,
+                                });
+                            }
+                            z_stack.push(lo);
+                            z_stack.push(hi);
+                            z_bisected = true;
+                        } else {
+                            cover.unresolved_boxes.push(slab);
+                        }
+                    } else {
+                        cover.unresolved_boxes.push(slab);
+                    }
+                }
+                // krawczyk's other refusal is `Empty` (an empty or non-finite
+                // start box): the leaf decides nothing, treat as Empty.
+                Err(_) => {}
             }
-            // krawczyk's other refusal is `Empty` (an empty or non-finite
-            // start box): the box decides nothing, treat as Empty.
-            Err(_) => {}
         }
     }
     Ok(Certified::new(
@@ -182,161 +193,79 @@ pub fn cover_branch(
     ))
 }
 
-/// The augmented 3×3 probe system: `F(p) = [f1(p), f2(p), g·(p−m)]`.
-struct AugmentedFF<'a> {
+/// The 2×2 z-slab probe system: `F(x, y) = [f1(x, y, z0), f2(x, y, z0)]`.
+struct SlabFF<'a> {
     f1: &'a dyn ImplicitField,
     f2: &'a dyn ImplicitField,
-    /// The normalized tangent-direction estimate.
-    g: Vector3,
-    /// The reference point (the search-box midpoint).
-    m: Point3,
+    /// The slab's mid-plane height.
+    z0: f64,
 }
 
-impl KrawczykSystem<3> for AugmentedFF<'_> {
+impl KrawczykSystem<2> for SlabFF<'_> {
     /// Point evaluation: both implicit fields wrapped as degenerate intervals
-    /// at `x`, plus the plane term `g·(x−m)`.
-    fn f_point(&self, x: &[f64; 3]) -> [Interval; 3] {
-        let [x0, x1, x2] = *x;
-        let boxed = Box3::point(Point3::new(x0, x1, x2));
-        let f1 = self.f1.implicit(&boxed);
-        let f2 = self.f2.implicit(&boxed);
-        let gx = interval_at(self.g.x);
-        let gy = interval_at(self.g.y);
-        let gz = interval_at(self.g.z);
-        let plane = gx * (interval_at(x0) - interval_at(self.m.x))
-            + gy * (interval_at(x1) - interval_at(self.m.y))
-            + gz * (interval_at(x2) - interval_at(self.m.z));
-        [f1, f2, plane]
+    /// at `(x, y, z0)`.
+    fn f_point(&self, x: &[f64; 2]) -> [Interval; 2] {
+        let [x0, x1] = *x;
+        let boxed = Box3::point(Point3::new(x0, x1, self.z0));
+        [self.f1.implicit(&boxed), self.f2.implicit(&boxed)]
     }
 
-    /// The interval Jacobian over the box: row per field, last row = g as
-    /// constants, row-major `[row][col] = dF_row/dx_col`.
-    fn jacobian(&self, b: &[Interval; 3]) -> [[Interval; 3]; 3] {
-        let [qx, qy, qz] = *b;
+    /// The interval 2×2 Jacobian over the box: rows f1/f2, cols ∂/∂x ∂/∂y,
+    /// evaluated over `q × [z0, z0]` (the slab mid-plane is degenerate in z).
+    fn jacobian(&self, b: &[Interval; 2]) -> [[Interval; 2]; 2] {
+        let [qx, qy] = *b;
         let boxed = Box3 {
             x: qx,
             y: qy,
-            z: qz,
+            z: interval_at(self.z0),
         };
-        let [f1x, f1y, f1z] = self.f1.grad(&boxed);
-        let [f2x, f2y, f2z] = self.f2.grad(&boxed);
-        [
-            [f1x, f1y, f1z],
-            [f2x, f2y, f2z],
-            [
-                interval_at(self.g.x),
-                interval_at(self.g.y),
-                interval_at(self.g.z),
-            ],
-        ]
+        let [f1x, f1y, _] = self.f1.grad(&boxed);
+        let [f2x, f2y, _] = self.f2.grad(&boxed);
+        [[f1x, f1y], [f2x, f2y]]
     }
 
-    /// A float inverse of the 3×3 Jacobian at a point. `None` (singular) lets
-    /// krawczyk bisect (its contract).
-    fn preconditioner(&self, x: &[f64; 3]) -> Option<[[f64; 3]; 3]> {
-        let [x0, x1, x2] = *x;
-        let boxed = Box3::point(Point3::new(x0, x1, x2));
-        let [f1x, f1y, f1z] = self.f1.grad(&boxed);
-        let [f2x, f2y, f2z] = self.f2.grad(&boxed);
-        let jac = [
-            [f1x.mid(), f1y.mid(), f1z.mid()],
-            [f2x.mid(), f2y.mid(), f2z.mid()],
-            [self.g.x, self.g.y, self.g.z],
-        ];
-        invert3x3(&jac)
+    /// The EXACT float inverse of `mid(J)` by the 2×2 closed form
+    /// `1/det · [[d, −b], [−c, a]]`. `None` when `|det|` is degenerate
+    /// (krawczyk then bisects per its contract).
+    fn preconditioner(&self, x: &[f64; 2]) -> Option<[[f64; 2]; 2]> {
+        let [x0, x1] = *x;
+        let boxed = Box3::point(Point3::new(x0, x1, self.z0));
+        let [f1x, f1y, _] = self.f1.grad(&boxed);
+        let [f2x, f2y, _] = self.f2.grad(&boxed);
+        let a = f1x.mid();
+        let b = f1y.mid();
+        let c = f2x.mid();
+        let d = f2y.mid();
+        let det = a * d - b * c;
+        if det.is_finite() && det != 0.0 {
+            Some([[d / det, -b / det], [-c / det, a / det]])
+        } else {
+            None
+        }
     }
 }
 
-/// The inverse of a 3×3 matrix by Gaussian elimination with partial pivoting.
-/// `None` when the matrix is singular (a zero or non-finite pivot); the
-/// Krawczyk contract bisects on `None`.
-fn invert3x3(a: &[[f64; 3]; 3]) -> Option<[[f64; 3]; 3]> {
-    let [[a00, a01, a02], [a10, a11, a12], [a20, a21, a22]] = *a;
-    // Augmented [A | I], kept row-major as 6-vectors.
-    let mut m = [
-        [a00, a01, a02, 1.0, 0.0, 0.0],
-        [a10, a11, a12, 0.0, 1.0, 0.0],
-        [a20, a21, a22, 0.0, 0.0, 1.0],
-    ];
-    for col in 0..3 {
-        // Partial pivot: the remaining row with the largest |entry|.
-        let mut pivot = col;
-        let mut best = m
-            .get(col)
-            .and_then(|row| row.get(col))
-            .copied()
-            .unwrap_or(0.0)
-            .abs();
-        for row in (col + 1)..3 {
-            let value = m
-                .get(row)
-                .and_then(|r| r.get(col))
-                .copied()
-                .unwrap_or(0.0)
-                .abs();
-            if value > best {
-                best = value;
-                pivot = row;
-            }
-        }
-        if !best.is_finite() || best == 0.0 {
-            return None;
-        }
-        if pivot != col {
-            m.swap(col, pivot);
-        }
-        let pivot_value = *m.get(col)?.get(col)?;
-        // Eliminate column `col` from every other row.
-        for row in 0..3 {
-            if row == col {
-                continue;
-            }
-            let factor = *m.get(row)?.get(col)? / pivot_value;
-            for k in 0..6 {
-                let entry = *m.get(row)?.get(k)? - factor * *m.get(col)?.get(k)?;
-                *m.get_mut(row)?.get_mut(k)? = entry;
-            }
-        }
-    }
-    // Normalize each row to a unit diagonal and read the inverse off the
-    // right half.
-    let mut out = [[0.0; 3]; 3];
-    for row in 0..3 {
-        let diag = *m.get(row)?.get(row)?;
-        if !diag.is_finite() || diag == 0.0 {
-            return None;
-        }
-        for col in 0..3 {
-            let entry = *m.get(row)?.get(col + 3)? / diag;
-            *out.get_mut(row)?.get_mut(col)? = entry;
-        }
-    }
-    Some(out)
-}
-
-/// A Newton refinement of the certified crossing from the box midpoint `c`.
+/// A Newton refinement of the certified crossing from the (x, y) box midpoint.
 ///
-/// The Krawczyk proof guarantees a unique root of the augmented system in the
-/// box and a contraction on it, so a few float Newton steps from `c` converge
-/// to that root. The certificate is the proof, not the float iteration; this
-/// only sharpens the recorded location toward the proven crossing.
-fn refine_point(sys: &AugmentedFF<'_>, c: Point3) -> Point3 {
+/// The Krawczyk proof guarantees a unique root of the 2×2 slab system in the
+/// box and a contraction on it, so a few float Newton steps from `c` (at the
+/// fixed slab height `z0`) converge to that root. The certificate is the
+/// proof, not the float iteration; this only sharpens the recorded location
+/// toward the proven crossing.
+fn refine_point(sys: &SlabFF<'_>, c: Point3) -> Point3 {
     let mut p = c;
     for _ in 0..MAX_NEWTON_STEPS {
-        let x = [p.x, p.y, p.z];
+        let x = [p.x, p.y];
         let Some(y) = sys.preconditioner(&x) else {
             break;
         };
         let f = sys.f_point(&x);
-        let [f0, f1, f2] = f;
-        let [[y00, y01, y02], [y10, y11, y12], [y20, y21, y22]] = y;
-        let step = Vector3::new(
-            y00 * f0.mid() + y01 * f1.mid() + y02 * f2.mid(),
-            y10 * f0.mid() + y11 * f1.mid() + y12 * f2.mid(),
-            y20 * f0.mid() + y21 * f1.mid() + y22 * f2.mid(),
-        );
-        let next = p - step;
-        let correction = (next - p).magnitude();
+        let [f0, f1] = f;
+        let [[y00, y01], [y10, y11]] = y;
+        let dx = y00 * f0.mid() + y01 * f1.mid();
+        let dy = y10 * f0.mid() + y11 * f1.mid();
+        let next = Point3::new(p.x - dx, p.y - dy, p.z);
+        let correction = ((p.x - next.x).powi(2) + (p.y - next.y).powi(2)).sqrt();
         if !correction.is_finite() || correction <= NEWTON_TOL {
             return next;
         }
@@ -360,56 +289,53 @@ fn excludes_zero(i: Interval) -> bool {
     i.inf() > 0.0 || i.sup() < 0.0
 }
 
-/// The float midpoint of a box.
-fn box_midpoint(b: &Box3) -> Point3 {
-    Point3::new(b.x.mid(), b.y.mid(), b.z.mid())
-}
-
-/// Splits a box on its widest axis (ties toward the lowest axis index) at the
-/// axis midpoint, as a convex combination so the halves hull back to the
-/// original even near overflow. `None` when the box cannot bisect: its widest
-/// axis is at or below `tau`, or its midpoint rounds onto an edge (f64
-/// resolution).
-fn bisect_pair(b: &Box3, tau: f64) -> Option<(Box3, Box3)> {
-    let wx = b.x.sup() - b.x.inf();
-    let wy = b.y.sup() - b.y.inf();
-    let wz = b.z.sup() - b.z.inf();
-    let max = wx.max(wy).max(wz);
+/// Splits a 2-D (x, y) box on its widest axis (ties toward the lowest axis
+/// index) at the axis midpoint, as a convex combination so the halves hull
+/// back to the original even near overflow. `None` when the box cannot
+/// bisect: its widest axis is at or below `tau`, or its midpoint rounds onto
+/// an edge (f64 resolution).
+fn bisect_xy(q: &[Interval; 2], tau: f64) -> Option<([Interval; 2], [Interval; 2])> {
+    let [qx, qy] = *q;
+    let wx = qx.sup() - qx.inf();
+    let wy = qy.sup() - qy.inf();
+    let max = wx.max(wy);
     if !max.is_finite() || max <= tau {
         return None;
     }
-    let axis = if max == wx {
-        0
-    } else if max == wy {
-        1
+    if max == wx {
+        let (inf, sup) = (qx.inf(), qx.sup());
+        let mid = 0.5 * inf + 0.5 * sup;
+        if mid == inf || mid == sup {
+            return None;
+        }
+        let lo_x = Interval::try_from((inf, mid)).unwrap_or(qx);
+        let hi_x = Interval::try_from((mid, sup)).unwrap_or(qx);
+        Some(([lo_x, qy], [hi_x, qy]))
     } else {
-        2
-    };
-    let (inf, sup) = match axis {
-        0 => (b.x.inf(), b.x.sup()),
-        1 => (b.y.inf(), b.y.sup()),
-        _ => (b.z.inf(), b.z.sup()),
-    };
-    let mid = 0.5 * inf + 0.5 * sup;
-    if mid == inf || mid == sup {
+        let (inf, sup) = (qy.inf(), qy.sup());
+        let mid = 0.5 * inf + 0.5 * sup;
+        if mid == inf || mid == sup {
+            return None;
+        }
+        let lo_y = Interval::try_from((inf, mid)).unwrap_or(qy);
+        let hi_y = Interval::try_from((mid, sup)).unwrap_or(qy);
+        Some(([qx, lo_y], [qx, hi_y]))
+    }
+}
+
+/// Splits a z-leaf interval at its midpoint. `None` when the leaf is at or
+/// below `tau`, or its midpoint rounds onto an edge (f64 resolution).
+fn bisect_interval(z: Interval, tau: f64) -> Option<(Interval, Interval)> {
+    let width = z.sup() - z.inf();
+    if !width.is_finite() || width <= tau {
         return None;
     }
-    let mut lo = *b;
-    let mut hi = *b;
-    match axis {
-        0 => {
-            lo.x = Interval::try_from((inf, mid)).unwrap_or(lo.x);
-            hi.x = Interval::try_from((mid, sup)).unwrap_or(hi.x);
-        }
-        1 => {
-            lo.y = Interval::try_from((inf, mid)).unwrap_or(lo.y);
-            hi.y = Interval::try_from((mid, sup)).unwrap_or(hi.y);
-        }
-        _ => {
-            lo.z = Interval::try_from((inf, mid)).unwrap_or(lo.z);
-            hi.z = Interval::try_from((mid, sup)).unwrap_or(hi.z);
-        }
+    let mid = 0.5 * z.inf() + 0.5 * z.sup();
+    if mid == z.inf() || mid == z.sup() {
+        return None;
     }
+    let lo = Interval::try_from((z.inf(), mid)).unwrap_or(z);
+    let hi = Interval::try_from((mid, z.sup())).unwrap_or(z);
     Some((lo, hi))
 }
 
@@ -459,8 +385,9 @@ mod tests {
         // The UNIT z-cylinder at the origin meets the sphere center (3,0,0)
         // radius 3 in the smooth curve z² = 6x − 1 (subtract the cylinder
         // equation from the sphere's). The box hugs the y>0, z>0 branch, with
-        // y bounded strictly away from 0 so the gradient cross product's
-        // z-component excludes zero and the box is not screened as singular.
+        // y bounded strictly away from 0 so the 2×2 slab determinant
+        // det = 4(y·cx − x·cy) = 12y excludes zero and the slab is not
+        // screened as singular.
         let cyl = unit_cylinder();
         let sph = Sphere::new(Point3::new(3.0, 0.0, 0.0), 3.0);
         let domain = Box3 {
@@ -494,8 +421,8 @@ mod tests {
     fn tangent_pair_classifies_singular() {
         // The sphere center (2,0,0) radius 1 is tangent to the cylinder at
         // exactly (1,0,0): both equations vanish there and the gradients
-        // (2,0,0) and (−2,0,0) are antiparallel, so a box around the tangency
-        // screens singular rather than probing.
+        // (2,0,0) and (−2,0,0) are antiparallel, so a slab around the
+        // tangency screens singular rather than probing.
         let cyl = unit_cylinder();
         let sph = Sphere::new(Point3::new(2.0, 0.0, 0.0), 1.0);
         let domain = Box3 {

@@ -1,58 +1,64 @@
-# QUESTION — BG-SOL-S7-GFF-COVER (SPEC_GAP)
+# QUESTION — BG-SOL-S7-GFF-COVER (SPEC_GAP, second attempt)
 
 ## The gap
 
-The packet's certified probe — the 3×3 augmented Krawczyk system
-`F(p) = [f1(p), f2(p), g·(p−m)]` with the full 3×3 Gaussian-elimination
-inverse preconditioner — cannot certify **any** box of the shared zero set of
-two implicit fields, because the vendored Krawczyk operator cannot certify a
-coupled system at all.
+The packet's certified probe — the 2×2 z-slab Krawczyk system
+`F(x,y) = [f1(x,y,z0), f2(x,y,z0)]` with the exact 2×2 inverse preconditioner —
+cannot certify **any** crossing of the transversal sphere/cylinder witness,
+even on a tiny box centered on the exact crossing. The r2 amendment's premise
+that the vendored Krawczyk operator is a full-matrix operator that will
+contract the 2×2 slab is factually wrong.
+
+(Note: anchor A3 is also stale — it pins zero `gff` matches in `contact/mod.rs`,
+but the committed r1 module this amendment instructs converting added
+`pub mod gff;`, so A3 returns 1 and cannot pass while the conversion exists.)
 
 ## What I observed
 
-- `num/krawczyk.rs` `k_image` computes its K image with an **entrywise**
-  contraction `d[r][c] = δ(r,c) − y[r][c]·j[r][c]` (same column index on Y and
-  J), i.e. the *diagonal-preconditioner* Krawczyk operator, not the matrix
-  product `(I − Y·J(Q))`.
-- That operator only contracts (and is only sound) for systems whose interval
-  Jacobian is effectively diagonal. The packet's augmented system has a
-  genuinely coupled Jacobian (rows `∇f1`, `∇f2`, `g` are not orthogonal:
-  `∇f1·∇f2 ≈ −2.4` at the sphere-cylinder crossing used in the tests).
-- Result: for the sphere-cylinder witness on a box centered on the certified
-  crossing (width 8e-3, `f(mid) ≈ 1e-3`), the entrywise K image spans nearly
-  the whole box (`K ≈ [0.533, 0.541] × …`); row 1 of `(I − Y∘J)` has
-  `|d|`-row-sum ≈ 3.9 > 1, so `K ⊂ strict interior(Q)` is structurally
-  impossible on any balanced box. `krawczyk` returns
-  `NumericallyUnresolved` (never `Unique`) under every budget I tried
-  (64 … 4096 subdivisions), and the transversal test fails with budget
-  exhaustion.
-- The full 3×3 inverse preconditioner the packet requires is exactly the
-  configuration that breaks: I verified `invert3x3` is correct (identity,
-  diagonal, and a general 3×3 known-inverse check all pass); the failure is in
-  the operator's contraction, not the inverse.
+**The operator is entrywise, not full-matrix.** `num/krawczyk.rs` `k_image`
+(162) computes `d[r][c] = δ(r,c) − y[r][c]·j[r][c]` — the *same* column index
+`c` on both the preconditioner row and the Jacobian row. That is the
+diagonal-preconditioner Krawczyk: it certifies exactly when the entrywise
+`(I − Y∘J)` is small, i.e. only for effectively diagonal Jacobians. It is NOT
+`(I − Y·J)` (the matrix product `δ − Σ_k y[r][k]·j[k][c]`).
 
-For contrast, krawczyk's own 2×2 production impl (`SurfaceKnotProjection` in
-`fid/rep.rs`) certifies only because a regular surface parameterization has
-near-diagonal Jacobian.
+**Control that isolates the operator:** the krawczyk module's own coupled 2×2
+linear witness (Lin2, full-matrix inverse) certifies one-shot on a small box
+around its root — but only because its entrywise `(I − Y∘J)` row sums are
+`0.4 < 1`. I verified this directly.
+
+**The 2×2 slab system cannot certify the witness.** Re-derived determinant:
+`J = [[2x, 2y], [2(x−cx), 2(y−cy)]]`, `det = 4(y·cx − x·cy) = 12y` for the
+witness — nonsingular off the singular locus, exactly as the packet states. But
+at any crossing `(x,y)` of the curve, the entrywise `(I − Y∘J)` row-1 |d|-sum is
+`(x−3)²/(3y) + |1 − x/3| ≥ 4/3 + 2/3 > 1` (since `x ∈ [1/6,1]` and `|y| ≤ 1` on
+the cylinder), so `K ⊂ strict interior(Q)` is unreachable on any axis-aligned
+box, regardless of position, shape, or budget. Measured: a 0.02-wide box
+centered on the exact crossing (f residuals ~1e-16) still returns
+`NumericallyUnresolved` after 223 subdivisions; the full cover exhausts a 4096
+budget.
 
 ## The question
 
 How should the Contact Layer's general validated FF stage proceed?
 
-1. **Amend the vendored krawczyk operator** (out of this packet's write set)
-   to compute the matrix product `(I − Y·J(Q))` instead of the entrywise
-   `(I − Y∘J)` — the documented contract ("the system supplies its own float
-   inverse") and the 2×2 test (`linear_system_certifies_one_shot`) only pass
-   today because of a huge start box, which hides the defect. Then this packet
-   is re-runnable as written.
-2. **Book the general FF stage on a different certified primitive** (e.g. a
-   bisection/exclusion-only curve-pointing scheme, or a Newton-continuation
-   arc following `t = ∇f1 × ∇f2`) and drop the 3×3 augmented-Krawczyk
-   formulation from the plan.
+1. **Fix the vendored krawczyk operator** (out of this packet's write set) to
+   compute the matrix product `(I − Y·J(Q))` instead of the entrywise
+   `(I − Y∘J)`. The current operator certifies the krawczyk module's own
+   `linear_system_certifies_one_shot` only because its start box is huge
+   ([−10,10]); a coupled 2×2 linear system on a small box would fail today.
+   With the matrix-product operator, the 2×2 z-slab probe here certifies, and
+   this packet is re-runnable as written.
+2. **Book the general FF stage on a different certified primitive** — e.g. a
+   coordinate-wise / Gauss–Seidel interval operator over the *diagonalized*
+   2×2 slab, or a pure bisection-plus-exclusion scheme, or a Newton-continuation
+   arc following `t = ∇f1 × ∇f2`.
 3. Keep `cover_branch` as the decomposition skeleton and re-point the probe at
    whatever certified primitive option 1 or 2 lands.
 
-The engine itself (`cover_branch`, `AugmentedFF`, `invert3x3`, singular
-screen, interval-exclusion pruning, widest-axis bisection, unresolved
-remainder) is implemented and the non-probe paths are verified (3 of the 4
-required tests pass).
+The engine (`cover_branch`, `SlabFF` 2×2 system, exact 2×2 inverse
+preconditioner, determinant singular screen, interval-exclusion pruning,
+nested (x,y)/z bisection, unresolved remainder) is implemented and the
+non-probe paths are verified (3 of the 4 required tests pass). Both the r1
+(3×3 augmented) and r2 (2×2 z-slab) formulations fail for the same root cause:
+the vendored krawczyk operator cannot contract genuinely coupled systems.
