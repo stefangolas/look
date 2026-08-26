@@ -583,6 +583,23 @@ the slab-Jacobian determinant (`det = 4(y·cx − x·cy)` for cylinder×sphere �
 non-singular exactly off the singular locus). This is the certified branch-
 cover formulation that wiring will consume.
 
+**AMENDED (session 34, BG-SOL-S7-GFF-WIRE, the first dispatcher wiring):**
+the branch cover is wired into the four offset mixed-quadric FF families
+(`Cylinder×Cone`, `Cylinder×Sphere`, `Cone×Cone`, `Cone×Sphere`, both
+orientations). The intermediate locus is deliberately
+`ContactLocus::ValidatedBranchCover(BranchCover)`, not a point vector and not
+an `ExactCurve`: `BranchCover` proves a deterministic set of regular
+cross-sections but does not yet prove connectivity or component ordering. A
+cover is returned as an `Arc1`/`Transverse` record only when both its singular
+and unresolved boxes are empty. Singular boxes stay in the deferred funnel for
+the singular-event stage; unresolved boxes produce a typed
+`NumericallyUnresolved` refusal. The finite world-space search domain is the
+intersection of the two carriers' certified `EnclosureSurface` boxes over the
+bounded face parameter ranges. As with the landed analytic FF stage, exact
+trimming/component splitting remains Phase 4 Boundary Rewrite work. `Placed`
+and `Torus` stay deferred. Resolution is scale-relative to the finite search
+box; budget spend remains caller-controlled.
+
 **Phase 4 — Boundary Rewrite.** New `truck-shapeops` module; material-state
 heart (spec §13.1).
 ```rust
