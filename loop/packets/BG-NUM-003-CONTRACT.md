@@ -36,7 +36,7 @@ tests_required:
 budget:      {turns: 25, ctx_tokens: 60000}
 anchors:
   - {id: A1, expect: 1, cmd: "grep -c 'fn k_image' vendor/truck/truck-evidence/src/num/krawczyk.rs"}
-  - {id: A2, expect: 1, cmd: "grep -c 'd\\[r\\]\\[c\\]' vendor/truck/truck-evidence/src/num/krawczyk.rs"}
+  - {id: A2, expect: 2, cmd: "grep -c 'd\\[r\\]\\[c\\]' vendor/truck/truck-evidence/src/num/krawczyk.rs"}
   - {id: A3, expect: 1, cmd: "grep -c 'pub fn krawczyk' vendor/truck/truck-evidence/src/num/krawczyk.rs"}
 ```
 
