@@ -68,24 +68,39 @@ independently testable substrate layer.
 `contact/mod.rs` beside `pub mod implicit;` as `pub mod gff;` plus whatever
 imports that declaration requires. That is the ONLY edit to mod.rs.**
 
-### The mathematics, fixed by the plan
+### The mathematics, fixed by the plan (AMENDMENT r2)
 
-The contact curve is `C = { p : f1(p) = 0, f2(p) = 0 }`. At any regular point
-the curve's tangent direction is `t = ∇f1 × ∇f2`. The certified probe is a
-**3×3 augmented Krawczyk system**: pick a direction `g` and a reference point
-`m`, and solve
+The contact curve is `C = { p : f1(p) = 0, f2(p) = 0 }`. The certified probe is
+a **2×2 z-slab Krawczyk system** (NOT the packet's r1 3×3 augmented system —
+see the r2 amendment note below): decompose the search box's z-range into
+leaves; for each z-leaf, at its mid-plane `z0`, solve
 
 ```text
-F(p) = [ f1(p), f2(p), g · (p − m) ]   over a box Q
+F(x, y) = [ f1(x, y, z0), f2(x, y, z0) ]   over the (x, y) box
 ```
 
-A `KrawczykProof::Unique` proves EXACTLY ONE point of C in Q that also lies in
-the plane `g·(p−m) = 0` — one certified crossing. Direction choice per call:
-`g = ∇f1(m_b) × ∇f2(m_b)` at the search box midpoint `m_b`; when that cross
-product is degenerate (∇f1 ∥ ∇f2 across the whole box — the tangency/singularity
-case) the box classifies as singular instead of probing. Interval arithmetic
-soundness comes from `ImplicitField`; existence/uniqueness from krawczyk; the
-composition decides nothing it cannot prove.
+A `KrawczykProof::Unique` proves EXACTLY ONE crossing of C through the slab's
+mid-plane. The Jacobian is the 2×2 `∂(f1,f2)/∂(x,y)`; for the z-aligned
+quadric pairs this stage exists for, its determinant is
+`4(y·cx − x·cy)`-type — non-singular exactly away from the singular locus, so
+the 2×2 is well-conditioned wherever the curve is regular. Slabs where the
+Jacobian determinant enclosure contains zero classify as `Singular`.
+
+**Why r1's 3×3 augmented system was abandoned (SPEC_GAP evidence, first
+attempt 836b704):** the r1 probe `F(p) = [f1, f2, g·(p−m)]` with a full 3×3
+inverse preconditioner could not reach `KrawczykProof::Unique` on the
+transversal sphere/cylinder witness — the coupled rows kept `I − YJ` wide at
+every box scale (the worker's numerical report: the residual rows' interval
+sums ≥ 1 at certified-crossing scale, `NumericallyUnresolved` after 4096
+subdivisions). Diagnosis after reading `k_image` (num/krawczyk.rs:162): the
+operator IS the correct full-matrix Krawczyk (`d[r][c] = δ − y[r][c]·j[r][c]`,
+row-major, Y system-supplied); it is NOT limited to diagonal systems. The
+defect was in the FORMULATION's conditioning, not the operator. The 2×2 slab
+system shrinks the coupled part and gives an exactly-invertible, well-scaled
+preconditioner (`det = 4(y·cx − x·cy)` for cylinder×sphere at (cx,0)), which is
+what Krawczyk needs to contract. This amendment replaces only the probe; the
+API, the algorithm shape (exclusion → screen → probe → bisect), the tests'
+intent, and the scope guards are unchanged.
 
 ### 1. Public API, verbatim:
 
@@ -95,11 +110,11 @@ composition decides nothing it cannot prove.
 pub enum CellVerdict {
     /// The box contains no point of C: some f_i enclosure excludes zero.
     Empty,
-    /// The box holds (part of) a singular locus: the gradient cross product
-    /// enclosure contains zero at the box midpoint AND neither field excludes
-    /// zero on the box. Not further classified here.
+    /// The box holds (part of) a singular locus: the slab Jacobian
+    /// determinant enclosure contains zero AND neither field excludes zero
+    /// on the box. Not further classified here.
     Singular,
-    /// Krawczyk proved exactly one crossing of C through the box's mid-plane.
+    /// Krawczyk proved exactly one crossing of C through the slab mid-plane.
     Point(Point3),
 }
 
@@ -131,32 +146,34 @@ pub fn cover_branch(
 
 ### 2. The algorithm, exactly:
 
-Worklist of boxes, initialised with `domain`. Pop a box B:
+Worklist of **z-leaves**: intervals partitioning `domain.z`, initialised with
+the full z-range. Pop a z-leaf Z. Let `B` be the full 3-D box
+`domain.x × domain.y × Z`, and `z0 = midpoint(Z)`.
 
 a. **Interval exclusion**: if `f1.implicit(B)` or `f2.implicit(B)` does not
    contain zero → `Empty`, emit nothing.
-b. **Singularity screen**: let `c = midpoint(B)` (float point); compute
-   `cross = ∇f1(c) × ∇f2(c)` as INTERVAL enclosures from the gradient boxes
-   over B (evaluate `grad` ON THE BOX, take the componentwise products'
-   intervals). If every component of `cross` contains zero → `Singular`,
-   record B.
-c. **Probe**: build the augmented system above with `m = c`,
-   `g = cross.midpoint()` (the float midpoints of the three component
-   intervals, renormalized if nonzero — if the midpoint degenerates to zero
-   treat as singular). Implement `KrawczykSystem<3>` for a private struct
-   holding the two fields, `g`, `m`: `f_point` evaluates both implicits AT
-   the point (degenerate-interval wrap) plus `g·(p−m)`; `jacobian` evaluates
-   both grads over the box (row per field, last row = g as constants);
-   `preconditioner` returns a float inverse of the 3×3 Jacobian midpoint —
-   write a small explicit 3×3 Gaussian-elimination invert returning
-   `Option`; None lets krawczyk bisect (its contract).
-d. `krawczyk(...)` outcome: `Unique` → record the certified point (use
-   the box midpoint projected onto the plane — the POINT recorded is the
-   box midpoint `c`; it lies within tau of the true crossing, and the PROOF
-   is the certificate, so store `c`). `NoRoot` → `Empty`. Refusal
-   (`NumericallyUnresolved`) → bisect B widest-axis-first (ties lowest
-   index) and push children, spending budget; if B cannot bisect (width ≤
-   tau on all axes, or f64 resolution) → `unresolved_boxes`.
+b. **Singularity screen**: let `c = (midpoint(x), midpoint(y), z0)`; evaluate
+   the 2×2 slab Jacobian `J = ∂(f1,f2)/∂(x,y)` as INTERVAL enclosures over
+   `B` (take the `grad` boxes' x/y components). If the determinant interval
+   `det(J)` contains zero → `Singular`, record B.
+c. **Probe**: build the 2×2 slab system with `z = z0` and `m = (mx, my)`:
+   implement `KrawczykSystem<2>` for a private struct holding the two fields
+   and `z0`: `f_point` evaluates both implicits AT the point `(x, y, z0)`
+   (degenerate-interval wrap); `jacobian` evaluates both grads over the box
+   `domain.x × domain.y × [z0, z0]` and returns the `(x, y)` 2×2 sub-matrix
+   (rows f1/f2, cols ∂/∂x ∂/∂y); `preconditioner` returns the EXACT float
+   inverse of `mid(J)` (2×2 closed form `1/det · [[d, −b], [−c, a]]`; `None`
+   when `|det|` is degenerate — krawczyk then bisects per its contract).
+d. `krawczyk(...)` outcome: `Unique` → record the certified point `(x, y,
+   z0)` (the recorded point may be refined by a few float Newton steps of the
+   2×2 system toward the root — the Krawczyk uniqueness proof justifies the
+   contraction; the point must satisfy both implicits to float accuracy).
+   `NoRoot` → `Empty`. Refusal (`NumericallyUnresolved`) → bisect Z
+   widest-axis... Z is a scalar interval, so bisect Z at its midpoint,
+   spending budget; also bisect the (x, y) box inside the probe when krawczyk
+   reports unresolved for a slab that survives the exclusion screen (the
+   probe worklist is nested: per Z-leaf, an (x, y)-worklist). If neither can
+   bisect (width ≤ tau, or f64 resolution) → `unresolved_boxes`.
 
 `Outcome<BranchCover>` errors only on budget exhaustion per the house
 `Refusal::BudgetExhausted`-style conventions already used by krawczyk — read
@@ -225,10 +242,20 @@ Refusal).
 ## Stop conditions
 
 - an anchor count differs → `ANCHOR_MISMATCH`, naming the file and what you saw
-- the 3×3 preconditioner contract cannot be met as specified → `SPEC_GAP`
-- the transversal test cannot certify ANY point under a generous budget and
-  you have re-checked the formulation → `SPEC_GAP` naming what you observed
+- the 2×2 slab probe cannot certify ANY crossing of the transversal pair
+  under a generous budget AND you have re-checked the formulation (including
+  re-deriving the determinant) → `SPEC_GAP` naming what you observed
 - three consecutive failed `cargo` runs on the same error → `BLOCKED`
+
+## Amendment r2 note
+
+This is the second attempt (first: SPEC_GAP at 836b704, recorded above). The
+r1 implementation in `gff.rs` on this branch is the 3×3 formulation; convert
+it to the 2×2 z-slab formulation — keep the public API, the exclusion and
+singular screens, the bisection structure, the `invert` helper if reusable
+for 2×2, and the three passing tests; REPLACE the probe and the failing
+transversal test's expectations. Update RESULT.json `notes` to record the
+conversion and confirm the transversal witness now certifies.
 
 ## Finish by writing `RESULT.json` in the root of your worktree
 

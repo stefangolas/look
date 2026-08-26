@@ -560,13 +560,23 @@ separate packets.
 **AMENDED (session 32, BG-SOL-S7-GFF-COVER, the branch-cover engine):** the
 second GFF substrate packet lands `contact/gff.rs`:
 `cover_branch(f1, f2, domain, tau, budget) -> Outcome<BranchCover>` decomposes
-a 3-D search box for two implicit fields into proven crossings (augmented
-3×3 Krawczyk system `[f1, f2, g·(p−m)]` with `g = ∇f1×∇f2` at the box
-midpoint), proven-singular boxes (gradient cross product degenerate), and an
-honestly-typed unresolved remainder under `tau`/budget. Deterministic
-widest-axis bisection. No dispatcher wiring, no new locus arms — the wiring
-packet (locus representation for non-exact arcs) follows once the cover is
-proven on the offset mixed quadric pairs.
+a 3-D search box for two implicit fields into proven crossings, proven-singular
+boxes, and an honestly-typed unresolved remainder under `tau`/budget.
+Deterministic widest-axis bisection. No dispatcher wiring, no new locus arms —
+the wiring packet (locus representation for non-exact arcs) follows once the
+cover is proven on the offset mixed quadric pairs.
+
+**AMENDMENT r2 (session 32):** the r1 probe — a 3×3 augmented Krawczyk system
+`[f1, f2, g·(p−m)]` with a full 3×3 inverse — returned SPEC_GAP at 836b704:
+it could not certify ANY crossing of the transversal sphere/cylinder pair
+(`NumericallyUnresolved` after 4096 subdivisions). Reading `k_image` showed
+the operator IS the correct full-matrix Krawczyk (not diagonal-only, as the
+worker first claimed); the defect was formulation conditioning. r2 replaces
+the probe with the **2×2 z-slab system** `F(x,y) = [f1(x,y,z0), f2(x,y,z0)]`
+per z-leaf, exact 2×2 closed-form inverse preconditioner, singular screen on
+the slab-Jacobian determinant (`det = 4(y·cx − x·cy)` for cylinder×sphere —
+non-singular exactly off the singular locus). This is the certified branch-
+cover formulation that wiring will consume.
 
 **Phase 4 — Boundary Rewrite.** New `truck-shapeops` module; material-state
 heart (spec §13.1).
