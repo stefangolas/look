@@ -557,6 +557,17 @@ the enum itself. The solver stages that consume it (offset mixed quadrics,
 Torus pairs, event finding + Krawczyk arc continuation, singular cells) are
 separate packets.
 
+**AMENDED (session 32, BG-SOL-S7-GFF-COVER, the branch-cover engine):** the
+second GFF substrate packet lands `contact/gff.rs`:
+`cover_branch(f1, f2, domain, tau, budget) -> Outcome<BranchCover>` decomposes
+a 3-D search box for two implicit fields into proven crossings (augmented
+3×3 Krawczyk system `[f1, f2, g·(p−m)]` with `g = ∇f1×∇f2` at the box
+midpoint), proven-singular boxes (gradient cross product degenerate), and an
+honestly-typed unresolved remainder under `tau`/budget. Deterministic
+widest-axis bisection. No dispatcher wiring, no new locus arms — the wiring
+packet (locus representation for non-exact arcs) follows once the cover is
+proven on the offset mixed quadric pairs.
+
 **Phase 4 — Boundary Rewrite.** New `truck-shapeops` module; material-state
 heart (spec §13.1).
 ```rust
