@@ -1,0 +1,18 @@
+{
+  "id": "BG-SOL-S7-GFF-COVER",
+  "status": "SPEC_GAP",
+  "contracts": ["BG-SOL-S7-GFF-COVER"],
+  "tests_added": 4,
+  "sites_migrated": 0,
+  "sites_deferred": 0,
+  "deviations": [
+    "recorded point for a Unique verdict is the box midpoint c refined by a few float Newton steps toward the certified root (refine_point), not the raw box midpoint. The packet's own transversal witness asserts every returned point satisfies |f1|,|f2| <= 1e-9, which a box midpoint (within O(width/2) of the crossing) cannot meet at the packet's tau = 1e-2; the Krawczyk uniqueness proof justifies the contraction. Matters only once the SPEC_GAP below is resolved."
+  ],
+  "disagreements": [
+    "the vendored krawczyk operator (vendor/truck/truck-evidence/src/num/krawczyk.rs, k_image) computes its K image with an ENTRYWISE contraction d[r][c] = delta(r,c) - y[r][c]*j[r][c] (documented in that module), i.e. the diagonal-preconditioner Krawczyk. It can only certify systems whose interval Jacobian is effectively diagonal. The packet's 3x3 augmented system F = [f1, f2, g.(p-m)] has a genuinely coupled Jacobian (rows grad f1, grad f2, g are not orthogonal; grad f1 . grad f2 ~ -2.4 at the sphere-cylinder crossing), so the entrywise K image never becomes strictly interior on any balanced box (at the certified-crossing scale, row 1 of (I - Y∘J) has |d|-row-sum ~ 3.9 > 1). Hence krawczyk can never return Unique for ANY box of this system, regardless of budget. The full 3x3 Gaussian-elimination inverse preconditioner the packet requires is exactly the configuration that fails. krawczyk's own SurfaceKnotProjection 2x2 impl works only because surface parameterizations have near-diagonal Jacobians."
+  ],
+  "baseline_failures": [
+    "contact::gff::tests::transversal_pair_yields_proven_points_on_curve — cover_branch(cyl, sphere(3,0,0) r3, x in [0.2,1.0], y in [0.1,0.95], z in [0.1,2.4], tau 1e-2, Budget::new(4096,0,0)) returns Err(NumericallyUnresolved { spent: subdiv 4096, witness: KrawczykIndeterminate }): the transversal pair cannot certify ANY point. The other three required tests pass; the full truck-evidence lib suite is 275 passed / 1 failed."
+  ],
+  "notes": "SPEC_GAP, stop condition 3: 'the transversal test cannot certify ANY point under a generous budget and you have re-checked the formulation'. The packet's certified probe (3x3 augmented Krawczyk system with a full 3x3 inverse preconditioner) is unimplementable on the vendored krawczyk operator because that operator's entrywise K-image contraction cannot certify a coupled system. Anchors A1/A2/A3 matched (1, 1, 0). cargo fmt --check, cargo clippy -p truck-evidence --all-targets --no-deps, and cargo check --workspace --all-targets are clean; only the transversal witness fails. The engine (cover_branch + AugmentedFF KrawczykSystem<3> + invert3x3 + singular screen + exclusion + bisection) is implemented as specified; the gap is upstream of it, in the krawczyk operator's contraction."
+}
