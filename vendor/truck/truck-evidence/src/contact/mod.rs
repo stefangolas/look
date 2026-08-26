@@ -38,7 +38,7 @@ use crate::analytic::plane_cylinder::plane_cylinder;
 use crate::analytic::plane_plane::plane_plane;
 use crate::analytic::plane_sphere::plane_sphere;
 use crate::analytic::sphere_sphere::sphere_sphere;
-use crate::analytic::{AnalyticIntersection, AnalyticOutcome};
+use crate::analytic::{AnalyticIntersection, AnalyticOutcome, ExactCurve};
 use truck_base::cgmath64::Point3;
 use truck_base::contact::{ContactDimension, ContactEventKind};
 use truck_base::evidence::{
@@ -48,6 +48,13 @@ use truck_base::evidence::{
 use truck_geometry::recognize::{
     CanonicalCarrier, CanonicalCarrierWitness, CanonicalCurve, CanonicalSurface,
 };
+
+/// BG-SOL-S4-FE-EE: the FE (Edge × Face) and EE (Edge × Edge) strata reductions.
+///
+/// All new FE/EE machinery lives in this submodule so the later funnel packets
+/// (cylinder × cylinder, general validated FF, 2-D overlap) extend the Contact
+/// Layer without colliding on this dispatcher file.
+pub mod fe_ee;
 
 /// One boundary stratum of a solid, lifted to the canonical-carrier level.
 ///
@@ -108,6 +115,17 @@ pub enum ContactLocus {
     Coincident,
     /// An exactly-solved analytic FF pair.
     Analytic(AnalyticIntersection),
+    /// An isolated contact point (FE punctures, EE crossings).
+    Point(Point3),
+    /// An exact curve clipped to a parameter range in the curve's own
+    /// parameterization: an Arc1 coincident sub-arc (an edge lying on a face,
+    /// overlapping collinear edges). `t_range` is on the curve's own
+    /// parameter, so a `Line` sub-segment is `t_range ⊂ [0, 1]` on `subs(t) =
+    /// a + t(b−a)` and a circle sub-arc is an angular interval on `[0, TAU)`.
+    BoundedCurve {
+        curve: ExactCurve,
+        t_range: (f64, f64),
+    },
 }
 
 /// Answers "how do these two boundary strata meet?"
@@ -122,8 +140,14 @@ pub enum ContactLocus {
 /// 2. **FF analytic** — both faces carry canonical analytic surfaces from the
 ///    §3.3 table; the ordered pair is solved by the existing exact pair
 ///    functions and the arm is mapped onto the shared 2-D ontology.
-/// 3. **Everything else** — the deferred funnel (FE, EE, general validated FF,
-///    singular event cells, 2-D overlap) refuses with
+/// 3. **Strata reductions** — an `Edge` × `Face` pair is answered by
+///    [`fe_ee::fe_contact`] (order-insensitive: the `(Face, Edge)` order feeds
+///    the same solver with the arguments normalized to `(edge, face)`), and an
+///    `Edge` × `Edge` pair by [`fe_ee::ee_contact`]. The bounded locus forms
+///    (`ContactLocus::Point`, `ContactLocus::BoundedCurve`) are emitted here.
+/// 4. **Everything else** — the deferred funnel (any pair involving a
+///    `Vertex`, FE/EE carrier families outside the landed tables, general
+///    validated FF, singular event cells, 2-D overlap) refuses with
 ///    `ContactReductionDeferred`.
 ///
 /// Nothing is spent from `budget` in this packet: the analytic pairs take no
@@ -184,7 +208,37 @@ pub fn contact(
         (BoundedStratum::Face { surface: l, .. }, BoundedStratum::Face { surface: r, .. }) => {
             analytic_ff(l, r, budget)
         }
-        // Stage 3: everything else is the deferred funnel.
+        // Stage 3: FE/EE strata reductions. The FE solver always sees
+        // `(edge, face)`; the `(Face, Edge)` order feeds the same solver with
+        // the arguments swapped, and the two orders produce structurally equal
+        // `ContactComplex` values (the metamorphic property).
+        (
+            BoundedStratum::Edge { curve, t_range },
+            BoundedStratum::Face {
+                surface,
+                u_range,
+                v_range,
+            },
+        ) => fe_ee::fe_contact(curve, t_range, surface, u_range, v_range, budget),
+        (
+            BoundedStratum::Face {
+                surface,
+                u_range,
+                v_range,
+            },
+            BoundedStratum::Edge { curve, t_range },
+        ) => fe_ee::fe_contact(curve, t_range, surface, u_range, v_range, budget),
+        (
+            BoundedStratum::Edge {
+                curve: l,
+                t_range: tl,
+            },
+            BoundedStratum::Edge {
+                curve: r,
+                t_range: tr,
+            },
+        ) => fe_ee::ee_contact(l, tl, r, tr, budget),
+        // Stage 4: everything else is the deferred funnel.
         _ => Err(Refusal::UnsupportedEnvelope(
             EnvelopeCase::ContactReductionDeferred,
         )),
@@ -455,10 +509,13 @@ mod tests {
 
     #[test]
     fn contact_fe_stratum_refuses_deferred() {
-        // The FE case: a face stratum paired with an edge stratum. The
-        // strata-reduction stage is not implemented in this packet, so the
-        // pair hits the deferred funnel.
-        let face = face(CanonicalSurface::Plane(Plane::xy()));
+        // An FE pair from a family outside the landed strata-reduction table:
+        // a line edge against a cone face. Line×Cone is not in the §5 FE table,
+        // so the pair still hits the deferred funnel.
+        let cone = Cone::new(Point3::new(0.0, 0.0, 0.0), 0.5)
+            .expect("a dyadic cone is a valid carrier")
+            .value;
+        let face = face(CanonicalSurface::Cone(cone));
         let edge = BoundedStratum::Edge {
             curve: CanonicalCurve::Line(Line(
                 Point3::new(0.0, 0.0, 0.0),
@@ -475,7 +532,7 @@ mod tests {
                     EnvelopeCase::ContactReductionDeferred
                 ))
             ),
-            "an FE stratum pair is the deferred funnel"
+            "a Line×Cone FE stratum pair is the deferred funnel"
         );
     }
 }
