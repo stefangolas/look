@@ -11,108 +11,156 @@ otherwise would eventually cost a trap.) If you are picking this up cold, read
 [`loop/ORCHESTRATOR.md`](ORCHESTRATOR.md) for how to run the loop, then
 `python loop/slot_status.py`** - nothing else. Do not read `LEDGER.jsonl` whole.
 
-Updated 2026-08-26, close of session 31 (Contact Layer funnel: FE/EE strata reductions LANDED; cylinder-family FF worker-DONE but V5-blocked by the concat_positive_test flake). Branch: `integration/kernel-bg`, HEAD `5bcfa67`.
+Updated 2026-08-26, close of session 32 (Contact Layer funnel unblocked: the
+flaky-proptest family got two durable fixes — BG-FIX-001 geotrait derivative
+asserts, BG-FIX-002 circle search parameter asserts — and BG-SOL-S5-CYLPAIR
+landed). Branch: `integration/kernel-bg`, HEAD `0f95484`.
 
 ## Where we are
 
-**The Contact Layer funnel's second and third stages both ran; one landed and
-one is verified-correct but blocked by a known flaky proptest.** What happened
-this session:
+**S5 is LANDED and the Contact Layer funnel is clear of blockers.** The
+session was supposed to be a coin-flip re-verify of S5; instead it turned into
+a flake-family extermination:
 
-- **BG-SOL-S4-FE-EE** (strata reductions, `4f1cbb6`, verified ACCEPTED at the
-  fork `a99f2dd`, merged `3dde3aa`) — FE (`Edge`×`Face`) and EE (`Edge`×`Edge`)
-  with the two new bounded locus forms: `ContactLocus::Point(Point3)` and
-  `ContactLocus::BoundedCurve { curve: ExactCurve, t_range: (f64, f64) }`.
-  `contact.rs` became the directory module `contact/mod.rs` (vocabulary +
-  dispatcher) with the new `contact/fe_ee.rs` (per plan §6, so later funnel
-  packets extend the Contact Layer without colliding on the dispatcher file).
-  FE table: `Line`×`Plane`/`Cylinder` (linear/quadratic, decisive-interval
-  predicates, generator-coincident for axis-parallel lines), `Circle`×`Plane`
-  (chord + coincident arc clipped to the face box), `Circle`×`Cylinder`
-  (latitudinal coincident only). EE table: `Line`×`Line` (skew/parallel-empty/
-  coplanar-point/coincident-arc), `Line`×`Circle` (transverse or in-plane
-  chord). Every reported point/arc is checked against BOTH strata's bounds
-  (edge `t_range` and the face `(u,v)` box; cylinder u wraps into `[0, 2π)`).
-  The worker caught TWO geometrically infeasible witnesses in my packet (S5.2
-  test 1's example line never meets the unit wall; S6.2 test 5's example point
-  is off the unit circle) and corrected them — both verified numerically.
-- **BG-SOL-S5-CYLPAIR** (FF cylinder-family pairs, `ab1ef12`, worker DONE in
-  one ~20-min attempt) — the `parallel_cylinders`/`coaxial` cells wired into
-  `analytic_ff`: `(Cylinder,Cylinder)` → coaxial `CylCyl` on same-axis (exact
-  `(x,y)` equality, matching `CoaxialPair::validate`) else `parallel_cylinders`;
-  `(Cylinder,Cone)/(Cylinder,Sphere)/(Cone,Cone)/(Cone,Sphere)` (both
-  orientations) → the corresponding `CoaxialPair` cell on same-axis else
-  `ContactReductionDeferred`. `equal_radius_cylinders` deliberately NOT wired
-  (its intersecting-axes cell is unreachable from canonical z-aligned
-  carriers; stays the BG-NUM-003 oracle). **Verify REJECTED 3 times on V5 only**
-  — see the traps and the Pick-up-here item.
+- **BG-FIX-001** (`bdbb6fc` via merge `afb...`; verified ACCEPTED at `37bbbb1`)
+  — `truck-geotrait/src/traits/curve.rs`: new private helper
+  `assert_derivative_near` with the combined predicate
+  `|a-b| <= TOLERANCE * max(1, |a|, |b|)` swapped in for exactly six
+  derivative assertions in `parameter_transform_random_test` /
+  `concat_random_test`; additive `InnerSpace` bounds; all callers already
+  satisfied them. This is the durable fix for `concat_positive_test` (the S5
+  blocker) and the historical `bspcurve::parameter_random_tests` flake.
+  **Orchestrator amendment on the worker commit**: the packet spec itself
+  carried the defect `.max(TOLERANCE)` as the floor — an effective epsilon of
+  TOLERANCE² near zero, one million times STRICTER than legacy, contradicting
+  its own comment. Corrected to `.max(1.0)` before verify; recorded as
+  `amended_by: orchestrator` in RESULT.json (V0 surfaces that field).
+- **BG-FIX-002** (`0f95484`; verified ACCEPTED at `3686c8e`) —
+  `truck-geometry/tests/circle.rs`: all six `prop_assert_near2!(s, t)` lines
+  replaced with the same combined predicate. The proven failure was `t = 4π`
+  drifting 1.3e-12 against the absolute `TOLERANCE2 = 1e-12` window at
+  `|t| ≤ 100` ranges — relative error ~1e-13. Strategies deliberately kept at
+  full range.
+- **BG-SOL-S5-CYLPAIR** (worker code `ab1ef12`, rebased to `bbc6815` onto the
+  FIX-001 base, landed as `3360178`) — FF cylinder-family analytic pairs:
+  `(Cylinder,Cylinder)` coaxial-else-parallel; `(Cylinder,Cone)`/
+  `(Cylinder,Sphere)`/`(Cone,Cone)`/`(Cone,Sphere)` coaxial-else-deferred;
+  `equal_radius_cylinders` still unwired (unreachable cell, BG-NUM-003
+  oracle). Took three extra verify attempts to land — see traps: one real
+  fresh-baseline rejection (concat, pre-fix), then two more members of the
+  latent-flaky population surfacing one per verify.
 
-Registry is 98 rows: **96 DONE, 2 BLOCKED** (BG-AUD-FIX-004 owner;
-BG-SOL-S5-CYLPAIR flake-blocked), **0 READY**. `schedule.py` reports eligible 0,
-dispatchable 0. Nothing is running except the watchdog.
+Registry is 100 rows: **99 DONE, 1 BLOCKED** (BG-AUD-FIX-004 owner),
+**0 READY**. `schedule.py` eligible 0, dispatchable 0. Nothing running except
+the watchdog.
 
 ## Pick up here
 
-1. **Resolve BG-SOL-S5-CYLPAIR first.** The worker's code is done and every
-   gate passes except V5, which fails ONLY on the known-flaky
-   `truck-geometry/tests/nurbscurve.rs::concat_positive_test` — a pre-existing
-   latent defect (an absolute `assert_near!` on unbounded-magnitude `der2` in
-   `truck-geotrait`'s `exec_concat_random_test`, curve.rs:547; documented in
-   BG-ENC-004-OFFSET's RESULT). This session it flipped from rare to
-   persistent (~all runs at both commits — reproduced 20/20 at BASE), and the
-   cached base baseline catching a lucky `ok` makes V5 keep mis-attributing it
-   as `newly failing`. The packet provably cannot affect it (only
-   `truck-evidence/src/contact/mod.rs` changed; truck-geometry has no
-   dependency on truck-evidence). Two clean exits:
-   a. **Re-verify when the flake clears** (the fresh-baseline run at 02:36
-      passed it, so it does pass sometimes). Delete the stale
-      `loop/baselines/a8eea8a__truck-base-truck-evidence-truck-geometry.json`
-      (it records a lucky `ok`) so a fresh base run decides, and re-verify.
-   b. **Dispatch a follow-up property-fix packet** (the INV-102 pattern) that
-      bounds `concat_positive_test`'s inputs or switches the assertion to a
-      relative tolerance — the durable fix for the documented flaky-proptest
-      family. Write set: `vendor/truck/truck-geometry/tests/nurbscurve.rs`
-      (and/or the shared helper in `truck-geotrait/src/traits/curve.rs`).
-   Either way the packet branch `packet/BG-SOL-S5-CYLPAIR`@`ab1ef12` is the
-   verified code; do not redispatch the worker.
-2. **The funnel's next stages**, in plan order:
-   - After S5 lands: **general validated FF → singular event cells → 2-D
-     overlap (C3/C4, last)** — the hard funnel, deliberately delayed.
-   - Then **Boundary Rewrite (Phase 4)** and the M2 flagship differential test
-     `Extrude(P−Q) ≅ Extrude(P)−Extrude(Q)`.
-
-Recommended, NOT dispatched: the follow-up audit of
-`truck-evidence/src/fid/rep.rs` (4362 lines; sole sanctioned exact→emitted
-path; last touched by BG-FID-005 / BG-FID-005-SRF). Its own program.
+1. **The hard funnel, next stages in plan order** (docs/SOLVER_FAMILY_PLAN.md
+   §4 Phase 3): general validated FF → singular event cells → 2-D overlap
+   (C3/C4, last, deliberately delayed). Write packets against §3 booked API;
+   the dispatcher order and `ContactLocus` vocabulary are as booked, now with
+   the cylinder-family cells exhaustive.
+2. Then Phase 4 Boundary Rewrite and the M2 flagship differential test
+   `Extrude(P−Q) ≅ Extrude(P)−Extrude(Q)`.
+3. **Open latent flake, NOT fixed**: `truck-base/tests/newton.rs::
+   test_newton1` failed once during an S5 verify (Newton oscillation exits via
+   `Err(log)` with `log.degenerate()` false — a solver/test-contract question,
+   NOT a tolerance swap). It needs its own decision; do not paper over it by
+   loosening the assertion blindly.
+4. Recommended, NOT dispatched: the follow-up audit of
+   `truck-evidence/src/fid/rep.rs` (4362 lines; last touched by BG-FID-005 /
+   BG-FID-005-SRF). Its own program.
 
 ## State of the machine, as left
 
-- **Watchdog RUNNING** (lock `loop/watchdog.lock`; heartbeat current,
-  `stagnant=3600s`).
-- Registry: 98 rows = 96 DONE + 2 BLOCKED (BG-AUD-FIX-004 owner,
-  BG-SOL-S5-CYLPAIR flake-blocked), 0 READY. `schedule.py` eligible 0,
-  dispatchable 0.
-- Slots: 0 on `packet/BG-SOL-S5-CYLPAIR`@`ab1ef12` (worker DONE, RESULT.json in
-  worktree, verified-against-everything-but-V5; re-fork only to reuse the
-  slot after S5 lands). Slots 1-3 FINISHED on landed branches. No leaked
-  `%TEMP%/look-verify-baseline-*` (the S5 verifies cleaned their own).
-- Disk ~11 GB free at close (S4/S5 slot targets ~11.4 GB + wt/target warm).
-  No leaked `%TEMP%/proc-macro-srv*` beyond per-session regrowth.
-- GATE-4 ceiling 111 (true count). `scripts/kernel-gates.sh HEAD` passes
-  111/111. No `unscaled_legacy()` calls added by any solver-family packet
-  (S4, S5 both ceiling-neutral).
-- S4 ledgered and filed under `loop/results/BG-SOL-S4-FE-EE.json` (ACCEPTED at
-  `4f1cbb6`). S5's RESULT is in the slot worktree, not yet filed.
-- Plan doc §4 Phase 3 amended twice this session (the S4 strata-reduction stage
-  design and the S5 cylinder-family design).
+- **Watchdog RUNNING** (lock `loop/watchdog.lock`, pid 20024).
+- Registry: 100 rows = 99 DONE + 1 BLOCKED (BG-AUD-FIX-004 owner), 0 READY.
+  `schedule.py` eligible 0, dispatchable 0.
+- Slots: 0 FINISHED on landed `packet/BG-SOL-S5-CYLPAIR@bbc6815`; 1 FINISHED
+  on landed `packet/BG-FIX-002@3686c8e`; 2-3 FINISHED on long-landed branches.
+  All four re-forkable.
+- Disk ~13.9 GB free. No leaked `%TEMP%/look-verify-baseline-*`. Slot targets
+  were reclaimed mid-session for the V9 disk-floor trap and re-warmed.
+- GATE-4 ceiling 111 (true count); `kernel-gates.sh HEAD` passes 111/111 at
+  `0f95484`. No `unscaled_legacy()` calls added by any of this session's
+  packets.
+- Results filed: `loop/results/BG-FIX-001.json`, `loop/results/BG-FIX-002.json`,
+  `loop/results/BG-SOL-S5-CYLPAIR.json`.
 
 ## The parallelism picture
 
-Nothing running (watchdog only; no workers, no verifies). Next work is the S5
-resolution (re-verify or the flake-fix packet), then the hard funnel stages,
-then Phase 4. The fid/rep.rs audit stays a recommendation.
+Nothing running (watchdog only). Next work is writing the funnel's next-stage
+packets (general validated FF first), then Phase 4 after C3/C4.
 
 ## Traps, each one paid for
+### Session 32 (flake-family fixes + S5 lands) - paid in full
+
+- **A packet-spec bug is amended, not redispatched — but only because the
+  amendment rule's scope was checked first.** BG-FIX-001's worker faithfully
+  implemented the floor `.max(TOLERANCE)`, which makes near-zero comparisons
+  an effective `TOLERANCE² = 1e-12` — a million times stricter than the
+  absolute tolerance the comment claimed to reproduce. Caught by review
+  post-dispatch. ORCHESTRATOR.md sanctions amending a worker's own commit only
+  when *the packet wrongly asked for it*, which is exactly this case; the fix
+  was one token plus comment/message text, recorded as `amended_by:
+  orchestrator` (verify.py V0 prints that field so amended work can never pass
+  as untouched). The general argument that saved re-running stabilization: the
+  amended predicate is pointwise NO tighter than the original everywhere, so
+  passes under the original imply passes under the amendment.
+- **`tests_required` is diff-scoped keyword overlap against test fns ADDED IN
+  THE DIFF.** A fix packet that lists PRE-EXISTING tests there fails V6
+  TEST_MISSING even when V5 passed — the gate cannot see tests it wasn't
+  promised as new. A packet that adds no test fns must ship `tests_required:
+  []` and pin its stabilized tests in prose (V5's baseline diff covers them
+  authoritatively anyway). Cost one full verify round trip on BG-FIX-001.
+- **The stale-VERDICT trap bit again, in its cheapest costume.** I relaunched
+  a verify WITHOUT deleting the previous VERDICT.json, read BLOCKED off the
+  old file, and nearly misdiagnosed a healthy running verify. The recorded
+  rule says check `base` AND `commit`; the sharper operational rule this
+  session adds: **delete VERDICT.json in the same command that launches the
+  verify**, and treat any verdict whose mtime predates the launch pid as
+  absent.
+- **proptest's SourceParallel persistence turns ONE unlucky draw into a
+  permanent local failure — the poison mechanism behind repeated "newly
+  failing" verdicts.** When a property test fails anywhere inside a slot
+  worktree, proptest writes `<test>.proptest-regressions` BESIDE THE TEST
+  SOURCE inside `loop/slots/N/wt/vendor/...`; every later run replays that
+  seed deterministically and fails, while V5's cached base baseline has a
+  frozen (lucky) pass — so the gate reports `newly failing` forever until the
+  file is deleted. **Before EVERY re-verify: delete all UNTRACKED
+  `*.proptest-regressions` files under the slot wt.** Distinguish them from
+  TRACKED seed files committed long ago (they replay old, since-fixed seeds
+  and pass — e.g. `truck-evidence/tests/plane_properties.proptest-
+  regressions`, which is tracked at base too; deleting THAT shows up as an
+  uncommitted `D` and blocks V0 RUN_INCOMPLETE instead). Never commit fresh
+  poison.
+- **The latent-flaky proptest population is a POPULATION, not one bad test.**
+  Three distinct members surfaced across three verifies of the same packet:
+  `nurbscurve.rs::concat_positive_test` (fixed by BG-FIX-001),
+  `circle.rs::search_parameter_with_parameter_hint` (fixed by BG-FIX-002), and
+  `newton.rs::test_newton1` (OPEN, different disease). V5 rolls fresh dice on
+  HEAD every verify while cached baselines freeze lucky base draws; expect
+  further members until somebody audits the whole vendored test corpus for
+  absolute/squared tolerances on unbounded-magnitude quantities. When a V5
+  rejection names ONE test in an untouched crate, check out.txt for the
+  minimal failing input BEFORE concluding anything: magnitude-vs-epsilon
+  arithmetic (relative error ~1e-13 against an absolute 1e-12 window) is
+  diagnostic by itself.
+- **`Remove-Item -ErrorAction SilentlyContinue` can fail silently and you
+  will believe the cleanup happened.** The `.obj` test dumps survived an
+  attempted deletion (locked or path issue) and resurfaced later, muddying a
+  forensic question about what a verify had or hadn't done. Follow every
+  silent-allowed deletion with `Test-Path` confirmation when being clean
+  matters.
+- **A V5 baseline cache that caught a lucky pass stays dangerous even after
+  you know about it** — this session's first move (delete cache, re-verify)
+  hit the same wall from the other side: the FRESH base run also rolled dice,
+  and the HEAD run rolled worse. Single-run comparisons of randomized suites
+  are structurally incapable of attributing flaky failures; the durable exit
+  is fixing the latent defects (BG-FIX-001/002 pattern), not waiting for
+  alignment. That judgment call — stop re-verifying, dispatch the property-fix
+  — is what actually unblocked the funnel.
 ### Session 31 (Contact Layer funnel: S4 landed, S5 flake-blocked) - paid in full
 
 - **A known flaky proptest can flip from rare to persistent, and then it blocks
