@@ -600,6 +600,21 @@ trimming/component splitting remains Phase 4 Boundary Rewrite work. `Placed`
 and `Torus` stay deferred. Resolution is scale-relative to the finite search
 box; budget spend remains caller-controlled.
 
+**AMENDED (session 35, BG-SOL-S7-GFF-CHART, chart-artifact recovery before
+true singular classification):** `BranchCover::singular_boxes` currently means
+the fixed z-slab Jacobian minor contains zero, not that the full surface
+gradients are rank-deficient. The xy minor is the z component of
+`grad(f1) cross grad(f2)`; a regular intersection whose tangent turns
+horizontal can therefore be mislabeled singular even when the xz or yz minor
+decisively excludes zero. Before classifying singular contact loci, generalize
+the slab probe to select a deterministic regular coordinate chart from all
+three 2x2 minors over the finite domain. Choose the minor with the largest
+certified distance from zero (stable axis tie-break); slice along its omitted
+coordinate and solve in the other two. Only a box for which no minor excludes
+zero remains a singular candidate. This packet does not claim those candidates
+are truly rank-deficient, connect arcs, or classify isolated/curve/region
+loci; those are the following singular-event packets.
+
 **Phase 4 — Boundary Rewrite.** New `truck-shapeops` module; material-state
 heart (spec §13.1).
 ```rust
