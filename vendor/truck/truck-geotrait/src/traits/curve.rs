@@ -3,8 +3,8 @@ use std::fmt::Debug;
 use thiserror::Error;
 use truck_base::{
     assert_near,
-    cgmath64::{Point2, Point3, Vector2, Vector3},
-    tolerance::Tolerance,
+    cgmath64::{InnerSpace, Point2, Point3, Vector2, Vector3},
+    tolerance::{Tolerance, TOLERANCE},
 };
 
 /// Parametric curves
@@ -475,12 +475,35 @@ pub trait Cut: BoundedCurve {
     fn cut(&mut self, t: f64) -> Self;
 }
 
+/// Relative-tolerance assertion for derivative vectors.
+///
+/// An absolute `assert_near!` on a derivative is the wrong predicate whenever
+/// the input data has unbounded magnitude: both sides' evaluation noise grows
+/// with the magnitude while [`TOLERANCE`] stays fixed, so mathematically equal
+/// derivatives fail once they are large enough. Compare the difference against
+/// the magnitudes instead: `|a - b| <= TOLERANCE * max(1, |a|, |b|)`. Below
+/// unit magnitude this is exactly the legacy absolute epsilon; above it, the
+/// margin grows proportionally, so the predicate is scale-invariant where the
+/// absolute one was not.
+fn assert_derivative_near<V>(left: V, right: V)
+where
+    V: Debug + Tolerance + std::ops::Sub<Output = V> + InnerSpace<Scalar = f64>,
+{
+    let diff = (left - right).magnitude();
+    let scale = left.magnitude().max(right.magnitude());
+    assert!(
+        diff <= TOLERANCE * scale.max(1.0),
+        "derivatives differ beyond combined absolute/relative tolerance\nleft: {left:?},\nright: {right:?}\n|diff| = {diff}, scale = {scale}",
+    );
+}
+
 /// positive test implementation for `ParameterTransform` by random transformation
 pub fn parameter_transform_random_test<C>(curve: &C, trials: usize)
 where
     C: ParameterTransform,
     C::Point: Debug + Tolerance,
-    C::Vector: Debug + Tolerance + std::ops::Mul<f64, Output = C::Vector>,
+    C::Vector:
+        Debug + Tolerance + std::ops::Mul<f64, Output = C::Vector> + InnerSpace<Scalar = f64>,
 {
     (0..trials).for_each(move |_| exec_parameter_transform_random_test(curve))
 }
@@ -489,7 +512,8 @@ fn exec_parameter_transform_random_test<C>(curve: &C)
 where
     C: ParameterTransform,
     C::Point: Debug + Tolerance,
-    C::Vector: Debug + Tolerance + std::ops::Mul<f64, Output = C::Vector>,
+    C::Vector:
+        Debug + Tolerance + std::ops::Mul<f64, Output = C::Vector> + InnerSpace<Scalar = f64>,
 {
     let a = rand::random::<f64>() + 0.5;
     let b = rand::random::<f64>() * 2.0;
@@ -501,8 +525,8 @@ where
     let p = rand::random::<f64>();
     let t = (1.0 - p) * t0 + p * t1;
     assert_near!(transformed.subs(t * a + b), curve.subs(t));
-    assert_near!(transformed.der(t * a + b) * a, curve.der(t));
-    assert_near!(transformed.der2(t * a + b) * a * a, curve.der2(t));
+    assert_derivative_near(transformed.der(t * a + b) * a, curve.der(t));
+    assert_derivative_near(transformed.der2(t * a + b) * a * a, curve.der2(t));
     assert_near!(transformed.front(), curve.front());
     assert_near!(transformed.back(), curve.back());
 }
@@ -512,7 +536,7 @@ pub fn concat_random_test<C0, C1>(curve0: &C0, curve1: &C1, trials: usize)
 where
     C0: Concat<C1>,
     C0::Point: Debug + Tolerance,
-    C0::Vector: Debug + Tolerance,
+    C0::Vector: Debug + Tolerance + std::ops::Sub<Output = C0::Vector> + InnerSpace<Scalar = f64>,
     C0::Output: BoundedCurve<Point = C0::Point, Vector = C0::Vector> + Debug,
     C1: BoundedCurve<Point = C0::Point, Vector = C0::Vector>,
 {
@@ -523,7 +547,7 @@ fn exec_concat_random_test<C0, C1>(curve0: &C0, curve1: &C1)
 where
     C0: Concat<C1>,
     C0::Point: Debug + Tolerance,
-    C0::Vector: Debug + Tolerance,
+    C0::Vector: Debug + Tolerance + std::ops::Sub<Output = C0::Vector> + InnerSpace<Scalar = f64>,
     C0::Output: BoundedCurve<Point = C0::Point, Vector = C0::Vector> + Debug,
     C1: BoundedCurve<Point = C0::Point, Vector = C0::Vector>,
 {
@@ -536,15 +560,15 @@ where
     let p = rand::random::<f64>();
     let t = t0 * (1.0 - p) + t1 * p;
     assert_near!(concatted.subs(t), curve0.subs(t));
-    assert_near!(concatted.der(t), curve0.der(t));
-    assert_near!(concatted.der2(t), curve0.der2(t));
+    assert_derivative_near(concatted.der(t), curve0.der(t));
+    assert_derivative_near(concatted.der2(t), curve0.der2(t));
     assert_near!(concatted.front(), curve0.front());
 
     let p = rand::random::<f64>();
     let t = t1 * (1.0 - p) + t2 * p;
     assert_near!(concatted.subs(t), curve1.subs(t));
-    assert_near!(concatted.der(t), curve1.der(t));
-    assert_near!(concatted.der2(t), curve1.der2(t));
+    assert_derivative_near(concatted.der(t), curve1.der(t));
+    assert_derivative_near(concatted.der2(t), curve1.der2(t));
     assert_near!(concatted.back(), curve1.back());
 }
 
