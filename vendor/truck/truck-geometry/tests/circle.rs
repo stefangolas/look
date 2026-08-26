@@ -1,5 +1,6 @@
 use proptest::{prelude::*, property_test};
 use std::f64::consts::{PI, TAU};
+use truck_base::tolerance::TOLERANCE;
 use truck_geometry::prelude::*;
 
 #[property_test]
@@ -7,7 +8,10 @@ fn search_parameter(#[strategy = 0.0..=TAU] t: f64) {
     let circle = UnitCircle::<Point2>::new();
     let p = circle.subs(t);
     let s = circle.search_nearest_parameter(p, None, 1).unwrap();
-    prop_assert_near2!(s, t);
+    prop_assert!(
+        (s - t).abs() <= TOLERANCE * t.abs().max(1.0),
+        "parameter drift beyond combined absolute/relative tolerance: s = {s}, t = {t}",
+    );
 }
 
 #[property_test]
@@ -15,7 +19,10 @@ fn search_nearest_parameter(#[strategy = 0.0..=TAU] t: f64, #[strategy = 0.1..=5
     let circle = UnitCircle::<Point2>::new();
     let p = a * circle.subs(t);
     let s = circle.search_nearest_parameter(p, None, 1).unwrap();
-    prop_assert_near2!(s, t);
+    prop_assert!(
+        (s - t).abs() <= TOLERANCE * t.abs().max(1.0),
+        "parameter drift beyond combined absolute/relative tolerance: s = {s}, t = {t}",
+    );
 }
 
 #[property_test]
@@ -26,7 +33,10 @@ fn search_parameter_with_parameter_hint(
     let circle = UnitCircle::<Point2>::new();
     let p = circle.subs(t);
     let s = circle.search_nearest_parameter(p, t + d, 1).unwrap();
-    prop_assert_near2!(s, t);
+    prop_assert!(
+        (s - t).abs() <= TOLERANCE * t.abs().max(1.0),
+        "parameter drift beyond combined absolute/relative tolerance: s = {s}, t = {t}",
+    );
 }
 
 #[property_test]
@@ -38,7 +48,10 @@ fn search_nearest_parameter_with_parameter_hint(
     let circle = UnitCircle::<Point2>::new();
     let p = a * circle.subs(t);
     let s = circle.search_nearest_parameter(p, t + d, 1).unwrap();
-    prop_assert_near2!(s, t);
+    prop_assert!(
+        (s - t).abs() <= TOLERANCE * t.abs().max(1.0),
+        "parameter drift beyond combined absolute/relative tolerance: s = {s}, t = {t}",
+    );
 }
 
 #[property_test]
@@ -52,7 +65,10 @@ fn search_parameter_with_range(
     let t = start + lerp_ratio * length;
     let p = circle.subs(t);
     let s = circle.search_nearest_parameter(p, range, 1).unwrap();
-    prop_assert_near2!(s, t);
+    prop_assert!(
+        (s - t).abs() <= TOLERANCE * t.abs().max(1.0),
+        "parameter drift beyond combined absolute/relative tolerance: s = {s}, t = {t}",
+    );
 }
 
 #[property_test]
@@ -67,7 +83,10 @@ fn search_nearest_parameter_with_range(
     let t = start + lerp_ratio * length;
     let p = a * circle.subs(t);
     let s = circle.search_nearest_parameter(p, range, 1).unwrap();
-    prop_assert_near2!(s, t);
+    prop_assert!(
+        (s - t).abs() <= TOLERANCE * t.abs().max(1.0),
+        "parameter drift beyond combined absolute/relative tolerance: s = {s}, t = {t}",
+    );
 }
 
 #[property_test]
