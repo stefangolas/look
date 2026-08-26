@@ -233,6 +233,11 @@ pub trait KrawczykSystem<const N: usize> {
 pub enum KrawczykProof { Unique, NoRoot }
 pub fn krawczyk<const N: usize>(system: &impl KrawczykSystem<N>,
     start: &[Interval; N], budget: &mut Budget) -> Outcome<KrawczykProof>;
+// AMENDED (session 32, BG-NUM-003-CONTRACT): the operator's contraction is
+// the true matrix product (I − Y·J)[r][c] = δ(r,c) − Σ_k y[r][k]·j[k][c],
+// not the Hadamard form δ(r,c) − y[r][c]·j[r][c] the original BG-NUM-003
+// spec encoded. The two agree on diagonal Jacobians (all early users); the
+// coupled slab systems of the general FF stage expose the difference.
 
 // roots.rs
 pub fn isolate_roots(coeffs: &[f64], domain: (f64, f64), tau: f64,
