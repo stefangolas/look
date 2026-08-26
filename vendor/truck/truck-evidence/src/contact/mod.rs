@@ -33,6 +33,8 @@
     clippy::indexing_slicing
 )]
 
+use crate::analytic::coaxial::{coaxial, CoaxialPair};
+use crate::analytic::parallel_cylinders::parallel_cylinders;
 use crate::analytic::plane_cone::plane_cone;
 use crate::analytic::plane_cylinder::plane_cylinder;
 use crate::analytic::plane_plane::plane_plane;
@@ -281,14 +283,30 @@ pub fn face_stratum(
     }
 }
 
+/// Whether two canonical curved carriers are coaxial: their axis positions
+/// (the `(x, y)` of the cylinder's center, the cone's apex, or the sphere's
+/// center) are exactly equal. This is `CoaxialPair::validate`'s exact f64
+/// equality — no intervals, no tolerance: a pair that is 1-ulp apart in `x`
+/// is not coaxial, and the parallel-cell answer (for cylinder × cylinder) or
+/// the deferred refusal (for the mixed pairs) is the correct one for it.
+fn coaxial_axes(axis0: Point3, axis1: Point3) -> bool {
+    axis0.x == axis1.x && axis0.y == axis1.y
+}
+
 /// The stage-2 FF analytic dispatch: match the ordered carrier pair against
 /// the §3.3 table, solve with the existing exact pair function, and map the
 /// arm onto the shared 2-D ontology.
 ///
-/// `Torus` and `Placed` carriers, and any canonical analytic pair without an
-/// exact closed form in §3.3, fall through to the deferred funnel
-/// (`ContactReductionDeferred`). A numerically unresolved analytic arm is
-/// propagated as-is: it is a stop, not a guess.
+/// Every canonical curved carrier is z-axis-aligned, so any curved × curved
+/// pair of canonical carriers has **parallel** axes; the pair is either
+/// coaxial (the same-axis `coaxial` family) or parallel-but-offset. The
+/// offset cylinder × cylinder cell is `parallel_cylinders`; the offset mixed
+/// curved pairs, `Torus` and `Placed` carriers, and any canonical analytic
+/// pair without an exact closed form in §3.3 fall through to the deferred
+/// funnel (`ContactReductionDeferred`). A numerically unresolved analytic arm
+/// is propagated as-is: it is a stop, not a guess. The dispatch predicate
+/// guarantees `CoaxialPair::validate` passes, so a `NonCanonicalCarrier`
+/// refusal from `coaxial` can only mean a bug and is propagated, not hidden.
 fn analytic_ff(
     l: &CanonicalSurface,
     r: &CanonicalSurface,
@@ -303,15 +321,83 @@ fn analytic_ff(
         (CanonicalSurface::Cylinder(a), CanonicalSurface::Plane(b)) => plane_cylinder(b, a),
         (CanonicalSurface::Plane(a), CanonicalSurface::Cone(b)) => plane_cone(a, b),
         (CanonicalSurface::Cone(a), CanonicalSurface::Plane(b)) => plane_cone(b, a),
+        // The cylinder-family analytic pairs (BG-SOL-S5-CYLPAIR). Coaxial iff
+        // the axis positions are exactly equal; offset cylinder × cylinder is
+        // `parallel_cylinders`, and the offset mixed pairs stay deferred.
+        (CanonicalSurface::Cylinder(a), CanonicalSurface::Cylinder(b)) => {
+            if coaxial_axes(a.center(), b.center()) {
+                coaxial(&CoaxialPair::CylCyl(a, b))
+            } else {
+                parallel_cylinders(a, b)
+            }
+        }
+        (CanonicalSurface::Cylinder(a), CanonicalSurface::Cone(b)) => {
+            if coaxial_axes(a.center(), b.apex()) {
+                coaxial(&CoaxialPair::CylCone(a, b))
+            } else {
+                Err(Refusal::UnsupportedEnvelope(
+                    EnvelopeCase::ContactReductionDeferred,
+                ))
+            }
+        }
+        (CanonicalSurface::Cone(a), CanonicalSurface::Cylinder(b)) => {
+            if coaxial_axes(a.apex(), b.center()) {
+                coaxial(&CoaxialPair::CylCone(b, a))
+            } else {
+                Err(Refusal::UnsupportedEnvelope(
+                    EnvelopeCase::ContactReductionDeferred,
+                ))
+            }
+        }
+        (CanonicalSurface::Cylinder(a), CanonicalSurface::Sphere(b)) => {
+            if coaxial_axes(a.center(), b.center()) {
+                coaxial(&CoaxialPair::CylSphere(a, b))
+            } else {
+                Err(Refusal::UnsupportedEnvelope(
+                    EnvelopeCase::ContactReductionDeferred,
+                ))
+            }
+        }
+        (CanonicalSurface::Sphere(a), CanonicalSurface::Cylinder(b)) => {
+            if coaxial_axes(a.center(), b.center()) {
+                coaxial(&CoaxialPair::CylSphere(b, a))
+            } else {
+                Err(Refusal::UnsupportedEnvelope(
+                    EnvelopeCase::ContactReductionDeferred,
+                ))
+            }
+        }
+        (CanonicalSurface::Cone(a), CanonicalSurface::Cone(b)) => {
+            if coaxial_axes(a.apex(), b.apex()) {
+                coaxial(&CoaxialPair::ConeCone(a, b))
+            } else {
+                Err(Refusal::UnsupportedEnvelope(
+                    EnvelopeCase::ContactReductionDeferred,
+                ))
+            }
+        }
+        (CanonicalSurface::Cone(a), CanonicalSurface::Sphere(b)) => {
+            if coaxial_axes(a.apex(), b.center()) {
+                coaxial(&CoaxialPair::ConeSphere(a, b))
+            } else {
+                Err(Refusal::UnsupportedEnvelope(
+                    EnvelopeCase::ContactReductionDeferred,
+                ))
+            }
+        }
+        (CanonicalSurface::Sphere(a), CanonicalSurface::Cone(b)) => {
+            if coaxial_axes(a.center(), b.apex()) {
+                coaxial(&CoaxialPair::ConeSphere(b, a))
+            } else {
+                Err(Refusal::UnsupportedEnvelope(
+                    EnvelopeCase::ContactReductionDeferred,
+                ))
+            }
+        }
         (CanonicalSurface::Torus(_), _)
         | (_, CanonicalSurface::Torus(_))
         | (CanonicalSurface::Placed(_), _)
         | (_, CanonicalSurface::Placed(_)) => {
-            return Err(Refusal::UnsupportedEnvelope(
-                EnvelopeCase::ContactReductionDeferred,
-            ))
-        }
-        _ => {
             return Err(Refusal::UnsupportedEnvelope(
                 EnvelopeCase::ContactReductionDeferred,
             ))
@@ -533,6 +619,200 @@ mod tests {
                 ))
             ),
             "a Line×Cone FE stratum pair is the deferred funnel"
+        );
+    }
+
+    #[test]
+    fn contact_ff_cylinder_cylinder_parallel_returns_two_lines() {
+        // Two offset parallel cylinders: axes at (0, 0) and (1.5, 0), both
+        // radius 1. The axis distance 1.5 lies strictly between r0 + r1 = 2
+        // and |r0 − r1| = 0, so the parallel-axis cell emits two transverse
+        // lines (the `TwoCurves` arm).
+        let cyl0 = Cylinder::new(Point3::new(0.0, 0.0, 0.0), 1.0)
+            .expect("a unit cylinder is a valid carrier")
+            .value;
+        let cyl1 = Cylinder::new(Point3::new(1.5, 0.0, 0.0), 1.0)
+            .expect("a unit cylinder is a valid carrier")
+            .value;
+        let lhs = face(CanonicalSurface::Cylinder(cyl0));
+        let rhs = face(CanonicalSurface::Cylinder(cyl1));
+        let mut budget = Budget::new(100, 100, 100);
+        let out = contact(&lhs, &rhs, &mut budget)
+            .expect("a dyadic offset parallel cylinder pair is decidable");
+        assert_eq!(out.cert.method, Method::Exact);
+        assert_eq!(out.cert.props.get(Prop::AnalyticCarrier), Truth::True);
+        assert_eq!(out.value.contacts.len(), 1);
+        let record = out.value.contacts.first().expect("one record");
+        assert_eq!(record.dimension, ContactDimension::Arc1);
+        assert_eq!(record.kind, ContactEventKind::Transverse);
+        assert!(
+            matches!(
+                &record.locus,
+                ContactLocus::Analytic(AnalyticIntersection::TwoCurves([
+                    ExactCurve::Line(_),
+                    ExactCurve::Line(_),
+                ]))
+            ),
+            "an offset parallel cylinder pair emits two transverse lines"
+        );
+    }
+
+    #[test]
+    fn contact_ff_cylinder_cylinder_coaxial_returns_empty() {
+        // Two coaxial cylinders of different radii: the carriers are
+        // struct-unequal, so the C0-C2 identity stage cannot fire, and the
+        // analytic `coaxial(CylCyl)` arm answers `Empty` — no contact.
+        let cyl0 = Cylinder::new(Point3::new(0.0, 0.0, 0.0), 1.0)
+            .expect("a unit cylinder is a valid carrier")
+            .value;
+        let cyl1 = Cylinder::new(Point3::new(0.0, 0.0, 0.0), 2.0)
+            .expect("a unit cylinder is a valid carrier")
+            .value;
+        let lhs = face(CanonicalSurface::Cylinder(cyl0));
+        let rhs = face(CanonicalSurface::Cylinder(cyl1));
+        let mut budget = Budget::new(100, 100, 100);
+        let out =
+            contact(&lhs, &rhs, &mut budget).expect("a dyadic coaxial cylinder pair is decidable");
+        assert_eq!(out.cert.method, Method::Exact);
+        assert!(
+            out.value.contacts.is_empty(),
+            "concentric cylinders of different radii meet nowhere"
+        );
+    }
+
+    #[test]
+    fn contact_ff_cylinder_cone_coaxial_returns_analytic() {
+        // A cylinder (0,0,0) r = 1 and a cone apex (0,0,0) tan = 3/4 are
+        // coaxial; the cone's lateral surface meets the cylinder in two
+        // circles at z = ±4/3 of radius 1 (the `TwoCurves` arm), which maps
+        // to exactly one `Arc1` / `Transverse` record.
+        let cyl_face = face(CanonicalSurface::Cylinder(
+            Cylinder::new(Point3::new(0.0, 0.0, 0.0), 1.0)
+                .expect("a unit cylinder is a valid carrier")
+                .value,
+        ));
+        let cone_face = face(CanonicalSurface::Cone(
+            Cone::new(Point3::new(0.0, 0.0, 0.0), (3.0 / 4.0f64).atan())
+                .expect("a dyadic cone is a valid carrier")
+                .value,
+        ));
+        let mut budget = Budget::new(100, 100, 100);
+        let out = contact(&cyl_face, &cone_face, &mut budget)
+            .expect("a dyadic coaxial cylinder/cone pair is decidable");
+        assert_eq!(out.cert.method, Method::Exact);
+        assert_eq!(out.value.contacts.len(), 1);
+        let record = out.value.contacts.first().expect("one record");
+        assert_eq!(record.dimension, ContactDimension::Arc1);
+        assert!(matches!(record.locus, ContactLocus::Analytic(_)));
+
+        // The metamorphic property: the swapped order produces a structurally
+        // equal `ContactComplex` (the coaxial cell is order-insensitive).
+        let mut budget = Budget::new(100, 100, 100);
+        let swapped = contact(&cone_face, &cyl_face, &mut budget)
+            .expect("the swapped coaxial pair is decidable");
+        assert_eq!(
+            format!("{out:?}"),
+            format!("{swapped:?}"),
+            "contact(cylinder, cone) and contact(cone, cylinder) must agree"
+        );
+    }
+
+    #[test]
+    fn contact_ff_cylinder_sphere_coaxial_returns_analytic() {
+        // A cylinder (0,0,0) r = 1 and a sphere centered at the origin
+        // r = 2: the wall circle x²+y² = 1 lies in the sphere at z² = 3, so
+        // the coaxial cell emits two circles.
+        let cyl_face = face(CanonicalSurface::Cylinder(
+            Cylinder::new(Point3::new(0.0, 0.0, 0.0), 1.0)
+                .expect("a unit cylinder is a valid carrier")
+                .value,
+        ));
+        let sph_face = face(CanonicalSurface::Sphere(Sphere::new(
+            Point3::new(0.0, 0.0, 0.0),
+            2.0,
+        )));
+        let mut budget = Budget::new(100, 100, 100);
+        let out = contact(&cyl_face, &sph_face, &mut budget)
+            .expect("a dyadic coaxial cylinder/sphere pair is decidable");
+        assert_eq!(out.cert.method, Method::Exact);
+        let record = out.value.contacts.first().expect("at least one record");
+        assert_eq!(record.dimension, ContactDimension::Arc1);
+        assert!(matches!(record.locus, ContactLocus::Analytic(_)));
+    }
+
+    #[test]
+    fn contact_ff_cone_cone_coaxial_returns_analytic() {
+        // Two coaxial cones, apexes (0,0,0) tan 3/4 and (0,0,1) tan 1/2:
+        // different angles on a shared axis, they meet in two circles (the
+        // coaxial module's own test proves the `TwoCurves` arm for this
+        // witness), one `Arc1` / `Transverse` record.
+        let cone0 = face(CanonicalSurface::Cone(
+            Cone::new(Point3::new(0.0, 0.0, 0.0), (3.0 / 4.0f64).atan())
+                .expect("a dyadic cone is a valid carrier")
+                .value,
+        ));
+        let cone1 = face(CanonicalSurface::Cone(
+            Cone::new(Point3::new(0.0, 0.0, 1.0), (1.0 / 2.0f64).atan())
+                .expect("a dyadic cone is a valid carrier")
+                .value,
+        ));
+        let mut budget = Budget::new(100, 100, 100);
+        let out =
+            contact(&cone0, &cone1, &mut budget).expect("a dyadic coaxial cone pair is decidable");
+        assert_eq!(out.cert.method, Method::Exact);
+        assert_eq!(out.value.contacts.len(), 1);
+        let record = out.value.contacts.first().expect("one record");
+        assert_eq!(record.dimension, ContactDimension::Arc1);
+        assert_eq!(record.kind, ContactEventKind::Transverse);
+        assert!(
+            matches!(
+                &record.locus,
+                ContactLocus::Analytic(AnalyticIntersection::TwoCurves(_))
+            ),
+            "two coaxial cones of different angles meet in two circles"
+        );
+    }
+
+    #[test]
+    fn contact_ff_non_coaxial_curved_pair_refuses_deferred() {
+        // Offset curved pairs (axes not exactly equal) stay in the deferred
+        // funnel: cylinder (0,0,0) r = 1 × cone apex (1,0,0) tan 3/4, and
+        // cylinder (0,0,0) r = 1 × sphere center (2,0,0) r = 2.
+        let cyl_face = face(CanonicalSurface::Cylinder(
+            Cylinder::new(Point3::new(0.0, 0.0, 0.0), 1.0)
+                .expect("a unit cylinder is a valid carrier")
+                .value,
+        ));
+        let off_cone = face(CanonicalSurface::Cone(
+            Cone::new(Point3::new(1.0, 0.0, 0.0), (3.0 / 4.0f64).atan())
+                .expect("a dyadic cone is a valid carrier")
+                .value,
+        ));
+        let off_sphere = face(CanonicalSurface::Sphere(Sphere::new(
+            Point3::new(2.0, 0.0, 0.0),
+            2.0,
+        )));
+        let mut budget = Budget::new(100, 100, 100);
+        let out = contact(&cyl_face, &off_cone, &mut budget);
+        assert!(
+            matches!(
+                out,
+                Err(Refusal::UnsupportedEnvelope(
+                    EnvelopeCase::ContactReductionDeferred
+                ))
+            ),
+            "an off-axis cylinder/cone pair is the deferred funnel"
+        );
+        let mut budget = Budget::new(100, 100, 100);
+        let out = contact(&cyl_face, &off_sphere, &mut budget);
+        assert!(
+            matches!(
+                out,
+                Err(Refusal::UnsupportedEnvelope(
+                    EnvelopeCase::ContactReductionDeferred
+                ))
+            ),
+            "an off-axis cylinder/sphere pair is the deferred funnel"
         );
     }
 }
