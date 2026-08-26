@@ -526,6 +526,22 @@ FE `Line`×{Cone,Sphere}, `Circle`×{Cone,Sphere}, Circle×Cylinder transverse,
 EE Circle×Circle (3-D two-circle), Torus/Placed, vertex strata — keeps the
 `ContactReductionDeferred` refusal with its documented follow-up.
 
+**AMENDED (session 31, BG-SOL-S5-CYLPAIR, the cylinder-family FF cells):** the
+curved × curved FF cells that canonical carriers make reachable dispatch
+through the §3.3 `parallel_cylinders` / `coaxial` families inside
+`analytic_ff`. Because every canonical `Cylinder`/`Cone`/`Sphere` is z-axis-
+aligned, any two of them have **parallel** axes, so the pair is either coaxial
+(exact `(x, y)` axis-position equality, matching `CoaxialPair::validate`) or
+parallel-but-offset. Dispatch: `(Cylinder, Cylinder)` → coaxial `CylCyl` on
+same-axis, `parallel_cylinders` otherwise; `(Cylinder, Cone)`,
+`(Cylinder, Sphere)`, `(Cone, Cone)`, `(Cone, Sphere)` (both orientations) →
+the corresponding `CoaxialPair` cell on same-axis, `ContactReductionDeferred`
+otherwise. **`equal_radius_cylinders` is NOT wired**: its intersecting-axes
+cell is unreachable from canonical carriers (parallel axes by construction) and
+needs `Placed` cylinders, which the funnel defers; the family stays the
+analytic-cell oracle for BG-NUM-003. `Torus` pairs stay deferred. All returned
+arms flow through the existing `analytic_records` mapping (no new locus forms).
+
 **Phase 4 — Boundary Rewrite.** New `truck-shapeops` module; material-state
 heart (spec §13.1).
 ```rust
