@@ -1184,7 +1184,7 @@ mod tests {
     }
 
     #[test]
-    fn contact_ff_offset_curved_pairs_leave_the_plain_deferred_funnel() {
+    fn contact_ff_non_coaxial_curved_pair_refuses_deferred() {
         // BG-SOL-S7-GFF-WIRE: the offset mixed-quadric cells no longer fall
         // into the plain deferred funnel — `analytic_ff` routes them to the
         // validated FF stage, which then classifies each witness. The cone
