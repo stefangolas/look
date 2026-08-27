@@ -832,6 +832,57 @@ component-adjacency logic transfers, its And/Or call site does not.
   adjacency. This is the cycle-parity check: the graph is consistent iff
   every cycle crosses an even number of Flip edges.
 
+**AMENDED (session 37, pre-dispatch of BG-SOL-RW3-CLASSIFY):** the
+realization was fixed by a full prototype run against the LANDED
+splitter (`scratch/rw3probe`, preserved; every number below is
+measured) — the sign convention is confirmed (the flagship's annulus
+fragment reads `(n_F × der) · n_B = +1.0` at the rim half-edge midpoint
+`(2,3,2)` ⇒ OUTSIDE), and the booked design gains these decisions:
+
+- The signature is `classify_fragments(shell_a, shell_b, &FragmentMesh,
+  tol) -> Outcome<FragmentClassification>` — no events parameter (the
+  arc-side test finds the other solid's normal by searching ITS faces
+  at the arc point; the ray seed solves against its carriers).
+  `mesh.coincident` is NOT consumed by classification: coincident
+  fragments get their bits by propagation like every other fragment;
+  the pairs matter only at RW4's decision.
+- The arc-side rule carries the wire-orientation sign
+  `s_F = +1 iff (A_eff > 0) == face.orientation()` (`A_eff` the signed
+  parameter-polygon area of the fragment's first EFFECTIVE boundary
+  wire): `bit = (s_F · (n_F × der)) · n_B < 0` with `der` the
+  fragment's own effective-boundary traversal direction of the shared
+  edge. `s_F` calibrates "interior on the left of travel" for both
+  stored-wire conventions; every flip-touching fragment of the
+  flagship family reads `s_F = +1`.
+- Ray seeds run an on-boundary containment PRE-SCREEN first (the
+  representative ON the other solid's trimmed region ⇒ the closure bit
+  `true`), then a 14-direction deterministic table (axial then
+  diagonal), signed WINDING (not parity — a single closed shell can be
+  genus ≥ 1), `t <= tol` origin crossings skipped, region trichotomy
+  (Inside / Boundary-ambiguous-retry / Outside) with the extrude-wall
+  BAND rule (degenerate full-period wire polygons ⇒ the v-band check)
+  for periodic carriers, `NumericallyUnresolved` on exhaustion.
+- The ray solve's four carriers are Plane/Cylinder/Cone/Sphere; any
+  other `Surface` arm in the other solid's shell refuses
+  `UnsupportedEnvelope(NonCanonicalCarrier)` (the arc-side seed has no
+  such restriction).
+- The contradiction witness uses a new `Prop::FragmentInsideOther` arm
+  in the evidence algebra (zero ripple — no exhaustive `match` on
+  `Prop` exists).
+- Validated witnesses: the flagship bits are exactly
+  `[F,F,T,F,F,F,F,T,T,T]`; the open-arc mesh (an event list with no
+  Region2 record) is parity-INCONSISTENT and refuses `Contradictory` —
+  the verification catches under-split meshes; ray seeds answer
+  disjoint (all false), strictly-contained (a false / b true), and the
+  ambiguous-retry case (direction 1 on-boundary crossings, direction 2
+  resolving through the band rule's rejection).
+- Known v1 limitation, recorded not hidden: a mesh whose fragments
+  STRADDLE the other solid's boundary (the through-hole family — a
+  contact arc interior to the other solid's unsplit carrier region)
+  classifies consistently-but-meaninglessly; that is the splitter's
+  concern (the wall is not divided at interior circles), not the
+  classifier's.
+
 The decision + assembly (RW4): per fragment, `MaterialState4` —
 coincident pairs take PRECEDENCE (A-fragment: own `(1,0)` in absolute
 orientation, other `(1,0)` Identical / `(0,1)` Anti); all other fragments
@@ -869,6 +920,14 @@ RW2):
 2. **BG-SOL-RW2-SPLIT**: the manifest edge truck-shapeops →
    truck-evidence (acyclic; evidence depends only on base/geotrait/
    geometry) + `boolean/split.rs` (FragmentMesh + the split semantics).
+   Follow-up **BG-SOL-SPLIT-PERIODIC** (session 37): the region checks
+   are periodic-branch-aware — a query parameter folded to the
+   principal u-branch is tested at its ± period translates against the
+   wire polygons (which unwrap from each wire's own front). Without it
+   the flagship test fails at HEAD: RW2 was verified at a pre-S2-fix
+   base (the packets ran in parallel) and the S2 wall fix changed the
+   wall's top-wire traversal so the FF circle no longer registered as
+   on-boundary against the wall.
 3. **BG-SOL-RW3-CLASSIFY**: `boolean/classify.rs` (FragmentClassification
    + seeds/propagation/verification).
 4. **BG-SOL-RW4-ASSEMBLE**: `boolean/assemble.rs` + the `boolean()` entry
