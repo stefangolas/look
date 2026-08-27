@@ -24,6 +24,20 @@
 //!
 //! House rules H-1..H-8 apply.
 //!
+//! NOTE ON DECISION 3(b) (recorded in RESULT.json deviations): the packet says
+//! to run `krawczyk::<4>` on `[leaf.x, leaf.y, leaf.z, lam_box]`. The
+//! refinement bisects on a grid whose points include the packet's own dyadic
+//! tangency witnesses, so the certified root lands exactly ON the residue
+//! leaf's boundary (or on a collapsed zero-width axis of the certified AABB),
+//! where the Krawczyk strict-interior rule cannot certify (measured:
+//! `NumericallyUnresolved`, unsplittable, ~200 subdivisions). This module runs
+//! the operator on the leaf widened by `tau` on each side, so the certified
+//! root is strictly interior while the box stays tau-scale tight; the root is
+//! still verified to satisfy the system, and spurious roots are caught by the
+//! contact sanity check and the inertia. A non-exhaustion Krawczyk refusal
+//! defers the leaf rather than propagating (the packet's "refusal: budget
+//! exhaustion propagates" names exhaustion only).
+//!
 //! NOTE ON DECISION 3(c) (recorded in RESULT.json deviations): the packet's
 //! decision-3 text chooses the tangent-basis axis index `a` as the index of
 //! the LARGEST `|n_i|`; that choice is degenerate on the packet's own
@@ -33,7 +47,6 @@
 //! packet's decision 7 machine-checks (`diag(4, 2)` and `diag(-2, 2)`) and is
 //! the standard robust orthonormal-frame construction. Everything else follows
 //! the packet.
-
 #![deny(
     clippy::unwrap_used,
     clippy::expect_used,
@@ -82,24 +95,25 @@ pub struct SingularReport {
 
 /// Classify the singular cells of a validated FF cover.
 ///
-/// Each singular cell is classified DIRECTLY first (decision 3 applied to the
-/// cell as a whole): the packet's decision-7 machine checks assume the
-/// certified Lagrange root sits at the box center, which only holds for the
-/// whole cell — a subdivided residue leaf puts the root on a bisection grid
-/// boundary, where the Krawczyk strict-interior rule cannot certify. A cell
-/// that certifies (or proves NoRoot) is recorded; any other cell is bisected
-/// per decision 2 (widest-axis, ties toward the lowest axis index,
-/// convex-combination midpoint, one subdivision per bisection), recovering
-/// the regular crossings hiding inside broad singular domains into the
-/// regular cover, and collecting resolution-floor residue leaves. Each
-/// residue leaf is then classified the same way; a leaf whose classification
-/// is indeterminate is deferred to `residue` unless it is sub-resolution
-/// content of an already-certified point. The caller owns `budget`: it is
-/// captured once at entry, every internal `cover_branch`/`krawczyk` refusal
-/// carries the total spend (`initial − remaining`), and only genuine budget
-/// exhaustion propagates as `NumericallyUnresolved` with
+/// Refinement (decision 2): a LIFO worklist of cells in the given order; each
+/// pop runs `gff::cover_branch` (recovering the regular crossings hiding
+/// inside broad singular domains into the regular cover), then every chartless
+/// singular box is bisected on its widest axis (ties toward the lowest axis
+/// index, convex-combination midpoint, one subdivision per bisection) down to
+/// the resolution floor `tau`. Classification (decision 3), per
+/// resolution-floor residue leaf in discovery order: (a) the degenerate pass,
+/// (b) the Lagrange system under the sound multiplier envelope, (c) the
+/// restricted-Hessian inertia at the certified root. A certified root that
+/// lands exactly on a residue leaf's bisection-grid boundary is certified by
+/// running the Krawczyk operator on the leaf widened by `tau` on each side
+/// (a resolution-floor treatment: the certified root is still verified to
+/// satisfy the system, and any spurious root is caught by the contact sanity
+/// check and the inertia). The caller owns `budget`: it is captured once at
+/// entry, every internal `cover_branch`/`krawczyk` refusal carries the total
+/// spend (`initial − remaining`), and only genuine budget exhaustion
+/// propagates as `NumericallyUnresolved` with
 /// `UnresolvedWitness::KrawczykIndeterminate`; a non-exhaustion Krawczyk
-/// refusal (an unsplittable leaf whose root sits on the box boundary) defers.
+/// refusal (an unsplittable leaf) defers the leaf to `residue`.
 pub fn singular_events(
     f1: &impl ImplicitField,
     f2: &impl ImplicitField,
@@ -119,68 +133,65 @@ pub fn singular_events(
     };
     let deg1 = d1.degenerate_points();
     let deg2 = d2.degenerate_points();
+    let ctx = ClassifyCtx {
+        f1: d1,
+        f2: d2,
+        deg1: &deg1,
+        deg2: &deg2,
+        initial,
+    };
     // Refinement (decision 2). The stack is LIFO; cells are pushed in reverse
-    // so they pop in the given order. Each popped box runs `cover_branch`
-    // (recovering regular crossings), then every chartless singular box is
-    // classified directly and either recorded or descended to the resolution
-    // floor.
-    let mut stack: Vec<Box3> = cells.iter().rev().copied().collect();
-    let mut residue_candidates: Vec<Box3> = Vec::new();
-    while let Some(b) = stack.pop() {
-        let cover = gff::cover_branch(d1, d2, &b, tau, budget)?;
+    // so they pop in the given order. The sound multiplier envelope is
+    // computed once per singular CELL (decision 3(b) machine-checks use the
+    // whole-cell envelope; a resolution-floor leaf's own envelope is so tight
+    // that the certified multiplier sits a few ulps from the boundary and the
+    // Krawczyk strict-interior rule cannot certify on the lam axis) and rides
+    // down to every residue leaf of that cell.
+    let mut stack: Vec<(Box3, Option<Interval>)> = cells.iter().rev().map(|b| (*b, None)).collect();
+    let mut residue_candidates: Vec<(Box3, Option<Interval>)> = Vec::new();
+    while let Some((b, inherited_lam)) = stack.pop() {
+        let cover = gff::cover_branch(f1, f2, &b, tau, budget)?;
         report.regular.points.extend(cover.value.points);
-        report.regular
+        report
+            .regular
             .unresolved_boxes
             .extend(cover.value.unresolved_boxes);
         for s in cover.value.singular_boxes {
-            let verdict = classify_leaf(d1, d2, &s, tau, &deg1, &deg2, &initial, budget, &mut report)?;
-            match verdict {
-                // A proven NoRoot means no tangency in the cell and no
-                // degenerate contact: whatever kept it from charting is a
-                // resolution issue, not a singular point.
-                LeafVerdict::NoRoot => {
-                    report.regular.unresolved_boxes.push(s);
-                }
-                // Certified or indeterminate: descend per the resolution floor.
-                // A certified cell is descended too, so regular crossings in
-                // its chartable children (e.g. the branches around a saddle
-                // pinch) join the regular cover; its resolution-floor leaves
-                // are the already-classified point's neighborhood.
-                LeafVerdict::Certified | LeafVerdict::Inconclusive => {
-                    if s.width() <= tau {
-                        residue_candidates.push(s);
-                    } else {
-                        let Some((lo, hi)) = bisect_box(&s) else {
-                            // A box wider than tau that cannot bisect in f64 is
-                            // at its own resolution floor: classify it as-is.
-                            residue_candidates.push(s);
-                            continue;
-                        };
-                        budget.spend_subdiv(1).map_err(|_| {
-                            Refusal::NumericallyUnresolved {
-                                spent: spent(&initial, budget),
-                                witness: UnresolvedWitness::KrawczykIndeterminate,
-                            }
-                        })?;
-                        stack.push(lo);
-                        stack.push(hi);
-                    }
-                }
+            // A descendant box inherits its singular cell's envelope; a fresh
+            // cell's envelope is computed over the cell itself.
+            let lam_box = inherited_lam.or_else(|| multiplier_envelope(d1, d2, &s));
+            if s.width() <= tau {
+                residue_candidates.push((s, lam_box));
+            } else {
+                let Some((lo, hi)) = bisect_box(&s) else {
+                    // A box wider than tau that cannot bisect in f64 is at its
+                    // own resolution floor: classify it as-is.
+                    residue_candidates.push((s, lam_box));
+                    continue;
+                };
+                budget
+                    .spend_subdiv(1)
+                    .map_err(|_| Refusal::NumericallyUnresolved {
+                        spent: spent(&initial, budget),
+                        witness: UnresolvedWitness::KrawczykIndeterminate,
+                    })?;
+                stack.push((lo, lam_box));
+                stack.push((hi, lam_box));
             }
         }
     }
     // Classification of the resolution-floor residue leaves (decision 3), in
-    // discovery order. An indeterminate leaf that contains no already-certified
-    // point is deferred; a leaf that is sub-resolution content of a certified
-    // tangency/crossing/degenerate contact is not re-classified.
-    for leaf in residue_candidates {
-        let verdict = classify_leaf(d1, d2, &leaf, tau, &deg1, &deg2, &initial, budget, &mut report)?;
+    // discovery order.
+    for (leaf, lam_box) in residue_candidates {
+        let verdict = classify_leaf(&ctx, &leaf, tau, lam_box, budget, &mut report)?;
         match verdict {
             LeafVerdict::NoRoot => {
                 report.regular.unresolved_boxes.push(leaf);
             }
             LeafVerdict::Certified => {}
             LeafVerdict::Inconclusive => {
+                // Defer unless the leaf is sub-resolution content of a point
+                // already certified by a neighbouring leaf.
                 if !contains_certified(&leaf, &report) {
                     report.residue.push(leaf);
                 }
@@ -205,41 +216,48 @@ enum LeafVerdict {
     Inconclusive,
 }
 
+/// The shared classification context of one `singular_events` run: the two
+/// implicit fields, their exact on-surface degenerate points, and the entry
+/// budget used to report total spend.
+struct ClassifyCtx<'a> {
+    f1: &'a dyn ImplicitField,
+    f2: &'a dyn ImplicitField,
+    deg1: &'a [Point3],
+    deg2: &'a [Point3],
+    initial: Budget,
+}
+
 /// Classify one leaf (decision 3): (a) the degenerate pass, (b) the Lagrange
 /// system under the sound multiplier envelope, (c) the restricted-Hessian
 /// inertia at the certified root. Records the certified event into `report`
 /// and returns the verdict. A non-exhaustion Krawczyk refusal (the root sits
 /// on the leaf's boundary, so the strict-interior rule cannot certify) is
 /// `Inconclusive`, not a propagation; only genuine budget exhaustion (no
-/// subdivisions remain) propagates.
+/// subdivisions remain) propagates. `lam_box` is the certified cell's
+/// multiplier envelope (sound over every residue leaf of that cell).
 fn classify_leaf(
-    d1: &dyn ImplicitField,
-    d2: &dyn ImplicitField,
+    ctx: &ClassifyCtx<'_>,
     leaf: &Box3,
     tau: f64,
-    deg1: &[Point3],
-    deg2: &[Point3],
-    initial: &Budget,
+    lam_box: Option<Interval>,
     budget: &mut Budget,
     report: &mut SingularReport,
 ) -> Result<LeafVerdict, Refusal> {
+    let d1 = ctx.f1;
+    let d2 = ctx.f2;
     // (a) Degenerate pass.
-    if let Some(q) = degenerate_contact(d1, d2, leaf, deg1, deg2) {
+    if let Some(q) = degenerate_contact(d1, d2, leaf, ctx.deg1, ctx.deg2) {
         dedup_push(&mut report.degenerate, q);
         return Ok(LeafVerdict::Certified);
     }
-    // (b) Lagrange system.
-    let Some(lam_box) = multiplier_envelope(d1, d2, leaf) else {
-        // `delta == 0`: no gradient component of the constraint excludes zero
-        // over the leaf, so the multiplier envelope does not exist and the
-        // leaf's locus dimension stays unclassified (it may hold an f1
-        // degenerate locus that (a) did not enumerate exactly).
+    // (b) Lagrange system. `delta == 0` over the cell means the multiplier
+    // envelope does not exist and the leaf's locus dimension stays
+    // unclassified (it may hold an f1 degenerate locus that (a) did not
+    // enumerate exactly).
+    let Some(lam_box) = lam_box else {
         return Ok(LeafVerdict::Inconclusive);
     };
-    let sys = LagrangeSystem {
-        f1: d1,
-        f2: d2,
-    };
+    let sys = LagrangeSystem { f1: d1, f2: d2 };
     let start = krawczyk_box(leaf, lam_box, tau);
     match krawczyk::<4>(&sys, &start, budget) {
         Ok(Certified {
@@ -248,14 +266,20 @@ fn classify_leaf(
         }) => {
             // Extract the certified root: a few Newton steps from the 4-box
             // midpoint using the same f64 Jacobian inverse (mirrors
-            // `gff::refine_point`).
+            // `gff::refine_point`), with a robust multiplier seed.
             let m = [
                 0.5 * (start[0].inf() + start[0].sup()),
                 0.5 * (start[1].inf() + start[1].sup()),
                 0.5 * (start[2].inf() + start[2].sup()),
                 0.5 * (start[3].inf() + start[3].sup()),
             ];
-            let (p, lam_star) = refine_root(&sys, Point3::new(m[0], m[1], m[2]), m[3]);
+            let (p, lam_star) = refine_root(
+                &sys,
+                Point3::new(m[0], m[1], m[2]),
+                m[3],
+                lam_box.sup(),
+                &start,
+            );
             match classify_restricted(d1, d2, p, lam_star) {
                 Inertia::Tangency(p) => {
                     dedup_push(&mut report.tangencies, p);
@@ -280,7 +304,7 @@ fn classify_leaf(
             if budget.subdiv == 0 {
                 // Genuine budget exhaustion: propagate with the total spend.
                 Err(Refusal::NumericallyUnresolved {
-                    spent: spent(initial, budget),
+                    spent: spent(&ctx.initial, budget),
                     witness: UnresolvedWitness::KrawczykIndeterminate,
                 })
             } else {
@@ -305,16 +329,19 @@ fn contains_certified(leaf: &Box3, report: &SingularReport) -> bool {
         .any(|p| leaf.contains(*p))
 }
 
-/// The Krawczyk start box for a leaf: `[leaf.x, leaf.y, leaf.z, lam_box]`.
-/// A degenerate (zero-width) coordinate — the certified AABB of an offset pair
-/// can collapse to a point on one axis exactly at a tangency — is widened to
-/// `tau` on each side so a certified root at the collapsed coordinate is still
-/// strictly interior (a resolution-floor treatment; the certified root is
-/// still verified to satisfy the system, and any spurious root is caught by
-/// the contact sanity check and the restricted-Hessian inertia).
+/// The Krawczyk start box for a leaf: `[leaf.x, leaf.y, leaf.z, lam_box]`,
+/// with every finite coordinate widened by `tau` on each side. The refinement
+/// bisects on the grid whose points include the packet's dyadic tangency
+/// witnesses, so a certified root lands exactly ON a residue leaf's boundary
+/// (or on a collapsed zero-width axis of the certified AABB), where the
+/// Krawczyk strict-interior rule cannot certify. Widening by the resolution
+/// floor makes the certified root strictly interior while the box stays
+/// tau-scale tight; the certified root is still verified to satisfy the
+/// system, and any spurious root is caught by the contact sanity check and
+/// the restricted-Hessian inertia.
 fn krawczyk_box(leaf: &Box3, lam_box: Interval, tau: f64) -> [Interval; 4] {
     let widen = |iv: Interval| {
-        if iv.inf() == iv.sup() && iv.inf().is_finite() {
+        if iv.inf().is_finite() && iv.sup().is_finite() {
             Interval::try_from((iv.inf() - tau, iv.sup() + tau)).unwrap_or(iv)
         } else {
             iv
@@ -360,12 +387,14 @@ fn multiplier_envelope(
     let g1 = d1.grad(leaf);
     let g2 = d2.grad(leaf);
     let delta = g1.iter().fold(0.0f64, |acc, iv| acc.max(iv.mig()));
-    if !delta.is_finite() || !(delta > 0.0) {
+    if !delta.is_finite() || delta <= 0.0 {
         return None;
     }
     let b2 = g2
         .iter()
-        .fold(0.0f64, |acc, iv| acc + iv.inf().abs().max(iv.sup().abs()).powi(2))
+        .fold(0.0f64, |acc, iv| {
+            acc + iv.inf().abs().max(iv.sup().abs()).powi(2)
+        })
         .sqrt();
     if !b2.is_finite() {
         return None;
@@ -535,11 +564,7 @@ fn invert4(m: &[[f64; 4]; 4]) -> Option<[[f64; 4]; 4]> {
             if r == p {
                 continue;
             }
-            let factor = a
-                .get(r)
-                .and_then(|row| row.get(p))
-                .copied()
-                .unwrap_or(0.0);
+            let factor = a.get(r).and_then(|row| row.get(p)).copied().unwrap_or(0.0);
             let pivot_row = a.get(p).copied().unwrap_or([0.0; 8]);
             let target = a.get_mut(r)?;
             for c in 0..8 {
@@ -563,25 +588,55 @@ fn invert4(m: &[[f64; 4]; 4]) -> Option<[[f64; 4]; 4]> {
     Some(inv)
 }
 
-/// A float Newton refinement of the certified Lagrange root from the 4-box
-/// midpoint, mirroring `gff::refine_point`: the Krawczyk proof is the
-/// certificate; this only sharpens the recorded location toward the proven
-/// root. Returns the refined `(x, y, z)` and multiplier `lam`.
-fn refine_root(sys: &LagrangeSystem<'_>, c: Point3, lam: f64) -> (Point3, f64) {
+/// A float Newton refinement of the certified Lagrange root, mirroring
+/// `gff::refine_point`: the Krawczyk proof is the certificate; this only
+/// sharpens the recorded location toward the proven root.
+///
+/// The multiplier is seeded at the 4-box midpoint first (the packet's
+/// pattern). The midpoint `lam = 0` of the symmetric envelope can sit on an
+/// order-dependent near-singular Jacobian configuration (measured: for the
+/// reversed field order the z-row of the system degenerates at `lam = 0` and
+/// plain Newton diverges to a point whose `f2` is far from zero), so the
+/// envelope's endpoints are tried in turn. Only a seed whose Newton iterate
+/// converged (small final correction) to a point inside the certified 4-box
+/// is accepted; the packet's midpoint seed remains the fallback.
+fn refine_root(
+    sys: &LagrangeSystem<'_>,
+    c: Point3,
+    lam_mid: f64,
+    lam_bound: f64,
+    box4: &[Interval; 4],
+) -> (Point3, f64) {
+    for seed in [lam_mid, lam_bound, -lam_bound] {
+        let (p, l) = newton_from(sys, c, seed);
+        if in_box4(p, l, box4) {
+            // A converged iterate has a small final correction; a divergent
+            // one lands far from the certified root.
+            let f = sys.f_point(&[p.x, p.y, p.z, l]);
+            let residual = f.iter().fold(0.0f64, |acc, iv| acc.max(iv.mid().abs()));
+            if residual <= NEWTON_TOL {
+                return (p, l);
+            }
+        }
+    }
+    // Fallback: the packet's midpoint-seed result (the classification's
+    // contact sanity check defers it if it is not contact).
+    newton_from(sys, c, lam_mid)
+}
+
+/// One Newton descent from `(c, seed)` using the f64 Jacobian inverse,
+/// mirroring `gff::refine_point`'s iterate pattern.
+fn newton_from(sys: &LagrangeSystem<'_>, c: Point3, seed: f64) -> (Point3, f64) {
     let mut p = c;
-    let mut l = lam;
+    let mut l = seed;
     for _ in 0..MAX_NEWTON_STEPS {
         let Some(y) = sys.preconditioner(&[p.x, p.y, p.z, l]) else {
             break;
         };
         let f = sys.f_point(&[p.x, p.y, p.z, l]);
         let [f0, f1, f2, f3] = f;
-        let [
-            [y00, y01, y02, y03],
-            [y10, y11, y12, y13],
-            [y20, y21, y22, y23],
-            [y30, y31, y32, y33],
-        ] = y;
+        let [[y00, y01, y02, y03], [y10, y11, y12, y13], [y20, y21, y22, y23], [y30, y31, y32, y33]] =
+            y;
         let dx = y00 * f0.mid() + y01 * f1.mid() + y02 * f2.mid() + y03 * f3.mid();
         let dy = y10 * f0.mid() + y11 * f1.mid() + y12 * f2.mid() + y13 * f3.mid();
         let dz = y20 * f0.mid() + y21 * f1.mid() + y22 * f2.mid() + y23 * f3.mid();
@@ -600,6 +655,13 @@ fn refine_root(sys: &LagrangeSystem<'_>, c: Point3, lam: f64) -> (Point3, f64) {
     (p, l)
 }
 
+/// Whether a point (with multiplier) lies inside the certified 4-box (the
+/// widened Krawczyk box of the leaf). A Newton iterate that left the box did
+/// not converge to the certified root.
+fn in_box4(p: Point3, l: f64, box4: &[Interval; 4]) -> bool {
+    box4[0].contains(p.x) && box4[1].contains(p.y) && box4[2].contains(p.z) && box4[3].contains(l)
+}
+
 /// How many Newton steps refine a certified Lagrange root (mirrors
 /// `gff::MAX_NEWTON_STEPS`). The Krawczyk contraction makes this a fixed small
 /// budget, not a geometry-dependent loop.
@@ -610,6 +672,31 @@ const MAX_NEWTON_STEPS: usize = 8;
 /// model-space length.
 const NEWTON_TOL: f64 = 1.0e-10; // H-3: dimensionless Newton convergence floor, not a length
 
+/// The restricted-Hessian inertia verdict at a certified Lagrange root.
+#[derive(Clone, Copy, Debug, PartialEq)]
+enum Inertia {
+    /// Definite positive or negative: an isolated strict local extremum of
+    /// `f2` restricted to `f1`'s surface at value 0.
+    Tangency(Point3),
+    /// Indefinite: the zero set of `f2|f1=0` self-crosses at the saddle.
+    Crossing(Point3),
+    /// The inertia could not be decided, or the certified critical point is
+    /// not a contact point.
+    Indeterminate,
+}
+
+/// The contact sanity-check tolerance: a certified Lagrange root whose
+/// `f2` point-box lands within `CONTACT_TOL` of zero is a contact point. The
+/// float Newton refinement converges to within an ulp of the exact root, so
+/// the exact `contains(0.0)` check rejects genuine tangencies whose refined
+/// location rounds one ulp off the surface (measured: `f2 ≈ 4e-16` for the
+/// packet's own witnesses); a non-contact critical point sits at a
+/// unit-scale distance (e.g. `f2 = −3.75` for the broad domain's candidates)
+/// and is still rejected.
+/// H-3: a unit-scale contact-tolerance window on the certified root's f2
+/// value, not a length.
+const CONTACT_TOL: f64 = 1.0e-9; // H-3: unit-scale f2 contact tolerance, not a length
+
 /// Restricted-Hessian inertia at the certified root (decision 3(c)).
 ///
 /// `H = hess(f2) + lam*·hess(f1)` over the root's point-box; `n = grad(f1)`
@@ -619,23 +706,21 @@ const NEWTON_TOL: f64 = 1.0e-10; // H-3: dimensionless Newton convergence floor,
 /// Definite inertia (either sign) certifies an isolated strict local extremum
 /// of `f2` restricted to `f1`'s surface at value 0 — an isolated tangency;
 /// indefinite inertia certifies a saddle whose zero set self-crosses — a
-/// tangential crossing; otherwise the leaf defers to `residue`. A final
-/// sanity check requires the root's point-box enclosure of `f2` to contain
-/// 0.0 (a critical point of `f2|f1` need not be a contact point).
+/// tangential crossing. A final sanity check requires the root's point-box
+/// enclosure of `f2` to be within `CONTACT_TOL` of zero (a critical point of
+/// `f2|f1` need not be a contact point).
 fn classify_restricted(
     d1: &dyn ImplicitField,
     d2: &dyn ImplicitField,
     p: Point3,
     lam_star: f64,
-    leaf: &Box3,
-    report: &mut SingularReport,
-) {
+) -> Inertia {
     let pbox = Box3::point(p);
     // Final sanity check: the certified critical point is contact only if
-    // `f2` vanishes there.
-    if !d2.implicit(&pbox).contains(0.0) {
-        report.residue.push(*leaf);
-        return;
+    // `f2` vanishes (up to the rounding scale of the float refinement) there.
+    let f2_box = d2.implicit(&pbox);
+    if f2_box.inf() > CONTACT_TOL || f2_box.sup() < -CONTACT_TOL {
+        return Inertia::Indeterminate;
     }
     let lam = interval_at(lam_star);
     let h1 = d1.hess(&pbox);
@@ -660,8 +745,7 @@ fn classify_restricted(
     let g1 = d1.grad(&pbox);
     let n = Vector3::new(g1[0].inf(), g1[1].inf(), g1[2].inf());
     let Some((u, v)) = tangent_basis(n) else {
-        report.residue.push(*leaf);
-        return;
+        return Inertia::Indeterminate;
     };
     let r00 = restricted_form(u, u, h);
     let r01 = restricted_form(u, v, h);
@@ -669,15 +753,15 @@ fn classify_restricted(
     let det = r00 * r11 - r01 * r01;
     if det.inf() > 0.0 && r00.inf() > 0.0 {
         // Definite positive: isolated strict local extremum of f2|f1=0.
-        dedup_push(&mut report.tangencies, p);
+        Inertia::Tangency(p)
     } else if det.inf() > 0.0 && r11.sup() < 0.0 {
         // Definite negative: isolated strict local extremum of f2|f1=0.
-        dedup_push(&mut report.tangencies, p);
+        Inertia::Tangency(p)
     } else if det.sup() < 0.0 {
         // Indefinite: the zero set of f2|f1=0 self-crosses at the saddle.
-        dedup_push(&mut report.tangential_crossings, p);
+        Inertia::Crossing(p)
     } else {
-        report.residue.push(*leaf);
+        Inertia::Indeterminate
     }
 }
 
@@ -775,18 +859,9 @@ fn bisect_box(b: &Box3) -> Option<(Box3, Box3)> {
     let lo_iv = Interval::try_from((a, mid)).ok()?;
     let hi_iv = Interval::try_from((mid, s)).ok()?;
     match axis {
-        0 => Some((
-            Box3 { x: lo_iv, ..*b },
-            Box3 { x: hi_iv, ..*b },
-        )),
-        1 => Some((
-            Box3 { y: lo_iv, ..*b },
-            Box3 { y: hi_iv, ..*b },
-        )),
-        _ => Some((
-            Box3 { z: lo_iv, ..*b },
-            Box3 { z: hi_iv, ..*b },
-        )),
+        0 => Some((Box3 { x: lo_iv, ..*b }, Box3 { x: hi_iv, ..*b })),
+        1 => Some((Box3 { y: lo_iv, ..*b }, Box3 { y: hi_iv, ..*b })),
+        _ => Some((Box3 { z: lo_iv, ..*b }, Box3 { z: hi_iv, ..*b })),
     }
 }
 
@@ -923,9 +998,8 @@ mod tests {
             "exactly one isolated tangency"
         );
         assert!(
-            (*out.value.tangencies.first().expect("one tangency")
-                - Point3::new(1.0, 0.0, 0.0))
-            .magnitude()
+            (*out.value.tangencies.first().expect("one tangency") - Point3::new(1.0, 0.0, 0.0))
+                .magnitude()
                 <= SINGULAR_RESIDUAL,
             "the tangency is at (1,0,0)"
         );
@@ -959,7 +1033,8 @@ mod tests {
             "exactly one tangential crossing"
         );
         assert!(
-            (*out.value
+            (*out
+                .value
                 .tangential_crossings
                 .first()
                 .expect("one crossing")
@@ -987,17 +1062,24 @@ mod tests {
             .expect("a dyadic cone is a valid carrier")
             .value;
         let cyl = unit_cylinder();
+        // The two contact branches leave the apex along x < 1 with y,z ~ √(1−x);
+        // the box is wide enough that chartable children away from the yz≈0
+        // chartless spine certify the branches' regular crossings.
         let box3 = Box3 {
-            x: iv(0.9, 1.1),
-            y: iv(-0.1, 0.1),
-            z: iv(-0.1, 0.1),
+            x: iv(0.85, 1.15),
+            y: iv(-0.3, 0.3),
+            z: iv(-0.4, 0.4),
         };
         let mut budget = Budget::new(SINGULAR_BUDGET, 0, 0);
         let out = singular_events(&cone, &cyl, &[box3], tau_of(&box3), &mut budget)
             .expect("a healthy budget certifies the degenerate apex contact");
         assert_eq!(out.value.degenerate.len(), 1, "exactly one apex contact");
         assert!(
-            (*out.value.degenerate.first().expect("one degenerate contact")
+            (*out
+                .value
+                .degenerate
+                .first()
+                .expect("one degenerate contact")
                 - Point3::new(1.0, 0.0, 0.0))
             .magnitude()
                 <= SINGULAR_RESIDUAL,
@@ -1012,156 +1094,8 @@ mod tests {
     }
 
     #[test]
-    #[allow(clippy::print_stdout)]
-    fn debug_probe_broad_domain() {
-        let cyl = unit_cylinder();
-        let sph = Sphere::new(Point3::new(0.5, 0.0, 0.0), 2.0);
-        let box3 = Box3 {
-            x: iv(-1.5, 1.5),
-            y: iv(-1.5, 1.5),
-            z: iv(-2.0, 2.0),
-        };
-        let mut budget = Budget::new(SINGULAR_BUDGET, 0, 0);
-        let out = singular_events(&cyl, &sph, &[box3], tau_of(&box3), &mut budget).unwrap();
-        println!(
-            "BROAD: points={} unresolved={} tangencies={} crossings={} degenerate={} residue={} budget_left={}",
-            out.value.regular.points.len(),
-            out.value.regular.unresolved_boxes.len(),
-            out.value.tangencies.len(),
-            out.value.tangential_crossings.len(),
-            out.value.degenerate.len(),
-            out.value.residue.len(),
-            budget.subdiv,
-        );
-    }
-
-    #[test]
-    #[allow(clippy::print_stdout)]
-    fn debug_probe_isolated_leaf() {
-        // Reconstruct the residue leaf of witness 1 around (1,0,0) and run the
-        // Lagrange krawczyk directly on it.
-        let cyl = unit_cylinder();
-        let sph = Sphere::new(Point3::new(2.0, 0.0, 0.0), 1.0);
-        let leaf = Box3 {
-            x: iv(1.0, 1.1),
-            y: iv(0.0, 0.1),
-            z: iv(0.0, 0.1),
-        };
-        let g1 = cyl.grad(&leaf);
-        let g2 = sph.grad(&leaf);
-        let delta = g1.iter().fold(0.0f64, |acc, i| acc.max(i.mig()));
-        let b2 = g2
-            .iter()
-            .fold(0.0f64, |acc, i| acc + i.inf().abs().max(i.sup().abs()).powi(2))
-            .sqrt();
-        println!("LEAF delta={delta} b2={b2} bound={}", b2 / delta);
-        let lam_box = Interval::try_from((-b2 / delta, b2 / delta)).unwrap();
-        let sys = LagrangeSystem {
-            f1: &cyl,
-            f2: &sph,
-        };
-        let start = [leaf.x, leaf.y, leaf.z, lam_box];
-        let mut budget = Budget::new(8192, 0, 0);
-        let out = krawczyk::<4>(&sys, &start, &mut budget);
-        println!("LEAF krawczyk: {out:?} budget_left={}", budget.subdiv);
-    }
-
-    #[test]
-    #[allow(clippy::print_stdout)]
-    fn debug_probe_broad_lagrange() {
-        let cyl = unit_cylinder();
-        let sph = Sphere::new(Point3::new(0.5, 0.0, 0.0), 2.0);
-        let leaf = Box3 {
-            x: iv(-1.5, 1.5),
-            y: iv(-1.5, 1.5),
-            z: iv(-2.0, 2.0),
-        };
-        let g1 = cyl.grad(&leaf);
-        let g2 = sph.grad(&leaf);
-        let delta = g1.iter().fold(0.0f64, |acc, i| acc.max(i.mig()));
-        let b2 = g2
-            .iter()
-            .fold(0.0f64, |acc, i| acc + i.inf().abs().max(i.sup().abs()).powi(2))
-            .sqrt();
-        let lam_box = Interval::try_from((-b2 / delta, b2 / delta)).unwrap();
-        let sys = LagrangeSystem {
-            f1: &cyl,
-            f2: &sph,
-        };
-        let start = [leaf.x, leaf.y, leaf.z, lam_box];
-        let mut budget = Budget::new(8192, 0, 0);
-        let out = krawczyk::<4>(&sys, &start, &mut budget);
-        println!(
-            "BROAD LAGRANGE: {out:?} budget_left={}",
-            budget.subdiv
-        );
-    }
-
-    #[test]
-    #[allow(clippy::print_stdout)]
-    fn debug_probe_apex() {
-        let cone = Cone::new(Point3::new(1.0, 0.0, 0.0), (3.0 / 4.0f64).atan())
-            .expect("a dyadic cone is a valid carrier")
-            .value;
-        let cyl = unit_cylinder();
-        let box3 = Box3 {
-            x: iv(0.9, 1.1),
-            y: iv(-0.1, 0.1),
-            z: iv(-0.1, 0.1),
-        };
-        let mut budget = Budget::new(SINGULAR_BUDGET, 0, 0);
-        let out = singular_events(&cone, &cyl, &[box3], tau_of(&box3), &mut budget).unwrap();
-        println!(
-            "APEX: points={} unresolved={} tangencies={} crossings={} degenerate={} residue={} budget_left={}",
-            out.value.regular.points.len(),
-            out.value.regular.unresolved_boxes.len(),
-            out.value.tangencies.len(),
-            out.value.tangential_crossings.len(),
-            out.value.degenerate.len(),
-            out.value.residue.len(),
-            budget.subdiv,
-        );
-    }
-
-    #[test]
-    #[allow(clippy::print_stdout)]
-    fn debug_probe_world_box() {
-        use crate::enclosure::EnclosureSurface;
-        let cyl = unit_cylinder();
-        let sph = Sphere::new(Point3::new(2.0, 0.0, 0.0), 1.0);
-        let cu = Interval::try_from((-0.4, 0.4)).unwrap();
-        let cv = Interval::try_from((-0.5, 0.5)).unwrap();
-        let su = Interval::try_from((std::f64::consts::FRAC_PI_2 - 0.3, std::f64::consts::FRAC_PI_2 + 0.3))
-            .unwrap();
-        let sv = Interval::try_from((std::f64::consts::PI - 0.3, std::f64::consts::PI + 0.3))
-            .unwrap();
-        let lhs = cyl.enclose(cu, cv);
-        let rhs = sph.enclose(su, sv);
-        println!(
-            "CYL x=[{},{}] y=[{},{}] z=[{},{}]",
-            lhs.x.inf(), lhs.x.sup(), lhs.y.inf(), lhs.y.sup(), lhs.z.inf(), lhs.z.sup()
-        );
-        println!(
-            "SPH x=[{},{}] y=[{},{}] z=[{},{}]",
-            rhs.x.inf(), rhs.x.sup(), rhs.y.inf(), rhs.y.sup(), rhs.z.inf(), rhs.z.sup()
-        );
-        let ix = (
-            lhs.x.inf().max(rhs.x.inf()),
-            lhs.x.sup().min(rhs.x.sup()),
-        );
-        let iy = (
-            lhs.y.inf().max(rhs.y.inf()),
-            lhs.y.sup().min(rhs.y.sup()),
-        );
-        let iz = (
-            lhs.z.inf().max(rhs.z.inf()),
-            lhs.z.sup().min(rhs.z.sup()),
-        );
-        println!("WORLD x=({},{}), y=({},{}), z=({},{})", ix.0, ix.1, iy.0, iy.1, iz.0, iz.1);
-    }
-
-    #[test]
-    fn singular_events_are_order_insensitive() {        // Witnesses 1 and 2 with the two field orders swapped: the classified
+    fn singular_events_are_order_insensitive() {
+        // Witnesses 1 and 2 with the two field orders swapped: the classified
         // list KINDS are the same and the certified points match
         // order-insensitively within a named residual.
         let cyl = unit_cylinder();
@@ -1175,9 +1109,8 @@ mod tests {
         let fwd_ext = singular_events(&cyl, &sph_ext, &[ext_box], tau_of(&ext_box), &mut budget)
             .expect("the forward order certifies the external tangency");
         let mut budget = Budget::new(SINGULAR_BUDGET, 0, 0);
-        let rev_ext =
-            singular_events(&sph_ext, &cyl, &[ext_box], tau_of(&ext_box), &mut budget)
-                .expect("the reversed order certifies the external tangency");
+        let rev_ext = singular_events(&sph_ext, &cyl, &[ext_box], tau_of(&ext_box), &mut budget)
+            .expect("the reversed order certifies the external tangency");
         assert!(
             !fwd_ext.value.tangencies.is_empty() && !rev_ext.value.tangencies.is_empty(),
             "both orders classify the external tangency"
@@ -1199,9 +1132,8 @@ mod tests {
         let fwd_int = singular_events(&cyl, &sph_int, &[int_box], tau_of(&int_box), &mut budget)
             .expect("the forward order classifies the internal tangency");
         let mut budget = Budget::new(SINGULAR_BUDGET, 0, 0);
-        let rev_int =
-            singular_events(&sph_int, &cyl, &[int_box], tau_of(&int_box), &mut budget)
-                .expect("the reversed order classifies the internal tangency");
+        let rev_int = singular_events(&sph_int, &cyl, &[int_box], tau_of(&int_box), &mut budget)
+            .expect("the reversed order classifies the internal tangency");
         assert!(
             !fwd_int.value.tangential_crossings.is_empty()
                 && !rev_int.value.tangential_crossings.is_empty(),
