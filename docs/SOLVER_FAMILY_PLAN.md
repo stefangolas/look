@@ -883,6 +883,74 @@ fragment reads `(n_F × der) · n_B = +1.0` at the rim half-edge midpoint
   concern (the wall is not divided at interior circles), not the
   classifier's.
 
+**AMENDED (session 38, the RW4 pre-dispatch prototype):** extending
+`scratch/rw3probe` to the assembler over the REAL six-event flagship mesh
+(top AND bottom: FF circle, FE BoundedCurve rim, Region2 cap-coincidence
+at each of z=0 and z=2) found TWO latent splitter defects invisible to
+every landed test — the landed flagship test divides only the top face,
+and the two defects cancel in any mesh that never assembles:
+
+- **The inverted-face division defect**: `divide_one_face` classified
+  region vs hole wires by a flag-dependent area sign, but the engine's
+  loops hold the STORED wires (`absolute_boundaries` returns the stored
+  vec), and for a valid face the stored outer wire is ALWAYS CCW-positive
+  in (u, v) regardless of the flag (the effective-outer CCW-around-the-
+  effective-normal rule reduces to it — the flag-dependent test
+  double-counted the flag). Every divided inverted face (the extruded
+  bottom cap: stored CCW, flag false) scrambled: the bottom face divided
+  into a doubled-loop `[2,2]` disk plus a hole-less `[4]` square. Fix:
+  `is_region = |area| area > 0.0` (packet BG-SOL-SPLIT-INVERTED).
+- **The sew-direction rotation**: `build_closed_loop_wire` cut the sew
+  stratum's edge OBJECT — named as USED in one face (the wall's INVERSE
+  rim use) — so the halves wire carried that use's direction and
+  `swap_edge_into_wire` rotated EVERY use's effective traversal: b's
+  top-cap fragment was born with a CW effective boundary around its own
+  +z normal, the wall's top wire flipped with it, and the disk/wall
+  effective traversals of the shared rim halves coincided — no
+  Intersection (disk+wall) or Difference (annulus+flipped-wall) result
+  could close; only Union (wall discarded) survived. Fix: normalize the
+  halves wire to the edge's forward traversal (`if !edge.orientation()
+  { wire = wire.inverse() }`) before the swap, and the same normalization
+  defensively in `prepare_contained_wire`.
+
+Both fixes were machine-validated by `scratch/rw3probe`'s `split_fixed`
+copy (byte-identical except the two lines): the six-event mesh measures
+11 fragments (each horizontal face dividing into `[4,2]` annulus + `[2]`
+disk), 20 adjacency (4 Flip, 16 Same), 2 Identical coincident pairs
+pairing each DISK with its cap, and classifier bits
+`[F,T,F,T,F,F,F,F,T,T,T]`. The RW4 assembler design below is likewise
+MEASURED against that mesh (all four ops assemble; Difference is
+geometrically congruent to `Extrude(P−Q)` on six containment probes and
+a 256-point grid, 208/208):
+
+- **The decision table** (per fragment): own pair `(1,0)` in the
+  fragment's own orientation; a coincident pair takes PRECEDENCE for the
+  other pair — `(1,0)` Identical, `(0,1)` Anti — else `(s,s)` with `s`
+  the classification bit. Measured Difference table over the 11-fragment
+  mesh: a's two disks (pair.a) Discard, a's two annuli + 4 sides
+  Keep-unflipped, b's two caps (pair.b) Discard, b's wall Keep-FLIPPED —
+  the booked 7-face result.
+- **The pair dedup rule**: for a coincident pair BOTH fragments always
+  reach the same verdict (machine-checked; disagreement is a refusal),
+  and when both are kept they are geometric duplicates with the SAME
+  resulting effective normal (Identical requires equal flips, Anti
+  opposite flips — machine-checked) — emit exactly the pair's a-side
+  once. Measured: Union keeps 8 faces (the block, cosmetically split),
+  Intersection 3 (the cylinder: 2 deduped disks + the unflipped wall),
+  Xor 7 (= Difference: the disk is interior).
+- **The `boolean()` entry's sweep**: lift every face by
+  `recognize_surface` + the boundary-wire (u,v) hull and every edge
+  (first-occurrence provenance) by `recognize_curve`; screen cross-solid
+  FF/FE/EE pairs by 3-D AABB overlap (INCLUSIVE — boundary touch counts;
+  the sound candidate screen that drops the exact arms'
+  bounds-blind false positives, e.g. the side-plane × cap Line records);
+  `contact()` over the survivors; the records become `ContactEvent`s
+  with provenance. Measured on the flagship: exactly the six events (2
+  Region2 `IdenticalCarrier` + 2 FF `Curve(Circle)` + 2 FE
+  `BoundedCurve` full-period), reproducing the hand-built mesh
+  (11/20/2). The FE edge provenance may name either face carrying the
+  edge (the splitter resolves the instance either way).
+
 The decision + assembly (RW4): per fragment, `MaterialState4` —
 coincident pairs take PRECEDENCE (A-fragment: own `(1,0)` in absolute
 orientation, other `(1,0)` Identical / `(0,1)` Anti); all other fragments
@@ -927,7 +995,14 @@ RW2):
    the flagship test fails at HEAD: RW2 was verified at a pre-S2-fix
    base (the packets ran in parallel) and the S2 wall fix changed the
    wall's top-wire traversal so the FF circle no longer registered as
-   on-boundary against the wall.
+   on-boundary against the wall. Follow-up **BG-SOL-SPLIT-INVERTED**
+   (session 38, after RW3): the inverted-face division fix (stored-frame
+   outer-positive `is_region`) + the sew-direction normalization
+   (forward-traversal halves in `build_closed_loop_wire` and
+   `prepare_contained_wire`) — both found by the six-event flagship
+   probe, both prerequisites for RW4's assemblies (RW3 is unaffected:
+   its witnesses never divide an inverted face and its bits are
+   direction-agnostic).
 3. **BG-SOL-RW3-CLASSIFY**: `boolean/classify.rs` (FragmentClassification
    + seeds/propagation/verification).
 4. **BG-SOL-RW4-ASSEMBLE**: `boolean/assemble.rs` + the `boolean()` entry
