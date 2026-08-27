@@ -46,7 +46,8 @@ use crate::analytic::plane_sphere::plane_sphere;
 use crate::analytic::sphere_sphere::sphere_sphere;
 use crate::analytic::{AnalyticIntersection, AnalyticOutcome, ExactCurve};
 use crate::enclosure::{Box3, EnclosureSurface, Interval};
-use truck_base::cgmath64::Point3;
+use std::f64::consts::TAU;
+use truck_base::cgmath64::{EuclideanSpace, InnerSpace, Point3};
 use truck_base::contact::{ContactDimension, ContactEventKind};
 use truck_base::evidence::{
     Budget, Certificate, Certified, EnvelopeCase, Margin, Method, Modulus, Outcome, Prop, PropMap,
@@ -55,6 +56,7 @@ use truck_base::evidence::{
 use truck_geometry::recognize::{
     CanonicalCarrier, CanonicalCarrierWitness, CanonicalCurve, CanonicalSurface,
 };
+use truck_geometry::specifieds::Plane;
 
 /// BG-SOL-S4-FE-EE: the FE (Edge × Face) and EE (Edge × Edge) strata reductions.
 ///
@@ -64,6 +66,10 @@ use truck_geometry::recognize::{
 pub mod fe_ee;
 pub mod gff;
 pub mod implicit;
+/// BG-SOL-S7-OVERLAP: the 2-D overlap screen (strict parameter-box interior
+/// overlap), consumed by the identity arms and the analytic `Coincident`
+/// screen.
+pub mod overlap;
 pub mod singular;
 
 /// One boundary stratum of a solid, lifted to the canonical-carrier level.
@@ -181,50 +187,104 @@ pub fn contact(
     budget: &mut Budget,
 ) -> Outcome<ContactComplex> {
     match (lhs, rhs) {
-        // Stage 1: C0-C2 identity/overlap.
-        (BoundedStratum::Face { surface: l, .. }, BoundedStratum::Face { surface: r, .. })
-            if l == r =>
-        {
-            let mut props = PropMap::new();
-            props.set(Prop::AnalyticCarrier, Truth::True);
-            Ok(Certified::new(
-                ContactComplex {
-                    contacts: vec![ContactRecord {
-                        dimension: ContactDimension::Region2,
-                        kind: ContactEventKind::IdenticalCarrier,
-                        locus: ContactLocus::Coincident,
-                    }],
-                },
-                Certificate {
-                    props,
-                    method: Method::Exact,
-                    budget_left: *budget,
-                    margin: Margin::UNBOUNDED,
-                    modulus: Modulus::Unbounded,
-                },
-            ))
+        // Stage 1: C0-C2 identity/overlap. The same carrier means the same
+        // parameterization, so the record is emitted only when the two
+        // patches' parameter boxes overlap with NON-EMPTY INTERIOR; disjoint
+        // patches of the same canonical carrier report a certified empty
+        // complex (BG-SOL-S7-OVERLAP).
+        (
+            BoundedStratum::Face {
+                surface: l,
+                u_range: l_u,
+                v_range: l_v,
+            },
+            BoundedStratum::Face {
+                surface: r,
+                u_range: r_u,
+                v_range: r_v,
+            },
+        ) if l == r => {
+            if identity_face_boxes_overlap(l, *l_u, *l_v, *r_u, *r_v) {
+                let mut props = PropMap::new();
+                props.set(Prop::AnalyticCarrier, Truth::True);
+                Ok(Certified::new(
+                    ContactComplex {
+                        contacts: vec![ContactRecord {
+                            dimension: ContactDimension::Region2,
+                            kind: ContactEventKind::IdenticalCarrier,
+                            locus: ContactLocus::Coincident,
+                        }],
+                    },
+                    Certificate {
+                        props,
+                        method: Method::Exact,
+                        budget_left: *budget,
+                        margin: Margin::UNBOUNDED,
+                        modulus: Modulus::Unbounded,
+                    },
+                ))
+            } else {
+                Ok(Certified::new(
+                    ContactComplex {
+                        contacts: Vec::new(),
+                    },
+                    Certificate {
+                        props: PropMap::new(),
+                        method: Method::Exact,
+                        budget_left: *budget,
+                        margin: Margin::UNBOUNDED,
+                        modulus: Modulus::Unbounded,
+                    },
+                ))
+            }
         }
-        (BoundedStratum::Edge { curve: l, .. }, BoundedStratum::Edge { curve: r, .. })
-            if l == r =>
-        {
-            let mut props = PropMap::new();
-            props.set(Prop::AnalyticCarrier, Truth::True);
-            Ok(Certified::new(
-                ContactComplex {
-                    contacts: vec![ContactRecord {
-                        dimension: ContactDimension::Arc1,
-                        kind: ContactEventKind::IdenticalCarrier,
-                        locus: ContactLocus::Coincident,
-                    }],
-                },
-                Certificate {
-                    props,
-                    method: Method::Exact,
-                    budget_left: *budget,
-                    margin: Margin::UNBOUNDED,
-                    modulus: Modulus::Unbounded,
-                },
-            ))
+        (
+            BoundedStratum::Edge {
+                curve: l,
+                t_range: tl,
+            },
+            BoundedStratum::Edge {
+                curve: r,
+                t_range: tr,
+            },
+        ) if l == r => {
+            let overlaps = match l {
+                CanonicalCurve::Line(_) => overlap::interior_overlap(*tl, *tr),
+                CanonicalCurve::Circle(_) => overlap::periodic_interior_overlap(*tl, *tr, TAU),
+            };
+            if overlaps {
+                let mut props = PropMap::new();
+                props.set(Prop::AnalyticCarrier, Truth::True);
+                Ok(Certified::new(
+                    ContactComplex {
+                        contacts: vec![ContactRecord {
+                            dimension: ContactDimension::Arc1,
+                            kind: ContactEventKind::IdenticalCarrier,
+                            locus: ContactLocus::Coincident,
+                        }],
+                    },
+                    Certificate {
+                        props,
+                        method: Method::Exact,
+                        budget_left: *budget,
+                        margin: Margin::UNBOUNDED,
+                        modulus: Modulus::Unbounded,
+                    },
+                ))
+            } else {
+                Ok(Certified::new(
+                    ContactComplex {
+                        contacts: Vec::new(),
+                    },
+                    Certificate {
+                        props: PropMap::new(),
+                        method: Method::Exact,
+                        budget_left: *budget,
+                        margin: Margin::UNBOUNDED,
+                        modulus: Modulus::Unbounded,
+                    },
+                ))
+            }
         }
         // Stage 2: FF analytic. Both `(u, v)` boxes ride into the analytic
         // dispatch; the exact arms ignore them and the validated arms consume
@@ -431,7 +491,20 @@ fn analytic_ff(
         }
     };
     let Certified { value, .. } = outcome?;
-    let contacts = analytic_records(&value);
+    // The analytic `Coincident` arm is screened before `analytic_records`:
+    // emit the Region2/`CoincidentInterval` record only when the two patches'
+    // parameter boxes overlap with non-empty interior, otherwise certify
+    // empty (BG-SOL-S7-OVERLAP).
+    let contacts = match &value {
+        AnalyticIntersection::Coincident => {
+            if analytic_coincident_screen(l, r, u_range_l, v_range_l, u_range_r, v_range_r) {
+                analytic_records(&value)
+            } else {
+                Vec::new()
+            }
+        }
+        _ => analytic_records(&value),
+    };
     let mut props = PropMap::new();
     props.set(Prop::AnalyticCarrier, Truth::True);
     Ok(Certified::new(
@@ -444,6 +517,155 @@ fn analytic_ff(
             modulus: Modulus::Unbounded,
         },
     ))
+}
+
+/// Whether two faces on the SAME canonical surface carrier have `(u, v)`
+/// boxes with non-empty interior overlap (BG-SOL-S7-OVERLAP).
+///
+/// The same carrier means the same parameterization, so the screen is the box
+/// test with the per-carrier periodicity, read off the carriers' own
+/// `parameter_range`/`u_period` conventions:
+///
+/// - `Plane`: `interior_overlap` on u AND v (neither periodic).
+/// - `Cylinder`/`Cone`: `periodic_interior_overlap(u, TAU)` AND
+///   `interior_overlap(v)` (u is the azimuth; v is z relative to the
+///   center/apex).
+/// - `Sphere`: `interior_overlap(u)` AND `periodic_interior_overlap(v, TAU)`
+///   (u is the POLAR angle on `[0, PI]`, v the azimuth — the swap relative to
+///   cylinder/cone).
+/// - `Torus`: periodic on BOTH u and v.
+/// - `Placed`: struct-equal placements carry the same parameter map; screen
+///   the inner carrier with its row of the table.
+fn identity_face_boxes_overlap(
+    surface: &CanonicalSurface,
+    u_l: (f64, f64),
+    v_l: (f64, f64),
+    u_r: (f64, f64),
+    v_r: (f64, f64),
+) -> bool {
+    match surface {
+        CanonicalSurface::Plane(_) => {
+            overlap::interior_overlap(u_l, u_r) && overlap::interior_overlap(v_l, v_r)
+        }
+        CanonicalSurface::Cylinder(_) | CanonicalSurface::Cone(_) => {
+            overlap::periodic_interior_overlap(u_l, u_r, TAU) && overlap::interior_overlap(v_l, v_r)
+        }
+        CanonicalSurface::Sphere(_) => {
+            overlap::interior_overlap(u_l, u_r) && overlap::periodic_interior_overlap(v_l, v_r, TAU)
+        }
+        CanonicalSurface::Torus(_) => {
+            overlap::periodic_interior_overlap(u_l, u_r, TAU)
+                && overlap::periodic_interior_overlap(v_l, v_r, TAU)
+        }
+        CanonicalSurface::Placed(placed) => {
+            identity_face_boxes_overlap(placed.entity(), u_l, v_l, u_r, v_r)
+        }
+    }
+}
+
+/// The analytic `Coincident` screen (BG-SOL-S7-OVERLAP): whether the two
+/// patches' parameter boxes overlap with non-empty interior, checked before
+/// `analytic_records` emits the Region2/`CoincidentInterval` record.
+///
+/// The screen is symmetric in its arguments, so the metamorphic property
+/// `C(A, B) = C(B, A)` holds for every screened path.
+fn analytic_coincident_screen(
+    l: &CanonicalSurface,
+    r: &CanonicalSurface,
+    u_l: (f64, f64),
+    v_l: (f64, f64),
+    u_r: (f64, f64),
+    v_r: (f64, f64),
+) -> bool {
+    match (l, r) {
+        (CanonicalSurface::Cylinder(a), CanonicalSurface::Cylinder(b)) => {
+            // The coaxial cell fired, so `(cx, cy, r)` are equal and the
+            // structs differ only in `cz`. u is identical; v differs by the
+            // center shift: patch 1's absolute z-extent is
+            // `[cz1 + v1.0, cz1 + v1.1]`, patch 2's `[cz2 + v2.0, cz2 + v2.1]`
+            // (each endpoint ONE exactly-rounded f64 addition).
+            let z_l = a.center().z;
+            let z_r = b.center().z;
+            let abs_l = (z_l + v_l.0, z_l + v_l.1);
+            let abs_r = (z_r + v_r.0, z_r + v_r.1);
+            overlap::interior_overlap(abs_l, abs_r)
+                && overlap::periodic_interior_overlap(u_l, u_r, TAU)
+        }
+        (CanonicalSurface::Plane(a), CanonicalSurface::Plane(b)) => {
+            plane_coincident_screen(a, b, u_l, v_l, u_r, v_r)
+        }
+        (CanonicalSurface::Cone(_), CanonicalSurface::Cone(_))
+        | (CanonicalSurface::Sphere(_), CanonicalSurface::Sphere(_))
+        | (CanonicalSurface::Torus(_), CanonicalSurface::Torus(_)) => {
+            // Same-type analytic Coincident implies the same surface and the
+            // same parameterization (the struct-unequal sphere/torus cases are
+            // unreachable — equal carriers hit the identity arm first); apply
+            // the identity-arm table as a defensive screen.
+            identity_face_boxes_overlap(l, u_l, v_l, u_r, v_r)
+        }
+        _ => true,
+    }
+}
+
+/// The struct-unequal coplanar plane screen (BG-SOL-S7-OVERLAP): solve the
+/// parameter correspondence by Cramer in plane `a`'s frame.
+///
+/// With `subs1(u1, v1) = o1 + u1*U1 + v1*V1` (`U1 = p1 - o1`, `V1 = q1 - o1`,
+/// same for plane 2), `n = plane1.normal()` and `det = (U1 x V1) . n`, the
+/// affine map `(u1, v1) = M (u2, v2) + c` has entries
+///
+/// ```text
+/// M[0][0] = ((U2 x V1) . n) / det    M[0][1] = ((V2 x V1) . n) / det
+/// M[1][0] = ((U1 x U2) . n) / det    M[1][1] = ((U1 x V2) . n) / det
+/// c[0] = ((o2 - o1) x V1) . n / det  c[1] = (U1 x (o2 - o1)) . n / det
+/// ```
+///
+/// When `M[0][1] == 0.0 && M[1][0] == 0.0` (the PARALLEL-frame signature —
+/// exactly zero for construction data whose frames are exact multiples), the
+/// image of box 2 is the axis-aligned rectangle `u1 in [c0 + M00*u2.0,
+/// c0 + M00*u2.1]` (ordered by M00's sign) and likewise for v1; overlap is
+/// `interior_overlap` on both image intervals. If the off-diagonals are NOT
+/// exactly zero (rotated frames), today's emission is kept and the decision
+/// is deferred to the booked `BG-SOL-S7-OVERLAP-PLANE` follow-up (3-D SAT).
+fn plane_coincident_screen(
+    a: &Plane,
+    b: &Plane,
+    u_l: (f64, f64),
+    v_l: (f64, f64),
+    u_r: (f64, f64),
+    v_r: (f64, f64),
+) -> bool {
+    let o1 = a.origin();
+    let o2 = b.origin();
+    let u1 = a.u_axis();
+    let v1 = a.v_axis();
+    let u2 = b.u_axis();
+    let v2 = b.v_axis();
+    let n = a.normal();
+    let det = u1.cross(v1).dot(n);
+    let m00 = u2.cross(v1).dot(n) / det;
+    let m01 = v2.cross(v1).dot(n) / det;
+    let m10 = u1.cross(u2).dot(n) / det;
+    let m11 = u1.cross(v2).dot(n) / det;
+    let d = o2.to_vec() - o1.to_vec();
+    let c0 = d.cross(v1).dot(n) / det;
+    let c1 = u1.cross(d).dot(n) / det;
+    if m01 != 0.0 || m10 != 0.0 {
+        // Rotated frames: not screened; the decision is deferred.
+        return true;
+    }
+    let image_u = ordered_interval(c0 + m00 * u_r.0, c0 + m00 * u_r.1);
+    let image_v = ordered_interval(c1 + m11 * v_r.0, c1 + m11 * v_r.1);
+    overlap::interior_overlap(u_l, image_u) && overlap::interior_overlap(v_l, image_v)
+}
+
+/// The ordered `(min, max)` image interval endpoint pair.
+fn ordered_interval(x: f64, y: f64) -> (f64, f64) {
+    if x <= y {
+        (x, y)
+    } else {
+        (y, x)
+    }
 }
 
 /// The general validated FF stage (BG-SOL-S7-GFF-WIRE): certify the regular
@@ -721,6 +943,21 @@ mod tests {
             }
         }
         points
+    }
+
+    /// A full-range unit circle in the z = 0 plane centered at the origin,
+    /// for the Edge identity-arm witnesses.
+    fn placed_unit_circle() -> Processor<TrimmedCurve<UnitCircle<Point3>>, Matrix4> {
+        let m = Matrix4 {
+            x: Vector4::new(1.0, 0.0, 0.0, 0.0),
+            y: Vector4::new(0.0, 1.0, 0.0, 0.0),
+            z: Vector4::new(0.0, 0.0, 1.0, 0.0),
+            w: Vector4::new(0.0, 0.0, 0.0, 1.0),
+        };
+        Processor::with_transform(
+            TrimmedCurve::new(UnitCircle::<Point3>::new(), (0.0, TAU)),
+            m,
+        )
     }
 
     #[test]
@@ -1305,5 +1542,332 @@ mod tests {
             "unit patches of the cylinder and the (2,0,0) r=2 sphere meet nowhere"
         );
         assert_eq!(out.cert.method, Method::Interval);
+    }
+
+    #[test]
+    fn overlap_screen_identity_face_disjoint_boxes_certify_empty() {
+        // The same canonical plane carrier with disjoint `(u, v)` boxes: the
+        // two sides of a shared wall report NO contact — a certified empty
+        // complex on `Method::Exact` with empty props and an untouched budget
+        // (BG-SOL-S7-OVERLAP).
+        let plane = CanonicalSurface::Plane(Plane::xy());
+        let lhs = face_with_bounds(plane.clone(), (0.0, 1.0), (0.0, 1.0));
+        let rhs = face_with_bounds(plane, (2.0, 3.0), (2.0, 3.0));
+        let entry = Budget::new(100, 100, 100);
+        let mut budget = entry;
+        let out = contact(&lhs, &rhs, &mut budget)
+            .expect("same-carrier disjoint plane boxes decide empty at the identity stage");
+        assert!(
+            out.value.contacts.is_empty(),
+            "disjoint patches of the same plane never touch"
+        );
+        assert_eq!(out.cert.method, Method::Exact);
+        assert_eq!(out.cert.budget_left, entry, "the screen spends nothing");
+        assert_eq!(budget, entry, "the caller's budget is untouched");
+        assert_eq!(
+            out.cert.props.get(Prop::AnalyticCarrier),
+            Truth::Unknown,
+            "the identity empty complex carries empty props"
+        );
+
+        // The same unit cylinder, v ranges (0,1) vs (5,6): absolute z extents
+        // [0,1] and [5,6] are disjoint, so the wall patches never touch.
+        let cylinder = CanonicalSurface::Cylinder(
+            Cylinder::new(Point3::new(0.0, 0.0, 0.0), 1.0)
+                .expect("a unit cylinder is a valid carrier")
+                .value,
+        );
+        let low = face_with_bounds(cylinder.clone(), (0.0, TAU), (0.0, 1.0));
+        let high = face_with_bounds(cylinder, (0.0, TAU), (5.0, 6.0));
+        let mut budget = Budget::new(100, 100, 100);
+        let out = contact(&low, &high, &mut budget)
+            .expect("same-carrier disjoint cylinder boxes decide empty at the identity stage");
+        assert!(
+            out.value.contacts.is_empty(),
+            "separated patches of the same cylinder never touch"
+        );
+        assert_eq!(out.cert.method, Method::Exact);
+        assert_eq!(out.cert.budget_left, budget, "the screen spends nothing");
+    }
+
+    #[test]
+    fn overlap_screen_identity_face_periodic_wrap_decides() {
+        // Same canonical cylinder: u is the azimuth on the circle, so the seam
+        // wrap decides. A near-seam interval overlaps the seam-crossing
+        // interval (which wraps onto `(0, 0.1) ∪ (TAU-0.1, TAU)`), while a far
+        // interval does not.
+        let cylinder = CanonicalSurface::Cylinder(
+            Cylinder::new(Point3::new(0.0, 0.0, 0.0), 1.0)
+                .expect("a unit cylinder is a valid carrier")
+                .value,
+        );
+        let seam = face_with_bounds(cylinder.clone(), (TAU - 0.1, TAU + 0.1), (0.0, 1.0));
+        let near = face_with_bounds(cylinder.clone(), (0.05, 0.2), (0.0, 1.0));
+        let far = face_with_bounds(cylinder.clone(), (3.0, 3.1), (0.0, 1.0));
+        let mut budget = Budget::new(100, 100, 100);
+        let out = contact(&near, &seam, &mut budget)
+            .expect("same-carrier seam-wrapped boxes decide at the identity stage");
+        assert_eq!(out.cert.method, Method::Exact);
+        assert_eq!(out.value.contacts.len(), 1);
+        let record = out.value.contacts.first().expect("one record");
+        assert_eq!(record.dimension, ContactDimension::Region2);
+        assert!(matches!(record.locus, ContactLocus::Coincident));
+        let mut budget = Budget::new(100, 100, 100);
+        let out = contact(&far, &seam, &mut budget)
+            .expect("same-carrier far boxes decide empty at the identity stage");
+        assert!(
+            out.value.contacts.is_empty(),
+            "the far u interval stays disjoint"
+        );
+        assert_eq!(out.cert.method, Method::Exact);
+
+        // One sphere case exercising the v azimuth wrap: u is the polar
+        // angle, v the azimuth, so v wraps across the seam.
+        let sphere = CanonicalSurface::Sphere(Sphere::new(Point3::origin(), 1.0));
+        let s_near = face_with_bounds(sphere.clone(), (0.2, 0.8), (0.05, 0.2));
+        let s_seam = face_with_bounds(sphere, (0.2, 0.8), (TAU - 0.1, TAU + 0.1));
+        let mut budget = Budget::new(100, 100, 100);
+        let out = contact(&s_near, &s_seam, &mut budget)
+            .expect("same-carrier sphere seam-wrapped boxes decide at the identity stage");
+        assert_eq!(out.cert.method, Method::Exact);
+        assert_eq!(out.value.contacts.len(), 1);
+        let record = out.value.contacts.first().expect("one record");
+        assert_eq!(record.dimension, ContactDimension::Region2);
+        assert!(matches!(record.locus, ContactLocus::Coincident));
+    }
+
+    #[test]
+    fn overlap_screen_same_axis_cylinder_shift_decides() {
+        // Two struct-unequal coaxial unit cylinders: centers (0,0,0) and
+        // (0,0,5), same wall. The coaxial cell answers Coincident; the screen
+        // compares the absolute z-extents `[cz + v0, cz + v1]` (one exactly
+        // rounded f64 addition per endpoint) and the azimuth boxes.
+        let cyl0 = CanonicalSurface::Cylinder(
+            Cylinder::new(Point3::new(0.0, 0.0, 0.0), 1.0)
+                .expect("a unit cylinder is a valid carrier")
+                .value,
+        );
+        let cyl5 = CanonicalSurface::Cylinder(
+            Cylinder::new(Point3::new(0.0, 0.0, 5.0), 1.0)
+                .expect("a unit cylinder is a valid carrier")
+                .value,
+        );
+        // Disjoint: v (0,1) on both -> absolute z [0,1] vs [5,6] -> empty.
+        let lhs = face_with_bounds(cyl0.clone(), (0.0, TAU), (0.0, 1.0));
+        let rhs = face_with_bounds(cyl5.clone(), (0.0, TAU), (0.0, 1.0));
+        let mut budget = Budget::new(100, 100, 100);
+        let out = contact(&lhs, &rhs, &mut budget)
+            .expect("same-wall cylinders with disjoint z extents decide empty");
+        assert!(
+            out.value.contacts.is_empty(),
+            "the wall patches never touch"
+        );
+        assert_eq!(out.cert.method, Method::Exact);
+        // Overlapping: v (4,6) on the first, v (0,1) on the second -> absolute
+        // z [4,6] vs [5,6] -> the analytic Region2/CoincidentInterval record.
+        let lhs = face_with_bounds(cyl0, (0.0, TAU), (4.0, 6.0));
+        let rhs = face_with_bounds(cyl5, (0.0, TAU), (0.0, 1.0));
+        let mut budget = Budget::new(100, 100, 100);
+        let out = contact(&lhs, &rhs, &mut budget)
+            .expect("same-wall cylinders with overlapping z extents decide coincident");
+        assert_eq!(out.cert.method, Method::Exact);
+        assert_eq!(out.value.contacts.len(), 1);
+        let record = out.value.contacts.first().expect("one record");
+        assert_eq!(record.dimension, ContactDimension::Region2);
+        assert_eq!(record.kind, ContactEventKind::CoincidentInterval);
+        assert!(matches!(
+            &record.locus,
+            ContactLocus::Analytic(AnalyticIntersection::Coincident)
+        ));
+    }
+
+    #[test]
+    fn overlap_screen_parallel_frame_planes_decide() {
+        // Two struct-unequal coplanar planes with parallel frames: plane A at
+        // the origin with unit axes, plane B at the origin with doubled axes
+        // ((2,0,0),(0,2,0)). The Cramer map in A's frame is M = [[2,0],[0,2]],
+        // c = (0,0) (see RESULT.json notes). Boxes in B's units that map away
+        // from A's box prove empty; boxes that map into A's interior stay
+        // Region2/CoincidentInterval.
+        let plane_a = CanonicalSurface::Plane(Plane::new(
+            Point3::new(0.0, 0.0, 0.0),
+            Point3::new(1.0, 0.0, 0.0),
+            Point3::new(0.0, 1.0, 0.0),
+        ));
+        let plane_b = CanonicalSurface::Plane(Plane::new(
+            Point3::new(0.0, 0.0, 0.0),
+            Point3::new(2.0, 0.0, 0.0),
+            Point3::new(0.0, 2.0, 0.0),
+        ));
+        // Disjoint: A box (0,1)x(0,1), B box (3,4)x(3,4) -> image u in [6,8],
+        // v in [6,8] -> empty.
+        let lhs = face_with_bounds(plane_a.clone(), (0.0, 1.0), (0.0, 1.0));
+        let rhs = face_with_bounds(plane_b.clone(), (3.0, 4.0), (3.0, 4.0));
+        let mut budget = Budget::new(100, 100, 100);
+        let out = contact(&lhs, &rhs, &mut budget)
+            .expect("parallel-frame coplanar planes with disjoint boxes decide empty");
+        assert!(
+            out.value.contacts.is_empty(),
+            "the image box maps away from the patch"
+        );
+        assert_eq!(out.cert.method, Method::Exact);
+        // Overlapping: B box (0.25, 0.4)x(0.25, 0.4) -> image u in [0.5, 0.8],
+        // v in [0.5, 0.8], strictly inside A's (0,1)x(0,1) -> Region2.
+        let lhs = face_with_bounds(plane_a, (0.0, 1.0), (0.0, 1.0));
+        let rhs = face_with_bounds(plane_b, (0.25, 0.4), (0.25, 0.4));
+        let mut budget = Budget::new(100, 100, 100);
+        let out = contact(&lhs, &rhs, &mut budget)
+            .expect("parallel-frame coplanar planes with overlapping boxes decide coincident");
+        assert_eq!(out.cert.method, Method::Exact);
+        assert_eq!(out.value.contacts.len(), 1);
+        let record = out.value.contacts.first().expect("one record");
+        assert_eq!(record.dimension, ContactDimension::Region2);
+        assert_eq!(record.kind, ContactEventKind::CoincidentInterval);
+        assert!(matches!(
+            &record.locus,
+            ContactLocus::Analytic(AnalyticIntersection::Coincident)
+        ));
+    }
+
+    #[test]
+    fn overlap_screen_edge_disjoint_ranges_certify_empty() {
+        // Same canonical line edge, t ranges touching at the endpoint (0.5):
+        // interiors disjoint, so no contact. Same placed circle, disjoint
+        // arcs: empty; overlapping arcs: the existing Arc1 coincident-carrier
+        // record.
+        let line =
+            CanonicalCurve::Line(Line(Point3::new(0.0, 0.0, 0.0), Point3::new(1.0, 0.0, 0.0)));
+        let edge_a = BoundedStratum::Edge {
+            curve: line.clone(),
+            t_range: (0.0, 0.5),
+        };
+        let edge_b = BoundedStratum::Edge {
+            curve: line,
+            t_range: (0.5, 1.0),
+        };
+        let mut budget = Budget::new(100, 100, 100);
+        let out = contact(&edge_a, &edge_b, &mut budget)
+            .expect("same-carrier disjoint edge ranges decide empty");
+        assert!(
+            out.value.contacts.is_empty(),
+            "touching at the endpoint is not overlap"
+        );
+        assert_eq!(out.cert.method, Method::Exact);
+        assert_eq!(out.cert.budget_left, budget, "the screen spends nothing");
+
+        let circle = CanonicalCurve::Circle(placed_unit_circle());
+        let disjoint_a = BoundedStratum::Edge {
+            curve: circle.clone(),
+            t_range: (0.1, 0.2),
+        };
+        let disjoint_b = BoundedStratum::Edge {
+            curve: circle.clone(),
+            t_range: (0.5, 0.6),
+        };
+        let mut budget = Budget::new(100, 100, 100);
+        let out = contact(&disjoint_a, &disjoint_b, &mut budget)
+            .expect("same-carrier disjoint circle arcs decide empty");
+        assert!(
+            out.value.contacts.is_empty(),
+            "disjoint arcs on the same circle never touch"
+        );
+        assert_eq!(out.cert.method, Method::Exact);
+
+        let overlap_a = BoundedStratum::Edge {
+            curve: circle.clone(),
+            t_range: (0.1, 0.5),
+        };
+        let overlap_b = BoundedStratum::Edge {
+            curve: circle,
+            t_range: (0.4, 0.6),
+        };
+        let mut budget = Budget::new(100, 100, 100);
+        let out = contact(&overlap_a, &overlap_b, &mut budget)
+            .expect("same-carrier overlapping circle arcs decide coincident");
+        assert_eq!(out.cert.method, Method::Exact);
+        assert_eq!(out.value.contacts.len(), 1);
+        let record = out.value.contacts.first().expect("one record");
+        assert_eq!(record.dimension, ContactDimension::Arc1);
+        assert!(matches!(record.locus, ContactLocus::Coincident));
+    }
+
+    #[test]
+    fn overlap_screen_is_order_insensitive() {
+        // The shift and parallel-frame witnesses with the strata swapped
+        // produce the same outcome: empty stays empty, Coincident stays
+        // Coincident with the same dimension/kind.
+        let cyl0 = CanonicalSurface::Cylinder(
+            Cylinder::new(Point3::new(0.0, 0.0, 0.0), 1.0)
+                .expect("a unit cylinder is a valid carrier")
+                .value,
+        );
+        let cyl5 = CanonicalSurface::Cylinder(
+            Cylinder::new(Point3::new(0.0, 0.0, 5.0), 1.0)
+                .expect("a unit cylinder is a valid carrier")
+                .value,
+        );
+        let cyl0_over = face_with_bounds(cyl0.clone(), (0.0, TAU), (4.0, 6.0));
+        let cyl5_over = face_with_bounds(cyl5.clone(), (0.0, TAU), (0.0, 1.0));
+        let mut budget = Budget::new(100, 100, 100);
+        let fwd = contact(&cyl0_over, &cyl5_over, &mut budget)
+            .expect("the forward overlapping shift decides");
+        let mut budget = Budget::new(100, 100, 100);
+        let rev = contact(&cyl5_over, &cyl0_over, &mut budget)
+            .expect("the reversed overlapping shift decides");
+        assert_eq!(
+            format!("{fwd:?}"),
+            format!("{rev:?}"),
+            "the shift screen is order-insensitive"
+        );
+        let cyl0_disj = face_with_bounds(cyl0, (0.0, TAU), (0.0, 1.0));
+        let cyl5_disj = face_with_bounds(cyl5, (0.0, TAU), (0.0, 1.0));
+        let mut budget = Budget::new(100, 100, 100);
+        let fwd = contact(&cyl0_disj, &cyl5_disj, &mut budget)
+            .expect("the forward disjoint shift decides");
+        let mut budget = Budget::new(100, 100, 100);
+        let rev = contact(&cyl5_disj, &cyl0_disj, &mut budget)
+            .expect("the reversed disjoint shift decides");
+        assert_eq!(
+            format!("{fwd:?}"),
+            format!("{rev:?}"),
+            "the empty shift screen is order-insensitive"
+        );
+
+        let plane_a = CanonicalSurface::Plane(Plane::new(
+            Point3::new(0.0, 0.0, 0.0),
+            Point3::new(1.0, 0.0, 0.0),
+            Point3::new(0.0, 1.0, 0.0),
+        ));
+        let plane_b = CanonicalSurface::Plane(Plane::new(
+            Point3::new(0.0, 0.0, 0.0),
+            Point3::new(2.0, 0.0, 0.0),
+            Point3::new(0.0, 2.0, 0.0),
+        ));
+        let a_over = face_with_bounds(plane_a.clone(), (0.0, 1.0), (0.0, 1.0));
+        let b_over = face_with_bounds(plane_b.clone(), (0.25, 0.4), (0.25, 0.4));
+        let mut budget = Budget::new(100, 100, 100);
+        let fwd = contact(&a_over, &b_over, &mut budget)
+            .expect("the forward overlapping plane pair decides");
+        let mut budget = Budget::new(100, 100, 100);
+        let rev = contact(&b_over, &a_over, &mut budget)
+            .expect("the reversed overlapping plane pair decides");
+        assert_eq!(
+            format!("{fwd:?}"),
+            format!("{rev:?}"),
+            "the plane screen is order-insensitive"
+        );
+        let a_disj = face_with_bounds(plane_a, (0.0, 1.0), (0.0, 1.0));
+        let b_disj = face_with_bounds(plane_b, (3.0, 4.0), (3.0, 4.0));
+        let mut budget = Budget::new(100, 100, 100);
+        let fwd = contact(&a_disj, &b_disj, &mut budget)
+            .expect("the forward disjoint plane pair decides");
+        let mut budget = Budget::new(100, 100, 100);
+        let rev = contact(&b_disj, &a_disj, &mut budget)
+            .expect("the reversed disjoint plane pair decides");
+        assert_eq!(
+            format!("{fwd:?}"),
+            format!("{rev:?}"),
+            "the empty plane screen is order-insensitive"
+        );
     }
 }
