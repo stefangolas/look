@@ -1,10 +1,21 @@
-# WORK PACKET BG-SOL-S7-SING-CLASSIFY - the singular-event stage
+# WORK PACKET BG-SOL-S7-SING-CLASSIFY - the singular-event stage (r2)
 
 Classify the GFF stage's singular candidate boxes by contact-locus dimension:
 certify isolated tangency points, detect carrier-degenerate contacts and
 tangential crossings, recover regular crossings hiding inside broad singular
 domains, and defer everything this stage cannot prove. If live code
 contradicts this packet, report it in `disagreements`.
+
+**AMENDMENT r2 (session 35, after an API-balance death mid-run):** the r1
+dispatch's worker correctly diagnosed that `krawczyk`'s STRICT-INTERIOR
+certification cannot prove a root that lies ON the searched box's boundary -
+and both real cases produce exactly that: refinement-grid-aligned tangencies
+(the root lands on a bisection face of every residue leaf containing it) and
+patch-extreme tangencies (the internal-tangency pinch sits on the world
+box's x-min face because it is the cylinder patch's x-extreme). Decision 8
+below is the fix. Your earlier work is committed on this branch at 8d2469b;
+continue from it (see the r2 anchor rule below the yaml block before
+touching anchors).
 
 ```json
 {"id":"BG-SOL-S7-SING-CLASSIFY","status":"DONE","contracts":["BG-SOL-S7-SING-CLASSIFY"],
@@ -42,9 +53,14 @@ anchors:
   - {id: A5, expect: 0, cmd: "ls vendor/truck/truck-evidence/src/contact/singular.rs 2>/dev/null | wc -l"}
 ```
 
-Anchors describe the PRE-EDIT state. A1 grows to 4 (`pub mod singular;`),
-A2 and A3 grow; A4 stays 6; A5 becomes 1. A3's single pre-existing
-`ContactLocus::Point` use is in the FE/EE stage - do not touch it.
+**r2 anchor rule (READ THIS BEFORE CHECKING ANCHORS):** the yaml anchors
+above are pinned to the PRE-r1 fork point and were verified at the r1
+dispatch. Your checkpointed branch (8d2469b) has legitimately moved past
+them: there `pub mod` is 4, `singular` is 27, `ContactLocus::Point` is 3,
+and `singular.rs` exists. Do NOT re-verify the yaml anchors and do NOT
+report ANCHOR_MISMATCH for them - the divergence is your own committed
+work, not a tree defect. A1 and A4 above must still hold on your branch;
+verify those two only.
 
 ## Problem
 
@@ -251,6 +267,45 @@ and `UnresolvedWitness::KrawczykIndeterminate` (the house pattern). No
 private budget, no replenishment. The success certificate is `Method::
 Interval`, empty props, actual `budget_left`, unbounded margin/modulus -
 exactly `gff`'s `certificate(budget)` shape.
+
+### 8. Boundary roots: dilate the residue leaf before the Lagrange Krawczyk (r2 - MANDATORY)
+
+`krawczyk`'s strict-interior rule proves uniqueness only for a root in the
+searched box's INTERIOR. Two real cases put the tangency exactly ON the
+boundary, where certification is impossible at ANY budget: refinement-grid
+-aligned roots (a tangency on a bisection face stays on a face of every
+descendant leaf), and patch-extreme tangencies (the internal-tangency pinch
+`(-1,0,0)` is the cylinder patch's x-extreme, so it sits on the world box's
+x-min face - on the boundary of every box the refinement can produce).
+
+The fix, fixed:
+
+- Before running `krawczyk::<4>` on a residue leaf `L`, build the DILATED
+  box `D`: `amount = DILATION_FRACTION * L.widest_axis_width().max(tau)`
+  (a degenerate point-leaf dilates by `DILATION_FRACTION * tau`), and each
+  axis of `D` extends `L`'s axis by `amount` on BOTH ends.
+  `DILATION_FRACTION = 0.5`, a named const with a same-line `// H-3`
+  comment (a dimensionless dilation fraction, not a length).
+- The lambda-envelope of decision 3(b) is computed over the DILATED box -
+  the gradient bounds must cover the box actually searched.
+- Run `krawczyk::<4>` on `[D.x, D.y, D.z, lam_box]`.
+- After `Unique` + Newton refine: the event point must lie within the
+  ORIGINAL leaf `L` (inclusive componentwise bounds). Inside -> record the
+  event (tangency/crossing by the inertia test, unchanged). Only in the
+  dilation margin -> the leaf goes to `residue`: a root outside the search
+  domain is a patch-trimming question this stage does not own.
+- The isolation claim in the report docs is "a NEIGHBORHOOD of the point" -
+  the dilated box is that neighborhood; extending past the search AABB is
+  sound because the certificate is about the geometry, not the box.
+
+Budget semantics are UNCHANGED (decision 6): a dilated Krawczyk that still
+exhausts the budget propagates `NumericallyUnresolved` with its spend.
+Mapping budget-exhaustion refusals to deferrals is FORBIDDEN - it hides
+real overruns behind a polite refusal. A `NoRoot` on the dilated box still
+moves the leaf to `report.regular.unresolved_boxes` per decision 3(b).
+Your in-progress whole-cell-first restructure may be kept or reverted as
+you judge; the refine-then-classify contract of decision 2 stands, and the
+dilation rule is the required fix.
 
 ### 7. Machine-checked witnesses (all verified exactly in f64)
 
