@@ -12,9 +12,9 @@ otherwise would eventually cost a trap.) If you are picking this up cold, read
 `python loop/slot_status.py`** - nothing else. Do not read `LEDGER.jsonl` whole.
 
 Updated 2026-08-27, close of session 35 (the singular-event stage landed
-whole; the 2-D overlap screen and the Phase 4 material primitive dispatched).
-Branch: `integration/kernel-bg`, HEAD `2828c39` (or later - see the
-parallelism picture; two packets were in flight at writing time).
+whole; the 2-D overlap screen and the Phase 4 material primitive landed
+too - FIVE packets this session). Branch: `integration/kernel-bg`,
+HEAD `1c57c88`.
 
 ## Where we are
 
@@ -43,31 +43,36 @@ complete.** This session landed, in order:
    with certified points; residue defers honestly. The dimension split
    lives in the report type - singular handling is NOT a tangent-point
    special case.
-4. **BG-SOL-RW1-MATERIAL**: the Phase 4 kick-off (pure 13.1 primitive)
-   dispatched to slot 1 and finished; awaiting verify.
-5. **BG-SOL-S7-OVERLAP**: the 2-D overlap screen (parameter-box
-   interior-overlap decides Coincident-vs-empty for both coincident
-   paths - fixing the false-Coincident defect where two DISJOINT patches
-   of one carrier reported contact) dispatched to slot 0 and finished;
-   awaiting verify.
+4. **BG-SOL-RW1-MATERIAL** (`1c57c88`, ACCEPTED at `b4b87e7`): the Phase 4
+   kick-off - `truck-shapeops/src/boolean/` with the pure 13.1 primitive
+   (`State`, `BoolOp::eval`, `MaterialState4`, `fragment_decision`:
+   keep iff `m_R- != m_R+`, `flip = !m_R-`). The classical 16-cell
+   orientation table and the coincident cells (A-A=empty, A u A=A,
+   butt-joined phantoms) are unit-asserted soundness checks.
+5. **BG-SOL-S7-OVERLAP** (`842b113`, ACCEPTED at `168ee5b`):
+   `contact/overlap.rs` - the parameter-box interior-overlap screen for
+   both coincident paths, fixing the false-Coincident defect where two
+   DISJOINT patches of one carrier reported contact. Per-carrier
+   periodicity, edge t-range screen, the coaxial same-radius cylinder
+   z-shift, and parallel-frame coplanar planes via an exact Cramer map
+   with the diagonal signature; rotated frames defer to the named
+   OVERLAP-PLANE follow-up.
 
 Progress estimate, difficulty-weighted:
 
-- M2 critical path: about **72-78% complete** (the funnel's analytic,
-  FE/EE, GFF, chart, and singular stages all landed; overlap in verify;
-  Boundary Rewrite design is the remaining big rock).
-- Entire approved solver family: about **55-60% complete**.
+- M2 critical path: about **75-80% complete** (the funnel's analytic,
+  FE/EE, GFF, chart, singular, and overlap stages all landed; the
+  Boundary Rewrite family is the remaining rock before the M2 witness).
+- Entire approved solver family: about **57-62% complete**.
 - At the demonstrated sequential-funnel rate (~2.5 critical-path
-  packets/day) plus the two hard stages' design sessions: M2 is about
+  packets/day) plus the rewrite's design sessions: M2 is about
   **2-4 working days** away, the full family **4-6 continuous / 7-12
   with observed friction** (API-balance deaths, usage cutoffs, disk).
 
 ## Pick up here
 
-1. Verify + land BG-SOL-S7-OVERLAP (slot 0) and BG-SOL-RW1-MATERIAL
-   (slot 1) - both workers committed; verify SEQUENTIALLY (same base
-   `2828c39`, they race the baseline cache).
-2. **The Boundary Rewrite design session is the next big rock.** The
+1. **The Boundary Rewrite design session is the next big rock** - the
+   frontier is empty by design until it writes its first packet. The
    survey is done: `transversal::{divide_faces, and/or, LoopsStore,
    FacesClassification}` is the old procedural Boolean (rewritten, not
    extended); the spec's commitments are 13.1 material-state (RW1 lands
@@ -77,40 +82,35 @@ Progress estimate, difficulty-weighted:
    `Extrude(P-Q) = Extrude(P)-Extrude(Q)` cross-layer test. Packet
    family: fragment splitting (consumes ContactLocus records), the
    propagation classifier, assembly, the boolean entry, M2 witness.
-3. BG-SOL-S7-OVERLAP-PLANE (rotated-frame coplanar SAT) - named
+2. BG-SOL-S7-OVERLAP-PLANE (rotated-frame coplanar SAT) - named
    follow-up, NOT on M2's path.
-4. Parallel side branches after/alongside: S8 safe shell, local fillet
+3. Parallel side branches after/alongside: S8 safe shell, local fillet
    scoping, RMF sweep, minimal-knot loft.
-5. Open latent flake, NOT fixed: `truck-base/tests/newton.rs::test_newton1`.
+4. Open latent flake, NOT fixed: `truck-base/tests/newton.rs::test_newton1`.
    Its own packet.
-6. Recommended, NOT dispatched: follow-up audit of
+5. Recommended, NOT dispatched: follow-up audit of
    `truck-evidence/src/fid/rep.rs` (4362 lines). Its own program.
 
 ## State of the machine, as left
 
 - Watchdog RUNNING (`loop/watchdog.lock`).
-- Registry: 109 rows = 107 DONE + 1 BLOCKED (BG-AUD-FIX-004 owner) +
-  2 READY (OVERLAP, RW1-MATERIAL - both dispatched, finished, awaiting
-  verify).
-- Slots 0-1 FINISHED with committed, unverified work (OVERLAP@168ee5b,
-  RW1@b4b87e7); slots 2-3 FINISHED, re-forkable.
-- Disk about 8.5 GB free (slot 0 target 8.3 GB, slot 1 target 0.9 GB).
-  The two verifies fit sequentially; reclaim a landed slot's target if a
-  floor refusal appears.
-- GATE-4 ceiling 111 (true count); `kernel-gates.sh HEAD` passes at
-  `2828c39`.
+- Registry: 109 rows = 108 DONE + 1 BLOCKED (BG-AUD-FIX-004 owner) +
+  0 READY; scheduler eligible 0, dispatchable 0.
+- Slots 0-3 FINISHED, all re-forkable.
+- Disk about 13.6 GB free (slot 0 target 8.3 GB, slot 1 target 0.9 GB).
+- GATE-4 ceiling 111 (true count); `kernel-gates.sh HEAD` passes all P-3
+  gates and 111/111 at `1c57c88`.
 - Results filed at `loop/results/BG-SOL-S7-{GFF-CHART,SING-SUBSTRATE,
-  SING-CLASSIFY}.json`.
+  SING-CLASSIFY,OVERLAP}.json` and `loop/results/BG-SOL-RW1-MATERIAL.json`.
 - Root tracked tree clean. Numerous pre-existing untracked user/baseline/
   scratch files remain and must be preserved.
 
 ## The parallelism picture
 
-At STATE-writing time: OVERLAP verify RUNNING (slot 0, pid 9252); the
-RW1 verify queues behind it (same base). After both land, the frontier
-is empty until the Boundary Rewrite design session writes its first
-packet. The critical path is Boundary Rewrite -> M2 witness; overlap-
-plane, shell, fillet, sweep, and loft fill the sides.
+Nothing running (watchdog only). The frontier is empty until the Boundary
+Rewrite design session writes its packets. Critical path: Boundary
+Rewrite -> M2 witness; overlap-plane, shell, fillet, sweep, and loft fill
+the sides.
 
 ## Traps, each one paid for
 ### Session 35 (singular stage whole, overlap screen, material primitive) - paid in full
