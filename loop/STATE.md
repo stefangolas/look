@@ -11,88 +11,173 @@ otherwise would eventually cost a trap.) If you are picking this up cold, read
 [`loop/ORCHESTRATOR.md`](ORCHESTRATOR.md) for how to run the loop, then
 `python loop/slot_status.py`** - nothing else. Do not read `LEDGER.jsonl` whole.
 
-Updated 2026-08-26, close of session 34 (validated mixed-quadric branch
-covers wired into the Contact Layer and verified). Branch:
-`integration/kernel-bg`, HEAD `9ddc985`.
+Updated 2026-08-27, close of session 35 (the singular-event stage landed
+whole; the 2-D overlap screen and the Phase 4 material primitive dispatched).
+Branch: `integration/kernel-bg`, HEAD `2828c39` (or later - see the
+parallelism picture; two packets were in flight at writing time).
 
 ## Where we are
 
-**The first general validated FF result now reaches the public Contact Layer.**
-BG-SOL-S7-GFF-WIRE landed at `9ddc985` (merge `81a64c2`, verified ACCEPTED at
-repaired worker commit `695796b` against explicit base `70a9c9b`). It:
+**The singular-event stage is DONE and the funnel is one screen short of
+complete.** This session landed, in order:
 
-- adds `ContactLocus::ValidatedBranchCover(BranchCover)`, an honest intermediate
-  that claims certified cross-sections but not connectivity/component order;
-- wires offset Cylinder/Cone, Cylinder/Sphere, Cone/Cone, and Cone/Sphere in
-  both orders through `gff::cover_branch` while preserving coaxial/exact paths;
-- derives the finite world domain from the intersection of the two certified
-  patch AABBs and uses scale-relative `tau = domain.width() / 128`;
-- returns a cover only when singular and unresolved lists are empty; singular
-  cells remain deferred and unresolved cells remain typed numerical refusals;
-- preserves the cover certificate and caller-owned budget, including an
-  untouched interval certificate for an early disjoint-AABB proof.
+1. **BG-SOL-S7-GFF-CHART** (`59fb25c`, verified ACCEPTED at worker commit
+   `421f755`): adaptive regular-chart recovery. The prior session's worker
+   had finished ALL work but never committed - the packet's done-when list
+   omitted the commit step. The orchestrator committed the worker's exact
+   bytes unchanged and the verify judged them. Every packet written since
+   mandates the commit explicitly.
+2. **BG-SOL-S7-SING-SUBSTRATE** (`d6b5e07`, ACCEPTED at `7ae9c66`):
+   `ImplicitField::hess` (constant for the quadrics, quartic-derived for
+   the torus) and `degenerate_points` (cone apex; the torus r=R/2
+   inner-equator circle documented NOT enumerated).
+3. **BG-SOL-S7-SING-CLASSIFY** (`2828c39`, ACCEPTED at `ceb62cd` after an
+   r2 amendment): `contact/singular.rs` - refine singular cells through
+   per-child `cover_branch`, classify residue leaves by the exact
+   degenerate pass, the 4-D Lagrange system `[f1, grad f2 + lam*grad f1]`
+   with a sound multiplier envelope, and restricted-Hessian inertia.
+   Isolated tangencies emit `Point0`/`Tangency` records (the cylinder-
+   tangent-sphere dispatcher test flipped from deferred to a certified
+   tangency record); tangential crossings (cyl x sphere internal
+   tangency, the in-family saddle) and degenerate contacts stay deferred
+   with certified points; residue defers honestly. The dimension split
+   lives in the report type - singular handling is NOT a tangent-point
+   special case.
+4. **BG-SOL-RW1-MATERIAL**: the Phase 4 kick-off (pure 13.1 primitive)
+   dispatched to slot 1 and finished; awaiting verify.
+5. **BG-SOL-S7-OVERLAP**: the 2-D overlap screen (parameter-box
+   interior-overlap decides Coincident-vs-empty for both coincident
+   paths - fixing the false-Coincident defect where two DISJOINT patches
+   of one carrier reported contact) dispatched to slot 0 and finished;
+   awaiting verify.
 
-The first verifier run correctly REJECTED the worker for renaming the existing
-`contact_ff_non_coaxial_curved_pair_refuses_deferred` test. Packet r2 required
-preserving that base test identity while updating its assertions. The resumed
-worker made exactly that one-line repair. The fresh verifier then passed V0-V9:
-4 required tests, no truck-evidence regressions, 1,068 downstream tests across
-five crates unchanged, and 39 real STEP geometry tests unchanged.
+Progress estimate, difficulty-weighted:
 
-Progress estimate, difficulty-weighted rather than registry-counted:
-
-- M2 critical path: about **58-62% complete**.
-- Entire approved solver family: about **42-47% complete**.
-- At the observed continuous pace, M2 is about **3-5 working days** away and
-  the complete solver family about **7-12 working days** away. With ordinary
-  pauses/machine interruptions, use **1-3 calendar weeks** for the full plan.
-- The registered count is not a denominator: future singular, overlap,
-  Boundary Rewrite, shell, fillet, sweep, and loft packets are not registered
-  yet, so the high DONE fraction would materially overstate completion.
-
-Registry is 104 rows: **103 DONE, 1 BLOCKED** (BG-AUD-FIX-004 owner),
-**0 READY**. `schedule.py` reports eligible 0, dispatchable 0. Nothing is
-running except the watchdog.
+- M2 critical path: about **72-78% complete** (the funnel's analytic,
+  FE/EE, GFF, chart, and singular stages all landed; overlap in verify;
+  Boundary Rewrite design is the remaining big rock).
+- Entire approved solver family: about **55-60% complete**.
+- At the demonstrated sequential-funnel rate (~2.5 critical-path
+  packets/day) plus the two hard stages' design sessions: M2 is about
+  **2-4 working days** away, the full family **4-6 continuous / 7-12
+  with observed friction** (API-balance deaths, usage cutoffs, disk).
 
 ## Pick up here
 
-1. **Design the singular-event stage before writing its packet.** The booked
-   Stage-4 contract requires the first split by contact-locus dimension:
-   isolated points, one-dimensional tangency loci, and coincident regions.
-   Do not reduce singular handling to a tangent-point special case. Re-derive
-   what the existing GFF singular boxes actually prove; they are currently
-   provable-or-suspected singular slabs, not isolated certified events.
-2. Then implement 2-D overlap (C3/C4, last), followed by Phase 4 Boundary
-   Rewrite and the M2 cross-layer Boolean witness.
-3. Parallel side branches after/alongside that critical path: S8 safe shell,
-   local fillet scoping, RMF sweep, and minimal-knot loft.
-4. Open latent flake, NOT fixed: `truck-base/tests/newton.rs::test_newton1`
-   (Newton basin contract question, not a tolerance swap). Its own packet.
-5. Recommended, NOT dispatched: follow-up audit of
+1. Verify + land BG-SOL-S7-OVERLAP (slot 0) and BG-SOL-RW1-MATERIAL
+   (slot 1) - both workers committed; verify SEQUENTIALLY (same base
+   `2828c39`, they race the baseline cache).
+2. **The Boundary Rewrite design session is the next big rock.** The
+   survey is done: `transversal::{divide_faces, and/or, LoopsStore,
+   FacesClassification}` is the old procedural Boolean (rewritten, not
+   extended); the spec's commitments are 13.1 material-state (RW1 lands
+   the primitive), 12 seed-and-propagate classification with
+   non-tree-edge verification (`FacesClassification::integrate_by_component`
+   is the embryo), and the M2 flagship
+   `Extrude(P-Q) = Extrude(P)-Extrude(Q)` cross-layer test. Packet
+   family: fragment splitting (consumes ContactLocus records), the
+   propagation classifier, assembly, the boolean entry, M2 witness.
+3. BG-SOL-S7-OVERLAP-PLANE (rotated-frame coplanar SAT) - named
+   follow-up, NOT on M2's path.
+4. Parallel side branches after/alongside: S8 safe shell, local fillet
+   scoping, RMF sweep, minimal-knot loft.
+5. Open latent flake, NOT fixed: `truck-base/tests/newton.rs::test_newton1`.
+   Its own packet.
+6. Recommended, NOT dispatched: follow-up audit of
    `truck-evidence/src/fid/rep.rs` (4362 lines). Its own program.
 
 ## State of the machine, as left
 
-- Watchdog RUNNING (`loop/watchdog.lock`; previous recorded pid 20024).
-- Registry: 104 rows = 103 DONE + 1 BLOCKED, 0 READY; scheduler eligible 0,
-  dispatchable 0.
-- Slots 0-3 FINISHED. Slot 0 is the landed
-  `packet/BG-SOL-S7-GFF-WIRE@695796b`; all are re-forkable.
-- Disk about 8.78 GB free. No leaked `%TEMP%/look-verify-baseline-*`.
-- GATE-4 ceiling 111 (true count); `kernel-gates.sh HEAD` passes all P-3 gates
-  and 111/111 at `9ddc985`.
-- Result filed at `loop/results/BG-SOL-S7-GFF-WIRE.json`.
-- Root tracked tree clean. Numerous pre-existing untracked user/baseline/scratch
-  files remain and must be preserved.
+- Watchdog RUNNING (`loop/watchdog.lock`).
+- Registry: 109 rows = 107 DONE + 1 BLOCKED (BG-AUD-FIX-004 owner) +
+  2 READY (OVERLAP, RW1-MATERIAL - both dispatched, finished, awaiting
+  verify).
+- Slots 0-1 FINISHED with committed, unverified work (OVERLAP@168ee5b,
+  RW1@b4b87e7); slots 2-3 FINISHED, re-forkable.
+- Disk about 8.5 GB free (slot 0 target 8.3 GB, slot 1 target 0.9 GB).
+  The two verifies fit sequentially; reclaim a landed slot's target if a
+  floor refusal appears.
+- GATE-4 ceiling 111 (true count); `kernel-gates.sh HEAD` passes at
+  `2828c39`.
+- Results filed at `loop/results/BG-SOL-S7-{GFF-CHART,SING-SUBSTRATE,
+  SING-CLASSIFY}.json`.
+- Root tracked tree clean. Numerous pre-existing untracked user/baseline/
+  scratch files remain and must be preserved.
 
 ## The parallelism picture
 
-Nothing running (watchdog only). The critical path is singular contact locus
-classification -> 2-D overlap -> Boundary Rewrite -> M2. The next packet does
-not yet exist because the singular ontology and proof boundary must be designed
-first.
+At STATE-writing time: OVERLAP verify RUNNING (slot 0, pid 9252); the
+RW1 verify queues behind it (same base). After both land, the frontier
+is empty until the Boundary Rewrite design session writes its first
+packet. The critical path is Boundary Rewrite -> M2 witness; overlap-
+plane, shell, fillet, sweep, and loft fill the sides.
 
 ## Traps, each one paid for
+### Session 35 (singular stage whole, overlap screen, material primitive) - paid in full
+
+- **A worker that follows the packet literally will not commit unless the
+  packet says to.** "Finish by writing RESULT.json" is not enough: the
+  GFF-CHART worker completed every gate, wrote RESULT.json, and stopped -
+  leaving the diff uncommitted, which reads to the verifier as an
+  interrupted run (V0 BLOCKED) and to the orchestrator as a recovery
+  dance (commit the worker's exact bytes, honestly labeled, then verify).
+  Every packet since mandates: "Commit your work on the current branch
+  (subject ...) BEFORE writing RESULT.json."
+- **The dispatch-time anchor check runs against the REPO ROOT, not the
+  slot.** For an amendment (r2) dispatch the worker's tree has moved past
+  the packet's yaml anchors BY DESIGN - but run_packet.py checks them
+  against the root, which still shows the pre-packet fork point. The
+  working shape: KEEP the yaml anchors at their pre-packet values (the
+  root still satisfies them) and add an "r2 anchor rule" in prose naming
+  the worker's own branch counts, forbidding ANCHOR_MISMATCH reports for
+  the expected divergence. Session 33's "re-derive anchors against the
+  worker's branch" applies to the PROSE, never the yaml.
+- **A stale CONTEXT.md blocks resume dispatches.** run_packet.py's dirty
+  filter ignored PACKET.md but not CONTEXT.md, so an API-death mid-run
+  left scaffolding that refused the next dispatch "1 uncommitted change."
+  Fixed in the filter (CONTEXT.md now ignored like PACKET.md); committed
+  as `70611a2`.
+- **The API-balance mid-run death recovery is: checkpoint-commit, amend,
+  resume.** Commit the worker's uncommitted in-progress bytes on the slot
+  branch (orchestrator commit, message says exactly that), amend the
+  packet with the missing design decision the worker was converging on,
+  and re-dispatch with `--resume` (the session id comes from
+  events.jsonl). Cost ~25 min against a fresh ~90-minute worker run.
+- **Krawczyk's strict-interior rule cannot certify a root ON the searched
+  box's boundary - and both real singular cases produce exactly that.**
+  Refinement-grid-aligned tangencies (the root lands on a bisection face
+  of every descendant leaf) and patch-extreme tangencies (the internal-
+  tangency pinch is the cylinder patch's x-extreme, hence on the world
+  box's face). The singular stage dilates each residue leaf before the
+  4-D Lagrange call so the root is interior, then requires the refined
+  root back inside the ORIGINAL leaf. A near-critical ROOTLESS leaf still
+  burns budget trying to prove NoRoot; the landed code maps an
+  UNSPLITTABLE refusal to residue while genuine budget exhaustion
+  propagates - keep that distinction when touching singular.rs.
+- **The largest-|n_i| tangent-basis axis rule is degenerate on
+  axis-aligned normals** (n x e_largest = 0 - no frame exists). The
+  packet specified largest; the worker caught it and used SMALLEST
+  (ties to lowest index). Packet math bugs that compile cleanly are
+  still packet bugs: require the worker to machine-check every
+  hand-derived rule, and expect deviations to be RIGHT.
+- **Workers catch orchestrator math errors when the packet makes them
+  machine-check.** This session: an infeasible wrap witness (a
+  boundary-touching interval pair my own strict-interior rule empties,
+  mislabeled Coincident in the packet), and a wrong Xor prose cell
+  (anti-oriented butt-joined faces: the rule says Discard - the face is
+  a PHANTOM of A xor B - while the packet prose said keep). Both workers
+  derived from the rule over the prose and reported deviations. The
+  packet pattern that works: state the rule as canonical, tell the
+  worker to derive each witness cell from it, and require measured
+  deviations in RESULT.json.
+- **A workspace-wide `cargo fmt` by a worker reformats PRE-EXISTING
+  drift in root-crate files** (examples/, tests/) that no gate ever
+  scoped - out-of-write_allow changes that V1 would reject. The
+  SING-CLASSIFY worker did it and then self-reverted before committing;
+  watch every worker diff for files outside write_allow even when the
+  changes look mechanical, and remember the look crate is NOT
+  fmt-clean at base.
+
 ### Session 34 (validated GFF wiring) - paid in full
 
 - **Renaming a pre-existing passing test is a regression even when its old
