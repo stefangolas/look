@@ -615,6 +615,47 @@ zero remains a singular candidate. This packet does not claim those candidates
 are truly rank-deficient, connect arcs, or classify isolated/curve/region
 loci; those are the following singular-event packets.
 
+**AMENDED (session 35, BG-SOL-S7-SING-*, the singular-event stage):** post-
+CHART, a `singular_boxes` entry means all three cross-gradient minors merely
+contain zero over the unsubdivided domain — provable-or-suspected, never
+proven rank deficiency. The stage is two packets. **SING-SUBSTRATE** extends
+`ImplicitField` with sound `hess(&Box3) -> [[Interval; 3]; 3]` enclosures
+(constant for the quadrics — plane 0, sphere 2I, cylinder diag(2,2,0), cone
+diag(2,2,−2t²); torus quartic `2∇g∇gᵀ + 4gI − 8R²diag(1,1,0)`) and
+`degenerate_points() -> Vec<Point3>` (exact isolated on-surface ∇f=0 points:
+cone apex only; the torus r=R/2 inner-equator circle is a positive-dimensional
+degenerate locus the method deliberately does NOT enumerate — documented in
+its contract). **SING-CLASSIFY** lands `contact/singular.rs`:
+`singular_events(f1, f2, cells, tau, budget)` refines each singular cell
+(children that field-exclude drop; children that chart-certify go through
+`cover_branch`, which re-selects a chart per child — the per-child chart use
+CHART deliberately deferred from its own scope; connectivity stays unclaimed);
+each resolution-floor residue leaf then classifies by (a) exact degenerate
+points tested against the other carrier, (b) the 4-D Lagrange system
+`[f1, ∇f2 + λ∇f1]` with the sound λ-envelope `±sup|∇f2| / min|∇f1|` — the
+direct 3×3 `[f1, f2, T]` formulation is unusable because its Jacobian is
+singular at every tangency and `krawczyk` correctly refuses double roots; the
+Lagrange system is the standard regularization and is nonsingular at
+nondegenerate tangencies — then (c) restricted-Hessian inertia of
+`Hess(f2) + λ*·Hess(f1)` on the certified root's tangent plane: definite →
+isolated tangency → `Point0`/`Tangency` record; indefinite → **tangential
+crossing** (the contact locus self-crosses at a gradient-parallel saddle —
+real in-family: cyl×sphere internal tangency at axis distance R−1 pinches the
+exit curve through itself) → deferred with the certified point recorded.
+Degenerate contacts and tangential crossings stay deferred: their local
+branch topology is Boundary-Rewrite vocabulary, not this stage's. Residue
+that certifies nothing stays deferred: one- and two-dimensional singular loci
+(tangency along a curve, coincident patches) are NOT claimed — for the wired
+offset mixed-quadric families Region2 coincidence is structurally unreachable
+(distinct quadric types cannot share a 2-D patch) and Arc1 tangency is
+coaxial-only (upstream), but the stage defers rather than hardcoding that
+belief. The dimension split lives in the report type: `tangencies` (proven
+isolated Point0), `tangential_crossings` (proven saddle points, locus not
+isolated), `degenerate` (proven carrier-degenerate contact points),
+`residue` (dimension unknown). Singular handling is not a tangent-point
+special case: only the isolated arm becomes a record, and every other arm
+defers with a named reason.
+
 **Phase 4 — Boundary Rewrite.** New `truck-shapeops` module; material-state
 heart (spec §13.1).
 ```rust
