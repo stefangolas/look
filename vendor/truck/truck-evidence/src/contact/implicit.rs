@@ -11,6 +11,10 @@
 //! primitive and nothing else: no solver logic, no event finding, no
 //! certificates, no `Method` — those belong to the consumers.
 //!
+//! This module also exposes the two primitives the singular-event stage needs
+//! on top of that substrate: sound Hessian enclosures (`hess`) and exact
+//! isolated on-surface degenerate points (`degenerate_points`).
+//!
 //! Every evaluation is plain sound interval arithmetic (BG-ENC-001): the true
 //! `f` value of EVERY point in the box lies inside the returned interval.
 //! Under-estimation is a silent-wrong-answer bug.
@@ -28,6 +32,7 @@
 
 use crate::enclosure::interval_at;
 use crate::enclosure::{Box3, Interval};
+use truck_base::cgmath64::Point3;
 use truck_geometry::specifieds::{Cone, Cylinder, Plane, Sphere, Torus};
 
 /// Certified interval evaluation of a canonical carrier's implicit function.
@@ -52,6 +57,15 @@ pub trait ImplicitField {
     /// component's gradient enclosure excludes zero. `false` means "not
     /// PROVEN regular here", never "proven singular".
     fn regular_on(&self, p: &Box3) -> bool;
+    /// Sound interval enclosure of the Hessian of f over the box, row-major:
+    /// `hess(p)[r][c]` encloses `d2f/dx_r dx_c` over every point of `p`.
+    fn hess(&self, p: &Box3) -> [[Interval; 3]; 3];
+    /// Exact isolated points of the carrier's zero set where grad f = 0.
+    /// Positive-dimensional degenerate loci are NOT enumerated: the torus with
+    /// small_radius == large_radius/2 is degenerate along its whole inner
+    /// equator circle, and this method returns empty for the torus; callers
+    /// must not conclude "no degenerate locus" from an empty result.
+    fn degenerate_points(&self) -> Vec<Point3>;
 }
 
 /// Whether the interval lies strictly away from zero.
@@ -84,6 +98,18 @@ impl ImplicitField for Plane {
             || excludes_zero(interval_at(n.y))
             || excludes_zero(interval_at(n.z))
     }
+
+    /// The Hessian of the affine plane form is identically zero.
+    fn hess(&self, _p: &Box3) -> [[Interval; 3]; 3] {
+        let zero = interval_at(0.0);
+        [[zero, zero, zero], [zero, zero, zero], [zero, zero, zero]]
+    }
+
+    /// The plane has no on-surface critical points: `∇f` is the constant unit
+    /// normal, never zero.
+    fn degenerate_points(&self) -> Vec<Point3> {
+        Vec::new()
+    }
 }
 
 impl ImplicitField for Sphere {
@@ -109,6 +135,19 @@ impl ImplicitField for Sphere {
 
     fn regular_on(&self, p: &Box3) -> bool {
         self.grad(p).iter().any(|g| excludes_zero(*g))
+    }
+
+    /// `Hess(f) = 2I`, the constant matrix with 2 on the diagonal.
+    fn hess(&self, _p: &Box3) -> [[Interval; 3]; 3] {
+        let two = interval_at(2.0);
+        let zero = interval_at(0.0);
+        [[two, zero, zero], [zero, two, zero], [zero, zero, two]]
+    }
+
+    /// The sphere's `∇f = 2(p−c)` vanishes only at the center, which is off
+    /// the zero set: no on-surface degenerate points.
+    fn degenerate_points(&self) -> Vec<Point3> {
+        Vec::new()
     }
 }
 
@@ -136,6 +175,19 @@ impl ImplicitField for Cylinder {
 
     fn regular_on(&self, p: &Box3) -> bool {
         self.grad(p).iter().any(|g| excludes_zero(*g))
+    }
+
+    /// `Hess(f) = diag(2, 2, 0)`: the axial direction is free.
+    fn hess(&self, _p: &Box3) -> [[Interval; 3]; 3] {
+        let two = interval_at(2.0);
+        let zero = interval_at(0.0);
+        [[two, zero, zero], [zero, two, zero], [zero, zero, zero]]
+    }
+
+    /// The cylinder's `∇f = 0` set is its axis, strictly off the wall: no
+    /// on-surface degenerate points.
+    fn degenerate_points(&self) -> Vec<Point3> {
+        Vec::new()
     }
 }
 
@@ -166,6 +218,21 @@ impl ImplicitField for Cone {
 
     fn regular_on(&self, p: &Box3) -> bool {
         self.grad(p).iter().any(|g| excludes_zero(*g))
+    }
+
+    /// `Hess(f) = diag(2, 2, −2t²)` with `t = half_angle().tan()`, constant.
+    fn hess(&self, _p: &Box3) -> [[Interval; 3]; 3] {
+        let t = self.half_angle().tan();
+        let two = interval_at(2.0);
+        let zero = interval_at(0.0);
+        let diag = -two * interval_at(t) * interval_at(t);
+        [[two, zero, zero], [zero, two, zero], [zero, zero, diag]]
+    }
+
+    /// The apex lies on the zero set with `∇f = 0`: the cone's single exact
+    /// isolated on-surface degenerate point.
+    fn degenerate_points(&self) -> Vec<Point3> {
+        vec![self.apex()]
     }
 }
 
@@ -202,6 +269,42 @@ impl ImplicitField for Torus {
 
     fn regular_on(&self, p: &Box3) -> bool {
         self.grad(p).iter().any(|g| excludes_zero(*g))
+    }
+
+    /// `Hess(f) = 2·∇g·∇gᵀ + 4g·I − 8R²·diag(1, 1, 0)` with `∇g = 2(x', y', z')`:
+    /// entry `[i][j] = 8·x'_i·x'_j + 4g·δ_ij − 8R²·δ_ij·[i<2]`, computed from
+    /// the interval enclosures of `g` and `x'_i` over the box.
+    fn hess(&self, p: &Box3) -> [[Interval; 3]; 3] {
+        let c = self.center();
+        let dx = p.x - interval_at(c.x);
+        let dy = p.y - interval_at(c.y);
+        let dz = p.z - interval_at(c.z);
+        let r2 = interval_at(self.large_radius()).sqr();
+        let g = dx.sqr() + dy.sqr() + dz.sqr() + r2 - interval_at(self.small_radius()).sqr();
+        let eight = interval_at(8.0);
+        let four_g = interval_at(4.0) * g;
+        let eight_r2 = eight * r2;
+        [
+            [
+                eight * dx.sqr() + four_g - eight_r2,
+                eight * dx * dy,
+                eight * dx * dz,
+            ],
+            [
+                eight * dy * dx,
+                eight * dy.sqr() + four_g - eight_r2,
+                eight * dy * dz,
+            ],
+            [eight * dz * dx, eight * dz * dy, eight * dz.sqr() + four_g],
+        ]
+    }
+
+    /// The torus has no isolated on-surface degenerate points. (The
+    /// `r = R/2` inner equator is a real positive-dimensional degenerate
+    /// locus this method does not enumerate; callers must not conclude "no
+    /// degenerate locus" from an empty result.)
+    fn degenerate_points(&self) -> Vec<Point3> {
+        Vec::new()
     }
 }
 
@@ -292,6 +395,40 @@ mod tests {
                 diff.inf() >= -FD_SLACK && diff.sup() <= FD_SLACK,
                 "{label} axis {i}: analytic {a:?} vs numeric {numeric:?}"
             );
+        }
+    }
+
+    /// The analytic Hessian at a degenerate box must agree with the central
+    /// difference of the corresponding gradient component, per (row, column),
+    /// within `FD_SLACK`.
+    fn fd_hess_match<C: ImplicitField>(
+        g: &impl Fn(Point3) -> [Interval; 3],
+        carrier: &C,
+        p: Point3,
+        label: &str,
+    ) {
+        let analytic = carrier.hess(&Box3::point(p));
+        for (i, row) in analytic.iter().enumerate() {
+            for (j, a) in row.iter().enumerate() {
+                let numeric = central_diff(
+                    &|q: Point3| {
+                        let [gx, gy, gz] = g(q);
+                        match j {
+                            0 => gx,
+                            1 => gy,
+                            _ => gz,
+                        }
+                    },
+                    p,
+                    i,
+                    FD_H,
+                );
+                let diff = *a - numeric;
+                assert!(
+                    diff.inf() >= -FD_SLACK && diff.sup() <= FD_SLACK,
+                    "{label} hess[{i}][{j}]: analytic {a:?} vs numeric {numeric:?}"
+                );
+            }
         }
     }
 
@@ -506,5 +643,127 @@ mod tests {
                 "cylinder soundness at {p:?}: f={f} not in {enc:?}"
             );
         }
+    }
+
+    #[test]
+    fn hess_matches_grad_finite_difference() {
+        // Each Hessian entry is a central difference of the corresponding grad
+        // component. Nondegenerate probes, all with g != 0 on the torus.
+        let sphere = Sphere::new(Point3::origin(), 1.0);
+        fd_hess_match(
+            &|q| sphere.grad(&Box3::point(q)),
+            &sphere,
+            Point3::new(1.0, 0.5, 0.25),
+            "sphere",
+        );
+        let cyl = cylinder(Point3::origin(), 1.0);
+        fd_hess_match(
+            &|q| cyl.grad(&Box3::point(q)),
+            &cyl,
+            Point3::new(1.0, 0.5, 3.0),
+            "cylinder",
+        );
+        let cone = cone(Point3::origin(), FRAC_PI_4);
+        fd_hess_match(
+            &|q| cone.grad(&Box3::point(q)),
+            &cone,
+            Point3::new(0.5, 0.25, 1.0),
+            "cone",
+        );
+        let torus = Torus::new(Point3::origin(), 2.0, 0.5);
+        fd_hess_match(
+            &|q| torus.grad(&Box3::point(q)),
+            &torus,
+            Point3::new(2.0, 1.0, 0.0),
+            "torus",
+        );
+        let plane = Plane::xy();
+        fd_hess_match(
+            &|q| plane.grad(&Box3::point(q)),
+            &plane,
+            Point3::new(1.0, 2.0, 3.0),
+            "plane",
+        );
+    }
+
+    #[test]
+    fn hessian_is_constant_where_claimed() {
+        let two = interval_at(2.0);
+        let zero = interval_at(0.0);
+        let sphere = Sphere::new(Point3::origin(), 1.0);
+        let expected = [[two, zero, zero], [zero, two, zero], [zero, zero, two]];
+        assert_eq!(
+            sphere.hess(&Box3::point(Point3::new(1.0, 0.0, 0.0))),
+            expected,
+            "sphere hessian at (1,0,0)"
+        );
+        assert_eq!(
+            sphere.hess(&Box3::point(Point3::new(2.0, -1.0, 3.0))),
+            expected,
+            "sphere hessian at (2,-1,3)"
+        );
+
+        let cyl = cylinder(Point3::origin(), 1.0);
+        assert_eq!(
+            cyl.hess(&Box3::point(Point3::new(2.0, 0.0, 3.0))),
+            [[two, zero, zero], [zero, two, zero], [zero, zero, zero],],
+            "cylinder hessian"
+        );
+
+        // tan(atan(3/4)) rounds back to exactly 3/4, so -2*t*t is exactly
+        // -9/8 and the cone hessian is the degenerate diag(2, 2, -9/8).
+        let half_angle = (3.0f64 / 4.0).atan();
+        let cone = cone(Point3::origin(), half_angle);
+        assert_eq!(
+            cone.hess(&Box3::point(Point3::new(0.5, 0.25, 1.0))),
+            [
+                [two, zero, zero],
+                [zero, two, zero],
+                [zero, zero, interval_at(-9.0 / 8.0)],
+            ],
+            "cone hessian with t = 3/4"
+        );
+
+        let plane = Plane::xy();
+        assert_eq!(
+            plane.hess(&Box3::point(Point3::new(1.0, 2.0, 3.0))),
+            [[zero, zero, zero], [zero, zero, zero], [zero, zero, zero],],
+            "plane hessian"
+        );
+    }
+
+    #[test]
+    fn degenerate_points_report_cone_apex_only() {
+        let apex = Point3::origin();
+        let at_origin = cone(apex, FRAC_PI_4);
+        assert_eq!(at_origin.degenerate_points(), vec![apex], "cone apex");
+
+        let off_origin = Point3::new(1.0, -2.0, 3.0);
+        let shifted = cone(off_origin, FRAC_PI_4);
+        assert_eq!(
+            shifted.degenerate_points(),
+            vec![off_origin],
+            "translated cone apex"
+        );
+
+        assert!(
+            Sphere::new(Point3::origin(), 1.0)
+                .degenerate_points()
+                .is_empty(),
+            "sphere"
+        );
+        assert!(
+            cylinder(Point3::origin(), 1.0)
+                .degenerate_points()
+                .is_empty(),
+            "cylinder"
+        );
+        assert!(Plane::xy().degenerate_points().is_empty(), "plane");
+        assert!(
+            Torus::new(Point3::origin(), 2.0, 0.5)
+                .degenerate_points()
+                .is_empty(),
+            "torus"
+        );
     }
 }
