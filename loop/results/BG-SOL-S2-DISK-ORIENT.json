@@ -1,0 +1,12 @@
+{
+  "id": "BG-SOL-S2-DISK-ORIENT",
+  "status": "DONE",
+  "contracts": ["BG-SOL-S2-DISK-ORIENT"],
+  "tests_added": 1,
+  "sites_migrated": 0,
+  "sites_deferred": 0,
+  "deviations": [],
+  "disagreements": [],
+  "baseline_failures": [],
+  "notes": "Wall orientation() before: false (unconditional cylinder_face.invert()); after: true for ci==0 (outer disk boundary, stored UNINVERTED with wire_bot=[be.clone()], wire_top=[te.inverse()]) and false for ci>0 (hole, exactly today's form). Asserted effective normal +xhat = [1,0,0] at (3,2,1) on the disk profile (circle at (2,2) r=1, height 2.0), via TOLERANCE; point_in_solid true at (2,2,1) and false at (5,5,1); Solid::try_new re-validates the boundary shell. Anchor A1 observed count = 1: the exact 'cylinder_face.invert();' string is retained under the hole (ci>0) arm only, so the invert is conditional (packet intent), not unconditional. A2=1, A3=1, A4=6, A5=7. All five pre-existing hole-path tests preserved unchanged and green. Note: the packet references scratch/rwdiskprobe as preserved in-repo, but it is not present in this tree; recipe was implemented directly per Decisions 1/2. cargo fmt/clippy/check/test and scripts/kernel-gates.sh (base 783c968) all pass."
+}
