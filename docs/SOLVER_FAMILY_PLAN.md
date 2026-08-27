@@ -683,6 +683,20 @@ keep today's unscreened emission until it lands.
 
 **Phase 4 — Boundary Rewrite.** New `truck-shapeops` module; material-state
 heart (spec §13.1).
+
+**AMENDED (session 35, BG-SOL-RW1-MATERIAL, the Phase 4 kick-off):** the
+rewrite lands bottom-up, pure logic first. `truck-shapeops/src/boolean/`
+is the module tree; its first packet carries ONLY the §13.1 primitive —
+`State`, `BoolOp::eval` (the four truth functions), `MaterialState4` (the
+four material witnesses in the fragment's own orientation), and
+`fragment_decision(op, m)`: keep iff `m_R⁻ ≠ m_R⁺`, orient toward the
+`m_R = 0` side (`flip = !m_R⁻`). No topology, no geometry, no imports
+beyond std. The soundness check is the spec's: the rule must reproduce the
+classical 16-cell orientation table for regularized solids in general
+position AND decide the coincident cells (A∪A=A, A−A=∅, butt-joined
+anti-oriented pairs) with zero special cases — the classical swamp is the
+motivating case. The §12 seed-and-propagate classifier, fragment
+splitting, and assembly are later packets in the same tree.
 ```rust
 pub struct State { pub in_a: bool, pub in_b: bool }
 pub enum BoolOp { Union, Intersection, Difference, Xor }
