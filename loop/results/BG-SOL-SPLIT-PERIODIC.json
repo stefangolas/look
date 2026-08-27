@@ -1,0 +1,15 @@
+{
+  "id": "BG-SOL-SPLIT-PERIODIC",
+  "status": "DONE",
+  "contracts": ["BG-SOL-SPLIT-PERIODIC"],
+  "tests_added": 1,
+  "sites_migrated": 0,
+  "sites_deferred": 0,
+  "deviations": [
+    "PACKET states the FF-only test totals 'NINE fragments' but the packet's own parts (a: 1 bottom + 2 top + 4 sides = 7; b: 3) sum to 10. My derivation: a's top face splits into disk + annulus (7 a-fragments), b's wall is skipped/uncut so b stays 3 (bottom cap, top cap, wall) => TEN. Machine-checked: the new test asserts mesh.fragments.len() == 10 and passes.",
+    "PACKET states adjacency '17 entries (2 Flip + a's 12 Same + b's 3 Same)' but with ONLY the FF event (no FE sewing) b's wall top rim is NOT cut, so wall<->top-cap shares the single original rim edge (1 Same, not 2); b's Same = wall<->top-cap 1 + wall<->bottom-cap 1 = 2. My derivation: 2 Flip + 12 Same (a) + 2 Same (b) = 16 entries. Machine-checked: the new test asserts mesh.adjacency.len() == 16 (2 Flip, 14 Same) and passes."
+  ],
+  "disagreements": [],
+  "baseline_failures": [],
+  "notes": "The periodic-branch fix: region_contains and on_face_boundary now take u_period: Option<f64> and re-test the QUERY at p.x +/- period (three translates), threaded from the face at hand. classify_curve passes the already-computed surface.u_period() to every check (sample loop and consecutive-sample transition loop); fragment_covering reads face.surface().u_period(); region_representative and containment_screen pass None per the packet. create_parameter_boundary, unwrap_periodic_parameter, the rem_euclid folding, the sewing oracle, the Region2 screen, is_full_period_circle, and every refusal are untouched. The flagship test split_flagship_top_face_by_ff_circle passes again with its exact landed assertions (10 fragments, 17 adjacency entries, 2 Flip, 1 Identical coincident pair). Observed post-fix open-arc test b-side wall fragment count: 2 fragments (one wall fragment with a 6-edge wire, one with a 4-edge wire); both v=0 and v=2 samples now read on-boundary (v=2 via the -2*pi translate), so insert_clipped_arc inserts the FULL generator lines and the wall splits into two half-band fragments with 2 Flip adjacencies. The open-arc test's existing assertions (3 side fragments, 2 a-side Flip, 4 total Flip, Same entries present, no cross-solid adjacency) all still hold; no other pre-existing test's behavior shifted (all nine boolean tests plus the new one pass). Known limitation: containment_screen (and region_representative) pass None for u_period — the Region2 screen's two-face periodic case (coaxial coincident cylinders) is outside this packet's scope and belongs to the RW-COPLANAR follow-up family. Verification: cargo fmt --check, clippy --all-targets --no-deps, cargo check --locked --all-targets, cargo test --lib boolean --no-fail-fast (10 passed), and scripts/kernel-gates.sh 05a88a1 (all P-3 gates pass, GATE-4 111/111)."
+}
