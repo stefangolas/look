@@ -64,6 +64,7 @@ use truck_geometry::recognize::{
 pub mod fe_ee;
 pub mod gff;
 pub mod implicit;
+pub mod singular;
 
 /// One boundary stratum of a solid, lifted to the canonical-carrier level.
 ///
@@ -529,11 +530,36 @@ where
     // The cover is certified by the caller's budget; every refusal from
     // `cover_branch` (budget exhaustion) is propagated as-is.
     let Certified { value: cover, cert } = gff::cover_branch(l, r, &domain, tau, budget)?;
-    // Completion rules (decision 4), applied in order.
+    // Completion rules (decision 4), applied in order. The singular-event
+    // stage (BG-SOL-S7-SING-CLASSIFY) refines every singular cell: it recovers
+    // the regular crossings hiding inside broad singular domains, certifies
+    // isolated tangencies as `Point0`/`Tangency` records, and defers
+    // tangential crossings, carrier-degenerate contacts, and anything it
+    // cannot prove with `ContactReductionDeferred`.
+    let mut cover = cover;
+    let mut tangencies: Vec<Point3> = Vec::new();
+    let mut singular_cert: Option<Certificate> = None;
     if !cover.singular_boxes.is_empty() {
-        return Err(Refusal::UnsupportedEnvelope(
-            EnvelopeCase::ContactReductionDeferred,
-        ));
+        let Certified {
+            value: report,
+            cert: scert,
+        } = singular::singular_events(l, r, &cover.singular_boxes, tau, budget)?;
+        let singular::SingularReport {
+            regular,
+            tangencies: t,
+            tangential_crossings,
+            degenerate,
+            residue,
+        } = report;
+        tangencies = t;
+        cover.points.extend(regular.points);
+        cover.unresolved_boxes.extend(regular.unresolved_boxes);
+        if !residue.is_empty() || !tangential_crossings.is_empty() || !degenerate.is_empty() {
+            return Err(Refusal::UnsupportedEnvelope(
+                EnvelopeCase::ContactReductionDeferred,
+            ));
+        }
+        singular_cert = Some(scert);
     }
     if !cover.unresolved_boxes.is_empty() {
         return Err(Refusal::NumericallyUnresolved {
@@ -541,16 +567,28 @@ where
             witness: UnresolvedWitness::KrawczykIndeterminate,
         });
     }
-    let contacts = if cover.points.is_empty() {
-        Vec::new()
-    } else {
-        vec![ContactRecord {
+    // The certified isolated tangencies first (discovery order), then the
+    // regular branch cover when it certified crossings.
+    let mut contacts: Vec<ContactRecord> = Vec::new();
+    for p in tangencies {
+        contacts.push(ContactRecord {
+            dimension: ContactDimension::Point0,
+            kind: ContactEventKind::Tangency,
+            locus: ContactLocus::Point(p),
+        });
+    }
+    if !cover.points.is_empty() {
+        contacts.push(ContactRecord {
             dimension: ContactDimension::Arc1,
             kind: ContactEventKind::Transverse,
             locus: ContactLocus::ValidatedBranchCover(cover),
-        }]
-    };
-    Ok(Certified::new(ContactComplex { contacts }, cert))
+        });
+    }
+    // The certificate is the `singular_events` cert (actual `budget_left`)
+    // when the singular path ran; otherwise the `cover_branch` cert is
+    // returned unchanged.
+    let out_cert = singular_cert.unwrap_or(cert);
+    Ok(Certified::new(ContactComplex { contacts }, out_cert))
 }
 
 /// The dimensionless divisor that scales a certified AABB's width into the
@@ -1151,11 +1189,12 @@ mod tests {
 
     #[test]
     fn contact_ff_offset_tangent_pair_stays_deferred_for_singular_stage() {
-        // The unit cylinder is tangent to the sphere center (2,0,0) radius 1
-        // at exactly (1,0,0). Patches enclosing (1,0,0) produce a world box
-        // whose slab Jacobian determinant (det = 4y for this pair) contains
-        // zero, so the cover classifies the tangency as singular and the pair
-        // stays deferred for the singular stage.
+        // The name is historical; the assertions are the NEW contract
+        // (BG-SOL-S7-SING-CLASSIFY). The unit cylinder is externally tangent
+        // to the sphere center (2,0,0) radius 1 at exactly (1,0,0). The
+        // singular stage now CERTIFIES that isolated tangency: `contact()`
+        // returns Ok with exactly one `Point0`/`Tangency` record at (1,0,0)
+        // on an interval certificate.
         let cyl = face_with_bounds(
             CanonicalSurface::Cylinder(
                 Cylinder::new(Point3::new(0.0, 0.0, 0.0), 1.0)
@@ -1170,8 +1209,46 @@ mod tests {
             (FRAC_PI_2 - 0.3, FRAC_PI_2 + 0.3),
             (PI - 0.3, PI + 0.3),
         );
-        let mut budget = Budget::new(1024, 0, 0);
-        let out = contact(&cyl, &tangent_sphere, &mut budget);
+        let mut budget = Budget::new(COVER_BUDGET, 0, 0);
+        let out = contact(&cyl, &tangent_sphere, &mut budget)
+            .expect("the singular stage certifies the isolated external tangency");
+        assert_eq!(out.cert.method, Method::Interval);
+        assert_eq!(out.value.contacts.len(), 1);
+        let record = out.value.contacts.first().expect("one record");
+        assert_eq!(record.dimension, ContactDimension::Point0);
+        assert_eq!(record.kind, ContactEventKind::Tangency);
+        match &record.locus {
+            ContactLocus::Point(p) => assert!(
+                (*p - Point3::new(1.0, 0.0, 0.0)).magnitude() <= COVER_RESIDUAL,
+                "the certified tangency is at (1,0,0)"
+            ),
+            other => panic!("the tangency locus is a Point, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn contact_ff_internal_tangency_pair_stays_deferred() {
+        // Witness 2 at the dispatcher level: the unit cylinder is internally
+        // tangent to the sphere center (1,0,0) radius 2 at (-1,0,0), where
+        // the contact locus self-crosses. The singular stage classifies the
+        // pinch as a tangential crossing (indefinite restricted Hessian) and
+        // defers the pair: a saddle is never an isolated tangency.
+        let cyl = face_with_bounds(
+            CanonicalSurface::Cylinder(
+                Cylinder::new(Point3::new(0.0, 0.0, 0.0), 1.0)
+                    .expect("a unit cylinder is a valid carrier")
+                    .value,
+            ),
+            (PI - 0.4, PI + 0.4),
+            (-0.5, 0.5),
+        );
+        let internal_sphere = face_with_bounds(
+            CanonicalSurface::Sphere(Sphere::new(Point3::new(1.0, 0.0, 0.0), 2.0)),
+            (FRAC_PI_2 - 0.3, FRAC_PI_2 + 0.3),
+            (PI - 0.3, PI + 0.3),
+        );
+        let mut budget = Budget::new(COVER_BUDGET, 0, 0);
+        let out = contact(&cyl, &internal_sphere, &mut budget);
         assert!(
             matches!(
                 out,
@@ -1179,7 +1256,7 @@ mod tests {
                     EnvelopeCase::ContactReductionDeferred
                 ))
             ),
-            "a tangent pair stays deferred for the singular stage"
+            "an internal tangency stays deferred: the saddle is not an isolated tangency"
         );
     }
 
