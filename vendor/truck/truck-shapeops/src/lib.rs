@@ -38,3 +38,7 @@ mod alternative;
 /// Fillets can be applied to a single edge whose end vertices are each adjacent to exactly three faces.
 /// Continuous edges are currently unsupported.
 pub mod fillet;
+
+/// BG-SOL-RW1-MATERIAL: the §13.1 material-state fragment-selection
+/// primitive.
+pub mod boolean;
