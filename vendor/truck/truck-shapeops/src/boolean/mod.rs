@@ -17,6 +17,9 @@
     clippy::indexing_slicing
 )]
 
+/// BG-SOL-RW2-SPLIT: the fragment splitter.
+pub mod split;
+
 /// Material membership of one side of a boundary fragment.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct State {

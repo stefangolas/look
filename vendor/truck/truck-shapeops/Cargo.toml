@@ -22,6 +22,7 @@ truck-meshalgo = { version = "0.4.0", path = "../truck-meshalgo" }
 
 truck-geotrait = { version = "0.4.0", path = "../truck-geotrait" }
 truck-stepio = { version = "0.3.0", path = "../truck-stepio", optional = true }
+truck-evidence = { version = "0.1.0", path = "../truck-evidence" }
 
 [dev-dependencies]
 rand = "0.10.2"
