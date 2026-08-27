@@ -706,6 +706,184 @@ pub fn boolean(a: &Solid<Point3, Curve, Surface>, op: BoolOp, b: &Solid<Point3, 
     budget: &mut Budget) -> Outcome<Solid<Point3, Curve, Surface>>;
 ```
 
+**AMENDED (session 36, the Boundary Rewrite design session — the booked
+family):** the design below was fixed before any rewrite packet was
+dispatched; every claim about the tree was verified by command
+(`scratch/rwdiskprobe`: (a) `extrude_profile` on the PURE DISK profile —
+the M2 flagship's `Extrude(Q)` input, covered by no S2 test — returns a
+3-face solid that passes `Solid::try_new` but orients the wall with the
+HOLE convention (effective normal −r̂, into the material); (b) the fixed
+recipe — outer cycle ⇒ wall wires `[be]`, `[te.inverse()]`, NO face
+invert — closes and orients all three faces outward).
+
+The pipeline (all in `truck-shapeops/src/boolean/`, growing beside the
+landed §13.1 primitive; `transversal::{and, or}` stay until the entry
+supersedes them):
+
+```
+boolean(a, op, b, budget):
+  0  GUARDS    v1: single-shell inputs (boundaries().len() == 1), else a
+              typed refusal (multi-shell is the RW-MULTISHELL fold).
+  1  LIFT      recognize_surface/recognize_curve per face/edge →
+              face_stratum/edge_stratum. Unrecognized ⇒
+              Refusal::UnsupportedEnvelope(NonCanonicalCarrier). Face
+              (u,v) box = boundary-wire hull (projected vertices,
+              periodicity-unwrapped — the divide_face
+              `create_parameter_boundary` pattern). This hull is an
+              OVER-APPROXIMATION of the trimmed region: sound for
+              candidate generation and the FE/EE screens; the Region2
+              path runs its own exact 2-D screen (below).
+  2  SWEEP     contact() over every cross-solid stratum pair (FF, FE, EE,
+              both orders), collecting ContactRecords WITH provenance
+              (which face/edge of which solid each record belongs to).
+  3  SPLIT     fragment splitting (RW2): insert the loci into face
+              boundaries as SHARED edge instances.
+  4  CLASSIFY  §12 seed-and-propagate (RW3).
+  5  DECIDE    fragment_decision per fragment (the landed primitive);
+     +ASSEMBLE sew kept fragments; Solid::try_new is the acceptance gate.
+```
+
+Booked inter-packet types (RW2 → RW3 → RW4 consume them in this order;
+these signatures are the contract between packets — internal helpers are
+the packets' own):
+
+```rust
+// split.rs
+pub struct FragmentMesh {
+    pub fragments: Vec<Fragment>,
+    pub adjacency: Vec<FragmentAdjacency>,
+    pub coincident: Vec<CoincidentPair>,
+}
+pub struct Fragment { pub face: Face<Point3, Curve, Surface>, pub origin: FragmentOrigin }
+pub enum FragmentOrigin { A { parent: usize }, B { parent: usize } }
+/// Same = an original sub-edge of one solid (status preserved across it);
+/// Flip = a transverse contact arc (inside-other flips across it).
+pub enum AdjacencyParity { Same, Flip }
+pub struct FragmentAdjacency { pub lhs: usize, pub rhs: usize, pub parity: AdjacencyParity }
+pub enum CoincidentOrientation { Identical, Anti }
+pub struct CoincidentPair { pub a: usize, pub b: usize, pub orientation: CoincidentOrientation }
+
+// classify.rs
+/// One bit per fragment (index-aligned): inside the OTHER solid's closure.
+/// For coincident fragments the bit is computed but NOT used by the
+/// decision — the CoincidentPair's witnesses take precedence there.
+pub struct FragmentClassification { pub inside_other: Vec<bool> }
+```
+
+The split semantics (RW2), face-centric — every `ContactLocus` arm has a
+defined behavior, none is silently dropped:
+
+- **FF Transverse `Analytic(Curve | TwoCurves)`**: insert each exact curve
+  into BOTH faces' boundary structures as SHARED edge instances (the old
+  `add_edge` / `add_independent_loop` wire-mutation pattern, rebuilt in
+  `boolean/` against ContactRecords — transversal is rewritten, not
+  extended, but its wire-mutation services are the pattern to copy).
+  Closed arcs enter as the doubled independent loop; open arcs cut the
+  boundary edges at their endpoints first. `ExactCurve::{Parabola,
+  Hyperbola}` have no `Curve` enum arm — typed refusal (RW-CONIC).
+- **`Point` loci (FE punctures, EE crossings)**: cut the edges at
+  parameter projections of the certified points. Insertion geometry is
+  tolerance-class (`search_parameter` + `cut_with_parameter`); the
+  DECISIONS are certified, the gluing is validated by shell closure.
+- **FE `BoundedCurve` (edge-on-face)**: the sewing oracle — when the
+  face's split produces a boundary along the edge's carrier sub-arc,
+  REUSE the (cut) existing edge instance instead of creating a duplicate
+  (Arc identity across the two solids' fragments).
+- **Region2 Coincident (any path — the identity arms and the analytic
+  `Coincident` cell)**: the containment screen. Project both faces' wires
+  to (u,v) polygons. No EE boundary crossings between the two faces AND
+  one polygon containing the other ⇒ containment coincidence: split the
+  CONTAINING face along the CONTAINED face's boundary wires (REUSING edge
+  instances already inserted by the FF events where the carriers coincide
+  — the flagship's rim circle is BOTH the FF wall×plane arc and the cap's
+  boundary edge; geometric carrier identity decides the reuse, not
+  struct equality of placements), and emit the CoincidentPair
+  (orientation from the two faces' ABSOLUTE normals). Disjoint regions
+  (the over-approx box false positive) ⇒ no pair, no split. Partial
+  overlap (EE crossings exist between the two faces' boundaries) ⇒ typed
+  refusal (RW-COPLANAR).
+- **`ValidatedBranchCover` locus, `Tangency`-kind records,
+  `EndpointTouch`**: typed refusals (RW-ARC-CONT, RW-TANGENT). A branch
+  cover proves cross-sections, not arcs; a tangency arc does not flip the
+  status parity — `ContactEventKind` IS the parity bit the tangency
+  follow-up will consume (Flip for Transverse, Same for Tangency).
+
+The classifier (RW3) — the spec's §12 commitment, not per-face ray
+casting. `FacesClassification::integrate_by_component` is the embryo: its
+component-adjacency logic transfers, its And/Or call site does not.
+
+- Graph: fragments are nodes; `AdjacencyParity` edges.
+- Seeds: ONE per connected component. A component bounded by a
+  transverse contact arc derives its statuses from the arc-side test (the
+  `from_is_curve` predicate on absolute normals: the fragment on the side
+  the OTHER solid's outward normal points toward is OUTSIDE; equivalently
+  `(n_F × der) · n_B < 0 ⇒ INSIDE` at a point of the arc — machine-check
+  the sign convention on the flagship before trusting it). Contact-free
+  components seed from a certified ray parity: a deterministic direction
+  table, analytic ray×carrier solves over the other solid's canonical
+  carriers (Plane/Cylinder/Cone/Sphere; others refuse), signed-crossing
+  count with the parameter-polygon trimmed-region check (the extrude.rs
+  test pattern promoted to production), retry on any degenerate answer,
+  `NumericallyUnresolved` when the table is exhausted.
+- Propagation: spanning tree; status = seed XOR path parity.
+- Verification: EVERY non-tree edge is checked (Same edges must agree,
+  Flip edges must differ); disagreement ⇒
+  `Refusal::Contradictory(ContradictionWitness)` localising the offending
+  adjacency. This is the cycle-parity check: the graph is consistent iff
+  every cycle crosses an even number of Flip edges.
+
+The decision + assembly (RW4): per fragment, `MaterialState4` —
+coincident pairs take PRECEDENCE (A-fragment: own `(1,0)` in absolute
+orientation, other `(1,0)` Identical / `(0,1)` Anti); all other fragments
+take own `(1,0)`, other `(s,s)`. `fragment_decision` decides. Kept faces
+orient absolute-XOR-flip; `Shell::connected_components` groups them;
+`Solid::try_new` validates (non-empty, connected, Closed, manifold) — a
+refusal there is a typed refusal about the split/classify, never a
+panic. All-discarded ⇒ the empty solid (zero shells; A−A=∅). The
+transaction boundary holds: no partial B-rep is committed on any refusal.
+
+The M2 flagship's verified contact complex (the witness's ground truth;
+the circle at (2,2) r=1 inside a 4×4 plate, both extruded z=0→h):
+
+- FF top/bottom plane × cylinder wall ⇒ `Curve(Circle)` / Transverse
+  (`plane_cylinder`'s perpendicular cell).
+- FF cap × top/bottom face ⇒ Region2 Coincident (extrude_profile's
+  fixed-origin caps are struct-equal planes; the identity arm + the
+  OVERLAP screen's box overlap fire).
+- FE rim circle edge × top/bottom face ⇒ `BoundedCurve` full-circle
+  coincident sub-arc (fe_ee's Circle×Plane coincident cell).
+- Every other pair (side planes × wall at distance > r; corner edges ×
+  wall; rim × side faces; EE pairs) ⇒ certified empty.
+- Difference result: 7 faces — 4 sides + 2 annuli + the hole wall (kept
+  from B, flipped); the caps and the disk fragments discarded; the rim
+  edges shared between the annuli and the wall.
+
+Packet family (write sets disjoint; RW2→RW3→RW4→M2 sequential because
+each consumes the previous' types — S2-DISK-ORIENT runs in parallel with
+RW2):
+
+1. **BG-SOL-S2-DISK-ORIENT** (prereq, mechanical): `extrude_profile`
+   orients the wall by cycle role — outer cycle (`boundaries[0]`) ⇒ wires
+   `[be]`, `[te.inverse()]`, NO face invert; holes (`boundaries[1..]`) ⇒
+   today's form. Fixes the M2 flagship's `Extrude(Q)` input.
+2. **BG-SOL-RW2-SPLIT**: the manifest edge truck-shapeops →
+   truck-evidence (acyclic; evidence depends only on base/geotrait/
+   geometry) + `boolean/split.rs` (FragmentMesh + the split semantics).
+3. **BG-SOL-RW3-CLASSIFY**: `boolean/classify.rs` (FragmentClassification
+   + seeds/propagation/verification).
+4. **BG-SOL-RW4-ASSEMBLE**: `boolean/assemble.rs` + the `boolean()` entry
+   (lift + sweep + composition).
+5. **BG-SOL-M2-WITNESS**: the cross-layer flagship test —
+   `Extrude(P−Q) ≅ boolean(Extrude(P), Difference, Extrude(Q))` — plus
+   the metamorphic battery (A∪A≅A, A−A=∅, A∩B≅ the cylinder,
+   A∪B≅B∪A).
+
+Named follow-ups the v1 refusals book: RW-ARC-CONT (branch-cover arc
+continuation), RW-TANGENT (tangency parity + fragment merge), RW-COPLANAR
+(partial-overlap coincident faces and the EE-coincident butt family),
+RW-CONIC (parabola/hyperbola split curves — needs a `Curve` enum
+decision), RW-MULTISHELL (the cavity fold).
+
 **Phase 5 — S8 safe shell.** `truck-shapeops`/`truck-modeling`.
 ```rust
 pub struct OffsetCertificates { pub local: LocalOffsetRegular, pub global: GloballySelfIntersectionFree }
