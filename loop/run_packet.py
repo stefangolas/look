@@ -261,7 +261,11 @@ def main():
     # when it is not usable code. Deciding to discard work stays an explicit
     # act, which is why this is a flag and not the default.
     porcelain = git_lines(wt, 'status', '--porcelain')
-    dirty = [l for l in porcelain if not re.search(r'(?i)\s(PACKET\.md|worker\.(pid|err|packet))$', l)]
+    # CONTEXT.md is dispatch scaffolding beside PACKET.md (regenerated from
+    # the tree on every dispatch, never committed, ignored by verify.py by
+    # name); a dead run's stale copy must not block the next dispatch the
+    # same way a dead run's source edit must.
+    dirty = [l for l in porcelain if not re.search(r'(?i)\s(PACKET\.md|CONTEXT\.md|worker\.(pid|err|packet))$', l)]
 
     if dirty:
         if not args.reset:
