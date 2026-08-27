@@ -1545,7 +1545,7 @@ fn unsupported() -> Refusal {
 }
 
 /// Whether two points are within `tol` of each other.
-fn near_pt(a: Point3, b: Point3, tol: f64) -> bool {
+pub(crate) fn near_pt(a: Point3, b: Point3, tol: f64) -> bool {
     (a - b).magnitude2() <= tol * tol
 }
 
@@ -1559,7 +1559,7 @@ fn unwrap_periodic_parameter(previous: f64, value: f64, period: f64) -> f64 {
 /// Projects the boundary edge's division points into the face's `(u, v)`
 /// parameter space, caching the per-edge 3-D polylines (the rebuilt
 /// `create_parameter_boundary`).
-fn create_parameter_boundary(
+pub(crate) fn create_parameter_boundary(
     face: &Face<Point3, Curve, Surface>,
     wire: &Wire<Point3, Curve>,
     polys: &mut HashMap<EdgeID<Curve>, PolylineCurve<Point3>>,
@@ -1735,7 +1735,11 @@ fn orient_ccw(poly: &PolylineCurve<Point2>) -> PolylineCurve<Point2> {
 /// sit on a different u-branch than the unwrapped boundary polygons, so the ±
 /// period translates of the QUERY are what let the frame-mismatched point see
 /// its true region membership.
-fn region_contains(polys: &[PolylineCurve<Point2>], p: Point2, u_period: Option<f64>) -> bool {
+pub(crate) fn region_contains(
+    polys: &[PolylineCurve<Point2>],
+    p: Point2,
+    u_period: Option<f64>,
+) -> bool {
     let inside = |q: Point2| {
         let Some(outer) = polys.first() else {
             return false;
@@ -1759,7 +1763,7 @@ fn region_contains(polys: &[PolylineCurve<Point2>], p: Point2, u_period: Option<
 }
 
 /// The perpendicular distance from `p` to the segment `a`-`b`.
-fn point_segment_distance(p: Point2, a: Point2, b: Point2) -> f64 {
+pub(crate) fn point_segment_distance(p: Point2, a: Point2, b: Point2) -> f64 {
     let ab = Vector2::new(b.x - a.x, b.y - a.y);
     let ap = Vector2::new(p.x - a.x, p.y - a.y);
     let len2 = ab.dot(ab);
@@ -1854,7 +1858,7 @@ fn polygon_centroid(poly: &PolylineCurve<Point2>) -> Option<Point2> {
 
 /// An interior representative point of the region, if one can be found: the
 /// outer centroid, else inward-nudged outer edge midpoints.
-fn region_representative(polys: &[PolylineCurve<Point2>], tol: f64) -> Option<Point2> {
+pub(crate) fn region_representative(polys: &[PolylineCurve<Point2>], tol: f64) -> Option<Point2> {
     let outer = polys.first()?;
     let mut candidates: Vec<Point2> = Vec::new();
     if let Some(centroid) = polygon_centroid(outer) {

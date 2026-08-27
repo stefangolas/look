@@ -245,6 +245,9 @@ pub enum Prop {
     /// §1.1 invariant 9: wedge non-degeneracy — dihedral bounded off 0 and
     /// 2π (BG-INV-109).
     WedgeNonDegeneracy,
+    /// §12: a boundary fragment lies inside the other solid's closure
+    /// (BG-SOL-RW3).
+    FragmentInsideOther,
 }
 
 /// π: the property map of a certificate.

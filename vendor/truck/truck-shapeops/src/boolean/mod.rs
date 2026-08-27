@@ -20,6 +20,10 @@
 /// BG-SOL-RW2-SPLIT: the fragment splitter.
 pub mod split;
 
+/// BG-SOL-RW3-CLASSIFY: the §12 fragment classifier (seed-and-propagate over
+/// the parity graph, one certified seed per connected component).
+pub mod classify;
+
 /// Material membership of one side of a boundary fragment.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct State {
