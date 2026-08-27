@@ -11,108 +11,174 @@ otherwise would eventually cost a trap.) If you are picking this up cold, read
 [`loop/ORCHESTRATOR.md`](ORCHESTRATOR.md) for how to run the loop, then
 `python loop/slot_status.py`** - nothing else. Do not read `LEDGER.jsonl` whole.
 
-Updated 2026-08-27, close of session 35 (the singular-event stage landed
-whole; the 2-D overlap screen and the Phase 4 material primitive landed
-too - FIVE packets this session). Branch: `integration/kernel-bg`,
-HEAD `1c57c88`.
+Updated 2026-08-27, close of session 36 (the Boundary Rewrite design session
++ its first two packets + the S2 blocker fix landed). Branch:
+`integration/kernel-bg`, HEAD `7b991a6`.
 
 ## Where we are
 
-**The singular-event stage is DONE and the funnel is one screen short of
-complete.** This session landed, in order:
+**The Boundary Rewrite is designed, booked, and half-landed.** Session 36
+ran the design session, wrote it into the plan doc, and landed its first
+two packets plus a prerequisite fix:
 
-1. **BG-SOL-S7-GFF-CHART** (`59fb25c`, verified ACCEPTED at worker commit
-   `421f755`): adaptive regular-chart recovery. The prior session's worker
-   had finished ALL work but never committed - the packet's done-when list
-   omitted the commit step. The orchestrator committed the worker's exact
-   bytes unchanged and the verify judged them. Every packet written since
-   mandates the commit explicitly.
-2. **BG-SOL-S7-SING-SUBSTRATE** (`d6b5e07`, ACCEPTED at `7ae9c66`):
-   `ImplicitField::hess` (constant for the quadrics, quartic-derived for
-   the torus) and `degenerate_points` (cone apex; the torus r=R/2
-   inner-equator circle documented NOT enumerated).
-3. **BG-SOL-S7-SING-CLASSIFY** (`2828c39`, ACCEPTED at `ceb62cd` after an
-   r2 amendment): `contact/singular.rs` - refine singular cells through
-   per-child `cover_branch`, classify residue leaves by the exact
-   degenerate pass, the 4-D Lagrange system `[f1, grad f2 + lam*grad f1]`
-   with a sound multiplier envelope, and restricted-Hessian inertia.
-   Isolated tangencies emit `Point0`/`Tangency` records (the cylinder-
-   tangent-sphere dispatcher test flipped from deferred to a certified
-   tangency record); tangential crossings (cyl x sphere internal
-   tangency, the in-family saddle) and degenerate contacts stay deferred
-   with certified points; residue defers honestly. The dimension split
-   lives in the report type - singular handling is NOT a tangent-point
-   special case.
-4. **BG-SOL-RW1-MATERIAL** (`1c57c88`, ACCEPTED at `b4b87e7`): the Phase 4
-   kick-off - `truck-shapeops/src/boolean/` with the pure 13.1 primitive
-   (`State`, `BoolOp::eval`, `MaterialState4`, `fragment_decision`:
-   keep iff `m_R- != m_R+`, `flip = !m_R-`). The classical 16-cell
-   orientation table and the coincident cells (A-A=empty, A u A=A,
-   butt-joined phantoms) are unit-asserted soundness checks.
-5. **BG-SOL-S7-OVERLAP** (`842b113`, ACCEPTED at `168ee5b`):
-   `contact/overlap.rs` - the parameter-box interior-overlap screen for
-   both coincident paths, fixing the false-Coincident defect where two
-   DISJOINT patches of one carrier reported contact. Per-carrier
-   periodicity, edge t-range screen, the coaxial same-radius cylinder
-   z-shift, and parallel-frame coplanar planes via an exact Cramer map
-   with the diagonal signature; rotated frames defer to the named
-   OVERLAP-PLANE follow-up.
+1. **The design session** (`aeb0a1a`): `docs/SOLVER_FAMILY_PLAN.md` §4
+   Phase 4 now carries the session-36 amendment — the full pipeline
+   (GUARDS → LIFT → SWEEP → SPLIT → CLASSIFY → DECIDE+ASSEMBLE), the
+   booked inter-packet types (`FragmentMesh`/`Fragment`/
+   `FragmentAdjacency`/`CoincidentPair` → `FragmentClassification`), the
+   per-arm split semantics, the §12 parity-graph classifier, the M2
+   flagship's VERIFIED contact complex, and the named refusal follow-ups
+   (RW-ARC-CONT, RW-TANGENT, RW-COPLANAR, RW-CONIC, RW-MULTISHELL).
+   Every design fact was machine-checked by scratch probes
+   (`scratch/rwdiskprobe`, untracked but preserved): (a) `extrude_profile`
+   inverted the disk wall unconditionally (a silent orientation defect —
+   passes `Solid::try_new`); (b) the fix recipe closes and orients
+   outward; (c) `Extrude(P)` (the rectangle) is correct.
+2. **BG-SOL-S2-DISK-ORIENT** (`6186d84`, ACCEPTED at `63797a5`): the
+   disk-profile wall orientation fix — outer cycle ⇒ wires `[be]`,
+   `[te.inverse()]`, no invert; holes keep the inverted form. Zero new
+   tolerance sites (ceiling 111 → 111). The M2 flagship's `Extrude(Q)`
+   input is now correct.
+3. **BG-SOL-RW2-SPLIT** (`820b6f5`, ACCEPTED at `557877e`): the fragment
+   splitter — `boolean/split.rs` (2,779 lines), the manifest edge
+   truck-shapeops → truck-evidence, every `ContactLocus` arm matched with
+   no wildcard, the flagship mesh counts EXACTLY as designed (10
+   fragments, 2 Flip + 15 Same adjacencies, the Identical coincident
+   pair, rim half-edges shared by EdgeID across BOTH solids' wires).
+   Zero new tolerance sites. The worker caught a geometric error in my
+   own packet prose (test 5: concentric circles never cross — its
+   neither-contains re-derivation reached the same required refusal) and
+   made four documented implementation corrections that RW3 should read
+   (see `loop/results/BG-SOL-RW2-SPLIT.json` notes: absolute-clone cuts,
+   orientation-aware divide, min-24-sample arc classification, periodic
+   u-folding before on-boundary tests).
 
 Progress estimate, difficulty-weighted:
 
-- M2 critical path: about **75-80% complete** (the funnel's analytic,
-  FE/EE, GFF, chart, singular, and overlap stages all landed; the
-  Boundary Rewrite family is the remaining rock before the M2 witness).
-- Entire approved solver family: about **57-62% complete**.
-- At the demonstrated sequential-funnel rate (~2.5 critical-path
-  packets/day) plus the rewrite's design sessions: M2 is about
-  **2-4 working days** away, the full family **4-6 continuous / 7-12
-  with observed friction** (API-balance deaths, usage cutoffs, disk).
+- M2 critical path: about **85-90% complete** (the Contact Layer funnel
+  + the material primitive + the splitter are landed; the classifier,
+  the assembler/entry, and the M2 witness remain).
+- Entire approved solver family: about **60-64% complete**.
+- At the demonstrated rate: M2 is about **1-1.5 working days** away (3
+  sequential packets: RW3 → RW4 → M2-WITNESS).
 
 ## Pick up here
 
-1. **The Boundary Rewrite design session is the next big rock** - the
-   frontier is empty by design until it writes its first packet. The
-   survey is done: `transversal::{divide_faces, and/or, LoopsStore,
-   FacesClassification}` is the old procedural Boolean (rewritten, not
-   extended); the spec's commitments are 13.1 material-state (RW1 lands
-   the primitive), 12 seed-and-propagate classification with
-   non-tree-edge verification (`FacesClassification::integrate_by_component`
-   is the embryo), and the M2 flagship
-   `Extrude(P-Q) = Extrude(P)-Extrude(Q)` cross-layer test. Packet
-   family: fragment splitting (consumes ContactLocus records), the
-   propagation classifier, assembly, the boolean entry, M2 witness.
-2. BG-SOL-S7-OVERLAP-PLANE (rotated-frame coplanar SAT) - named
+1. **BG-SOL-RW3-CLASSIFY is the frontier** (registry READY, scheduler
+   eligible, write set disjoint). Write its packet against the LANDED
+   `vendor/truck/truck-shapeops/src/boolean/split.rs` (the booked types
+   are verbatim there; re-derive every anchor against `7b991a6`) and the
+   plan's §4 Phase 4 session-36 amendment (the §12 seed-and-propagate
+   design: parity graph, arc-side seeds `(n_F × der) · n_B < 0 ⇒ INSIDE`,
+   ray-parity seeds for contact-free components, spanning-tree
+   propagation, every non-tree edge verified, cycle disagreement ⇒
+   `Refusal::Contradictory(ContradictionWitness)`).
+2. Then BG-SOL-RW4-ASSEMBLE (material decision with coincident-pair
+   precedence, sew, `Solid::try_new` acceptance, the `boolean()` entry
+   with lift+sweep), then BG-SOL-M2-WITNESS (the cross-layer flagship
+   `Extrude(P−Q) ≅ boolean(Extrude(P), Difference, Extrude(Q))` plus the
+   metamorphic battery). All three rows are READY in the registry.
+3. BG-SOL-S7-OVERLAP-PLANE (rotated-frame coplanar SAT) - named
    follow-up, NOT on M2's path.
-3. Parallel side branches after/alongside: S8 safe shell, local fillet
+4. Parallel side branches after/alongside: S8 safe shell, local fillet
    scoping, RMF sweep, minimal-knot loft.
-4. Open latent flake, NOT fixed: `truck-base/tests/newton.rs::test_newton1`.
+5. Open latent flake, NOT fixed: `truck-base/tests/newton.rs::test_newton1`.
    Its own packet.
-5. Recommended, NOT dispatched: follow-up audit of
+6. Recommended, NOT dispatched: follow-up audit of
    `truck-evidence/src/fid/rep.rs` (4362 lines). Its own program.
 
 ## State of the machine, as left
 
-- Watchdog RUNNING (`loop/watchdog.lock`).
-- Registry: 109 rows = 108 DONE + 1 BLOCKED (BG-AUD-FIX-004 owner) +
-  0 READY; scheduler eligible 0, dispatchable 0.
+- Watchdog RUNNING (`loop/watchdog.lock`, pid 20024).
+- Registry: 114 rows = 110 DONE + 1 BLOCKED (BG-AUD-FIX-004 owner) + 3
+  READY (RW3-CLASSIFY, RW4-ASSEMBLE, M2-WITNESS); scheduler eligible 1,
+  dispatchable 1.
 - Slots 0-3 FINISHED, all re-forkable.
-- Disk about 13.6 GB free (slot 0 target 8.3 GB, slot 1 target 0.9 GB).
-- GATE-4 ceiling 111 (true count); `kernel-gates.sh HEAD` passes all P-3
-  gates and 111/111 at `1c57c88`.
-- Results filed at `loop/results/BG-SOL-S7-{GFF-CHART,SING-SUBSTRATE,
-  SING-CLASSIFY,OVERLAP}.json` and `loop/results/BG-SOL-RW1-MATERIAL.json`.
+- Disk about 13 GB free (verify baselines cleaned; the session dipped to
+  2.5 GB mid-session — see the session-36 traps before running a verify
+  alongside a live worker).
+- GATE-4 ceiling 111 = true count; `kernel-gates.sh HEAD` passes all
+  P-3 gates and 111/111 at `7b991a6`.
+- Results filed at `loop/results/BG-SOL-S2-DISK-ORIENT.json` and
+  `loop/results/BG-SOL-RW2-SPLIT.json`.
 - Root tracked tree clean. Numerous pre-existing untracked user/baseline/
-  scratch files remain and must be preserved.
+  scratch files remain and must be preserved (including
+  `scratch/rwdiskprobe` — the design-session probe evidence).
 
 ## The parallelism picture
 
-Nothing running (watchdog only). The frontier is empty until the Boundary
-Rewrite design session writes its packets. Critical path: Boundary
-Rewrite -> M2 witness; overlap-plane, shell, fillet, sweep, and loft fill
-the sides.
+Nothing running (watchdog only). The rewrite chain is sequential by
+design (RW3 consumes RW2's landed types; RW4 consumes RW3's; M2-WITNESS
+consumes RW4's). If a second wave is wanted while RW3 runs, the side
+branches (S8 shell, fillet, sweep, loft, overlap-plane) are all
+write-disjoint from `boolean/` — but each verify is heavy; on this
+disk, do NOT run a verify concurrently with a live worker below ~15 GB
+free (session-36 trap 1).
+
+
 
 ## Traps, each one paid for
+### Session 36 (Boundary Rewrite design + first two packets) - paid in full
+
+- **A verify running CONCURRENTLY with a live worker dies at the 8 GB
+  V9 floor even from a healthy start.** The S2-DISK-ORIENT verify was
+  launched three times: V0-V4 passed every time, then the V5/V8/V9
+  baseline stages died at 5.6-6.7 GB free — the live RW2 worker's cargo
+  bursts consumed 2-3 GB between the launch (9.5 GB) and each floor
+  check. The recovery that finally worked: WAIT for the worker to
+  finish, then verify on a quiet machine (free space recovered to
+  22.8 GB the moment the worker's processes exited; the verify then
+  passed everything first try). Do not launch a verify alongside a live
+  worker below ~15 GB free; the floor check is at baseline START only,
+  so a mid-build dip kills the attempt after the expensive gates already
+  passed.
+- **A scratch crate under `scratch/` compiles the FULL dependency tree**
+  (wgpu, naga, ash, image...) into its own `target/` — the rwdiskprobe
+  design probes contributed to the mid-session 2.5 GB squeeze. The probes
+  were worth every minute (they caught the silent S2 disk-wall
+  orientation defect, verified the fix recipe, and verified Extrude(P))
+  — but DELETE the scratch target when the design session ends, and
+  budget its disk before the first `cargo run`.
+- **A yaml anchor counting `#[test]` must use `grep -cF` (or escaped
+  brackets).** `grep -c '#[test]'` is a REGEX where `[test]` is a char
+  class: the line `#[test]` does not match (after `#` comes `[`, not
+  t/e/s), so the anchor reads 0 and dispatch refuses. My anchor-check
+  script had the brackets escaped and the packet didn't — the same
+  command in two layers disagreed. Fixed-string `-F` is the robust form.
+- **`unscaled_legacy_budget` is for TOL-shard site tables ONLY.** A
+  non-shard packet that declares it is refused at dispatch ("no readable
+  site table (`| `fn` | line | code | class |` rows)"). For packets that
+  merely ADD tolerance sites (the rewrite's insertion geometry), OMIT the
+  field and raise the ceiling for headroom instead; the true count
+  ratchets down at landing. Both rewrite packets added ZERO new sites
+  (111 → 111): the workers routed tolerance checks through existing
+  contexts — do not assume a big budget need.
+- **land_packet.py's packet-path form must match what THIS verify.py
+  recorded.** The session-30 backslash rule is stale: the current
+  verify.py records forward slashes (`loop/packets/...`), and passing
+  the Windows form is rejected ("the verdict in slot 0 is for
+  'loop/packets/...', not 'loop\packets\...'"). Read VERDICT.json's
+  `packet` field and pass exactly that form.
+- **A REFUSAL test's premise needs machine-checking as much as an
+  acceptance test's.** My RW2 packet's test 5 prose said the r=1.5 disk
+  "crosses the hole circle r=1 twice" — they are CONCENTRIC and never
+  cross; the worker machine-checked, re-derived (neither region contains
+  the other ⇒ partial overlap), and reached the same required refusal
+  with the correct reasoning. The BG-NUM-002 rule applies to negative
+  witnesses too.
+- **LEDGER.jsonl had accumulated pre-existing duplicate rows** (early
+  sessions' manual+land_packet double-appends: BG-S0-002,
+  BG-ENC-002-CIRCLE, BG-SOL-S7-GFF-COVER, plus today's manual pair).
+  Deduped keeping the authoritative (last, ACCEPTED) row per id; the
+  removed rows remain recoverable in git history. land_packet.py does
+  NOT dedupe — if you hand-write a ledger row before landing, delete
+  your row after (or let land_packet's row be the only one).
+- **`Face::debug_new` is banned in ADDED kernel lines (GATE-3/H-4)** —
+  the old divide_face pattern cannot be copied verbatim. The RW2 worker
+  used `Face::new_unchecked` for fragment construction (validation is
+  `Solid::try_new`'s job at assembly, RW4). Pre-existing `debug_new`
+  uses are grandfathered; new ones are not.
+
 ### Session 35 (singular stage whole, overlap screen, material primitive) - paid in full
 
 - **A worker that follows the packet literally will not commit unless the
