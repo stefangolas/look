@@ -909,11 +909,11 @@ impl<'a> SplitEngine<'a> {
         let mut all_outside = true;
         let mut crossings: Vec<(f64, Point3)> = Vec::new();
         for (t, uv, pt) in &mapped {
-            if self.on_face_boundary(face_polys, *uv) {
+            if self.on_face_boundary(face_polys, *uv, u_period) {
                 all_inside = false;
                 all_outside = false;
                 crossings.push((*t, *pt));
-            } else if region_contains(face_polys, *uv) {
+            } else if region_contains(face_polys, *uv, u_period) {
                 all_on = false;
                 all_outside = false;
             } else {
@@ -928,8 +928,8 @@ impl<'a> SplitEngine<'a> {
             let (a, b) = (pair.first()?, pair.get(1)?);
             let (ta, aa, a3) = *a;
             let (tb, bb, b3) = *b;
-            let in_a = region_contains(face_polys, aa);
-            let in_b = region_contains(face_polys, bb);
+            let in_a = region_contains(face_polys, aa, u_period);
+            let in_b = region_contains(face_polys, bb, u_period);
             if in_a != in_b {
                 if let Some(s) = segment_boundary_crossing(aa, bb, face_polys) {
                     let t = ta + s * (tb - ta);
@@ -951,13 +951,33 @@ impl<'a> SplitEngine<'a> {
     }
 
     /// Whether `uv` lies within `tol` of one of the face's boundary polygon
-    /// segments.
-    fn on_face_boundary(&self, face_polys: &[PolylineCurve<Point2>], uv: Point2) -> bool {
-        face_polys.iter().any(|poly| {
-            poly.iter()
-                .circular_tuple_windows()
-                .any(|(a, b)| point_segment_distance(uv, *a, *b) <= self.tol)
-        })
+    /// segments. When the face's surface is periodic in u (`u_period` is
+    /// `Some(T)`), the test also runs at `uv.x ± T`: the boundary wires unwind
+    /// from their own front vertex and can live on a different u-branch than
+    /// the folded query point, so the ± period translates are what let a
+    /// frame-mismatched query see the 3-D coincidence.
+    fn on_face_boundary(
+        &self,
+        face_polys: &[PolylineCurve<Point2>],
+        uv: Point2,
+        u_period: Option<f64>,
+    ) -> bool {
+        let on = |q: Point2| {
+            face_polys.iter().any(|poly| {
+                poly.iter()
+                    .circular_tuple_windows()
+                    .any(|(a, b)| point_segment_distance(q, *a, *b) <= self.tol)
+            })
+        };
+        if on(uv) {
+            return true;
+        }
+        match u_period {
+            Some(period) => {
+                on(Point2::new(uv.x + period, uv.y)) || on(Point2::new(uv.x - period, uv.y))
+            }
+            None => false,
+        }
     }
 
     /// Builds the closed loop wire for a closed FF curve inside a face's
@@ -1491,7 +1511,8 @@ impl<'a> SplitEngine<'a> {
                 continue;
             };
             let uv: Point2 = uv.into();
-            if region_contains(&polys, uv) {
+            let u_period = face.surface().u_period();
+            if region_contains(&polys, uv, u_period) {
                 return Ok(idx);
             }
         }
@@ -1709,17 +1730,32 @@ fn orient_ccw(poly: &PolylineCurve<Point2>) -> PolylineCurve<Point2> {
 }
 
 /// Whether the parameter point is strictly inside the region bounded by the
-/// face's wire polygons (outer minus holes).
-fn region_contains(polys: &[PolylineCurve<Point2>], p: Point2) -> bool {
-    let Some(outer) = polys.first() else {
-        return false;
+/// face's wire polygons (outer minus holes). When `u_period` is `Some(T)` the
+/// test also runs at `p.x ± T`: a query parameter produced in one frame can
+/// sit on a different u-branch than the unwrapped boundary polygons, so the ±
+/// period translates of the QUERY are what let the frame-mismatched point see
+/// its true region membership.
+fn region_contains(polys: &[PolylineCurve<Point2>], p: Point2, u_period: Option<f64>) -> bool {
+    let inside = |q: Point2| {
+        let Some(outer) = polys.first() else {
+            return false;
+        };
+        let outer = orient_ccw(outer);
+        outer.include(q)
+            && polys.iter().skip(1).all(|hole| {
+                let hole = orient_ccw(hole);
+                !hole.include(q)
+            })
     };
-    let outer = orient_ccw(outer);
-    outer.include(p)
-        && polys.iter().skip(1).all(|hole| {
-            let hole = orient_ccw(hole);
-            !hole.include(p)
-        })
+    if inside(p) {
+        return true;
+    }
+    match u_period {
+        Some(period) => {
+            inside(Point2::new(p.x + period, p.y)) || inside(Point2::new(p.x - period, p.y))
+        }
+        None => false,
+    }
 }
 
 /// The perpendicular distance from `p` to the segment `a`-`b`.
@@ -1837,7 +1873,9 @@ fn region_representative(polys: &[PolylineCurve<Point2>], tol: f64) -> Option<Po
             ));
         }
     }
-    candidates.into_iter().find(|p| region_contains(polys, *p))
+    candidates
+        .into_iter()
+        .find(|p| region_contains(polys, *p, None))
 }
 
 /// The Region2 containment screen between two faces' wire polygons.
@@ -1860,18 +1898,18 @@ fn containment_screen(
     let b_pts = boundary_points(b);
     let rep_a = region_representative(a, tol);
     let rep_b = region_representative(b, tol);
-    let a_boundary_in_b = a_pts.iter().any(|p| region_contains(b, *p));
-    let b_boundary_in_a = b_pts.iter().any(|p| region_contains(a, *p));
-    let a_rep_in_b = rep_a.is_some_and(|p| region_contains(b, p));
-    let b_rep_in_a = rep_b.is_some_and(|p| region_contains(a, p));
+    let a_boundary_in_b = a_pts.iter().any(|p| region_contains(b, *p, None));
+    let b_boundary_in_a = b_pts.iter().any(|p| region_contains(a, *p, None));
+    let a_rep_in_b = rep_a.is_some_and(|p| region_contains(b, p, None));
+    let b_rep_in_a = rep_b.is_some_and(|p| region_contains(a, p, None));
     match (b_boundary_in_a && b_rep_in_a, a_boundary_in_b && a_rep_in_b) {
         (true, _) => RegionScreen::AContainsB,
         (_, true) => RegionScreen::BContainsA,
         (false, false) => {
-            let overlap = a_pts.iter().any(|p| region_contains(b, *p))
-                || b_pts.iter().any(|p| region_contains(a, *p))
-                || rep_a.is_some_and(|p| region_contains(b, p))
-                || rep_b.is_some_and(|p| region_contains(a, p));
+            let overlap = a_pts.iter().any(|p| region_contains(b, *p, None))
+                || b_pts.iter().any(|p| region_contains(a, *p, None))
+                || rep_a.is_some_and(|p| region_contains(b, p, None))
+                || rep_b.is_some_and(|p| region_contains(a, p, None));
             if overlap {
                 RegionScreen::PartialOverlap
             } else {
@@ -2773,6 +2811,168 @@ mod tests {
                     ))
                 ),
                 "the deferred locus family refuses with ContactReductionDeferred"
+            );
+        }
+    }
+
+    // ---------------------------------------------------------------------------
+    // Test 7: an FF-only circle reads OnBoundary against the wall (skipped).
+    // ---------------------------------------------------------------------------
+
+    #[test]
+    fn split_ff_only_circle_skips_the_on_boundary_wall() {
+        // a = the 4x4 block extrude (height 2), b = the disk extrude at (2,2)
+        // r=1 (height 2) — the flagship inputs, with ONLY the FF record between
+        // a's top face and b's cylinder wall.
+        let (profile_a, arr_a) = block_profile();
+        let shell_a = extrude_shell(&profile_a, &arr_a, 2.0);
+        let (profile_b, arr_b) = disk_profile(Point2::new(2.0, 2.0), 1.0);
+        let shell_b = extrude_shell(&profile_b, &arr_b, 2.0);
+
+        // Derivation of the expected fragment structure (BG-NUM-002 checked
+        // against the construction): the r=1 circle at (2,2,2) is strictly
+        // INSIDE a's top face (the doubled independent loop: a's top face -> the
+        // DISK and the ANNULUS) and lies ON b's wall's top rim, so the wall is
+        // SKIPPED (not split, keeps its two original self-loop wires). Fragments:
+        // a = 1 bottom + 2 top + 4 sides = 7; b = 3 (bottom cap, top cap, wall).
+        // Total 10 fragments.
+        //   Adjacency: a's disk<->annulus 2 Flip (the fresh circle halves);
+        //   a's annulus<->sides 4 Same + bottom<->sides 4 Same + sides<->sides 4
+        //   Same = 12 Same; b's wall<->top-cap 1 Same + wall<->bottom-cap 1 Same
+        //   = 2 Same (the wall's rims are NOT cut here: there is no FE sewing, so
+        //   the wall and the top cap share the single original rim edge). Total 16
+        //   entries (2 Flip, 14 Same).
+        //   Coincident: EMPTY (no Region2 event). No sewing: the two circle
+        //   half-edges appear in a's disk and annulus fragments but NOT in b's
+        //   wall or cap wires.
+
+        let top_a = plane_face_at_z(&shell_a, 2.0);
+        let wall_b = cylinder_face(&shell_b);
+        let cap_b = plane_face_at_z(&shell_b, 2.0);
+
+        let exact = ExactCurve::Circle(placed_circle(Point3::new(2.0, 2.0, 2.0), 1.0));
+        let ff = ev(
+            ff_curve_record(exact),
+            StratumRef::Face {
+                solid: SolidRef::A,
+                index: top_a,
+            },
+            StratumRef::Face {
+                solid: SolidRef::B,
+                index: wall_b,
+            },
+        );
+
+        let mesh = split_fragments(&shell_a, &shell_b, &[ff], TOL)
+            .unwrap()
+            .value;
+
+        // Total fragments: 7 from a + 3 from b = 10.
+        assert_eq!(mesh.fragments.len(), 10);
+
+        // a's top face becomes exactly two fragments.
+        let top_frags = fragments_of_origin(&mesh, SolidRef::A, top_a);
+        assert_eq!(top_frags.len(), 2);
+        let mut annulus = None;
+        let mut disk = None;
+        for idx in top_frags {
+            let counts = wire_edge_counts(&mesh, idx);
+            match counts.as_slice() {
+                [2] => disk = Some(idx),
+                [4, 2] => annulus = Some(idx),
+                other => unreachable!("unexpected top-face wire structure: {other:?}"),
+            }
+        }
+        let annulus = annulus.unwrap();
+        let disk = disk.unwrap();
+        assert_ne!(annulus, disk);
+
+        // Every other face is exactly one fragment: a's 5 untouched faces plus
+        // b's 3 faces (the wall is NOT split).
+        assert_eq!(
+            fragments_of_origin(&mesh, SolidRef::A, plane_face_at_z(&shell_a, 0.0)).len(),
+            1
+        );
+        for side in 0..4 {
+            let idx = 2 + side;
+            assert_eq!(fragments_of_origin(&mesh, SolidRef::A, idx).len(), 1);
+        }
+        assert_eq!(fragments_of_origin(&mesh, SolidRef::B, wall_b).len(), 1);
+        assert_eq!(fragments_of_origin(&mesh, SolidRef::B, cap_b).len(), 1);
+        assert_eq!(
+            fragments_of_origin(&mesh, SolidRef::B, plane_face_at_z(&shell_b, 0.0)).len(),
+            1
+        );
+
+        // The wall fragment keeps its two original self-loop wires (top rim,
+        // bottom rim), one full-circle edge each.
+        let wall_frag = fragments_of_origin(&mesh, SolidRef::B, wall_b)[0];
+        assert_eq!(wire_edge_counts(&mesh, wall_frag), vec![1, 1]);
+
+        // The two circle half-edge instances appear in a's disk and annulus
+        // fragments but NOT in b's wall or cap wires (no sewing event).
+        let disk_ids = fragment_edge_ids(&mesh, disk);
+        assert_eq!(disk_ids.len(), 2);
+        let annulus_hole_ids = mesh.fragments[annulus]
+            .face
+            .absolute_boundaries()
+            .get(1)
+            .unwrap()
+            .edge_iter()
+            .map(|e| e.id())
+            .collect::<Vec<_>>();
+        let same_pair = |a: &[EdgeID<Curve>], b: &[EdgeID<Curve>]| {
+            a.len() == b.len() && a.iter().all(|id| b.contains(id))
+        };
+        assert!(same_pair(&annulus_hole_ids, &disk_ids));
+        let wall_ids = fragment_edge_ids(&mesh, wall_frag);
+        assert!(
+            !wall_ids.iter().any(|id| disk_ids.contains(id)),
+            "the fresh circle halves never appear in b's wall (no sewing)"
+        );
+        let cap_frag = fragments_of_origin(&mesh, SolidRef::B, cap_b)[0];
+        assert!(
+            !fragment_edge_ids(&mesh, cap_frag)
+                .iter()
+                .any(|id| disk_ids.contains(id)),
+            "the fresh circle halves never appear in b's cap (no sewing)"
+        );
+
+        // No Region2 event, so no coincident pair.
+        assert!(mesh.coincident.is_empty());
+
+        // Adjacency: 2 Flip (disk<->annulus, once per half-edge), 14 Same, no
+        // cross-solid pair.
+        assert_eq!(mesh.adjacency.len(), 16);
+        let flips = mesh
+            .adjacency
+            .iter()
+            .filter(|a| a.parity == AdjacencyParity::Flip)
+            .collect::<Vec<_>>();
+        assert_eq!(flips.len(), 2);
+        for a in &flips {
+            assert!(
+                (a.lhs == disk && a.rhs == annulus) || (a.lhs == annulus && a.rhs == disk),
+                "the only Flip entries are disk<->annulus"
+            );
+        }
+        let sames = mesh
+            .adjacency
+            .iter()
+            .filter(|a| a.parity == AdjacencyParity::Same);
+        assert_eq!(sames.count(), 14);
+        for a in &mesh.adjacency {
+            let lhs_solid = match mesh.fragments[a.lhs].origin {
+                FragmentOrigin::A { .. } => SolidRef::A,
+                FragmentOrigin::B { .. } => SolidRef::B,
+            };
+            let rhs_solid = match mesh.fragments[a.rhs].origin {
+                FragmentOrigin::A { .. } => SolidRef::A,
+                FragmentOrigin::B { .. } => SolidRef::B,
+            };
+            assert_eq!(
+                lhs_solid, rhs_solid,
+                "adjacency is same-solid only; cross-solid edges are sewing"
             );
         }
     }
