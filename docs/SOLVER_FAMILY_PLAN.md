@@ -656,6 +656,31 @@ isolated), `degenerate` (proven carrier-degenerate contact points),
 special case: only the isolated arm becomes a record, and every other arm
 defers with a named reason.
 
+**AMENDED (session 35, BG-SOL-S7-OVERLAP, the 2-D overlap screen):** the
+landed coincident paths overclaim: BOTH the struct-equal identity arms and
+the analytic `Coincident` cells emit Region2/Arc1 records without screening
+the parameter boxes, so two DISJOINT patches of the same canonical carrier
+(a shared wall's two sides, two same-wall cylinder patches at different
+heights, two disjoint arcs of one circle) report contact today. The overlap
+screen decides, per coincident path, whether the patches' parameter boxes
+overlap with non-empty interior: only then is the Coincident record emitted;
+otherwise the stage returns a certified empty complex (exact method, no
+budget). Boundary-only contact (boxes touching at an edge/corner) is
+intentionally empty here — shared-boundary contact is owned by the FE/EE
+stages' own strata pairs. The screen is exact-f64 arithmetic on stored
+analytic data (the BG-ANA-002 5.1 decision class: sub-ulp boundary
+configurations may decide either way; test witnesses are dyadic). Covered:
+the identity arms for all five carriers with per-carrier periodicity
+(cylinder/cone: u wraps 2π, v aperiodic; sphere: u polar aperiodic, v wraps
+2π; torus: both wrap; plane: neither), the Edge×Edge identity arm (line
+plain, circle wrap on TAU), the coaxial same-radius Cylinder×Cylinder
+C1 case (same (cx, cy, r), any cz: u identical, v shifted by cz2 − cz1),
+and struct-unequal coplanar Plane×Plane with PARALLEL frames (the
+construction-data case: exact 2×2 solve per endpoint). Rotated-frame
+coplanar planes (general affine map → 3-D SAT with sound interval
+projections) are the named follow-up `BG-SOL-S7-OVERLAP-PLANE` packet and
+keep today's unscreened emission until it lands.
+
 **Phase 4 — Boundary Rewrite.** New `truck-shapeops` module; material-state
 heart (spec §13.1).
 ```rust
