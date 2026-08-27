@@ -15,109 +15,201 @@ Updated 2026-08-27, close of session 36 (the Boundary Rewrite design session
 + its first two packets + the S2 blocker fix landed). Branch:
 `integration/kernel-bg`, HEAD `7b991a6`.
 
+# Autobuild loop - STATE
+
+Rewritten at the end of every session. The **volatile** part - everything from
+"Where we are" through "The parallelism picture" - is capped at ~120 lines and
+must be rewritten each time. "Traps" and everything below it is **stable and
+accumulates**: entries are added when something costs a session and removed only
+when they stop being true, never for length. (The old header claimed the cap
+covered everything above "Quick reference"; it never did, and pretending
+otherwise would eventually cost a trap.) If you are picking this up cold, read
+**this file, then
+[`loop/ORCHESTRATOR.md`](ORCHESTRATOR.md) for how to run the loop, then
+`python loop/slot_status.py`** - nothing else. Do not read `LEDGER.jsonl` whole.
+
+Updated 2026-08-27, close of session 37 (the periodic-branch regression fix
+landed; the RW3 classifier packet written and probe-validated, held READY).
+Branch: `integration/kernel-bg`, HEAD `175d295`.
+
 ## Where we are
 
-**The Boundary Rewrite is designed, booked, and half-landed.** Session 36
-ran the design session, wrote it into the plan doc, and landed its first
-two packets plus a prerequisite fix:
+**Session 37 found and fixed a latent HEAD regression, then finished the
+RW3 design work.** The M2 chain is one packet away from resuming:
 
-1. **The design session** (`aeb0a1a`): `docs/SOLVER_FAMILY_PLAN.md` §4
-   Phase 4 now carries the session-36 amendment — the full pipeline
-   (GUARDS → LIFT → SWEEP → SPLIT → CLASSIFY → DECIDE+ASSEMBLE), the
-   booked inter-packet types (`FragmentMesh`/`Fragment`/
-   `FragmentAdjacency`/`CoincidentPair` → `FragmentClassification`), the
-   per-arm split semantics, the §12 parity-graph classifier, the M2
-   flagship's VERIFIED contact complex, and the named refusal follow-ups
-   (RW-ARC-CONT, RW-TANGENT, RW-COPLANAR, RW-CONIC, RW-MULTISHELL).
-   Every design fact was machine-checked by scratch probes
-   (`scratch/rwdiskprobe`, untracked but preserved): (a) `extrude_profile`
-   inverted the disk wall unconditionally (a silent orientation defect —
-   passes `Solid::try_new`); (b) the fix recipe closes and orients
-   outward; (c) `Extrude(P)` (the rectangle) is correct.
-2. **BG-SOL-S2-DISK-ORIENT** (`6186d84`, ACCEPTED at `63797a5`): the
-   disk-profile wall orientation fix — outer cycle ⇒ wires `[be]`,
-   `[te.inverse()]`, no invert; holes keep the inverted form. Zero new
-   tolerance sites (ceiling 111 → 111). The M2 flagship's `Extrude(Q)`
-   input is now correct.
-3. **BG-SOL-RW2-SPLIT** (`820b6f5`, ACCEPTED at `557877e`): the fragment
-   splitter — `boolean/split.rs` (2,779 lines), the manifest edge
-   truck-shapeops → truck-evidence, every `ContactLocus` arm matched with
-   no wildcard, the flagship mesh counts EXACTLY as designed (10
-   fragments, 2 Flip + 15 Same adjacencies, the Identical coincident
-   pair, rim half-edges shared by EdgeID across BOTH solids' wires).
-   Zero new tolerance sites. The worker caught a geometric error in my
-   own packet prose (test 5: concentric circles never cross — its
-   neither-contains re-derivation reached the same required refusal) and
-   made four documented implementation corrections that RW3 should read
-   (see `loop/results/BG-SOL-RW2-SPLIT.json` notes: absolute-clone cuts,
-   orientation-aware divide, min-24-sample arc classification, periodic
-   u-folding before on-boundary tests).
+1. **The regression**: the landed flagship test
+   `split_flagship_top_face_by_ff_circle` FAILED at HEAD
+   (`cargo test -p truck-shapeops --lib boolean` — the orchestrator's
+   pre-dispatch probe caught it; nothing had run cargo test at merged
+   HEAD since the parallel S2/RW2 landings of session 36). Root cause:
+   RW2 was verified at its own pre-S2 fork point (the packets ran in
+   parallel), and the S2 wall fix changed the extruded wall's top-wire
+   traversal direction, so `classify_curve`'s folded samples no longer
+   registered as on-boundary against the wall's unwrapped polygon (a
+   periodic-branch frame mismatch) → `Crossing` → `insert_clipped_arc`
+   refused.
+2. **BG-SOL-SPLIT-PERIODIC** (`0759d90`, ACCEPTED, landed as `175d295`):
+   `region_contains` and `on_face_boundary` take `u_period` and re-test
+   the QUERY at `p.x ± period` (three translates), threaded from the
+   face at hand (classify_curve, fragment_covering);
+   `region_representative`/`containment_screen` pass `None` (the
+   Region2 two-face periodic case is the recorded limitation). All ten
+   boolean tests pass at HEAD; the open-arc test's b-side wall now
+   splits properly into 2 fragments (the full generator lines inserted
+   — the worker's machine-checked note). Zero new tolerance sites
+   (111 → 111). The worker caught TWO arithmetic errors in the
+   orchestrator's own packet prose (10 fragments not 9; 16 adjacency
+   not 17 — without the FE event the rim is not cut into halves).
+3. **BG-SOL-RW3-CLASSIFY is WRITTEN, VALIDATED, and READY — not
+   dispatched** (write-set collision with the fix; the session chose to
+   close instead). The full classifier prototype ran against the landed
+   splitter (`scratch/rw3probe`, source preserved, target deleted):
+   the flagship bits are exactly `[F,F,T,F,F,F,F,T,T,T]`; the arc-side
+   sign convention is CONFIRMED (the annulus reads
+   `(n_F × der) · n_B = +1.0` at the rim midpoint ⇒ outside); the ray
+   seeds answer disjoint/contained/retry correctly; the open-arc mesh
+   refuses `Contradictory` (the parity check catches under-split
+   meshes). The plan doc §4 carries the session-37 classifier amendment
+   (signature, s_F, pre-screen, band rule, `Prop::FragmentInsideOther`,
+   the validated witnesses, the straddling-fragment limitation). All 8
+   packet anchors re-derived against `175d295`.
 
 Progress estimate, difficulty-weighted:
 
-- M2 critical path: about **85-90% complete** (the Contact Layer funnel
-  + the material primitive + the splitter are landed; the classifier,
-  the assembler/entry, and the M2 witness remain).
-- Entire approved solver family: about **60-64% complete**.
-- At the demonstrated rate: M2 is about **1-1.5 working days** away (3
-  sequential packets: RW3 → RW4 → M2-WITNESS).
+- M2 critical path: about **87-90% complete** (the funnel, the material
+  primitive, the splitter, the periodic fix, and the classifier DESIGN
+  are done; the classifier CODE, the assembler/entry, and the M2
+  witness remain).
+- Entire approved solver family: about **61-65% complete**.
+- At the demonstrated rate: the classifier is about **half a day**
+  (dispatch → verify → land), then RW4 and M2-WITNESS about a day more.
 
 ## Pick up here
 
-1. **BG-SOL-RW3-CLASSIFY is the frontier** (registry READY, scheduler
-   eligible, write set disjoint). Write its packet against the LANDED
-   `vendor/truck/truck-shapeops/src/boolean/split.rs` (the booked types
-   are verbatim there; re-derive every anchor against `7b991a6`) and the
-   plan's §4 Phase 4 session-36 amendment (the §12 seed-and-propagate
-   design: parity graph, arc-side seeds `(n_F × der) · n_B < 0 ⇒ INSIDE`,
-   ray-parity seeds for contact-free components, spanning-tree
-   propagation, every non-tree edge verified, cycle disagreement ⇒
-   `Refusal::Contradictory(ContradictionWitness)`).
-2. Then BG-SOL-RW4-ASSEMBLE (material decision with coincident-pair
-   precedence, sew, `Solid::try_new` acceptance, the `boolean()` entry
-   with lift+sweep), then BG-SOL-M2-WITNESS (the cross-layer flagship
-   `Extrude(P−Q) ≅ boolean(Extrude(P), Difference, Extrude(Q))` plus the
-   metamorphic battery). All three rows are READY in the registry.
-3. BG-SOL-S7-OVERLAP-PLANE (rotated-frame coplanar SAT) - named
+1. **BG-SOL-RW3-CLASSIFY is the frontier** (registry READY, needs
+   satisfied, packet at `loop/packets/BG-SOL-RW3-CLASSIFY.md`, anchors
+   verified against HEAD). Dispatch it FIRST; the design is fully
+   pre-made and probe-validated — do not redesign, just dispatch.
+2. **Then BG-SOL-RW4-ASSEMBLE.** Session-37 design intelligence, all
+   machine-derivable, none of it re-derived yet: (a) the REAL M2
+   flagship event set is SIX events (top AND bottom: FF circle, FE
+   BoundedCurve rim, Region2 cap-coincidence at each of z=0 and z=2) —
+   the landed 3-event test covers only the top; (b) the Difference
+   decision table over the 11-fragment full mesh: a's two disks
+   (pair.a) Discard, a's two annuli + 4 sides Keep-unflipped, b's two
+   caps (pair.b, Identical) Discard, b's wall Keep-FLIPPED — the 7-face
+   result (4 sides + 2 annuli + the hole wall) exactly as §4 books;
+   (c) prototype the assembler by EXTENDING `scratch/rw3probe` (it
+   already has the classifier prototype; add decide+sew+try_new over
+   the full 6-event mesh) BEFORE writing the packet — the third
+   instance of the num3-scratch discipline.
+3. Then BG-SOL-M2-WITNESS (the cross-layer flagship + the metamorphic
+   battery; all three inputs verified correct).
+4. BG-SOL-S7-OVERLAP-PLANE (rotated-frame coplanar SAT) - named
    follow-up, NOT on M2's path.
-4. Parallel side branches after/alongside: S8 safe shell, local fillet
+5. Parallel side branches after/alongside: S8 safe shell, local fillet
    scoping, RMF sweep, minimal-knot loft.
-5. Open latent flake, NOT fixed: `truck-base/tests/newton.rs::test_newton1`.
+6. Open latent flake, NOT fixed: `truck-base/tests/newton.rs::test_newton1`.
    Its own packet.
-6. Recommended, NOT dispatched: follow-up audit of
+7. Recommended, NOT dispatched: follow-up audit of
    `truck-evidence/src/fid/rep.rs` (4362 lines). Its own program.
 
 ## State of the machine, as left
 
 - Watchdog RUNNING (`loop/watchdog.lock`, pid 20024).
-- Registry: 114 rows = 110 DONE + 1 BLOCKED (BG-AUD-FIX-004 owner) + 3
-  READY (RW3-CLASSIFY, RW4-ASSEMBLE, M2-WITNESS); scheduler eligible 1,
-  dispatchable 1.
-- Slots 0-3 FINISHED, all re-forkable.
-- Disk about 13 GB free (verify baselines cleaned; the session dipped to
-  2.5 GB mid-session — see the session-36 traps before running a verify
-  alongside a live worker).
+- Registry: 115 rows = 111 DONE + 1 BLOCKED (BG-AUD-FIX-004 owner) + 3
+  READY (RW3-CLASSIFY, RW4-ASSEMBLE, M2-WITNESS); RW3 is the only one
+  whose needs are all satisfied.
+- Slots 0-3 FINISHED, all re-forkable (slot 1 holds the landed
+  SPLIT-PERIODIC branch; re-fork onto HEAD before the next dispatch).
+- Disk about 12.8 GB free (the scratch probe target and the repo-root
+  test target were deleted at close; slot 1's target is 9.1 GB and
+  reclaimable by the watchdog if needed).
 - GATE-4 ceiling 111 = true count; `kernel-gates.sh HEAD` passes all
-  P-3 gates and 111/111 at `7b991a6`.
-- Results filed at `loop/results/BG-SOL-S2-DISK-ORIENT.json` and
-  `loop/results/BG-SOL-RW2-SPLIT.json`.
+  P-3 gates and 111/111 at `175d295`.
+- Results filed at `loop/results/BG-SOL-SPLIT-PERIODIC.json`.
 - Root tracked tree clean. Numerous pre-existing untracked user/baseline/
   scratch files remain and must be preserved (including
-  `scratch/rwdiskprobe` — the design-session probe evidence).
+  `scratch/rwdiskprobe` and `scratch/rw3probe` — the design-session
+  probe evidence, sources only).
 
 ## The parallelism picture
 
-Nothing running (watchdog only). The rewrite chain is sequential by
-design (RW3 consumes RW2's landed types; RW4 consumes RW3's; M2-WITNESS
-consumes RW4's). If a second wave is wanted while RW3 runs, the side
-branches (S8 shell, fillet, sweep, loft, overlap-plane) are all
-write-disjoint from `boolean/` — but each verify is heavy; on this
-disk, do NOT run a verify concurrently with a live worker below ~15 GB
-free (session-36 trap 1).
-
+Nothing running (watchdog only). The rewrite chain stays sequential
+(RW3 consumes the fix's split.rs; RW4 consumes RW3's classification;
+M2-WITNESS consumes RW4's entry). If a second wave is wanted while RW3
+runs, the side branches (S8 shell, fillet, sweep, loft, overlap-plane)
+are write-disjoint from `boolean/` — but do NOT run a verify alongside
+a live worker below ~15 GB free (session-36 trap 1; see the session-37
+traps for the newest instance of why quiet-machine verifies are the
+only reliable ones).
 
 
 ## Traps, each one paid for
+### Session 37 (the periodic-branch regression + the RW3 prototype) - paid in full
+
+- **Two parallel packets can EACH verify green at their own fork points
+  and jointly break HEAD.** BG-SOL-S2-DISK-ORIENT and BG-SOL-RW2-SPLIT
+  ran in parallel (session 36); each verified ACCEPTED against its own
+  base; after both merged, the flagship test FAILED at HEAD — the S2
+  fix changed the extruded wall's boundary-wire direction and RW2's
+  region checks were sensitive to it. NOTHING had run `cargo test` at
+  merged HEAD: GATE-4 and kernel-gates cover the P-3 gates (fmt,
+  clippy, tolerance), not test suites, and no verify runs at a commit
+  nobody forked from. **After landing parallel packets whose write sets
+  interact semantically — even on disjoint files — run the affected
+  crates' tests at merged HEAD before writing the next packet against
+  it.** Recovery cost: one extra fix packet (BG-SOL-SPLIT-PERIODIC) —
+  cheap only because the pre-dispatch probe caught it before RW3 was
+  written against a broken flagship.
+- **A periodic parameter-frame mismatch is invisible to 2-D region
+  checks.** Query points folded to the principal branch
+  (`rem_euclid`) versus wire polygons unwrapped continuously from each
+  wire's OWN front vertex: a boundary wire traversed the other way
+  around the periodic axis lives on a different branch, and the
+  point-segment distance / containment tests read "not on boundary"
+  for a point that is geometrically ON the boundary. The fix pattern:
+  re-test the QUERY at `p.x ± period` (three translates) wherever the
+  query's frame and the polygons' frames can differ. `containment_screen`
+  still passes `None` (the two-face periodic Region2 case — coaxial
+  coincident cylinders) — a RECORDED limitation, the RW-COPLANAR
+  family's concern, not a bug to silently fix later.
+- **The pre-dispatch prototype is the cheapest defect-finder this loop
+  has — third confirmed instance of the num3-scratch discipline.**
+  `scratch/rw3probe` (a full classifier prototype over the landed
+  splitter) caught: (a) the HEAD regression above (the probe's
+  `split_fragments` refused where the landed test "passed" — because
+  the landed test had never run at HEAD); (b) the degenerate-polygon
+  wall fragment yields NO region representative (the seed-fallback
+  rule: the lowest-index fragment whose representative resolves);
+  (c) the `s_F = -1` degenerate case (a zero-area outer polygon makes
+  the wire-orientation sign meaningless — guard: refuse); and it
+  validated the sign convention (`+1.0` exactly) and all five
+  witnesses before a single worker token was spent. Compile it, RUN
+  the witnesses, THEN write the packet with the measured numbers.
+- **The worker's machine-check mandate catches the ORCHESTRATOR's own
+  arithmetic, not just the packet's geometry.** The SPLIT-PERIODIC
+  worker corrected two numbers in my own test spec: "NINE fragments"
+  where my own parts summed 7 + 3 = 10, and 17 adjacency entries where
+  the ff-only event set (no FE sewing) leaves the rim uncut so b has 2
+  Same, not 3 — total 16. Both corrections arrived with derivations in
+  the test comments and were right. Pre-checking the packet's own
+  sums with a one-line python would have caught both; the mandate is
+  the safety net that worked.
+- **PS 5.1 quoting failures have two more costumes.** (a)
+  `bash.exe -c "... $(grep ...)"` — PowerShell evaluates the
+  `$(...)` BEFORE bash sees it, so every grep "is not recognized";
+  write the anchor script to a file and run it (the session-36
+  pattern, re-hit). (b) `Start-Process cmd /c "long string"` — a
+  positional-parameter binding error; the working form is
+  `Start-Process cmd -ArgumentList '/c', '<command>' -WindowStyle
+  Hidden` (the session-23 detached-verify recipe needs it).
+- **A verify launched at 11.4 GB free on a quiet machine is fine —
+  but only because the worker had exited.** The session-36 rule (never
+  a verify alongside a live worker below ~15 GB) remains the
+  load-bearing form; a quiet-machine verify at ~11 GB passed all gates
+  first try this session.
+
 ### Session 36 (Boundary Rewrite design + first two packets) - paid in full
 
 - **A verify running CONCURRENTLY with a live worker dies at the 8 GB
