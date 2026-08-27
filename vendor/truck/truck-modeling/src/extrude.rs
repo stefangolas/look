@@ -207,11 +207,14 @@ pub fn extrude_profile(
                     let wire = Wire::from(vec![be.clone(), seam_n, te.inverse(), seam_o.inverse()]);
                     faces.push(Face::try_new(vec![wire], surface).map_err(|_| Refusal::Empty)?);
                 }
-                // A circle boundary edge is the hole wall: an ANNULUS with two
-                // boundary wires (the bottom self-loop, the top self-loop) and
-                // NO vertical seam edges. Each circle edge is shared by exactly
-                // two faces with opposite orientations (bottom: cap + cylinder;
-                // top: cap + cylinder), which is what closes the shell.
+                // A circle boundary edge is the wall of the extruded circle:
+                // an ANNULUS with two boundary wires (the bottom self-loop, the
+                // top self-loop) and NO vertical seam edges. Each circle edge is
+                // shared by exactly two faces with opposite orientations
+                // (bottom: cap + cylinder; top: cap + cylinder), which is what
+                // closes the shell. The wall's orientation is keyed on the
+                // cycle's role (arrange.rs): index 0 is the region's OUTER
+                // boundary (the pure disk profile), indices ≥ 1 are holes.
                 Some(Curve::Circle(p)) => {
                     let be = bottom_edges.get(i).ok_or(Refusal::Empty)?;
                     let te = top_edges.get(i).ok_or(Refusal::Empty)?;
@@ -223,17 +226,26 @@ pub fn extrude_profile(
                         Ok(c) => c.value,
                         Err(_) => return Err(Refusal::Empty),
                     };
-                    let wire_bot = Wire::from(vec![be.inverse()]);
-                    let wire_top = Wire::from(vec![te.clone()]);
-                    // The hole wall is stored INVERTED: the cylinder's natural
-                    // normal is +r (away from the axis) but the outward normal
-                    // of the solid at the hole wall is −r (into the hole).
-                    // Inverting the face also flips its effective boundary
-                    // edges so the caps' circle self-loops pair against them.
+                    // Outer boundary: the cylinder's natural +r̂ normal is
+                    // already outward, so the face is stored UNINVERTED with the
+                    // bottom wire in trace direction and the top wire reversed.
+                    // Hole: the hole arm keeps today's form exactly.
+                    let (wire_bot, wire_top) = if ci == 0 {
+                        (Wire::from(vec![be.clone()]), Wire::from(vec![te.inverse()]))
+                    } else {
+                        (Wire::from(vec![be.inverse()]), Wire::from(vec![te.clone()]))
+                    };
                     let mut cylinder_face =
                         Face::try_new(vec![wire_bot, wire_top], Surface::Cylinder(cylinder))
                             .map_err(|_| Refusal::Empty)?;
-                    cylinder_face.invert();
+                    if ci > 0 {
+                        // The hole wall is stored INVERTED: the cylinder's natural
+                        // normal is +r (away from the axis) but the outward normal
+                        // of the solid at the hole wall is −r (into the hole).
+                        // Inverting the face also flips its effective boundary
+                        // edges so the caps' circle self-loops pair against them.
+                        cylinder_face.invert();
+                    }
                     faces.push(cylinder_face);
                 }
                 _ => return Err(Refusal::Empty),
@@ -1021,5 +1033,78 @@ mod tests {
             checked += 1;
         }
         assert_eq!(checked, 7);
+    }
+
+    /// The M2 disk: the SAME circle as `plate_with_hole`, extruded ALONE. The
+    /// circle cycle is the material region's OUTER boundary, so the cylinder
+    /// wall must carry the cylinder's natural +r̂ normal (orientation == true)
+    /// and NOT the hole convention (BG-SOL-S2-DISK-ORIENT).
+    #[test]
+    fn extrude_disk_wall_normal_points_outward() {
+        let circle = Curve::Circle(Processor::with_transform(
+            TrimmedCurve::new(UnitCircle::<Point3>::new(), (0.0, TAU)),
+            Matrix4 {
+                x: Vector4::new(1.0, 0.0, 0.0, 0.0),
+                y: Vector4::new(0.0, 1.0, 0.0, 0.0),
+                z: Vector4::new(0.0, 0.0, 1.0, 0.0),
+                w: Vector4::new(2.0, 2.0, 0.0, 1.0),
+            },
+        ));
+        let profile = vec![circle];
+        let arrangement = arrange(&profile, None).unwrap().value;
+        let solid = extrude_profile(&profile, &arrangement, 2.0).unwrap().value;
+
+        // 3 faces: one cylinder wall, two planar caps.
+        let mut cylinders: Vec<Face> = Vec::new();
+        let mut planes: Vec<Face> = Vec::new();
+        for face in solid.face_iter() {
+            match face.surface() {
+                Surface::Cylinder(_) => cylinders.push(face.clone()),
+                Surface::Plane(_) => planes.push(face.clone()),
+                _ => unreachable!("unexpected surface"),
+            }
+        }
+        assert_eq!(cylinders.len(), 1);
+        assert_eq!(planes.len(), 2);
+
+        // The wall is stored UNINVERTED: orientation == true, effective normal
+        // +x̂ at (3, 2, 1) — the natural radial normal, away from the material.
+        let wall = cylinders.first().expect("one cylinder wall");
+        assert!(
+            wall.orientation(),
+            "the disk's cylinder wall must carry orientation == true"
+        );
+        let surface = wall.surface();
+        let q = Point3::new(3.0, 2.0, 1.0);
+        let n_eff = if wall.orientation() {
+            surface_normal_at(&surface, q)
+        } else {
+            -surface_normal_at(&surface, q)
+        };
+        let expected = Vector3::new(1.0, 0.0, 0.0);
+        assert!(
+            (n_eff - expected).magnitude() < TOLERANCE,
+            "wall effective normal {n_eff:?} must be +x̂ at (3, 2, 1)"
+        );
+
+        // The caps: bottom stored inverted (orientation == false), top not.
+        for cap in &planes {
+            let Surface::Plane(plane) = cap.surface() else {
+                unreachable!("cap surface is not a plane");
+            };
+            if plane.origin().z == 0.0 {
+                assert!(!cap.orientation(), "bottom cap must be stored inverted");
+            } else {
+                assert!(cap.orientation(), "top cap must not be inverted");
+            }
+        }
+
+        // Inside the disk material (r < 1 at z = 1) and outside it.
+        assert!(point_in_solid(&solid, Point3::new(2.0, 2.0, 1.0)));
+        assert!(!point_in_solid(&solid, Point3::new(5.0, 5.0, 1.0)));
+
+        // The boundary shell re-passes the closure validation.
+        let shell = solid.boundaries().first().expect("one boundary shell");
+        assert!(Solid::try_new(vec![shell.clone()]).is_ok());
     }
 }
