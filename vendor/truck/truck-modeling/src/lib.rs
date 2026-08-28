@@ -100,6 +100,8 @@ pub type Result<T> = std::result::Result<T, errors::Error>;
 
 /// the building model utility API
 pub mod builder;
+/// BG-CAD-P1-UTILITY: certified utility surface + planar face construction.
+pub mod cad;
 mod closed_sweep;
 /// declare errors
 pub mod errors;
