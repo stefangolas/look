@@ -39,13 +39,22 @@ Progress: **2 of 12-13 packets** (Tier 0: 2 of 8), ~3.5k of ~20k LOC.
 
 ## Pick up here
 
-1. **Write the P3/P4/P5 packets** (coverage plan §8; all pre-decided designs):
-   P3 section+split (new truck-shapeops module + its lib.rs), P4 sweep
-   reduction (curtain table + until + project), P5 revolve line-edge (+ the
-   `RevolutedCurve` recognition its recognize.rs comment already books).
-   P3/P4/P5 are write-disjoint (different crates/modules) and can wave. P6
-   (LocalBoundaryRewrite + chamfer) is design-class with a MANDATORY
-   num3-scratch probe before dispatch.
+1. **P3 is BLOCKED on a real Contact-Layer finding** (BG-CAD-P3-SPLIT,
+   SPEC_GAP session 40, result filed
+   `loop/results/BG-CAD-P3-SPLIT.SPEC_GAP.json`, WIP archived at
+   `loop/slots/0/abandoned-20260828-180102.patch`): the landed `boolean()`
+   refuses EVERY booked split happy-path (plate 4x4x2 vs a constructed
+   halfspace box through its middle) with
+   `UnsupportedEnvelope(ContactReductionDeferred)` — while the box itself is
+   valid. Both solids are Plane/Line-only, every pair class is in the landed
+   FF/FE/EE tables, yet the sweep defers. **NEXT: num3-scratch probe driving
+   the landed `contact()` over the plate-x-halfspace-box stratum pairs to
+   identify the deferring pair** (same archaeology pattern as the M2
+   self-pair record), then either a funnel packet or a packet amendment.
+   The difference from the M2 flagship: cutting through a solid's MIDDLE
+   produces open-arc cuts on several faces plus a closed rectangle loop on
+   the cut wall, vs the flagship's single-face circle cut. P4/P5 packets
+   remain writable (write-disjoint from the boolean funnel).
 2. **Model policy (owner directive): default worker is
    `zai/glm-5.3-flash`** (run_packet default; `land_packet` records the actual
    model per packet from the slot's `worker.model`). Deepseek was reupped
@@ -130,6 +139,26 @@ reclaimed by deleting the repo-root `target/`.
 - **`run_packet.py --reset-only` landed** (`b450e10`): archive-and-reset
   without spawning a worker (the session-14 gap). `archive_and_reset`
   extracted and shared with the dispatch path; selftest PASS.
+- **The landed `boolean()` refuses solid-x-halfspace-box cutting** (P3
+  SPEC_GAP, see Pick up here 1). The M2 milestone's envelope was
+  flagship-shaped: one face cut by one closed circle. Cutting through a
+  solid's middle (open arcs on several faces + a closed loop on the cut
+  wall) refuses `ContactReductionDeferred` even though every pair class is
+  Plane/Line and nominally landed. Do not route around it in packets; the
+  deferring pair must be identified by probe first.
+- **The packet's stop conditions WORK and paid off**: the P3 worker stopped
+  at stop #3, committed nothing, left its WIP as evidence, and filed a
+  RESULT with the refusal verbatim - exactly the behavior the section was
+  written to produce. The recovery dance: copy RESULT to
+  `loop/results/<ID>.SPEC_GAP.json`, `run_packet --reset-only` to archive
+  the WIP patch, registry row to BLOCKED with the finding in the note.
+- **glm-5.3-flash's zai endpoint has a ~32K default thinking budget and the
+  stream DIES silently when a step's reasoning hits it** (finish
+  `reason: length`, reasoning pinned ~31.9K, no ERROR line): four deaths
+  across P2/P3 before the owner switched the default back to deepseek
+  (commit reverted the model default). glm remains usable for
+  churn-shaped packets that never reason that long in one turn; design
+  packets with heavy geometric derivation are the killers.
 - **PowerShell inline `python -c` with quotes mangles every time** (re-hit
   twice this session) - write the script to a file and run the file. ALWAYS.
 - **P2's taper derivation notes are load-bearing for P3+**: wall-cone apex

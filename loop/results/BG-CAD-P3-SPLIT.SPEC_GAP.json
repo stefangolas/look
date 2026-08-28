@@ -1,0 +1,23 @@
+{
+  "id": "BG-CAD-P3-SPLIT",
+  "status": "SPEC_GAP",
+  "contracts": [
+    "truck-shapeops::section::split_by_plane(solid: &Solid<Point3, Curve, Surface>, plane: &Plane, budget: &mut Budget) -> Outcome<(Solid, Solid)>",
+    "truck-shapeops::section::section_faces(solid: &Solid<Point3, Curve, Surface>, plane: &Plane, budget: &mut Budget) -> Outcome<Vec<Face>>"
+  ],
+  "tests_added": 10,
+  "deviations": [
+    "STOP CONDITION (packet stop #3): the landed boolean() refuses every booked happy-path case (tests 1, 2, 3, 4, 5, 9, 10) inside the first boolean() call with Err(Refusal::UnsupportedEnvelope(EnvelopeCase::ContactReductionDeferred)). The halfspace box passes Solid::try_new (the refusal is not the box path's Refusal::Empty); the refusal is the landed splitter's RW-OPEN-ARC boundary: split.rs ff_curve refuses an OPEN FF contact curve whose trace lies strictly inside a face's region, and the split-by-plane wall necessarily receives the wall x S-side contact arcs as open arcs strictly inside its region (the wall must cover the whole over-box per D3's pad rule). The M2 flagship avoids this because its interior FF cuts are CLOSED circles (doubled-loop path). This is a finding about the landed pipeline, not a construction bug; boolean/** is forbidden to edit, so the packet stops and reports (see QUESTION.md for the empirical proof and redispatch options).",
+    "Tests 3 pass / 7 refuse: plane_missing_returns_whole_plus_empty, oblique_cylinder_section_refuses (typed refusal recorded as UnsupportedEnvelope(ContactReductionDeferred) - 'whatever the landed pipeline answers is the assertion'), and sphere_face_refuses_noncanonical are green; the 7 happy-path witnesses refuse with the verbatim arm above.",
+    "Test 8 minimal sphere-carrying solid: a ball whose single face surface is Surface::Processor wrapping a bare Sphere under a 90-degree rotation, so the over-box lift sees CanonicalSurface::Placed and refuses NonCanonicalCarrier before any boolean (budget asserted untouched). A bare Surface::Sphere face would NOT refuse at the over-box lift (D2 supports the full carrier box), so the placed construction is the faithful reading of the packet's 'noncanonical' test name.",
+    "H-3: the box comparisons use `const TOL: f64 = 1.0e-9; // H-3` because the landed splitter inserts cut vertices through search_parameter (Newton), so the halves' boundary points carry ulp noise and their over-boxes are not bit-exact dyadics; the packet's 'exactly' is asserted within that float insertion slack. (Moot while the happy path is blocked, but recorded for the redispatch.)",
+    "Pre-existing, unrelated to this stop: `cargo clippy --locked -p truck-shapeops --all-targets` fails on pre-existing clippy lints in truck-stepio and truck-meshalgo (reproduced with this packet's changes stashed); `cargo test --locked -p truck-shapeops --lib` fails the pre-existing healing::tests::step_import because the STEP fixture directory vendor/truck/resources/step is absent from the tree (NotFound, not a regression)."
+  ],
+  "notes": "Stopped at the packet's stop condition #3 before any commit; the Done-when commit applies only to the DONE path. Anchors re-derived at dispatch (all matched): A1=2 pub mod in lib.rs (becomes 3 with the declared pub mod section;), A2=1 pub fn boolean in boolean/assemble.rs, A3=1 pub enum BoolOp in boolean/mod.rs, A4=0 pub mod section in lib.rs. WIP probe left uncommitted in the working tree as evidence: vendor/truck/truck-shapeops/src/section.rs (D2 over-box per the carrier table, D3 axis-aligned + clipped halfspace boxes, D4 split_by_plane/section_faces, D6 Solid::try_new + exact plane-identity caps), the pub mod section; declaration in lib.rs, and vendor/truck/truck-shapeops/tests/split_plane.rs (the 10 required dyadic witnesses with the deny header and the match-based expect_ok helper). cargo check --locked -p truck-shapeops and cargo fmt --check -p truck-shapeops are green at this tree. The empirical proof and redispatch options are in QUESTION.md.",
+  "anchors": {
+    "A1_pub_mod_lib_rs": 2,
+    "A2_pub_fn_boolean_assemble_rs": 1,
+    "A3_pub_enum_BoolOp_boolean_mod_rs": 1,
+    "A4_pub_mod_section_lib_rs": 0
+  }
+}
