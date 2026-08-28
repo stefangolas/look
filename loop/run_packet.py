@@ -204,6 +204,24 @@ def first_session_id(events_log):
     return None
 
 
+def archive_and_reset(slot_root, wt, dirty):
+    """Archive a dead run's edits to a patch beside the slot, then hard-reset
+    the worktree. Shared by the --reset dispatch path and --reset-only; the
+    archive exists because a run that got far enough to edit files is evidence
+    about the packet even when it is not usable code."""
+    stamp = datetime.datetime.now().strftime('%Y%m%d-%H%M%S')
+    archive = slot_root / f"abandoned-{stamp}.patch"
+    diff_res = subprocess.run(['git', '-C', str(wt), 'diff', 'HEAD'], capture_output=True, text=True, encoding='utf-8', errors='replace')
+    with archive.open('w', encoding='utf-8', newline='\n') as f:
+        f.write(diff_res.stdout)
+        untracked = git_lines(wt, 'ls-files', '--others', '--exclude-standard')
+        if untracked:
+            f.write("\n# untracked, not captured above:\n# " + "\n# ".join(untracked))
+    print(f"archived {len(dirty)} abandoned change(s) to {archive}")
+    subprocess.run(['git', '-C', str(wt), 'reset', '--hard', 'HEAD'], capture_output=True, text=True, encoding='utf-8', errors='replace')
+    subprocess.run(['git', '-C', str(wt), 'clean', '-fd', '-e', 'PACKET.md'], capture_output=True, text=True, encoding='utf-8', errors='replace')
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument('--slot', type=int, required=True)
@@ -211,6 +229,10 @@ def main():
     ap.add_argument('--model', default='zai/glm-5.3-flash')
     ap.add_argument('--stall-minutes', type=int, default=12)  # unused here; slot_status.py owns the stall check
     ap.add_argument('--reset', action='store_true')
+    ap.add_argument('--reset-only', action='store_true',
+                    help='archive-and-reset the slot WITHOUT spawning a worker '
+                         '(--reset is archive-and-DISPATCH; resetting only '
+                         'previously meant killing a spawned worker by hand)')
     ap.add_argument('--dry-run', action='store_true')
     ap.add_argument('--resume', action='store_true',
                     help="resume the slot's previous worker session (opencode "
@@ -231,6 +253,16 @@ def main():
 
     if not wt.is_dir():
         sys.exit(f"slot {args.slot} has no worktree at {wt}; run new_slot.py --slot {args.slot} --branch NAME first")
+
+    if args.reset_only:
+        porcelain = git_lines(wt, 'status', '--porcelain')
+        dirty = [l for l in porcelain if not re.search(r'(?i)\s(PACKET\.md|CONTEXT\.md|worker\.(pid|err|packet))$', l)]
+        if dirty:
+            archive_and_reset(slot_root, wt, dirty)
+        else:
+            print(f"slot {args.slot} is clean; nothing to reset")
+        sys.exit(0)
+
     packet_path = Path(args.packet)
     if not packet_path.is_file():
         sys.exit(f"packet not found: {args.packet}")
@@ -271,17 +303,7 @@ def main():
         if not args.reset:
             sys.exit(f"slot {args.slot} has {len(dirty)} uncommitted change(s) from an earlier run. "
                       "Inspect them, or pass --reset to archive and discard them before dispatching.")
-        stamp = datetime.datetime.now().strftime('%Y%m%d-%H%M%S')
-        archive = slot_root / f"abandoned-{stamp}.patch"
-        diff_res = subprocess.run(['git', '-C', str(wt), 'diff', 'HEAD'], capture_output=True, text=True, encoding='utf-8', errors='replace')
-        with archive.open('w', encoding='utf-8', newline='\n') as f:
-            f.write(diff_res.stdout)
-            untracked = git_lines(wt, 'ls-files', '--others', '--exclude-standard')
-            if untracked:
-                f.write("\n# untracked, not captured above:\n# " + "\n# ".join(untracked))
-        print(f"archived {len(dirty)} abandoned change(s) to {archive}")
-        subprocess.run(['git', '-C', str(wt), 'reset', '--hard', 'HEAD'], capture_output=True, text=True, encoding='utf-8', errors='replace')
-        subprocess.run(['git', '-C', str(wt), 'clean', '-fd', '-e', 'PACKET.md'], capture_output=True, text=True, encoding='utf-8', errors='replace')
+        archive_and_reset(slot_root, wt, dirty)
 
     # The packet is copied into the worktree and the prompt points at it,
     # rather than being passed as the prompt itself (S2). A packet is ~9 KB
