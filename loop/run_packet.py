@@ -226,7 +226,7 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument('--slot', type=int, required=True)
     ap.add_argument('--packet', required=True)
-    ap.add_argument('--model', default='zai/glm-5.3-flash')
+    ap.add_argument('--model', default='deepseek/deepseek-v4-flash')
     ap.add_argument('--stall-minutes', type=int, default=12)  # unused here; slot_status.py owns the stall check
     ap.add_argument('--reset', action='store_true')
     ap.add_argument('--reset-only', action='store_true',
