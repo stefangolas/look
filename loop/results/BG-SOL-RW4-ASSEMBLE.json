@@ -1,0 +1,40 @@
+{
+  "id": "BG-SOL-RW4-ASSEMBLE",
+  "status": "DONE",
+  "contracts": ["BG-SOL-RW4-ASSEMBLE"],
+  "tests_added": 4,
+  "sites_migrated": 0,
+  "sites_deferred": 0,
+  "deviations": [
+    {
+      "site": "vendor/truck/truck-shapeops/src/boolean/assemble.rs (boolean signature)",
+      "expected": "use crate::BoolOp;",
+      "actual": "use super::BoolOp;",
+      "reason": "BoolOp lives at crate::boolean::BoolOp; lib.rs declares `pub mod boolean;` and does not re-export BoolOp at the crate root, so `use crate::BoolOp` cannot compile. `super::BoolOp` names the same item from the child module. The booked signature `pub fn boolean(a: &Solid<Point3, Curve, Surface>, op: BoolOp, b: &Solid<Point3, Curve, Surface>, budget: &mut Budget) -> Outcome<Solid<Point3, Curve, Surface>>` is realized exactly."
+    }
+  ],
+  "disagreements": [
+    {
+      "site": "scratch/rw3probe",
+      "claim": "the packet says the rw3probe prototype is preserved in the tree",
+      "observed": "the directory does not exist at this fork point (scratch/ holds only the fid-* scripts)",
+      "impact": "none on the deliverable: the sweep/assembly were built from the packet's own measured numbers (six events, 11-fragment six-event mesh, 20 adjacency, 2 coincident pairs, classification bits [F,T,F,T,F,F,F,F,T,T,T]) and verified against the landed splitter/classifier; every measured number in the packet reproduced exactly."
+    }
+  ],
+  "baseline_failures": [
+    {
+      "test": "healing::tests::step_import",
+      "reason": "pre-existing environment failure on this checkout: the STEP test assets under vendor/truck/resources/step/ (occt-cylinder.step etc.) are absent from the tree, so std::fs::read_to_string fails with NotFound. Unrelated to this packet: the required `cargo test -p truck-shapeops --lib boolean --no-fail-fast` suite is 22/22 green (the 4 new tests plus the 9 split + 6 classify + 3 material-state pre-existing tests)."
+    }
+  ],
+  "notes": "MEASURED EVENT COMPLEX (sweep_contact_events on the flagship, exactly six events in sweep order): (1,2) Region2 IdenticalCarrier / Coincident from the identity arm, a's z=0 plane x b's bottom cap and a's z=2 plane x b's top cap; (3,4) FF Arc1 Transverse / Analytic(Curve(Circle)) at (2,2,0) and (2,2,2), r=1, a's plane x b's wall; (5,6) FE Arc1 CoincidentInterval / BoundedCurve{Circle, t_range (0.0, TAU)} full-period, a's plane x b's rim edge, the rim-edge provenance landing on b's caps (face 0 / face 1, flat position 0) as the packet's decision 5 predicts. FOUR OPS' FACE COUNTS on the 11-fragment six-event mesh: Difference 7 (2 [4,2]-wire annuli + 4 [4]-wire sides + the [2,2]-wire wall FLIPPED, effective normal toward the axis), Union 8 (2 annuli + 2 deduped disks + 4 sides), Intersection 3 (2 deduped [2]-wire disks at z=0/z=2 + the unflipped [2,2]-wire wall), Xor 7 (the Difference set); each one shell, all four Solid::try_new Ok. TOLERANCE-CLASS: INSERTION_TOL = 1.0e-2 is the same insertion-tolerance class the splitter/classifier already use, so nothing surprised there; the one decision that had to be right was the INCLUSIVE AABB touch screen (a.lo <= b.hi && b.lo <= a.hi on all three axes) — the real FF circle at z=2 sits exactly on the wall's box boundary and must survive, and the screen drops the side-plane x cap Line false positives exactly as the packet measured. PROTOTYPE: scratch/rw3probe is not present in this checkout despite the packet calling it preserved, so I could not compare against the preserved prototype byte-for-byte; the implementation reproduces the packet's measured numbers directly against the landed splitter (six events, the 11/20/2 mesh, and the exact per-op assembly sets), which is the same evidence rw3probe was said to certify. Verified: cargo fmt --check -p truck-shapeops, cargo clippy -p truck-shapeops --all-targets --no-deps, cargo check --locked -p truck-shapeops --all-targets, cargo test -p truck-shapeops --lib boolean --no-fail-fast (22/22), bash scripts/kernel-gates.sh 0cce1a3 (all P-3 gates pass; GATE-4 unscaled_legacy 111/111).",
+  "verification": {
+    "commit": "c1d6e12",
+    "branch": "packet/BG-SOL-RW4-ASSEMBLE",
+    "fmt": "pass",
+    "clippy": "pass",
+    "check": "pass",
+    "boolean_tests": "22 passed",
+    "kernel_gates": "all P-3 gates pass"
+  }
+}
