@@ -24,6 +24,9 @@ pub mod split;
 /// the parity graph, one certified seed per connected component).
 pub mod classify;
 
+/// BG-SOL-RW4-ASSEMBLE: the assembler and the `boolean()` entry.
+pub mod assemble;
+
 /// Material membership of one side of a boundary fragment.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct State {
