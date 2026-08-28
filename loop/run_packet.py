@@ -208,7 +208,7 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument('--slot', type=int, required=True)
     ap.add_argument('--packet', required=True)
-    ap.add_argument('--model', default='deepseek/deepseek-v4-flash')
+    ap.add_argument('--model', default='zai/glm-5.3-flash')
     ap.add_argument('--stall-minutes', type=int, default=12)  # unused here; slot_status.py owns the stall check
     ap.add_argument('--reset', action='store_true')
     ap.add_argument('--dry-run', action='store_true')
@@ -385,6 +385,10 @@ def main():
 
     (slot_root / 'worker.pid').write_text(str(worker_pid), encoding='ascii')
     (slot_root / 'worker.packet').write_text(args.packet, encoding='ascii')
+    # The dispatching model, recorded so land_packet's ledger row is the truth
+    # instead of a hardcoded default. The worker-model switch is otherwise
+    # invisible after the fact (the BG-S0-002 lesson: prose is not provenance).
+    (slot_root / 'worker.model').write_text(args.model, encoding='ascii')
     if resume_session:
         (slot_root / 'worker.session').write_text(resume_session, encoding='ascii')
         print(f'resuming worker session {resume_session}')

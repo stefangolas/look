@@ -161,9 +161,15 @@ def main():
     gates = {}
     for g in verdict.get('gates', []):
         gates[g['name'].split()[0]] = g['status']
+    # The model that actually ran this packet, recorded by run_packet.py at
+    # dispatch. The fallback is the pre-switch default: slots dispatched before
+    # worker.model existed all ran it (the historical rows say so).
+    model_file = REPO_ROOT / 'loop' / 'slots' / str(args.slot) / 'worker.model'
+    model = (model_file.read_text(encoding='utf-8').strip()
+             if model_file.is_file() else 'deepseek/deepseek-v4-flash')
     row = {
         'id': pid, 'packet': args.packet, 'slot': args.slot,
-        'model': 'deepseek/deepseek-v4-flash', 'verdict': 'ACCEPTED', 'gates': gates,
+        'model': model, 'verdict': 'ACCEPTED', 'gates': gates,
         'worker_commit': head[:7], 'branch': branch,
         'timestamp': datetime.datetime.now(datetime.timezone.utc)
                      .isoformat().replace('+00:00', 'Z'),
