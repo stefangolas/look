@@ -45,7 +45,7 @@ tests_required:
 budget:      {turns: 50, ctx_tokens: 160000}
 anchors:
   - {id: A1, expect: 1, cmd: "grep -c 'pub mod classify' vendor/truck/truck-shapeops/src/boolean/mod.rs"}
-  - {id: A2, expect: 4, cmd: "ls vendor/truck/truck-shapeops/src/boolean | wc -l"}
+  - {id: A2, expect: 3, cmd: "ls vendor/truck/truck-shapeops/src/boolean | wc -l"}
   - {id: A3, expect: 9, cmd: "grep -cF '#[test]' vendor/truck/truck-shapeops/src/boolean/split.rs"}
   - {id: A4, expect: 6, cmd: "grep -cF '#[test]' vendor/truck/truck-shapeops/src/boolean/classify.rs"}
   - {id: A5, expect: 1, cmd: "grep -c 'pub fn classify_fragments' vendor/truck/truck-shapeops/src/boolean/classify.rs"}
@@ -54,8 +54,9 @@ anchors:
   - {id: A8, expect: 1, cmd: "grep -c 'FragmentInsideOther' vendor/truck/truck-base/src/evidence.rs"}
 ```
 
-A2 becomes 5 (`assemble.rs` joins); all others stay. (All anchors are
-re-derived by the orchestrator against the dispatch fork point.)
+A2 becomes 4 (`assemble.rs` joins); all others stay. (All anchors are
+re-derived by the orchestrator against the dispatch fork point; A2 measured 3
+at bbad435 and was corrected from the stale 4/5 pair.)
 
 ## Problem
 
