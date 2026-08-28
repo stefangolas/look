@@ -47,10 +47,12 @@ Progress: **2 of 12-13 packets** (Tier 0: 2 of 8), ~3.5k of ~20k LOC.
    halfspace box through its middle) with
    `UnsupportedEnvelope(ContactReductionDeferred)` — while the box itself is
    valid. Both solids are Plane/Line-only, every pair class is in the landed
-   FF/FE/EE tables, yet the sweep defers. **NEXT: num3-scratch probe driving
-   the landed `contact()` over the plate-x-halfspace-box stratum pairs to
-   identify the deferring pair** (same archaeology pattern as the M2
-   self-pair record), then either a funnel packet or a packet amendment.
+   FF/FE/EE tables, yet the sweep defers. **DONE: probed (session 40, loop/results/BG-CAD-P3-SPLIT.PROBE.md) -
+   every stratum pair answers; the deferral is the INTERIOR-LOOP DIVISION
+   gap in the Boundary Rewrite (the landed boolean only works when cutter
+   terminations are coplanar with the solid faces - the M2 envelope).
+   NEXT PACKET: RW-INTERIOR-LOOP (booked in the PROBE doc); P3 dispatches
+   unchanged after it.**
    The difference from the M2 flagship: cutting through a solid's MIDDLE
    produces open-arc cuts on several faces plus a closed rectangle loop on
    the cut wall, vs the flagship's single-face circle cut. P4/P5 packets
