@@ -993,6 +993,16 @@ impl<'a> SplitEngine<'a> {
         if let Some((edge, range)) = self.sew_edge_for(solid, face_idx, exact) {
             let halves = self.cut_edge_to_arc(&edge, range).ok_or_else(unsupported)?;
             let wire = Wire::from(halves);
+            // The sew stratum names the edge AS USED in one face (possibly the
+            // inverse use); cutting that object yields halves in that use's
+            // direction. Normalize to the edge's FORWARD traversal so
+            // `swap_edge_into_wire` (forward use -> wire, inverse use ->
+            // wire.inverse()) preserves EVERY use's original effective traversal.
+            let wire = if edge.orientation() {
+                wire
+            } else {
+                wire.inverse()
+            };
             self.swap_edge_into_wire(edge.id(), &wire);
             return Ok(wire);
         }
@@ -1311,7 +1321,12 @@ impl<'a> SplitEngine<'a> {
                 let (e0, e1) = edge
                     .cut_with_parameter(&vertex, t)
                     .ok_or_else(numerically_unresolved)?;
-                let halves = Wire::from(vec![e0, e1]);
+                let mut halves = Wire::from(vec![e0, e1]);
+                // Same normalization as build_closed_loop_wire: the halves wire carries
+                // the edge's FORWARD traversal so every use keeps its own.
+                if !edge.orientation() {
+                    halves = halves.inverse();
+                }
                 self.swap_edge_into_wire(edge.id(), &halves);
                 return Ok(halves);
             }
@@ -1665,13 +1680,16 @@ fn divide_one_face(
     loops: &Loops,
     tol: f64,
 ) -> Option<Vec<Face<Point3, Curve, Surface>>> {
-    let is_region = |area: f64| {
-        if face.orientation() {
-            area > 0.0
-        } else {
-            area < 0.0
-        }
-    };
+    // The stored-frame outer-positive invariant: for a valid face the STORED
+    // outer wire is always CCW-positive in the surface's (u, v) frame,
+    // independent of the orientation flag. Derivation: the effective outer
+    // wire is CCW around the face's effective normal; the (u, v) frame is
+    // right-handed around the surface's own normal; inverting a face flips
+    // the effective-normal side AND inverts every effective wire, and the
+    // loops hold the STORED wires, so the flag-dependent test below
+    // double-counted the flag and inverted region/hole for every divided
+    // inverted face (the extruded bottom cap: stored CCW, flag false).
+    let is_region = |area: f64| area > 0.0;
     let (mut pre_faces, mut negative_wires) = (Vec::new(), Vec::new());
     let mut map: HashMap<EdgeID<Curve>, PolylineCurve<Point3>> = HashMap::default();
     for wire in &loops.0 {
@@ -2368,6 +2386,398 @@ mod tests {
             assert_eq!(
                 lhs_solid, rhs_solid,
                 "adjacency is same-solid only; cross-solid edges are sewing"
+            );
+        }
+    }
+
+    // ---------------------------------------------------------------------------
+    // Test: the SIX-event flagship — a's inverted bottom face divides exactly
+    // like the top, and the sewn rims are shared at BOTH heights.
+    // ---------------------------------------------------------------------------
+
+    #[test]
+    fn split_six_event_flagship_bottom_face_divides_like_the_top() {
+        // a = the 4x4 block extrude (6 faces), b = the disk extrude at (2, 2)
+        // r = 1 (3 faces), both height 2 — the M2 flagship inputs.
+        let (profile_a, arr_a) = block_profile();
+        let shell_a = extrude_shell(&profile_a, &arr_a, 2.0);
+        let (profile_b, arr_b) = disk_profile(Point2::new(2.0, 2.0), 1.0);
+        let shell_b = extrude_shell(&profile_b, &arr_b, 2.0);
+
+        // The SIX events: for EACH of z = 2 and z = 0 — the FF circle (a's
+        // face at z x b's wall), the FE `BoundedCurve` (a's face at z x b's
+        // wall rim edge at z), and the Region2 `Coincident` (a's face at z x
+        // b's cap at z), built exactly like the landed top-only test's three
+        // events. The z = 0 triple drives the splitter through a's INVERTED
+        // bottom face, which no landed test touches.
+        let mut events = Vec::new();
+        for (z, face_a) in [
+            (2.0, plane_face_at_z(&shell_a, 2.0)),
+            (0.0, plane_face_at_z(&shell_a, 0.0)),
+        ] {
+            let wall_b = cylinder_face(&shell_b);
+            let cap_b = plane_face_at_z(&shell_b, z);
+            let rim_edge = flat_edge_at_z(&shell_b, wall_b, z);
+            let exact = ExactCurve::Circle(placed_circle(Point3::new(2.0, 2.0, z), 1.0));
+            // FF: the wall x plane intersection circle, on a's face at z and
+            // b's wall.
+            events.push(ev(
+                ff_curve_record(exact.clone()),
+                StratumRef::Face {
+                    solid: SolidRef::A,
+                    index: face_a,
+                },
+                StratumRef::Face {
+                    solid: SolidRef::B,
+                    index: wall_b,
+                },
+            ));
+            // FE: the same circle carried by b's wall rim edge at z (the
+            // sewing oracle).
+            events.push(ev(
+                ContactRecord {
+                    dimension: ContactDimension::Arc1,
+                    kind: ContactEventKind::CoincidentInterval,
+                    locus: ContactLocus::BoundedCurve {
+                        curve: exact,
+                        t_range: (0.0, TAU),
+                    },
+                },
+                StratumRef::Face {
+                    solid: SolidRef::A,
+                    index: face_a,
+                },
+                StratumRef::Edge {
+                    solid: SolidRef::B,
+                    face: wall_b,
+                    edge: rim_edge,
+                },
+            ));
+            // Region2: a's face at z and b's cap at z are coincident.
+            events.push(ev(
+                ContactRecord {
+                    dimension: ContactDimension::Region2,
+                    kind: ContactEventKind::CoincidentInterval,
+                    locus: ContactLocus::Coincident,
+                },
+                StratumRef::Face {
+                    solid: SolidRef::A,
+                    index: face_a,
+                },
+                StratumRef::Face {
+                    solid: SolidRef::B,
+                    index: cap_b,
+                },
+            ));
+        }
+
+        let mesh = split_fragments(&shell_a, &shell_b, &events, TOL)
+            .unwrap()
+            .value;
+
+        // Derivation of the decision-3 mesh (BG-NUM-002; the probe measured
+        // the same numbers): the bottom face divides EXACTLY like the top.
+        // Each of a's horizontal faces becomes a DISK `[2]` (the two rim
+        // half-edges) and an ANNULUS `[4, 2]` (the square wire + the hole
+        // wire of the same two half-edges inverted), so a = 2 + 2 + 4 = 8
+        // fragments. b's wall stays a single fragment cut at BOTH rims
+        // (`[2, 2]`), and the two caps stay one each: b = 3. Total 11.
+        assert_eq!(mesh.fragments.len(), 11);
+
+        let top_a = plane_face_at_z(&shell_a, 2.0);
+        let bottom_a = plane_face_at_z(&shell_a, 0.0);
+
+        // Each horizontal face of a divides into exactly two fragments with
+        // the same wire structures: the `[4, 2]` annulus and the `[2]` disk.
+        let divide = |face_a: usize| -> (usize, usize) {
+            let frags = fragments_of_origin(&mesh, SolidRef::A, face_a);
+            assert_eq!(frags.len(), 2);
+            let mut annulus = None;
+            let mut disk = None;
+            for idx in frags {
+                let counts = wire_edge_counts(&mesh, idx);
+                match counts.as_slice() {
+                    [2] => disk = Some(idx),
+                    [4, 2] => annulus = Some(idx),
+                    other => unreachable!("unexpected face wire structure: {other:?}"),
+                }
+            }
+            (disk.unwrap(), annulus.unwrap())
+        };
+        let (top_disk, top_annulus) = divide(top_a);
+        let (bottom_disk, bottom_annulus) = divide(bottom_a);
+        assert_ne!(top_disk, top_annulus);
+        assert_ne!(bottom_disk, bottom_annulus);
+
+        // Every other face is exactly one fragment: a's 4 sides, b's wall, and
+        // b's two caps.
+        for side in 2..6 {
+            assert_eq!(fragments_of_origin(&mesh, SolidRef::A, side).len(), 1);
+        }
+        let wall_b = cylinder_face(&shell_b);
+        let wall_frag = fragments_of_origin(&mesh, SolidRef::B, wall_b)[0];
+        // The wall is cut at BOTH rims: two wires of the two rim half-edges.
+        assert_eq!(wire_edge_counts(&mesh, wall_frag), vec![2, 2]);
+        for z in [0.0, 2.0] {
+            let cap = plane_face_at_z(&shell_b, z);
+            assert_eq!(fragments_of_origin(&mesh, SolidRef::B, cap).len(), 1);
+        }
+
+        // Adjacency: 4 Flip (two per rim, disk<->annulus) + 16 Same (a's 12:
+        // each annulus<->4 sides and sides<->sides 4; b's 4: wall<->each cap
+        // 2), all same-solid (cross-solid edges are sewing, never adjacency).
+        assert_eq!(mesh.adjacency.len(), 20);
+        let flips = mesh
+            .adjacency
+            .iter()
+            .filter(|a| a.parity == AdjacencyParity::Flip)
+            .collect::<Vec<_>>();
+        assert_eq!(flips.len(), 4);
+        for a in &flips {
+            assert!(
+                (a.lhs == top_disk && a.rhs == top_annulus)
+                    || (a.lhs == top_annulus && a.rhs == top_disk)
+                    || (a.lhs == bottom_disk && a.rhs == bottom_annulus)
+                    || (a.lhs == bottom_annulus && a.rhs == bottom_disk),
+                "the only Flip entries are the two disks' <-> annuli pairs"
+            );
+        }
+        assert_eq!(
+            mesh.adjacency
+                .iter()
+                .filter(|a| a.parity == AdjacencyParity::Same)
+                .count(),
+            16
+        );
+        for a in &mesh.adjacency {
+            let lhs_solid = match mesh.fragments[a.lhs].origin {
+                FragmentOrigin::A { .. } => SolidRef::A,
+                FragmentOrigin::B { .. } => SolidRef::B,
+            };
+            let rhs_solid = match mesh.fragments[a.rhs].origin {
+                FragmentOrigin::A { .. } => SolidRef::A,
+                FragmentOrigin::B { .. } => SolidRef::B,
+            };
+            assert_eq!(
+                lhs_solid, rhs_solid,
+                "adjacency is same-solid only; cross-solid edges are sewing"
+            );
+        }
+
+        // Coincident: exactly two pairs, both Identical, pairing each DISK
+        // fragment (the `[2]` one) with the cap at the same z.
+        let top_cap = fragments_of_origin(&mesh, SolidRef::B, plane_face_at_z(&shell_b, 2.0))[0];
+        let bottom_cap = fragments_of_origin(&mesh, SolidRef::B, plane_face_at_z(&shell_b, 0.0))[0];
+        assert_eq!(mesh.coincident.len(), 2);
+        let mut expected = vec![(top_disk, top_cap), (bottom_disk, bottom_cap)];
+        for pair in &mesh.coincident {
+            assert_eq!(pair.orientation, CoincidentOrientation::Identical);
+            let slot = expected
+                .iter()
+                .position(|(d, c)| *d == pair.a && *c == pair.b)
+                .expect("every coincident pair is a disk<->same-z cap pair");
+            expected.remove(slot);
+        }
+        assert!(
+            expected.is_empty(),
+            "missing coincident pairs: {expected:?}"
+        );
+
+        // The two rim half-edge INSTANCES at EACH rim are EdgeID-identical
+        // (compared as unordered pairs like the landed test) across the disk
+        // fragment, the annulus's hole wire, the wall's wire at that z, and
+        // the cap's wire.
+        let same_pair = |a: &[EdgeID<Curve>], b: &[EdgeID<Curve>]| {
+            a.len() == b.len() && a.iter().all(|id| b.contains(id))
+        };
+        let annulus_hole_ids = |annulus: usize| -> Vec<EdgeID<Curve>> {
+            mesh.fragments[annulus]
+                .face
+                .absolute_boundaries()
+                .get(1)
+                .unwrap()
+                .edge_iter()
+                .map(|e| e.id())
+                .collect()
+        };
+        let wall_wire_at_z = |z: f64| -> Vec<EdgeID<Curve>> {
+            mesh.fragments[wall_frag]
+                .face
+                .absolute_boundaries()
+                .iter()
+                .find(|wire| {
+                    wire.edge_iter().next().is_some_and(|edge| {
+                        let (t0, t1) = edge.curve().range_tuple();
+                        (edge.curve().subs((t0 + t1) * 0.5).z - z).abs() < TOL
+                    })
+                })
+                .expect("the wall has a wire at each rim height")
+                .edge_iter()
+                .map(|e| e.id())
+                .collect()
+        };
+        for (z, disk, annulus, cap) in [
+            (2.0, top_disk, top_annulus, top_cap),
+            (0.0, bottom_disk, bottom_annulus, bottom_cap),
+        ] {
+            let disk_ids = fragment_edge_ids(&mesh, disk);
+            assert_eq!(disk_ids.len(), 2);
+            assert!(
+                same_pair(&annulus_hole_ids(annulus), &disk_ids),
+                "the annulus's hole wire shares the rim halves at z = {z}"
+            );
+            assert!(
+                same_pair(&wall_wire_at_z(z), &disk_ids),
+                "the wall's wire shares the rim halves at z = {z}"
+            );
+            assert!(
+                same_pair(&fragment_edge_ids(&mesh, cap), &disk_ids),
+                "the cap's wire shares the rim halves at z = {z}"
+            );
+        }
+    }
+
+    // ---------------------------------------------------------------------------
+    // Test: the sewn rim directions preserve every use's effective traversal.
+    // ---------------------------------------------------------------------------
+
+    #[test]
+    fn split_sewn_rim_directions_preserve_effective_traversals() {
+        // The LANDED top-only three-event mesh (the flagship test's events,
+        // copied verbatim).
+        let (profile_a, arr_a) = block_profile();
+        let shell_a = extrude_shell(&profile_a, &arr_a, 2.0);
+        let (profile_b, arr_b) = disk_profile(Point2::new(2.0, 2.0), 1.0);
+        let shell_b = extrude_shell(&profile_b, &arr_b, 2.0);
+
+        let top_a = plane_face_at_z(&shell_a, 2.0);
+        let wall_b = cylinder_face(&shell_b);
+        let cap_b = plane_face_at_z(&shell_b, 2.0);
+        let rim_edge = flat_edge_at_z(&shell_b, wall_b, 2.0);
+        let exact = ExactCurve::Circle(placed_circle(Point3::new(2.0, 2.0, 2.0), 1.0));
+
+        // FF: the wall x plane intersection circle, on a's top face and b's wall.
+        let ff = ev(
+            ff_curve_record(exact.clone()),
+            StratumRef::Face {
+                solid: SolidRef::A,
+                index: top_a,
+            },
+            StratumRef::Face {
+                solid: SolidRef::B,
+                index: wall_b,
+            },
+        );
+        // FE: the same circle carried by b's wall top rim edge (the sewing oracle).
+        let fe = ev(
+            ContactRecord {
+                dimension: ContactDimension::Arc1,
+                kind: ContactEventKind::CoincidentInterval,
+                locus: ContactLocus::BoundedCurve {
+                    curve: exact,
+                    t_range: (0.0, TAU),
+                },
+            },
+            StratumRef::Face {
+                solid: SolidRef::A,
+                index: top_a,
+            },
+            StratumRef::Edge {
+                solid: SolidRef::B,
+                face: wall_b,
+                edge: rim_edge,
+            },
+        );
+        // Region2: a's top face and b's top cap are coincident.
+        let r2 = ev(
+            ContactRecord {
+                dimension: ContactDimension::Region2,
+                kind: ContactEventKind::CoincidentInterval,
+                locus: ContactLocus::Coincident,
+            },
+            StratumRef::Face {
+                solid: SolidRef::A,
+                index: top_a,
+            },
+            StratumRef::Face {
+                solid: SolidRef::B,
+                index: cap_b,
+            },
+        );
+
+        let mesh = split_fragments(&shell_a, &shell_b, &[ff, fe, r2], TOL)
+            .unwrap()
+            .value;
+
+        // Identify the fragments: a's top DISK `[2]` and ANNULUS `[4, 2]`, b's
+        // top CAP and b's WALL (each a single fragment).
+        let top_frags = fragments_of_origin(&mesh, SolidRef::A, top_a);
+        let mut annulus = None;
+        let mut disk = None;
+        for idx in top_frags {
+            let counts = wire_edge_counts(&mesh, idx);
+            match counts.as_slice() {
+                [2] => disk = Some(idx),
+                [4, 2] => annulus = Some(idx),
+                other => unreachable!("unexpected top-face wire structure: {other:?}"),
+            }
+        }
+        let disk = disk.unwrap();
+        let annulus = annulus.unwrap();
+        let wall_frag = fragments_of_origin(&mesh, SolidRef::B, wall_b)[0];
+        let cap_frag = fragments_of_origin(&mesh, SolidRef::B, cap_b)[0];
+
+        // The two shared rim half-edge ids (the disk fragment's single wire).
+        let rim_ids = fragment_edge_ids(&mesh, disk);
+        assert_eq!(rim_ids.len(), 2);
+
+        // The EFFECTIVE use orientation of a rim id inside one named wire of a
+        // face: the orientation flag of the edge instance in
+        // `face.boundaries()`, which for an inverted face is the stored wire
+        // INVERTED, so the effective traversal matches the face's effective
+        // normal. Wire indices: the disk/cap carry the rim in their single
+        // wire (0); the annulus's HOLE is the second wire of `[4, 2]`; the
+        // wall's TOP wire is the second stored wire (the landed flagship test
+        // reads `absolute_boundaries().get(1)` for the top rim).
+        let wire_use =
+            |face: &Face<Point3, Curve, Surface>, wire_idx: usize, id: EdgeID<Curve>| -> bool {
+                face.boundaries()[wire_idx]
+                    .edge_iter()
+                    .find(|edge| edge.id() == id)
+                    .map(|edge| edge.orientation())
+                    .unwrap()
+            };
+
+        let disk_face = &mesh.fragments[disk].face;
+        let annulus_face = &mesh.fragments[annulus].face;
+        let wall_face = &mesh.fragments[wall_frag].face;
+        let cap_face = &mesh.fragments[cap_frag].face;
+
+        // Derivation from the sewing-oracle contract (every use keeps its
+        // original effective traversal): (i) the coincident disk/cap pair is
+        // the same region with the same effective normal, so both traverse the
+        // shared rim the same way; (ii) in b's original closed shell the cap
+        // and the wall traverse the rim in OPPOSITE effective directions
+        // (adjacent faces of a closed shell), so the wall traverses opposite
+        // to the cap, i.e. exactly as the annulus's hole wire — the doubled
+        // loop's inverse of the disk, which equals the cap; (iii) the doubled
+        // loop is the same wire used both ways, so the disk and the annulus's
+        // hole oppose.
+        for id in &rim_ids {
+            assert_eq!(
+                wire_use(disk_face, 0, *id),
+                wire_use(cap_face, 0, *id),
+                "the coincident disk/cap pair shares the rim traversal"
+            );
+            assert_eq!(
+                wire_use(annulus_face, 1, *id),
+                wire_use(wall_face, 1, *id),
+                "the annulus's hole and the wall's top wire share the rim traversal"
+            );
+            assert_ne!(
+                wire_use(disk_face, 0, *id),
+                wire_use(annulus_face, 1, *id),
+                "the doubled loop opposes the disk"
             );
         }
     }
