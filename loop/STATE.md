@@ -9,115 +9,155 @@ when they stop being true, never for length. If you are picking this up cold, re
 [`loop/ORCHESTRATOR.md`](ORCHESTRATOR.md) for how to run the loop, then
 `python loop/slot_status.py`** - nothing else. Do not read `LEDGER.jsonl` whole.
 
-Updated 2026-08-27, close of session 38 (RW3 + the two splitter fixes landed;
-the RW4 packet written and fully measured, held READY). Branch:
-`integration/kernel-bg`, HEAD `34022b1`.
+Updated 2026-08-27, close of session 39 (RW4-ASSEMBLE and M2-WITNESS
+landed, both ACCEPTED first-try - **THE M2 MILESTONE IS COMPLETE**).
+Branch: `integration/kernel-bg`, HEAD `973234d`.
 
 ## Where we are
 
-**Session 38 landed TWO packets and pre-paid a third.** The M2 chain is
-one dispatch away from the assembler:
+**Session 39 landed the entire remaining M2 chain, one packet at a
+time, zero verify round trips.** The cross-layer flagship is measured
+and pinned:
 
-1. **BG-SOL-RW3-CLASSIFY** (`ed2f657`, ACCEPTED, landed as `71a971e`):
-   the §12 classifier - `boolean/classify.rs` (1430 lines), the
-   `Prop::FragmentInsideOther` arm, the split.rs pub(crate) exports. ZERO
-   deviations: the worker reproduced every packet number (flagship bits
-   `[F,F,T,F,F,F,F,T,T,T]`, the pre-screen, the ambiguous-direction
-   retry, the open-arc `Contradictory` refusal). All six tests green.
-2. **The RW4 pre-dispatch prototype found TWO latent splitter defects**
-   (see the session-38 traps): extending `scratch/rw3probe` to the
-   assembler over the REAL six-event flagship mesh (top AND bottom
-   FF/FE/Region2) showed the bottom (inverted) face scrambling into
-   `[2,2]+[4]` and the sewn rim directions rotating so only Union could
-   ever close. **BG-SOL-SPLIT-INVERTED** (`699d571`, ACCEPTED, landed as
-   `9c20011`/`34022b1`) fixes both: `is_region = area > 0.0` (the
-   stored-frame outer-positive invariant) and forward-traversal
-   normalization in `build_closed_loop_wire`/`prepare_contained_wire`.
-   Both fixes were machine-validated BEFORE dispatch by the probe's
-   `split_fixed` module (a patched copy of split.rs): the six-event mesh
-   becomes 11 fragments / 20 adjacency (4 Flip) / 2 Identical pairs on
-   the disks; the classifier bits `[F,T,F,T,F,F,F,F,T,T,T]`; ALL FOUR
-   ops assemble (Union 8, Intersection 3, Difference 7, Xor 7 faces,
-   `Solid::try_new` Ok each); Difference is congruent to `Extrude(P-Q)`
-   (six containment probes + a 256-point grid, 208/208); and the sweep
-   prototype (lift + 3-D AABB candidate screen + `contact()` over
-   cross-solid FF/FE/EE pairs) produces EXACTLY the six events with the
-   right provenance, reproducing the hand-built mesh.
-3. **BG-SOL-RW4-ASSEMBLE is WRITTEN, MEASURED, and READY - the
-   frontier** (packet at `loop/packets/BG-SOL-RW4-ASSEMBLE.md`; its
-   decision table, pair-dedup rule, sweep screen, and all expected
-   numbers come from the probe). Re-derive its anchors against HEAD by
-   command before dispatch (A2 becomes 4 with `assemble.rs`, A3 is 9).
+1. **BG-SOL-RW4-ASSEMBLE** (`c1d6e12`, ACCEPTED, merged `ac32f17`/`bd591bb`):
+   `boolean/assemble.rs` (1011 lines) + `pub mod assemble;` - the
+   `boolean()` entry (lift + AABB-screened sweep + split + classify +
+   decide/sew + `Solid::try_new`) with the six-event sweep
+   (`sweep_contact_events`, pub(crate)), the decision table, the pair
+   dedup, and 4 tests. Every packet number reproduced exactly (six
+   events with the predicted provenance; 7/8/3/7 faces for
+   Difference/Union/Intersection/Xor; 22/22 boolean tests). One
+   deviation: `use super::BoolOp` for the packet's `use crate::BoolOp`
+   (BoolOp lives at `crate::boolean::BoolOp`) - the worker was right.
+2. **BG-SOL-M2-WITNESS** (`5d63f09`, ACCEPTED, merged/filed `973234d`):
+   `tests/boolean_m2.rs` (750 lines, 4 tests) - the cross-layer
+   flagship `Extrude(P−Q) ≅ boolean(Extrude(P), Difference, Extrude(Q))`
+   as a face-set bijection, `A∩B ≅ Extrude(Q)` (wall outward), Union
+   commutativity both orders, and the self-pair boundary. One
+   deviation, the worker RIGHT: my packet's ground-truth wire census
+   was hand-derived from the boolean side and wrong (see traps).
+
+**The M2 flagship's measured numbers** (probe `scratch/m2probe_run1.txt`
+against the LANDED entry at `bd591bb`): Difference 7v7 faces, 256/256
+per-point grid; Intersection 3v3, 48/48; Union 8/8 BOTH orders, 256/256
+each; commutativity 256/256. **The self-pair runs (`A op A`, Union AND
+Difference) both refuse `UnsupportedEnvelope(ContactReductionDeferred)**
+- the typed v1 boundary, asserted by the battery; the idempotence
+ALGEBRA was already pinned by mod.rs's
+`material_state_decides_coincident_fragments`; the self-pair EVENT
+COMPLEX (intra-solid adjacency events) is the RW-COPLANAR family's
+concern. Which stage inside split/classify/decide/assemble folds is
+UNIDENTIFIED - one line of archaeology for whoever picks up that family.
 
 Progress estimate, difficulty-weighted:
 
-- M2 critical path: about **93% complete** (the funnel, the material
-  primitive, the splitter + three fix packets, the classifier, and the
-  assembler's FULL design are landed or measured; the RW4 CODE and the
-  M2 witness remain).
-- Entire approved solver family: about **67-70% complete**.
-- At the demonstrated rate: RW4 is about **half a day** (dispatch ->
-  verify -> land), then M2-WITNESS about a day.
+- M2 critical path: **100%** (funnel, material primitive, splitter +
+  three fixes, classifier, assembler, witness - all landed).
+- Entire approved solver family: about **75%** (the P4 wave's READY
+  packets are exhausted; what remains are the side branches and named
+  follow-ups, none of which has a packet written yet).
 
 ## Pick up here
 
-1. **BG-SOL-RW4-ASSEMBLE is the frontier** (registry READY, needs all
-   satisfied, packet written from the measured prototype). Dispatch it
-   FIRST; do not redesign - every number in it is measured. Re-derive
-   the anchors against HEAD (`scratch/anchors_split_inverted.sh` is the
-   script pattern), then `new_slot` + `run_packet` in one motion.
-2. **Then BG-SOL-M2-WITNESS**: the cross-layer flagship
-   `Extrude(P-Q) ~= boolean(Extrude(P), Difference, Extrude(Q))` plus
-   the metamorphic battery (A∪A≅A, A−A=∅, A∩B≅ the cylinder, A∪B≅B∪A).
-   Design note for its packet: the A−A case through the ENTRY runs the
-   sweep over a solid paired with ITSELF (self-pair events; the identity
-   arm fires per face) - decide whether the entry guards it or the
-   battery constructs it another way. RW4 deliberately does NOT claim
-   it.
-3. BG-SOL-S7-OVERLAP-PLANE (rotated-frame coplanar SAT) - named
-   follow-up, NOT on M2's path.
-4. Parallel side branches after/alongside: S8 safe shell, local fillet
-   scoping, RMF sweep, minimal-knot loft.
-5. Open latent flake, NOT fixed: `truck-base/tests/newton.rs::test_newton1`.
-   Its own packet.
-6. Recommended, NOT dispatched: follow-up audit of
-   `truck-evidence/src/fid/rep.rs` (4362 lines). Its own program.
+1. **The frontier is EMPTY** (`schedule.py` reports 0 eligible - the
+   first time in the program). The next session's work is WRITING
+   packets, from the plan doc's §5 graph: the parallel side branches
+   (S8 safe shell, local fillet scoping, RMF sweep, minimal-knot loft -
+   all write-disjoint from `boolean/`), S7-OVERLAP-PLANE (rotated-frame
+   coplanar SAT), the `newton.rs::test_newton1` flake (its own packet),
+   and/or the recommended rep.rs follow-up audit (its own program).
+   Design packets get the num3-scratch discipline: prototype, MEASURE,
+   then write the packet with the measured numbers.
+2. The self-pair fold and the M2 battery's recorded limitation: if a
+   future entry change makes `A op A` stop refusing, the M2 test FAILS
+   by design (the packet's stop condition) - update the battery AND the
+   fold documentation together.
+3. Open latent flake, NOT fixed: `truck-base/tests/newton.rs::test_newton1`.
 
 ## State of the machine, as left
 
 - Watchdog RUNNING (`loop/watchdog.lock`, pid 20024).
-- Registry: 116 rows = 113 DONE + 1 BLOCKED (BG-AUD-FIX-004 owner) + 2
-  READY (RW4-ASSEMBLE, M2-WITNESS); RW4-ASSEMBLE is the only one whose
-  needs are all satisfied.
-- Slots 0-3 FINISHED. Slot 1 holds the landed SPLIT-INVERTED branch
-  with its worker.pid/packet/branch files DELETED (a clean idle slot -
-  fork + dispatch in one motion next session, or it looks like a dead
-  worker to the watchdog). Slot 1's target is 12.74 GB, reclaimable by
-  the watchdog if needed.
-- Disk about 10.1 GB free (the rw3probe target was deleted at close;
-  its SOURCES, the `split_fixed` module, the run logs
-  `scratch/rw4probe_run*.txt`, `scratch/_mk_split_fixed.py`, and the
-  anchor scripts are preserved as the design-session evidence).
+- Registry: 116 rows = 115 DONE + 1 BLOCKED (BG-AUD-FIX-004 owner);
+  **0 READY** - nothing is dispatchable until new packets are written.
+- Slots 0-3 FINISHED. Slot 1 is clean-idle (its worker.pid/packet/
+  branch and the stale VERDICT.json were deleted at close; it holds the
+  landed M2-WITNESS branch; its target is 12.75 GB, reclaimable by the
+  watchdog).
+- Disk about 11 GB free (the rw3probe target was deleted at close; its
+  sources, `scratch/m2probe_run1.txt`, the anchor scripts
+  `scratch/anchors_rw4.sh` / `scratch/anchors_m2_witness.sh`, and
+  `scratch/m2_witness_design.md` are preserved as the design evidence).
 - GATE-4 ceiling 111 = true count; `kernel-gates.sh HEAD` passes all
-  P-3 gates and 111/111 at `34022b1`.
-- Results filed at `loop/results/BG-SOL-RW3-CLASSIFY.json` and
-  `loop/results/BG-SOL-SPLIT-INVERTED.json`.
-- Root tracked tree clean apart from this STATE rewrite. Numerous
-  pre-existing untracked user/baseline/scratch files remain and must be
-  preserved.
+  P-3 gates and 111/111 at `973234d`.
+- Results filed at `loop/results/BG-SOL-RW4-ASSEMBLE.json` and
+  `loop/results/BG-SOL-M2-WITNESS.json`.
+- Root tracked tree clean apart from this STATE rewrite.
 
 ## The parallelism picture
 
-Nothing running (watchdog only). The rewrite chain stays sequential
-(RW4 consumes the fix's split.rs semantics and RW3's classifier;
-M2-WITNESS consumes RW4's entry). If a second wave is wanted while RW4
-runs, the side branches (S8 shell, fillet, sweep, loft, overlap-plane)
-are write-disjoint from `boolean/` - but do NOT run a verify alongside
-a live worker below ~15 GB free (session-36 trap 1; the session-37/38
-quiet-machine verifies at ~10-12 GB passed only because the workers had
-exited).
+Nothing running (watchdog only). The next wave is whatever side-branch
+packets get written (write-disjoint from each other per the scheduler).
+The disk rules stand: no verify alongside a live worker below ~15 GB
+free; quiet-machine verifies at ~10-12 GB have now passed three
+sessions running (37, 38, 39) - but only because the workers had
+exited.
 
 ## Traps, each one paid for
+
+### Session 39 (the M2 chain closed: RW4 + M2-WITNESS, both first-try) - paid in full
+
+- **A yaml anchor pinned to the POST-landing value refuses dispatch -
+  and the packet prose had forecast it wrong in BOTH directions.** The
+  RW4 packet's yaml said A2 (files in `src/boolean/`) = 4 when the
+  pre-dispatch tree held 3; "A2 becomes 4 once assemble.rs exists" is
+  the POST-landing value. The handoff flagged it; the anchor script
+  (`scratch/anchors_rw4.sh`, the session-38 pattern) measured 3 and the
+  yaml was corrected pre-dispatch. Then MY OWN M2 packet repeated the
+  disease in prose: "A2 becomes 5" - wrong even as forecast, because
+  `boolean_m2.rs` lands in `tests/`, not `src/boolean/` (the worker
+  caught the miscount). Two rules: the yaml holds what the ROOT shows
+  NOW, measured by command; and forecast parentheticals ("becomes N")
+  are per-packet derivations, never copy-paste between packets.
+- **`scratch/` is untracked, therefore ABSENT from slot worktrees - a
+  packet that points the worker at scratch evidence is pointing at
+  nothing.** The RW4 worker's disagreement: "rw3probe does not exist at
+  this fork point (scratch/ holds only the fid-* scripts)". Correct
+  from where it sat: untracked files do not propagate to worktrees.
+  Every measured number must be IN the packet; cite the probe's log by
+  name as provenance only, never as a file the worker is asked to read.
+- **The M1 construction's full circles are SINGLE SELF-LOOP EDGES; the
+  boolean splitter's are seam-split halves - and a census hand-derived
+  from one side about the other is wrong.** Extrude(Q)'s caps are
+  `[1]`-wire and its wall `[1,1]`-wire; Extrude(P−Q)'s caps are
+  `[4,1]`; the boolean results carry `[2]`/`[2,2]`/`[4,2]` (the session
+  -28 self-loop construction versus the splitter's seam cut). My M2
+  packet stated the M1 side's census from the boolean side's numbers;
+  the worker's machine-check mandate caught it (deviation, zero round
+  trips) and the correct fix is the per-wire DISTINCT-curve-kind
+  signature (a full circle is one {Circle} wire however many edges
+  carry it). Measure the thing you cite; the BG-NUM-002 rule applies to
+  census numbers exactly as to arithmetic. The probe's `m2_compare`
+  printed face COUNTS - the wire structure was inferred, not measured.
+- **The A−A self-pair design question is DECIDED and measured: the
+  entry refuses it, and the refusal is the v1 boundary.** Running
+  `boolean(A, op, A)` through the LANDED entry (the probe
+  path-depends on vendor, so post-landing it drives the real code)
+  yields `Err(UnsupportedEnvelope(ContactReductionDeferred))` for BOTH
+  Union and Difference - the self-pair sweep's intra-solid adjacency
+  events (perpendicular side×cap Line records on shared edges, FE rim
+  coincidences, EE vertex sharings) are an event class no well-posed
+  cross-solid input produces. The M2 battery asserts the refusal; the
+  idempotence algebra was already pinned by mod.rs's
+  `material_state_decides_coincident_fragments`; the REJECTED
+  alternatives (a ptr::eq fast path in the entry - cosmetic, the clone
+  case still degenerates; hand-building the self-pair event list in the
+  battery - inflates the claim past the entry) are recorded in
+  `scratch/m2_witness_design.md`. Which stage inside
+  split/classify/decide/assemble folds is unidentified.
+- **`cargo test`-class commands in PowerShell through a bare `bash`
+  hit the WSL stub** (re-hit at session close running kernel-gates;
+  the recorded rule is `& "C:\Program Files\Git\bin\bash.exe" ...`).
+  Cheap to re-learn, annoying every time.
 
 ### Session 38 (the six-event probe: two latent splitter defects + the RW4 prototype) - paid in full
 
