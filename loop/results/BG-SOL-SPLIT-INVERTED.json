@@ -1,0 +1,12 @@
+{
+  "id": "BG-SOL-SPLIT-INVERTED",
+  "status": "DONE",
+  "contracts": ["BG-SOL-SPLIT-INVERTED"],
+  "tests_added": 2,
+  "sites_migrated": 0,
+  "sites_deferred": 0,
+  "deviations": [],
+  "disagreements": [],
+  "baseline_failures": [],
+  "notes": "Both decision fixes landed in vendor/truck/truck-shapeops/src/boolean/split.rs and nothing else changed: (1) divide_one_face's is_region classifies by the STORED-frame sign (area > 0.0 regardless of the orientation flag), so the inverted extruded bottom face divides like the top; (2) build_closed_loop_wire and prepare_contained_wire normalize the cut halves to the edge's FORWARD traversal before swap_edge_into_wire, preserving every use's original effective traversal. The six-event flagship test split_six_event_flagship_bottom_face_divides_like_the_top and the direction test split_sewn_rim_directions_preserve_effective_traversals were added (A3 7 -> 9; all other anchors unchanged). Measured six-event mesh (test 1 asserts every number): 11 fragments; a's bottom face divides exactly like the top (annulus [4, 2], disk [2]); wall is one fragment [2, 2], both caps one each; 20 adjacency = 4 Flip (two per rim, disk<->annulus) + 16 Same (a's 12: each annulus<->4 sides + sides<->sides 4; b's 4: wall<->each cap 2), same-solid only; 2 coincident pairs, both Identical, pairing each disk with the cap at the same z; the two rim half-edge instances at EACH rim are EdgeID-identical across disk, annulus hole wire, wall wire at z, and cap wire. Direction test: disk/cap share the rim traversal, annulus hole/wall top wire share it (opposite to disk/cap), disk vs annulus hole oppose. Pre-existing tests run green: all 18 `--lib boolean` tests green (7 pre-existing split + 6 classify + 3 material_state, all previously passing, plus the 2 new). Verification: cargo fmt --check, cargo clippy -p truck-shapeops --all-targets --no-deps, cargo check --locked, cargo test -p truck-shapeops --lib boolean --no-fail-fast all clean; scripts/kernel-gates.sh ff9b73b passes (GATE-4 111/111). Probe comparison: the scratch/rw3probe directory (with its split_fixed module) is NOT present in this worktree, so no direct diff against the preserved prototype was possible; the probe's predictions are confirmed by assertion instead — the produced six-event mesh matches decision 3's measured numbers exactly on every asserted quantity and the effective-traversal relations hold, so the two fixes reproduce the measured post-fix mesh. Commit 699d571 (subject as specified) on branch packet/BG-SOL-SPLIT-INVERTED."
+}
