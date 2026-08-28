@@ -4,148 +4,202 @@ Rewritten at the end of every session. The **volatile** part - everything from
 "Where we are" through "The parallelism picture" - is capped at ~120 lines and
 must be rewritten each time. "Traps" and everything below it is **stable and
 accumulates**: entries are added when something costs a session and removed only
-when they stop being true, never for length. (The old header claimed the cap
-covered everything above "Quick reference"; it never did, and pretending
-otherwise would eventually cost a trap.) If you are picking this up cold, read
+when they stop being true, never for length. If you are picking this up cold, read
 **this file, then
 [`loop/ORCHESTRATOR.md`](ORCHESTRATOR.md) for how to run the loop, then
 `python loop/slot_status.py`** - nothing else. Do not read `LEDGER.jsonl` whole.
 
-Updated 2026-08-27, close of session 36 (the Boundary Rewrite design session
-+ its first two packets + the S2 blocker fix landed). Branch:
-`integration/kernel-bg`, HEAD `7b991a6`.
-
-# Autobuild loop - STATE
-
-Rewritten at the end of every session. The **volatile** part - everything from
-"Where we are" through "The parallelism picture" - is capped at ~120 lines and
-must be rewritten each time. "Traps" and everything below it is **stable and
-accumulates**: entries are added when something costs a session and removed only
-when they stop being true, never for length. (The old header claimed the cap
-covered everything above "Quick reference"; it never did, and pretending
-otherwise would eventually cost a trap.) If you are picking this up cold, read
-**this file, then
-[`loop/ORCHESTRATOR.md`](ORCHESTRATOR.md) for how to run the loop, then
-`python loop/slot_status.py`** - nothing else. Do not read `LEDGER.jsonl` whole.
-
-Updated 2026-08-27, close of session 37 (the periodic-branch regression fix
-landed; the RW3 classifier packet written and probe-validated, held READY).
-Branch: `integration/kernel-bg`, HEAD `175d295`.
+Updated 2026-08-27, close of session 38 (RW3 + the two splitter fixes landed;
+the RW4 packet written and fully measured, held READY). Branch:
+`integration/kernel-bg`, HEAD `34022b1`.
 
 ## Where we are
 
-**Session 37 found and fixed a latent HEAD regression, then finished the
-RW3 design work.** The M2 chain is one packet away from resuming:
+**Session 38 landed TWO packets and pre-paid a third.** The M2 chain is
+one dispatch away from the assembler:
 
-1. **The regression**: the landed flagship test
-   `split_flagship_top_face_by_ff_circle` FAILED at HEAD
-   (`cargo test -p truck-shapeops --lib boolean` — the orchestrator's
-   pre-dispatch probe caught it; nothing had run cargo test at merged
-   HEAD since the parallel S2/RW2 landings of session 36). Root cause:
-   RW2 was verified at its own pre-S2 fork point (the packets ran in
-   parallel), and the S2 wall fix changed the extruded wall's top-wire
-   traversal direction, so `classify_curve`'s folded samples no longer
-   registered as on-boundary against the wall's unwrapped polygon (a
-   periodic-branch frame mismatch) → `Crossing` → `insert_clipped_arc`
-   refused.
-2. **BG-SOL-SPLIT-PERIODIC** (`0759d90`, ACCEPTED, landed as `175d295`):
-   `region_contains` and `on_face_boundary` take `u_period` and re-test
-   the QUERY at `p.x ± period` (three translates), threaded from the
-   face at hand (classify_curve, fragment_covering);
-   `region_representative`/`containment_screen` pass `None` (the
-   Region2 two-face periodic case is the recorded limitation). All ten
-   boolean tests pass at HEAD; the open-arc test's b-side wall now
-   splits properly into 2 fragments (the full generator lines inserted
-   — the worker's machine-checked note). Zero new tolerance sites
-   (111 → 111). The worker caught TWO arithmetic errors in the
-   orchestrator's own packet prose (10 fragments not 9; 16 adjacency
-   not 17 — without the FE event the rim is not cut into halves).
-3. **BG-SOL-RW3-CLASSIFY is WRITTEN, VALIDATED, and READY — not
-   dispatched** (write-set collision with the fix; the session chose to
-   close instead). The full classifier prototype ran against the landed
-   splitter (`scratch/rw3probe`, source preserved, target deleted):
-   the flagship bits are exactly `[F,F,T,F,F,F,F,T,T,T]`; the arc-side
-   sign convention is CONFIRMED (the annulus reads
-   `(n_F × der) · n_B = +1.0` at the rim midpoint ⇒ outside); the ray
-   seeds answer disjoint/contained/retry correctly; the open-arc mesh
-   refuses `Contradictory` (the parity check catches under-split
-   meshes). The plan doc §4 carries the session-37 classifier amendment
-   (signature, s_F, pre-screen, band rule, `Prop::FragmentInsideOther`,
-   the validated witnesses, the straddling-fragment limitation). All 8
-   packet anchors re-derived against `175d295`.
+1. **BG-SOL-RW3-CLASSIFY** (`ed2f657`, ACCEPTED, landed as `71a971e`):
+   the §12 classifier - `boolean/classify.rs` (1430 lines), the
+   `Prop::FragmentInsideOther` arm, the split.rs pub(crate) exports. ZERO
+   deviations: the worker reproduced every packet number (flagship bits
+   `[F,F,T,F,F,F,F,T,T,T]`, the pre-screen, the ambiguous-direction
+   retry, the open-arc `Contradictory` refusal). All six tests green.
+2. **The RW4 pre-dispatch prototype found TWO latent splitter defects**
+   (see the session-38 traps): extending `scratch/rw3probe` to the
+   assembler over the REAL six-event flagship mesh (top AND bottom
+   FF/FE/Region2) showed the bottom (inverted) face scrambling into
+   `[2,2]+[4]` and the sewn rim directions rotating so only Union could
+   ever close. **BG-SOL-SPLIT-INVERTED** (`699d571`, ACCEPTED, landed as
+   `9c20011`/`34022b1`) fixes both: `is_region = area > 0.0` (the
+   stored-frame outer-positive invariant) and forward-traversal
+   normalization in `build_closed_loop_wire`/`prepare_contained_wire`.
+   Both fixes were machine-validated BEFORE dispatch by the probe's
+   `split_fixed` module (a patched copy of split.rs): the six-event mesh
+   becomes 11 fragments / 20 adjacency (4 Flip) / 2 Identical pairs on
+   the disks; the classifier bits `[F,T,F,T,F,F,F,F,T,T,T]`; ALL FOUR
+   ops assemble (Union 8, Intersection 3, Difference 7, Xor 7 faces,
+   `Solid::try_new` Ok each); Difference is congruent to `Extrude(P-Q)`
+   (six containment probes + a 256-point grid, 208/208); and the sweep
+   prototype (lift + 3-D AABB candidate screen + `contact()` over
+   cross-solid FF/FE/EE pairs) produces EXACTLY the six events with the
+   right provenance, reproducing the hand-built mesh.
+3. **BG-SOL-RW4-ASSEMBLE is WRITTEN, MEASURED, and READY - the
+   frontier** (packet at `loop/packets/BG-SOL-RW4-ASSEMBLE.md`; its
+   decision table, pair-dedup rule, sweep screen, and all expected
+   numbers come from the probe). Re-derive its anchors against HEAD by
+   command before dispatch (A2 becomes 4 with `assemble.rs`, A3 is 9).
 
 Progress estimate, difficulty-weighted:
 
-- M2 critical path: about **87-90% complete** (the funnel, the material
-  primitive, the splitter, the periodic fix, and the classifier DESIGN
-  are done; the classifier CODE, the assembler/entry, and the M2
-  witness remain).
-- Entire approved solver family: about **61-65% complete**.
-- At the demonstrated rate: the classifier is about **half a day**
-  (dispatch → verify → land), then RW4 and M2-WITNESS about a day more.
+- M2 critical path: about **93% complete** (the funnel, the material
+  primitive, the splitter + three fix packets, the classifier, and the
+  assembler's FULL design are landed or measured; the RW4 CODE and the
+  M2 witness remain).
+- Entire approved solver family: about **67-70% complete**.
+- At the demonstrated rate: RW4 is about **half a day** (dispatch ->
+  verify -> land), then M2-WITNESS about a day.
 
 ## Pick up here
 
-1. **BG-SOL-RW3-CLASSIFY is the frontier** (registry READY, needs
-   satisfied, packet at `loop/packets/BG-SOL-RW3-CLASSIFY.md`, anchors
-   verified against HEAD). Dispatch it FIRST; the design is fully
-   pre-made and probe-validated — do not redesign, just dispatch.
-2. **Then BG-SOL-RW4-ASSEMBLE.** Session-37 design intelligence, all
-   machine-derivable, none of it re-derived yet: (a) the REAL M2
-   flagship event set is SIX events (top AND bottom: FF circle, FE
-   BoundedCurve rim, Region2 cap-coincidence at each of z=0 and z=2) —
-   the landed 3-event test covers only the top; (b) the Difference
-   decision table over the 11-fragment full mesh: a's two disks
-   (pair.a) Discard, a's two annuli + 4 sides Keep-unflipped, b's two
-   caps (pair.b, Identical) Discard, b's wall Keep-FLIPPED — the 7-face
-   result (4 sides + 2 annuli + the hole wall) exactly as §4 books;
-   (c) prototype the assembler by EXTENDING `scratch/rw3probe` (it
-   already has the classifier prototype; add decide+sew+try_new over
-   the full 6-event mesh) BEFORE writing the packet — the third
-   instance of the num3-scratch discipline.
-3. Then BG-SOL-M2-WITNESS (the cross-layer flagship + the metamorphic
-   battery; all three inputs verified correct).
-4. BG-SOL-S7-OVERLAP-PLANE (rotated-frame coplanar SAT) - named
+1. **BG-SOL-RW4-ASSEMBLE is the frontier** (registry READY, needs all
+   satisfied, packet written from the measured prototype). Dispatch it
+   FIRST; do not redesign - every number in it is measured. Re-derive
+   the anchors against HEAD (`scratch/anchors_split_inverted.sh` is the
+   script pattern), then `new_slot` + `run_packet` in one motion.
+2. **Then BG-SOL-M2-WITNESS**: the cross-layer flagship
+   `Extrude(P-Q) ~= boolean(Extrude(P), Difference, Extrude(Q))` plus
+   the metamorphic battery (A∪A≅A, A−A=∅, A∩B≅ the cylinder, A∪B≅B∪A).
+   Design note for its packet: the A−A case through the ENTRY runs the
+   sweep over a solid paired with ITSELF (self-pair events; the identity
+   arm fires per face) - decide whether the entry guards it or the
+   battery constructs it another way. RW4 deliberately does NOT claim
+   it.
+3. BG-SOL-S7-OVERLAP-PLANE (rotated-frame coplanar SAT) - named
    follow-up, NOT on M2's path.
-5. Parallel side branches after/alongside: S8 safe shell, local fillet
+4. Parallel side branches after/alongside: S8 safe shell, local fillet
    scoping, RMF sweep, minimal-knot loft.
-6. Open latent flake, NOT fixed: `truck-base/tests/newton.rs::test_newton1`.
+5. Open latent flake, NOT fixed: `truck-base/tests/newton.rs::test_newton1`.
    Its own packet.
-7. Recommended, NOT dispatched: follow-up audit of
+6. Recommended, NOT dispatched: follow-up audit of
    `truck-evidence/src/fid/rep.rs` (4362 lines). Its own program.
 
 ## State of the machine, as left
 
 - Watchdog RUNNING (`loop/watchdog.lock`, pid 20024).
-- Registry: 115 rows = 111 DONE + 1 BLOCKED (BG-AUD-FIX-004 owner) + 3
-  READY (RW3-CLASSIFY, RW4-ASSEMBLE, M2-WITNESS); RW3 is the only one
-  whose needs are all satisfied.
-- Slots 0-3 FINISHED, all re-forkable (slot 1 holds the landed
-  SPLIT-PERIODIC branch; re-fork onto HEAD before the next dispatch).
-- Disk about 12.8 GB free (the scratch probe target and the repo-root
-  test target were deleted at close; slot 1's target is 9.1 GB and
-  reclaimable by the watchdog if needed).
+- Registry: 116 rows = 113 DONE + 1 BLOCKED (BG-AUD-FIX-004 owner) + 2
+  READY (RW4-ASSEMBLE, M2-WITNESS); RW4-ASSEMBLE is the only one whose
+  needs are all satisfied.
+- Slots 0-3 FINISHED. Slot 1 holds the landed SPLIT-INVERTED branch
+  with its worker.pid/packet/branch files DELETED (a clean idle slot -
+  fork + dispatch in one motion next session, or it looks like a dead
+  worker to the watchdog). Slot 1's target is 12.74 GB, reclaimable by
+  the watchdog if needed.
+- Disk about 10.1 GB free (the rw3probe target was deleted at close;
+  its SOURCES, the `split_fixed` module, the run logs
+  `scratch/rw4probe_run*.txt`, `scratch/_mk_split_fixed.py`, and the
+  anchor scripts are preserved as the design-session evidence).
 - GATE-4 ceiling 111 = true count; `kernel-gates.sh HEAD` passes all
-  P-3 gates and 111/111 at `175d295`.
-- Results filed at `loop/results/BG-SOL-SPLIT-PERIODIC.json`.
-- Root tracked tree clean. Numerous pre-existing untracked user/baseline/
-  scratch files remain and must be preserved (including
-  `scratch/rwdiskprobe` and `scratch/rw3probe` — the design-session
-  probe evidence, sources only).
+  P-3 gates and 111/111 at `34022b1`.
+- Results filed at `loop/results/BG-SOL-RW3-CLASSIFY.json` and
+  `loop/results/BG-SOL-SPLIT-INVERTED.json`.
+- Root tracked tree clean apart from this STATE rewrite. Numerous
+  pre-existing untracked user/baseline/scratch files remain and must be
+  preserved.
 
 ## The parallelism picture
 
 Nothing running (watchdog only). The rewrite chain stays sequential
-(RW3 consumes the fix's split.rs; RW4 consumes RW3's classification;
-M2-WITNESS consumes RW4's entry). If a second wave is wanted while RW3
+(RW4 consumes the fix's split.rs semantics and RW3's classifier;
+M2-WITNESS consumes RW4's entry). If a second wave is wanted while RW4
 runs, the side branches (S8 shell, fillet, sweep, loft, overlap-plane)
-are write-disjoint from `boolean/` — but do NOT run a verify alongside
-a live worker below ~15 GB free (session-36 trap 1; see the session-37
-traps for the newest instance of why quiet-machine verifies are the
-only reliable ones).
-
+are write-disjoint from `boolean/` - but do NOT run a verify alongside
+a live worker below ~15 GB free (session-36 trap 1; the session-37/38
+quiet-machine verifies at ~10-12 GB passed only because the workers had
+exited).
 
 ## Traps, each one paid for
+
+### Session 38 (the six-event probe: two latent splitter defects + the RW4 prototype) - paid in full
+
+- **The pre-dispatch prototype caught TWO latent defects invisible to
+  every landed test - the fourth confirmed instance of the num3-scratch
+  discipline.** Extending `scratch/rw3probe` from the classifier to the
+  assembler over the REAL six-event flagship mesh found (a)
+  `divide_one_face`'s flag-dependent `is_region` against STORED-frame
+  polygon areas (every divided inverted face scrambles region/hole -
+  the extruded bottom cap divided into a doubled-loop `[2,2]` disk plus
+  a hole-less `[4]` square), and (b) `build_closed_loop_wire` cutting
+  the sew stratum's edge AS USED in one face (the wall's INVERSE rim
+  use), rotating every use's effective traversal so b's cap and wall
+  fragments were born with inverted boundaries and only Union could
+  ever close. Every landed test was green: the flagship test divides
+  only the TOP face (flag=true, forward rim use - neither defect
+  fires). "Green on every landed test" is exactly what a defect that
+  only the NEXT consumer can see looks like; the probe cost one
+  afternoon and saved two verify round trips plus a broken RW4 packet.
+- **Two defects can CANCEL each other's visibility - exercise EVERY op
+  through the acceptance gate when prototyping an assembler.** The sew
+  rotation preserved cap/wall RELATIVE orientation (so any single-face
+  or two-face assertion still passed) and the inverted-face scramble
+  broke the classifier BEFORE assembly was ever attempted; the probe
+  only found the second defect's signature (Union closed,
+  Intersection/Difference refused `NotClosedShell`) because it ran all
+  four ops through `Solid::try_new`. A single-op prototype would have
+  shipped the pair.
+- **truck-topology's boundary naming is the reverse of what you'd
+  guess, and every direction bug this session traces to it.**
+  `Face::boundaries()` returns the orientation-ADJUSTED wires;
+  `Face::absolute_boundaries()` returns the STORED wires verbatim
+  (`&self.boundaries`). The engine's loops hold the stored ones. The
+  invariant that fixes `is_region`: for a valid face the STORED outer
+  wire is ALWAYS CCW-positive in the surface's (u, v) frame,
+  independent of the orientation flag (the effective-outer wire is CCW
+  around the effective normal; the flag and the stored/effective
+  inversion both flip sign, so the flag-dependent test double-counted
+  the flag). The same naming bit the splitter's `StratumRef::Edge`
+  flat indices and the sweep's edge provenance - always check WHICH
+  accessor a wire came from before reasoning about direction.
+- **A scratch can carry a patched COPY of a kernel module to
+  machine-validate a fix hypothesis WITHOUT touching vendor/** - check
+  first that the module has no `crate::`/`super::` references outside
+  `#[cfg(test)]` (split.rs qualified: only the test module had
+  `use super::*;`). `scratch/rw3probe/src/split_fixed.rs` is
+  byte-identical to the landed split.rs except the two fix lines, so
+  the full six-event pipeline (split -> classify -> decide -> sew ->
+  `Solid::try_new` -> grid comparison) ran against the FIXED semantics
+  before any worker was paid. The probe's Cargo.toml needed the
+  module's dep edges added (itertools, rustc-hash, truck-geotrait,
+  truck-meshalgo) - copy them from the kernel crate's manifest.
+- **Cutting a sew edge AS NAMED IN ONE FACE yields that use's
+  direction - normalize to the forward traversal before swapping.**
+  `edge_from_ref` returns the Edge object found in the named face's
+  boundaries (possibly the inverse use); `cut_with_parameter` on it
+  yields inverse halves; `swap_edge_into_wire` then hands the FORWARD
+  uses the inverse wire, rotating every use's effective traversal.
+  Relative orientations survive (that is WHY no existing assertion
+  fails - the defect is born-latent, the session-37 regression's
+  signature exactly). The fix pattern: `if !edge.orientation() { wire =
+  wire.inverse(); }` before the swap, in every site that cuts a
+  stratum-named edge (`build_closed_loop_wire` AND defensively in
+  `prepare_contained_wire`).
+- **The exact FF arms are bounds-blind and the boolean() entry NEEDS
+  the 3-D AABB candidate screen.** `plane_plane` emits a Line record
+  for side-plane x cap pairs whose loci miss both trimmed faces (the
+  exact arms ignore the parameter boxes), while the REAL FF circle
+  sits exactly ON the wall's box boundary - so the screen must be
+  INCLUSIVE (touch counts) in 3-D AABB space, not parametric
+  interior-overlap. Measured: the screen admits exactly the flagship's
+  six real pairs and drops all eight spurious side x cap FF pairs.
+- **`land_packet.py` prints a scary WARNING if the orchestrator
+  pre-flips the registry row to DONE before landing** ("no
+  PACKETS.jsonl row for ...") - harmless: the row is already DONE and
+  the landing proceeds. Let land_packet do the flip; pre-flipping buys
+  nothing.
+- **The PowerShell LSP reports stale "unresolved module" errors for
+  files created outside the editor** (split_fixed.rs "not found" while
+  `cargo build` compiles it cleanly). Cargo is the truth; do not
+  re-create files because of a stale diagnostic.
+
 ### Session 37 (the periodic-branch regression + the RW3 prototype) - paid in full
 
 - **Two parallel packets can EACH verify green at their own fork points
