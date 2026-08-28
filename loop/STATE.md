@@ -9,100 +9,134 @@ when they stop being true, never for length. If you are picking this up cold, re
 [`loop/ORCHESTRATOR.md`](ORCHESTRATOR.md) for how to run the loop, then
 `python loop/slot_status.py`** - nothing else. Do not read `LEDGER.jsonl` whole.
 
-Updated 2026-08-27, close of session 39 (RW4-ASSEMBLE and M2-WITNESS
-landed, both ACCEPTED first-try - **THE M2 MILESTONE IS COMPLETE**).
-Branch: `integration/kernel-bg`, HEAD `973234d`.
+Updated 2026-08-28, close of session 40 (Phase 7 opened: BG-CAD-P1-UTILITY and
+BG-CAD-P2-EXTRUDE landed, both ACCEPTED; frontier = write P3/P4/P5).
+Branch: `integration/kernel-bg`, HEAD `b85ca04`.
 
 ## Where we are
 
-**Session 39 landed the entire remaining M2 chain, one packet at a
-time, zero verify round trips.** The cross-layer flagship is measured
-and pinned:
+**Session 40 opened the build123d coverage program
+(`docs/BUILD123D_COVERAGE_PLAN.md`) and landed its first two packets.**
 
-1. **BG-SOL-RW4-ASSEMBLE** (`c1d6e12`, ACCEPTED, merged `ac32f17`/`bd591bb`):
-   `boolean/assemble.rs` (1011 lines) + `pub mod assemble;` - the
-   `boolean()` entry (lift + AABB-screened sweep + split + classify +
-   decide/sew + `Solid::try_new`) with the six-event sweep
-   (`sweep_contact_events`, pub(crate)), the decision table, the pair
-   dedup, and 4 tests. Every packet number reproduced exactly (six
-   events with the predicted provenance; 7/8/3/7 faces for
-   Difference/Union/Intersection/Xor; 22/22 boolean tests). One
-   deviation: `use super::BoolOp` for the packet's `use crate::BoolOp`
-   (BoolOp lives at `crate::boolean::BoolOp`) - the worker was right.
-2. **BG-SOL-M2-WITNESS** (`5d63f09`, ACCEPTED, merged/filed `973234d`):
-   `tests/boolean_m2.rs` (750 lines, 4 tests) - the cross-layer
-   flagship `Extrude(P−Q) ≅ boolean(Extrude(P), Difference, Extrude(Q))`
-   as a face-set bijection, `A∩B ≅ Extrude(Q)` (wall outward), Union
-   commutativity both orders, and the self-pair boundary. One
-   deviation, the worker RIGHT: my packet's ground-truth wire census
-   was hand-derived from the boolean side and wrong (see traps).
+1. **BG-CAD-P1-UTILITY** (`28c7394`, ACCEPTED, merged `84854b5`/`d0bb5c3`):
+   `truck-modeling/src/cad.rs` - certified `solid_bounding_box` (per-carrier
+   table: Plane/Cylinder boundary-edge hull, Sphere full-carrier box, Cone
+   hull+apex, Torus/Placed refuse), the similarity fold
+   (`translate_solid`/`uniform_scale_solid`/`mirror_solid` riding the LANDED
+   `Mapped` chain with the det<0 face-flip rule), `make_face` (S1 arrangement
+   + session-28 containment rule, one planar z=0 face per material region),
+   `make_hull` (monotone chain on the landed exact `orient2d`). Manifest edge
+   truck-modeling -> truck-evidence landed with it. 10 tests.
+2. **BG-CAD-P2-EXTRUDE** (`b3d023a`, rebased to `cd0b731`, ACCEPTED, merged
+   `dc02f85`/`b85ca04`): `extrude_profile_vector` (arbitrary dir, `both`
+   interval) + `extrude_profile_taper` (signed 2-D offset re-arranged through
+   the landed `arrange` - no hand-built top polygons). Landed scalar
+   `extrude_profile` FROZEN and verified unchanged. Canonical-only envelope:
+   oblique circles refuse NonCanonicalCarrier (Placed is Tier 1's P9). 10
+   tests; verified at the POST-P1 merged HEAD (same crate, session-37 rule).
 
-**The M2 flagship's measured numbers** (probe `scratch/m2probe_run1.txt`
-against the LANDED entry at `bd591bb`): Difference 7v7 faces, 256/256
-per-point grid; Intersection 3v3, 48/48; Union 8/8 BOTH orders, 256/256
-each; commutativity 256/256. **The self-pair runs (`A op A`, Union AND
-Difference) both refuse `UnsupportedEnvelope(ContactReductionDeferred)**
-- the typed v1 boundary, asserted by the battery; the idempotence
-ALGEBRA was already pinned by mod.rs's
-`material_state_decides_coincident_fragments`; the self-pair EVENT
-COMPLEX (intra-solid adjacency events) is the RW-COPLANAR family's
-concern. Which stage inside split/classify/decide/assemble folds is
-UNIDENTIFIED - one line of archaeology for whoever picks up that family.
-
-Progress estimate, difficulty-weighted:
-
-- M2 critical path: **100%** (funnel, material primitive, splitter +
-  three fixes, classifier, assembler, witness - all landed).
-- Entire approved solver family: about **75%** (the P4 wave's READY
-  packets are exhausted; what remains are the side branches and named
-  follow-ups, none of which has a packet written yet).
+Progress: **2 of 12-13 packets** (Tier 0: 2 of 8), ~3.5k of ~20k LOC.
 
 ## Pick up here
 
-1. **The frontier is EMPTY** (`schedule.py` reports 0 eligible - the
-   first time in the program). The next session's work is WRITING
-   packets, from the plan doc's §5 graph: the parallel side branches
-   (S8 safe shell, local fillet scoping, RMF sweep, minimal-knot loft -
-   all write-disjoint from `boolean/`), S7-OVERLAP-PLANE (rotated-frame
-   coplanar SAT), the `newton.rs::test_newton1` flake (its own packet),
-   and/or the recommended rep.rs follow-up audit (its own program).
-   Design packets get the num3-scratch discipline: prototype, MEASURE,
-   then write the packet with the measured numbers.
-2. The self-pair fold and the M2 battery's recorded limitation: if a
-   future entry change makes `A op A` stop refusing, the M2 test FAILS
-   by design (the packet's stop condition) - update the battery AND the
-   fold documentation together.
-3. Open latent flake, NOT fixed: `truck-base/tests/newton.rs::test_newton1`.
+1. **Write the P3/P4/P5 packets** (coverage plan §8; all pre-decided designs):
+   P3 section+split (new truck-shapeops module + its lib.rs), P4 sweep
+   reduction (curtain table + until + project), P5 revolve line-edge (+ the
+   `RevolutedCurve` recognition its recognize.rs comment already books).
+   P3/P4/P5 are write-disjoint (different crates/modules) and can wave. P6
+   (LocalBoundaryRewrite + chamfer) is design-class with a MANDATORY
+   num3-scratch probe before dispatch.
+2. **Model policy (owner directive): default worker is
+   `zai/glm-5.3-flash`** (run_packet default; `land_packet` records the actual
+   model per packet from the slot's `worker.model`). Deepseek was reupped
+   mid-session as fallback. Calibration: 13/13 worker deviations across P1/P2
+   were RIGHT; the model churns well on pre-decided packets. glm's three
+   silent P2 deaths are CONFINDED by the account decline that ended in
+   `Insufficient Balance` (deepseek died of that first); post-reup glm
+   completed P2. On a future silent death, check the opencode log for account
+   errors before blaming the model.
+3. The dyadic-exactness domain of the landed `arrange` now bounds every
+   offset-based construction (P2's recorded domain note): fixtures whose
+   miter-crossing parameters are non-dyadic refuse. Machine-check fixture
+   crossing parameters when writing P3+ tests.
+4. Open latent flake, NOT fixed: `truck-base/tests/newton.rs::test_newton1`.
 
 ## State of the machine, as left
 
-- Watchdog RUNNING (`loop/watchdog.lock`, pid 20024).
-- Registry: 116 rows = 115 DONE + 1 BLOCKED (BG-AUD-FIX-004 owner);
-  **0 READY** - nothing is dispatchable until new packets are written.
-- Slots 0-3 FINISHED. Slot 1 is clean-idle (its worker.pid/packet/
-  branch and the stale VERDICT.json were deleted at close; it holds the
-  landed M2-WITNESS branch; its target is 12.75 GB, reclaimable by the
-  watchdog).
-- Disk about 11 GB free (the rw3probe target was deleted at close; its
-  sources, `scratch/m2probe_run1.txt`, the anchor scripts
-  `scratch/anchors_rw4.sh` / `scratch/anchors_m2_witness.sh`, and
-  `scratch/m2_witness_design.md` are preserved as the design evidence).
-- GATE-4 ceiling 111 = true count; `kernel-gates.sh HEAD` passes all
-  P-3 gates and 111/111 at `973234d`.
-- Results filed at `loop/results/BG-SOL-RW4-ASSEMBLE.json` and
-  `loop/results/BG-SOL-M2-WITNESS.json`.
+- Watchdog RUNNING (`loop/watchdog.lock`, pid 49420,
+  `LOOK_WATCHDOG_STAGNANT=3600`).
+- Registry: 118 rows = 118 DONE, **0 READY** - nothing dispatchable until
+  P3/P4/P5 packets are written.
+- Slots 0-3 idle/FINISHED (slot 0 holds the landed P1 branch, slot 1 the
+  landed P2 branch; both re-fork via new_slot when next used).
+- Disk ~16 GB free at close (repo-root `target/` deleted mid-session - it
+  regenerates; verify baselines are the transient risk).
+- GATE-4 ceiling 111 = true count; no new unscaled_legacy sites landed.
+- Results filed: `loop/results/BG-CAD-P1-UTILITY.json`,
+  `loop/results/BG-CAD-P2-EXTRUDE.json`.
 - Root tracked tree clean apart from this STATE rewrite.
 
 ## The parallelism picture
 
-Nothing running (watchdog only). The next wave is whatever side-branch
-packets get written (write-disjoint from each other per the scheduler).
-The disk rules stand: no verify alongside a live worker below ~15 GB
-free; quiet-machine verifies at ~10-12 GB have now passed three
-sessions running (37, 38, 39) - but only because the workers had
-exited.
+Nothing running (watchdog only). Next wave = P3/P4/P5 packets, write-disjoint.
+Disk rules stand: no verify alongside a live worker below ~15 GB; the machine
+hit 7.9 GB mid-verify this session (P2's V8/V9 look-baseline build) and was
+reclaimed by deleting the repo-root `target/`.
 
 ## Traps, each one paid for
+
+### Session 40 (Phase 7 opens; P1+P2 landed; model switch + balance drama) - paid in full
+
+- **A packet's Template section that mandates a new test file must add that
+  file to the YAML `write_allow`** - P1's `tests/cad_p1.rs` was in prose, not
+  the yaml, and V1 correctly SCOPE_VIOLATION'd the finished worker. One verify
+  round trip, zero worker fault; fixed by amending the packet + registry row,
+  then re-verifying. The worker had done exactly what the packet said.
+- **The landed `Mapped` chain PANICS in debug builds on circle self-loop
+  edges** (topology constructor: "Two same vertices cannot construct an
+  edge") - the P1 worker probed it, recorded it in RESULT notes, and left
+  truck-topology untouched (outside write_allow). Every transform/fold packet
+  until this is fixed must use line-edged test fixtures (or release builds,
+  where the constructors are unchecked). This is the session-28
+  `Wire::mapped` trap surfacing one layer up.
+- **Transforms of curved-carrier solids emit `Placed` (Processor) faces** -
+  the landed BG-CE-006-r2 rule places any bare analytic carrier under a
+  non-identity linear part. Recognized, but the contact funnel defers Placed:
+  Tier 0 transform tests must stay on line/plane-carried solids, and P9's
+  conjugation is the real unlock (now measured, not predicted).
+- **The landed `arrange` is dyadic-exact**: P2's taper fixtures must have
+  dyadic miter-crossing parameters (a 4x4 rect 0.5-OUTSET is non-dyadic and
+  refuses; 6x6 is dyadic). The offset-and-rearrange construction inherits
+  this domain; the worker machine-checked the crossing parameters and picked
+  fixtures that stay exact. Same discipline applies to P3+ offset tests.
+- **glm-5.3-flash's three silent P2 deaths were confounded by the API
+  account decline** (deepseek then died of `Insufficient Balance` outright;
+  owner reupped). Post-reup glm completed P2. Diagnosis order for a silent
+  death: opencode log ERROR lines (socket / length-truncation / balance)
+  BEFORE model blame. Also: a `reason: length` step-finish followed by
+  silence is the signature of both glm deaths - check the last event's
+  tokens before re-reading the whole transcript.
+- **Watchdog heartbeat timestamps are LOCAL time; opencode log timestamps are
+  UTC.** I misread a healthy watchdog (30-second-old heartbeats) as 4h stale
+  and killed it. The giveaway was in the line all along: the heartbeat's
+  disk= value matched current `df`. Restarted with
+  `LOOK_WATCHDOG_STAGNANT=3600` (the desired config anyway) - no harm, but
+  the misread class is the recorded "re-derive claims by command" one.
+- **Disk 7.9 GB mid-verify**: V8/V9 build the whole look workspace into
+  baseline worktrees; with the repo-root `target/` (several GB of idle
+  junk) deleted, the verify survived. Reclaim order that worked: repo-root
+  `target/`, idle slot targets, stale `%TEMP%/look-verify-baseline-*`.
+  Never touch the live verify's own slot target.
+- **`run_packet.py --reset-only` landed** (`b450e10`): archive-and-reset
+  without spawning a worker (the session-14 gap). `archive_and_reset`
+  extracted and shared with the dispatch path; selftest PASS.
+- **PowerShell inline `python -c` with quotes mangles every time** (re-hit
+  twice this session) - write the script to a file and run the file. ALWAYS.
+- **P2's taper derivation notes are load-bearing for P3+**: wall-cone apex
+  `apex_z = z0 - r0*(z1-z0)/(r1-r0)`, half_angle = |taper|; side-face
+  pairing by direction test (not index); seams keyed on bottom arrangement
+  vertices. Read P2's RESULT before writing any packet that offsets or
+  re-arranges profiles.
 
 ### Session 39 (the M2 chain closed: RW4 + M2-WITNESS, both first-try) - paid in full
 
