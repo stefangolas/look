@@ -9,114 +9,129 @@ when they stop being true, never for length. If you are picking this up cold, re
 [`loop/ORCHESTRATOR.md`](ORCHESTRATOR.md) for how to run the loop, then
 `python loop/slot_status.py`** - nothing else. Do not read `LEDGER.jsonl` whole.
 
-Updated 2026-08-29, mid-session 41 (RW-INTERIOR-LOOP + BG-CAD-P4-UNTIL +
-BG-CAD-P5-REVOLVE + RW-RESEW all LANDED; BG-CAD-P3-SPLIT on its second
-redispatch, worker RUNNING).
-Branch: `integration/kernel-bg`, HEAD `10e0fcc`.
+Updated 2026-08-29, close of session 41 (RW-INTERIOR-LOOP, BG-CAD-P4-UNTIL,
+BG-CAD-P5-REVOLVE, RW-RESEW, RW-DIVIDE-NESTING and **BG-CAD-P3-SPLIT** all
+LANDED; the vertex-touch cut family booked as a v1 boundary after three
+instrumented stops).
+Branch: `integration/kernel-bg`, HEAD `9257275`.
 
 ## Where we are
 
-**Session 41 landed four packets and turned the P3 blocker chain twice.**
+**Session 41 landed SIX packets and closed the entire P3 blocker chain.**
 
-1. **RW-INTERIOR-LOOP** (worker `6206f58`-class commit, amended `316b868`,
-   ACCEPTED, merged `eb9722e` via `7e92f06`): interior-loop division in
-   `truck-shapeops/src/boolean/split.rs`. The through-cut family (probe
-   variants [f]/[h]) now assembles: `classify_curve` is band-aware
-   (periodic-carrier walls divide at interior rims via the doubled
-   independent loop, shared edge instances), open FF lines re-parameterize
-   to their certified extent, interior chords assemble into closed loops.
-   The worker's D1 localization OVERTURNED the packet's diagnosis: the
-   splitter never refused — it left the wall undivided (degenerate
-   zero-area rim polygons defeat the polygon rule) and the refusal surfaced
-   at `Solid::try_new` in assemble. M2 battery unchanged. 8 tests.
+1. **RW-INTERIOR-LOOP** (amended `316b868`, ACCEPTED, merged `eb9722e`):
+   interior-loop division in `split.rs` — band-aware `classify_curve`
+   (periodic walls divide at interior rims), open-FF-line
+   re-parameterization, interior-chord loop assembly. The worker's D1
+   localization OVERTURNED the packet diagnosis (the splitter never
+   refused; it left the wall undivided and `Solid::try_new` refused).
+   8 tests; M2 battery unchanged.
 2. **BG-CAD-P4-UNTIL** (`c217e6e`, ACCEPTED first try, merged `190b984`):
    `truck-modeling/src/until.rs` — `extrude_until` (parallel target rides
-   landed `extrude_profile_vector` at the certified t·dir; oblique target =
-   `contact()`-certified termination lines + cap polygon in the target
-   plane) + `project_profile` (locus extraction from the same records).
-   `Until` is a module-local enum. The worker caught a sign error in MY
-   fixture plane and fixed it by construction. 9 tests.
+   landed extrude at certified t·dir; oblique target = contact()-certified
+   termination lines + cap polygon in the target plane) + `project_profile`.
+   Worker caught a sign error in MY fixture plane. 9 tests.
 3. **BG-CAD-P5-REVOLVE** (`7287e16`, ACCEPTED first try, merged `9174881`):
-   `truck-modeling/src/revolve.rs` — `revolve_profile` (line-edge profiles
-   about the z-axis, carriers per plan table 6.2: Cylinder/Cone/Plane
-   constructed canonical directly; full turn = 4-face tube; partial angle =
-   +2 planar end caps). Axis-crossing/touch and circle profiles refuse at
-   the lift. D6 recognition wiring took the pre-made fallback: the u/v
-   parameter roles are CROSSED for RevolutedCurve-of-Line and cannot be
-   certified against the landed `CanonicalParamMap` vocabulary without a
-   new type (booked follow-up). 9 tests.
-4. **RW-RESEW** (worker `6206f58`-era commit, amended twice to `a1e1156`,
-   ACCEPTED, merged `53dba23`): sew-completion pass in `split.rs` —
-   unconsumed FE seam records whose exact curve matches a face-side
-   boundary edge UNIFY the instance (direct wire rebuilds: `swap_edge_
-   into_wire` cannot cross solids because seam vertices are distinct
-   instances; seam-corner vertex substitution is required or the shell
-   stays disconnected). Face-adjacent unions assemble (adjacent boxes,
-   P3's split recombination). Zero-measure seam records filtered with a
-   ptr-eq cross-solid guard that keeps the M2 self-pair refusing.
+   `truck-modeling/src/revolve.rs` — `revolve_profile`, carriers per plan
+   table 6.2 (full turn = 4-face tube; partial = +2 planar caps);
+   axis-crossing/touch and circle profiles refuse. D6 recognition wiring
+   took the pre-made fallback (u/v roles crossed for
+   RevolutedCurve-of-Line; needs a new witness type — booked follow-up).
+   9 tests.
+4. **RW-RESEW** (amended twice to `a1e1156`, ACCEPTED, merged `53dba23`):
+   sew-completion pass — unconsumed FE seam records with exact carrier+range
+   identity UNIFY edge instances (direct wire rebuilds; `swap_edge_into_
+   wire` cannot cross solids — seam VERTEX substitution required).
+   Face-adjacent unions assemble. `no coplanar-face merging exists` —
+   butt-joins keep cosmetically-split faces (10 for two boxes); the
+   metamorphic is exact-BOX equality. 7 tests.
+5. **RW-DIVIDE-NESTING** (worker STOPPED at its write-set boundary, verify
+   ACCEPTED, merged `819fe9b`): `divide_one_face` negative-wire attachment
+   is now MINIMAL-CONTAINING (smallest-area strictly-containing region —
+   `PolylineCurve::include` is boundary-inclusive, so a doubled loop
+   attached to its own region without the strictness). Annulus (2-wire)
+   and two-hole (3-wire) sections assemble. The D2 half (vertex-touch
+   clipping) stopped at `assemble.rs:273` — outside its write set.
+   7 tests.
+6. **BG-CAD-P3-SPLIT** (amended twice to `89c8be1`, ACCEPTED, merged
+   `9257275`): `truck-shapeops/src/section.rs` — `split_by_plane` (two
+   boolean() calls against the constructed padded halfspace box) +
+   `section_faces` (cap extraction by exact plane identity). 10 tests.
+   The diagonal-plane test asserts the booked VERTEX-TOUCH BOUNDARY
+   (below); test 7's oblique-cylinder arm was machine-checked
+   (`NumericallyUnresolved(UncertifiedContainment)`, not
+   ContactReductionDeferred).
 
-Progress: **4 of 12-13 packets** (Tier 0: 4 of 8) + 2 Boundary-Rewrite
-funnel packets (RW-INTERIOR-LOOP, RW-RESEW). P3's own code exists only as
-archived WIP; its blocker chain is now fully landed.
+Progress: **5 of 8 Tier 0 packets LANDED** (P1-P5) + 3 Boundary-Rewrite
+funnel packets (RW-INTERIOR-LOOP, RW-RESEW, RW-DIVIDE-NESTING). Remaining
+Tier 0: P6 (LocalBoundaryRewrite + chamfer), P7 (fillet F1+F4), P8
+(facade + battery). Then Tier 1 (P9/P10), Tier 2 (P11/P12).
+
+## The vertex-touch boundary (the session's design output)
+
+P3's diagonal fixture (plane x + y = 2 through opposite box edges) is the
+hardest tangency class. Three instrumented worker stops
+(`RW-VERTEX-CLIP.STOP-r1/-r2`, `RW-SEED-DIAGONAL.STOP.json`) peeled the
+chain to four kernel decisions the v1 envelope does not make:
+canonical-vertex splicing (Vertex identity is by id — corner-endpoint arcs
+cannot splice), seam-edge replacement (contact-plane-coincident edges must
+become Flip-parity arc instances), per-face arc certification (conflicts
+with the sew-completion corner-touch skip), and Region2 coplanar-adjacent
+handling (the `Crossing` screen deliberately refuses edge-sharing
+regions). All recorded in the plan's deferred list
+(`docs/BUILD123D_COVERAGE_PLAN.md`, "Deferred with a full instrumented
+diagnosis"). The v1 boundary is typed and asserted (P3 test 3); the
+follow-up family's design input is complete.
 
 ## Pick up here
 
-1. **BG-CAD-P3-SPLIT is on its SECOND redispatch, worker RUNNING** (slot 0,
-   pid 43732, forked at `53dba23`). Session 41, first redispatch: the
-   split itself WORKS (flagship halves assemble, 6 faces each — the
-   RW-INTERIOR-LOOP landing did its job), but the booked metamorphic
-   `split+ Union split-` hit a SECOND landed-pipeline boundary, isolated
-   empirically: ANY face-adjacent union refuses (two directly-built
-   adjacent boxes refuse identically — independent of split construction).
-   Filed `loop/results/BG-CAD-P3-SPLIT.SPEC_GAP2.json`; RW-RESEW was
-   booked from it and landed. The registry row carries the pre-decided
-   worker deviation for test 2: the recombination union keeps **10
-   cosmetically-split faces** (the pipeline has no coplanar-face merging;
-   the M2 union likewise) — the metamorphic holds for the exact BOUNDING
-   BOX, not the face count. If the worker stops again, read its RESULT
-   verbatim before touching anything; its stop conditions have now paid
-   off twice.
-2. **Model policy: default worker is `deepseek/deepseek-v4-flash`**
-   (run_packet default, owner directive re-affirmed). All four session-41
-   workers ran deepseek; deviation calibration now 13/13 (P1/P2) plus
-   session 41's ~14 deviations across four packets, all machine-derived
-   and consistent with the tree.
-3. Next frontier after P3 lands: **P6 (LocalBoundaryRewrite + chamfer PP,
-   MANDATORY num3-scratch probe) and P7 (fillet F1 + F4)** — both design
-   packets to write; then P8 (facade + battery). Tier 1 (P9/P10) after.
-4. The dyadic-exactness domain of the landed `arrange` still bounds every
+1. **Next frontier: P6 and P7 packets.** P6 (LocalBoundaryRewrite +
+   chamfer PP: symmetric, distance-distance, distance-angle) carries a
+   MANDATORY pre-dispatch num3-scratch probe — the session-36/37/38
+   pattern: a patched COPY of the rewrite-candidate machinery in
+   `scratch/`, machine-validated before the packet is written (budget its
+   disk; delete its target after). P7 (fillet F1 + F4 three-plane corner)
+   rides P6's rewrite. Write them as fresh-context design work; the plan
+   doc's §8 entries are the booked scope.
+2. **Model policy: default worker is `deepseek/deepseek-v4-flash`** (owner
+   directive). Session 41: seven worker runs, all deepseek, every stop
+   correct per the packet's stop conditions, every machine-derived
+   deviation consistent with the tree.
+3. The dyadic-exactness domain of the landed `arrange` still bounds every
    offset-based construction; machine-check fixture crossing parameters.
-5. Open latent flake, NOT fixed: `truck-base/tests/newton.rs::test_newton1`.
-   Also environmental, recorded, do NOT chase: `truck-shapeops` lib
-   `healing::tests::step_import` fails at base AND head (STEP fixtures
-   absent from this checkout); V5's baseline comparison knows it.
+   Also: `translate_solid` panics in debug on circle-carrying solids (the
+   `Mapped` self-loop trap) — hand-build or place-at-construct fixtures.
+4. Open environmental, do NOT chase: `truck-shapeops` lib
+   `healing::tests::step_import` (STEP fixtures absent from the checkout;
+   fails at base, V5 knows); clippy deny-lints in untouched
+   truck-meshalgo/truck-stepio (Rust 1.97 toolchain drift, pre-existing);
+   `truck-base/tests/newton.rs::test_newton1` (latent flake).
 
 ## State of the machine, as left
 
 - Watchdog RUNNING (`loop/watchdog.lock`, pid 49420,
   `LOOK_WATCHDOG_STAGNANT=3600`). CAUTION: it misfired once this session
-  (see session-41 traps, item 1) — check `loop/watchdog.log` tail for
-  ACTION lines before dispatching into any slot.
-- Registry: 123 rows = 121 DONE + 1 BLOCKED (`BG-AUD-FIX-004`, old audit
-  row) + 1 READY (`BG-CAD-P3-SPLIT`, worker running).
-- Slot 0: P3 worker RUNNING. Slots 1/3: FINISHED branches (landed P5/P4).
-  Slot 2: old solver-program FINISHED.
-- Disk ~11 GB free at last check (repo-root `target/` deleted mid-session;
-  warm slot targets 1-6 GB each — reclaim order in the traps).
+  (session-41 traps, item 1) — check `loop/watchdog.log` tail for ACTION
+  lines before dispatching into any slot.
+- Registry: 126 rows = 125 DONE + 1 BLOCKED (`BG-AUD-FIX-004`, old audit
+  row); 0 READY — P6/P7 packets must be written before anything
+  dispatches.
+- Slots 0-3: FINISHED/landed branches, re-fork via new_slot.
+- Disk ~17.5 GB free at close (all slot targets + repo-root target/ reclaimed
+  after the final verify; they regenerate).
 - GATE-4 ceiling 111 = true count; no new unscaled_legacy sites landed.
 - Results filed this session: `loop/results/RW-INTERIOR-LOOP.json`,
   `BG-CAD-P4-UNTIL.json`, `BG-CAD-P5-REVOLVE.json`, `RW-RESEW.json`,
-  `BG-CAD-P3-SPLIT.SPEC_GAP2.json`.
+  `BG-CAD-P3-SPLIT.SPEC_GAP2.json`, `RW-DIVIDE-NESTING.json`,
+  `RW-VERTEX-CLIP.STOP-r1.json`, `RW-VERTEX-CLIP.STOP-r2.json`,
+  `RW-SEED-DIAGONAL.STOP.json`, `BG-CAD-P3-SPLIT.json`.
 - Root tracked tree clean apart from this STATE rewrite.
 
 ## The parallelism picture
 
-One worker running (P3, slot 0). P3 is the only dispatchable packet until
-it lands; then P6/P7 packets need writing (P6's probe first). Disk rules
-stand: no verify alongside a live worker below ~15 GB; the machine dipped
-to ~9.5 GB mid-session with two workers + a verify's leftovers and was
-reclaimed by deleting the repo-root `target/` and the stale slot-1
-worktree-internal `target/` (8.35 GB of P2-era buildup).
+Nothing running. P6/P7 are both truck-modeling-adjacent designs; P6's
+probe must complete before its packet exists. P8 (facade + battery) waits
+for P6/P7. Tier 1 (P9/P10) is the next parallel-eligible wave after P6/P7.
 
 ## Traps, each one paid for
 
@@ -213,6 +228,40 @@ worktree-internal `target/` (8.35 GB of P2-era buildup).
   built at their final position. Any packet whose fixtures translate
   circle-carrying solids must route around `Solid::mapped` until the
   topology constructor is fixed.
+- **The vertex-touch chase cost three worker runs and ended in a boundary
+  booking — the right call, and the pattern to copy.** RW-VERTEX-CLIP r1
+  (sweep filter + duplicate arcs), r2 (single-point certification + arc
+  dedupe — both machine-verified effective), RW-SEED-DIAGONAL (the
+  classifier): each stop was clean (instrumented, reverted, tree green)
+  and peeled exactly one layer. When the third stop showed the remaining
+  work was four un-pre-decided kernel decisions that conflict with
+  already-landed suites (resew), the resolution was NOT a fourth packet:
+  the v1 envelope already books this class of boundary (RW-CONIC, the
+  Region2 Crossing screen), so the plan's deferred list took the
+  four-link diagnosis and P3's test 3 asserts the typed refusal. The
+  line between "loosening a gate" and "recording a real boundary" is
+  whether the refusal is a typed, diagnosed, documented envelope line —
+  the P3 packet's own test 7 set the precedent.
+- **Cargo runs against the WRONG TREE — the repo root lies after a slot
+  commit.** I amended section.rs in the slot worktree, then ran
+  `cargo test -p truck-shapeops` from the repo root (pre-P3 tree): "no
+  test target named split_plane" and a green check that checked nothing.
+  Every cargo command that grades a worker's work runs with the slot wt
+  as the working directory (or --manifest-path). Also: my in-slot clippy
+  filter pattern `'src.section.rs'` never matched — the paths use
+  backslashes (`src\section.rs`); grep for the basename, or don't filter
+  at all and read the whole clippy output.
+- **Clippy reports findings in batches per run** — fixing five
+  indexing_slicing errors revealed three more (first/contains/
+  type_complexity) only on the next run. The amendment loop is: fix ALL
+  findings, run FULL clippy --all-targets unfiltered, THEN amend once.
+  Three P3 verify round trips came from not doing this the first time.
+- **The V9 disk floor re-hit (7.4 GB) with a fresh failure shape**: the
+  verify passed V0-V8 and died computing the V9 look baseline — the
+  reclaim recipe in the error message is complete and current (both slot
+  targets, wt-internal targets, %TEMP% baselines, worktree prune).
+  Sufficient after the session's many builds: 10 GB free was enough for
+  the V9 look baseline where 7.4 was not.
 
 ### Session 40 (Phase 7 opens; P1+P2 landed; model switch + balance drama) - paid in full
 
