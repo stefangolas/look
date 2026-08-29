@@ -42,3 +42,6 @@ pub mod fillet;
 /// BG-SOL-RW1-MATERIAL: the §13.1 material-state fragment-selection
 /// primitive.
 pub mod boolean;
+
+/// BG-CAD-P3-SPLIT: section + split by plane via the landed Boolean.
+pub mod section;
