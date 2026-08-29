@@ -1,0 +1,18 @@
+{
+  "id": "BG-CAD-P3-SPLIT",
+  "status": "STOPPED",
+  "stop_condition": "landed boolean() refuses a booked happy-path case (test 2 of tests 1-5)",
+  "refusal_verbatim": "UnsupportedEnvelope(ContactReductionDeferred)",
+  "contracts": [],
+  "tests_added": 0,
+  "deviations": [
+    {
+      "id": "RECOMBINATION-REFUSES",
+      "severity": "finding",
+      "description": "PACKET test 2 (split_recombination_is_original) requires `boolean(plus, Union, minus)` to be face-count- and box-equal to the original S. The landed boolean() refuses that call: `split_by_plane`'s two halves are face-adjacent solids that share ONLY the section face (plus = [0,4]^2 x [1,2], minus = [0,4]^2 x [0,1] for the flagship plate). In the union, the coincident section faces (the Anti pair of the two caps) are correctly discarded, but the halves' side faces do NOT merge (the coplanar touch along z=1 is classified Disjoint by the containment screen) and their section-boundary edges are distinct instances from two separate boolean runs, so no coedge pairs across the seam. The kept shell is therefore two disconnected boxes: `assemble.rs:96-99`'s multi-component fold (`shell.connected_components().len() != 1`) returns `unsupported()` = `Refusal::UnsupportedEnvelope(EnvelopeCase::ContactReductionDeferred)`.",
+      "derivation": "Empirical probe (quick profile), two independent constructions, both refuse identically: (a) `plus = boolean(S, Difference, box_)`, `minus = boolean(S, Intersection, box_)` with `box_ = [-8,12]x[-8,12]x[-8,1]` (the packet D3 axis-aligned minus_box for plate z=1, norm +z); both calls succeed (plus faces = 6, minus faces = 6), then `boolean(plus, Union, minus)` -> Err(UnsupportedEnvelope(ContactReductionDeferred)). (b) two directly-built adjacent boxes [0,4]^2 x [0,1] and [0,4]^2 x [1,2] -> boolean(b0, Union, b1) -> same refusal. This isolates the limitation to the landed union of face-adjacent solids, independent of any split/section construction. The packet's stop condition says a landed refusal of a booked happy-path case (tests 1-5) is 'a finding about the landed pipeline, not something to route around', so the packet is stopped here rather than weakening test 2 or hand-merging faces.",
+      "evidence": "probe output (saved at C:\\Users\\stefa\\AppData\\Local\\Temp\\opencode\\bg-cad-p3-split-recombine-probe.rs):\n  adjacent-box union REFUSED: UnsupportedEnvelope(ContactReductionDeferred)\n  plus faces = 6\n  minus faces = 6\n  union REFUSED: UnsupportedEnvelope(ContactReductionDeferred)"
+    }
+  ],
+  "notes": "BG-CAD-P3-SPLIT was not implemented: the packet's own stop condition fires before any section.rs / split_plane.rs code was written. The split itself works (both halves of the flagship plate assemble, 6 faces each), and the miss/refusal envelope paths are unaffected. The blocker is exclusively the booked metamorphic recombination split_+ U split_- = S (test 2): the landed boolean() cannot union two face-adjacent solids because (1) the splitter does not merge coplanar face-adjacent fragments and (2) the two results' seam edges are distinct instances, so the kept shell splits into two connected components and the assemble fold refuses with UnsupportedEnvelope(ContactReductionDeferred). A fix belongs to the landed boolean pipeline (e.g. a coincident-edge sewing/merge fold for face-adjacent union inputs, or instance reuse across the paired seam edges), not to this packet: AGENTS.md keeps vendor/truck/** off-limits to direct editing and the packet forbids routing around it. Anchor A4 was 0 (no `pub mod section`), as dispatched."
+}
