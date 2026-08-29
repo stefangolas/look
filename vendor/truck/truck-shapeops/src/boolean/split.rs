@@ -223,6 +223,7 @@ pub fn split_fragments(
     let mut engine = SplitEngine::new(shell_a, shell_b, tol);
     engine.collect_events(events)?;
     engine.run(events)?;
+    engine.sew_completion()?;
     engine.finish()
 }
 
@@ -421,6 +422,8 @@ struct SplitEngine<'a> {
     loops_a: Vec<Loops>,
     /// The mutable boundary wires of shell B, one `Loops` per face.
     loops_b: Vec<Loops>,
+    /// Whether the two inputs are the SAME shell object (the self-pair).
+    same_inputs: bool,
     /// The tolerance class for insertion geometry.
     tol: f64,
     /// The sewing-oracle records, keyed by the face they touch.
@@ -462,6 +465,7 @@ impl<'a> SplitEngine<'a> {
         Self {
             shell_a,
             shell_b,
+            same_inputs: std::ptr::eq(shell_a, shell_b),
             loops_a,
             loops_b,
             tol,
@@ -647,10 +651,25 @@ impl<'a> SplitEngine<'a> {
             ExactCurve::Line(_) | ExactCurve::Circle(_) | ExactCurve::Ellipse(_) => {}
             ExactCurve::Parabola(_) | ExactCurve::Hyperbola(_) => return Err(refused()),
         }
+        // A degenerate (zero-measure) sub-arc is a point contact, not an arc:
+        // the coincident-collinear EE records and the endpoint-touch FE records
+        // of a face-adjacent seam carry `t_lo == t_hi`. The splitter cannot act
+        // on a point arc; skip it (the RW-RESEW seam is witnessed by the
+        // non-degenerate full-range FE records alone).
+        let (t_lo, t_hi) = *t_range;
+        if (t_hi - t_lo).abs() <= PARAM_SLACK {
+            return Ok(());
+        }
         let (face_side, edge_side) = match (ev.lhs, ev.rhs) {
             (StratumRef::Face { .. }, StratumRef::Edge { .. }) => (ev.lhs, ev.rhs),
             (StratumRef::Edge { .. }, StratumRef::Face { .. }) => (ev.rhs, ev.lhs),
-            _ => return Err(refused()),
+            // An (Edge, Edge) coincident interval is a collinear edge-edge
+            // seam: the splitter has no edge-edge locus machinery, and the
+            // same locus is always witnessed by the FE records (each of the
+            // coincident edges lies on the other solid's incident faces), which
+            // the sew-completion pass owns. Skip it (the RW-INTERIOR-LOOP
+            // recombination class: a seam record the splitter cannot act on).
+            _ => return Ok(()),
         };
         let (solid, face_idx) = match face_side {
             StratumRef::Face { solid, index } => (solid, index),
@@ -663,6 +682,202 @@ impl<'a> SplitEngine<'a> {
             t_range: *t_range,
             edge,
         });
+        Ok(())
+    }
+
+    // -- the sew-completion pass (RW-RESEW) -----------------------------------
+
+    /// The sew-completion pass: after the three phase passes, unify every
+    /// unconsumed FE seam edge with the face-side boundary edge its record
+    /// certifies, so each seam locus becomes ONE shared edge instance used by
+    /// both solids' fragment wires with OPPOSITE effective orientations (the
+    /// proper-manifold butt-join).
+    ///
+    /// Direction: the FACE-SIDE of the record — solid A's edge — is the
+    /// canonical instance; the edge-side solid's (B's) seam edges are replaced
+    /// by it. The completion runs only over records keyed under an A face; the
+    /// symmetric records keyed under B faces witness the same loci and need no
+    /// work (the edge they name is already A's canonical instance). The
+    /// replacement is two-part: the seam edges themselves are swapped for A's
+    /// edge objects, and the edge-side solid's OTHER edges that touch the seam
+    /// corners are rebuilt to carry the face-side's corner vertices — so the
+    /// two solids' wires share the seam vertices and the assembled shell's
+    /// vertex graph closes.
+    fn sew_completion(&mut self) -> Result<(), Refusal> {
+        let mut seam_map: HashMap<EdgeID<Curve>, Edge<Point3, Curve>> = HashMap::default();
+        let mut protected: HashSet<EdgeID<Curve>> = HashSet::default();
+        let mut corner_map: Vec<(Point3, Vertex<Point3>)> = Vec::new();
+        let mut seam_arcs: HashSet<EdgeID<Curve>> = HashSet::default();
+        let mut ambiguous: Option<EdgeID<Curve>> = None;
+        let mut found = false;
+        for ((solid, face_idx), arcs) in self.sew.iter() {
+            if *solid != SolidRef::A {
+                continue;
+            }
+            for arc in arcs {
+                if !self.edge_id_present(arc.edge.id()) {
+                    continue;
+                }
+                // A genuine cross-solid seam edge is the OTHER solid's (B's)
+                // instance: present in B's wires and NOT also in A's wires. A
+                // self-pair (A == B) names A's own edges, which sit in both
+                // stores — those records are the identity self-contact and must
+                // not unify (the M2 self-pair envelope keeps refusing).
+                if !self.edge_in_solid(arc.edge.id(), SolidRef::B)
+                    || self.edge_in_solid(arc.edge.id(), SolidRef::A)
+                {
+                    continue;
+                }
+                let matches = self.face_edges_matching(*face_idx, arc)?;
+                match matches.len() {
+                    0 => {}
+                    1 => {
+                        let face_edge = matches.into_iter().next().ok_or_else(unsupported)?;
+                        let canonical = if face_edge.orientation() {
+                            face_edge.clone()
+                        } else {
+                            face_edge.inverse()
+                        };
+                        seam_map.insert(arc.edge.id(), canonical.clone());
+                        protected.insert(arc.edge.id());
+                        protected.insert(canonical.id());
+                        seam_arcs.insert(canonical.id());
+                        corner_map.push((arc.edge.front().point(), canonical.front().clone()));
+                        corner_map.push((arc.edge.back().point(), canonical.back().clone()));
+                        found = true;
+                    }
+                    _ => {
+                        ambiguous = Some(arc.edge.id());
+                        break;
+                    }
+                }
+            }
+        }
+        if ambiguous.is_some() {
+            // An arc matching MORE THAN ONE face-side boundary edge is an
+            // ambiguous seam (the deferred envelope).
+            return Err(unsupported());
+        }
+        if found {
+            self.sew_substitute_solid(&seam_map, &corner_map, &protected)?;
+            // The unified seam edges are contact arcs in BOTH solids' parity
+            // sets: the parity graph sees the seam as a Flip adjacency, so the
+            // classifier's arc-side seed (not the closure ray seed) adjudicates
+            // the touching fragments (D4).
+            for id in seam_arcs {
+                self.contact_a.insert(id);
+                self.contact_b.insert(id);
+            }
+        }
+        Ok(())
+    }
+
+    /// Whether an edge id still appears in either shell's mutable wire store —
+    /// an edge that was cut or reused by a face split or a point cut is gone,
+    /// and its sew record is consumed.
+    fn edge_id_present(&self, id: EdgeID<Curve>) -> bool {
+        self.loops_a.iter().chain(self.loops_b.iter()).any(|loops| {
+            loops
+                .0
+                .iter()
+                .any(|wire| wire.edge_iter().any(|e| e.id() == id))
+        })
+    }
+
+    /// Whether an edge id appears in one solid's mutable wire store.
+    fn edge_in_solid(&self, id: EdgeID<Curve>, solid: SolidRef) -> bool {
+        let loops = match solid {
+            SolidRef::A => &self.loops_a,
+            SolidRef::B => &self.loops_b,
+        };
+        loops.iter().any(|loops| {
+            loops
+                .0
+                .iter()
+                .any(|wire| wire.edge_iter().any(|e| e.id() == id))
+        })
+    }
+
+    /// The face-side boundary edges of solid A's face `face_idx` that are
+    /// carrier-and-range IDENTICAL to the sew arc (the D3 full-range seam
+    /// gate): exact curve identity AND the arc's parameter range equals the
+    /// edge's full range within the parameter slack.
+    fn face_edges_matching(
+        &self,
+        face_idx: usize,
+        arc: &SewArc,
+    ) -> Result<Vec<Edge<Point3, Curve>>, Refusal> {
+        let face = self
+            .shell_face(SolidRef::A, face_idx)
+            .ok_or_else(unsupported)?;
+        let arc_curve = exact_to_curve(&arc.curve)?;
+        let mut out = Vec::new();
+        for wire in face.absolute_boundaries() {
+            for edge in wire.edge_iter() {
+                let curve = edge.curve();
+                if curves_geometrically_identical(&arc_curve, &curve, self.tol)
+                    && ranges_identical(arc.t_range, curve.range_tuple())
+                {
+                    out.push(edge.clone());
+                }
+            }
+        }
+        Ok(out)
+    }
+
+    /// The two-part instance substitution in the edge-side (solid B) wire
+    /// store: every use of a seam edge is replaced by its canonical A edge
+    /// (orientation-preserving), and every NON-protected edge that touches a
+    /// seam corner vertex is rebuilt to carry the face-side's corner vertex.
+    fn sew_substitute_solid(
+        &mut self,
+        seam_map: &HashMap<EdgeID<Curve>, Edge<Point3, Curve>>,
+        corner_map: &[(Point3, Vertex<Point3>)],
+        protected: &HashSet<EdgeID<Curve>>,
+    ) -> Result<(), Refusal> {
+        let mut rebuilt: HashMap<EdgeID<Curve>, Edge<Point3, Curve>> = HashMap::default();
+        for loops in self.loops_b.iter_mut() {
+            for wire in loops.0.iter_mut() {
+                let edges: Vec<Edge<Point3, Curve>> = wire
+                    .edge_iter()
+                    .map(|edge| {
+                        if let Some(canonical) = seam_map.get(&edge.id()) {
+                            return if edge.orientation() {
+                                canonical.clone()
+                            } else {
+                                canonical.inverse()
+                            };
+                        }
+                        if protected.contains(&edge.id()) {
+                            return edge.clone();
+                        }
+                        let sub_vertex = |v: &Vertex<Point3>| -> Vertex<Point3> {
+                            corner_map
+                                .iter()
+                                .find(|(p, _)| near_pt(*p, v.point(), self.tol))
+                                .map(|(_, v)| v.clone())
+                                .unwrap_or_else(|| v.clone())
+                        };
+                        let front = sub_vertex(edge.front());
+                        let back = sub_vertex(edge.back());
+                        if front.id() == edge.front().id() && back.id() == edge.back().id() {
+                            return edge.clone();
+                        }
+                        let forward = rebuilt.entry(edge.id()).or_insert_with(|| {
+                            let f = sub_vertex(edge.absolute_front());
+                            let b = sub_vertex(edge.absolute_back());
+                            Edge::try_new(&f, &b, edge.curve()).unwrap_or_else(|_| edge.clone())
+                        });
+                        if edge.orientation() {
+                            forward.clone()
+                        } else {
+                            forward.inverse()
+                        }
+                    })
+                    .collect();
+                *wire = Wire::from(edges);
+            }
+        }
         Ok(())
     }
 
@@ -881,9 +1096,23 @@ impl<'a> SplitEngine<'a> {
                 faces_with_crossings.push((*solid, *face_idx, Vec::new()));
             }
             faces_with_crossings.extend(crossing_faces.iter().cloned());
-            self.insert_open_arc_shared(&faces_with_crossings, &classify_curve)?;
+            let seam_skip = self.event_cross_solid(ev);
+            self.insert_open_arc_shared(&faces_with_crossings, &classify_curve, seam_skip)?;
         }
         Ok(())
+    }
+
+    /// Whether a contact event's two strata belong to genuinely DIFFERENT
+    /// solid objects (a cross-solid seam). The self-pair (A == B) reads as
+    /// A-stratum x B-stratum of the SAME object and is not cross-solid.
+    fn event_cross_solid(&self, ev: &ContactEvent) -> bool {
+        if self.same_inputs {
+            return false;
+        }
+        let solid_of = |r: &StratumRef| match r {
+            StratumRef::Face { solid, .. } | StratumRef::Edge { solid, .. } => *solid,
+        };
+        solid_of(&ev.lhs) != solid_of(&ev.rhs)
     }
 
     /// The re-parameterized arc of an open line whose certified extent leaves
@@ -1229,6 +1458,7 @@ impl<'a> SplitEngine<'a> {
         &mut self,
         crossing_faces: &[CrossingFace],
         curve: &Curve,
+        seam_skip: bool,
     ) -> Result<(), Refusal> {
         // Union the certified crossings over all crossing faces.
         let mut certified: Vec<(f64, Point3)> = Vec::new();
@@ -1253,7 +1483,14 @@ impl<'a> SplitEngine<'a> {
             }
         }
         if certified.is_empty() {
-            return Err(refused());
+            // A crossing open arc with NO certified endpoint: a cross-solid
+            // seam touch (the face-adjacent box pair's cap x side rim lines
+            // ride the untrimmed plane x plane carrier and touch the faces at
+            // a single corner) carries no cut to certify — skip it. A real
+            // interior cut always carries its certified corner points (the
+            // RW-INTERIOR-LOOP halfspace-box family). A SAME-solid identity
+            // line (the M2 self-pair) keeps refusing as today.
+            return if seam_skip { Ok(()) } else { Err(refused()) };
         }
         let mut t_min = f64::INFINITY;
         let mut t_max = f64::NEG_INFINITY;
@@ -2423,6 +2660,11 @@ fn exact_curves_identical(a: &ExactCurve, b: &ExactCurve, tol: f64) -> bool {
         | (ExactCurve::Ellipse(ca), ExactCurve::Ellipse(cb)) => circles_identical(ca, cb, tol),
         _ => false,
     }
+}
+
+/// Whether two parameter ranges are identical within the parameter slack.
+fn ranges_identical(a: (f64, f64), b: (f64, f64)) -> bool {
+    (a.0 - b.0).abs() <= PARAM_SLACK && (a.1 - b.1).abs() <= PARAM_SLACK
 }
 
 /// The geometric identity of two stored curves.
