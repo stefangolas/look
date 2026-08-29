@@ -1,0 +1,43 @@
+{
+  "id": "RW-VERTEX-CLIP",
+  "status": "STOPPED",
+  "contracts": [
+    "boolean::assemble::emit_contact seam filter (assemble.rs) \u2014 an EndpointTouch record is dropped ONLY when the event is NOT cross-solid (the event_cross_solid discriminator: ptr-eq shell identity + distinct SolidRef, computed in the sweep); the Arc1 Coincident arms are untouched (machine-checked: their condition is byte-identical to base)",
+    "boolean::split::collect_events (split.rs) \u2014 the cross-solid EndpointTouch Point0 loci are collected as certified clipping points alongside the Transverse ones (verified by instrumentation: the diagonal fixture's four box vertices (2,0,0) (0,2,0) (2,0,2) (0,2,2) land in certified_points)",
+    "boolean::split::dispatch (split.rs) \u2014 a cross-solid (Point, EndpointTouch, Point0) event routes to point_cut in the Point phase (the same treatment Transverse points get) instead of refusing; the same-solid arm still refuses, which keeps the landed lib test split_deferred_locus_family_refuses green (its endpoint fixture feeds split_fragments a same-solid Face/Edge pair directly)"
+  ],
+  "tests_added": 0,
+  "deviations": [
+    {
+      "id": "DIAGONAL_STILL_REFUSES_AT_PENDING_LOOP_ASSEMBLY",
+      "test": "diagonal_plane_box_splits / diagonal_recombination_is_original / no_certified_endpoints_still_refuses",
+      "derivation": "The packet's booked D4 happy path (two valid 5-face triangular prisms; the recombination a valid single shell) does NOT unblock. With a faithful D1/D2 the recorded FIRST blocker is genuinely removed \u2014 instrumentation confirms the open-arc certified-endpoint guard (split.rs open_arc_certified) no longer fires and the four box vertices are collected \u2014 but the diagonal halves now refuse UnsupportedEnvelope(ContactReductionDeferred) at split.rs assemble_pending_loops (the unclosed-pending-chain guard, backtrace: assemble_pending_loops:1641 <- dispatch:909 <- run:900). The wall face (B,1) accumulates a duplicate of each box-edge open arc: each of the two box-edge lines (x=2,y=0 and x=0,y=2) is witnessed by TWO FF records (wall x box-face x=2 and wall x box-face y=0 / wall x box-face x=0 and wall x box-face y=2), and the greedy chain builder consumes a duplicate, leaving a chain whose last edge's back is not the first edge's front. The four certified arcs would close the box's wall cross-section quadrilateral ((2,0,0)-(0,2,0)-(0,2,2)-(2,0,2)), but the extra duplicate cannot close. The instrumented unclosed chain: [(2,0,0)->(0,2,0), (0,2,0)->(0,2,2), (0,2,2)->(2,0,2), (2,0,2)->(2,0,0), (2,0,0)->(2,0,2)] on face (B,1).",
+      "verbatim": "Err(UnsupportedEnvelope(ContactReductionDeferred)) from assemble_pending_loops unclosed chain (was the open-arc certified-endpoint guard)"
+    },
+    {
+      "id": "GUARD_CLASS_DISSOLVED",
+      "test": "no_certified_endpoints_still_refuses",
+      "derivation": "The packet's 4th stop condition fires: the guard fixture refuses for a DIFFERENT reason than the recorded one, and its recorded class (an open FF locus whose certified-extreme set is empty) has dissolved. The assertion still passes (the Difference still answers UnsupportedEnvelope(ContactReductionDeferred)) but the mechanism is now assemble_pending_loops (deviation 1), not the certified-extreme guard \u2014 the certified-extreme set is no longer empty. Per D3 this is a STOP condition finding, not a test to re-purpose; the test is left at base, unchanged.",
+      "verbatim": "Err(UnsupportedEnvelope(ContactReductionDeferred)) now emitted at split.rs assemble_pending_loops:1641, not the open-arc certified-endpoint guard"
+    },
+    {
+      "id": "RESEW_REGRESSION_SPEC_GAP",
+      "test": "resew (adjacent_boxes_union_assembles, p3_recombination_flagship_is_original, touching_difference_answers, butt_join_survives_further_boolean) \u2014 4/7 fail",
+      "derivation": "A faithful D1/D2 cannot satisfy the packet's 'resew must pass UNCHANGED' requirement. Collecting the cross-solid EndpointTouch seam corners into certified_points (the mandated D2 collect) also certifies the face-adjacent family's corner-touch FF lines: e.g. box A's x=0 face x box B's y=0 face bound to a SINGLE point (the seam corner (0,0,1)). insert_open_arc_shared then finds one certified point on the carrier, p_min == p_max, and Edge::try_new(&v0, &v0, sub) refuses (backtrace: insert_open_arc_shared Edge::try_new map_err refused <- ff_curve:1117 <- dispatch:921). At base these lines were skipped by the certified-empty seam_skip path (seam_skip = event_cross_solid = true). This is a decision-vs-tree contradiction (SPEC_GAP class): the packet pre-decided both 'cross-solid EndpointTouch points are certified clipping points' and 'resew stays unchanged', and the tree shows they cannot both hold. Fixing it (e.g. skipping single-certified-point arcs, or filtering which EndpointTouch loci certify) is a design decision the packet did not make; I did not extend the design.",
+      "verbatim": "resew 4/7 fail: Err(UnsupportedEnvelope(ContactReductionDeferred)) from Edge::try_new on a degenerate single-point open arc"
+    },
+    {
+      "id": "D4_FLIP_NOT_LANDED",
+      "test": "diagonal_plane_box_splits / diagonal_recombination_is_original",
+      "derivation": "D4 booked the flip of these two tests from refusal to acceptance. Because the diagonal halves still refuse (deviation 1), the flipped assertions failed; the tests were restored to the recorded refusal assertions (which pass at base and after the attempted change alike). The booked unblocking is empirically false in this tree, so no assertion was committed flipped.",
+      "verbatim": "flipped tests failed: 'the diagonal Intersection half assembles: UnsupportedEnvelope(ContactReductionDeferred)'"
+    },
+    {
+      "id": "NO_COMMIT",
+      "test": "commit",
+      "derivation": "The packet prescribes the subject 'RW-VERTEX-CLIP: cross-solid EndpointTouch points clip open FF loci' for a landed commit. Since a faithful D1/D2 breaks the required-unchanged resew suite (deviation 3) and does not unblock the diagonal (deviations 1, 4), there is no partial landing to commit without leaving the tree red. All kernel and test changes were reverted; the branch sits at the booking HEAD (af9acf2) with an empty diff and a green tree. Anchors A1-A5 re-derived on this tree: each count 1 (A1 assemble.rs:273, A2 assemble.rs:266, A3 split.rs:1108, A4 split.rs:966, A5 split.rs:621), matching the packet.",
+      "verbatim": "empty diff; tree green at base"
+    }
+  ],
+  "notes": "RW-VERTEX-CLIP stopped. The D1 filter and D2 collection/dispatch were implemented faithfully and PROVEN to work by temporary instrumentation (removed before revert): the four cross-solid EndpointTouch box vertices flow through the sweep and reach certified_points, and the open-arc certified-endpoint guard no longer fires. But the booked unblock is false in this tree: the diagonal still refuses ContactReductionDeferred, now at assemble_pending_loops (duplicate box-edge open arcs on the wall face cannot close a chain), and \u2014 more fundamentally \u2014 the mandated cross-solid EndpointTouch collection breaks the packet's required-unchanged resew suite (4/7: certified seam-corner points collapse corner-touch FF lines to a single point and Edge::try_new refuses). Both are stop conditions the packet itself prescribes ('the guard fixture refuses for a DIFFERENT reason than the recorded one'; 'if the fixture's refusal class dissolves'). The dispatch re-route needed a cross-solid guard (event_cross_solid) to keep the landed lib test split_deferred_locus_family_refuses green \u2014 its endpoint fixture feeds split_fragments a same-solid Face/Edge pair directly, which must still refuse. I did not extend the design (no D5 arms, no new Refusal/EnvelopeCase), did not touch the Arc1 Coincident arms or the RW-RESEW zero-measure filters, and reverted everything so the tree is green: cargo check -p truck-shapeops clean; cut_boundaries 7/7, boolean_m2 4/4, interior_loop 8/8, resew 7/7 (all at base); lib 46/47 (the recorded environmental healing::tests::step_import); kernel-gates.sh HEAD reports GATE-4 unscaled_legacy 111/111 and all P-3 gates pass. The follow-up packet needs a decision the packet did not make: how a certified clipping point pool interacts with the duplicate/witnessed open arcs (dedupe, or a certified-extreme >= 2-point filter at insert_open_arc_shared), and whether resew's corner-touch FF lines must be excluded from certification."
+}
