@@ -177,3 +177,46 @@ RESULT.json: `{"id":"RW-VERTEX-CLIP","status":"DONE","contracts":[...],
 "tests_added":2,"deviations":[...],"notes":"..."}` — tests_required lists
 the four flipped/preserved names; every deviation with your derivation;
 deviations are expected to be RIGHT.
+
+## Amendment r2 (session 41, after your STOPPED run — the two decisions your RESULT asked for)
+
+Your first run was correct to stop: the packet had not decided how the
+certified-point pool interacts with (a) corner-touch lines that certify to
+a SINGLE point and (b) open arcs witnessed by MULTIPLE FF records. It
+decides now; resume your own instrumented work.
+
+**D6 — certification requires TWO distinct points.** The open-arc
+certification/clipping gate (the `insert_open_arc_shared` path your
+deviation 3 traced) requires the certified-extreme set to hold at least
+TWO DISTINCT points (near_pt-separated) on the carrier before any arc is
+built; a single certified point is a CORNER TOUCH, not a clipping — the
+seam_skip path (with `event_cross_solid` deciding, as landed) skips it
+exactly as at base. This restores the resew family byte-for-byte (the
+corner-touch FF lines skip as before) AND preserves
+`no_certified_endpoints_still_refuses` with its ORIGINAL mechanism (an
+open locus with fewer than two certified extremes refuses at the
+certified-extreme guard, as recorded). Machine-check both suites: resew
+7/7 unchanged, the guard test unchanged.
+
+**D7 — duplicate witnessed arcs dedupe before chaining.** A box-edge
+open arc can be witnessed by two FF records (wall × face x=2 and wall ×
+face y=0 name the same locus); your instrumented unclosed chain had five
+arcs for a four-arc quadrilateral. The rule: before appending an open arc
+to a face's pending set, SKIP it if an arc with the same carrier AND the
+same certified extent (endpoints near_pt-equal in the same order or
+reversed) is already pending for that face — the first instance is the
+shared instance (the splitter's shared-instance invariant is what lets
+the assembled shell close). Dedupe is per-face, decided at insertion time
+in the open-arc insertion path, not in the chain builder.
+
+**D8 — stop-condition adjustments for this run only.** Your deviation-2
+stop (the guard fixture refusing for a different reason) is RESOLVED by
+D6 — the guard returns to its recorded mechanism; assert that. The
+deviation-1 duplicate-chain failure is RESOLVED by D7 — the diagonal
+halves must now assemble (D4's flip is booked again). If the diagonal
+STILL refuses after a D6/D7-faithful run, stop again with the new
+backtrace — that would be a third, genuinely new class.
+
+Everything else in this packet stands (D1/D2/D3/D5, the anchors — re-derive
+them; your first run measured A1 assemble.rs:273, A2 :266, A3 split.rs:1108,
+A4 :966, A5 :621 at HEAD `af9acf2`).
