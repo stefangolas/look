@@ -1,0 +1,47 @@
+{
+  "id": "BG-CAD-P6-REWRITE",
+  "status": "DONE",
+  "contracts": [
+    "D1 module shape: new vendor/truck/truck-shapeops/src/rewrite.rs opens with the house deny header (recognize.rs:22-29); lib.rs declares `pub mod rewrite;` (A1 3->4); new vendor/truck/truck-shapeops/tests/chamfer.rs carries the same deny header plus a match-based `fn expect_ok<T>(r: Outcome<T>) -> T`.",
+    "D2 signatures: `pub struct ChamferSpec { pub a: Point3, pub b: Point3, pub d_first: f64, pub d_second: f64 }` and `pub fn chamfer(&Solid<Point3, Curve, Surface>, &[ChamferSpec], &mut Budget) -> Outcome<Solid<Point3, Curve, Surface>>`. The ordering contract: d_first applies to the adjacent face whose outward unit normal is lexicographically SMALLER (x, then y, then z). Resolution matches the unique edge whose two absolute endpoints agree with a/b (either order) within the insertion tolerance (1.0e-2, the boolean assembler's class); 0 matches refuse Empty, >1 match refuse UnsupportedEnvelope(NonCanonicalCarrier).",
+    "D3 engine: (1) lift - every face is a canonical Plane carrier (ExactCanonical or Derived) with a single wire of Line edges forming a CONVEX polygon (wedge cross-products dot the stored plane's normal > 0), else NonCanonicalCarrier before any construction; (2) per-spec trim - the spec edge's line offset into each adjacent face by the face's d (offset direction outward x wire_dir, machine-checked by the strict-interior extent check), intersected closed-form with the two boundary edges adjacent to the spec edge; (3) collision check - a trim that exits an adjacent edge's extent, an empty/inverted/non-convex kept region, or a degenerate (parallel) trim refuses Empty; (4) rebuild - every affected face's polygon replaces each spec edge with the trim segment and each spec-endpoint corner (on the cap faces, which share an edge with each adjacent face) with the cap segment; surviving original edges are reused verbatim, new edges are minted once and shared through point-keyed pools, and one chamfer side face per spec is built by the cuboid side pattern Plane::new(bottom_start, bottom_end, top_start), so the chamfer plane data falls out exactly; (5) orientation - the stored-wire CCW-in-surface-frame invariant decides every wire direction (inverted faces rebuild with plane.inverse() + reversed wire). Solid::try_new is the acceptance gate.",
+    "D4 distance-angle form: `ChamferSpec::by_angle(a, b, d, alpha)` computes d_first = d and d_second = d * tan(alpha) (right-dihedral closed form; general-dihedral is the booked follow-up).",
+    "D5 refusals - zero new arms: NonCanonicalCarrier at the lift and for ambiguous edge resolution (>1 match, a spec edge with != 2 adjacent faces, or a spec endpoint with != 3 incident faces); Empty for degenerate requests (0 matches, duplicate spec edge, adjacent spec edges in a face's wire, trim overflow, empty/non-convex kept region, empty spec list); NumericallyUnresolved remains available for failed projections.",
+    "D6 certificates: Solid::try_new is the acceptance gate; tests additionally certify each trim point at EXACT distance d from the original edge's line, the chamfer plane passing through both its trim points, and the EXACT [0,4]^2 x [0,2] bounding box for convex-corner chamfers. The certificate is Method::Float (H-6), empty PropMap, budget_left = the caller's unspent budget (the engine spends nothing).",
+    "Test battery: 9 dyadic-witness tests in tests/chamfer.rs (all green): chamfer_symmetric_box (P1), chamfer_asymmetric_box (P2, the D2 ordering contract), chamfer_two_independent_edges (P3), chamfer_same_face_pair (P4), trim_distance_certificate, chamfer_nonplane_refuses (budget untouched), chamfer_trim_overflow_refuses, chamfer_distance_angle (D4), chamfer_result_survives_boolean."
+  ],
+  "tests_added": 9,
+  "deviations": [
+    {
+      "deviation": "cargo test --locked -p truck-shapeops --lib is not fully green: healing::tests::step_import fails on Os { kind: NotFound } reading occt-cylinder.step.",
+      "derivation": "The vendored tree omits the upstream STEP test resources (byte-identical before and after this commit; outside write_allow). This is the packet's recorded environmental failure ('fails at base too'). The remaining 46 lib tests pass."
+    },
+    {
+      "deviation": "cargo clippy --locked -p truck-shapeops --all-targets does not exit clean: clippy errors are reported in truck-meshalgo (formal/cone.rs, cylinder.rs, torus.rs, common_arc.rs, intersection.rs, bezier_isect.rs, ...) and truck-stepio.",
+      "derivation": "Both crates are workspace members, unchanged by this packet (outside write_allow), and clippy fails identically at the parent commit HEAD (verified in a detached worktree). The errors are deny-by-default clippy lints under the pinned Rust 1.97 toolchain against unchanged vendored code. None of the three files this packet adds/modifies produces a clippy finding (verified by filtering the unfiltered output for truck-shapeops)."
+    },
+    {
+      "deviation": "Test 7 (chamfer_trim_overflow_refuses, d=4) machine-checks the arm Refusal::Empty.",
+      "derivation": "The packet asked to machine-check and record the actual arm. At d=4 the trim line's reference point lands exactly on the far endpoint of the adjacent edge; cut_on_segment's strict-interior parameter check (t <= 0 || t >= 1) refuses Refusal::Empty on the first adjacent face's trim. The kept-region convexity check would also refuse Empty, but the extent check fires first."
+    },
+    {
+      "deviation": "The refusal arms for the D2/D3 structural guards were machine-checked and recorded: a spec edge with != 2 adjacent faces, or a spec endpoint with != 3 incident faces (the box-like cap-face precondition), refuse NonCanonicalCarrier; a duplicate spec edge (two specs resolving to the same unique edge), two adjacent spec edges in a face's wire (the shared-vertex chamfer, whose trim segments would be undefined), and an empty spec list refuse Empty.",
+      "derivation": "D2/D3/D5 specify 'zero or multiple matches' and 'anything else refuses' but not the arms for these specific guards; D5's two-arm rule (NonCanonicalCarrier for envelope structure, Empty for degenerate requests) was applied. None of the packet's nine tests exercises these paths; they are recorded so a later packet does not re-derive them."
+    },
+    {
+      "deviation": "D4 ships as the convenience constructor ChamferSpec::by_angle; test 8 (chamfer_distance_angle) asserts the EXACT P1 plane data x+y=7, not a tolerance.",
+      "derivation": "The packet left the API shape to my choice (constructor vs second entry); the constructor fits the module cleanest. Machine-checked: d * FRAC_PI_4.tan() computes to 0.9999999999999999 (tan is a float computation, H-6), and on this box the trim arithmetic 4 - d_second rounds to 3.0 exactly, so both trim points land exactly at (4,3,0) and (3,4,0) and the chamfer plane is exactly x+y=7. The test therefore keeps dyadic-exact assertions; the float nature of the D4 form is recorded here."
+    },
+    {
+      "deviation": "The point/edge pools key on f64-bit tuples (u64, u64, u64) rather than on Point3.",
+      "derivation": "cgmath's Point3<f64> implements neither Hash nor Eq (f64 is not Eq/Hash), so the exact-coincidence dedup rule (the load-bearing instance rule: coincident dyadic points share one vertex, or the shell stays open) is implemented via f64::to_bits point keys. Bit-identical points share a key, so the dyadic witnesses remain exact."
+    },
+    {
+      "deviation": "The inverted-face rebuild path (plane.inverse() + reversed wire for a stored-inverted face) is implemented but unexercised by the tests.",
+      "derivation": "All cuboid fixtures store outward-oriented faces (orientation == true, outward == plane.normal()), so the orientation-false branch is covered only by construction (it mirrors the true branch and was added so an extruded solid's inverted cap would still rebuild with the correct outward normal if ever chamfered)."
+    }
+  ],
+  "notes": "Commit df73bdd on branch packet/BG-CAD-P6-REWRITE with subject 'BG-CAD-P6-REWRITE: LocalBoundaryRewrite engine, proven on PP chamfer', then verified: cargo check --locked -p truck-shapeops (clean), cargo fmt --check -p truck-shapeops (clean, 0 diffs), cargo test --locked -p truck-shapeops --test chamfer (9/9 green), cargo test --locked -p truck-shapeops --test boolean_m2 (4/4), interior_loop (8/8), resew (7/7), cut_boundaries (7/7), split_plane (10/10) - all landed suites UNCHANGED and green, scripts/kernel-gates.sh HEAD (all P-3 gates pass, unscaled_legacy 111/111). Anchors re-derived after the change: A1 pub mod = 4 (expected divergence from 3), A2 pub mod rewrite = 1 (dispatch-time 0), A3 pub fn boolean( = 1, A4 pub fn cuboid = 1. No new Refusal/EnvelopeCase/UnresolvedWitness/Collapse arms (D5); no Face::debug_new (GATE-3/H-4); no bare absolute small literal without the same-line H-3 opt-out (INSERTION_TOL is the only one, tagged); no tolerance-migration constructor name in prose or comments (GATE-4); no instrumentation survives the committed diff. The engine spends no caller budget; the lift refusal (test 6) leaves the caller's Budget object untouched (asserted). Every happy-path witness (P1/P2/P3/P4, the D6 distance certificate, the D4 angle form, and the downstream boolean) assembles a closed valid solid through Solid::try_new on the first try, matching the probe's machine-validated evidence.",
+  "amended_by": null,
+  "amendment_note": null
+}
