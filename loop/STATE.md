@@ -9,92 +9,210 @@ when they stop being true, never for length. If you are picking this up cold, re
 [`loop/ORCHESTRATOR.md`](ORCHESTRATOR.md) for how to run the loop, then
 `python loop/slot_status.py`** - nothing else. Do not read `LEDGER.jsonl` whole.
 
-Updated 2026-08-28, close of session 40 (Phase 7 opened: BG-CAD-P1-UTILITY and
-BG-CAD-P2-EXTRUDE landed, both ACCEPTED; frontier = write P3/P4/P5).
-Branch: `integration/kernel-bg`, HEAD `b85ca04`.
+Updated 2026-08-29, mid-session 41 (RW-INTERIOR-LOOP + BG-CAD-P4-UNTIL +
+BG-CAD-P5-REVOLVE + RW-RESEW all LANDED; BG-CAD-P3-SPLIT on its second
+redispatch, worker RUNNING).
+Branch: `integration/kernel-bg`, HEAD `10e0fcc`.
 
 ## Where we are
 
-**Session 40 opened the build123d coverage program
-(`docs/BUILD123D_COVERAGE_PLAN.md`) and landed its first two packets.**
+**Session 41 landed four packets and turned the P3 blocker chain twice.**
 
-1. **BG-CAD-P1-UTILITY** (`28c7394`, ACCEPTED, merged `84854b5`/`d0bb5c3`):
-   `truck-modeling/src/cad.rs` - certified `solid_bounding_box` (per-carrier
-   table: Plane/Cylinder boundary-edge hull, Sphere full-carrier box, Cone
-   hull+apex, Torus/Placed refuse), the similarity fold
-   (`translate_solid`/`uniform_scale_solid`/`mirror_solid` riding the LANDED
-   `Mapped` chain with the det<0 face-flip rule), `make_face` (S1 arrangement
-   + session-28 containment rule, one planar z=0 face per material region),
-   `make_hull` (monotone chain on the landed exact `orient2d`). Manifest edge
-   truck-modeling -> truck-evidence landed with it. 10 tests.
-2. **BG-CAD-P2-EXTRUDE** (`b3d023a`, rebased to `cd0b731`, ACCEPTED, merged
-   `dc02f85`/`b85ca04`): `extrude_profile_vector` (arbitrary dir, `both`
-   interval) + `extrude_profile_taper` (signed 2-D offset re-arranged through
-   the landed `arrange` - no hand-built top polygons). Landed scalar
-   `extrude_profile` FROZEN and verified unchanged. Canonical-only envelope:
-   oblique circles refuse NonCanonicalCarrier (Placed is Tier 1's P9). 10
-   tests; verified at the POST-P1 merged HEAD (same crate, session-37 rule).
+1. **RW-INTERIOR-LOOP** (worker `6206f58`-class commit, amended `316b868`,
+   ACCEPTED, merged `eb9722e` via `7e92f06`): interior-loop division in
+   `truck-shapeops/src/boolean/split.rs`. The through-cut family (probe
+   variants [f]/[h]) now assembles: `classify_curve` is band-aware
+   (periodic-carrier walls divide at interior rims via the doubled
+   independent loop, shared edge instances), open FF lines re-parameterize
+   to their certified extent, interior chords assemble into closed loops.
+   The worker's D1 localization OVERTURNED the packet's diagnosis: the
+   splitter never refused — it left the wall undivided (degenerate
+   zero-area rim polygons defeat the polygon rule) and the refusal surfaced
+   at `Solid::try_new` in assemble. M2 battery unchanged. 8 tests.
+2. **BG-CAD-P4-UNTIL** (`c217e6e`, ACCEPTED first try, merged `190b984`):
+   `truck-modeling/src/until.rs` — `extrude_until` (parallel target rides
+   landed `extrude_profile_vector` at the certified t·dir; oblique target =
+   `contact()`-certified termination lines + cap polygon in the target
+   plane) + `project_profile` (locus extraction from the same records).
+   `Until` is a module-local enum. The worker caught a sign error in MY
+   fixture plane and fixed it by construction. 9 tests.
+3. **BG-CAD-P5-REVOLVE** (`7287e16`, ACCEPTED first try, merged `9174881`):
+   `truck-modeling/src/revolve.rs` — `revolve_profile` (line-edge profiles
+   about the z-axis, carriers per plan table 6.2: Cylinder/Cone/Plane
+   constructed canonical directly; full turn = 4-face tube; partial angle =
+   +2 planar end caps). Axis-crossing/touch and circle profiles refuse at
+   the lift. D6 recognition wiring took the pre-made fallback: the u/v
+   parameter roles are CROSSED for RevolutedCurve-of-Line and cannot be
+   certified against the landed `CanonicalParamMap` vocabulary without a
+   new type (booked follow-up). 9 tests.
+4. **RW-RESEW** (worker `6206f58`-era commit, amended twice to `a1e1156`,
+   ACCEPTED, merged `53dba23`): sew-completion pass in `split.rs` —
+   unconsumed FE seam records whose exact curve matches a face-side
+   boundary edge UNIFY the instance (direct wire rebuilds: `swap_edge_
+   into_wire` cannot cross solids because seam vertices are distinct
+   instances; seam-corner vertex substitution is required or the shell
+   stays disconnected). Face-adjacent unions assemble (adjacent boxes,
+   P3's split recombination). Zero-measure seam records filtered with a
+   ptr-eq cross-solid guard that keeps the M2 self-pair refusing.
 
-Progress: **2 of 12-13 packets** (Tier 0: 2 of 8), ~3.5k of ~20k LOC.
+Progress: **4 of 12-13 packets** (Tier 0: 4 of 8) + 2 Boundary-Rewrite
+funnel packets (RW-INTERIOR-LOOP, RW-RESEW). P3's own code exists only as
+archived WIP; its blocker chain is now fully landed.
 
 ## Pick up here
 
-1. **P3 is BLOCKED on a real Contact-Layer finding** (BG-CAD-P3-SPLIT,
-   SPEC_GAP session 40, result filed
-   `loop/results/BG-CAD-P3-SPLIT.SPEC_GAP.json`, WIP archived at
-   `loop/slots/0/abandoned-20260828-180102.patch`): the landed `boolean()`
-   refuses EVERY booked split happy-path (plate 4x4x2 vs a constructed
-   halfspace box through its middle) with
-   `UnsupportedEnvelope(ContactReductionDeferred)` — while the box itself is
-   valid. Both solids are Plane/Line-only, every pair class is in the landed
-   FF/FE/EE tables, yet the sweep defers. **DONE: probed (session 40, loop/results/BG-CAD-P3-SPLIT.PROBE.md) -
-   every stratum pair answers; the deferral is the INTERIOR-LOOP DIVISION
-   gap in the Boundary Rewrite (the landed boolean only works when cutter
-   terminations are coplanar with the solid faces - the M2 envelope).
-   NEXT PACKET: RW-INTERIOR-LOOP (booked in the PROBE doc); P3 dispatches
-   unchanged after it.**
-   The difference from the M2 flagship: cutting through a solid's MIDDLE
-   produces open-arc cuts on several faces plus a closed rectangle loop on
-   the cut wall, vs the flagship's single-face circle cut. P4/P5 packets
-   remain writable (write-disjoint from the boolean funnel).
-2. **Model policy (owner directive): default worker is
-   `zai/glm-5.3-flash`** (run_packet default; `land_packet` records the actual
-   model per packet from the slot's `worker.model`). Deepseek was reupped
-   mid-session as fallback. Calibration: 13/13 worker deviations across P1/P2
-   were RIGHT; the model churns well on pre-decided packets. glm's three
-   silent P2 deaths are CONFINDED by the account decline that ended in
-   `Insufficient Balance` (deepseek died of that first); post-reup glm
-   completed P2. On a future silent death, check the opencode log for account
-   errors before blaming the model.
-3. The dyadic-exactness domain of the landed `arrange` now bounds every
-   offset-based construction (P2's recorded domain note): fixtures whose
-   miter-crossing parameters are non-dyadic refuse. Machine-check fixture
-   crossing parameters when writing P3+ tests.
-4. Open latent flake, NOT fixed: `truck-base/tests/newton.rs::test_newton1`.
+1. **BG-CAD-P3-SPLIT is on its SECOND redispatch, worker RUNNING** (slot 0,
+   pid 43732, forked at `53dba23`). Session 41, first redispatch: the
+   split itself WORKS (flagship halves assemble, 6 faces each — the
+   RW-INTERIOR-LOOP landing did its job), but the booked metamorphic
+   `split+ Union split-` hit a SECOND landed-pipeline boundary, isolated
+   empirically: ANY face-adjacent union refuses (two directly-built
+   adjacent boxes refuse identically — independent of split construction).
+   Filed `loop/results/BG-CAD-P3-SPLIT.SPEC_GAP2.json`; RW-RESEW was
+   booked from it and landed. The registry row carries the pre-decided
+   worker deviation for test 2: the recombination union keeps **10
+   cosmetically-split faces** (the pipeline has no coplanar-face merging;
+   the M2 union likewise) — the metamorphic holds for the exact BOUNDING
+   BOX, not the face count. If the worker stops again, read its RESULT
+   verbatim before touching anything; its stop conditions have now paid
+   off twice.
+2. **Model policy: default worker is `deepseek/deepseek-v4-flash`**
+   (run_packet default, owner directive re-affirmed). All four session-41
+   workers ran deepseek; deviation calibration now 13/13 (P1/P2) plus
+   session 41's ~14 deviations across four packets, all machine-derived
+   and consistent with the tree.
+3. Next frontier after P3 lands: **P6 (LocalBoundaryRewrite + chamfer PP,
+   MANDATORY num3-scratch probe) and P7 (fillet F1 + F4)** — both design
+   packets to write; then P8 (facade + battery). Tier 1 (P9/P10) after.
+4. The dyadic-exactness domain of the landed `arrange` still bounds every
+   offset-based construction; machine-check fixture crossing parameters.
+5. Open latent flake, NOT fixed: `truck-base/tests/newton.rs::test_newton1`.
+   Also environmental, recorded, do NOT chase: `truck-shapeops` lib
+   `healing::tests::step_import` fails at base AND head (STEP fixtures
+   absent from this checkout); V5's baseline comparison knows it.
 
 ## State of the machine, as left
 
 - Watchdog RUNNING (`loop/watchdog.lock`, pid 49420,
-  `LOOK_WATCHDOG_STAGNANT=3600`).
-- Registry: 118 rows = 118 DONE, **0 READY** - nothing dispatchable until
-  P3/P4/P5 packets are written.
-- Slots 0-3 idle/FINISHED (slot 0 holds the landed P1 branch, slot 1 the
-  landed P2 branch; both re-fork via new_slot when next used).
-- Disk ~16 GB free at close (repo-root `target/` deleted mid-session - it
-  regenerates; verify baselines are the transient risk).
+  `LOOK_WATCHDOG_STAGNANT=3600`). CAUTION: it misfired once this session
+  (see session-41 traps, item 1) — check `loop/watchdog.log` tail for
+  ACTION lines before dispatching into any slot.
+- Registry: 123 rows = 121 DONE + 1 BLOCKED (`BG-AUD-FIX-004`, old audit
+  row) + 1 READY (`BG-CAD-P3-SPLIT`, worker running).
+- Slot 0: P3 worker RUNNING. Slots 1/3: FINISHED branches (landed P5/P4).
+  Slot 2: old solver-program FINISHED.
+- Disk ~11 GB free at last check (repo-root `target/` deleted mid-session;
+  warm slot targets 1-6 GB each — reclaim order in the traps).
 - GATE-4 ceiling 111 = true count; no new unscaled_legacy sites landed.
-- Results filed: `loop/results/BG-CAD-P1-UTILITY.json`,
-  `loop/results/BG-CAD-P2-EXTRUDE.json`.
+- Results filed this session: `loop/results/RW-INTERIOR-LOOP.json`,
+  `BG-CAD-P4-UNTIL.json`, `BG-CAD-P5-REVOLVE.json`, `RW-RESEW.json`,
+  `BG-CAD-P3-SPLIT.SPEC_GAP2.json`.
 - Root tracked tree clean apart from this STATE rewrite.
 
 ## The parallelism picture
 
-Nothing running (watchdog only). Next wave = P3/P4/P5 packets, write-disjoint.
-Disk rules stand: no verify alongside a live worker below ~15 GB; the machine
-hit 7.9 GB mid-verify this session (P2's V8/V9 look-baseline build) and was
-reclaimed by deleting the repo-root `target/`.
+One worker running (P3, slot 0). P3 is the only dispatchable packet until
+it lands; then P6/P7 packets need writing (P6's probe first). Disk rules
+stand: no verify alongside a live worker below ~15 GB; the machine dipped
+to ~9.5 GB mid-session with two workers + a verify's leftovers and was
+reclaimed by deleting the repo-root `target/` and the stale slot-1
+worktree-internal `target/` (8.35 GB of P2-era buildup).
 
 ## Traps, each one paid for
+
+### Session 41 (four packets land; P3 blocker chain turned twice; watchdog misfire) - paid in full
+
+- **The watchdog auto-redispatched a BLOCKED packet and raced the live
+  dispatch.** At 22:30:27 it saw session-40's long-finished P3 slot (stale
+  pid 41932, events stagnant 11102s) as a "hard death" and redispatched
+  BG-CAD-P3-SPLIT (restart 2/3) — 4 seconds before my own dispatch of
+  RW-INTERIOR-LOOP, which then died with `PermissionError` on the
+  `events.jsonl` unlink (the watchdog's worker held the log via its cmd
+  shim's `>` redirect). The misdispatch burned an 11-minute worker run on
+  a packet whose stop conditions were guaranteed to fire. Recovery:
+  `taskkill /PID <shim> /T /F` on the worker-cmd shim, then dispatch.
+  TWO rules: **check `loop/watchdog.log` tail for ACTION lines before
+  dispatching into any slot**, and note the `packet_is_done` guard only
+  protects DONE rows — a FINISHED slot holding a BLOCKED/READY packet's
+  stale pid is exactly what its "hard death" heuristic cannot distinguish
+  from a real one.
+- **A worker will write RESULT.json wherever convention suggests if the
+  packet doesn't name the path.** The RW-RESEW worker wrote it to
+  `wt/loop/results/RW-RESEW.json` (mimicking the filed-results layout)
+  instead of the worktree root. The commit was clean and the gates were
+  green — only the RESULT placement was wrong. Packet fix: the RESULT
+  line in every future packet says "write RESULT.json AT THE WORKTREE
+  ROOT". (Related, same session: I then DELETED the wt copy while
+  cleaning up the stray, and V0 correctly returned RUN_INCOMPLETE —
+  verify reads the wt root copy; the repo-root copy exists only for
+  land_packet's filing step. Both copies must exist at their moment of
+  use.)
+- **The detached-verify recipe failed silently once** (0-byte out file, no
+  python process, no verdict — after the same Start-Process form had
+  worked three times earlier in the session). The foreground re-run
+  passed all gates first try. Rule: if the detached verify's out file is
+  0 bytes a few minutes after launch, don't adjudicate anything — check
+  for a live python, then re-launch in the foreground.
+- **Two V3 round trips from worker-written test code in one session**
+  (RW-INTERIOR-LOOP: unused `TOL` const; RW-RESEW: four
+  immediate-deref errors + the same unused `TOL`). Both were one-token
+  orchestrator amendments (`amended_by: orchestrator`), minutes each —
+  the cheap path over redispatch, exactly as ORCHESTRATOR's session-3
+  counterweight prescribes. Pattern: a worker's "clippy-clean" claim
+  about its own diff is not reliable for NEW test files; if a packet
+  mandates a new test file, expect one lint round trip and budget the
+  amendment instead of a redispatch.
+- **`if ($?)` after a PowerShell pipeline is True even when the pipeline
+  matched nothing** (`Select-String` with no matches "succeeds"). Cost:
+  P4's dispatch silently skipped once (`if ($?) { run_packet }` after a
+  new_slot pipe) and the session-30 RESULT copy dance skipped its copy
+  once (land_packet then died at the filing step — the session-29 crash
+  shape, but caused by MY guard, not the script). Use `$LASTEXITCODE`
+  for native commands, or run the dispatch as its own command and read
+  its output.
+- **The session-36 "second target inside the worktree" trap re-hit at
+  8.35 GB** (slot 1, P2-era buildup) — the reclaim that worked:
+  `Remove-Item loop\slots\1\target` AND `loop\slots\1\wt\target`, then
+  re-warm (1-6 min). Repo-root `target/` regenerated again from merged-
+  HEAD test runs and was deleted again mid-session.
+- **RW-RESEW's diagnosis overturned the packet's mechanism AGAIN (the
+  second straight D1-style overturn, after RW-INTERIOR-LOOP)** — and both
+  times the worker was right and the packet's design still held at the
+  rule level. The actual refusing class for face-adjacent unions is three
+  record classes the splitter rejects BEFORE the multi-component fold
+  (degenerate zero-measure arcs, non-degenerate EE coincidences that
+  collect_sew's (Face,Edge) normalization refuses, and uncertified
+  crossing FF lines); and the unification required direct wire rebuilds
+  with seam-corner VERTEX substitution because `swap_edge_into_wire`
+  bails when end vertices differ — which they always do across distinct
+  solids. The lesson is now confirmed twice: **book the canonical rule
+  and the acceptance, mandate the empirical localization, and expect the
+  mechanism to be wrong in the worker's favor.**
+- **The butt-join union keeps 10 cosmetically-split faces — there is no
+  coplanar-face merging in the landed pipeline** (the M2 union likewise
+  emits split annulus+disk). Any future packet asserting face-count
+  equality across a union of separately-computed results must assert the
+  observed count or pre-decide the deviation; the metamorphic that holds
+  is exact-box equality. P3's registry row carries this pre-decision.
+- **An exact-footprint halfspace box whose walls are coplanar with the
+  solid's faces refuses `Contradictory(FragmentInsideOther)`** (mixed
+  instance parity under the landed seed rules) — the PADDED over-box
+  (P3's own D3 recipe) is the working construction. Pre-existing
+  limitation, reproduced with the sew pass disabled; not caused by
+  RW-RESEW.
+- **Packet-evidence files committed after the fork are absent from the
+  worker's checkout** (SPEC_GAP2 was committed in the same commit as the
+  dispatch AFTER new_slot forked — the worker found neither it nor its
+  sibling and worked from the packet's own derivation text). The
+  session-39 scratch/ rule generalizes: every file the worker must read
+  must be committed BEFORE `new_slot.py` runs, and the packet must quote
+  the load-bearing content anyway.
+- **`translate_solid` panics in debug on extruded-circle solids** (the
+  session-40 `Mapped` self-loop trap, one layer up): the P3/RW fixture
+  cutters must be hand-built (the classify.rs `raised_disk` pattern) or
+  built at their final position. Any packet whose fixtures translate
+  circle-carrying solids must route around `Solid::mapped` until the
+  topology constructor is fixed.
 
 ### Session 40 (Phase 7 opens; P1+P2 landed; model switch + balance drama) - paid in full
 
