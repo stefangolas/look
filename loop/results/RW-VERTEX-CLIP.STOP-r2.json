@@ -1,0 +1,45 @@
+{
+  "id": "RW-VERTEX-CLIP",
+  "status": "STOPPED",
+  "contracts": [
+    "boolean::assemble::emit_contact seam filter (assemble.rs) \u2014 an EndpointTouch record is dropped ONLY when the event is NOT cross-solid (the event_cross_solid discriminator: ptr-eq shell identity + distinct SolidRef, computed in the sweep); the Arc1 Coincident arms are untouched (machine-checked: byte-identical to base)",
+    "boolean::split::collect_events (split.rs) \u2014 the cross-solid EndpointTouch Point0 loci are collected as certified clipping points alongside the Transverse ones; same-solid (self-pair) EndpointTouch is not collected",
+    "boolean::split::dispatch (split.rs) \u2014 a cross-solid (Point, EndpointTouch, Point0) event routes to point_cut in the Point phase (the same treatment Transverse points get) instead of refusing; the same-solid arm still refuses, keeping the landed lib test split_deferred_locus_family_refuses green",
+    "boolean::split::insert_open_arc_shared (split.rs, D6) \u2014 certification requires at least TWO DISTINCT (near_pt-separated) certified points on the carrier before any arc is built; a single certified point is a corner touch that rides the seam_skip path exactly as at base",
+    "boolean::split::insert_open_arc_shared (split.rs, D7) \u2014 an open arc witnessed by multiple FF records dedupes BEFORE chaining: skipped if one with the same carrier AND the same certified extent (endpoints near_pt-equal, same order or reversed) is already pending for that face; dedupe is per-face, decided at insertion time"
+  ],
+  "tests_added": 0,
+  "deviations": [
+    {
+      "id": "D6_D7_VERIFIED_SPLIT_UNBLOCKS_RESEW_RESTORED",
+      "test": "resew / boolean_m2 / interior_loop / diagonal split phase",
+      "derivation": "The amendment's two decisions are faithful and effective, machine-checked before the stop. D6 (the >=2-distinct-point certification gate) restores resew to 7/7 (the face-adjacent corner-touch FF lines, whose certified set is a SINGLE seam-corner point, now ride the seam_skip path exactly as at base \u2014 the Edge::try_new single-point collapse is gone). D7 (per-face duplicate-witnessed-arc dedupe at insertion time) unblocks the diagonal SPLIT: the wall face's pending set is now the four-arc quadrilateral ((2,0,0)-(0,2,0)-(0,2,2)-(2,0,2)) instead of five arcs, assemble_pending_loops closes the chain, and the split succeeds (the split phase's UnsupportedEnvelope(ContactReductionDeferred) from my first run is gone). boolean_m2 4/4 and interior_loop 8/8 are unchanged.",
+      "verbatim": "resew 7/7, boolean_m2 4/4, interior_loop 8/8 all UNCHANGED; diagonal split phase completes"
+    },
+    {
+      "id": "THIRD_NEW_CLASS_CLASSIFY_CANNOT_SEED",
+      "test": "diagonal_plane_box_splits / diagonal_recombination_is_original / no_certified_endpoints_still_refuses",
+      "derivation": "D8's named stop fires: the diagonal STILL refuses after the D6/D7-faithful run, with a THIRD, genuinely new class \u2014 neither the recorded open-arc certified-endpoint guard nor the first run's assemble_pending_loops unclosed chain. The split now succeeds and the refusal moves to the CLASSIFY phase: find_seed (classify.rs) finds no seedable fragment in a mesh component and returns numerically_unresolved. Instrumented backtrace (temporary, removed before revert): numerically_unresolved classify.rs:852 <- find_seed classify.rs:277 <- classify_fragments classify.rs:98 (the 'no fragment in this component yields a region representative' arm). classify.rs is outside write_allow, so this blocker cannot be touched by this packet; D5 forbids new arms.",
+      "verbatim": "Err(NumericallyUnresolved { spent: Budget { subdiv: 0, newton: 0, depth: 0 }, witness: UncertifiedContainment }) at classify.rs:277 (find_seed)"
+    },
+    {
+      "id": "GUARD_CLASS_DISSOLVED_NEW_REFUSAL",
+      "test": "no_certified_endpoints_still_refuses",
+      "derivation": "D8's claim 'the guard test unchanged' is empirically false: with the D6/D7 kernel the guard fixture (the diagonal Difference) answers NumericallyUnresolved(UncertifiedContainment), NOT the recorded UnsupportedEnvelope(ContactReductionDeferred). Its recorded class and mechanism (an open FF locus whose certified-extreme set is empty, refusing at the certified-extreme guard) are gone \u2014 the open-arc guard no longer fires and the split completes. Per D3 ('if the fixture's refusal class dissolves, that is a STOP condition finding, not something to re-purpose the test around') this is a stop; the test is left at base, unchanged.",
+      "verbatim": "the guard assertion fails: got Err(NumericallyUnresolved { spent: Budget { subdiv: 0, newton: 0, depth: 0 }, witness: UncertifiedContainment })"
+    },
+    {
+      "id": "D4_FLIP_UNREACHABLE",
+      "test": "diagonal_plane_box_splits / diagonal_recombination_is_original",
+      "derivation": "D4 books the flip of these two tests to acceptance (two valid 5-face prisms; recombination box-equal). Because the diagonal halves still refuse (deviation THIRD_NEW_CLASS, at classify), neither the Intersection nor the Difference half assembles and the recombination union cannot run. The flip cannot land; the tests remain at their recorded refusal assertions at base.",
+      "verbatim": "both halves: Err(NumericallyUnresolved ... UncertifiedContainment); no half assembles"
+    },
+    {
+      "id": "NO_COMMIT",
+      "test": "commit",
+      "derivation": "No combination of the faithful D1/D2/D6/D7 can leave cut_boundaries green within D3/D4's constraints: tests 1-2 (flipped or at base) and the guard (base) all fail against the new UncertifiedContainment refusal, and D3 forbids re-purposing the guard. All kernel and test changes were therefore reverted; the branch sits at the booking HEAD (af9acf2) with an empty diff and a green tree. Anchors re-derived on this tree: A1 assemble.rs:273, A2 assemble.rs:266, A3 split.rs:1108, A4 split.rs:966, A5 split.rs:621 \u2014 each count 1, matching the packet.",
+      "verbatim": "empty diff; tree green at base"
+    }
+  ],
+  "notes": "RW-VERTEX-CLIP r2 stopped at D8's named stop: the diagonal STILL refuses after a D6/D7-faithful run \u2014 a third, genuinely new class. The amendment's D6 (certification requires two distinct points) and D7 (duplicate-witnessed open arcs dedupe before chaining) are faithful and machine-verified: resew returns to 7/7 (byte-for-byte), boolean_m2 4/4 and interior_loop 8/8 unchanged, and the diagonal SPLIT now succeeds (the first run's assemble_pending_loops unclosed-chain refusal is gone). The remaining blocker is in the classifier, outside write_allow: find_seed (classify.rs:277) cannot seed a diagonal-mesh component and refuses NumericallyUnresolved(UncertifiedContainment). The guard test no longer passes with its recorded mechanism (it now hits the same new class), and D4's booked flip is unreachable. No new Refusal/EnvelopeCase/UnresolvedWitness/Collapse arm was added; the Arc1 Coincident arms and the RW-RESEW zero-measure filters are untouched; no instrumentation survives; no added line carries a bare 1e-N literal; GATE-4 text is clean. The tree is reverted to base and green: cut_boundaries 7/7, resew 7/7, boolean_m2 4/4, interior_loop 8/8; lib 46/47 (the recorded environmental healing::tests::step_import); kernel-gates.sh HEAD reports GATE-4 unscaled_legacy 111/111 and all P-3 gates pass. The follow-up packet needs to decide the classifier's inability to seed a diagonal cut mesh (classify.rs find_seed / region_representative on the split wall-plus-box fragments), which the amendment did not."
+}
