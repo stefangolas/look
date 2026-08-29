@@ -1,0 +1,48 @@
+{
+  "id": "RW-DIVIDE-NESTING",
+  "status": "STOPPED",
+  "contracts": [
+    "boolean::split::split_fragments \u2014 divide_one_face attaches a negative (interior) wire as the hole of the SMALLEST-AREA pre-face region whose outer polygon STRICTLY contains it (D3, the session-28 containment/nesting rule), instead of the first containing one, so a wire strictly inside another wire's region never attaches to an ancestor region and the nesting is correct to any depth on one face",
+    "boolean::assemble::boolean \u2014 the plate-with-hole section at z = 1 (Difference half) assembles with exactly one plane-identical section face carrying two boundary wires, the two-hole plate with three boundary wires, and both annulus halves assemble as valid single shells with the exact hand-derived boxes"
+  ],
+  "tests_added": 7,
+  "deviations": [
+    {
+      "id": "D2_BLOCKED_AT_SWEEP",
+      "test": "diagonal_plane_box_splits / diagonal_recombination_is_original / no_certified_endpoints_still_refuses",
+      "derivation": "The packet's 4th stop condition fires, verified by instrumentation: for the diagonal fixture (2x2x2 box, plane x + y = 2, P3 padded-over-box two-call recipe), the sweep's `emit_contact` (assemble.rs) DOES emit the four certified clipping points as `EndpointTouch Point0` records at the box vertices (0,2,0), (0,2,2), (2,0,0), (2,0,2) \u2014 but the seam-record filter at assemble.rs:273 (`matches!(record.kind, ContactEventKind::EndpointTouch)`) drops every EndpointTouch record BEFORE the splitter. The splitter's `collect_events` therefore sees only the 6 FF open lines and 2 FE `CoincidentInterval` lying-edge records; `certified_points` is empty, `open_arc_certified` (A2) stays false, and the open-arc guard refuses the wall-face-inside chords. D2's prescribed mechanism (\u2018collect EndpointTouch Point loci alongside Transverse ones in the event-collection pass\u2019) is unreachable without editing `assemble.rs`, which is outside write_allow and explicitly forbidden (\u2018do not widen your own write set\u2019). Per the stop condition I did not widen the write set; tests 1-2 keep the recorded SPEC_GAP3 refusals (asserted verbatim) and test 6 pins the D2 guard (an open FF locus with NO certified endpoints still refuses). The packet's phrase \u2018filtered as zero-measure seam records at the split.rs:966 arm\u2019 is empirically wrong in location: the split.rs:966 dispatch arm is reached only by direct `split_fragments` unit-test events; the boolean() path's EndpointTouch records are gone at `collect_events` time.",
+      "verbatim": "Err(UnsupportedEnvelope(ContactReductionDeferred))"
+    },
+    {
+      "id": "D3_STRICT_CONTAINMENT",
+      "test": "annulus_section_face / annulus_split_assembles / two_hole_section_face",
+      "derivation": "The D3 minimal-containing rule as the packet words it (\u2018whose outer polygon contains it\u2019) needs STRICT (interior) containment: `PolylineCurve::include` is boundary-inclusive, so the doubled loop's own inverse (its representative point lies ON the region's boundary) attached back to its own region (the disk fragment became [circle, circle.inv]) and the classifier could not seed it (NumericallyUnresolved, UncertifiedContainment). `strictly_contains` (the packet's D3 rule + a boundary exclusion within the insertion tolerance) makes the annulus case fall out exactly as the packet hand-checks: the footprint-rect chord loop attaches to the outer border region, the hole circle (strictly inside the rect region) attaches to the RECT region as its hole, and the two-hole generalization (rect region + two circle holes, no hand-pairing) follows with no classifier change (D4: classify.rs is unchanged; no happy-path fixture answered Contradictory).",
+      "verbatim": "annulus section face = 2 wires; two-hole section face = 3 wires"
+    },
+    {
+      "id": "ANNULUS_HALF_BOX_ASSERTION",
+      "test": "annulus_split_assembles",
+      "derivation": "Test 4 asserts the halves' boxes against the hand-derived values directly (assert_box on the exact corners) rather than against `translate_solid`d hand-built halves: the plate-with-hole's hole rim is a self-loop edge, and `translate_solid` (Solid::mapped -> Edge::debug_new) panics on identical end vertices in debug mode (the known RW-INTERIOR-LOOP deviation). The exact boxes [0,4]^2 x [1,2] and [0,4]^2 x [0,1] are the hand-derived halves' boxes.",
+      "verbatim": "panic 'Two same vertices cannot construct an edge' on translate_solid(plate_with_hole)"
+    },
+    {
+      "id": "CANONICAL_VERTEX_VERIFIED",
+      "test": "none (machine-check)",
+      "derivation": "D2 asked to verify `canonical_vertex` dedupes by tolerance: it does \u2014 the loop over `canonical_vertices` returns the existing instance for any certified point within `near_pt` (tol), so a box-vertex crossing would be minted exactly once, shared across the wall-face arcs and the box's own wires. Recorded because the seam-filter removal that would make the EndpointTouch Point records reachable is blocked (D2_BLOCKED_AT_SWEEP); no double-minting is observable in this tree.",
+      "verbatim": "canonical_vertex dedupes by tol (verified by reading split.rs:603-615)"
+    },
+    {
+      "id": "COMMIT_SUBJECT",
+      "test": "commit message",
+      "derivation": "The packet prescribes the subject \u2018RW-DIVIDE-NESTING: vertex-touch clipping + minimal-containing loop nesting\u2019; since D2 (vertex-touch clipping) is blocked and did not land, the commit is titled honestly \u2018RW-DIVIDE-NESTING: minimal-containing loop nesting (D2 vertex-touch clipping blocked at the sweep)\u2019 so the branch history does not claim an implemented D2.",
+      "verbatim": "commit 7987699"
+    },
+    {
+      "id": "ENVIRONMENTAL",
+      "test": "lib / clippy",
+      "derivation": "The lib suite is 46/47 \u2014 the recorded environmental `healing::tests::step_import` fails at base too (STEP fixtures under vendor/truck/resources/step/ absent from this checkout). `cargo clippy --locked -p truck-shapeops --all-targets` fails on pre-existing lints in the untouched dependency crates truck-meshalgo (93) and truck-stepio (4); the packet's changed files are clippy-clean under `--all-targets --no-deps`. GATE-4 unscaled_legacy 111/111 and all P-3 gates pass.",
+      "verbatim": "step_import FAILED; clippy fails in truck-meshalgo/truck-stepio only"
+    }
+  ],
+  "notes": "RW-DIVIDE-NESTING: D3 landed, D2 stopped at the sweep. D1: tests/cut_boundaries.rs was written first and every fixture was confirmed to refuse at HEAD exactly as the packet's SPEC_GAP3 derivations record (the diagonal Difference/Intersection refuse UnsupportedEnvelope(ContactReductionDeferred) at the splitter's open-arc guard; the annulus Difference refuses UnsupportedEnvelope(ContactReductionDeferred) at the assembler). The machine-check (temporary instrumentation, removed before commit): the diagonal sweep emits 4 EndpointTouch Point0 records at the box vertices and assemble.rs:273 drops them, so the certified clipping points are unreachable at the splitter without touching assemble.rs \u2014 the packet's 4th stop condition. D3: divide_one_face's negative-wire attachment is now MINIMAL-CONTAINING (smallest-area strictly-containing region, ties to lowest index), implemented with `strictly_contains` (PolylineCurve::include is boundary-inclusive; a doubled loop's own inverse must not attach to its own region). The annulus section (1 face, 2 wires, exact plane data), the two-hole section (1 face, 3 wires, no hand-pairing), and the two halves (valid single shells, exact hand-derived boxes) all assemble; the recombination test's exact face count is moot because D2 is blocked. D4: classify.rs is unchanged; no happy-path fixture answered Contradictory. D5: no new Refusal/EnvelopeCase/UnresolvedWitness/Collapse arm was added; Face::debug_new is not used in added lines; no added line carries a bare 1e-N literal; no instrumentation survives in the committed diff. Anchors A1-A6 re-derived and match the pre-packet tree (each count 1). Gates: cargo check -p truck-shapeops green; cargo fmt --check -p truck-shapeops green; cut_boundaries 7/7, boolean_m2 4/4 (UNCHANGED), interior_loop 8/8 (UNCHANGED), resew 7/7 (UNCHANGED); lib 46/47 (the recorded environmental step_import); changed files clippy-clean (--no-deps); kernel-gates.sh HEAD reports GATE-4 111/111 and all P-3 gates pass. A redispatch can solve D2 by either widening the write set to assemble.rs's seam-record filter (switching it from record-kind to the ptr-eq cross-solid guard the packet names) or re-scoping the mechanism."
+}
