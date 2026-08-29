@@ -1,0 +1,31 @@
+{
+  "id": "BG-CAD-P3-SPLIT",
+  "status": "STOPPED",
+  "contracts": [
+    "pub mod section;  (vendor/truck/truck-shapeops/src/lib.rs)",
+    "pub fn split_by_plane(solid: &Solid<Point3, Curve, Surface>, plane: &Plane, budget: &mut Budget) -> Outcome<(Solid<Point3, Curve, Surface>, Solid<Point3, Curve, Surface>)>  (section.rs)",
+    "pub fn section_faces(solid: &Solid<Point3, Curve, Surface>, plane: &Plane, budget: &mut Budget) -> Outcome<Vec<Face<Point3, Curve, Surface>>>  (section.rs)"
+  ],
+  "tests_added": 10,
+  "deviations": [
+    {
+      "id": "RECOMBINATION_FACE_COUNT",
+      "test": "split_recombination_is_original",
+      "derivation": "The packet books `boolean(plus, Union, minus)` as face-count- and box-equal to S (6 faces). The landed assembler returns a valid single shell box-equal to S but with 10 faces: the 8 seam-split side halves (plus's 4 sides z in [1,2] and minus's 4 sides z in [0,1], coplanar pairs sharing only the z = 1 boundary) plus the top (z = 2) and the bottom (z = 0). The two coincident anti-oriented caps (each a fragment of the halfspace wall carrying the exact input Plane) are discarded by the coincident-pair rule for Union. The landed boolean does NOT merge coplanar seam-adjacent faces: the `plane_coincident_screen` interior-overlap test is false for boundary-touching boxes, so no coincident pair is emitted and each side half stays a separate face. The metamorphic identity holds as a point set and box; the extra faces are the z = 1 seam. The test asserts the tree's answer (box-equal single shell, 10 faces) and documents the packet claim that was not met.",
+      "verbatim": "union face count = 10; original S face count = 6"
+    },
+    {
+      "id": "DIAGONAL_SPLIT_REFUSED",
+      "test": "split_box_diagonal_plane",
+      "derivation": "The packet books the diagonal plane (x + y = 2 through the 2x2x2 box's opposite edges, normal (1,1,0)/sqrt(2)) as a happy path yielding two triangular prisms (5 faces each). The landed `boolean()` refuses inside the splitter: the oblique wall face cuts the box through its opposite edges, so every FF line's certified crossing is a box vertex, and the sweep emits NO Transverse point events there (the touching edges are EndpointTouch, filtered as seams; the lying edges (2,0,z) and (0,2,z) are CoincidentInterval, not points). The splitter's open-arc guard `!inside_faces.is_empty() && !open_arc_certified(&classify_curve)` then refuses with `UnsupportedEnvelope(ContactReductionDeferred)`. This is the packet's stop condition (a booked happy-path case the landed boolean refuses) - the refusal is recorded verbatim, not routed around.",
+      "verbatim": "Err(UnsupportedEnvelope(ContactReductionDeferred))"
+    },
+    {
+      "id": "ANNULUS_SECTION_REFUSED",
+      "test": "section_face_with_hole_annulus",
+      "derivation": "The packet books the plate-with-hole section at z = 1 as one annulus cap face (2 boundary wires). The landed `boolean()` refuses inside the assembler: the halfspace wall face receives TWO nested interior loops - the [0,4]^2 footprint rect assembled from the four side-face chords (RW-INTERIOR-LOOP pending-loop chaining) and the hole circle (doubled loop) - and the landed `divide_one_face` negative-wire attachment is first-containing (each negative wire attaches to the FIRST pre-face whose outer polygon contains its point), so the circle hole attaches to the outer border region instead of the rect region, malforming the nesting. The Difference assembles a 12-face shell (including wrongly-kept box far/side faces) that `Solid::try_new` rejects as `NotClosedShell`, surfaced as `UnsupportedEnvelope(ContactReductionDeferred)`. This is the packet's stop condition (a booked happy-path case the landed boolean refuses) - the refusal is recorded verbatim, not routed around.",
+      "verbatim": "Err(UnsupportedEnvelope(ContactReductionDeferred)); Solid::try_new -> NotClosedShell"
+    }
+  ],
+  "notes": "The halfspace box is the packet's D3 construction (8 vertices, 12 Line edges, 6 Plane faces, `Solid::try_new` as the gate): the padded over-box cut by the plane itself, its wall face carrying the EXACT input `Plane` so cap extraction is exact structural equality (a lookup, not a solve). Two construction details beyond the packet's words, both geometry-derived (no bare tolerances): (1) the far face is placed strictly beyond BOTH the over-box and the plane's own crossings at the box's four padded corners - an oblique plane can pass exactly through a padded corner (the diagonal plane x + y = 2 through (-pad, hi[b], .)) which would collapse the box to degenerate edges/planes; (2) the far face for na > 0 vs na < 0 is mirrored (the negative side is a < wall or a > wall respectively). The split and section both compose two `boolean()` calls (Difference + Intersection) against the same minus_box; the composed certificate reports the unchanged caller ledger (the landed boolean spends nothing). Non-canonical carriers refuse at the over-box lift before any boolean spend (verified: budget untouched). The missed-plane case returns (S, empty solid) and section_faces refuses `Empty`. The oblique-cylinder case refuses with `UnsupportedEnvelope(ContactReductionDeferred)` (the Ellipse FF locus -> RW-CONIC boundary, test 7 records the arm). Anchor re-derivation at dispatch time: A1 `pub mod` = 3 (the packet's expected divergence after declaring `pub mod section;`), A2 `pub fn boolean` = 1, A3 `pub enum BoolOp` = 1, A4 `pub mod section` = 1 (dispatch-time state). Pre-existing environmental gate failures, verified identical on clean HEAD (53dba23) by stash: `cargo test -p truck-shapeops --lib` fails `healing::tests::step_import` (the `vendor/truck/resources/step/` test assets are absent from this checkout), and `cargo clippy -p truck-shapeops --all-targets` fails in dependency crates truck-meshalgo/truck-stepio. My code is clippy-clean (`--no-deps`). Status is STOPPED rather than DONE because the packet's stop condition fired for tests 3 and 5 (booked happy-path cases refused by the landed boolean) - the finding, per the packet, is about the landed pipeline, not something to route around."
+}
