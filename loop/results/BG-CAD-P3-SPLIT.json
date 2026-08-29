@@ -1,0 +1,43 @@
+{
+  "id": "BG-CAD-P3-SPLIT",
+  "status": "DONE",
+  "contracts": [
+    "D1 module shape: new vendor/truck/truck-shapeops/src/section.rs opens with the house deny header (recognize.rs:22-29); lib.rs declares `pub mod section;` (A1 2->3, A4 0->1); new vendor/truck/truck-shapeops/tests/split_plane.rs carries the same deny header plus a match-based `fn expect_ok<T>(r: Outcome<T>) -> T`.",
+    "D2 over-box: private `solid_over_box(&Solid<Point3, Curve, Surface>) -> Outcome<((f64,f64),(f64,f64),(f64,f64))>`; per-face carrier table reimplemented locally (no truck-modeling edge): Plane/Cylinder faces hull the boundary edges' `EnclosureCurve::enclose` boxes over each edge's own range; Sphere faces take the full `[c-r, c+r]^3` carrier box; Cone faces take the edge boxes plus the apex; Torus / `CanonicalSurface::Placed` / Unrecognized refuse `UnsupportedEnvelope(NonCanonicalCarrier)` BEFORE any Boolean is paid for. Stored wires via `Face::absolute_boundaries()`.",
+    "D3 halfspace boxes: `halfspace_box` builds the axis-aligned pad-box (over-box extended by `pad = 2 * max over-box dimension` on every side) clipped by the closed halfspace of the cutting plane, as a convex polyhedron through 8-vertex/12-edge/6-face hexahedron topology where the cut allows, `Solid::try_new` as the gate. The wall face lies exactly IN Pi and carries the caller's `Plane` value (crossings taken exactly at the plane origin's coordinate for axis-aligned planes), so cap identification is exact-equality. Adjacent faces share one `Edge` instance per vertex-index pair.",
+    "D4 split: `pub fn split_by_plane(&Solid, &Plane, &mut Budget) -> Outcome<(Solid, Solid)>` = `boolean(S, Difference, minus_box)` for `plus` (the side the normal points to) and `boolean(S, Intersection, minus_box)` for `minus`; the composed spend is reported via `Certificate::accumulate`. `pub fn section_faces(&Solid, &Plane, &mut Budget) -> Outcome<Vec<Face>>` runs the Difference half and extracts the faces whose `Surface::Plane` data equals the wall's `Plane` exactly (C0, no tolerance).",
+    "D5 v1 envelope: no pre-screening and no new refusal arms; non-canonical faces refuse at the over-box lift, the oblique-cylinder RW-CONIC refusal surfaces from inside `boolean()`, and coplanar/unrecognized carriers answer exactly what the landed pipeline answers.",
+    "D6 certificates: both operations certify through the landed `Solid::try_new` acceptance gate; `section_faces` additionally certifies cap extraction by exact plane identity (a lookup, not a solve).",
+    "Test battery: 10 dyadic-witness tests in tests/split_plane.rs (all green): split_flagship_plate_through_middle, split_recombination_is_original, split_box_diagonal_plane, section_faces_of_plate, section_face_with_hole_annulus, plane_missing_returns_whole_plus_empty, oblique_cylinder_section_refuses, sphere_face_refuses_noncanonical, split_signs_follow_normal, halves_survive_further_boolean."
+  ],
+  "tests_added": 10,
+  "deviations": [
+    {
+      "deviation": "cargo test --locked -p truck-shapeops --lib is not fully green: healing::tests::step_import fails on Os { kind: NotFound } reading vendor/truck/resources/step/occt-cylinder.step.",
+      "derivation": "The vendored tree omits the upstream STEP test resources: `git ls-tree HEAD vendor/truck/resources` is empty and `git ls-tree HEAD^ vendor/truck/resources` is empty, and the file is absent from the working tree. The test is `#[cfg(feature = \"step-test\")]`, which the default feature set enables. Pre-existing tree condition, byte-identical before and after this commit; unrelated to this packet and outside write_allow. The remaining 46 lib tests pass."
+    },
+    {
+      "deviation": "cargo clippy --locked -p truck-shapeops --all-targets does not exit clean: clippy errors are reported in truck-meshalgo (formal/cone.rs, cylinder.rs, torus.rs, common_arc.rs, intersection.rs, ...) and truck-stepio (convert.rs, mod.rs).",
+      "derivation": "Both crates are workspace members and byte-identical to the parent commit (`git diff bf6b7f1 HEAD -- vendor/truck/truck-meshalgo vendor/truck/truck-stepio` is empty). The errors are new deny-by-default clippy lints under the Rust 1.97 toolchain (`negated_comparison`, `redundant_field_names`, `type_complexity`, `unnecessary_map_or`, ...) against unchanged vendored code. None of the three files this packet adds/modifies produces a clippy error (verified by filtering the clippy output)."
+    },
+    {
+      "deviation": "Test 7 (oblique_cylinder_section_refuses) asserts the machine-checked arm `Refusal::NumericallyUnresolved { witness: UncertifiedContainment, .. }`, not `ContactReductionDeferred`.",
+      "derivation": "The oblique plane x z-aligned cylinder wall is the booked RW-CONIC boundary; D5 says the typed refusal the caller sees is the landed one (do not pre-screen, do not catch). This run's landed arm is the splitter's failed insertion projection (`numerically_unresolved`, UncertifiedContainment), so that is the assertion."
+    },
+    {
+      "deviation": "Test 3 (split_box_diagonal_plane) machine-checks the arm `Refusal::UnsupportedEnvelope(EnvelopeCase::ContactReductionDeferred)`.",
+      "derivation": "The diagonal cut (x + y = 2 through the 2x2x2 box's opposite edges) is the booked vertex-touch cut boundary (deferred list, session 41; amendment r2 re-books it as a boundary assertion). The packet records the class across three instrumented stops as ContactReductionDeferred / NumericallyUnresolved(UncertifiedContainment); this run's landed arm (verified by a scratch harness against the committed code) is ContactReductionDeferred. The test asserts the OR of the two recorded classes with the mandated boundary comment."
+    },
+    {
+      "deviation": "Test 10's `small_box` is `truck_modeling::primitive::cuboid` at dyadic coordinates ([1.5,2.5]^2 x [0.5,2.5]) instead of an extruded `box_profile` box.",
+      "derivation": "An extruded box sharing a face plane with a half (e.g. a [0,1]^2 x [0,2] box under/over the plate) produces a coplanar partial-overlap contact pair that the landed pipeline refuses with UnsupportedEnvelope(ContactReductionDeferred) - the landed partial-overlap family boundary, not a packet stop (test 10 is outside the amendment's stop set {1,2,4,5,6}). The cuboid sits on dyadic coordinates off every half's face plane, so each half is consumed by a REAL transverse Difference cut and both results are valid single-shell solids."
+    },
+    {
+      "deviation": "D3's `plus_box` is not separately emitted; only `minus_box` is constructed.",
+      "derivation": "D4's exact recipes compose both boolean() calls against the negative halfspace box only (Difference and Intersection both use minus_box), so a separate plus_box solid is dead code. The halfspace-box helper is sign-parameterized (the `negative` flag) and covers the mirror construction on the positive side, so the plus_box capability is present but unexercised."
+    }
+  ],
+  "notes": "Commit d65ccbd on branch packet/BG-CAD-P3-SPLIT with subject 'BG-CAD-P3-SPLIT: section + split by plane via the landed boolean', then verified: cargo check --locked -p truck-shapeops (clean), cargo fmt --check -p truck-shapeops (clean), cargo test --locked -p truck-shapeops --test split_plane (10/10 green), scripts/kernel-gates.sh HEAD (all P-3 gates pass, unscaled_legacy 111/111). Anchors re-derived after the change: A1 pub mod = 3 (expected divergence from 2), A2 pub fn boolean = 1, A3 pub enum BoolOp = 1, A4 pub mod section = 1. No new Refusal/EnvelopeCase/UnresolvedWitness/Collapse arms; no pre-screening of the oblique-cylinder case; no debug_new; no bare absolute length literals; no tolerance-migration constructor name in prose. Test 8 asserts the placed-sphere NonCanonicalCarrier refusal with the budget untouched (Budget::new(0,0,0) compared after the call).",
+  "amended_by": "orchestrator",
+  "amendment_note": "orchestrator amendment: 5 indexing_slicing clippy errors at section.rs:285-290 (const corner-index pairs) converted to get-chains with static-safety comment; no behavioral change; split_plane 10/10 re-verified in the slot | second amendment: first/contains/SplitHalves type-alias clippy fixes at section.rs:428/485/512; no behavioral change"
+}
