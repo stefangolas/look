@@ -2201,12 +2201,38 @@ fn divide_one_face(
     }
     for (poly, wire) in negative_wires {
         let pt = poly.front();
-        let op = pre_faces.iter_mut().find(|pre| {
-            pre.first()
-                .is_some_and(|(first_poly, _)| orient_ccw(first_poly).include(pt))
-        });
-        match op {
-            Some(pre) => pre.push((poly, wire)),
+        // D3 (RW-DIVIDE-NESTING): the MINIMAL-CONTAINING attachment, the
+        // session-28 containment/nesting rule transplanted into the division.
+        // A negative (interior) wire attaches as the hole of the SMALLEST-AREA
+        // pre-face region whose outer polygon STRICTLY contains it, instead of
+        // the first containing one — so a wire strictly inside another wire's
+        // region never attaches to an ancestor region (the plate-with-hole's
+        // hole circle attaches to the footprint-rect region, not the outer
+        // border; the annulus section's nesting stays correct to any depth).
+        // Ties (equal area) resolve to the lowest region index: the scan
+        // keeps the first candidate on equal area.
+        let mut best: Option<usize> = None;
+        let mut best_area = f64::INFINITY;
+        for (idx, pre) in pre_faces.iter().enumerate() {
+            let contains = pre
+                .first()
+                .is_some_and(|(first_poly, _)| strictly_contains(first_poly, pt, tol));
+            if contains {
+                let area = pre
+                    .first()
+                    .map_or(0.0, |(first_poly, _)| first_poly.area().abs());
+                if best.is_none() || area < best_area {
+                    best = Some(idx);
+                    best_area = area;
+                }
+            }
+        }
+        match best {
+            Some(idx) => {
+                if let Some(pre) = pre_faces.get_mut(idx) {
+                    pre.push((poly, wire));
+                }
+            }
             None => pre_faces.push(vec![(poly, wire)]),
         }
     }
@@ -2308,6 +2334,20 @@ fn orient_ccw(poly: &PolylineCurve<Point2>) -> PolylineCurve<Point2> {
     } else {
         poly.inverse()
     }
+}
+
+/// Whether `q` is STRICTLY inside the polygon's interior (D3, the
+/// minimal-containing attachment): `PolylineCurve::include` is boundary-
+/// inclusive, which would let a doubled loop's own inverse attach back to its
+/// own region (its representative point lies on the region's boundary). The
+/// strict test excludes a point within `tol` of the boundary.
+fn strictly_contains(poly: &PolylineCurve<Point2>, q: Point2, tol: f64) -> bool {
+    let ccw = orient_ccw(poly);
+    ccw.include(q)
+        && !ccw
+            .iter()
+            .circular_tuple_windows()
+            .any(|(a, b)| point_segment_distance(q, *a, *b) <= tol)
 }
 
 /// Whether the parameter point is strictly inside the region bounded by the
