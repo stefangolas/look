@@ -45,3 +45,7 @@ pub mod boolean;
 
 /// BG-CAD-P3-SPLIT: section + split by plane via the landed Boolean.
 pub mod section;
+
+/// BG-CAD-P6-REWRITE: the LocalBoundaryRewrite engine, proven on plane-plane
+/// chamfer.
+pub mod rewrite;
