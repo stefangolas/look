@@ -113,5 +113,7 @@ mod mapped;
 mod multi_sweep;
 /// primitive shapes
 pub mod primitive;
+/// BG-CAD-P5-REVOLVE: revolve of line-edge profiles via the carrier table.
+pub mod revolve;
 mod sweep;
 mod topo_impls;
