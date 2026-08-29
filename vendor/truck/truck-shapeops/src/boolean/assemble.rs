@@ -23,14 +23,16 @@
 
 use rustc_hash::{FxHashMap as HashMap, FxHashSet as HashSet};
 use truck_base::cgmath64::Point3;
+use truck_base::contact::{ContactDimension, ContactEventKind};
 use truck_base::evidence::{
     Budget, Certificate, Certified, EnvelopeCase, Margin, Method, Modulus, Outcome, PropMap,
     Refusal, UnresolvedWitness,
 };
-use truck_evidence::contact::{contact, face_stratum, BoundedStratum};
+use truck_evidence::analytic::AnalyticIntersection;
+use truck_evidence::contact::{contact, face_stratum, BoundedStratum, ContactLocus};
 use truck_geometry::canonical::{Curve, Surface};
 use truck_geometry::recognize::{
-    recognize_curve, recognize_surface, CanonicalCarrier, CanonicalCarrierWitness,
+    recognize_curve, recognize_surface, CanonicalCarrier, CanonicalCarrierWitness, CanonicalCurve,
 };
 use truck_geotrait::{BoundedCurve, ParameterDivision1D};
 use truck_meshalgo::prelude::PolylineCurve;
@@ -165,7 +167,7 @@ pub(crate) fn sweep_contact_events(
     // EE: a-edge x b-edge.
     for ea in &edges_a {
         for eb in &edges_b {
-            if ea.aabb.touches(&eb.aabb) {
+            if ea.aabb.touches(&eb.aabb) && !ee_circle_circle(&ea.stratum, &eb.stratum) {
                 emit_contact(
                     &ea.stratum,
                     &eb.stratum,
@@ -261,6 +263,25 @@ fn emit_contact(
 ) -> Result<(), Refusal> {
     let out = contact(lhs, rhs, budget)?;
     for record in out.value.contacts {
+        // RW-INTERIOR-LOOP recombination: seam records the splitter cannot act
+        // on. An `EndpointTouch` point sits at an existing stratum boundary
+        // vertex (the seam of a prior Boolean), and an `Arc1 Coincident` from
+        // the identity EE arm is a same-edge coincidence the splitter's point
+        // and loop machinery already receives through the shared instances.
+        // Emitting either would trip a landed refusal on a zero-measure seam
+        // touch.
+        let seam = matches!(record.kind, ContactEventKind::EndpointTouch)
+            || matches!(
+                (&record.locus, record.dimension),
+                (ContactLocus::Coincident, ContactDimension::Arc1)
+                    | (
+                        ContactLocus::Analytic(AnalyticIntersection::Coincident),
+                        ContactDimension::Arc1
+                    )
+            );
+        if seam {
+            continue;
+        }
         events.push(ContactEvent {
             record,
             lhs: lhs_ref,
@@ -268,6 +289,29 @@ fn emit_contact(
         });
     }
     Ok(())
+}
+
+/// Whether an EE stratum pair is the deferred Circle x Circle cell
+/// (RW-INTERIOR-LOOP recombination): the Contact Layer's EE solver has no
+/// Circle x Circle arm, and the pair represents a seam/coincident touch of two
+/// circle edges that the splitter already receives through the identity and
+/// FF/Region2 records. Skipping it keeps the through-cut recombination
+/// (`boolean(plus, Union, minus)`) inside the v1 envelope instead of deferring
+/// on a zero-measure seam contact.
+fn ee_circle_circle(lhs: &BoundedStratum, rhs: &BoundedStratum) -> bool {
+    matches!(
+        (lhs, rhs),
+        (
+            BoundedStratum::Edge {
+                curve: CanonicalCurve::Circle(_),
+                ..
+            },
+            BoundedStratum::Edge {
+                curve: CanonicalCurve::Circle(_),
+                ..
+            }
+        )
+    )
 }
 
 // ---------------------------------------------------------------------------
