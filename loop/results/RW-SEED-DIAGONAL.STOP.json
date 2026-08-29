@@ -1,0 +1,58 @@
+{
+  "id": "RW-SEED-DIAGONAL",
+  "status": "STOPPED",
+  "contracts": [
+    "boolean::assemble::emit_contact seam filter (assemble.rs) \u2014 re-landed per D1, machine-verified faithful: an EndpointTouch record is dropped ONLY when the event is NOT cross-solid (the cross_solid_strata discriminator: ptr-eq shell identity + distinct SolidRef, computed in the sweep); the Arc1 Coincident arms are byte-identical to base (re-derived A1 assemble.rs:273, count 1)",
+    "boolean::split::collect_events (split.rs) \u2014 re-landed per D2: the cross-solid EndpointTouch Point0 loci are collected as certified clipping points alongside the Transverse ones; same-solid (self-pair) EndpointTouch is not collected (the landed lib test split_deferred_locus_family_refuses stays green)",
+    "boolean::split::dispatch (split.rs) \u2014 re-landed per D2: a cross-solid (Point, EndpointTouch, Point0) event routes to point_cut in the Point phase; the same-solid arm still refuses",
+    "boolean::split::insert_open_arc_shared (split.rs) \u2014 re-landed per D6: certification requires at least TWO DISTINCT (near_pt-separated) certified points before any arc is built; a single certified point rides the seam_skip path as at base (resew restored 7/7)",
+    "boolean::split::insert_open_arc_shared (split.rs) \u2014 re-landed per D7: an open arc witnessed by multiple FF records dedupes at insertion time per face (same carrier AND same certified extent, endpoints near_pt-equal, same order or reversed; first instance is the shared instance)",
+    "With ONLY D1/D2/D6/D7 re-landed (no other kernel change): resew 7/7, boolean_m2 4/4, interior_loop 8/8 all UNCHANGED; the diagonal split completes (no refusal) but produces a geometrically-broken mesh (see deviation 1)"
+  ],
+  "tests_added": 0,
+  "deviations": [
+    {
+      "id": "SPLIT_PRODUCES_DEGENERATE_SLIVERS",
+      "test": "diagonal_plane_box_splits / diagonal_recombination_is_original / no_certified_endpoints_still_refuses",
+      "derivation": "A faithful D1/D2/D6/D7 re-landing reproduces the r2 state exactly: the split completes but the box's z=0 and z=2 faces are NOT divided. The bottom/top faces stay full 2x2 squares (fragment parameter-polygon area 4.0) plus a degenerate zero-area sliver fragment (area 0.0, wire = [arc.inverse(), arc]). Root cause: the diagonal arcs' certified endpoint points (the box corners, e.g. (2,0,0)) are canonical vertices whose INSTANCE differs from the box's pre-existing corner vertex instances (Vertex equality is by id, vertex.rs:165), so `add_edge`'s find_wire_with_front finds no splice point (a=None b=None) and pushes the doubled-wire sliver instead of splitting the square. The classifier's find_seed then cannot seed the sliver-only components [1] and [3] (each a single fragment whose parameter polygon is degenerate \u2014 area 0.0 \u2014 so region_representative returns None), answering NumericallyUnresolved(UncertifiedContainment) at classify.rs:277. This CONFIRMS the packet's D3(a) hypothesis verbatim: the seed-fallback is per-component (the `for &u in comp` loop), and a component where EVERY fragment is degenerate-representative cannot fire it. But the DEEPER cause is the splitter artifact, not a classifier gap.",
+      "verbatim": "Err(NumericallyUnresolved { spent: Budget { subdiv: 0, newton: 0, depth: 0 }, witness: UncertifiedContainment }) from find_seed on components [1], [3] (degenerate slivers of the unsplit z=0/z=2 faces)"
+    },
+    {
+      "id": "SPLICE_NEEDS_CANONICAL_VERTEX_UNIFICATION",
+      "test": "diagonal_plane_box_splits / diagonal_recombination_is_original",
+      "derivation": "Making the split geometrically correct requires a kernel change NOT in the packet's chain: `canonical_vertex` must reuse an existing boundary-wire vertex when the certified point is already a face-corner instance, so `add_edge` splices the corner-endpoint arcs into the box faces. With that change the mesh is correct (bottom/top split into two triangles, areas 2.0 each; the wall face's quadrilateral closes). This is a third link the r1/r2 derivations did not record.",
+      "verbatim": "with canonical_vertex unification: add_edge finds a=Some((0,3)) b=Some((0,1)) and the bottom face divides into two triangles"
+    },
+    {
+      "id": "CONTRADICTORY_AT_SEAM_EDGES",
+      "test": "diagonal_plane_box_splits / diagonal_recombination_is_original",
+      "derivation": "With the geometry-corrected mesh, the classifier answers Contradictory \u2014 the packet's stop-condition-4 witness: Err(Contradictory(ContradictionWitness { prop: FragmentInsideOther, left: True, right: False })). The failing edge is the box's vertical seam edge on the contact plane x+y=2 (e.g. (2,0,0)-(2,0,2), shared by the y=0 face fragment, bit=true, and the x=2 face fragment, bit=false). The two faces lie on OPPOSITE sides of the plane and meet at an edge that lies ON the plane, so the edge MUST be a Flip adjacency; build_adjacency marks it Same because it is an original box edge, not an inserted contact arc. The classification bits are geometrically correct; the mesh's parity graph is inconsistent. This is the tree's failure to recognize contact-plane-coincident edges as contact arcs.",
+      "verbatim": "Err(Contradictory(ContradictionWitness { prop: FragmentInsideOther, left: True, right: False })) at classify.rs verification, adjacency 4-5 (y=0 face vs x=2 face, seam edge marked Same)"
+    },
+    {
+      "id": "SEAM_EDGE_REPLACEMENT_NEEDED",
+      "test": "diagonal_plane_box_splits / diagonal_recombination_is_original",
+      "derivation": "Fixing the parity requires replacing each contact-plane-coincident box edge with the inserted arc instance (OnBoundary FF lines currently drop into the `CurveFaceRelation::OnBoundary | Outside => {}` no-op arm): the coincident edge must become the arc so (a) the seam reads as a Flip contact arc in build_adjacency and (b) the box faces and the wall face's cut rectangle share the SAME edge instances so the assembled shells close. The replacement must match the arc's direction to the edge's absolute ends (the p_min->p_max direction is arbitrary; the swap silently no-ops otherwise). This is a fourth link not in the packet's chain. Even after it, D4 is unreachable (deviation 5) and resew breaks (deviation 6).",
+      "verbatim": "without direction matching: wire.swap_edge_into_wire returns false (ends reversed) and the seam edge stays an original edge"
+    },
+    {
+      "id": "RECOMBINATION_REFUSES_AT_REGION2",
+      "test": "diagonal_recombination_is_original",
+      "derivation": "After all splitter fixes, the halves assemble as VALID single shells with exactly 5 faces each (the two triangular prisms), satisfying the first half of D4. But the recombination boolean(plus, Union, minus) refuses UnsupportedEnvelope(ContactReductionDeferred) at the Region2 containment screen: the two coplanar z=0 (and z=2) triangles tile the box's face and share the diagonal edge, so containment_screen's wires_cross returns true \u2192 RegionScreen::Crossing \u2192 Err(refused()) (the v1 envelope's deliberate PartialOverlap/Crossing refusal, split.rs region2). D4 requires the recombination to assemble into a valid single shell; the v1 screen has no arm for coplanar-adjacent (edge-sharing, non-overlapping) regions. Fixing this is a design decision the packet did not make.",
+      "verbatim": "Err(UnsupportedEnvelope(ContactReductionDeferred)) from region2 on ContactRecord { dimension: Region2, kind: IdenticalCarrier, locus: Coincident } between the two bottom-triangle faces (containment_screen: Crossing)"
+    },
+    {
+      "id": "RESEW_REGRESSION_SPEC_GAP",
+      "test": "resew (partial_seam_refuses, adjacent_boxes_union_assembles, butt_join_survives_further_boolean, touching_difference_answers, p3_recombination_flagship_is_original) \u2014 5/7 fail",
+      "derivation": "The kernel machinery the diagonal REQUIRES (seam-edge replacement / per-face arc certification in insert_open_arc_shared) breaks the packet's required-unchanged resew suite (5/7 fail). This is the same decision-vs-tree contradiction class as r1's RESEW_REGRESSION_SPEC_GAP: the packet pre-decided BOTH 'the diagonal works' AND 'resew passes UNCHANGED', and the tree shows a faithful full-chain attempt cannot satisfy both. I did not extend the design.",
+      "verbatim": "resew 5/7 fail with the seam-edge machinery landed"
+    },
+    {
+      "id": "NO_COMMIT",
+      "test": "commit",
+      "derivation": "No partial landing keeps the tree green: the landed cut_boundaries tests 1-3 assert the old UnsupportedEnvelope(ContactReductionDeferred) refusal class, which the chain dissolves before the classifier is even reached; resew breaks under the required machinery (deviation 6); and D4's recombination is unreachable (deviation 5). All kernel and test changes were reverted; the branch sits at the booking HEAD (041df27) with an empty diff and a green tree: cut_boundaries 7/7, resew 7/7, boolean_m2 4/4, interior_loop 8/8 at base; lib 46/47 (the recorded environmental healing::tests::step_import); kernel-gates.sh HEAD reports GATE-4 unscaled_legacy 111/111 and all P-3 gates pass. Anchors re-derived on this tree: A1 assemble.rs:273, A2 split.rs:1108, A3 split.rs:1457, A4 split.rs:1580, A5 classify.rs:237, A6 split.rs:966 \u2014 each count 1, matching the packet (no ANCHOR_MISMATCH).",
+      "verbatim": "empty diff; tree green at base"
+    }
+  ],
+  "notes": "RW-SEED-DIAGONAL stopped at the packet's SPEC_GAP stop condition, with the D2 diagnosis (mandated) recorded here. D2 diagnosis \u2014 find_seed's failure mode on the diagonal mesh: the classifier's refusal is NOT a genuine seeding gap. Instrumentation shows the failing components are [1] and [3], each a SINGLE fragment (the box's z=0 and z=2 faces), each with a single degenerate parameter polygon (area 0.0, wire [arc.inverse(), arc]), so region_representative returns None and the per-component seed-fallback (lowest-index fragment whose representative resolves) cannot fire \u2014 exactly the D3(a) bug class the packet hypothesized. But the degenerate slivers are SPLITTER artifacts: `add_edge` cannot splice the corner-endpoint diagonal arcs into the box faces because the arcs' canonical endpoint vertices are not instance-equal to the box's pre-existing corner vertices (Vertex equality is by id). The full chain the packet pre-decided (filter, collect, certify+dedupe, seeding) is INSUFFICIENT: a faithful re-landing reproduces r2's NumericallyUnresolved; making the split geometrically correct requires canonical-vertex unification (splice corner arcs) AND seam-edge replacement (contact-plane-coincident box edges must become the arc instances, with direction matching) AND per-face arc certification; and even then the D4 recombination refuses at the Region2 screen (coplanar-adjacent triangles = Crossing, a deliberate v1 envelope refusal) while the required machinery breaks resew 5/7. Each of these is a kernel design decision the packet did not pre-decide ('churn, don't design'), so per the r1/r2 precedent I did not extend the design: everything was reverted, the tree is green at base, and the anchors re-derive at count 1. The follow-up packet needs pre-decisions for: (1) canonical-vertex unification of corner-endpoint arc splicing, (2) seam-edge replacement of contact-plane-coincident boundary edges (Flip parity + shared instances), (3) per-face arc certification, and (4) the Region2 screen's handling of coplanar-adjacent (edge-sharing) regions \u2014 with the resew-unchanged obligation re-examined, since the seam machinery conflicts with it."
+}

@@ -344,6 +344,22 @@ Deferred unchanged (derived from the closure table, not asserted): general
 sweep, general loft, offset/thicken/shell, post-hoc draft, general canal
 surfaces, topology-changing/face-consuming fillets, `ExtrudedCurve` emission.
 
+Deferred with a full instrumented diagnosis (session 41, three stops):
+**vertex-touch cuts** — a cut plane through the solid's edge graph (P3's
+diagonal fixture, plane x + y = 2 through opposite box edges). The typed
+refusal is the booked v1 boundary (same class as the RW-CONIC Ellipse and
+the Region2 `Crossing` screen); landing it requires four kernel decisions
+the v1 envelope does not make: (1) canonical-vertex unification so
+corner-endpoint arcs splice (`add_edge` needs instance-equal vertices),
+(2) seam-edge replacement of contact-plane-coincident boundary edges with
+arc instances (Flip parity + shared instances, direction-matched),
+(3) per-face arc certification in the open-arc path (conflicts with the
+sew-completion corner-touch skip — needs a joint redesign), and
+(4) Region2 handling of coplanar-adjacent (edge-sharing, non-overlapping)
+regions, which the `Crossing` screen deliberately refuses. Evidence chain:
+`loop/results/RW-VERTEX-CLIP.STOP-r1.json`, `.STOP-r2.json`,
+`RW-SEED-DIAGONAL.STOP.json`.
+
 Dependency sketch:
 
 ```text
