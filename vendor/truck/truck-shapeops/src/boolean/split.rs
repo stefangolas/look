@@ -75,6 +75,14 @@ const SURFACE_SEARCH_TRIALS: usize = 100;
 /// endpoint.
 const PARAM_SLACK: f64 = 1.0e-9; // H-3: dimensionless parameter slack, not a length
 
+/// Dimensionless slack on signed parameter-polygon areas (H-3): below this a
+/// polygon is degenerate (the extrude-wall band signature).
+const DEGENERATE_AREA_SLACK: f64 = 1.0e-9; // H-3: dimensionless area slack, not a length
+
+/// Dimensionless slack on full-period parameter spans (H-3): a polygon
+/// spanning at least `period − FULL_PERIOD_SLACK` is a full-period wire.
+const FULL_PERIOD_SLACK: f64 = 1.0e-9; // H-3: dimensionless span slack, not a length
+
 /// Which solid a stratum reference belongs to.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum SolidRef {
@@ -375,6 +383,18 @@ enum CurveFaceRelation {
     Outside,
 }
 
+/// The trichotomous classification of a query `(u, v)` against a face's
+/// trimmed region (the band-form path).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum BandRegion {
+    /// Strictly inside the face's trimmed region.
+    Inside,
+    /// Within `tol` of the face's trimmed boundary.
+    Boundary,
+    /// On the face's carrier but outside the trimmed region.
+    Outside,
+}
+
 /// The Region2 containment screen outcome.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum RegionScreen {
@@ -419,6 +439,9 @@ struct SplitEngine<'a> {
     contact_b: HashSet<EdgeID<Curve>>,
     /// Pending Region2 coincident pairs, resolved after division.
     pending_coincident: Vec<PendingCoincident>,
+    /// Interior open arcs accumulated per face for closed-loop assembly
+    /// (RW-INTERIOR-LOOP: the halfspace-box family's interior chords).
+    pending_loops: HashMap<(SolidRef, usize), Vec<Edge<Point3, Curve>>>,
 }
 
 impl<'a> SplitEngine<'a> {
@@ -450,6 +473,7 @@ impl<'a> SplitEngine<'a> {
             contact_a: HashSet::default(),
             contact_b: HashSet::default(),
             pending_coincident: Vec::new(),
+            pending_loops: HashMap::default(),
         }
     }
 
@@ -652,6 +676,7 @@ impl<'a> SplitEngine<'a> {
         for ev in events {
             self.dispatch(ev, Phase::Ff)?;
         }
+        self.assemble_pending_loops()?;
         for ev in events {
             self.dispatch(ev, Phase::Region2)?;
         }
@@ -807,11 +832,23 @@ impl<'a> SplitEngine<'a> {
         let faces = self.event_faces(ev);
         let mut inside_faces: Vec<(SolidRef, usize)> = Vec::new();
         let mut crossing_faces: Vec<CrossingFace> = Vec::new();
+        // RW-INTERIOR-LOOP: the Contact Layer emits the untrimmed analytic
+        // carrier (a plane x plane line spans one unit from its anchor), so an
+        // open line whose certified extent leaves the nominal range is
+        // classified over the RE-PARAMETERIZED arc (fresh Line over the
+        // certified 3-D endpoints), letting the faces the true arc crosses see
+        // it.
+        let classify_curve = if closed {
+            curve.clone()
+        } else {
+            self.reparameterized_open_arc(&curve)
+                .unwrap_or_else(|| curve.clone())
+        };
         for (solid, face_idx) in faces {
             let face = self.shell_face(solid, face_idx).ok_or_else(unsupported)?;
             let polys = self.face_parameter_polygons(solid, face_idx)?;
             let (relation, crossings) = self
-                .classify_curve(face, &polys, &curve)
+                .classify_curve(face, &polys, &classify_curve)
                 .ok_or_else(numerically_unresolved)?;
             match relation {
                 CurveFaceRelation::Inside => inside_faces.push((solid, face_idx)),
@@ -833,13 +870,62 @@ impl<'a> SplitEngine<'a> {
             }
         } else {
             // An open curve whose trace lies strictly inside a face's region
-            // has no certified endpoints on that face's boundary: refuse.
-            if !inside_faces.is_empty() {
+            // refuses only when the clipping is NOT certified by point events
+            // (RW-INTERIOR-LOOP: the halfspace-box family's interior chords
+            // carry certified corner endpoints).
+            if !inside_faces.is_empty() && !self.open_arc_certified(&classify_curve) {
                 return Err(refused());
             }
-            self.insert_open_arc_shared(&crossing_faces, &curve)?;
+            let mut faces_with_crossings: Vec<CrossingFace> = Vec::new();
+            for (solid, face_idx) in &inside_faces {
+                faces_with_crossings.push((*solid, *face_idx, Vec::new()));
+            }
+            faces_with_crossings.extend(crossing_faces.iter().cloned());
+            self.insert_open_arc_shared(&faces_with_crossings, &classify_curve)?;
         }
         Ok(())
+    }
+
+    /// The re-parameterized arc of an open line whose certified extent leaves
+    /// the carrier's nominal range: a fresh `Line` over the certified 3-D
+    /// extremes. `None` when the certified points stay inside the range.
+    fn reparameterized_open_arc(&self, curve: &Curve) -> Option<Curve> {
+        let Curve::Line(_) = curve else {
+            return None;
+        };
+        let (c0, c1) = curve.range_tuple();
+        let mut ts: Vec<f64> = Vec::new();
+        for cp in &self.certified_points {
+            if let Some(t) = curve.search_parameter(*cp, None, SEARCH_TRIALS) {
+                if near_pt(curve.subs(t), *cp, self.tol) {
+                    ts.push(t);
+                }
+            }
+        }
+        if ts.len() < 2 {
+            return None;
+        }
+        let t_min = ts.iter().copied().fold(f64::INFINITY, f64::min);
+        let t_max = ts.iter().copied().fold(f64::NEG_INFINITY, f64::max);
+        if t_min < c0 - PARAM_SLACK || t_max > c1 + PARAM_SLACK {
+            Some(Curve::Line(Line(curve.subs(t_min), curve.subs(t_max))))
+        } else {
+            None
+        }
+    }
+
+    /// Whether at least two distinct certified points lie on the open curve's
+    /// carrier — the clipping is certified by point events.
+    fn open_arc_certified(&self, curve: &Curve) -> bool {
+        let mut ts: Vec<f64> = Vec::new();
+        for cp in &self.certified_points {
+            if let Some(t) = curve.search_parameter(*cp, None, SEARCH_TRIALS) {
+                if near_pt(curve.subs(t), *cp, self.tol) {
+                    ts.push(t);
+                }
+            }
+        }
+        ts.len() >= 2
     }
 
     /// The parameter polygons of a face's ORIGINAL boundary wires, outer first
@@ -886,6 +972,17 @@ impl<'a> SplitEngine<'a> {
         }
         let surface = face.surface();
         let u_period = surface.u_period();
+        // The band-form screen (RW-INTERIOR-LOOP): a periodic carrier whose
+        // full-period wire polygons are ALL degenerate (area ~ 0) is a BAND —
+        // the extrude-wall signature — and its region is the v-interval
+        // between the two rim wires, which the polygon containment rule cannot
+        // see. Classify such a face's trace by the band rule so a closed
+        // full-period locus strictly between the rims reads `Inside`
+        // independent of the degenerate-polygon artifact.
+        let band = match u_period {
+            Some(period) => band_form(face_polys, period, 0),
+            None => false,
+        };
         let mut prev: Option<Point2> = None;
         let mut mapped: Vec<(f64, Point2, Point3)> = Vec::new();
         for (t, pt) in ts.iter().zip(pts.iter()) {
@@ -904,21 +1001,39 @@ impl<'a> SplitEngine<'a> {
             mapped.push((*t, uv, *pt));
             prev = Some(uv);
         }
+        // The per-sample region test, band-aware (RW-INTERIOR-LOOP): the band
+        // rule replaces both the boundary-distance and the polygon containment
+        // tests on a band-form carrier.
+        let region_of = |uv: Point2| -> BandRegion {
+            if band {
+                band_rule(face_polys, uv, 1, self.tol)
+            } else if self.on_face_boundary(face_polys, uv, u_period) {
+                BandRegion::Boundary
+            } else if region_contains(face_polys, uv, u_period) {
+                BandRegion::Inside
+            } else {
+                BandRegion::Outside
+            }
+        };
         let mut all_on = true;
         let mut all_inside = true;
         let mut all_outside = true;
         let mut crossings: Vec<(f64, Point3)> = Vec::new();
         for (t, uv, pt) in &mapped {
-            if self.on_face_boundary(face_polys, *uv, u_period) {
-                all_inside = false;
-                all_outside = false;
-                crossings.push((*t, *pt));
-            } else if region_contains(face_polys, *uv, u_period) {
-                all_on = false;
-                all_outside = false;
-            } else {
-                all_on = false;
-                all_inside = false;
+            match region_of(*uv) {
+                BandRegion::Boundary => {
+                    all_inside = false;
+                    all_outside = false;
+                    crossings.push((*t, *pt));
+                }
+                BandRegion::Inside => {
+                    all_on = false;
+                    all_outside = false;
+                }
+                BandRegion::Outside => {
+                    all_on = false;
+                    all_inside = false;
+                }
             }
         }
         // Inside<->outside transitions between consecutive samples are proper
@@ -928,8 +1043,8 @@ impl<'a> SplitEngine<'a> {
             let (a, b) = (pair.first()?, pair.get(1)?);
             let (ta, aa, a3) = *a;
             let (tb, bb, b3) = *b;
-            let in_a = region_contains(face_polys, aa, u_period);
-            let in_b = region_contains(face_polys, bb, u_period);
+            let in_a = matches!(region_of(aa), BandRegion::Inside);
+            let in_b = matches!(region_of(bb), BandRegion::Inside);
             if in_a != in_b {
                 if let Some(s) = segment_boundary_crossing(aa, bb, face_polys) {
                     let t = ta + s * (tb - ta);
@@ -1101,6 +1216,15 @@ impl<'a> SplitEngine<'a> {
 
     /// Inserts an open arc clipped to the certified extreme crossings as a
     /// SHARED instance across every crossing face.
+    ///
+    /// RW-INTERIOR-LOOP: the Contact Layer emits the untrimmed analytic
+    /// carrier (a plane x plane line spans one unit from its anchor point), so
+    /// the certified crossing extremes can lie BEYOND the curve's nominal
+    /// range. Every certified point on the carrier is folded into the
+    /// extremes, and a `Line` carrier whose certified extent leaves its range
+    /// is rebuilt from the certified 3-D endpoints. A face whose arc endpoints
+    /// lie strictly inside its region accumulates the arc for the
+    /// closed-loop assembly (the halfspace-box family's interior chords).
     fn insert_open_arc_shared(
         &mut self,
         crossing_faces: &[CrossingFace],
@@ -1116,6 +1240,15 @@ impl<'a> SplitEngine<'a> {
                     .any(|c| near_pt(*c, *p, self.tol))
                 {
                     certified.push((*t, *p));
+                }
+            }
+        }
+        for cp in &self.certified_points {
+            if let Some(t) = curve.search_parameter(*cp, None, SEARCH_TRIALS) {
+                if near_pt(curve.subs(t), *cp, self.tol)
+                    && !certified.iter().any(|(_, p)| near_pt(*p, *cp, self.tol))
+                {
+                    certified.push((t, *cp));
                 }
             }
         }
@@ -1142,15 +1275,112 @@ impl<'a> SplitEngine<'a> {
             self.cut_edge_at_point(*solid, *face_idx, p_min)?;
             self.cut_edge_at_point(*solid, *face_idx, p_max)?;
         }
-        let sub = clip_curve(curve.clone(), t_min, t_max).ok_or_else(unsupported)?;
+        let sub = self.clip_open_arc(curve.clone(), t_min, t_max, p_min, p_max)?;
         let arc = Edge::try_new(&v0, &v1, sub).map_err(|_| refused())?;
         for (solid, face_idx, _) in crossing_faces {
+            if self.is_on_face_boundary(*solid, *face_idx, p_min)
+                && self.is_on_face_boundary(*solid, *face_idx, p_max)
             {
-                let loops = self.mut_loops(*solid, *face_idx)?;
-                loops.add_edge(arc.clone())?;
+                {
+                    let loops = self.mut_loops(*solid, *face_idx)?;
+                    loops.add_edge(arc.clone())?;
+                }
+                self.contact_set_mut(*solid).insert(arc.id());
+                self.touched_mut(*solid).insert(*face_idx);
+            } else {
+                self.pending_loops
+                    .entry((*solid, *face_idx))
+                    .or_default()
+                    .push(arc.clone());
+                self.contact_set_mut(*solid).insert(arc.id());
+                self.touched_mut(*solid).insert(*face_idx);
             }
-            self.contact_set_mut(*solid).insert(arc.id());
-            self.touched_mut(*solid).insert(*face_idx);
+        }
+        Ok(())
+    }
+
+    /// The clipped sub-curve of an open arc. A `Line` carrier whose certified
+    /// extent leaves the nominal range is rebuilt from the certified 3-D
+    /// endpoints (RW-INTERIOR-LOOP); any other carrier clips as today.
+    fn clip_open_arc(
+        &self,
+        curve: Curve,
+        t_min: f64,
+        t_max: f64,
+        p_min: Point3,
+        p_max: Point3,
+    ) -> Result<Curve, Refusal> {
+        let (c0, c1) = curve.range_tuple();
+        if t_min < c0 - PARAM_SLACK || t_max > c1 + PARAM_SLACK {
+            match curve {
+                Curve::Line(_) => Ok(Curve::Line(Line(p_min, p_max))),
+                _ => clip_curve(curve, t_min, t_max).ok_or_else(unsupported),
+            }
+        } else {
+            clip_curve(curve, t_min, t_max).ok_or_else(unsupported)
+        }
+    }
+
+    /// Whether `p` lies on one of the face's absolute boundary edges.
+    fn is_on_face_boundary(&self, solid: SolidRef, face_idx: usize, p: Point3) -> bool {
+        let Some(face) = self.shell_face(solid, face_idx) else {
+            return false;
+        };
+        face.absolute_boundaries().iter().any(|wire| {
+            wire.edge_iter().any(|edge| {
+                let curve = edge.curve();
+                curve
+                    .search_parameter(p, None, SEARCH_TRIALS)
+                    .is_some_and(|t| near_pt(curve.subs(t), p, self.tol))
+            })
+        })
+    }
+
+    /// Assembles the accumulated interior arcs into closed independent loops
+    /// (RW-INTERIOR-LOOP): an arc chain that returns to its start on a face is
+    /// inserted as the doubled independent loop, dividing the face into the
+    /// loop's interior region and the containing region with the hole.
+    fn assemble_pending_loops(&mut self) -> Result<(), Refusal> {
+        let pending = std::mem::take(&mut self.pending_loops);
+        for ((solid, face_idx), mut arcs) in pending {
+            while !arcs.is_empty() {
+                let first = arcs.remove(0);
+                let mut chain = vec![first.clone()];
+                let mut current = first.clone();
+                let mut progressed = true;
+                while progressed {
+                    progressed = false;
+                    let target = current.back().clone();
+                    for i in 0..arcs.len() {
+                        let Some(cand) = arcs.get(i).cloned() else {
+                            break;
+                        };
+                        if *cand.front() == target {
+                            chain.push(cand.clone());
+                            current = cand;
+                            arcs.remove(i);
+                            progressed = true;
+                            break;
+                        } else if *cand.back() == target {
+                            let inv = cand.inverse();
+                            chain.push(inv.clone());
+                            current = inv;
+                            arcs.remove(i);
+                            progressed = true;
+                            break;
+                        }
+                    }
+                }
+                let closed = chain
+                    .last()
+                    .map(|edge| edge.back() == first.front())
+                    .unwrap_or(false);
+                if !closed {
+                    return Err(refused());
+                }
+                let wire = Wire::from(chain);
+                self.add_doubled_loop(solid, face_idx, &wire)?;
+            }
         }
         Ok(())
     }
@@ -1261,18 +1491,23 @@ impl<'a> SplitEngine<'a> {
             .shell_face(contained.0, contained.1)
             .ok_or_else(unsupported)?;
         let wires = contained_face.absolute_boundaries();
+        // RW-INTERIOR-LOOP recombination: two result solids share a coincident
+        // boundary (the recombined cylinder wall) whose wires are already
+        // present geometrically in the containing face — no split is needed,
+        // whatever the contained wire count.
+        let all_present = wires.iter().all(|wire| {
+            wire.edge_iter()
+                .all(|e| self.loops_have_edge(containing.0, containing.1, e))
+        });
+        if all_present {
+            return Ok(());
+        }
         if wires.len() != 1 {
             // v1 scope: the contained face is a single-wire region. A
             // multi-wire contained face (with holes) is deferred.
             return Err(refused());
         }
         let wire = wires.first().ok_or_else(unsupported)?.clone();
-        let all_present = wire
-            .edge_iter()
-            .all(|e| self.loops_have_edge(containing.0, containing.1, e));
-        if all_present {
-            return Ok(());
-        }
         // The contained wire is not yet shared with the containing face:
         // split a single self-loop into its two half-edges (the seam form),
         // propagate the cut, then insert as the doubled independent loop.
@@ -1527,7 +1762,16 @@ impl<'a> SplitEngine<'a> {
             };
             let uv: Point2 = uv.into();
             let u_period = face.surface().u_period();
-            if region_contains(&polys, uv, u_period) {
+            let band = match u_period {
+                Some(period) => band_form(&polys, period, 0),
+                None => false,
+            };
+            let covers = if band {
+                matches!(band_rule(&polys, uv, 1, self.tol), BandRegion::Inside)
+            } else {
+                region_contains(&polys, uv, u_period)
+            };
+            if covers {
                 return Ok(idx);
             }
         }
@@ -1680,6 +1924,24 @@ fn divide_one_face(
     loops: &Loops,
     tol: f64,
 ) -> Option<Vec<Face<Point3, Curve, Surface>>> {
+    // The band-form dispatch (RW-INTERIOR-LOOP): a periodic carrier whose
+    // full-period wire polygons are all degenerate has no signed polygon area
+    // to drive the region/hole grouping; the wires sit at distinct `v` levels
+    // and each band between consecutive levels is its own region.
+    let band = match face.surface().u_period() {
+        Some(period) => {
+            let mut map: HashMap<EdgeID<Curve>, PolylineCurve<Point3>> = HashMap::default();
+            let mut polys = Vec::new();
+            for wire in &loops.0 {
+                polys.push(create_parameter_boundary(face, wire, &mut map, tol)?);
+            }
+            band_form(&polys, period, 0)
+        }
+        None => false,
+    };
+    if band {
+        return divide_band_face(face, loops, tol);
+    }
     // The stored-frame outer-positive invariant: for a valid face the STORED
     // outer wire is always CCW-positive in the surface's (u, v) frame,
     // independent of the orientation flag. Derivation: the effective outer
@@ -1724,6 +1986,70 @@ fn divide_one_face(
             new_face
         })
         .collect();
+    Some(vec)
+}
+
+/// The band decomposition of a periodic face whose full-period wire polygons
+/// are all degenerate (the extrude-wall signature, RW-INTERIOR-LOOP): each
+/// wire sits at a constant `v` level, and each band between consecutive
+/// levels becomes a fragment whose two boundary wires are the u-increasing
+/// instance at the lower level and the u-decreasing instance at the upper
+/// level — the region-on-the-left traversal that closes the shell against the
+/// adjacent bands and the rim-sharing cap faces.
+fn divide_band_face(
+    face: &Face<Point3, Curve, Surface>,
+    loops: &Loops,
+    tol: f64,
+) -> Option<Vec<Face<Point3, Curve, Surface>>> {
+    let surface = face.surface();
+    let mut map: HashMap<EdgeID<Curve>, PolylineCurve<Point3>> = HashMap::default();
+    let mut wires: Vec<(f64, bool, &Wire<Point3, Curve>)> = Vec::new();
+    for wire in &loops.0 {
+        let poly = create_parameter_boundary(face, wire, &mut map, tol)?;
+        let first = *poly.first()?;
+        let last = *poly.iter().last()?;
+        wires.push((first.y, last.x > first.x, wire));
+    }
+    wires.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap_or(std::cmp::Ordering::Equal));
+    struct BandLevel<'w> {
+        v: f64,
+        wires: Vec<(&'w Wire<Point3, Curve>, bool)>,
+    }
+    let mut levels: Vec<BandLevel<'_>> = Vec::new();
+    for (v, u_inc, wire) in wires {
+        match levels.last_mut() {
+            Some(lv) if (lv.v - v).abs() <= tol => lv.wires.push((wire, u_inc)),
+            _ => levels.push(BandLevel {
+                v,
+                wires: vec![(wire, u_inc)],
+            }),
+        }
+    }
+    let mut vec: Vec<Face<Point3, Curve, Surface>> = Vec::new();
+    for pair in levels.windows(2) {
+        let lower = pair.first()?;
+        let upper = pair.get(1)?;
+        let lower_wire = lower
+            .wires
+            .iter()
+            .find(|(_, inc)| *inc)
+            .map(|(w, _)| *w)
+            .or_else(|| lower.wires.first().map(|(w, _)| *w))?;
+        let upper_wire = upper
+            .wires
+            .iter()
+            .find(|(_, inc)| !*inc)
+            .map(|(w, _)| *w)
+            .or_else(|| upper.wires.first().map(|(w, _)| *w))?;
+        let mut new_face = Face::new_unchecked(
+            vec![(*lower_wire).clone(), (*upper_wire).clone()],
+            surface.clone(),
+        );
+        if !face.orientation() {
+            new_face.invert();
+        }
+        vec.push(new_face);
+    }
     Some(vec)
 }
 
@@ -1777,6 +2103,61 @@ pub(crate) fn region_contains(
             inside(Point2::new(p.x + period, p.y)) || inside(Point2::new(p.x - period, p.y))
         }
         None => false,
+    }
+}
+
+/// The band-form test: every polygon degenerate (`|area| <= DEGENERATE_AREA_SLACK`)
+/// AND together they span a full period in the periodic coordinate — the
+/// extrude-wall signature (cut or uncut). `coordinate` is 0 for u (x) and 1
+/// for v (y).
+fn band_form(polys: &[PolylineCurve<Point2>], period: f64, coordinate: usize) -> bool {
+    if polys.is_empty() {
+        return false;
+    }
+    if !polys
+        .iter()
+        .all(|poly| poly.area().abs() <= DEGENERATE_AREA_SLACK)
+    {
+        return false;
+    }
+    let mut lo = f64::INFINITY;
+    let mut hi = f64::NEG_INFINITY;
+    for poly in polys {
+        for pt in poly.iter() {
+            let c = if coordinate == 0 { pt.x } else { pt.y };
+            lo = lo.min(c);
+            hi = hi.max(c);
+        }
+    }
+    hi - lo >= period - FULL_PERIOD_SLACK
+}
+
+/// The band rule: `lo`/`hi` are the min/max of the band coordinate over all
+/// polygon points; strictly between (with a `tol` margin) is `Inside`, at the
+/// margin is `Boundary`, else `Outside`. `coordinate` is 0 for u (x) and 1 for
+/// v (y).
+fn band_rule(
+    polys: &[PolylineCurve<Point2>],
+    uv: Point2,
+    coordinate: usize,
+    tol: f64,
+) -> BandRegion {
+    let mut lo = f64::INFINITY;
+    let mut hi = f64::NEG_INFINITY;
+    for poly in polys {
+        for pt in poly.iter() {
+            let c = if coordinate == 0 { pt.x } else { pt.y };
+            lo = lo.min(c);
+            hi = hi.max(c);
+        }
+    }
+    let c = if coordinate == 0 { uv.x } else { uv.y };
+    if lo + tol < c && c < hi - tol {
+        BandRegion::Inside
+    } else if (c - lo).abs() <= tol || (c - hi).abs() <= tol {
+        BandRegion::Boundary
+    } else {
+        BandRegion::Outside
     }
 }
 
@@ -1874,9 +2255,28 @@ fn polygon_centroid(poly: &PolylineCurve<Point2>) -> Option<Point2> {
     Some(Point2::new(cx / (3.0 * area), cy / (3.0 * area)))
 }
 
+/// The `lo`/`hi` of the band coordinate (v = y) over all polygon points.
+fn band_v_extent(polys: &[PolylineCurve<Point2>]) -> (f64, f64) {
+    let mut lo = f64::INFINITY;
+    let mut hi = f64::NEG_INFINITY;
+    for poly in polys {
+        for pt in poly.iter() {
+            lo = lo.min(pt.y);
+            hi = hi.max(pt.y);
+        }
+    }
+    (lo, hi)
+}
+
 /// An interior representative point of the region, if one can be found: the
-/// outer centroid, else inward-nudged outer edge midpoints.
+/// outer centroid, else inward-nudged outer edge midpoints. A band-form
+/// carrier (RW-INTERIOR-LOOP) has no polygon interior; its representative is
+/// the mid-v point at u = 0.
 pub(crate) fn region_representative(polys: &[PolylineCurve<Point2>], tol: f64) -> Option<Point2> {
+    if band_form(polys, TAU, 0) {
+        let (lo, hi) = band_v_extent(polys);
+        return Some(Point2::new(0.0, (lo + hi) * 0.5));
+    }
     let outer = polys.first()?;
     let mut candidates: Vec<Point2> = Vec::new();
     if let Some(centroid) = polygon_centroid(outer) {
@@ -1909,6 +2309,29 @@ fn containment_screen(
     if wires_cross(a, b) {
         return RegionScreen::Crossing;
     }
+    // The band-form screen (RW-INTERIOR-LOOP): two full-period degenerate
+    // band carriers (the extrude-wall signature) relate by their v-extents;
+    // the polygon containment rule cannot see a degenerate band.
+    if band_form(a, TAU, 0) && band_form(b, TAU, 0) {
+        let (a_lo, a_hi) = band_v_extent(a);
+        let (b_lo, b_hi) = band_v_extent(b);
+        let a_in_b = a_lo >= b_lo - tol && a_hi <= b_hi + tol;
+        let b_in_a = b_lo >= a_lo - tol && b_hi <= a_hi + tol;
+        if a_in_b && b_in_a {
+            // Identical bands coincide: the first face contains the second.
+            return RegionScreen::AContainsB;
+        }
+        if a_in_b {
+            return RegionScreen::BContainsA;
+        }
+        if b_in_a {
+            return RegionScreen::AContainsB;
+        }
+        if a_hi <= b_lo || b_hi <= a_lo {
+            return RegionScreen::Disjoint;
+        }
+        return RegionScreen::PartialOverlap;
+    }
     let boundary_points = |polys: &[PolylineCurve<Point2>]| {
         let mut pts = Vec::new();
         for poly in polys {
@@ -1928,10 +2351,26 @@ fn containment_screen(
         (true, _) => RegionScreen::AContainsB,
         (_, true) => RegionScreen::BContainsA,
         (false, false) => {
-            let overlap = a_pts.iter().any(|p| region_contains(b, *p, None))
-                || b_pts.iter().any(|p| region_contains(a, *p, None))
-                || rep_a.is_some_and(|p| region_contains(b, p, None))
-                || rep_b.is_some_and(|p| region_contains(a, p, None));
+            // RW-INTERIOR-LOOP recombination: a boundary point of one region
+            // that lies ON the other's boundary is ambiguous (the coincident
+            // disk / annulus rim of a recombined result), and two regions that
+            // only TOUCH along a shared boundary are disjoint. An overlap probe
+            // must be strictly interior to the other region.
+            let on_boundary = |polys: &[PolylineCurve<Point2>], q: Point2| -> bool {
+                polys.iter().any(|poly| {
+                    poly.iter()
+                        .circular_tuple_windows()
+                        .any(|(c, d)| point_segment_distance(q, *c, *d) <= tol)
+                })
+            };
+            let overlap = a_pts
+                .iter()
+                .any(|p| region_contains(b, *p, None) && !on_boundary(b, *p))
+                || b_pts
+                    .iter()
+                    .any(|p| region_contains(a, *p, None) && !on_boundary(a, *p))
+                || rep_a.is_some_and(|p| region_contains(b, p, None) && !on_boundary(b, p))
+                || rep_b.is_some_and(|p| region_contains(a, p, None) && !on_boundary(a, p));
             if overlap {
                 RegionScreen::PartialOverlap
             } else {

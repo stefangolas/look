@@ -350,6 +350,27 @@ fn wire_orientation_sign(face: &Face<Point3, Curve, Surface>, tol: f64) -> Resul
         .ok_or_else(numerically_unresolved)?;
     let area = poly.area();
     if area == 0.0 {
+        // The band-form degeneracy (RW-INTERIOR-LOOP): a periodic carrier's
+        // full-period wire polygons have zero signed area, so the area rule
+        // cannot decide the orientation sign. A band-form face's region is the
+        // positive-v-span strip over the full period — always positive — so the
+        // sign reduces to the orientation flag.
+        let band = match face.surface().u_period() {
+            Some(period) => {
+                let mut all_polys = Vec::new();
+                for wire in face.boundaries() {
+                    all_polys.push(
+                        create_parameter_boundary(face, &wire, &mut cache, tol)
+                            .ok_or_else(numerically_unresolved)?,
+                    );
+                }
+                band_form(&all_polys, Some(period), 0)
+            }
+            None => false,
+        };
+        if band {
+            return Ok(if face.orientation() { 1.0 } else { -1.0 });
+        }
         return Err(numerically_unresolved());
     }
     Ok(if (area > 0.0) == face.orientation() {
