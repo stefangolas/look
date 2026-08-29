@@ -4,7 +4,7 @@ class: design
 crates: [truck-shapeops]
 write_allow:
   - vendor/truck/truck-shapeops/src/rewrite.rs
-  - vendor/truck/truck-shapeops/tests/fillet.rs
+  - vendor/truck/truck-shapeops/tests/fillet_pp.rs
 tests_required:
   - fillet_symmetric_box
   - fillet_two_independent_edges
@@ -228,7 +228,7 @@ BEFORE writing RESULT.json AT THE WORKTREE ROOT (that exact path — not
 cargo check --locked -p truck-shapeops
 cargo fmt --check -p truck-shapeops
 cargo test --locked -p truck-shapeops --lib
-cargo test --locked -p truck-shapeops --test fillet
+cargo test --locked -p truck-shapeops --test fillet_pp
 cargo test --locked -p truck-shapeops --test chamfer
 cargo test --locked -p truck-shapeops --test boolean_m2
 cargo test --locked -p truck-shapeops --test interior_loop
