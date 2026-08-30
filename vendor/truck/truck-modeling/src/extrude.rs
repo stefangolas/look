@@ -1802,9 +1802,13 @@ mod tests {
     }
 
     #[test]
-    fn oblique_circle_emits_placed_wall() {
-        // BG-CAD-P10-FRAMED: the pre-packet refusal flipped to emission — the
-        // oblique circle sweep assembles the affine-placed right cylinder.
+    fn oblique_circle_refuses_noncanonical() {
+        // BG-CAD-P10-FRAMED: the base tree refused the oblique circle sweep
+        // (`UnsupportedEnvelope(NonCanonicalCarrier)`); D3 deliberately
+        // flipped that refusal to emission — the oblique circle sweep now
+        // assembles the affine-placed right cylinder. The landed test
+        // identity is preserved (session-34 rule) with its assertions
+        // updated in place to the new contract.
         let (profile, arrangement) = disk_profile();
         let solid =
             extrude_profile_vector(&profile, &arrangement, Vector3::new(1.0, 0.0, 1.0), false)
