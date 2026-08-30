@@ -45,7 +45,7 @@ use crate::analytic::plane_plane::plane_plane;
 use crate::analytic::plane_sphere::plane_sphere;
 use crate::analytic::sphere_sphere::sphere_sphere;
 use crate::analytic::{AnalyticIntersection, AnalyticOutcome, ExactCurve};
-use crate::enclosure::{Box3, EnclosureSurface, Interval};
+use crate::enclosure::{interval_at, Box3, EnclosureSurface, Interval};
 use std::f64::consts::TAU;
 use truck_base::cgmath64::{EuclideanSpace, InnerSpace, Point3};
 use truck_base::contact::{ContactDimension, ContactEventKind};
@@ -56,7 +56,7 @@ use truck_base::evidence::{
 use truck_geometry::recognize::{
     CanonicalCarrier, CanonicalCarrierWitness, CanonicalCurve, CanonicalSurface,
 };
-use truck_geometry::specifieds::Plane;
+use truck_geometry::specifieds::{Plane, Torus};
 
 /// BG-SOL-S4-FE-EE: the FE (Edge × Face) and EE (Edge × Edge) strata reductions.
 ///
@@ -169,15 +169,18 @@ pub enum ContactLocus {
 ///    [`gff::cover_branch`] over the world box; a complete regular cover
 ///    becomes a [`ContactLocus::ValidatedBranchCover`] record, an empty one a
 ///    certified empty complex, a singular one a deferred refusal, and an
-///    unresolved one a typed `NumericallyUnresolved`.
+///    unresolved one a typed `NumericallyUnresolved`. Pairs involving a bare
+///    `Torus` ride the same validated composition over a torus-aware pre-split
+///    domain (BG-CAD-P11, [`torus_ff`]).
 /// 4. **Strata reductions** — an `Edge` × `Face` pair is answered by
 ///    [`fe_ee::fe_contact`] (order-insensitive: the `(Face, Edge)` order feeds
 ///    the same solver with the arguments normalized to `(edge, face)`), and an
 ///    `Edge` × `Edge` pair by [`fe_ee::ee_contact`]. The bounded locus forms
 ///    (`ContactLocus::Point`, `ContactLocus::BoundedCurve`) are emitted here.
 /// 5. **Everything else** — the deferred funnel (any pair involving a
-///    `Vertex`, FE/EE carrier families outside the landed tables, singular
-///    event cells, 2-D overlap) refuses with `ContactReductionDeferred`.
+///    `Vertex`, a `Placed` carrier, FE/EE carrier families outside the landed
+///    tables, singular event cells, 2-D overlap) refuses with
+///    `ContactReductionDeferred`.
 ///
 /// The exact and coaxial analytic pairs take no budget; the validated FF stage
 /// owns the caller's budget and reports spend as entry minus remaining.
@@ -396,9 +399,11 @@ fn coaxial_axes(axis0: Point3, axis1: Point3) -> bool {
 /// offset cylinder × cylinder cell is `parallel_cylinders`; the offset mixed
 /// quadric cells (Cylinder/Cone, Cylinder/Sphere, Cone/Cone, Cone/Sphere)
 /// are answered by the general validated FF stage
-/// (BG-SOL-S7-GFF-WIRE); `Torus` and `Placed` carriers, and any canonical
-/// analytic pair without an exact closed form in §3.3, fall through to the
-/// deferred funnel (`ContactReductionDeferred`). A numerically unresolved
+/// (BG-SOL-S7-GFF-WIRE); any pair involving a bare `Torus` is answered by the
+/// torus-aware validated FF stage (BG-CAD-P11, `torus_ff`); a `Placed`
+/// carrier, and any canonical analytic pair without an exact closed form in
+/// §3.3, falls through to the deferred funnel
+/// (`ContactReductionDeferred`). A numerically unresolved
 /// analytic arm is propagated as-is: it is a stop, not a guess. The dispatch
 /// predicate guarantees `CoaxialPair::validate` passes, so a
 /// `NonCanonicalCarrier` refusal from `coaxial` can only mean a bug and is
@@ -481,10 +486,40 @@ fn analytic_ff(
                 return validated_ff(a, b, u_range_l, v_range_l, u_range_r, v_range_r, budget);
             }
         }
-        (CanonicalSurface::Torus(_), _)
-        | (_, CanonicalSurface::Torus(_))
-        | (CanonicalSurface::Placed(_), _)
-        | (_, CanonicalSurface::Placed(_)) => {
+        (CanonicalSurface::Torus(a), CanonicalSurface::Plane(b)) => {
+            return torus_ff(a, b, u_range_l, v_range_l, u_range_r, v_range_r, budget);
+        }
+        (CanonicalSurface::Plane(a), CanonicalSurface::Torus(b)) => {
+            return torus_ff(b, a, u_range_r, v_range_r, u_range_l, v_range_l, budget);
+        }
+        (CanonicalSurface::Torus(a), CanonicalSurface::Cylinder(b)) => {
+            return torus_ff(a, b, u_range_l, v_range_l, u_range_r, v_range_r, budget);
+        }
+        (CanonicalSurface::Cylinder(a), CanonicalSurface::Torus(b)) => {
+            return torus_ff(b, a, u_range_r, v_range_r, u_range_l, v_range_l, budget);
+        }
+        (CanonicalSurface::Torus(a), CanonicalSurface::Cone(b)) => {
+            return torus_ff(a, b, u_range_l, v_range_l, u_range_r, v_range_r, budget);
+        }
+        (CanonicalSurface::Cone(a), CanonicalSurface::Torus(b)) => {
+            return torus_ff(b, a, u_range_r, v_range_r, u_range_l, v_range_l, budget);
+        }
+        (CanonicalSurface::Torus(a), CanonicalSurface::Sphere(b)) => {
+            return torus_ff(a, b, u_range_l, v_range_l, u_range_r, v_range_r, budget);
+        }
+        (CanonicalSurface::Sphere(a), CanonicalSurface::Torus(b)) => {
+            return torus_ff(b, a, u_range_r, v_range_r, u_range_l, v_range_l, budget);
+        }
+        (CanonicalSurface::Torus(_), CanonicalSurface::Torus(_)) => {
+            // A struct-unequal torus × torus pair (offset tube surfaces) is the
+            // booked follow-up beyond this packet's envelope (BG-CAD-P11
+            // D2/D3 boundary); the identical-carrier case is decided by the
+            // C0-C2 identity screen before this dispatch is reached.
+            return Err(Refusal::UnsupportedEnvelope(
+                EnvelopeCase::ContactReductionDeferred,
+            ));
+        }
+        (CanonicalSurface::Placed(_), _) | (_, CanonicalSurface::Placed(_)) => {
             return Err(Refusal::UnsupportedEnvelope(
                 EnvelopeCase::ContactReductionDeferred,
             ))
@@ -817,6 +852,294 @@ where
 /// resolution floor of `gff::cover_branch`: `tau = width / TAU_DIVISOR`
 /// (decision 3).
 const TAU_DIVISOR: f64 = 128.0;
+
+/// The torus-aware validated FF stage (BG-CAD-P11, D2/D3/D4): certify the
+/// regular crossings of a torus carrier and any other canonical carrier via
+/// the landed validated-FF composition over a torus-aware pre-split domain.
+///
+/// The sqrt-form torus field (D1) is regular on the whole surface for
+/// `0 < r < R` EXCEPT that its x/y gradient components vanish on the equator
+/// band `r̂ = R` (the probe's Finding 3) and its `r̂` divisions degenerate on
+/// the torus axis, so a one-shot `validated_ff` domain refuses for essentially
+/// every torus pair (a box straddling `r̂ = R` fails every chart at every
+/// depth). This stage therefore:
+///
+/// - **D4 lift** — refuses the degenerate carrier families (horn `r ≥ R`
+///   cusp / spindle self-intersections) before any certified work.
+/// - **Degenerate-axis widening** — the certified AABB intersection is
+///   degenerate on an axis-parallel carrier's normal coordinate; a crossing on
+///   a zero-width solver axis can never satisfy the Krawczyk strict-interior
+///   rule, so each degenerate axis is widened by the resolution floor,
+///   off-center so the certified plane never lands on the solver's dyadic
+///   bisection grid.
+/// - **D3 pre-split** — deterministic widest-axis bisection (ties toward the
+///   lowest axis index) until every leaf either proves empty, is clean (its
+///   torus `r̂`-range excludes both the equator ring and the axis), or hits
+///   the resolution floor still straddling one of the two sqrt-form singular
+///   loci — the honest typed outcome (Finding 3's band-grazing tangency
+///   family; test 5 pins it).
+/// - **Landed composition** — per clean leaf `gff::cover_branch` then
+///   `singular::singular_events`, merging into one `ValidatedBranchCover`
+///   record (the D3 factoring choice: the composition mirrors `validated_ff`'s
+///   post-domain tail rather than sharing a helper — recorded in RESULT).
+fn torus_ff<O>(
+    torus: &Torus,
+    other: &O,
+    torus_u: (f64, f64),
+    torus_v: (f64, f64),
+    other_u: (f64, f64),
+    other_v: (f64, f64),
+    budget: &mut Budget,
+) -> Outcome<ContactComplex>
+where
+    O: ImplicitField + EnclosureSurface,
+{
+    let initial = *budget;
+    // D4: the degenerate-family lift. Machine-checked from the landed quartic
+    // form (the derivation is in the packet's RESULT notes): the quartic's
+    // critical set is `{z' = 0, g = 2R²} ∪ {x' = y' = 0, g = 0}`. The first
+    // circle (`r̂² = R² + r²`) is strictly OFF the surface (`f = −4R²r²`), and
+    // the second (the torus axis) meets the surface exactly when `r ≥ R` —
+    // the horn cusp (`r = R`) and the spindle self-intersections (`r > R`),
+    // where `∇f = 0` on the surface and no certified contact work is possible.
+    // The doc's `r = R/2` inner-equator family is NOT a sqrt-form degeneracy
+    // (the probe certified the r = R/2 inner equator at exact radius `R − r`);
+    // the refusal is therefore `r ≥ R` only.
+    if torus.large_radius() <= torus.small_radius() {
+        return Err(Refusal::UnsupportedEnvelope(
+            EnvelopeCase::NonCanonicalCarrier,
+        ));
+    }
+    let lu = param_interval(torus_u)?;
+    let lv = param_interval(torus_v)?;
+    let ru = param_interval(other_u)?;
+    let rv = param_interval(other_v)?;
+    let lhs = torus.enclose(lu, lv);
+    let rhs = other.enclose(ru, rv);
+    // The certified AABBs intersected axiswise, exactly as `validated_ff` does;
+    // a separated axis proves empty contact.
+    let ix = (lhs.x.inf().max(rhs.x.inf()), lhs.x.sup().min(rhs.x.sup()));
+    let iy = (lhs.y.inf().max(rhs.y.inf()), lhs.y.sup().min(rhs.y.sup()));
+    let iz = (lhs.z.inf().max(rhs.z.inf()), lhs.z.sup().min(rhs.z.sup()));
+    if ix.0 > ix.1 || iy.0 > iy.1 || iz.0 > iz.1 {
+        return Ok(Certified::new(
+            ContactComplex {
+                contacts: Vec::new(),
+            },
+            Certificate {
+                props: PropMap::new(),
+                method: Method::Interval,
+                budget_left: *budget,
+                margin: Margin::UNBOUNDED,
+                modulus: Modulus::Unbounded,
+            },
+        ));
+    }
+    // No separated axis: the intersection is the world search box. Empty or
+    // non-finite enclosure data certifies neither separation nor contact.
+    if !well_formed_box(&lhs) || !well_formed_box(&rhs) {
+        return Err(Refusal::NumericallyUnresolved {
+            spent: budget_spent(&initial, budget),
+            witness: UnresolvedWitness::KrawczykIndeterminate,
+        });
+    }
+    let Some(domain) = intersect_boxes(&lhs, &rhs) else {
+        return Err(Refusal::NumericallyUnresolved {
+            spent: budget_spent(&initial, budget),
+            witness: UnresolvedWitness::KrawczykIndeterminate,
+        });
+    };
+    // Scale-relative resolution floor, exactly `validated_ff`'s.
+    let width = domain.width();
+    let tau = width / TAU_DIVISOR;
+    if !width.is_finite() || width <= 0.0 || !tau.is_finite() || tau <= 0.0 {
+        return Err(Refusal::NumericallyUnresolved {
+            spent: budget_spent(&initial, budget),
+            witness: UnresolvedWitness::KrawczykIndeterminate,
+        });
+    }
+    // The certified AABB intersection is degenerate on an axis-parallel
+    // carrier's normal coordinate (e.g. the plane z=0.25's z): a crossing on a
+    // zero-width solver axis can never be strictly interior, so each
+    // degenerate axis is widened by the resolution floor, offset off-center so
+    // the certified plane never lands on the solver's dyadic bisection grid (a
+    // crossing exactly on the grid cannot become strictly interior once a
+    // bisection is needed). Every certified point still satisfies both
+    // implicit equations, so the widened search stays sound.
+    let search = widen_degenerate_axes(&domain, tau);
+    // D3: the torus-aware pre-split. The sqrt-form singular loci are the
+    // equator band `r̂ = R` (the x/y gradient components vanish there) and the
+    // axis `r̂ = 0` (the `r̂` divisions), so a leaf is clean only when its
+    // `r̂`-range excludes both; otherwise it bisects until proven empty or at
+    // the resolution floor, where a still-straddling leaf refuses
+    // `ContactReductionDeferred` (Finding 3's tangency family).
+    let mut clean_leaves: Vec<Box3> = Vec::new();
+    let mut stack: Vec<Box3> = vec![search];
+    while let Some(leaf) = stack.pop() {
+        if excludes_zero(torus.implicit(&leaf)) || excludes_zero(other.implicit(&leaf)) {
+            continue;
+        }
+        let rhat = torus_rhat_range(torus, &leaf);
+        let band_clean = rhat.sup() < torus.large_radius() || rhat.inf() > torus.large_radius();
+        let axis_clean = rhat.inf() > 0.0;
+        if band_clean && axis_clean {
+            clean_leaves.push(leaf);
+            continue;
+        }
+        if leaf.width() <= tau {
+            return Err(Refusal::UnsupportedEnvelope(
+                EnvelopeCase::ContactReductionDeferred,
+            ));
+        }
+        let Some((lo, hi)) = bisect_box(&leaf) else {
+            return Err(Refusal::UnsupportedEnvelope(
+                EnvelopeCase::ContactReductionDeferred,
+            ));
+        };
+        budget
+            .spend_subdiv(1)
+            .map_err(|_| Refusal::NumericallyUnresolved {
+                spent: budget_spent(&initial, budget),
+                witness: UnresolvedWitness::KrawczykIndeterminate,
+            })?;
+        stack.push(lo);
+        stack.push(hi);
+    }
+    // Per clean leaf: the landed certified composition (cover then singular),
+    // merging the records into one `ValidatedBranchCover` locus (the D3
+    // factoring choice — `validated_ff`'s post-domain tail is mirrored here
+    // rather than factored into a shared helper).
+    let mut cover = gff::BranchCover::default();
+    let mut tangencies: Vec<Point3> = Vec::new();
+    for leaf in &clean_leaves {
+        let Certified { value: c, .. } = gff::cover_branch(torus, other, leaf, tau, budget)?;
+        cover.points.extend(c.points);
+        cover.unresolved_boxes.extend(c.unresolved_boxes);
+        if !c.singular_boxes.is_empty() {
+            let Certified { value: report, .. } =
+                singular::singular_events(torus, other, &c.singular_boxes, tau, budget)?;
+            let singular::SingularReport {
+                regular,
+                tangencies: t,
+                tangential_crossings,
+                degenerate,
+                residue,
+            } = report;
+            tangencies.extend(t);
+            cover.points.extend(regular.points);
+            cover.unresolved_boxes.extend(regular.unresolved_boxes);
+            if !residue.is_empty() || !tangential_crossings.is_empty() || !degenerate.is_empty() {
+                return Err(Refusal::UnsupportedEnvelope(
+                    EnvelopeCase::ContactReductionDeferred,
+                ));
+            }
+        }
+    }
+    if !cover.unresolved_boxes.is_empty() {
+        return Err(Refusal::NumericallyUnresolved {
+            spent: budget_spent(&initial, budget),
+            witness: UnresolvedWitness::KrawczykIndeterminate,
+        });
+    }
+    // The certified isolated tangencies first (discovery order), then the
+    // regular branch cover when it certified crossings. The certificate is the
+    // landed validated-FF shape: interval method, empty props, the actual
+    // remaining budget, unbounded margin/modulus.
+    let mut contacts: Vec<ContactRecord> = Vec::new();
+    for p in tangencies {
+        contacts.push(ContactRecord {
+            dimension: ContactDimension::Point0,
+            kind: ContactEventKind::Tangency,
+            locus: ContactLocus::Point(p),
+        });
+    }
+    if !cover.points.is_empty() {
+        contacts.push(ContactRecord {
+            dimension: ContactDimension::Arc1,
+            kind: ContactEventKind::Transverse,
+            locus: ContactLocus::ValidatedBranchCover(cover),
+        });
+    }
+    Ok(Certified::new(
+        ContactComplex { contacts },
+        Certificate {
+            props: PropMap::new(),
+            method: Method::Interval,
+            budget_left: *budget,
+            margin: Margin::UNBOUNDED,
+            modulus: Modulus::Unbounded,
+        },
+    ))
+}
+
+/// The interval enclosure of the torus's radial coordinate
+/// `r̂ = sqrt(x'² + y'²)` over the box, from the carrier's centered x/y
+/// intervals. The sqrt-form field (D1) evaluates `r̂` from this single
+/// interval, so the pre-split and the certification agree on the band/axis
+/// predicates.
+fn torus_rhat_range(torus: &Torus, p: &Box3) -> Interval {
+    let c = torus.center();
+    let dx = p.x - interval_at(c.x);
+    let dy = p.y - interval_at(c.y);
+    (dx.sqr() + dy.sqr()).sqrt()
+}
+
+/// Whether the interval lies strictly away from zero.
+fn excludes_zero(i: Interval) -> bool {
+    i.inf() > 0.0 || i.sup() < 0.0
+}
+
+/// Widen each degenerate axis of the certified AABB intersection by the
+/// resolution floor, offset off-center by `tau/3`. A symmetric window
+/// `[c − tau, c + tau]` puts the certified plane `c` exactly on the solver's
+/// dyadic bisection grid (its midpoint), where the Krawczyk strict-interior
+/// rule can never certify once a bisection is needed; the off-center window
+/// puts `c` at the relative position `(tau + tau/3) / (2·tau) = 2/3`, which is
+/// not a dyadic rational, so `c` is never on the grid.
+fn widen_degenerate_axes(b: &Box3, tau: f64) -> Box3 {
+    let widen = |i: Interval| {
+        if i.inf() == i.sup() {
+            let off = tau / 3.0;
+            Interval::try_from((i.inf() - tau - off, i.sup() + tau - off))
+                .unwrap_or(Interval::EMPTY)
+        } else {
+            i
+        }
+    };
+    Box3 {
+        x: widen(b.x),
+        y: widen(b.y),
+        z: widen(b.z),
+    }
+}
+
+/// Bisect a box on its widest axis (ties toward the lowest axis index) at the
+/// convex-combination midpoint, exactly the shape `krawczyk::push_children`
+/// and the singular stage use. `None` when the box cannot bisect in f64 (the
+/// midpoint rounds onto an edge).
+fn bisect_box(b: &Box3) -> Option<(Box3, Box3)> {
+    let wx = b.x.sup() - b.x.inf();
+    let wy = b.y.sup() - b.y.inf();
+    let wz = b.z.sup() - b.z.inf();
+    let (axis, a, s) = if wx >= wy && wx >= wz {
+        (0, b.x.inf(), b.x.sup())
+    } else if wy >= wz {
+        (1, b.y.inf(), b.y.sup())
+    } else {
+        (2, b.z.inf(), b.z.sup())
+    };
+    let mid = 0.5 * a + 0.5 * s;
+    if mid == a || mid == s {
+        return None;
+    }
+    let lo_iv = Interval::try_from((a, mid)).ok()?;
+    let hi_iv = Interval::try_from((mid, s)).ok()?;
+    match axis {
+        0 => Some((Box3 { x: lo_iv, ..*b }, Box3 { x: hi_iv, ..*b })),
+        1 => Some((Box3 { y: lo_iv, ..*b }, Box3 { y: hi_iv, ..*b })),
+        _ => Some((Box3 { z: lo_iv, ..*b }, Box3 { z: hi_iv, ..*b })),
+    }
+}
 
 /// A certified parameter interval from a face's stored `(f64, f64)` bounds.
 ///

@@ -237,66 +237,67 @@ impl ImplicitField for Cone {
 }
 
 impl ImplicitField for Torus {
-    /// The sqrt-free quartic form: with `g = |p−c|² + R² − r²` and
-    /// `h = x'² + y'²`, `f = g² − 4R²h` (all of `|p−c|²`, `R`, `r` positive).
+    /// The sqrt form `f = (r̂ − R)² + z'² − r²` with `r̂ = sqrt(x'² + y'²)`,
+    /// the SAME zero set as the sqrt-free quartic `f = g² − 4R²h` (on the
+    /// surface `g = 2R·r̂`), re-enclosed for the gradient's sake (D1 of
+    /// BG-CAD-P11): the quartic gradient `4g·x' − 8R²·x'` is two separate
+    /// interval products whose subtraction spans zero on any box straddling
+    /// the torus's own gradient sign structure (the probe's Finding 1 —
+    /// measured `[−14.3, 46.7]` where the true value is one-signed
+    /// `[1.74, 30.7]`), so `select_chart`'s 2×2 minors all contain zero and
+    /// the whole domain lands in `singular_boxes`. The sqrt form evaluates
+    /// `r̂ = sqrt(h)` ONCE, keeping the x/y gradient components one-signed on
+    /// band-clean boxes, and its gradient never vanishes on the surface for
+    /// `0 < r < R` (the equator band `r̂ = R` only zeroes the x/y components,
+    /// with `∂f/∂z = 2z' ≠ 0` there).
     fn implicit(&self, p: &Box3) -> Interval {
         let c = self.center();
         let dx = p.x - interval_at(c.x);
         let dy = p.y - interval_at(c.y);
         let dz = p.z - interval_at(c.z);
-        let r2 = interval_at(self.large_radius()).sqr();
-        let g = dx.sqr() + dy.sqr() + dz.sqr() + r2 - interval_at(self.small_radius()).sqr();
-        let h = dx.sqr() + dy.sqr();
-        g.sqr() - interval_at(4.0) * r2 * h
+        let rhat = (dx.sqr() + dy.sqr()).sqrt();
+        let rho = interval_at(self.small_radius());
+        (rhat - interval_at(self.large_radius())).sqr() + dz.sqr() - rho.sqr()
     }
 
-    /// `∇f = 2g·∇g − 4R²·∇h` with `∇g = 2(x', y', z')`, `∇h = (2x', 2y', 0)`.
+    /// `∇f = (2(r̂−R)·x'/r̂, 2(r̂−R)·y'/r̂, 2z')`, computed from the single
+    /// interval `r̂ = sqrt(x'² + y'²)`. This is the gradient of the sqrt form
+    /// above, so `f_point` and `jacobian` of the Krawczyk slab systems stay
+    /// consistent (a mixed quartic/sqrt pairing would certify nothing).
     fn grad(&self, p: &Box3) -> [Interval; 3] {
         let c = self.center();
         let two = interval_at(2.0);
         let dx = p.x - interval_at(c.x);
         let dy = p.y - interval_at(c.y);
         let dz = p.z - interval_at(c.z);
-        let r2 = interval_at(self.large_radius()).sqr();
-        let g = dx.sqr() + dy.sqr() + dz.sqr() + r2 - interval_at(self.small_radius()).sqr();
-        let scale = interval_at(4.0) * r2;
-        [
-            two * g * (two * dx) - scale * (two * dx),
-            two * g * (two * dy) - scale * (two * dy),
-            two * g * (two * dz) - scale * interval_at(0.0),
-        ]
+        let rhat = (dx.sqr() + dy.sqr()).sqrt();
+        let factor = two * (rhat - interval_at(self.large_radius()));
+        [factor * dx / rhat, factor * dy / rhat, two * dz]
     }
 
     fn regular_on(&self, p: &Box3) -> bool {
         self.grad(p).iter().any(|g| excludes_zero(*g))
     }
 
-    /// `Hess(f) = 2·∇g·∇gᵀ + 4g·I − 8R²·diag(1, 1, 0)` with `∇g = 2(x', y', z')`:
-    /// entry `[i][j] = 8·x'_i·x'_j + 4g·δ_ij − 8R²·δ_ij·[i<2]`, computed from
-    /// the interval enclosures of `g` and `x'_i` over the box.
+    /// The Hessian of the sqrt form. With `v = (x', y')` and `r̂ = sqrt(h)`:
+    /// `H_xy = 2·v vᵀ/r̂² + 2(r̂−R)·(I₂/r̂ − v vᵀ/r̂³)`, `H_zz = 2`,
+    /// `H_xz = H_yz = 0` — the exact second-derivative matrix of `f` (the
+    /// `z`-axis torus has no x/z or y/z cross terms).
     fn hess(&self, p: &Box3) -> [[Interval; 3]; 3] {
         let c = self.center();
+        let two = interval_at(2.0);
+        let one = interval_at(1.0);
+        let zero = interval_at(0.0);
         let dx = p.x - interval_at(c.x);
         let dy = p.y - interval_at(c.y);
-        let dz = p.z - interval_at(c.z);
-        let r2 = interval_at(self.large_radius()).sqr();
-        let g = dx.sqr() + dy.sqr() + dz.sqr() + r2 - interval_at(self.small_radius()).sqr();
-        let eight = interval_at(8.0);
-        let four_g = interval_at(4.0) * g;
-        let eight_r2 = eight * r2;
-        [
-            [
-                eight * dx.sqr() + four_g - eight_r2,
-                eight * dx * dy,
-                eight * dx * dz,
-            ],
-            [
-                eight * dy * dx,
-                eight * dy.sqr() + four_g - eight_r2,
-                eight * dy * dz,
-            ],
-            [eight * dz * dx, eight * dz * dy, eight * dz.sqr() + four_g],
-        ]
+        let rhat = (dx.sqr() + dy.sqr()).sqrt();
+        let rhat2 = rhat.sqr();
+        let rhat3 = rhat2 * rhat;
+        let rmr = rhat - interval_at(self.large_radius());
+        let hxx = two * dx.sqr() / rhat2 + two * rmr * (one / rhat - dx.sqr() / rhat3);
+        let hyy = two * dy.sqr() / rhat2 + two * rmr * (one / rhat - dy.sqr() / rhat3);
+        let hxy = two * dx * dy / rhat2 - two * rmr * dx * dy / rhat3;
+        [[hxx, hxy, zero], [hxy, hyy, zero], [zero, zero, two]]
     }
 
     /// The torus has no isolated on-surface degenerate points. (The
@@ -517,10 +518,14 @@ mod tests {
         let enc = cone.implicit(&Box3::point(Point3::origin()));
         assert!(enc.contains(0.0), "cone apex box: {enc:?}");
 
-        // Torus R=2 r=0.5: the center is outside the wall (f = 14.0625 > 0).
+        // Torus R=2 r=0.5: the center is outside the wall. Under the sqrt
+        // form (BG-CAD-P11 D1) the value is (r̂−R)² + z'² − r² = 4 − 0.25 =
+        // 3.75 (the sqrt-free quartic's 14.0625 is the g² = (3.75)² value of
+        // a DIFFERENT function with the same zero set — the form switch is
+        // recorded in the packet's RESULT notes).
         let torus = Torus::new(Point3::origin(), 2.0, 0.5);
         let enc = torus.implicit(&Box3::point(Point3::origin()));
-        assert!(enc.contains(14.0625), "torus at the center: {enc:?}");
+        assert!(enc.contains(3.75), "torus at the center: {enc:?}");
     }
 
     #[test]
