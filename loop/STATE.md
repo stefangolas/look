@@ -9,155 +9,217 @@ when they stop being true, never for length. If you are picking this up cold, re
 [`loop/ORCHESTRATOR.md`](ORCHESTRATOR.md) for how to run the loop, then
 `python loop/slot_status.py`** - nothing else. Do not read `LEDGER.jsonl` whole.
 
-Updated 2026-08-29, final close of session 41 (NINE packets landed:
-RW-INTERIOR-LOOP, BG-CAD-P4-UNTIL, BG-CAD-P5-REVOLVE, RW-RESEW,
-RW-DIVIDE-NESTING, **BG-CAD-P3-SPLIT**, BG-CAD-P6-REWRITE, BG-CAD-P7-FILLET,
-**BG-CAD-P11-TORUS**; the vertex-touch cut family booked as a v1 boundary;
-**Tier 2 OPEN**).
-Branch: `integration/kernel-bg`, HEAD `cddbf58`.
+Updated 2026-08-30, mid-session close of session 42 (TWO packets landed:
+**BG-CAD-P12-BLEND**, **BG-CAD-P9-CONJUGATION** - both first-try ACCEPTED;
+**BG-CAD-P10-FRAMED written and RUNNING** in slot 0; **BG-CAD-P8-FACADE
+packet WRITTEN, dispatch-ready** (anchor re-measure before dispatch); only
+P8 remains after P10).
+Branch: `integration/kernel-bg`, HEAD `51e343d` (P10 packet commit).
 
 ## Where we are
 
-**Session 41 landed NINE packets across two tiers and closed the entire P3
-blocker chain.**
+**Session 42 landed the P12+P9 parallel wave first-try on both lanes.**
 
-1. **RW-INTERIOR-LOOP** (amended `316b868`, ACCEPTED, merged `eb9722e`):
-   interior-loop division in `split.rs` — band-aware `classify_curve`
-   (periodic walls divide at interior rims), open-FF-line
-   re-parameterization, interior-chord loop assembly. The worker's D1
-   localization OVERTURNED the packet diagnosis (the splitter never
-   refused; it left the wall undivided and `Solid::try_new` refused).
-   8 tests; M2 battery unchanged.
-2. **BG-CAD-P4-UNTIL** (`c217e6e`, ACCEPTED first try, merged `190b984`):
-   `truck-modeling/src/until.rs` — `extrude_until` (parallel target rides
-   landed extrude at certified t·dir; oblique target = contact()-certified
-   termination lines + cap polygon in the target plane) + `project_profile`.
-   Worker caught a sign error in MY fixture plane. 9 tests.
-3. **BG-CAD-P5-REVOLVE** (`7287e16`, ACCEPTED first try, merged `9174881`):
-   `truck-modeling/src/revolve.rs` — `revolve_profile`, carriers per plan
-   table 6.2 (full turn = 4-face tube; partial = +2 planar caps);
-   axis-crossing/touch and circle profiles refuse. D6 recognition wiring
-   took the pre-made fallback (u/v roles crossed for
-   RevolutedCurve-of-Line; needs a new witness type — booked follow-up).
-   9 tests.
-4. **RW-RESEW** (amended twice to `a1e1156`, ACCEPTED, merged `53dba23`):
-   sew-completion pass — unconsumed FE seam records with exact carrier+range
-   identity UNIFY edge instances (direct wire rebuilds; `swap_edge_into_
-   wire` cannot cross solids — seam VERTEX substitution required).
-   Face-adjacent unions assemble. `no coplanar-face merging exists` —
-   butt-joins keep cosmetically-split faces (10 for two boxes); the
-   metamorphic is exact-BOX equality. 7 tests.
-5. **RW-DIVIDE-NESTING** (worker STOPPED at its write-set boundary, verify
-   ACCEPTED, merged `819fe9b`): `divide_one_face` negative-wire attachment
-   is now MINIMAL-CONTAINING (smallest-area strictly-containing region —
-   `PolylineCurve::include` is boundary-inclusive, so a doubled loop
-   attached to its own region without the strictness). Annulus (2-wire)
-   and two-hole (3-wire) sections assemble. The D2 half (vertex-touch
-   clipping) stopped at `assemble.rs:273` — outside its write set.
-   7 tests.
-6. **BG-CAD-P3-SPLIT** (amended twice to `89c8be1`, ACCEPTED, merged
-   `9257275`): `truck-shapeops/src/section.rs` — `split_by_plane` (two
-   boolean() calls against the constructed padded halfspace box) +
-   `section_faces` (cap extraction by exact plane identity). 10 tests.
-   The diagonal-plane test asserts the booked VERTEX-TOUCH BOUNDARY
-   (below); test 7's oblique-cylinder arm was machine-checked
-   (`NumericallyUnresolved(UncertifiedContainment)`, not
-   ContactReductionDeferred).
+1. **BG-CAD-P12-BLEND** (verified at `7f870c4`, ACCEPTED, merged `dbff8d8`):
+   table 6.4's Circle->Torus row on the rewrite engine - `fillet_circle`
+   with the `CircleFilletSpec` entry. The num3-scratch probe
+   (`scratch/torus_fillet_probe`) derived the Cylinder/Torus junction
+   geometry BEFORE any worker money: full-revolution faces carry TWO
+   boundary wires of self-loop circle edges (no seam generator edges);
+   junction circles are shared self-loop instances; coedge recipe =
+   wall-forward / torus-inverse / cap-pairs ("This shell is not oriented
+   and closed" is the wrong-pairing signature); s-rule torus center locus
+   (radius R-r at cap_z + s*r); washer multi-wire cap = the concave
+   refusal boundary; vertex-derived bboxes are MEANINGLESS for
+   circle-carrying solids (carrier-derived certificates only). 7 tests.
+2. **BG-CAD-P9-CONJUGATION** (verified at `155046d`, ACCEPTED, merged
+   `8bd38c6`): relative-frame canonicalization in the Contact dispatch -
+   the `(Placed, _)` arm normalizes instead of refusing; the
+   landed-but-unwired `equal_radius_cylinders` is REACHABLE for the first
+   time. World-pose extraction; parallel placed pairs fold with the W3
+   PARAMETER-MAP equivalence (`recon.subs(u+theta, s*v)` with the FULL-foot
+   carrier - the worker caught the packet's t_z box-map inconsistency);
+   non-parallel equal radii route to eqrcyl on WORLD poses (skew maps to
+   ContactReductionDeferred per plan section 7); unequal radii /
+   non-cylinder families / improper placements stay deferred. Metamorphic
+   contact(A,B) ~= contact(g*A, g*B) landed with 26-point machine checks.
+   8 tests; truck-evidence 303/303 at merged HEAD.
+3. **BG-CAD-P10-FRAMED** (packet `51e343d`, RUNNING slot 0 pid 4108):
+   rotate_solid + mirror_about_plane fold entries (cad.rs), the oblique
+   circle extrusion emitted as the affine-placed right cylinder
+   (extrude.rs refusal site flips to emission), and the
+   T(A op B) = T(A) op T(B) metamorphic battery (truck-shapeops tests -
+   modeling does NOT depend on shapeops, so the boolean battery lives
+   there). The oblique probe (`scratch/oblique_probe`) passed FIRST TRY:
+   the placed-affine wall (`Surface::Processor` over a right cylinder
+   sheared by dir) assembles with the landed wall-forward/top-inverse
+   pairing; sheared subs = swept points exactly. Probe discipline now
+   **5-for-5** (chamfer, fillet, torus, conjugation, oblique).
+4. **BG-CAD-P8-FACADE** packet WRITTEN (`loop/packets/BG-CAD-P8-FACADE.md`,
+   not yet committed): facade at `truck-shapeops/src/facade.rs` (the only
+   crate reaching everything; modeling cannot host the boolean facade),
+   the D2 naming table (Mode/BlendSpec enums + one-line compositions),
+   and the conformance battery. Its consumability probe
+   (`scratch/p8_consumability_probe`) PASSED with THREE findings:
+   (a) every generated carrier tessellates Closed through the landed
+   `MeshableShape::triangulation(0.01)` + `put_together_same_attrs` -
+   INCLUDING the P12 torus-fillet solid and the placed-cylinder solid;
+   (b) the oblique sheared wall meshes with condition REGULAR, not Closed
+   (the measured boundary the battery books); (c) tessellating
+   circle-carrying solids PANICS in debug builds (the self-loop
+   constructor trap) - the battery's tessellation rows are
+   `#[cfg(not(debug_assertions))]`-gated. The P8 yaml anchors carry
+   pre-P10 values and are MARKED re-measure-at-dispatch.
 
-7. **BG-CAD-P6-REWRITE** (merged `5d8ff06`, **ACCEPTED FIRST TRY — zero
-   round trips**): `truck-shapeops/src/rewrite.rs` — the
-   LocalBoundaryRewrite engine proven on PP chamfer. The mandatory
-   pre-dispatch probe (4 witnesses, `scratch/chamfer_probe`) converted the
-   program's highest-risk packet into its cleanest landing. 9 tests.
-8. **BG-CAD-P7-FILLET** (merged `1ef93ce`): F1 PP fillet (quarter-cylinder
-   realization, arc-carrying caps via the landed revolve arc recipe) + F4
-   three-plane corner sphere — the worker machine-checked the Sphere frame
-   (u polar, v azimuthal; the pole a regular wire vertex). 8 tests.
-9. **BG-CAD-P11-TORUS** (merged `cddbf58`, **ACCEPTED FIRST TRY**): torus
-   FF pairs through the landed validated-FF stage. THE PROBE FOUND THE
-   REAL BLOCKER: the landed quartic `Torus::grad`'s interval dependency
-   (4g·x' − 8R²x' as separate products spans zero) killed every chart;
-   the sqrt-form re-enclosure (same f, tight components) certifies
-   perfectly. The equator band r̂=R is chart-degenerate at every scale —
-   the arm pre-splits the domain along the band; band-grazing cuts
-   refuse. The worker also overturned the landed doc's r=R/2 degeneracy
-   claim (certified the inner equator at exact radius) and booked r ≥ R as
-   the true degenerate family. 7 tests; truck-evidence lib 303/303.
-
-Progress: **Tier 0: 7 of 8 LANDED** (P1-P7; only P8 facade+battery
-remains) **+ 3 Boundary-Rewrite funnel packets + Tier 2 OPEN** (P11
-landed). Remaining: P8, P9, P10, P12.
-
-## The session's two design outputs
-
-1. **The vertex-touch boundary** (P3's diagonal fixture): four kernel
-   decisions the v1 envelope does not make (canonical-vertex splicing,
-   seam-edge replacement, per-face arc certification, Region2
-   coplanar-adjacent) — full instrumented diagnosis in the plan's
-   deferred list; the typed refusal asserted (P3 test 3); the follow-up
-   family's design input complete.
-2. **The torus findings** (the P11 probe): the quartic-grad dependency
-   fix, the equator-band chart degeneracy, and the spurious
-   singular-stage points on band boxes (a potential landed-stage defect
-   recorded for the stage's owner; unreachable through the v1 entry's
-   pre-split).
+Progress: **Tier 0: 7 of 8 LANDED** (P1-P7; P8 facade+battery packet
+ready) **+ Tier 1: P9 LANDED, P10 in flight + Tier 2: P11+P12 LANDED -
+Tier 2 CLOSED.** Remaining: P10 (running), then P8 (dispatch last).
 
 ## Pick up here
 
-1. **Next frontier: P12 + P9 as the next parallel wave, then P10, then
-   P8.** P12 (blend realization F2/F3 + revolve circle edges) rides P11's
-   torus pairs + the landed P6/P7 engine — its torus-realization geometry
-   (Cylinder/Torus junctions) should get a num3-scratch probe first (the
-   3-for-3 probe discipline). P9 (conjugation) touches the hot
-   `contact/mod.rs` dispatcher — serialize against other contact work
-   (P11 just landed there; P12 is rewrite.rs-adjacent, disjoint ✓). P8
-   (facade + conformance battery) goes last — it batteries everything.
-2. **Model policy: default worker is `deepseek/deepseek-v4-flash`** (owner
-   directive). Session 41: nine worker runs, all deepseek, every stop
-   correct per the packet's stop conditions, every machine-derived
-   deviation consistent with the tree. The probe discipline is 3-for-3:
-   chamfer, fillet, and torus probes each converted their packet's risk
-   into first-try or near-first-try landings.
-3. The dyadic-exactness domain of the landed `arrange` still bounds every
+1. **P10 in flight** (slot 0, packet `loop/packets/BG-CAD-P10-FRAMED.md`,
+   base `51e343d`). When it finishes: verify with `--base 51e343d`,
+   adjudicate, merge (`--no-ff`), file the RESULT, ledger row, PACKETS
+   row. Watch its stop conditions - the fold interiors
+   (`fold_solid`/`certify_carriers`) must NOT be patched; a refusal there
+   is a SPEC_GAP. After merging, run both crates' tests at merged HEAD
+   (the session-37 law; P10 touches cad.rs/extrude.rs which P8's probe
+   fixtures exercise).
+2. **Then P8**: re-measure the P8 packet's anchor table against the
+   post-P10 root (the table is MARKED; correct it by command), commit the
+   packet file, new_slot, dispatch. It is the LAST packet of the coverage
+   program; after it lands the program closes (booked follow-ups remain:
+   vertex-touch family, sheared funnel admission, arbitrary-axis revolve,
+   F3 chains, the fillet.rs upstream failure fix).
+3. **Model policy: default worker is `deepseek/deepseek-v4-flash`**
+   (`run_packet.py:229`; owner directive - NOTE the coverage plan section
+   11 still says glm, that line is STALE). Session 42 so far: three
+   dispatches, two first-try landings, one in flight; zero verify round
+   trips.
+4. The dyadic-exactness domain of the landed `arrange` still bounds every
    offset-based construction; machine-check fixture crossing parameters.
-   Also: `translate_solid` panics in debug on circle-carrying solids (the
-   `Mapped` self-loop trap) — hand-build or place-at-construct fixtures.
-4. Open environmental, do NOT chase: `truck-shapeops` lib
-   `healing::tests::step_import` (STEP fixtures absent from the checkout;
-   fails at base, V5 knows); clippy deny-lints in untouched
-   truck-meshalgo/truck-stepio (Rust 1.97 toolchain drift, pre-existing);
-   `truck-base/tests/newton.rs::test_newton1` (latent flake).
+   Also: `translate_solid`/`mirror_solid` panics in debug on
+   circle-carrying solids (the `Mapped` self-loop trap; re-measured this
+   session via the mesh path) - release-gate any test that transforms or
+   tessellates circle-carrying solids.
+5. Open environmental, do NOT chase: `truck-shapeops` lib
+   `healing::tests::step_import` (fails at base, V5 knows);
+   `truck-shapeops --test fillet::complex_surface` (upstream fillet suite
+   - NEW pre-existing failure, fails at base `92c9ae5` identically
+   ("Oriented" vs "Closed" at fillet.rs:412); broke during session 41
+   after its verify, machine-checked this session; not in any packet's
+   done-when list, which is why nothing caught it; a fix packet is
+   bookable); clippy deny-lints in untouched truck-meshalgo/truck-stepio
+   (99 findings, pre-existing); `truck-base/tests/newton.rs::test_newton1`
+   (latent flake).
 
 ## State of the machine, as left
 
-- Watchdog RUNNING (`loop/watchdog.lock`, pid 49420,
-  `LOOK_WATCHDOG_STAGNANT=3600`). CAUTION: it misfired once this session
-  (session-41 traps, item 1) — check `loop/watchdog.log` tail for ACTION
-  lines before dispatching into any slot.
-- Registry: 129 rows = 128 DONE + 1 BLOCKED (`BG-AUD-FIX-004`, old audit
-  row); 0 READY — P8/P9/P10/P12 packets must be written before anything
-  dispatches.
-- Slots 0-3: FINISHED/landed branches, re-fork via new_slot.
-- Disk ~12.8 GB free at close (slot targets reclaimed post-verify; they
-  regenerate).
-- GATE-4 ceiling 111 = true count; no new unscaled_legacy sites landed.
-- Results filed this session: `loop/results/RW-INTERIOR-LOOP.json`,
-  `BG-CAD-P4-UNTIL.json`, `BG-CAD-P5-REVOLVE.json`, `RW-RESEW.json`,
-  `BG-CAD-P3-SPLIT.SPEC_GAP2.json`, `RW-DIVIDE-NESTING.json`,
-  `RW-VERTEX-CLIP.STOP-r1.json`, `RW-VERTEX-CLIP.STOP-r2.json`,
-  `RW-SEED-DIAGONAL.STOP.json`, `BG-CAD-P3-SPLIT.json`,
-  `BG-CAD-P6-REWRITE.json`, `BG-CAD-P7-FILLET.json`,
-  `BG-CAD-P11-TORUS.json`.
-- Root tracked tree clean apart from this STATE rewrite.
+- Watchdog RUNNING (`loop/watchdog.lock`, `LOOK_WATCHDOG_STAGNANT=3600`).
+  Check `loop/watchdog.log` tail for ACTION lines before dispatching into
+  any slot (session-41 misfire trap).
+- Registry: 131 rows = 130 DONE + 1 BLOCKED (`BG-AUD-FIX-004`); 0 READY.
+  P8/P10 rows append at dispatch/landing.
+- Slots 1-3: FINISHED/landed branches (P9, P0-SPAN, P4), re-fork via
+  new_slot. Slot 0: P10 in flight.
+- Disk 18.4 GB free at the P10 dispatch (repo-root target/ reclaimed
+  post-merged-HEAD tests; it regenerates; probe targets deleted after
+  each probe per the disk rules).
+- Results filed this session: `loop/results/BG-CAD-P12-BLEND.json`,
+  `BG-CAD-P9-CONJUGATION.json`.
+- LOC ledger (derived by command, `git diff --shortstat da72cd5..HEAD --
+  vendor/truck`): **+68,227 / -1,553** across 179 files; by crate:
+  evidence +32,016, shapeops +14,986, geometry +6,646, modeling +6,363,
+  topology +4,954, base +2,179.
 
 ## The parallelism picture
 
-Nothing running. Next wave: P12 + P9 (write-disjoint, parallel-eligible),
-P8 after. Verify-disk rules stand: reclaim slot targets (BOTH the outer
-and the wt-internal one) before any verify; the V9 look baseline needs
-~7 GB headroom.
+P10 running alone (slot 0). After it lands: P8 (serial, batteries
+everything; packet ready). Verify-disk rules stand: reclaim slot targets
+(BOTH the outer and the wt-internal one) before any verify; same-base
+verifies run sequentially.
 
 ## Traps, each one paid for
+
+### Session 42 (P12+P9 parallel wave first-try; probe discipline 5-for-5) - paid in full
+
+- **A packet's two interlocking formulas must be derived TOGETHER.** The
+  P9 packet gave the fold's carrier reconstruction (full-foot
+  `Cylinder::new((foot.x, foot.y, foot.z), r')`) AND a v-box map
+  `v' = v*s + t_z` - mutually inconsistent (the W3 subs identity
+  `m*cyl.subs(u,v) == recon.subs(u+theta, s*v)` pins `v' = s*v` with the
+  full-foot carrier). The worker caught it with a derivation. Every
+  parameter-map formula in a packet must be machine-checked against the
+  same subs identity it is paired with, before dispatch.
+- **Interval sqrt of construction magnitudes FALSELY straddles.** The P9
+  worker found inari's outward-rounded interval products widen
+  genuinely-equal rotation columns to [1.0, 1.0000000000000002], so the
+  three-way comparator returns None (undecidable) and a VALID similarity
+  would refuse. The honest fix: extract the magnitude as plain f64, wrap
+  it in a degenerate interval, decide with the three-way discipline. The
+  predicate discipline (never naked f64 comparisons on GEOMETRIC
+  predicates) is about the DECISION, not the extraction.
+- **Every shared self-loop circle edge must appear with OPPOSITE
+  orientations in its two faces.** The P12 probe's W3 fixture initially
+  used the wall's top circle forward in BOTH the wall and the cap - all
+  four torus-direction combos then refused with exactly "This shell is
+  not oriented and closed", which looked like a geometry refusal but was
+  a fixture bug. When a try_new orientation refusal is
+  direction-combo-independent, suspect a FIXED pairing outside the varied
+  set.
+- **A full-ring patch's contact answer contains BOTH closed-form
+  branches.** The P12 P11-ride witness plane cuts the torus patch
+  mid-tube; the certified answer includes the INNER branch circle because
+  the patch's world box contains its positions (the landed torus_pairs
+  two-circle shape). A test asserting the outer branch only will FAIL on
+  valid output - assert both branches or filter.
+- **Vertex-derived bboxes are MEANINGLESS for circle-carrying solids** -
+  the only vertices are self-loop seam vertices; extremes live on the
+  circle carriers. The P6/P7 bbox-exact certificate pattern does NOT
+  transfer to circle/torus-carrying solids; certificates must be
+  carrier-derived.
+- **Tessellating circle-carrying solids PANICS in debug builds** (the
+  self-loop constructor trap, one layer up again): the P8 probe's mesh
+  path hit "Two same vertices cannot construct an edge" on the plain
+  CYLINDER control in debug; release meshes everything Closed. Any test
+  that tessellates (or transforms, per the session-40 trap) circle- or
+  torus-carrying solids must be `#[cfg(not(debug_assertions))]`-gated or
+  release-only.
+- **The upstream `tests/fillet.rs` suite now has a pre-existing failure**
+  (`complex_surface`, "Oriented" vs "Closed" at fillet.rs:412): fails
+  IDENTICALLY at base `92c9ae5` (machine-checked via a throwaway worktree
+  at the fork point) - it broke during session 41 after that session's
+  verify. Root cause is not any session-42 packet's; it survived because
+  the upstream suite is in NO packet's done-when list. Recorded as
+  environmental; a fix packet for the fillet.rs owner is bookable.
+- **The parallel-landing merged-HEAD check is still law** (session-37):
+  after merging P12+P9, `cargo test --tests --no-fail-fast` on BOTH
+  crates at merged HEAD - P12's tests drive `contact()` which P9 changed;
+  all green (the only failures were the two pre-existing ones).
+  `--no-fail-fast` is REQUIRED (cargo stops at the first failing binary -
+  the session-34 V5 rule, re-hit in the shell).
+- **`rg` is not on PATH in this shell** - use the Grep tool or
+  Select-String; the session's anchor re-derivation initially died on it.
+- **The inline `-replace` rule was re-hit** (a multi-regex
+  `(Get-Content) -replace | Set-Content` partially damaged a probe file;
+  cargo caught the residue). The rule stands: edits go through the Edit
+  tool or a script FILE, always. Same lesson at STATE scale: this
+  volatile-section rewrite is spliced BY LINE NUMBER from a script file,
+  because a 150-line Edit oldString reconstruction failed on invisible
+  whitespace drift.
+- **cgmath rotation composition carries a ~6.1e-17 residue** on the
+  rotated axis components (cos(pi/2) != 0 exactly) - the P9 worker
+  recorded it; fixture assertions on axis directions use a residual, not
+  exact equality.
+- **`git worktree add <path> <sha>` + `cargo --manifest-path` is the
+  working recipe for a base-failure check** - but copy the path EXACTLY
+  (the first attempt died on a dropped path segment). Remove the worktree
+  after (`git worktree remove --force`).
+- **A `Certified<T>` return can hide behind an error-recovery type
+  mismatch**: the P8 probe's `arrange()` returns `Certified<Arrangement>`;
+  a wrong return-type annotation made the compiler report BOTH a phantom
+  E0609 (field `value` on the unwrapped type) AND the real E0308. Fix the
+  declared type first; the phantom errors follow.
 
 ### Session 41 (four packets land; P3 blocker chain turned twice; watchdog misfire) - paid in full
 
