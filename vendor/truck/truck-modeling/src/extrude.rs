@@ -23,12 +23,13 @@
 //! `extrude_profile_taper` (height + draft) delegate to it, and the landed
 //! scalar entry is the degenerate interval `[0, height·ẑ]`. Every emitted
 //! carrier stays in the canonical set: line edges sweep to canonical `Plane`s
-//! in ANY sweep direction, circle edges sweep to canonical `Cylinder`s only
-//! for z-parallel sweeps (an oblique sweep of a circle edge is refused as
-//! `NonCanonicalCarrier` — an oblique cylinder is a `Placed` carrier, Tier
-//! 1's unlock), and a taper offsets the profile curves and re-arranges them
-//! (the parsimony move — the top cap is never hand-constructed), turning
-//! circle walls into z-aligned `Cone`s.
+//! in ANY sweep direction, circle edges sweep to canonical `Cylinder`s for
+//! z-parallel sweeps and — since BG-CAD-P10-FRAMED — to the affine-PLACED
+//! right cylinder for an oblique sweep (`Surface::Processor` of a bare
+//! cylinder under the shear columns `(x̂, ŷ, dir)`, a `Placed` canonical
+//! carrier, the W2 structure), and a taper offsets the profile curves and
+//! re-arranges them (the parsimony move — the top cap is never
+//! hand-constructed), turning circle walls into z-aligned `Cone`s.
 //!
 //! v1 scope: exactly one material region (bounded, `winding == 1`, not
 //! strictly inside another bounded `winding == 1` region's boundary cycle);
@@ -45,8 +46,8 @@
 )]
 
 use crate::{
-    Cone, Curve, Cylinder, Edge, Face, Homogeneous, InnerSpace, Line, Plane, Point2, Point3,
-    Processor, Shell, Solid, Surface, Vector3, Vertex, Wire, TOLERANCE,
+    Cone, Curve, Cylinder, Edge, Face, Homogeneous, InnerSpace, Line, Matrix4, Plane, Point2,
+    Point3, Processor, Shell, Solid, Surface, Vector3, Vector4, Vertex, Wire, TOLERANCE,
 };
 use std::collections::HashMap;
 use std::f64::consts::FRAC_PI_2;
@@ -91,9 +92,9 @@ pub fn extrude_profile(
 ///   profile swept within its own plane has zero volume.
 /// - `both == false` spans the interval `[0, dir]`; `both == true` spans
 ///   `[−dir, +dir]` — the same amount each way.
-/// - A circle boundary edge with a non-z-parallel `dir` refuses
-///   `UnsupportedEnvelope(NonCanonicalCarrier)`: the wall would be an
-///   oblique cylinder, a `Placed` carrier outside the canonical set.
+/// - A circle boundary edge with a non-z-parallel `dir` emits the
+///   affine-placed right cylinder wall (the `Placed` canonical carrier of
+///   BG-CAD-P10-FRAMED): the bare cylinder sheared by the sweep columns.
 pub fn extrude_profile_vector(
     profile: &[Curve],
     arrangement: &Arrangement,
@@ -235,18 +236,10 @@ fn extrude_interval(
         }
     }
 
-    // A circle boundary edge swept obliquely is an oblique cylinder — a
-    // `Placed` carrier, Tier 1's unlock, not ours (D1).
-    if sweep.x != 0.0 || sweep.y != 0.0 {
-        for curve_idx in roles.keys() {
-            if matches!(profile.get(*curve_idx), Some(Curve::Circle(_))) {
-                return Err(Refusal::UnsupportedEnvelope(
-                    EnvelopeCase::NonCanonicalCarrier,
-                ));
-            }
-        }
-    }
-
+    // BG-CAD-P10-FRAMED: a circle boundary edge swept obliquely is no longer
+    // refused — the wall below emits the affine-placed right cylinder (the
+    // probe's W2 structure). The profile is Line/Circle-only (`arrange`'s
+    // envelope), so no non-circle curved edge can reach the construction.
     // The top profile: the identity for a neutral draft; otherwise the
     // signed 2-D offset, re-arranged (D4 — the top cap is never
     // hand-constructed).
@@ -643,18 +636,48 @@ fn extrude_interval(
                 // containment role: the outer cycle's wall carries the
                 // carrier's natural outward normal (stored UNINVERTED), the
                 // hole's wall is stored INVERTED. The carrier is a canonical
-                // `Cylinder` for a neutral draft, a canonical z-aligned
-                // `Cone` (apex on the axis, derived from the bottom circle
-                // and the offset top circle) for a draft.
+                // `Cylinder` for a z-parallel neutral draft, the
+                // affine-placed right cylinder (`Surface::Processor` of a
+                // bare cylinder under the sweep shear, the P10 W2 structure)
+                // for an oblique neutral draft, a canonical z-aligned `Cone`
+                // (apex on the axis, derived from the bottom circle and the
+                // offset top circle) for a draft.
                 Some(Curve::Circle(p)) => {
                     let center = p.transform().w.to_point() + base;
                     let radius = p.transform().x.magnitude();
                     let surface = if d == 0.0 {
-                        let cylinder = match Cylinder::new(center, radius) {
-                            Ok(c) => c.value,
-                            Err(_) => return Err(Refusal::Empty),
-                        };
-                        Surface::Cylinder(cylinder)
+                        if sweep.x != 0.0 || sweep.y != 0.0 {
+                            // BG-CAD-P10-FRAMED: the oblique circle wall is the
+                            // affine-placed right cylinder — the probe's W2
+                            // structure. The bare cylinder at the origin with
+                            // the profile radius is sheared by the sweep
+                            // columns `(x̂, ŷ, sweep)` with the bottom-cap
+                            // circle's center in `w`; every evaluation
+                            // composes the shear exactly (the `Processor`
+                            // rule), so `wall.subs(u, v)` interpolates the
+                            // bottom junction circle (v = 0) onto the top
+                            // junction circle (v = 1).
+                            let right = match Cylinder::new(Point3::new(0.0, 0.0, 0.0), radius) {
+                                Ok(c) => c.value,
+                                Err(_) => return Err(Refusal::Empty),
+                            };
+                            let shear = Matrix4 {
+                                x: Vector4::new(1.0, 0.0, 0.0, 0.0),
+                                y: Vector4::new(0.0, 1.0, 0.0, 0.0),
+                                z: Vector4::new(sweep.x, sweep.y, sweep.z, 0.0),
+                                w: Vector4::new(center.x, center.y, center.z, 1.0),
+                            };
+                            Surface::Processor(Processor::with_transform(
+                                Box::new(Surface::Cylinder(right)),
+                                shear,
+                            ))
+                        } else {
+                            let cylinder = match Cylinder::new(center, radius) {
+                                Ok(c) => c.value,
+                                Err(_) => return Err(Refusal::Empty),
+                            };
+                            Surface::Cylinder(cylinder)
+                        }
                     } else {
                         let top_radius = match top_profile.get(he_i.curve) {
                             Some(Curve::Circle(q)) => q.transform().x.magnitude(),
@@ -1779,15 +1802,26 @@ mod tests {
     }
 
     #[test]
-    fn oblique_circle_refuses_noncanonical() {
+    fn oblique_circle_emits_placed_wall() {
+        // BG-CAD-P10-FRAMED: the pre-packet refusal flipped to emission — the
+        // oblique circle sweep assembles the affine-placed right cylinder.
         let (profile, arrangement) = disk_profile();
-        let err =
+        let solid =
             extrude_profile_vector(&profile, &arrangement, Vector3::new(1.0, 0.0, 1.0), false)
-                .unwrap_err();
-        assert!(matches!(
-            err,
-            Refusal::UnsupportedEnvelope(EnvelopeCase::NonCanonicalCarrier)
-        ));
+                .unwrap()
+                .value;
+        assert_eq!(solid.face_iter().count(), 3);
+        let mut placed = 0usize;
+        for face in solid.face_iter() {
+            if matches!(face.surface(), Surface::Processor(_)) {
+                placed += 1;
+            }
+        }
+        assert_eq!(
+            placed, 1,
+            "the oblique circle wall is the placed affine cylinder"
+        );
+        assert_shell_closes(&solid);
     }
 
     #[test]

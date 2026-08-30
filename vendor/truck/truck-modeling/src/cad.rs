@@ -6,7 +6,8 @@
 //! - [`solid_bounding_box`] — the certified axis-aligned box, derived
 //!   per-face over canonical carriers;
 //! - the similarity fold — [`translate_solid`], [`uniform_scale_solid`],
-//!   [`mirror_solid`] — one affine map applied over the whole `Vertex`→
+//!   [`mirror_solid`], and the P10 general entries [`rotate_solid`],
+//!   [`mirror_about_plane`] — one affine map applied over the whole `Vertex`→
 //!   `Solid` chain by the landed `Mapped` impls;
 //! - [`make_face`] — planar face construction on z = 0 from the landed
 //!   arrangement's material regions (build123d semantics: one face per
@@ -29,9 +30,9 @@
 )]
 
 use crate::{
-    BoundingBox, Curve, Edge, InnerSpace, Line, Mapped, Matrix4, Plane, Point2, Point3, Processor,
-    SquareMatrix, Surface, Transform, TrimmedCurve, UnitCircle, Vector3, Vector4, Vertex, Wire,
-    TOLERANCE,
+    BoundingBox, Curve, Edge, EuclideanSpace, InnerSpace, Line, Mapped, Matrix4, Plane, Point2,
+    Point3, Processor, Rad, SquareMatrix, Surface, Transform, TrimmedCurve, UnitCircle, Vector3,
+    Vector4, Vertex, Wire, TOLERANCE,
 };
 use std::collections::HashMap;
 use truck_base::evidence::{
@@ -361,6 +362,84 @@ fn axis_aligned_normal(n: Vector3) -> Option<usize> {
     } else {
         None
     }
+}
+
+/// Rotates `solid` about the axis through `axis_point` with direction
+/// `axis_dir` (need not be unit; normalized internally) by `angle` radians.
+/// The similarity fold with the rigid rotation matrix.
+///
+/// The rigid rotation `R` is the Rodrigues form about the normalized axis,
+/// composed as one matrix: translate the axis point to the origin, rotate,
+/// translate back. The fold's emission rule (BG-CE-006-r2) applies
+/// unchanged: planes carry bare under any affine map, curved analytic
+/// carriers place under a non-identity linear part. A zero-length `axis_dir`
+/// or a non-finite `angle` refuses `Refusal::Empty`.
+pub fn rotate_solid(
+    solid: &Solid<Point3, Curve, Surface>,
+    axis_point: Point3,
+    axis_dir: Vector3,
+    angle: f64,
+) -> Outcome<Solid<Point3, Curve, Surface>> {
+    if !angle.is_finite() {
+        return Err(Refusal::Empty);
+    }
+    let len = axis_dir.magnitude();
+    if !len.is_finite() || len == 0.0 {
+        return Err(Refusal::Empty);
+    }
+    let axis = axis_dir / len;
+    let rotation = Matrix4::from_axis_angle(axis, Rad(angle));
+    let mat = Matrix4::from_translation(axis_point.to_vec())
+        * rotation
+        * Matrix4::from_translation(-axis_point.to_vec());
+    fold_solid(solid, SimilarityFold { mat })
+}
+
+/// Mirrors `solid` about the plane through `plane_point` with normal
+/// `plane_normal` (need not be unit; normalized internally). The fold with
+/// the Householder reflection `I - 2nn^T` composed with the translation;
+/// det < 0 exactly like the landed axis-aligned mirror.
+///
+/// The reflection is the exact form `I - 2nn^T / (n·n)` — for a unit normal
+/// this is `I - 2nn^T`, and the un-normalized form only needs the dot `n·n`
+/// (no square root), so a dyadic normal like (1, 1, 0) with `n·n = 2` keeps
+/// the whole matrix exactly dyadic. A zero-length normal refuses
+/// `Refusal::Empty`.
+pub fn mirror_about_plane(
+    solid: &Solid<Point3, Curve, Surface>,
+    plane_point: Point3,
+    plane_normal: Vector3,
+) -> Outcome<Solid<Point3, Curve, Surface>> {
+    let nn = plane_normal.dot(plane_normal);
+    if !nn.is_finite() || nn == 0.0 {
+        return Err(Refusal::Empty);
+    }
+    let two_over_nn = 2.0 / nn;
+    let reflection = Matrix4 {
+        x: Vector4::new(
+            1.0 - two_over_nn * plane_normal.x * plane_normal.x,
+            -two_over_nn * plane_normal.y * plane_normal.x,
+            -two_over_nn * plane_normal.z * plane_normal.x,
+            0.0,
+        ),
+        y: Vector4::new(
+            -two_over_nn * plane_normal.x * plane_normal.y,
+            1.0 - two_over_nn * plane_normal.y * plane_normal.y,
+            -two_over_nn * plane_normal.z * plane_normal.y,
+            0.0,
+        ),
+        z: Vector4::new(
+            -two_over_nn * plane_normal.x * plane_normal.z,
+            -two_over_nn * plane_normal.y * plane_normal.z,
+            1.0 - two_over_nn * plane_normal.z * plane_normal.z,
+            0.0,
+        ),
+        w: Vector4::new(0.0, 0.0, 0.0, 1.0),
+    };
+    let mat = Matrix4::from_translation(plane_point.to_vec())
+        * reflection
+        * Matrix4::from_translation(-plane_point.to_vec());
+    fold_solid(solid, SimilarityFold { mat })
 }
 
 /// Applies the fold over the whole `Vertex`→`Solid` chain and certifies the
