@@ -8,7 +8,6 @@ write_allow:
   - vendor/truck/truck-modeling/tests/transforms.rs
   - vendor/truck/truck-shapeops/tests/transform_metamorphic.rs
 tests_required:
-  - rotate_solid_rigid_carriers
   - rotate_about_z_extrude_metamorphic
   - mirror_general_plane_assembles
   - mirror_axis_aligned_still_green
@@ -17,7 +16,6 @@ tests_required:
   - transform_union_metamorphic
   - transform_difference_metamorphic
   - transform_scale_metamorphic
-  - transform_oblique_extrude_metamorphic
 budget: {turns: 45, ctx_tokens: 140000}
 ---
 
@@ -207,6 +205,26 @@ and route.
   rule); read, do not edit.
 
 ## Tests required
+
+AMENDMENT (session 42, after the worker's SPEC_GAP, `amended_by:
+orchestrator`): the original tests 1 (`rotate_solid_rigid_carriers`) and
+10 (`transform_oblique_extrude_metamorphic`) are MOVED OUT of this packet —
+they require folding a full-circle disk-extrude solid, and the LANDED fold
+machinery aborts on self-loop edges in debug builds (the worker's
+QUESTION.md proves the landed `translate_solid` shares the limitation;
+locus chain `wire.rs:628 -> edge.rs:55-60`, debug-only `front == back`
+check). No self-loop-free cylinder solid is constructible (`arrange`
+refuses arc-seamed circle profiles). The two tests are re-booked as rows
+of the BG-CAD-P8-FACADE battery, to land after the truck-topology
+self-loop-safe fold fix packet. D1/D2/D3 themselves are UNCHANGED and
+delivered; `rotate_solid`'s placed-carrier emission is covered by test 2
+(planes stay bare) and by the P8 rows to come.
+
+Fixtures: the boolean_m2 profile recipe; T = Rz(pi/2) + translation on a
+**2x2** rect profile (the worker's machine-checked deviation: a 4x4
+rotated rect refuses `arrange` — 4c rounds so the rotated rect's opposite
+edges are not exactly anti-parallel; 2c is exactly representable and keeps
+the metamorphic at f64 equality).
 
 New file `vendor/truck/truck-modeling/tests/transforms.rs` (dyadic
 fixtures; `truck_modeling` is the crate under test):
