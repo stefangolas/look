@@ -5,6 +5,8 @@ crates: [truck-shapeops]
 write_allow:
   - vendor/truck/truck-shapeops/src/facade.rs
   - vendor/truck/truck-shapeops/src/lib.rs
+  - vendor/truck/truck-shapeops/Cargo.toml
+  - vendor/truck/truck-shapeops/Cargo.lock
   - vendor/truck/truck-shapeops/tests/conformance_battery.rs
 tests_required:
   - facade_naming_table_covers_every_landed_entry
@@ -87,10 +89,24 @@ A1 becomes 5 once you declare `pub mod facade;` (expected divergence).
 ## Decisions already made for you
 
 **D1 — the facade lives at `truck-shapeops/src/facade.rs`** (A2): the
-ONLY landed crate that reaches everything (truck-shapeops depends on
-truck-modeling, truck-evidence, truck-geometry). `pub mod facade;` in
+ONLY landed crate that reaches everything. `pub mod facade;` in
 lib.rs (A1 4→5). The module header carries the house deny header (copy
 from `rewrite.rs`) and the plan's §1 contract as its doc comment.
+
+**D1a — AMENDMENT (session 42 r2, orchestrator, after the worker's
+SPEC_GAP): promote `truck-modeling` to a normal dependency.** The r1
+packet asserted "truck-shapeops depends on truck-modeling" without
+checking the dependency KIND: `truck-modeling` is listed only under
+`[dev-dependencies]`, so non-test `src/facade.rs` cannot reach it (the
+worker's empirical proof: E0433 under the packet's own gate). The
+amendment: in `truck-shapeops/Cargo.toml`, move the `truck-modeling`
+line from `[dev-dependencies]` to `[dependencies]` (same version/path —
+no cycle: truck-modeling does not depend on truck-shapeops). The
+dependency-kind edge changes the lockfile's record, so run `cargo check
+-p truck-shapeops` once WITHOUT `--locked` to refresh `Cargo.lock`,
+commit BOTH the manifest and the updated lock, and confirm `cargo check
+--locked -p truck-shapeops` is green afterwards. Record the manifest
+change in RESULT deviations.
 
 **D2 — the naming table (pre-decided; every entry is a one-line
 composition or a typed refusal).**
