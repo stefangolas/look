@@ -1,16 +1,16 @@
-//! BG-CAD-P10-FRAMED — the packet's truck-modeling acceptance tests.
+﻿//! BG-CAD-P10-FRAMED â€” the packet's truck-modeling acceptance tests.
 //!
 //! The general transforms (`rotate_solid`, `mirror_about_plane`), the
 //! oblique circle extrusion through the LANDED `extrude_profile_vector`, and
 //! the T(extrude) metamorphic. Every fixture is dyadic; the fold is exact,
 //! so the mirrored/oblique-wall subs points are machine-checked at f64
-//! equality (the π/2 rotations use the same Rodrigues matrix the fold
+//! equality (the Ï€/2 rotations use the same Rodrigues matrix the fold
 //! composes, so both sides of each equality run the same float operations).
 //!
 //! SPEC_GAP NOTE (see the worktree QUESTION.md): the packet's test 1
 //! (`rotate_solid_rigid_carriers`, a full-circle disk-extrude cylinder
-//! rotated) cannot be realized in debug builds — the LANDED `Mapped`
-//! machinery's `Edge::debug_new` assertion aborts on the disk's self-loop
+//! rotated) cannot be realized in debug builds â€” the LANDED `Mapped`
+//! machinery's same-vertex edge-construction assertion aborts on the disk's self-loop
 //! circle edges (proven empirically: even the landed `translate_solid`
 //! aborts on the full-circle disk). Every cylinder-walled solid in
 //! truck-modeling carries self-loop circle edges, so no self-loop-free
@@ -66,7 +66,7 @@ fn expect_err<T>(r: Outcome<T>) -> Refusal {
     }
 }
 
-/// The `s × s` CCW rectangle on z = 0 with its arrangement.
+/// The `s Ã— s` CCW rectangle on z = 0 with its arrangement.
 fn rect_profile(s: f64) -> (Vec<Curve>, Arrangement) {
     let profile = vec![
         Curve::Line(Line(Point3::new(0.0, 0.0, 0.0), Point3::new(s, 0.0, 0.0))),
@@ -124,10 +124,10 @@ fn unique_edge_count(solid: &Solid) -> usize {
     ids.len()
 }
 
-/// 2. The T(extrude) metamorphic on a rect profile with T = Rz(π/2) +
+/// 2. The T(extrude) metamorphic on a rect profile with T = Rz(Ï€/2) +
 ///    translation (z-neutral): `T(extrude_profile(P, h))` equals
 ///    `extrude_profile(T(P), h)` in census, carrier kinds, and vertex points
-///    — EXACTLY (both sides compose the same Rodrigues matrix and the same
+///    â€” EXACTLY (both sides compose the same Rodrigues matrix and the same
 ///    dyadic translation on the same dyadic profile corners).
 #[test]
 fn rotate_about_z_extrude_metamorphic() {
@@ -184,9 +184,9 @@ fn rotate_about_z_extrude_metamorphic() {
 
 /// 3. A box mirrored about the plane through (1, 1, 0) with normal (1, 1, 0)
 ///    assembles; the mirrored vertices equal the hand-computed reflection
-///    images EXACTLY. The Householder `I - 2nn^T/(n·n)` for n = (1, 1, 0)
-///    needs only n·n = 2, so the whole matrix is exactly dyadic and the
-///    reflection (x, y, z) ↦ (2 − y, 2 − x, z) is f64-exact.
+///    images EXACTLY. The Householder `I - 2nn^T/(nÂ·n)` for n = (1, 1, 0)
+///    needs only nÂ·n = 2, so the whole matrix is exactly dyadic and the
+///    reflection (x, y, z) â†¦ (2 âˆ’ y, 2 âˆ’ x, z) is f64-exact.
 #[test]
 fn mirror_general_plane_assembles() {
     let (profile, arrangement) = rect_profile(BOX_SIDE);
@@ -220,8 +220,8 @@ fn mirror_general_plane_assembles() {
 }
 
 /// 4. The identity guard: the landed `mirror_solid` on the box across x = 0
-///    answers exactly what it answered before the packet — the box
-///    [0,4]×[0,4]×[0,2] mirrored is [−4,0]×[0,4]×[0,2], vertex-exact, with
+///    answers exactly what it answered before the packet â€” the box
+///    [0,4]Ã—[0,4]Ã—[0,2] mirrored is [âˆ’4,0]Ã—[0,4]Ã—[0,2], vertex-exact, with
 ///    the same census.
 #[test]
 fn mirror_axis_aligned_still_green() {
@@ -319,7 +319,7 @@ fn oblique_extrude_circle_assembles() {
     assert_eq!(inner.radius(), 2.0);
 
     // W3's machine check: the wall's subs points at v = 0 and v = 1 are the
-    // junction circles exactly — `(2 cos u, 2 sin u, 0)` on the bottom cap
+    // junction circles exactly â€” `(2 cos u, 2 sin u, 0)` on the bottom cap
     // and `(2 cos u + 1, 2 sin u, 1)` on the top cap (dir = (1, 0, 1)).
     let bottom = circle_at(Point3::new(0.0, 0.0, 0.0), 2.0);
     let top = circle_at(Point3::new(1.0, 0.0, 1.0), 2.0);

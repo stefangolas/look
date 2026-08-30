@@ -9,7 +9,8 @@
 //! SPEC_GAP NOTE (see the worktree QUESTION.md): the packet's test 10
 //! (`transform_oblique_extrude_metamorphic`) requires the fold to process
 //! the oblique-extruded full-circle disk, whose self-loop circle edges abort
-//! the landed `Mapped` machinery's debug assertion (`Edge::debug_new`).
+//! the landed `Mapped` machinery's same-vertex edge-construction assertion
+//! in debug builds.
 //! Every cylinder-walled solid in the tree carries such self-loops, so test
 //! 10 is omitted and reported as a SPEC_GAP.
 
