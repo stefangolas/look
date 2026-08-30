@@ -44,8 +44,17 @@ added_rs_lines() {
 # Kernel .rs files newly added relative to the baseline (not present in base
 # tree).
 new_rs_files() {
-    git diff --name-only "$base"...HEAD -- 'vendor/truck' -- '*.rs' \
+    # NOTE (session 42): the previous pathspec form
+    # `git diff -- vendor/truck -- '*.rs'` does NOT filter — the second
+    # `--` is not a second separator, so every new vendor file (including
+    # data files like proptest-regressions/*.txt) leaked into GATE-1 and
+    # misfired on non-Rust content. Filter the extension explicitly.
+    git diff --name-only "$base"...HEAD -- 'vendor/truck' \
         | while IFS= read -r f; do
+            case "$f" in
+                *.rs) ;;
+                *) continue ;;
+            esac
             if ! git cat-file -e "$base:$f" 2>/dev/null; then
                 printf '%s\n' "$f"
             fi
