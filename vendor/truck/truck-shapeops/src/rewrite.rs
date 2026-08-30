@@ -38,7 +38,7 @@
 )]
 
 use rustc_hash::{FxHashMap as HashMap, FxHashSet as HashSet};
-use std::f64::consts::FRAC_PI_2;
+use std::f64::consts::{FRAC_PI_2, TAU};
 use truck_base::cgmath64::{InnerSpace, Matrix4, Point3, Vector3, Vector4};
 use truck_base::evidence::{
     Budget, Certificate, Certified, ContradictionWitness, EnvelopeCase, Margin, Method, Modulus,
@@ -49,7 +49,7 @@ use truck_geometry::decorators::{Processor, TrimmedCurve};
 use truck_geometry::recognize::{
     recognize_surface, CanonicalCarrier, CanonicalCarrierWitness, CanonicalSurface,
 };
-use truck_geometry::specifieds::{Cylinder, Line, Plane, Sphere, UnitCircle};
+use truck_geometry::specifieds::{Cylinder, Line, Plane, Sphere, Torus, UnitCircle};
 use truck_geotrait::Invertible;
 use truck_topology::{Edge, EdgeID, Face, Shell, Solid, Vertex, Wire};
 
@@ -98,6 +98,19 @@ pub struct FilletSpec {
     /// The other endpoint of the edge to fillet (either order).
     pub b: Point3,
     /// The rolling-ball radius applied to both adjacent faces.
+    pub radius: f64,
+}
+
+/// One filleted CIRCULAR rim: the rim edge is named by its circle
+/// geometry (the canonical z-axis rim circle's center and radius).
+/// `radius` is the single rolling-ball radius.
+#[derive(Clone, Copy, Debug)]
+pub struct CircleFilletSpec {
+    /// The canonical z-axis rim circle's center.
+    pub center: Point3,
+    /// The rim circle's radius.
+    pub edge_radius: f64,
+    /// The single rolling-ball radius.
     pub radius: f64,
 }
 
@@ -1666,4 +1679,351 @@ fn fillet_corner(
     let shell: Shell<Point3, Curve, Surface> = faces.into();
     let result = Solid::try_new(vec![shell]).map_err(|_| invalid_shell())?;
     Ok(Certified::new(result, rewrite_certificate(*budget)))
+}
+
+// ---------------------------------------------------------------------------
+// BG-CAD-P12-BLEND — the circular-rim fillet on the rewrite engine.
+// ---------------------------------------------------------------------------
+
+/// One resolved circular rim: the matched circle edge and its carrier
+/// geometry (the D1 edge-resolution convention, P6-style).
+struct ResolvedRim {
+    /// The matched `Curve::Circle`-carried edge instance.
+    edge: Edge<Point3, Curve>,
+    /// The circle's center.
+    center: Point3,
+    /// The circle's radius.
+    radius: f64,
+}
+
+/// The center and radius of a `Curve::Circle`-carried edge, `None` for any
+/// other curve kind.
+fn circle_geometry(curve: &Curve) -> Option<(Point3, f64)> {
+    let Curve::Circle(circle) = curve else {
+        return None;
+    };
+    let t = circle.transform();
+    let center = Point3::new(t.w.x, t.w.y, t.w.z);
+    let radius = t.x.magnitude();
+    Some((center, radius))
+}
+
+/// Whether two circle centers share the canonical z-axis within the insertion
+/// tolerance (concentric rims at differing heights — the both-rims case).
+fn concentric_axis(a: Point3, b: Point3) -> bool {
+    (a.x - b.x).abs() <= INSERTION_TOL && (a.y - b.y).abs() <= INSERTION_TOL
+}
+
+/// D1 — resolves the spec's rim: the unique `Curve::Circle`-carried edge in
+/// the solid's wires whose circle center is within the insertion-tolerance
+/// class of `spec.center` and whose radius matches `spec.edge_radius`. Zero
+/// matches refuse `Empty`; multiple distinct edges refuse
+/// `UnsupportedEnvelope(NonCanonicalCarrier)`.
+fn resolve_circle_rim(
+    solid: &Solid<Point3, Curve, Surface>,
+    spec: &CircleFilletSpec,
+) -> Result<ResolvedRim, Refusal> {
+    let mut matched: Option<Edge<Point3, Curve>> = None;
+    for face in solid.face_iter() {
+        for wire in face.absolute_boundaries() {
+            for edge in wire.edge_iter() {
+                let Some((center, radius)) = circle_geometry(&edge.curve()) else {
+                    continue;
+                };
+                if (center - spec.center).magnitude() <= INSERTION_TOL
+                    && (radius - spec.edge_radius).abs() <= INSERTION_TOL
+                {
+                    match &matched {
+                        Some(prev) if prev.id() == edge.id() => {}
+                        Some(_) => return Err(non_canonical()),
+                        None => matched = Some(edge.clone()),
+                    }
+                }
+            }
+        }
+    }
+    let edge = matched.ok_or(Refusal::Empty)?;
+    let (center, radius) = circle_geometry(&edge.curve()).ok_or_else(non_canonical)?;
+    Ok(ResolvedRim {
+        edge,
+        center,
+        radius,
+    })
+}
+
+/// The D2-lifted neighborhood of one resolved rim: the wall face (a bare
+/// canonical z-axis `Cylinder`), the perpendicular cap face (a canonical
+/// `Plane` with a z-parallel normal), the cap plane height, and the wall's
+/// other-rim wire.
+struct RimNeighborhood {
+    /// The wall face (its `Surface::Cylinder` carrier, stored orientation
+    /// preserved).
+    wall: Face<Point3, Curve, Surface>,
+    /// The cap face (its `Surface::Plane` carrier, stored orientation
+    /// preserved).
+    cap: Face<Point3, Curve, Surface>,
+    /// The wall's cylindrical carrier.
+    wall_cylinder: Cylinder,
+    /// The cap's planar carrier.
+    cap_plane: Plane,
+    /// The cap plane height (the cap junction circle's z).
+    cap_z: f64,
+    /// The wall's other-rim wire: a single self-loop circle edge.
+    other_wire: Wire<Point3, Curve>,
+    /// The wall's other rim's z (`z_other`).
+    z_other: f64,
+}
+
+/// D2 — the neighborhood lift (NOT the P6 polygon lift): validates ONLY the
+/// resolved rim's neighborhood. The rim edge has exactly two adjacent faces,
+/// one a bare canonical z-axis `Cylinder` (the wall) and one a canonical
+/// `Plane` whose normal is parallel to the z-axis (the perpendicular cap); the
+/// cap's boundary is a SINGLE wire holding a single self-loop circle edge
+/// concentric with the rim; the wall's other boundary wire is a single
+/// self-loop circle edge concentric with the rim (its other rim). Anything
+/// else refuses `UnsupportedEnvelope(NonCanonicalCarrier)`.
+fn lift_rim_neighborhood(
+    solid: &Solid<Point3, Curve, Surface>,
+    rim: &ResolvedRim,
+) -> Result<RimNeighborhood, Refusal> {
+    let mut wall: Option<Face<Point3, Curve, Surface>> = None;
+    let mut cap: Option<Face<Point3, Curve, Surface>> = None;
+    for face in solid.face_iter() {
+        let uses_rim = face
+            .absolute_boundaries()
+            .iter()
+            .any(|wire| wire.edge_iter().any(|edge| edge.id() == rim.edge.id()));
+        if !uses_rim {
+            continue;
+        }
+        match face.surface() {
+            Surface::Cylinder(_) => {
+                if wall.is_some() {
+                    return Err(non_canonical());
+                }
+                wall = Some(face.clone());
+            }
+            Surface::Plane(_) => {
+                if cap.is_some() {
+                    return Err(non_canonical());
+                }
+                cap = Some(face.clone());
+            }
+            _ => return Err(non_canonical()),
+        }
+    }
+    let wall = wall.ok_or_else(non_canonical)?;
+    let cap = cap.ok_or_else(non_canonical)?;
+    let Surface::Cylinder(wall_cylinder) = wall.surface() else {
+        return Err(non_canonical());
+    };
+    let Surface::Plane(cap_plane) = cap.surface() else {
+        return Err(non_canonical());
+    };
+    // The perpendicular cap (the constant-frame case): the plane normal is
+    // parallel to the z-axis.
+    if cap_plane.normal().x != 0.0 || cap_plane.normal().y != 0.0 {
+        return Err(non_canonical());
+    }
+    // The cap face's boundary: a SINGLE wire holding a single self-loop circle
+    // edge concentric with the rim (the Finding 1 cap shape).
+    let cap_wires = cap.absolute_boundaries();
+    if cap_wires.len() != 1 {
+        return Err(non_canonical());
+    }
+    let cap_wire = cap_wires.first().ok_or_else(non_canonical)?;
+    if cap_wire.edge_iter().count() != 1 {
+        return Err(non_canonical());
+    }
+    let cap_edge = cap_wire.edge_iter().next().ok_or_else(non_canonical)?;
+    let Some((cap_center, _)) = circle_geometry(&cap_edge.curve()) else {
+        return Err(non_canonical());
+    };
+    if !concentric_axis(cap_center, rim.center) {
+        return Err(non_canonical());
+    }
+    // The wall's OTHER boundary wire: a single self-loop circle edge
+    // concentric with the rim (the wall's other rim, radius R at `z_other`).
+    let (other_wire_owned, z_other) = {
+        let wall_wires = wall.absolute_boundaries();
+        if wall_wires.len() != 2 {
+            return Err(non_canonical());
+        }
+        let other_wire = wall_wires
+            .iter()
+            .find(|wire| !wire.edge_iter().any(|edge| edge.id() == rim.edge.id()))
+            .ok_or_else(non_canonical)?;
+        if other_wire.edge_iter().count() != 1 {
+            return Err(non_canonical());
+        }
+        let other_edge = other_wire.edge_iter().next().ok_or_else(non_canonical)?;
+        let Some((other_center, other_radius)) = circle_geometry(&other_edge.curve()) else {
+            return Err(non_canonical());
+        };
+        if !concentric_axis(other_center, rim.center)
+            || (other_radius - wall_cylinder.radius()).abs() > INSERTION_TOL
+        {
+            return Err(non_canonical());
+        }
+        (other_wire.clone(), other_center.z)
+    };
+    Ok(RimNeighborhood {
+        wall,
+        cap,
+        wall_cylinder,
+        cap_plane,
+        cap_z: cap_plane.origin().z,
+        other_wire: other_wire_owned,
+        z_other,
+    })
+}
+
+/// The minted self-loop circle edge of one junction circle: the seam vertex is
+/// the circle's `u = 0` point, so the vertex lies exactly on the carrier curve.
+fn mint_circle_edge(center: Point3, radius: f64) -> Edge<Point3, Curve> {
+    let seam = Vertex::new(Point3::new(center.x + radius, center.y, center.z));
+    let curve = Curve::Circle(Processor::with_transform(
+        TrimmedCurve::new(UnitCircle::<Point3>::new(), (0.0, TAU)),
+        Matrix4 {
+            x: Vector4::new(radius, 0.0, 0.0, 0.0),
+            y: Vector4::new(0.0, radius, 0.0, 0.0),
+            z: Vector4::new(0.0, 0.0, 1.0, 0.0),
+            w: Vector4::new(center.x, center.y, center.z, 1.0),
+        },
+    ));
+    // The self-loop IS the seam (the Finding 1 census): `Edge::new_unchecked`
+    // is the sanctioned construction for front == back.
+    Edge::new_unchecked(&seam, &seam, curve)
+}
+
+/// D3 — one circular-rim fillet on the current solid (D4: the specs apply
+/// SEQUENTIALLY, each to the current solid): the realized canonical z-axis
+/// torus patch, the rebuilt wall and cap faces (carrier instances preserved),
+/// and the minted junction circle edges shared as instances between their two
+/// adjacent faces. `Solid::try_new` is the acceptance gate (D6).
+fn fillet_circle_once(
+    solid: &Solid<Point3, Curve, Surface>,
+    spec: &CircleFilletSpec,
+) -> Result<Solid<Point3, Curve, Surface>, Refusal> {
+    let rim = resolve_circle_rim(solid, spec)?;
+    let neighborhood = lift_rim_neighborhood(solid, &rim)?;
+    let cap_z = neighborhood.cap_z;
+    let z_other = neighborhood.z_other;
+    // The s-rule: the material side of the cap is the side the wall is on.
+    let s = if z_other > cap_z { 1.0 } else { -1.0 };
+    // D3 overflow — checked BEFORE minting anything: the wall would vanish or
+    // the cap would collapse.
+    if spec.radius >= (z_other - cap_z).abs() || spec.radius >= rim.radius {
+        return Err(Refusal::Empty);
+    }
+    let junction_z = cap_z + s * spec.radius;
+    let cap_junction_radius = rim.radius - spec.radius;
+    let e_jw = mint_circle_edge(
+        Point3::new(rim.center.x, rim.center.y, junction_z),
+        rim.radius,
+    );
+    let e_jc = mint_circle_edge(
+        Point3::new(rim.center.x, rim.center.y, cap_z),
+        cap_junction_radius,
+    );
+    let torus_surface = Surface::Torus(Torus::new(
+        Point3::new(rim.center.x, rim.center.y, junction_z),
+        rim.radius - spec.radius,
+        spec.radius,
+    ));
+
+    // The rebuilt wall: the SAME `Cylinder` carrier instance, wires
+    // [other-rim circle (existing edge instance), wall junction circle (new)].
+    let wall_inverted = !neighborhood.wall.orientation();
+    let wall_abs = vec![
+        neighborhood.other_wire.clone(),
+        Wire::from(vec![if wall_inverted {
+            e_jw.inverse()
+        } else {
+            e_jw.clone()
+        }]),
+    ];
+    let mut wall_new = Face::try_new(wall_abs, Surface::Cylinder(neighborhood.wall_cylinder))
+        .map_err(|_| Refusal::Empty)?;
+    if wall_inverted {
+        wall_new.invert();
+    }
+
+    // The realized torus face: the tube's outer equator (v = 0) meets the wall,
+    // the cap-tangent circle (v = pi/2) meets the cap.
+    let torus_face = Face::try_new(
+        vec![
+            Wire::from(vec![e_jw.inverse()]),
+            Wire::from(vec![e_jc.inverse()]),
+        ],
+        torus_surface,
+    )
+    .map_err(|_| Refusal::Empty)?;
+
+    // The rebuilt cap: the SAME `Plane` carrier instance, wire [cap junction
+    // circle (new)], stored with the cap's original orientation so its
+    // effective wire pairs against the torus's inverse use.
+    let cap_inverted = !neighborhood.cap.orientation();
+    let cap_abs = vec![Wire::from(vec![if cap_inverted {
+        e_jc.inverse()
+    } else {
+        e_jc.clone()
+    }])];
+    let mut cap_new = Face::try_new(cap_abs, Surface::Plane(neighborhood.cap_plane))
+        .map_err(|_| Refusal::Empty)?;
+    if cap_inverted {
+        cap_new.invert();
+    }
+
+    // The untouched faces ride verbatim (their faces, wires, and edge instances
+    // are reused).
+    let wall_id = neighborhood.wall.id();
+    let cap_id = neighborhood.cap.id();
+    let mut faces: Vec<Face<Point3, Curve, Surface>> = Vec::new();
+    for face in solid.face_iter() {
+        if face.id() == wall_id {
+            faces.push(wall_new.clone());
+        } else if face.id() == cap_id {
+            faces.push(cap_new.clone());
+        } else {
+            faces.push(face.clone());
+        }
+    }
+    faces.push(torus_face);
+
+    let shell: Shell<Point3, Curve, Surface> = faces.into();
+    Solid::try_new(vec![shell]).map_err(|_| invalid_shell())
+}
+
+/// D1/D2/D3/D4 — the circular-rim fillet: the realized canonical z-axis
+/// `Torus` patch of a perpendicular wall/cap rim (table 6.4: center locus
+/// Circle -> Torus). The specs apply SEQUENTIALLY to the current solid; a spec
+/// whose rim no longer exists on the current solid refuses `Empty` at
+/// resolution. An empty request list, a non-finite or non-positive radius or
+/// edge_radius, or the D3 overflow refuses `Empty`; an abnormal neighborhood or
+/// an ambiguous resolution refuses
+/// `UnsupportedEnvelope(NonCanonicalCarrier)`. `Solid::try_new` is the
+/// acceptance gate (D6).
+pub fn fillet_circle(
+    solid: &Solid<Point3, Curve, Surface>,
+    specs: &[CircleFilletSpec],
+    budget: &mut Budget,
+) -> Outcome<Solid<Point3, Curve, Surface>> {
+    if specs.is_empty() {
+        return Err(Refusal::Empty);
+    }
+    for spec in specs {
+        if !spec.radius.is_finite()
+            || !spec.edge_radius.is_finite()
+            || spec.radius <= 0.0
+            || spec.edge_radius <= 0.0
+        {
+            return Err(Refusal::Empty);
+        }
+    }
+    let mut current = solid.clone();
+    for spec in specs {
+        current = fillet_circle_once(&current, spec)?;
+    }
+    Ok(Certified::new(current, rewrite_certificate(*budget)))
 }
