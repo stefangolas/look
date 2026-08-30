@@ -49,3 +49,7 @@ pub mod section;
 /// BG-CAD-P6-REWRITE: the LocalBoundaryRewrite engine, proven on plane-plane
 /// chamfer.
 pub mod rewrite;
+
+/// BG-CAD-P8-FACADE: the build123d-shaped facade over the landed kernel
+/// entries (P1-P7) and the conformance battery's surface.
+pub mod facade;
