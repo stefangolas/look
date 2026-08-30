@@ -1,0 +1,41 @@
+{
+  "id": "BG-CAD-P9-CONJUGATION",
+  "status": "DONE",
+  "contracts": [
+    "Placed cylinder pair with parallel world axes folds to the bare canonical cylinder cells (coaxial screen, then parallel_cylinders) and answers EXACTLY the corresponding bare pair (D4.1, W3)",
+    "Placed cylinder pair with non-parallel equal world radii routes to the axis-explicit equal_radius_cylinders cell on the WORLD poses; the ellipses ride the landed analytic_records path with no conjugation-back (D4.2, W2)",
+    "equal_radius_cylinders skew refusal maps to ContactReductionDeferred; its NumericallyUnresolved propagates as-is (D4.2, section 7)",
+    "Non-parallel unequal radii, non-cylinder placed families, and improper placements stay exactly as deferred as today (D2/D3/D4.3)",
+    "Non-uniform-scaled placed cylinder refuses UnsupportedEnvelope(NonCanonicalCarrier) (D3 similarity screen)",
+    "D6 metamorphic gate: contact(A,B) ~= contact(g.A, g.B) for a rigid g, including the g = identity case Placed(identity) == bare (D6)",
+    "All 8 required dyadic witnesses in tests/conjugation.rs pass; lib, torus_pairs, plane_properties suites pass UNCHANGED"
+  ],
+  "tests_added": 8,
+  "deviations": [
+    {
+      "from": "PACKET D4.1 box map: v' = (v0*s + t_z, v1*s + t_z)",
+      "made": "v' = (v0*s, v1*s) with the reconstructed carrier at the FULL world foot Cylinder::new((foot.x, foot.y, foot.z), r')",
+      "derivation": "For a foldable placement m = T(t)*Rz(theta)*S(s) (translation + z-rotation + uniform scale), the placed image is m*cyl.subs(u,v) = t + s*r*(cos(u+theta), sin(u+theta), 0) + (0,0, s*v). The reconstructed carrier recon = Cylinder::new((t.x,t.y,t.z), s*r) evaluates recon.subs(u',v') = t + s*r*(cos u', sin u', 0) + (0,0,v'). The W3 subs identity m*cyl.subs(u,v) == recon.subs(u + theta, s*v) requires v' = s*v with the full-foot carrier; adding t_z would make the mapped v-box cover z = foot.z + s*v + t_z, a shifted world patch. The packet's two formulas (carrier at full foot AND box map with t_z) are mutually inconsistent; the W3 subs identity (the certified point-set property) picks v' = s*v. The bare-side identity fold (theta=0, s=1, identity box) then reconstructs the identical bare carrier, which is what makes tests 2/3's record-level equality exact.",
+      "verified": "conjugation_identity_placement_equals_bare and conjugation_parallel_placed_pair_folds pass with format-equal certified complexes on the offset-empty and coaxial-Region2 witnesses (the coaxial Region2 path exercises the mapped v-boxes through the Coincident screen)."
+    },
+    {
+      "from": "PACKET D3 predicate: per-component interval products on the extracted magnitudes",
+      "made": "The three column magnitudes are computed as plain f64 values sqrt(x*x + y*y + z*z) and wrapped in degenerate intervals, then decided by the three-way comparator",
+      "derivation": "inari's outward-rounded sqrt of interval products widens genuinely-equal construction magnitudes: a rotation's unit columns come out as [1.0, 1.0000000000000002] against [1.0, 1.0], so three-way returns None (a straddle) and a valid similarity would refuse NumericallyUnresolved instead of passing. The plain-f64 extracted magnitude is the honest 'extracted component'; the decision is still the three-way interval discipline (never a naked f64 comparison). Machine-checked: rotY(90), rotX(-90), T(1,2,3)*Rz(0.5)*S(2), and T(1,2,3)*Rz(0.7) composed with the fixtures all have exactly-equal f64 magnitudes (2.0/2.0/2.0 and 1.0/1.0/1.0), while scale(2,2,3) is decisively unequal.",
+      "verified": "conjugation_placed_intersecting_axes_two_ellipses, conjugation_parallel_placed_pair_folds, conjugation_metamorphic_rigid, conjugation_nonuniform_scale_refuses all pass."
+    },
+    {
+      "from": "PACKET D4.1 'fold each placed side' (parallel branch)",
+      "made": "A per-side 'axis parallel z-hat' guard defers (ContactReductionDeferred) a parallel pair with a non-z placed axis before folding",
+      "derivation": "W3's fold condition is exactly 'axis parallel z-hat': the C1 parameter-map equivalence m*cyl.subs(u,v) == recon.subs(u+theta, s*v) holds only for a placed side whose world axis is decisively z-parallel. In the parallel branch a bare side (dir = z-hat) forces the other side z-parallel, but a placed x placed pair with parallel non-z axes (e.g. both along x-hat) has no exact canonical-cell image, so it stays in the deferred funnel rather than folding to a geometrically different z-aligned carrier.",
+      "verified": "the z-parallel guard fires only outside the exercised envelope; all fold tests pass."
+    },
+    {
+      "from": "PACKET prose 'rotY(90) maps to world axis x-hat, rotX(-90) to world axis y-hat'",
+      "made": "Recorded actual cgmath mapping: rotY(90) -> (1, 0, 6e-17) = x-hat, rotX(-90) -> (0, 1, 6e-17) = y-hat (each carrying a cos(pi/2) ~ 6.1e-17 residue)",
+      "derivation": "cgmath from_angle_y(FRAC_PI_2) has column z = (s, 0, c) = (1, 0, cos(pi/2)) and from_angle_x(-FRAC_PI_2) has column z = (0, -s, c) = (0, 1, cos(pi/2)); cos(FRAC_PI_2) is not exactly 0, leaving a 6.123e-17 residue in the extracted direction. The signs match the packet's claim (the residue is recorded in tests/conjugation.rs and below). The perpendicular intersecting-axes geometry is sign-agnostic, so the W2 witness is unchanged.",
+      "verified": "test 1 asserts the recorded mapping component-wise against RESIDUAL."
+    }
+  ],
+  "notes": "D4 routing choices: (1) parallel world axes (interval cross product decisively zero) fold each side to its canonical z-aligned form and re-enter analytic_ff unchanged, so the folded pair rides the landed coaxial screen + parallel_cylinders with zero new code; the fold carries W3's 'axis parallel z-hat' condition per side. (2) non-parallel EQUAL scaled radii (exact f64 equality, the coaxial_axes convention) route to equal_radius_cylinders(radius, (foot0,dir0), (foot1,dir1)) with the WORLD poses; its TwoCurves ellipses ride the existing analytic_records path (the ellipses are already world-frame placed circles, no conjugation-back), its NonCanonicalCarrier (skew) refusal maps to ContactReductionDeferred per section 7, its NumericallyUnresolved propagates as-is. (3) non-parallel unequal radii, non-cylinder families, improper placements all defer exactly as before. The eqrcyl route rebuilds the dispatcher's analytic certificate shape (Method::Exact, AnalyticCarrier=True, budget_left = the caller's remaining budget), consuming the cell's cert without weakening its props/method. theta/s/t derivation: for a foldable placement m = T(t)*Rz(theta)*S(s), m*x-hat = s*(cos theta, sin theta, 0), so theta = atan2(m.x.y, m.x.x); s = |m*z-hat| = |column z|; t = m*center (the world foot). The u-box maps u' = u + theta; the v-box maps v' = s*v (absolute z = foot.z + s*v reproduces the world patch exactly; see the first deviation). Achieved precision (machine-measured, 26 samples per ellipse): W2 on-both-carriers max residual 3.3e-16 (asserted <= 1e-9); metamorphic g-image on-both-transformed-carriers max residual 5.6e-16. Anchors: A1 (Placed arm) 1, A3 1, A4 1 all pre-packet counts; A2 equal_radius_cylinders in contact/mod.rs went 0 -> 2 (import + call; the expected landed-cell divergence, not a mismatch); A5 conjugation.rs 0 -> 1 new file. Verification: cargo check --locked -p truck-evidence, cargo fmt --check -p truck-evidence, cargo test --locked -p truck-evidence --lib (303), --test conjugation (8), --test torus_pairs (7), --test plane_properties (3), and cargo clippy --locked -p truck-evidence --all-targets all green; scripts/kernel-gates.sh HEAD and scripts/kernel-gates.sh HEAD~1 (the genuine added-line diff) both pass (GATE-4 unscaled_legacy 111/111, unchanged)."
+}
