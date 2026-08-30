@@ -1,0 +1,7 @@
+# Seeds for failure cases proptest has generated in the past. It is
+# automatically read and these particular cases re-run before any
+# novel cases are generated.
+#
+# It is recommended to check this file in to source control so that
+# everyone who runs the test benefits from these saved cases.
+cc c2c666f51415cabeb9a684ed949a7344a7ac415830e794ffaf1dd8884abb323c # shrinks to TestCircleArcTangent0Args = TestCircleArcTangent0Args { p0: [-9.381012444251224, 0.0, 0.0], p1: [0.0, 0.0, 8.388488604248861], tangent0: [0.0, -5.520228236512575, 5.854337132727457], t: 0.9998653721537082 }
