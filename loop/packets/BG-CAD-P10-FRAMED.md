@@ -5,6 +5,8 @@ crates: [truck-modeling, truck-shapeops]
 write_allow:
   - vendor/truck/truck-modeling/src/cad.rs
   - vendor/truck/truck-modeling/src/extrude.rs
+  - vendor/truck/truck-modeling/src/geom_impls.rs
+  - vendor/truck/truck-modeling/proptest-regressions/geom_impls.txt
   - vendor/truck/truck-modeling/tests/transforms.rs
   - vendor/truck/truck-shapeops/tests/transform_metamorphic.rs
 tests_required:
@@ -189,6 +191,35 @@ the Contact funnel (D3's note) are OUT. General similarity folds BEYOND
 rotate/mirror/scale/translate are OUT. Do not touch the landed
 `fold_solid`/`certify_carriers` interiors — the entries compose matrices
 and route.
+
+**D8 — AMENDMENT (session 42, orchestrator): stabilize the landed
+`geom_impls::test_circle_arc_tangent0` property.** The verify's V5 gate
+exposed a flaky landed property: proptest found the persisting failing
+seed `p0=(-9.381, 0, 0), p1=(0, 0, 8.388), tangent0=(0, -5.520,
+5.854), t=0.9998653721537082` (now persisted in
+`proptest-regressions/geom_impls.txt`, which this packet commits). The
+seed's signature: `t` is ARBITRARILY CLOSE to 1 — the tangency parameter
+approaches the arc's endpoint. Mandate, in order:
+
+1. Reproduce with the persisted seed (it re-runs before any novel case).
+2. DIAGNOSE with a derivation: as `t → 1`, which quantity in the
+   construction degenerates (the three-point circle's conditioning as
+   the tangency point approaches the endpoint? a division by a vanishing
+   chord?). Machine-check the blow-up numerically along the seed's path.
+3. EITHER the underlying solve in `geom_impls.rs` is genuinely wrong for
+   this family — fix it — OR the property samples a degenerate
+   configuration family it must exclude: add the documented precondition
+   (e.g. `t` bounded away from 0 and 1 by a justified interval — justify
+   the bound from the conditioning derivation, not convenience).
+4. NEVER loosen the `near` tolerance without a conditioning derivation
+   that shows the achieved precision is the construction's ceiling (the
+   no-gate-loosening rule applies in full).
+5. Commit the persisted regressions file so the fix is verified against
+   the exact failing seed deterministically, forever.
+
+This file's test module is test-only territory for everything EXCEPT the
+property in question; do not touch other `geom_impls` code paths unless
+your diagnosis lands there (record it).
 
 ## Template
 
