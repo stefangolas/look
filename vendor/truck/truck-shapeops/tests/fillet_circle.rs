@@ -44,8 +44,8 @@ use truck_shapeops::rewrite::{fillet_circle, CircleFilletSpec};
 use truck_topology::{Edge, EdgeID, Solid};
 
 /// The certified-point residual: the certification precision achieved on the
-/// P11 ride (the probe's 1e-9; unit-scale certified-point residual, not a
-/// length).
+/// P11 ride (the probe's precision class; unit-scale certified-point residual,
+/// not a length).
 const RESIDUAL: f64 = 1.0e-9; // H-3: unit-scale certified-point residual, not a length
 
 // ---------------------------------------------------------------------------
