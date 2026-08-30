@@ -56,6 +56,11 @@ pub mod span;
 /// Scaffolded empty; the packet fills it.
 pub mod arrange;
 
+/// BG-CG-000-CONTRACT: the constructive geometry contract skeleton
+/// (`SpineFrameRecipe`, frame/profile laws, sampling policy, errors).
+/// Scaffolded with stub bodies; later CG packets fill them.
+pub mod constructive;
+
 /// re-export all modules.
 pub mod prelude {
     use crate::*;
