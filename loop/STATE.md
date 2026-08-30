@@ -9,15 +9,17 @@ when they stop being true, never for length. If you are picking this up cold, re
 [`loop/ORCHESTRATOR.md`](ORCHESTRATOR.md) for how to run the loop, then
 `python loop/slot_status.py`** - nothing else. Do not read `LEDGER.jsonl` whole.
 
-Updated 2026-08-29, close of session 41 (RW-INTERIOR-LOOP, BG-CAD-P4-UNTIL,
-BG-CAD-P5-REVOLVE, RW-RESEW, RW-DIVIDE-NESTING and **BG-CAD-P3-SPLIT** all
-LANDED; the vertex-touch cut family booked as a v1 boundary after three
-instrumented stops).
-Branch: `integration/kernel-bg`, HEAD `9257275`.
+Updated 2026-08-29, final close of session 41 (NINE packets landed:
+RW-INTERIOR-LOOP, BG-CAD-P4-UNTIL, BG-CAD-P5-REVOLVE, RW-RESEW,
+RW-DIVIDE-NESTING, **BG-CAD-P3-SPLIT**, BG-CAD-P6-REWRITE, BG-CAD-P7-FILLET,
+**BG-CAD-P11-TORUS**; the vertex-touch cut family booked as a v1 boundary;
+**Tier 2 OPEN**).
+Branch: `integration/kernel-bg`, HEAD `cddbf58`.
 
 ## Where we are
 
-**Session 41 landed SIX packets and closed the entire P3 blocker chain.**
+**Session 41 landed NINE packets across two tiers and closed the entire P3
+blocker chain.**
 
 1. **RW-INTERIOR-LOOP** (amended `316b868`, ACCEPTED, merged `eb9722e`):
    interior-loop division in `split.rs` — band-aware `classify_curve`
@@ -62,41 +64,60 @@ Branch: `integration/kernel-bg`, HEAD `9257275`.
    (`NumericallyUnresolved(UncertifiedContainment)`, not
    ContactReductionDeferred).
 
-Progress: **5 of 8 Tier 0 packets LANDED** (P1-P5) + 3 Boundary-Rewrite
-funnel packets (RW-INTERIOR-LOOP, RW-RESEW, RW-DIVIDE-NESTING). Remaining
-Tier 0: P6 (LocalBoundaryRewrite + chamfer), P7 (fillet F1+F4), P8
-(facade + battery). Then Tier 1 (P9/P10), Tier 2 (P11/P12).
+7. **BG-CAD-P6-REWRITE** (merged `5d8ff06`, **ACCEPTED FIRST TRY — zero
+   round trips**): `truck-shapeops/src/rewrite.rs` — the
+   LocalBoundaryRewrite engine proven on PP chamfer. The mandatory
+   pre-dispatch probe (4 witnesses, `scratch/chamfer_probe`) converted the
+   program's highest-risk packet into its cleanest landing. 9 tests.
+8. **BG-CAD-P7-FILLET** (merged `1ef93ce`): F1 PP fillet (quarter-cylinder
+   realization, arc-carrying caps via the landed revolve arc recipe) + F4
+   three-plane corner sphere — the worker machine-checked the Sphere frame
+   (u polar, v azimuthal; the pole a regular wire vertex). 8 tests.
+9. **BG-CAD-P11-TORUS** (merged `cddbf58`, **ACCEPTED FIRST TRY**): torus
+   FF pairs through the landed validated-FF stage. THE PROBE FOUND THE
+   REAL BLOCKER: the landed quartic `Torus::grad`'s interval dependency
+   (4g·x' − 8R²x' as separate products spans zero) killed every chart;
+   the sqrt-form re-enclosure (same f, tight components) certifies
+   perfectly. The equator band r̂=R is chart-degenerate at every scale —
+   the arm pre-splits the domain along the band; band-grazing cuts
+   refuse. The worker also overturned the landed doc's r=R/2 degeneracy
+   claim (certified the inner equator at exact radius) and booked r ≥ R as
+   the true degenerate family. 7 tests; truck-evidence lib 303/303.
 
-## The vertex-touch boundary (the session's design output)
+Progress: **Tier 0: 7 of 8 LANDED** (P1-P7; only P8 facade+battery
+remains) **+ 3 Boundary-Rewrite funnel packets + Tier 2 OPEN** (P11
+landed). Remaining: P8, P9, P10, P12.
 
-P3's diagonal fixture (plane x + y = 2 through opposite box edges) is the
-hardest tangency class. Three instrumented worker stops
-(`RW-VERTEX-CLIP.STOP-r1/-r2`, `RW-SEED-DIAGONAL.STOP.json`) peeled the
-chain to four kernel decisions the v1 envelope does not make:
-canonical-vertex splicing (Vertex identity is by id — corner-endpoint arcs
-cannot splice), seam-edge replacement (contact-plane-coincident edges must
-become Flip-parity arc instances), per-face arc certification (conflicts
-with the sew-completion corner-touch skip), and Region2 coplanar-adjacent
-handling (the `Crossing` screen deliberately refuses edge-sharing
-regions). All recorded in the plan's deferred list
-(`docs/BUILD123D_COVERAGE_PLAN.md`, "Deferred with a full instrumented
-diagnosis"). The v1 boundary is typed and asserted (P3 test 3); the
-follow-up family's design input is complete.
+## The session's two design outputs
+
+1. **The vertex-touch boundary** (P3's diagonal fixture): four kernel
+   decisions the v1 envelope does not make (canonical-vertex splicing,
+   seam-edge replacement, per-face arc certification, Region2
+   coplanar-adjacent) — full instrumented diagnosis in the plan's
+   deferred list; the typed refusal asserted (P3 test 3); the follow-up
+   family's design input complete.
+2. **The torus findings** (the P11 probe): the quartic-grad dependency
+   fix, the equator-band chart degeneracy, and the spurious
+   singular-stage points on band boxes (a potential landed-stage defect
+   recorded for the stage's owner; unreachable through the v1 entry's
+   pre-split).
 
 ## Pick up here
 
-1. **Next frontier: P6 and P7 packets.** P6 (LocalBoundaryRewrite +
-   chamfer PP: symmetric, distance-distance, distance-angle) carries a
-   MANDATORY pre-dispatch num3-scratch probe — the session-36/37/38
-   pattern: a patched COPY of the rewrite-candidate machinery in
-   `scratch/`, machine-validated before the packet is written (budget its
-   disk; delete its target after). P7 (fillet F1 + F4 three-plane corner)
-   rides P6's rewrite. Write them as fresh-context design work; the plan
-   doc's §8 entries are the booked scope.
+1. **Next frontier: P12 + P9 as the next parallel wave, then P10, then
+   P8.** P12 (blend realization F2/F3 + revolve circle edges) rides P11's
+   torus pairs + the landed P6/P7 engine — its torus-realization geometry
+   (Cylinder/Torus junctions) should get a num3-scratch probe first (the
+   3-for-3 probe discipline). P9 (conjugation) touches the hot
+   `contact/mod.rs` dispatcher — serialize against other contact work
+   (P11 just landed there; P12 is rewrite.rs-adjacent, disjoint ✓). P8
+   (facade + conformance battery) goes last — it batteries everything.
 2. **Model policy: default worker is `deepseek/deepseek-v4-flash`** (owner
-   directive). Session 41: seven worker runs, all deepseek, every stop
+   directive). Session 41: nine worker runs, all deepseek, every stop
    correct per the packet's stop conditions, every machine-derived
-   deviation consistent with the tree.
+   deviation consistent with the tree. The probe discipline is 3-for-3:
+   chamfer, fillet, and torus probes each converted their packet's risk
+   into first-try or near-first-try landings.
 3. The dyadic-exactness domain of the landed `arrange` still bounds every
    offset-based construction; machine-check fixture crossing parameters.
    Also: `translate_solid` panics in debug on circle-carrying solids (the
@@ -113,25 +134,28 @@ follow-up family's design input is complete.
   `LOOK_WATCHDOG_STAGNANT=3600`). CAUTION: it misfired once this session
   (session-41 traps, item 1) — check `loop/watchdog.log` tail for ACTION
   lines before dispatching into any slot.
-- Registry: 126 rows = 125 DONE + 1 BLOCKED (`BG-AUD-FIX-004`, old audit
-  row); 0 READY — P6/P7 packets must be written before anything
+- Registry: 129 rows = 128 DONE + 1 BLOCKED (`BG-AUD-FIX-004`, old audit
+  row); 0 READY — P8/P9/P10/P12 packets must be written before anything
   dispatches.
 - Slots 0-3: FINISHED/landed branches, re-fork via new_slot.
-- Disk ~17.5 GB free at close (all slot targets + repo-root target/ reclaimed
-  after the final verify; they regenerate).
+- Disk ~12.8 GB free at close (slot targets reclaimed post-verify; they
+  regenerate).
 - GATE-4 ceiling 111 = true count; no new unscaled_legacy sites landed.
 - Results filed this session: `loop/results/RW-INTERIOR-LOOP.json`,
   `BG-CAD-P4-UNTIL.json`, `BG-CAD-P5-REVOLVE.json`, `RW-RESEW.json`,
   `BG-CAD-P3-SPLIT.SPEC_GAP2.json`, `RW-DIVIDE-NESTING.json`,
   `RW-VERTEX-CLIP.STOP-r1.json`, `RW-VERTEX-CLIP.STOP-r2.json`,
-  `RW-SEED-DIAGONAL.STOP.json`, `BG-CAD-P3-SPLIT.json`.
+  `RW-SEED-DIAGONAL.STOP.json`, `BG-CAD-P3-SPLIT.json`,
+  `BG-CAD-P6-REWRITE.json`, `BG-CAD-P7-FILLET.json`,
+  `BG-CAD-P11-TORUS.json`.
 - Root tracked tree clean apart from this STATE rewrite.
 
 ## The parallelism picture
 
-Nothing running. P6/P7 are both truck-modeling-adjacent designs; P6's
-probe must complete before its packet exists. P8 (facade + battery) waits
-for P6/P7. Tier 1 (P9/P10) is the next parallel-eligible wave after P6/P7.
+Nothing running. Next wave: P12 + P9 (write-disjoint, parallel-eligible),
+P8 after. Verify-disk rules stand: reclaim slot targets (BOTH the outer
+and the wt-internal one) before any verify; the V9 look baseline needs
+~7 GB headroom.
 
 ## Traps, each one paid for
 
@@ -262,6 +286,51 @@ for P6/P7. Tier 1 (P9/P10) is the next parallel-eligible wave after P6/P7.
   targets, wt-internal targets, %TEMP% baselines, worktree prune).
   Sufficient after the session's many builds: 10 GB free was enough for
   the V9 look baseline where 7.4 was not.
+- **A packet's test file must not reuse a LANDED test file's path.** P7's
+  packet booked its tests at `tests/fillet.rs` — which already held the
+  landed upstream fillet suite. The worker faithfully clobbered it; V5's
+  identity guard caught the five vanished test names ("passed at base,
+  absent now"). Recovery: restore the landed file byte-identical from
+  base, move the new tests to a fresh name (`fillet_pp.rs`), amend the
+  packet's write_allow + Done-when, re-verify. Rule: before booking a NEW
+  test file, `Test-Path` the candidate path against the base tree.
+- **`--base` is read off the slot's fork point, not "the last landing".**
+  I verified P7 with `--base 5d8ff06` (the P6 landing) when the slot had
+  forked at `f45f2be` (which included my own packet-commit): V1 rejected
+  the diff for `loop/PACKETS.jsonl` and the packet file — MY commits, not
+  the worker's. The rule is mechanical: the base is the sha `slot_status`
+  showed at dispatch time ("git=...@XXXX (=base)").
+- **Clippy findings arrive in BATCHES, and the verify's clippy flags
+  differ from a plain run.** P7 took three V3 rounds: findings kept
+  appearing because (a) clippy reports per-run batches, (b) my in-slot
+  greps filtered for the wrong filename patterns, and (c) the verify runs
+  `cargo clippy --all-targets --message-format=short --no-deps` — a plain
+  run WITHOUT `--message-format=short --no-deps` hides test-crate findings
+  behind dependency noise. The amendment loop that actually terminates:
+  run the EXACT verify invocation unfiltered, fix ALL findings, re-run,
+  and only then amend.
+- **The landed Torus::grad's interval dependency was P11's real blocker —
+  and the probe found it in one afternoon.** The sqrt-free quartic form's
+  `4g·x' − 8R²x'` evaluates as two separate interval products and spans
+  zero wherever it matters; the sqrt-form re-enclosure (same function,
+  tight components) certifies perfectly. The plan's 7-8/10 "new solver
+  math" was actually a re-enclosure fix + a dispatch arm — because
+  `validated_ff` was already landed and generic. **Read the landed
+  generic engines before rating a packet's difficulty.**
+- **The equator band r̂=R is chart-degenerate at EVERY scale** (the torus
+  grad's xy-components vanish there; `cover_branch`'s chart is fixed per
+  input cell and never re-charts), so torus pairs need the band-aware
+  domain pre-split, and band-GRAZING contact curves are the booked v1
+  refusal family. ALSO RECORDED: the landed `singular_events` returns
+  SPURIOUS points (violating f1 by ±3.67) on equator-band boxes — a
+  potential landed-stage defect, unreachable through the v1 entry's
+  pre-split, booked for the stage's owner.
+- **PowerShell inline-pipeline data mangles silently** (backtick-n inside
+  single quotes written literally into files; `$(...)` evaluated early) —
+  the session-40 rule now has a third costume: file edits go through the
+  Edit tool or a script FILE, never inline `-c` or `-replace` chains, and
+  cargo commands that grade worker work always run with the slot wt as
+  the working directory.
 
 ### Session 40 (Phase 7 opens; P1+P2 landed; model switch + balance drama) - paid in full
 
