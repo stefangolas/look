@@ -9,94 +9,85 @@ when they stop being true, never for length. If you are picking this up cold, re
 [`loop/ORCHESTRATOR.md`](ORCHESTRATOR.md) for how to run the loop, then
 `python loop/slot_status.py`** - nothing else. Do not read `LEDGER.jsonl` whole.
 
-Updated 2026-08-30, final close of session 42 (the COVERAGE PROGRAM IS
-COMPLETE: **P1-P12 all landed** - this session landed P12, P9, P10, and P8;
-main pushed to origin at `9dbfb3b`).
-Branch: `integration/kernel-bg`, HEAD `9dbfb3b` (= origin/main).
+Updated 2026-08-30, session 43 open. The COVERAGE PROGRAM remains COMPLETE
+(P1-P12 all landed, session 42; origin main at `9dbfb3b`). This session BOOKED
+the next program: the **constructive geometry kernel** —
+`docs/CONSTRUCTIVE_GEOMETRY_PLAN.md` (new) is the approved loop-side design;
+the kernel-side spec lives in the truck-fork repo
+(`truck-fork/CONSTRUCTIVE-GEOMETRY-BUILD-SPEC.md`, committed on truck
+`master`). The pyo3 binding translation is booked but DEFERRED behind the CG
+core (owner decision, session 43).
+Branch: `integration/kernel-bg`, HEAD `a7966c2` at booking.
 
 ## Where we are
 
-**Session 42 landed FOUR packets (P12, P9, P10, P8) and closed the
-build123d coverage program.**
-
-1. **BG-CAD-P12-BLEND** (verified `7f870c4`, merged `dbff8d8`): table 6.4's
-   Circle->Torus row - `fillet_circle` + `CircleFilletSpec` on the rewrite
-   engine. Probe-derived junction geometry (two-wire full-revolution
-   faces, self-loop junction circles shared as instances, wall-forward/
-   torus-inverse/cap-pairs coedge recipe, s-rule center locus). 7 tests.
-2. **BG-CAD-P9-CONJUGATION** (verified `155046d`, merged `8bd38c6`):
-   relative-frame canonicalization in the Contact dispatch - the
-   `(Placed, _)` arm normalizes; `equal_radius_cylinders` reachable for
-   the first time; metamorphic contact(A,B) ~= contact(g*A, g*B) with
-   26-point checks. 8 tests.
-3. **BG-CAD-P10-FRAMED** (verified `fc72806`, merged `28bd6bf`):
-   rotate_solid + mirror_about_plane folds, the oblique circle extrusion
-   emitted as the affine-placed right cylinder, the T(A op B) = T(A) op
-   T(B) metamorphic battery measured f64-EXACT. One honest worker
-   SPEC_GAP (the landed fold machinery's DEBUG-ONLY self-loop abort,
-   proven on the landed `translate_solid`; locus `wire.rs:628 -> edge.rs:
-   55-60`) + one resumed round (D8: the flaky landed
-   `test_circle_arc_tangent0` stabilized by a justified t-precondition,
-   the failing seed committed permanently). 8 tests + the property fix.
-4. **BG-CAD-P8-FACADE** (verified `98794a4`, merged `1f6c521`): the
-   build123d-shaped facade (16-entry naming table + Mode/BlendSpec
-   wrappers, zero geometric content) at `truck-shapeops/src/facade.rs` +
-   the conformance battery. Three rounds: r1 worker SPEC_GAP
-   (truck-modeling is a DEV-dependency - promoted to [dependencies]);
-   r2 worker STOP with two characterized boundaries (split-of-filleted =
-   the RW-CONIC-class arc-face boundary; the oblique tessellation
-   measures Closed through the landed emission, not the hand-built
-   probe's Regular); r3 landed everything. 7 tests.
-
-**The coverage program is complete.** The facade is the Python-visible
-API surface; the next program is the **pyo3 binding translation**
-(booked, mechanical). Probe discipline finished **5-for-5** (chamfer,
-fillet, torus, conjugation/oblique, consumability).
+Session 42 landed four packets (P12, P9, P10, P8) and closed the build123d
+coverage program; probe discipline finished 5-for-5. Session 43 so far:
+audited `vendor/truck` against the external constructive-geometry design,
+converged the design with the owner (facet-first realization; deferred the
+public builder, the triangular transfinite patch, and the BVH; two
+realization modes over one recipe), and booked the program as the CG packet
+graph. **No CG packet dispatched yet** — CG-000-CONTRACT is the first.
 
 ## Pick up here
 
-1. **Next program: the pyo3 bindings** over the stabilized facade
-   (refusal -> typed exception; plan section 1 books it as a separate
-   mechanical program; it must never appear inside a kernel packet).
-2. **Booked kernel follow-ups** (each its own packet, none blocking the
-   bindings): the truck-topology self-loop-safe fold fix (`Mapped` path
-   uses new_unchecked when front==back; unlocks the two re-booked
-   rotate-on-cylinder rows and debug-build tessellation); split of
-   arc-carrying faces (RW-CONIC class, fully characterized by the P8 r2
-   worker); sheared-placement funnel admission; arbitrary-axis revolve;
-   F3 chains; the upstream `fillet::complex_surface` failure fix.
-3. **Model policy: default worker is `deepseek/deepseek-v4-flash`**
+1. **Dispatch `BG-CG-000-CONTRACT`** first (plan §4): the compilable contract
+   skeleton over `vendor/truck` — new `truck-geometry/src/constructive/`
+   module with real types and stub bodies, `DirectTolerance`, the frozen
+   index-identity convention (§3.4), the certificate field-level mapping
+   (§3.5). Every other CG packet types against it. Evidence files must be
+   committed BEFORE `new_slot.py` forks a slot.
+2. After 000 lands: CG-001 (recipe + profile laws + C1 refusals). Then the
+   disjoint set {CG-002 | CG-003} (after 001), {CG-005}, {CG-006},
+   {CG-008} runs with ≤3 live packets; elastic corpus/mutation/benchmark
+   packets fill idle slots. CG-004 after 001-003; CG-007 after 004+006;
+   CG-009 (enum ripple) effectively alone.
+3. **The Exeter regression gate** (plan §8) fires after CG-004: one rib
+   migrated to the kernel recipe API, benchmarked against the client's local
+   implementation.
+4. **Booked kernel follow-ups (pre-existing, still standing, each its own
+   packet, none blocking CG):** the truck-topology self-loop-safe fold fix
+   (`Mapped` path uses new_unchecked when front==back; NOTE it blocks
+   debug-build tessellation of circle-carrying solids — relevant to CG-004
+   fixture discipline); split of arc-carrying faces (RW-CONIC class);
+   sheared-placement funnel admission; arbitrary-axis revolve; F3 chains;
+   the upstream `fillet::complex_surface` failure fix.
+5. **Model policy: default worker is `deepseek/deepseek-v4-flash`**
    (`run_packet.py:229`; the coverage plan section 11's glm line is
    STALE). Session 42: six dispatches, four landings, two honest
    worker stops, every machine-derived deviation consistent with the
    tree.
-4. Open environmental, do NOT chase: `healing::tests::step_import`
+6. Open environmental, do NOT chase: `healing::tests::step_import`
    (missing fixture, fails at base); upstream
    `fillet::complex_surface` ("Oriented" vs "Closed", fails at base,
    machine-checked); clippy deny-lints in untouched
-   truck-meshalgo/truck-stepio; `test_circle_arc_tangent0` is now
+   truck-meshalgo/truck-stepio; `test_circle_arc_tangent0` is
    STABILIZED (D8) but keep the regressions file committed.
 
 ## State of the machine, as left
 
-- Watchdog RUNNING (`loop/watchdog.lock`, `LOOK_WATCHDOG_STAGNANT=3600`).
+- Watchdog RUNNING (`loop/watchdog.lock`, `LOOK_WATCHDOG_STAGNANT=3600`) —
+  re-derive before dispatching (`watchdog.log` tail for ACTION lines).
 - Slots 0-3: FINISHED (P10, P8, P0-SPAN, P4) - re-fork via new_slot.
 - Registry/ledger: every coverage packet DONE; P8/P10 rows filed.
-- Disk ~23 GB free at close (slot targets regenerate); **the pagefile
-  ballooned to 48 GB mid-session and a reboot reclaimed ~40 GB** - do
-  not run verifies below ~15 GB free
-  (V9's transient peak is 10-12 GB; the 8 GB floor is necessary, not
-  sufficient).
-- Results filed: `loop/results/BG-CAD-P12-BLEND.json`,
-  `BG-CAD-P9-CONJUGATION.json`, `BG-CAD-P10-FRAMED.json` (+ .QUESTION),
-  `BG-CAD-P8-FACADE.json`.
+- Disk ~23 GB free at session-42 close (slot targets regenerate); **the
+  pagefile ballooned to 48 GB mid-session and a reboot reclaimed ~40 GB** -
+  do not run verifies below ~15 GB free (V9's transient peak is 10-12 GB;
+  the 8 GB floor is necessary, not sufficient).
 - LOC ledger (`git diff --shortstat da72cd5..HEAD -- vendor/truck`):
   **+69,000 / -1,600** class (re-derive by command).
 
 ## The parallelism picture
 
-Nothing running. The program is closed; the next session starts the pyo3
-bindings (or any booked follow-up).
+CG-000 is serial. After it: ≤3 concurrent live packets over the
+write-set-disjoint set {CG-002 | CG-003 (serial after 001)}, {CG-005},
+{CG-006}, {CG-008}; CG-001 precedes the frame packets; CG-004 consumes
+001-003; CG-007 consumes 004+006; CG-009 runs alone. Elastic
+corpus/mutation/benchmark packets fill idle slots. **Full-wave orchestration
+is deliberately NOT planned** (plan §5 velocity recalibration: the core is a
+3-7 day serial effort at demonstrated throughput; escalation trigger is
+CG-009's enum ripple exceeding ~2 days). The pyo3 bindings program follows
+the CG core.
 
 ## Traps, each one paid for
 

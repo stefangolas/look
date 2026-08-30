@@ -8,13 +8,16 @@ You may not be the agent that wrote these. Nothing here depends on that.
 
 ## The current program
 
-The base loop (76/76) and the BG-AUDIT-001 remediation (17/17) are FINISHED.
-The next program is the **solver family** — `docs/SOLVER_FAMILY_PLAN.md` is
-the approved design and books the existing API surface (real signatures) so
-packets do not re-explore. Its Phase 0 is a 4-wide parallel wave; M1 is
-certified planar construction. Write solver-family packets against the plan
-doc's booked signatures and the parallel graph in its §5; keep the scheduler's
-write-set-disjointness rule (each solver family gets its own module file).
+The base loop (76/76), BG-AUDIT-001 (17/17), the solver family, and the
+build123d coverage program (P1–P12) are FINISHED. The next program is the
+**constructive geometry kernel** — `docs/CONSTRUCTIVE_GEOMETRY_PLAN.md` is the
+approved design and books the contract (§3), packet list, write sets, and
+dependency graph (§4, §6). Dispatch `BG-CG-000-CONTRACT` first; everything in
+the CG graph types against it. Concurrency is capped at ≤3 live packets over
+the write-set-disjoint set; full-wave orchestration is deliberately NOT
+planned (plan §5 — velocity recalibration). The pyo3 binding translation is
+booked but DEFERRED behind the CG core. Solver-family and pyo3 packet
+conventions (booked signatures, write-set disjointness) carry over unchanged.
 
 ## The one-sentence version
 

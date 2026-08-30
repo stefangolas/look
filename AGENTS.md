@@ -9,14 +9,19 @@ them.
 
 ## Kernel solver program
 
-The base kernel loop is FINISHED (76/76) and BG-AUDIT-001 closed (17/17). The
-next program is the certified solver family: `docs/SOLVER_FAMILY_PLAN.md` is
-the approved design and books the existing `truck-evidence`/`truck-shapeops`/
-`truck-geometry`/`truck-topology` API surface with real signatures so fresh
-packets do not re-explore it. Kernel code changes only through the packet /
+The base kernel loop is FINISHED (76/76), BG-AUDIT-001 closed (17/17), the
+solver family is landed, and the build123d coverage program is complete
+(P1–P12). The next program is the **constructive geometry kernel**:
+`docs/CONSTRUCTIVE_GEOMETRY_PLAN.md` is the approved design — a spine/frame
+constructive recipe with explicit frame laws, a direct facet realization
+backend emitting exact shared-topology `PolygonMesh` (no sewing, no welding),
+topology-preserving tessellation, reduced manifold diagnostics, and
+certificate integration into the existing evidence types. The kernel-side
+design spec lives in the truck-fork repo; the loop-side plan books the
+contract and packet graph. Kernel code changes only through the packet /
 worker / `verify.py` loop (see `loop/ORCHESTRATOR.md`); `vendor/truck/**` is
-off-limits to direct editing. Solver-family packets are written against the
-plan doc's §3 booked API and §5 parallel graph.
+off-limits to direct editing. The pyo3 binding translation over the
+stabilized facade is booked and deferred behind the CG core.
 
 ## Use look efficiently
 
