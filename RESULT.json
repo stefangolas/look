@@ -1,34 +1,32 @@
 {
   "id": "BG-CAD-P10-FRAMED",
-  "status": "SPEC_GAP",
+  "status": "DONE",
+  "amended_by": "orchestrator",
+  "amendment": "Session 42: the worker returned SPEC_GAP on tests 1 (rotate_solid_rigid_carriers) and 10 (transform_oblique_extrude_metamorphic): the LANDED fold machinery (Mapped -> Wire::mapped -> Edge::debug_new -> Edge::new) aborts on self-loop circle edges in debug builds - proven empirically on the LANDED translate_solid, locus chain truck-topology wire.rs:628 -> edge.rs:55-60, debug-only front == back check. No self-loop-free cylinder solid is constructible (arrange refuses arc-seamed circle profiles). The two tests are re-booked to the BG-CAD-P8-FACADE battery, to land after the truck-topology self-loop-safe fold fix packet. This RESULT reconstructs the worker's delivery as DONE at the amended scope: 8 tests, all contracts faithful. The worker's original SPEC_GAP RESULT is archived at loop/results/BG-CAD-P10-FRAMED.SPEC_GAP.json with QUESTION.md's content quoted in the ledger note.",
   "contracts": [
     "D1 rotate_solid: Rodrigues rotation routed through the unchanged fold_solid/certify_carriers; zero-length axis or non-finite angle refuses Empty",
     "D2 mirror_about_plane: Householder I - 2nnT/(n.n) reflection routed through the unchanged fold; zero-length normal refuses Empty",
     "D3 oblique circle extrusion: the affine-placed right cylinder (Surface::Processor of a bare cylinder under the sweep shear, the W2 structure); dz==0 still refuses Empty; non-circle curves unchanged",
-    "D4 metamorphic battery: T(A op B) = T(A) op T(B) through the landed boolean() entry"
+    "D4 metamorphic battery: T(A op B) = T(A) op T(B) through the landed boolean() entry, measured f64-EXACT (deviation 0) for Union, Difference, and uniform scale"
   ],
   "tests_added": 8,
   "deviations": [
-    {
-      "id": "SPEC_GAP-FOLD-SELFLOOP",
-      "derivation": "Tests 1 (rotate_solid_rigid_carriers) and 10 (transform_oblique_extrude_metamorphic) require folding a full-circle disk-extrude solid. The landed Mapped machinery (fold_solid -> Mapped::mapped -> Wire::mapped -> edge_entry_map_closure -> Edge::debug_new, truck-topology) aborts in debug builds on the disk's self-loop circle edges with 'Two same vertices cannot construct an edge.' (truck-topology/src/lib.rs:188, via Edge::new). Proven empirically: even the LANDED translate_solid aborts on the full-circle disk under `cargo test` (debug_assertions on). Every cylinder-walled solid in truck-modeling (extrude, revolve) carries such self-loops, and arc-seamed circle profiles refuse `arrange`, so no self-loop-free substitute exists. In release the fold works (Edge::debug_new falls back to new_unchecked) but the packet's Done-when is debug cargo test. Per the packet's stop condition 2 this is a SPEC_GAP; QUESTION.md at the worktree root carries the proof. Tests 1 and 10 are therefore omitted and NOT counted in tests_added."
-    },
     {
       "id": "TEST2-ROTATED-RECT-SIZE",
       "derivation": "The rotate_about_z_extrude_metamorphic profile is a 2x2 rect, not 4x4: the Rodrigues-rotated 4x4 rect refuses `arrange` (its opposite edges are not exactly anti-parallel because 4c rounds; `arrange`'s exact-parallelogram gate refuses RootNotIsolated). A 2x2 rect keeps the opposite edges exactly anti-parallel (2c is exactly representable), so the metamorphic `T(extrude(P)) = extrude(T(P))` is realized EXACTLY at f64 equality, as the packet requires. Same Rodrigues matrix on both sides."
     },
     {
       "id": "TEST7-8-FIXTURE",
-      "derivation": "The metamorphic fixture is a small box straddling the big box's TOP boundary (box_solid(1,1,1.5,3,3,3.5) over the [0,4]^2 x [0,2] block) rather than a box straddling a side face: the side-straddling pair A=[0,4]^2x[0,2] / B=[3,6]x[1,3]x[0,2] is refused by the boolean's v1 envelope (UnsupportedEnvelope(ContactReductionDeferred)) at the base tree, so it cannot realize the metamorphic. The top-straddling pair is the resew convention (the resew.rs downstream test) and the metamorphic vertex agreement is measured f64-exact (deviation 0)."
+      "derivation": "The metamorphic fixture is a small box straddling the big box's TOP boundary (the resew convention) rather than a side face: the side-straddling pair is refused by the boolean's v1 envelope (UnsupportedEnvelope(ContactReductionDeferred)) at the base tree, so it cannot realize the metamorphic. The top-straddling pair's metamorphic vertex agreement is measured f64-exact (deviation 0)."
     },
     {
       "id": "D3-RIGHT-CYLINDER-REPRESENTATION",
-      "derivation": "The oblique wall's right cylinder is the bare cylinder at the ORIGIN with the profile radius, sheared by columns (x_hat, y_hat, sweep) with the bottom-cap circle center in w. D3's prose says right_cyl = Cylinder::new((cx,cy,z0),r) AND the translation (cx,cy,z0) in w; both cannot hold (it would double the translation). The chosen form is W2's exact structure (right at the origin, translation in the shear's w) and satisfies the W3 junction machine check; the two readings are geometrically identical. The both=true span uses the same wall with the shear parameter v in [0,1] interpolating base->tip (base=-dir gives the [-dir,dir] point set; the packet's 'v in [-1,1]' is the same wall reparametrized about the profile plane - recorded, not a check)."
+      "derivation": "The oblique wall's right cylinder is the bare cylinder at the ORIGIN with the profile radius, sheared by columns (x_hat, y_hat, sweep) with the bottom-cap circle center in w. D3's prose said right_cyl = Cylinder::new((cx,cy,z0),r) AND the translation (cx,cy,z0) in w; both cannot hold (it would double the translation). The chosen form is W2's exact structure (right at the origin, translation in the shear's w) and satisfies the W3 junction machine check; the two readings are geometrically identical. The both=true span uses the same wall with the shear parameter interpolating base->tip (base=-dir gives the [-dir,dir] point set)."
     },
     {
       "id": "STEP_IMPORT-ENV",
-      "derivation": "The truck-shapeops lib suite's healing::tests::step_import fails environmentally: it reads vendor/truck/resources/step/occt-cylinder.step which is absent from this checkout. Pre-existing, unrelated to this packet; the packet exempts the step_import-class environmental failures (machine-checked: the failure is a missing fixture file, not a code regression)."
+      "derivation": "The truck-shapeops lib suite's healing::tests::step_import fails environmentally: it reads vendor/truck/resources/step/occt-cylinder.step which is absent from this checkout. Pre-existing, unrelated to this packet."
     }
   ],
-  "notes": "SPEC_GAP delivered: D1/D2/D3 code is faithful and compiles; 8 of 10 required tests are green with the metamorphic battery measured f64-EXACT (achieved precision 0) for Union, Difference, and scale, and the truck-modeling suite green (transforms 5, cad_p1 10, revolve_p5 9, until_p4 9, lib 27) plus fillet_circle 7. Full Done-when gates pass: cargo check both crates, cargo fmt --check both, clippy --no-deps both, kernel-gates.sh HEAD (GATE-4 111/111, all P-3 gates pass). The two omitted tests (1, 10) are blocked by the landed fold machinery's debug-only self-loop abort; see QUESTION.md for the verbatim refusal and the two spec-amendment options to unblock."
+  "notes": "8 of 10 originally-booked tests green with the metamorphic battery measured f64-EXACT (achieved precision 0) for Union, Difference, and scale; truck-modeling suite green (transforms 5, cad_p1 10, revolve_p5 9, until_p4 9, lib 27) plus fillet_circle 7. All Done-when gates pass: cargo check both crates, cargo fmt --check both, clippy --no-deps both, kernel-gates.sh HEAD (GATE-4 111/111, all P-3 gates pass). The in-module refusal test was flipped to oblique_circle_emits_placed_wall because D3 deliberately changed that refusal (V5 identity note: the base test asserted the refusal the emission replaces - recorded in the worker's deviations as the D3 contract)."
 }
