@@ -38,6 +38,7 @@
 
 use self::implicit::ImplicitField;
 use crate::analytic::coaxial::{coaxial, CoaxialPair};
+use crate::analytic::equal_radius_cylinders::equal_radius_cylinders;
 use crate::analytic::parallel_cylinders::parallel_cylinders;
 use crate::analytic::plane_cone::plane_cone;
 use crate::analytic::plane_cylinder::plane_cylinder;
@@ -46,8 +47,11 @@ use crate::analytic::plane_sphere::plane_sphere;
 use crate::analytic::sphere_sphere::sphere_sphere;
 use crate::analytic::{AnalyticIntersection, AnalyticOutcome, ExactCurve};
 use crate::enclosure::{interval_at, Box3, EnclosureSurface, Interval};
+use std::cmp::Ordering;
 use std::f64::consts::TAU;
-use truck_base::cgmath64::{EuclideanSpace, InnerSpace, Point3};
+use truck_base::cgmath64::{
+    EuclideanSpace, InnerSpace, Matrix4, Point3, SquareMatrix, Transform, Vector3,
+};
 use truck_base::contact::{ContactDimension, ContactEventKind};
 use truck_base::evidence::{
     Budget, Certificate, Certified, EnvelopeCase, Margin, Method, Modulus, Outcome, Prop, PropMap,
@@ -56,7 +60,7 @@ use truck_base::evidence::{
 use truck_geometry::recognize::{
     CanonicalCarrier, CanonicalCarrierWitness, CanonicalCurve, CanonicalSurface,
 };
-use truck_geometry::specifieds::{Plane, Torus};
+use truck_geometry::specifieds::{Cylinder, Plane, Torus};
 
 /// BG-SOL-S4-FE-EE: the FE (Edge × Face) and EE (Edge × Edge) strata reductions.
 ///
@@ -178,8 +182,9 @@ pub enum ContactLocus {
 ///    `Edge` × `Edge` pair by [`fe_ee::ee_contact`]. The bounded locus forms
 ///    (`ContactLocus::Point`, `ContactLocus::BoundedCurve`) are emitted here.
 /// 5. **Everything else** — the deferred funnel (any pair involving a
-///    `Vertex`, a `Placed` carrier, FE/EE carrier families outside the landed
-///    tables, singular event cells, 2-D overlap) refuses with
+///    `Vertex`, a `Placed` carrier outside the landed cylinder conjugation
+///    (BG-CAD-P9), FE/EE carrier families outside the landed tables,
+///    singular event cells, 2-D overlap) refuses with
 ///    `ContactReductionDeferred`.
 ///
 /// The exact and coaxial analytic pairs take no budget; the validated FF stage
@@ -400,14 +405,18 @@ fn coaxial_axes(axis0: Point3, axis1: Point3) -> bool {
 /// quadric cells (Cylinder/Cone, Cylinder/Sphere, Cone/Cone, Cone/Sphere)
 /// are answered by the general validated FF stage
 /// (BG-SOL-S7-GFF-WIRE); any pair involving a bare `Torus` is answered by the
-/// torus-aware validated FF stage (BG-CAD-P11, `torus_ff`); a `Placed`
-/// carrier, and any canonical analytic pair without an exact closed form in
-/// §3.3, falls through to the deferred funnel
-/// (`ContactReductionDeferred`). A numerically unresolved
-/// analytic arm is propagated as-is: it is a stop, not a guess. The dispatch
-/// predicate guarantees `CoaxialPair::validate` passes, so a
-/// `NonCanonicalCarrier` refusal from `coaxial` can only mean a bug and is
-/// propagated, not hidden.
+/// torus-aware validated FF stage (BG-CAD-P11, `torus_ff`). A `Placed`
+/// cylinder pair is conjugated to its world-frame relative configuration
+/// (BG-CAD-P9-CONJUGATION, [`placed_cylinder_conjugation`]): parallel world
+/// axes fold onto the canonical cylinder cells (the coaxial screen, then
+/// `parallel_cylinders`), and non-parallel equal radii route to the
+/// axis-explicit `equal_radius_cylinders` cell; any other `Placed` pair, and
+/// any canonical analytic pair without an exact closed form in §3.3, falls
+/// through to the deferred funnel (`ContactReductionDeferred`). A
+/// numerically unresolved analytic arm is propagated as-is: it is a stop, not
+/// a guess. The dispatch predicate guarantees `CoaxialPair::validate` passes,
+/// so a `NonCanonicalCarrier` refusal from `coaxial` can only mean a bug and
+/// is propagated, not hidden.
 fn analytic_ff(
     l: &CanonicalSurface,
     r: &CanonicalSurface,
@@ -520,9 +529,9 @@ fn analytic_ff(
             ));
         }
         (CanonicalSurface::Placed(_), _) | (_, CanonicalSurface::Placed(_)) => {
-            return Err(Refusal::UnsupportedEnvelope(
-                EnvelopeCase::ContactReductionDeferred,
-            ))
+            return placed_cylinder_conjugation(
+                l, r, u_range_l, v_range_l, u_range_r, v_range_r, budget,
+            );
         }
     };
     let Certified { value, .. } = outcome?;
@@ -540,6 +549,333 @@ fn analytic_ff(
         }
         _ => analytic_records(&value),
     };
+    let mut props = PropMap::new();
+    props.set(Prop::AnalyticCarrier, Truth::True);
+    Ok(Certified::new(
+        ContactComplex { contacts },
+        Certificate {
+            props,
+            method: Method::Exact,
+            budget_left: *budget,
+            margin: Margin::UNBOUNDED,
+            modulus: Modulus::Unbounded,
+        },
+    ))
+}
+
+/// The world-frame cylinder pose of one side of a `(Placed, _)` face pair
+/// (BG-CAD-P9-CONJUGATION D2/D3): the canonical cylinder's world axis foot,
+/// its normalized world axis direction, its world (scaled) radius, and the
+/// W3 fold parameters — the placement's z-rotation `theta` of `x̂` and its
+/// uniform scale `s = |m·ẑ|` (a bare cylinder is its own canonical pose:
+/// foot = its center, dir = `ẑ`, `theta = 0`, `s = 1`).
+struct CylinderPose {
+    /// The world axis foot (`m·center` for a placed cylinder).
+    foot: Point3,
+    /// The normalized world axis direction (`normalize(m·ẑ)`).
+    dir: Vector3,
+    /// The world radius (`r·|m·ẑ|` for a placed cylinder).
+    radius: f64,
+    /// The placement's z-rotation of `x̂`, `atan2(m·x̂.y, m·x̂.x)`.
+    theta: f64,
+    /// The placement's uniform scale, `|m·ẑ|`.
+    scale: f64,
+}
+
+/// The degenerate interval of an f64 component; a non-finite component is
+/// `Interval::EMPTY`, which propagates through the predicates and refuses
+/// downstream rather than panicking (the `equal_radius_cylinders.rs` pattern).
+fn ival(x: f64) -> Interval {
+    Interval::try_from((x, x)).unwrap_or(Interval::EMPTY)
+}
+
+/// The extracted magnitude `sqrt(x² + y² + z²)` of a linear-part column as a
+/// degenerate interval of its plain f64 value (D3's extracted-component
+/// discipline). The three-way comparator below then decides the equality of
+/// the three extracted magnitudes from these exact enclosures; the interval
+/// product + outward-rounded `sqrt` form would widen genuinely-equal
+/// construction magnitudes (e.g. a rotation's unit columns) into a straddle
+/// and refuse a valid similarity (recorded in RESULT notes).
+fn vector_magnitude_interval(x: f64, y: f64, z: f64) -> Interval {
+    ival((x * x + y * y + z * z).sqrt())
+}
+/// Whether the interval is exactly the single point `0`.
+fn decisively_zero(i: Interval) -> bool {
+    i.inf() == 0.0 && i.sup() == 0.0
+}
+
+/// The three-way ordering of two intervals: `Some` exactly when the relation
+/// is forced by the enclosures, `None` when they straddle (undecidable).
+fn three_way(a: Interval, b: Interval) -> Option<Ordering> {
+    if a.sup() < b.inf() {
+        Some(Ordering::Less)
+    } else if b.sup() < a.inf() {
+        Some(Ordering::Greater)
+    } else if a.inf() == a.sup() && b.inf() == b.sup() && a.inf() == b.inf() {
+        Some(Ordering::Equal)
+    } else {
+        None
+    }
+}
+
+/// The cross product of two (normalized) directions, per component in interval
+/// arithmetic so the outward rounding of the products catches the f64 noise
+/// (the `equal_radius_cylinders.rs` pattern).
+fn cross_intervals(a0: Vector3, a1: Vector3) -> [Interval; 3] {
+    [
+        ival(a0.y) * ival(a1.z) - ival(a0.z) * ival(a1.y),
+        ival(a0.z) * ival(a1.x) - ival(a0.x) * ival(a1.z),
+        ival(a0.x) * ival(a1.y) - ival(a0.y) * ival(a1.x),
+    ]
+}
+
+/// BG-CAD-P9-CONJUGATION: the `(Placed, _)` arm's relative-frame
+/// canonicalization (D1-D4). Extracts each side's world cylinder pose,
+/// classifies the relative configuration, and routes to the axis-explicit
+/// cells:
+///
+/// 1. **Parallel world axes** (the interval cross product decisively zero):
+///    fold each placed side to its canonical z-aligned form (W3) and re-enter
+///    the bare cylinder arms (`coaxial` screen, then `parallel_cylinders`)
+///    unchanged.
+/// 2. **Non-parallel, equal radii** (exact f64 equality on the scaled
+///    radii): the axis-explicit `equal_radius_cylinders` cell on the world
+///    poses; its skew `NonCanonicalCarrier` refusal maps to
+///    `ContactReductionDeferred` (§7), its `NumericallyUnresolved` propagates
+///    as-is.
+/// 3. **Everything else** — non-parallel unequal radii, non-cylinder placed
+///    families (D2), improper placements (D3) — stays exactly as deferred as
+///    today.
+///
+/// Every geometric predicate is decided by interval arithmetic on the
+/// extracted components, never by naked f64 comparison; an undecidable
+/// straddle refuses `NumericallyUnresolved` with `RootNotIsolated`.
+fn placed_cylinder_conjugation(
+    l: &CanonicalSurface,
+    r: &CanonicalSurface,
+    u_range_l: (f64, f64),
+    v_range_l: (f64, f64),
+    u_range_r: (f64, f64),
+    v_range_r: (f64, f64),
+    budget: &mut Budget,
+) -> Outcome<ContactComplex> {
+    let pose_l = cylinder_pose(l)?;
+    let pose_r = cylinder_pose(r)?;
+    // The classification: the interval cross product of the two world
+    // directions. All three components decisively zero means parallel;
+    // any component decisively nonzero means non-parallel; a straddle is
+    // undecidable.
+    let [cx, cy, cz] = cross_intervals(pose_l.dir, pose_r.dir);
+    if decisively_zero(cx) && decisively_zero(cy) && decisively_zero(cz) {
+        return fold_parallel_pair(
+            &pose_l, &pose_r, u_range_l, v_range_l, u_range_r, v_range_r, budget,
+        );
+    }
+    if !(excludes_zero(cx) || excludes_zero(cy) || excludes_zero(cz)) {
+        return Err(Refusal::NumericallyUnresolved {
+            spent: Budget::new(0, 0, 0),
+            witness: UnresolvedWitness::RootNotIsolated,
+        });
+    }
+    // Non-parallel world axes. Equal scaled radii (the `coaxial_axes` exact
+    // f64 convention) route to the axis-explicit cell; unequal radii belong
+    // to the general solver and defer exactly as today.
+    if pose_l.radius == pose_r.radius {
+        return equal_radius_world_route(&pose_l, &pose_r, budget);
+    }
+    Err(Refusal::UnsupportedEnvelope(
+        EnvelopeCase::ContactReductionDeferred,
+    ))
+}
+
+/// Extracts the world-frame cylinder pose of one side of a `(Placed, _)`
+/// face pair, running D2 (cylinder-family) and D3 (proper-similarity)
+/// screens.
+///
+/// D2: the v1 carrier family is cylinders on both sides. A bare side is its
+/// own canonical pose; a `Placed` side must wrap a `CanonicalSurface::Cylinder`
+/// inner carrier. Any other surface family refuses `ContactReductionDeferred`
+/// exactly as today.
+///
+/// D3: a placed side's linear part must be a proper similarity — the
+/// interval magnitudes `|m·x̂| = |m·ŷ| = |m·ẑ|` decisively equal (a violation
+/// is a non-uniform scale: an elliptical cross-section, `NonCanonicalCarrier`)
+/// and `det(m)` decisively positive (an improper/mirror placement defers
+/// `ContactReductionDeferred`, P10's booked follow-up). An undecidable
+/// straddle refuses `NumericallyUnresolved` with `RootNotIsolated`.
+fn cylinder_pose(surface: &CanonicalSurface) -> Result<CylinderPose, Refusal> {
+    match surface {
+        CanonicalSurface::Cylinder(cylinder) => Ok(CylinderPose {
+            foot: cylinder.center(),
+            dir: Vector3::new(0.0, 0.0, 1.0),
+            radius: cylinder.radius(),
+            theta: 0.0,
+            scale: 1.0,
+        }),
+        CanonicalSurface::Placed(placed) => {
+            let CanonicalSurface::Cylinder(inner) = &**placed.entity() else {
+                return Err(Refusal::UnsupportedEnvelope(
+                    EnvelopeCase::ContactReductionDeferred,
+                ));
+            };
+            let m = *placed.transform();
+            placed_similarity_screen(&m)?;
+            let foot = m.transform_point(inner.center());
+            let axis = Vector3::new(m.z.x, m.z.y, m.z.z);
+            let scale = axis.magnitude();
+            Ok(CylinderPose {
+                foot,
+                dir: axis.normalize(),
+                radius: inner.radius() * scale,
+                theta: m.x.y.atan2(m.x.x),
+                scale,
+            })
+        }
+        _ => Err(Refusal::UnsupportedEnvelope(
+            EnvelopeCase::ContactReductionDeferred,
+        )),
+    }
+}
+
+/// The D3 proper-similarity screen on a placed cylinder's affine placement.
+fn placed_similarity_screen(m: &Matrix4) -> Result<(), Refusal> {
+    let sx = vector_magnitude_interval(m.x.x, m.x.y, m.x.z);
+    let sy = vector_magnitude_interval(m.y.x, m.y.y, m.y.z);
+    let sz = vector_magnitude_interval(m.z.x, m.z.y, m.z.z);
+    match (three_way(sx, sy), three_way(sx, sz), three_way(sy, sz)) {
+        (Some(Ordering::Equal), Some(Ordering::Equal), Some(Ordering::Equal)) => {}
+        (Some(Ordering::Less) | Some(Ordering::Greater), _, _)
+        | (_, Some(Ordering::Less) | Some(Ordering::Greater), _)
+        | (_, _, Some(Ordering::Less) | Some(Ordering::Greater)) => {
+            return Err(Refusal::UnsupportedEnvelope(
+                EnvelopeCase::NonCanonicalCarrier,
+            ));
+        }
+        _ => {
+            return Err(Refusal::NumericallyUnresolved {
+                spent: Budget::new(0, 0, 0),
+                witness: UnresolvedWitness::RootNotIsolated,
+            });
+        }
+    }
+    match three_way(ival(m.determinant()), ival(0.0)) {
+        Some(Ordering::Greater) => Ok(()),
+        Some(Ordering::Less) | Some(Ordering::Equal) => Err(Refusal::UnsupportedEnvelope(
+            EnvelopeCase::ContactReductionDeferred,
+        )),
+        None => Err(Refusal::NumericallyUnresolved {
+            spent: Budget::new(0, 0, 0),
+            witness: UnresolvedWitness::RootNotIsolated,
+        }),
+    }
+}
+
+/// D4.1: the parallel-axes fold. Each side's world pose folds to its
+/// canonical z-aligned form, its `(u, v)` boxes ride the W3 parameter map,
+/// and the reconstructed (bare, bare) pair re-enters the landed cylinder
+/// arms unchanged. The reconstructed carriers' subs point sets equal the
+/// placed carriers' images exactly (W3), so a folded pair's records are
+/// world geometry — no conjugation-back.
+fn fold_parallel_pair(
+    pose_l: &CylinderPose,
+    pose_r: &CylinderPose,
+    u_range_l: (f64, f64),
+    v_range_l: (f64, f64),
+    u_range_r: (f64, f64),
+    v_range_r: (f64, f64),
+    budget: &mut Budget,
+) -> Outcome<ContactComplex> {
+    // W3's fold condition is exactly "axis ∥ ẑ": the C1 parameter-map
+    // equivalence holds only for a placed side whose world axis is decisively
+    // z-parallel. A parallel pair with a non-z placed axis has no canonical
+    // cell image and stays in the deferred funnel.
+    let [cxl, cyl, czl] = cross_intervals(pose_l.dir, Vector3::new(0.0, 0.0, 1.0));
+    let [cxr, cyr, czr] = cross_intervals(pose_r.dir, Vector3::new(0.0, 0.0, 1.0));
+    if !(decisively_zero(cxl)
+        && decisively_zero(cyl)
+        && decisively_zero(czl)
+        && decisively_zero(cxr)
+        && decisively_zero(cyr)
+        && decisively_zero(czr))
+    {
+        return Err(Refusal::UnsupportedEnvelope(
+            EnvelopeCase::ContactReductionDeferred,
+        ));
+    }
+    let (folded_l, folded_r) = (
+        fold_cylinder(pose_l, u_range_l, v_range_l)?,
+        fold_cylinder(pose_r, u_range_r, v_range_r)?,
+    );
+    analytic_ff(
+        &folded_l.surface,
+        &folded_r.surface,
+        folded_l.u_range,
+        folded_l.v_range,
+        folded_r.u_range,
+        folded_r.v_range,
+        budget,
+    )
+}
+
+/// One folded side of the parallel-axes route: the reconstructed bare
+/// canonical cylinder and its W3 parameter-mapped `(u, v)` boxes.
+struct FoldedCylinder {
+    surface: CanonicalSurface,
+    u_range: (f64, f64),
+    v_range: (f64, f64),
+}
+
+/// Reconstructs one folded side as a bare canonical cylinder carrying the W3
+/// parameter-mapped boxes. The carrier sits at the world foot with the
+/// scaled radius; the boxes map `u' = u + θ`, `v' = v·s` (the W3 subs
+/// identity `M·cyl.subs(u, v) == recon.subs(u + θ, s·v)` — the carrier
+/// carries the full foot, so the box map carries no additional z shift; see
+/// RESULT notes for the derivation).
+fn fold_cylinder(
+    pose: &CylinderPose,
+    u_range: (f64, f64),
+    v_range: (f64, f64),
+) -> Result<FoldedCylinder, Refusal> {
+    let cylinder = match Cylinder::new(pose.foot, pose.radius) {
+        Ok(certified) => certified.value,
+        // A non-finite or non-positive scaled radius is a chart degeneracy;
+        // the similarity screen already refuses non-finite inputs, so this
+        // is purely defensive.
+        Err(_) => return Err(Refusal::UnsupportedEnvelope(EnvelopeCase::ChartDegenerate)),
+    };
+    Ok(FoldedCylinder {
+        surface: CanonicalSurface::Cylinder(cylinder),
+        u_range: (u_range.0 + pose.theta, u_range.1 + pose.theta),
+        v_range: (v_range.0 * pose.scale, v_range.1 * pose.scale),
+    })
+}
+
+/// D4.2: the equal-radius non-parallel route. The axis-explicit
+/// `equal_radius_cylinders` cell runs on the WORLD poses (it is frame-free —
+/// its axes are arguments), so no conjugation-back of the emitted loci. Its
+/// skew `NonCanonicalCarrier` refusal maps to `ContactReductionDeferred`
+/// (§7) — parallel cannot reach here (the pre-screen folds it); its
+/// `NumericallyUnresolved` propagates as-is (a stop, not a guess).
+fn equal_radius_world_route(
+    pose_l: &CylinderPose,
+    pose_r: &CylinderPose,
+    budget: &mut Budget,
+) -> Outcome<ContactComplex> {
+    let outcome = equal_radius_cylinders(
+        pose_l.radius,
+        &(pose_l.foot, pose_l.dir),
+        &(pose_r.foot, pose_r.dir),
+    );
+    let Certified { value, .. } = match outcome {
+        Ok(certified) => certified,
+        Err(Refusal::UnsupportedEnvelope(EnvelopeCase::NonCanonicalCarrier)) => {
+            return Err(Refusal::UnsupportedEnvelope(
+                EnvelopeCase::ContactReductionDeferred,
+            ))
+        }
+        Err(other) => return Err(other),
+    };
+    let contacts = analytic_records(&value);
     let mut props = PropMap::new();
     props.set(Prop::AnalyticCarrier, Truth::True);
     Ok(Certified::new(
