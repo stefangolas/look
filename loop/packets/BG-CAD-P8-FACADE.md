@@ -153,12 +153,23 @@ facade names, the constructive sequences, the refusal cases, and the
 consumability row:
 
 1. **Constructive sequence** (the flagship): rectangle profile →
-   `extrude` → `fillet` (two vertical edges) → `boolean_op(Subtract,
-   small boundary-crossing box)` → `split` by a plane → EVERY
-   intermediate assembles (`Solid::try_new` semantics preserved by the
-   landed entries) and the final piece is a valid solid with the expected
-   face census (machine-derive the census from the landed suites'
-   fixtures — the chamfer/fillet_pp/resew fixtures are the witnesses).
+   `extrude` → `fillet` (two vertical edges, the grouped Straight batch
+   per D2) → `boolean_op(Subtract, small boundary-crossing box)` —
+   EVERY intermediate assembles (extrude 6 faces; fillet 8 faces;
+   Subtract 13 faces — the worker's r2 measured census). **AMENDMENT
+   (session 42 r3, orchestrator, after the worker's STOP 3): the
+   sequence ENDS at the boolean.** The r1 split step is re-booked as two
+   separate rows, both machine-measured by the r2 worker:
+   - `split` of a PLAIN box by z=1 assembles (1+1 shells) — a positive
+     split row;
+   - `split` of a FILLET-CARRYING solid refuses
+     `UnsupportedEnvelope(ContactReductionDeferred)` for every plane —
+     the measured **split-of-arc-carrying-faces v1 boundary** (the
+     RW-CONIC class; the landed boolean splitter's fragment machinery on
+     Circle edges — the worker proved `contact()` itself succeeds on
+     every face×plane and edge×plane pair, so the boundary sits in the
+     splitter/classifier, not the contact sweep). Assert the typed arm;
+     book the fix as a follow-up.
 2. **Metamorphic rows through the facade**: `A ∪ B ≅ B ∪ A`,
    `A − A = ∅` refusal-or-empty (machine-check the landed behavior),
    `fillet round trip` (the P6/P7 row: offset the two adjacent faces
@@ -173,13 +184,25 @@ consumability row:
    oblique on non-circle profiles, boolean multi-shell guard, split by a
    plane that grazes (the vertex-touch typed refusal — the booked v1
    boundary).
-4. **Consumability** (Finding 1/2/3): tessellation on the box, the plain
-   cylinder, the P12 torus-fillet solid, the mirrored placed cylinder,
-   and the boolean output — each asserts the probe's MEASURED condition
-   (Closed), GATED `#[cfg(not(debug_assertions))]` (Finding 3); the
-   oblique row (through `extrude_vector` with dir (1,0,1)) asserts
-   non-empty + the measured `Regular` with the probe citation, also
-   gated.
+4. **Consumability** (Finding 1/2/3 + the r2 worker's exhaustive
+   re-measurement): tessellation on the box, the plain cylinder, the P12
+   torus-fillet solid, the mirrored placed cylinder, and the boolean
+   output — each asserts the MEASURED condition on the dispatch tree
+   (**Closed** for all of these; the r2 worker reproduced every one) plus
+   non-emptiness; do NOT assert the probe's exact position/face counts
+   (they are fixture- and tree-dependent — the r2 worker measured the
+   boolean row at 290/280 vs the probe's quoted 384/364). GATED
+   `#[cfg(not(debug_assertions))]` (Finding 3).
+   **AMENDMENT (r3, after the worker's STOP 4): the oblique row asserts
+   the dispatch-tree measurement — condition Closed** (the r2 worker
+   exhaustively measured Closed for the landed `extrude_vector`
+   emission: dir (1,0,1)/(1,1,1)/(0,1,1), both=true, rotated, mirrored,
+   translated; raw triangulation Oriented, closing at every
+   put_together tolerance tried). The probe's quoted Regular was
+   measured on a HAND-BUILT construction on the PRE-P10 tree; the landed
+   P10 emission assembles a cleaner shell. Cite both measurements in the
+   test comment; the closure of sheared placements is simply recorded as
+   measured, no boundary claimed.
 
 **D4 — the facade is NOT allowed geometric content.** Every facade line
 either calls a landed entry or refuses; ANY branch that computes geometry
@@ -218,7 +241,8 @@ The D3 list, named exactly:
    the D2 list (a compile-time presence battery; assert one happy-path
    call per entry where cheap).
 2. `facade_constructive_sequence_plate_with_fillet_and_hole` — the D3.1
-   flagship sequence end-to-end.
+   flagship sequence end-to-end (extrude → fillet → Subtract), plus the
+   two split rows (plain-box positive; filleted-solid typed refusal).
 3. `facade_metamorphic_rows_still_hold_through_facade` — the D3.2 rows.
 4. `facade_refusal_cases_are_typed` — the D3.3 cases (assert each
    refusal arm; machine-check the arms you actually got).
