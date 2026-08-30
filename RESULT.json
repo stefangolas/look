@@ -1,33 +1,60 @@
 {
-  "id": "BG-CAD-P10-FRAMED",
+  "id": "BG-CAD-P8-FACADE",
   "status": "DONE",
-  "amended_by": "orchestrator",
-  "amendment": "Session 42: the worker returned SPEC_GAP on tests 1 (rotate_solid_rigid_carriers) and 10 (transform_oblique_extrude_metamorphic): the LANDED fold machinery (Mapped -> Wire::mapped -> Edge::debug_new -> Edge::new) aborts on self-loop circle edges in debug builds - proven empirically on the LANDED translate_solid, locus chain truck-topology wire.rs:628 -> edge.rs:55-60, debug-only front == back check. No self-loop-free cylinder solid is constructible (arrange refuses arc-seamed circle profiles). The two tests are re-booked to the BG-CAD-P8-FACADE battery, to land after the truck-topology self-loop-safe fold fix packet. This RESULT reconstructs the worker's delivery as DONE at the amended scope: 8 tests, all contracts faithful. The worker's original SPEC_GAP RESULT is archived at loop/results/BG-CAD-P10-FRAMED.SPEC_GAP.json with QUESTION.md's content quoted in the ledger note.",
   "contracts": [
-    "D1 rotate_solid: Rodrigues rotation routed through the unchanged fold_solid/certify_carriers; zero-length axis or non-finite angle refuses Empty",
-    "D2 mirror_about_plane: Householder I - 2nnT/(n.n) reflection routed through the unchanged fold; zero-length normal refuses Empty",
-    "D3 oblique circle extrusion: the affine-placed right cylinder (Surface::Processor of a bare cylinder under the sweep shear, the W2 structure); dz==0 still refuses Empty; non-circle curves unchanged",
-    "D4 metamorphic battery: T(A op B) = T(A) op T(B) through the landed boolean() entry, measured f64-EXACT (deviation 0) for Union, Difference, and uniform scale",
-    "D8 (session 42): test_circle_arc_tangent0 stabilized by a justified t-precondition - the interpolation parameter is bounded to [1e-2, 1-1e-2] so the property's circum_center equidistance check never samples the near-endpoint degenerate family (the persisted seed is reproduced, diagnosed, and excluded by the precondition; near tolerance untouched; the proptest-regressions file stays committed)"
+    "D1: the build123d-shaped facade lives at truck-shapeops/src/facade.rs (A2), declared `pub mod facade;` in lib.rs (A1 4->5); the module header carries the rewrite.rs house deny header and the plan's §1 naming-table contract as its doc comment",
+    "D1a: truck-modeling promoted from [dev-dependencies] to [dependencies] (same version/path, no cycle: truck-modeling does not depend on truck-shapeops); the manifest change is committed and `cargo check --locked -p truck-shapeops` is green",
+    "D2: the 16-entry naming table with the `Mode`/`BlendSpec` enum wrappers (naming only, D-zero-content): every operation either composes landed entries or refuses the typed Refusal they answer; no new solver mathematics, no restricted alternative names, no silent fallbacks; Python selectors excluded",
+    "D3: the conformance battery at tests/conformance_battery.rs, A7, with the 7 named tests: the constructive sequence (extrude 6 -> fillet 8 -> Subtract 13, the r2 census) plus the two split rows; the metamorphic rows (A∪B≅B∪A, A−A refusal-or-empty, fillet round trip, P9 contact, P10 transform); the typed refusal cases; the Mode->BoolOp mapping; the Closed consumability rows and the oblique row, both release-gated per Finding 3",
+    "D5: no new refusal arms - the facade forwards the landed refusals verbatim; the empty fillet list refuses Empty exactly as the landed entries do",
+    "D6: certificates forward untouched - the facade's fillet dispatch returns the last landed entry's certificate; the battery asserts `Solid::try_new`-class validity and the probe's measured mesh conditions, never new certificates"
   ],
-  "tests_added": 8,
+  "tests_added": 7,
   "deviations": [
     {
-      "id": "TEST2-ROTATED-RECT-SIZE",
-      "derivation": "The rotate_about_z_extrude_metamorphic profile is a 2x2 rect, not 4x4: the Rodrigues-rotated 4x4 rect refuses `arrange` (its opposite edges are not exactly anti-parallel because 4c rounds; `arrange`'s exact-parallelogram gate refuses RootNotIsolated). A 2x2 rect keeps the opposite edges exactly anti-parallel (2c is exactly representable), so the metamorphic `T(extrude(P)) = extrude(T(P))` is realized EXACTLY at f64 equality, as the packet requires. Same Rodrigues matrix on both sides."
+      "id": "D1A-LOCKFILE-UNCHANGED",
+      "derivation": "The dependency-kind move does NOT change Cargo.lock's truck-shapeops record: Cargo.lock encodes resolved versions, not whether a dependency is dev or normal (the truck-shapeops package's dependencies array already listed truck-modeling under the dev-dependency). The packet-mandated unlocked `cargo check -p truck-shapeops` refreshed Cargo.lock to a byte-identical file (git diff on the lockfile is empty), so there is no lockfile diff to commit; `cargo check --locked -p truck-shapeops` is green. The manifest change itself is committed."
     },
     {
-      "id": "TEST7-8-FIXTURE",
-      "derivation": "The metamorphic fixture is a small box straddling the big box's TOP boundary (the resew convention) rather than a side face: the side-straddling pair is refused by the boolean's v1 envelope (UnsupportedEnvelope(ContactReductionDeferred)) at the base tree, so it cannot realize the metamorphic. The top-straddling pair's metamorphic vertex agreement is measured f64-exact (deviation 0)."
+      "id": "D2-ARRANGEMENT-WRAPPER",
+      "derivation": "The D2 sketch's `arrangement: &Certified<Arrangement>` does not match the landed entries: `extrude_profile`, `extrude_profile_vector`, and `revolve_profile` all take `&Arrangement` (the certified VALUE, not the wrapper). Per the §3 rule the landed signature wins; the facade's `extrude`/`extrude_vector`/`revolve` take `&Arrangement` and forward."
     },
     {
-      "id": "D3-RIGHT-CYLINDER-REPRESENTATION",
-      "derivation": "The oblique wall's right cylinder is the bare cylinder at the ORIGIN with the profile radius, sheared by columns (x_hat, y_hat, sweep) with the bottom-cap circle center in w. D3's prose said right_cyl = Cylinder::new((cx,cy,z0),r) AND the translation (cx,cy,z0) in w; both cannot hold (it would double the translation). The chosen form is W2's exact structure (right at the origin, translation in the shear's w) and satisfies the W3 junction machine check; the two readings are geometrically identical. The both=true span uses the same wall with the shear parameter interpolating base->tip (base=-dir gives the [-dir,dir] point set)."
+      "id": "D2-BOUNDING-BOX-BUDGET",
+      "derivation": "The D2 sketch's `bounding_box(solid)` has no budget parameter; the landed `solid_bounding_box(solid, budget)` does. The facade's `bounding_box(solid, budget)` takes and forwards the budget."
     },
     {
-      "id": "STEP_IMPORT-ENV",
-      "derivation": "The truck-shapeops lib suite's healing::tests::step_import fails environmentally: it reads vendor/truck/resources/step/occt-cylinder.step which is absent from this checkout. Pre-existing, unrelated to this packet."
+      "id": "D2-SPLIT-RETURN-ALIAS",
+      "derivation": "The D2 sketch's `Outcome<...>` for section/split resolve to the landed shapes: `split_by_plane` -> `(Solid, Solid)` and `section_faces` -> `Vec<Face<Point3, Curve, Surface>>`. The split tuple is factored into the public type alias `facade::SplitHalves` so the facade signature stays under the crate's denied `clippy::type_complexity`."
+    },
+    {
+      "id": "D2-FILLET-GROUPED-BATCH",
+      "derivation": "The BlendSpec dispatch groups all Straight specs into ONE `rewrite::fillet` call (the D3.1 'grouped Straight batch') and all Circular specs into ONE `rewrite::fillet_circle` call, applied sequentially Straight-first per the P12 D4 rule. A sequential one-at-a-time Straight application is impossible: the first fillet mints a Cylinder face, and the next `rewrite::fillet` lift (plane-only) would refuse NonCanonicalCarrier. Grouping keeps the two-vertical-edge and three-edge-corner witnesses working exactly as the landed suites pin them. Empty list refuses Empty."
+    },
+    {
+      "id": "D3-NONCIRCLE-OBLIQUE-ARM",
+      "derivation": "The 'non-z-parallel oblique on non-circle profiles' refusal row's machine-checked arm on the dispatch tree is `Refusal::Empty` (the zero-volume dz=0 arm) asserted on the line-rectangle profile with dir (1,1,0). A dz!=0 oblique on a line rectangle ASSEMBLES (6 faces; the P10 emission), and a valid line+circle plate-with-hole oblique also assembles (7 faces), so the only typed refusal the landed `extrude_profile_vector` answers on non-circle profiles is the dz=0 Empty. Machine-checked across dirs (1,0,1)/(1,1,1)/(0,1,1) on rect, plate-with-hole, and washer fixtures."
+    },
+    {
+      "id": "D3-A-MINUS-A-ARM",
+      "derivation": "The `A − A = ∅` metamorphic row's machine-checked arm is the typed `UnsupportedEnvelope(ContactReductionDeferred)` refusal (the self-pair composition's recorded v1 boundary, boolean_m2 Test 4), not an empty solid; the battery asserts refusal-or-empty as the packet allows."
+    },
+    {
+      "id": "D3-SPLIT-FILLETED-ARM",
+      "derivation": "The split-of-fillet-carrying-solid row's machine-checked arm is `UnsupportedEnvelope(ContactReductionDeferred)` for the z=1 plane (matches the booked split-of-arc-carrying-faces v1 boundary; the RW-CONIC class)."
+    },
+    {
+      "id": "D3-SPLIT-GRAZE-ARM",
+      "derivation": "The split-by-a-grazing-plane row's machine-checked arm is `UnsupportedEnvelope(ContactReductionDeferred)` (the booked vertex-touch typed refusal; split_plane.rs test 3 accepts that or NumericallyUnresolved)."
+    },
+    {
+      "id": "CONSUMABILITY-MEASURED",
+      "derivation": "The consumability rows reproduce the probe's measured conditions on the dispatch tree: box 192 positions/180 faces Closed, plain cylinder 130/124 Closed, the P12 torus-fillet solid 281/366 Closed, the mirrored placed cylinder 130/124 Closed, the boolean Difference output 290/280 Closed (the r2 worker's census, not the probe's quoted 384/364 - fixture- and tree-dependent, so only non-emptiness + condition are asserted), and the oblique placed-affine wall 130/124 Closed (the r3 amendment: the LANDED `extrude_vector` emission is Closed, not the probe's pre-P10 hand-built Regular; closure of sheared placements recorded as measured, no boundary claimed)."
+    },
+    {
+      "id": "FINDING-3-CONFIRMED",
+      "derivation": "Finding 3 reproduced exactly: tessellation of circle-carrying solids panics in debug builds ('Two same vertices cannot construct an edge', truck-topology lib.rs:188) while the box control meshes; the battery's tessellation rows are release-gated and the gate itself is asserted (the debug arm returns early)."
     }
   ],
-  "notes": "8 of 10 originally-booked tests green with the metamorphic battery measured f64-EXACT (achieved precision 0) for Union, Difference, and scale; truck-modeling suite green (transforms 5, cad_p1 10, revolve_p5 9, until_p4 9, lib 27) plus fillet_circle 7. D8 delivered: the flaky test_circle_arc_tangent0 is stabilized at commit c495a66 - the seed reproduced (assertion r0.near(&r1) && r1.near(&r2) failed at line 254), diagnosed (the circumcenter error grows like 1/|delta|^2 as the sampled point approaches an arc endpoint, crossing the absolute 1e-6 near tolerance near |delta| ~ 1.6e-3), and the degenerate family excluded by the precondition t in [1e-2, 1-1e-2] (justified from the chord-ratio inequality |delta| >= (1-t)|p0-p1| and the error bound max|r_i-r_j| <= 2C*eps*L/(1-t)^2, keeping the error <= ~1.5e-9 - five orders under the tolerance - for every sampled geometry); validated over 20000 proptest cases. All Done-when gates pass: cargo check both crates, cargo fmt --check both, clippy --no-deps both, kernel-gates.sh HEAD (GATE-4 111/111, all P-3 gates pass). The in-module refusal test was flipped to oblique_circle_emits_placed_wall because D3 deliberately changed that refusal (V5 identity note: the base test asserted the refusal the emission replaces - recorded in the worker's deviations as the D3 contract)."
+  "notes": "7/7 battery tests green in debug AND release; the battery's mesh rows reproduce the probe's Closed conditions on the dispatch tree. All landed suites pass unchanged: fillet_circle 7, chamfer 9, fillet_pp 8, boolean_m2 4, interior_loop 8, resew 7, cut_boundaries 7, split_plane 10, transform_metamorphic 3, conformance_battery 7. The lib suite's healing::tests::step_import failure is the recorded environmental one (fails at base, verified by stashing this packet's changes; V5 knows). All Done-when gates pass: cargo check --locked -p truck-shapeops; cargo fmt --check -p truck-shapeops; cargo clippy --locked -p truck-shapeops --all-targets --no-deps (unfiltered, clean); kernel-gates.sh HEAD (all P-3 gates pass). The D2 signature adaptations are the deviations above (arrangement wrapper, bounding-box budget, split alias, fillet grouped batch). The D1a manifest move is committed with the unchanged lockfile deviation recorded."
 }
