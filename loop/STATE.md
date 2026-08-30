@@ -9,54 +9,76 @@ when they stop being true, never for length. If you are picking this up cold, re
 [`loop/ORCHESTRATOR.md`](ORCHESTRATOR.md) for how to run the loop, then
 `python loop/slot_status.py`** - nothing else. Do not read `LEDGER.jsonl` whole.
 
-Updated 2026-08-30, session 43 open. The COVERAGE PROGRAM remains COMPLETE
-(P1-P12 all landed, session 42; origin main at `9dbfb3b`). This session BOOKED
-the next program: the **constructive geometry kernel** —
-`docs/CONSTRUCTIVE_GEOMETRY_PLAN.md` (new) is the approved loop-side design;
-the kernel-side spec lives in the truck-fork repo
-(`truck-fork/CONSTRUCTIVE-GEOMETRY-BUILD-SPEC.md`, committed on truck
-`master`). The pyo3 binding translation is booked but DEFERRED behind the CG
-core (owner decision, session 43).
-Branch: `integration/kernel-bg`, HEAD `a7966c2` at booking.
+Updated 2026-08-30, session 44 open. The **constructive geometry (CG)
+program is OPEN and its first packet has LANDED**: `BG-CG-000-CONTRACT` (the
+contract skeleton over `vendor/truck/truck-geometry/src/constructive/`) was
+written, dispatched, verified and merged first-try this session; all eleven
+gates green. `BG-CG-001-RECIPE` is pre-written, committed and READY in the
+registry, deliberately NOT dispatched (scope decision below). The coverage
+program remains COMPLETE (P1-P12, session 42); the pyo3 binding translation
+is still booked and DEFERRED behind the CG core (owner decision, session 43).
+Branch: `integration/kernel-bg`, HEAD `caef98d` at close.
 
 ## Where we are
 
-Session 42 landed four packets (P12, P9, P10, P8) and closed the build123d
-coverage program; probe discipline finished 5-for-5. Session 43 so far:
-audited `vendor/truck` against the external constructive-geometry design,
-converged the design with the owner (facet-first realization; deferred the
-public builder, the triangular transfinite patch, and the BVH; two
-realization modes over one recipe), and booked the program as the CG packet
-graph. **No CG packet dispatched yet** — CG-000-CONTRACT is the first.
+Session 43 booked the CG program (`docs/CONSTRUCTIVE_GEOMETRY_PLAN.md` is the
+approved loop-side design; the kernel-side spec lives in the truck-fork repo
+and is never needed by packets - the plan quotes the load-bearing contract).
+Session 44: wrote `BG-CG-000-CONTRACT` (design class: the plan's section 3.2
+types as real signatures, four evaluators as typed stubs, five real bodies,
+`DirectTolerance`, the section 3.4 index-identity convention and the section
+3.5 certificate field-level mapping frozen as module docs, 11 contract-pinning
+tests; `lib.rs` in write_allow for exactly the two-line module declaration).
+Dispatched to deepseek-v4-flash, worker commit `6889fea`, verified ACCEPTED
+at base `524b15c`, merged `f1647f2`, filed DONE `f3137ae`. The worker caught
+two orchestrator packet-spelling defects and fixed them mechanically (f64
+cannot derive `Eq`; `cgmath::` paths are not a direct dep - the crate's
+`cgmath64` aliases are the correct spelling). Then pre-wrote
+`BG-CG-001-RECIPE` against the landed skeleton while the contract was fresh
+in context (anchors A1-A6 verified by `gen_packet --check`), added its READY
+registry row, and did NOT dispatch it - by explicit owner scope: CG-001's
+dispatch deserves a fresh cold-start read of the landed skeleton next
+session. **No packet is in flight.**
 
 ## Pick up here
 
-1. **Dispatch `BG-CG-000-CONTRACT`** first (plan §4): the compilable contract
-   skeleton over `vendor/truck` — new `truck-geometry/src/constructive/`
-   module with real types and stub bodies, `DirectTolerance`, the frozen
-   index-identity convention (§3.4), the certificate field-level mapping
-   (§3.5). Every other CG packet types against it. Evidence files must be
-   committed BEFORE `new_slot.py` forks a slot.
-2. After 000 lands: CG-001 (recipe + profile laws + C1 refusals). Then the
-   disjoint set {CG-002 | CG-003} (after 001), {CG-005}, {CG-006},
-   {CG-008} runs with ≤3 live packets; elastic corpus/mutation/benchmark
-   packets fill idle slots. CG-004 after 001-003; CG-007 after 004+006;
-   CG-009 (enum ripple) effectively alone.
-3. **The Exeter regression gate** (plan §8) fires after CG-004: one rib
-   migrated to the kernel recipe API, benchmarked against the client's local
-   implementation.
+1. **Dispatch `BG-CG-001-RECIPE`**
+   (`loop/packets/BG-CG-001-RECIPE.md`, committed `caef98d`, registry READY,
+   needs CG-000 satisfied): the spine trait (`domain`/`position_at`/
+   `derivative_at`) + `LineSpine`/`PolylineSpine` (declared non-C1,
+   `SpineNotC1` at corners = the plan section 7 gate), new
+   `constructive/profile.rs` (`ProfileLaw::evaluate`, per-edge-uniform ring
+   parameter, Scale-through-zero refuses `ProfileCollapse`), filled
+   `recipe.profile`/`recipe.position` (ordered composition finite -> profile
+   -> spine -> frame; `position` refuses until CG-002/003 fill `frame()`),
+   `SamplingPolicy::resolve` fills UniformCount/CustomParameters while
+   ChordTolerance/AngularTolerance keep refusing (typed envelope line,
+   spine-aware resolution booked as a follow-up). One booked in-place test
+   amendment (session-34 name rule): `sampling_policy_resolve_refuses_while_
+   stub` keeps its name, body updated. The packet's own dispatch note says:
+   read the landed `constructive/` module fresh before dispatching. Evidence
+   files are already committed (`caef98d`).
+2. After 001 lands: the write-set-disjoint set {CG-002 | CG-003} (both after
+   001, 003 serial after 001 per plan section 6), {CG-005}, {CG-006},
+   {CG-008} with <=3 live packets; elastic corpus/mutation/benchmark packets
+   fill idle slots. CG-004 after 001-003; CG-007 after 004+006; CG-009
+   (enum ripple) effectively alone.
+3. **The Exeter regression gate** (plan section 8) fires after CG-004: one
+   rib migrated to the kernel recipe API, benchmarked against the client's
+   local implementation.
 4. **Booked kernel follow-ups (pre-existing, still standing, each its own
    packet, none blocking CG):** the truck-topology self-loop-safe fold fix
-   (`Mapped` path uses new_unchecked when front==back; NOTE it blocks
-   debug-build tessellation of circle-carrying solids — relevant to CG-004
-   fixture discipline); split of arc-carrying faces (RW-CONIC class);
+   (`Mapped` path uses new_unchecked when front==back; blocks debug-build
+   tessellation of circle-carrying solids - relevant to CG-004 fixture
+   discipline); split of arc-carrying faces (RW-CONIC class);
    sheared-placement funnel admission; arbitrary-axis revolve; F3 chains;
-   the upstream `fillet::complex_surface` failure fix.
-5. **Model policy: default worker is `deepseek/deepseek-v4-flash`**
-   (`run_packet.py:229`; the coverage plan section 11's glm line is
-   STALE). Session 42: six dispatches, four landings, two honest
-   worker stops, every machine-derived deviation consistent with the
-   tree.
+   the upstream `fillet::complex_surface` failure fix. NEW from CG-001's
+   packet: spine-aware sampling resolution (ChordTolerance/AngularTolerance
+   need `Spine::derivative_at`; the frozen `resolve(s0, s1)` signature stays).
+5. **Model policy: default worker is `deepseek/deepseek-v4-flash`** (re-derived
+   this session: run_packet printed `model=deepseek/deepseek-v4-flash`; the
+   coverage plan section 11's glm line is STALE). Session 44: one dispatch,
+   one first-try landing, zero round trips.
 6. Open environmental, do NOT chase: `healing::tests::step_import`
    (missing fixture, fails at base); upstream
    `fillet::complex_surface` ("Oriented" vs "Closed", fails at base,
@@ -66,28 +88,33 @@ graph. **No CG packet dispatched yet** — CG-000-CONTRACT is the first.
 
 ## State of the machine, as left
 
-- Watchdog RUNNING (`loop/watchdog.lock`, `LOOK_WATCHDOG_STAGNANT=3600`) —
-  re-derive before dispatching (`watchdog.log` tail for ACTION lines).
-- Slots 0-3: FINISHED (P10, P8, P0-SPAN, P4) - re-fork via new_slot.
-- Registry/ledger: every coverage packet DONE; P8/P10 rows filed.
-- Disk ~23 GB free at session-42 close (slot targets regenerate); **the
-  pagefile ballooned to 48 GB mid-session and a reboot reclaimed ~40 GB** -
-  do not run verifies below ~15 GB free (V9's transient peak is 10-12 GB;
-  the 8 GB floor is necessary, not sufficient).
+- Watchdog RUNNING (pid `27556` in `loop/watchdog.lock`, restarted 17:42 with
+  `LOOK_WATCHDOG_STAGNANT=3600`). It was found DEAD at session open (last
+  heartbeat 08:45; disk had fallen to 1.0 GB before something reclaimed it) -
+  re-derive before trusting it.
+- Slots 0-3: FINISHED (slot 0 = CG-000; 1-3 = stale coverage sessions) -
+  re-fork via new_slot. CG-000's slot target and the repo-root `target/`
+  were reclaimed at close.
+- Registry/ledger: CG-000 DONE (ledger + `loop/results/BG-CG-000-CONTRACT.json`
+  filed, commit `f3137ae`); CG-001 READY; nothing else pending in the CG
+  graph is written yet.
+- Disk ~20.6 GB free at close (re-derive: the repo-root `target/` regenerates
+  from any verify; the pagefile ballooning trap below still applies - do not
+  run verifies below ~15 GB free).
 - LOC ledger (`git diff --shortstat da72cd5..HEAD -- vendor/truck`):
-  **+69,000 / -1,600** class (re-derive by command).
+  **+70,994 / -1,555** (re-derived at close; CG-000 added 678).
 
 ## The parallelism picture
 
-CG-000 is serial. After it: ≤3 concurrent live packets over the
-write-set-disjoint set {CG-002 | CG-003 (serial after 001)}, {CG-005},
-{CG-006}, {CG-008}; CG-001 precedes the frame packets; CG-004 consumes
-001-003; CG-007 consumes 004+006; CG-009 runs alone. Elastic
+CG-001 is next and is serial (design class; everything frame-shaped types
+against its landed recipe). After it: <=3 concurrent live packets over the
+write-set-disjoint set {CG-002 | CG-003}, {CG-005}, {CG-006}, {CG-008};
+CG-004 consumes 001-003; CG-007 consumes 004+006; CG-009 runs alone. Elastic
 corpus/mutation/benchmark packets fill idle slots. **Full-wave orchestration
-is deliberately NOT planned** (plan §5 velocity recalibration: the core is a
-3-7 day serial effort at demonstrated throughput; escalation trigger is
-CG-009's enum ripple exceeding ~2 days). The pyo3 bindings program follows
-the CG core.
+is deliberately NOT planned** (plan section 5 velocity recalibration: the
+core is a 3-7 day serial effort at demonstrated throughput; escalation
+trigger is CG-009's enum ripple exceeding ~2 days). The pyo3 bindings program
+follows the CG core.
 
 ## Traps, each one paid for
 
