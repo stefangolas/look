@@ -297,8 +297,12 @@ being done here and only one of them is orchestrator-grade:
 
 Assembly is most of the wall-clock and none of it needs a person. `class:
 survey` moves the largest single piece of it — reading every call site in a
-crate and proposing a classification — onto a worker, and `gen_packet.py` (still
-unwritten) is meant to take the rest.
+crate and proposing a classification — onto a worker, and `gen_packet.py`
+(anchor/budget pre-flight, refuses the dispatch) and `packet_lint.py`
+(crates-vs-write-set, test-path ownership, dependency KIND, forecast numbers,
+RESULT placement — the packet-fault classes the anchor check cannot see) take
+the rest. Run the lint on every packet before dispatch; both checks are cheap
+and each prevented round trip is 15-90 minutes.
 
 **A survey worker gets no write access to `vendor/truck/**` at all.** Its whole
 deliverable is `SURVEY.json`: one row per site with file, line, symbol, the
