@@ -222,7 +222,7 @@ fn convex_prism_volume_matches_analytic() {
     // The unit square swept by height 1 is a unit box: volume 1.0.
     let volume = signed_volume(&solid).abs();
     assert!(
-        (volume - 1.0).abs() <= 1.0e-4,
+        (volume - 1.0).abs() <= 1.0e-4, // H-3: test volume-match epsilon, not a model-space length
         "unit prism volume {volume} must match the analytic 1.0"
     );
 }

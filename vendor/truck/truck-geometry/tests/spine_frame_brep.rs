@@ -1,6 +1,6 @@
-#![deny(clippy::unwrap_used)]
+﻿#![deny(clippy::unwrap_used)]
 
-//! BG-CG-009-BREP — the parametric realization decorators and the closed-enum
+//! BG-CG-009-BREP â€” the parametric realization decorators and the closed-enum
 //! ripple. These tests pin the two new `Curve`/`Surface` variants' forwarding
 //! and the decorators' evaluation/search/transform discipline over the landed
 //! recipe evaluators.
@@ -24,7 +24,7 @@ fn unit_square() -> Profile2D {
 }
 
 /// The recipe over a `LineSpine` from the origin to (0, 0, 1): the frame plane
-/// is pinned by `FixedPlane { normal: +x }`, so `b = x`, `n = x × z = -y`,
+/// is pinned by `FixedPlane { normal: +x }`, so `b = x`, `n = x Ã— z = -y`,
 /// and `X(s, v) = (py, -px, s)`.
 fn line_spine_recipe() -> SpineFrameRecipe<LineSpine, ProfileLaw, FrameLaw> {
     let spine = LineSpine {
@@ -38,7 +38,7 @@ fn line_spine_recipe() -> SpineFrameRecipe<LineSpine, ProfileLaw, FrameLaw> {
     SpineFrameRecipe::new(spine, profile, frame)
 }
 
-/// The recipe over a `Box<Curve>` line spine — the storage form the closed
+/// The recipe over a `Box<Curve>` line spine â€” the storage form the closed
 /// enums carry (the indirection that breaks the enum recursion).
 fn curve_spine_recipe() -> SpineFrameRecipe<Box<Curve>, ProfileLaw, FrameLaw> {
     let spine = Box::new(Curve::Line(Line(
@@ -52,7 +52,7 @@ fn curve_spine_recipe() -> SpineFrameRecipe<Box<Curve>, ProfileLaw, FrameLaw> {
     SpineFrameRecipe::new(spine, profile, frame)
 }
 
-/// Edge 0 of the unit square: the window `[0, 1] × [0, 1/4]` on the recipe.
+/// Edge 0 of the unit square: the window `[0, 1] Ã— [0, 1/4]` on the recipe.
 fn edge_zero_surface() -> SpineFrameSurface<LineSpine> {
     SpineFrameSurface::try_new(line_spine_recipe(), 0.0, 1.0, 0.0, 0.25)
         .expect("edge zero is a valid surface window")
@@ -86,7 +86,7 @@ fn spine_frame_surface_evaluates_the_recipe() {
                 (got - expected).magnitude() <= tolerance,
                 "surface.subs({s}, {v}) diverged from the recipe"
             );
-            // The v-direction is analytic: `S_v = frame · dP/dv` on the edge.
+            // The v-direction is analytic: `S_v = frame Â· dP/dv` on the edge.
             let vder = surface.vder(s, v);
             assert!(vder.x == 0.0, "edge 0 keeps py = 0, so S_v.x == 0");
             assert!((vder.y + 4.0).abs() <= tolerance, "S_v = (0, -4, 0)");
@@ -131,8 +131,9 @@ fn search_parameter_newton_recovers_station_and_vertex() {
             let Some((su, sv)) = surface.search_parameter(point, None, 100) else {
                 panic!("Newton failed to recover ({s}, {v})");
             };
-            assert!((su - s).abs() <= 1.0e-6, "recovered station {su} != {s}");
-            assert!((sv - v).abs() <= 1.0e-6, "recovered vertex {sv} != {v}");
+            // Newton-recovery epsilons in parameters, not model-space lengths.
+            assert!((su - s).abs() <= 1.0e-6, "recovered station {su} != {s}"); // H-3
+            assert!((sv - v).abs() <= 1.0e-6, "recovered vertex {sv} != {v}"); // H-3
             assert!((surface.subs(su, sv) - point).magnitude() <= tolerance);
         }
     }
@@ -171,9 +172,9 @@ fn surface_variant_forwarding_all_landed_methods() {
     let Some((su, sv)) = surface.search_parameter(point, None, 100) else {
         panic!("forwarded search_parameter failed");
     };
-    assert!((su - 0.5).abs() <= 1.0e-6 && (sv - 0.125).abs() <= 1.0e-6);
-    // `SearchNearestParameter<D2>` forwards.
-    assert!(surface.search_nearest_parameter(point, None, 100).is_some());
+    // Recovery epsilons are test Newton tolerances, not model-space lengths.
+    assert!((su - 0.5).abs() <= 1.0e-6 && (sv - 0.125).abs() <= 1.0e-6); // H-3
+    assert!(surface.search_nearest_parameter(point, None, 100).is_some()); // SearchNearestParameter<D2> forwards.
 }
 
 #[test]
@@ -206,9 +207,9 @@ fn curve_variant_forwarding_all_landed_methods() {
     let Some(recovered) = curve.search_parameter(point, None, 100) else {
         panic!("forwarded curve search_parameter failed");
     };
-    assert!((recovered - 0.5).abs() <= 1.0e-6);
-    // `SearchNearestParameter<D1>` and `parameter_division` forward.
-    assert!(curve.search_nearest_parameter(point, None, 100).is_some());
+    // Recovery epsilon is a test Newton tolerance, not a model-space length.
+    assert!((recovered - 0.5).abs() <= 1.0e-6); // H-3
+    assert!(curve.search_nearest_parameter(point, None, 100).is_some()); // SearchNearestParameter<D1> forwards.
     let (params, _) = curve.parameter_division((0.0, 1.0), TOLERANCE);
     assert!(params.len() >= 2);
     // `cut` splits the s-window.
@@ -238,7 +239,7 @@ fn transform_of_surface_refuses_or_composes_typed() {
     // A trajectory-containment question cannot be certified on the placed
     // surface (the canonical `Curve` has no equality, and the placed
     // trajectory is not even representable as a canonical `SpineFrameCurve`);
-    // it refuses typed — never approximates.
+    // it refuses typed â€” never approximates.
     let trajectory =
         SpineFrameCurve::try_new(curve_spine_recipe(), 0.0, 1.0, 0.25).expect("a valid trajectory");
     let query = Curve::SpineFrameCurve(trajectory);
@@ -249,7 +250,7 @@ fn transform_of_surface_refuses_or_composes_typed() {
     );
 
     // A singular placement still composes exactly for `subs` (no inverse is
-    // needed for evaluation) — the refusal above is the honest boundary.
+    // needed for evaluation) â€” the refusal above is the honest boundary.
     let projection = Matrix4 {
         x: Vector4::new(1.0, 0.0, 0.0, 0.0),
         y: Vector4::new(0.0, 1.0, 0.0, 0.0),
@@ -264,7 +265,7 @@ fn transform_of_surface_refuses_or_composes_typed() {
 #[test]
 fn surface_constructor_refuses_invalid_windows_typed() {
     // A window that does not cover exactly one profile edge refuses
-    // `InvalidInput` — the profile-edge window contract.
+    // `InvalidInput` â€” the profile-edge window contract.
     let recipe = line_spine_recipe();
     let cross_edge = SpineFrameSurface::try_new(recipe.clone(), 0.0, 1.0, 0.0, 0.5);
     assert!(matches!(cross_edge, Err(ConstructError::InvalidInput)));

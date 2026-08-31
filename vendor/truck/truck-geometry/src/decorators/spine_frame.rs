@@ -769,10 +769,10 @@ impl<S: Spine + Clone> SearchParameter<D1> for SpineFrameCurve<S> {
         if (v - self.v_p).abs() > DirectTolerance::default().parameter {
             return None;
         }
-        let ctx = ToleranceCtx::unscaled_legacy();
-        match ctx.near_pt(self.subs(s), point) {
-            true => Some(s),
-            false => None,
+        if (self.subs(s) - point).magnitude() <= DirectTolerance::default().position {
+            Some(s)
+        } else {
+            None
         }
     }
 }

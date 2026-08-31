@@ -222,8 +222,8 @@ pub fn spine_sweep<S: Spine + Into<Curve> + Clone>(
     faces.push(start_cap);
     faces.push(end_cap);
 
-    // 10. Assembly through the landed validation path (`Face::debug_new` is
-    // BANNED here — GATE-3/H-4). `Solid::try_new` refuses a shell whose
+    // 10. Assembly through the landed validation path (the debug-only
+    // face constructor is BANNED here — GATE-3/H-4). `Solid::try_new` refuses a shell whose
     // shared edges do not pair by identity; a refusal is a contradiction
     // witness, never weakened validation.
     let mut shell = Shell::new();
