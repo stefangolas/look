@@ -51,6 +51,7 @@
 use truck_base::cgmath64::*;
 
 mod errors;
+mod profile;
 mod recipe;
 mod sampling;
 
@@ -314,4 +315,5 @@ impl Default for DirectTolerance {
 
 pub use errors::ConstructError;
 pub use recipe::SpineFrameRecipe;
+pub use recipe::{LineSpine, PolylineSpine, Spine};
 pub use sampling::SamplingPolicy;
