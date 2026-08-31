@@ -9,15 +9,20 @@ when they stop being true, never for length. If you are picking this up cold, re
 [`loop/ORCHESTRATOR.md`](ORCHESTRATOR.md) for how to run the loop, then
 `python loop/slot_status.py`** - nothing else. Do not read `LEDGER.jsonl` whole.
 
-Updated 2026-08-31, session 45 (mid-session update; volatile section below is
-still session-44 prose where not explicitly corrected - full rewrite at
-close). **The CG program is 7/10 landed**: CG-000, 001, 002 (r3), 003, 005,
-006, 008 merged (HEAD `003f3a7`). **CG-004-FACET is RUNNING in slot 2**
-(watchdog killed the wedged overnight run and auto-redispatched 08:53,
-restart 1/3, pid 16988 - re-derive before trusting). The deepseek balance
-blocker is GONE (dispatches work). **The certificate-mapping unification
-(3a) is DONE**: `docs/CERTIFICATE_MAPPING.md` is the single table; the
-truck-fork plan's X1 entry records it.
+Updated 2026-08-31, session 45. **CG program is 8/10 landed; BOTH remaining
+packets are IN FLIGHT in parallel**: CG-007-CERT in slot 0 (pid 22812) and
+CG-009-BREP in slot 1 (pid 9328), both dispatched ~10:55 against base
+`f332dfb`, model deepseek. Write sets are disjoint (007: base evidence +
+meshalgo assembly + facet outcome fields; 009: geometry canonical/decorators
++ modeling spine_sweep + bounded arms-only ripple). **The merged-HEAD check
+(session-37 law) is MANDATORY after both land** - they interact through
+truck-modeling. Session 45 also: certificate mapping unified
+(docs/CERTIFICATE_MAPPING.md; placement correction: CG-007's evidence types
+-> truck-base), packet_lint.py shipped (layer 1+2, validated, found three
+registry defects - CG-002/003 were landed-unregistered, now fixed), README +
+OVERVIEW published to the truck-fork repo (docs/ mirrored there; look/docs
+stays the working set). CG-004 landed this session (verify round trip 1 was
+V3 LINT_UNLINTED, PACKET fault, r3 fixed).
 
 ## Where we are
 
