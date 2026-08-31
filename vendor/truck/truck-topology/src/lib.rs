@@ -392,6 +392,11 @@ pub mod errors;
 pub mod face;
 /// The §1.1 invariant checkers (BG-INV-001).
 pub mod invariants;
+/// BG-CG-006-DIAG: the actionable manifold-diagnostics aggregate over the
+/// shell substrate (`shell_condition`, `connected_components`,
+/// `extract_boundaries`, `singular_vertices`, `face_adjacency`). Analysis
+/// only; it never repairs.
+pub mod manifold;
 /// classifies shell conditions and defines the face iterators.
 pub mod shell;
 mod solid;
