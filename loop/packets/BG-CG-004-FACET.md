@@ -1,5 +1,33 @@
 # WORK PACKET BG-CG-004-FACET — the direct facet realization backend (FAC)
 
+> **r2 amendment (orchestrator, session 44).** The r1 worker proved — with a
+> zero-volume straight-spine realization run against the landed crate — that
+> the landed `recipe.position` embeds the profile in the (tangent, normal)
+> plane, which degenerates every straight sweep to a flat slab. The sweep
+> semantics (plan §3.3's grid, the caps, the Exeter rib, every duct fixture)
+> require the profile to ride the plane PERPENDICULAR to the tangent. r2
+> therefore books ONE truck-geometry correction plus its test ripple, and
+> reads the plan's `X(s,v) = C(s) + T(s)·P(s,v)` with the profile in the
+> (normal, binormal) plane:
+>
+> **`constructive/recipe.rs` `position` (exactly this hunk, nothing else):**
+> the final line becomes
+> `Ok(c + f.normal * p.x + f.binormal * p.y)`
+> and the doc sentence "the profile plane maps profile-x to the tangent and
+> profile-y to the normal; the binormal carries nothing" becomes "the
+> profile plane maps profile-x to the frame NORMAL and profile-y to the
+> frame BINORMAL — the cross-section rides the plane perpendicular to the
+> tangent (r2: the tangent-embedded reading makes every straight sweep
+> coplanar; proven empirically by the r1 worker)."
+>
+> **Two landed tests amend IN PLACE, names kept (session-34 rule):**
+> `constructive_recipe.rs::recipe_position_refuses_until_frames_land` and
+> `constructive_contract.rs::recipe_evaluators_refuse_while_stub` — their
+> hand-derived expectations change from `C + t·p.x + n·p.y` to
+> `C + n·p.x + b·p.y` (for the straight-X-spine +Z-FixedPlane fixture:
+> profile-x rides +Y, profile-y rides +Z). One-line amendment comments name
+> BG-CG-004-FACET r2. No other landed test moves.
+
 You are landing the core realization backend of the constructive geometry
 program (plan §3.3, CG-004): the direct facet sweep that turns a landed
 `SpineFrameRecipe` into a shared-topology `PolygonMesh` **closed by
@@ -26,6 +54,9 @@ write_allow:
   - vendor/truck/truck-modeling/Cargo.toml
   - Cargo.lock
   - vendor/truck/truck-modeling/tests/facet_sweep_conformance.rs
+  - vendor/truck/truck-geometry/src/constructive/recipe.rs
+  - vendor/truck/truck-geometry/tests/constructive_contract.rs
+  - vendor/truck/truck-geometry/tests/constructive_recipe.rs
 read_allow:
   - docs/CONSTRUCTIVE_GEOMETRY_PLAN.md
   - vendor/truck/truck-geometry/src/constructive/mod.rs
@@ -56,6 +87,7 @@ anchors:
   - {id: A5, expect: 0, cmd: "grep -c 'facet_sweep' vendor/truck/truck-modeling/src/lib.rs"}
   - {id: A6, expect: 1, cmd: "grep -c 'pub enum FrameLaw' vendor/truck/truck-geometry/src/constructive/mod.rs"}
   - {id: A7, expect: 1, cmd: "grep -c 'pub fn evaluate' vendor/truck/truck-geometry/src/constructive/profile.rs"}
+  - {id: A8, expect: 1, cmd: "grep -cF 'c + f.tangent * p.x + f.normal * p.y' vendor/truck/truck-geometry/src/constructive/recipe.rs"}
 ```
 
 ## The manifest change (exactly this, nothing else)
@@ -321,15 +353,15 @@ to catch at worker time. Send cargo output to a file and read the tail.
 
 ## Forbidden
 
-Editing any file outside `write_allow` — especially
-`truck-geometry/src/constructive/**` (import the landed types; the
-`ProfileLaw::vertex_count` accessor you might wish for is a booked
-follow-up, NOT this packet), `truck-polymesh/**` (read-only),
-`tessellation/**`, `scripts/kernel-gates.sh`. Any welding/sewing/healing
-call. Any per-face float-comparison-based diagonal choice. Adding a
-fallback for non-convex caps (the typed refusal IS the booked v1 behavior).
-Adding `#[ignore]`. Adding `#[allow]` without a same-line justification.
-Committing to `main`.
+Editing any file outside `write_allow` — especially beyond the r2 hunks in
+`truck-geometry/src/constructive/**` (the ONE `position` body+doc hunk and
+the TWO named test amendments are the entire permitted truck-geometry
+surface; `ProfileLaw::vertex_count` remains a booked follow-up),
+`truck-polymesh/**` (read-only), `tessellation/**`,
+`scripts/kernel-gates.sh`. Any welding/sewing/healing call. Any per-face
+float-comparison-based diagonal choice. Adding a fallback for non-convex
+caps (the typed refusal IS the booked v1 behavior). Adding `#[ignore]`.
+Adding `#[allow]` without a same-line justification. Committing to `main`.
 
 ## Stop conditions
 
