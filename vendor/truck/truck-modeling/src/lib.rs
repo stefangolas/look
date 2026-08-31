@@ -108,6 +108,10 @@ pub mod errors;
 /// BG-SOL-S2-EXTRUDE: direct certified extrude of a planar arrangement.
 /// Scaffolded empty; the packet fills it.
 pub mod extrude;
+/// BG-CG-004-FACET: the direct facet realization backend (FAC) — a
+/// `SpineFrameRecipe` realized as a shared-topology `PolygonMesh`, closed
+/// by construction, with the mandatory mesh-level sanity audit (plan §3.3).
+pub mod facet_sweep;
 mod geom_impls;
 mod mapped;
 mod multi_sweep;

@@ -213,9 +213,10 @@ fn recipe_position_refuses_until_frames_land() {
             normal: Vector3::unit_z(),
         },
     );
+    // BG-CG-004-FACET r2: profile-x rides the frame normal, profile-y the frame binormal.
     let tol = DirectTolerance::default().position;
-    let t = Vector3::new(1.0, 0.0, 0.0);
     let n = Vector3::new(0.0, 1.0, 0.0);
+    let b = Vector3::new(0.0, 0.0, 1.0);
     for (s, v, px, py) in [
         (0.0, 0.0, 0.0, 0.0),
         (0.5, 0.0, 0.0, 0.0),
@@ -225,7 +226,7 @@ fn recipe_position_refuses_until_frames_land() {
     ] {
         let c = Point3::new(2.0 * s, 0.0, 0.0);
         let p = Point2::new(px, py);
-        let expected = c + t * p.x + n * p.y;
+        let expected = c + n * p.x + b * p.y;
         assert!(matches!(
             recipe.position(s, v),
             Ok(x) if (x - expected).magnitude() <= tol
