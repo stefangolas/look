@@ -1,5 +1,17 @@
 # WORK PACKET BG-CG-001-RECIPE — the spine trait, profile evaluation, and the C¹ refusals
 
+> **r2 amendment (orchestrator, session 44).** The r1 worker stopped with an
+> honest SPEC_GAP; both of its findings were packet defects, and both readings
+> it proposed are adopted:
+> 1. mod.rs may additionally RE-EXPORT the spine types
+>    (`pub use recipe::{LineSpine, PolylineSpine, Spine};`) — `mod recipe;`
+>    itself stays private (do NOT make it `pub mod`).
+> 2. A SECOND landed test is booked for in-place amendment:
+>    `recipe_evaluators_refuse_while_stub` (name kept, session-34 rule), and
+>    the evaluator impl block is bounded to the concrete laws (see Design
+>    decision 3) — the struct's `S, P, F` parameters stay generic; only the
+>    evaluator `impl` is specialized.
+
 You are filling in the constructive geometry recipe landed by
 BG-CG-000-CONTRACT. The types already exist and are frozen; this packet fills
 the evaluators that CG-000 stubbed, adds the spine trait surface, and pins the
@@ -57,18 +69,27 @@ anchors:
   - {id: A6, expect: 1, cmd: "grep -c 'pub struct DirectTolerance' vendor/truck/truck-geometry/src/constructive/mod.rs"}
 ```
 
-## The one existing module line you may add
+## The existing file you may touch (mod.rs, exactly these changes)
 
-`constructive/mod.rs` gains exactly one declaration line after the existing
-`mod sampling;`:
+`constructive/mod.rs` gains exactly two things, both additive (nothing
+existing moves; the frozen convention blocks and all landed types stay
+byte-identical):
+
+1. After the existing `mod sampling;` line:
 
 ```rust
 mod profile;
 ```
 
-Nothing else in mod.rs moves: the landed types, their docs, and the frozen
-convention blocks stay byte-identical. Every other file in your write set is
-either the landed files you are filling or new test files.
+2. After the existing `pub use recipe::SpineFrameRecipe;` line, the re-export
+   that makes the spine surface reachable from integration tests and future
+   consumers (r2 — the r1 worker's SPEC_GAP finding 1):
+
+```rust
+pub use recipe::{LineSpine, PolylineSpine, Spine};
+```
+
+`mod recipe;` itself stays PRIVATE — do not make it `pub mod`.
 
 ## What CG-000 landed (quote — do not re-derive, do not change)
 
@@ -216,7 +237,21 @@ lands on vertex 0 (the closing edge's end == start — the implicit closure);
 ## Design decision 3 — the recipe evaluators (fill `recipe.rs`)
 
 Fill the three landed stub bodies IN PLACE (signatures are frozen — do not
-touch them):
+touch them). **r2 spelling adjustment (booked):** the evaluator `impl` block
+is bounded to the concrete laws — the bodies must call `ProfileLaw::evaluate`
+(an inherent method on an enum, impossible through a generic `P`) and, in
+CG-002/003, will consume `Spine::derivative_at` through `S`. The struct's
+`S, P, F` parameters stay exactly as landed; only the impl specializes:
+
+```rust
+impl<S: Spine> SpineFrameRecipe<S, ProfileLaw, FrameLaw> {
+    // position / frame / profile bodies, as below
+}
+```
+
+A recipe assembled with a non-canonical `P`/`F` simply has no evaluators —
+that is the honest surface. Everything else about the struct (fields, docs,
+`new`) is untouched.
 
 - **`profile(s, v)`**: finite checks (`NonFinite { at: s }`), then
   `self.profile_law.evaluate(s, v)` — delegate; no duplicated semantics.
@@ -263,15 +298,29 @@ Fill the landed stub body IN PLACE (signature frozen):
   line, not a missing implementation — the resolver that can see the spine
   arrives with the realization backend that owns one.
 
-## The one booked amendment to a landed test
+## The booked amendments to landed tests (r2: TWO, both name-preserving)
 
-`tests/constructive_contract.rs::sampling_policy_resolve_refuses_while_stub`
-— keep the exact name (session-34 identity rule), replace the body so it
-asserts the CG-001 reality: `UniformCount { spine: 4 }` and a
-`CustomParameters` list now RESOLVE (assert the exact sorted values), while
-`ChordTolerance`/`AngularTolerance` still refuse `InvalidInput`. Add a
-one-line comment naming BG-CG-001-RECIPE as the amendment. All other landed
-tests stay byte-identical.
+Both keep their exact landed names (session-34 identity rule); only bodies
+change, each with a one-line comment naming BG-CG-001-RECIPE as the amendment.
+
+1. `tests/constructive_contract.rs::sampling_policy_resolve_refuses_while_stub`
+   — replace the body so it asserts the CG-001 reality: `UniformCount { spine: 4 }`
+   and a `CustomParameters` list now RESOLVE (assert the exact sorted values), while
+   `ChordTolerance`/`AngularTolerance` still refuse `InvalidInput`.
+
+2. `tests/constructive_contract.rs::recipe_evaluators_refuse_while_stub`
+   (r2 — the r1 worker's SPEC_GAP finding 2) — the landed `S = ()` spine no
+   longer typechecks against the bounded evaluator impl, and a filled
+   `profile` no longer refuses. Rewrite the body: build the recipe with
+   `spine: LineSpine { start, end }`, `profile_law: Constant(triangle)`,
+   `frame_law: FixedPlane { normal }`, and assert `profile(s, v)` now returns
+   `Ok(_)` equal to `profile_law.evaluate(s, v)` (positive assertion), while
+   `frame(s)` and `position(s, v)` still return `Err(ConstructError::InvalidInput)`
+   (the frame stub). The name stays: position/frame DO still refuse while the
+   frame is a stub.
+
+All other landed tests stay byte-identical. No existing test may be deleted,
+`#[ignore]`d, or weakened.
 
 ## New tests — `tests/constructive_recipe.rs` (new file)
 
@@ -371,13 +420,16 @@ Send cargo output to a file and read the tail.
 
 Editing any file outside `write_allow` — in particular
 `constructive/errors.rs` (the error set is frozen; no new variants),
-`constructive/mod.rs` beyond the single `mod profile;` line, the crate
-`prelude`, `Cargo.toml`, `Cargo.lock`, `scripts/kernel-gates.sh`. Changing any
-frozen signature (the three recipe evaluator signatures,
-`SamplingPolicy::resolve`'s signature, `ConstructError`'s variants). Adding a
-frame-law implementation or a spine-aware sampling resolver (CG-002/003 and a
-booked follow-up own those — do not blur the write sets). Adding `#[ignore]`.
-Adding `#[allow]` without a same-line justification. Committing to `main`.
+`constructive/mod.rs` beyond the two permitted additions (the `mod profile;`
+line and the spine re-export line — `mod recipe;` stays private),
+the crate `prelude`, `Cargo.toml`, `Cargo.lock`, `scripts/kernel-gates.sh`.
+Changing any frozen signature (the three recipe evaluator signatures,
+`SamplingPolicy::resolve`'s signature, `ConstructError`'s variants) or making
+the struct's `S, P, F` parameters concrete (only the evaluator impl block
+specializes). Adding a frame-law implementation or a spine-aware sampling
+resolver (CG-002/003 and a booked follow-up own those — do not blur the write
+sets). Adding `#[ignore]`. Adding `#[allow]` without a same-line
+justification. Committing to `main`.
 
 ## Stop conditions
 
