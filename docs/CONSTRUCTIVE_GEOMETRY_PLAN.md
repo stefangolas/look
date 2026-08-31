@@ -188,11 +188,18 @@ pub struct EdgeSampleLedger { pub edge_id: EdgeID<Curve>, pub parameters: Vec<f6
 
 New evidence composes with the existing `MeshedShellOutcome` /
 `FaceValidityCertificate` / provenance vocabulary — no parallel validation
-universe. CG-000 delivers the **field-level mapping table**: which existing
+universe. CG-000 delivered the **field-level mapping table**: which existing
 type carries spine/frame validity, profile collapse, Jacobian bounds,
 shared-edge pair errors (EdgeID + FaceID A + FaceID B + error_a + error_b),
 and the winding audit, and where a new evidence variant must be added.
 CG-007 cannot be dispatched against an unfrozen mapping.
+
+**The unified table is `docs/CERTIFICATE_MAPPING.md`** — the single booking
+surface shared with the certified-kernel program (its Phase 0 item X1 books
+its entries into the same table). The CG-000 snapshot in
+`constructive/mod.rs`'s module doc stays frozen; additions (and the CG-004
+`FacetVerdict` reconciliation) are booked in `docs/CERTIFICATE_MAPPING.md`
+only.
 
 ### 3.6 Manifold diagnostics (CG-006)
 

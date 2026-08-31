@@ -9,17 +9,15 @@ when they stop being true, never for length. If you are picking this up cold, re
 [`loop/ORCHESTRATOR.md`](ORCHESTRATOR.md) for how to run the loop, then
 `python loop/slot_status.py`** - nothing else. Do not read `LEDGER.jsonl` whole.
 
-Updated 2026-08-30, session 44 open (mid-session update). **The CG program
-is 4-for-10 landed**: CG-000, CG-001, CG-006, CG-008 all written, dispatched,
-verified ACCEPTED (all gates green every time), merged and filed. CG-002's
-first dispatch DIED pre-work on deepseek Insufficient Balance (the session-40
-signature; owner reup pending); CG-003 and CG-005 packets are written,
-anchor-verified, committed and READY. **The loop is currently BLOCKED on the
-deepseek API balance** - only the owner can lift it (or switch models, an
-owner decision). The certified-kernel-plan (truck-fork
-CERTIFIED-KERNEL-PLAN.md) was reviewed mid-session: complementary to the CG
-program; two coordination points recorded below. Branch:
-`integration/kernel-bg`, HEAD `03a185e` at update.
+Updated 2026-08-31, session 45 (mid-session update; volatile section below is
+still session-44 prose where not explicitly corrected - full rewrite at
+close). **The CG program is 7/10 landed**: CG-000, 001, 002 (r3), 003, 005,
+006, 008 merged (HEAD `003f3a7`). **CG-004-FACET is RUNNING in slot 2**
+(watchdog killed the wedged overnight run and auto-redispatched 08:53,
+restart 1/3, pid 16988 - re-derive before trusting). The deepseek balance
+blocker is GONE (dispatches work). **The certificate-mapping unification
+(3a) is DONE**: `docs/CERTIFICATE_MAPPING.md` is the single table; the
+truck-fork plan's X1 entry records it.
 
 ## Where we are
 
@@ -39,21 +37,22 @@ worker died on API balance with zero work done (packet intact).
 
 ## Pick up here
 
-1. **Reup the deepseek API balance (owner), then redispatch in this order:**
-   CG-002 (slot-ready, `loop/packets/BG-CG-002-FRAMES-ANALYTIC.md`, fresh
-   dispatch - the slot holds only PACKET.md/CONTEXT.md), then CG-005
-   (`BG-CG-005-LEDGER.md`, ready, write-set-disjoint from 002 - can run in
-   parallel), then CG-003 (`BG-CG-003-TRANSPORT.md`) ONLY after 002 merges
-   (both write recipe.rs - the packet says so). <=3 live.
-2. After 001-003 all land: write + dispatch CG-004-FACET (the facet backend,
-   largest item; needs the landed frames - write its packet only after 003
-   merges, against the landed signatures). Then CG-007-CERT (after 004+006)
-   and CG-009 (last, alone).
-3. **Certified-kernel-plan coordination (recorded, not urgent):** (a) the
-   certified plan's Phase-0 certificate-field mapping freeze and CG-000's
-   frozen 3.5 mapping target the SAME carriers (MeshedShellOutcome,
-   FaceValidityCertificate, ProvenanceRecord) - UNIFY the two tables into
-   one before CG-007 or certified-Phase-0 dispatches; (b) certified-Phase-0
+1. **CG-002, CG-003, CG-005 have all landed (7/10).** The session-44
+   redispatch list is obsolete; HEAD is `003f3a7` (CG-004 r2 packet commit).
+2. **CG-004-FACET is in flight** (slot 2, restart 1/3 after the watchdog
+   killed the wedged overnight run). When it finishes: verify with
+   `--base 2adb655` (the slot forked BEFORE the r2 amendment `003f3a7`; the
+   diff will legitimately contain the r2 write-set addition - the one-line
+   position correction). After 004 lands: write + dispatch CG-007-CERT
+   (against `docs/CERTIFICATE_MAPPING.md` sections A+B) and then CG-009
+   (last, alone).
+3. **Certified-kernel-plan coordination:** (a) **DONE 2026-08-31** - the
+   certificate-field mapping is unified at `docs/CERTIFICATE_MAPPING.md`
+   (CG-000 rows verbatim in section A, the in-flight CG-004 `FacetVerdict`
+   reconciliation in B, the certified Phase-0 bookings in C); the truck-fork
+   plan's X1 entry points there. CG-007 and certified-Phase-0 dispatch
+   against that table; further evidence kinds are booked there only.
+   (b) certified-Phase-0
    moves formal/+domain/ out of truck-meshalgo - do not run it concurrently
    with CG-005/CG-007 (same crate's module tree). Positive couplings:
    certified class 1 consumes CG-001's SpineFrameRecipe; certified class 4
