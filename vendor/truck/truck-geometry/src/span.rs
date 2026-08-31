@@ -98,6 +98,10 @@ fn extract_spans(s: &Surface) -> Vec<SpanRecord> {
         Surface::NurbsSurface(surface) => nurbs_spans(surface),
         Surface::Processor(processor) => processor_spans(processor),
         Surface::RevolutedCurve(_) | Surface::ExtrudedCurve(_) => Vec::new(),
+        // BG-CG-009-BREP: the spine-frame surface is not a spline carrier; its
+        // span extraction has no certified box (the recipe evaluators are not
+        // span-queryable), so it contributes no spans.
+        Surface::SpineFrameSurface(_) => Vec::new(),
     }
 }
 

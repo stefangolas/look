@@ -134,9 +134,10 @@ pub fn recognize_curve(c: &Curve) -> CanonicalCarrierWitness {
         },
         // Exact spline→analytic detection is a documented later packet; the
         // profile builders emit `Line`/`Circle` directly.
-        Curve::BSplineCurve(_) | Curve::NurbsCurve(_) | Curve::IntersectionCurve(_) => {
-            CanonicalCarrierWitness::Unrecognized
-        }
+        Curve::BSplineCurve(_)
+        | Curve::NurbsCurve(_)
+        | Curve::IntersectionCurve(_)
+        | Curve::SpineFrameCurve(_) => CanonicalCarrierWitness::Unrecognized,
     }
 }
 
@@ -150,9 +151,10 @@ pub fn recognize_surface(s: &Surface) -> CanonicalCarrierWitness {
         Surface::Torus(torus) => exact_surface(CanonicalSurface::Torus(*torus)),
         // Phase-0 scope: splines are `Unrecognized`, and revolve recognition
         // lands with S2's `revolve_profile`, which is where it is consumed.
-        Surface::BSplineSurface(_) | Surface::NurbsSurface(_) | Surface::RevolutedCurve(_) => {
-            CanonicalCarrierWitness::Unrecognized
-        }
+        Surface::BSplineSurface(_)
+        | Surface::NurbsSurface(_)
+        | Surface::RevolutedCurve(_)
+        | Surface::SpineFrameSurface(_) => CanonicalCarrierWitness::Unrecognized,
         Surface::Processor(processor) => {
             // The inner carrier's canonical form rides under the same affine
             // placement. `Processor` composes the affine map on output without
@@ -253,9 +255,10 @@ pub fn recognize_surface(s: &Surface) -> CanonicalCarrierWitness {
                 }
                 // Only `Line`/`Circle` profiles are canonical in Phase 0; a
                 // nested extrusion is `Unrecognized` with the rest.
-                Curve::BSplineCurve(_) | Curve::NurbsCurve(_) | Curve::IntersectionCurve(_) => {
-                    CanonicalCarrierWitness::Unrecognized
-                }
+                Curve::BSplineCurve(_)
+                | Curve::NurbsCurve(_)
+                | Curve::IntersectionCurve(_)
+                | Curve::SpineFrameCurve(_) => CanonicalCarrierWitness::Unrecognized,
             }
         }
     }

@@ -580,7 +580,8 @@ fn require_canonical_carriers(shell: &Shell<Point3, Curve, Surface>) -> Result<(
             | Surface::ExtrudedCurve(_)
             | Surface::BSplineSurface(_)
             | Surface::NurbsSurface(_)
-            | Surface::Processor(_) => false,
+            | Surface::Processor(_)
+            | Surface::SpineFrameSurface(_) => false,
         };
         if !canonical {
             return Err(Refusal::UnsupportedEnvelope(
@@ -698,7 +699,8 @@ fn surface_ray_crossings(surface: &Surface, p: Point3, d: Vector3) -> Vec<(f64, 
         | Surface::ExtrudedCurve(_)
         | Surface::BSplineSurface(_)
         | Surface::NurbsSurface(_)
-        | Surface::Processor(_) => Vec::new(),
+        | Surface::Processor(_)
+        | Surface::SpineFrameSurface(_) => Vec::new(),
     }
 }
 
@@ -746,7 +748,8 @@ fn classify_region(face: &Face<Point3, Curve, Surface>, uv: Point2, tol: f64) ->
         | Surface::ExtrudedCurve(_)
         | Surface::BSplineSurface(_)
         | Surface::NurbsSurface(_)
-        | Surface::Processor(_) => None,
+        | Surface::Processor(_)
+        | Surface::SpineFrameSurface(_) => None,
     }
 }
 

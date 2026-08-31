@@ -168,9 +168,10 @@ fn curve_box(curve: &Curve) -> Result<Box3, Refusal> {
                 z: from(center.z - ez, center.z + ez)?,
             })
         }
-        Curve::BSplineCurve(_) | Curve::NurbsCurve(_) | Curve::IntersectionCurve(_) => {
-            Err(non_canonical())
-        }
+        Curve::BSplineCurve(_)
+        | Curve::NurbsCurve(_)
+        | Curve::IntersectionCurve(_)
+        | Curve::SpineFrameCurve(_) => Err(non_canonical()),
     }
 }
 
