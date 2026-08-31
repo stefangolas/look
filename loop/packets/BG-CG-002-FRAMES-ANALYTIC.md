@@ -1,5 +1,20 @@
 # WORK PACKET BG-CG-002-FRAMES-ANALYTIC — the three analytic frame laws
 
+> **r2 amendment (orchestrator, session 44).** The r1 worker stopped with an
+> honest SPEC_GAP; all four findings are adopted:
+> 1. The dispatcher's calls are `super::`-qualified (Rust 2021 does not
+>    resolve sibling modules bare — E0433): `super::frame_fixed::fixed_plane(..)`
+>    etc. No import lines are needed or permitted.
+> 2. `radial_about_axis` takes the unit tangent as an argument — its body
+>    forms `b = t × n`, so the dispatcher passes the `t` it already computed.
+> 3. The circle fixture is in the XY plane about the Z axis
+>    (`C(s) = (cos θ, sin θ, 0)`), NOT XZ — the r1 worker correctly showed
+>    the XZ fixture makes the radial̂ constant and `t · n ≠ 0`.
+> 4. A SECOND landed test is booked for in-place amendment:
+>    `constructive_contract.rs::recipe_evaluators_refuse_while_stub` (name
+>    kept; already once amended by CG-001) goes fully positive once the
+>    frames land — `tests/constructive_contract.rs` joins write_allow.
+
 You are landing the analytic frame laws of the constructive geometry program
 (plan §4, CG-002): `FixedPlane`, `ArchitecturalUp`, `RadialAboutAxis`. The
 recipe's `frame()` stub swaps its body for a dispatcher; `ParallelTransport`
@@ -22,6 +37,7 @@ write_allow:
   - vendor/truck/truck-geometry/src/constructive/mod.rs
   - vendor/truck/truck-geometry/tests/constructive_frames.rs
   - vendor/truck/truck-geometry/tests/constructive_recipe.rs
+  - vendor/truck/truck-geometry/tests/constructive_contract.rs
 read_allow:
   - docs/CONSTRUCTIVE_GEOMETRY_PLAN.md
   - vendor/truck/truck-geometry/src/constructive/mod.rs
@@ -82,6 +98,15 @@ Every other landed test stays byte-identical. (The other landed test
 profile refusals fire before the frame step, which is still true with real
 frames.)
 
+**`tests/constructive_contract.rs`** changes in EXACTLY one place (r2): the
+landed test `recipe_evaluators_refuse_while_stub` (already once amended by
+CG-001) is amended IN PLACE again — name kept (session-34 identity rule;
+the name is now fully historical) — to the positive form test 9's sibling
+below requires: profile Ok, frame Ok (orthonormal, right-handed), position
+Ok matching the hand-derived composition, with a one-line comment naming
+BG-CG-002-FRAMES-ANALYTIC. Every other landed test in that file stays
+byte-identical.
+
 ## The dispatcher (recipe.rs `frame()` body, exact)
 
 ```rust
@@ -96,16 +121,19 @@ pub fn frame(&self, s: f64) -> Result<Frame3, ConstructError> {
     }
     let t = d / mag;
     match self.frame_law {
-        FrameLaw::FixedPlane { normal } => frame_fixed::fixed_plane(normal, t, s),
-        FrameLaw::ArchitecturalUp { up } => frame_up::architectural_up(up, t, s),
+        FrameLaw::FixedPlane { normal } => super::frame_fixed::fixed_plane(normal, t, s),
+        FrameLaw::ArchitecturalUp { up } => super::frame_up::architectural_up(up, t, s),
         FrameLaw::RadialAboutAxis { origin, axis } => {
             let c = self.spine.position_at(s)?;
-            frame_radial::radial_about_axis(origin, axis, c, s)
+            super::frame_radial::radial_about_axis(origin, axis, c, t, s)
         }
         FrameLaw::ParallelTransport { .. } => Err(ConstructError::InvalidInput),
     }
 }
 ```
+
+(r2: the calls are `super::`-qualified and `radial_about_axis` receives the
+unit tangent `t` — the r1 worker's E0433/E0425 findings.)
 
 (`FrameLaw` is already imported in recipe.rs. The per-law functions are
 `pub(super)` — the module docs of each new file say they are reachable only
@@ -158,7 +186,13 @@ policy as a possible later extension; it does not exist in this packet).
 ### `frame_radial.rs` — `RadialAboutAxis` (plan §3.2, normative)
 
 ```rust
-pub(super) fn radial_about_axis(origin: Point3, axis: Vector3, spine_point: Point3, at: f64) -> Result<Frame3, ConstructError>
+pub(super) fn radial_about_axis(
+    origin: Point3,
+    axis: Vector3,
+    spine_point: Point3,
+    tangent: Vector3,
+    at: f64,
+) -> Result<Frame3, ConstructError>
 ```
 
 Analytic from the axis: let `â = normalize(axis)`; let
@@ -167,9 +201,9 @@ Analytic from the axis: let `â = normalize(axis)`; let
 non-finite or zero, when `d` is zero/non-finite, or when
 `radial.magnitude() <= DirectTolerance::default().position` (the spine point
 lies ON the axis — no radial direction exists). Otherwise `n = radial̂`
-(profile-y points radially outward), `b = t × n` (t is the unit spine
-tangent from the dispatcher), returned as
-`Frame3 { tangent: t, normal: n, binormal: b }`. Rotated copies MUST remain
+(profile-y points radially outward), `b = tangent × n` (t is the unit spine
+tangent handed in by the dispatcher), returned as
+`Frame3 { tangent, normal: n, binormal: b }`. Rotated copies MUST remain
 equivariant under a rotation about the axis, modulo floating-point (test 10;
 the recorded cgmath rotation residue is ~6.1e-17 — assert within a
 TOLERANCE-scaled bound, never exact equality).
@@ -183,9 +217,11 @@ calls unused under `-D warnings`).
 
 Header `#![deny(clippy::unwrap_used)]`. The circle-spine fixture (tests 6,
 7, 10) is a test-local `Spine` impl — the trait is public and this is the
-sanctioned extension point; implement a unit-circle arc in the XZ plane
-(`C(s) = (cos θ, 0, sin θ)` with `θ = φ0 + s·Δ`, `s ∈ [0, 1]`), whose
-`derivative_at` returns the analytic tangent `Δ·(−sin θ, 0, cos θ)`. Every
+sanctioned extension point; implement a unit-circle arc in the **XY plane
+about the Z axis** (`C(s) = (cos θ, sin θ, 0)` with `θ = φ0 + s·Δ`, `s ∈
+[0, 1]` — r2: the r1 worker proved the XZ plane wrong: about the Z axis the
+radial̂ would be constant (1,0,0) and `t · n ≠ 0`), whose `derivative_at`
+returns the analytic tangent `Δ·(−sin θ, cos θ, 0)`. Every
 fixture premise is machine-checked before the assertion that depends on it.
 Plain decimal literals are fine; the H-3 regex bans only `1e-…` forms; every
 tolerance comparison goes through `DirectTolerance::default()` or
@@ -206,8 +242,8 @@ tolerance comparison goes through `DirectTolerance::default()` or
    `Err(FrameSingular { law: "ArchitecturalUp", .. })`.
 6. `radial_frame_matches_spec_formula` — the circle-spine fixture about the
    Z axis through the origin: at several s, `n` is the outward radial
-   direction `(cos θ, 0, sin θ)`, `t` is the analytic unit tangent, `b = t × n`
-   — all within the position bound.
+   direction `(cos θ, sin θ, 0)`, `t` is the analytic unit tangent
+   `(−sin θ, cos θ, 0)`, `b = t × n` — all within the position bound.
 7. `radial_frame_refuses_axis_incident_point` — a spine whose C(s) sits ON
    the axis: `Err(FrameSingular { law: "RadialAboutAxis", .. })`.
 8. `parallel_transport_still_refuses_in_cg002` — a recipe carrying
