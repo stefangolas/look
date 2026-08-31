@@ -9,92 +9,73 @@ when they stop being true, never for length. If you are picking this up cold, re
 [`loop/ORCHESTRATOR.md`](ORCHESTRATOR.md) for how to run the loop, then
 `python loop/slot_status.py`** - nothing else. Do not read `LEDGER.jsonl` whole.
 
-Updated 2026-08-31, session 45. **CG program is 8/10 landed; BOTH remaining
-packets are IN FLIGHT in parallel**: CG-007-CERT in slot 0 (pid 22812) and
-CG-009-BREP in slot 1 (pid 9328), both dispatched ~10:55 against base
-`f332dfb`, model deepseek. Write sets are disjoint (007: base evidence +
-meshalgo assembly + facet outcome fields; 009: geometry canonical/decorators
-+ modeling spine_sweep + bounded arms-only ripple). **The merged-HEAD check
-(session-37 law) is MANDATORY after both land** - they interact through
-truck-modeling. Session 45 also: certificate mapping unified
-(docs/CERTIFICATE_MAPPING.md; placement correction: CG-007's evidence types
--> truck-base), packet_lint.py shipped (layer 1+2, validated, found three
-registry defects - CG-002/003 were landed-unregistered, now fixed), README +
-OVERVIEW published to the truck-fork repo (docs/ mirrored there; look/docs
-stays the working set). CG-004 landed this session (verify round trip 1 was
-V3 LINT_UNLINTED, PACKET fault, r3 fixed).
+Updated 2026-08-31, session 45 CLOSE. **THE CG PROGRAM IS COMPLETE: 10/10
+LANDED.** CG-007-CERT landed `85f0426` (verify round trip: one GATE-2
+one-token amendment), CG-009-BREP landed `8eb890f` (verify round trips:
+one V1 SCOPE_VIOLATION from the packet's own match-site census miss, one V4
+bundle, two from the orchestrator's own amendment markers - all amendments,
+zero worker redispatches). Merged-HEAD check at `8eb890f`: base/geometry/
+topology/modeling fully green; the 6 non-green meshalgo/stepio suites all
+trace to the f332dfb baseline's own failure/absence set (missing fixtures,
+the recorded builder Closed-vs-Oriented, debug-panicked cone tests absent at
+base) - zero regressions. Branch: `integration/kernel-bg`, HEAD `8eb890f`.
 
 ## Where we are
 
-Session 44 so far: CG-000-CONTRACT (the plan 3.2 contract skeleton + the 3.4
-index-identity convention + the 3.5 certificate mapping, 11 tests) landed
-first-try; CG-001-RECIPE (spine trait, LineSpine/PolylineSpine with the C1
-refusals, profile.rs with the per-edge-uniform ring parameter, the ordered
-position composition, sampling Uniform/Custom) landed after an honest r1
-SPEC_GAP (two packet defects, r2 amended, resumed warm); CG-006-DIAG (the
-ManifoldDiagnostics aggregate + orientation_parity over the shell substrate,
-7 tests) landed first-try; CG-008-COONS (CoonsSurface, 7 tests) landed after
-an honest r1 SPEC_GAP (E0119 IncludeCurve overlap + E0308 Invertible swap -
-r2 restricted the struct to a single curve parameter). Pattern: three
-orchestrator packet defects caught by honest worker stops, all fixed by
-amendment + warm-session resume, zero wasted work. CG-002 dispatched but the
-worker died on API balance with zero work done (packet intact).
+Session 45: the certificate mapping was unified first
+(docs/CERTIFICATE_MAPPING.md; placement correction: CG-007's evidence types
+live in truck-base, BG-S0-001 precedent - modeling->meshalgo regular dep
+barred), then both remaining packets were written, linted
+(loop/packet_lint.py, layer 1+2), registered BEFORE dispatch (the CG-004
+lesson), and dispatched in parallel. Both workers finished in ~3h; both
+verified ACCEPTED after amendment-only round trips; both landed. The
+truck-fork repo got a real README + OVERVIEW and a full mirror of look/docs
+(look/docs stays the working set; two sources of truth, manual sync).
+CG-004 landed earlier the same session (V3 LINT_UNLINTED, PACKET fault, r3).
 
 ## Pick up here
 
-1. **CG-002, CG-003, CG-005 have all landed (7/10).** The session-44
-   redispatch list is obsolete; HEAD is `003f3a7` (CG-004 r2 packet commit).
-2. **CG-004-FACET is in flight** (slot 2, restart 1/3 after the watchdog
-   killed the wedged overnight run). When it finishes: verify with
-   `--base 2adb655` (the slot forked BEFORE the r2 amendment `003f3a7`; the
-   diff will legitimately contain the r2 write-set addition - the one-line
-   position correction). After 004 lands: write + dispatch CG-007-CERT
-   (against `docs/CERTIFICATE_MAPPING.md` sections A+B) and then CG-009
-   (last, alone).
-3. **Certified-kernel-plan coordination:** (a) **DONE 2026-08-31** - the
-   certificate-field mapping is unified at `docs/CERTIFICATE_MAPPING.md`
-   (CG-000 rows verbatim in section A, the in-flight CG-004 `FacetVerdict`
-   reconciliation in B, the certified Phase-0 bookings in C); the truck-fork
-   plan's X1 entry points there. CG-007 and certified-Phase-0 dispatch
-   against that table; further evidence kinds are booked there only.
-   (b) certified-Phase-0
-   moves formal/+domain/ out of truck-meshalgo - do not run it concurrently
-   with CG-005/CG-007 (same crate's module tree). Positive couplings:
-   certified class 1 consumes CG-001's SpineFrameRecipe; certified class 4
-   consumes CG-006's orientation_parity/ManifoldDiagnostics.
-4. **Model policy: default worker is `deepseek/deepseek-v4-flash`** - and
-   the balance died mid-session (one dispatch lost, zero work). glm remains
-   the booked alternative ONLY for churn-shaped packets and ONLY by owner
-   decision (session-40 thinking-budget deaths).
-5. Open environmental, do NOT chase: `healing::tests::step_import`
-   (missing fixture, fails at base); upstream `fillet::complex_surface`;
-   clippy deny-lints in untouched truck-meshalgo/truck-stepio;
-   `test_circle_arc_tangent0` STABILIZED (D8).
+1. **The CG program is DONE.** Next program per ORCHESTRATOR: the
+   certified-kernel plan (truck-fork CERTIFIED-KERNEL-PLAN.md) - Phase 0
+   (truck-certified promotion + contract freeze) may now dispatch against
+   docs/CERTIFICATE_MAPPING.md (X1 resolved this session). X2 still holds:
+   certified-Phase-0 must not run concurrently with packets writing
+   truck-meshalgo's module tree - nothing is in flight, so it is free.
+2. **packet_lint.py is law for new packets**: run it before dispatch
+   (gen_packet.check runs automatically at dispatch for anchors; the lint
+   adds crates-vs-write-set, test-path ownership, DEP_KIND, forecast
+   numbers, DIRECT_DEP, QUALIFIED_PATH). Validated this session; it found
+   three real registry defects on first contact.
+3. **Registry hygiene**: BG-CG-002/003 were found landed-but-unregistered
+   this session and fixed; every future packet gets its registry row at
+   dispatch time, not at landing.
+4. **Elastic pool is still unwritten** (plan section 4): corpus fixtures,
+   mutation batteries, kernel microbenchmarks - dispatch when idle.
+5. Open environmental, do NOT chase: healing::tests::step_import (missing
+   fixture); upstream fillet::complex_surface; stepio
+   assy/table/tessellate_shape/oi/ioi (missing data); stepio builder
+   (Closed-vs-Oriented, verified pre-existing twice); cone_topology tests
+   panic in debug (the circle-carrier trap); clippy deny-lints in untouched
+   truck-meshalgo/truck-stepio (toolchain drift).
 
 ## State of the machine, as left
 
-- Watchdog RUNNING (pid `27556`, `LOOK_WATCHDOG_STAGNANT=3600`, restarted
-  17:42 after being found dead at session open - re-derive before trusting).
-- Slots: 0/2/3 FINISHED (CG-000/006/008 - re-fork via new_slot); 1 IDLE
-  (CG-002's dead worker, no work in tree - safe to re-fork or re-dispatch).
-- Registry: CG-000/001/006/008 DONE; CG-002/003 READY; CG-005 packet written
-  (03a185e) but NOT yet registered - add its READY row before dispatching.
-- Disk ~15-20 GB free (three slot targets + repo-root target were reclaimed
-  mid-session after a 5.6 GB verify floor hit; reclaim everything when all
-  slots are idle).
-- LOC ledger (`git diff --shortstat da72cd5..HEAD -- vendor/truck`):
-  **+72,790 / -1,555 class** (re-derive by command; CG packets added ~2,600).
+- Watchdog RUNNING (pid 27556, re-derive before trusting).
+- All four slots idle/FINISHED; CG-007 slot 0 and CG-009 slot 1 hold landed
+  branches - re-fork via new_slot before reuse.
+- Disk ~11-13 GB free. The V9 look baseline for base f332dfb is CACHED
+  (loop/baselines/f332dfb__look__*.json) - future verifies at this base
+  skip the 5 GB cold build. The truck-fork checkout's target/ was reclaimed
+  this session (2.3 GB); a reboot is the reclaim of last resort.
+- LOC ledger (re-derive): `git diff --shortstat da72cd5..HEAD -- vendor/truck`.
 
 ## The parallelism picture
 
-4/10 CG packets landed. Next: CG-002 + CG-005 in parallel (disjoint), CG-003
-after 002 (recipe.rs shared), CG-004 after 001-003, CG-007 after 004+006
-(AND after the certificate-mapping unification with the certified plan),
-CG-009 last and alone. Elastic corpus/mutation/benchmark packets fill idle
-slots (none written yet). Full-wave orchestration is deliberately NOT
-planned (plan section 5); the certified-kernel-plan is a separate program
-that must not run its Phase 0 against truck-meshalgo while CG-005/007 are
-live.
+CG graph exhausted (10/10). Next waves belong to the certified-kernel plan;
+its Phase 0 sequels the X1/X2 rules in docs/CERTIFICATE_MAPPING.md. Elastic
+CG packets (corpus/mutation/benchmarks) may fill slots alongside certified
+work if the write sets stay disjoint.
+
 ## Traps, each one paid for
 
 ### Session 42 second half (P10's SPEC_GAP journey + P8's three rounds + the program close) - paid in full
