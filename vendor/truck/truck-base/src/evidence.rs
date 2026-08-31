@@ -94,6 +94,11 @@ pub enum EnvelopeCase {
     /// singular event cells, or 2-D overlap) is not yet implemented in the
     /// Contact Layer (plan §4 Phase 3).
     ContactReductionDeferred,
+    /// The envelope case for constructive-realization refusals (mapping A row 1).
+    /// CG-007 adds it; every realization entry maps `ConstructError` onto
+    /// `UnsupportedEnvelope(ConstructRefused)` and rides the details in
+    /// `RealizationEvidence`.
+    ConstructRefused,
 }
 
 /// Why a numerically unresolved result could not be certified.
@@ -647,6 +652,76 @@ impl Certificate {
             modulus,
         })
     }
+}
+
+/// A Copy/Eq-safe projection of a constructive `ConstructError`. base cannot
+/// name the error type (geometry depends on base, not vice versa), so the
+/// error's identity rides as a tag.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct ConstructErrorSummary {
+    /// The error's identity tag: `"ZeroTangent"` | `"FrameSingular"`
+    /// | `"SpineNotC1"` | `"ProfileCorrespondenceMismatch"`
+    /// | `"ProfileCollapse"` | `"NonFinite"` | `"InvalidInput"`.
+    pub kind: &'static str,
+    /// The spine parameter where the error fired; `None` for structural
+    /// refusals without a parameter.
+    pub at: Option<f64>,
+    /// Which frame law was singular; `FrameSingular` only.
+    pub law: Option<&'static str>,
+}
+
+/// The three-valued realization verdict (mapping A row 4 / section B).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum RealizationVerdict {
+    /// The mesh closed by construction and the audit found nothing.
+    CertifiedWithinTolerance,
+    /// The winding audit found violations — FAILED, never a warning.
+    Failed,
+    /// The audit could not decide; uncertainty is surfaced, never converted
+    /// into success.
+    Inconclusive,
+}
+
+/// Per-realization certificate (mapping A row 2). NOT a widening of
+/// FaceValidityCertificate; the same separation doctrine as band_attempts vs
+/// cone_band_attempts.
+#[derive(Clone, Debug, PartialEq)]
+pub struct RealizationCertificate {
+    /// H-6: the facet path computes in floats.
+    pub method: Method,
+    /// Max bilinear-twist deviation over cells.
+    pub max_cell_twist: f64,
+    /// The audit's extent (the tolerance scale).
+    pub extent: f64,
+}
+
+/// One shared-edge observation (mapping A row 3). Never a ProvenanceRecord
+/// variant (that type is Copy + Eq; this payload carries f64s).
+#[derive(Clone, Debug, PartialEq)]
+pub struct SharedEdgePairEvidence {
+    /// The measured position deviation of face A's sampled positions from the
+    /// shared canonical sequence.
+    pub error_a: f64,
+    /// The measured position deviation of face B's sampled positions from the
+    /// shared canonical sequence.
+    pub error_b: f64,
+}
+
+/// The realization evidence record (mapping A row 1). Construct-stage
+/// failures predate meshing and never enter MeshedShellOutcome; this is the
+/// record that carries them, plus realization-stage facts.
+#[derive(Clone, Debug, PartialEq)]
+pub struct RealizationEvidence {
+    /// The construct-stage error summary, when the realization refused at
+    /// construct time.
+    pub construct_error: Option<ConstructErrorSummary>,
+    /// The per-realization certificate, when one was produced.
+    pub certificate: Option<RealizationCertificate>,
+    /// Shared-edge pair observations over sampled edges. Exactness is
+    /// expressed by absence of rows.
+    pub shared_edge_pairs: Vec<SharedEdgePairEvidence>,
+    /// The three-valued realization verdict.
+    pub verdict: RealizationVerdict,
 }
 
 #[cfg(test)]
