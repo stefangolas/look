@@ -29,6 +29,17 @@ checks, one check per ledger fault class:
   The packet must say AT THE WORKTREE ROOT.
 - DEPENDS_KNOWN           every depends_on id must exist in PACKETS.jsonl. A
   typo'd dependency is invisible until scheduling.
+- DIRECT_DEP              external crates in the template's `use` statements
+  must be direct dependencies of the crates whose files the packet writes.
+  An absent crate is a guaranteed E0433; a dev-dependency-only crate is fine
+  in test code and wrong in src (CG-002 r1: `use cgmath::` in truck-geometry,
+  which takes cgmath only through truck_base's re-export).
+- QUALIFIED_PATH          `truck_<crate>::mod::Item` paths cited in template
+  code must resolve against the vendored tree: every module segment exists,
+  and the final identifier appears in the resolved file (re-export aware).
+  Catches cited APIs that were renamed, moved, or never existed (the
+  session-9 survey class: a proposed call whose generic bound supplies no
+  such method would not have compiled).
 
 Usage:
     python loop/packet_lint.py [--quiet] PACKET [PACKET ...]
@@ -109,6 +120,128 @@ class Findings(list):
         self.append((sev, check, msg))
 
 
+def code_blocks(text):
+    return re.findall(r"```[^\n]*\n(.*?)```", text, re.S)
+
+
+EXTERNAL_USE = re.compile(r"(?m)^\s*use\s+([a-z_][a-z0-9_]*)\s*::")
+QUALIFIED = re.compile(
+    r"\b(truck_(?:base|geotrait|geometry|topology|polymesh|meshalgo"
+    r"|modeling|shapeops|stepio|evidence))::([A-Za-z0-9_:]+)")
+
+
+def owning_crates(write_allow):
+    return sorted({c for p in write_allow if (c := crate_of(p))})
+
+
+def check_direct_deps(text, write_allow, findings):
+    externals = set()
+    for block in code_blocks(text):
+        externals.update(EXTERNAL_USE.findall(block))
+    externals -= {'std', 'core', 'alloc', 'crate', 'self', 'super'}
+    externals = {e for e in externals if not e.startswith('truck_')}
+    crates = owning_crates(write_allow)
+    for e in sorted(externals):
+        statuses = []
+        for c in crates:
+            deps, dev = manifest_sections(c)
+            if deps is None:
+                continue
+            if e in deps:
+                statuses.append('dep')
+            elif e in dev:
+                statuses.append('dev')
+            else:
+                statuses.append('absent')
+        if statuses and 'dep' not in statuses:
+            if 'absent' in statuses:
+                findings.add('FAIL', 'DIRECT_DEP',
+                             f"`use {e}::` in template code but {e} is not a direct "
+                             f"dependency of {', '.join(crates)} - guaranteed E0433 "
+                             "in the crate that lacks it (CG-002 r1 class)")
+            else:
+                findings.add('WARN', 'DIRECT_DEP',
+                             f"`use {e}::` is dev-dependency-only in {', '.join(crates)} "
+                             "- fine in test code, E0433 in src")
+
+
+def resolve_path(crate, segments):
+    """Returns (file, checked_identifier) or None.
+
+    Walks the longest module prefix (directories, seg.rs files, or `pub mod`
+    declarations), then checks the next segment as a pub item in the file it
+    lands in. Segments after the item are method/function calls - not checked.
+    """
+    cur = VENDOR / crate / 'src'
+    i = 0
+    while i < len(segments):
+        seg = segments[i]
+        if (cur / seg).is_dir():
+            cur = cur / seg
+            i += 1
+            continue
+        if (cur / f'{seg}.rs').is_file():
+            cur = cur / f'{seg}.rs'
+            i += 1
+            continue
+        break
+    container = cur if cur.is_file() else (
+        cur / 'mod.rs' if (cur / 'mod.rs').is_file() else cur / 'lib.rs')
+    if not container.is_file():
+        return None
+    if i >= len(segments):
+        return (container, None)
+    item = segments[i]
+    body = container.read_text(errors='replace')
+    pat_item = rf"\bpub\s+(?:fn|struct|enum|trait|type|const|use|mod)\s+(?:<[^>]*>\s*)?{item}\b"
+    pat_named_use = rf"\bpub use\b[^\n]*\b{item}\b"
+    if re.search(pat_item, body) or re.search(pat_named_use, body):
+        return (container, item)
+
+    def glob_follow(file, depth):
+        if depth > 3:
+            return None
+        for glob_src in re.findall(r"(?m)^\s*pub use\s+([a-z_][a-z0-9_]*)::\*",
+                                   file.read_text(errors='replace')):
+            sibling = file.parent / f'{glob_src}.rs'
+            if not sibling.is_file() and (file.parent / glob_src).is_dir():
+                sibling = file.parent / glob_src / 'mod.rs'
+            if not sibling.is_file():
+                continue
+            sbody = sibling.read_text(errors='replace')
+            if re.search(pat_item, sbody) or re.search(pat_named_use, sbody):
+                return (sibling, item)
+            hit = glob_follow(sibling, depth + 1)
+            if hit:
+                return hit
+        return None
+
+    return glob_follow(container, 0)
+
+
+def check_qualified_paths(text, findings):
+    seen = set()
+    for block in code_blocks(text):
+        for crate, path in QUALIFIED.findall(block):
+            segments = [s for s in path.split('::') if s]
+            if (crate, path) in seen:
+                continue
+            seen.add((crate, path))
+            dashed = f"truck-{crate.split('_', 1)[1]}"
+            resolved = resolve_path(dashed, segments)
+            if resolved is None:
+                findings.add('FAIL', 'QUALIFIED_PATH',
+                             f"{crate}::{path} does not resolve against the vendored "
+                             "tree - a cited API that was renamed, moved, or never "
+                             "existed; the template will not compile as written")
+                continue
+            container, item = resolved
+            if item and not re.search(rf"\b{item}\b", container.read_text(errors='replace')):
+                findings.add('FAIL', 'QUALIFIED_PATH',
+                             f"{crate}::{path}: final identifier not found in "
+                             f"{container.relative_to(REPO_ROOT)}")
+
+
 def lint_packet(packet_path, known_ids):
     text = Path(packet_path).read_text(encoding='utf-8', errors='replace')
     yaml_text = front_block(text)
@@ -165,6 +298,10 @@ def lint_packet(packet_path, known_ids):
             findings.add('FAIL', 'DEP_KIND',
                             f"line {line_no}: {x} has no manifest edge to {y} - "
                             "check KIND, version and direction before dispatch")
+
+    # DIRECT_DEP + QUALIFIED_PATH (template-code claims about the tree)
+    check_direct_deps(text, write_allow, findings)
+    check_qualified_paths(text, findings)
 
     # FORECAST_NUMBER
     for m in re.finditer(r"\bbecomes\s+\d+\b", text):
