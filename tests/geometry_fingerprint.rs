@@ -54,12 +54,7 @@ fn fingerprint(name: &str) -> Fingerprint {
             }
         }
     }
-    Fingerprint {
-        triangles,
-        vertices,
-        min,
-        max,
-    }
+    Fingerprint { triangles, vertices, min, max }
 }
 
 /// Relative to the part's own extent, deliberately. These two fixtures are
