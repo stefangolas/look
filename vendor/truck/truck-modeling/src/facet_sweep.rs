@@ -10,6 +10,10 @@
 
 use std::collections::HashMap;
 
+use truck_base::evidence::{
+    Budget, Certificate, Certified, ConstructErrorSummary, EnvelopeCase, Margin, Method, Modulus,
+    Outcome, PropMap, RealizationCertificate, RealizationVerdict, Refusal, SharedEdgePairEvidence,
+};
 use truck_geometry::constructive::*;
 use truck_polymesh::*;
 
@@ -57,6 +61,13 @@ pub struct FacetSweepResult {
     pub audit: FacetSweepAudit,
     /// The three-valued verdict.
     pub verdict: FacetVerdict,
+    /// Mapping A row 2: the per-realization certificate, Method::Float (H-6).
+    pub realization_certificate: RealizationCertificate,
+    /// Mapping A row 3. Empty on the exact-grid path: the grid registry makes
+    /// shared edges index-identical by construction, so there is no measured
+    /// error to record. The LEDGER assembly (meshalgo) populates this when a
+    /// realization is built over sampled edges.
+    pub shared_edge_pairs: Vec<SharedEdgePairEvidence>,
 }
 
 /// Realizes the recipe as a faceted `PolygonMesh` over the given spine
@@ -115,6 +126,10 @@ pub fn facet_sweep<S: Spine>(
     let mut triangle_count = 0usize;
     let mut quad_count = 0usize;
     let position_tol = DirectTolerance::default().position;
+    // The maximum bilinear-twist deviation over the side cells (mapping A
+    // row 2). Tracked here, beside the existing quad/tri split decision — no
+    // recomputation, no new tolerances.
+    let mut max_cell_twist: f64 = 0.0;
 
     // 3. Side faces. The diagonal choice (i,j)-(i+1,j2) is structural —
     // always this diagonal, never a float comparison between alternatives.
@@ -129,6 +144,7 @@ pub fn facet_sweep<S: Spine>(
             let twist = (positions[a] - origin) + (positions[c] - origin)
                 - (positions[b] - origin)
                 - (positions[d] - origin);
+            max_cell_twist = max_cell_twist.max(twist.magnitude());
             if twist.magnitude() <= position_tol {
                 quad_faces.push([a, b, c, d]);
                 quad_count += 1;
@@ -200,6 +216,12 @@ pub fn facet_sweep<S: Spine>(
         mesh,
         audit,
         verdict,
+        realization_certificate: RealizationCertificate {
+            method: Method::Float,
+            max_cell_twist,
+            extent,
+        },
+        shared_edge_pairs: Vec::new(),
     })
 }
 
@@ -317,4 +339,97 @@ fn vertex(index: usize) -> StandardVertex {
         uv: None,
         nor: None,
     }
+}
+
+/// The verdict absorption (mapping B — one tri-state doctrine, no third
+/// vocabulary): the facet backend's immediate verdict maps onto the
+/// evidence-stage realization verdict arm-for-arm.
+impl From<FacetVerdict> for RealizationVerdict {
+    fn from(verdict: FacetVerdict) -> Self {
+        match verdict {
+            FacetVerdict::CertifiedWithinTolerance => RealizationVerdict::CertifiedWithinTolerance,
+            FacetVerdict::Failed => RealizationVerdict::Failed,
+            FacetVerdict::Inconclusive => RealizationVerdict::Inconclusive,
+        }
+    }
+}
+
+/// Maps every `ConstructError` variant to its summary tag in ONE place. The
+/// mapping is modeling-local so base stays geometry-blind (geometry depends
+/// on base, not vice versa). A `From<&ConstructError> for ConstructErrorSummary`
+/// impl cannot live in this crate — the orphan rule rejects it because neither
+/// `ConstructError` nor `ConstructErrorSummary` is local to truck-modeling —
+/// so the mapping rides as a plain function instead (deviation recorded in
+/// RESULT.json; the mapping table's carrier is unchanged).
+pub fn summarize_construct_error(error: &ConstructError) -> ConstructErrorSummary {
+    match *error {
+        ConstructError::ZeroTangent { at } => ConstructErrorSummary {
+            kind: "ZeroTangent",
+            at: Some(at),
+            law: None,
+        },
+        ConstructError::FrameSingular { at, law } => ConstructErrorSummary {
+            kind: "FrameSingular",
+            at: Some(at),
+            law: Some(law),
+        },
+        ConstructError::SpineNotC1 { at } => ConstructErrorSummary {
+            kind: "SpineNotC1",
+            at: Some(at),
+            law: None,
+        },
+        ConstructError::ProfileCorrespondenceMismatch => ConstructErrorSummary {
+            kind: "ProfileCorrespondenceMismatch",
+            at: None,
+            law: None,
+        },
+        ConstructError::ProfileCollapse { at } => ConstructErrorSummary {
+            kind: "ProfileCollapse",
+            at: Some(at),
+            law: None,
+        },
+        ConstructError::NonFinite { at } => ConstructErrorSummary {
+            kind: "NonFinite",
+            at: Some(at),
+            law: None,
+        },
+        ConstructError::InvalidInput => ConstructErrorSummary {
+            kind: "InvalidInput",
+            at: None,
+            law: None,
+        },
+    }
+}
+
+/// The realization entry per mapping A row 1: construct refusals surface
+/// as `Refusal::UnsupportedEnvelope(ConstructRefused)` with the detailed
+/// error summarized in the evidence record. `facet_sweep` stays unchanged.
+///
+/// The packet spells the return `Outcome<Certified<FacetSweepResult>>`, but
+/// `Outcome<T> = Result<Certified<T>, Refusal>` here (the packet's own
+/// `// prelude Result<_, Refusal>` comment shows the intended expansion), so
+/// the single `Certified::new` wrap the body performs types as
+/// `Outcome<FacetSweepResult>` — deviation recorded in RESULT.json.
+pub fn facet_sweep_certified<S: Spine>(
+    recipe: &SpineFrameRecipe<S, ProfileLaw, FrameLaw>,
+    stations: &[f64],
+    ring_resolution: usize,
+) -> Outcome<FacetSweepResult> {
+    let result = match facet_sweep(recipe, stations, ring_resolution) {
+        Ok(result) => result,
+        Err(_) => {
+            // The refusal cannot carry a payload; the summary is re-derived
+            // from the construct error by the caller (mapping A row 1).
+            return Err(Refusal::UnsupportedEnvelope(EnvelopeCase::ConstructRefused));
+        }
+    };
+    let certificate = Certificate {
+        props: PropMap::new(),
+        // The facet path computes in floats (H-6); never `Exact`.
+        method: Method::Float,
+        budget_left: Budget::new(0, 0, 0),
+        margin: Margin::UNBOUNDED,
+        modulus: Modulus::Unbounded,
+    };
+    Ok(Certified::new(result, certificate))
 }

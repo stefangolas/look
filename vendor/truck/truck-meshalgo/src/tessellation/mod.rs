@@ -670,6 +670,7 @@ impl<C: PolylineableCurve, S: RobustMeshableSurface> RobustMeshableShape
 pub mod diagnosis;
 pub mod domain;
 pub mod formal;
+pub mod realization_evidence;
 pub mod source_edge;
 pub mod source_evidence;
 mod triangulation;

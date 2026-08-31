@@ -5,10 +5,14 @@
 //! planar-quad / fixed-diagonal split rules, the typed refusals, the winding
 //! audit, the signed-volume match, and the three-valued verdict.
 
+use truck_base::evidence::{
+    EnvelopeCase, Method, RealizationCertificate, RealizationVerdict, Refusal,
+};
 use truck_geometry::base::*;
 use truck_geometry::constructive::*;
 use truck_modeling::facet_sweep::{
-    facet_sweep, verdict_of, winding_audit, FacetSweepAudit, FacetSweepResult, FacetVerdict,
+    facet_sweep, facet_sweep_certified, summarize_construct_error, verdict_of, winding_audit,
+    FacetSweepAudit, FacetSweepResult, FacetVerdict,
 };
 use truck_polymesh::*;
 
@@ -155,6 +159,12 @@ fn swept<S: Spine>(
                 winding_violations: 1,
             },
             verdict: FacetVerdict::Failed,
+            realization_certificate: RealizationCertificate {
+                method: Method::Float,
+                max_cell_twist: 0.0,
+                extent: 0.0,
+            },
+            shared_edge_pairs: Vec::new(),
         },
     }
 }
@@ -461,4 +471,89 @@ fn stations_are_validated() {
         facet_sweep(&recipe, &[0.0, 1.0], 2),
         Err(ConstructError::InvalidInput)
     ));
+}
+
+#[test]
+fn construct_refused_variant_exists_and_carries_no_payload() {
+    let case = EnvelopeCase::ConstructRefused;
+    // The bare-variant pattern compiles only because the variant is unit
+    // shaped: a payload-carrying variant cannot be matched without binding it
+    // (mapping A row 1).
+    assert!(matches!(case, EnvelopeCase::ConstructRefused));
+    assert_eq!(case, EnvelopeCase::ConstructRefused);
+}
+
+#[test]
+fn realization_verdict_absorbs_facet_verdict() {
+    assert_eq!(
+        RealizationVerdict::from(FacetVerdict::CertifiedWithinTolerance),
+        RealizationVerdict::CertifiedWithinTolerance
+    );
+    assert_eq!(
+        RealizationVerdict::from(FacetVerdict::Failed),
+        RealizationVerdict::Failed
+    );
+    assert_eq!(
+        RealizationVerdict::from(FacetVerdict::Inconclusive),
+        RealizationVerdict::Inconclusive
+    );
+}
+
+#[test]
+fn facet_sweep_certified_refuses_with_construct_refused() {
+    let recipe = SpineFrameRecipe::new(
+        straight_spine(),
+        ProfileLaw::Scale {
+            profile: unit_square(),
+            scale: ScalarLaw::Constant(0.0),
+        },
+        fixed_plane_z(),
+    );
+    let stations = uniform_stations(5);
+    assert!(matches!(
+        facet_sweep_certified(&recipe, &stations, 4),
+        Err(Refusal::UnsupportedEnvelope(EnvelopeCase::ConstructRefused))
+    ));
+    // A refusal cannot carry a payload, so the summary is re-derived from the
+    // same construct error (mapping A row 1).
+    let construct_error = match facet_sweep(&recipe, &stations, 4) {
+        Err(error) => error,
+        Ok(_) => panic!("the collapsed-profile fixture must refuse"),
+    };
+    let summary = summarize_construct_error(&construct_error);
+    assert_eq!(summary.kind, "ProfileCollapse");
+}
+
+#[test]
+fn facet_sweep_certified_ok_carries_evidence_and_certificate() {
+    let recipe = SpineFrameRecipe::new(
+        straight_spine(),
+        ProfileLaw::Constant(unit_square()),
+        fixed_plane_z(),
+    );
+    let stations = uniform_stations(5);
+    let certified = match facet_sweep_certified(&recipe, &stations, 4) {
+        Ok(certified) => certified,
+        Err(other) => panic!("straight duct refused: {other:?}"),
+    };
+    // H-6: the facet path computes in floats — never `Exact`.
+    assert_eq!(certified.cert.method, Method::Float);
+    let result = certified.value;
+    assert_eq!(result.verdict, FacetVerdict::CertifiedWithinTolerance);
+    assert_eq!(result.realization_certificate.method, Method::Float);
+    assert!(result.realization_certificate.extent > 0.0); // H-3: a mesh extent is a length; a positive-literal bound is fine for the fixture
+}
+
+#[test]
+fn shared_edge_pairs_empty_on_exact_grid_path() {
+    let recipe = SpineFrameRecipe::new(
+        straight_spine(),
+        ProfileLaw::Constant(unit_square()),
+        fixed_plane_z(),
+    );
+    let stations = uniform_stations(5);
+    let result = swept(&recipe, &stations, 4);
+    // The grid registry makes shared edges index-identical by construction:
+    // there is no measured error to record (mapping A row 3).
+    assert!(result.shared_edge_pairs.is_empty());
 }
