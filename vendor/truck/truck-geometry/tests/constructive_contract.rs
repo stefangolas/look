@@ -150,46 +150,60 @@ fn construct_error_display_names_law_and_parameter() {
 
 #[test]
 fn recipe_evaluators_refuse_while_stub() {
-    let profile = Profile2D {
+    // BG-CG-001-RECIPE: in-place amendment (r2) — S = () no longer typechecks
+    // against the bounded evaluator impl, and a filled `profile` no longer
+    // refuses; frame and position still refuse while the frame is a stub.
+    let triangle = Profile2D {
         vertices: vec![
             Point2::new(0.0, 0.0),
             Point2::new(1.0, 0.0),
             Point2::new(0.0, 1.0),
         ],
     };
+    let profile_law = ProfileLaw::Constant(triangle);
     let recipe = SpineFrameRecipe::new(
-        (),
-        ProfileLaw::Constant(profile),
+        LineSpine {
+            start: Point3::new(0.0, 0.0, 0.0),
+            end: Point3::new(1.0, 0.0, 0.0),
+        },
+        profile_law.clone(),
         FrameLaw::FixedPlane {
             normal: Vector3::unit_z(),
         },
     );
-    assert!(matches!(
-        recipe.position(0.5, 0.25),
-        Err(ConstructError::InvalidInput)
-    ));
+    assert_eq!(recipe.profile(0.5, 0.25), profile_law.evaluate(0.5, 0.25));
     assert!(matches!(
         recipe.frame(0.5),
         Err(ConstructError::InvalidInput)
     ));
     assert!(matches!(
-        recipe.profile(0.5, 0.25),
+        recipe.position(0.5, 0.25),
         Err(ConstructError::InvalidInput)
     ));
 }
 
 #[test]
 fn sampling_policy_resolve_refuses_while_stub() {
-    let policies = [
-        SamplingPolicy::UniformCount { spine: 4 },
-        SamplingPolicy::CustomParameters(vec![0.0, 1.0]),
-        SamplingPolicy::ChordTolerance(0.1),
-        SamplingPolicy::AngularTolerance(0.1),
-    ];
-    for policy in &policies {
-        assert!(matches!(
-            policy.resolve(0.0, 1.0),
-            Err(ConstructError::InvalidInput)
-        ));
-    }
+    // BG-CG-001-RECIPE: in-place amendment — UniformCount and CustomParameters
+    // now resolve; ChordTolerance/AngularTolerance still refuse in CG-001.
+    let n = 4usize;
+    let expected_uniform: Vec<f64> = (0..n)
+        .map(|i| 0.0 + (1.0 - 0.0) * (i as f64) / ((n - 1) as f64))
+        .collect();
+    assert_eq!(
+        SamplingPolicy::UniformCount { spine: 4 }.resolve(0.0, 1.0),
+        Ok(expected_uniform)
+    );
+    assert_eq!(
+        SamplingPolicy::CustomParameters(vec![0.0, 1.0]).resolve(0.0, 1.0),
+        Ok(vec![0.0, 1.0])
+    );
+    assert!(matches!(
+        SamplingPolicy::ChordTolerance(0.1).resolve(0.0, 1.0),
+        Err(ConstructError::InvalidInput)
+    ));
+    assert!(matches!(
+        SamplingPolicy::AngularTolerance(0.1).resolve(0.0, 1.0),
+        Err(ConstructError::InvalidInput)
+    ));
 }
