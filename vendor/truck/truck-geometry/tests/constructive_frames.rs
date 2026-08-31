@@ -280,20 +280,70 @@ fn radial_frame_refuses_axis_incident_point() {
 
 #[test]
 fn parallel_transport_still_refuses_in_cg002() {
+    // BG-CG-003-TRANSPORT: in-place amendment — the ParallelTransport law
+    // landed; the name is historical (it pinned the CG-002 envelope line this
+    // packet retires). The body is now the positive helix orthonormality form.
+    #[derive(Debug, Clone, Copy)]
+    struct HelixSpine {
+        c: f64,
+    }
+    impl Spine for HelixSpine {
+        fn domain(&self) -> (f64, f64) {
+            (0.0, 1.0)
+        }
+
+        fn position_at(&self, s: f64) -> Result<Point3, ConstructError> {
+            if !s.is_finite() {
+                return Err(ConstructError::NonFinite { at: s });
+            }
+            if !(0.0..=1.0).contains(&s) {
+                return Err(ConstructError::InvalidInput);
+            }
+            let theta = 2.0 * std::f64::consts::PI * s;
+            Ok(Point3::new(theta.cos(), theta.sin(), self.c * theta))
+        }
+
+        fn derivative_at(&self, s: f64) -> Result<Vector3, ConstructError> {
+            if !s.is_finite() {
+                return Err(ConstructError::NonFinite { at: s });
+            }
+            if !(0.0..=1.0).contains(&s) {
+                return Err(ConstructError::InvalidInput);
+            }
+            let two_pi = 2.0 * std::f64::consts::PI;
+            let theta = 2.0 * std::f64::consts::PI * s;
+            Ok(Vector3::new(
+                -two_pi * theta.sin(),
+                two_pi * theta.cos(),
+                two_pi * self.c,
+            ))
+        }
+    }
+
     let recipe = SpineFrameRecipe::new(
-        LineSpine {
-            start: Point3::new(0.0, 0.0, 0.0),
-            end: Point3::new(1.0, 0.0, 0.0),
-        },
+        HelixSpine { c: 1.0 },
         ProfileLaw::Constant(triangle()),
         FrameLaw::ParallelTransport {
             initial_normal: Vector3::unit_z(),
         },
     );
-    assert!(matches!(
-        recipe.frame(0.5),
-        Err(ConstructError::InvalidInput)
-    ));
+    let tol = DirectTolerance::default().position;
+    for i in 0..=16 {
+        let s = (i as f64) / 16.0;
+        let ok = match recipe.frame(s) {
+            Ok(f) => {
+                (f.tangent.magnitude() - 1.0).abs() <= tol
+                    && (f.normal.magnitude() - 1.0).abs() <= tol
+                    && (f.binormal.magnitude() - 1.0).abs() <= tol
+                    && f.tangent.dot(f.normal).abs() <= tol
+                    && f.tangent.dot(f.binormal).abs() <= tol
+                    && f.normal.dot(f.binormal).abs() <= tol
+                    && (f.tangent.cross(f.normal) - f.binormal).magnitude() <= tol
+            }
+            Err(_) => false,
+        };
+        assert!(ok, "helix frame at s = {s} is not Ok and orthonormal");
+    }
 }
 
 #[test]

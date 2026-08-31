@@ -198,8 +198,7 @@ impl<S: Spine> SpineFrameRecipe<S, ProfileLaw, FrameLaw> {
 
     /// The frame at `s` (see `Frame3` for the axis convention).
     ///
-    /// Filled (BG-CG-002-FRAMES-ANALYTIC): dispatches on the frame law;
-    /// `ParallelTransport` refuses until CG-003 lands.
+    /// Filled (BG-CG-003-TRANSPORT).
     pub fn frame(&self, s: f64) -> Result<Frame3, ConstructError> {
         let d = self.spine.derivative_at(s)?;
         if !s.is_finite() {
@@ -217,7 +216,9 @@ impl<S: Spine> SpineFrameRecipe<S, ProfileLaw, FrameLaw> {
                 let c = self.spine.position_at(s)?;
                 super::frame_radial::radial_about_axis(origin, axis, c, t, s)
             }
-            FrameLaw::ParallelTransport { .. } => Err(ConstructError::InvalidInput),
+            FrameLaw::ParallelTransport { initial_normal } => {
+                super::frame_transport::parallel_transport(initial_normal, &self.spine, s)
+            }
         }
     }
 
