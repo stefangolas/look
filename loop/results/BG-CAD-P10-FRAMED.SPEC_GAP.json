@@ -1,0 +1,92 @@
+﻿# QUESTION â€” BG-CAD-P10-FRAMED: the landed fold machinery aborts on self-loop solids in debug builds
+
+## Claim
+
+The packet's tests 1 (`rotate_solid_rigid_carriers`) and 10
+(`transform_oblique_extrude_metamorphic`) require `rotate_solid` to fold a
+full-circle "disk-extrude" solid. The LANDED `Mapped` machinery that
+`fold_solid` routes through (unchanged, per D1) **aborts** on such a solid in
+debug builds. This is a genuine tree-vs-packet contradiction: a SPEC_GAP.
+
+## The refusal, verbatim
+
+```
+thread '...' panicked at vendor\truck\truck-topology\src\lib.rs:188:33:
+Two same vertices cannot construct an edge.
+```
+
+The abort fires inside `Wire::mapped` â†’ `edge_entry_map_closure`
+(`truck-topology/src/wire.rs:628`) â†’ `Edge::debug_new`
+(`truck-topology/src/edge.rs:55-60`) â†’ `Edge::new` â†’ `remove_try`'s panic.
+`Edge::debug_new` runs the `front == back` check **only under
+`cfg!(debug_assertions)`**, i.e. in every `cargo test` / `cargo check` dev
+profile the packet's "Done when" commands use. The disk's circle self-loop
+edges have `front == back` (the landed extrude builds them with
+`Edge::new_unchecked(v0, v1, ..)` where `v0 == v1`), so the fold cannot
+process them in debug.
+
+## The empirical proof
+
+1. **The landed entries share the limitation.** A minimal probe (`translate_solid`
+   on the full-circle disk extrude, run under `cargo test --locked -p
+   truck-modeling`) aborts with exactly the refusal above. `translate_solid` is
+   LANDED (A1, `cad.rs:281`); it predates this packet. The fold machinery never
+   accepted a self-loop solid in debug; no P1 test exercised one before.
+
+2. **Every cylinder-walled solid in the tree carries self-loops.** The only ways
+   to build a `Surface::Cylinder` wall in truck-modeling are the full-circle
+   extrude (the disk) and the revolve; both emit self-loop circle boundary
+   edges (extrude.rs wall recipe; revolve.rs doc: "self-loop circle boundary
+   wires (the landed extrude cylinder-wall recipe)"). Arc-seamed circle
+   profiles cannot substitute: `arrange` refuses a multi-arc circle loop
+   (`NumericallyUnresolved(RootNotIsolated)` / `Empty` â€” the seam endpoints
+   `subs(TAU)` vs `subs(0)` do not close exactly, and `arrange`'s exact-chain
+   and exact-parallelogram gates hold only for the single full-circle
+   carrier). So no self-loop-free "disk-extrude cylinder" exists.
+
+3. **In release builds the fold works** (`Edge::debug_new` falls back to
+   `Edge::new_unchecked`, no check), but the packet's "Done when" verification
+   is debug `cargo test`, which aborts.
+
+## What was delivered anyway
+
+- D1 `rotate_solid` and D2 `mirror_about_plane` in `cad.rs` (faithful: Rodrigues
+  + Householder `I âˆ’ 2nnáµ€/(nÂ·n)`, routed through the unchanged
+  `fold_solid`/`certify_carriers`).
+- D3 oblique circle emission in `extrude.rs` (the probe's W2 structure: the bare
+  right cylinder at the origin sheared by the sweep columns, translation in
+  `w`); the in-module `oblique_circle_refuses_noncanonical` test was flipped to
+  `oblique_circle_emits_placed_wall` because D3 deliberately changed that
+  refusal.
+- 8 of the 10 required tests, all green:
+  - `transforms.rs`: `rotate_about_z_extrude_metamorphic` (f64-exact),
+    `mirror_general_plane_assembles` (f64-exact), `mirror_axis_aligned_still_green`,
+    `oblique_extrude_circle_assembles` (W2 census + W3 junction machine check),
+    `oblique_extrude_refuses_dz0`.
+  - `transform_metamorphic.rs`: `transform_union_metamorphic`,
+    `transform_difference_metamorphic` (both measured **f64-exact**, deviation 0),
+    `transform_scale_metamorphic` (f64-exact).
+- All verification gates green: `cargo check -p truck-modeling`,
+  `cargo check -p truck-shapeops`, `cargo fmt --check` both crates,
+  `cargo test -p truck-modeling --lib` (27), `--test transforms` (5),
+  `--test cad_p1` (10), `--test revolve_p5` (9), `--test until_p4` (9),
+  `cargo test -p truck-shapeops --test transform_metamorphic` (3),
+  `--test fillet_circle` (7), clippy `--no-deps` both crates, and
+  `scripts/kernel-gates.sh HEAD` (GATE-4 111/111, all P-3 gates pass).
+
+## What the spec must decide
+
+Two ways to unblock tests 1 and 10:
+
+- **A** â€” land a self-loop-safe edge reconstruction in the fold path (e.g.
+  `Edge::mapped` uses `new_unchecked` when `front == back`), so the LANDED
+  machinery folds self-loops in debug; the packet's tests then work verbatim.
+  This touches `truck-topology`, which was outside this packet's `write_allow`
+  and the packet explicitly forbade patching the fold interiors.
+- **B** â€” specify tests 1 and 10 against a self-loop-free cylinder solid, which
+  the tree cannot currently construct (see proof item 2); the fix would need a
+  seam-split circle profile to be arrange-able, or a seam-split cylinder
+  primitive.
+
+Both are spec amendments; neither is patchable inside this packet's rules.
+
