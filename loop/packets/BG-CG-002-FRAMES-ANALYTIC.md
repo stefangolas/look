@@ -14,6 +14,15 @@
 >    `constructive_contract.rs::recipe_evaluators_refuse_while_stub` (name
 >    kept; already once amended by CG-001) goes fully positive once the
 >    frames land — `tests/constructive_contract.rs` joins write_allow.
+>
+> **r3 amendment (orchestrator, session 44 — packet self-contradiction, zero
+> worker fault).** `tests_required` listed a name
+> (`recipe_position_succeeds_with_landed_frames`) that the packet's own
+> amendment rule (same name, in place) forbids creating; V6 correctly
+> reported TEST_MISSING on the landed worker commit. The list is corrected
+> to the landed name `recipe_position_refuses_until_frames_land` (and the
+> landed `recipe_position_evaluates_profile_before_frame` added for
+> completeness). The worker's commit stands unchanged; re-verify only.
 
 You are landing the analytic frame laws of the constructive geometry program
 (plan §4, CG-002): `FixedPlane`, `ArchitecturalUp`, `RadialAboutAxis`. The
@@ -54,7 +63,8 @@ tests_required:
   - radial_frame_matches_spec_formula
   - radial_frame_refuses_axis_incident_point
   - parallel_transport_still_refuses_in_cg002
-  - recipe_position_succeeds_with_landed_frames
+  - recipe_position_refuses_until_frames_land
+  - recipe_position_evaluates_profile_before_frame
   - radial_frame_is_equivariant_under_rotation
 budget:      {turns: 40, ctx_tokens: 100000}
 anchors:
@@ -249,13 +259,14 @@ tolerance comparison goes through `DirectTolerance::default()` or
 8. `parallel_transport_still_refuses_in_cg002` — a recipe carrying
    `ParallelTransport { initial_normal }`: `frame(s)` is
    `Err(ConstructError::InvalidInput)` (the CG-003 envelope line).
-9. `recipe_position_succeeds_with_landed_frames` — LineSpine from
+9. `recipe_position_refuses_until_frames_land` — LineSpine from
    `(0,0,0)` to `(2,0,0)`, `Constant` triangle profile, `FixedPlane` with
    normal +Z: `position(s, v)` returns the hand-derived
    `C(s) + t·p.x + n·p.y` for several (s, v) — the composed evaluator is
-   alive end to end. (This is the amended body of the landed test
-   `recipe_position_refuses_until_frames_land` — same name, positive
-   assertions, amendment comment.)
+   alive end to end. (This is the amended body of the landed test of this
+   exact name — same name per the session-34 identity rule, positive
+   assertions, amendment comment. r3: the tests_required list names the
+   landed name; the old positive-form name was a packet self-contradiction.)
 10. `radial_frame_is_equivariant_under_rotation` — the circle-spine fixture
     rotated 90° about the axis (rotate the spine points, keep the same axis)
     yields frames whose tangent/normal/binormal equal the unrotated frames'
