@@ -2242,6 +2242,7 @@ dependencies = [
  "truck-evidence",
  "truck-geometry",
  "truck-geotrait",
+ "truck-polymesh",
  "truck-topology",
 ]
 

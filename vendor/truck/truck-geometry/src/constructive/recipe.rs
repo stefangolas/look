@@ -175,6 +175,11 @@ impl Spine for PolylineSpine {
 impl<S: Spine> SpineFrameRecipe<S, ProfileLaw, FrameLaw> {
     /// The realized point `X(s, v) = C(s) + T(s)·P(s, v)`.
     ///
+    /// The profile plane maps profile-x to the frame NORMAL and profile-y to
+    /// the frame BINORMAL — the cross-section rides the plane perpendicular
+    /// to the tangent (r2: the tangent-embedded reading makes every straight
+    /// sweep coplanar; proven empirically by the r1 worker).
+    ///
     /// DEVIATION NOTE (frozen here, do not relitigate): the program plan
     /// spelled this `fn position(&self, s, v) -> Point3`. CG-000 freezes it
     /// fallible — a stub body must be total without lying (H-1 forbids
@@ -193,7 +198,7 @@ impl<S: Spine> SpineFrameRecipe<S, ProfileLaw, FrameLaw> {
         let p = self.profile(s, v)?;
         let c = self.spine.position_at(s)?;
         let f = self.frame(s)?;
-        Ok(c + f.tangent * p.x + f.normal * p.y)
+        Ok(c + f.normal * p.x + f.binormal * p.y)
     }
 
     /// The frame at `s` (see `Frame3` for the axis convention).

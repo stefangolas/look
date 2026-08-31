@@ -169,6 +169,7 @@ fn recipe_evaluators_refuse_while_stub() {
             normal: Vector3::unit_z(),
         },
     );
+    // BG-CG-004-FACET r2: profile-x rides the frame normal, profile-y the frame binormal.
     let tol = DirectTolerance::default().position;
     assert_eq!(recipe.profile(0.5, 0.25), profile_law.evaluate(0.5, 0.25));
     let frame_ok = match recipe.frame(0.5) {
@@ -182,10 +183,10 @@ fn recipe_evaluators_refuse_while_stub() {
     };
     assert!(frame_ok, "frame is not Ok, unit-length, and right-handed");
     let c = Point3::new(0.5, 0.0, 0.0);
-    let t = Vector3::new(1.0, 0.0, 0.0);
     let n = Vector3::new(0.0, 1.0, 0.0);
+    let b = Vector3::new(0.0, 0.0, 1.0);
     let p = Point2::new(0.75, 0.0);
-    let expected = c + t * p.x + n * p.y;
+    let expected = c + n * p.x + b * p.y;
     assert!(matches!(
         recipe.position(0.5, 0.25),
         Ok(x) if (x - expected).magnitude() <= tol
