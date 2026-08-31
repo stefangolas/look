@@ -45,7 +45,7 @@ fn ledger_assembly_fills_shared_edge_pairs() {
 fn evidence_method_is_float_not_exact() {
     let certificate = RealizationCertificate {
         method: Method::Float,
-        max_cell_twist: 1e-7,
+        max_cell_twist: 1e-7, // H-3: fixture value for the assemble() call, not a length predicate
         extent: 2.0,
     };
     let evidence = assemble(
