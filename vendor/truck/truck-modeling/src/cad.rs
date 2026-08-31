@@ -206,9 +206,12 @@ fn edge_enclosure(curve: &Curve) -> Result<Box3, Refusal> {
             Ok(enclose_placed_circle(placed, tt))
         }
         // P1 emits and consumes bare canonical carriers only.
-        Curve::BSplineCurve(_) | Curve::NurbsCurve(_) | Curve::IntersectionCurve(_) => Err(
-            Refusal::UnsupportedEnvelope(EnvelopeCase::NonCanonicalCarrier),
-        ),
+        Curve::BSplineCurve(_)
+        | Curve::NurbsCurve(_)
+        | Curve::IntersectionCurve(_)
+        | Curve::SpineFrameCurve(_) => Err(Refusal::UnsupportedEnvelope(
+            EnvelopeCase::NonCanonicalCarrier,
+        )),
     }
 }
 
@@ -599,9 +602,12 @@ fn check_profile_curve(curve: &Curve) -> Result<(), Refusal> {
             Ok(())
         }
         // P1 emits and consumes bare canonical carriers only.
-        Curve::BSplineCurve(_) | Curve::NurbsCurve(_) | Curve::IntersectionCurve(_) => Err(
-            Refusal::UnsupportedEnvelope(EnvelopeCase::NonCanonicalCarrier),
-        ),
+        Curve::BSplineCurve(_)
+        | Curve::NurbsCurve(_)
+        | Curve::IntersectionCurve(_)
+        | Curve::SpineFrameCurve(_) => Err(Refusal::UnsupportedEnvelope(
+            EnvelopeCase::NonCanonicalCarrier,
+        )),
     }
 }
 

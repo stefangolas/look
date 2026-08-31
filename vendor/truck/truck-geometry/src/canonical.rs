@@ -47,6 +47,12 @@ pub enum Curve {
     NurbsCurve(NurbsCurve<Vector4>),
     /// intersection curve
     IntersectionCurve(IntersectionCurve<Box<Curve>, Box<Surface>, Box<Surface>>),
+    /// The trajectory of one fixed profile point under a spine-frame recipe
+    /// (BG-CG-009-BREP): `E(s) = X(s, p)`. Shared by adjacent side faces;
+    /// never re-derived. The spine is boxed: the decorator stores the closed
+    /// `Curve` spine, which would recurse without indirection (the
+    /// `IntersectionCurve` precedent).
+    SpineFrameCurve(SpineFrameCurve<Box<Curve>>),
 }
 
 macro_rules! derive_curve_method {
@@ -57,6 +63,7 @@ macro_rules! derive_curve_method {
             Curve::BSplineCurve(got) => $method(got, $($ver), *),
             Curve::NurbsCurve(got) => $method(got, $($ver), *),
             Curve::IntersectionCurve(got) => $method(got, $($ver), *),
+            Curve::SpineFrameCurve(got) => $method(got, $($ver), *),
         }
     };
 }
@@ -69,6 +76,7 @@ macro_rules! derive_curve_self_method {
             Curve::BSplineCurve(got) => Curve::BSplineCurve($method(got, $($ver), *)),
             Curve::NurbsCurve(got) => Curve::NurbsCurve($method(got, $($ver), *)),
             Curve::IntersectionCurve(got) => Curve::IntersectionCurve($method(got, $($ver), *)),
+            Curve::SpineFrameCurve(got) => Curve::SpineFrameCurve($method(got, $($ver), *)),
         }
     };
 }
@@ -228,6 +236,15 @@ impl Curve {
             Curve::IntersectionCurve(_) => {
                 unimplemented!("intersection curve cannot connect by homotopy")
             }
+            // BG-CG-009-BREP: a spine-frame trajectory has no spline lift
+            // either (it is a recipe evaluation, not a control-point curve)
+            // and `lift_up` has no error channel. Follow the ISC precedent
+            // verbatim; every certified include path routes the variant away
+            // before reaching here.
+            #[allow(clippy::unimplemented)]
+            Curve::SpineFrameCurve(_) => {
+                unimplemented!("spine-frame trajectory cannot connect by homotopy")
+            }
         }
     }
 }
@@ -278,6 +295,12 @@ pub enum Surface {
     /// `Processor<Surface, Matrix4>` would be a recursive type of infinite
     /// size (BG-CE-006-r2 deviation).
     Processor(Processor<Box<Surface>, Matrix4>),
+    /// The parametric spine/profile realization surface (BG-CG-009-BREP).
+    /// Realizes `X(s, v) = C(s) + frame(s)·P(s, v)` over the landed recipe
+    /// evaluators. One side face of a spine sweep; v-runs along a profile edge.
+    /// The spine is boxed: the decorator stores the closed `Curve` spine,
+    /// which would recurse without indirection.
+    SpineFrameSurface(SpineFrameSurface<Box<Curve>>),
 }
 
 macro_rules! derive_surface_method {
@@ -293,6 +316,7 @@ macro_rules! derive_surface_method {
             Self::BSplineSurface(got) => $method(got, $($ver), *),
             Self::NurbsSurface(got) => $method(got, $($ver), *),
             Self::Processor(got) => $method(got, $($ver), *),
+            Self::SpineFrameSurface(got) => $method(got, $($ver), *),
         }
     };
 }
@@ -357,6 +381,10 @@ impl Transformed<Matrix4> for Surface {
             Self::ExtrudedCurve(entity) => Self::ExtrudedCurve(entity.transformed(trans)),
             Self::BSplineSurface(entity) => Self::BSplineSurface(entity.transformed(trans)),
             Self::NurbsSurface(entity) => Self::NurbsSurface(entity.transformed(trans)),
+            // BG-CG-009-BREP: the placement composes into the stored matrix
+            // (the `SpineFrameSurface`/`SpineFrameCurve` decorators carry one);
+            // every evaluation is exact under any affine map.
+            Self::SpineFrameSurface(entity) => Self::SpineFrameSurface(entity.transformed(trans)),
         }
     }
 }
@@ -707,6 +735,13 @@ impl IncludeCurve<Curve> for Surface {
                 Curve::BSplineCurve(curve) => surface.include(curve),
                 Curve::NurbsCurve(curve) => surface.include(curve),
                 Curve::IntersectionCurve(ic) => self.include_intersection_curve(ic),
+                // BG-CG-009-BREP: certifying a spine-frame trajectory's
+                // containment in a spline/plane/revolution carrier is outside
+                // the certified envelope; refuse, never abort.
+                Curve::SpineFrameCurve(_) => Err(Refusal::NumericallyUnresolved {
+                    spent: Budget::new(0, 0, 0),
+                    witness: UnresolvedWitness::UncertifiedContainment,
+                }),
                 Curve::Circle(_) => unreachable!("circles are degraded above"),
             },
             Surface::NurbsSurface(surface) => match curve {
@@ -714,6 +749,13 @@ impl IncludeCurve<Curve> for Surface {
                 Curve::BSplineCurve(curve) => surface.include(curve),
                 Curve::NurbsCurve(curve) => surface.include(curve),
                 Curve::IntersectionCurve(ic) => self.include_intersection_curve(ic),
+                // BG-CG-009-BREP: certifying a spine-frame trajectory's
+                // containment in a spline/plane/revolution carrier is outside
+                // the certified envelope; refuse, never abort.
+                Curve::SpineFrameCurve(_) => Err(Refusal::NumericallyUnresolved {
+                    spent: Budget::new(0, 0, 0),
+                    witness: UnresolvedWitness::UncertifiedContainment,
+                }),
                 Curve::Circle(_) => unreachable!("circles are degraded above"),
             },
             Surface::Plane(surface) => match curve {
@@ -721,6 +763,13 @@ impl IncludeCurve<Curve> for Surface {
                 Curve::BSplineCurve(curve) => surface.include(curve),
                 Curve::NurbsCurve(curve) => surface.include(curve),
                 Curve::IntersectionCurve(ic) => self.include_intersection_curve(ic),
+                // BG-CG-009-BREP: certifying a spine-frame trajectory's
+                // containment in a spline/plane/revolution carrier is outside
+                // the certified envelope; refuse, never abort.
+                Curve::SpineFrameCurve(_) => Err(Refusal::NumericallyUnresolved {
+                    spent: Budget::new(0, 0, 0),
+                    witness: UnresolvedWitness::UncertifiedContainment,
+                }),
                 Curve::Circle(_) => unreachable!("circles are degraded above"),
             },
             Surface::RevolutedCurve(surface) => match surface.entity_curve() {
@@ -738,6 +787,12 @@ impl IncludeCurve<Curve> for Surface {
                         Curve::BSplineCurve(curve) => surface.include(curve),
                         Curve::NurbsCurve(curve) => surface.include(curve),
                         Curve::IntersectionCurve(ic) => self.include_intersection_curve(ic),
+                        // BG-CG-009-BREP: a revolved spine-frame trajectory is
+                        // outside the certified envelope; refuse.
+                        Curve::SpineFrameCurve(_) => Err(Refusal::NumericallyUnresolved {
+                            spent: Budget::new(0, 0, 0),
+                            witness: UnresolvedWitness::UncertifiedContainment,
+                        }),
                         Curve::Circle(_) => unreachable!("circles are degraded above"),
                     }
                 }
@@ -752,6 +807,12 @@ impl IncludeCurve<Curve> for Surface {
                         Curve::BSplineCurve(curve) => surface.include(curve),
                         Curve::NurbsCurve(curve) => surface.include(curve),
                         Curve::IntersectionCurve(ic) => self.include_intersection_curve(ic),
+                        // BG-CG-009-BREP: a revolved spine-frame trajectory is
+                        // outside the certified envelope; refuse.
+                        Curve::SpineFrameCurve(_) => Err(Refusal::NumericallyUnresolved {
+                            spent: Budget::new(0, 0, 0),
+                            witness: UnresolvedWitness::UncertifiedContainment,
+                        }),
                         Curve::Circle(_) => unreachable!("circles are degraded above"),
                     }
                 }
@@ -782,9 +843,22 @@ impl IncludeCurve<Curve> for Surface {
                         Curve::BSplineCurve(curve) => surface.include(curve),
                         Curve::NurbsCurve(curve) => surface.include(curve),
                         Curve::IntersectionCurve(ic) => self.include_intersection_curve(ic),
+                        // BG-CG-009-BREP: a revolved spine-frame trajectory is
+                        // outside the certified envelope; refuse.
+                        Curve::SpineFrameCurve(_) => Err(Refusal::NumericallyUnresolved {
+                            spent: Budget::new(0, 0, 0),
+                            witness: UnresolvedWitness::UncertifiedContainment,
+                        }),
                         Curve::Circle(_) => unreachable!("circles are degraded above"),
                     }
                 }
+                // BG-CG-009-BREP: a surface of revolution whose profile is a
+                // spine-frame trajectory is outside the certified envelope;
+                // refuse, not abort.
+                Curve::SpineFrameCurve(_) => Err(Refusal::NumericallyUnresolved {
+                    spent: Budget::new(0, 0, 0),
+                    witness: UnresolvedWitness::UncertifiedContainment,
+                }),
             },
             // Certified curve-in-analytic-surface containment is BG-CE-002 /
             // BG-ENC work; the analytic carriers refuse honestly for now.
@@ -804,6 +878,10 @@ impl IncludeCurve<Curve> for Surface {
                 spent: Budget::new(0, 0, 0),
                 witness: UnresolvedWitness::UncertifiedContainment,
             }),
+            // BG-CG-009-BREP: the spine-frame surface includes exactly its
+            // own boundary curves (structural equality); any other curve asks
+            // a question the decorator answers honestly.
+            Surface::SpineFrameSurface(surface) => surface.include(curve),
         }
     }
 }
@@ -902,6 +980,13 @@ impl IncludeCurve<Curve> for Plane {
             // `IntersectionCurve` (`Curve::lift_up` aborts on it), so route it
             // through the plane negative witness.
             Curve::IntersectionCurve(ic) => plane_include_intersection_curve(self, ic.leader()),
+            // BG-CG-009-BREP: a spine-frame trajectory cannot be lifted either
+            // (the ISC precedent); the plane containment question is a
+            // numerical-search matter and refuses honestly rather than abort.
+            Curve::SpineFrameCurve(_) => Err(Refusal::NumericallyUnresolved {
+                spent: Budget::new(0, 0, 0),
+                witness: UnresolvedWitness::UncertifiedContainment,
+            }),
             _ => Ok(Certified::new(
                 curve.lift_up().control_points().iter().all(|v| {
                     let p = v.to_point();
@@ -964,6 +1049,9 @@ impl SearchNearestParameter<D2> for Surface {
             }
             Surface::Processor(processor) => {
                 processor.search_nearest_parameter(point, hint, trials)
+            }
+            Surface::SpineFrameSurface(surface) => {
+                surface.search_nearest_parameter(point, hint, trials)
             }
         }
     }

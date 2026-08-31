@@ -501,6 +501,9 @@ impl DisplayByStep for ModelingCurve {
             ModelingCurve::BSplineCurve(x) => DisplayByStep::fmt(x, idx, f),
             ModelingCurve::NurbsCurve(x) => DisplayByStep::fmt(x, idx, f),
             ModelingCurve::IntersectionCurve(x) => DisplayByStep::fmt(x, idx, f),
+            // BG-CG-009-BREP: STEP writing of a spine-frame trajectory is
+            // TR-NRB-001's booked business, not ours — refuse typed.
+            ModelingCurve::SpineFrameCurve(_) => ERR,
         }
     }
 }
@@ -515,6 +518,8 @@ impl StepLength for ModelingCurve {
             ModelingCurve::BSplineCurve(x) => x.step_length(),
             ModelingCurve::NurbsCurve(x) => x.step_length(),
             ModelingCurve::IntersectionCurve(x) => x.step_length(),
+            // The variant refuses in `DisplayByStep`; never reached.
+            ModelingCurve::SpineFrameCurve(_) => 0,
         }
     }
 }
@@ -978,6 +983,9 @@ impl DisplayByStep for ModelingSurface {
                     }
                 }
             }
+            // BG-CG-009-BREP: STEP writing of a spine-frame realization
+            // surface is TR-NRB-001's booked business, not ours — refuse typed.
+            ModelingSurface::SpineFrameSurface(_) => ERR,
         }
     }
 }
@@ -1024,6 +1032,8 @@ impl StepLength for ModelingSurface {
             ModelingSurface::RevolutedCurve(x) => x.step_length(),
             ModelingSurface::ExtrudedCurve(x) => x.step_length(),
             ModelingSurface::Processor(x) => x.entity().step_length(),
+            // The variant refuses in `DisplayByStep`; never reached.
+            ModelingSurface::SpineFrameSurface(_) => 0,
         }
     }
 }
@@ -1097,5 +1107,49 @@ mod stepio_out_emits_analytic_entities_tests {
         // cos(π/2) residue is emitted in scientific notation, so the assertion
         // checks the dominant direction.
         assert!(text.contains("DIRECTION('', (0.0, -1.0"), "axis: {text}");
+    }
+
+    #[test]
+    fn step_out_refuses_spine_frame_variants_typed() {
+        use std::fmt::Write;
+        use truck_geometry::constructive::{FrameLaw, Profile2D, ProfileLaw, SpineFrameRecipe};
+        use truck_geometry::decorators::{SpineFrameCurve, SpineFrameSurface};
+
+        // STEP writing of a spine-frame realization is TR-NRB-001's booked
+        // business (build-spec §8B): the out-direction refuses both variants
+        // with a typed error, never a partial entity or a panic.
+        let square = Profile2D::try_closed(vec![
+            Point2::new(0.0, 0.0),
+            Point2::new(1.0, 0.0),
+            Point2::new(1.0, 1.0),
+            Point2::new(0.0, 1.0),
+        ])
+        .expect("a valid profile");
+        let recipe = SpineFrameRecipe::new(
+            Box::new(Curve::Line(Line(
+                Point3::origin(),
+                Point3::new(0.0, 0.0, 1.0),
+            ))),
+            ProfileLaw::Constant(square),
+            FrameLaw::FixedPlane {
+                normal: Vector3::unit_x(),
+            },
+        );
+        let surface = SpineFrameSurface::try_new(recipe.clone(), 0.0, 1.0, 0.0, 0.25)
+            .expect("a valid stored surface");
+        let surface = ModelingSurface::SpineFrameSurface(surface);
+        let mut buf = String::new();
+        assert!(
+            write!(buf, "{}", StepDataDisplay::new(&surface, 1)).is_err(),
+            "STEP-out of a SpineFrameSurface must refuse typed"
+        );
+        let trajectory =
+            SpineFrameCurve::try_new(recipe, 0.0, 1.0, 0.0).expect("a valid stored trajectory");
+        let curve = ModelingCurve::SpineFrameCurve(trajectory);
+        let mut buf = String::new();
+        assert!(
+            write!(buf, "{}", StepDataDisplay::new(&curve, 1)).is_err(),
+            "STEP-out of a SpineFrameCurve must refuse typed"
+        );
     }
 }
