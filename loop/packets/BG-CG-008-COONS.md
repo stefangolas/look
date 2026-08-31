@@ -1,5 +1,21 @@
 # WORK PACKET BG-CG-008-COONS — the bilinearly blended Coons patch
 
+> **r2 amendment (orchestrator, session 44).** The r1 worker stopped with an
+> honest SPEC_GAP; all three findings are adopted:
+> 1. **The struct is restricted to a single curve parameter** —
+>    `CoonsSurface<C>` with `bottom/top/left/right: C`. This resolves the
+>    E0119 coherence conflict (four `IncludeCurve` impls on independent type
+>    parameters pairwise unify) AND the E0308 conflict (`Invertible`'s
+>    re-parametrization swaps same-role fields, well-typed only under one
+>    parameter). Mixed-boundary generality is not booked; a client needing it
+>    is the promotion case, per doctrine.
+> 2. **`Result` spelling**: the crate's 1-argument `Result<T>` alias (from
+>    `errors.rs`, in scope through the glob imports) collides with the
+>    two-argument form — spell `std::result::Result<T, ConstructError>`
+>    explicitly in coons.rs.
+> 3. The r1 worker cleanly reverted its write_allow edits; the tree is at the
+>    base state.
+
 You are landing the Coons4 deliverable of the constructive geometry program
 (plan §3.7): a `CoonsSurface` decorator over four boundary curves, with
 analytic derivatives, a corner-validating constructor, and a certified (never
@@ -80,6 +96,12 @@ left(1), P11 = top(1) = right(1).
 ```rust
 /// The bilinearly blended Coons patch of four boundary curves (plan §3.7).
 ///
+/// r2: ONE curve parameter — all four boundaries have type `C`. (The
+/// r1 worker proved the four-parameter form cannot satisfy the trait
+/// checklist: `IncludeCurve` impls on independent parameters overlap
+/// (E0119) and `Invertible`'s re-parametrization swaps same-role fields
+/// (E0308).) Mixed-boundary generality is a promotion case, not a booking.
+///
 /// Boundary correctness is by EXACT pairwise cancellation against the corner
 /// term in exact arithmetic; in floats it holds to
 /// `DirectTolerance::default().position` and the tests assert exactly that.
@@ -87,28 +109,32 @@ left(1), P11 = top(1) = right(1).
 /// Regularity is certified, never assumed: `jacobian` exposes
 /// J = S_u × S_v; a folded patch is construction-valid but geometry-invalid.
 #[derive(Clone, Debug, PartialEq)]
-pub struct CoonsSurface<C0, C1, D0, D1> {
-    bottom: C0,   // private fields; accessors below
-    top: C1,
-    left: D0,
-    right: D1,
+pub struct CoonsSurface<C> {
+    bottom: C,   // private fields; accessors below
+    top: C,
+    left: C,
+    right: C,
     p00: Point3, p10: Point3, p01: Point3, p11: Point3,  // corners, cached at construction
 }
 ```
 
-All four curves are `ParametricCurve3D` (i.e.
-`ParametricCurve<Point = Point3, Vector = Vector3>` — copy the exact bound
-spelling from `homotopy.rs`). Provide `bottom()`, `top()`, `left()`,
-`right()` accessors returning `&C0` etc. Do not add `*_mut` accessors (a
-mutated boundary would invalidate the cached corners).
+`C` is `ParametricCurve3D` (i.e. `ParametricCurve<Point = Point3, Vector =
+Vector3>` — copy the exact bound spelling from `homotopy.rs`). Provide
+`bottom()`, `top()`, `left()`, `right()` accessors returning `&C`. Do not add
+`*_mut` accessors (a mutated boundary would invalidate the cached corners).
 
 ## Constructors (exact semantics)
 
 ```rust
-impl<C0, C1, D0, D1> CoonsSurface<C0, C1, D0, D1> { /* both constructors */ }
+impl<C: ParametricCurve3D> CoonsSurface<C> { /* both constructors */ }
 ```
 
-- **`try_new(bottom, top, left, right) -> Result<Self, ConstructError>`** —
+All return types are spelled `std::result::Result<_, ConstructError>` (r2
+finding 2: the crate's 1-argument `Result` alias is in scope through the glob
+imports and collides with the two-argument form).
+
+- **`try_new(bottom, top, left, right) -> std::result::Result<Self,
+  ConstructError>`** —
   evaluates the four corners and validates, pairwise, the four corner
   equalities at `DirectTolerance::default().position` (from
   `truck_geometry::constructive::DirectTolerance` — the CG-000 type; import
@@ -117,15 +143,16 @@ impl<C0, C1, D0, D1> CoonsSurface<C0, C1, D0, D1> { /* both constructors */ }
   `crate::constructive::ConstructError` — the frozen currency; do NOT invent
   a new error type.) On success, cache the four corners.
 - **`try_new_any_orientation(bottom, top, left, right) ->
-  Result<(Self, [bool; 4]), ConstructError>`** — the plan's "convenience
-  constructor MAY try finite legal reversals and return the chosen one".
-  Booked exactly: try the 16 combinations of `(inverted?, ...)` flags over
-  (bottom, top, left, right) in lexicographic order (false < true; bottom's
-  flag is the most significant), using `curve.inverse()` for a `true` flag;
-  return the FIRST `try_new` success together with the flag vector; the
-  `false`-everywhere combination is tried first, so a consistent-as-given
-  input returns flips `[false; 4]`. All 16 refuse → `Err(_)` of the last
-  `try_new`'s error. Deterministic; never guesses beyond the finite set.
+  std::result::Result<(Self, [bool; 4]), ConstructError>`** — the plan's
+  "convenience constructor MAY try finite legal reversals and return the
+  chosen one". Booked exactly: try the 16 combinations of `(inverted?, ...)`
+  flags over (bottom, top, left, right) in lexicographic order (false < true;
+  bottom's flag is the most significant), using `curve.inverse()` for a
+  `true` flag; return the FIRST `try_new` success together with the flag
+  vector; the `false`-everywhere combination is tried first, so a
+  consistent-as-given input returns flips `[false; 4]`. All 16 refuse →
+  `Err(_)` of the last `try_new`'s error. Deterministic; never guesses
+  beyond the finite set.
 
 ## The evaluation formula and derivatives (exact, quoted — transcribe, do not re-derive)
 
@@ -187,12 +214,15 @@ Trait-by-trait semantics:
   `self.inverse().subs(u, v) == self.subs(1.0 - u, v)` pointwise, and the
   normal flips sign. Derive the curve/corner assignment from the formula
   (this is the packet's single derivation duty — the identity above is the
-  machine-checkable contract; test 6 pins it on a grid).
+  machine-checkable contract; test 6 pins it on a grid). With the single
+  curve parameter the field swaps typecheck directly (r2).
 - `Transformed<Matrix4>::transform_by`: transform the four curves AND the
   four cached corners (`Point3::transform_by`), preserving the corner
   equalities (a rigid/affine map preserves coincidence within the transform's
   own arithmetic; no revalidation).
-- `IncludeCurve`: `true` exactly for a boundary curve of the patch.
+- `IncludeCurve`: a single impl for the boundary curve type `C` (r2: with
+  one parameter there is exactly one impl and no coherence conflict) —
+  `true` exactly for a boundary curve of the patch.
 
 ## House rules
 
