@@ -194,27 +194,43 @@ fn recipe_profile_evaluation_matches_profile_law() {
 
 #[test]
 fn recipe_position_refuses_until_frames_land() {
-    // CG-002 amends this test in place when FixedPlane makes the frame step
-    // succeed.
-    let quad = Profile2D {
+    // BG-CG-002-FRAMES-ANALYTIC: the frame step now succeeds — the composed
+    // evaluator is asserted positively end to end.
+    let triangle = Profile2D {
         vertices: vec![
             Point2::new(0.0, 0.0),
             Point2::new(1.0, 0.0),
-            Point2::new(1.0, 1.0),
             Point2::new(0.0, 1.0),
         ],
     };
     let recipe = SpineFrameRecipe::new(
         LineSpine {
             start: Point3::new(0.0, 0.0, 0.0),
-            end: Point3::new(1.0, 0.0, 0.0),
+            end: Point3::new(2.0, 0.0, 0.0),
         },
-        ProfileLaw::Constant(quad),
+        ProfileLaw::Constant(triangle),
         FrameLaw::FixedPlane {
             normal: Vector3::unit_z(),
         },
     );
-    assert!(recipe.position(0.5, 0.25).is_err());
+    let tol = DirectTolerance::default().position;
+    let t = Vector3::new(1.0, 0.0, 0.0);
+    let n = Vector3::new(0.0, 1.0, 0.0);
+    for (s, v, px, py) in [
+        (0.0, 0.0, 0.0, 0.0),
+        (0.5, 0.0, 0.0, 0.0),
+        (1.0, 0.0, 0.0, 0.0),
+        (0.25, 0.5, 0.5, 0.5),
+        (0.5, 1.0 / 3.0, 1.0, 0.0),
+    ] {
+        let c = Point3::new(2.0 * s, 0.0, 0.0);
+        let p = Point2::new(px, py);
+        let expected = c + t * p.x + n * p.y;
+        assert!(matches!(
+            recipe.position(s, v),
+            Ok(x) if (x - expected).magnitude() <= tol
+        ));
+    }
 }
 
 #[test]

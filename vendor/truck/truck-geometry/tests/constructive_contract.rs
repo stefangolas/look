@@ -150,9 +150,7 @@ fn construct_error_display_names_law_and_parameter() {
 
 #[test]
 fn recipe_evaluators_refuse_while_stub() {
-    // BG-CG-001-RECIPE: in-place amendment (r2) — S = () no longer typechecks
-    // against the bounded evaluator impl, and a filled `profile` no longer
-    // refuses; frame and position still refuse while the frame is a stub.
+    // BG-CG-002-FRAMES-ANALYTIC (r2): the frame step landed — asserted positively.
     let triangle = Profile2D {
         vertices: vec![
             Point2::new(0.0, 0.0),
@@ -171,14 +169,26 @@ fn recipe_evaluators_refuse_while_stub() {
             normal: Vector3::unit_z(),
         },
     );
+    let tol = DirectTolerance::default().position;
     assert_eq!(recipe.profile(0.5, 0.25), profile_law.evaluate(0.5, 0.25));
-    assert!(matches!(
-        recipe.frame(0.5),
-        Err(ConstructError::InvalidInput)
-    ));
+    let frame_ok = match recipe.frame(0.5) {
+        Ok(f) => {
+            (f.tangent.magnitude() - 1.0).abs() <= tol
+                && (f.normal.magnitude() - 1.0).abs() <= tol
+                && (f.binormal.magnitude() - 1.0).abs() <= tol
+                && (f.tangent.cross(f.normal) - f.binormal).magnitude() <= tol
+        }
+        Err(_) => false,
+    };
+    assert!(frame_ok, "frame is not Ok, unit-length, and right-handed");
+    let c = Point3::new(0.5, 0.0, 0.0);
+    let t = Vector3::new(1.0, 0.0, 0.0);
+    let n = Vector3::new(0.0, 1.0, 0.0);
+    let p = Point2::new(0.75, 0.0);
+    let expected = c + t * p.x + n * p.y;
     assert!(matches!(
         recipe.position(0.5, 0.25),
-        Err(ConstructError::InvalidInput)
+        Ok(x) if (x - expected).magnitude() <= tol
     ));
 }
 

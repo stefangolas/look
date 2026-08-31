@@ -198,11 +198,27 @@ impl<S: Spine> SpineFrameRecipe<S, ProfileLaw, FrameLaw> {
 
     /// The frame at `s` (see `Frame3` for the axis convention).
     ///
-    /// STUB (BG-CG-000-CONTRACT): the frame laws land with CG-002 (analytic)
-    /// and CG-003 (transport); CG-001 filled everything frame-adjacent (the
-    /// spine trait, C¹ refusals) so the frame laws only swap this body.
-    pub fn frame(&self, _s: f64) -> Result<Frame3, ConstructError> {
-        Err(ConstructError::InvalidInput)
+    /// Filled (BG-CG-002-FRAMES-ANALYTIC): dispatches on the frame law;
+    /// `ParallelTransport` refuses until CG-003 lands.
+    pub fn frame(&self, s: f64) -> Result<Frame3, ConstructError> {
+        let d = self.spine.derivative_at(s)?;
+        if !s.is_finite() {
+            return Err(ConstructError::NonFinite { at: s });
+        }
+        let mag = d.magnitude();
+        if mag <= DirectTolerance::default().position {
+            return Err(ConstructError::ZeroTangent { at: s });
+        }
+        let t = d / mag;
+        match self.frame_law {
+            FrameLaw::FixedPlane { normal } => super::frame_fixed::fixed_plane(normal, t, s),
+            FrameLaw::ArchitecturalUp { up } => super::frame_up::architectural_up(up, t, s),
+            FrameLaw::RadialAboutAxis { origin, axis } => {
+                let c = self.spine.position_at(s)?;
+                super::frame_radial::radial_about_axis(origin, axis, c, t, s)
+            }
+            FrameLaw::ParallelTransport { .. } => Err(ConstructError::InvalidInput),
+        }
     }
 
     /// The transported profile point `P(s, v)` in the frame plane.

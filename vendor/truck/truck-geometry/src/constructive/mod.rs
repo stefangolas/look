@@ -51,6 +51,9 @@
 use truck_base::cgmath64::*;
 
 mod errors;
+mod frame_fixed;
+mod frame_radial;
+mod frame_up;
 mod profile;
 mod recipe;
 mod sampling;
