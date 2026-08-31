@@ -46,7 +46,7 @@ identity, certificate mapping). Read them first.
 id:          BG-CG-004-FACET
 contract:    [BG-CG-004-FACET]
 class:       design
-crates:      [truck-modeling]
+crates:      [truck-modeling, truck-geometry]
 depends_on:  [BG-CG-001-RECIPE, BG-CG-002-FRAMES-ANALYTIC, BG-CG-003-TRANSPORT]
 write_allow:
   - vendor/truck/truck-modeling/src/facet_sweep.rs
