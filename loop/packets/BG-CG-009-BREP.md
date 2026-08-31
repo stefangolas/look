@@ -8,6 +8,8 @@ crates:      [truck-geometry, truck-modeling, truck-stepio, truck-shapeops, truc
 depends_on:  [BG-CG-000-CONTRACT, BG-CG-001-RECIPE, BG-CG-002-FRAMES-ANALYTIC, BG-CG-003-TRANSPORT, BG-CG-004-FACET]
 write_allow:
   - vendor/truck/truck-geometry/src/canonical.rs
+  - vendor/truck/truck-geometry/src/recognize.rs
+  - vendor/truck/truck-geometry/src/span.rs
   - vendor/truck/truck-geometry/src/decorators/spine_frame.rs
   - vendor/truck/truck-geometry/src/decorators/mod.rs
   - vendor/truck/truck-geometry/tests/spine_frame_brep.rs
@@ -16,6 +18,7 @@ write_allow:
   - vendor/truck/truck-modeling/tests/spine_sweep_conformance.rs
   - vendor/truck/truck-stepio/src/in/mod.rs
   - vendor/truck/truck-stepio/src/in/step_geometry/geom_impls.rs
+  - vendor/truck/truck-stepio/src/out/geometry.rs
   - vendor/truck/truck-shapeops/src/section.rs
   - vendor/truck/truck-shapeops/src/boolean/classify.rs
   - vendor/truck/truck-shapeops/src/boolean/split.rs
