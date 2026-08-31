@@ -673,6 +673,10 @@ pub mod formal;
 pub mod source_edge;
 pub mod source_evidence;
 mod triangulation;
+mod triangulation_with_ledger;
+pub use triangulation_with_ledger::{
+    triangulation_with_ledger, EdgeSampleLedger, EdgeSampleLedgerSet,
+};
 pub mod validity;
 
 use domain::lattice::CertifiedLattice;
