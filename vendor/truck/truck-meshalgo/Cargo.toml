@@ -27,6 +27,7 @@ itertools = "0.15.0"
 robust = "1.1"
 spade = { version = "2.15.1", optional = true }
 truck-base = { version = "0.5.0", path = "../truck-base" }
+truck-certified = { version = "0.1.0", path = "../truck-certified" }
 truck-geometry = { version = "0.5.0", path = "../truck-geometry" }
 truck-geotrait = { version = "0.4.0", path = "../truck-geotrait" }
 truck-polymesh = { version = "0.6.0", path = "../truck-polymesh" }

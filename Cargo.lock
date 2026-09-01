@@ -2157,6 +2157,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "truck-certified"
+version = "0.1.0"
+dependencies = [
+ "cgmath",
+ "robust",
+ "spade",
+ "truck-base",
+ "truck-geometry",
+ "truck-geotrait",
+ "truck-polymesh",
+ "truck-topology",
+]
+
+[[package]]
 name = "truck-derivers"
 version = "0.1.0"
 dependencies = [
@@ -2219,6 +2233,7 @@ dependencies = [
  "serde_json",
  "spade",
  "truck-base",
+ "truck-certified",
  "truck-geometry",
  "truck-geotrait",
  "truck-modeling",

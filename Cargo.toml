@@ -8,6 +8,7 @@ members = [
     ".",
     "vendor/truck/truck-assembly",
     "vendor/truck/truck-base",
+    "vendor/truck/truck-certified",
     "vendor/truck/truck-derivers",
     "vendor/truck/truck-evidence",
     "vendor/truck/truck-geometry",
