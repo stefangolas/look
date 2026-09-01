@@ -14,6 +14,7 @@
     unused_qualifications
 )]
 
+pub mod contract;
 pub mod domain;
 pub mod formal;
 pub mod meshable;
