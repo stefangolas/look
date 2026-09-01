@@ -1,0 +1,39 @@
+{
+  "id": "BG-CK-P0-CRATE",
+  "status": "STOPPED",
+  "stop_condition": 3,
+  "stop_condition_text": "A moved module needs a change beyond Section 4's table to compile.",
+  "crates": ["truck-certified", "truck-meshalgo"],
+  "summary": "Stop condition 3 fired before any file was moved. source_evidence.rs, which Section 3 moves verbatim into truck-certified/src/, contains a `use crate::tessellation::domain::lattice::CertifiedLattice;` inside its own `#[cfg(test)] mod tests` (line 842). That path does not resolve in truck-certified, so `cargo test -p truck-certified --lib --tests` cannot compile. Fixing it is an edit to a moved module beyond Section 4's import-rewrite table, which is exactly the condition the packet says to stop on. No worktree changes were made.",
+  "finding": {
+    "moved_module": "vendor/truck/truck-meshalgo/src/tessellation/source_evidence.rs -> vendor/truck/truck-certified/src/source_evidence.rs (per Section 3)",
+    "offending_site": {
+      "file": "vendor/truck/truck-meshalgo/src/tessellation/source_evidence.rs",
+      "line": 842,
+      "context": "inside `#[cfg(test)] mod tests`, test fn `rank_zero_is_reported_independently_of_orientation_evidence`",
+      "line_verbatim": "use crate::tessellation::domain::lattice::CertifiedLattice;"
+    },
+    "why_it_breaks": "In truck-certified the crate root declares only `pub mod domain; pub mod formal; pub mod meshable; pub mod source_evidence;` (Section 1 lib.rs), so `crate::tessellation` resolves to nothing (E0432) when the unit-test target is compiled.",
+    "minimal_fix_required_but_not_applied": "use crate::domain::lattice::CertifiedLattice;",
+    "derivation": "This is the identical mechanical transformation of Section 4 table row 1 (formal/ambient.rs: `use crate::tessellation::domain::lattice::{Axis, AxisPeriodStatus, CertifiedLattice};` -> `use crate::domain::lattice::{...};`), but at a site the census missed: anchor A6 (`use crate::tessellation` count == 12) greps only `tessellation/formal` and `tessellation/domain`, and source_evidence.rs is neither. This is a 13th `use crate::tessellation` site in the moved tree. Per the packet's rule ('Every moved file moves verbatim except the mechanical import rewrites enumerated in Section 4'; 'If you find yourself editing anything else inside a moved module, STOP'), the worker must stop and report rather than add a table row on its own judgement."
+  },
+  "secondary_finding": {
+    "section": 3,
+    "premise": "The packet authorizes exactly one non-verbatim line inside source_evidence.rs: 'its `use super::*;` (line 1) must become the explicit import set rustc demands (`super` is now the certified crate root, whose pub items are the four modules ...)'.",
+    "actual_tree": "source_evidence.rs has NO top-level `use super::*;`. The file's only `use super::*;` is at line 581, inside `#[cfg(test)] mod tests`, where `super` is the `source_evidence` module itself (unchanged after the move), so it compiles as-is and no rewrite is demanded by rustc. The packet's single authorized edit therefore has no real subject in the current tree; the only compile-fixing edit the file actually needs (line 842 above) is not authorized. Anchor A8 (`grep -c 'use super::*;' source_evidence.rs` == 1) is satisfied, confirming the packet's line-1 attribution is stale against the vendored tree (the file is unmodified since the vendoring commit da72cd5)."
+  },
+  "census_verification": {
+    "A1": {"expect": 1, "verified": "pre-state only (pub mod formal; currently present; will become a re-export per Section 2)"},
+    "A2": {"expect": 1, "verified": "pre-state only (pub mod domain; currently present)"},
+    "A3": {"expect": 1, "verified": "pre-state only (pub mod source_evidence; currently present)"},
+    "A4": {"expect": 1, "verified": "pre-state only (pub trait PreMeshableSurface currently at tessellation/mod.rs:33; moves to truck_certified::meshable)"},
+    "A5": {"expect": 1, "verified": "pre-state only (pub trait MeshableSurface currently at tessellation/mod.rs:37)"},
+    "A6": {"expect": 12, "verified": 12, "detail": "9 sites in formal/, 3 sites in domain/, all matching the Section 4 table verbatim"},
+    "A7": {"expect": 6, "verified": 6, "detail": "domain/ambient.rs:42, domain/plan.rs:7, domain/projection.rs:6, domain/quotient.rs:7, domain/schema.rs:6, domain/adapters/revolution.rs:8 - all `use crate::cgmath` -> `use cgmath`"},
+    "A8": {"expect": 1, "verified": 1, "detail": "source_evidence.rs:581 inside mod tests, not line 1 as Section 3 asserts"},
+    "A9": {"expect": 0, "verified": "pre-state only (truck-certified absent from root Cargo.toml at dispatch; Section 1 adds the workspace member)"},
+    "A10": {"expect": 14, "verified": 14, "detail": "all `use super::super::super::source_evidence` sites in formal/ rewrite to `use crate::source_evidence`; listed files and line numbers match the packet"}
+  },
+  "moved_tree_dependency_audit": "No moved file (formal/, domain/, source_evidence.rs) references meshalgo-only items (RobustMeshableSurface, PolylineableCurve, PolylineCurve, MeshableShape, RobustMeshableShape, unevidenced_lattice, LatticeMeshableShape). The moved tree names only truck-geometry, truck-topology, truck-polymesh, robust, spade, and cgmath directly, all of which the Section 1 manifest declares. No other blocker beyond the finding above.",
+  "required_action_for_redispatch": "Amend Section 4 with one additional row: source_evidence.rs:842 `use crate::tessellation::domain::lattice::CertifiedLattice;` -> `use crate::domain::lattice::CertifiedLattice;`, and correct Section 3's description (the file's only `use super::*;` is inside its `#[cfg(test)] mod tests` where `super` is the module itself, so no rewrite of it is needed). Then re-dispatch."
+}

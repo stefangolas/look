@@ -49,6 +49,7 @@ anchors:
   - {id: A8, expect: 1, cmd: "grep -c 'use super::\\*;' vendor/truck/truck-meshalgo/src/tessellation/source_evidence.rs"}
   - {id: A9, expect: 0, cmd: "grep -c 'truck-certified' Cargo.toml"}
   - {id: A10, expect: 14, cmd: "grep -rh --include=*.rs 'use super::super::super::source_evidence' vendor/truck/truck-meshalgo/src/tessellation/formal | wc -l"}
+  - {id: A11, expect: 1, cmd: "grep -c 'use crate::tessellation' vendor/truck/truck-meshalgo/src/tessellation/source_evidence.rs"}
 ```
 
 ## What this packet is
@@ -176,16 +177,20 @@ name a meshalgo path. Pre-made decision: `source_evidence.rs` moves into
 the certified layer owns), and meshalgo re-exports it (Section 2) so
 `triangulation.rs` and look's `src/step/*` keep their paths.
 
-One non-verbatim line inside it: its `use super::*;` (line 1) must become the
-explicit import set rustc demands (`super` is now the certified crate root,
-whose pub items are the four modules — nothing like what tessellation/mod.rs
-exported). Replace it with explicit `use` lines; record the exact set in
-RESULT.json notes. If the demanded set reaches for something the certified
-crate cannot name, STOP — that is stop condition 2.
+One non-verbatim line inside it (r2 amendment — the r1 worker's stop
+condition 3, both findings verified against the tree): the file's
+`use super::*;` sits at line 581, INSIDE its `#[cfg(test)] mod tests`, where
+`super` is the `source_evidence` module itself — unchanged by the move, so
+it compiles as-is and needs NO rewrite (the r1 packet wrongly placed it at
+line 1 as a top-level import). The edit the file actually needs is the
+Section 4 row for its line-842 test import. If rustc still demands anything
+further in this file, STOP — that is stop condition 2.
 
 ## Section 4 — the complete import-rewrite table (measured, verbatim census)
 
-All 12 `use crate::tessellation` sites in the moved tree (anchor A6 = 12):
+All 12 `use crate::tessellation` sites in the moved formal/+domain tree
+(anchor A6 = 12; the r1 worker machine-checked the split: 9 in formal/, 3 in
+domain/):
 
 | File | Now | Becomes |
 |---|---|---|
@@ -214,6 +219,14 @@ contact.rs:675, cylinder_face.rs:80, cylinder_lift.rs:378,
 cylinder_mesh.rs:117, intersection.rs:2181, planar_developed.rs:698,
 quotient.rs:746, span.rs:197, xmonotone.rs:912, planar_holes/tests.rs:10,
 planar_slice/tests.rs:9}.
+
+Plus one 13th `crate::tessellation` site outside formal/+domain (the r1
+worker's stop-condition-3 finding, verified against the tree; anchor A11
+pins it): source_evidence.rs:842, inside its `#[cfg(test)] mod tests` —
+`use crate::tessellation::domain::lattice::CertifiedLattice;` becomes
+`use crate::domain::lattice::CertifiedLattice;` (the same transformation as
+the ambient.rs row). This closes the census: source_evidence.rs is part of
+the move (Section 3) and holds exactly this one `crate::tessellation` site.
 
 All 6 `use crate::cgmath::…` sites in `domain/` (anchor A7 = 6; files:
 ambient.rs, plan.rs, projection.rs, quotient.rs, schema.rs,
