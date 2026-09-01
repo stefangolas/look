@@ -83,16 +83,34 @@ lib.rs line, tests.
 
 ### BG-CK-P1-DISPATCH — class 2 analytic pair dispatch (design; orchestrator writes)
 
+**AMENDED 2026-09-01 (session 47, orchestrator spec edit — mass-driven
+split):** the corpus pair masses decide the split. The exact-certifiable
+arms (plane~plane 26,274; cylinder~plane 37,361; plane~sphere 281;
+sphere~sphere 126; the coaxial/parallel subset of cylinder~cylinder 5,354)
+carry ~62% of analytic mass and land in BG-CK-P1-DISPATCH. The
+special-position-only arms (plane~cone 8,379, plane~torus 5,385,
+cylinder~sphere 3,249 — ellipse/conic/quartic cuts certifiable only in
+named geometric configurations) book as **BG-CK-P1-DISPATCH-2** after
+FLOOR's first measurement (velocity-recalibration doctrine; one
+rational-conic machinery serves plane~cone and the plane~cylinder general
+ellipse cut). `Plane/torus` in the v1 admitted set would have violated the
+exact-decision doctrine.
+
 `truck-certified/src/pair_dispatch.rs`: the fast-path dispatcher over
-certified support schemas — plane/plane, plane/cylinder, plane/cone,
-plane/torus, sphere pairs (sphere via P1-SPHERE), cylinder/cylinder
-coaxial+parallel via the landed `cylinder_arrangement.rs` machinery. Each
-arm produces a certified contact through the landed closed-form modules with
-directed rounding at the leaves; the landed `intersection.rs` 2D pipeline is
-the implementation model. Classes OUTSIDE the admitted set refuse
-`PairUnsupported` (typed, never swallowed — the no-silent-downgrade
-doctrine). Zero mesh-derived intersection polylines in the certified path
-(F1: witnesses, never approximations). Write set: `truck-certified/src/pair_dispatch.rs`,
+certified support schemas — the exact arms above. Each
+arm produces a certified contact through exact-predicate admission
+screens (`formal/exact.rs` expansions decide every configuration) with
+directed rounding at the value leaves; the landed `intersection.rs` 2D
+pipeline is the implementation model and `PairUnsupported` (widened by
+one named variant `UnsupportedPairClass`, booked per mapping section C
+row 1) is the refuse-class — classes OUTSIDE the admitted set refuse
+typed, never swallowed (the no-silent-downgrade doctrine). Zero
+mesh-derived intersection polylines in the certified path (F1: witnesses,
+never approximations). Chart (pcurve) emission books with Phase 3's
+boolean core — no Phase-1 consumer needs it (FLOOR measures
+certify/refuse, not pcurves). Write set:
+`truck-certified/src/pair_dispatch.rs`,
+`truck-certified/src/formal/intersection.rs` (the enum variant),
 lib.rs line, tests.
 
 ### BG-CK-P1-FLOOR — the Phase-1 gate measurement (mechanical; worker)
