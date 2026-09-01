@@ -17,5 +17,6 @@
 pub mod contract;
 pub mod domain;
 pub mod formal;
+pub mod hull;
 pub mod meshable;
 pub mod source_evidence;
