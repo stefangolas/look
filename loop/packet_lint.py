@@ -118,7 +118,9 @@ def test_paths_in(text, write_allow):
         if p in seen:
             continue
         seen.add(p)
-        if p in write_allow:
+        # Ownership matches the full write_allow entry OR a suffix shorthand:
+        # prose may say `tests/foo.rs` for `vendor/truck/crate/tests/foo.rs`.
+        if p in write_allow or any(w.endswith('/' + p) for w in write_allow):
             owned_hits.append(p)
         else:
             foreign.append(p)
