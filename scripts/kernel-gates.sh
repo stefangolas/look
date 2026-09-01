@@ -49,15 +49,34 @@ new_rs_files() {
     # `--` is not a second separator, so every new vendor file (including
     # data files like proptest-regressions/*.txt) leaked into GATE-1 and
     # misfired on non-Rust content. Filter the extension explicitly.
-    git diff --name-only "$base"...HEAD -- 'vendor/truck' \
-        | while IFS= read -r f; do
-            case "$f" in
-                *.rs) ;;
-                *) continue ;;
+    git diff --name-status -M "$base"...HEAD -- 'vendor/truck' \
+        | awk -F'\t' '
+            $1 ~ /^A/ && $2 ~ /\.rs$/ { print $2 }
+            $1 ~ /^R/ && $3 ~ /\.rs$/ { print $3 "\t" $2 }
+          ' \
+        | while IFS= read -r entry; do
+            case "$entry" in
+                *$'\t'*)
+                    # Rename destination (session 46): absent at base by
+                    # definition, but a rename whose SOURCE existed at base
+                    # is relocated baseline code, not new code — GATE-1's own
+                    # header disclaims pre-existing baseline content, and
+                    # BG-CK-P0-CRATE's 53 moved modules (252 grandfathered
+                    # unwraps) must not be force-fitted with an H-1 deny
+                    # their source never carried.
+                    f=${entry%%$'\t'*}; src=${entry#*$'\t'}
+                    if git cat-file -e "$base:$src" 2>/dev/null; then
+                        continue
+                    fi
+                    printf '%s\n' "$f"
+                    ;;
+                *)
+                    f=$entry
+                    if ! git cat-file -e "$base:$f" 2>/dev/null; then
+                        printf '%s\n' "$f"
+                    fi
+                    ;;
             esac
-            if ! git cat-file -e "$base:$f" 2>/dev/null; then
-                printf '%s\n' "$f"
-            fi
         done
 }
 
