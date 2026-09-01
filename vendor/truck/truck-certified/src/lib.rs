@@ -2,6 +2,7 @@
 
 #![cfg_attr(not(debug_assertions), deny(warnings))]
 #![deny(clippy::all, rust_2018_idioms)]
+#![deny(clippy::unwrap_used)]
 #![warn(
     missing_docs,
     missing_debug_implementations,

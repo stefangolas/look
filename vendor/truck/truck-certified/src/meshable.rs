@@ -2,6 +2,8 @@
 //! tessellation module: `PreMeshableSurface`, `MeshableSurface`, and the
 //! cfg'd `Parallelizable` shim they bound on.
 
+#![deny(clippy::unwrap_used)]
+
 use truck_geometry::prelude::*;
 
 #[cfg(not(target_arch = "wasm32"))]

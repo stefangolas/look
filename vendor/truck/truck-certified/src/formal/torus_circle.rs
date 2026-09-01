@@ -1,3 +1,11 @@
+// Grandfathered (orchestrator amendment, BG-CK-P0-CRATE r3): moved
+// verbatim from truck-meshalgo, whose crate never denied
+// clippy::unwrap_used. The crate-level deny in lib.rs is H-1's contract
+// for AUTHORED certified code; this module's pre-existing unwraps are
+// inherited baseline content and must not be force-rewritten by the
+// move packet. Do not add new unwraps under this allow.
+#![allow(clippy::unwrap_used)]
+
 //! Certified circle-on-torus membership, continuous-lift winding, and
 //! `GL(2, Z)` basis normalization for tilted-circle torus loops
 //! (TORUS-DIAGONAL-1).

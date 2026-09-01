@@ -1,3 +1,11 @@
+// Grandfathered (orchestrator amendment, BG-CK-P0-CRATE r3): moved
+// verbatim from truck-meshalgo, whose crate never denied
+// clippy::unwrap_used. The crate-level deny in lib.rs is H-1's contract
+// for AUTHORED certified code; this module's pre-existing unwraps are
+// inherited baseline content and must not be force-rewritten by the
+// move packet. Do not add new unwraps under this allow.
+#![allow(clippy::unwrap_used)]
+
 //! Certified pair intersection of x-monotone pieces.
 //!
 //! # What this module does
