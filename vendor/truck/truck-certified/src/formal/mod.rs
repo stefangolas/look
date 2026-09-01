@@ -99,6 +99,7 @@ pub mod planar_slice;
 pub mod quotient;
 pub mod rank1_annulus;
 pub mod span;
+pub mod sphere;
 pub mod support;
 pub mod xmonotone;
 
@@ -224,6 +225,7 @@ pub use rank1_annulus::{
     RankOnePeriodicAnnulus, RealizedAnnulus,
 };
 pub use span::{BranchGerm, CurveSpan2, FastPath, SpanId};
+pub use sphere::{CertifiedEmbeddedSphere, SphereIdentification, SphereIdentificationFailure};
 pub use support::{
     identify_line_segment, identify_plane, identify_polyline, CircularArcPlacement3, CurveSchema,
     CurveSchemaFailure, PlaneGram, PlaneSchema, SchemaIdentificationFailure, SupportSurfaceSchema,
