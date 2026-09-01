@@ -60,7 +60,17 @@ VENDOR = REPO_ROOT / 'vendor' / 'truck'
 
 
 def front_block(text):
+    # Two packet formats are in the repo: the older ```yaml fence
+    # (BG-S0-003 ... CG-007 era) and a --- front-matter block (the CAD-era
+    # packets). The fence-only form returned '' for every --- packet, so the
+    # lint silently no-opped on them - every check read empty lists and the
+    # file reported "clean" while nothing was read (the dropped-rows failure
+    # mode, found 2026-09-01 when the new CRATES_NONEMPTY check fired on
+    # packets whose crates: line was visibly non-empty).
     m = re.search(r"```yaml\n(.*?)```", text, re.S)
+    if m:
+        return m.group(1)
+    m = re.match(r"\A---\s*\n(.*?)\n---\s*\n", text, re.S)
     return m.group(1) if m else ''
 
 
@@ -262,6 +272,49 @@ def lint_packet(packet_path, known_ids):
     if vendor_crates and not crates:
         findings.add('FAIL', 'CRATES_COVER_WRITE_SET',
                         'write_allow touches vendor crates but `crates:` is empty')
+
+    packet_class = ''
+    cm = re.search(r'(?m)^class:\s*(\S+)', yaml_text)
+    if cm:
+        packet_class = cm.group(1)
+
+    # CRATES_NONEMPTY (session 46, BG-CK-P0-PREVALENCE r1): verify.py exits
+    # before any gate when `crates:` is falsy, and a packet writing
+    # root-crate files needs `look` in crates for cargo -p to have a target.
+    # Survey packets write no Rust and are exempt.
+    if packet_class != 'survey':
+        if not crates:
+            findings.add('FAIL', 'CRATES_NONEMPTY',
+                            '`crates:` is empty - verify.py exits before any gate '
+                            '(PREVALENCE r1 shipped this way and burned a verify)')
+        root_files = [p for p in write_allow
+                      if re.match(r'^(tests|src|examples|benchmarks)/', p)]
+        if root_files and 'look' not in crates:
+            findings.add('FAIL', 'CRATES_NONEMPTY',
+                            f"write_allow writes root-crate files ({root_files[0]}...) "
+                            "but `look` is not in `crates:` - the verify's cargo -p "
+                            "list has no target for them")
+
+    # H1_NEW_MODULE (session 46, CRATE Section 1 + FREEZE Section 3 - two
+    # GATE-1 round trips, identical class): a packet that creates NEW
+    # vendor/truck .rs files must state the H-1 requirement
+    # (deny(clippy::unwrap_used)) in prose, or the worker's new modules
+    # arrive without the header and kernel-gates rejects them post-hoc.
+    # Survey packets write no Rust; skipped.
+    if packet_class != 'survey':
+        new_rs = [p for p in write_allow
+                  if p.startswith('vendor/truck/') and p.endswith('.rs')
+                  and not (REPO_ROOT / p).exists()]
+        glob_new = [p for p in write_allow
+                    if p.startswith('vendor/truck/') and p.endswith('/**')]
+        if (new_rs or glob_new) and not re.search(r'unwrap_used|H-1', text):
+            detail = ', '.join(new_rs[:3]) if new_rs else glob_new[0]
+            findings.add('FAIL', 'H1_NEW_MODULE',
+                            f"write_allow creates new vendor .rs files ({detail}) but "
+                            "the packet never states the H-1 requirement - add "
+                            "'new modules carry #![deny(clippy::unwrap_used)]' to the "
+                            "Template/house rules (CRATE Section 1 and FREEZE "
+                            "Section 3 each burned a GATE-1 round trip on this)")
 
     # TEST_PATH_OWNERSHIP
     owned_hits, foreign, owned = test_paths_in(text, write_allow)
