@@ -163,3 +163,87 @@ class 4 (Select) consumes Phase 2's branch output and the landed
 ManifoldDiagnostics (mapping row: class-4 manifold consumption); classes
 3/5/6/7/10 type against Phase 2-3 outputs that do not exist. Reading the
 plan's sections again at each phase boundary is the pre-build.
+
+## Amendment 2026-09-01 (session 47, owner direction): the recognition ladder — measure the spline bucket before DISPATCH-2 or Phase 2 spends
+
+**The analysis (owner-authored, recorded here as the booking's fourth
+input gate).** The dispatch's implicit taxonomy is "canonical carrier
+pairs." The theoretically right one is "pairs sharing a symmetry group ⇒
+reduction to a lower-dimensional certified problem we already have." The
+four ranking axes: algebraic degree (plane 1 ⊂ quadrics 2 ⊂ tori/cyclides
+4 ⊂ general spline — bicubic×bicubic hits degree 54), symmetry class
+(SO(3) ⊃ SO(2)×… ⊃ S¹ ⊃ ℝ¹ ⊃ ruled ⊃ general), locus type (landed:
+`BranchGerm`, SS-TR/TAN/COIN cells, germ parity), conditioning (landed:
+Lipschitz/Pole/Hölder table). Fast paths exist only where degree is
+minimal AND symmetry is maximal. Everything below torus on the symmetry
+lattice falls through to generic SSI regardless of locus type — and the
+measured 62% analytic fraction is therefore a FLOOR: the census stops at
+representation names, and exporters NURBS-ize exact geometry constantly.
+
+**The captured-gap candidates, ranked by mechanical-CAD prior:**
+
+1. **Hidden analytics inside the spline bucket** (~60k pairs:
+   spline~spline 21,004; plane~spline 16,137; cylinder~spline 15,566;
+   cone~spline 3,808; spline~torus 3,923) — degree-1×1 control nets are
+   planes; circular-row rational patches are cylinders/tori/cones. Pure
+   control-net reads, representation-legible, zero taxonomy nodes exist
+   today. Potentially the biggest single bucket shift.
+2. **Surfaces of revolution with spline profiles** — a
+   `RevolutedCurve<Spline>` classifies Spline today. Face-level
+   recognition is a control-net read; the CONTACT reduction is
+   pair-level (see caution A) and lands in the landed 2D engine
+   (`intersection.rs`).
+3. **Translational/extruded splines and ruled patches** — extrude×plane
+   reduces to rail×plane; ruled×plane to two rail intersections. Same
+   recognizer shape.
+4. **General quadric–quadric (Levin's pencil-of-quadrics)** — the full
+   table is finitely enumerable; genus-0 rational, genus-1 via the
+   subresultant/Sturm tier the formal system books. Real mass
+   (cone~cone 2,050; cone~cylinder 3,918; the non-coaxial
+   cylinder~cylinder remainder). Phase-3-adjacent.
+5. **Circle×quadric full arms** — the contact funnel covers only
+   latitudinal-coincident Circle×Cylinder today; circle×cone/sphere/
+   plane are conic systems. Feeds the boolean edge funnel. Phase-3-
+   adjacent.
+6. **Tangential 1D / coincident 2D loci on splines** — fillet junctions
+   (spline fillet meeting its host wall tangentially) are the
+   high-prevalence instance; TAN-SNAP's booking, GATED on the
+   measurement below (if recognizers land, many "spline fillet" faces
+   become canonical and the tangential fast path inherits them).
+
+**Two cautions that shape the booking (orchestrator, concurring):**
+
+- **Caution A — recognition is face-level; reduction is pair-level.**
+  Revolute×plane reduces to the 2D profile problem only in symmetric
+  positions (meridian plane, ⊥-axis plane); a revolute surface meeting a
+  generic plane has no meridian reduction. Every recognizer arm needs a
+  pair-level exact-predicate screen (axis collinearity,
+  direction-parallelism — the DISPATCH screen discipline) on top of the
+  face-level refusing constructor.
+- **Caution B — canal/Dupin recognition is NOT the refusing-constructor
+  pattern.** A NURBS-ized fillet carries no rolling-ball structure in
+  its control net; recognizing it would be FITTING, which the
+  representation-derived doctrine forbids. The honest version collapses
+  into candidate 1: MEASURE whether the corpus carries canal surfaces as
+  NURBS (lossy export — stays generic until Phase 2) or as tori/
+  revolution entities (free recognition). No recognizer can certifiedly
+  recover what the representation discarded.
+
+**The fourth input gate (this supersedes the DISPATCH-2/Phase-2
+sequencing decision):** a **spline-bucket structural census** — extend
+the prevalence harness with a measurement-only decomposition of every
+spline-carried face: bilinear/planar-row nets, circular-row rationals,
+revolution-structured nets, extrusion-structured nets, degree histogram.
+No thresholds in-tree (census discipline); publishes
+`docs/CERTIFIED_SPLINE_CENSUS.md`. Runs BEFORE DISPATCH-2 spends and
+before the Phase-2 first dispatch — either outcome is a win: a big
+fast-path win (recognizer family DISPATCH-3, each arm literally the
+SPHERE packet shape) or a certified greenlight for Phase 2's generic
+engine with the residual quantified.
+
+**Sequencing authority:** per owner direction, the interleave of the
+census, DISPATCH-2, the recognizer family, and Phase 2 will be decided
+in a NEW BUILD SPEC, not here. This booking records the analysis, the
+cautions, and the measurement gate; it books no packets for the
+recognizer family and takes no position on the DISPATCH-2/Phase-2 order
+beyond "census first."
