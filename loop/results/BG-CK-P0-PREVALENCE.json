@@ -1,0 +1,40 @@
+{
+  "id": "BG-CK-P0-PREVALENCE",
+  "status": "DONE",
+  "contract": "BG-CK-P0-PREVALENCE",
+  "commit": "bb05d87",
+  "deliverables": [
+    "tests/certified_prevalence.rs",
+    "docs/CERTIFIED_PREVALENCE.md"
+  ],
+  "anchors_verified": {
+    "A1": 1,
+    "A2": 1,
+    "A3": 1,
+    "A4": 2,
+    "A5": 1,
+    "A6": 38
+  },
+  "headline": {
+    "files": 38,
+    "measured": 38,
+    "excluded": 0,
+    "faces": 71390,
+    "analytic_faces": 52034,
+    "analytic_face_fraction": 0.7288695895783723,
+    "pairs": 166307,
+    "analytic_pairs": 103649,
+    "analytic_pair_fraction": 0.6232389496533519
+  },
+  "verdict": "CONFIRMED. The plan's own deferral rule is that the class-2 analytic fast path 'carries the majority of pairs per the design's own corpus claim'. Measured analytic adjacent pairs = 103,649 / 166,307 = 62.32%, a strict majority (> 50%), so per the plan's own decision rule the analytic share does justify deferring Phase 2. CERTIFIED-KERNEL-PLAN.md is absent from the tree (also MISSING at dispatch per CONTEXT.md), so the decision rule was taken from the packet's own verbatim quote.",
+  "findings": [
+    "Sphere: no landed certified constructor exists; classified by the landed in-memory representation (a sphere-carried surface). Its evidence is representation-named, not certified-identified. This is itself a Phase-1 gap finding and is published in the doc (1,831 sphere faces, 2.56% of the corpus).",
+    "The Other residual bucket is fully named: 284 faces = 280 degenerate_toroidal_surface (formula1 142, quadruped 99, jackhammer 39) + 4 toroidal_surface (formula1) that identify_torus_world refused (spindle/horn or non-similarity placement). No unexplained residual.",
+    "nist_ftc_08_asme1_ap242-e1-tg.stp declares no B-rep shells (the AP242 tessellated-surface variant per the NIST README); it measured 0 faces / 0 pairs legitimately and is reported, not excluded.",
+    "The NIST subset is 96.44% analytic pairs (16,839 / 17,461); the five large assemblies are 58.32% (86,810 / 148,846). The corpus headline is driven up by the clean NIST part set.",
+    "Loader observation: the editable-shell round trip Shell::extract refuses degenerate seam edges ('Two same vertices cannot construct an edge.') on 22 of the 38 files (core_xy, formula1, jackhammer, quadruped, ur10 and 17 NIST files), so the census computes Shell::face_adjacency()'s relation on the compressed shell form production actually tessellates from; no kernel change was needed and no file was excluded."
+  ],
+  "tests_added": 1,
+  "run_command": "cargo test -p look --test certified_prevalence -- --ignored --nocapture",
+  "notes": "Measured on C:\\Users\\stefa\\look-corpus via LOOK_CORPUS (38 STEP files, anchor A6). The test skips with a clear message when LOOK_CORPUS is unset and asserts only structural sanity (corpus found, every shell-bearing file has faces > 0, every face lands in exactly one of the seven buckets); there is deliberately no threshold assertion on the analytic fraction. None of the packet's three stop conditions triggered. Verification: cargo check --locked --all-targets passes; cargo clippy -p look --test certified_prevalence --message-format=short --no-deps is clean on the new file; tests/certified_prevalence.rs is fmt-clean. Pre-existing fmt drift outside this diff (not touched): examples/step_face_timing.rs:554 and tests/geometry_fingerprint.rs:54. The corpus's own conformance quirks surface as per-entity 'Error while deserialize STEP struct: ...' lines on stderr from the landed table builder (the NIST README states these files are not reference-clean); they excluded nothing."
+}
