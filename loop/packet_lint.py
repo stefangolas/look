@@ -379,6 +379,52 @@ def lint_packet(packet_path, known_ids):
                             f"depends_on {dep} has no PACKETS.jsonl row - typo, or a "
                             "dependency that was never registered")
 
+    # ANCHOR_PREFIX_AMBIGUITY (session 47): a grep -c pattern that occurs in
+    # the target file immediately followed by an identifier character is
+    # prefix-matching a longer name - the counted lines may not be the ones
+    # the packet means. Hit three times in two packets (BG-CK-P1-SPHERE A2
+    # 'pub enum CylinderIdentification' also matching
+    # CylinderIdentificationFailure; the class generalizes). Literal check,
+    # WARN only: regex-flavored patterns are skipped here, gen_packet --check
+    # still measures the real count.
+    for m in re.finditer(r"\{id:\s*(\w+),\s*expect:\s*\d+,\s*cmd:\s*\""
+                         r"grep -c '([^']+)' ([^\"]+)\"\}", yaml_text):
+        aid, pat, path = m.group(1), m.group(2), m.group(3)
+        if any(c in pat for c in "\\^$.[](){}*+?|"):
+            continue  # regex-flavored; literal scan would mislead
+        target = REPO_ROOT / path
+        if not target.is_file():
+            continue
+        try:
+            content = target.read_text(encoding='utf-8', errors='replace')
+        except OSError:
+            continue
+        idx = content.find(pat)
+        while idx != -1:
+            end = idx + len(pat)
+            if end < len(content) and (content[end].isalnum()
+                                       or content[end] == '_'):
+                findings.add('WARN', 'ANCHOR_PREFIX_AMBIGUITY',
+                                f"anchor {aid}: '{pat}' occurs followed by an "
+                                "identifier character in the target file - it "
+                                "may prefix-match a longer name. Tighten with a "
+                                "word boundary or trailing delimiter and measure "
+                                "the real count (SPHERE A2 class)")
+                break
+            idx = content.find(pat, idx + 1)
+
+    # PROSE_API_SNIPPET - TRIED AND RETIRED (session 47): a regex scan for
+    # API-shaped text (subs(/::new(/pub fn) in packet prose fired 386 times
+    # across the historical corpus (every packet quotes constructors in
+    # prose), i.e. it carries no per-packet information and would be ignored.
+    # The class it targeted is real - the BG-CK-P1-SPHERE period-axis error
+    # was a prose `subs(u0 + TAU, v0)` snippet with the wrong parameter axis -
+    # but that error was caught by the packet's own stop-condition-3 mandate
+    # (worker reads the source, records the deviation), not by a lint. A
+    # regex cannot check prose API claims against the tree; if this class
+    # recurs, the fix is tree-aware (compare prose signatures against source),
+    # not a broader pattern.
+
     return findings
 
 
