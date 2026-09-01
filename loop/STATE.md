@@ -22,63 +22,59 @@ base) - zero regressions. Branch: `integration/kernel-bg`, HEAD `8eb890f`.
 
 ## Where we are
 
-Session 45: the certificate mapping was unified first
-(docs/CERTIFICATE_MAPPING.md; placement correction: CG-007's evidence types
-live in truck-base, BG-S0-001 precedent - modeling->meshalgo regular dep
-barred), then both remaining packets were written, linted
-(loop/packet_lint.py, layer 1+2), registered BEFORE dispatch (the CG-004
-lesson), and dispatched in parallel. Both workers finished in ~3h; both
-verified ACCEPTED after amendment-only round trips; both landed. The
-truck-fork repo got a real README + OVERVIEW and a full mirror of look/docs
-(look/docs stays the working set; two sources of truth, manual sync).
-CG-004 landed earlier the same session (V3 LINT_UNLINTED, PACKET fault, r3).
+Session 46: **CERTIFIED-KERNEL PHASE 0 IS COMPLETE (3/3 landed).** All four
+exit-gate items hold: workspace builds, suites unchanged, prevalence table
+published (docs/CERTIFIED_PREVALENCE.md), unified mapping table (session 45),
+and the F1/F2/F3 contract freeze is landed code. Branch:
+`integration/kernel-bg`, HEAD `7b3cb79`.
 
-## REBOOT CHECKPOINT (session 46, disk emergency)
-
-Certified-kernel Phase 0 opened this session: BG-CK-P0-CRATE and
-BG-CK-P0-PREVALENCE written, anchor-verified (gen_packet --check), linted
-(packet_lint), registered AT DISPATCH with the full scheduling schema
-(wave/needs/writes/packet/slot - schedule.py's wave counter needs them), and
-dispatched in parallel (slots 0/1, base 3a29a38). The two parallel cargo
-builds ballooned pagefile.sys to ~27 GB and drove the disk to 0.3 GB free;
-both workers were killed and their WIP checkpointed as orchestrator commits:
-- CRATE: `f190e8c` on packet/BG-CK-P0-CRATE (63 files: the ENTIRE
-  formal/+domain/+source_evidence tree moved into vendor/truck/truck-certified
-  with manifest + lib.rs + meshable.rs; renames tracked; UNVERIFIED - the
-  worker never reached a build). Safety ref: wip/BG-CK-P0-CRATE-1.
-- PREVALENCE: `ab4a57f` on packet/BG-CK-P0-PREVALENCE
-  (tests/certified_prevalence.rs written, 923 lines). Safety ref:
-  wip/BG-CK-P0-PREVALENCE-1.
-The checkpoint commits carry CONTEXT.md/PACKET.md (normally never committed)
-- they are reference material, not verify candidates. RECOVERY after reboot:
-pagefile shrinks; then `run_packet --reset` both slots (do NOT delete the
-wip/ branches) and REDISPATCH FRESH (packets unchanged, registry rows reset to
-RUNNING by run_packet? NO - set them back yourself if the reset leaves them).
-Alternative: a worker could resume from the checkpoint branch
-(`--resume` needs the events session id - gone after kill; so fresh it is).
-Root-cause trap for the traps section: TWO PARALLEL WORKERS on this machine
-is a pagefile event; ONE worker at a time until the pagefile growth is
-restrained, or verify disk floors with big margins.
+- **BG-CK-P0-CRATE** `b56bbfa`: truck-certified workspace crate created;
+  tessellation/{formal,domain} + source_evidence.rs moved verbatim (53
+  modules, ~41k LOC; 548 moved tests green); meshalgo consumes via compat
+  re-exports (look's own `truck_meshalgo::tessellation::formal::*` rides
+  them); meshable.rs holds the lifted PreMeshableSurface/MeshableSurface
+  traits + the Parallelizable shim; ONE new manifest edge
+  meshalgo->certified; truck-geometry stays certified-free (D1). H-1 policy:
+  crate-level deny in lib.rs + meshable.rs, 19 justified grandfathered
+  allows over the moved unwraps.
+- **BG-CK-P0-PREVALENCE** `425a1bc`: 62.32% analytic adjacent pairs
+  (103,649/166,307; 38/38 files, zero exclusions; NIST 96.44%, assemblies
+  58.32%) - the plan's own deferral rule CONFIRMS Phase 2 is deferrable.
+  Sphere constructor gap published (2.56% of faces); residual bucket fully
+  named (284 degenerate-torus faces).
+- **BG-CK-P0-FREEZE** `7b3cb79`: F1 WitnessEdge (pcurve pair + both surface
+  handles + interval enclosures; NO spline field - export view is a future
+  type), F2 five-row BoundPolicy (composition for normal/curvature/NURBS
+  value; auxiliary root isolation for the curvature denominator guard;
+  Unfrozen refuses), F3 continuation-coordinate contract (square 3x3
+  Krawczyk only; lowest-index-on-ties deterministic selection; switching =
+  CoordinateSwitch with BOTH certificates). Types refuse; Phase 1 fills.
 
 ## Pick up here
 
-1. **The CG program is DONE.** Next program per ORCHESTRATOR: the
-   certified-kernel plan (truck-fork CERTIFIED-KERNEL-PLAN.md) - Phase 0
-   (truck-certified promotion + contract freeze) may now dispatch against
-   docs/CERTIFICATE_MAPPING.md (X1 resolved this session). X2 still holds:
-   certified-Phase-0 must not run concurrently with packets writing
-   truck-meshalgo's module tree - nothing is in flight, so it is free.
-2. **packet_lint.py is law for new packets**: run it before dispatch
-   (gen_packet.check runs automatically at dispatch for anchors; the lint
-   adds crates-vs-write-set, test-path ownership, DEP_KIND, forecast
-   numbers, DIRECT_DEP, QUALIFIED_PATH). Validated this session; it found
-   three real registry defects on first contact.
-3. **Registry hygiene**: BG-CG-002/003 were found landed-but-unregistered
-   this session and fixed; every future packet gets its registry row at
-   dispatch time, not at landing.
-4. **Elastic pool is still unwritten** (plan section 4): corpus fixtures,
-   mutation batteries, kernel microbenchmarks - dispatch when idle.
-5. Open environmental, do NOT chase: healing::tests::step_import (missing
+1. **Phase 1 next**: class 1 CertifiedMap admission + class 2 analytic fast
+   path (plan §3 Phase 1; the prevalence table says the analytic path
+   carries the corpus). Booked gaps to fold in: a certified sphere
+   constructor (2.56% of corpus faces are sphere-carried, representation-
+   named only), the F3 provisional float margin (directed-rounded interval
+   division per Phase 1), the CG program's deferred truck-topology
+   self-loop-safe fold fix.
+2. **ONE WORKER AT A TIME on this machine** (pagefile trap, session 46:
+   two parallel builds ballooned pagefile.sys to ~27 GB, disk to 0.3 GB,
+   forced a reboot). Serial dispatch until the pagefile is restrained.
+3. **packet_lint.py reads BOTH packet formats now** and carries
+   H1_NEW_MODULE + CRATES_NONEMPTY (session 46). Before this session it
+   silently no-opped on every `---`-front-matter packet - run it on every
+   new packet; it is law.
+4. **Four harness defects were found and fixed on this session's packets**
+   (V1 write_allow globs, V3 added-lines renames, kernel-gates new_rs_files
+   renames, V5 baseline crate-existence + has_compile_error invocation
+   errors). All self-tested before trusted. A crate-CREATING packet and a
+   module-MOVING packet will exercise gates no previous packet has - expect
+   more of this class in Phase 1-3 and re-derive every gate's assumptions.
+5. **Registry hygiene holds**: every packet registered AT DISPATCH with the
+   full scheduling schema (wave/needs/writes/packet/slot).
+6. Open environmental, do NOT chase: healing::tests::step_import (missing
    fixture); upstream fillet::complex_surface; stepio
    assy/table/tessellate_shape/oi/ioi (missing data); stepio builder
    (Closed-vs-Oriented, verified pre-existing twice); cone_topology tests
@@ -87,23 +83,110 @@ restrained, or verify disk floors with big margins.
 
 ## State of the machine, as left
 
-- Watchdog RUNNING (pid 27556, re-derive before trusting).
-- All four slots idle/FINISHED; CG-007 slot 0 and CG-009 slot 1 hold landed
-  branches - re-fork via new_slot before reuse.
-- Disk ~11-13 GB free. The V9 look baseline for base f332dfb is CACHED
-  (loop/baselines/f332dfb__look__*.json) - future verifies at this base
-  skip the 5 GB cold build. The truck-fork checkout's target/ was reclaimed
-  this session (2.3 GB); a reboot is the reclaim of last resort.
+- Watchdog RUNNING (re-derive pid by command: `Get-Process python`;
+  started 21:34 with LOOK_WATCHDOG_STAGNANT=3600 after the reboot).
+- All four slots FINISHED/idle; slot 0 holds the landed FREEZE branch -
+  re-fork via new_slot before reuse. Nothing in flight.
+- Disk ~18-19 GB free at close. One worker at a time (pagefile rule above).
 - LOC ledger (re-derive): `git diff --shortstat da72cd5..HEAD -- vendor/truck`.
 
 ## The parallelism picture
 
-CG graph exhausted (10/10). Next waves belong to the certified-kernel plan;
-its Phase 0 sequels the X1/X2 rules in docs/CERTIFICATE_MAPPING.md. Elastic
-CG packets (corpus/mutation/benchmarks) may fill slots alongside certified
-work if the write sets stay disjoint.
+Phase 0 is complete (3/3). Phase 1 (class 1 CertifiedMap admission + class 2
+analytic fast path) is next per plan §3; its packets book against the frozen
+contract (truck-certified/src/contract.rs) and the prevalence table (the
+analytic path carries 62.32% of corpus pairs). ONE worker at a time (pagefile
+rule). Elastic packets (corpus/mutation/benchmarks) may follow serially when
+the Phase-1 graph is booked.
 
 ## Traps, each one paid for
+
+### Session 46 (Phase 0: the move, the reboot, four gate defects, the lint's blind spot) - paid in full
+
+- **Two parallel cargo workers are a pagefile event on this machine.** The
+  first parallel dispatch of the session (CRATE + PREVALENCE) ballooned
+  pagefile.sys to ~27 GB and drove the disk from 28 GB to 0.3 GB free in
+  under an hour; Windows will not shrink the pagefile until reboot, so both
+  workers were killed and their WIP checkpointed (refs
+  wip/BG-CK-P0-CRATE-1, wip/BG-CK-P0-PREVALENCE-1 - kept as guidance; the
+  fresh redispatches redid the work cleanly in about an hour). Rule: ONE
+  worker at a time until the pagefile is size-restrained, and a reboot is
+  cheaper than a dead-disk verify.
+- **The watchdog misfired again, benignly**: it read slot 1's stale pid (the
+  worker killed pre-reboot) as a "hard death" and auto-redispatched a READY
+  packet (restart 1/3). This time the outcome was the dispatch I wanted
+  anyway - but the class is confirmed: the watchdog cannot distinguish a
+  killed worker from a never-started one, and it will spend restarts on
+  READY rows. Check `watchdog.log` ACTION lines before any manual dispatch.
+- **Four gate defects, one packet class: rename- and creation-unaware
+  gates.** BG-CK-P0-CRATE (a module MOVE that CREATES a crate) exercised
+  gate code paths no prior packet ever hit, and four gates failed on their
+  own assumptions, not on the worker's work:
+  (1) V1's write_allow compare was a literal string match - `/**` globs
+  (already used by survey packets) never matched anything.
+  (2) V3's added-lines computation ran `git diff -U0 <range> -- <newpath>`
+  per file; with the old path absent from the pathspec, git cannot pair the
+  rename, so every byte-identical moved line counted as authored and five
+  pre-existing clippy findings were attributed to the packet.
+  (3) kernel-gates new_rs_files flagged rename destinations as "new"
+  (absent at base by definition), demanding an H-1 deny the moved code
+  cannot carry (252 grandfathered unwraps); a rename whose source existed
+  at base is relocated baseline code, not new code.
+  (4) V5's baseline ran one all-crates `cargo test` at base; the packet's
+  own new crate made it die with "package ID specification did not match"
+  BEFORE any compile output, so has_compile_error said compile_ok=True and
+  an EMPTY test inventory was CACHED as the baseline - the next verify then
+  loaded it and flagged eight pre-existing meshalgo failures as newly
+  failing. Every fix was self-tested against a violating case before
+  trusted; each commit carries the evidence.
+- **packet_lint silently no-opped on an entire packet format.**
+  front_block only read the older ```yaml fence; every `---` front-matter
+  packet (the whole CAD era, P1-P12) parsed as an empty yaml block and
+  reported "clean" while nothing was read. Found because the new
+  CRATES_NONEMPTY check fired on packets whose crates: line was visibly
+  non-empty - the fired-on-empty-parse contradiction was the tell. Both
+  formats supported now; validated against all 60+ packets (fires collapsed
+  from a false storm to the 4 real ones).
+- **Two packet faults of the orchestrator's own, both now linted:**
+  H1_NEW_MODULE (packets creating new vendor .rs files must state the
+  unwrap_used/H-1 requirement - CRATE Section 1 and FREEZE Section 3 each
+  burned a GATE-1 round trip on the omission) and CRATES_NONEMPTY
+  (crates:[] exits the verify before any gate - PREVALENCE r1). The
+  recorded backlog still holds the census-scope and line-attribution
+  classes from CRATE's r1 stop.
+- **A stop condition did exactly what it exists for**: the CRATE r1 worker
+  halted BEFORE moving anything (~25 min, zero work lost) on a 13th
+  `crate::tessellation` site my census missed (source_evidence.rs:842 -
+  my A6 grep covered formal/+domain/ but source_evidence.rs was also in
+  the move) and on a use-super-* line I had attributed to line 1 without
+  reading it (it is line 581, inside mod tests, needing no rewrite). Both
+  command-verified before the r2 amendment. The discipline "measure the
+  thing you cite, over the whole scope you move" is the lesson; the lint
+  backlog names it census-scope-vs-write-set.
+- **The `crate::cgmath` mystery, solved and recorded for future moves**:
+  inside truck-meshalgo, `crate::cgmath` resolves through a four-hop glob
+  chain (matext4cgmath does `pub use cgmath;` -> truck_base::cgmath64::* ->
+  truck_polymesh::base::* -> meshalgo's `use truck_polymesh::{...,*}`).
+  An accident of the host crate; a moved file needs a direct cgmath dep.
+- **H-1 on a moved crate is a design decision, not a header paste**: the
+  crate-level deny lives in lib.rs; the 19 moved modules containing
+  unwraps carry justified module-level allows (allow overrides deny at
+  inner scope). A bare crate-level deny over the moved tree would have
+  failed clippy on 252 sites; per-file denies on moved code violate the
+  verbatim-move doctrine. The amendment script
+  (loop/scripts/amend_p0_crate_unwrap_allows.py) is the record.
+- **The orchestrator re-hit its own two oldest traps in one command**: a
+  `git add -A` staged CONTEXT.md/PACKET.md/RESULT.json on the slot branch,
+  and an inline `-replace | Set-Content` (UTF8 = BOM in PS 5.1) touched a
+  kernel file. Both were recovered from the index before harm
+  (`git restore --staged` + `git restore`); the files were then edited via
+  the Edit tool. The rules stand: stage explicit paths only, never inline
+  pipeline edits to files.
+- **gen_packet anchors run through Git bash** (loop/gen_packet.py
+  BASH constant): GNU find/awk work with POSIX paths; Windows find.exe
+  does not. Write multi-step anchor probes as script FILES - PowerShell's
+  nested quoting mangles awk programs (re-hit; script file is the only
+  reliable form).
 
 ### Session 42 second half (P10's SPEC_GAP journey + P8's three rounds + the program close) - paid in full
 
