@@ -1,0 +1,91 @@
+{
+  "id": "BG-CK-P0-FREEZE",
+  "contract": ["BG-CK-P0-FREEZE"],
+  "class": "design",
+  "crates": ["truck-certified"],
+  "status": "DONE",
+  "phase_gate": "The three contract-freeze decisions F1/F2/F3 are landed as module docs + typed signatures + contract-pinning tests in truck-certified, exactly the CG-000 shape. No numerical implementation: every evaluator refuses. The mapping rows implemented are already published in docs/CERTIFICATE_MAPPING.md section C (rows 2-4); no new evidence kind was added and no mapping row was edited.",
+  "commit": {
+    "subject": "feat(certified): Phase-0 contract freeze F1/F2/F3 (BG-CK-P0-FREEZE)",
+    "sha": "36acae2",
+    "note": "Committed on branch packet/BG-CK-P0-FREEZE before writing this file, per the Finish instructions. Three files: contract.rs (new), lib.rs (one line), tests/contract_freeze.rs (new)."
+  },
+  "sections": {
+    "section_1_contract_rs": {
+      "header": "lib.rs lint style copied verbatim (cfg_attr deny warnings, deny clippy::all + rust_2018_idioms + clippy::unwrap_used, the same warn list).",
+      "module_doc": "The three frozen decisions (F1 witness edge, F2 per-quantity bound policy, F3 continuation-coordinate contract) quoted VERBATIM from the packet, each tagged with its plan section (F1 plan §1/§3 Phase 0/§4, F2 plan D2 scope statement, F3 plan §2 class 2 generic), including the full F2 markdown table.",
+      "types": {
+        "Refusal": "certified-layer refusal vocabulary in truck-certified: `Unfrozen`, `InvalidInput`, `ConditioningBelowThreshold`. Named cases only, matching the refusal shape of formal/outcome.rs. Per docs/CERTIFICATE_MAPPING.md section C row 1: NO variant added to the base truck_base::evidence::Refusal; the certified-layer failure witnesses live here in truck-certified.",
+        "IntervalEnclosure": "minimal certified interval enclosure: lower/upper as `FiniteF64` (formal/numeric.rs) + `Method` tag (truck-base), `Method::Interval` fixed (F1/H-6: a float estimate never enters this struct). Checked constructor refuses non-finite or misordered pairs. Certificate carrier only - no arithmetic, so D2's parsimony rule (one primitive, composed) holds: formal/exact.rs's `CertifiedInterval` remains the crate's one interval algebra, untouched.",
+        "WitnessEdge": "exactly the six pub fields (pcurve_a, pcurve_b, surface_a, surface_b, enclosure_a, enclosure_b). F1: the certified Edge IS the fiber-product witness; a compile_fail doctest pins the spline-negative (edge.spline() must not compile).",
+        "Quantity": "the five-row enum: NormalAdmissibility, Curvature, RationalNumerator, RationalDenominator, RationalQuotient.",
+        "BoundPolicy": "five private rows exactly the frozen F2 table; construction only through `BoundPolicy::frozen()`. `BoundPolicyRow::new` refuses composition-only for the Curvature guard (and any Unfrozen row) with `InvalidInput`.",
+        "ContinuationCoordinate": "pub index: usize + pub relative_margin: IntervalEnclosure (Method::Interval).",
+        "CoordinateSwitch": "outgoing + incoming, both REQUIRED certificates; no Option, no default, no reseed path.",
+        "BoundedSurfaceInput": "minimal patch identity carrier (Phase 0 carries no hull numerics).",
+        "SquareSystemInput": "SQUARE 3x3 only: [IntervalEnclosure; 3] diagonal-derivative enclosures + [PositiveFinite; 3] box extents."
+      },
+      "evaluators": {
+        "certified_bound": "refuses for every frozen quantity with `InvalidInput` (the freeze performs no numerics; the frozen row pins the sanctioned mechanism), and `Unfrozen` for a quantity outside the table (a SPEC_GAP - unreachable with the closed five-variant enum, recorded for the future).",
+        "select_continuation_coordinate": "the frozen decision: coordinate i whose certified dH_i/dt_i enclosure is strictly away from zero with the LARGEST relative margin (|lower bound| / box extent in t_i); ties break to the LOWEST index (strict >, iterate ascending); refuses `ConditioningBelowThreshold` when no coordinate certifies - never retried with a weaker test. The numeric margin it attaches is a provisional degenerate interval (Phase 1 replaces the float ratio with directed-rounded interval division, keeping the Method::Interval tag)."
+      }
+    },
+    "section_2_lib_rs": {
+      "added": "`pub mod contract;` as the first of the five module declarations. Nothing else in lib.rs changed (lint header and the four moved modules are BG-CK-P0-CRATE's landed surface - V8 identity applies)."
+    },
+    "section_3_tests": {
+      "file": "vendor/truck/truck-certified/tests/contract_freeze.rs (new), 8 tests, names verbatim from tests_required.",
+      "result": "all 8 pass (see tests_required)."
+    }
+  },
+  "tests_required": [
+    {"name": "witness_edge_carries_pcurve_pair_and_surfaces_and_enclosures", "status": "PASS"},
+    {"name": "witness_edge_has_no_spline_field", "status": "PASS"},
+    {"name": "bound_policy_table_names_all_five_quantities", "status": "PASS"},
+    {"name": "denominator_well_definedness_uses_root_isolation_not_composition", "status": "PASS"},
+    {"name": "continuation_coordinate_selection_is_deterministic_lowest_index_on_ties", "status": "PASS"},
+    {"name": "coordinate_switch_requires_both_certificates", "status": "PASS"},
+    {"name": "no_coordinate_certified_refuses_with_named_case", "status": "PASS"},
+    {"name": "freeze_types_refuse_construction_outside_their_rules", "status": "PASS"}
+  ],
+  "done_when": {
+    "fmt": {
+      "result": "New files rustfmt-clean. `cargo fmt --all -- --check` reports exactly the 2 PRE-EXISTING diffs recorded by BG-CK-P0-CRATE, both in look's own files OUTSIDE write_allow and untouched by this packet: examples/step_face_timing.rs:554 and tests/geometry_fingerprint.rs:54. (A stray `cargo fmt` invocation during the session formatted those two files; they were reverted to base to keep the diff in write_allow, restoring the recorded base-state diffs.)"
+    },
+    "clippy": {
+      "result": "ZERO findings on the new files (`cargo clippy -p truck-certified --all-targets --message-format=short --no-deps`). The crate shows 126 findings, ALL in the moved modules (formal/, domain/, source_evidence.rs) - pre-existing baseline content moved verbatim by BG-CK-P0-CRATE, none introduced by this packet. No finding names contract.rs, lib.rs, or tests/contract_freeze.rs."
+    },
+    "truck_certified_tests": {
+      "command": "cargo test -p truck-certified --lib --tests --no-fail-fast",
+      "result": "GREEN - 548 moved-tree lib tests (unchanged) + 8 new contract tests = 556 passed, 0 failed. Doctests also green (2/2): the WitnessEdge compile_fail spline-guard and the IntervalEnclosure Method::Interval pin."
+    },
+    "workspace_check": {
+      "command": "cargo check --workspace --all-targets --locked",
+      "result": "GREEN (exit 0). The single warning is a pre-existing unused_qualifications warning in truck-meshalgo, untouched by this packet."
+    }
+  },
+  "stop_conditions": {
+    "fired": "none",
+    "1_interval_type_reuse": "Assessed against formal/exact.rs::CertifiedInterval and judged NOT to fire. The packet's reuse scan is explicitly scoped to formal/numeric.rs and formal/evidence.rs; neither contains a certified interval *bound* type (numeric.rs: checked scalars FiniteF64/NonNegativeFinite/PositiveFinite; evidence.rs: ClosedInterval is a parameter-domain type, not a bound), so the packet's 'otherwise define the minimal one here (lower/upper as certified interval values, Method tagged)' branch applies. CertifiedInterval (formal/exact.rs) is the crate's one interval ARITHMETIC primitive (D2 parsimony) and is deliberately left untouched: IntervalEnclosure is a Method-tagged certificate carrier with no arithmetic, so no second interval algebra is invented and no moved module is widened. Reusing CertifiedInterval AS the enclosure would require widening it with a Method tag, which the packet avoids by prescribing the carrier; that widening remains available to the orchestrator without any code change by this packet.",
+    "2_f2_f3_expressibility": "The F2/F3 types express the frozen decisions with none of the barred mechanisms: no expression-tree interval arithmetic (IntervalEnclosure carries no arithmetic), no second root engine (curvature's guard is recorded as data - AuxiliaryRootIsolation), no rectangular Krawczyk (SquareSystemInput is 3x3 by construction).",
+    "3_anchor_stability": "All anchors verified at dispatch, pre-state: A1 pub mod formal; = 1, A2 pub mod domain; = 1, A3 pub mod contract; = 0 (becomes 1 by design), A4 pub mod meshable; = 1, A5 pub struct Expansion = 1, A6 pub enum StageOutcome = 1, A7 truck-geotrait in Cargo.toml = 1. No moved module's API changed under this packet."
+  },
+  "deviations": [
+    {
+      "id": "N1",
+      "item": "pre-existing gate violations",
+      "derivation": "fmt --all: 2 diffs in look examples/tests (outside write_allow, identical to the base state BG-CK-P0-CRATE recorded). clippy: 126 pre-existing findings in the moved modules; the packet's 'zero findings' bullet is unsatisfiable on the base tree, so the criterion was applied as the packet states it in the House rules - 'zero findings on the new files' - which holds exactly."
+    },
+    {
+      "id": "N2",
+      "item": "provisional margin in select_continuation_coordinate",
+      "derivation": "The frozen decision (which coordinate) is exact over the certified inputs, but the numeric margin ratio is computed with a float division in the freeze stub and wrapped as a degenerate IntervalEnclosure. Documented in the function's doc: Phase 1 replaces the float ratio with the directed-rounded interval division, keeping the Method::Interval tag this freeze pins. H-6 is not violated by the decision logic (it computes no recorded certificate bound); the provisional margin is the Phase-1 placeholder the packet's freeze posture allows."
+    }
+  ],
+  "notes": {
+    "refusal_vocabulary": "The evaluator signatures use `Refusal` per the packet ('Refusal-shape per formal/outcome.rs'). The only `Refusal` in the tree is truck-base's, whose variants cannot express the packet's named cases (Unfrozen, InvalidInput, ConditioningBelowThreshold) without new variants - which docs/CERTIFICATE_MAPPING.md section C row 1 forbids. A certified-layer `Refusal` with those named cases was therefore defined in contract.rs: no base variant added, and the certified-layer failure witnesses live in truck-certified exactly as the mapping prescribes.",
+    "interval_enclosure_decision": "Defined the minimal carrier per the packet's 'otherwise' branch: lower/upper as FiniteF64 + Method tag, Method::Interval fixed. formal/exact.rs::CertifiedInterval was considered under stop condition 1 and left as the composed arithmetic primitive; the packet names only numeric.rs/evidence.rs as reuse homes and prescribes this carrier. See stop_conditions.1.",
+    "h3": "No float-comparison opt-outs were needed: every float assertion is an exact round-trip of stored f64s, and the tie-break test uses exactly-representable ratios (4.0/2.0 == 6.0/3.0 == 2.0).",
+    "no_numerics": "Every evaluator refuses; `certified_bound` refuses for all five frozen quantities (InvalidInput) and records the Unfrozen spec-gap branch for the future; `select_continuation_coordinate` performs only the frozen deterministic decision and refuses ConditioningBelowThreshold when no coordinate certifies. No evaluator panics."
+  }
+}
