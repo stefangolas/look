@@ -874,9 +874,21 @@ def main():
     # write_allow entries are repo-relative, the same form `git diff --name-only`
     # prints, so they compare directly once separators are normalised. RESULT.json
     # is the packet's own required output and is always in scope.
+    # An entry ending in '/**' is a directory glob (the packets' own vocabulary
+    # since the BG-TOL-001 surveys; BG-CK-P0-CRATE's truck-certified move was the
+    # first vendor-writing packet to rely on it and V1's literal string compare
+    # rejected every moved file). A path is allowed if it equals the entry or
+    # lives under the entry's directory; the directory itself is not a path a
+    # name-only diff can print, so no special case is needed for it.
     allowed_rel = set(p.replace('\\', '/').strip() for p in pkt['write_allow']) | {'RESULT.json', 'QUESTION.md', 'PACKET.md'}
 
-    offenders = [f for f in changed if f.replace('\\', '/') not in allowed_rel]
+    def path_in_allow(path):
+        if path in allowed_rel:
+            return True
+        return any(a.endswith('/**') and path.startswith(a[:-2])
+                   for a in allowed_rel)
+
+    offenders = [f for f in changed if not path_in_allow(f.replace('\\', '/'))]
 
     # `changed` above is cheap (a name-only diff) and V3/V6 both read it, so
     # it's always computed even when V1 itself isn't in --only -- only the
