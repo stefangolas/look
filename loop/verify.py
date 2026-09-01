@@ -1155,11 +1155,30 @@ def main():
             # that edits a file inheriting a lint would otherwise be rejected
             # for its predecessor's work. BG-S0-003 was, on geometry.rs:294 --
             # a borrowed_box BG-S0-001 wrote and this packet never looked at.
+            #
+            # Renames need the OLD path in the pathspec: `git diff -U0 <range>
+            # -- <newpath>` cannot pair a rename with only the destination in
+            # the limit, so git reports the whole moved file as a fresh add
+            # and every inherited line counts as authored. BG-CK-P0-CRATE
+            # verify 2 failed exactly there: five pre-existing clippy findings
+            # on byte-identical moved lines. Name-status with rename detection
+            # gives the old path per renamed destination; diffing BOTH paths
+            # with -M yields only the lines the packet actually rewrote.
+            rename_src = {}
+            for st in git_lines(v.wt, 'diff', '--name-status', '-M', diff_range):
+                parts = st.split('\t')
+                if parts[0].startswith('R') and len(parts) == 3:
+                    rename_src[parts[2].replace('\\', '/')] = parts[1]
             added_lines = {}
             for f in changed:
                 key = f.replace('\\', '/').lower()
                 lineset = set()
-                _, hunk_out = git(v.wt, 'diff', '-U0', diff_range, '--', f)
+                src = rename_src.get(f.replace('\\', '/'))
+                if src:
+                    _, hunk_out = git(v.wt, 'diff', '-U0', '-M', diff_range,
+                                      '--', src, f)
+                else:
+                    _, hunk_out = git(v.wt, 'diff', '-U0', diff_range, '--', f)
                 for h in hunk_out.splitlines():
                     hm = re.match(r'^@@ -\S+ \+(\d+)(?:,(\d+))? @@', h)
                     if hm:
