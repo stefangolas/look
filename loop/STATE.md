@@ -22,84 +22,132 @@ base) - zero regressions. Branch: `integration/kernel-bg`, HEAD `8eb890f`.
 
 ## Where we are
 
-Session 46: **CERTIFIED-KERNEL PHASE 0 IS COMPLETE (3/3 landed).** All four
-exit-gate items hold: workspace builds, suites unchanged, prevalence table
-published (docs/CERTIFIED_PREVALENCE.md), unified mapping table (session 45),
-and the F1/F2/F3 contract freeze is landed code. Branch:
-`integration/kernel-bg`, HEAD `7b3cb79`.
+Session 47: **PHASE 1 IS 3/5 LANDED** (HULL, SPHERE, MAP — all verify
+first-try, zero worker redispatches), **DISPATCH RUNNING** (design class,
+pid per slot_status), **FLOOR WRITTEN AND LINTED** (committed b8fa644,
+anchor-check pending DISPATCH landing), **PHASE 2 BOOKED**
+(docs/CERTIFIED_PHASE2_BOOKING.md, 6f4ebf8). Branch:
+`integration/kernel-bg`, HEAD: see `git log --oneline -3`.
 
-- **BG-CK-P0-CRATE** `b56bbfa`: truck-certified workspace crate created;
-  tessellation/{formal,domain} + source_evidence.rs moved verbatim (53
-  modules, ~41k LOC; 548 moved tests green); meshalgo consumes via compat
-  re-exports (look's own `truck_meshalgo::tessellation::formal::*` rides
-  them); meshable.rs holds the lifted PreMeshableSurface/MeshableSurface
-  traits + the Parallelizable shim; ONE new manifest edge
-  meshalgo->certified; truck-geometry stays certified-free (D1). H-1 policy:
-  crate-level deny in lib.rs + meshable.rs, 19 justified grandfathered
-  allows over the moved unwraps.
-- **BG-CK-P0-PREVALENCE** `425a1bc`: 62.32% analytic adjacent pairs
-  (103,649/166,307; 38/38 files, zero exclusions; NIST 96.44%, assemblies
-  58.32%) - the plan's own deferral rule CONFIRMS Phase 2 is deferrable.
-  Sphere constructor gap published (2.56% of faces); residual bucket fully
-  named (284 degenerate-torus faces).
-- **BG-CK-P0-FREEZE** `7b3cb79`: F1 WitnessEdge (pcurve pair + both surface
-  handles + interval enclosures; NO spline field - export view is a future
-  type), F2 five-row BoundPolicy (composition for normal/curvature/NURBS
-  value; auxiliary root isolation for the curvature denominator guard;
-  Unfrozen refuses), F3 continuation-coordinate contract (square 3x3
-  Krawczyk only; lowest-index-on-ties deterministic selection; switching =
-  CoordinateSwitch with BOTH certificates). Types refuse; Phase 1 fills.
+- **BG-CK-P1-HULL** `77bd6dd`: D2 hull primitive as public API
+  (hull_bernstein_1d/_2d, bernstein_derivative_1d/_2d,
+  hull_curve_homogeneous + JetOrder, HullRefusal). Polynomial-only, no
+  division (consumer-side F2 composition). Worker's sound deviation:
+  subdivision-form de Casteljau node step (a + u*(b-a)) — makes
+  linear-span hulls exact; inclusion-monotone so still certified.
+- **BG-CK-P1-SPHERE** `c09eff6`: certified sphere constructor
+  (identify_sphere/_placement/_world, CertifiedEmbeddedSphere,
+  SphereIdentificationFailure). Placement similarity rule: exact
+  column-magnitude equality. Worker caught the packet's period-axis
+  prose error via stop-condition-3 source read (truck Sphere: u=latitude,
+  v=longitude).
+- **BG-CK-P1-MAP** `a94ee65`: class-1 CertifiedMap (admit_curve/
+  admit_surface + region entries, enclosure/rank_margin oracles,
+  MapRefusal). Surface Bezier decomposition in-module (row-then-column
+  cut, tensor commutation verified vs subs). Worker's key catch:
+  source-parameter derivative scaling (inverse piece width) — packet
+  under-specified it.
+- **BG-CK-P1-DISPATCH** (running): exact arms only — plane~plane,
+  plane~cylinder (axis-normal cut), plane~sphere, sphere~sphere,
+  cylinder~cylinder coaxial/parallel = 64,042 corpus pairs (~62% of
+  analytic mass). Exact-predicate admission screens; PairUnsupported
+  widened by ONE named variant UnsupportedPairClass (mapping C row 1).
+  Cone/torus special-position arms split to BG-CK-P1-DISPATCH-2 (booking
+  doc amended, mass-driven).
+- **BG-CK-P1-FLOOR** (written, b8fa644): exit-gate measurement; five
+  dispositions, certified_disjoint-on-adjacent-pairs is the LEAD anomaly
+  column; no threshold assertions in-tree; latency published, legacy
+  comparator deferrable to integration (recorded fallback).
 
 ## Pick up here
 
-1. **Phase 1 is BOOKED**: `docs/CERTIFIED_PHASE1_BOOKING.md` holds the
-   packet graph (HULL -> MAP, SPHERE -> DISPATCH -> FLOOR), the substrate
-   census (span.rs CurveSpan2 + intersection.rs pipeline + exact.rs
-   Expansion already landed - do not re-derive), and the pre-made design
-   decisions. First packet to write: BG-CK-P1-HULL (design class,
-   orchestrator) or BG-CK-P1-SPHERE (mechanical). The contract it types
-   against is landed: truck-certified/src/contract.rs.
-2. **ONE WORKER AT A TIME on this machine** (pagefile trap, session 46:
-   two parallel builds ballooned pagefile.sys to ~27 GB, disk to 0.3 GB,
-   forced a reboot). Serial dispatch until the pagefile is restrained.
-3. **packet_lint.py reads BOTH packet formats now** and carries
-   H1_NEW_MODULE + CRATES_NONEMPTY (session 46). Before this session it
-   silently no-opped on every `---`-front-matter packet - run it on every
-   new packet; it is law.
-4. **Four harness defects were found and fixed on this session's packets**
-   (V1 write_allow globs, V3 added-lines renames, kernel-gates new_rs_files
-   renames, V5 baseline crate-existence + has_compile_error invocation
-   errors). All self-tested before trusted. A crate-CREATING packet and a
-   module-MOVING packet will exercise gates no previous packet has - expect
-   more of this class in Phase 1-3 and re-derive every gate's assumptions.
-5. **Registry hygiene holds**: every packet registered AT DISPATCH with the
-   full scheduling schema (wave/needs/writes/packet/slot).
-6. Open environmental, do NOT chase: healing::tests::step_import (missing
-   fixture); upstream fillet::complex_surface; stepio
-   assy/table/tessellate_shape/oi/ioi (missing data); stepio builder
-   (Closed-vs-Oriented, verified pre-existing twice); cone_topology tests
-   panic in debug (the circle-carrier trap); clippy deny-lints in untouched
-   truck-meshalgo/truck-stepio (toolchain drift).
+1. Poll DISPATCH (`python loop/slot_status.py`); when finished: verify
+   `--base 4076d7b`, land, then `python loop/gen_packet.py --check
+   loop/packets/BG-CK-P1-FLOOR.md` (anchors reference DISPATCH's landed
+   names — they FAIL until DISPATCH lands), lint, register AT DISPATCH,
+   dispatch FLOOR. When FLOOR lands, Phase 1's exit gate is measured.
+2. Then: DISPATCH-2 decision (cone/torus special-position arms — booking
+   doc §DISPATCH amendment) vs Phase-2 start (booking doc
+   docs/CERTIFIED_PHASE2_BOOKING.md; input gates: floor numbers, corpus
+   seeds, DISPATCH-2 decision).
+3. ONE WORKER AT A TIME (pagefile rule stands — owner confirmed serial).
+4. Registry rows AT DISPATCH (session 47 missed twice: MAP post-landing
+   repair, DISPATCH late registration — the FLOOR DEPENDS_KNOWN lint
+   caught the second).
+5. Open environmental, do NOT chase: healing::tests::step_import;
+   upstream fillet::complex_surface; stepio assy/table/tessellate/oi/ioi;
+   stepio builder Closed-vs-Oriented; cone_topology debug panics; clippy
+   deny-lints in untouched meshalgo/stepio; pre-existing fmt violations
+   (examples/step_face_timing.rs, tests/geometry_fingerprint.rs); 129
+   pre-existing clippy all-targets findings in grandfathered certified
+   modules. All in the f332dfb-era baselines.
 
 ## State of the machine, as left
 
-- Watchdog RUNNING (re-derive pid by command: `Get-Process python`;
-  started 21:34 with LOOK_WATCHDOG_STAGNANT=3600 after the reboot).
-- All four slots FINISHED/idle; slot 0 holds the landed FREEZE branch -
-  re-fork via new_slot before reuse. Nothing in flight.
-- Disk ~18-19 GB free at close. One worker at a time (pagefile rule above).
-- LOC ledger (re-derive): `git diff --shortstat da72cd5..HEAD -- vendor/truck`.
+- Watchdog RUNNING (re-derive pid: `Get-Process python`; restarted 21:34
+  prior session with LOOK_WATCHDOG_STAGNANT=3600).
+- Slot 0: DISPATCH worker live. Slots 1-3: FINISHED/idle. Re-fork via
+  new_slot before reuse.
+- Disk at last check: ~16 GB free after warm. Reclaim order: repo-root
+  target, idle slot targets, %TEMP%/look-verify-baseline-*.
+- LOC ledger (re-derive): `git diff --shortstat da72cd5..HEAD --
+  vendor/truck`.
 
 ## The parallelism picture
 
-Phase 0 is complete (3/3). Phase 1 (class 1 CertifiedMap admission + class 2
-analytic fast path) is next per plan §3; its packets book against the frozen
-contract (truck-certified/src/contract.rs) and the prevalence table (the
-analytic path carries 62.32% of corpus pairs). ONE worker at a time (pagefile
-rule). Elastic packets (corpus/mutation/benchmarks) may follow serially when
-the Phase-1 graph is booked.
+Serial is law (owner confirmed: pagefile risk outweighs parallel gain).
+The pipeline is saturated orchestrator-side: worker churns while the
+next packet is written/linted/registered; dispatch on landing. Phase 2
+is booked (docs/CERTIFIED_PHASE2_BOOKING.md) with its packet graph
+(SYSTEM -> KRAWCZYK3 -> TRACE -> RESIDUAL) and substrate census (the 2D
+bivariate Krawczyk is fully landed in bezier_isect.rs — Phase 2 is a
+dimension raise, not a from-scratch solver). Input gates before the
+first Phase-2 dispatch: Phase-1 floor published, grazing-pair corpus
+seeds named, DISPATCH-2 decision.
 
 ## Traps, each one paid for
+
+### Session 47 (Phase 1 runs: 3/5 landed first-try; the lint's prefix check; two registry misses) - paid in part, session in flight
+
+- **The orchestrator's errors dominate; two lint upgrades shipped.** Kept:
+  ANCHOR_PREFIX_AMBIGUITY (a grep -c pattern occurring followed by an
+  identifier char is prefix-matching a longer name — hit three times in
+  two packets; gen_packet --check caught the count each time but only
+  after authoring). Retired with evidence: PROSE_API_SNIPPET fired 386
+  times across the historical corpus — pure noise; the class it targeted
+  (SPHERE's period-axis prose snippet) was caught by the packet's own
+  stop-condition-3 worker source-read, not a lint. A regex cannot check
+  prose API claims against the tree; the fix class is tree-aware or
+  stop-condition-mandated.
+- **Registry rows were missed twice.** MAP: registration never written;
+  land_packet's no-row WARNING caught it; repaired post-landing.
+  DISPATCH: registration skipped by the same chained-command failure
+  that ate the dispatch confirmation — the FLOOR packet's DEPENDS_KNOWN
+  lint caught it. Rule re-confirmed: registration is a script-file step
+  IN the dispatch sequence, never an afterthought; run
+  `python loop/packet_lint.py` on packets that depend_on a packet you
+  just dispatched.
+- **`if ($?)` after a Select-Object pipeline re-hit** (session-41 trap,
+  third costume): `new_slot ... | Select-Object -Last 3; if ($?) {
+  run_packet }` skipped the dispatch silently — the pipeline "succeeded".
+  Slot forked, worker never started. Run dispatch as its own command and
+  read its output.
+- **Anchor-authoring discipline**: write the expects by RUNNING the
+  commands first (SPHERE A5/A8 were undercounted from memory). The
+  gen_packet --check failure is cheap pre-dispatch; the same miss in a
+  landed packet is a GATE round trip.
+- **Worker stops conditions are load-bearing twice over**: SPHERE's
+  stop-condition-3 (record actual parameter semantics instead of
+  guessing) is what caught the packet's wrong period axis; MAP's
+  stop-condition-2 verification (tensor commutation vs subs) is what
+  validated the in-module surface decomposition. Write stop conditions
+  that MANDATE reading the source, and the worker becomes a packet-fault
+  detector.
+- **Corpus-mass-driven admission is the booking discipline that works**:
+  DISPATCH's arm list was cut to what exact predicates can certify
+  (62% of analytic mass) and the cone/torus special-position arms were
+  split to DISPATCH-2 rather than booked speculatively. The booking doc
+  amendment is labeled as an orchestrator spec edit.
 
 ### Session 46 (Phase 0: the move, the reboot, four gate defects, the lint's blind spot) - paid in full
 
