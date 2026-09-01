@@ -29,14 +29,6 @@ impl<
 {
 }
 
-/// It can be meshed, but not necessarily trimmed.
-pub trait PreMeshableSurface: ParametricSurface3D + ParameterDivision2D + Parallelizable {}
-impl<S: ParametricSurface3D + ParameterDivision2D + Parallelizable> PreMeshableSurface for S {}
-
-/// The generated mesh can be trimmed only if the boundary curves ride strictly on a surface.
-pub trait MeshableSurface: PreMeshableSurface + SearchParameter<D2, Point = Point3> {}
-impl<S: PreMeshableSurface + SearchParameter<D2, Point = Point3>> MeshableSurface for S {}
-
 /// The generated mesh can be trimmed if the boundary curves does not ride strictly on a surface.
 pub trait RobustMeshableSurface:
     MeshableSurface + SearchNearestParameter<D2, Point = Point3>
@@ -668,11 +660,10 @@ impl<C: PolylineableCurve, S: RobustMeshableSurface> RobustMeshableShape
 }
 
 pub mod diagnosis;
-pub mod domain;
-pub mod formal;
 pub mod realization_evidence;
 pub mod source_edge;
-pub mod source_evidence;
+pub use truck_certified::meshable::{MeshableSurface, PreMeshableSurface};
+pub use truck_certified::{domain, formal, source_evidence};
 mod triangulation;
 mod triangulation_with_ledger;
 pub use triangulation_with_ledger::{
