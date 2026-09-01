@@ -33,6 +33,33 @@ truck-fork repo got a real README + OVERVIEW and a full mirror of look/docs
 (look/docs stays the working set; two sources of truth, manual sync).
 CG-004 landed earlier the same session (V3 LINT_UNLINTED, PACKET fault, r3).
 
+## REBOOT CHECKPOINT (session 46, disk emergency)
+
+Certified-kernel Phase 0 opened this session: BG-CK-P0-CRATE and
+BG-CK-P0-PREVALENCE written, anchor-verified (gen_packet --check), linted
+(packet_lint), registered AT DISPATCH with the full scheduling schema
+(wave/needs/writes/packet/slot - schedule.py's wave counter needs them), and
+dispatched in parallel (slots 0/1, base 3a29a38). The two parallel cargo
+builds ballooned pagefile.sys to ~27 GB and drove the disk to 0.3 GB free;
+both workers were killed and their WIP checkpointed as orchestrator commits:
+- CRATE: `f190e8c` on packet/BG-CK-P0-CRATE (63 files: the ENTIRE
+  formal/+domain/+source_evidence tree moved into vendor/truck/truck-certified
+  with manifest + lib.rs + meshable.rs; renames tracked; UNVERIFIED - the
+  worker never reached a build). Safety ref: wip/BG-CK-P0-CRATE-1.
+- PREVALENCE: `ab4a57f` on packet/BG-CK-P0-PREVALENCE
+  (tests/certified_prevalence.rs written, 923 lines). Safety ref:
+  wip/BG-CK-P0-PREVALENCE-1.
+The checkpoint commits carry CONTEXT.md/PACKET.md (normally never committed)
+- they are reference material, not verify candidates. RECOVERY after reboot:
+pagefile shrinks; then `run_packet --reset` both slots (do NOT delete the
+wip/ branches) and REDISPATCH FRESH (packets unchanged, registry rows reset to
+RUNNING by run_packet? NO - set them back yourself if the reset leaves them).
+Alternative: a worker could resume from the checkpoint branch
+(`--resume` needs the events session id - gone after kill; so fresh it is).
+Root-cause trap for the traps section: TWO PARALLEL WORKERS on this machine
+is a pagefile event; ONE worker at a time until the pagefile growth is
+restrained, or verify disk floors with big margins.
+
 ## Pick up here
 
 1. **The CG program is DONE.** Next program per ORCHESTRATOR: the
