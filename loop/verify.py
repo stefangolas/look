@@ -414,9 +414,6 @@ def compute_baseline(base_sha, crate_names, out_file, test_args=None):
     tmp_parent = Path(tempfile.mkdtemp(prefix='look-verify-baseline-'))
     wt_path = tmp_parent / 'wt'
     target_path = tmp_parent / 'target'
-    p_args = []
-    for c in crate_names:
-        p_args += ['-p', c]
 
     with out_file.open('a', encoding='utf-8', newline='\n') as f:
         f.write(f"\n===== V5 baseline: computing at {base_sha[:12]} (worktree {wt_path}) =====\n")
@@ -431,6 +428,33 @@ def compute_baseline(base_sha, crate_names, out_file, test_args=None):
     if add_res.returncode != 0:
         shutil.rmtree(tmp_parent, ignore_errors=True)
         raise RuntimeError(f"could not create baseline worktree at {base_sha}: {add_res.stderr}")
+
+    # A packet may CREATE a crate. At base the package does not exist, and one
+    # all-crates `cargo test` dies on the first unknown -p with "package ID
+    # specification ... did not match any packages" -- taking EVERY crate's
+    # baseline down with it, so the base inventory comes back empty and every
+    # head failure reads as "newly failing" (BG-CK-P0-CRATE verify 4: eight
+    # pre-existing truck-meshalgo failures flagged because the base run
+    # aborted on the packet's own new crate). Test only the crates that exist
+    # at base; the new crate simply has no baseline to regress against.
+    p_args = []
+    for c in crate_names:
+        exists_at_base = c == 'look' or subprocess.run(
+            ['git', '-C', str(REPO_ROOT), 'cat-file', '-e',
+             f'{base_sha}:vendor/truck/{c}/Cargo.toml'],
+            capture_output=True,
+        ).returncode == 0
+        if exists_at_base:
+            p_args += ['-p', c]
+        else:
+            with out_file.open('a', encoding='utf-8', newline='\n') as f:
+                f.write(f"(baseline: crate {c} does not exist at {base_sha[:12]}; "
+                        f"no baseline inventory for it)\n")
+    if not p_args:
+        with out_file.open('a', encoding='utf-8', newline='\n') as f:
+            f.write(f"(baseline: every named crate is new at {base_sha[:12]}; "
+                    f"empty baseline inventory)\n")
+        return {'compile_ok': True, 'tests': {}}
 
     try:
         env = dict(os.environ)
