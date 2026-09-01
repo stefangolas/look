@@ -52,13 +52,13 @@ and the F1/F2/F3 contract freeze is landed code. Branch:
 
 ## Pick up here
 
-1. **Phase 1 next**: class 1 CertifiedMap admission + class 2 analytic fast
-   path (plan §3 Phase 1; the prevalence table says the analytic path
-   carries the corpus). Booked gaps to fold in: a certified sphere
-   constructor (2.56% of corpus faces are sphere-carried, representation-
-   named only), the F3 provisional float margin (directed-rounded interval
-   division per Phase 1), the CG program's deferred truck-topology
-   self-loop-safe fold fix.
+1. **Phase 1 is BOOKED**: `docs/CERTIFIED_PHASE1_BOOKING.md` holds the
+   packet graph (HULL -> MAP, SPHERE -> DISPATCH -> FLOOR), the substrate
+   census (span.rs CurveSpan2 + intersection.rs pipeline + exact.rs
+   Expansion already landed - do not re-derive), and the pre-made design
+   decisions. First packet to write: BG-CK-P1-HULL (design class,
+   orchestrator) or BG-CK-P1-SPHERE (mechanical). The contract it types
+   against is landed: truck-certified/src/contract.rs.
 2. **ONE WORKER AT A TIME on this machine** (pagefile trap, session 46:
    two parallel builds ballooned pagefile.sys to ~27 GB, disk to 0.3 GB,
    forced a reboot). Serial dispatch until the pagefile is restrained.
