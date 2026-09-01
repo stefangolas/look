@@ -64,7 +64,14 @@ def git_lines(wt, *args):
 # ---------------------------------------------------------------------------
 
 _TEST_LINE_RE = re.compile(r'^test\s+(\S+)\s+\.\.\.\s+(ok|FAILED|ignored)')
-_COMPILE_ERROR_RE = re.compile(r'error\[E\d+\]|could not compile|error: no test target')
+_COMPILE_ERROR_RE = re.compile(
+    r'error\[E\d+\]|could not compile|error: no test target'
+    # cargo refuses the whole invocation before compiling anything when one
+    # -p names an unknown package; that failure must never be read as
+    # "compiled, zero tests" (BG-CK-P0-CRATE verify 4 cached an empty
+    # baseline inventory exactly that way).
+    + r'|error: package ID specification'
+)
 
 
 def reverse_dep_closure(wt, crate_names):
