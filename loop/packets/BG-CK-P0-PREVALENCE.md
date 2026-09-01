@@ -11,7 +11,7 @@ and one published doc.
 id:          BG-CK-P0-PREVALENCE
 contract:    [BG-CK-P0-PREVALENCE]
 class:       mechanical
-crates:      []
+crates:      [look]
 depends_on:  []
 write_allow:
   - tests/certified_prevalence.rs
