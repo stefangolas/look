@@ -2,6 +2,8 @@
 //! witness-edge shape, the F2 bound policy table, and the F3 continuation
 //! coordinate contract. The test names are the contract.
 
+#![deny(clippy::unwrap_used)]
+
 use truck_certified::contract::{
     certified_bound, select_continuation_coordinate, BoundMechanism, BoundPolicy, BoundPolicyRow,
     BoundedSurfaceInput, ContinuationCoordinate, CoordinateSwitch, IntervalEnclosure, Quantity,
