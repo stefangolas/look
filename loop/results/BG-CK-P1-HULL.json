@@ -1,0 +1,48 @@
+{
+  "id": "BG-CK-P1-HULL",
+  "contract": ["BG-CK-P1-HULL"],
+  "status": "done",
+  "commit": "a09f864",
+  "branch": "packet/BG-CK-P1-HULL",
+  "summary": "Phase-1 D2 hull primitive as public API. New module truck-certified/src/hull.rs (HullRefusal with two named cases + tag(); hull_bernstein_1d; hull_bernstein_2d; bernstein_derivative_1d/2d; JetOrder; hull_curve_homogeneous). lib.rs: one line 'pub mod hull;'. New integration test suite tests/hull_conformance.rs plus in-module curve-form tests.",
+  "anchors": {
+    "A1_pub_mod_hull_in_lib_rs": "0 at dispatch (added by this packet)",
+    "A2_pub_struct_RationalBezierSpan2": "1 OK",
+    "A3_pub_crate_fn_evaluate_enclosure": "1 OK",
+    "A4_fn_one_d_range": "1 OK",
+    "A5_pub_enum_Refusal": "1 OK",
+    "A6_deny_clippy_unwrap_used_in_lib": "1 OK",
+    "A7_pub_fn_is_finite": "1 OK",
+    "A8_EnclosureUnavailable_word": "0 OK at dispatch; becomes 1 after this packet by design (HullRefusal::EnclosureUnavailable)",
+    "substrate_movement": "none observed; no stop condition triggered"
+  },
+  "tests_required": {
+    "hull_contains_point_evaluation_enclosures_on_degenerate_subinterval": "pass (tests/hull_conformance.rs)",
+    "hull_contains_brute_force_samples_of_the_polynomial": "pass (tests/hull_conformance.rs)",
+    "linear_span_hull_is_the_exact_range": "pass (tests/hull_conformance.rs)",
+    "non_compact_subinterval_refuses_domain_not_compact": "pass (tests/hull_conformance.rs) + curve-form part in-module (curve_homogeneous_non_compact_subinterval_refuses_domain_not_compact)",
+    "non_finite_hull_refuses_enclosure_unavailable": "pass (tests/hull_conformance.rs)",
+    "derivative_coefficients_match_analytic_quadratic": "pass (tests/hull_conformance.rs)",
+    "hull_over_subinterval_is_contained_in_hull_over_whole": "pass (tests/hull_conformance.rs) + curve-form part in-module",
+    "curve_homogeneous_jet_order_two_bounds_finite_difference_slopes": "pass (in-module hull::tests)",
+    "tensor_patch_hull_contains_corner_and_midpoint_samples": "pass (tests/hull_conformance.rs)",
+    "hull_never_panics_and_never_divides": "pass (tests/hull_conformance.rs source scan + crate-level deny)"
+  },
+  "test_split_note": "No public construction path to RationalBezierSpan2 exists (constructor is pub(crate); CurveSpan2 exposes only from_line/from_circular_arc), so per the packet the curve-form conformance (hull_curve_homogeneous, incl. required test #8 and the curve-form parts of #4/#7) lives in the #[cfg(test)] mod tests inside src/hull.rs (same-crate access to ::new, the crate's existing pattern). tests/hull_conformance.rs covers the pub kernels, the derivative transforms, HullRefusal, and the source scan.",
+  "design_notes": {
+    "de_casteljau_node_arrangement": "The kernel keeps the packet's mandated discipline (de Casteljau over the OUTWARD-ROUNDED CertifiedInterval subinterval parameter, every coefficient widened through CertifiedInterval::point). The node step is arranged as the subdivision form pts[i] + u*(pts[i+1]-pts[i]) instead of (1-u)*pts[i] + u*pts[i+1]: algebraically identical for scalar u, sound at every degree (interval arithmetic is inclusion-monotone), and it makes the degree-1 hull exactly the endpoint range. The packet's required test linear_span_hull_is_the_exact_range is impossible under the dependency-widened convex-combination arrangement (a linear hull over (0.2,0.8) evaluates to [0.6,2.4] instead of the exact [0.78,2.22]); the subdivision arrangement resolves that internal tension while staying within 'de Casteljau evaluation with the subinterval as a CertifiedInterval parameter'.",
+    "non_finite_hull_example": "Test non_finite_hull_refuses_enclosure_unavailable uses [f64::MAX, -f64::MAX] over a strict-interior subinterval rather than the packet's illustrative '[f64::MAX, f64::MAX]': under the subdivision arrangement the constant polynomial [MAX, MAX] evaluates exactly to [MAX, MAX] (finite, no sum overflow), whereas the difference -MAX - MAX overflows the CertifiedInterval subtraction, so the strict-interior hull refuses EnclosureUnavailable. Same named case, same mechanism class (finite coefficients, overflowing de Casteljau intermediate); documented in the test comment.",
+    "reversed_domain": "hull_curve_homogeneous maps sub through the span's OWN source-to-unit affine map (RationalBezierSpan2::domain_to_unit semantics), not the sorted-domain map, because the reversed span's coefficients are its own and must NOT be reversed (per packet). The compactness check uses the sorted (canonical) domain. Verified by the in-module reversed-domain test.",
+    "division_used_only_for_parameter_map": "unit_subinterval evaluates the source-to-unit affine map in CertifiedInterval arithmetic using CertifiedInterval::div (the packet's 'computed in CertifiedInterval arithmetic (widened)'); no dehomogenization happens anywhere in the module - X/Y/W are returned homogeneous. The module's own code contains no '/' operator at all (asserted by the source scan); the in-module tests divide only f64 values.",
+    "no_unwrap_expect_panic": "hull.rs carries no unwrap/expect/panic and no module-level allow (H-1); the in-module tests use match/ok patterns instead. Crate-level #![deny(clippy::unwrap_used)] enforced by compilation.",
+    "h3_optouts": "// H-3 is on the SAME LINE as every float-epsilon comparison in the new tests."
+  },
+  "done_when": {
+    "cargo_fmt_all_check": "FAILS on two PRE-EXISTING violations outside this packet's write scope: examples/step_face_timing.rs (line 554) and tests/geometry_fingerprint.rs (line 54) fail rustfmt in the committed baseline (verified by reverting to HEAD). All three files touched by this packet are fmt-clean.",
+    "cargo_clippy_p_truck-certified_all_targets": "126 PRE-EXISTING errors in baseline files (formal/quotient.rs approx_constant, xmonotone.rs unwrap_err, cylinder_lift.rs vec!, source_evidence.rs approx_constant, etc.) unchanged by this packet. ZERO findings on the new files (hull.rs, tests/hull_conformance.rs) - verified by filtering the clippy output; the single clamp-pattern finding on hull.rs was fixed with f64::clamp(0.0, 1.0).",
+    "cargo_test_p_truck-certified_lib_tests_no_fail_fast": "green: 553 lib tests (incl. 5 in-module hull tests) + 8 contract_freeze + 9 hull_conformance, 0 failed.",
+    "cargo_check_workspace_all_targets": "green.",
+    "cargo_check_p_truck-certified_release_all_targets": "green (validates #![cfg_attr(not(debug_assertions), deny(warnings))])."
+  },
+  "stop_conditions": "none triggered: substrate anchors all matched at dispatch; the hull certifies with de Casteljau-over-CertifiedInterval alone (no sampling/Lipschitz/second engine in the module; sampling appears only as test-side reference arithmetic); no division inside hull.rs."
+}
