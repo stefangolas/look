@@ -313,6 +313,10 @@ pub enum PairUnsupported {
     UnrelatedTangency,
     /// The two circular arcs lie on the same support circle.
     CoincidentCircles,
+    /// The pair class (or configuration) is outside the dispatcher's admitted
+    /// set. The typed no-silent-downgrade boundary: a refusal here is a class
+    /// line, not a failure — Phase 2's generic path owns what this refuses.
+    UnsupportedPairClass,
 }
 
 impl PairUnsupported {
@@ -322,6 +326,7 @@ impl PairUnsupported {
             Self::Overlap => "pair_overlap",
             Self::UnrelatedTangency => "pair_unrelated_tangency",
             Self::CoincidentCircles => "pair_coincident_circles",
+            Self::UnsupportedPairClass => "pair_unsupported_class",
         }
     }
 }
