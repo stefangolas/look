@@ -138,6 +138,57 @@ FLOOR shape, wave-phase scope:
   current branch first (subject: `feat(measure): Phase-2 gate harness
   skeleton (BG-CK-P2-RESIDUAL)`).
 
+## INTEGRATION AMENDMENT (session 49, orchestrator — the composed chain exists; fill your seam and run the measurement)
+
+W2's amendment landed the production entry (read the real signature from
+CONTEXT.md — it carries the composed ssi_trace.rs):
+
+```rust
+pub fn certified_pair_trace(
+    lhs: &RationalBipatch,   // W1's ssi.rs: control grids + weights
+    rhs: &RationalBipatch,
+    seed: [f64; 4],
+) -> Result<TraceOutcome, SsiRefusal>
+```
+
+Fill your single marked seam `run_certified_pair_pair` and run the
+measurement:
+
+1. **Patch extraction:** per spline-carried face, decompose the support
+   surface into rational Bézier patches via the LANDED decomposition
+   (the Phase-1 map's row-then-column Bézier cut / the landed curve
+   decomposition — find the reachable path; do not re-derive). If the
+   corpus's surface forms cannot reach a landed decomposition, STOP and
+   record which form and why — that is a finding.
+2. **Unit of measurement:** per admitted FACE pair, measure the FULL
+   patch-pair product (both sides decompose; every (patch_a, patch_b)
+   is one certified unit-pair). The doc publishes patch-pair totals
+   beside face-pair counts. If a product explodes the run budget,
+   publish what completed with wall time and the completion fraction —
+   never silently truncate.
+3. **Seed policy (pre-made, deterministic, published):** a FIXED seed
+   grid per unit-pair — the domain midpoint plus dyadic offsets in all
+   four parameters — first certified box wins; a unit-pair with no
+   certified seed on the grid dispositions as refused/unresolved with
+   its named cause. Dyadic literals carry H-3 comments. No per-pair
+   search beyond the grid.
+4. **Dispositions:** map `TraceOutcome`/`SsiRefusal` into the harness's
+   existing buckets (certified_contact / certified_disjoint /
+   refused:<cause> / unresolved); `integration_pending` disappears from
+   the aggregate. No threshold assertion; the doc's certify-rate table
+   fills with MEASURED numbers and the admitted mass sits beside it
+   (FLOOR anomaly-column discipline).
+5. **The run:** LOOK_CORPUS-gated as before; record wall time, the exact
+   command, and the aggregate JSON verbatim in
+   `docs/CERTIFIED_PHASE2_FLOOR.md` (replacing the wave-phase
+   all-pending table's placeholder columns — keep the wave-phase table
+   as history if cleaner).
+
+Write set: the same two files. If `certified_pair_trace`'s real behavior
+diverges from its tests' claims on corpus geometry (e.g. systematic
+refusals the fixtures never showed), STOP and record the distribution —
+that is the wave's most valuable output, not something to tune around.
+
 ## Stop conditions
 
 Stop, commit nothing beyond WIP evidence, write RESULT.json AT THE

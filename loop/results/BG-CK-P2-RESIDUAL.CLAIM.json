@@ -1,0 +1,53 @@
+{
+  "id": "BG-CK-P2-RESIDUAL",
+  "status": "DONE (claim, not verdict)",
+  "contract": "BG-CK-P2-RESIDUAL",
+  "class": "mechanical",
+  "branch": "packet/BG-CK-P2-RESIDUAL",
+  "commit": "b5487d5",
+  "deliverables": [
+    "tests/certified_phase2_floor.rs",
+    "docs/CERTIFIED_PHASE2_FLOOR.md"
+  ],
+  "anchors_verified": {
+    "A1": 9,
+    "A2": 0,
+    "A3": 0,
+    "A4": 2,
+    "A5": 7,
+    "A6": 2
+  },
+  "tests_required": [
+    "floor_harness_skips_cleanly_without_look_corpus",
+    "floor_refusal_distribution_buckets_are_exhaustive",
+    "floor_admitted_mass_is_published_not_asserted",
+    "floor_integration_seam_is_single_and_marked"
+  ],
+  "tests_run": {
+    "without_corpus": "4 passed, 0 failed (harness skips cleanly when LOOK_CORPUS is unset)",
+    "with_corpus": "4 passed, 0 failed; wave-phase structural run completed in ~156 s (target/debug)"
+  },
+  "wave_phase_aggregate_verbatim": "CERTIFIED_PHASE2_FLOOR_AGGREGATE {\"admitted_mass\":60438,\"certified_contact\":0,\"certified_disjoint\":0,\"certify_rate\":null,\"files\":38,\"integration_pending\":60438,\"refused\":{\"coincident_circles\":0,\"conditioning\":0,\"non_transverse\":0,\"overlap\":0,\"singular\":0,\"unrelated_tangency\":0,\"unsupported_pair_class\":0},\"seed_rows\":{\"cone~spline\":3808,\"cylinder~spline\":15566,\"plane~spline\":16137,\"spline~spline\":21004,\"spline~torus\":3923},\"seeds\":60438,\"unresolved\":0}",
+  "seed_machine_cross_check": "The re-walk reproduces the booked prevalence bucket totals exactly (spline~spline 21,004; plane~spline 16,137; cylinder~spline 15,566; cone~spline 3,808; spline~torus 3,923; seeds 60,438) and the prevalence doc's per-file faces/shells verbatim.",
+  "seeds_by_carrier": {
+    "quadruped/quadruped.step": 26397,
+    "jackhammer/jackhammer.step": 16679,
+    "formula1/formula1.step": 8967,
+    "ur10/ur10.step": 7129,
+    "core_xy/core_xy.step": 650,
+    "nist files (12 of 33 carry mass)": 616,
+    "assemblies_share": 0.9898
+  },
+  "verification": {
+    "cargo_fmt_check": "clean on tests/certified_phase2_floor.rs and docs/CERTIFIED_PHASE2_FLOOR.md (pre-existing drift outside the write set is out of scope)",
+    "scoped_clippy": "cargo clippy -p look --test certified_phase2_floor --locked --no-deps --message-format=short: clean on the new file (0 findings)",
+    "cargo_check_p_look": "cargo check -p look --locked: green",
+    "corpus_run": "LOOK_CORPUS=C:\\Users\\stefa\\look-corpus; cargo test -p look --test certified_phase2_floor -- --nocapture --test-threads=1 -> 4 passed; structural headline printed (per-file seed rows + aggregate). Build profile of the recorded run: debug (test profile); numbers are structural pair counts, deterministic across profiles. stderr conformance lines from the NIST files' table builder excluded nothing.",
+    "no_threshold_assertion_in_tree": true,
+    "no_unwrap_in_tree": true,
+    "integration_seam": "single, named run_certified_pair_pair, marked in code (doc comment) and doc; compile-only; unimplemented!()-free; not called by the corpus walk"
+  },
+  "doc_notes": "docs/CERTIFIED_PHASE2_FLOOR.md carries: the seeds table (file, pair counts by class pair) from the recorded run; the disposition vocabulary + refusal-cause mapping table (FLOOR pair-level causes + the plan's trace-level named causes NonTransverse/Conditioning/Singular, mapped from the shim's TraceRefusal variants at integration); the empty certify-rate table with fixed column headers (>=80% plan floor cited as context only) and the admitted-mass column beside it; the run command; the corpus provenance; the explicit wave-phase/integration-phase scope statement; and the explicit FLOOR anomaly exclusion (4,381 certified_disjoint adjacent pairs from BG-CK-P1-FLOOR.STOP.json are NOT folded in). All-dispositions-pending is stated as the EXPECTED wave-phase output.",
+  "stop_conditions": "none triggered",
+  "notes": "sccache (RUSTC_WRAPPER) rejects the incremental dev profile on this machine, so local checks ran with RUSTC_WRAPPER unset and CARGO_BUILD_JOBS=2 (the spec's pagefile/RAM discipline). Wave-mode rules observed: only local checks (cargo check -p look, cargo test -p look --test certified_phase2_floor with LOOK_CORPUS, scoped clippy + fmt); no workspace gates, no verify.py. Write set is exactly the two files; Cargo.toml/Cargo.lock untouched."
+}
