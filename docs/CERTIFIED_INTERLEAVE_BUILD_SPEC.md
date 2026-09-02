@@ -52,6 +52,12 @@ shim code is absent from that tree.
   `docs/CERTIFIED_SPLINE_CENSUS.md` + the wave's RESIDUAL numbers. Neither
   blocks the wave; the wave does not book them. The booking's own language
   already says the census makes either outcome a win.
+  - **Owner amendment, session 49 (second): the census gate is WAIVED.**
+    After ~4h of census worker time the owner cancelled the measurement
+    (row BLOCKED, WIP archived) and directed: build the specced wave
+    directly. The census may be re-run later as a cheap measurement; it
+    gates nothing. DISPATCH-2/recognizer decisions will be made from the
+    RESIDUAL numbers and geometric naturalness instead.
   - **Owner amendment, session 49:** the corpus-mass rule is demoted from
     a gate to an ordering device. Everything on this program is built
     speculatively — the corpus is a 38-file proxy for the domain, not
