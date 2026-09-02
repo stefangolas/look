@@ -105,7 +105,7 @@ DIFFERENT new module (`ssi_trace.rs`), its contract dependency (shim types)
 is frozen, and its seed/step needs are met by `ssi_fixtures` during the
 wave — production substitution happens at integration.
 
-## Concurrency decision (disk and cache, per wave-mode law)
+## Concurrency decision (disk and cache, per wave-mode law) — REVISED BY MEASUREMENT
 
 Measured at open: 32.6 GB free; ALL cargo targets cold (watchdog reclaimed
 repo-root and slot targets); pagefile size-restrained (6 GB initial /
@@ -114,10 +114,32 @@ sccache NOT installed at session open → **installed first** (wave-mode law:
 "either install it first or run fewer workers"), `RUSTC_WRAPPER` set for
 every worker spawn (worker spawn inherits the orchestrator environment),
 per-worker `CARGO_TARGET_DIR`s as the slot machinery already provides.
-Budget: a warm slot target is ~10–12 GB → **max 2 concurrent workers**;
-the third wave member dispatches when a slot frees. No worker ever runs
-the global gates; the prewarm happens once per slot fork (`new_slot.py`
-default warm build).
+
+**REVISED at first dispatch (session 49, measured twice): the binding
+constraint is RAM, not disk.** The machine has 15.7 GB total RAM; with
+ambient load (three opencode sessions ~4.6 GB, chrome) a single
+default-parallelism `cargo check --workspace --all-targets` OOMs
+(`rustc-LLVM ERROR: out of memory`, `STATUS_STACK_BUFFER_OVERRUN` cascade
+on proc-macro crates — first the slot-0 warm at default jobs, then a
+2-job warm CONCURRENT with the dispatched shim worker). Conclusions,
+both machine-checked:
+
+1. **The pre-wave and wave stages run ONE worker at a time** (warm
+   builds included) until RAM frees. The wave's parallelism collapses to
+   1-concurrent on this machine today; the wave-mode STRUCTURE (frozen
+   contracts, one authoritative verify, amendment-not-redispatch) is
+   unchanged — only the wall-clock parallelism is given up. If the owner
+   frees ≥4 GB ambient RAM (close browser/editor sessions), 2-concurrent
+   can be re-attempted with `CARGO_BUILD_JOBS=2` per slot and the
+   watchdog watched; the disk budget (32 GB) is NOT the limiter.
+2. **`CARGO_BUILD_JOBS` is capped for every cargo invocation** (2 for
+   warm builds; ≤4 for a lone worker's inner loop). Never leave it at
+   default on this machine.
+
+A warm slot target measured 0.9 GB (dev `cargo check` profile) — the
+old 10–12 GB estimate was release/test-tree shape; disk headroom is
+comfortable either way. No worker ever runs the global gates; the
+prewarm happens once per slot fork (`new_slot.py` default warm build).
 
 ## Wave execution rules in force (verbatim carriers)
 
