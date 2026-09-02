@@ -75,6 +75,12 @@ truck-topology = { path = "vendor/truck/truck-topology" }
 
 [dev-dependencies]
 tempfile = "3.20"
+# The SSI wave shim reachability edge (BG-CK-P2-CONTRACT, SESSION-49
+# AMENDMENT): lets the look test target `use truck_certified::...` so the
+# RESIDUAL gate can measure the certified Phase-2 floor from the look crate.
+# Test-target-only, no production-code change (the FLOOR r2 amendment 26b1ac9
+# authorized exactly this edge).
+truck-certified = { path = "vendor/truck/truck-certified" }
 truck-geometry = { path = "vendor/truck/truck-geometry" }
 truck-evidence = { path = "vendor/truck/truck-evidence" }
 

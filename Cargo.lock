@@ -1112,6 +1112,7 @@ dependencies = [
  "tempfile",
  "thiserror 2.0.20",
  "truck-assembly",
+ "truck-certified",
  "truck-evidence",
  "truck-geometry",
  "truck-meshalgo",
