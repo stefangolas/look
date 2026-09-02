@@ -512,6 +512,15 @@ the world — that happens once, at the end.
    its dispatch (the A6 class: root-Cargo.toml refs 1→2 from the
    shim's dev-dep edge).
 
+   **Amendments parallelize under the same rule (session 49, paid as a
+   serialization):** when two integration amendments touch disjoint
+   write sets but one must call the other's new function, freeze the
+   entry-point signature IN BOTH AMENDMENT TEXTS and dispatch them
+   concurrently — the wave's frozen-contract move applies one level
+   down. Do not give the producing amendment "exact spelling yours"
+   while sequencing the consuming amendment behind it; that converts a
+   parallel pair into a serial pair for no rigor gain.
+
 ## What a session should leave behind
 
 Rewrite `loop/STATE.md` — it is the next session's only cold-start read, and it
