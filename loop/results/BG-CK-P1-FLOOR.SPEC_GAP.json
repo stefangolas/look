@@ -1,0 +1,35 @@
+{
+  "id": "BG-CK-P1-FLOOR",
+  "status": "STOPPED",
+  "contract": "BG-CK-P1-FLOOR",
+  "commit": "d4a97d8",
+  "branch": "packet/BG-CK-P1-FLOOR",
+  "deliverables": [],
+  "anchors_verified": {
+    "A1": 1,
+    "A2": 1,
+    "A3": 1,
+    "A4": 0,
+    "A5": 7,
+    "A6": 1
+  },
+  "stop_condition": "stop-condition-1-family / reachability gap (none of the three stop conditions fires literally; the packet is unimplementable as designated)",
+  "headline": {
+    "corpus_present": true,
+    "corpus_path": "C:\\Users\\stefa\\look-corpus",
+    "certified_pairs_dispatched": "MEASUREMENT NOT PRODUCED",
+    "certify_rate": null,
+    "reason": "dispatch_pair is not reachable from the look crate's test target through any path the packet permits"
+  },
+  "verdict": "STOPPED. The Phase-1 exit-gate measurement cannot be produced from the packet-designated location (tests/certified_phase1_floor.rs in the look crate) because the DISPATCH packet's public contract that FLOOR must exercise — CertifiedPairParticipant, dispatch_pair, CertifiedPairResult, ContactLocus (truck_certified::pair_dispatch) — is NOT reachable from the look crate's test target. truck-certified is only a transitive dependency of look (via truck-meshalgo); truck_meshalgo::tessellation re-exports truck_certified::{domain, formal, source_evidence} and meshable::{MeshableSurface, PreMeshableSurface} (vendor/truck/truck-meshalgo/src/tessellation/mod.rs:665-666) but NOT pair_dispatch, and formal/mod.rs does not re-export it either; look's own src re-exports only the census's identification routes (step_support_schema_of, step_cylinder_of, step_cone_of, step::torus_deck::identify_source_torus_opt, src/lib.rs:23-31) and nothing from pair_dispatch. The packet's own fallback for the no-direct-edge case ('add NOTHING to the manifest: use the existing re-export path the census file uses, and cite it in RESULT notes') cannot close this gap: the census's re-export path reaches the identification WITNESSES but not dispatch_pair, so a FLOOR test written to call dispatch_pair cannot compile, cannot skip cleanly, and cannot meet any done-when condition. The fix is an orchestrator decision, never a test-side workaround (the no-silent-downgrade / do-not-adapt-silently doctrine); the FLOOR contract and the anchors are otherwise intact (A1-A6 verified against the landed pair_dispatch.rs).",
+  "findings": [
+    "REACHABILITY FINDING (verbatim): `use truck_certified::pair_dispatch::{dispatch_pair, CertifiedPairParticipant, CertifiedPairResult}` fails in the look test target with E0433 'cannot find module or crate truck_certified in this scope' (verified empirically). `use truck_meshalgo::tessellation::pair_dispatch::dispatch_pair` fails with E0432 'unresolved import' (verified empirically). The identification witnesses the census uses ARE reachable through truck_meshalgo::tessellation::formal::{support,cylinder,sphere,intersection,contact} (verified: those imports resolve), but the dispatcher itself is not. A manifest change is explicitly forbidden by the packet ('add NOTHING to the manifest', stated three times); a vendor edit (re-exporting pair_dispatch from truck-meshalgo's compat line) is off-limits (AGENTS.md: vendor/truck/** is off-limits to direct editing; not in write_allow). Therefore the floor test cannot be written to compile at tests/certified_phase1_floor.rs.",
+    "The corpus IS present in this worker environment (C:\\Users\\stefa\\look-corpus, 38 STEP files; LOOK_CORPUS unset but the directory exists, matching the census doc's measured path), so the packet's Section-2 'empty-run placeholder doc' contingency (which is conditioned on corpus unavailability) does NOT apply: writing a placeholder doc would misrepresent the state. The blocker is dispatch reachability, not corpus absence.",
+    "Stop-condition analysis: (1) anchors A1/A2/A3/A5/A6 all verify the landed dispatch surface exactly as anchored — no renamed participant, no changed result shape — so stop condition 1 does not fire literally, but the DISPATCH contract is not consumable from the designated test crate, which is the same family of 'the packet's anchors/contract cannot be discharged' gap; (2) the census's classification walk is fully re-derivable (step_support_schema_of, step_cylinder_of, step_cone_of, step::torus_deck::identify_source_torus_opt are all public) — stop condition 2 does not fire; (3) no recorded run exists, so the anomaly column cannot fire — stop condition 3 does not fire. The packet is nonetheless unimplementable as designated.",
+    "No deliverables were written. tests/certified_phase1_floor.rs cannot be produced in a compiling state (dispatch_pair unreachable), and docs/CERTIFIED_PHASE1_FLOOR.md has no recorded run to carry (the corpus-absent placeholder doc contingency does not apply; see finding 2). Nothing was committed beyond the dispatch-time branch state.",
+    "Proposed orchestrator fixes (for the decision, in order of least change): (a) add one line to look's [dev-dependencies]: `truck-certified = { path = \"vendor/truck/truck-certified\" }` — a dev-only edge that changes no production code and no vendor code, after which `use truck_certified::pair_dispatch::...` works and the FLOOR test can be written exactly as the packet designates; (b) re-export `pair_dispatch` from truck-meshalgo's tessellation compat line (vendor edit, needs a packet); (c) relocate the FLOOR measurement into vendor/truck/truck-certified/tests/ where pair_dispatch is directly reachable (changes the packet's crates/write_allow designation)."
+  ],
+  "tests_added": 0,
+  "run_command": "not run: no compiling test target exists (see findings)",
+  "notes": "Anchors verified 2026-09-01 on branch packet/BG-CK-P1-FLOOR at HEAD d4a97d8. Empirical probes: (1) tests/zz_reachability_probe.rs with `use truck_certified::pair_dispatch::{...}` -> cargo check -p look --test zz_reachability_probe: E0433; (2) the same probe with `use truck_meshalgo::tessellation::formal::sphere::{identify_sphere_world, SphereIdentification}`, `formal::cylinder::CylinderIdentification`, `formal::support::SupportSurfaceSchema`, `formal::intersection::PairUnsupported`, `formal::contact::GenericUnresolved` (all resolve cleanly) PLUS `use truck_meshalgo::tessellation::pair_dispatch::dispatch_pair` -> E0432; probe file removed afterwards. The DISPATCH packet's own conformance coverage (vendor/truck/truck-certified/tests/pair_dispatch_conformance.rs) exercises dispatch_pair from inside the truck-certified crate, which is why the DISPATCH packet landed green; the reachability gap is specific to the look-crate test target. The Phase-1 exit gate remains UNMEASURED; the floor 95% certify-rate and the throughput comparison (certified vs legacy) are not published because the certified path cannot be driven from the packet-designated harness."
+}

@@ -25,6 +25,8 @@ depends_on:  [BG-CK-P1-DISPATCH]
 write_allow:
   - tests/certified_phase1_floor.rs
   - docs/CERTIFIED_PHASE1_FLOOR.md
+  - Cargo.toml
+  - Cargo.lock
 read_allow:
   - CERTIFIED-KERNEL-PLAN.md
   - docs/CERTIFIED_PHASE1_BOOKING.md
@@ -140,13 +142,27 @@ adjusts accordingly (state which happened).
 No threshold assertion anywhere in the test (`no_threshold_assertion_in_tree`
 is a required test NAME and a source-scan discipline: no `assert!` on a
 rate, ever). Clippy zero findings on the new files; pre-existing baseline
-findings out of scope. `crates: [look]` — the root crate compiles the
-test against the workspace's truck-certified dependency (already in its
-manifest via meshalgo's compat re-exports — no manifest change; if the
-root crate's dev-dependencies lack a direct `truck-certified` edge for
-`use truck_certified::...` in tests, add NOTHING to the manifest: use the
-existing re-export path the census file uses, and cite it in RESULT
-notes).
+findings out of scope. `crates: [look]`.
+
+**AMENDED (r2, orchestrator — the r1 SPEC_GAP):** `dispatch_pair` and the
+pair-dispatch types are NOT reachable from the look test target through
+the meshalgo compat re-exports (the r1 worker verified this empirically:
+E0433/E0432; the re-export path carries the identification witnesses but
+not `pair_dispatch`). The fix: add EXACTLY ONE line to the root
+`Cargo.toml`'s `[dev-dependencies]`:
+
+```toml
+truck-certified = { path = "vendor/truck/truck-certified" }
+```
+
+A dev-only edge: it changes no production code (dev-dependencies are
+invisible to `look`'s own src), adds no vendor change, and the lockfile
+line rides in `Cargo.lock` (both are in write_allow). After that,
+`use truck_certified::pair_dispatch::{dispatch_pair, CertifiedPairParticipant,
+CertifiedPairResult, ContactLocus};` compiles in the test target and the
+packet proceeds exactly as written. No other manifest change is wanted;
+the "add NOTHING to the manifest" instruction of r1 is superseded by this
+one named edge.
 
 ## Done-when
 
