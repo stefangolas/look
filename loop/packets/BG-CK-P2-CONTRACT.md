@@ -173,10 +173,19 @@ in numbers.
 
 Two lines: `pub mod ssi_types;`, `pub mod ssi_fixtures;` beside
 `pub mod pair_dispatch;`, plus a `pub use ssi_types::{...}` re-export line.
-Additionally, the root `Cargo.toml` gains NOTHING this packet (the
-FLOOR r2 dev-dependency edge already reaches the crate; confirm the
-re-exports resolve from the look test target and say so in RESULT notes —
-RESIDUAL depends on that reachability).
+Additionally, the root `Cargo.toml` gains the ONE dev-dependency edge the
+landed FLOOR r2 amendment (26b1ac9) authorized and the FLOOR WIP
+(42617ff) already carries on its branch: under `[dev-dependencies]`,
+`truck-certified = { path = "vendor/truck/truck-certified" }`, with the
+Cargo.lock tick that follows. (SESSION-49 AMENDMENT: the original text
+said the root Cargo.toml "gains NOTHING this packet" on the premise the
+FLOOR edge had landed — it had not; FLOOR stopped before its WIP merged,
+so the reachability premise was false and stop condition 3 fired
+correctly. This amendment supplies the premise. `Cargo.toml` and
+`Cargo.lock` are already in the yaml write_allow.) After adding the edge,
+re-run the reachability probe (`use truck_certified::ssi_types::SquareSystem3;`
+resolving from the look test target) and record the result in RESULT
+notes — RESIDUAL depends on that reachability.
 
 ## Section 4 — tests (`truck-certified/tests/ssi_contract.rs`, NEW)
 
