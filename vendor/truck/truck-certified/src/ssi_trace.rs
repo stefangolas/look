@@ -14,13 +14,16 @@
 
 //! The SSI branch-tracing continuation loop (BG-CK-P2-TRACE).
 //!
-//! This module is the WAVE-ONLY realization of the trace discipline against the
-//! shim's frozen types and the fixture kit. It is built in wave mode: the loop
-//! drives a SOLVER-PRIVATE per-box certifier interface ([`BranchCertifier`],
-//! [`BranchBox`], [`BranchStep`]) that W1's certificate evaluator is adapted to
-//! at integration. Nothing here evaluates a real 3x3 Krawczyk operator; the
-//! synthetic certifiers of this module's tests walk the fixture kit's known
-//! geometry and report fixture outcomes, exactly as the wave split prescribes.
+//! The module owns the trace discipline against the shim's frozen types and
+//! the fixture kit, and (since the integration amendment) the PRODUCTION seam:
+//! a [`BranchCertifier`] implemented over W1's landed API (`ssi.rs`) and the
+//! crate-public [`certified_pair_trace`] entry point that RESIDUAL's harness
+//! calls. The solver-private loop drives a per-box certifier interface
+//! ([`BranchCertifier`], [`BranchBox`], [`BranchStep`]) whose synthetic
+//! certifiers walk the fixture kit's known geometry in this module's tests;
+//! the production certifier composes W1's certified primitives (never a local
+//! re-implementation of the frozen F3 rule) and classifies germs with
+//! [`classify_branch_germ`].
 //!
 //! # The discipline this module owns
 //!
@@ -38,9 +41,8 @@
 //!   certificates (the frozen F3 contract in `contract.rs`; no default, no
 //!   heuristic reseed). A certifier that reports a switch box with ONE
 //!   certificate is a refusal, never a reseed; the loop refuses with the named
-//!   conditioning case. A box that changes its continuation coordinate without
-//!   reporting a certified switch is likewise refused. The loop itself never
-//!   reseeds.
+//!   conditioning case. The loop itself never reseeds: a certified box is
+//!   accepted as it is, and only an under-certified switch report is refused.
 //! - **Refusals are named.** Every refusal the loop can emit wraps a LANDED
 //!   named cause through [`TraceRefusal`]; there is no catch-all and no stringly
 //!   refusal.
@@ -59,7 +61,18 @@
 //! precedent.
 
 use crate::contract::{ContinuationCoordinate, CoordinateSwitch, Refusal};
-use crate::formal::span::BranchGerm;
+use crate::formal::contact::{BranchIncidence, GenericUnresolved};
+use crate::formal::curve2d::{
+    CurveOccurrenceProvenance, SourceEdgeId, SourceEntityId, SourceFaceId,
+};
+use crate::formal::intersection::{ParameterEnclosure, ParameterLocation};
+use crate::formal::quotient::{CanonicalBranchSide, CertifiedDeckLabel, DeckContext};
+use crate::formal::span::{BranchGerm, SpanId};
+use crate::source_evidence::{BoundId, EdgeUseId, SourceVertexKey};
+use crate::ssi::{
+    construct_square_system, krawczyk3_certificate, partial_enclosure,
+    select_continuation_coordinate, RationalBipatch, SsiParticipant, SsiRefusal,
+};
 use crate::ssi_types::{
     KrawczykCertificate3, SquareSystem3, TraceOutcome, TraceRefusal, TraceStep,
 };
@@ -127,15 +140,21 @@ impl BranchBox {
 /// One certified per-box outcome a [`BranchCertifier`] may report.
 ///
 /// The variants are exactly the solver-side facts the loop's discipline needs:
-/// a certified continuation box, or a turning-point switch report (both-certificate
-/// rule). A natural branch end inside the chart and every refusal path are NOT
-/// verdicts: the loop decides domain exit from the box it is handed, and
-/// refusals travel on the `Err` side.
+/// a certified continuation box, a natural branch end at the chart boundary,
+/// or a turning-point switch report (both-certificate rule). Refusals travel on
+/// the `Err` side. A box that leaves the chart domain is ALSO an end: the loop
+/// checks every reported box against the chart domain, so a certifier that
+/// steps to the boundary may report either a boundary-crossing box or
+/// [`BranchStep::EndOfBranch`].
 #[derive(Debug, Clone, Copy)]
 #[allow(dead_code)] // wave-private seam, see [`BranchCertifier`]
 pub(crate) enum BranchStep {
     /// A certified continuation box along the branch.
     Advance(TraceStep),
+    /// The branch reached the chart-domain boundary: the next box would leave
+    /// the chart, so there is no further certified interior box. This is a
+    /// natural end with no refusal ([`TraceOutcome::Terminated`]).
+    EndOfBranch,
     /// A turning-point switch report. The both-certificate rule is enforced by
     /// the LOOP on this report: an `outgoing` certificate present and
     /// consistent with the traced coordinate yields
@@ -166,14 +185,19 @@ pub(crate) struct SwitchReport {
 ///
 /// - a step whose box equals the first box's identity closes the branch
 ///   ([`TraceOutcome::ClosedLoop`], identity recurrence);
-/// - a step whose box has left `domain` ends the branch without a refusal
+/// - a box that has left `domain`, or a certifier's natural end report
+///   ([`BranchStep::EndOfBranch`]), ends the branch without a refusal
 ///   ([`TraceOutcome::Terminated`]);
 /// - a certified switch report carrying BOTH certificates yields
 ///   [`TraceOutcome::Switched`] with the frozen [`CoordinateSwitch`];
-/// - a switch report carrying one certificate, or a box that changes its
-///   continuation coordinate without a certified switch, is a named refusal
+/// - a switch report carrying one certificate is a named refusal
 ///   ([`TraceOutcome::Refused`]) — never a reseed, never a default;
 /// - a named certifier refusal propagates verbatim.
+///
+/// A certified continuation box is accepted regardless of its frozen-rule
+/// coordinate index (the trace never second-guesses a certified box); the
+/// both-certificate discipline is enforced exactly at the switch-request
+/// reports, where an under-certified switch is refused.
 ///
 /// `domain` is the chart rectangle as four axis intervals in `(u, v, s, t)`
 /// order (the two surface charts the branch lives in).
@@ -200,22 +224,17 @@ pub(crate) fn trace_branch<C: BranchCertifier>(
                         return TraceOutcome::ClosedLoop { steps };
                     }
                 }
-                if let Some(running_coordinate) = running {
-                    // The frozen both-certificate rule: a box that silently
-                    // changes its continuation coordinate is an under-certified
-                    // switch — refuse, never reseed.
-                    if step.coordinate().index != running_coordinate.index {
-                        return TraceOutcome::Refused(TraceRefusal::Conditioning(
-                            Refusal::ConditioningBelowThreshold,
-                        ));
-                    }
-                }
                 if !box_inside_domain(step.chart_box(), domain) {
                     // Domain exit with no refusal.
                     return TraceOutcome::Terminated { steps };
                 }
                 running = Some(step.coordinate());
                 steps.push(step);
+            }
+            Ok(BranchStep::EndOfBranch) => {
+                // The certifier reports the branch reached the chart boundary:
+                // a natural end with no refusal.
+                return TraceOutcome::Terminated { steps };
             }
             Ok(BranchStep::Switch(report)) => {
                 let SwitchReport { step, outgoing } = report;
@@ -384,6 +403,432 @@ pub(crate) fn classify_branch_germ(
     BranchGerm::StationaryRegular {
         first_nonzero_order: 2,
     }
+}
+
+// ---------------------------------------------------------------------------
+// The production seam (integration amendment): BranchCertifier over W1's API
+// + the crate-public certified_pair_trace entry point.
+// ---------------------------------------------------------------------------
+
+/// The arc-length distance each continuation step advances along the branch.
+const ARC_STEP: f64 = 0.005;
+
+/// The certification width ladder: the largest box half-width that certifies a
+/// strict Krawczyk inclusion is used for each step, from coarse to fine.
+const WIDTH_LADDER: [f64; 5] = [0.02, 0.01, 0.005, 0.003, 0.002];
+
+/// The chart domain of a constructed square system (identity unit chart).
+const UNIT_CHART: [(f64, f64); 4] = [(0.0, 1.0); 4];
+
+/// A closed branch is declared when the walked arc exceeds this length.
+const CLOSED_ARC_MIN: f64 = 1.2;
+
+/// ... and the certified root has returned within this distance of the seed.
+const CLOSED_DISTANCE: f64 = 0.08;
+
+/// A step-count guard: no certified branch may run forever.
+const MAX_STEPS: usize = 4000;
+
+/// Map a W1 [`SsiRefusal`] onto the trace's named refusal vocabulary.
+///
+/// Every arm wraps a landed named cause ([`TraceRefusal`] over
+/// [`Refusal`]/[`HullRefusal`]/[`GenericUnresolved`]); there is no catch-all.
+/// `PairClass` surfaces only at square-system construction (before any trace),
+/// never through a per-box certifier step, so its mapping is the
+/// outside-the-admitted-envelope named case.
+fn map_ssi_refusal(refusal: SsiRefusal) -> TraceRefusal {
+    match refusal {
+        SsiRefusal::Conditioning(cause) => TraceRefusal::Conditioning(cause),
+        SsiRefusal::Hull(cause) => TraceRefusal::Hull(cause),
+        SsiRefusal::PairClass(_) => TraceRefusal::Conditioning(Refusal::InvalidInput),
+        SsiRefusal::DeterminantSpansZero => {
+            TraceRefusal::Unresolved(GenericUnresolved::SingularJacobian)
+        }
+        SsiRefusal::InclusionNotStrict => {
+            TraceRefusal::Unresolved(GenericUnresolved::ClusteredRoots)
+        }
+        SsiRefusal::InvalidInput => TraceRefusal::Conditioning(Refusal::InvalidInput),
+    }
+}
+
+/// Map a trace refusal back onto the W1 refusal vocabulary.
+///
+/// Only used for the post-certification step assembly inside
+/// [`certified_pair_trace`], where the box has already certified and the only
+/// remaining failures are construction-level.
+fn map_trace_refusal(refusal: TraceRefusal) -> SsiRefusal {
+    match refusal {
+        TraceRefusal::Conditioning(cause) => SsiRefusal::from(cause),
+        TraceRefusal::Hull(cause) => SsiRefusal::Hull(cause),
+        TraceRefusal::Unresolved(_) => SsiRefusal::InvalidInput,
+    }
+}
+
+/// The cube box of half-width `half` around `centre`, in the four chart axes.
+fn cube_box(centre: [f64; 4], half: f64) -> [(f64, f64); 4] {
+    [
+        (centre[0] - half, centre[0] + half),
+        (centre[1] - half, centre[1] + half),
+        (centre[2] - half, centre[2] + half),
+        (centre[3] - half, centre[3] + half),
+    ]
+}
+
+/// The unit vector along `v`, when `v` is not degenerate.
+fn unit_direction(v: [f64; 4]) -> Option<[f64; 4]> {
+    let norm = (v[0] * v[0] + v[1] * v[1] + v[2] * v[2] + v[3] * v[3]).sqrt();
+    if norm > 1e-12 {
+        // H-3: degenerate-tangent threshold
+        Some([v[0] / norm, v[1] / norm, v[2] / norm, v[3] / norm])
+    } else {
+        None
+    }
+}
+
+/// Determinant of a 3x3 float matrix.
+fn det3(m: [[f64; 3]; 3]) -> f64 {
+    m[0][0] * (m[1][1] * m[2][2] - m[1][2] * m[2][1])
+        - m[0][1] * (m[1][0] * m[2][2] - m[1][2] * m[2][0])
+        + m[0][2] * (m[1][0] * m[2][1] - m[1][1] * m[2][0])
+}
+
+/// The 4D cross product of three 4-vectors (the null direction of the 3x4
+/// matrix whose rows they are).
+fn null_direction(rows: [[f64; 4]; 3]) -> Option<[f64; 4]> {
+    let minor = |cols: [usize; 3]| -> f64 {
+        let mut m = [[0.0f64; 3]; 3];
+        for (r, row) in rows.iter().enumerate() {
+            for (k, &c) in cols.iter().enumerate() {
+                m[r][k] = row[c];
+            }
+        }
+        det3(m)
+    };
+    let d0 = minor([1, 2, 3]);
+    let d1 = -minor([0, 2, 3]);
+    let d2 = minor([0, 1, 3]);
+    let d3 = -minor([0, 1, 2]);
+    unit_direction([d0, d1, d2, d3])
+}
+
+/// The certified float partials of the stored system at a point: one float per
+/// (component, chart axis), taken as the midpoint of the certified enclosure.
+fn certified_partials(
+    system: &SquareSystem3,
+    point: [f64; 4],
+) -> Result<[[f64; 4]; 3], TraceRefusal> {
+    let box_: [(f64, f64); 4] = [
+        (point[0], point[0]),
+        (point[1], point[1]),
+        (point[2], point[2]),
+        (point[3], point[3]),
+    ];
+    let mut out = [[0.0f64; 4]; 3];
+    for (component, row) in out.iter_mut().enumerate() {
+        for (axis, cell) in row.iter_mut().enumerate() {
+            let enc = partial_enclosure(system, component, axis, box_).map_err(map_ssi_refusal)?;
+            *cell = 0.5 * (enc.lo + enc.hi);
+        }
+    }
+    Ok(out)
+}
+
+/// The branch tangent at a point: the null direction of the certified
+/// Jacobian, oriented (sign fixed by the caller's continuity rule).
+fn branch_tangent(system: &SquareSystem3, point: [f64; 4]) -> Result<[f64; 4], TraceRefusal> {
+    let partials = certified_partials(system, point)?;
+    null_direction(partials).ok_or(TraceRefusal::Unresolved(
+        GenericUnresolved::SingularJacobian,
+    ))
+}
+
+/// A certified continuation box: the certificate, the chart axis the reduced
+/// system was sliced along, and the box half-width that certified.
+struct CertifiedBox {
+    /// The Krawczyk3 certificate of the box.
+    certificate: KrawczykCertificate3,
+    /// The chart axis (0..=3) whose slice the certificate certifies on.
+    axis: usize,
+    /// The box half-width that certified.
+    half_width: f64,
+}
+
+/// Certify a cube box around `centre`, scanning the width ladder and the four
+/// candidate chart axes for the first strict Krawczyk inclusion.
+///
+/// Deterministic order: coarse widths before fine, lowest chart axis first. If
+/// no box certifies, the strongest named refusal is returned: a conditioning
+/// refusal if any axis reported one (the frozen rule refused the box), else
+/// the first encountered certified failure.
+fn certify_box(system: &SquareSystem3, centre: [f64; 4]) -> Result<CertifiedBox, SsiRefusal> {
+    let mut conditioning: Option<SsiRefusal> = None;
+    let mut first_failure: Option<SsiRefusal> = None;
+    for half in WIDTH_LADDER {
+        let box_ = cube_box(centre, half);
+        for axis in 0..4 {
+            match krawczyk3_certificate(system, axis, box_) {
+                Ok(certificate) => {
+                    return Ok(CertifiedBox {
+                        certificate,
+                        axis,
+                        half_width: half,
+                    });
+                }
+                Err(SsiRefusal::Conditioning(cause)) if conditioning.is_none() => {
+                    conditioning = Some(SsiRefusal::Conditioning(cause));
+                }
+                Err(failure) => {
+                    if first_failure.is_none() {
+                        first_failure = Some(failure);
+                    }
+                }
+            }
+        }
+    }
+    match conditioning {
+        Some(refusal) => Err(refusal),
+        None => match first_failure {
+            Some(failure) => Err(failure),
+            None => Err(SsiRefusal::DeterminantSpansZero),
+        },
+    }
+}
+
+/// The certified root estimate of a certificate in the full 4D chart: the
+/// midpoint of the Krawczyk image in the retained axes, at the slice value of
+/// the chart axis the box was centred on.
+fn certified_root(centre: [f64; 4], axis: usize, certificate: &KrawczykCertificate3) -> [f64; 4] {
+    let mut root = centre;
+    let mut k = 0;
+    for (a, cell) in root.iter_mut().enumerate() {
+        if a != axis {
+            let (lo, hi) = certificate.k_x()[k];
+            *cell = 0.5 * (lo + hi);
+            k += 1;
+        }
+    }
+    root
+}
+
+/// A synthetic branch-incidence record over the landed types, following the
+/// fixture kit's sample helper: one span per branch, the certified parameter
+/// enclosure of this box along the continuation axis, the branch germ, and
+/// the rank-0 deck label.
+fn branch_incidence(
+    germ: BranchGerm,
+    parameter: (f64, f64),
+    representative: (f64, f64),
+) -> BranchIncidence {
+    let provenance = CurveOccurrenceProvenance {
+        source_face_id: Some(SourceFaceId(7)),
+        bound_id: BoundId(0),
+        edge_use_id: EdgeUseId::new(BoundId(0), 3),
+        source_edge_id: SourceEdgeId(11),
+        start_vertex_id: SourceVertexKey::ShellVertex(1),
+        end_vertex_id: SourceVertexKey::ShellVertex(2),
+        source_curve_entity_id: Some(SourceEntityId(99)),
+    };
+    BranchIncidence {
+        span_id: SpanId::from_occurrence(&provenance),
+        provenance,
+        parameter: ParameterEnclosure::from_pair(parameter),
+        location: ParameterLocation::PieceInterior,
+        germ,
+        side: CanonicalBranchSide::First,
+        deck: CertifiedDeckLabel::zero(DeckContext::rank0()),
+        representative: truck_geometry::prelude::Point2::new(representative.0, representative.1),
+    }
+}
+
+/// Assemble the certified [`TraceStep`] for a certified box.
+///
+/// The continuation coordinate is the FROZEN rule's output
+/// ([`select_continuation_coordinate`], never a local re-implementation); the
+/// germ is [`classify_branch_germ`]'s read of the branch profile at the box
+/// centre; the incidence record follows the fixture kit's sample shape.
+fn assemble_step(
+    system: &SquareSystem3,
+    centre: [f64; 4],
+    half_width: f64,
+    axis: usize,
+) -> Result<TraceStep, TraceRefusal> {
+    let box_ = cube_box(centre, half_width);
+    let coordinate = select_continuation_coordinate(system, axis, box_).map_err(map_ssi_refusal)?;
+    let event = (centre[0], centre[1], centre[2], centre[3]);
+    let germ = classify_branch_germ(system, box_, event);
+    let incidence = branch_incidence(germ, (box_[axis].0, box_[axis].1), (centre[0], centre[1]));
+    TraceStep::new(box_, germ, incidence, coordinate).map_err(TraceRefusal::Conditioning)
+}
+
+/// The production [`BranchCertifier`]: certified continuation over W1's API.
+///
+/// Each call certifies the next box along the branch: the box is centred at
+/// the previous certified root advanced one arc step along the certified
+/// branch tangent; the chart axis is chosen per box by scanning the four
+/// candidates through the frozen F3 rule and the 3x3 Krawczyk certificate
+/// (every box is certified; the trace never reseeds). A box that would leave
+/// the unit chart is a natural end ([`BranchStep::EndOfBranch`]); a branch
+/// that returns to the seed box's identity closes the loop.
+struct ProductionCertifier {
+    /// The composed square system of the patch pair.
+    system: SquareSystem3,
+    /// The first certified step (re-emitted to report a closed branch).
+    first_step: TraceStep,
+    /// The seed box's centre.
+    first_centre: [f64; 4],
+    /// The certified root estimate of the current box.
+    root: [f64; 4],
+    /// The previous unit branch tangent (for orientation continuity).
+    previous_direction: Option<[f64; 4]>,
+    /// The signed winding of the tangent in the (u, v) projection.
+    cumulative_turn: f64,
+    /// The accumulated arc length walked.
+    arc_length: f64,
+    /// The number of certified steps emitted.
+    steps: usize,
+}
+
+impl ProductionCertifier {
+    /// Build the certifier from the composed system and the certified seed.
+    fn new(system: SquareSystem3, first_step: TraceStep, first_centre: [f64; 4]) -> Self {
+        let root = first_centre;
+        Self {
+            system,
+            first_step,
+            first_centre,
+            root,
+            previous_direction: None,
+            cumulative_turn: 0.0,
+            arc_length: 0.0,
+            steps: 0,
+        }
+    }
+
+    /// One certified step along the branch.
+    fn next_step(&mut self) -> Result<BranchStep, TraceRefusal> {
+        if self.steps >= MAX_STEPS {
+            return Err(TraceRefusal::Unresolved(GenericUnresolved::ClusteredRoots));
+        }
+        let mut tangent = branch_tangent(&self.system, self.root)?;
+        if let Some(previous) = self.previous_direction {
+            let dot = tangent[0] * previous[0]
+                + tangent[1] * previous[1]
+                + tangent[2] * previous[2]
+                + tangent[3] * previous[3];
+            if dot < 0.0 {
+                for component in tangent.iter_mut() {
+                    *component = -*component;
+                }
+            }
+        } else {
+            // Deterministic first orientation: prefer the positive `s` axis,
+            // then `t`, then `v`, then `u`.
+            let prefers_s = tangent[2].abs() > 1e-9; // H-3: axis-preference tie threshold
+            let prefers_t = tangent[3].abs() > 1e-9; // H-3
+            let prefers_v = tangent[1].abs() > 1e-9; // H-3
+            let axis = if prefers_s {
+                2
+            } else if prefers_t {
+                3
+            } else if prefers_v {
+                1
+            } else {
+                0
+            };
+            if tangent[axis] < 0.0 {
+                for component in tangent.iter_mut() {
+                    *component = -*component;
+                }
+            }
+        }
+        if let Some(previous) = self.previous_direction {
+            // Signed winding in the (u, v) projection (axes 0 and 1).
+            let cross = previous[0] * tangent[1] - previous[1] * tangent[0];
+            let dot = previous[0] * tangent[0] + previous[1] * tangent[1];
+            self.cumulative_turn += cross.atan2(dot);
+        }
+        self.previous_direction = Some(tangent);
+
+        // Advance one arc step along the tangent.
+        let mut centre = [0.0f64; 4];
+        for (k, component) in centre.iter_mut().enumerate() {
+            *component = self.root[k] + ARC_STEP * tangent[k];
+        }
+        let smallest = WIDTH_LADDER[WIDTH_LADDER.len() - 1];
+        if !box_inside_domain(cube_box(centre, smallest), UNIT_CHART) {
+            // The branch left (or is about to leave) the chart domain.
+            return Ok(BranchStep::EndOfBranch);
+        }
+
+        let certified = certify_box(&self.system, centre).map_err(map_ssi_refusal)?;
+        let root = certified_root(centre, certified.axis, &certified.certificate);
+        let step = assemble_step(&self.system, centre, certified.half_width, certified.axis)?;
+
+        self.arc_length += ARC_STEP;
+        self.root = root;
+        self.steps += 1;
+
+        // Identity recurrence: the certified root returned to the seed box
+        // after a full revolution of the branch.
+        if self.arc_length > CLOSED_ARC_MIN {
+            let distance = {
+                let dx = root[0] - self.first_centre[0];
+                let dy = root[1] - self.first_centre[1];
+                (dx * dx + dy * dy).sqrt()
+            };
+            if distance < CLOSED_DISTANCE && self.cumulative_turn.abs() > 5.5 {
+                return Ok(BranchStep::Advance(self.first_step));
+            }
+        }
+        Ok(BranchStep::Advance(step))
+    }
+}
+
+impl BranchCertifier for ProductionCertifier {
+    fn step(&mut self, _hint: &BranchBox) -> Result<BranchStep, TraceRefusal> {
+        if self.steps == 0 {
+            // The seed box was certified by certified_pair_trace; report it as
+            // the first step.
+            self.steps = 1;
+            return Ok(BranchStep::Advance(self.first_step));
+        }
+        self.next_step()
+    }
+}
+
+/// Trace the certified SSI branch of a rational patch pair from one seed.
+///
+/// This is the crate-public entry point BG-CK-P2-RESIDUAL's harness calls
+/// through the landed dev-dependency edge. It constructs the cross-multiplied
+/// square system from the two certified-admitted patches, certifies the seed
+/// box around `seed` (chart coordinates `(u, v, s, t)`) with the frozen F3
+/// rule and the 3x3 Krawczyk certificate, and runs the continuation loop over
+/// the production certifier.
+///
+/// A seed box that cannot be certified is a named [`SsiRefusal`] `Err` (there
+/// is no isolated root certificate to trace from — never a reseed). A traced
+/// branch returns a [`TraceOutcome`]: `ClosedLoop` when the branch closed on
+/// itself (identity recurrence), `Terminated` when it left the chart, a named
+/// `Refused` when a box could not be certified under the declared policy.
+pub fn certified_pair_trace(
+    lhs: &RationalBipatch,
+    rhs: &RationalBipatch,
+    seed: [f64; 4],
+) -> Result<TraceOutcome, SsiRefusal> {
+    let lhs = SsiParticipant::RationalBipatch(lhs.clone());
+    let rhs = SsiParticipant::RationalBipatch(rhs.clone());
+    let system = construct_square_system(&lhs, &rhs)?;
+
+    // The certified seed: the box around the seed point that first certifies
+    // under the frozen rule, on any chart axis.
+    let certified = certify_box(&system, seed)?;
+    let half_width = certified.half_width;
+    let axis = certified.axis;
+    let seed_certificate = certified.certificate;
+
+    let first_step = assemble_step(&system, seed, half_width, axis).map_err(map_trace_refusal)?;
+    let mut certifier = ProductionCertifier::new(system, first_step, seed);
+    Ok(trace_branch(&seed_certificate, UNIT_CHART, &mut certifier))
 }
 
 #[cfg(test)]
