@@ -1,0 +1,61 @@
+{
+  "packet": "BG-CK-P2-CONTRACT",
+  "class": "design",
+  "crates": ["truck-certified", "look"],
+  "branch": "packet/BG-CK-P2-CONTRACT",
+  "status": "STOPPED",
+  "stop_condition": 3,
+  "stop_condition_text": "3. The re-exports do not resolve from the look test target despite the landed dev-dependency edge — record the exact compiler error; the reachability assumption is load-bearing for RESIDUAL.",
+  "finding": "STOP, condition 3. The packet's Section 3 premise is FALSE in this tree: the FLOOR r2 dev-dependency edge does NOT reach the crate. BG-CK-P1-FLOOR was stopped at its own condition 3 before the r2 amendment that would have added the single root-Cargo.toml dev-dependency edge (`truck-certified`, path) ever landed (verified: root Cargo.toml has no `truck-certified` dev-dependency on this branch or on integration/kernel-bg or packet/BG-CK-P1-FLOOR). The shim's re-exports therefore do NOT resolve from the look test target, and Section 3's instruction that the root Cargo.toml gains NOTHING this packet forbids adding the missing edge here. The load-bearing reachability assumption for RESIDUAL is broken; the exact compiler error is recorded below. Per the packet stop conditions, nothing is committed beyond WIP evidence.",
+  "exact_compiler_error": [
+    "error[E0433]: cannot find module or crate `truck_certified` in this scope",
+    "7 | use truck_certified::ssi_types::SquareSystem3;",
+    "  |     ^^^^^^^^^^^^^^^ use of unresolved module or unlinked crate `truck_certified`",
+    "  = help: if you wanted to use a crate named `truck_certified`, use `cargo add truck_certified` to add it to your `Cargo.toml`",
+    "error[E0432]: unresolved import `truck_certified`",
+    "8 | use truck_certified::{KrawczykCertificate3, TraceStep};",
+    "  |     ^^^^^^^^^^^^^^^ use of unresolved module or unlinked crate `truck_certified`",
+    "  = help: if you wanted to use a crate named `truck_certified`, use `cargo add truck_certified` to add it to your `Cargo.toml`",
+    "error: could not compile `look` (test \"zz_ssi_probe\") due to 2 previous errors"
+  ],
+  "probe": {
+    "how": "throwaway integration test tests/zz_ssi_probe.rs in the look crate (`use truck_certified::ssi_types::SquareSystem3;` plus crate-root re-exports), compiled with `cargo check -p look --test zz_ssi_probe --locked`, then deleted after recording the error",
+    "result": "does not resolve — no `truck-certified` edge from the look test target exists",
+    "root_cause": "BG-CK-P1-FLOOR stopped (stop condition 3) before its r2 amendment landed the root-Cargo.toml dev-dependency edge; the CONTRACT packet assumed that edge was already present"
+  },
+  "deliverable": {
+    "landed_files": [
+      "vendor/truck/truck-certified/src/ssi_types.rs (NEW): SquareSystem3, KrawczykCertificate3, TraceStep, TraceOutcome, TraceRefusal with refusing constructors and verbatim accessors; D-shim/D-reuse/D-homogeneous doc tags; the verbatim freeze line",
+      "vendor/truck/truck-certified/src/ssi_fixtures.rs (NEW, #[doc(hidden)] pub test support): well_conditioned_root, negative_orientation_root, determinant_spans_zero, conditioning_below_threshold, germ_ladder (one fixture per BranchGerm variant), closed_loop_pair, sample_trace_incidence/sample_trace_step, plus plain-f64 direct-evaluation helpers (no hull kernels, no CertifiedInterval)",
+      "vendor/truck/truck-certified/src/lib.rs: pub mod ssi_types, #[doc(hidden)] pub mod ssi_fixtures, and the pub use ssi_types::{...} re-export line",
+      "vendor/truck/truck-certified/tests/ssi_contract.rs (NEW): the eight required tests_required names, plus three machine-check tests for the negative-orientation, conditioning and closed-loop fixtures"
+    ],
+    "fixture_ground_truths": {
+      "well_conditioned_root": "two plane patches crossing transversely; reduced square system at the s-slice has exactly one transverse interior root (1/2,1/2,1/2,1/2); reduced determinant +1 under the documented continuation convention (axis 2, identity pairing)",
+      "negative_orientation_root": "same pair with patch-1 parameter order flipped; same root; reduced determinant -1",
+      "determinant_spans_zero": "coincident parabolic-cylinder pair; F=0 is the 2D diagonal; every reduced determinant is exactly 0 at the diagonal witness (interior of the fixture box) and nonzero off the diagonal; a det enclosure containing zero forces KrawczykCertificate3::new to refuse",
+      "conditioning_below_threshold": "two transverse planes; an interior branch point exists but every candidate continuation axis's reduced diagonal derivatives are identically zero over the box, so the frozen margin rule must refuse ConditioningBelowThreshold",
+      "germ_ladder": "Regular (h_u=-1/2), StationaryRegular{2} (h_u=0, h_v=1, h_uu=-2), CuspCandidate ((tau^2,tau^3) cusp about (1/4,1/2), grad h = 0), Singular (coincident planes, 2D zero set, all reduced determinants 0), Unresolved (line branch with the event on the documented box's lower-u face — no endpoint-germ certificate at the declared policy)",
+      "closed_loop_pair": "bowl-vs-plane intersection is one closed circle loop (radius 3/10 about (1/2,1/2)); two diagonal seeds on it; F=0 along the whole sampled loop"
+    },
+    "machine_checks": "all ground truths verified by direct evaluation of the stored grids and exact coefficient-derivative helpers in tests/ssi_contract.rs; no solving, no hull kernels, no CertifiedInterval arithmetic in the shim modules (enforced by the shim_never_implements_a_solver source scan)"
+  },
+  "gates": {
+    "anchors_pre_dispatch": {
+      "A1 pub struct SquareSystemInput": 1,
+      "A2 pub enum BranchGerm": 1,
+      "A3 pub mod ssi_types in lib.rs": 0,
+      "A4 SquareSystem3 occurrences in src": 0,
+      "A5 ConditioningBelowThreshold in contract.rs": 4,
+      "A6 pub struct CoordinateSwitch": 1
+    },
+    "cargo_fmt_new_files": "clean (rustfmt --check rc=0 on ssi_types.rs, ssi_fixtures.rs, ssi_contract.rs). NOTE: `cargo fmt --all -- --check` over the whole workspace reports a pre-existing, unrelated formatting diff in tests/geometry_fingerprint.rs (tracked, unmodified by this packet).",
+    "cargo_test_p_truck_certified": "green: 553 lib tests + integration suites (10/8/9/11/8/11), 0 failures",
+    "ssi_contract": "green: 11 tests, 0 failures (the eight required tests_required names are present)",
+    "cargo_check_workspace_all_targets": "green (one pre-existing warning in truck-meshalgo lib test, unrelated)",
+    "clippy": "zero findings attributable to the new files. `cargo clippy -p truck-certified --lib` reports NO diagnostics on ssi_types.rs or ssi_fixtures.rs. A pre-existing baseline exists: the crate's own #![deny(clippy::all)] (lib.rs) fails on ~65 diagnostics in pre-existing files (formal/bezier_isect.rs, cone.rs, intersection.rs, xmonotone.rs, deck.rs, etc.) under this toolchain's clippy 1.97.0; none reference files this packet wrote or edited.",
+    "cargo_lock": "unchanged — no manifest change was made (the missing dev-dependency edge was NOT added, per Section 3's 'gains NOTHING')"
+  },
+  "commit": "none — stop path; the four source files are left as uncommitted WIP evidence in the working tree, and this RESULT.json sits at the worktree root per the packet. The normal-path feat commit (`feat(certified): SSI wave shim — shared types + fixture kit (BG-CK-P2-CONTRACT)`) was NOT made because stop condition 3 fired.",
+  "next_owner_action": "Orchestrator decision: either land the FLOOR r2 dev-dependency edge (single root-Cargo.toml dev-dependency: truck-certified, path) so the reachability assumption holds, or amend the packet. The shim itself is complete, verified green at the crate level, and ready to commit once the reachability gate can be satisfied."
+}
