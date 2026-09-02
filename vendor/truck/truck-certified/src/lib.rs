@@ -22,6 +22,7 @@ pub mod hull;
 pub mod meshable;
 pub mod pair_dispatch;
 pub mod source_evidence;
+pub mod ssi;
 #[doc(hidden)]
 pub mod ssi_fixtures;
 pub mod ssi_types;
