@@ -1,0 +1,50 @@
+{
+  "id": "BG-CK-P2-TRACE",
+  "class": "design",
+  "contract": ["BG-CK-P2-TRACE"],
+  "crates": ["truck-certified"],
+  "branch": "packet/BG-CK-P2-TRACE",
+  "commit": "7e671e8",
+  "status": "LOCAL_GREEN (wave claim, not a verdict)",
+  "summary": "Wave W2: the SSI branch-tracing continuation loop plus coordinate switching, realized against the shim's frozen types and the fixture kit. New module truck-certified/src/ssi_trace.rs implements the solver-private BranchCertifier/BranchBox/BranchStep seam (the shape this packet owns, pub(crate), NOT public API), the trace_branch loop (seeded from the KrawczykCertificate3 shape; identity recurrence -> ClosedLoop; chart-domain exit with no refusal -> Terminated; certified both-certificate switches -> Switched carrying the frozen CoordinateSwitch; one-certificate or under-certified switches -> named Refused, never a reseed), and the span.rs next-nonzero-jet germ classifier machine-checked against germ_ladder. lib.rs gains the single 'pub mod ssi_trace;' line. tests/ssi_trace.rs is the new public-path shape suite.",
+  "write_set": {
+    "vendor/truck/truck-certified/src/ssi_trace.rs": "NEW. pub(crate) BranchCertifier seam + BranchBox/BranchStep/SwitchReport, pub(crate) trace_branch(seed, domain, certifier) -> TraceOutcome, pub(crate) classify_branch_germ reading the next nonzero jet, and the in-module synthetic-certifier tests (the six tests_required live here because the seam is pub(crate) - same-crate access, HULL precedent). H-1 clean: no module-level allow; the module carries item-scoped #[allow(dead_code)] on the wave-private seam only (exercised by cfg(test) now, consumed by W1's adapter at integration), matching the repo's bezier_isect/quotient precedent.",
+    "vendor/truck/truck-certified/src/lib.rs": "ONE line added: 'pub mod ssi_trace;' (the expected one-line textual seam with W1's future 'pub mod ssi;').",
+    "vendor/truck/truck-certified/tests/ssi_trace.rs": "NEW public-path suite over truck_certified::ssi_fixtures and the re-exported ssi_types shapes: germ_ladder documented classes, closed_loop_pair ground truth on the branch, TraceStep/Outcome/Refusal shape round-trips, and the H-1 source scan of src/ssi_trace.rs."
+  },
+  "anchors": {
+    "A1_pub_enum_TraceOutcome_in_ssi_types": "1 OK",
+    "A2_pub_struct_TraceStep_in_ssi_types": "1 OK",
+    "A3_pub_enum_BranchGerm_in_span": "1 OK",
+    "A4_ssi_trace_rs_absent_at_dispatch": "0 OK at dispatch; becomes 1 by this packet by design",
+    "A5_closed_loop_pair_in_ssi_fixtures": "1 OK",
+    "A6_pub_struct_CoordinateSwitch_in_contract": "1 OK"
+  },
+  "tests_required": {
+    "trace_loop_walks_fixture_closed_loop_to_identity_recurrence": "pass (in-module ssi_trace::tests; synthetic certifier walks closed_loop_pair()'s circle; asserts ClosedLoop with first box id == closing box id, 13 steps, every box center on the fixture branch)",
+    "trace_loop_terminates_at_domain_boundary": "pass (in-module; synthetic certifier walks well_conditioned_root()'s branch out of the unit chart; asserts Terminated with in-domain steps, all on-branch)",
+    "trace_switch_requires_both_certificates_and_refuses_otherwise": "pass (in-module; switch at the closed-loop circle's rightmost s-turning point with BOTH certificates yields Switched carrying the frozen CoordinateSwitch; the same switch with ONE certificate yields Refused(Conditioning(ConditioningBelowThreshold)) - never a reseed, never a default)",
+    "trace_germ_classification_reads_next_nonzero_jet": "pass (in-module; every germ_ladder rung classifies to its documented germ: Regular, StationaryRegular{2}, CuspCandidate, Singular, and the boundary Unresolved rung)",
+    "trace_steps_carry_branch_incidence_records": "pass (in-module; every emitted step's BranchIncidence round-trips span + parameter enclosure + germ + deck label against the reference record)",
+    "trace_refusals_are_named_cases": "pass (in-module; the exhaustive match over every TraceRefusal variant has no catch-all arm and each family's stable tag is asserted, including the loop-emitted one-certificate-switch Conditioning refusal)"
+  },
+  "test_split_note": "The six tests_required are driven by hand-written synthetic certifiers (impl blocks of the pub(crate) BranchCertifier) walking fixture geometry, so per the wave-mode seam they live in the #[cfg(test)] mod tests inside src/ssi_trace.rs (same-crate access) - the crate's established pattern for pub(crate) seams (the HULL packet's curve-form tests did the same). tests/ssi_trace.rs is the NEW write-set file and carries the public-path suite over truck_certified::ssi_fixtures and the crate-root re-exports, plus the H-1 source scan. The exact shape of the seam (BranchBox contents, &mut self step, the BranchStep verdict carrying switch reports with an Option outgoing certificate) is this packet's fix under 'the exact shape is YOURS to fix'.",
+  "gates": {
+    "cargo_check_p_truck_certified_all_targets": "green, zero warnings",
+    "cargo_check_workspace_all_targets": "green at 7e671e8 (the lib.rs one-line ripple); only a pre-existing truck-meshalgo lib-test warning outside this packet's write scope",
+    "cargo_test_p_truck_certified_lib_tests_no_fail_fast": "green: 559 lib tests (incl. the six new in-module ssi_trace tests) + integration suites 10/8/9/11/8/11/8 (incl. the new 8-test tests/ssi_trace.rs), 0 failures, landed suites unchanged",
+    "rustfmt_on_new_files": "clean (rustfmt --check on src/ssi_trace.rs and tests/ssi_trace.rs)",
+    "clippy_scoped_to_diff": "zero findings attributable to ssi_trace.rs / tests/ssi_trace.rs (filtered from cargo clippy -p truck-certified --lib --tests). The crate has a large PRE-EXISTING baseline of deny(clippy::all) findings in grandfathered files (formal/bezier_isect.rs, common_arc.rs, cylinder_lift.rs, etc.), unchanged by this packet. Two findings on the new module were fixed during the run (needless_range_loop in classify_branch_germ; redundant braces in a test). tests/ssi_trace.rs cannot be linted through cargo clippy because the baseline lib failure blocks the integration-test target; it was written to the same clippy::all standards and self-reviewed (one eq_op self-comparison fixed).",
+    "release_check": "not run (wave-mode LOCAL gates only); the item-scoped #[allow(dead_code)] keeps the module warning-free under non-test builds so the crate's cfg_attr(not(debug_assertions), deny(warnings)) cannot trip on the wave-private seam"
+  },
+  "stop_conditions": "none triggered. (1) The shim's landed types match the packet's read exactly (anchors all green at dispatch, TraceStep/Outcome/Refusal/KrawczykCertificate3 read verbatim from ssi_types.rs). (2) The BranchGerm ladder is fully realizable: the germ_ladder fixtures document exact profile jets and the kit's direct-evaluation helpers (partial_grid4_axis / second_partial_grid4_axis) supply every jet the five rungs need; all five classify correctly. (3) The both-certificate rule is expressed without weakening: CoordinateSwitch carries both certificates by construction, and the switch report carries an Option outgoing certificate so a one-certificate switch is a refusal path, never a reseed - no shim type needed a widening.",
+  "design_notes": {
+    "both_certificate_rule": "The loop enforces the frozen F3 discipline itself: an Advance whose continuation-coordinate index silently changes is refused (Conditioning/ConditioningBelowThreshold), a Switch report with outgoing: None is refused (Conditioning/ConditioningBelowThreshold - the outgoing square system could not certify), a Switch whose outgoing is not the coordinate the branch was traced under or that does not change the coordinate is refused (Conditioning/InvalidInput). Only a Switch with a consistent outgoing certificate yields TraceOutcome::Switched carrying the frozen CoordinateSwitch. The loop never reseeds.",
+    "domain_exit": "trace_branch takes the chart domain (the four axis intervals in (u,v,s,t) from the fixture system's domain_maps) and returns Terminated when a reported box leaves it - a natural end with no refusal, distinct from every named refusal.",
+    "identity_recurrence": "ClosedLoop fires when a reported step's chart_box equals the FIRST step's chart_box (box id == first box id); the closing step is included so the recurrence is visible in the outcome steps.",
+    "germ_classifier_scope": "classify_branch_germ reads the reduced-branch-profile jets through the kit's plain-f64 direct-evaluation helpers (the kit's documented jet-reading path for consumers) and is machine-checked against germ_ladder; the reading stops at the second jet the kit provides, so an event whose first nonzero jet lies beyond order two is Unresolved (the ladder's stationary rung resolves at order two).",
+    "continuation_coordinate_semantics": "The loop treats TraceStep.coordinate().index as an opaque continuation-coordinate id and never interprets its numeric value; switch detection and the both-certificate rule therefore compose with whatever index convention W1's adapter produces at integration.",
+    "h1": "No unwrap/expect/panic-family calls and no module-level allow anywhere in ssi_trace.rs including its #[cfg(test)] code (tests bind results by match + process exit). Item-scoped #[allow(dead_code)] appears only on the wave-private seam items that cfg(test) exercises and W1's integration adapter will consume (mirrors bezier_isect.rs:403 and quotient.rs:366)."
+  },
+  "notes": "Wave-mode worker run: LOCAL checks only, no global verifier, no verify.py, no other crates touched. W1's src/ssi.rs does not exist in this tree and was not read or anticipated; contracts used are the frozen shim shapes. RESULT.json is written at the worktree root per the packet; it is a claim, not a verdict."
+}
