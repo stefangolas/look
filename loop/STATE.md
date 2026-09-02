@@ -9,118 +9,121 @@ when they stop being true, never for length. If you are picking this up cold, re
 [`loop/ORCHESTRATOR.md`](ORCHESTRATOR.md) for how to run the loop, then
 `python loop/slot_status.py`** - nothing else. Do not read `LEDGER.jsonl` whole.
 
-Updated 2026-09-01, session 48 CLOSE. **PHASE 1 IS 4/5 LANDED + FLOOR
-MEASURED-AND-STOPPED; THE EXIT GATE IS NOT CERTIFIED; THE PHASE-2 WAVE HAS
-STARTED.** BG-CK-P1-FLOOR ran the certified path over the full corpus (release)
-and stopped on its own stop condition 3: the anomaly column fired at mass.
-The wave-mode commits landed first (ORCHESTRATOR wave mode `47deab5`,
-BG-CK-P2-CONTRACT shim `37b0267`); the FLOOR STOP filing is `2ebf615`.
-Branch: `integration/kernel-bg`, HEAD `2ebf615`.
+Updated 2026-09-02, session 49 OPEN-ENDED (wave in flight — rewrite at
+close). **PHASE-2 WAVE IS OPEN AND RUNNING: all three members dispatched in
+parallel on top of the landed shim. The spline census was CANCELLED by the
+owner (gate waived). The shim "landed at 37b0267" claim in the session-48
+close was FALSE (machine-checked) — corrected this session.**
 
 ## Where we are
 
-Session 48: **FLOOR RAN AND STOPPED — the Phase-1 gate measurement is
-published and the exit gate is NOT certified.** For every corpus pair the
-landed dispatch admits, `dispatch_pair` was run and disposed; the anomaly
-column (`certified_disjoint` on adjacent pairs) fired at mass, which is the
-packet's stop condition 3. The finding is the loop's most valuable output: the
-dispatch's admission screens and the census's adjacency enumeration disagree
-about what a pair IS.
-
-- **BG-CK-P1-HULL** `77bd6dd`: D2 hull primitive as public API
-  (hull_bernstein_1d/_2d, bernstein_derivative_1d/_2d,
-  hull_curve_homogeneous + JetOrder, HullRefusal). Polynomial-only, no
-  division (consumer-side F2 composition). Worker's sound deviation:
-  subdivision-form de Casteljau node step (a + u*(b-a)) — makes
-  linear-span hulls exact; inclusion-monotone so still certified.
-- **BG-CK-P1-SPHERE** `c09eff6`: certified sphere constructor
-  (identify_sphere/_placement/_world, CertifiedEmbeddedSphere,
-  SphereIdentificationFailure). Placement similarity rule: exact
-  column-magnitude equality. Worker caught the packet's period-axis
-  prose error via stop-condition-3 source read (truck Sphere: u=latitude,
-  v=longitude).
-- **BG-CK-P1-MAP** `a94ee65`: class-1 CertifiedMap (admit_curve/
-  admit_surface + region entries, enclosure/rank_margin oracles,
-  MapRefusal). Surface Bezier decomposition in-module (row-then-column
-  cut, tensor commutation verified vs subs). Worker's key catch:
-  source-parameter derivative scaling (inverse piece width) — packet
-  under-specified it.
-- **BG-CK-P1-DISPATCH** `9f194e7`: exact arms — plane~plane,
-  plane~cylinder (axis-normal cut), plane~sphere, sphere~sphere,
-  cylinder~cylinder coaxial/parallel. Exact-predicate admission screens;
-  PairUnsupported widened by ONE named variant UnsupportedPairClass
-  (mapping C row 1). Cone/torus special-position arms split to
-  BG-CK-P1-DISPATCH-2 (booking doc amended, mass-driven).
-- **BG-CK-P1-FLOOR** `42617ff` (WIP evidence) — **STOPPED, condition 3**
-  (filed `loop/results/BG-CK-P1-FLOOR.STOP.json`, `2ebf615`): 71,957
-  admitted of 166,307 walked pairs; certify-rate 0.5862 (floor 0.95 NOT
-  met). **4,381 `certified_disjoint` on adjacent face pairs**
-  (cylinder~plane 3,600; cylinder~cylinder 746; sphere~sphere 25;
-  plane~plane 8; plane~sphere 2). The dispatch and census were
-  deliberately NOT "fixed" per the stop condition. Legacy throughput
-  comparator DEFERRED TO INTEGRATION (no directly-callable legacy
-  pair-contact entry in the test crate). Harness/doc/dev-dep edge ride
-  on packet/BG-CK-P1-FLOOR as WIP evidence.
-- **BG-CK-P2-CONTRACT** `37b0267` (landed): the wave's shared contract
-  shim — SquareSystem3, KrawczykCertificate3, TraceStep/TraceOutcome/
-  TraceRefusal, ssi_fixtures as #[doc(hidden)] test support. No solver
-  bodies; the wave packets implement against this.
+- **SESSION-49 CORRECTION OF RECORD:** the session-48 close claimed
+  "BG-CK-P2-CONTRACT LANDED at 37b0267". False on three counts
+  (git show --stat 37b0267 = packet doc only; SquareSystem3 in no tree;
+  no registry row). The shim was authored-only. The wave base is the
+  shim's LANDING MERGE, not 37b0267.
+- **Shim BG-CK-P2-CONTRACT: LANDED, DONE.** r1 worker STOPPED on its own
+  stop condition 3 and caught a PACKET fault: the FLOOR r2 dev-dep edge
+  (root Cargo.toml) never landed because FLOOR stopped before its WIP
+  merged — the shim's Section 3 premise was false, E0433 recorded
+  (loop/results/BG-CK-P2-CONTRACT.STOP.json). r2 amendment (f2fca2c)
+  authorized the one-line edge; resumed session landed edge + complete
+  shim (worker commit 1b5ca21); one orchestrator H-3 one-liner (V4
+  GATE-2, fixture approx() bare literal); full verify ACCEPTED; merge
+  a27edaa; filing 6932197 (land_packet died at the filing step — wt
+  RESULT was untracked — completed by loop/scripts/
+  complete_land_ck_p2_contract.py mirroring land_packet's post-merge
+  steps exactly). Ceiling 111 -> 111.
+- **WAVE BASE = a27edaa.** All wave branches fork its lineage
+  (85afe63..b79b38c at dispatch).
+- **Census CANCELLED BY OWNER** (~4h worker time; gate waived; row
+  BLOCKED; WIP archived loop/slots/1/abandoned-20260902-142536.patch;
+  spec amendment in docs/CERTIFIED_INTERLEAVE_BUILD_SPEC.md). The
+  corpus-mass rule was demoted by the owner from gate to ordering
+  device: recognizers get booked on geometric naturalness, never
+  blocked on measured mass.
+- **WAVE IN FLIGHT (all parallel, per owner direction):**
+  - W1 BG-CK-P2-SYSTEM (slot 1, pid 18344): the booking's SYSTEM +
+    KRAWCZYK3 COLLAPSED (both book src/ssi.rs; collapse under booking
+    decision 6's escape hatch). Square-system constructor + 3x3
+    Krawczyk (adjugate/det over CertifiedInterval, strict-inclusion-only
+    emission). Registered 85afe63.
+  - W2 BG-CK-P2-TRACE (slot 2, pid 21204): continuation loop + frozen
+    both-certificate CoordinateSwitch rule against shim types +
+    ssi_fixtures via a solver-private BranchCertifier seam (integration
+    adapters W1's evaluator). Registered c30a210.
+  - W3 BG-CK-P2-RESIDUAL (slot 3, pid 1984): FLOOR-shape harness,
+    wave-phase scope — single marked integration seam, corpus walk
+    reports integration_pending until the composed chain lands. Anchor
+    A6 re-measured post-shim (1 -> 2, the dev-dep edge) at b79b38c.
+- **Wave packets authored this session** (loop/packets/BG-CK-P2-*.md):
+  prose pre-made, anchors measured against the landed shim, gen_packet
+  --check + packet_lint green (W3's two TEST_PATH_OWNERSHIP WARNs are
+  the documented read-only-context case).
+- **Owner direction that stands:** parallel wave workers WITHOUT
+  building/testing the world (scoped checks only; one full verify at
+  the composed HEAD); ORCHESTRATOR wave mode now carries the full
+  build-spec spine workflow (spine session -> parallel wave -> one
+  integration sweep + verify + audit).
 
 ## Pick up here
 
-1. **The FLOOR finding feeds the DISPATCH-2 decision.** The Phase-1 gate is
-   uncertified and the anomaly column is at mass: before Phase-2 or DISPATCH-2,
-   decide how to act on "the dispatch's screens and the census's adjacency
-   enumeration disagree about what a pair IS" (the disagreement is localized to
-   cylinder~plane 3,600 and cylinder~cylinder 746). Do NOT paper over it.
-2. **The wave is running.** Phase 2 booked (docs/CERTIFIED_PHASE2_BOOKING.md;
-   SYSTEM -> KRAWCZYK3 -> TRACE -> RESIDUAL) and ORCHESTRATOR.md "wave mode"
-   now governs a packet tail. FLOOR's landed dev-dep edge (truck-certified in
-   the root `[dev-dependencies]`) is the re-export reachability basis
-   BG-CK-P2-CONTRACT references for RESIDUAL.
-3. ONE WORKER AT A TIME unless the owner explicitly authorizes wave
-   concurrency (pagefile rule; wave mode sets concurrency by disk + shared
-   compile cache, never N full builds).
-4. Registry rows AT DISPATCH (session 47 missed twice; the FLOOR
-   DEPENDS_KNOWN lint caught the second). `python loop/packet_lint.py` on
-   packets that depend_on a packet just dispatched.
-5. Open environmental, do NOT chase: healing::tests::step_import;
-   upstream fillet::complex_surface; stepio assy/table/tessellate/oi/ioi;
-   stepio builder Closed-vs-Oriented; cone_topology debug panics; clippy
-   deny-lints in untouched meshalgo/stepio; pre-existing fmt violations
-   (examples/step_face_timing.rs, tests/geometry_fingerprint.rs); 129
-   pre-existing clippy all-targets findings in grandfathered certified
-   modules. All in the f332dfb-era baselines.
+1. **Collect the three LOCAL_GREEN claims** (slot_status; RESULT.json at
+   each wt root). A worker STOP result: checkpoint WIP on the slot
+   branch (orchestrator-labeled), file RESULT as STOP.json, amend via
+   --resume — the shim's r1 dance is the template.
+2. **Integrate W1 -> W2 -> W3** on integration/kernel-bg, cargo check -p
+   truck-certified between merges; expect one-line lib.rs pub mod
+   conflicts; W2's BranchCertifier seam gets its adapter to W1's
+   evaluator (small orchestrator amendment or W2 --resume).
+3. **Reclaim slot targets BEFORE the final verify** (disk was 12-13 GB
+   free mid-wave). Then the ordinary full verifier ONCE at the composed
+   HEAD. Rows -> DONE only after PASS; fill the wave manifest in
+   docs/CERTIFIED_INTERLEAVE_BUILD_SPEC.md; rewrite this file.
+4. **W3's doc stays wave-phase honest**: certify-rate table fills at
+   integration; the run command is in the packet.
+5. **After the wave closes:** the certified-program leftovers are
+   DISPATCH-2 (cone/torus special positions), the recognizer family
+   (decide from RESIDUAL numbers + geometric naturalness — census is
+   waived, do not re-gate on it), and the FLOOR anomaly decision
+   (4,381 certified_disjoint adjacent pairs; STOP filing is the
+   record). Then the main line: the constructive geometry kernel
+   (docs/CONSTRUCTIVE_GEOMETRY_PLAN.md; CG-000..CG-009 already DONE).
+6. Environmental, do NOT chase: healing::tests::step_import;
+   fillet::complex_surface; stepio assy/table/tessellate/oi/ioi;
+   cone_topology debug panics; pre-existing fmt drift
+   (examples/step_face_timing.rs, tests/geometry_fingerprint.rs); ~65
+   pre-existing clippy findings in grandfathered certified modules
+   (clippy 1.97.0 baseline, recorded in the shim's RESULT gates).
 
 ## State of the machine, as left
 
-- Watchdog NOT running at session close (restart for the wave:
-  `LOOK_WATCHDOG_STAGNANT=3600`).
-- Slot 0: FLOOR worker finished (stop); WIP evidence committed on
-  packet/BG-CK-P1-FLOOR; slot 0 target dir was ~12 GB (warm) — reclaim if
-  the wave needs disk. Slots 1-3: FINISHED/idle. Re-fork via new_slot
-  before reuse.
-- Disk at last check: ~19 GB free. Reclaim order: repo-root target, idle
-  slot targets, %TEMP%/look-verify-baseline-*.
-- LOC ledger (re-derive): `git diff --shortstat da72cd5..HEAD --
-  vendor/truck`.
+- Watchdog RUNNING (pid 23884, LOOK_WATCHDOG_STAGNANT=3600). TWO
+  watchdogs were briefly alive after a reboot relaunch — one killed;
+  check for duplicate START lines before trusting the log.
+- Slots: 1/2/3 hold the RUNNING wave workers; slot 0 FINISHED (shim,
+  landed — reclaim its target when the verify needs disk).
+- RAM is the binding constraint: 15.7 GB total. CARGO_BUILD_JOBS=2-4
+  for every cargo invocation (two cold warm-build OOMs recorded at
+  default jobs); RUSTC_WRAPPER=sccache (installed session 49, cache
+  warm for the dep universe). Worker inner loops are scoped checks and
+  cheap — the wave ran 3 workers in parallel fine on the owner's call.
+- Disk: ~12-13 GB free mid-wave (slot targets ~0.9 GB each warm; they
+  grow during runs; the watchdog reclaims idle targets
+  automatically). Reclaim order for the verify: idle slot targets,
+  %TEMP% (a 12 GB proc-macro-srv leak from a reboot was reclaimed once
+  — check again if disk drops unexplained).
+- LOC ledger (re-derive): git diff --shortstat da72cd5..HEAD -- vendor/truck.
 
 ## The parallelism picture
 
-Serial has been law (pagefile risk), but wave mode is now booked and the
-owner is preparing the swarm wave: parallel implementation wave + one
-authoritative verification (ORCHESTRATOR.md "wave mode"; concurrency set by
-disk and the shared compilation cache, never N copies of the world). The
-pipeline is orchestrator-saturated: workers churn while the next packet is
-written/linted/registered; dispatch on landing. Phase 2 is booked
-(docs/CERTIFIED_PHASE2_BOOKING.md) with its packet graph (SYSTEM ->
-KRAWCZYK3 -> TRACE -> RESIDUAL) and substrate census (the 2D bivariate
-Krawczyk is fully landed in bezier_isect.rs — Phase 2 is a dimension raise,
-not a from-scratch solver). Input gates before the first Phase-2 dispatch:
-**Phase-1 floor published (done — and uncertified, see the finding),
-grazing-pair corpus seeds named, DISPATCH-2 decision.**
-
-## Traps, each one paid for
+Wave mode is PROVEN this session: contracts frozen in one shim packet;
+three implementation workers in parallel on disjoint write sets doing
+scoped checks only; integration + one authoritative verify at the end.
+The full recipe (spine session -> parallel wave -> integration sweep)
+is ORCHESTRATOR.md wave mode, "The build-spec spine workflow" — later
+build specs reuse it as-is. The certified Phase-2 wave is its first
+full instantiation.
 
 ### Session 47 (Phase 1 runs: 3/5 landed first-try; the lint's prefix check; two registry misses) - paid in part, session in flight
 

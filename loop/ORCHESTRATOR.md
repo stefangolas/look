@@ -455,6 +455,63 @@ contract inventory, and fixture list live in
 `docs/CERTIFIED_PHASE2_BOOKING.md` and the shim packet. Later tails reuse
 this section as-is.
 
+**The build-spec spine workflow (session 49, first full instantiation —
+the efficient-and-rigorous shape for any given build spec).** One session
+defines the spine; the wave parallelizes hard against it; one sweep
+integrates, audits, and verifies. The cost structure is the point:
+workers spend their time WRITING code, not re-building and re-testing
+the world — that happens once, at the end.
+
+1. **Spine session.** The owner/orchestrator writes ONE build spec (a
+   committed docs/ file that predates every dispatch — it is in the
+   workers' base): the interleave decision, the write-set pre-matrix,
+   collapse decisions (same new file = collapse; invoke the booking's
+   escape hatch and record it), the concurrency answer from MEASURED
+   machine facts, the integration order, and an empty wave manifest.
+   Shared contracts land as ONE shim packet through the NORMAL loop
+   (frozen types + refusing constructors + synthetic fixture kit with
+   stated, machine-checked ground truths; no solver bodies); full verify
+   once; **its landing merge SHA is the wave base.** In the same session,
+   author the wave packets while the shim worker runs: write sets
+   disjoint-or-collapsed, every shared type already in the shim, every
+   integration seam NAMED in the packet prose (e.g. W2's solver-private
+   `BranchCertifier` that the orchestrator adapters to W1's evaluator at
+   integration), anchors measured against the post-shim tree.
+
+2. **Parallel implementation wave — workers do not build or test the
+   world.** Dispatch all members against the same base (owner directs
+   the parallelism; the contracts being frozen is what makes it
+   legitimate). A wave worker runs SCOPED local checks only:
+   `cargo check -p <crate>` and its own packet's tests against the
+   slot's warm target — never a workspace build, never baselines,
+   corpus suites, or global gates, never verify.py. Measured (session
+   49): a worker's inner loop is seconds-scale incremental checking;
+   the two OOM crashes on the 15.7 GB machine came from COLD warm
+   builds at default rustc parallelism, not from N workers checking
+   one crate. Cap `CARGO_BUILD_JOBS` at 2–4 anyway, set
+   `RUSTC_WRAPPER=sccache`, and prewarm each slot's target once — after
+   that, N workers cost almost nothing per worker. LOCAL_GREEN is a
+   claim; RESULT.json is not a verdict; registry rows stay RUNNING with
+   the wave state in the note.
+
+3. **Integration sweep (one session, at the end).** Reclaim idle slot
+   targets first (the verify needs disk headroom). Merge in dependency
+   order, `cargo check -p <affected-crate>` between merges. Every seam
+   mismatch returns to its owning session via `--resume` as a small
+   amendment with the exact failure, contract, and correction — never a
+   redispatch, never a worker redoing proven mathematics. Expected and
+   cheap: the one-line `pub mod` conflicts per branch. Then the ordinary
+   full verifier ONCE at the composed HEAD — this is the audit where
+   composition errors surface; attribute from test ownership, refusal
+   type, and changed files; isolate 2+2 only with evidence. Rows flip to
+   DONE only after it passes; fill the wave manifest; rewrite STATE.
+
+   **Anchor-drift trap (paid once):** anchors authored before the shim
+   landed drift by exactly the shim's own changes — re-run
+   `gen_packet --check` on every packet after the shim merges and before
+   its dispatch (the A6 class: root-Cargo.toml refs 1→2 from the
+   shim's dev-dep edge).
+
 ## What a session should leave behind
 
 Rewrite `loop/STATE.md` — it is the next session's only cold-start read, and it
