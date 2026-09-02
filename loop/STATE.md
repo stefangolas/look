@@ -9,25 +9,23 @@ when they stop being true, never for length. If you are picking this up cold, re
 [`loop/ORCHESTRATOR.md`](ORCHESTRATOR.md) for how to run the loop, then
 `python loop/slot_status.py`** - nothing else. Do not read `LEDGER.jsonl` whole.
 
-Updated 2026-08-31, session 45 CLOSE. **THE CG PROGRAM IS COMPLETE: 10/10
-LANDED.** CG-007-CERT landed `85f0426` (verify round trip: one GATE-2
-one-token amendment), CG-009-BREP landed `8eb890f` (verify round trips:
-one V1 SCOPE_VIOLATION from the packet's own match-site census miss, one V4
-bundle, two from the orchestrator's own amendment markers - all amendments,
-zero worker redispatches). Merged-HEAD check at `8eb890f`: base/geometry/
-topology/modeling fully green; the 6 non-green meshalgo/stepio suites all
-trace to the f332dfb baseline's own failure/absence set (missing fixtures,
-the recorded builder Closed-vs-Oriented, debug-panicked cone tests absent at
-base) - zero regressions. Branch: `integration/kernel-bg`, HEAD `8eb890f`.
+Updated 2026-09-01, session 48 CLOSE. **PHASE 1 IS 4/5 LANDED + FLOOR
+MEASURED-AND-STOPPED; THE EXIT GATE IS NOT CERTIFIED; THE PHASE-2 WAVE HAS
+STARTED.** BG-CK-P1-FLOOR ran the certified path over the full corpus (release)
+and stopped on its own stop condition 3: the anomaly column fired at mass.
+The wave-mode commits landed first (ORCHESTRATOR wave mode `47deab5`,
+BG-CK-P2-CONTRACT shim `37b0267`); the FLOOR STOP filing is `2ebf615`.
+Branch: `integration/kernel-bg`, HEAD `2ebf615`.
 
 ## Where we are
 
-Session 47: **PHASE 1 IS 3/5 LANDED** (HULL, SPHERE, MAP — all verify
-first-try, zero worker redispatches), **DISPATCH RUNNING** (design class,
-pid per slot_status), **FLOOR WRITTEN AND LINTED** (committed b8fa644,
-anchor-check pending DISPATCH landing), **PHASE 2 BOOKED**
-(docs/CERTIFIED_PHASE2_BOOKING.md, 6f4ebf8). Branch:
-`integration/kernel-bg`, HEAD: see `git log --oneline -3`.
+Session 48: **FLOOR RAN AND STOPPED — the Phase-1 gate measurement is
+published and the exit gate is NOT certified.** For every corpus pair the
+landed dispatch admits, `dispatch_pair` was run and disposed; the anomaly
+column (`certified_disjoint` on adjacent pairs) fired at mass, which is the
+packet's stop condition 3. The finding is the loop's most valuable output: the
+dispatch's admission screens and the census's adjacency enumeration disagree
+about what a pair IS.
 
 - **BG-CK-P1-HULL** `77bd6dd`: D2 hull primitive as public API
   (hull_bernstein_1d/_2d, bernstein_derivative_1d/_2d,
@@ -47,33 +45,45 @@ anchor-check pending DISPATCH landing), **PHASE 2 BOOKED**
   cut, tensor commutation verified vs subs). Worker's key catch:
   source-parameter derivative scaling (inverse piece width) — packet
   under-specified it.
-- **BG-CK-P1-DISPATCH** (running): exact arms only — plane~plane,
+- **BG-CK-P1-DISPATCH** `9f194e7`: exact arms — plane~plane,
   plane~cylinder (axis-normal cut), plane~sphere, sphere~sphere,
-  cylinder~cylinder coaxial/parallel = 64,042 corpus pairs (~62% of
-  analytic mass). Exact-predicate admission screens; PairUnsupported
-  widened by ONE named variant UnsupportedPairClass (mapping C row 1).
-  Cone/torus special-position arms split to BG-CK-P1-DISPATCH-2 (booking
-  doc amended, mass-driven).
-- **BG-CK-P1-FLOOR** (written, b8fa644): exit-gate measurement; five
-  dispositions, certified_disjoint-on-adjacent-pairs is the LEAD anomaly
-  column; no threshold assertions in-tree; latency published, legacy
-  comparator deferrable to integration (recorded fallback).
+  cylinder~cylinder coaxial/parallel. Exact-predicate admission screens;
+  PairUnsupported widened by ONE named variant UnsupportedPairClass
+  (mapping C row 1). Cone/torus special-position arms split to
+  BG-CK-P1-DISPATCH-2 (booking doc amended, mass-driven).
+- **BG-CK-P1-FLOOR** `42617ff` (WIP evidence) — **STOPPED, condition 3**
+  (filed `loop/results/BG-CK-P1-FLOOR.STOP.json`, `2ebf615`): 71,957
+  admitted of 166,307 walked pairs; certify-rate 0.5862 (floor 0.95 NOT
+  met). **4,381 `certified_disjoint` on adjacent face pairs**
+  (cylinder~plane 3,600; cylinder~cylinder 746; sphere~sphere 25;
+  plane~plane 8; plane~sphere 2). The dispatch and census were
+  deliberately NOT "fixed" per the stop condition. Legacy throughput
+  comparator DEFERRED TO INTEGRATION (no directly-callable legacy
+  pair-contact entry in the test crate). Harness/doc/dev-dep edge ride
+  on packet/BG-CK-P1-FLOOR as WIP evidence.
+- **BG-CK-P2-CONTRACT** `37b0267` (landed): the wave's shared contract
+  shim — SquareSystem3, KrawczykCertificate3, TraceStep/TraceOutcome/
+  TraceRefusal, ssi_fixtures as #[doc(hidden)] test support. No solver
+  bodies; the wave packets implement against this.
 
 ## Pick up here
 
-1. Poll DISPATCH (`python loop/slot_status.py`); when finished: verify
-   `--base 4076d7b`, land, then `python loop/gen_packet.py --check
-   loop/packets/BG-CK-P1-FLOOR.md` (anchors reference DISPATCH's landed
-   names — they FAIL until DISPATCH lands), lint, register AT DISPATCH,
-   dispatch FLOOR. When FLOOR lands, Phase 1's exit gate is measured.
-2. Then: DISPATCH-2 decision (cone/torus special-position arms — booking
-   doc §DISPATCH amendment) vs Phase-2 start (booking doc
-   docs/CERTIFIED_PHASE2_BOOKING.md; input gates: floor numbers, corpus
-   seeds, DISPATCH-2 decision).
-3. ONE WORKER AT A TIME (pagefile rule stands — owner confirmed serial).
-4. Registry rows AT DISPATCH (session 47 missed twice: MAP post-landing
-   repair, DISPATCH late registration — the FLOOR DEPENDS_KNOWN lint
-   caught the second).
+1. **The FLOOR finding feeds the DISPATCH-2 decision.** The Phase-1 gate is
+   uncertified and the anomaly column is at mass: before Phase-2 or DISPATCH-2,
+   decide how to act on "the dispatch's screens and the census's adjacency
+   enumeration disagree about what a pair IS" (the disagreement is localized to
+   cylinder~plane 3,600 and cylinder~cylinder 746). Do NOT paper over it.
+2. **The wave is running.** Phase 2 booked (docs/CERTIFIED_PHASE2_BOOKING.md;
+   SYSTEM -> KRAWCZYK3 -> TRACE -> RESIDUAL) and ORCHESTRATOR.md "wave mode"
+   now governs a packet tail. FLOOR's landed dev-dep edge (truck-certified in
+   the root `[dev-dependencies]`) is the re-export reachability basis
+   BG-CK-P2-CONTRACT references for RESIDUAL.
+3. ONE WORKER AT A TIME unless the owner explicitly authorizes wave
+   concurrency (pagefile rule; wave mode sets concurrency by disk + shared
+   compile cache, never N full builds).
+4. Registry rows AT DISPATCH (session 47 missed twice; the FLOOR
+   DEPENDS_KNOWN lint caught the second). `python loop/packet_lint.py` on
+   packets that depend_on a packet just dispatched.
 5. Open environmental, do NOT chase: healing::tests::step_import;
    upstream fillet::complex_surface; stepio assy/table/tessellate/oi/ioi;
    stepio builder Closed-vs-Oriented; cone_topology debug panics; clippy
@@ -84,26 +94,31 @@ anchor-check pending DISPATCH landing), **PHASE 2 BOOKED**
 
 ## State of the machine, as left
 
-- Watchdog RUNNING (re-derive pid: `Get-Process python`; restarted 21:34
-  prior session with LOOK_WATCHDOG_STAGNANT=3600).
-- Slot 0: DISPATCH worker live. Slots 1-3: FINISHED/idle. Re-fork via
-  new_slot before reuse.
-- Disk at last check: ~16 GB free after warm. Reclaim order: repo-root
-  target, idle slot targets, %TEMP%/look-verify-baseline-*.
+- Watchdog NOT running at session close (restart for the wave:
+  `LOOK_WATCHDOG_STAGNANT=3600`).
+- Slot 0: FLOOR worker finished (stop); WIP evidence committed on
+  packet/BG-CK-P1-FLOOR; slot 0 target dir was ~12 GB (warm) — reclaim if
+  the wave needs disk. Slots 1-3: FINISHED/idle. Re-fork via new_slot
+  before reuse.
+- Disk at last check: ~19 GB free. Reclaim order: repo-root target, idle
+  slot targets, %TEMP%/look-verify-baseline-*.
 - LOC ledger (re-derive): `git diff --shortstat da72cd5..HEAD --
   vendor/truck`.
 
 ## The parallelism picture
 
-Serial is law (owner confirmed: pagefile risk outweighs parallel gain).
-The pipeline is saturated orchestrator-side: worker churns while the
-next packet is written/linted/registered; dispatch on landing. Phase 2
-is booked (docs/CERTIFIED_PHASE2_BOOKING.md) with its packet graph
-(SYSTEM -> KRAWCZYK3 -> TRACE -> RESIDUAL) and substrate census (the 2D
-bivariate Krawczyk is fully landed in bezier_isect.rs — Phase 2 is a
-dimension raise, not a from-scratch solver). Input gates before the
-first Phase-2 dispatch: Phase-1 floor published, grazing-pair corpus
-seeds named, DISPATCH-2 decision.
+Serial has been law (pagefile risk), but wave mode is now booked and the
+owner is preparing the swarm wave: parallel implementation wave + one
+authoritative verification (ORCHESTRATOR.md "wave mode"; concurrency set by
+disk and the shared compilation cache, never N copies of the world). The
+pipeline is orchestrator-saturated: workers churn while the next packet is
+written/linted/registered; dispatch on landing. Phase 2 is booked
+(docs/CERTIFIED_PHASE2_BOOKING.md) with its packet graph (SYSTEM ->
+KRAWCZYK3 -> TRACE -> RESIDUAL) and substrate census (the 2D bivariate
+Krawczyk is fully landed in bezier_isect.rs — Phase 2 is a dimension raise,
+not a from-scratch solver). Input gates before the first Phase-2 dispatch:
+**Phase-1 floor published (done — and uncertified, see the finding),
+grazing-pair corpus seeds named, DISPATCH-2 decision.**
 
 ## Traps, each one paid for
 
