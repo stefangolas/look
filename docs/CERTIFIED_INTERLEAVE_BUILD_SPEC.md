@@ -52,6 +52,13 @@ shim code is absent from that tree.
   `docs/CERTIFIED_SPLINE_CENSUS.md` + the wave's RESIDUAL numbers. Neither
   blocks the wave; the wave does not book them. The booking's own language
   already says the census makes either outcome a win.
+  - **Owner amendment, session 49:** the corpus-mass rule is demoted from
+    a gate to an ordering device. Everything on this program is built
+    speculatively — the corpus is a 38-file proxy for the domain, not
+    demand. Geometrically natural recognizers are worth building
+    regardless of measured mass; the census's counts only RANK the arm
+    order and size the win. Never again cite corpus mass as a reason NOT
+    to build a capability.
 - The **FLOOR anomaly** (4,381 certified_disjoint on adjacent pairs; the
   dispatch's screens vs the census's adjacency enumeration disagreeing
   about what a pair IS) is a Phase-1 dispatch/census disagreement. It is
