@@ -32,19 +32,18 @@ write_allow:
 read_allow:
   - docs/CERTIFIED_PHASE2_BOOKING.md
   - docs/CERTIFIED_INTERLEAVE_BUILD_SPEC.md
-  - tests/certified_phase1_floor.rs
-  - docs/CERTIFIED_PHASE1_FLOOR.md
+  - loop/packets/BG-CK-P1-FLOOR.md
+  - loop/results/BG-CK-P1-FLOOR.STOP.json
   - tests/certified_prevalence.rs
   - docs/CERTIFIED_PREVALENCE.md
-  - loop/results/BG-CK-P1-FLOOR.STOP.json
 budget:      {turns: 30, ctx_tokens: 120000}
 anchors:
-  - {id: A1, expect: TBD, cmd: "grep -c 'certified_disjoint' loop/results/BG-CK-P1-FLOOR.STOP.json"}
+  - {id: A1, expect: 9, cmd: "grep -c 'certified_disjoint' loop/results/BG-CK-P1-FLOOR.STOP.json"}
   - {id: A2, expect: 0, cmd: "ls tests/certified_phase2_floor.rs 2>/dev/null | wc -l"}
   - {id: A3, expect: 0, cmd: "ls docs/CERTIFIED_PHASE2_FLOOR.md 2>/dev/null | wc -l"}
-  - {id: A4, expect: TBD, cmd: "grep -c '21,004' docs/CERTIFIED_PHASE2_BOOKING.md"}
-  - {id: A5, expect: TBD, cmd: "grep -c 'LOOK_CORPUS' tests/certified_phase1_floor.rs"}
-  - {id: A6, expect: TBD, cmd: "grep -c 'truck-certified' Cargo.toml"}
+  - {id: A4, expect: 2, cmd: "grep -c '21,004' docs/CERTIFIED_PHASE2_BOOKING.md"}
+  - {id: A5, expect: 7, cmd: "grep -c 'LOOK_CORPUS' tests/certified_prevalence.rs"}
+  - {id: A6, expect: 1, cmd: "grep -c 'truck-certified' Cargo.toml"}
 tests_required:
   - floor_harness_skips_cleanly_without_look_corpus
   - floor_refusal_distribution_buckets_are_exhaustive
@@ -69,9 +68,15 @@ dispatch/census disagreement, an open owner decision, out of scope here
 
 FLOOR shape, wave-phase scope:
 
-- Same loader path discipline as `certified_phase1_floor.rs` (read the
-  landed file; reuse its import chain shape; `LOOK_CORPUS` env, clean
-  skip when unset).
+- Same loader path discipline as the FLOOR harness. NOTE: the FLOOR
+  harness itself (`tests/certified_phase1_floor.rs` +
+  `docs/CERTIFIED_PHASE1_FLOOR.md`) is NOT in your tree — it rides as
+  WIP evidence on branch `packet/BG-CK-P1-FLOOR` (the packet STOPPED;
+  its STOP filing `loop/results/BG-CK-P1-FLOOR.STOP.json` IS landed and
+  is your anchor A1). For the harness SHAPE, read the FLOOR packet doc
+  (`loop/packets/BG-CK-P1-FLOOR.md`, in your read_allow) — do not try
+  to check out or read the WIP branch, and do not re-derive adjacency
+  semantics beyond what the landed prevalence data provides.
 - **The integration seam, single and marked**: one function,
   `run_certified_pair_pair(...)` (name yours), is the ONLY site that
   will call the production chain. In the wave-phase tree it is a
