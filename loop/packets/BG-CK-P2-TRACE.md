@@ -163,6 +163,49 @@ path):
   current branch first (subject: `feat(certified): SSI branch tracing +
   coordinate switching (BG-CK-P2-TRACE)`).
 
+## INTEGRATION AMENDMENT (session 49, orchestrator — the wave compose succeeded; activate your production seam)
+
+W1 (BG-CK-P2-SYSTEM) merged into integration with its full public API in
+`src/ssi.rs`: `RationalBipatch::new`, `construct_square_system`,
+`partial_enclosure`, `f3_diagonal_derivatives`,
+`select_continuation_coordinate` (the frozen rule), and
+`krawczyk3_certificate` — read the real signatures from CONTEXT.md (it
+carries the W1 diff) or the file; do not guess them. The composed tree
+compiles and all suites are green. Your `BranchCertifier`/`trace_branch`
+are `pub(crate)` by design — that is still correct (H-1 module discipline)
+— but the production substitution now needs the one adapter this packet
+booked:
+
+1. **Implement `BranchCertifier` over W1's API** (in `ssi_trace.rs`):
+   given a `BranchBox`, build the composed system over that box via
+   `construct_square_system`, form the per-box enclosure inputs via
+   `partial_enclosure`/`f3_diagonal_derivatives`, select the coordinate
+   with `select_continuation_coordinate` (the frozen rule — never a
+   local re-implementation), certify with `krawczyk3_certificate`,
+   classify the germ with `classify_branch_germ`, and assemble the
+   `TraceStep` (incidence record as in the fixture kit's sample helpers).
+2. **Add ONE crate-public entry point** in `ssi_trace.rs`, e.g.
+   `pub fn certified_pair_trace(a: &RationalBipatch, b: &RationalBipatch,
+   seed: [f64; 4], ...) -> Result<TraceOutcome, ...>` (exact spelling
+   yours): wraps `trace_branch` over the new certifier. This is the
+   function BG-CK-P2-RESIDUAL's harness calls through the landed
+   dev-dependency edge. Refusals stay named; no catch-all.
+3. **Tests**: your synthetic-certifier tests stay green unchanged (the
+   loop's identity is unchanged). Add integration tests driving
+   `certified_pair_trace` on the shim fixtures:
+   `well_conditioned_root()`'s patches terminate/close per the fixture's
+   stated ground truth; `closed_loop_pair()` returns `ClosedLoop` with
+   the identity recurrence; `conditioning_below_threshold()` refuses the
+   named way.
+
+Write set: `src/ssi_trace.rs` + `tests/ssi_trace.rs` (unchanged yaml). If
+you find you MUST touch `src/ssi.rs` (a missing W1 primitive), STOP and
+record it instead — W1's session owns that file. If a fixture's ground
+truth does not survive the real pipeline (e.g. the trace diverges from
+the stated root), STOP and record the numbers — that is a finding, not
+something to tune.
+
+
 ## Stop conditions
 
 Stop, commit nothing beyond WIP evidence, write RESULT.json AT THE
