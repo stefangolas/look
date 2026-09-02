@@ -161,11 +161,21 @@ flip to DONE only after it passes.
 
 ## Wave manifest (filled at integration; the record of record)
 
-- base SHA (shim landing merge): _TBD_
+- base SHA (shim landing merge): **a27edaa** ("merge: BG-CK-P2-CONTRACT
+  (ACCEPTED, verified at 1b5ca21)"; filing commit 6932197; ceiling 111→111)
+- shim BG-CK-P2-CONTRACT: packet authored 37b0267; r1 STOPPED (condition 3,
+  filed loop/results/BG-CK-P2-CONTRACT.STOP.json — the packet's own false
+  Section 3 premise, worker caught it, E0433 recorded); r2 amendment
+  f2fca2c → resumed session landed the dev-dep edge + complete shim
+  (worker commit 1b5ca21); one orchestrator H-3 one-liner amendment (V4);
+  full verify ACCEPTED; **row DONE**
 - W1 packet SHA / worker commit SHA: _TBD_
 - W2 packet SHA / worker commit SHA: _TBD_
 - W3 packet SHA / worker commit SHA: _TBD_
 - census packet SHA / worker commit SHA: _TBD_
 - integration amendments (worker, failure, fix): _TBD_
 - verifier version + final integrated SHA: _TBD_
-- concurrency actually used + disk low-water mark: _TBD_
+- concurrency actually used + disk low-water mark: 1-concurrent (RAM-bound,
+  two OOM crashes recorded); CARGO_BUILD_JOBS=2–4; disk low-water ~26 GB;
+  one transient STATUS_STACK_BUFFER_OVERRUN rustc crash during the shim
+  worker's own check run (retried clean)
