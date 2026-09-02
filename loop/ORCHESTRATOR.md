@@ -336,6 +336,125 @@ Class matters: **mechanical** packets go to the worker model; **design** packets
 (new types, new invariants, anything the rest of the graph types against) you
 write yourself. BG-EVD-r3 is design class.
 
+## Wave mode — parallel implementation, one authoritative verification
+
+Wave mode is an owner-directed execution strategy for closing out a small
+tail of packets whose contracts are already frozen. It replaces
+N serial (worker run + full verify + merge) cycles with one parallel
+implementation wave plus one integration/verification wave. It changes
+throughput, not epistemology: every rule in this file still holds, and the
+wave's final verify is the same full verifier — run once at the composed
+HEAD instead of once per packet.
+
+**When wave mode is legitimate.** Only when (a) the tail is small enough
+that integration is cheaper than the serial verifies it replaces, (b) the
+shared contracts between the packets are frozen and landed (types, refusal
+vocabularies, interfaces), and (c) the owner has directed it. A wave is
+NOT a way to avoid designing contracts — it requires them up front.
+
+**The cost being eliminated, and the two costs that replace it.** The
+serial pattern pays one full verification per packet; each verify builds
+entire extra baseline worktrees and takes tens of minutes to hours. The
+wave pattern pays instead (1) a build-concurrency problem — N workers each
+compiling the dependency universe — and (2) an integration-seam bill.
+Wave mode is worth it only when (1) and (2) are cheaper than the serial
+verifies; that is a disk-and-math question answered per wave, not a
+doctrine.
+
+**Implementation dependency vs contract dependency.** A packet DAG edge
+is not automatically a serialization reason. If packet B needs only A's
+already-frozen interface and output semantics, B implements against those
+contracts plus synthetic fixtures, and A and B run concurrently.
+Production substitution happens at integration. Only a genuinely missing
+shared Rust type forces sequencing.
+
+**The contract shim is a packet, not an orchestrator commit.** If shared
+types do not exist yet, they land as a tiny pre-wave packet through the
+NORMAL loop (types + refusing constructors + contract-pinning tests, no
+solver bodies — the contract-freeze pattern), verified like any packet.
+The wave base is taken AFTER the shim lands. The shim also carries the
+shared synthetic fixture kit: mathematically valid states with known
+ground truth, covering each packet's success and refusal paths, so
+downstream workers build against fixtures instead of upstream production
+code. Never let two workers independently design the same public type;
+freeze it in the shim first.
+
+**LOCAL_GREEN is not DONE.** A wave worker's success state means: it
+implements its booked packet contract and passes LOCAL checks — fmt,
+`clippy -p <crate>` on its diff, diff-scoped kernel gates, targeted crate
+and packet-specific tests — against the wave base and shim contracts. No
+wave worker runs the full downstream/global verifier; that is the point.
+RESULT.json remains a claim; the authoritative verifier runs once at the
+integrated HEAD. Registry rows keep a known status during the wave (the
+scheduler does not know custom statuses — record the wave state in the row
+note and a wave manifest); packets flip to DONE only when the final verify
+passes. The wave manifest records: base SHA, packet IDs, packet commit
+SHAs, integration amendments, verifier version, final integrated SHA.
+
+**Branches stay independent.** Never merge worker A into the integration
+branch merely so worker B can continue; B uses the frozen contracts and
+fixtures. All wave branches fork from the exact same base SHA. If a
+worker discovers a real contract ambiguity, SPEC_GAP is correct — do not
+let N workers invent N interpretations; freeze the answer in the shim and
+amend.
+
+**Write-set pre-matrix.** Before dispatch, build a per-pair collision
+matrix across the wave (same file / same shared type / same function /
+disjoint). Same-crate separate-module additions are fine — expected
+textual conflicts (e.g. one `pub mod` line per branch in the crate's
+lib.rs) are resolved at integration. Same shared type means the type goes
+in the shim. Disjoint means disjoint.
+
+**Build strategy: never build N copies of the world.** The binding
+constraint is disk, and the pagefile incident in the traps is the
+precedent. Before dispatch: check free disk and check whether `sccache`
+(or any shared compilation cache) is available; if it is, set
+`RUSTC_WRAPPER` for every worker (worker spawn inherits the orchestrator's
+environment) and share the cache while keeping per-worker writable
+`CARGO_TARGET_DIR`s; if it is not, either install it first or run fewer
+workers. Prewarm the wave base once. Estimate N x target-tree size against
+free disk and set concurrency from that answer — a 2-implementation +
+1-low-build split beats N rustc storms and a dead disk. No wave worker
+ever runs the expensive global gates (baselines, corpus suites); those run
+once, in the final verification.
+
+**Integration in dependency order, fast gate between merges.** Create the
+integration branch from the wave base; merge locally-green branches in
+mathematical dependency order (not dispatch order) so compile failures are
+intelligible; after each merge run only a fast integration check
+(`cargo check -p <affected-crate>` + targeted cross-packet tests). The
+first objective is: do the independently implemented contracts compose?
+
+**Integration failures are amendments, not new packets.** Expect seam
+mismatches (a missing accessor, a differently-named field, a refusal
+variant mismatch, an ownership assumption). Attribute each to its semantic
+owner and return a small amendment to that worker's session (`--resume`
+where the session survives) with the exact failure, the exact contract,
+and the exact required correction. Never let a worker redo proven
+mathematics.
+
+**The final verification is the loop's ordinary verifier, once.** When all
+wave members compose, run the full authoritative verification campaign
+against the integrated HEAD — downstream compile, broad tests,
+regressions, geometry fingerprints, corpus tests, certification floors,
+whatever gates apply. Do not delete or weaken any correctness property;
+the only change is frequency. If it fails: attribute from test ownership,
+refusal type, and changed files; amend the owning worker only; at worst
+isolate 2+2 on the integration branch. Never return to N serial full
+verifies without evidence every packet needs individual isolation.
+
+**Measurement packets inside a wave** build their harness against the
+shim/fixture outcomes during the wave and substitute the production
+pipeline at integration time — the measurement then runs once against the
+composed chain, and its published numbers (certify rates, refusal
+distributions) are outputs, never thresholds to tune against.
+
+**First instantiation (for the record).** The BG-CK tail — SYSTEM,
+KRAWCZYK3, TRACE, RESIDUAL — is the first wave; its packet graph,
+contract inventory, and fixture list live in
+`docs/CERTIFIED_PHASE2_BOOKING.md` and the shim packet. Later tails reuse
+this section as-is.
+
 ## What a session should leave behind
 
 Rewrite `loop/STATE.md` — it is the next session's only cold-start read, and it
