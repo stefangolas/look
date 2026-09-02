@@ -43,7 +43,7 @@ anchors:
   - {id: A3, expect: 0, cmd: "ls docs/CERTIFIED_PHASE2_FLOOR.md 2>/dev/null | wc -l"}
   - {id: A4, expect: 2, cmd: "grep -c '21,004' docs/CERTIFIED_PHASE2_BOOKING.md"}
   - {id: A5, expect: 7, cmd: "grep -c 'LOOK_CORPUS' tests/certified_prevalence.rs"}
-  - {id: A6, expect: 1, cmd: "grep -c 'truck-certified' Cargo.toml"}
+  - {id: A6, expect: 2, cmd: "grep -c 'truck-certified' Cargo.toml"}
 tests_required:
   - floor_harness_skips_cleanly_without_look_corpus
   - floor_refusal_distribution_buckets_are_exhaustive
