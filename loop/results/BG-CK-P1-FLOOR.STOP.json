@@ -1,0 +1,69 @@
+{
+  "id": "BG-CK-P1-FLOOR",
+  "status": "STOPPED",
+  "contract": "BG-CK-P1-FLOOR",
+  "branch": "packet/BG-CK-P1-FLOOR",
+  "deliverables": [
+    "tests/certified_phase1_floor.rs",
+    "docs/CERTIFIED_PHASE1_FLOOR.md",
+    "Cargo.toml (one dev-dependency line)",
+    "Cargo.lock"
+  ],
+  "anchors_verified": {
+    "A1": 1,
+    "A2": 1,
+    "A3": 1,
+    "A4": 0,
+    "A5": 7,
+    "A6": 1
+  },
+  "stop_condition": 3,
+  "stop_condition_text": "The anomaly column (certified_disjoint on adjacent pairs) fires at mass in a recorded run — do not 'fix' the dispatch or the census; publish the finding and stop. A disagreement between two landed measurements is the loop's most valuable output.",
+  "headline": {
+    "corpus_present": true,
+    "corpus_path": "C:\\Users\\stefa\\look-corpus",
+    "files_measured": 38,
+    "pairs_walked": 166307,
+    "admitted": 71957,
+    "certified_contact": 37798,
+    "certified_disjoint": 4381,
+    "refused_unsupported": 29778,
+    "unresolved": 0,
+    "certify_rate": 0.5861695179065275,
+    "anomaly_column_at_mass": true,
+    "certify_rate_floor": 0.95,
+    "floor_met": false
+  },
+  "verdict": "STOPPED on stop condition 3. The Phase-1 gate measurement ran on the full corpus (release build) and the anomaly column fired at mass: 4,381 adjacent face pairs were answered exactly `certified_disjoint` by the certified dispatch, concentrated in cylinder~plane (3,600 of 37,361 admitted = 9.6%) and cylinder~cylinder (746 of 5,354 admitted = 13.9%). Adjacent faces share an edge by the census's own enumeration, so an exactly-disjoint certified answer is a representation/admission mismatch: the census's adjacency enumeration and the dispatch's exact admission screens disagree about what a pair IS at corpus scale. Per the packet this disagreement is the loop's most valuable output — the dispatch and the census were deliberately NOT 'fixed'. The certify-rate is 0.5862 (58.6%), far below the 95% floor, and counting the 4,381 disagreements as certified successes flatters the numerator; the Phase-1 exit gate is NOT certified by this run. The doc carries the aggregate verbatim, the per-file table, the per-class breakdown, the anomaly column analysis, the build profile (release), and the reproduction command. Throughput comparison vs the legacy path is DEFERRED TO INTEGRATION per the packet's D-latency fallback: no directly-callable legacy pair-contact entry exists in the test crate.",
+  "finding": {
+    "kind": "anomaly-column-at-mass",
+    "aggregate_line_verbatim": "CERTIFIED_PHASE1_FLOOR_AGGREGATE {\"admitted\":71957,\"certified_contact\":37798,\"certified_disjoint\":4381,\"certify_rate\":0.5861695179065275,\"files\":38,\"latency_ns_max\":8222400,\"latency_ns_median\":6400,\"latency_ns_min\":0,\"latency_ns_p95\":23100,\"pairs\":166307,\"refused_unsupported\":29778,\"unresolved\":0}",
+    "anomaly_column_verbatim": "CERTIFIED_PHASE1_FLOOR_ANOMALY {\"cone~cone\":0,\"cone~cylinder\":0,\"cone~other\":0,\"cone~plane\":0,\"cone~sphere\":0,\"cone~spline\":0,\"cone~torus\":0,\"cylinder~cylinder\":746,\"cylinder~other\":0,\"cylinder~plane\":3600,\"cylinder~sphere\":0,\"cylinder~spline\":0,\"cylinder~torus\":0,\"other~other\":0,\"other~plane\":0,\"other~sphere\":0,\"other~spline\":0,\"other~torus\":0,\"plane~plane\":8,\"plane~sphere\":2,\"plane~spline\":0,\"plane~torus\":0,\"sphere~sphere\":25,\"sphere~spline\":0,\"sphere~torus\":0,\"spline~spline\":0,\"spline~torus\":0,\"torus~torus\":0}",
+    "per_class_anomaly_breakdown": {
+      "cylinder~plane": {"admitted": 37361, "certified_disjoint": 3600, "anomaly_share": 0.096},
+      "cylinder~cylinder": {"admitted": 5354, "certified_disjoint": 746, "anomaly_share": 0.139},
+      "sphere~sphere": {"admitted": 75, "certified_disjoint": 25, "anomaly_share": 0.333},
+      "plane~plane": {"admitted": 26274, "certified_disjoint": 8, "anomaly_share": 0.0003},
+      "plane~sphere": {"admitted": 254, "certified_disjoint": 2, "anomaly_share": 0.008}
+    },
+    "reading": "A cylinder~plane or cylinder~cylinder adjacent pair sharing an edge answered Disjoint thousands of times. The exact screens that produced Disjoint (plane-cylinder: plane parallel to the axis and farther than the radius; cylinder-cylinder: parallel axes farther than r1+r2; sphere-sphere: center distance beyond r1+r2) are reached for pairs the census says touch. This is a landed-measurement disagreement to be investigated at the dispatch/census boundary (compressed-shell edge sharing vs world-space exact screens), not a bug to be papered over.",
+    "no_fix_applied": true
+  },
+  "tests_added": 1,
+  "test_names": [
+    "floor_measurement_is_ignored_and_skips_cleanly_without_corpus (ignored, corpus-gated)",
+    "every_admitted_pair_gets_exactly_one_disposition",
+    "adjacent_pair_disjoint_answers_are_counted_as_an_anomaly_column",
+    "aggregate_line_carries_certify_rate_and_latency_distribution",
+    "no_threshold_assertion_in_tree"
+  ],
+  "verification": {
+    "cargo_fmt_check": "clean on the new test file (pre-existing diffs in examples/step_face_timing.rs and tests/geometry_fingerprint.rs are out of scope)",
+    "cargo_clippy": "clean on tests/certified_phase1_floor.rs (0 findings)",
+    "unit_tests": "4 passed, 1 ignored (corpus-gated), no failures",
+    "cargo_check_workspace_all_targets": "green (one pre-existing truck-meshalgo unused_qualifications warning)",
+    "build_profile_of_recorded_run": "release"
+  },
+  "run_command": "$env:LOOK_CORPUS = \"C:\\Users\\stefa\\look-corpus\"; cargo test --release -j 2 -p look --test certified_phase1_floor -- --ignored --nocapture",
+  "notes": "The r1 SPEC_GAP (unreachable pair_dispatch from the look test target) was resolved per the packet's AMENDED r2 section by adding exactly one dev-dependency line to the root Cargo.toml: `truck-certified = { path = \"vendor/truck/truck-certified\" }`. After that `use truck_certified::pair_dispatch::{dispatch_pair, CertifiedPairParticipant, CertifiedPairResult}` compiles in the look test target, exactly as the amendment predicted. The harness then ran on the corpus. Note the machine's pagefile is small: the release dependency build required -j 2. Latency is per-call wall time of dispatch_pair over the admitted set; a second direct-binary release run produced the same counters with slightly different latency samples (fresh-process variance), and the doc records one canonical release run verbatim."
+}
