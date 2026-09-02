@@ -175,13 +175,43 @@ flip to DONE only after it passes.
   f2fca2c → resumed session landed the dev-dep edge + complete shim
   (worker commit 1b5ca21); one orchestrator H-3 one-liner amendment (V4);
   full verify ACCEPTED; **row DONE**
-- W1 packet SHA / worker commit SHA: _TBD_
-- W2 packet SHA / worker commit SHA: _TBD_
-- W3 packet SHA / worker commit SHA: _TBD_
-- census packet SHA / worker commit SHA: _TBD_
-- integration amendments (worker, failure, fix): _TBD_
-- verifier version + final integrated SHA: _TBD_
-- concurrency actually used + disk low-water mark: 1-concurrent (RAM-bound,
-  two OOM crashes recorded); CARGO_BUILD_JOBS=2–4; disk low-water ~26 GB;
-  one transient STATUS_STACK_BUFFER_OVERRUN rustc crash during the shim
-  worker's own check run (retried clean)
+- W1 BG-CK-P2-SYSTEM: worker commit **59ade56** (merged 3d991aa);
+  SYSTEM+KRAWCZYK3 collapsed; LOCAL_GREEN, composed battery green; **row DONE**
+- W2 BG-CK-P2-TRACE: v1 **7e671e8** (merged clean); amendment **e4a5fc2**
+  (merged 62127f5) activated the production seam — `certified_pair_trace`
+  over W1's pipeline, fixture-driven integration tests green; **row DONE**
+- W3 BG-CK-P2-RESIDUAL: v1 **b5487d5** (merged clean; seeds re-walk
+  reproduced the booked prevalence totals exactly); amendment **c0b8117**
+  (merged) filled the marked seam and RAN the measurement; **row DONE**
+- census BG-CK-SPLINE-CENSUS: CANCELLED by owner (gate waived; row
+  BLOCKED; WIP archived)
+- integration amendments: W2 seam activation (--resume, one round,
+  first-try LOCAL_GREEN); W3 seam fill + measurement run (--resume, one
+  round, first-try); anchor re-scoping A2/A3/A4/A6 post-compose (the
+  recorded anchor-drift class); zero seam conflicts at the merges
+- verifier: composed-HEAD battery ONCE per the wave-mode law —
+  `cargo test -p truck-certified --lib --tests --no-fail-fast` (559 lib
+  + all suites), harness tests, `scripts/kernel-gates.sh HEAD` (all P-3,
+  GATE-4 111/111), `cargo check --workspace --all-targets`, scoped clippy
+  (zero findings attributable to wave files; pre-existing grandfathered
+  baseline unchanged); V8/V9 regression baselines skipped on the recorded
+  justification that the wave diff is additive-only (new modules + test
+  files; zero production behavior touched outside truck-certified's new
+  modules) — final integrated SHA is the W3 amendment merge
+- **final integrated SHA: the c0b8117 merge on integration/kernel-bg**
+- concurrency actually used: the three wave members ran in PARALLEL
+  (owner-directed) on slots 1/2/3 + the shim on slot 0 serially before;
+  amendments ran serially only because W3's entry-point signature was
+  not frozen up front (the recorded lesson); disk low-water 4.9 GB
+  (reclaimed: slot 0's verify baselines 10.7 GB); CARGO_BUILD_JOBS 2–4
+  throughout, sccache warm
+- **the wave's published output (the measurement):** 60,438 booked
+  spline pairs → 726 admitted (funnel: 21,566 admission_refused;
+  9,356 rational-form; 28,790 non-spline-carrier); 226,654 patch-pair
+  units → 400 traced (0.83% completion, truncation published); typed
+  refusals only (3 non_transverse, 2 conditioning, 1 singular);
+  certify_rate 0.0 on 6 completed pairs — statistically empty,
+  honestly published. **The funnel is the Phase-2 finding** (the
+  FLOOR-STOP analogue): admission screens and patch extraction eat the
+  mass before the certified engine is consulted; the next booking
+  decides on these numbers.
