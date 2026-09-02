@@ -468,7 +468,13 @@ the world — that happens once, at the end.
    collapse decisions (same new file = collapse; invoke the booking's
    escape hatch and record it), the concurrency answer from MEASURED
    machine facts, the integration order, and an empty wave manifest.
-   Shared contracts land as ONE shim packet through the NORMAL loop
+   **Contracts precede concurrency — everywhere.** Enumerate every
+   cross-worker seam at spine time, including the ones that only appear
+   at integration (the adapter a repair will add, the entry point a
+   consumer will call) and freeze their signatures in the packets
+   themselves; a worker is only serialized when a genuinely missing
+   shared contract forces it. Shared contracts land as ONE shim packet
+   through the NORMAL loop
    (frozen types + refusing constructors + synthetic fixture kit with
    stated, machine-checked ground truths; no solver bodies); full verify
    once; **its landing merge SHA is the wave base.** In the same session,
