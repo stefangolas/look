@@ -40,7 +40,7 @@ budget:      {turns: 30, ctx_tokens: 120000}
 anchors:
   - {id: A1, expect: 9, cmd: "grep -c 'certified_disjoint' loop/results/BG-CK-P1-FLOOR.STOP.json"}
   - {id: A2, expect: 0, cmd: "ls tests/certified_phase2_floor.rs 2>/dev/null | wc -l"}
-  - {id: A3, expect: 0, cmd: "ls docs/CERTIFIED_PHASE2_FLOOR.md 2>/dev/null | wc -l"}
+  - {id: A3, expect: 1, cmd: "ls docs/CERTIFIED_PHASE2_FLOOR.md 2>/dev/null | wc -l"}
   - {id: A4, expect: 2, cmd: "grep -c '21,004' docs/CERTIFIED_PHASE2_BOOKING.md"}
   - {id: A5, expect: 7, cmd: "grep -c 'LOOK_CORPUS' tests/certified_prevalence.rs"}
   - {id: A6, expect: 2, cmd: "grep -c 'truck-certified' Cargo.toml"}
