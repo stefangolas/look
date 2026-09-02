@@ -1,0 +1,42 @@
+{
+  "packet": "BG-CK-P2-CONTRACT",
+  "class": "design",
+  "crates": ["truck-certified", "look"],
+  "branch": "packet/BG-CK-P2-CONTRACT",
+  "status": "COMPLETED",
+  "amendment": "SESSION-49 AMENDMENT (Section 3): the root Cargo.toml now gains the ONE dev-dependency edge the FLOOR r2 amendment (26b1ac9) authorized and FLOOR WIP (42617ff) carried — `truck-certified = { path = \"vendor/truck/truck-certified\" }` under [dev-dependencies] — with the Cargo.lock tick. The r1 stop (condition 3, reachability premise false) is resolved: the premise is now supplied.",
+  "commits": [
+    "c1f4be9 wip(certified): BG-CK-P2-CONTRACT r1 WIP checkpoint (orchestrator) — shim types + fixtures + contract tests, complete and crate-green per RESULT; stop condition 3 fired on the false Section 3 premise",
+    "31d8713 feat(certified): SSI wave shim — shared types + fixture kit (BG-CK-P2-CONTRACT) — Cargo.toml dev-dependency edge + Cargo.lock tick"
+  ],
+  "deliverable": {
+    "vendor/truck/truck-certified/src/ssi_types.rs": "SquareSystem3, KrawczykCertificate3, TraceStep, TraceOutcome, TraceRefusal — refusing constructors (Refusal::InvalidInput) and verbatim accessors; D-shim/D-reuse/D-homogeneous tags and the verbatim freeze line in the module doc",
+    "vendor/truck/truck-certified/src/ssi_fixtures.rs": "NEW #[doc(hidden)] pub fixture kit: well_conditioned_root, negative_orientation_root, determinant_spans_zero, conditioning_below_threshold, germ_ladder (one fixture per BranchGerm variant), closed_loop_pair, sample_trace_incidence/sample_trace_step, plus plain-f64 direct-evaluation helpers (no hull kernels, no CertifiedInterval)",
+    "vendor/truck/truck-certified/src/lib.rs": "pub mod ssi_types; #[doc(hidden)] pub mod ssi_fixtures; and the pub use ssi_types::{KrawczykCertificate3, SquareSystem3, TraceOutcome, TraceRefusal, TraceStep} re-export line",
+    "vendor/truck/truck-certified/tests/ssi_contract.rs": "the eight tests_required names plus three machine-check tests (negative orientation, conditioning, closed loop)",
+    "Cargo.toml": "[dev-dependencies] gains truck-certified = { path = \"vendor/truck/truck-certified\" } (the SESSION-49 AMENDMENT edge)",
+    "Cargo.lock": "ticked: the look package's dependency list now carries truck-certified"
+  },
+  "reachability": {
+    "requirement": "From the look test target: `use truck_certified::ssi_types::SquareSystem3;` resolves (RESIDUAL's load-bearing fact)",
+    "probe": "throwaway integration test tests/zz_ssi_probe.rs in the look crate (`use truck_certified::ssi_types::SquareSystem3;` and the crate-root re-exports `use truck_certified::{KrawczykCertificate3, TraceStep};`), compiled with `cargo check -p look --test zz_ssi_probe`, then deleted",
+    "result": "RESOLVES — `cargo check` finished with no errors after the dev-dependency edge was added (before the edge it failed with error[E0433]/error[E0432]: 'cannot find module or crate truck_certified'); the reachability fact for RESIDUAL is confirmed",
+    "verified_at_commit": "31d8713"
+  },
+  "gates": {
+    "anchors_pre_dispatch": {
+      "A1 pub struct SquareSystemInput": 1,
+      "A2 pub enum BranchGerm": 1,
+      "A3 pub mod ssi_types in lib.rs": 0,
+      "A4 SquareSystem3 occurrences in src": 0,
+      "A5 ConditioningBelowThreshold in contract.rs": 4,
+      "A6 pub struct CoordinateSwitch": 1
+    },
+    "cargo_fmt_new_files": "clean (rustfmt --check on ssi_types.rs, ssi_fixtures.rs, ssi_contract.rs)",
+    "cargo_test_p_truck_certified_lib_tests_no_fail_fast": "green — 553 lib tests + integration suites (10/8/9/11/8/11), 0 failures; the 11 ssi_contract tests (incl. all eight tests_required) pass",
+    "cargo_check_workspace_all_targets": "green at commit 31d8713. One transient rustc crash (STATUS_STACK_BUFFER_OVERRUN in trait selection while compiling the look lib-test target) occurred on the first invocation under memory pressure; the retry finished cleanly with no errors — recorded as an environment artifact, not a code defect",
+    "clippy": "zero findings attributable to the new files (verified on ssi_types.rs / ssi_fixtures.rs). Pre-existing crate-wide baseline: #![deny(clippy::all)] (lib.rs) still trips ~65 diagnostics in pre-existing files (formal/bezier_isect.rs, cone.rs, intersection.rs, xmonotone.rs, deck.rs, etc.) under clippy 1.97.0; none reference files this packet wrote or edited. Not introduced by this packet."
+  },
+  "stop_conditions": "none fired in this run — condition 3's trigger (re-exports not resolving) is cleared by the SESSION-49 AMENDMENT edge; the exact r1 compiler error (E0433/E0432) is preserved in the r1 RESULT record and c1f4be9",
+  "notes": "The shim source, fixtures, and contract tests were committed by the orchestrator as WIP (c1f4be9) after r1 stopped; this run added and committed the manifest edge (31d8713) and re-verified all gates. RESULT.json is written at the worktree root per the packet."
+}
