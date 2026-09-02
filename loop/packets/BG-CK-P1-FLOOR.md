@@ -41,8 +41,8 @@ anchors:
   - {id: A1, expect: 1, cmd: "grep -c 'pub fn dispatch_pair' vendor/truck/truck-certified/src/pair_dispatch.rs"}
   - {id: A2, expect: 1, cmd: "grep -c 'pub enum CertifiedPairParticipant' vendor/truck/truck-certified/src/pair_dispatch.rs"}
   - {id: A3, expect: 1, cmd: "grep -c 'pub enum ContactLocus' vendor/truck/truck-certified/src/pair_dispatch.rs"}
-  - {id: A4, expect: 0, cmd: "grep -c 'CERTIFIED_PHASE1_FLOOR_AGGREGATE' tests/certified_phase1_floor.rs"}
-  - {id: A5, expect: 1, cmd: "grep -c 'LOOK_CORPUS' tests/certified_prevalence.rs"}
+  - {id: A4, expect: 0, cmd: "ls tests/certified_phase1_floor.rs 2>/dev/null | wc -l"}
+  - {id: A5, expect: 7, cmd: "grep -c 'LOOK_CORPUS' tests/certified_prevalence.rs"}
   - {id: A6, expect: 1, cmd: "grep -c 'pub struct CertifiedEmbeddedSphere' vendor/truck/truck-certified/src/formal/sphere.rs"}
 tests_required:
   - floor_measurement_is_ignored_and_skips_cleanly_without_corpus
