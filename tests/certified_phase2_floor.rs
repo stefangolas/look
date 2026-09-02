@@ -1,36 +1,45 @@
 //! BG-CK-P2-RESIDUAL — the Phase-2 gate measurement harness (WAVE W3,
-//! FLOOR shape).
+//! FLOOR shape), INTEGRATION AMENDMENT (session 49).
 //!
-//! This is a MEASUREMENT packet, wave-phase scope. The production chain this
-//! harness measures (dispatch admission → Bézier decomposition →
-//! `SquareSystem3` → 3×3 Krawczyk → branch trace) does NOT exist in this tree:
-//! W1's and W2's modules land at integration. The wave-phase harness compiles
-//! against the SHIM ONLY ([`truck_certified::SquareSystem3`] etc. through the
-//! landed dev-dependency edge) plus the fixture kit
-//! ([`truck_certified::ssi_fixtures`]), and every measured pair is counted
-//! `integration_pending` WITHOUT pretending to certify. Wave-phase numbers are
-//! structural: pair counts, bucket totals, and named seeds. The certify-rate
-//! table fills at integration.
+//! The wave-phase tree measured the structural seeds only (every pair
+//! `integration_pending`). The composed chain now exists in-tree — W1's
+//! `ssi.rs` (square-system + 3×3 Krawczyk) and W2's `ssi_trace.rs`
+//! (`certified_pair_trace`) — so this harness fills its single marked
+//! integration seam ([`run_certified_pair_pair`]), extracts rational Bézier
+//! patches from the corpus's spline-carried faces through the LANDED
+//! decomposition (`certified_map::admit_surface`, the Phase-1 map's
+//! row-then-column Bézier cut — never re-derived here), measures the full
+//! patch-pair product per admitted FACE pair under the frozen seed grid, maps
+//! `TraceOutcome`/`SsiRefusal` into the harness's disposition buckets, and
+//! prints the measured certify-rate and refusal distribution. `integration_pending`
+//! disappears from the aggregate: every dispositioned pair is certified,
+//! refused with a named cause, or unresolved.
 //!
-//! The corpus subset is the booking's spline-mass rows
-//! (`docs/CERTIFIED_PHASE2_BOOKING.md`): spline~spline, plane~spline,
-//! cylinder~spline, cone~spline, spline~torus (~60k pairs). The seeds are
-//! named per file from the landed prevalence buckets — the adjacency machinery
-//! of `tests/certified_prevalence.rs` is re-walked here, not re-derived. The
-//! FLOOR STOP finding's anomaly pairs (adjacent `certified_disjoint`, 4,381
-//! mass) are NOT folded in: that is the Phase-1 dispatch/census disagreement,
-//! an open owner decision (`loop/results/BG-CK-P1-FLOOR.STOP.json`), out of
-//! scope here — the doc cites the STOP filing and states the exclusion.
+//! This is a MEASUREMENT. No threshold assertion in-tree; the certify-rate and
+//! the refusal distribution are OUTPUTS published in
+//! `docs/CERTIFIED_PHASE2_FLOOR.md`, never thresholds. Fail-closed is not
+//! passable by refusing everything: the doc shows the certify-rate AND the
+//! admitted mass (the FLOOR anomaly-column discipline carries over). The run
+//! is bounded by a certified-trace budget; what completes is published with
+//! the wall time and completion fraction — never silently truncated. No
+//! `unwrap` (the crate denies it).
 //!
-//! Structural assertions only. No threshold assertion on any rate; the
-//! certify-rate and the refusal distribution are OUTPUTS published in
-//! `docs/CERTIFIED_PHASE2_FLOOR.md`, never thresholds. No `unwrap` (the crate
-//! denies it).
+//! Corpus subset: the booking's spline-mass rows (spline~spline, plane~spline,
+//! cylinder~spline, cone~spline, spline~torus). Seeds named per file from the
+//! landed prevalence buckets (the prevalence-adjacency machinery is re-walked,
+//! not re-derived). The FLOOR STOP finding's anomaly pairs (adjacent
+//! `certified_disjoint`, 4,381 mass) are NOT folded in: that is the Phase-1
+//! dispatch/census disagreement, an open owner decision
+//! (`loop/results/BG-CK-P1-FLOOR.STOP.json`), out of scope here — the doc
+//! cites the STOP filing and states the exclusion.
 
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::path::{Path, PathBuf};
 
-use truck_certified::SquareSystem3;
+use truck_certified::certified_map::admit_surface;
+use truck_certified::formal::numeric::PositiveFinite;
+use truck_certified::ssi::{RationalBipatch, SsiRefusal};
+use truck_certified::ssi_types::{TraceOutcome, TraceRefusal};
 use truck_stepio::r#in::Table;
 use truck_stepio::r#in::step_geometry::{Curve3D, ElementarySurface, Point3, Surface, SweptCurve};
 use truck_topology::compress::{CompressedEdgeIndex, CompressedShell};
@@ -44,6 +53,26 @@ const SUBSET_ROWS: [&str; 5] = [
     "spline~spline",
     "spline~torus",
 ];
+
+/// The declared Phase-1 map admission τ for the landed decomposition
+/// (`certified_map::admit_surface`). The map module's D-tau discipline: a
+/// declared threshold, never inferred, never auto-tuned. This is a
+/// parameterization-degeneracy admission bound, not a certify-rate threshold.
+/// H-3: declared constant; small enough to admit regular corpus splines while
+/// still refusing exactly-degenerate domains.
+const DECOMPOSE_TAU: f64 = 1e-6;
+
+/// The frozen seed grid's half-step about the domain midpoint: the midpoint
+/// `(0.5, 0.5, 0.5, 0.5)` plus every dyadic offset `±1/4` in all four chart
+/// parameters (17 seeds). H-3: `1/4 = 2^-2` is the dyadic literal.
+const SEED_HALF_STEP: f64 = 0.25;
+
+/// The certified-trace run budget (calls of the seam's production entry).
+/// The corpus's patch-pair products are astronomically larger than any
+/// affordable trace budget; the run stops when the budget is spent and
+/// publishes the completion fraction. Override with `PHASE2_TRACE_BUDGET`.
+/// H-3: declared integer bound.
+const MAX_TRACE_CALLS: usize = 400;
 
 /// The seven classifier buckets, in the Phase-1 fast-path dispatch order
 /// (the prevalence census's classifier, copied verbatim as provenance).
@@ -152,9 +181,9 @@ fn load_table(path: &Path) -> anyhow::Result<Table> {
 /// Phase-2 trace-level named causes (the plan's own names). Every case is a
 /// named variant — there is no `Other` arm, no catch-all. The trace-level
 /// named causes are mapped from the shim's [`truck_certified::TraceRefusal`]
-/// variants AT INTEGRATION (the doc carries the mapping table); in the
-/// wave-phase tree they exist here with the mapping documented and receive no
-/// counts, because no pair is traced yet.
+/// variants AT INTEGRATION (the doc carries the mapping table); the mapping
+/// below is that documented integration mapping, applied to the composed
+/// chain's `SsiRefusal`/`TraceRefusal` values.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum RefusalCause {
     /// FLOOR pair-level cause: `PairUnsupported::Overlap`.
@@ -210,11 +239,6 @@ fn all_refusal_cause_tags() -> Vec<&'static str> {
 }
 
 /// One measured pair's disposition: every pair lands in exactly one of these.
-///
-/// Wave-phase note: the only dispositions the wave-phase walk emits is
-/// `IntegrationPending` — the production chain is not in this tree, so a pair
-/// is never certified, refused, or left unresolved here. The full vocabulary
-/// is what the FLOOR gate will publish at integration.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum Disposition {
     CertifiedContact,
@@ -281,26 +305,174 @@ impl DispositionCounts {
             + self.integration_pending
     }
 
-    /// Total pairs in the `refused:<cause>` bucket.
-    fn refused_total(&self) -> usize {
-        self.refused.values().sum()
+    /// Merge another counter set into this one (per-file -> aggregate).
+    fn merge(&mut self, other: &DispositionCounts) {
+        self.certified_contact += other.certified_contact;
+        self.certified_disjoint += other.certified_disjoint;
+        self.unresolved += other.unresolved;
+        self.integration_pending += other.integration_pending;
+        for (cause, count) in &other.refused {
+            *self.refused.entry(*cause).or_insert(0) += *count;
+        }
     }
 }
 
-/// One measured file's Phase-2 seed row: which spline-mass pair mass this file
-/// carries, per class pair.
+/// One measured file's Phase-2 census and measurement row.
 struct Phase2FileRow {
     file: String,
     shells: usize,
     faces: usize,
     seeds: usize,
     seed_rows: BTreeMap<&'static str, usize>,
+    admitted_pairs: usize,
+    admitted_rows: BTreeMap<&'static str, usize>,
+    not_admitted_reasons: BTreeMap<&'static str, usize>,
+    unit_pairs_total: usize,
+    completed_pairs: usize,
+    truncated_pairs: usize,
+    dispositions: DispositionCounts,
 }
 
-/// The Phase-2 subset row an unordered class pair belongs to, when it is one
-/// (the prevalence pair-key order, min/max by class tag so plane/cylinder and
-/// cylinder/plane are one bucket). Pairs outside the five spline-mass rows are
-/// not this gate's seeds.
+/// The corpus-wide run state shared across files.
+struct RunState {
+    /// The budget the run started with.
+    initial_budget: usize,
+    /// The remaining certified-trace budget (seam calls of
+    /// `certified_pair_trace`). Zero ends the measurement; the remaining
+    /// admitted pairs are reported truncated, never silently dropped.
+    budget: usize,
+    /// Set once the budget is exhausted; every later admitted pair is
+    /// truncated (counted in the totals, not dispositioned).
+    budget_spent: bool,
+    /// Wall clock of the run.
+    started: std::time::Instant,
+}
+
+impl RunState {
+    fn new(budget: usize) -> Self {
+        Self {
+            initial_budget: budget,
+            budget,
+            budget_spent: false,
+            started: std::time::Instant::now(),
+        }
+    }
+
+    fn trace_calls_used(&self) -> usize {
+        self.initial_budget - self.budget
+    }
+}
+
+/// One spline-carried face's extraction: the rational Bézier patches the
+/// LANDED decomposition produced, or the reason it could not be reached.
+enum FacePatches {
+    /// The face's rational Bézier patch list (landed `certified_map` cut).
+    Patches(Vec<RationalBipatch>),
+    /// The face's carrier cannot reach a landed decomposition, and why.
+    ///
+    /// `rational_nurbs`: a rational (NURBS) spline surface — the landed
+    /// surface decomposition (`certified_map`, D-map) is non-rational only.
+    /// `admission_refused`: the landed whole-domain admission refused the
+    /// face (`MapRefusal` — degenerate or cannot-decide parameterization).
+    NoPath(&'static str),
+}
+
+/// Decompose one spline surface into rational Bézier patches through the
+/// LANDED decomposition (`certified_map::admit_surface`, the Phase-1 map's
+/// row-then-column Bézier cut), reading the map's patch grids verbatim. Each
+/// non-rational Bézier piece is a unit-weight [`RationalBipatch`] over its own
+/// unit chart; the image of the piece (the surface's world-space geometry over
+/// the span) is unchanged by the unit reparametrization.
+fn spline_face_patches(surface: &Surface) -> FacePatches {
+    let bsp = match surface {
+        Surface::BSplineSurface(bsp) => bsp,
+        // Rational NURBS surfaces cannot reach the landed (non-rational)
+        // decomposition: the D-map's declared scope excludes them.
+        Surface::NurbsSurface(_) => {
+            return FacePatches::NoPath("rational_nurbs");
+        }
+        // Not spline-carried (the callers only route spline-classed faces).
+        _ => return FacePatches::NoPath("non_spline_carrier"),
+    };
+    let tau = match PositiveFinite::new(DECOMPOSE_TAU) {
+        Ok(tau) => tau,
+        Err(_) => return FacePatches::NoPath("admission_refused"),
+    };
+    let map = match admit_surface(bsp, tau) {
+        Ok(map) => map,
+        Err(_) => return FacePatches::NoPath("admission_refused"),
+    };
+    let mut patches = Vec::new();
+    for grid in map.patch_grids() {
+        // grid[k][a][b]: `grid[k]` has `m + 1` rows (first axis `a`), each of
+        // length `n + 1` (second axis `b`). Non-rational pieces carry the
+        // constant positive unit weight certificate.
+        let rows = grid[0].len();
+        let cols = grid[0][0].len();
+        let (m, n) = (rows - 1, cols - 1);
+        if m == 0 || n == 0 {
+            return FacePatches::NoPath("admission_refused");
+        }
+        let w: Vec<Vec<f64>> = (0..=m).map(|_| vec![1.0; n + 1]).collect();
+        match RationalBipatch::new(m, n, grid, w) {
+            Ok(patch) => patches.push(patch),
+            Err(_) => return FacePatches::NoPath("admission_refused"),
+        }
+    }
+    if patches.is_empty() {
+        return FacePatches::NoPath("admission_refused");
+    }
+    FacePatches::Patches(patches)
+}
+
+/// The cached extraction of both faces of a subset pair (decomposing spline
+/// carriers once per shell). Returns borrows of the two cache slots.
+fn extract_pair<'a>(
+    cache: &'a mut [Option<FacePatches>],
+    surface_a: &Surface,
+    surface_b: &Surface,
+    index_a: usize,
+    index_b: usize,
+) -> (&'a FacePatches, &'a FacePatches) {
+    if cache[index_a].is_none() {
+        cache[index_a] = Some(spline_face_patches(surface_a));
+    }
+    if cache[index_b].is_none() {
+        cache[index_b] = Some(spline_face_patches(surface_b));
+    }
+    let a = match cache[index_a].as_ref() {
+        Some(patches) => patches,
+        None => panic!("cache slot filled above"),
+    };
+    let b = match cache[index_b].as_ref() {
+        Some(patches) => patches,
+        None => panic!("cache slot filled above"),
+    };
+    (a, b)
+}
+
+/// The deterministic reason a subset face pair could not be built from two
+/// patch lists (never the empty slot: both sides were extracted).
+fn block_reason(left: &FacePatches, right: &FacePatches) -> &'static str {
+    let reason_of = |r: &FacePatches| match r {
+        FacePatches::NoPath(reason) => Some(*reason),
+        FacePatches::Patches(_) => None,
+    };
+    match (reason_of(left), reason_of(right)) {
+        (Some(a), Some(b)) if a != b => {
+            if a <= b {
+                a
+            } else {
+                b
+            }
+        }
+        (Some(a), _) => a,
+        (_, Some(b)) => b,
+        _ => "non_spline_carrier",
+    }
+}
+
+/// The Phase-2 subset row an unordered class pair belongs to, when it is one.
 fn subset_row(a: Class, b: Class) -> Option<&'static str> {
     let (a, b) = if a.tag() <= b.tag() { (a, b) } else { (b, a) };
     match (a, b) {
@@ -313,9 +485,9 @@ fn subset_row(a: Class, b: Class) -> Option<&'static str> {
     }
 }
 
-/// Measure one file's Phase-2 seed mass (prevalence-adjacency re-walk, same
-/// loader path, measurement only).
-fn measure_file(path: &Path, root: &Path) -> anyhow::Result<Phase2FileRow> {
+/// Measure one file: the prevalence-adjacency re-walk (structural seeds) plus
+/// the integration measurement over the admitted patch-pair products.
+fn measure_file(path: &Path, root: &Path, state: &mut RunState) -> anyhow::Result<Phase2FileRow> {
     let table = load_table(path)?;
     let mut row = Phase2FileRow {
         file: path
@@ -327,27 +499,37 @@ fn measure_file(path: &Path, root: &Path) -> anyhow::Result<Phase2FileRow> {
         faces: 0,
         seeds: 0,
         seed_rows: BTreeMap::new(),
+        admitted_pairs: 0,
+        admitted_rows: BTreeMap::new(),
+        not_admitted_reasons: BTreeMap::new(),
+        unit_pairs_total: 0,
+        completed_pairs: 0,
+        truncated_pairs: 0,
+        dispositions: DispositionCounts::default(),
     };
     for (&shell_id, shell) in &table.shell {
         let (compressed, _losses) = table
             .to_compressed_shell_with_losses(shell_id, shell)
             .map_err(|error| anyhow::anyhow!("shell #{shell_id}: {error}"))?;
-        measure_shell(&compressed, &mut row);
+        measure_shell(&compressed, &mut row, state);
     }
     Ok(row)
 }
 
-/// Count one shell's faces and Phase-2 subset adjacent pairs into the row.
-///
-/// Adjacency is `shell.face_adjacency()`'s relation — two faces sharing an
-/// edge — computed on the compressed form exactly as the prevalence census
-/// does (the adjacency machinery is copied, its semantics are not re-derived).
-/// Only the Phase-2 subset rows are counted here; the spline-mass rows are
-/// this gate's seeds.
-fn measure_shell(shell: &CompressedShell<Point3, Curve3D, Surface>, row: &mut Phase2FileRow) {
+/// Count one shell's faces and Phase-2 subset adjacent pairs, and measure the
+/// admitted patch-pair products under the run budget.
+fn measure_shell(
+    shell: &CompressedShell<Point3, Curve3D, Surface>,
+    row: &mut Phase2FileRow,
+    state: &mut RunState,
+) {
     let faces = &shell.faces;
     let classes: Vec<Class> = faces.iter().map(|face| classify(&face.surface).0).collect();
     row.faces += faces.len();
+
+    // Per-face extraction cache (only spline-classed faces are routed, but the
+    // slots are per shell face so the index math stays trivial).
+    let mut patch_cache: Vec<Option<FacePatches>> = (0..faces.len()).map(|_| None).collect();
 
     let mut edge_faces: HashMap<usize, Vec<usize>> = HashMap::new();
     for (face_index, face) in faces.iter().enumerate() {
@@ -367,16 +549,134 @@ fn measure_shell(shell: &CompressedShell<Point3, Curve3D, Surface>, row: &mut Ph
         adjacents.dedup();
         for (k, &index0) in adjacents.iter().enumerate() {
             for &index1 in &adjacents[k + 1..] {
-                if seen.insert((index0, index1)) {
-                    let class_a = classes[index0];
-                    let class_b = classes[index1];
-                    if let Some(key) = subset_row(class_a, class_b) {
-                        row.seeds += 1;
-                        *row.seed_rows.entry(key).or_insert(0) += 1;
+                if !seen.insert((index0, index1)) {
+                    continue;
+                }
+                let class_a = classes[index0];
+                let class_b = classes[index1];
+                let Some(key) = subset_row(class_a, class_b) else {
+                    continue;
+                };
+                row.seeds += 1;
+                *row.seed_rows.entry(key).or_insert(0) += 1;
+
+                let (left, right) = extract_pair(
+                    &mut patch_cache,
+                    &faces[index0].surface,
+                    &faces[index1].surface,
+                    index0,
+                    index1,
+                );
+                let (FacePatches::Patches(lhs_patches), FacePatches::Patches(rhs_patches)) =
+                    (left, right)
+                else {
+                    *row.not_admitted_reasons
+                        .entry(block_reason(left, right))
+                        .or_insert(0) += 1;
+                    continue;
+                };
+                // Admitted face pair: both sides decompose. Its full patch-pair
+                // product is the unit-pair mass this gate certifies.
+                row.admitted_pairs += 1;
+                *row.admitted_rows.entry(key).or_insert(0) += 1;
+                row.unit_pairs_total += lhs_patches.len() * rhs_patches.len();
+                if state.budget_spent {
+                    row.truncated_pairs += 1;
+                    continue;
+                }
+                match trace_pair_product(lhs_patches, rhs_patches, &mut state.budget) {
+                    Some(disposition) => {
+                        row.dispositions.record(disposition);
+                        row.completed_pairs += 1;
+                    }
+                    None => {
+                        row.truncated_pairs += 1;
+                        state.budget_spent = true;
                     }
                 }
             }
         }
+    }
+}
+
+/// The frozen seed grid of one unit-pair: the domain midpoint plus the dyadic
+/// offsets `±1/4` in all four parameters (17 seeds). First certified box wins.
+fn seed_grid() -> Vec<[f64; 4]> {
+    let mut seeds = vec![[0.5; 4]];
+    for d0 in [-SEED_HALF_STEP, SEED_HALF_STEP] {
+        for d1 in [-SEED_HALF_STEP, SEED_HALF_STEP] {
+            for d2 in [-SEED_HALF_STEP, SEED_HALF_STEP] {
+                for d3 in [-SEED_HALF_STEP, SEED_HALF_STEP] {
+                    seeds.push([0.5 + d0, 0.5 + d1, 0.5 + d2, 0.5 + d3]);
+                }
+            }
+        }
+    }
+    seeds
+}
+
+/// Attempt the full patch-pair product of one face pair under the frozen seed
+/// grid. First certified box wins; a pair whose whole product was attempted
+/// without a certified box dispositions as its first named failure. `None`
+/// when the run budget was exhausted mid-product (the pair is truncated, not
+/// dispositioned).
+fn trace_pair_product(
+    lhs_patches: &[RationalBipatch],
+    rhs_patches: &[RationalBipatch],
+    budget: &mut usize,
+) -> Option<Disposition> {
+    let seeds = seed_grid();
+    let mut first_failure: Option<Disposition> = None;
+    for lhs in lhs_patches {
+        for rhs in rhs_patches {
+            for seed in &seeds {
+                if *budget == 0 {
+                    return None;
+                }
+                *budget -= 1;
+                match run_certified_pair_pair(lhs, rhs, *seed) {
+                    Ok(TraceOutcome::ClosedLoop { .. })
+                    | Ok(TraceOutcome::Terminated { .. })
+                    | Ok(TraceOutcome::Switched { .. }) => {
+                        // A certified branch: the pair has a certified contact.
+                        return Some(Disposition::CertifiedContact);
+                    }
+                    Ok(TraceOutcome::Refused(refusal)) => {
+                        if first_failure.is_none() {
+                            first_failure = Some(disposition_of_trace_refusal(refusal));
+                        }
+                    }
+                    Err(refusal) => {
+                        if first_failure.is_none() {
+                            first_failure = Some(disposition_of_ssi_refusal(refusal));
+                        }
+                    }
+                }
+            }
+        }
+    }
+    Some(first_failure.unwrap_or(Disposition::Unresolved))
+}
+
+/// Map a composed-chain trace refusal into exactly one disposition bucket.
+fn disposition_of_trace_refusal(refusal: TraceRefusal) -> Disposition {
+    match refusal {
+        TraceRefusal::Conditioning(_) => Disposition::Refused(RefusalCause::Conditioning),
+        TraceRefusal::Hull(_) => Disposition::Refused(RefusalCause::NonTransverse),
+        TraceRefusal::Unresolved(_) => Disposition::Unresolved,
+    }
+}
+
+/// Map a composed-chain square-system refusal into exactly one disposition
+/// bucket (the doc's refusal-cause mapping table).
+fn disposition_of_ssi_refusal(refusal: SsiRefusal) -> Disposition {
+    match refusal {
+        SsiRefusal::Conditioning(_) => Disposition::Refused(RefusalCause::Conditioning),
+        SsiRefusal::PairClass(_) => Disposition::Refused(RefusalCause::UnsupportedPairClass),
+        SsiRefusal::Hull(_) => Disposition::Refused(RefusalCause::NonTransverse),
+        SsiRefusal::DeterminantSpansZero => Disposition::Refused(RefusalCause::Singular),
+        SsiRefusal::InclusionNotStrict => Disposition::Refused(RefusalCause::NonTransverse),
+        SsiRefusal::InvalidInput => Disposition::Refused(RefusalCause::UnsupportedPairClass),
     }
 }
 
@@ -385,31 +685,19 @@ fn edge_index(edge: &CompressedEdgeIndex) -> usize {
     edge.index
 }
 
-/// The wave-phase per-pair decision. The production chain is absent in this
-/// tree, so every measured subset pair is `integration_pending` by
-/// construction — the harness reports the structural counts without
-/// pretending to certify. At integration this decision is replaced by a call
-/// to the single marked seam [`run_certified_pair_pair`], and this
-/// pending-only answer becomes the seam's real disposition.
-fn wave_phase_disposition() -> Disposition {
-    Disposition::IntegrationPending
-}
-
-/// The aggregate JSON for the corpus walk: the structural headline plus the
-/// disposition counts, the admitted mass column, and the (wave-phase: empty)
-/// certify-rate field beside it.
-///
-/// `admitted_mass` is the number of subset pairs the gate would hand the
-/// seam; `certify_rate` is `null` in the wave phase because no pair has been
-/// certified yet (the doc's certify-rate table fills at integration). The
-/// refusal distribution bucket table is seeded with every named cause so the
-/// bucket is visibly exhaustive even at zero counts.
+/// The aggregate JSON for the corpus run: the structural headline (the seed
+/// files and their pair masses) plus the MEASURED gate columns — the admitted
+/// mass beside the certify-rate (the FLOOR anomaly-column discipline) and the
+/// refusal distribution by named cause.
 fn aggregate_json(
     files: usize,
     seed_rows: &BTreeMap<&'static str, usize>,
+    admitted_rows: &BTreeMap<&'static str, usize>,
+    not_admitted_reasons: &BTreeMap<&'static str, usize>,
+    unit_pairs_total: usize,
+    state: &RunState,
     dispositions: &DispositionCounts,
 ) -> serde_json::Value {
-    let seeds: usize = seed_rows.values().sum();
     let refused = serde_json::json!({
         "overlap": dispositions.refused.get("overlap").copied().unwrap_or(0),
         "coincident_circles": dispositions.refused.get("coincident_circles").copied().unwrap_or(0),
@@ -419,17 +707,38 @@ fn aggregate_json(
         "conditioning": dispositions.refused.get("conditioning").copied().unwrap_or(0),
         "singular": dispositions.refused.get("singular").copied().unwrap_or(0),
     });
+    let seeds: usize = seed_rows.values().sum();
+    let admitted: usize = admitted_rows.values().sum();
+    let completed = dispositions.total();
+    let certify_rate = if completed > 0 {
+        serde_json::Value::from(dispositions.certified_contact as f64 / completed as f64)
+    } else {
+        serde_json::Value::Null
+    };
+    let completion = if admitted > 0 {
+        serde_json::Value::from(completed as f64 / admitted as f64)
+    } else {
+        serde_json::Value::Null
+    };
     serde_json::json!({
         "files": files,
         "seeds": seeds,
         "seed_rows": seed_rows,
+        "admitted_pairs": admitted,
+        "admitted_rows": admitted_rows,
+        "not_admitted_reasons": not_admitted_reasons,
+        "unit_pairs_total": unit_pairs_total,
+        "unit_pairs_traced": state.trace_calls_used(),
+        "completed_pairs": completed,
+        "truncated_pairs": admitted.saturating_sub(completed),
+        "completion_fraction": completion,
+        "wall_seconds": state.started.elapsed().as_secs_f64(),
         "certified_contact": dispositions.certified_contact,
         "certified_disjoint": dispositions.certified_disjoint,
         "refused": refused,
         "unresolved": dispositions.unresolved,
-        "integration_pending": dispositions.integration_pending,
-        "admitted_mass": seeds,
-        "certify_rate": serde_json::Value::Null,
+        "admitted_mass": admitted,
+        "certify_rate": certify_rate,
     })
 }
 
@@ -439,14 +748,10 @@ struct ExcludedFile {
     error: String,
 }
 
-/// The wave-phase corpus walk: name the seeds (per-file spline-mass pair
-/// counts), count every subset pair into exactly one disposition bucket, print
-/// the per-file rows and the aggregate headline, and assert structural sanity.
-///
-/// Prints one JSON row per file plus the `CERTIFIED_PHASE2_FLOOR_AGGREGATE`
-/// line (census format discipline) so the doc's numbers are copy-out
-/// reproducible.
-fn run_floor_measurement(root: &Path) {
+/// The corpus run: name the seeds, admit the decomposable face pairs, measure
+/// the patch-pair products under the certified-trace budget, and print the
+/// per-file rows plus the aggregate. Structural assertions only.
+fn run_floor_measurement(root: &Path, state: &mut RunState) {
     let mut files = Vec::new();
     let mut pending = vec![root.to_path_buf()];
     while let Some(directory) = pending.pop() {
@@ -471,7 +776,7 @@ fn run_floor_measurement(root: &Path) {
     let mut rows = Vec::new();
     let mut excluded = Vec::new();
     for path in &files {
-        match measure_file(path, root) {
+        match measure_file(path, root, state) {
             Ok(row) => {
                 let json = serde_json::json!({
                     "file": row.file,
@@ -479,6 +784,13 @@ fn run_floor_measurement(root: &Path) {
                     "faces": row.faces,
                     "seeds": row.seeds,
                     "seed_rows": row.seed_rows,
+                    "admitted_pairs": row.admitted_pairs,
+                    "admitted_rows": row.admitted_rows,
+                    "not_admitted_reasons": row.not_admitted_reasons,
+                    "unit_pairs_total": row.unit_pairs_total,
+                    "completed_pairs": row.completed_pairs,
+                    "truncated_pairs": row.truncated_pairs,
+                    "certified_contact": row.dispositions.certified_contact,
                 });
                 println!("{json}");
                 rows.push(row);
@@ -504,7 +816,10 @@ fn run_floor_measurement(root: &Path) {
     );
 
     let mut seed_rows: BTreeMap<&'static str, usize> = BTreeMap::new();
+    let mut admitted_rows: BTreeMap<&'static str, usize> = BTreeMap::new();
+    let mut not_admitted_reasons: BTreeMap<&'static str, usize> = BTreeMap::new();
     let mut dispositions = DispositionCounts::default();
+    let mut unit_pairs_total = 0usize;
     for row in &rows {
         if row.shells > 0 {
             assert!(row.faces > 0, "{}: measured faces must be > 0", row.file);
@@ -522,42 +837,57 @@ fn run_floor_measurement(root: &Path) {
                 row.file
             );
             *seed_rows.entry(*key).or_insert(0) += *count;
-            // The per-pair disposition decision is recorded for every subset
-            // pair (exactly one bucket each).
-            for _ in 0..*count {
-                dispositions.record(wave_phase_disposition());
-            }
         }
+        for (key, count) in &row.admitted_rows {
+            *admitted_rows.entry(*key).or_insert(0) += *count;
+        }
+        for (reason, count) in &row.not_admitted_reasons {
+            *not_admitted_reasons.entry(*reason).or_insert(0) += *count;
+        }
+        unit_pairs_total += row.unit_pairs_total;
+        dispositions.merge(&row.dispositions);
     }
 
-    // Seeds must be NAMED with nonzero pair mass: every spline-mass row the
-    // booking assigns to Phase 2 is present in the aggregate. These are
-    // structural facts (the pair rows exist), never rate thresholds.
     for key in SUBSET_ROWS {
         assert!(
             seed_rows.contains_key(key),
             "Phase-2 subset row {key} carries no mass in the measured corpus"
         );
     }
-
-    // Every pair lands in exactly one disposition bucket. Wave phase: all
-    // subset pairs are pending (the chain is absent), so the certified /
-    // disjoint / refused / unresolved buckets are structurally zero — the
-    // FLOOR anomaly's `certified_disjoint` mass is not produced here because
-    // no dispatch runs in this tree (and it is out of scope per the STOP).
     let seeds: usize = seed_rows.values().sum();
-    assert_eq!(dispositions.total(), seeds, "pairs outside all buckets");
+    let admitted: usize = admitted_rows.values().sum();
     assert_eq!(
-        dispositions.integration_pending, seeds,
-        "wave phase must report every subset pair integration_pending"
+        not_admitted_reasons.values().sum::<usize>() + admitted,
+        seeds,
+        "every subset pair is admitted or blocked by a named reason"
     );
-    assert_eq!(dispositions.certified_contact, 0, "no contact certified");
-    assert_eq!(dispositions.certified_disjoint, 0, "no disjoint certified");
-    assert_eq!(dispositions.refused_total(), 0, "no refusal produced");
-    assert_eq!(dispositions.unresolved, 0, "no unresolved produced");
+    assert_eq!(
+        dispositions.total(),
+        admitted - rows.iter().map(|r| r.truncated_pairs).sum::<usize>(),
+        "every completed pair landed in exactly one bucket"
+    );
+    let completed = dispositions.total();
+    let truncated = admitted.saturating_sub(completed);
+    let _ = truncated;
 
-    let aggregate = aggregate_json(rows.len(), &seed_rows, &dispositions);
+    let aggregate = aggregate_json(
+        rows.len(),
+        &seed_rows,
+        &admitted_rows,
+        &not_admitted_reasons,
+        unit_pairs_total,
+        state,
+        &dispositions,
+    );
     println!("CERTIFIED_PHASE2_FLOOR_AGGREGATE {aggregate}");
+    if state.budget_spent {
+        println!(
+            "CERTIFIED_PHASE2_FLOOR_BUDGET_EXHAUSTED completed={completed} admitted={admitted} \
+             unit_pairs_traced={} wall_seconds={:.1}",
+            state.trace_calls_used(),
+            state.started.elapsed().as_secs_f64()
+        );
+    }
 }
 
 #[test]
@@ -565,21 +895,23 @@ fn floor_harness_skips_cleanly_without_look_corpus() {
     let Some(root) = std::env::var_os("LOOK_CORPUS") else {
         eprintln!(
             "LOOK_CORPUS is unset: skipping the Phase-2 floor harness. \
-             Point it at the look-corpus checkout to measure the wave-phase \
-             structural run."
+             Point it at the look-corpus checkout to measure the Phase-2 gate."
         );
         return;
     };
     let root = PathBuf::from(root);
     assert!(root.is_dir(), "LOOK_CORPUS {root:?} is not a directory");
-    run_floor_measurement(&root);
+    let budget = std::env::var("PHASE2_TRACE_BUDGET")
+        .ok()
+        .and_then(|value| value.parse::<usize>().ok())
+        .unwrap_or(MAX_TRACE_CALLS);
+    let mut state = RunState::new(budget);
+    run_floor_measurement(&root, &mut state);
 }
 
 #[test]
 fn floor_refusal_distribution_buckets_are_exhaustive() {
     let tags = all_refusal_cause_tags();
-    // Named cases only: every refusal cause has a distinct, non-empty tag and
-    // there is no catch-all arm in the vocabulary.
     let distinct: HashSet<&str> = tags.iter().copied().collect();
     assert_eq!(
         distinct.len(),
@@ -594,8 +926,6 @@ fn floor_refusal_distribution_buckets_are_exhaustive() {
         !tags.contains(&"other") && !tags.contains(&"unknown") && !tags.contains(&"catch_all"),
         "the refusal vocabulary must have no catch-all bucket"
     );
-    // The vocabulary holds the FLOOR pair-level causes (the landed
-    // `PairUnsupported` variants of the Phase-1 gate, carried over 1:1)...
     for floor_cause in [
         "overlap",
         "coincident_circles",
@@ -607,15 +937,12 @@ fn floor_refusal_distribution_buckets_are_exhaustive() {
             "FLOOR pair-level refusal cause {floor_cause} missing from the vocabulary"
         );
     }
-    // ... AND the Phase-2 trace-level named causes (the plan's own names,
-    // mapped from the shim's `TraceRefusal` variants at integration).
     for trace_cause in ["non_transverse", "conditioning", "singular"] {
         assert!(
             tags.contains(&trace_cause),
             "Phase-2 trace-level cause {trace_cause} missing from the vocabulary"
         );
     }
-    // Every disposition lands in exactly one of the five top-level buckets.
     for disposition in [
         Disposition::CertifiedContact,
         Disposition::CertifiedDisjoint,
@@ -629,8 +956,52 @@ fn floor_refusal_distribution_buckets_are_exhaustive() {
             disposition.family()
         );
     }
-    // Counting through the record function places each disposition in exactly
-    // one bucket (the exhaustive match has no catch-all arm).
+    // Every composed-chain refusal maps to exactly one bucket (exhaustive
+    // matches, no catch-all).
+    let ssi_cases = [
+        (
+            SsiRefusal::Conditioning(
+                truck_certified::contract::Refusal::ConditioningBelowThreshold,
+            ),
+            "conditioning",
+        ),
+        (
+            SsiRefusal::Hull(truck_certified::hull::HullRefusal::EnclosureUnavailable),
+            "non_transverse",
+        ),
+        (SsiRefusal::DeterminantSpansZero, "singular"),
+        (SsiRefusal::InclusionNotStrict, "non_transverse"),
+    ];
+    for (refusal, expected) in ssi_cases {
+        match disposition_of_ssi_refusal(refusal) {
+            Disposition::Refused(cause) => assert_eq!(cause.tag(), expected),
+            other => panic!("refusal must map to a refused bucket, got {other:?}"),
+        }
+    }
+    let trace_cases = [
+        (
+            TraceRefusal::Conditioning(
+                truck_certified::contract::Refusal::ConditioningBelowThreshold,
+            ),
+            "conditioning",
+        ),
+        (
+            TraceRefusal::Hull(truck_certified::hull::HullRefusal::DomainNotCompact),
+            "non_transverse",
+        ),
+    ];
+    for (refusal, expected) in trace_cases {
+        match disposition_of_trace_refusal(refusal) {
+            Disposition::Refused(cause) => assert_eq!(cause.tag(), expected),
+            other => panic!("refusal must map to a refused bucket, got {other:?}"),
+        }
+    }
+    match disposition_of_trace_refusal(TraceRefusal::Unresolved(
+        truck_certified::formal::contact::GenericUnresolved::ClusteredRoots,
+    )) {
+        Disposition::Unresolved => {}
+        other => panic!("a trace unresolved must map to unresolved, got {other:?}"),
+    }
     let mut counts = DispositionCounts::default();
     for disposition in [
         Disposition::CertifiedContact,
@@ -653,30 +1024,38 @@ fn floor_refusal_distribution_buckets_are_exhaustive() {
 #[test]
 fn floor_admitted_mass_is_published_not_asserted() {
     // The FLOOR anomaly-column discipline carries over: the doc must show the
-    // certify-rate AND the admitted mass side by side, so "refuse everything"
-    // cannot masquerade as the gate passing. The aggregate printer emits both
-    // columns. This test checks the columns are PUBLISHED; it asserts nothing
-    // numeric about any rate.
+    // certify-rate AND the admitted mass side by side. The aggregate printer
+    // emits both columns. This test checks the columns are PUBLISHED; it
+    // asserts nothing numeric about any rate.
     let seed_rows: BTreeMap<&'static str, usize> = BTreeMap::new();
+    let admitted_rows: BTreeMap<&'static str, usize> = BTreeMap::new();
+    let not_admitted: BTreeMap<&'static str, usize> = BTreeMap::new();
+    let state = RunState::new(0);
     let dispositions = DispositionCounts::default();
-    let aggregate = aggregate_json(0, &seed_rows, &dispositions);
+    let aggregate = aggregate_json(
+        0,
+        &seed_rows,
+        &admitted_rows,
+        &not_admitted,
+        0,
+        &state,
+        &dispositions,
+    );
     let has_admitted_mass = aggregate.get("admitted_mass").is_some();
     let has_rate_field = aggregate.get("certify_rate").is_some();
-    let has_integration_pending = aggregate.get("integration_pending").is_some();
     let has_seeds = aggregate.get("seeds").is_some();
+    let has_completed = aggregate.get("completed_pairs").is_some();
+    let has_admitted = aggregate.get("admitted_pairs").is_some();
     assert!(has_admitted_mass, "aggregate must publish admitted_mass");
     assert!(
         has_rate_field,
         "aggregate must publish the certify-rate column"
     );
-    assert!(
-        has_integration_pending,
-        "aggregate must publish integration_pending"
-    );
     assert!(has_seeds, "aggregate must publish the seed mass");
+    assert!(has_completed, "aggregate must publish completed pairs");
+    assert!(has_admitted, "aggregate must publish admitted pairs");
     // No threshold assertion in-tree: no `assert!`/`assert_eq!` line may
-    // reference a rate or a floor numeric. The certify-rate is published, never
-    // asserted (source-scan discipline, per the FLOOR packet's house rule).
+    // reference a rate or a floor numeric (source-scan discipline).
     let source = include_str!("certified_phase2_floor.rs");
     let threshold_tokens = [
         "certify_rate",
@@ -703,28 +1082,23 @@ fn floor_admitted_mass_is_published_not_asserted() {
 #[test]
 fn floor_integration_seam_is_single_and_marked() {
     let source = include_str!("certified_phase2_floor.rs");
-    // The search needles are assembled from pieces so the needle text never
-    // appears contiguously in the scanner's own source (the file is self-
-    // included); only the seam's real definition and doc lines can match.
     let seam_def = concat!("fn run_certified_", "pair_pair(");
     let seam_call = concat!("run_certified_", "pair_pair(");
     let seam_marker = concat!("BG-CK-P2-", "RESIDUAL integration seam");
-    // Single: the seam is defined exactly once.
     let definitions = count_occurrences(source, seam_def);
     assert_eq!(definitions, 1, "the integration seam must be single");
-    // Compile-only: the corpus walk never calls the seam. Exactly two lines
-    // carry the call syntax — the definition line itself and the seam's own
-    // structural test below (one non-definition call).
+    // Exactly three lines carry the call syntax: the definition line itself,
+    // the measurement's per-unit seam call (trace_pair_product), and the
+    // seam's own structural test below. The measurement must route every unit
+    // pair through this one seam.
     let call_syntax = count_occurrences(source, seam_call);
     assert_eq!(
-        call_syntax, 2,
-        "the compile-only seam must not be called by the measurement"
+        call_syntax, 3,
+        "the single seam is the measurement's only production-call site"
     );
-    // Marked: the seam's doc comment carries the marker text (also quoted into
-    // docs/CERTIFIED_PHASE2_FLOOR.md).
     let markers = count_occurrences(source, seam_marker);
     assert_eq!(markers, 1, "the seam must be marked exactly once");
-    // Compile-only: the seam is free of the panic-stub macros. The needles are
+    // Wired-phase discipline: no panic-stub macros remain. The needles are
     // assembled from pieces so the scanner's own text never matches.
     let unimplemented_needle = concat!("unimplement", "ed!");
     let todo_needle = concat!("todo", "!()");
@@ -738,19 +1112,17 @@ fn floor_integration_seam_is_single_and_marked() {
         0,
         "the seam must not carry a panic-stub body"
     );
-    // Wave-phase honesty: exercised on a shim fixture square system the seam
-    // answers `integration_pending`, never a certification (a compile-only
-    // seam returning data would fake a measurement).
-    match truck_certified::ssi_fixtures::well_conditioned_root() {
-        Ok(fixture) => {
-            let pending = run_certified_pair_pair(&fixture.system);
-            assert_eq!(
-                pending,
-                Disposition::IntegrationPending,
-                "the wave-phase seam must not certify"
-            );
-        }
-        Err(error) => panic!("the well-conditioned fixture must construct: {error:?}"),
+    // Wired honesty: the seam over a well-conditioned analytic pair certifies a
+    // real branch at the midpoint seed (the pair's documented ground truth).
+    let (p1, p2) = well_conditioned_patch_pair();
+    match run_certified_pair_pair(&p1, &p2, [0.5, 0.5, 0.5, 0.5]) {
+        Ok(outcome) => match outcome {
+            TraceOutcome::ClosedLoop { .. }
+            | TraceOutcome::Terminated { .. }
+            | TraceOutcome::Switched { .. } => {}
+            TraceOutcome::Refused(_) => panic!("midpoint seed must certify the fixture branch"),
+        },
+        Err(_) => panic!("midpoint seed must certify the fixture branch"),
     }
 }
 
@@ -759,25 +1131,91 @@ fn count_occurrences(haystack: &str, needle: &str) -> usize {
     haystack.matches(needle).count()
 }
 
+/// The integration seam's well-conditioned exercise pair (the fixture kit's
+/// documented ground truth): patch 1 `(u, v, v)`, patch 2 `(s, t, 1/4 + s/2)`.
+fn well_conditioned_patch_pair() -> (RationalBipatch, RationalBipatch) {
+    let u = chart_grid(1, 1, 0);
+    let v = chart_grid(1, 1, 1);
+    let p1 = unit_weight_patch([u.clone(), v.clone(), v.clone()]);
+    let z2 = monomial_grid(1, 1, &[(0, 0, 0.25), (1, 0, 0.5)]);
+    let p2 = unit_weight_patch([u, v, z2]);
+    (p1, p2)
+}
+
+/// The first-parameter (`which == 0`) or second-parameter chart coordinate grid.
+fn chart_grid(m: usize, n: usize, which: usize) -> Vec<Vec<f64>> {
+    let mut grid = Vec::with_capacity(m + 1);
+    for a in 0..=m {
+        let mut row = Vec::with_capacity(n + 1);
+        for b in 0..=n {
+            let value = if which == 0 {
+                a as f64 / m as f64
+            } else {
+                b as f64 / n as f64
+            };
+            row.push(value);
+        }
+        grid.push(row);
+    }
+    grid
+}
+
+fn binom(n: usize, k: usize) -> f64 {
+    let mut numerator = 1u64;
+    let mut denominator = 1u64;
+    for i in 0..k {
+        numerator *= (n - i) as u64;
+        denominator *= (i + 1) as u64;
+    }
+    numerator as f64 / denominator as f64
+}
+
+fn add_monomial_term(grid: &mut [Vec<f64>], m: usize, n: usize, pu: usize, pv: usize, coeff: f64) {
+    for (a, row) in grid.iter_mut().enumerate().skip(pu) {
+        let fa = binom(a, pu) / binom(m, pu);
+        for (b, cell) in row.iter_mut().enumerate().skip(pv) {
+            let fb = binom(b, pv) / binom(n, pv);
+            *cell += coeff * fa * fb;
+        }
+    }
+}
+
+fn monomial_grid(m: usize, n: usize, terms: &[(usize, usize, f64)]) -> Vec<Vec<f64>> {
+    let mut grid = vec![vec![0.0; n + 1]; m + 1];
+    for &(pu, pv, coeff) in terms {
+        add_monomial_term(&mut grid, m, n, pu, pv, coeff);
+    }
+    grid
+}
+
+/// A unit-weight rational patch from explicit component grids.
+fn unit_weight_patch(num: [Vec<Vec<f64>>; 3]) -> RationalBipatch {
+    let m = num[0].len() - 1;
+    let n = num[0][0].len() - 1;
+    let w: Vec<Vec<f64>> = (0..=m).map(|_| vec![1.0; n + 1]).collect();
+    match RationalBipatch::new(m, n, num, w) {
+        Ok(patch) => patch,
+        Err(_) => panic!("a valid unit-weight patch was refused"),
+    }
+}
+
 /// BG-CK-P2-RESIDUAL integration seam — single and marked.
 ///
-/// The ONLY site that will call the Phase-2 production chain (dispatch
-/// admission → Bézier decomposition → `SquareSystem3` → 3×3 Krawczyk →
-/// branch trace) at integration. The wave-phase tree has no such chain — W1's
-/// and W2's modules land at integration — so this seam is compile-only: the
-/// corpus walk never calls it, and every measured subset pair is counted
-/// `integration_pending` without pretending to certify (see
-/// [`wave_phase_disposition`]). At integration the orchestrator amends this
-/// function to the production chain's real inputs (the pair's certified-
-/// admitted Bézier patches) and routes each measured pair through it.
-///
-/// The parameter is the shim's frozen square-system carrier
-/// ([`truck_certified::SquareSystem3`], BG-CK-P2-CONTRACT); naming it here
-/// pins the dev-dependency re-export reachability the integration relies on
-/// (the packet's stop condition 2 load-bearing premise). Returning
-/// `integration_pending` is the honest wave-phase answer, and it is never
-/// reached by the measurement.
-fn run_certified_pair_pair(system: &SquareSystem3) -> Disposition {
-    let _ = system;
-    Disposition::IntegrationPending
+/// The ONLY site that calls the composed Phase-2 production entry
+/// (`truck_certified::ssi_trace::certified_pair_trace`, W2's branch tracing
+/// over W1's square-system + 3×3 Krawczyk pipeline). The wave-phase tree had
+/// no chain, so the seam was compile-only and every pair was counted
+/// `integration_pending`; at integration the chain landed and the seam was
+/// wired in — the measurement's [`trace_pair_product`] routes every unit-pair
+/// through this one function under the frozen seed grid. The parameters are
+/// the two certified-admitted rational Bézier patches and one chart seed
+/// `(u, v, s, t)`; the result is the chain's raw [`TraceOutcome`] or named
+/// [`SsiRefusal`], which the harness maps into exactly one disposition bucket
+/// (see [`disposition_of_trace_refusal`] / [`disposition_of_ssi_refusal`]).
+fn run_certified_pair_pair(
+    lhs: &RationalBipatch,
+    rhs: &RationalBipatch,
+    seed: [f64; 4],
+) -> Result<TraceOutcome, SsiRefusal> {
+    truck_certified::ssi_trace::certified_pair_trace(lhs, rhs, seed)
 }
