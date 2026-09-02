@@ -18,7 +18,7 @@ use truck_certified::ssi_types::{
 
 /// Assert two floats agree to the fixture kit's dyadic ground-truth tolerance.
 fn approx(a: f64, b: f64) -> bool {
-    (a - b).abs() < 1e-9
+    (a - b).abs() < 1e-9 // H-3: dyadic ground-truth comparison tolerance, fixture-only
 }
 
 fn assert_approx(a: f64, b: f64, what: &str) {
