@@ -34,12 +34,12 @@ read_allow:
   - vendor/truck/truck-certified/src/formal/bezier_isect.rs
 budget:      {turns: 34, ctx_tokens: 130000}
 anchors:
-  - {id: A1, expect: TBD, cmd: "grep -c 'pub struct SquareSystem3' vendor/truck/truck-certified/src/ssi_types.rs"}
-  - {id: A2, expect: TBD, cmd: "grep -c 'pub struct KrawczykCertificate3' vendor/truck/truck-certified/src/ssi_types.rs"}
-  - {id: A3, expect: TBD, cmd: "grep -c 'pub mod ssi_types;' vendor/truck/truck-certified/src/lib.rs"}
+  - {id: A1, expect: 1, cmd: "grep -c 'pub struct SquareSystem3' vendor/truck/truck-certified/src/ssi_types.rs"}
+  - {id: A2, expect: 1, cmd: "grep -c 'pub struct KrawczykCertificate3' vendor/truck/truck-certified/src/ssi_types.rs"}
+  - {id: A3, expect: 1, cmd: "grep -c 'pub mod ssi_types;' vendor/truck/truck-certified/src/lib.rs"}
   - {id: A4, expect: 0, cmd: "ls vendor/truck/truck-certified/src/ssi.rs 2>/dev/null | wc -l"}
-  - {id: A5, expect: TBD, cmd: "grep -c 'ConditioningBelowThreshold' vendor/truck/truck-certified/src/contract.rs"}
-  - {id: A6, expect: TBD, cmd: "grep -c 'well_conditioned_root' vendor/truck/truck-certified/src/ssi_fixtures.rs"}
+  - {id: A5, expect: 4, cmd: "grep -c 'ConditioningBelowThreshold' vendor/truck/truck-certified/src/contract.rs"}
+  - {id: A6, expect: 1, cmd: "grep -c 'well_conditioned_root' vendor/truck/truck-certified/src/ssi_fixtures.rs"}
 tests_required:
   - system3_constructor_matches_fixture_ground_truth
   - system3_refuses_non_spline_class_pairs

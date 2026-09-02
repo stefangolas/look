@@ -32,12 +32,12 @@ read_allow:
   - vendor/truck/truck-certified/src/formal/bezier_isect.rs
 budget:      {turns: 34, ctx_tokens: 130000}
 anchors:
-  - {id: A1, expect: TBD, cmd: "grep -c 'pub enum TraceOutcome' vendor/truck/truck-certified/src/ssi_types.rs"}
-  - {id: A2, expect: TBD, cmd: "grep -c 'pub struct TraceStep' vendor/truck/truck-certified/src/ssi_types.rs"}
-  - {id: A3, expect: TBD, cmd: "grep -c 'pub enum BranchGerm' vendor/truck/truck-certified/src/formal/span.rs"}
+  - {id: A1, expect: 1, cmd: "grep -c 'pub enum TraceOutcome' vendor/truck/truck-certified/src/ssi_types.rs"}
+  - {id: A2, expect: 1, cmd: "grep -c 'pub struct TraceStep' vendor/truck/truck-certified/src/ssi_types.rs"}
+  - {id: A3, expect: 1, cmd: "grep -c 'pub enum BranchGerm' vendor/truck/truck-certified/src/formal/span.rs"}
   - {id: A4, expect: 0, cmd: "ls vendor/truck/truck-certified/src/ssi_trace.rs 2>/dev/null | wc -l"}
-  - {id: A5, expect: TBD, cmd: "grep -c 'closed_loop_pair' vendor/truck/truck-certified/src/ssi_fixtures.rs"}
-  - {id: A6, expect: TBD, cmd: "grep -c 'pub struct CoordinateSwitch' vendor/truck/truck-certified/src/contract.rs"}
+  - {id: A5, expect: 1, cmd: "grep -c 'closed_loop_pair' vendor/truck/truck-certified/src/ssi_fixtures.rs"}
+  - {id: A6, expect: 1, cmd: "grep -c 'pub struct CoordinateSwitch' vendor/truck/truck-certified/src/contract.rs"}
 tests_required:
   - trace_loop_walks_fixture_closed_loop_to_identity_recurrence
   - trace_loop_terminates_at_domain_boundary
