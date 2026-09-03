@@ -38,23 +38,27 @@ use crate::kernel::{Interval, SignCert};
 
 /// An orthonormal moving frame of the arc's `N`-dimensional state space
 /// (§11): `q` is an `N x N` orthonormal matrix whose columns are basis
-/// vectors, column 0 is the unit tangent `q_tau`, `z_hat` is the certified
-/// normal direction, `q_perp` stores the column-wise complement of `q_tau` in
-/// `q`, and `a` is the (finite) Jacobian matrix.
+/// vectors, column 0 is the unit tangent `q_tau`, `z_hat` is the expansion
+/// point of the frame (spec section 8.1 — z_hat is a POINT in `R^n`, so no
+/// unit constraint exists on it; the unit requirements are on the frame basis:
+/// `q_tau` unit, `Q` orthonormal), `q_perp` stores the column-wise complement
+/// of `q_tau` in `q`, and `a` is the (finite) Jacobian matrix.
 ///
 /// `q_perp` carries the `N - 1` perpendicular columns of `q` (columns `1..N`)
 /// in its leading columns and re-stores `q_tau` as its final column so the
 /// field keeps the square shape: `q_perp[i] == q[i + 1]` for `i < N - 1` and
 /// `q_perp[N - 1] == q_tau == q[0]`.
 ///
-/// Construct only through [`Frame::try_new`], which refuses non-finite data,
-/// a non-unit `z_hat` or `q_tau`, non-orthonormal `q` columns, a `q_perp` that
-/// is not the column-wise complement of `q_tau` in `q` (all within
-/// [`TOL_JACOBIAN`]), and a non-finite `a`. `N` is `2..=7` in practice; for
-/// `N = 1` nothing is checked beyond finiteness.
+/// Construct only through [`Frame::try_new`], which refuses non-finite data
+/// (only finiteness is required of the point `z_hat`), a non-unit `q_tau`,
+/// non-orthonormal `q` columns, a `q_perp` that is not the column-wise
+/// complement of `q_tau` in `q` (all within [`TOL_JACOBIAN`]), and a
+/// non-finite `a`. `N` is `2..=7` in practice; for `N = 1` nothing is checked
+/// beyond finiteness.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Frame<const N: usize> {
-    /// The certified normal direction (unit).
+    /// The expansion point of the frame in `R^N` (spec section 8.1); a point,
+    /// so it carries no unit constraint.
     pub z_hat: [f64; N],
     /// The `N x N` orthonormal frame matrix; column 0 is `q_tau`.
     pub q: [[f64; N]; N],
@@ -199,7 +203,10 @@ pub struct TubeOverlapCert {
 // Refusal carries Option<PartialGraph> by frozen §2 shape; large-Err is allowed (BG-KV2-000).
 #[allow(clippy::result_large_err)]
 impl<const N: usize> Frame<N> {
-    /// Build a frame, validating orthonormality and the complement relation.
+    /// Build a frame. `z_hat` is the expansion point (§8.1) — only finiteness
+    /// is required of it; the basis carries the unit constraints. Validates
+    /// finiteness of all data, orthonormality of `q`, and the complement
+    /// relation.
     pub fn try_new(
         z_hat: [f64; N],
         q: [[f64; N]; N],
@@ -222,13 +229,6 @@ impl<const N: usize> Frame<N> {
                 q_perp,
                 a,
             });
-        }
-        if !is_unit_vector(&z_hat, TOL_JACOBIAN) {
-            return Err(refusal(
-                RefusalKind::ClaimRefuted,
-                "frame_z_hat_not_unit",
-                format!("z_hat {z_hat:?} is not unit to {TOL_JACOBIAN}"),
-            ));
         }
         if !is_unit_vector(&q_tau, TOL_JACOBIAN) {
             return Err(refusal(
