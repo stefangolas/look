@@ -132,3 +132,24 @@ before either dispatches (session-49 lesson — do not give the producer
   watch for `%TEMP%` proc-macro-srv leaks after reboots.
 - One authoritative verification per wave at composed HEAD; amendments
   return to owning sessions via `--resume`; LOCAL_GREEN is never DONE.
+
+## 6. Build sharing policy for the v2 swarm (owner direction, session 49)
+
+Parallel agents do NOT each build the world:
+
+1. **Worktrees stay per-agent** (branch-per-packet is structural; the
+   agent's uncommitted WIP lives there) — but a worktree implies
+   NOTHING about builds.
+2. **Workers run check-only local gates** (`cargo check -p <crate>`);
+   test suites never run in a worker — they run ONCE at the composed
+   HEAD. A worker packet scoped so it needs `cargo test` locally is
+   scoped wrong.
+3. **Shared target directory**: workers on the same base point
+   `CARGO_TARGET_DIR` at ONE shared location (cargo's file locking
+   serializes concurrent invocations — acceptable for check-only
+   steps); duplicate per-worker target trees are eliminated. sccache
+   deduplicates the compile work itself.
+4. The orchestrator prewarms the shared target once at the wave base;
+   workers never warm their own.
+5. Per-agent RAM is the only remaining per-worker cost; the JOBS cap
+   still applies to every invocation.
