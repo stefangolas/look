@@ -93,6 +93,12 @@ pub mod residual;
 /// (arity 3) and the one-chart curve–curve system (arity 2) over the S2A C1
 /// seam, plus the 1-var homogeneous curve leaf they consume.
 pub mod residuals_r89;
+/// The §13 R6 self-intersection residual (BG-KV2-404-S8): the deflated
+/// divided-difference residual on the Bézier net, the exact-cover charts A/B
+/// (Theorem 13.1), the Theorem 13.3 transition seams emitting the frozen
+/// `R6ChartSwitch` / `R6BaseSwap` segment breaks, and the Theorem 13.4 λ = 0
+/// routing (chart or carrier, never the contact classifier).
+pub mod selfint;
 /// The Tier-1 loop-free certificate and the §9.3 R8 boundary-stratum seeds
 /// (BG-KV2-301-S03A): the two-cone LP of Theorem 9.1 (cos-space cone
 /// separation) and the R8 subdivision seeds over caller-supplied boundary
