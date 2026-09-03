@@ -88,6 +88,11 @@ pub mod residual;
 /// (arity 3) and the one-chart curve–curve system (arity 2) over the S2A C1
 /// seam, plus the 1-var homogeneous curve leaf they consume.
 pub mod residuals_r89;
+/// The §11 exact-overlap sheet classifier (BG-KV2-403-S6): `SheetCert` for
+/// real over the recognized carriers (plane/plane, cylinder/coaxial,
+/// sphere/concentric) and the certified leaf-pair affine map, with the real
+/// `PsiMap`, the four §11 conditions, and the `NearOverlap` disproof.
+pub mod sheet;
 /// The Tier-1 loop-free certificate and the §9.3 R8 boundary-stratum seeds
 /// (BG-KV2-301-S03A): the two-cone LP of Theorem 9.1 (cos-space cone
 /// separation) and the R8 subdivision seeds over caller-supplied boundary
