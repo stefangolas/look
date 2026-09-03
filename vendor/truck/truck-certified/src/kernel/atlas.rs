@@ -270,6 +270,7 @@ impl ChartLattice {
     };
 
     /// Build a lattice, refusing a non-finite or non-positive generator.
+    #[allow(clippy::result_large_err)] // frozen Refusal carries Option<PartialGraph>; large-Err allowed (BG-KV2-000, graph.rs precedent)
     pub fn try_new(u_period: Option<f64>, v_period: Option<f64>) -> Construction<Self> {
         for (axis, period) in [("u", u_period), ("v", v_period)] {
             if let Some(p) = period {
@@ -374,6 +375,7 @@ impl ChartAtlas {
     /// constructed here (the §3.3 bookkeeping), where the Wave-1
     /// `kernel::rational::admit` refusal (with its pending name) remains
     /// available for out-of-atlas carriers.
+    #[allow(clippy::result_large_err)] // frozen Refusal carries Option<PartialGraph>; large-Err allowed (BG-KV2-000, graph.rs precedent)
     pub fn try_new(carrier: &RationalCarrier) -> Construction<Self> {
         let kind = carrier.kind;
         let charts = match kind {
@@ -460,6 +462,7 @@ impl ChartAtlas {
     /// [`DECK_MAX`](crate::kernel::config::DECK_MAX) refuses
     /// [`RefusalKind::DeckExhausted`] (Inconclusive) — the deck-exhaustion
     /// termination of helical lifts.
+    #[allow(clippy::result_large_err)] // frozen Refusal carries Option<PartialGraph>; large-Err allowed (BG-KV2-000, graph.rs precedent)
     pub fn lift(&self, id: ChartId, from: &Param, raw_u: f64) -> Construction<Param> {
         let period = match self.u_period(id) {
             Some(period) => period,
@@ -1226,6 +1229,7 @@ fn unwrap_deck(period: f64, raw_u: f64) -> (i32, f64) {
 /// The result keeps `from`'s `v`, canonical `u` in `[0, period)`, and the
 /// winding `deck`. The §0.4 ceiling is enforced per edge: `|deck − from.deck|
 /// > DECK_MAX` refuses [`RefusalKind::DeckExhausted`] (Inconclusive).
+#[allow(clippy::result_large_err)] // frozen Refusal carries Option<PartialGraph>; large-Err allowed (BG-KV2-000, graph.rs precedent)
 pub fn lift_periodic(chart: ChartId, period: f64, from: &Param, raw_u: f64) -> Construction<Param> {
     if !raw_u.is_finite() {
         return Err(refusal(
