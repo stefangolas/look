@@ -1,0 +1,46 @@
+{
+  "packet": "BG-KV2-404-S8",
+  "id": "BG-KV2-404-S8",
+  "contract": ["BG-KV2-404-S8"],
+  "class": "design",
+  "crates": ["truck-certified"],
+  "status": "complete",
+  "summary": "The §13 R6 self-intersection machinery is landed in vendor/truck/truck-certified/src/kernel/selfint.rs (wired as kernel::selfint in kernel/mod.rs); the nine required tests live in tests/kernel_selfint.rs and all pass. Section 1 (deflation): divided_difference_1d/2d-u/v and shift_1d/u/v realize the exact divided differences [S(u+h,v+k)-S(u,v+k)]/h and [S(u,v+k)-S(u,v)]/k as Bernstein coefficient arithmetic (shift the net into the same basis via the scalar blossom, subtract, divide by the scalar step, exact degree-n to n-1 elevation-inverse reduction), so the deflated residual D1/D2 is a genuine polynomial on the Bezier net, never a sampled finite difference; dyadic test steps keep the divisions exact. For rational S = P/w the residual is carried in the §7.1 NUMERATOR form P(base+delta)*w(base) - P(base)*w(base+delta) (R6System::residual; no weight-bearing division anywhere, the weight bound is a value argument, exactly the R8/R9 S1A discipline). Section 2 (cover + transitions): r6_witness implements Theorem 13.1 exactly on the sign-canonical member of the unordered pair {delta, -delta} (|h| >= |k| -> chart A, |k| > |h| -> chart B, canonical dominant step > 0 so r6_witness(delta) == r6_witness(-delta) and r6_admits admits exactly one of the antipodal pair); r6_transition_type1 (m_A = +1: m_B = 1/m_A, lambda_B = lambda_A*m_A, SegmentBreak::R6ChartSwitch, same base) and r6_transition_type2 (m_A = -1: base-point swap onto the far member, SegmentBreak::R6BaseSwap, far-side chart data repoints to the old base) both preserve the witness per Theorem 13.3/Corollary 13.2 - the tests check the surface-point identity across each break on real fold leaves. Section 3 (Theorem 13.4 lambda=0): at lambda=0 chart A reduces to S_u + m S_v = 0, solvable only at parametric degeneracy; r6_lambda_zero routes a regular leaf back to the charts (LambdaZeroRoute::Chart) and a leaf whose partials are degenerate at the base to the carrier (LambdaZeroRoute::Carrier), and r6_lambda_zero_refusal is the typed refusal of the section 3.4 (contact-classifier) route naming the route in its predicate (RefusalKind::Conditioning, backing Inconclusive) - the contact classifier is never a route. Fixtures: hand-built unit-weight self-overlapping sweep leaves (the degree-3 profile y=(v-1/2)^2, z=-(v-1/2)/16+(v-1/2)^3 self-crosses at y=1/16,z=0 for v=1/4 and 3/4; extruded along x=u, x=u+v, or x=u-v) carry exact dyadic fold pairs with offsets (0,1/2) [chart B], (1/2,-1/2) [chart A m=-1], and (1/2,1/2) [chart A m=+1] respectively; each unordered pair is detected exactly once and delta/-delta canonicalize to the same witness. A plane leaf and a rational stereographic sphere-cap leaf (bidegree (2,2), weights 1+u^2+v^2) show ZERO R6 zeros over the small dyadic fixture domain. House rule H-1 holds: neither new file contains unwrap/expect/panic and neither adds a module-level allow; result_large_err is allowed item-level only with the standard frozen-§2 comment, matching residuals_r89/leaf.rs. N4 holds: no transcendental call in selfint.rs (tested by source scan). No stop condition fired: the frozen seam (graph.rs R6ChartSwitch/R6BaseSwap, the landed BezierLeaf format with its public fields) needed no accessor amendment.",
+  "tests": {
+    "deflated_divided_differences_are_polynomial_on_bezier_net": "PASS",
+    "rational_deflated_residual_uses_numerator_form": "PASS",
+    "exact_cover_thm_13_1_admits_exactly_one_of_delta_minus_delta": "PASS",
+    "chart_transition_type_1_preserves_the_witness": "PASS",
+    "base_point_swap_type_2_preserves_the_witness": "PASS",
+    "lambda_zero_routes_to_chart_or_carrier_not_classifier": "PASS",
+    "self_overlapping_sweep_detected_on_fixture": "PASS",
+    "valid_patch_has_zero_self_intersections": "PASS",
+    "no_transcendental_call_in_selfint_module": "PASS"
+  },
+  "pass_count": 9,
+  "fail_count": 0,
+  "measured_counts": {
+    "sweep_vert_fold_pair": "leaf x = u, bidegree (1,3): unordered pair base (1/2,1/4) <-> far (1/2,3/4), offset (0,1/2), chart B {lambda 0.5, m 0}; dyadic offset scan from the base finds EXACTLY ONE zero offset (0,1/2) and from the far base EXACTLY ONE zero offset (0,-1/2); r6_witness(delta) == r6_witness(-delta) and r6_admits admits exactly one of the antipodal pair.",
+    "sweep_minus_fold_pair": "leaf x = u - v: fold pair (1/4,1/4) <-> (3/4,3/4), offset (1/2,1/2), chart A {lambda 0.5, m +1}; Type I transition emits R6ChartSwitch with m_B = 1/m_A = 1 and lambda_B = lambda_A*m_A = 0.5 and preserves the far point and the surface witness S(base) = S(far).",
+    "sweep_plus_fold_pair": "leaf x = u + v: fold pair (1/4,3/4) <-> (3/4,1/4), offset (1/2,-1/2), chart A {lambda 0.5, m -1}; Type II base swap emits R6BaseSwap, moves the base to (3/4,1/4), and the far-side chart data A {lambda -0.5, m -1} repoints to the old base; S(swapped base) == S(old base) (witness preserved).",
+    "sphere_cap": "rational stereographic cap (x,y,z) = (2u,2v,1-u^2-v^2)/(1+u^2+v^2) at bidegree (2,2): non-unit weights; R6System::residual returns the numerator form P(base+delta)*w(base) - P(base)*w(base+delta) equal to w(base)*w(base+delta)*(S(base+delta)-S(base)) and differing from the weightless numerator difference; ZERO R6 zeros over the 9-base x 5x5-offset dyadic fixture scan.",
+    "lambda_zero_routing": "regular sweep leaf at base (1/2,1/4) routes m in {-1,0,1} to LambdaZeroRoute::Chart; the degenerate leaf S = (u, v^2-v, v^2-v) at base (1/2,1/2) (S_v = 0) routes to LambdaZeroRoute::Carrier; the section 3.4 route is refused by the typed predicate r6_lambda_zero_section_3_4_route (Conditioning / Inconclusive).",
+    "divided_difference_dimensions": "cubic (3,3) net: D1 net rows drop to the u degree (3) with the v degree unchanged, D2 net columns drop to the v degree (3) with the u degree unchanged; h*D1 + k*D2 telescopes to S(u+h,v+k) - S(u,v) at every dyadic sample."
+  },
+  "blocking_finding": {
+    "text": "None. All nine required tests pass; cargo fmt --check for the truck-certified package is clean; cargo check -p truck-certified --tests and the full pre-existing truck-certified suite stay green except the three S4A kernel_tracer failures (dtau_grows_on_success_and_halves_on_failure, escalation_routes_isolated_r2_to_the_contact_future, high_order_singularity_refuses) that were already recorded as partial in the worktree RESULT.json at dispatch and are untouched by this packet (no kernel file they depend on was modified). No clippy finding is attributable to kernel/selfint.rs or tests/kernel_selfint.rs (result_large_err allowed item-level exactly as residuals_r89/leaf.rs do; the crate as a whole carries pre-existing default-clippy findings in committed code). The one recorded design spelling: r6_witness (packet signature -> ChartChoice) maps the degenerate zero offset to the diagonal marker A { lambda 0, m 0 } and the refusing selector r6_witness_checked refuses it; chart A/B seam values (m = +/-1) are carried by the transition data even though B's open-m interior bound is strict - the transitions fire at the shared seam and step into the interior thereafter, matching the packet's verbatim seam formulas.",
+    "anchors": { "A1": 1, "A2": 1, "A3": 1 }
+  },
+  "stop_conditions": {
+    "1_frozen_seam_differs": false,
+    "2_divided_difference_needs_missing_accessor": false,
+    "3_witness_preservation_cannot_be_certified_at_break": false
+  },
+  "verify": {
+    "fmt": "cargo fmt -p truck-certified -- --check clean (changed/new files: kernel/selfint.rs, tests/kernel_selfint.rs, kernel/mod.rs)",
+    "check": "cargo check --manifest-path <slot>/Cargo.toml -p truck-certified --locked --tests green (exit 0)",
+    "tests": "cargo test --manifest-path <slot>/Cargo.toml -p truck-certified --locked: 566 lib tests + every integration/doc suite pass, including the 9 new tests in tests/kernel_selfint.rs; the only failures are the 3 pre-existing kernel_tracer (S4A partial) failures recorded in the RESULT.json present at dispatch",
+    "clippy": "cargo clippy -p truck-certified --tests reports no finding in selfint.rs or kernel_selfint.rs (pre-existing crate-wide findings remain in committed code)",
+    "anchors": "A1=1 A2=1 A3=1 verified after the change (graph.rs R6ChartSwitch/R6BaseSwap each 1, leaf_extract.rs extract_bezier_leaves 1)"
+  }
+}

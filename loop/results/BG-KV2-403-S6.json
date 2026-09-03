@@ -1,0 +1,39 @@
+{
+  "packet": "BG-KV2-403-S6",
+  "id": "BG-KV2-403-S6",
+  "contract": ["BG-KV2-403-S6"],
+  "class": "design",
+  "crates": ["truck-certified"],
+  "status": "local_green",
+  "wave": "Wave-4",
+  "summary": "The §11 exact-overlap sheet classifier lands for real in vendor/truck/truck-certified/src/kernel/sheet.rs (wired by one `pub mod sheet;` in kernel/mod.rs), turning the shim's frozen SheetCert into a produced certificate over the two recognized pairing classes. The module owns the real PsiMap {kind, coeffs, offset} with a refusing constructor (finite; Identity data exact; affine det nonzero) plus image_box (the §4.2 Rule B outward-rounded transport, exact for the exact identity), public exact_sheet(p1,p2,domain,psi) -> ClaimVerdict<SheetCert, Refusal, Reason>, and public normal_dot_sign (the CertifiedSign output of condition 3). The four §11 conditions are implemented verbatim over the frozen CertifiedPatch (C1) seam: (1) certified psi existence through the map data + certified transport into p2's certified region; (2) representational equality decided EXACTLY - bit-identical certified enclosures on the sheet box and its certified dyadic refinement (depth 2) certify, certified separation at the certified grid vertices refutes (Refuse(NearOverlap), backing Disproven of ExactSheet), and everything else is Inconclusive - no tolerance comparison exists anywhere (no constructor accepts a tolerance-tagged sheet; `tolerance_sheet_is_not_admitted` pins the module source); (3) n1.(n2∘psi) interval dot with a certified sign margin, CertifiedSign output; (4) det Dpsi certified nonzero by the shim SheetCert::try_new. Tests in tests/kernel_sheet.rs (7/7 green): same_carrier_identity_psi_certifies (fixtures::coaxial_cylinders, identity psi -> Proven, psi_kind Identity, det 1), leaf_pair_affine_psi_certifies (identical unit plane leaves under a certified affine map -> Proven psi_kind Affine, plus nontrivial-affine Rule B containment), constant_sign_normal_dot_certified (+1 coaxial, -1 mirrored plane), det_dpsi_nonzero_certified (degenerate affine and SheetCert both refuse det 0), near_overlap_refuses_disproven_of_exact_sheet (radius-offset coaxial twin -> Disproven NearOverlap), tolerance_sheet_is_not_admitted (source pin + fn-pointer signature pin of exact_sheet), no_transcendental_call_in_sheet_module. Anchors A1-A3 verified 1/1/1.",
+  "tests": {
+    "same_carrier_identity_psi_certifies": "PASS",
+    "leaf_pair_affine_psi_certifies": "PASS",
+    "constant_sign_normal_dot_certified": "PASS",
+    "det_dpsi_nonzero_certified": "PASS",
+    "near_overlap_refuses_disproven_of_exact_sheet": "PASS",
+    "tolerance_sheet_is_not_admitted": "PASS",
+    "no_transcendental_call_in_sheet_module": "PASS"
+  },
+  "pass_count": 7,
+  "fail_count": 0,
+  "anchors_verified": {"A1": 1, "A2": 1, "A3": 1},
+  "design_decisions_recorded": {
+    "shape_bilinear": "PsiMap stores affine data in the frozen {kind, coeffs, offset} six-float shape. PsiMapKind::Bilinear is refused at construction with predicate psi_bilinear_uv_twist_not_representable because a bilinear map adds a u*v cross term - two further coefficients the frozen shape cannot carry (the packet's 'record the shape decision'). The affine class is exact in the shape. PsiMapKind::RecognizedCarrier is refused too: a recognized carrier's closed-form correspondence is the exact Identity/Affine map over the shared chart (the fixture's identity psi), not a fourth coefficient-carrying kind.",
+    "representational_equality_predicate": "CertifiedPatch exposes no coefficient net, so condition (2) is decided exactly over the CertifiedPatch oracle: certify iff p1.enclose and p2.enclose(psi.image_box(.)) agree BIT-IDENTICALLY on the sheet box and every dyadic sub-box to depth 2 (for the admitted class - the same carrier or the same leaf enumerated twice - CertifiedPatch evaluation is a deterministic function of the representation, so exact oracle agreement over the refinement IS the representational equality of the two surfaces over D); refute iff certified separation (a component with disjoint certified enclosures) occurs at any certified grid vertex; otherwise Inconclusive. Near-but-not-exact pairs are therefore either refuted (separation resolvable above the certified arithmetic resolution, e.g. the radius-offset coaxial twin) or left Inconclusive - never admitted. A genuinely affine leaf pair with DIFFERENT control nets whose certified hulls are not bit-identical across sub-domains is Inconclusive through the dyn seam rather than certified or relaxed (stop-condition-3 discipline: record, never relax to a tolerance); the leaf_pair_affine fixture certifies through a certified affine map whose action over the sheet domain is the exact identity on identical leaves, and the Rule B outward transport of a genuinely nontrivial affine map is separately asserted for containment.",
+    "near_overlap": "The coaxial-adjacent-but-offset twin (same z-axis chart, radius +1e-3) has no exact psi; exact_sheet returns ClaimVerdict::Disproven(Refusal{kind: NearOverlap, backing: Disproven}) via the certified grid-vertex separation of the two certified point enclosures.",
+    "no_tolerance": "The module constructs no tolerance-tagged sheet anywhere: no `tolerance`/`TOL_` token appears in sheet.rs code (source-pinned), SheetCert is only ever built by the frozen SheetCert::try_new (domain, psi_kind, det), and PsiMap carries no tolerance field.",
+    "c2_not_required": "Overlap needs no CertifiedPatchC2: the module consumes only the C1 CertifiedPatch methods (enclose/derivs), per spec §3.1/§11."
+  },
+  "stop_conditions": {
+    "1_frozen_seam_differs": false,
+    "2_carrier_psi_closed_form_only_in_literature": false,
+    "3_representational_equality_not_certifiable_on_legitimate_fixture": false
+  },
+  "notes": {
+    "queue": "All cargo invocations went through the cargoq shim on PATH. This slot's queue servers (8233/8234) were flaky mid-session (intermittent 'server unreachable'), so several runs fell back to the documented DIRECT path, which runs in the slot worktree and is recorded in loop/cargoq/fallback.log. An earlier mis-routed run hit the main-repo server on 8231 (cwd C:\\Users\\stefa\\look); the two files it accidentally formatted there (examples/step_face_timing.rs, tests/geometry_fingerprint.rs) were reverted with git checkout. All subsequent cargo ran against the slot-4 worktree target.",
+    "scoped_checks": "rustfmt --check clean on the three changed files; cargo check -p truck-certified --all-targets --locked green; cargo test -p truck-certified --lib green (566 passed); cargo test -p truck-certified --test kernel_sheet green (7 passed). Clippy: no finding references kernel/sheet.rs or tests/kernel_sheet.rs; the crate remains not clippy-clean at default settings crate-wide (pre-existing findings in the landed formal/ssi population, unchanged - matches the prior S4A record).",
+    "commit": "7210431 feat(certified): ExactSheet for recognized carriers (BG-KV2-403-S6); committed before this RESULT.json was written at the worktree root."
+  }
+}
