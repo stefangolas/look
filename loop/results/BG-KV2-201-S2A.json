@@ -1,0 +1,60 @@
+{
+  "packet": "BG-KV2-201-S2A",
+  "class": "design",
+  "crates": ["truck-certified"],
+  "status": "done",
+  "commit": "cfd0751 (packet/BG-KV2-201-S2A): feat(certified): Lemma 8.0 rho + C1 generic + C2 tube + frame construction (BG-KV2-201-S2A)",
+  "tests_required": {
+    "contraction_rho_matches_hand_computed_weighted_norm": "pass",
+    "c1_proves_unique_root_on_a_known_quadratic": "pass",
+    "c1_refuses_when_krawczyk_image_exits_the_box": "pass",
+    "c1_inconclusive_backing_when_inclusion_is_not_strict": "pass",
+    "weight_bound_is_a_value_argument_not_an_assumption": "pass",
+    "c2_tube_certifies_over_a_nontrivial_tau_interval": "pass",
+    "c2_tube_refuses_when_perpendicular_contraction_fails": "pass",
+    "frame_is_orthonormal_and_q_tau_is_the_normalized_kernel_direction": "pass",
+    "no_transcendental_call_in_engine_module": "pass"
+  },
+  "anchors": {
+    "A1_pub_struct_KrawczykCertificate3_in_ssi_types": 1,
+    "A2_pub_struct_Frame_in_kernel_certs": 1,
+    "A3_pub_struct_ArcCert_in_kernel_certs": 1,
+    "A4_pub_const_RHO_MAX_in_kernel_config": 1,
+    "A5_c2_certify_tube4_in_src": 5,
+    "A6_leaf_extract_in_kernel_mod": 1
+  },
+  "files_written": [
+    "vendor/truck/truck-certified/src/kernel/engine.rs",
+    "vendor/truck/truck-certified/src/kernel/mod.rs",
+    "vendor/truck/truck-certified/tests/kernel_engine.rs"
+  ],
+  "verification": {
+    "cargo_test_p_truck_certified_lib_tests_no_fail_fast": "green (566 lib tests + all 12 integration suites unchanged; the 9 new kernel_engine tests pass)",
+    "cargo_check_p_truck_certified_all_targets": "green",
+    "cargo_check_workspace_all_targets": "green",
+    "cargo_fmt": "cargo fmt -p truck-certified -- --check clean on the three packet files; whole-workspace check reports ONLY the pre-existing out-of-write-set drift in examples/step_face_timing.rs and tests/geometry_fingerprint.rs (unchanged by this packet)",
+    "clippy_p_truck_certified_all_targets_no_deps": "zero findings attributed to kernel/engine.rs, kernel/mod.rs, or tests/kernel_engine.rs (the crate carries its documented pre-existing findings in unrelated formal/* files; the verifier scopes to added lines)",
+    "kernel_gates": "bash scripts/kernel-gates.sh c64ab55: GATE-1..GATE-4 all pass (unscaled_legacy 111/111 ceiling unchanged)",
+    "env": "CARGO_BUILD_JOBS=4, CARGO_TARGET_DIR=loop/slots/1/target (warm), rustc 1.97.1"
+  },
+  "stop_conditions": {
+    "triggered": false,
+    "details": [
+      "1 (landed ssi Krawczyk internals not reusable without editing ssi.rs): not triggered - engine.rs reimplements the interval adjugate-over-determinant and de-Casteljau hull discipline locally (same algorithms), and reaches the SquareSystem3 grids only through the public accessors; ssi.rs is untouched.",
+      "2 (Lemma 8.0 rho needs a transcendental): not triggered - rho is extracted as max_i (M r)_i / r_i from mag(I - A*DR(B)) and rad(B); only interval arithmetic and f64 abs/max, no transcendental.",
+      "3 (tube needs division by an uncertified W enclosure): not triggered - the tube certifies on the stored homogeneous grids and never divides by any weight enclosure; w is a value argument checked only for non-emptiness (empty -> WeightDegenerate, Disproven)."
+    ]
+  },
+  "notes": [
+    "JUDGEMENT (recorded): C1 box carrier. The frozen PointCert.box_ is IBox2, so krawczyk_c1 lands on IBox2 (arity must be 2) - the exact 2D certificate the PointCert carrier can record. A 3x3 (R8-class) strict inclusion has no typed Proven carrier in the frozen shapes, so the engine never claims one; the SquareResidualEval trait keeps arity 2-or-3 for the R8 wave to extend against. This is the honest expression of the frozen-shape limitation and is reported rather than papered over.",
+    "JUDGEMENT (recorded): residual identity. The frozen seam krawczyk_c1 carries no ResidualId but PointCert must name one; the engine stamps ResidualId::R1 (the ordinary-trace family this packet's own C2 targets). A caller certifying another §7 residual rebuilds the PointCert with its own id through PointCert::try_new (documented one-line seam).",
+    "JUDGEMENT (recorded): ArcCert<4>.b_perp convention. The frozen ArcCert<N> stores b_perp: IBox<N> while the perpendicular space is N-1. Following the shim's Frame<N>.q_perp layout (which re-stores q_tau as its final column), c2_certify_tube4 records the box the tube ran over in q_perp-aligned frame coordinates: axes 0..=2 are the perpendicular coordinates y and axis 3 is the tangent interval i_tau; ArcCert.i_tau carries the same interval verbatim.",
+    "Anchor A5 ('c2_certify_tube4' absent from src) is a dispatch-time claim; implementing Section 2's named entry necessarily introduces the spelling (definition + module-doc references), measured 5 after landing. The loop's post-landing anchors for the downstream 202 packet already expect the function to exist in engine.rs.",
+    "The C2 straight-branch fixture is the diagonal-lift family of ssi_fixtures reframed: S1 = (u,v,u) (plane z=x) against S2 = (s,t,0.5) (horizontal plane). Their product-space zero set is the straight line {u=0.5, s=0.5, v=t} tangent to the (v,t) chart plane. This geometry keeps the axis-aligned hull of the swept slice thin so the layered-Bernstein-hull dependency conservatism stays inside a certifyable perpendicular box at tau width ~0.1; a 45-degree (1,1,1,1) branch would inflate the image beyond the (0,1)^4 chart capacity at the same width.",
+    "The Krawczyk image K for both C1 and the C2 is built exactly per Lemma 8.0 / Theorem 8.1 with CertifiedInterval (every op widened by next_down/next_up), the preconditioner is the interval inverse of the midpoint Jacobian (adjugate over determinant, 2x2 and 3x3), and the box-radii contraction rate is rho = max_i (M r)_i / r_i. The rho test replicates the engine's arithmetic op-for-op in the test (M and r computed by hand) and asserts bit equality of the resulting rate.",
+    "Emission/backing table implemented as specified: C1 - empty w -> WeightDegenerate Disproven; zero/non-finite radius -> NonFinite Disproven; K strictly inside -> Proven (rho <= RHO_MAX else Inconclusive); K disjoint -> Disproven ClaimRefuted (no root in the box); overlap-not-strict -> Inconclusive; midpoint Jacobian singular / non-finite enclosure -> Inconclusive. C2 - empty w -> WeightDegenerate Disproven; non-strict perpendicular image -> Inconclusive (never Disproven, shrink-and-retry licensed); conditioning beyond KAPPA_MAX -> Inconclusive (Conditioning).",
+    "N4: engine.rs contains no sin/cos/atan2/exp/ln/log/powf outside comments and no std::f64::consts; the only sqrt is the IEEE normalization in build_frame4 (the no_transcendental_call_in_engine_module scan strips comments and checks whole words). Frame bases are deterministic Gram-Schmidt in fixed index order (no SVD) - the N4 cross-platform bit-reproducibility record.",
+    "H-1: no unwrap/expect/panic! anywhere in engine.rs; item-level #[allow(clippy::result_large_err)] only, with the frozen-shape justification comment (Refusal carries Option<PartialGraph>), matching the shim files' discipline; no module-level allow.",
+    "The straight-branch fixture, its hand-computed Theorem 6.4 minor vector, and every frame/tube ground truth are machine-checked by direct evaluation (ssi_fixtures::eval_grid4/partial_grid4_axis and CertifiedInterval arithmetic), never by solving."
+  ]
+}
