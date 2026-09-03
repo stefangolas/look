@@ -29,8 +29,7 @@
 
 /// Model-space representation gap (spec §0.4): the scale at which two model
 /// points are treated as the same represented point.
-// H-3: normative §0.4 default (representation gap)
-pub const EPS_REP: f64 = 1e-9;
+pub const EPS_REP: f64 = 1e-9; // H-3: normative §0.4 default (representation gap)
 
 /// Krawczyk contraction acceptance ceiling (spec §0.4): a residual-based
 /// certificate is only issued when the contraction rate is at most `RHO_MAX`.
@@ -54,18 +53,15 @@ pub const DECK_MAX: i32 = 8;
 
 /// Model-space agreement tolerance (spec §0.4): two positions agree when they
 /// are within `TOL_POSITION`.
-// H-3: normative §0.4 default (position agreement)
-pub const TOL_POSITION: f64 = 1e-9;
+pub const TOL_POSITION: f64 = 1e-9; // H-3: normative §0.4 default (position agreement)
 
 /// Parameter agreement tolerance (spec §0.4): parameter values agree, and C1
 /// detection is decided, at `TOL_PARAMETER`.
-// H-3: normative §0.4 default (parameter agreement / C1 detection)
-pub const TOL_PARAMETER: f64 = 1e-11;
+pub const TOL_PARAMETER: f64 = 1e-11; // H-3: normative §0.4 default (parameter agreement / C1 detection)
 
 /// Regularity floor (spec §0.4): the tolerance for `EG - F^2` being treated as
 /// zero, i.e. the singular-map floor.
-// H-3: normative §0.4 default (regularity floor EG - F^2)
-pub const TOL_JACOBIAN: f64 = 1e-12;
+pub const TOL_JACOBIAN: f64 = 1e-12; // H-3: normative §0.4 default (regularity floor EG - F^2)
 
 /// Tangency-claim tag (§10.3): an at-tolerance contact claim may only be
 /// issued at `TOL_INTERSECTION`, never unified with an exact certificate.
