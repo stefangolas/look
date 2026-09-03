@@ -612,6 +612,57 @@ the second shim every bash-shelled worker silently bypasses the queue).
     that did not enforce one-at-a-time). Re-run that two-job test after
     ANY server change.
 
+## Session-50 machinery (all of it, explicated)
+
+Six harness pieces landed this session; all are mandatory and none may be
+silently dropped:
+
+1. **cargoq** (`loop/cargoq/`) — the RAM queue; see its section above.
+2. **janitor.py** (`python loop/janitor.py status | ensure --need N`) —
+   the disk allocation service. Priority-ordered reclaim: repo-root
+   `target/` -> idle slot targets -> TEMP leaks -> worktree prune.
+   **Live-slot detection is process-scan authoritative**
+   (`worker-cmd.bat` command lines) — the janitor wiped two live targets
+   under running workers before that fix, the 2026-08-19 incident class.
+   `new_slot` calls `ensure --need` BEFORE its floor refusal: the janitor
+   is the first response, a manual reclaim is the fallback, and the floor
+   refusal is the last resort. Never widen a skip list to get past it.
+3. **dispatch_ready.py** (`python loop/dispatch_ready.py [--dry-run]
+   [--max-workers=N]`) — the mechanical rolling dispatcher: READY rows
+   with deps LANDED and write sets disjoint from RUNNING rows go to free
+   slots, with `gen_packet --check` + `packet_lint` pre-flight and the
+   cargoq PATH + JOBS cap inherited. **Ground truth is slot_status, not
+   row bookkeeping** (it caught: case-sensitive status compares, in-flight
+   rows never flipped, dead dispatches = FINISHED without a matching
+   RESULT.json, stale RESULTs compared by packet id). What stays MANUAL:
+   adjudicating RESULTs, merging, amending — the dispatcher fills the
+   machine, it does not think.
+4. **`LOOK_SHARED_TARGET`** (run_packet.py) — when set, workers share ONE
+   `CARGO_TARGET_DIR` (race-free because cargoq serializes invocations);
+   per-slot targets stay the default otherwise. Booking section 6's policy
+   is now wired, not aspirational.
+5. **validate_survey.py** (`python loop/scripts/validate_survey.py
+   SURVEY.json`) — the V10 class run MANUALLY under the one-verify
+   amendment: survey rows feed later packets before the program-end
+   verify exists to catch invented line numbers, so every survey is
+   validated at filing time (checks file/line/expression resolve against
+   the tree).
+6. **The one-verify amendment** (build spec section 5, owner directive):
+   ONE full verification for the entire build spec, at the END. No
+   per-wave verification batteries; between merges, `cargo check -p` plus
+   session-37 scoped lib tests where write sets interact semantically.
+   The shim packet's own normal-loop verify was the wave-base landing and
+   remains the only mid-program verify. Registry rows stay RUNNING
+   (LANDED in the note) until the final battery flips them DONE.
+   Survey packets are the exception: validated at filing (item 5), not at
+   program end, because their consumers read them immediately.
+
+**Recurring worker behavior, codified:** the skipped-commit-step class
+(three occurrences) — work complete, RESULT written, commit skipped.
+Protocol: scoped-verify the worktree yourself, then commit AS DELIVERED
+with the orchestrator-amendment subject line recording the occurrence
+count. Never redispatch for it; never write the RESULT yourself.
+
 ## Amendment dispatches and the worker inner loop (session 20)
 
 Four speed levers, all measured against the FID-008 chain (three amendment
