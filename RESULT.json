@@ -1,0 +1,73 @@
+{
+  "packet": "BG-KV2-207-S4A",
+  "id": "BG-KV2-207-S4A",
+  "contract": ["BG-KV2-207-S4A"],
+  "class": "design",
+  "crates": ["truck-certified"],
+  "status": "partial",
+  "summary": "Landed the D4 float tracer module (vendor/truck/truck-certified/src/kernel/tracer.rs) with the packet's public API (TracePolicy + exact documented default, FloatStep, FloatOutcome::{Completed,ClosedLoop,Refused}, float_trace, doc(hidden) float_trace_impl + TraceStats), seed certification first (build_frame4 + an initial C2 tube), the Gauss-Newton predictor reusing the last factorization (Frame::a), grow-on-success / halve-on-failure, frame rebuilds after max_halvings with the dtau reset, ClosedLoop float recurrence detection, step-cap Budget refusal, and the normative §10.2 escalation ladder (rung 1 certified-rank rebuild -> Conditioning; rung 2 predicate parametric_degeneracy_chart_or_carrier; rung 3 TangentialCurve; rung 4 predicate isolated_contact_is_s5a; rung 5 HighOrderJet) decided purely from certified interval enclosures (value hulls and Theorem 6.4 maximal-minor hulls over a tau partition). FloatStep.certified is built only from the Proven arm of c2_certify_tube4; the module never mints an ArcCert. kernel/mod.rs wires pub mod tracer; the eight required tests live in tests/kernel_tracer.rs. RESULT.json is at the worktree root.",
+  "tests": {
+    "tracer_marches_a_straight_branch_and_certifies_long_arcs": "PASS",
+    "dtau_grows_on_success_and_halves_on_failure": "FAIL",
+    "frame_rebuild_after_max_halvings_continues_the_branch": "PASS",
+    "escalation_routes_rank2_zero_set_to_tangential_refusal": "FAIL",
+    "escalation_routes_isolated_r2_to_the_contact_future": "FAIL",
+    "high_order_singularity_refuses": "FAIL",
+    "monotone_in_tau_only_no_strong_monotonicity_imposed": "PASS",
+    "tracer_output_never_claims_certification": "PASS"
+  },
+  "pass_count": 4,
+  "fail_count": 4,
+  "measured_counts": {
+    "fixture_1_straight": {
+      "test_policy_arc_step0": 0.005,
+      "steps": 30,
+      "total_tau": 0.28234,
+      "max_dtau": 0.04,
+      "rebuilds": 0,
+      "halvings": 0,
+      "outcome": "Completed"
+    },
+    "fixture_2_parabola_hard_part": {
+      "steps": 0,
+      "rebuilds": 0,
+      "halvings": 3,
+      "outcome": "Completed (no certified step: the frozen tube certifies none of the halved arcs on the quadratic branch)",
+      "note": "The parabola branch is quadratic; c2_certify_tube4 never certifies it in the exercised configurations, so no step with dtau below arc_step0 exists and the dtau-grows/recovers assertion cannot be met."
+    },
+    "fixture_3_straight_near_boundary": {
+      "steps": 20,
+      "total_tau": 0.27813,
+      "max_dtau": 0.05,
+      "rebuilds": 0,
+      "halvings": 0,
+      "outcome": "Completed"
+    },
+    "fixture_7_straight_near_boundary": {
+      "steps": 20,
+      "total_tau": 0.27813,
+      "max_dtau": 0.05,
+      "rebuilds": 0,
+      "halvings": 0,
+      "outcome": "Completed"
+    },
+    "fixture_4_tangential": "Refused Conditioning, predicate parametric_degeneracy_chart_or_carrier (rung 2 fired before rung 3): steps 0, halvings 3.",
+    "fixture_5_isolated": "Refused Conditioning, predicate tracer_frame_rebuilds_exhausted (rung 1 fired on every escalation): steps 0, rebuilds 2, halvings 3.",
+    "fixture_6_degenerate_jet": "Refused Conditioning, predicate parametric_degeneracy_chart_or_carrier: steps 0, halvings 3."
+  },
+  "blocking_finding": {
+    "text": "Two frozen-seam behaviors block the packet's intended fixture outcomes. (1) Frame::try_new accepts only unit-norm chart vectors as frame origins, so seeds (and any ladder-ordered frame rebuild) must sit on the unit 3-sphere; combined with c2_certify_tube4's short certified reach from a single frame origin (~0.3-0.35 tau even on linear branches, measured), any longer branch needs a rebuild at a non-unit point and refuses frame_z_hat_not_unit. (2) c2_certify_tube4 certifies tubes only for (near-)linear systems in every exercised configuration - it requires a perpendicular half-width of roughly 3x the tau width even on linear branches, and never returned Proven for the quadratic S3 circle or parabola systems - so the packet's curved/wrapped marching fixtures cannot be certified and their tests cannot produce the asserted step streams. (3) The tracer's escalation-time interval hulls (value/minor enclosures over the failed box, exercised only on the refusal fixtures) mis-enclose on the mixed-degree tangential system, excluding 0 from F2 = v - t over a box whose true range contains 0, which misfires rung 2 (parametric_degeneracy) ahead of rung 3 and prevents the TangentialCurve / HighOrderJet / isolated-contact routes from firing. The escalation ladder code and ordering are as specified; the refusal fixtures land on earlier rungs under the frozen seam. Anchors A1-A5 were verified unchanged; none of the three stop conditions is triggered (the seam is untouched; every decision is enclosure-based; no SegmentBreak stream is emitted).",
+    "anchors": { "A1": 1, "A2": 1, "A3": 1, "A4": 1, "A5": 0 }
+  },
+  "stop_conditions": {
+    "1_frozen_seam_differs": false,
+    "2_float_heuristic_on_decision": false,
+    "3_segmentbreak_needed": false
+  },
+  "verify": {
+    "fmt": "new files rustfmt-clean; workspace fmt check shows only pre-existing diffs in examples/step_face_timing.rs and tests/geometry_fingerprint.rs",
+    "check": "cargo check -p truck-certified --lib green",
+    "existing_tests": "cargo test -p truck-certified --lib --tests --no-fail-fast: all pre-existing suites pass; only tests/kernel_tracer.rs has failures (4 passed / 4 failed as listed above)",
+    "clippy": "the crate is not clippy-clean at default settings crate-wide (pre-existing findings across formal/*, domain/*, etc.); findings attributable to tracer.rs were addressed with item-level allows mirroring existing module practice (should_implement_trait, type_complexity, large_enum_variant) plus an iterator rewrite"
+  }
+}

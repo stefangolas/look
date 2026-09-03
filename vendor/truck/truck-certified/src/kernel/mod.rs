@@ -75,3 +75,8 @@ pub mod residual;
 /// (arity 3) and the one-chart curve–curve system (arity 2) over the S2A C1
 /// seam, plus the 1-var homogeneous curve leaf they consume.
 pub mod residuals_r89;
+/// The D4 float predictor-corrector (BG-KV2-207-S4A): the fast, UNCERTIFIED
+/// branch tracer whose accept/reject path always goes through the certified
+/// seam ([`engine::build_frame4`] + [`engine::c2_certify_tube4`]), with the
+/// §10.2 escalation ladder.
+pub mod tracer;
