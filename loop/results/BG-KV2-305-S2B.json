@@ -1,0 +1,44 @@
+{
+  "packet": "BG-KV2-305-S2B",
+  "id": "BG-KV2-305-S2B",
+  "contract": ["BG-KV2-305-S2B"],
+  "class": "design",
+  "crates": ["truck-certified"],
+  "status": "complete",
+  "summary": "The §8.5/§8.6 projection certificates and the §7 R4/R4′ entries are landed in vendor/truck/truck-certified/src/kernel/projection.rs (wired as kernel::projection in kernel/mod.rs). graphcert implements Theorem 8.3 as a cone test with NO solve: the certified sign of n0 against the patch's normal set over the box is decided by the outward-rounded enclosure of n0·N (N = S_u × S_v) built from the CertifiedPatch derivative enclosures (cross product + dot), after finite-enclosure and finite-normal-cone gates; it refuses with the named predicate graphcert_no_feasible_n0 (Conditioning/Inconclusive) when zero cannot be excluded. n0 feasibility is documented as the §9.1 two-cone LP (tier1_loop_free, cited not forked). r4_project packages the R4 2x2 projection solve (the frozen krawczyk_c1 IS the solver) over a deterministic orthonormal complement basis (e1 × e2 = n0, IEEE-sqrt normalization only); r4_prime packages the R4′ normal-projection residual P(u0; s,t) = (S1_u·(S2−S1), S1_v·(S2−S1)) for a fixed first-patch chart point as the no-feasible-n0 fallback. r5_enclose implements §8.6 step 1 (preimage) verbatim for the reduced shared-chart configuration (both patches graphs over Π, preimage region = the target box): per patch, graphcert over the target region, the §7.1 weight-bound value argument, then C1 on R4 at the target centre; it emits the frozen R5Enclosure { q, preimage, cert } with R4-stamped PointCerts, and refuses with RefusalKind::R5EnclosureFailed (Inconclusive) when any preimage stage cannot be certified (named predicates r5_graphcert_refused_over_target / r5_weight_bound_not_proven / r5_krawczyk_stalled_at_depth_max). Steps 2/3/5 (value, gradient, g = f1 − f2) are exposed as r5_graph_enclose returning R5Graph { value, grad }, with the R5 gradient's interval inversion implemented locally (adjugate/det over the landed CertifiedInterval primitives — stop condition 2 did not need to fire); step 4 (Hessian) is deferred to S5A. The shim R5Enclosure carries no try_new (certs.rs is frozen and outside the write set), so the value is constructed locally after every stage validates. No Bernstein evaluation exists anywhere in the module; no transcendental call appears (the two source audits pin both). The nine required integration tests live in tests/kernel_projection.rs. RESULT.json is at the worktree root.",
+  "tests": {
+    "graphcert_is_a_cone_test_with_no_solve": "PASS",
+    "graphcert_injectivity_on_a_sphere_chart": "PASS",
+    "graphcert_refuses_when_no_feasible_n0": "PASS",
+    "r5_enclosure_preimage_via_c1_on_r4": "PASS",
+    "r5_value_and_gradient_enclose_the_truth": "PASS",
+    "r5_refusal_when_krawczyk_fails_at_depth_max": "PASS",
+    "r4_fallback_prime_exercised_on_no_feasible_n0_fixture": "PASS",
+    "no_bernstein_applies_to_r5_audit": "PASS",
+    "no_transcendental_call_in_projection_module": "PASS"
+  },
+  "pass_count": 9,
+  "fail_count": 0,
+  "measured_counts": {
+    "graphcert_sphere_chart": "rational unit-sphere carrier, chart cap box [-0.25,0.25]^2, n0 = polar axis (0,0,1): GraphCert Proven with a strictly positive certified det bound (0 excluded from □(n0·N)); projection injective on the certified box (distinct chart points project distinctly).",
+    "graphcert_refusal_tangential_pair": "302 tangential-adjacent family members (sphere cap z = 1 − (u²+v²)/2 and its tangent plane z = 1) with n0 = (1,0,0) over [-1e-3,1e-3]^2: cap returns Conditioning/graphcert_no_feasible_n0 (n0·N = −h_u = u straddles zero); plane returns Conditioning/graphcert_no_feasible_n0 (n0·N exactly zero up to the directed-rounding subnormal floor). Feasible n0 = (0,0,1) certifies both.",
+    "r5_preimage_refusal": "horizontal plane pair (z = 1) with n0 = (1,0,0) over [-0.2,0.2]^2: r5_enclose refuses RefusalKind::R5EnclosureFailed (Inconclusive), predicate r5_graphcert_refused_over_target; every refinement is also non-graph in the x direction, so the caller subdivides or falls back to R4′.",
+    "r4_prime_fallback": "302 tangential-adjacent pair: cap normal at u0 = (0,0) certified to meet the tangent plane z = 1 at the chart origin (Proven, ResidualId::R4Prime, rho <= RHO_MAX, S2A C1 parity identical); cap normal at (0.5,0) meets the tangent plane at (0.5625,0), provably outside the [0.8,1]×[-0.1,0.1] search box — honest non-Proven, never a false Proven."
+  },
+  "blocking_finding": {
+    "text": "None. All nine required tests pass; the workspace check (cargo check --workspace --all-targets --locked) is green and the full pre-existing truck-certified suite (566 lib + all integration/doc suites) stays green. The only semantic nuance recorded: because the frozen &dyn CertifiedPatch seam exposes no parameter-domain accessor and the frozen R5Enclosure shim has no try_new, r5_enclose operates over the §10.3 reduced shared-chart configuration where the certified preimage region is the target box itself, and R5 preimage failures surface as RefusalKind::R5EnclosureFailed through the refusal-carrying verdict arm (the ClaimVerdict E slot) — both recorded in the module docs. graphcert's zero-exclusion test treats the directed-rounding subnormal floor of an exactly-degenerate graph as the same no-feasible-n0 refusal rather than a separate exact-zero class.",
+    "anchors": { "A1": 1, "A2": 1, "A3": 1, "A4": 0 }
+  },
+  "stop_conditions": {
+    "1_frozen_shape_differs": false,
+    "2_interval_inverse_needs_beyond_landed_primitives": false,
+    "3_fixture_graphcert_cannot_exclude_zero_honestly": false
+  },
+  "verify": {
+    "fmt": "changed/new files (projection.rs, tests/kernel_projection.rs, mod.rs edit) rustfmt-clean under the crate edition (2021); the installed rustfmt 1.9.0 additionally reports pre-existing diffs across committed truck files and the look tests/examples that are outside this packet's write set and were left untouched",
+    "check": "cargo check --workspace --all-targets --locked green",
+    "tests": "cargo test -p truck-certified: 566 lib tests + every integration/doc suite pass, including the 9 new tests in tests/kernel_projection.rs",
+    "clippy": "the crate is not clippy-clean at default settings crate-wide under the installed clippy 1.97 (pre-existing findings in committed code, e.g. src/formal/xmonotone.rs, src/source_evidence.rs, src/formal/cylinder_lift.rs); no clippy finding is attributable to kernel/projection.rs (a single needless_range_loop in complement_basis found during the run was rewritten)",
+    "anchors": "A1=1 A2=1 A3=1 A4=0 verified after the commit"
+  }
+}
