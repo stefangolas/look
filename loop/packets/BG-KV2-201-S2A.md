@@ -34,7 +34,7 @@ anchors:
   - {id: A1, expect: 1, cmd: "grep -c 'pub struct KrawczykCertificate3' vendor/truck/truck-certified/src/ssi_types.rs"}
   - {id: A2, expect: 1, cmd: "grep -c 'pub struct Frame' vendor/truck/truck-certified/src/kernel/certs.rs"}
   - {id: A3, expect: 1, cmd: "grep -c 'pub struct ArcCert' vendor/truck/truck-certified/src/kernel/certs.rs"}
-  - {id: A4, expect: 1, cmd: "grep -c 'RHO_MAX' vendor/truck/truck-certified/src/kernel/config.rs"}
+  - {id: A4, expect: 1, cmd: "grep -c 'pub const RHO_MAX' vendor/truck/truck-certified/src/kernel/config.rs"}
   - {id: A5, expect: 0, cmd: "grep -rnw 'c2_certify_tube4' vendor/truck/truck-certified/src | wc -l"}
   - {id: A6, expect: 1, cmd: "grep -c 'leaf_extract' vendor/truck/truck-certified/src/kernel/mod.rs"}
 tests_required:
