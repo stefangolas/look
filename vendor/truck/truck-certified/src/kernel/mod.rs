@@ -59,6 +59,7 @@ pub mod evidence;
 #[doc(hidden)]
 pub mod fixtures;
 pub mod graph;
+pub mod identity;
 pub mod leaf;
 pub mod patch;
 pub mod residual;
