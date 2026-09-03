@@ -566,6 +566,52 @@ nothing was watching.
 Commit messages carry the reasoning; STATE.md carries the conclusions. Both are
 load-bearing, because the next orchestrator may not be you.
 
+## The cargo queue (MANDATORY machinery, session 50)
+
+`loop/cargoq/` is a machine-wide cargo queue: a localhost server owns ALL
+cargo invocations, one heavy job at a time (FIFO, per-job timeout kill at
+`CARGOQ_TIMEOUT`, default 40 min), so N agents' spike phases never
+overlap — the ENOMEM / `Thread failed to start` / `0xc0000409` class is
+structurally dead instead of merely avoided. Agents block on the HTTP
+call exactly as they would block on cargo; the full output and exit code
+come back. The server is started with the watchdog and must be running
+before any dispatch.
+
+**Dispatch procedure (every run_packet / new_slot / verify invocation):**
+
+```
+$env:PATH = "C:\Users\stefa\look\loop\cargoq;" + $env:PATH
+```
+
+The shim dir carries BOTH spellings: `cargo.bat` (cmd/PowerShell) and
+extensionless `cargo` (bash — bash does not execute .bat files; without
+the second shim every bash-shelled worker silently bypasses the queue).
+
+**Bypass discipline — the rules:**
+
+1. A packet's house rules state it verbatim: "All cargo invocations go
+   through the queue (the `cargo` on PATH IS the queue shim). Do not
+   invoke cargo by absolute path; do not unset the shim." Workers follow
+   packet text; the machinery must therefore be in the environment the
+   packet assumes — a bypassing worker is an ORCHESTRATOR fault (env not
+   set) or a PACKET fault (rule not stated), never a worker fault.
+2. Direct execution is never silent: when the server is unreachable the
+   client falls back to running cargo directly AND appends to
+   `loop/cargoq/fallback.log`. Reading that log is part of adjudication —
+   fallback lines mean the server died mid-wave and the machine is back
+   in the spike-overlap regime until restarted.
+3. `curl 127.0.0.1:8231/ping` (queued/running counts) and `/stats` are
+   the observability surface; the server log (`server.log`) is the
+   authoritative job history.
+4. The per-job timeout returns exit 3 with a `[cargoq] killed` note in
+   stderr — a hung test wedges one job, never the machine.
+5. Trust but verify: the serialization behavior was validated by watching
+   two concurrent jobs (A's DONE precedes B's START in the log) — the
+    "watch it fail before you trust it" rule applied to infrastructure;
+    it caught two real server bugs (a condvar never notified, and a pump
+    that did not enforce one-at-a-time). Re-run that two-job test after
+    ANY server change.
+
 ## Amendment dispatches and the worker inner loop (session 20)
 
 Four speed levers, all measured against the FID-008 chain (three amendment

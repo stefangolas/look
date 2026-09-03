@@ -1,0 +1,9 @@
+#!/usr/bin/env python
+"""bash-resolvable cargo shim: forwards to the cargoq client."""
+import os
+import runpy
+
+runpy.run_path(
+    os.path.join(os.path.dirname(os.path.abspath(__file__)), "cargoq.py"),
+    run_name="__main__",
+)

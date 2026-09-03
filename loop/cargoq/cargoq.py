@@ -8,6 +8,7 @@ import json
 import os
 import subprocess
 import sys
+import time
 import urllib.request
 
 PORT = int(os.environ.get("CARGOQ_PORT", "8231"))
@@ -15,7 +16,14 @@ TIMEOUT = int(os.environ.get("CARGOQ_TIMEOUT", "2400"))
 
 
 def direct():
+    """Fallback: run cargo directly. LOUD — every bypass is logged."""
     here = os.path.dirname(os.path.abspath(__file__))
+    with open(os.path.join(here, "fallback.log"), "a",
+              encoding="utf-8") as f:
+        f.write(f"{time.strftime('%Y-%m-%d %H:%M:%S')} DIRECT: "
+                f"cargo {' '.join(sys.argv[1:])}\n")
+    sys.stderr.write("[cargoq] server unreachable, running DIRECT "
+                     "(recorded in fallback.log)\n")
     path = [p for p in os.environ.get("PATH", "").split(os.pathsep)
             if os.path.abspath(p or ".") != here]
     env = dict(os.environ)

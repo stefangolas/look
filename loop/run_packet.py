@@ -370,7 +370,16 @@ def main():
     # reclaimed on re-fork anyway, and the watchdog only touches idle slots.
     env = dict(os.environ)
     env['CARGO_INCREMENTAL'] = '1'
-    env['CARGO_TARGET_DIR'] = str(target_dir)
+    # LOOK_SHARED_TARGET (session 50, booking section 6 now viable via the
+    # cargo queue): when set, workers share ONE target dir - the queue
+    # serializes invocations, so the shared tree is race-free and the
+    # per-slot target duplication (GBs each) disappears. Default stays
+    # per-slot for one-off packets.
+    shared = os.environ.get('LOOK_SHARED_TARGET')
+    if shared:
+        env['CARGO_TARGET_DIR'] = shared
+    else:
+        env['CARGO_TARGET_DIR'] = str(target_dir)
 
     print(f"Running packet '{args.packet}' in slot {args.slot} (model={args.model})...")
 
