@@ -1,0 +1,30 @@
+{
+  "packet": "BG-KV2-306-FRAMEGATE",
+  "id": "BG-KV2-306-FRAMEGATE",
+  "contract": ["BG-KV2-306-FRAMEGATE"],
+  "class": "design",
+  "crates": ["truck-certified"],
+  "status": "complete",
+  "summary": "Frame::try_new gate corrected TO SPEC (spec section 8.1): z_hat is the expansion POINT in R^n and carries no unit constraint; the unit requirements live on the frame basis (q_tau unit, Q orthonormal). Removed the shim-time unit-z_hat refusal from vendor/truck/truck-certified/src/kernel/certs.rs Frame::try_new; only finiteness is now required of z_hat (enforced by the existing all_finite_frame gate), while q_tau-unit (TOL_JACOBIAN), q-orthonormality (TOL_JACOBIAN), q_perp-as-complement-of-q_tau, and finite-a checks are kept verbatim. The Frame doc comment and the z_hat field doc now cite section 8.1 (expansion point; the basis carries the unit constraints). The shim contract test frame_refuses_non_orthonormal_basis keeps its landed name and its orthonormality/q_tau assertions; its former non-unit-normal refusal assertion was replaced IN PLACE by a non-unit-z_hat acceptance case plus a non-finite-z_hat finiteness refusal. The new required test frame_try_new_accepts_nonunit_z_hat_and_still_gates_the_basis covers both directions: accepts the [0.3, 0.7, 1.2, 0.5]-class non-unit point with a valid basis (and asserts the probe is genuinely non-unit), refuses a non-unit q_tau, and refuses non-finite z_hat (NaN and infinity). This unblocks mid-branch frame rebuilds (S4A fixture 3 frame_zhat_not_unit; build_frame4 constructs frames at arbitrary box centers and gates z_hat on finiteness only). RESULT.json is at the worktree root.",
+  "tests": {
+    "frame_try_new_accepts_nonunit_z_hat_and_still_gates_the_basis": "PASS",
+    "frame_refuses_non_orthonormal_basis": "PASS",
+    "frame_is_orthonormal_and_q_tau_is_the_normalized_kernel_direction": "PASS",
+    "point_and_arc_cert_refuse_rho_above_max": "PASS"
+  },
+  "pass_count": 4,
+  "fail_count": 0,
+  "anchors": {
+    "A1": 1,
+    "A2": 1
+  },
+  "stop_conditions": {
+    "1_landed_consumer_depends_on_unit_z_hat_refusal": false
+  },
+  "verify": {
+    "fmt": "packet files rustfmt-clean (cargo fmt --all -- --check reports only pre-existing diffs in examples/step_face_timing.rs and tests/geometry_fingerprint.rs, which are outside the packet write_allow and were left untouched)",
+    "check": "cargo check --workspace --all-targets green",
+    "existing_tests": "cargo test -p truck-certified --lib --tests --no-fail-fast green: all 18 suites pass (566 lib + all integration binaries), 0 failed, including the in-place-updated frame_refuses_non_orthonormal_basis and the new frame_try_new_accepts_nonunit_z_hat_and_still_gates_the_basis",
+    "clippy": "the crate is not clippy-clean at default settings crate-wide (pre-existing findings across formal/*, domain/*, etc., matching the recorded S4A worker verify); no clippy finding is attributable to certs.rs or kernel_contract.rs, the packet's only touched files"
+  }
+}
