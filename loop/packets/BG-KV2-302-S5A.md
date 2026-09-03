@@ -106,8 +106,9 @@ The eight `tests_required` names; ground truths:
 
 House rules: H-1; H-3 same-line; fmt + clippy (exact verify form,
 unfiltered, ALL findings) clean; `cargo check --workspace --all-targets`
-green. CARGO_BUILD_JOBS=2-4. COMMIT BEFORE RESULT.json (explicit final
-turns: add, commit, then RESULT).
+green. CARGO_BUILD_JOBS=2-4. COMMIT BEFORE writing `RESULT.json` AT THE
+WORKTREE ROOT (explicit final turns: add, commit, then RESULT.json at the
+worktree root).
 
 ## Stop conditions
 
