@@ -155,7 +155,13 @@ def main():
 
     print(f"Warming slot {args.slot} ({wt}), target={target_dir} ...")
     start = time.monotonic()
-    res = subprocess.run(['cargo', 'check', '--workspace', '--all-targets'], cwd=str(wt), env=env)
+    # Session 50: the warm build goes through the cargo queue like every
+    # other cargo invocation (a warm build is exactly the RAM spike that
+    # crashed the machine when it overlapped running workers).
+    warm_env = dict(env)
+    qdir = REPO_ROOT / 'loop' / 'cargoq'
+    warm_env['PATH'] = str(qdir) + os.pathsep + env.get('PATH', '')
+    res = subprocess.run(['cargo', 'check', '--workspace', '--all-targets'], cwd=str(wt), env=warm_env)
     elapsed_min = (time.monotonic() - start) / 60
 
     if res.returncode != 0:
