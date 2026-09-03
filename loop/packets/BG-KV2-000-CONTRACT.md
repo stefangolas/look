@@ -419,3 +419,31 @@ WORKTREE ROOT) with the finding verbatim if:
 Commit your work on the current branch (subject: `feat(certified): kernel
 v2 shim — shared types + refusing constructors + fixture kit
 (BG-KV2-000-CONTRACT)`) BEFORE writing `RESULT.json`.
+
+## AMENDMENT r2 (orchestrator, session 50) - FINISH STEPS ONLY
+
+Your r1 run died on an API 402 (Insufficient Balance) after writing all the
+code. The orchestrator has since:
+
+1. RESTORED the two out-of-write-set files your cargo fmt --all reformatted
+   (examples/step_face_timing.rs, tests/geometry_fingerprint.rs - the
+   recorded pre-existing fmt drift; they must NOT be in your diff).
+2. Committed your work AS A WIP CHECKPOINT on this branch (51133e3): all
+   kernel/*.rs files + tests/kernel_contract.rs + the lib.rs pub mod
+   line. Treat it as YOUR work; build on it, do not redo it.
+
+Remaining steps, nothing else:
+
+- Run cargo fmt -p truck-certified -- --check and cargo fmt -- --check
+  scoped appropriately: if fmt wants changes in files OUTSIDE
+  vendor/truck/truck-certified/src/kernel/** and
+  vendor/truck/truck-certified/tests/kernel_contract.rs, RESTORE those
+  files (git checkout --) and format only the new files directly with
+  rustfmt. The two restored files stay byte-identical to base.
+- Run the Done-when checks from the packet (cargo test -p truck-certified
+  --lib --tests --no-fail-fast; cargo check --workspace --all-targets;
+  clippy exact verify form) with CARGO_BUILD_JOBS=2-4.
+- Fix any failures found (your code is in scope; landed code is not).
+- Commit (may be an amendment commit on top of 51133e3).
+- Write RESULT.json AT THE WORKTREE ROOT: status, what the r1 run
+  completed, the fmt-drift incident, check outcomes.
