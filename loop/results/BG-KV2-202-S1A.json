@@ -1,0 +1,62 @@
+{
+  "id": "BG-KV2-202-S1A",
+  "class": "design",
+  "crates": ["truck-certified"],
+  "status": "done",
+  "summary": "Lands spec §7's R8 (curve-surface, 3 eq in 3 unknowns) and R9 (one-chart curve-curve, 2 eq in 2 unknowns) as square C1 residuals over the S2A frozen seam. New kernel/residuals_r89.rs defines the minimal 1-var homogeneous curve leaf BezierLeaf1 (degree/control/chart/carrier; try_new refuses degree 0, mismatched count, non-finite coordinates, non-positive weights), R8System { curve: BezierLeaf1, surface: BezierLeaf } and R9System { chart: ChartId, a: BezierLeaf1, b: BezierLeaf1 }, both implementing the frozen SquareResidualEval seam (arity 3 / arity 2). Eval and Jacobian enclosures are composed as products of per-factor hulls over the joint box through the landed hull kernels (hull_bernstein_1d/2d, bernstein_derivative_1d/2d), outward-rounded CertifiedInterval only: H_k = Cw(t).S_k(u,v) - C_k(t).Sw(u,v) for R8 (k in x,y,z) and H_k = C1w(t).C2_k(r) - C1_k(t).C2w(r) for R9 (k in x,y) - NO division anywhere (N5, weights arrive as the §7.1 value argument) and NO transcendental call (N4). R8 certifies through krawczyk_c1_n3 (IBox3 -> PointCert3, rebuild stamped with ResidualId::R8 through PointCert3::try_new); R9 certifies through krawczyk_c1 (IBox2 -> PointCert, rebuild stamped ResidualId::R9). R9 try_new refuses mismatched charts with RefusalKind::ChartExhausted + RefusalEvidence::Predicate { name: \"r9_requires_one_chart\" }. Constructors re-run the leaf admission gate (raw pub-field leaves cannot reach a residual), refusing non-finite (NonFinite), degree 0 (ClaimRefuted), non-positive weight (WeightDegenerate), and a transcendental-carrier curve marker (TranscendentalCarrier, Disproven). The eight required integration tests land in tests/kernel_r89.rs. mod.rs registers the module (one doc-commented pub mod line).",
+  "stop_conditions": {
+    "triggered": false,
+    "details": [
+      "1 (S2A seam differs from the verbatim frozen shapes): not triggered - at this fork point engine.rs carries exactly SquareResidualEval { arity, eval, jac_encl }, krawczyk_c1(g: &dyn SquareResidualEval, b: IBox2, w: &[CertifiedPositive]) -> ClaimVerdict<PointCert, Refusal, Reason>, AND the amendment-time addition krawczyk_c1_n3(g: &dyn SquareResidualEval, b: IBox3, w: &[CertifiedPositive]) -> ClaimVerdict<PointCert3, Refusal, Reason> (engine.rs:104/249/1348); nothing was adapted or re-spelled.",
+      "2 (cross-multiplied R8 grids exceed the landed hull kernels' degree support): not triggered - the landed hull kernels (hull_bernstein_1d/hull_bernstein_2d) are generic-degree de Casteljau over CertifiedInterval with no degree ceiling, and the packet's fixtures are degree (1,1) surface leaves with degree-1 curve leaves and degree-2 R9 chart curves; no Bernstein arithmetic was reimplemented.",
+      "3 (a fixture's known root cannot certify Proven with rho <= RHO_MAX after honest subdivision): not triggered - both known roots certified Proven in a single honest box with no subdivision: R8 pierce root (t,u,v) = (0.5, 0.25, 0.5) in [0.45,0.55]x[0.2,0.3]x[0.45,0.55] and R9 crossing (t,r) = (0.5, 0.5) in [0.48,0.52]^2; every certificate emitted with rho <= RHO_MAX. The tangential R8 fixture correctly refuses Inconclusive(c1_n3_midpoint_jacobian_singular) and the separated R9 pair gives Disproven (ClaimRefuted, backing Disproven)."
+    ]
+  },
+  "files_written": [
+    "vendor/truck/truck-certified/src/kernel/residuals_r89.rs",
+    "vendor/truck/truck-certified/src/kernel/mod.rs",
+    "vendor/truck/truck-certified/tests/kernel_r89.rs"
+  ],
+  "anchors_before": {
+    "A1_pub_trait_SquareResidualEval_in_engine_rs": 1,
+    "A2_pub_fn_krawczyk_c1_in_engine_rs": 2,
+    "A3_pub_fn_extract_bezier_leaves_in_leaf_extract_rs": 1,
+    "A4_R8System_in_src": 0
+  },
+  "anchors_after": {
+    "A1_pub_trait_SquareResidualEval_in_engine_rs": 1,
+    "A2_pub_fn_krawczyk_c1_in_engine_rs": 2,
+    "A3_pub_fn_extract_bezier_leaves_in_leaf_extract_rs": 1,
+    "A4_R8System_in_src": 5
+  },
+  "tests_required": {
+    "r8_system_builds_from_curve_and_surface_leaves": "pass",
+    "r8_refuses_nonfinite_or_degree_zero_inputs": "pass",
+    "r8_regular_root_certifies_with_point_cert": "pass",
+    "r8_transversality_refusal_when_tangent_to_surface": "pass",
+    "r9_system_builds_from_two_curve_leaves_in_one_chart": "pass",
+    "r9_crossing_certifies_and_non_crossing_disproves": "pass",
+    "homogeneous_evaluation_no_premature_division": "pass",
+    "no_transcendental_call_in_r89_module": "pass"
+  },
+  "tests_command": "cargo test -p truck-certified --lib --tests --no-fail-fast --locked -> all green: lib 566 passed, 0 failed; all 14 integration suites 0 failed incl. kernel_r89 8 passed (the 8 required names). kernel_r89 alone: 8 passed.",
+  "verification": {
+    "cargo_test_p_truck_certified_lib_tests_no_fail_fast": "green (566 lib + 14 integration suites, 0 failures; kernel_r89 8/8)",
+    "cargo_check_workspace_all_targets": "cargo check --workspace --all-targets --locked: Finished, zero errors",
+    "cargo_fmt": "cargo fmt -p truck-certified -- --check clean on the three packet files; the exact verify form also moves the pre-existing `pub mod coons_patch;` line in kernel/mod.rs up one position (pure rustfmt reordering of a line this packet legitimately edits), so the crate is fmt-clean under the installed rustfmt",
+    "clippy": "cargo clippy -p truck-certified --all-targets --locked: ZERO diagnostics reference kernel/residuals_r89.rs, kernel/mod.rs, or tests/kernel_r89.rs. The crate-wide failure population is unchanged at the pre-existing 65 lib / 126 lib-test baseline errors in unrelated vendored modules under the locally installed clippy 1.97.0 (the tree carries no rust-toolchain pin); none touch this packet's files and there were zero real compile errors in them.",
+    "H1": "no unwrap/expect/panic! in residuals_r89.rs or kernel_r89.rs; #[allow(clippy::result_large_err)] appears item-level only with the frozen-shape justification comment (Refusal carries Option<PartialGraph>); no module-level allow; the deny header matches the shim files",
+    "H3": "no bare absolute length literal in the added kernel predicate code; fixture constants and the scan files follow the landed // H-3 conventions",
+    "N4_N5": "the in-file discipline scans (homogeneous_evaluation_no_premature_division, no_transcendental_call_in_r89_module) pass over residuals_r89.rs: no '/' outside comments, and no sin/cos/atan2/exp/ln/log/powf/sqrt outside comments",
+    "env": "CARGO_BUILD_JOBS default, rustc 1.97.1 (no rust-toolchain pin), host x86_64-pc-windows-gnullvm, no --target flag passed"
+  },
+  "notes": [
+    "JUDGEMENT (recorded): 1-var leaf. Wave-1 landed no 1-var homogeneous leaf (leaf_extract extracts only 2-var BezierLeaf surfaces), so this packet defines the minimal BezierLeaf1 in residuals_r89.rs per Section 1 (degree + homogeneous xyzw control + chart), mirroring BezierLeaf::try_new's discipline. Its public chart field is what makes R9's one-chart discipline enforceable (try_new compares a.chart vs b.chart and refuses with RefusalKind::ChartExhausted + predicate r9_requires_one_chart). Its public carrier field carries the rational-leaves-only admission marker: CurveCarrierKind::Rational is set by try_new; a transcendental-only source is refused at the residual constructors with RefusalKind::TranscendentalCarrier (Disproven). The packet's test note 'construct via CarrierData misuse' has no direct encoding in the landed leaf vocabulary (BezierLeaf/BezierLeaf1 hold numeric nets only, and CarrierData does not enter these signatures), so the marker is exercised by a raw pub-field leaf; the refusal kind itself is the caller-constructible §3.2 spelling and this module is the R8/R9 caller.",
+    "JUDGEMENT (recorded): eval composition. The residual systems store the leaves, not materialized trivariate grids: the joint-box eval/jacobian is composed as products of per-factor hulls (Cw over the t-axis times S_k over the (u,v)-rectangle, etc.). The product of supersets of the factor ranges is a superset of the product range, so the composition is a sound outward-rounded enclosure of the cross-multiplied residual and its partials over the box; no division by any weight enclosure ever occurs. A box axis outside a leaf's [0,1] unit domain (or a hull refusal) yields the vacuous unbounded enclosure, so the C1 entry answers Inconclusive rather than an unsound bound (leaf.rs convention).",
+    "Fixtures are machine-checked ground truths with exact dyadic roots. R8 regular: the line C(t) = (-1/4 + t, 1/4 + t/2, -1/2 + t) pierces the plane S(u,v) = (u, v, 0) at (t,u,v) = (1/2, 1/4, 1/2), C' = (1, 1/2, 1) not in the tangent plane (det DH = 1); box [0.45,0.55]x[0.2,0.3]x[0.45,0.55] certifies Proven with rho <= RHO_MAX and the rebuilt PointCert3 names ResidualId::R8. R8 tangent: the line C(t) = (t, 1/2, t) lies IN the plane z = x (its tangent plane), det DH = 0 on the contact; the C1 refuses Inconclusive (reason c1_n3_midpoint_jacobian_singular) - a Proven PointCert IS the transversality certificate and this box has none. R9 crossing: two coplanar rational quadratics C1(t) = (2t, 4t(1-t)) and C2(r) = (2r, -1+6r-4r^2) cross at the single dyadic pair (1/2, 1/2) at the point (1,1) with det[C1', -C2'] = -4 != 0; box [0.48,0.52]^2 certifies Proven and the rebuilt PointCert names ResidualId::R9. R9 non-crossing: C2n(r) = (2r, -2+4r-3r^2) never meets C1 (y-gap 2 - t^2 >= 1); over [0.3,0.7]^2 the Krawczyk image is disjoint and the C1 is Disproven (ClaimRefuted, backing Disproven), the S2A backing-table class the packet's ground truth permits.",
+    "The seam rebuild is the documented one-line seam: the engine stamps ResidualId::R1 and the tests rebuild the emitted certificate through PointCert3::try_new(ResidualId::R8, cert.box_, cert.rho) / PointCert::try_new(ResidualId::R9, cert.box_, cert.rho).",
+    "R9 arity 2 runs through the frozen krawczyk_c1 (the seam's n=2 arm composes the landed formal/bezier_isect.rs square 2x2 discipline); no second 2D engine is forked. R8 arity 3 runs through krawczyk_c1_n3 (BG-KV2-206's frozen additive entry), whose backing table is identical to krawczyk_c1's.",
+    "mod.rs: the only non-append change is the rustfmt reordering of the pre-existing `pub mod coons_patch;` line (the crate must satisfy the exact fmt verify form; the line was out of rustfmt's canonical position at HEAD).",
+    "PACKET.md, CONTEXT.md, and RESULT.json remain untracked at the worktree root; the orchestrator commits with the packet's required subject."
+  ]
+}
