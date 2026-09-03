@@ -9,117 +9,128 @@ when they stop being true, never for length. If you are picking this up cold, re
 [`loop/ORCHESTRATOR.md`](ORCHESTRATOR.md) for how to run the loop, then
 `python loop/slot_status.py`** - nothing else. Do not read `LEDGER.jsonl` whole.
 
-Updated 2026-09-02, session 49, wave close. **THE PHASE-2 WAVE IS CLOSED:
-shim landed, all three members ran in PARALLEL, integrated, measured, rows
-DONE.** The spline census was CANCELLED by the owner (gate waived). The
-session-48 "shim landed at 37b0267" claim was FALSE and is corrected here
-and in the ledger.
+Updated 2026-09-03, session 50 (kernel v2 swarm, spine + waves 0-4).
+**THE PROGRAM IS ~72% LANDED (18/25 rows), mid-Wave-4, handoff mid-flight.**
 
 ## Where we are
 
-- **Wave base = a27edaa** (shim BG-CK-P2-CONTRACT landing merge; verified
-  at 1b5ca21; filing 6932197). The shim r1 STOPPED on the packet's own
-  false Section 3 premise (the FLOOR r2 dev-dep edge never landed);
-  worker caught it (stop condition 3, E0433 recorded); r2 amendment
-  f2fca2c supplied the premise; resumed session landed edge + shim.
-- **W1 BG-CK-P2-SYSTEM DONE** (59ade56, merged 3d991aa): SYSTEM+KRAWCZYK3
-  collapsed; src/ssi.rs 961 lines (constructor, frozen coordinate rule,
-  3x3 Krawczyk adjugate/det over CertifiedInterval,
-  strict-inclusion-only emission) + tests.
-- **W2 BG-CK-P2-TRACE DONE** (v1 7e671e8; amendment e4a5fc2, merged
-  62127f5): continuation loop + frozen both-certificate switching;
-  solver-private BranchCertifier; amendment activated the production
-  seam - pub fn certified_pair_trace(&RationalBipatch,
-  &RationalBipatch, [f64;4]) -> Result<TraceOutcome, SsiRefusal> over
-  W1's pipeline, fixture-driven integration tests green first-try.
-- **W3 BG-CK-P2-RESIDUAL DONE** (v1 b5487d5; amendment c0b8117, merged):
-  harness seeds re-walk reproduced the booked prevalence totals EXACTLY
-  (60,438); amendment filled the marked seam and RAN the measurement.
-- **THE MEASUREMENT (the wave's published output, in
-  docs/CERTIFIED_PHASE2_FLOOR.md + RESULT):** 60,438 booked spline
-  face-pairs -> 726 admitted (funnel: 21,566 admission_refused; 9,356
-  rational-form mismatch; 28,790 non-spline-carrier in the walk);
-  226,654 patch-pair units from the product rule -> 400 traced (0.83%
-  completion in 279 s, truncation PUBLISHED not hidden); refusals typed
-  (3 non_transverse, 2 conditioning, 1 singular); certify_rate 0.0 on 6
-  completed pairs - statistically empty, honestly published.
-- **THE PHASE-2 FINDING (next booking's input, the FLOOR-STOP
-  analogue):** the admission funnel + patch extraction eat ~99% of the
-  mass before the certified engine is consulted, and the patch-pair
-  product explodes. The engine WORKS (real pairs, real traces, typed
-  refusals end to end); the pipeline AROUND it is where the mass dies.
-  Owner decisions live in: DISPATCH-2 (special-position arms), the
-  recognizer family (geometric-naturalness grounds - census waived),
-  admission-screen widening, decomposition policy (multi-patch faces),
-  and the Phase-1 FLOOR anomaly (4,381 adjacent certified_disjoint,
-  STOP filing on record). docs/CERTIFIED_INTERLEAVE_BUILD_SPEC.md's
-  manifest carries the full record.
-- **Composed-HEAD battery (the wave's ONE authoritative verification):**
-  cargo test -p truck-certified --lib --tests 559 + all suites green;
-  harness 4 green; kernel-gates HEAD all P-3 + GATE-4 111/111; cargo
-  check --workspace --all-targets green; clippy zero findings
-  attributable to wave files (pre-existing grandfathered baseline
-  unchanged). V8/V9 skipped on the recorded additive-only
-  justification. Rows flipped DONE (loop/scripts/close_wave_ck_p2.py).
+- **Program**: kernel v2 swarm per `docs/KERNEL_V2_BUILD_SPEC.md` (the
+  spine: census, 6 owner decisions, shim inventory, wave plan, manifest).
+  Normative theory: `docs/CONSTRUCTIVE_GEOMETRY_KERNEL_SPEC_V2.md`.
+- **LANDED (18 packets)**: Wave 0 shim (fd65c24 = wave base; `kernel/`
+  module in truck-certified: types + refusing constructors + fixture kit +
+  config constants). Wave 1: 101 survey (filed, validator-clean),
+  102 BezierLeaf, 103 identity Rules A/B/C + dyadic join, 104 rational
+  carriers. Wave 2: 201 engine (Lemma 8.0 rho + C1 + C2 tube + frames),
+  206 PointCert3/krawczyk_c1_n4-precursor (arity-3), 202 R8/R9 residuals,
+  203 Spine enum + septic PH + FrameData + SpineCurve rename, 205 Coons
+  CertifiedPatch, 207 S4A PARTIAL (5/8). Wave 3: 301 minor algebra + Tier-1
+  LP + R8 seeds, 302 contact classifier + ContactCert, 303 gluing + deck id
+  + assembly, 305 GraphCert + R5 + R4/R4', 306 Frame::try_new gate fix,
+  304 Tier-2 Psi_a + arity-4 C1. Wave 4: 403 ExactSheet, 404 R6 deflation.
+- **IN FLIGHT at close (adjudicate FIRST on pickup)**: slot 0 = 307
+  ENGINEREACH (two-pass frames, tube-reach envelope, ladder margins; owns
+  S4A's 3 blocked tests), slot 1 = 401 S3C trim clip. Both were healthy
+  (fresh events) at close.
+- **NOT dispatched**: 402 S7 (blocked on 307 landing), 405 K2B (worker died
+  twice at dispatch - 0 events both times; re-dispatch is the FIRST act and
+  if it dies a third time, investigate the packet, not the machine).
+- **UNAUTHORED**: Wave 5 (serial, integrator-owned): C6 enum-boundary
+  consolidation, S9b B-rep promotion, S10 certify_claimed.
+- **THEN**: the ONE full verification battery (owner amendment - build spec
+  section 5), kernel-gates.sh audit additions (listed in build spec
+  section 5 - NOT yet written), rows flip DONE, STATE rewrite.
 
 ## Pick up here
 
-0. **NEXT PROGRAM (filed, not started): the kernel v2 swarm.** Normative
-   theory: docs/CONSTRUCTIVE_GEOMETRY_KERNEL_SPEC_V2.md. Build-spec
-   skeleton + spine-session agenda: docs/KERNEL_V2_SWARM_BOOKING.md —
-   first acts are the gap census (v2 spec vs the landed tree) and the
-   shim contract inventory; open owner decisions are enumerated there.
-   The wave recipe is ORCHESTRATOR's build-spec spine workflow.
-
-1. **Owner decisions from the measurement** (the next booking): funnel
-   admission, decomposition policy, DISPATCH-2 / recognizer family /
-   admission widening. Do NOT book Phase-3 class-4 work against a
-   certified chain that admits 1.2% of its corpus.
-2. **Then the main line**: the constructive geometry kernel
-   (docs/CONSTRUCTIVE_GEOMETRY_PLAN.md; CG-000..CG-009 DONE - read the
-   plan for the remaining gates: Exeter regression gate after CG-004
-   lands, CG-007 cert against the frozen mapping, completion list).
-   The wave recipe (ORCHESTRATOR "build-spec spine workflow") is the
-   template for the next build spec: contracts precede concurrency
-   everywhere, INCLUDING amendment-time seams (freeze entry-point
-   signatures in both amendment texts - paid serialization this
-   session).
-3. **If the certified chain gets its next packet**: the shim's fixture
-   kit + certified_pair_trace are the substrate; the harness's funnel
-   counters (not_admitted_reasons) are the instrument.
-4. Environmental, do NOT chase: healing::tests::step_import;
-   fillet::complex_surface; stepio assy/table/tessellate/oi/ioi;
-   cone_topology debug panics; pre-existing fmt drift;
-   ~65-126 pre-existing clippy findings in grandfathered certified
-   modules under clippy 1.97.0 (recorded in the shim's RESULT).
+0. `python loop/dispatch_ready.py --dry-run` FIRST - it reads slot ground
+   truth and tells you what is dispatchable vs blocked vs dead.
+1. Adjudicate slots 0/1 if their workers finished (scoped test + merge +
+   file RESULT + ledger row; the skipped-commit protocol is in
+   ORCHESTRATOR). 307 landing unblocks 402.
+2. Re-dispatch 405 (died twice at 0 events - machine state is fine now;
+   a third death means read its packet for a worker-killing trap).
+3. Author Wave 5 (one serial chain, integrator-owned; C6 consolidation +
+   S9b promotion + S10) and dispatch it when the bench drains.
+4. The final battery: workspace tests + clippy + kernel-gates + the
+   section 20 acceptance rows; V8/V9 skip-justifications recorded if
+   additive-only; rows flip DONE only after it passes.
+5. WATCHDOG: was running (restarted 08:26 pid 28720, then again later);
+   verify it is alive (`watchdog.log` tail) - it misfired twice this
+   session on stale pids (recorded in traps).
 
 ## State of the machine, as left
 
-- Watchdog RUNNING (pid 23884, LOOK_WATCHDOG_STAGNANT=3600).
-- Slots: 0-3 all FINISHED (shim + W1/W2/W3), branches merged. Slot
-  targets 0/1 were reclaimed mid-session (10.7 GB was the shim verify's
-  baselines); 2/3 remain warm; reclaim freely - the wave is closed.
-- RAM 15.7 GB is the binding constraint: CARGO_BUILD_JOBS=2-4 for every
-  cargo invocation (two cold warm-build OOMs at default jobs recorded);
-  RUSTC_WRAPPER=sccache installed and warm for the dep universe
-  (NOTE: sccache rejects the incremental dev profile - W3 unset it
-  locally; workers may need RUSTC_WRAPPER unset for test runs).
-- Disk ~16 GB free at wave close. Reclaim order: idle slot targets,
-  repo-root target (5.0 GB, regenerates), %TEMP% (a 12 GB
-  proc-macro-srv reboot leak was reclaimed once).
-- LOC ledger (re-derive): git diff --shortstat da72cd5..HEAD -- vendor/truck.
+- cargoq server RUNNING (port 8231; `curl 127.0.0.1:8231/ping`); watchdog
+  RUNNING. Check both on pickup.
+- CARGO_BUILD_JOBS=2-4 everywhere; 6 slots exist (0-5); workers were
+  dispatched with the cargoq shim in PATH - pre-shim workers are gone.
+- Disk was ~20 GB free (janitor keeps it there; it is wired into new_slot).
+- RAM is the constraint: 6 agents is the ceiling with chrome closed; the
+  queue caps cargo at one spike regardless.
+- deepseek balance was reupped mid-session (one 402 death); check balance
+  if workers die with APIError.
 
 ## The parallelism picture
 
-Wave mode is PROVEN end to end this session: contracts frozen in one
-shim packet (through the normal loop); three implementation workers in
-PARALLEL on disjoint write sets doing scoped checks only; integration
-sweep with zero seam conflicts; amendments to owning sessions via
---resume (W2/W3 amendments first-try LOCAL_GREEN); ONE composed-HEAD
-verification; rows flipped DONE after. Full recipe: ORCHESTRATOR wave
-mode, "The build-spec spine workflow". The certified Phase-2 wave is
-the first full instantiation; the CG program's next build spec reuses
-it.
+The session-50 machinery is explicated in ORCHESTRATOR.md ("The cargo
+queue" + "Session-50 machinery"): cargoq (RAM queue server), janitor.py
+(disk service, wired into new_slot), dispatch_ready.py (the mechanical
+rolling dispatcher - RUN IT FIRST on pickup), LOOK_SHARED_TARGET,
+validate_survey.py, the one-verify amendment. Rolling dispatch + 6-wide +
+pipelined authoring measured ~3.3x the prior week's LOC rate; the queue
+ended the ENOMEM death class entirely.
+
+### Session 50 (the v2 swarm spine; machinery + waves 0-4) - paid in full
+
+- **The machine slept overnight and HUNG two workers (not killed them)**:
+  processes alive, events frozen, no API errors. slot_status showed
+  DEAD?/stale-pid; the real diagnosis is `Get-CimInstance` on
+  worker-cmd/opencode processes. Recovery: kill the hung shims, --resume
+  (sessions survive). Disable sleep for unattended runs.
+- **ENOMEM deaths are real and queue-fixable**: at 0.3 GB free, workers
+  died with "ENOMEM: not enough memory" / "Thread failed to start" /
+  0xc0000409. cargoq (one cargo spike machine-wide) ended the class.
+  The janitor owns disk the same way (it wiped two LIVE targets before
+  process-scan detection - fixed; never trust bookkeeping over processes).
+- **The 402 Insufficient Balance class again**: a worker died mid-run on
+  API 402; code survived in the worktree; --resume after reup completed
+  it. Check events.jsonl tail for APIError before diagnosing anything else.
+- **The skipped-commit-step class hit THREE times**: worker writes all
+  code + RESULT, exits before committing. Protocol (ORCHESTRATOR):
+  scoped-verify, commit AS DELIVERED with the recorded amendment subject.
+  The packets now say "COMMIT BEFORE writing RESULT.json AT THE WORKTREE
+  ROOT" explicitly.
+- **dispatch_ready bugs, caught by dry-run/watching**: case-sensitive
+  status compare; slot ground truth beats row bookkeeping (rows lag
+  reality); stale RESULT.json resurrection - `run_packet --reset-only`
+  RESTORES the filed RESULT, so dead-recovery must delete AFTER reset;
+  mod.rs is the designed one-line conflict and is exempt from the
+  write-set clash.
+- **Stop conditions earned their keep 3x**: 203 r1 (my census undercounted
+  the Spine-rename ripple by 5 files), 203 r2 (the worker REFUSED to
+  fabricate the RRMF/ERF external math and instead DERIVED the PH/ER
+  frame, spin, and septic membership from first principles - the
+  derivation is packet content now; M1/M2 stay deferred with named
+  refusals), 301's survey caught the census torus.rs:22 misattribution.
+- **Anchor drift is a per-dispatch ritual**: 4 drifts caught pre-dispatch
+  (CertifiedPatch 1->3 post-shim; RHO_MAX/KAPPA_MAX doc mentions;
+  next_after paren; normal_cone has no `pub` in a trait). gen_packet
+  --check before EVERY dispatch, no exceptions.
+- **GATE-2 H-3 same-line**: the shim's config constants tripped it (the
+  worker put `// H-3` on the line ABOVE; the gate wants same-line). The
+  packet must say so for constants, not just fixtures.
+- **Watchdog misfired twice** (stale pid -> "hard death" -> redispatch of
+  an already-landed packet into a busy slot; and the kill tree took down
+  BOTH watchdog instances). Check `watchdog.log` ACTION lines before any
+  manual dispatch; taskkill /T on the watchdog kills its children too.
+- **"Thread failed to start" at 0.3 GB free** is the memory signature,
+  not a worker bug. Close chrome; the queue caps the spikes.
+- **Session artifacts**: 7 historical packet files got swept into tracking
+  by a broad `git add loop\packets` (benign); two full-STATUS rustc
+  crashes were pagefile exhaustion, not code.
+
+
 ### Session 47 (Phase 1 runs: 3/5 landed first-try; the lint's prefix check; two registry misses) - paid in part, session in flight
 
 - **The orchestrator's errors dominate; two lint upgrades shipped.** Kept:

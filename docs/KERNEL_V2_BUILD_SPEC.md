@@ -315,7 +315,13 @@ matrix.
 
 | Wave | Base SHA | Packets (ID → commit) | Amendments | Fast checks | Final integrated SHA |
 |---|---|---|---|---|---|
-| — | — | — | — | — | — |
+| 0 (shim) | 7c861ff | BG-KV2-000-CONTRACT → a5e3d04 | r2 resume (worker 402 death); orchestrator H-3 same-line | merged-HEAD workspace check | fd65c24 |
+| 1 | fd65c24 | 101 (survey, filed 25f7731); 102 → 97ba812; 103 → fb18b4c; 104 → 3cec37d | none | merged-HEAD 673 green | b6c6ce4 |
+| 2 | b6c6ce4 | 201 → cfd0751; 206 → 43721c8 (orch. commit amendment); 202 → 483b593 (orch. commit amendment); 203 → 0d8c2d1 (r1 STOP census undercount; r2 STOP external math, derivation adopted; r3 rescope); 205 → 20e223f; 207 PARTIAL → d6282a9 (5/8; blockers → 306 + 307) | 306 gate-fix → 38956f7; S4A finish + diagnose amendments | merged-HEAD checks each merge | 62f011b |
+| 3 | 62f011b | 301 → debf8c9; 302 → 269e4e3; 303 → 1ac604f; 305 → ced0bca; 304 → 1d878f0 | none | merged-HEAD green (1f632ea) | 1f632ea |
+| 4 | 1f632ea | 403 → 7210431; 404 → ae0a32f (orch. commit amendment) | none | merged-HEAD green | 94ead87 |
+| in flight at session close | | 307 (engine reach, slot 0); 401 (trim clip, slot 1) | 405 K2B: worker died twice at dispatch (see STATE); 402 blocked on 307 | | |
+| 5 (serial) + final battery | | unauthored | | | |
 
 ## 8. Machine facts (inherited, binding)
 

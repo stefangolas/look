@@ -640,7 +640,11 @@ silently dropped:
 4. **`LOOK_SHARED_TARGET`** (run_packet.py) — when set, workers share ONE
    `CARGO_TARGET_DIR` (race-free because cargoq serializes invocations);
    per-slot targets stay the default otherwise. Booking section 6's policy
-   is now wired, not aspirational.
+   is now wired, not aspirational. **new_slot's warm build also queues**
+   (a warm build is exactly the spike class that crashed the machine when
+   it overlapped running workers). **new_slot's warm build also queues**
+   (a warm build is exactly the spike class that crashed the machine when
+   it overlapped running workers).
 5. **validate_survey.py** (`python loop/scripts/validate_survey.py
    SURVEY.json`) — the V10 class run MANUALLY under the one-verify
    amendment: survey rows feed later packets before the program-end
