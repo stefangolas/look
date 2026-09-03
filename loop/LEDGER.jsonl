@@ -161,3 +161,4 @@
 {"id":"BG-KV2-305-S2B","verdict":"LANDED-WAVE3","commit":"ced0bca","note":"GraphCert + R5 + R4/R4prime; scoped-verified green post-janitor-wipe"}
 {"id":"BG-KV2-403-S6","verdict":"LANDED-WAVE4","commit":"7210431","note":"ExactSheet; scoped-verified green"}
 {"id":"BG-KV2-404-S8","verdict":"LANDED-WAVE4","commit":"see merge","note":"R6 deflation + transitions; scoped-verified green; orchestrator commit amendment where worker skipped commit"}
+{"id":"BG-KV2-304-S3B","verdict":"LANDED-WAVE3","commit":"1d878f0","note":"Tier-2 + arity-4 C1 (N3CERT pattern second application); scoped-verified green"}

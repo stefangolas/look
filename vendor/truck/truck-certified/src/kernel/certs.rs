@@ -599,3 +599,65 @@ impl PointCert3 {
         })
     }
 }
+
+/// The 4D box of the product chart (the additive arity-4 spelling of the
+/// spec's box): the box [`PointCert4`] and the Tier-2 (§9.2) machinery
+/// record. [`crate::kernel::patch::IBox2`] and [`crate::kernel::patch::IBox3`]
+/// live in `patch.rs`; this alias is declared at the arity-4 certificate
+/// carrier because the arity-4 entry is the only consumer this wave, and
+/// `patch.rs` is outside this packet's write set (BG-KV2-304-S3B).
+pub type IBox4 = crate::kernel::patch::IBox<4>;
+
+/// The arity-4 zero-dimensional certificate (R3-class C1; the recorded
+/// additive spelling for Tier-2's `Psi_a` residual, §9.2): the residual that
+/// certified it, the 4D box it ran over, and the contraction rate `rho`.
+///
+/// This type is ADDITIVE, exactly as [`PointCert3`] is: the frozen
+/// [`PointCert`] (whose `box_` is an `IBox2`) and [`PointCert3`] (whose
+/// `box_` is an `IBox3`) are untouched, and the spec's `PointCert { box_:
+/// IBox }` is spelled arity-specifically at n = 2, 3, and 4.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct PointCert4 {
+    /// The residual that certified the point.
+    pub residual: ResidualId,
+    /// The 4D box the certificate ran over.
+    pub box_: IBox4,
+    /// Lemma 8.0's contraction rate.
+    pub rho: f64,
+}
+
+// Refusal carries Option<PartialGraph> by frozen §2 shape; large-Err is allowed (BG-KV2-000).
+#[allow(clippy::result_large_err)]
+impl PointCert4 {
+    /// Build an arity-4 point certificate, refusing a `rho > RHO_MAX` (Lemma
+    /// 8.0's contraction acceptance), a non-finite `rho`, or a non-finite box
+    /// (the same gate as [`PointCert3::try_new`]).
+    pub fn try_new(residual: ResidualId, box_: IBox4, rho: f64) -> Result<Self, Refusal> {
+        if !rho.is_finite() {
+            return Err(refusal(
+                RefusalKind::NonFinite,
+                "point4_rho_not_finite",
+                format!("rho {rho} is not finite"),
+            ));
+        }
+        if rho > RHO_MAX {
+            return Err(refusal(
+                RefusalKind::Conditioning,
+                "point4_rho_exceeds_rho_max",
+                format!("rho {rho} exceeds RHO_MAX {RHO_MAX}"),
+            ));
+        }
+        if !box_.lo.iter().chain(box_.hi.iter()).all(|c| c.is_finite()) {
+            return Err(refusal(
+                RefusalKind::NonFinite,
+                "point4_box_not_finite",
+                format!("box {box_:?} is not finite"),
+            ));
+        }
+        Ok(Self {
+            residual,
+            box_,
+            rho,
+        })
+    }
+}

@@ -114,3 +114,9 @@ pub mod tier1;
 /// seam ([`engine::build_frame4`] + [`engine::c2_certify_tube4`]), with the
 /// §10.2 escalation ladder.
 pub mod tracer;
+/// The Tier-2 critical-point start set (BG-KV2-304-S3B): the §7 R3 minor-form
+/// residual `Psi_a(x) = (F(x), a·m(x))` (arity 4, square) over the frozen
+/// seam's additive arity-4 C1 entry, and the §9.2 subdivision start set with
+/// the a-posteriori `k_a` direction-perturbation retry rule (Corollary 9.3's
+/// composition with 301's boundary seeds).
+pub mod tier2;
