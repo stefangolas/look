@@ -63,6 +63,7 @@ def slot_states():
     states = {}
     assigned = set()
     dead = set()   # FINISHED with no RESULT.json in the wt = dead dispatch
+    slot_of = {}   # packet id -> slot number
     for line in out.stdout.splitlines():
         parts = line.split()
         if len(parts) >= 2 and parts[0] == "slot" and parts[1].isdigit():
@@ -71,6 +72,7 @@ def slot_states():
             if len(parts) >= 4 and parts[3].startswith("packet="):
                 pkt = parts[3][len("packet="):].removesuffix(".md")
             if pkt:
+                slot_of[pkt] = parts[1]
                 res = os.path.join(ROOT, "loop", "slots", parts[1],
                                    "wt", "RESULT.json")
                 res_id = None
@@ -88,7 +90,7 @@ def slot_states():
                 else:
                     assigned.add(pkt)  # a STALE RESULT from another packet:
                     # the slot needs manual cleanup, not an auto-dispatch
-    return states, assigned, dead
+    return states, assigned, dead, slot_of
 
 
 def main():
@@ -102,7 +104,7 @@ def main():
     running = [r for r in rs if r.get("status") == "RUNNING"
                and not landed(r)]
     running_writes = {w for r in running for w in r.get("writes", [])}
-    states, assigned, dead = slot_states()
+    states, assigned, dead, slot_of = slot_states()
     free = [s for s, st in states.items() if st in ("IDLE", "FINISHED")]
     next_slot = max((int(s) for s in states), default=-1) + 1
     busy = sum(1 for st in states.values() if st == "RUNNING")
@@ -118,9 +120,15 @@ def main():
         if r["id"] in assigned:
             continue  # already in a slot (ground truth beats row status)
         if r["id"] in dead:
-            print(f"  {r['id']}: DEAD DISPATCH in a slot - reset that slot "
-                  f"first (run_packet --reset-only), then re-dispatch")
-            continue
+            # A dead dispatch holds nothing (no RESULT, no code): reset is
+            # safe and the re-dispatch proceeds through the normal path.
+            s = slot_of.get(r["id"])
+            if s:
+                sh([sys.executable, os.path.join(ROOT, "loop",
+                    "run_packet.py"), "--slot", s, "--reset-only",
+                    "--packet", os.path.join(ROOT, "loop", "packets",
+                    r["id"] + ".md")])
+                free.append(s)
         needs = r.get("needs", [])
         unmet = [n for n in needs
                  if n not in by_id or not landed(by_id[n])]
