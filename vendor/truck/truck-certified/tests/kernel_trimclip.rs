@@ -1,4 +1,4 @@
-//! BG-KV2-401-S3C integration tests: the §9.4 trim clip - certified R9
+//! BG-KV2-401-S3C integration tests: the Â§9.4 trim clip - certified R9
 //! crossings between an arc pcurve and the trim loops of the same chart, arc
 //! splitting at the certified crossings, and inside/outside classification of
 //! the sub-arcs by the winding number of the closed trim loop about a
@@ -267,14 +267,14 @@ fn r9_crossings_certify_between_arc_pcurve_and_trim_loop() {
     assert!(crossing.cert.rho <= config::RHO_MAX);
     // The certified (t, r) box must contain the transverse crossing pair.
     assert!(
-        crossing.cert.box_.lo[0] <= 1.0 / 3.0 + 1e-9
-            && 1.0 / 3.0 - 1e-9 <= crossing.cert.box_.hi[0],
+        crossing.cert.box_.lo[0] <= 1.0 / 3.0 + 1e-9 // H-3
+            && 1.0 / 3.0 - 1e-9 <= crossing.cert.box_.hi[0], // H-3
         "certified t-axis must contain 1/3: {:?}",
         crossing.cert.box_
     );
     assert!(
-        crossing.cert.box_.lo[1] <= 1.0 / 3.0 + 1e-9
-            && 1.0 / 3.0 - 1e-9 <= crossing.cert.box_.hi[1],
+        crossing.cert.box_.lo[1] <= 1.0 / 3.0 + 1e-9 // H-3
+            && 1.0 / 3.0 - 1e-9 <= crossing.cert.box_.hi[1], // H-3
         "certified r-axis must contain 1/3: {:?}",
         crossing.cert.box_
     );
@@ -284,8 +284,8 @@ fn r9_crossings_certify_between_arc_pcurve_and_trim_loop() {
     let t_mid = 0.5 * (crossing.cert.box_.lo[0] + crossing.cert.box_.hi[0]);
     let expected_point = chart_at(&pcurve, t_mid);
     assert!(
-        (crossing.point[0] - expected_point[0]).abs() < 1e-12
-            && (crossing.point[1] - expected_point[1]).abs() < 1e-12,
+        (crossing.point[0] - expected_point[0]).abs() < 1e-12 // H-3
+            && (crossing.point[1] - expected_point[1]).abs() < 1e-12, // H-3
         "the certified chart point must be the pcurve image of the certified \
          t-midpoint {t_mid}: got {:?}, expected {expected_point:?}",
         crossing.point
@@ -313,17 +313,17 @@ fn sample_certified_off_the_loop() {
         );
         // The partition covers [0, 1]: contiguous, ordered, first at 0 and
         // last at 1.
-        assert!((cert.exclusions[0].r.0 - 0.0).abs() < 1e-12);
+        assert!((cert.exclusions[0].r.0 - 0.0).abs() < 1e-12); // H-3
         for pair in cert.exclusions.windows(2) {
             assert!(
-                (pair[1].r.0 - pair[0].r.1).abs() < 1e-9,
+                (pair[1].r.0 - pair[0].r.1).abs() < 1e-9, // H-3
                 "the exclusion boxes must form a contiguous partition: {:?} then {:?}",
                 pair[0].r,
                 pair[1].r
             );
         }
         let last = &cert.exclusions[cert.exclusions.len() - 1];
-        assert!((last.r.1 - 1.0).abs() < 1e-12);
+        assert!((last.r.1 - 1.0).abs() < 1e-12); // H-3
         for exclusion in &cert.exclusions {
             assert!(
                 !exclusion.separation.contains(0.0),
@@ -430,7 +430,7 @@ fn arc_splits_at_certified_trim_crossings() {
             "a TrimCrossing node is certified exactly"
         );
         assert!(
-            (crossing.at.p1.v - 0.3).abs() < 1e-9,
+            (crossing.at.p1.v - 0.3).abs() < 1e-9, // H-3
             "the crossings lie on the arc's line y = 0.3"
         );
         assert!(
@@ -465,7 +465,7 @@ fn arc_splits_at_certified_trim_crossings() {
     assert_eq!(b_kind, Some(TopoNode::TrimCrossing));
     let p0 = kept.approx.gamma.segments[0].p0;
     let p1 = kept.approx.gamma.segments[0].p1;
-    assert!((p0[1] - 0.3).abs() < 1e-9 && (p1[1] - 0.3).abs() < 1e-9);
+    assert!((p0[1] - 0.3).abs() < 1e-9 && (p1[1] - 0.3).abs() < 1e-9); // H-3
     assert!(
         p0[0] < p1[0],
         "the retained run is ordered along the chord: {p0:?} to {p1:?}"
@@ -499,7 +499,7 @@ fn arc_splits_at_certified_trim_crossings() {
 
 #[test]
 fn interior_loop_crossing_no_leaf_boundary_is_clipped() {
-    // The §9 no-special-case fixture: a CLOSED interior loop of the 1-complex
+    // The Â§9 no-special-case fixture: a CLOSED interior loop of the 1-complex
     // (four certified straight arcs forming a square) that lies strictly inside
     // the chart and misses every leaf boundary, but crosses the face's closed
     // trim loop. Steps 3-6 clip it with no leaf-boundary handling: the two
@@ -549,7 +549,7 @@ fn interior_loop_crossing_no_leaf_boundary_is_clipped() {
         .filter(|node| node.kind == TopoNode::TrimCrossing)
     {
         assert!(
-            (crossing.at.p1.v - 0.446).abs() < 1e-2,
+            (crossing.at.p1.v - 0.446).abs() < 1e-2, // H-3
             "the crossings lie on the loop's upper arc"
         );
     }
@@ -602,7 +602,7 @@ fn depth_max_failure_refuses_trim_clip_failed() {
     // R9 residual vanishes there but its Jacobian is singular, so no box
     // containing the contact can ever isolate a transverse root. The
     // subdivision stalls at DEPTH_MAX and the clip refuses TrimClipFailed
-    // (Inconclusive) - the named §9.4 refusal. The fixture is NOT supposed to
+    // (Inconclusive) - the named Â§9.4 refusal. The fixture is NOT supposed to
     // isolate (a tangent contact has no transverse crossing), so the refusal
     // is the deliverable.
     let parabola = quad_leaf(CH, [[0.0, 0.0625], [0.5, -0.1875], [1.0, 0.5625]]);
