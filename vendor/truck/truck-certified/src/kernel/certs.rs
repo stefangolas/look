@@ -540,3 +540,62 @@ fn all_finite_frame<const N: usize>(
 fn refusal(kind: RefusalKind, name: &'static str, detail: String) -> Refusal {
     Refusal::new(kind, RefusalEvidence::Predicate { name, detail })
 }
+
+/// The arity-3 zero-dimensional certificate (R8-class C1; the recorded
+/// additive spelling for the spec's n-generic `PointCert`, §8.2/§16): the
+/// residual that certified it, the 3D R8 domain box it ran over, and the
+/// contraction rate `rho`.
+///
+/// This type is ADDITIVE: the frozen [`PointCert`] (whose `box_` is an
+/// `IBox2`) is untouched, and the spec's `PointCert { box_: IBox }` is
+/// spelled arity-specifically at n = 2 (`PointCert`) and n = 3 (`PointCert3`).
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct PointCert3 {
+    /// The residual that certified the point.
+    pub residual: ResidualId,
+    /// The 3D box the certificate ran over.
+    pub box_: crate::kernel::patch::IBox3,
+    /// Lemma 8.0's contraction rate.
+    pub rho: f64,
+}
+
+// Refusal carries Option<PartialGraph> by frozen §2 shape; large-Err is allowed (BG-KV2-000).
+#[allow(clippy::result_large_err)]
+impl PointCert3 {
+    /// Build an arity-3 point certificate, refusing a `rho > RHO_MAX` (Lemma
+    /// 8.0's contraction acceptance), a non-finite `rho`, or a non-finite box
+    /// (the same gate as [`PointCert::try_new`], plus the finite-box gate the
+    /// R8 entry requires).
+    pub fn try_new(
+        residual: ResidualId,
+        box_: crate::kernel::patch::IBox3,
+        rho: f64,
+    ) -> Result<Self, Refusal> {
+        if !rho.is_finite() {
+            return Err(refusal(
+                RefusalKind::NonFinite,
+                "point3_rho_not_finite",
+                format!("rho {rho} is not finite"),
+            ));
+        }
+        if rho > RHO_MAX {
+            return Err(refusal(
+                RefusalKind::Conditioning,
+                "point3_rho_exceeds_rho_max",
+                format!("rho {rho} exceeds RHO_MAX {RHO_MAX}"),
+            ));
+        }
+        if !box_.lo.iter().chain(box_.hi.iter()).all(|c| c.is_finite()) {
+            return Err(refusal(
+                RefusalKind::NonFinite,
+                "point3_box_not_finite",
+                format!("box {box_:?} is not finite"),
+            ));
+        }
+        Ok(Self {
+            residual,
+            box_,
+            rho,
+        })
+    }
+}

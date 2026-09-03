@@ -1226,3 +1226,275 @@ pub fn c2_certify_tube4(
         Err(refusal) => ClaimVerdict::Disproven(refusal),
     }
 }
+
+// ---------------------------------------------------------------------------
+// The n=3 Krawczyk arm (BG-KV2-206-N3CERT): the arity-3 R8 C1 carrier
+// ---------------------------------------------------------------------------
+
+use crate::kernel::certs::PointCert3;
+use crate::kernel::patch::IBox3;
+
+/// The float midpoint centre of an `IBox<3>`.
+fn centre3(b: &IBox3) -> [f64; 3] {
+    [
+        (b.lo[0] + b.hi[0]) / 2.0,
+        (b.lo[1] + b.hi[1]) / 2.0,
+        (b.lo[2] + b.hi[2]) / 2.0,
+    ]
+}
+
+/// The interval radius vector of an `IBox<3>`, `None` on a non-positive or
+/// non-finite radius.
+fn radii3(b: &IBox3) -> Option<[f64; 3]> {
+    let r = [
+        (b.hi[0] - b.lo[0]) / 2.0,
+        (b.hi[1] - b.lo[1]) / 2.0,
+        (b.hi[2] - b.lo[2]) / 2.0,
+    ];
+    if r.iter().all(|c| c.is_finite() && *c > 0.0) {
+        Some(r)
+    } else {
+        None
+    }
+}
+
+/// Determinant of a 3x3 interval matrix under directed rounding (the same
+/// cofactor expansion as [`det3_f64`], over interval arithmetic).
+fn det3_iv(m: &M3) -> Interval {
+    let a = m[0][0].mul(&m[1][1].mul(&m[2][2]).sub(&m[1][2].mul(&m[2][1])));
+    let b = m[0][1].mul(&m[1][0].mul(&m[2][2]).sub(&m[1][2].mul(&m[2][0])));
+    let c = m[0][2].mul(&m[1][0].mul(&m[2][1]).sub(&m[1][1].mul(&m[2][0])));
+    a.sub(&b).add(&c)
+}
+
+/// The interval inverse of a 3x3 matrix via adjugate over determinant (the
+/// same adjugate layout as [`inv3_f64`], over interval arithmetic). `None`
+/// when the determinant enclosure contains (or is) zero or a quotient is not
+/// finite.
+fn inv3_iv(m: &M3) -> Option<M3> {
+    let det = det3_iv(m);
+    if !det.is_finite() || (det.lo <= 0.0 && det.hi >= 0.0) {
+        return None;
+    }
+    let adj: M3 = [
+        [
+            m[1][1].mul(&m[2][2]).sub(&m[1][2].mul(&m[2][1])),
+            m[0][2].mul(&m[2][1]).sub(&m[0][1].mul(&m[2][2])),
+            m[0][1].mul(&m[1][2]).sub(&m[0][2].mul(&m[1][1])),
+        ],
+        [
+            m[1][2].mul(&m[2][0]).sub(&m[1][0].mul(&m[2][2])),
+            m[0][0].mul(&m[2][2]).sub(&m[0][2].mul(&m[2][0])),
+            m[0][2].mul(&m[1][0]).sub(&m[0][0].mul(&m[1][2])),
+        ],
+        [
+            m[1][0].mul(&m[2][1]).sub(&m[1][1].mul(&m[2][0])),
+            m[0][1].mul(&m[2][0]).sub(&m[0][0].mul(&m[2][1])),
+            m[0][0].mul(&m[1][1]).sub(&m[0][1].mul(&m[1][0])),
+        ],
+    ];
+    let mut out = [[Interval::point(0.0); 3]; 3];
+    for r in 0..3 {
+        for c in 0..3 {
+            out[r][c] = adj[r][c].div(&det)?;
+        }
+    }
+    Some(out)
+}
+
+/// The outward-rounded box `B − z_hat` (centred box), replicating the landed
+/// 2D reduction's op order at n = 3.
+fn centred_dx3(b: &IBox3, z: &[Interval; 3]) -> [Interval; 3] {
+    let mut dx = [Interval::point(0.0); 3];
+    for k in 0..3 {
+        let d_lo = Interval::point(b.lo[k]).sub(&z[k]);
+        let d_hi = Interval::point(b.hi[k]).sub(&z[k]);
+        dx[k] = Interval {
+            lo: d_lo.lo.min(d_hi.lo),
+            hi: d_lo.hi.max(d_hi.hi),
+        };
+    }
+    dx
+}
+
+/// Lemma 8.0's contraction rate `max_i (M r)_i / r_i` at n = 3. `None` when a
+/// quotient is not finite.
+fn rho3(id_minus: &M3, r: [f64; 3]) -> Option<f64> {
+    let mut rho = 0.0f64;
+    for i in 0..3 {
+        let mr =
+            mag(&id_minus[i][0]) * r[0] + mag(&id_minus[i][1]) * r[1] + mag(&id_minus[i][2]) * r[2];
+        let ratio = mr / r[i];
+        if !ratio.is_finite() {
+            return None;
+        }
+        rho = rho.max(ratio);
+    }
+    Some(rho)
+}
+
+/// The arity-3 C1 entry (R8-class): identical operator discipline to
+/// [`krawczyk_c1`] (Lemma 8.0 + §8.2), on the n=3 adjugate/det path, emitting
+/// a [`PointCert3`]. Weight bounds remain the §7.1 value argument.
+///
+/// The Disproven/Inconclusive backing table is IDENTICAL to
+/// [`krawczyk_c1`]'s: an empty `w` is `WeightDegenerate` (Disproven); a
+/// non-positive/non-finite radius is `NonFinite` (Disproven); a disjoint
+/// image is `ClaimRefuted` (Disproven); a merely overlapping image, a
+/// singular midpoint Jacobian, a non-finite enclosure, or a `rho > RHO_MAX`
+/// is Inconclusive. ResidualId stamping keeps the S2A convention: the engine
+/// stamps [`ResidualId::R1`] and the caller rebuilds the certificate with its
+/// own id through `PointCert3::try_new` (the documented one-line seam).
+pub fn krawczyk_c1_n3(
+    g: &dyn SquareResidualEval,
+    b: IBox3,
+    w: &[CertifiedPositive],
+) -> ClaimVerdict<PointCert3, Refusal, Reason> {
+    if g.arity() != 3 {
+        return ClaimVerdict::Inconclusive("c1_n3_arity_mismatch_box_dimension");
+    }
+    if w.is_empty() {
+        return ClaimVerdict::Disproven(engine_refusal(
+            RefusalKind::WeightDegenerate,
+            "c1_n3_weights_empty",
+            "krawczyk_c1_n3 requires at least one certified positive weight bound (§7.1 value argument)"
+                .to_string(),
+        ));
+    }
+    let r = match radii3(&b) {
+        Some(r) => r,
+        None => {
+            return ClaimVerdict::Disproven(engine_refusal(
+                RefusalKind::NonFinite,
+                "c1_n3_radius_nonpositive",
+                "krawczyk_c1_n3 requires a strictly positive finite radius on every box axis"
+                    .to_string(),
+            ))
+        }
+    };
+    let z = centre3(&b);
+    let ziv: [Interval; 3] = [
+        Interval::point(z[0]),
+        Interval::point(z[1]),
+        Interval::point(z[2]),
+    ];
+    let box_iv: [Interval; 3] = [
+        Interval {
+            lo: b.lo[0],
+            hi: b.hi[0],
+        },
+        Interval {
+            lo: b.lo[1],
+            hi: b.hi[1],
+        },
+        Interval {
+            lo: b.lo[2],
+            hi: b.hi[2],
+        },
+    ];
+
+    let r0 = g.eval(&ziv);
+    if r0.len() != 3 {
+        return ClaimVerdict::Inconclusive("c1_n3_eval_arity_mismatch");
+    }
+    let j0_rows = g.jac_encl(&ziv);
+    let jb_rows = g.jac_encl(&box_iv);
+    if j0_rows.len() != 3
+        || j0_rows.iter().any(|row| row.len() != 3)
+        || jb_rows.len() != 3
+        || jb_rows.iter().any(|row| row.len() != 3)
+    {
+        return ClaimVerdict::Inconclusive("c1_n3_jac_arity_mismatch");
+    }
+
+    let j0: M3 = [
+        [j0_rows[0][0], j0_rows[0][1], j0_rows[0][2]],
+        [j0_rows[1][0], j0_rows[1][1], j0_rows[1][2]],
+        [j0_rows[2][0], j0_rows[2][1], j0_rows[2][2]],
+    ];
+    let jb: M3 = [
+        [jb_rows[0][0], jb_rows[0][1], jb_rows[0][2]],
+        [jb_rows[1][0], jb_rows[1][1], jb_rows[1][2]],
+        [jb_rows[2][0], jb_rows[2][1], jb_rows[2][2]],
+    ];
+
+    // A = the interval inverse of the midpoint (centre) Jacobian.
+    let a = match inv3_iv(&j0) {
+        Some(a) => a,
+        None => return ClaimVerdict::Inconclusive("c1_n3_midpoint_jacobian_singular"),
+    };
+
+    // (I − A·□DR(B)) and the Krawczyk image K(B).
+    let cj = matmul3_iv(&a, &jb);
+    let id_minus: M3 = [
+        [
+            Interval::point(1.0).sub(&cj[0][0]),
+            cj[0][1].neg(),
+            cj[0][2].neg(),
+        ],
+        [
+            cj[1][0].neg(),
+            Interval::point(1.0).sub(&cj[1][1]),
+            cj[1][2].neg(),
+        ],
+        [
+            cj[2][0].neg(),
+            cj[2][1].neg(),
+            Interval::point(1.0).sub(&cj[2][2]),
+        ],
+    ];
+    if id_minus.iter().flatten().any(|v| !v.is_finite()) {
+        return ClaimVerdict::Inconclusive("c1_n3_enclosure_not_finite");
+    }
+    let dx = centred_dx3(&b, &ziv);
+    let r0v: Iv3 = [r0[0], r0[1], r0[2]];
+    let ch = matvec3_iv(&a, &r0v);
+    let md = matvec3_iv(&id_minus, &dx);
+    let k: Iv3 = [
+        ziv[0].sub(&ch[0]).add(&md[0]),
+        ziv[1].sub(&ch[1]).add(&md[1]),
+        ziv[2].sub(&ch[2]).add(&md[2]),
+    ];
+    if k.iter().any(|v| !v.is_finite()) {
+        return ClaimVerdict::Inconclusive("c1_n3_enclosure_not_finite");
+    }
+
+    // Classification (rule 2).
+    let mut strict = true;
+    let mut disjoint = false;
+    for ((lo_i, hi_i), k_i) in b.lo.iter().zip(b.hi.iter()).zip(k.iter()) {
+        match classify_axis(*lo_i, *hi_i, k_i.lo, k_i.hi) {
+            Inclusion::Strict => {}
+            Inclusion::Disjoint => {
+                disjoint = true;
+                strict = false;
+            }
+            Inclusion::Overlap => strict = false,
+        }
+    }
+    if !strict {
+        if disjoint {
+            return ClaimVerdict::Disproven(engine_refusal(
+                RefusalKind::ClaimRefuted,
+                "c1_n3_k_disjoint_no_root_in_box",
+                "the Krawczyk image is disjoint from the box: no root of the residual in the box"
+                    .to_string(),
+            ));
+        }
+        return ClaimVerdict::Inconclusive("c1_n3_inclusion_not_strict");
+    }
+
+    // Lemma 8.0's contraction rate.
+    let rho = match rho3(&id_minus, r) {
+        Some(rho) => rho,
+        None => return ClaimVerdict::Inconclusive("c1_n3_rho_not_finite"),
+    };
+    if rho > RHO_MAX {
+        return ClaimVerdict::Inconclusive("c1_n3_rho_exceeds_rho_max");
+    }
+    // See the module-doc seam judgement: the engine stamps R1.
+    match PointCert3::try_new(ResidualId::R1, b, rho) {
+        Ok(cert) => ClaimVerdict::Proven(cert),
+        Err(refusal) => ClaimVerdict::Disproven(refusal),
+    }
+}

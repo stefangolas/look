@@ -691,3 +691,235 @@ fn no_transcendental_call_in_engine_module() {
     );
     assert!(!sqrt_lines.is_empty(), "frame normalization uses sqrt");
 }
+
+// ---------------------------------------------------------------------------
+// The arity-3 C1 entry tests (BG-KV2-206-N3CERT)
+// ---------------------------------------------------------------------------
+
+use truck_certified::kernel::certs::PointCert3;
+use truck_certified::kernel::engine::krawczyk_c1_n3;
+use truck_certified::kernel::patch::IBox3;
+
+/// A linear 3x3 residual `F(x) = J·x − b`.
+struct Linear3 {
+    /// The 3x3 matrix.
+    j: [[f64; 3]; 3],
+    /// The shift vector.
+    b: [f64; 3],
+}
+
+impl Linear3 {
+    fn at(&self, x: &[Interval]) -> [Interval; 3] {
+        let f0 = iv(self.j[0][0])
+            .mul(&x[0])
+            .add(&iv(self.j[0][1]).mul(&x[1]))
+            .add(&iv(self.j[0][2]).mul(&x[2]))
+            .sub(&iv(self.b[0]));
+        let f1 = iv(self.j[1][0])
+            .mul(&x[0])
+            .add(&iv(self.j[1][1]).mul(&x[1]))
+            .add(&iv(self.j[1][2]).mul(&x[2]))
+            .sub(&iv(self.b[1]));
+        let f2 = iv(self.j[2][0])
+            .mul(&x[0])
+            .add(&iv(self.j[2][1]).mul(&x[1]))
+            .add(&iv(self.j[2][2]).mul(&x[2]))
+            .sub(&iv(self.b[2]));
+        [f0, f1, f2]
+    }
+}
+
+impl SquareResidualEval for Linear3 {
+    fn arity(&self) -> usize {
+        3
+    }
+    fn eval(&self, x: &[Interval]) -> Vec<Interval> {
+        self.at(x).to_vec()
+    }
+    fn jac_encl(&self, _b: &[Interval]) -> Vec<Vec<Interval>> {
+        vec![
+            vec![iv(self.j[0][0]), iv(self.j[0][1]), iv(self.j[0][2])],
+            vec![iv(self.j[1][0]), iv(self.j[1][1]), iv(self.j[1][2])],
+            vec![iv(self.j[2][0]), iv(self.j[2][1]), iv(self.j[2][2])],
+        ]
+    }
+}
+
+/// The R8-shaped line-pierce-plane residual as a raw [`SquareResidualEval`]
+/// (the fixture does not need `R8System`; that is S1A's). The line
+/// `C(t) = (t, t, t − 1)` pierces the plane `S(u, v) = (u, v, 0)` exactly
+/// where `(t, u, v) = (1, 1, 1)`:
+/// `H(t, u, v) = C(t) − S(u, v) = (t − u, t − v, t − 1)`.
+struct R8LinePiercePlane;
+
+impl SquareResidualEval for R8LinePiercePlane {
+    fn arity(&self) -> usize {
+        3
+    }
+    fn eval(&self, x: &[Interval]) -> Vec<Interval> {
+        vec![x[0].sub(&x[1]), x[0].sub(&x[2]), x[0].sub(&iv(1.0))]
+    }
+    fn jac_encl(&self, _b: &[Interval]) -> Vec<Vec<Interval>> {
+        // DH = [ C'(t)  −S_u  −S_v ] = [[1, −1, 0], [1, 0, −1], [1, 0, 0]]
+        vec![
+            vec![iv(1.0), iv(-1.0), iv(0.0)],
+            vec![iv(1.0), iv(0.0), iv(-1.0)],
+            vec![iv(1.0), iv(0.0), iv(0.0)],
+        ]
+    }
+}
+
+#[test]
+fn point_cert3_try_new_enforces_rho_and_finite_box() {
+    let box_ = box3([0.9, 0.9, 0.9], [1.1, 1.1, 1.1]);
+    let ok = construct_ok(PointCert3::try_new(
+        truck_certified::kernel::residual::ResidualId::R1,
+        box_,
+        0.3,
+    ));
+    assert_eq!(ok.rho, 0.3);
+    assert_eq!(ok.box_, box_);
+    assert_eq!(
+        ok.residual,
+        truck_certified::kernel::residual::ResidualId::R1
+    );
+
+    // rho above the Lemma 8.0 ceiling refuses Conditioning (Inconclusive),
+    // exactly as PointCert::try_new does.
+    match PointCert3::try_new(
+        truck_certified::kernel::residual::ResidualId::R1,
+        box_,
+        config::RHO_MAX + 0.01,
+    ) {
+        Err(refusal) => {
+            assert_eq!(refusal.kind, RefusalKind::Conditioning);
+            assert_eq!(
+                refusal.backing,
+                truck_certified::kernel::evidence::VerdictClass::Inconclusive
+            );
+        }
+        Ok(_) => panic!("rho above RHO_MAX must refuse the arity-3 point certificate"),
+    }
+    assert!(
+        PointCert3::try_new(truck_certified::kernel::residual::ResidualId::R1, box_, 0.9).is_err(),
+        "a clearly-over-ceiling rho must refuse"
+    );
+
+    // A non-finite rho refuses NonFinite (Disproven).
+    match PointCert3::try_new(
+        truck_certified::kernel::residual::ResidualId::R1,
+        box_,
+        f64::NAN,
+    ) {
+        Err(refusal) => {
+            assert_eq!(refusal.kind, RefusalKind::NonFinite);
+            assert_eq!(
+                refusal.backing,
+                truck_certified::kernel::evidence::VerdictClass::Disproven
+            );
+        }
+        Ok(_) => panic!("a non-finite rho must refuse the arity-3 point certificate"),
+    }
+
+    // A non-finite box refuses even at an acceptable rho.
+    let bad_box = IBox3 {
+        lo: [0.9, 0.9, f64::NAN],
+        hi: [1.1, 1.1, 1.1],
+    };
+    assert!(
+        PointCert3::try_new(
+            truck_certified::kernel::residual::ResidualId::R1,
+            bad_box,
+            0.1
+        )
+        .is_err(),
+        "a non-finite box must refuse the arity-3 point certificate"
+    );
+}
+
+#[test]
+fn krawczyk_c1_n3_proves_a_known_3var_root() {
+    let sys = R8LinePiercePlane;
+    // The unique root (t, u, v) = (1, 1, 1) is interior to the box.
+    let root = [1.0, 1.0, 1.0];
+    let b = box3([0.9, 0.9, 0.9], [1.1, 1.1, 1.1]);
+    let w = weights(1);
+
+    // Ground the fixture: the raw residual vanishes at the claimed root.
+    let at_root = <R8LinePiercePlane as SquareResidualEval>::eval(
+        &sys,
+        &[iv(root[0]), iv(root[1]), iv(root[2])],
+    );
+    for (k, component) in at_root.iter().enumerate() {
+        assert!(
+            component.contains(0.0),
+            "the residual must vanish at the known root: component {k} = {component:?}"
+        );
+    }
+
+    match krawczyk_c1_n3(&sys, b, &w) {
+        ClaimVerdict::Proven(cert) => {
+            assert!(cert.rho <= config::RHO_MAX, "rho must satisfy the ceiling");
+            assert_eq!(cert.box_, b);
+            assert_eq!(
+                cert.residual,
+                truck_certified::kernel::residual::ResidualId::R1
+            );
+            // The box of the emitted certificate contains the known root.
+            for axis in 0..3 {
+                assert!(
+                    cert.box_.lo[axis] <= root[axis] && root[axis] <= cert.box_.hi[axis],
+                    "certified box must contain the root on axis {axis}"
+                );
+            }
+        }
+        ClaimVerdict::Disproven(refusal) => {
+            panic!("the line-pierce-plane root must certify Proven, refused: {refusal:?}")
+        }
+        ClaimVerdict::Inconclusive(reason) => {
+            panic!("the line-pierce-plane root must certify Proven, inconclusive: {reason}")
+        }
+    }
+}
+
+#[test]
+fn krawczyk_c1_n3_backing_matches_the_2d_table() {
+    let w = weights(1);
+
+    // A disjoint Krawczyk image is Disproven-backed (mirror of the 2D
+    // c1_refuses_when_krawczyk_image_exits_the_box test): the root (2.5,
+    // 2.5, 2.5) of `4x − 10` sits far outside the box [0, 1]^3.
+    let sys = Linear3 {
+        j: [[4.0, 0.0, 0.0], [0.0, 4.0, 0.0], [0.0, 0.0, 4.0]],
+        b: [10.0, 10.0, 10.0],
+    };
+    let b = box3([0.0, 0.0, 0.0], [1.0, 1.0, 1.0]);
+    match krawczyk_c1_n3(&sys, b, &w) {
+        ClaimVerdict::Disproven(refusal) => {
+            assert_eq!(refusal.kind, RefusalKind::ClaimRefuted);
+            assert_eq!(
+                refusal.backing,
+                truck_certified::kernel::evidence::VerdictClass::Disproven
+            );
+        }
+        other => panic!("a disjoint 3D Krawczyk image must be Disproven, got {other:?}"),
+    }
+
+    // A non-strict (boundary-touching) inclusion is Inconclusive (mirror of
+    // the 2D c1_inconclusive_backing_when_inclusion_is_not_strict test): the
+    // root (1, 1, 1) of `x − 1` sits exactly at the box corner [1, 2]^3.
+    let sys = Linear3 {
+        j: [[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]],
+        b: [1.0, 1.0, 1.0],
+    };
+    let b = box3([1.0, 1.0, 1.0], [2.0, 2.0, 2.0]);
+    match krawczyk_c1_n3(&sys, b, &w) {
+        ClaimVerdict::Inconclusive(_) => {}
+        ClaimVerdict::Proven(cert) => {
+            panic!("a boundary-touching 3D inclusion must not certify Proven: {cert:?}")
+        }
+        ClaimVerdict::Disproven(refusal) => {
+            panic!("a boundary-touching (non-strict) 3D inclusion is Inconclusive, got a Disproven refusal: {refusal:?}")
+        }
+    }
+}
