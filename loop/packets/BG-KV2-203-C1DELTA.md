@@ -166,3 +166,60 @@ refusal kind).
 
 Commit subject: `feat(geometry): Spine enum + PH fast path + FrameData
 (BG-KV2-203-C1DELTA)`.
+
+## AMENDMENT r3 (orchestrator, session 50) - RESCOPE per the r2 stop
+
+The r2 worker's stop is ACCEPTED and its first-principles derivation is
+ADOPTED as packet content (it is in loop/results/BG-KV2-203-C1DELTA.r2.STOP
+.json, field derived_from_first_principles, and is REPEATED here so you
+need not re-derive):
+
+- PH setup: quaternion preimage A(w) = u + vi + pj + qk (real polynomials);
+  hodograph c'(w) = A i A* = (u^2+v^2-p^2-q^2, 2(vp+uq), 2(vq-up)); speed
+  sigma = u^2+v^2+p^2+q^2 = |A|^2 polynomial, so |c'|^2 = sigma^2.
+- ER frame (RATIONAL in w): e1 = c'/sigma; e2 = (2(vp-uq), u^2-v^2+p^2-q^2,
+  2(pq+uv))/sigma; e3 = (2(vq+up), 2(pq-uv), u^2-v^2-p^2+q^2)/sigma;
+  orthonormal, right-handed.
+- ER spin: tau(w) = 2(u v' - v u' - p q' + q p')/sigma.
+- RMF reduction: RMF = ER frame rotated by theta(w) about the tangent with
+  theta' = -tau; the frame is rational iff e^{i theta} = h/hbar for a
+  complex polynomial h.
+- RmErfSeptic membership IS DERIVABLE and is this packet's contract: the
+  ER frame IS the RMF iff tau(w) == 0 as a polynomial identity in the
+  cubic preimage coefficients. Implement exactly that identity check
+  (coefficient identities, no transcendental).
+
+RESCOPE (owner decision, recorded):
+
+1. RmErfSeptic: FULLY implement. Membership = tau(w) == 0 identity.
+   Fixtures: the planar degenerate family is ADMITTED for tests and
+   FLAGGED as degenerate in the fixture doc (a spatial non-degenerate
+   family is the published M3 characterization and is DEFERRED, not
+   fabricated: constructing one honestly is its own math problem - three
+   attempts reduce to planar; do not burn turns on it). The variant's doc
+   states: membership complete, non-degenerate fixture family deferred.
+2. RrmfQuintic: the enum VARIANT FREEZES (spec: the enum names exactly
+   those two) but its CONSTRUCTOR REFUSES with named evidence
+   RefusalEvidence::Predicate { name: 'rrmf_membership_pending_external_
+   characterization' } wrapped as RefusalKind::Budget, backing
+   Inconclusive - the M1 membership condition and M2 closed-form rational
+   RMF are EXTERNAL published mathematics (Farouki et al., spec section 23
+   'classical, no citation risk') that neither the spec body nor this
+   packet supplies; section 23's own rule forbids landing an unproved
+   external dependency. The refusal is the recorded section-21-style
+   deferral with a named trigger (the characterization supplied and
+   verified). Do NOT approximate with double reflection (that erases the
+   fast path).
+3. The trait rename, the Spine enum, FrameData, and the promotion
+   contract (Sections 1-3 otherwise unchanged) proceed as written. The
+   test ph_quintic_yields_rational_frame_and_exact_arclength_samples
+   is REPLACED by ph_septic_membership_and_rational_frame (tau == 0
+   accepted, tau != 0 refused, frame == ER frame rational orthonormal) +
+   rmf_quintic_constructor_refuses_pending. ph_arclength_matches_
+   f64_integration_ground_truth runs on the admitted septic fixtures
+   (exact polynomial arc length vs adaptive Simpson, 1e-9, H-3 same-line).
+
+Everything else (anchors, done-when, stop conditions 1 and 3, house rules)
+stands. Stop condition 2 is DISCHARGED by this amendment for the septic
+path and re-arms only if you find the derivation itself unusable (say why
+verbatim).
