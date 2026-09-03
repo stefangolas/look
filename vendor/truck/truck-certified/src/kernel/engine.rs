@@ -382,7 +382,7 @@ pub fn krawczyk_c1(
 
 /// Why a hull/derivative enclosure could not be produced.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum HullErr {
+pub(crate) enum HullErr {
     /// The box is not a compact subset of the chart rectangle.
     DomainNotCompact,
     /// The enclosure work did not produce a finite interval.
@@ -968,7 +968,15 @@ fn frame_tube_chart_box(
 
 /// The certified value enclosure of the three residual components over a
 /// chart box.
-fn system_values(system: &SquareSystem3, box_: [(f64, f64); 4]) -> Result<[Interval; 3], HullErr> {
+///
+/// `pub(crate)` since BG-KV2-304-S3B: the Tier-2 `Psi_a` residual (the §7 R3
+/// minor form, `kernel/tier2.rs`) composes the value enclosure of `F` with the
+/// Theorem 6.4(iii) `a·m` enclosure. Additive exposure only; the machinery is
+/// unchanged.
+pub(crate) fn system_values(
+    system: &SquareSystem3,
+    box_: [(f64, f64); 4],
+) -> Result<[Interval; 3], HullErr> {
     let mut out = [Interval::point(0.0); 3];
     for (k, out_k) in out.iter_mut().enumerate() {
         *out_k = component_value(system, k, box_)?;
@@ -978,7 +986,11 @@ fn system_values(system: &SquareSystem3, box_: [(f64, f64); 4]) -> Result<[Inter
 
 /// The certified chart-coordinate partial matrix (3 components x 4 axes) over
 /// a chart box.
-fn system_jacobian(
+///
+/// `pub(crate)` since BG-KV2-304-S3B: the Tier-2 `Psi_a` residual composes the
+/// Theorem 6.4 maximal-minor enclosure of `m` from this Jacobian enclosure.
+/// Additive exposure only; the machinery is unchanged.
+pub(crate) fn system_jacobian(
     system: &SquareSystem3,
     box_: [(f64, f64); 4],
 ) -> Result<[[Interval; 4]; 3], HullErr> {
@@ -986,6 +998,84 @@ fn system_jacobian(
     for (r, orow) in out.iter_mut().enumerate() {
         for (c, cell) in orow.iter_mut().enumerate() {
             *cell = component_partial(system, r, c, box_)?;
+        }
+    }
+    Ok(out)
+}
+
+/// A zero coefficient grid of the given degrees (the second-partial-of-a-
+/// linear-axis case): every stored coefficient is `0.0`.
+fn zero_grid(degrees: (usize, usize, usize, usize)) -> Grid4 {
+    let (m1, n1, m2, n2) = degrees;
+    let rows = (m1 + 1) * (n1 + 1);
+    let cols = (m2 + 1) * (n2 + 1);
+    Grid4 {
+        degrees,
+        rows: vec![vec![0.0f64; cols]; rows],
+    }
+}
+
+/// The certified second-partial coefficient grid of one stored component along
+/// the chart axes `j` then `l` (in the unit chart; the caller scales by the
+/// chart widths). The double derivative along a linear axis is the zero
+/// polynomial, represented as a zero grid of the reduced degree.
+fn grid_second_partial(grid: &Grid4, j: usize, l: usize) -> Result<Grid4, HullErr> {
+    if j > 3 || l > 3 {
+        return Err(HullErr::Unavailable);
+    }
+    let derived = grid.partial_axis(j)?;
+    if l == j && derived.len_axis(j) == 1 {
+        // The axis is linear: the second derivative along it is identically
+        // zero, and a further partial would refuse a degree-0 axis.
+        return Ok(zero_grid(derived.degrees));
+    }
+    derived.partial_axis(l)
+}
+
+/// The certified chart-coordinate second-partial enclosure of one component
+/// along the chart axes `j` and `l` over a chart box (the Hessian entry
+/// `∂²F_component/∂x_j ∂x_l`, scaled by the two inverse chart widths).
+fn component_second_partial(
+    system: &SquareSystem3,
+    component: usize,
+    j: usize,
+    l: usize,
+    box_: [(f64, f64); 4],
+) -> Result<Interval, HullErr> {
+    if component > 2 || j > 3 || l > 3 {
+        return Err(HullErr::Unavailable);
+    }
+    let unit = to_unit_box(system, box_).ok_or(HullErr::DomainNotCompact)?;
+    let grid = system_grid(system, component);
+    let derived = grid_second_partial(&grid, j, l)?;
+    let hull = hull_grid4(&derived, unit)?;
+    let rect = chart_rects(system);
+    let width = Interval::point(rect[j].1)
+        .sub(&Interval::point(rect[j].0))
+        .mul(&Interval::point(rect[l].1).sub(&Interval::point(rect[l].0)));
+    match hull.div(&width) {
+        Some(out) if out.is_finite() => Ok(out),
+        _ => Err(HullErr::Unavailable),
+    }
+}
+
+/// The certified Hessian tensor of the stored system over a chart box:
+/// `out[r][j][l]` encloses `∂²F_r/∂x_j ∂x_l` for the three spatial components
+/// `r` and the four product-space axes `(j, l)`.
+///
+/// `pub(crate)` since BG-KV2-304-S3B: the Tier-2 `Psi_a` residual's Jacobian
+/// row (the gradient of the `a·m` component) is assembled from this tensor.
+/// Additive exposure only; the machinery is unchanged.
+pub(crate) fn system_hessian(
+    system: &SquareSystem3,
+    box_: [(f64, f64); 4],
+) -> Result<[[[Interval; 4]; 4]; 3], HullErr> {
+    let mut out = [[[Interval::point(0.0); 4]; 4]; 3];
+    for (r, orow) in out.iter_mut().enumerate() {
+        for (j, ocol) in orow.iter_mut().enumerate() {
+            for (l, cell) in ocol.iter_mut().enumerate() {
+                *cell = component_second_partial(system, r, j, l, box_)?;
+            }
         }
     }
     Ok(out)
@@ -1494,6 +1584,349 @@ pub fn krawczyk_c1_n3(
     }
     // See the module-doc seam judgement: the engine stamps R1.
     match PointCert3::try_new(ResidualId::R1, b, rho) {
+        Ok(cert) => ClaimVerdict::Proven(cert),
+        Err(refusal) => ClaimVerdict::Disproven(refusal),
+    }
+}
+
+// ---------------------------------------------------------------------------
+// The n=4 Krawczyk arm (BG-KV2-304-S3B): the additive arity-4 C1 carrier for
+// Tier-2's square `Psi_a = (F, a·m)` system (the §7 R3 minor form, §9.2)
+// ---------------------------------------------------------------------------
+
+use crate::kernel::certs::{IBox4, PointCert4};
+
+type Iv4 = [Interval; 4];
+type M4 = [[Interval; 4]; 4];
+
+/// The float midpoint centre of an `IBox<4>`.
+fn centre4(b: &IBox4) -> [f64; 4] {
+    [
+        (b.lo[0] + b.hi[0]) / 2.0,
+        (b.lo[1] + b.hi[1]) / 2.0,
+        (b.lo[2] + b.hi[2]) / 2.0,
+        (b.lo[3] + b.hi[3]) / 2.0,
+    ]
+}
+
+/// The interval radius vector of an `IBox<4>`, `None` on a non-positive or
+/// non-finite radius.
+fn radii4(b: &IBox4) -> Option<[f64; 4]> {
+    let r = [
+        (b.hi[0] - b.lo[0]) / 2.0,
+        (b.hi[1] - b.lo[1]) / 2.0,
+        (b.hi[2] - b.lo[2]) / 2.0,
+        (b.hi[3] - b.lo[3]) / 2.0,
+    ];
+    if r.iter().all(|c| c.is_finite() && *c > 0.0) {
+        Some(r)
+    } else {
+        None
+    }
+}
+
+/// The 3x3 interval minor of a 4x4 interval matrix after deleting `row` and
+/// `col` (the adjugate building block).
+fn minor3_iv(m: &M4, row: usize, col: usize) -> M3 {
+    let mut out = [[Interval::point(0.0); 3]; 3];
+    let mut r_out = 0usize;
+    for r in 0..4 {
+        if r == row {
+            continue;
+        }
+        let mut c_out = 0usize;
+        for c in 0..4 {
+            if c == col {
+                continue;
+            }
+            out[r_out][c_out] = m[r][c];
+            c_out += 1;
+        }
+        r_out += 1;
+    }
+    out
+}
+
+/// Determinant of a 4x4 interval matrix under directed rounding: the cofactor
+/// expansion along row 0 over the engine's [`det3_iv`] (the exact 3x3 op
+/// order), with the `(+ − + −)` sign pattern.
+fn det4_iv(m: &M4) -> Interval {
+    let mut acc = Interval::point(0.0);
+    for c in 0..4 {
+        let sign = if c % 2 == 0 { 1.0 } else { -1.0 };
+        let term = Interval::point(sign)
+            .mul(&m[0][c])
+            .mul(&det3_iv(&minor3_iv(m, 0, c)));
+        acc = acc.add(&term);
+    }
+    acc
+}
+
+/// The interval inverse of a 4x4 matrix via adjugate over determinant (the
+/// `(row, col)` entry is the transposed cofactor `(−1)^{row+col}` of the minor
+/// deleting `col`, `row`, divided by the determinant — the same adjugate
+/// layout as [`inv3_iv`], at n = 4). `None` when the determinant enclosure
+/// contains (or is) zero or a quotient is not finite.
+fn inv4_iv(m: &M4) -> Option<M4> {
+    let det = det4_iv(m);
+    if !det.is_finite() || (det.lo <= 0.0 && det.hi >= 0.0) {
+        return None;
+    }
+    let mut out = [[Interval::point(0.0); 4]; 4];
+    for r in 0..4 {
+        for c in 0..4 {
+            let sign = if (r + c) % 2 == 0 { 1.0 } else { -1.0 };
+            let cof = Interval::point(sign).mul(&det3_iv(&minor3_iv(m, c, r)));
+            out[r][c] = cof.div(&det)?;
+        }
+    }
+    Some(out)
+}
+
+/// Interval 4x4 matrix product.
+fn matmul4_iv(a: &M4, b: &M4) -> M4 {
+    let mut out = [[Interval::point(0.0); 4]; 4];
+    for r in 0..4 {
+        for c in 0..4 {
+            let mut acc = Interval::point(0.0);
+            for k in 0..4 {
+                acc = acc.add(&a[r][k].mul(&b[k][c]));
+            }
+            out[r][c] = acc;
+        }
+    }
+    out
+}
+
+/// Interval 4x4 matrix times 4-vector.
+fn matvec4_iv(m: &M4, v: &Iv4) -> Iv4 {
+    let mut out = [Interval::point(0.0); 4];
+    for r in 0..4 {
+        let mut acc = Interval::point(0.0);
+        for k in 0..4 {
+            acc = acc.add(&m[r][k].mul(&v[k]));
+        }
+        out[r] = acc;
+    }
+    out
+}
+
+/// The outward-rounded box `B − z_hat` (centred box), replicating the landed
+/// 2D/3D reductions' op order at n = 4.
+fn centred_dx4(b: &IBox4, z: &Iv4) -> Iv4 {
+    let mut dx = [Interval::point(0.0); 4];
+    for k in 0..4 {
+        let d_lo = Interval::point(b.lo[k]).sub(&z[k]);
+        let d_hi = Interval::point(b.hi[k]).sub(&z[k]);
+        dx[k] = Interval {
+            lo: d_lo.lo.min(d_hi.lo),
+            hi: d_lo.hi.max(d_hi.hi),
+        };
+    }
+    dx
+}
+
+/// Lemma 8.0's contraction rate `max_i (M r)_i / r_i` at n = 4. `None` when a
+/// quotient is not finite.
+fn rho4(id_minus: &M4, r: [f64; 4]) -> Option<f64> {
+    let mut rho = 0.0f64;
+    for i in 0..4 {
+        let mr = mag(&id_minus[i][0]) * r[0]
+            + mag(&id_minus[i][1]) * r[1]
+            + mag(&id_minus[i][2]) * r[2]
+            + mag(&id_minus[i][3]) * r[3];
+        let ratio = mr / r[i];
+        if !ratio.is_finite() {
+            return None;
+        }
+        rho = rho.max(ratio);
+    }
+    Some(rho)
+}
+
+/// The arity-4 C1 entry (R3-class): identical operator discipline to
+/// [`krawczyk_c1`] / [`krawczyk_c1_n3`] (Lemma 8.0 + §8.2), on the n=4
+/// adjugate/det path, emitting a [`PointCert4`]. Weight bounds remain the §7.1
+/// value argument.
+///
+/// The Disproven/Inconclusive backing table is IDENTICAL to
+/// [`krawczyk_c1_n3`]'s: an empty `w` is `WeightDegenerate` (Disproven); a
+/// non-positive/non-finite radius is `NonFinite` (Disproven); a disjoint image
+/// is `ClaimRefuted` (Disproven); a merely overlapping image, a singular
+/// midpoint Jacobian, a non-finite enclosure, or a `rho > RHO_MAX` is
+/// Inconclusive. ResidualId stamping keeps the S2A convention: the engine
+/// stamps [`ResidualId::R1`] and the caller rebuilds the certificate with its
+/// own id through `PointCert4::try_new` (the documented one-line seam).
+pub fn krawczyk_c1_n4(
+    g: &dyn SquareResidualEval,
+    b: IBox4,
+    w: &[CertifiedPositive],
+) -> ClaimVerdict<PointCert4, Refusal, Reason> {
+    if g.arity() != 4 {
+        return ClaimVerdict::Inconclusive("c1_n4_arity_mismatch_box_dimension");
+    }
+    if w.is_empty() {
+        return ClaimVerdict::Disproven(engine_refusal(
+            RefusalKind::WeightDegenerate,
+            "c1_n4_weights_empty",
+            "krawczyk_c1_n4 requires at least one certified positive weight bound (§7.1 value argument)"
+                .to_string(),
+        ));
+    }
+    let r = match radii4(&b) {
+        Some(r) => r,
+        None => {
+            return ClaimVerdict::Disproven(engine_refusal(
+                RefusalKind::NonFinite,
+                "c1_n4_radius_nonpositive",
+                "krawczyk_c1_n4 requires a strictly positive finite radius on every box axis"
+                    .to_string(),
+            ))
+        }
+    };
+    let z = centre4(&b);
+    let ziv: Iv4 = [
+        Interval::point(z[0]),
+        Interval::point(z[1]),
+        Interval::point(z[2]),
+        Interval::point(z[3]),
+    ];
+    let box_iv: Iv4 = [
+        Interval {
+            lo: b.lo[0],
+            hi: b.hi[0],
+        },
+        Interval {
+            lo: b.lo[1],
+            hi: b.hi[1],
+        },
+        Interval {
+            lo: b.lo[2],
+            hi: b.hi[2],
+        },
+        Interval {
+            lo: b.lo[3],
+            hi: b.hi[3],
+        },
+    ];
+
+    let r0 = g.eval(&ziv);
+    if r0.len() != 4 {
+        return ClaimVerdict::Inconclusive("c1_n4_eval_arity_mismatch");
+    }
+    let j0_rows = g.jac_encl(&ziv);
+    if j0_rows.len() != 4 || j0_rows.iter().any(|row| row.len() != 4) {
+        return ClaimVerdict::Inconclusive("c1_n4_jac_arity_mismatch");
+    }
+
+    let j0: M4 = [
+        [j0_rows[0][0], j0_rows[0][1], j0_rows[0][2], j0_rows[0][3]],
+        [j0_rows[1][0], j0_rows[1][1], j0_rows[1][2], j0_rows[1][3]],
+        [j0_rows[2][0], j0_rows[2][1], j0_rows[2][2], j0_rows[2][3]],
+        [j0_rows[3][0], j0_rows[3][1], j0_rows[3][2], j0_rows[3][3]],
+    ];
+
+    // A = the interval inverse of the midpoint (centre) Jacobian. A singular
+    // midpoint returns Inconclusive BEFORE the box Jacobian is enclosed —
+    // result-identical to enclosing it first, and it skips the expensive box
+    // enclosure on every cell whose midpoint Jacobian is singular (the
+    // positive-dimensional cells dominate the Tier-2 stall searches).
+    let a = match inv4_iv(&j0) {
+        Some(a) => a,
+        None => return ClaimVerdict::Inconclusive("c1_n4_midpoint_jacobian_singular"),
+    };
+
+    let jb_rows = g.jac_encl(&box_iv);
+    if jb_rows.len() != 4 || jb_rows.iter().any(|row| row.len() != 4) {
+        return ClaimVerdict::Inconclusive("c1_n4_jac_arity_mismatch");
+    }
+    let jb: M4 = [
+        [jb_rows[0][0], jb_rows[0][1], jb_rows[0][2], jb_rows[0][3]],
+        [jb_rows[1][0], jb_rows[1][1], jb_rows[1][2], jb_rows[1][3]],
+        [jb_rows[2][0], jb_rows[2][1], jb_rows[2][2], jb_rows[2][3]],
+        [jb_rows[3][0], jb_rows[3][1], jb_rows[3][2], jb_rows[3][3]],
+    ];
+
+    // (I − A·□DR(B)) and the Krawczyk image K(B).
+    let cj = matmul4_iv(&a, &jb);
+    let id_minus: M4 = [
+        [
+            Interval::point(1.0).sub(&cj[0][0]),
+            cj[0][1].neg(),
+            cj[0][2].neg(),
+            cj[0][3].neg(),
+        ],
+        [
+            cj[1][0].neg(),
+            Interval::point(1.0).sub(&cj[1][1]),
+            cj[1][2].neg(),
+            cj[1][3].neg(),
+        ],
+        [
+            cj[2][0].neg(),
+            cj[2][1].neg(),
+            Interval::point(1.0).sub(&cj[2][2]),
+            cj[2][3].neg(),
+        ],
+        [
+            cj[3][0].neg(),
+            cj[3][1].neg(),
+            cj[3][2].neg(),
+            Interval::point(1.0).sub(&cj[3][3]),
+        ],
+    ];
+    if id_minus.iter().flatten().any(|v| !v.is_finite()) {
+        return ClaimVerdict::Inconclusive("c1_n4_enclosure_not_finite");
+    }
+    let dx = centred_dx4(&b, &ziv);
+    let r0v: Iv4 = [r0[0], r0[1], r0[2], r0[3]];
+    let ch = matvec4_iv(&a, &r0v);
+    let md = matvec4_iv(&id_minus, &dx);
+    let k: Iv4 = [
+        ziv[0].sub(&ch[0]).add(&md[0]),
+        ziv[1].sub(&ch[1]).add(&md[1]),
+        ziv[2].sub(&ch[2]).add(&md[2]),
+        ziv[3].sub(&ch[3]).add(&md[3]),
+    ];
+    if k.iter().any(|v| !v.is_finite()) {
+        return ClaimVerdict::Inconclusive("c1_n4_enclosure_not_finite");
+    }
+
+    // Classification (rule 2).
+    let mut strict = true;
+    let mut disjoint = false;
+    for ((lo_i, hi_i), k_i) in b.lo.iter().zip(b.hi.iter()).zip(k.iter()) {
+        match classify_axis(*lo_i, *hi_i, k_i.lo, k_i.hi) {
+            Inclusion::Strict => {}
+            Inclusion::Disjoint => {
+                disjoint = true;
+                strict = false;
+            }
+            Inclusion::Overlap => strict = false,
+        }
+    }
+    if !strict {
+        if disjoint {
+            return ClaimVerdict::Disproven(engine_refusal(
+                RefusalKind::ClaimRefuted,
+                "c1_n4_k_disjoint_no_root_in_box",
+                "the Krawczyk image is disjoint from the box: no root of the residual in the box"
+                    .to_string(),
+            ));
+        }
+        return ClaimVerdict::Inconclusive("c1_n4_inclusion_not_strict");
+    }
+
+    // Lemma 8.0's contraction rate.
+    let rho = match rho4(&id_minus, r) {
+        Some(rho) => rho,
+        None => return ClaimVerdict::Inconclusive("c1_n4_rho_not_finite"),
+    };
+    if rho > RHO_MAX {
+        return ClaimVerdict::Inconclusive("c1_n4_rho_exceeds_rho_max");
+    }
+    // See the module-doc seam judgement: the engine stamps R1.
+    match PointCert4::try_new(ResidualId::R1, b, rho) {
         Ok(cert) => ClaimVerdict::Proven(cert),
         Err(refusal) => ClaimVerdict::Disproven(refusal),
     }

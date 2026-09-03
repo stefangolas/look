@@ -88,3 +88,9 @@ pub mod residuals_r89;
 /// separation) and the R8 subdivision seeds over caller-supplied boundary
 /// edges.
 pub mod tier1;
+/// The Tier-2 critical-point start set (BG-KV2-304-S3B): the §7 R3 minor-form
+/// residual `Psi_a(x) = (F(x), a·m(x))` (arity 4, square) over the frozen
+/// seam's additive arity-4 C1 entry, and the §9.2 subdivision start set with
+/// the a-posteriori `k_a` direction-perturbation retry rule (Corollary 9.3's
+/// composition with 301's boundary seeds).
+pub mod tier2;
