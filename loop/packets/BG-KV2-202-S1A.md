@@ -47,6 +47,15 @@ tests_required:
 
 ## Section 1 — R8: H(t, u, v) = C(t) - S(u, v)
 
+**SEAM UPDATE (amendment-time rule, session 50):** the shim froze
+`PointCert.box_: IBox2`, so arity-3 C1 emits through BG-KV2-206's frozen
+addition: `pub fn krawczyk_c1_n3(g: &dyn SquareResidualEval, b: IBox3, w:
+&[CertifiedPositive]) -> ClaimVerdict<PointCert3, Refusal, Reason>` (same
+backing table as `krawczyk_c1`; residual stamping R1 internally, rebuild
+with `ResidualId::R8` via `PointCert3::try_new` — the documented one-line
+seam). R9 (arity 2) uses `krawczyk_c1` directly. If `krawczyk_c1_n3` is
+absent at your fork point, STOP (that is stop condition 1 below).
+
 ```rust
 pub struct R8System { /* Bernstein grids: curve leaf (1-var) and surface
                         leaf (2-var) lifted homogeneous, cross-multiplied:
