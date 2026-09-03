@@ -147,3 +147,4 @@
 {"id":"BG-KV2-102-LEAF","verdict":"LANDED-WAVE1","commit":"97ba812","note":"BezierLeaf extraction + CertifiedPatch impl; scoped-verified; merged-HEAD 673 green"}
 {"id":"BG-KV2-103-IDENTITY","verdict":"LANDED-WAVE1","commit":"fb18b4c","note":"identity rules + dyadic join; scoped-verified; merged-HEAD 673 green"}
 {"id":"BG-KV2-104-RATCARRIER","verdict":"LANDED-WAVE1","commit":"3cec37d","note":"rational carriers implement CertifiedPatch; merged-HEAD check green; Wave-1 COMPLETE (4/4)"}
+{"id":"BG-KV2-201-S2A","verdict":"LANDED-WAVE2","commit":"cfd0751","note":"engine core; scoped-verified; N3CERT booked for the arity-3 carrier"}
