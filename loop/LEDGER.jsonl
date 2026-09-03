@@ -159,3 +159,5 @@
 {"id":"BG-KV2-303-S9A","verdict":"LANDED-WAVE3","commit":"1ac604f","note":"gluing + deck id + assembly; scoped-verified green"}
 {"id":"BG-KV2-207-S4A","verdict":"LANDED-PARTIAL-WAVE2","commit":"d6282a9","note":"tracer landed 5/8; engine-reach packet 307 owns the remainder"}
 {"id":"BG-KV2-305-S2B","verdict":"LANDED-WAVE3","commit":"ced0bca","note":"GraphCert + R5 + R4/R4prime; scoped-verified green post-janitor-wipe"}
+{"id":"BG-KV2-403-S6","verdict":"LANDED-WAVE4","commit":"7210431","note":"ExactSheet; scoped-verified green"}
+{"id":"BG-KV2-404-S8","verdict":"LANDED-WAVE4","commit":"see merge","note":"R6 deflation + transitions; scoped-verified green; orchestrator commit amendment where worker skipped commit"}
