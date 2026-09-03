@@ -1,0 +1,63 @@
+{
+  "id": "BG-KV2-301-S03A",
+  "class": "design",
+  "crates": ["truck-certified"],
+  "status": "done",
+  "summary": "Lands the S0 algebra as CERTIFIED enclosure machinery (Theorems 6.4/6.5), the Tier-1 loop-free certificate (Theorem 9.1: the two-cone LP, implemented as a cos-space cone-separation test over two cached Cone axes/half-angles), and the section-9.3 R8 boundary-stratum seeding (every edge of P against Q is an R8 problem, solved by krawczyk_c1_n3 with subdivision to DEPTH_MAX). New src/kernel/minor_algebra.rs provides minor_vector_encl(jac: &[[Interval;4];3]) -> [[Interval;4];1] (the m enclosure with the exact landed sign pattern m_j = (-1)^j det(DF without column j), det3 reuse of the engine's cofactor op order), df_times_m(jac, m) -> [[Interval;3];1] (Theorem 6.4(i) zero-containment checkable) and a_dot_m(a, m) -> Interval (Theorem 6.4(iii)); Theorem 6.5's a = (d.S1_u, d.S1_v, 0, 0) => a.m = d.w route is tested on a rational-carrier transversal fixture (sphere/plane shim pair at the chart crossing (u,v)=(1,0)). New src/kernel/tier1.rs provides TierOneCert { d, min_dot } and tier1_loop_free(c1, c2) -> ClaimVerdict<TierOneCert, Degeneracy, Reason>: a certified strictly-positive lower bound on d.(n1 x n2) (d = normalized a1 x a2) is computed in cos-space from the bilinear Lagrange identity evaluated over certified superset ranges, Proven iff the bound clears the TOL_JACOBIAN floor, Inconclusive (Reason) for the tangential-adjacent infeasible pair (routes to Tier 2 / S3b). boundary_seeds solves every caller-supplied boundary edge of one leaf against the other as an R8 problem, pruning cells whose certified residual component excludes zero and bisecting deterministically to DEPTH_MAX, returning R8-stamped PointCert3s. The eight required tests land in tests/kernel_s03a.rs, ground truths rational/exact: sphere/plane and coaxial-cylinder fixtures from the shim kit, plus hand-built leaf/edge fixtures with known non-dyadic transverse crossings (single line-pierce-plane and a wavy arch whose v-boundary edges pierce the plane four times, oracle count verified). N4 source scans over both new modules pass (no sin|cos|atan2|exp|ln|log|powf outside comments; the one sqrt is the Tier-1 direction normalization). mod.rs registers the two modules with doc comments.",
+  "stop_conditions": {
+    "triggered": false,
+    "details": [
+      "1 (frozen seam differs from the quotes): not triggered - at this fork point the frozen shapes match the quotes exactly: R8System (residuals_r89.rs:339), Cone + trait normal_cone (patch.rs), krawczyk_c1_n3(g: &dyn SquareResidualEval, b: IBox3, w: &[CertifiedPositive]) -> ClaimVerdict<PointCert3, Refusal, Reason> (engine.rs), CertifiedPatch (patch.rs). Nothing was adapted or re-spelled.",
+      "2 (cos-space Tier-1 cannot decide a fixture Theorem 9.1 clearly decides): not triggered - the sphere/plane transversal fixture over a crossing-region box certifies Proven with min_dot > 0 (the plane normal cone is a point cone, half-angle 0; the sphere cone axis is orthogonal), and the coaxial-cylinder tangential fixture is Inconclusive (axes parallel, |a1 x a2| certifiably 0). No cone was widened and no floor loosened.",
+      "3 (boundary seeding needs face-topology edge enumeration): not triggered - the packet's own v1 honest scope applies: the edge set is caller-supplied as BezierLeaf1 (curve, chart) leaf data built from the leaf control nets by the tests; boundary_seeds solves R8 per supplied edge with subdivision to DEPTH_MAX and never enumerates B-rep edges from face topology."
+    ]
+  },
+  "files_written": [
+    "vendor/truck/truck-certified/src/kernel/minor_algebra.rs",
+    "vendor/truck/truck-certified/src/kernel/tier1.rs",
+    "vendor/truck/truck-certified/src/kernel/mod.rs",
+    "vendor/truck/truck-certified/tests/kernel_s03a.rs"
+  ],
+  "anchors_before": {
+    "A1_pub_struct_R8System_in_residuals_r89_rs": 1,
+    "A2_pub_struct_Cone_in_patch_rs": 1,
+    "A3_fn_normal_cone_in_patch_rs": 1,
+    "A4_minor_algebra_in_src": 0
+  },
+  "anchors_after": {
+    "A1_pub_struct_R8System_in_residuals_r89_rs": 1,
+    "A2_pub_struct_Cone_in_patch_rs": 1,
+    "A3_fn_normal_cone_in_patch_rs": 1,
+    "A4_minor_algebra_in_src": 1
+  },
+  "tests_required": {
+    "minor_vector_satisfies_df_times_m_is_zero_on_grid": "pass",
+    "minor_enclosure_brackets_the_float_minor": "pass",
+    "a_dot_m_matches_d_times_w_theorem_6_5": "pass",
+    "tier1_lp_feasible_on_transversal_fixture_and_excludes_contact": "pass",
+    "tier1_infeasible_on_tangential_fixture": "pass",
+    "boundary_seeds_r8_hits_on_known_edge_crossings": "pass",
+    "boundary_seed_completeness_matches_oracle_on_fixture": "pass",
+    "no_transcendental_call_in_s03a_modules": "pass"
+  },
+  "tests_command": "cargo test --locked -p truck-certified --lib --tests --no-fail-fast -> all green: lib 566 passed / 0 failed, every integration suite 0 failed incl. kernel_s03a 8/8 (the eight required names). kernel_s03a alone: 8 passed.",
+  "verification": {
+    "cargo_test_p_truck_certified_lib_tests_no_fail_fast": "green: lib 566 + 15 integration suites (incl. kernel_s03a 8/8), 0 failures",
+    "cargo_check_workspace_all_targets": "cargo check --locked --workspace --all-targets: Finished, zero errors (pre-existing warnings in truck-meshalgo lib test only)",
+    "cargo_fmt": "cargo fmt --check -p truck-certified: clean, exit 0 (rustfmt 1.9.0-stable); rustfmt --check on the four changed files clean",
+    "clippy": "cargo clippy -p truck-certified --all-targets --message-format=short --no-deps: ZERO findings reference kernel/minor_algebra.rs, kernel/tier1.rs, kernel/mod.rs, or tests/kernel_s03a.rs. The crate-wide failure population is the pre-existing vendored baseline under clippy 1.97 (formal/*, source_evidence, etc.), none of it in this packet's files",
+    "H1": "no unwrap/expect/panic! in minor_algebra.rs, tier1.rs, or kernel_s03a.rs; #[allow(clippy::result_large_err)] appears item-level only with the frozen-shape justification comment; no module-level allow; both new modules declare the H-1 deny header identical to the shim files",
+    "H3": "scripts/kernel-gates.sh against the base merge-base: all P-3 gates pass (GATE-1 new modules deny clippy::unwrap_used; GATE-2 has no bare absolute length literal without the // H-3 marker - the only 1e-N literals in the added kernel lines are the three H-3-marked fixture constants/tolerances in the test file; GATE-3/GATE-4 clean)",
+    "N4_N5": "the in-file N4 scan (no_transcendental_call_in_s03a_modules) passes over both new modules: no sin/cos/atan2/exp/ln/log/powf outside comments and no std::f64::consts; the single sqrt in tier1.rs is the candidate-direction normalization carve-out. No interval division by a weight anywhere (weights are the section-7.1 value argument to the C1 entry, never divided by)",
+    "env": "CARGO_BUILD_JOBS=2, rustc 1.97.1 / cargo 1.97.1, rustfmt 1.9.0-stable, host x86_64-pc-windows-gnullvm, no --target flag passed"
+  },
+  "notes": [
+    "JUDGEMENT (recorded): boundary_seeds honest v1 signature. The packet quotes boundary_seeds(p: &dyn CertifiedPatch, q: &dyn CertifiedPatch) -> Construction<Vec<PointCert>>, but two frozen-seam facts make that spelling unrealizable: the R8 residual is arity 3, so its C1 certificate is the frozen arity-3 PointCert3 (PointCert.box_ is an IBox2 and cannot record an R8 box), and the R8 residual consumes a CONCRETE BezierLeaf homogeneous net (a &dyn CertifiedPatch cannot expose one). The landed v1 shape is boundary_seeds(p: &BezierLeaf, p_edges: &[BezierLeaf1], q: &BezierLeaf, q_edges: &[BezierLeaf1]) -> Construction<Vec<PointCert3>>, solving every edge of p against q and every edge of q against p as an R8 problem. Consistent with the packet's own honest scope, the edge set is CALLER-SUPPLIED (curve, chart) leaf data; the tests build the four leaf boundary curves from the public control nets. R8-stamped PointCert3 rebuilt through the documented one-line seam (PointCert3::try_new(ResidualId::R8, box_, rho)).",
+    "JUDGEMENT (recorded): Tier-1 margin derivation. The cos-space test bounds d.(n1 x n2) for the candidate d = (a1 x a2)/|a1 x a2| via the Lagrange identity (a1 x a2).(n1 x n2) = c1 c2 (1-m^2) - m c1 s2 (a1.r2) - m c2 s1 (a2.r1) - s1 s2 (a1.r2)(a2.r1) with n_i = c_i a_i + s_i r_i. Each factor is enclosed by a certified superset range: c_i in [cos_lb(theta_i), 1] with cos_lb = 1 - theta^2/2 rounded downward, s_i in [-min(theta_i,1), +min(theta_i,1)], m from an outward-rounded axis dot, and (a1.r2),(a2.r1) in [-sg_hi, sg_hi] with sg_hi the outward sqrt of the certified (1-m^2) range. The four terms are combined with outward-rounded interval arithmetic so the resulting lo is a certified lower bound of d.(n1 x n2); min_dot = g_lb/sg_hi, Proven iff it clears the TOL_JACOBIAN floor. This is a pure polynomial/trig-free inequality on the stored axis/half-angle data (NO angle function anywhere).",
+    "JUDGEMENT (recorded): fixture crossing parameters are non-dyadic by construction. A certified C1 requires the Krawczyk image STRICTLY inside the box, so a root whose parameter coordinate is an exact dyadic rational (e.g. 1/4) lies on a bisection boundary of the subdivision tree at depth >= 2 and can never certify. The single-crossing fixture uses the line C(t) = (1/5 + 7t/10, 1/5 + t/2, -1 + 3t), which pierces the plane z=0 at the non-dyadic product-space point (t,u,v) = (1/3, 13/30, 11/30), and the wavy-arch completeness fixture places the arch heights at 3/10 and 7/10 with arch roots at u ~ 1/3 and 2/3 so every crossing coordinate avoids the dyadic grid; both fixtures certify cleanly and the oracle count (1 and 4 seeds respectively) is reproduced exactly.",
+    "The dyadic-root hazard also explains why the completeness oracle passes exactly 4: the arch's u-boundary edges (constant height 0.2) never cross the plane and are pruned by the certified residual-exclusion at the root cell, and the plane's own edges against the arch produce no hits inside the arch domain; all 4 seeds are distinct transverse R8 certificates with rho <= RHO_MAX.",
+    "Anchors: the A1-A3 seams matched at dispatch (1/1/1) and A4 was 0 (no minor_algebra module in src); after the packet A4 is 1 (the single pub mod registration).",
+    "mod.rs: the only change is two doc-commented pub mod additions in alphabetical position; the existing crate compiles and rustfmt-clean state is preserved (cargo fmt --check -p truck-certified exits 0).",
+    "PACKET.md, CONTEXT.md, and RESULT.json remain untracked at the worktree root; the source commit (debf8c9) is in place with the packet's required subject."
+  ]
+}
