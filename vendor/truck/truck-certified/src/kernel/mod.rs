@@ -54,6 +54,10 @@ pub type SignCert = crate::formal::exact::CertifiedSign;
 
 pub mod certs;
 pub mod config;
+/// The §10.3 isolated-contact classifier (BG-KV2-302-S5A): the tolerance-
+/// tagged contact claim (Corollary 10.2 + Prop 10.3 over the frozen C2/C3
+/// seams and `krawczyk_c1`).
+pub mod contact;
 pub mod coons_patch;
 /// The certificate-calculus engine (BG-KV2-201-S2A): Lemma 8.0's rho, the
 /// generic square C1, the C2 tube, and frame construction. This is the wave-2
