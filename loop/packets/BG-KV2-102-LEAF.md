@@ -38,7 +38,8 @@ read_allow:
 budget:      {turns: 34, ctx_tokens: 110000}
 anchors:
   - {id: A1, expect: 1, cmd: "grep -c 'pub struct BezierLeaf' vendor/truck/truck-certified/src/kernel/leaf.rs"}
-  - {id: A2, expect: 1, cmd: "grep -c 'pub trait CertifiedPatch' vendor/truck/truck-certified/src/kernel/patch.rs"}
+  # 3 = CertifiedPatch + prefix-matching CertifiedPatchC2/C3 subtrait declarations (measured post-shim, deliberate)
+  - {id: A2, expect: 3, cmd: "grep -c 'pub trait CertifiedPatch' vendor/truck/truck-certified/src/kernel/patch.rs"}
   - {id: A3, expect: 1, cmd: "grep -c 'pub mod kernel;' vendor/truck/truck-certified/src/lib.rs"}
   - {id: A4, expect: 0, cmd: "grep -c 'leaf_extract' vendor/truck/truck-certified/src/kernel/mod.rs"}
   - {id: A5, expect: 2, cmd: "grep -c 'fn hull_bernstein_1d\\|fn hull_bernstein_2d' vendor/truck/truck-certified/src/hull.rs"}

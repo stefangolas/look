@@ -34,7 +34,8 @@ read_allow:
 budget:      {turns: 30, ctx_tokens: 100000}
 anchors:
   - {id: A1, expect: 1, cmd: "grep -c 'pub enum RationalCarrierKind' vendor/truck/truck-certified/src/kernel/leaf.rs"}
-  - {id: A2, expect: 1, cmd: "grep -c 'pub trait CertifiedPatch' vendor/truck/truck-certified/src/kernel/patch.rs"}
+  # 3 = CertifiedPatch + prefix-matching CertifiedPatchC2/C3 subtrait declarations (measured post-shim, deliberate)
+  - {id: A2, expect: 3, cmd: "grep -c 'pub trait CertifiedPatch' vendor/truck/truck-certified/src/kernel/patch.rs"}
   - {id: A3, expect: 1, cmd: "grep -c 'pub mod kernel;' vendor/truck/truck-certified/src/lib.rs"}
   - {id: A4, expect: 0, cmd: "grep -c 'rational.rs' vendor/truck/truck-certified/src/kernel/mod.rs"}
   - {id: A5, expect: 1, cmd: "grep -c 'pub struct CertifiedInterval' vendor/truck/truck-certified/src/formal/exact.rs"}
