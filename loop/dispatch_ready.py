@@ -126,6 +126,10 @@ def main():
             # so the stale file is removed AFTER the reset - otherwise the
             # machinery resurrects the very file that marks the slot dead.
             s = slot_of.get(r["id"])
+            if s and dry:
+                print(f"  {r['id']}: DEAD dispatch (slot {s} holds no "
+                      f"matching RESULT) - would reset + delete + redispatch")
+                continue
             if s:
                 sh([sys.executable, os.path.join(ROOT, "loop",
                     "run_packet.py"), "--slot", s, "--reset-only",
