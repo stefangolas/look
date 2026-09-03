@@ -82,7 +82,7 @@ pub struct FacetSweepResult {
 /// created EXACTLY ONCE via the private grid registry (index i*k + j);
 /// adjacent faces reuse the identity; internal grid edges are created once
 /// and traversed oppositely by their two faces. No sewing (plan §3.3).
-pub fn facet_sweep<S: Spine>(
+pub fn facet_sweep<S: SpineCurve>(
     recipe: &SpineFrameRecipe<S, ProfileLaw, FrameLaw>,
     stations: &[f64],
     ring_resolution: usize,
@@ -410,7 +410,7 @@ pub fn summarize_construct_error(error: &ConstructError) -> ConstructErrorSummar
 /// `// prelude Result<_, Refusal>` comment shows the intended expansion), so
 /// the single `Certified::new` wrap the body performs types as
 /// `Outcome<FacetSweepResult>` — deviation recorded in RESULT.json.
-pub fn facet_sweep_certified<S: Spine>(
+pub fn facet_sweep_certified<S: SpineCurve>(
     recipe: &SpineFrameRecipe<S, ProfileLaw, FrameLaw>,
     stations: &[f64],
     ring_resolution: usize,

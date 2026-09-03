@@ -58,6 +58,7 @@ mod frame_up;
 mod profile;
 mod recipe;
 mod sampling;
+mod spine_ph;
 
 /// The orthonormal right-handed frame at one spine station.
 ///
@@ -319,5 +320,6 @@ impl Default for DirectTolerance {
 
 pub use errors::ConstructError;
 pub use recipe::SpineFrameRecipe;
-pub use recipe::{LineSpine, PolylineSpine, Spine};
+pub use recipe::{FrameData, LineSpine, PolylineSpine, Spine, SpineCurve};
 pub use sampling::SamplingPolicy;
+pub use spine_ph::{PendingMembership, PhSpine, RmErfSeptic, RrmfQuintic, SepticMembership};

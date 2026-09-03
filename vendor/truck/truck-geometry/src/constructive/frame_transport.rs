@@ -9,23 +9,24 @@
 //! reflections is the rotation carrying the incoming chord direction onto the
 //! outgoing one, which yields the rotation-minimizing (Bishop) frame — stable
 //! at zero curvature and through inflections, with twist only O(h²) per
-//! transition. The transport grid is [`TRANSPORT_STATIONS`] uniform stations
-//! over the spine's full domain plus the queried parameter `s` as the final
-//! station when `s` is not exactly on the grid, so `frame(s)` costs a bounded
-//! number of closed-form steps (the §3.3 fast-path contract). The frame is a
-//! pure function of `(spine, initial_normal, s)`: no mutable state, no
+//! transition. The transport grid is `refinement_level` uniform stations
+//! (spec §5.3's `FrameData`: the declared refinement level, defaulted to the
+//! landed 64-station count) over the spine's full domain plus the queried
+//! parameter `s` as the final station when `s` is not exactly on the grid, so
+//! `frame(s)` costs a bounded number of closed-form steps (the §3.3
+//! fast-path contract). The frame is a pure function of
+//! `(spine, initial_normal, refinement_level, s)`: no mutable state, no
 //! caching. Reachable only through the recipe dispatcher
-//! (`FrameLaw::ParallelTransport`).
+//! (`FrameLaw::ParallelTransport`). A `Ph` spine does not route here: its
+//! exact rational rotation-minimizing frame is the PhSpine fast path.
 
-use super::{ConstructError, DirectTolerance, Frame3, Spine};
+use super::{ConstructError, DirectTolerance, Frame3, SpineCurve};
 use truck_base::cgmath64::*;
 
-/// The uniform station count of the transport grid over the spine's full
-/// domain. Deterministic from the spine alone; never cached across calls.
-const TRANSPORT_STATIONS: usize = 64;
-
 /// The `ParallelTransport` law: the rotation-minimizing frame at `s` via the
-/// Hanson–Ma double-reflection transport of `initial_normal` along the spine.
+/// Hanson–Ma double-reflection transport of `initial_normal` along the spine
+/// over `refinement_level` uniform stations (spec §5.3's `FrameData`; the
+/// default level 64 reproduces the landed behavior bit-identically).
 ///
 /// The start tangent is `C'(s_min)/‖C'(s_min)‖`; `initial_normal` is
 /// orthonormalized against it, and a non-finite, zero, or tangent-parallel
@@ -35,19 +36,25 @@ const TRANSPORT_STATIONS: usize = 64;
 /// propagate unchanged, and a vanishing tangent refuses `ZeroTangent` at the
 /// parameter where it vanished. The frame is re-orthonormalized after every
 /// transition and satisfies the `Frame3` convention (`t × n == b`, unit
-/// lengths) at the emitted frame.
+/// lengths) at the emitted frame. A `refinement_level < 2` is structurally
+/// invalid (the grid arithmetic divides by `n - 1`) and refuses
+/// `ConstructError::InvalidInput`.
 pub(super) fn parallel_transport(
     initial_normal: Vector3,
-    spine: &dyn Spine,
+    spine: &dyn SpineCurve,
+    refinement_level: usize,
     s: f64,
 ) -> Result<Frame3, ConstructError> {
+    if refinement_level < 2 {
+        return Err(ConstructError::InvalidInput);
+    }
     let tolerance = DirectTolerance::default().position;
     let (s_min, s_max) = spine.domain();
 
-    let mut stations: Vec<f64> = Vec::with_capacity(TRANSPORT_STATIONS + 1);
+    let mut stations: Vec<f64> = Vec::with_capacity(refinement_level + 1);
     stations.push(s_min);
-    for i in 1..TRANSPORT_STATIONS {
-        let station = s_min + (s_max - s_min) * (i as f64) / ((TRANSPORT_STATIONS - 1) as f64);
+    for i in 1..refinement_level {
+        let station = s_min + (s_max - s_min) * (i as f64) / ((refinement_level - 1) as f64);
         if station <= s {
             stations.push(station);
         } else {
@@ -129,7 +136,11 @@ pub(super) fn parallel_transport(
 
 /// The unit spine tangent `C'(at)/‖C'(at)‖`, refusing `ZeroTangent` when the
 /// derivative vanishes within the given position bound.
-fn unit_tangent(spine: &dyn Spine, at: f64, tolerance: f64) -> Result<Vector3, ConstructError> {
+fn unit_tangent(
+    spine: &dyn SpineCurve,
+    at: f64,
+    tolerance: f64,
+) -> Result<Vector3, ConstructError> {
     let derivative = spine.derivative_at(at)?;
     let magnitude = derivative.magnitude();
     if magnitude <= tolerance {

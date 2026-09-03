@@ -18,7 +18,7 @@
 //! `LinearCorrespondence` is accepted when both profiles are straight-edged
 //! with identical edge counts. Curved profile edges, through-zero scale, and
 //! mismatched correspondence refuse `ConstructError::InvalidInput` at the
-//! entry — a booked boundary, not a bug. The spine may be any landed `Spine`
+//! entry — a booked boundary, not a bug. The spine may be any landed `SpineCurve`
 //! (the C1 gate is the landed `PolylineSpine` refusal, which fires during the
 //! recipe validation pass before any storage spine is converted); all four
 //! landed frame laws are accepted (their singularity refusals are the landed
@@ -37,7 +37,7 @@ use truck_base::evidence::{
     Outcome, Prop, PropMap, Refusal, Truth,
 };
 use truck_geometry::constructive::{
-    ConstructError, DirectTolerance, FrameLaw, ProfileLaw, ScalarLaw, Spine, SpineFrameRecipe,
+    ConstructError, DirectTolerance, FrameLaw, ProfileLaw, ScalarLaw, SpineCurve, SpineFrameRecipe,
 };
 
 /// The authored-topology sweep constructor (build-spec §8B; plan §4 CG-009).
@@ -49,7 +49,7 @@ use truck_geometry::constructive::{
 /// Every refusal is typed: invalid stations, a profile law outside the V1
 /// domain, a recipe that refuses at a station (the C1/frame gates), a
 /// nonplanar cap, or a shell `Solid::try_new` rejects all return a `Refusal`.
-pub fn spine_sweep<S: Spine + Into<Curve> + Clone>(
+pub fn spine_sweep<S: SpineCurve + Into<Curve> + Clone>(
     recipe: &SpineFrameRecipe<S, ProfileLaw, FrameLaw>,
     stations: &[f64],
 ) -> Outcome<Solid> {
@@ -257,7 +257,7 @@ pub fn spine_sweep<S: Spine + Into<Curve> + Clone>(
 }
 
 /// The number of profile ring vertices.
-fn profile_vertex_count(recipe: &SpineFrameRecipe<impl Spine, ProfileLaw, FrameLaw>) -> usize {
+fn profile_vertex_count(recipe: &SpineFrameRecipe<impl SpineCurve, ProfileLaw, FrameLaw>) -> usize {
     match &recipe.profile_law {
         ProfileLaw::Constant(profile) => profile.vertices.len(),
         ProfileLaw::Scale { profile, .. } => profile.vertices.len(),

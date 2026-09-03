@@ -93,7 +93,7 @@ fn fixed_plane_z() -> FrameLaw {
 }
 
 /// The unit-circle arc spine about the Z axis (the sanctioned test-local
-/// curved `Spine`, same as the frame packets): `C(s) = (cos θ, sin θ, 0)`
+/// curved `SpineCurve`, same as the frame packets): `C(s) = (cos θ, sin θ, 0)`
 /// with `θ = phi0 + s·delta`, `s ∈ [0, 1]`.
 #[derive(Debug, Clone, Copy)]
 struct QuarterCircleSpine {
@@ -103,7 +103,7 @@ struct QuarterCircleSpine {
     delta: f64,
 }
 
-impl Spine for QuarterCircleSpine {
+impl SpineCurve for QuarterCircleSpine {
     fn domain(&self) -> (f64, f64) {
         (0.0, 1.0)
     }
@@ -141,7 +141,7 @@ fn uniform_stations(n: usize) -> Vec<f64> {
 
 /// Sweeps and extracts the result; any refusal fails the test loudly. The
 /// Err arm is unreachable (the `assert!` already failed) but must typecheck.
-fn swept<S: Spine>(
+fn swept<S: SpineCurve>(
     recipe: &SpineFrameRecipe<S, ProfileLaw, FrameLaw>,
     stations: &[f64],
     ring: usize,
