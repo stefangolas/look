@@ -150,3 +150,4 @@
 {"id":"BG-KV2-201-S2A","verdict":"LANDED-WAVE2","commit":"cfd0751","note":"engine core; scoped-verified; N3CERT booked for the arity-3 carrier"}
 {"id":"BG-KV2-205-C5PATCH","verdict":"LANDED-WAVE2","commit":"20e223f","note":"CoonsSurface CertifiedPatch impl; scoped-verified green"}
 {"id":"BG-KV2-205-C5PATCH","verdict":"LANDED-WAVE2","commit":"20e223f","note":"CoonsSurface CertifiedPatch impl; first mod.rs conflict, resolved both-lines"}
+{"id":"BG-KV2-206-N3CERT","verdict":"LANDED-WAVE2","commit":"43721c8","note":"arity-3 C1 carrier; worker skipped commit step, orchestrator committed as delivered (recorded)"}
