@@ -82,6 +82,11 @@ pub mod leaf_extract;
 /// over a per-box 3x4 Jacobian, with the `DF·m = 0` and `a·m` checkables.
 pub mod minor_algebra;
 pub mod patch;
+/// The §8.5/§8.6 projection certificates (BG-KV2-305-S2B): GraphCert's cone
+/// test (Theorem 8.3, no solve), the R5 enclosure contract's five steps over
+/// the frozen `R5Enclosure` shim shape, and the packaged §7 R4 / R4′ square
+/// projection solves.
+pub mod projection;
 pub mod rational;
 pub mod residual;
 /// The §7 R8/R9 square residuals (BG-KV2-202-S1A): the curve–surface system
