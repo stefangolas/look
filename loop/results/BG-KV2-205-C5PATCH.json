@@ -1,0 +1,45 @@
+{
+  "id": "BG-KV2-205-C5PATCH",
+  "class": "design",
+  "status": "done",
+  "branch": "packet/BG-KV2-205-C5PATCH",
+  "head": "20e223f",
+  "summary": "Add the §5.9 (C5) CertifiedPatch implementation for the landed bilinear CoonsSurface as a NEW truck-certified kernel module (orphan-rule placement): vendor/truck/truck-certified/src/kernel/coons_patch.rs implements enclose/derivs/normal_cone/regularity/weight_bound for CoonsSurface<C: ParametricCurve3D> over the recovered cached corners p00..p11 via product-form CertifiedInterval arithmetic in the N2-pinned evaluation orders (enclose expands ((1-u)(1-v)p00 + u(1-v)p10) + ((1-u)v p01 + u v p11) per coordinate; derivs use the once-hand-differentiated bilinear partials S_u = (1-v)(p10-p00) + v(p11-p01), S_v = (1-u)(p01-p00) + u(p11-p10); regularity classifies the exposed EG-F^2 against config::TOL_JACOBIAN with the Proven/Disproven/Inconclusive split; weight_bound returns the frozen §3.1 constant-1 Proven plumbing; the §5.9 one-call rule is exposed as pub egf2 for the machine-check). No change to CoonsSurface itself (V5 identity). New tests/kernel_coons_patch.rs carries the six required machine-checked ground truths (BG-KV2-205-C5PATCH).",
+  "stop_conditions": {
+    "triggered": false,
+    "details": [
+      "1: CoonsSurface stored fields/constructors MATCH the census — truck-geometry/src/decorators/coons.rs stores bottom/top/left/right plus cached corners p00/p10/p01/p11, try_new validates the four corner equalities pairwise at DirectTolerance::default().position and caches p00=bottom(0), p10=bottom(1), p01=top(0), p11=top(1); no deviation, no stop.",
+      "2: the bilinear interval form proves regularity on the regular (twisted) fixture with wide margin — over box [0.4,0.4]x[0.6,0.6] the certified EG-F^2 lower bound is ~0.51, five orders above the 1e-12 TOL_JACOBIAN floor (Proven, no loosening); the full-unit-box interval evaluation is dependency-widened to Inconclusive, which is the certified-subdivision behavior documented in-module, not a proof failure."
+    ]
+  },
+  "files_written": [
+    "vendor/truck/truck-certified/src/kernel/coons_patch.rs",
+    "vendor/truck/truck-certified/src/kernel/mod.rs",
+    "vendor/truck/truck-certified/tests/kernel_coons_patch.rs"
+  ],
+  "anchors_after": {
+    "A1_pub_struct_coons_surface": 1,
+    "A2_pub_trait_certified_patch": 1,
+    "A3_pub_fn_jacobian": 1,
+    "A4_coons_patch_in_kernel_mod": 1
+  },
+  "tests": {
+    "required_6": "all present and green in tests/kernel_coons_patch.rs: coons_enclose_contains_sampled_points, coons_regularity_proven_on_a_regular_patch, coons_folded_patch_is_inconclusive_not_proven, coons_weight_bound_is_the_constant_one_plumbing, coons_jacobian_and_certifiedpatch_regularity_agree, no_transcendental_call_in_coons_patch_module",
+    "command": "cargo test -p truck-certified --lib --tests --no-fail-fast (the packet's done-when, no --locked) -> all green: lib 566 passed, integration 14 targets 0 failed incl. kernel_coons_patch 6 passed"
+  },
+  "verification": {
+    "fmt": "cargo fmt -p truck-certified -- --check clean (0 findings)",
+    "crate_check": "cargo check -p truck-certified --all-targets --locked: Finished, zero errors",
+    "workspace_check": "cargo check --workspace --all-targets --locked: Finished, zero errors (pre-existing truck-meshalgo test warning only, outside the write set)",
+    "clippy_packet_files": "cargo clippy -p truck-certified --lib --tests --no-deps --message-format=short: ZERO findings referencing kernel/coons_patch.rs, kernel/mod.rs, or tests/kernel_coons_patch.rs. All emitted errors are the pre-existing baseline population in formal/domain/... (same set the shim recorded); none touch the packet's files.",
+    "kernel_gates_parity": "H-1: new module declares #![deny(clippy::unwrap_used)] and carries no unwrap/expect/panic. H-3: no bare absolute 1e-X literal in added lines without a same-line // H-3 opt-out (consts carry it). H-4: no debug_new / cfg!(debug_assertions) semantics added."
+  },
+  "notes": [
+    "A4 is a dispatch-time anchor: the packet expects grep 'coons_patch' in kernel/mod.rs == 0 at dispatch (module not yet wired). The write set mandates editing kernel/mod.rs to register the module, so after the work the count is exactly 1 (the single `pub mod coons_patch;` line between `config` and `evidence`); recorded as anchors_after for the record.",
+    "Certified content is the bilinear Bernstein form over the cached corners p00..p11 (POLYNOMIAL, exact in the corners, no weight field). CoonsSurface's corner fields are private in truck-geometry, so the impl recovers them deterministically from the stored boundary endpoints through the public accessors: p00 = bottom(0), p10 = bottom(1), p01 = top(0), p11 = top(1) (the constructor caches exactly these). The impl is generic over C: ParametricCurve3D; it is exact (sound) when the four boundary curves are the straight corner segments, which is the C5 recipe geometry — the module doc records that premise so no caller certifies a patch whose boundaries are curved.",
+    "Interval evaluation is dependency-widened (product-form CertifiedInterval), so regularity Proven on the regular fixture holds on sub-boxes (e.g. [0.4,0.4]x[0.6,0.6], bound ~0.51) but not on the full unit box; that is the certified-subdivision behavior, matching how the other implementors' regularity is consumed. The folded (bow-tie) fixture is construction-valid and geometry-invalid: at the fold line u=0.5 the exposed Jacobian S_u x S_v vanishes, and regularity over the degenerate center box is Disproven carrying the Degeneracy { box_, egf2 } witness (enclosure below TOL_JACOBIAN); over straddling boxes it is Inconclusive — never Proven.",
+    "weight_bound returns Some(Proven(CertifiedPositive(1.0))) over every box — the frozen §3.1 constant-1 plumbing spelled like BG-KV2-104's plane carrier. The one-call rule (spec §5.9) is exposed as pub fn egf2 so the integration test can machine-check that regularity's exact EG-F^2 interval contains the squared magnitude of the landed CoonsSurface::jacobian() f64 cross product at sampled grid points, and that regularity is Proven on every regular sample box.",
+    "No transcendental function call appears in the module (machine-checked by no_transcendental_call_in_coons_patch_module, same token list as the leaf/rational scans); normal_cone reuses leaf.rs's closed-hemisphere constructor discipline over the interval cross product of the derivative enclosure.",
+    "Toolchain rustc 1.97.1, no rust-toolchain pin. Committed on packet/BG-KV2-205-C5PATCH as 20e223f with the packet's required subject; RESULT.json filed at the worktree root after the commit. Only the three write-set files were committed; PACKET.md and CONTEXT.md remain untracked."
+  ]
+}
