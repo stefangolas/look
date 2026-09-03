@@ -1,0 +1,54 @@
+{
+  "packet": "BG-KV2-102-LEAF",
+  "class": "design",
+  "crates": ["truck-certified"],
+  "status": "done",
+  "commit": "97ba812 (packet/BG-KV2-102-LEAF): feat(certified): BezierLeaf extraction + CertifiedPatch impl (BG-KV2-102-LEAF)",
+  "tests_required": {
+    "leaf_extraction_round_trips_a_bezier_patch_exactly": "pass",
+    "leaf_extraction_splits_a_bspline_span_into_bezier_leaves": "pass",
+    "enclose_contains_every_sampled_point": "pass",
+    "derivs_enclose_finite_difference_derivatives": "pass",
+    "regularity_proven_on_regular_patch_and_disproven_on_degenerate": "pass",
+    "weight_bound_proven_on_positive_leaf_and_refuses_straddle": "pass",
+    "c2_second_derivs_enclose_second_finite_differences": "pass",
+    "no_transcendental_call_in_leaf_module": "pass"
+  },
+  "anchors": {
+    "A1_pub_struct_BezierLeaf": 1,
+    "A2_pub_trait_CertifiedPatch_prefix": 3,
+    "A3_pub_mod_kernel": 1,
+    "A4_leaf_extract_in_mod": 1,
+    "A5_hull_bernstein_1d_or_2d": 2,
+    "A6_fn_knot_vec_in_nurbs": 1
+  },
+  "files_written": [
+    "vendor/truck/truck-certified/src/kernel/leaf_extract.rs",
+    "vendor/truck/truck-certified/src/kernel/leaf.rs",
+    "vendor/truck/truck-certified/src/kernel/mod.rs",
+    "vendor/truck/truck-certified/tests/kernel_leaf.rs"
+  ],
+  "verification": {
+    "cargo_check_p_truck_certified_all_targets": "green",
+    "cargo_test_p_truck_certified_lib_tests_no_fail_fast": "green (landed + shim suites unchanged; 8 new kernel_leaf tests pass)",
+    "cargo_fmt": "packet files clean; full-workspace check reports ONLY pre-existing drift in out-of-write-set look files examples/step_face_timing.rs and tests/geometry_fingerprint.rs (unchanged by this packet)",
+    "clippy_p_truck_certified_all_targets_no_deps": "zero findings attributable to the packet's files",
+    "cargo_check_workspace_all_targets": "green"
+  },
+  "notes": [
+    "FROZEN SIGNATURE decision (Section 1): extract_bezier_leaves takes ONE concrete input type, `&NurbsSurface<Vector4>` (the landed homogeneous carrier; a polynomial BSplineSurface<Vector3> lifts to it through the landed From conversion with unit weights). No generic bound, no second surface type exposed.",
+    "Leaf semantics: control is the homogeneous xyzw net over the unit square; CertifiedPatch evaluation divides the X/Y/Z hulls by the certified-positive W hull ONCE at the end (N5/N6), over sub-boxes of [0,1]^2.",
+    "Derivative nets: recomputed per call through the landed bernstein_derivative_2d; no interior mutability / no caching fields (the shim struct shape is impl-blocks-only, so caching would need interior state; recompute-per-call choice recorded here).",
+    "Section 2 enclose/§7.1: the frozen CertifiedPatch::enclose returns IBox3 and cannot express a refusal, so the §7.1 WeightDegenerate Disproven/Inconclusive split lives in weight_bound (the certificate that can carry it). enclose gates internally on the W-hull lower bound; a box whose W enclosure is not certifiably positive (or a pass-through leaf with a non-positive weight field) yields a documented vacuously-true unbounded enclosure, never a panic/unwrap.",
+    "Regularity classification uses the §0.4 normative singular-map floor config::TOL_JACOBIAN (1e-12), not a bare 0 comparison: Proven iff EG-F^2 lower bound > TOL_JACOBIAN, Disproven iff upper bound < TOL_JACOBIAN, else Inconclusive. The packet's literal '< 0' Disproven rule cannot express the required collapsed-edge Disproven fixture because outward-rounded interval arithmetic turns exact-zero degenerate quantities into ~1e-323 subnormal noise; the floor is exactly config's documented 'tolerance for EG-F^2 being treated as zero'. No tolerance was loosened to force Proven; the regular plane fixture certifies with margin ~1.",
+    "weight_bound: never returns None for BezierLeaf; straddle -> Some(Inconclusive(Pole)) per §7.1; the §7.4 (1,-1,1) straddle fixture leaf is Inconclusive over [0,1]^2 and Proven at a strictly-positive spot.",
+    "leaf_from_control is a structural pass-through (degree/count/finite checks) that does NOT enforce strictly positive weights: this is what lets the §7.4 straddle data exist as a leaf for weight_bound classification (BezierLeaf::try_new keeps the positive-weight constructor gate).",
+    "normal_cone (no test this wave) returns the smallest coordinate-axis PI/2 hemisphere cone whose dot-product lower bound certifies all normals in an open hemisphere; the landed enclosure.rs midpoint-ball cone is the shape reference but needs sqrt/asin, which the N4 transcendental gate (and no truck-evidence dependency) forbids in this module. When no coordinate axis certifies, the best-coordinate PI/2 cone is returned (shim Cone cannot express absence); callers subdivide until the certified arm holds.",
+    "N4: the shim's own require_direction/require_unit_axis norm checks used sqrt(); they were rewritten to squared-length comparisons (algebraically the same boundary) so the whole leaf module is transcendental-free and the no_transcendental_call_in_leaf_module scan passes over leaf.rs + leaf_extract.rs.",
+    "Extraction scope: Bezier extraction is implemented for knot vectors clamped to their degree (the CAD/STEP norm). A non-clamped surface is refused ClaimRefuted('spline_not_clamped'); the tail-span control alignment of open knot vectors is outside this wave's scope.",
+    "Extraction algorithm: standard Bezier extraction, inserting every interior distinct knot to full multiplicity degree+1 via Boehm knot insertion applied directly to the control net (no new dependency), then carving contiguous per-cell control blocks from the refined clamped net; order u-major, v-minor. Round-trip on an already-Bezier net performs no insertion and reproduces the control net exactly.",
+    "reparam convention (Section 1): affine rows are [scale, shift] per axis; the returned leaf g satisfies g(s,t) = leaf(scale_u*s + shift_u, scale_v*t + shift_v). Composition is exact on the control net via the blossom/de Casteljau in f64; no test was specified for it (later-wave transport primitive).",
+    "H-1: no unwrap/expect/panic!, no module-level allow in leaf_extract.rs or the leaf.rs additions; clippy -p truck-certified --all-targets --no-deps reports zero findings attributable to the packet files.",
+    "Verification ran with CARGO_BUILD_JOBS=2 and the workspace .cargo/config.toml rustflags; no sccache wrapper was in use and no incremental rejection was encountered."
+  ]
+}
