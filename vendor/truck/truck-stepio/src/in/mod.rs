@@ -3458,34 +3458,9 @@ impl EdgeCurve {
                 Curve3D::PCurve(truck::PCurve::new(Box::new(curve2d), Box::new(surface)))
             }
             CurveAny::SurfaceCurve(c) => {
-                if ctx.near_pt(p, q) {
-                    // BG-TOL-001: model
-                    return Self::sub_parse_curve3d(&c.curve_3d, p, q, same_sense);
-                }
-                use PreferredSurfaceCurveRepresentation::*;
-                match c.master_representation {
-                    Curve3D => Self::sub_parse_curve3d(&c.curve_3d, p, q, same_sense)?,
-                    PcurveS1 => {
-                        if let Some(PcurveOrSurface::Pcurve(c)) = c.associated_geometry.first() {
-                            Self::sub_parse_curve3d(&CurveAny::Pcurve(c.clone()), p, q, true)?
-                        } else {
-                            return Err(
-                                "The 0-indexed associated geometry is nothing or not PCURVE."
-                                    .into(),
-                            );
-                        }
-                    }
-                    PcurveS2 => {
-                        if let Some(PcurveOrSurface::Pcurve(c)) = c.associated_geometry.get(1) {
-                            Self::sub_parse_curve3d(&CurveAny::Pcurve(c.clone()), p, q, true)?
-                        } else {
-                            return Err(
-                                "The 1-indexed associated geometry is nothing or not PCURVE."
-                                    .into(),
-                            );
-                        }
-                    }
-                }
+                // Associated PCurves are face-local, but this is the one shared/global edge
+                // carrier. Preserve them on `SurfaceCurve` and use its model-space 3D curve here.
+                Self::sub_parse_curve3d(&c.curve_3d, p, q, true)?
             }
         };
         if !same_sense {

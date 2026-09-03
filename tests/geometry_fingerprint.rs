@@ -54,7 +54,12 @@ fn fingerprint(name: &str) -> Fingerprint {
             }
         }
     }
-    Fingerprint { triangles, vertices, min, max }
+    Fingerprint {
+        triangles,
+        vertices,
+        min,
+        max,
+    }
 }
 
 /// Relative to the part's own extent, deliberately. These two fixtures are
@@ -86,6 +91,19 @@ fn bracket_tessellates_to_a_known_mesh() {
     assert_eq!(f.triangles, 1814, "bracket triangle count moved");
     assert_eq!(f.vertices, 5442, "bracket vertex count moved");
     assert_bounds_near(&f, [-9.0, -9.0, 0.0], [60.0, 40.0, 22.0], "bracket");
+}
+
+#[test]
+fn surface_curve_pcurve_master_tessellates_to_complete_mesh() {
+    let f = fingerprint("surface_curve_pcurve_master.step");
+    assert_eq!(f.triangles, 5344, "surface-curve triangle count moved");
+    assert_eq!(f.vertices, 16032, "surface-curve vertex count moved");
+    assert_bounds_near(
+        &f,
+        [-43.0, -11.0, -2.0],
+        [43.0, 59.999_85, 9.6],
+        "surface curve with PCurve master",
+    );
 }
 
 #[test]
