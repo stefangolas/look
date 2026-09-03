@@ -60,5 +60,6 @@ pub mod evidence;
 pub mod fixtures;
 pub mod graph;
 pub mod leaf;
+pub mod leaf_extract;
 pub mod patch;
 pub mod residual;
