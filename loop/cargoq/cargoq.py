@@ -46,7 +46,8 @@ def direct():
 
 
 def main():
-    body = json.dumps({"args": sys.argv[1:], "timeout": TIMEOUT}).encode()
+    body = json.dumps({"args": sys.argv[1:], "timeout": TIMEOUT,
+                       "cwd": os.getcwd()}).encode()
     try:
         req = urllib.request.Request(
             f"http://127.0.0.1:{PORT}/run", data=body,

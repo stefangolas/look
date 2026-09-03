@@ -4,8 +4,8 @@ One heavy job at a time (FIFO), per-job timeout, output buffered and
 returned with the exit code. Agents block on the HTTP call exactly as
 they would block on cargo itself; peak RAM = agents + ONE cargo spike.
 
-- POST /run  body {"args": [...], "timeout": seconds-optional}
-             -> {"exit": int, "stdout": str, "stderr": str}
+- POST /run  body {"args": [...], "cwd": str-optional, "timeout": sec-optional}
+              -> {"exit": int, "stdout": str, "stderr": str}
 - GET /ping  -> {"ok": true, "queued": n, "running": bool}
 - GET /stats -> the log of finished jobs (tail)
 
@@ -66,11 +66,17 @@ env["PATH"] = os.pathsep.join(
 def worker(job, cond):
     global _running
     args, timeout = job["args"], job.get("timeout") or DEFAULT_TIMEOUT
+    # The caller's cwd is load-bearing (session 51): workers live in slot
+    # worktrees, and a bare `cargo test -p` / `cargo fmt --all` executed in
+    # the SERVER's cwd silently operated on the MAIN tree - wrong-tree
+    # checks and main-tree fmt drift. The client sends its cwd per job;
+    # absent cwd (old client), the job runs here and the log says so.
+    cwd = job.get("cwd") or os.getcwd()
     t0 = time.time()
-    log(f"START cargo {' '.join(args)}")
+    log(f"START [cwd={cwd}] cargo {' '.join(args)}")
     try:
         proc = subprocess.Popen(
-            [CARGO] + args, env=env, stdout=subprocess.PIPE,
+            [CARGO] + args, env=env, cwd=cwd, stdout=subprocess.PIPE,
             stderr=subprocess.PIPE)
         try:
             out, err = proc.communicate(timeout=timeout)
@@ -151,7 +157,8 @@ class Handler(BaseHTTPRequestHandler):
             self._send({"exit": 127, "stdout": "",
                         "stderr": "[cargoq] no args or no cargo"}, 200)
             return
-        job = {"args": args, "timeout": body.get("timeout")}
+        job = {"args": args, "timeout": body.get("timeout"),
+               "cwd": body.get("cwd")}
         cond = _cond
         with cond:
             _queue.append(job)
