@@ -57,6 +57,14 @@ pub type SignCert = crate::formal::exact::CertifiedSign;
 /// overlap, the deck-step breaks of a closed chain, and the certified-graph
 /// constructor over the frozen topology shapes.
 pub mod assemble;
+/// §3.3/§3.4 the lifted atlas over the rational carriers (BG-KV2-405-K2B): the
+/// finite atlas of regular charts per carrier kind with chart ids, overlap
+/// regions, and exact affine/rational transition data, the pole-chart
+/// sphere atlas, the cone/torus chart families joining the admitted carrier
+/// family, the `SwitchChart`-vs-`CarrierSingular` degeneracy doctrine, and the
+/// unwrapped K2 pcurve lifts with the deck integer as a first-class coordinate
+/// and [`crate::kernel::config::DECK_MAX`] as the termination bound.
+pub mod atlas;
 pub mod certs;
 pub mod config;
 /// The §10.3 isolated-contact classifier (BG-KV2-302-S5A): the tolerance-
@@ -93,30 +101,30 @@ pub mod residual;
 /// (arity 3) and the one-chart curve–curve system (arity 2) over the S2A C1
 /// seam, plus the 1-var homogeneous curve leaf they consume.
 pub mod residuals_r89;
-/// The §11 exact-overlap sheet classifier (BG-KV2-403-S6): `SheetCert` for
-/// real over the recognized carriers (plane/plane, cylinder/coaxial,
-/// sphere/concentric) and the certified leaf-pair affine map, with the real
-/// `PsiMap`, the four §11 conditions, and the `NearOverlap` disproof.
-pub mod sheet;
 /// The §13 R6 self-intersection residual (BG-KV2-404-S8): the deflated
 /// divided-difference residual on the Bézier net, the exact-cover charts A/B
 /// (Theorem 13.1), the Theorem 13.3 transition seams emitting the frozen
 /// `R6ChartSwitch` / `R6BaseSwap` segment breaks, and the Theorem 13.4 λ = 0
 /// routing (chart or carrier, never the contact classifier).
 pub mod selfint;
+/// The §11 exact-overlap sheet classifier (BG-KV2-403-S6): `SheetCert` for
+/// real over the recognized carriers (plane/plane, cylinder/coaxial,
+/// sphere/concentric) and the certified leaf-pair affine map, with the real
+/// `PsiMap`, the four §11 conditions, and the `NearOverlap` disproof.
+pub mod sheet;
 /// The Tier-1 loop-free certificate and the §9.3 R8 boundary-stratum seeds
 /// (BG-KV2-301-S03A): the two-cone LP of Theorem 9.1 (cos-space cone
 /// separation) and the R8 subdivision seeds over caller-supplied boundary
 /// edges.
 pub mod tier1;
-/// The D4 float predictor-corrector (BG-KV2-207-S4A): the fast, UNCERTIFIED
-/// branch tracer whose accept/reject path always goes through the certified
-/// seam ([`engine::build_frame4`] + [`engine::c2_certify_tube4`]), with the
-/// §10.2 escalation ladder.
-pub mod tracer;
 /// The Tier-2 critical-point start set (BG-KV2-304-S3B): the §7 R3 minor-form
 /// residual `Psi_a(x) = (F(x), a·m(x))` (arity 4, square) over the frozen
 /// seam's additive arity-4 C1 entry, and the §9.2 subdivision start set with
 /// the a-posteriori `k_a` direction-perturbation retry rule (Corollary 9.3's
 /// composition with 301's boundary seeds).
 pub mod tier2;
+/// The D4 float predictor-corrector (BG-KV2-207-S4A): the fast, UNCERTIFIED
+/// branch tracer whose accept/reject path always goes through the certified
+/// seam ([`engine::build_frame4`] + [`engine::c2_certify_tube4`]), with the
+/// §10.2 escalation ladder.
+pub mod tracer;

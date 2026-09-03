@@ -1,72 +1,56 @@
 {
-  "packet": "BG-KV2-207-S4A",
-  "id": "BG-KV2-207-S4A",
-  "contract": ["BG-KV2-207-S4A"],
+  "packet": "BG-KV2-405-K2B",
+  "id": "BG-KV2-405-K2B",
+  "contract": ["BG-KV2-405-K2B"],
   "class": "design",
   "crates": ["truck-certified"],
-  "status": "partial",
-  "summary": "The D4 float tracer (vendor/truck/truck-certified/src/kernel/tracer.rs) is landed with the packet's public API (TracePolicy + documented default, FloatStep, FloatOutcome::{Completed,ClosedLoop,Refused}, float_trace, doc(hidden) float_trace_impl + TraceStats), seed certification first through build_frame4 + an initial C2 tube, the Gauss-Newton predictor reusing the last factorization (Frame::a), grow-on-success / halve-on-failure, frame rebuilds after max_halvings with dtau reset, ClosedLoop float recurrence detection, Budget step-cap refusal, and the normative §10.2 escalation ladder decided purely from certified interval enclosures (rung 1 certified-rank rebuild -> Conditioning; rung 2 predicate parametric_degeneracy_chart_or_carrier; rung 3 TangentialCurve; rung 4 predicate isolated_contact_is_s5a; rung 5 HighOrderJet). The rank screen partitions the failed arc into RANK_SUBBOXES (16) tau sub-boxes of a NARROW perpendicular box around the branch (SCREEN_PERP, H-3), localizing rank collapse along tau. FloatStep.certified is built only from the Proven arm of c2_certify_tube4; the module never mints an ArcCert. kernel/mod.rs wires pub mod tracer; the eight required tests live in tests/kernel_tracer.rs. RESULT.json is at the worktree root.",
+  "status": "complete",
+  "summary": "Section 3.3's lifted atlas is landed in vendor/truck/truck-certified/src/kernel/atlas.rs and wired through kernel/mod.rs: pub struct ChartAtlas over a rational carrier holding the FINITE chart family per carrier kind (chart ids, certified-regular regions, ChartLattice deck generators, ChartPatch CertifiedPatch leaves, and the pole/partner switch data). The sphere atlas is the pole-chart family (two rationalized polar half-angle pole charts degenerate on the polar line u = 0 through u = v = 0, plus their stereographic partners that are regular AT the same pole), with the exact rational pole-to-partner transition (point map pole_to_partner and its outward-rounded box transport pole_to_partner_box). Cone and Torus join the admitted carrier family here: ChartAtlas::try_new accepts them and constructs their chart families (the cone's apex-excluding charts keep the carrier-singularity apex locus; the torus builds the product-of-half-angle family), while the Wave-1 404 pending refusal in kernel::rational is preserved untouched (the re-route is asserted in tests/kernel_atlas.rs, never by editing the landed files). Section 3.4's doctrine is code: classify_degeneracy(p: &dyn CertifiedPatch, box_) over one of the atlas's own chart patches returns DegeneracyRoute::{SwitchChart{target}, CarrierSingular} - the sphere pole box (rank-deficient parameterization at a regular image point, partner regularity Proven over its pole box) routes SwitchChart and the arc continues with no valence change; the cone apex box (a genuine carrier singularity, no partner) routes CarrierSingular. K2 lifts run through the atlas: Param is the LIFTED coordinate (5.9 stays 5.9; the deck integer carries the winding), the unwrapped pcurve run 5.9 -> 6.4 lifts to deck +1 with canonical u = 6.4 - P (the shim kit deck-wrap fixture), and |deck| > DECK_MAX on one edge refuses RefusalKind::DeckExhausted (Inconclusive). N4 is pinned by the module's source test: no sin/cos/atan2/exp/ln/log/powf/sqrt call in atlas.rs; H-1 discipline holds (no unwrap/expect/panic!, no module-level allow).",
   "tests": {
-    "tracer_marches_a_straight_branch_and_certifies_long_arcs": "PASS",
-    "dtau_grows_on_success_and_halves_on_failure": "FAIL",
-    "frame_rebuild_after_max_halvings_continues_the_branch": "PASS",
-    "escalation_routes_rank2_zero_set_to_tangential_refusal": "PASS",
-    "escalation_routes_isolated_r2_to_the_contact_future": "FAIL",
-    "high_order_singularity_refuses": "FAIL",
-    "monotone_in_tau_only_no_strong_monotonicity_imposed": "PASS",
-    "tracer_output_never_claims_certification": "PASS"
+    "sphere_pole_chart_switches_and_continues_the_arc": "PASS",
+    "param_lift_never_wraps_and_deck_is_first_class": "PASS",
+    "chart_switch_vs_carrier_singularity_distinguished": "PASS",
+    "cone_carrier_admitted_with_its_chart_family": "PASS",
+    "deck_exhausted_terminates_helical_lifts": "PASS",
+    "pcurve_runs_unwrapped_5_9_to_6_4": "PASS",
+    "no_transcendental_call_in_atlas_module": "PASS"
   },
-  "pass_count": 5,
-  "fail_count": 3,
+  "pass_count": 7,
+  "fail_count": 0,
   "measured_counts": {
-    "fixture_1_straight": {
-      "policy_arc_step0": 0.005,
-      "steps": 30,
-      "total_tau": 0.28234,
-      "max_dtau": 0.04,
-      "rebuilds": 0,
-      "halvings": 0,
-      "outcome": "Completed"
-    },
-    "fixture_3_straight_near_boundary": {
-      "steps": 20,
-      "total_tau": 0.27813,
-      "max_dtau": 0.05,
-      "rebuilds": 0,
-      "halvings": 0,
-      "outcome": "Completed"
-    },
-    "fixture_7_straight_near_boundary": {
-      "steps": 20,
-      "total_tau": 0.27813,
-      "max_dtau": 0.05,
-      "rebuilds": 0,
-      "halvings": 0,
-      "outcome": "Completed"
-    },
-    "fixture_2_parabola": {
-      "steps": 0,
-      "halvings": 3,
-      "outcome": "Completed with no certified step: the frozen tube never certifies the quadratic branch at any width",
-      "note": "c2_certify_tube4 returned Proven only for (near-)linear systems in every configuration exercised; a parabola 'hard part' cannot produce a halved certified step, so the dtau-grows/recovers assertions cannot be met."
-    },
-    "fixture_4_tangential_line": "Refused TangentialCurve (predicate r2_contact_zero_set_one_dimensional), steps 0, halvings 3.",
-    "fixture_5_isolated_node": "Refused HighOrderJet (predicate rank_screen_not_isolated_not_curve), steps 0, halvings 3. The isolated node's certified rank footprint exceeds the isolated cap because the crossing component keeps g_u within the interval-hull noise over several sub-boxes.",
-    "fixture_6_three_nodes": "Refused TangentialCurve (predicate r2_contact_zero_set_one_dimensional), steps 0, halvings 3. Three nodes clustered within one floor arc force the maximal-minor polynomial to ~1e-8 magnitude between them, below the interval-hull zero-containment resolution, so every sub-box reads rank collapse."
+    "sphere_chart_family": 4,
+    "sphere_pole_chart_region_regularity": "Proven (EG-F^2 = 64 u^2 / ((1+u^2)^4 (1+v^2)^2) lower bound positive on the region u in [0.5,2], v in [-1.5,1.5])",
+    "partner_pole_box_regularity_lower_bound": 15.987206397440856,
+    "arc_samples": 18,
+    "pole_to_partner_transition_checks": "agrees with the direct partner coordinates to < 1e-12 on all pre-pole samples",
+    "lift_5_9_to_6_4": "deck +1, canonical u = 6.4 - 2*pi (~0.116814692820414), v preserved",
+    "helix_at_DECK_MAX": "deck +8 admitted",
+    "helix_above_DECK_MAX": "9 crossings refused DeckExhausted (Inconclusive, predicate deck_exhausted_lift)",
+    "cone_chart_family": "2 apex-excluding half-angle sheets, each region axial lower bound 0.1 (> 0, apex at v = 0 excluded)",
+    "rational_cone_admit_still_refuses": "CarrierSingularity, predicate cone_torus_carrier_packet_pending"
   },
-  "blocking_finding": {
-    "text": "Three frozen-seam behaviors block the remaining fixtures. (1) c2_certify_tube4 only certifies tubes for (near-)linear systems in every exercised configuration and demands a perpendicular half-width of ~3x the tau width even there, so the packet's curved/wrapped marching fixtures (parabola hard part, circle arcs) cannot be certified and cannot produce the asserted step streams. (2) Frame::try_new admits only unit-norm frame origins and build_frame4's Gram-Schmidt trips its 1e-12 orthogonality gate near degenerate seeds (observed dots ~1e-11 to 1e-9 as seeds approach rank-collapse points), so seeds/rebuilds must sit on S3 away from degeneracies, and a branch's single-frame certified reach (~0.3-0.35 tau) forces rebuilds at non-unit points on any longer non-S3 branch. (3) The escalation ladder's rung 3/4/5 separation needs certified rank margins the interval hulls cannot deliver at the required scale: components clustered within one floor arc force the maximal-minor polynomial to ~1e-8 between them, below hull zero-containment resolution, so isolated nodes read as broader collapses and clustered nodes read as full-arc tangencies. The ladder code, order, and refusal vocabulary are exactly as specified; none of the three stop conditions is triggered (the seam is untouched; every decision is enclosure-based; no SegmentBreak stream is emitted). Anchors A1-A5 verified unchanged.",
-    "anchors": { "A1": 1, "A2": 1, "A3": 1, "A4": 1, "A5": 0 }
+  "design_notes": {
+    "classify_degeneracy": "implemented as ChartAtlas::classify_degeneracy(&self, p: &dyn CertifiedPatch, box_) because the SwitchChart target and the 'image certified regular elsewhere' premise need the atlas's partner charts; p must be one of the atlas's own Chart::patch leaves (matched by object address). An out-of-atlas CertifiedPatch routes CarrierSingular (refuse/trim).",
+    "pole_chart_geometry": "the sphere pole charts are the rationalized polar half-angle charts (u = tan(theta/2), v = tan(phi/2)); their u = 0 polar line collapses onto the pole u = v = 0. The partner stereographic charts are regular at that same pole, so classify certifies the pole image regular elsewhere and routes SwitchChart.",
+    "cone_and_torus_leaves": "the cone/torus CertifiedPatch leaves keep the crate's deferred pending markers (cone_half_angle_slope_needs_data / torus_rational_form_pending) - an exactly rational slope cannot be recovered N4-cleanly from a stored half-angle, and the torus enclosure machinery is later work. This packet certifies the CHART structure (ids, regions, apex-excluding boxes, lattice) and the section 3.4 routing over it; the Wave-1 kernel::rational refusal surface is untouched.",
+    "transitions": "exact affine/rational data with outward-rounded transport (CertifiedInterval map for the box form); no transcendental transition is needed for any admitted carrier (stop condition 2 not triggered).",
+    "chart_switch_breaks": "a pole switch is a SegmentBreak::ChartSwitch, not a topology node; the pole crossing adds no valence because the partner certifies the crossing point regular."
   },
   "stop_conditions": {
     "1_frozen_seam_differs": false,
-    "2_float_heuristic_on_decision": false,
-    "3_segmentbreak_needed": false
+    "2_transition_not_affine_rational": false,
+    "3_refusal_reroute_breaks_landed_104_test": false
+  },
+  "anchors": {
+    "A1": 1,
+    "A2": 1,
+    "A3": 1
   },
   "verify": {
-    "fmt": "changed files rustfmt-clean",
-    "check": "cargo check -p truck-certified --lib green",
-    "existing_tests": "all pre-existing truck-certified lib/integration suites pass; only tests/kernel_tracer.rs has failures (5 passed / 3 failed as listed)",
-    "clippy": "the crate is not clippy-clean at default settings crate-wide (pre-existing findings); findings attributable to tracer.rs were addressed with item-level allows mirroring existing module practice and iterator rewrites"
+    "fmt": "atlas.rs / mod.rs / kernel_atlas.rs rustfmt-clean (rustfmt --check exit 0)",
+    "check": "cargo check --manifest-path <slot>/Cargo.toml -p truck-certified --locked green, no warnings",
+    "required_tests": "all 7 tests_required pass (tests/kernel_atlas.rs)",
+    "existing_tests": "all pre-existing truck-certified lib/integration suites pass, including tests/kernel_rational.rs (the landed 104 file is untouched and its cone/torus pending-refusal test still passes). The only failing target is tests/kernel_tracer.rs (3 failures), which reproduces identically on the unmodified HEAD baseline (verified by stashing the mod.rs registration) and is unrelated to this packet.",
+    "clippy": "the crate is not clippy-clean at default settings crate-wide (pre-existing); no clippy findings were introduced by atlas.rs"
   }
 }
