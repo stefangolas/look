@@ -128,13 +128,60 @@ def log(line):
         f.write(f"{time.strftime('%m-%d %H:%M:%S')} {line}\n")
 
 
+def free_ram_gb():
+    out = subprocess.run(
+        ["powershell", "-NoProfile", "-Command",
+         "(Get-CimInstance Win32_OperatingSystem).FreePhysicalMemory"],
+        capture_output=True, text=True, timeout=30).stdout.strip()
+    try:
+        return int(out) * 1024 / GB
+    except ValueError:
+        return -1.0
+
+
+def kill_worker_language_servers(dry=False):
+    """Kill rust-analyzer instances PARENTED by an opencode/bun process.
+
+    The session-51 class: opencode auto-spawns a language server per
+    worker session over a cold slot worktree - 1-2+ GB each, a duplicate
+    index of the same tree. Worker dispatch now sets lsp:false in the
+    config env, so this is the backstop for processes that predate it or
+    slip past it. Editor-spawned instances (VS Code parent chain) are
+    exempt by parentage - the owner's own rust-analyzer is never touched.
+    """
+    ps = ("Get-CimInstance Win32_Process -Filter \"Name='rust-analyzer.exe'\" "
+          "| ForEach-Object { $p = $_; $par = Get-CimInstance Win32_Process "
+          "-Filter ('ProcessId=' + $p.ParentProcessId) -ErrorAction "
+          "SilentlyContinue; '{0}|{1}' -f $p.ProcessId, "
+          "$(if ($par) { $par.Name } else { '?' }) }")
+    out = subprocess.run(["powershell", "-NoProfile", "-Command", ps],
+                         capture_output=True, text=True, timeout=30).stdout
+    killed = 0
+    for line in out.splitlines():
+        if "|" not in line:
+            continue
+        pid, parent = line.split("|", 1)
+        if not pid.strip().isdigit():
+            continue
+        if parent.strip().lower() not in ("opencode.exe", "bun.exe",
+                                          "node.exe"):
+            continue
+        if not dry:
+            subprocess.run(["taskkill", "/PID", pid.strip(), "/T", "/F"],
+                           capture_output=True)
+        log(f"kill worker language server pid {pid.strip()} "
+            f"(parent {parent.strip()})")
+        killed += 1
+    return killed
+
+
 def main():
     if len(sys.argv) < 2:
         print(__doc__)
         return 2
     if sys.argv[1] == "status":
         f = free_gb()
-        print(f"free: {f:.1f} GB")
+        print(f"free: {f:.1f} GB disk, {free_ram_gb():.1f} GB RAM")
         if os.path.isdir(SLOTS):
             for name in sorted(os.listdir(SLOTS)):
                 for cand in (os.path.join(SLOTS, name, "target"),
@@ -143,9 +190,21 @@ def main():
                         print(f"  slot {name}: {dir_size_gb(cand):.1f} GB "
                               f"({os.path.relpath(cand, ROOT)})")
         return 0
+    if sys.argv[1] == "ram":
+        # RAM reclaim: kill opencode-parented language servers regardless
+        # of threshold when invoked directly.
+        killed = kill_worker_language_servers()
+        print(f"janitor: killed {killed} worker language server(s); "
+              f"{free_ram_gb():.1f} GB RAM free")
+        return 0
     if sys.argv[1] == "ensure":
         need = float(sys.argv[sys.argv.index("--need") + 1])
         skip = {a for a in sys.argv[2:] if a.startswith("--slot=")}
+        # RAM first (session 51: 0xc0000409 under allocation pressure is
+        # the memory signature; a worker language server is the one
+        # reclaimable consumer the disk sweep never touched).
+        if free_ram_gb() < 4.0:
+            kill_worker_language_servers()
         f = free_gb()
         if f >= need:
             print(f"janitor: {f:.1f} GB free, need {need} - OK")
