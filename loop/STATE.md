@@ -64,6 +64,13 @@ and in the ledger.
 
 ## Pick up here
 
+0. **NEXT PROGRAM (filed, not started): the kernel v2 swarm.** Normative
+   theory: docs/CONSTRUCTIVE_GEOMETRY_KERNEL_SPEC_V2.md. Build-spec
+   skeleton + spine-session agenda: docs/KERNEL_V2_SWARM_BOOKING.md —
+   first acts are the gap census (v2 spec vs the landed tree) and the
+   shim contract inventory; open owner decisions are enumerated there.
+   The wave recipe is ORCHESTRATOR's build-spec spine workflow.
+
 1. **Owner decisions from the measurement** (the next booking): funnel
    admission, decomposition policy, DISPATCH-2 / recognizer family /
    admission widening. Do NOT book Phase-3 class-4 work against a
