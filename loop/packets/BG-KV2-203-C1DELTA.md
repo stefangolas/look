@@ -11,8 +11,19 @@ from the certified-crate Wave-2 packets.
 (`constructive/recipe.rs:44`). The enum lands beside it at module level
 with the spec spelling; the trait RENAMES to `SpineCurve`** with the old
 name retained as a deprecated alias ONLY if a rename ripples beyond the
-measured call sites (measure first; the census knows: recipe.rs:44, the
-impls in spine_frame.rs:43,74, the uses in spine_sweep.rs:32,40).
+measured call sites.
+
+**CENSUS CORRECTION (r2 amendment, from the r1 worker's stop-condition-1
+finding — the session-46 census-scope-vs-write-set class, re-hit): the
+design-time census UNDERCOUNTED the trait rename ripple. Measured at
+dispatch, the trait `Spine` is referenced by five additional files, all now
+IN write_allow: `constructive/frame_transport.rs` (use + two `&dyn Spine`
+signatures), `truck-modeling/src/facet_sweep.rs` (:85 and :413 generics),
+and the integration-test files `constructive_frames.rs`,
+`constructive_transport.rs`, `facet_sweep_conformance.rs` (impl blocks +
+generic fns). All five migrate in the same commit. canonical.rs / graph.rs
+`Spine*` matches are SpineFrameSurface/SpineFrameCurve/AnyArc::Spine names,
+NOT the constructive trait — do not touch them for the rename.**
 
 **H-1.** New modules (`constructive/spine_ph.rs`,
 `tests/constructive_spine_enum.rs`) carry their crate's unwrap discipline:
@@ -31,9 +42,14 @@ write_allow:
   - vendor/truck/truck-geometry/src/constructive/recipe.rs
   - vendor/truck/truck-geometry/src/constructive/spine_ph.rs
   - vendor/truck/truck-geometry/src/constructive/mod.rs
+  - vendor/truck/truck-geometry/src/constructive/frame_transport.rs
   - vendor/truck/truck-geometry/src/decorators/spine_frame.rs
-  - vendor/truck/truck-modeling/src/spine_sweep.rs
+  - vendor/truck/truck-geometry/tests/constructive_frames.rs
+  - vendor/truck/truck-geometry/tests/constructive_transport.rs
   - vendor/truck/truck-geometry/tests/constructive_spine_enum.rs
+  - vendor/truck/truck-modeling/src/spine_sweep.rs
+  - vendor/truck/truck-modeling/src/facet_sweep.rs
+  - vendor/truck/truck-modeling/tests/facet_sweep_conformance.rs
 read_allow:
   - docs/CONSTRUCTIVE_GEOMETRY_KERNEL_SPEC_V2.md
   - vendor/truck/truck-geometry/src/constructive

@@ -1,0 +1,29 @@
+{
+  "id": "BG-KV2-203-C1DELTA",
+  "class": "design",
+  "crates": ["truck-geometry", "truck-modeling", "truck-certified"],
+  "status": "stopped",
+  "branch": "packet/BG-KV2-203-C1DELTA",
+  "head": "150f7fd",
+  "summary": "STOPPED at stop condition 1 (trait rename ripples outside the write set). The packet seam says 'measure first' and Section 1's bullet says: 'If a call site outside the write set references the trait, STOP ... and name it.' The packet's census claims the Spine->SpineCurve rename only touches recipe.rs:44, the impls in spine_frame.rs:43,74, and the uses in spine_sweep.rs:32,40 (all inside write_allow). A word-boundary scan of the actual tree at dispatch shows the trait Spine is referenced by five additional files that are NOT in write_allow, so the rename cannot be completed within the packet's write set.",
+  "stop_conditions": {
+    "triggered": true,
+    "details": [
+      "1 (rename ripples to a crate/file outside the write set): TRIGGERED. Renaming the trait Spine->SpineCurve (and landing the Spine enum under the spec spelling, which forces the old trait name off the public path) requires editing code in these files, none of which is in write_allow: (a) vendor/truck/truck-geometry/src/constructive/frame_transport.rs L20 (use super::{... Spine}), L41 and L132 (&dyn Spine in parallel_transport / unit_tangent signatures); (b) vendor/truck/truck-geometry/tests/constructive_frames.rs L20/L54/L290 (impl Spine for CircleSpine / RotatedSpine / HelixSpine); (c) vendor/truck/truck-geometry/tests/constructive_transport.rs L18/L56/L113 (impl Spine for CircleSpine / SSpine / HelixSpine); (d) vendor/truck/truck-modeling/src/facet_sweep.rs L85 and L413 (pub fn facet_sweep<S: Spine> / facet_sweep_certified<S: Spine>); (e) vendor/truck/truck-modeling/tests/facet_sweep_conformance.rs L106 (impl Spine for QuarterCircleSpine) and L144 (fn swept<S: Spine>). All five are compiled by the done-when commands (cargo test -p truck-geometry -p truck-modeling --lib --tests, cargo check --workspace --all-targets) and would fail to compile after the rename unless edited. Per the packet: the write set grows by amendment, not improvisation; this worker stops and names the sites instead of editing out-of-write-set files.",
+      "2 (RRMF-quintic closed form): not reached - the packet stops at condition 1 before any Section 1/2/3 implementation begins.",
+      "3 (default FrameData bit-identity): not reached - no FrameData/landed-test work was started."
+    ]
+  },
+  "files_written": [],
+  "verification": {
+    "measurement": "grep for '(?<![A-Za-z])Spine(?![A-Za-z])' over all *.rs in the tree (comments excluded) plus targeted '(impl Spine|: Spine|dyn Spine)' scan. Trait-Spine reference files and membership: recipe.rs (write), constructive/mod.rs re-export L322 (write), decorators/spine_frame.rs (write), truck-modeling/src/spine_sweep.rs (write), constructive/frame_transport.rs (OUT), truck-geometry/tests/constructive_frames.rs (OUT), truck-geometry/tests/constructive_transport.rs (OUT), truck-modeling/src/facet_sweep.rs (OUT), truck-modeling/tests/facet_sweep_conformance.rs (OUT). canonical.rs / cad.rs / graph.rs matches are SpineFrameCurve / SpineFrameSurface / SSI Spine(Arc) names, not the constructive trait.",
+    "census_check": "CONTEXT.md caller-site table itself lists facet_sweep.rs:85 and :413 as trait-Spine users, contradicting the packet's design-time census of 5 write-set sites.",
+    "commands_run": "git status/log/ls-files; Select-String word-boundary scans (above).",
+    "source_edits": "NONE - no write-set file was modified."
+  },
+  "notes": [
+    "The packet seam and CONTEXT.md (dispatch-generated) disagree: PACKET.md states the census measured only recipe.rs:44 / spine_frame.rs impls / spine_sweep.rs uses, while the actual dispatch tree carries trait-Spine users in frame_transport.rs, facet_sweep.rs, and three integration-test files, none writable. This is exactly the scenario stop condition 1 is written for.",
+    "No deprecated-alias escape is available: landing `pub enum Spine` under the spec spelling at the constructive module level occupies the name, so out-of-write-set references that still spell the trait `Spine` cannot be preserved by an alias without a name collision; those references must migrate, and the files owning them are outside write_allow.",
+    "Per stop-condition protocol the result is a STOP with named sites so the orchestrator can amend write_allow (e.g. add constructive/frame_transport.rs, truck-modeling/src/facet_sweep.rs, and the three test files) and re-dispatch; no commit was created because no code changed."
+  ]
+}
