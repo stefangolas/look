@@ -162,3 +162,16 @@ clippy (exact verify form, unfiltered, ALL findings) clean; `cargo check
 
 Commit subject: `feat(certified): float tracer + escalation ladder
 (BG-KV2-207-S4A)`.
+
+## AMENDMENT (orchestrator, session 50) - FINISH
+
+Your run exited mid-debugging (no RESULT.json, no commit). The worktree
+holds tracer.rs, tests/kernel_tracer.rs, a mod.rs line, and two probe
+files (tests/zz_probe.rs, tests/zz_probe2.rs) - debug artifacts that are
+NOT in the packet's write set and must be DELETED, not committed.
+
+Finish steps, nothing else: delete the zz_probe files; run the Done-when
+battery (cargo test -p truck-certified --lib --tests --no-fail-fast,
+workspace check, fmt, clippy exact verify form; CARGO_BUILD_JOBS=2-4); fix
+any failures in YOUR files; commit with the packet's prescribed subject;
+write RESULT.json AT THE WORKTREE ROOT last.
