@@ -1,0 +1,13 @@
+12:23:17 SERVER START port=8231 cargo=C:\Users\stefa\.cargo\bin\cargo.exe
+12:29:27 SERVER START port=8231 cargo=C:\Users\stefa\.cargo\bin\cargo.exe
+12:29:30 START cargo check -p truck-certified --lib --locked
+12:29:33 DONE exit=0 in 2s: cargo check -p truck-certified --lib --locked
+12:29:45 START cargo check -p truck-geometry --lib --locked
+12:29:45 START cargo check -p truck-modeling --lib --locked
+12:29:45 DONE exit=0 in 0s: cargo check -p truck-geometry --lib --locked
+12:29:54 DONE exit=0 in 9s: cargo check -p truck-modeling --lib --locked
+12:30:49 SERVER START port=8231 cargo=C:\Users\stefa\.cargo\bin\cargo.exe
+12:30:52 START cargo check -p truck-geometry --lib --locked
+12:30:52 DONE exit=0 in 0s: cargo check -p truck-geometry --lib --locked
+12:30:52 START cargo check -p truck-modeling --lib --locked
+12:30:52 DONE exit=0 in 0s: cargo check -p truck-modeling --lib --locked
