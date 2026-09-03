@@ -85,11 +85,11 @@ def slot_states():
                         res_id = "?unreadable"
                 if parts[2] == "RUNNING" or res_id == pkt:
                     assigned.add(pkt)
-                elif res_id is None:
-                    dead.add(pkt)  # no RESULT: the dispatch died
                 else:
-                    assigned.add(pkt)  # a STALE RESULT from another packet:
-                    # the slot needs manual cleanup, not an auto-dispatch
+                    # Stale RESULT from another packet (or none): garbage -
+                    # the filed copy lives in loop/results/. The slot is
+                    # free for THIS packet after the stale file goes.
+                    dead.add(pkt)
     return states, assigned, dead, slot_of
 
 
