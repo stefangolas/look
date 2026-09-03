@@ -1,0 +1,91 @@
+{
+  "id": "BG-KV2-203-C1DELTA",
+  "class": "design",
+  "status": "done",
+  "branch": "packet/BG-KV2-203-C1DELTA",
+  "head": "0d8c2d1",
+  "summary": "Lands the r3-rescoped C1 delta (build spec section 4; spec sections 5.2-5.3; section 19 row 5's v2 delta): the constructive `Spine` ENUM beside the renamed `SpineCurve` trait, the PH fast path as specified by AMENDMENT r3 (RmErfSeptic fully implemented with the tau==0 membership identity and the exact rational Euler-Rodrigues frame; RrmfQuintic frozen with a named-deferral refusing constructor), and FrameData (the declared double-reflection refinement level stored as data on SpineFrameRecipe, defaulting to 64 so landed behavior is bit-identical). The trait rename ripples only through the write set (measured: recipe.rs, frame_transport.rs, spine_frame.rs decorators, spine_sweep.rs, facet_sweep.rs, and the three integration tests constructive_frames/constructive_transport/facet_sweep_conformance; no site outside the write set - the `look` crate root/src/tests/examples reference no Spine identifiers).",
+  "stop_conditions": {
+    "triggered": false,
+    "details": [
+      "1 (rename ripple outside the write set): NOT fired. Whole-workspace grep plus a fresh-target `cargo check --workspace --all-targets --exclude look` (green) show the trait rename is fully contained in the r2/r3 write set. canonical.rs / graph.rs `Spine*` matches are SpineFrameSurface/SpineFrameCurve/AnyArc::Spine names, untouched as the census correction directs.",
+      "2 (RRMF-quintic closed form unavailable): DISCHARGED by AMENDMENT r3. RmErfSeptic membership is implemented exactly as the amendment's contract: tau(w) == 0 as a polynomial identity on the cubic-quaternion preimage recovered from the Bezier net (no transcendental). The r3 rescope admits the planar degenerate fixture family (flagged degenerate in the fixture doc) and defers the non-degenerate spatial family (M3), so no reference formula was needed or fabricated. RrmfQuintic's constructor refuses with the named trigger `rrmf_membership_pending_external_characterization` (budget/Inconclusive shape) rather than approximating with double reflection.",
+      "3 (default-level FrameData bit-identity): NOT fired. The default refinement level is 64 and frame_transport's station-grid arithmetic is byte-for-byte the landed code (the hardcoded 64 became the parameter with default 64); every landed test in the truck-geometry/truck-modeling suites is green unchanged."
+    ]
+  },
+  "files_written": [
+    "vendor/truck/truck-geometry/src/constructive/recipe.rs",
+    "vendor/truck/truck-geometry/src/constructive/spine_ph.rs (NEW)",
+    "vendor/truck/truck-geometry/src/constructive/mod.rs",
+    "vendor/truck/truck-geometry/src/constructive/frame_transport.rs",
+    "vendor/truck/truck-geometry/src/decorators/spine_frame.rs",
+    "vendor/truck/truck-geometry/tests/constructive_spine_enum.rs (NEW)",
+    "vendor/truck/truck-geometry/tests/constructive_frames.rs",
+    "vendor/truck/truck-geometry/tests/constructive_transport.rs",
+    "vendor/truck/truck-modeling/src/spine_sweep.rs",
+    "vendor/truck/truck-modeling/src/facet_sweep.rs",
+    "vendor/truck/truck-modeling/tests/facet_sweep_conformance.rs"
+  ],
+  "anchors_pre_dispatch": {
+    "A1_pub_trait_Spine_recipe_rs": "1 (grep substring also matches the `pub trait SpineCurve` rename line post-state)",
+    "A2_TRANSPORT_STATIONS_frame_transport_rs": "5",
+    "A3_pub_struct_SpineFrameRecipe_recipe_rs": "1",
+    "A4_PhSpine_in_src": "0",
+    "A5_FrameData_in_src": "0"
+  },
+  "anchors_after": {
+    "A1_pub_trait_Spine_substring": "1 (now the `pub trait SpineCurve` line)",
+    "A2_TRANSPORT_STATIONS_frame_transport_rs": "0 (the hardcoded constant is gone; the default level 64 lives on FrameData::DEFAULT_REFINEMENT_LEVEL)",
+    "A3_pub_struct_SpineFrameRecipe_recipe_rs": "1",
+    "A4_PhSpine_in_src": "21 references (PhSpine enum + PhSpine::* construction/delegation)",
+    "A5_FrameData_in_src": "14 references (FrameData struct + recipe field + accessors + serde)"
+  },
+  "tests": {
+    "required_8_present_and_green": [
+      "spine_enum_dispatches_general_to_the_landed_spine_curve",
+      "polyline_spine_refuses_as_not_c1_through_the_enum",
+      "ph_septic_membership_and_rational_frame",
+      "frame_data_refinement_level_changes_surface_and_is_recorded",
+      "frame_data_is_resolution_independent_once_frozen",
+      "general_spine_becomes_certifiedpatch_not_refused_for_promotion",
+      "rmf_quintic_constructor_refuses_pending",
+      "ph_arclength_matches_f64_integration_ground_truth"
+    ],
+    "command": "cargo test -p truck-geometry -p truck-modeling --lib --tests --no-fail-fast --locked -> all green; constructive_spine_enum 8/8 passed. (Re-run fresh-target to rule out slot-target cache poison; also green.)"
+  },
+  "verification": {
+    "fmt": "rustfmt --check on all 11 packet files: clean (exit 0).",
+    "crate_check": "cargo check -p truck-geometry -p truck-modeling --tests --locked: clean.",
+    "workspace_check": "fresh-target `cargo check --workspace --all-targets --exclude look --locked`: Finished, zero errors (one pre-existing unused_qualifications warning in truck-meshalgo, outside the write set). The `look` package (wgpu closure) is excluded ONLY because the slot's shared target dir is cache-poisoned for the wgpu/ash dependency closure (rotating E0460 'possibly newer version of crate ash/wgpu_core', E0463, and rmeta-stub errors on untouched crates such as truck-stepio and look examples); a fresh-target run of the truck workspace builds every truck crate including truck-certified/truck-stepio/truck-meshalgo/truck-shapeops green, which is the rename's actual ripple surface.",
+    "clippy_packet_files": "cargo clippy -p truck-geometry -p truck-modeling --all-targets --message-format=short --no-deps --locked: ZERO findings in any packet file (slot-target and fresh-target both clean). All earlier findings (needless_range_loop, large_enum_variant, is_multiple_of, manual ok, needless return, assertions_on_constants) fixed.",
+    "house_rules_parity": "H-1: spine_ph.rs and constructive_spine_enum.rs carry #![deny(clippy::unwrap_used)] and no unwrap/expect/panic!/module-level allow (test values extracted via a real-predicate assert + divergent return arm, so clippy is silent). H-3: every bare absolute 1e-? literal on an added line carries a same-line `// H-3` (consts carry it on their line). H-4: no debug_new / cfg!(debug_assertions) semantics added."
+  },
+  "deviations": [
+    {
+      "id": "K1_EVIDENCE_UNREACHABLE_FROM_GEOMETRY",
+      "derivation": "AMENDMENT r3 spells the RrmfQuintic deferral as RefusalEvidence::Predicate{name} wrapped as RefusalKind::Budget with backing Inconclusive. Those K1 types live in truck-certified (kernel/evidence.rs), which depends on truck-geometry - the reverse dependency does not exist and cannot be added within the write set. The deferral is therefore spelled geometry-locally as PendingMembership { predicate: &'static str } with associated consts KIND=\"Budget\" and BACKING=\"Inconclusive\" and the stable predicate name `rrmf_membership_pending_external_characterization`; the module doc records the mapping onto the K1 vocabulary at the certified boundary. No parallel validation universe was created: the constructive layer's refusals reach the evidence world through the existing ConstructError -> Refusal mapping.",
+      "verbatim": "pub struct PendingMembership { pub predicate: &'static str } with RRMF_MEMBERSHIP_PENDING / KIND / BACKING consts; RrmfQuintic::try_new always returns Err(PendingMembership { predicate: RRMF_MEMBERSHIP_PENDING })"
+    },
+    {
+      "id": "PH_EXACT_FRAME_AT_THE_PHSPINE_LEVEL",
+      "derivation": "Section 5.3's 'For Spine::Ph: the exact rational rotation-minimizing frame' is delivered at the PhSpine level (RmErfSeptic::frame_at returns the exact ER frame, which IS the RMF for members) rather than through the generic recipe dispatcher. The landed recipe evaluator is generic over `S: SpineCurve` and specialization-free Rust cannot branch on `S == Spine::Ph` there, so the dispatcher keeps routing ParallelTransport through the declared-level double reflection for every `S: SpineCurve`, and a doc note records the section-5.10 closed-surface seam for Ph-frame routing. No test in the packet or the landed suites constructs a Ph spine in a recipe under ParallelTransport, so the seam is not observable.",
+      "verbatim": "recipe.rs frame(): FrameLaw::ParallelTransport arm comment records the seam; PhSpine::frame_at exposes the exact frame"
+    },
+    {
+      "id": "RMERFSEPTIC_MEMBERSHIP_SCOPE",
+      "derivation": "Membership (tau == 0) is complete for every net whose cubic preimage is recovered by the d*A == sigma*A*i identity solve (the frame and spin are constant-complex-gauge invariant, so the recovered gauge does not matter). The admitted test fixtures are the planar degenerate family the r3 amendment admits (flagged degenerate in the fixture doc); the non-degenerate spatial fixture family remains the deferred M3 characterization. The refusal fixture is a genuine spatial degree-7 PH curve with tau(w) = 2(1-w^4) != 0, refused as SepticMembership::NotErfRmf.",
+      "verbatim": "RmErfSeptic::try_new validates structural + PH (|c'|^2 == sigma^2 square-root identity) + membership (tau == 0 coefficient identity); frame_at returns the exact rational ER frame; arc_length integrates the polynomial speed exactly"
+    },
+    {
+      "id": "FRAMEDATA_SERDE_SCHEMA",
+      "derivation": "SpineFrameRecipe's manual Serialize/Deserialize (decorators/spine_frame.rs) now round-trips the fourth field frame_data: FrameData (FrameData derives Serialize/Deserialize). Serialized recipes gain the field; there is no persisted backward-compatibility contract in-tree.",
+      "verbatim": "serialize_struct(\"SpineFrameRecipe\", 4) with spine/profile_law/frame_law/frame_data"
+    }
+  ],
+  "notes": [
+    "PH tests are non-circular: the fixture nets are built in the test file by independent power-basis arithmetic (integrate A*i*A* for the declared preimage, degree-elevate to a 7-control net), and the fixture premises (tau==0 / tau!=0, speed sigma = 1+w^2 so L(1)=4/3) are asserted with the test's own polynomial code before the library is consulted.",
+    "The FrameData default (64) reproduces landed bit-identical transport: the station-grid generation loop in frame_transport.rs is unchanged from the pre-C1DELTA code, with the hardcoded count replaced by the parameter whose default is FrameData::DEFAULT_REFINEMENT_LEVEL = 64.",
+    "general-spine promotion test constructs a recipe over Spine::General(Box<dyn SpineCurve>) holding a cubic B-spline Curve (sampled, no refusal) and realizes the same spine as its canonical Curve carrier through SpineFrameSurface / SpineFrameCurve (evaluated, trajectory-on-surface checked).",
+    "Commit 0d8c2d1 uses the packet's required subject. PACKET.md and CONTEXT.md remain untracked at the worktree root; RESULT.json is filed here per the packet's done-when."
+  ]
+}
