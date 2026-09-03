@@ -71,12 +71,23 @@ def slot_states():
             if len(parts) >= 4 and parts[3].startswith("packet="):
                 pkt = parts[3][len("packet="):].removesuffix(".md")
             if pkt:
-                has_result = os.path.isfile(os.path.join(
-                    ROOT, "loop", "slots", parts[1], "wt", "RESULT.json"))
-                if parts[2] == "RUNNING" or has_result:
+                res = os.path.join(ROOT, "loop", "slots", parts[1],
+                                   "wt", "RESULT.json")
+                res_id = None
+                if os.path.isfile(res):
+                    try:
+                        with open(res, encoding="utf-8-sig") as f:
+                            rj = json.load(f)
+                        res_id = (rj.get("packet") or rj.get("id") or "")
+                    except Exception:
+                        res_id = "?unreadable"
+                if parts[2] == "RUNNING" or res_id == pkt:
                     assigned.add(pkt)
+                elif res_id is None:
+                    dead.add(pkt)  # no RESULT: the dispatch died
                 else:
-                    dead.add(pkt)
+                    assigned.add(pkt)  # a STALE RESULT from another packet:
+                    # the slot needs manual cleanup, not an auto-dispatch
     return states, assigned, dead
 
 
