@@ -152,3 +152,4 @@
 {"id":"BG-KV2-205-C5PATCH","verdict":"LANDED-WAVE2","commit":"20e223f","note":"CoonsSurface CertifiedPatch impl; first mod.rs conflict, resolved both-lines"}
 {"id":"BG-KV2-206-N3CERT","verdict":"LANDED-WAVE2","commit":"43721c8","note":"arity-3 C1 carrier; worker skipped commit step, orchestrator committed as delivered (recorded)"}
 {"id":"BG-KV2-202-S1A","verdict":"LANDED-WAVE2","commit":"483b593","note":"R8/R9 residuals; second skipped-commit-step occurrence (recorded)"}
+{"id":"BG-KV2-203-C1DELTA","verdict":"LANDED-WAVE2","commit":"0d8c2d1","note":"Spine enum + septic PH + FrameData + rename; two stops fed the amendments; merged-HEAD workspace check green"}
