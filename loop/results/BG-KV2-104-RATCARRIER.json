@@ -1,0 +1,49 @@
+{
+  "id": "BG-KV2-104-RATCARRIER",
+  "class": "design",
+  "status": "done",
+  "branch": "packet/BG-KV2-103-IDENTITY",
+  "head": "3cec37d",
+  "summary": "Land the Wave-1 rational half-angle carriers in truck-certified: new kernel/rational.rs implements CertifiedPatch for the shim's RationalCarrier over the Plane, Sphere, and Cylinder rational forms (N4-safe, no transcendental on any enclosure path), with a refusing admit() gate carrying the named pending refusal for Cone/Torus (BG-KV2-104-RATCARRIER).",
+  "stop_conditions": {
+    "triggered": false,
+    "details": [
+      "1: no shim shape mismatch — leaf.rs RationalCarrier/RationalCarrierKind/CarrierData and patch.rs CertifiedPatch (+ C2/C3 subtraits, weight_bound Option<ClaimVerdict<CertifiedPositive, Pole, Reason>>, regularity ClaimVerdict<CertifiedPositive, Degeneracy, Reason>) match the packet quotes exactly; the impl block lives in rational.rs, leaf.rs is untouched.",
+      "2: no enclosure needed a transcendental call — every derivative closed form was differentiated once by hand (plane constants; sphere q_u/q_v; cylinder half-angle + constant axial axis), all interval evaluation is over the landed CertifiedInterval, and the machine-checked source scan pins the module clean.",
+      "3: the rational sphere's regularity certified on a legitimate full chart box — over the [-1, 1]^2 unit-sphere chart box the certified EG - F^2 = 16/w^4 lower bound is ~0.1975 > 0 (Proven); the comparison was not loosened to force the result."
+    ]
+  },
+  "files_written": [
+    "vendor/truck/truck-certified/src/kernel/rational.rs",
+    "vendor/truck/truck-certified/src/kernel/mod.rs",
+    "vendor/truck/truck-certified/tests/kernel_rational.rs"
+  ],
+  "anchors_after": {
+    "A1_pub_enum_rational_carrier_kind": 1,
+    "A2_pub_trait_certified_patch": 3,
+    "A3_pub_mod_kernel_in_lib": 1,
+    "A4_rational_dot_rs_in_kernel_mod": 0,
+    "A5_pub_struct_certified_interval": 1
+  },
+  "tests": {
+    "required_7": "all present and green in tests/kernel_rational.rs: sphere_rational_param_matches_implicit_form_on_grid, cylinder_rational_param_matches_implicit_form_on_grid, enclosures_contain_sampled_points_all_three_carriers, regularity_proven_away_from_the_rational_degeneration, weight_bound_proven_denominator_separated_from_zero, no_transcendental_call_in_rational_module, cone_variant_refuses_pending_its_packet",
+    "lib_tests": "566 passed (0 failed)",
+    "integration": "all truck-certified integration targets green incl. kernel_rational 7 passed and kernel_contract 16 passed (10 integration targets, 100 tests, 0 failed)",
+    "command": "cargo test -p truck-certified --lib --tests --no-fail-fast --locked"
+  },
+  "verification": {
+    "fmt": "cargo fmt -p truck-certified -- --check clean; note: cargo fmt --all -- --check still flags PRE-EXISTING out-of-write-set drift at HEAD on examples/step_face_timing.rs and tests/geometry_fingerprint.rs (untouched, outside the write set)",
+    "crate_check": "cargo check -p truck-certified --all-targets --locked: Finished, zero errors (also clean under --release)",
+    "workspace_check": "cargo check --workspace --all-targets --locked: Finished, zero errors",
+    "clippy_packet_files": "cargo clippy -p truck-certified --lib --tests --no-deps --message-format=short: zero findings referencing kernel/rational.rs, kernel/mod.rs, or tests/kernel_rational.rs. Two findings in the new file were fixed: manual-ok in positive_bound (now CertifiedPositive::try_new(lo).ok()) and result_large_err on admit() (allowed inline with the BG-KV2-000 justification comment: Refusal carries Option<PartialGraph> by the frozen §2 shape). Remaining clippy errors are pre-existing baseline lints in formal/domain/... (neg_cmp_op_on_partial_ord, approx_constant, unwrap_err, useless vec!, ...) — the same baseline population the shim recorded; none touch the packet's files.",
+    "env": "CARGO_BUILD_JOBS=4 on every cargo invocation"
+  },
+  "notes": [
+    "Chart model: box coordinates ARE the rational chart parameters. Plane X = origin + u*u_dir + v*v_dir; Sphere = the stereographic chart center + radius*(2u, 2v, 1-u^2-v^2)/(1+u^2+v^2); Cylinder = the half-angle chart origin + v*axis + radius*((1-u^2)e1 + 2u*e2)/(1+u^2) with v axial linear. Homogeneous (P, w) carried through every enclosure and divided once at the end (N5); the weight split check is still made where it cannot fail (N6).",
+    "Regularity/weight use the collapsed hand algebra of the derivative closed forms (sphere EG-F^2 = 16 r^4/w^4, cylinder 4 r^2/w^2, plane |cross|^2), because the raw interval product of the derivative enclosures is dependency-widened to non-certifying on any finite chart box; documented in-module.",
+    "Cylinder axis scope (Wave 1): an exactly rational orthonormal circle frame exists only for axes that are exactly a coordinate axis (any other unit axis would need a transcendental normalization, which N4 bans in this module). Non-coordinate cylinder axes and the Cone/Torus forms refuse admit() with CarrierSingularity (Disproven) carrying RefusalEvidence::Predicate (cone_torus_carrier_packet_pending / cylinder_axis_not_coordinate_wave1); in the claim layer the same situations surface as ClaimVerdict::Inconclusive with the same names, and enclose/derivs/normal_cone return the module's NaN no-certified-patch markers for carriers that never pass admit.",
+    "Sphere chart degeneration: the chart's single missing point is the point at infinity, so no finite chart box degenerates; a box reaching the degeneration (coordinates so large the certified arithmetic is no longer finite, e.g. [-1e200, 1e200]^2) refuses the Proven regularity claim (Inconclusive), machine-checked by regularity_proven_away_from_the_rational_degeneration.",
+    "Denominators are bounded below by 1 by construction; weight_bound returns Some(Proven) with a certified positive lower bound >= 1 (plane exactly CertifiedPositive(1.0) per the frozen spelling) on every chart box.",
+    "Toolchain rustc 1.97.1, no rust-toolchain pin; committed on the current branch with the packet's required subject; RESULT.json filed at the worktree root after the commit."
+  ]
+}
