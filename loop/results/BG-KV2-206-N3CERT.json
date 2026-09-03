@@ -1,0 +1,52 @@
+{
+  "id": "BG-KV2-206-N3CERT",
+  "class": "design",
+  "crates": ["truck-certified"],
+  "status": "done",
+  "summary": "Add the arity-3 C1 carrier additively (the recorded spelling deviation, same class as PsiMapKind): certs.rs gains `pub struct PointCert3 { residual: ResidualId, box_: crate::kernel::patch::IBox3, rho: f64 }` with the frozen gate (`rho <= RHO_MAX` Conditioning/Inconclusive, non-finite rho NonFinite/Disproven, non-finite box NonFinite/Disproven); engine.rs appends `pub fn krawczyk_c1_n3(g: &dyn SquareResidualEval, b: IBox3, w: &[CertifiedPositive]) -> ClaimVerdict<PointCert3, Refusal, Reason>` reusing the S2A module internals already in the file (M3/Iv3, matmul3_iv, matvec3_iv, mag, classify_axis/Inclusion) plus newly appended interval adjugate/det helpers (det3_iv, inv3_iv, centre3, radii3, centred_dx3, rho3); the Disproven/Inconclusive backing table is identical to krawczyk_c1's and the engine stamps ResidualId::R1 (the caller rebuilds through PointCert3::try_new with its own id, the documented one-line seam verbatim from S2A). No existing type or test changed. The three required tests land in tests/kernel_engine.rs.",
+  "stop_conditions": {
+    "triggered": false,
+    "details": [
+      "1 (adding PointCert3 breaks an exhaustive match or a pinning test over the certificate types): not triggered - PointCert3 is a new standalone struct and no source match or integration test enumerates the certificate structs exhaustively (the only source-parsing pin tests are over the RefusalKind/TopoNode/SegmentBreak ENUM bodies, which this packet does not touch); nothing needed amending.",
+      "2 (S2A engine internals not reusable for the n=3 entry without restructuring): not triggered - the same module already implements the 3x3 interval matrix discipline (M3, matmul3_iv, matvec3_iv for the tube's D_yF block, plus mag/classify_axis/Inclusion), so the n=3 C1 arm reuses them directly; only the interval 3x3 adjugate/det inverse (det3_iv/inv3_iv) and the IBox3 centre/radii/rho helpers were appended, mirroring the 2D entry's op order."
+    ]
+  },
+  "files_written": [
+    "vendor/truck/truck-certified/src/kernel/certs.rs",
+    "vendor/truck/truck-certified/src/kernel/engine.rs",
+    "vendor/truck/truck-certified/tests/kernel_engine.rs"
+  ],
+  "anchors_before": {
+    "A1_pub_fn_krawczyk_c1_in_engine_rs": 1,
+    "A2_pub_struct_PointCert_in_certs_rs": 1,
+    "A3_PointCert3_in_certs_rs": 0
+  },
+  "anchors_after": {
+    "A1_pub_fn_krawczyk_c1_in_engine_rs": 1,
+    "A2_pub_struct_PointCert_prefix_in_certs_rs": 2,
+    "A3_PointCert3_in_certs_rs": 3,
+    "krawczyk_c1_n3_spellings_in_engine_rs": 3
+  },
+  "tests_required": {
+    "point_cert3_try_new_enforces_rho_and_finite_box": "pass",
+    "krawczyk_c1_n3_proves_a_known_3var_root": "pass",
+    "krawczyk_c1_n3_backing_matches_the_2d_table": "pass"
+  },
+  "tests_command": "cargo test -p truck-certified --lib --tests --no-fail-fast --locked -> all green: lib 566 passed, all 13 integration suites 0 failed incl. kernel_engine 12 passed (the 3 new tests + the 9 landed ones); kernel_engine alone: 12 passed",
+  "verification": {
+    "cargo_test_p_truck_certified_lib_tests_no_fail_fast": "green (566 lib + 12 integration suites, 0 failures)",
+    "cargo_check_workspace_all_targets": "cargo check --workspace --all-targets --locked: Finished, zero errors",
+    "cargo_fmt": "the three packet files are rustfmt-clean (cargo fmt --all made no change to them); whole-workspace `cargo fmt --all -- --check` reports ONLY the pre-existing out-of-write-set drift in examples/step_face_timing.rs and tests/geometry_fingerprint.rs, which are unchanged by this packet and were reverted to HEAD",
+    "clippy": "cargo clippy -p truck-certified --locked --all-targets -- -D warnings: ZERO diagnostics reference kernel/certs.rs, kernel/engine.rs, or tests/kernel_engine.rs. The emitted error population is entirely pre-existing baseline findings in unrelated vendored modules (formal/*, domain/*, source_evidence.rs) that fail under the locally installed clippy 1.97.0 (the tree carries no rust-toolchain pin); none touch this packet's files, and there were zero real compile errors (error[E...]=0).",
+    "H1": "no unwrap/expect/panic! added to certs.rs or engine.rs; item-level #[allow(clippy::result_large_err)] with the frozen-shape justification comment only, no module-level allow",
+    "H3": "no bare absolute length literal appears in the added comparison code; float comparisons use the constructed boxes' own bounds and exact equality, so no new // H-3 opt-out was needed",
+    "env": "CARGO_BUILD_JOBS=4, rustc 1.97.1 (no rust-toolchain pin), host x86_64-pc-windows-gnullvm, no --target flag passed"
+  },
+  "notes": [
+    "JUDGEMENT (recorded): additive arity-3 carrier. The spec's §8.2/§16 C1 is n-generic ('Square residual R : R^n -> R^n', PointCert { box_: IBox }), while the frozen shim's PointCert.box_ is IBox2 (already consumed by identity.rs/engine.rs/fixtures). This packet lands the n=3 spelling as the standalone additive type PointCert3 (box_: IBox3) without changing PointCert, exactly the recorded deviation class used for PsiMapKind. engine.rs's module-level 'no typed Proven carrier yet' prose is left as the pre-packet record (append-only work); krawczyk_c1_n3's own doc comment records that this packet now supplies the typed carrier.",
+    "The R8-shaped known-root fixture is a raw SquareResidualEval (no R8System - that is S1A's): the line C(t) = (t, t, t - 1) pierces the plane S(u,v) = (u, v, 0) exactly at (t,u,v) = (1,1,1); H(t,u,v) = (t - u, t - v, t - 1) with constant Jacobian [[1,-1,0],[1,0,-1],[1,0,0]] (det = 1, transverse C' not in the tangent plane). The box [0.9,1.1]^3 is centred on the root and certifies Proven with rho <= RHO_MAX.",
+    "krawczyk_c1_n3 replicates krawczyk_c1's op order at n=3 over CertifiedInterval (every op widened by next_down/next_up): midpoint-Jacobian interval inverse via adjugate over determinant, K = z - A R(z) + (I - A DR(B))(B - z), strict-inside/disjoint/overlap classification, and Lemma 8.0's rate rho = max_i (M r)_i / r_i. Backing table parity is pinned by the test mirroring the 2D entries: disjoint image -> Disproven (ClaimRefuted, backing Disproven); boundary-touching non-strict image -> Inconclusive (the outward-rounded point interval straddles the boundary, so it is Overlap, never Disproven).",
+    "The no_transcendental_call_in_engine_module scan still passes after the append (the added code performs no sin/cos/atan2/exp/ln/log/powf and no sqrt), so the N4 bit-reproducibility record of engine.rs is preserved.",
+    "Uncommitted in this worktree; the orchestrator commits with the packet's required subject. PACKET.md, CONTEXT.md, and RESULT.json remain untracked."
+  ]
+}
