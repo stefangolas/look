@@ -744,18 +744,57 @@ fn kernel_minors(rows: [[f64; 4]; 3]) -> [f64; 4] {
     [d0, d1, d2, d3]
 }
 
+/// The dot product of two 4-vectors.
+fn dot4(a: &[f64; 4], b: &[f64; 4]) -> f64 {
+    a[0] * b[0] + a[1] * b[1] + a[2] * b[2] + a[3] * b[3]
+}
+
 /// §8.1/§11 frame construction: `q_tau = m/||m||` (IEEE sqrt, deterministic),
-/// the perpendicular basis by Gram–Schmidt in FIXED index order, and the
-/// `a = [DF(ẑ) Q_⊥]⁻¹` preconditioner (embedded as the 4x4 `Frame` field with
-/// the tangent axis carried identically).
+/// the perpendicular basis by TWO-PASS (reorthogonalized) Gram–Schmidt in
+/// FIXED index order, and the `a = [DF(ẑ) Q_⊥]⁻¹` preconditioner (embedded as
+/// the 4x4 `Frame` field with the tangent axis carried identically).
+///
+/// Two passes drive the residual perpendicular–tangent dot products to machine
+/// precision for every non-degenerate input, so the §8.1 orthonormality gate
+/// (in the frozen [`Frame::try_new`]) is not tripped by rounding near
+/// degenerate seeds. If a residual dot still exceeds [`TOL_JACOBIAN`] after two
+/// passes, the input is genuinely near-rank-collapse and this refuses
+/// `Conditioning` (Inconclusive) — the caller subdivides (spec §9.2's `k_a`
+/// discipline does not apply here; the seed quality is the caller's).
 ///
 /// Returns the frame and the float kernel direction `m`. If `||m||` is below
 /// the normative floor (rank 2 territory) or the frame Jacobian block is
 /// singular, refuses `Conditioning` (Inconclusive) — the caller subdivides or
 /// switches coordinate; rank 2 is S0/S5a territory, not this packet's.
+///
+/// The frame's κ estimate (the §0.4 conditioning measure `||DF(ẑ)Q_⊥||·||(DF(ẑ)
+/// Q_⊥)⁻¹||`, compared against [`KAPPA_MAX`] by the tube seam) is not carried
+/// by the frozen tuple; it is reported through [`frame4_kappa_report`].
 // Refusal carries Option<PartialGraph> by frozen §2 shape; large-Err is allowed (BG-KV2-000).
 #[allow(clippy::result_large_err)]
 pub fn build_frame4(system: &SquareSystem3, z_hat: [f64; 4]) -> Construction<(Frame<4>, [f64; 4])> {
+    let built = frame4_impl(system, z_hat)?;
+    Ok((built.frame, built.m))
+}
+
+/// The outcome of a §8.1 frame construction: the frame, the float kernel
+/// direction `m`, and the frame's κ estimate (the conditioning measure the
+/// tube seam compares against [`KAPPA_MAX`]).
+#[derive(Debug, Clone, Copy)]
+struct FrameBuild4 {
+    /// The §8.1 frame.
+    frame: Frame<4>,
+    /// The float maximal-minor kernel direction at `z_hat`.
+    m: [f64; 4],
+    /// The κ estimate `||DF(ẑ)Q_⊥||_∞ · ||(DF(ẑ)Q_⊥)⁻¹||_∞` of the frame.
+    kappa: f64,
+}
+
+/// The two-pass (reorthogonalized) Gram–Schmidt body shared by
+/// [`build_frame4`] and [`frame4_kappa_report`].
+// Refusal carries Option<PartialGraph> by frozen §2 shape; large-Err is allowed (BG-KV2-000).
+#[allow(clippy::result_large_err)]
+fn frame4_impl(system: &SquareSystem3, z_hat: [f64; 4]) -> Result<FrameBuild4, Refusal> {
     if !z_hat.iter().all(|c| c.is_finite()) {
         return Err(engine_refusal(
             RefusalKind::NonFinite,
@@ -786,7 +825,13 @@ pub fn build_frame4(system: &SquareSystem3, z_hat: [f64; 4]) -> Construction<(Fr
     let norm = norm_sq.sqrt();
     let q_tau = [m[0] / norm, m[1] / norm, m[2] / norm, m[3] / norm];
 
-    // Deterministic Gram-Schmidt over the fixed candidate order e_0..e_3.
+    // Deterministic TWO-PASS Gram-Schmidt over the fixed candidate order
+    // e_0..e_3. Each candidate is projected against the accepted basis twice
+    // (reorthogonalization): one pass leaves residual dot products at the
+    // rounding level of the seed (1e-11..1e-9 near degenerate seeds); the
+    // second drives them to machine precision. A residual dot that still
+    // exceeds TOL_JACOBIAN after two passes is a genuine near-rank-collapse
+    // seed: refuse Conditioning (the caller subdivides).
     let mut perp: Vec<[f64; 4]> = Vec::with_capacity(3);
     let mut basis: Vec<[f64; 4]> = vec![q_tau];
     for k in 0..4 {
@@ -796,10 +841,12 @@ pub fn build_frame4(system: &SquareSystem3, z_hat: [f64; 4]) -> Construction<(Fr
         let mut e = [0.0f64; 4];
         e[k] = 1.0;
         let mut v = e;
-        for fixed in &basis {
-            let dot = v[0] * fixed[0] + v[1] * fixed[1] + v[2] * fixed[2] + v[3] * fixed[3];
-            for j in 0..4 {
-                v[j] -= dot * fixed[j];
+        for _pass in 0..2 {
+            for fixed in &basis {
+                let dot = dot4(&v, fixed);
+                for j in 0..4 {
+                    v[j] -= dot * fixed[j];
+                }
             }
         }
         let v_norm_sq = v[0] * v[0] + v[1] * v[1] + v[2] * v[2] + v[3] * v[3];
@@ -808,6 +855,22 @@ pub fn build_frame4(system: &SquareSystem3, z_hat: [f64; 4]) -> Construction<(Fr
         }
         let v_norm = v_norm_sq.sqrt();
         let unit = [v[0] / v_norm, v[1] / v_norm, v[2] / v_norm, v[3] / v_norm];
+        if basis
+            .iter()
+            .any(|fixed| dot4(&unit, fixed).abs() > TOL_JACOBIAN)
+        {
+            // Two full passes still leave a residual dot above the gate: the
+            // candidate is not separable from the accepted basis at the
+            // required precision — a genuinely near-rank-collapse seed.
+            return Err(engine_refusal(
+                RefusalKind::Conditioning,
+                "frame_two_pass_residual_above_gate",
+                "after two Gram-Schmidt passes a perpendicular candidate still has a residual \
+                 dot above TOL_JACOBIAN: the seed is genuinely near-rank-collapse (the caller \
+                 subdivides)"
+                    .to_string(),
+            ));
+        }
         basis.push(unit);
         perp.push(unit);
     }
@@ -819,7 +882,9 @@ pub fn build_frame4(system: &SquareSystem3, z_hat: [f64; 4]) -> Construction<(Fr
         ));
     }
 
-    // The perpendicular Jacobian block B = DF(z_hat)·Q_⊥ and its inverse.
+    // The perpendicular Jacobian block B = DF(z_hat)·Q_⊥, its inverse, and the
+    // frame's κ estimate (the §0.4 conditioning measure the tube seam compares
+    // against KAPPA_MAX — reported, not a build gate).
     let b: [[f64; 3]; 3] = {
         let mut out = [[0.0f64; 3]; 3];
         for r in 0..3 {
@@ -843,6 +908,15 @@ pub fn build_frame4(system: &SquareSystem3, z_hat: [f64; 4]) -> Construction<(Fr
             ))
         }
     };
+    let kappa = norm_inf3(b) * norm_inf3(a33);
+    if !kappa.is_finite() {
+        return Err(engine_refusal(
+            RefusalKind::Conditioning,
+            "frame_kappa_not_finite",
+            "the frame's kappa estimate is not finite".to_string(),
+        ));
+    }
+
     // The `Frame.a` field is N x N; embed the (N-1)x(N-1) preconditioner with
     // the tangent axis carried identically (row/column 3 = tau).
     let mut a = [[0.0f64; 4]; 4];
@@ -856,7 +930,39 @@ pub fn build_frame4(system: &SquareSystem3, z_hat: [f64; 4]) -> Construction<(Fr
     let q: [[f64; 4]; 4] = [q_tau, perp[0], perp[1], perp[2]];
     let q_perp: [[f64; 4]; 4] = [perp[0], perp[1], perp[2], q_tau];
     let frame = Frame::try_new(z_hat, q, q_tau, q_perp, a)?;
-    Ok((frame, m))
+    Ok(FrameBuild4 { frame, m, kappa })
+}
+
+/// The §8.1 conditioning report of a frame built at `z_hat` (BG-KV2-307):
+/// whether the frame's κ estimate crosses the §0.4 [`KAPPA_MAX`] rebuild bound.
+///
+/// A κ above [`KAPPA_MAX`] marks the frame rebuild-recommended in the
+/// certificate evidence (spec §10.1's rebuild rule: re-factor only when
+/// `κ(DF Q_⊥) > κ_max`). The build gate itself stays the orthonormality check
+/// in [`build_frame4`]; this report never refuses an orthonormal frame.
+#[derive(Debug, Clone, Copy)]
+pub struct FrameKappaReport {
+    /// The frame's κ estimate `||DF(ẑ)Q_⊥||_∞ · ||(DF(ẑ)Q_⊥)⁻¹||_∞`.
+    pub kappa: f64,
+    /// Whether `kappa > KAPPA_MAX` (frame rebuild-recommended, spec §10.1).
+    pub rebuild_recommended: bool,
+}
+
+/// Build the §8.1 frame at `z_hat` and report its κ estimate. Refuses exactly
+/// as [`build_frame4`] does; the report is additive (the frozen seam tuple is
+/// unchanged).
+// Refusal carries Option<PartialGraph> by frozen §2 shape; large-Err is allowed (BG-KV2-000).
+#[allow(clippy::result_large_err)]
+pub fn frame4_kappa_report(
+    system: &SquareSystem3,
+    z_hat: [f64; 4],
+) -> Construction<(Frame<4>, FrameKappaReport)> {
+    let built = frame4_impl(system, z_hat)?;
+    let report = FrameKappaReport {
+        kappa: built.kappa,
+        rebuild_recommended: built.kappa > KAPPA_MAX,
+    };
+    Ok((built.frame, report))
 }
 
 // ---------------------------------------------------------------------------
@@ -1314,6 +1420,330 @@ pub fn c2_certify_tube4(
     ) {
         Ok(cert) => ClaimVerdict::Proven(cert),
         Err(refusal) => ClaimVerdict::Disproven(refusal),
+    }
+}
+
+// ---------------------------------------------------------------------------
+// The tube-reach envelope probe (BG-KV2-307-ENGINEREACH §2): a PUBLISHED
+// characteristic, profiled not tuned against (spec §18 discipline)
+// ---------------------------------------------------------------------------
+
+/// The probe's starting forward arc width (a proposal constant, H-3): the
+/// tracer's §10.1 default `arc_step0`, reused verbatim so the probe and the
+/// march probe the same envelope.
+const PROBE_ARC_STEP0: f64 = 0.05; // H-3: reach-probe start width (= TracePolicy default arc_step0)
+
+/// The probe's perpendicular half-width ratio (a proposal constant, H-3): the
+/// tracer's `PERP_RATIO` — the S4A observation the probe confirms or corrects.
+const PROBE_PERP_RATIO: f64 = 3.0; // H-3: reach-probe perpendicular half-width ratio
+
+/// The halving floor of the tau-width search: below this width a seed has no
+/// certifiable forward arc (a probe floor, H-3; far below the tracer's dtau
+/// floor so curved "hard parts" are still measurable).
+const PROBE_MIN_WIDTH: f64 = 1e-6; // H-3: reach-probe width search floor
+
+/// The bisection iterations of each reach search (a probe precision setting,
+/// H-3).
+const PROBE_BISECT_ITERS: u32 = 60; // H-3: reach-probe bisection iterations
+
+/// The relative tolerance that declares the tau reach chart-limited (a probe
+/// precision setting, H-3).
+const PROBE_CHART_LIMITED_REL: f64 = 1e-3; // H-3: reach-probe chart-limit relative tolerance
+
+/// The measured single-frame tube-reach envelope of a seed (BG-KV2-307 §2).
+///
+/// The envelope is a PUBLISHED characteristic of the frozen tube seam: it is
+/// profiled, never tuned against. Both searches replicate the tracer's
+/// proposal discipline (one Gauss–Newton predictor step reusing `Frame::a`,
+/// perpendicular half width [`PROBE_PERP_RATIO`] times the arc width) so the
+/// published numbers describe what the march can actually certify from the
+/// seed's single frame.
+#[derive(Debug, Clone)]
+pub struct ProbeReport {
+    /// Whether the seed framed at all (false when `build_frame4` refused).
+    pub frame_ok: bool,
+    /// A machine-readable note (predicate name) when the seed did not frame or
+    /// the probe hit a degenerate edge; `None` on a clean measurement.
+    pub note: Option<String>,
+    /// The frame's κ estimate at the seed (`||DF Q_⊥||_∞ · ||(DF Q_⊥)⁻¹||_∞`).
+    pub frame_kappa: f64,
+    /// Whether `frame_kappa > KAPPA_MAX` (frame rebuild-recommended, §10.1).
+    pub rebuild_recommended: bool,
+    /// The largest FORWARD arc width `[0, W]` the frozen tube certifies from
+    /// the seed frame at the [`PROBE_PERP_RATIO`] perpendicular half width.
+    pub tau_reach: f64,
+    /// Whether `tau_reach` saturates the forward chart room (the certified
+    /// reach is chart-boundary-limited rather than certificate-limited).
+    pub tau_reach_chart_limited: bool,
+    /// Whether no positive arc width certified down to [`PROBE_MIN_WIDTH`].
+    pub no_reach: bool,
+    /// The reference arc width the perpendicular probe ran at (equal to the
+    /// measured `tau_reach`, or 0 when there is no certified reach to probe).
+    pub perp_probe_width: f64,
+    /// The smallest perpendicular half width at which the reference arc still
+    /// certifies (the inverse of the S4A "3x width" observation).
+    pub perp_half_min: f64,
+    /// `perp_half_min / perp_probe_width`: the measured minimum perpendicular
+    /// ratio, confirming or correcting the ~3x observation.
+    pub perp_ratio_min: f64,
+}
+
+/// A single certified unit weight bound (the tracer's §7.1 value argument).
+fn probe_weight() -> Option<CertifiedPositive> {
+    CertifiedPositive::try_new(1.0).ok()
+}
+
+/// The certified float value of the three residual components at a chart point
+/// (the midpoint of the certified enclosure over the degenerate point box).
+fn float_residual_mid(sys: &SquareSystem3, point: [f64; 4]) -> Option<[f64; 3]> {
+    let values = system_values(sys, point_box(point)).ok()?;
+    let mut out = [0.0f64; 3];
+    for (k, out_k) in out.iter_mut().enumerate() {
+        *out_k = 0.5 * (values[k].lo + values[k].hi);
+        if !out_k.is_finite() {
+            return None;
+        }
+    }
+    Some(out)
+}
+
+/// One Gauss–Newton predictor step reusing the seed factorization (`Frame::a`)
+/// — the tracer's cheap-predictor rule (§10.1). Float proposal data only.
+fn probe_predict_y(frame: &Frame<4>, sys: &SquareSystem3, tau: f64) -> Option<[f64; 3]> {
+    let p = chart_point(frame, tau, [0.0, 0.0, 0.0]);
+    let f = float_residual_mid(sys, p)?;
+    let mut y = [0.0f64; 3];
+    for (r, row) in frame.a.iter().take(3).enumerate() {
+        let mut acc = 0.0f64;
+        for (aa, ff) in row.iter().take(3).zip(f.iter()) {
+            acc += aa * ff;
+        }
+        y[r] = -acc;
+    }
+    if y.iter().all(|v| v.is_finite()) {
+        Some(y)
+    } else {
+        None
+    }
+}
+
+/// Whether the frozen tube certifies the forward arc `[0, width]` from the
+/// seed frame with the given perpendicular half width (the tracer's proposal
+/// shape: the box is centred on the predicted arc-end centre).
+fn probe_arc_certifies(
+    sys: &SquareSystem3,
+    frame: &Frame<4>,
+    weight: &CertifiedPositive,
+    width: f64,
+    half_perp: f64,
+) -> bool {
+    if !width.is_finite() || width <= 0.0 || !half_perp.is_finite() || half_perp <= 0.0 {
+        return false;
+    }
+    let y_pred = match probe_predict_y(frame, sys, width) {
+        Some(y) => y,
+        None => return false,
+    };
+    let lo = [
+        y_pred[0] - half_perp,
+        y_pred[1] - half_perp,
+        y_pred[2] - half_perp,
+    ];
+    let hi = [
+        y_pred[0] + half_perp,
+        y_pred[1] + half_perp,
+        y_pred[2] + half_perp,
+    ];
+    let b_perp = match IBox::<3>::try_new(lo, hi) {
+        Ok(b) => b,
+        Err(_) => return false,
+    };
+    let i_tau = Interval { lo: 0.0, hi: width };
+    matches!(
+        c2_certify_tube4(sys, frame, i_tau, b_perp, std::slice::from_ref(weight)),
+        ClaimVerdict::Proven(_)
+    )
+}
+
+/// The chart room ahead of the seed along `+tau` (how far the forward arc may
+/// extend before the midpoint leaves the chart rectangle).
+fn probe_forward_room(sys: &SquareSystem3, frame: &Frame<4>) -> f64 {
+    let rects = chart_rects(sys);
+    let mut room = f64::INFINITY;
+    for ((&d, (lo, hi)), &z) in frame.q_tau.iter().zip(rects.iter()).zip(frame.z_hat.iter()) {
+        let rem = if d > 0.0 {
+            (hi - z) / d
+        } else if d < 0.0 {
+            (lo - z) / d
+        } else {
+            continue;
+        };
+        if rem.is_finite() {
+            room = room.min(rem);
+        }
+    }
+    room
+}
+
+/// Grow-then-halve with a closing bisection: find the largest forward arc
+/// width that certifies at the [`PROBE_PERP_RATIO`] perpendicular half width.
+fn probe_tau_reach(
+    sys: &SquareSystem3,
+    frame: &Frame<4>,
+    weight: &CertifiedPositive,
+) -> (f64, bool, bool) {
+    let ceiling = 0.999 * probe_forward_room(sys, frame);
+    let start = PROBE_ARC_STEP0.min(ceiling);
+    if !start.is_finite() || start <= PROBE_MIN_WIDTH {
+        return (0.0, false, true);
+    }
+    let certifies = |w: f64| probe_arc_certifies(sys, frame, weight, w, PROBE_PERP_RATIO * w);
+
+    let (mut lo, mut hi) = if certifies(start) {
+        // Grow on success (halving never runs on the growth side).
+        let mut w = start;
+        loop {
+            let next = (2.0 * w).min(ceiling);
+            if next <= w {
+                break (w, w);
+            }
+            if certifies(next) {
+                w = next;
+            } else {
+                break (w, next);
+            }
+        }
+    } else {
+        // Halve on failure down to the probe floor.
+        let mut w = start;
+        loop {
+            if certifies(w) {
+                break (w, start);
+            }
+            w *= 0.5;
+            if w < PROBE_MIN_WIDTH {
+                return (0.0, false, true);
+            }
+        }
+    };
+    if hi <= lo {
+        hi = ceiling;
+    }
+    // Close the interval with a deterministic bisection.
+    for _ in 0..PROBE_BISECT_ITERS {
+        let mid = 0.5 * (lo + hi);
+        if mid <= lo || mid >= hi {
+            break;
+        }
+        if certifies(mid) {
+            lo = mid;
+        } else {
+            hi = mid;
+        }
+    }
+    let chart_limited = ceiling.is_finite() && (ceiling - lo) <= PROBE_CHART_LIMITED_REL * ceiling;
+    (lo, chart_limited, lo <= 0.0)
+}
+
+/// The smallest perpendicular half width at which the reference arc still
+/// certifies (bisection between a degenerate radius 0 and the certifying
+/// [`PROBE_PERP_RATIO`] half width).
+fn probe_perp_min(
+    sys: &SquareSystem3,
+    frame: &Frame<4>,
+    weight: &CertifiedPositive,
+    width: f64,
+) -> Option<f64> {
+    if width <= 0.0 {
+        return None;
+    }
+    let hi_start = PROBE_PERP_RATIO * width;
+    if !probe_arc_certifies(sys, frame, weight, width, hi_start) {
+        return None;
+    }
+    let mut lo = 0.0f64;
+    let mut hi = hi_start;
+    for _ in 0..PROBE_BISECT_ITERS {
+        let mid = 0.5 * (lo + hi);
+        if mid <= lo || mid >= hi {
+            break;
+        }
+        if probe_arc_certifies(sys, frame, weight, width, mid) {
+            hi = mid;
+        } else {
+            lo = mid;
+        }
+    }
+    Some(hi)
+}
+
+/// Measure the tube-reach envelope of a seed (BG-KV2-307 §2): the largest
+/// forward `I_tau` width the frozen tube certifies from the seed's single
+/// frame at the [`PROBE_PERP_RATIO`] perpendicular half width, and the largest
+/// perpendicular half width at that tau width.
+///
+/// The returned [`ProbeReport`] is the PUBLISHED characteristic (spec §18):
+/// profile, do not tune against it.
+// Refusal carries Option<PartialGraph> by frozen §2 shape; large-Err is allowed (BG-KV2-000).
+#[allow(clippy::result_large_err)]
+pub fn tube_reach_probe(sys: &SquareSystem3, seed: [f64; 4]) -> ProbeReport {
+    let build = match frame4_impl(sys, seed) {
+        Ok(built) => built,
+        Err(refusal) => {
+            let note = match &refusal.evidence {
+                RefusalEvidence::Predicate { name, .. } => Some((*name).to_string()),
+                _ => Some("seed_frame_refused".to_string()),
+            };
+            return ProbeReport {
+                frame_ok: false,
+                note,
+                frame_kappa: f64::NAN,
+                rebuild_recommended: false,
+                tau_reach: 0.0,
+                tau_reach_chart_limited: false,
+                no_reach: true,
+                perp_probe_width: 0.0,
+                perp_half_min: f64::NAN,
+                perp_ratio_min: f64::NAN,
+            };
+        }
+    };
+    let frame = build.frame;
+    let weight = match probe_weight() {
+        Some(w) => w,
+        None => {
+            return ProbeReport {
+                frame_ok: true,
+                note: Some("probe_weight_unavailable".to_string()),
+                frame_kappa: build.kappa,
+                rebuild_recommended: build.kappa > KAPPA_MAX,
+                tau_reach: 0.0,
+                tau_reach_chart_limited: false,
+                no_reach: true,
+                perp_probe_width: 0.0,
+                perp_half_min: f64::NAN,
+                perp_ratio_min: f64::NAN,
+            }
+        }
+    };
+    let (tau_reach, chart_limited, no_reach) = probe_tau_reach(sys, &frame, &weight);
+    let perp_probe_width = if no_reach { 0.0 } else { tau_reach };
+    let (perp_half_min, perp_ratio_min) =
+        match probe_perp_min(sys, &frame, &weight, perp_probe_width) {
+            Some(h) => (h, h / perp_probe_width),
+            None => (f64::NAN, f64::NAN),
+        };
+    ProbeReport {
+        frame_ok: true,
+        note: None,
+        frame_kappa: build.kappa,
+        rebuild_recommended: build.kappa > KAPPA_MAX,
+        tau_reach,
+        tau_reach_chart_limited: chart_limited,
+        no_reach,
+        perp_probe_width,
+        perp_half_min,
+        perp_ratio_min,
     }
 }
 
