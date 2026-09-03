@@ -54,6 +54,11 @@ pub type SignCert = crate::formal::exact::CertifiedSign;
 
 pub mod certs;
 pub mod config;
+/// The certificate-calculus engine (BG-KV2-201-S2A): Lemma 8.0's rho, the
+/// generic square C1, the C2 tube, and frame construction. This is the wave-2
+/// real engine over the landed interval core; the shim shapes it emits are
+/// frozen in [`certs`].
+pub mod engine;
 pub mod evidence;
 /// The machine-checked fixture kit — test support only.
 #[doc(hidden)]
