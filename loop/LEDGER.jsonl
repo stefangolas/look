@@ -146,3 +146,4 @@
 {"id":"BG-KV2-000-CONTRACT","verdict":"ACCEPTED","base":"7c861ff","commit":"a5e3d04","merge":"fd65c24","note":"kernel-v2 shim; 3319 insertions; 16 contract tests + 566 lib green; GATE-2 H-3 amendment recorded"}
 {"id":"BG-KV2-102-LEAF","verdict":"LANDED-WAVE1","commit":"97ba812","note":"BezierLeaf extraction + CertifiedPatch impl; scoped-verified; merged-HEAD 673 green"}
 {"id":"BG-KV2-103-IDENTITY","verdict":"LANDED-WAVE1","commit":"fb18b4c","note":"identity rules + dyadic join; scoped-verified; merged-HEAD 673 green"}
+{"id":"BG-KV2-104-RATCARRIER","verdict":"LANDED-WAVE1","commit":"3cec37d","note":"rational carriers implement CertifiedPatch; merged-HEAD check green; Wave-1 COMPLETE (4/4)"}
