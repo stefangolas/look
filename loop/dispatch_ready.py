@@ -122,12 +122,19 @@ def main():
         if r["id"] in dead:
             # A dead dispatch holds nothing (no RESULT, no code): reset is
             # safe and the re-dispatch proceeds through the normal path.
+            # BUT reset-only RESTORES the filed RESULT.json (its semantics),
+            # so the stale file is removed AFTER the reset - otherwise the
+            # machinery resurrects the very file that marks the slot dead.
             s = slot_of.get(r["id"])
             if s:
                 sh([sys.executable, os.path.join(ROOT, "loop",
                     "run_packet.py"), "--slot", s, "--reset-only",
                     "--packet", os.path.join(ROOT, "loop", "packets",
                     r["id"] + ".md")])
+                res = os.path.join(ROOT, "loop", "slots", s, "wt",
+                                   "RESULT.json")
+                if os.path.isfile(res):
+                    os.remove(res)
                 free.append(s)
         needs = r.get("needs", [])
         unmet = [n for n in needs
