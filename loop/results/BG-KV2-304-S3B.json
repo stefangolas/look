@@ -1,0 +1,51 @@
+{
+  "id": "BG-KV2-304-S3B",
+  "class": "design",
+  "status": "done",
+  "branch": "packet/BG-KV2-304-S3B",
+  "head": "1d878f0",
+  "summary": "Land the Tier-2 Psi_a critical-point start set in truck-certified with the additive arity-4 C1 carrier (the N3CERT pattern, second application). The frozen SquareResidualEval seam now has an arity-4 arm: krawczyk_c1_n4 (engine.rs) mirrors krawczyk_c1/krawczyk_c1_n3 exactly on the 4x4 adjugate/det path, emitting the new PointCert4 (certs.rs, with the IBox4 box alias declared at the arity-4 carrier because patch.rs is outside this packet's write set). Tier-2 (kernel/tier2.rs, NEW) implements the §7 R3 minor-form residual PsiA(x) = (F(x), a.m(x)) over a stored SquareSystem3: the F value enclosure is stacked over the Theorem 6.4(iii) a.m enclosure (minor_algebra::minor_vector_encl + the landed a_dot_m over the engine's Jacobian enclosure), and the Jacobian's fourth row (the gradient of a.m) is assembled from a new certified Hessian tensor of the stored system (engine.rs, additive pub(crate) second-partial machinery) by the row-replacement expansion of the maximal-minor derivatives with Theorem 6.4's (-1)^j signs. tier2_start_set subdivides the 4D domain (exclusion first: 0 not-in the a.m enclosure - the §9.2/N7 cheap form; then the full-residual root-free sweep; then krawczyk_c1_n4), isolating every Psi_a zero (rebuilt R3 through the engine's documented one-line seam) under DEPTH_MAX with a CELL_BUDGET work bound. The §9.2 a-posteriori rule perturbs a through a fixed deterministic unit-norm table (no RNG) up to KA times; a caller direction that caps the bounded search (a persistent positive-dimensional zero set: every cell of the shrinking sub-box family carries zero) refuses TangentialCurve (§10.4 routing, never IncompleteStartSet), and a bounded isolated-but-unresolved stall that survives the KA perturbations refuses IncompleteStartSet (predicate pins ka=KA). All seven required tests are present and green in tests/kernel_tier2.rs over rational fixtures with non-dyadic ground truths (dyadic-aligned roots cannot be strict-included by a dyadic subdivision, so every fixture root coordinate is non-dyadic): the additive carrier gates, the loop fixture's two isolated Psi_a zeros, exclusion clearing curve-carrying/zero-free domains, the tangential-curve routing, the branch-crossing incomplete routing after KA, the Corollary 9.3 composition (boundary seeds cover the two boundary-meeting arc components and Psi_a certifies no interior critical point), and the N4 source scan.",
+  "stop_conditions": {
+    "triggered": false,
+    "details": [
+      "1: no frozen shape differs - the frozen SquareResidualEval seam, krawczyk_c1/krawczyk_c1_n3, PointCert/PointCert3, and the S2A engine internals are untouched; the arity-4 carrier (PointCert4/IBox4 in certs.rs) and krawczyk_c1_n4 are additive, and the engine only gains pub(crate) visibility on existing value/jacobian helpers plus a new second-partial/hessian tensor helper (no restructuring).",
+      "2: the 4x4 adjugate path needed only additive engine machinery (a det4/inv4-by-adjugate mirror of the n=2/n=3 arms plus the hessian tensor); no restructuring of the S2A engine was required.",
+      "3: no fixture cell needed a loosened enclosure: every exclusion/refusal outcome was decided by the certified enclosures (the one caveat - the landed interval hull is loose on steep polynomials, so the fixtures avoid steep factors and dyadic-aligned roots, which are documented in the fixture comments)."
+    ]
+  },
+  "files_written": [
+    "vendor/truck/truck-certified/src/kernel/tier2.rs",
+    "vendor/truck/truck-certified/src/kernel/certs.rs",
+    "vendor/truck/truck-certified/src/kernel/engine.rs",
+    "vendor/truck/truck-certified/src/kernel/mod.rs",
+    "vendor/truck/truck-certified/tests/kernel_tier2.rs"
+  ],
+  "anchors_after": {
+    "A1_pub_fn_minor_vector_encl_in_minor_algebra": 1,
+    "A2_pub_fn_krawczyk_c1_n3_in_engine": 1,
+    "A3_pub_struct_PointCert3_in_certs": 1,
+    "A4_PointCert4_in_certs": 3
+  },
+  "tests": {
+    "required_7": "all present and green in tests/kernel_tier2.rs: point_cert4_and_n4_entry_additive_and_gated, psi_a_zeros_isolated_on_a_transversal_fixture, exclusion_clears_the_remainder, persistent_positive_dimensional_psi_a_routes_to_tangential, ka_perturbation_retries_then_incomplete_start_set, boundary_seeds_plus_psi_a_cover_every_oracle_component, no_transcendental_call_in_tier2_module",
+    "lib_tests": "566 passed (0 failed)",
+    "integration": "all truck-certified integration targets green including kernel_tier2 7/7 (kernel_contact 8, kernel_contract 16, kernel_coons_patch 6, kernel_engine 12, kernel_identity 9, kernel_leaf 8, kernel_r89 8, kernel_rational 7, kernel_s03a 8, certified_map 10, contract_freeze 8, hull 9, pair_dispatch 11, sphere 8, ssi_contract 11, ssi_system 8, ssi_trace 12, doc-tests 2)",
+    "command": "cargo test -p truck-certified --locked"
+  },
+  "verification": {
+    "fmt": "cargo fmt -p truck-certified applied to the five write files and clean under --check; cargo fmt --all -- --check flags only the two recorded PRE-EXISTING out-of-write-set files (examples/step_face_timing.rs, tests/geometry_fingerprint.rs), identical to the baseline the 104/201/202/302 results recorded",
+    "crate_check": "cargo check -p truck-certified --lib --locked: Finished, zero errors",
+    "workspace_check": "cargo check --workspace --all-targets --locked: Finished, zero errors (only the pre-existing unused_qualifications warning in truck-meshalgo, outside the write set)",
+    "clippy_packet_files": "cargo clippy -p truck-certified --lib --tests --no-deps --message-format=short: zero findings referencing kernel/certs.rs, kernel/engine.rs, kernel/mod.rs, kernel/tier2.rs, or tests/kernel_tier2.rs (the tree's pre-existing clippy findings are all outside the write set and are the diff-scoped gate's baseline)",
+    "env": "CARGO_BUILD_JOBS=2 on every cargo invocation"
+  },
+  "notes": [
+    "Additive arity-4: PointCert4 { residual, box_: IBox4, rho } mirrors PointCert3's gate exactly (rho ceiling -> Conditioning Inconclusive, non-finite rho/box -> NonFinite Disproven); the IBox4 alias is declared at the arity-4 carrier because patch.rs (the home of IBox2/IBox3) is outside this packet's write set.",
+    "The R3 residual PsiA implements the frozen SquareResidualEval seam at arity 4: eval = (F enclosure, a.m enclosure), jac_encl = the 3x4 Jacobian rows over the certified DF enclosure plus the gradient of a.m assembled from the certified Hessian tensor (row-replacement expansion of d/dx_l of each maximal minor with the (-1)^j signs of minor_vector_encl). The hessian machinery is engine-side and additive: grid_second_partial (with the linear-axis zero-grid case), component_second_partial, system_hessian, all pub(crate).",
+    "krawczyk_c1_n4 returns the box-Jacobian Inconclusive early when the midpoint Jacobian is singular (result-identical to enclosing the box first, since the box enclosure is only used after a successful midpoint inversion); this keeps the Tier-2 stall searches (whose positive-dimensional cells are midpoint-singular) tractable in debug.",
+    "Ground-truth discipline discovered and recorded: a root with ANY coordinate at a dyadic grid value can never be strict-included by a dyadic subdivision (every depth-d cell boundary is a dyadic grid line, so the root always lies on a cell boundary). All fixture Psi_a/R8 roots therefore use non-dyadic rational coordinates (1/3, 2/5, 7/12, ...), exactly as the S03A boundary-seed fixtures already did.",
+    "The §9.2 a-posteriori rule: the caller's direction first, then the KA-entry deterministic unit-norm table A_TABLE (Hadamard/2 directions). The classification is decided by the FIRST attempt: a capped first attempt (persistent positive-dimensional zero set under every perturbation) is TangentialCurve and routes to §10.4; a bounded depth-max stall surviving all KA perturbations is IncompleteStartSet, whose predicate detail pins ka=KA.",
+    "Corollary 9.3's composition is exercised on the two-arc fixture: the two oracle components both meet the leaf boundary, so the R8 boundary seeds (301's landed entry) cover both arcs (four non-dyadic crossing seeds) and the Tier-2 Psi_a run over the leaf product certifies that no interior critical point exists (complete empty) - the combined start set covers every oracle component.",
+    "No transcendental call appears in tier2.rs (N4 source-scan pinned, sqrt scanned too since the module has no normalization carve-out); the module carries no unwrap/expect/panic and adds no module-level allow."
+  ]
+}
