@@ -31,7 +31,8 @@ read_allow:
 budget:      {turns: 32, ctx_tokens: 110000}
 anchors:
   - {id: A1, expect: 1, cmd: "grep -c 'pub trait SquareResidualEval' vendor/truck/truck-certified/src/kernel/engine.rs"}
-  - {id: A2, expect: 1, cmd: "grep -c 'pub fn krawczyk_c1' vendor/truck/truck-certified/src/kernel/engine.rs"}
+  # 2 = krawczyk_c1 (arity-2) + krawczyk_c1_n3 (arity-3, BG-KV2-206's additive entry)
+  - {id: A2, expect: 2, cmd: "grep -c 'pub fn krawczyk_c1' vendor/truck/truck-certified/src/kernel/engine.rs"}
   - {id: A3, expect: 1, cmd: "grep -c 'pub fn extract_bezier_leaves' vendor/truck/truck-certified/src/kernel/leaf_extract.rs"}
   - {id: A4, expect: 0, cmd: "grep -rnw 'R8System' vendor/truck/truck-certified/src | wc -l"}
 tests_required:
