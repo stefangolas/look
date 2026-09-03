@@ -34,7 +34,7 @@ anchors:
   - {id: A1, expect: 1, cmd: "grep -c 'pub fn c2_certify_tube4' vendor/truck/truck-certified/src/kernel/engine.rs"}
   - {id: A2, expect: 1, cmd: "grep -c 'pub fn build_frame4' vendor/truck/truck-certified/src/kernel/engine.rs"}
   - {id: A3, expect: 1, cmd: "grep -c 'pub enum SegmentBreak' vendor/truck/truck-certified/src/kernel/graph.rs"}
-  - {id: A4, expect: 1, cmd: "grep -c 'KAPPA_MAX' vendor/truck/truck-certified/src/kernel/config.rs"}
+  - {id: A4, expect: 1, cmd: "grep -c 'pub const KAPPA_MAX' vendor/truck/truck-certified/src/kernel/config.rs"}
   - {id: A5, expect: 0, cmd: "grep -rnw 'float_trace' vendor/truck/truck-certified/src | wc -l"}
 tests_required:
   - tracer_marches_a_straight_branch_and_certifies_long_arcs
