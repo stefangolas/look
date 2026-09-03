@@ -28,7 +28,7 @@ read_allow:
 budget:      {turns: 12, ctx_tokens: 50000}
 anchors:
   - {id: A1, expect: 1, cmd: "grep -c 'pub struct Frame' vendor/truck/truck-certified/src/kernel/certs.rs"}
-  - {id: A2, expect: 1, cmd: "grep -c 'frame_is_orthonormal_and_q_tau_is_the_normalized_kernel_direction' vendor/truck/truck-certified/tests/kernel_contract.rs"}
+  - {id: A2, expect: 1, cmd: "grep -c 'fn frame_refuses_non_orthonormal_basis' vendor/truck/truck-certified/tests/kernel_contract.rs"}
 tests_required:
   - frame_try_new_accepts_nonunit_z_hat_and_still_gates_the_basis
 ```
@@ -45,10 +45,10 @@ the basis carries the unit constraints).
 ## Section 2 — tests (`tests/kernel_contract.rs`, in place)
 
 The shim contract test that pinned the old behavior keeps its LANDED NAME
-(`frame_is_orthonormal_and_q_tau_is_the_normalized_kernel_direction`,
-V5 identity) and its assertions are updated IN PLACE: the orthonormality
-and q_tau assertions stand; any z_hat-unit assertion is replaced by a
-finiteness assertion plus a non-unit-z_hat acceptance case (the new
+(`frame_refuses_non_orthonormal_basis`, V5 identity) and its assertions
+are updated IN PLACE: the orthonormality and q_tau assertions stand; any
+z_hat-unit assertion is replaced by a finiteness assertion plus a
+non-unit-z_hat acceptance case (the new
 `frame_try_new_accepts_nonunit_z_hat_and_still_gates_the_basis` covers
 both directions: accepts z_hat = [0.3, 0.7, 1.2, 0.5]-class non-unit
 point with a valid basis; refuses non-unit q_tau; refuses non-finite
