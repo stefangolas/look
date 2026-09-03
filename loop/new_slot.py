@@ -39,8 +39,17 @@ def main():
     # §7 rule 5: refuse, don't flag. A slot warm build is the single largest
     # single write burst in the loop (target/quick-scale, ~2.5 GB), so check
     # the floor before touching disk at all rather than failing partway
-    # through.
+    # through. Session 50: the janitor is the FIRST response, not a manual
+    # step - reclaim known-safe caches (never a live slot's target; the
+    # process-scan detection is authoritative), then re-check, then refuse.
     free_gb = shutil.disk_usage('C:\\').free / 2**30
+    if free_gb < args.min_free_gb:
+        jan = subprocess.run(
+            [sys.executable, str(REPO_ROOT / 'loop' / 'janitor.py'),
+             'ensure', '--need', str(args.min_free_gb)],
+            capture_output=True, text=True)
+        print(jan.stdout.strip() or jan.stderr.strip())
+        free_gb = shutil.disk_usage('C:\\').free / 2**30
     if free_gb < args.min_free_gb:
         sys.exit(f"new_slot: {free_gb:.1f} GB free on C:, below the {args.min_free_gb:.1f} GB floor. "
                   "Run the janitor (see docs §7.2) before creating or warming a slot.")
