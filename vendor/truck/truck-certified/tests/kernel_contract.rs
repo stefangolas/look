@@ -321,15 +321,58 @@ fn frame_refuses_non_orthonormal_basis() {
     )
     .is_err());
 
-    // A non-unit normal refuses.
-    assert!(Frame::<3>::try_new(
+    // z_hat is a point (§8.1): a non-unit z_hat is accepted with a valid
+    // basis, and only a non-finite z_hat refuses.
+    construct(Frame::<3>::try_new(
         [0.0, 0.0, 2.0],
+        [[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]],
+        q_tau,
+        q_perp,
+        a,
+    ));
+    assert!(Frame::<3>::try_new(
+        [0.0, f64::NAN, 2.0],
         [[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]],
         q_tau,
         q_perp,
         a
     )
     .is_err());
+}
+
+#[test]
+fn frame_try_new_accepts_nonunit_z_hat_and_still_gates_the_basis() {
+    // A non-unit point (§8.1 expansion point) with a valid basis is accepted.
+    let z_hat = [0.3, 0.7, 1.2, 0.5];
+    let norm_sq = z_hat.iter().map(|c| c * c).sum::<f64>();
+    assert!(
+        (norm_sq - 1.0).abs() > config::TOL_JACOBIAN,
+        "the probe z_hat must be non-unit"
+    );
+    let q = [
+        [1.0, 0.0, 0.0, 0.0],
+        [0.0, 1.0, 0.0, 0.0],
+        [0.0, 0.0, 1.0, 0.0],
+        [0.0, 0.0, 0.0, 1.0],
+    ];
+    let q_tau = [1.0, 0.0, 0.0, 0.0];
+    let q_perp = [
+        [0.0, 1.0, 0.0, 0.0],
+        [0.0, 0.0, 1.0, 0.0],
+        [0.0, 0.0, 0.0, 1.0],
+        [1.0, 0.0, 0.0, 0.0],
+    ];
+    let a = q;
+    let frame = construct(Frame::<4>::try_new(z_hat, q, q_tau, q_perp, a));
+    assert_eq!(frame.z_hat, z_hat);
+    assert_eq!(frame.q_tau, [1.0, 0.0, 0.0, 0.0]);
+
+    // The basis gates stand: a non-unit q_tau still refuses.
+    assert!(Frame::<4>::try_new(z_hat, q, [2.0, 0.0, 0.0, 0.0], q_perp, a).is_err());
+
+    // The point gate narrows to finiteness: a non-finite z_hat refuses.
+    assert!(Frame::<4>::try_new([0.3, f64::INFINITY, 1.2, 0.5], q, q_tau, q_perp, a).is_err());
+    assert!(Frame::<4>::try_new([0.3, f64::NAN, 1.2, 0.5], q, q_tau, q_perp, a).is_err());
 }
 
 #[test]
