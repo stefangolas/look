@@ -366,7 +366,14 @@ is not automatically a serialization reason. If packet B needs only A's
 already-frozen interface and output semantics, B implements against those
 contracts plus synthetic fixtures, and A and B run concurrently.
 Production substitution happens at integration. Only a genuinely missing
-shared Rust type forces sequencing.
+shared Rust type forces sequencing. **This applies to the `needs` field
+you write, not just to wave design (session 51, paid in worker-hours):**
+mechanically encoding a booking posture ("Wave 5: serial,
+integrator-owned") as `needs` edges serialized three packets whose only
+mutual file was the designed mod.rs one-liner; the owner flattened them.
+Before writing a `needs` edge, name the landed contract the consumer
+actually calls — a needs edge to an UNLANDED packet with no named
+contract is a posture, not a dependency.
 
 **The contract shim is a packet, not an orchestrator commit.** If shared
 types do not exist yet, they land as a tiny pre-wave packet through the
@@ -527,20 +534,41 @@ the world — that happens once, at the end.
    while sequencing the consuming amendment behind it; that converts a
    parallel pair into a serial pair for no rigor gain.
 
-   **Rolling dispatch (session 50, owner direction — the default
-   dispatch posture, not a per-wave decision):** the orchestrator
-   authors the NEXT wave's packets while the current wave's workers
-   run, and every slot that frees is refilled immediately — no batching
-   into wave-sized dispatch rounds. The wave is a bookkeeping and
-   integration boundary only (its manifest, its composed checks), never
-   a synchronization barrier for worker starts. Concretely: poll
-   `slot_status.py`; on FINISHED, adjudicate + merge + re-fork + dispatch
-   the next READY packet in dependency order in the same pass; keep the
-   worker count at the RAM cap (measured: 2 safe with browser open, 3
-   with browser closed and check-only workers; COLD warm builds still
-   one at a time). The authoring pipeline feeds this: if no READY
-   packet exists when a slot frees, the authoring was the bottleneck —
-   author ahead, never idle a slot behind the author.
+    **Rolling dispatch (session 50, owner direction — the default
+    dispatch posture, not a per-wave decision):** the orchestrator
+    authors the NEXT wave's packets while the current wave's workers
+    run, and every slot that frees is refilled immediately — no batching
+    into wave-sized dispatch rounds. The wave is a bookkeeping and
+    integration boundary only (its manifest, its composed checks), never
+    a synchronization barrier for worker starts. Concretely: poll
+    `slot_status.py`; on FINISHED, adjudicate + merge + re-fork + dispatch
+    the next READY packet in dependency order in the same pass; keep the
+    worker count at the RAM cap (see below). The authoring pipeline feeds
+    this: if no READY packet exists when a slot frees, the authoring was
+    the bottleneck — author ahead, never idle a slot behind the author.
+
+    **The RAM cap is arithmetic, not folklore — re-derive it when the
+    baseline changes (session 51, paid for by reciting a stale one).**
+    cargoq already serializes cargo, so the cap was never about cargo
+    overlap; it is this inequality:
+
+        N × (worker host + helpers) + OS baseline + ONE queued spike
+            ≤ physical RAM (15.7 GB here)
+
+    The numbers move when the baseline moves. The session-49/50
+    measurement ("2 safe with browser open, 3 with browser closed") was
+    taken when every worker spawned its own rust-analyzer (~1 GB each,
+    over a cold slot worktree) and chrome was in the baseline. Session 51
+    removed the per-worker LSP at source (lsp:false in the dispatch env)
+    and added the janitor's RAM guard, so the same arithmetic now supports
+    4 workers; 6 re-enters the 0xc0000409 zone on a COLD warm-build cycle
+    (the workspace spike alone is 4–8 GB; typical per-crate spikes are
+    2–3 GB). The rule: when anything material changes in the baseline
+    (LSP on/off, chrome, a new resident consumer), re-run the arithmetic
+    before raising or lowering `--max-workers`, and let one spike cycle
+    under watch validate the new cap before trusting it. A rustc
+    0xc0000409 anywhere is the sign the inequality is violated — shrink,
+    do not retry blindly.
 
 ## What a session should leave behind
 
