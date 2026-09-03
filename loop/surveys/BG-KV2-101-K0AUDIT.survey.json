@@ -1,0 +1,868 @@
+﻿{
+    "packet":  "BG-KV2-101-K0AUDIT",
+    "class":  "survey",
+    "generated":  "2026-09-03T00:45:32Z",
+    "anchors":  {
+                    "A1":  1,
+                    "A2":  0,
+                    "A3":  1,
+                    "A4":  1
+                },
+    "notes":  [
+                  "Census hypothesis torus.rs:22 does not reproduce as a code site (line 22 is a doc comment pointing at crate::elementary); actual interval-trig consumers in torus.rs measured at 54,72,73,74,87,98.",
+                  "Census hypothesis cone.rs:63,117 reproduce exactly (f64 tan(half_angle) feeding cone enclosure slope / normal-cone axis); extra measured tan sites at cone.rs:73,151.",
+                  "N4 violation the census MISSED: elementary interval sin/cos also consumed by cylinder.rs (53,54,69,70), revolved.rs rot_der (67,68) and sphere.rs immersion_lower_bound (179) - these feed certified enclosures/immersion bounds and are not named in the census seed list.",
+                  "elementary.rs exposes only pub sin/cos; no interval exp/log/atan2 exists in this module, so the exp/log/atan2 consumer grep is empty by measurement.",
+                  "A2 measured 0 across vendor/truck: no par.sum/par_sum. Compliant index-stable serial reductions recorded (planar_holes.rs:881, planar_slice.rs:1528, kernel/certs.rs:512, rank1_annulus.rs:747, planar_developed.rs:612).",
+                  "Directed-rounding primitive inventory: next_after(deck.rs:188), toward_neg(210), toward_pos(225), DeckInterval(259), CertifiedInterval(exact.rs:227), two_sum(exact.rs:45), two_product(exact.rs:53).",
+                  "SamplingPolicy::CustomParameters blast radius: definition sampling.rs:23, resolve arm sampling.rs:66, test call sites truck-geometry/tests/constructive_contract.rs:209 and constructive_recipe.rs:289.",
+                  "No par-iterator float-sum reduction exists; rayon appears only in truck-assembly/topology/meshalgo/truck-stepio doc/example paths, none on the certificate path."
+              ],
+    "rows":  [
+                 {
+                     "file":  "vendor/truck/truck-evidence/src/torus.rs",
+                     "line":  54,
+                     "symbol":  "tube_radius",
+                     "expression":  "interval_at(large)+interval_at(small)*cos(vv)",
+                     "proposed_class":  "quarantine-rational",
+                     "reason":  "elementary interval cos consumed by certified tube-radius enclosure (EnclosureSurface::enclose/derive path); transcendental param feeding enclosure - N4 seed",
+                     "confidence":  "medium"
+                 },
+                 {
+                     "file":  "vendor/truck/truck-evidence/src/torus.rs",
+                     "line":  72,
+                     "symbol":  "enclose",
+                     "expression":  "rho*cos(uu)",
+                     "proposed_class":  "quarantine-rational",
+                     "reason":  "interval cos feeding point enclosure Box3",
+                     "confidence":  "medium"
+                 },
+                 {
+                     "file":  "vendor/truck/truck-evidence/src/torus.rs",
+                     "line":  73,
+                     "symbol":  "enclose",
+                     "expression":  "rho*sin(uu)",
+                     "proposed_class":  "quarantine-rational",
+                     "reason":  "interval sin feeding point enclosure Box3",
+                     "confidence":  "medium"
+                 },
+                 {
+                     "file":  "vendor/truck/truck-evidence/src/torus.rs",
+                     "line":  74,
+                     "symbol":  "enclose",
+                     "expression":  "small*sin(vv)",
+                     "proposed_class":  "quarantine-rational",
+                     "reason":  "interval sin feeding point enclosure Box3",
+                     "confidence":  "medium"
+                 },
+                 {
+                     "file":  "vendor/truck/truck-evidence/src/torus.rs",
+                     "line":  87,
+                     "symbol":  "enclose_der",
+                     "expression":  "0 =\u003e (cos(uu), sin(uu))",
+                     "proposed_class":  "quarantine-rational",
+                     "reason":  "interval trig in u-derivative table feeding derivative enclosure",
+                     "confidence":  "medium"
+                 },
+                 {
+                     "file":  "vendor/truck/truck-evidence/src/torus.rs",
+                     "line":  98,
+                     "symbol":  "enclose_der",
+                     "expression":  "0 =\u003e (r0 + r*cos(vv), r*sin(vv))",
+                     "proposed_class":  "quarantine-rational",
+                     "reason":  "interval trig in v-derivative table feeding derivative enclosure",
+                     "confidence":  "medium"
+                 },
+                 {
+                     "file":  "vendor/truck/truck-evidence/src/circle.rs",
+                     "line":  43,
+                     "symbol":  "enclose",
+                     "expression":  "x: cos(tt)",
+                     "proposed_class":  "quarantine-rational",
+                     "reason":  "interval cos feeding curve point enclosure (UnitCircle is transcendental carrier)",
+                     "confidence":  "medium"
+                 },
+                 {
+                     "file":  "vendor/truck/truck-evidence/src/circle.rs",
+                     "line":  44,
+                     "symbol":  "enclose",
+                     "expression":  "y: sin(tt)",
+                     "proposed_class":  "quarantine-rational",
+                     "reason":  "interval sin feeding curve point enclosure",
+                     "confidence":  "medium"
+                 },
+                 {
+                     "file":  "vendor/truck/truck-evidence/src/circle.rs",
+                     "line":  55,
+                     "symbol":  "enclose_der",
+                     "expression":  "x: cos(tt)",
+                     "proposed_class":  "quarantine-rational",
+                     "reason":  "interval trig derivative enclosure order 0",
+                     "confidence":  "medium"
+                 },
+                 {
+                     "file":  "vendor/truck/truck-evidence/src/circle.rs",
+                     "line":  60,
+                     "symbol":  "enclose_der",
+                     "expression":  "x: -sin(tt)",
+                     "proposed_class":  "quarantine-rational",
+                     "reason":  "interval trig derivative enclosure order 1",
+                     "confidence":  "medium"
+                 },
+                 {
+                     "file":  "vendor/truck/truck-evidence/src/circle.rs",
+                     "line":  65,
+                     "symbol":  "enclose_der",
+                     "expression":  "x: -cos(tt)",
+                     "proposed_class":  "quarantine-rational",
+                     "reason":  "interval trig derivative enclosure order 2",
+                     "confidence":  "medium"
+                 },
+                 {
+                     "file":  "vendor/truck/truck-evidence/src/circle.rs",
+                     "line":  70,
+                     "symbol":  "enclose_der",
+                     "expression":  "x: sin(tt)",
+                     "proposed_class":  "quarantine-rational",
+                     "reason":  "interval trig derivative enclosure order 3",
+                     "confidence":  "medium"
+                 },
+                 {
+                     "file":  "vendor/truck/truck-evidence/src/cone.rs",
+                     "line":  66,
+                     "symbol":  "enclose",
+                     "expression":  "x: s*vv*cos(uu)",
+                     "proposed_class":  "quarantine-rational",
+                     "reason":  "interval cos feeding cone point enclosure",
+                     "confidence":  "medium"
+                 },
+                 {
+                     "file":  "vendor/truck/truck-evidence/src/cone.rs",
+                     "line":  67,
+                     "symbol":  "enclose",
+                     "expression":  "y: s*vv*sin(uu)",
+                     "proposed_class":  "quarantine-rational",
+                     "reason":  "interval sin feeding cone point enclosure",
+                     "confidence":  "medium"
+                 },
+                 {
+                     "file":  "vendor/truck/truck-evidence/src/cone.rs",
+                     "line":  87,
+                     "symbol":  "enclose_der",
+                     "expression":  "x: s*cos(uu)",
+                     "proposed_class":  "quarantine-rational",
+                     "reason":  "interval cos feeding (0,1) derivative enclosure",
+                     "confidence":  "medium"
+                 },
+                 {
+                     "file":  "vendor/truck/truck-evidence/src/cone.rs",
+                     "line":  88,
+                     "symbol":  "enclose_der",
+                     "expression":  "y: s*sin(uu)",
+                     "proposed_class":  "quarantine-rational",
+                     "reason":  "interval sin feeding (0,1) derivative enclosure",
+                     "confidence":  "medium"
+                 },
+                 {
+                     "file":  "vendor/truck/truck-evidence/src/cone.rs",
+                     "line":  95,
+                     "symbol":  "enclose_der",
+                     "expression":  "0 =\u003e (cos(uu), sin(uu))",
+                     "proposed_class":  "quarantine-rational",
+                     "reason":  "interval trig u-derivative table feeding derivative enclosure",
+                     "confidence":  "medium"
+                 },
+                 {
+                     "file":  "vendor/truck/truck-evidence/src/sphere.rs",
+                     "line":  62,
+                     "symbol":  "enclose",
+                     "expression":  "(sin(uu), cos(uu))",
+                     "proposed_class":  "quarantine-rational",
+                     "reason":  "interval trig feeding sphere point enclosure",
+                     "confidence":  "medium"
+                 },
+                 {
+                     "file":  "vendor/truck/truck-evidence/src/sphere.rs",
+                     "line":  63,
+                     "symbol":  "enclose",
+                     "expression":  "(sin(vv), cos(vv))",
+                     "proposed_class":  "quarantine-rational",
+                     "reason":  "interval trig feeding sphere point enclosure",
+                     "confidence":  "medium"
+                 },
+                 {
+                     "file":  "vendor/truck/truck-evidence/src/sphere.rs",
+                     "line":  79,
+                     "symbol":  "enclose_der",
+                     "expression":  "(sin(uu), cos(uu))",
+                     "proposed_class":  "quarantine-rational",
+                     "reason":  "interval trig feeding sphere derivative enclosure",
+                     "confidence":  "medium"
+                 },
+                 {
+                     "file":  "vendor/truck/truck-evidence/src/sphere.rs",
+                     "line":  80,
+                     "symbol":  "enclose_der",
+                     "expression":  "(sin(vv), cos(vv))",
+                     "proposed_class":  "quarantine-rational",
+                     "reason":  "interval trig feeding sphere derivative enclosure",
+                     "confidence":  "medium"
+                 },
+                 {
+                     "file":  "vendor/truck/truck-evidence/src/sphere.rs",
+                     "line":  179,
+                     "symbol":  "immersion_lower_bound",
+                     "expression":  "sin(uu)",
+                     "proposed_class":  "quarantine-rational",
+                     "reason":  "interval sin feeding certified immersion lower bound",
+                     "confidence":  "medium"
+                 },
+                 {
+                     "file":  "vendor/truck/truck-evidence/src/cylinder.rs",
+                     "line":  53,
+                     "symbol":  "enclose",
+                     "expression":  "r*cos(uu)",
+                     "proposed_class":  "quarantine-rational",
+                     "reason":  "interval cos feeding cylinder point enclosure",
+                     "confidence":  "medium"
+                 },
+                 {
+                     "file":  "vendor/truck/truck-evidence/src/cylinder.rs",
+                     "line":  54,
+                     "symbol":  "enclose",
+                     "expression":  "r*sin(uu)",
+                     "proposed_class":  "quarantine-rational",
+                     "reason":  "interval sin feeding cylinder point enclosure",
+                     "confidence":  "medium"
+                 },
+                 {
+                     "file":  "vendor/truck/truck-evidence/src/cylinder.rs",
+                     "line":  69,
+                     "symbol":  "enclose_der",
+                     "expression":  "x: -(r*sin(uu))",
+                     "proposed_class":  "quarantine-rational",
+                     "reason":  "interval sin feeding (1,0) derivative enclosure",
+                     "confidence":  "medium"
+                 },
+                 {
+                     "file":  "vendor/truck/truck-evidence/src/cylinder.rs",
+                     "line":  70,
+                     "symbol":  "enclose_der",
+                     "expression":  "y: r*cos(uu)",
+                     "proposed_class":  "quarantine-rational",
+                     "reason":  "interval cos feeding (1,0) derivative enclosure",
+                     "confidence":  "medium"
+                 },
+                 {
+                     "file":  "vendor/truck/truck-evidence/src/decorators/revolved.rs",
+                     "line":  67,
+                     "symbol":  "rot_der",
+                     "expression":  "s = sin(vv)",
+                     "proposed_class":  "quarantine-rational",
+                     "reason":  "interval sin feeding interval rotation-matrix-derivative enclosure",
+                     "confidence":  "medium"
+                 },
+                 {
+                     "file":  "vendor/truck/truck-evidence/src/decorators/revolved.rs",
+                     "line":  68,
+                     "symbol":  "rot_der",
+                     "expression":  "c = cos(vv)",
+                     "proposed_class":  "quarantine-rational",
+                     "reason":  "interval cos feeding interval rotation-matrix-derivative enclosure",
+                     "confidence":  "medium"
+                 },
+                 {
+                     "file":  "vendor/truck/truck-evidence/src/cone.rs",
+                     "line":  63,
+                     "symbol":  "enclose",
+                     "expression":  "s = interval_at(half_angle().tan())",
+                     "proposed_class":  "quarantine-rational",
+                     "reason":  "CENSUS HYPOTHESIS cone.rs:63 reproduces: f64 tan(half_angle) wrapped degenerate feeds cone enclosure slope; transcendental slope datum; migration: store rational slope h/r instead of half-angle",
+                     "confidence":  "medium"
+                 },
+                 {
+                     "file":  "vendor/truck/truck-evidence/src/cone.rs",
+                     "line":  73,
+                     "symbol":  "enclose_der",
+                     "expression":  "s = interval_at(half_angle().tan())",
+                     "proposed_class":  "quarantine-rational",
+                     "reason":  "remeasured extra: same tan slope into (0,1)/(m,n) derivative enclosures",
+                     "confidence":  "medium"
+                 },
+                 {
+                     "file":  "vendor/truck/truck-evidence/src/cone.rs",
+                     "line":  117,
+                     "symbol":  "normal_cone",
+                     "expression":  "slope = half_angle().tan()",
+                     "proposed_class":  "quarantine-rational",
+                     "reason":  "CENSUS HYPOTHESIS cone.rs:117 reproduces: f64 tan slope feeding certified normal-cone axis direction",
+                     "confidence":  "medium"
+                 },
+                 {
+                     "file":  "vendor/truck/truck-evidence/src/cone.rs",
+                     "line":  151,
+                     "symbol":  "immersion_lower_bound",
+                     "expression":  "slope = half_angle().tan()",
+                     "proposed_class":  "quarantine-rational",
+                     "reason":  "remeasured extra: f64 tan slope feeding certified immersion lower bound",
+                     "confidence":  "medium"
+                 },
+                 {
+                     "file":  "vendor/truck/truck-evidence/src/circle.rs",
+                     "line":  89,
+                     "symbol":  "tangent_cone",
+                     "expression":  "axis: Vector3::new(-mid.sin(), mid.cos(), 0.0)",
+                     "proposed_class":  "predictor-only",
+                     "reason":  "float trig at cell midpoint selects cone axis only; certified spread is w/2 arc-width bound; axis rounding is D4-legal predictor",
+                     "confidence":  "medium"
+                 },
+                 {
+                     "file":  "vendor/truck/truck-evidence/src/cylinder.rs",
+                     "line":  99,
+                     "symbol":  "normal_cone",
+                     "expression":  "axis: Vector3::new(mid.cos(), mid.sin(), 0.0)",
+                     "proposed_class":  "predictor-only",
+                     "reason":  "float trig at cell midpoint selects axis; certified cone half-angle from arc width w; axis is predictor",
+                     "confidence":  "medium"
+                 },
+                 {
+                     "file":  "vendor/truck/truck-evidence/src/cone.rs",
+                     "line":  137,
+                     "symbol":  "normal_cone",
+                     "expression":  "(su, cu) = m.sin_cos()",
+                     "proposed_class":  "predictor-only",
+                     "reason":  "float sin_cos at midpoint picks axis; certified cone half-angle w/2 over-approx; D4-legal predictor",
+                     "confidence":  "medium"
+                 },
+                 {
+                     "file":  "vendor/truck/truck-evidence/src/torus.rs",
+                     "line":  137,
+                     "symbol":  "normal_cone",
+                     "expression":  "axis = Vector3::new(vm.cos()*um.cos(), vm.cos()*um.sin(), vm.sin()).normalize()",
+                     "proposed_class":  "predictor-only",
+                     "reason":  "float trig at midpoint normal selects axis; certified spread (wu+wv)/2; axis is predictor; normalize ungated but unit-by-construction",
+                     "confidence":  "medium"
+                 },
+                 {
+                     "file":  "vendor/truck/truck-evidence/src/sphere.rs",
+                     "line":  32,
+                     "symbol":  "unit_normal",
+                     "expression":  "Vector3::new(u.sin()*v.cos(), u.sin()*v.sin(), u.cos())",
+                     "proposed_class":  "predictor-only",
+                     "reason":  "float corner-normal predictor for normal_cone corner-average axis; certification via corner-convexity + everything-cone fallback",
+                     "confidence":  "medium"
+                 },
+                 {
+                     "file":  "vendor/truck/truck-evidence/src/sphere.rs",
+                     "line":  148,
+                     "symbol":  "normal_cone",
+                     "expression":  "axis = sum / mag",
+                     "proposed_class":  "predictor-only",
+                     "reason":  "float axis from corner-normal sum, ungated by interval norm; corner-hull soundness argument; D4 predictor",
+                     "confidence":  "medium"
+                 },
+                 {
+                     "file":  "vendor/truck/truck-evidence/src/sphere.rs",
+                     "line":  152,
+                     "symbol":  "normal_cone",
+                     "expression":  "half_angle = half_angle.max(dot.acos())",
+                     "proposed_class":  "predictor-only",
+                     "reason":  "float acos over corners produces cone half-angle; certified via convexity/fallback clamps",
+                     "confidence":  "medium"
+                 },
+                 {
+                     "file":  "vendor/truck/truck-evidence/src/analytic/equal_radius_cylinders.rs",
+                     "line":  130,
+                     "symbol":  "equal_radius_cylinders",
+                     "expression":  "u_hat = d.normalize()",
+                     "proposed_class":  "predictor-only",
+                     "reason":  "float normalize of axis delta feeding analytic intersection construction; results later interval-verified",
+                     "confidence":  "medium"
+                 },
+                 {
+                     "file":  "vendor/truck/truck-evidence/src/analytic/equal_radius_cylinders.rs",
+                     "line":  131,
+                     "symbol":  "equal_radius_cylinders",
+                     "expression":  "bp = (a0 + a1).normalize()",
+                     "proposed_class":  "predictor-only",
+                     "reason":  "float normalize of bisector direction in analytic construction",
+                     "confidence":  "medium"
+                 },
+                 {
+                     "file":  "vendor/truck/truck-evidence/src/analytic/equal_radius_cylinders.rs",
+                     "line":  132,
+                     "symbol":  "equal_radius_cylinders",
+                     "expression":  "bm = (a0 - a1).normalize()",
+                     "proposed_class":  "predictor-only",
+                     "reason":  "float normalize of difference direction in analytic construction",
+                     "confidence":  "medium"
+                 },
+                 {
+                     "file":  "vendor/truck/truck-evidence/src/analytic/plane_cone.rs",
+                     "line":  225,
+                     "symbol":  "plane_cone",
+                     "expression":  "u_hat = (n_hat.cross(unit_z())).normalize()",
+                     "proposed_class":  "predictor-only",
+                     "reason":  "float normalize of in-plane axis feeding analytic plane-cone construction (interval-verified output)",
+                     "confidence":  "medium"
+                 },
+                 {
+                     "file":  "vendor/truck/truck-evidence/src/analytic/plane_cylinder.rs",
+                     "line":  155,
+                     "symbol":  "plane_cylinder",
+                     "expression":  "u_hat = n.cross(z_hat).normalize()",
+                     "proposed_class":  "predictor-only",
+                     "reason":  "float normalize of in-plane axis in analytic plane-cylinder two-line case",
+                     "confidence":  "medium"
+                 },
+                 {
+                     "file":  "vendor/truck/truck-evidence/src/analytic/plane_cylinder.rs",
+                     "line":  220,
+                     "symbol":  "plane_cylinder",
+                     "expression":  "u_hat = n.cross(z_hat).normalize()",
+                     "proposed_class":  "predictor-only",
+                     "reason":  "float normalize of in-plane axis in analytic plane-cylinder ellipse case",
+                     "confidence":  "medium"
+                 },
+                 {
+                     "file":  "vendor/truck/truck-evidence/src/analytic/plane_plane.rs",
+                     "line":  49,
+                     "symbol":  "plane_plane",
+                     "expression":  "d = n0.cross(n1).normalize()",
+                     "proposed_class":  "predictor-only",
+                     "reason":  "float normalize of intersection direction, gated by interval excludes_zero on cross above; D4 predictor",
+                     "confidence":  "high"
+                 },
+                 {
+                     "file":  "vendor/truck/truck-evidence/src/analytic/plane_sphere.rs",
+                     "line":  183,
+                     "symbol":  "in_plane_axes",
+                     "expression":  "u = n.cross(axis).normalize()",
+                     "proposed_class":  "predictor-only",
+                     "reason":  "float normalize of in-plane axis in analytic plane-sphere construction",
+                     "confidence":  "medium"
+                 },
+                 {
+                     "file":  "vendor/truck/truck-evidence/src/analytic/sphere_sphere.rs",
+                     "line":  202,
+                     "symbol":  "sphere_sphere",
+                     "expression":  "u = least_aligned_axis(n_hat).cross(n_hat).normalize()",
+                     "proposed_class":  "predictor-only",
+                     "reason":  "float normalize of in-plane axis in analytic sphere-sphere construction",
+                     "confidence":  "medium"
+                 },
+                 {
+                     "file":  "vendor/truck/truck-evidence/src/contact/fe_ee.rs",
+                     "line":  920,
+                     "symbol":  "circle_cylinder",
+                     "expression":  "normal = x.cross(y).normalize()",
+                     "proposed_class":  "predictor-only",
+                     "reason":  "float normal of placed circle feeding circle-cylinder contact candidates; interval screens later certify",
+                     "confidence":  "medium"
+                 },
+                 {
+                     "file":  "vendor/truck/truck-evidence/src/contact/fe_ee.rs",
+                     "line":  1087,
+                     "symbol":  "line_circle",
+                     "expression":  "normal = x.cross(y).normalize()",
+                     "proposed_class":  "predictor-only",
+                     "reason":  "float normal feeding line-circle contact candidates; interval screens later certify",
+                     "confidence":  "medium"
+                 },
+                 {
+                     "file":  "vendor/truck/truck-evidence/src/contact/mod.rs",
+                     "line":  728,
+                     "symbol":  "cylinder_pose",
+                     "expression":  "dir: axis.normalize()",
+                     "proposed_class":  "predictor-only",
+                     "reason":  "float normalize of placed cylinder axis feeding CylinderPose; interval-based face screens certify",
+                     "confidence":  "medium"
+                 },
+                 {
+                     "file":  "vendor/truck/truck-certified/src/formal/planar_holes.rs",
+                     "line":  1201,
+                     "symbol":  "run_planar_holes_slice",
+                     "expression":  "let normal = plane.u_axis().cross(plane.v_axis()).normalize()",
+                     "proposed_class":  "predictor-only",
+                     "reason":  "float chart normal used to embed 3D mesh output; plane schema axes unit by construction; not interval norm-gated",
+                     "confidence":  "low"
+                 },
+                 {
+                     "file":  "vendor/truck/truck-certified/src/formal/planar_slice.rs",
+                     "line":  1806,
+                     "symbol":  "run_planar_slice",
+                     "expression":  "let normal = plane.u_axis().cross(plane.v_axis()).normalize()",
+                     "proposed_class":  "predictor-only",
+                     "reason":  "float chart normal used to embed 3D mesh output; not interval norm-gated",
+                     "confidence":  "low"
+                 },
+                 {
+                     "file":  "vendor/truck/truck-evidence/src/enclosure.rs",
+                     "line":  121,
+                     "symbol":  "midpoint_ball_cone",
+                     "expression":  "axis = c.normalize()",
+                     "proposed_class":  "compliant",
+                     "reason":  "EXEMPLAR (packet): normalize preceded by certified-norm gate cn\u003erho computed from interval norm with lower endpoint, refusal on non-finite",
+                     "confidence":  "high"
+                 },
+                 {
+                     "file":  "vendor/truck/truck-evidence/src/fid/one_sheet.rs",
+                     "line":  162,
+                     "symbol":  "fibre_degree_one",
+                     "expression":  "u = mid.normalize()",
+                     "proposed_class":  "compliant",
+                     "reason":  "normalize gated by interval box3_contains_zero(tangent_box) refusal before midpoint normalize",
+                     "confidence":  "high"
+                 },
+                 {
+                     "file":  "vendor/truck/truck-evidence/src/analytic/equal_radius_cylinders.rs",
+                     "line":  191,
+                     "symbol":  "normalize_axis",
+                     "expression":  "Ok(d.normalize())",
+                     "proposed_class":  "compliant",
+                     "reason":  "gated by decisively_zero(x*x+y*y+z*z) interval test before normalize",
+                     "confidence":  "high"
+                 },
+                 {
+                     "file":  "vendor/truck/truck-evidence/src/line.rs",
+                     "line":  88,
+                     "symbol":  "tangent_cone",
+                     "expression":  "axis: d.normalize()",
+                     "proposed_class":  "compliant",
+                     "reason":  "gated by interval contains_zero(\u0026der) refusal before normalize; degenerate line refused",
+                     "confidence":  "high"
+                 },
+                 {
+                     "file":  "vendor/truck/truck-evidence/src/elementary.rs",
+                     "line":  180,
+                     "symbol":  "sin",
+                     "expression":  "pub fn sin(xx: Interval) -\u003e Interval",
+                     "proposed_class":  "compliant",
+                     "reason":  "certified elementary: Taylor polynomial in interval arithmetic, outward rounding, argument reduction vs interval PI/2, inflate by first omitted term; compliant polynomial-form carrier",
+                     "confidence":  "high"
+                 },
+                 {
+                     "file":  "vendor/truck/truck-evidence/src/elementary.rs",
+                     "line":  231,
+                     "symbol":  "cos",
+                     "expression":  "pub fn cos(xx: Interval) -\u003e Interval",
+                     "proposed_class":  "compliant",
+                     "reason":  "certified elementary: cos x = sin(x+PI/2) with interval PI/2 shift; outward rounding",
+                     "confidence":  "high"
+                 },
+                 {
+                     "file":  "vendor/truck/truck-certified/src/formal/planar_holes.rs",
+                     "line":  881,
+                     "symbol":  "final_validity_with_holes",
+                     "expression":  "area = ... .sum()",
+                     "proposed_class":  "compliant",
+                     "reason":  "serial order-pinned index-stable float area reduction over Vec iterator; no par-sum (A2=0)",
+                     "confidence":  "high"
+                 },
+                 {
+                     "file":  "vendor/truck/truck-certified/src/formal/planar_slice.rs",
+                     "line":  1528,
+                     "symbol":  "final_validity",
+                     "expression":  "area = ... .sum()",
+                     "proposed_class":  "compliant",
+                     "reason":  "serial order-pinned index-stable float area reduction; no par-sum (A2=0)",
+                     "confidence":  "high"
+                 },
+                 {
+                     "file":  "vendor/truck/truck-certified/src/kernel/certs.rs",
+                     "line":  512,
+                     "symbol":  "dot_vector",
+                     "expression":  "a.iter().zip(b.iter()).map(|(x,y)| x*y).sum()",
+                     "proposed_class":  "compliant",
+                     "reason":  "serial order-pinned float dot-product reduction over aligned Vec; index stable; no par-sum (A2=0)",
+                     "confidence":  "high"
+                 },
+                 {
+                     "file":  "vendor/truck/truck-certified/src/formal/rank1_annulus.rs",
+                     "line":  747,
+                     "symbol":  "cut_open",
+                     "expression":  "segments = occurrences.iter()... .sum()",
+                     "proposed_class":  "compliant",
+                     "reason":  "serial usize chain-segment count; index stable",
+                     "confidence":  "high"
+                 },
+                 {
+                     "file":  "vendor/truck/truck-certified/src/formal/planar_developed.rs",
+                     "line":  612,
+                     "symbol":  "certified_crossings",
+                     "expression":  "bounds.iter()... .sum()",
+                     "proposed_class":  "compliant",
+                     "reason":  "serial usize count reduction; index stable",
+                     "confidence":  "high"
+                 },
+                 {
+                     "file":  "vendor/truck/truck-certified/src/formal/deck.rs",
+                     "line":  188,
+                     "symbol":  "next_after",
+                     "expression":  "fn next_after(x: f64, target: f64) -\u003e f64",
+                     "proposed_class":  "compliant",
+                     "reason":  "manual reimplementation of f64::next_after, only rounding device of deck endpoint arithmetic",
+                     "confidence":  "high"
+                 },
+                 {
+                     "file":  "vendor/truck/truck-certified/src/formal/deck.rs",
+                     "line":  210,
+                     "symbol":  "toward_neg",
+                     "expression":  "fn toward_neg(x: f64) -\u003e Result\u003cf64, DeckNumericFailure\u003e",
+                     "proposed_class":  "compliant",
+                     "reason":  "directed rounding toward -inf via next_after; consumers: endpoints of DeckInterval::from_f64 (239,244), quotient bounds (598-599), provably_outside (614,617)",
+                     "confidence":  "high"
+                 },
+                 {
+                     "file":  "vendor/truck/truck-certified/src/formal/deck.rs",
+                     "line":  225,
+                     "symbol":  "toward_pos",
+                     "expression":  "fn toward_pos(x: f64) -\u003e Result\u003cf64, DeckNumericFailure\u003e",
+                     "proposed_class":  "compliant",
+                     "reason":  "directed rounding toward +inf via next_after; same consumer set as toward_neg",
+                     "confidence":  "high"
+                 },
+                 {
+                     "file":  "vendor/truck/truck-certified/src/formal/deck.rs",
+                     "line":  259,
+                     "symbol":  "DeckInterval",
+                     "expression":  "pub struct DeckInterval { lower, upper }",
+                     "proposed_class":  "compliant",
+                     "reason":  "endpoint interval type carrying directed rounding; consumers: contact.rs:1454-1470, cylinder_cover.rs:157-177, quotient.rs:1022-1031, rank1_annulus.rs:1255-1260, torus_cell/cylinder_band",
+                     "confidence":  "high"
+                 },
+                 {
+                     "file":  "vendor/truck/truck-certified/src/formal/exact.rs",
+                     "line":  45,
+                     "symbol":  "two_sum",
+                     "expression":  "fn two_sum(a: f64, b: f64) -\u003e (f64, f64)",
+                     "proposed_class":  "compliant",
+                     "reason":  "exact error-free sum primitive; consumers: Expansion::grow(81), from_sum(149), diff(185)",
+                     "confidence":  "high"
+                 },
+                 {
+                     "file":  "vendor/truck/truck-certified/src/formal/exact.rs",
+                     "line":  53,
+                     "symbol":  "two_product",
+                     "expression":  "fn two_product(a: f64, b: f64) -\u003e (f64, f64)",
+                     "proposed_class":  "compliant",
+                     "reason":  "exact error-free product primitive (fma-free split); consumers: from_product(137), from_sum/mul chains(167), cross_exp/exact_dot2",
+                     "confidence":  "high"
+                 },
+                 {
+                     "file":  "vendor/truck/truck-certified/src/formal/exact.rs",
+                     "line":  227,
+                     "symbol":  "CertifiedInterval",
+                     "expression":  "pub struct CertifiedInterval { lo, hi }",
+                     "proposed_class":  "compliant",
+                     "reason":  "certified interval over exact expansions; consumers across bezier_isect, common_arc, intersection, torus_circle, kernel/fixtures",
+                     "confidence":  "high"
+                 },
+                 {
+                     "file":  "vendor/truck/truck-geometry/src/constructive/sampling.rs",
+                     "line":  23,
+                     "symbol":  "SamplingPolicy",
+                     "expression":  "CustomParameters(Vec\u003cf64\u003e)",
+                     "proposed_class":  "compliant",
+                     "reason":  "variant definition; §4.3 shared-edge guard deferred to later wave; blast-radius consumers: sampling.rs:66 resolve arm; tests constructive_contract.rs:209, constructive_recipe.rs:289",
+                     "confidence":  "high"
+                 },
+                 {
+                     "file":  "vendor/truck/truck-geometry/src/constructive/sampling.rs",
+                     "line":  66,
+                     "symbol":  "resolve",
+                     "expression":  "SamplingPolicy::CustomParameters(list) =\u003e {...}",
+                     "proposed_class":  "compliant",
+                     "reason":  "resolve normalizes custom list deterministically (sort + exact dedup + finite check); index stable, no par",
+                     "confidence":  "high"
+                 },
+                 {
+                     "file":  "vendor/truck/truck-geometry/src/constructive/mod.rs",
+                     "line":  306,
+                     "symbol":  "Default for DirectTolerance",
+                     "expression":  "position/parameter/jacobian/intersection = truck_base TOLERANCE (1e-6)",
+                     "proposed_class":  "config-gap",
+                     "reason":  "RECORDED DEVIATION: direct path tolerances default to 1e-6 while kernel config normative is TOL_POSITION 1e-9 / TOL_PARAMETER 1e-11 / TOL_JACOBIAN 1e-12 / TOL_INTERSECTION 1e-9 (build-spec decision 2); consumers of each field listed as blast radius",
+                     "confidence":  "high"
+                 },
+                 {
+                     "file":  "vendor/truck/truck-geometry/src/constructive/frame_fixed.rs",
+                     "line":  28,
+                     "symbol":  "fixed_plane",
+                     "expression":  "mag \u003c= DirectTolerance::default().position",
+                     "proposed_class":  "config-gap",
+                     "reason":  "consumer of .position (shared 1e-6); blast radius for tolerance migration",
+                     "confidence":  "high"
+                 },
+                 {
+                     "file":  "vendor/truck/truck-geometry/src/constructive/frame_radial.rs",
+                     "line":  35,
+                     "symbol":  "radial_about_axis",
+                     "expression":  "axis_mag \u003c= DirectTolerance::default().position",
+                     "proposed_class":  "config-gap",
+                     "reason":  "consumer of .position",
+                     "confidence":  "high"
+                 },
+                 {
+                     "file":  "vendor/truck/truck-geometry/src/constructive/frame_radial.rs",
+                     "line":  49,
+                     "symbol":  "radial_about_axis",
+                     "expression":  "d.magnitude() \u003c= DirectTolerance::default().position",
+                     "proposed_class":  "config-gap",
+                     "reason":  "consumer of .position",
+                     "confidence":  "high"
+                 },
+                 {
+                     "file":  "vendor/truck/truck-geometry/src/constructive/frame_up.rs",
+                     "line":  31,
+                     "symbol":  "architectural_up",
+                     "expression":  "mag \u003c= DirectTolerance::default().position",
+                     "proposed_class":  "config-gap",
+                     "reason":  "consumer of .position",
+                     "confidence":  "high"
+                 },
+                 {
+                     "file":  "vendor/truck/truck-geometry/src/constructive/frame_transport.rs",
+                     "line":  44,
+                     "symbol":  "parallel_transport",
+                     "expression":  "tolerance = DirectTolerance::default().position",
+                     "proposed_class":  "config-gap",
+                     "reason":  "consumer of .position",
+                     "confidence":  "high"
+                 },
+                 {
+                     "file":  "vendor/truck/truck-geometry/src/constructive/mod.rs",
+                     "line":  89,
+                     "symbol":  "try_new",
+                     "expression":  "tolerance = DirectTolerance::default().position",
+                     "proposed_class":  "config-gap",
+                     "reason":  "consumer of .position in constructive entry validation",
+                     "confidence":  "high"
+                 },
+                 {
+                     "file":  "vendor/truck/truck-geometry/src/constructive/profile.rs",
+                     "line":  28,
+                     "symbol":  "evaluate",
+                     "expression":  "c.abs() \u003c= DirectTolerance::default().parameter",
+                     "proposed_class":  "config-gap",
+                     "reason":  "consumer of .parameter",
+                     "confidence":  "high"
+                 },
+                 {
+                     "file":  "vendor/truck/truck-geometry/src/constructive/recipe.rs",
+                     "line":  80,
+                     "symbol":  "position_at",
+                     "expression":  "tol = DirectTolerance::default().parameter",
+                     "proposed_class":  "config-gap",
+                     "reason":  "consumer of .parameter (C1 tangent-discontinuity threshold)",
+                     "confidence":  "high"
+                 },
+                 {
+                     "file":  "vendor/truck/truck-geometry/src/decorators/coons.rs",
+                     "line":  84,
+                     "symbol":  "try_new",
+                     "expression":  "tol = DirectTolerance::default().position",
+                     "proposed_class":  "config-gap",
+                     "reason":  "consumer of .position in coons corner collapse",
+                     "confidence":  "high"
+                 },
+                 {
+                     "file":  "vendor/truck/truck-geometry/src/decorators/spine_frame.rs",
+                     "line":  52,
+                     "symbol":  "position_at",
+                     "expression":  "tolerance = DirectTolerance::default().parameter",
+                     "proposed_class":  "config-gap",
+                     "reason":  "consumer of .parameter",
+                     "confidence":  "high"
+                 },
+                 {
+                     "file":  "vendor/truck/truck-evidence/src/elementary.rs",
+                     "line":  267,
+                     "symbol":  "sin_encloses_sampled_values",
+                     "expression":  "sin(cell) over sample grid",
+                     "proposed_class":  "quarantine-rational",
+                     "reason":  "EXCLUDED (test): elementary.rs test module exercises certified interval sin on cells; excluded from blast radius",
+                     "confidence":  "medium",
+                     "excluded":  true
+                 },
+                 {
+                     "file":  "vendor/truck/truck-evidence/src/elementary.rs",
+                     "line":  288,
+                     "symbol":  "cos_encloses_sampled_values",
+                     "expression":  "cos(cell) over sample grid",
+                     "proposed_class":  "quarantine-rational",
+                     "reason":  "EXCLUDED (test): cos certification test; excluded row",
+                     "confidence":  "medium",
+                     "excluded":  true
+                 },
+                 {
+                     "file":  "vendor/truck/truck-evidence/src/elementary.rs",
+                     "line":  338,
+                     "symbol":  "a_full_period_is_the_whole_range",
+                     "expression":  "sin(cell)/cos(cell) on [0,7]",
+                     "proposed_class":  "quarantine-rational",
+                     "reason":  "EXCLUDED (test): elementary consumer test; excluded row",
+                     "confidence":  "medium",
+                     "excluded":  true
+                 },
+                 {
+                     "file":  "vendor/truck/truck-evidence/src/sphere.rs",
+                     "line":  241,
+                     "symbol":  "sphere_trig_extrema_inside_interval",
+                     "expression":  "cos(vv).sup()",
+                     "proposed_class":  "quarantine-rational",
+                     "reason":  "EXCLUDED (test): carrier test module consumes elementary interval cos via super::*; excluded row",
+                     "confidence":  "medium",
+                     "excluded":  true
+                 },
+                 {
+                     "file":  "vendor/truck/truck-evidence/src/sphere.rs",
+                     "line":  406,
+                     "symbol":  "sphere_immersion_lower_bound_is_directed",
+                     "expression":  "sin(const_interval!(0.3, 0.4))",
+                     "proposed_class":  "quarantine-rational",
+                     "reason":  "EXCLUDED (test): carrier test module consumes elementary interval sin; excluded row",
+                     "confidence":  "medium",
+                     "excluded":  true
+                 },
+                 {
+                     "file":  "vendor/truck/truck-evidence/src/fid/isotopy.rs",
+                     "line":  1154,
+                     "symbol":  "enclose",
+                     "expression":  "x: cos(tt) * interval_at(self.r)",
+                     "proposed_class":  "quarantine-rational",
+                     "reason":  "EXCLUDED (test): fid isotopy test-module witness consumes elementary interval cos/sin (import line 1032); excluded row",
+                     "confidence":  "medium",
+                     "excluded":  true
+                 },
+                 {
+                     "file":  "vendor/truck/truck-evidence/src/fid/one_sheet.rs",
+                     "line":  622,
+                     "symbol":  "enclose",
+                     "expression":  "x: cos(tt) * interval_at(self.r)",
+                     "proposed_class":  "quarantine-rational",
+                     "reason":  "EXCLUDED (test): fid one_sheet test-module witness consumes elementary interval cos/sin (import line 528); excluded row",
+                     "confidence":  "medium",
+                     "excluded":  true
+                 },
+                 {
+                     "file":  "vendor/truck/truck-evidence/src/fid/rep.rs",
+                     "line":  2820,
+                     "symbol":  "enclose",
+                     "expression":  "x: cos(tt) * interval_at(self.r)",
+                     "proposed_class":  "quarantine-rational",
+                     "reason":  "EXCLUDED (test): fid rep test-module witness consumes elementary interval cos/sin (import line 2706); excluded row",
+                     "confidence":  "medium",
+                     "excluded":  true
+                 },
+                 {
+                     "file":  "vendor/truck/truck-evidence/src/plane.rs",
+                     "line":  80,
+                     "symbol":  "normal_cone",
+                     "expression":  "let n = cross.normalize()",
+                     "proposed_class":  "predictor-only",
+                     "reason":  "float normalize of u_axis x v_axis feeding certified DirCone axis; gated only by float cross.magnitude()==0.0 zero test, not an interval certified-norm gate; axes are orthonormal by Plane construction so unit by construction",
+                     "confidence":  "low"
+                 }
+             ]
+}

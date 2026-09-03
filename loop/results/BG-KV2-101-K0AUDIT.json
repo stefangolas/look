@@ -1,0 +1,35 @@
+﻿{
+    "packet":  "BG-KV2-101-K0AUDIT",
+    "deliverable":  "SURVEY.json",
+    "row_count":  93,
+    "counted_rows":  85,
+    "excluded_test_rows":  8,
+    "anchors":  {
+                    "A1":  1,
+                    "A2":  0,
+                    "A3":  1,
+                    "A4":  1
+                },
+    "class_totals":  {
+                         "quarantine-rational":  32,
+                         "predictor-only":  22,
+                         "compliant":  20,
+                         "config-gap":  11,
+                         "n7-candidate":  0
+                     },
+    "low_confidence_sites":  [
+                                 "vendor/truck/truck-certified/src/formal/planar_holes.rs:1201 run_planar_holes_slice (predictor-only)",
+                                 "vendor/truck/truck-certified/src/formal/planar_slice.rs:1806 run_planar_slice (predictor-only)",
+                                 "vendor/truck/truck-evidence/src/plane.rs:80 normal_cone (predictor-only)"
+                             ],
+    "census_missed_n4":  [
+                             "Census hypothesis torus.rs:22 does not reproduce as a code site (line 22 is a doc comment pointing at crate::elementary); actual interval-trig consumers in torus.rs measured at 54,72,73,74,87,98.",
+                             "Census hypothesis cone.rs:63,117 reproduce exactly (f64 tan(half_angle) feeding cone enclosure slope / normal-cone axis); extra measured tan sites at cone.rs:73,151.",
+                             "N4 violation the census MISSED: elementary interval sin/cos also consumed by cylinder.rs (53,54,69,70), revolved.rs rot_der (67,68) and sphere.rs immersion_lower_bound (179) - these feed certified enclosures/immersion bounds and are not named in the census seed list.",
+                             "elementary.rs exposes only pub sin/cos; no interval exp/log/atan2 exists in this module, so the exp/log/atan2 consumer grep is empty by measurement.",
+                             "A2 measured 0 across vendor/truck: no par.sum/par_sum. Compliant index-stable serial reductions recorded (planar_holes.rs:881, planar_slice.rs:1528, kernel/certs.rs:512, rank1_annulus.rs:747, planar_developed.rs:612).",
+                             "Directed-rounding primitive inventory: next_after(deck.rs:188), toward_neg(210), toward_pos(225), DeckInterval(259), CertifiedInterval(exact.rs:227), two_sum(exact.rs:45), two_product(exact.rs:53).",
+                             "SamplingPolicy::CustomParameters blast radius: definition sampling.rs:23, resolve arm sampling.rs:66, test call sites truck-geometry/tests/constructive_contract.rs:209 and constructive_recipe.rs:289.",
+                             "No par-iterator float-sum reduction exists; rayon appears only in truck-assembly/topology/meshalgo/truck-stepio doc/example paths, none on the certificate path."
+                         ]
+}
