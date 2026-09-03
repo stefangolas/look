@@ -80,7 +80,19 @@ const PERP_RATIO: f64 = 3.0; // H-3: predictor perpendicular half-width ratio
 const CLOSE_TOL: f64 = 1e-3; // H-3: closed-loop recurrence detection tolerance
 
 /// The number of `tau` sub-boxes of the escalation ladder's rank screen.
-const RANK_SUBBOXES: usize = 8;
+const RANK_SUBBOXES: usize = 16;
+
+/// The perpendicular half-width of the escalation rank screen's sub-boxes as a
+/// multiple of the failed arc's `tau` width. The C2 tube needs a wide
+/// perpendicular box to certify, but the ladder's rank screen must localize
+/// rank collapse along `tau`, so it re-slices the failed arc in a NARROW box
+/// around the branch (a proposal tolerance, H-3).
+const SCREEN_PERP: f64 = 0.05; // H-3: rank-screen perpendicular half-width ratio
+
+/// The largest rank-collapse sub-box count that still reads as an ISOLATED R2
+/// zero set (a point, plus its narrow screen footprint). A 1-dimensional
+/// contact locus saturates every sub-box.
+const ISOLATED_CAP: usize = RANK_SUBBOXES / 4;
 
 /// The run policy of the float tracer.
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -720,9 +732,10 @@ fn tau_room(frame: &Frame<4>, point: &[f64; 4], rect: &[(f64, f64); 4]) -> f64 {
     room
 }
 
-/// The §10.2 escalation ladder over a failed arc `[tau_lo, tau_lo + dtau]`
-/// whose tube box (in the current frame) is `[y_lo, y_hi]`. Decided from
-/// certified enclosures alone.
+/// The §10.2 escalation ladder over a failed arc `[tau_lo, tau_lo + dtau]`.
+/// The failed tube box (in the current frame) spans `[y_lo, y_hi]` and the
+/// branch passes through `(tau_lo, y_cur)`. Decided from certified enclosures
+/// alone.
 fn escalate(
     sys: &SquareSystem3,
     frame: &Frame<4>,
@@ -730,6 +743,7 @@ fn escalate(
     dtau: f64,
     y_lo: &[f64; 3],
     y_hi: &[f64; 3],
+    y_cur: &[f64; 3],
 ) -> Escalation {
     let y_iv: [Interval; 3] = [
         Interval {
@@ -772,8 +786,24 @@ fn escalate(
         }
     }
 
-    // Partition the failed arc into tau sub-boxes and run the enclosure rank
-    // screen.
+    // Partition the failed arc into tau sub-boxes of a NARROW box around the
+    // branch (the rank screen must localize rank collapse along tau; the fat
+    // C2 tube box cannot resolve features a tube-width apart).
+    let hs = SCREEN_PERP * dtau;
+    let screen_iv: [Interval; 3] = [
+        Interval {
+            lo: y_cur[0] - hs,
+            hi: y_cur[0] + hs,
+        },
+        Interval {
+            lo: y_cur[1] - hs,
+            hi: y_cur[1] + hs,
+        },
+        Interval {
+            lo: y_cur[2] - hs,
+            hi: y_cur[2] + hs,
+        },
+    ];
     let mut collapse = 0usize;
     for k in 0..RANK_SUBBOXES {
         let (f0, f1) = sub_interval(k, RANK_SUBBOXES);
@@ -781,7 +811,7 @@ fn escalate(
             lo: tau_lo + f0 * dtau,
             hi: tau_lo + f1 * dtau,
         };
-        let sub_box = match tube_chart_box(sys, frame, sub_tau, &y_iv) {
+        let sub_box = match tube_chart_box(sys, frame, sub_tau, &screen_iv) {
             Some(b) => b,
             None => {
                 collapse += 1;
@@ -812,7 +842,7 @@ fn escalate(
                 ),
             },
         )),
-        c if c <= 2 => Escalation::Refuse(Refusal::new(
+        c if c <= ISOLATED_CAP => Escalation::Refuse(Refusal::new(
             RefusalKind::Conditioning,
             RefusalEvidence::Predicate {
                 name: "isolated_contact_is_s5a",
@@ -950,7 +980,7 @@ fn trace_march(
                 let h = PERP_RATIO * dtau;
                 let y_lo = [y_pred[0] - h, y_pred[1] - h, y_pred[2] - h];
                 let y_hi = [y_pred[0] + h, y_pred[1] + h, y_pred[2] + h];
-                match escalate(sys, &frame, tau_local, dtau, &y_lo, &y_hi) {
+                match escalate(sys, &frame, tau_local, dtau, &y_lo, &y_hi, &y) {
                     Escalation::Rebuild => {
                         if rebuilds >= policy.max_frame_rebuilds {
                             let st = make_stats(steps.len(), rebuilds, halvings);

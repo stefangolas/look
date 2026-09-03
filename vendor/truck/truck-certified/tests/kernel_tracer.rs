@@ -116,6 +116,57 @@ fn net_parabola(k: f64) -> Vec<Vec<f64>> {
     net
 }
 
+/// g = (v − v*)²: a tangential line at v = v* (rank 2 along it).
+fn net_tangent_line(vstar: f64) -> Vec<Vec<f64>> {
+    let c = [
+        vstar * vstar,
+        vstar * vstar - vstar,
+        (1.0 - vstar) * (1.0 - vstar),
+    ];
+    vec![c.to_vec()]
+}
+
+/// g = (u − ua) * Π(v − vbk): isolated tangential nodes on the branch u = ua.
+fn net_nodes(ua: f64, vbs: &[f64]) -> Vec<Vec<f64>> {
+    let n = vbs.len();
+    // P(v) = Π(v − vbk), power coefficients in ascending degree.
+    let mut poly = vec![1.0f64];
+    for &r in vbs {
+        let old = poly.clone();
+        let mut nxt = vec![0.0f64; old.len() + 1];
+        for (k, &co) in old.iter().enumerate() {
+            nxt[k] += -r * co;
+            nxt[k + 1] += co;
+        }
+        poly = nxt;
+    }
+    // Power -> Bernstein (degree n): c_j = Σ_{k<=j} p_k * C(j,k) / C(n,k).
+    let comb = |a: usize, b: usize| -> f64 {
+        let mut v = 1.0f64;
+        for t in 0..b {
+            v *= (a - t) as f64 / (t + 1) as f64;
+        }
+        v
+    };
+    let mut pc = vec![0.0f64; n + 1];
+    for j in 0..=n {
+        let mut acc = 0.0f64;
+        for k in 0..=j {
+            acc += poly[k] * comb(j, k) / comb(n, k);
+        }
+        pc[j] = acc;
+    }
+    // (u − ua) over u at degree 1: [−ua, 1−ua].
+    let uc = [-ua, 1.0 - ua];
+    let mut net = Vec::with_capacity(2);
+    for &u in &uc {
+        net.push(pc.iter().map(|c| u * c).collect());
+    }
+    net
+}
+
+/// g = v² − (u − uc)³: an ordinary cusp at (uc, 0), an isolated rank-collapse
+/// point on a single branch (no second crossing component).
 fn seed_unit(u: f64, v: f64) -> [f64; 4] {
     [u, v, u, v]
 }
@@ -210,11 +261,14 @@ fn frame_rebuild_after_max_halvings_continues_the_branch() {
 
 #[test]
 fn escalation_routes_rank2_zero_set_to_tangential_refusal() {
-    // g = v²: the zero set is the tangential line v = 0 (rank 2). A unit seed
-    // beside it must refuse TangentialCurve.
-    let sys = two_graph(&vec![vec![0.0, 0.0, 1.0]], -0.5);
-    let u0 = (0.5f64 - 1e-6).sqrt();
-    let seed = seed_unit(u0, 0.001);
+    // g = (v − 0.5)²: the zero set is the tangential line v = 0.5 (rank 2
+    // along it), interior to the chart. A unit seed beside the line (inside
+    // every tube box) must refuse TangentialCurve.
+    let vs = 0.5f64;
+    let dv = 0.0003f64;
+    let u0 = (0.5f64 - (vs + dv) * (vs + dv)).sqrt();
+    let sys = two_graph(&net_tangent_line(vs), 0.0);
+    let seed = seed_unit(u0, vs + dv);
     let policy = TracePolicy::default();
     let outcome = float_trace(&sys, seed, &policy);
     match &outcome {
@@ -228,22 +282,15 @@ fn escalation_routes_rank2_zero_set_to_tangential_refusal() {
 
 #[test]
 fn escalation_routes_isolated_r2_to_the_contact_future() {
-    // g = (u − ua)(v − vb): isolated tangential node at (ua, vb). A unit seed
-    // on the vertical branch u = ua below the node marches into it and the
-    // ladder refuses the S5a seam.
+    // g = (u − ua)(v − vb): an isolated tangential node at (ua, vb) on the
+    // branch u = ua, one floor arc ahead of a unit seed on that branch. The
+    // first tube already contains the node's rank collapse, so the ladder
+    // escalates at once and refuses the S5a seam.
     let ua = 0.3f64;
-    let vb = 0.7f64;
-    let mut g = vec![vec![0.0f64; 2]; 2];
-    for a in 0..2 {
-        let uc = if a == 0 { -ua } else { 1.0 - ua };
-        for b in 0..2 {
-            let vc = if b == 0 { -vb } else { 1.0 - vb };
-            g[a][b] = uc * vc;
-        }
-    }
-    let sys = two_graph(&g, 0.0);
-    // Unit seed on the branch u = ua below the node: ua² + v0² = 0.5.
-    let v0 = (0.5 - ua * ua).sqrt();
+    let v0 = (0.5f64 - ua * ua).sqrt();
+    let floor = 0.05 * 0.5f64.powi(3);
+    let vb = v0 + (floor / 2.0) / 2.0f64.sqrt();
+    let sys = two_graph(&net_nodes(ua, &[vb]), 0.0);
     let seed = seed_unit(ua, v0);
     let policy = TracePolicy::default();
     let outcome = float_trace(&sys, seed, &policy);
@@ -254,11 +301,20 @@ fn escalation_routes_isolated_r2_to_the_contact_future() {
 
 #[test]
 fn high_order_singularity_refuses() {
-    // A broad degeneracy (the tangential-line fixture with the seed offset so
-    // the rank screen reads a partial-arc collapse) refuses HighOrderJet.
-    let sys = two_graph(&vec![vec![0.0, 0.0, 1.0]], -0.5);
-    let u0 = (0.5f64 - 4e-6).sqrt();
-    let seed = seed_unit(u0, 0.002);
+    // Three isolated tangential nodes on the branch u = ua inside one floor
+    // arc of the seed, spread over three rank-screen sub-boxes: the screen
+    // reads neither a clean isolated contact nor a full-arc tangency and
+    // refuses HighOrderJet.
+    let ua = 0.5f64;
+    let v0 = (0.5f64 - ua * ua).sqrt();
+    let floor = 0.05 * 0.5f64.powi(3);
+    let r2 = 2.0f64.sqrt();
+    let vbs: Vec<f64> = [0.15f64, 0.5, 0.85]
+        .iter()
+        .map(|f| v0 + f * floor / r2)
+        .collect();
+    let sys = two_graph(&net_nodes(ua, &vbs), 0.0);
+    let seed = seed_unit(ua, v0);
     let policy = TracePolicy::default();
     let outcome = float_trace(&sys, seed, &policy);
     match &outcome {
