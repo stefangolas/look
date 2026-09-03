@@ -52,6 +52,11 @@ pub type Interval = crate::formal::exact::CertifiedInterval;
 /// `CertifiedSign`.
 pub type SignCert = crate::formal::exact::CertifiedSign;
 
+/// §14.2 segment gluing, deck identification, and §16 graph assembly
+/// (BG-KV2-303-S9A): the Rules A/B/C endpoint identity, the C1-agreement tube
+/// overlap, the deck-step breaks of a closed chain, and the certified-graph
+/// constructor over the frozen topology shapes.
+pub mod assemble;
 pub mod certs;
 pub mod config;
 /// The §10.3 isolated-contact classifier (BG-KV2-302-S5A): the tolerance-
