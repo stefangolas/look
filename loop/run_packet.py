@@ -370,6 +370,16 @@ def main():
     # reclaimed on re-fork anyway, and the watchdog only touches idle slots.
     env = dict(os.environ)
     env['CARGO_INCREMENTAL'] = '1'
+    # Workers never start a language server (session 51): opencode
+    # auto-spawns rust-analyzer per session over its slot worktree - a cold,
+    # duplicate index of the same tree at 1-2+ GB each, with CPU/RAM spikes
+    # that compound with the cargo spike the cargo queue just serialized.
+    # Workers' packets mandate cargo check as the inner loop and verify.py
+    # is authoritative, so the LSP is redundant here. This merges as the
+    # final local config scope, so it holds regardless of repo/global
+    # opencode.json, and it exists only under this dispatch - interactive
+    # sessions are unaffected.
+    env['OPENCODE_CONFIG_CONTENT'] = '{"lsp": false}'
     # LOOK_SHARED_TARGET (session 50, booking section 6 now viable via the
     # cargo queue): when set, workers share ONE target dir - the queue
     # serializes invocations, so the shared tree is race-free and the
