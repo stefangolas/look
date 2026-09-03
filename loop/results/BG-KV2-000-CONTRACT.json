@@ -1,0 +1,58 @@
+{
+  "id": "BG-KV2-000-CONTRACT",
+  "class": "design",
+  "status": "done",
+  "branch": "packet/BG-KV2-000-CONTRACT",
+  "head": "2147665",
+  "summary": "Land the kernel-v2 shim in truck-certified: shared types, refusing constructors, the §17 refusal vocabulary, config constants, and the six machine-checked fixtures (BG-KV2-000-CONTRACT). Work spans the orchestrator resume checkpoint 51133e3 (full write set) and the finish commit 2147665 (clippy-cleanup + fmt restore) whose subject is the packet's required subject.",
+  "stop_conditions": {
+    "triggered": false,
+    "details": [
+      "1: no landed shape mismatch — CertifiedInterval/CertifiedSign signatures match the packet quotes (verified in formal/exact.rs); aliased, never restated.",
+      "2: no fixture needed a solver to carry its ground truth — every ground truth is direct evaluation, stored data, or a CertifiedInterval-style polynomial enclosure.",
+      "3: adding `pub mod kernel;` broke no crate-root re-export and caused no unfixable missing_docs/deny(warnings) failure."
+    ]
+  },
+  "files_written": [
+    "vendor/truck/truck-certified/src/kernel/mod.rs",
+    "vendor/truck/truck-certified/src/kernel/config.rs",
+    "vendor/truck/truck-certified/src/kernel/evidence.rs",
+    "vendor/truck/truck-certified/src/kernel/residual.rs",
+    "vendor/truck/truck-certified/src/kernel/patch.rs",
+    "vendor/truck/truck-certified/src/kernel/leaf.rs",
+    "vendor/truck/truck-certified/src/kernel/certs.rs",
+    "vendor/truck/truck-certified/src/kernel/graph.rs",
+    "vendor/truck/truck-certified/src/kernel/fixtures.rs",
+    "vendor/truck/truck-certified/src/lib.rs",
+    "vendor/truck/truck-certified/tests/kernel_contract.rs"
+  ],
+  "anchors_after": {
+    "A1_pub_mod_kernel": 1,
+    "A2_claim_verdict_present": true,
+    "A3_certified_interval_struct": 1,
+    "A4_certified_sign_enum": 1,
+    "A5_deny_unwrap_used_in_lib": 1,
+    "A6_pub_mod_count_in_lib": 13,
+    "A7_inari_in_cargo_toml": 0,
+    "A8_residual_id_present": true
+  },
+  "tests": {
+    "required_16": "all present and green in tests/kernel_contract.rs",
+    "lib_tests": "566 passed (includes 6 kernel::fixtures ground-truth unit tests and kernel::residual::tests::implication_table_is_exactly_rule_c)",
+    "integration_kernel_contract": "16 passed",
+    "other_suites": "all truck-certified integration suites green (pair_dispatch 11, certified_map 9, hull 8, ssi_contract 8, ssi_system 8, sphere 8, ssi_trace 12, witness 8)",
+    "command": "cargo test -p truck-certified --lib --tests --no-fail-fast --locked"
+  },
+  "verification": {
+    "fmt": "cargo fmt --all -- --check clean (out-of-write-set fmt drift on examples/step_face_timing.rs and tests/geometry_fingerprint.rs restored via mechanical git checkout)",
+    "workspace_check": "cargo check --workspace --all-targets --locked: Finished, zero errors",
+    "clippy_new_files": "cargo clippy -p truck-certified --lib --message-format=short --no-deps: zero findings under src/kernel/** (allowed lints on the refusing constructors carry inline justification comments: result_large_err/large_enum_variant because Refusal carries Option<PartialGraph> by the frozen §2 shape, plus a stored-2PI approx_constant)",
+    "env": "CARGO_BUILD_JOBS=4 on every cargo invocation; RUSTC_WRAPPER empty (no sccache interference), so no unset was needed"
+  },
+  "notes": [
+    "Toolchain is rustc 1.97.1 with no rust-toolchain pin. `cargo clippy -p truck-certified --all-targets` cannot complete end-to-end because LANDED baseline modules (formal/cone.rs, formal/cylinder.rs, ...) trip lints that are new/deny under this toolchain (neg_cmp_op_on_partial_ord, result_large_err, large_enum_variant, approx_constant, ...); those files are outside this packet's write set. All findings attributable to the new kernel files and the new contract tests were fixed; the scoped lib-target clippy run over src/kernel is clean.",
+    "Fixture 2 (coaxial cylinders) carries the identity exact-sheet sign as input data per the packet; the refusing helper coaxial_cylinder_sheet accepts the co-oriented pair and refuses the anti-parallel twin (ClaimRefuted, Disproven).",
+    "Fixture 3 (determinant spans zero) refuses with backing Inconclusive (R5EnclosureFailed, R5 residual evidence over the [-2,2]^2 box); fixture 4 pins the §7.1 WeightDegenerate Disproven/Inconclusive pair.",
+    "Deck-wrap fixture stores 2PI = 6.283185307179586 and the canonical unwrap 6.4 - 2PI = 0.11681469282041412 as data; tests check only the exact deck integer from floor-div on the crossing count."
+  ]
+}
