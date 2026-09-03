@@ -63,4 +63,5 @@ pub mod identity;
 pub mod leaf;
 pub mod leaf_extract;
 pub mod patch;
+pub mod rational;
 pub mod residual;
