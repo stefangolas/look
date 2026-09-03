@@ -68,6 +68,10 @@ pub mod graph;
 pub mod identity;
 pub mod leaf;
 pub mod leaf_extract;
+/// The §6.3 maximal-minor algebra (BG-KV2-301-S03A): Theorem 6.4's `m` vector
+/// (`m_j = (−1)^j det(DF with column j deleted)`) as a certified enclosure
+/// over a per-box 3x4 Jacobian, with the `DF·m = 0` and `a·m` checkables.
+pub mod minor_algebra;
 pub mod patch;
 pub mod rational;
 pub mod residual;
@@ -75,3 +79,8 @@ pub mod residual;
 /// (arity 3) and the one-chart curve–curve system (arity 2) over the S2A C1
 /// seam, plus the 1-var homogeneous curve leaf they consume.
 pub mod residuals_r89;
+/// The Tier-1 loop-free certificate and the §9.3 R8 boundary-stratum seeds
+/// (BG-KV2-301-S03A): the two-cone LP of Theorem 9.1 (cos-space cone
+/// separation) and the R8 subdivision seeds over caller-supplied boundary
+/// edges.
+pub mod tier1;
