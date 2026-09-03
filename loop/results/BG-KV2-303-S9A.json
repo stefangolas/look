@@ -1,0 +1,38 @@
+{
+  "packet": "BG-KV2-303-S9A",
+  "id": "BG-KV2-303-S9A",
+  "contract": ["BG-KV2-303-S9A"],
+  "class": "design",
+  "crates": ["truck-certified"],
+  "status": "complete",
+  "commit": "1ac604f",
+  "summary": "Landed kernel/assemble.rs (segment gluing + deck identification + graph assembly) with the packet's public API: regions_identify (Rules A/B/C via the landed kernel/identity rule_a/rule_c, never proximity), c1_bound_of (outward-rounded enclosure comparison of both stored Hermite ends' positions/derivatives over the junction box, no snapping), glue -> Construction<GlueCert> (identity + TubeOverlapCert::try_new(shared_point, c1_bound) with the shared point as the nearer-pair float proposal; a near non-identifying pair refuses SliverOrNearOverlap, Inconclusive; a C1 disagreement refuses ClaimRefuted), deck_identify(&[ChainArc], period, unions) -> Construction<Vec<Break>> (exact i32/i64 deck sums - the chain chart data carries the periods, so no formal/deck.rs interval solver adapter is needed; Rule B closure via rule_b_transport on a physically-closed chain; per-edge |deck| > DECK_MAX refuses DeckExhausted, Inconclusive; emits one SegmentBreak::DeckStep break per seam crossing with the exact (chart, deck=k, u=P)/(chart, deck=k+1, u=0) parameter pair and a trivial same-arc tube overlap), and assemble(Vec<AnyArc>, Vec<Break>, Vec<Node>) -> Construction<CertifiedGraph> (every ArcEnd::Topo resolves to a Node whose NodeCert is the exhaustive Exact-or-AtTolerance match - the shape pin - every ArcEnd::Seg resolves to a Break, unresolved references refuse ClaimRefuted). kernel/mod.rs wires `pub mod assemble;` with a doc comment. The S9b ledger seam (EdgeSampleLedger monotone-arclength reparameterization) and the frozen-shape winding-field question are recorded as seams in the module docs, not improvised. All eight required tests live in tests/kernel_assemble.rs and PASS. RESULT.json is at the worktree root.",
+  "tests": {
+    "gluing_requires_tube_overlap_and_c1_agreement": "PASS",
+    "gluing_refuses_sliver_instead_of_snapping": "PASS",
+    "deck_identification_closes_a_full_cylinder_wrap": "PASS",
+    "helix_exceeding_deck_max_refuses_deck_exhausted": "PASS",
+    "node_identity_uses_rules_abc_not_proximity": "PASS",
+    "morse_saddle_identifies_against_its_half_arc_endpoints": "PASS",
+    "assembled_graph_has_no_refuse_nodes": "PASS",
+    "no_transcendental_call_in_assemble_module": "PASS"
+  },
+  "pass_count": 8,
+  "fail_count": 0,
+  "anchors": { "A1": 1, "A2": 1, "A3": 1, "A4": 1 },
+  "stop_conditions": {
+    "1_frozen_shape_differs": false,
+    "2_deck_machinery_missing_adapter": false
+  },
+  "seams_recorded": [
+    "S9b: EdgeSampleLedger monotone-arclength reparameterization (condition 3) is booked - the ledger is not reachable through this tree's public path; the C1 data statement is certified and the ledger wiring is deferred to S9b.",
+    "Deck winding is carried as data on the emitted SegmentBreak::DeckStep breaks; the frozen CertifiedGraph shape has no per-arc winding field, and adding one would be a frozen-shape amendment (not made)."
+  ],
+  "verify": {
+    "fmt": "rustfmt --check clean on the three changed files (src/kernel/assemble.rs, src/kernel/mod.rs, tests/kernel_assemble.rs)",
+    "check": "cargo check --locked --workspace --all-targets green (with CARGO_BUILD_JOBS=2; the unrestricted parallel build crashes the toolchain with STATUS_STACK_BUFFER_OVERRUN on the look examples)",
+    "tests": "cargo test --locked -p truck-certified --lib --tests --no-fail-fast: all green (566 lib + every integration suite, including the 8 new kernel_assemble tests)",
+    "clippy": "cargo clippy --locked -p truck-certified --lib --tests --no-deps: no finding on any line of the changed files (crate-wide findings are pre-existing in formal/*, domain/*, etc.)",
+    "house_rules": "scripts/kernel-gates.sh <merge-base>: all P-3 gates pass (H-1 denials present, no bare 1e-N literal without a same-line H-3 marker, no debug_new/cfg!(debug_assertions))"
+  }
+}
