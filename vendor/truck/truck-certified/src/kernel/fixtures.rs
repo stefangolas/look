@@ -60,6 +60,7 @@ use crate::kernel::residual::ResidualId;
 
 /// The stored period of the deck fixture: `2*PI`, kept as data (never
 /// recomputed as a transcendental by the fixtures or their tests).
+#[allow(clippy::approx_constant)] // H-3: normative stored 2*PI constant, kept as data
 const PERIOD: f64 = 6.283_185_307_179_586;
 
 /// The canonical unwrap of the deck fixture's raw end parameter
@@ -154,6 +155,7 @@ pub struct C1DiscontinuityFixture {
 }
 
 /// Fixture 1: the transversal sphere/plane pair.
+#[allow(clippy::result_large_err)] // Refusal carries Option<PartialGraph> by frozen §2 shape (BG-KV2-000).
 pub fn transversal_sphere_plane() -> Result<SpherePlaneFixture, Refusal> {
     let theta_domain = IBox2::try_new(
         [0.0, -std::f64::consts::FRAC_PI_2],
@@ -181,6 +183,7 @@ pub fn transversal_sphere_plane() -> Result<SpherePlaneFixture, Refusal> {
 }
 
 /// Fixture 2: two coincident unit cylinders on the z-axis.
+#[allow(clippy::result_large_err)] // Refusal carries Option<PartialGraph> by frozen §2 shape (BG-KV2-000).
 pub fn coaxial_cylinders() -> Result<CoaxialCylinderFixture, Refusal> {
     let first = cylinder_carrier([0.0, 0.0, 1.0])?;
     let second = cylinder_carrier([0.0, 0.0, 1.0])?;
@@ -200,6 +203,7 @@ pub fn coaxial_cylinders() -> Result<CoaxialCylinderFixture, Refusal> {
 /// consistent, co-oriented pair and refuses an anti-parallel (flipped) twin,
 /// because the identity correspondence between coincident cylinders is only
 /// certifiable when the oriented normals agree.
+#[allow(clippy::result_large_err)] // Refusal carries Option<PartialGraph> by frozen §2 shape (BG-KV2-000).
 pub fn coaxial_cylinder_sheet(
     first: &RationalCarrier,
     second: &RationalCarrier,
@@ -209,7 +213,7 @@ pub fn coaxial_cylinder_sheet(
     let axis_dot = first_axis[0] * second_axis[0]
         + first_axis[1] * second_axis[1]
         + first_axis[2] * second_axis[2];
-    if !(axis_dot > 1.0 - crate::kernel::config::EPS_REP) {
+    if axis_dot <= 1.0 - crate::kernel::config::EPS_REP {
         return Err(Refusal::new(
             RefusalKind::ClaimRefuted,
             RefusalEvidence::Predicate {
@@ -226,6 +230,7 @@ pub fn coaxial_cylinder_sheet(
 
 /// Fixture 3: residual `F = (x^2-1, y)` on `[-2,2]^2` whose `det DF = 2x`
 /// spans zero.
+#[allow(clippy::result_large_err)] // Refusal carries Option<PartialGraph> by frozen §2 shape (BG-KV2-000).
 pub fn determinant_spans_zero() -> Result<DeterminantFixture, Refusal> {
     let domain = IBox2::try_new([-2.0, -2.0], [2.0, 2.0])?;
     let x = CertifiedInterval { lo: -2.0, hi: 2.0 };
@@ -249,6 +254,7 @@ pub fn determinant_spans_zero() -> Result<DeterminantFixture, Refusal> {
 
 /// Fixture 4: the homogeneous quadratic weights `(1,-1,1)` with
 /// `w(t) = 1 - 4t(1-t)`.
+#[allow(clippy::result_large_err)] // Refusal carries Option<PartialGraph> by frozen §2 shape (BG-KV2-000).
 pub fn weight_straddles_zero() -> Result<WeightFixture, Refusal> {
     let weights = [1.0, -1.0, 1.0];
     let w_at_half = weight_on(weights, 0.5);
@@ -303,6 +309,7 @@ pub fn weight_straddles_zero() -> Result<WeightFixture, Refusal> {
 }
 
 /// Fixture 5: the pcurve deck wrap over a period-`2*PI` chart.
+#[allow(clippy::result_large_err)] // Refusal carries Option<PartialGraph> by frozen §2 shape (BG-KV2-000).
 pub fn deck_wrap() -> Result<DeckWrapFixture, Refusal> {
     let chart = ChartId(0);
     let start = Param::try_new(chart, 0, 5.9, 0.0)?;
@@ -328,6 +335,7 @@ pub fn c1_discontinuity() -> C1DiscontinuityFixture {
     }
 }
 
+#[allow(clippy::result_large_err)] // Refusal carries Option<PartialGraph> by frozen §2 shape (BG-KV2-000).
 fn cylinder_carrier(axis: [f64; 3]) -> Result<RationalCarrier, Refusal> {
     let domain = IBox2::try_new([0.0, 0.0], [PERIOD, 1.0])?;
     RationalCarrier::try_new(
@@ -342,6 +350,7 @@ fn cylinder_carrier(axis: [f64; 3]) -> Result<RationalCarrier, Refusal> {
     )
 }
 
+#[allow(clippy::result_large_err)] // Refusal carries Option<PartialGraph> by frozen §2 shape (BG-KV2-000).
 fn cylinder_axis(carrier: &RationalCarrier) -> Result<[f64; 3], Refusal> {
     match carrier.data {
         CarrierData::Cylinder { axis, .. } => Ok(axis),

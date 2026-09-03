@@ -215,6 +215,9 @@ pub struct CarrierArc {
 
 /// Any arc of the certified graph: ordinary, difference, self-intersection,
 /// spine, or carrier.
+// Arc<N> carries a Frame<N> + enclosures; the §16 shape freezes the five
+// families as-is, so the inherent size spread is allowed (BG-KV2-000).
+#[allow(clippy::large_enum_variant)]
 #[derive(Debug, Clone, PartialEq)]
 pub enum AnyArc {
     /// An ordinary surface-intersection arc.
@@ -291,6 +294,8 @@ pub struct PartialGraph {
     pub frontier: Vec<Point4>,
 }
 
+// Refusal carries Option<PartialGraph> by frozen §2 shape; large-Err is allowed (BG-KV2-000).
+#[allow(clippy::result_large_err)]
 impl Param {
     /// Build a parameter, refusing non-finite `u`/`v`.
     pub fn try_new(chart: ChartId, deck: i32, u: f64, v: f64) -> Result<Self, Refusal> {
@@ -305,6 +310,8 @@ impl Param {
     }
 }
 
+// Refusal carries Option<PartialGraph> by frozen §2 shape; large-Err is allowed (BG-KV2-000).
+#[allow(clippy::result_large_err)]
 impl HermiteSpline {
     /// Build a spline, refusing an empty segment list or non-finite segment
     /// data.
