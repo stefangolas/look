@@ -54,6 +54,7 @@ pub type SignCert = crate::formal::exact::CertifiedSign;
 
 pub mod certs;
 pub mod config;
+pub mod coons_patch;
 pub mod evidence;
 /// The machine-checked fixture kit — test support only.
 #[doc(hidden)]
