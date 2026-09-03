@@ -158,3 +158,4 @@
 {"id":"BG-KV2-306-FRAMEGATE","verdict":"LANDED-WAVE3","commit":"38956f7","note":"gate correction to spec; recorded as gate FIX not loosening (the constraint was not in the spec)"}
 {"id":"BG-KV2-303-S9A","verdict":"LANDED-WAVE3","commit":"1ac604f","note":"gluing + deck id + assembly; scoped-verified green"}
 {"id":"BG-KV2-207-S4A","verdict":"LANDED-PARTIAL-WAVE2","commit":"d6282a9","note":"tracer landed 5/8; engine-reach packet 307 owns the remainder"}
+{"id":"BG-KV2-305-S2B","verdict":"LANDED-WAVE3","commit":"ced0bca","note":"GraphCert + R5 + R4/R4prime; scoped-verified green post-janitor-wipe"}
