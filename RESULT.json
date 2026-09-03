@@ -1,72 +1,42 @@
 {
-  "packet": "BG-KV2-207-S4A",
-  "id": "BG-KV2-207-S4A",
-  "contract": ["BG-KV2-207-S4A"],
+  "packet": "BG-KV2-401-S3C",
+  "id": "BG-KV2-401-S3C",
+  "contract": ["BG-KV2-401-S3C"],
   "class": "design",
   "crates": ["truck-certified"],
-  "status": "partial",
-  "summary": "The D4 float tracer (vendor/truck/truck-certified/src/kernel/tracer.rs) is landed with the packet's public API (TracePolicy + documented default, FloatStep, FloatOutcome::{Completed,ClosedLoop,Refused}, float_trace, doc(hidden) float_trace_impl + TraceStats), seed certification first through build_frame4 + an initial C2 tube, the Gauss-Newton predictor reusing the last factorization (Frame::a), grow-on-success / halve-on-failure, frame rebuilds after max_halvings with dtau reset, ClosedLoop float recurrence detection, Budget step-cap refusal, and the normative §10.2 escalation ladder decided purely from certified interval enclosures (rung 1 certified-rank rebuild -> Conditioning; rung 2 predicate parametric_degeneracy_chart_or_carrier; rung 3 TangentialCurve; rung 4 predicate isolated_contact_is_s5a; rung 5 HighOrderJet). The rank screen partitions the failed arc into RANK_SUBBOXES (16) tau sub-boxes of a NARROW perpendicular box around the branch (SCREEN_PERP, H-3), localizing rank collapse along tau. FloatStep.certified is built only from the Proven arm of c2_certify_tube4; the module never mints an ArcCert. kernel/mod.rs wires pub mod tracer; the eight required tests live in tests/kernel_tracer.rs. RESULT.json is at the worktree root.",
+  "status": "complete",
+  "summary": "The §9.4 trim clip (vendor/truck/truck-certified/src/kernel/trimclip.rs) is landed with the packet's public API: TrimLoop { chart, curve: BezierLeaf1, closed }, CertifiedCrossing, CertifiedExclusion, OffLoopCert, certify_crossings, certify_off_loop, winding_number, and trim_clip(graph: &CertifiedGraph, trims: &[TrimLoop]) -> Construction<CertifiedGraph>. Steps 3-6 of §9.4 are implemented verbatim: per arc's pcurve and each closed trim curve IN THE SAME CHART, certified R9 crossings are isolated by R9System + krawczyk_c1 (the S1A seam) with subdivision to DEPTH_MAX and the engine's one-line ResidualId::R9 re-stamp; each is a TopoNode::TrimCrossing node (Rule A holds by construction: per (pcurve, trim) residual the certified boxes are pairwise disjoint and each root is unique per §8.2); arcs are split at the certified crossings; every sub-arc is classified inside/outside by the winding number of the closed trim loop about one certified-off interior sample, where the sample's off-loop property is certified by R9 distance-positivity data (certify_off_loop: the cross-multiplied point-vs-trim residual components of the R9 family certified to exclude zero over a partition of the trim parameter); outside sub-arcs are discarded. The winding is an exact integer ray-crossing count in the plane with certified sign discipline (Bernstein-coefficient hulls, degenerate point sign evals, and i64 sums — polynomial arithmetic only, N4: no sin/cos/atan2/exp/ln/log/powf/sqrt and no angle function). Failure to isolate at DEPTH_MAX refuses TrimClipFailed (Inconclusive) with predicate names trim_crossing_depth_max / sample_off_loop_depth_max / winding_*. The interior-loop no-special-case case is handled by steps 3-6 with no special case. kernel/mod.rs wires `pub mod trimclip;`. The seven required tests live in tests/kernel_trimclip.rs and all pass. Commit 1c7bcaf at the worktree root. RESULT.json is at the worktree root.",
   "tests": {
-    "tracer_marches_a_straight_branch_and_certifies_long_arcs": "PASS",
-    "dtau_grows_on_success_and_halves_on_failure": "FAIL",
-    "frame_rebuild_after_max_halvings_continues_the_branch": "PASS",
-    "escalation_routes_rank2_zero_set_to_tangential_refusal": "PASS",
-    "escalation_routes_isolated_r2_to_the_contact_future": "FAIL",
-    "high_order_singularity_refuses": "FAIL",
-    "monotone_in_tau_only_no_strong_monotonicity_imposed": "PASS",
-    "tracer_output_never_claims_certification": "PASS"
+    "r9_crossings_certify_between_arc_pcurve_and_trim_loop": "PASS",
+    "arc_splits_at_certified_trim_crossings": "PASS",
+    "winding_classification_inside_and_outside_on_fixture": "PASS",
+    "interior_loop_crossing_no_leaf_boundary_is_clipped": "PASS",
+    "sample_certified_off_the_loop": "PASS",
+    "depth_max_failure_refuses_trim_clip_failed": "PASS",
+    "no_transcendental_call_in_trimclip_module": "PASS"
   },
-  "pass_count": 5,
-  "fail_count": 3,
+  "pass_count": 7,
+  "fail_count": 0,
   "measured_counts": {
-    "fixture_1_straight": {
-      "policy_arc_step0": 0.005,
-      "steps": 30,
-      "total_tau": 0.28234,
-      "max_dtau": 0.04,
-      "rebuilds": 0,
-      "halvings": 0,
-      "outcome": "Completed"
-    },
-    "fixture_3_straight_near_boundary": {
-      "steps": 20,
-      "total_tau": 0.27813,
-      "max_dtau": 0.05,
-      "rebuilds": 0,
-      "halvings": 0,
-      "outcome": "Completed"
-    },
-    "fixture_7_straight_near_boundary": {
-      "steps": 20,
-      "total_tau": 0.27813,
-      "max_dtau": 0.05,
-      "rebuilds": 0,
-      "halvings": 0,
-      "outcome": "Completed"
-    },
-    "fixture_2_parabola": {
-      "steps": 0,
-      "halvings": 3,
-      "outcome": "Completed with no certified step: the frozen tube never certifies the quadratic branch at any width",
-      "note": "c2_certify_tube4 returned Proven only for (near-)linear systems in every configuration exercised; a parabola 'hard part' cannot produce a halved certified step, so the dtau-grows/recovers assertions cannot be met."
-    },
-    "fixture_4_tangential_line": "Refused TangentialCurve (predicate r2_contact_zero_set_one_dimensional), steps 0, halvings 3.",
-    "fixture_5_isolated_node": "Refused HighOrderJet (predicate rank_screen_not_isolated_not_curve), steps 0, halvings 3. The isolated node's certified rank footprint exceeds the isolated cap because the crossing component keeps g_u within the interval-hull noise over several sub-boxes.",
-    "fixture_6_three_nodes": "Refused TangentialCurve (predicate r2_contact_zero_set_one_dimensional), steps 0, halvings 3. Three nodes clustered within one floor arc force the maximal-minor polynomial to ~1e-8 magnitude between them, below the interval-hull zero-containment resolution, so every sub-box reads rank collapse."
+    "crossing_fixture": "diagonal line vs quadratic trim: exactly 1 certified crossing, certified (t, r) box contains (1/3, 1/3) (root non-dyadic, off every subdivision boundary below DEPTH_MAX); certified chart point is the pcurve image of the certified t-midpoint.",
+    "split_fixture": "horizontal chord y = 0.3 across the closed cubic loop: 2 certified crossings (boxes [0.34375, 0.375] and [0.625, 0.65625] in the arc parameter); leading/trailing outside runs discarded, 1 inside run retained between the two TrimCrossing nodes.",
+    "interior_loop_fixture": "closed square ring [0.42, 0.58] x [0.2, 0.62] strictly inside the chart (missing every leaf boundary) crossing the closed loop: 2 TrimCrossing nodes at (0.58, 0.446) and (0.42, 0.446); bottom side retained whole, lower runs of the two vertical sides retained, top side and upper vertical runs discarded (3 arcs retained).",
+    "winding_fixture": "inside sample (0.5, 0.3): certified winding +1 (matches the independent dense angle-sum reference); outside samples (0.5, 1.2) and (0.1, 0.3): winding 0. Off-loop certificates carry 7-16 certified exclusion boxes partitioning the trim parameter.",
+    "depth_max_fixture": "parabola C1(t) = (t, (t - 0.25)^2) exactly tangent to the horizontal trim C2(r) = (r, 0) at the contact (0.25, 0.25): the R9 residual vanishes there but its Jacobian is singular, so no box containing the contact isolates a transverse root; the subdivision stalls at DEPTH_MAX 40 and certify_crossings refuses TrimClipFailed (Inconclusive, predicate trim_crossing_depth_max). The fixture is NOT supposed to isolate (a tangent contact has no crossing), so the refusal is the deliverable, not a stop condition."
   },
   "blocking_finding": {
-    "text": "Three frozen-seam behaviors block the remaining fixtures. (1) c2_certify_tube4 only certifies tubes for (near-)linear systems in every exercised configuration and demands a perpendicular half-width of ~3x the tau width even there, so the packet's curved/wrapped marching fixtures (parabola hard part, circle arcs) cannot be certified and cannot produce the asserted step streams. (2) Frame::try_new admits only unit-norm frame origins and build_frame4's Gram-Schmidt trips its 1e-12 orthogonality gate near degenerate seeds (observed dots ~1e-11 to 1e-9 as seeds approach rank-collapse points), so seeds/rebuilds must sit on S3 away from degeneracies, and a branch's single-frame certified reach (~0.3-0.35 tau) forces rebuilds at non-unit points on any longer non-S3 branch. (3) The escalation ladder's rung 3/4/5 separation needs certified rank margins the interval hulls cannot deliver at the required scale: components clustered within one floor arc force the maximal-minor polynomial to ~1e-8 between them, below hull zero-containment resolution, so isolated nodes read as broader collapses and clustered nodes read as full-arc tangencies. The ladder code, order, and refusal vocabulary are exactly as specified; none of the three stop conditions is triggered (the seam is untouched; every decision is enclosure-based; no SegmentBreak stream is emitted). Anchors A1-A5 verified unchanged.",
-    "anchors": { "A1": 1, "A2": 1, "A3": 1, "A4": 1, "A5": 0 }
+    "text": "None. All seven required tests pass. The trim-clip module's honest scope is recorded in-module: the frozen CertifiedGraph carries no polynomial pcurves, so like tier1::boundary_seeds (caller-supplied edge leaves), an arc is clippable exactly when its certified trace in the trim chart is the straight segment between its two certified chart endpoints, which trim_clip recovers exactly as a degree-1 BezierLeaf1 (the leaf/atlas wave supplies general pcurves). A straight certified trace whose R9 events cannot be recovered is refused TrimClipFailed (Inconclusive). No frozen seam was touched; the winding uses only polynomial sign evaluations (no transcendental evaluation, so the §9.4 SOUND use of the winding index holds). Pre-existing baseline note: the crate's kernel_tracer.rs retains its three documented S4A partial failures (dtau_grows_on_success_and_halves_on_failure, escalation_routes_isolated_r2_to_the_contact_future, high_order_singularity_refuses); they are untouched by this packet.",
+    "anchors": { "A1": 1, "A2": 1, "A3": 0 }
   },
   "stop_conditions": {
     "1_frozen_seam_differs": false,
-    "2_float_heuristic_on_decision": false,
-    "3_segmentbreak_needed": false
+    "2_winding_needs_nonpoly_eval": false,
+    "3_fixture_supposed_to_isolate_refused": false
   },
   "verify": {
-    "fmt": "changed files rustfmt-clean",
-    "check": "cargo check -p truck-certified --lib green",
-    "existing_tests": "all pre-existing truck-certified lib/integration suites pass; only tests/kernel_tracer.rs has failures (5 passed / 3 failed as listed)",
-    "clippy": "the crate is not clippy-clean at default settings crate-wide (pre-existing findings); findings attributable to tracer.rs were addressed with item-level allows mirroring existing module practice and iterator rewrites"
+    "fmt": "changed files rustfmt-clean (cargo fmt --all + rustfmt --check on trimclip.rs / mod.rs / kernel_trimclip.rs); the two pre-existing out-of-tree unformatted files (examples/step_face_timing.rs, tests/geometry_fingerprint.rs) were reverted untouched",
+    "check": "cargo check --locked -p truck-certified --all-targets green; cargo check --locked --all-targets (workspace) green at CARGO_BUILD_JOBS=1",
+    "clippy": "cargo clippy -p truck-certified --all-targets --no-deps -- -D warnings: no finding attributable to trimclip.rs or kernel_trimclip.rs (the crate has pre-existing clippy findings in formal/*, domain/*, matching the recorded S4A note; none in this diff)",
+    "tests": "cargo test --locked -p truck-certified --test kernel_trimclip: 7/7 pass; all other truck-certified suites pass except the three pre-existing kernel_tracer.rs failures documented in BG-KV2-207-S4A's RESULT"
   }
 }
