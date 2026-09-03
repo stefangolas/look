@@ -249,11 +249,33 @@ amendment-time seams. Known seams to pin at Wave-2 authoring: S2a's
 argument), S1a's R8/R9 residual constructors, S4a's escalation-ladder call
 into S2a.
 
-## 5. Integration order and verification plan
+## 5. Integration order and verification plan (OWNER AMENDMENT, session 50)
 
-- Merge order per wave: dependency order (Wave 1: 102 → 104 → 103 → 101's
-  recorded findings are doc-only), fast `cargo check -p truck-certified`
-  between merges, ONE composed-HEAD verification battery per wave.
+**ONE full verification for the entire build spec — at the END.** Owner
+direction supersedes the booking's per-wave battery: no composed-HEAD
+verification battery runs after Waves 1–4; the loop's ordinary verifier runs
+ONCE against the final integrated HEAD (after Wave 5), and only then do rows
+flip DONE. Registry rows stay RUNNING (wave state in the note) for the whole
+program; LOCAL_GREEN is never DONE.
+
+Between merges (within and across waves), the composition discipline is
+cheap and continuous:
+
+- `cargo check -p <affected-crate>` after every merge (compile-level seam
+  detection, minutes).
+- The session-37 scoped rule: where two merged write sets interact
+  semantically, run the affected crates' `--lib` tests at merged HEAD
+  before authoring the next packet against it — targeted tests, not the
+  verifier.
+- The shim keeps its one NORMAL-loop verify (it is the wave-base landing;
+  verify.py is the only acceptance authority). This is the packet's own
+  gate, not a per-wave battery.
+
+Risk, stated plainly: deferring test-level verification to the end means a
+final-battery failure attributes across five waves. The mitigation is the
+continuous fast checks above and the frozen-contract rule (§4) — seam
+mismatches surface at `cargo check` time, attribution rides the write-set
+matrix.
 - **kernel-gates.sh additions (the §20 cross-cutting audits, grep-class):**
   no transcendental call inside `kernel/` (sin/cos/atan2/log/exp in
   `truck-certified/src/kernel/**`); no `par.sum()`; no `dist < eps`-identity
@@ -267,7 +289,8 @@ into S2a.
   Added during Wave-1 integration, watched failing once before trusted.
 - N4: per-module enclosure fixtures run on the gnullvm host AND the Linux CI
   job (decision 4) from Wave 2 onward.
-- V8/V9 skip-justifications recorded per wave if additive-only.
+- V8/V9 skip-justifications recorded once at the final verification if
+  additive-only across the whole program.
 
 ## 6. §22 mapping table — the booking surface (status column maintained here)
 
@@ -288,9 +311,9 @@ into S2a.
 | RefusalKind (25 variants) | taxonomy | §17 | **shim** |
 | config constants §0.4 | consts | K0 | **shim** |
 
-## 7. Wave manifest (empty — filled per wave at integration)
+## 7. Wave manifest (filled ONCE at the final integration)
 
-| Wave | Base SHA | Packets (ID → commit) | Amendments | Verifier | Integrated SHA |
+| Wave | Base SHA | Packets (ID → commit) | Amendments | Fast checks | Final integrated SHA |
 |---|---|---|---|---|---|
 | — | — | — | — | — | — |
 
