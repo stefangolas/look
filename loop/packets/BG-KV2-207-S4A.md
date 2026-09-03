@@ -175,3 +175,36 @@ battery (cargo test -p truck-certified --lib --tests --no-fail-fast,
 workspace check, fmt, clippy exact verify form; CARGO_BUILD_JOBS=2-4); fix
 any failures in YOUR files; commit with the packet's prescribed subject;
 write RESULT.json AT THE WORKTREE ROOT last.
+
+## AMENDMENT 2 (orchestrator, session 50) - DIAGNOSE, THEN FINISH
+
+Your partial RESULT is ACCEPTED as honest. The remaining 6 tests hinge on
+two mechanical blockers your own fixture notes name. Diagnose each BEFORE
+touching the tracer loop, and record the exact refusal evidence:
+
+1. rame_zhat_not_unit at rebuild points (fixture 3): build_frame4
+   refuses because the predictor's current point is not the unit-norm
+   chart point the frame gate demands. Check the S2A seam's actual gate
+   (kernel/engine.rs build_frame4): is z_hat required unit, or is the
+   REFUSAL your caller's construction? If the gate demands a unit
+   z_hat and your branch point is a general point, the fix is at the
+   CALL SITE: pass the branch point as z_hat data and normalize the
+   frame basis, never the branch point itself. If the frozen gate is
+   genuinely incompatible with rebuilds mid-branch, STOP and record the
+   exact code line - that is an S2A seam amendment, not yours.
+
+2. Fixture 2's tube refusals: record per-refusal the Evidence payload
+   (rho value, the width attempted, the Conditioning margins). If the
+   tube refuses because the fixture's arc_step0 starts WIDER than the
+   tube's admissible width, the fix is the tracer's initial-width
+   negotiation: start at the width the seed certification accepted and
+   grow from THERE (the packet's own 'accept the largest I_tau that
+   passes' rule - the growth test then measures growth relative to the
+   accepted seed width, not arc_step0). That reading is consistent with
+   the packet text; adopt it and adjust the test's growth assertion
+   accordingly (growth >= 2x OF THE SEED-ADMITTED WIDTH).
+
+Then: all 8 tests green (adjust fixtures/assertions ONLY as justified
+above, recording each adjustment), the full Done-when battery, commit
+with the prescribed subject, RESULT.json AT THE WORKTREE ROOT with the
+diagnosis outcomes recorded.
