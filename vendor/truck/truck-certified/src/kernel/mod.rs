@@ -54,12 +54,12 @@ pub type SignCert = crate::formal::exact::CertifiedSign;
 
 pub mod certs;
 pub mod config;
+pub mod coons_patch;
 /// The certificate-calculus engine (BG-KV2-201-S2A): Lemma 8.0's rho, the
 /// generic square C1, the C2 tube, and frame construction. This is the wave-2
 /// real engine over the landed interval core; the shim shapes it emits are
 /// frozen in [`certs`].
 pub mod engine;
-pub mod coons_patch;
 pub mod evidence;
 /// The machine-checked fixture kit — test support only.
 #[doc(hidden)]
@@ -71,3 +71,7 @@ pub mod leaf_extract;
 pub mod patch;
 pub mod rational;
 pub mod residual;
+/// The §7 R8/R9 square residuals (BG-KV2-202-S1A): the curve–surface system
+/// (arity 3) and the one-chart curve–curve system (arity 2) over the S2A C1
+/// seam, plus the 1-var homogeneous curve leaf they consume.
+pub mod residuals_r89;
