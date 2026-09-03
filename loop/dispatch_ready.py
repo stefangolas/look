@@ -143,7 +143,11 @@ def main():
             print(f"  {r['id']}: blocked on {unmet}")
             continue
         writes = set(r.get("writes", []))
-        clash = writes & running_writes
+        # kernel/mod.rs is the standard one-line pub-mod registration file:
+        # same-file work there is the DESIGNED textual conflict, resolved at
+        # merge (build spec section 4) - it does not block dispatch.
+        EXPECTED = {"vendor/truck/truck-certified/src/kernel/mod.rs"}
+        clash = (writes - EXPECTED) & (running_writes - EXPECTED)
         if clash:
             print(f"  {r['id']}: write-set clash with a RUNNING row: "
                   f"{sorted(clash)[:2]}")
