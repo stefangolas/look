@@ -59,6 +59,7 @@ pub mod config;
 /// real engine over the landed interval core; the shim shapes it emits are
 /// frozen in [`certs`].
 pub mod engine;
+pub mod coons_patch;
 pub mod evidence;
 /// The machine-checked fixture kit — test support only.
 #[doc(hidden)]
