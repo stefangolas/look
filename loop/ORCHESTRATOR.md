@@ -527,6 +527,21 @@ the world — that happens once, at the end.
    while sequencing the consuming amendment behind it; that converts a
    parallel pair into a serial pair for no rigor gain.
 
+   **Rolling dispatch (session 50, owner direction — the default
+   dispatch posture, not a per-wave decision):** the orchestrator
+   authors the NEXT wave's packets while the current wave's workers
+   run, and every slot that frees is refilled immediately — no batching
+   into wave-sized dispatch rounds. The wave is a bookkeeping and
+   integration boundary only (its manifest, its composed checks), never
+   a synchronization barrier for worker starts. Concretely: poll
+   `slot_status.py`; on FINISHED, adjudicate + merge + re-fork + dispatch
+   the next READY packet in dependency order in the same pass; keep the
+   worker count at the RAM cap (measured: 2 safe with browser open, 3
+   with browser closed and check-only workers; COLD warm builds still
+   one at a time). The authoring pipeline feeds this: if no READY
+   packet exists when a slot frees, the authoring was the bottleneck —
+   author ahead, never idle a slot behind the author.
+
 ## What a session should leave behind
 
 Rewrite `loop/STATE.md` — it is the next session's only cold-start read, and it
