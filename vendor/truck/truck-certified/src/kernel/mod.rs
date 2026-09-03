@@ -93,3 +93,8 @@ pub mod residuals_r89;
 /// separation) and the R8 subdivision seeds over caller-supplied boundary
 /// edges.
 pub mod tier1;
+/// The D4 float predictor-corrector (BG-KV2-207-S4A): the fast, UNCERTIFIED
+/// branch tracer whose accept/reject path always goes through the certified
+/// seam ([`engine::build_frame4`] + [`engine::c2_certify_tube4`]), with the
+/// §10.2 escalation ladder.
+pub mod tracer;
