@@ -17,7 +17,7 @@ struct CircleSpine {
     delta: f64,
 }
 
-impl Spine for CircleSpine {
+impl SpineCurve for CircleSpine {
     fn domain(&self) -> (f64, f64) {
         (0.0, 1.0)
     }
@@ -51,7 +51,7 @@ struct RotatedSpine {
     rot: f64,
 }
 
-impl Spine for RotatedSpine {
+impl SpineCurve for RotatedSpine {
     fn domain(&self) -> (f64, f64) {
         self.base.domain()
     }
@@ -287,7 +287,7 @@ fn parallel_transport_still_refuses_in_cg002() {
     struct HelixSpine {
         c: f64,
     }
-    impl Spine for HelixSpine {
+    impl SpineCurve for HelixSpine {
         fn domain(&self) -> (f64, f64) {
             (0.0, 1.0)
         }
