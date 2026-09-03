@@ -1,0 +1,49 @@
+{
+  "id": "BG-KV2-302-S5A",
+  "class": "design",
+  "status": "done",
+  "branch": "packet/BG-KV2-302-S5A",
+  "head": "269e4e3",
+  "summary": "Land the §10.3 isolated-contact classifier in truck-certified: new kernel/contact.rs turns the shim's ContactCert into a real, tolerance-tagged certificate. The pipeline consumes the frozen seams verbatim (CertifiedPatchC2/C3 trait shapes in patch.rs, krawczyk_c1 in engine.rs, the fixture carriers' CertifiedPatch enclosures, config::TOL_INTERSECTION): (1) the exact critical point of the gap grad g = 0 is certified by the frozen square C1 over the R4Prime normal-projection residual (ContactGradSystem, the S1A pattern), (2) the gap is the certified interval of g's values, (3) the Hessian sign classifies per Corollary 10.2 (MorseSaddle/MorseExtremum, with the n2 = -n0 flip verbatim), (4) the A2Cusp branch uses the CertifiedPatchC3 third jets (rank-1 Hessian + certified nonzero cubic in the null direction) and otherwise refuses HighOrderJet, and (5) the Prop 10.3 three-valued contract decides Proven(ContactCert, tagged at TOL_INTERSECTION, rule 7) / Disproven(SeparationWitness, the packet's one new type) / Inconclusive. No R5Enclosure is required for the classification (audit row pinned by a source scan), and the module carries no transcendental call. All eight required tests are present and green in tests/kernel_contact.rs.",
+  "stop_conditions": {
+    "triggered": false,
+    "details": [
+      "1: no frozen seam shape differs - the write set is kernel/contact.rs (NEW), kernel/mod.rs (one pub-mod line), tests/kernel_contact.rs (NEW); certs.rs/patch.rs/config.rs/engine.rs/leaf.rs/fixtures.rs are untouched and all four anchors still pass (A1..A4 = 1).",
+      "2: the II1 - II2 composition needed only CertifiedPatchC2 data that the frozen SecondDerivativeEnclosure carries (suu, suv, svv) plus the CertifiedPatchC3 ThirdJetEnclosure for the A2 branch; no needed quantity was absent from the frozen shim shapes, so no shim amendment was required.",
+      "3: no fixture classification sat exactly at the tolerance boundary against an honest certificate - every required outcome (genuine contact, 1e-3-perturbed Disproven, 1e-12 in-tolerance Proven, saddle/extremum/cusp classes) certified cleanly; the three-valued contract decided each case."
+    ]
+  },
+  "files_written": [
+    "vendor/truck/truck-certified/src/kernel/contact.rs",
+    "vendor/truck/truck-certified/src/kernel/mod.rs",
+    "vendor/truck/truck-certified/tests/kernel_contact.rs"
+  ],
+  "anchors_after": {
+    "A1_pub_struct_ContactCert_in_certs": 1,
+    "A2_fn_second_derivs_in_patch": 1,
+    "A3_fn_third_jet_in_patch": 1,
+    "A4_pub_const_TOL_INTERSECTION_in_config": 1
+  },
+  "tests": {
+    "required_8": "all present and green in tests/kernel_contact.rs: critical_point_of_nabla_g_certifies_square_c1, hessian_sign_classifies_saddle_extremum_and_perturbed_refusal, contact_cert_three_valued_contract_holds, perturbed_near_tangency_returns_disproven_with_certified_gap, genuine_contact_returns_tangency_at_tolerance, a2_cusp_branch_needs_c3_and_refuses_without_it, no_r5_enclosure_required_for_classification, no_transcendental_call_in_contact_module",
+    "lib_tests": "566 passed (0 failed)",
+    "integration": "all truck-certified integration targets green including kernel_contact 8/8 (kernel_contract 16, kernel_engine 12, kernel_rational 7, kernel_leaf 8, kernel_r89 8, kernel_identity 9, kernel_coons_patch 6, ssi_* and conformance targets all green)",
+    "command": "cargo test -p truck-certified --locked"
+  },
+  "verification": {
+    "fmt": "rustfmt (edition 2021) applied to the three write files; cargo fmt --all -- --check flags only the two recorded PRE-EXISTING out-of-write-set files (examples/step_face_timing.rs, tests/geometry_fingerprint.rs), identical to the baseline the 104/201/202 results recorded",
+    "crate_check": "cargo check -p truck-certified --lib --locked: Finished, zero errors; all test targets compile",
+    "workspace_check": "cargo check --workspace --all-targets --locked: Finished, zero errors (only a pre-existing unused_qualifications warning in truck-meshalgo, outside the write set)",
+    "clippy_packet_files": "cargo clippy -p truck-certified --lib --tests --no-deps --message-format=short: zero findings referencing kernel/contact.rs, kernel/mod.rs, or tests/kernel_contact.rs (three findings in contact.rs were fixed: manual-ok x2 -> .ok(), classify_inner too_many_arguments -> item-level allow with the BG-KV2-000 justification comment)",
+    "env": "CARGO_BUILD_JOBS=2 on every cargo invocation"
+  },
+  "notes": [
+    "Reduced configuration: the classifier consumes two CertifiedPatchC2/C3 implementors in the §10.3 shared-chart graph arrangement over Pi = n0^perp (the fixture carriers are graphs over the shared chart with the common unit normal n0 supplied in closed form); the residual, Hessian, and jets are the certified n0-projections of the carriers' enclosures, exactly Theorem 10.1's quantities.",
+    "The exact critical point is the frozen square C1 (krawczyk_c1, the S2A seam) over the inline SquareResidualEval ContactGradSystem; the emitted PointCert is rebuilt with ResidualId::R4Prime through the engine's documented one-line residual seam (the S2A backing-table parity test checks krawczyk_c1 stamps R1 and the classifier rebuilds R4Prime with identical box/rho).",
+    "The gap is the certified interval of g's VALUES at the certified box (homogeneous position enclosures, one division inside the carriers per N5). Prop 10.3's honesty is reproduced end to end: a 1e-3-above perturbation is Disproven with a certified gap excluding zero, while a 1e-12 (inside-tolerance) perturbation is tagged TangencyAtTolerance because the certified resolution cannot separate it - never an exact certificate (rule 7).",
+    "The n2 = -n0 sign flip of Theorem 10.1 is implemented verbatim in the Hessian assembly (convert_orientation: II^own = sigma*H_raw then II^{wrt n0} = sigma*II^own, so the assembly is orientation-invariant); the flip test pins the invariance of the classification under flipping the second carrier's normal convention.",
+    "The A2 branch (C3 only) certifies the rank-1 Hessian at the certified box midpoint plus a certified nonzero cubic in the null direction from the CertifiedPatchC3 third jets (the shared-chart composed closed form); a C2-only implementor refuses HighOrderJet (the trait boundary is the audit, exercised through the WithoutC3 test wrapper). A2Cusp classification is reported as TopoNode variant data; no graph assembly occurs here.",
+    "Classification output is the TopoNode variant name as data (MorseSaddle/MorseExtremum/A2Cusp); no R5Enclosure is required for the classification (source-scan pinned), and contact.rs carries no transcendental call (source-scan pinned with the kernel_rational scanner).",
+    "Fixture carriers in kernel_contact.rs are polynomial graph patches (u,v) -> (u,v,h(u,v)) over the shared identity chart (plane, unit-sphere-cap local model z = 1 - (u^2+v^2)/2, saddle z = -uv, A2 cusp z = u^2 + v^3), using sound dependency-loose CertifiedInterval evaluation so the at-tolerance semantics of Prop 10.3 are exercised honestly."
+  ]
+}
