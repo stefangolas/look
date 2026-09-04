@@ -53,6 +53,10 @@
 /// alias as `kernel::Interval` — one interval type, never a second one.
 pub type Interval = crate::formal::exact::CertifiedInterval;
 
+/// The P4 argmin-with-margin operator (seam S5): the strict-separation argmin
+/// over interval enclosures, refusing `AmbiguousEventOrdering` on overlap.
+pub mod argmin;
+
 /// The C6 normative config constants (the `kernel/config.rs` pattern).
 pub mod config;
 
