@@ -9,68 +9,68 @@ when they stop being true, never for length. If you are picking this up cold, re
 [`loop/ORCHESTRATOR.md`](ORCHESTRATOR.md) for how to run the loop, then
 `python loop/slot_status.py`** - nothing else. Do not read `LEDGER.jsonl` whole.
 
-Updated 2026-09-03, session 50 (kernel v2 swarm, spine + waves 0-4).
-**THE PROGRAM IS ~72% LANDED (18/25 rows), mid-Wave-4, handoff mid-flight.**
+Updated 2026-09-04, session 51 (kernel v2 swarm CLOSE). **THE PROGRAM IS
+COMPLETE: 26/26 rows DONE, the one battery green, manifest filled.**
 
 ## Where we are
 
-- **Program**: kernel v2 swarm per `docs/KERNEL_V2_BUILD_SPEC.md` (the
-  spine: census, 6 owner decisions, shim inventory, wave plan, manifest).
-  Normative theory: `docs/CONSTRUCTIVE_GEOMETRY_KERNEL_SPEC_V2.md`.
-- **LANDED (18 packets)**: Wave 0 shim (fd65c24 = wave base; `kernel/`
-  module in truck-certified: types + refusing constructors + fixture kit +
-  config constants). Wave 1: 101 survey (filed, validator-clean),
-  102 BezierLeaf, 103 identity Rules A/B/C + dyadic join, 104 rational
-  carriers. Wave 2: 201 engine (Lemma 8.0 rho + C1 + C2 tube + frames),
-  206 PointCert3/krawczyk_c1_n4-precursor (arity-3), 202 R8/R9 residuals,
-  203 Spine enum + septic PH + FrameData + SpineCurve rename, 205 Coons
-  CertifiedPatch, 207 S4A PARTIAL (5/8). Wave 3: 301 minor algebra + Tier-1
-  LP + R8 seeds, 302 contact classifier + ContactCert, 303 gluing + deck id
-  + assembly, 305 GraphCert + R5 + R4/R4', 306 Frame::try_new gate fix,
-  304 Tier-2 Psi_a + arity-4 C1. Wave 4: 403 ExactSheet, 404 R6 deflation.
-- **IN FLIGHT at close (adjudicate FIRST on pickup)**: slot 0 = 307
-  ENGINEREACH (two-pass frames, tube-reach envelope, ladder margins; owns
-  S4A's 3 blocked tests), slot 1 = 401 S3C trim clip. Both were healthy
-  (fresh events) at close.
-- **NOT dispatched**: 402 S7 (blocked on 307 landing), 405 K2B (worker died
-  twice at dispatch - 0 events both times; re-dispatch is the FIRST act and
-  if it dies a third time, investigate the packet, not the machine).
-- **UNAUTHORED**: Wave 5 (serial, integrator-owned): C6 enum-boundary
-  consolidation, S9b B-rep promotion, S10 certify_claimed.
-- **THEN**: the ONE full verification battery (owner amendment - build spec
-  section 5), kernel-gates.sh audit additions (listed in build spec
-  section 5 - NOT yet written), rows flip DONE, STATE rewrite.
+- **Program**: kernel v2 swarm per `docs/KERNEL_V2_BUILD_SPEC.md` —
+  **CLOSED**. All 26 BG-KV2 rows are DONE in `loop/PACKETS.jsonl`; the
+  one-verify amendment's single battery (workspace tests + workspace
+  clippy + kernel-gates) went green at integrated HEAD
+  `fd65c24..HEAD battery at 45d9ad6+`; the wave manifest is derivable by
+  `python loop/scripts/wave_manifest.py --markdown` (registry, ledger
+  and git verified in agreement by `--check`).
+- Landed this program: the shim + waves 1-5 — identity/carriers (103,
+  104), the certified engine (201-207), the completeness protocol
+  (301-306), the overlap/self-intersection/fillet+canal/atlas tail
+  (401-405), and the Wave-5 bridge (501 enum boundary, 502 B-rep
+  promotion, 503 certify_claimed). 307 ENGINEREACH landed PARTIAL (3/5)
+  — the two S4A tracer tests are the booked follow-up packet (write
+  set: kernel/tracer.rs + tests/kernel_tracer.rs).
+- Normative deviation recorded in spec 5.10 (owner amendment): the
+  `SpineFrameSweep` enum payload carries the four whole-sweep fields
+  PLUS the per-face window domain on the closed value, spine on the
+  canonical `Box<Curve>` carrier (the constructive `Spine` enum is not
+  Clone/Serialize).
+- Battery environmental exclusions (evidence-carrying, in
+  `loop/overnight.py`): `bracket_tessellates_to_a_known_mesh` (verified
+  failing at base fd65c24 by throwaway worktree) and the ~63 clippy
+  findings in `src/formal/*` (zero commits since base).
 
 ## Pick up here
 
-0. `python loop/dispatch_ready.py --dry-run` FIRST - it reads slot ground
-   truth and tells you what is dispatchable vs blocked vs dead.
-1. Adjudicate slots 0/1 if their workers finished (scoped test + merge +
-   file RESULT + ledger row; the skipped-commit protocol is in
-   ORCHESTRATOR). 307 landing unblocks 402.
-2. Re-dispatch 405 (died twice at 0 events - machine state is fine now;
-   a third death means read its packet for a worker-killing trap).
-3. Author Wave 5 (one serial chain, integrator-owned; C6 consolidation +
-   S9b promotion + S10) and dispatch it when the bench drains.
-4. The final battery: workspace tests + clippy + kernel-gates + the
-   section 20 acceptance rows; V8/V9 skip-justifications recorded if
-   additive-only; rows flip DONE only after it passes.
-5. WATCHDOG: was running (restarted 08:26 pid 28720, then again later);
-   verify it is alive (`watchdog.log` tail) - it misfired twice this
-   session on stale pids (recorded in traps).
+0. The machine state: cargoq + watchdog + overnight driver all idle;
+   disk ~30 GB free; sleep disabled (powercfg, session 51).
+1. The open follow-ups, in rough size order: the 307 follow-up packet
+   (S4A tracer tests, ~2h); a `draft_angle` front-door over the landed
+   ProfileLaw::Scale (thin); the render-path owner's
+   `bracket_tessellates_to_a_known_mesh` fingerprint refresh (look
+   crate, NOT kernel); the booked facet-sweep declaration amendment.
+2. The next PROGRAM candidates (all unbuilt, none booked): offset/shell
+   engine (~5.5k LOC per the old CG plan table), loft with
+   correspondence (~2.5k), BVH + interval distance (~1k, perf), the
+   certified second-derivative bounds (~1.5k). The wave/shim machinery
+   (ORCHESTRATOR wave-mode + build-spec spine workflow) is the tested
+   way to run any of them.
+3. The pyo3 binding translation remains booked and DEFERRED behind the
+   CG core.
+4. If running a new swarm: read ORCHESTRATOR's session-51 blocks first
+   (dispatch regime, RAM-cap arithmetic, one-verify, the battery gates)
+   — they are the current law; older conflicting text is marked
+   superseded in place.
 
 ## State of the machine, as left
 
-- cargoq server RUNNING (port 8231; `curl 127.0.0.1:8231/ping`); watchdog
-  RUNNING. Check both on pickup.
-- CARGO_BUILD_JOBS=2-4 everywhere; 6 slots exist (0-5); workers were
-  dispatched with the cargoq shim in PATH - pre-shim workers are gone.
-- Disk was ~20 GB free (janitor keeps it there; it is wired into new_slot).
-- RAM is the constraint: 6 agents is the ceiling with chrome closed; the
-  queue caps cargo at one spike regardless.
-- deepseek balance was reupped mid-session (one 402 death); check balance
-  if workers die with APIError.
-
+- cargoq RUNNING (port 8231); watchdog RUNNING (single instance, the
+  08:26 lineage); overnight driver EXITED after the green battery.
+- 6 slots exist (0-5), all FINISHED/IDLE with their workers done; slot
+  targets reclaimed by the janitor as the battery preflight.
+- Workers dispatch with the lean profile (lsp/formatter/snapshot/
+  autoupdate off, plugins + external skills off) via
+  `run_packet.py`'s `OPENCODE_CONFIG_CONTENT` — interactive sessions
+  are unaffected.
+- deepseek balance: watch for 402-class deaths (one mid-session).
 ## The parallelism picture
 
 The session-50 machinery is explicated in ORCHESTRATOR.md ("The cargo
@@ -80,6 +80,105 @@ rolling dispatcher - RUN IT FIRST on pickup), LOOK_SHARED_TARGET,
 validate_survey.py, the one-verify amendment. Rolling dispatch + 6-wide +
 pipelined authoring measured ~3.3x the prior week's LOC rate; the queue
 ended the ENOMEM death class entirely.
+
+### Session 51 (the swarm CLOSE: 26/26, one battery, and the machinery that made it survivable) - paid in full
+
+- **cargoq ran every queued job in the SERVER's cwd, not the caller's.**
+  The client sent only args+timeout; the server spawned without cwd=.
+  Bare `cargo test -p` / `cargo fmt --all` from slot worktrees silently
+  operated on the MAIN tree all day: wrong-tree worker checks and the
+  main-tree fmt drift that blocked the 401 merge. Only absolute
+  --manifest-path calls were correct. Fix: client sends cwd per job,
+  server spawns with it and logs [cwd=] per job. VALIDATION GAP: the
+  session-50 two-job test checked ordering, not cwd. Also: the first
+  fix dropped the field in do_POST — watched fail via a probe project,
+  watched pass end to end.
+- **The one-verify amendment was misread as permitting per-packet
+  verifies — 401 ran three, 405 six attempts, the largest sink of the
+  session.** The build spec says the ordinary verifier runs ONCE at the
+  final integrated HEAD. ORCHESTRATOR's "On a verdict" is now marked
+  SUPERSEDED for KV2 packets; the pre-battery landing standard is the
+  orchestrator's own scoped checks (check -p + the packet's test file)
+  at merged HEAD — minutes, not hours. If a landing is blocked on more
+  than that, the gate is wrong, not the code.
+- **The battery's gates are baseline-aware, evidence-carrying.**
+  Clippy: a finding fails only if its FILE changed since the program
+  base (the ~63 formal/* findings are byte-identical-to-base; verified
+  by zero commits there since fd65c24). Tests: a failing test is
+  excluded only with carried evidence (bracket canary verified failing
+  at base by throwaway worktree). Both watched failing first (the
+  pre-fix claims.rs findings; the base worktree run). The 17 REAL
+  kernel findings (claims 11, engine 5, tier2 4) were fixed, not
+  allowed away: needless_range_loop allows are statement-level with
+  the matrix-algebra justification, neg_cmp_op_on_partial_ord is the
+  D4 fail-closed discipline (a>=b is wrong on a partial order), and
+  the frozen-shape result_large_err follows the graph.rs precedent.
+- **Per-worker rust-analyzer was the RAM killer (4.1 GB for two)** —
+  killed at source (`OPENCODE_CONFIG_CONTENT` lsp:false in the
+  dispatch env) with a janitor backstop that kills only
+  opencode-parented RAs by parentage. The full worker-lean profile
+  also disables the autoformatter (which moves trailing // H-3 markers
+  off their literal line — a recorded GATE-2 hazard, not just
+  overhead), snapshots, autoupdate, share, plugins, and external
+  skills scans. Validated live + selftest.
+- **The RAM cap is arithmetic, not folklore** (ORCHESTRATOR now says
+  so): N x (worker host + helpers) + OS baseline + ONE queued spike <=
+  physical RAM. The old "2 open/3 closed" measurement baked in
+  per-worker LSPs; with them gone the cap is 4 (6 re-enters the
+  0xc0000409 zone on a cold warm build). rustc 0xc0000409 anywhere =
+  the inequality violated: shrink, do not retry. Chrome reopening
+  moves the arithmetic again.
+- **`needs` edges are contract dependencies, not postures.** The
+  build-spec booking "Wave 5: serial" was mechanically encoded as
+  needs edges that serialized three packets whose only mutual file was
+  the designed mod.rs one-liner; the owner flattened them. Rule: name
+  the landed contract the consumer actually calls, or do not write the
+  edge.
+- **The watchdog needed four fixes, each caught live**: two instances
+  raced (killed the stale 02:23 pair); a wedged worker sat 2.5h before
+  the wedged branch fired; packet_is_done only checked status DONE so
+  a LANDED packet was re-dispatched (307, twice); restart budget
+  exhaustion left 501 dead with zero forensics. Now: single instance
+  verified, the LANDED <sha> marker counts as done, and the AUTOPSY
+  (`loop/autopsy.py`) gates every restart from the second one —
+  RAM_PRESSURE defers without spending budget, provider balance stops
+  cold, SILENT_HANG recovers via `--resume-interrupted` (session
+  survives, WIP intact) instead of a cold reset.
+- **dispatch_ready's dead-branch ran even under --dry-run** (observed:
+  a dry-run reset slot 2 and deleted its stale RESULT) — gated, and
+  dry mode now reports DEAD dispatches instead of acting. Two more
+  dispatch blockers: landed() ignored the LANDED marker on a READY row
+  (402 stayed blocked on a merged packet), and new_slot died on
+  "branch already used by worktree" when a previous warm-build failure
+  left the branch orphaned (now auto-released when the holding wt is
+  clean and at-tip, aborted loudly otherwise).
+- **501's design stop was the loop working as designed**: the worker
+  stopped at stop condition 1 (the whole-sweep payload broke two
+  immovable landed constraints; compiler-verified that the
+  constructive Spine enum cannot be the stored payload) and left the
+  tree clean. Resolution = owner amendment in spec 5.10 (window on the
+  closed value, Box<Curve> carrier) folded into the r2 packet, which
+  landed first-try with all landed assertions passing UNCHANGED.
+- **The overnight driver** (`loop/overnight.py`) does mechanical
+  adjudication only (complete/partial-0-fail + scoped check + merge;
+  everything else left for morning) and fires the battery when every
+  row is LANDED and no slot is running. Its own bug — hardcoding
+  -p truck-certified for test targets — made 501 'fail' for an hour
+  while the test passed 8/8 by hand; the crate now comes from the
+  write path. Sleep was disabled (powercfg) after the recorded
+  overnight-hang class; no workers hung overnight.
+- **307 ENGINEREACH landed PARTIAL (3/5)**: the engine work is real
+  and green, but the two remaining S4A tests live in tracer.rs /
+  kernel_tracer.rs, outside the packet write_allow — the booked
+  follow-up packet widens it. The worker's stop conditions and the
+  archived WIP patch (49 KB, loop/slots/0/abandoned-20260903-145502)
+  are the record.
+- **Small trap, third costume**: PowerShell Set-Content writes a BOM
+  (UTF8) / mangles encodings — the 12-line H-3 marker edit initially
+  wrote a BOM into a test file (caught by bytes 239 187 191, stripped
+  before it cost a build); a later ASCII Set-Content would have
+  mangled the §-signs in atlas.rs doc comments. Edits go through the
+  Edit tool or a script FILE with explicit encoding, always.
 
 ### Session 50 (the v2 swarm spine; machinery + waves 0-4) - paid in full
 
