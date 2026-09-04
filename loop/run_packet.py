@@ -9,6 +9,7 @@ Usage: python loop/run_packet.py --slot 0 --packet loop/packets/BG-S0-002.md [--
 """
 import argparse
 import datetime
+import json
 import re
 import os
 import shutil
@@ -386,15 +387,31 @@ def main():
     env = dict(os.environ)
     env['CARGO_INCREMENTAL'] = '1'
     # Workers never start a language server (session 51): opencode
-    # auto-spawns rust-analyzer per session over its slot worktree - a cold,
+    # auto-starts rust-analyzer per session over its slot worktree - a cold,
     # duplicate index of the same tree at 1-2+ GB each, with CPU/RAM spikes
     # that compound with the cargo spike the cargo queue just serialized.
     # Workers' packets mandate cargo check as the inner loop and verify.py
-    # is authoritative, so the LSP is redundant here. This merges as the
-    # final local config scope, so it holds regardless of repo/global
-    # opencode.json, and it exists only under this dispatch - interactive
-    # sessions are unaffected.
-    env['OPENCODE_CONFIG_CONTENT'] = '{"lsp": false}'
+    # is authoritative, so the LSP is redundant here. The rest of the
+    # profile strips the interactive-developer defaults a worker never
+    # needs: auto-formatters (which also move trailing // H-3 markers off
+    # their literal line - a recorded GATE-2 hazard, not just overhead),
+    # per-edit git snapshots (undo machinery; workers commit packet-scoped),
+    # auto-update checks, share/telemetry. This merges as the final local
+    # config scope, so it holds regardless of repo/global opencode.json,
+    # and it exists only under this dispatch - interactive sessions are
+    # unaffected.
+    env['OPENCODE_CONFIG_CONTENT'] = json.dumps({
+        'lsp': False,
+        'formatter': False,
+        'snapshot': False,
+        'autoupdate': False,
+        'share': 'disabled',
+    })
+    # External skills scans and default plugins: filesystem walks and
+    # module loads a churn worker never uses.
+    env['OPENCODE_DISABLE_DEFAULT_PLUGINS'] = '1'
+    env['OPENCODE_DISABLE_EXTERNAL_SKILLS'] = '1'
+    env['OPENCODE_DISABLE_CLAUDE_CODE_SKILLS'] = '1'
     # LOOK_SHARED_TARGET (session 50, booking section 6 now viable via the
     # cargo queue): when set, workers share ONE target dir - the queue
     # serializes invocations, so the shared tree is race-free and the
