@@ -125,6 +125,11 @@ def main():
                 break
         if r.get("status") != "READY":
             continue
+        if landed(r):
+            # LANDED marker beats a stale READY status (session-51: 307
+            # was re-dispatched onto a slot minutes after its merge
+            # because only the status field was read).
+            continue
         if r["id"] in assigned:
             continue  # already in a slot (ground truth beats row status)
         if r["id"] in dead:
