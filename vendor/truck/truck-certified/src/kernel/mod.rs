@@ -65,6 +65,15 @@ pub mod assemble;
 /// unwrapped K2 pcurve lifts with the deck integer as a first-class coordinate
 /// and [`crate::kernel::config::DECK_MAX`] as the termination bound.
 pub mod atlas;
+/// The §12 fillet/canal machinery (BG-KV2-402-S7): the R7 ball-center residual
+/// (six polynomial equations in `(c, u, v, s, t)` over two rational-carrier
+/// leaves, in the D-homogeneous cross-multiplied form), the additive n=7 frame
+/// construction and the C2 tube certificate that serve R7 at n=7 (Theorem 8.1
+/// n-generic), the spec §16 `Canal { spine, r, sigma, contact }` type (no
+/// orthogonality certificate field — Prop 12.3 is a theorem), the Δ_off
+/// offset-regularity diagnostic (spec §8.7), and the §12.3 three-face corner
+/// (compositional via the S1A R8 seam, else `CornerUnsolved`).
+pub mod canal;
 pub mod certs;
 /// §15 authored-topology verification (BG-KV2-503-S10): the claim vocabulary
 /// ([`claims::TopologyClaim`], [`claims::ClaimedComponent`],
