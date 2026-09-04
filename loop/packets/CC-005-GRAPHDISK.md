@@ -18,6 +18,7 @@ depends_on:  [CC-000-CONTRACT, CC-002-INJECTIVITY]
 write_allow:
   - vendor/truck/truck-certified/src/construct/graphdisk.rs
   - vendor/truck/truck-certified/src/construct/mod.rs
+  - vendor/truck/truck-certified/src/construct/stubs.rs
   - vendor/truck/truck-certified/tests/construct_graphdisk.rs
 read_allow:
   - docs/CERTIFIED_CONSTRUCTION_CONTRACTS.md

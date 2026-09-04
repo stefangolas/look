@@ -183,9 +183,15 @@ pub struct GraphDiskCert { /* witness set, projection w, per-piece records */ }
 pub fn certify_graph_disk(pieces: &[DiskPiece], boundary: &BoundaryPlan)
     -> Result<GraphDiskCert, ConstructRefusal>;
 ```
-`BoundaryPlan` (boundary simplicity input) is frozen in CC-000 as a stub
-type; its production comes from the planar machinery (`formal/intersection`,
-`formal/xmonotone`) inside CC-005, not across the seam.
+`BoundaryPlan` is frozen as a stub type in CC-000; its production comes from
+the planar machinery (`formal/intersection`, `formal/xmonotone`) inside
+CC-005, not across the seam.
+AMENDED at CC-005 dispatch (session 51, QUESTION.md accepted): the stub was
+uninhabitable (private `_sealed`, refusing constructor only) — the S11
+`TripleContactNode` posture applies instead: frozen PUB fields
+`{ pub boundary_simple: bool, pub seams_glued: bool }` plus a refusing
+`try_new()`, landed by CC-005 inside `stubs.rs`. The contract test keeps
+asserting the refusing constructor.
 
 **S7 — P5 clearance (CC-004 → CC-014, CC-021, CC-023, CC-030).** Two-layer
 seam. Layer 1 (truck-base, leaf, additive):
