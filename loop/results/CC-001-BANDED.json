@@ -1,0 +1,62 @@
+{
+  "packet": "CC-001-BANDED",
+  "id": "CC-001-BANDED",
+  "contract": ["CC-001-BANDED"],
+  "class": "design",
+  "crates": ["truck-certified"],
+  "title": "P1: certified banded solve (interval no-pivot GE + Rump fallback)",
+  "commit": "e801a1fa135991d01de6ab39d4451da9a8244a3e",
+  "commit_subject": "feat(certified): interval no-pivot banded TP solve + Rump residual fallback (CC-001-BANDED)",
+  "outcome": "completed",
+  "stop_conditions": {
+    "triggered": false,
+    "notes": [
+      "Stop 1 (read formal/exact.rs first): satisfied. All interval work is built on CertifiedInterval add/sub/mul/div/point plus outward next_down/next_up endpoint widening; no directed rounding was reimplemented (anchors A2/A3 confirm sqrt/from_product exist; they were not needed by the elimination, which only requires the four field ops).",
+      "Stop 2 (interval arithmetic cannot express a needed step): not triggered. The only divisions in the banded path divide by pivots that were certified free of 0 at factor time (never a division by a zero-containing interval in a non-pivot position); the Rump fallback divides only by the positive scalar (1 - eta). Nothing was widened, no QUESTION.md was filed.",
+      "Stop 3 (fixture ground truths): both CC-000 fixtures hold. banded_cubic_uniform(4) factors and solves to its exact rational control net, and banded_pivot_spans_zero's first pivot (lo -0.25 < 0 < hi 0.25) is refused with SingularInterpolationSystem exactly as the fixture's ground truth states. The fixtures were not bent."
+    ]
+  },
+  "files": {
+    "written": [
+      "vendor/truck/truck-certified/src/construct/banded.rs",
+      "vendor/truck/truck-certified/src/construct/residual_solve.rs",
+      "vendor/truck/truck-certified/src/construct/mod.rs",
+      "vendor/truck/truck-certified/tests/construct_banded.rs"
+    ]
+  },
+  "tests_required": {
+    "banded_uniform_cubic_recovers_known_rational_solution": "pass",
+    "pivot_containing_zero_refuses_singular_interpolation_system": "pass",
+    "ill_conditioned_non_tp_fixture_refuses_never_pivots": "pass",
+    "enclosure_width_shrinks_with_input_width": "pass",
+    "rump_residual_certifies_when_eta_below_one": "pass",
+    "rump_refuses_conditioning_below_threshold_when_eta_at_or_above_one": "pass"
+  },
+  "pass_count": 6,
+  "fail_count": 0,
+  "verification": {
+    "anchors": {
+      "A1_pub_type_Interval_in_kernel_mod": 1,
+      "A2_pub_fn_sqrt_in_exact": 1,
+      "A3_pub_fn_from_product_in_exact": 1,
+      "A4_pub_fn_banded_cubic_uniform_in_fixtures": 1,
+      "A5_pub_fn_banded_pivot_spans_zero_in_fixtures": 1
+    },
+    "commands": [
+      "cargo check -p truck-certified (green)",
+      "cargo test -p truck-certified --test construct_banded (6/6 pass)",
+      "cargo fmt on the four changed files (rustfmt --edition 2021) applied; whole-package cargo fmt -- --check reports only pre-existing rustfmt drift in untouched kernel/*.rs files (claims.rs, engine.rs, tier2.rs) that this packet did not modify"
+    ],
+    "scoped_notes": [
+      "Only the packet's scoped checks were run (cargo check -p truck-certified and cargo test -p truck-certified --test construct_banded); no workspace builds, no absolute-path cargo, the PATH queue shim was kept. Cargo output is cp1252-hostile on this console, so PYTHONIOENCODING=utf-8 was set for the queue shim's stdout only; the shim was not bypassed or unset."
+    ]
+  },
+  "notes": [
+    "Section 1 (construct/banded.rs): factor_banded_tp takes the row-major collocation coefficients as a square dense row-major input (bands.len() a perfect square; non-square is InvalidInput), derives the structural half-bandwidth q as the largest |i-j| carrying a coefficient that is not the exact-zero point interval, extracts the compact band (stride 2q+1), and runs interval Gaussian elimination WITHOUT pivoting. Any pivot interval containing 0 refuses SingularInterpolationSystem (never swap, never retry, never widen). The de Boor-Pinkus growth-factor-1 justification and the Schoenberg-Whitney class restriction are stated in the module doc, and the P1 exact rational path is pre-decided out of v1 with num-rational staying out of the manifest and CC_N_EXACT reserved, also recorded in the module doc.",
+    "Section 2 (impl BandedFactor): solve_homogeneous(&[[Interval;4]]) solves all four homogeneous control channels of a loft in one call against the one shared factorization (L y = rhs forward, U x = y backward, fixed ascending/descending order; RHS length other than the order is InvalidInput); max_control_error() returns the max enclosure width over the delivered control entries of the most recent solve via an interior Cell cache, deterministic per (factor, input). This matches the seam S3 signature exactly.",
+    "Section 3 (construct/residual_solve.rs): residual_solve_dense<const N> implements the Rump/Ogita/Oishi fallback. eta = ||I - R*A||_inf is computed as an upper bound in interval arithmetic (fixed-order sums, next_up per addition); eta >= 1 refuses ConditioningBelowThreshold; otherwise r = b - A*x_hat, bound = ||R*r||_inf / (1 - eta) with the denominator rounded down and the quotient up, returning x_hat +/- bound with outward endpoints. The proof identity RA = I - E and the bound derivation are in the module doc. The float preconditioner R is caller-supplied (the packet does not build preconditioners).",
+    "Section 4: no rational-path code and no rational-path test were added; CC_N_EXACT remains reserved.",
+    "House rules: banded.rs and residual_solve.rs carry no unwrap/expect/panic! and add no module-level allow (H-1); test float comparisons carry the // H-3 same-line opt-out where the house gate applies; the two CC-000 fixtures were used verbatim as the required test inputs and were not modified; COMMIT (e801a1f) precedes RESULT.json.",
+    "Design detail worth review: the test for the uniform cubic fixture uses the exact known rational solution of the FINITE order-5 system, x_j = k_c*(j+1)/3 for per-channel integer scales k_c = [1,2,3,4] with the integer RHS k_c*[2,4,6,8,8], verified in the test by exact integer arithmetic against the fixture band. Boundary rows of the finite Toeplitz matrix make the naive bi-infinite quadratic-blossom control net (which references the phantom control c_-1) NOT a solution of the finite system; the chosen vector is the exact rational solution of the finite fixture matrix and the test asserts certified-enclosure containment of each rational control value."
+  ]
+}

@@ -1,0 +1,47 @@
+{
+  "packet": "BG-KV2-501-C6",
+  "id": "BG-KV2-501-C6",
+  "contract": ["BG-KV2-501-C6"],
+  "class": "design",
+  "crates": ["truck-geometry", "truck-modeling", "truck-shapeops", "truck-stepio"],
+  "status": "complete",
+  "summary": "Attempt 2 of BG-KV2-501-C6 (r1 stopped at stop condition 1 pre-implementation; the owner amendment recorded in spec 5.10 resolves the conflict: the per-face window rides ON the closed whole-sweep value, so both immovable landed assertions hold unchanged). The enum boundary now carries the whole-sweep surface type: new `constructive::SpineFrameSweep` (`vendor/truck/truck-geometry/src/constructive/sweep_surface.rs`) stores the landed `SpineFrameRecipe` ONCE over the canonical `Box<Curve>` spine carrier (the closed Curve/Surface enums are Clone+Serialize, which the constructive Spine enum's Box<dyn SpineCurve> payload forbids; compiler-verified at r1), the realized window domain [s0,s1]x[v0,v1] as part of the closed value (the r1 volume evidence - windowed -1.0 vs whole-ring -3.0 on the unit prism - is why the window stays on the closed value), and the sweep-level `Matrix4` placement. `canonical.rs`'s `Surface::SpineFrameSurface` variant payload switches from the windowed realization decorator `SpineFrameSurface<Box<Curve>>` to `SpineFrameSweep`; the variant NAME is unchanged. The decorator layer keeps the windowed realization decorator (constructed through the same shared window validation `decorators::validate_surface_window`, reused verbatim by both constructors), and the landed B-rep constructor's per-face windowed realizations are preserved: `spine_sweep` stores one whole-sweep closed value per side face over exactly that face's edge window with the identity placement the constructor always set (stop condition 2's guard: no two faces of one sweep carry different transforms). Numeric realization stays in the landed evaluator path (the sweep forwards to the shared spine_frame evaluation helpers; no surface math re-derived in the constructive module). Section 3's typed-refusal carry is landed: `refuse` in `truck-modeling/src/spine_sweep.rs` is now an explicit per-variant match over every `ConstructError` (no catch-all arm) mapping to the honest envelope case - `EnvelopeCase::ConstructRefused`, the constructive-realization envelope (CG-000 mapping A row 1); the previous code dropped the detail onto `NonCanonicalCarrier`. Every immovable constraint passes UNCHANGED: truck-modeling `spine_sweep_conformance.rs::convex_prism_volume_matches_analytic` (unit prism volume 1.0, measured again with the real conformance formula) and truck-geometry `spine_frame_brep.rs` (incl. `surface_variant_forwarding_all_landed_methods`, whose enum-carried window assertions now hold on the sweep payload). Pre-existing, environment-caused failures unrelated to this diff were confirmed present at the base commit (e3305c2) by running them in a base worktree: truck-stepio lib `geom_impls::builder`, truck-shapeops lib `healing::tests::step_import`, truck-shapeops `fillet::complex_surface`, and the truck-stepio data-driven integration tests that read the not-vendored `vendor/truck/resources/step` directory.",
+  "tests": {
+    "whole_sweep_variant_stores_the_recipe_once": "PASS",
+    "window_rides_on_the_closed_sweep_value": "PASS",
+    "sweep_transform_is_sweep_level": "PASS",
+    "refusal_mapping_is_total_no_catch_all": "PASS",
+    "enum_has_exactly_one_spine_frame_variant": "PASS",
+    "landed_brep_constructor_semantics_unchanged": "PASS",
+    "spine_frame_brep.rs::surface_variant_forwarding_all_landed_methods": "PASS",
+    "spine_sweep_conformance.rs::convex_prism_volume_matches_analytic": "PASS"
+  },
+  "pass_count": 8,
+  "fail_count": 0,
+  "measured_counts": {
+    "unit_prism_volume": "1.0 (windowed per-face sweeps; the r1 whole-ring 3.0 reading is gone)",
+    "side_faces_of_unit_prism": "4 sweep faces each over exactly one edge window + 2 plane caps; every sweep placement identity",
+    "spine_frame_variant_declarations_in_canonical.rs": "1 x 'SpineFrameSurface(SpineFrameSweep)', 0 x 'SpineFrameSurface(SpineFrameSurface'",
+    "refuse_match_arms": "7 ConstructError variants named, 0 wildcard arms"
+  },
+  "deviations": [
+    {
+      "id": "RECIPE_SPINE_ON_CANONICAL_CARRIER",
+      "derivation": "Spec 5.10's literal struct would store `spine: Spine` (Ph | General(Box<dyn SpineCurve>)); the closed Surface enum and every truck topology S: Clone/Serialize path force the stored recipe's spine onto the canonical Box<Curve> carrier (the constructive Spine enum is not Clone/Serialize - compiler-verified at r1 and recorded in the owner amendment). The packet's Section 1 as amended stores `SpineFrameRecipe<Box<Curve>, ProfileLaw, FrameLaw>`; the sweep_surface module doc and canonical.rs variant doc record this."
+    },
+    {
+      "id": "WINDOW_IS_PART_OF_THE_CLOSED_VALUE",
+      "derivation": "r1's CONVEX_PRISM_VOLUME_BREAKS_UNDER_WHOLE_SWEEP and PINNED_WINDOW_SEMANTICS_ON_ENUM_PAYLOAD deviations are RESOLVED by the owner amendment: the sweep carries its realized window [s0,s1]x[v0,v1] as part of the closed value (plus the sweep-level placement), so the landed B-rep constructor keeps one per-face windowed sweep per side face and convex_prism_volume_matches_analytic stays at 1.0. Section 2's 'window views derive, never store' is read (per the amendment) as: the enum no longer stores the windowed REALIZATION DECORATOR; the realization view is derived from the closed value over the shared validation."
+    },
+    {
+      "id": "CONSTRUCT_ERRORS_MAP_TO_CONSTRUCT_REFUSED",
+      "derivation": "The typed-refusal carry (Section 3): every ConstructError variant now maps to Refusal::UnsupportedEnvelope(EnvelopeCase::ConstructRefused), the honest constructive-realization envelope of mapping A row 1 (the previous code dropped the detail onto NonCanonicalCarrier). The per-variant match has no catch-all arm, so a new ConstructError variant stops the build for an explicit decision; stop condition 3 never fired because every landed variant has an honest envelope case."
+    }
+  ],
+  "stop_conditions": {
+    "1_payload_swap_breaks_landed_assertion": false,
+    "2_two_faces_carry_different_transforms": false,
+    "3_construct_error_without_honest_envelope_case": false
+  },
+  "notes": "Commit fde664d 'feat(geometry): the enum boundary carries the whole-sweep surface type (BG-KV2-501-C6)' carries the code; this RESULT.json is written and committed separately per the packet instruction 'COMMIT BEFORE writing RESULT.json AT THE WORKTREE ROOT'. Verification run: cargo fmt --check clean; cargo check --locked --all-targets clean across the workspace; truck-geometry and truck-modeling full test suites (lib + integration) green including all landed spine-frame assertions and the six required tests; the 4 pre-existing environment failures (missing not-vendored truck resources/step data + the two mesher/topology numerics geom_impls::builder and fillet::complex_surface) were reproduced at the base commit e3305c2 in a temporary worktree and are not regressions from this diff. truck-shapeops/src/boolean/classify.rs was measured by grep (its match sites are payload-agnostic wildcards) and needed no edit; truck-geometry recognize.rs and span.rs likewise. Anchors verified at dispatch (pre-state): A1=1, A2=1, A3=1. No golden image or performance claim changed."
+}
