@@ -1,9 +1,9 @@
-# CC-003-ARGMIN — P4: argmin-with-margin operator
+﻿# CC-003-ARGMIN â€” P4: argmin-with-margin operator
 
 CC program Phase A (spine S5). Theory:
-`docs/CERTIFIED_LOFT_AND_SHELL_THEORY_SPEC.md` §1 P4. The operator
+`docs/CERTIFIED_LOFT_AND_SHELL_THEORY_SPEC.md` Â§1 P4. The operator
 certifies STRICT SEPARATION, never intent: return i\* only if
-sup[λ_i\*] &lt; inf[λ_j] for all j ≠ i\*; overlap → typed refusal.
+sup[Î»_i\*] &lt; inf[Î»_j] for all j â‰  i\*; overlap â†’ typed refusal.
 Consumers: cyclic correspondence disambiguation (CC-013), thickness event
 selection (CC-026), blend event ordering (CC-030).
 
@@ -23,8 +23,8 @@ read_allow:
 budget:      {turns: 12, ctx_tokens: 60000}
 anchors:
   - {id: A1, expect: 1, cmd: "grep -c 'pub type Interval' vendor/truck/truck-certified/src/kernel/mod.rs"}
-  - {id: A2, expect: 1, cmd: "grep -c 'argmin_separated' vendor/truck/truck-certified/src/construct/fixtures.rs"}
-  - {id: A3, expect: 1, cmd: "grep -c 'argmin_overlapping' vendor/truck/truck-certified/src/construct/fixtures.rs"}
+  - {id: A2, expect: 1, cmd: "grep -c 'pub fn argmin_separated' vendor/truck/truck-certified/src/construct/fixtures.rs"}
+  - {id: A3, expect: 1, cmd: "grep -c 'pub fn argmin_overlapping' vendor/truck/truck-certified/src/construct/fixtures.rs"}
 tests_required:
   - strictly_separated_enclosures_select_the_unique_minimizer
   - overlapping_enclosures_refuse_ambiguous_event_ordering
@@ -33,18 +33,18 @@ tests_required:
   - tie_is_refused_never_broken_by_value_comparison
 ```
 
-Section 1: `construct/argmin.rs` — `pub fn argmin_margin(enclosures:
+Section 1: `construct/argmin.rs` â€” `pub fn argmin_margin(enclosures:
 &[Interval]) -> Result<usize, ConstructRefusal>` per spine S5. Semantics,
-pre-made: empty slice → `Err(ConstructRefusal::InvalidInput)`; scan once in
+pre-made: empty slice â†’ `Err(ConstructRefusal::InvalidInput)`; scan once in
 index order (deterministic; no reordering, no sorting); the candidate i\*
 is the index whose enclosure's UPPER bound is smallest (strict `<`
-comparison of sup values — a tie in sup values among distinct indices is
+comparison of sup values â€” a tie in sup values among distinct indices is
 itself ambiguous); after selecting i\*, verify `sup[i\*] < inf[j]` for ALL
-j ≠ i\*; any violation → `Err(ConstructRefusal::AmbiguousEventOrdering)`.
+j â‰  i\*; any violation â†’ `Err(ConstructRefusal::AmbiguousEventOrdering)`.
 There is NO tie-breaking by value, no epsilon slack, no "closest wins":
-overlap refuses. NaN or non-finite enclosure bounds → `InvalidInput`.
+overlap refuses. NaN or non-finite enclosure bounds â†’ `InvalidInput`.
 
-Section 2: doc comment carries the theory §1 P4 contract verbatim in
+Section 2: doc comment carries the theory Â§1 P4 contract verbatim in
 substance: the operator certifies strict separation; callers use it to
 disambiguate cyclic shifts, event orderings, and thickness candidates, and
 every consumer must handle the refusal as a typed outcome, never as a
@@ -63,5 +63,5 @@ RESULT.json AT THE WORKTREE ROOT.
 Stop conditions: (1) the two CC-000 fixtures (`argmin_separated`,
 `argmin_overlapping`) are the required inputs for the first two tests; if
 their ground truths do not hold, file QUESTION.md (CC-000 defect), do not
-bend the fixture; (2) this packet is deliberately tiny — if it grows past
+bend the fixture; (2) this packet is deliberately tiny â€” if it grows past
 ~120 lines of production code, the design is wrong: re-read spine S5.
