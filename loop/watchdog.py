@@ -29,6 +29,7 @@ loop/watchdog-state.json so a restarted watchdog keeps its restart budget.
 
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -107,7 +108,16 @@ def packet_is_done(packet_path):
                 continue
             row = json.loads(line)
             if row.get("id") == stem:
-                return row.get("status") == "DONE"
+                if row.get("status") == "DONE":
+                    return True
+                # One-verify amendment convention: rows stay RUNNING with a
+                # "LANDED <sha>" note until the final battery flips them.
+                # Session-51 bug: a LANDED packet was re-dispatched because
+                # only the DONE status counted and its worker looked dead.
+                if re.search(r"landed [0-9a-f]{7,}",
+                             (row.get("note") or "").lower()):
+                    return True
+                return False
     except (OSError, ValueError):
         return False
     return False
