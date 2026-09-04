@@ -1,0 +1,60 @@
+{
+  "id": "CC-000-CONTRACT",
+  "class": "design",
+  "status": "done",
+  "branch": "packet/CC-000-CONTRACT",
+  "head": "7497931fbd0855cd70ab3f5f8b9704225399fb47",
+  "summary": "Land the CC construct shim in truck-certified: the construct module tree (Interval alias, ConstructRefusal vocabulary with tag(), the C6 config constants, the sole C3 inari bridge, the S6/S9/S10/S11/S12 stub types with refusing constructors), the C2 manifest edge truck-certified -> truck-evidence, the pub mod construct line, and the six-fixture-kit integration contract test (construct_contract 6/6). Every later CC packet types against this landing; its merge SHA is the CC wave base.",
+  "stop_conditions": {
+    "triggered": false,
+    "details": [
+      "1: base-tree A4 (truck-evidence in truck-certified Cargo.toml) = 0 and A5 (pub mod construct in lib.rs) = 0 as the anchors required, so no other packet touched the manifest; no QUESTION.md filed.",
+      "2: every fixture ground truth is machine-checked by direct evaluation in tests/construct_contract.rs (no solver): the exact integer determinant 780 of the order-5 cubic collocation matrix recomputed by the tridiagonal recurrence, the strict sup<inf / overlap properties, the dyadic 2*sigma_lo/L deltas, and the determinant sign-change across the folded corner. No fixture needed to be recorded as data-only and no consumer packet must deepen one.",
+      "3: kernel/mod.rs (the Interval alias, one home for the type) and kernel/fixtures.rs (doc-hidden TEST SUPPORT ONLY fixture-kit pattern) were read before writing; the alias is the SAME type, never restated, and the fixture/module doc style is copied, not reinvented."
+    ]
+  },
+  "files_written": [
+    "Cargo.lock",
+    "vendor/truck/truck-certified/Cargo.toml",
+    "vendor/truck/truck-certified/src/lib.rs",
+    "vendor/truck/truck-certified/src/construct/mod.rs",
+    "vendor/truck/truck-certified/src/construct/refusal.rs",
+    "vendor/truck/truck-certified/src/construct/config.rs",
+    "vendor/truck/truck-certified/src/construct/convert.rs",
+    "vendor/truck/truck-certified/src/construct/stubs.rs",
+    "vendor/truck/truck-certified/src/construct/fixtures.rs",
+    "vendor/truck/truck-certified/tests/construct_contract.rs"
+  ],
+  "anchors_after": {
+    "A1_pub_type_Interval_in_kernel_mod": 1,
+    "A2_pub_type_IBox2_in_kernel_patch": 1,
+    "A3_pub_enum_Refusal_in_truck_base": 1,
+    "A4_truck_evidence_in_cargo_toml": 1,
+    "A5_pub_mod_construct_in_lib": 1,
+    "A6_pub_use_inari_Interval_in_enclosure": 1,
+    "A7_pub_fn_hull_bernstein_2d": 1
+  },
+  "tests": {
+    "required_6": "all present and green in tests/construct_contract.rs",
+    "construct_refusal_variants_are_distinct_and_tagged": "ok",
+    "config_constants_match_the_spine_document": "ok",
+    "inari_conversion_is_an_exact_order_preserving_copy": "ok",
+    "box3_to_ibox_preserves_bounds": "ok",
+    "radius_law_stubs_carry_no_default_construction": "ok",
+    "fixture_ground_truths_hold": "ok",
+    "command": "cargo test -p truck-certified --test construct_contract (exit 0, 6 passed)"
+  },
+  "verification": {
+    "scoped_check": "cargo check -p truck-certified (exit 0, zero warnings/errors)",
+    "scoped_test": "cargo test -p truck-certified --test construct_contract (exit 0, 6 passed)",
+    "fmt": "the six new construct source files and the new test file are rustfmt-clean under the default config (checked leaf files directly; rustfmt on lib.rs was NOT used as a full-tree formatter because it recurses into the whole pre-existing kernel module tree, whose baseline is not default-rustfmt-formatted)",
+    "manifest": "Cargo.lock delta is exactly the one-line truck-certified dependency entry for truck-evidence (the C2 edge); no other package edges changed"
+  },
+  "notes": [
+    "C2 edge spelling follows the existing truck-* dependency lines: truck-evidence = { version = \"0.1.0\", path = \"../truck-evidence\" }.",
+    "The Interval alias in construct/mod.rs is the SAME type as kernel::Interval (crate::formal::exact::CertifiedInterval); no second interval type was introduced (C3). The inari crate name appears in no manifest and in no use-statement of truck-certified; the bridge types are reached only through truck_evidence::enclosure (A6).",
+    "Stub posture (C7): WireComplex/ShiftFunctional (CC-013), BoundaryPlan (CC-005), BranchSeed (CC-030), and TripleContactNode (CC-020) carry private-field opaque shapes (or frozen pub fields) with refusing constructors returning ConstructRefusal::Unfrozen; no production logic lives in stubs.rs.",
+    "The refusing-stub marker Unfrozen matches the contract::Refusal::Unfrozen precedent (A3-class fact, not an anchor obligation).",
+    "Fixture builders are data + builders only; all eight spine §6 fixtures land (banded_cubic_uniform with n, banded_pivot_spans_zero, argmin_separated, argmin_overlapping, flat_patch, curved_patch, degenerate_patch, genuine_star, folded_corner) as Result<_, ConstructRefusal> builders with doc-stated numeric ground truths machine-checked by direct evaluation."
+  ]
+}
