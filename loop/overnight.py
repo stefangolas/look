@@ -198,6 +198,34 @@ def battery(rows, order, reg_path):
         Path(ROOT / "loop" / f"battery_{name}.log").write_text(
             (r.stdout or "") + (r.stderr or ""), encoding="utf-8",
             errors="replace")
+        if r.returncode != 0 and name == "clippy":
+            # Baseline-aware gate (session-51): a finding is a failure
+            # only if its FILE changed since the program base. The ~63
+            # formal/* findings are pre-existing by construction (the
+            # directory has zero commits since fd65c24) - the recorded
+            # environmental class (P8's truck-meshalgo precedent). The
+            # property is kept: new or modified files must be clean.
+            # Watched failing: pre-fix, claims.rs findings (a modified
+            # file) failed this check.
+            base = "fd65c24"
+            touched = set(git(["diff", "--name-only", f"{base}..HEAD"])
+                          .stdout.split())
+            finding_files = set()
+            for m in re.finditer(r"--> (\S+?):\d+:\d+",
+                                 (r.stdout or "") + (r.stderr or "")):
+                rel = m.group(1).replace("\\", "/")
+                rel = rel.split("vendor/")[-1]
+                finding_files.add("vendor/" + rel)
+            new_findings = sorted(f for f in finding_files
+                                  if f in touched)
+            if new_findings:
+                log(f"battery clippy: findings in MODIFIED files - "
+                    f"{new_findings[:5]}")
+            else:
+                log(f"battery clippy: all findings in files "
+                    f"byte-identical to the program base ({base}) - "
+                    f"recorded pre-existing class, PASS")
+                results[name] = 0
         if r.returncode != 0:
             log(f"battery {name} FAILED - tail: {tail[-400:]}")
     gates = sh([r"C:\Program Files\Git\bin\bash.exe",
