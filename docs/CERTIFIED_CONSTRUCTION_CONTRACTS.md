@@ -190,10 +190,18 @@ impl<P: BoundedPiece> Bvh<P> {
 Layer 2 (truck-evidence, `construct`-adjacent, inari world):
 ```rust
 pub enum BallAdmissibility { Fillet, Round }
-pub fn ball_clearance(field: &impl ImplicitField, exclusion: &Box3, r: Interval, mu: f64,
-                      mode: BallAdmissibility) -> Result<bool, Refusal>;
+pub fn ball_clearance(field: &impl ImplicitField, centre: &Box3, exclusion: &Box3,
+                      r: Interval, mu: f64, mode: BallAdmissibility)
+    -> Result<bool, Refusal>;
     // mu passed explicitly: truck-evidence cannot read construct/config.rs (F1);
     // the certified-side wrapper supplies CC_MU_CLEAR.
+    // AMENDED at CC-004 landing (session 51): `centre: &Box3` (the ball-centre
+    // region) is an explicit parameter — the displaced-ball and straddle ground
+    // truths cannot be expressed without it. Separation is a tri-state over the
+    // single certified axis-gap lower bound: d > mu => Clear; d == 0 => Rejected;
+    // 0 < d <= mu => Err(NumericallyUnresolved/UncertifiedContainment) with a
+    // zero-spend ledger (this layer performs one decisive interval evaluation
+    // per side, no retry; higher precision is the caller's escalation).
 ```
 Consumed through the C2 edge; the inari→CertifiedInterval bridge at this
 boundary is `convert.rs` (S1), the ONLY sanctioned conversion site.
@@ -201,8 +209,10 @@ boundary is `convert.rs` (S1), the ONLY sanctioned conversion site.
 **S8 — Loft construction (CC-010 → CC-012/013/014, CC-015).**
 ```rust
 pub fn averaged_knot_vector(stations: &[f64], degree: usize) -> KnotVec;  // de Boor averaging, L0 construction
-pub struct LoftOutput { pub surface: BSplineSurface<Point4>, pub epsilon: f64 }  // homogeneous net + L2 enclosure
-pub fn loft_sections(sections: &[BSplineCurve<Point4>], stations: &[f64], degree: usize,
+// AMENDED at CC-010 landing (session 51): the homogeneous carrier is the
+// landed `Vector4` (truck-geometry), not a new Point4 — no new carrier type.
+pub struct LoftOutput { pub surface: BSplineSurface<Vector4>, pub epsilon: f64 }  // homogeneous net + L2 enclosure
+pub fn loft_sections(sections: &[BSplineCurve<Vector4>], stations: &[f64], degree: usize,
                      factor: &BandedFactor) -> Result<LoftOutput, ConstructRefusal>;
 ```
 Chord-length stationing fn is CC-010-internal (normative summation order in
