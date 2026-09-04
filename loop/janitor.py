@@ -42,19 +42,21 @@ def dir_size_gb(path):
 
 
 def live_slot_pids():
-    """Slots with a LIVE worker shim process.
+    """Slots with a LIVE worker shim or verify process.
 
     Detection = Win32_Process command lines containing
-    'loop\\slots\\N\\worker-cmd.bat' (the same shape the watchdog uses).
-    The 2026-08-19 recorded incident: guard_disk rmtree'd a target under
-    a live cargo because detection trusted stale bookkeeping. This
-    function trusts RUNNING PROCESSES only.
+    'loop\\slots\\N\\worker-cmd.bat' (the same shape the watchdog uses)
+    OR 'verify.py --slot N' (the verifier builds in the slot's target for
+    tens of minutes; the 2026-09-03 incident: the janitor reclaimed a
+    slot target under a mid-run verify because only worker shims counted
+    as live). This function trusts RUNNING PROCESSES only.
     """
     live = set()
     try:
         out = subprocess.run(
             ["powershell", "-NoProfile", "-Command",
-             "Get-CimInstance Win32_Process -Filter \"Name='cmd.exe'\" "
+             "Get-CimInstance Win32_Process "
+             "-Filter \"Name='cmd.exe' OR Name='python.exe'\" "
              "| Select-Object -ExpandProperty CommandLine"],
             capture_output=True, text=True, timeout=30).stdout
     except Exception:
@@ -65,6 +67,14 @@ def live_slot_pids():
             try:
                 seg = low.split("slots")[1].strip("\\ \t\"'")
                 name = seg.split("\\")[0].strip(" \t\"'")
+                if name.isdigit():
+                    live.add(name)
+            except Exception:
+                pass
+        if "verify.py" in low and "--slot" in low:
+            try:
+                seg = low.split("--slot")[1].strip()
+                name = seg.split()[0].strip(" \t\"'")
                 if name.isdigit():
                     live.add(name)
             except Exception:

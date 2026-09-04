@@ -8,16 +8,25 @@ You may not be the agent that wrote these. Nothing here depends on that.
 
 ## The current program
 
-The base loop (76/76), BG-AUDIT-001 (17/17), the solver family, and the
-build123d coverage program (P1–P12) are FINISHED. The next program is the
-**constructive geometry kernel** — `docs/CONSTRUCTIVE_GEOMETRY_PLAN.md` is the
-approved design and books the contract (§3), packet list, write sets, and
-dependency graph (§4, §6). Dispatch `BG-CG-000-CONTRACT` first; everything in
-the CG graph types against it. Concurrency is capped at ≤3 live packets over
-the write-set-disjoint set; full-wave orchestration is deliberately NOT
-planned (plan §5 — velocity recalibration). The pyo3 binding translation is
-booked but DEFERRED behind the CG core. Solver-family and pyo3 packet
-conventions (booked signatures, write-set disjointness) carry over unchanged.
+The program in flight is the **kernel v2 swarm** per
+`docs/KERNEL_V2_BUILD_SPEC.md` (spine, wave plan, manifest) with normative
+theory in `docs/CONSTRUCTIVE_GEOMETRY_KERNEL_SPEC_V2.md`. The base loop
+(76/76), BG-AUDIT-001 (17/17), the solver family, and the build123d coverage
+program (P1–P12) are FINISHED behind it. The pyo3 binding translation is
+booked but DEFERRED behind the CG core.
+
+**The dispatch regime (the one currently in force — this paragraph wins
+over any older number elsewhere in this file):** rolling dispatch up to
+the currently measured RAM cap (its arithmetic and history are in the
+wave-mode section below — 4 workers as of session 51, re-derive when the
+machine's baseline changes). Waves are integration and verification
+boundaries only, never dispatch barriers: slots refill the moment they
+free, and a wave's packets dispatch as their real contract dependencies
+land, not when their siblings finish. All cargo invocations go through
+the cargoq queue, which turns compilation into a machine-wide service:
+N coding agents do NOT mean N concurrent Rust builds — the agents'
+expensive spike phases serialize globally while their inspect/reason/
+edit phases run fully parallel.
 
 ## The one-sentence version
 
@@ -47,6 +56,16 @@ diff.
 about the harness; REJECTED is about the code.
 
 ## On a verdict
+
+**SUPERSEDED for kernel-v2 swarm packets by the one-verify amendment
+(item 6 below): per-packet `verify.py` runs are SUSPENDED for BG-KV2-*
+packets. The full verifier runs ONCE, at the final integrated HEAD.
+Session 51 ran per-packet verifies anyway — 401 three times, 405 six
+attempts — and the verify attempts, not the code, were the largest time
+sink of the session; several died environmentally (janitor wipe, slot
+collision, RAM thrash). Do not re-apply this section's verify flow to a
+wave packet. It remains in force for one-off harness/survey work outside
+a build-spec wave.**
 
 **ACCEPTED** — merge the packet branch into `integration/kernel-bg` with
 `--no-ff`, move the worker's `RESULT.json` to `loop/results/<ID>.json`, append a
@@ -216,8 +235,11 @@ docs names only the outer one and reclaims less than half of what is there.
   If a gate is wrong, fix the gate and say so in the commit; if it is right,
   fix the code.
 - **A worker's `RESULT.json` is a claim, never a verdict.** It reports what the
-  worker believes it did. `verify.py` is the only acceptance authority, and it
-  reads the diff, not the claim.
+  worker believes it did. Under the one-verify amendment the acceptance
+  authority is the END-OF-PROGRAM battery at the integrated HEAD; before
+  that, a landing rests on the worker's scoped checks PLUS the orchestrator's
+  own merged-HEAD scoped checks (`cargo check -p <crate>` + the packet's
+  test file) — run by the orchestrator, in the open, at every merge.
 - **Never commit to `main`,** and do not push without being asked.
 - **Anchors are `rg` patterns, never line numbers** (H-8), and a count mismatch
   is a stop condition. Re-run every anchor when you write a packet; the spec
@@ -238,8 +260,13 @@ docs names only the outer one and reclaims less than half of what is there.
   `-p <crate> --lib --tests`.
 - **Scheduling is on write-set disjointness, not waves.** Two packets can be
   logically independent and still collide on a file; that collision surfaces at
-  merge, after both workers have been paid for. `schedule.py --running` is the
-  authority.
+  merge, after both workers have been paid for. **`dispatch_ready.py` is the
+  dispatch authority** (session 50): it reads dependency status, write-set
+  disjointness, LIVE SLOT TRUTH via `slot_status.py` (slot ground truth beats
+  registry bookkeeping — rows lag reality), and runs `gen_packet --check` +
+  `packet_lint` preflight before any dispatch. `schedule.py` is demoted to a
+  query/debug primitive over the registry — use it to inspect what is
+  dispatchable, never as the dispatch path itself.
 - **If you change a gate, watch it fail before you trust it.** Deliberately
   break the thing it is supposed to catch and confirm it says so. A gate that
   has only ever been observed passing is indistinguishable from a gate that
