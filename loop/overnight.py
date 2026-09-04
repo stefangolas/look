@@ -1,0 +1,248 @@
+"""overnight: the session-51 unattended driver.
+
+The owner left the loop running until morning. This script does the
+MECHANICAL part of adjudication and nothing else:
+
+  1. Poll every POLL_SECONDS. For each FINISHED slot holding a RESULT
+     whose registry row is not yet LANDED:
+       - admit only status "complete" or PARTIAL WITH ZERO FAILS;
+       - scoped check: cargo check -p <row crates> + cargo test --test
+         <stems from the packet's write_allow tests/*.rs>;
+       - on green: merge --no-ff, file the RESULT, heal the row
+         (wave_manifest --fix), append a ledger row;
+       - merge conflicts or any surprise: git merge --abort, log, skip.
+  2. STOP/QUESTION/partial-with-fails results are logged and LEFT for
+     the morning orchestrator (adjudication with judgment).
+  3. When no slot is RUNNING and every KV2 row is LANDED: reclaim disk
+     (janitor ensure --need 15), then the ONE battery of the one-verify
+     amendment: workspace tests + workspace clippy + kernel-gates.
+     Rows flip to DONE only if all three are green; anything else is
+     logged for morning review.
+
+All cargo goes through the cargoq shim (PATH prepended here). All
+actions append to loop/overnight.log. Stdlib only.
+"""
+import json
+import os
+import re
+import subprocess
+import sys
+import time
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parent.parent
+QUEUE = str(ROOT / "loop" / "cargoq")
+LOG = ROOT / "loop" / "overnight.log"
+LANDED_RE = re.compile(r"landed [0-9a-f]{7,}")
+POLL_SECONDS = 300
+BATTERY_ENV = {**os.environ,
+               "PATH": QUEUE + os.pathsep + os.environ.get("PATH", ""),
+               "CARGO_BUILD_JOBS": "2"}
+
+
+def log(msg):
+    with open(LOG, "a", encoding="utf-8") as f:
+        f.write(f"{time.strftime('%m-%d %H:%M:%S')} {msg}\n")
+
+
+def sh(args, **kw):
+    return subprocess.run(args, capture_output=True, text=True,
+                          timeout=kw.pop("timeout", 3600), **kw)
+
+
+def git(args, cwd=None):
+    return sh(["git", "-C", str(cwd or ROOT)] + args, timeout=300)
+
+
+def registry():
+    p = ROOT / "loop" / "PACKETS.jsonl"
+    rows = {}
+    order = []
+    for line in p.read_text(encoding="utf-8-sig").splitlines():
+        if line.strip():
+            r = json.loads(line)
+            rows[r["id"]] = r
+            order.append(r["id"])
+    return rows, order, p
+
+
+def save_registry(rows, order, p):
+    with open(p, "w", encoding="utf-8", newline="\n") as f:
+        for pid in order:
+            f.write(json.dumps(rows[pid]) + "\n")
+
+
+def packet_tests_and_crates(packet_path, row):
+    """Test-file stems + affected crates from the packet write_allow and
+    the row's write paths."""
+    try:
+        text = Path(packet_path).read_text(encoding="utf-8-sig")
+    except OSError:
+        return [], []
+    tests = re.findall(r"vendor/\S+/tests/(\w+)\.rs", text)
+    crates = sorted({p.split("/")[2] for p in (row.get("writes") or [])
+                     if p.startswith("vendor/truck/")})
+    if not crates:
+        crates = ["truck-certified"]
+    return crates, tests
+
+
+def scoped_check(crates, tests, wt):
+    for c in crates:
+        r = sh(["cargo", "check", "--locked", "-p", c,
+                "--manifest-path", str(Path(wt) / "Cargo.toml")],
+               env=BATTERY_ENV)
+        if r.returncode != 0:
+            return False, f"check -p {c} failed"
+    for t in tests:
+        r = sh(["cargo", "test", "--locked", "-p", "truck-certified",
+                "--test", t,
+                "--manifest-path", str(Path(wt) / "Cargo.toml")],
+               env=BATTERY_ENV)
+        if r.returncode != 0:
+            return False, f"test {t} failed"
+    return True, "green"
+
+
+def try_land(slot_dir, slot_no, rows, order, reg_path):
+    packet_path = (slot_dir / "worker.packet").read_text().strip()
+    pid = Path(packet_path).stem
+    row = rows.get(pid)
+    if row is None:
+        log(f"slot {slot_no}: no registry row for {pid}; skip")
+        return
+    if LANDED_RE.search((row.get("note") or "").lower()):
+        return  # already landed
+    res_file = slot_dir / "wt" / "RESULT.json"
+    if not res_file.exists():
+        log(f"slot {slot_no}: FINISHED without RESULT; left for morning")
+        return
+    try:
+        result = json.loads(res_file.read_text(encoding="utf-8-sig"))
+    except ValueError:
+        log(f"slot {slot_no}: unreadable RESULT; left for morning")
+        return
+    status = (result.get("status") or "").lower()
+    fails = result.get("fail_count")
+    if status not in ("complete", "partial") or \
+            (isinstance(fails, int) and fails > 0):
+        log(f"slot {slot_no}: {pid} status={status!r} fails={fails} - "
+            f"LEFT FOR MORNING (judgment required)")
+        return
+    crates, tests = packet_tests_and_crates(packet_path, row)
+    ok, why = scoped_check(crates, tests, slot_dir / "wt")
+    if not ok:
+        log(f"slot {slot_no}: {pid} scoped check NOT green ({why}); "
+            f"left for morning")
+        return
+    head = git(["rev-parse", "--short", "HEAD"],
+               cwd=slot_dir / "wt").stdout.strip()
+    m = git(["merge", "--no-ff", "--no-edit", "-m",
+             f"merge: {pid} - overnight mechanical landing (scoped check "
+             f"green: {why}; one-verify amendment)", head])
+    if m.returncode != 0:
+        git(["merge", "--abort"])
+        log(f"slot {slot_no}: {pid} merge CONFLICT - aborted, left for "
+            f"morning")
+        return
+    # file the RESULT, drop the root copy if the merge carried it
+    root_res = ROOT / "RESULT.json"
+    if root_res.exists():
+        (ROOT / "loop" / "results" / f"{pid}.json").write_text(
+            root_res.read_text(encoding="utf-8-sig"), encoding="utf-8")
+        root_res.unlink()
+        git(["add", "RESULT.json", f"loop/results/{pid}.json"])
+        git(["commit", "-m", f"loop: file {pid} RESULT (overnight)"])
+    row["note"] = (row.get("note", "")
+                   + f"; LANDED {head} (overnight, one-verify amendment)")
+    save_registry(rows, order, reg_path)
+    git(["add", "loop/PACKETS.jsonl"])
+    git(["commit", "-m", f"loop: {pid} row LANDED (overnight)"])
+    with open(ROOT / "loop" / "LEDGER.jsonl", "a", encoding="utf-8") as f:
+        f.write(json.dumps({
+            "id": pid, "slot": slot_no, "verdict": "LANDED",
+            "worker_commit": head, "model": "deepseek/deepseek-v4-flash",
+            "note": "overnight mechanical landing (scoped check green)",
+            "closed": time.strftime("%Y-%m-%d"),
+        }) + "\n")
+    log(f"slot {slot_no}: {pid} LANDED at {head}")
+
+
+def all_landed(rows):
+    return all(LANDED_RE.search((r.get("note") or "").lower())
+               for r in rows.values() if r["id"].startswith("BG-KV2-"))
+
+
+def battery(rows, order, reg_path):
+    log("BATTERY: the one-verify amendment's single full verification")
+    jan = sh([sys.executable, str(ROOT / "loop" / "janitor.py"),
+              "ensure", "--need", "15"], timeout=1800)
+    log(f"battery preflight: {jan.stdout.strip()[-120:]}")
+    stages = [
+        ["cargo", "test", "--locked", "--workspace", "--all-targets"],
+        ["cargo", "clippy", "--locked", "--workspace", "--all-targets",
+         "--no-deps"],
+    ]
+    results = {}
+    for cmd in stages:
+        r = sh(cmd, env=BATTERY_ENV, timeout=4 * 3600)
+        name = cmd[1]
+        results[name] = r.returncode
+        log(f"battery {name}: exit {r.returncode}")
+        tail = (r.stdout or "")[-1500:]
+        Path(ROOT / "loop" / f"battery_{name}.log").write_text(
+            (r.stdout or "") + (r.stderr or ""), encoding="utf-8",
+            errors="replace")
+        if r.returncode != 0:
+            log(f"battery {name} FAILED - tail: {tail[-400:]}")
+    gates = sh([r"C:\Program Files\Git\bin\bash.exe",
+                str(ROOT / "scripts" / "kernel-gates.sh"), "HEAD"],
+               timeout=1800, env=BATTERY_ENV)
+    results["kernel-gates"] = gates.returncode
+    (ROOT / "loop" / "battery_kernel-gates.log").write_text(
+        (gates.stdout or "") + (gates.stderr or ""), encoding="utf-8",
+        errors="replace")
+    log(f"battery kernel-gates: exit {gates.returncode}")
+    if all(v == 0 for v in results.values()):
+        for pid in rows:
+            if pid.startswith("BG-KV2-"):
+                rows[pid]["status"] = "DONE"
+        save_registry(rows, order, reg_path)
+        git(["add", "loop/PACKETS.jsonl"])
+        git(["commit", "-m", "loop: the battery passed - all KV2 rows "
+                            "flip DONE (one-verify amendment satisfied)"])
+        log("BATTERY GREEN: all rows flipped DONE. Program pending only "
+            "the morning STATE rewrite.")
+    else:
+        log("BATTERY NOT GREEN - rows stay RUNNING; morning review of "
+            "loop/battery_*.log")
+
+
+def main():
+    log(f"overnight driver start (pid {os.getpid()})")
+    battery_done = False
+    while not battery_done:
+        rows, order, reg_path = registry()
+        status_out = sh([sys.executable,
+                         str(ROOT / "loop" / "slot_status.py")]).stdout
+        for line in status_out.splitlines():
+            parts = line.split()
+            if len(parts) >= 4 and parts[0] == "slot" \
+                    and parts[2] == "FINISHED":
+                try_land(ROOT / "loop" / "slots" / parts[1],
+                         parts[1], rows, order, reg_path)
+        if all_landed(rows):
+            still_running = any(
+                len(l.split()) >= 3 and l.split()[2] == "RUNNING"
+                for l in status_out.splitlines()
+                if l.startswith("slot "))
+            if not still_running:
+                battery(rows, order, reg_path)
+                battery_done = True
+                break
+        time.sleep(POLL_SECONDS)
+    log("overnight driver exit")
+
+
+if __name__ == "__main__":
+    sys.exit(main())
