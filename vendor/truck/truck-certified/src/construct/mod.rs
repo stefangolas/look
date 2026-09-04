@@ -103,6 +103,11 @@ pub mod gordon;
 /// criterion over a certified spine, refusing `CanalSingular`.
 pub mod canal;
 
+/// The S11 three-support constrained contact system (CC-020-CONTACT-K3): the
+/// ≤4-unknown reduced-variable mapping over the offset-centre chart, the
+/// arity-4 Krawczyk solve (`krawczyk_c1_n4`), and the typed node outcome.
+pub mod contact3;
+
 /// The seam stub types (S6/S9/S10/S11/S12): frozen shapes and refusing
 /// constructors only, no production logic.
 pub mod stubs;
