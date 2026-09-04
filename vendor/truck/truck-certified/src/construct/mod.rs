@@ -98,6 +98,11 @@ pub mod loft;
 /// CC-010 loft machinery and its two direction factorizations.
 pub mod gordon;
 
+/// The S10 canal-surface regularity seam (CC-025-CANAL): the radius-law
+/// production evaluators and the closed-form arc-restricted regularity
+/// criterion over a certified spine, refusing `CanalSingular`.
+pub mod canal;
+
 /// The seam stub types (S6/S9/S10/S11/S12): frozen shapes and refusing
 /// constructors only, no production logic.
 pub mod stubs;
