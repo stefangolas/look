@@ -1,0 +1,48 @@
+{
+  "id": "CC-005-GRAPHDISK",
+  "contract": ["CC-005-GRAPHDISK"],
+  "class": "design",
+  "crates": ["truck-certified"],
+  "status": "complete",
+  "commit": "ade5c45abdff1e0bcc8c8ee5a59ec1798ed0eebd",
+  "commit_subject": "feat(truck-certified): CC-005-GRAPHDISK P3 graph-disk embedding certificate + normative projection search (seam S6)",
+  "write_set": [
+    "vendor/truck/truck-certified/src/construct/graphdisk.rs",
+    "vendor/truck/truck-certified/src/construct/mod.rs",
+    "vendor/truck/truck-certified/src/construct/stubs.rs",
+    "vendor/truck/truck-certified/tests/construct_graphdisk.rs"
+  ],
+  "anchors": {
+    "A1_pub_fn_genuine_star": 1,
+    "A2_pub_fn_folded_corner": 1,
+    "A3_pub_fn_make_x_monotone": 1,
+    "A4_pub_fn_injectivity_radius": 1
+  },
+  "scoped_checks": {
+    "cargo check -p truck-certified": "pass",
+    "cargo test -p truck-certified --test construct_graphdisk": "pass (6/6)",
+    "cargo test -p truck-certified --lib --tests --no-fail-fast": "pass except the 3 pre-existing kernel_tracer failures (dtau_grows_on_success_and_halves_on_failure, escalation_routes_isolated_r2_to_the_contact_future, high_order_singularity_refuses), the identical set CC-002 recorded at its base c1017d9",
+    "cargo clippy -p truck-certified --all-targets --no-deps --message-format=short": "no finding on any added line of the changed files",
+    "cargo fmt --check -p truck-certified": "the four changed files are rustfmt-clean (only pre-existing drift in untouched kernel files is reported)",
+    "kernel-gates.sh 6ca129e (V4 house rules)": "all P-3 gates pass (GATE-1 H-1 denies on the new module, GATE-2 H-3 clean, GATE-3 H-4 clean, GATE-4 unscaled_legacy 111/111)"
+  },
+  "tests_required": {
+    "genuine_star_certifies": "pass",
+    "folded_corner_refuses_no_admissible_projection_or_star_not_embedded": "pass",
+    "non_simple_boundary_refuses_star_not_embedded": "pass",
+    "unglued_seam_refuses_star_not_embedded": "pass",
+    "projection_candidate_order_is_the_normative_sequence": "pass",
+    "projected_boundary_simplicity_uses_planar_exclusion_and_near_diagonal_radius": "pass"
+  },
+  "notes": {
+    "section_3_seam_resolution": "The session-51 accepted QUESTION (BoundaryPlan S11-posture amendment, recorded in f0cf620) is landed HERE: stubs.rs now carries the frozen PUB fields { pub boundary_simple: bool, pub seams_glued: bool } plus the refusing try_new() (the S11 TripleContactNode posture; the CC-000 contract test still asserts the refusing constructor and the no-Default rule). certify_graph_disk consumes boundary.boundary_simple as the frozen verdict. The Section-3 stop condition is discharged by the amendment, not re-filed.",
+    "certify_graph_disk_decision_table": "The decider is exactly the pre-made table in frozen order: (1) any piece with det_lower.lo <= 0 or non-finite det_lower.lo (require inf > 0; sup <= 0 or straddling 0 is not admissible) -> NoAdmissibleProjection; (2) any piece with seam_glued == false -> StarNotEmbedded; (3) boundary.boundary_simple == false -> StarNotEmbedded; else Ok(GraphDiskCert) with the per-piece witness records. No heuristics, no repair, no second chances.",
+    "graphdiskcert_shape": "The S6 spec freezes DiskPiece's three pub fields and certify_graph_disk's two-argument signature but leaves GraphDiskCert's shape a comment, not code. A two-argument decider over caller certificates cannot re-derive the caller's projection direction, so GraphDiskCert carries the per-piece witness records and the winning projection w lives on search_projection's Ok((w, pieces)) return (consumers attach it to their own ledger). This is the only self-consistent reading of the frozen signature set.",
+    "spherical_code_table": "SPHERICAL_CODE_14 is the 14-point refined octahedron, order-stable and pinned by a test asserting the exact f64 values: the six +-axis octahedron vertices in the fixed order +X,-X,+Y,-Y,+Z,-Z, then the eight octant body diagonals (+-1,+-1,+-1)/sqrt(3) in the fixed sign order (+++), (++-), (+-+), (+--), (-++), (-+-), (--+), (---), each coordinate the exact f64 literal 0.5773502691896258 (1/sqrt(3)). Stop condition (2) is discharged: the normative table IS the deliverable and is written as one pub const with a same-line H-3 marker.",
+    "search_projection": "search_projection walks the FROZEN normative candidate sequence (tested by projection_candidate_order_is_the_normative_sequence): (1) the area-weighted average patch normal unit(sum area_lower * mid(normal_box)); (2) the two principal control-net directions unit(mean net_u) then unit(mean net_v); (3) SPHERICAL_CODE_14 in table order. For each candidate w, every piece's det_lower is the interval-arithmetic evaluation w dot (S_u x S_v) of the caller-provided per-piece derivative enclosure (fixed coordinate order, outward rounding); the per-candidate projected-boundary verdict comes from the caller's discharge closure; certify_graph_disk decides. Exhaustion -> NoAdmissibleProjection; empty piece set -> InvalidInput; unglued seam -> StarNotEmbedded (no projection repairs it). No pairwise patch/patch SSI was written (stop condition 3: that is CC-014's composition).",
+    "boundary_discharge": "projected_boundary_simplicity discharges theory §1 P3 hypothesis (2) over caller-certified projected arcs: (a) near-diagonal radius - every arc's certified P2 radius (curve_injectivity_radius output over the plane-projected arc) must have lo > 0 (a fold arc carries lo <= 0); (b) a closed single chain over distinct vertices (no self-loops, no two arcs sharing both endpoints, one in/out arc per vertex, one covering cycle); (c) planar exclusion - every pair of non-adjacent arcs is strictly separated (boxes disjoint on at least one axis). The square success case computes each arc radius through the real CC-002 curve_injectivity_radius on admitted flat projected-line maps (delta = +inf).",
+    "search_input_abstraction": "search_projection's per-piece input is AdmittedPiece (normal_box: the per-piece derivative enclosure [Interval;3] of S_u x S_v; area_lower: a certified norm lower bound for the area weighting; net_u/net_v: the mean control-net leg direction hints for candidate family (2); seam_glued). This keeps the certified det evaluation (interval dot against w) inside CC-005 while the full CertifiedSurfaceMap plumbing for candidates over real patch grids remains the caller's certificate substrate - the machine-checked CC-000 graph-disk fixtures carry exactly this DiskPiece-shaped interval/bool data.",
+    "stop_conditions": "No stop condition triggered. (1) The CC-000 fixtures genuine_star and folded_corner carry DiskPiece-shaped data with machine-checked ground truths and decide exactly as §6 says: genuine_star certifies Ok, folded_corner refuses (deterministically NoAdmissibleProjection, since the fold's negative determinant fires before the non-simple boundary could fire StarNotEmbedded; the test accepts either variant per its name). (2) The 14-point spherical code is pinned by an exact-f64-value test as the normative table. (3) No pairwise patch/patch SSI was implemented.",
+    "house_rules": "graphdisk.rs and the stubs.rs edit are shipped code: no unwrap/expect/panic, no module-level allow, H-1 lint denials declared; the spherical-code const carries a same-line H-3 marker. All float assertions in the tests carry the same-line // H-3 opt-out. Cargo invocations went through the PATH queue shim only."
+  }
+}
