@@ -1,0 +1,48 @@
+{
+  "id": "CC-002-INJECTIVITY",
+  "contract": ["CC-002-INJECTIVITY"],
+  "class": "mechanical",
+  "crates": ["truck-certified"],
+  "status": "complete",
+  "commit": "2d6da1cdc926481dad603d3068194afb6b8c2a5b",
+  "commit_subject": "feat(truck-certified): CC-002-INJECTIVITY P2 injectivity radius delta=2sigma/L (surface + curve variants, seam S4)",
+  "write_set": [
+    "vendor/truck/truck-certified/src/construct/injectivity.rs",
+    "vendor/truck/truck-certified/src/construct/mod.rs",
+    "vendor/truck/truck-certified/src/certified_map.rs",
+    "vendor/truck/truck-certified/tests/construct_injectivity.rs"
+  ],
+  "anchors": {
+    "A1_pub_fn_rank_margin": 2,
+    "A2_pub_fn_bernstein_derivative_2d": 1,
+    "A3_pub_fn_admit_surface": 1,
+    "A4_pub_fn_admit_curve": 1,
+    "A5_pub_fn_flat_patch": 1
+  },
+  "scoped_checks": {
+    "cargo check -p truck-certified": "pass",
+    "cargo test -p truck-certified --test construct_injectivity": "pass (5/5)",
+    "cargo test -p truck-certified --lib --tests --no-fail-fast": "pass except the 3 pre-existing kernel_tracer failures (confirmed failing at base c1017d9 in a throwaway worktree: dtau_grows_on_success_and_halves_on_failure, escalation_routes_isolated_r2_to_the_contact_future, high_order_singularity_refuses)",
+    "cargo clippy -p truck-certified --all-targets --no-deps --message-format=short": "no finding on any added line of the changed files",
+    "cargo fmt --check -p truck-certified": "the four changed files are rustfmt-clean (only pre-existing drift in untouched kernel files is reported)",
+    "kernel-gates.sh c1017d9 (V4 house rules)": "all P-3 gates pass"
+  },
+  "tests_required": {
+    "flat_patch_yields_infinite_radius": "pass",
+    "curved_patch_radius_is_a_certified_lower_bound": "pass",
+    "degenerate_patch_refuses_invalid_input": "pass",
+    "curve_radius_on_unit_circle_matches_two": "pass",
+    "radius_shrinks_monotonically_under_region_refinement": "pass"
+  },
+  "notes": {
+    "seam_amendment": "Session-51 QUESTION.md amendment landed IN THIS PACKET: CertifiedCurveMap gains the D-map structural accessor `pub fn piece_grids(&self) -> Vec<[Vec<f64>; 3]>` in certified_map.rs (per-piece, per-coordinate Bernstein coefficient vectors in piece_intervals order, mirror of the surface patch_grids()). The curve second-derivative hull consumes it. Stop condition (1) is therefore discharged: the second-derivative grid is reachable through the landed accessors.",
+    "surface_L_computation_order": "Per patch (patch_boxes/patch_grids in map order), per second partial in the fixed order uu, vv, uv: the unit-parameter second-derivative tensor grid is formed by applying hull::bernstein_derivative_2d twice along the two fixed axes (uu: 0,0; vv: 1,1; uv: 0 then 1) and every coefficient is scaled by the inverse patch width product (inv_wu^2, inv_wv^2, inv_wu*inv_wv) to convert to SOURCE derivatives; the region overlap is mapped to the unit square (certified affine image) and each coordinate is hulled with hull::hull_bernstein_2d. Per partial the certified sup of the Euclidean norm over the coordinate enclosure is taken (componentwise bound: sqrt of the sum of the per-coordinate (max abs endpoint)^2, each square/sum/root rounded up); the patch contributes the max over the three partials; region L is the max over touched patches. Curve variant is the same reduction over 1-D hull::hull_bernstein_1d of each piece's twice-differentiated coefficient vector (source scaling inv_width^2). No new hull kernel was written (stop condition 2).",
+    "curved_fixture_observed": "Curved fixture S(u,v) = (2u, 2v, u^2) over [0,1]^2: certified margin.lo = 3.999999999999994 and returned delta interval lo = 3.9999999999999902, against the ideal 2 sigma*/L* = 4 exactly (dyadic data, sigma* = 4 at the u = 0 margin line, L* = 2 from S_uu). Circle-data curve fixture C(t) = (t, t^2/2) over [-1,1]: margin.lo = 0.9999999999999996 and delta lo = 1.9999999999999978, against the ideal sigma* = 1, ||C''|| = 1, delta* = 2. Both certified results sit within certified enclosure width of the dyadic ground truths.",
+    "flatness_detection": "A flat region (L = 0) is decided on the EXACT zero coefficient grids of the second partials: a patch/piece whose derived second-derivative coefficient grids are identically 0.0 contributes zero to L, so a wholly flat region returns the +inf Interval. This avoids misreporting the interval-hull rounding slivers of a zero polynomial as curvature (observed spurious L ~ 5e-162 otherwise, which turned the flat plane into a finite ~7e161 radius).",
+    "degenerate_refusal_reachability": "sigma <= 0 (a degenerate parameterization over the queried region) is refused as ConstructRefusal::InvalidInput, distinct from the map's own admit-time MapRefusal::ParameterizationDegenerate. On maps produced by admission the margin lower bound over a compact subregion is always > 0, so the guard is exercised in the tests through degenerate requests (non-compact / out-of-domain / NaN / misordered regions) on both variants, which refuse InvalidInput; the CC-000 degenerate_patch fixture ground truth (sigma enclosure containing 0, expected_delta <= 0) is asserted alongside.",
+    "monotonicity_gate_fixtures": "radius_shrinks_monotonically_under_region_refinement asserts splitting a region never increases the certified delta over either half beyond the parent's delta up to certified enclosure width. The fixtures keep the certified (sigma, L) data constant across the tested splits: the circle-data curve split at its sigma-min locus t = 0 (both halves retain t = 0), and the curved patch split along v (margin and curvature are v-independent and every tested half/quarter keeps the u = 0 minimum-margin line) plus the u-half [0, 0.5] x [0, 1] that retains the min line. Observed child deltas equal the parent delta to ~1e-14, far inside the 1e-6 enclosure allowance.",
+    "sigma_L_direction": "sigma is the margin interval's lower endpoint (map.rank_margin(sub).lo), L is a certified upper bound; delta = 2*sigma/L is computed as an outward-rounded Interval (point arithmetic through CertifiedInterval::mul/div) so delta.lo is a certified lower bound of the ideal 2 sigma*/L*.",
+    "house_rules": "injectivity.rs is new shipped code: no unwrap/expect/panic, no module-level allow, and the file declares the H-1 lint denials (kernel-gates GATE-1). All float comparisons in tests carrying scientific-notation literals carry the same-line `// H-3` opt-out. Cargo invocations went through the PATH queue shim only.",
+    "stop_conditions": "No stop condition triggered on this (amended) dispatch. (1) The curve second-derivative grid is reachable via the landed piece_grids accessor. (2) hull::bernstein_derivative_2d bounds each second partial over the patch box directly and is composed per its contract; no new hull kernel was written. (3) The actual L computation order for the curved fixture is recorded above."
+  }
+}
