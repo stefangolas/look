@@ -84,6 +84,11 @@ pub mod refusal;
 /// certified enclosure for dense systems outside the banded-TP class.
 pub mod residual_solve;
 
+/// The loft core (CC-010-LOFT-CORE, seam S8): tensor-product loft construction
+/// over the landed `truck_geometry::nurbs` types — compatibility, stationing,
+/// and the collocation solve through the P1 banded factor.
+pub mod loft;
+
 /// The seam stub types (S6/S9/S10/S11/S12): frozen shapes and refusing
 /// constructors only, no production logic.
 pub mod stubs;
