@@ -11,3 +11,620 @@
 12:30:52 DONE exit=0 in 0s: cargo check -p truck-geometry --lib --locked
 12:30:52 START cargo check -p truck-modeling --lib --locked
 12:30:52 DONE exit=0 in 0s: cargo check -p truck-modeling --lib --locked
+12:48:38 START cargo test -p truck-certified --test kernel_tracer -- --nocapture
+12:49:31 DONE exit=101 in 52s: cargo test -p truck-certified --test kernel_tracer -- --nocapture
+12:50:52 START cargo test -p truck-certified --test scratch_reach -- --nocapture --test-threads=1
+12:50:52 DONE exit=101 in 0s: cargo test -p truck-certified --test scratch_reach -- --nocapture --test-threads=1
+12:50:56 START cargo test -p truck-certified --test scratch_reach -- --nocapture --test-threads=1
+12:50:56 DONE exit=101 in 0s: cargo test -p truck-certified --test scratch_reach -- --nocapture --test-threads=1
+12:51:06 START cargo test -p truck-certified --test scratch_reach -- --nocapture --test-threads=1
+12:51:07 DONE exit=101 in 0s: cargo test -p truck-certified --test scratch_reach -- --nocapture --test-threads=1
+12:51:18 START cargo metadata --no-deps --format-version 1
+12:51:18 DONE exit=0 in 0s: cargo metadata --no-deps --format-version 1
+12:51:44 START cargo metadata --no-deps --format-version 1
+12:51:44 DONE exit=0 in 0s: cargo metadata --no-deps --format-version 1
+12:53:56 SERVER START port=8232 cargo=C:\Users\stefa\.cargo\bin\cargo.exe
+13:10:05 START cargo fmt --version
+13:10:06 DONE exit=0 in 0s: cargo fmt --version
+13:10:11 START cargo fmt --all
+13:10:21 DONE exit=0 in 10s: cargo fmt --all
+13:10:27 START cargo check -p truck-certified --lib
+13:10:32 DONE exit=0 in 4s: cargo check -p truck-certified --lib
+13:10:39 START cargo test -p truck-certified --test kernel_sheet --no-run
+13:10:40 DONE exit=101 in 0s: cargo test -p truck-certified --test kernel_sheet --no-run
+13:10:57 START cargo test -p truck-certified --test kernel_sheet --no-run
+13:10:58 DONE exit=101 in 0s: cargo test -p truck-certified --test kernel_sheet --no-run
+13:11:14 START cargo metadata --no-deps --format-version 1
+13:11:14 DONE exit=0 in 0s: cargo metadata --no-deps --format-version 1
+13:12:17 START cargo metadata --no-deps --format-version 1
+13:12:17 DONE exit=0 in 0s: cargo metadata --no-deps --format-version 1
+13:12:18 START cargo metadata --no-deps --format-version 1
+13:12:18 DONE exit=0 in 0s: cargo metadata --no-deps --format-version 1
+13:13:50 START cargo fmt --all -- --check
+13:13:54 DONE exit=1 in 3s: cargo fmt --all -- --check
+13:25:09 START cargo check -p truck-certified --locked --tests
+13:25:11 DONE exit=0 in 2s: cargo check -p truck-certified --locked --tests
+13:25:17 START cargo check -p truck-certified --locked --tests
+13:25:17 DONE exit=0 in 0s: cargo check -p truck-certified --locked --tests
+13:25:24 START cargo test -p truck-certified --locked --test kernel_selfint
+13:25:24 DONE exit=101 in 0s: cargo test -p truck-certified --locked --test kernel_selfint
+13:25:44 START cargo metadata --no-deps --format-version 1
+13:25:44 DONE exit=0 in 0s: cargo metadata --no-deps --format-version 1
+13:26:40 START cargo metadata --manifest-path C:\Users\stefa\look\loop\slots\5\wt\Cargo.toml --format-version 1
+13:27:29 DONE exit=0 in 49s: cargo metadata --manifest-path C:\Users\stefa\look\loop\slots\5\wt\Cargo.toml --format-version 1
+13:27:36 START cargo metadata --manifest-path C:\Users\stefa\look\loop\slots\5\wt\Cargo.toml --format-version 1
+13:27:37 DONE exit=0 in 0s: cargo metadata --manifest-path C:\Users\stefa\look\loop\slots\5\wt\Cargo.toml --format-version 1
+13:27:51 START cargo check --manifest-path C:\Users\stefa\look\loop\slots\5\wt\Cargo.toml -p truck-certified --locked --tests
+13:28:28 DONE exit=0 in 36s: cargo check --manifest-path C:\Users\stefa\look\loop\slots\5\wt\Cargo.toml -p truck-certified --locked --tests
+13:28:33 START cargo test --manifest-path C:\Users\stefa\look\loop\slots\5\wt\Cargo.toml -p truck-certified --locked --test kernel_selfint
+13:29:16 DONE exit=0 in 43s: cargo test --manifest-path C:\Users\stefa\look\loop\slots\5\wt\Cargo.toml -p truck-certified --locked --test kernel_selfint
+13:29:22 START cargo test --manifest-path C:\Users\stefa\look\loop\slots\5\wt\Cargo.toml -p truck-certified --locked
+13:29:58 DONE exit=101 in 36s: cargo test --manifest-path C:\Users\stefa\look\loop\slots\5\wt\Cargo.toml -p truck-certified --locked
+13:30:22 START cargo clippy --manifest-path C:\Users\stefa\look\loop\slots\5\wt\Cargo.toml -p truck-certified --locked --tests
+13:30:42 DONE exit=101 in 19s: cargo clippy --manifest-path C:\Users\stefa\look\loop\slots\5\wt\Cargo.toml -p truck-certified --locked --tests
+13:33:54 START cargo clippy --manifest-path C:\Users\stefa\look\loop\slots\5\wt\Cargo.toml -p truck-certified --locked --tests
+13:34:09 DONE exit=101 in 15s: cargo clippy --manifest-path C:\Users\stefa\look\loop\slots\5\wt\Cargo.toml -p truck-certified --locked --tests
+13:34:16 START cargo test --manifest-path C:\Users\stefa\look\loop\slots\5\wt\Cargo.toml -p truck-certified --locked --test kernel_selfint
+13:34:21 DONE exit=0 in 4s: cargo test --manifest-path C:\Users\stefa\look\loop\slots\5\wt\Cargo.toml -p truck-certified --locked --test kernel_selfint
+13:34:34 START cargo fmt --manifest-path C:\Users\stefa\look\loop\slots\5\wt\Cargo.toml -p truck-certified -- --check
+13:34:35 DONE exit=0 in 0s: cargo fmt --manifest-path C:\Users\stefa\look\loop\slots\5\wt\Cargo.toml -p truck-certified -- --check
+13:34:40 START cargo test --manifest-path C:\Users\stefa\look\loop\slots\5\wt\Cargo.toml -p truck-certified --locked
+13:34:56 DONE exit=101 in 16s: cargo test --manifest-path C:\Users\stefa\look\loop\slots\5\wt\Cargo.toml -p truck-certified --locked
+13:55:49 START cargo metadata --no-deps --format-version 1
+13:55:50 DONE exit=0 in 0s: cargo metadata --no-deps --format-version 1
+13:56:14 START cargo test -p truck-certified --test scratch_reach -- --nocapture --test-threads=1
+14:08:24 DONE exit=0 in 729s: cargo test -p truck-certified --test scratch_reach -- --nocapture --test-threads=1
+14:10:07 START cargo test -p truck-certified --test scratch_reach -- --nocapture --test-threads=1
+14:10:12 DONE exit=0 in 5s: cargo test -p truck-certified --test scratch_reach -- --nocapture --test-threads=1
+14:12:48 START cargo test -p truck-certified --test scratch_reach -- --nocapture --test-threads=1
+14:13:00 DONE exit=0 in 11s: cargo test -p truck-certified --test scratch_reach -- --nocapture --test-threads=1
+14:13:56 START cargo test -p truck-certified --test scratch_reach -- --nocapture --test-threads=1
+14:13:56 DONE exit=101 in 0s: cargo test -p truck-certified --test scratch_reach -- --nocapture --test-threads=1
+14:14:09 START cargo test -p truck-certified --test scratch_reach -- --nocapture --test-threads=1
+14:14:10 DONE exit=0 in 0s: cargo test -p truck-certified --test scratch_reach -- --nocapture --test-threads=1
+14:17:34 START cargo test -p truck-certified --test scratch_reach -- --nocapture --test-threads=1
+14:17:35 DONE exit=0 in 0s: cargo test -p truck-certified --test scratch_reach -- --nocapture --test-threads=1
+14:21:29 START cargo check -p truck-certified --lib
+14:21:46 DONE exit=101 in 17s: cargo check -p truck-certified --lib
+14:22:06 START cargo check -p truck-certified --lib
+14:22:09 DONE exit=0 in 3s: cargo check -p truck-certified --lib
+14:23:34 START cargo test -p truck-certified --test scratch_reach -- --nocapture --test-threads=1
+14:23:56 DONE exit=0 in 21s: cargo test -p truck-certified --test scratch_reach -- --nocapture --test-threads=1
+14:24:47 START cargo test -p truck-certified --no-run
+14:25:41 DONE exit=0 in 53s: cargo test -p truck-certified --no-run
+14:26:41 START cargo test -p truck-certified --test scratch_reach -- --nocapture --test-threads=1
+14:26:45 DONE exit=0 in 4s: cargo test -p truck-certified --test scratch_reach -- --nocapture --test-threads=1
+14:26:56 START cargo test -p truck-certified --test scratch_reach scratch_kappa -- --nocapture --test-threads=1
+14:26:56 DONE exit=0 in 0s: cargo test -p truck-certified --test scratch_reach scratch_kappa -- --nocapture --test-threads=1
+14:27:23 START cargo test -p truck-certified --test scratch_reach scratch_kappa -- --nocapture --test-threads=1
+14:27:24 DONE exit=0 in 0s: cargo test -p truck-certified --test scratch_reach scratch_kappa -- --nocapture --test-threads=1
+14:28:13 START cargo test -p truck-certified --test scratch_reach scratch_kappa -- --nocapture --test-threads=1
+14:28:14 DONE exit=101 in 0s: cargo test -p truck-certified --test scratch_reach scratch_kappa -- --nocapture --test-threads=1
+14:28:18 START cargo test -p truck-certified --test scratch_reach scratch_kappa -- --nocapture --test-threads=1
+14:28:18 DONE exit=101 in 0s: cargo test -p truck-certified --test scratch_reach scratch_kappa -- --nocapture --test-threads=1
+14:28:27 START cargo test -p truck-certified --test scratch_reach scratch_kappa -- --nocapture --test-threads=1
+14:28:28 DONE exit=0 in 0s: cargo test -p truck-certified --test scratch_reach scratch_kappa -- --nocapture --test-threads=1
+14:29:35 START cargo test -p truck-certified --test kernel_engine --no-run
+14:29:36 DONE exit=101 in 0s: cargo test -p truck-certified --test kernel_engine --no-run
+14:29:51 START cargo test -p truck-certified --test kernel_engine --no-run
+14:29:52 DONE exit=0 in 1s: cargo test -p truck-certified --test kernel_engine --no-run
+14:30:03 START cargo test -p truck-certified --test kernel_engine -- --nocapture --test-threads=1
+14:30:11 DONE exit=101 in 8s: cargo test -p truck-certified --test kernel_engine -- --nocapture --test-threads=1
+14:30:21 START cargo test -p truck-certified --test kernel_engine
+14:30:33 DONE exit=0 in 11s: cargo test -p truck-certified --test kernel_engine
+14:31:00 START cargo test -p truck-certified --lib --tests --no-fail-fast
+14:31:16 DONE exit=101 in 15s: cargo test -p truck-certified --lib --tests --no-fail-fast
+14:31:25 START cargo fmt -p truck-certified -- --check
+14:31:26 DONE exit=1 in 1s: cargo fmt -p truck-certified -- --check
+14:31:30 START cargo fmt -p truck-certified
+14:31:31 DONE exit=0 in 0s: cargo fmt -p truck-certified
+14:31:36 START cargo fmt -p truck-certified -- --check
+14:31:37 DONE exit=0 in 0s: cargo fmt -p truck-certified -- --check
+14:31:43 START cargo clippy -p truck-certified --all-targets
+14:32:14 DONE exit=101 in 31s: cargo clippy -p truck-certified --all-targets
+14:32:50 START cargo clippy -p truck-certified --lib
+14:32:59 DONE exit=101 in 8s: cargo clippy -p truck-certified --lib
+14:33:07 START cargo clippy -p truck-certified --all-targets
+14:33:28 DONE exit=101 in 20s: cargo clippy -p truck-certified --all-targets
+14:33:36 START cargo fmt -p truck-certified
+14:33:37 DONE exit=0 in 1s: cargo fmt -p truck-certified
+14:33:38 START cargo fmt -p truck-certified -- --check
+14:33:39 DONE exit=0 in 0s: cargo fmt -p truck-certified -- --check
+14:33:47 START cargo test -p truck-certified --lib --tests --no-fail-fast
+14:34:36 DONE exit=101 in 48s: cargo test -p truck-certified --lib --tests --no-fail-fast
+14:34:45 START cargo check --workspace --all-targets --locked
+14:37:37 DONE exit=101 in 171s: cargo check --workspace --all-targets --locked
+14:37:47 START cargo check --workspace --all-targets --locked
+14:38:21 DONE exit=101 in 34s: cargo check --workspace --all-targets --locked
+14:38:43 START cargo check --workspace --all-targets --locked
+14:40:09 DONE exit=101 in 85s: cargo check --workspace --all-targets --locked
+14:40:33 START cargo check --workspace --all-targets --locked
+14:41:00 DONE exit=101 in 26s: cargo check --workspace --all-targets --locked
+14:41:41 START cargo metadata --manifest-path C:\Users\stefa\look\loop\slots\0\wt\Cargo.toml --no-deps --format-version 1
+14:41:41 DONE exit=0 in 0s: cargo metadata --manifest-path C:\Users\stefa\look\loop\slots\0\wt\Cargo.toml --no-deps --format-version 1
+14:41:48 START cargo metadata --manifest-path C:\Users\stefa\look\loop\slots\0\wt\Cargo.toml --no-deps --format-version 1
+14:41:49 DONE exit=0 in 0s: cargo metadata --manifest-path C:\Users\stefa\look\loop\slots\0\wt\Cargo.toml --no-deps --format-version 1
+14:41:56 START cargo metadata --manifest-path C:\Users\stefa\look\loop\slots\0\wt\Cargo.toml --no-deps --format-version 1
+14:41:56 DONE exit=0 in 0s: cargo metadata --manifest-path C:\Users\stefa\look\loop\slots\0\wt\Cargo.toml --no-deps --format-version 1
+14:42:18 START cargo check --manifest-path C:\Users\stefa\look\loop\slots\0\wt\Cargo.toml --workspace --all-targets --locked
+14:46:55 DONE exit=0 in 276s: cargo check --manifest-path C:\Users\stefa\look\loop\slots\0\wt\Cargo.toml --workspace --all-targets --locked
+14:46:55 START cargo check --locked -p truck-certified --lib
+14:46:56 DONE exit=0 in 0s: cargo check --locked -p truck-certified --lib
+14:47:08 START cargo check --locked -p truck-certified --all-targets
+14:47:09 DONE exit=0 in 0s: cargo check --locked -p truck-certified --all-targets
+14:47:17 START cargo check --locked -p truck-certified --lib
+14:47:18 DONE exit=0 in 0s: cargo check --locked -p truck-certified --lib
+14:47:20 START cargo test --manifest-path C:\Users\stefa\look\loop\slots\0\wt\Cargo.toml -p truck-certified --lib --tests --no-fail-fast
+14:48:47 DONE exit=101 in 87s: cargo test --manifest-path C:\Users\stefa\look\loop\slots\0\wt\Cargo.toml -p truck-certified --lib --tests --no-fail-fast
+14:48:47 START cargo clean -p truck-certified
+14:48:48 DONE exit=0 in 0s: cargo clean -p truck-certified
+14:48:49 START cargo check --locked -p truck-certified --lib
+14:48:57 DONE exit=0 in 8s: cargo check --locked -p truck-certified --lib
+14:49:56 START cargo fmt -p truck-certified
+14:49:58 DONE exit=0 in 2s: cargo fmt -p truck-certified
+14:49:59 START cargo check --manifest-path C:\Users\stefa\look\loop\slots\0\wt\Cargo.toml -p truck-certified --lib
+14:50:36 DONE exit=0 in 37s: cargo check --manifest-path C:\Users\stefa\look\loop\slots\0\wt\Cargo.toml -p truck-certified --lib
+14:50:47 START cargo test --manifest-path C:\Users\stefa\look\loop\slots\0\wt\Cargo.toml -p truck-certified --lib --test kernel_engine
+14:52:36 DONE exit=0 in 108s: cargo test --manifest-path C:\Users\stefa\look\loop\slots\0\wt\Cargo.toml -p truck-certified --lib --test kernel_engine
+14:52:36 START cargo test --locked -p truck-certified --test kernel_trimclip --no-run
+14:52:59 DONE exit=3221226505 in 23s: cargo test --locked -p truck-certified --test kernel_trimclip --no-run
+14:53:08 START cargo test --locked -p truck-certified --test kernel_trimclip --no-run
+14:53:09 DONE exit=101 in 0s: cargo test --locked -p truck-certified --test kernel_trimclip --no-run
+14:53:31 START cargo test --locked -p truck-certified --test kernel_trimclip --no-run
+14:53:32 DONE exit=101 in 0s: cargo test --locked -p truck-certified --test kernel_trimclip --no-run
+14:53:42 START cargo test --locked -p truck-certified --no-run -- --list
+14:54:34 DONE exit=0 in 52s: cargo test --locked -p truck-certified --no-run -- --list
+14:54:55 START cargo test --locked -p truck-certified --no-run -- --list
+14:54:55 DONE exit=0 in 0s: cargo test --locked -p truck-certified --no-run -- --list
+14:55:16 START cargo test --locked -p truck-certified --test kernel_trimclip --no-run
+14:55:16 DONE exit=101 in 0s: cargo test --locked -p truck-certified --test kernel_trimclip --no-run
+14:55:49 START cargo --version
+14:55:49 DONE exit=0 in 0s: cargo --version
+14:56:18 START cargo test --locked -p truck-certified --test kernel_tier2 --no-run
+14:56:19 DONE exit=0 in 0s: cargo test --locked -p truck-certified --test kernel_tier2 --no-run
+14:56:34 START cargo test --locked --all-targets --no-run
+14:58:05 DONE exit=101 in 91s: cargo test --locked --all-targets --no-run
+14:58:05 START cargo locate-project --message-format plain
+14:58:05 DONE exit=0 in 0s: cargo locate-project --message-format plain
+15:01:13 START cargo qtest -p truck-certified --test kernel_tracer --no-fail-fast
+15:04:46 DONE exit=101 in 213s: cargo qtest -p truck-certified --test kernel_tracer --no-fail-fast
+15:04:52 START cargo qtest -p truck-certified --test kernel_tracer --no-fail-fast
+15:04:56 DONE exit=101 in 4s: cargo qtest -p truck-certified --test kernel_tracer --no-fail-fast
+15:05:56 START cargo qtest -p truck-certified --test kernel_tracer --no-fail-fast escalation_routes_isolated_r2_to_the_contact_future dtau_grows_on_success_and_halves_on_failure high_order_singularity_refuses
+15:05:56 DONE exit=1 in 0s: cargo qtest -p truck-certified --test kernel_tracer --no-fail-fast escalation_routes_isolated_r2_to_the_contact_future dtau_grows_on_success_and_halves_on_failure high_order_singularity_refuses
+15:06:02 START cargo qtest -p truck-certified --test kernel_tracer --no-fail-fast high_order_singularity_refuses
+15:06:03 DONE exit=101 in 1s: cargo qtest -p truck-certified --test kernel_tracer --no-fail-fast high_order_singularity_refuses
+15:06:28 START cargo qtest -p truck-certified --test kernel_tracer --no-fail-fast escalation_routes_isolated_r2_to_the_contact_future
+15:06:30 DONE exit=101 in 2s: cargo qtest -p truck-certified --test kernel_tracer --no-fail-fast escalation_routes_isolated_r2_to_the_contact_future
+15:06:40 START cargo qtest -p truck-certified --test kernel_tracer --no-fail-fast dtau_grows_on_success_and_halves_on_failure
+15:06:43 DONE exit=101 in 2s: cargo qtest -p truck-certified --test kernel_tracer --no-fail-fast dtau_grows_on_success_and_halves_on_failure
+15:17:22 START cargo qcheck -p truck-certified --lib
+15:17:38 DONE exit=0 in 16s: cargo qcheck -p truck-certified --lib
+15:17:43 START cargo qtest -p truck-certified --test kernel_engine --no-fail-fast
+15:17:51 DONE exit=101 in 8s: cargo qtest -p truck-certified --test kernel_engine --no-fail-fast
+15:18:01 START cargo test --profile quick --locked -p truck-certified --test kernel_engine --no-fail-fast
+15:18:01 DONE exit=0 in 0s: cargo test --profile quick --locked -p truck-certified --test kernel_engine --no-fail-fast
+15:19:07 START cargo check -p truck-certified --locked
+15:19:14 DONE exit=0 in 6s: cargo check -p truck-certified --locked
+15:19:42 START cargo metadata --no-deps --format-version 1
+15:19:42 DONE exit=0 in 0s: cargo metadata --no-deps --format-version 1
+15:20:14 START cargo metadata --manifest-path C:\Users\stefa\look\loop\slots\2\wt\Cargo.toml --no-deps --format-version 1
+15:20:14 DONE exit=0 in 0s: cargo metadata --manifest-path C:\Users\stefa\look\loop\slots\2\wt\Cargo.toml --no-deps --format-version 1
+15:20:37 START cargo check --manifest-path C:\Users\stefa\look\loop\slots\2\wt\Cargo.toml -p truck-certified --locked
+15:21:08 DONE exit=101 in 31s: cargo check --manifest-path C:\Users\stefa\look\loop\slots\2\wt\Cargo.toml -p truck-certified --locked
+15:21:08 START cargo fmt -- vendor/truck/truck-certified/src/kernel/engine.rs vendor/truck/truck-certified/tests/kernel_engine.rs
+15:21:12 DONE exit=0 in 3s: cargo fmt -- vendor/truck/truck-certified/src/kernel/engine.rs vendor/truck/truck-certified/tests/kernel_engine.rs
+15:21:16 START cargo test --profile quick --locked -p truck-certified --test kernel_engine --no-fail-fast
+15:21:20 DONE exit=0 in 3s: cargo test --profile quick --locked -p truck-certified --test kernel_engine --no-fail-fast
+15:21:25 START cargo check --manifest-path C:\Users\stefa\look\loop\slots\2\wt\Cargo.toml -p truck-certified --locked
+15:21:30 DONE exit=0 in 5s: cargo check --manifest-path C:\Users\stefa\look\loop\slots\2\wt\Cargo.toml -p truck-certified --locked
+15:21:54 START cargo check --manifest-path C:\Users\stefa\look\loop\slots\2\wt\Cargo.toml -p truck-certified --locked
+15:21:55 DONE exit=0 in 1s: cargo check --manifest-path C:\Users\stefa\look\loop\slots\2\wt\Cargo.toml -p truck-certified --locked
+15:21:59 START cargo test --profile quick --locked -p truck-certified --test kernel_engine --no-fail-fast
+15:21:59 DONE exit=0 in 0s: cargo test --profile quick --locked -p truck-certified --test kernel_engine --no-fail-fast
+15:22:04 START cargo test --profile quick --locked -p truck-certified --test kernel_engine --no-fail-fast
+15:22:04 DONE exit=0 in 0s: cargo test --profile quick --locked -p truck-certified --test kernel_engine --no-fail-fast
+15:22:43 START cargo metadata --no-deps --format-version 1
+15:22:43 DONE exit=0 in 0s: cargo metadata --no-deps --format-version 1
+15:23:18 START cargo check --manifest-path C:\Users\stefa\look\loop\slots\2\wt\Cargo.toml -p truck-certified --locked
+15:23:19 DONE exit=101 in 0s: cargo check --manifest-path C:\Users\stefa\look\loop\slots\2\wt\Cargo.toml -p truck-certified --locked
+15:23:28 START cargo check --manifest-path C:\Users\stefa\look\loop\slots\2\wt\Cargo.toml -p truck-certified --locked
+15:23:29 DONE exit=0 in 1s: cargo check --manifest-path C:\Users\stefa\look\loop\slots\2\wt\Cargo.toml -p truck-certified --locked
+15:24:29 START cargo test --manifest-path C:\Users\stefa\look\loop\slots\2\wt\Cargo.toml -p truck-certified --locked --test kernel_atlas
+15:25:29 DONE exit=101 in 59s: cargo test --manifest-path C:\Users\stefa\look\loop\slots\2\wt\Cargo.toml -p truck-certified --locked --test kernel_atlas
+15:25:37 START cargo test --manifest-path C:\Users\stefa\look\loop\slots\2\wt\Cargo.toml -p truck-certified --locked --test kernel_atlas
+15:25:38 DONE exit=101 in 1s: cargo test --manifest-path C:\Users\stefa\look\loop\slots\2\wt\Cargo.toml -p truck-certified --locked --test kernel_atlas
+15:26:20 START cargo test --manifest-path C:\Users\stefa\look\loop\slots\2\wt\Cargo.toml -p truck-certified --locked --test kernel_atlas sphere_pole_chart_switches_and_continues_the_arc -- --nocapture
+15:26:21 DONE exit=101 in 1s: cargo test --manifest-path C:\Users\stefa\look\loop\slots\2\wt\Cargo.toml -p truck-certified --locked --test kernel_atlas sphere_pole_chart_switches_and_continues_the_arc -- --nocapture
+15:26:41 START cargo test --manifest-path C:\Users\stefa\look\loop\slots\2\wt\Cargo.toml -p truck-certified --locked --test kernel_atlas sphere_pole_chart_switches_and_continues_the_arc -- --nocapture
+15:26:43 DONE exit=101 in 2s: cargo test --manifest-path C:\Users\stefa\look\loop\slots\2\wt\Cargo.toml -p truck-certified --locked --test kernel_atlas sphere_pole_chart_switches_and_continues_the_arc -- --nocapture
+15:27:04 START cargo test --manifest-path C:\Users\stefa\look\loop\slots\2\wt\Cargo.toml -p truck-certified --locked --test kernel_atlas sphere_pole_chart_switches_and_continues_the_arc -- --nocapture
+15:27:07 DONE exit=101 in 2s: cargo test --manifest-path C:\Users\stefa\look\loop\slots\2\wt\Cargo.toml -p truck-certified --locked --test kernel_atlas sphere_pole_chart_switches_and_continues_the_arc -- --nocapture
+15:27:45 START cargo test --manifest-path C:\Users\stefa\look\loop\slots\2\wt\Cargo.toml -p truck-certified --locked --test kernel_atlas
+15:27:48 DONE exit=0 in 2s: cargo test --manifest-path C:\Users\stefa\look\loop\slots\2\wt\Cargo.toml -p truck-certified --locked --test kernel_atlas
+15:27:54 START cargo test --manifest-path C:\Users\stefa\look\loop\slots\2\wt\Cargo.toml -p truck-certified --locked
+15:28:49 DONE exit=101 in 54s: cargo test --manifest-path C:\Users\stefa\look\loop\slots\2\wt\Cargo.toml -p truck-certified --locked
+15:28:55 START cargo test --manifest-path C:\Users\stefa\look\loop\slots\2\wt\Cargo.toml -p truck-certified --locked --test kernel_tracer
+15:28:55 DONE exit=101 in 0s: cargo test --manifest-path C:\Users\stefa\look\loop\slots\2\wt\Cargo.toml -p truck-certified --locked --test kernel_tracer
+15:29:01 START cargo test --manifest-path C:\Users\stefa\look\loop\slots\2\wt\Cargo.toml -p truck-certified --locked --test kernel_tracer
+15:29:15 DONE exit=101 in 13s: cargo test --manifest-path C:\Users\stefa\look\loop\slots\2\wt\Cargo.toml -p truck-certified --locked --test kernel_tracer
+15:29:24 START cargo test --manifest-path C:\Users\stefa\look\loop\slots\2\wt\Cargo.toml -p truck-certified --locked
+15:30:03 DONE exit=101 in 38s: cargo test --manifest-path C:\Users\stefa\look\loop\slots\2\wt\Cargo.toml -p truck-certified --locked
+15:30:51 START cargo test --manifest-path C:\Users\stefa\look\loop\slots\2\wt\Cargo.toml -p truck-certified --locked --test kernel_atlas
+15:31:01 DONE exit=0 in 9s: cargo test --manifest-path C:\Users\stefa\look\loop\slots\2\wt\Cargo.toml -p truck-certified --locked --test kernel_atlas
+15:55:01 SERVER START port=8231 cargo=C:\Users\stefa\.cargo\bin\cargo.exe
+15:55:27 START [cwd=C:\Users\stefa\look] cargo metadata --no-deps --format-version 1
+15:55:27 DONE exit=0 in 0s: cargo metadata --no-deps --format-version 1
+15:56:55 START [cwd=C:\Users\stefa\look] cargo metadata --no-deps --format-version 1
+15:56:55 DONE exit=0 in 0s: cargo metadata --no-deps --format-version 1
+15:57:56 SERVER START port=8231 cargo=C:\Users\stefa\.cargo\bin\cargo.exe
+15:57:59 START [cwd=C:\Users\stefa\AppData\Local\Temp\cargoq-cwd-test] cargo metadata --no-deps --format-version 1
+15:58:00 DONE exit=0 in 0s: cargo metadata --no-deps --format-version 1
+16:21:27 START [cwd=C:\Users\stefa\AppData\Local\Temp\cargoq-cwd-test] cargo metadata --no-deps --format-version 1
+16:21:27 DONE exit=0 in 0s: cargo metadata --no-deps --format-version 1
+16:21:27 START [cwd=C:\Users\stefa\look] cargo metadata --no-deps --format-version 1
+16:21:27 DONE exit=0 in 0s: cargo metadata --no-deps --format-version 1
+16:45:28 START [cwd=C:\Users\stefa\look] cargo check --locked -p truck-certified
+16:46:07 DONE exit=0 in 38s: cargo check --locked -p truck-certified
+16:48:40 START [cwd=C:\Users\stefa\look] cargo check --locked -p look --example nop_geo_probe
+16:50:35 DONE exit=0 in 115s: cargo check --locked -p look --example nop_geo_probe
+16:52:32 START [cwd=C:\Users\stefa\look] cargo check --locked -p look --example nop_geo_probe
+16:52:32 DONE exit=0 in 0s: cargo check --locked -p look --example nop_geo_probe
+16:52:56 START [cwd=C:\Users\stefa\look\loop\slots\0\wt] cargo test -p truck-certified --test kernel_tracer --no-fail-fast
+16:53:45 DONE exit=101 in 48s: cargo test -p truck-certified --test kernel_tracer --no-fail-fast
+16:53:45 START [cwd=C:\Users\stefa\look] cargo check --workspace --all-targets --locked --manifest-path C:\Users\stefa\look\loop\slots\0\wt\Cargo.toml
+16:56:25 DONE exit=0 in 160s: cargo check --workspace --all-targets --locked --manifest-path C:\Users\stefa\look\loop\slots\0\wt\Cargo.toml
+17:03:22 START [cwd=C:\Users\stefa\look\loop\slots\0\wt] cargo check -p truck-certified --lib
+17:03:38 DONE exit=0 in 16s: cargo check -p truck-certified --lib
+17:04:00 START [cwd=C:\Users\stefa\look\loop\slots\0\wt] cargo check -p truck-certified --lib
+17:04:02 DONE exit=0 in 1s: cargo check -p truck-certified --lib
+17:04:09 START [cwd=C:\Users\stefa\look\loop\slots\0\wt] cargo test -p truck-certified --test kernel_engine --test kernel_tracer --no-fail-fast
+17:04:16 DONE exit=101 in 7s: cargo test -p truck-certified --test kernel_engine --test kernel_tracer --no-fail-fast
+17:06:46 START [cwd=C:\Users\stefa\look] cargo clippy --manifest-path C:\Users\stefa\look\loop\slots\2\wt\Cargo.toml --locked -p truck-certified --all-targets --no-deps -- -D warnings
+19:36:18 TIMEOUT after 2400s: cargo clippy --manifest-path C:\Users\stefa\look\loop\slots\2\wt\Cargo.toml --locked -p truck-certified --all-targets --no-deps -- -D warnings
+19:36:18 START [cwd=C:\Users\stefa\look\loop\slots\0\wt] cargo test -p truck-certified --test kernel_engine --no-fail-fast -- --nocapture
+19:36:25 DONE exit=101 in 6s: cargo test -p truck-certified --test kernel_engine --no-fail-fast -- --nocapture
+19:36:25 START [cwd=C:\Users\stefa\look] cargo fmt --manifest-path C:\Users\stefa\look\loop\slots\2\wt\Cargo.toml -p truck-certified -- --check
+19:36:26 DONE exit=0 in 1s: cargo fmt --manifest-path C:\Users\stefa\look\loop\slots\2\wt\Cargo.toml -p truck-certified -- --check
+19:37:19 START [cwd=C:\Users\stefa\look\loop\slots\0\wt] cargo test -p truck-certified --test kernel_engine frame_two_pass_orthonormality_near_degenerate_seeds -- --nocapture
+19:37:21 DONE exit=101 in 2s: cargo test -p truck-certified --test kernel_engine frame_two_pass_orthonormality_near_degenerate_seeds -- --nocapture
+19:38:12 START [cwd=C:\Users\stefa\look\loop\slots\0\wt] cargo test -p truck-certified --test kernel_engine --no-fail-fast -- --nocapture
+19:38:14 DONE exit=0 in 2s: cargo test -p truck-certified --test kernel_engine --no-fail-fast -- --nocapture
+19:38:43 START [cwd=C:\Users\stefa\look\loop\slots\0\wt] cargo test -p truck-certified --test kernel_engine --no-fail-fast
+19:38:44 DONE exit=0 in 1s: cargo test -p truck-certified --test kernel_engine --no-fail-fast
+19:39:15 START [cwd=C:\Users\stefa\look\loop\slots\0\wt] cargo test -p truck-certified --lib --tests --no-fail-fast
+19:39:50 DONE exit=101 in 34s: cargo test -p truck-certified --lib --tests --no-fail-fast
+19:40:02 START [cwd=C:\Users\stefa\look\loop\slots\0\wt] cargo clippy -p truck-certified --all-targets --message-format=short
+19:40:21 DONE exit=101 in 18s: cargo clippy -p truck-certified --all-targets --message-format=short
+19:42:38 START [cwd=C:\Users\stefa\look\loop\slots\0\wt] cargo clippy -p truck-certified --all-targets --message-format=short
+19:42:46 DONE exit=101 in 8s: cargo clippy -p truck-certified --all-targets --message-format=short
+19:43:49 START [cwd=C:\Users\stefa\look\loop\slots\0\wt] cargo test -p truck-certified --test kernel_engine --no-fail-fast
+19:43:56 DONE exit=0 in 6s: cargo test -p truck-certified --test kernel_engine --no-fail-fast
+19:43:58 START [cwd=C:\Users\stefa\look\loop\slots\0\wt] cargo check --workspace --all-targets
+19:47:07 DONE exit=0 in 188s: cargo check --workspace --all-targets
+22:05:38 START [cwd=C:\Users\stefa\look] cargo check --locked -p truck-certified --manifest-path C:\Users\stefa\look\loop\slots\2\wt\Cargo.toml
+22:06:11 DONE exit=0 in 33s: cargo check --locked -p truck-certified --manifest-path C:\Users\stefa\look\loop\slots\2\wt\Cargo.toml
+22:06:11 START [cwd=C:\Users\stefa\look] cargo test --locked -p truck-certified --test kernel_atlas --manifest-path C:\Users\stefa\look\loop\slots\2\wt\Cargo.toml
+22:07:17 DONE exit=0 in 65s: cargo test --locked -p truck-certified --test kernel_atlas --manifest-path C:\Users\stefa\look\loop\slots\2\wt\Cargo.toml
+22:09:38 START [cwd=C:\Users\stefa\look] cargo check --locked -p truck-certified
+22:10:06 DONE exit=0 in 28s: cargo check --locked -p truck-certified
+22:10:08 START [cwd=C:\Users\stefa\look] cargo test --locked -p truck-certified --test kernel_atlas --test kernel_trimclip
+22:11:29 DONE exit=0 in 81s: cargo test --locked -p truck-certified --test kernel_atlas --test kernel_trimclip
+22:28:40 START [cwd=C:\Users\stefa\look] cargo check --locked -p truck-certified --manifest-path C:\Users\stefa\look\loop\slots\0\wt\Cargo.toml
+22:29:14 DONE exit=0 in 34s: cargo check --locked -p truck-certified --manifest-path C:\Users\stefa\look\loop\slots\0\wt\Cargo.toml
+22:29:15 START [cwd=C:\Users\stefa\look] cargo test --locked -p truck-certified --test kernel_engine --manifest-path C:\Users\stefa\look\loop\slots\0\wt\Cargo.toml
+22:30:07 DONE exit=0 in 51s: cargo test --locked -p truck-certified --test kernel_engine --manifest-path C:\Users\stefa\look\loop\slots\0\wt\Cargo.toml
+22:34:21 START [cwd=C:\Users\stefa\look] cargo check --locked -p truck-certified
+22:34:27 DONE exit=0 in 5s: cargo check --locked -p truck-certified
+22:37:17 START [cwd=C:\Users\stefa\look\loop\slots\0\wt] cargo --version
+22:37:17 DONE exit=0 in 0s: cargo --version
+22:39:25 START [cwd=C:\Users\stefa\look\loop\slots\0\wt] cargo test -p truck-certified --lib --test kernel_engine --no-fail-fast
+22:41:15 DONE exit=0 in 110s: cargo test -p truck-certified --lib --test kernel_engine --no-fail-fast
+22:41:22 START [cwd=C:\Users\stefa\look\loop\slots\0\wt] cargo test -p truck-certified --test kernel_engine tube_reach_envelope_measured_and_published -- --nocapture --exact
+22:41:22 DONE exit=0 in 0s: cargo test -p truck-certified --test kernel_engine tube_reach_envelope_measured_and_published -- --nocapture --exact
+22:52:03 START [cwd=C:\Users\stefa\look\loop\slots\2\wt] cargo check -p truck-geometry --tests
+22:52:40 DONE exit=0 in 37s: cargo check -p truck-geometry --tests
+22:53:19 START [cwd=C:\Users\stefa\look\loop\slots\1\wt] cargo fmt --all
+22:53:43 DONE exit=0 in 23s: cargo fmt --all
+22:53:47 START [cwd=C:\Users\stefa\look\loop\slots\1\wt] cargo check --profile quick -p truck-certified --all-targets --locked
+22:54:33 DONE exit=0 in 45s: cargo check --profile quick -p truck-certified --all-targets --locked
+22:54:44 START [cwd=C:\Users\stefa\look\loop\slots\1\wt] cargo fmt --all
+22:54:47 DONE exit=0 in 3s: cargo fmt --all
+22:54:47 START [cwd=C:\Users\stefa\look\loop\slots\1\wt] cargo test --profile quick -p truck-certified --test kernel_promote --locked
+22:56:36 DONE exit=0 in 108s: cargo test --profile quick -p truck-certified --test kernel_promote --locked
+22:56:36 START [cwd=C:\Users\stefa\look\loop\slots\2\wt] cargo test -p truck-modeling --test scratch_vol
+22:57:36 DONE exit=101 in 60s: cargo test -p truck-modeling --test scratch_vol
+22:57:36 START [cwd=C:\Users\stefa\look\loop\slots\1\wt] cargo fmt --all -- --check
+22:57:39 DONE exit=0 in 2s: cargo fmt --all -- --check
+22:57:40 START [cwd=C:\Users\stefa\look\loop\slots\1\wt] cargo check --locked -p truck-certified --all-targets
+22:58:23 DONE exit=0 in 43s: cargo check --locked -p truck-certified --all-targets
+22:58:23 START [cwd=C:\Users\stefa\look\loop\slots\2\wt] cargo test -p truck-modeling --test scratch_vol
+22:58:24 DONE exit=101 in 0s: cargo test -p truck-modeling --test scratch_vol
+22:58:30 START [cwd=C:\Users\stefa\look\loop\slots\1\wt] cargo test --profile quick -p truck-certified --tests --locked
+22:59:50 DONE exit=101 in 80s: cargo test --profile quick -p truck-certified --tests --locked
+22:59:50 START [cwd=C:\Users\stefa\look\loop\slots\2\wt] cargo test -p truck-modeling --test scratch_vol
+22:59:51 DONE exit=101 in 0s: cargo test -p truck-modeling --test scratch_vol
+22:59:56 START [cwd=C:\Users\stefa\look\loop\slots\2\wt] cargo test -p truck-modeling --test scratch_vol
+22:59:56 DONE exit=101 in 0s: cargo test -p truck-modeling --test scratch_vol
+22:59:59 START [cwd=C:\Users\stefa\look\loop\slots\1\wt] cargo test --locked -p truck-certified --test kernel_promote
+23:00:57 DONE exit=0 in 58s: cargo test --locked -p truck-certified --test kernel_promote
+23:01:30 START [cwd=C:\Users\stefa\look\loop\slots\1\wt] cargo clippy --profile quick -p truck-certified --lib --tests --locked
+23:02:12 DONE exit=101 in 41s: cargo clippy --profile quick -p truck-certified --lib --tests --locked
+23:02:12 START [cwd=C:\Users\stefa\look\loop\slots\2\wt] cargo check -p truck-geometry --test scratch_spine
+23:02:12 DONE exit=101 in 0s: cargo check -p truck-geometry --test scratch_spine
+23:03:14 START [cwd=C:\Users\stefa\look\loop\slots\1\wt] cargo fmt --all
+23:03:17 DONE exit=0 in 3s: cargo fmt --all
+23:03:17 START [cwd=C:\Users\stefa\look\loop\slots\1\wt] cargo clippy --profile quick -p truck-certified --lib --locked
+23:03:26 DONE exit=101 in 8s: cargo clippy --profile quick -p truck-certified --lib --locked
+23:03:43 START [cwd=C:\Users\stefa\look\loop\slots\2\wt] cargo test -p truck-modeling --test scratch_vol
+23:03:44 DONE exit=101 in 0s: cargo test -p truck-modeling --test scratch_vol
+23:03:48 START [cwd=C:\Users\stefa\look\loop\slots\2\wt] cargo test -p truck-modeling --test scratch_vol
+23:03:48 DONE exit=101 in 0s: cargo test -p truck-modeling --test scratch_vol
+23:03:52 START [cwd=C:\Users\stefa\look\loop\slots\1\wt] cargo test --profile quick -p truck-certified --test kernel_promote --locked
+23:03:54 DONE exit=0 in 2s: cargo test --profile quick -p truck-certified --test kernel_promote --locked
+23:03:57 START [cwd=C:\Users\stefa\look\loop\slots\2\wt] cargo test -p truck-modeling --test scratch_vol
+23:03:58 DONE exit=101 in 0s: cargo test -p truck-modeling --test scratch_vol
+23:04:01 START [cwd=C:\Users\stefa\look\loop\slots\2\wt] cargo test -p truck-modeling --test scratch_vol
+23:04:02 DONE exit=101 in 0s: cargo test -p truck-modeling --test scratch_vol
+23:04:12 START [cwd=C:\Users\stefa\look\loop\slots\2\wt] cargo test -p truck-modeling --test scratch_vol
+23:04:13 DONE exit=101 in 1s: cargo test -p truck-modeling --test scratch_vol
+23:08:53 START [cwd=C:\Users\stefa\look\loop\slots\2\wt] cargo test -p truck-modeling --test spine_sweep_conformance
+23:08:57 DONE exit=0 in 3s: cargo test -p truck-modeling --test spine_sweep_conformance
+23:11:01 START [cwd=C:\Users\stefa\look\loop\slots\3\wt] cargo check -p truck-certified --profile quick --locked
+23:12:09 DONE exit=101 in 67s: cargo check -p truck-certified --profile quick --locked
+23:12:41 START [cwd=C:\Users\stefa\look\loop\slots\3\wt] cargo check -p truck-certified --profile quick --locked
+23:12:50 DONE exit=0 in 9s: cargo check -p truck-certified --profile quick --locked
+23:14:38 START [cwd=C:\Users\stefa\look\loop\slots\3\wt] cargo check -p truck-certified --profile quick --locked
+23:14:40 DONE exit=0 in 1s: cargo check -p truck-certified --profile quick --locked
+23:14:56 START [cwd=C:\Users\stefa\look] cargo check --locked -p truck-certified --manifest-path C:\Users\stefa\look\loop\slots\1\wt\Cargo.toml
+23:16:05 DONE exit=0 in 69s: cargo check --locked -p truck-certified --manifest-path C:\Users\stefa\look\loop\slots\1\wt\Cargo.toml
+23:16:05 START [cwd=C:\Users\stefa\look\loop\slots\3\wt] cargo test --profile quick -p truck-certified --test kernel_claims --no-run --locked
+23:18:59 DONE exit=101 in 173s: cargo test --profile quick -p truck-certified --test kernel_claims --no-run --locked
+23:18:59 START [cwd=C:\Users\stefa\look] cargo test --locked -p truck-certified --test kernel_promote --manifest-path C:\Users\stefa\look\loop\slots\1\wt\Cargo.toml
+23:20:35 DONE exit=0 in 96s: cargo test --locked -p truck-certified --test kernel_promote --manifest-path C:\Users\stefa\look\loop\slots\1\wt\Cargo.toml
+23:20:35 START [cwd=C:\Users\stefa\look\loop\slots\0\wt] cargo check -p truck-certified --lib
+23:21:04 DONE exit=101 in 29s: cargo check -p truck-certified --lib
+23:21:04 START [cwd=C:\Users\stefa\look\loop\slots\0\wt] cargo check -p truck-certified --lib
+23:21:10 DONE exit=101 in 6s: cargo check -p truck-certified --lib
+23:21:10 START [cwd=C:\Users\stefa\look\loop\slots\3\wt] cargo test --profile quick -p truck-certified --test kernel_claims --no-run --locked
+23:21:11 DONE exit=0 in 0s: cargo test --profile quick -p truck-certified --test kernel_claims --no-run --locked
+23:21:17 START [cwd=C:\Users\stefa\look\loop\slots\3\wt] cargo test --profile quick -p truck-certified --test kernel_claims --locked
+23:21:17 DONE exit=101 in 0s: cargo test --profile quick -p truck-certified --test kernel_claims --locked
+23:22:14 START [cwd=C:\Users\stefa\look\loop\slots\0\wt] cargo check -p truck-certified --lib
+23:22:29 DONE exit=0 in 14s: cargo check -p truck-certified --lib
+23:22:37 START [cwd=C:\Users\stefa\look\loop\slots\0\wt] cargo check -p truck-certified --lib
+23:22:38 DONE exit=0 in 0s: cargo check -p truck-certified --lib
+23:24:19 START [cwd=C:\Users\stefa\look\loop\slots\0\wt] cargo check -p truck-certified --lib
+23:24:19 DONE exit=0 in 0s: cargo check -p truck-certified --lib
+23:26:41 START [cwd=C:\Users\stefa\look\loop\slots\3\wt] cargo test --profile quick -p truck-certified --test kernel_claims --locked
+23:26:44 DONE exit=101 in 3s: cargo test --profile quick -p truck-certified --test kernel_claims --locked
+23:27:15 START [cwd=C:\Users\stefa\look\loop\slots\3\wt] cargo test --profile quick -p truck-certified --test kernel_claims_dbg --locked -- --nocapture
+23:27:16 DONE exit=101 in 0s: cargo test --profile quick -p truck-certified --test kernel_claims_dbg --locked -- --nocapture
+23:27:30 START [cwd=C:\Users\stefa\look\loop\slots\3\wt] cargo test --profile quick -p truck-certified --test kernel_claims_dbg --locked -- --nocapture
+23:27:31 DONE exit=101 in 0s: cargo test --profile quick -p truck-certified --test kernel_claims_dbg --locked -- --nocapture
+23:27:41 START [cwd=C:\Users\stefa\look\loop\slots\3\wt] cargo test --profile quick -p truck-certified --test kernel_claims_dbg --locked -- --nocapture
+23:27:42 DONE exit=0 in 1s: cargo test --profile quick -p truck-certified --test kernel_claims_dbg --locked -- --nocapture
+23:28:53 START [cwd=C:\Users\stefa\look\loop\slots\3\wt] cargo test --profile quick -p truck-certified --test kernel_claims_dbg --locked -- --nocapture
+23:28:54 DONE exit=0 in 0s: cargo test --profile quick -p truck-certified --test kernel_claims_dbg --locked -- --nocapture
+23:29:54 START [cwd=C:\Users\stefa\look\loop\slots\3\wt] cargo test --profile quick -p truck-certified --test kernel_claims_dbg --locked -- --nocapture
+23:29:55 DONE exit=0 in 0s: cargo test --profile quick -p truck-certified --test kernel_claims_dbg --locked -- --nocapture
+23:31:25 START [cwd=C:\Users\stefa\look\loop\slots\3\wt] cargo test --profile quick -p truck-certified --test kernel_claims --locked
+23:31:29 DONE exit=101 in 3s: cargo test --profile quick -p truck-certified --test kernel_claims --locked
+23:31:31 START [cwd=C:\Users\stefa\look\loop\slots\0\wt] cargo test -p truck-certified --test kernel_canal --no-run
+23:32:03 DONE exit=101 in 31s: cargo test -p truck-certified --test kernel_canal --no-run
+23:32:03 START [cwd=C:\Users\stefa\look\loop\slots\3\wt] cargo test --profile quick -p truck-certified --test kernel_claims_dbg --locked -- --nocapture
+23:32:04 DONE exit=0 in 0s: cargo test --profile quick -p truck-certified --test kernel_claims_dbg --locked -- --nocapture
+23:32:53 START [cwd=C:\Users\stefa\look\loop\slots\0\wt] cargo test -p truck-certified --test kernel_canal --no-run
+23:32:55 DONE exit=0 in 1s: cargo test -p truck-certified --test kernel_canal --no-run
+23:33:03 START [cwd=C:\Users\stefa\look\loop\slots\0\wt] cargo test -p truck-certified --test kernel_canal
+23:33:04 DONE exit=101 in 0s: cargo test -p truck-certified --test kernel_canal
+23:33:53 START [cwd=C:\Users\stefa\look\loop\slots\0\wt] cargo test -p truck-certified --test kernel_canal ball_center
+23:33:54 DONE exit=101 in 1s: cargo test -p truck-certified --test kernel_canal ball_center
+23:34:03 START [cwd=C:\Users\stefa\look\loop\slots\3\wt] cargo test --profile quick -p truck-certified --test kernel_claims --locked
+23:34:05 DONE exit=101 in 2s: cargo test --profile quick -p truck-certified --test kernel_claims --locked
+23:34:51 START [cwd=C:\Users\stefa\look\loop\slots\3\wt] cargo test --profile quick -p truck-certified --test kernel_claims_dbg --locked -- --nocapture
+23:34:52 DONE exit=0 in 0s: cargo test --profile quick -p truck-certified --test kernel_claims_dbg --locked -- --nocapture
+23:36:20 START [cwd=C:\Users\stefa\look\loop\slots\3\wt] cargo test --profile quick -p truck-certified --test kernel_claims --locked
+23:36:21 DONE exit=0 in 0s: cargo test --profile quick -p truck-certified --test kernel_claims --locked
+23:36:25 START [cwd=C:\Users\stefa\look\loop\slots\0\wt] cargo test -p truck-certified --test kernel_canal ball_center
+23:36:28 DONE exit=101 in 3s: cargo test -p truck-certified --test kernel_canal ball_center
+23:36:32 START [cwd=C:\Users\stefa\look\loop\slots\3\wt] cargo fmt --all -- --check
+23:36:47 DONE exit=1 in 15s: cargo fmt --all -- --check
+23:36:47 START [cwd=C:\Users\stefa\look\loop\slots\0\wt] cargo test -p truck-certified --test kernel_canal ball_center -- --nocapture
+23:36:47 DONE exit=101 in 0s: cargo test -p truck-certified --test kernel_canal ball_center -- --nocapture
+23:36:54 START [cwd=C:\Users\stefa\look\loop\slots\0\wt] cargo test -p truck-certified --test kernel_canal ball_center -- --nocapture
+23:36:54 DONE exit=101 in 0s: cargo test -p truck-certified --test kernel_canal ball_center -- --nocapture
+23:36:55 START [cwd=C:\Users\stefa\look\loop\slots\3\wt] cargo fmt --all -- --check
+23:36:57 DONE exit=1 in 2s: cargo fmt --all -- --check
+23:37:07 START [cwd=C:\Users\stefa\look\loop\slots\3\wt] cargo fmt -p truck-certified
+23:37:08 DONE exit=0 in 0s: cargo fmt -p truck-certified
+23:37:16 START [cwd=C:\Users\stefa\look\loop\slots\0\wt] cargo test -p truck-certified --test kernel_canal ball_center -- --nocapture
+23:37:18 DONE exit=101 in 2s: cargo test -p truck-certified --test kernel_canal ball_center -- --nocapture
+23:37:18 START [cwd=C:\Users\stefa\look\loop\slots\3\wt] cargo check -p truck-certified --all-targets --profile quick --locked
+23:37:41 DONE exit=0 in 22s: cargo check -p truck-certified --all-targets --profile quick --locked
+23:37:48 START [cwd=C:\Users\stefa\look\loop\slots\3\wt] cargo test -p truck-certified --profile quick --locked
+23:39:20 DONE exit=101 in 92s: cargo test -p truck-certified --profile quick --locked
+23:39:20 START [cwd=C:\Users\stefa\look] cargo test --locked -p truck-certified --test kernel_promote --manifest-path C:\Users\stefa\look\loop\slots\1\wt\Cargo.toml
+23:39:20 DONE exit=0 in 0s: cargo test --locked -p truck-certified --test kernel_promote --manifest-path C:\Users\stefa\look\loop\slots\1\wt\Cargo.toml
+23:39:20 START [cwd=C:\Users\stefa\look\loop\slots\0\wt] cargo test -p truck-certified --test kernel_canal ball_center -- --nocapture
+23:39:25 DONE exit=101 in 4s: cargo test -p truck-certified --test kernel_canal ball_center -- --nocapture
+23:39:35 START [cwd=C:\Users\stefa\look\loop\slots\3\wt] cargo test -p truck-certified --profile quick --test kernel_claims --locked
+23:39:36 DONE exit=0 in 0s: cargo test -p truck-certified --profile quick --test kernel_claims --locked
+23:39:37 START [cwd=C:\Users\stefa\look] cargo check --locked -p truck-certified
+23:40:04 DONE exit=0 in 27s: cargo check --locked -p truck-certified
+23:40:04 START [cwd=C:\Users\stefa\look\loop\slots\0\wt] cargo test -p truck-certified --test kernel_canal ball_center -- --nocapture
+23:40:06 DONE exit=0 in 1s: cargo test -p truck-certified --test kernel_canal ball_center -- --nocapture
+23:40:23 START [cwd=C:\Users\stefa\look\loop\slots\3\wt] cargo fmt -p truck-certified
+23:40:24 DONE exit=0 in 0s: cargo fmt -p truck-certified
+23:40:31 START [cwd=C:\Users\stefa\look\loop\slots\3\wt] cargo test -p truck-certified --profile quick --test kernel_claims --locked
+23:40:32 DONE exit=0 in 0s: cargo test -p truck-certified --profile quick --test kernel_claims --locked
+23:40:53 START [cwd=C:\Users\stefa\look\loop\slots\0\wt] cargo test -p truck-certified --test kernel_canal
+23:40:56 DONE exit=0 in 2s: cargo test -p truck-certified --test kernel_canal
+23:41:13 START [cwd=C:\Users\stefa\look\loop\slots\0\wt] cargo check -p truck-certified --lib
+23:41:15 DONE exit=0 in 1s: cargo check -p truck-certified --lib
+23:41:20 START [cwd=C:\Users\stefa\look\loop\slots\0\wt] cargo check -p truck-certified --tests
+23:41:39 DONE exit=0 in 18s: cargo check -p truck-certified --tests
+23:42:12 START [cwd=C:\Users\stefa\look\loop\slots\0\wt] cargo fmt -p truck-certified
+23:42:13 DONE exit=0 in 0s: cargo fmt -p truck-certified
+23:42:23 START [cwd=C:\Users\stefa\look\loop\slots\0\wt] cargo fmt -p truck-certified -- --check
+23:42:24 DONE exit=0 in 0s: cargo fmt -p truck-certified -- --check
+23:42:33 START [cwd=C:\Users\stefa\look\loop\slots\0\wt] cargo test -p truck-certified --test kernel_canal
+23:42:36 DONE exit=0 in 3s: cargo test -p truck-certified --test kernel_canal
+23:43:15 START [cwd=C:\Users\stefa\look\loop\slots\0\wt] cargo test -p truck-certified --lib
+23:43:35 DONE exit=0 in 19s: cargo test -p truck-certified --lib
+23:43:59 START [cwd=C:\Users\stefa\look] cargo check --locked -p truck-certified --manifest-path C:\Users\stefa\look\loop\slots\3\wt\Cargo.toml
+23:44:47 DONE exit=0 in 47s: cargo check --locked -p truck-certified --manifest-path C:\Users\stefa\look\loop\slots\3\wt\Cargo.toml
+23:44:48 START [cwd=C:\Users\stefa\look] cargo test --locked -p truck-certified --test kernel_claims --manifest-path C:\Users\stefa\look\loop\slots\3\wt\Cargo.toml
+23:46:06 DONE exit=0 in 78s: cargo test --locked -p truck-certified --test kernel_claims --manifest-path C:\Users\stefa\look\loop\slots\3\wt\Cargo.toml
+23:46:06 START [cwd=C:\Users\stefa\look\loop\slots\0\wt] cargo fmt --all -- --check
+23:46:24 DONE exit=1 in 17s: cargo fmt --all -- --check
+23:46:24 START [cwd=C:\Users\stefa\look] cargo check --locked -p truck-certified
+23:46:29 DONE exit=0 in 5s: cargo check --locked -p truck-certified
+23:47:16 START [cwd=C:\Users\stefa\look\loop\slots\0\wt] cargo clippy -p truck-certified --tests
+23:47:56 DONE exit=101 in 40s: cargo clippy -p truck-certified --tests
+23:51:04 START [cwd=C:\Users\stefa\look\loop\slots\0\wt] cargo clippy -p truck-certified --tests
+23:51:38 DONE exit=101 in 34s: cargo clippy -p truck-certified --tests
+23:51:58 START [cwd=C:\Users\stefa\look\loop\slots\0\wt] cargo test -p truck-certified --test kernel_canal
+23:52:03 DONE exit=0 in 5s: cargo test -p truck-certified --test kernel_canal
+23:52:11 START [cwd=C:\Users\stefa\look\loop\slots\0\wt] cargo fmt -p truck-certified -- --check
+23:52:12 DONE exit=0 in 0s: cargo fmt -p truck-certified -- --check
+23:52:36 START [cwd=C:\Users\stefa\look\loop\slots\0\wt] cargo test -p truck-certified
+23:53:10 DONE exit=101 in 33s: cargo test -p truck-certified
+23:53:57 START [cwd=C:\Users\stefa\look\loop\slots\2\wt] cargo check --locked -p truck-geometry
+23:54:08 DONE exit=101 in 10s: cargo check --locked -p truck-geometry
+23:54:15 START [cwd=C:\Users\stefa\look\loop\slots\2\wt] cargo check --locked -p truck-geometry
+23:54:18 DONE exit=101 in 3s: cargo check --locked -p truck-geometry
+23:54:53 START [cwd=C:\Users\stefa\look\loop\slots\0\wt] cargo test -p truck-certified --test kernel_canal
+23:54:54 DONE exit=0 in 1s: cargo test -p truck-certified --test kernel_canal
+23:55:02 START [cwd=C:\Users\stefa\look\loop\slots\2\wt] cargo check --locked -p truck-geometry
+23:55:06 DONE exit=0 in 3s: cargo check --locked -p truck-geometry
+23:55:16 START [cwd=C:\Users\stefa\look\loop\slots\2\wt] cargo check --locked -p truck-geometry
+23:55:17 DONE exit=0 in 1s: cargo check --locked -p truck-geometry
+23:55:22 START [cwd=C:\Users\stefa\look\loop\slots\2\wt] cargo check --locked -p truck-geometry --tests
+23:55:28 DONE exit=101 in 6s: cargo check --locked -p truck-geometry --tests
+23:55:43 START [cwd=C:\Users\stefa\look\loop\slots\2\wt] cargo check --locked -p truck-geometry --tests
+23:55:44 DONE exit=0 in 1s: cargo check --locked -p truck-geometry --tests
+23:56:34 START [cwd=C:\Users\stefa\look\loop\slots\0\wt] cargo clippy -p truck-certified --tests
+23:57:06 DONE exit=101 in 32s: cargo clippy -p truck-certified --tests
+23:57:06 START [cwd=C:\Users\stefa\look\loop\slots\2\wt] cargo check --locked -p truck-modeling -p truck-shapeops -p truck-stepio
+23:58:33 DONE exit=0 in 87s: cargo check --locked -p truck-modeling -p truck-shapeops -p truck-stepio
+23:58:33 START [cwd=C:\Users\stefa\look\loop\slots\0\wt] cargo clippy -p truck-certified --tests
+00:00:36 DONE exit=101 in 123s: cargo clippy -p truck-certified --tests
+00:00:36 START [cwd=C:\Users\stefa\look\loop\slots\2\wt] cargo check --locked -p truck-modeling -p truck-shapeops -p truck-stepio
+00:00:37 DONE exit=0 in 0s: cargo check --locked -p truck-modeling -p truck-shapeops -p truck-stepio
+00:00:55 START [cwd=C:\Users\stefa\look\loop\slots\2\wt] cargo check --locked -p truck-geometry -p truck-modeling -p truck-shapeops -p truck-stepio --tests
+00:02:43 DONE exit=0 in 108s: cargo check --locked -p truck-geometry -p truck-modeling -p truck-shapeops -p truck-stepio --tests
+00:02:43 START [cwd=C:\Users\stefa\look\loop\slots\0\wt] cargo fmt -p truck-certified -- --check
+00:02:51 DONE exit=0 in 7s: cargo fmt -p truck-certified -- --check
+00:02:51 START [cwd=C:\Users\stefa\look\loop\slots\2\wt] cargo test --locked -p truck-geometry --test spine_frame_brep --test constructive_spine_enum
+00:03:23 DONE exit=0 in 31s: cargo test --locked -p truck-geometry --test spine_frame_brep --test constructive_spine_enum
+00:03:26 START [cwd=C:\Users\stefa\look\loop\slots\2\wt] cargo test --locked -p truck-modeling --test spine_sweep_conformance
+00:03:44 DONE exit=0 in 18s: cargo test --locked -p truck-modeling --test spine_sweep_conformance
+00:03:44 START [cwd=C:\Users\stefa\look\loop\slots\0\wt] cargo test -p truck-certified --test zz_fd_probe -- --nocapture
+00:04:02 DONE exit=0 in 18s: cargo test -p truck-certified --test zz_fd_probe -- --nocapture
+00:04:50 START [cwd=C:\Users\stefa\look\loop\slots\0\wt] cargo fmt -p truck-certified
+00:04:51 DONE exit=0 in 0s: cargo fmt -p truck-certified
+00:04:51 START [cwd=C:\Users\stefa\look\loop\slots\0\wt] cargo test -p truck-certified --test kernel_canal
+00:04:52 DONE exit=0 in 0s: cargo test -p truck-certified --test kernel_canal
+00:05:53 START [cwd=C:\Users\stefa\look\loop\slots\0\wt] cargo check -p truck-certified --all-targets --locked
+00:05:58 DONE exit=0 in 5s: cargo check -p truck-certified --all-targets --locked
+00:06:52 START [cwd=C:\Users\stefa\look\loop\slots\2\wt] cargo check --locked -p truck-modeling --lib --tests
+00:06:59 DONE exit=101 in 6s: cargo check --locked -p truck-modeling --lib --tests
+00:07:08 START [cwd=C:\Users\stefa\look\loop\slots\2\wt] cargo check --locked -p truck-modeling --lib --tests
+00:07:09 DONE exit=101 in 1s: cargo check --locked -p truck-modeling --lib --tests
+00:07:13 START [cwd=C:\Users\stefa\look\loop\slots\2\wt] cargo check --locked -p truck-modeling --lib --tests
+00:07:14 DONE exit=101 in 1s: cargo check --locked -p truck-modeling --lib --tests
+00:07:17 START [cwd=C:\Users\stefa\look\loop\slots\0\wt] cargo test -p truck-certified --test zz_delta_probe -- --nocapture
+00:07:19 DONE exit=0 in 2s: cargo test -p truck-certified --test zz_delta_probe -- --nocapture
+00:07:19 START [cwd=C:\Users\stefa\look\loop\slots\2\wt] cargo check --locked -p truck-modeling --lib --tests
+00:07:21 DONE exit=101 in 1s: cargo check --locked -p truck-modeling --lib --tests
+00:07:52 START [cwd=C:\Users\stefa\look\loop\slots\2\wt] cargo check --locked -p truck-modeling --lib --tests
+00:07:53 DONE exit=101 in 1s: cargo check --locked -p truck-modeling --lib --tests
+00:07:57 START [cwd=C:\Users\stefa\look\loop\slots\0\wt] cargo fmt -p truck-certified -- --check
+00:07:58 DONE exit=0 in 0s: cargo fmt -p truck-certified -- --check
+00:07:58 START [cwd=C:\Users\stefa\look\loop\slots\0\wt] cargo test -p truck-certified --test kernel_canal
+00:07:59 DONE exit=0 in 0s: cargo test -p truck-certified --test kernel_canal
+00:08:01 START [cwd=C:\Users\stefa\look\loop\slots\2\wt] cargo check --locked -p truck-modeling --lib --tests
+00:08:02 DONE exit=0 in 1s: cargo check --locked -p truck-modeling --lib --tests
+00:08:06 START [cwd=C:\Users\stefa\look\loop\slots\2\wt] cargo test --locked -p truck-modeling --lib
+00:08:11 DONE exit=0 in 5s: cargo test --locked -p truck-modeling --lib
+00:08:53 START [cwd=C:\Users\stefa\look\loop\slots\2\wt] cargo test --locked -p truck-geometry --test constructive_sweep_surface
+00:08:54 DONE exit=101 in 0s: cargo test --locked -p truck-geometry --test constructive_sweep_surface
+00:08:58 START [cwd=C:\Users\stefa\look\loop\slots\2\wt] cargo test --locked -p truck-geometry --test constructive_sweep_surface
+00:08:58 DONE exit=101 in 0s: cargo test --locked -p truck-geometry --test constructive_sweep_surface
+00:09:11 START [cwd=C:\Users\stefa\look\loop\slots\2\wt] cargo test --locked -p truck-geometry --test constructive_sweep_surface
+00:09:12 DONE exit=0 in 1s: cargo test --locked -p truck-geometry --test constructive_sweep_surface
+00:09:17 START [cwd=C:\Users\stefa\look\loop\slots\2\wt] cargo fmt --all
+00:09:20 DONE exit=0 in 2s: cargo fmt --all
+00:09:25 START [cwd=C:\Users\stefa\look\loop\slots\0\wt] cargo check -p truck-certified --tests
+00:09:29 DONE exit=0 in 3s: cargo check -p truck-certified --tests
+00:09:29 START [cwd=C:\Users\stefa\look\loop\slots\2\wt] cargo fmt --check -p truck-geometry -p truck-modeling -p truck-shapeops -p truck-stepio
+00:09:30 DONE exit=0 in 1s: cargo fmt --check -p truck-geometry -p truck-modeling -p truck-shapeops -p truck-stepio
+00:09:36 START [cwd=C:\Users\stefa\look\loop\slots\2\wt] cargo test --locked -p truck-geometry --lib --tests
+00:10:34 DONE exit=0 in 57s: cargo test --locked -p truck-geometry --lib --tests
+00:10:38 START [cwd=C:\Users\stefa\look\loop\slots\2\wt] cargo test --locked -p truck-modeling --lib --tests
+00:10:51 DONE exit=0 in 13s: cargo test --locked -p truck-modeling --lib --tests
+00:10:55 START [cwd=C:\Users\stefa\look\loop\slots\2\wt] cargo test --locked -p truck-shapeops --lib --tests
+00:14:33 DONE exit=101 in 217s: cargo test --locked -p truck-shapeops --lib --tests
+00:14:33 START [cwd=C:\Users\stefa\look\loop\slots\0\wt] cargo fmt -p truck-certified -- --check
+00:14:34 DONE exit=0 in 0s: cargo fmt -p truck-certified -- --check
+00:14:34 START [cwd=C:\Users\stefa\look\loop\slots\0\wt] cargo check -p truck-certified --tests --locked
+00:14:35 DONE exit=0 in 0s: cargo check -p truck-certified --tests --locked
+00:14:50 START [cwd=C:\Users\stefa\look\loop\slots\2\wt] cargo test --locked -p truck-stepio --lib --tests
+00:18:18 DONE exit=101 in 207s: cargo test --locked -p truck-stepio --lib --tests
+00:18:18 START [cwd=C:\Users\stefa\look\loop\slots\0\wt] cargo test -p truck-certified --test kernel_canal
+00:18:18 DONE exit=0 in 0s: cargo test -p truck-certified --test kernel_canal
+00:18:19 START [cwd=C:\Users\stefa\look\loop\slots\0\wt] cargo test -p truck-certified --lib
+00:18:24 DONE exit=0 in 5s: cargo test -p truck-certified --lib
+00:19:16 START [cwd=C:\Users\stefa\AppData\Local\Temp\opencode\wt-base] cargo test --locked -p truck-stepio --lib geom_impls::builder
+00:24:39 DONE exit=101 in 323s: cargo test --locked -p truck-stepio --lib geom_impls::builder
+00:25:15 START [cwd=C:\Users\stefa\look\loop\slots\2\wt] cargo clippy --locked -p truck-geometry --all-targets --no-deps --message-format=short
+00:25:26 DONE exit=0 in 10s: cargo clippy --locked -p truck-geometry --all-targets --no-deps --message-format=short
+00:26:43 START [cwd=C:\Users\stefa\look\loop\slots\2\wt] cargo fmt -p truck-geometry
+00:26:44 DONE exit=0 in 0s: cargo fmt -p truck-geometry
+00:26:44 START [cwd=C:\Users\stefa\look\loop\slots\2\wt] cargo clippy --locked -p truck-geometry --all-targets --no-deps --message-format=short
+00:26:45 DONE exit=0 in 0s: cargo clippy --locked -p truck-geometry --all-targets --no-deps --message-format=short
+00:26:54 START [cwd=C:\Users\stefa\look\loop\slots\2\wt] cargo clippy --locked -p truck-modeling --all-targets --no-deps --message-format=short
+00:27:02 DONE exit=0 in 8s: cargo clippy --locked -p truck-modeling --all-targets --no-deps --message-format=short
+00:27:11 START [cwd=C:\Users\stefa\look\loop\slots\2\wt] cargo clippy --locked -p truck-stepio --all-targets --no-deps --message-format=short
+00:27:33 DONE exit=101 in 21s: cargo clippy --locked -p truck-stepio --all-targets --no-deps --message-format=short
+00:27:38 START [cwd=C:\Users\stefa\look\loop\slots\2\wt] cargo test --locked -p truck-geometry --test constructive_sweep_surface
+00:27:44 DONE exit=0 in 6s: cargo test --locked -p truck-geometry --test constructive_sweep_surface
+00:28:11 START [cwd=C:\Users\stefa\look\loop\slots\2\wt] cargo test --locked -p truck-topology -p truck-evidence --lib --tests --no-fail-fast
+00:36:19 DONE exit=0 in 487s: cargo test --locked -p truck-topology -p truck-evidence --lib --tests --no-fail-fast
+00:36:28 START [cwd=C:\Users\stefa\look\loop\slots\2\wt] cargo check --locked -p truck-certified -p truck-meshalgo --all-targets
+00:36:45 DONE exit=0 in 16s: cargo check --locked -p truck-certified -p truck-meshalgo --all-targets
+00:37:01 START [cwd=C:\Users\stefa\look\loop\slots\2\wt] cargo fmt --check -p truck-geometry -p truck-modeling -p truck-shapeops -p truck-stepio
+00:37:02 DONE exit=0 in 0s: cargo fmt --check -p truck-geometry -p truck-modeling -p truck-shapeops -p truck-stepio
+00:37:05 START [cwd=C:\Users\stefa\look\loop\slots\2\wt] cargo fmt --check -p truck-geometry -p truck-modeling -p truck-shapeops -p truck-stepio
+00:37:06 DONE exit=0 in 1s: cargo fmt --check -p truck-geometry -p truck-modeling -p truck-shapeops -p truck-stepio
+00:37:54 START [cwd=C:\Users\stefa\look\loop\slots\2\wt] cargo check --locked -p look --all-targets
+00:40:29 DONE exit=0 in 154s: cargo check --locked -p look --all-targets
+00:40:39 START [cwd=C:\Users\stefa\look\loop\slots\2\wt] cargo test --locked -p truck-stepio --tests --no-fail-fast
+00:41:06 DONE exit=101 in 26s: cargo test --locked -p truck-stepio --tests --no-fail-fast
+00:41:19 START [cwd=C:\Users\stefa\look\loop\slots\2\wt] cargo test --locked -p truck-shapeops --tests --no-fail-fast
+00:42:00 DONE exit=101 in 41s: cargo test --locked -p truck-shapeops --tests --no-fail-fast
+00:42:13 START [cwd=C:\Users\stefa\look\loop\slots\2\wt] cargo test --locked -p truck-shapeops --lib --tests healing::tests::step_import
+00:42:14 DONE exit=101 in 0s: cargo test --locked -p truck-shapeops --lib --tests healing::tests::step_import
+00:42:19 START [cwd=C:\Users\stefa\look\loop\slots\2\wt] cargo test --locked -p truck-shapeops --test fillet complex_surface
+00:42:20 DONE exit=101 in 1s: cargo test --locked -p truck-shapeops --test fillet complex_surface
+00:42:31 START [cwd=C:\Users\stefa\look\loop\slots\2\wt] cargo check --locked --all-targets
+00:42:31 DONE exit=0 in 0s: cargo check --locked --all-targets
+07:56:04 START [cwd=C:\Users\stefa\look] cargo test --locked -p truck-geometry --test constructive_spine_enum --manifest-path C:\Users\stefa\look\loop\slots\2\wt\Cargo.toml
+07:56:44 DONE exit=0 in 40s: cargo test --locked -p truck-geometry --test constructive_spine_enum --manifest-path C:\Users\stefa\look\loop\slots\2\wt\Cargo.toml
+07:57:28 START [cwd=C:\Users\stefa\look] cargo check --locked -p truck-certified -p truck-geometry -p truck-modeling
+07:58:10 DONE exit=0 in 41s: cargo check --locked -p truck-certified -p truck-geometry -p truck-modeling
+08:26:18 START [cwd=C:\Users\stefa\look] cargo clippy --locked -p truck-certified --all-targets --no-deps
+08:26:43 DONE exit=101 in 25s: cargo clippy --locked -p truck-certified --all-targets --no-deps
+08:27:07 START [cwd=C:\Users\stefa\look] cargo clippy --locked -p truck-certified --all-targets --no-deps
+08:27:07 DONE exit=101 in 0s: cargo clippy --locked -p truck-certified --all-targets --no-deps
+08:28:00 START [cwd=C:\Users\stefa\look] cargo clippy --locked -p truck-certified --all-targets --no-deps
+08:28:42 DONE exit=101 in 42s: cargo clippy --locked -p truck-certified --all-targets --no-deps
+08:28:43 START [cwd=C:\Users\stefa\look] cargo test --locked -p truck-certified --test kernel_claims --test kernel_engine --test kernel_tier2
+08:30:05 DONE exit=0 in 82s: cargo test --locked -p truck-certified --test kernel_claims --test kernel_engine --test kernel_tier2
+09:22:54 START [cwd=C:\Users\stefa\look] cargo test --locked -p look --test geometry_fingerprint
+09:25:46 DONE exit=101 in 171s: cargo test --locked -p look --test geometry_fingerprint
+09:26:06 START [cwd=C:\Users\stefa\look] cargo test --locked -p look --test geometry_fingerprint bracket_tessellates -- --nocapture
+09:26:07 DONE exit=101 in 1s: cargo test --locked -p look --test geometry_fingerprint bracket_tessellates -- --nocapture
+09:27:09 START [cwd=C:\Users\stefa\look] cargo test --locked -p look --test geometry_fingerprint bracket_tessellates --manifest-path C:\Users\stefa\look\tmp_base_check\Cargo.toml
+09:33:00 DONE exit=101 in 350s: cargo test --locked -p look --test geometry_fingerprint bracket_tessellates --manifest-path C:\Users\stefa\look\tmp_base_check\Cargo.toml
