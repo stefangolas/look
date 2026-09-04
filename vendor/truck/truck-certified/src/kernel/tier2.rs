@@ -205,6 +205,7 @@ fn am_gradient_row(
     let mut row = [Interval::point(0.0); 4];
     for l in 0..4 {
         let mut acc = Interval::point(0.0);
+        #[allow(clippy::needless_range_loop)] // matrix indices over fixed 4-vectors; the index form is the algebra
         for j in 0..4 {
             let sign = if j % 2 == 0 { 1.0 } else { -1.0 };
             let cols: [usize; 3] = {
@@ -218,6 +219,7 @@ fn am_gradient_row(
                 }
                 c
             };
+        #[allow(clippy::needless_range_loop)] // matrix indices over fixed 4-vectors; the index form is the algebra
             for r in 0..3 {
                 let mut m = [[Interval::point(0.0); 3]; 3];
                 for (r2, mrow) in m.iter_mut().enumerate() {
@@ -274,6 +276,7 @@ impl<'a> SquareResidualEval for PsiA<'a> {
         };
         let row3 = am_gradient_row(&jac, &hes, self.a);
         let mut rows = Vec::with_capacity(4);
+        #[allow(clippy::needless_range_loop)] // matrix indices over fixed 4-vectors; the index form is the algebra
         for r in 0..3 {
             rows.push(vec![jac[r][0], jac[r][1], jac[r][2], jac[r][3]]);
         }

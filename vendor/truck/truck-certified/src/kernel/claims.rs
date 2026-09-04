@@ -270,6 +270,7 @@ impl LeafPair {
                     format!("the claim domain axis {k} must lie within the unit chart"),
                 ));
             }
+                  #[allow(clippy::neg_cmp_op_on_partial_ord)] // fail-closed: !(a<b) refuses the undecidable middle; a>=b would not, on a partial order
             if !(domain.lo[k] < domain.hi[k]) {
                 return Err(caller_refusal(
                     "claims_domain_degenerate_axis",
@@ -400,6 +401,7 @@ fn build_pair_system(first: &BezierLeaf, second: &BezierLeaf) -> Construction<Sq
 }
 
 /// The claim domain as a box.
+    #[allow(clippy::result_large_err)] // frozen Refusal carries Option<PartialGraph>; large-Err allowed (BG-KV2-000, graph.rs precedent)
 fn claim_domain_box(pair: &LeafPair) -> Construction<IBox<4>> {
     IBox::try_new(pair.domain.lo, pair.domain.hi).map_err(|_| {
         caller_refusal(
@@ -447,6 +449,7 @@ fn chart_to_point4(pair: &LeafPair, x: [f64; 4]) -> Construction<Point4> {
 }
 
 /// A degenerate box around the shared-chart point `(u, v)`.
+    #[allow(clippy::result_large_err)] // frozen Refusal carries Option<PartialGraph>; large-Err allowed (BG-KV2-000, graph.rs precedent)
 fn point_box(u: f64, v: f64) -> Construction<IBox2> {
     IBox2::try_new([u, v], [u, v]).map_err(|_| {
         caller_refusal(
@@ -490,6 +493,7 @@ fn tube_chart_box(frame: &Frame<4>, tau_lo: f64, tau_hi: f64, h: f64) -> Option<
     };
     let y = Interval { lo: -h, hi: h };
     let mut out = [[0.0f64; 2]; 4];
+        #[allow(clippy::needless_range_loop)] // matrix indices over fixed 4-vectors; the index form is the algebra
     for j in 0..4 {
         let mut acc = Interval::point(frame.z_hat[j]);
         acc = acc.add(&Interval::point(frame.q_tau[j]).mul(&tau));
@@ -823,6 +827,7 @@ fn certify_component(
         return refute(P_TUBE_CHAIN);
     }
     let x0 = seed_to_chart(&component.seed)?;
+        #[allow(clippy::needless_range_loop)] // matrix indices over fixed 4-vectors; the index form is the algebra
     for k in 0..4 {
         if !(x0[k] > pair.domain.lo[k] && x0[k] < pair.domain.hi[k]) {
             return refute(P_TUBE_CHAIN);
@@ -868,6 +873,7 @@ fn certify_component(
         }
         // The tube must be strictly inside the claim domain.
         let room = t_hi.min(-t_lo);
+                  #[allow(clippy::neg_cmp_op_on_partial_ord)] // fail-closed: !(a<b) refuses the undecidable middle; a>=b would not, on a partial order
         if !(tau_half < room) {
             continue;
         }
@@ -953,6 +959,7 @@ fn certify_component(
 
 /// Build the certified graph content (nodes + arcs) of all certified
 /// components.
+    #[allow(clippy::result_large_err)] // frozen Refusal carries Option<PartialGraph>; large-Err allowed (BG-KV2-000, graph.rs precedent)
 fn build_graph_content(
     pair: &LeafPair,
     tubes: &[CertifiedTube],
@@ -1010,10 +1017,7 @@ fn build_graph_content(
             t0: chord,
             t1: chord,
         };
-        let spline = match HermiteSpline::try_new(vec![segment]) {
-            Ok(s) => s,
-            Err(refusal) => return Err(refusal),
-        };
+        let spline = HermiteSpline::try_new(vec![segment])?;
         let topo_arc = Arc {
             id: ArcId(arc_index),
             approx: Approx { gamma: spline },
@@ -1034,6 +1038,7 @@ fn build_graph_content(
 
 /// Subtract an inner box from an outer box (the inner box must be a sub-box of
 /// the outer). The returned axis slabs together cover the difference.
+    #[allow(clippy::result_large_err)] // frozen Refusal carries Option<PartialGraph>; large-Err allowed (BG-KV2-000, graph.rs precedent)
 fn subtract_box(outer: &IBox<4>, inner: &IBox<4>) -> Construction<Vec<IBox<4>>> {
     let mut out: Vec<IBox<4>> = Vec::new();
     for k in 0..4 {
@@ -1069,6 +1074,7 @@ fn subtract_box(outer: &IBox<4>, inner: &IBox<4>) -> Construction<Vec<IBox<4>>> 
 
 /// The complement boxes of the claim domain minus each certified tube's
 /// parameter box (box subtraction over the landed [`IBox`] shape).
+    #[allow(clippy::result_large_err)] // frozen Refusal carries Option<PartialGraph>; large-Err allowed (BG-KV2-000, graph.rs precedent)
 fn complement_boxes(domain: &IBox<4>, tubes: &[CertifiedTube]) -> Construction<Vec<IBox<4>>> {
     let mut current: Vec<IBox<4>> = vec![*domain];
     for tube in tubes {

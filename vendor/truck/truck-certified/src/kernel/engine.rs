@@ -2060,11 +2060,13 @@ fn radii4(b: &IBox4) -> Option<[f64; 4]> {
 fn minor3_iv(m: &M4, row: usize, col: usize) -> M3 {
     let mut out = [[Interval::point(0.0); 3]; 3];
     let mut r_out = 0usize;
+        #[allow(clippy::needless_range_loop)] // matrix indices over fixed 4-vectors; the index form is the algebra
     for r in 0..4 {
         if r == row {
             continue;
         }
         let mut c_out = 0usize;
+        #[allow(clippy::needless_range_loop)] // matrix indices over fixed 4-vectors; the index form is the algebra
         for c in 0..4 {
             if c == col {
                 continue;
@@ -2103,7 +2105,9 @@ fn inv4_iv(m: &M4) -> Option<M4> {
         return None;
     }
     let mut out = [[Interval::point(0.0); 4]; 4];
+        #[allow(clippy::needless_range_loop)] // matrix indices over fixed 4-vectors; the index form is the algebra
     for r in 0..4 {
+        #[allow(clippy::needless_range_loop)] // matrix indices over fixed 4-vectors; the index form is the algebra
         for c in 0..4 {
             let sign = if (r + c) % 2 == 0 { 1.0 } else { -1.0 };
             let cof = Interval::point(sign).mul(&det3_iv(&minor3_iv(m, c, r)));
