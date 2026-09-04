@@ -95,6 +95,11 @@ pub mod patch;
 /// the frozen `R5Enclosure` shim shape, and the packaged §7 R4 / R4′ square
 /// projection solves.
 pub mod projection;
+/// §14.3 promotion of an assembled arc to a model edge (BG-KV2-502-S9B): the
+/// eight refusing promotion conditions walked as one entry over the landed
+/// assemble output, emitting the spec 14.3 record ([`promote::PromotedEdge`]) —
+/// a KERNEL RECORD, deliberately not a live `truck_topology::Edge` handle.
+pub mod promote;
 pub mod rational;
 pub mod residual;
 /// The §7 R8/R9 square residuals (BG-KV2-202-S1A): the curve–surface system
