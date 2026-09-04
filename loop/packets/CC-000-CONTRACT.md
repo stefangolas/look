@@ -15,6 +15,7 @@ class:       design
 crates:      [truck-certified]
 depends_on:  []
 write_allow:
+  - Cargo.lock
   - vendor/truck/truck-certified/Cargo.toml
   - vendor/truck/truck-certified/src/lib.rs
   - vendor/truck/truck-certified/src/construct/mod.rs
