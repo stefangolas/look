@@ -53,6 +53,10 @@
 /// alias as `kernel::Interval` — one interval type, never a second one.
 pub type Interval = crate::formal::exact::CertifiedInterval;
 
+/// The P1 banded fast path (CC-001-BANDED, seam S3): interval no-pivot
+/// Gaussian elimination for banded totally-positive collocation matrices.
+pub mod banded;
+
 /// The C6 normative config constants (the `kernel/config.rs` pattern).
 pub mod config;
 
@@ -71,6 +75,10 @@ pub mod fixtures;
 /// The construct refusal vocabulary (C4), frozen here and grown only by CC-000
 /// amendment.
 pub mod refusal;
+
+/// The Rump / Ogita / Oishi residual fallback (CC-001-BANDED, seam S3): the
+/// certified enclosure for dense systems outside the banded-TP class.
+pub mod residual_solve;
 
 /// The seam stub types (S6/S9/S10/S11/S12): frozen shapes and refusing
 /// constructors only, no production logic.
