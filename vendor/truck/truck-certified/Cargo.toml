@@ -12,6 +12,7 @@ cgmath = { version = "0.18.0", features = ["serde"] }
 robust = "1.1"
 spade = "2.15.1"
 truck-base = { version = "0.5.0", path = "../truck-base" }
+truck-evidence = { version = "0.1.0", path = "../truck-evidence" }
 truck-geotrait = { version = "0.4.0", path = "../truck-geotrait" }
 truck-geometry = { version = "0.5.0", path = "../truck-geometry" }
 truck-polymesh = { version = "0.6.0", path = "../truck-polymesh" }

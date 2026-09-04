@@ -2165,6 +2165,7 @@ dependencies = [
  "robust",
  "spade",
  "truck-base",
+ "truck-evidence",
  "truck-geometry",
  "truck-geotrait",
  "truck-polymesh",

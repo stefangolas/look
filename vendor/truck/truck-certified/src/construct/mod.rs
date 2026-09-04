@@ -1,0 +1,77 @@
+#![cfg_attr(not(debug_assertions), deny(warnings))]
+#![deny(clippy::all, rust_2018_idioms)]
+#![deny(clippy::unwrap_used)]
+#![warn(
+    missing_docs,
+    missing_debug_implementations,
+    trivial_casts,
+    trivial_numeric_casts,
+    unsafe_code,
+    unstable_features,
+    unused_import_braces,
+    unused_qualifications
+)]
+
+//! The CC program shim (CC-000-CONTRACT): the frozen construct-layer shapes —
+//! the interval universe, the refusal vocabulary, the config constants, the
+//! sole inari bridge, the seam stub types, and the machine-checked fixture
+//! kit. No solver body lands here.
+//!
+//! **C1 — one home.** All Phase A/B/C/D construction modules live in this one
+//! module tree of `truck-certified` (spine decision C1). The loft, offset /
+//! shell, and blend wave packets write only into `construct/**`.
+//!
+//! **C2 — one manifest edge.** This packet adds the single sanctioned manifest
+//! edge `truck-certified → truck-evidence` to this crate's `Cargo.toml`:
+//! `truck-evidence = { version = "0.1.0", path = "../truck-evidence" }`
+//! (spine decision C2, the recorded escape hatch). It is added once, here, and
+//! is never extended further without a spec amendment. The kernel-v2 "zero new
+//! manifest edges" doctrine is scoped to the kernel module; this module
+//! carries the amendment record.
+//!
+//! **C3 — no inari in this crate.** The construct layer uses [`Interval`] —
+//! the SAME alias as `kernel::Interval` (`crate::formal::exact::CertifiedInterval`),
+//! never a second interval type — and `kernel::patch::IBox{2,3}` for parameter
+//! boxes. The inari world is only ever reached through the C2 edge's boundary
+//! types; the sole bridge is [`convert`] (`from_inari` / `box3_to_ibox`).
+//!
+//! **C7 — stub posture.** Types and refusing constructors only. Every public
+//! production function returns `Err(ConstructRefusal::Unfrozen)` (the
+//! refusing-stub marker, matching the `contract::Refusal::Unfrozen` precedent)
+//! until its owning wave packet lands.
+//!
+//! **C9 — determinism house rules.** Fixed-order float reductions, no
+//! hash-iteration-dependent output, no bare absolute literals (H-3 same-line
+//! opt-out in tests), no `unwrap` / `expect` / `panic!` in shipped code, and
+//! COMMIT BEFORE RESULT.json. These carry into `construct/**` verbatim.
+//!
+//! **H-1.** The crate-level `#![deny(clippy::unwrap_used)]` in `lib.rs` covers
+//! this module and every submodule. The new files carry no `unwrap`, no
+//! `expect`, and no `panic!`, and add no module-level `allow`.
+
+/// The certified-interval primitive of the construct layer (C3): the SAME
+/// alias as `kernel::Interval` — one interval type, never a second one.
+pub type Interval = crate::formal::exact::CertifiedInterval;
+
+/// The C6 normative config constants (the `kernel/config.rs` pattern).
+pub mod config;
+
+/// The only sanctioned inari bridge (C3): exact, order-preserving field
+/// copies that add no width.
+pub mod convert;
+
+/// The §6 machine-checked fixture kit.
+///
+/// This module is `#[doc(hidden)] pub`: TEST SUPPORT ONLY, excluded from the
+/// certified API surface, but reachable by wave packets' integration tests
+/// through the crate's public path.
+#[doc(hidden)]
+pub mod fixtures;
+
+/// The construct refusal vocabulary (C4), frozen here and grown only by CC-000
+/// amendment.
+pub mod refusal;
+
+/// The seam stub types (S6/S9/S10/S11/S12): frozen shapes and refusing
+/// constructors only, no production logic.
+pub mod stubs;

@@ -15,6 +15,9 @@
 )]
 
 pub mod certified_map;
+/// The construct layer (CC-000-CONTRACT): the frozen shapes of the CC program
+/// (spine decision C1 — one home for all Phase A/B/C/D construction modules).
+pub mod construct;
 pub mod contract;
 pub mod domain;
 pub mod formal;
