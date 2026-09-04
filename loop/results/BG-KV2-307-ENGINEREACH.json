@@ -1,0 +1,57 @@
+{
+  "packet": "BG-KV2-307-ENGINEREACH",
+  "id": "BG-KV2-307-ENGINEREACH",
+  "contract": ["BG-KV2-307-ENGINEREACH"],
+  "class": "design",
+  "crates": ["truck-certified"],
+  "status": "partial",
+  "summary": "Engine-reach work delivered within write_allow (vendor/truck/truck-certified/src/kernel/engine.rs + tests/kernel_engine.rs). Section 1: build_frame4 now runs TWO-PASS (reorthogonalized) Gram-Schmidt in the fixed candidate order; a residual dot above TOL_JACOBIAN after two passes refuses Conditioning (Inconclusive, frame_two_pass_residual_above_gate) - the gate itself is untouched and every non-degenerate seed now builds an orthonormal frame. build_frame4 additionally computes the frame's kappa estimate (||DF(z_hat)Q_perp||inf * ||(DF(z_hat)Q_perp)^-1||inf), reported via the new public frame4_kappa_report + FrameKappaReport: kappa > KAPPA_MAX marks rebuild_recommended (spec 10.1) while the build gate stays the orthonormality check. Section 2: new public tube_reach_probe(sys, seed) -> ProbeReport measures the single-frame tube-reach envelope (grow-then-halve + bisection on the forward tau width at the tracer's 3x perpendicular half width, then the minimum perpendicular half width at that tau width) and PUBLISHES the measured table below (spec 18: profile, do not tune). Measured on the S4A fixture family + the shim kit: straight linear branch reaches ~0.0707 tau with a minimum perpendicular half-width ratio ~2.49x tau (the ~3x observation confirmed, the tracer's 3.0 sits just above the measured minimum); the k=16 parabola hard part, the three-node clustered fixture (seed frame kappa ~3.6e8 > KAPPA_MAX, rebuild-recommended) and the closed-loop circle (wrapped branch) all measure NO reach down to the 1e-6 probe floor; the isolated-node fixture certifies only a ~6.5e-5-wide arc before the node's rank collapse. Three of the five required tests land and pass in tests/kernel_engine.rs (frame_two_pass_orthonormality_near_degenerate_seeds, frame_conditioning_rebuild_gate_uses_kappa_max, tube_reach_envelope_measured_and_published). RESULT.json is at the worktree root.",
+  "tests_required": {
+    "frame_two_pass_orthonormality_near_degenerate_seeds": "PASS",
+    "frame_conditioning_rebuild_gate_uses_kappa_max": "PASS",
+    "tube_reach_envelope_measured_and_published": "PASS",
+    "ladder_margin_refusals_are_budget_backed": "BLOCKED",
+    "s4a_remaining_three_tests_pass_after_engine_fix": "BLOCKED"
+  },
+  "s4a_three_remaining_tests_after_engine_fix": {
+    "dtau_grows_on_success_and_halves_on_failure": {
+      "status": "FAIL",
+      "note": "parabola_k16 seed frame measures NO reach at the probe floor (tube_reach_probe tau_reach = 0); the tracer still completes with <3 certified steps. The test asserts a certified halved step through the hard part that the frozen tube seam cannot deliver; it can neither pass nor (without a tracer.rs change) become a Budget-backed refusal."
+    },
+    "escalation_routes_isolated_r2_to_the_contact_future": {
+      "status": "FAIL",
+      "note": "the isolated node still reads rank_screen_not_isolated_not_curve (HighOrderJet), not isolated_contact_is_s5a. The rank-margin enclosure straddles at the screen's resolution; the honest contract class is a Budget-backed refusal (RefusalEvidence::Residual naming the straddling margin), which requires the escalation ladder in tracer.rs - outside this packet's write_allow."
+    },
+    "high_order_singularity_refuses": {
+      "status": "FAIL",
+      "note": "the three-node cluster still reads TangentialCurve (rung-3 guess), not HighOrderJet. The clustered-component rank margins are ~1e-8 and below hull resolution; the honest contract class is a Budget-backed refusal, not a guessed rung - requires tracer.rs, outside this packet's write_allow."
+    }
+  },
+  "tube_reach_envelope_measured": {
+    "probe_definition": "forward arc [0,W] from the seed frame; perpendicular box centred on the one-Gauss-Newton-step predicted arc-end centre; perpendicular half width = 3*W for the tau search (the tracer's PERP_RATIO); probe floor W=1e-6; perp_ratio_min = smallest perpendicular half width / tau width that still certifies at the measured reach.",
+    "straight_linear": { "tau_reach": 7.071068e-2, "no_reach": false, "frame_kappa": 4.0, "rebuild_recommended": false, "perp_half_min": 1.762596e-1, "perp_ratio_min": 2.493 },
+    "parabola_k16": { "tau_reach": 0.0, "no_reach": true, "frame_kappa": 4.0, "rebuild_recommended": false, "note": "quadratic hard part: no positive width certifies down to the 1e-6 probe floor" },
+    "isolated_node": { "tau_reach": 6.516355e-5, "no_reach": false, "frame_kappa": 9.071e2, "rebuild_recommended": false, "perp_half_min": 7.573873e-5, "perp_ratio_min": 1.162 },
+    "three_node_cluster": { "tau_reach": 0.0, "no_reach": true, "frame_kappa": 3.635e8, "rebuild_recommended": true, "note": "seed frame beyond KAPPA_MAX conditioning; no arc certifies" },
+    "closed_loop_circle": { "tau_reach": 0.0, "no_reach": true, "frame_kappa": 5.333, "rebuild_recommended": false, "note": "wrapped/closed curved branch: no positive width certifies down to the 1e-6 probe floor" },
+    "three_x_observation": "confirmed within measurement on the linear branch: minimum perpendicular half width ~2.49x the tau width (the tracer's 3.0 sits just above the measured minimum); near the isolated node the required ratio drops to ~1.16x."
+  },
+  "pass_count": 3,
+  "fail_count": 0,
+  "blocked_count": 2,
+  "anchors": { "A1": 1, "A2": 1, "A3": 1 },
+  "blocking_finding": {
+    "text": "Three S4A tests (tests/kernel_tracer.rs: dtau_grows_on_success_and_halves_on_failure, escalation_routes_isolated_r2_to_the_contact_future, high_order_singularity_refuses) still fail after the engine fix and can neither pass NOR become honest Budget-backed refusals within this packet's write_allow, which names only vendor/truck/truck-certified/src/kernel/engine.rs and vendor/truck/truck-certified/tests/kernel_engine.rs. The two remaining required test names (ladder_margin_refusals_are_budget_backed, s4a_remaining_three_tests_pass_after_engine_fix) are therefore BLOCKED: the honest-margin refusal discipline (Refused(Budget) with RefusalEvidence::Residual naming the straddling margin at DEPTH_MAX, never a guessed rung) lives in the tracer's escalation ladder (src/kernel/tracer.rs), and converting the S4A test assertions to the Budget-backed envelope class requires editing tests/kernel_tracer.rs - both files are outside the packet's write_allow. The reach characterization measured by tube_reach_probe is published and machine-checked; it does not contradict the S4A linear anecdote (measured single-tube forward reach ~0.0707 tau is not wildly larger than ~0.3-0.35; the ~0.3-0.35 figure is the multi-arc march extent, which the probe does not reproduce by design - recorded, superseding the anecdote).",
+    "stop_conditions": {
+      "1_two_pass_trips_on_non_degenerate": false,
+      "2_linear_reach_contradiction": false,
+      "3_s4a_test_neither_passes_nor_budget_refusal": true
+    }
+  },
+  "verify": {
+    "fmt": "packet files rustfmt-clean (cargo fmt --all -- --check reports only pre-existing diffs outside the packet write_allow)",
+    "check": "cargo check --workspace --all-targets green",
+    "existing_tests": "cargo test -p truck-certified --lib --tests --no-fail-fast: 566 lib + all integration suites green except tests/kernel_tracer.rs (5 passed / 3 failed, the three named S4A tests, unchanged from the S4A partial baseline); tests/kernel_engine.rs 15/15 including the three landed required tests",
+    "clippy": "the crate is not clippy-clean at default settings crate-wide (pre-existing findings across formal/* etc., matching the recorded S4A/306 notes). No clippy finding is attributable to the packet's added code; the only remaining engine.rs findings (minor3_iv/inv4_iv range loops, S3B-era) are pre-existing and outside this packet's additions"
+  }
+}
