@@ -5,11 +5,13 @@
 //! [`spine_sweep`] realizes a landed `SpineFrameRecipe` as a closed
 //! `Solid<Point3, Curve, Surface>` with authored topology (build-spec §8B;
 //! plan §4 CG-009): ONE side BREP face per profile edge — never one face per
-//! spine sample — each on a [`SpineFrameSurface`] over
-//! `[s_first, s_last] × [v0_j, v1_j]`, its wire built from the SHARED
-//! trajectory `Edge`s (each [`SpineFrameCurve`] is constructed once and cloned
-//! into both adjacent faces' wires — identity, not coordinates), straight
-//! ring edges at the first/last stations, and planar caps via the landed
+//! spine sample — each carrying a whole-sweep closed value
+//! ([`SpineFrameSweep`]) over `[s_first, s_last] × [v0_j, v1_j]` (the windowed
+//! realization decorator is derived from that closed value, never stored
+//! separately; BG-KV2-501-C6), its wire built from the SHARED trajectory
+//! `Edge`s (each [`SpineFrameCurve`] is constructed once and cloned into both
+//! adjacent faces' wires — identity, not coordinates), straight ring edges at
+//! the first/last stations, and planar caps via the landed
 //! [`builder::try_attach_plane`]. No sewing, no welding, no healing anywhere.
 //!
 //! V1 domain (pre-decided; outside it, typed refusals — never silent
@@ -29,8 +31,7 @@
 //! fast path, this module is the topology stage.
 
 use crate::{
-    builder, Curve, Edge, Face, Line, Shell, Solid, SpineFrameCurve, SpineFrameSurface, Surface,
-    Vertex, Wire,
+    builder, Curve, Edge, Face, Line, Shell, Solid, SpineFrameCurve, Surface, Vertex, Wire,
 };
 use truck_base::evidence::{
     Budget, Certificate, Certified, ContradictionWitness, EnvelopeCase, Margin, Method, Modulus,
@@ -38,6 +39,7 @@ use truck_base::evidence::{
 };
 use truck_geometry::constructive::{
     ConstructError, DirectTolerance, FrameLaw, ProfileLaw, ScalarLaw, SpineCurve, SpineFrameRecipe,
+    SpineFrameSweep,
 };
 
 /// The authored-topology sweep constructor (build-spec §8B; plan §4 CG-009).
@@ -181,7 +183,11 @@ pub fn spine_sweep<S: SpineCurve + Into<Curve> + Clone>(
     // rectangle [s_first, s_last] × [v0_j, v1_j] CCW: the shared trajectory
     // edge, the end ring edge, the next trajectory edge reversed, the start
     // ring edge reversed. Every shared edge appears with OPPOSITE orientations
-    // in its two faces (the P12 fixture rule).
+    // in its two faces (the P12 fixture rule). The face's stored surface is the
+    // whole-sweep closed value over THAT face's window — the enum now carries
+    // the sweep, window and all, not the windowed realization decorator
+    // (BG-KV2-501-C6); the sweep's placement stays the identity the constructor
+    // sets, shared across every face of one sweep (stop condition 2's guard).
     let mut faces: Vec<Face> = Vec::with_capacity(k + 2);
     for j in 0..k {
         let j2 = (j + 1) % k;
@@ -189,7 +195,7 @@ pub fn spine_sweep<S: SpineCurve + Into<Curve> + Clone>(
         // The v-window endpoint of edge j is (j+1)/k, NOT cyclic: the closing
         // edge (j = k-1) spans [ (k-1)/k, 1.0 ].
         let v1 = (j + 1) as f64 / k as f64;
-        let surface = SpineFrameSurface::try_new(storage_recipe.clone(), s_first, s_last, v0, v1)
+        let sweep = SpineFrameSweep::try_new(storage_recipe.clone(), s_first, s_last, v0, v1)
             .map_err(refuse)?;
         let wire = Wire::from(vec![
             trajectory[j].clone(),
@@ -198,7 +204,7 @@ pub fn spine_sweep<S: SpineCurve + Into<Curve> + Clone>(
             start_ring[j].inverse(),
         ]);
         faces.push(
-            Face::try_new(vec![wire], Surface::SpineFrameSurface(surface))
+            Face::try_new(vec![wire], Surface::SpineFrameSurface(sweep))
                 .map_err(|_| refuse(ConstructError::InvalidInput))?,
         );
     }
@@ -285,11 +291,29 @@ fn scale_touches_zero(scale: &ScalarLaw, s_first: f64, s_last: f64) -> bool {
 }
 
 /// The construction-refusal mapping at the realization entry (CG-007's
-/// pattern): every `ConstructError` becomes an envelope refusal. The detailed
-/// `ConstructError` rides the realization evidence record when that record
-/// lands (CG-007); until then it is dropped here, not approximated.
-fn refuse(_error: ConstructError) -> Refusal {
-    Refusal::UnsupportedEnvelope(EnvelopeCase::NonCanonicalCarrier)
+/// pattern, mapping A row 1): every `ConstructError` becomes the constructive-
+/// refusal envelope. The detailed `ConstructError` rides the realization
+/// evidence record when that record lands (CG-007); until then the envelope
+/// case — not the dropped detail — is what the closed `Refusal` can carry.
+///
+/// The match NAMES EVERY `ConstructError` variant with no catch-all arm: the
+/// compiler proves the mapping is total (a new `ConstructError` variant stops
+/// the build here for an explicit decision), and `refusal_mapping_is_total_no_
+/// catch_all` asserts that property textually. Every landed variant has an
+/// honest envelope case — `ConstructRefused`, the constructive-realization
+/// envelope this entry point realizes — so stop condition 3 does not fire.
+fn refuse(error: ConstructError) -> Refusal {
+    match error {
+        ConstructError::ZeroTangent { .. }
+        | ConstructError::FrameSingular { .. }
+        | ConstructError::SpineNotC1 { .. }
+        | ConstructError::ProfileCorrespondenceMismatch
+        | ConstructError::ProfileCollapse { .. }
+        | ConstructError::NonFinite { .. }
+        | ConstructError::InvalidInput => {
+            Refusal::UnsupportedEnvelope(EnvelopeCase::ConstructRefused)
+        }
+    }
 }
 
 /// The cap-attachment refusal mapping: a nonplanar cap is outside the V1
@@ -304,5 +328,187 @@ fn refuse_topology(error: crate::errors::Error) -> Refusal {
             left: Truth::True,
             right: Truth::False,
         }),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::base::*;
+    use truck_geometry::constructive::{LineSpine, Profile2D};
+
+    /// The unit-square profile (CCW about +z in the frame plane).
+    fn unit_square() -> Profile2D {
+        match Profile2D::try_closed(vec![
+            Point2::new(0.0, 0.0),
+            Point2::new(1.0, 0.0),
+            Point2::new(1.0, 1.0),
+            Point2::new(0.0, 1.0),
+        ]) {
+            Ok(profile) => profile,
+            Err(_) => panic!("the unit-square fixture must be a valid closed profile"),
+        }
+    }
+
+    /// The recipe of a unit prism: `LineSpine` of height 1 along +z, the unit
+    /// square profile, and a `FixedPlane` frame pinned to +x (the sweep is a
+    /// 1×1×1 box, profile mapped to `(py, -px)`).
+    fn unit_prism_recipe() -> SpineFrameRecipe<LineSpine, ProfileLaw, FrameLaw> {
+        let spine = LineSpine {
+            start: Point3::origin(),
+            end: Point3::new(0.0, 0.0, 1.0),
+        };
+        let frame = FrameLaw::FixedPlane {
+            normal: Vector3::unit_x(),
+        };
+        SpineFrameRecipe::new(spine, ProfileLaw::Constant(unit_square()), frame)
+    }
+
+    #[test]
+    fn refusal_mapping_is_total_no_catch_all() {
+        // Every `ConstructError` variant maps to its honest envelope case —
+        // `ConstructRefused`, the constructive-realization envelope (CG-000,
+        // mapping A row 1). Building the refusal for every variant by name
+        // exercises each arm.
+        let errors = [
+            ConstructError::ZeroTangent { at: 0.0 },
+            ConstructError::FrameSingular {
+                at: 0.0,
+                law: "FixedPlane",
+            },
+            ConstructError::SpineNotC1 { at: 1.0 },
+            ConstructError::ProfileCorrespondenceMismatch,
+            ConstructError::ProfileCollapse { at: 0.5 },
+            ConstructError::NonFinite { at: 0.0 },
+            ConstructError::InvalidInput,
+        ];
+        for error in errors {
+            match refuse(error) {
+                Refusal::UnsupportedEnvelope(EnvelopeCase::ConstructRefused) => {}
+                other => panic!("ConstructError::{other:?} refused the wrong envelope"),
+            }
+        }
+        // The no-catch-all property, asserted textually: the `refuse` body must
+        // name every variant and contain no wildcard (`_`) match arm — the
+        // compiler already proves totality; this pins the arm shape so a later
+        // "simplification" to a catch-all cannot land silently.
+        let source = include_str!("spine_sweep.rs");
+        let after_signature = match source.split_once("fn refuse(error: ConstructError)") {
+            Some((_, tail)) => tail,
+            None => panic!("the refuse signature is not present"),
+        };
+        let open_brace = match after_signature.find('{') {
+            Some(index) => index,
+            None => panic!("the refuse body has no opening brace"),
+        };
+        let mut depth = 0i32;
+        let mut close = None;
+        for (i, ch) in after_signature[open_brace..].char_indices() {
+            match ch {
+                '{' => depth += 1,
+                '}' => {
+                    depth -= 1;
+                    if depth == 0 {
+                        close = Some(open_brace + i);
+                        break;
+                    }
+                }
+                _ => {}
+            }
+        }
+        let body = match close {
+            Some(close) => &after_signature[open_brace..=close],
+            None => panic!("the refuse body never closes"),
+        };
+        for name in [
+            "ZeroTangent",
+            "FrameSingular",
+            "SpineNotC1",
+            "ProfileCorrespondenceMismatch",
+            "ProfileCollapse",
+            "NonFinite",
+            "InvalidInput",
+        ] {
+            assert!(
+                body.contains(name),
+                "the refuse body must name ConstructError::{name}"
+            );
+        }
+        assert!(
+            !body.contains("_ =>"),
+            "refuse must have no wildcard match arm"
+        );
+        assert!(
+            !body.contains("_other"),
+            "refuse must have no named catch-all"
+        );
+    }
+
+    #[test]
+    fn landed_brep_constructor_semantics_unchanged() {
+        // The landed constructor semantics are immovable: ONE side face per
+        // profile edge carrying the whole-sweep closed value over exactly that
+        // face's window, planar caps, every side sweep's placement the identity
+        // the constructor sets. The enum payload moved onto the sweep
+        // (BG-KV2-501-C6), but this is what the volume conformance measures,
+        // so it must not move.
+        let recipe = unit_prism_recipe();
+        let certified = match spine_sweep(&recipe, &[0.0, 1.0]) {
+            Ok(certified) => certified,
+            Err(refusal) => panic!("the landed unit-prism sweep refused: {refusal:?}"),
+        };
+        let solid = certified.value;
+        assert_eq!(solid.boundaries()[0].len(), 6, "4 side faces + 2 caps");
+        let mut side_windows: Vec<(f64, f64)> = Vec::new();
+        let mut cap_faces = 0usize;
+        let tolerance = DirectTolerance::default().position;
+        for face in solid.face_iter() {
+            match face.surface() {
+                Surface::SpineFrameSurface(sweep) => {
+                    // The sweep-level placement is the shared identity the
+                    // constructor sets — never per-face differing transforms
+                    // (stop condition 2's guard).
+                    assert_eq!(*sweep.transform(), Matrix4::identity());
+                    assert_eq!(sweep.s0(), 0.0);
+                    assert_eq!(sweep.s1(), 1.0);
+                    side_windows.push((sweep.v0(), sweep.v1()));
+                    // The per-face realization still evaluates the recipe over
+                    // the window: X(s, v) = C(s) + n·px + b·py = (py, -px, s).
+                    let s = 0.5;
+                    let v = 0.5 * (sweep.v0() + sweep.v1());
+                    let expected = edge_midpoint_position(sweep.v0(), sweep.v1(), s);
+                    let got = sweep.subs(s, v);
+                    assert!(
+                        (got - expected).magnitude() <= tolerance,
+                        "side realization diverged at ({s}, {v}): {got:?} vs {expected:?}"
+                    );
+                }
+                Surface::Plane(_) => cap_faces += 1,
+                other => panic!("a side face must be a sweep or a plane cap, got {other:?}"),
+            }
+        }
+        side_windows.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap_or(std::cmp::Ordering::Equal));
+        assert_eq!(
+            side_windows,
+            vec![(0.0, 0.25), (0.25, 0.5), (0.5, 0.75), (0.75, 1.0),],
+            "the four side windows must tile the profile ring exactly once"
+        );
+        assert_eq!(cap_faces, 2, "both caps must attach as planar faces");
+    }
+
+    /// The analytic unit-square position at ring parameter `v` of the edge
+    /// whose window is `[v0, v1]`, mapped through the prism fixture's frame:
+    /// `X(s, v) = (py, -px, s)`.
+    fn edge_midpoint_position(v0: f64, v1: f64, s: f64) -> Point3 {
+        let vertices = [(0.0, 0.0), (1.0, 0.0), (1.0, 1.0), (0.0, 1.0)];
+        let j = (v0 * 4.0).round() as usize % 4;
+        let a = vertices[j];
+        let b = vertices[(j + 1) % 4];
+        let width = v1 - v0;
+        let v = v0 + 0.5 * width;
+        let w = (v - v0) / width;
+        let px = a.0 + (b.0 - a.0) * w;
+        let py = a.1 + (b.1 - a.1) * w;
+        Point3::new(py, -px, s)
     }
 }

@@ -120,8 +120,9 @@ pub mod primitive;
 /// BG-CAD-P5-REVOLVE: revolve of line-edge profiles via the carrier table.
 pub mod revolve;
 /// BG-CG-009-BREP: the authored-topology spine sweep constructor — side faces
-/// per profile edge on `SpineFrameSurface`, trajectory edges shared by
-/// identity, caps via `try_attach_plane`. No sewing anywhere.
+/// per profile edge on the whole-sweep closed value (`SpineFrameSweep`),
+/// trajectory edges shared by identity, caps via `try_attach_plane`. No
+/// sewing anywhere.
 pub mod spine_sweep;
 mod sweep;
 mod topo_impls;

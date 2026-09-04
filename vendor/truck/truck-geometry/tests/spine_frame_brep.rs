@@ -8,6 +8,7 @@
 use truck_base::evidence::Refusal;
 use truck_geometry::constructive::{
     ConstructError, DirectTolerance, FrameLaw, LineSpine, Profile2D, ProfileLaw, SpineFrameRecipe,
+    SpineFrameSweep,
 };
 use truck_geometry::prelude::*;
 
@@ -58,13 +59,14 @@ fn edge_zero_surface() -> SpineFrameSurface<LineSpine> {
         .expect("edge zero is a valid surface window")
 }
 
-/// The stored (`Box<Curve>`-spine) edge-zero surface, as the canonical
-/// `Surface` enum carries it.
+/// The stored (`Box<Curve>`-spine) edge-zero sweep, as the canonical
+/// `Surface` enum carries it: the whole-sweep closed value over the edge
+/// window, exactly what the landed B-rep constructor stores per side face.
 fn edge_zero_stored_surface() -> Surface {
     let recipe = curve_spine_recipe();
-    let surface =
-        SpineFrameSurface::try_new(recipe, 0.0, 1.0, 0.0, 0.25).expect("a valid stored surface");
-    Surface::SpineFrameSurface(surface)
+    let sweep =
+        SpineFrameSweep::try_new(recipe, 0.0, 1.0, 0.0, 0.25).expect("a valid stored sweep");
+    Surface::SpineFrameSurface(sweep)
 }
 
 #[test]
