@@ -1,0 +1,37 @@
+{
+  "id": "CC-015-GORDON",
+  "contract": ["CC-015-GORDON"],
+  "class": "mechanical",
+  "status": "complete",
+  "commit": "042e03e",
+  "write_set": [
+    "vendor/truck/truck-certified/src/construct/gordon.rs",
+    "vendor/truck/truck-certified/src/construct/mod.rs",
+    "vendor/truck/truck-certified/tests/construct_gordon.rs"
+  ],
+  "anchors": {
+    "A1_make_compatible": 1,
+    "A2_loft_sections": 1,
+    "A3_rank_margin": 2
+  },
+  "scoped_checks": {
+    "cargo check -p truck-certified": "pass",
+    "cargo test -p truck-certified --test construct_gordon": "pass (4/4)"
+  },
+  "tests_required": [
+    "cardinal_functions_are_exactly_delta_at_stations",
+    "correction_term_removes_double_counting_at_network_points",
+    "output_passes_the_same_validity_postcondition",
+    "incompatible_component_bases_refuse"
+  ],
+  "notes": {
+    "homogeneous_carrier": "The packet's 'Point4' homogeneous point is spelled with the landed truck homogeneous carrier Vector4 (the S8 reuse contract); the result reuses the CC-010 LoftOutput type — no new carrier, deliberately.",
+    "degree_derivation": "GordonInput carries no degree fields. The two direction degrees are derived from the families after make_compatible: u_degree = the common profile degree, v_degree = the common guide degree. The basis-compatibility gate then requires the averaged station knot vector at that degree to equal the family's knot vector.",
+    "basis_gate": "Basis incompatibility refuses ConstructRefusal::InvalidInput, never a silent re-basis: the profile u basis must equal averaged_knot_vector(stations_u, u_degree) AND the guide v basis must equal averaged_knot_vector(stations_v, v_degree). Station/family count mismatches and unclamped/empty families also refuse InvalidInput.",
+    "factorization_reuse": "Exactly two banded-TP factorizations exist: factor_u over stations_u (u_degree) and factor_v over stations_v (v_degree). S_u = loft_sections(profiles, stations_v, v_degree, &factor_v); S_v = swap_axes(loft_sections(guides, stations_u, u_degree, &factor_u)); the correction interpolates each network row through &factor_u (one u-basis correction curve per v station) and lofts those curves through &factor_v.",
+    "correction_grid_data": "The correction surface S_uv interpolates AT the network points (u_i, v_j) the network values (one copy per crossing, equal to the amount S_u + S_v double counts there). A consistent fixture network reproduces the carrier exactly; the homogeneous weight channel (w ≈ 1, not w ≈ 2) is the double-count witness in the tests.",
+    "accumulation_order": "Control nets combine pointwise in homogeneous R4 as (S_u + S_v) − S_uv per control entry, iterated u-major then v. LoftOutput::epsilon of the result is the sum su.epsilon + sv.epsilon + suv.epsilon (per-entry enclosure width of the Boolean sum is at most the sum of the component widths).",
+    "factor_sharing_epsilon_observations": "Observed (--nocapture) on the quadratic carrier fixture over stations_u = [0, .45, 1], stations_v = [0, .6, 1]: factor_v shared pair — profile loft S_u epsilon = 2.665e-15 and correction loft S_uv epsilon = 2.665e-15 (identical; the correction rows reproduce the profiles in the shared W_u space, so identical data flows into the shared v-direction solve); factor_u shared pair — guide loft S_v epsilon = 2.331e-15 and correction's u-direction solve epsilon = 2.331e-15 (identical). Delivered combined epsilon = 7.661e-15; worst doubled weight-channel gap observed = 2.220e-16; worst corrected-surface gap at the network points = 1.360e-16.",
+    "stop_conditions": "No stop condition triggered. (1) Mechanical: every object came from CC-010 (make_compatible, averaged_knot_vector, loft_collocation_bands, factor_banded_tp, loft_sections) — no new interpolation kernel was written. (2) Profiles and guides stay independent families: make_compatible runs per family and the code never couples their knot vectors; the fixture (consistent sections of the carrier T(u,v) = (u,v,uv)) supplies the shared averaged-station knots. (3) The two factorization-sharing assertions' observed epsilon values are recorded above."
+  }
+}
