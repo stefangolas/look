@@ -68,6 +68,10 @@ pub mod convert;
 #[doc(hidden)]
 pub mod fixtures;
 
+/// The P2 local injectivity radius (`δ = 2σ/L`) over the certified map types
+/// (CC-002-INJECTIVITY, spine seam S4).
+pub mod injectivity;
+
 /// The construct refusal vocabulary (C4), frozen here and grown only by CC-000
 /// amendment.
 pub mod refusal;
