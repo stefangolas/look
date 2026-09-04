@@ -129,7 +129,7 @@ def try_land(slot_dir, slot_no, rows, order, reg_path):
         return
     status = (result.get("status") or "").lower()
     fails = result.get("fail_count")
-    if status not in ("complete", "partial") or \
+    if status not in ("complete", "partial", "done") or \
             (isinstance(fails, int) and fails > 0):
         log(f"slot {slot_no}: {pid} status={status!r} fails={fails} - "
             f"LEFT FOR MORNING (judgment required)")
@@ -289,7 +289,7 @@ def main():
                     and parts[2] == "FINISHED":
                 try_land(ROOT / "loop" / "slots" / parts[1],
                          parts[1], rows, order, reg_path)
-        if all_landed(rows):
+        # Rolling dispatch (owner direction, session 51): refill slots before`n        # the landed check - the KV2 overnight ran waves by hand; the CC`n        # program is chain-serial and must not idle a slot behind the author.`n        disp = sh([sys.executable, str(ROOT / "loop" / "dispatch_ready.py"),`n                   "--max-workers", "3"], timeout=1800)`n        for ln in (disp.stdout or "").splitlines():`n            if "dispatched" in ln or "clash" in ln or "blocked" in ln:`n                log(f"dispatch: {ln.strip()}")`n        if all_landed(rows):
             still_running = any(
                 len(l.split()) >= 3 and l.split()[2] == "RUNNING"
                 for l in status_out.splitlines()
