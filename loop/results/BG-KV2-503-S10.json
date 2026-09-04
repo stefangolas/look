@@ -1,0 +1,51 @@
+{
+  "packet": "BG-KV2-503-S10",
+  "title": "authored-topology verification: certify_claimed (spec 15)",
+  "commit": "ba605da18fd32491ddb95f29461f2accd5c5531b",
+  "commit_subject": "feat(certified): authored-topology verification via certify_claimed (BG-KV2-503-S10)",
+  "outcome": "completed",
+  "stop_conditions": {
+    "triggered": false,
+    "notes": [
+      "Stop 1 (frozen seams): the C2 entry (engine::c2_certify_tube4), the C1 entry (engine::krawczyk_c1), ClaimVerdict's three-valued shape, and ClaimedGraph/CertifiedGraph match what the packet names. LeafPair is NOT present anywhere in the tree (exhaustive grep of vendor/truck and src/tests), and its serial dependency BG-KV2-502-S9B is not merged, so claims.rs lands LeafPair itself under the spec's spelling (recorded). No shape mismatch with a landed seam was found.",
+      "Stop 2 (complement subdivision): the targeted-completeness complement is expressed purely as the claim-domain box minus each certified tube's chart-space parameter box via deterministic axis-slab IBox subtraction; Tier-1/Tier-2 run over the resulting boxes. No interval-subdivision doctrine beyond the packet's pre-decided form was needed.",
+      "Stop 3 (component-kind vocabulary): ComponentKind spells the landed tube-chain kind set (the certified-graph AnyArc families: Ordinary/Difference/SelfInt/Spine/Carrier). The fixtures' expected components (Ordinary R1 chains) are expressible."
+    ]
+  },
+  "files": {
+    "written": [
+      "vendor/truck/truck-certified/src/kernel/claims.rs",
+      "vendor/truck/truck-certified/src/kernel/mod.rs",
+      "vendor/truck/truck-certified/tests/kernel_claims.rs"
+    ]
+  },
+  "tests_required": {
+    "certify_claimed_accepts_a_true_component": "pass",
+    "refuted_component_names_component_and_predicate": "pass",
+    "non_exhaustive_claim_yields_claimed_graph": "pass",
+    "exhaustive_claim_discharges_targeted_completeness": "pass",
+    "provenance_does_not_discharge_completeness": "pass",
+    "trusted_provenance_yields_claimed_graph_not_certified": "pass"
+  },
+  "verification": {
+    "anchors": { "A1_tier1_loop_free": 1, "A2_tier2_start_set": 1, "A3_ClaimedGraph": 1 },
+    "commands": [
+      "cargo fmt -p truck-certified",
+      "cargo check -p truck-certified --all-targets --profile quick --locked",
+      "cargo test -p truck-certified --profile quick --test kernel_claims --locked  (6/6 pass)"
+    ],
+    "scoped_notes": [
+      "Whole-workspace `cargo fmt --all -- --check` reports pre-existing rustfmt drift in untouched files (examples/step_face_timing.rs, tests/geometry_fingerprint.rs) that this packet did not modify.",
+      "The full truck-certified test battery still shows the three known pre-existing kernel_tracer failures (dtau_grows_on_success_and_halves_on_failure, escalation_routes_isolated_r2_to_the_contact_future, high_order_singularity_refuses) recorded in loop history as a booked amendment outside this packet's write_allow. kernel_claims is green."
+    ]
+  },
+  "notes": [
+    "LeafPair was named in the census as a landed seam but is not present in the tree; it is landed in claims.rs (v1 scope): two unit-weight polynomial graph leaves over the shared identity chart, the R1 tensor-difference SquareSystem3, the claim domain (paired u/v axes), and the Tier-2 direction a.",
+    "ComponentKind spelling: the packet said to use the landed component vocabulary's own names and note the spelling. The landed tube-chain kind vocabulary is the certified-graph AnyArc family set, so ComponentKind spells Ordinary / Difference / SelfInt / Spine / Carrier. The C2 seam certifies ordinary R1 chains only; a claim whose expected kind is not Ordinary refutes under tube-chain-via-C2 (no partial graph, spec 15 item 2).",
+    "Predicate labels are exactly tube-chain-via-C2, endpoints-via-C1, nodes-via-A4.2 (ClaimRefutation.predicate carries the label).",
+    "Per-component certification (items 1-2): tube chain via build_frame4 + c2_certify_tube4 at the claimed seed (a Disproven tube or a provably-off-curve seed refutes; an unresolved tube is Inconclusive, never silently repaired); endpoints via krawczyk_c1 on the square 2D shared-chart boundary-crossing residual (g(u,v), c - f); nodes via the landed regions_identify (the two ends of one component must not identify).",
+    "certify_claimed requires claim.exhaustive (a non-exhaustive claim can never produce a CertifiedGraph, spec 15 item 4 / D6) and routes the trusted-provenance opt-in / non-exhaustive path through claim_claimed, which returns ClaimedGraph (a distinct type).",
+    "Completeness (item 3): complement = claim-domain box minus each certified tube's chart-space parameter box (axis-slab IBox subtraction); Tier-1 (tier1_loop_free) and Tier-2 (tier2_start_set) exclusion run over the resulting boxes. Discharge gate = every complement box has an empty Tier-2 start set. With the landed conservative PI/2-hemisphere BezierLeaf normal cones Tier-1 separation cannot certify for these leaf pairs, so Tier-1 is run as the packet's loop-free exclusion over the boxes but is not the gate (a closed component always carries a Tier-2 start point by Theorem 9.2). The exclusion runs regardless of provenance (D6); only the trusted/claimed entry skips it, and its output is a ClaimedGraph.",
+    "House rules: claims.rs and kernel_claims.rs carry no unwrap/expect/panic! and add no module-level allow; the fixture kit (kernel/fixtures.rs) was not modified; cargo invocations went through the PATH queue shim."
+  ]
+}
