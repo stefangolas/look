@@ -1,0 +1,37 @@
+{
+  "id": "CC-010-LOFT-CORE",
+  "contract": ["CC-010-LOFT-CORE"],
+  "class": "design",
+  "status": "complete",
+  "commit": "ea19679",
+  "write_set": [
+    "vendor/truck/truck-certified/src/construct/loft.rs",
+    "vendor/truck/truck-certified/src/construct/mod.rs",
+    "vendor/truck/truck-certified/tests/construct_loft.rs"
+  ],
+  "anchors": {
+    "A1_factor_banded_tp": 1,
+    "A2_solve_homogeneous": 1,
+    "A3_elevate_degree": 1,
+    "A4_add_knot": 1
+  },
+  "scoped_checks": {
+    "cargo check -p truck-certified": "pass",
+    "cargo test -p truck-certified --test construct_loft": "pass (7/7)"
+  },
+  "tests_required": [
+    "averaged_knot_vector_satisfies_schoenberg_whitney_on_increasing_stations",
+    "chord_length_stations_are_deterministic_and_normalized",
+    "loft_reproduces_sections_identically_up_to_epsilon",
+    "delivered_epsilon_matches_max_control_error",
+    "knot_union_is_exact_additive_never_tolerance_merged",
+    "incompatible_sections_refuse"
+  ],
+  "notes": {
+    "homogeneous_carrier": "The S8 seam 'Point4' homogeneous point is spelled with the landed truck homogeneous carrier Vector4 (BSplineCurve/BSplineSurface<Vector4>); no new carrier was introduced.",
+    "polyline_sample_count": "CHORD_STATION_SAMPLES = 64 per section (named const in construct/loft.rs).",
+    "station_summation_order": "Per section, chord edges are summed in ascending-parameter order over 64 equal parametric steps across the section's declared knot range; per-section chords are accumulated in section order into a running total; each running total is pushed as that section's station; every station is then divided by the final total (the last station is therefore exactly 1.0).",
+    "loft_epsilon": "LoftOutput::epsilon equals BandedFactor::max_control_error after loft_sections re-solves the widest control column last, so the delivered L2 width is the GLOBAL maximum control enclosure width of the net.",
+    "stop_conditions": "No stop condition triggered: landed nurbs types provided all arithmetic needed (no truck-geometry edits), and the union knot vectors evaluated cleanly (no QUESTION.md filed)."
+  }
+}
