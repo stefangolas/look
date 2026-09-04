@@ -162,8 +162,10 @@ def main():
         writes = set(r.get("writes", []))
         # kernel/mod.rs is the standard one-line pub-mod registration file:
         # same-file work there is the DESIGNED textual conflict, resolved at
-        # merge (build spec section 4) - it does not block dispatch.
-        EXPECTED = {"vendor/truck/truck-certified/src/kernel/mod.rs"}
+        # merge (build spec section 4) - it does not block dispatch. The CC
+        # program's construct/mod.rs is the same convention (session 51).
+        EXPECTED = {"vendor/truck/truck-certified/src/kernel/mod.rs",
+                    "vendor/truck/truck-certified/src/construct/mod.rs"}
         clash = (writes - EXPECTED) & (running_writes - EXPECTED)
         if clash:
             print(f"  {r['id']}: write-set clash with a RUNNING row: "
