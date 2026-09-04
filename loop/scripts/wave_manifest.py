@@ -180,7 +180,8 @@ def fix(data):
             continue
         row = json.loads(line)
         pid = row.get("id", "")
-        if pid in merged and "landed" not in (row.get("note") or "").lower():
+        if pid in merged and not LANDED_RE.search(
+                (row.get("note") or "").lower()):
             row["note"] = (row.get("note", "")
                            + f"; LANDED {merged[pid][:7]} (one-verify "
                              f"amendment: stays RUNNING until the final "
