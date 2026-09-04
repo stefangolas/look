@@ -345,6 +345,17 @@ impl CertifiedCurveMap {
     pub fn piece_intervals(&self) -> Vec<(f64, f64)> {
         self.pieces.iter().map(|piece| piece.interval).collect()
     }
+
+    /// The per-piece, per-coordinate Bernstein coefficient vectors of the map,
+    /// in the same order as [`Self::piece_intervals`] (D-map structural
+    /// accessor; the CC-002 curve injectivity radius consumes these to bound
+    /// `‖C″‖`).
+    pub fn piece_grids(&self) -> Vec<[Vec<f64>; 3]> {
+        self.pieces
+            .iter()
+            .map(|piece| piece.coeffs.clone())
+            .collect()
+    }
 }
 
 impl CertifiedSurfaceMap {
