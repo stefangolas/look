@@ -17,6 +17,44 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parent.parent
 
 
+def release_orphaned_branch(branch, want_wt):
+    """Detach `branch` from any OTHER worktree holding it.
+
+    Session-51 class: a failed new_slot (warm-build crash) leaves the
+    packet branch checked out in its attempted slot; the next dispatch of
+    the same packet to a DIFFERENT slot then dies on 'already used by
+    worktree' and the machine idles. If the holding worktree is clean and
+    at the branch tip with no work (the half-forked case), detach it; if
+    it holds anything, abort loudly - the orchestrator decides.
+    """
+    out = git(REPO_ROOT, "worktree", "list", "--porcelain").stdout
+    blocks = out.split("\n\n")
+    for block in blocks:
+        lines = block.strip().splitlines()
+        wt_path = branch_ref = None
+        for line in lines:
+            if line.startswith("worktree "):
+                wt_path = line[len("worktree "):]
+            if line.startswith("branch "):
+                branch_ref = line[len("branch "):]
+        if not wt_path or branch_ref is None:
+            continue
+        if not branch_ref.endswith(f"refs/heads/{branch}"):
+            continue
+        if Path(wt_path).resolve() == Path(want_wt).resolve():
+            continue
+        held = git(wt_path, "status", "--porcelain").stdout.strip()
+        tip = git(wt_path, "rev-parse", "HEAD").stdout.strip()
+        branch_tip = git(REPO_ROOT, "rev-parse", branch).stdout.strip()
+        if held or tip != branch_tip:
+            sys.exit(f"branch {branch} is held by worktree {wt_path} "
+                     f"which has work (dirty={bool(held)}, "
+                     f"at_tip={tip == branch_tip}); release it manually")
+        print(f"releasing orphaned branch {branch} from {wt_path} "
+              f"(clean, no work)")
+        git(wt_path, "checkout", "--detach", branch_tip)
+
+
 def git(cwd, *args):
     return subprocess.run(['git', '-C', str(cwd), *args], capture_output=True, text=True, encoding='utf-8', errors='replace')
 
@@ -102,6 +140,7 @@ def main():
         # it to base_ref if it does -- this is the "reset rather than error"
         # contract.
         print(f"Slot {args.slot} worktree exists at {wt}; resetting branch {args.branch} to {base_ref}")
+        release_orphaned_branch(args.branch, wt)
         res = git(wt, 'checkout', '-B', args.branch, base_ref)
         if res.returncode != 0:
             sys.exit(f"git checkout -B {args.branch} failed in {wt}: {res.stderr}")
@@ -119,6 +158,7 @@ def main():
         branch_exists = bool(git(REPO_ROOT, 'branch', '--list', args.branch).stdout.strip())
         if branch_exists:
             print(f"Branch {args.branch} already exists; attaching worktree and resetting to {base_ref}")
+            release_orphaned_branch(args.branch, wt)
             res = git(REPO_ROOT, 'worktree', 'add', str(wt), args.branch)
             if res.returncode != 0:
                 sys.exit(f"git worktree add {wt} {args.branch} failed: {res.stderr}")

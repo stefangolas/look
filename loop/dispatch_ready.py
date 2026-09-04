@@ -18,6 +18,7 @@ Usage:
 """
 import json
 import os
+import re
 import subprocess
 import sys
 
@@ -40,10 +41,17 @@ def rows():
     return out
 
 
+LANDED_RE = re.compile(r"landed [0-9a-f]{7,}")
+
+
 def landed(r):
+    """The LANDED <sha> note marker is the truth (wave_manifest's
+    convention), regardless of the status field: session 51 saw a row
+    stuck at READY with the LANDED note and dispatch stayed blocked on a
+    packet that was already merged."""
     s = (r.get("status") or "").lower()
     note = (r.get("note") or "").lower()
-    return s == "done" or (s == "running" and "landed" in note)
+    return s == "done" or LANDED_RE.search(note) is not None
 
 
 def slots():
