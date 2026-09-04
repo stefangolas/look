@@ -426,6 +426,21 @@ pub struct SpineFrameSurface {
 
 Generic composition stays inside the constructive module. This is the difference between a one-variant ripple and a combinatorial one, and it is the highest-risk integration point in the constructive half.
 
+**Owner amendment (session 51, BG-KV2-501-C6 stop 1 — recorded deviation).**
+Two constraints force a refinement of the struct as literally written:
+(1) the canonical `Curve`/`Surface` enums require `Clone + Serialize +
+Deserialize`, and the constructive `Spine` enum (§5.2) implements neither —
+so the stored `spine` field is the closed canonical `Box<Curve>` carrier
+(the §5.2 decorator precedent), with the `Spine` recipe type living at the
+constructive layer; (2) the B-rep constructor stores one per-face WINDOWED
+realization as the enum variant's value (a side face's carrier must know
+its own `s0/s1/v0/v1` window, pinned by landed volume and window
+conformance tests). The variant therefore carries the four §5.10 fields —
+whole sweep, no per-window combinatorial family — PLUS the window domain
+as part of its closed value, and per-face windows are NOT derived from
+face wires at realization time. The §5.10 rationale ("one variant, not a
+combinatorial family") is unaffected.
+
 ## Part 3 — Certified intersection
 
 ### 6. The product-space identity and its rank structure (S0)
