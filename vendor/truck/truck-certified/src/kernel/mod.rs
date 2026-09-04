@@ -57,6 +57,14 @@ pub type SignCert = crate::formal::exact::CertifiedSign;
 /// overlap, the deck-step breaks of a closed chain, and the certified-graph
 /// constructor over the frozen topology shapes.
 pub mod assemble;
+/// §3.3/§3.4 the lifted atlas over the rational carriers (BG-KV2-405-K2B): the
+/// finite atlas of regular charts per carrier kind with chart ids, overlap
+/// regions, and exact affine/rational transition data, the pole-chart
+/// sphere atlas, the cone/torus chart families joining the admitted carrier
+/// family, the `SwitchChart`-vs-`CarrierSingular` degeneracy doctrine, and the
+/// unwrapped K2 pcurve lifts with the deck integer as a first-class coordinate
+/// and [`crate::kernel::config::DECK_MAX`] as the termination bound.
+pub mod atlas;
 pub mod certs;
 pub mod config;
 /// The §10.3 isolated-contact classifier (BG-KV2-302-S5A): the tolerance-
@@ -109,17 +117,17 @@ pub mod sheet;
 /// separation) and the R8 subdivision seeds over caller-supplied boundary
 /// edges.
 pub mod tier1;
-/// The D4 float predictor-corrector (BG-KV2-207-S4A): the fast, UNCERTIFIED
-/// branch tracer whose accept/reject path always goes through the certified
-/// seam ([`engine::build_frame4`] + [`engine::c2_certify_tube4`]), with the
-/// §10.2 escalation ladder.
-pub mod tracer;
 /// The Tier-2 critical-point start set (BG-KV2-304-S3B): the §7 R3 minor-form
 /// residual `Psi_a(x) = (F(x), a·m(x))` (arity 4, square) over the frozen
 /// seam's additive arity-4 C1 entry, and the §9.2 subdivision start set with
 /// the a-posteriori `k_a` direction-perturbation retry rule (Corollary 9.3's
 /// composition with 301's boundary seeds).
 pub mod tier2;
+/// The D4 float predictor-corrector (BG-KV2-207-S4A): the fast, UNCERTIFIED
+/// branch tracer whose accept/reject path always goes through the certified
+/// seam ([`engine::build_frame4`] + [`engine::c2_certify_tube4`]), with the
+/// §10.2 escalation ladder.
+pub mod tracer;
 /// The §9.4 trim clip (BG-KV2-401-S3C): certified R9 crossings between the
 /// leaf-product 1-complex arcs and the closed trim loops of the same chart,
 /// arc splitting at the certified crossings, and inside/outside classification
