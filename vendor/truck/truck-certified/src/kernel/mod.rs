@@ -66,6 +66,13 @@ pub mod assemble;
 /// and [`crate::kernel::config::DECK_MAX`] as the termination bound.
 pub mod atlas;
 pub mod certs;
+/// §15 authored-topology verification (BG-KV2-503-S10): the claim vocabulary
+/// ([`claims::TopologyClaim`], [`claims::ClaimedComponent`],
+/// [`claims::ClaimRefutation`]) and the verification entry
+/// [`claims::certify_claimed`] with the trusted/non-exhaustive claimed-graph
+/// path [`claims::claim_claimed`], over the shared-chart graph-arrangement
+/// leaf pair ([`claims::LeafPair`]).
+pub mod claims;
 pub mod config;
 /// The §10.3 isolated-contact classifier (BG-KV2-302-S5A): the tolerance-
 /// tagged contact claim (Corollary 10.2 + Prop 10.3 over the frozen C2/C3
