@@ -57,6 +57,10 @@ pub type Interval = crate::formal::exact::CertifiedInterval;
 /// Gaussian elimination for banded totally-positive collocation matrices.
 pub mod banded;
 
+/// The P4 argmin-with-margin operator (seam S5): the strict-separation argmin
+/// over interval enclosures, refusing `AmbiguousEventOrdering` on overlap.
+pub mod argmin;
+
 /// The C6 normative config constants (the `kernel/config.rs` pattern).
 pub mod config;
 
