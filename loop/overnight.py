@@ -73,34 +73,39 @@ def save_registry(rows, order, p):
 
 
 def packet_tests_and_crates(packet_path, row):
-    """Test-file stems + affected crates from the packet write_allow and
-    the row's write paths."""
+    """(crate, test stem) pairs + affected crates, derived from the
+    packet's write_allow tests/*.rs paths (the crate is in the path) and
+    the row's write paths. Session-51 bug: the test loop hardcoded
+    -p truck-certified, so every non-certified test target 'failed' with
+    'no test target named...' and a finished packet sat unlanded for an
+    hour while its test actually passed 8/8."""
     try:
         text = Path(packet_path).read_text(encoding="utf-8-sig")
     except OSError:
         return [], []
-    tests = re.findall(r"vendor/\S+/tests/(\w+)\.rs", text)
+    pairs = [(m.group(1), m.group(2)) for m in
+             re.finditer(r"vendor/truck/(\S+)/tests/(\w+)\.rs", text)]
     crates = sorted({p.split("/")[2] for p in (row.get("writes") or [])
                      if p.startswith("vendor/truck/")})
     if not crates:
         crates = ["truck-certified"]
-    return crates, tests
+    return crates, pairs
 
 
-def scoped_check(crates, tests, wt):
+def scoped_check(crates, test_pairs, wt):
     for c in crates:
         r = sh(["cargo", "check", "--locked", "-p", c,
                 "--manifest-path", str(Path(wt) / "Cargo.toml")],
                env=BATTERY_ENV)
         if r.returncode != 0:
             return False, f"check -p {c} failed"
-    for t in tests:
-        r = sh(["cargo", "test", "--locked", "-p", "truck-certified",
-                "--test", t,
+    for crate, stem in test_pairs:
+        r = sh(["cargo", "test", "--locked", "-p", crate,
+                "--test", stem,
                 "--manifest-path", str(Path(wt) / "Cargo.toml")],
                env=BATTERY_ENV)
         if r.returncode != 0:
-            return False, f"test {t} failed"
+            return False, f"test {crate}:{stem} failed"
     return True, "green"
 
 
