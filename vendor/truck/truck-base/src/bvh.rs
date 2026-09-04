@@ -186,6 +186,61 @@ impl<P: BoundedPiece> Bvh<P> {
         out
     }
 
+    /// A certified lower bound on the minimum distance between THIS piece set
+    /// and `other`'s piece set: the returned value is `<=` the true minimum
+    /// over every piece pair (one piece from each tree). The bound is a pure
+    /// box-level certificate — every piece lies inside its leaf box, so the
+    /// minimum leaf-box distance over the two trees is never above the true
+    /// minimum. `f64::INFINITY` is returned exactly when the two sets are
+    /// provably disjoint at the root (their root boxes do not overlap) or when
+    /// either set is empty: no piece pair can then meet within any finite
+    /// distance, so the separation is certified unbounded.
+    ///
+    /// The dual traversal is deterministic (the fixed child order of
+    /// [`Bvh::candidate_pairs`], never hash- or parallel-dependent). A node
+    /// pair is pruned once its box distance already exceeds the best-so-far
+    /// upper bound on the true minimum; that upper bound is refined from leaf
+    /// box pairs (their farthest-corner distance dominates the true minimum),
+    /// so the surviving leaf pairs always include the minimizer and the
+    /// reported minimum is exact at the box level.
+    pub fn distance_lower_bound(&self, other: &Self) -> f64 {
+        let Some(a) = self.nodes.first() else {
+            return f64::INFINITY;
+        };
+        let Some(b) = other.nodes.first() else {
+            return f64::INFINITY;
+        };
+        if box_distance_lower(&a.bbox, &b.bbox) > 0.0 {
+            return f64::INFINITY;
+        }
+        let mut best = f64::INFINITY;
+        let mut upper = f64::INFINITY;
+        dual_distance_min(&self.nodes, &other.nodes, 0, 0, &mut best, &mut upper);
+        best
+    }
+
+    /// A certified lower bound on the minimum distance between two DISTINCT
+    /// pieces of this same tree: `<=` the true minimum over every `i < j`
+    /// piece pair. A leaf holding two or more pieces cannot certify a positive
+    /// separation for its own pairs (the pieces are only known through the
+    /// leaf's union box, so their pair distance may be `0`), so the bound is
+    /// `0` whenever any leaf carries more than one primitive. Returns
+    /// `f64::INFINITY` when fewer than two primitives exist (no pair at all).
+    /// Deterministic: same fixed traversal order as
+    /// [`Bvh::candidate_pairs_self`].
+    pub fn distance_lower_bound_self(&self) -> f64 {
+        if self.primitives.len() < 2 {
+            return f64::INFINITY;
+        }
+        if self.nodes.is_empty() {
+            return f64::INFINITY;
+        }
+        let mut best = f64::INFINITY;
+        let mut upper = f64::INFINITY;
+        self_distance_min(&self.nodes, 0, &mut best, &mut upper);
+        best
+    }
+
     /// The number of primitives this BVH was built over.
     pub fn len(&self) -> usize {
         self.primitives.len()
@@ -279,6 +334,149 @@ impl<P: BoundedPiece> Bvh<P> {
         self.traverse_query(n.left as usize, aabb, out);
         self.traverse_query(n.right as usize, aabb, out);
     }
+}
+
+/// The per-axis gap between two boxes, clamped at `0`: `max(lo_b - hi_a,
+/// lo_a - hi_b)` is non-zero only on a strictly separating axis. Euclidean
+/// combination of the three axis gaps gives a lower bound on the point-set
+/// distance between the two boxes (port of the six-line `box_distance` formula
+/// of `truck-evidence`'s feature-size substrate, reimplemented here because
+/// `truck-base` cannot depend on `truck-evidence`).
+fn box_distance_lower(a: &BoundingBox<Point3>, b: &BoundingBox<Point3>) -> f64 {
+    let a_min = a.min();
+    let a_max = a.max();
+    let b_min = b.min();
+    let b_max = b.max();
+    let gap = |lo_a: f64, hi_a: f64, lo_b: f64, hi_b: f64| (lo_b - hi_a).max(lo_a - hi_b).max(0.0);
+    let dx = gap(a_min.x, a_max.x, b_min.x, b_max.x);
+    let dy = gap(a_min.y, a_max.y, b_min.y, b_max.y);
+    let dz = gap(a_min.z, a_max.z, b_min.z, b_max.z);
+    (dx * dx + dy * dy + dz * dz).sqrt()
+}
+
+/// The farthest-corner distance between two boxes: an upper bound on the
+/// distance between ANY point pair, one point in each box. Because every piece
+/// lies inside its box, this dominates the true minimum piece-set distance, so
+/// it is a sound "best-so-far" pruning target for the dual distance walk.
+fn box_distance_upper(a: &BoundingBox<Point3>, b: &BoundingBox<Point3>) -> f64 {
+    let a_min = a.min();
+    let a_max = a.max();
+    let b_min = b.min();
+    let b_max = b.max();
+    let farthest =
+        |lo_a: f64, hi_a: f64, lo_b: f64, hi_b: f64| (lo_a - hi_b).abs().max((hi_a - lo_b).abs());
+    let dx = farthest(a_min.x, a_max.x, b_min.x, b_max.x);
+    let dy = farthest(a_min.y, a_max.y, b_min.y, b_max.y);
+    let dz = farthest(a_min.z, a_max.z, b_min.z, b_max.z);
+    (dx * dx + dy * dy + dz * dz).sqrt()
+}
+
+/// Walks the node pairs of the subtrees rooted at `na` (of `a_nodes`) and `nb`
+/// (of `b_nodes`) in the fixed order of [`Bvh::candidate_pairs`], recording in
+/// `best` the minimum leaf-box distance seen. A node pair whose box distance
+/// already exceeds `upper` (or whose interior cannot beat a recorded `0`) is
+/// pruned; `upper` is the best-so-far bound on the true minimum, tightened
+/// from the farthest-corner distances of visited leaf pairs, so pruning never
+/// discards the minimizing leaf pair.
+fn dual_distance_min(
+    a_nodes: &[BvhNode],
+    b_nodes: &[BvhNode],
+    na: usize,
+    nb: usize,
+    best: &mut f64,
+    upper: &mut f64,
+) {
+    if *best == 0.0 {
+        return;
+    }
+    let Some(a) = a_nodes.get(na) else {
+        return;
+    };
+    let Some(b) = b_nodes.get(nb) else {
+        return;
+    };
+    let d = box_distance_lower(&a.bbox, &b.bbox);
+    if d > *upper {
+        return;
+    }
+    let a_leaf = a.left == u32::MAX;
+    let b_leaf = b.left == u32::MAX;
+    if a_leaf && b_leaf {
+        if d < *best {
+            *best = d;
+        }
+        if *best == 0.0 {
+            *upper = 0.0;
+            return;
+        }
+        let candidate = box_distance_upper(&a.bbox, &b.bbox);
+        if candidate < *upper {
+            *upper = candidate;
+        }
+        return;
+    }
+    if a_leaf {
+        dual_distance_min(a_nodes, b_nodes, na, b.left as usize, best, upper);
+        dual_distance_min(a_nodes, b_nodes, na, b.right as usize, best, upper);
+    } else if b_leaf {
+        dual_distance_min(a_nodes, b_nodes, a.left as usize, nb, best, upper);
+        dual_distance_min(a_nodes, b_nodes, a.right as usize, nb, best, upper);
+    } else {
+        dual_distance_min(
+            a_nodes,
+            b_nodes,
+            a.left as usize,
+            b.left as usize,
+            best,
+            upper,
+        );
+        dual_distance_min(
+            a_nodes,
+            b_nodes,
+            a.left as usize,
+            b.right as usize,
+            best,
+            upper,
+        );
+        dual_distance_min(
+            a_nodes,
+            b_nodes,
+            a.right as usize,
+            b.left as usize,
+            best,
+            upper,
+        );
+        dual_distance_min(
+            a_nodes,
+            b_nodes,
+            a.right as usize,
+            b.right as usize,
+            best,
+            upper,
+        );
+    }
+}
+
+/// The self-distance walk over the subtree rooted at `node`: within-leaf piece
+/// pairs (two or more primitives in one leaf) certify `0`, and distinct
+/// subtrees are compared by the dual walk. Mirrors [`Bvh::candidate_pairs_self`].
+fn self_distance_min(nodes: &[BvhNode], node: usize, best: &mut f64, upper: &mut f64) {
+    if *best == 0.0 {
+        return;
+    }
+    let Some(n) = nodes.get(node) else {
+        return;
+    };
+    if n.left == u32::MAX {
+        if n.count >= 2 {
+            *best = 0.0;
+            *upper = 0.0;
+        }
+        return;
+    }
+    self_distance_min(nodes, n.left as usize, best, upper);
+    self_distance_min(nodes, n.right as usize, best, upper);
+    dual_distance_min(nodes, nodes, n.left as usize, n.right as usize, best, upper);
 }
 
 /// Recursively builds the subtree over `primitives[lo..hi)` pre-order (parent
