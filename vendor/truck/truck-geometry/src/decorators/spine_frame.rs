@@ -203,9 +203,12 @@ fn profile_derivative_s(
 }
 
 /// The float-method certificate for the structural `include` predicates
-/// (H-6: concrete float arithmetic certifies `Float`, never `Exact`).
+/// (H-6: concrete float arithmetic certifies `Float`, never `Exact`). Shared
+/// by the realization decorator and the closed whole-sweep value
+/// (`constructive::SpineFrameSweep`), whose include predicate is the same
+/// boundary-line comparison.
 #[inline(always)]
-fn float_certificate() -> Certificate {
+pub(crate) fn float_certificate() -> Certificate {
     Certificate {
         props: PropMap::new(),
         method: Method::Float,
@@ -268,12 +271,61 @@ fn validate_spine_parameter(
     Ok(())
 }
 
+/// The SHARED surface-window validation (BG-KV2-501-C6): the window contract a
+/// realized surface over one profile edge must satisfy. Both the windowed
+/// realization decorator [`SpineFrameSurface::try_new`] and the closed
+/// whole-sweep value (`constructive::SpineFrameSweep::try_new`) run this same
+/// check, so a sweep stored on the closed `Surface::SpineFrameSurface` variant
+/// and the per-face decorator derived from it can never disagree on a valid
+/// window. Validation: both spine parameters inside the recipe's spine domain,
+/// the window ascending, both `v` parameters inside `[0, 1]` and within
+/// `DirectTolerance::parameter` of a profile-edge boundary (`j/k`), and every
+/// corner evaluation succeeding (the frame/profile gates fire here).
+pub(crate) fn validate_surface_window<S: SpineCurve>(
+    recipe: &SpineFrameRecipe<S, ProfileLaw, FrameLaw>,
+    s0: f64,
+    s1: f64,
+    v0: f64,
+    v1: f64,
+) -> std::result::Result<(), ConstructError> {
+    validate_spine_parameter(&recipe.spine, s0)?;
+    validate_spine_parameter(&recipe.spine, s1)?;
+    if s1 <= s0 {
+        return Err(ConstructError::InvalidInput);
+    }
+    if !(0.0..=1.0).contains(&v0) || !(0.0..=1.0).contains(&v1) || v1 <= v0 {
+        return Err(ConstructError::InvalidInput);
+    }
+    let k = profile_vertex_count(&recipe.profile_law);
+    if k < 3 {
+        return Err(ConstructError::InvalidInput);
+    }
+    let tolerance = DirectTolerance::default().parameter;
+    let edge = (v0 * k as f64).floor() as usize;
+    if edge >= k
+        || ((v0 - ring_parameter(edge, k)).abs() > tolerance)
+        || ((v1 - ring_parameter(edge + 1, k)).abs() > tolerance)
+    {
+        return Err(ConstructError::InvalidInput);
+    }
+    for &s in &[s0, s1] {
+        for &v in &[v0, v1] {
+            recipe.position(s, v)?;
+        }
+    }
+    Ok(())
+}
+
 impl<S: SpineCurve + Clone> SpineFrameSurface<S> {
     /// Assembles the surface over `[s0, s1] × [v0, v1]` after validating:
     /// both spine parameters inside the recipe's spine domain, the window
     /// ascending, both `v` parameters inside `[0, 1]` and within
     /// `DirectTolerance::parameter` of a profile-edge boundary (`j/k`), and
     /// every corner evaluation succeeding (the frame/profile gates fire here).
+    /// The validation is [`validate_surface_window`], the SAME window check
+    /// the closed whole-sweep value (`constructive::SpineFrameSweep`) runs —
+    /// this decorator is a windowed realization view derived from that sweep's
+    /// closed value, never an independent authority on what a window means.
     pub fn try_new(
         recipe: SpineFrameRecipe<S, ProfileLaw, FrameLaw>,
         s0: f64,
@@ -281,31 +333,7 @@ impl<S: SpineCurve + Clone> SpineFrameSurface<S> {
         v0: f64,
         v1: f64,
     ) -> std::result::Result<Self, ConstructError> {
-        validate_spine_parameter(&recipe.spine, s0)?;
-        validate_spine_parameter(&recipe.spine, s1)?;
-        if s1 <= s0 {
-            return Err(ConstructError::InvalidInput);
-        }
-        if !(0.0..=1.0).contains(&v0) || !(0.0..=1.0).contains(&v1) || v1 <= v0 {
-            return Err(ConstructError::InvalidInput);
-        }
-        let k = profile_vertex_count(&recipe.profile_law);
-        if k < 3 {
-            return Err(ConstructError::InvalidInput);
-        }
-        let tolerance = DirectTolerance::default().parameter;
-        let edge = (v0 * k as f64).floor() as usize;
-        if edge >= k
-            || ((v0 - ring_parameter(edge, k)).abs() > tolerance)
-            || ((v1 - ring_parameter(edge + 1, k)).abs() > tolerance)
-        {
-            return Err(ConstructError::InvalidInput);
-        }
-        for &s in &[s0, s1] {
-            for &v in &[v0, v1] {
-                recipe.position(s, v)?;
-            }
-        }
+        validate_surface_window(&recipe, s0, s1, v0, v1)?;
         Ok(SpineFrameSurface {
             recipe,
             s0,
@@ -402,8 +430,9 @@ impl<S: SpineCurve + Clone> SpineFrameCurve<S> {
 /// Evaluates `X(s, v)` under the stored placement. The constructor validated
 /// the window, so an evaluation refusal inside it is unreachable; this is the
 /// match-based unwrap the house rules sanction (no `.unwrap()` in source).
+/// Shared with the closed whole-sweep value's evaluation path.
 #[inline(always)]
-fn evaluate_position<S: SpineCurve>(
+pub(crate) fn evaluate_position<S: SpineCurve>(
     recipe: &SpineFrameRecipe<S, ProfileLaw, FrameLaw>,
     transform: &Matrix4,
     s: f64,
@@ -432,7 +461,7 @@ fn evaluate_frame<S: SpineCurve>(
 /// `S_v = frame(s) · ∂P/∂v`: analytic (the profile law is linear in `v` along
 /// an edge — landed `profile.rs`), then placed.
 #[inline(always)]
-fn surface_vder<S: SpineCurve>(
+pub(crate) fn surface_vder<S: SpineCurve>(
     recipe: &SpineFrameRecipe<S, ProfileLaw, FrameLaw>,
     transform: &Matrix4,
     s: f64,
@@ -450,7 +479,7 @@ fn surface_vder<S: SpineCurve>(
 /// placed. Central differences at `DirectTolerance::parameter` scale are
 /// sanctioned only on the search path, never here.
 #[inline(always)]
-fn surface_uder<S: SpineCurve>(
+pub(crate) fn surface_uder<S: SpineCurve>(
     recipe: &SpineFrameRecipe<S, ProfileLaw, FrameLaw>,
     transform: &Matrix4,
     s: f64,
@@ -468,29 +497,21 @@ fn surface_uder<S: SpineCurve>(
 }
 
 /// The central-difference second derivative of a first derivative, at
-/// `DirectTolerance::parameter` scale. Sanctioned for the SEARCH path only:
-/// `SearchParameter`/`SearchNearestParameter` are numerical searches and their
-/// certificates never quote these values.
-fn central_difference_s<S: SpineCurve>(
-    surface: &SpineFrameSurface<S>,
-    s: f64,
-    v: f64,
-    first: impl Fn(&SpineFrameSurface<S>, f64, f64) -> Vector3,
-) -> Vector3 {
+/// `DirectTolerance::parameter` scale, sampled along `s`. Sanctioned for the
+/// SEARCH path only: `SearchParameter`/`SearchNearestParameter` are numerical
+/// searches and their certificates never quote these values. Shared by the
+/// realization decorator and the closed whole-sweep value (the same landed
+/// derivative machinery, closure-form so both carriers can call it).
+pub(crate) fn central_difference_s(s: f64, v: f64, first: impl Fn(f64, f64) -> Vector3) -> Vector3 {
     let h = DirectTolerance::default().parameter;
-    (first(surface, s + h, v) - first(surface, s - h, v)) / (2.0 * h)
+    (first(s + h, v) - first(s - h, v)) / (2.0 * h)
 }
 
 /// The central-difference second derivative with respect to `v` (see
 /// [`central_difference_s`]).
-fn central_difference_v<S: SpineCurve>(
-    surface: &SpineFrameSurface<S>,
-    s: f64,
-    v: f64,
-    first: impl Fn(&SpineFrameSurface<S>, f64, f64) -> Vector3,
-) -> Vector3 {
+pub(crate) fn central_difference_v(s: f64, v: f64, first: impl Fn(f64, f64) -> Vector3) -> Vector3 {
     let h = DirectTolerance::default().parameter;
-    (first(surface, s, v + h) - first(surface, s, v - h)) / (2.0 * h)
+    (first(s, v + h) - first(s, v - h)) / (2.0 * h)
 }
 
 impl<S: SpineCurve + Clone> ParametricSurface for SpineFrameSurface<S> {
@@ -522,15 +543,15 @@ impl<S: SpineCurve + Clone> ParametricSurface for SpineFrameSurface<S> {
     }
     #[inline(always)]
     fn uuder(&self, u: f64, v: f64) -> Self::Vector {
-        central_difference_s(self, u, v, |surface, s, w| surface.uder(s, w))
+        central_difference_s(u, v, |s, w| self.uder(s, w))
     }
     #[inline(always)]
     fn uvder(&self, u: f64, v: f64) -> Self::Vector {
-        central_difference_s(self, u, v, |surface, s, w| surface.vder(s, w))
+        central_difference_s(u, v, |s, w| self.vder(s, w))
     }
     #[inline(always)]
     fn vvder(&self, u: f64, v: f64) -> Self::Vector {
-        central_difference_v(self, u, v, |surface, s, w| surface.vder(s, w))
+        central_difference_v(u, v, |s, w| self.vder(s, w))
     }
     #[inline(always)]
     fn parameter_range(&self) -> (ParameterRange, ParameterRange) {

@@ -1112,8 +1112,10 @@ mod stepio_out_emits_analytic_entities_tests {
     #[test]
     fn step_out_refuses_spine_frame_variants_typed() {
         use std::fmt::Write;
-        use truck_geometry::constructive::{FrameLaw, Profile2D, ProfileLaw, SpineFrameRecipe};
-        use truck_geometry::decorators::{SpineFrameCurve, SpineFrameSurface};
+        use truck_geometry::constructive::{
+            FrameLaw, Profile2D, ProfileLaw, SpineFrameRecipe, SpineFrameSweep,
+        };
+        use truck_geometry::decorators::SpineFrameCurve;
 
         // STEP writing of a spine-frame realization is TR-NRB-001's booked
         // business (build-spec §8B): the out-direction refuses both variants
@@ -1135,9 +1137,11 @@ mod stepio_out_emits_analytic_entities_tests {
                 normal: Vector3::unit_x(),
             },
         );
-        let surface = SpineFrameSurface::try_new(recipe.clone(), 0.0, 1.0, 0.0, 0.25)
-            .expect("a valid stored surface");
-        let surface = ModelingSurface::SpineFrameSurface(surface);
+        // The enum variant now carries the whole-sweep closed value, not the
+        // windowed realization decorator (BG-KV2-501-C6).
+        let sweep = SpineFrameSweep::try_new(recipe.clone(), 0.0, 1.0, 0.0, 0.25)
+            .expect("a valid stored sweep");
+        let surface = ModelingSurface::SpineFrameSurface(sweep);
         let mut buf = String::new();
         assert!(
             write!(buf, "{}", StepDataDisplay::new(&surface, 1)).is_err(),

@@ -15,6 +15,7 @@
     clippy::indexing_slicing
 )]
 
+use crate::constructive::SpineFrameSweep;
 use crate::prelude::*;
 use serde::{Deserialize, Serialize};
 use truck_base::evidence::{
@@ -295,12 +296,16 @@ pub enum Surface {
     /// `Processor<Surface, Matrix4>` would be a recursive type of infinite
     /// size (BG-CE-006-r2 deviation).
     Processor(Processor<Box<Surface>, Matrix4>),
-    /// The parametric spine/profile realization surface (BG-CG-009-BREP).
-    /// Realizes `X(s, v) = C(s) + frame(s)·P(s, v)` over the landed recipe
-    /// evaluators. One side face of a spine sweep; v-runs along a profile edge.
-    /// The spine is boxed: the decorator stores the closed `Curve` spine,
-    /// which would recurse without indirection.
-    SpineFrameSurface(SpineFrameSurface<Box<Curve>>),
+    /// The parametric spine/profile realization surface (BG-CG-009-BREP,
+    /// spec §5.10 as amended by BG-KV2-501-C6). Realizes
+    /// `X(s, v) = C(s) + frame(s)·P(s, v)` over the landed recipe evaluators.
+    /// The variant now carries the WHOLE-SWEEP closed value
+    /// ([`SpineFrameSweep`]): the recipe stored once on the canonical
+    /// `Box<Curve>` spine carrier, the realized window `[s0, s1] × [v0, v1]`
+    /// riding on the closed value, and the sweep-level placement. The
+    /// windowed realization decorator is derived from that closed value, never
+    /// stored here.
+    SpineFrameSurface(SpineFrameSweep),
 }
 
 macro_rules! derive_surface_method {
@@ -382,8 +387,9 @@ impl Transformed<Matrix4> for Surface {
             Self::BSplineSurface(entity) => Self::BSplineSurface(entity.transformed(trans)),
             Self::NurbsSurface(entity) => Self::NurbsSurface(entity.transformed(trans)),
             // BG-CG-009-BREP: the placement composes into the stored matrix
-            // (the `SpineFrameSurface`/`SpineFrameCurve` decorators carry one);
-            // every evaluation is exact under any affine map.
+            // (the `SpineFrameSweep` closed value and the `SpineFrameCurve`
+            // decorator carry one — the sweep-level placement); every
+            // evaluation is exact under any affine map.
             Self::SpineFrameSurface(entity) => Self::SpineFrameSurface(entity.transformed(trans)),
         }
     }

@@ -457,6 +457,16 @@ mod trimmied_curve;
 pub use coons::CoonsSurface;
 pub use spine_frame::{SpineFrameCurve, SpineFrameSurface};
 
+// BG-KV2-501-C6: the closed whole-sweep value (`constructive::SpineFrameSweep`)
+// realizes through the LANDED evaluator path — these spine-frame evaluation
+// helpers are shared with the windowed realization decorator, never re-derived
+// in the constructive module. Re-exported pub(crate) because `spine_frame` is a
+// private module (its items are not nameable across the crate otherwise).
+pub(crate) use spine_frame::{
+    central_difference_s, central_difference_v, evaluate_position, float_certificate, surface_uder,
+    surface_vder, validate_surface_window,
+};
+
 fn bound2opt<T>(x: Bound<T>) -> Option<T> {
     match x {
         Bound::Included(x) => Some(x),
