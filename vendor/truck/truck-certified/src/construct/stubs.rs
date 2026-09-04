@@ -116,19 +116,28 @@ impl ShiftFunctional {
     }
 }
 
-/// The S6 boundary-simplicity input plan (stub posture C7).
+/// The S6 boundary-simplicity input plan.
 ///
-/// Opaque: private fields only, constructible exclusively through the refusing
-/// constructor until the CC-005 graph-disk packet lands its production from
-/// the planar machinery.
-#[derive(Debug, Clone)]
+/// **S11 posture (CC-005 dispatch amendment, session 51).** The original
+/// CC-000 stub was uninhabitable (private `_sealed`, refusing constructor
+/// only), so CC-005 could not consume a plan verdict across the seam. The
+/// accepted QUESTION amended the shape to the S11 `TripleContactNode`
+/// posture: frozen PUB fields landed here by CC-005 plus a refusing
+/// `try_new()` (the contract test keeps asserting the refusing constructor).
+/// Consumers — `certify_graph_disk` in `construct/graphdisk.rs` and the
+/// projection search — read the verdict through these public fields.
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub struct BoundaryPlan {
-    /// Sealed. Production data is CC-005's design.
-    _sealed: (),
+    /// Whether the projected region boundary is certified simple.
+    pub boundary_simple: bool,
+    /// Whether every seam of the glued region is certified glued.
+    pub seams_glued: bool,
 }
 
 impl BoundaryPlan {
-    /// The refusing stub constructor (C7): production belongs to CC-005.
+    /// The refusing stub constructor (C7): the frozen shape is constructible
+    /// through its public fields; `try_new` stays refusing as the C7 posture
+    /// marker.
     pub fn try_new() -> Result<Self, ConstructRefusal> {
         Err(ConstructRefusal::Unfrozen)
     }

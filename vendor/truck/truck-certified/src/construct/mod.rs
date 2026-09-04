@@ -101,3 +101,7 @@ pub mod gordon;
 /// The seam stub types (S6/S9/S10/S11/S12): frozen shapes and refusing
 /// constructors only, no production logic.
 pub mod stubs;
+
+/// The P3 graph-disk embedding certificate and its normative projection search
+/// (CC-005-GRAPHDISK, spine seam S6).
+pub mod graphdisk;
