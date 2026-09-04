@@ -16,6 +16,7 @@ depends_on:  [CC-000-CONTRACT]
 write_allow:
   - vendor/truck/truck-certified/src/construct/injectivity.rs
   - vendor/truck/truck-certified/src/construct/mod.rs
+  - vendor/truck/truck-certified/src/certified_map.rs
   - vendor/truck/truck-certified/tests/construct_injectivity.rs
 read_allow:
   - docs/CERTIFIED_CONSTRUCTION_CONTRACTS.md
@@ -55,7 +56,7 @@ parameterization is an input defect, and the map's own admit-time check is
 has no curvature-driven self-contact; non-finite intermediate â†’ refuse
 `InvalidInput`, never propagate NaN.
 
-Section 2: curve variant per spine S4: `pub fn
+Section 2: seam amendment (session 51, QUESTION.md accepted verbatim): CertifiedCurveMap gains the D-map structural accessor 'pub fn piece_grids(&self) -> Vec<[Vec<f64>; 3]>' returning the per-piece, per-coordinate Bernstein coefficient vectors in piece_intervals order — mirror of the surface patch_grids(), landed IN THIS PACKET inside certified_map.rs. The curve variant consumes it for the second-derivative hull. Curve variant per spine S4: `pub fn
 curve_injectivity_radius(map: &CertifiedCurveMap, sub: CurveRegion) ->
 Result<Interval, ConstructRefusal>` â€” Ïƒ from the curve `rank_margin` (|
 Câ€²| lower bound), L from the second-derivative bound (Bernstein derivative

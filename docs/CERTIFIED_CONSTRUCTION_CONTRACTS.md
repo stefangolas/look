@@ -161,6 +161,14 @@ pub fn curve_injectivity_radius(map: &CertifiedCurveMap, sub: CurveRegion)
     -> Result<Interval, ConstructRefusal>;      // 1-D variant
 ```
 Refuses when σ ≤ 0 (degenerate) — never returns δ = 0 as a success.
+AMENDED at CC-002 dispatch (session 51, QUESTION.md accepted verbatim):
+`CertifiedCurveMap` gains the structural accessor
+`pub fn piece_grids(&self) -> Vec<[Vec<f64>; 3]>` (per-piece Bernstein
+coefficient vectors, `piece_intervals` order — mirror of the surface
+`patch_grids()`); landed by CC-002 inside `certified_map.rs`. This was the
+first QUESTION.md of the program: the curve second-derivative hull was
+unreachable through the landed accessors, and the stop condition caught it
+as designed.
 
 **S5 — P4 argmin-with-margin (CC-003 → CC-013, CC-026, CC-030).**
 ```rust
