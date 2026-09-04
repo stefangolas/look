@@ -923,3 +923,470 @@ fn krawczyk_c1_n3_backing_matches_the_2d_table() {
         }
     }
 }
+
+// ---------------------------------------------------------------------------
+// BG-KV2-307-ENGINEREACH integration tests: two-pass frames, the κ report,
+// the tube-reach envelope, and the S4A re-run discipline. The S4A fixture
+// family is reconstructed here (integration tests are separate binaries and
+// cannot share the kernel_tracer.rs helpers).
+// ---------------------------------------------------------------------------
+
+use truck_certified::kernel::engine::{frame4_kappa_report, tube_reach_probe};
+use truck_certified::ssi_fixtures::closed_loop_pair;
+
+/// Elevate a coefficient list to a target degree (the S4A fixture helper).
+fn elev1(c: &[f64], target: usize) -> Vec<f64> {
+    let mut v = c.to_vec();
+    while v.len() - 1 < target {
+        v = elev_step(&v);
+    }
+    v
+}
+
+/// One degree-elevation step of a Bernstein coefficient list.
+fn elev_step(c: &[f64]) -> Vec<f64> {
+    let n = c.len() - 1;
+    let m = n + 1;
+    let mut out = Vec::with_capacity(m + 1);
+    for i in 0..=m {
+        let mut acc = 0.0f64;
+        if i > 0 {
+            acc += c[i - 1] * (i as f64) / (m as f64);
+        }
+        if i < m {
+            acc += c[i] * ((m - i) as f64) / (m as f64);
+        }
+        out.push(acc);
+    }
+    out
+}
+
+/// Elevate a bivariate control net to a target bidegree.
+fn net_elev(net: &[Vec<f64>], target: (usize, usize)) -> Vec<Vec<f64>> {
+    let cols: Vec<Vec<f64>> = net.iter().map(|row| elev1(row, target.1)).collect();
+    let mut out = vec![vec![0.0f64; target.1 + 1]; target.0 + 1];
+    for col in 0..=target.1 {
+        let mut colvec = Vec::with_capacity(cols.len());
+        for row in &cols {
+            colvec.push(row[col]);
+        }
+        let c = elev1(&colvec, target.0);
+        for (r, value) in c.iter().enumerate() {
+            out[r][col] = *value;
+        }
+    }
+    out
+}
+
+/// Build the graph-pair system `F = (u−s, v−t, g(u,v))` over chart rects
+/// `(0,1)` for `(u,s)` and `(v_chart_lo,1)` for `(v,t)`.
+fn two_graph(g01: &[Vec<f64>], v_chart_lo: f64) -> SquareSystem3 {
+    let gu = g01.len().saturating_sub(1);
+    let gv = g01[0].len().saturating_sub(1);
+    let (d1, d2) = (gu.max(1), gv.max(1));
+    let (d3, d4) = (1usize, 1usize);
+    let rows = (d1 + 1) * (d2 + 1);
+    let cols = 4usize;
+    let mut f0 = vec![vec![0.0f64; cols]; rows];
+    let mut f1 = vec![vec![0.0f64; cols]; rows];
+    let mut f2 = vec![vec![0.0f64; cols]; rows];
+    let ge = net_elev(g01, (d1, d2));
+    let ucoef = elev1(&[0.0, 1.0], d1);
+    let vcoef = elev1(&[0.0, 1.0], d2);
+    for a in 0..=d1 {
+        for b in 0..=d2 {
+            for i in 0..=d3 {
+                for j in 0..=d4 {
+                    let r = a * (d2 + 1) + b;
+                    let c = i * (d4 + 1) + j;
+                    f0[r][c] = ucoef[a] - (i as f64);
+                    f1[r][c] = vcoef[b] - (j as f64);
+                    f2[r][c] = ge[a][b];
+                }
+            }
+        }
+    }
+    construct_ok(SquareSystem3::new(
+        [f0, f1, f2],
+        (d1, d2, d3, d4),
+        (0.0, 1.0, v_chart_lo, 1.0, 0.0, 1.0, v_chart_lo, 1.0),
+    ))
+}
+
+/// `g = v − K(u − u0)²` with the vertex `(u0, 0)` unit-norm.
+fn net_parabola(k: f64) -> Vec<Vec<f64>> {
+    let u0 = 1.0f64 / 2.0f64.sqrt();
+    let a = [u0 * u0, u0 * u0 - u0, (1.0 - u0) * (1.0 - u0)];
+    let mut net = Vec::with_capacity(3);
+    for &ca in &a {
+        net.push(vec![-k * ca, 1.0 - k * ca]);
+    }
+    net
+}
+
+/// `g = (u − ua) * Π(v − vbk)`: isolated tangential nodes on `u = ua`.
+fn net_nodes(ua: f64, vbs: &[f64]) -> Vec<Vec<f64>> {
+    let n = vbs.len();
+    let mut poly = vec![1.0f64];
+    for &r in vbs {
+        let old = poly.clone();
+        let mut nxt = vec![0.0f64; old.len() + 1];
+        for (k, &co) in old.iter().enumerate() {
+            nxt[k] += -r * co;
+            nxt[k + 1] += co;
+        }
+        poly = nxt;
+    }
+    let comb = |a: usize, b: usize| -> f64 {
+        let mut v = 1.0f64;
+        for t in 0..b {
+            v *= (a - t) as f64 / (t + 1) as f64;
+        }
+        v
+    };
+    let mut pc = vec![0.0f64; n + 1];
+    for j in 0..=n {
+        let mut acc = 0.0f64;
+        for k in 0..=j {
+            acc += poly[k] * comb(j, k) / comb(n, k);
+        }
+        pc[j] = acc;
+    }
+    let uc = [-ua, 1.0 - ua];
+    let mut net = Vec::with_capacity(2);
+    for &u in &uc {
+        net.push(pc.iter().map(|c| u * c).collect());
+    }
+    net
+}
+
+/// A unit-norm diagonal-lift chart point `(u, v, u, v)`.
+fn seed_unit(u: f64, v: f64) -> [f64; 4] {
+    [u, v, u, v]
+}
+
+/// The maximal pairwise |dot| of a 4x4 column set (basis-vector orthogonality).
+fn max_dot(q: &[[f64; 4]; 4]) -> f64 {
+    let dot = |a: &[f64; 4], b: &[f64; 4]| a.iter().zip(b.iter()).map(|(x, y)| x * y).sum::<f64>();
+    let mut worst = 0.0f64;
+    for c in 0..4 {
+        let n = dot(&q[c], &q[c]).sqrt();
+        worst = worst.max((n - 1.0).abs());
+        for d in (c + 1)..4 {
+            worst = worst.max(dot(&q[c], &q[d]).abs());
+        }
+    }
+    worst
+}
+
+/// The S4A parabola fixture (vertex seed).
+fn parabola_system() -> (SquareSystem3, [f64; 4]) {
+    let sys = two_graph(&net_parabola(16.0), -0.3);
+    let u0 = 1.0f64 / 2.0f64.sqrt();
+    (sys, seed_unit(u0, 0.0))
+}
+
+/// The S4A isolated-node fixture `g = (u − ua)(v − vb)` with the node one
+/// floor half-arc ahead of the seed on the `u = ua` branch.
+fn isolated_node_system() -> (SquareSystem3, [f64; 4]) {
+    let ua = 0.3f64;
+    let v0 = (0.5f64 - ua * ua).sqrt();
+    let floor = 0.05 * 0.5f64.powi(3);
+    let vb = v0 + (floor / 2.0) / 2.0f64.sqrt();
+    let sys = two_graph(&net_nodes(ua, &[vb]), 0.0);
+    (sys, seed_unit(ua, v0))
+}
+
+/// A straight-branch S4A fixture (`g = v0 − v`, marching toward the `u = 0`
+/// boundary from `u0 = 0.2`).
+fn straight_system() -> (SquareSystem3, [f64; 4]) {
+    let u0 = 0.2f64;
+    let v0 = (0.5f64 - 0.04).sqrt();
+    let sys = two_graph(&[vec![v0, v0 - 1.0]], 0.0);
+    (sys, seed_unit(u0, v0))
+}
+
+/// The clamped three-node S4A cluster (`u = ua` with three `v` nodes in one
+/// floor arc).
+fn three_node_system() -> (SquareSystem3, [f64; 4]) {
+    let ua = 0.5f64;
+    let v0 = (0.5f64 - ua * ua).sqrt();
+    let floor = 0.05 * 0.5f64.powi(3);
+    let r2 = 2.0f64.sqrt();
+    let vbs: Vec<f64> = [0.15f64, 0.5, 0.85]
+        .iter()
+        .map(|f| v0 + f * floor / r2)
+        .collect();
+    let sys = two_graph(&net_nodes(ua, &vbs), 0.0);
+    (sys, seed_unit(ua, v0))
+}
+
+/// `g = (v − v*)²`: a tangential line at `v = v*` (rank 2 along it).
+fn net_tangent_line(vstar: f64) -> Vec<Vec<f64>> {
+    let c = [
+        vstar * vstar,
+        vstar * vstar - vstar,
+        (1.0 - vstar) * (1.0 - vstar),
+    ];
+    vec![c.to_vec()]
+}
+
+#[test]
+fn frame_two_pass_orthonormality_near_degenerate_seeds() {
+    // Seeds approaching a rank-collapse point must either build an
+    // orthonormal frame (two-pass Gram-Schmidt drives the residual dots below
+    // the TOL_JACOBIAN gate) or refuse Conditioning (Inconclusive) when the
+    // input is genuinely near-rank-collapse. They must NEVER produce a frame
+    // the frozen gate rejects (ClaimRefuted) nor a non-orthonormal frame.
+    //
+    // The tangential-line family (`g = (v − v*)²`) has rank 2 exactly on the
+    // line `v = v*`, so the kernel direction `m` shrinks as the seed
+    // approaches it and the build must end in a Conditioning refusal; the
+    // isolated-node family keeps full rank but degenerates at the node. On
+    // every seed that still builds, the two-pass basis must clear the gate.
+    let mut built = 0usize;
+    let mut refused_conditioning = 0usize;
+
+    let vt = 0.5f64;
+    let line = two_graph(&net_tangent_line(vt), 0.0);
+    for d in [1e-1, 1e-2, 1e-4, 1e-6, 1e-8, 1e-10, 1e-12, 1e-13, 1e-14] {
+        let u = (0.5f64 - (vt + d) * (vt + d)).sqrt();
+        if !(u > 0.0 && u < 1.0) {
+            continue;
+        }
+        match build_frame4(&line, seed_unit(u, vt + d)) {
+            Ok((frame, _m)) => {
+                built += 1;
+                assert_orthonormal(&frame.q);
+            }
+            Err(refusal) => {
+                assert_eq!(refusal.kind, RefusalKind::Conditioning);
+                assert_eq!(
+                    refusal.backing,
+                    truck_certified::kernel::evidence::VerdictClass::Inconclusive
+                );
+                refused_conditioning += 1;
+            }
+        }
+    }
+
+    let (node_sys, _) = isolated_node_system();
+    let ua = 0.3f64;
+    let v0 = (0.5f64 - ua * ua).sqrt();
+    let vb = v0 + (0.05 * 0.5f64.powi(3) / 2.0) / 2.0f64.sqrt();
+    for d in [1e-2, 1e-5, 1e-7, 1e-9, 1e-10, 1e-12] {
+        let v_seed = vb - d;
+        if !(v_seed > 0.0 && v_seed < 1.0) {
+            continue;
+        }
+        match build_frame4(&node_sys, seed_unit(ua, v_seed)) {
+            Ok((frame, _m)) => {
+                built += 1;
+                assert_orthonormal(&frame.q);
+            }
+            Err(refusal) => {
+                assert_eq!(refusal.kind, RefusalKind::Conditioning);
+                refused_conditioning += 1;
+            }
+        }
+    }
+
+    assert!(
+        built >= 3,
+        "several approaching seeds must build orthonormal frames (built {built})"
+    );
+    assert!(
+        refused_conditioning >= 1,
+        "at least one genuinely near-rank-collapse seed must refuse Conditioning"
+    );
+}
+
+#[test]
+fn frame_conditioning_rebuild_gate_uses_kappa_max() {
+    // The frame's kappa estimate (the measure the tube seam compares against
+    // KAPPA_MAX) must be finite and the rebuild-recommended flag must toggle
+    // exactly at the KAPPA_MAX bound (spec §0.4/§10.1). The gate itself stays
+    // the orthonormality check: a rebuild-recommended frame is still built.
+    let (sys, _) = isolated_node_system();
+    let ua = 0.3f64;
+    let v0 = (0.5f64 - ua * ua).sqrt();
+    let vb = v0 + (0.05 * 0.5f64.powi(3) / 2.0) / 2.0f64.sqrt();
+
+    // Far from the node the frame is well conditioned; sweeping toward the
+    // node the kappa estimate grows and eventually crosses KAPPA_MAX while the
+    // frame still builds orthonormal.
+    let mut saw_rebuild_recommended = false;
+    for d in [1e-1, 1e-2, 1e-3, 1e-4, 1e-5, 1e-6, 1e-7, 1e-8] {
+        let v_seed = vb - d;
+        if !(v_seed > 0.0 && v_seed < 1.0) {
+            continue;
+        }
+        match frame4_kappa_report(&sys, seed_unit(ua, v_seed)) {
+            Ok((frame, report)) => {
+                assert!(
+                    report.kappa.is_finite() && report.kappa > 0.0,
+                    "kappa must be finite and positive"
+                );
+                assert_eq!(
+                    report.rebuild_recommended,
+                    report.kappa > config::KAPPA_MAX,
+                    "rebuild_recommended must be exactly (kappa > KAPPA_MAX)"
+                );
+                assert!(
+                    max_dot(&frame.q) <= config::TOL_JACOBIAN,
+                    "a rebuild-recommended frame still builds orthonormal to the gate"
+                );
+                if report.rebuild_recommended {
+                    saw_rebuild_recommended = true;
+                }
+            }
+            Err(_) => break,
+        }
+    }
+    assert!(
+        saw_rebuild_recommended,
+        "some seed approaching the node must report kappa > KAPPA_MAX before the frame \
+         refuses Conditioning"
+    );
+}
+
+/// A scratch reach probe over the engine-level fixture family.
+#[test]
+fn tube_reach_envelope_measured_and_published() {
+    let mut table: Vec<(&str, ProbeRow)> = Vec::new();
+    let straight = straight_system();
+    let parabola = parabola_system();
+    let isolated = isolated_node_system();
+    let three = three_node_system();
+
+    for (name, (sys, seed)) in [
+        ("straight", &straight),
+        ("parabola_k16", &parabola),
+        ("isolated_node", &isolated),
+        ("three_node_cluster", &three),
+    ] {
+        let report = tube_reach_probe(sys, *seed);
+        println!(
+            "REACH {name:>20}: ok={} reach={:.6e} chart_lim={} no_reach={} kappa={:.3e} \
+             rebuild={} perp_width={:.6e} perp_min={:.6e} perp_ratio={:.3} note={:?}",
+            report.frame_ok,
+            report.tau_reach,
+            report.tau_reach_chart_limited,
+            report.no_reach,
+            report.frame_kappa,
+            report.rebuild_recommended,
+            report.perp_probe_width,
+            report.perp_half_min,
+            report.perp_ratio_min,
+            report.note,
+        );
+        table.push((name, row(&report)));
+    }
+
+    // The wrapped/closed branch: the shim kit's circle (ssi closed_loop_pair),
+    // seeded at the top of the loop.
+    match closed_loop_pair() {
+        Ok(fx) => {
+            let seed = [
+                fx.first_seed.0,
+                fx.first_seed.1,
+                fx.first_seed.2,
+                fx.first_seed.3,
+            ];
+            let report = tube_reach_probe(&fx.system, seed);
+            println!(
+                "REACH {:>20}: ok={} reach={:.6e} chart_lim={} no_reach={} kappa={:.3e} \
+                 rebuild={} perp_width={:.6e} perp_min={:.6e} perp_ratio={:.3} note={:?}",
+                "closed_loop_circle",
+                report.frame_ok,
+                report.tau_reach,
+                report.tau_reach_chart_limited,
+                report.no_reach,
+                report.frame_kappa,
+                report.rebuild_recommended,
+                report.perp_probe_width,
+                report.perp_half_min,
+                report.perp_ratio_min,
+                report.note,
+            );
+            table.push(("closed_loop_circle", row(&report)));
+        }
+        Err(err) => panic!("the closed-loop shim fixture must construct: {err:?}"),
+    }
+
+    // Published envelope assertions (the machine-checked table below is the
+    // characterization; the bands record the measured envelope, spec §18).
+    for (name, r) in &table {
+        println!(
+            "REACH_TABLE {name}: reach={:.6e} no_reach={} perp_ratio={:.3}",
+            r.reach, r.no_reach, r.perp_ratio
+        );
+    }
+    let probe = |name: &str| -> ProbeRow {
+        table
+            .iter()
+            .find(|(n, _)| *n == name)
+            .map(|(_, r)| *r)
+            .unwrap_or_else(|| panic!("{name} must be probed"))
+    };
+
+    // Straight linear branch: a real certified forward arc exists, and the
+    // minimum perpendicular half width is ~2.5-3x the tau width (the S4A "3x"
+    // observation confirmed within measurement).
+    let s = probe("straight");
+    assert!(
+        !s.no_reach && s.reach > 0.05 && s.reach < 0.15,
+        "straight reach measured {}",
+        s.reach
+    );
+    assert!(
+        s.perp_ratio > 2.0 && s.perp_ratio < 3.2,
+        "straight minimum perp ratio measured {}",
+        s.perp_ratio
+    );
+
+    // Quadratic (k=16) hard part: no positive width certifies down to the
+    // probe floor (measured 0) — the S4A observation, published as measured.
+    let p = probe("parabola_k16");
+    assert!(
+        p.no_reach && p.reach == 0.0,
+        "parabola reach must measure 0"
+    );
+
+    // Isolated node: a tiny certified arc exists before the node's rank
+    // collapse, below the tracer's dtau floor.
+    let n = probe("isolated_node");
+    assert!(
+        !n.no_reach && n.reach > 1e-6 && n.reach < 1e-3,
+        "isolated-node reach measured {}",
+        n.reach
+    );
+
+    // Three-node cluster: the seed's frame is beyond KAPPA_MAX conditioning
+    // (rebuild-recommended) and no arc certifies — the honest no-reach line.
+    let c = probe("three_node_cluster");
+    assert!(
+        c.no_reach && c.reach == 0.0,
+        "three-node reach must measure 0"
+    );
+
+    // Wrapped/closed (circle) branch: no positive width certifies down to the
+    // probe floor (measured 0) — the S4A observation, published as measured.
+    let w = probe("closed_loop_circle");
+    assert!(w.no_reach && w.reach == 0.0, "circle reach must measure 0");
+}
+
+#[derive(Debug, Clone, Copy)]
+struct ProbeRow {
+    reach: f64,
+    no_reach: bool,
+    perp_ratio: f64,
+}
+
+fn row(r: &truck_certified::kernel::engine::ProbeReport) -> ProbeRow {
+    ProbeRow {
+        reach: r.tau_reach,
+        no_reach: r.no_reach,
+        perp_ratio: r.perp_ratio_min,
+    }
+}
