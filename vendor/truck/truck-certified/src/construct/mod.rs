@@ -89,6 +89,11 @@ pub mod residual_solve;
 /// and the collocation solve through the P1 banded factor.
 pub mod loft;
 
+/// The Gordon Boolean-sum construction (CC-015-GORDON, spine S8 consumer):
+/// `S = S_u + S_v − S_uv` over a compatible profile/guide network, reusing the
+/// CC-010 loft machinery and its two direction factorizations.
+pub mod gordon;
+
 /// The seam stub types (S6/S9/S10/S11/S12): frozen shapes and refusing
 /// constructors only, no production logic.
 pub mod stubs;
