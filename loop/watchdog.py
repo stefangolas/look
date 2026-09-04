@@ -149,8 +149,34 @@ def redispatch(slot_dir, slot_no, reason):
         log(f"CRITICAL slot {slot_no}: restart budget exhausted for {packet} "
             f"({count}); leaving it for the orchestrator")
         return
+    # Session-51 self-diagnosis (owner directive): from the second restart
+    # of the same packet on, autopsy the dead sessions first. Some killers
+    # (RAM pressure, provider balance) kill the next run too - redispatch
+    # would only burn the budget. RAM_PRESSURE defers; balance stops.
+    strategy = "fresh"
+    if count >= 1:
+        try:
+            out = subprocess.run(
+                [sys.executable, str(ROOT / "loop" / "autopsy.py"),
+                 str(slot_no)],
+                capture_output=True, text=True, timeout=120, cwd=str(ROOT))
+            verdict = (out.stdout or "").strip().splitlines()
+            verdict = verdict[-1] if verdict else "NO_EVIDENCE"
+        except Exception as exc:  # noqa: BLE001
+            verdict = f"NO_EVIDENCE (autopsy failed: {exc})"
+        log(f"ACTION slot {slot_no}: autopsy: {verdict}")
+        if verdict.startswith("RAM_PRESSURE"):
+            log(f"DEFERRED slot {slot_no}: autopsy says RAM_PRESSURE - not "
+                f"spending restart {count + 1}; will retry next poll")
+            return
+        if "balance" in verdict.lower():
+            log(f"CRITICAL slot {slot_no}: autopsy says provider balance - "
+                f"not redispatching; orchestrator must reup")
+            return
+        if count == 1 and "resume-interrupted" in verdict:
+            strategy = "resume"
     log(f"ACTION slot {slot_no}: {reason}; killing and redispatching {packet} "
-        f"(restart {count + 1}/{MAX_RESTARTS})")
+        f"(restart {count + 1}/{MAX_RESTARTS}, strategy={strategy})")
     pid = None
     try:
         pid = int((slot_dir / "worker.pid").read_text().strip() or 0)
@@ -159,12 +185,17 @@ def redispatch(slot_dir, slot_no, reason):
     if pid:
         kill_tree(pid)
         time.sleep(3)
+    argv = [sys.executable, str(ROOT / "loop" / "run_packet.py"),
+            "--slot", str(slot_no), "--packet", packet]
+    if strategy == "resume":
+        # Death recovery: continue the dead session in its own worktree -
+        # the WIP stays, the context survives, no cold re-read.
+        argv.append("--resume-interrupted")
+    else:
+        argv.append("--reset")
     try:
-        out = subprocess.run(
-            [sys.executable, str(ROOT / "loop" / "run_packet.py"),
-             "--slot", str(slot_no), "--packet", packet, "--reset"],
-            capture_output=True, text=True, timeout=300, cwd=str(ROOT),
-        )
+        out = subprocess.run(argv, capture_output=True, text=True,
+                             timeout=300, cwd=str(ROOT))
         tail = (out.stdout or "").strip().splitlines()
         log(f"ACTION slot {slot_no}: redispatch output: "
             + (tail[-1] if tail else "(none)"))

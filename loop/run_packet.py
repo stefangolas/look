@@ -239,6 +239,11 @@ def main():
                          "-s) instead of a fresh context -- the amendment "
                          "path: the prior worker already knows the code, the "
                          "packet and its own prior findings")
+    ap.add_argument('--resume-interrupted', action='store_true',
+                    help='death-recovery resume: same session continuation as '
+                         '--resume, but the lead tells the worker its session '
+                         'was interrupted mid-run with WIP still in the '
+                         'worktree (the watchdog recovery path)')
     ap.add_argument('--session-id',
                     help='explicit session id to resume (overrides --resume)')
     ap.add_argument('--context-diff',
@@ -333,7 +338,7 @@ def main():
     resume_session = None
     if args.session_id:
         resume_session = args.session_id.strip()
-    elif args.resume:
+    elif args.resume or args.resume_interrupted:
         resume_session = first_session_id(events_log)
         if not resume_session:
             sys.exit('--resume: no sessionID in this slot\'s events.jsonl (the '
@@ -341,9 +346,19 @@ def main():
                      'rotated away). Dispatch without --resume, or pass '
                      '--session-id explicitly.')
 
-    lead = ("You are continuing your previous session in this repository; your "
-            "earlier work is committed on this branch and the packet amends "
-            "it. " if resume_session else "")
+    if args.resume_interrupted:
+        lead = ("Your previous session in this repository was INTERRUPTED "
+                "mid-run (process died or hung; this is a recovery resume). "
+                "Your work-in-progress is still in the worktree, possibly "
+                "uncommitted. Re-orient by reading PACKET.md and checking "
+                "git status; do NOT redo work you already did; continue the "
+                "packet to completion. ")
+    elif resume_session:
+        lead = ("You are continuing your previous session in this repository; "
+                "your earlier work is committed on this branch and the packet "
+                "amends it. ")
+    else:
+        lead = ""
     packet_text = (lead +
                    "Read the files PACKET.md and CONTEXT.md in the root of this "
                    "repository and carry out the work packet PACKET.md describes, "
