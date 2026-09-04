@@ -53,6 +53,9 @@ pub mod analytic;
 pub mod bspline;
 /// BG-ENC-002-CIRCLE: the carrier impl. Scaffolded empty; the packet fills it.
 pub mod circle;
+/// CC-004-CLEAR: the P5 ball-clearance predicate over the `ImplicitField`
+/// carriers and the box-level distance substrate.
+pub mod clear;
 /// BG-ENC-002-CONE: the carrier impl. Scaffolded empty; the packet fills it.
 pub mod cone;
 /// BG-SOL-S3-CONTACT: the Contact Layer skeleton. Scaffolded empty; the
