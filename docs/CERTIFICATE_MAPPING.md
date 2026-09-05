@@ -76,6 +76,24 @@ not two widenings of the same evidence types (certified plan X1).
 | Class-4 manifold consumption | landed `ManifoldDiagnostics` + `orientation_parity` (`truck-topology/src/manifold.rs`, CG-006) | Consumed substrate — the certified class-4 stage reads the aggregate; it never re-emits a parallel diagnostics type. |
 | Certified outcome layers (`formal/{outcome,evidence}.rs`, four layers; promoted to `truck-certified` in Phase 0) | the certified layer's own outcome shape | Maps onto the tri-state doctrine (§9.7): certified layers → `CERTIFIED_WITHIN_TOLERANCE`; failed layers → `FAILED`; unresolved layers → `INCONCLUSIVE`. `INCONCLUSIVE` is never converted into success in either program. |
 
+## D. BIE-000 bookings (Certified Interaction Engine shim)
+
+The Certified Interaction Engine program (`docs/BIE_BUILD_SPINE.md`,
+`docs/CERTIFIED_INTERACTION_ENGINE_BUILD_SPEC.md`) books its contract rows into
+this same table. The shim packet BIE-000-CONTRACT lands the restricted-pair
+outcome vocabulary, records the §8.1 carrier decision, and ships a unit-shape
+fixture kit whose ground truths later BIE wave tests are graded against. All
+rows here were dispatched against the tree 2026-09-05 (evidence.rs anchors
+`pub enum Refusal` at 1, `NumericallyUnresolved` at 2).
+
+| BIE evidence kind | Carrier | Booking |
+|---|---|---|
+| Restricted-pair unresolved verdict `InteractionOutcome::Unresolved { kappa, cell, slope }` | `Refusal::NumericallyUnresolved { spent: Budget::new(0, 0, 0), witness: UnresolvedWitness::KrawczykIndeterminate }` | NO new top-level `Refusal` variants and NO new `UnresolvedWitness` variants. The κ / cell / slope witness is first-class on the engine's own `InteractionOutcome::Unresolved` arm (it stays in the engine vocabulary); the landed projection records the refusal class only, for routing through machinery that consumes the landed taxonomy. The witness is `KrawczykIndeterminate` because the restricted-pair solver (BIE-002) raises an unresolved verdict exactly when its slicewise Krawczyk operator proves neither existence nor absence on a box — the closest landed arm of the same epistemic shape. The `Refused` arm is a real landed `Refusal`, passed through unchanged (`From<Refusal>`); a `Certified` answer carries no landed refusal. Both `NumericallyUnresolved` sites (`truck-base/src/evidence.rs`, enum arm and the `Budget::spend_*` doc) anchor the shape. |
+| Restricted-pair certified value (a certified scalar/point answer, e.g. a section circle's centre/radius) | `InteractionOutcome::Certified(CertificateValue)` where `CertificateValue` carries an explicit `Method` tag | `CertificateValue` is a BIE value type in `truck-certified/src/construct/bie/mod.rs`: a certified scalar or point with the producing `Method` (H-6 — float-derived closed forms are tagged `Method::Float`, never `Exact`). There is deliberately no `From<f64>`/`From<Point3>`: a `Certified` answer is never fabricated from raw floats without an explicit `Method`. |
+| Restricted-pair parameter cell witness | `WitnessCell` (`(u, v) × (s, t)` four-interval box) in `construct/bie/mod.rs` | The `Unresolved` verdict's `cell` field. The cell label convention is per-side and not semantically load-bearing; it is the product-domain box the solver bisects (the shape BIE-001's `IntervalBox4` refines). |
+| §8.1 procedural interaction carrier — **carrier decision (pre-decided, recorded)** | `CertifiedImplicitIntersectionCurve`: a NEW canonical `Curve` variant in `truck-geometry/src/canonical.rs`, landed by BIE-003 (NOT BIE-000) | Carries a certified 3-D polyline with per-sample tangent frames plus the unresolved witness slot. Mirrors the landed `Curve::IntersectionCurve` boxed-variant pattern (canonical.rs); PL-at-tessellation only (`EdgeSampleLedger`-compatible; truck-meshalgo read-only). BIE-000 records this decision; the tree evidence that the record is sound is the landed `IntersectionCurve` canonical variant, which the additive variant ripple copies. |
+| Unit-shape fixture kit ground truths | BIE fixture records in `construct/bie/fixtures.rs` (`#[doc(hidden)] pub`, TEST SUPPORT ONLY) | plane × sphere (section circle: centre = perpendicular foot `c − δ·n`, radius `sqrt(R² − δ²)`, `δ = (c − o)·n`); plane × cylinder (section ellipse: semi-axes `r` and `r/|sin θ|`, `θ` the incidence vs the axis); sweep × plane (straight-spine `Scale`-of-a-circle sweep unit shape: section is the ring at the station `s*` selected by the plane equation, circle of radius `radius(s*)` about `C(s*)`). Ground truths are closed-form constants, tagged `Method::Float`, machine-checked in-module under `// H-3` discipline; no solver is called to build or check a fixture. Determinism: the whole kit builds from ordered dyadic data — two constructions compare equal. |
+
 ## Standing rules (both programs)
 
 1. **H-6 method rule.** `Method ∈ {Exact, Interval, Float, None}`

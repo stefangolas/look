@@ -184,3 +184,9 @@ pub mod thickness;
 /// on four counts (boundary, G¹ ribbons, local regularity, global
 /// embeddedness).
 pub mod setback;
+
+/// The Certified Interaction Engine contract shim (BIE-000-CONTRACT): the
+/// frozen restricted-pair outcome vocabulary, the recorded §8.1 carrier
+/// decision, and the unit-shape fixture kit that later BIE wave packets build
+/// their synthetic fixtures and grading tests against.
+pub mod bie;
