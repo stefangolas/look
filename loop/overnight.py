@@ -228,7 +228,7 @@ def try_land(slot_dir, slot_no, rows, order, reg_path):
 
 def all_landed(rows):
     prog = [r for r in rows.values()
-            if r["id"].startswith(("BG-KV2-", "CC-", "BIE-"))]
+            if r["id"].startswith(("BG-KV2-", "CC-", "BIE-", "CTE-"))]
     if not prog:
         return False  # vacuous truth fired the premature battery (session 51)
     return all(LANDED_RE.search((r.get("note") or "").lower())
@@ -331,11 +331,11 @@ def battery(rows, order, reg_path):
     log(f"battery kernel-gates: exit {gates.returncode}")
     if all(v == 0 for v in results.values()):
         for pid in rows:
-            if pid.startswith(("BG-KV2-", "CC-")):
+            if pid.startswith(("BG-KV2-", "CC-", "CTE-")):
                 rows[pid]["status"] = "DONE"
         save_registry(rows, order, reg_path)
         git(["add", "loop/PACKETS.jsonl"])
-        git(["commit", "-m", "loop: the battery passed - all KV2 rows "
+        git(["commit", "-m", "loop: the battery passed - all KV2/CTE rows "
                             "flip DONE (one-verify amendment satisfied)"])
         log("BATTERY GREEN: all rows flipped DONE. Program pending only "
             "the morning STATE rewrite.")

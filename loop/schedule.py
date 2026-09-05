@@ -57,7 +57,14 @@ def max_parallel(cands, running=()):
     chosen = list(running)
     picked = []
     for r in cands:
-        if not any(overlaps(r['writes'], c['writes']) for c in chosen):
+        # .get: the BIE rows were registered without `writes` (and with the
+        # `clas` typo) - a hard key here crashed the frontier tool on the
+        # live registry. A write-set-less row cannot be collision-checked,
+        # so it is held back (fail-closed) rather than assumed disjoint.
+        rw = r.get('writes')
+        if rw is None:
+            continue
+        if not any(overlaps(rw, c.get('writes', [])) for c in chosen):
             chosen.append(r)
             picked.append(r)
     return picked
@@ -81,15 +88,18 @@ if __name__ == '__main__':
     par = max_parallel(cands, running)
     print(f"eligible now: {len(cands)}  dispatchable in parallel: {len(par)}")
     for r in par:
-        print(f"  {r['id']:<28} {r['class']:<16} {r['wave']}")
+        print(f"  {r['id']:<28} {r.get('class', r.get('clas', '?')):<16} "
+              f"{r.get('wave', '?')}")
     blocked = [r for r in cands if r not in par]
     if blocked:
-        print("held back by write-set collision:")
+        print("held back by write-set collision (or missing write set):")
         for r in blocked:
-            hit = next(c['id'] for c in list(running) + par
-                       if overlaps(r['writes'], c['writes']))
+            hit = next((c['id'] for c in list(running) + par
+                        if overlaps(r.get('writes', []), c.get('writes', []))),
+                       '(missing writes / unknown)')
             print(f"  {r['id']:<28} collides with {hit}")
     print()
-    w = collections.Counter(r['wave'] for r in ROWS)
+    w = collections.Counter(r.get('wave', '?') for r in ROWS)
     print("packets per wave:", dict(sorted(w.items())))
-    print("by class:", dict(collections.Counter(r['class'] for r in ROWS)))
+    print("by class:", dict(collections.Counter(
+        r.get('class', r.get('clas', '?')) for r in ROWS)))
