@@ -40,7 +40,7 @@ budget:      {turns: 34, ctx_tokens: 110000}
 anchors:
   - {id: A1, expect: 1, cmd: "grep -c 'normal: tangent.cross(binormal)' vendor/truck/truck-geometry/src/constructive/frame_up.rs"}
   - {id: A2, expect: 1, cmd: "grep -c 'architectural_up_handedness_inverts_the_solid' showcases/tests/battery_waterslide.rs"}
-  - {id: A3, expect: 1, cmd: "grep -c 'scale_touches_zero' vendor/truck/truck-modeling/src/spine_sweep.rs"}
+  - {id: A3, expect: 2, cmd: "grep -c 'scale_touches_zero' vendor/truck/truck-modeling/src/spine_sweep.rs"}
   - {id: A4, expect: 1, cmd: "grep -c 'through_zero_scale_facet_path_behavior' showcases/tests/battery_construction.rs"}
   - {id: A5, expect: 1, cmd: "grep -c 'correspondence_mismatch_facet_path_behavior' showcases/tests/battery_construction.rs"}
   - {id: A6, expect: 1, cmd: "grep -c 'pub fn try_interpole' vendor/truck/truck-geometry/src/nurbs/bspcurve.rs"}
