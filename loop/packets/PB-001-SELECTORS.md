@@ -28,7 +28,7 @@ tests_required:
   - centroid_and_aabb_match_brute
   - axis_sort_group_filter_semantics
   - edge_resolution_names_blend_targets
-budget:      {turns: 50, ctx_tokens: 120000}
+budget:      {turns: 80, ctx_tokens: 180000}
 ```
 
 **New file** (`selectors.rs`): H-1 applies.
