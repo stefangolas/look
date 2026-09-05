@@ -125,3 +125,8 @@ pub mod graphdisk;
 /// k=1 face, k=2 edge (canal), and k=3 corner (triple-node) strata with their
 /// certified reach bounds and per-stratum refusals.
 pub mod offset_strata;
+
+/// The two-support rolling-ball blend trace (CC-030-BLEND-SPINE, seam S12):
+/// the certified predictor/corrector walk of each branch to its certified
+/// events, with event isolation and the P6 shared-node discipline.
+pub mod blend;
