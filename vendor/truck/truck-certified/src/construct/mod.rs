@@ -98,6 +98,11 @@ pub mod loft;
 /// weight field, refining dyadically and returning the applied refinements.
 pub mod loft_weights;
 
+/// The closed-wire loft as strips (CC-012-LOFT-STRIPS, spine S8/S9 consumer):
+/// r strip lofts over matched edges sharing one banded factorization, with
+/// P6 identity-keyed split values and a bitwise seam gate between strips.
+pub mod loft_strips;
+
 /// The Gordon Boolean-sum construction (CC-015-GORDON, spine S8 consumer):
 /// `S = S_u + S_v − S_uv` over a compatible profile/guide network, reusing the
 /// CC-010 loft machinery and its two direction factorizations.
