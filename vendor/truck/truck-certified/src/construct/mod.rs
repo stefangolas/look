@@ -146,3 +146,10 @@ pub mod blend;
 /// §5.3): the amended CC-030 walk closed by the foot-point pair of a certified
 /// guide curve and radius law, with the foot-point uniqueness gate (Section 1).
 pub mod blend_varradius;
+
+/// The n-valent corner setback patch (CC-033-SETBACK, Phase D, spine S6/S3
+/// consumers / theory §5.5): the deterministic corner-advance fill of a 2n
+/// sided corner loop with Hermite ribbon patches per boundary arc, certified
+/// on four counts (boundary, G¹ ribbons, local regularity, global
+/// embeddedness).
+pub mod setback;
