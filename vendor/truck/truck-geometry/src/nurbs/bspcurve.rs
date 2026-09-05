@@ -296,7 +296,7 @@ impl<P: ControlPoint<f64>> BSplineCurve<P> {
         control_points: &[P],
         parameter_points: &[(f64, P)],
     ) -> Result<()> {
-        if !(data_extent > 0.0) {
+        if data_extent <= 0.0 || data_extent.is_nan() {
             // Degenerate zero-extent data has no scale to overshoot against;
             // the constant interpolant the invertible solve must return needs
             // no extent gate.
