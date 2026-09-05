@@ -250,6 +250,103 @@ impl<P: ControlPoint<f64>> BSplineCurve<P> {
         true
     }
 
+    /// The boundedness admission factor of [`BSplineCurve::try_interpole`]
+    /// (NUM-INTERPOLE-OVERSHOOT-001). A solve whose control-point extent
+    /// exceeds `BOUND_FACTOR ×` the data extent is refused typed
+    /// (`Error::InterpolationNotSwVerified`) rather than delivered as a
+    /// silently-overshooting interpolant. Justified from the defect record's
+    /// scaling table: honest interpolants sit at O(1)× the data extent, the
+    /// measured defect at 10⁹× — a factor of 1e3 separates the regimes by six
+    /// orders of magnitude.
+    const BOUND_FACTOR: f64 = 1e3;
+
+    /// The Schoenberg–Whitney admission gate (NUM-INTERPOLE-OVERSHOOT-001).
+    ///
+    /// After ordering the stations ascending, the `k`-th basis function must be
+    /// nonzero at the `k`-th station: `M_{k,q}(v_{(k)}) != 0` for every station
+    /// (the collocation matrix cannot be invertible otherwise). A violation is a
+    /// typed `Error::InterpolationNotSwVerified { at }` — never a panic, never a
+    /// silent accept. `rows[i]` is the full basis-value row of station `i` in the
+    /// caller's order (as `try_interpole` built it for the solve).
+    fn check_schoenberg_whitney(rows: &[Vec<f64>], stations: &[(f64, P)]) -> Result<()> {
+        let mut order: Vec<usize> = (0..stations.len()).collect();
+        order.sort_by(|&a, &b| {
+            stations[a]
+                .0
+                .partial_cmp(&stations[b].0)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
+        for (k, &station) in order.iter().enumerate() {
+            if rows[station][k] == 0.0 {
+                return Err(Error::InterpolationNotSwVerified {
+                    at: stations[station].0,
+                });
+            }
+        }
+        Ok(())
+    }
+
+    /// The boundedness admission gate (NUM-INTERPOLE-OVERSHOOT-001), run on the
+    /// DELIVERED control points after the solve: if `control_extent >
+    /// BOUND_FACTOR × data_extent` the near-singular no-pivot solve has
+    /// produced a wildly overshooting interpolant, refused typed. `at` locates
+    /// the station of the control point that reaches the extreme coordinate.
+    fn check_control_extent(
+        data_extent: f64,
+        control_points: &[P],
+        parameter_points: &[(f64, P)],
+    ) -> Result<()> {
+        if !(data_extent > 0.0) {
+            // Degenerate zero-extent data has no scale to overshoot against;
+            // the constant interpolant the invertible solve must return needs
+            // no extent gate.
+            return Ok(());
+        }
+        let mut lo = vec![f64::INFINITY; P::DIM];
+        let mut hi = vec![f64::NEG_INFINITY; P::DIM];
+        let mut worst = 0usize;
+        for (i, p) in control_points.iter().enumerate() {
+            for d in 0..P::DIM {
+                if p[d] < lo[d] {
+                    lo[d] = p[d];
+                }
+                if p[d] > hi[d] {
+                    hi[d] = p[d];
+                    worst = i;
+                }
+            }
+        }
+        let mut control_extent = 0.0f64;
+        for d in 0..P::DIM {
+            control_extent = control_extent.max(hi[d] - lo[d]);
+        }
+        if control_extent > Self::BOUND_FACTOR * data_extent {
+            return Err(Error::InterpolationNotSwVerified {
+                at: parameter_points[worst].0,
+            });
+        }
+        Ok(())
+    }
+
+    /// The per-dimension L∞ span of a point set, as a single scalar: the
+    /// maximum coordinate range over every axis. Translation-invariant and
+    /// cheap (no pairwise metric required).
+    fn coordinate_extent(points: &[(f64, P)]) -> f64 {
+        let mut lo = vec![f64::INFINITY; P::DIM];
+        let mut hi = vec![f64::NEG_INFINITY; P::DIM];
+        for &(_, p) in points {
+            for d in 0..P::DIM {
+                lo[d] = lo[d].min(p[d]);
+                hi[d] = hi[d].max(p[d]);
+            }
+        }
+        let mut extent = 0.0f64;
+        for d in 0..P::DIM {
+            extent = extent.max(hi[d] - lo[d]);
+        }
+        extent
+    }
+
     /// Interpole by B-spline curve with the knot vector `knot_vec`.
     /// # Examples
     /// ```
@@ -268,6 +365,14 @@ impl<P: ControlPoint<f64>> BSplineCurve<P> {
     ///     assert_near!(curve.subs(t), p);
     /// });
     /// ```
+    ///
+    /// # Failures (NUM-INTERPOLE-OVERSHOOT-001)
+    /// - The caller's knot vector violates the Schoenberg–Whitney condition
+    ///   (the `at`-th basis function is zero at the `at`-th station after
+    ///   ordering) → `Error::InterpolationNotSwVerified { at }`.
+    /// - The solved control points overshoot the data extent by more than
+    ///   `BOUND_FACTOR ×` → the same typed refusal. No pivoting is performed;
+    ///   the solve itself is unchanged, so valid inputs are bit-identical.
     pub fn try_interpole(
         knot_vec: KnotVec,
         mut parameter_points: impl AsMut<[(f64, P)]>,
@@ -291,6 +396,17 @@ impl<P: ControlPoint<f64>> BSplineCurve<P> {
             })
             .collect::<Result<Vec<_>>>()?;
 
+        // The Schoenberg–Whitney admission gate runs before the solve: a knot
+        // vector that violates it cannot yield an invertible collocation
+        // system, so the refusal is the typed admission error rather than a
+        // downstream elimination artifact.
+        Self::check_schoenberg_whitney(&rows, parameter_points)?;
+
+        // The data extent, snapshotted before the solve overwrites the points
+        // in place (the boundedness gate compares the delivered controls
+        // against it).
+        let data_extent = Self::coordinate_extent(parameter_points);
+
         for i in 0..P::DIM {
             let mut rows = rows.clone();
             rows.iter_mut()
@@ -304,6 +420,10 @@ impl<P: ControlPoint<f64>> BSplineCurve<P> {
         }
 
         let control_points = parameter_points.iter().map(|(_, p)| *p).collect::<Vec<_>>();
+        // The boundedness admission gate on the delivered control points: an
+        // interpolant that wildly overshoots the data extent is not delivered
+        // as success.
+        Self::check_control_extent(data_extent, &control_points, parameter_points)?;
         Self::try_new(knot_vec, control_points)
     }
 

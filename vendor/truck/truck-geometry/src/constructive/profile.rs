@@ -31,6 +31,16 @@ impl ProfileLaw {
                 Ok(ring_point(profile, v) * c)
             }
             ProfileLaw::LinearCorrespondence { start, end } => {
+                // SEM-FACET-CORRESPONDENCE-TRUNCATION-001: a correspondence
+                // whose vertex counts differ is refused at EVALUATION time too,
+                // not only by `try_linear_correspondence` — a struct-literal
+                // law bypasses the constructor, and `zip` would silently
+                // truncate the longer profile. Correspondence is never
+                // inferred.
+                super::validation::validate_correspondence(
+                    start.vertices.len(),
+                    end.vertices.len(),
+                )?;
                 let interpolated = Profile2D {
                     vertices: start
                         .vertices

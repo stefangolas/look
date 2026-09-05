@@ -35,10 +35,11 @@ use truck_base::cgmath64::*;
 /// `derivative_at`, including `SpineNotC1` and out-of-domain `InvalidInput`)
 /// propagate unchanged, and a vanishing tangent refuses `ZeroTangent` at the
 /// parameter where it vanished. The frame is re-orthonormalized after every
-/// transition and satisfies the `Frame3` convention (`t × n == b`, unit
-/// lengths) at the emitted frame. A `refinement_level < 2` is structurally
-/// invalid (the grid arithmetic divides by `n - 1`) and refuses
-/// `ConstructError::InvalidInput`.
+/// transition, routed through the `Frame3` validated constructor (whose gate
+/// failure would surface as `FrameSingular` at `s`), and satisfies the `Frame3`
+/// convention (`t × n == b`, unit lengths) at the emitted frame. A
+/// `refinement_level < 2` is structurally invalid (the grid arithmetic divides
+/// by `n - 1`) and refuses `ConstructError::InvalidInput`.
 pub(super) fn parallel_transport(
     initial_normal: Vector3,
     spine: &dyn SpineCurve,
@@ -127,10 +128,15 @@ pub(super) fn parallel_transport(
         binormal = tangent.cross(normal);
     }
 
-    Ok(Frame3 {
-        tangent,
-        normal,
-        binormal,
+    // ORI-FRAME-ORTHONORMALITY-GATE-001: every frame law routes its result
+    // through the landed validated constructor, so the gate is structural, not
+    // per-law convention. The Bishop frame is rotation-minimizing and passes
+    // the gate by construction; routing it through `try_new` anyway keeps the
+    // law set uniform. `try_new` returns the SAME vectors it validated, so the
+    // transported frame's bits are unchanged on every input that passes.
+    Frame3::try_new(tangent, normal, binormal).map_err(|_| ConstructError::FrameSingular {
+        at: s,
+        law: "ParallelTransport",
     })
 }
 

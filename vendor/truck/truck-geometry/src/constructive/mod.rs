@@ -60,6 +60,7 @@ mod recipe;
 mod sampling;
 mod spine_ph;
 mod sweep_surface;
+pub mod validation;
 
 /// The orthonormal right-handed frame at one spine station.
 ///
@@ -127,15 +128,22 @@ impl Frame3 {
 
 /// Which frame law a recipe carries, and its normative semantics.
 ///
+/// Every law's constructor routes its result through [`Frame3::try_new`]
+/// (ORI-FRAME-ORTHONORMALITY-GATE-001); a triple that fails the gate is
+/// refused as `ConstructError::FrameSingular`, never emitted.
+///
 /// - `FixedPlane`: `t = C'/‖C'‖`, `b = normal`, `n = b × t`; refuse
-///   `‖C'‖ < tolerance`. Preferred for planar spines.
-/// - `ArchitecturalUp`: `b = normalize(up × t)`, `n = t × b`; refuse `up ∥ t`
-///   unless an explicit fallback policy is supplied. No silent frame rotation.
+///   `‖C'‖ < tolerance`. Orthonormal only while `t ⊥ b`, so a non-planar
+///   spine refuses in v1 (projection is a later amendment). Preferred for
+///   planar spines.
+/// - `ArchitecturalUp`: `b = normalize(up × t)`, `n = b × t` (so `t × n = b`,
+///   the right-handed completion); refuse `up ∥ t`. No silent frame rotation.
 /// - `ParallelTransport`: Bishop rotation-minimizing frame via the
 ///   double-reflection method; stable at zero curvature and inflections;
 ///   deterministic from `initial_normal`. Frenet framing is never the default.
 /// - `RadialAboutAxis`: analytic from the axis; rotated copies equivariant
-///   modulo floating-point.
+///   modulo floating-point. Orthonormal only while `t ⊥ n`, so a tangent with
+///   a radial component refuses.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum FrameLaw {
     /// Pin the binormal to a fixed plane normal (planar spines).

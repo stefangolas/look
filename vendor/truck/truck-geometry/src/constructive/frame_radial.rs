@@ -17,7 +17,8 @@ use truck_base::cgmath64::*;
 /// The `RadialAboutAxis` law: the normal is the unit perpendicular component
 /// of `spine_point − origin` away from the axis; the binormal is `t × n`.
 /// Refuses `FrameSingular` for the axis degeneracies listed in the module
-/// docs.
+/// docs, or when the completed triple fails the orthonormal right-handed
+/// `Frame3` gate (a spine tangent with a radial component refuses).
 pub(super) fn radial_about_axis(
     origin: Point3,
     axis: Vector3,
@@ -61,9 +62,15 @@ pub(super) fn radial_about_axis(
         });
     }
     let normal3 = radial / radial_mag;
-    Ok(Frame3 {
-        tangent,
-        normal: normal3,
-        binormal: tangent.cross(normal3),
+    let binormal = tangent.cross(normal3);
+    // ORI-FRAME-ORTHONORMALITY-GATE-001: every frame law routes its result
+    // through the landed validated constructor. The completed frame is
+    // orthonormal only while the spine tangent is perpendicular to the radial
+    // normal; a tangent with a radial component makes `b = t × n` sub-unit and
+    // the `Frame3` gate refuses — the typed `FrameSingular`, never a silently
+    // sheared cross-section.
+    Frame3::try_new(tangent, normal3, binormal).map_err(|_| ConstructError::FrameSingular {
+        at,
+        law: "RadialAboutAxis",
     })
 }

@@ -18,8 +18,9 @@
 //! clamping): `ProfileLaw::Constant` and `ProfileLaw::Scale`
 //! (non-through-zero uniform scale) with straight profile edges;
 //! `LinearCorrespondence` is accepted when both profiles are straight-edged
-//! with identical edge counts. Curved profile edges, through-zero scale, and
-//! mismatched correspondence refuse `ConstructError::InvalidInput` at the
+//! with identical edge counts. Curved profile edges, through-zero scale
+//! (refused by the shared `validate_scalar_law_range` window gate,
+//! `SEM-FACET-SCALE-ZERO-001`), and mismatched correspondence refuse at the
 //! entry — a booked boundary, not a bug. The spine may be any landed `SpineCurve`
 //! (the C1 gate is the landed `PolylineSpine` refusal, which fires during the
 //! recipe validation pass before any storage spine is converted); all four
@@ -37,8 +38,9 @@ use truck_base::evidence::{
     Budget, Certificate, Certified, ContradictionWitness, EnvelopeCase, Margin, Method, Modulus,
     Outcome, Prop, PropMap, Refusal, Truth,
 };
+use truck_geometry::constructive::validation::validate_scalar_law_range;
 use truck_geometry::constructive::{
-    ConstructError, DirectTolerance, FrameLaw, ProfileLaw, ScalarLaw, SpineCurve, SpineFrameRecipe,
+    ConstructError, DirectTolerance, FrameLaw, ProfileLaw, SpineCurve, SpineFrameRecipe,
     SpineFrameSweep,
 };
 
@@ -87,10 +89,12 @@ pub fn spine_sweep<S: SpineCurve + Into<Curve> + Clone>(
     match &recipe.profile_law {
         ProfileLaw::Constant(_) => {}
         ProfileLaw::Scale { scale, .. } => {
-            if scale_touches_zero(scale, s_first, s_last) {
-                // Through-zero scale collapses the profile (booked boundary):
-                // refuse `InvalidInput` at the entry, never silent clamping.
-                return Err(refuse(ConstructError::InvalidInput));
+            // Through-zero scale collapses the profile. The window check is
+            // the SHARED validator (SEM-FACET-SCALE-ZERO-001): both realization
+            // entries call `validate_scalar_law_range` over the station window,
+            // so backend symmetry is structural. Refusal envelope unchanged.
+            if let Err(error) = validate_scalar_law_range(scale, (s_first, s_last)) {
+                return Err(refuse(error));
             }
         }
         ProfileLaw::LinearCorrespondence { start, end } => {
@@ -274,20 +278,6 @@ fn profile_vertex_count(recipe: &SpineFrameRecipe<impl SpineCurve, ProfileLaw, F
 /// The ring parameter of profile vertex `j` out of `k`.
 fn ring_parameter(j: usize, k: usize) -> f64 {
     j as f64 / k as f64
-}
-
-/// Whether a `ScalarLaw` reaches zero anywhere on `[s_first, s_last]`: a sign
-/// change or an exact zero of the linear interpolation. A through-zero scale
-/// collapses the profile (refused at the entry, V1).
-fn scale_touches_zero(scale: &ScalarLaw, s_first: f64, s_last: f64) -> bool {
-    match *scale {
-        ScalarLaw::Constant(c) => c == 0.0,
-        ScalarLaw::Linear { start, end } => {
-            let a = start + (end - start) * s_first;
-            let b = start + (end - start) * s_last;
-            (a <= 0.0 && 0.0 <= b) || (b <= 0.0 && 0.0 <= a)
-        }
-    }
 }
 
 /// The construction-refusal mapping at the realization entry (CG-007's
