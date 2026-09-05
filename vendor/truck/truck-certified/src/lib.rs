@@ -28,6 +28,10 @@ pub mod interval;
 pub mod kernel;
 pub mod meshable;
 pub mod pair_dispatch;
+/// The spline-carrier admission layer (CL-000-SPLINE-ADMIT): the bridge from a
+/// landed `BSplineSurface` to the certified rational tensor-Bernstein engine
+/// (`ssi.rs`), plus the certified derivative enclosures spline faces need.
+pub mod patch_admit;
 pub mod source_evidence;
 pub mod ssi;
 #[doc(hidden)]

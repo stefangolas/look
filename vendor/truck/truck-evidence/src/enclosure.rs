@@ -19,7 +19,7 @@
 
 pub use inari::Interval;
 use truck_base::cgmath64::{InnerSpace, Point3, Vector3};
-use truck_geometry::nurbs::BSplineCurve;
+use truck_geometry::nurbs::{BSplineCurve, BSplineSurface, KnotVec};
 use truck_geometry::specifieds::Plane;
 use truck_geotrait::{ParametricCurve, ParametricSurface};
 
@@ -194,6 +194,207 @@ pub trait EnclosureSurface: ParametricSurface<Point = Point3> {
     }
 }
 
+// ---------------------------------------------------------------------------
+// CL-000-SPLINE-ADMIT: BSplineSurface spline-carrier enclosures (additive).
+// ---------------------------------------------------------------------------
+
+/// The relative outward pad per hull endpoint (mirrors `bspline.rs`'s HULL_PAD).
+const SPLINE_SURFACE_HULL_PAD: f64 = 64.0 * f64::EPSILON;
+
+/// Coordinate access for a control net without `Index` (H-1's
+/// `clippy::indexing_slicing` denial bans indexing). `Point3` and `Vector3`
+/// both carry `x`, `y`, `z` fields.
+trait SurfaceCoord {
+    /// The `x` coordinate.
+    fn x(self) -> f64;
+    /// The `y` coordinate.
+    fn y(self) -> f64;
+    /// The `z` coordinate.
+    fn z(self) -> f64;
+}
+
+impl SurfaceCoord for Point3 {
+    fn x(self) -> f64 {
+        self.x
+    }
+    fn y(self) -> f64 {
+        self.y
+    }
+    fn z(self) -> f64 {
+        self.z
+    }
+}
+
+impl SurfaceCoord for Vector3 {
+    fn x(self) -> f64 {
+        self.x
+    }
+    fn y(self) -> f64 {
+        self.y
+    }
+    fn z(self) -> f64 {
+        self.z
+    }
+}
+
+/// The outward-rounded control-net box of a spline carrier.
+///
+/// The pad is applied per coordinate relative to the coordinate magnitude,
+/// mirroring `bspline.rs`: the control net lives in `f64`, and evaluation of
+/// the spline (or its derivative) can land a few ulps outside the raw hull.
+/// The returned box therefore contains the whole parameterized image on the
+/// spline's clamped domain by the convex-hull property of B-splines, padded
+/// outward.
+fn control_net_box<P: Copy + SurfaceCoord>(surface: &BSplineSurface<P>) -> Box3 {
+    let mut lo_x = f64::INFINITY;
+    let mut hi_x = f64::NEG_INFINITY;
+    let mut lo_y = f64::INFINITY;
+    let mut hi_y = f64::NEG_INFINITY;
+    let mut lo_z = f64::INFINITY;
+    let mut hi_z = f64::NEG_INFINITY;
+    for row in surface.control_points().iter() {
+        for &pt in row.iter() {
+            let (x, y, z) = (pt.x(), pt.y(), pt.z());
+            lo_x = lo_x.min(x);
+            hi_x = hi_x.max(x);
+            lo_y = lo_y.min(y);
+            hi_y = hi_y.max(y);
+            lo_z = lo_z.min(z);
+            hi_z = hi_z.max(z);
+        }
+    }
+    let expand = |lo: f64, hi: f64| -> Interval {
+        let pad = SPLINE_SURFACE_HULL_PAD * (1.0 + lo.abs().max(hi.abs()));
+        Interval::try_from((lo - pad, hi + pad)).unwrap_or(Interval::EMPTY)
+    };
+    Box3 {
+        x: expand(lo_x, hi_x),
+        y: expand(lo_y, hi_y),
+        z: expand(lo_z, hi_z),
+    }
+}
+
+/// The spline's clamped-interior parameter rectangle (where the B-spline
+/// basis is a partition of unity), or `None` when the box reaches outside it
+/// (the carrier cannot certify there; the outward answer is the whole line).
+fn spline_interior(surface: &BSplineSurface<Point3>) -> Option<((f64, f64), (f64, f64))> {
+    let (du, dv) = surface.degrees();
+    let (u0, u1) = interior_axis(surface.uknot_vec(), du)?;
+    let (v0, v1) = interior_axis(surface.vknot_vec(), dv)?;
+    Some(((u0, u1), (v0, v1)))
+}
+
+/// The clamped-interior interval of one knot axis.
+fn interior_axis(knots: &KnotVec, degree: usize) -> Option<(f64, f64)> {
+    let lo = knots.get(degree)?;
+    let n = knots.len();
+    if n <= degree {
+        return None;
+    }
+    let hi = knots.get(n - 1 - degree)?;
+    if lo.is_finite() && hi.is_finite() && lo < hi {
+        Some((*lo, *hi))
+    } else {
+        None
+    }
+}
+
+impl EnclosureSurface for BSplineSurface<Point3> {
+    fn enclose(&self, uu: Interval, vv: Interval) -> Box3 {
+        if uu.is_empty() || vv.is_empty() || !uu.inf().is_finite() || !uu.sup().is_finite() {
+            return Box3::empty();
+        }
+        let Some(((u0, u1), (v0, v1))) = spline_interior(self) else {
+            return Box3 {
+                x: Interval::ENTIRE,
+                y: Interval::ENTIRE,
+                z: Interval::ENTIRE,
+            };
+        };
+        if uu.inf() < u0 || uu.sup() > u1 || vv.inf() < v0 || vv.sup() > v1 {
+            return Box3 {
+                x: Interval::ENTIRE,
+                y: Interval::ENTIRE,
+                z: Interval::ENTIRE,
+            };
+        }
+        control_net_box(self)
+    }
+
+    fn enclose_der(&self, m: usize, n: usize, uu: Interval, vv: Interval) -> Box3 {
+        if uu.is_empty() || vv.is_empty() || !uu.inf().is_finite() || !uu.sup().is_finite() {
+            return Box3::empty();
+        }
+        let Some(((u0, u1), (v0, v1))) = spline_interior(self) else {
+            return Box3 {
+                x: Interval::ENTIRE,
+                y: Interval::ENTIRE,
+                z: Interval::ENTIRE,
+            };
+        };
+        if uu.inf() < u0 || uu.sup() > u1 || vv.inf() < v0 || vv.sup() > v1 {
+            return Box3 {
+                x: Interval::ENTIRE,
+                y: Interval::ENTIRE,
+                z: Interval::ENTIRE,
+            };
+        }
+        // CL-000: the derivative of a B-spline surface is a B-spline surface
+        // of degree k - 1 whose control points are derived exactly from the
+        // carrier's net (truck-geometry's `uderivation` / `vderivation`). The
+        // derivative image is bounded by that derived net's outward hull.
+        let derived: BSplineSurface<Vector3> = match uderive_chain(self, m, n) {
+            Some(d) => d,
+            None => {
+                // (0, 0): the surface itself.
+                return self.enclose(uu, vv);
+            }
+        };
+        control_net_box(&derived)
+    }
+
+    fn normal_cone(&self, uu: Interval, vv: Interval) -> Option<DirCone> {
+        let su = self.enclose_der(1, 0, uu, vv);
+        let sv = self.enclose_der(0, 1, uu, vv);
+        let normal_box = cross_box(&su, &sv);
+        midpoint_ball_cone(&normal_box)
+    }
+
+    fn immersion_lower_bound(&self, uu: Interval, vv: Interval) -> f64 {
+        let su = self.enclose_der(1, 0, uu, vv);
+        let sv = self.enclose_der(0, 1, uu, vv);
+        let normal_box = cross_box(&su, &sv);
+        immersion_lower_bound_box(&normal_box)
+    }
+}
+
+/// Apply `m` u-derivations then `n` v-derivations to a spline surface,
+/// yielding the derivative surface. Returns `None` for order (0, 0).
+fn uderive_chain(
+    surface: &BSplineSurface<Point3>,
+    m: usize,
+    n: usize,
+) -> Option<BSplineSurface<Vector3>> {
+    if m == 0 && n == 0 {
+        return None;
+    }
+    // truck-geometry BSplineSurface::uderivation/vderivation reduce the
+    // degree on the derived axis and return a surface whose control points
+    // are the exact derivative coefficients.
+    let mut derived: BSplineSurface<Vector3> = if m > 0 {
+        surface.uderivation()
+    } else {
+        surface.vderivation()
+    };
+    for _ in 1..m {
+        derived = derived.uderivation();
+    }
+    for _ in 1..n {
+        derived = derived.vderivation();
+    }
+    Some(derived)
+}
+
 /// Certified enclosure interface for vector-valued parametric fields
 /// (`Point = Vector3`), the companion of [`EnclosureSurface`] for the
 /// `Offset<S, N>` decorator (BG-ENC-004-OFFSET). `N` in `Offset<T, N>` is
@@ -360,5 +561,63 @@ mod tests {
         assert_eq!(q.x, iv(12.0, 12.0));
         assert_eq!(q.y, iv(-7.0, -7.0));
         assert_eq!(q.z, iv(-3.0, -3.0));
+    }
+
+    /// A clamped uniform spline surface of bidegree `(du, dv)` with a few
+    /// interior knot spans, used as a spline-carrier witness.
+    fn spline_witness(du: usize, dv: usize) -> BSplineSurface<Point3> {
+        let uknot = KnotVec::uniform_knot(du, 4);
+        let vknot = KnotVec::uniform_knot(dv, 4);
+        let nu = uknot.len() - du - 1;
+        let nv = vknot.len() - dv - 1;
+        let ctrl = (0..nu)
+            .map(|i| {
+                (0..nv)
+                    .map(|j| {
+                        let u = i as f64 / nu as f64;
+                        let v = j as f64 / nv as f64;
+                        Point3::new(
+                            u,
+                            v,
+                            0.1 * u * u + 0.2 * v * v + 0.05 * u * v + (i as f64).cos() * 0.01,
+                        )
+                    })
+                    .collect()
+            })
+            .collect();
+        BSplineSurface::new((uknot, vknot), ctrl)
+    }
+
+    /// CL-000 required test: for at least three surfaces the first-partial
+    /// derivative enclosures bracket a thousand brute samples per axis on an
+    /// interior box.
+    #[test]
+    fn bspline_enclosure_brackets_brute_sample() {
+        let surfaces = [
+            spline_witness(1, 1),
+            spline_witness(2, 2),
+            spline_witness(3, 3),
+        ];
+        const SAMPLES: usize = 1000;
+        for surface in surfaces.iter() {
+            let uu = iv(0.2, 0.8);
+            let vv = iv(0.2, 0.8);
+            let e_du = surface.enclose_der(1, 0, uu, vv);
+            let e_dv = surface.enclose_der(0, 1, uu, vv);
+            for i in 0..SAMPLES {
+                let u = uu.inf() + (uu.sup() - uu.inf()) * (i as f64) / (SAMPLES as f64 - 1.0);
+                let v = vv.inf() + (vv.sup() - vv.inf()) * (i as f64) / (SAMPLES as f64 - 1.0);
+                let du = surface.uder(u, v);
+                let dv = surface.vder(u, v);
+                assert!(
+                    e_du.contains(Point3::new(du.x, du.y, du.z)),
+                    "u-derivative at ({u}, {v}) escaped the enclosure"
+                );
+                assert!(
+                    e_dv.contains(Point3::new(dv.x, dv.y, dv.z)),
+                    "v-derivative at ({u}, {v}) escaped the enclosure"
+                );
+            }
+        }
     }
 }
