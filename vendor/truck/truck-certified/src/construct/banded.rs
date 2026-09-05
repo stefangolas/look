@@ -114,9 +114,18 @@ impl BandedFactor {
         let mut max_width = 0.0_f64;
         for c in 0..4 {
             let mut y = Vec::with_capacity(self.order);
+            // Forward substitution: the three loops below are the fixed-order
+            // band recurrence that IS the determinism contract (module doc). The
+            // band index math is retained verbatim; the iterator forms clippy
+            // proposes would hide the compact-band offsets and the partially
+            // built `y` / `rows` buffer invariants behind skip/take windows.
+            #[allow(clippy::needless_range_loop)]
+            // fixed-order band recurrence; index math is the contract
             for i in 0..self.order {
                 let mut acc = rhs[i][c];
                 let k_lo = i.saturating_sub(self.half_bandwidth);
+                #[allow(clippy::needless_range_loop)]
+                // fixed-order band recurrence; index math is the contract
                 for k in k_lo..i {
                     acc = acc.sub(&self.at(i, k).mul(&y[k]));
                 }
@@ -125,6 +134,8 @@ impl BandedFactor {
             for i in (0..self.order).rev() {
                 let mut acc = y[i];
                 let k_hi = (i + self.half_bandwidth).min(self.order - 1);
+                #[allow(clippy::needless_range_loop)]
+                // fixed-order band recurrence; index math is the contract
                 for k in (i + 1)..=k_hi {
                     acc = acc.sub(&self.at(i, k).mul(&rows[k][c]));
                 }

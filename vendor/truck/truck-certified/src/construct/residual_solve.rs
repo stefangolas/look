@@ -73,8 +73,10 @@ pub fn residual_solve_dense<const N: usize>(
 ) -> Result<[Interval; N], ConstructRefusal> {
     // η := ‖I − R·A‖_∞, an upper bound in interval arithmetic, fixed order.
     let mut eta = 0.0_f64;
-    for i in 0..N {
+    for (i, r_inv_row) in r_inv.iter().enumerate() {
         let mut row_sum = 0.0_f64;
+        #[allow(clippy::needless_range_loop)]
+        // fixed-order matrix row sum; `a[k][j]` is a column access across the inner `k` range, so clippy's row iterator is not order-equivalent
         for j in 0..N {
             let mut e = if i == j {
                 Interval::point(1.0)
@@ -82,7 +84,7 @@ pub fn residual_solve_dense<const N: usize>(
                 Interval { lo: 0.0, hi: 0.0 }
             };
             for k in 0..N {
-                let ra = Interval::point(r_inv[i][k]).mul(&a[k][j]);
+                let ra = Interval::point(r_inv_row[k]).mul(&a[k][j]);
                 e = e.sub(&ra);
             }
             row_sum = (row_sum + abs_sup(&e)).next_up();
@@ -111,10 +113,10 @@ pub fn residual_solve_dense<const N: usize>(
 
     // The certified numerator ‖R·r‖_∞, fixed ascending order per row.
     let mut num = 0.0_f64;
-    for i in 0..N {
+    for r_inv_row in r_inv {
         let mut row_sum = 0.0_f64;
         for j in 0..N {
-            let rr = Interval::point(r_inv[i][j]).mul(&r[j]);
+            let rr = Interval::point(r_inv_row[j]).mul(&r[j]);
             row_sum = (row_sum + abs_sup(&rr)).next_up();
         }
         if !row_sum.is_finite() {
