@@ -236,6 +236,13 @@ pub mod fixtures;
 /// contract shape that BIE-004 escalates and BIE-005 consumes.
 pub mod ssi4;
 
+/// The completeness layer of the Certified Interaction Engine (BIE-004-CLOSURE):
+/// the Theorem E polar-exclusion oracle over the restricted-pair F-form, the
+/// certified slope diagnostic that feeds the frozen κ/cell/slope witness, and
+/// the escalate-iff-predicted-cost scheduler that bounds the face-tangency
+/// retry loop.
+pub mod closure;
+
 #[cfg(test)]
 mod tests {
     use super::*;
