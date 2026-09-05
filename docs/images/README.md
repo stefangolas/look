@@ -1,4 +1,16 @@
-# Third-party comparison images
+# Render evidence and third-party comparison images
+
+`step-pcurve-shared-edge-before.png` and
+`step-pcurve-shared-edge-after.png` are repository-owned renders of
+`tests/fixtures/surface_curve_pcurve_master.step` with the same ISO camera
+and default renderer settings. The before image was rendered at
+`8190f7d`: two of 24 STEP faces were refused with
+`EdgeTraversalUnresolved`, leaving 4,349 triangles and 13,047 vertices. The
+after image was rendered with the shared-edge 3D-carrier fix: all faces are
+present, with 5,344 triangles and 16,032 vertices.
+
+Both the fixture and these two generated renders are licensed under the
+repository's MIT-or-Apache-2.0 terms.
 
 `damaged-helmet-look-vs-f3d.png` is the side-by-side comparison built from
 `damaged-helmet-look.png` and `damaged-helmet-f3d.png` by

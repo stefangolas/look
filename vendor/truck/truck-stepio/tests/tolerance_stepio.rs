@@ -13,7 +13,8 @@ fn ctx_at(scale: f64) -> ToleranceCtx {
 /// predicate must carry its `// BG-TOL-001:` marker, and no migrated line may
 /// retain a legacy absolute-tolerance predicate. The five source files are read
 /// from the crate source at compile time so the check tracks the code as it
-/// exists, not a snapshot.
+/// exists, not a snapshot. The exact census is 20 after removing the obsolete
+/// surface-curve endpoint predicate.
 #[test]
 fn every_migrated_stepio_site_is_marked() {
     let files = [
@@ -69,8 +70,8 @@ fn every_migrated_stepio_site_is_marked() {
         }
     }
     assert_eq!(
-        markers, 21,
-        "expected 21 migrated sites, found {markers} markers"
+        markers, 20,
+        "expected 20 migrated sites, found {markers} markers"
     );
 }
 

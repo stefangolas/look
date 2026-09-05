@@ -10,6 +10,12 @@
   planar and cylindrical trimmed faces rather than reading triangles. It exists
   to keep the STEP path covered without depending on an external CAD corpus.
 
+- `surface_curve_pcurve_master.step` is repository-owned output from the
+  build123d 0.11.0 reproducer in issue 1. Its SHA-256 is
+  `bbec6fd474a959b945f83d9f11386a21429d1419c2da80e39e8c3efde2d69576`. It
+  covers a `SURFACE_CURVE` whose PCurve master is shared by faces on unlike
+  supporting surfaces.
+
 Regenerate the ball bearing deterministically from the repository root:
 
 ```console
