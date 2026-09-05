@@ -146,3 +146,9 @@ pub mod blend;
 /// §5.3): the amended CC-030 walk closed by the foot-point pair of a certified
 /// guide curve and radius law, with the foot-point uniqueness gate (Section 1).
 pub mod blend_varradius;
+
+/// The face-consumption outcome of the trim arrangement (CC-032-FACE-CONSUMPTION,
+/// seam S12 consumer / theory §5.4): `F_i_new = F_i \ R_i` decided by the
+/// arrangement of the contact pcurves, with certified per-cell blend-side
+/// classification and the surviving cells' trim provenance.
+pub mod face_consumption;
