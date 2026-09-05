@@ -103,7 +103,12 @@ def slot_states():
 
 def main():
     dry = "--dry-run" in sys.argv
-    max_workers = 6
+    # 4, not 6: the session-51 re-derived RAM arithmetic caps clean warm
+    # builds at 4 workers; above that, concurrent prewarms re-enter the
+    # 0xc0000409 zone (recorded 2026-09-05: CTE-000 lost the warm-build
+    # lottery twice and CTE-006/CL-005 collided at the same second while 6
+    # ran). Dead workers make the machine slower, not faster.
+    max_workers = 4
     for a in sys.argv:
         if a.startswith("--max-workers="):
             max_workers = int(a.split("=")[1])

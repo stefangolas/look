@@ -12,7 +12,7 @@ id:          CTE-006-SIDEALG
 contract:    [CTE-006-SIDEALG]
 class:       mechanical
 crates:      [truck-shapeops]
-depends_on:  []
+depends_on:  [CTE-000-SPINE]
 write_allow:
   - vendor/truck/truck-shapeops/src/boolean/mod.rs
 read_allow:
