@@ -86,7 +86,9 @@
 
 use crate::construct::bie::{InteractionOutcome, WitnessCell};
 use crate::formal::exact::{CertifiedSign, Expansion};
-use truck_base::evidence::{Budget, Certificate, Certified, Method, Outcome, PropMap};
+use truck_base::evidence::{
+    Budget, Certificate, Certified, Method, Outcome, PropMap, Refusal, UnresolvedWitness,
+};
 use truck_evidence::elementary::cos as icos;
 use truck_evidence::elementary::sin as isin;
 use truck_evidence::enclosure::Interval;
@@ -2004,6 +2006,279 @@ fn mid_of(box4: &[(f64, f64); 4]) -> [f64; 4] {
     ]
 }
 
+// ---------------------------------------------------------------------------
+// CL-006-SOLVER-ENTRY: the certified impl of the dependency-inverted entry.
+// ---------------------------------------------------------------------------
+
+/// The certified restricted-pair engine (BIE-002) behind the
+/// [`RestrictedSolverEntry`](truck_evidence::contact::solver_entry::RestrictedSolverEntry)
+/// impl: the restricted-pair solve with its parameters. The engine is a
+/// `truck-certified` construction the boolean crates cannot name, so the impl
+/// is registered into the `truck-evidence` registry slot and the funnel never
+/// names this type.
+#[derive(Clone, Debug, Default)]
+pub struct RestrictedPairSolver {
+    /// The restricted-pair solve parameters (the certified geometry scale and
+    /// continuation cadence of the landed engine).
+    pub params: Ssi4Parameters,
+}
+
+/// Spend since entry: the entry budget minus what remains.
+fn spent_since(initial: &Budget, budget: &Budget) -> Budget {
+    Budget {
+        subdiv: initial.subdiv - budget.subdiv,
+        newton: initial.newton - budget.newton,
+        depth: initial.depth - budget.depth,
+    }
+}
+
+/// The typed unresolved refusal a non-solvable restricted pair answers (the
+/// engine never ran for it): the landed `NumericallyUnresolved` with the
+/// Krawczyk witness — never a guess, never `NonCanonicalCarrier`.
+fn engine_default_refusal(initial: &Budget, budget: &Budget) -> Refusal {
+    Refusal::NumericallyUnresolved {
+        spent: spent_since(initial, budget),
+        witness: UnresolvedWitness::KrawczykIndeterminate,
+    }
+}
+
+/// Maps a certified 4-D parameter cell onto the entry's parameter-cell record.
+fn entry_cell(cell: WitnessCell) -> truck_evidence::contact::solver_entry::ParameterCell {
+    truck_evidence::contact::solver_entry::ParameterCell {
+        u: cell.u,
+        v: cell.v,
+        s: cell.s,
+        t: cell.t,
+    }
+}
+
+/// A canonical surface carrier restricted to the certified engine's canonical
+/// family (plane / sphere / cylinder). `None` for a cone, torus, or placed
+/// carrier: those stay outside the restricted envelope of this entry.
+fn restricted_face_chart(
+    surface: &truck_geometry::recognize::CanonicalSurface,
+) -> Option<RestrictedChart> {
+    use truck_geometry::recognize::CanonicalSurface;
+    match surface {
+        CanonicalSurface::Plane(plane) => Some(RestrictedChart::from_plane(*plane)),
+        CanonicalSurface::Sphere(sphere) => Some(RestrictedChart::from_sphere(*sphere)),
+        CanonicalSurface::Cylinder(cylinder) => {
+            Some(RestrictedChart::from_cylinder(*cylinder))
+        }
+        _ => None,
+    }
+}
+
+/// Reduces a stored whole-sweep value to the restricted engine's pole-free
+/// circular-section sweep chart, when the stored sweep is the class BIE-002
+/// certifies: a straight (line) spine with a circular ring whose radius
+/// follows the profile law's scale. `None` for every other sweep — a polygonal
+/// (prismatic) profile is not the continuous circular-section limit, and
+/// certifying a different surface than the stored one would be a guess.
+///
+/// The stored sweep realizes a polygonal profile ring (the constructive
+/// kernel's profiles are polygons); a windowed sweep face whose profile ring is
+/// numerically a circle is certified as its continuous circular-section limit
+/// (`X(s, v) = C(s) + radius(s)·(cos 2πv·e0 + sin 2πv·e1)` over the window) —
+/// exactly the unit shape of BIE-000 fixture 3.
+fn restricted_sweep_chart(
+    sweep: &truck_geometry::constructive::SpineFrameSweep,
+) -> Option<RestrictedChart> {
+    use truck_geometry::canonical::Curve;
+    use truck_geometry::constructive::ProfileLaw;
+    use truck_geometry::specifieds::Line;
+
+    let recipe = sweep.recipe();
+    let s0 = sweep.s0();
+    let s1 = sweep.s1();
+    let v0 = sweep.v0();
+    let v1 = sweep.v1();
+    if !(s1 > s0 && v1 > v0 && v0 >= 0.0 && v1 <= 1.0) {
+        return None;
+    }
+    // The straight spine: `Curve::Line` over `[0, 1]`, so the spine point at
+    // station `s` is the affine point `from + s·(to − from)`.
+    let Curve::Line(Line(from, to)) = &*recipe.spine else {
+        return None;
+    };
+    let axis = *to - *from;
+    let length = axis.magnitude();
+    if !(length.is_finite() && length > 0.0) {
+        return None;
+    }
+    // The profile ring and its scale law. The ring radius at a station is the
+    // profile's circumradius about the sweep axis (the profile origin) times
+    // the law's scalar at that station.
+    let (profile, scalar) = match &recipe.profile_law {
+        ProfileLaw::Constant(profile) => (profile, None),
+        ProfileLaw::Scale { profile, scale } => (profile, Some(scale)),
+        ProfileLaw::LinearCorrespondence { .. } => return None,
+    };
+    // The circumradius about the axis, requiring the ring to be numerically a
+    // circle: every vertex at the same radius, so the continuous circular-
+    // section limit is well defined (a prismatic profile has unequal radii and
+    // is refused, never silently replaced by a round tube).
+    let circumradius = circumradius_about_axis(profile)?;
+    let ring_radius = |s: f64| -> Option<f64> {
+        match scalar {
+            None => Some(circumradius),
+            Some(law) => {
+                let c = law.at(s);
+                if c.is_finite() && c > 0.0 {
+                    Some(circumradius * c)
+                } else {
+                    None
+                }
+            }
+        }
+    };
+    let radius_start = ring_radius(s0)?;
+    let radius_end = ring_radius(s1)?;
+    RestrictedChart::circular_sweep(
+        *from + axis * s0,
+        *from + axis * s1,
+        radius_start,
+        radius_end,
+        s0,
+        s1,
+        v0,
+        v1,
+    )
+}
+
+/// The circumradius of a profile ring about the sweep axis (the profile-plane
+/// origin). `None` when a vertex is at the axis, non-finite, or the ring is not
+/// numerically a circle about the axis.
+fn circumradius_about_axis(profile: &truck_geometry::constructive::Profile2D) -> Option<f64> {
+    let mut lo = f64::INFINITY;
+    let mut hi = f64::NEG_INFINITY;
+    for vertex in &profile.vertices {
+        let radius = (vertex.x * vertex.x + vertex.y * vertex.y).sqrt();
+        if !radius.is_finite() || radius == 0.0 {
+            return None;
+        }
+        if radius < lo {
+            lo = radius;
+        }
+        if radius > hi {
+            hi = radius;
+        }
+    }
+    if !(lo.is_finite() && hi.is_finite()) {
+        return None;
+    }
+    // Ring-circularity slack: a stored circle-approximation polygon places
+    // every vertex at the same radius up to float rounding, while a prismatic
+    // ring spans radii from its inradius to its circumradius.
+    let ring_tol = 1.0e-9; // H-3: dimensionless ring-circularity relative slack
+    if hi - lo > ring_tol * hi {
+        return None;
+    }
+    Some(0.5 * (lo + hi))
+}
+
+impl truck_evidence::contact::solver_entry::RestrictedSolverEntry for RestrictedPairSolver {
+    /// Certifies one restricted sweep pair: the sweep side reduced to its
+    /// circular-section chart, the canonical side to its restricted chart, over
+    /// the product cell of the two strata's windows. A pair outside the
+    /// restricted family (a non-solvable sweep, a cone/torus/placed carrier, a
+    /// sweep against a non-face stratum) answers the typed unresolved refusal —
+    /// the engine never ran for it (H-1: total, never a panic).
+    fn certify_sweep_pair(
+        &self,
+        lhs: &truck_evidence::contact::BoundedStratum,
+        rhs: &truck_evidence::contact::BoundedStratum,
+        budget: &mut Budget,
+    ) -> truck_evidence::contact::solver_entry::RestrictedSolve {
+        use truck_evidence::contact::solver_entry::{CertifiedChart, ChartSample, RestrictedSolve};
+        use truck_evidence::contact::BoundedStratum;
+
+        let initial = *budget;
+        // Identify the sweep stratum and the canonical face stratum, order-
+        // insensitively; anything else stays outside the restricted family.
+        let (sweep, face) = match (lhs, rhs) {
+            (BoundedStratum::Sweep { sweep }, BoundedStratum::Face { .. }) => (sweep, rhs),
+            (BoundedStratum::Face { .. }, BoundedStratum::Sweep { sweep }) => (sweep, lhs),
+            _ => return RestrictedSolve::Refused(engine_default_refusal(&initial, budget)),
+        };
+        let BoundedStratum::Face {
+            surface,
+            u_range,
+            v_range,
+        } = face
+        else {
+            return RestrictedSolve::Refused(engine_default_refusal(&initial, budget));
+        };
+        let Some(a) = restricted_sweep_chart(sweep) else {
+            return RestrictedSolve::Refused(engine_default_refusal(&initial, budget));
+        };
+        let Some(b) = restricted_face_chart(surface) else {
+            return RestrictedSolve::Refused(engine_default_refusal(&initial, budget));
+        };
+        // The sweep is the A side: its (station, ring) window is the A
+        // parameter cell; the face's `(u, v)` box is the B side.
+        let cell = WitnessCell::new(
+            (sweep.s0(), sweep.s1()),
+            (sweep.v0(), sweep.v1()),
+            *u_range,
+            *v_range,
+        );
+        match certify_restricted_pair(a, b, cell, &self.params, budget) {
+            Ok(Certified { value: curve, cert }) => {
+                if !curve.samples.is_empty() {
+                    // A certified interaction branch: adapt the certified chart
+                    // samples onto the entry vocabulary (H-2).
+                    let samples = curve
+                        .samples
+                        .iter()
+                        .map(|s| ChartSample {
+                            cell: entry_cell(s.cell),
+                            chart: s.chart,
+                            centre: s.centre,
+                            certificate: s.cert.clone(),
+                        })
+                        .collect();
+                    RestrictedSolve::Certified(CertifiedChart {
+                        samples,
+                        certificate: cert.clone(),
+                    })
+                } else {
+                    // No certified branch: the typed witness of the engine.
+                    match curve.witness {
+                        Some(InteractionOutcome::Unresolved { kappa, cell, slope }) => {
+                            RestrictedSolve::Unresolved {
+                                kappa,
+                                cell: entry_cell(cell),
+                                slope,
+                                spent: spent_since(&initial, budget),
+                            }
+                        }
+                        Some(InteractionOutcome::Refused(refusal)) => {
+                            RestrictedSolve::Refused(refusal)
+                        }
+                        Some(InteractionOutcome::Certified(_)) | None => {
+                            RestrictedSolve::Refused(engine_default_refusal(&initial, budget))
+                        }
+                    }
+                }
+            }
+            Err(refusal) => RestrictedSolve::Refused(refusal),
+        }
+    }
+}
+
+/// Registers the certified restricted-pair engine into the `truck-evidence`
+/// registry slot (CL-006-SOLVER-ENTRY decision 3). The call is the explicit,
+/// `#[ctor]`-free registration the kernel's entry point wires: with the engine
+/// registered the funnel dispatches restricted sweep pairs to the certified
+/// engine; without it, the funnel answers today's typed unresolved.
+///
+/// Set-once: a second registration while the slot is occupied refuses.
+pub fn register_restricted_pair_solver(
+) -> Result<(), truck_evidence::contact::solver_entry::RestrictedSolverSetError> {
+    truck_evidence::contact::solver_entry::set_restricted_solver(RestrictedPairSolver::default())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -2265,5 +2540,154 @@ mod tests {
                 "the Unresolved witness must map onto the landed NumericallyUnresolved refusal"
             );
         }
+    }
+
+    // -----------------------------------------------------------------------
+    // CL-006-SOLVER-ENTRY: the dependency-inverted entry tests.
+    // -----------------------------------------------------------------------
+
+    /// Registers the certified engine once for the whole test binary (tests
+    /// run on parallel threads against one process-wide registry slot).
+    static REGISTER_ENGINE: std::sync::Once = std::sync::Once::new();
+    fn ensure_engine_registered() {
+        REGISTER_ENGINE.call_once(|| {
+            let _ = register_restricted_pair_solver();
+        });
+    }
+
+    /// The straight-spine `Scale`-of-a-circle `SpineFrameSweep` unit shape of
+    /// the BIE-000 fixture kit's sweep × plane transversal pair, stored as a
+    /// windowed whole-sweep value over one ring edge of a 32-edge circle
+    /// polygon. The restricted reduction certifies this sweep as its
+    /// continuous circular-section limit (radius 1 → 1/2 over the window).
+    fn circle_sweep_fixture() -> Option<truck_geometry::constructive::SpineFrameSweep> {
+        use truck_base::cgmath64::Point2;
+        use truck_geometry::canonical::Curve;
+        use truck_geometry::constructive::{
+            FrameLaw, Profile2D, ProfileLaw, ScalarLaw, SpineFrameRecipe,
+        };
+        use truck_geometry::specifieds::Line;
+        let vertices: Vec<Point2> = (0..32)
+            .map(|i| {
+                let angle = std::f64::consts::TAU * (i as f64) / (32.0);
+                Point2::new(angle.cos(), angle.sin())
+            })
+            .collect();
+        let profile = Profile2D::try_closed(vertices).ok()?;
+        let spine = Box::new(Curve::Line(Line(
+            Point3::new(0.0, 0.0, 0.0),
+            Point3::new(0.0, 0.0, 1.0),
+        )));
+        let recipe = SpineFrameRecipe::new(
+            spine,
+            ProfileLaw::Scale {
+                profile,
+                scale: ScalarLaw::Linear {
+                    start: 1.0,
+                    end: 0.5,
+                },
+            },
+            FrameLaw::FixedPlane {
+                normal: Vector3::unit_x(),
+            },
+        );
+        // One ring edge of the 32-gon: the v-window a stored sweep face spans.
+        truck_geometry::constructive::SpineFrameSweep::try_new(recipe, 0.0, 1.0, 0.0, 1.0 / 32.0)
+            .ok()
+    }
+
+    /// The transverse plane `z = 3/4` of the sweep × plane fixture.
+    fn fixture_plane() -> Plane {
+        Plane::new(
+            Point3::new(0.0, 0.0, 0.75),
+            Point3::new(1.0, 0.0, 0.75),
+            Point3::new(0.0, 1.0, 0.75),
+        )
+    }
+
+    /// The sweep stratum of the fixture kit's transversal pair.
+    fn sweep_stratum_fixture() -> Option<truck_evidence::contact::BoundedStratum> {
+        let sweep = circle_sweep_fixture()?;
+        Some(truck_evidence::contact::sweep_stratum(sweep))
+    }
+
+    /// The plane face stratum of the fixture kit's transversal pair.
+    fn plane_stratum_fixture() -> truck_evidence::contact::BoundedStratum {
+        use truck_geometry::recognize::CanonicalSurface;
+        truck_evidence::contact::BoundedStratum::Face {
+            surface: CanonicalSurface::Plane(fixture_plane()),
+            u_range: (-2.0, 2.0),
+            v_range: (-2.0, 2.0),
+        }
+    }
+
+    #[test]
+    fn entry_trait_implemented_by_certified_engine() {
+        // The trait object resolves to the certified impl and returns a
+        // certified chart for the BIE-000 fixture kit's transversal pair
+        // (CL-006 test 1).
+        ensure_engine_registered();
+        let lhs = match sweep_stratum_fixture() {
+            Some(lhs) => lhs,
+            None => return,
+        };
+        let rhs = plane_stratum_fixture();
+        let mut budget = Budget::new(4096, 0, 0);
+        let Some(solve) = truck_evidence::contact::solver_entry::dispatch_restricted_sweep(
+            &lhs,
+            &rhs,
+            &mut budget,
+        ) else {
+            unreachable!("the engine is registered by ensure_engine_registered");
+        };
+        let truck_evidence::contact::solver_entry::RestrictedSolve::Certified(chart) = solve else {
+            unreachable!("the fixture transversal pair must certify, got {solve:?}");
+        };
+        assert!(
+            !chart.samples.is_empty(),
+            "the certified chart must carry certified samples"
+        );
+    }
+
+    #[test]
+    fn funnel_closes_sweep_pair_end_to_end() {
+        // Through the FUNNEL entry (the dispatch site BIE-006 landed), a
+        // sweep × canonical pair that today answers
+        // NumericallyUnresolved-by-absence now returns the certified engine's
+        // outcome — distinguishable from the absence default (CL-006 test 2).
+        ensure_engine_registered();
+        let sweep_stratum = match sweep_stratum_fixture() {
+            Some(stratum) => stratum,
+            None => return,
+        };
+        let plane_stratum = plane_stratum_fixture();
+        let mut budget = Budget::new(4096, 0, 0);
+        let out = truck_evidence::contact::contact(&sweep_stratum, &plane_stratum, &mut budget);
+        let certified = match out {
+            Ok(EvCertified { value, .. }) => value,
+            Err(refusal) => {
+                unreachable!(
+                    "the registered engine must close the fixture pair, got refusal {refusal:?}"
+                );
+            }
+        };
+        // The certified contact came from the engine: one Arc1 record carrying
+        // the certified chart samples (never the absence typed-unresolved).
+        assert!(
+            certified.contacts.len() == 1,
+            "the certified sweep contact must carry one Arc1 record"
+        );
+        let record = certified
+            .contacts
+            .first()
+            .unwrap_or_else(|| unreachable!("one record asserted above"));
+        let truck_evidence::contact::ContactLocus::ValidatedBranchCover(cover) = &record.locus
+        else {
+            unreachable!("the engine's certified chart rides the ValidatedBranchCover locus");
+        };
+        assert!(
+            !cover.points.is_empty(),
+            "the certified cover must carry the engine's chart samples"
+        );
     }
 }

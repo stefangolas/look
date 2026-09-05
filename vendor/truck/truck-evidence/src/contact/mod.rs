@@ -76,6 +76,10 @@ pub mod implicit;
 /// screen.
 pub mod overlap;
 pub mod singular;
+/// CL-006-SOLVER-ENTRY: the restricted solver entry — the dependency-inverted
+/// seam through which the funnel reaches the certified restricted-pair engine
+/// (a `truck-certified` construction no boolean crate can name).
+pub mod solver_entry;
 
 /// One boundary stratum of a solid, lifted to the canonical-carrier level.
 ///
@@ -424,26 +428,76 @@ pub fn contact(
 /// certifies the section of a `SpineFrameSweep` face against a canonical
 /// carrier. The certified engine is a `truck-certified` construction that this
 /// crate cannot name (the dependency direction is the reverse), so the seam
-/// resolves only the sections this layer can decide and returns the typed
-/// `NumericallyUnresolved` outcome — with the budget spent recorded — for the
-/// rest. It NEVER returns `NonCanonicalCarrier`: a lifted sweep is inside the
+/// dispatches through the dependency-inverted entry
+/// [`solver_entry::dispatch_restricted_sweep`] (CL-006-SOLVER-ENTRY). With a
+/// certified engine registered, a certified solve returns a certified contact
+/// complex carrying the certified interaction (one Arc1 record whose
+/// [`ContactLocus::ValidatedBranchCover`] holds the certified chart samples'
+/// model centres — the same epistemic shape as the validated-FF cover); a
+/// typed unresolved or landed refusal propagates. With no engine registered the
+/// seam returns the typed `NumericallyUnresolved` outcome — with the budget
+/// spent recorded — exactly as BIE-006 landed it (the registry-flip baseline
+/// arm). It NEVER returns `NonCanonicalCarrier`: a lifted sweep is inside the
 /// restricted envelope by construction, and an undecidable section is an
 /// unresolved outcome, not a carrier refusal.
 fn restricted_sweep_contact(
-    _lhs: &BoundedStratum,
-    _rhs: &BoundedStratum,
+    lhs: &BoundedStratum,
+    rhs: &BoundedStratum,
     budget: &mut Budget,
 ) -> Outcome<ContactComplex> {
-    // The certified restricted engine (BIE-002) lives in truck-certified and
-    // is unreachable from this crate; every section this layer cannot decide
-    // analytically is the typed unresolved outcome. The certified arm of the
-    // funnel is the analytic section reduction, which the shapeops sweep path
-    // (truck-shapeops::boolean::sweep_lift) consumes through the restricted
-    // dispatch before this refusal is ever reached.
-    Err(Refusal::NumericallyUnresolved {
-        spent: *budget,
-        witness: UnresolvedWitness::KrawczykIndeterminate,
-    })
+    // The registry baseline: with no certified engine registered (or a
+    // poisoned lock) the seam answers today's typed unresolved, bit-for-bit
+    // the BIE-006 shortcut (the certified engine never ran).
+    let initial = *budget;
+    let Some(solve) = solver_entry::dispatch_restricted_sweep(lhs, rhs, budget) else {
+        return Err(Refusal::NumericallyUnresolved {
+            spent: initial,
+            witness: UnresolvedWitness::KrawczykIndeterminate,
+        });
+    };
+    match solve {
+        solver_entry::RestrictedSolve::Certified(chart) if !chart.samples.is_empty() => {
+            // A certified solve: the interaction is one Arc1 branch. The record
+            // carries the certified chart samples as a validated branch cover
+            // (model centres of the certified cells; connectivity is not
+            // claimed), the same epistemic class as the validated-FF cover the
+            // funnel already emits. The solve certificate records the spend.
+            let certificate = chart.certificate.clone();
+            *budget = certificate.budget_left;
+            let points = chart.samples.iter().map(|s| s.centre).collect();
+            let cover = gff::BranchCover {
+                points,
+                singular_boxes: Vec::new(),
+                unresolved_boxes: Vec::new(),
+            };
+            Ok(Certified::new(
+                ContactComplex {
+                    contacts: vec![ContactRecord {
+                        dimension: ContactDimension::Arc1,
+                        kind: ContactEventKind::Transverse,
+                        locus: ContactLocus::ValidatedBranchCover(cover),
+                    }],
+                },
+                certificate,
+            ))
+        }
+        // The engine certified but produced no samples (never a branch, never a
+        // fabricated answer): the typed unresolved outcome, spend recorded.
+        solver_entry::RestrictedSolve::Certified(_) => Err(Refusal::NumericallyUnresolved {
+            spent: budget_spent(&initial, budget),
+            witness: UnresolvedWitness::KrawczykIndeterminate,
+        }),
+        // The engine's typed unresolved verdict maps onto the landed refusal
+        // taxonomy (BIE-000's projection: Krawczyk witness, spent recorded).
+        solver_entry::RestrictedSolve::Unresolved { spent, .. } => {
+            Err(Refusal::NumericallyUnresolved {
+                spent,
+                witness: UnresolvedWitness::KrawczykIndeterminate,
+            })
+        }
+        // A landed typed refusal, passed through unchanged.
+        solver_entry::RestrictedSolve::Refused(refusal) => Err(refusal),
+    }
 }
 
 /// Lift a stored surface's structural-recognition witness to a bounded face
@@ -2641,6 +2695,76 @@ mod tests {
             format!("{fwd:?}"),
             format!("{rev:?}"),
             "the empty plane screen is order-insensitive"
+        );
+    }
+
+    /// A valid straight-spine whole-sweep value (a unit-square profile over one
+    /// ring edge) for the registry-absence funnel fixture. The sweep content is
+    /// not load-bearing: with no engine registered the funnel never reduces it.
+    fn prism_sweep_fixture() -> Option<truck_geometry::constructive::SpineFrameSweep> {
+        use truck_geometry::canonical::Curve;
+        use truck_geometry::constructive::{
+            FrameLaw, Profile2D, ProfileLaw, SpineFrameRecipe, SpineFrameSweep,
+        };
+        use truck_geometry::specifieds::Line;
+        let profile = Profile2D::try_closed(vec![
+            Point2::new(0.0, 0.0),
+            Point2::new(1.0, 0.0),
+            Point2::new(1.0, 1.0),
+            Point2::new(0.0, 1.0),
+        ])
+        .ok()?;
+        let spine = Box::new(Curve::Line(Line(
+            Point3::new(0.0, 0.0, 0.0),
+            Point3::new(0.0, 0.0, 1.0),
+        )));
+        let recipe = SpineFrameRecipe::new(
+            spine,
+            ProfileLaw::Constant(profile),
+            FrameLaw::FixedPlane {
+                normal: Vector3::unit_x(),
+            },
+        );
+        SpineFrameSweep::try_new(recipe, 0.0, 1.0, 0.0, 0.25).ok()
+    }
+
+    #[test]
+    fn registry_flips_when_engine_absent() {
+        // CL-006 test 3: with the registry cleared (no certified engine
+        // registered), the funnel answers exactly today's typed
+        // `NumericallyUnresolved` — the V5 baseline arm the registry-flip test
+        // pins. (The engine-absent arm is the same answer BIE-006 landed.)
+        let _cleared = solver_entry::take_restricted_solver();
+
+        let sweep = match prism_sweep_fixture() {
+            Some(sweep) => sweep,
+            None => return,
+        };
+        let sweep_stratum = sweep_stratum(sweep);
+        let plane_stratum = BoundedStratum::Face {
+            surface: CanonicalSurface::Plane(Plane::new(
+                Point3::new(0.0, 0.0, 0.75),
+                Point3::new(1.0, 0.0, 0.75),
+                Point3::new(0.0, 1.0, 0.75),
+            )),
+            u_range: (-2.0, 2.0),
+            v_range: (-2.0, 2.0),
+        };
+
+        let mut budget = Budget::new(0, 0, 0);
+        let out = contact(&sweep_stratum, &plane_stratum, &mut budget);
+        assert!(
+            matches!(out, Err(Refusal::NumericallyUnresolved { .. })),
+            "with no engine registered the funnel must answer today's typed \
+             NumericallyUnresolved, got {out:?}"
+        );
+
+        let mut budget = Budget::new(0, 0, 0);
+        let out = contact(&plane_stratum, &sweep_stratum, &mut budget);
+        assert!(
+            matches!(out, Err(Refusal::NumericallyUnresolved { .. })),
+            "the canonical × sweep order must answer the same typed \
+             NumericallyUnresolved, got {out:?}"
         );
     }
 }
