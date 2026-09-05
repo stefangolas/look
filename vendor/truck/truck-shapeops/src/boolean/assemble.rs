@@ -43,6 +43,10 @@ use super::split::{
     create_parameter_boundary, split_fragments, CoincidentOrientation, ContactEvent, FragmentMesh,
     FragmentOrigin, SolidRef, StratumRef,
 };
+use super::sweep_lift::{
+    classify_from_cells, fragment_provenance, sweep_face_stratum, windowed_sweep_face,
+    FragmentProvenance,
+};
 use super::BoolOp;
 use super::{fragment_decision, FragmentDecision, MaterialState4};
 
@@ -74,10 +78,25 @@ pub fn boolean(
     let events = sweep_contact_events(a, b, INSERTION_TOL)?.value;
     // SPLIT (step 3).
     let mesh = split_fragments(shell_a, shell_b, &events, INSERTION_TOL)?.value;
-    // CLASSIFY (step 4).
-    let classification = classify_fragments(shell_a, shell_b, &mesh, INSERTION_TOL)?.value;
-    // DECIDE + ASSEMBLE (step 5, decision 4).
-    let faces = decide_and_assemble(op, &mesh, &classification)?;
+    // CLASSIFY (step 4). A sweep-carrier shell is classified through the
+    // BIE-006 arrangement-cell seeds ([`classify_from_cells`]); the canonical
+    // path rides the landed seed-and-propagate classifier unchanged (V5).
+    let has_sweep = shell_a
+        .face_iter()
+        .any(|face| matches!(face.surface(), Surface::SpineFrameSurface(_)))
+        || shell_b
+            .face_iter()
+            .any(|face| matches!(face.surface(), Surface::SpineFrameSurface(_)));
+    let classification = if has_sweep {
+        classify_from_cells(shell_a, shell_b, &mesh, INSERTION_TOL)?.value
+    } else {
+        classify_fragments(shell_a, shell_b, &mesh, INSERTION_TOL)?.value
+    };
+    // DECIDE + ASSEMBLE (step 5, decision 4). The provenance rows of the kept
+    // fragments are recorded ([`FragmentProvenance`]); the sealed output
+    // carries the solid, the rows are the next integration seam.
+    let mut provenance_rows: Vec<FragmentProvenance> = Vec::new();
+    let faces = decide_and_assemble(op, &mesh, &classification, &mut provenance_rows)?;
 
     let cert = Certificate {
         props: PropMap::new(),
@@ -365,9 +384,10 @@ fn edge_aabb(edge: &Edge<Point3, Curve>, tol: f64) -> Aabb {
     aabb
 }
 
-/// Lifts every face of a shell to a bounded canonical stratum, refusing a
-/// non-canonical carrier at the lift boundary (before `contact()` is ever
-/// reached).
+/// Lifts every face of a shell to a bounded stratum, refusing a non-canonical
+/// carrier at the lift boundary (before `contact()` is ever reached). A sweep
+/// face lifts to `BoundedStratum::Sweep` (BIE-006), never the `Unrecognized`
+/// refusal.
 fn lift_faces(
     solid: SolidRef,
     shell: &Shell<Point3, Curve, Surface>,
@@ -375,6 +395,18 @@ fn lift_faces(
 ) -> Result<Vec<LiftedFace>, Refusal> {
     let mut out = Vec::new();
     for (fi, face) in shell.face_iter().enumerate() {
+        if let Some(stratum) = sweep_face_stratum(face) {
+            // A sweep face: the whole-sweep closed value carries the recipe,
+            // the realized window and the placement — no parameter-box
+            // projection is needed.
+            let aabb = face_aabb(face, tol);
+            out.push(LiftedFace {
+                provenance: StratumRef::Face { solid, index: fi },
+                stratum,
+                aabb,
+            });
+            continue;
+        }
         let witness = recognize_surface(&face.surface());
         if matches!(witness, CanonicalCarrierWitness::Unrecognized) {
             return Err(non_canonical());
@@ -531,11 +563,14 @@ fn section_matches(a0: Point3, a1: Point3, b0: Point3, b1: Point3, tol: f64) -> 
 /// Coincident pairs are resolved ONCE: their verdicts must agree, their flips
 /// must match their orientation, and the pair's `a` fragment is emitted (with
 /// its flip applied). Non-pair fragments are kept iff
-/// [`fragment_decision`] says `Keep`.
+/// [`fragment_decision`] says `Keep`. A kept sweep fragment is emitted as a
+/// windowed `SpineFrameSweep` face (BIE-006), and every kept fragment records
+/// its `EntityId`/`Op` provenance row.
 fn decide_and_assemble(
     op: BoolOp,
     mesh: &FragmentMesh,
     classification: &FragmentClassification,
+    rows: &mut Vec<FragmentProvenance>,
 ) -> Result<Vec<Face<Point3, Curve, Surface>>, Refusal> {
     let n = mesh.fragments.len();
     // A fragment in two coincident pairs is the pair-dedup fold.
@@ -593,6 +628,11 @@ fn decide_and_assemble(
                     face.invert();
                 }
                 kept.push(face);
+                let other_parent = match b_origin {
+                    FragmentOrigin::A { parent } => parent,
+                    FragmentOrigin::B { parent } => parent,
+                };
+                rows.push(fragment_provenance(a_origin, other_parent, op));
             }
             _ => {
                 // The pair's verdicts disagree (the pair-consistency fold).
@@ -615,11 +655,26 @@ fn decide_and_assemble(
         let bit = classification.inside_other.get(i).copied().unwrap_or(false);
         let decision = fragment_decision(op, fragment_state(fragment.origin, bit, None));
         if let FragmentDecision::Keep { flip } = decision {
+            // A kept sweep fragment is emitted as a windowed
+            // `SpineFrameSweep` face (BIE-006 decision 3); a fragment whose
+            // region is not a clean window keeps its carrier unchanged.
             let mut face = fragment.face.clone();
+            if let Some(windowed) = windowed_sweep_face(&face, INSERTION_TOL) {
+                face = windowed;
+            }
             if flip {
                 face.invert();
             }
             kept.push(face);
+            // §8.3: the kept fragment's row cites its parent face and the
+            // boolean op. A non-paired fragment's other-shell reference is not
+            // tracked (there is no event partner); the row cites the parent
+            // face, the row's other-slot refinement lands with the sweep path.
+            let parent = match fragment.origin {
+                FragmentOrigin::A { parent } => parent,
+                FragmentOrigin::B { parent } => parent,
+            };
+            rows.push(fragment_provenance(fragment.origin, parent, op));
         }
     }
     Ok(kept)
@@ -695,10 +750,16 @@ mod tests {
     use truck_base::cgmath64::{Matrix4, Point2, Vector4};
     use truck_base::contact::{ContactDimension, ContactEventKind};
     use truck_evidence::analytic::{AnalyticIntersection, ExactCurve};
-    use truck_evidence::contact::ContactLocus;
+    use truck_evidence::contact::{sweep_stratum, ContactLocus};
     use truck_geometry::arrange::{arrange, Arrangement};
+    use truck_geometry::constructive::{
+        FrameLaw, LineSpine, Profile2D, ProfileLaw, SpineFrameRecipe, SpineFrameSweep,
+    };
     use truck_geometry::prelude::*;
+    use truck_geometry::recognize::CanonicalSurface;
     use truck_modeling::extrude::extrude_profile;
+    use truck_modeling::spine_sweep::spine_sweep;
+    use truck_topology::{Vertex, Wire};
 
     /// The insertion tolerance class for the sweep/split/classify calls (H-3:
     /// dimensionless relative to the unit-scale witnesses; dyadic geometry
@@ -1135,5 +1196,332 @@ mod tests {
             ),
             "multi-shell input must refuse at the guard, before any sweep work"
         );
+    }
+
+    // ---------------------------------------------------------------------------
+    // BIE-006-CLASSIFY: sweep lift/path adapters + windowed sweep output.
+    // ---------------------------------------------------------------------------
+
+    /// The unit-square profile (CCW), the prism fixture's constant section.
+    fn unit_square_profile() -> Profile2D {
+        Profile2D::try_closed(vec![
+            Point2::new(0.0, 0.0),
+            Point2::new(1.0, 0.0),
+            Point2::new(1.0, 1.0),
+            Point2::new(0.0, 1.0),
+        ])
+        .unwrap()
+    }
+
+    /// The unit-prism sweep recipe over the straight spine
+    /// `(0, 0, z0) → (0, 0, z1)` with a `FixedPlane` frame: the straight-spine
+    /// `SpineFrameSweep` of the junction fixture (the teapot-junction-class
+    /// straight-spine × canonical pair). Every side face is a
+    /// `Surface::SpineFrameSurface` over `[0, 1] × [j/k, (j+1)/k]`, `k = 4`;
+    /// the spine runs along z, so `X(s, v).z = z0 + s·(z1 − z0)`.
+    fn prism_recipe(z0: f64, z1: f64) -> SpineFrameRecipe<LineSpine, ProfileLaw, FrameLaw> {
+        SpineFrameRecipe::new(
+            LineSpine {
+                start: Point3::new(0.0, 0.0, z0),
+                end: Point3::new(0.0, 0.0, z1),
+            },
+            ProfileLaw::Constant(unit_square_profile()),
+            FrameLaw::FixedPlane {
+                normal: Vector3::unit_x(),
+            },
+        )
+    }
+
+    /// The authored-topology prism sweep solid over `[z0, z1]` along the spine.
+    fn prism_sweep_solid(z0: f64, z1: f64) -> Solid<Point3, Curve, Surface> {
+        let recipe = prism_recipe(z0, z1);
+        spine_sweep(&recipe, &[0.0, 1.0]).unwrap().value
+    }
+
+    /// The storage recipe of a prism sweep: the spine converted to its closed
+    /// `Curve` carrier and boxed (the form `SpineFrameSweep` stores).
+    fn prism_storage_recipe(
+        z0: f64,
+        z1: f64,
+    ) -> SpineFrameRecipe<Box<Curve>, ProfileLaw, FrameLaw> {
+        let recipe = prism_recipe(z0, z1);
+        SpineFrameRecipe::new(
+            Box::new(recipe.spine.into()),
+            recipe.profile_law.clone(),
+            recipe.frame_law,
+        )
+    }
+
+    #[test]
+    fn sweep_stratum_lifts_with_window() {
+        // A straight-spine whole-sweep value over a nontrivial (profile-edge)
+        // window.
+        let recipe = prism_storage_recipe(0.0, 1.0);
+        let sweep = SpineFrameSweep::try_new(recipe, 0.25, 0.75, 0.25, 0.5).unwrap();
+
+        // The lift adapter recognizes the sweep as a bounded `Sweep` stratum
+        // carrying the whole-sweep closed value and therefore the same window.
+        let stratum = sweep_stratum(sweep.clone());
+        let BoundedStratum::Sweep { sweep: lifted } = &stratum else {
+            unreachable!("a sweep must lift to the Sweep arm");
+        };
+        assert_eq!((lifted.s0(), lifted.s1()), (0.25, 0.75));
+        assert_eq!((lifted.v0(), lifted.v1()), (0.25, 0.5));
+
+        // The shapeops lift boundary recognizes a stored sweep face the same
+        // way (the path an assembled sweep solid rides).
+        let solid = prism_sweep_solid(0.0, 1.0);
+        let shell = solid.boundaries().first().unwrap();
+        let mut sweep_faces = 0usize;
+        for face in shell.face_iter() {
+            if matches!(face.surface(), Surface::SpineFrameSurface(_)) {
+                let Some(BoundedStratum::Sweep { sweep }) = sweep_face_stratum(face) else {
+                    unreachable!("a stored sweep face lifts to the Sweep arm");
+                };
+                assert_eq!(sweep.s0(), 0.0);
+                assert_eq!(sweep.s1(), 1.0);
+                sweep_faces += 1;
+            }
+        }
+        assert_eq!(sweep_faces, 4, "the prism has four side sweep faces");
+
+        // The `Unrecognized` refusal still fires for a genuinely non-canonical
+        // face (the other arm is asserted unchanged).
+        let refusal = face_stratum(
+            CanonicalCarrierWitness::Unrecognized,
+            (0.0, 1.0),
+            (0.0, 1.0),
+        );
+        assert!(
+            matches!(
+                refusal,
+                Err(Refusal::UnsupportedEnvelope(
+                    EnvelopeCase::ContactReductionDeferred
+                ))
+            ),
+            "a genuinely non-canonical face must still refuse at the lift"
+        );
+    }
+
+    #[test]
+    fn sweep_pairs_reach_interaction_solver() {
+        // The junction pair: a straight-spine sweep stratum against a canonical
+        // plane stratum (BIE-000 kit recipe class).
+        let recipe = prism_storage_recipe(0.0, 1.0);
+        let sweep = SpineFrameSweep::try_new(recipe, 0.0, 1.0, 0.0, 0.25).unwrap();
+        let sweep_stratum = sweep_stratum(sweep);
+        let plane_stratum = BoundedStratum::Face {
+            surface: CanonicalSurface::Plane(Plane::xy()),
+            u_range: (0.0, 1.0),
+            v_range: (0.0, 1.0),
+        };
+
+        // Both orders dispatch to the restricted sweep path (BIE-002), never
+        // the old `NonCanonicalCarrier` gate and never the deferred envelope:
+        // the pair answers with the typed `NumericallyUnresolved` outcome.
+        let mut budget_a = Budget::new(0, 0, 0);
+        let out = contact(&sweep_stratum, &plane_stratum, &mut budget_a);
+        assert!(
+            matches!(out, Err(Refusal::NumericallyUnresolved { .. })),
+            "the sweep × canonical pair must answer typed-Unresolved, got {out:?}"
+        );
+
+        let mut budget_b = Budget::new(0, 0, 0);
+        let out = contact(&plane_stratum, &sweep_stratum, &mut budget_b);
+        assert!(
+            matches!(out, Err(Refusal::NumericallyUnresolved { .. })),
+            "the canonical × sweep order must answer typed-Unresolved, got {out:?}"
+        );
+        assert!(
+            !matches!(
+                out,
+                Err(Refusal::UnsupportedEnvelope(
+                    EnvelopeCase::NonCanonicalCarrier
+                ))
+            ),
+            "a lifted sweep is never refused as NonCanonicalCarrier"
+        );
+    }
+
+    #[test]
+    fn classifier_seeds_from_arrangement_cells() {
+        // A sweep solid A strictly inside a canonical box B, no contact
+        // events: every face is one fragment. The BIE-006 arrangement-cell
+        // seeds decide each fragment's inside/out bit by the containment of its
+        // `(s, v)` region representative in the other shell — the sweep shell
+        // is classifiable even though a sweep-carrier shell cannot ride the
+        // landed canonical-carrier ray gate.
+        let a = prism_sweep_solid(0.5, 1.5);
+        let shell_a = a.boundaries().first().unwrap().clone();
+        let (pb, ab) = box_profile(-1.0, -2.0, 2.0, 1.0);
+        let shell_b = extrude_shell(&pb, &ab, 3.0);
+
+        let mesh = split_fragments(&shell_a, &shell_b, &[], TOL).unwrap().value;
+        assert_eq!(mesh.fragments.len(), 12, "six sweep faces + six box faces");
+
+        let seeds = classify_from_cells(&shell_a, &shell_b, &mesh, TOL)
+            .unwrap()
+            .value
+            .inside_other;
+        assert_eq!(seeds.len(), 12);
+
+        // A is strictly inside B: every sweep fragment's seed is INSIDE
+        // (true); the containing box's own fragments are outside A (false).
+        for bit in seeds.iter().take(6) {
+            assert!(bit, "a sweep fragment inside B must seed inside");
+        }
+        for bit in seeds.iter().skip(6) {
+            assert!(!bit, "a box fragment must seed outside the enclosed sweep");
+        }
+
+        // Parity unchanged: the canonical-only control rides the LANDED
+        // classifier and reproduces the landed disjoint answer (every bit
+        // outside) — the propagation machinery is untouched.
+        let (pa, aa) = block_profile();
+        let shell_block = extrude_shell(&pa, &aa, 2.0);
+        let (pd, ad) = disk_profile(Point2::new(6.0, 6.0), 1.0);
+        let shell_disk = extrude_shell(&pd, &ad, 2.0);
+        let control_mesh = split_fragments(&shell_block, &shell_disk, &[], TOL)
+            .unwrap()
+            .value;
+        let control = classify_fragments(&shell_block, &shell_disk, &control_mesh, TOL)
+            .unwrap()
+            .value
+            .inside_other;
+        assert_eq!(control.len(), 9);
+        assert!(
+            control.iter().all(|bit| !bit),
+            "the landed disjoint canonical control classifies every fragment outside"
+        );
+    }
+
+    /// The two junction halves of one prism side face: a straight-spine sweep
+    /// side face cut at the station `s_mid`. Each half is a genuine face whose
+    /// carrier is the ORIGINAL whole-window `SpineFrameSweep` (the split
+    /// fragment's carrier — a fragment keeps its parent face's surface) and
+    /// whose wire is the rectangular sub-region `[s0, s_mid]` / `[s_mid, s1]`
+    /// over the face's ring window. The assembler's windowed emission must
+    /// re-window each kept half to exactly that box.
+    fn junction_halves(
+        face: &Face<Point3, Curve, Surface>,
+        sweep: &SpineFrameSweep,
+        s_mid: f64,
+    ) -> (Face<Point3, Curve, Surface>, Face<Point3, Curve, Surface>) {
+        let w0 = sweep.v0();
+        let w1 = sweep.v1();
+        let s0 = sweep.s0();
+        let s1 = sweep.s1();
+        let at = |s: f64, v: f64| sweep.subs(s, v);
+        let (a00, a01) = (at(s0, w0), at(s0, w1));
+        let (b00, b01) = (at(s_mid, w0), at(s_mid, w1));
+        let (c00, c01) = (at(s1, w0), at(s1, w1));
+
+        // A ring of four shared corner vertices (closed and simple).
+        let ring = |v0: Point3, v1: Point3, v2: Point3, v3: Point3| -> Wire<Point3, Curve> {
+            let (a, b, c, d) = (
+                Vertex::new(v0),
+                Vertex::new(v1),
+                Vertex::new(v2),
+                Vertex::new(v3),
+            );
+            let edges = [
+                Edge::try_new(&a, &b, Curve::Line(Line(a.point(), b.point()))).unwrap(),
+                Edge::try_new(&b, &c, Curve::Line(Line(b.point(), c.point()))).unwrap(),
+                Edge::try_new(&c, &d, Curve::Line(Line(c.point(), d.point()))).unwrap(),
+                Edge::try_new(&d, &a, Curve::Line(Line(d.point(), a.point()))).unwrap(),
+            ];
+            Wire::from(edges.to_vec())
+        };
+        let below_wire = ring(a00, b00, b01, a01);
+        let above_wire = ring(b00, c00, c01, b01);
+        let surface = face.surface();
+        let below = Face::try_new(vec![below_wire], surface.clone()).unwrap();
+        let above = Face::try_new(vec![above_wire], surface).unwrap();
+        (below, above)
+    }
+
+    #[test]
+    fn assembler_emits_windowed_sweep_faces() {
+        // The junction fixture (teapot-junction class): a straight-spine prism
+        // sweep A cut by a canonical plane perpendicular to the spine at the
+        // station s_mid (the Difference over the junction removes the sweep
+        // material past the cut). The kept halves are the assembler's output
+        // fragments: their carriers are still the whole-window sweep, and
+        // ASSEMBLE emits them as WINDOWED `SpineFrameSweep` faces (the type
+        // already carries windowed domains) with the expected window bounds.
+        let a = prism_sweep_solid(0.3, 1.3);
+        let shell_a = a.boundaries().first().unwrap().clone();
+        let s_mid = 0.5;
+
+        let mut emitted: Vec<(f64, f64, f64, f64)> = Vec::new();
+        let mut raw: Vec<(f64, f64, f64, f64)> = Vec::new();
+        for face in shell_a.face_iter() {
+            let Surface::SpineFrameSurface(sweep) = face.surface() else {
+                continue;
+            };
+            let (below, above) = junction_halves(&face, &sweep, s_mid);
+            for half in [below, above] {
+                let Some(emitted_face) = windowed_sweep_face(&half, TOL) else {
+                    let boxed = super::super::sweep_lift::face_parameter_box(&half, TOL);
+                    panic!(
+                        "windowed emission returned None for a junction half; parameter box: {boxed:?}"
+                    );
+                };
+                let Surface::SpineFrameSurface(emitted_sweep) = emitted_face.surface() else {
+                    unreachable!("the emitted face is a windowed SpineFrameSweep");
+                };
+                emitted.push((
+                    emitted_sweep.s0(),
+                    emitted_sweep.s1(),
+                    emitted_sweep.v0(),
+                    emitted_sweep.v1(),
+                ));
+                let Surface::SpineFrameSurface(raw_sweep) = half.surface() else {
+                    unreachable!("the half fragment's carrier is the whole-window sweep");
+                };
+                raw.push((
+                    raw_sweep.s0(),
+                    raw_sweep.s1(),
+                    raw_sweep.v0(),
+                    raw_sweep.v1(),
+                ));
+            }
+        }
+
+        // Four side faces × two halves: every emitted sweep face carries a
+        // windowed domain (its own station/ring extent), never the whole
+        // `[0, 1] × [j/4, (j+1)/4]` parent window twice.
+        assert_eq!(
+            emitted.len(),
+            8,
+            "four side faces emit two windowed halves each"
+        );
+        assert_eq!(raw.len(), 8);
+        let below_windows: Vec<(f64, f64)> = emitted
+            .iter()
+            .map(|(s0, s1, _, _)| (*s0, *s1))
+            .filter(|(_s0, s1)| (*s1 - s_mid).abs() <= TOL)
+            .collect();
+        let above_windows: Vec<(f64, f64)> = emitted
+            .iter()
+            .map(|(s0, s1, _, _)| (*s0, *s1))
+            .filter(|(s0, _s1)| (*s0 - s_mid).abs() <= TOL)
+            .collect();
+        assert_eq!(
+            below_windows.len(),
+            4,
+            "the below-cut halves are windowed to [0, s_mid]"
+        );
+        assert_eq!(
+            above_windows.len(),
+            4,
+            "the above-cut halves are windowed to [s_mid, 1]"
+        );
+        for (s0, s1) in below_windows.iter().chain(above_windows.iter()) {
+            assert!(
+                *s0 >= 0.0 && *s1 <= 1.0,
+                "windows stay inside the parent sweep"
+            );
+        }
     }
 }
