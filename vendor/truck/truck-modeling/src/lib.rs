@@ -103,6 +103,10 @@ pub mod builder;
 /// BG-CAD-P1-UTILITY: certified utility surface + planar face construction.
 pub mod cad;
 mod closed_sweep;
+/// PB-001-SELECTORS: scoped selector layer over live topology (deterministic
+/// face/edge enumeration over `EntityId` identity, per-face facts, and
+/// `BlendSpec`-compatible edge names).
+pub mod selectors;
 /// declare errors
 pub mod errors;
 /// BG-SOL-S2-EXTRUDE: direct certified extrude of a planar arrangement.
