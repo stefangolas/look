@@ -1048,6 +1048,47 @@ impl CircleCarrier {
         }
         out
     }
+
+    /// Whether `p` lies on this carrier's trimmed arc — the CCW angular
+    /// window `[t0, t1]` modulo `TAU` (a reversed placement spans the same
+    /// geometric window, only traversed backwards). A point on the supporting
+    /// circle but outside the trim window is OFF the arc: a full-circle
+    /// intersection root there is not a contact of the trimmed carrier, so the
+    /// certified line/circle and circle/circle predicates report only on-arc
+    /// contacts (BIE-005-ARRANGE §4; the dyadic discipline, H-3).
+    fn on_arc(&self, p: Point2) -> bool {
+        let v = p - self.center;
+        let eu2 = self.e_u.dot(self.e_u);
+        let ev2 = self.e_v.dot(self.e_v);
+        if eu2 == 0.0 || ev2 == 0.0 || !v.x.is_finite() || !v.y.is_finite() {
+            return false;
+        }
+        let cos_t = v.dot(self.e_u) / eu2;
+        let sin_t = v.dot(self.e_v) / ev2;
+        let mut ang = f64::atan2(sin_t, cos_t);
+        if ang < 0.0 {
+            ang += TAU;
+        }
+        self.angle_in_range(ang)
+    }
+
+    /// Whether a CCW angle (in `[0, TAU)`) lies inside the carrier's trim
+    /// window `[t0, t1]`. A window of span `≥ TAU` covers every angle; a
+    /// narrower window may wrap across the seam, which the `rem_euclid`-based
+    /// normalization below resolves without the `param_of_point` walk.
+    fn angle_in_range(&self, ang: f64) -> bool {
+        let len = self.t1 - self.t0;
+        if len >= TAU {
+            return true;
+        }
+        let a0 = self.t0.rem_euclid(TAU);
+        let end = a0 + len;
+        if end <= TAU {
+            ang >= a0 && ang <= end
+        } else {
+            ang >= a0 || ang <= end - TAU
+        }
+    }
 }
 
 /// The recognized 2-D carrier of a profile curve in the plane.
@@ -1498,9 +1539,17 @@ fn line_circle_intersection(
     let t2 = ratio_f64(&t2_num, &dd)?;
     let p1 = line_point(&da, &r, &t1_num, &dd)?;
     let p2 = line_point(&da, &r, &t2_num, &dd)?;
-    let c1 = circle.param_of_point(p1);
-    let c2 = circle.param_of_point(p2);
-    Ok(vec![(t1, c1, pt3(p1)), (t2, c2, pt3(p2))])
+    // A trimmed circle reports only the roots ON its arc window: a root on the
+    // supporting circle but outside `(t0, t1)` is off the carrier and would
+    // not be a contact of the trimmed curve (PB-002-SKETCH-ARCS, additive).
+    let mut contacts = Vec::new();
+    if circle.on_arc(p1) {
+        contacts.push((t1, circle.param_of_point(p1), pt3(p1)));
+    }
+    if circle.on_arc(p2) {
+        contacts.push((t2, circle.param_of_point(p2), pt3(p2)));
+    }
+    Ok(contacts)
 }
 
 /// The point `a + (num_t / denom) · r` in exact arithmetic.
@@ -1574,10 +1623,18 @@ fn circle_circle_intersection(
     let p2y = dyad_result(p2y_num.sub(&tnx))?;
     let p1 = Point2::new(ratio_f64(&p1x, &a)?, ratio_f64(&p1y, &a)?);
     let p2 = Point2::new(ratio_f64(&p2x, &a)?, ratio_f64(&p2y, &a)?);
-    Ok(vec![
-        (c1.param_of_point(p1), c2.param_of_point(p1), pt3(p1)),
-        (c2.param_of_point(p2), c2.param_of_point(p2), pt3(p2)),
-    ])
+    // Trimmed circles report a root only when it lies on BOTH carriers' arc
+    // windows: a root on a supporting circle but outside a trim window is off
+    // that carrier and is not a contact of the pair (PB-002-SKETCH-ARCS,
+    // additive). Each contact carries the parameter on the FIRST carrier first.
+    let mut contacts = Vec::new();
+    if c1.on_arc(p1) && c2.on_arc(p1) {
+        contacts.push((c1.param_of_point(p1), c2.param_of_point(p1), pt3(p1)));
+    }
+    if c1.on_arc(p2) && c2.on_arc(p2) {
+        contacts.push((c1.param_of_point(p2), c2.param_of_point(p2), pt3(p2)));
+    }
+    Ok(contacts)
 }
 
 /// Integer square root of a `u128`, `None` when not a perfect square.
@@ -2880,3 +2937,24 @@ mod tests {
         assert_eq!(pt, pt2(1.0, 1.0));
     }
 }
+
+// ---------------------------------------------------------------------------
+// PB-002-SKETCH-ARCS — the sketch authoring layer.
+//
+// The arc + spline constructors and the mixed-loop assembly live in a child
+// module so they can reach this module's private carrier machinery (the
+// `Carrier2D` envelope and the certified intersect dispatcher). Everything
+// here is ADDITIVE: the landed `Arrangement`/`arrange` semantics are
+// byte-stable (the V5 identity guard). The module is deliberately NOT `pub`:
+// `arrange.rs` gains only `pub mod`-free additive items (PB-002 scope §5).
+// ---------------------------------------------------------------------------
+#[path = "sketch.rs"]
+mod sketch;
+
+// PB-002-SKETCH-ARCS — the authoring constructors are re-exported from the
+// arrangement module (an additive `pub use`, never a `pub mod`): the sketch
+// authoring API is reachable as `crate::arrange::{arc_radius, arc_three_point,
+// spline, assemble, SketchArc, SketchSegment, SketchLoop}`.
+pub use sketch::{
+    arc_radius, arc_three_point, assemble, spline, SketchArc, SketchLoop, SketchSegment,
+};
