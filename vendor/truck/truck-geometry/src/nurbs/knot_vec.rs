@@ -797,6 +797,42 @@ impl KnotVec {
     }
 }
 
+/// The de Boor-averaged interpolation knot vector over `stations`
+/// (NUM-INTERPOLE-OVERSHOOT-001): `ξ_{j+q} = (1/q) Σ_{r=j}^{j+q−1} v_r` with
+/// the clamped ends repeated `q + 1` times — the pure-math port of the landed
+/// certified definition, provided here because truck-geometry cannot depend on
+/// truck-certified. The resulting clamped knot vector satisfies the
+/// Schoenberg–Whitney condition for interpolation through the same `stations`
+/// at `degree q` (each station lies in the interior of its matching basis
+/// support), which is exactly the property [`BSplineCurve::try_interpole`]
+/// now verifies before admitting a caller-supplied knot vector.
+///
+/// This is the DEFAULT knot choice for interpolant users: pass its result as
+/// the `knot_vec` argument of [`BSplineCurve::try_interpole`] together with
+/// the same `stations`.
+///
+/// Preconditions (a valid interpolation system): `degree >= 1` and
+/// `stations.len() > degree`. The returned knot vector has length
+/// `stations.len() + degree + 1`.
+pub fn averaged_interpolation_knots(stations: &[f64], degree: usize) -> KnotVec {
+    let n = stations.len();
+    let p = degree;
+    let mut knots = Vec::with_capacity(n + p + 1);
+    knots.extend(std::iter::repeat_n(stations[0], p + 1));
+    if let Some(limit) = n.checked_sub(p + 1) {
+        let inv_p = 1.0 / p as f64;
+        for j in 1..=limit {
+            let mut sum = 0.0;
+            for r in j..(j + p) {
+                sum += stations[r];
+            }
+            knots.push(sum * inv_p);
+        }
+    }
+    knots.extend(std::iter::repeat_n(stations[n - 1], p + 1));
+    KnotVec(knots)
+}
+
 impl From<Vec<f64>> for KnotVec {
     /// constructs from `Vec<f64>`. The vector will sorted by the order.
     /// ```

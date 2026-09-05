@@ -14,6 +14,9 @@ use truck_base::evidence::{
     Budget, Certificate, Certified, ConstructErrorSummary, EnvelopeCase, Margin, Method, Modulus,
     Outcome, PropMap, RealizationCertificate, RealizationVerdict, Refusal, SharedEdgePairEvidence,
 };
+use truck_geometry::constructive::validation::{
+    validate_correspondence, validate_scalar_law_range,
+};
 use truck_geometry::constructive::*;
 use truck_polymesh::*;
 
@@ -107,6 +110,25 @@ pub fn facet_sweep<S: SpineCurve>(
         .any(|&s| s < s_min - parameter_tol || s > s_max + parameter_tol)
     {
         return Err(ConstructError::InvalidInput);
+    }
+
+    // 1b. V1 profile-law domain validation, shared with the BREP entry
+    // (SEM-FACET-SCALE-ZERO-001, SEM-FACET-CORRESPONDENCE-TRUNCATION-001):
+    // a `Scale` law whose scalar touches zero anywhere on the CLOSED station
+    // window, and a struct-literal `LinearCorrespondence` whose vertex counts
+    // differ, refuse here — the same admissions the BREP path already enforces.
+    // The per-station evaluator catches a zero AT a station; the window gate
+    // catches the between-station zero sampling misses.
+    let s_first = stations[0];
+    let s_last = stations[stations.len() - 1];
+    match &recipe.profile_law {
+        ProfileLaw::Scale { scale, .. } => {
+            validate_scalar_law_range(scale, (s_first, s_last))?;
+        }
+        ProfileLaw::LinearCorrespondence { start, end } => {
+            validate_correspondence(start.vertices.len(), end.vertices.len())?;
+        }
+        ProfileLaw::Constant(_) => {}
     }
 
     // 2. Grid emission. The position array IS the grid registry: grid vertex
@@ -432,4 +454,168 @@ pub fn facet_sweep_certified<S: SpineCurve>(
         modulus: Modulus::Unbounded,
     };
     Ok(Certified::new(result, certificate))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::spine_sweep::spine_sweep;
+    use truck_base::cgmath64::{Point2, Point3, Vector3};
+
+    fn unit_square() -> Profile2D {
+        Profile2D {
+            vertices: vec![
+                Point2::new(0.0, 0.0),
+                Point2::new(1.0, 0.0),
+                Point2::new(1.0, 1.0),
+                Point2::new(0.0, 1.0),
+            ],
+        }
+    }
+
+    fn regular_polygon(n: usize, radius: f64) -> Profile2D {
+        let vertices = (0..n)
+            .map(|i| {
+                let t = 2.0 * std::f64::consts::PI * (i as f64) / (n as f64);
+                Point2::new(radius * t.cos(), radius * t.sin())
+            })
+            .collect();
+        match Profile2D::try_closed(vertices) {
+            Ok(profile) => profile,
+            Err(error) => panic!("regular polygon must be a valid closed profile: {error:?}"),
+        }
+    }
+
+    fn vertical_line() -> LineSpine {
+        LineSpine {
+            start: Point3::new(0.0, 0.0, 0.0),
+            end: Point3::new(0.0, 0.0, 2.0),
+        }
+    }
+
+    fn stations(spine: usize) -> Vec<f64> {
+        match (SamplingPolicy::UniformCount { spine }).resolve(0.0, 1.0) {
+            Ok(stations) => stations,
+            Err(error) => panic!("the station fixture must resolve: {error:?}"),
+        }
+    }
+
+    fn through_zero_recipe() -> SpineFrameRecipe<LineSpine, ProfileLaw, FrameLaw> {
+        SpineFrameRecipe::new(
+            vertical_line(),
+            ProfileLaw::Scale {
+                profile: unit_square(),
+                scale: ScalarLaw::Linear {
+                    start: 1.0,
+                    end: -1.0,
+                },
+            },
+            FrameLaw::FixedPlane {
+                normal: Vector3::unit_x(),
+            },
+        )
+    }
+
+    fn mismatched_correspondence_recipe() -> SpineFrameRecipe<LineSpine, ProfileLaw, FrameLaw> {
+        // Built as a STRUCT LITERAL, deliberately bypassing
+        // `try_linear_correspondence`: the defect path.
+        SpineFrameRecipe::new(
+            vertical_line(),
+            ProfileLaw::LinearCorrespondence {
+                start: regular_polygon(4, 0.2),
+                end: regular_polygon(6, 0.1),
+            },
+            FrameLaw::FixedPlane {
+                normal: Vector3::unit_x(),
+            },
+        )
+    }
+
+    fn valid_recipe() -> SpineFrameRecipe<LineSpine, ProfileLaw, FrameLaw> {
+        SpineFrameRecipe::new(
+            LineSpine {
+                start: Point3::origin(),
+                end: Point3::new(0.0, 0.0, 1.0),
+            },
+            ProfileLaw::Constant(unit_square()),
+            FrameLaw::FixedPlane {
+                normal: Vector3::unit_x(),
+            },
+        )
+    }
+
+    #[test]
+    fn facet_path_refuses_through_zero_scale() {
+        // SEM-FACET-SCALE-ZERO-001: the facet backend must refuse a through-zero
+        // `Scale` law the moment the shared window validator sees the sign
+        // change — the same typed refusal the BREP entry produces.
+        let recipe = through_zero_recipe();
+        let result = facet_sweep(&recipe, &stations(4), 4);
+        match result {
+            Err(ConstructError::ProfileCollapse { at }) => {
+                let expected = 0.5;
+                assert!(
+                    (at - expected).abs() <= 1.0e-12, // H-3: the linear root is exactly 0.5
+                    "the collapse must be reported at the closed-form zero {expected}, got {at}"
+                );
+            }
+            other => panic!(
+                "through-zero scale must refuse ProfileCollapse on the facet path, got {other:?}"
+            ),
+        }
+    }
+
+    #[test]
+    fn facet_path_refuses_mismatched_correspondence() {
+        // SEM-FACET-CORRESPONDENCE-TRUNCATION-001: a struct-literal
+        // `LinearCorrespondence` with differing vertex counts must refuse at the
+        // facet entry — never zip-truncate to the shorter profile.
+        let recipe = mismatched_correspondence_recipe();
+        let result = facet_sweep(&recipe, &stations(4), 4);
+        match result {
+            Err(ConstructError::ProfileCorrespondenceMismatch) => {}
+            other => panic!(
+                "mismatched correspondence must refuse ProfileCorrespondenceMismatch \
+                 on the facet path, got {other:?}"
+            ),
+        }
+    }
+
+    #[test]
+    fn spine_sweep_refusals_unchanged_on_the_twin_fixtures() {
+        // The BREP entry's refusals on the twin fixtures are unchanged by the
+        // shared-validator move: both SEM fixtures still refuse at the entry
+        // with the same constructive-refusal envelope.
+        let through_zero = spine_sweep(&through_zero_recipe(), &stations(4));
+        match through_zero {
+            Err(Refusal::UnsupportedEnvelope(EnvelopeCase::ConstructRefused)) => {}
+            other => panic!("the BREP twin must still refuse through-zero scale, got {other:?}"),
+        }
+        let mismatched = spine_sweep(&mismatched_correspondence_recipe(), &stations(4));
+        match mismatched {
+            Err(Refusal::UnsupportedEnvelope(EnvelopeCase::ConstructRefused)) => {}
+            other => {
+                panic!("the BREP twin must still refuse mismatched correspondence, got {other:?}")
+            }
+        }
+    }
+
+    #[test]
+    fn valid_recipes_still_realize_on_both_paths() {
+        // Backend symmetry, positive direction: a valid recipe realizes on the
+        // facet path AND the authored-BREP path, with a clean winding audit on
+        // the facet mesh.
+        let recipe = valid_recipe();
+        let result = facet_sweep(&recipe, &[0.0, 0.5, 1.0], 4);
+        match result {
+            Ok(realized) => {
+                assert_eq!(realized.audit.winding_violations, 0);
+            }
+            Err(error) => panic!("the valid recipe must realize on the facet path: {error:?}"),
+        }
+        match spine_sweep(&recipe, &[0.0, 1.0]) {
+            Ok(_) => {}
+            Err(refusal) => panic!("the valid recipe must realize on the BREP path: {refusal:?}"),
+        }
+    }
 }

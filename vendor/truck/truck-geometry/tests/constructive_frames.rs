@@ -74,6 +74,47 @@ fn rotated_about_z(v: Vector3, rot: f64) -> Vector3 {
     Vector3::new(v.x * c - v.y * sn, v.x * sn + v.y * c, v.z)
 }
 
+/// The circular helix about the Z axis: `C(s) = (cos θ, sin θ, c·θ)` with
+/// `θ = 2πs`. Genuinely non-planar; its tangent is never orthogonal to `up =
+/// +Z` when `c != 0`, which makes it the FixedPlane/non-planar fixture.
+#[derive(Debug, Clone, Copy)]
+struct HelixSpine {
+    c: f64,
+}
+
+impl SpineCurve for HelixSpine {
+    fn domain(&self) -> (f64, f64) {
+        (0.0, 1.0)
+    }
+
+    fn position_at(&self, s: f64) -> Result<Point3, ConstructError> {
+        if !s.is_finite() {
+            return Err(ConstructError::NonFinite { at: s });
+        }
+        if !(0.0..=1.0).contains(&s) {
+            return Err(ConstructError::InvalidInput);
+        }
+        let theta = 2.0 * std::f64::consts::PI * s;
+        Ok(Point3::new(theta.cos(), theta.sin(), self.c * theta))
+    }
+
+    fn derivative_at(&self, s: f64) -> Result<Vector3, ConstructError> {
+        if !s.is_finite() {
+            return Err(ConstructError::NonFinite { at: s });
+        }
+        if !(0.0..=1.0).contains(&s) {
+            return Err(ConstructError::InvalidInput);
+        }
+        let two_pi = 2.0 * std::f64::consts::PI;
+        let theta = 2.0 * std::f64::consts::PI * s;
+        Ok(Vector3::new(
+            -two_pi * theta.sin(),
+            two_pi * theta.cos(),
+            two_pi * self.c,
+        ))
+    }
+}
+
 /// The Constant-profile triangle used by every frame fixture.
 fn triangle() -> Profile2D {
     Profile2D {
@@ -158,6 +199,8 @@ fn fixed_plane_refuses_degenerate_normal() {
 
 #[test]
 fn architectural_up_matches_spec_formula() {
+    // ORI-FRAME-HANDEDNESS-001: the law's completion is right-handed — the
+    // normal is `b × t`, so `t × n == b` at every station.
     let up = Vector3::unit_z();
     let recipe = SpineFrameRecipe::new(
         LineSpine {
@@ -169,7 +212,7 @@ fn architectural_up_matches_spec_formula() {
     );
     let t = Vector3::new(1.0, 1.0, 0.0).normalize();
     let b = up.cross(t).normalize();
-    let n = t.cross(b);
+    let n = b.cross(t);
     let tol = DirectTolerance::default().position;
     for s in [0.0, 0.5, 1.0] {
         let ok = match recipe.frame(s) {
@@ -177,6 +220,7 @@ fn architectural_up_matches_spec_formula() {
                 (f.tangent - t).magnitude() <= tol
                     && (f.binormal - b).magnitude() <= tol
                     && (f.normal - n).magnitude() <= tol
+                    && (f.tangent.cross(f.normal) - f.binormal).magnitude() <= tol
             }
             Err(_) => false,
         };
@@ -386,4 +430,163 @@ fn radial_frame_is_equivariant_under_rotation() {
             "radial frame is not equivariant under the 90° rotation at s = {s}"
         );
     }
+}
+
+#[test]
+fn architectural_up_frame_is_right_handed_at_every_station() {
+    // ORI-FRAME-HANDEDNESS-001: after the sign fix the ArchitecturalUp law
+    // emits a right-handed orthonormal frame at EVERY station — `t × n == b`,
+    // unit lengths, pairwise orthogonal — on a spine whose tangent rotates.
+    let up = Vector3::unit_z();
+    let recipe = SpineFrameRecipe::new(
+        CircleSpine {
+            phi0: 0.0,
+            delta: 2.0 * std::f64::consts::PI,
+        },
+        ProfileLaw::Constant(triangle()),
+        FrameLaw::ArchitecturalUp { up },
+    );
+    let tol = DirectTolerance::default().position;
+    const N: usize = 24;
+    for i in 0..N {
+        let s = i as f64 / (N - 1) as f64;
+        let ok = match recipe.frame(s) {
+            Ok(f) => {
+                (f.tangent.magnitude() - 1.0).abs() <= tol
+                    && (f.normal.magnitude() - 1.0).abs() <= tol
+                    && (f.binormal.magnitude() - 1.0).abs() <= tol
+                    && f.tangent.dot(f.normal).abs() <= tol
+                    && f.tangent.dot(f.binormal).abs() <= tol
+                    && f.normal.dot(f.binormal).abs() <= tol
+                    && (f.tangent.cross(f.normal) - f.binormal).magnitude() <= tol
+            }
+            Err(_) => false,
+        };
+        assert!(
+            ok,
+            "ArchitecturalUp frame at s = {s} is not right-handed orthonormal"
+        );
+    }
+}
+
+#[test]
+fn fixed_plane_non_planar_spine_refuses_frame_singular() {
+    // ORI-FRAME-ORTHONORMALITY-GATE-001: a FixedPlane frame over a non-planar
+    // spine whose tangent leaves the pinned plane is not orthonormal
+    // (`|b × t| < 1`), so the `Frame3` gate refuses `FrameSingular` at every
+    // station. v1 REFUSES; projection onto the osculating plane is a later
+    // amendment.
+    let recipe = SpineFrameRecipe::new(
+        HelixSpine { c: 0.5 },
+        ProfileLaw::Constant(triangle()),
+        FrameLaw::FixedPlane {
+            normal: Vector3::unit_z(),
+        },
+    );
+    const N: usize = 12;
+    for i in 0..N {
+        let s = i as f64 / (N - 1) as f64;
+        assert!(
+            matches!(
+                recipe.frame(s),
+                Err(ConstructError::FrameSingular {
+                    law: "FixedPlane",
+                    at
+                }) if at == s
+            ),
+            "FixedPlane on a non-planar spine must refuse FrameSingular at s = {s}"
+        );
+    }
+}
+
+#[test]
+fn radial_about_axis_non_orthogonal_refuses_frame_singular() {
+    // ORI-FRAME-ORTHONORMALITY-GATE-001: a RadialAboutAxis frame whose spine
+    // tangent carries a radial component is non-orthogonal (`b = t × n` is
+    // sub-unit), so the `Frame3` gate refuses `FrameSingular` — the frame is
+    // never silently sheared.
+    let recipe = SpineFrameRecipe::new(
+        LineSpine {
+            start: Point3::new(1.0, 0.0, 0.0),
+            end: Point3::new(2.0, 1.0, 0.0),
+        },
+        ProfileLaw::Constant(triangle()),
+        FrameLaw::RadialAboutAxis {
+            origin: Point3::origin(),
+            axis: Vector3::unit_z(),
+        },
+    );
+    for s in [0.0, 0.25, 0.5, 0.75, 1.0] {
+        assert!(
+            matches!(
+                recipe.frame(s),
+                Err(ConstructError::FrameSingular {
+                    law: "RadialAboutAxis",
+                    at
+                }) if at == s
+            ),
+            "a radial spine tangent must refuse FrameSingular at s = {s}"
+        );
+    }
+}
+
+#[test]
+fn parallel_transport_behavior_bit_identical_on_planar_and_nonplanar_fixtures() {
+    // ORI-FRAME-ORTHONORMALITY-GATE-001: routing ParallelTransport through the
+    // `Frame3` gate must not perturb the transported frame — the law is clean
+    // on planar AND non-planar spines, the emitted frames stay orthonormal
+    // right-handed, and repeated evaluation returns bit-identical triples.
+    fn orthonormal(f: &Frame3) -> bool {
+        let tol = DirectTolerance::default().position;
+        (f.tangent.magnitude() - 1.0).abs() <= tol
+            && (f.normal.magnitude() - 1.0).abs() <= tol
+            && (f.binormal.magnitude() - 1.0).abs() <= tol
+            && f.tangent.dot(f.normal).abs() <= tol
+            && f.tangent.dot(f.binormal).abs() <= tol
+            && f.normal.dot(f.binormal).abs() <= tol
+            && (f.tangent.cross(f.normal) - f.binormal).magnitude() <= tol
+    }
+    // The planar fixture: a quarter-circle arc in the z = 0 plane.
+    let planar = SpineFrameRecipe::new(
+        CircleSpine {
+            phi0: 0.0,
+            delta: std::f64::consts::FRAC_PI_2,
+        },
+        ProfileLaw::Constant(triangle()),
+        FrameLaw::ParallelTransport {
+            initial_normal: Vector3::unit_z(),
+        },
+    );
+    // The non-planar fixture: the helix.
+    let nonplanar = SpineFrameRecipe::new(
+        HelixSpine { c: 0.5 },
+        ProfileLaw::Constant(triangle()),
+        FrameLaw::ParallelTransport {
+            initial_normal: Vector3::unit_z(),
+        },
+    );
+    fn check_recipe<S: SpineCurve>(recipe: &SpineFrameRecipe<S, ProfileLaw, FrameLaw>) {
+        const N: usize = 16;
+        for i in 0..N {
+            let s = i as f64 / (N - 1) as f64;
+            let first = match recipe.frame(s) {
+                Ok(frame) => frame,
+                Err(error) => panic!("ParallelTransport refused the fixture at s = {s}: {error:?}"),
+            };
+            assert!(
+                orthonormal(&first),
+                "ParallelTransport frame at s = {s} is not orthonormal right-handed"
+            );
+            let second = match recipe.frame(s) {
+                Ok(frame) => frame,
+                Err(error) => panic!("second evaluation refused at s = {s}: {error:?}"),
+            };
+            assert_eq!(
+                first, second,
+                "ParallelTransport must be bit-identical across evaluations at s = {s}"
+            );
+        }
+    }
+    check_recipe(&planar);
+    check_recipe(&nonplanar);
 }

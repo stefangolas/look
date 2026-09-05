@@ -191,6 +191,18 @@ the number of control points: {1}"
     /// ```
     #[error("Gaussian elimination is failed.")]
     GaussianEliminationFailure,
+    /// The interpolation was not Schoenberg–Whitney verified: either the
+    /// caller's knot vector violates the Schoenberg–Whitney condition at the
+    /// station `at` (the `at`-th basis function is zero there), or the solved
+    /// control points overshoot the data extent by more than `BOUND_FACTOR`
+    /// (the near-singular no-pivot solve delivered a wildly oscillating
+    /// interpolant — NUM-INTERPOLE-OVERSHOOT-001). Never a panic, never a
+    /// silent accept.
+    #[error("interpolation is not Schoenberg-Whitney verified at station {at}")]
+    InterpolationNotSwVerified {
+        /// The station parameter where the verification failed.
+        at: f64,
+    },
 }
 
 #[test]
