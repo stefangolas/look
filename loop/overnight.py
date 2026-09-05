@@ -35,6 +35,7 @@ QUEUE = str(ROOT / "loop" / "cargoq")
 LOG = ROOT / "loop" / "overnight.log"
 LANDED_RE = re.compile(r"landed [0-9a-f]{7,}")
 POLL_SECONDS = 300
+BATTERY_COOLDOWN_UNTIL = 0.0
 BATTERY_ENV = {**os.environ,
                "PATH": QUEUE + os.pathsep + os.environ.get("PATH", ""),
                "CARGO_BUILD_JOBS": "2"}
@@ -174,8 +175,18 @@ def try_land(slot_dir, slot_no, rows, order, reg_path):
 
 
 def all_landed(rows):
+    prog = [r for r in rows.values()
+            if r["id"].startswith(("BG-KV2-", "CC-"))]
+    if not prog:
+        return False  # vacuous truth fired the premature battery (session 51)
     return all(LANDED_RE.search((r.get("note") or "").lower())
-               for r in rows.values() if r["id"].startswith("BG-KV2-"))
+               for r in prog)
+
+
+def rows_done(rows):
+    return all(r.get("status") == "DONE"
+               for r in rows.values()
+               if r["id"].startswith(("BG-KV2-", "CC-")))
 
 
 def battery(rows, order, reg_path):
@@ -289,15 +300,31 @@ def main():
                     and parts[2] == "FINISHED":
                 try_land(ROOT / "loop" / "slots" / parts[1],
                          parts[1], rows, order, reg_path)
-        # Rolling dispatch (owner direction, session 51): refill slots before`n        # the landed check - the KV2 overnight ran waves by hand; the CC`n        # program is chain-serial and must not idle a slot behind the author.`n        disp = sh([sys.executable, str(ROOT / "loop" / "dispatch_ready.py"),`n                   "--max-workers", "3"], timeout=1800)`n        for ln in (disp.stdout or "").splitlines():`n            if "dispatched" in ln or "clash" in ln or "blocked" in ln:`n                log(f"dispatch: {ln.strip()}")`n        if all_landed(rows):
+        # Rolling dispatch (owner direction, session 51): refill slots before
+        # the landed check - the KV2 overnight ran waves by hand; the CC
+        # program is chain-serial and must not idle a slot behind the author.
+        disp = sh([sys.executable, str(ROOT / 'loop' / 'dispatch_ready.py'),
+                   '--max-workers', '3'], timeout=1800)
+        for ln in (disp.stdout or '').splitlines():
+            if 'dispatched' in ln or 'clash' in ln or 'blocked' in ln:
+                log('dispatch: ' + ln.strip())
+        if all_landed(rows):
             still_running = any(
                 len(l.split()) >= 3 and l.split()[2] == "RUNNING"
                 for l in status_out.splitlines()
                 if l.startswith("slot "))
             if not still_running:
-                battery(rows, order, reg_path)
-                battery_done = True
-                break
+                if time.time() < BATTERY_COOLDOWN_UNTIL:
+                    log("battery cooldown active - cycling")
+                elif rows_done(rows) and all_landed(rows):
+                    battery(rows, order, reg_path)
+                    if rows_done(rows):
+                        battery_done = True
+                        break
+                    BATTERY_COOLDOWN_UNTIL = time.time() + 2 * 3600
+                    log("battery not green - 2h cooldown, the loop keeps cycling")
+                else:
+                    log("program rows not all DONE yet - keep cycling")
         time.sleep(POLL_SECONDS)
     log("overnight driver exit")
 

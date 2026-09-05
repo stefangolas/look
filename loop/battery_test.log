@@ -1,0 +1,514 @@
+
+running 187 tests
+test ocrt::tests::test_root_failure_preservation ... ok
+test cli::tests::explicit_commands_are_not_rewritten ... ok
+test config::tests::parses_resolution ... ok
+test config::tests::color_is_converted_to_linear ... ok
+test config::tests::named_views_have_stable_ids ... ok
+test cli::tests::model_path_implies_render_command ... ok
+test scene::tests::generated_triangle_normals_face_positive_z ... ok
+test camera::tests::orthographic_fit_uses_projected_bounds_not_diagonal_radius ... ok
+test camera::tests::camera_matrices_are_finite ... ok
+test scene::tests::soup_normals_decline_a_welded_mesh ... ok
+test scene::tests::transformed_bounds_include_all_corners ... ok
+test ocrt::tests::test_obligation_discharge_produces_certificate ... ok
+test scene::tests::parses_binary_stl_without_an_import_framework ... ok
+test scene::tests::parses_ascii_stl_case_insensitively ... ok
+test scene::tests::soup_normals_agree_with_the_general_path ... ok
+test ocrt::tests::test_assumption_ledger_conservation ... ok
+test step::circular_arc::tests::a_nearly_circular_ellipse_is_still_refused_by_the_exact_decoder ... ok
+test step::circular_arc::tests::a_non_finite_determinant_does_not_certify_an_orientation ... ok
+test step::circular_arc::tests::a_negative_sweep_is_preserved ... ok
+test step::circular_arc::tests::a_near_singular_transform_does_not_certify_an_orientation ... ok
+test step::circular_arc::tests::a_non_finite_interval_is_refused ... ok
+test step::circular_arc::tests::a_nonuniformly_transformed_source_circle_is_not_admitted ... ok
+test step::circular_arc::tests::a_one_ulp_anisotropy_is_certified_non_circular_not_undecidable ... ok
+test step::circular_arc::tests::a_one_ulp_shear_is_certified_non_circular ... ok
+test step::circular_arc::tests::a_partial_arc_is_not_a_full_turn ... ok
+test step::circular_arc::tests::a_reflected_source_circle_still_reports_a_reversing_transform ... ok
+test step::circular_arc::tests::a_reflection_is_orientation_reversing_but_still_circular ... ok
+test step::circular_arc::tests::a_shear_is_refused_as_a_noncircular_ellipse ... ok
+test step::circular_arc::tests::a_seam_crossing_interval_is_preserved_unwrapped ... ok
+test step::circular_arc::tests::a_single_full_turn_is_recognised ... ok
+test step::circular_arc::tests::a_source_circle_whose_transform_is_measurably_not_a_similarity_is_undecided ... ok
+test step::circular_arc::tests::a_source_circle_with_finite_precision_orientation_is_retained_as_a_circle ... ok
+test step::circular_arc::tests::a_sweep_greater_than_pi_is_preserved ... ok
+test step::circular_arc::tests::a_tiny_nonzero_shear_is_never_a_circle ... ok
+test step::circular_arc::tests::a_translated_rotated_arc_evaluates_through_the_full_composition ... ok
+test step::circular_arc::tests::a_zero_determinant_transform_is_refused ... ok
+test step::circular_arc::tests::an_anisotropy_at_five_e_minus_ten_is_certified_non_circular_not_undecidable ... ok
+test step::circular_arc::tests::an_anisotropy_at_two_e_minus_nine_is_certified_non_circular ... ok
+test step::circular_arc::tests::an_eight_ulp_anisotropy_is_certified_non_circular ... ok
+test step::circular_arc::tests::an_exact_positive_near_zero_determinant_still_certifies_orientation ... ok
+test step::circular_arc::tests::an_exact_reflection_and_uniform_scale_is_a_circle_with_reversing_orientation ... ok
+test step::circular_arc::tests::an_exact_uniform_scale_and_rotation_is_certified_a_circle ... ok
+test step::circular_arc::tests::anisotropic_scale_is_refused_as_a_noncircular_ellipse ... ok
+test step::circular_arc::tests::evaluate_matches_the_untransformed_unit_circle_at_identity ... ok
+test step::circular_arc::tests::both_decoders_agree_wherever_the_exact_predicate_certifies ... ok
+test step::circular_arc::tests::identity_transformed_partial_arc_preserves_center_basis_and_interval ... ok
+test step::circular_arc::tests::processor_orientation_false_reverses_the_source_interval ... ok
+test step::circular_arc::tests::rotated_arc_rotates_both_basis_vectors ... ok
+test step::circular_arc::tests::selected_edge_reversal_swaps_the_interval_and_negates_the_sweep ... ok
+test step::circular_arc::tests::shadow_classifier_still_accepts_an_exact_circle ... ok
+test step::circular_arc::tests::shadow_classifier_still_bands_five_e_minus_ten_as_undecidable ... ok
+test step::circular_arc::tests::the_derived_placement_really_is_inexact_or_this_suite_proves_nothing ... ok
+test step::circular_arc::tests::the_source_circle_gate_folds_the_processor_orientation_exactly_once ... ok
+test step::circular_arc::tests::translated_partial_arc_moves_only_the_center ... ok
+test step::circular_arc::tests::uniformly_scaled_circle_is_still_a_circle ... ok
+test step::cone::tests::a_cylinder_smuggled_as_conical_surface_is_refused ... ok
+test step::cone::tests::a_non_uniform_scale_is_refused_before_a_circular_cone_is_certified ... ok
+test step::cone::tests::a_cylindrical_surface_representation_is_refused_by_name ... ok
+test step::cone::tests::a_non_conical_surface_representation_is_refused_by_name ... ok
+test scene::tests::compiles_khr_materials_unlit ... ok
+test step::cone::tests::a_real_step_conical_surface_is_certified ... ok
+test step::cone::tests::a_transformed_conical_surface_is_contracted_and_certified ... ok
+test step::cone::tests::a_reflected_placement_is_admitted_and_its_chart_still_round_trips ... ok
+test step::cone::tests::a_shearing_placement_is_refused ... ok
+test step::cone::tests::a_uniform_scale_is_admitted_and_scales_the_apex_but_not_the_half_angle ... ok
+test step::cone::tests::the_importers_inversion_negates_the_axis_and_swaps_the_nappe_labels ... ok
+test step::cylinder::tests::a_cone_smuggled_as_cylindrical_surface_is_refused ... ok
+test step::cylinder::tests::a_non_cylindrical_surface_representation_is_refused_by_name ... ok
+test step::cylinder::tests::a_real_step_cylindrical_surface_is_certified ... ok
+test step::cylinder::tests::a_transformed_cylindrical_surface_is_contracted_and_certified ... ok
+test step::lattice::cylinder_curve_tests::a_nearly_circular_source_ellipse_is_still_not_a_circle ... ok
+test step::lattice::cylinder_curve_tests::a_non_circular_ellipse_is_not_admitted ... ok
+test step::lattice::cylinder_curve_tests::a_nonuniformly_transformed_source_circle_is_refused ... ok
+test step::lattice::cylinder_curve_tests::a_real_circular_arc_classifies_with_its_own_source_interval ... ok
+test step::lattice::cylinder_curve_tests::a_real_line_classifies_as_the_line_family ... ok
+test scene::tests::a_cyclic_node_graph_is_refused_rather_than_fatal ... ok
+test step::lattice::cylinder_curve_tests::a_source_circle_folds_the_curve_orientation_exactly_once ... ok
+test step::lattice::cylinder_curve_tests::a_source_circle_with_a_collapsed_interval_is_still_a_complete_circle ... ok
+test step::lattice::cylinder_curve_tests::a_spline_stays_unadmitted_exactly_as_the_planar_path_refuses_it ... ok
+test step::lattice::cylinder_curve_tests::a_source_circle_with_finite_precision_orientation_is_admitted ... ok
+test step::lattice::cylinder_curve_tests::the_planar_curve_schema_carries_the_arc_placement_the_source_declared ... ok
+test step::lattice::cylinder_curve_tests::both_seams_read_a_circle_the_same_way ... ok
+test step::lattice::schema_tests::a_sphere_certifies_its_azimuth_as_a_generator ... ok
+test step::lattice::schema_tests::a_step_plane_is_structurally_identified ... ok
+test step::lattice::cylinder_curve_tests::the_planar_curve_schema_identifies_a_conic_without_making_it_polygonal ... ok
+test step::lattice::schema_tests::an_inverted_sphere_puts_the_certified_azimuth_on_v ... ok
+test step::lattice::schema_tests::a_torus_reports_no_structural_reader_though_its_lattice_looks_aperiodic ... ok
+test step::lattice::source_closure_tests::a5_source_open_with_unclamped_knots_stays_open ... ok
+test step::lattice::source_closure_tests::a4_source_open_with_repeated_control_net_stays_open ... ok
+test step::lattice::source_closure_tests::a2_source_open_v_is_non_periodic ... ok
+test step::lattice::source_closure_tests::a3_source_open_with_coincident_seam_geometry_stays_open ... ok
+test step::meshing_policy::tests::a_common_hole_gets_approximately_24_segments ... ok
+test step::meshing_policy::tests::a_large_radius_curve_is_governed_by_the_linear_term_not_the_floor ... ok
+test step::meshing_policy::tests::a_non_finite_radius_falls_back_to_the_capped_linear_tolerance ... ok
+test step::meshing_policy::tests::a_partial_arc_gets_its_proportional_share ... ok
+test step::meshing_policy::tests::default_targets_24_segments_via_the_angular_interval ... ok
+test step::meshing_policy::tests::identity_changes_when_the_policy_changes ... ok
+test step::meshing_policy::tests::the_absolute_cap_engages_for_a_very_large_model_tolerance ... ok
+test step::part21::tests::a_trailing_signature_section_is_tolerated ... ok
+test step::part21::tests::a_bare_e_does_not_start_an_exponent ... ok
+test step::part21::tests::a_user_defined_keyword_drops_its_bang ... ok
+test step::part21::tests::accepts_the_nesting_real_geometry_uses ... ok
+test step::part21::tests::comments_separate_tokens_anywhere ... ok
+test step::part21::tests::distinguishes_integers_from_reals ... ok
+test step::part21::tests::instance_ids_ignore_leading_zeros ... ok
+test step::part21::tests::reads_a_complex_instance ... ok
+test step::part21::tests::reads_a_simple_instance ... ok
+test step::part21::tests::reads_an_empty_parameter_list ... ok
+test step::part21::tests::reads_exponents ... ok
+test step::part21::tests::reads_non_ascii_strings ... ok
+test step::part21::tests::reads_numbers_with_spaces_around_signs ... ok
+test step::part21::tests::reads_strings_with_doubled_apostrophes ... ok
+test step::part21::tests::reads_the_header ... ok
+test step::part21::tests::reads_the_remaining_parameter_forms ... ok
+test step::part21::tests::rejects_an_unterminated_string ... ok
+test step::part21::tests::rejects_binary_parameters ... ok
+test step::part21::tests::rejects_sections_it_does_not_read ... ok
+test step::part21::tests::reports_where_it_stopped ... ok
+test step::part21::tests::rejects_parameters_nested_too_deeply ... ok
+test step::part21::tests::reals_round_like_the_whole_literal ... ok
+test step::lattice::source_closure_tests::a_declared_closure_with_an_incompatible_conversion_is_not_certified ... ok
+test step::lattice::source_closure_tests::a1_source_closed_v_certifies_exact_v_period ... ok
+test step::policy_geometry::quotient_tests::certified_v_axis_maps_evaluation_but_keeps_topology_unwrapped ... ok
+test step::policy_geometry::quotient_tests::non_periodic_axis_passes_through_exactly ... ok
+test step::policy_geometry::quotient_tests::non_periodic_spline_preserves_legacy_inverse_and_certified_axis_stays_bounded ... ok
+test step::policy_geometry::quotient_tests::quotient_map_with_native_interval_not_starting_at_zero ... ok
+test step::policy_geometry::quotient_tests::analytic_periodic_surfaces_never_gain_a_quotient ... ok
+test step::spline_carrier::tests::binom_is_exact_for_small_n ... ok
+test step::spline_carrier::tests::empty_trim_is_operational_failure ... ok
+test step::spline_carrier::tests::exact_dot_helpers_decide_zero ... ok
+test step::spline_carrier::tests::inverted_trim_is_refused ... ok
+test step::spline_carrier::tests::mixed_sign_weights_are_inconsistent_denominator ... ok
+test step::spline_carrier::tests::non_bezier_form_nurbs_circle_is_unresolved ... ok
+test step::spline_carrier::tests::degenerate_point_on_circle_is_certified_circular_arc ... ok
+test step::spline_carrier::tests::non_finite_trim_is_operational_failure ... ok
+test step::spline_carrier::tests::non_rational_cannot_be_circular_parallel ... ok
+test step::spline_carrier::tests::non_rational_line_has_constant_axial_coordinate ... ok
+test step::spline_carrier::tests::non_rational_line_is_certified_straight_line ... ok
+test step::spline_carrier::tests::non_rational_parabola_is_refused_as_not_collinear ... ok
+test step::spline_carrier::tests::non_rational_varying_z_is_not_constant_axial ... ok
+test step::spline_carrier::tests::non_spline_representation_is_unsupported ... ok
+test step::spline_carrier::tests::nonuniform_knots_constancy_holds ... ok
+test step::spline_carrier::tests::rational_circle_has_constant_axial_coordinate ... ok
+test step::spline_carrier::tests::perturbed_circle_is_inconsistent_not_on_circle ... ok
+test step::spline_carrier::tests::rational_circle_endpoint_off_circle_is_inconsistent ... ok
+test step::spline_carrier::tests::rational_non_collinear_is_inconsistent ... ok
+test step::spline_carrier::tests::rational_line_is_certified_straight_line ... ok
+test cache::tests::metadata_round_trips_and_invalidates_on_source_change ... ok
+test step::spline_carrier::tests::rational_quarter_circle_is_unresolved_within_rounding ... ok
+test step::spline_carrier::tests::rational_varying_z_is_not_constant_axial ... ok
+test step::spline_carrier::tests::reflected_nurbs_circle_is_unresolved_within_rounding ... ok
+test step::spline_carrier::tests::tags_are_stable_and_distinct ... ok
+test step::spline_carrier::tests::trim_cutting_non_constant_span_is_unresolved ... ok
+test step::spline_carrier::tests::translated_nurbs_circle_is_unresolved_within_rounding ... ok
+test step::spline_carrier::tests::trim_outside_domain_is_operational_failure ... ok
+test step::spline_carrier::tests::trim_subinterval_aligning_with_knot_is_certified ... ok
+test step::appearance::tests::an_unstyled_face_is_absent ... ok
+test step::spline_carrier::tests::two_span_circle_is_unresolved_within_rounding ... ok
+test step::spline_carrier::tests::visually_near_but_not_on_circle_is_inconsistent ... ok
+test step::appearance::tests::an_unknown_predefined_colour_is_unresolved ... ok
+test step::appearance::tests::a_direct_rgb_face_resolves_exactly ... ok
+test step::policy_geometry::quotient_tests::certified_axis_subdivision_maps_back_to_the_same_physical_grid ... ok
+test step::appearance::tests::adjacent_faces_keep_distinct_colours ... ok
+test step::appearance::tests::a_predefined_colour_resolves ... ok
+test step::spline_carrier::tests::zero_radius_candidate_circle_is_unresolved ... ok
+test step::tests::a_degenerate_model_falls_back_to_a_usable_tolerance ... ok
+test step::tests::a_metre_scale_model_is_not_held_to_a_millimetre_floor ... ok
+test step::tessellated::tests::a_file_without_tessellated_faces_reads_as_none ... ok
+test step::tessellated::tests::decodes_a_triangle_fan ... ok
+test step::tessellated::tests::decodes_a_triangle_strip ... ok
+test step::tessellated::tests::parameter_helpers_reject_wrong_shapes ... ok
+test step::tests::a_millimetre_scale_model_is_unchanged ... ok
+test step::tessellated::tests::empty_pnindex_addresses_coordinates_directly ... ok
+test step::tessellated::tests::decodes_explicit_triangles ... ok
+test step::tessellated::tests::out_of_range_indices_are_skipped ... ok
+test step::tests::tolerance_tracks_the_model_across_unit_scales ... ok
+test step::torus_deck::tests::a_non_toroidal_surface_is_refused_by_name ... ok
+test step::torus_deck::tests::a_real_step_toroidal_surface_is_certified ... ok
+test step::appearance::tests::a_styled_curve_does_not_colour_faces ... ok
+test step::appearance::tests::an_unstyled_face_inherits_the_parent_solid_colour ... ok
+test step::appearance::tests::an_explicit_face_style_overrides_the_parent ... ok
+test step::appearance::tests::an_over_riding_styled_item_colours_the_face ... ok
+test step::torus_deck::tests::both_generators_are_two_pi_on_distinct_axes ... ok
+test ui::tests::test_generate_html_viewer_embedding ... ok
+test step::policy_geometry::quotient_tests::certified_axis_subdivision_is_deck_translation_invariant ... ok
+test step::policy_geometry::quotient_tests::search_parameter_forwards_through_the_acceptance_gate ... ok
+test step::tests::d9_conversion_loss_emits_one_import_record ... ok
+
+test result: ok. 187 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.05s
+
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 5 tests
+test assembly_scene_counts_are_graph_semantic ... ok
+test repeated_definition_shares_geometry_and_splits_occurrences ... ok
+test definition_geometry_stays_local_and_transform_applies_once ... ok
+test nested_occurrence_composes_parent_and_local ... ok
+test single_part_step_stays_flat ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.34s
+
+
+running 4 tests
+test floor_harness_skips_cleanly_without_look_corpus ... ok
+test floor_refusal_distribution_buckets_are_exhaustive ... ok
+test floor_admitted_mass_is_published_not_asserted ... ok
+test floor_integration_seam_is_single_and_marked ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.06s
+
+
+running 1 test
+test certified_prevalence_census ... ignored, corpus census: needs LOOK_CORPUS; run explicitly
+
+test result: ok. 0 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 2 tests
+test bracket_tessellates_to_a_known_mesh ... FAILED
+test washer_with_circular_edges_tessellates_to_a_known_mesh ... ok
+
+failures:
+
+---- bracket_tessellates_to_a_known_mesh stdout ----
+
+thread 'bracket_tessellates_to_a_known_mesh' (26292) panicked at tests\geometry_fingerprint.rs:86:5:
+assertion `left == right` failed: bracket triangle count moved
+  left: 1875
+ right: 1814
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    bracket_tessellates_to_a_known_mesh
+
+test result: FAILED. 1 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 20.41s
+
+   Compiling proc-macro2 v1.0.107
+   Compiling unicode-ident v1.0.24
+   Compiling quote v1.0.47
+   Compiling cfg-if v1.0.4
+   Compiling autocfg v1.5.1
+   Compiling syn v2.0.119
+   Compiling syn v3.0.3
+   Compiling libm v0.2.16
+   Compiling num-traits v0.2.19
+   Compiling windows-link v0.2.1
+   Compiling serde_core v1.0.229
+   Compiling serde v1.0.229
+   Compiling serde_derive v1.0.229
+   Compiling rand_core v0.10.1
+   Compiling getrandom v0.4.3
+   Compiling syn v1.0.109
+   Compiling version_check v0.9.5
+   Compiling katexit v0.1.5
+   Compiling cgmath v0.18.0
+   Compiling approx v0.4.0
+   Compiling proc-macro-error-attr v1.0.4
+   Compiling num-complex v0.4.6
+   Compiling thiserror v2.0.20
+   Compiling matext4cgmath v0.1.0
+   Compiling proc-macro-error v1.0.4
+   Compiling thiserror-impl v2.0.20
+   Compiling rustc-hash v2.1.3
+   Compiling truck-base v0.5.0 (C:\Users\stefa\look\vendor\truck\truck-base)
+   Compiling cpufeatures v0.3.0
+   Compiling chacha20 v0.10.1
+   Compiling rand v0.10.2
+   Compiling truck-derivers v0.1.0 (C:\Users\stefa\look\vendor\truck\truck-derivers)
+   Compiling unicode-segmentation v1.13.3
+   Compiling either v1.17.0
+   Compiling regex-syntax v0.8.11
+   Compiling truck-geotrait v0.4.0 (C:\Users\stefa\look\vendor\truck\truck-geotrait)
+   Compiling truck-geometry v0.5.0 (C:\Users\stefa\look\vendor\truck\truck-geometry)
+   Compiling zerocopy v0.8.56
+   Compiling zerocopy-derive v0.8.56
+   Compiling crossbeam-utils v0.8.22
+   Compiling bitflags v2.13.1
+   Compiling crossbeam-epoch v0.9.20
+   Compiling forward_ref v1.0.0
+   Compiling crossbeam-deque v0.8.7
+   Compiling parking_lot_core v0.9.12
+   Compiling once_cell v1.21.4
+   Compiling smallvec v1.15.2
+   Compiling inari v2.0.0
+   Compiling windows-sys v0.61.2
+   Compiling bytemuck_derive v1.12.0
+   Compiling rayon-core v1.13.0
+   Compiling scopeguard v1.2.0
+   Compiling lock_api v0.4.14
+   Compiling bytemuck v1.25.2
+   Compiling semver v1.0.28
+   Compiling rustc_version v0.4.1
+   Compiling parking_lot v0.12.5
+   Compiling truck-evidence v0.1.0 (C:\Users\stefa\look\vendor\truck\truck-evidence)
+   Compiling rayon v1.12.0
+   Compiling branches v0.4.5
+   Compiling rclite v0.4.1
+   Compiling fastrand v2.5.0
+   Compiling tempfile v3.27.0
+   Compiling truck-topology v0.6.0 (C:\Users\stefa\look\vendor\truck\truck-topology)
+   Compiling itertools v0.15.0
+   Compiling array-macro v2.1.8
+   Compiling truck-polymesh v0.6.0 (C:\Users\stefa\look\vendor\truck\truck-polymesh)
+   Compiling equivalent v1.0.2
+   Compiling foldhash v0.2.0
+   Compiling allocator-api2 v0.2.21
+   Compiling hashbrown v0.16.1
+   Compiling robust v1.2.0
+   Compiling spade v2.15.1
+   Compiling memchr v2.8.3
+   Compiling truck-certified v0.1.0 (C:\Users\stefa\look\vendor\truck\truck-certified)
+   Compiling zmij v1.0.23
+   Compiling itoa v1.0.18
+   Compiling serde_json v1.0.151
+   Compiling convert_case v0.10.0
+   Compiling unicode-xid v0.2.6
+   Compiling derive_more-impl v2.1.1
+   Compiling derive_more v2.1.1
+   Compiling truck-modeling v0.6.0 (C:\Users\stefa\look\vendor\truck\truck-modeling)
+   Compiling libc v0.2.189
+   Compiling shlex v2.0.1
+   Compiling find-msvc-tools v0.1.11
+   Compiling getrandom v0.3.4
+   Compiling cc v1.4.3
+   Compiling crc32fast v1.5.0
+   Compiling simd-adler32 v0.3.10
+   Compiling pkg-config v0.3.34
+   Compiling adler2 v2.0.1
+   Compiling miniz_oxide v0.8.9
+   Compiling lzma-sys v0.1.20
+   Compiling rand_core v0.9.5
+   Compiling flate2 v1.1.9
+   Compiling memchr v1.0.2
+   Compiling byteorder v1.5.0
+   Compiling nom v3.2.1
+   Compiling quick-xml v0.22.0
+   Compiling ppv-lite86 v0.2.21
+   Compiling convert_case v0.11.0
+   Compiling num-derive v0.3.3
+   Compiling bit-vec v0.8.0
+   Compiling quick-error v1.2.3
+   Compiling lz4_flex v0.7.5
+   Compiling wait-timeout v0.2.1
+   Compiling fnv v1.0.7
+   Compiling base64 v0.13.1
+   Compiling rusty-fork v0.3.1
+   Compiling bit-set v0.8.0
+   Compiling proptest-macro v0.5.0
+   Compiling rand_chacha v0.9.0
+   Compiling rand_xorshift v0.4.0
+   Compiling rand v0.9.5
+   Compiling unarray v0.1.4
+   Compiling proptest v1.11.0
+   Compiling lazy_static v1.5.0
+   Compiling aho-corasick v1.1.5
+   Compiling regex-automata v0.4.18
+   Compiling regex v1.13.1
+   Compiling thiserror v1.0.69
+   Compiling minimal-lexical v0.2.1
+   Compiling hashbrown v0.17.1
+   Compiling indexmap v2.14.0
+   Compiling xz2 v0.1.7
+   Compiling vtkio v0.6.3
+   Compiling Inflector v0.11.4
+   Compiling thiserror-impl v1.0.69
+   Compiling truck-meshalgo v0.4.0 (C:\Users\stefa\look\vendor\truck\truck-meshalgo)
+   Compiling convert_case v0.4.0
+   Compiling toml_datetime v0.6.11
+   Compiling winnow v0.5.40
+   Compiling toml_edit v0.19.15
+   Compiling derive_more v0.99.20
+   Compiling itertools v0.10.5
+   Compiling proc-macro-crate v1.3.1
+   Compiling ruststep-derive v0.4.0 (https://github.com/stefangolas/ruststep?rev=67f1f7c#67f1f7c3)
+   Compiling nom v7.1.3
+   Compiling truck-assembly v0.1.0 (C:\Users\stefa\look\vendor\truck\truck-assembly)
+   Compiling derive-new v0.5.9
+   Compiling chrono v0.4.45
+   Compiling ruststep v0.4.0 (https://github.com/stefangolas/ruststep?rev=67f1f7c#67f1f7c3)
+   Compiling cfg_aliases v0.2.2
+   Compiling log v0.4.33
+   Compiling utf8parse v0.2.2
+   Compiling anstyle v1.0.14
+   Compiling once_cell_polyfill v1.70.2
+   Compiling anstyle-wincon v3.0.11
+   Compiling truck-stepio v0.3.0 (C:\Users\stefa\look\vendor\truck\truck-stepio)
+   Compiling anstyle-parse v1.0.0
+   Compiling anstyle-query v1.1.5
+   Compiling windows-result v0.4.1
+   Compiling windows-strings v0.5.1
+   Compiling windows-implement v0.60.2
+   Compiling windows-interface v0.59.3
+   Compiling khronos_api v3.1.0
+   Compiling is_terminal_polyfill v1.70.2
+   Compiling colorchoice v1.0.5
+   Compiling anstream v1.0.0
+   Compiling windows-core v0.62.2
+   Compiling clap_lex v1.1.0
+   Compiling strsim v0.11.1
+   Compiling heck v0.5.0
+   Compiling clap_derive v4.6.4
+   Compiling clap_builder v4.6.6
+   Compiling xml-rs v0.8.29
+   Compiling rustc-hash v1.1.0
+   Compiling naga-types v30.0.0
+   Compiling gl_generator v0.14.0
+   Compiling clap v4.6.6
+   Compiling naga v30.0.0
+   Compiling windows-threading v0.2.1
+   Compiling libloading v0.8.9
+   Compiling unicode-width v0.2.2
+   Compiling bit-vec v0.9.1
+   Compiling arrayvec v0.7.8
+   Compiling ash v0.38.0+1.3.281
+   Compiling codespan-reporting v0.13.1
+   Compiling bit-set v0.10.0
+   Compiling windows-future v0.3.2
+   Compiling glutin_wgl_sys v0.6.1
+   Compiling windows-numerics v0.3.1
+   Compiling windows-collections v0.3.2
+   Compiling half v2.7.1
+   Compiling spirv v0.4.0+sdk-1.4.341.0
+   Compiling raw-window-handle v0.6.2
+   Compiling static_assertions v1.1.0
+   Compiling khronos-egl v6.0.0
+   Compiling wgpu-types v30.0.0
+   Compiling windows v0.62.2
+   Compiling wgpu-hal v30.0.0
+   Compiling presser v0.3.1
+   Compiling wgpu-naga-bridge v30.0.0
+   Compiling ordered-float v5.3.0
+   Compiling glow v0.17.0
+   Compiling profiling v1.0.18
+   Compiling renderdoc-sys v1.1.0
+   Compiling range-alloc v0.1.5
+   Compiling wgpu-core v30.0.0
+   Compiling inflections v1.1.1
+   Compiling litrs v1.0.0
+   Compiling document-features v0.2.12
+   Compiling gltf-derive v1.4.1
+   Compiling wgpu v30.0.0
+   Compiling blake3 v1.8.6
+   Compiling fdeflate v0.3.7
+   Compiling pxfm v0.1.30
+   Compiling gpu-allocator v0.28.0
+   Compiling zune-core v0.5.3
+   Compiling wgpu-core-deps-windows-linux-android v30.0.0
+   Compiling anyhow v1.0.104
+   Compiling zune-jpeg v0.5.15
+   Compiling moxcms v0.8.1
+   Compiling png v0.18.1
+   Compiling gltf-json v1.4.1
+   Compiling arrayref v0.3.9
+   Compiling unsafe-libyaml v0.2.11
+   Compiling byteorder-lite v0.1.0
+   Compiling constant_time_eq v0.4.2
+   Compiling ryu v1.0.23
+   Compiling serde_yaml v0.9.34+deprecated
+   Compiling image v0.25.10
+   Compiling gltf v1.4.1
+   Compiling glam v0.30.10
+   Compiling pollster v0.4.0
+   Compiling truck-shapeops v0.4.0 (C:\Users\stefa\look\vendor\truck\truck-shapeops)
+   Compiling winapi v0.3.9
+   Compiling look v0.1.0 (C:\Users\stefa\look)
+   Compiling unicode-width v0.1.14
+   Compiling textwrap v0.11.0
+   Compiling atty v0.2.14
+   Compiling heck v0.3.3
+   Compiling vec_map v0.8.2
+   Compiling strsim v0.8.0
+   Compiling bitflags v1.3.2
+   Compiling clap v2.34.0
+   Compiling structopt-derive v0.4.18
+   Compiling structopt v0.3.26
+   Compiling check_keyword v0.2.0
+   Compiling maplit v1.0.2
+   Compiling espr v0.4.0
+   Compiling espr-derive v0.4.0
+warning: unnecessary qualification
+     --> vendor\truck\truck-meshalgo\src\tessellation\triangulation.rs:16957:17
+      |
+16957 |                 crate::tessellation::validity::FaceValidityCertificate::all_bounds_collapsed(0),
+      |                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+      |
+note: the lint level is defined here
+     --> vendor\truck\truck-meshalgo\src\lib.rs:13:5
+      |
+   13 |     unused_qualifications
+      |     ^^^^^^^^^^^^^^^^^^^^^
+help: remove the unnecessary path segments
+      |
+16957 -                 crate::tessellation::validity::FaceValidityCertificate::all_bounds_collapsed(0),
+16957 +                 FaceValidityCertificate::all_bounds_collapsed(0),
+      |
+
+warning: `truck-meshalgo` (lib test) generated 1 warning (run `cargo fix --lib -p truck-meshalgo --tests` to apply 1 suggestion)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 7m 03s
+warning: the following packages contain code that will be rejected by a future version of Rust: nom v3.2.1, quick-xml v0.22.0
+note: to see what the problems were, use the option `--future-incompat-report`, or run `cargo report future-incompatibilities --id 1`
+     Running unittests src\lib.rs (target\debug\deps\look-d38a9319cd5161fc.exe)
+     Running unittests src\main.rs (target\debug\deps\look-8a026d9ef9a2bdde.exe)
+     Running tests\assembly.rs (target\debug\deps\assembly-b8c329087ab09e7b.exe)
+     Running tests\certified_phase2_floor.rs (target\debug\deps\certified_phase2_floor-56f90e6808326be9.exe)
+     Running tests\certified_prevalence.rs (target\debug\deps\certified_prevalence-06fd9ab684620c6f.exe)
+     Running tests\geometry_fingerprint.rs (target\debug\deps\geometry_fingerprint-2ee9d684b19456d6.exe)
+error: test failed, to rerun pass `-p look --test geometry_fingerprint`

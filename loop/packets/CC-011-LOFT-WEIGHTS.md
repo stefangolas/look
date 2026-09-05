@@ -1,9 +1,9 @@
-# CC-011-LOFT-WEIGHTS — L1r: certified positive weight field
+﻿# CC-011-LOFT-WEIGHTS â€” L1r: certified positive weight field
 
-CC program Phase B (spine S8 consumer; theory §2.2 L1r). Collocation is not
+CC program Phase B (spine S8 consumer; theory Â§2.2 L1r). Collocation is not
 weight-preserving and the inverse of a totally positive matrix has a
 checkerboard sign pattern, so strictly positive input weights can yield
-negative interpolated `w_ij` — a pole inside the domain. Certify positivity
+negative interpolated `w_ij` â€” a pole inside the domain. Certify positivity
 of the delivered weight field, or refuse.
 
 ```yaml
@@ -24,7 +24,7 @@ budget:      {turns: 18, ctx_tokens: 80000}
 anchors:
   - {id: A1, expect: 1, cmd: "grep -c 'pub fn hull_bernstein_2d' vendor/truck/truck-certified/src/hull.rs"}
   - {id: A2, expect: 1, cmd: "grep -c 'pub struct LoftOutput' vendor/truck/truck-certified/src/construct/loft.rs"}
-  - {id: A3, expect: 1, cmd: "grep -c 'weight_straddles_zero' vendor/truck/truck-certified/src/kernel/fixtures.rs"}
+  - {id: A3, expect: 1, cmd: "grep -c 'pub fn weight_straddles_zero' vendor/truck/truck-certified/src/kernel/fixtures.rs"}
 tests_required:
   - all_positive_control_weights_admit_without_subdivision
   - straddling_weight_field_refuses_non_positive_weight_field
@@ -32,27 +32,27 @@ tests_required:
   - certified_net_is_the_refined_net_never_the_coarse_one
 ```
 
-Section 1: `construct/loft_weights.rs` — `pub struct WeightCert { pub
+Section 1: `construct/loft_weights.rs` â€” `pub struct WeightCert { pub
 min_control_weight: f64, pub refined: bool }` and `pub fn
 certify_weight_field(surface: &BSplineSurface<Point4>, budget: &mut Budget)
 -> Result<WeightCert, ConstructRefusal>`. Fast path (free, sufficient):
-`min w_ij > 0` over the control net in row-major order → admit, `refined:
-false`. Fallback: extract each Bézier patch of the weight field and run
-`hull_bernstein_2d` (A1); all-strictly-positive coefficients on a patch →
+`min w_ij > 0` over the control net in row-major order â†’ admit, `refined:
+false`. Fallback: extract each BÃ©zier patch of the weight field and run
+`hull_bernstein_2d` (A1); all-strictly-positive coefficients on a patch â†’
 that patch admits (convex-hull property). Patches that straddle zero are
 subdivided (budgeted: each split spends one `budget.spend_subdiv()`; depth
 cap `CC_DEPTH_MAX`). Budget exhaustion, or any patch whose enclosure stays
-straddling at the cap, or any certified zero →
+straddling at the cap, or any certified zero â†’
 `Err(ConstructRefusal::NonPositiveWeightField)`. Never admit a straddling
 patch; never report a negative weight as a failure of GEOMETRY (it is a
-failure of THIS field's admissibility — the refusal says exactly that).
+failure of THIS field's admissibility â€” the refusal says exactly that).
 
 Section 2: the storage rule, restated as a HARD structural rule (theory
 D4-clause-(a) lineage): a certificate produced under refinement is valid
 ONLY if the identical knot insertions are applied to the shipped surface.
 Pre-made mechanism: `certify_weight_field` does not mutate its input; it
 returns the refined knot insertions inside `WeightCert` as `pub
-refinements: Vec<(bool, usize, f64)>` (axis, span, knot — the
+refinements: Vec<(bool, usize, f64)>` (axis, span, knot â€” the
 `add_uknot`/`add_vknot` argument triple) and the test
 `certified_net_is_the_refined_net_never_the_coarse_one` applies them and
 re-checks positivity on the refined net. The caller (CC-012/CC-014) applies
@@ -70,10 +70,10 @@ line in `construct/mod.rs` is the DESIGNED one-line conflict. COMMIT BEFORE
 writing RESULT.json AT THE WORKTREE ROOT.
 
 Stop conditions: (1) the landed kernel fixture `weight_straddles_zero` (A3)
-documents the straddling-field ground truth pattern — read it before
+documents the straddling-field ground truth pattern â€” read it before
 building the loft-side straddling fixture in the test; (2) if
 `hull_bernstein_2d` cannot be applied to a homogeneous weight extraction
 directly, extract weights to a plain `BSplineSurface<f64>`-shaped grid and
-hull that — do not modify `hull.rs`; (3) subdivision must be dyadic
-(midpoint splits only) so refinement knots are exactly representable —
+hull that â€” do not modify `hull.rs`; (3) subdivision must be dyadic
+(midpoint splits only) so refinement knots are exactly representable â€”
 record this in the module doc.

@@ -1,0 +1,854 @@
+   Compiling unicode-ident v1.0.24
+    Checking cfg-if v1.0.4
+    Checking windows-link v0.2.1
+   Compiling proc-macro2 v1.0.107
+    Checking libm v0.2.16
+   Compiling quote v1.0.47
+    Checking num-traits v0.2.19
+   Compiling syn v2.0.119
+   Compiling syn v3.0.3
+    Checking serde_core v1.0.229
+   Compiling serde_derive v1.0.229
+    Checking rand_core v0.10.1
+   Compiling katexit v0.1.5
+    Checking getrandom v0.4.3
+    Checking approx v0.4.0
+   Compiling proc-macro-error-attr v1.0.4
+    Checking serde v1.0.229
+   Compiling syn v1.0.109
+    Checking cgmath v0.18.0
+    Checking num-complex v0.4.6
+    Checking matext4cgmath v0.1.0
+   Compiling thiserror-impl v2.0.20
+    Checking rustc-hash v2.1.3
+    Checking truck-base v0.5.0 (C:\Users\stefa\look\vendor\truck\truck-base)
+   Compiling proc-macro-error v1.0.4
+    Checking thiserror v2.0.20
+    Checking cpufeatures v0.3.0
+    Checking chacha20 v0.10.1
+   Compiling truck-derivers v0.1.0 (C:\Users\stefa\look\vendor\truck\truck-derivers)
+    Checking rand v0.10.2
+    Checking either v1.17.0
+   Compiling zerocopy-derive v0.8.56
+    Checking truck-geotrait v0.4.0 (C:\Users\stefa\look\vendor\truck\truck-geotrait)
+    Checking bitflags v2.13.1
+    Checking zerocopy v0.8.56
+    Checking truck-geometry v0.5.0 (C:\Users\stefa\look\vendor\truck\truck-geometry)
+    Checking crossbeam-utils v0.8.22
+    Checking once_cell v1.21.4
+    Checking forward_ref v1.0.0
+    Checking smallvec v1.15.2
+    Checking inari v2.0.0
+    Checking crossbeam-epoch v0.9.20
+   Compiling bytemuck_derive v1.12.0
+    Checking windows-sys v0.61.2
+    Checking scopeguard v1.2.0
+    Checking lock_api v0.4.14
+    Checking bytemuck v1.25.2
+    Checking crossbeam-deque v0.8.7
+    Checking parking_lot_core v0.9.12
+    Checking regex-syntax v0.8.11
+    Checking parking_lot v0.12.5
+    Checking rayon-core v1.13.0
+    Checking truck-evidence v0.1.0 (C:\Users\stefa\look\vendor\truck\truck-evidence)
+    Checking rayon v1.12.0
+    Checking branches v0.4.5
+    Checking rclite v0.4.1
+    Checking fastrand v2.5.0
+    Checking tempfile v3.27.0
+    Checking truck-topology v0.6.0 (C:\Users\stefa\look\vendor\truck\truck-topology)
+    Checking itertools v0.15.0
+    Checking array-macro v2.1.8
+    Checking foldhash v0.2.0
+    Checking truck-polymesh v0.6.0 (C:\Users\stefa\look\vendor\truck\truck-polymesh)
+    Checking equivalent v1.0.2
+    Checking allocator-api2 v0.2.21
+    Checking hashbrown v0.16.1
+    Checking robust v1.2.0
+    Checking memchr v2.8.3
+    Checking spade v2.15.1
+    Checking itoa v1.0.18
+    Checking zmij v1.0.23
+    Checking serde_json v1.0.151
+    Checking truck-certified v0.1.0 (C:\Users\stefa\look\vendor\truck\truck-certified)
+error: redundant field names in struct initialization
+    --> vendor\truck\truck-certified\src\formal\common_arc.rs:1412:53
+     |
+1412 |             enclosure: ParameterEnclosure { lo: hi, hi: hi },
+     |                                                     ^^^^^^ help: replace it with: `hi`
+     |
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.97.0/index.html#redundant_field_names
+note: the lint level is defined here
+    --> vendor\truck\truck-certified\src\lib.rs:4:9
+     |
+   4 | #![deny(clippy::all, rust_2018_idioms)]
+     |         ^^^^^^^^^^^
+     = note: `#[deny(clippy::redundant_field_names)]` implied by `#[deny(clippy::all)]`
+
+error: redundant field names in struct initialization
+    --> vendor\truck\truck-certified\src\formal\common_arc.rs:1989:53
+     |
+1989 |             enclosure: ParameterEnclosure { lo: hi, hi: hi },
+     |                                                     ^^^^^^ help: replace it with: `hi`
+     |
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.97.0/index.html#redundant_field_names
+
+   Compiling derive_more-impl v2.1.1
+error: the loop variable `i` is used to index `rhs`
+   --> vendor\truck\truck-certified\src\construct\banded.rs:117:22
+    |
+117 |             for i in 0..self.order {
+    |                      ^^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.97.0/index.html#needless_range_loop
+note: the lint level is defined here
+   --> vendor\truck\truck-certified\src\construct\banded.rs:2:9
+    |
+  2 | #![deny(clippy::all, rust_2018_idioms)]
+    |         ^^^^^^^^^^^
+    = note: `#[deny(clippy::needless_range_loop)]` implied by `#[deny(clippy::all)]`
+help: consider using an iterator and enumerate()
+    |
+117 -             for i in 0..self.order {
+117 +             for (i, <item>) in rhs.iter().enumerate().take(self.order) {
+    |
+
+error: the loop variable `k` is used to index `y`
+   --> vendor\truck\truck-certified\src\construct\banded.rs:120:26
+    |
+120 |                 for k in k_lo..i {
+    |                          ^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.97.0/index.html#needless_range_loop
+help: consider using an iterator and enumerate()
+    |
+120 -                 for k in k_lo..i {
+120 +                 for (k, <item>) in y.iter().enumerate().take(i).skip(k_lo) {
+    |
+
+error: the loop variable `k` is used to index `rows`
+   --> vendor\truck\truck-certified\src\construct\banded.rs:128:26
+    |
+128 |                 for k in (i + 1)..=k_hi {
+    |                          ^^^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.97.0/index.html#needless_range_loop
+help: consider using an iterator and enumerate()
+    |
+128 -                 for k in (i + 1)..=k_hi {
+128 +                 for (k, <item>) in rows.iter().enumerate().take(k_hi + 1).skip((i + 1)) {
+    |
+
+error: the loop variable `i` is used to index `r_inv`
+  --> vendor\truck\truck-certified\src\construct\residual_solve.rs:76:14
+   |
+76 |     for i in 0..N {
+   |              ^^^^
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.97.0/index.html#needless_range_loop
+note: the lint level is defined here
+  --> vendor\truck\truck-certified\src\construct\residual_solve.rs:2:9
+   |
+ 2 | #![deny(clippy::all, rust_2018_idioms)]
+   |         ^^^^^^^^^^^
+help: consider using an iterator and enumerate()
+   |
+76 -     for i in 0..N {
+76 +     for (i, <item>) in r_inv.iter().enumerate().take(N) {
+   |
+
+error: the loop variable `j` is used to index `a`
+  --> vendor\truck\truck-certified\src\construct\residual_solve.rs:78:18
+   |
+78 |         for j in 0..N {
+   |                  ^^^^
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.97.0/index.html#needless_range_loop
+help: consider using an iterator and enumerate()
+   |
+78 -         for j in 0..N {
+78 +         for (j, <item>) in a.iter().enumerate().take(N) {
+   |
+
+error: the loop variable `i` is only used to index `r_inv`
+   --> vendor\truck\truck-certified\src\construct\residual_solve.rs:114:14
+    |
+114 |     for i in 0..N {
+    |              ^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.97.0/index.html#needless_range_loop
+help: consider using an iterator
+    |
+114 -     for i in 0..N {
+114 +     for <item> in r_inv.iter().take(N) {
+    |
+
+error: the loop variable `r` is only used to index `stations`
+   --> vendor\truck\truck-certified\src\construct\loft.rs:224:18
+    |
+224 |         for r in j..(j + degree) {
+    |                  ^^^^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.97.0/index.html#needless_range_loop
+note: the lint level is defined here
+   --> vendor\truck\truck-certified\src\construct\loft.rs:2:9
+    |
+  2 | #![deny(clippy::all, rust_2018_idioms)]
+    |         ^^^^^^^^^^^
+help: consider using an iterator
+    |
+224 -         for r in j..(j + degree) {
+224 +         for <item> in stations.iter().skip(j).take(degree) {
+    |
+
+error: the use of negated comparison operators on partially ordered types produces code that is hard to read and refactor, please consider using the `partial_cmp` method instead, to make it clear that the two values could be incomparable
+   --> vendor\truck\truck-certified\src\construct\canal.rs:428:12
+    |
+428 |         if !(r.lo > 0.0) {
+    |            ^^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.97.0/index.html#neg_cmp_op_on_partial_ord
+note: the lint level is defined here
+   --> vendor\truck\truck-certified\src\construct\canal.rs:2:9
+    |
+  2 | #![deny(clippy::all, rust_2018_idioms)]
+    |         ^^^^^^^^^^^
+    = note: `#[deny(clippy::neg_cmp_op_on_partial_ord)]` implied by `#[deny(clippy::all)]`
+
+error: the use of negated comparison operators on partially ordered types produces code that is hard to read and refactor, please consider using the `partial_cmp` method instead, to make it clear that the two values could be incomparable
+   --> vendor\truck\truck-certified\src\construct\canal.rs:433:12
+    |
+433 |         if !(a2.lo > 0.0) {
+    |            ^^^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.97.0/index.html#neg_cmp_op_on_partial_ord
+
+error: you should consider adding a `Default` implementation for `LiftedBoundaryComplex`
+   --> vendor\truck\truck-certified\src\domain\projection.rs:150:5
+    |
+150 | /     pub fn new() -> Self {
+151 | |         Self {
+152 | |             vertices: Vec::new(),
+153 | |             half_edges: Vec::new(),
+154 | |         }
+155 | |     }
+    | |_____^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.97.0/index.html#new_without_default
+    = note: `#[deny(clippy::new_without_default)]` implied by `#[deny(clippy::all)]`
+help: try adding this
+    |
+148 + impl Default for LiftedBoundaryComplex {
+149 +     fn default() -> Self {
+150 +         Self::new()
+151 +     }
+152 + }
+    |
+
+error: large size difference between variants
+   --> vendor\truck\truck-certified\src\formal\cone.rs:229:1
+    |
+229 | / pub enum ConeIdentification {
+230 | |     /// An embedded cone was certified.
+231 | |     Cone(CertifiedEmbeddedCone),
+    | |     --------------------------- the largest variant contains at least 216 bytes
+232 | |     /// The surface is not an embedded cone. Carries the reason.
+233 | |     NotACone(ConeIdentificationFailure),
+    | |     ----------------------------------- the second-largest variant contains at least 1 bytes
+234 | | }
+    | |_^ the entire enum is at least 216 bytes
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.97.0/index.html#large_enum_variant
+    = note: `#[deny(clippy::large_enum_variant)]` implied by `#[deny(clippy::all)]`
+help: consider boxing the large fields or introducing indirection in some other way to reduce the total size of the enum
+    |
+231 -     Cone(CertifiedEmbeddedCone),
+231 +     Cone(Box<CertifiedEmbeddedCone>),
+    |
+
+error: the use of negated comparison operators on partially ordered types produces code that is hard to read and refactor, please consider using the `partial_cmp` method instead, to make it clear that the two values could be incomparable
+   --> vendor\truck\truck-certified\src\formal\cone.rs:492:8
+    |
+492 |     if !(axis_norm > 0.0) {
+    |        ^^^^^^^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.97.0/index.html#neg_cmp_op_on_partial_ord
+
+error: the use of negated comparison operators on partially ordered types produces code that is hard to read and refactor, please consider using the `partial_cmp` method instead, to make it clear that the two values could be incomparable
+   --> vendor\truck\truck-certified\src\formal\cone.rs:499:8
+    |
+499 |     if !(d_norm > 0.0) {
+    |        ^^^^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.97.0/index.html#neg_cmp_op_on_partial_ord
+
+error: the use of negated comparison operators on partially ordered types produces code that is hard to read and refactor, please consider using the `partial_cmp` method instead, to make it clear that the two values could be incomparable
+   --> vendor\truck\truck-certified\src\formal\cone.rs:511:8
+    |
+511 |     if !(d_perp_norm / d_norm >= MINIMUM_CONE_GENERATRIX_TILT) {
+    |        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.97.0/index.html#neg_cmp_op_on_partial_ord
+
+error: the use of negated comparison operators on partially ordered types produces code that is hard to read and refactor, please consider using the `partial_cmp` method instead, to make it clear that the two values could be incomparable
+   --> vendor\truck\truck-certified\src\formal\cone.rs:514:8
+    |
+514 |     if !(d_axial.abs() / d_norm >= MINIMUM_CONE_AXIAL_COMPONENT) {
+    |        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.97.0/index.html#neg_cmp_op_on_partial_ord
+
+error: the use of negated comparison operators on partially ordered types produces code that is hard to read and refactor, please consider using the `partial_cmp` method instead, to make it clear that the two values could be incomparable
+   --> vendor\truck\truck-certified\src\formal\cone.rs:536:8
+    |
+536 |     if !(skew <= CONE_STRUCTURAL_RESIDUAL * rp_perp_norm * d_perp_norm) {
+    |        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.97.0/index.html#neg_cmp_op_on_partial_ord
+
+error: the use of negated comparison operators on partially ordered types produces code that is hard to read and refactor, please consider using the `partial_cmp` method instead, to make it clear that the two values could be incomparable
+   --> vendor\truck\truck-certified\src\formal\cone.rs:551:8
+    |
+551 |     if !(apex_radial.magnitude() <= CONE_STRUCTURAL_RESIDUAL * d_norm.max(1.0)) {
+    |        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.97.0/index.html#neg_cmp_op_on_partial_ord
+
+error: the use of negated comparison operators on partially ordered types produces code that is hard to read and refactor, please consider using the `partial_cmp` method instead, to make it clear that the two values could be incomparable
+   --> vendor\truck\truck-certified\src\formal\cone.rs:571:12
+    |
+571 |         if !((radial.magnitude() - predicted).abs() <= CONE_STRUCTURAL_RESIDUAL * scale) {
+    |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.97.0/index.html#neg_cmp_op_on_partial_ord
+
+error: the use of negated comparison operators on partially ordered types produces code that is hard to read and refactor, please consider using the `partial_cmp` method instead, to make it clear that the two values could be incomparable
+   --> vendor\truck\truck-certified\src\formal\cone.rs:586:8
+    |
+586 |     if !(frame_norm > 0.0) {
+    |        ^^^^^^^^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.97.0/index.html#neg_cmp_op_on_partial_ord
+
+error: the use of negated comparison operators on partially ordered types produces code that is hard to read and refactor, please consider using the `partial_cmp` method instead, to make it clear that the two values could be incomparable
+   --> vendor\truck\truck-certified\src\formal\cone_band.rs:281:8
+    |
+281 |     if !(schema.radius_at(s) > 0.0) {
+    |        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.97.0/index.html#neg_cmp_op_on_partial_ord
+
+error: this function has too many arguments (8/7)
+    --> vendor\truck\truck-certified\src\formal\cone_band.rs:1190:1
+     |
+1190 | / pub fn run_conical_essential_band(
+1191 | |     source_face_id: Option<u64>,
+1192 | |     cone: CertifiedEmbeddedCone,
+1193 | |     input: &SourceFaceInput,
+...    |
+1198 | |     tolerance: f64,
+1199 | | ) -> Result<(CertifiedConicalEssentialBand, CertifiedConicalBandMesh), ConicalBandExit> {
+     | |_______________________________________________________________________________________^
+     |
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.97.0/index.html#too_many_arguments
+     = note: `#[deny(clippy::too_many_arguments)]` implied by `#[deny(clippy::all)]`
+
+error: the use of negated comparison operators on partially ordered types produces code that is hard to read and refactor, please consider using the `partial_cmp` method instead, to make it clear that the two values could be incomparable
+   --> vendor\truck\truck-certified\src\formal\cylinder.rs:277:8
+    |
+277 |     if !(axis_norm > 0.0) {
+    |        ^^^^^^^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.97.0/index.html#neg_cmp_op_on_partial_ord
+
+error: the use of negated comparison operators on partially ordered types produces code that is hard to read and refactor, please consider using the `partial_cmp` method instead, to make it clear that the two values could be incomparable
+   --> vendor\truck\truck-certified\src\formal\cylinder.rs:284:8
+    |
+284 |     if !(d_norm > 0.0) {
+    |        ^^^^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.97.0/index.html#neg_cmp_op_on_partial_ord
+
+error: the use of negated comparison operators on partially ordered types produces code that is hard to read and refactor, please consider using the `partial_cmp` method instead, to make it clear that the two values could be incomparable
+   --> vendor\truck\truck-certified\src\formal\cylinder.rs:292:8
+    |
+292 |     if !(sine < MINIMUM_CYLINDER_LINE_AXIS_PARALLELISM) {
+    |        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.97.0/index.html#neg_cmp_op_on_partial_ord
+
+error: the use of negated comparison operators on partially ordered types produces code that is hard to read and refactor, please consider using the `partial_cmp` method instead, to make it clear that the two values could be incomparable
+   --> vendor\truck\truck-certified\src\formal\cylinder.rs:308:8
+    |
+308 |     if !(radius > 0.0) {
+    |        ^^^^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.97.0/index.html#neg_cmp_op_on_partial_ord
+
+error: the use of negated comparison operators on partially ordered types produces code that is hard to read and refactor, please consider using the `partial_cmp` method instead, to make it clear that the two values could be incomparable
+   --> vendor\truck\truck-certified\src\formal\cylinder.rs:314:8
+    |
+314 |     if !(radius_drift < MINIMUM_CYLINDER_LINE_AXIS_PARALLELISM) {
+    |        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.97.0/index.html#neg_cmp_op_on_partial_ord
+
+error: this function has too many arguments (8/7)
+    --> vendor\truck\truck-certified\src\formal\cylinder_band.rs:999:1
+     |
+ 999 | / pub fn run_cylinder_band(
+1000 | |     source_face_id: Option<u64>,
+1001 | |     cylinder: CertifiedEmbeddedCylinder,
+1002 | |     input: &SourceFaceInput,
+...    |
+1007 | |     tolerance: f64,
+1008 | | ) -> Result<(CertifiedCylinderBand, CertifiedBandMesh), BandExit> {
+     | |_________________________________________________________________^
+     |
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.97.0/index.html#too_many_arguments
+
+error: the use of negated comparison operators on partially ordered types produces code that is hard to read and refactor, please consider using the `partial_cmp` method instead, to make it clear that the two values could be incomparable
+   --> vendor\truck\truck-certified\src\formal\torus.rs:269:8
+    |
+269 |     if !(axis_norm > 0.0) {
+    |        ^^^^^^^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.97.0/index.html#neg_cmp_op_on_partial_ord
+
+error: the use of negated comparison operators on partially ordered types produces code that is hard to read and refactor, please consider using the `partial_cmp` method instead, to make it clear that the two values could be incomparable
+   --> vendor\truck\truck-certified\src\formal\torus.rs:283:8
+    |
+283 |     if !(large > small) {
+    |        ^^^^^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.97.0/index.html#neg_cmp_op_on_partial_ord
+
+error: the use of negated comparison operators on partially ordered types produces code that is hard to read and refactor, please consider using the `partial_cmp` method instead, to make it clear that the two values could be incomparable
+   --> vendor\truck\truck-certified\src\formal\torus_circle.rs:343:8
+    |
+343 |     if !(n_mag > 0.0) || !(placement.radius > 0.0) {
+    |        ^^^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.97.0/index.html#neg_cmp_op_on_partial_ord
+
+error: the use of negated comparison operators on partially ordered types produces code that is hard to read and refactor, please consider using the `partial_cmp` method instead, to make it clear that the two values could be incomparable
+   --> vendor\truck\truck-certified\src\formal\torus_circle.rs:343:26
+    |
+343 |     if !(n_mag > 0.0) || !(placement.radius > 0.0) {
+    |                          ^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.97.0/index.html#neg_cmp_op_on_partial_ord
+
+error: the use of negated comparison operators on partially ordered types produces code that is hard to read and refactor, please consider using the `partial_cmp` method instead, to make it clear that the two values could be incomparable
+   --> vendor\truck\truck-certified\src\formal\torus_circle.rs:356:8
+    |
+356 |     if !(a1n > 0.0) {
+    |        ^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.97.0/index.html#neg_cmp_op_on_partial_ord
+
+error: manual implementation of an assign operation
+   --> vendor\truck\truck-certified\src\formal\torus_circle.rs:359:5
+    |
+359 |     a1 = a1 / a1n;
+    |     ^^^^^^^^^^^^^ help: replace it with: `a1 /= a1n`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.97.0/index.html#assign_op_pattern
+    = note: `#[deny(clippy::assign_op_pattern)]` implied by `#[deny(clippy::all)]`
+
+error: the use of negated comparison operators on partially ordered types produces code that is hard to read and refactor, please consider using the `partial_cmp` method instead, to make it clear that the two values could be incomparable
+   --> vendor\truck\truck-certified\src\formal\torus_circle.rs:535:8
+    |
+535 |     if !(n_mag > 0.0) || !(placement.radius > 0.0) {
+    |        ^^^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.97.0/index.html#neg_cmp_op_on_partial_ord
+
+error: the use of negated comparison operators on partially ordered types produces code that is hard to read and refactor, please consider using the `partial_cmp` method instead, to make it clear that the two values could be incomparable
+   --> vendor\truck\truck-certified\src\formal\torus_circle.rs:535:26
+    |
+535 |     if !(n_mag > 0.0) || !(placement.radius > 0.0) {
+    |                          ^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.97.0/index.html#neg_cmp_op_on_partial_ord
+
+error: the use of negated comparison operators on partially ordered types produces code that is hard to read and refactor, please consider using the `partial_cmp` method instead, to make it clear that the two values could be incomparable
+   --> vendor\truck\truck-certified\src\formal\torus_circle.rs:546:8
+    |
+546 |     if !(a1n > 0.0) {
+    |        ^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.97.0/index.html#neg_cmp_op_on_partial_ord
+
+error: manual implementation of an assign operation
+   --> vendor\truck\truck-certified\src\formal\torus_circle.rs:549:5
+    |
+549 |     a1 = a1 / a1n;
+    |     ^^^^^^^^^^^^^ help: replace it with: `a1 /= a1n`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.97.0/index.html#assign_op_pattern
+
+error: this function has too many arguments (10/7)
+   --> vendor\truck\truck-certified\src\formal\torus_circle.rs:678:1
+    |
+678 | / fn signed_poloidal_crossings(
+679 | |     cx: f64,
+680 | |     ax: f64,
+681 | |     bx: f64,
+...   |
+688 | |     large: f64,
+689 | | ) -> Option<i8> {
+    | |_______________^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.97.0/index.html#too_many_arguments
+
+error: the loop variable `j` is only used to index `c`
+   --> vendor\truck\truck-certified\src\formal\bezier_isect.rs:310:22
+    |
+310 |             for j in 0..=n {
+    |                      ^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.97.0/index.html#needless_range_loop
+help: consider using an iterator
+    |
+310 -             for j in 0..=n {
+310 +             for <item> in c.iter().take(n + 1) {
+    |
+
+error: the loop variable `i` is only used to index `c`
+   --> vendor\truck\truck-certified\src\formal\bezier_isect.rs:322:18
+    |
+322 |         for i in 0..=m {
+    |                  ^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.97.0/index.html#needless_range_loop
+help: consider using an iterator
+    |
+322 -         for i in 0..=m {
+322 +         for <item> in c.iter().take(m + 1) {
+    |
+
+error: large size difference between variants
+   --> vendor\truck\truck-certified\src\formal\bezier_isect.rs:588:1
+    |
+588 | / enum NodeClass {
+589 | |     Excluded,
+    | |     -------- the second-largest variant carries no data at all
+590 | |     Root(KrawczykCertificate),
+    | |     ------------------------- the largest variant contains at least 208 bytes
+591 | |     Split,
+592 | | }
+    | |_^ the entire enum is at least 216 bytes
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.97.0/index.html#large_enum_variant
+help: consider boxing the large fields or introducing indirection in some other way to reduce the total size of the enum
+    |
+590 -     Root(KrawczykCertificate),
+590 +     Root(Box<KrawczykCertificate>),
+    |
+
+error: writing `&mut Vec` instead of `&mut [_]` involves a new object where a slice will do
+   --> vendor\truck\truck-certified\src\formal\bezier_isect.rs:700:21
+    |
+700 |     fn find(parent: &mut Vec<usize>, x: usize) -> usize {
+    |                     ^^^^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.97.0/index.html#ptr_arg
+    = note: `#[deny(clippy::ptr_arg)]` implied by `#[deny(clippy::all)]`
+help: change this to
+    |
+700 -     fn find(parent: &mut Vec<usize>, x: usize) -> usize {
+700 +     fn find(parent: &mut [usize], x: usize) -> usize {
+    |
+
+error: you seem to be trying to use `match` for destructuring a single pattern. Consider using `if let`
+    --> vendor\truck\truck-certified\src\formal\bezier_isect.rs:1344:5
+     |
+1344 | /     match super::common_arc::common_arc_for_pair(&lhs_span, &rhs_span) {
+1345 | |         Ok(arc) => return PairContactResult::Components(vec![ContactComponent2::CommonArc(arc)]),
+...    |
+1351 | |         Err(_) => {}
+1352 | |     }
+     | |_____^ help: try: `if let Ok(arc) = super::common_arc::common_arc_for_pair(&lhs_span, &rhs_span) { return PairContactResult::Components(vec![ContactComponent2::CommonArc(arc)]) }`
+     |
+     = note: you might want to preserve the comments from inside the `match`
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.97.0/index.html#single_match
+     = note: `#[deny(clippy::single_match)]` implied by `#[deny(clippy::all)]`
+
+error: this function has too many arguments (10/7)
+    --> vendor\truck\truck-certified\src\formal\common_arc.rs:1148:1
+     |
+1148 | / fn assemble(
+1149 | |     first: &CurveSpan2,
+1150 | |     second: &CurveSpan2,
+1151 | |     support: CommonSupportFragment,
+...    |
+1158 | |     context: DeckContext,
+1159 | | ) -> Result<CommonArc2, CommonArcError> {
+     | |_______________________________________^
+     |
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.97.0/index.html#too_many_arguments
+
+error: large size difference between variants
+   --> vendor\truck\truck-certified\src\formal\contact.rs:453:1
+    |
+453 | / pub enum ContactComponent2 {
+454 | |     /// An isolated (0-dimensional) event.
+455 | |     IsolatedEvent(IsolatedEvent2),
+    | |     ----------------------------- the second-largest variant contains at least 152 bytes
+456 | |     /// A positive-dimensional common arc.
+457 | |     CommonArc(CommonArc2),
+    | |     --------------------- the largest variant contains at least 1456 bytes
+458 | | }
+    | |_^ the entire enum is at least 1456 bytes
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.97.0/index.html#large_enum_variant
+help: consider boxing the large fields or introducing indirection in some other way to reduce the total size of the enum
+    |
+457 -     CommonArc(CommonArc2),
+457 +     CommonArc(Box<CommonArc2>),
+    |
+
+error: method `neg` can be confused for the standard trait method `std::ops::Neg::neg`
+   --> vendor\truck\truck-certified\src\formal\deck.rs:313:5
+    |
+313 | /     pub fn neg(self) -> Result<Self, DeckNumericFailure> {
+314 | |         // -(upper) is the new lower; round it down. -(lower) is the new upper.
+315 | |         let lower = lower_of(-self.upper.get())?;
+316 | |         let upper = upper_of(-self.lower.get())?;
+317 | |         Ok(Self { lower, upper })
+318 | |     }
+    | |_____^
+    |
+    = help: consider implementing the trait `std::ops::Neg` or choosing a less ambiguous method name
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.97.0/index.html#should_implement_trait
+    = note: `#[deny(clippy::should_implement_trait)]` implied by `#[deny(clippy::all)]`
+
+error: method `add` can be confused for the standard trait method `std::ops::Add::add`
+   --> vendor\truck\truck-certified\src\formal\deck.rs:321:5
+    |
+321 | /     pub fn add(self, other: Self) -> Result<Self, DeckNumericFailure> {
+322 | |         let lower = lower_of(self.lower.get() + other.lower.get())?;
+323 | |         let upper = upper_of(self.upper.get() + other.upper.get())?;
+324 | |         Ok(Self { lower, upper })
+325 | |     }
+    | |_____^
+    |
+    = help: consider implementing the trait `std::ops::Add` or choosing a less ambiguous method name
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.97.0/index.html#should_implement_trait
+
+error: method `sub` can be confused for the standard trait method `std::ops::Sub::sub`
+   --> vendor\truck\truck-certified\src\formal\deck.rs:328:5
+    |
+328 | /     pub fn sub(self, other: Self) -> Result<Self, DeckNumericFailure> {
+329 | |         self.add(other.neg()?)
+330 | |     }
+    | |_____^
+    |
+    = help: consider implementing the trait `std::ops::Sub` or choosing a less ambiguous method name
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.97.0/index.html#should_implement_trait
+
+error: manual `!RangeInclusive::contains` implementation
+   --> vendor\truck\truck-certified\src\formal\deck.rs:689:8
+    |
+689 |     if rounded < I64_GUARD_FLOOR || rounded > I64_GUARD_CEIL {
+    |        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: use: `!(I64_GUARD_FLOOR..=I64_GUARD_CEIL).contains(&rounded)`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.97.0/index.html#manual_range_contains
+    = note: `#[deny(clippy::manual_range_contains)]` implied by `#[deny(clippy::all)]`
+
+error: using `clone` on type `ParameterEnclosure` which implements the `Copy` trait
+    --> vendor\truck\truck-certified\src\formal\intersection.rs:1518:40
+     |
+1518 |         return PieceLocation::interior(s_iv.clone());
+     |                                        ^^^^^^^^^^^^ help: try dereferencing it: `*s_iv`
+     |
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.97.0/index.html#clone_on_copy
+     = note: `#[deny(clippy::clone_on_copy)]` implied by `#[deny(clippy::all)]`
+
+error: using `clone` on type `ParameterEnclosure` which implements the `Copy` trait
+    --> vendor\truck\truck-certified\src\formal\intersection.rs:1774:21
+     |
+1774 |                     line_loc.parameter.clone(),
+     |                     ^^^^^^^^^^^^^^^^^^^^^^^^^^ help: try removing the `clone` call: `line_loc.parameter`
+     |
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.97.0/index.html#clone_on_copy
+
+error: using `clone` on type `ParameterEnclosure` which implements the `Copy` trait
+    --> vendor\truck\truck-certified\src\formal\intersection.rs:1775:21
+     |
+1775 |                     arc_loc.parameter.clone(),
+     |                     ^^^^^^^^^^^^^^^^^^^^^^^^^ help: try removing the `clone` call: `arc_loc.parameter`
+     |
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.97.0/index.html#clone_on_copy
+
+error: using `clone` on type `ParameterEnclosure` which implements the `Copy` trait
+    --> vendor\truck\truck-certified\src\formal\intersection.rs:1785:21
+     |
+1785 |                     arc_loc.parameter.clone(),
+     |                     ^^^^^^^^^^^^^^^^^^^^^^^^^ help: try removing the `clone` call: `arc_loc.parameter`
+     |
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.97.0/index.html#clone_on_copy
+
+error: using `clone` on type `ParameterEnclosure` which implements the `Copy` trait
+    --> vendor\truck\truck-certified\src\formal\intersection.rs:1786:21
+     |
+1786 |                     line_loc.parameter.clone(),
+     |                     ^^^^^^^^^^^^^^^^^^^^^^^^^^ help: try removing the `clone` call: `line_loc.parameter`
+     |
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.97.0/index.html#clone_on_copy
+
+error: using `clone` on type `ParameterEnclosure` which implements the `Copy` trait
+    --> vendor\truck\truck-certified\src\formal\intersection.rs:2020:17
+     |
+2020 |                 lhs_loc.parameter.clone(),
+     |                 ^^^^^^^^^^^^^^^^^^^^^^^^^ help: try removing the `clone` call: `lhs_loc.parameter`
+     |
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.97.0/index.html#clone_on_copy
+
+error: using `clone` on type `ParameterEnclosure` which implements the `Copy` trait
+    --> vendor\truck\truck-certified\src\formal\intersection.rs:2021:17
+     |
+2021 |                 rhs_loc.parameter.clone(),
+     |                 ^^^^^^^^^^^^^^^^^^^^^^^^^ help: try removing the `clone` call: `rhs_loc.parameter`
+     |
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.97.0/index.html#clone_on_copy
+
+error: the use of negated comparison operators on partially ordered types produces code that is hard to read and refactor, please consider using the `partial_cmp` method instead, to make it clear that the two values could be incomparable
+   --> vendor\truck\truck-certified\src\formal\planar_developed.rs:214:8
+    |
+214 |     if !(normal_magnitude > 0.0) || !normal_magnitude.is_finite() {
+    |        ^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.97.0/index.html#neg_cmp_op_on_partial_ord
+
+error: you seem to want to iterate on a map's keys
+   --> vendor\truck\truck-certified\src\formal\planar_holes.rs:788:22
+    |
+788 |     for (edge, _) in incidence.iter() {
+    |                      ^^^^^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.97.0/index.html#for_kv_map
+    = note: `#[deny(clippy::for_kv_map)]` implied by `#[deny(clippy::all)]`
+help: use the corresponding method
+    |
+788 -     for (edge, _) in incidence.iter() {
+788 +     for edge in incidence.keys() {
+    |
+
+error: the use of negated comparison operators on partially ordered types produces code that is hard to read and refactor, please consider using the `partial_cmp` method instead, to make it clear that the two values could be incomparable
+   --> vendor\truck\truck-certified\src\formal\planar_holes.rs:883:8
+    |
+883 |     if !(area_residual <= certificate.material_area * 1e-9) {
+    |        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.97.0/index.html#neg_cmp_op_on_partial_ord
+
+error: the use of negated comparison operators on partially ordered types produces code that is hard to read and refactor, please consider using the `partial_cmp` method instead, to make it clear that the two values could be incomparable
+   --> vendor\truck\truck-certified\src\formal\planar_slice.rs:738:8
+    |
+738 |     if !(normalised > 0.0) || !tolerance.is_finite() || tolerance <= 0.0 {
+    |        ^^^^^^^^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.97.0/index.html#neg_cmp_op_on_partial_ord
+
+error: the use of negated comparison operators on partially ordered types produces code that is hard to read and refactor, please consider using the `partial_cmp` method instead, to make it clear that the two values could be incomparable
+   --> vendor\truck\truck-certified\src\formal\planar_slice.rs:756:8
+    |
+756 |     if !(magnitude > 0.0) {
+    |        ^^^^^^^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.97.0/index.html#neg_cmp_op_on_partial_ord
+
+error: using `contains()` instead of `iter().any()` is more efficient
+   --> vendor\truck\truck-certified\src\formal\planar_slice.rs:988:13
+    |
+988 |         if !touches.iter().any(|existing| *existing == point) {
+    |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: try: `touches.contains(&point)`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.97.0/index.html#manual_contains
+    = note: `#[deny(clippy::manual_contains)]` implied by `#[deny(clippy::all)]`
+
+error: the use of negated comparison operators on partially ordered types produces code that is hard to read and refactor, please consider using the `partial_cmp` method instead, to make it clear that the two values could be incomparable
+    --> vendor\truck\truck-certified\src\formal\planar_slice.rs:1533:8
+     |
+1533 |     if !(area_residual <= polygon_area * 1e-9) {
+     |        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+     |
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.97.0/index.html#neg_cmp_op_on_partial_ord
+
+error: the use of negated comparison operators on partially ordered types produces code that is hard to read and refactor, please consider using the `partial_cmp` method instead, to make it clear that the two values could be incomparable
+   --> vendor\truck\truck-certified\src\formal\rank1_annulus.rs:459:8
+    |
+459 |     if !(separation > 0.0) || !separation.is_finite() {
+    |        ^^^^^^^^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.97.0/index.html#neg_cmp_op_on_partial_ord
+
+error: the use of negated comparison operators on partially ordered types produces code that is hard to read and refactor, please consider using the `partial_cmp` method instead, to make it clear that the two values could be incomparable
+   --> vendor\truck\truck-certified\src\formal\rank1_annulus.rs:468:12
+    |
+468 |         if !(clearance > 0.0) || !clearance.is_finite() || !singular_coordinate.is_finite() {
+    |            ^^^^^^^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.97.0/index.html#neg_cmp_op_on_partial_ord
+
+error: the use of negated comparison operators on partially ordered types produces code that is hard to read and refactor, please consider using the `partial_cmp` method instead, to make it clear that the two values could be incomparable
+   --> vendor\truck\truck-certified\src\formal\rank1_annulus.rs:603:8
+    |
+603 |     if !(tolerance > 0.0) {
+    |        ^^^^^^^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.97.0/index.html#neg_cmp_op_on_partial_ord
+
+error: the use of negated comparison operators on partially ordered types produces code that is hard to read and refactor, please consider using the `partial_cmp` method instead, to make it clear that the two values could be incomparable
+   --> vendor\truck\truck-certified\src\formal\support.rs:299:8
+    |
+299 |     if !(scale > 0.0) || !determinant.is_finite() {
+    |        ^^^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.97.0/index.html#neg_cmp_op_on_partial_ord
+
+error: using `clone` on type `CertifiedCriticalPoint` which implements the `Copy` trait
+   --> vendor\truck\truck-certified\src\formal\xmonotone.rs:763:47
+    |
+763 |         interior.iter().map(|&(k, ref c)| (k, c.clone())).collect()
+    |                                               ^^^^^^^^^ help: try dereferencing it: `*c`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.97.0/index.html#clone_on_copy
+
+error: using `clone` on type `CertifiedCriticalPoint` which implements the `Copy` trait
+   --> vendor\truck\truck-certified\src\formal\xmonotone.rs:768:36
+    |
+768 |             .map(|&(k, ref c)| (k, c.clone()))
+    |                                    ^^^^^^^^^ help: try dereferencing it: `*c`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.97.0/index.html#clone_on_copy
+
+error: using `clone` on type `CertifiedCriticalPoint` which implements the `Copy` trait
+   --> vendor\truck\truck-certified\src\formal\xmonotone.rs:788:59
+    |
+788 |         endpoints.push((t_mid, ArcPieceEndpoint::Critical(critical.clone())));
+    |                                                           ^^^^^^^^^^^^^^^^ help: try dereferencing it: `*critical`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.97.0/index.html#clone_on_copy
+
+error: using `clone` on type `ArcPieceEndpoint` which implements the `Copy` trait
+   --> vendor\truck\truck-certified\src\formal\xmonotone.rs:804:24
+    |
+804 |         let start_ep = cur_ep.clone();
+    |                        ^^^^^^^^^^^^^^ help: try dereferencing it: `*cur_ep`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.97.0/index.html#clone_on_copy
+
+error: using `clone` on type `ArcPieceEndpoint` which implements the `Copy` trait
+   --> vendor\truck\truck-certified\src\formal\xmonotone.rs:805:22
+    |
+805 |         let end_ep = endpoints[idx + 1].1.clone();
+    |                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: try removing the `clone` call: `endpoints[idx + 1].1`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.97.0/index.html#clone_on_copy
+
+    Checking derive_more v2.1.1
+error: could not compile `truck-certified` (lib) due to 74 previous errors
+warning: build failed, waiting for other jobs to finish...
