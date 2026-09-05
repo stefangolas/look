@@ -136,3 +136,8 @@ pub mod offset_strata;
 /// [`stars::Star`] reduced to the P3 graph-disk machinery, and the
 /// reach-bound [`stars::reach_prune`] broad phase (sound but not complete).
 pub mod stars;
+
+/// The two-support rolling-ball blend trace (CC-030-BLEND-SPINE, seam S12):
+/// the certified predictor/corrector walk of each branch to its certified
+/// events, with event isolation and the P6 shared-node discipline.
+pub mod blend;
