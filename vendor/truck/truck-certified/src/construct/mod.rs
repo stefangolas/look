@@ -154,6 +154,7 @@ pub mod blend;
 /// guide curve and radius law, with the foot-point uniqueness gate (Section 1).
 pub mod blend_varradius;
 
+<<<<<<< HEAD
 /// The face-consumption outcome of the trim arrangement (CC-032-FACE-CONSUMPTION,
 /// seam S12 consumer / theory §5.4): `F_i_new = F_i \ R_i` decided by the
 /// arrangement of the contact pcurves, with certified per-cell blend-side
@@ -171,3 +172,10 @@ pub mod shell;
 /// S7 consumer; theory §7.1): the focal term from the per-patch interval
 /// quadratic solve and the bottleneck term over the non-adjacent strata.
 pub mod thickness;
+
+/// The n-valent corner setback patch (CC-033-SETBACK, Phase D, spine S6/S3
+/// consumers / theory §5.5): the deterministic corner-advance fill of a 2n
+/// sided corner loop with Hermite ribbon patches per boundary arc, certified
+/// on four counts (boundary, G¹ ribbons, local regularity, global
+/// embeddedness).
+pub mod setback;
