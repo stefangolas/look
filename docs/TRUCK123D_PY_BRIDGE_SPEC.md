@@ -88,6 +88,18 @@ PB-000 ─┬→ PB-001 ─┐
 PB-001/002/003 are mutually write-disjoint and parallel-eligible after 000.
 PB-004 is independent of A-phase packets.
 
+> **Program status (PB-000-CONTRACT, LANDED):** the shim packet is complete.
+> The four contracts are frozen in [`docs/PY_BRIDGE_CONTRACT.md`](PY_BRIDGE_CONTRACT.md):
+> the 25-row API mapping table (16 landed facade entries + the 9 CC-port
+> forwards the showcases consume through `showcases/src/cc_ports.rs`), the
+> two-class refusal→exception mapping (`Refused` / `Unresolved`, nothing to a
+> bare `Exception`), the `tables/*.json` schema v1 (v1-by-omission — no
+> version field), and the byte-determinism contract. No new evidence variant
+> appeared, so no mapping rows were booked into `CERTIFICATE_MAPPING.md`
+> (target met). `showcases/src/cc_ports.rs` carries the anti-corruption-layer
+> doc freeze; `showcases/tests/pb_contract.rs` pins all four contracts. Later
+> packets type against that document.
+
 ## 5. Gates and invariants
 
 - **Zero geometric content in Python and in the bridge crate**: every

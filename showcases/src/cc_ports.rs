@@ -9,6 +9,17 @@
 //! Refusal discipline: a port that is not yet landed reports
 //! `UnsupportedEnvelope(ContactReductionDeferred)` — a deferred capability is
 //! surfaced, never silently skipped and never approximated.
+//!
+//! PB PROGRAM FREEZE (PB-000-CONTRACT): this module is the Truck123d Python
+//! Bridge (PB) program's anti-corruption layer — the same trait `truck123d`
+//! (the pyo3 facade) wraps later, so the Python side inherits identical
+//! semantics. Its method set is FROZEN as of PB-000-CONTRACT (2026-09-05 at
+//! `90672a7`): no signature changes may land here. `docs/PY_BRIDGE_CONTRACT.md`
+//! §1.2 names the nine forwards the showcases consume and records their rows
+//! in the bridge's API mapping table; `CcPorts::gordon` and
+//! `CcPorts::certify_shell` are part of the frozen method set but are not
+//! bridge-facing until a showcase consumer exercises them. This paragraph is
+//! the whole of the PB-000 edit to this file.
 
 use truck_base::cgmath64::Point3;
 use truck_base::evidence::{EnvelopeCase, Outcome, Refusal};
