@@ -304,7 +304,7 @@ def main():
         # the landed check - the KV2 overnight ran waves by hand; the CC
         # program is chain-serial and must not idle a slot behind the author.
         disp = sh([sys.executable, str(ROOT / 'loop' / 'dispatch_ready.py'),
-                   '--max-workers', '3'], timeout=1800)
+                   '--max-workers', '4'], timeout=1800)
         for ln in (disp.stdout or '').splitlines():
             if 'dispatched' in ln or 'clash' in ln or 'blocked' in ln:
                 log('dispatch: ' + ln.strip())
