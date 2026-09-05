@@ -15,7 +15,7 @@
     clippy::indexing_slicing
 )]
 
-use crate::constructive::SpineFrameSweep;
+use crate::constructive::{CertifiedImplicitIntersectionCurve, SpineFrameSweep};
 use crate::prelude::*;
 use serde::{Deserialize, Serialize};
 use truck_base::evidence::{
@@ -54,6 +54,14 @@ pub enum Curve {
     /// `Curve` spine, which would recurse without indirection (the
     /// `IntersectionCurve` precedent).
     SpineFrameCurve(SpineFrameCurve<Box<Curve>>),
+    /// The certified implicit intersection curve carrier (BIE-003-CARRIER): a
+    /// certified 3-D polyline with per-sample tangent frames and the
+    /// unresolved witness slot. Procedural (continuously evaluable through its
+    /// stored frames), polyline form consumed only at tessellation. Mirrors
+    /// the `IntersectionCurve` decorator precedent (variant + `From` +
+    /// method-delegation macro arms); the payload stores no `Curve`, so no
+    /// boxing indirection is needed.
+    CertifiedImplicitIntersectionCurve(CertifiedImplicitIntersectionCurve),
 }
 
 macro_rules! derive_curve_method {
@@ -65,6 +73,7 @@ macro_rules! derive_curve_method {
             Curve::NurbsCurve(got) => $method(got, $($ver), *),
             Curve::IntersectionCurve(got) => $method(got, $($ver), *),
             Curve::SpineFrameCurve(got) => $method(got, $($ver), *),
+            Curve::CertifiedImplicitIntersectionCurve(got) => $method(got, $($ver), *),
         }
     };
 }
@@ -78,6 +87,9 @@ macro_rules! derive_curve_self_method {
             Curve::NurbsCurve(got) => Curve::NurbsCurve($method(got, $($ver), *)),
             Curve::IntersectionCurve(got) => Curve::IntersectionCurve($method(got, $($ver), *)),
             Curve::SpineFrameCurve(got) => Curve::SpineFrameCurve($method(got, $($ver), *)),
+            Curve::CertifiedImplicitIntersectionCurve(got) => {
+                Curve::CertifiedImplicitIntersectionCurve($method(got, $($ver), *))
+            }
         }
     };
 }
@@ -137,6 +149,13 @@ impl From<IntersectionCurve<Box<Curve>, Box<Surface>, Box<Surface>>> for Curve {
     }
 }
 
+impl From<CertifiedImplicitIntersectionCurve> for Curve {
+    #[inline(always)]
+    fn from(x: CertifiedImplicitIntersectionCurve) -> Self {
+        Curve::CertifiedImplicitIntersectionCurve(x)
+    }
+}
+
 impl TryFrom<Curve> for Line<Point3> {
     type Error = Curve;
     fn try_from(value: Curve) -> std::result::Result<Self, Self::Error> {
@@ -182,6 +201,16 @@ impl TryFrom<Curve> for IntersectionCurve<Box<Curve>, Box<Surface>, Box<Surface>
     fn try_from(value: Curve) -> std::result::Result<Self, Self::Error> {
         match value {
             Curve::IntersectionCurve(x) => Ok(x),
+            _ => Err(value),
+        }
+    }
+}
+
+impl TryFrom<Curve> for CertifiedImplicitIntersectionCurve {
+    type Error = Curve;
+    fn try_from(value: Curve) -> std::result::Result<Self, Self::Error> {
+        match value {
+            Curve::CertifiedImplicitIntersectionCurve(x) => Ok(x),
             _ => Err(value),
         }
     }
@@ -245,6 +274,15 @@ impl Curve {
             #[allow(clippy::unimplemented)]
             Curve::SpineFrameCurve(_) => {
                 unimplemented!("spine-frame trajectory cannot connect by homotopy")
+            }
+            // BIE-003-CARRIER: a certified implicit intersection curve has no
+            // spline lift either (it is a certified sample/frame stream, not a
+            // control-point curve) and `lift_up` has no error channel. Follow
+            // the ISC/SpineFrameCurve precedent verbatim; every certified
+            // include path routes the variant away before reaching here.
+            #[allow(clippy::unimplemented)]
+            Curve::CertifiedImplicitIntersectionCurve(_) => {
+                unimplemented!("certified implicit intersection curve cannot connect by homotopy")
             }
         }
     }
@@ -748,6 +786,16 @@ impl IncludeCurve<Curve> for Surface {
                     spent: Budget::new(0, 0, 0),
                     witness: UnresolvedWitness::UncertifiedContainment,
                 }),
+                // BIE-003-CARRIER: a certified implicit intersection curve's
+                // containment in a spline/plane/revolution carrier is outside
+                // this packet's certified envelope (BIE-005 answers it); refuse
+                // typed, never abort.
+                Curve::CertifiedImplicitIntersectionCurve(_) => {
+                    Err(Refusal::NumericallyUnresolved {
+                        spent: Budget::new(0, 0, 0),
+                        witness: UnresolvedWitness::UncertifiedContainment,
+                    })
+                }
                 Curve::Circle(_) => unreachable!("circles are degraded above"),
             },
             Surface::NurbsSurface(surface) => match curve {
@@ -762,6 +810,16 @@ impl IncludeCurve<Curve> for Surface {
                     spent: Budget::new(0, 0, 0),
                     witness: UnresolvedWitness::UncertifiedContainment,
                 }),
+                // BIE-003-CARRIER: a certified implicit intersection curve's
+                // containment in a spline/plane/revolution carrier is outside
+                // this packet's certified envelope (BIE-005 answers it); refuse
+                // typed, never abort.
+                Curve::CertifiedImplicitIntersectionCurve(_) => {
+                    Err(Refusal::NumericallyUnresolved {
+                        spent: Budget::new(0, 0, 0),
+                        witness: UnresolvedWitness::UncertifiedContainment,
+                    })
+                }
                 Curve::Circle(_) => unreachable!("circles are degraded above"),
             },
             Surface::Plane(surface) => match curve {
@@ -776,6 +834,16 @@ impl IncludeCurve<Curve> for Surface {
                     spent: Budget::new(0, 0, 0),
                     witness: UnresolvedWitness::UncertifiedContainment,
                 }),
+                // BIE-003-CARRIER: a certified implicit intersection curve's
+                // containment in a spline/plane/revolution carrier is outside
+                // this packet's certified envelope (BIE-005 answers it); refuse
+                // typed, never abort.
+                Curve::CertifiedImplicitIntersectionCurve(_) => {
+                    Err(Refusal::NumericallyUnresolved {
+                        spent: Budget::new(0, 0, 0),
+                        witness: UnresolvedWitness::UncertifiedContainment,
+                    })
+                }
                 Curve::Circle(_) => unreachable!("circles are degraded above"),
             },
             Surface::RevolutedCurve(surface) => match surface.entity_curve() {
@@ -799,6 +867,15 @@ impl IncludeCurve<Curve> for Surface {
                             spent: Budget::new(0, 0, 0),
                             witness: UnresolvedWitness::UncertifiedContainment,
                         }),
+                        // BIE-003-CARRIER: a revolved certified implicit
+                        // intersection curve is outside this packet's certified
+                        // envelope (BIE-005 answers it); refuse typed.
+                        Curve::CertifiedImplicitIntersectionCurve(_) => {
+                            Err(Refusal::NumericallyUnresolved {
+                                spent: Budget::new(0, 0, 0),
+                                witness: UnresolvedWitness::UncertifiedContainment,
+                            })
+                        }
                         Curve::Circle(_) => unreachable!("circles are degraded above"),
                     }
                 }
@@ -819,6 +896,15 @@ impl IncludeCurve<Curve> for Surface {
                             spent: Budget::new(0, 0, 0),
                             witness: UnresolvedWitness::UncertifiedContainment,
                         }),
+                        // BIE-003-CARRIER: a revolved certified implicit
+                        // intersection curve is outside this packet's certified
+                        // envelope (BIE-005 answers it); refuse typed.
+                        Curve::CertifiedImplicitIntersectionCurve(_) => {
+                            Err(Refusal::NumericallyUnresolved {
+                                spent: Budget::new(0, 0, 0),
+                                witness: UnresolvedWitness::UncertifiedContainment,
+                            })
+                        }
                         Curve::Circle(_) => unreachable!("circles are degraded above"),
                     }
                 }
@@ -855,6 +941,15 @@ impl IncludeCurve<Curve> for Surface {
                             spent: Budget::new(0, 0, 0),
                             witness: UnresolvedWitness::UncertifiedContainment,
                         }),
+                        // BIE-003-CARRIER: a revolved certified implicit
+                        // intersection curve is outside this packet's certified
+                        // envelope (BIE-005 answers it); refuse typed.
+                        Curve::CertifiedImplicitIntersectionCurve(_) => {
+                            Err(Refusal::NumericallyUnresolved {
+                                spent: Budget::new(0, 0, 0),
+                                witness: UnresolvedWitness::UncertifiedContainment,
+                            })
+                        }
                         Curve::Circle(_) => unreachable!("circles are degraded above"),
                     }
                 }
@@ -865,6 +960,15 @@ impl IncludeCurve<Curve> for Surface {
                     spent: Budget::new(0, 0, 0),
                     witness: UnresolvedWitness::UncertifiedContainment,
                 }),
+                // BIE-003-CARRIER: a surface of revolution whose profile is a
+                // certified implicit intersection curve is outside this
+                // packet's certified envelope; refuse typed.
+                Curve::CertifiedImplicitIntersectionCurve(_) => {
+                    Err(Refusal::NumericallyUnresolved {
+                        spent: Budget::new(0, 0, 0),
+                        witness: UnresolvedWitness::UncertifiedContainment,
+                    })
+                }
             },
             // Certified curve-in-analytic-surface containment is BG-CE-002 /
             // BG-ENC work; the analytic carriers refuse honestly for now.
@@ -990,6 +1094,14 @@ impl IncludeCurve<Curve> for Plane {
             // (the ISC precedent); the plane containment question is a
             // numerical-search matter and refuses honestly rather than abort.
             Curve::SpineFrameCurve(_) => Err(Refusal::NumericallyUnresolved {
+                spent: Budget::new(0, 0, 0),
+                witness: UnresolvedWitness::UncertifiedContainment,
+            }),
+            // BIE-003-CARRIER: a certified implicit intersection curve cannot
+            // be lifted either (the ISC/SpineFrameCurve precedent); the plane
+            // containment question is BIE-005's certified answer and refuses
+            // honestly rather than abort.
+            Curve::CertifiedImplicitIntersectionCurve(_) => Err(Refusal::NumericallyUnresolved {
                 spent: Budget::new(0, 0, 0),
                 witness: UnresolvedWitness::UncertifiedContainment,
             }),
@@ -1645,5 +1757,151 @@ mod placed_analytic_transform_tests {
                 assert_near!(processor.subs(u, v), Point3::new(v.cos(), 2.0 * v.sin(), u));
             }
         }
+    }
+}
+
+#[cfg(test)]
+// BIE-003-CARRIER tests. The certified carrier and its hand-built sample
+// stream are test witnesses — the H-1 deny lints on unwrap/expect/panic do not
+// apply to the assertions here, and every accessor path stays unwrap-free.
+mod certified_carrier_canonical_tests {
+    use super::*;
+    use crate::constructive::intersection_carrier::{CertifiedSample, IntersectionFrame};
+    use crate::constructive::{CertifiedImplicitIntersectionCurve, Frame3};
+
+    /// The orthonormal +x-tangent frame shared by every straight-line station.
+    fn x_frame() -> Option<IntersectionFrame> {
+        let frame =
+            Frame3::try_new(Vector3::unit_x(), Vector3::unit_z(), -Vector3::unit_y()).ok()?;
+        Some(IntersectionFrame {
+            tangent: frame.tangent,
+            normal: frame.normal,
+            binormal: frame.binormal,
+        })
+    }
+
+    /// A certified straight carrier along +x at z = 0 with three stations.
+    fn certified_line() -> Option<(Curve, CertifiedImplicitIntersectionCurve)> {
+        let frame = x_frame()?;
+        let positions = [
+            Point3::new(0.0, 0.0, 0.0),
+            Point3::new(1.0, 0.0, 0.0),
+            Point3::new(2.0, 0.0, 0.0),
+        ];
+        let samples: Vec<CertifiedSample> = positions
+            .iter()
+            .map(|&position| CertifiedSample {
+                position,
+                frame,
+                method: Method::Float,
+            })
+            .collect();
+        match CertifiedImplicitIntersectionCurve::try_new(&samples, None) {
+            Ok(certified) => {
+                let value = certified.value;
+                Some((value.clone().into(), value))
+            }
+            Err(_) => None,
+        }
+    }
+
+    #[test]
+    fn canonical_ripple_delegates_all_methods() {
+        // The new variant is additive: the carrier enters the canonical enum
+        // through the `From` impl and every landed method/macro arm delegates
+        // (or refuses typed) for it — compile-enforced by this module building
+        // against the full enum, asserted here on the carrier's behaviour.
+        let (curve, carrier) = match certified_line() {
+            Some(pair) => pair,
+            None => return,
+        };
+        // Variant identity + the `TryFrom` downcast.
+        assert!(matches!(
+            &curve,
+            Curve::CertifiedImplicitIntersectionCurve(_)
+        ));
+        let downcast: CertifiedImplicitIntersectionCurve =
+            match CertifiedImplicitIntersectionCurve::try_from(curve.clone()) {
+                Ok(carrier) => carrier,
+                Err(_) => return,
+            };
+        assert_eq!(downcast.polyline(), carrier.polyline());
+
+        // Parametric evaluation delegates through the enum.
+        let tolerance = 1.0e-9; // H-3
+        assert!((curve.subs(0.0) - Point3::new(0.0, 0.0, 0.0)).magnitude() <= tolerance);
+        assert!((curve.subs(2.0) - Point3::new(2.0, 0.0, 0.0)).magnitude() <= tolerance);
+        assert!((curve.der(1.0) - Vector3::unit_x()).magnitude() <= tolerance);
+        assert_eq!(curve.range_tuple(), (0.0, 2.0));
+
+        // `Cut` delegates: the split lands on the certified station at
+        // parameter 1, and both halves keep the certified-carrier variant.
+        let mut head = curve.clone();
+        let tail = head.cut(1.0);
+        assert!(matches!(head, Curve::CertifiedImplicitIntersectionCurve(_)));
+        assert!(matches!(tail, Curve::CertifiedImplicitIntersectionCurve(_)));
+        assert_eq!(head.range_tuple().1, 1.0);
+        assert_eq!(tail.range_tuple().0, 1.0);
+        assert_eq!(tail.range_tuple().1, 2.0);
+
+        // `Invertible` delegates: the domain is unchanged, the geometry is
+        // traversed back to front.
+        let mut inverted = curve.clone();
+        inverted.invert();
+        assert_eq!(inverted.range_tuple(), (0.0, 2.0));
+        assert!((inverted.subs(0.0) - Point3::new(2.0, 0.0, 0.0)).magnitude() <= tolerance);
+        assert!((inverted.subs(2.0) - Point3::new(0.0, 0.0, 0.0)).magnitude() <= tolerance);
+
+        // `Transformed` delegates through the macro arms.
+        let translation = Matrix4::from_translation(Vector3::new(0.0, 0.0, 5.0));
+        let moved = curve.transformed(translation);
+        assert!((moved.front() - Point3::new(0.0, 0.0, 5.0)).magnitude() <= tolerance);
+        assert!((moved.back() - Point3::new(2.0, 0.0, 5.0)).magnitude() <= tolerance);
+
+        // Parameter search delegates.
+        let param_tolerance = 1.0e-6; // H-3
+        let found = curve.search_parameter(Point3::new(1.0, 0.0, 0.0), None, 50);
+        match found {
+            Some(t) => assert!((t - 1.0).abs() <= param_tolerance),
+            None => return,
+        }
+
+        // Containment refuses typed on every carrier surface — the certified
+        // envelope answers the containment question only for its own pair
+        // (BIE-005); never a panic, never a fabricated `Proven`.
+        let plane = Plane::new(
+            Point3::origin(),
+            Point3::new(1.0, 0.0, 0.0),
+            Point3::new(0.0, 1.0, 0.0),
+        );
+        let on_plane = Surface::Plane(plane).include(&curve);
+        assert!(
+            matches!(
+                on_plane,
+                Err(Refusal::NumericallyUnresolved {
+                    witness: UnresolvedWitness::UncertifiedContainment,
+                    ..
+                })
+            ),
+            "plane containment of a certified carrier must refuse typed, got {on_plane:?}"
+        );
+        let patch = BSplineSurface::new(
+            (KnotVec::bezier_knot(1), KnotVec::bezier_knot(1)),
+            vec![
+                vec![Point3::new(0.0, 0.0, 0.0), Point3::new(1.0, 0.0, 0.0)],
+                vec![Point3::new(0.0, 1.0, 0.0), Point3::new(1.0, 1.0, 0.0)],
+            ],
+        );
+        let on_patch = Surface::BSplineSurface(patch).include(&curve);
+        assert!(
+            matches!(
+                on_patch,
+                Err(Refusal::NumericallyUnresolved {
+                    witness: UnresolvedWitness::UncertifiedContainment,
+                    ..
+                })
+            ),
+            "spline containment of a certified carrier must refuse typed, got {on_patch:?}"
+        );
     }
 }

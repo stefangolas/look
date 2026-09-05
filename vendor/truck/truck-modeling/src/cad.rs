@@ -205,11 +205,14 @@ fn edge_enclosure(curve: &Curve) -> Result<Box3, Refusal> {
             let tt = interval_pair(t0, t1)?;
             Ok(enclose_placed_circle(placed, tt))
         }
-        // P1 emits and consumes bare canonical carriers only.
+        // P1 emits and consumes bare canonical carriers only. A certified
+        // implicit intersection curve has no certified enclosure either — the
+        // `IntersectionCurve` delegation.
         Curve::BSplineCurve(_)
         | Curve::NurbsCurve(_)
         | Curve::IntersectionCurve(_)
-        | Curve::SpineFrameCurve(_) => Err(Refusal::UnsupportedEnvelope(
+        | Curve::SpineFrameCurve(_)
+        | Curve::CertifiedImplicitIntersectionCurve(_) => Err(Refusal::UnsupportedEnvelope(
             EnvelopeCase::NonCanonicalCarrier,
         )),
     }
@@ -601,11 +604,14 @@ fn check_profile_curve(curve: &Curve) -> Result<(), Refusal> {
             }
             Ok(())
         }
-        // P1 emits and consumes bare canonical carriers only.
+        // P1 emits and consumes bare canonical carriers only. A certified
+        // implicit intersection curve is not a z = 0 profile carrier either —
+        // the `IntersectionCurve` delegation.
         Curve::BSplineCurve(_)
         | Curve::NurbsCurve(_)
         | Curve::IntersectionCurve(_)
-        | Curve::SpineFrameCurve(_) => Err(Refusal::UnsupportedEnvelope(
+        | Curve::SpineFrameCurve(_)
+        | Curve::CertifiedImplicitIntersectionCurve(_) => Err(Refusal::UnsupportedEnvelope(
             EnvelopeCase::NonCanonicalCarrier,
         )),
     }
