@@ -53,3 +53,7 @@ pub mod rewrite;
 /// BG-CAD-P8-FACADE: the build123d-shaped facade over the landed kernel
 /// entries (P1-P7) and the conformance battery's surface.
 pub mod facade;
+
+/// BIE-007-GATES: the χ valuation + mod-2 homology validity gate over the
+/// output complex (diagnose → χ/homology → verdict).
+pub mod gates;
