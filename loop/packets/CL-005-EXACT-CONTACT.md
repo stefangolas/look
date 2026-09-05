@@ -21,6 +21,7 @@ read_allow:
   - vendor/truck/truck-shapeops/tests/boolean_m2.rs
   - docs/CARRIER_LIFT_BUILD_SPEC.md
 tests_required:
+tests_required:
   - butt_join_coplanar_union_certified
   - exact_footprint_halfspace_difference_certified
   - canonical_controls_bit_identical

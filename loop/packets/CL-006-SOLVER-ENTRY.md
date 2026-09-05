@@ -76,7 +76,7 @@ end to end.
 | A1 | `vendor/truck/truck-certified/src/construct/bie/ssi4.rs` | `pub struct CertifiedChartCurve` | 1 |
 | A2 | `vendor/truck/truck-evidence/src/contact/mod.rs` | `NumericallyUnresolved` | 2 |
 | A3 | `vendor/truck/truck-certified/src/Cargo.toml` | `truck-evidence` | 1 |
-| A4 | `vendor/truck/truck-shapeops/src/boolean/sweep_lift.rs` | `pub fn` | >= 2 |
+| A4 | `vendor/truck/truck-shapeops/src/boolean/sweep_lift.rs` | `pub struct FragmentProvenance` | 1 |
 
 A3 is the dependency-direction proof: truck-certified already depends on
 truck-evidence — the impl side can name the trait.
@@ -133,7 +133,7 @@ registry. Adding `#[ignore]`. Unjustified `#[allow]`. Committing to
 
 ```json
 {"id":"CL-006-SOLVER-ENTRY","status":"DONE","contracts":["CL-006-SOLVER-ENTRY"],
- "tests_added":3,"anchors_verified":{"A1":1,"A2":2,"A3":1,"A4":"2+"},
+ "tests_added":3,"anchors_verified":{"A1":1,"A2":2,"A3":1,"A4":1},
  "notes":"the init site where the engine registers, and the fixture pairs that flipped from absent-unresolved to engine-certified"}
 ```
 
