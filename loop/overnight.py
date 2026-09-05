@@ -68,6 +68,14 @@ def registry():
 
 
 def save_registry(rows, order, p):
+    # merge-on-save (session 51): rows appended concurrently (the side
+    # session's registrations) must survive the driver's rewrite.
+    for line in p.read_text(encoding="utf-8-sig").splitlines():
+        if line.strip():
+            r = json.loads(line)
+            if r["id"] not in rows:
+                rows[r["id"]] = r
+                order.append(r["id"])
     with open(p, "w", encoding="utf-8", newline="\n") as f:
         for pid in order:
             f.write(json.dumps(rows[pid]) + "\n")
@@ -322,6 +330,7 @@ def battery(rows, order, reg_path):
 
 
 def main():
+    global BATTERY_COOLDOWN_UNTIL
     log(f"overnight driver start (pid {os.getpid()})")
     battery_done = False
     while not battery_done:
@@ -334,34 +343,31 @@ def main():
                     and parts[2] == "FINISHED":
                 try_land(ROOT / "loop" / "slots" / parts[1],
                          parts[1], rows, order, reg_path)
-        # Rolling dispatch (owner direction, session 51): refill slots before
-        # the landed check - the KV2 overnight ran waves by hand; the CC
-        # program is chain-serial and must not idle a slot behind the author.
-        disp = sh([sys.executable, str(ROOT / 'loop' / 'dispatch_ready.py'),
-                   '--max-workers', '4'], timeout=1800)
-        for ln in (disp.stdout or '').splitlines():
-            if 'dispatched' in ln or 'clash' in ln or 'blocked' in ln:
-                log('dispatch: ' + ln.strip())
-        if all_landed(rows):
-            still_running = any(
-                len(l.split()) >= 3 and l.split()[2] == "RUNNING"
-                for l in status_out.splitlines()
-                if l.startswith("slot "))
-            if not still_running:
-                if time.time() < BATTERY_COOLDOWN_UNTIL:
-                    log("battery cooldown active - cycling")
-                elif all_landed(rows):  # rows flip DONE only via the battery - requiring DONE first deadlocked (session 51)
-                    battery(rows, order, reg_path)
-                    if rows_done(rows):
-                        battery_done = True
-                        break
-                    BATTERY_COOLDOWN_UNTIL = time.time() + 2 * 3600
-                    log("battery not green - 2h cooldown, the loop keeps cycling")
+        # Verifier-first gate (owner directive, session 51): no dispatch
+        # until the CC program's battery is green. BIE rows in the shared
+        # registry stay held by this gate.
+        still_running = any(
+            len(l.split()) >= 3 and l.split()[2] == "RUNNING"
+            for l in status_out.splitlines()
+            if l.startswith("slot "))
+        rows_done_now = rows_done(rows)
+        if not still_running and all_landed(rows) and not rows_done_now:
+            if time.time() < BATTERY_COOLDOWN_UNTIL:
+                log("battery cooldown active - no dispatch until green")
+            else:
+                battery(rows, order, reg_path)
+                if rows_done(rows):
+                    log("BATTERY GREEN - program complete; dispatch opens")
                 else:
-                    log("program rows not all DONE yet - keep cycling")
+                    BATTERY_COOLDOWN_UNTIL = time.time() + 2 * 3600
+                    log("battery not green - 2h cooldown, no dispatch until green")
+        elif rows_done_now:
+            disp = sh([sys.executable, str(ROOT / 'loop' / 'dispatch_ready.py'),
+                       '--max-workers', '4'], timeout=1800)
+            for ln in (disp.stdout or '').splitlines():
+                if ln.strip():
+                    log('dispatch: ' + ln.strip())
+        else:
+            log("landing/running phase - no dispatch")
         time.sleep(POLL_SECONDS)
     log("overnight driver exit")
-
-
-if __name__ == "__main__":
-    sys.exit(main())
