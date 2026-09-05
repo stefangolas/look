@@ -71,7 +71,11 @@ report `ANCHOR_MISMATCH`.
 | A1 | `vendor/truck/truck-certified/src/ssi.rs` | `pub fn construct_square_system` | 1 |
 | A2 | `vendor/truck/truck-certified/src/hull.rs` | `pub fn hull_bernstein_2d` | 1 |
 | A3 | `vendor/truck/truck-certified/src/lib.rs` | `^pub mod` | 15 |
-| A4 | `vendor/truck/truck-geometry/src/nurbs/bspsurface.rs` | `pub struct BSplineSurface` | 1 |
+| A4 | `vendor/truck/truck-geometry/src/nurbs/mod.rs` | `pub struct BSplineSurface` | 1 |
+
+A4's declaration lives in `nurbs/mod.rs` (the module root), not
+`bspsurface.rs` (impl-only) — re-pointed after the first dispatch's
+command-verified stop.
 
 A3 becomes 16 when you add `pub mod patch_admit;`. If the measured count
 of `^pub mod` differs because another program landed first, re-derive and
