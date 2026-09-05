@@ -289,8 +289,13 @@ def battery(rows, order, reg_path):
             touched = set(git(["diff", "--name-only", f"{base}..HEAD"])
                           .stdout.split())
             finding_files = set()
-            for m in re.finditer(r"--> (\S+?):\d+:\d+",
-                                 (r.stdout or "") + (r.stderr or "")):
+            # The primary span is the arrow IMMEDIATELY after the error
+            # line; later arrows belong to help/note blocks (the lint-level
+            # note points at lib.rs and mis-attributed pre-existing
+            # formal/ findings to the modified lib.rs - session 51).
+            for m in re.finditer(r"^error:[^\n]*\n\s*--> (\S+?):\d+:\d+",
+                                 (r.stdout or "") + (r.stderr or ""),
+                                 re.MULTILINE):
                 rel = m.group(1).replace("\\", "/")
                 rel = rel.split("vendor/")[-1]
                 finding_files.add("vendor/" + rel)
