@@ -22,6 +22,14 @@
 //! - `Processor` recurses into its entity and pushes the affine map through
 //!   the boxes exactly (8-corner transform).
 //!
+//! One recorded drift (BIE_BUILD_SPINE §2, BIE-003-CARRIER): the swept-face
+//! carrier (`Surface::SpineFrameSurface`) is a procedural recipe evaluation,
+//! not a spline, so its box cannot be a structural certificate. The plan
+//! authorizes **sampling/enclosure-based** bounds for it: a deterministic
+//! lattice over the windowed domain `(s0, s1, v0, v1)`, grown outward by half
+//! the largest measured per-axis step between adjacent lattice stations —
+//! never a certified enclosure, exactly the accepted drift.
+//!
 //! `DerivativeBounds` is the shared broad-phase type from
 //! `truck_base::bvh` (packet BG-SOL-P0-BVH); orchestrator amendment a557d09
 //! replaced the packet's original local copy with the shared one after the
@@ -48,6 +56,7 @@ use truck_base::cgmath64::*;
 use truck_geotrait::ParametricSurface;
 
 use crate::canonical::Surface;
+use crate::constructive::SpineFrameSweep;
 use crate::decorators::Processor;
 use crate::nurbs::{BSplineSurface, KnotVec, NurbsSurface};
 use crate::specifieds::{Plane, Sphere, Torus};
@@ -98,11 +107,76 @@ fn extract_spans(s: &Surface) -> Vec<SpanRecord> {
         Surface::NurbsSurface(surface) => nurbs_spans(surface),
         Surface::Processor(processor) => processor_spans(processor),
         Surface::RevolutedCurve(_) | Surface::ExtrudedCurve(_) => Vec::new(),
-        // BG-CG-009-BREP: the spine-frame surface is not a spline carrier; its
-        // span extraction has no certified box (the recipe evaluators are not
-        // span-queryable), so it contributes no spans.
-        Surface::SpineFrameSurface(_) => Vec::new(),
+        // BIE-003-CARRIER: the spine-frame surface contributes real span
+        // records now — sampling/enclosure-based bounds over the windowed
+        // domain `(s0, s1, v0, v1)` (spine §2 drift: the recipe evaluators are
+        // not span-queryable, so the box is a deterministic lattice enclosure,
+        // outward by construction).
+        Surface::SpineFrameSurface(sweep) => spine_frame_surface_spans(sweep),
     }
+}
+
+/// `SpineFrameSurface` — sampling/enclosure-based bounds over the windowed
+/// domain `(s0, s1, v0, v1)` of the landed whole-sweep value.
+///
+/// The recipe is procedural, so the span cannot be a structural certificate;
+/// the plan books sampling/enclosure bounds for this carrier (drift record,
+/// module doc). A deterministic lattice over the window is hulled, then grown
+/// outward by half the largest measured per-axis step between adjacent lattice
+/// stations ("outward by construction"). On the straight-spine fixed-frame
+/// sweeps the surface is affine over the window, so the lattice hull already
+/// contains the whole image exactly and the growth is pure padding.
+fn spine_frame_surface_spans(sweep: &SpineFrameSweep) -> Vec<SpanRecord> {
+    // Lattice counts (dimensionless sample budgets, H-5): the spine direction
+    // carries all the curvature, the profile edge is straight in `v`.
+    const SPINE_STATIONS: usize = 24;
+    const RING_STATIONS: usize = 4;
+    let s0 = sweep.s0();
+    let s1 = sweep.s1();
+    let v0 = sweep.v0();
+    let v1 = sweep.v1();
+    let u_lo = s0.min(s1);
+    let u_hi = s0.max(s1);
+    let v_lo = v0.min(v1);
+    let v_hi = v0.max(v1);
+    let sample = |i: usize, j: usize| {
+        let s = s0 + (s1 - s0) * (i as f64) / (SPINE_STATIONS as f64);
+        let v = v0 + (v1 - v0) * (j as f64) / (RING_STATIONS as f64);
+        sweep.subs(s, v)
+    };
+    let mut hull = BoundingBox::new();
+    for i in 0..=SPINE_STATIONS {
+        for j in 0..=RING_STATIONS {
+            hull.push(sample(i, j));
+        }
+    }
+    let mut grow = Vector3::new(0.0, 0.0, 0.0);
+    for i in 0..SPINE_STATIONS {
+        for j in 0..=RING_STATIONS {
+            let step = sample(i + 1, j) - sample(i, j);
+            grow.x = grow.x.max(step.x.abs());
+            grow.y = grow.y.max(step.y.abs());
+            grow.z = grow.z.max(step.z.abs());
+        }
+    }
+    for i in 0..=SPINE_STATIONS {
+        for j in 0..RING_STATIONS {
+            let step = sample(i, j + 1) - sample(i, j);
+            grow.x = grow.x.max(step.x.abs());
+            grow.y = grow.y.max(step.y.abs());
+            grow.z = grow.z.max(step.z.abs());
+        }
+    }
+    let grow = grow * 0.5;
+    let mut bbox = BoundingBox::new();
+    bbox.push(hull.min() - grow);
+    bbox.push(hull.max() + grow);
+    vec![SpanRecord {
+        bbox,
+        derivative_hull: DerivativeBounds::new(),
+        u_range: (u_lo, u_hi),
+        v_range: (v_lo, v_hi),
+    }]
 }
 
 /// `Plane` — the bilinear image is exactly the hull of its four corners.
@@ -478,7 +552,9 @@ fn box_corners(bbox: BoundingBox<Point3>) -> [Point3; 8] {
 // flow through `assert_eq!`/`assert!` and `match` with a total `Err` arm.
 mod tests {
     use super::*;
-    use crate::specifieds::{Cone, Cylinder};
+    use crate::canonical::Curve;
+    use crate::constructive::{FrameLaw, Profile2D, ProfileLaw, SpineFrameRecipe, SpineFrameSweep};
+    use crate::specifieds::{Cone, Cylinder, Line};
     use std::f64::consts::PI;
 
     /// A degree-2×2 B-spline surface over `uniform_knot(2, 2)`: three distinct
@@ -628,5 +704,70 @@ mod tests {
         };
         let surface = Surface::Cone(cone);
         assert!(cache.spans(2, &surface).is_empty());
+    }
+
+    #[test]
+    fn swept_face_span_covers_windowed_domain() {
+        // BIE-003-CARRIER: the straight-spine, fixed-plane sweep fixture
+        // `X = (py, -px, s)` over the edge-zero window `[0, 1] × [0, 1/4]` —
+        // hand-derived world extent x = 0, y ∈ [-1, 0], z ∈ [0, 1]. The swept
+        // face must now contribute span records that cover it.
+        let profile = match Profile2D::try_closed(vec![
+            Point2::new(0.0, 0.0),
+            Point2::new(1.0, 0.0),
+            Point2::new(1.0, 1.0),
+            Point2::new(0.0, 1.0),
+        ]) {
+            Ok(profile) => profile,
+            Err(_) => return,
+        };
+        let recipe = SpineFrameRecipe::new(
+            Box::new(Curve::Line(Line(
+                Point3::origin(),
+                Point3::new(0.0, 0.0, 1.0),
+            ))),
+            ProfileLaw::Constant(profile),
+            FrameLaw::FixedPlane {
+                normal: Vector3::unit_x(),
+            },
+        );
+        let sweep = match SpineFrameSweep::try_new(recipe, 0.0, 1.0, 0.0, 0.25) {
+            Ok(sweep) => sweep,
+            Err(_) => return,
+        };
+        let surface = Surface::SpineFrameSurface(sweep);
+        let mut cache = SpanCache::new();
+        let records = cache.spans(11, &surface).to_vec();
+        assert!(
+            !records.is_empty(),
+            "swept faces must now contribute span records"
+        );
+        for record in &records {
+            assert_eq!(record.u_range, (0.0, 1.0));
+            assert_eq!(record.v_range, (0.0, 0.25));
+            // The hand-derived world-space extent of the window.
+            for (x, y, z) in [
+                (0.0, -1.0, 0.0),
+                (0.0, 0.0, 1.0),
+                (0.0, -1.0, 1.0),
+                (0.0, 0.0, 0.0),
+                (0.0, -0.5, 0.5),
+            ] {
+                assert!(
+                    record.bbox.contains(Point3::new(x, y, z)),
+                    "span box {record:?} misses the exact extent point ({x}, {y}, {z})"
+                );
+            }
+            // Interior window samples ride inside the record box too.
+            for s in [0.0, 0.25, 0.5, 0.75, 1.0] {
+                for v in [0.0625, 0.125, 0.1875] {
+                    let point = Point3::new(0.0, -4.0 * v, s);
+                    assert!(
+                        record.bbox.contains(point),
+                        "span box misses the analytic window sample {point:?}"
+                    );
+                }
+            }
+        }
     }
 }

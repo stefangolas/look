@@ -55,6 +55,7 @@ mod frame_fixed;
 mod frame_radial;
 mod frame_transport;
 mod frame_up;
+pub mod intersection_carrier;
 mod profile;
 mod recipe;
 mod sampling;
@@ -328,6 +329,7 @@ impl Default for DirectTolerance {
 }
 
 pub use errors::ConstructError;
+pub use intersection_carrier::CertifiedImplicitIntersectionCurve;
 pub use recipe::SpineFrameRecipe;
 pub use recipe::{FrameData, LineSpine, PolylineSpine, Spine, SpineCurve};
 pub use sampling::SamplingPolicy;
