@@ -159,3 +159,10 @@ pub mod blend_varradius;
 /// arrangement of the contact pcurves, with certified per-cell blend-side
 /// classification and the surviving cells' trim provenance.
 pub mod face_consumption;
+
+/// The S1 embedding certificate on the stratum quotient and the S1′ solid
+/// corollary (CC-023-SHELL-BRIDGE, spine S7 consumer): the shell certificate —
+/// per-pair three-valued verdicts (stars → broad phase → the evidence contact
+/// funnel), the certified-star count, and the pre-made closed/connected/
+/// orientation checks that decide [`shell::SolidOutcome`].
+pub mod shell;
