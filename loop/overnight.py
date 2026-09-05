@@ -128,12 +128,13 @@ def try_land(slot_dir, slot_no, rows, order, reg_path):
     except ValueError:
         log(f"slot {slot_no}: unreadable RESULT; left for morning")
         return
-    status = (result.get("status") or "").lower()
+    status = (result.get("status") or result.get("outcome") or "").lower()
     fails = result.get("fail_count")
-    if status not in ("complete", "partial", "done") or \
-            (isinstance(fails, int) and fails > 0):
-        log(f"slot {slot_no}: {pid} status={status!r} fails={fails} - "
-            f"LEFT FOR MORNING (judgment required)")
+    stopped = bool((result.get("stop_conditions") or {}).get("triggered"))
+    good = status in ("complete", "partial", "done", "landed", "completed")
+    if stopped or not good or (isinstance(fails, int) and fails > 0):
+        log(f"slot {slot_no}: {pid} status={status!r} fails={fails} "
+            f"stopped={stopped} - LEFT FOR MORNING (judgment required)")
         return
     crates, tests = packet_tests_and_crates(packet_path, row)
     ok, why = scoped_check(crates, tests, slot_dir / "wt")
