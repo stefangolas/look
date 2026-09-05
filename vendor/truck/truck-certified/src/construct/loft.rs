@@ -221,8 +221,8 @@ pub fn averaged_knot_vector(stations: &[f64], degree: usize) -> KnotVec {
     for p in (degree + 1)..count {
         let j = p - degree;
         let mut acc = 0.0_f64;
-        for r in j..(j + degree) {
-            acc += stations[r];
+        for station in stations.iter().skip(j).take(degree) {
+            acc += *station;
         }
         knots.push(acc / (degree as f64));
     }

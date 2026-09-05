@@ -205,14 +205,14 @@ fn radius_jet(
             .iter()
             .map(|c| c * inv_width)
             .collect();
-        let first_hull = hull_bernstein_1d(&first, (t_lo, t_hi))
-            .map_err(|_| ConstructRefusal::InvalidInput)?;
+        let first_hull =
+            hull_bernstein_1d(&first, (t_lo, t_hi)).map_err(|_| ConstructRefusal::InvalidInput)?;
         let second: Vec<f64> = bernstein_derivative_1d(&first)
             .iter()
             .map(|c| c * inv_width)
             .collect();
-        let second_hull = hull_bernstein_1d(&second, (t_lo, t_hi))
-            .map_err(|_| ConstructRefusal::InvalidInput)?;
+        let second_hull =
+            hull_bernstein_1d(&second, (t_lo, t_hi)).map_err(|_| ConstructRefusal::InvalidInput)?;
         r_lo = r_lo.min(value.lo);
         r_hi = r_hi.max(value.hi);
         rp_lo = rp_lo.min(first_hull.lo);
@@ -224,7 +224,10 @@ fn radius_jet(
         return Err(ConstructRefusal::InvalidInput);
     }
     let r = Interval { lo: r_lo, hi: r_hi };
-    let rp = Interval { lo: rp_lo, hi: rp_hi };
+    let rp = Interval {
+        lo: rp_lo,
+        hi: rp_hi,
+    };
     let rpp = Interval {
         lo: rpp_lo,
         hi: rpp_hi,
@@ -424,13 +427,28 @@ fn canal_criterion(
         }
         let (u_lo, u_hi) = unit_image(*interval, overlap)?;
         let (tau_lo, tau_hi) = unit_image(arc, overlap)?;
-        let (r, rp, rpp) = radius_jet(radius, Interval { lo: tau_lo, hi: tau_hi })?;
+        let (r, rp, rpp) = radius_jet(
+            radius,
+            Interval {
+                lo: tau_lo,
+                hi: tau_hi,
+            },
+        )?;
+        // The radius gate refuses exactly the negated greater-than test on
+        // `r.lo` against zero: a non-positive or NaN lower endpoint refuses. A
+        // bare `r.lo <= 0.0` would silently admit a NaN endpoint, so the
+        // negated comparison is retained verbatim below.
+        #[allow(clippy::neg_cmp_op_on_partial_ord)]
+        // the radius positivity gate's negated-greater-than semantics are the contract: NaN and non-positive lower endpoints must refuse
         if !(r.lo > 0.0) {
             return Err(ConstructRefusal::CanalSingular);
         }
         let rp2 = rp.mul(&rp);
         let a2 = Interval::point(1.0).sub(&rp2);
-        if !(a2.lo > 0.0) {
+        // `a2 = 1 − rp²` must be strictly positive; spelled without the
+        // negation as `<= 0 || NaN`, which is exactly the negated-greater-than
+        // semantics of the radius gate above.
+        if a2.lo <= 0.0 || a2.lo.is_nan() {
             return Err(ConstructRefusal::CanalSingular);
         }
         let a = a2.sqrt().ok_or(ConstructRefusal::CanalSingular)?;
