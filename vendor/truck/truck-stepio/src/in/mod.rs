@@ -52,6 +52,7 @@ pub struct Table {
     // curve
     pub line: HashMap<u64, LineHolder>,
     pub polyline: HashMap<u64, PolylineHolder>,
+    pub trimmed_curve: HashMap<u64, StepTrimmedCurveHolder>,
     pub b_spline_curve_with_knots: HashMap<u64, BSplineCurveWithKnotsHolder>,
     pub bezier_curve: HashMap<u64, BezierCurveHolder>,
     pub quasi_uniform_curve: HashMap<u64, QuasiUniformCurveHolder>,
@@ -347,6 +348,99 @@ impl Table {
         true
     }
 
+    /// Parse a `TRIMMED_CURVE` record into its holder.
+    ///
+    /// The record's `trimming_select` elements are either a `CARTESIAN_POINT`
+    /// (an entity reference, resolved against this table) or a
+    /// `PARAMETER_VALUE` (a bare number, or the `PARAMETER_VALUE(...)` spelling
+    /// some exporters use). The canonical record is
+    /// `TRIMMED_CURVE(name, basis_curve, trim_1, trim_2, sense_agreement,
+    /// master_representation)`; a writer that emits a single combined trim set
+    /// is tolerated by reading it as `trim_1`. Returns `None` for a record that
+    /// is not a well-formed `TRIMMED_CURVE`.
+    fn parse_trimmed_curve(
+        &self,
+        record: &Record,
+    ) -> ruststep::error::Result<Option<StepTrimmedCurveHolder>> {
+        use ruststep::ast::Parameter;
+        let Parameter::List(params) = &record.parameter else {
+            return Ok(None);
+        };
+        if params.len() < 5 {
+            return Ok(None);
+        }
+        let label = match Deserialize::deserialize(&params[0]) {
+            Ok(label) => label,
+            Err(_) => return Ok(None),
+        };
+        let basis_curve = match PlaceHolder::<CurveAnyHolder>::deserialize(&params[1]) {
+            Ok(basis_curve) => basis_curve,
+            Err(_) => return Ok(None),
+        };
+        // The trailing two parameters are the sense agreement and the master
+        // preference; everything between the basis and them is one or two trim
+        // sets.
+        let sense_idx = params.len() - 2;
+        let sense_agreement = match Deserialize::deserialize(&params[sense_idx]) {
+            Ok(sense) => sense,
+            Err(_) => return Ok(None),
+        };
+        let master_representation = match Deserialize::deserialize(&params[params.len() - 1]) {
+            Ok(master) => master,
+            Err(_) => return Ok(None),
+        };
+        let mut trim_sets = params[2..sense_idx].to_vec();
+        let trim_select = |param: &Parameter| -> Option<TrimSelect> {
+            let items: Vec<&Parameter> = match param {
+                Parameter::List(items) => items.iter().collect(),
+                other => vec![other],
+            };
+            let mut select = TrimSelect::default();
+            for item in items {
+                match item {
+                    Parameter::Real(value) => select.parameter = Some(*value),
+                    Parameter::Integer(value) => select.parameter = Some(*value as f64),
+                    Parameter::Typed { keyword, parameter }
+                        if keyword.eq_ignore_ascii_case("PARAMETER_VALUE") =>
+                    {
+                        select.parameter = Self::typed_parameter_value(parameter);
+                    }
+                    Parameter::Ref(Name::Entity(point_id)) => {
+                        if let Some(point) = self.cartesian_point.get(point_id) {
+                            select.point_coordinates = Some(point.coordinates.clone());
+                        }
+                    }
+                    _ => {}
+                }
+            }
+            Some(select)
+        };
+        let trim_1 = trim_sets.first().and_then(trim_select).unwrap_or_default();
+        let trim_2 = trim_sets
+            .pop()
+            .and_then(|set| trim_select(&set))
+            .unwrap_or_default();
+        Ok(Some(StepTrimmedCurveHolder {
+            label,
+            basis_curve,
+            trim_1,
+            trim_2,
+            sense_agreement,
+            master_representation,
+        }))
+    }
+
+    /// The inner value of a `PARAMETER_VALUE(real)` spelling, if that spelling
+    /// is what a trim element used.
+    fn typed_parameter_value(parameter: &Parameter) -> Option<f64> {
+        match parameter {
+            Parameter::Real(value) => Some(*value),
+            Parameter::Integer(value) => Some(*value as f64),
+            Parameter::List(values) => values.iter().find_map(Self::typed_parameter_value),
+            _ => None,
+        }
+    }
+
     pub fn push_instance(&mut self, instance: &EntityInstance) -> ruststep::error::Result<()> {
         match instance {
             EntityInstance::Simple { id, record } => {
@@ -387,6 +481,27 @@ impl Table {
                     }
                     "POLYLINE" => {
                         self.polyline.insert(*id, Deserialize::deserialize(record)?);
+                    }
+                    "TRIMMED_CURVE" => {
+                        match self.parse_trimmed_curve(record) {
+                            Ok(Some(holder)) => {
+                                self.trimmed_curve.insert(*id, holder);
+                            }
+                            // A record that is not a well-formed `TRIMMED_CURVE`
+                            // is not geometry the reader can use. Park it in
+                            // `dummy` exactly like any other unrecognised
+                            // record, so a stray presentation `TRIMMED_CURVE`
+                            // never takes a file down with it.
+                            _ => {
+                                self.dummy.insert(
+                                    *id,
+                                    DummyHolder {
+                                        record: format!("{record:?}"),
+                                        is_simple: true,
+                                    },
+                                );
+                            }
+                        }
                     }
                     "B_SPLINE_CURVE_WITH_KNOTS" => {
                         self.b_spline_curve_with_knots
@@ -1765,6 +1880,8 @@ pub enum BoundedCurveAny {
     Polyline(Box<Polyline>),
     #[holder(use_place_holder)]
     BSplineCurve(Box<BSplineCurveAny>),
+    #[holder(use_place_holder)]
+    TrimmedCurve(Box<StepTrimmedCurve>),
 }
 
 impl TryFrom<&BoundedCurveAny> for Curve2D {
@@ -1775,6 +1892,7 @@ impl TryFrom<&BoundedCurveAny> for Curve2D {
         Ok(match value {
             Polyline(x) => Self::Polyline(x.as_ref().into()),
             BSplineCurve(x) => x.as_ref().try_into()?,
+            TrimmedCurve(x) => x.as_ref().realize_curve2d()?,
         })
     }
 }
@@ -1787,6 +1905,7 @@ impl TryFrom<&BoundedCurveAny> for Curve3D {
         Ok(match value {
             Polyline(x) => Self::Polyline(x.as_ref().into()),
             BSplineCurve(x) => x.as_ref().try_into()?,
+            TrimmedCurve(x) => x.as_ref().realize_curve3d()?,
         })
     }
 }
@@ -1805,6 +1924,503 @@ impl<'a, P: From<&'a CartesianPoint>> From<&'a Polyline> for PolylineCurve<P> {
     #[inline(always)]
     fn from(poly: &'a Polyline) -> Self {
         Self(poly.points.iter().map(|pt| P::from(pt)).collect())
+    }
+}
+
+/// `trimming_preference`
+#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
+pub enum TrimmingPreference {
+    Cartesian,
+    Parameter,
+    Unspecified,
+}
+
+/// One trim side (`trim_1` or `trim_2`) of a `TRIMMED_CURVE`.
+///
+/// A `trimming_select` set carries at most one `CARTESIAN_POINT` and at most
+/// one `PARAMETER_VALUE`. Both readings are kept so the master preference and
+/// the trim-duality certificate can be evaluated at conversion time; the point
+/// is stored by its resolved coordinates because the conversion runs on the
+/// owned entity, where no table is in hand to resolve a reference.
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+pub struct TrimSelect {
+    /// The point's coordinates when the side carries a `CARTESIAN_POINT`.
+    pub point_coordinates: Option<Vec<f64>>,
+    /// The declared `PARAMETER_VALUE` when the side carries one.
+    pub parameter: Option<f64>,
+}
+
+/// `trimmed_curve`
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Holder)]
+#[holder(table = Table)]
+#[holder(field = trimmed_curve)]
+#[holder(generate_deserialize)]
+pub struct StepTrimmedCurve {
+    pub label: String,
+    #[holder(use_place_holder)]
+    pub basis_curve: CurveAny,
+    pub trim_1: TrimSelect,
+    pub trim_2: TrimSelect,
+    pub sense_agreement: bool,
+    pub master_representation: TrimmingPreference,
+}
+
+impl StepTrimmedCurve {
+    /// Resolve one trim side to a basis parameter.
+    ///
+    /// `solve` maps a point to its parameter on the converted basis curve;
+    /// `subs` maps a basis parameter back to its model-space point so the
+    /// GEO-006 residual certificate can be measured. The declared parameter and
+    /// the solved parameter must agree within the context tolerance when a
+    /// trim carries both (the duality certificate); disagreement is a typed
+    /// refusal, never an average and never a silent pick.
+    fn resolve_side<Solve, Subs>(
+        &self,
+        ctx: &ToleranceCtx,
+        side: &TrimSelect,
+        side_name: &str,
+        solve: &mut Solve,
+        subs: &Subs,
+    ) -> Result<f64, StepConvertingError>
+    where
+        Solve: FnMut(&Point3) -> Option<f64>,
+        Subs: Fn(f64) -> Point3,
+    {
+        let mut solved = None;
+        if let Some(coordinates) = &side.point_coordinates {
+            let point = match coordinates.len() {
+                2 => Point3::new(coordinates[0], coordinates[1], 0.0),
+                3 => Point3::new(coordinates[0], coordinates[1], coordinates[2]),
+                _ => {
+                    return Err(format!(
+                        "TRIMMED_CURVE {side_name} point carries {} coordinates",
+                        coordinates.len()
+                    )
+                    .into())
+                }
+            };
+            let Some(parameter) = solve(&point) else {
+                return Err(
+                    format!("TRIMMED_CURVE {side_name} point is not on its basis curve").into(),
+                );
+            };
+            // GEO-006: a distant nearest point is not a valid inverse.
+            if (subs(parameter) - point).magnitude() > ctx.length_margin() {
+                return Err(format!(
+                    "TRIMMED_CURVE {side_name} point is at residual \
+                     {:?} from its basis curve (beyond the context tolerance)",
+                    (subs(parameter) - point).magnitude()
+                )
+                .into());
+            }
+            solved = Some(parameter);
+        }
+        if let (Some(declared), Some(resolved)) = (side.parameter, solved) {
+            if (resolved - declared).abs() > ctx.sin_margin() {
+                return Err(format!(
+                    "TRIMMED_CURVE {side_name} point solves to parameter {resolved:?} but the \
+                     declared PARAMETER_VALUE is {declared:?}; the two readings disagree"
+                )
+                .into());
+            }
+        }
+        match self.master_representation {
+            TrimmingPreference::Parameter => side.parameter.ok_or_else(|| {
+                format!(
+                    "TRIMMED_CURVE {side_name} carries no PARAMETER_VALUE for a .PARAMETER. master"
+                )
+                .into()
+            }),
+            TrimmingPreference::Cartesian => solved.ok_or_else(|| {
+                format!(
+                    "TRIMMED_CURVE {side_name} carries no CARTESIAN_POINT for a .CARTESIAN. master"
+                )
+                .into()
+            }),
+            TrimmingPreference::Unspecified => side.parameter.or(solved).ok_or_else(|| {
+                format!("TRIMMED_CURVE {side_name} carries no usable trimming select").into()
+            }),
+        }
+    }
+
+    /// Realize a `TRIMMED_CURVE` in 3D.
+    ///
+    /// The basis is converted whole and the trim selects are resolved in the
+    /// basis' own parameterization (conics: radians on the unit conic). A
+    /// periodic basis gets the conic wrap rule and refuses a multi-period trim.
+    pub fn realize_curve3d(&self) -> Result<Curve3D, StepConvertingError> {
+        let ctx = ToleranceCtx::unscaled_legacy();
+        let mut curve = match &self.basis_curve {
+            CurveAny::Line(line) => {
+                let pnt = Point3::from(&line.pnt);
+                let dir = Vector3::from(&line.dir);
+                let (t0, t1) = self.resolve_pair(
+                    &ctx,
+                    |point| {
+                        let denominator = dir.dot(dir);
+                        if ctx.is_small_len2(denominator) {
+                            return None;
+                        }
+                        Some((*point - pnt).dot(dir) / denominator)
+                    },
+                    |t| pnt + dir * t,
+                )?;
+                // PAR-RANGE-INHERITANCE: a STEP line is parameterized by
+                // distance along its direction from `pnt`, so the segment is
+                // re-anchored at `pnt + dir*t0 .. pnt + dir*t1` rather than a
+                // STEP parameter being passed into a truck `Line`'s 0..=1 range.
+                Curve3D::Line(Line(pnt + dir * t0, pnt + dir * t1))
+            }
+            CurveAny::Conic(conic) => match conic.as_ref() {
+                Conic::Circle(circle) => {
+                    let mat =
+                        Matrix4::try_from(&circle.position)? * Matrix4::from_scale(circle.radius);
+                    let inv_mat = mat
+                        .invert()
+                        .ok_or_else(|| "failed to invert a circle placement".to_string())?;
+                    let (t0, mut t1) = self.resolve_pair(
+                        &ctx,
+                        |point| {
+                            let q = inv_mat.transform_point(*point);
+                            UnitCircle::<Point3>::new().search_nearest_parameter(q, None, 0)
+                        },
+                        |t| mat.transform_point(UnitCircle::<Point3>::new().subs(t)),
+                    )?;
+                    if t1 < t0 - ctx.sin_margin() {
+                        t1 += 2.0 * PI;
+                    }
+                    if (t1 - t0).abs() > 2.0 * PI {
+                        return Err(format!(
+                            "TRIMMED_CURVE spans more than one period (t0 {t0:?}, t1 {t1:?}); \
+                             a multi-period trim is not realizable here"
+                        )
+                        .into());
+                    }
+                    let trimmed = TrimmedCurve::new(UnitCircle::<Point3>::new(), (t0, t1));
+                    let mut processor = Processor::new(trimmed);
+                    processor.transform_by(mat);
+                    Curve3D::Conic(Conic3D::Circle(processor))
+                }
+                Conic::Ellipse(ellipse) => {
+                    let mat = Matrix4::try_from(&ellipse.position)?
+                        * Matrix4::from_nonuniform_scale(
+                            ellipse.semi_axis_1,
+                            ellipse.semi_axis_2,
+                            f64::min(ellipse.semi_axis_1, ellipse.semi_axis_2),
+                        );
+                    let inv_mat = mat
+                        .invert()
+                        .ok_or_else(|| "failed to invert an ellipse placement".to_string())?;
+                    let (t0, mut t1) = self.resolve_pair(
+                        &ctx,
+                        |point| {
+                            let q = inv_mat.transform_point(*point);
+                            UnitCircle::<Point3>::new().search_nearest_parameter(q, None, 0)
+                        },
+                        |t| mat.transform_point(UnitCircle::<Point3>::new().subs(t)),
+                    )?;
+                    if t1 < t0 - ctx.sin_margin() {
+                        t1 += 2.0 * PI;
+                    }
+                    if (t1 - t0).abs() > 2.0 * PI {
+                        return Err(format!(
+                            "TRIMMED_CURVE spans more than one period (t0 {t0:?}, t1 {t1:?}); \
+                             a multi-period trim is not realizable here"
+                        )
+                        .into());
+                    }
+                    let trimmed = TrimmedCurve::new(UnitCircle::<Point3>::new(), (t0, t1));
+                    let mut processor = Processor::new(trimmed);
+                    processor.transform_by(mat);
+                    Curve3D::Conic(Conic3D::Ellipse(processor))
+                }
+                Conic::Hyperbola(hyperbola) => {
+                    let mat = Matrix4::try_from(&hyperbola.position)?
+                        * Matrix4::from_nonuniform_scale(
+                            hyperbola.semi_axis,
+                            hyperbola.semi_imag_axis,
+                            f64::min(hyperbola.semi_axis, hyperbola.semi_imag_axis),
+                        );
+                    let inv_mat = mat
+                        .invert()
+                        .ok_or_else(|| "failed to invert a hyperbola placement".to_string())?;
+                    let (t0, t1) = self.resolve_pair(
+                        &ctx,
+                        |point| {
+                            let q = inv_mat.transform_point(*point);
+                            UnitHyperbola::<Point3>::new().search_nearest_parameter(q, None, 0)
+                        },
+                        |t| mat.transform_point(UnitHyperbola::<Point3>::new().subs(t)),
+                    )?;
+                    let unit = TrimmedCurve::new(UnitHyperbola::<Point3>::new(), (t0, t1));
+                    let mut processor = Processor::new(unit);
+                    processor.transform_by(mat);
+                    Curve3D::Conic(Conic3D::Hyperbola(processor))
+                }
+                Conic::Parabola(parabola) => {
+                    let mat = Matrix4::try_from(&parabola.position)?
+                        * Matrix4::from_scale(parabola.focal_dist);
+                    let inv_mat = mat
+                        .invert()
+                        .ok_or_else(|| "failed to invert a parabola placement".to_string())?;
+                    let (t0, t1) = self.resolve_pair(
+                        &ctx,
+                        |point| {
+                            let q = inv_mat.transform_point(*point);
+                            UnitHyperbola::<Point3>::new().search_nearest_parameter(q, None, 0)
+                        },
+                        |t| mat.transform_point(UnitHyperbola::<Point3>::new().subs(t)),
+                    )?;
+                    let unit = TrimmedCurve::new(UnitHyperbola::<Point3>::new(), (t0, t1));
+                    let mut processor = Processor::new(unit);
+                    processor.transform_by(mat);
+                    Curve3D::Conic(Conic3D::Hyperbola(processor))
+                }
+            },
+            other => {
+                return Err(format!(
+                    "a TRIMMED_CURVE over a {other:?} basis cannot be realized as a 3D curve"
+                )
+                .into())
+            }
+        };
+        if !self.sense_agreement {
+            curve.invert();
+        }
+        Ok(curve)
+    }
+
+    /// Realize a `TRIMMED_CURVE` in 2D.
+    pub fn realize_curve2d(&self) -> Result<Curve2D, StepConvertingError> {
+        let ctx = ToleranceCtx::unscaled_legacy();
+        let mut curve = match &self.basis_curve {
+            CurveAny::Line(line) => {
+                let pnt = Point2::from(&line.pnt);
+                let dir = Vector2::from(&line.dir);
+                let (t0, t1) = self.resolve_pair_2d(
+                    &ctx,
+                    |point| {
+                        let denominator = dir.dot(dir);
+                        if ctx.is_small_len2(denominator) {
+                            return None;
+                        }
+                        Some((*point - pnt).dot(dir) / denominator)
+                    },
+                    |t| pnt + dir * t,
+                )?;
+                // PAR-RANGE-INHERITANCE: see `realize_curve3d`.
+                Curve2D::Line(Line(pnt + dir * t0, pnt + dir * t1))
+            }
+            CurveAny::Conic(conic) => match conic.as_ref() {
+                Conic::Circle(circle) => {
+                    let mat =
+                        Matrix3::try_from(&circle.position)? * Matrix3::from_scale(circle.radius);
+                    let inv_mat = mat
+                        .invert()
+                        .ok_or_else(|| "failed to invert a circle placement".to_string())?;
+                    let (t0, mut t1) = self.resolve_pair_2d(
+                        &ctx,
+                        |point| {
+                            let q = inv_mat.transform_point(*point);
+                            UnitCircle::<Point2>::new().search_nearest_parameter(q, None, 0)
+                        },
+                        |t| mat.transform_point(UnitCircle::<Point2>::new().subs(t)),
+                    )?;
+                    if t1 < t0 - ctx.sin_margin() {
+                        t1 += 2.0 * PI;
+                    }
+                    if (t1 - t0).abs() > 2.0 * PI {
+                        return Err(format!(
+                            "TRIMMED_CURVE spans more than one period (t0 {t0:?}, t1 {t1:?}); \
+                             a multi-period trim is not realizable here"
+                        )
+                        .into());
+                    }
+                    let trimmed = TrimmedCurve::new(UnitCircle::<Point2>::new(), (t0, t1));
+                    let mut processor = Processor::new(trimmed);
+                    processor.transform_by(mat);
+                    Curve2D::Conic(Conic2D::Ellipse(processor))
+                }
+                Conic::Ellipse(ellipse) => {
+                    let mat = Matrix3::try_from(&ellipse.position)?
+                        * Matrix3::from_nonuniform_scale(ellipse.semi_axis_1, ellipse.semi_axis_2);
+                    let inv_mat = mat
+                        .invert()
+                        .ok_or_else(|| "failed to invert an ellipse placement".to_string())?;
+                    let (t0, mut t1) = self.resolve_pair_2d(
+                        &ctx,
+                        |point| {
+                            let q = inv_mat.transform_point(*point);
+                            UnitCircle::<Point2>::new().search_nearest_parameter(q, None, 0)
+                        },
+                        |t| mat.transform_point(UnitCircle::<Point2>::new().subs(t)),
+                    )?;
+                    if t1 < t0 - ctx.sin_margin() {
+                        t1 += 2.0 * PI;
+                    }
+                    if (t1 - t0).abs() > 2.0 * PI {
+                        return Err(format!(
+                            "TRIMMED_CURVE spans more than one period (t0 {t0:?}, t1 {t1:?}); \
+                             a multi-period trim is not realizable here"
+                        )
+                        .into());
+                    }
+                    let trimmed = TrimmedCurve::new(UnitCircle::<Point2>::new(), (t0, t1));
+                    let mut processor = Processor::new(trimmed);
+                    processor.transform_by(mat);
+                    Curve2D::Conic(Conic2D::Ellipse(processor))
+                }
+                Conic::Hyperbola(hyperbola) => {
+                    let mat = Matrix3::try_from(&hyperbola.position)?
+                        * Matrix3::from_nonuniform_scale(
+                            hyperbola.semi_axis,
+                            hyperbola.semi_imag_axis,
+                        );
+                    let inv_mat = mat
+                        .invert()
+                        .ok_or_else(|| "failed to invert a hyperbola placement".to_string())?;
+                    let (t0, t1) = self.resolve_pair_2d(
+                        &ctx,
+                        |point| {
+                            let q = inv_mat.transform_point(*point);
+                            UnitHyperbola::<Point2>::new().search_nearest_parameter(q, None, 0)
+                        },
+                        |t| mat.transform_point(UnitHyperbola::<Point2>::new().subs(t)),
+                    )?;
+                    let unit = TrimmedCurve::new(UnitHyperbola::<Point2>::new(), (t0, t1));
+                    let mut processor = Processor::new(unit);
+                    processor.transform_by(mat);
+                    Curve2D::Conic(Conic2D::Hyperbola(processor))
+                }
+                Conic::Parabola(parabola) => {
+                    let mat = Matrix3::try_from(&parabola.position)?
+                        * Matrix3::from_scale(parabola.focal_dist);
+                    let inv_mat = mat
+                        .invert()
+                        .ok_or_else(|| "failed to invert a parabola placement".to_string())?;
+                    let (t0, t1) = self.resolve_pair_2d(
+                        &ctx,
+                        |point| {
+                            let q = inv_mat.transform_point(*point);
+                            UnitHyperbola::<Point2>::new().search_nearest_parameter(q, None, 0)
+                        },
+                        |t| mat.transform_point(UnitHyperbola::<Point2>::new().subs(t)),
+                    )?;
+                    let unit = TrimmedCurve::new(UnitHyperbola::<Point2>::new(), (t0, t1));
+                    let mut processor = Processor::new(unit);
+                    processor.transform_by(mat);
+                    Curve2D::Conic(Conic2D::Hyperbola(processor))
+                }
+            },
+            other => {
+                return Err(format!(
+                    "a TRIMMED_CURVE over a {other:?} basis cannot be realized as a 2D curve"
+                )
+                .into())
+            }
+        };
+        if !self.sense_agreement {
+            curve.invert();
+        }
+        Ok(curve)
+    }
+
+    fn resolve_pair<Solve, Subs>(
+        &self,
+        ctx: &ToleranceCtx,
+        mut solve: Solve,
+        subs: Subs,
+    ) -> Result<(f64, f64), StepConvertingError>
+    where
+        Solve: FnMut(&Point3) -> Option<f64>,
+        Subs: Fn(f64) -> Point3,
+    {
+        let t0 = self.resolve_side(ctx, &self.trim_1, "trim_1", &mut solve, &subs)?;
+        let t1 = self.resolve_side(ctx, &self.trim_2, "trim_2", &mut solve, &subs)?;
+        Ok((t0, t1))
+    }
+
+    fn resolve_pair_2d<Solve, Subs>(
+        &self,
+        ctx: &ToleranceCtx,
+        mut solve: Solve,
+        subs: Subs,
+    ) -> Result<(f64, f64), StepConvertingError>
+    where
+        Solve: FnMut(&Point2) -> Option<f64>,
+        Subs: Fn(f64) -> Point2,
+    {
+        let t0 = self.resolve_side_2d(ctx, &self.trim_1, "trim_1", &mut solve, &subs)?;
+        let t1 = self.resolve_side_2d(ctx, &self.trim_2, "trim_2", &mut solve, &subs)?;
+        Ok((t0, t1))
+    }
+
+    fn resolve_side_2d<Solve, Subs>(
+        &self,
+        ctx: &ToleranceCtx,
+        side: &TrimSelect,
+        side_name: &str,
+        solve: &mut Solve,
+        subs: &Subs,
+    ) -> Result<f64, StepConvertingError>
+    where
+        Solve: FnMut(&Point2) -> Option<f64>,
+        Subs: Fn(f64) -> Point2,
+    {
+        let mut solved = None;
+        if let Some(coordinates) = &side.point_coordinates {
+            let point = match coordinates.len() {
+                2 => Point2::new(coordinates[0], coordinates[1]),
+                _ => {
+                    return Err(format!(
+                        "TRIMMED_CURVE {side_name} point carries {} coordinates",
+                        coordinates.len()
+                    )
+                    .into())
+                }
+            };
+            let Some(parameter) = solve(&point) else {
+                return Err(
+                    format!("TRIMMED_CURVE {side_name} point is not on its basis curve").into(),
+                );
+            };
+            // GEO-006: a distant nearest point is not a valid inverse.
+            if !ctx.near_points(subs(parameter), point) {
+                return Err(format!(
+                    "TRIMMED_CURVE {side_name} point is at residual \
+                     {:?} from its basis curve (beyond the context tolerance)",
+                    (subs(parameter) - point).magnitude()
+                )
+                .into());
+            }
+            solved = Some(parameter);
+        }
+        if let (Some(declared), Some(resolved)) = (side.parameter, solved) {
+            if (resolved - declared).abs() > ctx.sin_margin() {
+                return Err(format!(
+                    "TRIMMED_CURVE {side_name} point solves to parameter {resolved:?} but the \
+                     declared PARAMETER_VALUE is {declared:?}; the two readings disagree"
+                )
+                .into());
+            }
+        }
+        match self.master_representation {
+            TrimmingPreference::Parameter => side.parameter.ok_or_else(|| {
+                format!(
+                    "TRIMMED_CURVE {side_name} carries no PARAMETER_VALUE for a .PARAMETER. master"
+                )
+                .into()
+            }),
+            TrimmingPreference::Cartesian => solved.ok_or_else(|| {
+                format!(
+                    "TRIMMED_CURVE {side_name} carries no CARTESIAN_POINT for a .CARTESIAN. master"
+                )
+                .into()
+            }),
+            TrimmingPreference::Unspecified => side.parameter.or(solved).ok_or_else(|| {
+                format!("TRIMMED_CURVE {side_name} carries no usable trimming select").into()
+            }),
+        }
     }
 }
 
@@ -3321,8 +3937,100 @@ impl EdgeCurve {
             true => (p, q),
             false => (q, p),
         };
-        Self::sub_parse_curve3d(&self.edge_geometry, p, q, self.same_sense)
+        let ctx = ToleranceCtx::unscaled_legacy();
+        // OCCT-HIGH-ROI-CLUSTER-001 C2: the converted curve must reconcile with
+        // the two vertex positions. A folded-anchor realization puts its
+        // endpoint on the wrong side of a seam, at a residual on the order of
+        // the model diameter; refusing here carries that evidence instead of
+        // leaving the face to fail far downstream as `EdgeTraversalUnresolved`
+        // with nothing at the layer that held both curve and vertices.
+        let primary = Self::sub_parse_curve3d(&self.edge_geometry, p, q, self.same_sense);
+        match primary {
+            Ok(curve) if Self::reconciles_edge_curve(&ctx, &curve, p, q) => Ok(curve),
+            Ok(curve) => {
+                // The declared 3D curve parses but does not cover its vertices.
+                // The controlled rescue is the pcurve fallback (C2), gated by
+                // the same reconciliation predicate; it never fires for an
+                // edge that converted correctly today.
+                if let Some(fallback) = Self::reconciling_pcurve_fallback(&ctx, self, p, q)? {
+                    return Ok(fallback);
+                }
+                let (front_residual, back_residual) = Self::best_endpoint_residuals(&curve, p, q);
+                Err(format!(
+                    "edge curve does not reconcile with its vertex positions: the declared 3D \
+                     curve leaves endpoint residuals ({front_residual:.3e}, {back_residual:.3e}) \
+                     in the better assignment"
+                )
+                .into())
+            }
+            Err(original) => {
+                // The declared 3D curve failed to parse. The pcurve fallback
+                // is gated on a primary that *parsed* but failed
+                // reconciliation only; it never masks a broken `curve_3d`
+                // (OCCT-HIGH-ROI-CLUSTER-001 test: broken_curve_3d_refuses).
+                Err(original)
+            }
+        }
     }
+
+    /// The C2 reconciliation predicate: the curve's two range endpoints must
+    /// both cover the vertex positions under one of the two endpoint
+    /// assignments, each within the context tolerance (the `near_pt`
+    /// semantics: Euclidean distance against `tau_rep * model_scale`).
+    fn reconciles_edge_curve(ctx: &ToleranceCtx, curve: &Curve3D, p: Point3, q: Point3) -> bool {
+        let front = curve.front();
+        let back = curve.back();
+        let within = |a: Point3, b: Point3| (a - b).magnitude() <= ctx.length_margin();
+        (within(front, p) && within(back, q)) || (within(front, q) && within(back, p))
+    }
+
+    /// Both endpoint residuals under the better of the two assignments.
+    fn best_endpoint_residuals(curve: &Curve3D, p: Point3, q: Point3) -> (f64, f64) {
+        let front = curve.front();
+        let back = curve.back();
+        let front_p = (front - p).magnitude();
+        let back_q = (back - q).magnitude();
+        let front_q = (front - q).magnitude();
+        let back_p = (back - p).magnitude();
+        if front_p + back_q <= front_q + back_p {
+            (front_p, back_q)
+        } else {
+            (front_q, back_p)
+        }
+    }
+
+    /// Try the `SURFACE_CURVE`'s associated pcurves, S1 then S2, accepting the
+    /// first one that reconciles at both ends under the C2 predicate.
+    fn reconciling_pcurve_fallback(
+        ctx: &ToleranceCtx,
+        edge: &EdgeCurve,
+        p: Point3,
+        q: Point3,
+    ) -> Result<Option<Curve3D>, StepConvertingError> {
+        let CurveAny::SurfaceCurve(surface_curve) = &edge.edge_geometry else {
+            return Ok(None);
+        };
+        let mut candidates = Vec::new();
+        if let Some(PcurveOrSurface::Pcurve(pcurve)) = surface_curve.associated_geometry.first() {
+            candidates.push(pcurve.as_ref().clone());
+        }
+        if let Some(PcurveOrSurface::Pcurve(pcurve)) = surface_curve.associated_geometry.get(1) {
+            candidates.push(pcurve.as_ref().clone());
+        }
+        for pcurve in candidates {
+            // A candidate that fails to parse is not the rescue; move on.
+            let Ok(candidate) =
+                Self::sub_parse_curve3d(&CurveAny::Pcurve(Box::new(pcurve)), p, q, true)
+            else {
+                continue;
+            };
+            if Self::reconciles_edge_curve(ctx, &candidate, p, q) {
+                return Ok(Some(candidate));
+            }
+        }
+        Ok(None)
+    }
+
     fn sub_parse_curve3d(
         curve: &CurveAny,
         p: Point3,
@@ -3462,30 +4170,12 @@ impl EdgeCurve {
                     // BG-TOL-001: model
                     return Self::sub_parse_curve3d(&c.curve_3d, p, q, same_sense);
                 }
-                use PreferredSurfaceCurveRepresentation::*;
-                match c.master_representation {
-                    Curve3D => Self::sub_parse_curve3d(&c.curve_3d, p, q, same_sense)?,
-                    PcurveS1 => {
-                        if let Some(PcurveOrSurface::Pcurve(c)) = c.associated_geometry.first() {
-                            Self::sub_parse_curve3d(&CurveAny::Pcurve(c.clone()), p, q, true)?
-                        } else {
-                            return Err(
-                                "The 0-indexed associated geometry is nothing or not PCURVE."
-                                    .into(),
-                            );
-                        }
-                    }
-                    PcurveS2 => {
-                        if let Some(PcurveOrSurface::Pcurve(c)) = c.associated_geometry.get(1) {
-                            Self::sub_parse_curve3d(&CurveAny::Pcurve(c.clone()), p, q, true)?
-                        } else {
-                            return Err(
-                                "The 1-indexed associated geometry is nothing or not PCURVE."
-                                    .into(),
-                            );
-                        }
-                    }
-                }
+                // OCCT-HIGH-ROI-CLUSTER-001 C1: the declared 3D curve is
+                // mandatory for a `SURFACE_CURVE` and is honored over any
+                // `master_representation` preference. A pcurve realization is
+                // only ever reached through the gated fallback in
+                // `parse_curve3d`, never branched to here.
+                Self::sub_parse_curve3d(&c.curve_3d, p, q, same_sense)?
             }
         };
         if !same_sense {
