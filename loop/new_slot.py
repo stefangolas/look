@@ -171,6 +171,22 @@ def main():
 
     target_dir.mkdir(parents=True, exist_ok=True)
 
+    # Stale root-artifact guard: a worker QUESTION.md/RESULT.json committed at
+    # the repo root by an old STOP merge rides every subsequent fork --
+    # `reset --hard` keeps tracked files and `clean -fdx` never touches them,
+    # so slot_status reports every later dispatch of the slot as
+    # finished-with-question. The CC-013 incident: its committed QUESTION.md
+    # sat at integration HEAD for a day and flagged PB-004/CL-005 runs that
+    # had written nothing of the kind. Remove it from the fork so the slot's
+    # finished-state is the worker's own signal, never an inherited file.
+    for stale in ('QUESTION.md', 'RESULT.json'):
+        stale_path = wt / stale
+        if stale_path.exists():
+            res = git(wt, 'rm', '-fq', stale)
+            if res.returncode != 0:
+                stale_path.unlink()
+            print(f"removed stale {stale} inherited from the fork base")
+
     # CARGO_INCREMENTAL=0 per §7 rule 1 -- incremental state buys nothing in a
     # one-packet-per-process world and was 389 MB dead weight in the last audit.
     import os

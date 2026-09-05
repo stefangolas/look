@@ -25,7 +25,7 @@ tests_required:
   - butt_join_coplanar_union_certified
   - exact_footprint_halfspace_difference_certified
   - canonical_controls_bit_identical
-budget:      {turns: 55, ctx_tokens: 130000}
+budget:      {turns: 100, ctx_tokens: 200000}
 ```
 
 **New test file** (`cl_exact_contact.rs`): H-1 applies; no landed test file

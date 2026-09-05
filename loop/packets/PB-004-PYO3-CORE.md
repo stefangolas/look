@@ -26,7 +26,7 @@ tests_required:
   - unresolved_carries_witness_payload
   - table_serde_round_trip
   - gil_released_during_kernel_call
-budget:      {turns: 55, ctx_tokens: 130000}
+budget:      {turns: 100, ctx_tokens: 200000}
 ```
 
 **New crate** (`truck123d/`): H-1 applies. This is the workspace's ONLY
