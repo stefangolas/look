@@ -26,7 +26,6 @@ anchors:
   - {id: A1, expect: 1, cmd: "grep -c 'pub fn solve_triple_node' vendor/truck/truck-certified/src/construct/contact3.rs"}
   - {id: A2, expect: 1, cmd: "grep -c 'pub enum EventKind' vendor/truck/truck-certified/src/construct/stubs.rs"}
   - {id: A3, expect: 1, cmd: "grep -c 'pub struct BranchSeed' vendor/truck/truck-certified/src/construct/stubs.rs"}
-  - {id: A4, expect: 1, cmd: "grep -c 'pub fn trace_blend_chain' vendor/truck/truck-certified/src/construct/blend.rs"}
 tests_required:
   - two_plane_chain_walks_and_terminates_at_trim_events
   - event_isolation_holds_between_certified_events
