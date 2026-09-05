@@ -64,7 +64,7 @@ disjointness per the scheduler's law; merge only along same-module chains.
 |---|---|---|---|---|
 | `PB-000-CONTRACT` | design | Freeze the Python-facing API table (build123d name → Rust entry), the refusal→exception mapping table, the table-schema version (`tables/*.json` v1), and the byte-determinism contract (same table + same kernel rev → identical report JSON). Book mapping rows into `docs/CERTIFICATE_MAPPING.md` if any new evidence variant appears (target: none) | `docs/TRUCK123D_PY_BRIDGE_SPEC.md` amendments, `showcases/src/cc_ports.rs` doc freeze | — |
 | `PB-001-SELECTORS` | mechanical | Scoped selector layer in a new `truck-modeling::selectors` module: `FaceRef`/`EdgeRef` iteration over a `Solid`, per-face centroid + AABB (fan-sampled, reusing the harness method), `sort_by_axis`, `group_by_axis`, `filter_by_plane`, `take`/`last`, and resolution into `BlendSpec`-compatible edge names (endpoint pairs for straight edges, canonical rim for circles). Consumes `entity_id.rs`'s `Selector` for identity. Difficulty 2/10 | new module + tests | 000 |
-| `PB-002-SKETCH-ARCS` | design | Arc authoring + arrangement: `arc_three_point`, `arc_radius` constructors producing trimmed `CircleCarrier`s; Region2 cells for arc×line and arc×arc reusing the landed analytic intersections; profile assembly accepting mixed line/arc loops. The teapot silhouette switches to arcs. Difficulty 3–4/10 (the Region2 cells are wiring; the loop assembly needs the endpoint-pairing care of P3) | `truck-geometry/src/arrange.rs` additive + new `sketch.rs` | 000 |
+| `PB-002-SKETCH-ARCS` | design | Arc authoring + arrangement: `arc_three_point`, `arc_radius` constructors producing trimmed `CircleCarrier`s; Region2 cells for arc×line and arc×arc reusing the landed analytic intersections; profile assembly accepting mixed line/arc loops. The teapot silhouette switches to arcs. **Amended 2026-09-05 (ttc audit):** the scope also lands periodic/open `Spline` authoring through point lists (`Spline(*pts, periodic=True)`-shaped) — the F1/Falcon-Heavy section idiom is spline→make_face→loft, so arcs alone do not reach the corpus. Difficulty 3–4/10 (the Region2 cells are wiring; the loop assembly needs the endpoint-pairing care of P3) | `truck-geometry/src/arrange.rs` additive + new `sketch.rs` | 000 |
 | `PB-003-CONCAVE-CAPS` | mechanical | Facet backend: non-convex cap rings triangulate through the per-face CDT path instead of fan+convexity-gate; the convexity fast path stays for convex rings (bit-identical behavior there — V5 identity guard). The U-chute negative test inverts to a positive test. Difficulty 3/10 | `truck-modeling/src/facet_sweep.rs` cap section + tests | 000 |
 
 ### Phase B — Python bridge
@@ -74,19 +74,23 @@ disjointness per the scheduler's law; merge only along same-module chains.
 | `PB-004-PYO3-CORE` | mechanical | New crate `truck123d/` (pyo3): module init, `Outcome` → typed exception hierarchy (`Refused`, `Unresolved`, with `EnvelopeCase`/witness payload), `Budget`/verdict marshaling, GIL policy (all kernel calls release GIL; no kernel type crosses the boundary except via opaque handles), serde round-trip of tables. Difficulty 3/10 | new crate + Cargo workspace member | 000 |
 | `PB-005-PYTHON-FACADE` | design | build123d-shaped Python: `BuildPart`/`BuildSketch` context managers (thin sugar over data tables — the Python side EDITS TABLES, then submits; statefulness is Python-side only), `Mode` algebra sugar, primitives (`Box`, `Cylinder`, `Polygon`, `Polyline`), `extrude`/`revolve`/`sweep`/`loft`/`fillet`/`chamfer` entry points, scoped selectors exposed fluently, `export_stl`/`export_step`. Difficulty 3/10 — the design constraint is that nothing computes in Python | `truck123d/src/*.py` + pyo3 surface | 001, 004 |
 | `PB-006-ASSEMBLY` | mechanical | Multi-solid assembly emission: N solids + intended-contact/evidence list → STEP assembly via `truck-assembly`; the teapot ships as body+spout+handle with recorded contact intents until BIE lands. Difficulty 2/10 | `truck-modeling` additive or `truck123d` client | 004 |
-| `PB-007-CONFORMANCE` | design | The three showcase scripts **in Python** as the conformance battery: each produces report JSON byte-equal to the Rust run of the same table; refusal battery (the typed-refusal tests of `battery_construction.rs`) mirrored as pytest `raises`; determinism test. Gate for the whole program | `truck123d/tests/` | 005, 006 |
+| `PB-007-CONFORMANCE` | design | The three showcase scripts **in Python** as the conformance battery: each produces report JSON byte-equal to the Rust run of the same table; refusal battery (the typed-refusal tests of `battery_construction.rs`) mirrored as pytest `raises`; determinism test. **Amended 2026-09-05:** the battery also consumes PB-008's corpus rows for the canonical-only ttc subset. Gate for the whole program | `truck123d/tests/` | 005, 006, 008 |
+| `PB-008-TTC-HARNESS` | design | The text-to-cad corpus harness (spec §8): vendor the F1 + Falcon-Heavy model trees (MIT, Thompson Labs LLC) under `corpus/ttc/` with provenance headers; land `docs/PY_BRIDGE_COMPAT_SURFACE.md` (the build123d-compat vocabulary the corpus exercises — distinct from PB-000's kernel-facing API table); a runner executing corpus scripts against the compat module, asserting geometry facts + report JSON + **STL** (never STEP for swept parts — TR-NRB-001 boundary); per-script timing in three regimes (OCC baseline, our drop-in, native facade) per the BENCHMARKS fresh-vs-resident doctrine; staged skips with recorded reasons for boolean-heavy scripts until BIE lands. Difficulty 4/10 | `corpus/ttc/**`, `docs/PY_BRIDGE_COMPAT_SURFACE.md`, `truck123d/compat/`, `truck123d/tests/ttc_harness.rs` | 002, 006 |
 
 ## 4. Dependency graph
 
 ```text
 PB-000 ─┬→ PB-001 ─┐
         ├→ PB-002  ├→ PB-005 ─┐
-        ├→ PB-003  │           ├→ PB-007
+        ├→ PB-003  │           ├→ PB-007 ←── PB-008-TTC-HARNESS (002, 006)
         └→ PB-004 ─┴→ PB-006 ──┘
 ```
 
 PB-001/002/003 are mutually write-disjoint and parallel-eligible after 000.
-PB-004 is independent of A-phase packets.
+PB-004 is independent of A-phase packets. PB-008 depends on PB-002 (spline
+authoring reaches the corpus) and PB-006 (assembly emission for the
+multi-part trees); its canonical-only subset is runnable earlier through
+the staged skips.
 
 ## 5. Gates and invariants
 
@@ -135,3 +139,59 @@ showcases whether or not the Python layer ships first.
   substrate; not exercised by the three models (all are z-canonical).
 - **mesh Booleans, fuzzy intent recovery, ShapeFix analogues** — out of
   scope indefinitely; the typed-refusal doctrine is the product.
+
+## 8. External corpus harness — earthtojake/text-to-cad (added 2026-09-05)
+
+**Provenance.** `github.com/earthtojake/text-to-cad`, MIT (Thompson Labs
+LLC), audited from a shallow clone the same day. The `models/**/src` trees
+are build123d scripts; `skills/cad` is the execution contract; the F1 and
+Falcon-Heavy trees (~40 files, `lib/` files 20–46 KB each) are the harness
+corpus — chosen as the hardest available models. `cadgen.build123d` is a
+transparent PEP 562 re-export of genuine build123d ("no wrapper objects,
+same signatures, never improved"), so the corpus exercises the real
+build123d API and the compat surface must answer to it, name for name.
+
+**Measured API surface** (F1 + Falcon-Heavy `lib/`, by command):
+
+| Surface | Uses | Verdict |
+|---|---|---|
+| Algebra operators `+` `-` `&` | 1107 | the dominant verb; canonical×canonical lands today, sweep×canonical unlocks with BIE — the staged-skip list exists because of this row |
+| Plane/Location algebra (`plane * shape`, `plane.offset(d)`, `Pos`, `Rotation`) | ~250 | client-layer arithmetic; zero kernel content. Note: the 19 `.offset(` hits are ALL `Plane.offset` frame moves, NOT kernel `offset` — no solid-offset requirement hides here |
+| Primitives (`Box`, `Cylinder`, `Sphere`, `Torus`, `Compound`) | ~110 | facade/kernel landed |
+| `make_face` / topology types (`Edge`, `Face`, `Wire`, `Solid`, `Shape`) | ~50 | facade landed; compat typing only |
+| `Spline(*pts, periodic=True)` sections → loft | ~15 | PB-002 amended scope (spline authoring) |
+| `loft` / `revolve` / `extrude` / `sweep` / `fillet` / `chamfer` / `mirror` | ~20 | facade landed; the loft entry rides cc_ports (CC landed) |
+| Selectors (`.faces()`, `.filter_by()`, builder mode) | 4 total | the corpus is algebra-mode; PB-001's fluent selectors are for OUR Python layer, not for corpus reach |
+
+**Correctness oracle.** The corpus itself documents the OCC baseline's
+failure mode: its `_solid` helper notes OCC's ThruSections *silently
+returns a self-intersecting shape past ~25 sections while reporting
+valid*, so it builds ruled + smooth and compares volume/bounds. The
+harness records per-script: volume, AABB, solid count, and the certified
+validity verdict — where OCC's oracle is a volume-diff heuristic, ours is
+the landed three-valued validity. A script passes when geometry facts
+match the OCC-derived reference within recorded tolerance AND our verdict
+is `Certified` (or the typed refusal matches the booked envelope line).
+
+**Timing oracle.** Per-script wall clock in three regimes — OCC/build123d
+baseline (recorded once on this machine from the pip-installed corpus
+toolchain), our Python drop-in, and the native Rust facade entry for the
+same model table — fresh-process and resident-session kept separate per
+`docs/BENCHMARKS.md`. Published claims only from the physical-GPU
+machine's fresh-process numbers.
+
+**Staged skips.** `corpus/ttc/SKIPS.json` lists every script not runnable
+at the current program stage with a machine-checked reason
+(`booleans-on-swept-carriers: awaiting BIE-006`, `step-out:
+TR-NRB-001`). A skip without a reason row is a harness failure. The skip
+list is an output of the program's progress, never a threshold to tune.
+
+**Licensing.** Vendored trees keep their upstream headers and carry a
+`corpus/ttc/PROVENANCE.md` (repo, commit sha, license). Test fixtures,
+not kernel code — the `vendor/truck/**` write-gate doctrine does not
+apply, but nothing under `corpus/` is imported by production code.
+
+**Boundaries.** The harness never feeds `@step` STEP outputs for swept
+parts (TR-NRB-001); it never requires builder-mode (`BuildPart`) — the
+corpus doesn't use it; and it never reimplements `cadgen`'s daemon/store —
+our runner is a plain process-per-script door.
