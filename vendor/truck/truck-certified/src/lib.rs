@@ -38,6 +38,11 @@ pub mod ssi;
 pub mod ssi_fixtures;
 pub mod ssi_trace;
 pub mod ssi_types;
+/// The tangency layer of the Certified Tangency and Exact Contact (CTE)
+/// program (CTE-000-SPINE): the frozen certificate vocabulary for singular SSI
+/// closure (T1) and coincident-carrier Boolean classification (T2), plus the
+/// F1–F7 fixture kit (booking §5).
+pub mod tangency;
 
 /// The SSI wave shim's shared shapes, re-exported at the crate root for the
 /// look test target's reachability (BG-CK-P2-CONTRACT).

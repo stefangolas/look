@@ -94,6 +94,22 @@ rows here were dispatched against the tree 2026-09-05 (evidence.rs anchors
 | §8.1 procedural interaction carrier — **carrier decision (pre-decided, recorded)** | `CertifiedImplicitIntersectionCurve`: a NEW canonical `Curve` variant in `truck-geometry/src/canonical.rs`, landed by BIE-003 (NOT BIE-000) | Carries a certified 3-D polyline with per-sample tangent frames plus the unresolved witness slot. Mirrors the landed `Curve::IntersectionCurve` boxed-variant pattern (canonical.rs); PL-at-tessellation only (`EdgeSampleLedger`-compatible; truck-meshalgo read-only). BIE-000 records this decision; the tree evidence that the record is sound is the landed `IntersectionCurve` canonical variant, which the additive variant ripple copies. |
 | Unit-shape fixture kit ground truths | BIE fixture records in `construct/bie/fixtures.rs` (`#[doc(hidden)] pub`, TEST SUPPORT ONLY) | plane × sphere (section circle: centre = perpendicular foot `c − δ·n`, radius `sqrt(R² − δ²)`, `δ = (c − o)·n`); plane × cylinder (section ellipse: semi-axes `r` and `r/|sin θ|`, `θ` the incidence vs the axis); sweep × plane (straight-spine `Scale`-of-a-circle sweep unit shape: section is the ring at the station `s*` selected by the plane equation, circle of radius `radius(s*)` about `C(s*)`). Ground truths are closed-form constants, tagged `Method::Float`, machine-checked in-module under `// H-3` discipline; no solver is called to build or check a fixture. Determinism: the whole kit builds from ordered dyadic data — two constructions compare equal. |
 
+## E. CTE-000 bookings (Certified Tangency and Exact Contact spine)
+
+The CTE program (`docs/CTE_BUILD_SPINE.md`,
+`docs/CERTIFIED_TANGENCY_BUILD_SPEC.md`) freezes the certificate
+vocabulary for singular SSI closure (T1) and coincident-carrier Boolean
+classification (T2) before any implementation wave. The shim packet
+CTE-000-SPINE lands the tangency shapes and the F1–F7 fixture kit and records
+its mapping rows here. All rows were dispatched against the tree 2026-09-05.
+
+| CTE evidence kind | Carrier | Booking |
+|---|---|---|
+| Tangency shape-constructor refusals (the CTE-000 D-shim) | `contract::Refusal::InvalidInput` | NO new top-level evidence kinds. Every refusing constructor in `tangency/shapes.rs` (a construction outside a frozen rule) returns `Refusal::InvalidInput`, the `ssi_types.rs` P0-freeze precedent. Numeric-evaluation requests in the shim refuse the same way; the named CTE refusal cases the wave packets raise (`no-chart`, `graph-failure`, …) wrap the landed vocabularies (`SsiRefusal`, `TraceRefusal`, kernel `Refusal`, `HullRefusal`) in the owning packet, never as new top-level arms. |
+| Five-way `ContactVerdict` (theory §2.11) | certified verdict on the engine vocabulary; `Unresolved { kappa, cell }` projects onto `Refusal::NumericallyUnresolved { spent: Budget::new(0,0,0), witness: UnresolvedWitness::KrawczykIndeterminate }` | NO new `Refusal`/`UnresolvedWitness` variants. `Transversal`/`Empty`/`A1Isolated`/`A1Node`/`A2Branch` are certified answers carrying their own certificate data (a `Certified` answer never maps to a landed refusal). The `Unresolved { kappa, cell }` residual maps onto the closest landed epistemic shape — the BIE-000 section-D precedent — for routing through machinery that consumes the landed taxonomy; `kappa`/`cell` stay first-class on the CTE verdict itself. `A1Node` (A₁⁻) is first-class from day one (theory R3); it is never routed to `Unresolved`. |
+| `A2BranchCurve` producing stub (pending until CTE-005) | pending refusal name `a2_branch_packet_pending`, surfaced through the owning packet's refusal vocabulary | NO new top-level evidence kind. The shape ships behind the pending refusal, the `cone_torus_carrier_packet_pending` precedent (`kernel/rational.rs`): at the shape layer the stub refuses `Refusal::InvalidInput`; the named cause is carried by the producing packet (CTE-005) and asserted by CTE-008's gates. |
+| F1–F7 fixture kit (`tangency/fixtures.rs`) | TEST SUPPORT ONLY — `#[doc(hidden)] pub`, excluded from the certified API surface | A one-line mapping-table note, not a row (the `ssi_fixtures.rs` precedent): no new evidence kind. Ground truths are exact-integer records machine-checked at admission; the F7 rows copy the landed `boolean_m2` fixture *values* read-only. |
+
 ## Standing rules (both programs)
 
 1. **H-6 method rule.** `Method ∈ {Exact, Interval, Float, None}`
@@ -117,6 +133,8 @@ rows here were dispatched against the tree 2026-09-05 (evidence.rs anchors
 
 - Unified table published 2026-08-31 (session 45). Resolves certified plan X1
   and loop plan §3.5's booking requirement.
+- CTE-000-SPINE rows (section E) dispatched 2026-09-05; the tangency shim and
+  fixture kit are test-support-only and add no evidence kind.
 - CG-007-CERT may be written against row sets A + B once CG-004 lands; the
   certified program's Phase 0 may dispatch against sections A + C (and must
   still respect the X2 sequencing rule: not concurrent with CG-005/CG-007
