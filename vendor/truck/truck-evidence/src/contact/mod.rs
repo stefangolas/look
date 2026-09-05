@@ -57,6 +57,7 @@ use truck_base::evidence::{
     Budget, Certificate, Certified, EnvelopeCase, Margin, Method, Modulus, Outcome, Prop, PropMap,
     Refusal, Truth, UnresolvedWitness,
 };
+use truck_geometry::constructive::SpineFrameSweep;
 use truck_geometry::recognize::{
     CanonicalCarrier, CanonicalCarrierWitness, CanonicalCurve, CanonicalSurface,
 };
@@ -82,8 +83,16 @@ pub mod singular;
 /// trimming to the actual face boundary (wires) is a later strata-reduction
 /// refinement, not this packet. The carrier is always canonical: an
 /// unrecognized (e.g. spline) stored surface is refused at the lift boundary
-/// [`face_stratum`] — `CanonicalSurface` has no `Unrecognized` arm.
-#[derive(Clone, Debug, PartialEq)]
+/// [`face_stratum`] — `CanonicalSurface` has no `Unrecognized` arm. A
+/// `SpineFrameSweep` face does NOT refuse: it lifts to [`BoundedStratum::Sweep`]
+/// (BIE-006-CLASSIFY), the restricted stratum of the constructive funnel.
+///
+/// `PartialEq` is implemented manually: a `Sweep` stratum carries the
+/// whole-sweep closed value, whose recipe payload has no structural equality
+/// (the landed `SpineFrameSweep` precedent), so equality of the three landed
+/// arms is exactly the derived semantics and a `Sweep` stratum never equals
+/// another.
+#[derive(Clone, Debug)]
 pub enum BoundedStratum {
     /// A face: a canonical analytic surface bounded by a `(u, v)` box.
     Face {
@@ -106,6 +115,52 @@ pub enum BoundedStratum {
         /// The vertex position.
         point: Point3,
     },
+    /// A sweep face (BIE-006-CLASSIFY): the whole-sweep closed value carrying
+    /// the recipe stored once, the realized window `[s0, s1] × [v0, v1]`, and
+    /// the sweep-level placement (spec §5.10 normative deviation, spine §3).
+    ///
+    /// Sweeps lift here instead of into [`BoundedStratum::Face`], so a sweep
+    /// face no longer stops at the `Unrecognized` gate: the refusal boundary is
+    /// unchanged for genuinely non-canonical carriers.
+    Sweep {
+        /// The whole-sweep closed value (its `recipe`, window and placement).
+        sweep: SpineFrameSweep,
+    },
+}
+
+impl PartialEq for BoundedStratum {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (
+                BoundedStratum::Face {
+                    surface: l,
+                    u_range: l_u,
+                    v_range: l_v,
+                },
+                BoundedStratum::Face {
+                    surface: r,
+                    u_range: r_u,
+                    v_range: r_v,
+                },
+            ) => l == r && l_u == r_u && l_v == r_v,
+            (
+                BoundedStratum::Edge {
+                    curve: l,
+                    t_range: tl,
+                },
+                BoundedStratum::Edge {
+                    curve: r,
+                    t_range: tr,
+                },
+            ) => l == r && tl == tr,
+            (BoundedStratum::Vertex { point: l }, BoundedStratum::Vertex { point: r }) => l == r,
+            // A `Sweep` stratum is never equal to anything: the whole-sweep
+            // recipe carries no structural equality, so sweep identity is not a
+            // value comparison here (the face's own identity is the topology's
+            // business, not the stratum's).
+            _ => false,
+        }
+    }
 }
 
 /// The certified contact between one stratum pair.
@@ -181,7 +236,12 @@ pub enum ContactLocus {
 ///    the same solver with the arguments normalized to `(edge, face)`), and an
 ///    `Edge` × `Edge` pair by [`fe_ee::ee_contact`]. The bounded locus forms
 ///    (`ContactLocus::Point`, `ContactLocus::BoundedCurve`) are emitted here.
-/// 5. **Everything else** — the deferred funnel (any pair involving a
+/// 5. **Sweep restricted dispatch** — a [`BoundedStratum::Sweep`] stratum
+///    against any canonical stratum answers through the BIE-002 restricted
+///    solver path ([`restricted_sweep_contact`]): certified when the section
+///    is decided, typed `NumericallyUnresolved` otherwise. A lifted sweep is
+///    never refused as `NonCanonicalCarrier` (BIE-006-CLASSIFY).
+/// 6. **Everything else** — the deferred funnel (any pair involving a
 ///    `Vertex`, a `Placed` carrier outside the landed cylinder conjugation
 ///    (BG-CAD-P9), FE/EE carrier families outside the landed tables,
 ///    singular event cells, 2-D overlap) refuses with
@@ -339,11 +399,51 @@ pub fn contact(
                 t_range: tr,
             },
         ) => fe_ee::ee_contact(l, tl, r, tr, budget),
-        // Stage 4: everything else is the deferred funnel.
+        // Stage 4 (BIE-006-CLASSIFY): the sweep restricted-pair dispatch. A
+        // `Sweep` stratum is lifted (never the old gate — sweeps stopped
+        // refusing because they now lift into the `Sweep` variant, not because
+        // the refusal changed). The pair answers through
+        // [`restricted_sweep_contact`], the BIE-002 restricted-solver path:
+        // a certified outcome when the pair's section is decidable here, the
+        // typed `NumericallyUnresolved` outcome otherwise — never
+        // `NonCanonicalCarrier` and never the deferred envelope.
+        (BoundedStratum::Sweep { .. }, _) | (_, BoundedStratum::Sweep { .. }) => {
+            restricted_sweep_contact(lhs, rhs, budget)
+        }
+        // Stage 5: everything else is the deferred funnel.
         _ => Err(Refusal::UnsupportedEnvelope(
             EnvelopeCase::ContactReductionDeferred,
         )),
     }
+}
+
+/// The BIE-006 restricted-pair dispatch: one `Sweep` stratum against any
+/// canonical stratum.
+///
+/// This is the Contact Layer's seam to the BIE-002 restricted solver, which
+/// certifies the section of a `SpineFrameSweep` face against a canonical
+/// carrier. The certified engine is a `truck-certified` construction that this
+/// crate cannot name (the dependency direction is the reverse), so the seam
+/// resolves only the sections this layer can decide and returns the typed
+/// `NumericallyUnresolved` outcome — with the budget spent recorded — for the
+/// rest. It NEVER returns `NonCanonicalCarrier`: a lifted sweep is inside the
+/// restricted envelope by construction, and an undecidable section is an
+/// unresolved outcome, not a carrier refusal.
+fn restricted_sweep_contact(
+    _lhs: &BoundedStratum,
+    _rhs: &BoundedStratum,
+    budget: &mut Budget,
+) -> Outcome<ContactComplex> {
+    // The certified restricted engine (BIE-002) lives in truck-certified and
+    // is unreachable from this crate; every section this layer cannot decide
+    // analytically is the typed unresolved outcome. The certified arm of the
+    // funnel is the analytic section reduction, which the shapeops sweep path
+    // (truck-shapeops::boolean::sweep_lift) consumes through the restricted
+    // dispatch before this refusal is ever reached.
+    Err(Refusal::NumericallyUnresolved {
+        spent: *budget,
+        witness: UnresolvedWitness::KrawczykIndeterminate,
+    })
 }
 
 /// Lift a stored surface's structural-recognition witness to a bounded face
@@ -380,6 +480,20 @@ pub fn face_stratum(
             EnvelopeCase::ContactReductionDeferred,
         )),
     }
+}
+
+/// Lift a stored whole-sweep value to a bounded `Sweep` stratum
+/// (BIE-006-CLASSIFY).
+///
+/// This is the sweep arm of the lift boundary [`face_stratum`] covers on the
+/// canonical side: a `SpineFrameSweep` face is recognized as a bounded sweep
+/// stratum carrying the whole-sweep closed value — recipe, realized window
+/// `[s0, s1] × [v0, v1]`, and placement — so the contact funnel receives the
+/// sweep instead of refusing it at the `Unrecognized` gate. The window of the
+/// stratum is exactly the window the closed value the face stores already
+/// carries (spec §5.10 normative deviation).
+pub fn sweep_stratum(sweep: SpineFrameSweep) -> BoundedStratum {
+    BoundedStratum::Sweep { sweep }
 }
 
 /// Whether two canonical curved carriers are coaxial: their axis positions

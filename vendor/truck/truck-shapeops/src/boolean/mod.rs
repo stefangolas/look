@@ -27,6 +27,10 @@ pub mod classify;
 /// BG-SOL-RW4-ASSEMBLE: the assembler and the `boolean()` entry.
 pub mod assemble;
 
+/// BIE-006-CLASSIFY: the sweep lift/path adapters + windowed sweep output
+/// (the pipeline tie-in that lets a `SpineFrameSweep` face through the funnel).
+mod sweep_lift;
+
 /// Material membership of one side of a boundary fragment.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct State {
