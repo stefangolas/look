@@ -371,3 +371,6 @@ def main():
             log("landing/running phase - no dispatch")
         time.sleep(POLL_SECONDS)
     log("overnight driver exit")
+
+if __name__ == "__main__":
+    sys.exit(main())
