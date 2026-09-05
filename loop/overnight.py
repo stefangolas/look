@@ -110,6 +110,10 @@ def scoped_check(crates, test_pairs, wt):
     return True, "green"
 
 
+def fname_guard(uf):
+    return uf in ("RESULT.json", "QUESTION.md", "CONTEXT.md", "PACKET.md")
+
+
 def try_land(slot_dir, slot_no, rows, order, reg_path):
     packet_path = (slot_dir / "worker.packet").read_text().strip()
     pid = Path(packet_path).stem
@@ -141,6 +145,27 @@ def try_land(slot_dir, slot_no, rows, order, reg_path):
             if f.exists():
                 tag = "PENDING-QUESTION" if fname == "QUESTION.md" else "PENDING"
                 shutil.copy(f, ROOT / "loop" / "results" / f"{pid}.{tag}.{fname}")
+        # uncommitted partial code: tracked diff + untracked files
+        diff = git(["diff", "HEAD"], cwd=slot_dir / "wt")
+        untracked = git(["ls-files", "--others", "--exclude-standard"],
+                        cwd=slot_dir / "wt")
+        if (diff or "").strip() or (untracked or "").strip():
+            patch_path = ROOT / "loop" / "results" / f"{pid}.PENDING.partial.patch"
+            with open(patch_path, "w", encoding="utf-8", errors="replace") as pf:
+                pf.write(diff or "")
+                for uf in (untracked or "").splitlines():
+                    if not uf.strip() or fname_guard(uf):
+                        continue
+                    uf_path = slot_dir / "wt" / uf
+                    try:
+                        content = uf_path.read_text(encoding="utf-8",
+                                                    errors="replace")
+                    except Exception:
+                        continue
+                    pf.write(f"\n--- /dev/null\n+++ /dev/null/{uf}\n")
+                    pf.write("".join("+" + ln + "\n" for ln in
+                                     content.splitlines()))
+            log(f"slot {slot_no}: partial work archived to {patch_path.name}")
         log(f"slot {slot_no}: {pid} status={status!r} fails={fails} "
             f"stopped={stopped} - LEFT FOR MORNING (judgment required)")
         return
