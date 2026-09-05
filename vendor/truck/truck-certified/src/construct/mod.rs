@@ -141,3 +141,8 @@ pub mod stars;
 /// the certified predictor/corrector walk of each branch to its certified
 /// events, with event isolation and the P6 shared-node discipline.
 pub mod blend;
+
+/// The variable-radius blend trace (CC-031-BLEND-VARRADIUS, seam S12 / theory
+/// §5.3): the amended CC-030 walk closed by the foot-point pair of a certified
+/// guide curve and radius law, with the foot-point uniqueness gate (Section 1).
+pub mod blend_varradius;
