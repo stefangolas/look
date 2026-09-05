@@ -1,0 +1,45 @@
+# truck123d — the pyo3 core of the Python Bridge (PB-004).
+#
+# This is the workspace's ONLY pyo3 dependency (PB-000's zero-pyo3 invariant
+# ends here, by owner directive). Wheel builds are out of scope for this
+# packet; the done-when is the Rust-side suite below plus the `python -c
+# "import truck123d"` smoke instruction in `README.md`.
+#
+# Binding/feature layout (see RESULT.json notes for the reasoning):
+#   * `pyo3` is declared with `default-features = false` plus `macros`.
+#   * The `abi3` wheel feature lives behind the `wheel-abi3` cargo feature so
+#     that `cargo test -p truck123d` links the FULL CPython API (an embedded
+#     interpreter is required to run the exception-class and GIL tests) while
+#     `maturin build --features wheel-abi3` still produces a PEP 384 abi3
+#     wheel (maturin >= 1.9.4 sets PYO3_BUILD_EXTENSION_MODULE itself, so no
+#     `extension-module` cargo feature is needed on pyo3 0.29).
+#   * `auto-initialize` is a DEV-dependency feature only: it lets the test
+#     binary embed an interpreter for the GIL-policy proof without leaking
+#     into the shipped extension module.
+
+[package]
+name = "truck123d"
+version = "0.1.0"
+edition = "2024"
+license = "MIT OR Apache-2.0"
+description = "Truck123d Python bridge core: Refusal marshaling, table serde, GIL policy"
+publish = false
+
+[lib]
+name = "truck123d"
+crate-type = ["cdylib", "rlib"]
+
+[features]
+default = []
+# maturin build --features wheel-abi3 -> PEP 384 limited-API (abi3) wheel.
+wheel-abi3 = ["pyo3/abi3"]
+
+[dependencies]
+pyo3 = { version = "0.29.2", default-features = false, features = ["macros"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+truck-base = { path = "../vendor/truck/truck-base" }
+
+[dev-dependencies]
+# auto-initialize only for the test build (embedded interpreter in tests).
+pyo3 = { version = "0.29.2", default-features = false, features = ["macros", "auto-initialize"] }
