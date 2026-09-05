@@ -350,7 +350,7 @@ def main():
             if not still_running:
                 if time.time() < BATTERY_COOLDOWN_UNTIL:
                     log("battery cooldown active - cycling")
-                elif rows_done(rows) and all_landed(rows):
+                elif all_landed(rows):  # rows flip DONE only via the battery - requiring DONE first deadlocked (session 51)
                     battery(rows, order, reg_path)
                     if rows_done(rows):
                         battery_done = True
