@@ -403,7 +403,9 @@ impl BranchSeed {
         clearance: Option<ClearanceBoundary>,
     ) -> Result<BranchSeed, ConstructRefusal> {
         for axis in 0..3 {
-            if !seed.lo[axis].is_finite() || !seed.hi[axis].is_finite() || seed.lo[axis] > seed.hi[axis]
+            if !seed.lo[axis].is_finite()
+                || !seed.hi[axis].is_finite()
+                || seed.lo[axis] > seed.hi[axis]
             {
                 return Err(ConstructRefusal::InvalidInput);
             }
@@ -479,6 +481,8 @@ impl LinEq {
     /// The outward-rounded enclosure of `w·c + k` over the box.
     fn eval_iv(&self, c: &[Interval; 3]) -> Interval {
         let mut acc = Interval::point(self.k);
+        #[allow(clippy::needless_range_loop)]
+        // the fixed 0..3 axis accumulation order is the determinism contract
         for axis in 0..3 {
             let term = Interval::point(self.w[axis]).mul(&c[axis]);
             acc = acc.add(&term);
@@ -679,14 +683,35 @@ fn trace_branch_with_bank(
             refusal,
             partial: empty.clone(),
         })?;
-    let seed_step = certify_seed_step(&chart, budget, &weight).map_err(|refusal| BranchRefusal {
-        refusal,
-        partial: empty.clone(),
-    })?;
+    let seed_step =
+        certify_seed_step(&chart, budget, &weight).map_err(|refusal| BranchRefusal {
+            refusal,
+            partial: empty.clone(),
+        })?;
     let mut steps: Vec<CertifiedStep> = vec![seed_step.clone()];
     let mut events: Vec<BlendEvent> = Vec::new();
-    walk_direction(&chart, &seed_step, 1.0, radius, budget, &weight, bank, &mut steps, &mut events)?;
-    walk_direction(&chart, &seed_step, -1.0, radius, budget, &weight, bank, &mut steps, &mut events)?;
+    walk_direction(
+        &chart,
+        &seed_step,
+        1.0,
+        radius,
+        budget,
+        &weight,
+        bank,
+        &mut steps,
+        &mut events,
+    )?;
+    walk_direction(
+        &chart,
+        &seed_step,
+        -1.0,
+        radius,
+        budget,
+        &weight,
+        bank,
+        &mut steps,
+        &mut events,
+    )?;
     Ok(CertifiedBranch { events, steps })
 }
 
@@ -850,10 +875,7 @@ impl Exclusion {
             1.0
         };
         let k = -dot3(&self.normal, &self.origin) - eps * radius;
-        LinEq {
-            w: self.normal,
-            k,
-        }
+        LinEq { w: self.normal, k }
     }
 
     /// The certified implicit-field plane of the face.
@@ -866,8 +888,8 @@ impl Exclusion {
 fn dominant_axis(v: &[f64; 3]) -> Result<usize, ConstructRefusal> {
     let mut axis = 0usize;
     let mut best = v[0].abs();
-    for i in 1..3 {
-        let mag = v[i].abs();
+    for (i, component) in v.iter().enumerate().skip(1) {
+        let mag = component.abs();
         if mag > best {
             best = mag;
             axis = i;
@@ -884,7 +906,11 @@ fn dominant_axis(v: &[f64; 3]) -> Result<usize, ConstructRefusal> {
 /// `u = c`, `v = n̂ × c` for a unit vector `c ⊥ n̂`, so `u × v = n̂` exactly
 /// (up to normalization) and the implicit field reads `n̂·(p − origin)`.
 fn plane_from_normal(origin: [f64; 3], n: [f64; 3]) -> Plane {
-    let seed = if n[2].abs() < 0.9 { [0.0, 0.0, 1.0] } else { [1.0, 0.0, 0.0] };
+    let seed = if n[2].abs() < 0.9 {
+        [0.0, 0.0, 1.0]
+    } else {
+        [1.0, 0.0, 0.0]
+    };
     let w = cross3(&n, &seed);
     let w = unit_or_zero(&w);
     let b = cross3(&n, &w);
@@ -922,7 +948,10 @@ fn certify_seed_step(
         _ => return Err(ConstructRefusal::ConditioningBelowThreshold),
     };
     let state = step_state(chart, &centre)?;
-    if !state.feet_interior || !state.clearance_clear || !state.rank_regular || !state.radius_admissible
+    if !state.feet_interior
+        || !state.clearance_clear
+        || !state.rank_regular
+        || !state.radius_admissible
     {
         return Err(ConstructRefusal::InvalidInput);
     }
@@ -988,8 +1017,9 @@ fn walk_direction(
             current = step;
             continue;
         }
-        let located = match locate_event(chart, &current, &candidate, direction, radius, budget, weight, bank)
-        {
+        let located = match locate_event(
+            chart, &current, &candidate, direction, radius, budget, weight, bank,
+        ) {
             Ok(located) => located,
             Err(refusal) => {
                 return Err(BranchRefusal {
@@ -1054,7 +1084,12 @@ fn certify_next_step(
 }
 
 /// The continuation system of a step at `dir·δ` from the reference point `p`.
-fn continuation_system(chart: &BranchChart, p: &[f64; 3], direction: f64, delta: f64) -> ChartSystem {
+fn continuation_system(
+    chart: &BranchChart,
+    p: &[f64; 3],
+    direction: f64,
+    delta: f64,
+) -> ChartSystem {
     ChartSystem {
         rows: [
             chart.offset_first,
@@ -1152,10 +1187,10 @@ fn locate_event(
     let mut best: Option<LocatedEvent> = None;
     let mut best_distance: f64 = f64::INFINITY;
     let accept = |kind: EventKind,
-                      centre: IBox3,
-                      node: Option<TripleContactNode>,
-                      best: &mut Option<LocatedEvent>,
-                      best_distance: &mut f64| {
+                  centre: IBox3,
+                  node: Option<TripleContactNode>,
+                  best: &mut Option<LocatedEvent>,
+                  best_distance: &mut f64| {
         let m = box_midpoint(&centre);
         let s = (m[0] - last_centre[0]) * chart.dir[0]
             + (m[1] - last_centre[1]) * chart.dir[1]
@@ -1235,29 +1270,13 @@ fn certified_node(
         return Ok(node);
     }
     let seed_box = node_seed_box(chart, tangency)?;
-    let maps = [
-        chart.first.map(),
-        chart.second.map(),
-        junction.map(),
-    ];
+    let maps = [chart.first.map(), chart.second.map(), junction.map()];
     let regions = [chart.first.region, chart.second.region, junction.region];
     let eps = [chart.first.side, chart.second.side, junction.side];
     let system = ReducedSystem::try_new(
-        [
-            maps[order[0]],
-            maps[order[1]],
-            maps[order[2]],
-        ],
-        [
-            regions[order[0]],
-            regions[order[1]],
-            regions[order[2]],
-        ],
-        [
-            eps[order[0]],
-            eps[order[1]],
-            eps[order[2]],
-        ],
+        [maps[order[0]], maps[order[1]], maps[order[2]]],
+        [regions[order[0]], regions[order[1]], regions[order[2]]],
+        [eps[order[0]], eps[order[1]], eps[order[2]]],
         radius,
         seed_box,
     )
@@ -1331,7 +1350,11 @@ fn node_seed_box(chart: &BranchChart, tangency: &IBox3) -> Result<IBox4, Constru
 }
 
 /// The certified trim system: the offset rows plus one foot-parameter row.
-fn trim_system(chart: &BranchChart, row: &LinEq, bound: f64) -> Result<ChartSystem, ConstructRefusal> {
+fn trim_system(
+    chart: &BranchChart,
+    row: &LinEq,
+    bound: f64,
+) -> Result<ChartSystem, ConstructRefusal> {
     let trim = LinEq {
         w: row.w,
         k: row.k - bound,
@@ -1455,13 +1478,7 @@ fn newton_guess(system: &ChartSystem, boxed: &IBox3) -> [f64; 3] {
         eval_point(&system.rows[1], &z),
         eval_point(&system.rows[2], &z),
     ];
-    solve_linear(&system.jac, &f).map_or(z, |step| {
-        [
-            z[0] + step[0],
-            z[1] + step[1],
-            z[2] + step[2],
-        ]
-    })
+    solve_linear(&system.jac, &f).map_or(z, |step| [z[0] + step[0], z[1] + step[1], z[2] + step[2]])
 }
 
 /// Evaluate a linear row at a point in `f64`.

@@ -195,7 +195,11 @@ pub fn certify_weight_field(
 
     loop {
         let mut first_straddling: Option<(usize, usize)> = None;
+        #[allow(clippy::needless_range_loop)]
+        // the fixed row-major iu scan of the patch grid is the determinism contract
         for iu in 0..(du_vals.len() - 1) {
+            #[allow(clippy::needless_range_loop)]
+            // the fixed row-major iv scan of the patch grid is the determinism contract
             for iv in 0..(dv_vals.len() - 1) {
                 match leaf_verdict(&work, iu, du, iv, dv)? {
                     LeafVerdict::Positive => {}

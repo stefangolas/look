@@ -488,6 +488,8 @@ impl LinEq {
     /// The outward-rounded enclosure of `w·c + k` over the box.
     fn eval_iv(&self, c: &[Interval; 3]) -> Interval {
         let mut acc = Interval::point(self.k);
+        #[allow(clippy::needless_range_loop)]
+        // the fixed 0..3 axis accumulation order is the determinism contract
         for axis in 0..3 {
             let term = Interval::point(self.w[axis]).mul(&c[axis]);
             acc = acc.add(&term);
@@ -691,10 +693,7 @@ fn walk_direction(
 ) -> Result<(), ConstructRefusal> {
     let mut current = seed_step.clone();
     loop {
-        let next = match certify_next_step(chart, guide, law, &current, direction, budget) {
-            Ok(step) => step,
-            Err(refusal) => return Err(refusal),
-        };
+        let next = certify_next_step(chart, guide, law, &current, direction, budget)?;
         let window = foot_window(guide, next.foot_point)?;
         let candidate_region = foot_certified_region(guide, &box_iv3(&next.centre), window)?;
         let radius_region = law_radius_region(law, guide, &candidate_region)?;
@@ -725,7 +724,7 @@ fn walk_direction(
             current = step;
             continue;
         }
-        let located = match locate_event(
+        let located = locate_event(
             chart,
             guide,
             &current,
@@ -733,10 +732,7 @@ fn walk_direction(
             direction,
             next.radius_point,
             budget,
-        ) {
-            Ok(located) => located,
-            Err(refusal) => return Err(refusal),
-        };
+        )?;
         match located {
             Some(event) => {
                 events.push(BlendEvent {
@@ -784,7 +780,7 @@ fn certify_next_step(
     loop {
         let predicted = add3_scaled(&p, &chart.dir, direction * delta);
         let window = foot_window(guide, current.foot_point)?;
-        let point_iv: [Interval; 3] = predicted.map(|v| Interval::point(v));
+        let point_iv: [Interval; 3] = predicted.map(Interval::point);
         foot_point_gate(guide, &point_iv, window)?;
         match refine_foot_point(guide, &predicted, window)? {
             FootRoot::Point(foot_point) => {
@@ -1468,7 +1464,7 @@ fn refine_foot_point(
     centre: &[f64; 3],
     window: CurveRegion,
 ) -> Result<FootRoot, ConstructRefusal> {
-    let c: [Interval; 3] = centre.map(|v| Interval::point(v));
+    let c: [Interval; 3] = centre.map(Interval::point);
     let whole = foot_residual(map, &c, window)?;
     if !whole.is_finite() {
         return Err(ConstructRefusal::ConditioningBelowThreshold);
@@ -1888,8 +1884,8 @@ fn abs_lower(v: Interval) -> f64 {
 fn dominant_axis(v: &[f64; 3]) -> Result<usize, ConstructRefusal> {
     let mut axis = 0usize;
     let mut best = v[0].abs();
-    for i in 1..3 {
-        let mag = v[i].abs();
+    for (i, component) in v.iter().enumerate().skip(1) {
+        let mag = component.abs();
         if mag > best {
             best = mag;
             axis = i;

@@ -452,7 +452,7 @@ fn coordinate_cuts(lo: f64, hi: f64, chords: &[Chord], axis: Axis) -> Vec<f64> {
     cuts.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
     let mut out = Vec::with_capacity(cuts.len());
     for value in cuts {
-        let duplicate = out.last().map_or(false, |last| *last == value);
+        let duplicate = out.last().is_some_and(|last| *last == value);
         if !duplicate {
             out.push(value);
         }

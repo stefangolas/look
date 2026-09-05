@@ -231,7 +231,7 @@ impl SetbackInput {
     ///   delivered tangent plane within `DATA_PLANE_TOL`.
     pub fn try_new(arcs: Vec<SetbackArc>) -> Result<Self, ConstructRefusal> {
         let count = arcs.len();
-        if count < 2 * SETBACK_MIN_VALENCE || count % 2 != 0 {
+        if count < 2 * SETBACK_MIN_VALENCE || !count.is_multiple_of(2) {
             return Err(ConstructRefusal::InvalidInput);
         }
         for (index, arc) in arcs.iter().enumerate() {
@@ -315,7 +315,7 @@ impl SetbackPatch {
 /// and a non-finite intermediate refuses [`ConstructRefusal::InvalidInput`].
 pub fn build_setback_patch(input: &SetbackInput) -> Result<SetbackPatch, ConstructRefusal> {
     let count = input.arcs.len();
-    if count < 2 * SETBACK_MIN_VALENCE || count % 2 != 0 {
+    if count < 2 * SETBACK_MIN_VALENCE || !count.is_multiple_of(2) {
         return Err(ConstructRefusal::InvalidInput);
     }
     let n = count / 2;
@@ -336,6 +336,8 @@ pub fn build_setback_patch(input: &SetbackInput) -> Result<SetbackPatch, Constru
         let rail_lo = hub[index];
         let rail_hi = hub[next_index];
         let mut net = [[[0.0_f64; 3]; 4]; 4];
+        #[allow(clippy::needless_range_loop)]
+        // the fixed 4-column ribbon fill (t = j/3 along the arc) is the determinism contract
         for j in 0..4 {
             let t = (j as f64) / 3.0;
             net[0][j] = arc.curve[j];
@@ -358,8 +360,12 @@ pub fn build_setback_patch(input: &SetbackInput) -> Result<SetbackPatch, Constru
         let b = hub[2 * k + 1];
         let c = hub[(2 * k + 2) % count];
         let mut net = [[[0.0_f64; 3]; 4]; 4];
+        #[allow(clippy::needless_range_loop)]
+        // the fixed row-major hub-grid fill (v rows) is the determinism contract
         for v in 0..4 {
             let s = (v as f64) / 3.0;
+            #[allow(clippy::needless_range_loop)]
+            // the fixed row-major hub-grid fill (u columns within a v row) is the determinism contract
             for u in 0..4 {
                 let t = (u as f64) / 3.0;
                 net[v][u] = bilinear_point(centre, a, b, c, t, s);
@@ -403,7 +409,11 @@ pub fn certify_boundary(patch: &SetbackPatch) -> Result<Vec<BoundaryRecord>, Con
     for (index, arc) in patch.input.arcs.iter().enumerate() {
         let net = patch.ribbon(index).net;
         let mut max_deviation = 0.0_f64;
+        #[allow(clippy::needless_range_loop)]
+        // the fixed 4-row boundary-deviation scan (j) is the determinism contract
         for j in 0..4 {
+            #[allow(clippy::needless_range_loop)]
+            // the fixed 3-coordinate boundary-deviation scan (c) is the determinism contract
             for c in 0..3 {
                 let deviation = (net[0][j][c] - arc.curve[j][c]).abs();
                 if deviation > max_deviation {
@@ -669,16 +679,20 @@ pub fn certified_profile_solve(cross: &[[f64; 3]; 4]) -> Result<f64, ConstructRe
     let mut width = 0.0_f64;
     for coordinate in 0..3 {
         let samples = sample_field(cross, coordinate);
-        let enclosures: [Interval; 4] = samples.map(|value| Interval::point(value));
+        let enclosures: [Interval; 4] = samples.map(Interval::point);
         if band <= RIBBON_TP_MAX_BAND {
             let factor = factor_banded_tp(&flat_rows(&matrix))?;
             let mut rhs: Vec<[Interval; 4]> = Vec::with_capacity(4);
+            #[allow(clippy::needless_range_loop)]
+            // the fixed 0..4 rhs-row assembly order is the determinism contract
             for row in 0..4 {
                 let mut channels = [Interval::point(0.0); 4];
                 channels[coordinate] = enclosures[row];
                 rhs.push(channels);
             }
             let solved = factor.solve_homogeneous(&rhs)?;
+            #[allow(clippy::needless_range_loop)]
+            // the fixed 0..4 solved-row scan order is the determinism contract
             for row in 0..4 {
                 let w = solved[row][coordinate].hi - solved[row][coordinate].lo;
                 if w > width {
@@ -709,8 +723,12 @@ pub fn certified_profile_solve(cross: &[[f64; 3]; 4]) -> Result<f64, ConstructRe
 /// `t_j = j/3`, in fixed order.
 fn bernstein_sample_matrix() -> [[f64; 4]; 4] {
     let mut matrix = [[0.0_f64; 4]; 4];
+    #[allow(clippy::needless_range_loop)]
+    // the fixed row-major Bernstein sample fill (j rows) is the determinism contract
     for j in 0..4 {
         let t = (j as f64) / 3.0;
+        #[allow(clippy::needless_range_loop)]
+        // the fixed row-major Bernstein sample fill (k columns within a j row) is the determinism contract
         for k in 0..4 {
             matrix[j][k] = bernstein_basis(3, k, t);
         }
@@ -787,7 +805,11 @@ fn flat_rows(matrix: &[[f64; 4]; 4]) -> Vec<Interval> {
 /// entries that are not exactly zero.
 fn structural_half_bandwidth(matrix: &[[f64; 4]; 4]) -> usize {
     let mut band = 0usize;
+    #[allow(clippy::needless_range_loop)]
+    // the fixed row-major |i − j| band scan (i rows) is the determinism contract
     for i in 0..4 {
+        #[allow(clippy::needless_range_loop)]
+        // the fixed row-major |i − j| band scan (j columns within an i row) is the determinism contract
         for j in 0..4 {
             if matrix[i][j] != 0.0 {
                 let distance = i.abs_diff(j);
@@ -814,6 +836,8 @@ fn float_inverse(matrix: &[[f64; 4]; 4]) -> Option<[[f64; 4]; 4]> {
     for pivot in 0..4 {
         let mut best = pivot;
         let mut best_value = aug[pivot][pivot].abs();
+        #[allow(clippy::needless_range_loop)]
+        // the partial-row pivot scan over the fixed aug rows is the determinism contract
         for row in (pivot + 1)..4 {
             let value = aug[row][pivot].abs();
             if value > best_value {
@@ -825,11 +849,11 @@ fn float_inverse(matrix: &[[f64; 4]; 4]) -> Option<[[f64; 4]; 4]> {
             return None;
         }
         if best != pivot {
-            let swap = aug[pivot];
-            aug[pivot] = aug[best];
-            aug[best] = swap;
+            aug.swap(pivot, best);
         }
         let diagonal = aug[pivot][pivot];
+        #[allow(clippy::needless_range_loop)]
+        // the fixed 0..8 column normalisation of the pivot row is the determinism contract
         for col in 0..8 {
             aug[pivot][col] /= diagonal;
         }
@@ -838,6 +862,8 @@ fn float_inverse(matrix: &[[f64; 4]; 4]) -> Option<[[f64; 4]; 4]> {
                 continue;
             }
             let factor = aug[row][pivot];
+            #[allow(clippy::needless_range_loop)]
+            // the fixed 0..8 column elimination of a non-pivot row is the determinism contract
             for col in 0..8 {
                 aug[row][col] -= factor * aug[pivot][col];
             }
@@ -1067,8 +1093,12 @@ fn scalar_range(coeffs: &[f64; 4]) -> Result<Interval, ConstructRefusal> {
 fn coord_grids(net: &[[[f64; 3]; 4]; 4]) -> [Vec<Vec<f64>>; 3] {
     let mut grids: [Vec<Vec<f64>>; 3] = [Vec::new(), Vec::new(), Vec::new()];
     for coordinate in 0..3 {
+        #[allow(clippy::needless_range_loop)]
+        // the fixed coordinate-major grid extraction (v rows) is the determinism contract
         for v in 0..4 {
             let mut row = Vec::with_capacity(4);
+            #[allow(clippy::needless_range_loop)]
+            // the fixed coordinate-major grid extraction (u columns within a v row) is the determinism contract
             for u in 0..4 {
                 row.push(net[v][u][coordinate]);
             }
@@ -1095,10 +1125,16 @@ fn piece_boxes(patch: &SetbackPatch) -> Result<Vec<[Interval; 3]>, ConstructRefu
     let mut boxes = Vec::with_capacity(patch.pieces.len());
     for piece in &patch.pieces {
         let mut boxed = [Interval::point(0.0); 3];
+        #[allow(clippy::needless_range_loop)]
+        // the fixed 0..3 coordinate-box scan is the determinism contract
         for coordinate in 0..3 {
             let mut lo = f64::INFINITY;
             let mut hi = f64::NEG_INFINITY;
+            #[allow(clippy::needless_range_loop)]
+            // the fixed row-major net box scan (v rows) is the determinism contract
             for v in 0..4 {
+                #[allow(clippy::needless_range_loop)]
+                // the fixed row-major net box scan (u columns within a v row) is the determinism contract
                 for u in 0..4 {
                     let value = piece.net[v][u][coordinate];
                     if !value.is_finite() {
@@ -1174,7 +1210,11 @@ fn piece_plane(net: &[[[f64; 3]; 4]; 4]) -> Result<([f64; 3], [f64; 3]), Constru
     let e1 = sub3(net[0][3], base);
     let e2 = sub3(net[3][0], base);
     let normal = unit3(cross3(&e1, &e2)).ok_or(ConstructRefusal::NoAdmissibleProjection)?;
+    #[allow(clippy::needless_range_loop)]
+    // the fixed row-major plane-containment scan (v rows) is the determinism contract
     for v in 0..4 {
+        #[allow(clippy::needless_range_loop)]
+        // the fixed row-major plane-containment scan (u columns within a v row) is the determinism contract
         for u in 0..4 {
             let offset = sub3(net[v][u], base);
             if dot3(&offset, &normal).abs() > SEAM_TOL {
@@ -1237,10 +1277,7 @@ fn shared_edge(a: &[[[f64; 3]; 4]; 4], b: &[[[f64; 3]; 4]; 4]) -> Option<[[f64; 
 /// The unit direction of a straight segment.
 fn direction(p: [f64; 3], q: [f64; 3]) -> [f64; 3] {
     let unit = unit3(sub3(q, p));
-    match unit {
-        Some(unit) => unit,
-        None => [1.0, 0.0, 0.0],
-    }
+    unit.unwrap_or([1.0, 0.0, 0.0])
 }
 
 /// Certify that a piece's off-seam corners lie strictly on ONE side of the
