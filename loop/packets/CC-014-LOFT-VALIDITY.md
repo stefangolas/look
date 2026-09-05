@@ -27,7 +27,7 @@ anchors:
   - {id: A1, expect: 1, cmd: "grep -c 'pub fn injectivity_radius' vendor/truck/truck-certified/src/construct/injectivity.rs"}
   - {id: A2, expect: 1, cmd: "grep -c 'pub fn certify_graph_disk' vendor/truck/truck-certified/src/construct/graphdisk.rs"}
   - {id: A3, expect: 1, cmd: "grep -c 'pub fn contact' vendor/truck/truck-evidence/src/contact/mod.rs"}
-  - {id: A4, expect: 1, cmd: "grep -c 'pub fn rank_margin' vendor/truck/truck-certified/src/certified_map.rs"}
+  - {id: A4, expect: 2, cmd: "grep -c 'pub fn rank_margin' vendor/truck/truck-certified/src/certified_map.rs"}
   - {id: A5, expect: 1, cmd: "grep -c 'pub struct LoftStrips' vendor/truck/truck-certified/src/construct/loft_strips.rs"}
 tests_required:
   - regular_margin_below_eta_j_fails_the_postcondition

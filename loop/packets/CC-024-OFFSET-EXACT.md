@@ -24,7 +24,7 @@ read_allow:
   - vendor/truck/truck-shapeops/src/boolean
 budget:      {turns: 24, ctx_tokens: 100000}
 anchors:
-  - {id: A1, expect: 1, cmd: "grep -c 'pub fn arrange(profile: &[Curve], domain: Option<BoundingBox<Point2>>) -> Outcome<Arrangement> {' vendor/truck/truck-geometry/src/arrange.rs"}
+  - {id: A1, expect: 1, cmd: "grep -c 'let mut carriers = Vec::with_capacity(profile.len());' vendor/truck/truck-geometry/src/arrange.rs"}
   - {id: A2, expect: 1, cmd: "grep -c 'pub enum OffsetStratum' vendor/truck/truck-certified/src/construct/offset_strata.rs"}
 tests_required:
   - mitered_wedge_edge_reach_bound_is_t_over_sin_theta

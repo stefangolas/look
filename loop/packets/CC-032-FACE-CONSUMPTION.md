@@ -24,7 +24,7 @@ read_allow:
 budget:      {turns: 24, ctx_tokens: 100000}
 anchors:
   - {id: A1, expect: 1, cmd: "grep -c 'pub struct BlendTrace' vendor/truck/truck-certified/src/construct/blend.rs"}
-  - {id: A2, expect: 1, cmd: "grep -c 'pub fn arrange' vendor/truck/truck-geometry/src/arrange.rs"}
+  - {id: A2, expect: 2, cmd: "grep -c 'pub fn arrange' vendor/truck/truck-geometry/src/arrange.rs"}
 tests_required:
   - contact_pcurve_splits_the_support_domain
   - short_intermediate_face_is_fully_consumed
