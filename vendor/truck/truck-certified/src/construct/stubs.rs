@@ -16,17 +16,19 @@
 //!
 //! This module freezes the shared shapes the later CC packets type against:
 //! the admissible v1 [`RadiusLaw`] (theory §5.3), the [`EventKind`] event
-//! vocabulary (theory §5.2), the opaque [`WireComplex`], [`ShiftFunctional`],
-//! [`BoundaryPlan`], and [`BranchSeed`] stub types, and the S11
-//! [`TripleContactNode`] output record.
+//! vocabulary (theory §5.2), the S9 seam records [`WireComplex`],
+//! [`ShiftFunctional`], and [`Correspondence`], the [`BoundaryPlan`] and
+//! [`BranchSeed`] seam types, and the S11 [`TripleContactNode`] output
+//! record.
 //!
-//! **C7 stub posture.** The opaque seam types carry private fields and
+//! **C7 stub posture.** Seam types whose production has not landed carry
 //! refusing constructors that always return
 //! `Err(ConstructRefusal::Unfrozen)`: their production belongs to the named
-//! wave packet (CC-013 for [`WireComplex`]/[`ShiftFunctional`], CC-005 for
-//! [`BoundaryPlan`], CC-030 for [`BranchSeed`], CC-020 for the triple-contact
-//! solve that produces [`TripleContactNode`] values). No production logic
-//! lives anywhere in this file.
+//! wave packet (CC-013 for [`WireComplex`]/[`ShiftFunctional`] and the
+//! [`Correspondence`] record, CC-005 for [`BoundaryPlan`], CC-030 for
+//! [`BranchSeed`], CC-020 for the triple-contact solve that produces
+//! [`TripleContactNode`] values). No production logic lives anywhere in this
+//! file.
 //!
 //! **H-1.** This module carries no `unwrap`, no `expect`, and no `panic!`, and
 //! adds no module-level `allow`.
@@ -82,38 +84,122 @@ pub enum EventKind {
     Trace,
 }
 
-/// The S9 abstract oriented cyclic wire complex (stub posture C7).
+/// The S9 abstract oriented cyclic wire complex (seam S9; theory §2.2 L4).
 ///
-/// Opaque: private fields only, constructible exclusively through the refusing
-/// constructor until the CC-013 correspondence packet lands its production.
-#[derive(Debug, Clone)]
+/// **S11 posture (CC-013 amendment, accepted at the packet's fifth
+/// dispatch).** The CC-000 stub was opaque (`_sealed`, refusing constructor
+/// only), so CC-013's wire production and correspondence resolver could not
+/// build or read a single wire; the accepted QUESTION amended the shape to
+/// this frozen PUB-field form, landed here by CC-013. The refusing
+/// [`Self::try_new`] marker is kept so the CC-000 contract test stays green.
+///
+/// Production meaning (CC-013-CORRESPONDENCE): an oriented cyclic sequence of
+/// `arc_count` matched edges. `vertices[i]` is the certified position
+/// enclosure of the vertex that starts arc `i` and ends arc `i - 1` (a
+/// cycle), so the vertex count always equals `arc_count`. A valid complex has
+/// `arc_count >= 2`. Values are built with
+/// [`wire_complex_of`](crate::construct::correspondence::wire_complex_of);
+/// this module never splits an edge (edge splitting happens upstream).
+#[derive(Debug, Clone, PartialEq)]
 pub struct WireComplex {
-    /// Sealed. Production data is CC-013's design.
-    _sealed: (),
+    /// The number of matched edges (arcs) of the closed wire; at least 2.
+    pub arc_count: usize,
+    /// The per-vertex position enclosures, in cyclic order. The vertex count
+    /// equals `arc_count`: it is a cycle.
+    pub vertices: Vec<[Interval; 3]>,
 }
 
 impl WireComplex {
-    /// The refusing stub constructor (C7): production belongs to CC-013.
+    /// The refusing stub-constructor marker (C7): kept so CC-000's contract
+    /// test stays green; production belongs to CC-013's
+    /// `wire_complex_of`.
     pub fn try_new() -> Result<Self, ConstructRefusal> {
         Err(ConstructRefusal::Unfrozen)
     }
 }
 
-/// The S9 declared geometric shift functional (stub posture C7).
+/// The declared geometric shift-functional discriminant (seam S9).
 ///
-/// Opaque: private fields only, constructible exclusively through the refusing
-/// constructor until the CC-013 correspondence packet lands its production.
-#[derive(Debug, Clone)]
+/// The v1 functional set is closed at [`ShiftFunctionalKind::VertexSumSq`];
+/// any other functional is a later CC-000 amendment, never a wave-worker
+/// choice.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ShiftFunctionalKind {
+    /// The v1 declared functional: the sum of squared distances between
+    /// matched vertices, accumulated in index order over interval
+    /// arithmetic.
+    VertexSumSq,
+}
+
+/// A caller-supplied correspondence anchor (seam S9, theory §2.2 L4).
+///
+/// When a functional carries an anchor, the resolver returns immediately
+/// with it (resolution step 1) — the anchor is never second-guessed by the
+/// geometric functional.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ShiftAnchor {
+    /// The anchor vertex index (into the wire's cyclic vertex sequence) that
+    /// each section is aligned to.
+    pub index: usize,
+    /// Explicit caller consent for the orientation-reversing match. The
+    /// automatic path is orientation-preserving only; a reversing match is
+    /// taken exclusively when the caller supplied it here.
+    pub reversed: bool,
+}
+
+/// The S9 declared geometric shift functional (seam S9; theory §2.2 L4).
+///
+/// **S11 posture (CC-013 amendment, accepted at the packet's fifth
+/// dispatch).** The CC-000 stub was opaque (`_sealed`, refusing constructor
+/// only); CC-013 lands this frozen PUB-field production shape. The refusing
+/// [`Self::try_new`] marker is kept so the CC-000 contract test stays green.
+///
+/// A functional declares which geometric functional the step-3 argmin
+/// evaluates over the `r` cyclic shifts ([`ShiftFunctionalKind::VertexSumSq`]
+/// is the closed v1 set) together with an optional caller-supplied
+/// [`ShiftAnchor`].
+#[derive(Debug, Clone, PartialEq)]
 pub struct ShiftFunctional {
-    /// Sealed. Production data is CC-013's design.
-    _sealed: (),
+    /// The declared geometric functional discriminant (closed v1 set).
+    pub kind: ShiftFunctionalKind,
+    /// The optional caller-supplied anchor (resolution step 1). When set, the
+    /// resolver returns immediately with this anchor and never runs the
+    /// declared functional.
+    pub anchor: Option<ShiftAnchor>,
 }
 
 impl ShiftFunctional {
-    /// The refusing stub constructor (C7): production belongs to CC-013.
+    /// The refusing stub-constructor marker (C7): kept so CC-000's contract
+    /// test stays green; production values are assembled through the pub
+    /// fields above.
     pub fn try_new() -> Result<Self, ConstructRefusal> {
         Err(ConstructRefusal::Unfrozen)
     }
+}
+
+/// The S9 correspondence record (seam S9; theory §2.2 L4).
+///
+/// A correspondence is an orientation, an anchor, and a cyclic edge matching:
+/// `shifts[k]` is the cyclic shift that aligns section `k` to the wire. When
+/// the caller supplied an anchor, `anchor` records it (`None` on the
+/// automatic argmin path).
+///
+/// This carrier was missing from the crate entirely (accepted CC-013
+/// QUESTION, fifth dispatch); its frozen shape is the S9 seam shape from the
+/// construction-contracts document, landed here by CC-013. Values are
+/// produced by
+/// [`resolve_correspondence`](crate::construct::correspondence::resolve_correspondence).
+#[derive(Debug, Clone, PartialEq)]
+pub struct Correspondence {
+    /// Whether the matching is orientation-preserving (`true`) or
+    /// orientation-reversing (`false`). The automatic path is forward only;
+    /// reversal is taken solely on explicit caller consent in the anchor.
+    pub orientation: bool,
+    /// The caller-supplied anchor vertex index, when one was supplied.
+    pub anchor: Option<usize>,
+    /// The per-section cyclic shift of the resolved matching, in `sections`
+    /// order.
+    pub shifts: Vec<usize>,
 }
 
 /// The S6 boundary-simplicity input plan.
