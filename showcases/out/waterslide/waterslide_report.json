@@ -1,0 +1,120 @@
+{
+  "item": "waterslide",
+  "spine_total_length": 108.95398571793706,
+  "spine_samples": 51,
+  "facets": [
+    {
+      "law": "parallel",
+      "triangle_count": 952,
+      "quad_count": 0,
+      "signed_volume": 103.65445009952491,
+      "winding_violations": 0,
+      "verdict": "CertifiedWithinTolerance",
+      "refusal": null
+    },
+    {
+      "law": "architectural",
+      "triangle_count": 952,
+      "quad_count": 0,
+      "signed_volume": 109.54642353429676,
+      "winding_violations": 0,
+      "verdict": "CertifiedWithinTolerance",
+      "refusal": null
+    },
+    {
+      "law": "radial",
+      "triangle_count": 952,
+      "quad_count": 0,
+      "signed_volume": 96.90264975508653,
+      "winding_violations": 0,
+      "verdict": "CertifiedWithinTolerance",
+      "refusal": null
+    }
+  ],
+  "breps": [
+    {
+      "law": "parallel",
+      "face_count": 6,
+      "edge_use_pairs": 12,
+      "edge_nonpair_uses": 0,
+      "edge_orientation_sum": 0,
+      "signed_volume": -100.51684279240277,
+      "refusal": null
+    },
+    {
+      "law": "architectural",
+      "face_count": 6,
+      "edge_use_pairs": 12,
+      "edge_nonpair_uses": 0,
+      "edge_orientation_sum": 0,
+      "signed_volume": 105.14572271858556,
+      "refusal": null
+    },
+    {
+      "law": "radial",
+      "face_count": 6,
+      "edge_use_pairs": 12,
+      "edge_nonpair_uses": 0,
+      "edge_orientation_sum": 0,
+      "signed_volume": -82.623787985192,
+      "refusal": null
+    }
+  ],
+  "exports": [
+    {
+      "kind": "step",
+      "path": "showcases/out/waterslide\\pool.step",
+      "ok": false,
+      "detail": "step display failed: an error occurred when formatting an argument"
+    },
+    {
+      "kind": "step",
+      "path": "showcases/out/waterslide\\tower.step",
+      "ok": false,
+      "detail": "step display failed: an error occurred when formatting an argument"
+    },
+    {
+      "kind": "step",
+      "path": "showcases/out/waterslide\\waterslide_chute.step",
+      "ok": false,
+      "detail": "step display failed: an error occurred when formatting an argument"
+    },
+    {
+      "kind": "stl",
+      "path": "showcases/out/waterslide\\waterslide_parallel.stl",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "kind": "stl",
+      "path": "showcases/out/waterslide\\waterslide_architectural.stl",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "kind": "stl",
+      "path": "showcases/out/waterslide\\waterslide_radial.stl",
+      "ok": true,
+      "detail": null
+    }
+  ],
+  "booleans": [
+    {
+      "port": "boolean_union_chute_pool",
+      "status": "refused",
+      "detail": "UnsupportedEnvelope(NonCanonicalCarrier)"
+    }
+  ],
+  "cc_ports": [
+    {
+      "port": "canal_regularity_chute_spine",
+      "status": "deferred",
+      "detail": "UnsupportedEnvelope(ContactReductionDeferred)"
+    },
+    {
+      "port": "clear_chute_tower",
+      "status": "deferred",
+      "detail": "UnsupportedEnvelope(ContactReductionDeferred)"
+    }
+  ]
+}

@@ -1,0 +1,23 @@
+{
+  "drop_length": 8.0,
+  "drop_angle_deg": 50.0,
+  "transition_radius": 6.0,
+  "helix_radius": 5.4,
+  "helix_turns": 2.5,
+  "helix_slope_deg": 12.0,
+  "runout_length": 9.0,
+  "spine_samples": 48,
+  "chute_width": 1.2,
+  "chute_wall_height": 0.54,
+  "chute_top_fraction": 0.35,
+  "chute_wall_thickness": 0.072,
+  "chute_floor_thickness": 0.096,
+  "runout_widening": 1.35,
+  "stations": 120,
+  "pool_radius": 3.0,
+  "pool_depth": 1.2,
+  "pool_rim_height": 0.25,
+  "pool_center_fraction": 0.5,
+  "tower_radius": 0.9,
+  "tower_clearance": 0.4
+}

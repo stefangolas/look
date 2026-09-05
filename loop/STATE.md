@@ -73,11 +73,15 @@ Updated 2026-09-05, session 52 (CC program COMPLETE - battery green).
 
 - cargoq RUNNING (port 8231), supervisor RUNNING (restarts driver + cargoq +
   watchdog every 60s), driver cycling every 5 min.
-- **BIE wave 0 dispatched 2026-09-05 ~12:16**: BIE-000-CONTRACT in slot 0,
-  OCCT-HIGH-ROI-CLUSTER-001 in slot 1 (both deepseek-v4-flash). The driver's
-  rolling dispatch fills slots as deps land (cap 4); mechanical adjudication
-  + scoped-check merges are the driver's; the battery fires when every row is
-  LANDED.
+- **BIE progress (session 53, ~13:45):** LANDED + merged + pushed:
+  BIE-000-CONTRACT, OCCT-HIGH-ROI-CLUSTER-001, BIE-001-ARITHMETIC,
+  BIE-002-SSI4, BIE-003-CARRIER (r2: SPEC_GAP ripple resolved by widening
+  write_allow over 7 exhaustive-match sites; base-failure claim for
+  constructive_spine_enum x2 verified by throwaway worktree). RUNNING:
+  BIE-004-CLOSURE (slot 0), BIE-005-ARRANGE (slot 1). Tail: BIE-006 (on 005),
+  BIE-007 (on 006), then the battery. Driver fixed (try_land CompletedProcess
+  crash) and rolling; adjudication + merges are automatic unless a stop
+  condition fires.
 - **CARGO.LOCK PRUNE trap ROOT-CAUSED and fixed** (b684ee6, pushed): HEAD's
   Cargo.lock carried a 17-line stale `showcases` package its committed
   Cargo.toml never declared, so EVERY slot warm build re-dirtied the tree and

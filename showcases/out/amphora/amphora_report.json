@@ -1,0 +1,120 @@
+{
+  "item": "amphora",
+  "spine_total_length": 0.0,
+  "spine_samples": 7,
+  "facets": [
+    {
+      "law": "handle_a",
+      "triangle_count": 3040,
+      "quad_count": 0,
+      "signed_volume": 0.00848283463988727,
+      "winding_violations": 0,
+      "verdict": "CertifiedWithinTolerance",
+      "refusal": null
+    },
+    {
+      "law": "handle_b",
+      "triangle_count": 3040,
+      "quad_count": 0,
+      "signed_volume": 0.008482834639887292,
+      "winding_violations": 0,
+      "verdict": "CertifiedWithinTolerance",
+      "refusal": null
+    }
+  ],
+  "breps": [
+    {
+      "law": "handle_a",
+      "face_count": 18,
+      "edge_use_pairs": 48,
+      "edge_nonpair_uses": 0,
+      "edge_orientation_sum": 0,
+      "signed_volume": -0.008017737498748657,
+      "refusal": null
+    },
+    {
+      "law": "handle_b",
+      "face_count": 18,
+      "edge_use_pairs": 48,
+      "edge_nonpair_uses": 0,
+      "edge_orientation_sum": 0,
+      "signed_volume": -0.008017737498748881,
+      "refusal": null
+    },
+    {
+      "law": "foot_prism",
+      "face_count": 10,
+      "edge_use_pairs": 24,
+      "edge_nonpair_uses": 0,
+      "edge_orientation_sum": 0,
+      "signed_volume": -0.012264083681655413,
+      "refusal": null
+    }
+  ],
+  "exports": [
+    {
+      "kind": "step",
+      "path": "showcases/out/amphora\\amphora_handle_a.step",
+      "ok": false,
+      "detail": "step display failed: an error occurred when formatting an argument"
+    },
+    {
+      "kind": "stl",
+      "path": "showcases/out/amphora\\amphora_handle_a.stl",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "kind": "step",
+      "path": "showcases/out/amphora\\amphora_handle_b.step",
+      "ok": false,
+      "detail": "step display failed: an error occurred when formatting an argument"
+    },
+    {
+      "kind": "stl",
+      "path": "showcases/out/amphora\\amphora_handle_b.stl",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "kind": "step",
+      "path": "showcases/out/amphora\\amphora_foot.step",
+      "ok": false,
+      "detail": "step display failed: an error occurred when formatting an argument"
+    },
+    {
+      "kind": "stl",
+      "path": "showcases/out/amphora\\amphora_foot.stl",
+      "ok": true,
+      "detail": null
+    }
+  ],
+  "booleans": [],
+  "cc_ports": [
+    {
+      "port": "loft_body",
+      "status": "deferred",
+      "detail": "UnsupportedEnvelope(ContactReductionDeferred)"
+    },
+    {
+      "port": "gordon_body",
+      "status": "deferred",
+      "detail": "UnsupportedEnvelope(ContactReductionDeferred)"
+    },
+    {
+      "port": "canal_regularity_handle_spine",
+      "status": "deferred",
+      "detail": "UnsupportedEnvelope(ContactReductionDeferred)"
+    },
+    {
+      "port": "certified_shell_wall",
+      "status": "deferred",
+      "detail": "UnsupportedEnvelope(ContactReductionDeferred)"
+    },
+    {
+      "port": "blend_handle_root_var_radius",
+      "status": "deferred",
+      "detail": "UnsupportedEnvelope(ContactReductionDeferred)"
+    }
+  ]
+}

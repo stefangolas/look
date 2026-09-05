@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Look Showcases — certified B-rep stress cases</title>
+<style>
+  body { margin: 0; overflow: hidden; background: #1a1a1e; font-family: Consolas, monospace; }
+  #hud { position: absolute; top: 12px; left: 12px; color: #cfcfcf; font-size: 13px;
+         background: rgba(0,0,0,0.55); padding: 10px 14px; border-radius: 6px; }
+  #hud h1 { font-size: 14px; margin: 0 0 6px 0; color: #fff; }
+  .part { cursor: pointer; padding: 2px 0; }
+  .part.off { color: #666; text-decoration: line-through; }
+  .part .dot { display: inline-block; width: 10px; height: 10px; margin-right: 8px; border-radius: 2px; }
+  #note { position: absolute; bottom: 10px; left: 12px; color: #888; font-size: 11px; }
+</style>
+</head>
+<body>
+<div id="hud">
+  <h1>look showcases — certified parts</h1>
+  <div id="parts"></div>
+</div>
+<div id="note">drag = orbit &middot; wheel = zoom &middot; right-drag = pan &middot; click a part to toggle</div>
+<script src="three.min.js"></script>
+<script src="STLLoader.js"></script>
+<script src="OrbitControls.js"></script>
+<script>
+const PARTS = [
+  { file: '../out/waterslide/waterslide_parallel.stl',       name: 'Waterslide (ParallelTransport)', color: 0x9fb8c8 },
+  { file: '../out/waterslide/waterslide_architectural.stl',  name: 'Waterslide (ArchitecturalUp)',   color: 0xc8b89f },
+  { file: '../out/teapot/teapot_body.stl',                   name: 'Teapot body (revolve, canonical cones/planes)', color: 0xc87f7f },
+  { file: '../out/teapot/teapot_spout.stl',                  name: 'Teapot spout (LinearCorrespondence sweep)', color: 0xb89fc8 },
+  { file: '../out/teapot/teapot_handle.stl',                 name: 'Teapot handle (FixedPlane sweep)',          color: 0x9fc8a8 },
+  { file: '../out/amphora/amphora_foot.stl',                 name: 'Amphora foot (octagon prism)',   color: 0x7f9fc8 },
+  { file: '../out/amphora/amphora_handle_a.stl',             name: 'Amphora handle A (swept tube)',  color: 0xc89f9f },
+  { file: '../out/amphora/amphora_handle_b.stl',             name: 'Amphora handle B (rotated twin)', color: 0xc8c89f },
+];
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x1a1a1e);
+const camera = new THREE.PerspectiveCamera(45, innerWidth / innerHeight, 0.01, 5000);
+camera.position.set(18, 12, 18);
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setSize(innerWidth, innerHeight);
+renderer.setPixelRatio(devicePixelRatio);
+document.body.appendChild(renderer.domElement);
+
+scene.add(new THREE.HemisphereLight(0xbfbfbf, 0x33333a, 1.0));
+const dir = new THREE.DirectionalLight(0xffffff, 0.7);
+dir.position.set(10, 20, 8);
+scene.add(dir);
+const grid = new THREE.GridHelper(60, 30, 0x3a3a42, 0x2a2a30);
+scene.add(grid);
+
+const controls = new THREE.OrbitControls(camera, renderer.domElement);
+controls.target.set(0, 2, 0);
+
+const loader = new THREE.STLLoader();
+const hud = document.getElementById('parts');
+const SLOT = 12;
+let slot = 0;
+
+PARTS.forEach((part, idx) => {
+  loader.load(part.file, function (geometry) {
+    geometry.computeVertexNormals();
+    const mesh = new THREE.Mesh(geometry, new THREE.MeshStandardMaterial({
+      color: part.color, metalness: 0.15, roughness: 0.55,
+      flatShading: true, side: THREE.DoubleSide,
+    }));
+    geometry.computeBoundingBox();
+    const bb = geometry.boundingBox;
+    const center = new THREE.Vector3(); bb.getCenter(center);
+    const size = new THREE.Vector3(); bb.getSize(size);
+    const s = 10 / Math.max(size.x, size.y, size.z);
+    mesh.scale.setScalar(s);
+    mesh.position.set(-center.x * s + slot * SLOT, -center.y * s + 5, -center.z * s);
+    const y = size.y * s;
+    mesh.position.y = -bb.min.y * s;
+    scene.add(mesh);
+    part.mesh = mesh;
+
+    const row = document.createElement('div');
+    row.className = 'part';
+    row.innerHTML = '<span class="dot" style="background:#' +
+      part.color.toString(16).padStart(6, '0') + '"></span>' + part.name;
+    row.onclick = function () {
+      mesh.visible = !mesh.visible;
+      row.classList.toggle('off', !mesh.visible);
+    };
+    hud.appendChild(row);
+    slot += 1;
+  });
+});
+
+addEventListener('resize', function () {
+  camera.aspect = innerWidth / innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth, innerHeight);
+});
+
+(function animate() {
+  requestAnimationFrame(animate);
+  controls.update();
+  renderer.render(scene, camera);
+})();
+</script>
+</body>
+</html>

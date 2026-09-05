@@ -1,0 +1,116 @@
+{
+  "item": "teapot",
+  "spine_total_length": 0.0,
+  "spine_samples": 6,
+  "facets": [
+    {
+      "law": "spout_sweep",
+      "triangle_count": 4560,
+      "quad_count": 0,
+      "signed_volume": 0.9802219199960925,
+      "winding_violations": 0,
+      "verdict": "CertifiedWithinTolerance",
+      "refusal": null
+    },
+    {
+      "law": "handle_sweep",
+      "triangle_count": 3040,
+      "quad_count": 0,
+      "signed_volume": 0.31910125174494675,
+      "winding_violations": 0,
+      "verdict": "CertifiedWithinTolerance",
+      "refusal": null
+    }
+  ],
+  "breps": [
+    {
+      "law": "body_revolve",
+      "face_count": 6,
+      "edge_use_pairs": 6,
+      "edge_nonpair_uses": 0,
+      "edge_orientation_sum": 0,
+      "signed_volume": 1.3333333333331143,
+      "refusal": null
+    },
+    {
+      "law": "spout_sweep",
+      "face_count": 26,
+      "edge_use_pairs": 72,
+      "edge_nonpair_uses": 0,
+      "edge_orientation_sum": 0,
+      "signed_volume": -0.9447014618282044,
+      "refusal": null
+    },
+    {
+      "law": "handle_sweep",
+      "face_count": 18,
+      "edge_use_pairs": 48,
+      "edge_nonpair_uses": 0,
+      "edge_orientation_sum": 0,
+      "signed_volume": -0.2639116184890426,
+      "refusal": null
+    }
+  ],
+  "exports": [
+    {
+      "kind": "step",
+      "path": "showcases/out/teapot\\teapot_body.step",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "kind": "stl",
+      "path": "showcases/out/teapot\\teapot_body.stl",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "kind": "step",
+      "path": "showcases/out/teapot\\teapot_spout.step",
+      "ok": false,
+      "detail": "step display failed: an error occurred when formatting an argument"
+    },
+    {
+      "kind": "step",
+      "path": "showcases/out/teapot\\teapot_handle.step",
+      "ok": false,
+      "detail": "step display failed: an error occurred when formatting an argument"
+    },
+    {
+      "kind": "stl",
+      "path": "showcases/out/teapot\\teapot_spout.stl",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "kind": "stl",
+      "path": "showcases/out/teapot\\teapot_handle.stl",
+      "ok": true,
+      "detail": null
+    }
+  ],
+  "booleans": [
+    {
+      "port": "boolean_union_body_spout",
+      "status": "refused",
+      "detail": "UnsupportedEnvelope(NonCanonicalCarrier)"
+    }
+  ],
+  "cc_ports": [
+    {
+      "port": "loft_spout_variant",
+      "status": "deferred",
+      "detail": "UnsupportedEnvelope(ContactReductionDeferred)"
+    },
+    {
+      "port": "junction_blend_var_radius",
+      "status": "deferred",
+      "detail": "UnsupportedEnvelope(ContactReductionDeferred)"
+    },
+    {
+      "port": "canal_regularity_spout_spine",
+      "status": "deferred",
+      "detail": "UnsupportedEnvelope(ContactReductionDeferred)"
+    }
+  ]
+}

@@ -1,0 +1,36 @@
+[package]
+name = "showcases"
+version = "0.1.0"
+edition = "2024"
+description = "Stress-case showcase models exercising the constructive B-rep generation pipeline"
+publish = false
+
+[dependencies]
+truck-base = { path = "../vendor/truck/truck-base" }
+truck-geotrait = { path = "../vendor/truck/truck-geotrait" }
+truck-geometry = { path = "../vendor/truck/truck-geometry" }
+truck-topology = { path = "../vendor/truck/truck-topology" }
+truck-modeling = { path = "../vendor/truck/truck-modeling" }
+truck-shapeops = { path = "../vendor/truck/truck-shapeops" }
+truck-polymesh = { path = "../vendor/truck/truck-polymesh" }
+truck-meshalgo = { path = "../vendor/truck/truck-meshalgo" }
+truck-stepio = { path = "../vendor/truck/truck-stepio" }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+thiserror = "2.0"
+
+[features]
+default = []
+cc = []
+
+[[bin]]
+name = "waterslide"
+path = "src/bin/waterslide.rs"
+
+[[bin]]
+name = "teapot"
+path = "src/bin/teapot.rs"
+
+[[bin]]
+name = "amphora"
+path = "src/bin/amphora.rs"
