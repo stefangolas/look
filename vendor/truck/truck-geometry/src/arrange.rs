@@ -551,6 +551,12 @@ fn line_section(c: Carrier2D) -> S1Result<(Point2, Point2)> {
         Carrier2D::Circle(_) => Err(Refusal::UnsupportedEnvelope(
             EnvelopeCase::NonCanonicalCarrier,
         )),
+        // A certified-PL chart curve is not an analytic plane-face section;
+        // its miter/trim routes through the certified pair machinery, never
+        // this engine's v1 line-section completion.
+        Carrier2D::Chart(_) => Err(Refusal::UnsupportedEnvelope(
+            EnvelopeCase::NonCanonicalCarrier,
+        )),
     }
 }
 
@@ -1044,11 +1050,22 @@ impl CircleCarrier {
     }
 }
 
-/// The recognized 2-D analytic carrier of a profile curve.
-#[derive(Clone, Copy, Debug)]
+/// The recognized 2-D carrier of a profile curve in the plane.
+///
+/// BIE-005-ARRANGE (ADDITIVE): the certified-PL chart carrier. The chart's
+/// `(s, v)` curves are the certified PL projections of the BIE-002 chart-curve
+/// / BIE-003 implicit-intersection sample streams; they are carried in
+/// [`Carrier2D::Chart`] as plain data (truck-geometry does not depend on
+/// truck-certified, so the certified samples are accepted as a
+/// `Vec<(f64, f64)>` whose certificate flag is decided by the constructor's
+/// refusing signature). The variant participates in the certified inter-curve
+/// crossing predicate (§4). The landed Line/Circle envelope and the `arrange`
+/// semantics are unchanged (the V5 identity guard).
+#[derive(Clone, Debug)]
 enum Carrier2D {
     Line(Line<Point2>),
     Circle(CircleCarrier),
+    Chart(ChartCurve),
 }
 
 impl Carrier2D {
@@ -1056,6 +1073,7 @@ impl Carrier2D {
         match self {
             Carrier2D::Line(_) => (0.0, 1.0),
             Carrier2D::Circle(c) => (c.t0, c.t1),
+            Carrier2D::Chart(ch) => (0.0, ch.segment_count() as f64),
         }
     }
 
@@ -1063,6 +1081,7 @@ impl Carrier2D {
         match self {
             Carrier2D::Line(Line(a, b)) => *a + (*b - *a) * t,
             Carrier2D::Circle(c) => c.subs(t),
+            Carrier2D::Chart(ch) => ch.subs(t),
         }
     }
 
@@ -1070,6 +1089,7 @@ impl Carrier2D {
         match self {
             Carrier2D::Line(Line(a, b)) => *b - *a,
             Carrier2D::Circle(c) => c.tangent(t),
+            Carrier2D::Chart(ch) => ch.tangent(t),
         }
     }
 
@@ -1077,6 +1097,7 @@ impl Carrier2D {
         match self {
             Carrier2D::Circle(c) => c.t1 - c.t0 == TAU,
             Carrier2D::Line(_) => false,
+            Carrier2D::Chart(_) => false,
         }
     }
 }
@@ -1316,7 +1337,14 @@ fn f64_bits(x: f64) -> u64 {
 }
 
 /// The intersection contacts of two carriers: `(param on a, param on b, point)`.
-/// Exact where the vertices are dyadic; `Err` otherwise.
+/// Exact where the vertices are dyadic; `Err` otherwise. The certified-PL
+/// chart carrier (`BIE-005-ARRANGE`) is scanned segment-wise against the
+/// analytic envelope and against other chart carriers: every contact is the
+/// certified line/line (or line/circle) sign-test decision of the landed
+/// machinery, in the carrier's global parameter (segment index + local
+/// parameter). A contact the predicates cannot certify — a non-dyadic
+/// crossing parameter or an overlapping collinear pair — is a typed refusal,
+/// never a guess (H-6).
 fn intersect(a: &Carrier2D, b: &Carrier2D) -> S1Result<Vec<(f64, f64, Point3)>> {
     match (a, b) {
         (Carrier2D::Line(l1), Carrier2D::Line(l2)) => line_line_intersection(*l1, *l2),
@@ -1326,6 +1354,17 @@ fn intersect(a: &Carrier2D, b: &Carrier2D) -> S1Result<Vec<(f64, f64, Point3)>> 
             Ok(contacts.into_iter().map(|(t, u, p)| (u, t, p)).collect())
         }
         (Carrier2D::Circle(c1), Carrier2D::Circle(c2)) => circle_circle_intersection(c1, c2),
+        (Carrier2D::Line(l), Carrier2D::Chart(ch)) => chart_line_contacts(ch, *l),
+        (Carrier2D::Chart(ch), Carrier2D::Line(l)) => {
+            let contacts = chart_line_contacts(ch, *l)?;
+            Ok(contacts.into_iter().map(|(t, u, p)| (u, t, p)).collect())
+        }
+        (Carrier2D::Circle(c), Carrier2D::Chart(ch)) => chart_circle_contacts(ch, c),
+        (Carrier2D::Chart(ch), Carrier2D::Circle(c)) => {
+            let contacts = chart_circle_contacts(ch, c)?;
+            Ok(contacts.into_iter().map(|(t, u, p)| (u, t, p)).collect())
+        }
+        (Carrier2D::Chart(a), Carrier2D::Chart(b)) => chart_chart_contacts(a, b),
     }
 }
 
@@ -1334,6 +1373,10 @@ fn interior_param(c: &Carrier2D, t: f64) -> bool {
     match c {
         Carrier2D::Line(_) => t > 0.0 && t < 1.0,
         Carrier2D::Circle(c) => t > c.t0 && t < c.t1,
+        Carrier2D::Chart(ch) => {
+            let n = ch.segment_count() as f64;
+            t > 0.0 && t < n
+        }
     }
 }
 
@@ -1888,6 +1931,10 @@ fn cycle_polygon(cyc: &[usize], half_edges: &[ArrHalfEdge], carriers: &[Carrier2
                 let n = (POLY_SAMPLES as f64 * span / TAU).ceil() as usize;
                 2usize.max(n)
             }
+            // A chart half-edge spans exactly one straight PL segment (the
+            // sample kinks are arrangement vertices), so the endpoints alone
+            // resolve its polygonization.
+            Carrier2D::Chart(_) => 1usize,
         };
         for k in 0..=steps {
             let t = u0 + (u1 - u0) * (k as f64 / steps as f64);
@@ -2079,6 +2126,457 @@ fn bbox_limits(poly: &[Point2]) -> Option<(Point2, Point2)> {
     Some((Point2::new(min_x, min_y), Point2::new(max_x, max_y)))
 }
 
+// ---------------------------------------------------------------------------
+// BIE-005-ARRANGE — the (s, v) chart-curve carrier and certified chart
+// arrangement.
+//
+// Everything in this section is ADDITIVE to the landed arrangement engine
+// (spine §5: arrange.rs is this packet's own file this wave). The chart-curve
+// carrier extends `Carrier2D` (§3); certified inter-curve crossings reuse the
+// landed exact-sign line/circle machinery and are dyadic-exact where the
+// landed `arrange` is dyadic (§4); containment in the chart reuses the landed
+// `ArrRegion` semantics (§2 drift record — there is no `Region2` type in the
+// tree); the Lemma-F pcurve-simplicity oracle is asserted in tests on the
+// same certified predicate, never as production code (§5). The landed
+// `Arrangement` / `arrange` semantics are unchanged (the V5 identity guard).
+//
+// truck-geometry does not depend on truck-certified: the certified samples of
+// BIE-003's `CertifiedImplicitIntersectionCurve` / BIE-002's
+// `CertifiedChartCurve` are accepted as plain 2-D data (`Vec<(f64, f64)>`)
+// whose certificate flag is decided by the constructor's refusing signature —
+// the same pattern the carrier packet used. Certified-PL carrier parameters
+// run uniformly per segment (segment index + local parameter over
+// `[0, segment_count]`), so the fixture crossings below are dyadic by
+// construction (H-3) and a crossing the exact predicates cannot certify is a
+// typed refusal, never a guess (H-6).
+// ---------------------------------------------------------------------------
+
+/// A certified PL chart curve: the `(s, v)` projection of a certified
+/// implicit-intersection / chart-curve sample stream, accepted as plain data.
+///
+/// The samples form the curve's polyline in the surface's own `(s, v)` chart.
+#[derive(Clone, Debug, PartialEq)]
+pub struct ChartCurve {
+    /// The certified polyline vertices `(s, v)`, in sample order.
+    vertices: Vec<Point2>,
+    /// Whether the curve is a closed ring (its last sample repeats its first).
+    closed: bool,
+}
+
+impl ChartCurve {
+    /// Certified construction from the certified sample stream.
+    ///
+    /// Refuses typed (H-2, never panics) when:
+    ///
+    /// - the `certified` flag is false — bare float data carries no
+    ///   certificate (the BIE-003 `Method::None` refusal, mirrored),
+    /// - fewer than two samples (fewer than four for a closed ring),
+    /// - any sample is non-finite, or two consecutive samples coincide (a
+    ///   zero-length segment), or
+    /// - `closed` is required and the samples do not close (`first != last`):
+    ///   a declared loop that is not closed is a boundary contradiction.
+    ///
+    /// The returned certificate stamps `Method::Exact`: the carrier is its
+    /// samples, carried exactly, with no float computation on admission
+    /// (H-6).
+    pub fn try_new(samples: Vec<(f64, f64)>, closed: bool, certified: bool) -> Outcome<ChartCurve> {
+        if !certified {
+            return Err(Refusal::UnsupportedEnvelope(EnvelopeCase::ConstructRefused));
+        }
+        if samples.len() < 2 || (closed && samples.len() < 4) {
+            return Err(Refusal::UnsupportedEnvelope(EnvelopeCase::ConstructRefused));
+        }
+        let mut vertices = Vec::with_capacity(samples.len());
+        for &(x, y) in samples.iter() {
+            if !x.is_finite() || !y.is_finite() {
+                return Err(Refusal::UnsupportedEnvelope(EnvelopeCase::ConstructRefused));
+            }
+            vertices.push(Point2::new(x, y));
+        }
+        for k in 0..vertices.len().saturating_sub(1) {
+            let a = match vertices.get(k) {
+                Some(&a) => a,
+                None => continue,
+            };
+            let b = match vertices.get(k + 1) {
+                Some(&b) => b,
+                None => continue,
+            };
+            if a == b {
+                return Err(Refusal::UnsupportedEnvelope(EnvelopeCase::ConstructRefused));
+            }
+        }
+        if closed {
+            let first = match vertices.first() {
+                Some(&v) => v,
+                None => return Err(Refusal::UnsupportedEnvelope(EnvelopeCase::ConstructRefused)),
+            };
+            let last = match vertices.last() {
+                Some(&v) => v,
+                None => return Err(Refusal::UnsupportedEnvelope(EnvelopeCase::ConstructRefused)),
+            };
+            if first != last {
+                return Err(contradiction());
+            }
+        }
+        Ok(Certified::new(
+            ChartCurve { vertices, closed },
+            Certificate {
+                props: PropMap::new(),
+                method: Method::Exact,
+                budget_left: Budget::new(0, 0, 0),
+                margin: Margin::UNBOUNDED,
+                modulus: Modulus::Unbounded,
+            },
+        ))
+    }
+
+    /// The certified polyline vertices `(s, v)`.
+    pub fn vertices(&self) -> &[Point2] {
+        &self.vertices
+    }
+
+    /// Whether the curve is a closed ring.
+    pub fn is_closed(&self) -> bool {
+        self.closed
+    }
+
+    /// The number of PL segments (vertices minus one); never zero on a
+    /// constructed carrier.
+    fn segment_count(&self) -> usize {
+        self.vertices.len().saturating_sub(1)
+    }
+
+    /// The containing segment endpoints of parameter `t`, clamped to the
+    /// carrier span; `None` only when the carrier has no segments.
+    fn vertex_pair(&self, t: f64) -> Option<(Point2, Point2)> {
+        let segs = self.segment_count();
+        if segs == 0 {
+            return None;
+        }
+        let hi = segs as f64;
+        let c = if t.is_finite() { t.clamp(0.0, hi) } else { 0.0 };
+        let mut k = c.floor() as usize;
+        if k >= segs {
+            k = segs - 1;
+        }
+        let a = match self.vertices.get(k) {
+            Some(&a) => a,
+            None => return None,
+        };
+        let b = match self.vertices.get(k + 1) {
+            Some(&b) => b,
+            None => return None,
+        };
+        Some((a, b))
+    }
+
+    /// The segment index containing parameter `t`, clamped to the carrier
+    /// span.
+    fn segment_index(&self, t: f64) -> usize {
+        let segs = self.segment_count();
+        if segs == 0 {
+            return 0;
+        }
+        let hi = segs as f64;
+        let c = if t.is_finite() { t.clamp(0.0, hi) } else { 0.0 };
+        let mut k = c.floor() as usize;
+        if k >= segs {
+            k = segs - 1;
+        }
+        k
+    }
+
+    /// The linear interpolation of the carrier at parameter `t`.
+    fn subs(&self, t: f64) -> Point2 {
+        match self.vertex_pair(t) {
+            Some((a, b)) => {
+                let k = self.segment_index(t);
+                let u = (t - k as f64).clamp(0.0, 1.0);
+                a + (b - a) * u
+            }
+            None => self
+                .vertices
+                .first()
+                .copied()
+                .unwrap_or(Point2::new(0.0, 0.0)),
+        }
+    }
+
+    /// The tangent direction of the containing segment (piecewise-constant).
+    fn tangent(&self, t: f64) -> Vector2 {
+        match self.vertex_pair(t) {
+            Some((a, b)) => b - a,
+            None => Vector2::zero(),
+        }
+    }
+
+    /// The PL segments as 2-D lines, in sample order.
+    fn segments(&self) -> Vec<Line<Point2>> {
+        let n = self.segment_count();
+        let mut out = Vec::with_capacity(n);
+        for k in 0..n {
+            let a = match self.vertices.get(k) {
+                Some(&a) => a,
+                None => continue,
+            };
+            let b = match self.vertices.get(k + 1) {
+                Some(&b) => b,
+                None => continue,
+            };
+            out.push(Line(a, b));
+        }
+        out
+    }
+
+    /// The carrier flattened onto the z = 0 plane: one `Curve::Line` per PL
+    /// segment, in sample order — the form the landed `arrange` consumes.
+    fn to_line_curves(&self) -> Vec<Curve> {
+        self.segments()
+            .iter()
+            .map(|&Line(a, b)| Curve::Line(Line(pt3(a), pt3(b))))
+            .collect()
+    }
+}
+
+/// A certified crossing between two chart carriers: `(parameter on the
+/// first, parameter on the second, crossing point)`.
+type ChartContact = (f64, f64, Point2);
+
+/// Orders certified chart contacts by carrier parameter, then parameter on
+/// each carrier, then position — the determinism rule of spine §8.
+fn sort_contacts(out: &mut [(f64, f64, Point3)]) {
+    out.sort_by(|a, b| {
+        a.0.total_cmp(&b.0)
+            .then_with(|| a.1.total_cmp(&b.1))
+            .then_with(|| a.2.x.total_cmp(&b.2.x))
+            .then_with(|| a.2.y.total_cmp(&b.2.y))
+            .then_with(|| a.2.z.total_cmp(&b.2.z))
+    });
+}
+
+/// Removes exact duplicate contacts after sorting (a contact on a shared
+/// sample vertex is reported once per adjacent segment).
+fn dedup_contacts(out: &mut Vec<(f64, f64, Point3)>) {
+    let mut kept: Vec<(f64, f64, Point3)> = Vec::new();
+    for c in out.drain(..) {
+        let dup = kept
+            .last()
+            .map(|k| k.0 == c.0 && k.1 == c.1 && k.2 == c.2)
+            .unwrap_or(false);
+        if !dup {
+            kept.push(c);
+        }
+    }
+    *out = kept;
+}
+
+/// Certified contacts between the chart carrier `ch` and the analytic line
+/// `l`: `(parameter on l, global chart parameter, point)`. Every segment pair
+/// is decided by the landed exact line/line sign test; the chart parameter is
+/// the dyadic `segment index + local parameter` (H-3).
+fn chart_line_contacts(ch: &ChartCurve, l: Line<Point2>) -> S1Result<Vec<(f64, f64, Point3)>> {
+    let mut out = Vec::new();
+    for (k, seg) in ch.segments().iter().enumerate() {
+        for (t, u, pt) in line_line_intersection(l, *seg)? {
+            out.push((t, k as f64 + u, pt));
+        }
+    }
+    sort_contacts(&mut out);
+    dedup_contacts(&mut out);
+    Ok(out)
+}
+
+/// Certified contacts between the chart carrier `ch` and the analytic circle
+/// `circle`: `(circle parameter, global chart parameter, point)`. Roots off a
+/// segment's own span are dropped; a vertex contact is reported once after
+/// dedup.
+fn chart_circle_contacts(
+    ch: &ChartCurve,
+    circle: &CircleCarrier,
+) -> S1Result<Vec<(f64, f64, Point3)>> {
+    let mut out = Vec::new();
+    for (k, seg) in ch.segments().iter().enumerate() {
+        for (t_seg, u_circ, pt) in line_circle_intersection(*seg, circle)? {
+            if (0.0..=1.0).contains(&t_seg) {
+                out.push((u_circ, k as f64 + t_seg, pt));
+            }
+        }
+    }
+    sort_contacts(&mut out);
+    dedup_contacts(&mut out);
+    Ok(out)
+}
+
+/// Certified contacts between two chart carriers: `(global parameter on a,
+/// global parameter on b, point)`.
+fn chart_chart_contacts(a: &ChartCurve, b: &ChartCurve) -> S1Result<Vec<(f64, f64, Point3)>> {
+    let segs_a = a.segments();
+    let segs_b = b.segments();
+    let mut out = Vec::new();
+    for (ia, sa) in segs_a.iter().enumerate() {
+        for (ib, sb) in segs_b.iter().enumerate() {
+            for (ta, tb, pt) in line_line_intersection(*sa, *sb)? {
+                out.push((ia as f64 + ta, ib as f64 + tb, pt));
+            }
+        }
+    }
+    sort_contacts(&mut out);
+    dedup_contacts(&mut out);
+    Ok(out)
+}
+
+/// The certified self-crossing predicate of one chart carrier (the Lemma-F
+/// oracle's engine): every proper crossing between two NON-ADJACENT segments
+/// with both parameters strictly interior to their segments. Adjacent
+/// segments share a corner vertex (a chain's own angle, never a
+/// self-crossing); for a closed ring the first/last segments share the seam
+/// vertex and are likewise excluded.
+fn chart_self_contacts(c: &ChartCurve) -> S1Result<Vec<(f64, f64, Point3)>> {
+    let segs = c.segments();
+    let n = segs.len();
+    let mut out = Vec::new();
+    for i in 0..n {
+        for j in (i + 1)..n {
+            if j == i + 1 {
+                continue;
+            }
+            if c.is_closed() && i == 0 && j == n.saturating_sub(1) {
+                continue;
+            }
+            let sa = match segs.get(i) {
+                Some(&s) => s,
+                None => continue,
+            };
+            let sb = match segs.get(j) {
+                Some(&s) => s,
+                None => continue,
+            };
+            for (ta, tb, pt) in line_line_intersection(sa, sb)? {
+                if ta > 0.0 && ta < 1.0 && tb > 0.0 && tb < 1.0 {
+                    out.push((i as f64 + ta, j as f64 + tb, pt));
+                }
+            }
+        }
+    }
+    Ok(out)
+}
+
+/// The certified crossings of two chart curves: `(parameter on the first,
+/// parameter on the second, crossing point)`, ordered by first parameter then
+/// second. Two chart curves cross iff the certified exact sign test says so;
+/// a crossing the predicates cannot certify (a non-dyadic parameter or an
+/// overlapping collinear pair) is a typed refusal, never a guess (H-6). Both
+/// curves are admitted as [`Carrier2D::Chart`] carriers and dispatched
+/// through the certified inter-curve crossing predicate, so the chart carrier
+/// participates in the same certified machinery as the analytic envelope.
+pub fn chart_crossings(a: &ChartCurve, b: &ChartCurve) -> ChartCrossings {
+    let ca = Carrier2D::Chart(a.clone());
+    let cb = Carrier2D::Chart(b.clone());
+    let contacts = intersect(&ca, &cb)?;
+    Ok(contacts
+        .into_iter()
+        .map(|(ta, tb, p)| (ta, tb, Point2::new(p.x, p.y)))
+        .collect())
+}
+
+/// The certified self-crossings of one chart curve: the witness parameters
+/// (both interior on the curve) and point of every proper non-adjacent
+/// segment crossing. Empty for a simple (Lemma-F-simple) chart curve; the
+/// test oracle asserts this on the fixture curves.
+pub fn chart_self_crossings(c: &ChartCurve) -> ChartCrossings {
+    let contacts = chart_self_contacts(c)?;
+    Ok(contacts
+        .into_iter()
+        .map(|(ta, tb, p)| (ta, tb, Point2::new(p.x, p.y)))
+        .collect())
+}
+
+/// The type of a certified chart-crossing predicate result: `(parameter on
+/// the first carrier, parameter on the second, point)`.
+type ChartCrossings = std::result::Result<Vec<ChartContact>, Refusal>;
+
+/// The certified `(s, v)` chart arrangement: the flattened profile the landed
+/// `arrange` ran over plus the landed `Arrangement` itself. Half-edges of
+/// `arrangement` index into `profile`, so a consumer can reconstruct the
+/// per-curve carriers and map each region's boundary arcs (the FF-arcs of the
+/// chart) back to their source analytic curves / chart curves.
+#[derive(Clone, Debug)]
+pub struct ChartArrangement {
+    /// The flattened profile: the `analytic` curves unchanged, then each
+    /// chart curve as one `Curve::Line` per PL segment.
+    pub profile: Vec<Curve>,
+    /// The certified planar arrangement over `profile` — the landed
+    /// `Arrangement`/`ArrRegion` semantics, unmodified.
+    pub arrangement: Arrangement,
+}
+
+/// Builds the certified `(s, v)` chart arrangement over a sweep face's chart
+/// boundary: analytic profile curves (`Curve::Line`/`Curve::Circle`) plus
+/// certified chart curves (`BIE-005-ARRANGE`). Each chart curve is flattened
+/// onto its PL segments (z = 0) and the landed `arrange` engine subdivides,
+/// wires and regions the result with its dyadic-exact certified crossings —
+/// the same machinery the planar carrier packet landed, extended to the
+/// chart's certified-PL boundary curves.
+pub fn arrange_chart(
+    analytic: &[Curve],
+    chart: &[ChartCurve],
+    domain: Option<BoundingBox<Point2>>,
+) -> Outcome<ChartArrangement> {
+    let mut profile: Vec<Curve> = Vec::new();
+    profile.extend_from_slice(analytic);
+    for c in chart {
+        profile.extend(c.to_line_curves());
+    }
+    let Certified { value, cert } = arrange(&profile, domain)?;
+    Ok(Certified::new(
+        ChartArrangement {
+            profile,
+            arrangement: value,
+        },
+        cert,
+    ))
+}
+
+/// Re-derives the per-curve carriers of a flattened chart profile.
+fn chart_carriers(profile: &[Curve]) -> S1Result<Vec<Carrier2D>> {
+    profile.iter().map(recognize).collect()
+}
+
+/// The certified containment answer in the chart: the index of the
+/// arrangement region containing `p`, decided by the landed `ArrRegion`
+/// semantics — `p` is in a region exactly when its winding over that region's
+/// stored boundary cycles equals the region's stored winding (an interior
+/// point of a bounded region of winding ±1, or of the exterior of winding 0,
+/// matches exactly one region). `Ok(None)` when no unique region matches
+/// (`p` lies on a boundary or the figure is not a closed-loop chart). A
+/// winding decision the exact predicates cannot certify refuses typed.
+pub fn chart_region_containing(
+    chart: &ChartArrangement,
+    p: Point2,
+) -> std::result::Result<Option<usize>, Refusal> {
+    let carriers = chart_carriers(&chart.profile)?;
+    let mut matches: Vec<usize> = Vec::new();
+    for (idx, region) in chart.arrangement.regions.iter().enumerate() {
+        let mut w = 0i32;
+        for boundary in &region.boundaries {
+            let poly = cycle_polygon(boundary, &chart.arrangement.half_edges, &carriers);
+            match polygon_winding(p, &poly) {
+                Some(x) => w += x,
+                None => return Err(numerically_unresolved()),
+            }
+        }
+        if w == region.winding {
+            matches.push(idx);
+        }
+    }
+    if matches.len() == 1 {
+        Ok(matches.first().copied())
+    } else {
+        Ok(None)
+    }
+}
+
 #[cfg(test)]
 #[allow(clippy::unwrap_used, clippy::expect_used)]
 mod tests {
@@ -2224,5 +2722,161 @@ mod tests {
             }
         }
         assert_eq!(polygon_winding(Point2::new(0.0, 0.0), &poly).unwrap(), 1);
+    }
+
+    /// Certified chart-curve fixture helper: the samples are certified data.
+    fn cc(samples: Vec<(f64, f64)>, closed: bool) -> ChartCurve {
+        ChartCurve::try_new(samples, closed, true).unwrap().value
+    }
+
+    #[test]
+    fn chart_carrier_constructs_and_refuses() {
+        let ok = cc(vec![(0.0, 0.0), (1.0, 0.0), (1.0, 1.0)], false);
+        assert_eq!(ok.vertices().len(), 3);
+        assert_eq!(ok.segment_count(), 2);
+        assert!(!ok.is_closed());
+
+        // Fewer than two samples refuses typed (H-2).
+        assert!(ChartCurve::try_new(Vec::new(), false, true).is_err());
+        assert!(ChartCurve::try_new(vec![(0.0, 0.0)], false, true).is_err());
+        // A closed ring needs its seam repeat (>= 4 samples).
+        assert!(
+            ChartCurve::try_new(vec![(0.0, 0.0), (1.0, 0.0), (1.0, 1.0)], true, true,).is_err()
+        );
+        // Non-finite samples refuse.
+        assert!(ChartCurve::try_new(vec![(0.0, f64::NAN), (1.0, 0.0)], false, true).is_err());
+        assert!(ChartCurve::try_new(vec![(f64::INFINITY, 0.0), (1.0, 0.0)], false, true).is_err());
+        // Consecutive coincident samples (a zero-length segment) refuse.
+        assert!(
+            ChartCurve::try_new(vec![(0.0, 0.0), (0.0, 0.0), (1.0, 0.0)], false, true).is_err()
+        );
+        // Bare float data with no certificate flag refuses (the BIE-003
+        // `Method::None` pattern).
+        assert!(ChartCurve::try_new(vec![(0.0, 0.0), (1.0, 0.0)], false, false).is_err());
+        // Unclosed where closed is required: the declared ring does not close.
+        assert!(ChartCurve::try_new(
+            vec![(0.0, 0.0), (4.0, 0.0), (4.0, 4.0), (0.0, 4.0)],
+            true,
+            true,
+        )
+        .is_err());
+
+        let ring = cc(
+            vec![(0.0, 0.0), (4.0, 0.0), (4.0, 4.0), (0.0, 4.0), (0.0, 0.0)],
+            true,
+        );
+        assert!(ring.is_closed());
+        assert_eq!(ring.segment_count(), 4);
+    }
+
+    #[test]
+    fn crossings_certified_on_known_figure() {
+        // A two-segment PL diagonal across a dyadic vertical: the certified
+        // crossing sits at (2, 2), at the known dyadic parameters 1.5 and 0.5.
+        let diag = cc(vec![(0.0, 0.0), (1.0, 1.0), (3.0, 3.0)], false);
+        let vert = cc(vec![(2.0, -1.0), (2.0, 5.0)], false);
+        let crossings = chart_crossings(&diag, &vert).unwrap();
+        assert_eq!(crossings.len(), 1);
+        let (ta, tb, pt) = crossings.first().copied().unwrap();
+        assert_eq!(ta, 1.5);
+        assert_eq!(tb, 0.5);
+        assert_eq!(pt, pt2(2.0, 2.0));
+
+        // A non-dyadic crossing parameter (1/3) refuses by design: the landed
+        // dyadic exactness cannot certify it (H-3).
+        let horiz = cc(vec![(0.0, 0.0), (3.0, 0.0)], false);
+        let unit_vert = cc(vec![(1.0, -1.0), (1.0, 1.0)], false);
+        assert!(chart_crossings(&horiz, &unit_vert).is_err());
+    }
+
+    #[test]
+    fn containment_matches_region_semantics() {
+        let outer = cc(
+            vec![(0.0, 0.0), (4.0, 0.0), (4.0, 4.0), (0.0, 4.0), (0.0, 0.0)],
+            true,
+        );
+        let hole = cc(
+            vec![(1.0, 1.0), (3.0, 1.0), (3.0, 3.0), (1.0, 3.0), (1.0, 1.0)],
+            true,
+        );
+        let ok = arrange_chart(&[], &[outer, hole], None).unwrap();
+        let chart = &ok.value;
+        let regions = &chart.arrangement.regions;
+        assert_eq!(regions.len(), 3);
+
+        let plate = regions
+            .iter()
+            .position(|r| r.bounded && r.boundaries.len() == 2)
+            .unwrap();
+        let hole_r = regions
+            .iter()
+            .position(|r| r.bounded && r.boundaries.len() == 1)
+            .unwrap();
+        let exterior = regions.iter().position(|r| !r.bounded).unwrap();
+        let plate_w = regions.get(plate).unwrap().winding;
+        assert!(plate_w == 1 || plate_w == -1);
+
+        // The chart containment answer agrees with the landed ArrRegion
+        // semantics on the constructed arrangement: each analytic chart point
+        // lands in the region whose stored boundary cycles carry exactly its
+        // stored winding.
+        assert_eq!(
+            chart_region_containing(chart, pt2(0.5, 0.5)).unwrap(),
+            Some(plate)
+        );
+        assert_eq!(
+            chart_region_containing(chart, pt2(2.0, 2.0)).unwrap(),
+            Some(hole_r)
+        );
+        assert_eq!(
+            chart_region_containing(chart, pt2(5.0, 5.0)).unwrap(),
+            Some(exterior)
+        );
+
+        // Cross-check the semantics directly: the winding of the plate's
+        // representative point over the plate boundary cycles equals the
+        // stored winding.
+        let carriers = chart_carriers(&chart.profile).unwrap();
+        let mut plate_wound = 0i32;
+        for b in &regions.get(plate).unwrap().boundaries {
+            let poly = cycle_polygon(b, &chart.arrangement.half_edges, &carriers);
+            plate_wound += polygon_winding(pt2(0.5, 0.5), &poly).unwrap();
+        }
+        assert_eq!(plate_wound, plate_w);
+    }
+
+    #[test]
+    fn pcurve_simplicity_oracle_holds() {
+        // The Lemma-F oracle: every fixture chart curve's projection is
+        // simple — the same certified crossing predicate reports no
+        // self-crossing.
+        let fixtures: Vec<ChartCurve> = vec![
+            cc(vec![(0.0, 0.0), (1.0, 1.0), (3.0, 3.0)], false),
+            cc(vec![(2.0, -1.0), (2.0, 5.0)], false),
+            cc(
+                vec![(0.0, 0.0), (4.0, 0.0), (4.0, 4.0), (0.0, 4.0), (0.0, 0.0)],
+                true,
+            ),
+            cc(
+                vec![(1.0, 1.0), (3.0, 1.0), (3.0, 3.0), (1.0, 3.0), (1.0, 1.0)],
+                true,
+            ),
+        ];
+        for curve in &fixtures {
+            assert!(
+                chart_self_crossings(curve).unwrap().is_empty(),
+                "fixture chart curve must be simple"
+            );
+        }
+
+        // A deliberately self-crossing control curve (a bowtie) FAILS the
+        // oracle at the certified crossing (1, 1) on segments 0 and 2.
+        let bowtie = cc(vec![(0.0, 0.0), (2.0, 2.0), (0.0, 2.0), (2.0, 0.0)], false);
+        let crossings = chart_self_crossings(&bowtie).unwrap();
+        assert_eq!(crossings.len(), 1);
+        let (ta, tb, pt) = crossings.first().copied().unwrap();
+        assert_eq!(ta, 0.5);
+        assert_eq!(tb, 2.5);
+        assert_eq!(pt, pt2(1.0, 1.0));
     }
 }
