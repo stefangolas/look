@@ -22,6 +22,9 @@ pub mod contract;
 pub mod domain;
 pub mod formal;
 pub mod hull;
+/// The BIE-001 arithmetic substrate: outward-rounded 4-D interval boxes and
+/// certified range bounds over them (BIE-001-ARITHMETIC).
+pub mod interval;
 pub mod kernel;
 pub mod meshable;
 pub mod pair_dispatch;
