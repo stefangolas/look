@@ -125,3 +125,9 @@ pub mod graphdisk;
 /// k=1 face, k=2 edge (canal), and k=3 corner (triple-node) strata with their
 /// certified reach bounds and per-stratum refusals.
 pub mod offset_strata;
+
+/// The closed-star embedding certificate and the certified broad phase over
+/// the constructed strata (CC-022-STARS, spine S6 consumer): the glued
+/// [`stars::Star`] reduced to the P3 graph-disk machinery, and the
+/// reach-bound [`stars::reach_prune`] broad phase (sound but not complete).
+pub mod stars;
