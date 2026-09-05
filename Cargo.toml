@@ -6,6 +6,7 @@
 [workspace]
 members = [
     ".",
+    "truck123d",
     "showcases",
     "vendor/truck/truck-assembly",
     "vendor/truck/truck-base",
