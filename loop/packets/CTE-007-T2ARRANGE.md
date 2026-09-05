@@ -134,7 +134,16 @@ pub fn atom_decision(sa: SideState, sb: SideState, op: BoolOp) -> FragmentDecisi
 4. `containment_certified_without_case_explosion` — `D_A ⊆ D_B` reduces to
    two atoms; separation certifies without the full arrangement.
 5. `butt_join_union_drops_shared_wall` — the 10/01 union row drops the wall
-   (§5.9), congruent with the landed orientation fold.
+   (§5.9), congruent with the landed orientation fold. **R2 addition
+   (adjudicated from CL-005's SPEC_GAP, commit `4d59d5b`)**: the x/y-axis
+   full-face butt joins currently refuse inside `split.rs::finish`
+   (Region2 `CoincidentInterval` between vertical side faces) while their
+   z-axis twin certifies — your splitter work makes the vertical seam
+   split identically, and the worker's recorded experiment (Region2
+   `Coincident` events are load-bearing for strictly-interior
+   containments, harmful only for the boundary-touching coplanar class)
+   is the evidence to build against. The exact-footprint halfspace class
+   stays OUT (theory §5.9: interior-loop rewrite machinery, booked open).
 6. `atom_emission_is_single_canonical_record` — a kept coincident atom
    emits ONE canonical geometry record + provenance set, never two faces.
 

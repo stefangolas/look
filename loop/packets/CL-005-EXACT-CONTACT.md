@@ -43,28 +43,38 @@ is theory-class, deliberately out of scope).
 
 ## Scope decisions — pre-made, do not relitigate
 
-1. **Case (a) — coplanar butt-join union**: when the contact funnel's
-   events certify that the shared boundary region between two solids is
-   exactly a common face set (carrier-equal, opposite orientation, zero
-   measure intersection interior), the union decision for those fragments
-   is: keep both, emit the split faces as today's record — the DECISION is
-   certified (the typed refusal is replaced by a certified answer whose
-   content matches the recorded 10-split-face behavior). The decision is
-   derived from the already-certified event records — no new tolerance.
-2. **Case (b) — exact-footprint halfspace difference**: when the cutter's
-   wall planes are certified coplanar with the target's faces (plane
-   equality within the ctx's exact-predicate discipline — dyadic where
-   possible), the fragment classification takes the ON-BOUNDARY fragments
-   from the certified plane-equality record instead of refusing
-   `Contradictory`. The padded over-box construction stays valid.
-3. **V5, absolute**: every canonical fixture that certifies today
-   certifies bit-identically; the two cases above are reached ONLY where
-   the funnel currently refuses. `boolean_m2` byte-identical.
-4. **The general calculus is out of scope**: if a case arrives that the
-   two certified decisions do not cover, it keeps its typed refusal —
-   that is success, not failure.
+**R2 AMENDMENT (2026-09-05, adjudicated SPEC_GAP):** the r1 worker proved by
+experiment that neither case below is derivable at the DECIDE/ASSEMBLE
+boundary — the choke points live in `split.rs`/`classify.rs`, which this
+packet's write set freezes (`CL-005-STOP-QUESTION.md`, commit `4d59d5b`;
+probe transcripts preserved). The packet is RESCOPED to what the boundary can
+certify, per the root theory's own §5.9 scoping correction (the
+exact-footprint halfspace class "should not be booked as a T2 battery row").
+
+1. **Case (a) — coplanar butt-join union, REBOOKED**: the x/y-axis
+   full-face butt joins refuse inside `split.rs::finish` (Region2
+   `CoincidentInterval` between vertical side faces) — upstream of this
+   packet's boundary. Certifying them requires the splitter's vertical-face
+   seam to split like its z-axis twin: that is **CTE-007's** write set and
+   its §5.9 truth-row battery. NOT this packet's row anymore.
+2. **Case (b) — exact-footprint halfspace, DROPPED**: the theory's §5.9
+   scoping correction excludes it from the contact battery (no coplanar cap
+   pair; cutter walls terminate inside the plate — interior-loop rewrite
+   machinery, booked open). It keeps its typed refusal with a recorded
+   reason; a refusal that is typed and recorded is SUCCESS under §5.9.
+3. **This packet's actual work**: pin the families that ALREADY certify at
+   HEAD (z-axis full-face union 10-face, P3 recombination 10-face, padded
+   over-box controls 6-face, M2 flagship 7/8-face) as a regression battery;
+   document the certified decision predicates behind them; and assert the
+   two rescoped classes carry their typed refusals (never silent wrong
+   output). The worker's experiment (Region2 `Coincident` events are
+   load-bearing for strictly-interior containments and harmful only for the
+   boundary-touching coplanar class) is the recorded evidence CTE-007
+   builds against — preserve it in the RESULT notes.
+4. **V5, absolute**: every canonical fixture that certifies today
+   certifies bit-identically. `boolean_m2` byte-identical.
 5. `classify.rs` propagation logic is NOT edited (BIE-006's frozen reuse);
-   the decisions enter at the DECIDE/ASSEMBLE boundary your write set owns.
+   `split.rs` stays frozen here (CTE-007's write set).
 
 ## Anchors — measured 2026-09-05, counts are exact
 
@@ -86,15 +96,17 @@ is theory-class, deliberately out of scope).
 
 ## Tests required
 
-1. `butt_join_coplanar_union_certified` — two boxes sharing an exact face
-   union WITHOUT `ContactReductionDeferred`; the output carries the
-   recorded split-face structure; the exact-box metamorphic test (landed
-   semantics) holds.
-2. `exact_footprint_halfspace_difference_certified` — the recorded
-   exact-footprint halfspace case (P3's D3 fixture class) now certifies;
-   the padded over-box control still works identically.
+1. `z_axis_full_face_butt_join_certified` — the z-stacked full-face union
+   and the P3 `(S−pad) ∪ (S∩pad)` recombination keep their recorded
+   10-face structure through the certified decision path (pinned as
+   regression, not changed behavior).
+2. `rescoped_classes_carry_typed_refusals` — the x/y full-face butt joins
+   refuse inside the splitter and the exact-footprint halfspace cases
+   refuse `Contradictory`/typed — asserted AS REFUSALS with their named
+   causes (a silent wrong output on either is a failure).
 3. `canonical_controls_bit_identical` — boolean_m2's fixture set through
-   the same entries gives byte-identical results (hash asserted).
+   the same entries gives byte-identical results (hash asserted), plus the
+   padded controls (6 faces) and M2 flagship (7/8 faces).
 
 No existing test may be deleted, `#[ignore]`d, or weakened.
 
