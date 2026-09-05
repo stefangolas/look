@@ -403,6 +403,11 @@ fn sub3_f(a: &[f64; 3], b: &[f64; 3]) -> [f64; 3] {
     [a[0] - b[0], a[1] - b[1], a[2] - b[2]]
 }
 
+/// Scales a float 3-vector by a scalar.
+fn scale3(s: f64, v: &[f64; 3]) -> [f64; 3] {
+    [s * v[0], s * v[1], s * v[2]]
+}
+
 impl RestrictedChart {
     /// The float surface point at the carrier parameters `(p0, p1)`.
     fn point_f(&self, p0: f64, p1: f64) -> [f64; 3] {
@@ -665,6 +670,113 @@ impl RestrictedChart {
             }
         }
     }
+
+    /// The float second partials `(X_{00}, X_{01}, X_{11})` of the carrier at
+    /// the parameter point `(p0, p1)`: the three symmetric second partial
+    /// 3-vectors of the surface map. These feed the BIE-004 polar-augmented
+    /// Jacobian row (the derivative of a Jacobian minor along the chart).
+    fn second_partials_f(&self, p0: f64, p1: f64) -> [[f64; 3]; 3] {
+        match self {
+            RestrictedChart::Plane { .. } => [[0.0; 3]; 3],
+            RestrictedChart::Sphere { center: _, radius } => {
+                let (ss, cs) = p0.sin_cos();
+                let (st, ct) = p1.sin_cos();
+                let r = *radius;
+                [
+                    [-r * ss * ct, -r * ss * st, -r * cs],
+                    [-r * cs * st, r * cs * ct, 0.0],
+                    [-r * ss * ct, -r * ss * st, 0.0],
+                ]
+            }
+            RestrictedChart::Cylinder { center: _, radius } => {
+                let (ss, cs) = p0.sin_cos();
+                let r = *radius;
+                [[-r * cs, -r * ss, 0.0], [0.0; 3], [0.0; 3]]
+            }
+            RestrictedChart::CircularSweep(sweep) => {
+                let r = sweep.radius_at(p0);
+                let dr = (sweep.radius_end - sweep.radius_start) / (sweep.s1 - sweep.s0);
+                let angle = std::f64::consts::TAU * p1;
+                let (sa, ca) = angle.sin_cos();
+                let e0 = [sweep.ring0.x, sweep.ring0.y, sweep.ring0.z];
+                let e1 = [sweep.ring1.x, sweep.ring1.y, sweep.ring1.z];
+                let two_pi = std::f64::consts::TAU;
+                let ring_t = [
+                    -two_pi * sa * e0[0] + two_pi * ca * e1[0],
+                    -two_pi * sa * e0[1] + two_pi * ca * e1[1],
+                    -two_pi * sa * e0[2] + two_pi * ca * e1[2],
+                ];
+                let ring = [
+                    ca * e0[0] + sa * e1[0],
+                    ca * e0[1] + sa * e1[1],
+                    ca * e0[2] + sa * e1[2],
+                ];
+                let ring_tt = [
+                    -two_pi * two_pi * ring[0],
+                    -two_pi * two_pi * ring[1],
+                    -two_pi * two_pi * ring[2],
+                ];
+                // The straight spine and the linear scale radius make the
+                // second s-partials vanish (BIE-004 closure fixture algebra).
+                [[0.0; 3], scale3(dr, &ring_t), scale3(r, &ring_tt)]
+            }
+        }
+    }
+
+    /// The interval second partials `(X_{00}, X_{01}, X_{11})` over the
+    /// parameter box `(p0, p1)` (outward-rounded).
+    fn second_partials_iv(&self, p0: Interval, p1: Interval) -> [[Interval; 3]; 3] {
+        match self {
+            RestrictedChart::Plane { .. } => [[iv(0.0); 3]; 3],
+            RestrictedChart::Sphere { center: _, radius } => {
+                let r = iv(*radius);
+                let (ss, cs) = (isin(p0), icos(p0));
+                let (st, ct) = (isin(p1), icos(p1));
+                [
+                    [-r * ss * ct, -r * ss * st, -r * cs],
+                    [-r * cs * st, r * cs * ct, iv(0.0)],
+                    [-r * ss * ct, -r * ss * st, iv(0.0)],
+                ]
+            }
+            RestrictedChart::Cylinder { center: _, radius } => {
+                let r = iv(*radius);
+                let (ss, cs) = (isin(p0), icos(p0));
+                [[-r * cs, -r * ss, iv(0.0)], [iv(0.0); 3], [iv(0.0); 3]]
+            }
+            RestrictedChart::CircularSweep(sweep) => {
+                let span = iv(sweep.s1 - sweep.s0);
+                let tau = (p0 - iv(sweep.s0)) / span;
+                let r =
+                    iv(sweep.radius_start) + (iv(sweep.radius_end) - iv(sweep.radius_start)) * tau;
+                let dr = (iv(sweep.radius_end) - iv(sweep.radius_start)) / span;
+                let angle = iv(std::f64::consts::TAU) * p1;
+                let (sa, ca) = (isin(angle), icos(angle));
+                let two_pi = iv(std::f64::consts::TAU);
+                let e0 = [iv(sweep.ring0.x), iv(sweep.ring0.y), iv(sweep.ring0.z)];
+                let e1 = [iv(sweep.ring1.x), iv(sweep.ring1.y), iv(sweep.ring1.z)];
+                let ring = [
+                    ca * e0[0] + sa * e1[0],
+                    ca * e0[1] + sa * e1[1],
+                    ca * e0[2] + sa * e1[2],
+                ];
+                let ring_t = [
+                    -two_pi * sa * e0[0] + two_pi * ca * e1[0],
+                    -two_pi * sa * e0[1] + two_pi * ca * e1[1],
+                    -two_pi * sa * e0[2] + two_pi * ca * e1[2],
+                ];
+                let ring_tt = [
+                    -(two_pi * two_pi) * ring[0],
+                    -(two_pi * two_pi) * ring[1],
+                    -(two_pi * two_pi) * ring[2],
+                ];
+                [
+                    [iv(0.0); 3],
+                    [dr * ring_t[0], dr * ring_t[1], dr * ring_t[2]],
+                    [r * ring_tt[0], r * ring_tt[1], r * ring_tt[2]],
+                ]
+            }
+        }
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -683,31 +795,75 @@ pub struct FForm {
 
 impl FForm {
     /// The float residual at the 4-D chart point.
-    fn residual_f(&self, x: &[f64; 4]) -> [f64; 3] {
+    pub(crate) fn residual_f(&self, x: &[f64; 4]) -> [f64; 3] {
         let pa = self.a.point_f(x[0], x[1]);
         let pb = self.b.point_f(x[2], x[3]);
         sub3_f(&pa, &pb)
     }
 
     /// The float 3×4 Jacobian columns `(X_u, X_v, −X_s, −X_t)` at the point.
-    fn partial_columns_f(&self, x: &[f64; 4]) -> [[f64; 3]; 4] {
+    pub(crate) fn partial_columns_f(&self, x: &[f64; 4]) -> [[f64; 3]; 4] {
         let (au, av) = self.a.partials_f(x[0], x[1]);
         let (bs, bt) = self.b.partials_f(x[2], x[3]);
         [au, av, [-bs[0], -bs[1], -bs[2]], [-bt[0], -bt[1], -bt[2]]]
     }
 
     /// The interval residual over the 4-D box (outward-rounded).
-    fn residual_iv(&self, x: &[Interval; 4]) -> [Interval; 3] {
+    pub(crate) fn residual_iv(&self, x: &[Interval; 4]) -> [Interval; 3] {
         let pa = self.a.point_iv(x[0], x[1]);
         let pb = self.b.point_iv(x[2], x[3]);
         sub3(&pa, &pb)
     }
 
     /// The interval 3×4 Jacobian columns over the 4-D box.
-    fn partial_columns_iv(&self, x: &[Interval; 4]) -> [[Interval; 3]; 4] {
+    pub(crate) fn partial_columns_iv(&self, x: &[Interval; 4]) -> [[Interval; 3]; 4] {
         let (au, av) = self.a.partials_iv(x[0], x[1]);
         let (bs, bt) = self.b.partials_iv(x[2], x[3]);
         [au, av, neg3(&bs), neg3(&bt)]
+    }
+
+    /// The float second partial columns: `out[a][j]` is the 3-vector
+    /// `∂(∂F/∂x_a)/∂x_j = ∂²F/∂x_a∂x_j` of the residual at the chart point
+    /// (the derivative of the 3×4 Jacobian columns along the chart). Columns
+    /// of the two carriers are decoupled, so the mixed (side-A axis, side-B
+    /// axis) entries vanish exactly.
+    pub(crate) fn second_columns_f(&self, x: &[f64; 4]) -> [[[f64; 3]; 4]; 4] {
+        let ha = self.a.second_partials_f(x[0], x[1]);
+        let hb = self.b.second_partials_f(x[2], x[3]);
+        let mut out = [[[0.0; 3]; 4]; 4];
+        for (i, j, h) in [(0usize, 0usize, &ha[0]), (0, 1, &ha[1]), (1, 1, &ha[2])] {
+            out[i][j] = *h;
+            out[j][i] = *h;
+        }
+        for (i, j, h) in [(2usize, 2usize, &hb[0]), (2, 3, &hb[1]), (3, 3, &hb[2])] {
+            let neg = [-h[0], -h[1], -h[2]];
+            out[i][j] = neg;
+            out[j][i] = neg;
+        }
+        out
+    }
+
+    /// The interval second partial columns over the 4-D box (outward-rounded):
+    /// `out[a][j]` encloses `∂²F/∂x_a∂x_j` on the box.
+    pub(crate) fn second_columns_iv(&self, x: &[Interval; 4]) -> [[[Interval; 3]; 4]; 4] {
+        let ha = self.a.second_partials_iv(x[0], x[1]);
+        let hb = self.b.second_partials_iv(x[2], x[3]);
+        let mut out = [[[Interval::EMPTY; 3]; 4]; 4];
+        for k in 0..4 {
+            for l in 0..4 {
+                out[k][l] = [iv(0.0); 3];
+            }
+        }
+        for (i, j, h) in [(0usize, 0usize, &ha[0]), (0, 1, &ha[1]), (1, 1, &ha[2])] {
+            out[i][j] = *h;
+            out[j][i] = *h;
+        }
+        for (i, j, h) in [(2usize, 2usize, &hb[0]), (2, 3, &hb[1]), (3, 3, &hb[2])] {
+            let neg = [-h[0], -h[1], -h[2]];
+            out[i][j] = neg;
+            out[j][i] = neg;
+        }
+        out
     }
 }
 
