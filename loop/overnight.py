@@ -218,7 +218,7 @@ def try_land(slot_dir, slot_no, rows, order, reg_path):
 
 def all_landed(rows):
     prog = [r for r in rows.values()
-            if r["id"].startswith(("BG-KV2-", "CC-"))]
+            if r["id"].startswith(("BG-KV2-", "CC-", "BIE-"))]
     if not prog:
         return False  # vacuous truth fired the premature battery (session 51)
     return all(LANDED_RE.search((r.get("note") or "").lower())
