@@ -93,6 +93,11 @@ pub mod residual_solve;
 /// and the collocation solve through the P1 banded factor.
 pub mod loft;
 
+/// The certified positive weight field of a delivered loft (CC-011-LOFT-WEIGHTS,
+/// spine S8 consumer): certify-or-refuse strict positivity of the homogeneous
+/// weight field, refining dyadically and returning the applied refinements.
+pub mod loft_weights;
+
 /// The Gordon Boolean-sum construction (CC-015-GORDON, spine S8 consumer):
 /// `S = S_u + S_v − S_uv` over a compatible profile/guide network, reusing the
 /// CC-010 loft machinery and its two direction factorizations.
