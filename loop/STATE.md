@@ -71,14 +71,24 @@ Updated 2026-09-05, session 52 (CC program COMPLETE - battery green).
 
 ## State of the machine, as left
 
-- cargoq RUNNING (port 8231), supervisor RUNNING (restarts driver +
-  cargoq + watchdog every 60s), driver cycling every 5 min (currently
-  dispatch-gated: rows all DONE, so it dispatches any READY row - the BIE
-  rows are hard-held).
-- Disk was ~27 GB free post-janitor. RAM cap: 4 workers with chrome
-  closed (re-derive on baseline change).
-- All work pushed: origin/main + origin/integration/kernel-bg at the
-  battery-green HEAD (plus the earlier truck-fork master sync).
+- cargoq RUNNING (port 8231), supervisor RUNNING (restarts driver + cargoq +
+  watchdog every 60s), driver cycling every 5 min.
+- **BIE wave 0 dispatched 2026-09-05 ~12:16**: BIE-000-CONTRACT in slot 0,
+  OCCT-HIGH-ROI-CLUSTER-001 in slot 1 (both deepseek-v4-flash). The driver's
+  rolling dispatch fills slots as deps land (cap 4); mechanical adjudication
+  + scoped-check merges are the driver's; the battery fires when every row is
+  LANDED.
+- **CARGO.LOCK PRUNE trap ROOT-CAUSED and fixed** (b684ee6, pushed): HEAD's
+  Cargo.lock carried a 17-line stale `showcases` package its committed
+  Cargo.toml never declared, so EVERY slot warm build re-dirtied the tree and
+  run_packet refused dispatch ("N uncommitted change(s)") — this is what made
+  the driver's 11:59 dispatch fail. Regenerated the lock against the
+  committed toml in a throwaway detached worktree and ff-merged. The main
+  tree still carries the OWNER's uncommitted showcases work (Cargo.toml
+  member + regenerated lock; stash "owner showcases wip" kept as backup) —
+  do not commit or revert it, it is render-side work.
+- All work pushed: origin/main + origin/integration/kernel-bg at b684ee6.
+- Disk/RAM: janitor active; cap 4 workers with chrome closed (unchanged).
 
 ## The parallelism picture
 
