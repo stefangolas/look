@@ -1,4 +1,4 @@
-# Autobuild loop - STATE
+﻿# Autobuild loop - STATE
 
 Rewritten at the end of every session. The **volatile** part - everything from
 "Where we are" through "The parallelism picture" - is capped at ~120 lines and
@@ -6,82 +6,87 @@ must be rewritten each time. "Traps" and everything below it is **stable and
 accumulates**: entries are added when something costs a session and removed only
 when they stop being true, never for length. If you are picking this up cold, read
 **this file, then
-[`loop/ORCHESTRATOR.md`](ORCHESTRATOR.md) for how to run the loop, then
+[`loop/ORCHESTRATOR.md`](ORCHESTRATOR.md)` for how to run the loop, then
 `python loop/slot_status.py`** - nothing else. Do not read `LEDGER.jsonl` whole.
 
-Updated 2026-09-04, session 51 (kernel v2 swarm CLOSE). **THE PROGRAM IS
-COMPLETE: 26/26 rows DONE, the one battery green, manifest filled.**
+Updated 2026-09-05, session 52 (CC program COMPLETE - battery green).
 
 ## Where we are
 
-- **Program**: kernel v2 swarm per `docs/KERNEL_V2_BUILD_SPEC.md` —
-  **CLOSED**. All 26 BG-KV2 rows are DONE in `loop/PACKETS.jsonl`; the
-  one-verify amendment's single battery (workspace tests + workspace
-  clippy + kernel-gates) went green at integrated HEAD
-  `fd65c24..HEAD battery at 45d9ad6+`; the wave manifest is derivable by
-  `python loop/scripts/wave_manifest.py --markdown` (registry, ledger
-  and git verified in agreement by `--check`).
-- Landed this program: the shim + waves 1-5 — identity/carriers (103,
-  104), the certified engine (201-207), the completeness protocol
-  (301-306), the overlap/self-intersection/fillet+canal/atlas tail
-  (401-405), and the Wave-5 bridge (501 enum boundary, 502 B-rep
-  promotion, 503 certify_claimed). 307 ENGINEREACH landed PARTIAL (3/5)
-  — the two S4A tracer tests are the booked follow-up packet (write
-  set: kernel/tracer.rs + tests/kernel_tracer.rs).
-- Normative deviation recorded in spec 5.10 (owner amendment): the
-  `SpineFrameSweep` enum payload carries the four whole-sweep fields
-  PLUS the per-face window domain on the closed value, spine on the
-  canonical `Box<Curve>` carrier (the constructive `Spine` enum is not
-  Clone/Serialize).
-- Battery environmental exclusions (evidence-carrying, in
-  `loop/overnight.py`): `bracket_tessellates_to_a_known_mesh` (verified
-  failing at base fd65c24 by throwaway worktree) and the ~63 clippy
-  findings in `src/formal/*` (zero commits since base).
+- **Program**: the CC program (certified construction: loft / offset-shell /
+  blend) per `docs/CERTIFIED_CONSTRUCTION_BUILD_SPEC.md` +
+  `docs/CERTIFIED_CONSTRUCTION_CONTRACTS.md` (the spine: C1-C9 decisions,
+  S1-S12 seams) is **COMPLETE: 27/27 rows DONE, one battery green at the
+  integrated HEAD** (workspace tests pass with the recorded environmental
+  exclusion, clippy clean on modified files, kernel-gates 111/111).
+- Theory: `docs/CERTIFIED_LOFT_AND_SHELL_THEORY_SPEC.md` (unified v1).
+- **What landed** (all in `vendor/truck/truck-certified/src/construct/` +
+  `truck-evidence/src/clear.rs` + additive `truck-base/src/bvh.rs`):
+  the six primitives (P1 banded certified solve, P2 injectivity radius,
+  P3 graph-disk, P4 argmin-with-margin, P5 ball clearance, P6 identity
+  via EntityId-keyed split registry), the loft family (core, L1r weights,
+  strips + bitwise L3 seams, correspondence, L5 three-valued validity,
+  Gordon), offset/shell (k=3 contact, strata, stars, S1/S1' bridge,
+  sharp/concave completion, canal, conservative t_safe), blends (spine
+  trace with event isolation, variable radius, face consumption, setback
+  corners), and the five B-rep generation defect fixes
+  (CC-DEF-BREP-FIXES: ORI-FRAME x2, SEM-FACET x2, NUM-INTERPOLE).
+- **Machinery added this program** (all in the loop/ harness, all
+  committed with reasoning): supervisor.py (restarts driver+cargoq+
+  watchdog), verifier-first battery gate (no dispatch until green),
+  merge-on-save registry, pending-archive + partial-code archive on
+  left-for-morning, semantic RESULT admission, dispatch_ready BIE/SEM
+  hard-hold + construct/mod.rs exemption, battery clippy parser takes the
+  primary span only, dispatch cap arithmetic re-derived (4 with chrome
+  closed).
+- **BIE program: STARTED 2026-09-05 ~12:15 by the session-53 orchestrator.**
+  Spine + 9 packets were already committed by the arming commit `2fcb1d5`
+  (13 commits back on integration/kernel-bg); all 46 packet anchors
+  re-measured with ZERO drift at `f49f64b` (BIE-000 A5 = 26, matching the
+  table; its stale RESULT template said 25, fixed); the 8 BIE rows flipped
+  BLOCKED→READY; dispatch_ready's BIE/SEM hard-hold guard REMOVED; SEM-PCURVE
+  stays BLOCKED (superseded by owner directive into OCCT-HIGH-ROI-CLUSTER-001,
+  one packet, registered READY, untracked packet committed this session).
+  Dispatch: BIE-000-CONTRACT (shim) + OCCT-HIGH-ROI-CLUSTER-001 first; rolling
+  dispatch handles the rest as deps land.
 
 ## Pick up here
 
-0. The machine state: cargoq + watchdog + overnight driver all idle;
-   disk ~30 GB free; sleep disabled (powercfg, session 51).
-1. The open follow-ups, in rough size order: the 307 follow-up packet
-   (S4A tracer tests, ~2h); a `draft_angle` front-door over the landed
-   ProfileLaw::Scale (thin); the render-path owner's
-   `bracket_tessellates_to_a_known_mesh` fingerprint refresh (look
-   crate, NOT kernel); the booked facet-sweep declaration amendment.
-2. The next PROGRAM candidates (all unbuilt, none booked): offset/shell
-   engine (~5.5k LOC per the old CG plan table), loft with
-   correspondence (~2.5k), BVH + interval distance (~1k, perf), the
-   certified second-derivative bounds (~1.5k). The wave/shim machinery
-   (ORCHESTRATOR wave-mode + build-spec spine workflow) is the tested
-   way to run any of them.
-3. The pyo3 binding translation remains booked and DEFERRED behind the
-   CG core.
-4. If running a new swarm: read ORCHESTRATOR's session-51 blocks first
-   (dispatch regime, RAM-cap arithmetic, one-verify, the battery gates)
-   — they are the current law; older conflicting text is marked
-   superseded in place.
+0. `python loop/dispatch_ready.py --dry-run` FIRST (it reads slot ground
+   truth). cargoq + watchdog + supervisor should be alive.
+1. **The BIE program is RUNNING** (see Where we are). Adjudicate slots as
+   they FINISH: scoped checks at merged HEAD, merge `--no-ff` into
+   integration/kernel-bg in spine §7 order, file RESULT to
+   loop/results/<ID>.json, ledger row, note `LANDED <sha>`; rows stay
+   RUNNING until the end-of-program battery. dispatch_ready keeps slots
+   full via the rolling posture. Milestones: push origin main +
+   integration/kernel-bg at the first BIE landing and at battery green;
+   leave one line in STATE when the BIE battery greens.
+2. Any new program: follow the CC pattern - spine doc with pre-made
+   decisions + frozen seams, CC-000-style shim packet, semantic-admission
+   driver, one-verify battery at the end.
+3. The GPU render-side work (bracket fingerprint refresh, draft
+   front-door) is still the render-path owner's, untouched by this
+   program.
 
 ## State of the machine, as left
 
-- cargoq RUNNING (port 8231); watchdog RUNNING (single instance, the
-  08:26 lineage); overnight driver EXITED after the green battery.
-- 6 slots exist (0-5), all FINISHED/IDLE with their workers done; slot
-  targets reclaimed by the janitor as the battery preflight.
-- Workers dispatch with the lean profile (lsp/formatter/snapshot/
-  autoupdate off, plugins + external skills off) via
-  `run_packet.py`'s `OPENCODE_CONFIG_CONTENT` — interactive sessions
-  are unaffected.
-- deepseek balance: watch for 402-class deaths (one mid-session).
+- cargoq RUNNING (port 8231), supervisor RUNNING (restarts driver +
+  cargoq + watchdog every 60s), driver cycling every 5 min (currently
+  dispatch-gated: rows all DONE, so it dispatches any READY row - the BIE
+  rows are hard-held).
+- Disk was ~27 GB free post-janitor. RAM cap: 4 workers with chrome
+  closed (re-derive on baseline change).
+- All work pushed: origin/main + origin/integration/kernel-bg at the
+  battery-green HEAD (plus the earlier truck-fork master sync).
+
 ## The parallelism picture
 
-The session-50 machinery is explicated in ORCHESTRATOR.md ("The cargo
-queue" + "Session-50 machinery"): cargoq (RAM queue server), janitor.py
-(disk service, wired into new_slot), dispatch_ready.py (the mechanical
-rolling dispatcher - RUN IT FIRST on pickup), LOOK_SHARED_TARGET,
-validate_survey.py, the one-verify amendment. Rolling dispatch + 6-wide +
-pipelined authoring measured ~3.3x the prior week's LOC rate; the queue
-ended the ENOMEM death class entirely.
-
-### Session 51 (the swarm CLOSE: 26/26, one battery, and the machinery that made it survivable) - paid in full
+Unchanged from session 50/51: cargoq serializes all cargo, rolling
+dispatch via dispatch_ready (write-set disjointness + anchor preflight),
+one-verify amendment (single battery at program end), wave workers scoped
+only. The CC program ran 6-wide at peak (warm slots, chrome closed) and
+held 4-wide as the steady state.
 
 - **cargoq ran every queued job in the SERVER's cwd, not the caller's.**
   The client sent only args+timeout; the server spawned without cwd=.
@@ -91,15 +96,15 @@ ended the ENOMEM death class entirely.
   --manifest-path calls were correct. Fix: client sends cwd per job,
   server spawns with it and logs [cwd=] per job. VALIDATION GAP: the
   session-50 two-job test checked ordering, not cwd. Also: the first
-  fix dropped the field in do_POST — watched fail via a probe project,
+  fix dropped the field in do_POST â€” watched fail via a probe project,
   watched pass end to end.
 - **The one-verify amendment was misread as permitting per-packet
-  verifies — 401 ran three, 405 six attempts, the largest sink of the
+  verifies â€” 401 ran three, 405 six attempts, the largest sink of the
   session.** The build spec says the ordinary verifier runs ONCE at the
   final integrated HEAD. ORCHESTRATOR's "On a verdict" is now marked
   SUPERSEDED for KV2 packets; the pre-battery landing standard is the
   orchestrator's own scoped checks (check -p + the packet's test file)
-  at merged HEAD — minutes, not hours. If a landing is blocked on more
+  at merged HEAD â€” minutes, not hours. If a landing is blocked on more
   than that, the gate is wrong, not the code.
 - **The battery's gates are baseline-aware, evidence-carrying.**
   Clippy: a finding fails only if its FILE changed since the program
@@ -113,12 +118,12 @@ ended the ENOMEM death class entirely.
   the matrix-algebra justification, neg_cmp_op_on_partial_ord is the
   D4 fail-closed discipline (a>=b is wrong on a partial order), and
   the frozen-shape result_large_err follows the graph.rs precedent.
-- **Per-worker rust-analyzer was the RAM killer (4.1 GB for two)** —
+- **Per-worker rust-analyzer was the RAM killer (4.1 GB for two)** â€”
   killed at source (`OPENCODE_CONFIG_CONTENT` lsp:false in the
   dispatch env) with a janitor backstop that kills only
   opencode-parented RAs by parentage. The full worker-lean profile
   also disables the autoformatter (which moves trailing // H-3 markers
-  off their literal line — a recorded GATE-2 hazard, not just
+  off their literal line â€” a recorded GATE-2 hazard, not just
   overhead), snapshots, autoupdate, share, plugins, and external
   skills scans. Validated live + selftest.
 - **The RAM cap is arithmetic, not folklore** (ORCHESTRATOR now says
@@ -140,12 +145,12 @@ ended the ENOMEM death class entirely.
   a LANDED packet was re-dispatched (307, twice); restart budget
   exhaustion left 501 dead with zero forensics. Now: single instance
   verified, the LANDED <sha> marker counts as done, and the AUTOPSY
-  (`loop/autopsy.py`) gates every restart from the second one —
+  (`loop/autopsy.py`) gates every restart from the second one â€”
   RAM_PRESSURE defers without spending budget, provider balance stops
   cold, SILENT_HANG recovers via `--resume-interrupted` (session
   survives, WIP intact) instead of a cold reset.
 - **dispatch_ready's dead-branch ran even under --dry-run** (observed:
-  a dry-run reset slot 2 and deleted its stale RESULT) — gated, and
+  a dry-run reset slot 2 and deleted its stale RESULT) â€” gated, and
   dry mode now reports DEAD dispatches instead of acting. Two more
   dispatch blockers: landed() ignored the LANDED marker on a READY row
   (402 stayed blocked on a merged packet), and new_slot died on
@@ -162,22 +167,22 @@ ended the ENOMEM death class entirely.
 - **The overnight driver** (`loop/overnight.py`) does mechanical
   adjudication only (complete/partial-0-fail + scoped check + merge;
   everything else left for morning) and fires the battery when every
-  row is LANDED and no slot is running. Its own bug — hardcoding
-  -p truck-certified for test targets — made 501 'fail' for an hour
+  row is LANDED and no slot is running. Its own bug â€” hardcoding
+  -p truck-certified for test targets â€” made 501 'fail' for an hour
   while the test passed 8/8 by hand; the crate now comes from the
   write path. Sleep was disabled (powercfg) after the recorded
   overnight-hang class; no workers hung overnight.
 - **307 ENGINEREACH landed PARTIAL (3/5)**: the engine work is real
   and green, but the two remaining S4A tests live in tracer.rs /
-  kernel_tracer.rs, outside the packet write_allow — the booked
+  kernel_tracer.rs, outside the packet write_allow â€” the booked
   follow-up packet widens it. The worker's stop conditions and the
   archived WIP patch (49 KB, loop/slots/0/abandoned-20260903-145502)
   are the record.
 - **Small trap, third costume**: PowerShell Set-Content writes a BOM
-  (UTF8) / mangles encodings — the 12-line H-3 marker edit initially
+  (UTF8) / mangles encodings â€” the 12-line H-3 marker edit initially
   wrote a BOM into a test file (caught by bytes 239 187 191, stripped
   before it cost a build); a later ASCII Set-Content would have
-  mangled the §-signs in atlas.rs doc comments. Edits go through the
+  mangled the Â§-signs in atlas.rs doc comments. Edits go through the
   Edit tool or a script FILE with explicit encoding, always.
 
 ### Session 50 (the v2 swarm spine; machinery + waves 0-4) - paid in full
@@ -234,10 +239,10 @@ ended the ENOMEM death class entirely.
 
 - **The orchestrator's errors dominate; two lint upgrades shipped.** Kept:
   ANCHOR_PREFIX_AMBIGUITY (a grep -c pattern occurring followed by an
-  identifier char is prefix-matching a longer name — hit three times in
+  identifier char is prefix-matching a longer name â€” hit three times in
   two packets; gen_packet --check caught the count each time but only
   after authoring). Retired with evidence: PROSE_API_SNIPPET fired 386
-  times across the historical corpus — pure noise; the class it targeted
+  times across the historical corpus â€” pure noise; the class it targeted
   (SPHERE's period-axis prose snippet) was caught by the packet's own
   stop-condition-3 worker source-read, not a lint. A regex cannot check
   prose API claims against the tree; the fix class is tree-aware or
@@ -245,14 +250,14 @@ ended the ENOMEM death class entirely.
 - **Registry rows were missed twice.** MAP: registration never written;
   land_packet's no-row WARNING caught it; repaired post-landing.
   DISPATCH: registration skipped by the same chained-command failure
-  that ate the dispatch confirmation — the FLOOR packet's DEPENDS_KNOWN
+  that ate the dispatch confirmation â€” the FLOOR packet's DEPENDS_KNOWN
   lint caught it. Rule re-confirmed: registration is a script-file step
   IN the dispatch sequence, never an afterthought; run
   `python loop/packet_lint.py` on packets that depend_on a packet you
   just dispatched.
 - **`if ($?)` after a Select-Object pipeline re-hit** (session-41 trap,
   third costume): `new_slot ... | Select-Object -Last 3; if ($?) {
-  run_packet }` skipped the dispatch silently — the pipeline "succeeded".
+  run_packet }` skipped the dispatch silently â€” the pipeline "succeeded".
   Slot forked, worker never started. Run dispatch as its own command and
   read its output.
 - **Anchor-authoring discipline**: write the expects by RUNNING the
@@ -503,7 +508,7 @@ ended the ENOMEM death class entirely.
 - **The watchdog auto-redispatched a BLOCKED packet and raced the live
   dispatch.** At 22:30:27 it saw session-40's long-finished P3 slot (stale
   pid 41932, events stagnant 11102s) as a "hard death" and redispatched
-  BG-CAD-P3-SPLIT (restart 2/3) — 4 seconds before my own dispatch of
+  BG-CAD-P3-SPLIT (restart 2/3) â€” 4 seconds before my own dispatch of
   RW-INTERIOR-LOOP, which then died with `PermissionError` on the
   `events.jsonl` unlink (the watchdog's worker held the log via its cmd
   shim's `>` redirect). The misdispatch burned an 11-minute worker run on
@@ -511,30 +516,30 @@ ended the ENOMEM death class entirely.
   `taskkill /PID <shim> /T /F` on the worker-cmd shim, then dispatch.
   TWO rules: **check `loop/watchdog.log` tail for ACTION lines before
   dispatching into any slot**, and note the `packet_is_done` guard only
-  protects DONE rows — a FINISHED slot holding a BLOCKED/READY packet's
+  protects DONE rows â€” a FINISHED slot holding a BLOCKED/READY packet's
   stale pid is exactly what its "hard death" heuristic cannot distinguish
   from a real one.
 - **A worker will write RESULT.json wherever convention suggests if the
   packet doesn't name the path.** The RW-RESEW worker wrote it to
   `wt/loop/results/RW-RESEW.json` (mimicking the filed-results layout)
   instead of the worktree root. The commit was clean and the gates were
-  green — only the RESULT placement was wrong. Packet fix: the RESULT
+  green â€” only the RESULT placement was wrong. Packet fix: the RESULT
   line in every future packet says "write RESULT.json AT THE WORKTREE
   ROOT". (Related, same session: I then DELETED the wt copy while
-  cleaning up the stray, and V0 correctly returned RUN_INCOMPLETE —
+  cleaning up the stray, and V0 correctly returned RUN_INCOMPLETE â€”
   verify reads the wt root copy; the repo-root copy exists only for
   land_packet's filing step. Both copies must exist at their moment of
   use.)
 - **The detached-verify recipe failed silently once** (0-byte out file, no
-  python process, no verdict — after the same Start-Process form had
+  python process, no verdict â€” after the same Start-Process form had
   worked three times earlier in the session). The foreground re-run
   passed all gates first try. Rule: if the detached verify's out file is
-  0 bytes a few minutes after launch, don't adjudicate anything — check
+  0 bytes a few minutes after launch, don't adjudicate anything â€” check
   for a live python, then re-launch in the foreground.
 - **Two V3 round trips from worker-written test code in one session**
   (RW-INTERIOR-LOOP: unused `TOL` const; RW-RESEW: four
   immediate-deref errors + the same unused `TOL`). Both were one-token
-  orchestrator amendments (`amended_by: orchestrator`), minutes each —
+  orchestrator amendments (`amended_by: orchestrator`), minutes each â€”
   the cheap path over redispatch, exactly as ORCHESTRATOR's session-3
   counterweight prescribes. Pattern: a worker's "clippy-clean" claim
   about its own diff is not reliable for NEW test files; if a packet
@@ -544,17 +549,17 @@ ended the ENOMEM death class entirely.
   matched nothing** (`Select-String` with no matches "succeeds"). Cost:
   P4's dispatch silently skipped once (`if ($?) { run_packet }` after a
   new_slot pipe) and the session-30 RESULT copy dance skipped its copy
-  once (land_packet then died at the filing step — the session-29 crash
+  once (land_packet then died at the filing step â€” the session-29 crash
   shape, but caused by MY guard, not the script). Use `$LASTEXITCODE`
   for native commands, or run the dispatch as its own command and read
   its output.
 - **The session-36 "second target inside the worktree" trap re-hit at
-  8.35 GB** (slot 1, P2-era buildup) — the reclaim that worked:
+  8.35 GB** (slot 1, P2-era buildup) â€” the reclaim that worked:
   `Remove-Item loop\slots\1\target` AND `loop\slots\1\wt\target`, then
   re-warm (1-6 min). Repo-root `target/` regenerated again from merged-
   HEAD test runs and was deleted again mid-session.
 - **RW-RESEW's diagnosis overturned the packet's mechanism AGAIN (the
-  second straight D1-style overturn, after RW-INTERIOR-LOOP)** — and both
+  second straight D1-style overturn, after RW-INTERIOR-LOOP)** â€” and both
   times the worker was right and the packet's design still held at the
   rule level. The actual refusing class for face-adjacent unions is three
   record classes the splitter rejects BEFORE the multi-component fold
@@ -562,11 +567,11 @@ ended the ENOMEM death class entirely.
   collect_sew's (Face,Edge) normalization refuses, and uncertified
   crossing FF lines); and the unification required direct wire rebuilds
   with seam-corner VERTEX substitution because `swap_edge_into_wire`
-  bails when end vertices differ — which they always do across distinct
+  bails when end vertices differ â€” which they always do across distinct
   solids. The lesson is now confirmed twice: **book the canonical rule
   and the acceptance, mandate the empirical localization, and expect the
   mechanism to be wrong in the worker's favor.**
-- **The butt-join union keeps 10 cosmetically-split faces — there is no
+- **The butt-join union keeps 10 cosmetically-split faces â€” there is no
   coplanar-face merging in the landed pipeline** (the M2 union likewise
   emits split annulus+disk). Any future packet asserting face-count
   equality across a union of separately-computed results must assert the
@@ -574,13 +579,13 @@ ended the ENOMEM death class entirely.
   is exact-box equality. P3's registry row carries this pre-decision.
 - **An exact-footprint halfspace box whose walls are coplanar with the
   solid's faces refuses `Contradictory(FragmentInsideOther)`** (mixed
-  instance parity under the landed seed rules) — the PADDED over-box
+  instance parity under the landed seed rules) â€” the PADDED over-box
   (P3's own D3 recipe) is the working construction. Pre-existing
   limitation, reproduced with the sew pass disabled; not caused by
   RW-RESEW.
 - **Packet-evidence files committed after the fork are absent from the
   worker's checkout** (SPEC_GAP2 was committed in the same commit as the
-  dispatch AFTER new_slot forked — the worker found neither it nor its
+  dispatch AFTER new_slot forked â€” the worker found neither it nor its
   sibling and worked from the packet's own derivation text). The
   session-39 scratch/ rule generalizes: every file the worker must read
   must be committed BEFORE `new_slot.py` runs, and the packet must quote
@@ -592,9 +597,9 @@ ended the ENOMEM death class entirely.
   circle-carrying solids must route around `Solid::mapped` until the
   topology constructor is fixed.
 - **The vertex-touch chase cost three worker runs and ended in a boundary
-  booking — the right call, and the pattern to copy.** RW-VERTEX-CLIP r1
+  booking â€” the right call, and the pattern to copy.** RW-VERTEX-CLIP r1
   (sweep filter + duplicate arcs), r2 (single-point certification + arc
-  dedupe — both machine-verified effective), RW-SEED-DIAGONAL (the
+  dedupe â€” both machine-verified effective), RW-SEED-DIAGONAL (the
   classifier): each stop was clean (instrumented, reverted, tree green)
   and peeled exactly one layer. When the third stop showed the remaining
   work was four un-pre-decided kernel decisions that conflict with
@@ -603,30 +608,30 @@ ended the ENOMEM death class entirely.
   Region2 Crossing screen), so the plan's deferred list took the
   four-link diagnosis and P3's test 3 asserts the typed refusal. The
   line between "loosening a gate" and "recording a real boundary" is
-  whether the refusal is a typed, diagnosed, documented envelope line —
+  whether the refusal is a typed, diagnosed, documented envelope line â€”
   the P3 packet's own test 7 set the precedent.
-- **Cargo runs against the WRONG TREE — the repo root lies after a slot
+- **Cargo runs against the WRONG TREE â€” the repo root lies after a slot
   commit.** I amended section.rs in the slot worktree, then ran
   `cargo test -p truck-shapeops` from the repo root (pre-P3 tree): "no
   test target named split_plane" and a green check that checked nothing.
   Every cargo command that grades a worker's work runs with the slot wt
   as the working directory (or --manifest-path). Also: my in-slot clippy
-  filter pattern `'src.section.rs'` never matched — the paths use
+  filter pattern `'src.section.rs'` never matched â€” the paths use
   backslashes (`src\section.rs`); grep for the basename, or don't filter
   at all and read the whole clippy output.
-- **Clippy reports findings in batches per run** — fixing five
+- **Clippy reports findings in batches per run** â€” fixing five
   indexing_slicing errors revealed three more (first/contains/
   type_complexity) only on the next run. The amendment loop is: fix ALL
   findings, run FULL clippy --all-targets unfiltered, THEN amend once.
   Three P3 verify round trips came from not doing this the first time.
 - **The V9 disk floor re-hit (7.4 GB) with a fresh failure shape**: the
-  verify passed V0-V8 and died computing the V9 look baseline — the
+  verify passed V0-V8 and died computing the V9 look baseline â€” the
   reclaim recipe in the error message is complete and current (both slot
   targets, wt-internal targets, %TEMP% baselines, worktree prune).
   Sufficient after the session's many builds: 10 GB free was enough for
   the V9 look baseline where 7.4 was not.
 - **A packet's test file must not reuse a LANDED test file's path.** P7's
-  packet booked its tests at `tests/fillet.rs` — which already held the
+  packet booked its tests at `tests/fillet.rs` â€” which already held the
   landed upstream fillet suite. The worker faithfully clobbered it; V5's
   identity guard caught the five vanished test names ("passed at base,
   absent now"). Recovery: restore the landed file byte-identical from
@@ -636,36 +641,36 @@ ended the ENOMEM death class entirely.
 - **`--base` is read off the slot's fork point, not "the last landing".**
   I verified P7 with `--base 5d8ff06` (the P6 landing) when the slot had
   forked at `f45f2be` (which included my own packet-commit): V1 rejected
-  the diff for `loop/PACKETS.jsonl` and the packet file — MY commits, not
+  the diff for `loop/PACKETS.jsonl` and the packet file â€” MY commits, not
   the worker's. The rule is mechanical: the base is the sha `slot_status`
   showed at dispatch time ("git=...@XXXX (=base)").
 - **Clippy findings arrive in BATCHES, and the verify's clippy flags
   differ from a plain run.** P7 took three V3 rounds: findings kept
   appearing because (a) clippy reports per-run batches, (b) my in-slot
   greps filtered for the wrong filename patterns, and (c) the verify runs
-  `cargo clippy --all-targets --message-format=short --no-deps` — a plain
+  `cargo clippy --all-targets --message-format=short --no-deps` â€” a plain
   run WITHOUT `--message-format=short --no-deps` hides test-crate findings
   behind dependency noise. The amendment loop that actually terminates:
   run the EXACT verify invocation unfiltered, fix ALL findings, re-run,
   and only then amend.
-- **The landed Torus::grad's interval dependency was P11's real blocker —
+- **The landed Torus::grad's interval dependency was P11's real blocker â€”
   and the probe found it in one afternoon.** The sqrt-free quartic form's
-  `4g·x' − 8R²x'` evaluates as two separate interval products and spans
+  `4gÂ·x' âˆ’ 8RÂ²x'` evaluates as two separate interval products and spans
   zero wherever it matters; the sqrt-form re-enclosure (same function,
   tight components) certifies perfectly. The plan's 7-8/10 "new solver
-  math" was actually a re-enclosure fix + a dispatch arm — because
+  math" was actually a re-enclosure fix + a dispatch arm â€” because
   `validated_ff` was already landed and generic. **Read the landed
   generic engines before rating a packet's difficulty.**
-- **The equator band r̂=R is chart-degenerate at EVERY scale** (the torus
+- **The equator band rÌ‚=R is chart-degenerate at EVERY scale** (the torus
   grad's xy-components vanish there; `cover_branch`'s chart is fixed per
   input cell and never re-charts), so torus pairs need the band-aware
   domain pre-split, and band-GRAZING contact curves are the booked v1
   refusal family. ALSO RECORDED: the landed `singular_events` returns
-  SPURIOUS points (violating f1 by ±3.67) on equator-band boxes — a
+  SPURIOUS points (violating f1 by Â±3.67) on equator-band boxes â€” a
   potential landed-stage defect, unreachable through the v1 entry's
   pre-split, booked for the stage's owner.
 - **PowerShell inline-pipeline data mangles silently** (backtick-n inside
-  single quotes written literally into files; `$(...)` evaluated early) —
+  single quotes written literally into files; `$(...)` evaluated early) â€”
   the session-40 rule now has a third costume: file edits go through the
   Edit tool or a script FILE, never inline `-c` or `-replace` chains, and
   cargo commands that grade worker work always run with the slot wt as
@@ -768,7 +773,7 @@ ended the ENOMEM death class entirely.
 - **The M1 construction's full circles are SINGLE SELF-LOOP EDGES; the
   boolean splitter's are seam-split halves - and a census hand-derived
   from one side about the other is wrong.** Extrude(Q)'s caps are
-  `[1]`-wire and its wall `[1,1]`-wire; Extrude(P−Q)'s caps are
+  `[1]`-wire and its wall `[1,1]`-wire; Extrude(Pâˆ’Q)'s caps are
   `[4,1]`; the boolean results carry `[2]`/`[2,2]`/`[4,2]` (the session
   -28 self-loop construction versus the splitter's seam cut). My M2
   packet stated the M1 side's census from the boolean side's numbers;
@@ -778,13 +783,13 @@ ended the ENOMEM death class entirely.
   carry it). Measure the thing you cite; the BG-NUM-002 rule applies to
   census numbers exactly as to arithmetic. The probe's `m2_compare`
   printed face COUNTS - the wire structure was inferred, not measured.
-- **The A−A self-pair design question is DECIDED and measured: the
+- **The Aâˆ’A self-pair design question is DECIDED and measured: the
   entry refuses it, and the refusal is the v1 boundary.** Running
   `boolean(A, op, A)` through the LANDED entry (the probe
   path-depends on vendor, so post-landing it drives the real code)
   yields `Err(UnsupportedEnvelope(ContactReductionDeferred))` for BOTH
   Union and Difference - the self-pair sweep's intra-solid adjacency
-  events (perpendicular side×cap Line records on shared edges, FE rim
+  events (perpendicular sideÃ—cap Line records on shared edges, FE rim
   coincidences, EE vertex sharings) are an event class no well-posed
   cross-solid input produces. The M2 battery asserts the refusal; the
   idempotence algebra was already pinned by mod.rs's
@@ -885,15 +890,15 @@ ended the ENOMEM death class entirely.
 - **Two parallel packets can EACH verify green at their own fork points
   and jointly break HEAD.** BG-SOL-S2-DISK-ORIENT and BG-SOL-RW2-SPLIT
   ran in parallel (session 36); each verified ACCEPTED against its own
-  base; after both merged, the flagship test FAILED at HEAD — the S2
+  base; after both merged, the flagship test FAILED at HEAD â€” the S2
   fix changed the extruded wall's boundary-wire direction and RW2's
   region checks were sensitive to it. NOTHING had run `cargo test` at
   merged HEAD: GATE-4 and kernel-gates cover the P-3 gates (fmt,
   clippy, tolerance), not test suites, and no verify runs at a commit
   nobody forked from. **After landing parallel packets whose write sets
-  interact semantically — even on disjoint files — run the affected
+  interact semantically â€” even on disjoint files â€” run the affected
   crates' tests at merged HEAD before writing the next packet against
-  it.** Recovery cost: one extra fix packet (BG-SOL-SPLIT-PERIODIC) —
+  it.** Recovery cost: one extra fix packet (BG-SOL-SPLIT-PERIODIC) â€”
   cheap only because the pre-dispatch probe caught it before RW3 was
   written against a broken flagship.
 - **A periodic parameter-frame mismatch is invisible to 2-D region
@@ -903,21 +908,21 @@ ended the ENOMEM death class entirely.
   around the periodic axis lives on a different branch, and the
   point-segment distance / containment tests read "not on boundary"
   for a point that is geometrically ON the boundary. The fix pattern:
-  re-test the QUERY at `p.x ± period` (three translates) wherever the
+  re-test the QUERY at `p.x Â± period` (three translates) wherever the
   query's frame and the polygons' frames can differ. `containment_screen`
-  still passes `None` (the two-face periodic Region2 case — coaxial
-  coincident cylinders) — a RECORDED limitation, the RW-COPLANAR
+  still passes `None` (the two-face periodic Region2 case â€” coaxial
+  coincident cylinders) â€” a RECORDED limitation, the RW-COPLANAR
   family's concern, not a bug to silently fix later.
 - **The pre-dispatch prototype is the cheapest defect-finder this loop
-  has — third confirmed instance of the num3-scratch discipline.**
+  has â€” third confirmed instance of the num3-scratch discipline.**
   `scratch/rw3probe` (a full classifier prototype over the landed
   splitter) caught: (a) the HEAD regression above (the probe's
-  `split_fragments` refused where the landed test "passed" — because
+  `split_fragments` refused where the landed test "passed" â€” because
   the landed test had never run at HEAD); (b) the degenerate-polygon
   wall fragment yields NO region representative (the seed-fallback
   rule: the lowest-index fragment whose representative resolves);
   (c) the `s_F = -1` degenerate case (a zero-area outer polygon makes
-  the wire-orientation sign meaningless — guard: refuse); and it
+  the wire-orientation sign meaningless â€” guard: refuse); and it
   validated the sign convention (`+1.0` exactly) and all five
   witnesses before a single worker token was spent. Compile it, RUN
   the witnesses, THEN write the packet with the measured numbers.
@@ -926,19 +931,19 @@ ended the ENOMEM death class entirely.
   worker corrected two numbers in my own test spec: "NINE fragments"
   where my own parts summed 7 + 3 = 10, and 17 adjacency entries where
   the ff-only event set (no FE sewing) leaves the rim uncut so b has 2
-  Same, not 3 — total 16. Both corrections arrived with derivations in
+  Same, not 3 â€” total 16. Both corrections arrived with derivations in
   the test comments and were right. Pre-checking the packet's own
   sums with a one-line python would have caught both; the mandate is
   the safety net that worked.
 - **PS 5.1 quoting failures have two more costumes.** (a)
-  `bash.exe -c "... $(grep ...)"` — PowerShell evaluates the
+  `bash.exe -c "... $(grep ...)"` â€” PowerShell evaluates the
   `$(...)` BEFORE bash sees it, so every grep "is not recognized";
   write the anchor script to a file and run it (the session-36
-  pattern, re-hit). (b) `Start-Process cmd /c "long string"` — a
+  pattern, re-hit). (b) `Start-Process cmd /c "long string"` â€” a
   positional-parameter binding error; the working form is
   `Start-Process cmd -ArgumentList '/c', '<command>' -WindowStyle
   Hidden` (the session-23 detached-verify recipe needs it).
-- **A verify launched at 11.4 GB free on a quiet machine is fine —
+- **A verify launched at 11.4 GB free on a quiet machine is fine â€”
   but only because the worker had exited.** The session-36 rule (never
   a verify alongside a live worker below ~15 GB) remains the
   load-bearing form; a quiet-machine verify at ~11 GB passed all gates
@@ -949,7 +954,7 @@ ended the ENOMEM death class entirely.
 - **A verify running CONCURRENTLY with a live worker dies at the 8 GB
   V9 floor even from a healthy start.** The S2-DISK-ORIENT verify was
   launched three times: V0-V4 passed every time, then the V5/V8/V9
-  baseline stages died at 5.6-6.7 GB free — the live RW2 worker's cargo
+  baseline stages died at 5.6-6.7 GB free â€” the live RW2 worker's cargo
   bursts consumed 2-3 GB between the launch (9.5 GB) and each floor
   check. The recovery that finally worked: WAIT for the worker to
   finish, then verify on a quiet machine (free space recovered to
@@ -959,17 +964,17 @@ ended the ENOMEM death class entirely.
   so a mid-build dip kills the attempt after the expensive gates already
   passed.
 - **A scratch crate under `scratch/` compiles the FULL dependency tree**
-  (wgpu, naga, ash, image...) into its own `target/` — the rwdiskprobe
+  (wgpu, naga, ash, image...) into its own `target/` â€” the rwdiskprobe
   design probes contributed to the mid-session 2.5 GB squeeze. The probes
   were worth every minute (they caught the silent S2 disk-wall
   orientation defect, verified the fix recipe, and verified Extrude(P))
-  — but DELETE the scratch target when the design session ends, and
+  â€” but DELETE the scratch target when the design session ends, and
   budget its disk before the first `cargo run`.
 - **A yaml anchor counting `#[test]` must use `grep -cF` (or escaped
   brackets).** `grep -c '#[test]'` is a REGEX where `[test]` is a char
   class: the line `#[test]` does not match (after `#` comes `[`, not
   t/e/s), so the anchor reads 0 and dispatch refuses. My anchor-check
-  script had the brackets escaped and the packet didn't — the same
+  script had the brackets escaped and the packet didn't â€” the same
   command in two layers disagreed. Fixed-string `-F` is the robust form.
 - **`unscaled_legacy_budget` is for TOL-shard site tables ONLY.** A
   non-shard packet that declares it is refused at dispatch ("no readable
@@ -977,8 +982,8 @@ ended the ENOMEM death class entirely.
   merely ADD tolerance sites (the rewrite's insertion geometry), OMIT the
   field and raise the ceiling for headroom instead; the true count
   ratchets down at landing. Both rewrite packets added ZERO new sites
-  (111 → 111): the workers routed tolerance checks through existing
-  contexts — do not assume a big budget need.
+  (111 â†’ 111): the workers routed tolerance checks through existing
+  contexts â€” do not assume a big budget need.
 - **land_packet.py's packet-path form must match what THIS verify.py
   recorded.** The session-30 backslash rule is stale: the current
   verify.py records forward slashes (`loop/packets/...`), and passing
@@ -987,9 +992,9 @@ ended the ENOMEM death class entirely.
   `packet` field and pass exactly that form.
 - **A REFUSAL test's premise needs machine-checking as much as an
   acceptance test's.** My RW2 packet's test 5 prose said the r=1.5 disk
-  "crosses the hole circle r=1 twice" — they are CONCENTRIC and never
+  "crosses the hole circle r=1 twice" â€” they are CONCENTRIC and never
   cross; the worker machine-checked, re-derived (neither region contains
-  the other ⇒ partial overlap), and reached the same required refusal
+  the other â‡’ partial overlap), and reached the same required refusal
   with the correct reasoning. The BG-NUM-002 rule applies to negative
   witnesses too.
 - **LEDGER.jsonl had accumulated pre-existing duplicate rows** (early
@@ -997,9 +1002,9 @@ ended the ENOMEM death class entirely.
   BG-ENC-002-CIRCLE, BG-SOL-S7-GFF-COVER, plus today's manual pair).
   Deduped keeping the authoritative (last, ACCEPTED) row per id; the
   removed rows remain recoverable in git history. land_packet.py does
-  NOT dedupe — if you hand-write a ledger row before landing, delete
+  NOT dedupe â€” if you hand-write a ledger row before landing, delete
   your row after (or let land_packet's row be the only one).
-- **`Face::debug_new` is banned in ADDED kernel lines (GATE-3/H-4)** —
+- **`Face::debug_new` is banned in ADDED kernel lines (GATE-3/H-4)** â€”
   the old divide_face pattern cannot be copied verbatim. The RW2 worker
   used `Face::new_unchecked` for fragment construction (validation is
   `Solid::try_new`'s job at assembly, RW4). Pre-existing `debug_new`
@@ -1087,18 +1092,18 @@ ended the ENOMEM death class entirely.
 
 - **A packet-spec math formula can be wrong, faithful workers implement it,
   and the operator it built stays wrong for years until a coupled system
-  arrives.** BG-NUM-003's spec line 148 wrote `d[r][c] = δ(r,c) −
-  y[r][c]·j[r][c]` — the Hadamard contraction — where standard Krawczyk
-  needs `δ(r,c) − Σ_k y[r][k]·j[k][c]`. Every early user (parametric
+  arrives.** BG-NUM-003's spec line 148 wrote `d[r][c] = Î´(r,c) âˆ’
+  y[r][c]Â·j[r][c]` â€” the Hadamard contraction â€” where standard Krawczyk
+  needs `Î´(r,c) âˆ’ Î£_k y[r][k]Â·j[k][c]`. Every early user (parametric
   projections) had near-diagonal Jacobians where the two agree, so the defect
   was invisible. This session's general FF slab system (a genuinely coupled
-  2×2) made `KrawczykProof::Unique` unreachable at ANY box scale and budget.
+  2Ã—2) made `KrawczykProof::Unique` unreachable at ANY box scale and budget.
   Two SPEC_GAP attempts of BG-SOL-S7-GFF-COVER pinned it down. The recovery
   was a kernel-fix packet (BG-NUM-003-CONTRACT) that corrects the operator
   and adds a coupled-system regression test asserting the OLD entrywise form
   would NOT have certified. Lesson: an interval-operator implementation is
   exactly the kind of code whose spec formula must be re-derived from first
-  principles — the matrix product is one tensor-index operation, and the
+  principles â€” the matrix product is one tensor-index operation, and the
   Hadamard form is what a hurried spec-writer produces.
 - **Dismissing a worker's numerical evidence because it contradicts your
   read of the code costs you a full SPEC_GAP round.** In S7 r1 the worker
@@ -1107,14 +1112,14 @@ ended the ENOMEM death class entirely.
   amendment ("r2") asserting the worker was wrong and the operator was fine.
   The worker then re-derived the entrywise contraction, produced a control
   measurement (the operator's own `Lin2` witness certifies because its
-  `I−Y∘J` row sums are 0.4 < 1), and proved the slab system's row sums were
-  1.12/3.24 — the operator really is entrywise. The correct order of
+  `Iâˆ’Yâˆ˜J` row sums are 0.4 < 1), and proved the slab system's row sums were
+  1.12/3.24 â€” the operator really is entrywise. The correct order of
   operations: when a worker's numerical claim about kernel code contradicts
   your code reading, write the tensor product out on paper BEFORE amending.
-  The `Σ_k` dropped out of the inner sum is one character and one session.
+  The `Î£_k` dropped out of the inner sum is one character and one session.
 - **A SPEC_GAP'd branch is not dead work: rebase it, re-verify it, land it.**
-  S7's r2 conversion (2×2 z-slab probe, exact 2×2 inverse, determinant
-  singular screen) was complete and correct — it failed ONLY on the operator
+  S7's r2 conversion (2Ã—2 z-slab probe, exact 2Ã—2 inverse, determinant
+  singular screen) was complete and correct â€” it failed ONLY on the operator
   defect. After BG-NUM-003-CONTRACT landed, rebasing the two S7 commits onto
   the fixed base and re-verifying ACCEPTED on the first try. The RESULT.json
   for the re-verify was reconstructed as an orchestrator record
@@ -1124,7 +1129,7 @@ ended the ENOMEM death class entirely.
 - **A stale anchor bites when the packet's own history contradicts it.**
   S7 r1's A3 pinned `grep -c 'gff' contact/mod.rs == 0`; by r2 the r1 commit
   had added `pub mod gff;`, so the anchor could not pass simultaneously with
-  the conversion instruction — the worker reported ANCHOR_MISMATCH as a
+  the conversion instruction â€” the worker reported ANCHOR_MISMATCH as a
   disagreement. An amendment to a packet that keeps its anchors must re-derive
   them against the WORKER'S branch, not against the pre-packet tree.
 - **Verbatim code in a packet must compile under the house lints.** The
@@ -1137,10 +1142,10 @@ ended the ENOMEM death class entirely.
 
 ### Session 32 (flake-family fixes + S5 lands) - paid in full
 
-- **A packet-spec bug is amended, not redispatched — but only because the
+- **A packet-spec bug is amended, not redispatched â€” but only because the
   amendment rule's scope was checked first.** BG-FIX-001's worker faithfully
   implemented the floor `.max(TOLERANCE)`, which makes near-zero comparisons
-  an effective `TOLERANCE² = 1e-12` — a million times stricter than the
+  an effective `TOLERANCEÂ² = 1e-12` â€” a million times stricter than the
   absolute tolerance the comment claimed to reproduce. Caught by review
   post-dispatch. ORCHESTRATOR.md sanctions amending a worker's own commit only
   when *the packet wrongly asked for it*, which is exactly this case; the fix
@@ -1151,7 +1156,7 @@ ended the ENOMEM death class entirely.
   passes under the original imply passes under the amendment.
 - **`tests_required` is diff-scoped keyword overlap against test fns ADDED IN
   THE DIFF.** A fix packet that lists PRE-EXISTING tests there fails V6
-  TEST_MISSING even when V5 passed — the gate cannot see tests it wasn't
+  TEST_MISSING even when V5 passed â€” the gate cannot see tests it wasn't
   promised as new. A packet that adds no test fns must ship `tests_required:
   []` and pin its stabilized tests in prose (V5's baseline diff covers them
   authoritatively anyway). Cost one full verify round trip on BG-FIX-001.
@@ -1163,16 +1168,16 @@ ended the ENOMEM death class entirely.
   verify**, and treat any verdict whose mtime predates the launch pid as
   absent.
 - **proptest's SourceParallel persistence turns ONE unlucky draw into a
-  permanent local failure — the poison mechanism behind repeated "newly
+  permanent local failure â€” the poison mechanism behind repeated "newly
   failing" verdicts.** When a property test fails anywhere inside a slot
   worktree, proptest writes `<test>.proptest-regressions` BESIDE THE TEST
   SOURCE inside `loop/slots/N/wt/vendor/...`; every later run replays that
   seed deterministically and fails, while V5's cached base baseline has a
-  frozen (lucky) pass — so the gate reports `newly failing` forever until the
+  frozen (lucky) pass â€” so the gate reports `newly failing` forever until the
   file is deleted. **Before EVERY re-verify: delete all UNTRACKED
   `*.proptest-regressions` files under the slot wt.** Distinguish them from
   TRACKED seed files committed long ago (they replay old, since-fixed seeds
-  and pass — e.g. `truck-evidence/tests/plane_properties.proptest-
+  and pass â€” e.g. `truck-evidence/tests/plane_properties.proptest-
   regressions`, which is tracked at base too; deleting THAT shows up as an
   uncommitted `D` and blocks V0 RUN_INCOMPLETE instead). Never commit fresh
   poison.
@@ -1195,30 +1200,30 @@ ended the ENOMEM death class entirely.
   silent-allowed deletion with `Test-Path` confirmation when being clean
   matters.
 - **A V5 baseline cache that caught a lucky pass stays dangerous even after
-  you know about it** — this session's first move (delete cache, re-verify)
+  you know about it** â€” this session's first move (delete cache, re-verify)
   hit the same wall from the other side: the FRESH base run also rolled dice,
   and the HEAD run rolled worse. Single-run comparisons of randomized suites
   are structurally incapable of attributing flaky failures; the durable exit
   is fixing the latent defects (BG-FIX-001/002 pattern), not waiting for
-  alignment. That judgment call — stop re-verifying, dispatch the property-fix
-  — is what actually unblocked the funnel.
+  alignment. That judgment call â€” stop re-verifying, dispatch the property-fix
+  â€” is what actually unblocked the funnel.
 ### Session 31 (Contact Layer funnel: S4 landed, S5 flake-blocked) - paid in full
 
 - **A known flaky proptest can flip from rare to persistent, and then it blocks
   the SAME packet three verifies while every other gate passes.** This session
   `truck-geometry/tests/nurbscurve.rs::concat_positive_test` (already recorded
   in BG-ENC-004-OFFSET's RESULT as "failed in one run, passed immediately on
-  re-run") went from rare to ~always-failing — reproduced 20/20 at BASE and 6/6
+  re-run") went from rare to ~always-failing â€” reproduced 20/20 at BASE and 6/6
   at the branch commit, on byte-identical sources. The V5 gate compares one
   HEAD run against a CACHED base baseline; deleting the cache and recomputing
   the baseline caught ANOTHER lucky pass, so V5 kept reporting `newly failing:
   concat_positive_test` even though the base genuinely fails it too. The packet
   provably cannot be the cause (it changed only `truck-evidence/src/contact/
-  mod.rs`; truck-geometry has no dependency on truck-evidence — verified by
+  mod.rs`; truck-geometry has no dependency on truck-evidence â€” verified by
   hashing the crate sources identical at both commits and the lockfile
   identical). **When a V5 rejection names a test in a crate the packet never
   touched AND the failure reproduces at base, the recovery is not "re-verify
-  until the flake aligns" — it is to prove the base-level failure (done) and
+  until the flake aligns" â€” it is to prove the base-level failure (done) and
   either wait for the flake to clear or fix the latent test defect with a
   property-fix packet.** Do not keep burning verifies on a persistent flake.
 - **A V5 baseline cache that caught a lucky pass is indistinguishable from
@@ -1232,12 +1237,12 @@ ended the ENOMEM death class entirely.
   baseline is telling the truth.
 - **The worker caught two infeasible witnesses in my own packet prose, and both
   were geometrically wrong in the same way (a line/point outside the carrier).**
-  S4's required test 1 example ("edge `(2,0,−1)→(2,0,2)` against the unit
+  S4's required test 1 example ("edge `(2,0,âˆ’1)â†’(2,0,2)` against the unit
   cylinder") is axis-parallel at radial distance 2 and never meets the radius-1
   wall; test 5's example ("vertical line `x=2, y=0` vs the unit circle") is off
   the circle. The worker corrected both (keeping the required names and
   assertions) and I machine-checked the corrections (the corrected witness
-  punctures at `t = √2/4`, point `(1/√2, 1/√2, 0)` — on the wall). This is the
+  punctures at `t = âˆš2/4`, point `(1/âˆš2, 1/âˆš2, 0)` â€” on the wall). This is the
   BG-NUM-002 rule ("hand-derived numbers in a packet must be machine-checked")
   applied to WITNESS GEOMETRY: a line/point is a predicate too, and a quick
   distance-vs-radius python check at packet-writing time would have caught both.
@@ -1275,7 +1280,7 @@ ended the ENOMEM death class entirely.
   RESULT.json uncommitted; `land_packet.py` would have died at the filing step.
   Before copying, `git -C loop/slots/N/wt ls-files | Select-String RESULT.json`
   told me it was untracked, so the copy-first dance applied: `Copy-Item
-  loop/slots/N/wt/RESULT.json` → repo root, re-run `land_packet.py`, then
+  loop/slots/N/wt/RESULT.json` â†’ repo root, re-run `land_packet.py`, then
   `Remove-Item` the root copy (the script's `git rm` only removes tracked
   files). The extra check (`ls-files`) is cheaper than reading the merge stat
   and answers the same question.
@@ -1297,7 +1302,7 @@ ended the ENOMEM death class entirely.
   never created because the file wasn't tracked. Recovery: copy
   `loop/slots/N/wt/RESULT.json` to the repo root, re-run `land_packet.py` (the
   second merge is a no-op "Already up to date"), then `Remove-Item` the root
-  copy — the script's own `git rm -q RESULT.json` only removes TRACKED files, so
+  copy â€” the script's own `git rm -q RESULT.json` only removes TRACKED files, so
   the untracked copy silently survives and would be the "untracked file would be
   overwritten by merge" trap for the NEXT landing. Check whether the worker
   committed RESULT.json (read the merge stat for a `create mode 100644
@@ -1316,22 +1321,22 @@ ended the ENOMEM death class entirely.
   The ORIENT packet's suggested face identification ("plane whose origin() has
   z==0.0 / 2.0 or x/y==0.0 / 4.0") cannot tell the bottom cap from a side face
   by origin alone. The worker disambiguated caps from sides by boundary-wire
-  count (caps carry 2 wires, sides 1) and recorded it in notes — correct, and
+  count (caps carry 2 wires, sides 1) and recorded it in notes â€” correct, and
   the packet's sample-point table was still usable once the dispatch is fixed.
   When a packet tells a worker how to identify faces, dispatch on wire count or
   surface type, not origin coordinates.
 
 ### Session 28 (M1 construction: S1 arrange + S2 extrude) - paid in full
 
-- **The plan's §4 target signatures are infeasible until validated against the
+- **The plan's Â§4 target signatures are infeasible until validated against the
   landed modules, and the SPEC_GAP is the cheap detector.** `extrude_profile(
   &Arrangement, height)` was booked in the plan, but the landed S1 arrangement
   carries no carrier geometry (`ArrHalfEdge.curve` is an index into the profile
   slice, which the arrangement-only signature never receives) and a full circle
-  is not determined by its seam vertex plus a 2π window. The S2 worker returned
+  is not determined by its seam vertex plus a 2Ï€ window. The S2 worker returned
   SPEC_GAP with the empirical proof (three unknowns, two constraints); the
   amendment added the `&[Curve]` argument and the plan doc now records it.
-  Lesson: a Phase-N packet that consumes a Phase-(N−1) module must anchor the
+  Lesson: a Phase-N packet that consumes a Phase-(Nâˆ’1) module must anchor the
   CONSUMING signature against the landed API (the anchors did catch the types;
   the signature's feasibility is the thing to double-check).
 - **S1 normalizes every loop to its CCW representative, so winding is
@@ -1343,8 +1348,8 @@ ended the ENOMEM death class entirely.
   future "winding decides materiality" assumption will hit the same wall.
 - **A single-wire face boundary containing a closed self-loop cannot close a
   shell.** The packet's cylinder wall `[circle, seam up, top circle, seam down]`
-  is not simple (the seam vertex appears twice → `NotSimpleWire`) and its seam
-  edges occur once in the shell → `shell_condition() != Closed`. The correct
+  is not simple (the seam vertex appears twice â†’ `NotSimpleWire`) and its seam
+  edges occur once in the shell â†’ `shell_condition() != Closed`. The correct
   construction (worker-verified, `Solid::try_new` Ok with 7 faces): the hole
   wall is an ANNULUS with two boundary wires (bottom + top circle self-loops)
   and NO seam edges; each circle edge is shared by exactly two faces with
@@ -1360,11 +1365,11 @@ ended the ENOMEM death class entirely.
   4/4 re-runs at the branch commit and the re-verify ACCEPTED. No
   `proptest-regressions` artifact was persisted this time. Before believing a
   V5 failure in a file the packet did not open, re-run at both commits.
-- **A packet's §1 "module NOT yet in the tree" prose goes stale the moment the
+- **A packet's Â§1 "module NOT yet in the tree" prose goes stale the moment the
   orchestrator scaffolds the module.** The S2 packet was written pre-scaffold,
   then the module was scaffolded before dispatch; the worker correctly refused
   to edit `lib.rs` (outside `write_allow`) and filled the existing file. When a
-  scaffold exists, the packet's §1 must say so and keep `lib.rs` out of the
+  scaffold exists, the packet's Â§1 must say so and keep `lib.rs` out of the
   write set.
 
 ### Session 27 (solver-family Phase 0) - paid in full
@@ -1373,7 +1378,7 @@ ended the ENOMEM death class entirely.
   not the cause.** Dispatching the 4-wide wave with cold slots (and slot 0
   still holding 9.5 GB of the previous packet's target residue) drove free
   disk to 6.5 GB; three workers died with `EUNKNOWN: unknown error, uv_spawn`
-  in `events.jsonl` — a process-spawn failure from resource exhaustion, not an
+  in `events.jsonl` â€” a process-spawn failure from resource exhaustion, not an
   API-balance death and not a code error. The recoveries worked (nothing was
   committed, so `new_slot.py` + `run_packet.py` redelivered cleanly), but the
   real fix is prophylactic: **delete a slot's old target residue at fork time,
@@ -1384,7 +1389,7 @@ ended the ENOMEM death class entirely.
   V8 runs the whole downstream workspace into the slot target (truck-base
   verify grew a target to 7.65 GB, truck-geometry to 5.84 GB). Two verifies at
   DIFFERENT bases ran concurrently this session and still drove disk to 3.1 GB,
-  and the second (SPAN) died at `compute_baseline`'s 8.0 GB floor — a harness
+  and the second (SPAN) died at `compute_baseline`'s 8.0 GB floor â€” a harness
   refusal, not a verdict. Recovery was freeing the landed PRED slot's target
   and re-running. **Run verifies sequentially always**, and free a landed
   slot's target before launching the next verify.
@@ -1394,16 +1399,16 @@ ended the ENOMEM death class entirely.
   `#[allow(clippy::unwrap_used, clippy::expect_used)]` is a second. Both REC
   and BVH workers hit this; REC kept the count at 1 by writing unwrap/expect-
   free tests, BVH let it become 2. The anchor's intent was "the H-1 header is
-  present", which is a presence check — count a stable string, or accept that
+  present", which is a presence check â€” count a stable string, or accept that
   the anchor is a pre-dispatch-only scaffold check and say so in the packet.
 - **Machine-check witnesses for f64 REPRESENTABILITY, not just exact rational
   arithmetic.** The orient2d escalation witness used `(1e16+1, 1e16+3)` as
-  integer literals; the exact-rational check computed det = −2 on the
+  integer literals; the exact-rational check computed det = âˆ’2 on the
   MATHEMATICAL integers, but `1e16+1`/`1e16+3` round in f64 to `1e16`/`1e16+4`,
-  making the actual float determinant +2e16 and the filter CONCLUSIVE — the
+  making the actual float determinant +2e16 and the filter CONCLUSIVE â€” the
   test could not exercise the escalation path it existed for. The worker
   caught it and substituted coordinates < 2^53 (all exactly representable)
-  preserving det = −2 and filter inconclusiveness. `Fraction`-checking the
+  preserving det = âˆ’2 and filter inconclusiveness. `Fraction`-checking the
   integer literals is not enough; check the f64 values the literal parses to.
 - **A parallel wave needs its shared vocabulary scaffolded BEFORE the wave, or
   the dependent packet defines its own copy and a post-merge amendment must
@@ -1505,19 +1510,19 @@ ended the ENOMEM death class entirely.
 - **The watchdog's default 1200s wedged-killer kills healthy workers during a
   model-latency storm.** Session 13's endpoint had 23-60+ minute silence gaps
   from boot on three workers; the shipped default killed two of them mid-think
-  (both later passed verify after redispatch — the kills cost ~25 min each).
+  (both later passed verify after redispatch â€” the kills cost ~25 min each).
   Start it with `LOOK_WATCHDOG_STAGNANT=3600`, and note **PowerShell 5.1's
-  `Start-Process` has no `-Environment` parameter** — launch through
+  `Start-Process` has no `-Environment` parameter** â€” launch through
   `cmd /c "set LOOK_WATCHDOG_STAGNANT=3600&& python loop/watchdog.py"` or the
   variable silently never reaches the child.
 - **The watchdog reaps on its own events-growth clock, not yours.** PARCYL's
   first worker looked 67 minutes stale from outside, but the run_packet boot
   touches the events file again after the worker's first write, so the
   watchdog's 3600s clock started ~13 minutes later than the file mtime
-  suggested — and the reap fired at exactly `stagnant=3610s` (log,
+  suggested â€” and the reap fired at exactly `stagnant=3610s` (log,
   14:24:10). A reap that looks hours late usually is not: read the log's
   `stagnant Ns` field before concluding the timer failed. Related: a wedged
-  worker keeps its `cmd.exe` shim alive, so a pid check alone says RUNNING —
+  worker keeps its `cmd.exe` shim alive, so a pid check alone says RUNNING â€”
   the underlying `opencode run` node process is the one that matters.
 - **Whether a worker commits `RESULT.json` varies, and it changes the landing
   dance.** Four of session 13's six left it uncommitted in the worktree (copy
@@ -1527,8 +1532,8 @@ ended the ENOMEM death class entirely.
   `create mode 100644 RESULT.json` line means the committed flavor.
 - **Derive every pair's algebra to the end before fixing shared enum arms.**
   Session 13 added `Curves(Vec<ExactCurve>)` for coaxial torus families it
-  believed could meet in four circles, then proved — one line of algebra
-  later — that outer and inner contacts are mutually exclusive and share the
+  believed could meet in four circles, then proved â€” one line of algebra
+  later â€” that outer and inner contacts are mutually exclusive and share the
   squared equation, capping every family at two. The arm was added and
   dropped in two commits. Arms are cheap before dispatch and impossible
   after; so is the algebra that justifies them.
@@ -1537,13 +1542,13 @@ ended the ENOMEM death class entirely.
   verifies inside a backgrounded shell wrapper whose harness cap is 600 s. A
   verify takes longer than that. The wrapper was killed mid-build, all three
   child verifies died with it, and three baseline worktrees (~1.3 GB) and three
-  stale `loop/slots/N/verify.pid` files were left behind — the exact leak
+  stale `loop/slots/N/verify.pid` files were left behind â€” the exact leak
   ORCHESTRATOR.md already warns about, walked into anyway. **Launch a verify
   detached** (`Start-Process` on Windows) so no caller's timeout can reach it,
   and poll `loop/slots/N/VERDICT.json` for the result instead of waiting on the
   process. Recovery, if it happens again: `git worktree remove --force` each
   `%TEMP%/look-verify-baseline-*/wt`, `rm -rf` the parents, `git worktree
-  prune`, `rm -f loop/slots/*/verify.pid`. Nothing is lost — the packet branches
+  prune`, `rm -f loop/slots/*/verify.pid`. Nothing is lost â€” the packet branches
   are untouched and the verify just re-runs.
 - **Never run two verifies at the same base concurrently.** They each build a
   baseline keyed by (base commit, test set) and will race on it, and "a baseline
@@ -1558,7 +1563,7 @@ ended the ENOMEM death class entirely.
   normal cone axis". It does not: `Processor::subs` evaluates
   `entity.subs(v, u)` and `der_mn` swaps the orders *and* the arguments, so the
   parameters are transposed. A packet written to the description would have
-  produced an enclosure that does not contain its own surface — an
+  produced an enclosure that does not contain its own surface â€” an
   under-estimation, which BG-ENC-001 calls a silent wrong answer, and one that
   the *sampling* test would have caught only if the test box were asymmetric.
   The same ten minutes in `processor.rs` also turned up the projective divide in
@@ -1567,15 +1572,15 @@ ended the ENOMEM death class entirely.
   running a command") applied to prose about types, where it is easiest to skip
   because the prose is confident and specific.
 - **A `grep 'pub fn '` misses `pub const fn` and will convince you a type has no
-  getters.** Every accessor `BG-ENC-004` needed — `Processor::entity`,
+  getters.** Every accessor `BG-ENC-004` needed â€” `Processor::entity`,
   `transform`, `orientation`, `ExtrudedCurve::entity_curve`,
   `extruding_vector`, `RevolutedCurve::origin`, `axis`, `Offset::entity`,
-  `offset` — is `pub const fn`. Grep `pub \(const \)\?fn`.
+  `offset` â€” is `pub const fn`. Grep `pub \(const \)\?fn`.
 - **Pseudocode in a packet must satisfy the lints the packet mandates.** Three
   ENC-004 packets specified a guard as `if !(cn > rho)`, and the same packets
   mandate `clippy -D warnings`, under which `neg_cmp_op_on_partial_ord` rejects
   exactly that. Two workers rewrote it to `cn <= rho` and reported it in
-  `notes` — correctly, but the two forms **differ on NaN** (`!(x > y)` is true,
+  `notes` â€” correctly, but the two forms **differ on NaN** (`!(x > y)` is true,
   `x <= y` is false), so the rewrite is only safe because an explicit
   `!cn.is_finite()` guard sits beside it. That was checked in the landed code
   rather than taken from the notes, and it held in all three. The lesson is
@@ -1586,7 +1591,7 @@ ended the ENOMEM death class entirely.
   `RUNNING` and `DONE`, so a packet whose dependencies were all satisfied but
   which had been found undispatchable listed as eligible **forever**.
   `BG-INV-107` was reclassified BLOCKED in session 10 and was reported
-  dispatchable in every frontier from then until session 12 — that is where the
+  dispatchable in every frontier from then until session 12 â€” that is where the
   "17 eligible" and "16 eligible" counts came from, both inflated. Filing
   `BG-ENC-004-OFFSET` BLOCKED made it two. A status the scheduler does not know
   is a status that does not exist; putting the reason only in `note` does not
@@ -1601,17 +1606,17 @@ ended the ENOMEM death class entirely.
   V3 is scoped to the **lines the diff added** (clippy) and the **files the diff
   changed** (fmt); V5 to the **test fns the diff added**.
 - **The fmt half of V3 was whole-crate for five sessions** and cost
-  BG-NUM-001-FILLET its sixth rejection — on a file the packet never opened and
+  BG-NUM-001-FILLET its sixth rejection â€” on a file the packet never opened and
   *could not have fixed*, because it was outside its own `write_allow`. That
   combination is the signature of a gate defect: when the only way to get green
   is to violate another gate, it is not the worker who is wrong. Fixed in
-  `ec34aa0`. **fmt is scoped by file, not by line** — rustfmt reports where its
+  `ec34aa0`. **fmt is scoped by file, not by line** â€” rustfmt reports where its
   diff *context* starts, several lines above the text it wants to change, so
   intersecting those numbers with added lines both misses real findings and
   invents absent ones.
 - **`git grep` exits 1 when it matches nothing, and under `set -o pipefail`
   that kills the whole script.** GATE-4's first run on a clean tree exited 1
-  with **zero output** — every earlier gate unreported, indistinguishable from
+  with **zero output** â€” every earlier gate unreported, indistinguishable from
   a crash. The `|| true` inside the command substitution is load-bearing.
 - **`kernel-gates.sh` reads `HEAD`, not the worktree.** Staging a probe is not
   enough to trip GATE-4; the negative test has to commit. This matches V4's
@@ -1627,7 +1632,7 @@ ended the ENOMEM death class entirely.
   and workers check them with whatever grep they have. Verify anchors yourself
   before dispatch; do not write a packet that shells out to `rg`.
 - **Dead code looks exactly like live code.** `truck-shapeops/src/fillet/
-  experiment.rs` holds 5 tolerance sites and is not compiled — `fillet/mod.rs`
+  experiment.rs` holds 5 tolerance sites and is not compiled â€” `fillet/mod.rs`
   carries `//mod experiment;`. A fifth of the SHAPEOPS shard would have been
   unverifiable edits to a file nothing builds. Check that a module is actually
   declared before putting it in a write set.
@@ -1636,7 +1641,7 @@ ended the ENOMEM death class entirely.
   compares nothing, so it has no `model`/`param` classification, and a
   mechanical migration would have produced nonsense that still compiled.
 - **Legacy `.near()` is componentwise; `ToleranceCtx::near_pt` is Euclidean.**
-  Not the same predicate — Euclidean is stricter by up to `sqrt(3)`. Every Stage-A
+  Not the same predicate â€” Euclidean is stricter by up to `sqrt(3)`. Every Stage-A
   shard is therefore a small deliberate tightening. A test that moves because of
   it is a finding to report, never a tolerance to widen.
 - **A write set has to cover the ripple, not just the edit.** BG-NUM-001-FILLET
@@ -1646,7 +1651,7 @@ ended the ENOMEM death class entirely.
 - **A ceiling a packet can raise is not a ratchet.**
   `scripts/unscaled_legacy_ceiling.txt` is deliberately outside every shard's
   `write_allow`; the orchestrator raises it before dispatch and lowers it after.
-**Already fixed in the harness — do not undo these.** Each cost a session; the
+**Already fixed in the harness â€” do not undo these.** Each cost a session; the
 reason is in the commit that made the change, and the code will not tell you.
 
 - **V5 uses `--no-fail-fast`**: without it cargo stops at the first failing test
@@ -1655,32 +1660,32 @@ reason is in the commit that made the change, and the code will not tell you.
 - **V5 diffs a cached baseline** rather than scoping to added lines the way V3
   does: a test failure is not located in the diff, and scoping it there
   discards regression detection instead of noise.
-- **V0 allow-lists `*.obj` specifically** rather than ignoring untracked files —
+- **V0 allow-lists `*.obj` specifically** rather than ignoring untracked files â€”
   `cargo test` drops mesh dumps into the worktree the verifier is judging, but
   an uncommitted new `.rs` is exactly what V0 exists to catch.
 - **V0 exists because an interrupted run reads as a perfect one**: a worker that
-  dies mid-packet leaves its edits uncommitted, an empty diff that passes V1–V6.
+  dies mid-packet leaves its edits uncommitted, an empty diff that passes V1â€“V6.
 - **The dispatch uses `CREATE_NO_WINDOW | CREATE_NEW_PROCESS_GROUP |
   CREATE_BREAKAWAY_FROM_JOB`, never `DETACHED_PROCESS`**, which silences the
   worker it is meant to free, and writes its redirect into a command file
   because `opencode` is a `.cmd` shim with an 8191-char command line. **Run
   `python loop/selftest_dispatch.py` after touching any of this.**
-- **V4 hardcodes Git Bash** — a bare `bash` is the WSL stub.
+- **V4 hardcodes Git Bash** â€” a bare `bash` is the WSL stub.
 - **`slot_status.py --kill-stalled`** reaps anything silent for 12 min; only
   `events.jsonl` growth distinguishes a hang from a worker thinking.
 - **`autotests = false` in truck-polymesh**: a new test file there needs an
   explicit `[[test]]` entry or it silently never runs. V6 flags this.
-- **`truck_base::evidence`, not `truck_evidence`** — the module lives in
-  truck-base to avoid a geotrait→evidence cycle.
+- **`truck_base::evidence`, not `truck_evidence`** â€” the module lives in
+  truck-base to avoid a geotraitâ†’evidence cycle.
 
 - **This loop can eat 40 GB of disk in one session, and did.** Free space went
-  40 GB → **0.1 GB**. Two causes, both in the verifier. Every V9/V5 baseline
+  40 GB â†’ **0.1 GB**. Two causes, both in the verifier. Every V9/V5 baseline
   builds a *whole extra workspace* in a throwaway worktree under the system
   temp dir, and `compute_baseline`'s cleanup is best-effort with a comment
-  calling a leftover "harmless" — it is not, each one is ~1.3 GB and they
+  calling a leftover "harmless" â€” it is not, each one is ~1.3 GB and they
   accumulate per distinct (base, test-set) key. And a probe that edits
   `truck-base` invalidates every downstream crate, so a slot's `target/` grew
-  4.4 → 12.9 GB across three negative-test runs. Recovery is easy and total:
+  4.4 â†’ 12.9 GB across three negative-test runs. Recovery is easy and total:
   delete `loop/slots/*/target` (a slot re-warms in 1-3 min) and any
   `%TEMP%/look-verify-baseline-*`, then `git worktree prune`. **Check
   `Get-PSDrive C` before a run of repeated verifies, not after.**
@@ -1692,8 +1697,8 @@ reason is in the commit that made the change, and the code will not tell you.
   main worktree and delete the probe branch as part of the probe, not after it.
 - **Dead text looks exactly like live code, and it reached a packet.** The
   SHAPEOPS site table listed `fillet/mod.rs:615`, which sits inside a `/* */`
-  block spanning lines 500–662. The worker migrated a comment, as instructed,
-  and said so plainly — it was right and the packet was wrong. `git grep` and
+  block spanning lines 500â€“662. The worker migrated a comment, as instructed,
+  and said so plainly â€” it was right and the packet was wrong. `git grep` and
   the census both counted it, and GATE-4 counted the resulting phantom scaffold
   call. The census now skips `/* */`; **a module declared out with a commented
   `mod` statement still slips through** (`experiment.rs`, 5 sites), because
@@ -1705,7 +1710,7 @@ reason is in the commit that made the change, and the code will not tell you.
 - **A raw grep for tolerance sites is off by 3x, in both directions.**
   `python loop/census_tol_sites.py` splits them: **238 production predicates**,
   plus 66 doc-comment examples, 4 `#[strategy = TOLERANCE..]` test-input bounds,
-  2 in-src test assertions and 22 squared-order sites — none of which are
+  2 in-src test assertions and 22 squared-order sites â€” none of which are
   migration work. truck-modeling reads as 34 sites and has **11**; truck-topology
   reads as 14 and has **4**; truck-meshalgo was recorded here as 375 and has
   **45**, so it never needed the split earlier sessions planned. Size a shard
@@ -1717,15 +1722,15 @@ reason is in the commit that made the change, and the code will not tell you.
   decided something. Fix the spec *and* the packet; never only the packet.
 - **CI gates are still vacuous.** `kernel-gates.sh` is diff-scoped and
   `origin/main` has no `vendor/truck/`, so CI passes on nothing. Packet
-  verification is unaffected — its baseline is the branch tip.
+  verification is unaffected â€” its baseline is the branch tip.
 
 - **A packet's budget is a claim about the repo, and claims rot.** Session 7
   found two in one packet: the anchor table was **wrong when written** (3 of 7
-  counts, on files unchanged since before the packet existed — so not drift),
+  counts, on files unchanged since before the packet existed â€” so not drift),
   and `unscaled_legacy_budget` was an estimate ("about 12 here") against a true
   19. Both would have been caught by running a command instead of reading a
   file. `run_packet.py` now refuses to dispatch when GATE-4's count plus the
-  declared budget exceeds the ceiling **committed on the slot's own branch** —
+  declared budget exceeds the ceiling **committed on the slot's own branch** â€”
   raising it on `integration/kernel-bg` after the slot forked does nothing.
 - **The budget is one context per FUNCTION with a site, not per site or per
   file.** `census_tol_sites.py <path-fragment>` prints it. Keying those
@@ -1737,7 +1742,7 @@ reason is in the commit that made the change, and the code will not tell you.
   `truck-geometry/tests/bspcurve.rs::parameter_random_tests` fails
   occasionally by ~3e-6 against a 1e-6 tolerance; it did so once during
   GEOM-SPECIFIEDS' verify, in a file the packet never opened. 12 subsequent
-  runs — 6 at base, 6 on the branch, with the failing seed present — all
+  runs â€” 6 at base, 6 on the branch, with the failing seed present â€” all
   passed. **Before believing a V5 failure in a file the packet did not touch,
   re-run it at both commits.**
 - **A gate that blocks its own retry turns a flake into a permanent
@@ -1748,21 +1753,21 @@ reason is in the commit that made the change, and the code will not tell you.
 - **Backticks in a `git commit -m` message are command substitution.** A commit
   message quoting a command name in backticks hung the shell for two minutes and
   committed nothing. Write the message to a file and use `-F`.
-- **Two workers on write-disjoint packets run concurrently without trouble** —
+- **Two workers on write-disjoint packets run concurrently without trouble** â€”
   first demonstrated in session 7 (slots 0 and 1, both editing `truck-geometry`
   but disjoint files). The open question about concurrency was about the *free*
   model tier and is still open.
 
 - **A survey's `proposed_rewrite` can be right about the class and wrong about
   the code, and the schema is what lets it happen.** One row, one rewrite. When
-  a source line carries two predicates of different classes —
-  `if !previous_uv.x.near(&current_uv.x) && surface.uder(u, v).so_small()` — the
+  a source line carries two predicates of different classes â€”
+  `if !previous_uv.x.near(&current_uv.x) && surface.uder(u, v).so_small()` â€” the
   survey classified for the deciding test and proposed
   `ctx.is_small_len(surface.uder(u, v).magnitude())`, which is the correct
   migration of that predicate and **silently deletes the guard**. The worker knew
   and said so in its own `reason`; it had nowhere else to put it. Four of the 26
   rows were like this, and they are exactly the four it marked `confidence: low`
-  — the confidence field worked. The survey template now carries
+  â€” the confidence field worked. The survey template now carries
   `predicates_on_line` and `mixed_classification`, and requires
   `proposed_rewrite` to replace the **whole condition**. **When reviewing a
   survey, grep the source lines for a second predicate token before trusting any
@@ -1770,9 +1775,9 @@ reason is in the commit that made the change, and the code will not tell you.
 - **`model` means degree ONE in length, and nothing enforces that.** A
   cross-product magnitude is twice a triangle's area; a `Matrix3::determinant()`
   of two displacements and a unit direction is a scalar triple product. Both
-  scale as `k²` while `ctx.length_margin()` scales as `k`, so
-  `ctx.is_small_len(area)` is exactly correct at Stage A — where `model_scale =
-  1.0` makes the two identical — and silently wrong the moment Stage B threads a
+  scale as `kÂ²` while `ctx.length_margin()` scales as `k`, so
+  `ctx.is_small_len(area)` is exactly correct at Stage A â€” where `model_scale =
+  1.0` makes the two identical â€” and silently wrong the moment Stage B threads a
   real scale. **That is worse than not migrating**, because Stage B sees a
   migrated site and never looks again. Six such sites in `truck-meshalgo` were
   proposed as `model`; a worker on an earlier shard had already hit the identical
@@ -1782,12 +1787,12 @@ reason is in the commit that made the change, and the code will not tell you.
   classification's own justification contains "area" or "length-squared", it is
   not `model`.**
 - **Recognise a squared-order site by its CONSTANT, not by its shape.**
-  `d.distance2(c) <= TOLERANCE * TOLERANCE` is *not* the `near2` family — it is
+  `d.distance2(c) <= TOLERANCE * TOLERANCE` is *not* the `near2` family â€” it is
   algebraically `distance <= TOLERANCE`, an ordinary first-order predicate
   written squared to skip a `sqrt`, and it migrates. What cannot migrate is a
   comparison against `TOLERANCE2` = 1e-12, because nothing on `ToleranceCtx`
   reproduces that number. The survey excluded a live site by getting this
-  backwards, and the census miscounts the same line in the other direction —
+  backwards, and the census miscounts the same line in the other direction â€”
   its SQUARED regex matches the `TOLERANCE2` *token* and not a written-out
   `TOLERANCE * TOLERANCE`.
 - **A `const` item is never a migration site.** `pub const FOO: f64 = TOLERANCE;`
@@ -1795,7 +1800,7 @@ reason is in the commit that made the change, and the code will not tell you.
   Same for a `use` import, a `.max(TOLERANCE)` floor and a `+ TOLERANCE` offset:
   they compare nothing, so they have no class. Their *consumers* are the sites.
   This is the same family as the spatial-hash bucket pitch already recorded, and
-  it is much wider than that one instance — four of `truck-meshalgo`'s 30 census
+  it is much wider than that one instance â€” four of `truck-meshalgo`'s 30 census
   "production predicates" are value computations, not predicates.
 - **`census_tol_sites.py` cannot see a constant whose name ends in
   `_TOLERANCE`.** Its pattern needs a word boundary before `TOLERANCE` and `_` is
@@ -1809,7 +1814,7 @@ reason is in the commit that made the change, and the code will not tell you.
 - **`--skeleton` and `--check` disagreed with each other, and `--check` won.**
   `gen_packet --skeleton` computed `unscaled_legacy_budget` from the survey's live
   rows (16) while `--check` validated it against the census function count (20),
-  and `run_packet.py` refuses to dispatch on the mismatch — so **no
+  and `run_packet.py` refuses to dispatch on the mismatch â€” so **no
   survey-derived packet could be dispatched at all**. The census counts every
   function holding a grep hit, including ones whose only hits a packet correctly
   excludes, so the two numbers diverge by construction, not by error. The budget
@@ -1818,18 +1823,18 @@ reason is in the commit that made the change, and the code will not tell you.
   gate that will eventually reject correct work.**
 - **Resolve a packet's site table against the tree, not against its own text.**
   The first version of that budget parser keyed on the function name and read
-  `BG-TOL-001-STEPIO` as 10 contexts against a true 15 — reproducing the exact
+  `BG-TOL-001-STEPIO` as 10 contexts against a true 15 â€” reproducing the exact
   undercount already in the traps (five distinct `fmt` impls in
   `truck-stepio/src/out/geometry.rs` collapsing to one). It was also brittle
   across packet styles: MESHALGO's generated table states the class in the row
   and STEPIO's states it in the section heading, so a regex tuned to one counts
   zero rows in the other and reports a mismatch that is the parser's. Resolving
   `(file, line)` to the enclosing `fn`'s definition line fixes both and checks
-  one more thing for free — a table line that lands outside any function does not
+  one more thing for free â€” a table line that lands outside any function does not
   resolve, so an invented line number cannot pad a budget.
 - **A green line can state something false.** Watching the new budget gate fail
   on "budget above the census ceiling" showed it printing
-  `budget 25 <= census ceiling 20  ok` — the comparison silently used the counted
+  `budget 25 <= census ceiling 20  ok` â€” the comparison silently used the counted
   value instead of the declared one. The real error was caught by the other half
   of the same check, so nothing leaked; the message was wrong anyway, and a
   wrong-but-green line is exactly what a later session reads and believes. **Read
@@ -1841,14 +1846,14 @@ reason is in the commit that made the change, and the code will not tell you.
   prose needs the same line.
 - **`new_slot.py` can exceed a two-minute tool timeout and still have
   succeeded.** It warms a cold slot, which takes ~5.6 min. A timeout is not a
-  failure — check `slot_status.py` and `git worktree list` before re-running it,
+  failure â€” check `slot_status.py` and `git worktree list` before re-running it,
   or you will fork a second worktree onto the same branch.
 
 - **"`Plane` implements `BoundedSurface` despite being unbounded" is false, and
   it reached a packet as a stated fact.** `Plane::parameter_range` is
   `(Bound::Included(0.0), Bound::Included(1.0))` on both axes; `range_tuple`'s
   `.expect(UNBOUNDED_ERROR)` cannot fire on it. `Cylinder` and `Cone` are the
-  ones that are unbounded — `(Bound::Unbounded, Bound::Unbounded)` in `v` — so
+  ones that are unbounded â€” `(Bound::Unbounded, Bound::Unbounded)` in `v` â€” so
   the panic the claim described is real and lives on the other types. The worker
   that was told this contradicted it in its `RESULT.json` notes and was right.
   **The packet asked for that judgement explicitly** ("report whether Plane's
@@ -1982,41 +1987,41 @@ reason is in the commit that made the change, and the code will not tell you.
 - **A scratch crate outside the repo needs the repo's `.cargo/config.toml`
   rustflags** (`[target.'cfg(target_arch = "x86_64")']
   rustflags = ["-Ctarget-feature=+avx,+fma"]`) or inari 2.0.0 fails to
-  compile with `cannot find function sub1_ru` — its directed-rounding SIMD
+  compile with `cannot find function sub1_ru` â€” its directed-rounding SIMD
   backend `compile_error!`s without AVX+FMA, and there is no per-crate
   mechanism. Cost twenty minutes of misdiagnosis (the repo builds it
   "somehow") before the config file was remembered.
 - **PowerShell has no `grep`, and anchor counts must be verified under the
-  same shell the worker uses** — write a small `.sh` and run it through
+  same shell the worker uses** â€” write a small `.sh` and run it through
   `"C:\Program Files\Git\bin\bash.exe"`; Select-String counts can silently
   disagree with grep's on regex-escaping grounds. (PowerShell also mangles
   inline `grep -c '...'` quoting entirely.)
 - **A multiline `python -c` through PowerShell mangles embedded quotes**
-  — the heredoc trap in its `-c` form, hit twice more this session. Write
+  â€” the heredoc trap in its `-c` form, hit twice more this session. Write
   patch scripts to files and run the files. ALWAYS.
 - **inari division by a zero-containing divisor returns the ENTIRE
-  interval, not EMPTY** (measured: `[-1,1]/[-1,1] = [-inf,inf]`) — safe to
+  interval, not EMPTY** (measured: `[-1,1]/[-1,1] = [-inf,inf]`) â€” safe to
   rely on where a straddling divisor legitimately means "unbounded", but
   an explicit `contains(0.0)` guard reads better and is what the ISC packet
   mandates.
 - **`new_slot.py` surviving a tool timeout does NOT mean the warm build
-  finished** — session 17's slot-1 fork succeeded while the killed warm
+  finished** â€” session 17's slot-1 fork succeeded while the killed warm
   build left the target at 0.72 GB. Harmless: dispatch anyway and let the
   worker's first cargo pay the warm cost. The thing to check after a
   timeout is `git worktree list` (no duplicate fork), not the target size.
 - **A grep-measured ripple list rots in BOTH directions.** The MIGRATE row
-  over-included (modeling/integrate/meshalgo-src: no edits needed — the
+  over-included (modeling/integrate/meshalgo-src: no edits needed â€” the
   `mapped` signatures are unchanged) and under-included (a live `set_curve`
   in `fillet/mod.rs`, the set_curve in meshalgo's TEST file where the row
   named the src file, and the mutex-reach in `invariants/same_parameter.rs`
   which landed after the row was filed). Re-derive every ripple against the
   live tree; a row filed months ago is a hypothesis, not a fact.
 - **A dangling `needs` entry is invisible forever.** BG-NUM-002/003 listed
-  `BG-NUM-001` but the row's id is `BG-NUM-001-FILLET` — both rows were
+  `BG-NUM-001` but the row's id is `BG-NUM-001-FILLET` â€” both rows were
   permanently unschedulable and nothing reported it. When a row "should" be
   eligible but `schedule.py` disagrees, print its `needs` against the actual
   id set before assuming a scheduler bug. (A five-line python check now
-  exists in spirit — re-run one whenever the frontier looks too small.)
+  exists in spirit â€” re-run one whenever the frontier looks too small.)
 
 - **Most of this machine's missing disk is not the loop's.** Session 9 found
   **19 GB** of regenerable junk in `%TEMP%`: 118 `chrome-lite-*` throwaway
@@ -2049,7 +2054,7 @@ reason is in the commit that made the change, and the code will not tell you.
   GATE-2 is a text gate on the diff: any *added* line with a bare `1e-N`
   literal fails unless that line ends `// H-3`. It cannot tell an angle from a
   length and it does not exempt tests. `BG-CE-006-ENUM-r3` lost a verify to one
-  such line, `BG-ENC-002-LINE` to one, and `BG-ENC-002-CIRCLE` to six — three
+  such line, `BG-ENC-002-LINE` to one, and `BG-ENC-002-CIRCLE` to six â€” three
   packets, three round trips, one cause. A packet that says "named consts; a
   `// H-3` same-line opt-out if a bare float is ever unavoidable" in its test
   section is **not** enough: it reads as a style note. The four remaining
@@ -2058,7 +2063,7 @@ reason is in the commit that made the change, and the code will not tell you.
   RESULT.json. Copy that section into every new kernel packet.
 - **The watchdog cannot tell a landed slot from a dead worker.** After
   `land_packet.py` moves RESULT.json out of the worktree, a finished slot has
-  no pid, no RESULT.json and no event growth — Rule B exactly. It redispatched
+  no pid, no RESULT.json and no event growth â€” Rule B exactly. It redispatched
   `BG-ENC-002-LINE` minutes after that packet merged, and the new worker took a
   lock on `events.jsonl` that made the next real dispatch die with
   `PermissionError: [WinError 32]`. Fixed by asking PACKETS.jsonl: a slot whose
@@ -2106,8 +2111,8 @@ reason is in the commit that made the change, and the code will not tell you.
 
 - **A sampling property test must clamp its grid into the box it quantifies
   over.** `plane_enclose_is_sound` sampled `u0 + (u1-u0)*20/20` at the last
-  grid index — a multiply-then-divide round trip that landed one ulp ABOVE
-  `u1` (seed `e2369bfc`: 1.6356989675203588 → 1.635698967520359) — and the
+  grid index â€” a multiply-then-divide round trip that landed one ulp ABOVE
+  `u1` (seed `e2369bfc`: 1.6356989675203588 â†’ 1.635698967520359) â€” and the
   point evaluated there escaped Plane's correctly-rounded affine box by one
   ulp. The enclosure was sound the whole time; the same-tree
   interval-induction argument never failed, and the "escape" was the test
@@ -2123,38 +2128,38 @@ reason is in the commit that made the change, and the code will not tell you.
   branch.** After a SPEC_GAP or a dead run, resetting the slot with
   `--reset` leaves the branch sitting on the old commits, so the next
   worker builds on top of them (tracked QUESTION.md/RESULT.json ride into
-  the diff → V1 rejection) and measures against a stale base. The correct
+  the diff â†’ V1 rejection) and measures against a stale base. The correct
   redispatch sequence is `new_slot.py --slot N --branch packet/<ID>` (which
   re-forks onto integration HEAD) **then** `run_packet.py` (no `--reset`
   needed on a clean fresh fork). Session 14 paid one worker kill for
-  learning this — caught it only because `slot_status` showed the old
+  learning this â€” caught it only because `slot_status` showed the old
   commit instead of `(=base, no work)` after the redispatch.
 
 - **A handoff's "loose ends" list rots as fast as any other prose.** Session
   14's handoff said BG-TOL-001-SMALL was "still unadjudicated, not
-  mergeable unverified" — the registry and ledger said it was DONE two
+  mergeable unverified" â€” the registry and ledger said it was DONE two
   sessions earlier (`8f4f04d`, ACCEPTED, merged as `901f0ac`, fault GATE).
   The leftover branch ref `72e2b89` on the pre-landing base is what fooled
   the handoff. **Read `PACKETS.jsonl` and `LEDGER.jsonl` for status, never
-  the handoff's own summary of them** — and never start a rebase/verify of
+  the handoff's own summary of them** â€” and never start a rebase/verify of
   an "unadjudicated" packet without that check first.
 
 - **A decisive boundary classification needs dyadic data on the PRIMARY
   parameters, and multi-step interval polynomials never degenerate.**
   inari rounds every intermediate outward, so a polynomial expression of an
-  exact-zero quantity evaluates to `[−ε, 0]` or `[0, ε]`, never `[0, 0]` —
+  exact-zero quantity evaluates to `[âˆ’Îµ, 0]` or `[0, Îµ]`, never `[0, 0]` â€”
   `decisively_zero` can only fire on short exactly-representable chains.
   The PCONE parabola rule died on this (spec amendment entry 4). The
   escape: classify on the primary parameters with a scale-free invariant,
-  and choose witnesses with **integer raw normals and a dyadic slope** —
-  `tan α = 3/4` is dyadic where `sin α = 3/5` is not, and no nontrivial
+  and choose witnesses with **integer raw normals and a dyadic slope** â€”
+  `tan Î± = 3/4` is dyadic where `sin Î± = 3/5` is not, and no nontrivial
   Pythagorean triple has a power-of-two hypotenuse, so no unit vector with
   dyadic components exists at all. The same arithmetic limits apply to any
   future "exactly on the boundary" witness.
 
 - **Verify a packet's own arithmetic with a command before dispatch.** The
-  amended PCONE packet stated a witness plane `q = (−3, 0, 5)` whose stated
-  cross product `(4, 0, 3)` belongs to `q = (−3, 0, 9)`; the worker caught
+  amended PCONE packet stated a witness plane `q = (âˆ’3, 0, 5)` whose stated
+  cross product `(4, 0, 3)` belongs to `q = (âˆ’3, 0, 9)`; the worker caught
   it (the fourth worker correction of the session, and the second one in a
   packet the orchestrator wrote). Ten seconds of Python on the cross
   product at packet-writing time would have caught it. The
@@ -2165,13 +2170,13 @@ reason is in the commit that made the change, and the code will not tell you.
   until the tool's timeout, and the launched process survives the kill.**
   Every verify launch this session "timed out" at the tool cap while the
   verify ran to completion and wrote its verdict. The correct response is
-  to poll the artifact (`VERDICT.json`, `verify.out`), never to re-launch —
+  to poll the artifact (`VERDICT.json`, `verify.out`), never to re-launch â€”
   a second verify at the same base races the first on its baseline cache.
 
 - **Composing enclosures: never forward an unbounded parameter box into an
   inner carrier's `enclose`.** The landed surface carriers' behavior on
-  non-finite input boxes is not uniform — `bspline.rs`'s `hull_of` returns
-  the EMPTY box for non-finite `tt` (its "non-finite → empty" rule reads
+  non-finite input boxes is not uniform â€” `bspline.rs`'s `hull_of` returns
+  the EMPTY box for non-finite `tt` (its "non-finite â†’ empty" rule reads
   NaN and ENTIRE the same way), so a composition that forwards
   `Interval::ENTIRE` inward can under-estimate the whole thing. Decide the
   out-of-range answer yourself, at the composition boundary (PCURVE's
@@ -2185,7 +2190,7 @@ reason is in the commit that made the change, and the code will not tell you.
   edit made through PowerShell left `EF BB BF` at the head of
   `PACKETS.jsonl`; `read_text(encoding="utf-8")` then prefixes line 1 with
   U+FEFF, `json.loads` raises `ValueError`, and the `except` in
-  `packet_is_done` returns `False` — so **every packet reads not-DONE and
+  `packet_is_done` returns `False` â€” so **every packet reads not-DONE and
   Rule B will redispatch a landed one.** At 01:53 it redispatched the
   already-merged `BG-ENC-004-PCURVE` onto the freshly forked
   `packet/BG-TOL-004` branch, where a worker dutifully re-verified the
@@ -2201,36 +2206,36 @@ reason is in the commit that made the change, and the code will not tell you.
   resets the *worktree* but not `worker.pid` / `worker.packet` /
   `worker.branch` in the slot root, so a forked-but-not-yet-dispatched slot
   presents the previous packet's dead pid and stagnant events to the
-  watchdog — which Rule-B's the *previous* packet onto the *new* branch
+  watchdog â€” which Rule-B's the *previous* packet onto the *new* branch
   (`run_packet.py` does not re-fork; that half is the older trap). The
   PCURVE misdispatch needed both halves of this: stale slot files AND the
-  BOM-blinded DONE check — with the registry intact, `packet_is_done` would
+  BOM-blinded DONE check â€” with the registry intact, `packet_is_done` would
   have held. **Fork and dispatch in one motion; if a forked slot must be
   left idle, delete its `worker.pid` / `worker.packet` / `worker.branch`
   first.**
 - **Machine sleep reads as stagnation, and the watchdog reaps on wake.**
   The watchdog's clock is wall time; sleep freezes `events.jsonl` but not
-  the clock, so a worker that slept 6.9 h (02:10–08:45, the heartbeat gap
+  the clock, so a worker that slept 6.9 h (02:10â€“08:45, the heartbeat gap
   in `watchdog.log` is the signature) presents exactly like a wedged one
-  and is killed and redispatched on the first poll after wake — CE-001
+  and is killed and redispatched on the first poll after wake â€” CE-001
   attempt 1 died this way having done nothing wrong. The workers
   themselves survive sleep and resume fine. **If the machine will sleep
   (lid close, overnight), stop the watchdog first** (pid in
   `loop/watchdog.lock`) and restart it when the session resumes; restart
   budgets absorb one such reap, but each one wastes a worker's progress.
 
-- **V8 reads a flaky proptest as a regression too — proven this session,
+- **V8 reads a flaky proptest as a regression too â€” proven this session,
   and the recovery has a path trap.** BG-INV-102's first verify REJECTED
   on V8 via `truck-modeling/src/geom_impls.rs::test_circle_arc_tangent0`
-  (a `#[property_test]`). The packet changed one unreferenced leaf module —
-  impossible — and replaying the pinned seed at BASE proved it: the seed
-  (p0/p1 both on the z-axis, `t = 0.9999789572401523`, so p2 ≈ p1 and
+  (a `#[property_test]`). The packet changed one unreferenced leaf module â€”
+  impossible â€” and replaying the pinned seed at BASE proved it: the seed
+  (p0/p1 both on the z-axis, `t = 0.9999789572401523`, so p2 â‰ˆ p1 and
   `circum_center` is ill-conditioned) fails 4/4 at base too. The property
-  is missing a precondition on `t` near 0/1 — a latent truck-modeling
+  is missing a precondition on `t` near 0/1 â€” a latent truck-modeling
   defect outside every write set. Recovery: delete the slot worktree's
   `proptest-regressions/` artifact and re-verify (fresh seeds pass 8/8).
   **THE PATH TRAP: the regression artifact is a DIRECTORY
-  (`proptest-regressions/geom_impls.txt`), not a flat file — copying it to
+  (`proptest-regressions/geom_impls.txt`), not a flat file â€” copying it to
   the flat path makes the replay run silently draw FRESH seeds and
   "pass", invalidating the experiment.** Reproduce at the right path
   before believing any pinned-seed result. Same disease family as the V5
@@ -2238,16 +2243,16 @@ reason is in the commit that made the change, and the code will not tell you.
   truck-modeling.
 
 - **The RESULT.json landing dance has three flavors, and over-cleaning
-  costs recoveries.** (a) Uncommitted: copy worktree → repo root BEFORE
+  costs recoveries.** (a) Uncommitted: copy worktree â†’ repo root BEFORE
   `land_packet.py` (it reads the root after the worktree check). (b)
-  Committed: your untracked root copy BLOCKS the merge — remove it, land
+  Committed: your untracked root copy BLOCKS the merge â€” remove it, land
   (the merge brings RESULT.json in tracked), then delete the root copy
   again. (c) If you delete the worktree copy too early: committed ones
   restore with `git -C <slot wt> checkout -- RESULT.json`; UNCOMMITTED
-  ones are recoverable VERBATIM from the worker's session transcript —
+  ones are recoverable VERBATIM from the worker's session transcript â€”
   `events.jsonl` records the write tool call with the full content
   (`part.state.input.content`). **Never reconstruct a RESULT.json from
-  memory or from a truncated read — the worker's reasoning must stay
+  memory or from a truncated read â€” the worker's reasoning must stay
   verbatim.** A land attempt that fails at the merge step has NOT filed
   anything; re-run it after fixing the collision.
 
@@ -2255,20 +2260,20 @@ reason is in the commit that made the change, and the code will not tell you.
   Session 16's INV packets were designed from scratch-crate perspective and
   all three wave-1 workers caught the same class: `Shell` takes THREE type
   parameters (`Shell<P, C, S>`, no default), `Shell` lives at the crate
-  root (`use crate::Shell`, not `crate::shell::Shell` — shell.rs only
+  root (`use crate::Shell`, not `crate::shell::Shell` â€” shell.rs only
   privately glob-imports it), `use truck_topology::*` is E0432 from inside
   the crate (use `use crate::*`), and `#[derive(Default)]`-only types trip
   `missing_debug_implementations` in truck-topology but not in a scratch
-  crate. The workers' `disagreements` field caught every one — packets that
+  crate. The workers' `disagreements` field caught every one â€” packets that
   name API signatures must invite disagreement explicitly, and the
   orchestrator should write in-crate sketches as if from inside the module.
 
-- **A checker that calls another crate's API needs the manifest edge — and
+- **A checker that calls another crate's API needs the manifest edge â€” and
   nobody had landed it.** BG-INV-104 attempt 1 was a clean SPEC_GAP: the
   worker implemented the whole checker, hit E0432 on `use
-  truck_evidence::…`, reverted to baseline and asked. The fix is
-  `truck-topology → truck-evidence` (+ `inari`; `truck-geometry` as
-  dev-dep) — acyclic, since evidence does not depend on topology — landed
+  truck_evidence::â€¦`, reverted to baseline and asked. The fix is
+  `truck-topology â†’ truck-evidence` (+ `inari`; `truck-geometry` as
+  dev-dep) â€” acyclic, since evidence does not depend on topology â€” landed
   by the amended packet as decision 0 (manifest + lock in write_allow, the
   BG-CE-003 serde_json precedent). Spec amended: the edge is the intended
   layering. Any future invariants-tree checker speaking interval
@@ -2278,11 +2283,11 @@ reason is in the commit that made the change, and the code will not tell you.
   `events.jsonl` right after printing "Running packet" is BENIGN.** The
   worker launched and opened the events log before run_packet's own
   post-launch cleanup could reset it; the crash is orchestrator-side
-  bookkeeping only. Check `slot_status.py` — a fresh pid and growing
+  bookkeeping only. Check `slot_status.py` â€” a fresh pid and growing
   events means the dispatch took; do NOT re-run it.
 
 - **`grep -rc PATTERN dir | wc -l` counts FILES, not matches** (GNU grep
-  prints one line per file, zero-count files included) — two packet
+  prints one line per file, zero-count files included) â€” two packet
   anchors were written with it this session and one was caught by
   `run_packet.py`'s own pre-dispatch anchor check (the A3 refusal, fixed
   before any worker was paid), the other by manual verification. The
@@ -2293,11 +2298,11 @@ reason is in the commit that made the change, and the code will not tell you.
   scratch RUN (not just compiled) the whole design: it found the carriers'
   terminal-strip convergence defect (a BG-ENC-002 violation, spec
   amended), measured the bisection cost model that forced the two-route
-  design (130 µs/cell → minutes per edge at tau=1e-6), and caught f64
+  design (130 Âµs/cell â†’ minutes per edge at tau=1e-6), and caught f64
   having neither Eq nor Hash. The discipline for design packets: compile
   it, then RUN the flagship witnesses and the cost, then write the packet
   with the measured numbers in it. The one thing the scratch could NOT
-  cover was in-crate compilation (the trap above) — the workers covered
+  cover was in-crate compilation (the trap above) â€” the workers covered
   that half, exactly as the disagreements field was designed for.
 
 ## The commands
@@ -2321,15 +2326,15 @@ python loop/selftest_dispatch.py                # prove the dispatch works (~40s
 ```
 
 Dispatch is fire-and-forget by design: a worker runs for tens of minutes, and
-anything that waits on it is a long-lived process that can be killed — when one
+anything that waits on it is a long-lived process that can be killed â€” when one
 was, it took its worker down mid-run. Poll instead. Run `verify.py` with a long
 timeout (or in the background); it takes about four minutes on a warm slot, more
 with V5's `--no-fail-fast` running every test binary.
 
 `verify.py` exits **0 ACCEPTED**, **1 REJECTED** (the work is wrong), **2
-BLOCKED** (the run never finished — reset the worktree and redispatch;
+BLOCKED** (the run never finished â€” reset the worktree and redispatch;
 nothing is implied about the worker's code), or **3 PARTIAL** (`--only` was
-used — see below). Environment: Windows, `cargo`, and Git Bash at
+used â€” see below). Environment: Windows, `cargo`, and Git Bash at
 `C:\Program Files\Git\bin\bash.exe`. The harness itself is Python 3
 stdlib-only (`loop/*.py`).
 
@@ -2339,12 +2344,12 @@ since every other gate reads the diff between base and HEAD and that's
 meaningless if the run didn't finish. This exists for the amend-and-verify
 path: editing one test file to re-check V5 used to pay for a full 4-6 minute
 cycle (V2, V3, V4, and the whole suite) even though nothing else changed. A
-partial run can never report ACCEPTED — its verdict is always `PARTIAL`
+partial run can never report ACCEPTED â€” its verdict is always `PARTIAL`
 (exit 3) no matter what the requested gates found, because acceptance is a
 claim about the whole packet and nothing about re-checking one gate tells
 you the others still hold.
 
-## Quick reference — enough to write and judge a packet without another file
+## Quick reference â€” enough to write and judge a packet without another file
 
 A packet is one markdown file whose YAML front block the verifier parses. Only
 these fields are read mechanically; everything else in the file is prose aimed
@@ -2381,11 +2386,11 @@ untouched worker output.
 The prose sections that make a packet work, in the order they earn their keep:
 **Problem** (one paragraph, why this is reachable from untrusted geometry);
 **Anchors** (a table of `rg` patterns with exact expected counts, verified the
-day the packet is written — H-8); **decisions already made for you** (every
+day the packet is written â€” H-8); **decisions already made for you** (every
 judgement you can pre-make, so the worker churns rather than designs);
-**Template** (the nearest landed diff to copy — BG-S0-001's work in
+**Template** (the nearest landed diff to copy â€” BG-S0-001's work in
 `truck-modeling/src/geometry.rs` is the house pattern); **Tests required**;
-**Done when** (the exact commands — run touched `--test <stem>` targets, not
+**Done when** (the exact commands â€” run touched `--test <stem>` targets, not
 `--lib --tests`, on this tree); **Forbidden**; **Stop conditions**
 (`ANCHOR_MISMATCH`, `SPEC_GAP`, `BLOCKED`) and the `RESULT.json` shape.
 
@@ -2393,15 +2398,15 @@ The gates, in the order `verify.py` runs them:
 
 | gate | asks |
 |---|---|
-| V0 preflight | did the run finish — commit past base, clean *tracked* tree, RESULT.json or QUESTION.md |
+| V0 preflight | did the run finish â€” commit past base, clean *tracked* tree, RESULT.json or QUESTION.md |
 | V1 scope | is every changed file in `write_allow` |
 | V2 build | `cargo check --locked -p <crates>` |
 | V3 lint | `cargo fmt --check`, then clippy findings **on the added lines only** |
-| V4 house rules | `scripts/kernel-gates.sh <base>` — H-1/H-3/H-4, diff-scoped |
+| V4 house rules | `scripts/kernel-gates.sh <base>` â€” H-1/H-3/H-4, diff-scoped |
 | V5 tests | `cargo test -p <crates> --lib --tests --no-fail-fast`, FAIL only on **added** test fns |
 | V6 test-reality | does every `tests_required` name appear as a real test fn in the diff |
-| V7 mutation | stub — always passes |
-| V8 no-regression | stub — always passes |
+| V7 mutation | stub â€” always passes |
+| V8 no-regression | stub â€” always passes |
 
 ## The CE chain, scoped against the tree (session 9)
 
@@ -2410,7 +2415,7 @@ Seven of the nine BG-INV checkers gate on `BG-CE-003` through
 what the tree says about the last two, as opposed to what the spec says.
 
 - **`BG-CE-001` is mostly assembly and its design is already written.** The
-  spec gives the struct verbatim — add `pcurve: Option<PC>` beside the
+  spec gives the struct verbatim â€” add `pcurve: Option<PC>` beside the
   existing per-use `orientation`, with `PC = ()` defaulting so `None`
   reproduces today's behaviour. truck's `Edge` is *already* a coedge. The
   work is a wide ripple: **25 files mention `Edge<` across six crates**
@@ -2418,29 +2423,29 @@ what the tree says about the last two, as opposed to what the spec says.
   That write set is determinable now and getting it wrong is the single most
   common cause of a V1 rejection in this loop.
 - **`BG-CE-002`'s certification is real math and is not assembly**:
-  `‖Γ_f(pc_u(t)) − c_e(φ_u(t))‖ ≤ τ_e` for **all** t by interval evaluation
+  `â€–Î“_f(pc_u(t)) âˆ’ c_e(Ï†_u(t))â€– â‰¤ Ï„_e` for **all** t by interval evaluation
   over the whole span, gated on `BG-ENC-001`. Sampling is the classic false
   pass and the spec says so.
 - **`BG-CE-003` is half-designed.** `EntityId` is spec'd as an enum, but
-  **`Selector`, `OpId` and `Op` are defined nowhere in the tree** — checked —
+  **`Selector`, `OpId` and `Op` are defined nowhere in the tree** â€” checked â€”
   so `Sel { base, selector }` is a name, not a design. That algebra can be
   built and property-tested as a standalone module with no truck code
   involved, and that is where the design risk lives.
 - **One spec correction, found by running its own command:** BG-CE-003's
   prose says "10 documented deadlock hazards" and its command says expect 12.
-  **12 is right** — exactly 2 each in `edge.rs`, `face.rs`, `shell.rs`,
+  **12 is right** â€” exactly 2 each in `edge.rs`, `face.rs`, `shell.rs`,
   `solid.rs`, `vertex.rs`, `wire.rs`. Fix the prose; a stale number in the
   item seven checkers gate on will be believed.
 
 ## Open questions
 
-- **V9 was proven in session 7 — see "Pick up here" item 2** for both
+- **V9 was proven in session 7 â€” see "Pick up here" item 2** for both
   negative tests and what each one does and does not establish. It was added
   because nothing in this loop had ever been measured against real geometry.
   Its first version ran `tests/step.rs`, `torus_deck.rs` and
-  `spline_carrier.rs`, **passed with `TOLERANCE` loosened 1e-6 → 1e-1**, and
-  the reason is worth keeping: those tests assert *structure*, not geometry —
-  one geometry, one instance, indices a multiple of 3, a colour present — and
+  `spline_carrier.rs`, **passed with `TOLERANCE` loosened 1e-6 â†’ 1e-1**, and
+  the reason is worth keeping: those tests assert *structure*, not geometry â€”
+  one geometry, one instance, indices a multiple of 3, a colour present â€” and
   `torus_deck` asserts the torus's *declared* parameters read back from the
   source rather than anything tessellated. All of it holds for an arbitrarily
   wrong mesh. `tests/geometry_fingerprint.rs` is the fix (triangle count,
@@ -2458,7 +2463,7 @@ what the tree says about the last two, as opposed to what the spec says.
   `gen_packet.py` fixes a naming convention.
 - `gen_packet.py` exists and works end to end as of session 8. What it still
   does **not** do: `--skeleton` emits no prose, by design, and it has no notion
-  of a site that needs a `FIXME` rather than a rewrite — `BG-TOL-001-MESHALGO`'s
+  of a site that needs a `FIXME` rather than a rewrite â€” `BG-TOL-001-MESHALGO`'s
   six deferred area sites had to be written by hand into a section the budget
   parser deliberately stops at. If a third shard needs deferrals, teach the
   survey schema an `action: fixme_marker` value and let the skeleton emit them.
@@ -2700,21 +2705,21 @@ what the tree says about the last two, as opposed to what the spec says.
   passes over a packet file, re-check that its non-ASCII survived.
 
 - **Machine sleep killed a healthy worker a SECOND time, and this time it
-  cost four hours of work — the recovery recipe is proven, use it.**
+  cost four hours of work â€” the recovery recipe is proven, use it.**
   Session 22: the worker died mid-run at 23:47 when the machine slept; the
   watchdog woke at 02:51, read 12195s of stagnation, killed it and
   redispatched FRESH (the redispatch archives the uncommitted worktree as
-  `loop/slots/N/abandoned-<timestamp>.patch` — that archive is the
+  `loop/slots/N/abandoned-<timestamp>.patch` â€” that archive is the
   lifeline). Recovery that worked, first try: (1) stop the watchdog; (2)
   kill the fresh worker it started; (3) `git -C wt reset --hard && clean
   -fd`, then `git apply` the abandoned patch; (4) COMMIT the restored state
-  on the packet branch — run_packet REFUSES a dirty tree without `--reset`,
+  on the packet branch â€” run_packet REFUSES a dirty tree without `--reset`,
   and `--reset` archives-and-discards, destroying the recovery;
   (5) `run_packet.py --resume --session-id <old id>` (the old session id is
   in the opencode provider log's stream lines, or worker.session if not yet
   overwritten). The resumed session woke with its full debugging context
   and finished in ~80 min. Also: the pre-sleep events.jsonl transcript is
-  LOST to the redispatch's reset — copy it aside before any recovery if the
+  LOST to the redispatch's reset â€” copy it aside before any recovery if the
   transcript matters.
 
 - **A killed or timed-out test binary keeps its cargo file lock, and that
@@ -2744,11 +2749,11 @@ what the tree says about the last two, as opposed to what the spec says.
   hull of an empty point list is the `[inf,-inf]` box, every downstream
   midpoint is NaN, and the loop hangs on NaN comparisons. When an enclosure
   comes back empty/infinite, print the OVERLAP SET first. (Same family as
-  the curve's cellOverlaps rule — the per-axis port must carry the
+  the curve's cellOverlaps rule â€” the per-axis port must carry the
   degenerate clause.)
 
 - **The pre-dispatch machine-check caught three design traps and the worker
-  caught two more implementation traps — both halves are load-bearing.**
+  caught two more implementation traps â€” both halves are load-bearing.**
   Session 22: the orchestrator-side interval scratch (scratch/fid005srf-
   check.py, outward-rounded arithmetic through the exact mandated formulas)
   caught the level-cap/linear-convergence explosion, the false convergence
@@ -2758,26 +2763,26 @@ what the tree says about the last two, as opposed to what the spec says.
   half alone would have landed this packet.
 
 - **A `HashMap` keyed by a type that serializes as a map cannot round-trip
-  through serde_json — and the failure is deferred and data-dependent.**
+  through serde_json â€” and the failure is deferred and data-dependent.**
   Session 23, INV-107 pre-dispatch: a derived `HashMap<EntityId, _>`
   Serialize compiles fine and serializes an EMPTY map as `{}`; the first
   non-empty map fails at RUNTIME with "key must be a string" (serde_json
-  requires string keys, `EntityId` is externally tagged — a map). A
+  requires string keys, `EntityId` is externally tagged â€” a map). A
   doctest or test that only round-trips an empty store would have passed
   and shipped the defect. The fix is to serialize as a sequence of pairs
   (`serializer.collect_seq(map.iter())`, deserialize a `Vec<(K, V)>` and
   rebuild), which is also duplicate-tolerant (last wins). Caught by the
   scratch-crate run against the real type (`scratch/inv107serde`), not by
-  compilation — the scratch discipline again. Any new keyed-by-EntityId
+  compilation â€” the scratch discipline again. Any new keyed-by-EntityId
   container owes the same check.
 
 - **The scratch must model the packet's EXACT signatures, not a
   simplification of them.** Session 23: the INV-107 serde scratch validated
-  the store design with a `raise` returning `()` — but the packet's
+  the store design with a `raise` returning `()` â€” but the packet's
   `raise` returned `Outcome<()>` (= `Result<Certified<()>, Refusal>`), and
   the packet's `Ok(())` success line does not compile against that alias.
   The scratch's simplification hid exactly the bug the worker caught (and
-  fixed correctly, with an empty PropMap — a mutation does not certify the
+  fixed correctly, with an empty PropMap â€” a mutation does not certify the
   invariant). Same family as "reference values must come from the SAME code
   path the packet mandates": every fn a packet spells verbatim goes into
   the scratch verbatim, return types included, or the scratch proves
@@ -2788,7 +2793,7 @@ what the tree says about the last two, as opposed to what the spec says.
   was killed mid-baseline exactly as the session-12 trap predicts. The
   recovery is already recorded (relaunch detached, poll `VERDICT.json`,
   check its `packet`/`base`/`commit` fields before believing it) and worked
-  first try — the addition is only that the tool timeout is a live instance
+  first try â€” the addition is only that the tool timeout is a live instance
   of the wrapper, so verify NEVER runs in the foreground of a tool call
   with a cap; launch it via `Start-Process cmd /c "... > out 2>&1"` and
   poll.

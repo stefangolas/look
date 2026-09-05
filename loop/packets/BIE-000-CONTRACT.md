@@ -198,7 +198,7 @@ of your worktree (not `loop/results/` — the orchestrator files it there).
 
 ```json
 {"id":"BIE-000-CONTRACT","status":"DONE","contracts":["BIE-000-CONTRACT"],
- "tests_added":5,"anchors_verified":{"A1":1,"A2":2,"A3":1,"A4":1,"A5":25},
+ "tests_added":5,"anchors_verified":{"A1":1,"A2":2,"A3":1,"A4":1,"A5":26},
  "notes":"anything the fixture derivations pinned down that the packet did not state"}
 ```
 

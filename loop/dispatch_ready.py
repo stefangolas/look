@@ -159,11 +159,6 @@ def main():
         if unmet:
             print(f"  {r['id']}: blocked on {unmet}")
             continue
-        # Owner hold (session 51): the BIE program rows are BLOCKED-held
-        # until the BIE spine session commits - never dispatch them,
-        # whatever a stale or raced row status says.
-        if r["id"].startswith("BIE-") or r["id"] == "SEM-PCURVE-MASTER-001-FIX":
-            continue
         writes = set(r.get("writes", []))
         # kernel/mod.rs is the standard one-line pub-mod registration file:
         # same-file work there is the DESIGNED textual conflict, resolved at

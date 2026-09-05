@@ -1,5 +1,12 @@
 # WORK PACKET SEM-PCURVE-MASTER-001-FIX — honor the declared 3D curve over pcurve mastery
 
+> **SUPERSEDED 2026-09-05.** Do not dispatch. The owner directed one packet
+> for the cheap high-yield OCCT cluster; this packet's correction and its
+> four tests are absorbed, unchanged in substance, into
+> [`OCCT-HIGH-ROI-CLUSTER-001.md`](OCCT-HIGH-ROI-CLUSTER-001.md) as item C1
+> and tests 1–4. This file remains for the record of the pre-decided
+> scoping.
+
 You are fixing a recorded STEP-ingestion defect inside the Certified
 Interaction Engine (BIE) program wave — the write set is fully disjoint from
 every BIE packet, so nothing here touches the interaction solver. Everything

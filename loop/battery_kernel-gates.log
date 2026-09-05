@@ -1,0 +1,2 @@
+kernel-gates: GATE-4 unscaled_legacy 111/111.
+kernel-gates: all P-3 gates pass.
