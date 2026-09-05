@@ -154,9 +154,9 @@ def try_land(slot_dir, slot_no, rows, order, reg_path):
                 tag = "PENDING-QUESTION" if fname == "QUESTION.md" else "PENDING"
                 shutil.copy(f, ROOT / "loop" / "results" / f"{pid}.{tag}.{fname}")
         # uncommitted partial code: tracked diff + untracked files
-        diff = git(["diff", "HEAD"], cwd=slot_dir / "wt")
+        diff = git(["diff", "HEAD"], cwd=slot_dir / "wt").stdout
         untracked = git(["ls-files", "--others", "--exclude-standard"],
-                        cwd=slot_dir / "wt")
+                        cwd=slot_dir / "wt").stdout
         if (diff or "").strip() or (untracked or "").strip():
             patch_path = ROOT / "loop" / "results" / f"{pid}.PENDING.partial.patch"
             with open(patch_path, "w", encoding="utf-8", errors="replace") as pf:

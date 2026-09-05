@@ -10,13 +10,17 @@ stop and report, you do not research it.
 id:          BIE-003-CARRIER
 contract:    [BIE-003-CARRIER]
 class:       design
-crates:      [truck-geometry]
+crates:      [truck-geometry, truck-modeling, truck-shapeops, truck-stepio]
 depends_on:  [BIE-000-CONTRACT]
 write_allow:
   - vendor/truck/truck-geometry/src/canonical.rs
   - vendor/truck/truck-geometry/src/constructive/mod.rs
   - vendor/truck/truck-geometry/src/constructive/intersection_carrier.rs
   - vendor/truck/truck-geometry/src/span.rs
+  - vendor/truck/truck-geometry/src/recognize.rs
+  - vendor/truck/truck-modeling/src/cad.rs
+  - vendor/truck/truck-shapeops/src/section.rs
+  - vendor/truck/truck-stepio/src/out/geometry.rs
 read_allow:
   - vendor/truck/truck-geometry/src/constructive/sweep_surface.rs
   - vendor/truck/truck-meshalgo/src/tessellation/realization_evidence.rs
@@ -46,6 +50,20 @@ span cache returns nothing for `SpineFrameSweep`, so swept faces get no
 per-face AABB. This packet lands both.
 
 ## Scope decisions — pre-made, do not relitigate
+
+> **AMENDMENT r2 (2026-09-05, orchestrator; resolves the r1 SPEC_GAP).** The
+> canonical `Curve` variant's exhaustive-match ripple reaches SEVEN sites
+> outside the original write set: `truck-geometry/src/recognize.rs` (2),
+> `truck-modeling/src/cad.rs` (2), `truck-shapeops/src/section.rs` (1),
+> `truck-stepio/src/out/geometry.rs` (3). Those files are now in
+> `write_allow`. For each site add the new variant arm
+> (`| Curve::CertifiedImplicitIntersectionCurve(_)`) delegating exactly as
+> the landed `IntersectionCurve` arm delegates — no landed arm changes
+> semantics. Everything r1 committed (carrier, spans, canonical ripple in
+> `canonical.rs`) is proven work: keep it, do not redo it. Scoped checks
+> must now also pass: `cargo check -p truck-modeling -p truck-shapeops -p
+> truck-stepio` (the signature-ripple rule: a canonical variant is a
+> cross-crate fact).
 
 1. **The carrier type lives in a new file**,
    `truck-geometry/src/constructive/intersection_carrier.rs`; the canonical
