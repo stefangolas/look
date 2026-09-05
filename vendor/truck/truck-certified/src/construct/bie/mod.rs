@@ -229,6 +229,13 @@ impl WitnessCell {
 #[doc(hidden)]
 pub mod fixtures;
 
+/// The restricted-pair interaction solver (BIE-002-SSI4): the certified
+/// F-form systems, the (R′) minor-sign predicate and transversal column
+/// choice, the boundary-stratum seeding, and the parallelotope continuation,
+/// emitting the frozen [`CertifiedChartCurve`](ssi4::CertifiedChartCurve)
+/// contract shape that BIE-004 escalates and BIE-005 consumes.
+pub mod ssi4;
+
 #[cfg(test)]
 mod tests {
     use super::*;
