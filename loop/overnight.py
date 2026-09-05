@@ -133,6 +133,14 @@ def try_land(slot_dir, slot_no, rows, order, reg_path):
     stopped = bool((result.get("stop_conditions") or {}).get("triggered"))
     good = status in ("complete", "partial", "done", "landed", "completed")
     if stopped or not good or (isinstance(fails, int) and fails > 0):
+        # Session-51 harness gap: worktree recycles destroyed two unlanded
+        # RESULTs (CC-030, CC-013). Archive the evidence BEFORE returning.
+        import shutil
+        for fname in ("RESULT.json", "QUESTION.md"):
+            f = slot_dir / "wt" / fname
+            if f.exists():
+                tag = "PENDING-QUESTION" if fname == "QUESTION.md" else "PENDING"
+                shutil.copy(f, ROOT / "loop" / "results" / f"{pid}.{tag}.{fname}")
         log(f"slot {slot_no}: {pid} status={status!r} fails={fails} "
             f"stopped={stopped} - LEFT FOR MORNING (judgment required)")
         return
