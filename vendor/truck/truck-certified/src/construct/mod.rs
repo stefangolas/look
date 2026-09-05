@@ -103,6 +103,13 @@ pub mod loft_weights;
 /// P6 identity-keyed split values and a bitwise seam gate between strips.
 pub mod loft_strips;
 
+/// The S9 cyclic correspondence resolver (CC-013-CORRESPONDENCE, spine S9 /
+/// theory §2.2 L4): wire production over the S9 [`stubs::WireComplex`] and the
+/// fixed-order resolution — caller anchor, combinatorially forced unique
+/// isomorphism, then the P4 separation-margin argmin over the r cyclic shifts
+/// of the declared [`stubs::ShiftFunctionalKind::VertexSumSq`] functional.
+pub mod correspondence;
+
 /// The Gordon Boolean-sum construction (CC-015-GORDON, spine S8 consumer):
 /// `S = S_u + S_v − S_uv` over a compatible profile/guide network, reusing the
 /// CC-010 loft machinery and its two direction factorizations.
