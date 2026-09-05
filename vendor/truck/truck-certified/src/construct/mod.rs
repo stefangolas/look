@@ -166,3 +166,8 @@ pub mod face_consumption;
 /// funnel), the certified-star count, and the pre-made closed/connected/
 /// orientation checks that decide [`shell::SolidOutcome`].
 pub mod shell;
+
+/// The conservative certified shell thickness bound (CC-026-THICKNESS, spine
+/// S7 consumer; theory §7.1): the focal term from the per-patch interval
+/// quadratic solve and the bottleneck term over the non-adjacent strata.
+pub mod thickness;
