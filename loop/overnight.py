@@ -123,7 +123,17 @@ def fname_guard(uf):
 
 
 def try_land(slot_dir, slot_no, rows, order, reg_path):
-    packet_path = (slot_dir / "worker.packet").read_text().strip()
+    try:
+        packet_path = (slot_dir / "worker.packet").read_text(
+            encoding="utf-8-sig").strip()
+    except (OSError, UnicodeDecodeError):
+        # A killed worker or a slot/bookkeeping desync can leave this file
+        # missing or unreadable (recorded 2026-09-05: slot 3's worker.packet
+        # was overwritten mid-run by a different packet's dispatch). Such a
+        # slot holds no adjudicable evidence; leave it for the morning
+        # orchestrator instead of crash-looping the driver.
+        log(f"slot {slot_no}: unreadable worker.packet; left for morning")
+        return
     pid = Path(packet_path).stem
     row = rows.get(pid)
     if row is None:
