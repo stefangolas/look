@@ -23,7 +23,7 @@ read_allow:
 tests_required:
   - concave_ring_caps_through_cdt
   - convex_fast_path_bit_identical
-  - u_chute_negative_test_now_positive
+  - concave_ring_refusals_stay_typed
 budget:      {turns: 45, ctx_tokens: 110000}
 ```
 
@@ -39,15 +39,30 @@ rings through the CDT path; the U-chute negative test inverts to positive.
 
 ## Scope decisions — pre-made, do not relitigate
 
-1. **The convexity fast path stays for convex rings, bit-identical** (V5
-   identity guard): same ring → same triangles, byte-equal STL on every
-   convex fixture that exists today. The CDT path only ever swaps a
-   refusal for a triangulation.
-2. **Routing**: replace the convexity gate's refuse arm with a CDT
-   dispatch for the non-convex case; the gate itself stays as the
-   ROUTER (its boolean result selects the path) — you are not deleting the
-   convexity analysis, you are giving its `false` arm a destination.
-3. **Self-intersecting rings** refuse typed as today — CDT is not a repair.
+> **AMENDMENT r2 (2026-09-05, orchestrator; resolves the r1 ANCHOR_MISMATCH
+> and its two corroborating SPEC_GAP findings).** The r1 packet assumed the
+> CG-005 per-face CDT (`truck-meshalgo`) was reusable from
+> `facet_sweep.rs`. Measured: `truck-meshalgo` depends on
+> `truck-modeling` (a modeling→meshalgo edge is a cycle), no cap-reachable
+> CDT entry exists in modeling's dependency closure, and no landed
+> U-chute test exists. The re-scope:
+>
+> 1. **Self-contained deterministic cap triangulation lands IN
+>    `truck-modeling`** (inside `facet_sweep.rs` or a sibling module in
+>    the same write set — prefer a `cap_triangulation` module-unit within
+>    facet_sweep.rs to keep the write set to one file): ear-clipping over
+>    the cap ring projected to its carrier plane. Caps are planar,
+>    hole-free simple polygons; ear-clipping is O(n²) worst case, fully
+>    deterministic (leftmost-most-convex ear order — state the tie-break
+>    in a doc comment), and needs no new dependency.
+> 2. **The convexity fast path stays bit-identical** (V5 guard): same
+>    convex ring → byte-equal STL. The ear-clipping path only ever
+>    replaces a refusal.
+> 3. **Self-intersecting rings refuse typed as today** — no repair, no
+>    tolerance games; the ring's simplicity check precedes triangulation.
+> 4. **No U-chute inversion** (the booked test never existed): the
+>    positive-case test is a non-convex ring of your construction with
+>    stated ground truth instead.
 4. `truck-meshalgo` is read-only (the ledger/CDT internals are consumed,
    never edited).
 
@@ -56,7 +71,7 @@ rings through the CDT path; the U-chute negative test inverts to positive.
 | id | file | pattern | expect |
 |---|---|---|---|
 | A1 | `vendor/truck/truck-modeling/src/facet_sweep.rs` | `ring_is_convex` | 2 |
-| A2 | `vendor/truck/truck-meshalgo/src/tessellation/triangulation.rs` | `fn triangulate` | 1 |
+| A2 | `vendor/truck/truck-meshalgo/Cargo.toml` | `truck-modeling` | 1 |
 
 ## House rules
 
@@ -71,14 +86,10 @@ rings through the CDT path; the U-chute negative test inverts to positive.
    overlap; the solid is closed with positive volume.
 2. `convex_fast_path_bit_identical` — every convex fixture's cap
    triangulation is byte-identical before/after (hash the STL bytes).
-3. `u_chute_negative_test_now_positive` — the recorded U-chute refusal
-   case now produces a valid solid; the ORIGINAL refusal assertion is
-   replaced, not deleted (state the replacement in RESULT notes).
+3. `concave_ring_refusals_stay_typed` — a self-intersecting (figure-eight)
+   ring still refuses typed; the simplicity check precedes triangulation.
 
-No existing test may be deleted, `#[ignore]`d, or weakened — except the
-single recorded U-chute assertion this packet's spec books as inverted
-(name it in RESULT notes; the verifier accepts exactly this documented
-inversion).
+No existing test may be deleted, `#[ignore]`d, or weakened.
 
 ## Done when
 

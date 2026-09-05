@@ -44,7 +44,7 @@ drop-in claim made testable.
 | Edge identity machinery | **LANDED** — reuse, do not duplicate | `truck-topology/src/entity_id.rs`: `EntityId`, `Op`, `OpKind`, and a `Selector` primitive (`sel(base, selector)` :176) — PB-001 must consume this vocabulary |
 | Sketch arcs in profiles | **PARTIAL** — `arrange.rs` `Carrier2D` is `Line | CircleCarrier` (:682), and `CircleCarrier` carries a parameter range `(c.t0, c.t1)` :690 — trimmed circles (arcs) are representable; what's missing is the authoring level (3-point/tangent arc constructors) and arc×line/arc×arc Region2 cells | `truck-geometry/src/arrange.rs:682-708` |
 | Concave caps on the facet path | **ABSENT** — `ring_is_convex` gate refuses | `truck-modeling/src/facet_sweep.rs:164` |
-| Per-face CDT for caps | **LANDED** — the ledger entry point reuses per-face CDT internals | `docs/CONSTRUCTIVE_GEOMETRY_PLAN.md` §3.4 (CG-005 landed) |
+| Per-face CDT for caps | **WRONG SUBSTRATE (corrected 2026-09-05, PB-003 r1 stop)** — the CDT lives in `truck-meshalgo`, which depends on `truck-modeling`; a modeling→meshalgo edge is a cycle, so it is unreachable from the facet path. Cap triangulation must be self-contained in `truck-modeling` (PB-003 r2: deterministic ear-clipping over planar hole-free cap rings) | `truck-meshalgo/Cargo.toml` dependency direction; no CDT entry in modeling's closure |
 | pyo3 / any Python binding | **ABSENT** — greenfield | no `pyo3`/`pyclass` occurrence in the workspace |
 | Build123d-named facade entries | **LANDED** (Rust) | `truck-shapeops/src/facade.rs`: extrude/extrude_vector/revolve/fillet/chamfer/mirror/rotate/scale/translate/section/split/bounding_box/boolean_op/make_face/make_hull |
 | Constructive sweeps | **LANDED** | `truck-modeling/src/{spine_sweep,facet_sweep}.rs` |
