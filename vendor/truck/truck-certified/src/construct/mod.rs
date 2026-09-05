@@ -115,3 +115,8 @@ pub mod stubs;
 /// The P3 graph-disk embedding certificate and its normative projection search
 /// (CC-005-GRAPHDISK, spine seam S6).
 pub mod graphdisk;
+
+/// The rounded-offset contact-complex strata (CC-021-OFFSET-STRATA): the
+/// k=1 face, k=2 edge (canal), and k=3 corner (triple-node) strata with their
+/// certified reach bounds and per-stratum refusals.
+pub mod offset_strata;
