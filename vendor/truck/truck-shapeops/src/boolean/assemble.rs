@@ -22,7 +22,7 @@
 )]
 
 use rustc_hash::{FxHashMap as HashMap, FxHashSet as HashSet};
-use truck_base::cgmath64::Point3;
+use truck_base::cgmath64::{InnerSpace, Point3};
 use truck_base::contact::{ContactDimension, ContactEventKind};
 use truck_base::evidence::{
     Budget, Certificate, Certified, EnvelopeCase, Margin, Method, Modulus, Outcome, PropMap,
@@ -436,6 +436,90 @@ fn lift_edges(
         }
     }
     Ok(out)
+}
+
+// ---------------------------------------------------------------------------
+// CC-024 concave-trim provenance (the `StratumRef` convention this module
+// landed). The arrangement engine's concave trim (`concave_trim` in
+// truck-geometry) emits surviving cells and trim curves tagged by source face
+// section (0/1 over the two adjacent source edges of the concave vertex).
+// This bridge resolves each tagged section onto the shell `StratumRef` whose
+// edge realises it, so the planar concave-trim output carries the boolean
+// provenance the rest of this module consumes.
+// ---------------------------------------------------------------------------
+
+/// Resolves each source section of a concave trim to the shell
+/// `StratumRef::Edge` that realises it, using the [`lift_edges`] convention:
+/// the edge's FIRST occurrence across `face_iter()` /
+/// `face.absolute_boundaries()` order, with `edge` its flat position there.
+/// The refs are returned in input order; a source section the shell does not
+/// realise (geometry not matched within `tol`) is a refusal.
+pub fn trim_provenance(
+    shell: &Shell<Point3, Curve, Surface>,
+    sources: &[Curve],
+    tol: f64,
+) -> Outcome<Vec<StratumRef>> {
+    let mut out = Vec::with_capacity(sources.len());
+    for source in sources {
+        let found = find_shell_edge_ref(shell, source, tol);
+        match found {
+            Some(r) => out.push(r),
+            None => return Err(Refusal::Empty),
+        }
+    }
+    let cert = Certificate {
+        props: PropMap::new(),
+        method: Method::Float,
+        budget_left: Budget::new(0, 0, 0),
+        margin: Margin::UNBOUNDED,
+        modulus: Modulus::Unbounded,
+    };
+    Ok(Certified::new(out, cert))
+}
+
+/// Finds the shell edge whose sampled section geometry equals `source`,
+/// returning its `StratumRef::Edge` under the [`lift_edges`] convention.
+fn find_shell_edge_ref(
+    shell: &Shell<Point3, Curve, Surface>,
+    source: &Curve,
+    tol: f64,
+) -> Option<StratumRef> {
+    let s_points = curve_samples(source, tol);
+    let s0 = s_points.first().copied()?;
+    let s1 = s_points.last().copied()?;
+    let mut seen: HashSet<EdgeID<Curve>> = HashSet::default();
+    for (fi, face) in shell.face_iter().enumerate() {
+        let mut flat = 0usize;
+        for wire in face.absolute_boundaries() {
+            for edge in wire.edge_iter() {
+                if !seen.insert(edge.id()) {
+                    flat += 1;
+                    continue;
+                }
+                let e_points = curve_samples(&edge.curve(), tol);
+                let same = match (e_points.first().copied(), e_points.last().copied()) {
+                    (Some(e0), Some(e1)) => section_matches(e0, e1, s0, s1, tol),
+                    _ => false,
+                };
+                if same {
+                    return Some(StratumRef::Edge {
+                        solid: SolidRef::A,
+                        face: fi,
+                        edge: flat,
+                    });
+                }
+                flat += 1;
+            }
+        }
+    }
+    None
+}
+
+/// Whether two sampled sections coincide as undirected segments.
+fn section_matches(a0: Point3, a1: Point3, b0: Point3, b1: Point3, tol: f64) -> bool {
+    let forward = (a0 - b0).magnitude() <= tol && (a1 - b1).magnitude() <= tol;
+    let reverse = (a0 - b1).magnitude() <= tol && (a1 - b0).magnitude() <= tol;
+    forward || reverse
 }
 
 // ---------------------------------------------------------------------------

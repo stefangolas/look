@@ -52,7 +52,7 @@ use crate::recognize::{
 };
 use std::cmp::Ordering;
 use std::collections::HashMap;
-use std::f64::consts::TAU;
+use std::f64::consts::{PI, TAU};
 use truck_base::evidence::{
     Budget, Certificate, Certified, ContradictionWitness, EnvelopeCase, Margin, Method, Modulus,
     Outcome, Prop, PropMap, Refusal, Truth, UnresolvedWitness,
@@ -407,6 +407,374 @@ pub fn arrange(profile: &[Curve], domain: Option<BoundingBox<Point2>>) -> Outcom
             modulus: Modulus::Unbounded,
         },
     ))
+}
+
+// ---------------------------------------------------------------------------
+// CC-024-OFFSET-EXACT — sharp (mitered) and concave-edge completion via the
+// arrangement engine.
+//
+// Theory §3.4's sharp/concave strata are ARRANGEMENT OUTPUTS — never new
+// `OffsetStratum` variants (the certified enum is read-only context here).
+// Both completion rules are the extend-and-intersect rule evaluated on the
+// two adjacent offset face carriers of a source edge, seen in the plane
+// section of an extruded shell (this engine's domain). A CONVEX source wedge
+// (dihedral half-angle θ < π/2) whose offset diverges the two adjacent offset
+// faces is completed by extending both faces to their exact carrier
+// intersection — the mitered stratum, whose reach ρ_A = |t|/sin θ is pinned
+// by [`mitered_edge_reach`] and is NEVER the ball stratum's |t| shortcut
+// (a convex corner of half-angle θ puts the completion at |t|/sin θ from its
+// source). A CONCAVE (reflex) source wedge whose offset overlaps the two
+// adjacent offset faces is completed by the concave rule: the cells the
+// overlapping faces cover twice are marked and discarded, and each face is
+// trimmed back to the crossing. Plane-face sections are the v1 canonical set
+// here (they give an exact line); curved-face sections route through the
+// landed certified pair machinery and refuse in this engine, as does the
+// mirror regime of each rule. Everything below is ADDITIVE — the `arrange`
+// entry above is untouched, so every fixture it already answers answers
+// identically (the V5 identity gate).
+// ---------------------------------------------------------------------------
+
+/// Pins the theory §3.4 reach bound of a sharp (mitered) stratum as code:
+/// `ρ_A = |t| / sin θ` for a source wedge of dihedral half-angle `θ` and
+/// offset magnitude `|t|`. For `θ < π/2` the bound is STRICTLY greater than
+/// `|t|` — the sharp completion point is not within `|t|` of its source, so a
+/// mitered stratum must never carry the ball-stratum `|t|` shortcut. A
+/// degenerate half-angle (`sin θ ≤ 0`: `θ ≤ 0`, `θ = π`, or non-finite input)
+/// has no finite sharp completion; the bound recedes to infinity.
+pub fn mitered_edge_reach(dihedral_half_angle: f64, t: f64) -> f64 {
+    if !dihedral_half_angle.is_finite() || !t.is_finite() {
+        return f64::INFINITY;
+    }
+    let s = dihedral_half_angle.sin();
+    if s <= 0.0 {
+        return f64::INFINITY;
+    }
+    t.abs() / s
+}
+
+/// One sharp (mitered) stratum of the arrangement engine: the completion of a
+/// convex source edge whose adjacent offset faces diverge. `miter_point` is
+/// the extend-and-intersect vertex of the two offset face carriers;
+/// `reach` is the COMPUTED bound `|t| / sin θ` (never `|t|`), and for
+/// `θ < π/2` the miter point is strictly farther from `source` than `|t|`.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct MiteredStratum {
+    /// The convex source vertex the stratum completes (z = 0).
+    pub source: Point3,
+    /// The extend-and-intersect vertex of the two offset face carriers.
+    pub miter_point: Point3,
+    /// The unit direction from `source` to `miter_point`.
+    pub direction: Vector2,
+    /// The computed reach bound `ρ_A = |t| / sin θ`.
+    pub reach: f64,
+    /// The dihedral half-angle `θ` of the source wedge (half the CCW interior
+    /// wedge swept from the first edge's end tangent to the second's start).
+    pub half_angle: f64,
+    /// The signed offset magnitude applied to each source edge section.
+    pub offset: f64,
+}
+
+/// One boundary segment of the concave-trim output, tagged with its source
+/// face section: `source == 0` names the first edge (`a`), `source == 1` the
+/// second (`b`).
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct OffsetSegment {
+    /// Which adjacent source edge the segment lies on (0 = `a`, 1 = `b`).
+    pub source: usize,
+    /// One endpoint of the segment.
+    pub from: Point3,
+    /// The other endpoint of the segment.
+    pub to: Point3,
+}
+
+/// The concave-edge completion of the arrangement engine (theory §3.4): two
+/// adjacent offset faces of a reflex source edge overlap; the cell(s) the
+/// overlapping adjacent offset face covers are marked and DISCARDED, and each
+/// face is trimmed back to the crossing. Output: the surviving cells (the
+/// offset-face boundary segments that stay on the completed boundary) plus
+/// the trim curves (the discarded covered sub-segments), each with source
+/// provenance through the [`OffsetSegment::source`] tag.
+#[derive(Clone, Debug, PartialEq)]
+pub struct ConcaveTrim {
+    /// The reflex source vertex being completed (z = 0).
+    pub vertex: Point3,
+    /// The crossing of the two adjacent offset face carriers: the trim point.
+    pub crossing: Point3,
+    /// The computed reach `|t| / sin θ` of the crossing from `vertex`.
+    pub reach: f64,
+    /// The dihedral half-angle `θ` of the reflex wedge (half the CCW interior
+    /// wedge, so `θ ∈ (π/2, π)`).
+    pub half_angle: f64,
+    /// The signed offset magnitude applied to each source edge section.
+    pub offset: f64,
+    /// The number of cells covered by the overlapping adjacent offset faces
+    /// that were discarded (1 for a simple reflex completion).
+    pub covered_cells: usize,
+    /// The surviving offset-face boundary segments: one per source edge, each
+    /// running from the crossing to that face's far end.
+    pub surviving: Vec<OffsetSegment>,
+    /// The discarded trim curves: one per source edge, each running from that
+    /// face's vertex-near end to the crossing.
+    pub trims: Vec<OffsetSegment>,
+}
+
+/// The completion rule's certificate. The completion evaluates analytic
+/// carriers in floating point (only the `arrange` subdivision itself is
+/// dyadic-exact), so the method is `Float` with an unbounded margin.
+fn completion_certificate() -> Certificate {
+    Certificate {
+        props: PropMap::new(),
+        method: Method::Float,
+        budget_left: Budget::new(0, 0, 0),
+        margin: Margin::UNBOUNDED,
+        modulus: Modulus::Unbounded,
+    }
+}
+
+/// The vanishing-crossing guard of the extend-and-intersect rule. The
+/// carriers are unit direction vectors, so the crossing denominator is the
+/// sine of the carrier angle.
+const MIN_CROSS: f64 = 1.0e-9; // H-3: dimensionless sine floor, not a length
+
+/// Reads the planar Line section endpoints off a recognized carrier. A curved
+/// (Circle) section refuses `NonCanonicalCarrier`: its miter/trim routes
+/// through the landed certified pair machinery, out of this engine's v1
+/// plane-face envelope.
+fn line_section(c: Carrier2D) -> S1Result<(Point2, Point2)> {
+    match c {
+        Carrier2D::Line(Line(a, b)) => {
+            if !a.x.is_finite() || !a.y.is_finite() || !b.x.is_finite() || !b.y.is_finite() {
+                return Err(Refusal::UnsupportedEnvelope(EnvelopeCase::ChartDegenerate));
+            }
+            Ok((a, b))
+        }
+        Carrier2D::Circle(_) => Err(Refusal::UnsupportedEnvelope(
+            EnvelopeCase::NonCanonicalCarrier,
+        )),
+    }
+}
+
+/// The signed CCW wedge from `ta` to `tb` in `(0, TAU)` — the interior angle
+/// of the source wedge at a vertex where edge `a` (end tangent `ta`) hands off
+/// to edge `b` (start tangent `tb`) of a CCW profile.
+fn ccw_wedge(ta: Vector2, tb: Vector2) -> S1Result<f64> {
+    let la = ta.magnitude();
+    let lb = tb.magnitude();
+    if la == 0.0 || lb == 0.0 || !la.is_finite() || !lb.is_finite() {
+        return Err(Refusal::UnsupportedEnvelope(EnvelopeCase::ChartDegenerate));
+    }
+    let cross = ta.x * tb.y - ta.y * tb.x;
+    let dot = ta.x * tb.x + ta.y * tb.y;
+    let mut w = f64::atan2(cross, dot);
+    if w < 0.0 {
+        w += TAU;
+    }
+    Ok(w)
+}
+
+/// One offset face section: the parallel translate of a source edge section
+/// by `offset` along the section's unit right (outward for a CCW profile)
+/// normal. `from` is the offset of the source start; `to` of its end.
+struct OffsetFace {
+    /// The offset of the source edge's start.
+    from: Point2,
+    /// The offset of the source edge's end.
+    to: Point2,
+    /// The unit source-edge direction.
+    unit: Vector2,
+}
+
+/// Translates a Line section by `offset` along its right normal.
+fn offset_face(seg: (Point2, Point2), offset: f64) -> S1Result<OffsetFace> {
+    let (a, b) = seg;
+    let d = b - a;
+    let m = d.magnitude();
+    if m == 0.0 || !m.is_finite() {
+        return Err(Refusal::UnsupportedEnvelope(EnvelopeCase::ChartDegenerate));
+    }
+    let u = Vector2::new(d.x / m, d.y / m);
+    let n = Vector2::new(u.y, -u.x);
+    let shift = n * offset;
+    Ok(OffsetFace {
+        from: a + shift,
+        to: b + shift,
+        unit: u,
+    })
+}
+
+/// Whether `p` lies strictly inside the span of the offset face section.
+fn inside_span(p: Point2, face: &OffsetFace) -> bool {
+    let v = face.to - face.from;
+    let w = p - face.from;
+    let l2 = v.x * v.x + v.y * v.y;
+    if l2 == 0.0 {
+        return false;
+    }
+    let s = (w.x * v.x + w.y * v.y) / l2;
+    s > 0.0 && s < 1.0
+}
+
+/// The crossing of two offset face carriers, refused when they are
+/// (near-)parallel.
+fn faces_cross(a: &OffsetFace, b: &OffsetFace) -> S1Result<Point2> {
+    let denom = a.unit.x * b.unit.y - a.unit.y * b.unit.x;
+    if denom.abs() <= MIN_CROSS {
+        return Err(Refusal::UnsupportedEnvelope(EnvelopeCase::ChartDegenerate));
+    }
+    let r = b.from - a.from;
+    let num = r.x * b.unit.y - r.y * b.unit.x;
+    let s = num / denom;
+    Ok(a.from + a.unit * s)
+}
+
+/// The mirror-regime refusal: the requested corner/side combination belongs
+/// to the OTHER completion rule (or to a later envelope), never a silent
+/// approximation here.
+fn regime_refusal() -> Refusal {
+    Refusal::UnsupportedEnvelope(EnvelopeCase::ContactReductionDeferred)
+}
+
+/// The sharp (mitered) completion of a CONVEX source edge: extends the two
+/// adjacent offset face carriers and intersects them. The two source curves
+/// must be the consecutive plane-face sections around the convex vertex
+/// (first ends where the second starts), and the offset must drive the two
+/// offset faces apart (diverge) — an overlapping convex offset is the trim
+/// regime's domain and refuses here. Curved (Circle) face sections refuse:
+/// a curved-face miter routes through the landed certified pair machinery.
+pub fn mitered_stratum(a: &Curve, b: &Curve, offset: f64) -> Outcome<MiteredStratum> {
+    let stratum = mitered_stratum_inner(a, b, offset)?;
+    Ok(Certified::new(stratum, completion_certificate()))
+}
+
+fn mitered_stratum_inner(a: &Curve, b: &Curve, offset: f64) -> S1Result<MiteredStratum> {
+    if !offset.is_finite() || offset == 0.0 {
+        return Err(Refusal::Empty);
+    }
+    let seg_a = line_section(recognize(a)?)?;
+    let seg_b = line_section(recognize(b)?)?;
+    let a_end = seg_a.1;
+    let b_start = seg_b.0;
+    if (a_end - b_start).magnitude() > 64.0 * TOLERANCE {
+        // The two sections are not consecutive around a shared vertex.
+        return Err(Refusal::Empty);
+    }
+    let vertex = a_end;
+    let ta = seg_a.1 - seg_a.0;
+    let tb = seg_b.1 - seg_b.0;
+    let interior = ccw_wedge(ta, tb)?;
+    if interior == 0.0 || interior == PI {
+        // A degenerate (straight) wedge has no corner at all.
+        return Err(Refusal::UnsupportedEnvelope(EnvelopeCase::ChartDegenerate));
+    }
+    if interior > PI {
+        // A reflex wedge is the concave rule's domain.
+        return Err(regime_refusal());
+    }
+    let half_angle = 0.5 * interior;
+    let face_a = offset_face(seg_a, offset)?;
+    let face_b = offset_face(seg_b, offset)?;
+    let miter = faces_cross(&face_a, &face_b)?;
+    if inside_span(miter, &face_a) || inside_span(miter, &face_b) {
+        // The offset drives the adjacent faces ACROSS each other: the
+        // completion is a covered-cell trim, not a sharp miter.
+        return Err(regime_refusal());
+    }
+    let delta = miter - vertex;
+    let len = delta.magnitude();
+    if len == 0.0 || !len.is_finite() {
+        return Err(Refusal::Empty);
+    }
+    Ok(MiteredStratum {
+        source: pt3(vertex),
+        miter_point: pt3(miter),
+        direction: Vector2::new(delta.x / len, delta.y / len),
+        reach: mitered_edge_reach(half_angle, offset),
+        half_angle,
+        offset,
+    })
+}
+
+/// The concave-edge completion of a REFLEX source edge: marks the cell
+/// covered by the two OVERLAPPING adjacent offset faces and discards it,
+/// trimming each face back to the crossing. The two source curves must be the
+/// consecutive plane-face sections around the reflex vertex (first ends where
+/// the second starts) and the offset must overlap the two offset faces (their
+/// carriers cross strictly inside both natural spans) — a diverging reflex
+/// offset has no covered cell in this engine's v1 envelope and refuses.
+pub fn concave_trim(a: &Curve, b: &Curve, offset: f64) -> Outcome<ConcaveTrim> {
+    let trim = concave_trim_inner(a, b, offset)?;
+    Ok(Certified::new(trim, completion_certificate()))
+}
+
+fn concave_trim_inner(a: &Curve, b: &Curve, offset: f64) -> S1Result<ConcaveTrim> {
+    if !offset.is_finite() || offset == 0.0 {
+        return Err(Refusal::Empty);
+    }
+    let seg_a = line_section(recognize(a)?)?;
+    let seg_b = line_section(recognize(b)?)?;
+    let a_end = seg_a.1;
+    let b_start = seg_b.0;
+    if (a_end - b_start).magnitude() > 64.0 * TOLERANCE {
+        // The two sections are not consecutive around a shared vertex.
+        return Err(Refusal::Empty);
+    }
+    let vertex = a_end;
+    let ta = seg_a.1 - seg_a.0;
+    let tb = seg_b.1 - seg_b.0;
+    let interior = ccw_wedge(ta, tb)?;
+    if interior == 0.0 || interior == PI {
+        // A degenerate (straight) wedge has no corner at all.
+        return Err(Refusal::UnsupportedEnvelope(EnvelopeCase::ChartDegenerate));
+    }
+    if interior <= PI {
+        // A convex wedge is the miter rule's domain.
+        return Err(regime_refusal());
+    }
+    let half_angle = 0.5 * interior;
+    let face_a = offset_face(seg_a, offset)?;
+    let face_b = offset_face(seg_b, offset)?;
+    let crossing = faces_cross(&face_a, &face_b)?;
+    if !inside_span(crossing, &face_a) || !inside_span(crossing, &face_b) {
+        // The offset drives the adjacent faces apart: no cell is covered and
+        // no trim is produced at this reflex edge in the v1 envelope.
+        return Err(regime_refusal());
+    }
+    // `face_a` runs from its far (start) end to its vertex end; `face_b` runs
+    // from its vertex end to its far (end) end. The surviving boundary is the
+    // far end up to the crossing on each face; the discarded covered cell is
+    // the sub-segment between each face's vertex-near end and the crossing.
+    let mut surviving = Vec::new();
+    let mut trims = Vec::new();
+    surviving.push(OffsetSegment {
+        source: 0,
+        from: pt3(crossing),
+        to: pt3(face_a.from),
+    });
+    trims.push(OffsetSegment {
+        source: 0,
+        from: pt3(face_a.to),
+        to: pt3(crossing),
+    });
+    surviving.push(OffsetSegment {
+        source: 1,
+        from: pt3(crossing),
+        to: pt3(face_b.to),
+    });
+    trims.push(OffsetSegment {
+        source: 1,
+        from: pt3(face_b.from),
+        to: pt3(crossing),
+    });
+    Ok(ConcaveTrim {
+        vertex: pt3(vertex),
+        crossing: pt3(crossing),
+        reach: mitered_edge_reach(half_angle, offset),
+        half_angle,
+        offset,
+        covered_cells: 1,
+        surviving,
+        trims,
+    })
 }
 
 /// An exact dyadic rational `num * 2^exp` — the substrate for the certified
