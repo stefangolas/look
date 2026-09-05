@@ -542,6 +542,8 @@ fn curvature_magnitude_bound(q2: f64, trace_sup: f64, sigma: f64) -> Result<f64,
     }
     let q = q2.sqrt().next_up();
     let sigma2 = Interval::point(sigma).mul(&Interval::point(sigma));
+    #[allow(clippy::neg_cmp_op_on_partial_ord)]
+    // the sigma2 positivity gate's negated-greater-than semantics are the contract: NaN and non-positive lower endpoints must refuse
     if !sigma2.is_finite() || !(sigma2.lo > 0.0) {
         return Err(ConstructRefusal::InvalidInput);
     }
@@ -571,17 +573,23 @@ fn jacobian_enclosure(offset: f64, curvature: f64) -> Result<Interval, Construct
     if !r_iv.is_finite() {
         return Err(ConstructRefusal::InvalidInput);
     }
+    #[allow(clippy::neg_cmp_op_on_partial_ord)]
+    // the `r < 1` focal-degeneracy gate's negated-less-than semantics are the contract: NaN and ≥ 1 upper endpoints must refuse
     if !(r_iv.hi < 1.0) {
         return Err(ConstructRefusal::FocalDegeneracy);
     }
     let one = Interval::point(1.0);
     let low = one.sub(&r_iv);
     let high = one.add(&r_iv);
+    #[allow(clippy::neg_cmp_op_on_partial_ord)]
+    // the `low = 1 − r` positivity gate's negated-greater-than semantics are the contract: NaN and non-positive lower endpoints must refuse
     if !(low.lo > 0.0) {
         return Err(ConstructRefusal::FocalDegeneracy);
     }
     let lo = low.mul(&low).lo;
     let hi = high.mul(&high).hi;
+    #[allow(clippy::neg_cmp_op_on_partial_ord)]
+    // the J_t positivity gate's negated-greater-than semantics are the contract: NaN and non-positive lower endpoints must refuse
     if !lo.is_finite() || !hi.is_finite() || !(lo > 0.0) || lo > hi {
         return Err(ConstructRefusal::InvalidInput);
     }
