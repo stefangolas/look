@@ -146,3 +146,10 @@ pub mod blend;
 /// §5.3): the amended CC-030 walk closed by the foot-point pair of a certified
 /// guide curve and radius law, with the foot-point uniqueness gate (Section 1).
 pub mod blend_varradius;
+
+/// The S1 embedding certificate on the stratum quotient and the S1′ solid
+/// corollary (CC-023-SHELL-BRIDGE, spine S7 consumer): the shell certificate —
+/// per-pair three-valued verdicts (stars → broad phase → the evidence contact
+/// funnel), the certified-star count, and the pre-made closed/connected/
+/// orientation checks that decide [`shell::SolidOutcome`].
+pub mod shell;
