@@ -15,6 +15,7 @@ depends_on:  [PB-000-CONTRACT]
 write_allow:
   - vendor/truck/truck-modeling/src/facet_sweep.rs
   - vendor/truck/truck-modeling/tests/pb_concave_caps.rs
+  - vendor/truck/truck-modeling/tests/facet_sweep_conformance.rs
 read_allow:
   - vendor/truck/truck-modeling/src/facet_sweep.rs
   - vendor/truck/truck-meshalgo/src/tessellation/triangulation.rs
@@ -63,6 +64,17 @@ rings through the CDT path; the U-chute negative test inverts to positive.
 > 4. **No U-chute inversion** (the booked test never existed): the
 >    positive-case test is a non-convex ring of your construction with
 >    stated ground truth instead.
+> 5. **AMENDMENT r3 (2026-09-05, orchestrator; resolves the r2
+>    remaining-blocker): `facet_sweep_conformance.rs` joins the write
+>    set with ONE booked change** — the landed
+>    `non_convex_cap_refuses` test (L-shape fixture, ring_resolution 6,
+>    asserting `Err(ConstructError::InvalidInput)`) is the envelope line
+>    this packet deliberately moves: replace the refusal assertion with
+>    the certified-success assertion matching r2 test 1 (same fixture,
+>    valid closed solid), keeping the test's NAME. Every other assertion
+>    in that file is byte-identical (V5). The packet's Forbidden
+>    "landed test file" clause does not apply to this single booked
+>    inversion.
 4. `truck-meshalgo` is read-only (the ledger/CDT internals are consumed,
    never edited).
 
