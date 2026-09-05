@@ -110,6 +110,12 @@ pub mod loft_strips;
 /// of the declared [`stubs::ShiftFunctionalKind::VertexSumSq`] functional.
 pub mod correspondence;
 
+/// The L5 loft validity certificate (CC-014-LOFT-VALIDITY, spine S4/S6/S7
+/// consumers): the three-valued regularity + self-contact postcondition over
+/// the closed-wire strip loft, composing rank margins, the P2 injectivity
+/// radius, the P3 graph-disk decider, and the evidence contact funnel.
+pub mod loft_validity;
+
 /// The Gordon Boolean-sum construction (CC-015-GORDON, spine S8 consumer):
 /// `S = S_u + S_v − S_uv` over a compatible profile/guide network, reusing the
 /// CC-010 loft machinery and its two direction factorizations.
