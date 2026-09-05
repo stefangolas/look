@@ -25,8 +25,11 @@ def log(msg):
 
 
 def alive(cmd_fragment):
-    out = subprocess.run(["wmic", "process", "get", "CommandLine"],
-                         capture_output=True, text=True).stdout
+    out = subprocess.run(
+        ["powershell", "-NoProfile", "-Command",
+         "Get-CimInstance Win32_Process | "
+         "Select-Object -ExpandProperty CommandLine"],
+        capture_output=True, text=True).stdout
     return any(cmd_fragment in ln for ln in out.splitlines())
 
 
@@ -43,6 +46,11 @@ def main():
                 log("cargoq server not running - restarting")
                 subprocess.Popen(
                     [sys.executable, str(ROOT / "loop" / "cargoq" / "server.py")],
+                    cwd=str(ROOT), creationflags=subprocess.CREATE_NO_WINDOW)
+            if not alive("watchdog.py"):
+                log("watchdog not running - restarting")
+                subprocess.Popen(
+                    [sys.executable, str(ROOT / "loop" / "watchdog.py")],
                     cwd=str(ROOT), creationflags=subprocess.CREATE_NO_WINDOW)
         except Exception as exc:  # never die
             log(f"supervisor cycle error: {exc!r}")
