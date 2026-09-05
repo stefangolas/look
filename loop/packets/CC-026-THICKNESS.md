@@ -12,7 +12,7 @@ id:          CC-026-THICKNESS
 contract:    [CC-026-THICKNESS]
 class:       mechanical
 crates:      [truck-certified]
-depends_on:  [CC-000-CONTRACT, CC-004-CLEAR, CC-021-OFFSET-STRATA]
+depends_on:  [CC-000-CONTRACT, CC-004-CLEAR, CC-021-OFFSET-STRATA, CC-022-STARS]
 write_allow:
   - vendor/truck/truck-certified/src/construct/thickness.rs
   - vendor/truck/truck-certified/src/construct/mod.rs
@@ -47,7 +47,7 @@ coefficient composition cannot be made SOUND from the landed hull kernels,
 STOP and file QUESTION.md â€” that is the booked second-form decision
 (deferred Â§7.2â€“7.3), not a per-packet derivation.
 
-Section 2: the bottleneck term â€” `pub fn d_min_over_nonadjacent(strata:
+Section 2 (seam amendment, session 51: GluePlan is CC-022's landed type - the needs-edge was missing from this packet's registration and the worker's stop caught it): the bottleneck term â€” `pub fn d_min_over_nonadjacent(strata:
 &[OffsetStratum], glue: &GluePlan) -> Result<f64, ConstructRefusal>`:
 certified minimum distance between NON-ADJACENT source strata, adjacent
 pairs excluded by the glue plan (they are handled by the local star
