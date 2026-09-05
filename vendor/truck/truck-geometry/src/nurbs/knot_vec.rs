@@ -823,8 +823,8 @@ pub fn averaged_interpolation_knots(stations: &[f64], degree: usize) -> KnotVec 
         let inv_p = 1.0 / p as f64;
         for j in 1..=limit {
             let mut sum = 0.0;
-            for r in j..(j + p) {
-                sum += stations[r];
+            for &v in stations[j..(j + p)].iter() {
+                sum += v;
             }
             knots.push(sum * inv_p);
         }
