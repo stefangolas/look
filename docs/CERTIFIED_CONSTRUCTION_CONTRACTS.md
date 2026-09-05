@@ -244,6 +244,14 @@ pub fn resolve_correspondence(wire: &WireComplex, sections: &[WireComplex],
 (declared geometric functional) are frozen as stub types in CC-000; the
 argmin over r cyclic shifts calls S5. `AmbiguousCorrespondence` on enclosure
 overlap — never a proximity tie-break.
+AMENDED at CC-013's fifth dispatch (session 51, QUESTION.md finally
+preserved by the pending-archive patch): the S9 stubs were uninhabitable
+(sealed, no fields) and `Correspondence` was never defined anywhere. The S11
+posture applies — frozen PUB fields landed by CC-013 inside `stubs.rs`:
+`WireComplex { pub arc_count: usize, pub vertices: Vec<[Interval; 3]> }`,
+`ShiftFunctional` as the enum `Anchor { index: usize } | VertexSumSq`,
+`Correspondence { pub orientation: bool, pub anchor: Option<usize>,
+pub shifts: Vec<usize> }`.
 
 **S10 — Canal regularity (CC-025 → CC-021, CC-030/031).**
 ```rust

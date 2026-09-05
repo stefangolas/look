@@ -1,0 +1,47 @@
+{
+  "id": "CC-025-CANAL",
+  "contract": ["CC-025-CANAL"],
+  "class": "mechanical",
+  "crates": ["truck-certified"],
+  "status": "DONE",
+  "commit": "cb6a3b6",
+  "commit_subject": "feat(truck-certified): CC-025-CANAL canal closed-form regularity, arc-restricted (seam S10)",
+  "write_set": [
+    "vendor/truck/truck-certified/src/construct/canal.rs",
+    "vendor/truck/truck-certified/src/construct/mod.rs",
+    "vendor/truck/truck-certified/tests/construct_canal.rs"
+  ],
+  "anchors": {
+    "A1_pub_fn_injectivity_radius": 1,
+    "A2_pub_fn_rank_margin": 2,
+    "A3_pub_enum_RadiusLaw": 1,
+    "A4_pub_fn_bernstein_derivative_1d": 1
+  },
+  "scoped_checks": {
+    "cargo check -p truck-certified --locked": "pass",
+    "cargo test -p truck-certified --test construct_canal --locked": "pass (5/5)",
+    "cargo fmt -p truck-certified -- --check": "the three changed files are rustfmt-clean",
+    "cargo clippy -p truck-certified --all-targets --no-deps --message-format=short": "no finding on any added line of canal.rs / construct_canal.rs",
+    "kernel-gates.sh 6ca129e (V4 house rules)": "all P-3 gates pass (GATE-1 new modules deny unwrap_used; GATE-2 H-3 markers on the two 1e-N tolerance lines; GATE-3 none; GATE-4 111/111)"
+  },
+  "tests_required": {
+    "constant_radius_unit_circle_satisfies_pipe_condition": "pass",
+    "radius_law_slope_at_or_above_one_refuses_canal_singular": "pass",
+    "singular_spine_fixture_refuses_canal_singular": "pass",
+    "arc_restriction_is_strictly_more_permissive_than_all_theta": "pass",
+    "radius_law_evaluation_matches_declared_law": "pass"
+  },
+  "deviations": [],
+  "disagreements": [],
+  "baseline_failures": [],
+  "notes": {
+    "landed_surface": "canal.rs lands the S10 production evaluators and criterion: pub radius_eval(law, s) -> Result<Interval, ConstructRefusal>, pub radius_derivs(law, s) -> Result<(Interval, Interval), ConstructRefusal>, pub canal_regularity(spine, radius, arc) -> Result<Interval, ConstructRefusal>, pub canal_regularity_closed_pipe(spine, radius) -> Result<Interval, ConstructRefusal>. construct/mod.rs gains the designed one-line 'pub mod canal;' (with its doc line). RadiusLaw stays closed (stubs.rs untouched): evaluator production, not variant growth (stop condition 1).",
+    "radius_derivs_tuple_semantics": "radius_derivs returns (r, r') - the (value, first-derivative) pair matching the packet's per-law semantics note ('Constant(c) -> (c, 0)'; 'Linear -> interpolation with constant slope'). The second derivative r'' that the closed form needs (q = r'') is composed by the seam through an internal radius_jet that returns (r, r', r''); the public evaluator pair keeps the declared two-slot shape. The packet's '(r and r'; r'' where the law carries it)' is read that way: value and slope are the two public slots, r'' is carried internally where the law has one.",
+    "profile_coordinate": "Radius profiles are functions over the CALLER'S ARC normalized to u in [0,1]; canal_regularity maps each piece-overlap onto the arc's unit coordinate before evaluating the law (unit_image), so Linear slope = r1 - r0, Hermite/monotone evaluation happens on the unit sub-interval, and VertexControl is the monotone cubic through the control radii at the uniformly spaced control-vertex stations (index spacing; stations then cover 0..1 exactly for n >= 2). On a unit-length spine arc the normalized coordinate is the theory 6.1 arc-length coordinate and the seam is the packet's Section-2 prescription verbatim. The |r'| first gate is applied in that normalized coordinate; a strictly-positive radicand 1 - r'^2 is additionally enforced inside the criterion.",
+    "canal_criterion": "Per arc piece (map piece_intervals/piece_grids, the landed decomposition): the radius jet over the piece-overlap's normalized sub-interval; a = sqrt(1 - r'^2) refusing CanalSingular when the radicand enclosure is not strictly positive; z = a^2 - r*q with q = r''; ||c''|| via the Bernstein 1-D second-derivative hulls in SOURCE units (bernstein_derivative_1d twice, inv-width^2 coefficient scaling, hull_bernstein_1d over the piece-overlap unit image, componentwise norm sup with every square/sum/root rounded up - exactly the CC-002 curve discipline, stop condition 3: no second hull path). The certified arc value is min over the arc of |a^2 - rq| minus max over the arc of r*a*||c''|| with FIXED per-piece accumulation order (min of per-piece |z| lower bounds, then min of upper bounds; max of per-piece r.hi*a.hi*c2 upper terms). Returned Ok enclosure is [lo, hi] = [min_abs_lo - max_term, min_abs_hi]; lo > 0 -> regular (Ok); straddling or at/below zero -> Err(CanalSingular). A radius law whose enclosure is not strictly positive over a piece also refuses CanalSingular (the sphere envelope degenerates). Invalid requests (empty map, non-compact / degenerate arc, non-finite data) refuse InvalidInput.",
+    "arc_restriction_vs_closed_pipe": "canal_regularity_closed_pipe is the same criterion body minus the arc restriction: a closed pipe spans the map's entire spine loop, so the function takes no arc and certifies over the whole map domain (derived from the piece table). The permissiveness gap is exercised by the (t, t^3) spine (||c''|| = 6t rising 0..6): constant radius 0.5 fails the pipe condition on the whole loop (0.5*6 = 3 >= 1) and refuses both the whole-arc form and the closed pipe, while the arc-restricted form over [0, 0.1] (curvature bound ~0.6, r*||c''|| < 1) certifies - the gap is observed, not assumed.",
+    "monotone_cubic": "MonotoneCubic and VertexControl build a shape-preserving (Fritsch-Carlson) monotone cubic: sorted strictly-increasing finite stations required to cover [0,1] (first 0.0, last 1.0), interior slopes the weighted harmonic mean with zeros at sign changes, endpoint slopes the clamped three-point estimates, one cubic Bezier segment per span. Tests pin the collinear dyadic case (radii 0.5/0.7/0.9 at 0/0.5/1): value 0.6 and slope 0.4 at u = 0.25, plus exact station reproduction.",
+    "stop_conditions": "None triggered. (1) RadiusLaw stays closed in stubs.rs - production evaluators land in canal.rs. (2) The composition never builds a Frenet frame and no torsion term appears; the closed form is the theory 6.3 identity |X_s x X_theta| = r*|a^2 - rq - r*a*(c''.e_theta)| with q = r'', and torsion cancels (verified against theory 6.3 before implementing; the seam composes only r, r', r'', ||c''||). (3) ||c''|| is bounded directly by the landed hull::bernstein_derivative_1d + hull::hull_bernstein_1d over the map's piece grids - no second hull path was written.",
+    "house_rules": "canal.rs is new shipped code: no unwrap/expect/panic, no module-level allow, H-1 lint denials declared, all pub items documented. Float comparisons in tests carrying scientific-notation literals carry the same-line // H-3 opt-out (two lines flagged by kernel-gates GATE-2). Cargo invocations went through the PATH queue shim only. COMMIT made before RESULT.json."
+  }
+}
