@@ -321,7 +321,7 @@ def battery(rows, order, reg_path):
     log(f"battery kernel-gates: exit {gates.returncode}")
     if all(v == 0 for v in results.values()):
         for pid in rows:
-            if pid.startswith("BG-KV2-"):
+            if pid.startswith(("BG-KV2-", "CC-")):
                 rows[pid]["status"] = "DONE"
         save_registry(rows, order, reg_path)
         git(["add", "loop/PACKETS.jsonl"])
@@ -361,6 +361,7 @@ def main():
                 log("battery cooldown active - no dispatch until green")
             else:
                 battery(rows, order, reg_path)
+                rows, order, reg_path = registry()  # battery flips rows in the file
                 if rows_done(rows):
                     log("BATTERY GREEN - program complete; dispatch opens")
                 else:
