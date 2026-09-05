@@ -94,7 +94,7 @@ pub fn provenance_witness(/* construction data */) -> Result<ExactVanishingWitne
 |---|---|---|---|
 | A1 | `truck-certified/src/formal/exact.rs` | `pub struct Expansion` | 1 |
 | A2 | `truck-certified/src/tangency/shapes.rs` | `pub struct ExactVanishingWitness` | 1 |
-| A3 | `truck-certified/src/kernel/rational.rs` | `cone_torus_carrier_packet_pending` | 1 |
+| A3 | `truck-certified/src/construct/refusal.rs` | `pub enum ConstructRefusal` | 1 |
 | A4 | `truck-certified/src/ssi_types.rs` | `pub struct SquareSystem3` | 1 |
 
 ## House rules

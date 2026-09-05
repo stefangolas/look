@@ -105,20 +105,25 @@ Each fixture is a hand-computable ground truth machine-checked at admission:
 - **F7 (T2)**: reuse the landed `boolean_m2` fixture *values* (copied as
   constants, read-only — do not import the test module).
 
-## Anchors — measured this session; re-check on your branch before building
+## Anchors — R2 correction: base-relative, drift-tolerant (re-measured 2026-09-05 evening)
 
-Locate by pattern, never by line number. If a count differs, STOP and report
-`ANCHOR_MISMATCH` with what you saw.
+The r1 dispatch stopped `ANCHOR_MISMATCH` because two anchors were absolute
+counts on SHARED files: `lib.rs`'s `^pub mod` total (13 at authoring, 16
+after CL-000/CL-006 landed additive modules) and the pending-refusal string
+(now 2 occurrences). Lesson recorded: never anchor a count on a shared-file
+total; anchor on the packet-owned delta. Re-check on your branch:
 
 | id | file | pattern | expect |
 |---|---|---|---|
 | A1 | `truck-certified/src/ssi_types.rs` | `pub struct SquareSystem3` | 1 |
 | A2 | `truck-certified/src/formal/exact.rs` | `pub struct CertifiedInterval` | 1 |
 | A3 | `truck-certified/src/formal/exact.rs` | `pub struct Expansion` | 1 |
-| A4 | `truck-certified/src/lib.rs` | `^pub mod` | 13 |
-| A5 | `truck-certified/src/kernel/rational.rs` | `cone_torus_carrier_packet_pending` | 1 |
+| A4 | `truck-certified/src/lib.rs` | `pub mod tangency` | **0 before, 1 after your change** |
+| A5 | `truck-certified/src/construct/stubs.rs` | `pub struct WireComplex` | 1 |
 
-A4 becomes 14 when you add `pub mod tangency;`.
+A4 is deliberately 0 at base: the tangency module does not exist yet — you
+create it. If `pub mod tangency` is already present, another writer landed
+first: STOP, `ANCHOR_MISMATCH`.
 
 ## House rules
 
@@ -180,7 +185,7 @@ of your worktree.
 
 ```json
 {"id":"CTE-000-SPINE","status":"DONE","contracts":["CTE-000-SPINE"],
- "tests_added":6,"anchors_verified":{"A1":1,"A2":1,"A3":1,"A4":13,"A5":1},
+ "tests_added":6,"anchors_verified":{"A1":1,"A2":1,"A3":1,"A4":1,"A5":1},
  "notes":"shape inventory frozen; mapping rows added; any contract deviation from spine §2 stated here"}
 ```
 
