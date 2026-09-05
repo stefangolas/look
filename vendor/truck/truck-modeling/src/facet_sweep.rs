@@ -180,18 +180,47 @@ pub fn facet_sweep<S: SpineCurve>(
 
     // 4. Caps. The ring vertices ARE the grid vertices (shared identity).
     // Convexity is certified at BOTH cap stations: the ring polygon's
-    // consecutive edge pairs all cross with one strict sign.
+    // consecutive edge pairs all cross with one strict sign. A convex ring
+    // keeps the landed apex fan verbatim — the V5 byte-identity guard (the
+    // cap triangulation of a convex ring is bit-identical to the pre-packet
+    // build). A non-convex ring routes to the deterministic ear-clip
+    // triangulation ([`cap_triangulation::triangulate`]) instead of refusing:
+    // that path only ever replaces the historical refusal.
     let start_ring: Vec<Point3> = (0..k).map(|j| positions[j]).collect();
     let end_ring: Vec<Point3> = ((m - 1) * k..m * k).map(|i| positions[i]).collect();
-    if !ring_is_convex(&start_ring, position_tol) || !ring_is_convex(&end_ring, position_tol) {
-        return Err(ConstructError::InvalidInput);
-    }
-    for t in 1..k - 1 {
-        tri_faces.push([0, t, t + 1]);
-    }
-    let r0 = (m - 1) * k;
-    for t in 1..k - 1 {
-        tri_faces.push([r0, r0 + t + 1, r0 + t]);
+    let start_convex = ring_is_convex(&start_ring, position_tol);
+    let end_convex = ring_is_convex(&end_ring, position_tol);
+    if start_convex && end_convex {
+        for t in 1..k - 1 {
+            tri_faces.push([0, t, t + 1]);
+        }
+        let r0 = (m - 1) * k;
+        for t in 1..k - 1 {
+            tri_faces.push([r0, r0 + t + 1, r0 + t]);
+        }
+    } else {
+        // H-6: cap triangulation is facet output computed in floats — the same
+        // evidence doctrine as the fast path, never `Exact`. Each emitted
+        // triangle is a fan from the ring's own boundary orientation at the
+        // start cap and reversed at the end cap (the side band's ring edges
+        // are shared in the opposite direction — closure, plan §3.3).
+        let start_cap = if start_convex {
+            (1..k - 1).map(|t| [0usize, t, t + 1]).collect::<Vec<_>>()
+        } else {
+            cap_triangulation::triangulate(&start_ring, position_tol)?
+        };
+        let r0 = (m - 1) * k;
+        let end_cap = if end_convex {
+            (1..k - 1).map(|t| [0usize, t, t + 1]).collect::<Vec<_>>()
+        } else {
+            cap_triangulation::triangulate(&end_ring, position_tol)?
+        };
+        for tri in start_cap {
+            tri_faces.push(tri);
+        }
+        for tri in end_cap {
+            tri_faces.push([tri[2] + r0, tri[1] + r0, tri[0] + r0]);
+        }
     }
 
     // 5. Global orientation normalization. The grid's faces share one
@@ -352,6 +381,284 @@ fn ring_is_convex(ring: &[Point3], tolerance: f64) -> bool {
         }
     }
     true
+}
+
+/// The concave-cap layer (PB-003-CONCAVE-CAPS): the deterministic ear-clip
+/// triangulation of ONE planar cap ring.
+///
+/// Caps are planar, hole-free simple polygons. A convex ring never reaches
+/// this module — `ring_is_convex` keeps the apex-fan fast path bit-identical
+/// (the V5 guard). Only a ring that failed the convex fan is triangulated
+/// here, and only when it is a simple polygon: a self-intersecting ring
+/// refuses typed (`ConstructError::InvalidInput`), never repaired. The ring's
+/// simplicity check precedes any triangulation.
+///
+/// Determinism (H-1, plan §7): the ring is projected onto its carrier plane
+/// and clipped leftmost-most-convex-ear first — at every step the clipped ear
+/// is the convex ear whose apex projects LEFTMOST (smallest carrier-plane x;
+/// an exact x tie is broken by the smallest carrier-plane y). An exact tie
+/// cannot occur for a simple ring, which never revisits a boundary point; the
+/// rule makes the emitted triangle order a pure function of the ring. Every
+/// emitted triangle keeps the ring's own boundary orientation (the caller
+/// reverses the end cap so both caps share the side band's ring edges in the
+/// opposite direction — closure, plan §3.3).
+///
+/// Ear clipping is O(n²) ears over an O(n) scan (n = the ring resolution).
+/// Refusals are typed, never panics (H-1): a degenerate ring that offers no
+/// strictly convex ear refuses instead of looping. H-6: cap triangulation is
+/// facet output computed in floats — never `Exact`.
+mod cap_triangulation {
+    use super::*;
+
+    /// Triangulates one planar cap ring, returning the triangles over the
+    /// ring's LOCAL vertex ordinals (0..k-1), each oriented with the ring's
+    /// own boundary. See the module docs for the determinism rule.
+    pub(super) fn triangulate(
+        ring: &[Point3],
+        tolerance: f64,
+    ) -> Result<Vec<[usize; 3]>, ConstructError> {
+        let k = ring.len();
+        if k < 3 {
+            return Err(ConstructError::InvalidInput);
+        }
+        let coords = project(ring, tolerance)?;
+        if !ring_is_simple(&coords) {
+            return Err(ConstructError::InvalidInput);
+        }
+        let twice_area = signed_twice_area(&coords);
+        if twice_area.abs() <= tolerance {
+            return Err(ConstructError::InvalidInput);
+        }
+        let orientation = if twice_area > 0.0 { 1.0 } else { -1.0 };
+        ear_clip(&coords, orientation)
+    }
+
+    /// Projects the ring onto its carrier plane as 2-D coordinates. The
+    /// carrier normal is the Newell normal; when the algebraic area vanishes
+    /// (a self-intersecting ring whose lobes cancel) the first non-collinear
+    /// consecutive triple supplies the plane instead. A degenerate (collinear)
+    /// ring refuses typed.
+    fn project(ring: &[Point3], tolerance: f64) -> Result<Vec<[f64; 2]>, ConstructError> {
+        let origin = Point3::origin();
+        let mut normal = Vector3::zero();
+        for (j, point) in ring.iter().enumerate() {
+            let next = ring[(j + 1) % ring.len()];
+            normal += (*point - origin).cross(next - origin);
+        }
+        if normal.magnitude() <= tolerance {
+            normal = Vector3::zero();
+            let mut found = false;
+            for j in 0..ring.len() {
+                let a = ring[j];
+                let b = ring[(j + 1) % ring.len()];
+                let c = ring[(j + 2) % ring.len()];
+                let cross = (b - a).cross(c - b);
+                if cross.magnitude() > tolerance {
+                    normal = cross;
+                    found = true;
+                    break;
+                }
+            }
+            if !found {
+                return Err(ConstructError::InvalidInput);
+            }
+        }
+        let n_hat = normal.normalize();
+        let axis = if n_hat.x.abs() <= n_hat.y.abs() && n_hat.x.abs() <= n_hat.z.abs() {
+            Vector3::unit_x()
+        } else if n_hat.y.abs() <= n_hat.z.abs() {
+            Vector3::unit_y()
+        } else {
+            Vector3::unit_z()
+        };
+        let u = n_hat.cross(axis).normalize();
+        let v = n_hat.cross(u);
+        let base = ring[0];
+        Ok(ring
+            .iter()
+            .map(|point| {
+                let d = *point - base;
+                [d.dot(u), d.dot(v)]
+            })
+            .collect())
+    }
+
+    /// The ring's simplicity gate, preceding any triangulation: no zero-length
+    /// edge and no two non-adjacent edges intersect. An endpoint touching a
+    /// non-adjacent edge counts as an intersection — a simple ring never
+    /// revisits a boundary point. Exact f64 predicates; the planar fixtures
+    /// decide exactly (no repair, no tolerance games).
+    fn ring_is_simple(coords: &[[f64; 2]]) -> bool {
+        let n = coords.len();
+        for j in 0..n {
+            if coords[j] == coords[(j + 1) % n] {
+                return false;
+            }
+        }
+        for j in 0..n {
+            let a = coords[j];
+            let b = coords[(j + 1) % n];
+            for l in (j + 1)..n {
+                if l == j + 1 || (j == 0 && l == n - 1) {
+                    continue;
+                }
+                let c = coords[l];
+                let d = coords[(l + 1) % n];
+                if segments_intersect(a, b, c, d) {
+                    return false;
+                }
+            }
+        }
+        true
+    }
+
+    /// The signed twice-area of the ring (shoelace), giving its orientation.
+    fn signed_twice_area(coords: &[[f64; 2]]) -> f64 {
+        let mut sum = 0.0;
+        for (j, a) in coords.iter().enumerate() {
+            let b = coords[(j + 1) % coords.len()];
+            sum += a[0] * b[1] - a[1] * b[0];
+        }
+        sum
+    }
+
+    /// The ear-clip loop over the ring's carrier-plane coordinates. Clips
+    /// leftmost-most-convex-ear first (see the module docs); refuses typed if
+    /// a step finds no strictly convex ear.
+    fn ear_clip(coords: &[[f64; 2]], orientation: f64) -> Result<Vec<[usize; 3]>, ConstructError> {
+        let mut active: Vec<usize> = (0..coords.len()).collect();
+        let mut triangles: Vec<[usize; 3]> = Vec::with_capacity(coords.len() - 2);
+        while active.len() > 3 {
+            let len = active.len();
+            let mut chosen: Option<usize> = None;
+            for i in 0..len {
+                let prev = active[(i + len - 1) % len];
+                let cur = active[i];
+                let next = active[(i + 1) % len];
+                if turn2(coords, prev, cur, next) * orientation <= 0.0 {
+                    continue;
+                }
+                if contains_other_vertex(coords, &active, prev, cur, next) {
+                    continue;
+                }
+                chosen = match chosen {
+                    None => Some(i),
+                    Some(best) => {
+                        let best_apex = active[best];
+                        if coords[cur][0] < coords[best_apex][0]
+                            || (coords[cur][0] == coords[best_apex][0]
+                                && coords[cur][1] < coords[best_apex][1])
+                        {
+                            Some(i)
+                        } else {
+                            Some(best)
+                        }
+                    }
+                };
+            }
+            let i = match chosen {
+                Some(i) => i,
+                None => return Err(ConstructError::InvalidInput),
+            };
+            let len = active.len();
+            let prev = active[(i + len - 1) % len];
+            let cur = active[i];
+            let next = active[(i + 1) % len];
+            triangles.push([prev, cur, next]);
+            active.remove(i);
+        }
+        triangles.push([active[0], active[1], active[2]]);
+        Ok(triangles)
+    }
+
+    /// Whether any OTHER active ring vertex lies inside or on the candidate
+    /// ear triangle `(prev, cur, next)`. A convex vertex whose ear triangle
+    /// holds another vertex is not an ear — its diagonal would cut the ring.
+    fn contains_other_vertex(
+        coords: &[[f64; 2]],
+        active: &[usize],
+        prev: usize,
+        cur: usize,
+        next: usize,
+    ) -> bool {
+        for &m in active {
+            if m == prev || m == cur || m == next {
+                continue;
+            }
+            if in_triangle(coords, m, prev, cur, next) {
+                return true;
+            }
+        }
+        false
+    }
+
+    /// Whether vertex `m` lies inside or on the (non-degenerate) triangle
+    /// `(a, b, c)`, in either orientation.
+    fn in_triangle(coords: &[[f64; 2]], m: usize, a: usize, b: usize, c: usize) -> bool {
+        let o1 = orient2(coords, a, b, m);
+        let o2 = orient2(coords, b, c, m);
+        let o3 = orient2(coords, c, a, m);
+        (o1 >= 0.0 && o2 >= 0.0 && o3 >= 0.0) || (o1 <= 0.0 && o2 <= 0.0 && o3 <= 0.0)
+    }
+
+    /// The signed 2-D turn at `b` along the path `a -> b -> c` (the z of
+    /// `(b - a) x (c - b)`).
+    fn turn2(coords: &[[f64; 2]], a: usize, b: usize, c: usize) -> f64 {
+        let (ax, ay) = (coords[a][0], coords[a][1]);
+        let (bx, by) = (coords[b][0], coords[b][1]);
+        let (cx, cy) = (coords[c][0], coords[c][1]);
+        let (dx1, dy1) = (bx - ax, by - ay);
+        let (dx2, dy2) = (cx - bx, cy - by);
+        dx1 * dy2 - dy1 * dx2
+    }
+
+    /// The signed 2-D orient of vertex `m` against the directed line
+    /// `a -> b` (the z of `(b - a) x (m - a)`).
+    fn orient2(coords: &[[f64; 2]], a: usize, b: usize, m: usize) -> f64 {
+        let (ax, ay) = (coords[a][0], coords[a][1]);
+        let (bx, by) = (coords[b][0], coords[b][1]);
+        let (mx, my) = (coords[m][0], coords[m][1]);
+        (bx - ax) * (my - ay) - (by - ay) * (mx - ax)
+    }
+
+    /// Whether segments `ab` and `cd` intersect (proper crossing, collinear
+    /// overlap, or an endpoint touching the other segment).
+    fn segments_intersect(a: [f64; 2], b: [f64; 2], c: [f64; 2], d: [f64; 2]) -> bool {
+        let o1 = orient(a, b, c);
+        let o2 = orient(a, b, d);
+        let o3 = orient(c, d, a);
+        let o4 = orient(c, d, b);
+        if o1 * o2 < 0.0 && o3 * o4 < 0.0 {
+            return true;
+        }
+        if o1 == 0.0 && on_segment(a, b, c) {
+            return true;
+        }
+        if o2 == 0.0 && on_segment(a, b, d) {
+            return true;
+        }
+        if o3 == 0.0 && on_segment(c, d, a) {
+            return true;
+        }
+        if o4 == 0.0 && on_segment(c, d, b) {
+            return true;
+        }
+        false
+    }
+
+    /// The signed 2-D orient of `c` against the directed line `a -> b`.
+    fn orient(a: [f64; 2], b: [f64; 2], c: [f64; 2]) -> f64 {
+        (b[0] - a[0]) * (c[1] - a[1]) - (b[1] - a[1]) * (c[0] - a[0])
+    }
+
+    /// Whether `p` lies within the bounding box of segment `ab` (the caller
+    /// has already certified `p` collinear with `ab`).
+    fn on_segment(a: [f64; 2], b: [f64; 2], p: [f64; 2]) -> bool {
+        p[0] >= a[0].min(b[0])
+            && p[0] <= a[0].max(b[0])
+            && p[1] >= a[1].min(b[1])
+            && p[1] <= a[1].max(b[1])
+    }
 }
 
 /// The position-only `StandardVertex` for a grid-registry index.

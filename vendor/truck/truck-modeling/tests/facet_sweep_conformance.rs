@@ -351,16 +351,23 @@ fn profile_collapse_refuses_before_emission() {
 
 #[test]
 fn non_convex_cap_refuses() {
+    // PB-003-CONCAVE-CAPS r3: the ONE booked inversion of this file. The
+    // L-shape cap ring (ring 6) no longer refuses — it routes to the
+    // deterministic ear-clip cap triangulation and realizes a valid closed
+    // solid: clean winding, certified verdict, positive volume.
     let recipe = SpineFrameRecipe::new(
         straight_spine(),
         ProfileLaw::Constant(l_shape()),
         fixed_plane_z(),
     );
     let stations = uniform_stations(5);
-    assert!(matches!(
-        facet_sweep(&recipe, &stations, 6),
-        Err(ConstructError::InvalidInput)
-    ));
+    let result = swept(&recipe, &stations, 6);
+    assert_eq!(result.audit.winding_violations, 0);
+    assert_eq!(result.verdict, FacetVerdict::CertifiedWithinTolerance);
+    assert!(
+        result.audit.signed_volume > 0.0,
+        "the L prism must realize with positive volume"
+    );
 }
 
 #[test]
