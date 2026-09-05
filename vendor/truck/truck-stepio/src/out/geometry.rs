@@ -504,6 +504,10 @@ impl DisplayByStep for ModelingCurve {
             // BG-CG-009-BREP: STEP writing of a spine-frame trajectory is
             // TR-NRB-001's booked business, not ours — refuse typed.
             ModelingCurve::SpineFrameCurve(_) => ERR,
+            // BIE-003-CARRIER: STEP writing of a certified implicit
+            // intersection curve carrier is the certified envelope's booked
+            // business, not ours — refuse typed (never panic).
+            ModelingCurve::CertifiedImplicitIntersectionCurve(_) => ERR,
         }
     }
 }
@@ -520,6 +524,9 @@ impl StepLength for ModelingCurve {
             ModelingCurve::IntersectionCurve(x) => x.step_length(),
             // The variant refuses in `DisplayByStep`; never reached.
             ModelingCurve::SpineFrameCurve(_) => 0,
+            // BIE-003-CARRIER: the variant refuses in `DisplayByStep`; never
+            // reached.
+            ModelingCurve::CertifiedImplicitIntersectionCurve(_) => 0,
         }
     }
 }

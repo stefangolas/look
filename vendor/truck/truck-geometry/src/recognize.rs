@@ -133,11 +133,14 @@ pub fn recognize_curve(c: &Curve) -> CanonicalCarrierWitness {
             map: CanonicalParamMap::Curve(ParamMap::IDENTITY),
         },
         // Exact spline→analytic detection is a documented later packet; the
-        // profile builders emit `Line`/`Circle` directly.
+        // profile builders emit `Line`/`Circle` directly. A certified implicit
+        // intersection curve is a procedural carrier, never a canonical
+        // analytic one — the `IntersectionCurve` delegation.
         Curve::BSplineCurve(_)
         | Curve::NurbsCurve(_)
         | Curve::IntersectionCurve(_)
-        | Curve::SpineFrameCurve(_) => CanonicalCarrierWitness::Unrecognized,
+        | Curve::SpineFrameCurve(_)
+        | Curve::CertifiedImplicitIntersectionCurve(_) => CanonicalCarrierWitness::Unrecognized,
     }
 }
 
@@ -254,11 +257,16 @@ pub fn recognize_surface(s: &Surface) -> CanonicalCarrierWitness {
                     }
                 }
                 // Only `Line`/`Circle` profiles are canonical in Phase 0; a
-                // nested extrusion is `Unrecognized` with the rest.
+                // nested extrusion is `Unrecognized` with the rest. A certified
+                // implicit intersection curve is never canonical either — the
+                // `IntersectionCurve` delegation.
                 Curve::BSplineCurve(_)
                 | Curve::NurbsCurve(_)
                 | Curve::IntersectionCurve(_)
-                | Curve::SpineFrameCurve(_) => CanonicalCarrierWitness::Unrecognized,
+                | Curve::SpineFrameCurve(_)
+                | Curve::CertifiedImplicitIntersectionCurve(_) => {
+                    CanonicalCarrierWitness::Unrecognized
+                }
             }
         }
     }

@@ -171,7 +171,8 @@ fn curve_box(curve: &Curve) -> Result<Box3, Refusal> {
         Curve::BSplineCurve(_)
         | Curve::NurbsCurve(_)
         | Curve::IntersectionCurve(_)
-        | Curve::SpineFrameCurve(_) => Err(non_canonical()),
+        | Curve::SpineFrameCurve(_)
+        | Curve::CertifiedImplicitIntersectionCurve(_) => Err(non_canonical()),
     }
 }
 
