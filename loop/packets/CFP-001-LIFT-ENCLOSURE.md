@@ -188,3 +188,38 @@ of your worktree.
  "v5_boolean_adjudication":"<count of battery diffs, each a superset; one line each>",
  "notes":"both defects corrected; screen rewired; any deviation stated here"}
 ```
+
+## Amendment r2 (orchestrator, 2026-09-06) - rebase and resolve the assemble.rs seam
+
+Your r1 work committed as 930db75 and is intact, but its merge into
+integration/kernel-bg CONFLICTED in
+`vendor/truck/truck-shapeops/src/boolean/assemble.rs`: CTE-007-T2ARRANGE
+landed first (its own tests appended at the same end-of-module anchor) and
+your branch forked before that landing. Your commit is checked out at the
+slot worktree root on branch `wip/CFP-001-r2` - unmodified, exactly as you
+wrote it.
+
+Required correction:
+1. `git rebase integration/kernel-bg` (or cherry-pick / re-apply) so your
+   commit sits on the integrated HEAD.
+2. Resolve the assemble.rs conflict by keeping BOTH sides: every
+   CTE-007-landed test keeps its exact name and assertions
+   (`self_pair_rewrites_before_sweep`, `butt_join_union_drops_shared_wall`,
+   their helpers), and all of your fixture constants, fixture fns, and
+   tests land alongside them at module level. Union the use-blocks. No
+   assertion may be weakened or deleted on either side - that is a
+   Forbidden outcome.
+3. Your enclosure.rs and defect-record changes should apply cleanly; if
+   anything else conflicts, keep both semantics and state it in the RESULT.
+4. Commit the resolution as ONE commit:
+   subject `fix(evidence/shapeops): CFP-001 r2 - rebase onto integrated HEAD, resolve the assemble.rs seam (CFP-001-LIFT-ENCLOSURE)`.
+5. Scoped checks (run them all):
+   cargo check -p truck-shapeops -p truck-evidence
+   cargo test -p truck-shapeops --lib boolean
+   cargo test -p truck-evidence --lib
+6. Write RESULT.json AT THE WORKTREE ROOT (r2 - status DONE only if every
+   r1 test and every landed CTE-007 test passes).
+
+Note: a worker commit 930db75 exists on branch wip/CFP-001-r1 as well; if
+you find the rebase in an unexpected state, `git log --oneline -3` first
+and recover from wip/CFP-001-r1.
