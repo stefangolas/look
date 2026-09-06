@@ -55,6 +55,11 @@
 /// `#[doc(hidden)] pub` so the wave packets' tests can reach it through the
 /// crate's public path without admitting it to the certified API surface
 /// (the `ssi_fixtures` precedent).
+/// The Lemma T1.0 bounded 18-chart search (CTE-002-GRAPH).
+pub mod chart;
 #[doc(hidden)]
 pub mod fixtures;
+/// The (H-graph) parametric Newton/Krawczyk graph certification
+/// (CTE-002-GRAPH).
+pub mod graph;
 pub mod shapes;
