@@ -49,8 +49,9 @@ use crate::analytic::{AnalyticIntersection, AnalyticOutcome, ExactCurve};
 use crate::enclosure::{interval_at, Box3, EnclosureSurface, Interval};
 use std::cmp::Ordering;
 use std::f64::consts::TAU;
+use std::sync::Mutex;
 use truck_base::cgmath64::{
-    EuclideanSpace, InnerSpace, Matrix4, Point3, SquareMatrix, Transform, Vector3,
+    EuclideanSpace, InnerSpace, Matrix4, Point3, SquareMatrix, Transform, Vector3, Vector4,
 };
 use truck_base::contact::{ContactDimension, ContactEventKind};
 use truck_base::evidence::{
@@ -58,6 +59,7 @@ use truck_base::evidence::{
     Refusal, Truth, UnresolvedWitness,
 };
 use truck_geometry::constructive::SpineFrameSweep;
+use truck_geometry::nurbs::BSplineSurface;
 use truck_geometry::recognize::{
     CanonicalCarrier, CanonicalCarrierWitness, CanonicalCurve, CanonicalSurface,
 };
@@ -497,6 +499,185 @@ fn restricted_sweep_contact(
         }
         // A landed typed refusal, passed through unchanged.
         solver_entry::RestrictedSolve::Refused(refusal) => Err(refusal),
+    }
+}
+
+// ---------------------------------------------------------------------------
+// CL-001-SPLINE-LIFT: the spline×analytic SSI dispatch arm.
+// ---------------------------------------------------------------------------
+
+/// One certified root sample of a spline×analytic box (CL-001): the certified
+/// 4-D parameter cell (the certified statement), the float chart centre and
+/// the float model centre (diagnostics, H-6), and the solve certificate.
+#[derive(Clone, Debug)]
+pub struct SsiCertifiedRoot {
+    /// The certified 4-D parameter cell of the root, in the shared unit chart
+    /// of the pair's two patches (`(u, v)` on the spline side, `(s, t)` on the
+    /// analytic side).
+    pub cell: solver_entry::ParameterCell,
+    /// The float chart centre of the cell (diagnostics; the cell is the
+    /// certified statement).
+    pub chart: [f64; 4],
+    /// The model point at the chart centre on the spline carrier (float
+    /// diagnostics, H-6).
+    pub centre: Point3,
+    /// The solve certificate of the box (interval method).
+    pub certificate: Certificate,
+}
+
+/// The certified dispatch outcome vocabulary of the spline×analytic SSI arm
+/// (CL-001, mirroring [`solver_entry::RestrictedSolve`] — zero new `Refusal`
+/// arms).
+#[derive(Clone, Debug)]
+pub enum SsiSplineSolve {
+    /// A certified unique root of the pair's square system on the box.
+    Certified(SsiCertifiedRoot),
+    /// The typed unresolved verdict with the κ / cell / slope witness of the
+    /// engine (the CL-001 dispatch's `Unresolved { κ, cell, slope }`).
+    Unresolved {
+        /// The conditioning / curvature witness that kept the box from a
+        /// certified answer.
+        kappa: f64,
+        /// The `(u, v) × (s, t)` box that stayed unresolved, in the shared
+        /// unit chart of the pair's patches.
+        cell: solver_entry::ParameterCell,
+        /// The §5.4 slope diagnostic of the unresolved box.
+        slope: f64,
+        /// What the engine spent before giving up.
+        spent: Budget,
+    },
+    /// A landed typed refusal, passed through unchanged.
+    Refused(Refusal),
+}
+
+/// The dependency-inverted entry of the spline×analytic SSI dispatch (CL-001).
+///
+/// The certified SSI engine (admission + `construct_square_system` +
+/// `krawczyk3_certificate`) is a `truck-certified` construction this crate
+/// cannot name, so the seam is a runtime-registered trait whose impl lives in
+/// `truck-certified` (`ssi_admit.rs`). A spline carrier (the corpus loft's
+/// clamped homogeneous `BSplineSurface<Vector4>`) against an analytic carrier
+/// is certified on one box of the pair's shared patch chart; the impl answers
+/// the typed outcome vocabulary — a certified root, the typed unresolved with
+/// the κ/cell/slope witness, or a landed refusal. A pair the impl cannot
+/// express answers `Refused` (never a panic).
+pub trait SplineSsiEntry: Send + Sync {
+    /// Certifies one spline×analytic box and returns the typed outcome.
+    fn certify_spline_box(
+        &self,
+        spline: &BSplineSurface<Vector4>,
+        analytic: &CanonicalSurface,
+        analytic_window: ((f64, f64), (f64, f64)),
+        box_: [(f64, f64); 4],
+        budget: &mut Budget,
+    ) -> SsiSplineSolve;
+}
+
+/// The registry slot refused a registration (an entry was already set, or the
+/// lock was poisoned). Registration is set-once (determinism).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct SplineSsiSetError;
+
+/// The process-wide set-once registry slot of the spline×analytic SSI entry.
+///
+/// Registration is runtime-explicit (never a cargo feature, never a
+/// `#[ctor]`); the slot is empty until the certified crate registers at its
+/// init. With an empty slot the funnel answers today's typed
+/// `NumericallyUnresolved` (the pre-CL-001 refusal boundary is gone: a spline
+/// pair is inside the certified dispatch envelope, never the deferred funnel).
+static SPLINE_SSI: Mutex<Option<Box<dyn SplineSsiEntry>>> = Mutex::new(None);
+
+/// Sets the spline×analytic SSI entry, once.
+///
+/// A second registration while the slot is occupied refuses
+/// ([`SplineSsiSetError`]); the caller is expected to [`take_spline_ssi_entry`]
+/// a stale entry before re-registering (determinism: set-once semantics).
+pub fn set_spline_ssi_entry(entry: impl SplineSsiEntry + 'static) -> Result<(), SplineSsiSetError> {
+    match SPLINE_SSI.lock() {
+        Ok(mut guard) => {
+            if guard.is_some() {
+                return Err(SplineSsiSetError);
+            }
+            *guard = Some(Box::new(entry));
+            Ok(())
+        }
+        Err(_) => Err(SplineSsiSetError),
+    }
+}
+
+/// Empties the registry slot, returning whether an entry was present.
+pub fn take_spline_ssi_entry() -> bool {
+    match SPLINE_SSI.lock() {
+        Ok(mut guard) => guard.take().is_some(),
+        Err(_) => false,
+    }
+}
+
+/// Dispatches one spline×analytic box through the registered SSI entry.
+///
+/// Returns `None` when no entry is registered (or the lock is poisoned): the
+/// funnel then answers today's typed `NumericallyUnresolved` — the CL-001
+/// baseline arm.
+fn dispatch_spline_ssi(
+    spline: &BSplineSurface<Vector4>,
+    analytic: &CanonicalSurface,
+    analytic_window: ((f64, f64), (f64, f64)),
+    box_: [(f64, f64); 4],
+    budget: &mut Budget,
+) -> Option<SsiSplineSolve> {
+    match SPLINE_SSI.lock() {
+        Ok(guard) => guard
+            .as_deref()
+            .map(|entry| entry.certify_spline_box(spline, analytic, analytic_window, box_, budget)),
+        Err(_) => None,
+    }
+}
+
+/// The CL-001 dispatch entry of the contact funnel: certifies one
+/// spline×analytic carrier box through the registered SSI engine and maps the
+/// typed outcome onto the landed evidence taxonomy.
+///
+/// With an entry registered, a certified root emits one `Point0` /
+/// `Transverse` contact record whose locus is the certified model centre; the
+/// engine's typed unresolved verdict maps onto `Refusal::NumericallyUnresolved`
+/// (spend recorded), and a landed refusal passes through unchanged. With no
+/// entry registered the funnel answers today's typed `NumericallyUnresolved`
+/// — the spline pair dispatches through the certified envelope, never the old
+/// `ContactReductionDeferred` lift refusal.
+pub fn spline_analytic_contact(
+    spline: &BSplineSurface<Vector4>,
+    analytic: &CanonicalSurface,
+    analytic_window: ((f64, f64), (f64, f64)),
+    box_: [(f64, f64); 4],
+    budget: &mut Budget,
+) -> Outcome<ContactComplex> {
+    let initial = *budget;
+    let Some(solve) = dispatch_spline_ssi(spline, analytic, analytic_window, box_, budget) else {
+        return Err(Refusal::NumericallyUnresolved {
+            spent: initial,
+            witness: UnresolvedWitness::KrawczykIndeterminate,
+        });
+    };
+    match solve {
+        SsiSplineSolve::Certified(root) => {
+            let certificate = root.certificate.clone();
+            *budget = certificate.budget_left;
+            Ok(Certified::new(
+                ContactComplex {
+                    contacts: vec![ContactRecord {
+                        dimension: ContactDimension::Point0,
+                        kind: ContactEventKind::Transverse,
+                        locus: ContactLocus::Point(root.centre),
+                    }],
+                },
+                certificate,
+            ))
+        }
+        SsiSplineSolve::Unresolved { spent, .. } => Err(Refusal::NumericallyUnresolved {
+            spent,
+            witness: UnresolvedWitness::KrawczykIndeterminate,
+        }),
+        SsiSplineSolve::Refused(refusal) => Err(refusal),
     }
 }
 
@@ -1878,13 +2059,16 @@ mod tests {
 
     #[test]
     fn contact_ff_spline_surface_refuses() {
-        // A BSplineSurface is not a canonical analytic carrier: the structural
-        // recognizer returns `Unrecognized`. `BoundedStratum::Face` carries a
-        // `CanonicalSurface`, which has no `Unrecognized` arm, so the Contact
-        // Layer's refusal for this carrier is enforced at the stratum-lift
-        // boundary `face_stratum` — the same `ContactReductionDeferred` the
-        // dispatcher reports for the rest of the deferred funnel (plan §4
-        // Phase 3).
+        // Name kept, assertion MOVED (CL-001-SPLINE-LIFT envelope change,
+        // owner-noted): a spline carrier is still structurally
+        // `Unrecognized` — the recognizer has no spline arm — but the pair no
+        // longer stops at the `face_stratum` lift with
+        // `ContactReductionDeferred`. The spline×analytic dispatch arm routes
+        // the pair through the certified SSI entry instead; with no certified
+        // engine registered in this crate the funnel answers today's typed
+        // `NumericallyUnresolved` (the certified envelope's engine-absent
+        // baseline), never the old lift refusal. The certified path itself is
+        // pinned by `ssi_admit`'s dispatch tests in `truck-certified`.
         let bspline = BSplineSurface::try_new(
             (KnotVec::bezier_knot(1), KnotVec::bezier_knot(1)),
             vec![
@@ -1898,15 +2082,40 @@ mod tests {
             matches!(witness, CanonicalCarrierWitness::Unrecognized),
             "a spline carrier has no canonical analytic form"
         );
-        let lifted = face_stratum(witness, (0.0, 1.0), (0.0, 1.0));
+
+        // The same flat bilinear patch as the homogeneous corpus carrier (the
+        // certified admission carrier) dispatches through the SSI entry.
+        let _cleared = take_spline_ssi_entry();
+        let carrier = BSplineSurface::new(
+            (KnotVec::bezier_knot(1), KnotVec::bezier_knot(1)),
+            vec![
+                vec![
+                    Vector4::new(0.0, 0.0, 0.0, 1.0),
+                    Vector4::new(0.0, 1.0, 0.0, 1.0),
+                ],
+                vec![
+                    Vector4::new(1.0, 0.0, 0.0, 1.0),
+                    Vector4::new(1.0, 1.0, 0.0, 1.0),
+                ],
+            ],
+        );
+        let analytic = CanonicalSurface::Plane(Plane::new(
+            Point3::new(0.0, 0.0, 0.0),
+            Point3::new(1.0, 0.0, 0.0),
+            Point3::new(0.0, 1.0, 0.0),
+        ));
+        let mut budget = Budget::new(100, 100, 100);
+        let out = spline_analytic_contact(
+            &carrier,
+            &analytic,
+            ((0.0, 1.0), (0.0, 1.0)),
+            [(0.4, 0.6), (0.4, 0.6), (0.4, 0.6), (0.4, 0.6)],
+            &mut budget,
+        );
         assert!(
-            matches!(
-                lifted,
-                Err(Refusal::UnsupportedEnvelope(
-                    EnvelopeCase::ContactReductionDeferred
-                ))
-            ),
-            "an unrecognized carrier refuses with ContactReductionDeferred"
+            matches!(out, Err(Refusal::NumericallyUnresolved { .. })),
+            "a spline×analytic pair dispatches through the certified path \
+             (engine-absent baseline is the typed NumericallyUnresolved), got {out:?}"
         );
     }
 

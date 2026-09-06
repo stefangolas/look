@@ -34,6 +34,11 @@ pub mod pair_dispatch;
 pub mod patch_admit;
 pub mod source_evidence;
 pub mod ssi;
+/// The spline×analytic SSI dispatch bridge (CL-001-SPLINE-LIFT): the funnel
+/// arm that admits a spline carrier (CL-000's `patch_admit`) against an exact
+/// affine analytic side into the landed SSI square-system engine, with typed
+/// κ/cell/slope unresolved outcomes where the engine cannot certify.
+pub mod ssi_admit;
 #[doc(hidden)]
 pub mod ssi_fixtures;
 pub mod ssi_trace;
