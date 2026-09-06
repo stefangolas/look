@@ -21,6 +21,13 @@
     clippy::indexing_slicing
 )]
 
+// CFP-009-BROADPHASE: the uniform-grid broadphase pair screen lives in its
+// own module file, `boolean/broadphase.rs` (the packet's write_allow pins
+// that path). It is registered here as a child of the assembler rather than
+// in `boolean/mod.rs` so this packet's diff stays inside its write_allow set.
+#[path = "broadphase.rs"]
+mod broadphase;
+
 use rustc_hash::FxHashSet as HashSet;
 use truck_base::cgmath64::{InnerSpace, Point2, Point3};
 use truck_base::contact::{ContactDimension, ContactEventKind};
@@ -39,6 +46,7 @@ use truck_geometry::specifieds::UnitCircle;
 use truck_geotrait::{BoundedCurve, ParameterDivision1D, ParametricSurface, SearchParameter};
 use truck_topology::{Edge, EdgeID, EntityId, Face, Shell, Solid};
 
+use self::broadphase::{candidate_touching_pairs, HasBox};
 use super::classify::{classify_fragments, FragmentClassification};
 use super::split::{
     split_fragments, CoincidentOrientation, ContactEvent, FragmentMesh, FragmentOrigin, SolidRef,
@@ -168,7 +176,9 @@ pub fn boolean_certified_operands(
 /// The AABB-screened cross-solid contact sweep over the two solids' lifted
 /// strata (decision 3, step 2; unit-testable). The sweep runs `contact()` on
 /// a fresh budget: every flagship event takes the no-budget
-/// exact/identity/FE arms.
+/// exact/identity/FE arms. The screen is the uniform-grid broadphase
+/// (CFP-009): the indexed pair set is exactly the flat loop's pair set,
+/// emitted in the flat loop's canonical order.
 pub(crate) fn sweep_contact_events(
     a: &Solid<Point3, Curve, Surface>,
     b: &Solid<Point3, Curve, Surface>,
@@ -183,64 +193,67 @@ pub(crate) fn sweep_contact_events(
     let edges_b = lift_edges(SolidRef::B, shell_b, tol)?;
     let mut events: Vec<ContactEvent> = Vec::new();
 
+    // The pair screen (CFP-009): the uniform-grid broadphase replaces the flat
+    // O(n·m) `touches()` double loops. It returns EXACTLY the touching pair
+    // set the flat loops admitted (same predicate, same boxes) and emits it in
+    // the flat loops' canonical order — `(index_a, index_b)` ascending per
+    // screen. The edge special cases move WITH the pairs: the FF/FE/EF/EE arm
+    // routing and the `ee_circle_circle` skip still live at these call sites,
+    // applied to the indexed candidates exactly as the flat loop applied them.
     // FF: a-face x b-face.
-    for fa in &faces_a {
-        for fb in &faces_b {
-            if fa.aabb.touches(&fb.aabb) {
-                emit_contact(
-                    &fa.stratum,
-                    &fb.stratum,
-                    fa.provenance,
-                    fb.provenance,
-                    &mut budget,
-                    &mut events,
-                )?;
-            }
-        }
+    for (ia, ib) in candidate_touching_pairs(&faces_a, &faces_b) {
+        let fa = faces_a.get(ia).ok_or_else(unsupported)?;
+        let fb = faces_b.get(ib).ok_or_else(unsupported)?;
+        emit_contact(
+            &fa.stratum,
+            &fb.stratum,
+            fa.provenance,
+            fb.provenance,
+            &mut budget,
+            &mut events,
+        )?;
     }
-    // FE: a-face x b-edge, then a-edge x b-face (the splitter's `collect_sew`
-    // normalizes the `(Face, Edge)` order either way).
-    for fa in &faces_a {
-        for eb in &edges_b {
-            if fa.aabb.touches(&eb.aabb) {
-                emit_contact(
-                    &fa.stratum,
-                    &eb.stratum,
-                    fa.provenance,
-                    eb.provenance,
-                    &mut budget,
-                    &mut events,
-                )?;
-            }
-        }
+    // FE: a-face x b-edge (the splitter's `collect_sew` normalizes the
+    // `(Face, Edge)` order either way).
+    for (ia, ib) in candidate_touching_pairs(&faces_a, &edges_b) {
+        let fa = faces_a.get(ia).ok_or_else(unsupported)?;
+        let eb = edges_b.get(ib).ok_or_else(unsupported)?;
+        emit_contact(
+            &fa.stratum,
+            &eb.stratum,
+            fa.provenance,
+            eb.provenance,
+            &mut budget,
+            &mut events,
+        )?;
     }
-    for ea in &edges_a {
-        for fb in &faces_b {
-            if ea.aabb.touches(&fb.aabb) {
-                emit_contact(
-                    &ea.stratum,
-                    &fb.stratum,
-                    ea.provenance,
-                    fb.provenance,
-                    &mut budget,
-                    &mut events,
-                )?;
-            }
-        }
+    // EF: a-edge x b-face.
+    for (ia, ib) in candidate_touching_pairs(&edges_a, &faces_b) {
+        let ea = edges_a.get(ia).ok_or_else(unsupported)?;
+        let fb = faces_b.get(ib).ok_or_else(unsupported)?;
+        emit_contact(
+            &ea.stratum,
+            &fb.stratum,
+            ea.provenance,
+            fb.provenance,
+            &mut budget,
+            &mut events,
+        )?;
     }
-    // EE: a-edge x b-edge.
-    for ea in &edges_a {
-        for eb in &edges_b {
-            if ea.aabb.touches(&eb.aabb) && !ee_circle_circle(&ea.stratum, &eb.stratum) {
-                emit_contact(
-                    &ea.stratum,
-                    &eb.stratum,
-                    ea.provenance,
-                    eb.provenance,
-                    &mut budget,
-                    &mut events,
-                )?;
-            }
+    // EE: a-edge x b-edge (the `ee_circle_circle` skip rides the candidate
+    // pairs exactly as the flat loop applied it).
+    for (ia, ib) in candidate_touching_pairs(&edges_a, &edges_b) {
+        let ea = edges_a.get(ia).ok_or_else(unsupported)?;
+        let eb = edges_b.get(ib).ok_or_else(unsupported)?;
+        if !ee_circle_circle(&ea.stratum, &eb.stratum) {
+            emit_contact(
+                &ea.stratum,
+                &eb.stratum,
+                ea.provenance,
+                eb.provenance,
+                &mut budget,
+                &mut events,
+            )?;
         }
     }
 
@@ -284,6 +297,7 @@ impl Aabb {
     /// Whether two boxes touch: INCLUSIVE overlap on all three axes (boundary
     /// touch counts — the real FF circle sits exactly on the wall's box
     /// boundary).
+    #[allow(dead_code)] // retained as the flat-loop predicate the CFP-009 exactness fixture gate compares the index against
     fn touches(&self, other: &Aabb) -> bool {
         self.lo.x <= other.hi.x
             && other.lo.x <= self.hi.x
@@ -312,6 +326,27 @@ struct LiftedEdge {
     stratum: BoundedStratum,
     /// The 3-D AABB of the edge curve.
     aabb: Aabb,
+}
+
+// CFP-009-BROADPHASE: the lifted strata expose their screen boxes to the
+// uniform-grid index through [`HasBox`]; the index never sees the strata
+// themselves, only the box corners.
+impl HasBox for LiftedFace {
+    fn lo(&self) -> Point3 {
+        self.aabb.lo
+    }
+    fn hi(&self) -> Point3 {
+        self.aabb.hi
+    }
+}
+
+impl HasBox for LiftedEdge {
+    fn lo(&self) -> Point3 {
+        self.aabb.lo
+    }
+    fn hi(&self) -> Point3 {
+        self.aabb.hi
+    }
 }
 
 /// Runs `contact()` on one screened stratum pair and turns every record of an
@@ -2269,5 +2304,204 @@ mod tests {
                 }
             }
         }
+    }
+
+    // -----------------------------------------------------------------------
+    // CFP-009-BROADPHASE: the uniform-grid broadphase replaces the flat AABB
+    // double loop at the boolean entry. The observable contract is EXACTNESS:
+    // the indexed sweep admits precisely the pair set the flat loop admits, in
+    // the flat loop's canonical order. Test 1 compares the two pair sets
+    // exhaustively (both computed in the test) on every landed boolean
+    // fixture; the determinism of the index itself is exercised both here and
+    // in `broadphase.rs`; test 3 pins the empty short-circuit.
+    // -----------------------------------------------------------------------
+
+    /// The flat screen's admitted pair set, tagged by screen (0 = FF, 1 = FE,
+    /// 2 = EF, 3 = EE) in the flat loop's canonical emission order. The EE
+    /// screen applies the `ee_circle_circle` skip exactly as the sweep does.
+    fn flat_screen_pairs(
+        faces_a: &[LiftedFace],
+        edges_a: &[LiftedEdge],
+        faces_b: &[LiftedFace],
+        edges_b: &[LiftedEdge],
+    ) -> Vec<(u8, usize, usize)> {
+        let mut out: Vec<(u8, usize, usize)> = Vec::new();
+        for (i, fa) in faces_a.iter().enumerate() {
+            for (j, fb) in faces_b.iter().enumerate() {
+                if fa.aabb.touches(&fb.aabb) {
+                    out.push((0, i, j));
+                }
+            }
+        }
+        for (i, fa) in faces_a.iter().enumerate() {
+            for (j, eb) in edges_b.iter().enumerate() {
+                if fa.aabb.touches(&eb.aabb) {
+                    out.push((1, i, j));
+                }
+            }
+        }
+        for (i, ea) in edges_a.iter().enumerate() {
+            for (j, fb) in faces_b.iter().enumerate() {
+                if ea.aabb.touches(&fb.aabb) {
+                    out.push((2, i, j));
+                }
+            }
+        }
+        for (i, ea) in edges_a.iter().enumerate() {
+            for (j, eb) in edges_b.iter().enumerate() {
+                if ea.aabb.touches(&eb.aabb) && !ee_circle_circle(&ea.stratum, &eb.stratum) {
+                    out.push((3, i, j));
+                }
+            }
+        }
+        out
+    }
+
+    /// The broadphase screen's admitted pair set, tagged exactly as
+    /// [`flat_screen_pairs`] and in the same canonical order.
+    fn indexed_screen_pairs(
+        faces_a: &[LiftedFace],
+        edges_a: &[LiftedEdge],
+        faces_b: &[LiftedFace],
+        edges_b: &[LiftedEdge],
+    ) -> Vec<(u8, usize, usize)> {
+        let mut out: Vec<(u8, usize, usize)> = Vec::new();
+        for (i, j) in candidate_touching_pairs(faces_a, faces_b) {
+            out.push((0, i, j));
+        }
+        for (i, j) in candidate_touching_pairs(faces_a, edges_b) {
+            out.push((1, i, j));
+        }
+        for (i, j) in candidate_touching_pairs(edges_a, faces_b) {
+            out.push((2, i, j));
+        }
+        for (i, j) in candidate_touching_pairs(edges_a, edges_b) {
+            if !ee_circle_circle(&edges_a[i].stratum, &edges_b[j].stratum) {
+                out.push((3, i, j));
+            }
+        }
+        out
+    }
+
+    /// One fixture's exhaustive pair-set gate: lifts both solids and compares
+    /// the indexed sweep's pair set with the flat loop's pair set, screen by
+    /// screen and element by element (the comparison is ordered, so it also
+    /// pins the canonical emission order). Re-runs the indexed computation to
+    /// pin determinism on the real lifted data.
+    fn assert_fixture_pairs_match(
+        label: &str,
+        a: &Solid<Point3, Curve, Surface>,
+        b: &Solid<Point3, Curve, Surface>,
+    ) {
+        let shell_a = a.boundaries().first().expect("A is single-shell");
+        let shell_b = b.boundaries().first().expect("B is single-shell");
+        let faces_a = lift_faces(SolidRef::A, shell_a, TOL).expect("A faces lift");
+        let edges_a = lift_edges(SolidRef::A, shell_a, TOL).expect("A edges lift");
+        let faces_b = lift_faces(SolidRef::B, shell_b, TOL).expect("B faces lift");
+        let edges_b = lift_edges(SolidRef::B, shell_b, TOL).expect("B edges lift");
+        let flat = flat_screen_pairs(&faces_a, &edges_a, &faces_b, &edges_b);
+        let indexed = indexed_screen_pairs(&faces_a, &edges_a, &faces_b, &edges_b);
+        assert_eq!(
+            flat, indexed,
+            "{label}: the indexed pair set must equal the flat pair set exactly"
+        );
+        let rerun = indexed_screen_pairs(&faces_a, &edges_a, &faces_b, &edges_b);
+        assert_eq!(
+            indexed, rerun,
+            "{label}: identical input must reproduce the pair sequence"
+        );
+    }
+
+    /// Required test 1: on every landed boolean fixture, the indexed sweep's
+    /// pair set equals the flat loop's pair set exactly (both computed in the
+    /// test; exhaustive ordered comparison per screen).
+    #[test]
+    fn indexed_pair_set_identical_to_flat_loop() {
+        // The flagship: the 4x4 block x the (2, 2) r=1 disk (the six-event
+        // complex; exercises FF/FE/EE screens over planes, the cylinder wall
+        // and the rim circles).
+        let (pa, aa) = block_profile();
+        let a_block = Solid::try_new(vec![extrude_shell(&pa, &aa, 2.0)]).expect("flagship A");
+        let (pb, ab) = disk_profile(Point2::new(2.0, 2.0), 1.0);
+        let b_disk = Solid::try_new(vec![extrude_shell(&pb, &ab, 2.0)]).expect("flagship B");
+        assert_fixture_pairs_match("flagship block x disk", &a_block, &b_disk);
+
+        // The coplanar full-face butt joins (x and y axes) of the R2 addition:
+        // two 2-cubes sharing an entire vertical face.
+        let (px, ax) = box_profile(0.0, 0.0, 2.0, 2.0);
+        let a_cube = Solid::try_new(vec![extrude_shell(&px, &ax, 2.0)]).expect("cube A");
+        let (px2, ax2) = box_profile(2.0, 0.0, 4.0, 2.0);
+        let b_butt_x = Solid::try_new(vec![extrude_shell(&px2, &ax2, 2.0)]).expect("cube Bx");
+        assert_fixture_pairs_match("x-axis butt join", &a_cube, &b_butt_x);
+        let (py, ay) = box_profile(0.0, 2.0, 2.0, 4.0);
+        let b_butt_y = Solid::try_new(vec![extrude_shell(&py, &ay, 2.0)]).expect("cube By");
+        assert_fixture_pairs_match("y-axis butt join", &a_cube, &b_butt_y);
+
+        // Two separated 2-cubes (the multishell/disjoint pair, as one-shell
+        // solids): no certified box can touch.
+        let (pd, ad) = box_profile(10.0, 10.0, 12.0, 12.0);
+        let b_far = Solid::try_new(vec![extrude_shell(&pd, &ad, 2.0)]).expect("far cube");
+        assert_fixture_pairs_match("disjoint cubes", &a_cube, &b_far);
+
+        // The disk x itself (two independent co-located disk solids): the EE
+        // circle-circle rim pair exercises the `ee_circle_circle` skip on both
+        // the flat and the indexed screen.
+        let b_disk2 = Solid::try_new(vec![extrude_shell(&pb, &ab, 2.0)]).expect("disk A'");
+        assert_fixture_pairs_match("co-located disk x disk", &b_disk, &b_disk2);
+
+        // A cube partially overlapping the disk's footprint (not a full-face
+        // seam, not a containment): a general-position boolean screen.
+        let (pc, ac) = box_profile(-1.0, 0.0, 1.5, 2.0);
+        let b_overlap = Solid::try_new(vec![extrude_shell(&pc, &ac, 2.0)]).expect("overlap cube");
+        assert_fixture_pairs_match("block x overlapping cube", &a_block, &b_overlap);
+    }
+
+    /// Required test 3: a boolean of two solids whose certified boxes cannot
+    /// touch produces zero candidates and the same (empty-event) outcome as
+    /// the flat loop.
+    #[test]
+    fn empty_index_short_circuits_clean() {
+        let (pa, aa) = box_profile(0.0, 0.0, 2.0, 2.0);
+        let a = Solid::try_new(vec![extrude_shell(&pa, &aa, 2.0)]).expect("cube A");
+        let (pb, ab) = box_profile(10.0, 10.0, 12.0, 12.0);
+        let b = Solid::try_new(vec![extrude_shell(&pb, &ab, 2.0)]).expect("cube B");
+
+        // The indexed sweep short-circuits to zero contact events.
+        let events = sweep_contact_events(&a, &b, TOL)
+            .expect("the sweep resolves")
+            .value;
+        assert!(
+            events.is_empty(),
+            "no certified box can touch across the gap, got {} events",
+            events.len()
+        );
+
+        // The flat loop admits the same (empty) pair set on the same lifts.
+        let shell_a = a.boundaries().first().expect("A is single-shell");
+        let shell_b = b.boundaries().first().expect("B is single-shell");
+        let faces_a = lift_faces(SolidRef::A, shell_a, TOL).expect("A faces lift");
+        let edges_a = lift_edges(SolidRef::A, shell_a, TOL).expect("A edges lift");
+        let faces_b = lift_faces(SolidRef::B, shell_b, TOL).expect("B faces lift");
+        let edges_b = lift_edges(SolidRef::B, shell_b, TOL).expect("B edges lift");
+        let flat = flat_screen_pairs(&faces_a, &edges_a, &faces_b, &edges_b);
+        let indexed = indexed_screen_pairs(&faces_a, &edges_a, &faces_b, &edges_b);
+        assert!(
+            flat.is_empty(),
+            "the flat screen admits nothing across the gap"
+        );
+        assert!(
+            indexed.is_empty(),
+            "the indexed screen admits nothing across the gap"
+        );
+
+        // The same empty-event outcome as the flat loop end to end: the
+        // intersection of two separated solids is the empty solid.
+        let mut budget = Budget::new(1000, 1000, 1000);
+        let inter = boolean(&a, BoolOp::Intersection, &b, &mut budget)
+            .expect("the intersection of separated solids assembles");
+        assert!(
+            inter.value.boundaries().is_empty(),
+            "the intersection of separated solids is the empty solid"
+        );
     }
 }
