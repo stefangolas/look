@@ -1,0 +1,27 @@
+{
+  "schema": "ttc_reference.v1",
+  "row_id": "falcon_heavy/engine_prototype",
+  "door_version": "1",
+  "facts": {
+    "solid_count": 70,
+    "volume": 0,
+    "bbox": [
+      [
+        -504.0000001,
+        -504.0000001,
+        -1e-07
+      ],
+      [
+        786.0,
+        504.0000001,
+        2526.0
+      ]
+    ]
+  },
+  "tolerances": {
+    "solid_count": "exact",
+    "volume_rel": 0.0001,
+    "volume_abs": 1e-06,
+    "bbox_abs": 0.001
+  }
+}

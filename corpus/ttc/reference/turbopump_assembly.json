@@ -1,0 +1,27 @@
+{
+  "schema": "ttc_reference.v1",
+  "row_id": "falcon_heavy/turbopump_assembly",
+  "door_version": "1",
+  "facts": {
+    "solid_count": 59,
+    "volume": 77563936.47352602,
+    "bbox": [
+      [
+        -162.0,
+        -172.0000001,
+        1040.0
+      ],
+      [
+        672.5,
+        172.0000001,
+        2018.0
+      ]
+    ]
+  },
+  "tolerances": {
+    "solid_count": "exact",
+    "volume_rel": 0.0001,
+    "volume_abs": 1e-06,
+    "bbox_abs": 0.001
+  }
+}

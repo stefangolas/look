@@ -1,0 +1,27 @@
+{
+  "schema": "ttc_reference.v1",
+  "row_id": "falcon_heavy/nozzle_assembly",
+  "door_version": "1",
+  "facts": {
+    "solid_count": 12,
+    "volume": 50356695.264747284,
+    "bbox": [
+      [
+        -504.0000001,
+        -504.0000001,
+        -1e-07
+      ],
+      [
+        504.0000001,
+        504.0000001,
+        1165.0000001
+      ]
+    ]
+  },
+  "tolerances": {
+    "solid_count": "exact",
+    "volume_rel": 0.0001,
+    "volume_abs": 1e-06,
+    "bbox_abs": 0.001
+  }
+}

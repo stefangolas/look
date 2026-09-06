@@ -1,0 +1,27 @@
+{
+  "schema": "ttc_reference.v1",
+  "row_id": "falcon_heavy/gas_generator_assembly",
+  "door_version": "1",
+  "facts": {
+    "solid_count": 19,
+    "volume": 11279791.24344284,
+    "bbox": [
+      [
+        -100.0,
+        -109.0,
+        1431.7410392212578
+      ],
+      [
+        642.4766930214263,
+        109.0,
+        2218.0
+      ]
+    ]
+  },
+  "tolerances": {
+    "solid_count": "exact",
+    "volume_rel": 0.0001,
+    "volume_abs": 1e-06,
+    "bbox_abs": 0.001
+  }
+}
