@@ -21,6 +21,13 @@
 
 /// BG-NUM-004: certified ball-overlap clustering (topology-free core).
 pub mod cluster;
+/// CL-003-SWEEP-ENCLOSURE: the composite `EnclosureSurface` for the closed
+/// whole-sweep value (`truck_geometry::constructive::SpineFrameSweep`). The
+/// implementation lives in its own file at the crate root (this `#[path]`
+/// declaration) so this packet and CL-000-SPLINE-ADMIT stay write-disjoint on
+/// `enclosure.rs`; the impl is crate-wide once compiled here.
+#[path = "../enclosure_sweep.rs"]
+pub mod enclosure_sweep;
 /// BG-NUM-003: the Krawczyk existence/uniqueness operator. Scaffolded empty;
 /// the packet fills it.
 pub mod krawczyk;
@@ -32,3 +39,7 @@ pub mod parallelotope;
 /// BG-NUM-002: certified univariate root isolation (Bernstein/Descartes).
 /// Scaffolded empty; the packet fills it.
 pub mod roots;
+/// CL-003-SWEEP-ENCLOSURE: the certified sweep-side σ_G helper — interval
+/// bounds on the first fundamental form's four entries over the sweep's
+/// windowed domain, composed from the sweep derivative enclosures.
+pub mod sweep_sigma;
