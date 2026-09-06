@@ -42,9 +42,13 @@ files; comments, docstrings and strings excluded). `algebra_ops` is an
 arithmetic; shape algebra is the dominant verb of the corpus and is why the
 corpus rows are staged (`corpus/ttc/SKIPS.json`, reason
 `booleans-on-swept-carriers` → BIE-006). The other families are name/call
-counts of the exact compat vocabulary.
+counts of the exact compat vocabulary. Row S8 below is **not** a counted §8
+census family: `shape.color` and the `#o1.N` occurrence labels are client-layer
+payload (data rows + a sidecar table), so its usage figures are the corpus AST
+count of `.color` assignment sites and the label count pinned by the vendored
+`f1.step.js`, re-derived separately on 2026-09-06.
 
-## The measured surface — 7 rows (spec §8's table)
+## The measured surface — spec §8's 7 counted rows, plus S8 (recorded client layer)
 
 | # | surface id | usage (census 2026-09-06) | compat status | answered-by (bridge rows) |
 |---|---|---|---|---|
@@ -55,6 +59,7 @@ counts of the exact compat vocabulary.
 | S5 | `Spline(*pts, periodic=...) sections -> loft` | 28 | `landed` (authoring = PB-002 amended scope; loft = CC-port) | facade `spline` carrier authoring + `loft`/`loft_ribs` CC-port forwards |
 | S6 | `loft / revolve / extrude / sweep / fillet / chamfer / mirror` | 26 | `landed` | facade `loft`/`revolve`/`extrude`/`sweep`/`fillet`/`chamfer`/`mirror` (constructive parts export STL, never STEP — TR-NRB-001) |
 | S7 | `Selectors (.faces(), .edges(), .filter_by(), .take())` | 4 | `landed` | the four-expression selector rows of the facade table (PB-001 machinery, exposed as data rows); the corpus is algebra-mode, so 4 is the whole census |
+| S8 | `Color/Shape.color` + occurrence naming | 6 `.color` assignment sites (corpus AST, 2026-09-06; not a counted §8 census family) + 28 occurrence labels pinned by `f1.step.js` | `recorded-client-layer` | GLB emission (PB-009): per-solid sRGB color → linear `baseColorFactor`; `#o1.N` node names reproduced from assembly insertion order |
 
 ## Row notes
 
@@ -97,6 +102,20 @@ boundary would carry the typed skip reason `step-out`).
 selectors census is 4 total; PB-001's fluent selectors are for OUR Python
 layer, not for corpus reach.
 
+**S8 — color records and occurrence naming (PB-009).** Every corpus solid
+carries `shape.color` (a client-layer record, S2-class: zero kernel content)
+and every top-level part of the F1 assembly is addressed by a frozen
+occurrence label (`#o1.N` — the vendored `f1.step.js` OCCURRENCES block pins
+28 labels under the root assembly, ordered by `src/f1.py`'s `assemble()`).
+OCCT's `export_step` carried both into the corpus's STEP render payload;
+swept/lofted F1 carriers cannot export STEP (TR-NRB-001), so this row is
+answered by the bridge's **GLB emission** (PB-009): each emitted GLB node
+carries its occurrence label as the node name, its local transform (matrix),
+and its solid's sRGB color as a linear `baseColorFactor`. The row is
+`recorded-client-layer`, not `landed`: `shape.color` is data, never kernel
+geometry, and the occurrence labels are a sidecar table this side reproduces
+from assembly insertion order — not a Python surface the facade answers.
+
 ## Envelope and boundary notes (normative for the harness)
 
 - **STL, never STEP, for swept parts** (TR-NRB-001). The harness door
@@ -117,6 +136,9 @@ layer, not for corpus reach.
 `truck123d/tests/ttc_harness.rs` (`compat_surface_table_is_complete`) scans
 this file for each of the seven surface ids (`S1`..`S7`) above and for a
 **status token** on each row (one of the `landed`, `recorded-client-layer`,
-`deferred-bie`, `boundary-refusal`, `staged-skip` values). Adding a corpus
-surface family that spec §8's table does not name is a SPEC_GAP, not a doc
-edit: the doc and the corpus table move together, and the test pins that.
+`deferred-bie`, `boundary-refusal`, `staged-skip` values). The check is
+one-directional: the seven `SURFACE_ROWS` of `compat/surface.rs` are the
+spec §8 counted families, and a doc row beyond them (row S8, PB-009) is not
+rejected. Adding a corpus surface family that spec §8's table does not name
+is a SPEC_GAP, not a doc edit: the doc and the corpus table move together,
+and the test pins that.

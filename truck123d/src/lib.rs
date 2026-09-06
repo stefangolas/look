@@ -24,6 +24,7 @@ mod assembly_emit;
 mod exceptions;
 mod facade;
 mod gil;
+mod glb_emit;
 mod marshal;
 mod python;
 mod tables;
@@ -33,11 +34,12 @@ mod test_bridge;
 
 pub use assembly_emit::{
     AssemblyContactIntent, AssemblyNode, AssemblyPart, AssemblyReport, EvidenceRowKind,
-    SolidHandle, emit_step_assembly, read_step_assembly,
+    SolidHandle, assembly_occurrence_labels, emit_step_assembly, read_step_assembly,
 };
 pub use exceptions::{Refused, TruckError, Unresolved};
 pub use facade::{AxisValue, FacadeOp, FacadeReport, FacadeTable, ModeValue, run_facade};
 pub use gil::ModulusSpec;
+pub use glb_emit::{GlbMesh, GlbNodePayload, SrgbColor, emit_glb};
 pub use marshal::{
     ExceptionClass, Ledger, Marshaled, MarshaledPayload, RefusedPayload, UnresolvedPayload,
     envelope_case_name, ledger_from_budget, prop_name, truth_name, witness_name,
