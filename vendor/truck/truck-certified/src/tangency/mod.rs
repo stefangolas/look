@@ -57,4 +57,13 @@
 /// (the `ssi_fixtures` precedent).
 #[doc(hidden)]
 pub mod fixtures;
+/// The ℚ-polynomial substrate of the exact-vanishing verifier (CTE-001-QPOLY):
+/// a hand-rolled exact multivariate polynomial ring with `i128` rational
+/// coefficients (no CAS dependency). Consumed by [`witness`] and, later, by
+/// CTE-005/007.
+pub mod qpoly;
 pub mod shapes;
+/// The one-witness exact verifier (CTE-001-QPOLY): the frozen
+/// [`shapes::ExactWitnessVerifier`] implementation over [`qpoly::QPoly`] plus
+/// the pending-refusal provenance stub [`witness::provenance_witness`].
+pub mod witness;
