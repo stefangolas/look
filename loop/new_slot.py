@@ -141,6 +141,12 @@ def main():
         # contract.
         print(f"Slot {args.slot} worktree exists at {wt}; resetting branch {args.branch} to {base_ref}")
         release_orphaned_branch(args.branch, wt)
+        # Clean BEFORE the checkout: a previous dispatch leaves untracked
+        # PACKET.md/CONTEXT.md artifacts, and `checkout -B` aborts when the
+        # incoming branch tracks files with those names -- the recorded
+        # "untracked working tree files would be overwritten" loop (the
+        # clean below never ran because checkout failed first).
+        git(wt, 'clean', '-fdx', '-e', 'target')
         res = git(wt, 'checkout', '-B', args.branch, base_ref)
         if res.returncode != 0:
             sys.exit(f"git checkout -B {args.branch} failed in {wt}: {res.stderr}")
