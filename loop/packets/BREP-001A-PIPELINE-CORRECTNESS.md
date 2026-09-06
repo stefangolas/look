@@ -22,6 +22,8 @@ write_allow:
   - vendor/truck/truck-geometry/src/arrange.rs
   - vendor/truck/truck-meshalgo/tests/defect_regressions.rs
   - vendor/truck/truck-geometry/tests/defect_regressions.rs
+  - vendor/truck/truck-modeling/tests/revolve_p5.rs
+  - vendor/truck/truck-modeling/tests/until_p4.rs
 read_allow:
   - docs/defects/PAR-RANGE-INHERITANCE-001.md
   - docs/defects/QUO-EUCLIDEAN-CLOSURE-001.md
@@ -223,3 +225,30 @@ Unjustified `#[allow]`. Committing to `main`.
 non-`DONE` status also write `QUESTION.md` beside it.
 
 Commit subject: `fix(brep): pipeline correctness — quotient closure, base-domain parity, bounds-derived domains, observable caps, typed arrange refusal, incidence probe (BREP-001A-PIPELINE-CORRECTNESS)`.
+
+## Amendment r2 (orchestrator, 2026-09-06) - downstream compile ripple of the typed refusal
+
+Your r1 work landed (c7c9b41, merged). One downstream ripple remains: the
+E-ARRANGE deliverable changed `arrange()`'s error type from `Refusal` to
+`ArrangeError`, and two landed truck-modeling test files call `arrange()`
+through helpers typed against the OLD error type. At integrated HEAD:
+
+- `cargo check --workspace --all-targets` fails with 9x E0308 in
+  `vendor/truck/truck-modeling/tests/until_p4.rs` (helpers at :38) and
+  2x E0308 in `vendor/truck/truck-modeling/tests/revolve_p5.rs`
+  (helper `expect_ok` at :35): expected `Result<Certified<_>, Refusal>`,
+  found `Result<Certified<Arrangement>, ArrangeError>`.
+
+Required correction (mechanical): widen those test files' helpers to accept
+the new typed error (`Result<Certified<Arrangement>, ArrangeError>` or a
+generic `Result<Certified<T>, E: Debug>` - your call, keep it minimal), fix
+every call site the compiler names, change NOTHING else. The helper
+refactors must not weaken any assertion: same expected values, same
+refusal cases. The rebase onto integration HEAD is already done for you -
+commit on top of it.
+
+Done-when additions:
+cargo check -p truck-modeling --tests
+cargo test -p truck-modeling --test revolve_p5 --test until_p4
+Commit subject: `fix(brep): widen truck-modeling test helpers to the typed ArrangeError ripple (BREP-001A-PIPELINE-CORRECTNESS r2)`.
+Write RESULT.json AT THE WORKTREE ROOT (r2 - notes describe the helper widening).
