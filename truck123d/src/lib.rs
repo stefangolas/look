@@ -20,6 +20,7 @@
 
 #![doc = include_str!("../README.md")]
 
+mod assembly_emit;
 mod exceptions;
 mod facade;
 mod gil;
@@ -30,6 +31,10 @@ mod tables;
 #[cfg(test)]
 mod test_bridge;
 
+pub use assembly_emit::{
+    AssemblyContactIntent, AssemblyNode, AssemblyPart, AssemblyReport, EvidenceRowKind,
+    SolidHandle, emit_step_assembly, read_step_assembly,
+};
 pub use exceptions::{Refused, TruckError, Unresolved};
 pub use facade::{AxisValue, FacadeOp, FacadeReport, FacadeTable, ModeValue, run_facade};
 pub use gil::ModulusSpec;
