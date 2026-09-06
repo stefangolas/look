@@ -76,6 +76,7 @@ use crate::ssi::{
 use crate::ssi_types::{
     KrawczykCertificate3, SquareSystem3, TraceOutcome, TraceRefusal, TraceStep,
 };
+use truck_geometry::constructive::intersection_carrier::StitchEnclosure;
 
 /// One per-box Krawczyk step, as the loop consumes it.
 ///
@@ -831,6 +832,171 @@ pub fn certified_pair_trace(
     Ok(trace_branch(&seed_certificate, UNIT_CHART, &mut certifier))
 }
 
+// ---------------------------------------------------------------------------
+// CL-002-SPLINE-ASSEMBLY (additive): the trace-outcome extension that carries
+// STITCHED branches. A multi-patch spline carrier certifies its intersection
+// branch PER PATCH ([`certified_pair_trace`] on each patch against the shared
+// analytic side); the per-patch fragments stitch into one carried curve where
+// patches share an edge. The stitch certificate is interval bookkeeping over
+// the already-certified shared-edge samples ([`StitchEnclosure`], the carrier
+// mirror of the certified position enclosure a per-patch trace records at its
+// seam) — never a new solve. A pair whose shared-edge samples disagree beyond
+// their certified enclosures refuses typed ([`StitchOutcome::Unresolved`] with
+// the [`StitchWitness`]), never a silent gap; zero new `Refusal` arms are
+// added to the landed vocabularies.
+// ---------------------------------------------------------------------------
+
+/// The unit-chart boundary a per-patch branch fragment meets at its shared
+/// edge with the neighbouring patch.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PatchBoundary {
+    /// The `u = 0` boundary.
+    UMin,
+    /// The `u = 1` boundary.
+    UMax,
+    /// The `v = 0` boundary.
+    VMin,
+    /// The `v = 1` boundary.
+    VMax,
+}
+
+impl PatchBoundary {
+    /// A short stable tag, for diagnostics.
+    pub fn tag(self) -> &'static str {
+        match self {
+            Self::UMin => "umin",
+            Self::UMax => "umax",
+            Self::VMin => "vmin",
+            Self::VMax => "vmax",
+        }
+    }
+}
+
+/// One per-patch certified branch fragment offered to the trace stitch.
+///
+/// CL-001 certifies the intersection branch of one patch against the analytic
+/// side as a [`TraceOutcome`]; a multi-patch spline carrier yields one such
+/// fragment per patch. The fragment records the shared edge it meets (the
+/// unit-chart boundary the branch crosses there) and the certified sample of
+/// the branch restricted to that shared edge — the [`StitchEnclosure`] the
+/// per-patch trace recorded for the seam crossing. The trace outcome is
+/// carried verbatim as provenance; the stitch predicate consults only the
+/// certified seam sample.
+#[derive(Debug, Clone, PartialEq)]
+pub struct StitchFragment {
+    /// Deterministic provenance: the patch slot the fragment was traced on.
+    pub patch: usize,
+    /// The patch boundary the branch meets at the shared edge.
+    pub boundary: PatchBoundary,
+    /// The certified position enclosure of the branch sample restricted to the
+    /// shared edge.
+    pub seam: StitchEnclosure,
+    /// The per-patch certified trace outcome that produced the branch.
+    pub trace: TraceOutcome,
+}
+
+/// The certified shared-edge agreement of one adjacent pair (the stitch
+/// certificate).
+///
+/// The pair's seam samples agree within their certified enclosures, certified
+/// on the shared edge's enclosing box ([`StitchEnclosure::hull_with`] of the
+/// two agreed seam enclosures).
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct StitchCertificate {
+    /// The certified enclosure of the shared edge the agreement was certified
+    /// on.
+    pub edge: StitchEnclosure,
+    /// The left fragment's certified seam-sample enclosure.
+    pub lhs: StitchEnclosure,
+    /// The right fragment's certified seam-sample enclosure.
+    pub rhs: StitchEnclosure,
+}
+
+/// A stitched carried branch: the ordered per-patch fragments plus one
+/// certified shared-edge agreement per seam.
+#[derive(Debug, Clone, PartialEq)]
+pub struct StitchedBranch {
+    /// The stitched fragments, in carried order.
+    pub fragments: Vec<StitchFragment>,
+    /// One certified shared-edge agreement per adjacent pair (empty for a
+    /// single-fragment branch).
+    pub certificates: Vec<StitchCertificate>,
+}
+
+/// The typed witness of an unstitchable pair: which adjacent pair disagreed,
+/// and the two certified seam-sample enclosures that fail to agree.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct StitchWitness {
+    /// The index (within the offered fragments) of the left fragment of the
+    /// disagreeing pair.
+    pub at: usize,
+    /// The left fragment's certified seam-sample enclosure.
+    pub lhs: StitchEnclosure,
+    /// The right fragment's certified seam-sample enclosure.
+    pub rhs: StitchEnclosure,
+}
+
+/// The typed outcome of stitching ordered per-patch fragments (CL-002).
+#[derive(Debug, Clone, PartialEq)]
+pub enum StitchOutcome {
+    /// The fragments stitched into one carried branch.
+    Stitched(StitchedBranch),
+    /// The pair's shared-edge samples disagreed beyond their certified
+    /// enclosures: a typed `Unresolved` carrying the witness — never a silent
+    /// gap.
+    Unresolved(StitchWitness),
+}
+
+/// Whether two per-patch seam samples restricted to a shared edge agree within
+/// their certified enclosures.
+///
+/// The stitch predicate: interval agreement over already-certified enclosures
+/// ([`StitchEnclosure::agrees_with`]), never a new solve.
+pub fn shared_edge_samples_agree(lhs: &StitchEnclosure, rhs: &StitchEnclosure) -> bool {
+    lhs.agrees_with(rhs)
+}
+
+/// Stitch ordered per-patch fragments into one carried branch (CL-002).
+///
+/// Consecutive fragments meet along a shared patch edge, so the carried branch
+/// continues from one patch into the next exactly when their certified seam
+/// samples — the branch restricted to the shared edge — agree within their
+/// certified enclosures. Every adjacent pair must certify; the returned
+/// [`StitchCertificate`] records each agreed shared-edge enclosure. A pair
+/// whose shared-edge samples disagree beyond enclosures refuses typed
+/// ([`StitchOutcome::Unresolved`]) with the [`StitchWitness`], never a silent
+/// gap. Zero or one fragment is a carried branch with no seam to certify.
+///
+/// Determinism: the fragments are stitched in the given (fixed) order; the
+/// certificates appear in pair order. No hashing, no reordering.
+pub fn stitch_fragments(fragments: &[StitchFragment]) -> StitchOutcome {
+    let mut certificates = Vec::new();
+    if fragments.len() < 2 {
+        return StitchOutcome::Stitched(StitchedBranch {
+            fragments: fragments.to_vec(),
+            certificates,
+        });
+    }
+    for (at, (left, right)) in fragments.iter().zip(fragments.iter().skip(1)).enumerate() {
+        if !left.seam.agrees_with(&right.seam) {
+            return StitchOutcome::Unresolved(StitchWitness {
+                at,
+                lhs: left.seam,
+                rhs: right.seam,
+            });
+        }
+        certificates.push(StitchCertificate {
+            edge: left.seam.hull_with(&right.seam),
+            lhs: left.seam,
+            rhs: right.seam,
+        });
+    }
+    StitchOutcome::Stitched(StitchedBranch {
+        fragments: fragments.to_vec(),
+        certificates,
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1378,5 +1544,250 @@ mod tests {
             };
             assert_eq!(tag, expected_tag, "refusals keep their stable named tags");
         }
+    }
+
+    /// A `(1, 1)` unit-weight sheet patch: the plane `z = y` whose image runs
+    /// over `x in [x0, x1]` along the first parameter (`x = x0 + (x1 - x0)u`,
+    /// `y = v`). Built through the landed admission layer
+    /// ([`RationalBipatch::new`]); `None` when the patch refuses admission.
+    fn sheet_patch(x0: f64, x1: f64) -> Option<RationalBipatch> {
+        let x = vec![vec![x0, x0], vec![x1, x1]];
+        let v = vec![vec![0.0, 1.0], vec![0.0, 1.0]];
+        let w = vec![vec![1.0, 1.0], vec![1.0, 1.0]];
+        RationalBipatch::new(1, 1, [x, v.clone(), v], w).ok()
+    }
+
+    /// The bilinear evaluation of the `(1, 1)` rational patch at `(u, v)`
+    /// (unit weights; the fixtures are affine). Plain `f64` arithmetic —
+    /// `Method::Float` discipline (H-6), matching how the certified engine
+    /// records its stations.
+    fn patch_point(patch: &RationalBipatch, u: f64, v: f64) -> Option<[f64; 3]> {
+        let bu = [1.0 - u, u];
+        let bv = [1.0 - v, v];
+        let weights = patch.weights();
+        let mut weight_sum = 0.0;
+        let mut out = [0.0f64; 3];
+        for a in 0..=1usize {
+            for c in 0..=1usize {
+                let factor = bu[a] * bv[c];
+                let coefficient = weights[a][c];
+                weight_sum += coefficient * factor;
+                for (k, grid) in patch.numerator().iter().enumerate() {
+                    out[k] += coefficient * grid[a][c] * factor;
+                }
+            }
+        }
+        if weight_sum == 0.0 {
+            None
+        } else {
+            Some([
+                out[0] / weight_sum,
+                out[1] / weight_sum,
+                out[2] / weight_sum,
+            ])
+        }
+    }
+
+    /// A certified seam-sample enclosure centred on `point` with half-width
+    /// `half` (the tight certified box a per-patch trace records for its
+    /// shared-edge sample).
+    fn enclosure_around(point: [f64; 3], half: f64) -> Option<StitchEnclosure> {
+        StitchEnclosure::try_new(
+            (point[0] - half, point[0] + half),
+            (point[1] - half, point[1] + half),
+            (point[2] - half, point[2] + half),
+        )
+        .ok()
+    }
+
+    /// The certified steps of the patch-A fragment: the branch centres of
+    /// `z = y` (sheet) against `z = 1/4 + x/2` (analytic) approaching the
+    /// `u = 1` seam, in the `(u, v, s, t)` chart of the `A x analytic` pair.
+    fn sheet_a_steps(incidence: BranchIncidence) -> Vec<TraceStep> {
+        let mut steps = Vec::new();
+        for u in [0.5, 0.7, 0.9] {
+            let v = 0.25 + 0.5 * u;
+            steps.push(refuse_ok(step_at(
+                (u, v, 0.5 * u, v),
+                BranchGerm::Regular,
+                incidence,
+                2,
+            )));
+        }
+        steps
+    }
+
+    /// The certified steps of the patch-B fragment: the branch centres of the
+    /// same sheet against `z = 1/4 + x/2` leaving the `u = 0` seam inward, in
+    /// the `(u, v, s, t)` chart of the `B x analytic` pair.
+    fn sheet_b_steps(incidence: BranchIncidence) -> Vec<TraceStep> {
+        let mut steps = Vec::new();
+        for u in [0.1, 0.3] {
+            let v = 0.75 + 0.5 * u;
+            steps.push(refuse_ok(step_at(
+                (u, v, 0.5 + 0.5 * u, v),
+                BranchGerm::Regular,
+                incidence,
+                2,
+            )));
+        }
+        steps
+    }
+
+    /// The certified steps of a patch-B fragment traced against the shifted
+    /// analytic `z = 1/4` (a branch at constant `y = 1/4`, so the seam sample
+    /// does not agree with the `z = 1/4 + x/2` trace).
+    fn sheet_b_shifted_steps(incidence: BranchIncidence) -> Vec<TraceStep> {
+        let mut steps = Vec::new();
+        for u in [0.1, 0.3] {
+            steps.push(refuse_ok(step_at(
+                (u, 0.25, 0.5 + 0.5 * u, 0.25),
+                BranchGerm::Regular,
+                incidence,
+                2,
+            )));
+        }
+        steps
+    }
+
+    #[test]
+    fn shared_edge_samples_agree_within_enclosure() {
+        // Two adjacent admitted patches of one spline sheet (the planes z = y
+        // over x in [0, 1] and [1, 2]) share the geometric edge x = 1. The
+        // analytic side (z = 1/4 + x/2) crosses the sheet along the carried
+        // branch y = 1/4 + x/2, which leaves patch A through its u = 1
+        // boundary and enters patch B through its u = 0 boundary at the SAME
+        // seam point (1, 3/4, 3/4). The per-patch seam samples — the branches
+        // restricted to the shared edge — agree within their certified
+        // enclosures, so the stitch predicate certifies on the shared edge's
+        // enclosure.
+        let (Some(a), Some(b)) = (sheet_patch(0.0, 1.0), sheet_patch(1.0, 2.0)) else {
+            fail("an admitted sheet patch was refused");
+        };
+        let incidence = ssi_fixtures::sample_trace_incidence();
+        let half = 1.0e-6; // H-3: certified seam-sample half-width of the fixture
+        let seam_v = 0.75;
+        let (Some(seam_a), Some(seam_b)) =
+            (patch_point(&a, 1.0, seam_v), patch_point(&b, 0.0, seam_v))
+        else {
+            fail("the planar seam sample refused evaluation");
+        };
+        let (Some(enclosure_a), Some(enclosure_b)) = (
+            enclosure_around(seam_a, half),
+            enclosure_around(seam_b, half),
+        ) else {
+            return;
+        };
+        assert!(
+            shared_edge_samples_agree(&enclosure_a, &enclosure_b),
+            "the shared-edge samples agree within their certified enclosures"
+        );
+        let fragment_a = StitchFragment {
+            patch: 0,
+            boundary: PatchBoundary::UMax,
+            seam: enclosure_a,
+            trace: TraceOutcome::Terminated {
+                steps: sheet_a_steps(incidence),
+            },
+        };
+        let fragment_b = StitchFragment {
+            patch: 1,
+            boundary: PatchBoundary::UMin,
+            seam: enclosure_b,
+            trace: TraceOutcome::Terminated {
+                steps: sheet_b_steps(incidence),
+            },
+        };
+        let stitched = match stitch_fragments(&[fragment_a.clone(), fragment_b.clone()]) {
+            StitchOutcome::Stitched(stitched) => stitched,
+            other => fail(&format!("an agreeing pair must stitch, got {other:?}")),
+        };
+        // One shared edge between the two patches: one certified seam
+        // agreement, recording both seam enclosures and the shared edge's
+        // enclosing box.
+        let certificate = match stitched.certificates.first() {
+            Some(certificate) => certificate,
+            None => fail("the stitch emitted no seam certificate"),
+        };
+        assert_eq!(certificate.lhs, enclosure_a, "left seam enclosure recorded");
+        assert_eq!(
+            certificate.rhs, enclosure_b,
+            "right seam enclosure recorded"
+        );
+        let shared_edge = truck_geometry::prelude::Point3::new(1.0, 0.75, 0.75);
+        assert!(
+            certificate.edge.contains(shared_edge),
+            "the shared edge's enclosure certifies the agreeing seam point"
+        );
+        // Fragment provenance intact: the carried branch keeps both per-patch
+        // traces, in order.
+        assert_eq!(stitched.fragments.len(), 2);
+        assert_eq!(
+            stitched.fragments[0].trace, fragment_a.trace,
+            "fragment 0 provenance intact"
+        );
+        assert_eq!(
+            stitched.fragments[1].trace, fragment_b.trace,
+            "fragment 1 provenance intact"
+        );
+    }
+
+    #[test]
+    fn unstitchable_pair_refuses_typed() {
+        // Patch A's fragment is traced against z = 1/4 + x/2 (seam sample at
+        // (1, 3/4, 3/4)); patch B's fragment is traced against a DIFFERENT
+        // analytic z = 1/4 (seam sample at (1, 1/4, 1/4)). Both claim the
+        // shared edge x = 1, but the per-patch carried branches disagree there
+        // beyond their certified enclosures: the stitch refuses typed
+        // (`Unresolved` with the witness) — never a silent gap.
+        let (Some(a), Some(b)) = (sheet_patch(0.0, 1.0), sheet_patch(1.0, 2.0)) else {
+            fail("an admitted sheet patch was refused");
+        };
+        let incidence = ssi_fixtures::sample_trace_incidence();
+        let half = 1.0e-6; // H-3: certified seam-sample half-width of the fixture
+        let (Some(seam_a), Some(seam_b)) = (patch_point(&a, 1.0, 0.75), patch_point(&b, 0.0, 0.25))
+        else {
+            fail("the planar seam sample refused evaluation");
+        };
+        let (Some(enclosure_a), Some(enclosure_b)) = (
+            enclosure_around(seam_a, half),
+            enclosure_around(seam_b, half),
+        ) else {
+            return;
+        };
+        let fragment_a = StitchFragment {
+            patch: 0,
+            boundary: PatchBoundary::UMax,
+            seam: enclosure_a,
+            trace: TraceOutcome::Terminated {
+                steps: sheet_a_steps(incidence),
+            },
+        };
+        let fragment_b = StitchFragment {
+            patch: 1,
+            boundary: PatchBoundary::UMin,
+            seam: enclosure_b,
+            trace: TraceOutcome::Terminated {
+                steps: sheet_b_shifted_steps(incidence),
+            },
+        };
+        let witness = match stitch_fragments(&[fragment_a, fragment_b]) {
+            StitchOutcome::Unresolved(witness) => witness,
+            other => fail(&format!(
+                "a disagreeing pair must refuse typed, got {other:?}"
+            )),
+        };
+        assert_eq!(
+            witness.at, 0,
+            "the disagreement is on the first shared edge"
+        );
+        assert!(
+            !shared_edge_samples_agree(&witness.lhs, &witness.rhs),
+            "the witness records the certified enclosures that fail to agree"
+        );
+        assert!(
+            !witness.lhs.agrees_with(&witness.rhs),
+            "the disjointness witness is observable, never a silent gap"
+        );
     }
 }
