@@ -99,6 +99,12 @@ pub mod hessian;
 /// [`cascade::classify_box`].
 pub mod cascade;
 
+/// The T2 carrier arrangement into atoms (CTE-007-T2ARRANGE): the certified
+/// arrangement of a coincidence witness's trim domains and the tangential
+/// contact curves as strata, with H-atom probe admission, the §5.6 cheap
+/// containment predicate, and the §5.5 single-canonical-record emission.
+pub mod arrange;
+
 use crate::contract::Refusal;
 use crate::hull::HullRefusal;
 

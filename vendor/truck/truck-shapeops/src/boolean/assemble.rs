@@ -36,7 +36,7 @@ use truck_geometry::recognize::{
 };
 use truck_geotrait::{BoundedCurve, ParameterDivision1D};
 use truck_meshalgo::prelude::PolylineCurve;
-use truck_topology::{Edge, EdgeID, Face, Shell, Solid};
+use truck_topology::{Edge, EdgeID, EntityId, Face, Shell, Solid};
 
 use super::classify::{classify_fragments, FragmentClassification};
 use super::split::{
@@ -118,6 +118,50 @@ pub fn boolean(
     }
     let solid = Solid::try_new(vec![shell]).map_err(|_| unsupported())?;
     Ok(Certified::new(solid, cert))
+}
+
+/// The self-pair entry gate (T2 §5.8 arm 1): a Boolean whose two operands are
+/// CERTIFIED to be the same construction node rewrites before the sweep.
+///
+/// `a_id`/`b_id` are the operands' certified [`EntityId`]s (construction-node
+/// content identity, `truck-topology`). When the two ids are equal the
+/// self-pair identities hold — `A ∪ A = A`, `A ∩ A = A`, `A − A = ∅`,
+/// `A △ A = ∅` — and the operation is answered by a rewrite that never enters
+/// the sweep: there is no SSI to certify, and nothing to prove about the
+/// intra-solid adjacency event classes. The certificate budget is untouched.
+///
+/// When the ids differ the call falls back to [`boolean`], where an identity
+/// that is NOT certifiable at this boundary keeps its typed refusal (the
+/// §5.8 arm-2 route through the common-carrier contact calculus is the
+/// certified layer's, and stays out of this shapeops boundary).
+pub fn boolean_certified_operands(
+    a_id: &EntityId,
+    a: &Solid<Point3, Curve, Surface>,
+    op: BoolOp,
+    b_id: &EntityId,
+    b: &Solid<Point3, Curve, Surface>,
+    budget: &mut Budget,
+) -> Outcome<Solid<Point3, Curve, Surface>> {
+    let cert = Certificate {
+        props: PropMap::new(),
+        method: Method::Float,
+        budget_left: *budget,
+        margin: Margin::UNBOUNDED,
+        modulus: Modulus::Unbounded,
+    };
+    if a_id == b_id {
+        // Certified-identical operands (§5.8): the idempotent and the
+        // complement-self rewrite, never the sweep.
+        let result = match op {
+            BoolOp::Union | BoolOp::Intersection => a.clone(),
+            BoolOp::Difference | BoolOp::Xor => {
+                let empty = Solid::try_new(Vec::new()).map_err(|_| unsupported())?;
+                return Ok(Certified::new(empty, cert));
+            }
+        };
+        return Ok(Certified::new(result, cert));
+    }
+    boolean(a, op, b, budget)
 }
 
 /// The AABB-screened cross-solid contact sweep over the two solids' lifted
@@ -1522,6 +1566,192 @@ mod tests {
                 *s0 >= 0.0 && *s1 <= 1.0,
                 "windows stay inside the parent sweep"
             );
+        }
+    }
+
+    #[test]
+    fn self_pair_rewrites_before_sweep() {
+        // The §5.8 entry gate: certified-identical operands (equal EntityId)
+        // rewrite before the sweep — A ∪ A = A, A ∩ A = A, A − A = ∅, A △ A =
+        // ∅ — while the landed typed refusal remains for an identity the
+        // boundary cannot certify.
+        let (profile, arr) = box_profile(0.0, 0.0, 2.0, 2.0);
+        let a = Solid::try_new(vec![extrude_shell(&profile, &arr, 2.0)]).expect("cube A");
+        let id = EntityId::src(7);
+        let a_faces = a
+            .boundaries()
+            .first()
+            .expect("one shell")
+            .face_iter()
+            .count();
+
+        let mut union_budget = Budget::new(1000, 1000, 1000);
+        let union = boolean_certified_operands(&id, &a, BoolOp::Union, &id, &a, &mut union_budget)
+            .expect("A ∪ A rewrites as A")
+            .value;
+        assert_eq!(union.boundaries().len(), 1, "A ∪ A is one shell");
+        assert_eq!(
+            union
+                .boundaries()
+                .first()
+                .expect("one shell")
+                .face_iter()
+                .count(),
+            a_faces,
+            "A ∪ A keeps A's face record"
+        );
+
+        let mut inter_budget = Budget::new(1000, 1000, 1000);
+        let intersection =
+            boolean_certified_operands(&id, &a, BoolOp::Intersection, &id, &a, &mut inter_budget)
+                .expect("A ∩ A rewrites as A")
+                .value;
+        assert_eq!(intersection.boundaries().len(), 1);
+        assert_eq!(
+            intersection
+                .boundaries()
+                .first()
+                .expect("one shell")
+                .face_iter()
+                .count(),
+            a_faces,
+            "A ∩ A keeps A's face record"
+        );
+
+        for op in [BoolOp::Difference, BoolOp::Xor] {
+            let mut budget = Budget::new(1000, 1000, 1000);
+            let empty = boolean_certified_operands(&id, &a, op, &id, &a, &mut budget)
+                .unwrap_or_else(|e| panic!("A {op:?} A rewrites as ∅, got {e:?}"))
+                .value;
+            assert!(
+                empty.boundaries().is_empty(),
+                "A {op:?} A is the empty solid"
+            );
+        }
+
+        // The landed typed refusal remains for identity this boundary cannot
+        // certify: `boolean` on the same solid value, with no certified ids,
+        // still refuses the typed envelope (never a panic, never a guess).
+        let mut budget = Budget::new(1000, 1000, 1000);
+        let uncertified = boolean(&a, BoolOp::Union, &a, &mut budget);
+        assert!(
+            matches!(
+                uncertified,
+                Err(Refusal::UnsupportedEnvelope(
+                    EnvelopeCase::ContactReductionDeferred
+                ))
+            ),
+            "uncertified self-pair identity keeps the typed refusal, got {uncertified:?}"
+        );
+    }
+
+    // ---------------------------------------------------------------------------
+    // CTE-007-T2ARRANGE: the coplanar full-face butt-join union drops the
+    // shared wall (T2 §5.9; R2 addition, commit 4d59d5b).
+    // ---------------------------------------------------------------------------
+
+    /// The `(axis, coord)` of a plane face: `axis` 0/1/2 = x/y/z, `coord` the
+    /// plane's constant coordinate.
+    fn plane_axis_coord(face: &Face<Point3, Curve, Surface>) -> Option<(usize, f64)> {
+        let Surface::Plane(plane) = face.surface() else {
+            return None;
+        };
+        let n = plane.normal();
+        let axis = if n.x.abs() > 0.5 {
+            0
+        } else if n.y.abs() > 0.5 {
+            1
+        } else {
+            2
+        };
+        let coord = match axis {
+            0 => plane.origin().x,
+            1 => plane.origin().y,
+            _ => plane.origin().z,
+        };
+        Some((axis, coord))
+    }
+
+    #[test]
+    fn butt_join_union_drops_shared_wall() {
+        // The coplanar full-face butt join, x- and y-axis (R2 addition, commit
+        // 4d59d5b): two 2-cubes sharing an ENTIRE vertical face. The two seam
+        // side faces are stored with the SAME orientation flag yet their
+        // outward normals oppose, so the geometric orientation test must label
+        // the Region2 coincident pair `Anti` — the flag-only test would keep
+        // the wall interior to the union. With the pair `Anti`, the §5.9 union
+        // row `10 ∨ 01 = 11` drops the shared wall on both members, exactly as
+        // the landed orientation-consistency fold (`assemble.rs`) already does
+        // for the z-axis twin. The splitter now resolves the seam (the
+        // recorded `split.rs::finish` refusal is gone) and the assembled kept
+        // set carries no face on the seam plane.
+        for (profile, seam_axis, what) in [
+            (
+                box_profile(2.0, 0.0, 4.0, 2.0),
+                0,
+                "x-axis full-face butt join",
+            ),
+            (
+                box_profile(0.0, 2.0, 2.0, 4.0),
+                1,
+                "y-axis full-face butt join",
+            ),
+        ] {
+            let (b_profile, b_arr) = profile;
+            let (a_profile, a_arr) = box_profile(0.0, 0.0, 2.0, 2.0);
+            let a = Solid::try_new(vec![extrude_shell(&a_profile, &a_arr, 2.0)]).expect("cube A");
+            let b = Solid::try_new(vec![extrude_shell(&b_profile, &b_arr, 2.0)]).expect("cube B");
+            let shell_a = a.boundaries().first().expect("one shell").clone();
+            let shell_b = b.boundaries().first().expect("one shell").clone();
+
+            // The seam is a single Region2 coincident event between the two
+            // vertical side faces.
+            let events = sweep_contact_events(&a, &b, TOL)
+                .expect("the seam sweep resolves")
+                .value;
+            let region2: Vec<_> = events
+                .iter()
+                .filter(|e| e.record.dimension == ContactDimension::Region2)
+                .collect();
+            assert_eq!(
+                region2.len(),
+                1,
+                "{what}: exactly one coincident seam event"
+            );
+
+            // The splitter resolves the seam (the recorded finish refusal is
+            // gone) and emits ONE coincident pair, geometrically Anti.
+            let mesh = split_fragments(&shell_a, &shell_b, &events, TOL)
+                .unwrap_or_else(|e| panic!("{what}: the seam split must certify, got {e:?}"))
+                .value;
+            assert_eq!(mesh.coincident.len(), 1, "{what}: one coincident seam pair");
+            let pair = mesh.coincident.first().expect("the seam pair");
+            assert_eq!(
+                pair.orientation,
+                CoincidentOrientation::Anti,
+                "{what}: the seam wall pair must be geometrically Anti"
+            );
+
+            // Classify and decide the union: the `10 ∨ 01 = 11` row drops the
+            // shared wall — no kept face lies on the seam plane.
+            let classification = classify_fragments(&shell_a, &shell_b, &mesh, TOL)
+                .unwrap_or_else(|e| panic!("{what}: the seam mesh classifies, got {e:?}"))
+                .value;
+            let mut rows: Vec<FragmentProvenance> = Vec::new();
+            let kept = decide_and_assemble(BoolOp::Union, &mesh, &classification, &mut rows)
+                .unwrap_or_else(|e| panic!("{what}: the union decides, got {e:?}"));
+            assert!(!kept.is_empty(), "{what}: exterior faces survive");
+            for face in &kept {
+                let Some((axis, coord)) = plane_axis_coord(face) else {
+                    continue;
+                };
+                if axis == seam_axis {
+                    assert!(
+                        (coord - 2.0).abs() > TOL,
+                        "{what}: the shared wall at the seam plane must be dropped"
+                    );
+                }
+            }
         }
     }
 }
