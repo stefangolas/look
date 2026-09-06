@@ -30,14 +30,17 @@
 //! F_k(u,v,s,t) = W2(s,t)·N1_k(u,v) − W1(u,v)·N2_k(s,t)   (k ∈ x, y, z)
 //! ```
 //!
-//! over the product chart `(u,v) × (s,t)`, exactly as the shim froze it. The
-//! stored `SquareSystem3` grid of component `k` is the coefficient array of
-//! that tensor polynomial over the four chart axes, in the shim's flat
-//! layout (`row = a·(n1+1)+b` indexes the `(u,v)` bidegree of patch 1,
-//! `col = i·(n2+1)+j` the `(s,t)` bidegree of patch 2). [`construct_square_system`]
-//! computes that coefficient grid from two patches and feeds the shim's
-//! refusing `SquareSystem3::new`; ragged / empty / non-finite / degree-0
-//! refusal is the shim's, never restated here.
+//! over the product chart `(u,v) × (s,t)`, exactly as the shim froze it.
+//! CFP-003-SEPARABILITY stores the system PER SIDE ([`SquareSystem3`] keeps
+//! the two carriers, never the materialized four-axis coefficient grid);
+//! [`construct_square_system`] builds the two per-side carriers from the
+//! patches and feeds the shim's refusing `SquareSystem3::from_sides`; ragged /
+//! empty / non-finite / degree-0 refusal is the shim's, never restated here.
+//! Every certified enclosure is the interval product / difference of per-side
+//! 2-D hulls over each carrier's box (spec Corollaries 1.1–1.2, O(deg²) per
+//! cell). A materialized view of the component grids stays available through
+//! [`SquareSystem3::grids`] for the pre-CFP whole-grid consumers, computed
+//! from the per-side carriers on first demand.
 //!
 //! ## F3 square reduction
 //!
@@ -57,11 +60,11 @@
 //! The 2D Krawczyk inner loop of `formal/bezier_isect.rs`, dimension-raised.
 //! [`krawczyk3_certificate`] certifies a unique root of the reduced square
 //! system on the slice `{continuation axis = box centre}` within the retained
-//! 3D box `X`: the Jacobian minors are certified Bernstein-patch enclosures
-//! (the landed `CertifiedInterval` de-Casteljau discipline, composed over the
-//! four axes), the inverse is the adjugate over the determinant under
-//! directed rounding, and only a STRICT inclusion `K(X) ⊂ int(X)` emits a
-//! [`KrawczykCertificate3`] through the shim's strict-inclusion-only
+//! 3D box `X`: the Jacobian minors are certified per-side 2-D hulls composed
+//! by Corollaries 1.1–1.2 (the landed `CertifiedInterval` de-Casteljau
+//! discipline, per carrier), the inverse is the adjugate over the determinant
+//! under directed rounding, and only a STRICT inclusion `K(X) ⊂ int(X)` emits
+//! a [`KrawczykCertificate3`] through the shim's strict-inclusion-only
 //! constructor. Every non-result is a named refusal; there is no catch-all.
 //!
 //! # Refusal vocabulary
@@ -79,7 +82,7 @@ use crate::formal::exact::CertifiedInterval;
 use crate::formal::intersection::PairUnsupported;
 use crate::formal::numeric::PositiveFinite;
 use crate::hull::HullRefusal;
-use crate::ssi_types::{KrawczykCertificate3, SquareSystem3};
+use crate::ssi_types::{KrawczykCertificate3, SideCarrier, SquareSystem3};
 
 /// Why an SSI square-system or Krawczyk3 operation could not be certified.
 ///
@@ -164,7 +167,8 @@ struct Tensor4 {
 
 impl Tensor4 {
     /// Wrap one stored component grid verbatim (shape already validated by
-    /// the shim's `SquareSystem3::new`).
+    /// the shim's `SquareSystem3`).
+    #[allow(dead_code)] // retained as the materialized-grid test substrate (per-side vs grid-hull set-identity tests, Cor 1.1)
     fn from_grid(grid: &[Vec<f64>], degrees: (usize, usize, usize, usize)) -> Self {
         Tensor4 {
             degrees,
@@ -327,6 +331,7 @@ fn one_d_interval(
 /// Reduction is axis by axis by interval de Casteljau, exactly the outward-
 /// rounded discipline of the landed `hull_bernstein_1d`/`_2d` kernels (each
 /// coefficient widened to a point interval, every node step outward-rounded).
+#[allow(dead_code)] // retained as the materialized-grid hull reference for the per-side set-identity test (Cor 1.1)
 fn hull_tensor4(t: &Tensor4, box_axis: [(f64, f64); 4]) -> Result<CertifiedInterval, SsiRefusal> {
     for (lo, hi) in box_axis {
         if !lo.is_finite() || !hi.is_finite() || !(lo >= 0.0 && hi <= 1.0 && lo <= hi) {
@@ -379,6 +384,7 @@ fn hull_tensor4(t: &Tensor4, box_axis: [(f64, f64); 4]) -> Result<CertifiedInter
 
 /// Interval de Casteljau over the `(s, t)` box of an interval-valued
 /// bivariate tensor grid (`grid[i][j]` = coefficient of `B^i_m(s) B^j_n(t)`).
+#[allow(dead_code)] // retained as part of the materialized-grid hull reference (hull_tensor4), exercised by the Cor 1.1 set-identity test
 fn hull_2d_interval(
     grid: &[Vec<CertifiedInterval>],
     s: (f64, f64),
@@ -466,6 +472,191 @@ fn unit_box(system: &SquareSystem3, box_: [(f64, f64); 4]) -> Result<[(f64, f64)
 }
 
 // ---------------------------------------------------------------------------
+// Per-side 2-D hull kernels (CFP-003-SEPARABILITY, spec Corollaries 1.1-1.2)
+// ---------------------------------------------------------------------------
+
+/// The certified range enclosure of one side's bivariate Bernstein grid over a
+/// UNIT-chart sub-box (each axis a compact subinterval of `[0, 1]`).
+///
+/// Reduction is axis-by-axis interval de Casteljau (the outward-rounded
+/// discipline of the landed hull kernels). `grid` has `dm + 1` rows (first
+/// parameter) and `dn + 1` columns (second parameter).
+fn hull_bivariate(
+    grid: &[Vec<f64>],
+    dm: usize,
+    dn: usize,
+    u: (f64, f64),
+    v: (f64, f64),
+) -> Result<CertifiedInterval, SsiRefusal> {
+    if grid.len() != dm + 1 || grid.iter().any(|row| row.len() != dn + 1) {
+        return Err(SsiRefusal::Hull(HullRefusal::EnclosureUnavailable));
+    }
+    for (lo, hi) in [u, v] {
+        if !lo.is_finite() || !hi.is_finite() || !(lo >= 0.0 && hi <= 1.0 && lo <= hi) {
+            return Err(SsiRefusal::Hull(HullRefusal::DomainNotCompact));
+        }
+    }
+    let u_iv = CertifiedInterval { lo: u.0, hi: u.1 };
+    let v_iv = CertifiedInterval { lo: v.0, hi: v.1 };
+    // Transpose to column-major: one interval per second-parameter slot after
+    // reducing the first parameter over each column of coefficients.
+    let mut columns = vec![Vec::<CertifiedInterval>::with_capacity(dm + 1); dn + 1];
+    for row in grid.iter().take(dm + 1) {
+        for (c, value) in row.iter().enumerate() {
+            columns[c].push(CertifiedInterval::point(*value));
+        }
+    }
+    let mut per_column = Vec::with_capacity(dn + 1);
+    for column in columns {
+        per_column.push(one_d_interval(&column, &u_iv)?);
+    }
+    // Reduce the second parameter.
+    let hull = one_d_interval(&per_column, &v_iv)?;
+    if hull.is_finite() {
+        Ok(hull)
+    } else {
+        Err(SsiRefusal::Hull(HullRefusal::EnclosureUnavailable))
+    }
+}
+
+/// The Bernstein first-derivative coefficient grid of one side's bivariate
+/// grid along its first (`axis == 0`) or second (`axis == 1`) parameter.
+fn bivariate_derivative(
+    grid: &[Vec<f64>],
+    dm: usize,
+    dn: usize,
+    axis: usize,
+) -> Result<Vec<Vec<f64>>, SsiRefusal> {
+    if grid.len() != dm + 1 || grid.iter().any(|row| row.len() != dn + 1) {
+        return Err(SsiRefusal::Hull(HullRefusal::EnclosureUnavailable));
+    }
+    match axis {
+        0 => {
+            if dm == 0 {
+                return Err(SsiRefusal::InvalidInput);
+            }
+            let scale = dm as f64;
+            let mut out = vec![vec![0.0f64; dn + 1]; dm];
+            for a in 0..dm {
+                for b in 0..=dn {
+                    out[a][b] = scale * (grid[a + 1][b] - grid[a][b]);
+                }
+            }
+            Ok(out)
+        }
+        1 => {
+            if dn == 0 {
+                return Err(SsiRefusal::InvalidInput);
+            }
+            let scale = dn as f64;
+            let mut out = vec![vec![0.0f64; dn]; dm + 1];
+            for a in 0..=dm {
+                for b in 0..dn {
+                    out[a][b] = scale * (grid[a][b + 1] - grid[a][b]);
+                }
+            }
+            Ok(out)
+        }
+        _ => Err(SsiRefusal::InvalidInput),
+    }
+}
+
+/// The certified range enclosure of one component of the stored difference
+/// system over a UNIT-chart product box, computed PER SIDE.
+///
+/// `F_k = W2·N1_k − W1·N2_k` with the two terms' functions on disjoint
+/// parameter sets: the range of `W2(s,t)·N1_k(u,v)` over `B1 x B2` is exactly
+/// the product of the per-side ranges, and the range of the difference is the
+/// interval difference (spec Corollary 1.1; set-identical to the materialized
+/// four-axis hull, computed at O(deg²)).
+fn component_value_unit(
+    system: &SquareSystem3,
+    component: usize,
+    unit: [(f64, f64); 4],
+) -> Result<CertifiedInterval, SsiRefusal> {
+    if component > 2 {
+        return Err(SsiRefusal::InvalidInput);
+    }
+    let side_a = system.side_a();
+    let side_b = system.side_b();
+    let (ma, na) = (side_a.m(), side_a.n());
+    let (mb, nb) = (side_b.m(), side_b.n());
+    let ha_num = hull_bivariate(&side_a.numerator()[component], ma, na, unit[0], unit[1])?;
+    let ha_w = hull_bivariate(side_a.weights(), ma, na, unit[0], unit[1])?;
+    let hb_num = hull_bivariate(&side_b.numerator()[component], mb, nb, unit[2], unit[3])?;
+    let hb_w = hull_bivariate(side_b.weights(), mb, nb, unit[2], unit[3])?;
+    // (W2 over B2)·(N1_k over B1) − (W1 over B1)·(N2_k over B2).
+    let term1 = hb_w.mul(&ha_num);
+    let term2 = ha_w.mul(&hb_num);
+    let hull = term1.sub(&term2);
+    if hull.is_finite() {
+        Ok(hull)
+    } else {
+        Err(SsiRefusal::Hull(HullRefusal::EnclosureUnavailable))
+    }
+}
+
+/// The certified partial-derivative enclosure of one component along one chart
+/// axis over a UNIT-chart product box, computed PER SIDE.
+///
+/// `∂_u F_k = W2·∂_u N1_k − ∂_u W1·N2_k`, `∂_v` likewise on side A; `∂_s
+/// F_k = ∂_s W2·N1_k − W1·∂_s N2_k`, `∂_t` likewise on side B. Each product
+/// term hulls on disjoint parameter sets (spec Corollary 1.2 — every partial
+/// belongs to one carrier, no mixed-derivative grid).
+fn component_partial_unit(
+    system: &SquareSystem3,
+    component: usize,
+    axis: usize,
+    unit: [(f64, f64); 4],
+) -> Result<CertifiedInterval, SsiRefusal> {
+    if component > 2 || axis > 3 {
+        return Err(SsiRefusal::InvalidInput);
+    }
+    let side_a = system.side_a();
+    let side_b = system.side_b();
+    let (ma, na) = (side_a.m(), side_a.n());
+    let (mb, nb) = (side_b.m(), side_b.n());
+    let ha_num = hull_bivariate(&side_a.numerator()[component], ma, na, unit[0], unit[1])?;
+    let ha_w = hull_bivariate(side_a.weights(), ma, na, unit[0], unit[1])?;
+    let hb_num = hull_bivariate(&side_b.numerator()[component], mb, nb, unit[2], unit[3])?;
+    let hb_w = hull_bivariate(side_b.weights(), mb, nb, unit[2], unit[3])?;
+    let hull = match axis {
+        0 | 1 => {
+            // Side A: ∂ F_k = W2·∂ N1_k − ∂ W1·N2_k.
+            let du = bivariate_derivative(&side_a.numerator()[component], ma, na, axis)?;
+            let dw = bivariate_derivative(side_a.weights(), ma, na, axis)?;
+            let (d_ma, d_na) = if axis == 0 {
+                (ma - 1, na)
+            } else {
+                (ma, na - 1)
+            };
+            let h_du = hull_bivariate(&du, d_ma, d_na, unit[0], unit[1])?;
+            let h_dw = hull_bivariate(&dw, d_ma, d_na, unit[0], unit[1])?;
+            hb_w.mul(&h_du).sub(&h_dw.mul(&hb_num))
+        }
+        _ => {
+            // Side B: ∂ F_k = ∂ W2·N1_k − W1·∂ N2_k.
+            let side_axis = axis - 2;
+            let du = bivariate_derivative(&side_b.numerator()[component], mb, nb, side_axis)?;
+            let dw = bivariate_derivative(side_b.weights(), mb, nb, side_axis)?;
+            let (d_mb, d_nb) = if side_axis == 0 {
+                (mb - 1, nb)
+            } else {
+                (mb, nb - 1)
+            };
+            let h_du = hull_bivariate(&du, d_mb, d_nb, unit[2], unit[3])?;
+            let h_dw = hull_bivariate(&dw, d_mb, d_nb, unit[2], unit[3])?;
+            h_dw.mul(&ha_num).sub(&ha_w.mul(&h_du))
+        }
+    };
+    if hull.is_finite() {
+        Ok(hull)
+    } else {
+        Err(SsiRefusal::Hull(HullRefusal::EnclosureUnavailable))
+    }
+}
+
+// ---------------------------------------------------------------------------
 // Section 1 — F3 square reduction (certified diagonal derivatives + extents)
 // ---------------------------------------------------------------------------
 
@@ -473,11 +664,11 @@ fn unit_box(system: &SquareSystem3, box_: [(f64, f64); 4]) -> Result<[(f64, f64)
 /// along a chart axis over a trace box.
 ///
 /// The box is given in the chart coordinates of the stored system (each axis
-/// must be a compact subset of that axis's chart rectangle). The partial is a
-/// Bernstein coefficient derivative in the unit chart, then scaled by the
-/// inverse chart width so the result is the partial along the CHART
-/// coordinate. `component` selects `x`, `y` or `z`; `axis` is 0..=3 in the
-/// `(u,v,s,t)` order.
+/// must be a compact subset of that axis's chart rectangle). The partial is
+/// hulled per side in the unit chart (spec Corollary 1.2 — the derivative
+/// belongs to one carrier), then scaled by the inverse chart width so the
+/// result is the partial along the CHART coordinate. `component` selects `x`,
+/// `y` or `z`; `axis` is 0..=3 in the `(u,v,s,t)` order.
 pub fn partial_enclosure(
     system: &SquareSystem3,
     component: usize,
@@ -489,14 +680,230 @@ pub fn partial_enclosure(
     }
     let widths = chart_widths(system.domain_maps());
     let unit = unit_box(system, box_)?;
-    let grid = &system.grids()[component];
-    let tensor = Tensor4::from_grid(grid, system.degrees());
-    let derived = tensor.partial_axis(axis)?;
-    let hull = hull_tensor4(&derived, unit)?;
+    let hull = component_partial_unit(system, component, axis, unit)?;
     let inv_width = CertifiedInterval::point(1.0).div(&CertifiedInterval::point(widths[axis]));
     match inv_width {
         Some(scale) => Ok(hull.mul(&scale)),
         None => Err(SsiRefusal::Hull(HullRefusal::EnclosureUnavailable)),
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Per-side normal nets and the Corollary 1.4 hull memo (CFP-003)
+// ---------------------------------------------------------------------------
+
+/// A small integer binomial coefficient as `f64`.
+#[allow(dead_code)] // CFP-003 per-side substrate: Bernstein product weights (normal-net composition, Prop 2.1), exercised by the normal-net/memo tests
+fn binom_f(n: usize, k: usize) -> f64 {
+    if k > n {
+        return 0.0;
+    }
+    let mut num = 1.0f64;
+    let mut den = 1.0f64;
+    for t in 0..k {
+        num *= (n - t) as f64;
+        den *= (t + 1) as f64;
+    }
+    num / den
+}
+
+/// The Bernstein product weight of one axis: `C(da,i)·C(db,j)/C(da+db,k)`
+/// with `i + j = k`.
+#[allow(dead_code)] // CFP-003 per-side substrate: exercised by the normal-net composition tests
+fn product_weight(da: usize, db: usize, i: usize, j: usize, k: usize) -> f64 {
+    binom_f(da, i) * binom_f(db, j) / binom_f(da + db, k)
+}
+
+/// The Bernstein product of two bivariate grids over the shared unit square:
+/// per-axis degree sums with the Bernstein convolution weights
+/// `C(da,i)·C(db,j)/C(da+db,k)` on each axis (the exact coefficient algebra
+/// behind the per-side normal-net composition, spec Prop. 2.1 scope decision
+/// 2). `a` has bidegree `(ma, na)`, `b` `(mb, nb)`.
+#[allow(dead_code)]
+// CFP-003 per-side substrate: normal-net composition + Cor 1.3 tests; consumed by CFP-005 (bvh) per the build-spec packet row
+#[allow(clippy::needless_range_loop)] // the Bernstein-convolution index algebra over the (ka,kb,a0,a1,b0,b1) index lattice is clearest in the explicit range form
+fn bernstein_mul_2d(
+    a: &[Vec<f64>],
+    (ma, na): (usize, usize),
+    b: &[Vec<f64>],
+    (mb, nb): (usize, usize),
+) -> Result<Vec<Vec<f64>>, SsiRefusal> {
+    if a.len() != ma + 1 || b.len() != mb + 1 {
+        return Err(SsiRefusal::Hull(HullRefusal::EnclosureUnavailable));
+    }
+    if a.iter().any(|r| r.len() != na + 1) || b.iter().any(|r| r.len() != nb + 1) {
+        return Err(SsiRefusal::Hull(HullRefusal::EnclosureUnavailable));
+    }
+    let (om, on) = (ma + mb, na + nb);
+    let mut out = vec![vec![0.0f64; on + 1]; om + 1];
+    for ka in 0..=om {
+        for kb in 0..=on {
+            let mut acc = 0.0f64;
+            for a0 in 0..=ma.min(ka) {
+                let a1 = ka - a0;
+                if a1 > mb {
+                    continue;
+                }
+                let w0 = product_weight(ma, mb, a0, a1, ka);
+                for b0 in 0..=na.min(kb) {
+                    let b1 = kb - b0;
+                    if b1 > nb {
+                        continue;
+                    }
+                    let w1 = product_weight(na, nb, b0, b1, kb);
+                    acc += w0 * w1 * a[a0][b0] * b[a1][b1];
+                }
+            }
+            out[ka][kb] = acc;
+        }
+    }
+    Ok(out)
+}
+
+/// The per-side unit normal net of one carrier under D2 (unit weights): the
+/// coefficient grids of `n = ∂_u S × ∂_v S`, composed per patch by exact
+/// Bernstein coefficient products (spec Prop. 2.1, scope decision 2 — the
+/// normal is enclosed by its OWN net of bidegree `(2m−1, 2n−1)`, `4mn`
+/// coefficients per component, never as interval cross products of derivative
+/// hulls). Returns the three component grids in `(x, y, z)` order.
+#[allow(dead_code)] // CFP-003 per-side substrate: D3-counted normal nets (Prop 2.1), exercised by the normal-net tests; the count feeds the D3 budget note
+fn side_normal_nets(side: &SideCarrier) -> Result<[Vec<Vec<f64>>; 3], SsiRefusal> {
+    let (m, n) = (side.m(), side.n());
+    // ∂_u has bidegree (m−1, n), ∂_v bidegree (m, n−1); the cross product has
+    // bidegree (2m−1, 2n−1).
+    let mut du = [Vec::new(), Vec::new(), Vec::new()];
+    let mut dv = [Vec::new(), Vec::new(), Vec::new()];
+    for k in 0..3 {
+        du[k] = bivariate_derivative(&side.numerator()[k], m, n, 0)?;
+        dv[k] = bivariate_derivative(&side.numerator()[k], m, n, 1)?;
+    }
+    let du_deg = (m - 1, n);
+    let dv_deg = (m, n - 1);
+    // n = ∂_u × ∂_v: n_x = du_y·dv_z − du_z·dv_y, etc.
+    let x = bernstein_mul_2d(&du[1], du_deg, &dv[2], dv_deg)?;
+    let x_sub = bernstein_mul_2d(&du[2], du_deg, &dv[1], dv_deg)?;
+    let y = bernstein_mul_2d(&du[2], du_deg, &dv[0], dv_deg)?;
+    let y_sub = bernstein_mul_2d(&du[0], du_deg, &dv[2], dv_deg)?;
+    let z = bernstein_mul_2d(&du[0], du_deg, &dv[1], dv_deg)?;
+    let z_sub = bernstein_mul_2d(&du[1], du_deg, &dv[0], dv_deg)?;
+    let sub = |a: Vec<Vec<f64>>, b: Vec<Vec<f64>>| -> Result<Vec<Vec<f64>>, SsiRefusal> {
+        if a.len() != b.len() {
+            return Err(SsiRefusal::Hull(HullRefusal::EnclosureUnavailable));
+        }
+        let mut out = Vec::with_capacity(a.len());
+        for (ra, rb) in a.iter().zip(b.iter()) {
+            if ra.len() != rb.len() {
+                return Err(SsiRefusal::Hull(HullRefusal::EnclosureUnavailable));
+            }
+            out.push(ra.iter().zip(rb.iter()).map(|(u, v)| u - v).collect());
+        }
+        Ok(out)
+    };
+    Ok([sub(x, x_sub)?, sub(y, y_sub)?, sub(z, z_sub)?])
+}
+
+/// A deterministic memoization key: one side's unit box (spec Corollary 1.4).
+///
+/// A side box is the two unit-chart intervals of one carrier plus the function
+/// being hulled (one of the three numerator components, or the weight grid).
+/// The interval endpoints are stored as exact `f64` bit patterns so that two
+/// float-identical boxes collide and the key order is total (unit coordinates
+/// in `[0, 1]` are positive, so `to_bits` is monotone in value).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+#[allow(dead_code)] // CFP-003 per-side substrate: memo key exercised by the memoization test (Cor 1.4)
+pub(crate) struct SideBoxKey {
+    /// Which carrier (0 = side A, 1 = side B).
+    side: u8,
+    /// Which grid on that side is hulled (0..2 numerator component, 3 weight).
+    kind: u8,
+    /// First-axis unit interval, `(lo, hi)` bit patterns.
+    axis0: (u64, u64),
+    /// Second-axis unit interval, `(lo, hi)` bit patterns.
+    axis1: (u64, u64),
+}
+
+/// The deterministic per-side hull memo (spec Corollary 1.4): hulls keyed on
+/// (side, box, function), with no eviction — the subdivision visit order is
+/// fixed, so a subdivision visiting `M` cells drawn from `k` distinct per-side
+/// boxes pays `O(k)` hulls per side plus `O(M)` interval arithmetic on cached
+/// values.
+#[derive(Debug, Clone, Default)]
+#[allow(dead_code)] // CFP-003 per-side substrate: memoized per-side hulls (Cor 1.4), exercised by the memoization test
+pub(crate) struct PerSideHullMemo {
+    cache: std::collections::BTreeMap<SideBoxKey, CertifiedInterval>,
+}
+
+impl PerSideHullMemo {
+    /// The cached certified hull of one function on one side over a unit box,
+    /// computing (and counting) it only on a first visit.
+    fn hull_side_box(
+        &mut self,
+        system: &SquareSystem3,
+        side: usize,
+        kind: usize,
+        box2: [(f64, f64); 2],
+    ) -> Result<CertifiedInterval, SsiRefusal> {
+        if side > 1 || kind > 3 {
+            return Err(SsiRefusal::InvalidInput);
+        }
+        for (lo, hi) in box2 {
+            if !lo.is_finite() || !hi.is_finite() || !(lo >= 0.0 && hi <= 1.0 && lo <= hi) {
+                return Err(SsiRefusal::Hull(HullRefusal::DomainNotCompact));
+            }
+        }
+        let key = SideBoxKey {
+            side: side as u8,
+            kind: kind as u8,
+            axis0: (box2[0].0.to_bits(), box2[0].1.to_bits()),
+            axis1: (box2[1].0.to_bits(), box2[1].1.to_bits()),
+        };
+        if let Some(hit) = self.cache.get(&key) {
+            return Ok(*hit);
+        }
+        let carrier = if side == 0 {
+            system.side_a()
+        } else {
+            system.side_b()
+        };
+        let (m, n) = (carrier.m(), carrier.n());
+        let grid = if kind == 3 {
+            carrier.weights()
+        } else {
+            &carrier.numerator()[kind]
+        };
+        let hull = hull_bivariate(grid, m, n, box2[0], box2[1])?;
+        self.cache.insert(key, hull);
+        Ok(hull)
+    }
+
+    /// The memoized per-side value enclosure of one component over a unit
+    /// product box (the D2 cross-multiplied form of spec Corollary 1.1).
+    #[allow(dead_code)] // CFP-003 per-side substrate: exercised by the memoization + set-identity tests (Cor 1.1/1.4)
+    pub(crate) fn component_value_unit(
+        &mut self,
+        system: &SquareSystem3,
+        component: usize,
+        unit: [(f64, f64); 4],
+    ) -> Result<CertifiedInterval, SsiRefusal> {
+        if component > 2 {
+            return Err(SsiRefusal::InvalidInput);
+        }
+        let ha_num = self.hull_side_box(system, 0, component, [unit[0], unit[1]])?;
+        let ha_w = self.hull_side_box(system, 0, 3, [unit[0], unit[1]])?;
+        let hb_num = self.hull_side_box(system, 1, component, [unit[2], unit[3]])?;
+        let hb_w = self.hull_side_box(system, 1, 3, [unit[2], unit[3]])?;
+        let hull = hb_w.mul(&ha_num).sub(&ha_w.mul(&hb_num));
+        if hull.is_finite() {
+            Ok(hull)
+        } else {
+            Err(SsiRefusal::Hull(HullRefusal::EnclosureUnavailable))
+        }
+    }
+
+    /// The number of distinct (side, box, function) hull entries held.
+    #[allow(dead_code)] // CFP-003 per-side substrate: exercised by the memoization test (Cor 1.4)
+    pub(crate) fn distinct_entries(&self) -> usize {
+        self.cache.len()
     }
 }
 
@@ -648,13 +1055,16 @@ fn matmul3(a: &Matrix3, b: &Matrix3) -> Matrix3 {
     out
 }
 
-/// Certified value of one component at a chart point: hull over a degenerate
-/// box (no differentiation).
+/// Certified value of one component at a chart point: per-side hull over a
+/// degenerate box (no differentiation; spec Corollary 1.1).
 fn value_at_point(
     system: &SquareSystem3,
     component: usize,
     point: [f64; 4],
 ) -> Result<CertifiedInterval, SsiRefusal> {
+    if component > 2 {
+        return Err(SsiRefusal::InvalidInput);
+    }
     let box_: [(f64, f64); 4] = [
         (point[0], point[0]),
         (point[1], point[1]),
@@ -662,8 +1072,7 @@ fn value_at_point(
         (point[3], point[3]),
     ];
     let unit = unit_box(system, box_)?;
-    let tensor = Tensor4::from_grid(&system.grids()[component], system.degrees());
-    let hull = hull_tensor4(&tensor, unit)?;
+    let hull = component_value_unit(system, component, unit)?;
     if hull.is_finite() {
         Ok(hull)
     } else {
@@ -939,17 +1348,14 @@ pub enum SsiParticipant {
 /// Class pairs outside the spline-admissible shapes refuse
 /// [`SsiRefusal::PairClass`] with the DISPATCH widening
 /// [`PairUnsupported::UnsupportedPairClass`] (a named variant, never a
-/// string). For two rational patches the cross-multiplied coefficient grid of
-/// component `k` is, at flat index `(a,b,i,j)`,
-///
-/// ```text
-/// W2[i][j]·N1_k[a][b] − W1[a][b]·N2_k[i][j]
-/// ```
-///
-/// stored through the shim's refusing `SquareSystem3::new` (ragged / empty /
-/// non-finite / degree-0 refusal is the shim's; this function feeds it). The
-/// two patches share the unit chart, so the stored domain maps are the
-/// identity rectangle `(0,1,0,1,0,1,0,1)`.
+/// string). For two rational patches the cross-multiplied D-homogeneous
+/// component is `F_k = W2(s,t)·N1_k(u,v) − W1(u,v)·N2_k(s,t)`. Under
+/// CFP-003-SEPARABILITY the stored form is PER-SIDE ([`SquareSystem3`] keeps
+/// the two carriers, no materialized four-axis grid): every certified
+/// enclosure combines per-side 2-D hulls (spec Corollaries 1.1–1.2), so
+/// construction performs no cross-multiplied materialization. The two patches
+/// share the unit chart, so the stored domain maps are the identity rectangle
+/// `(0,1,0,1,0,1,0,1)`.
 pub fn construct_square_system(
     lhs: &SsiParticipant,
     rhs: &SsiParticipant,
@@ -966,39 +1372,28 @@ pub fn construct_square_system(
             return Err(SsiRefusal::PairClass(PairUnsupported::UnsupportedPairClass));
         }
     };
-    let (m1, n1) = (p1.m(), p1.n());
-    let (m2, n2) = (p2.m(), p2.n());
-    let rows = (m1 + 1) * (n1 + 1);
-    let cols = (m2 + 1) * (n2 + 1);
-    let mut grids = [
-        vec![vec![0.0f64; cols]; rows],
-        vec![vec![0.0f64; cols]; rows],
-        vec![vec![0.0f64; cols]; rows],
-    ];
-    for (k, grid_k) in grids.iter_mut().enumerate() {
-        for a in 0..=m1 {
-            for b in 0..=n1 {
-                let row = a * (n1 + 1) + b;
-                let w1 = p1.weights()[a][b];
-                let n1k = p1.numerator()[k][a][b];
-                for i in 0..=m2 {
-                    for j in 0..=n2 {
-                        let col = i * (n2 + 1) + j;
-                        let w2 = p2.weights()[i][j];
-                        let n2k = p2.numerator()[k][i][j];
-                        grid_k[row][col] = w2 * n1k - w1 * n2k;
-                    }
-                }
-            }
-        }
-    }
+    let side_a = SideCarrier::new(
+        p1.m(),
+        p1.n(),
+        p1.numerator().clone(),
+        p1.weights().to_vec(),
+    )
+    .map_err(|_| SsiRefusal::InvalidInput)?;
+    let side_b = SideCarrier::new(
+        p2.m(),
+        p2.n(),
+        p2.numerator().clone(),
+        p2.weights().to_vec(),
+    )
+    .map_err(|_| SsiRefusal::InvalidInput)?;
     let identity = (0.0, 1.0, 0.0, 1.0, 0.0, 1.0, 0.0, 1.0);
-    SquareSystem3::new(grids, (m1, n1, m2, n2), identity).map_err(SsiRefusal::from)
+    SquareSystem3::from_sides(side_a, side_b, identity).map_err(SsiRefusal::from)
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::formal::exact::{CertifiedInterval, CertifiedSign, Expansion};
 
     /// A tolerance for the coefficientwise finite-difference comparison.
     /// H-3: a dimensionless roundoff allowance over the small integer
@@ -1283,6 +1678,492 @@ mod tests {
                     c
                 );
             }
+        }
+    }
+
+    // -----------------------------------------------------------------------
+    // CFP-003-SEPARABILITY — per-side machinery gates (fixture data copied
+    // from `cfp/fixtures.rs` as read-only constants).
+    // -----------------------------------------------------------------------
+
+    /// The exact `λ·p` dot product of integer data as an [`Expansion`].
+    fn dot_exp(lambda: &[i64; 3], p: &[i64; 3]) -> Expansion {
+        let mut acc = Expansion::zero();
+        for k in 0..3 {
+            acc = acc.merge(&Expansion::from_product(lambda[k] as f64, p[k] as f64));
+        }
+        acc
+    }
+
+    /// Whether `a > b` exactly (the exact `Expansion` dot-sign predicate).
+    fn expansion_strictly_gt(a: &Expansion, b: &Expansion) -> bool {
+        matches!(a.merge(&b.negate()).sign(), CertifiedSign::Positive)
+    }
+
+    /// The exact Theorem-3 separation certificate
+    /// `min_α λ·P¹_α > max_β λ·P²_β` (F-C3 data, copied read-only).
+    fn separated_by_exact_dot(
+        lambda: &[i64; 3],
+        net_a: &[[i64; 3]; 4],
+        net_b: &[[i64; 3]; 4],
+    ) -> bool {
+        let dots_a: Vec<Expansion> = net_a.iter().map(|p| dot_exp(lambda, p)).collect();
+        let dots_b: Vec<Expansion> = net_b.iter().map(|p| dot_exp(lambda, p)).collect();
+        dots_a
+            .iter()
+            .all(|a| dots_b.iter().all(|b| expansion_strictly_gt(a, b)))
+    }
+
+    #[test]
+    fn fc3_separation_exact_sign_certificate() {
+        // F-C3 data copied from cfp/fixtures.rs (read-only).
+        // The separated pair: λ = (1, 0, 0), all of A at x = 2, all of B at
+        // x ∈ {0, 1}.
+        let separated_lambda = [1i64, 0, 0];
+        let separated_a = [[2, 0, 0], [2, 1, 0], [2, 0, 1], [2, 1, 1]];
+        let separated_b = [[0, 0, 0], [1, 1, 0], [1, 0, 1], [0, 1, 1]];
+        // The touching pair shares the point (2, 1, 0).
+        let touching_lambda = [1i64, 0, 0];
+        let touching_a = [[0, 0, 0], [1, 1, 1], [2, 1, 0], [1, 0, 0]];
+        let touching_b = [[2, 1, 0], [3, 0, 0], [3, 2, 1], [2, 2, 0]];
+
+        assert!(
+            separated_by_exact_dot(&separated_lambda, &separated_a, &separated_b),
+            "the separated pair certifies via the exact Expansion dot-sign row"
+        );
+        assert!(
+            !separated_by_exact_dot(&touching_lambda, &touching_a, &touching_b),
+            "the touching pair must NOT separate along the exact dot-sign row"
+        );
+        assert!(
+            touching_a.contains(&[2, 1, 0]) && touching_b.contains(&[2, 1, 0]),
+            "F-C3's touching pair shares the recorded control point"
+        );
+    }
+
+    /// Whether two certified enclosures agree within a directed-rounding slack
+    /// scaled to the enclosure magnitude (H-3).
+    fn intervals_agree(a: &CertifiedInterval, b: &CertifiedInterval) -> bool {
+        let scale = 1.0 + a.lo.abs().max(a.hi.abs()).max(b.lo.abs().max(b.hi.abs()));
+        const SLACK: f64 = 1e-12; // H-3: outward-rounding slack for set-identity (Cor 1.1), fixture scale O(1)
+        let tol = SLACK * scale;
+        (a.lo - b.lo).abs() <= tol && (a.hi - b.hi).abs() <= tol
+    }
+
+    /// The certified coefficient hull of a grid: `[min c, max c]` over all
+    /// coefficients, outward rounded (the exact control hull over the full
+    /// chart — the tight enclosure the per-side/grid set identity is about).
+    fn coefficient_hull(grid: &[Vec<f64>]) -> CertifiedInterval {
+        let mut lo = f64::INFINITY;
+        let mut hi = f64::NEG_INFINITY;
+        for row in grid {
+            for &c in row {
+                lo = lo.min(c);
+                hi = hi.max(c);
+            }
+        }
+        CertifiedInterval {
+            lo: lo.next_down(),
+            hi: hi.next_up(),
+        }
+    }
+
+    #[test]
+    fn per_side_hull_set_identical_to_grid_hull_on_fixtures() {
+        // The landed fixture battery of per-side systems (all D2 unit-weight
+        // cross differences). For every fixture pair and every component the
+        // per-side composition and the old (materialized four-axis) grid hull
+        // are SET-identical (Corollary 1.1): `min c_αβ = min P1 − max P2` and
+        // `max c_αβ = max P1 − min P2` over the coefficient lattice, so the
+        // tight control-hull ranges agree exactly up to outward rounding; and
+        // the per-side interval enclosure stays a sound BG-ENC-001 enclosure
+        // of the same grid polynomial on sub-boxes.
+        let systems: Vec<SquareSystem3> = {
+            let mut out = Vec::new();
+            out.push(parabola_system());
+            if let Ok(record) = crate::ssi_fixtures::well_conditioned_root() {
+                out.push(record.system);
+            }
+            if let Ok(record) = crate::ssi_fixtures::negative_orientation_root() {
+                out.push(record.system);
+            }
+            if let Ok(record) = crate::ssi_fixtures::determinant_spans_zero() {
+                out.push(record.system);
+            }
+            if let Ok(record) = crate::ssi_fixtures::conditioning_below_threshold() {
+                out.push(record.system);
+            }
+            if let Ok(pair) = crate::ssi_fixtures::closed_loop_pair() {
+                out.push(pair.system);
+            }
+            if let Ok(ladder) = crate::ssi_fixtures::germ_ladder() {
+                for germ in ladder {
+                    out.push(germ.system);
+                }
+            }
+            out
+        };
+        assert!(
+            systems.len() >= 8,
+            "the battery must span at least the F5 + F-C fixture systems"
+        );
+        let mut checked = 0usize;
+        for system in &systems {
+            let degrees = system.degrees();
+            let side_a = system.side_a();
+            let side_b = system.side_b();
+            for component in 0..3 {
+                let grid = system.grids()[component].clone();
+                let grid_hull = coefficient_hull(&grid);
+                let a_hull = coefficient_hull(&side_a.numerator()[component]);
+                let b_hull = coefficient_hull(&side_b.numerator()[component]);
+                let per_side = CertifiedInterval {
+                    lo: (a_hull.lo - b_hull.hi).next_down(),
+                    hi: (a_hull.hi - b_hull.lo).next_up(),
+                };
+                assert!(
+                    intervals_agree(&per_side, &grid_hull),
+                    "system degrees {degrees:?} comp {component}: per-side {per_side:?} vs \
+                     grid hull {grid_hull:?}"
+                );
+                // Structural identity: every stored coefficient is exactly the
+                // per-side difference of the two side grids' coefficients
+                // (Theorem 1's `c_αβ = P¹_α − P²_β`, no cross terms).
+                let sp1 = degrees.1 + 1;
+                let sp2 = degrees.3 + 1;
+                for (r, row) in grid.iter().enumerate() {
+                    for (c, value) in row.iter().enumerate() {
+                        let a_val = side_a.numerator()[component][r / sp1][r % sp1];
+                        let b_val = side_b.numerator()[component][c / sp2][c % sp2];
+                        assert!(
+                            (*value - (a_val - b_val)).abs() <= 1e-12,
+                            "degrees {degrees:?} comp {component}: grid[{r}][{c}] {} != {a_val} − {b_val}",
+                            value
+                        );
+                    }
+                }
+                // Sub-box soundness: the per-side interval enclosure is a
+                // BG-ENC-001 enclosure of the same grid polynomial: it
+                // contains the direct evaluations at every cell corner of a
+                // depth-2 dyadic subdivision.
+                let div = 4usize;
+                for ui in 0..div {
+                    for vi in 0..div {
+                        for si in 0..div {
+                            for ti in 0..div {
+                                let cell = [
+                                    (ui as f64 / div as f64, (ui + 1) as f64 / div as f64),
+                                    (vi as f64 / div as f64, (vi + 1) as f64 / div as f64),
+                                    (si as f64 / div as f64, (si + 1) as f64 / div as f64),
+                                    (ti as f64 / div as f64, (ti + 1) as f64 / div as f64),
+                                ];
+                                let per_side = component_value_unit(system, component, cell)
+                                    .expect("the per-side composition certifies on the cell");
+                                for du in [cell[0].0, cell[0].1] {
+                                    for dv in [cell[1].0, cell[1].1] {
+                                        for ds in [cell[2].0, cell[2].1] {
+                                            for dt in [cell[3].0, cell[3].1] {
+                                                let sample = crate::ssi_fixtures::eval_grid4(
+                                                    &grid,
+                                                    degrees,
+                                                    (du, dv, ds, dt),
+                                                )
+                                                .expect("a corner evaluation of the fixture grid");
+                                                assert!(
+                                                    per_side.lo <= sample && sample <= per_side.hi,
+                                                    "per-side enclosure {per_side:?} misses the \
+                                                     sampled value {sample}"
+                                                );
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                checked += 1;
+            }
+        }
+        assert!(checked >= systems.len() * 3);
+    }
+
+    /// Float evaluation of a bivariate Bernstein coefficient grid at a unit
+    /// point (test support).
+    fn eval_2d_float_test(grid: &[Vec<f64>], u: f64, v: f64) -> f64 {
+        let bern = |mut level: Vec<f64>, x: f64| -> f64 {
+            while level.len() > 1 {
+                let mut next = Vec::with_capacity(level.len() - 1);
+                for w in level.windows(2) {
+                    next.push(w[0] + x * (w[1] - w[0]));
+                }
+                level = next;
+            }
+            level[0]
+        };
+        let mut rows = Vec::with_capacity(grid.len());
+        for row in grid {
+            rows.push(bern(row.to_vec(), v));
+        }
+        bern(rows, u)
+    }
+
+    #[test]
+    #[allow(clippy::needless_range_loop)] // the 3x4 block-Jacobian row/column index algebra is clearest in the explicit range form
+    fn minor_factorization_matches_direct_expansion() {
+        // Corollary 1.3 vs the direct det3 expansion of the block Jacobian on
+        // fixture Jacobians, equal within rounding.
+        let system = parabola_system();
+        let a = system.side_a();
+        let b = system.side_b();
+        let (ma, na) = (a.m(), a.n());
+        let (mb, nb) = (b.m(), b.n());
+        let points: [(f64, f64, f64, f64); 4] = [
+            (0.5, 0.5, 0.5, 0.5),
+            (0.25, 0.5, 0.75, 0.5),
+            (0.5, 0.25, 0.5, 0.75),
+            (0.75, 0.25, 0.25, 0.75),
+        ];
+        const MINOR_TOL: f64 = 1e-9; // H-3
+        for (u, v, s, t) in points {
+            // The 3 x 4 block Jacobian J = [S1_u | S1_v | -S2_s | -S2_t].
+            let mut j = [[0.0f64; 4]; 3];
+            for k in 0..3 {
+                let du_a = bivariate_derivative(&a.numerator()[k], ma, na, 0)
+                    .expect("side A u-derivative grid");
+                let dv_a = bivariate_derivative(&a.numerator()[k], ma, na, 1)
+                    .expect("side A v-derivative grid");
+                let ds_b = bivariate_derivative(&b.numerator()[k], mb, nb, 0)
+                    .expect("side B s-derivative grid");
+                let dt_b = bivariate_derivative(&b.numerator()[k], mb, nb, 1)
+                    .expect("side B t-derivative grid");
+                j[k][0] = eval_2d_float_test(&du_a, u, v);
+                j[k][1] = eval_2d_float_test(&dv_a, u, v);
+                j[k][2] = -eval_2d_float_test(&ds_b, s, t);
+                j[k][3] = -eval_2d_float_test(&dt_b, s, t);
+            }
+            let det3 = |cols: [usize; 3]| -> f64 {
+                let m = |r: usize, c: usize| j[r][cols[c]];
+                m(0, 0) * (m(1, 1) * m(2, 2) - m(1, 2) * m(2, 1))
+                    - m(0, 1) * (m(1, 0) * m(2, 2) - m(1, 2) * m(2, 0))
+                    + m(0, 2) * (m(1, 0) * m(2, 1) - m(1, 1) * m(2, 0))
+            };
+            let dot = |x: [f64; 3], y: [f64; 3]| x[0] * y[0] + x[1] * y[1] + x[2] * y[2];
+            let cross = |x: [f64; 3], y: [f64; 3]| -> [f64; 3] {
+                [
+                    x[1] * y[2] - x[2] * y[1],
+                    x[2] * y[0] - x[0] * y[2],
+                    x[0] * y[1] - x[1] * y[0],
+                ]
+            };
+            let col = |c: usize| [j[0][c], j[1][c], j[2][c]];
+            let s1_u = col(0);
+            let s1_v = col(1);
+            let n1 = cross(s1_u, s1_v);
+            let n2 = cross(col(2), col(3));
+            // Corollary 1.3 factorizations per dropped chart axis.
+            let factored = [
+                dot(s1_v, n2),   // drop u: M_u = S1_v·n2
+                dot(s1_u, n2),   // drop v: M_v = S1_u·n2
+                dot(n1, col(3)), // drop s: M_s = −n1·S2_t = n1·J_t
+                dot(n1, col(2)), // drop t: M_t = −n1·S2_s = n1·J_s
+            ];
+            let direct = [
+                det3([1, 2, 3]),
+                det3([0, 2, 3]),
+                det3([0, 1, 3]),
+                det3([0, 1, 2]),
+            ];
+            for axis in 0..4 {
+                let scale = 1.0 + direct[axis].abs();
+                assert!(
+                    (factored[axis] - direct[axis]).abs() <= MINOR_TOL * scale,
+                    "point ({u},{v},{s},{t}) axis {axis}: Cor 1.3 {:.12} vs det3 {:.12}",
+                    factored[axis],
+                    direct[axis]
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn memoization_distinct_boxes_bounded() {
+        // Corollary 1.4: a dyadic subdivision visiting M cells drawn from k
+        // distinct per-side boxes pays O(k) hulls. F-C5-style product-grid
+        // subdivision of the unit chart at depth 2 (4 intervals per axis):
+        // M = 4^4 cells, k = 4^2 + 4^2 = 32 distinct side boxes.
+        use crate::cfp::spine::InstrumentCounters;
+        let system = parabola_system();
+        let mut memo = PerSideHullMemo::default();
+        let div = 4usize;
+        let mut cells_visited = 0u64;
+        let mut distinct_side_boxes = std::collections::BTreeSet::<(u8, u64, u64, u64, u64)>::new();
+        for ui in 0..div {
+            for vi in 0..div {
+                for si in 0..div {
+                    for ti in 0..div {
+                        let cell = [
+                            (ui as f64 / div as f64, (ui + 1) as f64 / div as f64),
+                            (vi as f64 / div as f64, (vi + 1) as f64 / div as f64),
+                            (si as f64 / div as f64, (si + 1) as f64 / div as f64),
+                            (ti as f64 / div as f64, (ti + 1) as f64 / div as f64),
+                        ];
+                        let side_a_box = (
+                            0u8,
+                            cell[0].0.to_bits(),
+                            cell[0].1.to_bits(),
+                            cell[1].0.to_bits(),
+                            cell[1].1.to_bits(),
+                        );
+                        let side_b_box = (
+                            1u8,
+                            cell[2].0.to_bits(),
+                            cell[2].1.to_bits(),
+                            cell[3].0.to_bits(),
+                            cell[3].1.to_bits(),
+                        );
+                        distinct_side_boxes.insert(side_a_box);
+                        distinct_side_boxes.insert(side_b_box);
+                        let hull = memo
+                            .component_value_unit(&system, 0, cell)
+                            .expect("the memoized per-side enclosure certifies on every cell");
+                        assert!(hull.is_finite());
+                        cells_visited += 1;
+                    }
+                }
+            }
+        }
+        let k = distinct_side_boxes.len() as u64;
+        assert_eq!(cells_visited, 256, "M = 4^4 product cells visited");
+        assert_eq!(k, 32, "k = 4^2 + 4^2 distinct per-side boxes");
+        // The memo holds one (side, box, function) entry per distinct hull;
+        // component 0 needs the numerator and weight hull on each side box.
+        let entries = memo.distinct_entries() as u64;
+        assert!(
+            entries <= 2 * k,
+            "O(k) hulls: {entries} entries for {k} distinct side boxes"
+        );
+        assert!(
+            k * 4 < cells_visited,
+            "memoization is only meaningful when k is far below M"
+        );
+        // Recorded through the landed instrument fields (schema positions 3/4).
+        let counters = InstrumentCounters::new(0, 0, 0, cells_visited, k, 0);
+        assert_eq!(counters.values()[3], cells_visited);
+        assert_eq!(counters.values()[4], k);
+    }
+
+    #[test]
+    #[allow(clippy::needless_range_loop)] // the three normal-net component grids are indexed by component in the degree/count checks
+    fn normal_net_degree_and_d3_count() {
+        // Prop 2.1 / scope decision 2: the composed per-side normal net of a
+        // bidegree-(p, q) carrier has bidegree (2p−1, 2q−1) and 4pq
+        // coefficients per component (never interval cross products of
+        // derivative hulls).
+        let system = parabola_system();
+        // Side A of the F5 fixture is the bidegree-(2, 2) plane z = 0; side B
+        // the bidegree-(2, 1) extruded parabola.
+        let (pa, qa) = (system.side_a().m(), system.side_a().n());
+        let (pb, qb) = (system.side_b().m(), system.side_b().n());
+        let net_a = side_normal_nets(system.side_a()).expect("side A normal net composes");
+        let net_b = side_normal_nets(system.side_b()).expect("side B normal net composes");
+        for (grid, (p, q)) in [(&net_a, (pa, qa)), (&net_b, (pb, qb))] {
+            let want_rows = 2 * p;
+            let want_cols = 2 * q;
+            assert_eq!(want_rows * want_cols, 4 * p * q);
+            for component in 0..3 {
+                let g = &grid[component];
+                assert_eq!(g.len(), want_rows, "normal net rows = 2p for p={p}");
+                assert_eq!(g[0].len(), want_cols, "normal net cols = 2q for q={q}");
+                assert_eq!(
+                    g.iter()
+                        .map(Vec::len)
+                        .collect::<std::collections::HashSet<_>>()
+                        .len(),
+                    1,
+                    "normal net grids are rectangular"
+                );
+                assert_eq!(g.iter().flatten().count(), 4 * p * q);
+            }
+        }
+        assert_eq!(4 * pa * qa, 16, "4pq = 16 for the (2,2) side");
+        assert_eq!(4 * pb * qb, 8, "4pq = 8 for the (2,1) side");
+    }
+
+    /// One battery verdict tag of the landed SSI fixture battery: the outcome
+    /// of certifying one continuation axis on one fixture box.
+    fn ssi_fixture_tag(system: &SquareSystem3, axis: usize, box_: [(f64, f64); 4]) -> String {
+        match krawczyk3_certificate(system, axis, box_) {
+            Ok(cert) => {
+                let (d_lo, d_hi) = cert.det();
+                if d_lo > 0.0 {
+                    "certified_pos".to_string()
+                } else if d_hi < 0.0 {
+                    "certified_neg".to_string()
+                } else {
+                    "certified_zero_span".to_string()
+                }
+            }
+            Err(e) => e.tag().to_string(),
+        }
+    }
+
+    #[test]
+    fn landed_ssi_fixture_verdicts_unchanged() {
+        // The landed ssi_fixtures battery's VERDICT SET is identical
+        // pre/post the per-side refactor: same Certified/Unresolved pattern,
+        // same roots. Enclosures may differ in ulps (Corollary 1.1 is
+        // SET-identical, not bit-identical); the verdict tags below are the
+        // battery recorded on the pre-refactor (materialized-grid) engine and
+        // re-measured unchanged on the per-side engine (the SSI system /
+        // contract / trace integration suites pin the same verdicts on the
+        // same data).
+        let well = crate::ssi_fixtures::well_conditioned_root().expect("F-C fixture admits");
+        let det0 = crate::ssi_fixtures::determinant_spans_zero().expect("F-C fixture admits");
+        let cond = crate::ssi_fixtures::conditioning_below_threshold().expect("F-C fixture admits");
+        let root_box: [(f64, f64); 4] = [(0.4, 0.6), (0.4, 0.6), (0.4, 0.6), (0.4, 0.6)];
+        let mut battery = Vec::new();
+        for axis in 0..4 {
+            battery.push(ssi_fixture_tag(&well.system, axis, root_box));
+        }
+        for axis in 0..4 {
+            battery.push(ssi_fixture_tag(&det0.system, axis, det0.box_));
+        }
+        for axis in 0..4 {
+            battery.push(ssi_fixture_tag(&cond.system, axis, cond.box_));
+        }
+        // Recorded pre-refactor verdict set (identical post-refactor): the
+        // well-conditioned root certifies positive on the s continuation axis
+        // and negative on the v/t axes (axis 0 conditioning-refuses); the
+        // determinant-spans-zero fixture refuses DeterminantSpansZero on the
+        // v/s/t axes (axis 0 conditions); the conditioning-below-threshold
+        // fixture Conditioning-refuses on every axis.
+        assert_eq!(
+            battery,
+            vec![
+                "ssi_conditioning",
+                "certified_neg",
+                "certified_pos",
+                "certified_neg",
+                "ssi_conditioning",
+                "ssi_determinant_spans_zero",
+                "ssi_determinant_spans_zero",
+                "ssi_determinant_spans_zero",
+                "ssi_conditioning",
+                "ssi_conditioning",
+                "ssi_conditioning",
+                "ssi_conditioning",
+            ]
+            .into_iter()
+            .map(String::from)
+            .collect::<Vec<String>>()
+        );
+        // The roots themselves are unchanged: F evaluates to zero at the
+        // fixture roots (the set of roots is part of the verdict set).
+        let values = crate::ssi_fixtures::eval_system(&well.system, well.root)
+            .expect("the fixture root evaluates");
+        for v in values {
+            assert!(v.abs() < 1e-9); // H-3
         }
     }
 }

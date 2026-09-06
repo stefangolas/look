@@ -24,7 +24,23 @@
 //! **D3 — bidegree budget.** The engine's certified hull / Bernstein work is
 //! exercised with modest tensor degrees; this admission enforces a documented
 //! budget so a degree blow-up cannot leak past the funnel. The budget is a
-//! module constant (recorded in RESULT notes).
+//! module constant (recorded in RESULT notes). CFP-003-SEPARABILITY revisits
+//! the budget ONCE with the per-side stored form and the D3-counted per-side
+//! normal nets (spec Prop. 2.1, scope decision 2 / item 7): the composed
+//! normal net of a bidegree-`(p, q)` carrier has bidegree `(2p−1, 2q−1)` and
+//! `4pq` coefficients per component, and the stored square system holds only
+//! the two per-side carriers (O(pq), never the O(p²q²) four-axis product
+//! grid). At `MAX_BIDEGREE = 8` the worst-case per-side normal net has
+//! bidegree `(15, 15)` with `4·8·8 = 256` coefficients per component (768
+//! across the three components, 1 536 for both carriers), and the two
+//! per-side carriers hold `4·(8+1)² = 324` coefficients each (numerators and
+//! weights), 648 total. A CFP-005 span-BVH leaf (one admitted patch pair)
+//! therefore costs `≈ 1.5k` normal-net + `≈ 0.6k` carrier coefficients — a
+//! 600-leaf decomposition (F-C5) stays `≈ 1.3M` coefficients and the
+//! subdivision-phase hulls stay O(deg²) per cell (spec Corollaries 1.1–1.2).
+//! The constant is unchanged at `8`; the re-derivation confirms it still
+//! bounds the nets + BVH leaves (the instrument test at
+//! `cfp/instrument.rs` pins the value).
 
 use crate::ssi::{RationalBipatch, SsiRefusal};
 use truck_geometry::prelude::{BSplineSurface, KnotVec, Vector4};
