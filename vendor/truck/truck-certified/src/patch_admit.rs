@@ -239,7 +239,13 @@ pub fn admit_surface(
             });
         }
     }
-    Ok(SplinePatchStack { patches })
+    let stack = SplinePatchStack { patches };
+    // CFP-002-INSTRUMENT: per admitted carrier, record the knot-span-cell count
+    // (the stack length — the CFP-005 span-BVH leaf count) and the admitted
+    // bidegree against MAX_BIDEGREE. Gated record: one atomic load + branch
+    // when off, never a verdict change, never a refusal.
+    crate::cfp::instrument::record_admit(stack.len(), du, dv);
+    Ok(stack)
 }
 
 /// Whether a sorted-knot sequence is non-decreasing.

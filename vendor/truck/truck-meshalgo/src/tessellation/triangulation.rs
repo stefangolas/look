@@ -69,6 +69,18 @@ std::thread_local! {
 type MeshedShell = Shell<Point3, PolylineCurve, Option<PolygonMesh>>;
 type MeshedCShell = CompressedShell<Point3, PolylineCurve, Option<PolygonMesh>>;
 
+/// How often the whole-rectangle domain fallback fired since the process
+/// started (`DOM-ARTIFICIAL-CLOSURE-001` U-item): a face with NO source
+/// boundary at all took its domain from the declared parameter rectangle. The
+/// path is gated to exactly that population, so a corpus run can count it.
+static WHOLE_RECTANGLE_DOMAIN_CENSUS: std::sync::atomic::AtomicUsize =
+    std::sync::atomic::AtomicUsize::new(0);
+
+/// Reads the [`WHOLE_RECTANGLE_DOMAIN_CENSUS`] counter.
+fn whole_rectangle_domain_census() -> usize {
+    WHOLE_RECTANGLE_DOMAIN_CENSUS.load(std::sync::atomic::Ordering::Relaxed)
+}
+
 pub(super) trait SP<S>:
     Fn(&S, Point3, Option<(f64, f64)>) -> Option<(f64, f64)> + Parallelizable
 {
@@ -8214,6 +8226,15 @@ impl PolyBoundary {
         // unconditionally, which is correct only when parts chain â€” the
         // assumption `BoundaryPath::append` now makes the caller state, so the
         // helper has no remaining callers.
+        //
+        // A lone open piece is closed synthetically, but bounded by the
+        // *face-local* working range derived from the face's own bounds
+        // (`working_range`), never by the supporting primitive's declared
+        // parameter rectangle (`PAR-RANGE-INHERITANCE-001`), and the closing
+        // segments carry `SegmentOrigin::SyntheticClosure` so the fabricated
+        // geometry is named and countable (`DOM-ARTIFICIAL-CLOSURE-001`). When
+        // the face-local range is not recoverable the piece stays open and
+        // contributes no boundary.
         match open.len() {
             1 => {
                 let (mut curve, mut curve_sources) = open.pop().unwrap();
@@ -8343,8 +8364,23 @@ impl PolyBoundary {
             );
         }
         // Only a face with no enclosing loop takes its domain from the surface.
+        //
+        // `DOM-ARTIFICIAL-CLOSURE-001`: this whole-rectangle path is the
+        // untrimmed-surface signature the record's U-item never counted. It is
+        // gated to faces with NO source boundary at all (`!had_source_pieces`,
+        // e.g. the closed-sphere ball whose only bound is a collapsed vertex
+        // loop), so a face that carries real bounds can never fall back to the
+        // declared rectangle — the census below counts exactly how often the
+        // gated path fires, making the population countable on any corpus.
         if closed.is_empty() && !had_source_pieces {
             if let (Some((u0, u1)), Some((v0, v1))) = range {
+                WHOLE_RECTANGLE_DOMAIN_CENSUS.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                if std::env::var_os("TRUCK_PROBE_BOUNDARY").is_some() {
+                    eprintln!(
+                        "CENSUS whole_rectangle_domain_emitted=1 cumulative={}",
+                        whole_rectangle_domain_census()
+                    );
+                }
                 let p = [
                     (Point2::new(u0, v0), surface.subs(u0, v0)).into(),
                     (Point2::new(u1, v0), surface.subs(u1, v0)).into(),

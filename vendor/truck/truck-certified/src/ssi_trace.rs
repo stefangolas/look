@@ -561,6 +561,18 @@ struct CertifiedBox {
 /// no box certifies, the strongest named refusal is returned: a conditioning
 /// refusal if any axis reported one (the frozen rule refused the box), else
 /// the first encountered certified failure.
+///
+/// **CFP-007 note.** The per-box certificate function
+/// (`ssi.rs::krawczyk3_certificate`) owns its interval-adjugate preconditioner
+/// internally — the reduced F3 Jacobian and its inverse are recomputed inside
+/// that FROZEN function on every (width, axis) attempt. There is no caller-side
+/// float preconditioner to cache here, so the CFP-007 caller-side reuse +
+/// ε-inflation machinery (implemented in `construct/bie/ssi4.rs`, where the
+/// N=4 parallelotope system exposes its float preconditioner to the caller)
+/// does not extend into this module without editing the frozen `ssi.rs`
+/// certificate function — which the packet forbids. This is a stated
+/// deviation, not a silent gap: the landed width ladder stays the bounded
+/// retry discipline of this path.
 fn certify_box(system: &SquareSystem3, centre: [f64; 4]) -> Result<CertifiedBox, SsiRefusal> {
     let mut conditioning: Option<SsiRefusal> = None;
     let mut first_failure: Option<SsiRefusal> = None;

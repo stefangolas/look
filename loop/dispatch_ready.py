@@ -114,10 +114,17 @@ def main():
             max_workers = int(a.split("=")[1])
     rs = rows()
     by_id = {r["id"]: r for r in rs}
-    running = [r for r in rs if r.get("status") == "RUNNING"
-               and not landed(r)]
-    running_writes = {w for r in running for w in r.get("writes", [])}
     states, assigned, dead, slot_of = slot_states()
+    # Session-54 fix (paid by CFP-001 x BREP-002): the running write-set
+    # came from rows with status == "RUNNING", but this program's rows stay
+    # READY with the LANDED-marker-in-note convention, so every in-flight
+    # packet was invisible to the clash check and BREP-002 dispatched into
+    # assemble.rs while CFP-001 (same defect, same file) was live. Slot
+    # ground truth beats row bookkeeping (the session-50 doctrine).
+    running = [by_id[p] for p, s in slot_of.items()
+               if states.get(s) == "RUNNING" and p in by_id
+               and not landed(by_id[p])]
+    running_writes = {w for r in running for w in r.get("writes", [])}
     free = [s for s, st in states.items() if st in ("IDLE", "FINISHED")]
     next_slot = max((int(s) for s in states), default=-1) + 1
     busy = sum(1 for st in states.values() if st == "RUNNING")

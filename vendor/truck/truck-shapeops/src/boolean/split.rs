@@ -57,7 +57,7 @@ use truck_geometry::decorators::{Processor, TrimmedCurve};
 use truck_geometry::specifieds::{Line, UnitCircle};
 use truck_geotrait::{
     BoundedCurve, Cut, Invertible, ParameterDivision1D, ParametricCurve, ParametricSurface,
-    SearchParameter,
+    ParametricSurface3D, SearchParameter,
 };
 use truck_meshalgo::prelude::PolylineCurve;
 use truck_topology::EdgeID;
@@ -1700,20 +1700,33 @@ impl<'a> SplitEngine<'a> {
     }
 
     /// The `Identical`/`Anti` orientation of a coincident pair from the two
-    /// faces' `orientation()` flags.
+    /// faces' EFFECTIVE outward normals. The stored orientation flag is not
+    /// the right discriminator: the two faces of a coplanar full-face butt
+    /// join (a vertical shared wall) are usually stored with the SAME
+    /// orientation flag while their geometric outward normals oppose, so the
+    /// flag-only test mislabels that anti-oriented pair as `Identical` and the
+    /// union keeps a wall that is interior to the result (T2 §5.9). The
+    /// effective outward normal is the surface normal at a representative
+    /// carrier point, reversed on an inverted face.
     fn orientation_pair(
         &self,
         a: (SolidRef, usize),
         b: (SolidRef, usize),
     ) -> CoincidentOrientation {
-        let same = match (self.shell_face(a.0, a.1), self.shell_face(b.0, b.1)) {
-            (Some(fa), Some(fb)) => fa.orientation() == fb.orientation(),
-            _ => true,
+        let normal_of = |solid: SolidRef, face_idx: usize| -> Option<Vector3> {
+            let face = self.shell_face(solid, face_idx)?;
+            let n = face.surface().normal(0.5, 0.5);
+            Some(if face.orientation() { n } else { -n })
         };
-        if same {
-            CoincidentOrientation::Identical
-        } else {
-            CoincidentOrientation::Anti
+        match (normal_of(a.0, a.1), normal_of(b.0, b.1)) {
+            (Some(na), Some(nb)) => {
+                if na.dot(nb) >= 0.0 {
+                    CoincidentOrientation::Identical
+                } else {
+                    CoincidentOrientation::Anti
+                }
+            }
+            _ => CoincidentOrientation::Identical,
         }
     }
 
@@ -1970,6 +1983,15 @@ impl<'a> SplitEngine<'a> {
     }
 
     /// The fragment of `(solid, face_idx)` whose region contains `point_3d`.
+    ///
+    /// A face's fragments tile the face, so a face that came through the split
+    /// as ONE fragment covers every point of its region by construction. The
+    /// full-coincident boundary-touching class (the coplanar full-face butt
+    /// join) can leave that single fragment with a seam-rebuilt wire whose
+    /// parameter polygon is degenerate even though it is the whole region;
+    /// trusting the tiling there is exactly what makes the vertical seam split
+    /// identically to its horizontal twin (T2 §5.9). Multi-fragment faces are
+    /// decided by region membership as before.
     fn fragment_covering(
         &mut self,
         fragments: &[Fragment],
@@ -1978,11 +2000,29 @@ impl<'a> SplitEngine<'a> {
         face_idx: usize,
         point_3d: Point3,
     ) -> Result<usize, Refusal> {
-        for (idx, (fragment, origin)) in fragments.iter().zip(origins.iter()).enumerate() {
-            if origin.0 != solid || origin.1 != face_idx {
-                continue;
+        let mut matching: Vec<usize> = Vec::new();
+        for (idx, (_fragment, origin)) in fragments.iter().zip(origins.iter()).enumerate() {
+            if origin.0 == solid && origin.1 == face_idx {
+                matching.push(idx);
             }
-            let face = &fragment.face;
+        }
+        if matching.len() == 1 {
+            let idx = *matching.first().ok_or_else(unsupported)?;
+            let face = &fragments.get(idx).ok_or_else(unsupported)?.face;
+            let Some(uv) = face
+                .surface()
+                .search_parameter(point_3d, None, SURFACE_SEARCH_TRIALS)
+            else {
+                return Err(refused());
+            };
+            let uv: Point2 = uv.into();
+            if !near_pt(face.surface().subs(uv.x, uv.y), point_3d, self.tol) {
+                return Err(refused());
+            }
+            return Ok(idx);
+        }
+        for idx in matching {
+            let face = &fragments.get(idx).ok_or_else(unsupported)?.face;
             let mut cache: HashMap<EdgeID<Curve>, PolylineCurve<Point3>> = HashMap::default();
             let mut polys = Vec::new();
             for wire in face.absolute_boundaries() {

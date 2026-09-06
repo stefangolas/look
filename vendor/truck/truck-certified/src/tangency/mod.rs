@@ -68,6 +68,13 @@ pub mod chart;
 #[doc(hidden)]
 pub mod fixtures;
 
+/// The CTE program battery gates (CTE-008-GATES): deterministic certified
+/// fixture-input reconstruction and gate helpers for the program battery.
+/// TEST SUPPORT ONLY: `#[doc(hidden)] pub`, excluded from the certified API
+/// surface (the `fixtures` precedent).
+#[doc(hidden)]
+pub mod gates;
+
 /// The (H-graph) parametric Newton/Krawczyk graph certification
 /// (CTE-002-GRAPH).
 pub mod graph;
@@ -98,6 +105,12 @@ pub mod hessian;
 /// stage table (§2.11) over one certified box, driven by
 /// [`cascade::classify_box`].
 pub mod cascade;
+
+/// The T2 carrier arrangement into atoms (CTE-007-T2ARRANGE): the certified
+/// arrangement of a coincidence witness's trim domains and the tangential
+/// contact curves as strata, with H-atom probe admission, the §5.6 cheap
+/// containment predicate, and the §5.5 single-canonical-record emission.
+pub mod arrange;
 
 use crate::contract::Refusal;
 use crate::hull::HullRefusal;
