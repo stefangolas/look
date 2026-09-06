@@ -14,16 +14,29 @@ where the upstream file carries one; the upstream model READMEs and the
 
 ## What is vendored
 
-The two harness corpus trees, verbatim from the upstream repo:
+The three harness corpus trees, verbatim from the upstream repo:
 
 | vendored tree | upstream path | contents |
 |---|---|---|
 | `trees/f1/` | `models/f1/` | F1 concept-car model tree: `src/*.py` per-part model files, `src/lib/*.py` shared geometry library, `src/README.md`, `f1_stage.appearance.json` |
 | `trees/falcon_heavy/` | `models/falcon_heavy/` | Falcon-Heavy educational model tree: `src/*.py` model files, `src/lib/*.py` shared geometry library, `README.md`, `PROVENANCE.md`, `RESEARCH.md`, `DIMENSIONS.md`, `HIERARCHY.md`, `ENGINE_INSTANCES.md` |
+| `trees/hypercar/` | `models/hypercar/` | Hypercar mid-engine model tree (PB-012-HYPERCAR-VENDOR): `src/*.py` per-system model files, `src/lib/*.py` per-system geometry builders plus the shared master-surface/`palette`/`context` libraries, `src/README.md`, `STEP/hypercar.step.js`, `render/presentation_display.json`, `render/presentation_theme.json` |
 
 Upstream headers and license notices are retained byte-for-byte in every file.
-`trees/f1/STEP/f1.step.js` (a generated preview artifact) is vendored with its
-tree so the tree stays whole.
+`trees/f1/STEP/f1.step.js` and `trees/hypercar/STEP/hypercar.step.js` (generated
+preview artifacts) are vendored with their trees so the trees stay whole.
+
+Hypercar tree note: every system in the tree is a `src/lib/<system>.py`
+`build()` that returns the system's labelled group, wrapped by a sibling
+`src/<system>.py` cadgen `@step` file (the wrapper's `@step`/kinematics surface
+is the cadgen-store boundary the harness does not reimplement). Body panels are
+cut from one lofted master surface (`src/lib/surfaces.py`), so twelve systems
+boolean-compose lofted/revolved/swept carriers and stage `skipped` (reason
+`booleans-on-swept-carriers` in `SKIPS.json`); the boolean-free `wheels` system
+(constructive tyre/rim/hub revolves, spoke and arch-flare lofts) stages
+`canonical` with its OCC-door reference in `reference/wheels.json`. The
+whole-car `src/hypercar.py` composition (thirteen sibling models + cadgen
+`cylindrical`/`fastened`/`couple` door kinematics) is not enrolled.
 
 ## What this corpus is NOT
 
