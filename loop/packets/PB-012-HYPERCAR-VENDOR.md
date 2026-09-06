@@ -12,7 +12,7 @@ files. A genuine gap is a SPEC_GAP: stop and report.
 id:          PB-012-HYPERCAR-VENDOR
 contract:    [PB-012-HYPERCAR-VENDOR]
 class:       mechanical
-crates:      []
+crates:      [truck123d]
 depends_on:  [PB-010-TTC-PARITY-AUDIT]
 write_allow:
   - corpus/ttc/trees/hypercar/
