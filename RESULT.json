@@ -1,0 +1,12 @@
+{
+  "id": "PB-013-OP-CAPABILITY-MATRIX",
+  "status": "DONE",
+  "contracts": ["PB-013-OP-CAPABILITY-MATRIX"],
+  "tests_added": 4,
+  "anchors_verified": {"A1": 3, "A2": 93, "A3": 1},
+  "notes": "Cell set derived from the census: 26 (op x carrier-class) cells in fixed doc order cover all 93 census rows, each row mapping to exactly one cell (asserted by matrix_doc_rows_match_live_semantics against loop/results/PB-010-TTC-PARITY-AUDIT.json and docs/OP_CAPABILITY_MATRIX.md). Every cell's current verdict is asserted against live facade/compat behavior and all four tests pass; no cell's annotated verdict was contradicted by execution. Recording for PB-011 (a deviation made explicit, not papered over): the census records the swept-pair boolean cells as missing-kernel with no executable refusal path, and run_facade has no native geometry boolean row, so each G1 cell's typed refusal is pinned at the only executable NonCanonicalCarrier boundary the facade answers today (STEP out of a constructive/swept product, TR-NRB-001; STL/GLB stay in-envelope). PB-011 flips these cells by routing. Also annotated per the audit findings: revolve(partial-arc,spline-profile) = unavailable, flipped-by PB-011, target certified (G5: the SKIPS 'boolean sectioning' reason mis-describes a partial-arc revolve; the cell is not a G1 boolean cell); author(circle-profile) = unavailable, flipped-by PB-011, target certified (G3 missing-facade: S5 names Spline authoring only, no facade Circle row); cut(canonical,canonical) certified on the landed S1 canonical path even though its census rows are staged rows. Verdict vocabulary is closed (certified / refuses(NonCanonicalCarrier) / client-layer / unavailable); no facade.rs or other behavior changed - the matrix observes.",
+  "files": {
+    "doc": "docs/OP_CAPABILITY_MATRIX.md",
+    "tests": "truck123d/tests/pb_op_matrix.rs"
+  }
+}
