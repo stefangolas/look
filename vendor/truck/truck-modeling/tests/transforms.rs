@@ -32,7 +32,7 @@
 
 use std::collections::HashSet;
 use std::f64::consts::TAU;
-use truck_base::evidence::{Outcome, Refusal};
+use truck_base::evidence::{Certified, Outcome, Refusal};
 use truck_geometry::arrange::{arrange, Arrangement};
 use truck_modeling::cad::{mirror_about_plane, mirror_solid, rotate_solid, translate_solid};
 use truck_modeling::extrude::{extrude_profile, extrude_profile_vector};
@@ -49,12 +49,14 @@ const BOX_SIDE: f64 = 4.0;
 /// The wall-subs sampling density for the W3 junction machine check.
 const JUNCTION_SAMPLES: usize = 9;
 
-/// Unwraps an `Outcome` via `match` + `panic` so the deny lints stay
-/// satisfied (the recognize.rs test-module precedent).
-fn expect_ok<T>(r: Outcome<T>) -> T {
+/// Unwraps a certified result via `match` + `panic` so the deny lints stay
+/// satisfied (the recognize.rs test-module precedent). The error type is
+/// generic so both the kernel's `Refusal` outcomes and the typed
+/// `ArrangeError` of `arrange` are accepted (BREP-001A r2).
+fn expect_ok<T, E: std::fmt::Debug>(r: std::result::Result<Certified<T>, E>) -> T {
     match r {
         Ok(ok) => ok.value,
-        Err(refusal) => panic!("expected a certified value, got {refusal:?}"),
+        Err(error) => panic!("expected a certified value, got {error:?}"),
     }
 }
 

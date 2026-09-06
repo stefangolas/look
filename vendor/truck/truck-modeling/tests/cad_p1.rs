@@ -20,7 +20,7 @@
 #![allow(clippy::panic)]
 
 use std::f64::consts::TAU;
-use truck_base::evidence::{Budget, EnvelopeCase, Outcome, Refusal};
+use truck_base::evidence::{Budget, Certified, EnvelopeCase, Refusal};
 use truck_geometry::arrange::arrange;
 use truck_geometry::recognize::{recognize_curve, recognize_surface, CanonicalCarrierWitness};
 use truck_modeling::cad::{
@@ -40,12 +40,14 @@ const FLAGSHIP_SIDE: f64 = 4.0;
 const WALL_THETA_SAMPLES: usize = 24;
 const WALL_V_SAMPLES: usize = 8;
 
-/// Unwraps an `Outcome` via `match` + `panic` so the deny lints stay
-/// satisfied (the recognize.rs test-module precedent).
-fn expect_ok<T>(r: Outcome<T>) -> T {
+/// Unwraps a certified result via `match` + `panic` so the deny lints stay
+/// satisfied (the recognize.rs test-module precedent). The error type is
+/// generic so both the kernel's `Refusal` outcomes and the typed
+/// `ArrangeError` of `arrange` are accepted (BREP-001A r2).
+fn expect_ok<T, E: std::fmt::Debug>(r: std::result::Result<Certified<T>, E>) -> T {
     match r {
         Ok(ok) => ok.value,
-        Err(refusal) => panic!("expected a certified value, got {refusal:?}"),
+        Err(error) => panic!("expected a certified value, got {error:?}"),
     }
 }
 

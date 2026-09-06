@@ -20,7 +20,7 @@
 #![allow(clippy::panic)]
 
 use std::f64::consts::TAU;
-use truck_base::evidence::{Budget, EnvelopeCase, Outcome, Refusal};
+use truck_base::evidence::{Budget, Certified, EnvelopeCase, Refusal};
 use truck_geometry::arrange::{arrange, Arrangement};
 use truck_modeling::cad::solid_bounding_box;
 use truck_modeling::extrude::extrude_profile_vector;
@@ -33,12 +33,14 @@ use truck_modeling::{
 /// The sweep direction of the flagship fixtures.
 const SWEEP: Vector3 = Vector3::new(0.0, 0.0, 2.0);
 
-/// Unwraps an `Outcome` via `match` + `panic` so the deny lints stay
-/// satisfied (the recognize.rs test-module precedent).
-fn expect_ok<T>(r: Outcome<T>) -> T {
+/// Unwraps a certified result via `match` + `panic` so the deny lints stay
+/// satisfied (the recognize.rs test-module precedent). The error type is
+/// generic so both the kernel's `Refusal` outcomes and the typed
+/// `ArrangeError` of `arrange` are accepted (BREP-001A r2).
+fn expect_ok<T, E: std::fmt::Debug>(r: std::result::Result<Certified<T>, E>) -> T {
     match r {
         Ok(ok) => ok.value,
-        Err(refusal) => panic!("expected a certified value, got {refusal:?}"),
+        Err(error) => panic!("expected a certified value, got {error:?}"),
     }
 }
 
