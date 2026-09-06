@@ -15,6 +15,11 @@
 )]
 
 pub mod certified_map;
+/// The Contact Fast-Path (CFP) program spine (CFP-000-SPINE): the frozen
+/// shapes, fixture kit, gate definitions, and instrument schema of the
+/// constructive contact program (`docs/CONTACT_FAST_PATH_BUILD_SPEC.md`).
+/// `fixtures` is `#[doc(hidden)]` test-support data.
+pub mod cfp;
 /// The construct layer (CC-000-CONTRACT): the frozen shapes of the CC program
 /// (spine decision C1 — one home for all Phase A/B/C/D construction modules).
 pub mod construct;
