@@ -1,0 +1,27 @@
+{
+  "schema": "ttc_reference.v1",
+  "row_id": "falcon_heavy/mvac",
+  "door_version": "1",
+  "facts": {
+    "solid_count": 56,
+    "volume": 0,
+    "bbox": [
+      [
+        -1462.0,
+        -1462.0,
+        -2730.0
+      ],
+      [
+        1462.0,
+        1462.0,
+        2526.0
+      ]
+    ]
+  },
+  "tolerances": {
+    "solid_count": "exact",
+    "volume_rel": 0.0001,
+    "volume_abs": 1e-06,
+    "bbox_abs": 0.001
+  }
+}

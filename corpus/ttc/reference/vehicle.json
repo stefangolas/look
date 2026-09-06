@@ -1,0 +1,27 @@
+{
+  "schema": "ttc_reference.v1",
+  "row_id": "falcon_heavy/vehicle",
+  "door_version": "1",
+  "facts": {
+    "solid_count": 2142,
+    "volume": 0,
+    "bbox": [
+      [
+        -5921.02964758637,
+        -2761.7733353381223,
+        -1e-07
+      ],
+      [
+        5921.029647586369,
+        2761.7733353381223,
+        70000.0000001
+      ]
+    ]
+  },
+  "tolerances": {
+    "solid_count": "exact",
+    "volume_rel": 0.0001,
+    "volume_abs": 1e-06,
+    "bbox_abs": 0.001
+  }
+}

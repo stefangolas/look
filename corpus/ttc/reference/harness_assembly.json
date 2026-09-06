@@ -1,0 +1,27 @@
+{
+  "schema": "ttc_reference.v1",
+  "row_id": "falcon_heavy/harness_assembly",
+  "door_version": "1",
+  "facts": {
+    "solid_count": 24,
+    "volume": 8314024.823125286,
+    "bbox": [
+      [
+        -255.34419161307127,
+        -390.0,
+        1145.3383767805158
+      ],
+      [
+        237.72878281044513,
+        255.34419161307127,
+        2175.0
+      ]
+    ]
+  },
+  "tolerances": {
+    "solid_count": "exact",
+    "volume_rel": 0.0001,
+    "volume_abs": 1e-06,
+    "bbox_abs": 0.001
+  }
+}

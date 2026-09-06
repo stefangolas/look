@@ -1,0 +1,27 @@
+{
+  "schema": "ttc_reference.v1",
+  "row_id": "falcon_heavy/feed_assembly",
+  "door_version": "1",
+  "facts": {
+    "solid_count": 49,
+    "volume": 49572187.367974795,
+    "bbox": [
+      [
+        -220.34746004324347,
+        -220.34746004324347,
+        1053.9999999
+      ],
+      [
+        802.0,
+        220.34746004324347,
+        2922.0
+      ]
+    ]
+  },
+  "tolerances": {
+    "solid_count": "exact",
+    "volume_rel": 0.0001,
+    "volume_abs": 1e-06,
+    "bbox_abs": 0.001
+  }
+}

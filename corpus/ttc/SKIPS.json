@@ -1,0 +1,40 @@
+{
+  "schema": "ttc_skips.v1",
+  "corpus": "earthtojake/text-to-cad",
+  "reasons": {
+    "booleans-on-swept-carriers": {
+      "resolved_by": "BIE-006",
+      "label": "Boolean algebra over lofted/swept/revolved (non-canonical-carrier) geometry",
+      "note": "Canonical-by-canonical booleans are landed; sweep/swept-carrier pairs unlock with the BIE program's sweep-pair certification (BIE-006). A row that boolean-composes lofted/swept shells is not runnable at this program stage and carries this typed reason; the reason row is the machine-checked evidence."
+    },
+    "step-out": {
+      "resolved_by": "TR-NRB-001",
+      "label": "STEP export out of constructive/swept geometry",
+      "note": "STEP out of constructive/swept surfaces is a typed kernel refusal; STL covers render and print. A row whose export target is STEP-only behind this boundary carries this typed reason."
+    }
+  },
+  "rows": [
+    {"id": "falcon_heavy/cutaway", "reason": "booleans-on-swept-carriers", "note": "falcon_heavy_cutaway calls build_vehicle(cutaway=True): the 270-deg section opening CUTs through the swept tank/engine stack (CUT_START/CUT_ARC in lib/falcon_common.py) - boolean sectioning of swept-carrier bodies."},
+    {"id": "f1/airbox", "reason": "booleans-on-swept-carriers", "note": "lib/engine_cover.py build_airbox fuses the lobe/pod/collar swept bodies (_fuse at engine_cover.py) - booleans on swept carriers."},
+    {"id": "f1/beam_wing", "reason": "booleans-on-swept-carriers", "note": "lib/rear_wing.py beam/endplate builders cut and trim swept airfoil shells (surfaces.cut at rear_wing.py)."},
+    {"id": "f1/corner_fl", "reason": "booleans-on-swept-carriers", "note": "lib/wheels.py build_corner('fl') cuts rim/tyre clearances out of revolved carriers (_cut at wheels.py)."},
+    {"id": "f1/corner_fr", "reason": "booleans-on-swept-carriers", "note": "lib/wheels.py build_corner('fr') cuts rim/tyre clearances out of revolved carriers (_cut at wheels.py)."},
+    {"id": "f1/corner_rl", "reason": "booleans-on-swept-carriers", "note": "lib/wheels.py build_corner('rl') cuts rim/tyre clearances out of revolved carriers (_cut at wheels.py)."},
+    {"id": "f1/corner_rr", "reason": "booleans-on-swept-carriers", "note": "lib/wheels.py build_corner('rr') cuts rim/tyre clearances out of revolved carriers (_cut at wheels.py)."},
+    {"id": "f1/details", "reason": "booleans-on-swept-carriers", "note": "lib/details.py build_details shells and cuts the mirror/tyre-sensor bodies (surfaces.cut / fuse_all at details.py)."},
+    {"id": "f1/diffuser", "reason": "booleans-on-swept-carriers", "note": "lib/floor.py build_diffuser cuts the floor-edge bead out of the swept diffuser shell (surfaces.cut at floor.py)."},
+    {"id": "f1/drivetrain", "reason": "booleans-on-swept-carriers", "note": "lib/drivetrain.py build_drivetrain fuses casing/strut/gear bodies (_fuse / .fuse at drivetrain.py)."},
+    {"id": "f1/drs_actuator", "reason": "booleans-on-swept-carriers", "note": "lib/rear_wing.py DRS actuator housing is cut/bored from lofted endplate carriers."},
+    {"id": "f1/drs_flap", "reason": "booleans-on-swept-carriers", "note": "lib/rear_wing.py flap element is trimmed against the endplate by surfaces.cut."},
+    {"id": "f1/engine_cover", "reason": "booleans-on-swept-carriers", "note": "lib/engine_cover.py build_engine_cover fuses the shell and cuts sill/aperture cavities out of swept bodies (_fuse / surfaces.cut at engine_cover.py)."},
+    {"id": "f1/floor", "reason": "booleans-on-swept-carriers", "note": "lib/floor.py build_floor cuts the edge-rail beads out of the swept floor shell (surfaces.cut at floor.py)."},
+    {"id": "f1/monocoque", "reason": "booleans-on-swept-carriers", "note": "lib/mono_tub.py builds the survival tub as surfaces.cut(skin, _cavity()) and fuses proud bosses (_fuse_proud at mono_tub.py)."},
+    {"id": "f1/power_unit", "reason": "booleans-on-swept-carriers", "note": "lib/power_unit.py build_power_unit fuses head/cover/bank bodies (_fuse at power_unit.py)."},
+    {"id": "f1/rear_wing", "reason": "booleans-on-swept-carriers", "note": "lib/rear_wing.py build_rear_wing trims the mainplane/endplate pair with cutters (surfaces.cut at rear_wing.py)."},
+    {"id": "f1/steering_rack", "reason": "booleans-on-swept-carriers", "note": "lib/suspension.py build_steering_rack bores and fuses blade/rod carriers (_cut/_fuse at suspension.py)."},
+    {"id": "f1/suspension_front", "reason": "booleans-on-swept-carriers", "note": "lib/suspension.py build_suspension_front cuts rod-end bores and fuses wishbone carriers (_cut/_fuse at suspension.py)."},
+    {"id": "f1/suspension_rear", "reason": "booleans-on-swept-carriers", "note": "lib/suspension.py build_suspension_rear cuts rod-end bores and fuses wishbone carriers (_cut/_fuse at suspension.py)."},
+    {"id": "f1/track_rod_left", "reason": "booleans-on-swept-carriers", "note": "lib/suspension.py build_track_rod('left') bores the rod eyes (_cut at suspension.py)."},
+    {"id": "f1/track_rod_right", "reason": "booleans-on-swept-carriers", "note": "lib/suspension.py build_track_rod('right') bores the rod eyes (_cut at suspension.py)."}
+  ]
+}

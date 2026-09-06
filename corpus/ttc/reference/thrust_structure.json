@@ -1,0 +1,27 @@
+{
+  "schema": "ttc_reference.v1",
+  "row_id": "falcon_heavy/thrust_structure",
+  "door_version": "1",
+  "facts": {
+    "solid_count": 41,
+    "volume": 30474877.222122572,
+    "bbox": [
+      [
+        -185.4462188183847,
+        -150.0,
+        1990.0
+      ],
+      [
+        185.44621881838475,
+        280.9860073326921,
+        2526.0
+      ]
+    ]
+  },
+  "tolerances": {
+    "solid_count": "exact",
+    "volume_rel": 0.0001,
+    "volume_abs": 1e-06,
+    "bbox_abs": 0.001
+  }
+}
