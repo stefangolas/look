@@ -68,6 +68,21 @@ Updated 2026-09-05, session 52 (CC program COMPLETE - battery green).
 3. The GPU render-side work (bracket fingerprint refresh, draft
    front-door) is still the render-path owner's, untouched by this
    program.
+   **CONFIRMED 2026-09-06 (session 54):** `cargo test -p look --test
+   geometry_fingerprint` FAILS at HEAD d0108af —
+   bracket_tessellates_to_a_known_mesh 1860 vs expected 1814;
+   washer_with_circular_edges PASSES (9518, the tolerance-sharp fixture is
+   green). This is the recorded golden-drift class (BG-CG-003
+   "fails identically on the base commit"), BUT the count has moved since
+   that record: 1875 (BG-CG base) → 1860 (now). Suspected author: the CC
+   program's BREP generation defect fixes; NOT verified. Battery
+   consequence: CTE-008's packet carries NO fingerprint-exclusion language,
+   so the battery adjudication must either carry fresh evidence (test
+   failing at the CTE base via throwaway worktree — the count moved, so
+   the BG-CG-era evidence alone is stale) or attribute 1875→1860 to a named
+   landing, or the owner's refresh lands first. Do not touch the golden
+   numbers from this side (AGENTS.md rule; refresh is the render-path
+   owner's).
 
 ## State of the machine, as left
 
