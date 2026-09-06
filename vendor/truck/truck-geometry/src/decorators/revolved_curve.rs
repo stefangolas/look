@@ -667,6 +667,191 @@ impl IncludeCurve<NurbsCurve<Vector4>> for RevolutedCurve<NurbsCurve<Vector4>> {
 /// that both arrive from imported geometry, and neither is bounded.
 const MAX_CIRCLE_DIVISION: usize = 1 << 12;
 
+/// A checked sample count (RES-001).
+///
+/// `NUM-SUBDIVISION-GROWTH-001`: any count derived from imported (untrusted)
+/// geometry and used as an allocation size must be bounded and total. The
+/// constructor is the boundary where an untrusted request is checked: a
+/// non-finite or negative count is refused, never floored into an allocation
+/// size. The value is the number of periodic-axis cells the revolved sampling
+/// uses (`1 + floor(requested)`, the ceiling-less answer the tolerance asks
+/// for before `MAX_CIRCLE_DIVISION` is applied).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct SampleCount(usize);
+
+/// Why a [`SampleCount`] request was refused (RES-001).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SampleCountError {
+    /// The requested count is `NaN` or infinite: no allocation can honor it.
+    NonFinite,
+    /// The requested count is negative: a cell count cannot be.
+    Negative,
+}
+
+impl SampleCount {
+    /// The checked constructor (RES-001): refuses a non-finite or negative
+    /// request and floors a positive finite one to whole cells.
+    ///
+    /// The constructor never clamps: whether the request fit
+    /// `MAX_CIRCLE_DIVISION` is a separate, observable decision
+    /// ([`SampleDivision`]) so a capped request is not ordinary success
+    /// (RES-003).
+    fn try_new(requested: f64) -> std::result::Result<SampleCount, SampleCountError> {
+        if !requested.is_finite() {
+            return Err(SampleCountError::NonFinite);
+        }
+        if requested < 0.0 {
+            return Err(SampleCountError::Negative);
+        }
+        Ok(SampleCount(1 + requested.floor().max(0.0) as usize))
+    }
+
+    /// The number of cells.
+    pub fn cells(self) -> usize {
+        self.0
+    }
+}
+
+/// The observable outcome of one periodic-axis sample request.
+///
+/// RES-003 (`NUM-SUBDIVISION-GROWTH-001`): a request that hit the cap must be
+/// reported as `ResourceCapped { requested, used, achieved_error }` and must
+/// not claim the tolerance it was asked for. The `ParameterDivision2D` trait
+/// cannot carry the report (its signature returns plain vectors), so the
+/// decision is exposed here and the trait method is a thin wrapper over it.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum SampleDivision {
+    /// The request fit inside `MAX_CIRCLE_DIVISION`: `cells` reaches the
+    /// requested tolerance.
+    Within {
+        /// The number of cells actually used.
+        cells: usize,
+    },
+    /// The request hit the cap; see [`ResourceCapped`] (RES-003).
+    Capped(ResourceCapped),
+}
+
+/// What a capped request could not deliver (RES-003).
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct ResourceCapped {
+    /// The cell count the tolerance asked for (the unbounded `1 + requested`),
+    /// for the report; the request is never silently rounded down.
+    pub requested: f64,
+    /// The cell count actually used (the cap).
+    pub used: usize,
+    /// The chord error the returned division achieves at the revolved radius,
+    /// so the caller can see how far the capped answer is from the tolerance it
+    /// was asked for. A full revolution at the cap has a chord error of about
+    /// `2.3e-7` of the radius.
+    pub achieved_error: f64,
+}
+
+impl SampleDivision {
+    /// The number of periodic-axis cells actually used.
+    pub fn used_cells(self) -> usize {
+        match self {
+            Self::Within { cells } => cells,
+            Self::Capped(capped) => capped.used,
+        }
+    }
+
+    /// Whether the request hit the cap (RES-003).
+    pub fn is_resource_capped(self) -> bool {
+        matches!(self, Self::Capped(_))
+    }
+
+    /// The cap report, present exactly when the request was capped (RES-003).
+    pub fn resource_capped(self) -> Option<ResourceCapped> {
+        match self {
+            Self::Capped(capped) => Some(capped),
+            Self::Within { .. } => None,
+        }
+    }
+}
+
+impl<C> RevolutedCurve<C> {
+    /// The checked sample-count constructor (RES-001): refuses a non-finite or
+    /// negative `requested` cell count and floors a positive finite one.
+    pub fn checked_sample_count(
+        requested: f64,
+    ) -> std::result::Result<SampleCount, SampleCountError> {
+        SampleCount::try_new(requested)
+    }
+}
+
+/// The periodic-axis cell decision for one revolved-surface request.
+///
+/// `max_radius` is the largest radius the generatrix reaches over `urange`;
+/// the requested cell count is `(v1 - v0) / acos(1 - tol / max_radius)`, which
+/// is unbounded and reaches this code with untrusted numbers.
+///
+/// - a zero radius makes `tol / max` infinite and `acos` NaN, and a radius
+///   small against the tolerance puts the argument below `-1` and does the
+///   same: the request is not finite, and a usable single-cell division is
+///   returned (the landed fallback, locked by the existing regression tests);
+/// - a finite request that fits the cap returns the exact ceiling-less count;
+/// - a finite request that exceeds `MAX_CIRCLE_DIVISION` returns the cap with
+///   the [`ResourceCapped`] report (RES-003), never silent ordinary success.
+fn circle_cell_decision(max_radius: f64, (v0, v1): (f64, f64), tol: f64) -> SampleDivision {
+    let acos = f64::acos(1.0 - tol / max_radius);
+    let requested = (v1 - v0) / acos;
+    match requested.is_finite() {
+        false => SampleDivision::Within { cells: 1 },
+        true => {
+            let floored = requested.floor().max(0.0) as usize;
+            if floored > MAX_CIRCLE_DIVISION {
+                let used = 1 + MAX_CIRCLE_DIVISION;
+                SampleDivision::Capped(ResourceCapped {
+                    requested: 1.0 + requested,
+                    used,
+                    achieved_error: chord_error(max_radius, (v1 - v0) / used as f64),
+                })
+            } else {
+                SampleDivision::Within { cells: 1 + floored }
+            }
+        }
+    }
+}
+
+/// The chord error (sagitta) of one angular step of size `step` on a circle of
+/// radius `radius`. Steps beyond a half turn are clamped: the sagitta of a
+/// half turn is the diameter, the worst a chord on the circle can do.
+fn chord_error(radius: f64, step: f64) -> f64 {
+    let step = step.min(PI);
+    radius * (1.0 - f64::cos(step / 2.0))
+}
+
+impl<C> RevolutedCurve<C>
+where
+    C: ParametricCurve3D + ParameterDivision1D<Point = Point3>,
+{
+    /// The periodic-axis sampling decision for one request, with the cap report
+    /// observable (RES-003). The number of cells equals what
+    /// [`ParameterDivision2D::parameter_division`] uses, so a caller can see a
+    /// capped request without changing the produced division.
+    pub fn sample_division(
+        &self,
+        (urange, vrange): ((f64, f64), (f64, f64)),
+        tol: f64,
+    ) -> SampleDivision {
+        let max_radius = self.max_revolved_radius(urange, tol);
+        circle_cell_decision(max_radius, vrange, tol)
+    }
+
+    /// The largest radius the generatrix reaches over `urange`.
+    fn max_revolved_radius(&self, urange: (f64, f64), tol: f64) -> f64 {
+        let curve_division = self.curve.parameter_division(urange, tol);
+        curve_division
+            .1
+            .into_iter()
+            .fold(0.0, |max2, pt| {
+                let h = self.revolution.proj_point(pt).y;
+                f64::max(max2, h)
+            })
+            .sqrt()
+    }
+}
+
 impl<C> ParameterDivision2D for RevolutedCurve<C>
 where
     C: ParametricCurve3D + ParameterDivision1D<Point = Point3>,
@@ -676,16 +861,6 @@ where
         (urange, vrange): ((f64, f64), (f64, f64)),
         tol: f64,
     ) -> (Vec<f64>, Vec<f64>) {
-        let curve_division = self.curve.parameter_division(urange, tol);
-        let max = curve_division
-            .1
-            .into_iter()
-            .fold(0.0, |max2, pt| {
-                let h = self.revolution.proj_point(pt).y;
-                f64::max(max2, h)
-            })
-            .sqrt();
-        let acos = f64::acos(1.0 - tol / max);
         // Nothing bounded this, and it is reached with untrusted numbers.
         //
         // `acos` collapses toward zero as the revolved radius grows against the
@@ -707,11 +882,19 @@ where
         // aborted process. A full revolution at the cap has a chord error of
         // about 2.3e-7 of its radius, far finer than any tolerance that reaches
         // this code.
-        let requested = (vrange.1 - vrange.0) / acos;
-        let div: usize = match requested.is_finite() {
-            true => 1 + (requested.floor().max(0.0) as usize).min(MAX_CIRCLE_DIVISION),
-            false => 1,
-        };
+        //
+        // The trait method cannot report a capped request (RES-003); the
+        // decision and its report are exposed through [`RevolutedCurve::sample_division`].
+        let curve_division = self.curve.parameter_division(urange, tol);
+        let max_radius = curve_division
+            .1
+            .iter()
+            .fold(0.0, |max2, pt| {
+                let h = self.revolution.proj_point(*pt).y;
+                f64::max(max2, h)
+            })
+            .sqrt();
+        let div = circle_cell_decision(max_radius, vrange, tol).used_cells();
         let circle_division = (0..=div)
             .map(|j| vrange.0 + (vrange.1 - vrange.0) * j as f64 / div as f64)
             .collect();

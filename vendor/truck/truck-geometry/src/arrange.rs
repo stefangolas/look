@@ -125,13 +125,154 @@ const POLY_SAMPLES: usize = 16;
 /// form.
 type S1Result<T> = std::result::Result<T, Refusal>;
 
+/// The typed refusal of the profile arrangement entry.
+///
+/// The kernel's own refusals ride unchanged inside [`Self::Kernel`]; the
+/// dyadic-lattice envelope violation is its own named case so a client is not
+/// handed the misleading `RootNotIsolated` witness
+/// (`SEM-ARRANGE-DYADIC-CONTRACT-001`).
+#[derive(Clone, Debug)]
+pub enum ArrangeError {
+    /// A refusal of the certified arrangement kernel, unchanged in meaning.
+    Kernel(Refusal),
+    /// The arrangement's certified predicates run over exact dyadic
+    /// arithmetic, which can represent an intersection vertex only when the
+    /// pair's extended carriers meet in an exactly-representable point. The
+    /// profile's curve `pair` violates that lattice requirement; `at` is the
+    /// (float) location of the non-dyadic crossing, kept for diagnostics — the
+    /// exact value is by definition not representable.
+    ///
+    /// Refused at the entry, before any root-isolation call, so the failure is
+    /// attributed to the profile's own geometry rather than to a numerical
+    /// solver.
+    NonDyadicProfileVertices {
+        /// The offending curve pair `(i, j)` of the input `profile`.
+        pair: (usize, usize),
+        /// The approximate location of the non-dyadic crossing.
+        at: Point2,
+    },
+}
+
+impl From<Refusal> for ArrangeError {
+    fn from(refusal: Refusal) -> Self {
+        ArrangeError::Kernel(refusal)
+    }
+}
+
+impl From<ArrangeError> for Refusal {
+    /// The boundary conversion for callers whose public error type is still the
+    /// kernel's [`Refusal`]: the lattice violation maps back to the exact
+    /// refusal the entry produced before the dyadic contract was typed, so no
+    /// downstream behavior changes.
+    fn from(error: ArrangeError) -> Self {
+        match error {
+            ArrangeError::Kernel(refusal) => refusal,
+            ArrangeError::NonDyadicProfileVertices { .. } => numerically_unresolved(),
+        }
+    }
+}
+
 /// Builds the arrangement of a closed analytic profile. The profile's loops
 /// must be closed (each curve's end meets the next start within the
 /// representation tolerance) and pairwise disjoint in the M1 contract;
 /// interior crossings are supported by the machinery and reported as split
 /// vertices (tests below prove it), but a self-intersecting single loop is
 /// refused.
-pub fn arrange(profile: &[Curve], domain: Option<BoundingBox<Point2>>) -> Outcome<Arrangement> {
+pub fn arrange(
+    profile: &[Curve],
+    domain: Option<BoundingBox<Point2>>,
+) -> std::result::Result<Certified<Arrangement>, ArrangeError> {
+    // The dyadic-lattice envelope is checked at the entry, before any root
+    // isolation: a profile that demands a non-dyadic vertex is refused with a
+    // typed case naming the offending pair, never with the misleading
+    // `RootNotIsolated` witness (SEM-ARRANGE-DYADIC-CONTRACT-001). When the
+    // preflight finds nothing, the machinery below is byte-identical to the
+    // landed behaviour (the preflight runs the same per-pair exact solve and
+    // defers every other outcome to it).
+    if let Some(violation) = dyadic_lattice_preflight(profile) {
+        return Err(violation);
+    }
+    arrange_inner(profile, domain).map_err(ArrangeError::Kernel)
+}
+
+/// The dyadic-lattice preflight of [`arrange`].
+///
+/// `SEM-ARRANGE-DYADIC-CONTRACT-001`: the certified arrangement predicates
+/// assume every pair of extended carriers meets in an exactly-representable
+/// (dyadic) point. A pair whose exact solve cannot represent its vertex is
+/// caught here and reported typed; every other outcome is deferred so the
+/// machinery reproduces its exact landed refusal.
+fn dyadic_lattice_preflight(profile: &[Curve]) -> Option<ArrangeError> {
+    let mut carriers = Vec::with_capacity(profile.len());
+    for curve in profile {
+        match recognize(curve) {
+            Ok(carrier) => carriers.push(carrier),
+            // The kernel's envelope refusal reproduces identically below.
+            Err(_) => return None,
+        }
+    }
+    for i in 0..carriers.len() {
+        for j in (i + 1)..carriers.len() {
+            let ci = carriers.get(i)?;
+            let cj = carriers.get(j)?;
+            match intersect(ci, cj) {
+                Err(Refusal::NumericallyUnresolved {
+                    witness: UnresolvedWitness::RootNotIsolated,
+                    ..
+                }) => {
+                    let at = approximate_crossing(ci, cj);
+                    return Some(ArrangeError::NonDyadicProfileVertices { pair: (i, j), at });
+                }
+                // Any other refusal is deferred: the machinery stops at the
+                // same pair with its landed error.
+                Err(_) => return None,
+                Ok(_) => {}
+            }
+        }
+    }
+    None
+}
+
+/// The float approximation of a pair's crossing, for the typed refusal's `at`
+/// diagnostic. The exact vertex is non-dyadic by construction, so no exact
+/// value exists to report; this is the best float witness.
+fn approximate_crossing(a: &Carrier2D, b: &Carrier2D) -> Point2 {
+    let fallback = |carrier: &Carrier2D| -> Point2 {
+        match carrier {
+            Carrier2D::Line(Line(p, q)) => Point2::new(0.5 * (p.x + q.x), 0.5 * (p.y + q.y)),
+            Carrier2D::Circle(c) => c.center,
+            Carrier2D::Chart(ch) => ch
+                .vertices()
+                .first()
+                .copied()
+                .unwrap_or(Point2::new(0.0, 0.0)),
+        }
+    };
+    match (a, b) {
+        (Carrier2D::Line(Line(p, q)), Carrier2D::Line(Line(r, s))) => {
+            let denom = (q.x - p.x) * (s.y - r.y) - (q.y - p.y) * (s.x - r.x);
+            if denom.abs() <= f64::EPSILON {
+                return fallback(a);
+            }
+            let t = ((r.x - p.x) * (s.y - r.y) - (r.y - p.y) * (s.x - r.x)) / denom;
+            Point2::new(p.x + t * (q.x - p.x), p.y + t * (q.y - p.y))
+        }
+        (Carrier2D::Circle(c), _) => c.center,
+        (_, Carrier2D::Circle(c)) => c.center,
+        _ => fallback(a),
+    }
+}
+
+/// Builds the arrangement of a closed analytic profile. The profile's loops
+/// must be closed (each curve's end meets the next start within the
+/// representation tolerance) and pairwise disjoint in the M1 contract;
+/// interior crossings are supported by the machinery and reported as split
+/// vertices (tests below prove it), but a self-intersecting single loop is
+/// refused.
+fn arrange_inner(
+    profile: &[Curve],
+    domain: Option<BoundingBox<Point2>>,
+) -> S1Result<Certified<Arrangement>> {
     // Stage 1 — recognition, the z = 0 plane, and the loop structure.
     let mut carriers = Vec::with_capacity(profile.len());
     for c in profile {
