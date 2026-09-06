@@ -50,6 +50,14 @@
 //! `HullRefusal`); the mapping rows are recorded in
 //! `docs/CERTIFICATE_MAPPING.md`. A case that seems to need a new arm is a
 //! SPEC_GAP.
+//!
+//! The CTE-003 wave adds the A₁/A₂ deflation substrate behind those shapes
+//! (CTE-003-MINORS): the polynomial chart-minor grids
+//! ([`minors::build_chart_minors`]), the deflated `T = (G₁, G₂, M₁, M₂`
+//! system as a [`tsystem::TSystem`] (`KrawczykSystem<4>`), and the T1.5(1)
+//! five-equation exclusion driver [`exclude::exclude_five`]. All of it
+//! returns the module-level refusal vocabulary [`TangencyRefusal`], which
+//! wraps the landed named causes verbatim.
 
 /// The CTE fixture kit (booking §5, normative). TEST SUPPORT ONLY: this is
 /// `#[doc(hidden)] pub` so the wave packets' tests can reach it through the
@@ -58,3 +66,64 @@
 #[doc(hidden)]
 pub mod fixtures;
 pub mod shapes;
+
+/// The chart-minor polynomial substrate (CTE-003-MINORS): `M₁, M₂` built as
+/// composed Bernstein grids from the stored square system and a chart pivot,
+/// together with the internal four-axis polynomial-grid algebra the deflated
+/// system and the exclusion driver share.
+pub mod minors;
+
+/// The deflated square system `T = (G₁, G₂, M₁, M₂)` (theory §2.4) as a
+/// [`tsystem::TSystem`] instantiating the landed generic
+/// `KrawczykSystem<4>` (CTE-003-MINORS).
+pub mod tsystem;
+
+/// The T1.5(1) five-equation exclusion driver (CTE-003-MINORS): subdivision
+/// under [`Budget`](truck_base::evidence::Budget) deciding whether
+/// `(F, M₁, M₂)` has a root in a box.
+pub mod exclude;
+
+use crate::contract::Refusal;
+use crate::hull::HullRefusal;
+
+/// The CTE deflation substrate's refusal vocabulary (CTE-003-MINORS; scope
+/// decision 6 — refusals are named, wrapping landed causes).
+///
+/// Zero new top-level evidence kinds: every variant wraps a landed named
+/// cause verbatim (D-reuse). A construction outside a frozen rule carries
+/// [`Refusal::InvalidInput`]; a hull failure carries the landed
+/// [`HullRefusal`] cases.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TangencyRefusal {
+    /// A construction outside a frozen rule or an invalid input. Carries the
+    /// landed [`Refusal::InvalidInput`].
+    Input(Refusal),
+    /// A certified enclosure could not be produced. Carries the landed
+    /// [`HullRefusal`] (`EnclosureUnavailable` / `DomainNotCompact`).
+    Hull(HullRefusal),
+}
+
+impl From<Refusal> for TangencyRefusal {
+    fn from(refusal: Refusal) -> Self {
+        TangencyRefusal::Input(refusal)
+    }
+}
+
+impl From<HullRefusal> for TangencyRefusal {
+    fn from(refusal: HullRefusal) -> Self {
+        TangencyRefusal::Hull(refusal)
+    }
+}
+
+impl TangencyRefusal {
+    /// A short stable tag, for diagnostics.
+    pub fn tag(self) -> &'static str {
+        match self {
+            Self::Input(Refusal::InvalidInput) => "tangency_invalid_input",
+            Self::Input(Refusal::ConditioningBelowThreshold) => "tangency_conditioning",
+            Self::Input(Refusal::Unfrozen) => "tangency_unfrozen",
+            Self::Hull(HullRefusal::EnclosureUnavailable) => "tangency_hull_enclosure_unavailable",
+            Self::Hull(HullRefusal::DomainNotCompact) => "tangency_hull_domain_not_compact",
+        }
+    }
+}
