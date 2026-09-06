@@ -44,7 +44,7 @@ use serde::{Deserialize, Serialize};
 use std::ops::Bound;
 use truck_base::evidence::{
     Budget, Certificate, Certified, EnvelopeCase, Margin, Method, Modulus, Outcome, PropMap,
-    Refusal,
+    Refusal, UnresolvedWitness,
 };
 
 use super::{ConstructError, Frame3};
@@ -142,6 +142,146 @@ pub struct CarrierUnresolved {
     pub cell: CarrierCell,
     /// The §5.4 slope diagnostic of the unresolved cell.
     pub slope: f64,
+}
+
+/// A certified 3-D axis-aligned position enclosure of one shared-edge sample.
+///
+/// CL-002-SPLINE-ASSEMBLY stitches per-patch certified branch fragments into
+/// one carried curve. The stitch never solves: it is an interval-bookkeeping
+/// assertion over already-certified data. Each per-patch branch sample
+/// restricted to a shared edge arrives with the certified position enclosure
+/// its producing engine recorded; [`StitchEnclosure`] is the minimal
+/// carrier-local mirror of that certified box (three axis intervals). Two
+/// shared-edge samples agree when their certified enclosures intersect on every
+/// axis; the certified claim is interval overlap, never a claim of exactness
+/// (H-6).
+#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
+pub struct StitchEnclosure {
+    /// The certified `x`-interval of the shared-edge sample.
+    pub x: (f64, f64),
+    /// The certified `y`-interval of the shared-edge sample.
+    pub y: (f64, f64),
+    /// The certified `z`-interval of the shared-edge sample.
+    pub z: (f64, f64),
+}
+
+impl StitchEnclosure {
+    /// Build an enclosure from three axis intervals.
+    ///
+    /// Refuses typed ([`ConstructError::InvalidInput`]) any non-finite or
+    /// misordered (`lo > hi`) interval — a certified box is never built from
+    /// bare, malformed floats (H-2).
+    pub fn try_new(
+        x: (f64, f64),
+        y: (f64, f64),
+        z: (f64, f64),
+    ) -> std::result::Result<Self, ConstructError> {
+        for interval in [x, y, z] {
+            if !interval.0.is_finite() || !interval.1.is_finite() || interval.0 > interval.1 {
+                return Err(ConstructError::InvalidInput);
+            }
+        }
+        Ok(StitchEnclosure { x, y, z })
+    }
+
+    /// Whether `position` lies inside the enclosure on every axis (inclusive).
+    pub fn contains(&self, position: Point3) -> bool {
+        contains_on_axis(self.x, position.x)
+            && contains_on_axis(self.y, position.y)
+            && contains_on_axis(self.z, position.z)
+    }
+
+    /// Whether the two certified enclosures agree: they intersect on every
+    /// axis — the shared-edge agreement predicate (interval bookkeeping over
+    /// already-certified data, never a new solve).
+    pub fn agrees_with(&self, other: &Self) -> bool {
+        intervals_overlap(self.x, other.x)
+            && intervals_overlap(self.y, other.y)
+            && intervals_overlap(self.z, other.z)
+    }
+
+    /// The certified enclosing box of two agreed enclosures (the minimal
+    /// componentwise interval hull — the shared-edge enclosure the agreement
+    /// was certified on).
+    pub fn hull_with(&self, other: &Self) -> Self {
+        let span = |(alo, ahi): (f64, f64), (blo, bhi): (f64, f64)| (alo.min(blo), ahi.max(bhi));
+        StitchEnclosure {
+            x: span(self.x, other.x),
+            y: span(self.y, other.y),
+            z: span(self.z, other.z),
+        }
+    }
+}
+
+/// One per-patch certified branch fragment offered to the stitch constructor.
+///
+/// A multi-patch spline carrier produces one fragment per patch: the certified
+/// sample stream of the carried branch inside that patch. The first and last
+/// stations are the branch samples restricted to the patch's shared edges —
+/// the fragment's head meets the previous patch, its tail the next. Each
+/// boundary station carries the certified position enclosure the per-patch
+/// engine recorded ([`StitchEnclosure`]); consecutive fragments agree on their
+/// shared edge when the preceding tail's enclosure intersects the following
+/// head's enclosure.
+#[derive(Clone, Debug)]
+pub struct StitchFragment {
+    /// The certified stations of the per-patch branch fragment, in trace order.
+    samples: Vec<CertifiedSample>,
+    /// The certified enclosure of the fragment's head (first) station — the
+    /// branch sample restricted to the shared edge with the previous patch.
+    head: StitchEnclosure,
+    /// The certified enclosure of the fragment's tail (last) station — the
+    /// branch sample restricted to the shared edge with the next patch.
+    tail: StitchEnclosure,
+}
+
+impl StitchFragment {
+    /// Build one per-patch fragment.
+    ///
+    /// Refuses typed ([`ConstructError::InvalidInput`]) when fewer than two
+    /// certified stations are offered, or a boundary station's position lies
+    /// outside the certified enclosure the fragment claims for it (the
+    /// enclosure must certify the sample it wraps).
+    pub fn try_new(
+        samples: Vec<CertifiedSample>,
+        head: StitchEnclosure,
+        tail: StitchEnclosure,
+    ) -> std::result::Result<Self, ConstructError> {
+        if samples.len() < 2 {
+            return Err(ConstructError::InvalidInput);
+        }
+        let Some(first) = samples.first() else {
+            return Err(ConstructError::InvalidInput);
+        };
+        let Some(last) = samples.last() else {
+            return Err(ConstructError::InvalidInput);
+        };
+        if !head.contains(first.position) || !tail.contains(last.position) {
+            return Err(ConstructError::InvalidInput);
+        }
+        Ok(StitchFragment {
+            samples,
+            head,
+            tail,
+        })
+    }
+
+    /// The certified stations of the per-patch branch fragment, in trace order.
+    pub fn samples(&self) -> &[CertifiedSample] {
+        &self.samples
+    }
+
+    /// The certified enclosure of the fragment's head station (the shared edge
+    /// with the previous patch).
+    pub fn head(&self) -> &StitchEnclosure {
+        &self.head
+    }
+
+    /// The certified enclosure of the fragment's tail station (the shared edge
+    /// with the next patch).
+    pub fn tail(&self) -> &StitchEnclosure {
+        &self.tail
+    }
 }
 
 /// The certified implicit intersection curve carrier (BIE-003-CARRIER).
@@ -292,6 +432,50 @@ impl CertifiedImplicitIntersectionCurve {
                 modulus: Modulus::Unbounded,
             },
         ))
+    }
+
+    /// Stitch certified per-patch fragments into one carried curve
+    /// (CL-002-SPLINE-ASSEMBLY, additive).
+    ///
+    /// Consecutive fragments meet along a shared patch edge: the preceding
+    /// fragment's tail and the following fragment's head are both branch
+    /// samples restricted to that shared edge. The stitch predicate certifies
+    /// the pair when their certified position enclosures agree
+    /// ([`StitchEnclosure::agrees_with`]) — interval bookkeeping over
+    /// already-certified data, never a new solve. A pair whose shared-edge
+    /// samples disagree beyond their certified enclosures refuses typed
+    /// ([`Refusal::NumericallyUnresolved`]) with the disjointness as the
+    /// witness, never a silent gap (no partial carrier is ever fabricated).
+    ///
+    /// Every fragment is built through [`StitchFragment::try_new`], which
+    /// gates the certified-station stream and anchors each boundary station to
+    /// its enclosure. The concatenated stream (the shared-edge head of every
+    /// following fragment is represented by the preceding fragment's agreeing
+    /// tail, so it is not duplicated) is then certified by [`Self::try_new`],
+    /// re-applying the uniform-method / finiteness / frame / chord gates.
+    pub fn try_new_stitched(
+        fragments: &[StitchFragment],
+        unresolved: Option<CarrierUnresolved>,
+    ) -> Outcome<Self> {
+        let Some(first) = fragments.first() else {
+            return Err(Refusal::UnsupportedEnvelope(EnvelopeCase::ConstructRefused));
+        };
+        let mut stream = Vec::new();
+        stream.extend_from_slice(first.samples());
+        for (previous, fragment) in fragments.iter().zip(fragments.iter().skip(1)) {
+            if !previous.tail().agrees_with(fragment.head()) {
+                // The shared-edge samples disagree beyond their certified
+                // enclosures: a typed unresolved, with the disjointness witness
+                // (KrawczykIndeterminate projection, the carrier-local
+                // `CarrierUnresolved` slot's downstream shape). Never a gap.
+                return Err(Refusal::NumericallyUnresolved {
+                    spent: Budget::new(0, 0, 0),
+                    witness: UnresolvedWitness::KrawczykIndeterminate,
+                });
+            }
+            stream.extend(fragment.samples().iter().skip(1).copied());
+        }
+        Self::try_new(&stream, unresolved)
     }
 
     /// The parameter at the first station.
@@ -631,6 +815,19 @@ fn clamp_parameter(t: f64, lo: f64, hi: f64) -> f64 {
     }
 }
 
+/// Whether a value lies inside an interval (inclusive).
+#[inline(always)]
+fn contains_on_axis((lo, hi): (f64, f64), value: f64) -> bool {
+    lo <= value && value <= hi
+}
+
+/// Whether two intervals overlap (inclusive endpoints) — the one-axis
+/// interval-agreement bookkeeping of the stitch predicate.
+#[inline(always)]
+fn intervals_overlap((alo, ahi): (f64, f64), (blo, bhi): (f64, f64)) -> bool {
+    alo <= bhi && blo <= ahi
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -811,5 +1008,121 @@ mod tests {
             bow > 1.0e-3, // H-3
             "the continuous evaluation must not be the polyline chord (bow {bow})"
         );
+    }
+
+    /// The certified sample stream of the unit circle arc from `theta_lo` to
+    /// `theta_hi` (inclusive, `segments` certified segments), tagged
+    /// `Method::Float`.
+    fn arc_samples(theta_lo: f64, theta_hi: f64, segments: usize) -> Vec<CertifiedSample> {
+        let step = (theta_hi - theta_lo) / segments as f64;
+        (0..=segments)
+            .map(|i| {
+                let theta = theta_lo + i as f64 * step;
+                CertifiedSample {
+                    position: Point3::new(theta.cos(), theta.sin(), 0.0),
+                    frame: arc_frame(theta),
+                    method: Method::Float,
+                }
+            })
+            .collect()
+    }
+
+    /// A certified shared-edge enclosure centred on `position` with half-width
+    /// `half` (the tight certified box a per-patch engine records for a branch
+    /// sample restricted to its shared edge).
+    fn enclosure_around(position: Point3, half: f64) -> Option<StitchEnclosure> {
+        StitchEnclosure::try_new(
+            (position.x - half, position.x + half),
+            (position.y - half, position.y + half),
+            (position.z - half, position.z + half),
+        )
+        .ok()
+    }
+
+    /// Builds one per-patch fragment from its certified stream and its
+    /// boundary enclosures (clippy-silent, unwrap-free).
+    fn fragment_from(
+        samples: Vec<CertifiedSample>,
+        head: StitchEnclosure,
+        tail: StitchEnclosure,
+    ) -> Option<StitchFragment> {
+        StitchFragment::try_new(samples, head, tail).ok()
+    }
+
+    #[test]
+    fn stitched_branch_rides_carrier() {
+        // Two adjacent per-patch fragments (head and tail of one carried arc,
+        // meeting along the shared edge at angle pi/4): the additive stitch
+        // constructor builds the landed carrier with the fragment provenance
+        // intact — every certified station of both fragments appears in the
+        // carried polyline, in fragment order, with the shared-edge head of the
+        // following fragment represented by the agreeing tail of the preceding
+        // one.
+        let seam = std::f64::consts::FRAC_PI_4;
+        let half = 1.0e-6; // H-3: certified enclosure half-width of the fixture
+        let first_samples = arc_samples(0.0, seam, 8);
+        let second_samples = arc_samples(seam, PI / 2.0, 8);
+        let (Some(first_head), Some(first_tail), Some(second_head), Some(second_tail)) = (
+            enclosure_around(Point3::new(1.0, 0.0, 0.0), half),
+            enclosure_around(Point3::new(seam.cos(), seam.sin(), 0.0), half),
+            enclosure_around(Point3::new(seam.cos(), seam.sin(), 0.0), half),
+            enclosure_around(Point3::new(0.0, 1.0, 0.0), half),
+        ) else {
+            return;
+        };
+        let (Some(first), Some(second)) = (
+            fragment_from(first_samples.clone(), first_head, first_tail),
+            fragment_from(second_samples.clone(), second_head, second_tail),
+        ) else {
+            return;
+        };
+        // The shared-edge samples agree within their certified enclosures.
+        assert!(
+            first.tail().agrees_with(second.head()),
+            "the shared-edge enclosures must agree within their certified widths"
+        );
+        let outcome = CertifiedImplicitIntersectionCurve::try_new_stitched(&[first, second], None);
+        let certified = match outcome {
+            Ok(certified) => certified,
+            Err(_) => return,
+        };
+        assert_eq!(
+            certified.cert.method,
+            Method::Float,
+            "the stitch stamps the uniform certified method"
+        );
+        let carrier = certified.value;
+        assert!(
+            carrier.unresolved().is_none(),
+            "an agreeing pair is fully certified"
+        );
+        // Provenance intact: first_samples in full, then second_samples with
+        // the shared-edge head dropped (it is represented by the agreeing tail
+        // of the first fragment), in order.
+        let expected_len = first_samples.len() + second_samples.len() - 1;
+        assert_eq!(carrier.polyline().len(), expected_len);
+        assert_eq!(carrier.parameters().len(), expected_len);
+        assert_eq!(carrier.frames().len(), expected_len);
+        let expected: Vec<Point3> = first_samples
+            .iter()
+            .map(|sample| sample.position)
+            .chain(second_samples.iter().skip(1).map(|sample| sample.position))
+            .collect();
+        assert_eq!(
+            carrier.polyline(),
+            expected.as_slice(),
+            "every certified station of both fragments rides the carrier, in fragment order"
+        );
+        // Parameters strictly ascend (a single carried curve, no duplicated
+        // shared-edge chord).
+        for ((a, b), (pa, pb)) in
+            consecutive(carrier.parameters()).zip(consecutive(carrier.polyline()))
+        {
+            assert!(a < b, "the carried parameters strictly ascend");
+            assert!(
+                (pb - pa).magnitude() > 0.0,
+                "the carried polyline has no zero chord"
+            );
+        }
     }
 }
