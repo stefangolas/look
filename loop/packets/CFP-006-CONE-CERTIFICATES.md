@@ -32,7 +32,7 @@ tests_required:
 anchors:
   - {id: A1, expect: 1, cmd: "grep -c 'pub fn' vendor/truck/truck-evidence/src/contact/gff.rs"}
   - {id: A2, expect: 11, cmd: "grep -c SplineSsiEntry vendor/truck/truck-certified/src/cfp/spine.rs"}
-  - {id: A3, expect: 18, cmd: "grep -c instrument vendor/truck/truck-evidence/src/contact/mod.rs"}
+  - {id: A3, expect: 19, cmd: "grep -c instrument vendor/truck/truck-evidence/src/contact/mod.rs"}
   - {id: A4, expect: 5, cmd: "grep -cF 'F-C6' vendor/truck/truck-certified/src/cfp/fixtures.rs"}
 budget:      {turns: 60, ctx_tokens: 140000}
 ```
