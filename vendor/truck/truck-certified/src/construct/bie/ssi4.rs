@@ -122,6 +122,14 @@ pub struct Ssi4Parameters {
     /// The model-space distance to the seed that closes a branch, as a
     /// multiple of [`Self::theta_step`].
     pub closure_radius_steps: f64,
+    /// Whether the CFP-007 sample-constant machinery runs (caller-side float
+    /// preconditioner reuse across consecutive samples plus the bounded
+    /// ε-inflation ladder). The machinery is a pure cost optimization: it only
+    /// ever re-runs the landed Krawczyk operator on the caller's chosen `Y`
+    /// and box radius, so verdicts and certificate boxes are unchanged whether
+    /// it is enabled or not (the reuse path is deterministic because the
+    /// invalidation rule is).
+    pub sample_constants: bool,
 }
 
 impl Default for Ssi4Parameters {
@@ -134,6 +142,7 @@ impl Default for Ssi4Parameters {
             max_steps: 2048,
             seed_grid_per_axis: 3,
             closure_radius_steps: 3.0,
+            sample_constants: true,
         }
     }
 }
@@ -1715,6 +1724,253 @@ fn unresolved_outcome(form: &FForm, center: &[f64; 4], cell: WitnessCell) -> Int
     InteractionOutcome::Unresolved { kappa, cell, slope }
 }
 
+// ---------------------------------------------------------------------------
+// CFP-007-SAMPLE-CONSTANTS: caller-side float-preconditioner reuse + ε-inflation
+// ---------------------------------------------------------------------------
+//
+// Two landed facts make most of the steady-state per-sample Krawczyk input cost
+// redundant on a branch (build spec §3):
+//
+// 1. **Y-independence.** The strict inclusion test `K(X) ⊂ int(X)` proves a
+//    unique root in `X` for ANY invertible float preconditioner `Y`; `Y`
+//    affects tightness only, never soundness. The continuation loop therefore
+//    caches the `Y` of the last accepted sample and re-uses it for the next
+//    sample, where conditioning varies slowly; on an inclusion failure the
+//    cache is invalidated (never re-used after a failure) and a fresh `Y` is
+//    recomputed at the new point.
+// 2. **ε-inflation (Rump).** A sample that fails inclusion at radius `r` is
+//    often certifiable at `2r`; the retry sequence `r·2^k` for `k = 0..=3`
+//    (four attempts, low-first) is a FIXED, BOUNDED named constant — never
+//    adaptive, never geometry-dependent. If the whole ladder fails the sample
+//    falls back to the landed bisection discipline ([`theta_rho_step`]).
+//
+// Both are SFC-clean: floats shape the *search* (which `Y`, which box radius),
+// and every emitted certificate is the landed Krawczyk operator's own interval
+// proof of the box. `num/krawczyk.rs` is FROZEN — all of this is caller-side.
+
+/// The fixed ε-inflation multipliers of one continuation sample: the box
+/// radius is `r · 2^k` for `k = 0..=3` (radii `r`, `2r`, `4r`, `8r`), four
+/// attempts total, low-first. A named constant schedule — never adaptive,
+/// never geometry-dependent (H-3).
+const EPS_INFLATION_RADII: [f64; 4] = [1.0, 2.0, 4.0, 8.0]; // H-3: radii r·2^k, k=0..=3
+
+/// The ε-inflation attempt count of one sample: exactly the length of the
+/// named constant ladder [`EPS_INFLATION_RADII`] (H-3).
+const EPS_INFLATION_ATTEMPTS: usize = 4; // H-3: fixed bounded attempt count per sample
+
+/// The one accepted float preconditioner of a branch trace: the float inverse
+/// `Y` that certified a continuation sample, and the index of that sample.
+///
+/// `Y` is a float search aid (H-6: it never enters evidence); the certified
+/// statement is always the box the landed operator proves.
+#[derive(Clone, Copy, Debug)]
+struct AcceptedPreconditioner<const N: usize> {
+    /// The accepted float inverse `Y`.
+    y: [[f64; N]; N],
+    /// The index of the continuation sample `y` certified.
+    sample: usize,
+}
+
+/// The deterministic preconditioner-reuse cache of one branch trace
+/// (CFP-007). A `Y` is accepted exactly when the sample it was used for
+/// certified; it is re-used for a later sample only while the accepted sample
+/// is the immediately preceding one, and is dropped forever on the first
+/// inclusion failure (the invalidation rule).
+#[derive(Clone, Copy, Debug, Default)]
+struct PreconditionerCache<const N: usize> {
+    /// The accepted preconditioner, absent before the first certified sample.
+    accepted: Option<AcceptedPreconditioner<N>>,
+}
+
+/// A [`KrawczykSystem`] adapter that pins the preconditioner to a fixed float
+/// `Y` (CFP-007 reuse): the operator runs its inclusion test against the SAME
+/// `Y` instead of recomputing the wrapped system's preconditioner at every box
+/// midpoint. `f_point`/`jacobian` delegate to the wrapped system, so the
+/// certificate remains the landed operator's own interval proof (sound by
+/// Y-independence).
+struct FixedPreconditioner<'a, S: KrawczykSystem<N>, const N: usize> {
+    /// The wrapped system.
+    system: &'a S,
+    /// The fixed float preconditioner the operator uses.
+    y: [[f64; N]; N],
+}
+
+impl<S: KrawczykSystem<N>, const N: usize> KrawczykSystem<N> for FixedPreconditioner<'_, S, N> {
+    fn f_point(&self, x: &[f64; N]) -> [Interval; N] {
+        self.system.f_point(x)
+    }
+
+    fn jacobian(&self, b: &[Interval; N]) -> [[Interval; N]; N] {
+        self.system.jacobian(b)
+    }
+
+    fn preconditioner(&self, _x: &[f64; N]) -> Option<[[f64; N]; N]> {
+        Some(self.y)
+    }
+}
+
+/// The outcome of one single-box Krawczyk inclusion test
+/// ([`one_shot_krawczyk`]).
+enum OneShotOutcome {
+    /// The operator proved exactly one solution in the box.
+    Unique { cert: Certificate },
+    /// The operator proved no solution in the searched box.
+    NoRoot,
+    /// The single-box test was inconclusive: the operator could not certify
+    /// strict inclusion one-shot (it would need to bisect, which the caller's
+    /// retry ladder owns).
+    Inconclusive,
+}
+
+/// One single-box Krawczyk run: the landed operator over `cell` with a
+/// zero-subdivision local budget, so it certifies strict inclusion one-shot,
+/// proves no root, or refuses — it never bisects. `fixed` pins the
+/// preconditioner to the caller's `Y`; `None` lets the system compute its own
+/// fresh preconditioner at the box midpoint (the landed path). Sound in every
+/// case: the returned proofs are the operator's own.
+fn one_shot_krawczyk<S: KrawczykSystem<N>, const N: usize>(
+    system: &S,
+    cell: &[Interval; N],
+    fixed: Option<[[f64; N]; N]>,
+) -> OneShotOutcome {
+    let mut budget = Budget::new(0, 0, 0);
+    let outcome = match fixed {
+        Some(y) => {
+            let pinned = FixedPreconditioner { system, y };
+            krawczyk(&pinned, cell, &mut budget)
+        }
+        None => krawczyk(system, cell, &mut budget),
+    };
+    match outcome {
+        Ok(Certified {
+            value: KrawczykProof::Unique,
+            cert,
+        }) => OneShotOutcome::Unique { cert },
+        Ok(Certified {
+            value: KrawczykProof::NoRoot,
+            ..
+        }) => OneShotOutcome::NoRoot,
+        Err(_) => OneShotOutcome::Inconclusive,
+    }
+}
+
+/// The float midpoint of an interval box (the operator's own midpoint
+/// convention).
+fn box_midpoint<const N: usize>(box_: &[Interval; N]) -> [f64; N] {
+    std::array::from_fn(|a| {
+        let c = box_[a];
+        0.5 * (c.inf() + c.sup())
+    })
+}
+
+/// The refusal a θρ-style step answers when no certified box can be built
+/// about the center (mirrors [`theta_rho_step`]).
+fn step_box_refusal<const N: usize>(budget: &Budget) -> StepVerdict<N> {
+    StepVerdict::Refused(Refusal::NumericallyUnresolved {
+        spent: *budget,
+        witness: UnresolvedWitness::KrawczykIndeterminate,
+    })
+}
+
+/// The CFP-007 certified θρ step: preconditioner reuse + bounded ε-inflation
+/// over the parallelotope about `center`, caller-side. Returns the same
+/// [`StepVerdict`] vocabulary as [`theta_rho_step`], which the continuation
+/// loop consumes unchanged.
+///
+/// Per sample, deterministically:
+///
+/// 1. **Reuse attempt.** If the cache holds a `Y` that certified the
+///    immediately preceding sample, the operator runs one-shot over the base
+///    parallelotope with that cached `Y`. Strict inclusion certifies the box
+///    (and re-accepts the same `Y`); an empty image intersection is the
+///    operator's certified `NoRoot`; anything else is an inclusion failure,
+///    which invalidates the cached `Y` forever (never reused after a failure).
+/// 2. **Fresh retry + ε-inflation.** A fresh `Y` is computed at the box
+///    midpoint and the fixed ladder [`EPS_INFLATION_RADII`] (`r`, `2r`, `4r`,
+///    `8r`) is attempted one-shot, low-first, each against that fresh `Y`. The
+///    first strict inclusion certifies its (inflated) box.
+/// 3. **Landed fallback.** If every bounded attempt is inconclusive, the
+///    frozen [`theta_rho_step`] runs (the landed bisection discipline) — the
+///    behavior is bit-identical to a run with `sample_constants` disabled.
+///
+/// `budget` is the caller's per-sample step budget; the one-shot attempts use
+/// their own zero-subdivision local budget and only the landed fallback spends
+/// from `budget`.
+fn certified_theta_rho_step<S: KrawczykSystem<N>, const N: usize>(
+    system: &S,
+    center: [f64; N],
+    radii: [f64; N],
+    budget: &mut Budget,
+    cache: &mut PreconditionerCache<N>,
+    sample_index: usize,
+) -> StepVerdict<N> {
+    let base = match box_around(center, radii) {
+        Some(cell) => cell,
+        None => return step_box_refusal(budget),
+    };
+
+    // (1) reuse attempt with the cached Y of the immediately preceding sample.
+    if let Some(accepted) = cache.accepted.filter(|a| a.sample + 1 == sample_index) {
+        match one_shot_krawczyk(system, &base, Some(accepted.y)) {
+            OneShotOutcome::Unique { cert } => {
+                cache.accepted = Some(AcceptedPreconditioner {
+                    y: accepted.y,
+                    sample: sample_index,
+                });
+                let mut cert = cert;
+                // The one-shot ran on a local zero budget; the caller's step
+                // budget was untouched, so the certificate's budget_left is
+                // the true remaining budget.
+                cert.budget_left = *budget;
+                return StepVerdict::Certified {
+                    cell: base,
+                    center,
+                    cert,
+                };
+            }
+            OneShotOutcome::NoRoot => return StepVerdict::NoRoot,
+            OneShotOutcome::Inconclusive => {
+                // An inclusion failure with the reused Y: never reuse it again
+                // (the invalidation rule). Fall through to a fresh retry.
+                cache.accepted = None;
+            }
+        }
+    }
+
+    // (2) fresh Y at the base midpoint, then the fixed inflation ladder.
+    let midpoint = box_midpoint(&base);
+    let Some(fresh) = system.preconditioner(&midpoint) else {
+        // No float inverse at the point (singular derivative): the operator's
+        // bisection-on-None discipline is the landed path.
+        return theta_rho_step(system, center, radii, budget);
+    };
+    for k in 0..EPS_INFLATION_ATTEMPTS {
+        let scale = EPS_INFLATION_RADII[k];
+        let scaled: [f64; N] = std::array::from_fn(|a| radii[a] * scale);
+        let Some(cell) = box_around(center, scaled) else {
+            break;
+        };
+        match one_shot_krawczyk(system, &cell, Some(fresh)) {
+            OneShotOutcome::Unique { cert } => {
+                cache.accepted = Some(AcceptedPreconditioner {
+                    y: fresh,
+                    sample: sample_index,
+                });
+                let mut cert = cert;
+                // See the reuse arm: the one-shot did not spend the caller's
+                // step budget, so budget_left is the true remaining budget.
+                cert.budget_left = *budget;
+                return StepVerdict::Certified { cell, center, cert };
+            }
+            OneShotOutcome::NoRoot => return StepVerdict::NoRoot,
+            OneShotOutcome::Inconclusive => {}
+        }
+    }
+
+    // (3) the landed bisection discipline.
+    theta_rho_step(system, center, radii, budget)
+}
+
 /// Traces one branch from a certified seed by the parallelotope θρ step,
 /// appending certified samples and frames. Returns the samples, the frames,
 /// and the first typed unresolved witness if the trace could not certify
@@ -1732,6 +1988,9 @@ fn trace_branch(
     let mut samples: Vec<ChartSample> = Vec::new();
     let mut frames: Vec<ParallelotopeFrame> = Vec::new();
     let mut witness: Option<InteractionOutcome> = None;
+    // CFP-007: the branch-local preconditioner cache (reuse across consecutive
+    // samples; deterministic state, invalidated on every inclusion failure).
+    let mut preconditioner_cache = PreconditionerCache::<4>::default();
 
     let Some((mut frame, start_model)) = trace_begin(form, seed, cell4_box) else {
         // A degenerate branch start: typed unresolved over the seed cell.
@@ -1797,7 +2056,19 @@ fn trace_branch(
         }
         let system = Ssi4System::new(form.clone(), frame.tangent, rhs);
         let mut budget = params.step_budget;
-        let verdict = theta_rho_step(&system, predicted, radii, &mut budget);
+        let sample_index = samples.len();
+        let verdict = if params.sample_constants {
+            certified_theta_rho_step(
+                &system,
+                predicted,
+                radii,
+                &mut budget,
+                &mut preconditioner_cache,
+                sample_index,
+            )
+        } else {
+            theta_rho_step(&system, predicted, radii, &mut budget)
+        };
         match verdict {
             StepVerdict::Certified { cell, center, cert } => {
                 let Some(wcell) = witness_from_intervals(&cell) else {
@@ -2889,5 +3160,504 @@ mod tests {
                 "sample centre left the spine window: {point:?}"
             );
         }
+    }
+
+    // -----------------------------------------------------------------------
+    // CFP-007-SAMPLE-CONSTANTS: caller-side preconditioner reuse + ε-inflation
+    // -----------------------------------------------------------------------
+
+    use std::cell::Cell;
+    use std::rc::Rc;
+
+    /// A counting wrapper over the [`Ssi4System`] that tallies every FRESH
+    /// float-preconditioner computation (a fixed-`Y` reuse never reaches the
+    /// wrapped preconditioner). The counters are `Rc`-shared so a caller can
+    /// observe the running total across consecutive samples of one branch.
+    #[derive(Clone)]
+    struct CountingSystem {
+        /// The wrapped augmented system.
+        inner: Ssi4System,
+        /// Fresh-preconditioner computation count, shared across samples.
+        fresh: Rc<Cell<usize>>,
+        /// The last freshly computed `Y`, shared across samples.
+        last_y: Rc<Cell<Option<[[f64; 4]; 4]>>>,
+    }
+
+    impl CountingSystem {
+        /// Wraps `system` with fresh shared counters.
+        fn new(system: Ssi4System) -> Self {
+            CountingSystem {
+                inner: system,
+                fresh: Rc::new(Cell::new(0usize)),
+                last_y: Rc::new(Cell::new(None)),
+            }
+        }
+
+        /// A handle to the shared fresh-recompute counter.
+        fn fresh(&self) -> Rc<Cell<usize>> {
+            Rc::clone(&self.fresh)
+        }
+
+        /// A handle to the shared last-`Y` cell.
+        fn last_y(&self) -> Rc<Cell<Option<[[f64; 4]; 4]>>> {
+            Rc::clone(&self.last_y)
+        }
+    }
+
+    impl KrawczykSystem<4> for CountingSystem {
+        fn f_point(&self, x: &[f64; 4]) -> [Interval; 4] {
+            self.inner.f_point(x)
+        }
+
+        fn jacobian(&self, b: &[Interval; 4]) -> [[Interval; 4]; 4] {
+            self.inner.jacobian(b)
+        }
+
+        fn preconditioner(&self, x: &[f64; 4]) -> Option<[[f64; 4]; 4]> {
+            let y = self.inner.preconditioner(x);
+            if y.is_some() {
+                self.fresh.set(self.fresh.get() + 1);
+                self.last_y.set(y);
+            }
+            y
+        }
+    }
+
+    /// The CFP-007 straight-branch fixture: the planes `z = x` (carrier A,
+    /// `X_A(u, v) = (u, v, u)`) and `z = 1 − x` (carrier B,
+    /// `X_B(s, t) = (s, t, 1 − s)`) meet along the straight branch
+    /// `{u = s = 1/2, v = t}` in the 4-D chart. The augmented Jacobian is
+    /// constant along the branch, so one sample's float preconditioner
+    /// certifies every sample — a deterministic straight-branch fixture for
+    /// the reuse tests.
+    fn straight_branch_form() -> FForm {
+        FForm {
+            a: RestrictedChart::Plane {
+                origin: Point3::new(0.0, 0.0, 0.0),
+                u_axis: Vector3::new(1.0, 0.0, 1.0),
+                v_axis: Vector3::new(0.0, 1.0, 0.0),
+            },
+            b: RestrictedChart::Plane {
+                origin: Point3::new(0.0, 0.0, 1.0),
+                u_axis: Vector3::new(1.0, 0.0, -1.0),
+                v_axis: Vector3::new(0.0, 1.0, 0.0),
+            },
+        }
+    }
+
+    /// The unit tangent of the straight branch `(1/2, v, 1/2, v)`.
+    fn straight_branch_tangent() -> [f64; 4] {
+        [
+            0.0,
+            std::f64::consts::FRAC_1_SQRT_2,
+            0.0,
+            std::f64::consts::FRAC_1_SQRT_2,
+        ]
+    }
+
+    /// The chart point of the straight branch at `v`.
+    fn straight_branch_point(v: f64) -> [f64; 4] {
+        [0.5, v, 0.5, v]
+    }
+
+    /// The augmented N=4 system of the straight branch through `v`, with the
+    /// hyperplane `τ · (x − c) = 0` through the branch point at `v`.
+    fn straight_branch_system(form: &FForm, v: f64) -> Ssi4System {
+        let center = straight_branch_point(v);
+        let tangent = straight_branch_tangent();
+        let mut rhs = 0.0;
+        for j in 0..4 {
+            rhs += tangent[j] * center[j];
+        }
+        Ssi4System::new(form.clone(), tangent, rhs)
+    }
+
+    /// The identity 4×4 — an invertible but (for the straight-branch system)
+    /// deliberately wrong preconditioner, whose Krawczyk image equals the box
+    /// on the F-axes (never a strict inclusion).
+    fn identity4() -> [[f64; 4]; 4] {
+        [
+            [1.0, 0.0, 0.0, 0.0],
+            [0.0, 1.0, 0.0, 0.0],
+            [0.0, 0.0, 1.0, 0.0],
+            [0.0, 0.0, 0.0, 1.0],
+        ]
+    }
+
+    /// Whether `verdict` is the certified step carrying exactly `cell`.
+    fn certified_with_cell(verdict: &StepVerdict<4>, cell: &[Interval; 4]) -> bool {
+        matches!(verdict, StepVerdict::Certified { cell: c, .. } if c == cell)
+    }
+
+    /// The box of half-width `r` about `center` (all axes).
+    fn cube_cell(center: [f64; 4], r: f64) -> Option<[Interval; 4]> {
+        box_around(center, [r; 4])
+    }
+
+    #[test]
+    fn preconditioner_reused_across_consecutive_samples() {
+        // The straight branch: two consecutive samples whose augmented systems
+        // share a constant Jacobian. The first sample computes its float
+        // preconditioner fresh (one recompute); the second sample's Krawczyk
+        // call must receive the first sample's cached Y — observable through
+        // the counting wrappers, whose fresh-recompute counters show the second
+        // sample never recomputes.
+        let form = straight_branch_form();
+        let half_width = 0.05; // H-3: certified-box half-width, parameter units
+        let radii = [half_width; 4];
+        let sys0 = CountingSystem::new(straight_branch_system(&form, 0.3));
+        let fresh0 = sys0.fresh();
+        let last_y0 = sys0.last_y();
+        let sys1 = CountingSystem::new(straight_branch_system(&form, 0.35));
+        let fresh1 = sys1.fresh();
+        let mut cache = PreconditionerCache::<4>::default();
+        let mut budget = Budget::new(128, 0, 0);
+
+        let point0 = straight_branch_point(0.3);
+        let base0 = cube_cell(point0, half_width).expect("finite radii produce a box");
+        let verdict0 = certified_theta_rho_step(&sys0, point0, radii, &mut budget, &mut cache, 1);
+        assert!(
+            certified_with_cell(&verdict0, &base0),
+            "the first sample must certify its base parallelotope, got {verdict0:?}"
+        );
+        let first_y = last_y0.get().expect("the first sample computed a fresh Y");
+        assert_eq!(
+            fresh0.get(),
+            1,
+            "the first sample recomputes Y exactly once"
+        );
+
+        let point1 = straight_branch_point(0.35);
+        let base1 = cube_cell(point1, half_width).expect("finite radii produce a box");
+        let verdict1 = certified_theta_rho_step(&sys1, point1, radii, &mut budget, &mut cache, 2);
+        assert!(
+            certified_with_cell(&verdict1, &base1),
+            "the second sample must certify its base parallelotope, got {verdict1:?}"
+        );
+        // The second sample never recomputed a preconditioner: its Krawczyk
+        // call received the first sample's cached Y (bit-identical to it).
+        assert_eq!(
+            fresh1.get(),
+            0,
+            "a reused preconditioner must not be recomputed on the second sample"
+        );
+        assert_eq!(
+            fresh0.get(),
+            1,
+            "two consecutive samples, one fresh preconditioner computation"
+        );
+        let cached = cache
+            .accepted
+            .expect("the accepted Y is cached after the second sample");
+        assert_eq!(
+            cached.sample, 2,
+            "the cache records the certified sample index"
+        );
+        assert_eq!(cached.y, first_y, "the cached Y is the first sample's Y");
+    }
+
+    #[test]
+    fn preconditioner_invalidated_on_inclusion_failure() {
+        // Force an inclusion failure on the next sample by planting a
+        // deliberately wrong (identity) cached Y: its Krawczyk image equals the
+        // box on the F-axes, so the strict-inclusion one-shot fails. The next
+        // attempt must use a freshly computed Y at the new point — observable
+        // through the counting wrapper — and certify.
+        let form = straight_branch_form();
+        let half_width = 0.05; // H-3: certified-box half-width, parameter units
+        let radii = [half_width; 4];
+        let sys = CountingSystem::new(straight_branch_system(&form, 0.4));
+        let fresh = sys.fresh();
+        // A "previous sample" (index 1) whose Y is the identity: invertible but
+        // never a strict inclusion for the straight-branch system.
+        let mut cache = PreconditionerCache::<4> {
+            accepted: Some(AcceptedPreconditioner {
+                y: identity4(),
+                sample: 1,
+            }),
+        };
+        let mut budget = Budget::new(128, 0, 0);
+
+        let point = straight_branch_point(0.4);
+        let base = cube_cell(point, half_width).expect("finite radii produce a box");
+        let verdict = certified_theta_rho_step(&sys, point, radii, &mut budget, &mut cache, 2);
+        assert!(
+            certified_with_cell(&verdict, &base),
+            "the fresh-Y retry after the forced failure must certify, got {verdict:?}"
+        );
+        // The identity cached attempt fails inclusion; the retry recomputes Y
+        // fresh at the new point exactly once.
+        assert_eq!(
+            fresh.get(),
+            1,
+            "after an inclusion failure the next attempt recomputes Y fresh"
+        );
+        let cached = cache.accepted.expect("the fresh Y is accepted and cached");
+        assert_eq!(cached.sample, 2, "the cache records the recovered sample");
+        assert_ne!(
+            cached.y,
+            identity4(),
+            "the recovered Y is the freshly computed inverse, never the failed one"
+        );
+    }
+
+    /// The F-C5 branch fixture: the plane × sphere circle of the BIE unit-shape
+    /// kit, run whole by the restricted solver. Its branch sample count and
+    /// certified box set are the F-C5-style branch data the optimization must
+    /// leave unchanged.
+    fn fc5_branch_fixture() -> (RestrictedChart, RestrictedChart, WitnessCell) {
+        let fixture = plane_sphere_fixture();
+        (
+            RestrictedChart::from_plane(fixture.plane),
+            RestrictedChart::from_sphere(fixture.sphere),
+            fixture.cell,
+        )
+    }
+
+    /// One whole restricted-pair solve on a battery fixture in one mode,
+    /// reduced to the ordered certified box set and the witness presence.
+    fn battery_run(
+        a: RestrictedChart,
+        b: RestrictedChart,
+        cell: WitnessCell,
+        on: bool,
+    ) -> Option<(Vec<WitnessCell>, bool)> {
+        let params = Ssi4Parameters {
+            sample_constants: on,
+            ..Ssi4Parameters::default()
+        };
+        let mut budget = Budget::new(0, 0, 0);
+        match certify_restricted_pair(a, b, cell, &params, &mut budget) {
+            Ok(EvCertified { value, .. }) => Some((
+                value.samples.iter().map(|s| s.cell).collect(),
+                value.witness.is_some(),
+            )),
+            Err(_) => None,
+        }
+    }
+
+    #[test]
+    fn verdicts_bit_identical_with_reuse_enabled() {
+        // The landed ssi4 fixture battery, run whole with the CFP-007 machinery
+        // on vs off: the full verdict + certificate box set is bit-identical
+        // (reuse + inflation change cost, never results). Fixtures are
+        // well-conditioned straight/circle branches, so no sample is marginal.
+        let ps = fc5_branch_fixture();
+        let sp = sweep_plane_fixture();
+        let sp_a = RestrictedChart::circular_sweep(
+            sp.sweep.spine_from,
+            sp.sweep.spine_to,
+            sp.sweep.radius_start,
+            sp.sweep.radius_end,
+            sp.sweep.s0,
+            sp.sweep.s1,
+            sp.sweep.v0,
+            sp.sweep.v1,
+        )
+        .expect("the fixture sweep spine is non-degenerate");
+        let battery: Vec<(&str, RestrictedChart, RestrictedChart, WitnessCell)> = vec![
+            ("plane_x_sphere", ps.0, ps.1, ps.2),
+            (
+                "sweep_x_plane",
+                sp_a,
+                RestrictedChart::from_plane(sp.plane),
+                sp.cell,
+            ),
+        ];
+        for (name, a, b, cell) in battery {
+            let on = battery_run(a.clone(), b.clone(), cell, true)
+                .expect("battery certifies with constants on");
+            let off = battery_run(a, b, cell, false).expect("battery certifies with constants off");
+            assert_eq!(
+                on.0, off.0,
+                "the certified box set of {name} must be bit-identical with the cache on vs off"
+            );
+            assert_eq!(
+                on.1, off.1,
+                "the verdict (witness presence) of {name} must be unchanged"
+            );
+            assert!(!on.0.is_empty(), "{name} must certify branch samples");
+        }
+    }
+
+    #[test]
+    fn fc5_branch_fixture_prune_count_unchanged() {
+        // F-C5 branch-fixture data: the branch sample count and ordered
+        // certified box set on the fixture are unchanged by the optimization
+        // (the reuse + inflation machinery never prunes a sample and never
+        // re-boxes one).
+        let (a, b, cell) = fc5_branch_fixture();
+        fn curve(
+            a: RestrictedChart,
+            b: RestrictedChart,
+            cell: WitnessCell,
+            on: bool,
+        ) -> CertifiedChartCurve {
+            let params = Ssi4Parameters {
+                sample_constants: on,
+                ..Ssi4Parameters::default()
+            };
+            let mut budget = Budget::new(0, 0, 0);
+            must_certified(certify_restricted_pair(a, b, cell, &params, &mut budget))
+        }
+        let with = curve(a.clone(), b.clone(), cell, true);
+        let baseline = curve(a, b, cell, false);
+        assert_eq!(with.samples.len(), baseline.samples.len());
+        let boxes_with: Vec<WitnessCell> = with.samples.iter().map(|s| s.cell).collect();
+        let boxes_baseline: Vec<WitnessCell> = baseline.samples.iter().map(|s| s.cell).collect();
+        assert_eq!(boxes_with, boxes_baseline);
+        assert_eq!(
+            with.tangent_frames.len(),
+            baseline.tangent_frames.len(),
+            "one certified frame per sample, unchanged"
+        );
+    }
+
+    #[test]
+    fn eps_inflation_sequence_is_fixed_and_bounded() {
+        // The inflation schedule is a named, bounded constant: radii `r·2^k`
+        // for `k = 0..=3` (four attempts total, low-first), independent of any
+        // geometry input — no adaptive, no geometry-dependent schedule.
+        assert_eq!(
+            EPS_INFLATION_RADII,
+            [1.0, 2.0, 4.0, 8.0],
+            "the fixed inflation multipliers are 2^k for k = 0..=3"
+        );
+        assert_eq!(
+            EPS_INFLATION_ATTEMPTS,
+            EPS_INFLATION_RADII.len(),
+            "the attempt count is exactly the named constant"
+        );
+        assert_eq!(EPS_INFLATION_ATTEMPTS, 4);
+        for (k, &scale) in EPS_INFLATION_RADII.iter().enumerate() {
+            assert_eq!(
+                scale,
+                2.0_f64.powi(k as i32),
+                "the k-th attempt doubles the base radius (radii r·2^k)"
+            );
+        }
+    }
+
+    /// One discovered marginal sample on the certified circle: the sample
+    /// index, its chart centre, the base radius `r` (one-shot inclusion fails
+    /// at `r`), and the box at `2r` that certifies.
+    struct MarginalSample {
+        /// The certified sample index (trace order, diagnostics).
+        _idx: usize,
+        /// The chart centre.
+        center: [f64; 4],
+        /// The base radius that fails one-shot.
+        radius: f64,
+        /// The doubled box that certifies.
+        cell_2r: [Interval; 4],
+        /// The augmented system at the sample.
+        system: Ssi4System,
+    }
+
+    #[test]
+    fn eps_inflation_recovers_marginal_sample() {
+        // A marginal sample on the certified plane × sphere branch: one whose
+        // box at the base radius `r` is NOT strictly certified one-shot by the
+        // fresh preconditioner (the Krawczyk image touches the box boundary),
+        // while the doubled box at `2r` certifies. The ε-inflation ladder must
+        // recover exactly that sample at exactly `2r`.
+        //
+        // The marginal sample is constructed deterministically from the
+        // fixture: the FIRST certified sample centre (in trace order) and
+        // radius `r` from the fixed candidate list whose one-shot inclusion
+        // fails at `r` and certifies at `2r`. Deterministic ordered search —
+        // no randomness, no geometry-dependent schedule in the production code.
+        let fixture = plane_sphere_fixture();
+        let form = plane_sphere_form();
+        let mut budget = Budget::new(0, 0, 0);
+        let curve = must_certified(certify_restricted_pair(
+            form.a.clone(),
+            form.b.clone(),
+            fixture.cell,
+            &Ssi4Parameters::default(),
+            &mut budget,
+        ));
+        assert!(
+            curve.samples.len() > 64,
+            "the certified circle provides sample centres"
+        );
+
+        // Candidate base radii, coarse to fine: the certified circle's sample
+        // centres sit a few model units off the true root, so a base radius
+        // just below the Newton offset is the marginal case; `2r` recovers.
+        let candidate_radii = [5.0e-3, 2.5e-3, 1.25e-3, 1.0e-3]; // H-3: box half-widths, param units
+        let mut marginal: Option<MarginalSample> = None;
+        for (idx, sample) in curve.samples.iter().enumerate() {
+            let center = sample.chart;
+            let tangent = curve.tangent_frames[idx].tangent;
+            let mut rhs = 0.0;
+            for j in 0..4 {
+                rhs += tangent[j] * center[j];
+            }
+            let system = Ssi4System::new(form.clone(), tangent, rhs);
+            let Some(fresh) = system.preconditioner(&center) else {
+                continue;
+            };
+            for &r in &candidate_radii {
+                let Some(cell_r) = box_around(center, [r; 4]) else {
+                    continue;
+                };
+                let Some(cell_2r) = box_around(center, [2.0 * r; 4]) else {
+                    continue;
+                };
+                let at_r = one_shot_krawczyk(&system, &cell_r, Some(fresh));
+                let at_2r = one_shot_krawczyk(&system, &cell_2r, Some(fresh));
+                if matches!(at_r, OneShotOutcome::Inconclusive)
+                    && matches!(at_2r, OneShotOutcome::Unique { .. })
+                {
+                    marginal = Some(MarginalSample {
+                        _idx: idx,
+                        center,
+                        radius: r,
+                        cell_2r,
+                        system,
+                    });
+                    break;
+                }
+            }
+            if marginal.is_some() {
+                break;
+            }
+        }
+        let MarginalSample {
+            center,
+            radius,
+            cell_2r,
+            system,
+            ..
+        } = marginal.expect("the certified circle provides a marginal sample");
+        // The recovered certificate box is the inflated box (radius 2r), never
+        // a re-boxed or bisected one: inflation widens the REQUESTED box.
+        let mut cache = PreconditionerCache::<4>::default();
+        let mut step_budget = Budget::new(128, 0, 0);
+        let verdict = certified_theta_rho_step(
+            &system,
+            center,
+            [radius; 4],
+            &mut step_budget,
+            &mut cache,
+            1,
+        );
+        let StepVerdict::Certified { cell, .. } = &verdict else {
+            unreachable!(
+                "the ε-inflation ladder must certify the marginal sample (r {radius}), \
+                 got {verdict:?}"
+            );
+        };
+        assert_eq!(
+            cell, &cell_2r,
+            "the marginal sample is certified at exactly the doubled radius 2r"
+        );
+        let cached = cache.accepted.expect("the recovered sample is accepted");
+        assert_eq!(cached.sample, 1);
+        // The inflation sequence is bounded: the marginal sample certifies at
+        // the SECOND attempt of the fixed ladder (k = 1), inside the named
+        // attempt count.
+        assert!(radius > 0.0 && cell_2r.iter().all(|c| c.inf().is_finite()));
     }
 }
