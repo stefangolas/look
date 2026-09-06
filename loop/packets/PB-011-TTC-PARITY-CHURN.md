@@ -38,7 +38,7 @@ tests_required:
 anchors:
   - {id: A1, expect: 3, cmd: "grep -c NonCanonicalCarrier truck123d/src/facade.rs"}
   - {id: A2, expect: 1, cmd: "grep -c 'pub fn' vendor/truck/truck-evidence/src/contact/gff.rs"}
-  - {id: A3, expect: 23, cmd: "grep -c booleans-on-swept-carriers corpus/ttc/SKIPS.json"}
+  - {id: A3, expect: 35, cmd: "grep -c booleans-on-swept-carriers corpus/ttc/SKIPS.json"}
 budget:      {turns: 90, ctx_tokens: 200000}
 ```
 
@@ -77,6 +77,15 @@ same-line `// H-3`. H-6: never record Float as Exact.
    supports (spline/swept/revolved per CFP-004's stage contract); classes
    the funnel refuses (torus, A7) KEEP the typed refusal. Fail-closed:
    every refusal carries the stratum-pair/localization identity.
+   **PB-013 finding (RESULT, normative for this packet):** the G1
+   capability cells were pinned at the STEP-out refusal because
+   `run_facade` has NO native geometry boolean row for swept carriers —
+   the cells are not executable through the runner at all today. The
+   flip therefore requires BOTH: (a) expose swept-carrier boolean rows
+   through `run_facade`'s table validation (Mode rows on non-canonical
+   carriers must reach the certified entry instead of being refused
+   pre-execution), and (b) the dispatch itself. The matrix doc's
+   `flipped-by: PB-011` cells assert through that exposed row.
 2. **Skip lifts are evidence-gated, one row at a time.** A lifted row
    moves from SKIPS.json `rows` to the runnable manifest ONLY after its
    script runs green through the harness door (geometry facts + report
@@ -89,11 +98,19 @@ same-line `// H-3`. H-6: never record Float as Exact.
    (`compat_surface_table_is_complete`) is satisfied by the existing
    SURFACE_ROWS; you update doc status text + the `surface.rs` row
    descriptions if needed, never the 7-row structure.
-4. **Partial-arc revolve (cutaway)**: check the landed S6 revolve against
-   `revolution_arc` semantics first (read facade + kernel revolve entry).
-   If coverage exists, cutaway lifts after its run goes green. If not,
-   the missing piece is an additive revolve-arc parameter — same packet,
-   flagged in RESULT.
+4. **Partial-arc revolve (cutaway)** — RESOLVED by orchestrator check
+   2026-09-06: the kernel's `RevolvedSurface` v-range is hardwired
+   `[0, 2π)` (`revolved_curve.rs:152`, `by_revolution` :321 takes no
+   angles), and that is CORRECT for this purpose — a partial-arc revolve
+   is a bridge-level construction: a trimmed face on the full revolved
+   surface (v-range `[start, start+arc]`) plus two planar cap faces
+   bounded by the profile and its rotated image. No `vendor/truck`
+   change is expected or permitted for this; build the trimmed shell in
+   `facade.rs` (in write_allow), expose the `arc_deg`/`start_deg`
+   parameters the vendored `revolved_shell` passes
+   (`falcon_common.py:202-206`), and lift cutaway after its run goes
+   green. If the cap-face construction hits a landed-kernel limitation,
+   THAT is a SPEC_GAP (the exception, not the expectation).
 5. **V5, absolute**: landed harness tests (`ttc_harness.rs` existing
    tests) are byte-identical constraints — you ADD tests, never modify
    landed ones. The `staged_skips_carry_reasons` test may need the lifted
