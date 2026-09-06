@@ -2811,3 +2811,21 @@ what the tree says about the last two, as opposed to what the spec says.
   of the wrapper, so verify NEVER runs in the foreground of a tool call
   with a cap; launch it via `Start-Process cmd /c "... > out 2>&1"` and
   poll.
+
+---
+
+## Session handoff — 2026-09-06 ~11:15 (CTE/CL/PB close-out + BREP registration)
+
+Programs at handoff:
+
+- **CL: CLOSED 7/7** (carrier lift complete — spline admission/lift/stitching, sweep enclosures/dispatch, exact-contact r2, solver entry).
+- **PB: 9/9 authored, 8 landed, PB-007-CONFORMANCE RUNNING** (the program gate — Python/Rust byte-equality). PB-008 landed; F1/Falcon-Heavy corpus reach statement is in its RESULT.
+- **CTE: 7/9 landed, CTE-007-T2ARRANGE RUNNING, CTE-008-GATES gated on it.** CTE-004's RESULT carries the program's key result: F3 A1Isolated + F4 A1Node + F6 Transversal-via-T1.5 all certified (the R3 gate passed — the indefinite Morse case is NOT Unresolved). One CTE-004 deviation to know: the D-shim trait ReducedHessianEvaluator stays a signature; the real body is packet-frozen free functions.
+- **BREP: registered this session.** BREP-001A-PIPELINE-CORRECTNESS RUNNING (apex chain QUO/DOM/PAR + NUM observable caps + ARRANGE typed refusal + GEO probe). BREP-002-DSC-SCREENS gated on CTE-007 (owns boolean/assemble.rs). Face-recovery populations (UNKNOWN-NIST-ORDINARY-CONE, UNKNOWN-ABC-BSPLINE, CTC05-FUNNEL) deliberately EXCLUDED per owner — pipeline correctness only.
+- **New speed build spec: landing now, packet authoring started by the incoming session.** Perf doctrine applies: release builds only for recorded numbers, quick profile never.
+
+Repairs landed this session (do not re-do): new_slot cleans untracked dispatch artifacts BEFORE checkout -B (the PACKET.md checkout-overwrite loop); schedule.py tolerant of write-set-less/clas-typo rows; overnight battery trigger + DONE-flip widened to CTE-; PB-005/006/007/008 + CL-001/002/004 packets authored (the 2026-09-05 14:15/14:24 authoring session registered rows but left 5 files empty); PACKETS.jsonl edits must be BOM-free (WriteAllLines + UTF8Encoding(false) — Set-Content -Encoding UTF8 breaks json.loads, the 26902cd trap).
+
+Recurring pattern to watch: **row-filing lag** — try_land merges + appends the LANDED note, but the status field lags READY; the LANDED marker in the note is ground truth (dispatch_ready already honors it). Flip stale READY rows to DONE when adjudicating, or the dispatcher re-runs landed work (CTE-001's branch label was force-reset by exactly this).
+
+Watch items for the next session: CTE-007's RESULT (the arrangement + self-pair rewrite + H-atom strata — the biggest remaining surface); BREP-001A's acceptance gates (apex_only 0→~46 triangles, ctc_02 both-encodings metamorphic, blob count ≤ 10); the -p look --test geometry_fingerprint failure seen in stale slot output (verify at HEAD before the battery); BREP-002 dispatches automatically when CTE-007 lands.
