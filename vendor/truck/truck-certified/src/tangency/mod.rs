@@ -143,3 +143,8 @@ pub mod qpoly;
 /// the pending-refusal provenance stub [`witness::provenance_witness`].
 pub mod witness;
 
+/// The A₂ (Morse–Bott branch) certificate and its rank-3 continuation adapter
+/// (CTE-005-A2): the T1.7 contact-factor identity with the interval
+/// nonvanishing multipliers, the rank-3 separation of `D(G₁, G₂, q)`, the R6
+/// certified non-empty branch, and the parallelotope branch-curve production.
+pub mod a2;
