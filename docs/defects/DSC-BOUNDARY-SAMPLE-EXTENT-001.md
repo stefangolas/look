@@ -10,9 +10,24 @@ registration.
 ## 1. Status
 
 ```
-Mechanism established   — code-verified at named sites; counterexample is
-                          synthetic and not yet run
-Not corrected           — fix direction recorded, no experiment landed
+Correction landed — validated by F-C0/F-C2
+```
+
+Corrected by `CFP-001-LIFT-ENCLOSURE`. The lift screen no longer hulls
+boundary-curve samples: `face_aabb` is replaced by `face_enclosure`
+(`truck-shapeops/src/boolean/assemble.rs`), which consumes the certified
+`EnclosureSurface` boxes of the recognized carrier over the face's true
+parameter extent (per-span sub-box hulls for a spline carrier), and
+`face_uv_box` returns the trim's true parameter extent — the carrier's own
+clamped parameter domain for the curved carriers whose interior leaves the
+boundary polygon (sphere/torus/spline), the exact boundary-derived extent for
+the classes whose region extremes lie on the boundary. The parameter-twin and
+world-screen mechanisms are pinned by the CFP-001 tests
+`fc0_defect_counterexample_red_on_sampled_green_on_certified` and
+`param_box_derived_from_trim_not_boundary` (shapeops boolean suite), with the
+BG-ENC-001 containment guard carried by the F-C2 battery
+(`fc2_enclosure_containment_randomized`, evidence suite). Synthetic witnesses
+only so far — the record stays open.
 ```
 
 ## 2. Mathematical objects

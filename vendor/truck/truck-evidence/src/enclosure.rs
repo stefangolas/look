@@ -18,7 +18,9 @@
 //! FMA without fast-math, so float results remain bit-identical.)
 
 pub use inari::Interval;
+use truck_base::cgmath64::control_point::ControlPoint;
 use truck_base::cgmath64::{InnerSpace, Point3, Vector3};
+use truck_base::tolerance::Tolerance;
 use truck_geometry::nurbs::{BSplineCurve, BSplineSurface, KnotVec};
 use truck_geometry::specifieds::Plane;
 use truck_geotrait::{ParametricCurve, ParametricSurface};
@@ -299,6 +301,155 @@ fn interior_axis(knots: &KnotVec, degree: usize) -> Option<(f64, f64)> {
     }
 }
 
+// ---------------------------------------------------------------------------
+// CFP-001-LIFT-ENCLOSURE: the sub-box spline hull primitive
+// (NUM-SPLINE-ENCLOSURE-CONVERGENCE-001 correction; BG-ENC-002).
+//
+// `enclose`/`enclose_der`/`normal_cone` used to return whole-net bounds
+// regardless of the query box: sound but non-convergent, so any loop that
+// separates on enclosures could not terminate on spline pairs and cones never
+// shrank under subdivision. The correction is the shared sub-box spline hull
+// the lift screen consumes too: locate the knot spans overlapping the query
+// box, de Casteljau-restrict each span's net to the box∩span intersection
+// (exact knot manipulation via the landed `KnotVec` insertion ops — no new
+// spline math), and union the per-span hulls. The F-C7 cross-check test guards
+// the duplicated leaf math (F1).
+// ---------------------------------------------------------------------------
+
+/// The multiplicity of the knot value `x` in a knot vector, counted over exact
+/// knot equality. `KnotVec::multiplicity` matches by tolerance and would count
+/// a *different* knot value within the legacy tolerance of `x`, which
+/// under-inserts in the raising loop and extracts an over-wide sub-surface
+/// whenever `x` sits within tolerance of another knot (the `bspline.rs` exact
+/// count, applied to surfaces).
+fn exact_knot_multiplicity(knots: &KnotVec, x: f64) -> usize {
+    knots.iter().filter(|&&k| k == x).count()
+}
+
+/// Raises the u-knot value `x` to full multiplicity `degree + 1` by repeated
+/// exact Boehm insertion. `add_uknot` inserts a single exact copy and never
+/// validates; inserting past `degree + 1` would make an invalid knot vector,
+/// so the loop stops exactly at the maximum multiplicity.
+fn raise_uknot_full<P: ControlPoint<f64> + Tolerance + Clone>(
+    surface: &mut BSplineSurface<P>,
+    x: f64,
+    degree: usize,
+) {
+    while exact_knot_multiplicity(surface.uknot_vec(), x) < degree + 1 {
+        surface.add_uknot(x);
+    }
+}
+
+/// Raises the v-knot value `x` to full multiplicity `degree + 1` by repeated
+/// exact Boehm insertion (the v-axis sibling of [`raise_uknot_full`]).
+fn raise_vknot_full<P: ControlPoint<f64> + Tolerance + Clone>(
+    surface: &mut BSplineSurface<P>,
+    x: f64,
+    degree: usize,
+) {
+    while exact_knot_multiplicity(surface.vknot_vec(), x) < degree + 1 {
+        surface.add_vknot(x);
+    }
+}
+
+/// The sub-surface over the rectangle `[u_lo, u_hi] × [v_lo, v_hi]`, where
+/// `u_lo < u_hi` and `v_lo < v_hi` are already clamped into the carrier's knot
+/// range (the per-span restriction primitive; `bspline.rs`'s `sub_curve`,
+/// lifted to two axes). Each endpoint is first raised to full knot multiplicity
+/// so that `ucut`/`vcut`'s tolerance snapping is exact — `x − x == 0.0`, so the
+/// cut inserts no further copies — and then the surface is cut at `u_hi`
+/// (keeping the front) and at `u_lo` (returning the middle), then likewise
+/// along `v`. Over that rectangle the extracted surface's basis functions are
+/// non-negative and sum to 1, so every image point is a convex combination of
+/// the sub-surface's control points: its outward-rounded axis-aligned box is an
+/// enclosure (the convex-hull property).
+fn restrict_surface<P: ControlPoint<f64> + Tolerance + Clone>(
+    surface: &BSplineSurface<P>,
+    u_lo: f64,
+    u_hi: f64,
+    v_lo: f64,
+    v_hi: f64,
+) -> BSplineSurface<P> {
+    let u_degree = surface.udegree();
+    let v_degree = surface.vdegree();
+    let mut s = surface.clone();
+    for x in [u_lo, u_hi] {
+        raise_uknot_full(&mut s, x, u_degree);
+    }
+    let _tail_u = s.ucut(u_hi);
+    let mut s = s.ucut(u_lo);
+    for y in [v_lo, v_hi] {
+        raise_vknot_full(&mut s, y, v_degree);
+    }
+    let _tail_v = s.vcut(v_hi);
+    s.vcut(v_lo)
+}
+
+/// The positive-width intersections of `[lo, hi]` with the non-degenerate knot
+/// spans of one axis, in increasing order (determinism: low-before-high, exact
+/// knot comparison). A span whose clipped width is zero contributes nothing —
+/// the shared edge belongs to the neighbouring span.
+fn span_clips(knots: &KnotVec, lo: f64, hi: f64) -> Vec<(f64, f64)> {
+    let mut out = Vec::new();
+    let mut prev: Option<f64> = None;
+    for &k in knots.iter() {
+        if let Some(p) = prev {
+            if p < k {
+                let a = p.max(lo);
+                let b = k.min(hi);
+                if a < b {
+                    out.push((a, b));
+                }
+            }
+        }
+        prev = Some(k);
+    }
+    out
+}
+
+/// The outward-rounded union of two boxes: per coordinate the lower endpoint
+/// is the min of the two lowers and the upper endpoint the max of the two
+/// uppers, so the union encloses both. `min`/`max` on already outward-rounded
+/// endpoints stays outward (BG-ENC-003).
+fn union_box(a: &Box3, b: &Box3) -> Box3 {
+    let union = |x: Interval, y: Interval| -> Interval {
+        Interval::try_from((x.inf().min(y.inf()), x.sup().max(y.sup()))).unwrap_or(Interval::EMPTY)
+    };
+    Box3 {
+        x: union(a.x, b.x),
+        y: union(a.y, b.y),
+        z: union(a.z, b.z),
+    }
+}
+
+/// The sub-box spline hull of a spline carrier over an in-domain query box:
+/// the union over every knot span overlapping the box of the per-span
+/// restriction's control-net hull (BG-ENC-002). Empty when the box clips no
+/// positive span (a fully degenerate box).
+fn sub_box_hull<P: ControlPoint<f64> + Tolerance + Copy + Clone + SurfaceCoord>(
+    surface: &BSplineSurface<P>,
+    uu: Interval,
+    vv: Interval,
+) -> Box3 {
+    let u_clips = span_clips(surface.uknot_vec(), uu.inf(), uu.sup());
+    let v_clips = span_clips(surface.vknot_vec(), vv.inf(), vv.sup());
+    let mut acc = Box3::empty();
+    let mut any = false;
+    for (u_lo, u_hi) in u_clips {
+        for &(v_lo, v_hi) in &v_clips {
+            let sub = restrict_surface(surface, u_lo, u_hi, v_lo, v_hi);
+            let b = control_net_box(&sub);
+            acc = if any { union_box(&acc, &b) } else { b };
+            any = true;
+        }
+    }
+    if any {
+        acc
+    } else {
+        Box3::empty()
+    }
+}
+
 impl EnclosureSurface for BSplineSurface<Point3> {
     fn enclose(&self, uu: Interval, vv: Interval) -> Box3 {
         if uu.is_empty() || vv.is_empty() || !uu.inf().is_finite() || !uu.sup().is_finite() {
@@ -318,7 +469,14 @@ impl EnclosureSurface for BSplineSurface<Point3> {
                 z: Interval::ENTIRE,
             };
         }
-        control_net_box(self)
+        // CFP-001: a query box spanning the whole clamped domain returns the
+        // whole control-net hull (the landed whole-domain answer, a superset of
+        // the refined per-span union); every strictly-smaller box returns the
+        // sub-box spline hull, whose width → 0 as the box → 0 (BG-ENC-002).
+        if uu.inf() == u0 && uu.sup() == u1 && vv.inf() == v0 && vv.sup() == v1 {
+            return control_net_box(self);
+        }
+        sub_box_hull(self, uu, vv)
     }
 
     fn enclose_der(&self, m: usize, n: usize, uu: Interval, vv: Interval) -> Box3 {
@@ -342,7 +500,9 @@ impl EnclosureSurface for BSplineSurface<Point3> {
         // CL-000: the derivative of a B-spline surface is a B-spline surface
         // of degree k - 1 whose control points are derived exactly from the
         // carrier's net (truck-geometry's `uderivation` / `vderivation`). The
-        // derivative image is bounded by that derived net's outward hull.
+        // derivative image is bounded by the derived net's sub-box spline hull
+        // over the same query box (BG-ENC-002, the convergence the defect
+        // record demands).
         let derived: BSplineSurface<Vector3> = match uderive_chain(self, m, n) {
             Some(d) => d,
             None => {
@@ -350,7 +510,10 @@ impl EnclosureSurface for BSplineSurface<Point3> {
                 return self.enclose(uu, vv);
             }
         };
-        control_net_box(&derived)
+        if uu.inf() == u0 && uu.sup() == u1 && vv.inf() == v0 && vv.sup() == v1 {
+            return control_net_box(&derived);
+        }
+        sub_box_hull(&derived, uu, vv)
     }
 
     fn normal_cone(&self, uu: Interval, vv: Interval) -> Option<DirCone> {
@@ -617,6 +780,308 @@ mod tests {
                     e_dv.contains(Point3::new(dv.x, dv.y, dv.z)),
                     "v-derivative at ({u}, {v}) escaped the enclosure"
                 );
+            }
+        }
+    }
+
+    // -----------------------------------------------------------------------
+    // CFP-001 fixture data, copied from `truck-certified/src/cfp/fixtures.rs`
+    // as read-only constants (F1 — never import the module). The evaluation
+    // assertions the fixtures record as expectations land HERE (the parallel
+    // contract): F-C2's containment/convergence/monotonicity against the
+    // landed `BSplineSurface` enclosures, and F-C7's evidence-side hull against
+    // a locally-reproduced certified-side per-span hull.
+    // -----------------------------------------------------------------------
+
+    /// The F-C2 fixed bicubic net `z = i·j` over the `4 × 4` grid, verbatim.
+    const FC2_NET: [[[f64; 3]; 4]; 4] = [
+        [
+            [0.0, 0.0, 0.0],
+            [0.0, 1.0, 0.0],
+            [0.0, 2.0, 0.0],
+            [0.0, 3.0, 0.0],
+        ],
+        [
+            [1.0, 0.0, 0.0],
+            [1.0, 1.0, 1.0],
+            [1.0, 2.0, 2.0],
+            [1.0, 3.0, 3.0],
+        ],
+        [
+            [2.0, 0.0, 0.0],
+            [2.0, 1.0, 2.0],
+            [2.0, 2.0, 4.0],
+            [2.0, 3.0, 6.0],
+        ],
+        [
+            [3.0, 0.0, 0.0],
+            [3.0, 1.0, 3.0],
+            [3.0, 2.0, 6.0],
+            [3.0, 3.0, 9.0],
+        ],
+    ];
+    /// The F-C2 outer box `B₁`.
+    const FC2_B1: ((f64, f64), (f64, f64)) = ((0.0, 1.0), (0.0, 1.0));
+    /// The F-C2 middle box `B₂ ⊂ B₁`.
+    const FC2_B2: ((f64, f64), (f64, f64)) = ((0.25, 0.75), (0.25, 0.75));
+    /// The F-C2 inner box `B₃ ⊂ B₂`.
+    const FC2_B3: ((f64, f64), (f64, f64)) = ((0.4375, 0.5625), (0.4375, 0.5625));
+
+    /// The F-C2 battery surface: the fixed bicubic net over the clamped unit
+    /// square (one Bézier span per axis; the F-C2 boxes are nested sub-patches
+    /// of that single span).
+    fn battery_surface() -> BSplineSurface<Point3> {
+        let ctrl: Vec<Vec<Point3>> = FC2_NET
+            .iter()
+            .map(|row| row.iter().map(|&p| Point3::new(p[0], p[1], p[2])).collect())
+            .collect();
+        BSplineSurface::new((KnotVec::bezier_knot(3), KnotVec::bezier_knot(3)), ctrl)
+    }
+
+    /// A recorded `((f64, f64), (f64, f64))` box as the enclosure intervals.
+    fn recorded_box_iv(b: ((f64, f64), (f64, f64))) -> (Interval, Interval) {
+        (iv(b.0 .0, b.0 .1), iv(b.1 .0, b.1 .1))
+    }
+
+    /// Asserts that `inner` lies inside `outer` coordinate-wise up to a
+    /// `HULL_PAD`-scale outward slack (the box comparison used by the
+    /// monotonicity and cross-check assertions; the slack absorbs the last-ulp
+    /// float drift between independently-restricted control nets, never a real
+    /// gap).
+    fn assert_box_within(inner: &Box3, outer: &Box3, what: &str) {
+        let slack = |x: f64| 256.0 * f64::EPSILON * (1.0 + x.abs());
+        for (axis, i, o) in [
+            ("x", inner.x, outer.x),
+            ("y", inner.y, outer.y),
+            ("z", inner.z, outer.z),
+        ] {
+            assert!(
+                i.inf() >= o.inf() - slack(o.inf()) && i.sup() <= o.sup() + slack(o.sup()),
+                "{what}: {axis} [{}, {}] escapes [{}, {}]",
+                i.inf(),
+                i.sup(),
+                o.inf(),
+                o.sup()
+            );
+        }
+    }
+
+    /// F-C2 (BG-ENC-001): on the fixed battery surface, a dense point sampling
+    /// of each recorded box's image — the surface itself and both first
+    /// partials — is contained in the corresponding enclosure.
+    #[test]
+    fn fc2_enclosure_containment_randomized() {
+        let surface = battery_surface();
+        const SAMPLES: usize = 12;
+        for (b, name) in [(FC2_B1, "B1"), (FC2_B2, "B2"), (FC2_B3, "B3")] {
+            let (uu, vv) = recorded_box_iv(b);
+            let enc = surface.enclose(uu, vv);
+            let e_du = surface.enclose_der(1, 0, uu, vv);
+            let e_dv = surface.enclose_der(0, 1, uu, vv);
+            for i in 0..SAMPLES {
+                for j in 0..SAMPLES {
+                    let u = b.0 .0 + (b.0 .1 - b.0 .0) * (i as f64) / (SAMPLES as f64 - 1.0);
+                    let v = b.1 .0 + (b.1 .1 - b.1 .0) * (j as f64) / (SAMPLES as f64 - 1.0);
+                    let p = surface.subs(u, v);
+                    assert!(
+                        enc.contains(p),
+                        "{name}: surface point at ({u}, {v}) escaped"
+                    );
+                    let du = surface.uder(u, v);
+                    assert!(
+                        e_du.contains(Point3::new(du.x, du.y, du.z)),
+                        "{name}: u-derivative at ({u}, {v}) escaped"
+                    );
+                    let dv = surface.vder(u, v);
+                    assert!(
+                        e_dv.contains(Point3::new(dv.x, dv.y, dv.z)),
+                        "{name}: v-derivative at ({u}, {v}) escaped"
+                    );
+                }
+            }
+        }
+    }
+
+    /// F-C2 (BG-ENC-002, the permanent guard on
+    /// `NUM-SPLINE-ENCLOSURE-CONVERGENCE-001`): the enclosure width strictly
+    /// decreases down the recorded nest `B₁ ⊃ B₂ ⊃ B₃` — the width is no
+    /// longer constant in the query box.
+    #[test]
+    fn fc2_enclosure_convergence_under_bisection() {
+        let surface = battery_surface();
+        let (u1, v1) = recorded_box_iv(FC2_B1);
+        let (u2, v2) = recorded_box_iv(FC2_B2);
+        let (u3, v3) = recorded_box_iv(FC2_B3);
+        let w1 = surface.enclose(u1, v1).width();
+        let w2 = surface.enclose(u2, v2).width();
+        let w3 = surface.enclose(u3, v3).width();
+        let slack = |w: f64| 256.0 * f64::EPSILON * (1.0 + w);
+        assert!(
+            w2 <= w1 + slack(w1),
+            "width not non-increasing down the nest: {w1} -> {w2}"
+        );
+        assert!(
+            w3 <= w2 + slack(w2),
+            "width not non-increasing down the nest: {w2} -> {w3}"
+        );
+        assert!(
+            w3 < w1,
+            "width did not strictly decrease down the nest: {w1} -> {w3}"
+        );
+    }
+
+    /// F-C2 (monotonicity): `B ⊆ B′ ⇒ enclose(B) ⊆ enclose(B′)` on the
+    /// recorded nest.
+    #[test]
+    fn fc2_enclosure_monotonicity() {
+        let surface = battery_surface();
+        let (u1, v1) = recorded_box_iv(FC2_B1);
+        let (u2, v2) = recorded_box_iv(FC2_B2);
+        let (u3, v3) = recorded_box_iv(FC2_B3);
+        let e1 = surface.enclose(u1, v1);
+        let e2 = surface.enclose(u2, v2);
+        let e3 = surface.enclose(u3, v3);
+        assert_box_within(&e2, &e1, "enclose(B2) ⊆ enclose(B1)");
+        assert_box_within(&e3, &e2, "enclose(B3) ⊆ enclose(B2)");
+    }
+
+    /// One F-C7 cross-check input: a bicubic net and a sub-box of its domain.
+    struct Fc7Input {
+        /// The `4 × 4` spline control net.
+        net: [[[f64; 3]; 4]; 4],
+        /// The parameter sub-box `(u, v)`.
+        box_: ((f64, f64), (f64, f64)),
+    }
+
+    /// The F-C7 fixed seed, verbatim.
+    const FC7_SEED: u64 = 0x5EED_C700;
+    /// The F-C7 input count, verbatim.
+    const FC7_COUNT: usize = 8;
+
+    /// The F-C7 LCG step (the fixtures' generator, verbatim).
+    fn fc7_next(state: &mut u64) -> f64 {
+        *state = state
+            .wrapping_mul(6_364_136_223_846_793_005)
+            .wrapping_add(1_442_695_040_888_963_407);
+        ((*state >> 11) & 0xFFFF) as f64 / 65_535.0
+    }
+
+    /// The fixtures' `ordered_pair`: an ordered pair, degenerate draws falling
+    /// back to the unit interval (deterministic).
+    fn fc7_ordered_pair(a: f64, b: f64) -> (f64, f64) {
+        let (lo, hi) = if a <= b { (a, b) } else { (b, a) };
+        if lo < hi {
+            (lo, hi)
+        } else {
+            (0.0, 1.0)
+        }
+    }
+
+    /// Regenerate the F-C7 seeded inputs (the fixtures' generator, verbatim).
+    fn fc7_inputs() -> Vec<Fc7Input> {
+        let mut state = FC7_SEED;
+        let mut inputs = Vec::with_capacity(FC7_COUNT);
+        for _ in 0..FC7_COUNT {
+            let mut net = [[[0.0f64; 3]; 4]; 4];
+            for point in net.iter_mut().flatten() {
+                for component in point.iter_mut() {
+                    *component = fc7_next(&mut state) * 3.0;
+                }
+            }
+            let box_ = (
+                fc7_ordered_pair(fc7_next(&mut state), fc7_next(&mut state)),
+                fc7_ordered_pair(fc7_next(&mut state), fc7_next(&mut state)),
+            );
+            inputs.push(Fc7Input { net, box_ });
+        }
+        inputs
+    }
+
+    /// The F-C7 surface over one input's net, clamped over the unit square.
+    fn fc7_surface(input: &Fc7Input) -> BSplineSurface<Point3> {
+        let ctrl: Vec<Vec<Point3>> = input
+            .net
+            .iter()
+            .map(|row| row.iter().map(|&p| Point3::new(p[0], p[1], p[2])).collect())
+            .collect();
+        BSplineSurface::new((KnotVec::bezier_knot(3), KnotVec::bezier_knot(3)), ctrl)
+    }
+
+    /// The distinct knot values strictly between `lo` and `hi`, in order.
+    fn interior_knot_values(knots: &KnotVec, lo: f64, hi: f64) -> Vec<f64> {
+        let mut out = Vec::new();
+        let mut prev: Option<f64> = None;
+        for &k in knots.iter() {
+            if let Some(p) = prev {
+                if p != k && lo < k && k < hi {
+                    out.push(k);
+                }
+            }
+            prev = Some(k);
+        }
+        out
+    }
+
+    /// The certified-side per-span hull (the `SplinePatchStack` view of the F1
+    /// duplication): admit the surface into its per-span Bézier patches once
+    /// (D1 — every interior knot raised to full multiplicity), then restrict
+    /// each span overlapping the box to the box∩span intersection and union the
+    /// per-span control-net hulls. Structurally the certified admission +
+    /// restriction CFP-003 performs on `AdmittedPatch`s; reproduced here so the
+    /// cross-check lives on the evidence side of the F1 edge.
+    fn certified_per_span_hull(
+        surface: &BSplineSurface<Point3>,
+        uu: Interval,
+        vv: Interval,
+    ) -> Box3 {
+        let Some(((u0, u1), (v0, v1))) = spline_interior(surface) else {
+            return Box3 {
+                x: Interval::ENTIRE,
+                y: Interval::ENTIRE,
+                z: Interval::ENTIRE,
+            };
+        };
+        let mut admitted = surface.clone();
+        for x in interior_knot_values(surface.uknot_vec(), u0, u1) {
+            let degree = admitted.udegree();
+            raise_uknot_full(&mut admitted, x, degree);
+        }
+        for y in interior_knot_values(surface.vknot_vec(), v0, v1) {
+            let degree = admitted.vdegree();
+            raise_vknot_full(&mut admitted, y, degree);
+        }
+        sub_box_hull(&admitted, uu, vv)
+    }
+
+    /// F-C7 (F1): the evidence-side sub-box hull (`BSplineSurface::enclose`)
+    /// agrees with the certified-side per-span hull on the seeded inputs.
+    #[test]
+    fn fc7_cross_check_evidence_hull_matches_certified_side() {
+        for (idx, input) in fc7_inputs().iter().enumerate() {
+            let surface = fc7_surface(input);
+            let (uu, vv) = recorded_box_iv(input.box_);
+            let evidence = surface.enclose(uu, vv);
+            let certified = certified_per_span_hull(&surface, uu, vv);
+            assert_box_within(&evidence, &certified, "evidence hull ⊆ certified-side hull");
+            assert_box_within(&certified, &evidence, "certified-side hull ⊆ evidence hull");
+            // Both hulls enclose the sampled image (BG-ENC-001 sanity on the
+            // cross-check inputs).
+            const SAMPLES: usize = 8;
+            let b = input.box_;
+            for i in 0..SAMPLES {
+                for j in 0..SAMPLES {
+                    let u = b.0 .0 + (b.0 .1 - b.0 .0) * (i as f64) / (SAMPLES as f64 - 1.0);
+                    let v = b.1 .0 + (b.1 .1 - b.1 .0) * (j as f64) / (SAMPLES as f64 - 1.0);
+                    let p = surface.subs(u, v);
+                    assert!(
+                        evidence.contains(p),
+                        "input {idx}: point escaped the evidence hull"
+                    );
+                    assert!(
+                        certified.contains(p),
+                        "input {idx}: point escaped the certified-side hull"
+                    );
+                }
             }
         }
     }
