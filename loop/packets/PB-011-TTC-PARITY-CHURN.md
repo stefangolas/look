@@ -38,7 +38,7 @@ tests_required:
 anchors:
   - {id: A1, expect: 3, cmd: "grep -c NonCanonicalCarrier truck123d/src/facade.rs"}
   - {id: A2, expect: 1, cmd: "grep -c 'pub fn' vendor/truck/truck-evidence/src/contact/gff.rs"}
-  - {id: A3, expect: 22, cmd: "grep -c booleans-on-swept-carriers corpus/ttc/SKIPS.json"}
+  - {id: A3, expect: 23, cmd: "grep -c booleans-on-swept-carriers corpus/ttc/SKIPS.json"}
 budget:      {turns: 90, ctx_tokens: 200000}
 ```
 
