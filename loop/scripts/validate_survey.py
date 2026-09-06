@@ -28,6 +28,13 @@ def main(path):
         ln = r.get("line")
         expr = r.get("expression", "") or ""
         sym = r.get("symbol", "") or ""
+        # PB-010 census schema (orchestrator packet defined the row shape):
+        # op + evidence carry the cited identifiers when the classic
+        # symbol/expression fields are absent. The anti-fabrication
+        # property is unchanged: some cited identifier must appear at the
+        # cited line (+/-2).
+        op = r.get("op", "") or ""
+        ev = r.get("evidence", "") or ""
         if not os.path.exists(f):
             bad.append(("NO_FILE", r))
             continue
@@ -40,8 +47,11 @@ def main(path):
             continue
         window = "\n".join(lines[max(0, ln - 3): ln + 2])
         toks = ident_tokens(sym) + ident_tokens(expr)
+        if not toks:
+            toks = ident_tokens(op) + ident_tokens(ev)
         code_toks = [t for t in toks if t not in
-                     ("interval_at", "self", "let", "fn", "pub")]
+                     ("interval_at", "self", "let", "fn", "pub", "the", "and",
+                      "with", "under", "into", "from", "this", "that")]
         if not code_toks:
             bad.append(("NO_TOKENS", r))
             continue

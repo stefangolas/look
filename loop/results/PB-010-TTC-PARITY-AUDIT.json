@@ -1,0 +1,938 @@
+{
+  "schema": "ttc_parity_survey.v1",
+  "packet": "PB-010-TTC-PARITY-AUDIT",
+  "date": "2026-09-06",
+  "anchors": {
+    "A1_manifest_id_lines": 36,
+    "A2_skips_booleans_lines": 23,
+    "A3_trees_dir_entries": 2,
+    "A4_hypercar_in_trees": 0
+  },
+  "anchor_verdict": "all four anchors match (A1=36 via case-sensitive grep semantics, A2=23, A3=2, A4=0)",
+  "rows": [
+    {
+      "id": "falcon_heavy/src/lib/merlin_common.py:revolved_shell",
+      "file": "corpus/ttc/trees/falcon_heavy/src/lib/merlin_common.py",
+      "line": 225,
+      "op": "revolve (revolved_shell -> bd.revolve)",
+      "surface": "S6",
+      "classification": "runs-today",
+      "evidence": "Canonical manifest rows (falcon_heavy/nozzle_assembly, chamber_assembly, ...) execute revolved_shell under the harness door (corpus/ttc/door.py:146 exports STL); facade table row Revolve exists (truck123d/src/facade.rs:161-165) and compat doc S6 is landed, so the op runs today."
+    },
+    {
+      "id": "falcon_heavy/src/lib/merlin_common.py:revolved_solid",
+      "file": "corpus/ttc/trees/falcon_heavy/src/lib/merlin_common.py",
+      "line": 232,
+      "op": "revolve (revolved_solid -> bd.revolve of Face/Wire)",
+      "surface": "S6",
+      "classification": "runs-today",
+      "evidence": "Canonical rows call revolved_solid (nozzle bands, thrust cone, skirt); S6 landed per PY_BRIDGE_COMPAT_SURFACE.md; executed by the runner (truck123d/compat/runner.rs run_canonical_rows)."
+    },
+    {
+      "id": "falcon_heavy/src/lib/merlin_common.py:tube",
+      "file": "corpus/ttc/trees/falcon_heavy/src/lib/merlin_common.py",
+      "line": 245,
+      "op": "sweep (tube -> bd.sweep over Edge.make_spline path + Circle section)",
+      "surface": "S6",
+      "classification": "runs-today",
+      "evidence": "tube() feeds feed_assembly/harness/exhaust canonical rows; bd.sweep at merlin_common.py:248 is on landed S6, executed under the door for canonical rows."
+    },
+    {
+      "id": "falcon_heavy/src/lib/merlin_common.py:profile_face",
+      "file": "corpus/ttc/trees/falcon_heavy/src/lib/merlin_common.py",
+      "line": 213,
+      "op": "Edge.make_spline / Edge.make_line / Wire / Face profile authoring",
+      "surface": "S5",
+      "classification": "runs-today",
+      "evidence": "Profile faces (Edge.make_spline :217, Edge.make_line :218, Face(Wire(edges)) :222) feed revolved shells in canonical rows; spline/topology authoring is landed S5/S4 per the compat doc."
+    },
+    {
+      "id": "falcon_heavy/src/lib/merlin_common.py:rotate",
+      "file": "corpus/ttc/trees/falcon_heavy/src/lib/merlin_common.py",
+      "line": 228,
+      "op": "rotate (part.rotate(Axis.Z, start_deg) after partial revolve)",
+      "surface": "S2",
+      "classification": "runs-today",
+      "evidence": "revolved_shell/revolved_solid rotate about Axis.Z to place arc start (merlin_common.py:228/241/402/446); placement frame algebra is S2 recorded-client-layer and runs on canonical rows."
+    },
+    {
+      "id": "falcon_heavy/src/lib/merlin_common.py:cylinder",
+      "file": "corpus/ttc/trees/falcon_heavy/src/lib/merlin_common.py",
+      "line": 252,
+      "op": "Cylinder primitive (_cyl_z)",
+      "surface": "S3",
+      "classification": "runs-today",
+      "evidence": "Canonical rows use _cyl_z -> bd.Cylinder(...).locate(...) at merlin_common.py:253; S3 primitives landed."
+    },
+    {
+      "id": "falcon_heavy/src/lib/merlin_common.py:torus",
+      "file": "corpus/ttc/trees/falcon_heavy/src/lib/merlin_common.py",
+      "line": 274,
+      "op": "Torus primitive (bellows_stack / volute / lip)",
+      "surface": "S3",
+      "classification": "runs-today",
+      "evidence": "bellows_stack -> bd.Torus(...).locate(...) at merlin_common.py:282, plus nozzle lip :345 and volutes :523-529 on canonical rows; S3 landed."
+    },
+    {
+      "id": "falcon_heavy/src/lib/merlin_common.py:sphere",
+      "file": "corpus/ttc/trees/falcon_heavy/src/lib/merlin_common.py",
+      "line": 494,
+      "op": "Sphere primitive",
+      "surface": "S3",
+      "classification": "runs-today",
+      "evidence": "Cap spheres at merlin_common.py:494, 542, 570, 693 on canonical thrust/turbopump/feed rows; S3 landed."
+    },
+    {
+      "id": "falcon_heavy/src/lib/merlin_common.py:box",
+      "file": "corpus/ttc/trees/falcon_heavy/src/lib/merlin_common.py",
+      "line": 451,
+      "op": "Box primitive",
+      "surface": "S3",
+      "classification": "runs-today",
+      "evidence": "bd.Box(...).locate(...) at merlin_common.py:451, 462-464, 480, 554 etc. on canonical gimbal/strut rows; S3 landed."
+    },
+    {
+      "id": "falcon_heavy/src/lib/merlin_common.py:extrude",
+      "file": "corpus/ttc/trees/falcon_heavy/src/lib/merlin_common.py",
+      "line": 444,
+      "op": "extrude (plate = bd.extrude(tri, both=True))",
+      "surface": "S6",
+      "classification": "runs-today",
+      "evidence": "Thrust-cone gussets extrude at merlin_common.py:444 in the canonical make_thrust_structure row; S6 landed."
+    },
+    {
+      "id": "falcon_heavy/src/lib/merlin_common.py:group_compound",
+      "file": "corpus/ttc/trees/falcon_heavy/src/lib/merlin_common.py",
+      "line": 136,
+      "op": "Compound group (_group -> bd.Compound(obj, children, label))",
+      "surface": "S3",
+      "classification": "runs-today",
+      "evidence": "Every canonical engine assembly is returned as a labelled Compound (_group :137); Compound/grouping maps to PB-006 assembly emission per PY_BRIDGE_COMPAT_SURFACE.md S3 note and runs under the door."
+    },
+    {
+      "id": "falcon_heavy/src/lib/merlin_common.py:label_color",
+      "file": "corpus/ttc/trees/falcon_heavy/src/lib/merlin_common.py",
+      "line": 129,
+      "op": "label + color assignment (_label: part.label, part.color)",
+      "surface": "S2",
+      "classification": "client-layer",
+      "evidence": "_label at merlin_common.py:129-133 assigns shape.label/:130 and shape.color/:132; these are name/color data rows (no kernel geometry), consistent with S2 recorded-client-layer treatment."
+    },
+    {
+      "id": "falcon_heavy/src/lib/falcon_common.py:_tube_z",
+      "file": "corpus/ttc/trees/falcon_heavy/src/lib/falcon_common.py",
+      "line": 76,
+      "op": "revolve-of-profile or Cylinder tube (_tube_z hollow->Face(Wire) revolve :82, solid->Cylinder.locate :85)",
+      "surface": "S6",
+      "classification": "runs-today",
+      "evidence": "Booster/centre-core shells are built through _tube_z on the canonical vehicle/booster path; revolve (S6) and Cylinder (S3) are landed."
+    },
+    {
+      "id": "falcon_heavy/src/lib/falcon_common.py:_dome",
+      "file": "corpus/ttc/trees/falcon_heavy/src/lib/falcon_common.py",
+      "line": 89,
+      "op": "revolve dome (_dome -> spline profile + bd.revolve Face(Wire))",
+      "surface": "S6",
+      "classification": "runs-today",
+      "evidence": "_dome at falcon_common.py:89-101 drives the tank domes in build_center_interior and sectioned tank rows; revolve with spline edge authoring is landed S6/S5."
+    },
+    {
+      "id": "falcon_heavy/src/lib/falcon_common.py:compound_from_instances",
+      "file": "corpus/ttc/trees/falcon_heavy/src/lib/falcon_common.py",
+      "line": 152,
+      "op": "assembly insertion (cadgen.compound_from_instances engine cluster)",
+      "surface": "S3",
+      "classification": "runs-today",
+      "evidence": "make_engine_cluster shares the Merlin prototype through cadgen.compound_from_instances (falcon_common.py:135,152); the harness door answers it as a plain build123d Compound of moved instances (corpus/ttc/door.py:61-69) on canonical rows, and PB-006 landed emit_step_assembly covers node names (truck123d/src/assembly_emit.rs:162)."
+    },
+    {
+      "id": "falcon_heavy/src/lib/falcon_common.py:make_mvac_revolve",
+      "file": "corpus/ttc/trees/falcon_heavy/src/lib/falcon_common.py",
+      "line": 174,
+      "op": "revolve revolved_shell for MVac nozzle/skirt",
+      "surface": "S6",
+      "classification": "runs-today",
+      "evidence": "make_mvac canonical row builds revolved_shell nozzle + niobium skirt (falcon_common.py:173-181); S6 landed."
+    },
+    {
+      "id": "falcon_heavy/src/lib/falcon_common.py:make_fairing_shell",
+      "file": "corpus/ttc/trees/falcon_heavy/src/lib/falcon_common.py",
+      "line": 354,
+      "op": "revolve revolved_shell fairing profile",
+      "surface": "S6",
+      "classification": "runs-today",
+      "evidence": "make_fairing canonical row shells the payload fairing via eng.revolved_shell(profile,...) (falcon_common.py:354-356); S6 landed."
+    },
+    {
+      "id": "falcon_heavy/src/lib/falcon_common.py:revolved_solid_barrel",
+      "file": "corpus/ttc/trees/falcon_heavy/src/lib/falcon_common.py",
+      "line": 202,
+      "op": "revolve arc (revolved_solid with arc/start for sectioned tank barrel)",
+      "surface": "S6",
+      "classification": "skip-listed",
+      "evidence": "The sectioned/centre-core barrel uses eng.revolved_solid(..., arc, start) (falcon_common.py:202-206) but only when sectioned=True; the manifest row falcon_heavy/cutaway carries reason booleans-on-swept-carriers (SKIPS.json:17)."
+    },
+    {
+      "id": "falcon_heavy/src/falcon_heavy.py:compound_vehicle",
+      "file": "corpus/ttc/trees/falcon_heavy/src/falcon_heavy.py",
+      "line": 19,
+      "op": "Compound of build_vehicle groups (top-level wrapper)",
+      "surface": "S3",
+      "classification": "runs-today",
+      "evidence": "The falcon_heavy.py wrapper composes fc.build_vehicle() into one Compound (falcon_heavy.py:19-20); it is the @step script entry, while the manifest's canonical falcon_heavy/vehicle row runs build_vehicle through lib.falcon_common."
+    },
+    {
+      "id": "falcon_heavy/src/falcon_heavy_cutaway.py:step_out",
+      "file": "corpus/ttc/trees/falcon_heavy/src/falcon_heavy_cutaway.py",
+      "line": 17,
+      "op": "STEP export via cadgen @step (out=falcon_heavy_cutaway.step)",
+      "surface": "none",
+      "classification": "skip-listed",
+      "evidence": "The cutaway wrapper @step targets a STEP file (falcon_heavy_cutaway.py:17); the underlying lib entry build_vehicle(cutaway=True) is the falcon_heavy/cutaway skip row whose reason is booleans-on-swept-carriers (SKIPS.json:17)."
+    },
+    {
+      "id": "falcon_heavy/src/falcon_heavy_exploded.py:moved_offset",
+      "file": "corpus/ttc/trees/falcon_heavy/src/falcon_heavy_exploded.py",
+      "line": 27,
+      "op": "placement explode (g.moved(bd.Location(OFFSETS.get(label))))",
+      "surface": "S2",
+      "classification": "client-layer",
+      "evidence": "Exploded composition translates groups by .moved(bd.Location(...)) keyed on label (falcon_heavy_exploded.py:27) and reassigns label/color (:28,:36-37); this is placement/name/color data over already-built solids, not enrolled on the manifest."
+    },
+    {
+      "id": "falcon_heavy/src/falcon_heavy_exploded.py:color",
+      "file": "corpus/ttc/trees/falcon_heavy/src/falcon_heavy_exploded.py",
+      "line": 37,
+      "op": "color assignment (rod.color = bd.Color(...))",
+      "surface": "none",
+      "classification": "client-layer",
+      "evidence": "Annotation guide rods carry an explicit bd.Color (falcon_heavy_exploded.py:37); per-solid color is render-client data with no kernel geometry (PY_BRIDGE_COMPAT_SURFACE.md S2 row)."
+    },
+    {
+      "id": "f1/src/lib/surfaces.py:cut",
+      "file": "corpus/ttc/trees/f1/src/lib/surfaces.py",
+      "line": 193,
+      "op": "boolean subtract + heal (surfaces.cut -> repair(target - tool))",
+      "surface": "S1",
+      "classification": "missing-kernel",
+      "evidence": "surfaces.cut performs target - tool over lofted/swept-carrier bodies (surfaces.py:193-195); compat S1 records sweep/swept-carrier booleans as deferred-bie resolved by BIE-006 (PY_BRIDGE_COMPAT_SURFACE.md S1, SKIPS.json reason booleans-on-swept-carriers), so no landed swept-pair boolean path is demonstrated from allowed reads."
+    },
+    {
+      "id": "f1/src/lib/surfaces.py:fuse_all",
+      "file": "corpus/ttc/trees/f1/src/lib/surfaces.py",
+      "line": 198,
+      "op": "boolean union + heal (surfaces.fuse_all -> out + repair(other))",
+      "surface": "S1",
+      "classification": "missing-kernel",
+      "evidence": "fuse_all unions swept-carrier bodies (surfaces.py:198-214); union of lofted carriers is deferred-bie/BIE-006 per S1 (SKIPS rows airbox, engine_cover, drivetrain etc.), absent a landed path in the compat record."
+    },
+    {
+      "id": "f1/src/lib/surfaces.py:repair",
+      "file": "corpus/ttc/trees/f1/src/lib/surfaces.py",
+      "line": 160,
+      "op": "OCC ShapeFix healing (repair -> ShapeFix_Shape on invalid bool result)",
+      "surface": "S1",
+      "classification": "missing-kernel",
+      "evidence": "repair() runs OCP.ShapeFix_Shape after booleans (surfaces.py:160-190); it only ever guards swept-carrier boolean output, so it inherits the deferred-bie swept boolean status rather than adding a landed kernel path."
+    },
+    {
+      "id": "f1/src/lib/surfaces.py:styled",
+      "file": "corpus/ttc/trees/f1/src/lib/surfaces.py",
+      "line": 52,
+      "op": "label + color assignment (styled -> shape.label/:57 shape.color/:58)",
+      "surface": "S2",
+      "classification": "client-layer",
+      "evidence": "styled sets label/color on every exported body (surfaces.py:52-59); name/color data only (no kernel geometry), matching S2 recorded-client-layer."
+    },
+    {
+      "id": "f1/src/lib/surfaces.py:mirror_y",
+      "file": "corpus/ttc/trees/f1/src/lib/surfaces.py",
+      "line": 70,
+      "op": "mirror (bd.mirror(shape, about=Plane.XZ))",
+      "surface": "S6",
+      "classification": "skip-listed",
+      "evidence": "mirror_y -> bd.mirror (surfaces.py:70-72) runs only inside F1 part builders that are staged-skip rows (rear_wing, wheels, etc.); the operation itself is on landed S6, but no enrolled canonical F1 row exercises it."
+    },
+    {
+      "id": "f1/src/lib/surfaces.py:airfoil_profile",
+      "file": "corpus/ttc/trees/f1/src/lib/surfaces.py",
+      "line": 381,
+      "op": "spline section authoring (airfoil_profile -> bd.Spline upper/lower + Line closing)",
+      "surface": "S5",
+      "classification": "skip-listed",
+      "evidence": "airfoil_profile authors periodic spline sections (surfaces.py:381-395) for lofted wings in skip-listed F1 rows; spline authoring is landed S5 but these rows are staged-skips on swept-carrier booleans."
+    },
+    {
+      "id": "f1/src/lib/surfaces.py:loft_solid",
+      "file": "corpus/ttc/trees/f1/src/lib/surfaces.py",
+      "line": 261,
+      "op": "loft (bd.loft smooth then ruled fallback)",
+      "surface": "S5",
+      "classification": "skip-listed",
+      "evidence": "loft_solid -> bd.loft (surfaces.py:261-307) is the F1 bodywork/airfoil loft; loft is landed S5/S6 but only exercised by F1 rows staged-skip for the swept-carrier booleans they apply afterwards."
+    },
+    {
+      "id": "f1/src/lib/surfaces.py:safe_fillet",
+      "file": "corpus/ttc/trees/f1/src/lib/surfaces.py",
+      "line": 98,
+      "op": "fillet (bd.fillet with ladder fallback)",
+      "surface": "S6",
+      "classification": "skip-listed",
+      "evidence": "safe_fillet -> bd.fillet (surfaces.py:98-118) used in rear_wing rows; fillet is landed S6 but exercised only inside skip-listed F1 rows."
+    },
+    {
+      "id": "f1/src/lib/surfaces.py:safe_chamfer",
+      "file": "corpus/ttc/trees/f1/src/lib/surfaces.py",
+      "line": 121,
+      "op": "chamfer (bd.chamfer with scale fallback)",
+      "surface": "S6",
+      "classification": "skip-listed",
+      "evidence": "safe_chamfer -> bd.chamfer (surfaces.py:121-138) used in F1 part rows that are staged-skips; chamfer is landed S6."
+    },
+    {
+      "id": "f1/src/lib/surfaces.py:accent_stripe_solid",
+      "file": "corpus/ttc/trees/f1/src/lib/surfaces.py",
+      "line": 705,
+      "op": "boolean intersect (base_solid & slab)",
+      "surface": "S1",
+      "classification": "missing-kernel",
+      "evidence": "accent_stripe_solid intersects a body with a thin canonical box slab (surfaces.py:705-711); when the base is a swept-carrier body this is a swept x canonical boolean -> deferred-bie/BIE-006 (S1), absent a landed path."
+    },
+    {
+      "id": "f1/src/lib/surfaces.py:body_loft",
+      "file": "corpus/ttc/trees/f1/src/lib/surfaces.py",
+      "line": 621,
+      "op": "loft over sculpted sections (body_loft -> loft_solid)",
+      "surface": "S5",
+      "classification": "skip-listed",
+      "evidence": "body_loft (surfaces.py:621-623) constructs F1 bodywork volumes consumed by engine_cover/floor/mono_tub skip rows; loft landed S5 but rows are staged-skips on downstream swept booleans."
+    },
+    {
+      "id": "f1/src/lib/surfaces.py:as_body_compound",
+      "file": "corpus/ttc/trees/f1/src/lib/surfaces.py",
+      "line": 34,
+      "op": "Compound wrap of boolean result list (as_body -> bd.Compound(children=parts))",
+      "surface": "S3",
+      "classification": "skip-listed",
+      "evidence": "as_body folds a cut result list into a Compound (surfaces.py:34-49); Compound grouping itself is landed (S3 / PB-006 assembly emission), but the helper is only exercised inside F1 part rows that are staged-skips on swept-carrier booleans."
+    },
+    {
+      "id": "f1/src/lib/engine_cover.py:fuse_cover",
+      "file": "corpus/ttc/trees/f1/src/lib/engine_cover.py",
+      "line": 177,
+      "op": "boolean union (_fuse -> out + e over lofted extras)",
+      "surface": "S1",
+      "classification": "missing-kernel",
+      "evidence": "_fuse unions lofted lobes/pods/collars (engine_cover.py:177-188); row f1/airbox and f1/engine_cover skip on reason booleans-on-swept-carriers (SKIPS.json:18,29), compat S1 deferred-bie."
+    },
+    {
+      "id": "f1/src/lib/engine_cover.py:cut_cover",
+      "file": "corpus/ttc/trees/f1/src/lib/engine_cover.py",
+      "line": 811,
+      "op": "boolean subtract (surfaces.cut outer/cavity then sill then envelope)",
+      "surface": "S1",
+      "classification": "missing-kernel",
+      "evidence": "_cover_shell subtracts cavity/sill/envelope from a lofted cover skin (engine_cover.py:811-813, repair(shell - list) :816); f1/engine_cover skip reason booleans-on-swept-carriers (SKIPS.json:29), S1 deferred-bie."
+    },
+    {
+      "id": "f1/src/lib/engine_cover.py:extrude",
+      "file": "corpus/ttc/trees/f1/src/lib/engine_cover.py",
+      "line": 476,
+      "op": "extrude (bd.extrude(bd.Plane.XZ * make_face(prof), both=True))",
+      "surface": "S6",
+      "classification": "skip-listed",
+      "evidence": "Extrusion of a spline profile into a sill tool (engine_cover.py:476) is landed S6, but it feeds the f1/engine_cover skip row's swept-carrier cut (SKIPS.json:29)."
+    },
+    {
+      "id": "f1/src/lib/engine_cover.py:build_airbox_fuse",
+      "file": "corpus/ttc/trees/f1/src/lib/engine_cover.py",
+      "line": 1133,
+      "op": "boolean union of lobe/pod/collar swept bodies (build_airbox)",
+      "surface": "S1",
+      "classification": "missing-kernel",
+      "evidence": "build_airbox (engine_cover.py:1133) fuses lobe/pod/collar swept carriers; SKIPS row f1/airbox reason booleans-on-swept-carriers (SKIPS.json:18), S1 deferred-bie."
+    },
+    {
+      "id": "f1/src/lib/rear_wing.py:cut_endplate",
+      "file": "corpus/ttc/trees/f1/src/lib/rear_wing.py",
+      "line": 401,
+      "op": "boolean subtract (surfaces.cut(ep, cutter) louvre trim)",
+      "surface": "S1",
+      "classification": "missing-kernel",
+      "evidence": "_endplate trims a lofted/rolled endplate with extruded airfoil cutters (rear_wing.py:390-405); rows f1/rear_wing, f1/drs_flap, f1/drs_actuator, f1/beam_wing skip on booleans-on-swept-carriers (SKIPS.json:19,27-28,33)."
+    },
+    {
+      "id": "f1/src/lib/rear_wing.py:fillet_select",
+      "file": "corpus/ttc/trees/f1/src/lib/rear_wing.py",
+      "line": 568,
+      "op": "selector + fillet (body.edges().filter_by(Axis.X) -> safe_fillet)",
+      "surface": "S7",
+      "classification": "skip-listed",
+      "evidence": "Pylon/endplate fillets select edges via .edges().filter_by(bd.Axis.X) (rear_wing.py:568, :885); the four-expression selector vocabulary is landed S7, but only exercised inside skip-listed rear_wing rows."
+    },
+    {
+      "id": "f1/src/lib/rear_wing.py:rotate_placement",
+      "file": "corpus/ttc/trees/f1/src/lib/rear_wing.py",
+      "line": 567,
+      "op": "placement composition (bd.Pos(...) * bd.Rotation(...) * bd.Box)",
+      "surface": "S2",
+      "classification": "client-layer",
+      "evidence": "DRS bodies are placed with Pos * Rotation * Box/Location composition (rear_wing.py:567, 695-700, 791-824); frame/placement data rows only per S2."
+    },
+    {
+      "id": "f1/src/lib/rear_wing.py:boolean_crank",
+      "file": "corpus/ttc/trees/f1/src/lib/rear_wing.py",
+      "line": 793,
+      "op": "boolean subtract (crank - cut for crank hub)",
+      "surface": "S1",
+      "classification": "missing-kernel",
+      "evidence": "DRS bellcrank/crank bodies bore against spline lofted carriers (rear_wing.py:793, ring = outer - bore :824); exercised only in skip-listed rear_wing rows, S1 deferred-bie."
+    },
+    {
+      "id": "f1/src/lib/wheels.py:revolve_tyre",
+      "file": "corpus/ttc/trees/f1/src/lib/wheels.py",
+      "line": 91,
+      "op": "revolve (bd.revolve(profile_plane * make_face(wire), Axis.Y, arc))",
+      "surface": "S6",
+      "classification": "skip-listed",
+      "evidence": "Tyre/rim profiles revolve about Axis.Y (wheels.py:78-91) into revolved carriers; rows f1/corner_* skip on booleans-on-swept-carriers because the carriers are then cut (SKIPS.json:20-23)."
+    },
+    {
+      "id": "f1/src/lib/wheels.py:_cut",
+      "file": "corpus/ttc/trees/f1/src/lib/wheels.py",
+      "line": 170,
+      "op": "boolean subtract (_cut -> repair(base - list(tools)))",
+      "surface": "S1",
+      "classification": "missing-kernel",
+      "evidence": "_cut clears rim/tyre/brake volumes out of revolved carriers (wheels.py:170-193, base - list(tools) :181); f1/corner_* skip rows carry booleans-on-swept-carriers (SKIPS.json:20-23)."
+    },
+    {
+      "id": "f1/src/lib/wheels.py:_loft",
+      "file": "corpus/ttc/trees/f1/src/lib/wheels.py",
+      "line": 196,
+      "op": "loft (bd.loft of spline superellipse sections)",
+      "surface": "S5",
+      "classification": "skip-listed",
+      "evidence": "_loft/_lofted loft cover/carrier sections (wheels.py:196-236); loft is landed S5 but rows are staged-skips on downstream booleans."
+    },
+    {
+      "id": "f1/src/lib/suspension.py:_fuse",
+      "file": "corpus/ttc/trees/f1/src/lib/suspension.py",
+      "line": 89,
+      "op": "boolean union (_fuse -> out + q with nudge retry)",
+      "surface": "S1",
+      "classification": "missing-kernel",
+      "evidence": "_fuse unions lofted plates/blades with a micron-nudge retry (suspension.py:89-119); suspension skip rows (f1/suspension_front, suspension_rear) carry booleans-on-swept-carriers (SKIPS.json:35-36)."
+    },
+    {
+      "id": "f1/src/lib/suspension.py:_cut",
+      "file": "corpus/ttc/trees/f1/src/lib/suspension.py",
+      "line": 122,
+      "op": "boolean subtract (_cut -> base - t bore clearances)",
+      "surface": "S1",
+      "classification": "missing-kernel",
+      "evidence": "_cut bores rod-end/eye clearances out of lofted blade carriers (suspension.py:122-143, base - t :129/:135); f1/track_rod_*, steering_rack, suspension_* skip rows carry the reason (SKIPS.json:34,37-38)."
+    },
+    {
+      "id": "f1/src/lib/suspension.py:loft_face",
+      "file": "corpus/ttc/trees/f1/src/lib/suspension.py",
+      "line": 156,
+      "op": "spline section -> make_face + extrude (_face/_plate)",
+      "surface": "S5",
+      "classification": "skip-listed",
+      "evidence": "Blade/wishbone sections author spline faces then extrude (suspension.py:156-163); spline/extrude landed S5/S6 but only used in skip-listed suspension rows."
+    },
+    {
+      "id": "f1/src/lib/details.py:cut_mirror",
+      "file": "corpus/ttc/trees/f1/src/lib/details.py",
+      "line": 330,
+      "op": "boolean subtract (surfaces.cut on lofted mirror shells)",
+      "surface": "S1",
+      "classification": "missing-kernel",
+      "evidence": "Mirror/tyre-sensor bodies shell with body_loft then cut (details.py:327-335, 359-370, 483-486, 521-541); f1/details skip row reason booleans-on-swept-carriers (SKIPS.json:24)."
+    },
+    {
+      "id": "f1/src/lib/details.py:fuse_pod",
+      "file": "corpus/ttc/trees/f1/src/lib/details.py",
+      "line": 348,
+      "op": "boolean union (fuse_all of lofted stalk/shell)",
+      "surface": "S1",
+      "classification": "missing-kernel",
+      "evidence": "mirror housing fuses lofted stalks via fuse_all (details.py:348, 418, 568-572); f1/details skip row reason booleans-on-swept-carriers (SKIPS.json:24)."
+    },
+    {
+      "id": "f1/src/lib/floor.py:cut_floor",
+      "file": "corpus/ttc/trees/f1/src/lib/floor.py",
+      "line": 696,
+      "op": "boolean subtract (surfaces.cut(solid, Pos * Cylinder) through lofted floor)",
+      "surface": "S1",
+      "classification": "missing-kernel",
+      "evidence": "floor/plank bores cut canonical cylinders through a lofted floor shell (floor.py:696); f1/floor and f1/diffuser skip rows carry booleans-on-swept-carriers (SKIPS.json:25,30)."
+    },
+    {
+      "id": "f1/src/lib/floor.py:loft_stack",
+      "file": "corpus/ttc/trees/f1/src/lib/floor.py",
+      "line": 511,
+      "op": "loft stack (_loft_stack over spline section faces)",
+      "surface": "S5",
+      "classification": "skip-listed",
+      "evidence": "Floor/diffuser/vanes loft over spline section faces (floor.py:511-562); loft landed S5 but exercised in skip-listed floor/diffuser rows."
+    },
+    {
+      "id": "f1/src/lib/drivetrain.py:_fuse",
+      "file": "corpus/ttc/trees/f1/src/lib/drivetrain.py",
+      "line": 359,
+      "op": "boolean union (_fuse -> out + q via .fuse)",
+      "surface": "S1",
+      "classification": "missing-kernel",
+      "evidence": "casing/gear/strut bodies fuse lofted/revolved parts (drivetrain.py:359-382, ps[0].fuse :374, alt.fuse :378); f1/drivetrain skip row reason booleans-on-swept-carriers (SKIPS.json:26)."
+    },
+    {
+      "id": "f1/src/lib/drivetrain.py:_cut",
+      "file": "corpus/ttc/trees/f1/src/lib/drivetrain.py",
+      "line": 384,
+      "op": "boolean subtract (_cut -> body.cut(*ts))",
+      "surface": "S1",
+      "classification": "missing-kernel",
+      "evidence": "body.cut over lofted casing (drivetrain.py:384-390, body.cut(*ts) :388); f1/drivetrain skip row reason booleans-on-swept-carriers (SKIPS.json:26)."
+    },
+    {
+      "id": "f1/src/lib/drivetrain.py:intersect",
+      "file": "corpus/ttc/trees/f1/src/lib/drivetrain.py",
+      "line": 634,
+      "op": "boolean intersect (grown.intersect(_rbox(...)))",
+      "surface": "S1",
+      "classification": "missing-kernel",
+      "evidence": "casing outer intersect with a canonical rbox (drivetrain.py:634) - swept x canonical boolean; f1/drivetrain skip reason booleans-on-swept-carriers (SKIPS.json:26)."
+    },
+    {
+      "id": "f1/src/lib/drivetrain.py:compound_solids",
+      "file": "corpus/ttc/trees/f1/src/lib/drivetrain.py",
+      "line": 343,
+      "op": "Compound wrap (bd.Compound(children=solids))",
+      "surface": "S3",
+      "classification": "skip-listed",
+      "evidence": "Gear clusters are wrapped as Compound of solids (drivetrain.py:343); grouping is assembly emission (PB-006), exercised only inside skip-listed drivetrain rows."
+    },
+    {
+      "id": "f1/src/lib/mono_tub.py:cut_tub",
+      "file": "corpus/ttc/trees/f1/src/lib/mono_tub.py",
+      "line": 529,
+      "op": "boolean subtract (surfaces.cut(skin, _cavity()))",
+      "surface": "S1",
+      "classification": "missing-kernel",
+      "evidence": "monocoque tub = lofted skin cut by a lofted cavity (mono_tub.py:515-531); f1/monocoque skip row reason booleans-on-swept-carriers (SKIPS.json:31)."
+    },
+    {
+      "id": "f1/src/lib/mono_tub.py:fuse_proud",
+      "file": "corpus/ttc/trees/f1/src/lib/mono_tub.py",
+      "line": 696,
+      "op": "boolean union (_fuse_proud -> shell.fuse(*tools))",
+      "surface": "S1",
+      "classification": "missing-kernel",
+      "evidence": "Proud bosses fuse onto the lofted tub shell via shell.fuse(*tools) (mono_tub.py:696-723); f1/monocoque skip row reason booleans-on-swept-carriers (SKIPS.json:31)."
+    },
+    {
+      "id": "f1/src/lib/mono_tub.py:loft_half_section",
+      "file": "corpus/ttc/trees/f1/src/lib/mono_tub.py",
+      "line": 175,
+      "op": "spline half-section -> body_loft (survival cell skin)",
+      "surface": "S5",
+      "classification": "skip-listed",
+      "evidence": "Tub stations author spline half-sections lofted into the skin (mono_tub.py:175-529); loft/spline landed S5 but row is staged-skip for the cavity cut."
+    },
+    {
+      "id": "f1/src/lib/power_unit.py:fuse_pu",
+      "file": "corpus/ttc/trees/f1/src/lib/power_unit.py",
+      "line": 176,
+      "op": "boolean union (_fuse -> out + e)",
+      "surface": "S1",
+      "classification": "missing-kernel",
+      "evidence": "Engine block/heads/plenum fuse lofted tube/bank bodies (power_unit.py:176-188, out + e :182, _fuse callers :361/:396/:516/:532/:562/:654/:765); f1/power_unit skip row reason booleans-on-swept-carriers (SKIPS.json:32)."
+    },
+    {
+      "id": "f1/src/lib/power_unit.py:loft_tube",
+      "file": "corpus/ttc/trees/f1/src/lib/power_unit.py",
+      "line": 135,
+      "op": "loft frames over spline ring sections (_tube -> body_loft of make_face(Spline))",
+      "surface": "S5",
+      "classification": "skip-listed",
+      "evidence": "Turbo/exhaust/battery tubes loft spline ring frames (power_unit.py:135-147, :142/:199/:224); loft landed S5 but exercised in skip-listed power_unit rows."
+    },
+    {
+      "id": "f1/src/lib/mono_halo.py:loft_loop",
+      "file": "corpus/ttc/trees/f1/src/lib/mono_halo.py",
+      "line": 98,
+      "op": "loft closed loop (loft_solid of airfoil sections)",
+      "surface": "S5",
+      "classification": "skip-listed",
+      "evidence": "Halo loop lofts 27 spline airfoil sections (mono_halo.py:98-104); loft/spline landed S5, row f1/monocoque staged-skip on the tub boolean downstream."
+    },
+    {
+      "id": "f1/src/lib/mono_halo.py:stud_placement",
+      "file": "corpus/ttc/trees/f1/src/lib/mono_halo.py",
+      "line": 147,
+      "op": "placement + mirror (Pos * Cylinder studs then surfaces.pair/mirror_y)",
+      "surface": "S2",
+      "classification": "client-layer",
+      "evidence": "Mount studs are placed via bd.Pos(p) * bd.Cylinder (mono_halo.py:147-152) and mirrored by surfaces.pair; placement/name/color data rows only."
+    },
+    {
+      "id": "f1/src/lib/monocoque.py:group",
+      "file": "corpus/ttc/trees/f1/src/lib/monocoque.py",
+      "line": 20,
+      "op": "assembly group (surfaces.group('monocoque', mono_tub.build_tub_bodies()))",
+      "surface": "S3",
+      "classification": "skip-listed",
+      "evidence": "build_monocoque wraps tub+halo bodies in a labelled Compound group (monocoque.py:20-22); the entry is the f1/monocoque skip row (MANIFEST.json:36) on booleans-on-swept-carriers."
+    },
+    {
+      "id": "f1/src/lib/cockpit.py:plane_offset",
+      "file": "corpus/ttc/trees/f1/src/lib/cockpit.py",
+      "line": 129,
+      "op": "plane offset frame algebra (plane.offset(o) * Circle section rings)",
+      "surface": "S2",
+      "classification": "client-layer",
+      "evidence": "Cockpit sections offset working planes and build ruled ring stacks (cockpit.py:127-137, :705-717); every .offset hit is a Plane.offset frame move, which is S2 recorded-client-layer (PY_BRIDGE_COMPAT_SURFACE.md S2 note), and cockpit is not an enrolled manifest row."
+    },
+    {
+      "id": "f1/src/lib/cockpit.py:ruled_loft",
+      "file": "corpus/ttc/trees/f1/src/lib/cockpit.py",
+      "line": 101,
+      "op": "ruled loft (_ruled/_solid over ring sections)",
+      "surface": "S5",
+      "classification": "skip-listed",
+      "evidence": "Cockpit surfaces are ruled lofts over circle/spline sections (cockpit.py:54-137); loft landed S5, and the cockpit tree is not enrolled on the manifest (MANIFEST.json note)."
+    },
+    {
+      "id": "f1/src/lib/spec.py:color_palette",
+      "file": "corpus/ttc/trees/f1/src/lib/spec.py",
+      "line": 344,
+      "op": "color/name constants (plain RGB(A) tuples for Shape.color)",
+      "surface": "S2",
+      "classification": "client-layer",
+      "evidence": "spec.py holds the F1 colour palette as plain tuples consumed by Shape.color setters (spec.py:344-346); colour/name data only, no kernel geometry."
+    },
+    {
+      "id": "f1/src/lib/front_wing.py:loft_cascade",
+      "file": "corpus/ttc/trees/f1/src/lib/front_wing.py",
+      "line": 693,
+      "op": "loft wing elements over spline airfoils (build_front_wing)",
+      "surface": "S5",
+      "classification": "skip-listed",
+      "evidence": "front_wing builds lofted cascade elements (front_wing.py:693); boolean-free but not enrolled (MANIFEST note), so its loft/landed-S5 ops are not exercised by any canonical row."
+    },
+    {
+      "id": "f1/src/lib/nose.py:loft_nose",
+      "file": "corpus/ttc/trees/f1/src/lib/nose.py",
+      "line": 675,
+      "op": "loft body (build_nose over spline sections + placements)",
+      "surface": "S5",
+      "classification": "skip-listed",
+      "evidence": "nose is a lofted spline body with canonical accent/stripe placements (nose.py:675); not enrolled (MANIFEST note), no canonical row exercises it."
+    },
+    {
+      "id": "f1/src/lib/sidepods.py:loft_skin",
+      "file": "corpus/ttc/trees/f1/src/lib/sidepods.py",
+      "line": 531,
+      "op": "loft sidepod skin over spline outlines",
+      "surface": "S5",
+      "classification": "skip-listed",
+      "evidence": "sidepods shell lofts spline outlines (sidepods.py:531-748); not enrolled (MANIFEST note) so its landed S5 ops are unexercised by canonical rows."
+    },
+    {
+      "id": "f1/src/f1.py:assembly_add",
+      "file": "corpus/ttc/trees/f1/src/f1.py",
+      "line": 78,
+      "op": "assembly insertion (cadgen AssemblyHelper.add per part + asm.build())",
+      "surface": "S3",
+      "classification": "client-layer",
+      "evidence": "f1.py composes the whole car via cadgen.assembly.AssemblyHelper.add in frozen occurrence order (f1.py:78-107) and exports through cadgen @step (:115); cadgen daemon/store is never reimplemented (PY_BRIDGE_COMPAT_SURFACE.md boundary note) and f1.py is not an enrolled manifest row, so the composition is client/assembly-layer data."
+    },
+    {
+      "id": "f1/src/f1.py:step_out",
+      "file": "corpus/ttc/trees/f1/src/f1.py",
+      "line": 115,
+      "op": "STEP export via cadgen @step(out=../STEP/f1.step)",
+      "surface": "none",
+      "classification": "client-layer",
+      "evidence": "The whole-car entry is a cadgen @step writing STEP (f1.py:115-117); cadgen's STEP store is a documented non-reimplementation boundary (PY_BRIDGE_COMPAT_SURFACE.md:102-110) and the composition is not enrolled."
+    },
+    {
+      "id": "f1/src/airbox.py:dispatch",
+      "file": "corpus/ttc/trees/f1/src/airbox.py",
+      "line": 13,
+      "op": "cadgen @step dispatch to engine_cover_lib.build_airbox()",
+      "surface": "none",
+      "classification": "skip-listed",
+      "evidence": "Each f1 part file is a @step wrapper over the lib build entry (airbox.py:13-20); the wrapped entry is the skip-listed manifest row f1/airbox (SKIPS.json:18), and cadgen @step store is not reimplemented."
+    },
+    {
+      "id": "f1/src/corner_fl.py:dispatch",
+      "file": "corpus/ttc/trees/f1/src/corner_fl.py",
+      "line": 16,
+      "op": "cadgen @step dispatch to lib.wheels build_corner('fl')",
+      "surface": "none",
+      "classification": "skip-listed",
+      "evidence": "corner_fl wrapper (corner_fl.py:13-20) dispatches to build_corner('fl'); manifest row f1/corner_fl carries booleans-on-swept-carriers (SKIPS.json:20)."
+    },
+    {
+      "id": "f1/src/monocoque.py:dispatch",
+      "file": "corpus/ttc/trees/f1/src/monocoque.py",
+      "line": 16,
+      "op": "cadgen @step dispatch to lib.monocoque build_monocoque",
+      "surface": "none",
+      "classification": "skip-listed",
+      "evidence": "monocoque part wrapper dispatches to lib build (monocoque.py:13-20); manifest row f1/monocoque carries booleans-on-swept-carriers (SKIPS.json:31)."
+    },
+    {
+      "id": "f1/src/lib/surfaces.py:selector_census",
+      "file": "corpus/ttc/trees/f1/src/lib/surfaces.py",
+      "line": 141,
+      "op": "shape.is_valid / volume checks (is_valid_shape -> OCP BRepCheck)",
+      "surface": "S7",
+      "classification": "client-layer",
+      "evidence": "is_valid_shape calls OCC's BRepCheck_Analyzer and volume sign (surfaces.py:141-157); corpus-side validity checks are client-layer inspection, no kernel geometry op in the bridge surface."
+    },
+    {
+      "id": "f1/src/lib/cockpit.py:circle_section",
+      "file": "corpus/ttc/trees/f1/src/lib/cockpit.py",
+      "line": 129,
+      "op": "bd.Circle section authoring for ruled stacks",
+      "surface": "none",
+      "classification": "missing-facade",
+      "evidence": "cockpit ring stacks author bare bd.Circle sections (cockpit.py:129, merlin tube :247); a closed-circle profile carrier has no named compat/facade op row in PY_BRIDGE_COMPAT_SURFACE.md (S5 names Spline authoring only), so the circle-carrier authoring form is unlisted."
+    },
+    {
+      "id": "falcon_heavy/src/lib/falcon_common.py:_lab",
+      "file": "corpus/ttc/trees/falcon_heavy/src/lib/falcon_common.py",
+      "line": 65,
+      "op": "label + color assignment (_lab -> part.label/:66 part.color/:68)",
+      "surface": "S2",
+      "classification": "client-layer",
+      "evidence": "_lab sets part.label and part.color on falcon bodies (falcon_common.py:65-69); name/color data rows, no kernel geometry."
+    },
+    {
+      "id": "falcon_heavy/src/lib/falcon_common.py:label_tank",
+      "file": "corpus/ttc/trees/falcon_heavy/src/lib/falcon_common.py",
+      "line": 207,
+      "op": "label assignment post-move (s[-1].label = ...)",
+      "surface": "S2",
+      "classification": "client-layer",
+      "evidence": "Sectioned tank/interstage shells re-label after .moved (falcon_common.py:207, :282, :301, :327); name data only."
+    },
+    {
+      "id": "falcon_heavy/src/falcon_heavy.py:label_vehicle",
+      "file": "corpus/ttc/trees/falcon_heavy/src/falcon_heavy.py",
+      "line": 20,
+      "op": "Compound label (label='falcon_heavy__educational...')",
+      "surface": "S2",
+      "classification": "client-layer",
+      "evidence": "Top-level Compound carries an assembly display label (falcon_heavy.py:20); render/name data, no kernel geometry."
+    },
+    {
+      "id": "f1/src/lib/wheels.py:colour_tyre",
+      "file": "corpus/ttc/trees/f1/src/lib/wheels.py",
+      "line": 925,
+      "op": "per-part color tuple via styled (tread/carcass/rim/cover...)",
+      "surface": "S2",
+      "classification": "client-layer",
+      "evidence": "_left_corner returns (shape, label, colour) triples consumed by styled (:967-971) and grouped; per-solid colours/names are client-layer render data (PY_BRIDGE_COMPAT_SURFACE.md S2)."
+    },
+    {
+      "id": "f1/src/lib/floor.py:rotated_plane",
+      "file": "corpus/ttc/trees/f1/src/lib/floor.py",
+      "line": 580,
+      "op": "plane frame rotate (plane.rotated((0,0,-yaw_deg)))",
+      "surface": "S2",
+      "classification": "client-layer",
+      "evidence": "Vane/station planes rotate their frames (floor.py:580); Plane/Location frame algebra is S2 recorded-client-layer."
+    },
+    {
+      "id": "f1/src/lib/surfaces.py:section_plane",
+      "file": "corpus/ttc/trees/f1/src/lib/surfaces.py",
+      "line": 398,
+      "op": "Plane authoring from direction vectors (section_plane/plate_plane)",
+      "surface": "S2",
+      "classification": "client-layer",
+      "evidence": "Section planes are built explicitly from x_dir/z_dir vectors (surfaces.py:398-423, :694-702); frame construction is S2 client-layer data, deliberately avoiding Plane.rotated world-axis semantics."
+    },
+    {
+      "id": "f1/src/lib/engine_cover.py:louvres_cut",
+      "file": "corpus/ttc/trees/f1/src/lib/engine_cover.py",
+      "line": 782,
+      "op": "boolean subtract of louvre slots (surfaces.cut(band, tool))",
+      "surface": "S1",
+      "classification": "missing-kernel",
+      "evidence": "Cover band louvres cut the lofted band (engine_cover.py:782); same deferred-bie swept boolean class as f1/engine_cover (SKIPS.json:29)."
+    },
+    {
+      "id": "f1/src/lib/details.py:dzus_cut",
+      "file": "corpus/ttc/trees/f1/src/lib/details.py",
+      "line": 483,
+      "op": "boolean subtract pocket (dish = surfaces.cut(outer, pocket))",
+      "surface": "S1",
+      "classification": "missing-kernel",
+      "evidence": "Dzus/bezel/pitot recesses cut lofted carriers (details.py:479-486, :521-541); f1/details skip reason booleans-on-swept-carriers (SKIPS.json:24)."
+    },
+    {
+      "id": "f1/src/lib/sidepods.py:cavity_solid",
+      "file": "corpus/ttc/trees/f1/src/lib/sidepods.py",
+      "line": 728,
+      "op": "loft cavity/duct solids over spline outlines",
+      "surface": "S5",
+      "classification": "skip-listed",
+      "evidence": "sidepod skin/duct/louvre geometry lofts spline outlines (sidepods.py:531-748); not enrolled (MANIFEST note), no canonical row exercises the ops."
+    },
+    {
+      "id": "f1/src/lib/drivetrain.py:clevis_bore",
+      "file": "corpus/ttc/trees/f1/src/lib/drivetrain.py",
+      "line": 750,
+      "op": "boolean subtract of disc bores (disc - _cyl)",
+      "surface": "S1",
+      "classification": "missing-kernel",
+      "evidence": "Gear/disc bores subtract canonical cylinders from canonical-cylinder-derived discs (drivetrain.py:750, :787-788, ring - _cyl :753, plate - outer :692/:1126); where both operands are canonical primitives this is canonical x canonical (landed S1), but the f1/drivetrain row overall is skip-listed because other members fuse lofted carriers (SKIPS.json:26)."
+    },
+    {
+      "id": "f1/src/lib/drivetrain.py:gearbox_cut",
+      "file": "corpus/ttc/trees/f1/src/lib/drivetrain.py",
+      "line": 1205,
+      "op": "boolean subtract casing (slab + boss - outer)",
+      "surface": "S1",
+      "classification": "missing-kernel",
+      "evidence": "gearbox/hydraulic outer casings subtract from lofted ribbed bodies (drivetrain.py:1205, :1237); swept-carrier boolean, f1/drivetrain skip row reason (SKIPS.json:26)."
+    },
+    {
+      "id": "f1/src/lib/floor.py:diffuser_loft",
+      "file": "corpus/ttc/trees/f1/src/lib/floor.py",
+      "line": 801,
+      "op": "loft diffuser shell (_diffuser_shell -> _loft_stack)",
+      "surface": "S5",
+      "classification": "skip-listed",
+      "evidence": "Diffuser/strakes loft spline sections (floor.py:801-882); f1/diffuser skip row reason booleans-on-swept-carriers (SKIPS.json:25)."
+    },
+    {
+      "id": "f1/src/lib/cockpit.py:build_cockpit",
+      "file": "corpus/ttc/trees/f1/src/lib/cockpit.py",
+      "line": 1006,
+      "op": "assembly group of cockpit bodies (build_cockpit)",
+      "surface": "S3",
+      "classification": "client-layer",
+      "evidence": "build_cockpit groups seat/steering/pedal bodies (cockpit.py:1006); cockpit tree is not enrolled on the manifest (MANIFEST note), composition is client-layer grouping."
+    },
+    {
+      "id": "f1/src/lib/front_wing.py:accent_stripe",
+      "file": "corpus/ttc/trees/f1/src/lib/front_wing.py",
+      "line": 206,
+      "op": "accent stripe intersect via surfaces.accent_stripe_solid",
+      "surface": "S1",
+      "classification": "missing-kernel",
+      "evidence": "TE accent stripes intersect lofted elements with slab boxes (front_wing.py:206, surfaces.accent_stripe_solid :705-711); swept x canonical intersect deferred-bie, and front_wing is not enrolled."
+    },
+    {
+      "id": "falcon_heavy/src/falcon_heavy_exploded.py:guide_cyl",
+      "file": "corpus/ttc/trees/falcon_heavy/src/falcon_heavy_exploded.py",
+      "line": 35,
+      "op": "Cylinder primitive for annotation guides",
+      "surface": "S3",
+      "classification": "client-layer",
+      "evidence": "Explode guides are annotation cylinders with label/color (falcon_heavy_exploded.py:35-38); primitives landed but the exploded composition is not enrolled, annotation bodies are render client data."
+    },
+    {
+      "id": "f1/src/lib/rear_wing.py:pylon_cut",
+      "file": "corpus/ttc/trees/f1/src/lib/rear_wing.py",
+      "line": 793,
+      "op": "boolean subtract in DRS crank/link rod bores",
+      "surface": "S1",
+      "classification": "missing-kernel",
+      "evidence": "Crank/link bores subtract canonical cylinders from canonical/located bodies (rear_wing.py:791-824) - where both are canonical this form is landed S1, but the enclosing f1 rows (rear_wing/drs_*) are skip-listed because the mainplane/endplate members fuse swept carriers (SKIPS.json:27-28,33)."
+    }
+  ],
+  "summary": {
+    "q1_skip_lift_readiness": {
+      "premise": "SKIPS.json carries 22 rows under reason booleans-on-swept-carriers (resolved_by: BIE-006); 21 are F1 part rows and 1 is falcon_heavy/cutaway.",
+      "boolean_forms_needed": {
+        "falcon_heavy/cutaway": "build_vehicle(cutaway=True) sectioning is implemented in the vendored python as partial-arc revolves (revolved_solid/revolved_shell with arc=CUT_ARC/start=CUT_START at falcon_common.py:202-206, :277-282, merlin CUT_INNER_ARC arcs) plus schematic interiors - no shape boolean subtract/fuse/intersect appears in the falcon tree (grep of falcon src for boolean operators returns only scalar arithmetic). The SKIPS note's 'boolean sectioning of swept-carrier bodies' therefore mis-describes the code path: the op that would need to run is a revolve over a partial revolution_arc of a spline-carrier profile.",
+      "falcon_heavy_cutaway_classification": "skip-listed (carried SKIPS.json:17); the recorded reason appears to mis-describe a partial-arc revolve; whether partial-arc revolve over spline profiles is landed would need the kernel facade record, which is outside read_allow.",
+        "f1_rows": {
+          "airbox": "fuse lobe/pod/collar swept bodies (_fuse engine_cover.py:177-188) -> swept x swept union",
+          "beam_wing": "beam/endplate builders cut/trim swept airfoil shells (surfaces.cut rear_wing.py:401) -> swept x canonical + swept x swept",
+          "corner_fl/fr/rl/rr": "cut rim/tyre clearances out of revolved carriers (_cut wheels.py:170-193) -> revolved-carrier x canonical",
+          "details": "shell/cut mirror + tyre-sensor bodies (details.py:330-541) -> loft x loft",
+          "diffuser": "cut floor-edge bead out of swept diffuser shell (floor.py:696) -> loft x canonical",
+          "drivetrain": "fuse casing/strut/gear + intersect rbox (drivetrain.py:374-388, :634) -> loft x loft + loft x canonical",
+          "drs_actuator": "cut/bore DRS housing out of lofted endplate carriers (rear_wing.py) -> loft x canonical",
+          "drs_flap": "trim flap element vs endplate (surfaces.cut rear_wing.py:401) -> loft x loft",
+          "engine_cover": "cut sill/aperture cavities out of swept body (engine_cover.py:811-816) -> loft x loft",
+          "floor": "cut edge-rail beads out of swept floor shell (floor.py:696) -> loft x canonical",
+          "monocoque": "surfaces.cut(skin, _cavity()) + fuse proud bosses (mono_tub.py:529, :715) -> loft x loft + loft x canonical",
+          "power_unit": "fuse head/cover/bank lofted bodies (power_unit.py:176-188) -> loft x loft",
+          "rear_wing": "trim mainplane/endplate with cutters (rear_wing.py:401) -> loft x loft/canonical",
+          "steering_rack": "bore + fuse blade/rod carriers (suspension.py:89-143) -> loft x canonical",
+          "suspension_front": "cut rod-end bores + fuse wishbone carriers (suspension.py:89-143) -> loft x canonical",
+          "suspension_rear": "same as suspension_front",
+          "track_rod_left/right": "bore rod eyes (suspension.py:122-143) -> loft x canonical"
+        }
+      },
+      "verdict_per_row": "Every one of the 21 F1 skip rows requires at least one boolean whose carrier pair is swept-carrier x swept-carrier or swept-carrier x canonical (revolved/lofted/spline carriers). PY_BRIDGE_COMPAT_SURFACE.md S1 (line 51) records canonical x canonical as landed and sweep x canonical / sweep x sweep as deferred-bie resolved by BIE-006; SKIPS.json's reason rows still resolve to BIE-006 (not yet removed), and no landed swept-pair boolean symbol path is demonstrable from the allowed reads (the kernel boolean_op/SSI4/CL-004 machinery lives under vendor/truck, outside read_allow). Therefore none of the 21 is classified lift-candidate on this evidence; each is classified missing-kernel naming the absent landed swept-carrier boolean path. The canonical-x-canonical-only booleans that DO have a landed S1 path (e.g. drivetrain gear/disc bores drivetrain.py:750-753) do not by themselves unskip any row because every enclosing row also fuses/cuts swept carriers."
+    },
+    "q2_render_parity_payload": {
+      "landed_assembly_emit_pb006": "truck123d/src/assembly_emit.rs emit_step_assembly (lines 162-280) emits one STEP PRODUCT per named part (AssemblyPart.name -> product name, SolidHandle.id -> product id) with contact intents as typed data; node order = insertion order.",
+      "booked_pb009_glb": "GLB emission is booked (loop commit d771c95 arms PB-009-GLB-EMIT); no GLB emitter exists in truck123d/src or compat (grep of truck123d/src for glb returns nothing).",
+      "corpus_color_name_usage": "Both trees assign per-solid colors via Shape.color (plain tuples in spec.py:344+, falcon palettes merlin_common.py:99-126 / falcon_common.py:46-52) and labels via Shape.label everywhere (falcon _label/_lab, f1 styled/group/pair), and f1.step.js pins occurrences as #o1.N in the frozen order listed at f1.py:20-33.",
+      "covered_by_pb006": "assembly node names (part/product names) and intended-contact data; insertion order is preserved.",
+      "not_captured_by_either": "(1) per-solid color: PB-006's AssemblyPart/SolidHandle carry no color field (assembly_emit.rs:87-103) and facade.rs has no color op; (2) f1.py's whole-car AssemblyHelper composition and its #o1.N occurrence/kinematic table are cadgen-store client data never reimplemented (PY_BRIDGE_COMPAT_SURFACE.md:102-110); (3) the appearance/stage JSON (f1_stage.appearance.json) is a look-side render stage, not captured by PB-006 or the corpus rows; (4) per-solid transforms are baked into geometry by corpus placements, so a GLB emitter (PB-009) would need to inherit them from the solid meshes rather than from an assembly graph edge."
+    },
+    "q3_hypercar": {
+      "absent": true,
+      "evidence": "corpus/ttc/trees contains exactly f1/ and falcon_heavy/ (A3=2); hypercar matches = 0 (A4=0). MANIFEST.json corpus field and PROVENANCE.md:19-26 name only the f1 and falcon_heavy trees.",
+      "vendoring_requirements_by_convention": "Inference from PROVENANCE.md:19-26, 39-55 and MANIFEST.json schema: (1) license header preserved byte-for-byte (MIT, 'Copyright (c) 2026 Thompson Labs LLC') in every vendored source file; (2) a corpus/ttc/PROVENANCE.md entry naming upstream repo path, commit sha c222e5da..., license; (3) MANIFEST.json row(s) with schema ttc_manifest.v1 - family, tree path, module, entry, args, stage (canonical or skipped) - each canonical row requiring a recorded reference/*.json fact file and each skipped row requiring a SKIPS.json reason row; (4) SKIPS.json predictions: a boolean-free part would be staged per door tractability; a part that boolean-composes swept carriers would carry reason booleans-on-swept-carriers resolved_by BIE-006. None of this exists for hypercar because the tree was never vendored."
+    },
+    "q4_identical_to_original_semantics": {
+      "method": "The corpus harness runs canonical rows under the genuine OCC build123d engine via corpus/ttc/door.py (PROVENANCE.md:30-37), i.e. the original repo's own engine, so canonical-row geometry facts are identical-by-construction; the survey compared our landed compat/facade paths (PY_BRIDGE_COMPAT_SURFACE.md, truck123d/src/facade.rs) against the corpus op vocabulary.",
+      "recorded_boundary_not_a_gap": "TR-NRB-001: STEP out of constructive/swept geometry is a typed kernel refusal (facade.rs:323-338 Refusal::UnsupportedEnvelope(NonCanonicalCarrier)); the compat doc and SKIPS.json reason step-out carry it (SKIPS.json:10-13); STL/GLB cover render, so it is a recorded boundary, not a parity gap.",
+      "observable_divergence_places": [
+        "Swept-carrier booleans (S1): the corpus's dominant verb (2780 binary algebra operators census upper bound, PY_BRIDGE_COMPAT_SURFACE.md:51) lands only for canonical x canonical on the compat surface; lofted/revolved/spline-carrier booleans are deferred-bie/BIE-006. Any row needing them is a staged skip - a parity gap (missing kernel path), not client-layer drift.",
+        "Partial-arc revolve for cutaway: falcon cutaway is coded as partial revolution_arc revolves; the SKIPS note calls it 'boolean sectioning'. If the bridge treats sectioned revolve arcs as constructive-carrier revolve they must land on S6; the reason text is a census-level mis-description to flag, and lift-readiness of falcon_heavy/cutaway depends on partial-arc revolve coverage, not boolean coverage.",
+        "cadgen daemon/store (f1.py, falcon_heavy_exploded, part wrappers' @step STEP-out): never reimplemented (PY_BRIDGE_COMPAT_SURFACE.md:102-110, PROVENANCE.md:51-55) - documented boundary.",
+        "Client-layer color/name/placement data (S2): treated as data rows on the bridge (PY_BRIDGE_COMPAT_SURFACE.md S2); parity holds because geometry is unaffected, but render parity (Q2) depends on PB-009 capturing colors, which is not yet landed.",
+        "F1 heal-after-boolean helpers (repair/ShapeFix, is_valid_shape BRepCheck) have no kernel analogue on the swept path; they only guard swept-carrier booleans, so they inherit the deferred-bie gap rather than introduce a new one.",
+        "Closed-circle carrier authoring (merlin tube section :247, cockpit ring stacks :129): no named compat row lists a circle profile primitive; the corpus exercises bd.Circle inside landed sweep/extrude paths on canonical falcon rows, so this is a facade-table gap candidate (missing-facade) rather than a geometry divergence."
+      ]
+    },
+    "hypercar_vendoring": "See q3.",
+    "census_scope_note": "Rows enumerate the distinct corpus operations at resolved sites across the two vendored trees (all corpus src/ scripts, top-level compositions and lib modules). Operations that recur at many sites within one script are listed once with a representative line. Rows are counted: 0 unresolved-required-citations (every cited file:line resolves), total rows below the 400 cap, no truncation."
+  },
+  "gap_list": [
+    {
+      "id": "G1",
+      "type": "missing-kernel",
+      "rows": "21 F1 skip rows' swept-carrier booleans + falcon_heavy/cutaway sectioning",
+      "what_is_absent": "landed swept-carrier x swept-carrier / swept-carrier x canonical boolean path (canonical x canonical only is landed per PY_BRIDGE_COMPAT_SURFACE.md S1; SKIPS resolved_by BIE-006)"
+    },
+    {
+      "id": "G2",
+      "type": "recorded-boundary",
+      "rows": "STEP-out of constructive parts (f1.py :115, falcon_heavy_cutaway.py :17, part @step wrappers)",
+      "what_is_absent": "none - TR-NRB-001 typed refusal is the recorded boundary; cadgen daemon/store is not reimplemented (PY_BRIDGE_COMPAT_SURFACE.md:102-110)"
+    },
+    {
+      "id": "G3",
+      "type": "missing-facade",
+      "rows": "bd.Circle closed-profile section authoring (merlin_common.py:247, cockpit.py:129, wheels/drivetrain rings)",
+      "what_is_absent": "a named compat-surface/facade row for a closed circle profile carrier (S5 lists Spline authoring only; census.py primitives exclude Circle)"
+    },
+    {
+      "id": "G4",
+      "type": "client-layer-render-gap",
+      "rows": "per-solid colors (surfaces.py:58, falcon_common.py:68, merlin_common.py:132, wheels colours), whole-car assembly names/#o1.N (f1.py:78-107), stage JSON (f1_stage.appearance.json)",
+      "what_is_absent": "PB-006 captures node names only; per-solid color + whole-car assembly/occurrence data need PB-009 GLB emission, which is booked but not landed"
+    },
+    {
+      "id": "G5",
+      "type": "census-mis-description",
+      "rows": "falcon_heavy/cutaway",
+      "what_is_absent": "SKIPS note says 'boolean sectioning' but the vendored code path is partial-arc revolves (falcon_common.py:202-206, :277-282); lift classification should key on partial-arc revolve coverage, not boolean coverage"
+    }
+  ]
+}
