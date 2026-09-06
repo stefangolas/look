@@ -1,14 +1,15 @@
-//! Scratch epistemic probe for the 00007667 shared spline edge (Phase 1).
+﻿//! Scratch epistemic probe for the 00007667 shared spline edge (Phase 1).
 //!
 //! Deep-dives ONE spline edge of a swept/extruded face: full knot vector,
 //! multiplicities, degree, control points / weights, declared vs evaluable
 //! range, basis partition-of-unity behaviour around the interesting
 //! parameters, and a parameter search for the source vertices. It does NOT
-//! classify — it reports evidence.
+//! classify â€” it reports evidence.
 //! Usage: spline_edge_00007667_probe MODEL.step --edge 30
 
 use truck_meshalgo::prelude::*;
 use truck_stepio::r#in::{Table, step_geometry::Curve3D};
+use truck_base::cgmath64::Point3;
 
 fn main() -> anyhow::Result<()> {
     let args: Vec<String> = std::env::args().collect();
