@@ -75,7 +75,7 @@ report `ANCHOR_MISMATCH`.
 | A1 | `vendor/truck/truck-geometry/src/constructive/sweep_surface.rs` | `pub struct SpineFrameSweep` | 1 |
 | A2 | `vendor/truck/truck-geometry/src/constructive/sweep_surface.rs` | `impl ParametricSurface for SpineFrameSweep` | 1 |
 | A3 | `vendor/truck/truck-evidence/src/enclosure.rs` | `pub trait EnclosureSurface` | 1 |
-| A4 | `vendor/truck/truck-evidence/src/num/mod.rs` | `^pub mod` | 3 |
+| A4 | `vendor/truck/truck-evidence/src/num/mod.rs` | `pub mod enclosure_sweep` | **0 before, 1 after your change** (r2: the old absolute `^pub mod` = 3 rotted when BIE-002's parallelotope landed — anchor the packet-owned delta, not a shared-file total) |
 
 A4 becomes 4 when you add `pub mod sweep_sigma;`.
 
