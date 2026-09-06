@@ -71,12 +71,12 @@ pub mod fixtures;
 /// The (H-graph) parametric Newton/Krawczyk graph certification
 /// (CTE-002-GRAPH).
 pub mod graph;
-pub mod shapes;
 /// The chart-minor polynomial substrate (CTE-003-MINORS): `M₁, M₂` built as
 /// composed Bernstein grids from the stored square system and a chart pivot,
 /// together with the internal four-axis polynomial-grid algebra the deflated
 /// system and the exclusion driver share.
 pub mod minors;
+pub mod shapes;
 
 /// The deflated square system `T = (G₁, G₂, M₁, M₂)` (theory §2.4) as a
 /// [`tsystem::TSystem`] instantiating the landed generic
@@ -87,6 +87,17 @@ pub mod tsystem;
 /// under [`Budget`](truck_base::evidence::Budget) deciding whether
 /// `(F, M₁, M₂)` has a root in a box.
 pub mod exclude;
+
+/// The T1.3 reduced-Hessian evaluator and the §2.8 definiteness test
+/// (CTE-004-HESSIAN): the R2 graph-enclosure signature
+/// [`hessian::reduced_hessian`] and the R9-carrying
+/// [`hessian::definiteness`].
+pub mod hessian;
+
+/// The five-way contact-classifier cascade (CTE-004-HESSIAN): the theory's
+/// stage table (§2.11) over one certified box, driven by
+/// [`cascade::classify_box`].
+pub mod cascade;
 
 use crate::contract::Refusal;
 use crate::hull::HullRefusal;
