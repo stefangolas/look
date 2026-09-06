@@ -47,6 +47,7 @@ use crate::analytic::plane_sphere::plane_sphere;
 use crate::analytic::sphere_sphere::sphere_sphere;
 use crate::analytic::{AnalyticIntersection, AnalyticOutcome, ExactCurve};
 use crate::enclosure::{interval_at, Box3, EnclosureSurface, Interval};
+use crate::num::sweep_sigma::{sweep_sigma_g, SweepSigmaG};
 use std::cmp::Ordering;
 use std::f64::consts::TAU;
 use std::sync::Mutex;
@@ -245,8 +246,13 @@ pub enum ContactLocus {
 /// 5. **Sweep restricted dispatch** — a [`BoundedStratum::Sweep`] stratum
 ///    against any canonical stratum answers through the BIE-002 restricted
 ///    solver path ([`restricted_sweep_contact`]): certified when the section
-///    is decided, typed `NumericallyUnresolved` otherwise. A lifted sweep is
-///    never refused as `NonCanonicalCarrier` (BIE-006-CLASSIFY).
+///    is decided, typed `NumericallyUnresolved` otherwise. A both-sides-sweep
+///    pair (CL-004-SWEEP-SWEEP, monocoque×sidepod class) answers through
+///    [`restricted_sweep_sweep_contact`]: the dispatch arm recognizes both
+///    sides as sweeps, composes the CL-003 σ_G bounds from the landed sweep
+///    enclosures (the certified boundability screen), and hands the pair to
+///    the same restricted solver with σ_G composed on both sides. A lifted
+///    sweep is never refused as `NonCanonicalCarrier` (BIE-006-CLASSIFY).
 /// 6. **Everything else** — the deferred funnel (any pair involving a
 ///    `Vertex`, a `Placed` carrier outside the landed cylinder conjugation
 ///    (BG-CAD-P9), FE/EE carrier families outside the landed tables,
@@ -405,14 +411,21 @@ pub fn contact(
                 t_range: tr,
             },
         ) => fe_ee::ee_contact(l, tl, r, tr, budget),
-        // Stage 4 (BIE-006-CLASSIFY): the sweep restricted-pair dispatch. A
-        // `Sweep` stratum is lifted (never the old gate — sweeps stopped
-        // refusing because they now lift into the `Sweep` variant, not because
-        // the refusal changed). The pair answers through
-        // [`restricted_sweep_contact`], the BIE-002 restricted-solver path:
-        // a certified outcome when the pair's section is decidable here, the
-        // typed `NumericallyUnresolved` outcome otherwise — never
-        // `NonCanonicalCarrier` and never the deferred envelope.
+        // Stage 4 (BIE-006-CLASSIFY / CL-004-SWEEP-SWEEP): the sweep
+        // restricted-pair dispatch. A `Sweep` stratum is lifted (never the
+        // old gate — sweeps stopped refusing because they now lift into the
+        // `Sweep` variant, not because the refusal changed). A both-sides-
+        // sweep pair answers through [`restricted_sweep_sweep_contact`]
+        // (CL-004: both sides recognized as sweeps, σ_G composed, the pair
+        // handed to the restricted solver); a sweep against any canonical
+        // stratum through [`restricted_sweep_contact`]. Both are the
+        // BIE-002 restricted-solver path: a certified outcome when the pair's
+        // section is decidable here, the typed `NumericallyUnresolved`
+        // outcome otherwise — never `NonCanonicalCarrier` and never the
+        // deferred envelope.
+        (BoundedStratum::Sweep { .. }, BoundedStratum::Sweep { .. }) => {
+            restricted_sweep_sweep_contact(lhs, rhs, budget)
+        }
         (BoundedStratum::Sweep { .. }, _) | (_, BoundedStratum::Sweep { .. }) => {
             restricted_sweep_contact(lhs, rhs, budget)
         }
@@ -442,21 +455,16 @@ pub fn contact(
 /// arm). It NEVER returns `NonCanonicalCarrier`: a lifted sweep is inside the
 /// restricted envelope by construction, and an undecidable section is an
 /// unresolved outcome, not a carrier refusal.
-fn restricted_sweep_contact(
-    lhs: &BoundedStratum,
-    rhs: &BoundedStratum,
+/// Maps a restricted-solver outcome onto the evidence taxonomy, recording the
+/// spend and the returned certificate's `budget_left`. Shared by the two sweep
+/// dispatch seams ([`restricted_sweep_contact`] and
+/// [`restricted_sweep_sweep_contact`]) so the sweep×analytic and sweep×sweep
+/// arms map bit-for-bit identically (V5).
+fn solve_to_contact(
+    initial: Budget,
     budget: &mut Budget,
+    solve: solver_entry::RestrictedSolve,
 ) -> Outcome<ContactComplex> {
-    // The registry baseline: with no certified engine registered (or a
-    // poisoned lock) the seam answers today's typed unresolved, bit-for-bit
-    // the BIE-006 shortcut (the certified engine never ran).
-    let initial = *budget;
-    let Some(solve) = solver_entry::dispatch_restricted_sweep(lhs, rhs, budget) else {
-        return Err(Refusal::NumericallyUnresolved {
-            spent: initial,
-            witness: UnresolvedWitness::KrawczykIndeterminate,
-        });
-    };
     match solve {
         solver_entry::RestrictedSolve::Certified(chart) if !chart.samples.is_empty() => {
             // A certified solve: the interaction is one Arc1 branch. The record
@@ -500,6 +508,105 @@ fn restricted_sweep_contact(
         // A landed typed refusal, passed through unchanged.
         solver_entry::RestrictedSolve::Refused(refusal) => Err(refusal),
     }
+}
+
+fn restricted_sweep_contact(
+    lhs: &BoundedStratum,
+    rhs: &BoundedStratum,
+    budget: &mut Budget,
+) -> Outcome<ContactComplex> {
+    // The registry baseline: with no certified engine registered (or a
+    // poisoned lock) the seam answers today's typed unresolved, bit-for-bit
+    // the BIE-006 shortcut (the certified engine never ran).
+    let initial = *budget;
+    let Some(solve) = solver_entry::dispatch_restricted_sweep(lhs, rhs, budget) else {
+        return Err(Refusal::NumericallyUnresolved {
+            spent: initial,
+            witness: UnresolvedWitness::KrawczykIndeterminate,
+        });
+    };
+    solve_to_contact(initial, budget, solve)
+}
+
+/// The interval over an ordered `(lo, hi)` window. The empty interval on a
+/// malformed bound (a caller bug); σ_G then refuses the window (never a
+/// panic).
+fn window_interval(lo: f64, hi: f64) -> Interval {
+    Interval::try_from((lo, hi)).unwrap_or(Interval::EMPTY)
+}
+
+/// CL-004-SWEEP-SWEEP: composes the CL-003 σ_G bounds of a sweep×sweep pair
+/// over its two stored windows.
+///
+/// Each sweep's windowed first fundamental form is bounded by
+/// [`sweep_sigma_g`] (CL-003's landed `num/sweep_sigma`), and the pair
+/// composes when both sides certify — the composed box is finite on every
+/// diagonal entry. `None` when a side lies outside the CL-003 certified
+/// envelope (an empty or non-finite bound — the sweep is not certifiably
+/// boundable), so the pair is never handed to the restricted solver
+/// unbounded.
+fn compose_sweep_sigma(
+    a: &SpineFrameSweep,
+    b: &SpineFrameSweep,
+) -> Option<(SweepSigmaG, SweepSigmaG)> {
+    let sa = sweep_sigma_g(
+        a,
+        window_interval(a.s0(), a.s1()),
+        window_interval(a.v0(), a.v1()),
+    )
+    .ok()?;
+    let sb = sweep_sigma_g(
+        b,
+        window_interval(b.s0(), b.s1()),
+        window_interval(b.v0(), b.v1()),
+    )
+    .ok()?;
+    Some((sa.value, sb.value))
+}
+
+/// CL-004-SWEEP-SWEEP: the sweep×sweep restricted dispatch arm (monocoque×
+/// sidepod class).
+///
+/// The dispatch arm mirrors CL-001's: recognize both sides as sweeps, compose
+/// the σ_G bounds from CL-003's landed enclosures (the certified boundability
+/// screen — a pair outside the certified envelope is never handed to the
+/// engine and answers the typed `NumericallyUnresolved`), and hand the pair to
+/// the restricted solver entry ([`solver_entry::dispatch_restricted_sweep`]).
+/// The certified-engine reduction of both sides and the outcome mapping are
+/// shared with the sweep×analytic seam ([`restricted_sweep_contact`],
+/// [`solve_to_contact`]); the only new behavior of this packet is the
+/// both-sides-sweep recognition and the σ_G composition.
+fn restricted_sweep_sweep_contact(
+    lhs: &BoundedStratum,
+    rhs: &BoundedStratum,
+    budget: &mut Budget,
+) -> Outcome<ContactComplex> {
+    let initial = *budget;
+    let (a, b) = match (lhs, rhs) {
+        (BoundedStratum::Sweep { sweep: a }, BoundedStratum::Sweep { sweep: b }) => (a, b),
+        _ => {
+            return Err(Refusal::UnsupportedEnvelope(
+                EnvelopeCase::ContactReductionDeferred,
+            ))
+        }
+    };
+    // The σ_G composition screen (CL-003): both sweeps must be certifiably
+    // boundable over their stored windows before the pair is handed to the
+    // restricted solver. A pair outside the certified envelope is the typed
+    // unresolved outcome (spend recorded), never a guess.
+    if compose_sweep_sigma(a, b).is_none() {
+        return Err(Refusal::NumericallyUnresolved {
+            spent: initial,
+            witness: UnresolvedWitness::KrawczykIndeterminate,
+        });
+    }
+    let Some(solve) = solver_entry::dispatch_restricted_sweep(lhs, rhs, budget) else {
+        return Err(Refusal::NumericallyUnresolved {
+            spent: initial,
+            witness: UnresolvedWitness::KrawczykIndeterminate,
+        });
+    };
+    solve_to_contact(initial, budget, solve)
 }
 
 // ---------------------------------------------------------------------------
@@ -2973,6 +3080,165 @@ mod tests {
         assert!(
             matches!(out, Err(Refusal::NumericallyUnresolved { .. })),
             "the canonical × sweep order must answer the same typed \
+             NumericallyUnresolved, got {out:?}"
+        );
+    }
+
+    /// The scaled-profile prism sweep: the unit-square profile ring under a
+    /// linear `1 → 1/2` `Scale` law over the straight `+z` spine, edge-zero
+    /// window — the second, parameterization-distinct side of the σ_G
+    /// composition fixture (the CL-003 `scaled_profile_sweep` shape).
+    fn scaled_sweep_fixture() -> Option<truck_geometry::constructive::SpineFrameSweep> {
+        use truck_geometry::canonical::Curve;
+        use truck_geometry::constructive::{
+            FrameLaw, Profile2D, ProfileLaw, ScalarLaw, SpineFrameRecipe, SpineFrameSweep,
+        };
+        use truck_geometry::specifieds::Line;
+        let profile = Profile2D::try_closed(vec![
+            Point2::new(0.0, 0.0),
+            Point2::new(1.0, 0.0),
+            Point2::new(1.0, 1.0),
+            Point2::new(0.0, 1.0),
+        ])
+        .ok()?;
+        let spine = Box::new(Curve::Line(Line(
+            Point3::new(0.0, 0.0, 0.0),
+            Point3::new(0.0, 0.0, 1.0),
+        )));
+        let recipe = SpineFrameRecipe::new(
+            spine,
+            ProfileLaw::Scale {
+                profile,
+                scale: ScalarLaw::Linear {
+                    start: 1.0,
+                    end: 0.5,
+                },
+            },
+            FrameLaw::FixedPlane {
+                normal: Vector3::unit_x(),
+            },
+        );
+        SpineFrameSweep::try_new(recipe, 0.0, 1.0, 0.0, 0.25).ok()
+    }
+
+    /// The full-ring prism sweep: the unit-square profile ring with the ring
+    /// window spanning all four edges (`v ∈ [0, 1]`). The window crosses ring
+    /// vertices, so CL-003's per-edge certified envelope does not cover it and
+    /// the σ_G bound is the whole-space box (never finite).
+    fn full_ring_prism_sweep_fixture() -> Option<truck_geometry::constructive::SpineFrameSweep> {
+        use truck_geometry::canonical::Curve;
+        use truck_geometry::constructive::{
+            FrameLaw, Profile2D, ProfileLaw, SpineFrameRecipe, SpineFrameSweep,
+        };
+        use truck_geometry::specifieds::Line;
+        let profile = Profile2D::try_closed(vec![
+            Point2::new(0.0, 0.0),
+            Point2::new(1.0, 0.0),
+            Point2::new(1.0, 1.0),
+            Point2::new(0.0, 1.0),
+        ])
+        .ok()?;
+        let spine = Box::new(Curve::Line(Line(
+            Point3::new(0.0, 0.0, 0.0),
+            Point3::new(0.0, 0.0, 1.0),
+        )));
+        let recipe = SpineFrameRecipe::new(
+            spine,
+            ProfileLaw::Constant(profile),
+            FrameLaw::FixedPlane {
+                normal: Vector3::unit_x(),
+            },
+        );
+        SpineFrameSweep::try_new(recipe, 0.0, 1.0, 0.0, 1.0).ok()
+    }
+
+    #[test]
+    fn sigma_g_composed_both_sides() {
+        // CL-004 required test 2: the CL-003 σ_G bounds compose on both sides
+        // of a sweep×sweep pair and the composed box is finite/isotropic in
+        // model units.
+        let a = match prism_sweep_fixture() {
+            Some(sweep) => sweep,
+            None => return,
+        };
+        let b = match scaled_sweep_fixture() {
+            Some(sweep) => sweep,
+            None => return,
+        };
+        let (ga, gb) = compose_sweep_sigma(&a, &b)
+            .expect("single-edge windowed fixture sweeps must compose σ_G");
+        // Composed on both sides: every σ_G entry of both sweeps is finite.
+        let finite = |g: &SweepSigmaG| {
+            g.g_ss.inf().is_finite()
+                && g.g_ss.sup().is_finite()
+                && g.g_sv.inf().is_finite()
+                && g.g_sv.sup().is_finite()
+                && g.g_vs.inf().is_finite()
+                && g.g_vs.sup().is_finite()
+                && g.g_vv.inf().is_finite()
+                && g.g_vv.sup().is_finite()
+        };
+        assert!(finite(&ga), "the A-side σ_G must be finite: {ga:?}");
+        assert!(finite(&gb), "the B-side σ_G must be finite: {gb:?}");
+        // ... and finitely scaled on the diagonal: each column-scale upper
+        // bound is finite and positive (the box the model radius maps through
+        // is well defined on both sides).
+        for (g, side) in [(&ga, "A"), (&gb, "B")] {
+            assert!(
+                g.g_ss.sup().is_finite() && g.g_ss.sup() > 0.0,
+                "the {side} station column-scale bound must be finite/positive"
+            );
+            assert!(
+                g.g_vv.sup().is_finite() && g.g_vv.sup() > 0.0,
+                "the {side} ring column-scale bound must be finite/positive"
+            );
+        }
+        // Isotropic in model units: the composed box's per-axis parameter
+        // half-widths all map the SAME model radius r onto their axis under the
+        // certified column-scale bounds — a finite, model-isotropic box.
+        let r = 1.0;
+        let caps = [
+            r / ga.g_ss.sup().sqrt() * ga.g_ss.sup().sqrt(),
+            r / ga.g_vv.sup().sqrt() * ga.g_vv.sup().sqrt(),
+            r / gb.g_ss.sup().sqrt() * gb.g_ss.sup().sqrt(),
+            r / gb.g_vv.sup().sqrt() * gb.g_vv.sup().sqrt(),
+        ];
+        for cap in caps {
+            assert!(
+                cap.is_finite() && (cap - r).abs() <= 1.0e-9,
+                "every axis must map the model radius {r} isotropically, got {cap}"
+            );
+        }
+    }
+
+    #[test]
+    fn unresolved_elsewhere_is_typed() {
+        // CL-004 required test 3: a sweep×sweep pair outside the solver's
+        // admissible set yields the typed witness, never a guess. The pair's
+        // ring window crosses profile vertices, so CL-003's σ_G cannot bound it
+        // and the dispatch arm never hands the pair to the restricted solver:
+        // the funnel answers the typed `NumericallyUnresolved` (never a
+        // fabricated verdict, never the deferred envelope).
+        let a = match prism_sweep_fixture() {
+            Some(sweep) => sweep,
+            None => return,
+        };
+        let b = match full_ring_prism_sweep_fixture() {
+            Some(sweep) => sweep,
+            None => return,
+        };
+        // The σ_G composition screen refuses the unbounded side.
+        assert!(
+            compose_sweep_sigma(&a, &b).is_none(),
+            "the full-ring window must refuse the σ_G composition"
+        );
+        let lhs = sweep_stratum(a);
+        let rhs = sweep_stratum(b);
+        let mut budget = Budget::new(0, 0, 0);
+        let out = contact(&lhs, &rhs, &mut budget);
+        assert!(
+            matches!(out, Err(Refusal::NumericallyUnresolved { .. })),
+            "an inadmissible sweep×sweep pair must answer the typed \
              NumericallyUnresolved, got {out:?}"
         );
     }
