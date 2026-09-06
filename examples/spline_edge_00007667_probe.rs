@@ -9,7 +9,7 @@
 
 use truck_meshalgo::prelude::*;
 use truck_stepio::r#in::{Table, step_geometry::Curve3D};
-use truck_base::cgmath64::Point3;
+use truck_polymesh::Point3;
 
 fn main() -> anyhow::Result<()> {
     let args: Vec<String> = std::env::args().collect();
