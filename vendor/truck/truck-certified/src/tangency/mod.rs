@@ -67,11 +67,11 @@
 pub mod chart;
 #[doc(hidden)]
 pub mod fixtures;
+
 /// The (H-graph) parametric Newton/Krawczyk graph certification
 /// (CTE-002-GRAPH).
 pub mod graph;
 pub mod shapes;
-
 /// The chart-minor polynomial substrate (CTE-003-MINORS): `M₁, M₂` built as
 /// composed Bernstein grids from the stored square system and a chart pivot,
 /// together with the internal four-axis polynomial-grid algebra the deflated
@@ -132,3 +132,14 @@ impl TangencyRefusal {
         }
     }
 }
+/// The ℚ-polynomial substrate of the exact-vanishing verifier (CTE-001-QPOLY):
+/// a hand-rolled exact multivariate polynomial ring with `i128` rational
+/// coefficients (no CAS dependency). Consumed by [`witness`] and, later, by
+/// CTE-005/007.
+pub mod qpoly;
+
+/// The one-witness exact verifier (CTE-001-QPOLY): the frozen
+/// [`shapes::ExactWitnessVerifier`] implementation over [`qpoly::QPoly`] plus
+/// the pending-refusal provenance stub [`witness::provenance_witness`].
+pub mod witness;
+
