@@ -309,6 +309,35 @@ pub fn read_step_assembly(step: &str) -> Result<AssemblyReport, Refusal> {
     })
 }
 
+/// Walks the landed assembly graph (the parts, in insertion order, built into
+/// the same graph [`emit_step_assembly`] walks) into the per-node occurrence
+/// labels that name the GLB emission's node payloads (PB-009).
+///
+/// The corpus convention is frozen by the vendored tree, not researched: the
+/// `f1.step.js` OCCURRENCES block pins each top-level child of the root
+/// assembly `o1` by insertion order (`front_wing: "#o1.1"` … `details:
+/// "#o1.28"`). This function reproduces that table from assembly insertion
+/// order alone: the `p`-th part under the root occurrence `root` is named
+/// `#root.{p + 1}`. Returns one label per part, in insertion order (an empty
+/// part list yields an empty label list).
+pub fn assembly_occurrence_labels(root: &str, parts: &[AssemblyPart]) -> Vec<String> {
+    let mut graph = AssemblyGraph::new();
+    for part in parts {
+        graph.create_node(NodeEntity {
+            shape: part.solid.clone(),
+            attrs: AssemblyNodeAttrs {
+                name: part.name.clone(),
+                rows: Vec::new(),
+            },
+        });
+    }
+    let mut labels = Vec::with_capacity(parts.len());
+    for (position, _node) in graph.all_nodes().enumerate() {
+        labels.push(format!("#{root}.{}", position + 1));
+    }
+    labels
+}
+
 /// The evidence rows of the node `name`: every intended contact in which
 /// `name` participates (as `node_a` or `node_b`), in list order.
 fn rows_touching(name: &str, intents: &[AssemblyContactIntent]) -> Vec<AssemblyContactIntent> {
