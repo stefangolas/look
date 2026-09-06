@@ -256,6 +256,42 @@ impl Tensor4 {
         }
         Ok(Tensor4 { degrees, rows: out })
     }
+
+    /// A zero coefficient grid of the given degrees.
+    #[allow(dead_code)] // CTE-003 substrate, exercised by the ssi second-partial tests
+    fn zero_tensor(degrees: (usize, usize, usize, usize)) -> Self {
+        let (m1, n1, m2, n2) = degrees;
+        let rows = (m1 + 1) * (n1 + 1);
+        let cols = (m2 + 1) * (n2 + 1);
+        Tensor4 {
+            degrees,
+            rows: vec![vec![0.0f64; cols]; rows],
+        }
+    }
+
+    /// The second-partial coefficient grid along the chart axes `j` then `l`.
+    ///
+    /// The Bernstein second-derivative rule `d·(d−1)·(c[k+2] − 2c[k+1] + c[k])`
+    /// per axis pair, computed exactly as the kernel engine's private
+    /// `grid_second_partial` (engine.rs:1128) — first partial along `j`, then
+    /// along `l`. The pattern is adapted, not imported (V5 guard). A linear
+    /// axis (the double derivative along it would refuse a degree-0 axis) is
+    /// the identically-zero polynomial, represented as a zero grid of the
+    /// first partial's degrees.
+    #[allow(dead_code)] // CTE-003 substrate, exercised by the ssi second-partial tests
+    fn partial2_axis(&self, j: usize, l: usize) -> Result<Tensor4, SsiRefusal> {
+        if j > 3 || l > 3 {
+            return Err(SsiRefusal::InvalidInput);
+        }
+        let first = self.partial_axis(j)?;
+        if l == j && first.len_axis(j) == 1 {
+            // The axis is linear after one partial: the second derivative
+            // along it is identically zero, and a further partial would
+            // refuse the degree-0 axis.
+            return Ok(Self::zero_tensor(first.degrees));
+        }
+        first.partial_axis(l)
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -958,4 +994,295 @@ pub fn construct_square_system(
     }
     let identity = (0.0, 1.0, 0.0, 1.0, 0.0, 1.0, 0.0, 1.0);
     SquareSystem3::new(grids, (m1, n1, m2, n2), identity).map_err(SsiRefusal::from)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// A tolerance for the coefficientwise finite-difference comparison.
+    /// H-3: a dimensionless roundoff allowance over the small integer
+    /// coefficient grids of the F5 fixture pair.
+    const SECOND_PARTIAL_TOL: f64 = 1e-9; // H-3
+
+    /// The binomial coefficient `C(n, k)` as `f64` (small exact integers).
+    fn binom(n: usize, k: usize) -> f64 {
+        let mut num = 1.0;
+        let mut den = 1.0;
+        for i in 0..k {
+            num *= (n - i) as f64;
+            den *= (i + 1) as f64;
+        }
+        num / den
+    }
+
+    /// A graph-patch coordinate grid: the first/second parameter coordinate
+    /// elevated to the bidegree `(m, n)`.
+    fn coord_grid(m: usize, n: usize, which: usize) -> Vec<Vec<f64>> {
+        let mut grid = Vec::with_capacity(m + 1);
+        for a in 0..=m {
+            let mut row = Vec::with_capacity(n + 1);
+            for b in 0..=n {
+                row.push(if which == 0 {
+                    a as f64 / m as f64
+                } else {
+                    b as f64 / n as f64
+                });
+            }
+            grid.push(row);
+        }
+        grid
+    }
+
+    /// A zero grid of bidegree `(m, n)`.
+    fn zero_grid(m: usize, n: usize) -> Vec<Vec<f64>> {
+        vec![vec![0.0; n + 1]; m + 1]
+    }
+
+    /// A Bernstein grid of bidegree `(m, n)` from monomial terms
+    /// `(pu, pv, coeff)` in `u^pu v^pv`.
+    fn monomial_grid(m: usize, n: usize, terms: &[(usize, usize, f64)]) -> Vec<Vec<f64>> {
+        let mut grid = zero_grid(m, n);
+        for &(pu, pv, coeff) in terms {
+            let row_factors: Vec<f64> = (pu..=m).map(|a| binom(a, pu) / binom(m, pu)).collect();
+            let col_factors: Vec<f64> = (pv..=n).map(|b| binom(b, pv) / binom(n, pv)).collect();
+            for (a, fa) in (pu..=m).zip(row_factors.iter()) {
+                for (b, fb) in (pv..=n).zip(col_factors.iter()) {
+                    grid[a][b] += coeff * fa * fb;
+                }
+            }
+        }
+        grid
+    }
+
+    /// The F5 fixture pair: the plane `z = 0` (graph over `(u, v)`, bidegree
+    /// `(2, 2)`) and the extruded-parabola bipatch `z = s^2` over `(s, t)`,
+    /// bidegree `(2, 1)`, both with unit weights. The cross-multiplied square
+    /// system's grids are `F = P1 - P2`.
+    fn parabola_system() -> SquareSystem3 {
+        let m1 = 2usize;
+        let n1 = 2usize;
+        let m2 = 2usize;
+        let n2 = 1usize;
+        let ones1 = vec![vec![1.0f64; n1 + 1]; m1 + 1];
+        let ones2 = vec![vec![1.0f64; n2 + 1]; m2 + 1];
+        let plane = RationalBipatch::new(
+            m1,
+            n1,
+            [
+                coord_grid(m1, n1, 0),
+                coord_grid(m1, n1, 1),
+                zero_grid(m1, n1),
+            ],
+            ones1,
+        )
+        .expect("the F5 plane patch admits");
+        let parabola = RationalBipatch::new(
+            m2,
+            n2,
+            [
+                coord_grid(m2, n2, 0),
+                coord_grid(m2, n2, 1),
+                monomial_grid(m2, n2, &[(2, 0, 1.0)]),
+            ],
+            ones2,
+        )
+        .expect("the F5 parabola patch admits");
+        construct_square_system(
+            &SsiParticipant::RationalBipatch(plane),
+            &SsiParticipant::RationalBipatch(parabola),
+        )
+        .expect("the F5 pair constructs a square system")
+    }
+
+    /// A dense axis-major 4-D view of a stored `rows x cols` grid.
+    struct Dense4 {
+        dims: [usize; 4],
+        data: Vec<f64>,
+    }
+
+    impl Dense4 {
+        fn from_rows(grid: &[Vec<f64>], degrees: (usize, usize, usize, usize)) -> Self {
+            let (m1, n1, m2, n2) = degrees;
+            let dims = [m1 + 1, n1 + 1, m2 + 1, n2 + 1];
+            let mut data = vec![0.0f64; dims[0] * dims[1] * dims[2] * dims[3]];
+            for a in 0..dims[0] {
+                for b in 0..dims[1] {
+                    for i in 0..dims[2] {
+                        for j in 0..dims[3] {
+                            let idx = ((a * dims[1] + b) * dims[2] + i) * dims[3] + j;
+                            data[idx] = grid[a * (n1 + 1) + b][i * (n2 + 1) + j];
+                        }
+                    }
+                }
+            }
+            Dense4 { dims, data }
+        }
+
+        fn into_rows(self, degrees: (usize, usize, usize, usize)) -> Vec<Vec<f64>> {
+            let (m1, n1, m2, n2) = degrees;
+            let rows = (m1 + 1) * (n1 + 1);
+            let cols = (m2 + 1) * (n2 + 1);
+            let mut out = vec![vec![0.0f64; cols]; rows];
+            let [d0, d1, d2, d3] = self.dims;
+            for a in 0..d0 {
+                for b in 0..d1 {
+                    for i in 0..d2 {
+                        for j in 0..d3 {
+                            let idx = ((a * d1 + b) * d2 + i) * d3 + j;
+                            out[a * (n1 + 1) + b][i * (n2 + 1) + j] = self.data[idx];
+                        }
+                    }
+                }
+            }
+            out
+        }
+
+        fn at(&self, x: [usize; 4]) -> f64 {
+            self.data[((x[0] * self.dims[1] + x[1]) * self.dims[2] + x[2]) * self.dims[3] + x[3]]
+        }
+    }
+
+    /// The closed-form second-difference reference on a stored grid along the
+    /// chart axes `j` then `l`: `d_j·d_l` applied to the two-axis centered
+    /// difference of the coefficient sequence (for `j == l`, the one-axis
+    /// rule `d·(d−1)·(c[k+2] − 2c[k+1] + c[k])`). A linear double-derivative
+    /// axis is the zero grid. Returns the reference in the rows layout.
+    fn second_difference_reference(
+        grid: &[Vec<f64>],
+        degrees: (usize, usize, usize, usize),
+        j: usize,
+        l: usize,
+    ) -> (Vec<Vec<f64>>, (usize, usize, usize, usize)) {
+        let deg = [degrees.0, degrees.1, degrees.2, degrees.3];
+        let out_deg: [usize; 4] = deg.map(|d| d + 1);
+        let mut out_deg = out_deg;
+        for a in [j, l] {
+            out_deg[a] -= 1;
+        }
+        if j == l && deg[j] == 1 {
+            // The axis is linear: the second derivative is the zero grid at
+            // the first partial's degree (axis degree 0).
+            let mut reduced = deg;
+            reduced[j] = 0;
+            let (m1, n1, m2, n2) = (reduced[0], reduced[1], reduced[2], reduced[3]);
+            let rows = (m1 + 1) * (n1 + 1);
+            let cols = (m2 + 1) * (n2 + 1);
+            return (vec![vec![0.0; cols]; rows], (m1, n1, m2, n2));
+        }
+        let dense = Dense4::from_rows(grid, degrees);
+        let mut data = vec![0.0f64; out_deg[0] * out_deg[1] * out_deg[2] * out_deg[3]];
+        for x0 in 0..out_deg[0] {
+            for x1 in 0..out_deg[1] {
+                for x2 in 0..out_deg[2] {
+                    for x3 in 0..out_deg[3] {
+                        let x = [x0, x1, x2, x3];
+                        let value = if j == l {
+                            let dj = deg[j] as f64;
+                            let up2 = {
+                                let mut y = x;
+                                y[j] += 2;
+                                dense.at(y)
+                            };
+                            let up1 = {
+                                let mut y = x;
+                                y[j] += 1;
+                                dense.at(y)
+                            };
+                            let here = dense.at(x);
+                            dj * (dj - 1.0) * (up2 - 2.0 * up1 + here)
+                        } else {
+                            let dj = deg[j] as f64;
+                            let dl = deg[l] as f64;
+                            let jp = {
+                                let mut y = x;
+                                y[j] += 1;
+                                y
+                            };
+                            let lp = {
+                                let mut y = x;
+                                y[l] += 1;
+                                y
+                            };
+                            let jplp = {
+                                let mut y = x;
+                                y[j] += 1;
+                                y[l] += 1;
+                                y
+                            };
+                            dj * dl * (dense.at(jplp) - dense.at(jp) - dense.at(lp) + dense.at(x))
+                        };
+                        let idx = ((x0 * out_deg[1] + x1) * out_deg[2] + x2) * out_deg[3] + x3;
+                        data[idx] = value;
+                    }
+                }
+            }
+        }
+        let od = Dense4 {
+            dims: out_deg,
+            data,
+        };
+        let out_degrees = (
+            out_deg[0] - 1,
+            out_deg[1] - 1,
+            out_deg[2] - 1,
+            out_deg[3] - 1,
+        );
+        (od.into_rows(out_degrees), out_degrees)
+    }
+
+    #[test]
+    fn second_partials_match_finite_difference_on_fixture() {
+        let system = parabola_system();
+        let degrees = system.degrees();
+        let grids = system.grids();
+        for (component, grid) in grids.iter().enumerate() {
+            let grid = grid.clone();
+            let tensor = Tensor4::from_grid(&grid, degrees);
+            for j in 0..4 {
+                for l in 0..4 {
+                    let got = tensor
+                        .partial2_axis(j, l)
+                        .expect("every F5 grid second-partials on a degree-1+ axis");
+                    let (want_rows, want_degrees) =
+                        second_difference_reference(&grid, degrees, j, l);
+                    assert_eq!(got.degrees, want_degrees);
+                    assert_eq!(got.rows.len(), want_rows.len());
+                    for (grow, wrow) in got.rows.iter().zip(want_rows.iter()) {
+                        assert_eq!(grow.len(), wrow.len());
+                        for (g, w) in grow.iter().zip(wrow.iter()) {
+                            let diff = (g - w).abs();
+                            assert!(
+                                diff <= SECOND_PARTIAL_TOL,
+                                "axis pair ({}, {}) component {}: partial2 {} vs finite difference {}",
+                                j,
+                                l,
+                                component,
+                                g,
+                                w
+                            );
+                        }
+                    }
+                }
+            }
+        }
+
+        // The fixture's semantic pin: the z-component of the F5 pair is
+        // `-s^2`, whose second s-partial is the constant `-2` over the whole
+        // chart.
+        let z_grid = &grids[2];
+        let z_tensor = Tensor4::from_grid(z_grid, degrees);
+        let second = z_tensor
+            .partial2_axis(2, 2)
+            .expect("the parabola axis second-partials");
+        for row in second.rows.iter() {
+            for c in row.iter() {
+                assert!(
+                    (c + 2.0).abs() <= SECOND_PARTIAL_TOL,
+                    "d2/ds2 of -s^2 must be the constant -2, got {}",
+                    c
+                );
+            }
+        }
+    }
 }
