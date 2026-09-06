@@ -75,6 +75,8 @@ not two widenings of the same evidence types (certified plan X1).
 | Enclosure / interval bounds (D2 hull + directed rounding; F2 per-quantity choice of interval composition vs auxiliary root isolation) | `Method::Interval` certificates | These bounds feed row A's `RealizationCertificate` (Jacobian/frame conditioning) as one of two producers. Composition rule under H-6: an aggregate certificate's method is the weakest of its inputs — a float estimate (`Method::Float`) composed with an interval bound (`Method::Interval`) aggregates as `Method::Float`. |
 | Class-4 manifold consumption | landed `ManifoldDiagnostics` + `orientation_parity` (`truck-topology/src/manifold.rs`, CG-006) | Consumed substrate — the certified class-4 stage reads the aggregate; it never re-emits a parallel diagnostics type. |
 | Certified outcome layers (`formal/{outcome,evidence}.rs`, four layers; promoted to `truck-certified` in Phase 0) | the certified layer's own outcome shape | Maps onto the tri-state doctrine (§9.7): certified layers → `CERTIFIED_WITHIN_TOLERANCE`; failed layers → `FAILED`; unresolved layers → `INCONCLUSIVE`. `INCONCLUSIVE` is never converted into success in either program. |
+| `ImplicitReduction` Method tag (CFP-000-SPINE decision 7; produced by CFP-004's implicit-reduction stage) | certificate-provenance record on CFP certificates produced by the Theorem-4 implicit arm (`h = g∘S`, planes + quadrics; torus excluded) | NO new top-level `Refusal`/`UnresolvedWitness`/`EnvelopeCase`/`Prop` kind, and NO widening of the base `Method` set `{Exact, Interval, Float, None}` at the spine. The tag is booked here as the provenance name the producing packet (CFP-004) stamps on its certificates; if CFP-004 needs it on the base `Method` itself, that widening is an orchestrator spec edit to this row first — never a worker widening of `truck-base/src/evidence.rs`. |
+| `ConeCertificate` Method tag (CFP-000-SPINE decision 7; produced by CFP-006's cone-certificate stage) | certificate-provenance record on CFP certificates carrying the Gauss-map verdicts (`ConeVerdict`: loop-free / transversal-by-proof / fixed continuation axis) | Same booking discipline as the `ImplicitReduction` row: no new top-level evidence kind, no base `Method` widening at the spine. The `ConeVerdict` shape itself ships in `truck-certified/src/cfp/spine.rs` behind the pending refusal (production paths land with CFP-006). |
 
 ## D. BIE-000 bookings (Certified Interaction Engine shim)
 
@@ -135,6 +137,10 @@ its mapping rows here. All rows were dispatched against the tree 2026-09-05.
   and loop plan §3.5's booking requirement.
 - CTE-000-SPINE rows (section E) dispatched 2026-09-05; the tangency shim and
   fixture kit are test-support-only and add no evidence kind.
+- CFP-000-SPINE rows (section C, `ImplicitReduction` / `ConeCertificate`
+  provenance tags) dispatched 2026-09-06; the CFP shim and fixture kit
+  (`truck-certified/src/cfp/{spine,fixtures}.rs`) are the D-shim spine of
+  `docs/CONTACT_FAST_PATH_BUILD_SPEC.md` and add no top-level evidence kind.
 - CG-007-CERT may be written against row sets A + B once CG-004 lands; the
   certified program's Phase 0 may dispatch against sections A + C (and must
   still respect the X2 sequencing rule: not concurrent with CG-005/CG-007
