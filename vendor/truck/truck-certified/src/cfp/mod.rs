@@ -29,6 +29,9 @@
 
 #[doc(hidden)]
 pub mod fixtures;
+/// The CFP-002 process-local instrument counters (decision 5 schema, gated
+/// recording; the admit-path knot-span and composed-bidegree distributions).
+pub mod instrument;
 pub mod spine;
 
 pub use spine::{

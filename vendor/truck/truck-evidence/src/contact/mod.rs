@@ -74,6 +74,9 @@ use truck_geometry::specifieds::{Cylinder, Plane, Torus};
 pub mod fe_ee;
 pub mod gff;
 pub mod implicit;
+/// CFP-002-INSTRUMENT: the evidence crate's process-local instrument counters
+/// (the stage-5 pair-class histogram feeding the CFP program's `f` datum).
+pub mod instrument;
 /// BG-SOL-S7-OVERLAP: the 2-D overlap screen (strict parameter-box interior
 /// overlap), consumed by the identity arms and the analytic `Coincident`
 /// screen.
@@ -758,6 +761,10 @@ pub fn spline_analytic_contact(
     box_: [(f64, f64); 4],
     budget: &mut Budget,
 ) -> Outcome<ContactComplex> {
+    // CFP-002-INSTRUMENT: a spline×analytic pair entering the spline-SSI arm is
+    // a stage-5 entry (the class CFP-004 removes from the 4-D machinery). Gated
+    // record; one atomic load + branch when off, never a verdict change.
+    instrument::record_stage5_spline_analytic(analytic);
     let initial = *budget;
     let Some(solve) = dispatch_spline_ssi(spline, analytic, analytic_window, box_, budget) else {
         return Err(Refusal::NumericallyUnresolved {
@@ -906,6 +913,7 @@ fn analytic_ff(
             if coaxial_axes(a.center(), b.apex()) {
                 coaxial(&CoaxialPair::CylCone(a, b))
             } else {
+                instrument::record_stage5_canonical(l, r);
                 return validated_ff(a, b, u_range_l, v_range_l, u_range_r, v_range_r, budget);
             }
         }
@@ -913,6 +921,7 @@ fn analytic_ff(
             if coaxial_axes(a.apex(), b.center()) {
                 coaxial(&CoaxialPair::CylCone(b, a))
             } else {
+                instrument::record_stage5_canonical(l, r);
                 return validated_ff(a, b, u_range_l, v_range_l, u_range_r, v_range_r, budget);
             }
         }
@@ -920,6 +929,7 @@ fn analytic_ff(
             if coaxial_axes(a.center(), b.center()) {
                 coaxial(&CoaxialPair::CylSphere(a, b))
             } else {
+                instrument::record_stage5_canonical(l, r);
                 return validated_ff(a, b, u_range_l, v_range_l, u_range_r, v_range_r, budget);
             }
         }
@@ -927,6 +937,7 @@ fn analytic_ff(
             if coaxial_axes(a.center(), b.center()) {
                 coaxial(&CoaxialPair::CylSphere(b, a))
             } else {
+                instrument::record_stage5_canonical(l, r);
                 return validated_ff(a, b, u_range_l, v_range_l, u_range_r, v_range_r, budget);
             }
         }
@@ -934,6 +945,7 @@ fn analytic_ff(
             if coaxial_axes(a.apex(), b.apex()) {
                 coaxial(&CoaxialPair::ConeCone(a, b))
             } else {
+                instrument::record_stage5_canonical(l, r);
                 return validated_ff(a, b, u_range_l, v_range_l, u_range_r, v_range_r, budget);
             }
         }
@@ -941,6 +953,7 @@ fn analytic_ff(
             if coaxial_axes(a.apex(), b.center()) {
                 coaxial(&CoaxialPair::ConeSphere(a, b))
             } else {
+                instrument::record_stage5_canonical(l, r);
                 return validated_ff(a, b, u_range_l, v_range_l, u_range_r, v_range_r, budget);
             }
         }
@@ -948,31 +961,40 @@ fn analytic_ff(
             if coaxial_axes(a.center(), b.apex()) {
                 coaxial(&CoaxialPair::ConeSphere(b, a))
             } else {
+                instrument::record_stage5_canonical(l, r);
                 return validated_ff(a, b, u_range_l, v_range_l, u_range_r, v_range_r, budget);
             }
         }
         (CanonicalSurface::Torus(a), CanonicalSurface::Plane(b)) => {
+            instrument::record_stage5_canonical(l, r);
             return torus_ff(a, b, u_range_l, v_range_l, u_range_r, v_range_r, budget);
         }
         (CanonicalSurface::Plane(a), CanonicalSurface::Torus(b)) => {
+            instrument::record_stage5_canonical(l, r);
             return torus_ff(b, a, u_range_r, v_range_r, u_range_l, v_range_l, budget);
         }
         (CanonicalSurface::Torus(a), CanonicalSurface::Cylinder(b)) => {
+            instrument::record_stage5_canonical(l, r);
             return torus_ff(a, b, u_range_l, v_range_l, u_range_r, v_range_r, budget);
         }
         (CanonicalSurface::Cylinder(a), CanonicalSurface::Torus(b)) => {
+            instrument::record_stage5_canonical(l, r);
             return torus_ff(b, a, u_range_r, v_range_r, u_range_l, v_range_l, budget);
         }
         (CanonicalSurface::Torus(a), CanonicalSurface::Cone(b)) => {
+            instrument::record_stage5_canonical(l, r);
             return torus_ff(a, b, u_range_l, v_range_l, u_range_r, v_range_r, budget);
         }
         (CanonicalSurface::Cone(a), CanonicalSurface::Torus(b)) => {
+            instrument::record_stage5_canonical(l, r);
             return torus_ff(b, a, u_range_r, v_range_r, u_range_l, v_range_l, budget);
         }
         (CanonicalSurface::Torus(a), CanonicalSurface::Sphere(b)) => {
+            instrument::record_stage5_canonical(l, r);
             return torus_ff(a, b, u_range_l, v_range_l, u_range_r, v_range_r, budget);
         }
         (CanonicalSurface::Sphere(a), CanonicalSurface::Torus(b)) => {
+            instrument::record_stage5_canonical(l, r);
             return torus_ff(b, a, u_range_r, v_range_r, u_range_l, v_range_l, budget);
         }
         (CanonicalSurface::Torus(_), CanonicalSurface::Torus(_)) => {
