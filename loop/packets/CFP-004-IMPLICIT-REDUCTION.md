@@ -88,13 +88,13 @@ honestly). Coefficient mass at bicubic×plane: 16 vs 192.
    quadrics only; the torus arm is a no-op route-through (A7 boundary).
    The dispatcher must still route torus pairs correctly today; it just
    gets no reduction.
-4. **Consumer rule (spec §3a, verbatim):** `Unresolved` propagation into
-   the boundary rewrite is a typed refusal to the caller of `boolean()`,
-   localizable to faces via the lift's index→face map; no narrowing
-   retry, no fallback. The open assembly-scale decisiveness decision
-   (one resistant cell fails the operation vs only its region) is
-   DEFERRED with owner sign-off required — do not decide it here; carry
-   the stratum-pair identity so either answer remains available.
+4. **Consumer rule (spec §3a, DECIDED 2026-09-06, owner sign-off):**
+   `Unresolved` propagation into the boundary rewrite is a typed refusal
+   to the caller of `boolean()` **failing the WHOLE operation** — one
+   resistant cell fails the call, with the stratum-pair identity carried
+   so a client-layer partition strategy remains available; no narrowing
+   retry, no fallback, no partial-result shape. This matches the landed
+   fail-closed refusal arms and OCC's whole-op failure semantics.
 5. **SFC discipline:** every float heuristic is (search, exact-verify)
    pairs. The exclusion test's coefficients are exact Bernstein
    coefficients; sign decisions use the landed interval/Expansion

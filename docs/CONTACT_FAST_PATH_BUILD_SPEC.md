@@ -266,10 +266,16 @@ along the branch.
 - **`Unresolved` propagation into the boundary rewrite**: the stage contract
   (CFP-004) states the consumer rule — typed refusal to the caller of
   `boolean()`, localizable to faces via the lift's index→face map; no
-  narrowing retry, no fallback. Open decision recorded at spine: whether one
-  resistant cell fails the operation or only the region touching it
-  (assembly-scale decisiveness concern; an API-semantics decision, deferred
-  with owner sign-off required).
+  narrowing retry, no fallback. **DECIDED 2026-09-06 (owner sign-off,
+  session 54): whole-operation failure (Option A).** One resistant cell
+  fails the entire `boolean()` call with the typed, localizable refusal.
+  Rationale: parity with OCC (the original engine fails the whole op), native
+  to the landed evidence algebra (no partial-certified result shape, no new
+  evidence kind), and reversible — the refusal's localization payload keeps a
+  client-layer partition strategy available later without touching kernel
+  semantics. A partial-result shape (Option B) is rejected: it muddies H-6
+  (a partial result can silently render as fully certified) and re-opens the
+  spine's frozen vocabulary.
 
 ---
 
