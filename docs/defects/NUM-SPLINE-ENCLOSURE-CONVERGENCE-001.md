@@ -8,9 +8,21 @@ degrades every consumer that separates on enclosures. BG-ENC-001 (soundness) is
 ## 1. Status
 
 ```
-Mechanism established   — code-verified at named sites
-Not corrected           — correction is CFP-001-LIFT-ENCLOSURE
-                          (docs/CONTACT_FAST_PATH_BUILD_SPEC.md)
+Correction landed — validated by F-C0/F-C2
+```
+
+Corrected by `CFP-001-LIFT-ENCLOSURE`. `BSplineSurface::enclose` /
+`enclose_der` / `normal_cone` (`truck-evidence/src/enclosure.rs`) now return
+the sub-box spline hull: locate the knot spans overlapping the query box,
+de Casteljau-restrict each span's net to the box∩span intersection (exact
+`KnotVec` insertion via the landed ops), and union the per-span hulls — width
+→ 0 as the box → 0 (BG-ENC-002). The whole-domain query still returns the
+whole control-net hull (`control_net_box`). The permanent guard is the F-C2
+battery `fc2_enclosure_convergence_under_bisection` (strict width decrease down
+the nest) plus `fc2_enclosure_monotonicity` and
+`fc2_enclosure_containment_randomized`; the F1 duplicate-leaf cross-check is
+`fc7_cross_check_evidence_hull_matches_certified_side` (evidence suite).
+Synthetic witnesses only so far — the record stays open.
 ```
 
 ## 2. Mathematical objects

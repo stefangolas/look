@@ -21,8 +21,8 @@
     clippy::indexing_slicing
 )]
 
-use rustc_hash::{FxHashMap as HashMap, FxHashSet as HashSet};
-use truck_base::cgmath64::{InnerSpace, Point3};
+use rustc_hash::FxHashSet as HashSet;
+use truck_base::cgmath64::{InnerSpace, Point2, Point3};
 use truck_base::contact::{ContactDimension, ContactEventKind};
 use truck_base::evidence::{
     Budget, Certificate, Certified, EnvelopeCase, Margin, Method, Modulus, Outcome, PropMap,
@@ -30,18 +30,19 @@ use truck_base::evidence::{
 };
 use truck_evidence::analytic::AnalyticIntersection;
 use truck_evidence::contact::{contact, face_stratum, BoundedStratum, ContactLocus};
+use truck_evidence::enclosure::{Box3, EnclosureCurve, EnclosureSurface, Interval};
 use truck_geometry::canonical::{Curve, Surface};
 use truck_geometry::recognize::{
     recognize_curve, recognize_surface, CanonicalCarrier, CanonicalCarrierWitness, CanonicalCurve,
 };
-use truck_geotrait::{BoundedCurve, ParameterDivision1D};
-use truck_meshalgo::prelude::PolylineCurve;
+use truck_geometry::specifieds::UnitCircle;
+use truck_geotrait::{BoundedCurve, ParameterDivision1D, ParametricSurface, SearchParameter};
 use truck_topology::{Edge, EdgeID, EntityId, Face, Shell, Solid};
 
 use super::classify::{classify_fragments, FragmentClassification};
 use super::split::{
-    create_parameter_boundary, split_fragments, CoincidentOrientation, ContactEvent, FragmentMesh,
-    FragmentOrigin, SolidRef, StratumRef,
+    split_fragments, CoincidentOrientation, ContactEvent, FragmentMesh, FragmentOrigin, SolidRef,
+    StratumRef,
 };
 use super::sweep_lift::{
     classify_from_cells, fragment_provenance, sweep_face_stratum, windowed_sweep_face,
@@ -381,25 +382,143 @@ fn ee_circle_circle(lhs: &BoundedStratum, rhs: &BoundedStratum) -> bool {
 // the lift
 // ---------------------------------------------------------------------------
 
-/// The `(u, v)` box of a face: the min/max over the parameter polygons of its
-/// boundary wires (the `create_parameter_boundary` hull), in the stored
-/// frame.
+/// Unwraps a periodic parameter onto the branch of `previous` (the
+/// `sweep_lift` rule: a circle rim crossing the seam keeps its `u` hull
+/// continuous instead of snapping back to `[0, 2π)`).
+fn unwrap_periodic(period: f64, previous: f64, value: f64) -> f64 {
+    let mut delta = value - previous;
+    delta -= (delta / period).round() * period;
+    previous + delta
+}
+
+/// The number of `search_parameter` trials for one trim-extent inversion.
+const EXTENT_SEARCH_TRIALS: usize = 100;
+
+/// Whether the carrier's image over its own natural domain can bulge away from
+/// its boundary curves (the DSC-BOUNDARY-SAMPLE-EXTENT class): a sphere cap's
+/// pole, a torus band, a spline panel's interior. For these, the boundary
+/// polygon hull is not a sound cover, so the trim's parameter extent is the
+/// carrier's own (clamped) parameter domain.
+fn bulging_carrier(surface: &Surface) -> bool {
+    match surface {
+        Surface::Sphere(_)
+        | Surface::Torus(_)
+        | Surface::BSplineSurface(_)
+        | Surface::NurbsSurface(_) => true,
+        Surface::Processor(processor) => bulging_carrier(processor.entity()),
+        _ => false,
+    }
+}
+
+/// The carrier's natural parameter extent, when both axes are finite: the
+/// certified superset of any trim of that carrier (a sphere is `[0, π] ×
+/// [0, 2π]`, a clamped spline its knot domain). `None` when an axis is
+/// unbounded (a `Plane`, `Cylinder`, `Cone` — whose region extremes always lie
+/// on the boundary, so the boundary-derived trim box below is the right box).
+fn natural_extent(surface: &Surface) -> Option<((f64, f64), (f64, f64))> {
+    let (urange, vrange) = surface.parameter_range();
+    let u = range_interval(urange)?;
+    let v = range_interval(vrange)?;
+    if u.0 < u.1 && v.0 < v.1 {
+        Some((u, v))
+    } else {
+        None
+    }
+}
+
+/// A parameter-axis bound pair into a finite `(lo, hi)` pair; `None` for an
+/// unbounded axis.
+fn range_interval(range: (std::ops::Bound<f64>, std::ops::Bound<f64>)) -> Option<(f64, f64)> {
+    let lo = match range.0 {
+        std::ops::Bound::Included(x) | std::ops::Bound::Excluded(x) => x,
+        std::ops::Bound::Unbounded => return None,
+    };
+    let hi = match range.1 {
+        std::ops::Bound::Included(x) | std::ops::Bound::Excluded(x) => x,
+        std::ops::Bound::Unbounded => return None,
+    };
+    if lo.is_finite() && hi.is_finite() {
+        Some((lo, hi))
+    } else {
+        None
+    }
+}
+
+/// The `(u, v)` box of a face — the trim's TRUE parameter extent in the
+/// stored frame (CFP-001 decision 3; the `DSC-BOUNDARY-SAMPLE-EXTENT-001`
+/// parameter twin). For a curved carrier whose interior can leave the boundary
+/// polygon (a cap around a pole, a spline panel), the extent is the carrier's
+/// own clamped parameter domain — the certified superset the certified stages
+/// and enclosures reason over (F-C1: `param_box_derived_from_trim_not_boundary`).
+/// For the classes whose region extremes are always on the boundary (`Plane`,
+/// `Cylinder`, `Cone`), the extent is the boundary-derived trim box — exact
+/// there, and the DSC record itself grants the boundary rule for planar faces.
 fn face_uv_box(face: &Face<Point3, Curve, Surface>, tol: f64) -> Option<((f64, f64), (f64, f64))> {
-    let mut cache: HashMap<EdgeID<Curve>, PolylineCurve<Point3>> = HashMap::default();
+    let surface = face.surface();
+    if bulging_carrier(&surface) {
+        if let Some(natural) = natural_extent(&surface) {
+            return Some(natural);
+        }
+    }
+    boundary_parameter_extent(&surface, face, tol)
+}
+
+/// The exact boundary-derived trim box: the min/max over the `(u, v)` images
+/// of the boundary wires' parameter-division samples, in the stored frame
+/// (periodic `u` unwrapped onto one branch). This is the splitter's
+/// parameter-polygon hull semantics, inlined here so the lift no longer
+/// depends on the splitter/classifier's shared parameter-boundary builder (its
+/// remaining call sites all live outside the lift path).
+fn boundary_parameter_extent(
+    surface: &Surface,
+    face: &Face<Point3, Curve, Surface>,
+    tol: f64,
+) -> Option<((f64, f64), (f64, f64))> {
+    let u_period = surface.u_period();
     let mut u_lo = f64::INFINITY;
     let mut u_hi = f64::NEG_INFINITY;
     let mut v_lo = f64::INFINITY;
     let mut v_hi = f64::NEG_INFINITY;
+    let mut any = false;
     for wire in face.absolute_boundaries() {
-        let poly = create_parameter_boundary(face, wire, &mut cache, tol)?;
-        for p in poly.iter() {
-            u_lo = u_lo.min(p.x);
-            u_hi = u_hi.max(p.x);
-            v_lo = v_lo.min(p.y);
-            v_hi = v_hi.max(p.y);
+        let mut previous: Option<Point2> = None;
+        let front = wire.front_vertex()?.point();
+        let mut p: Point2 = surface
+            .search_parameter(front, None, EXTENT_SEARCH_TRIALS)?
+            .into();
+        u_lo = u_lo.min(p.x);
+        u_hi = u_hi.max(p.x);
+        v_lo = v_lo.min(p.y);
+        v_hi = v_hi.max(p.y);
+        any = true;
+        for edge in wire.edge_iter() {
+            let curve = edge.curve();
+            let div = curve.parameter_division(curve.range_tuple(), tol).1;
+            for q in div.iter() {
+                let mut uv: Point2 = surface
+                    .search_parameter(*q, Some(p.into()), EXTENT_SEARCH_TRIALS)?
+                    .into();
+                if let Some(period) = u_period {
+                    if let Some(prev) = previous {
+                        uv.x = unwrap_periodic(period, prev.x, uv.x);
+                    } else {
+                        uv.x = unwrap_periodic(period, p.x, uv.x);
+                    }
+                }
+                previous = Some(uv);
+                p = uv;
+                u_lo = u_lo.min(p.x);
+                u_hi = u_hi.max(p.x);
+                v_lo = v_lo.min(p.y);
+                v_hi = v_hi.max(p.y);
+            }
         }
     }
-    Some(((u_lo, u_hi), (v_lo, v_hi)))
+    if any && u_lo < u_hi && v_lo < v_hi {
+        Some(((u_lo, u_hi), (v_lo, v_hi)))
+    } else {
+        None
+    }
 }
 
 /// The parameter-division sample points of a curve (its 3-D polyline).
@@ -407,16 +526,146 @@ fn curve_samples(curve: &Curve, tol: f64) -> Vec<Point3> {
     curve.parameter_division(curve.range_tuple(), tol).1
 }
 
-/// The 3-D AABB of a face: min/max over the sample points of its boundary
-/// curves (the trimmed region's closure lies inside it).
-fn face_aabb(face: &Face<Point3, Curve, Surface>, tol: f64) -> Aabb {
-    let mut aabb = Aabb::empty();
-    for edge in face.edge_iter() {
-        for p in curve_samples(&edge.curve(), tol) {
-            aabb.grow(p);
+/// An interval pair from finite `(lo, hi)` bounds; the empty interval on a
+/// malformed pair (H-1: no panic).
+fn iv(lo: f64, hi: f64) -> Interval {
+    Interval::try_from((lo, hi)).unwrap_or(Interval::EMPTY)
+}
+
+/// The outward-rounded image of the box under the affine placement `m`
+/// (`world = m · (x, y, z, 1)`; the matrix columns are the affine columns).
+fn transform_box3(b: &Box3, m: truck_base::cgmath64::Matrix4) -> Box3 {
+    let s = |v: f64| Interval::try_from((v, v)).unwrap_or(Interval::EMPTY);
+    let x = s(m.x.x) * b.x + s(m.y.x) * b.y + s(m.z.x) * b.z + s(m.w.x);
+    let y = s(m.x.y) * b.x + s(m.y.y) * b.y + s(m.z.y) * b.z + s(m.w.y);
+    let z = s(m.x.z) * b.x + s(m.y.z) * b.y + s(m.z.z) * b.z + s(m.w.z);
+    Box3 { x, y, z }
+}
+
+/// The certified 3-D box of the carrier over the face's parameter extent
+/// (CFP-001 decision 3): `face_aabb`'s boundary sampling is replaced by the
+/// `EnclosureSurface` boxes — per-carrier exact for the canonical carriers,
+/// per-span sub-box hulls for a spline carrier, all unioned over the trim's
+/// true extent.
+fn certified_surface_box(surface: &Surface, uv: ((f64, f64), (f64, f64))) -> Option<Box3> {
+    let (uu, vv) = (iv(uv.0 .0, uv.0 .1), iv(uv.1 .0, uv.1 .1));
+    match surface {
+        Surface::Plane(s) => Some(s.enclose(uu, vv)),
+        Surface::Cylinder(s) => Some(s.enclose(uu, vv)),
+        Surface::Cone(s) => Some(s.enclose(uu, vv)),
+        Surface::Sphere(s) => Some(s.enclose(uu, vv)),
+        Surface::Torus(s) => Some(s.enclose(uu, vv)),
+        Surface::BSplineSurface(s) => Some(s.enclose(uu, vv)),
+        Surface::NurbsSurface(_) => None,
+        Surface::Processor(processor) => {
+            let inner = certified_surface_box(processor.entity(), uv)?;
+            Some(transform_box3(&inner, *processor.transform()))
         }
+        // A sweep face carries its realized window on the whole-sweep closed
+        // value; the sweep's certified enclosure over that window is the
+        // certified cover of the face.
+        Surface::SpineFrameSurface(sweep) => {
+            Some(sweep.enclose(iv(sweep.s0(), sweep.s1()), iv(sweep.v0(), sweep.v1())))
+        }
+        // A derived-of-revolution carrier keeps its boundary-curve cover below.
+        Surface::RevolutedCurve(_) | Surface::ExtrudedCurve(_) => None,
+    }
+}
+
+/// The 3-D AABB of a face: the certified carrier enclosure over the face's
+/// true parameter extent (per-span unioned for a spline carrier), grown over
+/// the certified enclosures of the boundary curves where the carrier itself
+/// has no certified enclosure (the sweep/derived-carrier fallback).
+fn face_enclosure(face: &Face<Point3, Curve, Surface>, tol: f64) -> Aabb {
+    let mut aabb = Aabb::empty();
+    let surface = face.surface();
+    if let Some(b) = boundary_enclosure_accumulate(&surface, face, tol) {
+        grow_aabb(&mut aabb, &b);
     }
     aabb
+}
+
+/// The certified enclosure of one face: the union of the carrier's certified
+/// box over the trim extent and the certified boxes of the boundary curves
+/// (for carriers whose own box is unavailable or, for full-face canonical
+/// classes, always equal to the boundary cover — the cad.rs rule).
+fn boundary_enclosure_accumulate(
+    surface: &Surface,
+    face: &Face<Point3, Curve, Surface>,
+    tol: f64,
+) -> Option<Box3> {
+    let carrier_box = match face_uv_box(face, tol) {
+        Some(uv) => certified_surface_box(surface, uv),
+        None => None,
+    };
+    let mut acc: Option<Box3> = carrier_box;
+    let mut push = |b: Box3| {
+        acc = Some(match acc {
+            Some(a) => union_box3(&a, &b),
+            None => b,
+        });
+    };
+    for wire in face.absolute_boundaries() {
+        for edge in wire.edge_iter() {
+            if let Some(b) = certified_edge_box(&edge.curve()) {
+                push(b);
+            }
+        }
+    }
+    acc
+}
+
+/// Grows the AABB to contain the interval box (finite bounds only; a
+/// non-finite enclosure contributes nothing — it is not a usable screen bound).
+fn grow_aabb(aabb: &mut Aabb, b: &Box3) {
+    let (x0, x1) = (b.x.inf(), b.x.sup());
+    let (y0, y1) = (b.y.inf(), b.y.sup());
+    let (z0, z1) = (b.z.inf(), b.z.sup());
+    if x0.is_finite()
+        && x1.is_finite()
+        && y0.is_finite()
+        && y1.is_finite()
+        && z0.is_finite()
+        && z1.is_finite()
+    {
+        aabb.grow(Point3::new(x0, y0, z0));
+        aabb.grow(Point3::new(x1, y1, z1));
+    }
+}
+
+/// The outward-rounded union of two interval boxes (coordinate-wise hull).
+fn union_box3(a: &Box3, b: &Box3) -> Box3 {
+    let union = |x: Interval, y: Interval| -> Interval {
+        Interval::try_from((x.inf().min(y.inf()), x.sup().max(y.sup()))).unwrap_or(Interval::EMPTY)
+    };
+    Box3 {
+        x: union(a.x, b.x),
+        y: union(a.y, b.y),
+        z: union(a.z, b.z),
+    }
+}
+
+/// The certified 3-D box of one boundary edge over its own bounded parameter
+/// range (`EnclosureCurve` per carrier; the section.rs rule).
+fn certified_edge_box(curve: &Curve) -> Option<Box3> {
+    match curve {
+        Curve::Line(line) => {
+            let (t0, t1) = line.range_tuple();
+            let tt = iv(t0, t1);
+            Some(line.enclose(tt))
+        }
+        Curve::Circle(placed) => {
+            let (t0, t1) = placed.range_tuple();
+            let tt = iv(t0, t1);
+            let local = UnitCircle::<Point3>::new().enclose(tt);
+            Some(transform_box3(&local, *placed.transform()))
+        }
+        Curve::BSplineCurve(_)
+        | Curve::NurbsCurve(_)
+        | Curve::IntersectionCurve(_)
+        | Curve::SpineFrameCurve(_)
+        | Curve::CertifiedImplicitIntersectionCurve(_) => None,
+    }
 }
 
 /// The 3-D AABB of an edge: min/max over its curve's sample points.
@@ -442,8 +691,9 @@ fn lift_faces(
         if let Some(stratum) = sweep_face_stratum(face) {
             // A sweep face: the whole-sweep closed value carries the recipe,
             // the realized window and the placement — no parameter-box
-            // projection is needed.
-            let aabb = face_aabb(face, tol);
+            // projection is needed. The certified enclosure of the sweep over
+            // its realized window screens the pair (CFP-001 decision 3).
+            let aabb = face_enclosure(face, tol);
             out.push(LiftedFace {
                 provenance: StratumRef::Face { solid, index: fi },
                 stratum,
@@ -459,7 +709,7 @@ fn lift_faces(
             return Err(numerically_unresolved());
         };
         let stratum = face_stratum(witness, u_range, v_range).map_err(|_| non_canonical())?;
-        let aabb = face_aabb(face, tol);
+        let aabb = face_enclosure(face, tol);
         out.push(LiftedFace {
             provenance: StratumRef::Face { solid, index: fi },
             stratum,
@@ -790,7 +1040,7 @@ fn numerically_unresolved() -> Refusal {
 )]
 mod tests {
     use super::*;
-    use std::f64::consts::TAU;
+    use std::f64::consts::{PI, TAU};
     use truck_base::cgmath64::{Matrix4, Point2, Vector4};
     use truck_base::contact::{ContactDimension, ContactEventKind};
     use truck_evidence::analytic::{AnalyticIntersection, ExactCurve};
@@ -799,8 +1049,10 @@ mod tests {
     use truck_geometry::constructive::{
         FrameLaw, LineSpine, Profile2D, ProfileLaw, SpineFrameRecipe, SpineFrameSweep,
     };
+    use truck_geometry::nurbs::{BSplineSurface, KnotVec};
     use truck_geometry::prelude::*;
     use truck_geometry::recognize::CanonicalSurface;
+    use truck_geometry::specifieds::{Line, Plane, Sphere, UnitCircle};
     use truck_modeling::extrude::extrude_profile;
     use truck_modeling::spine_sweep::spine_sweep;
     use truck_topology::{Vertex, Wire};
@@ -1503,7 +1755,7 @@ mod tests {
             let Surface::SpineFrameSurface(sweep) = face.surface() else {
                 continue;
             };
-            let (below, above) = junction_halves(&face, &sweep, s_mid);
+            let (below, above) = junction_halves(face, &sweep, s_mid);
             for half in [below, above] {
                 let Some(emitted_face) = windowed_sweep_face(&half, TOL) else {
                     let boxed = super::super::sweep_lift::face_parameter_box(&half, TOL);
@@ -1566,6 +1818,270 @@ mod tests {
                 *s0 >= 0.0 && *s1 <= 1.0,
                 "windows stay inside the parent sweep"
             );
+        }
+    }
+
+    // -----------------------------------------------------------------------
+    // CFP-001 fixture data, copied from `truck-certified/src/cfp/fixtures.rs`
+    // as read-only constants (F1 — never import the module). F-C0 exercises the
+    // lift screen (`face_enclosure`) on the DSC defect counterexample; F-C1 the
+    // parameter box on its twin.
+    // -----------------------------------------------------------------------
+
+    /// The F-C0 sphere-cap fixture data, verbatim (sphere centre, radius, cap
+    /// plane `z = cap_plane_z`, rim radius, apex, slab box, and the screen
+    /// records).
+    const FC0_SPHERE_CENTRE: [f64; 3] = [0.0, 0.0, 0.0];
+    const FC0_SPHERE_RADIUS: f64 = 5.0;
+    const FC0_CAP_PLANE_Z: f64 = -3.0;
+    const FC0_CAP_RIM_RADIUS: f64 = 4.0;
+    const FC0_APEX: [f64; 3] = [0.0, 0.0, -5.0];
+    const FC0_SLAB_LO: [f64; 3] = [-10.0, -10.0, -6.0];
+    const FC0_SLAB_HI: [f64; 3] = [10.0, 10.0, -4.0];
+    const FC0_SAMPLED_LO: [f64; 3] = [-4.0, -4.0, -3.0];
+    const FC0_SAMPLED_HI: [f64; 3] = [4.0, 4.0, -3.0];
+
+    /// The F-C1 parameter-twin data, verbatim.
+    const FC1_TRUE_EXTENT: ((f64, f64), (f64, f64)) = ((0.0, 1.0), (0.0, 1.0));
+    const FC1_BOUNDARY_POLYGON: [[f64; 2]; 4] = [[0.1, 0.1], [0.4, 0.1], [0.4, 0.4], [0.1, 0.4]];
+
+    /// Whether an AABB contains the point (inclusive).
+    fn aabb_contains(b: &Aabb, p: Point3) -> bool {
+        b.lo.x <= p.x
+            && p.x <= b.hi.x
+            && b.lo.y <= p.y
+            && p.y <= b.hi.y
+            && b.lo.z <= p.z
+            && p.z <= b.hi.z
+    }
+
+    /// The F-C0 cap face: the unit-5 sphere about the origin, bounded by the
+    /// rim circle at `z = −3` (radius 4). A whole-carrier face: the trim region
+    /// is the southern cap whose apex `(0, 0, −5)` is strictly below the rim —
+    /// the DSC boundary-sample screen hulls only the rim and silently drops the
+    /// cap's interior.
+    fn fc0_cap_face() -> Face<Point3, Curve, Surface> {
+        let sphere = Surface::Sphere(Sphere::new(
+            Point3::new(
+                FC0_SPHERE_CENTRE[0],
+                FC0_SPHERE_CENTRE[1],
+                FC0_SPHERE_CENTRE[2],
+            ),
+            FC0_SPHERE_RADIUS,
+        ));
+        let arc = |t0: f64, t1: f64| -> Curve {
+            Curve::Circle(Processor::with_transform(
+                TrimmedCurve::new(UnitCircle::<Point3>::new(), (t0, t1)),
+                Matrix4 {
+                    x: Vector4::new(FC0_CAP_RIM_RADIUS, 0.0, 0.0, 0.0),
+                    y: Vector4::new(0.0, FC0_CAP_RIM_RADIUS, 0.0, 0.0),
+                    z: Vector4::new(0.0, 0.0, 1.0, 0.0),
+                    w: Vector4::new(
+                        FC0_SPHERE_CENTRE[0],
+                        FC0_SPHERE_CENTRE[1],
+                        FC0_CAP_PLANE_Z,
+                        1.0,
+                    ),
+                },
+            ))
+        };
+        let v0 = Vertex::new(Point3::new(FC0_CAP_RIM_RADIUS, 0.0, FC0_CAP_PLANE_Z));
+        let v1 = Vertex::new(Point3::new(-FC0_CAP_RIM_RADIUS, 0.0, FC0_CAP_PLANE_Z));
+        let edge0 = Edge::try_new(&v0, &v1, arc(0.0, PI)).unwrap();
+        let edge1 = Edge::try_new(&v1, &v0, arc(PI, TAU)).unwrap();
+        Face::try_new(vec![Wire::from(vec![edge0, edge1])], sphere).unwrap()
+    }
+
+    /// The F-C0 slab's top face: the plane at `z = −4` spanning the slab's
+    /// `[−10, 10]²` footprint.
+    fn fc0_slab_top_face() -> Face<Point3, Curve, Surface> {
+        let plane = Surface::Plane(Plane::new(
+            Point3::new(0.0, 0.0, FC0_SLAB_HI[2]),
+            Point3::new(1.0, 0.0, FC0_SLAB_HI[2]),
+            Point3::new(0.0, 1.0, FC0_SLAB_HI[2]),
+        ));
+        let (x0, y0, z) = (FC0_SLAB_LO[0], FC0_SLAB_LO[1], FC0_SLAB_HI[2]);
+        let (x1, y1) = (FC0_SLAB_HI[0], FC0_SLAB_HI[1]);
+        let corners = [
+            Point3::new(x0, y0, z),
+            Point3::new(x1, y0, z),
+            Point3::new(x1, y1, z),
+            Point3::new(x0, y1, z),
+        ];
+        let verts: Vec<Vertex<Point3>> = corners.iter().map(|&p| Vertex::new(p)).collect();
+        let line = |a: &Vertex<Point3>, b: &Vertex<Point3>| {
+            Edge::try_new(a, b, Curve::Line(Line(a.point(), b.point()))).unwrap()
+        };
+        let n = verts.len();
+        let mut edges = Vec::new();
+        for i in 0..n {
+            edges.push(line(&verts[i], &verts[(i + 1) % n]));
+        }
+        Face::try_new(vec![Wire::from(edges)], plane).unwrap()
+    }
+
+    /// The F-C1 face: a cubic B-spline carrier over the clamped unit square,
+    /// trimmed to the recorded boundary polygon (the F-C1 twin: the boundary
+    /// polygon's hull is strictly inside the trim's true parameter extent, the
+    /// carrier's own domain).
+    fn fc1_trim_face() -> Face<Point3, Curve, Surface> {
+        let net = [
+            [
+                [0.0, 0.0, 0.0],
+                [0.0, 1.0, 0.0],
+                [0.0, 2.0, 0.0],
+                [0.0, 3.0, 0.0],
+            ],
+            [
+                [1.0, 0.0, 0.0],
+                [1.0, 1.0, 1.0],
+                [1.0, 2.0, 2.0],
+                [1.0, 3.0, 3.0],
+            ],
+            [
+                [2.0, 0.0, 0.0],
+                [2.0, 1.0, 2.0],
+                [2.0, 2.0, 4.0],
+                [2.0, 3.0, 6.0],
+            ],
+            [
+                [3.0, 0.0, 0.0],
+                [3.0, 1.0, 3.0],
+                [3.0, 2.0, 6.0],
+                [3.0, 3.0, 9.0],
+            ],
+        ];
+        let ctrl: Vec<Vec<Point3>> = net
+            .iter()
+            .map(|row| row.iter().map(|&p| Point3::new(p[0], p[1], p[2])).collect())
+            .collect();
+        let bsp = BSplineSurface::new((KnotVec::bezier_knot(3), KnotVec::bezier_knot(3)), ctrl);
+        let surface = Surface::BSplineSurface(bsp);
+        // The trim's boundary polygon in the carrier's own `(u, v)` frame,
+        // realized on the carrier: vertices at the recorded polygon corners.
+        let pts: Vec<Point3> = FC1_BOUNDARY_POLYGON
+            .iter()
+            .map(|v| surface.subs(v[0], v[1]))
+            .collect();
+        let verts: Vec<Vertex<Point3>> = pts.iter().map(|&p| Vertex::new(p)).collect();
+        let line = |a: &Vertex<Point3>, b: &Vertex<Point3>| {
+            Edge::try_new(a, b, Curve::Line(Line(a.point(), b.point()))).unwrap()
+        };
+        let n = verts.len();
+        let mut edges = Vec::new();
+        for i in 0..n {
+            edges.push(line(&verts[i], &verts[(i + 1) % n]));
+        }
+        Face::try_new(vec![Wire::from(edges)], surface).unwrap()
+    }
+
+    /// F-C0 (the DSC defect counterexample): the boundary-sample screen drops
+    /// the cap × slab pair; the certified `face_enclosure` screen admits it
+    /// (BG-ENC-001 — the sampled AABB does not contain the cap apex, the
+    /// certified one does).
+    #[test]
+    fn fc0_defect_counterexample_red_on_sampled_green_on_certified() {
+        let cap = fc0_cap_face();
+        let slab_top = fc0_slab_top_face();
+
+        // Red: the recorded boundary-sample AABBs do not touch — the sampled
+        // screen silently drops the pair (the defect).
+        let sampled_cap = Aabb {
+            lo: Point3::new(FC0_SAMPLED_LO[0], FC0_SAMPLED_LO[1], FC0_SAMPLED_LO[2]),
+            hi: Point3::new(FC0_SAMPLED_HI[0], FC0_SAMPLED_HI[1], FC0_SAMPLED_HI[2]),
+        };
+        let slab_solid = Aabb {
+            lo: Point3::new(FC0_SLAB_LO[0], FC0_SLAB_LO[1], FC0_SLAB_LO[2]),
+            hi: Point3::new(FC0_SLAB_HI[0], FC0_SLAB_HI[1], FC0_SLAB_HI[2]),
+        };
+        assert!(
+            !sampled_cap.touches(&slab_solid),
+            "the sampled cap screen box must not reach the slab (the defect)"
+        );
+        assert!(
+            !sampled_cap.touches(&face_enclosure(&slab_top, TOL)),
+            "the sampled cap screen box must not touch the slab's certified box"
+        );
+        // The sampled box does not even contain the cap apex — the interior the
+        // defect record says leaves the boundary hull.
+        assert!(!aabb_contains(
+            &sampled_cap,
+            Point3::new(FC0_APEX[0], FC0_APEX[1], FC0_APEX[2])
+        ));
+
+        // Green: the certified enclosures cover the true image and the pair is
+        // admitted by the screen (`face_enclosure` on both faces touches).
+        let cap_box = face_enclosure(&cap, TOL);
+        assert!(
+            aabb_contains(&cap_box, Point3::new(FC0_APEX[0], FC0_APEX[1], FC0_APEX[2])),
+            "the certified cap enclosure must contain the apex"
+        );
+        assert!(
+            cap_box.touches(&face_enclosure(&slab_top, TOL)),
+            "the certified screens must admit the cap × slab pair"
+        );
+    }
+
+    /// F-C1: the face's parameter box (`face_uv_box`) covers the trim's true
+    /// parameter extent; the boundary polygon hull does not.
+    #[test]
+    fn param_box_derived_from_trim_not_boundary() {
+        let face = fc1_trim_face();
+        let uv = face_uv_box(&face, TOL).expect("the trim face has a parameter box");
+        // The recorded boundary-polygon hull is strictly inside the true extent
+        // (the F-C1 ground truth).
+        let poly_lo = (0.1f64, 0.1f64);
+        let poly_hi = (0.4f64, 0.4f64);
+        assert!(
+            poly_lo.0 > FC1_TRUE_EXTENT.0 .0 && poly_hi.0 < FC1_TRUE_EXTENT.0 .1,
+            "the F-C1 boundary hull is strictly inside the true extent"
+        );
+        // The face's parameter box is derived from the carrier (the trim's true
+        // extent), so it covers the full recorded extent...
+        assert!(
+            uv.0 .0 <= FC1_TRUE_EXTENT.0 .0 + 1.0e-12 // H-3: parameter slack on the recorded extent endpoint
+                && uv.0 .1 >= FC1_TRUE_EXTENT.0 .1 - 1.0e-12
+                && uv.1 .0 <= FC1_TRUE_EXTENT.1 .0 + 1.0e-12
+                && uv.1 .1 >= FC1_TRUE_EXTENT.1 .1 - 1.0e-12,
+            "the trim parameter box must cover the true extent, got {uv:?}"
+        );
+        // ...and, unlike the boundary hull, strictly covers it somewhere.
+        assert!(
+            uv.0 .0 < poly_lo.0 && uv.1 .0 < poly_lo.1,
+            "the trim parameter box must leave the boundary hull: {uv:?}"
+        );
+    }
+
+    /// Reach assertion: the sweep screen's per-face AABB is the certified
+    /// `face_enclosure`, not a sampled boundary box — running the sweep on the
+    /// flagship pair reaches it, and every lifted face's screen box certifiably
+    /// contains the image of its own carrier's parameter mid-point.
+    #[test]
+    fn face_enclosure_used_by_lift_screen() {
+        let (profile_a, arr_a) = block_profile();
+        let shell_a = extrude_shell(&profile_a, &arr_a, 2.0);
+        let (profile_b, arr_b) = disk_profile(Point2::new(2.0, 2.0), 1.0);
+        let shell_b = extrude_shell(&profile_b, &arr_b, 2.0);
+        let solid_a = Solid::try_new(vec![shell_a.clone()]).unwrap();
+        let solid_b = Solid::try_new(vec![shell_b.clone()]).unwrap();
+        // The sweep consumes face_enclosure for its screen; the flagship pair
+        // still resolves its six-event complex through it.
+        let events = sweep_contact_events(&solid_a, &solid_b, TOL).unwrap().value;
+        assert_eq!(events.len(), 6, "the certified screen reaches the oracle");
+        for shell in [&shell_a, &shell_b] {
+            for face in shell.face_iter() {
+                let b = face_enclosure(face, TOL);
+                let Some(uv) = face_uv_box(face, TOL) else {
+                    continue;
+                };
+                let u = (uv.0 .0 + uv.0 .1) / 2.0;
+                let v = (uv.1 .0 + uv.1 .1) / 2.0;
+                let p = face.surface().subs(u, v);
+                assert!(
+                    aabb_contains(&b, p),
+                    "the screen box must certifiably contain the carrier at the extent mid-point"
+                );
+            }
         }
     }
 
