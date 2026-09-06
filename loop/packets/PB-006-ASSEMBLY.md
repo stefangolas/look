@@ -15,6 +15,8 @@ depends_on:  [PB-004-PYO3-CORE]
 write_allow:
   - truck123d/src/assembly_emit.rs
   - truck123d/src/lib.rs
+  - truck123d/Cargo.toml
+  - truck123d/Cargo.lock
   - truck123d/tests/pb_assembly.rs
 read_allow:
   - truck123d/src/{python,tables,marshal}.rs
@@ -40,17 +42,32 @@ emission: N solids + an intended-contact/evidence list → STEP assembly.
 
 ## Scope decisions — pre-made, do not relitigate
 
-1. **Client-side, additive**: the emission lives in `truck123d` (new file);
-   `truck-assembly` is read-only (V5 guard on the landed DAG/assy surface).
-2. **Contact intents are RECORDED, not resolved** (spec row: "with recorded
-   contact intents until BIE lands"): the emission writes each intended
-   contact as evidence rows on the assembly node — the BIE/CTE programs
-   supply the certified contact resolution later. A recorded intent is
-   data, never a claim.
-3. **The teapot fixture** (showcases' `teapot.rs` table, read-only):
-   body+spout+handle assembles to a STEP file whose three nodes carry the
-   recorded intents.
-4. **V5, absolute**: landed bridge tests are byte-identical constraints;
+**R2 AMENDMENT (2026-09-06, adjudicated SPEC_GAP):** the r1 worker proved
+the emission cannot compile inside the r1 write set — `truck123d` carries
+no `truck-assembly` edge (PB-004's manifest never added one), `PyTruckSolid`
+holds no solid representation, and the intent record did not exist
+(`CL-005-STOP`-class write-set boundary; probe transcripts in the slot's
+QUESTION.md). Adjudicated per the worker's resolution 1:
+
+1. **Write set grows**: `truck123d/Cargo.toml` (+ `Cargo.lock`, scoped to
+   the workspace-internal `truck-assembly` path-dep edge — the PB-004
+   precedent, which shipped its manifest the same way). Add the edge, then
+   the emission compiles.
+2. **The INTENT record is defined here** (the missing certificate named by
+   the worker): `AssemblyContactIntent { node_a, node_b, kind: Intent,
+   note: String }` — recorded as evidence rows on assembly nodes, typed
+   INTENT, never certified. This is a client-side record over the landed
+   evidence marshaling; zero new kernel `Refusal` arms.
+3. **The teapot test fixture is built through the bridge tables** (three
+   simple solids — body/spout/handle shapes via PB-004's primitives +
+   extrude), NOT by linking `showcases/` (a separate crate, unreachable
+   from `truck123d` tests). The test asserts 3 nodes + the recorded
+   intents; shape fidelity is not under test here.
+4. **Solid representation**: use the bridge's marshaled solid handles —
+   do not widen `python.rs` (PB-004's, read-only).
+5. **Client-side, additive**: `truck-assembly` is read-only except through
+   its public emission API (V5 guard on the landed DAG/assy surface).
+6. **V5, absolute**: landed bridge tests are byte-identical constraints;
    this packet is purely additive.
 
 ## Anchors — measured 2026-09-05 evening, re-check on your branch
