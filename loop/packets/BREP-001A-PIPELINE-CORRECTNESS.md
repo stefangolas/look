@@ -1,6 +1,6 @@
-# WORK PACKET BREP-001-PIPELINE-CORRECTNESS — the BRep generation pipeline defects, one combined packet
+# WORK PACKET BREP-001A-PIPELINE-CORRECTNESS — the BRep generation pipeline defects, one combined packet
 
-You are correcting six violated obligations in the BRep generation pipeline
+You are correcting Five violated obligations in the BRep generation pipeline
 (STEP ingestion → surface conversion → boundary projection → material domain
 → tessellation, plus the boolean screen layer). Everything you need is in
 this document and the six normative defect records in `docs/defects/` named
@@ -9,18 +9,17 @@ read other spec files. If something you need is genuinely missing, that is a
 SPEC_GAP (see "Stop conditions"): you stop and report, you do not research it.
 
 ```yaml
-id:          BREP-001-PIPELINE-CORRECTNESS
-contract:    [BREP-001-PIPELINE-CORRECTNESS]
+id:          BREP-001A-PIPELINE-CORRECTNESS
+contract:    [BREP-001A-PIPELINE-CORRECTNESS]
 class:       design
-crates:      [truck-stepio, truck-geometry, truck-meshalgo, truck-shapeops, truck-evidence]
-depends_on:  [CTE-007-T2ARRANGE]
+crates:      [truck-stepio, truck-geometry, truck-meshalgo, truck-evidence]
+depends_on:  []
 write_allow:
   - vendor/truck/truck-meshalgo/src/tessellation/triangulation.rs
   - vendor/truck/truck-stepio/src/in/mod.rs
   - vendor/truck/truck-stepio/src/in/step_geometry.rs
   - vendor/truck/truck-geometry/src/decorators/revolved_curve.rs
   - vendor/truck/truck-geometry/src/arrange.rs
-  - vendor/truck/truck-shapeops/src/boolean/assemble.rs
   - vendor/truck/truck-meshalgo/tests/defect_regressions.rs
   - vendor/truck/truck-geometry/tests/defect_regressions.rs
 read_allow:
@@ -46,22 +45,25 @@ tests_required:
   - num_subdivision_growth_001_cap_hit_is_observable_as_resource_capped
   - num_subdivision_growth_001_sample_count_constructor_refuses_non_finite
   - sem_arrange_dyadic_contract_001_non_dyadic_vertices_refuse_typed
-  - dsc_boundary_sample_extent_001_sphere_cap_screen_admits_the_contact
-  - dsc_boundary_sample_extent_001_planar_faces_screen_unchanged
   - geo_incidence_001_transform_provenance_probe_records_first_failing_stage
-budget:      {turns: 200, ctx_tokens: 260000}
+budget:      {turns: 160, ctx_tokens: 220000}
 ```
 
 **New files** (`defect_regressions.rs` × 2): H-1 applies — no `unwrap_used`
 without a justified same-line opt-out.
 
+**R2 split note:** this packet was split from BREP-001 so it can dispatch
+while CTE-007 runs — the DSC enclosure-screen fix (Contract F) moved to
+[`BREP-002-DSC-SCREENS`](BREP-002-DSC-SCREENS.md) because it writes
+`boolean/assemble.rs`, which CTE-007 owns until it lands. Nothing else
+changed.
+
 ## The one-sentence version
 
-Six records, one pipeline: make the domain model derive from source
+Five records, one pipeline: make the domain model derive from source
 semantics (A→B→C), make cap-hitting observable (D), make the arrange
-refusal honest (E), make the boolean screens sound (F), and settle the
-incidence question with a probe instead of a gate (G). Work them in that
-order; ONE commit at the end.
+refusal honest (E), and settle the incidence question with a probe instead
+of a gate (G). Work them in that order; ONE commit at the end.
 
 ## Contracts — frozen, per boundary (these cross six module boundaries; each is restated AT the boundary)
 
@@ -120,21 +122,10 @@ arrange exactly as today). Location: the arrange entry
 profile-facing one), with the precondition on vertex coordinates the
 SEM-ARRANGE-DYADIC-CONTRACT-001 record defines.
 
-### Contract F (DSC) — screens are enclosures, not sampled extents
-In `boolean/assemble.rs`: `face_aabb`/`face_uv_box` (boundary-sample hulls)
-are replaced as SCREENS by certified enclosures:
-- world screen: `EnclosureSurface::enclose(parameter_box)` per stratum —
-  sound by construction (over-estimation acceptable: extra pairs admitted,
-  refused typed downstream; UNDER-estimation is the cardinal failure);
-- the tighter variant where width matters: union of per-knot-span `enclose`
-  boxes over the D1 Bézier decomposition the carrier already paid for at
-  admission (CL-000's landed extraction);
-- the uv box derives from the trim's true parameter extent, not the
-  boundary-polygon hull.
-The `ee_circle_circle` guard stays (falsified-hypothesis section of the
-record — documented v1 envelope, not a defect). This section runs LAST
-(CTE-007 owns assemble.rs until it lands; this packet's `depends_on` enforces
-the serialization).
+### Contract F — moved to BREP-002-DSC-SCREENS
+The DSC enclosure-screen fix writes `boolean/assemble.rs`, which CTE-007
+owns until it lands — it is BREP-002's whole content. Read its record
+(DSC-BOUNDARY-SAMPLE-EXTENT-001) but do NOT implement it here.
 
 ### Contract G (GEO) — the incidence question is settled by a probe, not a gate
 NO production policy change: `COMPATIBILITY_FACTOR` stays `inf` (the record's
@@ -151,8 +142,8 @@ face→surface pairing answer (checked for edges, never for surfaces).
 A → B → C share `triangulation.rs`/`stepio` and chain causally (each arrow
 of PAR's derivation is separately correctable; the closure test feeds the
 open-piece classification, which feeds the parity model, which the domain
-derivation consumes). D, E are independent — interleave anywhere. F runs
-last. G is test-side, anytime. **After each fix, run that fix's named tests
+derivation consumes). D, E are independent — interleave anywhere. G is
+test-side, anytime. **After each fix, run that fix's named tests
 before starting the next; a red gate stops the packet** (stop condition 3).
 
 ## Anchors — measured 2026-09-06 morning, re-check on your branch
@@ -162,12 +153,10 @@ before starting the next; a red gate stops the packet** (stop condition 3).
 | A1 | `truck-meshalgo/src/tessellation/triangulation.rs` | `impl PolyBoundary` | 1 |
 | A2 | `truck-geometry/src/specifieds/line.rs` | `fn parameter_range` | 1 |
 | A3 | `truck-geometry/src/decorators/revolved_curve.rs` | `MAX_CIRCLE_DIVISION` | ≥1 |
-| A4 | `truck-shapeops/src/boolean/assemble.rs` | `fn face_aabb` | 1 |
-| A5 | `truck-shapeops/src/boolean/assemble.rs` | `fn face_uv_box` | 1 |
-| A6 | `truck-stepio/src/` (recursive) | `FACE_OUTER_BOUND` | 10 |
-| A7 | `vendor/truck/` (recursive) | `AllBoundsCollapsed` | 11 |
+| A4 | `truck-stepio/src/` (recursive) | `FACE_OUTER_BOUND` | 10 |
+| A5 | `vendor/truck/` (recursive) | `AllBoundsCollapsed` | 11 |
 
-A6/A7 are shared-file totals quoted as CENSUS anchors only — your write set
+A4/A5 are shared-file totals quoted as CENSUS anchors only — your write set
 names the files; do not re-count them as behavior gates.
 
 ## Acceptance gates (the records' own measurements — these ARE the verdicts)
@@ -205,9 +194,10 @@ when the boundary lies on its edge; loosening the closure tolerance until
 2π counts as zero; any arbitrary range multiplier (the experiment's factor
 of 2 included); file-specific exceptions; silently guessed parameters;
 turning `COMPATIBILITY_FACTOR` on; deleting or weakening
-`AllBoundsCollapsed`; touching `truck-evidence/src/num/krawczyk.rs` or
-`tangency/**` (CTE's, landed); `Cargo.lock`. Adding `#[ignore]`. Unjustified
-`#[allow]`. Committing to `main`.
+`AllBoundsCollapsed`; touching `truck-evidence/src/num/krawczyk.rs`,
+`tangency/**` (CTE's, landed), or `boolean/assemble.rs` (BREP-002's write
+set — the DSC screen fix lives there); `Cargo.lock`. Adding `#[ignore]`.
+Unjustified `#[allow]`. Committing to `main`.
 
 ## Stop conditions
 
@@ -224,12 +214,12 @@ turning `COMPATIBILITY_FACTOR` on; deleting or weakening
 **COMMIT BEFORE writing `RESULT.json`.**
 
 ```json
-{"id":"BREP-001-PIPELINE-CORRECTNESS","status":"DONE","contracts":["BREP-001-PIPELINE-CORRECTNESS"],
- "tests_added":13,"anchors_verified":{"A1":1,"A2":1,"A3":1,"A4":1,"A5":1,"A6":10,"A7":11},
+{"id":"BREP-001A-PIPELINE-CORRECTNESS","status":"DONE","contracts":["BREP-001A-PIPELINE-CORRECTNESS"],
+ "tests_added":11,"anchors_verified":{"A1":1,"A2":1,"A3":1,"A4":10,"A5":11},
  "notes":"per-fix: which acceptance gates met (apex triangles, ctc_02 both-encodings, blob census, cap observability); the whole-rectangle census count; the transform-provenance probe's first failing stage; every API deviation"}
 ```
 
 `status` is one of `DONE`, `ANCHOR_MISMATCH`, `SPEC_GAP`, `BLOCKED`. On any
 non-`DONE` status also write `QUESTION.md` beside it.
 
-Commit subject: `fix(brep): pipeline correctness — quotient closure, base-domain parity, bounds-derived domains, observable caps, typed arrange refusal, enclosure screens (BREP-001-PIPELINE-CORRECTNESS)`.
+Commit subject: `fix(brep): pipeline correctness — quotient closure, base-domain parity, bounds-derived domains, observable caps, typed arrange refusal, incidence probe (BREP-001A-PIPELINE-CORRECTNESS)`.
