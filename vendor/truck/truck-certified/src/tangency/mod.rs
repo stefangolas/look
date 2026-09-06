@@ -68,6 +68,13 @@ pub mod chart;
 #[doc(hidden)]
 pub mod fixtures;
 
+/// The CTE program battery gates (CTE-008-GATES): deterministic certified
+/// fixture-input reconstruction and gate helpers for the program battery.
+/// TEST SUPPORT ONLY: `#[doc(hidden)] pub`, excluded from the certified API
+/// surface (the `fixtures` precedent).
+#[doc(hidden)]
+pub mod gates;
+
 /// The (H-graph) parametric Newton/Krawczyk graph certification
 /// (CTE-002-GRAPH).
 pub mod graph;
