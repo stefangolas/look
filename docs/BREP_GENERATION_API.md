@@ -196,6 +196,65 @@ intervals, and defers the not-yet-implemented reductions. Its records
 `ContactEvent` carries into the splitter. Callers composing their own
 event lists (§5) build them from `contact` output.
 
+## 8.1 The analytic×spline funnel stage (CFP-004-IMPLICIT-REDUCTION)
+
+```rust
+// truck_evidence::contact::implicit2d — Theorem-4 scalar reduction.
+pub struct ScalarNet2;          // bivariate scalar Bernstein net on [0,1]²
+pub struct PatchNet2;           // tensor control net on [0,1]²
+pub enum ReductionVerdict { Empty, LoopFree,
+                            Critical { cell, local, chart, centre, residue },
+                            Resistant }
+pub struct ImplicitReduction { pub h: ScalarNet2, pub verdict: ReductionVerdict }
+
+pub fn reduce_analytic_spline(
+    analytic: &CanonicalSurface, spline: &BSplineSurface<Vector4>,
+    box_uv: ((f64, f64), (f64, f64)), budget: &mut Budget,
+) -> Option<ImplicitReduction>
+pub fn screen_empty(
+    analytic: &CanonicalSurface, spline: &BSplineSurface<Vector4>,
+    box_uv: ((f64, f64), (f64, f64)),
+) -> Option<bool>
+pub fn restrict_patch(net: &PatchNet2, box_uv: ((f64, f64), (f64, f64)))
+    -> Option<PatchNet2>
+pub fn gradient_hull_naive(du: &ScalarNet2, dv: &ScalarNet2) -> bool
+pub fn gradient_hull_elevated(du: &ScalarNet2, dv: &ScalarNet2) -> bool
+```
+
+The funnel's spline×analytic entry (`spline_analytic_contact`) routes a
+recognized analytic carrier (plane, sphere, cylinder, cone) against a
+single-span clamped unit-weight spline patch through the Theorem-4 scalar
+reduction: contact becomes one scalar equation `h = g∘S` on the spline
+chart (`(p, q)` for planes — signed control-point distances — and `(2p, 2q)`
+for quadrics — the exact Bernstein product). A cell whose outward-rounded
+`h` hull excludes zero is a certified prune (`screen_empty` returns
+`Some(true)`); every other cell routes through, unchanged, to the
+registered SSI engine. The torus is excluded from the reduction (its
+quartic implicit, spec §7) and always routes through. Critical points of
+`h` are a 2×2 square system solved through the landed Krawczyk operator;
+`gradient_hull_elevated` is the elevation-corrected loop detector (the
+naive pairing's false certificate is the F-C4 trap).
+
+Localizable refusals (spec §3a consumer rule, decided 2026-09-06):
+
+```rust
+// truck_evidence::contact
+pub enum StratumSide { A, B }
+pub type StratumPair = (StratumSide, usize, StratumSide, usize);
+pub struct LocalizedRefusal { /* cause, stratum_pair */ }
+pub fn spline_analytic_contact_localized(
+    spline: &BSplineSurface<Vector4>, analytic: &CanonicalSurface,
+    analytic_window: ((f64, f64), (f64, f64)),
+    box_: [(f64, f64); 4], budget: &mut Budget,
+    stratum_pair: StratumPair,
+) -> Result<Certified<ContactComplex>, LocalizedRefusal>
+```
+
+An unresolved cell propagates as a typed refusal failing the WHOLE call,
+carrying the stratum-pair identity (no narrowing retry, no fallback, no
+partial-result shape); `truck-shapeops` re-attributes to faces through the
+lift's index→face map.
+
 ## 9. The refusal taxonomy
 
 | `Refusal` | means |

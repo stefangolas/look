@@ -74,6 +74,11 @@ use truck_geometry::specifieds::{Cylinder, Plane, Torus};
 pub mod fe_ee;
 pub mod gff;
 pub mod implicit;
+/// CFP-004-IMPLICIT-REDUCTION: the analytic×spline implicit-reduction stage
+/// (Theorem 4) — contact between a recognized analytic carrier (plane or
+/// quadric) and a spline patch becomes ONE scalar equation `h = g∘S` on the
+/// spline chart, with the 2×2 `∇h = 0` system for the landed Krawczyk.
+pub mod implicit2d;
 /// CFP-002-INSTRUMENT: the evidence crate's process-local instrument counters
 /// (the stage-5 pair-class histogram feeding the CFP program's `f` datum).
 pub mod instrument;
@@ -766,6 +771,27 @@ pub fn spline_analytic_contact(
     // record; one atomic load + branch when off, never a verdict change.
     instrument::record_stage5_spline_analytic(analytic);
     let initial = *budget;
+    // CFP-004-IMPLICIT-REDUCTION pre-screen: for a recognized plane/quadric ×
+    // single-span spline cell, the Theorem-4 exclusion decides the cell as
+    // certified-empty in one scalar-hull test (coefficient mass 16 vs 192 at
+    // bicubic × plane) — no 4-D machinery is reached for the pruned class.
+    // A cell the exclusion does NOT certify empty routes through, unchanged,
+    // to the registered SSI entry: no silent downgrade, no partial answer.
+    let box_uv = (box_[0], box_[1]);
+    if let Some(true) = implicit2d::screen_empty(analytic, spline, box_uv) {
+        return Ok(Certified::new(
+            ContactComplex {
+                contacts: Vec::new(),
+            },
+            Certificate {
+                props: PropMap::new(),
+                method: Method::Interval,
+                budget_left: *budget,
+                margin: Margin::UNBOUNDED,
+                modulus: Modulus::Unbounded,
+            },
+        ));
+    }
     let Some(solve) = dispatch_spline_ssi(spline, analytic, analytic_window, box_, budget) else {
         return Err(Refusal::NumericallyUnresolved {
             spent: initial,
@@ -792,6 +818,116 @@ pub fn spline_analytic_contact(
             witness: UnresolvedWitness::KrawczykIndeterminate,
         }),
         SsiSplineSolve::Refused(refusal) => Err(refusal),
+    }
+}
+
+// ---------------------------------------------------------------------------
+// CFP-004-IMPLICIT-REDUCTION: the localizable-refusal seam (spec §3a consumer
+// rule, DECIDED 2026-09-06; spine decision 3 mirrored per F1).
+// ---------------------------------------------------------------------------
+
+/// One side of a dispatched or refused stratum pair.
+///
+/// This is the evidence mirror of the CFP spine's `StratumSide` (decision 3).
+/// F1 forbids `truck-evidence` naming `truck-certified`, so the frozen
+/// decision-3 shapes are mirrored here exactly as the instrument schema is
+/// mirrored and the solver-entry cells are (`contact::solver_entry`). Side `A`
+/// is the pair's first participant, side `B` the second; a stratum pair names
+/// one stratum per side in canonical `A`-then-`B` order.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum StratumSide {
+    /// The pair's first (left / `a`) side.
+    A,
+    /// The pair's second (right / `b`) side.
+    B,
+}
+
+impl StratumSide {
+    /// A short stable tag, for diagnostics.
+    pub fn tag(self) -> &'static str {
+        match self {
+            Self::A => "a",
+            Self::B => "b",
+        }
+    }
+}
+
+/// A stratum pair: one stratum index per side, canonically `A` first.
+///
+/// `(StratumSide::A, i, StratumSide::B, j)` names stratum `i` on the first
+/// side and stratum `j` on the second (the evidence mirror of the CFP spine's
+/// `StratumPair`, decision 3).
+pub type StratumPair = (StratumSide, usize, StratumSide, usize);
+
+/// A localizable refusal: a landed evidence refusal wrapped beside the stratum
+/// pair it concerns (the consumer rule's typed refusal).
+///
+/// `Unresolved` propagation into the boundary rewrite is a typed refusal to the
+/// caller of `boolean()` **failing the whole operation** — one resistant cell
+/// fails the call — with the stratum-pair identity carried so a client-layer
+/// partition strategy remains available (spec §3a, Option A; no narrowing
+/// retry, no fallback, no partial-result shape). Re-attribution to faces
+/// happens in `truck-shapeops` through the lift's index→face map.
+///
+/// The evidence mirror of the CFP spine's `LocalizedRefusal` (decision 3): the
+/// cause is a landed [`Refusal`](truck_base::evidence::Refusal) carried
+/// verbatim. The spine's refusing constructor (`Refusal::InvalidInput` for a
+/// non-canonical pairing) is mirrored as an infallible wrapper: the evidence
+/// `Refusal` vocabulary has no `InvalidInput` arm, and the funnel only ever
+/// localizes a canonical `A`-then-`B` pair (the seam's documented contract).
+#[derive(Debug, Clone)]
+pub struct LocalizedRefusal {
+    /// The landed evidence refusal, verbatim.
+    cause: Refusal,
+    /// The stratum pair `(A, i, B, j)` the refusal concerns.
+    stratum_pair: StratumPair,
+}
+
+impl LocalizedRefusal {
+    /// Wrap a landed evidence refusal with its stratum pair.
+    ///
+    /// The caller supplies a canonical `A`-then-`B` pair (the funnel seam's
+    /// contract); the wrapper carries the cause verbatim beside the identity
+    /// of the two strata whose interaction refused.
+    pub fn new(cause: Refusal, stratum_pair: StratumPair) -> Self {
+        Self {
+            cause,
+            stratum_pair,
+        }
+    }
+
+    /// The landed evidence refusal, verbatim.
+    pub fn cause(&self) -> &Refusal {
+        &self.cause
+    }
+
+    /// The stratum pair `(A, i, B, j)`, verbatim.
+    pub fn stratum_pair(&self) -> StratumPair {
+        self.stratum_pair
+    }
+}
+
+/// The consumer-rule funnel entry of the spline × analytic dispatch: certifies
+/// one spline×analytic cell and, on a resistant (unresolved) cell, returns the
+/// **localizable** typed refusal carrying the stratum-pair identity — failing
+/// the WHOLE call, never a narrowed retry, never a fallback, never a silent
+/// downgrade (spec §3a, DECIDED 2026-09-06).
+///
+/// This is the boundary-rewrite-facing form of [`spline_analytic_contact`]: a
+/// certified outcome is returned as-is; every refusal is wrapped beside the
+/// caller's canonical `A`-then-`B` stratum pair so the whole-operation failure
+/// stays partitionable at a client layer.
+pub fn spline_analytic_contact_localized(
+    spline: &BSplineSurface<Vector4>,
+    analytic: &CanonicalSurface,
+    analytic_window: ((f64, f64), (f64, f64)),
+    box_: [(f64, f64); 4],
+    budget: &mut Budget,
+    stratum_pair: StratumPair,
+) -> Result<Certified<ContactComplex>, LocalizedRefusal> {
+    match spline_analytic_contact(spline, analytic, analytic_window, box_, budget) {
+        Ok(certified) => Ok(certified),
+        Err(cause) => Err(LocalizedRefusal::new(cause, stratum_pair)),
     }
 }
 
@@ -3262,6 +3398,64 @@ mod tests {
             matches!(out, Err(Refusal::NumericallyUnresolved { .. })),
             "an inadmissible sweep×sweep pair must answer the typed \
              NumericallyUnresolved, got {out:?}"
+        );
+    }
+
+    #[test]
+    fn unresolved_localizes_to_stratum_pair() {
+        // CFP-004 required test 3 (consumer rule, spec §3a): a constructed
+        // resistant cell — a spline patch COINCIDENT with the analytic plane
+        // (`h ≡ 0` over the cell fails the exclusion honestly) — yields the
+        // typed refusal carrying the stratum-pair identity through the
+        // localized funnel entry: no retry, no fallback, no silent downgrade.
+        let _cleared = take_spline_ssi_entry();
+        // The flat bilinear patch S(u, v) = (u, v, 0) lies in the plane z = 0:
+        // h ≡ 0 over the whole cell, so the Theorem-4 screen cannot certify
+        // empty (the exclusion is honest) and the cell resists.
+        let spline = BSplineSurface::new(
+            (KnotVec::bezier_knot(1), KnotVec::bezier_knot(1)),
+            vec![
+                vec![
+                    Vector4::new(0.0, 0.0, 0.0, 1.0),
+                    Vector4::new(0.0, 1.0, 0.0, 1.0),
+                ],
+                vec![
+                    Vector4::new(1.0, 0.0, 0.0, 1.0),
+                    Vector4::new(1.0, 1.0, 0.0, 1.0),
+                ],
+            ],
+        );
+        let analytic = CanonicalSurface::Plane(Plane::new(
+            Point3::new(0.0, 0.0, 0.0),
+            Point3::new(1.0, 0.0, 0.0),
+            Point3::new(0.0, 1.0, 0.0),
+        ));
+        let pair = (StratumSide::A, 3, StratumSide::B, 7);
+        let mut budget = Budget::new(100, 100, 100);
+        let out = spline_analytic_contact_localized(
+            &spline,
+            &analytic,
+            ((0.0, 1.0), (0.0, 1.0)),
+            [(0.0, 1.0), (0.0, 1.0), (0.0, 1.0), (0.0, 1.0)],
+            &mut budget,
+            pair,
+        );
+        let localized = out.expect_err("a resistant cell fails the whole call, typed");
+        assert_eq!(
+            localized.stratum_pair(),
+            pair,
+            "the refusal carries the stratum-pair identity, verbatim"
+        );
+        assert!(
+            matches!(
+                localized.cause(),
+                Refusal::NumericallyUnresolved {
+                    witness: UnresolvedWitness::KrawczykIndeterminate,
+                    ..
+                }
+            ),
+            "the localized cause is the typed unresolved refusal, got {:?}",
+            localized.cause()
         );
     }
 }
