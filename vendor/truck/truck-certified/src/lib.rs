@@ -14,6 +14,12 @@
     unused_qualifications
 )]
 
+/// The per-carrier span BVH broadphase (CFP-005-BRANCH-BVH): a balanced BVH
+/// over the admitted span stack of a carrier whose node pairs are pruned by
+/// exact Theorem-3 sign rows (SFC float search + exact `Expansion`
+/// certificate), so a loft×loft contact enumerates surviving span pairs
+/// instead of the full span-pair Cartesian product.
+pub mod bvh;
 pub mod certified_map;
 /// The Contact Fast-Path (CFP) program spine (CFP-000-SPINE): the frozen
 /// shapes, fixture kit, gate definitions, and instrument schema of the
