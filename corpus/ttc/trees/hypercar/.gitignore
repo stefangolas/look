@@ -1,0 +1,13 @@
+/STEP/*
+!/STEP/imported/
+!/STEP/*.step.js
+/DXF/*
+!/DXF/imported/
+/STL/*
+!/STL/imported/
+/GLB/*
+!/GLB/imported/
+/3MF/*
+!/3MF/imported/
+/tmp/
+__pycache__/

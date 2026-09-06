@@ -1,0 +1,27 @@
+{
+  "schema": "ttc_reference.v1",
+  "row_id": "hypercar/wheels",
+  "door_version": "1",
+  "facts": {
+    "solid_count": 76,
+    "volume": 19362361.55003055,
+    "bbox": [
+      [
+        -1843.466497806774,
+        -1028.5111105816454,
+        -0.8080949064216156
+      ],
+      [
+        1790.447757046812,
+        1028.5111105816454,
+        849.6890806104931
+      ]
+    ]
+  },
+  "tolerances": {
+    "solid_count": "exact",
+    "volume_rel": 0.0001,
+    "volume_abs": 1e-06,
+    "bbox_abs": 0.001
+  }
+}
