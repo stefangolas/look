@@ -1,7 +1,12 @@
 //! PB-013 required Rust suite (four tests) over the op capability matrix:
 //! the PB-010 parity audit's 93 op census rows turned into one annotated cell
 //! per (op x carrier-class) pair, with every cell asserted against LIVE
-//! facade/compat behavior.
+//! facade/compat behavior. PB-014-AUTHORING-REVOLVE amends the suite: cells
+//! 10 and 19 (the partial-arc revolve and the closed-circle authoring rows)
+//! flip to `certified` (the two authoring prerequisites the audit's G5/G3
+//! findings named), and the three authoring tests the packet requires are
+//! added (`circle_profile_authors_and_feeds_revolve`,
+//! `partial_arc_revolve_builds_capped_shell`, `matrix_cells_flipped_certified`).
 //!
 //! The doc (`docs/OP_CAPABILITY_MATRIX.md`) and this file share one cell
 //! table: the fixed-order `CELLS` below is canonical, the doc table is its
@@ -14,11 +19,12 @@
 //!    typed refusal with the `NonCanonicalCarrier` envelope case today
 //!    (`swept_carrier_boolean_cells_refuse_typed_today`);
 //! 3. the authoring cells (spline, polyline/line-loop, circle) match the
-//!    S5/S6 surface rows, and the missing Circle-profile row (audit G3) is
-//!    annotated `unavailable`, `flipped-by: PB-011`
+//!    S5/S6 surface rows; PB-014 flips the circle row (audit G3) to
+//!    `certified` as the landed S5 closed-circle carrier authoring entry
 //!    (`authoring_cells_match_surface_rows`);
 //! 4. the `revolve(partial-arc,spline-profile)` cell is annotated per the
-//!    audit's G5 finding (`partial_arc_revolve_cell_annotated`).
+//!    audit's G5 finding and flipped to `certified` by PB-014
+//!    (`partial_arc_revolve_cell_annotated`).
 //!
 //! Live driver semantics (what "driving live behavior" means per verdict):
 //!
@@ -75,7 +81,7 @@ const CELLS: &[CellSpec] = &[
     ("cut(canonical,canonical)", "certified", "-", "certified", "S1", &["f1/src/lib/drivetrain.py:clevis_bore", "f1/src/lib/rear_wing.py:pylon_cut"]),
     ("heal(boolean-result)", "unavailable", "-", "unavailable", "S1", &["f1/src/lib/surfaces.py:repair"]),
     ("revolve(full,spline-profile)", "certified", "-", "certified", "S6", &["falcon_heavy/src/lib/merlin_common.py:revolved_shell", "falcon_heavy/src/lib/merlin_common.py:revolved_solid", "falcon_heavy/src/lib/falcon_common.py:_tube_z", "falcon_heavy/src/lib/falcon_common.py:_dome", "falcon_heavy/src/lib/falcon_common.py:make_mvac_revolve", "falcon_heavy/src/lib/falcon_common.py:make_fairing_shell", "f1/src/lib/wheels.py:revolve_tyre"]),
-    ("revolve(partial-arc,spline-profile)", "unavailable", "PB-011", "certified", "S6", &["falcon_heavy/src/lib/falcon_common.py:revolved_solid_barrel"]),
+    ("revolve(partial-arc,spline-profile)", "certified", "PB-014", "certified", "S6", &["falcon_heavy/src/lib/falcon_common.py:revolved_solid_barrel"]),
     ("sweep(spine,closed-section)", "certified", "-", "certified", "S6", &["falcon_heavy/src/lib/merlin_common.py:tube"]),
     ("loft(spline-section)", "certified", "-", "certified", "S5", &["f1/src/lib/surfaces.py:loft_solid", "f1/src/lib/surfaces.py:body_loft", "f1/src/lib/wheels.py:_loft", "f1/src/lib/floor.py:loft_stack", "f1/src/lib/mono_tub.py:loft_half_section", "f1/src/lib/power_unit.py:loft_tube", "f1/src/lib/mono_halo.py:loft_loop", "f1/src/lib/cockpit.py:ruled_loft", "f1/src/lib/front_wing.py:loft_cascade", "f1/src/lib/nose.py:loft_nose", "f1/src/lib/sidepods.py:loft_skin", "f1/src/lib/sidepods.py:cavity_solid", "f1/src/lib/floor.py:diffuser_loft"]),
     ("extrude(profile)", "certified", "-", "certified", "S6", &["falcon_heavy/src/lib/merlin_common.py:extrude", "f1/src/lib/engine_cover.py:extrude"]),
@@ -84,7 +90,7 @@ const CELLS: &[CellSpec] = &[
     ("mirror(axis-plane)", "certified", "-", "certified", "S6", &["f1/src/lib/surfaces.py:mirror_y"]),
     ("author(spline-profile)", "certified", "-", "certified", "S5", &["falcon_heavy/src/lib/merlin_common.py:profile_face", "f1/src/lib/surfaces.py:airfoil_profile", "f1/src/lib/suspension.py:loft_face"]),
     ("author(polyline-profile)", "certified", "-", "certified", "S4", &[]),
-    ("author(circle-profile)", "unavailable", "PB-011", "certified", "none", &["f1/src/lib/cockpit.py:circle_section"]),
+    ("author(circle-profile)", "certified", "PB-014", "certified", "S5", &["f1/src/lib/cockpit.py:circle_section"]),
     ("validity-check", "client-layer", "-", "client-layer", "S7", &["f1/src/lib/surfaces.py:selector_census"]),
     ("primitive(canonical-solid)", "certified", "-", "certified", "S3", &["falcon_heavy/src/lib/merlin_common.py:cylinder", "falcon_heavy/src/lib/merlin_common.py:torus", "falcon_heavy/src/lib/merlin_common.py:sphere", "falcon_heavy/src/lib/merlin_common.py:box", "falcon_heavy/src/falcon_heavy_exploded.py:guide_cyl"]),
     ("compound(group)", "certified", "-", "certified", "S3", &["falcon_heavy/src/lib/merlin_common.py:group_compound", "falcon_heavy/src/lib/falcon_common.py:compound_from_instances", "falcon_heavy/src/falcon_heavy.py:compound_vehicle", "f1/src/lib/surfaces.py:as_body_compound", "f1/src/lib/drivetrain.py:compound_solids", "f1/src/lib/monocoque.py:group", "f1/src/f1.py:assembly_add", "f1/src/lib/cockpit.py:build_cockpit"]),
@@ -361,6 +367,41 @@ fn observe(cell: &str, census: &Census) -> Verdict {
             assert_eq!(report.exports.len(), 1);
             Verdict::Certified
         }
+        "revolve(partial-arc,spline-profile)" => {
+            // The G5 cell flipped by PB-014: the facade partial-arc revolve
+            // row (arc_deg/start_deg) over a spline-carrier profile runs
+            // in-envelope — the trimmed-shell construction that closes the
+            // sectioned barrel with two planar caps.
+            let ops = vec![
+                FacadeOp::PushPart,
+                FacadeOp::PushSketch,
+                spline_carrier(),
+                FacadeOp::Pop,
+                FacadeOp::RevolveArc {
+                    arc_deg: 270.0,
+                    start_deg: 135.0,
+                },
+                FacadeOp::ExportStl {
+                    path: "partial_arc.stl".to_string(),
+                },
+                FacadeOp::Pop,
+            ];
+            let report = run(ops).expect("spline-profile partial-arc revolve is in envelope"); // H-3: the certified verdict is the assertion
+            assert!(report.constructive, "a spline-carrier part is constructive");
+            assert_eq!(report.exports.len(), 1);
+            // The census row stays skip-listed (the corpus row's lift is
+            // PB-011's, pending the green door run); the op form is landed.
+            let rows: Vec<&CensusRow> = census
+                .rows
+                .iter()
+                .filter(|row| {
+                    row.id == "falcon_heavy/src/lib/falcon_common.py:revolved_solid_barrel"
+                })
+                .collect();
+            assert_eq!(rows.len(), 1, "the G5 census row must exist");
+            assert_eq!(rows[0].classification, "skip-listed");
+            Verdict::Certified
+        }
         "sweep(spine,closed-section)" => {
             let ops = vec![
                 FacadeOp::PushPart,
@@ -506,6 +547,33 @@ fn observe(cell: &str, census: &Census) -> Verdict {
             assert!(!report.constructive);
             Verdict::Certified
         }
+        "author(circle-profile)" => {
+            // The G3 cell flipped by PB-014: the facade Circle carrier row
+            // authors a closed-circle profile in-envelope. The carrier is a
+            // canonical closed profile (constructive only when a verb over it
+            // is: loft/sweep, or a spline-carrier revolve).
+            let ops = vec![
+                FacadeOp::PushPart,
+                FacadeOp::PushSketch,
+                FacadeOp::Circle { radius: 3.0 },
+                FacadeOp::Pop,
+            ];
+            let report = run(ops).expect("circle authoring row is in envelope"); // H-3: the certified verdict is the assertion
+            assert!(
+                !report.constructive,
+                "a closed circle profile is a canonical carrier"
+            );
+            // The census row stays recorded missing-facade (the PB-010 audit
+            // is frozen); the facade row that answers it is now landed.
+            let rows: Vec<&CensusRow> = census
+                .rows
+                .iter()
+                .filter(|row| row.id == "f1/src/lib/cockpit.py:circle_section")
+                .collect();
+            assert_eq!(rows.len(), 1, "the G3 census row must exist");
+            assert_eq!(rows[0].classification, "missing-facade");
+            Verdict::Certified
+        }
         "primitive(canonical-solid)" => {
             for solid in [
                 FacadeOp::Box {
@@ -600,33 +668,13 @@ fn observe(cell: &str, census: &Census) -> Verdict {
             );
             Verdict::ClientLayer
         }
-        // Unavailable: no landed facade row (G3 circle carrier, ShapeFix heal)
-        // or no enrolled row exercises the form today (G5 partial-arc revolve).
-        "author(circle-profile)" | "heal(boolean-result)" => {
-            let op_tag = if cell == "author(circle-profile)" {
-                r#"{"op":"circle","radius":1.0}"#
-            } else {
-                r#"{"op":"heal","precision":1e-4}"#
-            };
+        // Unavailable: no landed facade/compat row (ShapeFix healing has no
+        // kernel analogue and none is planned).
+        "heal(boolean-result)" => {
             assert!(
-                !facade_op_tag_lands(op_tag),
-                "{cell} must have no landed facade op row"
+                !facade_op_tag_lands(r#"{"op":"heal","precision":1e-4}"#),
+                "heal must have no landed facade op row"
             );
-            Verdict::Unavailable
-        }
-        "revolve(partial-arc,spline-profile)" => {
-            // The G5 cell: its only census row is the skip-listed partial-arc
-            // barrel revolve; no enrolled row exercises partial-arc revolve
-            // coverage today, so the op form is unavailable until PB-011.
-            let rows: Vec<&CensusRow> = census
-                .rows
-                .iter()
-                .filter(|row| {
-                    row.id == "falcon_heavy/src/lib/falcon_common.py:revolved_solid_barrel"
-                })
-                .collect();
-            assert_eq!(rows.len(), 1, "the G5 census row must exist");
-            assert_eq!(rows[0].classification, "skip-listed");
             Verdict::Unavailable
         }
         _ => unreachable!("no observe arm for cell {cell}"),
@@ -988,8 +1036,9 @@ fn swept_carrier_boolean_cells_refuse_typed_today() {
 
 /// Test 3: the authoring cells (spline, polyline/line-loop, circle) asserted
 /// against the S5/S6 surface rows. Spline and polyline authoring are landed
-/// (certified); the missing Circle-profile row (audit G3) is annotated
-/// `unavailable`, `flipped-by: PB-011`.
+/// (certified); PB-014 lands the closed-circle profile carrier (audit G3) as
+/// the S5 facade `Circle` row, so the circle cell is `certified`,
+/// `flipped-by: PB-014`, targeting certified.
 #[test]
 fn authoring_cells_match_surface_rows() {
     let path = matrix_doc_path();
@@ -1030,27 +1079,29 @@ fn authoring_cells_match_surface_rows() {
         r#"{"op":"polyline","points":[[0.0,0.0],[1.0,0.0]]}"#
     ));
 
-    // author(circle-profile): audit G3 missing-facade. The compat S5 row
-    // names Spline authoring only - there is no facade Circle row, so the
-    // cell is `unavailable`, flipped by PB-011, targeting certified.
+    // author(circle-profile): audit G3 missing-facade fixed by PB-014. The
+    // facade Circle carrier row lands on the S5 section-authoring surface (a
+    // canonical closed profile, mirroring the Spline row shape), so the cell
+    // is `certified`, flipped by PB-014, targeting certified.
     let circle = by_id
         .get("author(circle-profile)")
         .expect("the circle authoring cell must exist"); // H-3: const table is closed
-    assert_eq!(circle.current, "unavailable");
-    assert_eq!(circle.flipped_by, "PB-011");
+    assert_eq!(circle.current, "certified");
+    assert_eq!(circle.flipped_by, "PB-014");
     assert_eq!(circle.target, "certified");
-    assert_eq!(circle.surface, "none");
+    assert_eq!(circle.surface, "S5");
     assert_eq!(
         circle.rows,
         vec!["f1/src/lib/cockpit.py:circle_section".to_string()],
         "the G3 Circle-profile row must be the census row the audit names"
     );
     assert!(
-        !facade_op_tag_lands(r#"{"op":"circle","radius":1.0}"#),
-        "no facade row must name a closed-circle profile carrier (audit G3)"
+        facade_op_tag_lands(r#"{"op":"circle","radius":1.0}"#),
+        "the facade must name a closed-circle profile carrier row (audit G3, PB-014)"
     );
 
-    // The surface doc's S5 row names Spline authoring and no Circle row.
+    // The surface doc's S5 row names both Spline section authoring and the
+    // closed-circle profile authoring that now rides it.
     let compat_surface = std::fs::read_to_string(
         PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../docs/PY_BRIDGE_COMPAT_SURFACE.md"),
     )
@@ -1061,18 +1112,19 @@ fn authoring_cells_match_surface_rows() {
         .expect("the compat surface doc must carry an S5 row"); // H-3: machine-check contract pins S1..S7
     assert!(
         s5_row.contains("Spline"),
-        "S5 is the spline authoring surface"
+        "S5 is the spline section-authoring surface"
     );
     assert!(
-        !s5_row.contains("Circle"),
-        "S5 names Spline authoring only (audit G3)"
+        s5_row.contains("Circle"),
+        "S5 must name closed-circle profile authoring (PB-014)"
     );
 }
 
 /// Test 4: the `revolve(partial-arc,spline-profile)` cell annotated per the
-/// audit's G5 finding - current verdict, `flipped-by: PB-011`, target
-/// certified, its census row recorded skip-listed (not a swept-carrier
-/// boolean).
+/// audit's G5 finding and flipped by PB-014 - current `certified`,
+/// `flipped-by: PB-014`, target certified, its census row still recorded
+/// skip-listed (the op form is landed; the corpus row's lift is PB-011's,
+/// pending the green door run). The cell is not a swept-carrier boolean.
 #[test]
 fn partial_arc_revolve_cell_annotated() {
     let path = matrix_doc_path();
@@ -1083,13 +1135,18 @@ fn partial_arc_revolve_cell_annotated() {
         .find(|doc_cell| doc_cell.cell == "revolve(partial-arc,spline-profile)")
         .expect("the partial-arc revolve cell must be in the doc"); // H-3: G5 cell is a required doc row
     assert_eq!(
-        partial_arc.flipped_by, "PB-011",
-        "G5: PB-011 flips the cell"
+        partial_arc.flipped_by, "PB-014",
+        "G5: PB-014 flips the cell"
     );
     assert_eq!(
         partial_arc.target, "certified",
         "G5: the target verdict is certified"
     );
+    assert_eq!(
+        partial_arc.current, "certified",
+        "G5: PB-014 lands the partial-arc revolve row, so current is certified"
+    );
+    assert_eq!(partial_arc.surface, "S6");
     assert_eq!(
         partial_arc.rows,
         vec!["falcon_heavy/src/lib/falcon_common.py:revolved_solid_barrel".to_string()],
@@ -1104,7 +1161,7 @@ fn partial_arc_revolve_cell_annotated() {
         .expect("the barrel revolve row must be in the census"); // H-3: mapping was asserted in test 1
     assert_eq!(
         barrel.classification, "skip-listed",
-        "G5: the cutaway row is staged-skip; the SKIPS 'boolean sectioning' reason mis-describes a partial-arc revolve"
+        "G5: the cutaway row stays staged; the SKIPS 'boolean sectioning' reason mis-describes a partial-arc revolve"
     );
     assert!(
         barrel.surface == "S6",
@@ -1116,12 +1173,219 @@ fn partial_arc_revolve_cell_annotated() {
     );
 
     // The partial-arc form is a distinct corpus call (revolution_arc + start)
-    // that no enrolled row exercises today: current is `unavailable` and the
-    // cell is NOT a swept-carrier boolean refusal cell (it is not in the G1
-    // class pinned by test 2).
-    assert_eq!(partial_arc.current, "unavailable");
+    // that PB-014 answers with the facade `revolve_arc` row; the cell is NOT a
+    // swept-carrier boolean refusal cell (it is not in the G1 class pinned by
+    // test 2).
     assert!(
         !G1_CELLS.contains(&"revolve(partial-arc,spline-profile)"),
         "the partial-arc revolve is not a G1 swept-carrier boolean cell"
     );
+}
+
+// ---------------------------------------------------------------------------
+// PB-014 required authoring tests
+// ---------------------------------------------------------------------------
+
+/// PB-014 required test 1 (audit G3): a closed circle profile authors through
+/// the new facade `Circle` carrier row and feeds the landed full revolve — the
+/// cockpit ring shape — running in-envelope with the expected report shape. A
+/// circle profile is a canonical closed profile, so the ring product stays
+/// canonical (constructive only when the verb over the profile is); the STL
+/// export is in envelope. The authored radius and the revolve angle ride the
+/// deterministic table verbatim (parameter fidelity, no Float-as-Exact).
+#[test]
+fn circle_profile_authors_and_feeds_revolve() {
+    // The closed-circle carrier row is a landed facade row (audit G3).
+    assert!(facade_op_tag_lands(r#"{"op":"circle","radius":1.0}"#));
+
+    // The cockpit ring shape: author a closed circle section, close it to a
+    // profile, and feed the landed full revolve about the part axis.
+    let ops = vec![
+        FacadeOp::PushPart,
+        FacadeOp::PushSketch,
+        FacadeOp::Circle { radius: 3.0 },
+        FacadeOp::MakeFace,
+        FacadeOp::Pop,
+        FacadeOp::Revolve { angle_deg: 360.0 },
+        FacadeOp::ExportStl {
+            path: "ring.stl".to_string(),
+        },
+        FacadeOp::Pop,
+    ];
+    let report =
+        run(ops.clone()).expect("circle-profile authoring feeding the full revolve is in envelope"); // H-3: the certified verdict is the assertion
+    assert!(
+        !report.constructive,
+        "a circle profile is a canonical closed profile (the full revolve of one is a canonical ring)"
+    );
+    assert_eq!(report.exports.len(), 1);
+    assert_eq!(
+        report.exports.first().map(|entry| entry.op),
+        Some("export_stl"),
+        "the ring exports STL in envelope"
+    );
+
+    // The radius and the revolve angle ride the deterministic table verbatim:
+    // the serialized table round-trips exactly (parameter fidelity of the
+    // authored section feeding the landed revolve).
+    let table = FacadeTable { ops };
+    let text = serde_json::to_string(&table).expect("the circle/revolve table must serialize"); // H-3: serde output of a fixed table
+    let back: FacadeTable =
+        serde_json::from_str(&text).expect("the circle/revolve table must round-trip"); // H-3: table is machine-produced
+    assert_eq!(back, table);
+}
+
+/// PB-014 required test 2 (audit G5): a spline-carrier profile revolved over
+/// [start, start + arc] (the falcon cutaway barrel shape) runs through the new
+/// facade `revolve_arc` row. The bridge construction builds the full revolved
+/// surface, then emits a shell of trimmed faces whose v-range is
+/// [start_deg, start_deg + arc_deg] plus two planar cap faces bounded by the
+/// profile and its rotated image — the caps close the solid, so the sectioned
+/// barrel is watertight. Both angles ride the deterministic table verbatim,
+/// and the constructive spline carrier keeps the part on the STL side of the
+/// envelope (TR-NRB-001).
+#[test]
+fn partial_arc_revolve_builds_capped_shell() {
+    // The partial-arc revolve row is a landed facade row (audit G5): the
+    // corpus cutaway's revolution_arc + start call maps to arc_deg/start_deg.
+    assert!(facade_op_tag_lands(
+        r#"{"op":"revolve_arc","arc_deg":270.0,"start_deg":135.0}"#
+    ));
+
+    // falcon_common.py:202-206: the center-core tank barrel is a partial-arc
+    // revolve of a closed profile over CUT_ARC=270 from CUT_START=135.
+    let ops = vec![
+        FacadeOp::PushPart,
+        FacadeOp::PushSketch,
+        spline_carrier(),
+        FacadeOp::Pop,
+        FacadeOp::RevolveArc {
+            arc_deg: 270.0,
+            start_deg: 135.0,
+        },
+        FacadeOp::ExportStl {
+            path: "barrel.stl".to_string(),
+        },
+        FacadeOp::Pop,
+    ];
+    let report = run(ops.clone()).expect("spline-profile partial-arc revolve is in envelope"); // H-3: the certified verdict is the assertion
+    assert!(
+        report.constructive,
+        "a spline-carrier part is constructive (STL side of TR-NRB-001)"
+    );
+    assert_eq!(report.exports.len(), 1);
+
+    // The v-range [start, start + arc] is honored as recorded parameters: the
+    // row round-trips verbatim with both angles intact (deterministic record,
+    // no Float-as-Exact).
+    let table = FacadeTable { ops };
+    let text = serde_json::to_string(&table).expect("the partial-arc revolve table must serialize"); // H-3: serde output of a fixed table
+    let value: serde_json::Value =
+        serde_json::from_str(&text).expect("the serialized table must parse"); // H-3: table is machine-produced
+    let arc_row = value
+        .get("ops")
+        .and_then(serde_json::Value::as_array)
+        .and_then(|ops| ops.get(4))
+        .expect("the partial-arc revolve row must serialize at its table position"); // H-3: fixed table shape
+    assert_eq!(
+        arc_row.get("op").and_then(serde_json::Value::as_str),
+        Some("revolve_arc"),
+        "the partial-arc revolve serializes under its op tag"
+    );
+    let arc_deg = arc_row
+        .get("arc_deg")
+        .and_then(serde_json::Value::as_f64)
+        .expect("arc_deg must serialize as a number"); // H-3: fixed table shape
+    let start_deg = arc_row
+        .get("start_deg")
+        .and_then(serde_json::Value::as_f64)
+        .expect("start_deg must serialize as a number"); // H-3: fixed table shape
+    assert!(
+        (arc_deg - 270.0).abs() < 1e-9 && (start_deg - 135.0).abs() < 1e-9,
+        "the capped shell honors [start, start + arc] = [135, 405] deg"
+    );
+    let back: FacadeTable =
+        serde_json::from_str(&text).expect("the partial-arc revolve table must round-trip"); // H-3: table is machine-produced
+    assert_eq!(back, table);
+}
+
+/// PB-014 required test 3: cells 10 (`revolve(partial-arc,spline-profile)`)
+/// and 19 (`author(circle-profile)`) assert `certified` against live behavior
+/// (matrix cells flipped), matching the flipped doc rows: `flipped-by:
+/// PB-014`, target `certified`, and exactly these two cells carry the PB-014
+/// flip. The other 24 cells are unchanged (the only sanctioned V5 edits are
+/// the two flipped rows).
+#[test]
+fn matrix_cells_flipped_certified() {
+    let census = load_census();
+    let path = matrix_doc_path();
+    let doc = std::fs::read_to_string(&path).expect("the capability matrix doc must be readable"); // H-3: doc under test is a write_allow file
+    let doc_cells = load_doc_cells(&doc);
+
+    // Exactly the two PB-014 cells carry the PB-014 flip annotation.
+    let flipped: Vec<&DocCell> = doc_cells
+        .iter()
+        .filter(|doc_cell| doc_cell.flipped_by == "PB-014")
+        .collect();
+    let flipped_ids: Vec<&str> = flipped
+        .iter()
+        .map(|doc_cell| doc_cell.cell.as_str())
+        .collect();
+    assert_eq!(
+        flipped_ids,
+        vec![
+            "revolve(partial-arc,spline-profile)",
+            "author(circle-profile)"
+        ],
+        "PB-014 flips exactly cells 10 and 19"
+    );
+
+    // Both flipped cells assert `certified` against live behavior.
+    for doc_cell in flipped {
+        assert_eq!(
+            doc_cell.current, "certified",
+            "cell {} is certified",
+            doc_cell.cell
+        );
+        assert_eq!(
+            doc_cell.target, "certified",
+            "cell {} targets certified",
+            doc_cell.cell
+        );
+        let observed = observe(&doc_cell.cell, &census);
+        assert_eq!(
+            observed,
+            Verdict::Certified,
+            "cell {}: the doc annotates certified and live behavior must certify",
+            doc_cell.cell
+        );
+    }
+
+    // No other cell changes: the doc rows mirror CELLS for the other 24 cells.
+    assert_eq!(
+        doc_cells.len(),
+        CELLS.len(),
+        "the doc must list every canonical cell once"
+    );
+    for (index, (cell, current, flipped, target, surface, rows)) in CELLS.iter().enumerate() {
+        if *cell == "revolve(partial-arc,spline-profile)" || *cell == "author(circle-profile)" {
+            continue;
+        }
+        let doc_cell = &doc_cells[index];
+        assert_eq!(doc_cell.cell, *cell);
+        assert_eq!(doc_cell.current, *current, "cell {cell} must be unchanged");
+        assert_eq!(
+            doc_cell.flipped_by, *flipped,
+            "cell {cell} must be unchanged"
+        );
+        assert_eq!(doc_cell.target, *target, "cell {cell} must be unchanged");
+        assert_eq!(doc_cell.surface, *surface, "cell {cell} must be unchanged");
+        assert_eq!(
+            doc_cell.rows,
+            rows.iter()
+                .map(|row| row.to_string())
+                .collect::<Vec<String>>(),
+            "cell {cell} census rows must be unchanged"
+        );
+    }
 }

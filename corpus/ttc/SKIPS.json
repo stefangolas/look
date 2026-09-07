@@ -14,7 +14,7 @@
     }
   },
   "rows": [
-    {"id": "falcon_heavy/cutaway", "reason": "booleans-on-swept-carriers", "note": "falcon_heavy_cutaway calls build_vehicle(cutaway=True): the 270-deg section opening CUTs through the swept tank/engine stack (CUT_START/CUT_ARC in lib/falcon_common.py) - boolean sectioning of swept-carrier bodies."},
+    {"id": "falcon_heavy/cutaway", "reason": "booleans-on-swept-carriers", "note": "falcon_heavy_cutaway calls build_vehicle(cutaway=True): the 270-deg section opening is built from partial-arc revolves of the center-core tank barrel and interstage shells (CUT_START=135/CUT_ARC=270 in lib/falcon_common.py drive arc/start on eng.revolved_solid/eng.revolved_shell), so the prior 'boolean sectioning' label mis-describes the vendored code path; the row stays staged pending the PB-011 door run."},
     {"id": "f1/airbox", "reason": "booleans-on-swept-carriers", "note": "lib/engine_cover.py build_airbox fuses the lobe/pod/collar swept bodies (_fuse at engine_cover.py) - booleans on swept carriers."},
     {"id": "f1/beam_wing", "reason": "booleans-on-swept-carriers", "note": "lib/rear_wing.py beam/endplate builders cut and trim swept airfoil shells (surfaces.cut at rear_wing.py)."},
     {"id": "f1/corner_fl", "reason": "booleans-on-swept-carriers", "note": "lib/wheels.py build_corner('fl') cuts rim/tyre clearances out of revolved carriers (_cut at wheels.py)."},
