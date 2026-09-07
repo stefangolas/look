@@ -19,10 +19,10 @@
 //! * `Mode` algebra — `mode` (`union` / `subtract` / `intersect`, the §3.2
 //!   encoding of build123d's `Add` / `Subtract` / `Intersect`);
 //! * primitives — `box`, `cylinder`, `sphere`, `torus` (solids) and `polygon`,
-//!   `polyline`, `spline` (sketch carriers);
+//!   `polyline`, `spline`, `circle` (sketch carriers);
 //! * topology verb — `make_face`;
-//! * verbs — `extrude`, `revolve`, `sweep`, `loft`, `fillet`, `chamfer`,
-//!   `mirror`;
+//! * verbs — `extrude`, `revolve`, `revolve_arc`, `sweep`, `loft`, `fillet`,
+//!   `chamfer`, `mirror`;
 //! * fluent selectors (PB-001's machinery exposed thinly as rows) — the
 //!   four-expression vocabulary is `select_faces`, `select_edges`,
 //!   `select_filter`, `select_take`. A `fillet`/`chamfer` row binds the edges
@@ -151,6 +151,18 @@ pub enum FacadeOp {
         /// Whether the spline closes on itself.
         periodic: bool,
     },
+    /// `Circle(radius)` — a closed-circle profile carrier on the working
+    /// plane (audit G3, PB-014). Mirrors the Spline section-authoring row
+    /// (S5): a closed circle section plus `make_face` yields a disc profile
+    /// that feeds the landed revolve/loft rows (cockpit ring stacks, Merlin
+    /// tube rings). A circle is an exact conic profile, so the carrier is
+    /// canonical; a part built over circle sections becomes constructive when
+    /// the verb is (`loft`/`sweep`, or a spline-carrier revolve), never by
+    /// the carrier alone.
+    Circle {
+        /// The radius of the closed circle profile.
+        radius: f64,
+    },
     /// `make_face()` — face a closed planar profile (the topology verb).
     MakeFace,
     /// `extrude(amount=...)` — extrude the current sketch along z.
@@ -162,6 +174,19 @@ pub enum FacadeOp {
     Revolve {
         /// The revolve angle in degrees.
         angle_deg: f64,
+    },
+    /// `revolve_arc(arc_deg=..., start_deg=...)` — a partial-arc revolve
+    /// (audit G5, PB-014). Over the landed full-revolve surface the bridge
+    /// builds the full revolution, then emits a shell of trimmed faces whose
+    /// v-range is `[start_deg, start_deg + arc_deg]` plus two planar cap
+    /// faces bounded by the profile and its rotated image (the caps close the
+    /// solid). Constructive classification follows the profile carrier,
+    /// exactly as a full `revolve`.
+    RevolveArc {
+        /// The swept arc in degrees (`(0, 360]`).
+        arc_deg: f64,
+        /// The v-range start in degrees.
+        start_deg: f64,
     },
     /// `sweep(...)` — a spine sweep. Constructive for the STEP boundary.
     Sweep,
@@ -291,13 +316,16 @@ pub fn run_facade(table: &FacadeTable) -> Result<FacadeReport, Refusal> {
             | FacadeOp::MakeFace
             | FacadeOp::Extrude { .. }
             | FacadeOp::Revolve { .. }
+            | FacadeOp::RevolveArc { .. }
             | FacadeOp::Mirror { .. } => {
                 solid_ops += 1;
                 selection_pending = false;
             }
-            FacadeOp::Polygon { .. } | FacadeOp::Polyline { .. } => {
+            FacadeOp::Polygon { .. } | FacadeOp::Polyline { .. } | FacadeOp::Circle { .. } => {
                 // Sketch carriers: not a solid and not constructive by
-                // themselves.
+                // themselves (a circle is an exact conic profile, canonical
+                // like a polygon; only the constructive verbs over one mark
+                // the part constructive).
                 selection_pending = false;
             }
             FacadeOp::SelectFaces | FacadeOp::SelectEdges => {

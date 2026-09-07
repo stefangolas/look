@@ -1,6 +1,8 @@
 # Op Capability Matrix - machine-checked per-(op x carrier-class) verdicts (PB-013-OP-CAPABILITY-MATRIX)
 
-**Status:** LANDED by work packet PB-013-OP-CAPABILITY-MATRIX.
+**Status:** LANDED by work packet PB-013-OP-CAPABILITY-MATRIX. **Amended by
+PB-014-AUTHORING-REVOLVE:** cells 10 and 19 (the partial-arc revolve and closed-circle authoring
+rows) flip to `certified` in one V5 commit (the audit G5/G3 authoring prerequisites).
 
 This matrix turns the PB-010-TTC-PARITY-AUDIT op census
 (`loop/results/PB-010-TTC-PARITY-AUDIT.json`, 93 site rows) into one annotated cell per
@@ -26,7 +28,7 @@ Determinism: cell order below is fixed (the doc order); no hash iteration appear
 | 7 | cut(canonical,canonical) | certified | - | certified | S1 | f1/src/lib/drivetrain.py:clevis_bore; f1/src/lib/rear_wing.py:pylon_cut |
 | 8 | heal(boolean-result) | unavailable | - | unavailable | S1 | f1/src/lib/surfaces.py:repair |
 | 9 | revolve(full,spline-profile) | certified | - | certified | S6 | falcon_heavy/src/lib/merlin_common.py:revolved_shell; falcon_heavy/src/lib/merlin_common.py:revolved_solid; falcon_heavy/src/lib/falcon_common.py:_tube_z; falcon_heavy/src/lib/falcon_common.py:_dome; falcon_heavy/src/lib/falcon_common.py:make_mvac_revolve; falcon_heavy/src/lib/falcon_common.py:make_fairing_shell; f1/src/lib/wheels.py:revolve_tyre |
-| 10 | revolve(partial-arc,spline-profile) | unavailable | PB-011 | certified | S6 | falcon_heavy/src/lib/falcon_common.py:revolved_solid_barrel |
+| 10 | revolve(partial-arc,spline-profile) | certified | PB-014 | certified | S6 | falcon_heavy/src/lib/falcon_common.py:revolved_solid_barrel |
 | 11 | sweep(spine,closed-section) | certified | - | certified | S6 | falcon_heavy/src/lib/merlin_common.py:tube |
 | 12 | loft(spline-section) | certified | - | certified | S5 | f1/src/lib/surfaces.py:loft_solid; f1/src/lib/surfaces.py:body_loft; f1/src/lib/wheels.py:_loft; f1/src/lib/floor.py:loft_stack; f1/src/lib/mono_tub.py:loft_half_section; f1/src/lib/power_unit.py:loft_tube; f1/src/lib/mono_halo.py:loft_loop; f1/src/lib/cockpit.py:ruled_loft; f1/src/lib/front_wing.py:loft_cascade; f1/src/lib/nose.py:loft_nose; f1/src/lib/sidepods.py:loft_skin; f1/src/lib/sidepods.py:cavity_solid; f1/src/lib/floor.py:diffuser_loft |
 | 13 | extrude(profile) | certified | - | certified | S6 | falcon_heavy/src/lib/merlin_common.py:extrude; f1/src/lib/engine_cover.py:extrude |
@@ -35,7 +37,7 @@ Determinism: cell order below is fixed (the doc order); no hash iteration appear
 | 16 | mirror(axis-plane) | certified | - | certified | S6 | f1/src/lib/surfaces.py:mirror_y |
 | 17 | author(spline-profile) | certified | - | certified | S5 | falcon_heavy/src/lib/merlin_common.py:profile_face; f1/src/lib/surfaces.py:airfoil_profile; f1/src/lib/suspension.py:loft_face |
 | 18 | author(polyline-profile) | certified | - | certified | S4 | - |
-| 19 | author(circle-profile) | unavailable | PB-011 | certified | none | f1/src/lib/cockpit.py:circle_section |
+| 19 | author(circle-profile) | certified | PB-014 | certified | S5 | f1/src/lib/cockpit.py:circle_section |
 | 20 | validity-check | client-layer | - | client-layer | S7 | f1/src/lib/surfaces.py:selector_census |
 | 21 | primitive(canonical-solid) | certified | - | certified | S3 | falcon_heavy/src/lib/merlin_common.py:cylinder; falcon_heavy/src/lib/merlin_common.py:torus; falcon_heavy/src/lib/merlin_common.py:sphere; falcon_heavy/src/lib/merlin_common.py:box; falcon_heavy/src/falcon_heavy_exploded.py:guide_cyl |
 | 22 | compound(group) | certified | - | certified | S3 | falcon_heavy/src/lib/merlin_common.py:group_compound; falcon_heavy/src/lib/falcon_common.py:compound_from_instances; falcon_heavy/src/falcon_heavy.py:compound_vehicle; f1/src/lib/surfaces.py:as_body_compound; f1/src/lib/drivetrain.py:compound_solids; f1/src/lib/monocoque.py:group; f1/src/f1.py:assembly_add; f1/src/lib/cockpit.py:build_cockpit |
@@ -54,13 +56,16 @@ Determinism: cell order below is fixed (the doc order); no hash iteration appear
   (`NonCanonicalCarrier`) at the STEP boundary (TR-NRB-001; a swept part exports STL/GLB, never
   STEP). Each G1 cell is pinned by `swept_carrier_boolean_cells_refuse_typed_today` and flips to
   certified when PB-011 routes the swept-pair boolean.
-- **G5 (partial-arc revolve).** SKIPS.json records falcon_heavy/cutaway under
-  booleans-on-swept-carriers, but the vendored code path is a partial-arc revolve (revolution_arc +
-  start rotate); the reason text is a census-level mis-description. The cell is annotated per the
-  G5 finding (current unavailable, flipped-by PB-011, target certified).
-- **G3 (circle-profile authoring).** S5 names Spline authoring only; a closed-circle profile carrier
-  has no named facade row (missing-facade). author(circle-profile) is `unavailable` and flips when
-  PB-011 lands the row.
+- **G5 (partial-arc revolve).** PB-014 lands the facade partial-arc revolve row (`revolve_arc`:
+  arc_deg/start_deg) as a trimmed-shell construction over the full-revolve surface. SKIPS.json
+  records falcon_heavy/cutaway under booleans-on-swept-carriers; the row stays staged (its lift is
+  PB-011's, pending the green door run) but its note is corrected to the true code path — a
+  partial-arc revolve (revolution_arc + start rotate) — the reason text being a census-level
+  mis-description. The cell is flipped per the G5 finding (current certified, flipped-by PB-014).
+- **G3 (circle-profile authoring).** PB-014 lands the closed-circle profile carrier as the S5
+  facade `Circle` row, mirroring the Spline authoring entry; bd.Circle section authoring (cockpit
+  ring stacks, Merlin tube rings) is no longer a missing-facade row. author(circle-profile) is
+  `certified`, flipped-by PB-014.
 - Refusal is never worked around: a cell annotated `refuses(...)` asserts the refusal, and PB-011 flips
   by editing this row + the asserted expectation together, one commit per flip (V5).
 
@@ -73,8 +78,8 @@ Determinism: cell order below is fixed (the doc order); no hash iteration appear
 - **cut(canonical,canonical)** - Landed S1 canonical x canonical subtraction (clevis/disc bores, pylon rod bores). The census rows stay staged because their enclosing F1 rows fuse swept carriers elsewhere, but this cell's op form is landed and certifies.
 - **heal(boolean-result)** - OCC ShapeFix healing (repair) has no kernel analogue and none is planned (ShapeFix analogues are an explicit non-goal); the helper only guards swept-carrier boolean output, so it inherits the G1 deferral without adding a landed path. No facade/compat row names it.
 - **revolve(full,spline-profile)** - Full (360 deg) revolve of a spline/line profile over the landed S6 revolve row; canonical Falcon-Heavy rows run it end to end today (STL out).
-- **revolve(partial-arc,spline-profile)** - Audit G5: the falcon_heavy/cutaway sectioning is a partial-arc revolve (revolution_arc + start rotate), mis-recorded in SKIPS as 'boolean sectioning'. No enrolled row exercises partial-arc revolve coverage today (its only census row is skip-listed), so the cell is annotated per the G5 finding: current unavailable, flipped-by PB-011, target certified.
-- **sweep(spine,closed-section)** - The Merlin tube idiom (spline spine + closed circle section) runs on canonical rows through the landed sweep row (S6); the circle-section authoring form itself is the G3 missing-facade candidate tracked by author(circle-profile).
+- **revolve(partial-arc,spline-profile)** - Audit G5: the falcon_heavy/cutaway sectioning is a partial-arc revolve (revolution_arc + start rotate), mis-recorded in SKIPS as 'boolean sectioning'. PB-014 lands the facade partial-arc row (revolve_arc: arc_deg/start_deg): the bridge builds the full revolved surface, then emits a shell of trimmed faces whose v-range is [start_deg, start_deg + arc_deg] plus two planar cap faces bounded by the profile and its rotated image (the caps close the solid — watertight). The cell's only census row is skip-listed (its lift is PB-011's, pending the green door run), but the op form is landed: current certified, flipped-by PB-014, target certified.
+- **sweep(spine,closed-section)** - The Merlin tube idiom (spline spine + closed circle section) runs on canonical rows through the landed sweep row (S6); the closed-circle section it authors is the landed S5 author(circle-profile) row (PB-014).
 - **loft(spline-section)** - Loft over spline sections is landed (S5 spline authoring + CC-port loft); every census row in this cell is staged-skip only because its enclosing script boolean-composes the lofted result.
 - **extrude(profile)** - Extrusion over a planar profile is landed S6 (Merlin thrust gussets run canonical; the F1 sill-tool extrude is a skip-row member whose block is downstream).
 - **fillet(edge-selector)** - Fillet over the four-expression selector vocabulary is landed S6/S7; the census rows are staged because their enclosing F1 rows boolean-compose swept carriers.
@@ -82,7 +87,7 @@ Determinism: cell order below is fixed (the doc order); no hash iteration appear
 - **mirror(axis-plane)** - Mirror about an axis-aligned plane is landed S6; the census row is staged because it runs only inside F1 part builders that are staged-skip rows.
 - **author(spline-profile)** - Spline section/profile authoring is landed S5 (facade Spline row; PB-002 amended scope); profile_face feeds the canonical Falcon revolves, the F1 sections are skip-row members.
 - **author(polyline-profile)** - Closed line-loop (polyline/polygon) profile authoring over the landed facade Polygon/Polyline rows; the census records it inside the mixed profile rows (Edge.make_line in profile_face, tube outlines) rather than as a dedicated row.
-- **author(circle-profile)** - Audit G3 missing-facade: no named compat/facade row lists a closed-circle profile primitive (S5 names Spline authoring only); bd.Circle section authoring (cockpit ring stacks, Merlin tube) is unlistable today. Annotated per authoring_cells_match_surface_rows.
+- **author(circle-profile)** - Audit G3 missing-facade fixed by PB-014: no named facade row listed a closed-circle profile primitive (S5 named Spline authoring only), so bd.Circle section authoring (cockpit ring stacks, Merlin tube rings) was unlistable. PB-014 lands the facade `Circle` carrier as the S5 section-authoring complement to Spline: a canonical closed profile whose parts become constructive only when the verb is (loft/sweep, or a spline-carrier revolve), never by the carrier alone. The cell flips to certified (flipped-by PB-014); see authoring_cells_match_surface_rows.
 - **validity-check** - Corpus-side is_valid/BRepCheck + volume inspection is client-layer data (no kernel geometry op), matching the S7 selector/validity note.
 - **primitive(canonical-solid)** - The canonical solid primitives Box/Cylinder/Sphere/Torus are landed S3; guide_cyl's row context is render-client annotation, but the primitive capability cell is certified.
 - **compound(group)** - Compound/group composition over landed assembly emission (PB-006 emit_step_assembly covers node names in insertion order); the door answers compound_from_instances as a plain placement Compound on canonical rows.

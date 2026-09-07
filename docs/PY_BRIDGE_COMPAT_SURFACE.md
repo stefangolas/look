@@ -56,7 +56,7 @@ count of `.color` assignment sites and the label count pinned by the vendored
 | S2 | `Plane/Location algebra (plane * shape, plane.offset(d), Pos, Rotation, Location, Axis)` | 183 | `recorded-client-layer` | frame/placement rows of the submitted session table; `.offset(` is 19 of the 183 and every hit is a `Plane.offset` frame move — no kernel solid-offset hides here |
 | S3 | `Primitives (Box, Cylinder, Sphere, Torus, Compound)` | 126 | `landed` | facade `box`/`cylinder`/`sphere`/`torus`; `Compound`/grouping is assembly emission (PB-006) |
 | S4 | `make_face / topology types (Edge, Face, Wire, Solid, Shape)` | 49 | `landed` | facade `make_face`; topology typing only on the compat side (no kernel geometry in the bridge) |
-| S5 | `Spline(*pts, periodic=...) sections -> loft` | 28 | `landed` (authoring = PB-002 amended scope; loft = CC-port) | facade `spline` carrier authoring + `loft`/`loft_ribs` CC-port forwards |
+| S5 | `Spline(*pts, periodic=...) sections -> loft` (+ closed-circle `Circle(radius)` profile authoring, PB-014) | 28 (Spline-call count) | `landed` (authoring = PB-002 amended scope + PB-014 circle carrier; loft = CC-port) | facade `spline`/`circle` carrier authoring + `loft`/`loft_ribs` CC-port forwards |
 | S6 | `loft / revolve / extrude / sweep / fillet / chamfer / mirror` | 26 | `landed` | facade `loft`/`revolve`/`extrude`/`sweep`/`fillet`/`chamfer`/`mirror` (constructive parts export STL, never STEP — TR-NRB-001) |
 | S7 | `Selectors (.faces(), .edges(), .filter_by(), .take())` | 4 | `landed` | the four-expression selector rows of the facade table (PB-001 machinery, exposed as data rows); the corpus is algebra-mode, so 4 is the whole census |
 | S8 | `Color/Shape.color` + occurrence naming | 6 `.color` assignment sites (corpus AST, 2026-09-06; not a counted §8 census family) + 28 occurrence labels pinned by `f1.step.js` | `recorded-client-layer` | GLB emission (PB-009): per-solid sRGB color → linear `baseColorFactor`; `#o1.N` node names reproduced from assembly insertion order |
@@ -87,13 +87,21 @@ is canonical (Falcon-Heavy engine/vehicle assemblies).
 topology type names. The compat side types against them; the kernel content is
 the landed facade entries.
 
-**S5 — spline sections.** `Spline(*points, periodic=...)`-shaped section
-authoring (PB-002's amended scope) feeding the loft/loft-rib CC-port forwards.
-A spline carrier is a non-canonical carrier: parts built over one are
-constructive for the STEP boundary and export STL only.
+**S5 — spline and circle sections.** `Spline(*points, periodic=...)`-shaped
+section authoring (PB-002's amended scope) and closed-circle `Circle(radius)`
+profile authoring (PB-014, audit G3) feed the loft/loft-rib CC-port forwards
+and the landed revolve. A spline carrier is a non-canonical carrier: parts
+built over one are constructive for the STEP boundary and export STL only. A
+circle profile is a canonical closed profile (the exact conic of the S3
+cylinder/torus family): a part built over circle sections is constructive only
+when the verb is (`loft`/`sweep`, or a spline-carrier revolve), never by the
+circle carrier alone.
 
 **S6 — constructive verbs.** The loft/sweep/revolve/extrude/fillet/chamfer/
-mirror families. Constructive parts stay behind the TR-NRB-001 STEP boundary:
+mirror families. The partial-arc revolve form (facade `revolve_arc`: arc_deg +
+start_deg, the audit G5 cutaway construction — a trimmed shell over
+[start, start+arc] closed by two planar caps) rides the S6 revolve family
+(PB-014). Constructive parts stay behind the TR-NRB-001 STEP boundary:
 STL, never STEP (a corpus row whose export target is STEP-only behind that
 boundary would carry the typed skip reason `step-out`).
 
