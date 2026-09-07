@@ -12,7 +12,7 @@ id:          PB-011-TTC-PARITY-CHURN
 contract:    [PB-011-TTC-PARITY-CHURN]
 class:       design
 crates:      [truck123d, truck-evidence]
-depends_on:  [PB-010-TTC-PARITY-AUDIT, PB-009-GLB-EMIT, CFP-004-IMPLICIT-REDUCTION, CFP-006-CONE-CERTIFICATES, CFP-008-STAGNATION, CFP-010-GATES]
+depends_on:  [PB-010-TTC-PARITY-AUDIT, PB-009-GLB-EMIT, PB-014-AUTHORING-REVOLVE, CFP-004-IMPLICIT-REDUCTION, CFP-006-CONE-CERTIFICATES, CFP-008-STAGNATION, CFP-010-GATES]
 write_allow:
   - truck123d/src/facade.rs
   - truck123d/compat/surface.rs
@@ -34,7 +34,6 @@ tests_required:
   - swept_carrier_booleans_route_to_certified_entry
   - lifted_skip_rows_run_green
   - cutaway_partial_arc_revolve_coverage
-  - circle_profile_authoring_facade_row
 anchors:
   - {id: A1, expect: 3, cmd: "grep -c NonCanonicalCarrier truck123d/src/facade.rs"}
   - {id: A2, expect: 1, cmd: "grep -c 'pub fn' vendor/truck/truck-evidence/src/contact/gff.rs"}
@@ -98,19 +97,11 @@ same-line `// H-3`. H-6: never record Float as Exact.
    (`compat_surface_table_is_complete`) is satisfied by the existing
    SURFACE_ROWS; you update doc status text + the `surface.rs` row
    descriptions if needed, never the 7-row structure.
-4. **Partial-arc revolve (cutaway)** — RESOLVED by orchestrator check
-   2026-09-06: the kernel's `RevolvedSurface` v-range is hardwired
-   `[0, 2π)` (`revolved_curve.rs:152`, `by_revolution` :321 takes no
-   angles), and that is CORRECT for this purpose — a partial-arc revolve
-   is a bridge-level construction: a trimmed face on the full revolved
-   surface (v-range `[start, start+arc]`) plus two planar cap faces
-   bounded by the profile and its rotated image. No `vendor/truck`
-   change is expected or permitted for this; build the trimmed shell in
-   `facade.rs` (in write_allow), expose the `arc_deg`/`start_deg`
-   parameters the vendored `revolved_shell` passes
-   (`falcon_common.py:202-206`), and lift cutaway after its run goes
-   green. If the cap-face construction hits a landed-kernel limitation,
-   THAT is a SPEC_GAP (the exception, not the expectation).
+4. **Partial-arc revolve (cutaway)** — MOVED TO PB-014-AUTHORING-REVOLVE
+   (landed ahead of this packet): the capability (arc_deg/start_deg
+   trimmed-shell construction) and the SKIPS.json note correction are
+   PB-014's. This packet LIFTS the cutaway row — the green door run on
+   top of PB-014's capability, per the lift discipline below.
 5. **V5, absolute**: landed harness tests (`ttc_harness.rs` existing
    tests) are byte-identical constraints — you ADD tests, never modify
    landed ones. The `staged_skips_carry_reasons` test may need the lifted
@@ -131,9 +122,6 @@ same-line `// H-3`. H-6: never record Float as Exact.
 3. `cutaway_partial_arc_revolve_coverage` — falcon cutaway's
    partial-arc revolve path runs (or the coverage gap is typed and
    booked, per decision 4).
-4. `circle_profile_authoring_facade_row` — G3: a closed `Circle` profile
-   authors through the facade and feeds a revolve (the merlin rings
-   shape).
 
 ## Done when — run these, all must pass
 
@@ -170,7 +158,7 @@ Weakening any landed assertion. Adding `#[ignore]`. Unjustified
 
 ```json
 {"id":"PB-011-TTC-PARITY-CHURN","status":"DONE","contracts":["PB-011-TTC-PARITY-CHURN"],
- "tests_added":4,"anchors_verified":{"A1":2,"A2":1,"A3":22},
+ "tests_added":3,"anchors_verified":{"A1":3,"A2":1,"A3":35},
  "notes":"rows lifted (each with its green-run evidence); rows still skipped and why; the S1 status text change; the cutaway partial-arc finding; any deviation"}
 ```
 
