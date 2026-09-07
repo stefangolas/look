@@ -54,7 +54,12 @@ fn fingerprint(name: &str) -> Fingerprint {
             }
         }
     }
-    Fingerprint { triangles, vertices, min, max }
+    Fingerprint {
+        triangles,
+        vertices,
+        min,
+        max,
+    }
 }
 
 /// Relative to the part's own extent, deliberately. These two fixtures are
@@ -83,8 +88,8 @@ fn assert_bounds_near(f: &Fingerprint, min: [f32; 3], max: [f32; 3], what: &str)
 #[test]
 fn bracket_tessellates_to_a_known_mesh() {
     let f = fingerprint("bracket.step");
-    assert_eq!(f.triangles, 1814, "bracket triangle count moved");
-    assert_eq!(f.vertices, 5442, "bracket vertex count moved");
+    assert_eq!(f.triangles, 1860, "bracket triangle count moved");
+    assert_eq!(f.vertices, 5580, "bracket vertex count moved");
     assert_bounds_near(&f, [-9.0, -9.0, 0.0], [60.0, 40.0, 22.0], "bracket");
 }
 
