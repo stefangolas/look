@@ -50,6 +50,19 @@ def release_orphaned_branch(branch, want_wt):
             sys.exit(f"branch {branch} is held by worktree {wt_path} "
                      f"which has work (dirty={bool(held)}, "
                      f"at_tip={tip == branch_tip}); release it manually")
+        # Session-54 guard: a live worker between commits is ALSO clean and
+        # at-tip. If that slot's events are fresh, the worker is mid-run and
+        # the branch must not be released — the 22:11 incident orphaned
+        # CFP-001's and PB-014's committed work exactly this way.
+        ev = Path(wt_path) / "events.jsonl"
+        try:
+            ev_age = time.time() - ev.stat().st_mtime
+        except OSError:
+            ev_age = None
+        if ev_age is not None and ev_age < 600:
+            sys.exit(f"branch {branch} is held by worktree {wt_path} whose "
+                     f"events are fresh ({int(ev_age)}s old) - a worker may "
+                     f"be mid-run between commits; release it manually")
         print(f"releasing orphaned branch {branch} from {wt_path} "
               f"(clean, no work)")
         git(wt_path, "checkout", "--detach", branch_tip)
