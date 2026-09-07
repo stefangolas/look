@@ -10,7 +10,7 @@ registration.
 ## 1. Status
 
 ```
-Correction landed — validated by F-C0/F-C2
+Closed — correction validated by F-C0 at integrated HEAD
 ```
 
 Corrected by `CFP-001-LIFT-ENCLOSURE`. The lift screen no longer hulls
@@ -26,8 +26,19 @@ world-screen mechanisms are pinned by the CFP-001 tests
 `fc0_defect_counterexample_red_on_sampled_green_on_certified` and
 `param_box_derived_from_trim_not_boundary` (shapeops boolean suite), with the
 BG-ENC-001 containment guard carried by the F-C2 battery
-(`fc2_enclosure_containment_randomized`, evidence suite). Synthetic witnesses
-only so far — the record stays open.
+(`fc2_enclosure_containment_randomized`, evidence suite).
+
+**Closed by `CFP-010-GATES` against the integrated-HEAD witness. Mechanism established** at HEAD: the F-C0 sphere-cap × plane-slab pair is re-driven
+through the integrated funnel in the battery
+(`fc0_defect_correction_green_at_head`, `truck-certified/tests/cfp_battery.rs`
+and the boolean-boundary adjudication in `truck-shapeops/tests/cfp_gates.rs`)
+— the certified screen (`Sphere::enclose` over the trim's true parameter
+extent) admits the pair and `contact()` certifies the cap × slab contact,
+while the recorded boundary-sample screen box still provably drops it (the
+sampled screen is gone from the live lift path). The V5-boolean consequence of
+the widening is adjudicated under the CFP gate (monotone superset), recorded
+in `cfp_gates.rs`. Witnesses remain synthetic (no corpus boolean yet) — the
+record keeps its corpus-witness caveat and is not deleted.
 ```
 
 ## 2. Mathematical objects
