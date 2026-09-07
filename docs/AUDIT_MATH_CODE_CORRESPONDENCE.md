@@ -312,3 +312,95 @@ For each item in order M1 → M4 → M3 → M9 → M2 (highest severity first):
    new arm or the emission site needs the extra precondition.
 5. Produce per-item verdicts: SOUND / SOUND-WITH-MISSING-PROOF-STEP (write
    the step) / UNSOUND (book the fix packet).
+
+---
+
+## Adjudication outcomes (2026-09-07, frontier review — see audit_adjudication)
+
+- **M1: AUDIT WRONG — the theorem is valid for arbitrary Y.** Strict
+  inclusion K(X) ⊆ int(X) implies ρ(|I − Y·J(X)|) < 1 (rad(K) ≥
+  |I−YJ|·rad(X) + strict inclusion + Perron); nonsingularity of Y and every
+  J ∈ J(X) is CONCLUDED, not assumed (Neumaier 5.1.7 / Moore 1977 / Rump).
+  CFP-007's stale-Y reuse is sound PROVIDED Y enters only the operator,
+  never the verdict. **Code checks done:** PreconditionerCache stores Y
+  only, invalidated on failure, every verdict re-derived per sample
+  (ssi4.rs:1774-1887) — no verdict caching, no cached ρ, no K
+  short-circuit. `KrawczykCertificate3::new` (ssi_types.rs:460+) enforces
+  strict-per-coordinate inclusion (`b_lo < k_lo && k_hi < b_hi`) and a
+  determinant enclosure excluding zero strictly — a degenerate box is
+  unconstructible, so no non-strict emission path exists at the 3×3 level.
+  Residuals (low): write the Perron step into
+  CONTACT_FAST_PATH_BUILD_SPEC.md:238-240 (invertibility concluded, not
+  assumed); confirm K̃ ⊇ K outward rounding once; the verdict-arm split
+  (non-strict = existence-only) as hardening.
+- **M5: SOUND — verified in inari source.** `Interval::FRAC_PI_2 =
+  const_interval!(1.5707963267948966, 1.5707963267948968)` — "the tightest
+  interval enclosing π/2" (inari-2.0.0/src/constants.rs): a true outward
+  enclosure, so the interval subtraction in `reduce` is sound. Residuals:
+  add the k.rem_euclid(4.0) exactness assertion and a large-|k| test
+  asserting the [-1,1] fallback is reached.
+- **M2: CONFIRMED (high).** Only the `0 → Rebuild` bucket is certified.
+  Fix re-aimed: rename buckets (RankCertifiedRegular /
+  DegeneracyCandidates{clusters, budget}), strip positive-fact detail
+  strings from Inconclusive-backed paths, verified route = bisect-while-S
+  for refutation + square-subsystem reduction (F₁,F₂,F₃,mⱼ) for
+  verification (the raw 7-eq/4-unknown system admits neither Krawczyk nor
+  Miranda directly). BG-KV2-207B-TRACER-REST owns; amendment recorded here
+  for its r2.
+- **M3: RE-AIMED.** My counterexample defeats the DOCUMENTED criterion
+  (oriented cones, gff.rs:421-426 as written) but NOT the implemented
+  unoriented-line-separation test (the two spheres' axes are antipodal →
+  γ_L = 0 → the code refuses). The audit's monotonicity repair was
+  insufficient (both carriers monotone in the two-sphere case). The
+  correct theorem: α + β < γ_L ⟹ d = ±(a×b)/‖a×b‖ satisfies
+  |d·(∇h_A × ∇h_B)| ≥ sin(γ_L − α − β)·‖∇h_A‖·‖∇h_B‖ > 0 — strict
+  monotonicity along d, every component meets ∂B, seed completeness holds.
+  α + β < γ_L ≤ π/2 forces the half-angle guard automatically. Packet:
+  rewrite the comment (unoriented hypothesis, drop Sinha/Sederberg),
+  make LoopFree carry evidence (axis d + margin sin(γ_L − α − β)), check
+  the pad direction in unoriented_axis_separation. Booked: DEF-GFF-LOOPFREE.
+- **M4: TARGET MOVED.** Exclusion needs NO homogenisation: with w_α > 0 the
+  rational patch satisfies the convex-hull property directly (λ_α =
+  w_αB_α/Σw_βB_β ≥ 0, sums to 1), and 0 ∉ conv{p¹_α − p²_β} ⟹ disjoint
+  images. The REAL exposures: (1) weight positivity as a hard admission
+  precondition (encode in the carrier type); (2) subdivision of rationals
+  MUST be homogeneous ((w_αp_α, w_α) then renormalise — sub-weights stay
+  positive by convexity; subdividing affine control points directly
+  corrupts every node silently); (3) derivative/span bounds — coefficient
+  differences bound polynomial derivatives but NOT rational ones
+  (P' = (P'_num − P·w')/w needs a lower bound on w): audit every Theorem-3
+  sign row for coefficient-difference-as-derivative-bound. Booked:
+  DEF-RATIONAL-EXCLUSION.
+- **M9: CONFIRMED (high).** Certificate conditions specified: edge/vertex
+  avoidance along the WHOLE ray segment (certified δ > 0), transversality
+  (enclosure of ω·∇h_f excludes 0), finiteness + pairwise-disjoint
+  certified crossing intervals with certified exclusion of the complement.
+  Until all three hold, soften the §12 "interval separation, not
+  symbolic-perturbation folklore" wording. Booked: DEF-SEEDRAY-CERT.
+- **M6, M11: CONFIRMED.** Type-state remedies: CoveringWitness as the only
+  constructor argument to the degree-one discharge (M6);
+  CommonBidegree newtype in implicit2d.rs (M11 — failure is asymmetric:
+  skipping elevation is UNSOUND (false exclusion), over-elevating merely
+  conservative). Small packets.
+- **M10: SPEC MATH ERROR FOUND.** With unit rows, ‖DF̂‖₂ = √(1+|c|), not
+  √2 — √2 is the FROBENIUS norm. ‖DF̂‖₂ = √2 only at |c| = 1 (the
+  degenerate case). If code forms κ = √(2/(1−|c|)) it over-estimates by
+  [1, √2] — safe direction, but the spec must name the norm, and the funnel
+  check (does it consume σ_min = √(1−|c|) or the raw ‖DF‖?) stands.
+- **M7: CONFIRMED + SHARPENED.** Monotone degradation is a falsification
+  instrument: non-monotonicity refutes; monotonicity over a sampled range
+  does not establish. Doctrine wording must drop to "necessary condition,
+  tested by construction" or the harness must be built.
+- **M8: CONFIRMED.** The theorem needs FOUR hypotheses: index identity,
+  injective (EdgeID, ordinal) → vertex map, per-face simplicial disc, and
+  exactly-two-faces-per-edge (non-manifold edges rejected, never welded).
+  Path enumeration + BG-CG-000 scoping owed. NEW companion finding from
+  the DEF wave: the legacy tessellation path cannot close analytic-surface
+  shells AT ALL (booked: DEF-TESS-ANALYTIC-SEAM) — the M8 path enumeration
+  must include it.
+- **Cross-cutting (accepted):** M2/M3/M6/M8/M11 are one defect class —
+  verdict variants asserting more than their construction site proves. The
+  remedy: evidence-carrying variants (axis+margin, covering witness,
+  common-bidegree token, cluster budget, path provenance) so an unprovable
+  verdict is UNCONSTRUCTIBLE, not merely untested. "Write the proof before
+  booking the packet."

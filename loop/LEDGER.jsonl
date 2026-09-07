@@ -240,3 +240,7 @@
 {"id": "CFP-006-CONE-CERTIFICATES", "slot": "0", "verdict": "LANDED", "worker_commit": "67c9a47", "model": "deepseek/deepseek-v4-flash", "note": "overnight mechanical landing (scoped check green)", "closed": "2026-09-06"}
 {"id": "CFP-008-STAGNATION", "slot": "0", "verdict": "LANDED", "worker_commit": "a7b5abd", "model": "deepseek/deepseek-v4-flash", "note": "overnight mechanical landing (scoped check green)", "closed": "2026-09-06"}
 {"id": "CFP-010-GATES", "slot": "0", "verdict": "LANDED", "worker_commit": "b8d7d30", "model": "deepseek/deepseek-v4-flash", "note": "overnight mechanical landing (scoped check green)", "closed": "2026-09-07"}
+{"id": "PB-011-TTC-PARITY-CHURN", "slot": "0", "verdict": "LANDED", "worker_commit": "2a12623", "model": "deepseek/deepseek-v4-flash", "note": "overnight mechanical landing (scoped check green)", "closed": "2026-09-07"}
+{"id": "DEF-CDT-INVW32", "slot": "0", "verdict": "LANDED", "worker_commit": "2e882ad", "model": "deepseek/deepseek-v4-flash", "note": "overnight mechanical landing (scoped check green)", "closed": "2026-09-07"}
+{"id": "DEF-CDT-INVW32", "slot": 0, "verdict": "LANDED", "worker_commit": "2e882ad", "model": "deepseek/deepseek-v4-flash", "note": "adjudicated landing (scoped check green)", "closed": "2026-09-07"}
+{"id": "DEF-VENDOR-FIXTURES", "slot": 1, "verdict": "LANDED", "worker_commit": "d6796fd", "model": "deepseek/deepseek-v4-flash", "note": "adjudicated landing; finding: legacy tessellation cannot close analytic-surface shells (booked DEF-TESS-ANALYTIC-SEAM)", "closed": "2026-09-07"}
