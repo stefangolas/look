@@ -12054,35 +12054,58 @@ mod cone_topology_tests {
         assert!(!mesh.faces().is_empty());
     }
 
+    /// INV-W3-1: a duplicate traversal is admitted, never rejected. The fixture
+    /// below is the plain square whose bottom edge (0,0)-(10,0) is additionally
+    /// walked out-and-back as a zero-area spike — three traversals of one
+    /// segment, i.e. DUPLICATE traversals, not a proper crossing (proper
+    /// crossings are planarized by `ConstraintRoles::insert_with_split` and are
+    /// covered by the bowtie test). Under the landed ARR-SEAM W3 semantics
+    /// (parity = multiplicity mod 2) the spike cancels and the mesh equals the
+    /// plain square's. The pre-W3 name was
+    /// `test_parity_intersecting_constraints_rejected`, which asserted that the
+    /// loop must fail or produce an empty mesh; INV-W3 replaces that semantics.
     #[test]
-    fn test_parity_intersecting_constraints_rejected() {
-        use truck_geometry::prelude::*;
-        let plane = Plane::new(
-            Point3::origin(),
-            Point3::new(1.0, 0.0, 0.0),
-            Point3::new(0.0, 1.0, 0.0),
-        );
+    fn duplicate_spike_matches_plain_square() {
+        let plane = parity_plane();
         let tol = 0.01;
-        // Self-overlapping loop traversing same segment (0,0)->(10,0) twice in forward direction
-        let loop0: Vec<SurfacePoint> = vec![
-            (Point2::new(0.0, 0.0), Point3::new(0.0, 0.0, 0.0)).into(),
-            (Point2::new(10.0, 0.0), Point3::new(10.0, 0.0, 0.0)).into(),
-            (Point2::new(0.0, 0.0), Point3::new(0.0, 0.0, 0.0)).into(),
-            (Point2::new(10.0, 0.0), Point3::new(10.0, 0.0, 0.0)).into(),
-            (Point2::new(10.0, 10.0), Point3::new(10.0, 10.0, 0.0)).into(),
-            (Point2::new(0.0, 10.0), Point3::new(0.0, 10.0, 0.0)).into(),
-            (Point2::new(0.0, 0.0), Point3::new(0.0, 0.0, 0.0)).into(),
+        let corner =
+            |x: f64, y: f64| -> SurfacePoint { (Point2::new(x, y), Point3::new(x, y, 0.0)).into() };
+        // The out-and-back spike claims the bottom edge three times; the rest of
+        // the loop bounds the square (0,0)-(10,0)-(10,10)-(0,10).
+        let spiked: Vec<SurfacePoint> = vec![
+            corner(0.0, 0.0),
+            corner(10.0, 0.0),
+            corner(0.0, 0.0),
+            corner(10.0, 0.0),
+            corner(10.0, 10.0),
+            corner(0.0, 10.0),
+            corner(0.0, 0.0),
         ];
-        let boundary = PolyBoundary::new(
-            vec![PolyBoundaryPiece::untagged(loop0)],
+        let spiked_boundary = PolyBoundary::new(
+            vec![PolyBoundaryPiece::untagged(spiked)],
             &plane,
             tol,
             &unevidenced_lattice(&plane),
         );
-        let mesh = trimming_tessellation(&plane, &boundary, tol, &unevidenced_lattice(&plane));
+        let plain_boundary = PolyBoundary::new(
+            vec![PolyBoundaryPiece::untagged(square(1))],
+            &plane,
+            tol,
+            &unevidenced_lattice(&plane),
+        );
+        let spiked_mesh =
+            trimming_tessellation(&plane, &spiked_boundary, tol, &unevidenced_lattice(&plane));
+        let plain_mesh =
+            trimming_tessellation(&plane, &plain_boundary, tol, &unevidenced_lattice(&plane));
         assert!(
-            mesh.faces().is_empty(),
-            "Self-overlapping degenerate loop must fail or produce empty mesh"
+            !spiked_mesh.faces().tri_faces().is_empty(),
+            "duplicate traversals must not reject the square (INV-W3-1)",
+        );
+        assert_eq!(
+            spiked_mesh.faces().tri_faces().len(),
+            plain_mesh.faces().tri_faces().len(),
+            "the zero-area spike cancels mod 2 and the square's triangles are \
+             unchanged (INV-W3-1)",
         );
     }
 
@@ -12612,12 +12635,17 @@ mod cone_topology_tests {
         let tol = 0.01;
         let corner =
             |x: f64, y: f64| -> SurfacePoint { (Point2::new(x, y), Point3::new(x, y, 0.0)).into() };
+        // A closed pentagon: the base (0,0)-(10,0) is walked out, back, out,
+        // and the roof closes from the apex (5,10) back to (0,0), so no
+        // synthetic closure is added and the realized loop keeps the three
+        // unique constraint edges.
         let loop0: Vec<SurfacePoint> = vec![
             corner(0.0, 0.0),
             corner(10.0, 0.0),
             corner(0.0, 0.0),
             corner(10.0, 0.0),
             corner(5.0, 10.0),
+            corner(0.0, 0.0),
         ];
         let boundary = PolyBoundary::new(
             vec![PolyBoundaryPiece::untagged(loop0)],
