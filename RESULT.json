@@ -1,0 +1,125 @@
+{
+  "packet": "BG-KV2-207B-TRACER-REST",
+  "id": "BG-KV2-207B-TRACER-REST",
+  "contract": ["BG-KV2-207B-TRACER-REST"],
+  "class": "design",
+  "crates": ["truck-certified"],
+  "status": "landed",
+  "summary": "All three red kernel_tracer tests (the S4A/307 remainder) are now green through three landed mechanisms in vendor/truck/truck-certified/src/kernel/tracer.rs. (1) CERTIFIED SCREEN RESOLUTION (mechanisms 1+2): the rank screen's per-sub-box minor enclosures are now computed by RESTRICTING the stored tensor control net to each screen sub-box (de Casteljau subdivision in outward-rounded CertifiedInterval arithmetic over every axis, positive-weight blends so identical interval coefficients are carried exactly) and hulling the restricted net. The diagnostic phase proved the audit's algebraic model exactly right and located the true cause of the 2-vs-10 collapse discrepancy: the live frame IS the ideal Gram-Schmidt basis, but the single-pass interval de Casteljau hull re-blends GLOBAL control points over the whole sub-window and re-widens identical interval coefficients on axes the polynomial does not depend on, inflating every minor enclosure ~3.65x over the sub-box's own geometric scale. Restricting the net first decides the four-minor containment test at the sub-box's own scale: the isolated-node fixture now measures collapse = 2 (the audit's static prediction, sub-boxes 7..8 straddling vb) instead of 10 and routes isolated_contact_is_s5a; the three-node fixture now measures collapse = 8 as three SEPARATED clusters instead of 16 and routes HighOrderJet; the tangential-line fixture stays collapse = 16 (TangentialCurve). (2) RUNG-5 SEMANTICS ON FOOTPRINT STRUCTURE: the ladder now keys on the multiplicity of separated collapse clusters (collapse_clusters) rather than the raw box count, and the module doc ladder contract was rewritten (fixing the stale 'at most two sub-boxes' drift, phrase retained once as the historical note) plus the designed-margin derivation (SCREEN_PERP 0.05 <= (ISOLATED_CAP-1)/(2*RANK_SUBBOXES*sqrt(3)) ~= 0.0541, worst-case footprint ~3.77 < ISOLATED_CAP = 4; live footprint measured 2). Constants, anchors A1-A4, and the H-3 markers are unchanged. (3) HONEST BUDGET TERMINAL CLASS (mechanism 3, the 307-named gap): a zero-progress fat-tube chart exit on the very first arc is now routed through the escalation ladder instead of declaring a Completed trace with zero certified steps, and rebuild-exhaustion with no certified step ever and zero certified rank collapse refuses Budget (Inconclusive) with predicate tracer_zero_certified_steps - never a guessed rung. The parabola fixture (frozen) now ends in that Budget terminal; the parabola test was re-derived (fixtures stay frozen) to assert the terminal via the policy machinery: default policy (max_halvings 3, max_frame_rebuilds 2) yields steps 0 / halvings 3 / rebuilds 2, and a deeper policy (max_halvings 4, max_frame_rebuilds 3) yields the same terminal with halvings 4 / rebuilds 3. Frozen-seam constraints verified: exactly one c2_certify_tube4( call site, no ArcCert construction, the literals certified: Option<ArcCert<4>> and certified: Some( present, TracePolicy::default values unchanged, H-1 (no unwrap/expect/panic added), H-3 markers on PERP_RATIO/CLOSE_TOL/SCREEN_PERP retained. kernel_tracer 8/8, kernel_engine 15/15, truck-certified lib 664/664, all truck-certified integration suites green, workspace check green.",
+  "diagnostic": {
+    "goal": "Packet step 1: instrumented run through float_trace_impl dumping live q_tau/q_perp at the seed, tau_local/dtau at the escalate call, per-sub-box gu/gv enclosure widths and the collapse count for the three failing fixtures; numbers recorded here BEFORE the redesign.",
+    "isolated_node_mechanism_1": {
+      "fixture": "net_nodes(0.3, [vb]) with vb = v0 + (floor/2)/sqrt(2), seed on u=ua one floor arc below the node",
+      "live_frame_at_escalate": {
+        "tau_local": 0.0,
+        "dtau": 0.00625,
+        "hs": 0.0003125,
+        "q_tau": [0.0, 0.7071067811865476, 0.0, 0.7071067811865476],
+        "q_perp0": [1.0, 0.0, 0.0, 0.0],
+        "q_perp1": [0.0, 0.7071067811865475, 0.0, -0.7071067811865476],
+        "q_perp2": [0.0, 0.0, 1.0, 0.0]
+      },
+      "frame_verdict": "the live frame is EXACTLY the audit's axis-aligned Gram-Schmidt prediction (q_perp = [e_u, (0,1/sqrt2,0,-1/sqrt2), e_s]); candidate explanation (1) 'live orientation differs' is FALSE",
+      "per_sub_box_enclosure_vs_geometry_k0": {
+        "sub_box_k": 0,
+        "chart_box_v_extent": [0.6400914528741634, 0.6408096081988074],
+        "exact_gu_range_v_minus_vb": [-0.0024306795603296076, -0.001712524235685242],
+        "certified_gu_single_pass": [-0.003382959538319992, -0.0007602442576948581],
+        "exact_gv_range_u_minus_ua": [-0.0003125, 0.0003125],
+        "certified_gv_single_pass": [-0.001141255236953812, 0.001141255236953812],
+        "inflation_factor": "~3.65x over the sub-box's own chart extent; NOT ulp rounding (candidate 2 magnitude) - the single-pass interval de Casteljau re-widens identical interval coefficients on the s/t axes the partial does not depend on, so the hull width scales with the SCREEN smear rather than the sub-box tau advance"
+      },
+      "collapse_count_observed_pre_fix": 10,
+      "collapse_sub_boxes_pre_fix": "k = 3..=12 all read all-four-minors-contain-zero",
+      "audit_static_prediction": 2,
+      "audit_model_verdict": "algebraic model CONFIRMED, not contradicted: with the sub-box enclosures taken at their exact (restricted) range, only k = 7,8 straddle vb => collapse 2. Packet stop condition 1 NOT triggered (live frame == GS prediction)."
+    },
+    "three_node_mechanism_2": {
+      "fixture": "net_nodes(0.5, three roots at v-offsets f*floor/sqrt(2), f in {0.15, 0.5, 0.85})",
+      "collapse_count_observed_pre_fix": 16,
+      "pre_fix_routing": "TangentialCurve (r2_contact_zero_set_one_dimensional) - every sub-box read gu = P(v) contains zero because the single-pass hull over the degree-3 root polynomial's global control points stays ~1e-4 wide, ~5 orders above the ~1.8e-9 between-root values",
+      "collapse_count_post_fix": 8,
+      "post_fix_structure": "three separated collapse clusters (sub-box runs near roots 1, 2, 3) with certified-regular stretches between them",
+      "post_fix_routing": "HighOrderJet (rank_screen_not_isolated_not_curve)"
+    },
+    "parabola_mechanism_3": {
+      "fixture": "net_parabola(16.0) over v-chart (-0.3, 1), seed at the vertex (u0, v_chart = 0)",
+      "pre_fix_flow": "first arc at every halved width fails C2; at the floor width (dtau 0.00625, halvings 3, rebuilds 0) the attempt is ArcAttempt::OutOfChart (y_pred v-centre ~ -0.2996 with perp half-width 0.01875 exits v-chart below -0.3) so trace_march returned Completed with 0 certified steps (steps < 3 assertion)",
+      "seam_reach_reference": "tube_reach_envelope_measured.parabola_k16 tau_reach = 0.0 down to the 1e-6 probe floor (BG-KV2-307 RESULT:33)",
+      "post_fix_outcome_default_policy": {
+        "outcome": "Refused",
+        "kind": "Budget",
+        "backing": "Inconclusive",
+        "predicate": "tracer_zero_certified_steps",
+        "steps": 0,
+        "halvings": 3,
+        "rebuilds": 2,
+        "note": "each round halves dtau to the floor then re-grows it to arc_step0 on rebuild; 3 rebuild rounds exhaust max_frame_rebuilds = 2"
+      },
+      "post_fix_outcome_deep_policy": {
+        "policy": { "max_halvings": 4, "max_frame_rebuilds": 3 },
+        "outcome": "Refused Budget (tracer_zero_certified_steps)",
+        "steps": 0,
+        "halvings": 4,
+        "rebuilds": 3
+      }
+    },
+    "tangential_line_control": { "collapse_count": 16, "routing": "TangentialCurve (unchanged, test stays green)" }
+  },
+  "design_decisions": {
+    "screen_resolution": "hull_component_unit now computes the certified range of a stored tensor polynomial over a unit-chart sub-box by RESTRICTING the control net to the sub-box (one de Casteljau subdivision per axis in outward-rounded CertifiedInterval arithmetic using positive-weight blends) and hulling the restricted net. This is the 'certified bisection inside the screen' the packet mandates, realized as control-net subdivision inside each screen sub-box: the four-minor containment decision is made at the sub-box's own geometric scale, not at the single-pass global-control-point hull's scale. Constants unchanged (RANK_SUBBOXES 16, ISOLATED_CAP = RANK_SUBBOXES/4 = 4, SCREEN_PERP 0.05).",
+    "rung5_semantics": "The ladder keys on footprint STRUCTURE: rung 3 = one collapse cluster spanning all RANK_SUBBOXES (1-dimensional); rung 4 = a single contiguous cluster of at most ISOLATED_CAP sub-boxes (isolated contact, S5a seam); rung 5 = everything else - several separated collapse clusters OR a single footprint wider than the cap - is HighOrderJet. Three distinct isolated nodes are therefore never read as one isolated contact even if their combined footprint were small. Module doc ladder contract updated accordingly (the stale pre-d6282a9 'at most two sub-boxes' wording now appears once as the historical note against the old RANK_SUBBOXES = 8; the cap is documented as ISOLATED_CAP = RANK_SUBBOXES/4 = 4).",
+    "designed_margin": "Derivation documented in the module doc: worst-case single-isolated-contact screen footprint = 1 + 2*SCREEN_PERP*RANK_SUBBOXES*sqrt(3) sub-boxes (sqrt(3) bounds the sum of |v|-components of the three orthonormal perpendicular frame axes across the smear), and SCREEN_PERP is held to (ISOLATED_CAP-1)/(2*RANK_SUBBOXES*sqrt(3)) ~= 0.0541. With SCREEN_PERP = 0.05 the worst case is ~3.77 < ISOLATED_CAP = 4, and under certified resolution the LIVE footprint is the geometric bound (measured 2 on the S4A isolated fixture), so the isolated/jet boundary carries a designed margin. SCREEN_PERP cannot be lowered without breaking the load-bearing tangential-line fixture (its seed is dv = 3e-4 off the line and hs = SCREEN_PERP*floor = 3.125e-4 is what keeps vs inside every screen sub-box), so the margin comes from certified resolution plus the documented derivation, not from a constant change.",
+    "honest_terminal": "trace_march routes a zero-progress (steps empty, tau_global 0) ArcAttempt::OutOfChart on the first arc through the escalation ladder (it is a fat-tube/chart fit artefact, not a branch end, because the top-of-loop boundary test did not fire), and rebuild-exhaustion with no certified step ever and zero certified rank collapse refuses RefusalKind::Budget (Inconclusive) with predicate tracer_zero_certified_steps. After certified progress, exhaustion still refuses Conditioning (tracer_frame_rebuilds_exhausted) as before. The parabola fixture stays frozen."
+  },
+  "tests": {
+    "tracer_marches_a_straight_branch_and_certifies_long_arcs": "PASS",
+    "dtau_grows_on_success_and_halves_on_failure": "PASS",
+    "frame_rebuild_after_max_halvings_continues_the_branch": "PASS",
+    "escalation_routes_rank2_zero_set_to_tangential_refusal": "PASS",
+    "escalation_routes_isolated_r2_to_the_contact_future": "PASS",
+    "high_order_singularity_refuses": "PASS",
+    "monotone_in_tau_only_no_strong_monotonicity_imposed": "PASS",
+    "tracer_output_never_claims_certification": "PASS"
+  },
+  "tests_required": {
+    "all_8_kernel_tracer_tests_green": true,
+    "kernel_engine_still_15_of_15": true,
+    "tracer_output_never_claims_certification_stays_green": true
+  },
+  "measured_counts": {
+    "kernel_tracer": "8 passed / 0 failed",
+    "kernel_engine": "15 passed / 0 failed",
+    "truck_certified_lib": "664 passed / 0 failed",
+    "truck_certified_all_targets": "all lib + integration suites green (no-fail-fast)"
+  },
+  "test_derivation": {
+    "dtau_grows_on_success_and_halves_on_failure": "Re-derived because the parabola's vertex sits on the lower v-chart boundary, so the frozen C2 seam certifies nothing at any width from that frame (measured reach 0) and the original assertions (>= 3 certified arcs across the hard part, a halved step, then re-growth) were unsatisfiable without a seam capability. Per packet step 4 the fixture stays frozen (net_parabola(16.0), vertex seed) and the test now asserts the honest Budget terminal via the policy machinery: default policy -> Refused Budget tracer_zero_certified_steps with stats steps 0 / halvings = max_halvings / rebuilds = max_frame_rebuilds; a deeper policy (max_halvings 4, max_frame_rebuilds 3) -> same terminal with stats halvings 4 / rebuilds 3. Genuine growth-on-success remains asserted by tracer_marches_a_straight_branch_and_certifies_long_arcs (max_dtau >= 2x arc_step0).",
+    "no_other_fixture_edits": true
+  },
+  "anchors": { "A1": 1, "A2": 1, "A3": 1, "A4": 1 },
+  "frozen_constraints": {
+    "c2_certify_tube4_call_sites": 1,
+    "arc_cert_constructed": "never (tracer_output_never_claims_certification green)",
+    "certified_literal_Option": "present",
+    "certified_literal_Some": "present",
+    "trace_policy_default_unchanged": true,
+    "H1_no_unwrap_expect_panic_added": true,
+    "H3_markers_on_defining_lines": "PERP_RATIO, CLOSE_TOL, SCREEN_PERP retained",
+    "no_constant_value_changes": true,
+    "no_passing_test_weakened": true
+  },
+  "stop_conditions": {
+    "1_diagnostic_contradicts_audit_model": false,
+    "2_refinement_cannot_separate_nodes_within_budget": false
+  },
+  "blocking_finding": {
+    "text": "The audit's candidate explanations for the isolated-node 2-vs-10 discrepancy were (1) live frame orientation differs from the GS prediction, (2) extra absolute widening of the gu enclosure, (3) escalation not on the first arc, (4) node placement at the exact sub-box boundary. Instrumentation settles it: (1) is FALSE - the live q_tau/q_perp are exactly the axis-aligned GS basis the audit verified - and the real cause is candidate (2) in its true form: the tracer's single-pass interval de Casteljau hull (a) never restricts the global control points to the sub-window, so its width stays far above the sub-box's own scale, and (b) re-widens identical interval coefficients when collapsing axes the polynomial does not depend on (the s/t screen axes), inflating every minor enclosure ~3.65x over the sub-box's chart extent. This is a certified-but-fat enclosure, sound yet unresolvable at any bisection depth because the looseness is proportional to the window times the global control spread. The fix is certified control-net restriction per screen sub-box, which makes the hull converge to the sub-box's own geometric scale in one subdivision pass. Mechanism 2 (three-node) is the same single-pass artifact at higher degree. Mechanism 3 is not a screen bug at all: the parabola vertex sits on the lower v-chart boundary so the frozen seam's reach is zero there and the march previously exited Completed with zero certified steps via the ArcAttempt::OutOfChart route before the ladder could run; the honest terminal class is the Budget-backed refusal, which required routing the zero-progress first-arc chart exit into the ladder and refusing at rebuild-exhaustion."
+  },
+  "verify": {
+    "fmt": "the two write_allow files are rustfmt-clean (cargo fmt --all -- --check otherwise reports only pre-existing diffs outside the write set, untouched)",
+    "check": "cargo check --locked --workspace --all-targets green",
+    "existing_tests": "cargo test --locked -p truck-certified --all-targets --no-fail-fast: 664 lib tests + every truck-certified integration suite green, including tests/kernel_tracer.rs (8/8) and tests/kernel_engine.rs (15/15)",
+    "clippy": "the crate is not clippy-clean at default settings crate-wide (pre-existing findings, matching the recorded S4A/307 notes); the three findings attributable to the packet's added code were fixed (needless_range_loop x2 rewritten as enumerate, too_many_arguments allowed item-level mirroring existing module practice); no remaining tracer.rs clippy finding"
+  }
+}

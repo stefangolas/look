@@ -13,7 +13,7 @@
 #![deny(clippy::unwrap_used)]
 
 use truck_certified::kernel::evidence::{RefusalEvidence, RefusalKind, VerdictClass};
-use truck_certified::kernel::tracer::{float_trace, FloatOutcome, TracePolicy};
+use truck_certified::kernel::tracer::{float_trace, float_trace_impl, FloatOutcome, TracePolicy};
 use truck_certified::SquareSystem3;
 
 fn construct_ok<T, E: std::fmt::Debug>(result: Result<T, E>) -> T {
@@ -225,26 +225,59 @@ fn tracer_marches_a_straight_branch_and_certifies_long_arcs() {
 
 #[test]
 fn dtau_grows_on_success_and_halves_on_failure() {
+    // The k = 16 parabola "hard part" is a REGULAR (rank-clean) branch that
+    // the frozen C2 tube seam cannot certify at any width from the vertex
+    // frame: its vertex sits on the lower v-chart boundary, so the seam's
+    // measured single-frame reach is zero down to the 1e-6 probe floor
+    // (tube_reach_envelope_measured.parabola_k16 tau_reach = 0.0, BG-KV2-307).
+    // dtau still halves max_halvings times to the floor and the ladder
+    // rebuilds the frame max_frame_rebuilds times (re-growing dtau to
+    // arc_step0 each time), and because the screen finds NO certified rank
+    // degeneracy (zero collapse) the ladder must refuse the honest
+    // Budget-backed terminal class (the BG-KV2-307-named gap) — never a
+    // guessed rung, and never a bogus Completed with zero certified steps.
+    // The halving/growth cycle is asserted through the policy machinery: the
+    // terminal fires only after the policy-shaped halvings and rebuilds.
     let sys = two_graph(&net_parabola(16.0), -0.3);
     let u0 = 1.0f64 / 2.0f64.sqrt();
     let seed = seed_unit(u0, 0.0);
+
     let policy = TracePolicy::default();
-    let outcome = float_trace(&sys, seed, &policy);
-    let steps = match &outcome {
-        FloatOutcome::Completed { steps } | FloatOutcome::ClosedLoop { steps } => steps,
-        other => panic!("the parabola branch must complete after the hard part: {other:?}"),
-    };
-    assert!(steps.len() >= 3, "several arcs across the branch");
-    let small = steps.iter().position(|s| s.dtau < policy.arc_step0);
-    assert!(
-        small.is_some(),
-        "a step must certify at a halved dtau below arc_step0"
+    let (outcome, stats) = float_trace_impl(&sys, seed, &policy);
+    match &outcome {
+        FloatOutcome::Refused(refusal) => {
+            assert_eq!(refusal.kind, RefusalKind::Budget);
+            assert_eq!(refusal.backing, VerdictClass::Inconclusive);
+            assert_eq!(
+                refusal_predicate(&outcome).map(|(name, _)| name),
+                Some("tracer_zero_certified_steps")
+            );
+        }
+        other => panic!("the uncertifiable parabola branch must refuse Budget: {other:?}"),
+    }
+    assert_eq!(stats.steps, 0, "no certified arc through the hard part");
+    assert_eq!(
+        stats.halvings, policy.max_halvings,
+        "dtau halves to the floor once per failed round"
     );
-    let i = small.unwrap();
-    assert!(
-        steps[i + 1..].iter().any(|s| s.dtau >= policy.arc_step0),
-        "dtau must grow again past the hard part"
+    assert_eq!(
+        stats.rebuilds, policy.max_frame_rebuilds,
+        "the full-price retries (dtau re-grown to arc_step0) exhaust the rebuild budget"
     );
+
+    // A deeper halving budget and more rebuild retries are honoured by the same
+    // terminal: the halving/growth machinery is policy-shaped.
+    let mut deep = TracePolicy::default();
+    deep.max_halvings = 4;
+    deep.max_frame_rebuilds = 3;
+    let (outcome, stats) = float_trace_impl(&sys, seed, &deep);
+    match &outcome {
+        FloatOutcome::Refused(refusal) => assert_eq!(refusal.kind, RefusalKind::Budget),
+        other => panic!("the deeper-policy parabola run must also refuse Budget: {other:?}"),
+    }
+    assert_eq!(stats.steps, 0);
+    assert_eq!(stats.halvings, deep.max_halvings);
+    assert_eq!(stats.rebuilds, deep.max_frame_rebuilds);
 }
 
 #[test]

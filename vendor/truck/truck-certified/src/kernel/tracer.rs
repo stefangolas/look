@@ -46,17 +46,51 @@
 //! **The §10.2 escalation ladder** classifies a C2 failure (once halving is
 //! exhausted) in the normative order:
 //!
-//! 1. `sigma_min(DF) > 0` certified on the box (the F3 margin on the selected
-//!    continuation block, evaluated as the four maximal minors of the stored
-//!    Jacobian over a `tau` partition): rebuild the frame and retry; after
-//!    `TracePolicy::max_frame_rebuilds` the trace refuses `Conditioning`.
+//! 1. Certified full rank over the whole failed box (the four maximal minors
+//!    of the stored Jacobian jointly exclude zero on every screen sub-box):
+//!    rebuild the frame and retry. With no certified step ever, exhausting
+//!    `TracePolicy::max_frame_rebuilds` refuses the honest Budget terminal
+//!    (`tracer_zero_certified_steps`): a rank-clean branch the frozen seam
+//!    cannot certify is a budget gap, never a guessed rung (BG-KV2-307). After
+//!    progress, exhaustion refuses `Conditioning` as before.
 //! 2. Parametric-regularity floor fails (no certified zero in the failed
 //!    parameter box): refuse predicate `parametric_degeneracy_chart_or_carrier`.
 //! 3. The R2 rank screen shows the contact zero set is 1-dimensional over the
-//!    whole failed box: refuse [`RefusalKind::TangentialCurve`] (§10.4).
-//! 4. The R2 zero set is isolated (rank collapse confined to at most two
-//!    sub-boxes): refuse predicate `isolated_contact_is_s5a` (Wave-3 seam).
-//! 5. Otherwise: refuse [`RefusalKind::HighOrderJet`].
+//!    whole failed box (one collapse cluster spanning every sub-box): refuse
+//!    [`RefusalKind::TangentialCurve`] (§10.4).
+//! 4. The R2 zero set is isolated: the rank collapse is a SINGLE contiguous
+//!    cluster of at most [`ISOLATED_CAP`] sub-boxes (the pre-d6282a9 contract
+//!    was spelled "at most two sub-boxes" against `RANK_SUBBOXES` = 8; the cap
+//!    is [`ISOLATED_CAP`] = [`RANK_SUBBOXES`]/4 = 4): refuse predicate
+//!    `isolated_contact_is_s5a` (Wave-3 seam).
+//! 5. Otherwise — several SEPARATED collapse clusters, or a single footprint
+//!    wider than the isolated cap without saturating the arc — refuse
+//!    [`RefusalKind::HighOrderJet`]. Rung 5 keys on footprint STRUCTURE (the
+//!    multiplicity of separated collapse clusters), never on a raw box count:
+//!    three distinct isolated nodes are neither one isolated contact (rung 4)
+//!    nor a 1-dimensional curve (rung 3).
+//!
+//! **Certified screen resolution.** Each screen sub-box's four minor
+//! enclosures are computed with the stored tensor control net RESTRICTED to
+//! the sub-box (de Casteljau subdivision in outward-rounded arithmetic,
+//! [`hull_component_unit`]). A single-pass interval de Casteljau hull re-blends
+//! the global control points over the whole sub-window, so its width stays far
+//! above the sub-box's geometric scale and it re-widens identical coefficients
+//! on axes a polynomial does not depend on; both effects smear a genuine
+//! isolated contact into the HighOrderJet bucket and a clustered higher-order
+//! jet into a full-arc tangency. Restricting the net first decides the
+//! four-minor containment test at the sub-box's own scale.
+//!
+//! **Designed margin.** The isolated-vs-jet boundary is not razor thin: a
+//! single isolated contact's worst-case screen footprint is
+//! `1 + 2·SCREEN_PERP·RANK_SUBBOXES·√3` sub-boxes (√3 bounds the sum of the
+//! |v|-components of the three orthonormal perpendicular frame axes across the
+//! smear), and the isolating screen width is held to
+//! `SCREEN_PERP ≤ (ISOLATED_CAP−1)/(2·RANK_SUBBOXES·√3) ≈ 0.054`. With
+//! `SCREEN_PERP` = 0.05 the worst case is ≈ 3.77 < [`ISOLATED_CAP`] = 4, and
+//! under certified resolution the LIVE footprint returns to the geometric
+//! bound (measured 2 sub-boxes on the S4A isolated fixture), so the constants
+//! carry a designed margin rather than a razor-thin race.
 //!
 //! **H-3.** The predictor tolerances carry their `// H-3` markers on the
 //! defining lines.
@@ -89,9 +123,11 @@ const RANK_SUBBOXES: usize = 16;
 /// around the branch (a proposal tolerance, H-3).
 const SCREEN_PERP: f64 = 0.05; // H-3: rank-screen perpendicular half-width ratio
 
-/// The largest rank-collapse sub-box count that still reads as an ISOLATED R2
-/// zero set (a point, plus its narrow screen footprint). A 1-dimensional
-/// contact locus saturates every sub-box.
+/// The largest SINGLE contiguous rank-collapse cluster (in sub-boxes) that
+/// still reads as an ISOLATED R2 zero set (a point, plus its narrow screen
+/// footprint). A 1-dimensional contact locus saturates every sub-box; several
+/// separated clusters are a higher-order jet even when their total footprint
+/// is small. Derived with the margin argument in the module doc.
 const ISOLATED_CAP: usize = RANK_SUBBOXES / 4;
 
 /// The run policy of the float tracer.
@@ -346,48 +382,171 @@ fn bern_basis(deg: usize, t: f64) -> Vec<f64> {
 // as the engine, kept local because the engine's kernels are module-private).
 // ---------------------------------------------------------------------------
 
-/// The interval de Casteljau step over a list of coefficients. `None` when the
-/// result is not finite.
-fn dcast1_iv(pts: &[Interval], u: &Interval) -> Option<Interval> {
-    if pts.is_empty() {
+/// One outward-rounded convex de Casteljau blend `(1 − t)·a + t·b` (the
+/// positive-weight form: no subtraction, so identical interval coefficients are
+/// carried exactly rather than re-widened).
+fn bern_blend(a: &Interval, b: &Interval, t: f64) -> Option<Interval> {
+    if !t.is_finite() || !(0.0..=1.0).contains(&t) {
         return None;
     }
-    let mut level = pts.to_vec();
-    while level.len() > 1 {
-        let mut next = Vec::with_capacity(level.len() - 1);
-        for w in level.windows(2) {
-            next.push(w[0].add(&u.mul(&w[1].sub(&w[0]))));
-        }
-        level = next;
-    }
-    if level[0].is_finite() {
-        Some(level[0])
+    let w1 = Interval::point(t);
+    let w0 = Interval::point(1.0).sub(&w1);
+    let out = a.mul(&w0).add(&b.mul(&w1));
+    if out.is_finite() {
+        Some(out)
     } else {
         None
     }
 }
 
-/// Certified range enclosure of an interval-valued bivariate tensor grid over
-/// the parameter rectangle `(s, t)`. `grid[i][j]` is the coefficient of
-/// `B_i^m(s) B_j^n(t)`; `s` runs along rows and `t` along columns.
-fn hull2_iv(grid: &[Vec<Interval>], s: &Interval, t: &Interval) -> Option<Interval> {
-    if grid.is_empty() || grid[0].is_empty() {
+/// Split a 1-D Bernstein control list at `t`, returning the control points of
+/// the left and right sub-curves. `None` on an empty list or an invalid `t`.
+fn bern_split(pts: &[Interval], t: f64) -> Option<(Vec<Interval>, Vec<Interval>)> {
+    if pts.is_empty() || !t.is_finite() || !(0.0..=1.0).contains(&t) {
         return None;
     }
-    let width = grid[0].len();
-    if grid.iter().any(|row| row.len() != width) {
-        return None;
+    let n = pts.len() - 1;
+    // The de Casteljau triangle: row `r` has length `n + 1 − r`.
+    let mut triangle: Vec<Vec<Interval>> = Vec::with_capacity(n + 1);
+    triangle.push(pts.to_vec());
+    for r in 1..=n {
+        let prev = &triangle[r - 1];
+        let mut row = Vec::with_capacity(n + 1 - r);
+        for i in 0..(n + 1 - r) {
+            row.push(bern_blend(&prev[i], &prev[i + 1], t)?);
+        }
+        triangle.push(row);
     }
-    let mut col_evals = Vec::with_capacity(width);
-    for j in 0..width {
-        let col: Vec<Interval> = grid.iter().map(|row| row[j]).collect();
-        col_evals.push(dcast1_iv(&col, s)?);
+    let mut left = Vec::with_capacity(n + 1);
+    let mut right = Vec::with_capacity(n + 1);
+    for r in 0..=n {
+        left.push(triangle[r][0]);
+        right.push(triangle[n - r][r]);
     }
-    dcast1_iv(&col_evals, t)
+    Some((left, right))
 }
 
-/// Certified range enclosure of a stored component over a unit-chart sub-box.
-/// Axes are collapsed in the fixed order 0,1,2,3.
+/// The control points of the polynomial a 1-D Bernstein control list represents,
+/// restricted to the parameter interval `[lo, hi]` (outward-rounded, certified).
+/// `None` when `[lo, hi]` is not a compact subset of `[0, 1]` or a split fails.
+fn bern_restrict(pts: &[Interval], lo: f64, hi: f64) -> Option<Vec<Interval>> {
+    if pts.is_empty()
+        || !lo.is_finite()
+        || !hi.is_finite()
+        || !(0.0..=1.0).contains(&lo)
+        || !(0.0..=1.0).contains(&hi)
+        || lo > hi
+    {
+        return None;
+    }
+    if lo == 0.0 && hi == 1.0 {
+        return Some(pts.to_vec());
+    }
+    // Restrict to [lo, 1] (keep the right part), then to [lo, hi] (keep the
+    // left part of the re-parameterised remainder).
+    let (_, right) = bern_split(pts, lo)?;
+    if hi == 1.0 {
+        return Some(right);
+    }
+    let rem = 1.0 - lo;
+    if rem == 0.0 {
+        return None;
+    }
+    let u0 = (hi - lo) / rem;
+    let (left, _) = bern_split(&right, u0)?;
+    Some(left)
+}
+
+/// The per-axis degree lengths and flat strides of the stored tensor layout
+/// `rows[a·(n1+1)+b][i·(n2+1)+j]`.
+#[allow(clippy::type_complexity)]
+fn tensor_shape(deg: (usize, usize, usize, usize)) -> ([usize; 4], [usize; 4]) {
+    let (m1, n1, m2, n2) = deg;
+    let lens = [m1 + 1, n1 + 1, m2 + 1, n2 + 1];
+    let col_count = (m2 + 1) * (n2 + 1);
+    let strides = [(n1 + 1) * col_count, col_count, n2 + 1, 1];
+    (lens, strides)
+}
+
+/// Restrict every coefficient list along `axis` of an interval tensor grid to
+/// the parameter interval `[lo, hi]`, returning the re-based grid.
+fn tensor_restrict_axis(
+    vals: &[Interval],
+    lens: &[usize; 4],
+    strides: &[usize; 4],
+    axis: usize,
+    lo: f64,
+    hi: f64,
+) -> Option<Vec<Interval>> {
+    if lens[axis] <= 1 || (lo == 0.0 && hi == 1.0) {
+        return Some(vals.to_vec());
+    }
+    let total: usize = lens.iter().product();
+    let mut out = vec![Interval::point(0.0); total];
+    let mut coord = [0usize; 4];
+    tensor_restrict_walk(vals, &mut out, lens, strides, axis, lo, hi, &mut coord, 0).map(|_| out)
+}
+
+/// Depth-first walk over the four tensor coordinates of [`tensor_restrict_axis`].
+#[allow(clippy::too_many_arguments)]
+fn tensor_restrict_walk(
+    vals: &[Interval],
+    out: &mut [Interval],
+    lens: &[usize; 4],
+    strides: &[usize; 4],
+    axis: usize,
+    lo: f64,
+    hi: f64,
+    coord: &mut [usize; 4],
+    level: usize,
+) -> Option<()> {
+    if level == 4 {
+        if coord[axis] == 0 {
+            let mut list = Vec::with_capacity(lens[axis]);
+            for k in 0..lens[axis] {
+                coord[axis] = k;
+                let off = coord
+                    .iter()
+                    .zip(strides.iter())
+                    .map(|(c, s)| c * s)
+                    .sum::<usize>();
+                list.push(vals[off]);
+            }
+            coord[axis] = 0;
+            let restr = bern_restrict(&list, lo, hi)?;
+            for (k, value) in restr.into_iter().enumerate() {
+                coord[axis] = k;
+                let off = coord
+                    .iter()
+                    .zip(strides.iter())
+                    .map(|(c, s)| c * s)
+                    .sum::<usize>();
+                out[off] = value;
+            }
+            coord[axis] = 0;
+        }
+        return Some(());
+    }
+    for v in 0..lens[level] {
+        coord[level] = v;
+        tensor_restrict_walk(vals, out, lens, strides, axis, lo, hi, coord, level + 1)?;
+    }
+    coord[level] = 0;
+    Some(())
+}
+
+/// Certified range enclosure of a stored tensor polynomial over a unit-chart
+/// sub-box, computed by RESTRICTING the control net to the sub-box (a de
+/// Casteljau subdivision in outward-rounded interval arithmetic on every axis)
+/// and hulling the restricted net.
+///
+/// The single-pass interval de Casteljau hull (the engine's `one_d_interval`
+/// discipline) re-blends the GLOBAL control points over the whole sub-window at
+/// every level, so its width only shrinks linearly with the window and — worse —
+/// it re-widens identical interval coefficients on axes the polynomial does not
+/// depend on. Restricting the control net to the sub-box first makes the hull
+/// converge to the true range at the sub-box's own geometric scale, which the
+/// escalation ladder's rank screen needs (BG-KV2-207B-TRACER-REST).
 fn hull_component_unit(
     rows: &[Vec<f64>],
     deg: (usize, usize, usize, usize),
@@ -401,46 +560,30 @@ fn hull_component_unit(
             return None;
         }
     }
-    let (d1, d2, _d3, d4) = deg;
-    let cols = rows[0].len();
-    let u_iv = Interval {
-        lo: box_[0].0,
-        hi: box_[0].1,
+    let (lens, strides) = tensor_shape(deg);
+    let total: usize = lens.iter().product();
+    let mut vals = Vec::with_capacity(total);
+    for row in rows {
+        vals.extend(row.iter().map(|&c| Interval::point(c)));
+    }
+    if vals.len() != total {
+        return None;
+    }
+    for (axis, &(lo, hi)) in box_.iter().enumerate() {
+        vals = tensor_restrict_axis(&vals, &lens, &strides, axis, lo, hi)?;
+    }
+    let mut out = Interval {
+        lo: f64::INFINITY,
+        hi: f64::NEG_INFINITY,
     };
-    let v_iv = Interval {
-        lo: box_[1].0,
-        hi: box_[1].1,
-    };
-    // Collapse axis 0 (u, index a) for each (b, column) pair.
-    let mut u_cols = vec![Vec::<Interval>::with_capacity(d2 + 1); cols];
-    for b in 0..=d2 {
-        for (c, slot) in u_cols.iter_mut().enumerate() {
-            let mut pts = Vec::with_capacity(d1 + 1);
-            for a in 0..=d1 {
-                pts.push(Interval::point(rows[a * (d2 + 1) + b][c]));
-            }
-            slot.push(dcast1_iv(&pts, &u_iv)?);
+    for v in &vals {
+        if !v.is_finite() {
+            return None;
         }
+        out.lo = out.lo.min(v.lo);
+        out.hi = out.hi.max(v.hi);
     }
-    // Collapse axis 1 (v, index b).
-    let mut v_collapsed = Vec::with_capacity(cols);
-    for col in u_cols {
-        v_collapsed.push(dcast1_iv(&col, &v_iv)?);
-    }
-    // Reshape into (i, j) over axes 2, 3.
-    let mut grid2: Vec<Vec<Interval>> = Vec::with_capacity(v_collapsed.len() / (d4 + 1));
-    for row_slice in v_collapsed.chunks(d4 + 1) {
-        grid2.push(row_slice.to_vec());
-    }
-    let s_iv = Interval {
-        lo: box_[2].0,
-        hi: box_[2].1,
-    };
-    let t_iv = Interval {
-        lo: box_[3].0,
-        hi: box_[3].1,
-    };
-    hull2_iv(&grid2, &s_iv, &t_iv)
+    Some(out)
 }
 
 /// The first-partial coefficient grid of a stored component along one chart
@@ -623,6 +766,28 @@ fn sub_interval(k: usize, count: usize) -> (f64, f64) {
     (k as f64 / count as f64, (k + 1) as f64 / count as f64)
 }
 
+/// The maximal runs of consecutive collapsed sub-boxes of the rank screen, as
+/// `(start_index, width)` pairs along the failed arc. Two rank-collapse boxes
+/// that touch (or are separated by an unresolved box that also counts as
+/// collapsed) form ONE cluster; separated clusters are the footprint structure
+/// the §10.2 ladder keys on.
+fn collapse_clusters(collapse: &[bool]) -> Vec<(usize, usize)> {
+    let mut runs: Vec<(usize, usize)> = Vec::new();
+    let mut i = 0usize;
+    while i < collapse.len() {
+        if collapse[i] {
+            let start = i;
+            while i < collapse.len() && collapse[i] {
+                i += 1;
+            }
+            runs.push((start, i - start));
+        } else {
+            i += 1;
+        }
+    }
+    runs
+}
+
 // ---------------------------------------------------------------------------
 // The marching loop
 // ---------------------------------------------------------------------------
@@ -789,6 +954,19 @@ fn escalate(
     // Partition the failed arc into tau sub-boxes of a NARROW box around the
     // branch (the rank screen must localize rank collapse along tau; the fat
     // C2 tube box cannot resolve features a tube-width apart).
+    //
+    // **Certified screen resolution.** Each sub-box's four minor enclosures are
+    // evaluated by RESTRICTING the stored tensor control nets to the sub-box
+    // (de Casteljau subdivision in outward-rounded arithmetic, see
+    // [`hull_component_unit`]) before hulling. A single-pass interval de
+    // Casteljau hull re-blends the global control points over the whole
+    // sub-window, so its width does not fall to the sub-box's geometric scale
+    // and it even re-widens identical coefficients on axes a polynomial does
+    // not depend on — a genuine isolated contact then reads as a broad
+    // HighOrderJet smear and a clustered higher-order jet reads as a full-arc
+    // tangency. Restricting the net first decides the four-minor containment
+    // test at the sub-box's own scale (D4: certified enclosures only, no float
+    // heuristic on the decision).
     let hs = SCREEN_PERP * dtau;
     let screen_iv: [Interval; 3] = [
         Interval {
@@ -804,8 +982,8 @@ fn escalate(
             hi: y_cur[2] + hs,
         },
     ];
-    let mut collapse = 0usize;
-    for k in 0..RANK_SUBBOXES {
+    let mut collapse = [false; RANK_SUBBOXES];
+    for (k, flag) in collapse.iter_mut().enumerate() {
         let (f0, f1) = sub_interval(k, RANK_SUBBOXES);
         let sub_tau = Interval {
             lo: tau_lo + f0 * dtau,
@@ -814,53 +992,66 @@ fn escalate(
         let sub_box = match tube_chart_box(sys, frame, sub_tau, &screen_iv) {
             Some(b) => b,
             None => {
-                collapse += 1;
+                *flag = true;
                 continue;
             }
         };
         let minors = match minor_enclosures(sys, &sub_box) {
             Some(m) => m,
             None => {
-                collapse += 1;
+                *flag = true;
                 continue;
             }
         };
         if minors.iter().all(contains_zero) {
-            collapse += 1;
+            *flag = true;
         }
     }
+    let clusters = collapse_clusters(&collapse);
+    let collapsed_total: usize = collapse.iter().filter(|&&c| c).count();
 
-    match collapse {
-        0 => Escalation::Rebuild,
-        c if c == RANK_SUBBOXES => Escalation::Refuse(Refusal::new(
+    // **Rung semantics on footprint STRUCTURE.** Three distinct isolated nodes
+    // are neither one isolated contact (rung 4) nor a 1-dimensional curve
+    // (rung 3): the ladder keys on the multiplicity of SEPARATED collapse
+    // clusters along the failed arc, not on the raw box count. A single
+    // contiguous cluster of at most [`ISOLATED_CAP`] sub-boxes is one isolated
+    // contact; a cluster spanning the whole arc is a 1-dimensional zero set;
+    // anything else (a wider single footprint, or several separated contacts)
+    // is a higher-order jet.
+    match clusters.as_slice() {
+        [] => Escalation::Rebuild,
+        [(_, width)] if *width == RANK_SUBBOXES => Escalation::Refuse(Refusal::new(
             RefusalKind::TangentialCurve,
             RefusalEvidence::Predicate {
                 name: "r2_contact_zero_set_one_dimensional",
                 detail: format!(
-                    "the four minor enclosures jointly contain zero on all {c} sub-boxes of the \
-                     failed arc: the R2 contact zero set is 1-dimensional (§10.4, never trace)"
+                    "the four minor enclosures jointly contain zero on all {collapsed_total} \
+                     sub-boxes of the failed arc: the R2 contact zero set is 1-dimensional \
+                     (§10.4, never trace)"
                 ),
             },
         )),
-        c if c <= ISOLATED_CAP => Escalation::Refuse(Refusal::new(
+        [(start, width)] if *width <= ISOLATED_CAP => Escalation::Refuse(Refusal::new(
             RefusalKind::Conditioning,
             RefusalEvidence::Predicate {
                 name: "isolated_contact_is_s5a",
                 detail: format!(
-                    "the rank collapse is confined to {c} sub-box(es): the R2 zero set is \
-                     isolated — the contact-certificate path is S5a's (Wave 3), the refusal is \
-                     the seam"
+                    "the rank collapse is a single {width}-sub-box footprint (sub-boxes \
+                     {start}..{}) : the R2 zero set is isolated — the contact-certificate path \
+                     is S5a's (Wave 3), the refusal is the seam",
+                    start + width
                 ),
             },
         )),
-        c => Escalation::Refuse(Refusal::new(
+        _ => Escalation::Refuse(Refusal::new(
             RefusalKind::HighOrderJet,
             RefusalEvidence::Predicate {
                 name: "rank_screen_not_isolated_not_curve",
                 detail: format!(
-                    "the rank screen shows rank collapse on {c} of {RANK_SUBBOXES} sub-boxes: \
-                     neither a clean isolated contact nor a full-arc tangency — a higher-order \
-                     jet is required"
+                    "the rank screen shows {collapsed_total} of {RANK_SUBBOXES} sub-boxes \
+                     collapsed in {} separated cluster(s): neither a clean isolated contact nor \
+                     a full-arc tangency — a higher-order jet is required",
+                    clusters.len()
                 ),
             },
         )),
@@ -957,8 +1148,18 @@ fn trace_march(
                     continue;
                 }
                 if matches!(failed, ArcAttempt::OutOfChart) {
-                    let st = make_stats(steps.len(), rebuilds, halvings);
-                    return (FloatOutcome::Completed { steps }, st);
+                    // A fat-tube exit on the VERY FIRST arc (no certified step
+                    // yet) is a tube/chart fit artefact, not a branch end: the
+                    // point is interior (the top-of-loop boundary test did not
+                    // fire), so the tube box alone left the chart. Route that
+                    // case through the escalation ladder instead of declaring a
+                    // completed trace with zero certified steps — the ladder's
+                    // honest terminal class then decides (BG-KV2-207B, rung the
+                    // 307-named gap).
+                    if !(steps.is_empty() && tau_global == 0.0) {
+                        let st = make_stats(steps.len(), rebuilds, halvings);
+                        return (FloatOutcome::Completed { steps }, st);
+                    }
                 }
                 let y_pred = match predict_y(sys, &frame, tau_local + dtau, &y) {
                     Some(y) => y,
@@ -984,6 +1185,32 @@ fn trace_march(
                     Escalation::Rebuild => {
                         if rebuilds >= policy.max_frame_rebuilds {
                             let st = make_stats(steps.len(), rebuilds, halvings);
+                            if steps.is_empty() && tau_global == 0.0 {
+                                // Honest terminal class (the BG-KV2-307-named
+                                // gap): the ladder rebuilt the frame without a
+                                // single certified step AND the rank screen
+                                // found no certified rank degeneracy to route
+                                // on — a regular branch the frozen tube seam
+                                // cannot certify at any width. Budget-backed
+                                // refusal, never a guessed rung.
+                                return (
+                                    FloatOutcome::Refused(Refusal::new(
+                                        RefusalKind::Budget,
+                                        RefusalEvidence::Predicate {
+                                            name: "tracer_zero_certified_steps",
+                                            detail: format!(
+                                                "the seam certified no arc and {} frame \
+                                                 rebuilds made no progress on a rank-clean \
+                                                 (zero-collapse) branch: the tube certificate \
+                                                 cannot certify this branch — budget-exhausted \
+                                                 refusal, never a guessed rung",
+                                                policy.max_frame_rebuilds
+                                            ),
+                                        },
+                                    )),
+                                    st,
+                                );
+                            }
                             return (
                                 FloatOutcome::Refused(Refusal::new(
                                     RefusalKind::Conditioning,
