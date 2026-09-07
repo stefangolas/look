@@ -69,8 +69,11 @@ Updated 2026-09-06, session 54 (evening) - the mega-session: 5 programs advanced
 - cargoq RUNNING (port 8231), supervisor + watchdog + janitor RUNNING
   (restarted 09-05), driver cycling every 5 min. Disk 21+ GB after the
   20:15 crisis (0.1 GB -> janitor reclaimed 22.6 GB).
-- CTE battery running (attempt 3; attempts 1-2 died environmentally: disk
-  exhaustion exit-101, then exit-3 during the 0.1 GB window).
+- CTE battery PAUSED (attempts 1-2 died environmentally: disk exhaustion
+  exit-101, then exit-3 during the 0.1 GB window; attempt 3 was killed by
+  the queue-starvation fix). RELAUNCH when CFP-008 lands and the worker
+  queue is empty - batteries never run alongside a worker's done-when
+  loop (Session 54 rule).
 - The 4 slots: 0 CFP-006 LANDED (67c9a47, driver-adjudicated), 1 PB-014
   LANDED (ccc5def), 2 PB-014 dup killed + archived (see Session 54 traps),
   3 CTE-008 FINISHED. Slots re-fork cleanly on next dispatch.
