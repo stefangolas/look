@@ -1,0 +1,1158 @@
+{
+  "boundaries": [
+    {
+      "vertices": [
+        {
+          "x": 0.0,
+          "y": 0.0,
+          "z": 0.0
+        },
+        {
+          "x": 0.0,
+          "y": 0.0,
+          "z": 1.0
+        },
+        {
+          "x": 1.0,
+          "y": 0.0,
+          "z": 1.0
+        },
+        {
+          "x": 1.0,
+          "y": 0.0,
+          "z": 0.0
+        },
+        {
+          "x": 0.0,
+          "y": 1.0,
+          "z": 1.0
+        },
+        {
+          "x": 0.0,
+          "y": 1.0,
+          "z": 0.0
+        },
+        {
+          "x": 1.0,
+          "y": 1.0,
+          "z": 1.0
+        },
+        {
+          "x": 1.0,
+          "y": 1.0,
+          "z": 0.0
+        }
+      ],
+      "edges": [
+        {
+          "vertices": [
+            0,
+            1
+          ],
+          "curve": {
+            "Line": [
+              {
+                "x": 0.0,
+                "y": 0.0,
+                "z": 0.0
+              },
+              {
+                "x": 0.0,
+                "y": 0.0,
+                "z": 1.0
+              }
+            ]
+          }
+        },
+        {
+          "vertices": [
+            1,
+            2
+          ],
+          "curve": {
+            "Line": [
+              {
+                "x": 0.0,
+                "y": 0.0,
+                "z": 1.0
+              },
+              {
+                "x": 1.0,
+                "y": 0.0,
+                "z": 1.0
+              }
+            ]
+          }
+        },
+        {
+          "vertices": [
+            3,
+            2
+          ],
+          "curve": {
+            "Line": [
+              {
+                "x": 1.0,
+                "y": 0.0,
+                "z": 0.0
+              },
+              {
+                "x": 1.0,
+                "y": 0.0,
+                "z": 1.0
+              }
+            ]
+          }
+        },
+        {
+          "vertices": [
+            0,
+            3
+          ],
+          "curve": {
+            "Line": [
+              {
+                "x": 0.0,
+                "y": 0.0,
+                "z": 0.0
+              },
+              {
+                "x": 1.0,
+                "y": 0.0,
+                "z": 0.0
+              }
+            ]
+          }
+        },
+        {
+          "vertices": [
+            1,
+            4
+          ],
+          "curve": {
+            "Line": [
+              {
+                "x": 0.0,
+                "y": 0.0,
+                "z": 1.0
+              },
+              {
+                "x": 0.0,
+                "y": 1.0,
+                "z": 1.0
+              }
+            ]
+          }
+        },
+        {
+          "vertices": [
+            5,
+            4
+          ],
+          "curve": {
+            "Line": [
+              {
+                "x": 0.0,
+                "y": 1.0,
+                "z": 0.0
+              },
+              {
+                "x": 0.0,
+                "y": 1.0,
+                "z": 1.0
+              }
+            ]
+          }
+        },
+        {
+          "vertices": [
+            0,
+            5
+          ],
+          "curve": {
+            "Line": [
+              {
+                "x": 0.0,
+                "y": 0.0,
+                "z": 0.0
+              },
+              {
+                "x": 0.0,
+                "y": 1.0,
+                "z": 0.0
+              }
+            ]
+          }
+        },
+        {
+          "vertices": [
+            2,
+            6
+          ],
+          "curve": {
+            "Line": [
+              {
+                "x": 1.0,
+                "y": 0.0,
+                "z": 1.0
+              },
+              {
+                "x": 1.0,
+                "y": 1.0,
+                "z": 1.0
+              }
+            ]
+          }
+        },
+        {
+          "vertices": [
+            4,
+            6
+          ],
+          "curve": {
+            "Line": [
+              {
+                "x": 0.0,
+                "y": 1.0,
+                "z": 1.0
+              },
+              {
+                "x": 1.0,
+                "y": 1.0,
+                "z": 1.0
+              }
+            ]
+          }
+        },
+        {
+          "vertices": [
+            7,
+            6
+          ],
+          "curve": {
+            "Line": [
+              {
+                "x": 1.0,
+                "y": 1.0,
+                "z": 0.0
+              },
+              {
+                "x": 1.0,
+                "y": 1.0,
+                "z": 1.0
+              }
+            ]
+          }
+        },
+        {
+          "vertices": [
+            3,
+            7
+          ],
+          "curve": {
+            "Line": [
+              {
+                "x": 1.0,
+                "y": 0.0,
+                "z": 0.0
+              },
+              {
+                "x": 1.0,
+                "y": 1.0,
+                "z": 0.0
+              }
+            ]
+          }
+        },
+        {
+          "vertices": [
+            5,
+            7
+          ],
+          "curve": {
+            "Line": [
+              {
+                "x": 0.0,
+                "y": 1.0,
+                "z": 0.0
+              },
+              {
+                "x": 1.0,
+                "y": 1.0,
+                "z": 0.0
+              }
+            ]
+          }
+        }
+      ],
+      "faces": [
+        {
+          "boundaries": [
+            [
+              {
+                "index": 0,
+                "orientation": true
+              },
+              {
+                "index": 1,
+                "orientation": true
+              },
+              {
+                "index": 2,
+                "orientation": false
+              },
+              {
+                "index": 3,
+                "orientation": false
+              }
+            ]
+          ],
+          "orientation": false,
+          "surface": {
+            "Plane": {
+              "o": {
+                "x": 0.0,
+                "y": 0.0,
+                "z": 0.0
+              },
+              "p": {
+                "x": 0.0,
+                "y": 0.0,
+                "z": 1.0
+              },
+              "q": {
+                "x": 1.0,
+                "y": 0.0,
+                "z": 0.0
+              }
+            }
+          },
+          "provenance": {
+            "use_id": null,
+            "definition_id": null,
+            "surface_id": null,
+            "outer_bound": "NotRetained"
+          }
+        },
+        {
+          "boundaries": [
+            [
+              {
+                "index": 0,
+                "orientation": true
+              },
+              {
+                "index": 4,
+                "orientation": true
+              },
+              {
+                "index": 5,
+                "orientation": false
+              },
+              {
+                "index": 6,
+                "orientation": false
+              }
+            ]
+          ],
+          "orientation": true,
+          "surface": {
+            "Plane": {
+              "o": {
+                "x": 0.0,
+                "y": 0.0,
+                "z": 0.0
+              },
+              "p": {
+                "x": 0.0,
+                "y": 0.0,
+                "z": 1.0
+              },
+              "q": {
+                "x": 0.0,
+                "y": 1.0,
+                "z": 0.0
+              }
+            }
+          },
+          "provenance": {
+            "use_id": null,
+            "definition_id": null,
+            "surface_id": null,
+            "outer_bound": "NotRetained"
+          }
+        },
+        {
+          "boundaries": [
+            [
+              {
+                "index": 1,
+                "orientation": true
+              },
+              {
+                "index": 7,
+                "orientation": true
+              },
+              {
+                "index": 8,
+                "orientation": false
+              },
+              {
+                "index": 4,
+                "orientation": false
+              }
+            ]
+          ],
+          "orientation": true,
+          "surface": {
+            "Plane": {
+              "o": {
+                "x": 0.0,
+                "y": 0.0,
+                "z": 1.0
+              },
+              "p": {
+                "x": 1.0,
+                "y": 0.0,
+                "z": 1.0
+              },
+              "q": {
+                "x": 0.0,
+                "y": 1.0,
+                "z": 1.0
+              }
+            }
+          },
+          "provenance": {
+            "use_id": null,
+            "definition_id": null,
+            "surface_id": null,
+            "outer_bound": "NotRetained"
+          }
+        },
+        {
+          "boundaries": [
+            [
+              {
+                "index": 7,
+                "orientation": true
+              },
+              {
+                "index": 9,
+                "orientation": false
+              },
+              {
+                "index": 10,
+                "orientation": false
+              },
+              {
+                "index": 2,
+                "orientation": true
+              }
+            ]
+          ],
+          "orientation": false,
+          "surface": {
+            "Plane": {
+              "o": {
+                "x": 1.0,
+                "y": 0.0,
+                "z": 0.0
+              },
+              "p": {
+                "x": 1.0,
+                "y": 0.0,
+                "z": 1.0
+              },
+              "q": {
+                "x": 1.0,
+                "y": 1.0,
+                "z": 0.0
+              }
+            }
+          },
+          "provenance": {
+            "use_id": null,
+            "definition_id": null,
+            "surface_id": null,
+            "outer_bound": "NotRetained"
+          }
+        },
+        {
+          "boundaries": [
+            [
+              {
+                "index": 10,
+                "orientation": true
+              },
+              {
+                "index": 11,
+                "orientation": false
+              },
+              {
+                "index": 6,
+                "orientation": false
+              },
+              {
+                "index": 3,
+                "orientation": true
+              }
+            ]
+          ],
+          "orientation": false,
+          "surface": {
+            "Plane": {
+              "o": {
+                "x": 0.0,
+                "y": 0.0,
+                "z": 0.0
+              },
+              "p": {
+                "x": 1.0,
+                "y": 0.0,
+                "z": 0.0
+              },
+              "q": {
+                "x": 0.0,
+                "y": 1.0,
+                "z": 0.0
+              }
+            }
+          },
+          "provenance": {
+            "use_id": null,
+            "definition_id": null,
+            "surface_id": null,
+            "outer_bound": "NotRetained"
+          }
+        },
+        {
+          "boundaries": [
+            [
+              {
+                "index": 5,
+                "orientation": true
+              },
+              {
+                "index": 8,
+                "orientation": true
+              },
+              {
+                "index": 9,
+                "orientation": false
+              },
+              {
+                "index": 11,
+                "orientation": false
+              }
+            ]
+          ],
+          "orientation": true,
+          "surface": {
+            "Plane": {
+              "o": {
+                "x": 0.0,
+                "y": 1.0,
+                "z": 0.0
+              },
+              "p": {
+                "x": 0.0,
+                "y": 1.0,
+                "z": 1.0
+              },
+              "q": {
+                "x": 1.0,
+                "y": 1.0,
+                "z": 0.0
+              }
+            }
+          },
+          "provenance": {
+            "use_id": null,
+            "definition_id": null,
+            "surface_id": null,
+            "outer_bound": "NotRetained"
+          }
+        }
+      ],
+      "source_geometric_uncertainty": null
+    },
+    {
+      "vertices": [
+        {
+          "x": 0.25,
+          "y": 0.25,
+          "z": 0.25
+        },
+        {
+          "x": 0.75,
+          "y": 0.25,
+          "z": 0.25
+        },
+        {
+          "x": 0.75,
+          "y": 0.25,
+          "z": 0.75
+        },
+        {
+          "x": 0.25,
+          "y": 0.25,
+          "z": 0.75
+        },
+        {
+          "x": 0.75,
+          "y": 0.75,
+          "z": 0.25
+        },
+        {
+          "x": 0.25,
+          "y": 0.75,
+          "z": 0.25
+        },
+        {
+          "x": 0.75,
+          "y": 0.75,
+          "z": 0.75
+        },
+        {
+          "x": 0.25,
+          "y": 0.75,
+          "z": 0.75
+        }
+      ],
+      "edges": [
+        {
+          "vertices": [
+            0,
+            1
+          ],
+          "curve": {
+            "Line": [
+              {
+                "x": 0.25,
+                "y": 0.25,
+                "z": 0.25
+              },
+              {
+                "x": 0.75,
+                "y": 0.25,
+                "z": 0.25
+              }
+            ]
+          }
+        },
+        {
+          "vertices": [
+            1,
+            2
+          ],
+          "curve": {
+            "Line": [
+              {
+                "x": 0.75,
+                "y": 0.25,
+                "z": 0.25
+              },
+              {
+                "x": 0.75,
+                "y": 0.25,
+                "z": 0.75
+              }
+            ]
+          }
+        },
+        {
+          "vertices": [
+            3,
+            2
+          ],
+          "curve": {
+            "Line": [
+              {
+                "x": 0.25,
+                "y": 0.25,
+                "z": 0.75
+              },
+              {
+                "x": 0.75,
+                "y": 0.25,
+                "z": 0.75
+              }
+            ]
+          }
+        },
+        {
+          "vertices": [
+            0,
+            3
+          ],
+          "curve": {
+            "Line": [
+              {
+                "x": 0.25,
+                "y": 0.25,
+                "z": 0.25
+              },
+              {
+                "x": 0.25,
+                "y": 0.25,
+                "z": 0.75
+              }
+            ]
+          }
+        },
+        {
+          "vertices": [
+            1,
+            4
+          ],
+          "curve": {
+            "Line": [
+              {
+                "x": 0.75,
+                "y": 0.25,
+                "z": 0.25
+              },
+              {
+                "x": 0.75,
+                "y": 0.75,
+                "z": 0.25
+              }
+            ]
+          }
+        },
+        {
+          "vertices": [
+            5,
+            4
+          ],
+          "curve": {
+            "Line": [
+              {
+                "x": 0.25,
+                "y": 0.75,
+                "z": 0.25
+              },
+              {
+                "x": 0.75,
+                "y": 0.75,
+                "z": 0.25
+              }
+            ]
+          }
+        },
+        {
+          "vertices": [
+            0,
+            5
+          ],
+          "curve": {
+            "Line": [
+              {
+                "x": 0.25,
+                "y": 0.25,
+                "z": 0.25
+              },
+              {
+                "x": 0.25,
+                "y": 0.75,
+                "z": 0.25
+              }
+            ]
+          }
+        },
+        {
+          "vertices": [
+            2,
+            6
+          ],
+          "curve": {
+            "Line": [
+              {
+                "x": 0.75,
+                "y": 0.25,
+                "z": 0.75
+              },
+              {
+                "x": 0.75,
+                "y": 0.75,
+                "z": 0.75
+              }
+            ]
+          }
+        },
+        {
+          "vertices": [
+            4,
+            6
+          ],
+          "curve": {
+            "Line": [
+              {
+                "x": 0.75,
+                "y": 0.75,
+                "z": 0.25
+              },
+              {
+                "x": 0.75,
+                "y": 0.75,
+                "z": 0.75
+              }
+            ]
+          }
+        },
+        {
+          "vertices": [
+            7,
+            6
+          ],
+          "curve": {
+            "Line": [
+              {
+                "x": 0.25,
+                "y": 0.75,
+                "z": 0.75
+              },
+              {
+                "x": 0.75,
+                "y": 0.75,
+                "z": 0.75
+              }
+            ]
+          }
+        },
+        {
+          "vertices": [
+            3,
+            7
+          ],
+          "curve": {
+            "Line": [
+              {
+                "x": 0.25,
+                "y": 0.25,
+                "z": 0.75
+              },
+              {
+                "x": 0.25,
+                "y": 0.75,
+                "z": 0.75
+              }
+            ]
+          }
+        },
+        {
+          "vertices": [
+            5,
+            7
+          ],
+          "curve": {
+            "Line": [
+              {
+                "x": 0.25,
+                "y": 0.75,
+                "z": 0.25
+              },
+              {
+                "x": 0.25,
+                "y": 0.75,
+                "z": 0.75
+              }
+            ]
+          }
+        }
+      ],
+      "faces": [
+        {
+          "boundaries": [
+            [
+              {
+                "index": 0,
+                "orientation": true
+              },
+              {
+                "index": 1,
+                "orientation": true
+              },
+              {
+                "index": 2,
+                "orientation": false
+              },
+              {
+                "index": 3,
+                "orientation": false
+              }
+            ]
+          ],
+          "orientation": false,
+          "surface": {
+            "Plane": {
+              "o": {
+                "x": 0.25,
+                "y": 0.25,
+                "z": 0.25
+              },
+              "p": {
+                "x": 0.75,
+                "y": 0.25,
+                "z": 0.25
+              },
+              "q": {
+                "x": 0.25,
+                "y": 0.25,
+                "z": 0.75
+              }
+            }
+          },
+          "provenance": {
+            "use_id": null,
+            "definition_id": null,
+            "surface_id": null,
+            "outer_bound": "NotRetained"
+          }
+        },
+        {
+          "boundaries": [
+            [
+              {
+                "index": 0,
+                "orientation": true
+              },
+              {
+                "index": 4,
+                "orientation": true
+              },
+              {
+                "index": 5,
+                "orientation": false
+              },
+              {
+                "index": 6,
+                "orientation": false
+              }
+            ]
+          ],
+          "orientation": true,
+          "surface": {
+            "Plane": {
+              "o": {
+                "x": 0.25,
+                "y": 0.25,
+                "z": 0.25
+              },
+              "p": {
+                "x": 0.75,
+                "y": 0.25,
+                "z": 0.25
+              },
+              "q": {
+                "x": 0.25,
+                "y": 0.75,
+                "z": 0.25
+              }
+            }
+          },
+          "provenance": {
+            "use_id": null,
+            "definition_id": null,
+            "surface_id": null,
+            "outer_bound": "NotRetained"
+          }
+        },
+        {
+          "boundaries": [
+            [
+              {
+                "index": 1,
+                "orientation": true
+              },
+              {
+                "index": 7,
+                "orientation": true
+              },
+              {
+                "index": 8,
+                "orientation": false
+              },
+              {
+                "index": 4,
+                "orientation": false
+              }
+            ]
+          ],
+          "orientation": true,
+          "surface": {
+            "Plane": {
+              "o": {
+                "x": 0.75,
+                "y": 0.25,
+                "z": 0.25
+              },
+              "p": {
+                "x": 0.75,
+                "y": 0.25,
+                "z": 0.75
+              },
+              "q": {
+                "x": 0.75,
+                "y": 0.75,
+                "z": 0.25
+              }
+            }
+          },
+          "provenance": {
+            "use_id": null,
+            "definition_id": null,
+            "surface_id": null,
+            "outer_bound": "NotRetained"
+          }
+        },
+        {
+          "boundaries": [
+            [
+              {
+                "index": 7,
+                "orientation": true
+              },
+              {
+                "index": 9,
+                "orientation": false
+              },
+              {
+                "index": 10,
+                "orientation": false
+              },
+              {
+                "index": 2,
+                "orientation": true
+              }
+            ]
+          ],
+          "orientation": false,
+          "surface": {
+            "Plane": {
+              "o": {
+                "x": 0.25,
+                "y": 0.25,
+                "z": 0.75
+              },
+              "p": {
+                "x": 0.75,
+                "y": 0.25,
+                "z": 0.75
+              },
+              "q": {
+                "x": 0.25,
+                "y": 0.75,
+                "z": 0.75
+              }
+            }
+          },
+          "provenance": {
+            "use_id": null,
+            "definition_id": null,
+            "surface_id": null,
+            "outer_bound": "NotRetained"
+          }
+        },
+        {
+          "boundaries": [
+            [
+              {
+                "index": 10,
+                "orientation": true
+              },
+              {
+                "index": 11,
+                "orientation": false
+              },
+              {
+                "index": 6,
+                "orientation": false
+              },
+              {
+                "index": 3,
+                "orientation": true
+              }
+            ]
+          ],
+          "orientation": false,
+          "surface": {
+            "Plane": {
+              "o": {
+                "x": 0.25,
+                "y": 0.25,
+                "z": 0.25
+              },
+              "p": {
+                "x": 0.25,
+                "y": 0.25,
+                "z": 0.75
+              },
+              "q": {
+                "x": 0.25,
+                "y": 0.75,
+                "z": 0.25
+              }
+            }
+          },
+          "provenance": {
+            "use_id": null,
+            "definition_id": null,
+            "surface_id": null,
+            "outer_bound": "NotRetained"
+          }
+        },
+        {
+          "boundaries": [
+            [
+              {
+                "index": 5,
+                "orientation": true
+              },
+              {
+                "index": 8,
+                "orientation": true
+              },
+              {
+                "index": 9,
+                "orientation": false
+              },
+              {
+                "index": 11,
+                "orientation": false
+              }
+            ]
+          ],
+          "orientation": true,
+          "surface": {
+            "Plane": {
+              "o": {
+                "x": 0.25,
+                "y": 0.75,
+                "z": 0.25
+              },
+              "p": {
+                "x": 0.75,
+                "y": 0.75,
+                "z": 0.25
+              },
+              "q": {
+                "x": 0.25,
+                "y": 0.75,
+                "z": 0.75
+              }
+            }
+          },
+          "provenance": {
+            "use_id": null,
+            "definition_id": null,
+            "surface_id": null,
+            "outer_bound": "NotRetained"
+          }
+        }
+      ],
+      "source_geometric_uncertainty": null
+    }
+  ]
+}
