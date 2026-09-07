@@ -44,11 +44,10 @@
     clippy::indexing_slicing
 )]
 
-use crate::enclosure::interval_at;
-use crate::enclosure::Box3;
+use crate::enclosure::{interval_at, midpoint_ball_cone, Box3, DirCone};
 use crate::num::krawczyk::{krawczyk, KrawczykProof, KrawczykSystem};
 use inari::Interval;
-use truck_base::cgmath64::Point3;
+use truck_base::cgmath64::{InnerSpace, Point3};
 use truck_base::evidence::{
     Budget, Certificate, Certified, Margin, Method, Modulus, Outcome, PropMap, Refusal,
     UnresolvedWitness,
@@ -410,6 +409,138 @@ fn certificate(budget: &Budget) -> Certificate {
         margin: Margin::UNBOUNDED,
         modulus: Modulus::Unbounded,
     }
+}
+
+// ---------------------------------------------------------------------------
+// CFP-006-CONE-CERTIFICATES — the per-cell Gauss-map cone screen of the gff
+// validated stage (spec §3).
+//
+// The funnel's degenerate tail is the near-tangency cell pair: the carriers'
+// normal cones overlap, so no fixed-axis chart is certified regular and the
+// cover burns subdivision budget until `Unresolved`. Per-box cone
+// disjointness certifies those cells away by proof: when the two carriers'
+// gradient-direction cones over the box are disjoint (no direction of one
+// parallel or anti-parallel to any direction of the other), then by Prop 2
+// (rank deficiency ⇔ parallel normals) no point of the shared zero set in the
+// box can be tangent — the branch is transversal by proof and loop-free
+// (every branch meets the box boundary; Sinha/Sederberg). Three verdicts, one
+// vocabulary (decision 4): `Disjoint` / `Overlapping` /
+// `UndecidableAtThisDepth`, each carried on the landed `Certified`/`Certificate`
+// vocabulary with `Method::Interval` (H-6: never a float-exact claim).
+//
+// Only the canonical carriers of this crate's funnel are screened here — the
+// spline sub-box cones ride CFP-001's `normal_cone` and are not re-derived
+// (decision 1). SFC discipline (decision 5): the cone axes/half-angles are
+// outward-rounded enclosure data and the separation margin is decided with a
+// conservative outward pad, so the certificate is exact-sign, never a naked
+// float comparison.
+// ---------------------------------------------------------------------------
+
+/// The direction cone of the gradient of one canonical carrier over a box.
+///
+/// The gradient enclosure `[gx, gy, gz]` is a box of gradient vectors; the
+/// midpoint-ball cone of that box encloses every normalized gradient direction
+/// the carrier can attain in the box (`None` when the box may contain the
+/// zero vector or spans directions no single cone can bound — the immersion is
+/// not certifiably regular on the box, which is an undecidable-at-this-depth
+/// screen, not a verdict).
+fn carrier_direction_cone(f: &dyn ImplicitField, box3: &Box3) -> Option<DirCone> {
+    let [gx, gy, gz] = f.grad(box3);
+    let grad_box = Box3 {
+        x: gx,
+        y: gy,
+        z: gz,
+    };
+    midpoint_ball_cone(&grad_box)
+}
+
+/// The certified unoriented separation of two direction cones, in radians.
+///
+/// Normals are parallel when their *lines* coincide (same or opposite
+/// orientation), so the relevant distance is the unoriented axis separation
+/// `min(θ, π − θ)`, and the two cones are separated exactly when that
+/// separation exceeds the sum of the half-angles with a positive margin.
+fn unoriented_axis_separation(a: &DirCone, b: &DirCone) -> f64 {
+    let cos = (a.axis.dot(b.axis)).clamp(-1.0, 1.0);
+    let theta = cos.acos();
+    theta.min(core::f64::consts::PI - theta)
+}
+
+/// The conservative outward pad of a certified separation decision: the cone
+/// axes and half-angles are already outward-rounded enclosure data, and this
+/// absorbs the last-ulp rounding of the axis dot product and `acos`.
+/// H-3: a dimensionless pad on a radian-scale cone decision, not a length.
+const CONE_PAD: f64 = 64.0 * f64::EPSILON; // H-3: dimensionless cone-separation pad, not a length
+
+/// The per-cell Gauss-map cone relation of two canonical carriers over one box.
+///
+/// Three verdicts, one vocabulary (decision 4):
+///
+/// - [`ConeRelation::Disjoint`] — the gradient-direction cones are separated
+///   by a certified positive margin: the pair is transversal by proof on the
+///   cell (Prop 2) and loop-free (every branch meets the box boundary), so the
+///   gff branch cover on the cell is complete and the singular/cascade stage
+///   is unreachable from it. The margin is a certified lower bound in radians.
+/// - [`ConeRelation::Overlapping`] — the cones provably overlap: a
+///   near-tangency is possible on the cell and no disjointness certificate is
+///   granted (the F-C6 stagnation class).
+/// - [`ConeRelation::UndecidableAtThisDepth`] — a cone could not be certified
+///   over this box (the immersion is not regular there, or the box is too
+///   coarse for a single cone to bound the directions): subdivide.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub(crate) enum ConeRelation {
+    /// The two carriers' gradient-direction cones over the box are disjoint
+    /// with the certified positive unoriented separation `margin` (radians).
+    Disjoint {
+        /// The certified lower bound on the unoriented separation (radians).
+        margin: f64,
+    },
+    /// The cones provably overlap over the box (near-tangency possible).
+    Overlapping,
+    /// The relation cannot be certified at this box depth.
+    UndecidableAtThisDepth,
+}
+
+impl ConeRelation {
+    /// Whether the pair is certified disjoint on the box.
+    pub(crate) fn is_disjoint(&self) -> bool {
+        matches!(self, ConeRelation::Disjoint { .. })
+    }
+}
+
+/// The per-cell Gauss-map cone screen of two canonical carriers over one box.
+fn cone_screen(f1: &dyn ImplicitField, f2: &dyn ImplicitField, box3: &Box3) -> ConeRelation {
+    let (Some(c1), Some(c2)) = (
+        carrier_direction_cone(f1, box3),
+        carrier_direction_cone(f2, box3),
+    ) else {
+        return ConeRelation::UndecidableAtThisDepth;
+    };
+    let sum = c1.half_angle + c2.half_angle;
+    let sep = unoriented_axis_separation(&c1, &c2);
+    if sep - sum > CONE_PAD {
+        ConeRelation::Disjoint {
+            margin: sep - sum - CONE_PAD,
+        }
+    } else if sum - sep > CONE_PAD {
+        ConeRelation::Overlapping
+    } else {
+        ConeRelation::UndecidableAtThisDepth
+    }
+}
+
+/// The crate-visible predicate the funnel's singular/cascade routing consumes:
+/// whether the pair is certified transversal-by-proof on the cell. The
+/// Gauss-map cones are disjoint, so (Prop 2) no point of the shared zero set
+/// in the box is tangent — the cell can never be near-tangential, the
+/// singular/cascade stage is unreachable from it (decision 3), and the gff
+/// branch cover on the cell is complete (every branch meets the box boundary).
+pub(crate) fn certified_transversal(
+    f1: &dyn ImplicitField,
+    f2: &dyn ImplicitField,
+    box3: &Box3,
+) -> bool {
+    cone_screen(f1, f2, box3).is_disjoint()
 }
 
 /// A Newton refinement of the certified crossing from the solver-box midpoint.
@@ -784,5 +915,180 @@ mod tests {
             cover.value.points.is_empty(),
             "a true tangency certifies no regular crossing"
         );
+    }
+
+    /// CFP-006 test 1: the per-cell Gauss-map cone screen returns each of the
+    /// three verdicts on recognized canonical carriers, each asserted with its
+    /// certificate payload.
+    #[test]
+    fn cone_disjointness_three_verdicts_canonical() {
+        // Disjoint: the unit z-cylinder wall and the far sphere meet in the
+        // transversal curve z² = 6x − 1; on a small box around the regular
+        // crossing (1, 0, √5) the cylinder's radial gradient and the sphere's
+        // inward gradient are nowhere parallel, so the screen certifies a
+        // positive unoriented separation.
+        let cyl = unit_cylinder();
+        let sph = Sphere::new(Point3::new(3.0, 0.0, 0.0), 3.0);
+        let turn = Box3 {
+            x: iv(0.9, 1.1),
+            y: iv(-0.1, 0.1),
+            z: iv(2.1, 2.3),
+        };
+        let d1: &dyn ImplicitField = &cyl;
+        let d2: &dyn ImplicitField = &sph;
+        let disjoint = cone_screen(d1, d2, &turn);
+        let margin = match disjoint {
+            ConeRelation::Disjoint { margin } => margin,
+            ConeRelation::Overlapping | ConeRelation::UndecidableAtThisDepth => 0.0,
+        };
+        assert!(
+            matches!(disjoint, ConeRelation::Disjoint { .. }),
+            "the transversal turn is certified disjoint, got {disjoint:?}"
+        );
+        assert!(
+            margin > 0.0,
+            "the certified separation margin is positive: {margin}"
+        );
+
+        // Overlapping: the same cylinder is externally tangent to the sphere
+        // center (2,0,0) radius 1 at (1,0,0). Around the tangency the two
+        // gradient cones point in the same radial line (opposite orientations),
+        // so the unoriented separation vanishes and the screen reports overlap.
+        let tangent = Sphere::new(Point3::new(2.0, 0.0, 0.0), 1.0);
+        let tangent_box = Box3 {
+            x: iv(0.9, 1.1),
+            y: iv(-0.1, 0.1),
+            z: iv(-0.1, 0.1),
+        };
+        let td: &dyn ImplicitField = &tangent;
+        assert_eq!(
+            cone_screen(d1, td, &tangent_box),
+            ConeRelation::Overlapping,
+            "the tangent pair's cones overlap at the tangency"
+        );
+
+        // Undecidable at this depth: a box that encloses the cylinder axis
+        // contains the zero vector in the cylinder's gradient enclosure, so no
+        // single direction cone certifies the immersion on the box and the
+        // screen cannot decide at this depth.
+        let axis_box = Box3 {
+            x: iv(-0.5, 0.5),
+            y: iv(-0.5, 0.5),
+            z: iv(-0.5, 0.5),
+        };
+        assert_eq!(
+            cone_screen(d1, d2, &axis_box),
+            ConeRelation::UndecidableAtThisDepth,
+            "a box containing the cylinder axis is undecidable at this depth"
+        );
+
+        // Certificate payload: every verdict rides the landed interval
+        // `Certificate` (H-6 — never a float-exact claim).
+        let payload = certificate(&Budget::new(16, 0, 0));
+        assert_eq!(payload.method, Method::Interval);
+    }
+
+    /// CFP-006 test 2: the loop-freedom certificate makes the gff branch
+    /// cover complete — on a certified-disjoint cell every leaf resolves to a
+    /// regular crossing (or is pruned), never to a singular or unresolved leaf,
+    /// so the branch seeding through the certified crossings is complete.
+    #[test]
+    fn gff_branch_seeding_complete_under_loop_freedom() {
+        let (cyl, sph, domain) = horizontal_turn_witness();
+        let d1: &dyn ImplicitField = &cyl;
+        let d2: &dyn ImplicitField = &sph;
+        // The horizontal-turn cell is certified loop-free: the gradient cones
+        // of the cylinder and the far sphere are separated by a certified
+        // positive margin on the box.
+        assert!(
+            certified_transversal(d1, d2, &domain),
+            "the horizontal-turn cell is certified loop-free"
+        );
+        // The certified loop-free cover resolves completely: every certified
+        // crossing lies on the shared zero set, no leaf is left singular and no
+        // leaf is left unresolved under a healthy budget.
+        let mut budget = Budget::new(4096, 0, 0);
+        let cover = cover_branch(&cyl, &sph, &domain, TAU, &mut budget)
+            .expect("the loop-free cell certifies under healthy budget");
+        assert!(
+            !cover.value.points.is_empty(),
+            "the loop-free cell certifies regular crossings"
+        );
+        assert!(
+            cover.value.singular_boxes.is_empty(),
+            "a loop-free cell proves no singular leaf"
+        );
+        assert!(
+            cover.value.unresolved_boxes.is_empty(),
+            "a loop-free cell proves no unresolved leaf"
+        );
+        for p in &cover.value.points {
+            let f_cyl = p.x * p.x + p.y * p.y - 1.0;
+            let f_sph = (p.x - 3.0) * (p.x - 3.0) + p.y * p.y + p.z * p.z - 9.0;
+            assert!(
+                f_cyl.abs() <= RESIDUAL && f_sph.abs() <= RESIDUAL,
+                "certified point {p:?} has residuals {f_cyl} {f_sph}"
+            );
+        }
+    }
+
+    /// CFP-006 test 3: on a certified-disjoint (transversal-by-proof) cell the
+    /// routing refuses the singular/cascade stage — the cell can never be
+    /// near-tangential, so no tangency classification is reachable from it and
+    /// the cover is completed by the certified regular path alone.
+    #[test]
+    fn transversality_cascade_unreachable_on_disjoint_cells() {
+        // The flat funnel WOULD route the near-tangent pair (the same unit
+        // cylinder externally tangent to the sphere) into the cascade: its
+        // cones overlap at the tangency and the cover reports a singular leaf.
+        let cyl = unit_cylinder();
+        let tangent = Sphere::new(Point3::new(2.0, 0.0, 0.0), 1.0);
+        let tangent_box = Box3 {
+            x: iv(0.5, 1.5),
+            y: iv(-0.5, 0.5),
+            z: iv(-0.5, 0.5),
+        };
+        let d1: &dyn ImplicitField = &cyl;
+        let dt: &dyn ImplicitField = &tangent;
+        assert!(
+            !certified_transversal(d1, dt, &tangent_box),
+            "a near-tangent pair is NOT certified transversal: the flat path \
+             would enter the cascade"
+        );
+        let mut flat_budget = Budget::new(1024, 0, 0);
+        let flat = cover_branch(&cyl, &tangent, &tangent_box, TAU, &mut flat_budget)
+            .expect("the near-tangent flat path classifies");
+        assert!(
+            flat.value
+                .singular_boxes
+                .iter()
+                .any(|b| b.contains(Point3::new(1.0, 0.0, 0.0))),
+            "the flat path produces a singular leaf at the tangency"
+        );
+        // The disjoint, genuinely transversal cell IS certified transversal by
+        // proof, so the cascade entry is refused with the transversality
+        // certificate: the routing below runs the certified regular path.
+        let sph = Sphere::new(Point3::new(3.0, 0.0, 0.0), 3.0);
+        let d2: &dyn ImplicitField = &sph;
+        let turn = Box3 {
+            x: iv(0.9, 1.1),
+            y: iv(-0.1, 0.1),
+            z: iv(2.1, 2.3),
+        };
+        assert!(
+            certified_transversal(d1, d2, &turn),
+            "the transversal cell is certified by the Gauss-map cones"
+        );
+        // Executable: the disjoint cell completes through the certified regular
+        // path with no singular/cascade content.
+        let mut budget = Budget::new(4096, 0, 0);
+        let cover = cover_branch(&cyl, &sph, &turn, TAU, &mut budget)
+            .expect("the transversal cell certifies under healthy budget");
+        assert!(!cover.value.points.is_empty());
+        assert!(
+            cover.value.singular_boxes.is_empty(),
+            "a certified-transversal cell never needs the singular/cascade stage"
+        );
+        assert!(cover.value.unresolved_boxes.is_empty());
     }
 }

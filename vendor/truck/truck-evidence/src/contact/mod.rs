@@ -1747,26 +1747,55 @@ where
     let mut tangencies: Vec<Point3> = Vec::new();
     let mut singular_cert: Option<Certificate> = None;
     if !cover.singular_boxes.is_empty() {
-        let Certified {
-            value: report,
-            cert: scert,
-        } = singular::singular_events(l, r, &cover.singular_boxes, tau, budget)?;
-        let singular::SingularReport {
-            regular,
-            tangencies: t,
-            tangential_crossings,
-            degenerate,
-            residue,
-        } = report;
-        tangencies = t;
-        cover.points.extend(regular.points);
-        cover.unresolved_boxes.extend(regular.unresolved_boxes);
-        if !residue.is_empty() || !tangential_crossings.is_empty() || !degenerate.is_empty() {
-            return Err(Refusal::UnsupportedEnvelope(
-                EnvelopeCase::ContactReductionDeferred,
-            ));
+        // CFP-006-CONE-CERTIFICATES (decision 3): a domain whose two carriers'
+        // Gauss-map cones are certified DISJOINT is transversal by proof (spec
+        // §3, Prop 2: rank deficiency ⇔ parallel normals). No near-tangency
+        // can exist in it, so the CTE cascade — the evidence-side singular
+        // tangency classification — is unreachable from this cell by proof:
+        // the routing refuses the cascade entry and instead certifies the
+        // regular crossings hiding behind the fixed-axis chart degeneracies
+        // directly (a chart-artifact leaf of a transversal pair can only hold
+        // regular crossings). Zero new evidence kinds: the refusal and the
+        // resulting certified cover carry the existing interval `Certificate`.
+        let disjoint = {
+            let d1: &dyn ImplicitField = l;
+            let d2: &dyn ImplicitField = r;
+            gff::certified_transversal(d1, d2, &domain)
+        };
+        if disjoint {
+            let Certified { value: refined, .. } =
+                refine_chartless_transversal(l, r, &cover.singular_boxes, tau, budget)?;
+            cover.points.extend(refined.points);
+            cover.unresolved_boxes.extend(refined.unresolved_boxes);
+            // The chartless leaves were coordinate artifacts only; their regular
+            // crossings are now in the cover, so no singular content remains.
+            cover.singular_boxes.clear();
+            // No tangency classification ran: on a certified-transversal cell
+            // every chartless leaf is a coordinate artifact, and its regular
+            // crossings have just been recovered. `singular_cert` stays None so
+            // the caller's cover certificate is returned unchanged.
+        } else {
+            let Certified {
+                value: report,
+                cert: scert,
+            } = singular::singular_events(l, r, &cover.singular_boxes, tau, budget)?;
+            let singular::SingularReport {
+                regular,
+                tangencies: t,
+                tangential_crossings,
+                degenerate,
+                residue,
+            } = report;
+            tangencies = t;
+            cover.points.extend(regular.points);
+            cover.unresolved_boxes.extend(regular.unresolved_boxes);
+            if !residue.is_empty() || !tangential_crossings.is_empty() || !degenerate.is_empty() {
+                return Err(Refusal::UnsupportedEnvelope(
+                    EnvelopeCase::ContactReductionDeferred,
+                ));
+            }
+            singular_cert = Some(scert);
         }
-        singular_cert = Some(scert);
     }
     if !cover.unresolved_boxes.is_empty() {
         return Err(Refusal::NumericallyUnresolved {
@@ -1796,6 +1825,83 @@ where
     // returned unchanged.
     let out_cert = singular_cert.unwrap_or(cert);
     Ok(Certified::new(ContactComplex { contacts }, out_cert))
+}
+
+/// CFP-006-CONE-CERTIFICATES: recover the regular crossings of a certified-
+/// transversal cell's chartless leaves by pure subdivision.
+///
+/// On a cone-disjoint cell the pair is transversal by proof (spec §3), so a
+/// leaf whose 2×2 minors all merely contain zero is a *coordinate* artifact of
+/// a regular branch (the branch's tangent direction rotates through the
+/// coordinate planes over the leaf), never a genuine tangency. Subdividing the
+/// leaf re-establishes a certified regular chart around every crossing it
+/// holds; the recovered points are certified regular crossings, exactly as the
+/// singular stage's refinement step would produce them, but without any
+/// tangency classification (which the transversality proof makes unreachable).
+///
+/// A leaf that is still chartless at the resolution floor, and whose field
+/// enclosures do not exclude it, is an honest unresolved remainder (typed
+/// later by the caller) — never a fabricated crossing, never a silent empty.
+/// Spend is charged through `budget`; refusals (budget exhaustion) propagate.
+fn refine_chartless_transversal<L, R>(
+    l: &L,
+    r: &R,
+    chartless: &[Box3],
+    tau: f64,
+    budget: &mut Budget,
+) -> Outcome<gff::BranchCover>
+where
+    L: ImplicitField + EnclosureSurface,
+    R: ImplicitField + EnclosureSurface,
+{
+    let initial = *budget;
+    let mut cover = gff::BranchCover::default();
+    let mut worklist: Vec<Box3> = chartless.to_vec();
+    while let Some(box3) = worklist.pop() {
+        // `cover_branch` is generic over `&impl ImplicitField` (Sized), so the
+        // concrete sized refs are passed rather than the `dyn` upcasts (which
+        // cannot unsize-coerce through the `impl` bound). The carriers here
+        // are concrete canonical types.
+        let Certified { value: child, .. } = gff::cover_branch(l, r, &box3, tau, budget)?;
+        cover.points.extend(child.points);
+        cover.unresolved_boxes.extend(child.unresolved_boxes);
+        // A chartless child is a coordinate artifact on a transversal cell:
+        // subdivide it (widest axis, ties toward the lowest index) until a
+        // regular chart reappears or the resolution floor is reached. A leaf
+        // that is still chartless at the floor is an honest unresolved box.
+        for singular in child.singular_boxes {
+            if singular.width() <= tau {
+                cover.unresolved_boxes.push(singular);
+                continue;
+            }
+            let Some((lo, hi)) = bisect_box(&singular) else {
+                cover.unresolved_boxes.push(singular);
+                continue;
+            };
+            budget
+                .spend_subdiv(1)
+                .map_err(|_| Refusal::NumericallyUnresolved {
+                    spent: budget_spent(&initial, budget),
+                    witness: UnresolvedWitness::KrawczykIndeterminate,
+                })?;
+            worklist.push(lo);
+            worklist.push(hi);
+        }
+    }
+    Ok(Certified::new(cover, gff_certificate(budget)))
+}
+
+/// The certified-cover certificate shape of the transversal-refinement path:
+/// interval method, empty props, the actual remaining budget, unbounded
+/// margin/modulus (identical to the landed `gff`/`singular` certificate).
+fn gff_certificate(budget: &Budget) -> Certificate {
+    Certificate {
+        props: PropMap::new(),
+        method: Method::Interval,
+        budget_left: *budget,
+        margin: Margin::UNBOUNDED,
+        modulus: Modulus::Unbounded,
+    }
 }
 
 /// The dimensionless divisor that scales a certified AABB's width into the
