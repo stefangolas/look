@@ -1,0 +1,452 @@
+//! PB-011 required Rust suite — the corpus-parity churn over the landed
+//! certified funnel (`tests_required`: swept_carrier_booleans_route_to_certified_entry,
+//! lifted_skip_rows_run_green, cutaway_partial_arc_revolve_coverage).
+//!
+//! PB-011 routes the facade's swept-carrier boolean rows into the landed
+//! certified entry (audit G1): the facade's `Mode` row is the `boolean_op`
+//! encoding, and a `Mode` row over a swept carrier (spline/swept/revolved
+//! carrier class, the CFP-004 stage contract) now dispatches the carrier pair
+//! through the facade's certified-entry dispatch instead of the pair being
+//! refused pre-execution. Accepted pairs certify in-envelope and are recorded
+//! on the facade report as routed swept-carrier boolean rows; a pair coupling
+//! a swept carrier with a funnel-refused carrier class (torus) keeps the
+//! typed, localized refusal. The loop-side facade cannot name the certified
+//! crate (the dependency law PB-013/PB-014 record), so the certified outcome
+//! is asserted at the report / refusal granularity this crate owns — exactly
+//! as the landed PB-013/PB-014 suites assert live certification (in-envelope
+//! report semantics). Canonical x canonical pairs are untouched (landed S1).
+//!
+//! The corpus-side lift tests run the lifted rows through the harness door
+//! (`corpus/ttc/door.py`, OCC baseline regime — a fresh python process per
+//! row) exactly as `compat::runner` runs canonical rows, asserting the row's
+//! geometry facts + STL + report record (the lift evidence the skip discipline
+//! keys on). They need the machine python and the genuine `build123d` package
+//! the corpus is written against (installed on this machine, same as the
+//! landed `ttc_harness` canonical-subset test).
+
+#[path = "../compat/mod.rs"]
+// This suite consumes the manifest + skips machinery only; the runner/
+// reference/surface modules of the shared compat tree are exercised by
+// ttc_harness.rs, so the dead-code lints are silenced here rather than
+// replicated per item.
+#[allow(dead_code)]
+mod compat;
+
+use std::path::{Path, PathBuf};
+use std::process::Command;
+
+use truck_base::evidence::{EnvelopeCase, Refusal};
+use truck123d::{FacadeOp, FacadeReport, FacadeTable, ModeValue, run_facade};
+
+/// The absolute path of the `corpus/ttc` directory (the harness corpus).
+fn corpus_dir() -> PathBuf {
+    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../corpus/ttc")
+}
+
+/// A scratch directory unique to this test process and call site (parallel
+/// door runs must never share a scratch path).
+fn scratch_dir(tag: &str) -> PathBuf {
+    use std::sync::atomic::{AtomicU64, Ordering};
+    static COUNTER: AtomicU64 = AtomicU64::new(0);
+    let serial = COUNTER.fetch_add(1, Ordering::Relaxed);
+    std::env::temp_dir().join(format!(
+        "pb_parity_{}_{}_{}",
+        std::process::id(),
+        serial,
+        tag
+    ))
+}
+
+/// The corpus-shaped spline carrier rows (S5 section authoring).
+fn spline_carrier() -> FacadeOp {
+    FacadeOp::Spline {
+        points: vec![[0.0, 0.0, 0.0], [1.0, 2.0, 0.0], [0.0, 0.0, 3.0]],
+        periodic: false,
+    }
+}
+
+/// Runs a table to completion: `Ok(report)` or a typed refusal.
+fn run(ops: Vec<FacadeOp>) -> Result<FacadeReport, Refusal> {
+    run_facade(&FacadeTable { ops })
+}
+
+/// The routed swept-carrier boolean rows of a report as a JSON value (the
+/// serialized report omits the field when no swept-carrier boolean row ran).
+fn routed_boolean_rows(report: &FacadeReport) -> serde_json::Value {
+    serde_json::to_value(report)
+        .map(|value| {
+            value
+                .get("boolean_events")
+                .cloned()
+                .unwrap_or(serde_json::Value::Array(vec![]))
+        })
+        .expect("the facade report must serialize") // H-3: serde output of a fixed report
+}
+
+// ---------------------------------------------------------------------------
+// Test 1 (G1 core): swept-carrier booleans route to the certified entry
+// ---------------------------------------------------------------------------
+
+/// PB-011 required test 1 (audit G1): a lofted/revolved carrier pair that
+/// refused `NonCanonicalCarrier` pre-execution now reaches the certified
+/// entry through the facade boundary and returns a certified verdict — or the
+/// typed localized refusal — asserted WHICH, never a bare `Err`.
+#[test]
+fn swept_carrier_booleans_route_to_certified_entry() {
+    // Live through the facade: the lofted-base x revolved-tool subtract pair
+    // (surfaces.cut's target - tool over a lofted body and a revolved shell)
+    // runs in-envelope, the routed swept-carrier boolean row rides the
+    // deterministic report (mode + carrier-class pair), and STL exports.
+    let cut_table = vec![
+        FacadeOp::PushPart,
+        spline_carrier(),
+        FacadeOp::Loft,
+        FacadeOp::Mode {
+            value: ModeValue::Subtract,
+        },
+        spline_carrier(),
+        FacadeOp::Revolve { angle_deg: 360.0 },
+        FacadeOp::ExportStl {
+            path: "cut_loft.stl".to_string(),
+        },
+        FacadeOp::Pop,
+    ];
+    let report = run(cut_table)
+        .expect("a swept-carrier boolean routes into the certified entry in-envelope"); // H-3: the certified verdict is the assertion
+    assert!(report.constructive, "a swept-carrier part is constructive");
+    let rows = routed_boolean_rows(&report);
+    let routed = rows
+        .as_array()
+        .expect("routed boolean rows serialize as an array"); // H-3: machine-produced report shape
+    assert_eq!(
+        routed.len(),
+        1,
+        "the lofted-base x revolved-tool pair is recorded as one routed swept-carrier boolean row"
+    );
+    let first = routed
+        .first()
+        .and_then(serde_json::Value::as_object)
+        .expect("the routed row serializes as an object"); // H-3: machine-produced report shape
+    assert_eq!(
+        first.get("mode").and_then(serde_json::Value::as_str),
+        Some("subtract"),
+        "the routed row carries the subtract mode"
+    );
+    assert_eq!(
+        first.get("base").and_then(serde_json::Value::as_str),
+        Some("swept"),
+        "the routed row carries the lofted base carrier class"
+    );
+    assert_eq!(
+        first.get("tool").and_then(serde_json::Value::as_str),
+        Some("revolved"),
+        "the routed row carries the revolved tool carrier class"
+    );
+    assert_eq!(report.exports.len(), 1);
+    assert_eq!(report.exports[0].op, "export_stl");
+
+    // The funnel-refused class refuses typed through the facade too: a torus
+    // tool subtracted from a lofted carrier is `ContactReductionDeferred`
+    // (the typed, localized refusal), never a bare failure and never `Ok`.
+    let torus_table = vec![
+        FacadeOp::PushPart,
+        spline_carrier(),
+        FacadeOp::Loft,
+        FacadeOp::Mode {
+            value: ModeValue::Subtract,
+        },
+        FacadeOp::Torus {
+            major_radius: 2.0,
+            minor_radius: 0.5,
+        },
+    ];
+    let refusal = run(torus_table).expect_err("a swept x torus boolean must refuse typed"); // H-3: the typed refusal is the assertion
+    assert!(
+        matches!(
+            refusal,
+            Refusal::UnsupportedEnvelope(EnvelopeCase::ContactReductionDeferred)
+        ),
+        "expected the typed localized ContactReductionDeferred refusal, got {refusal:?}"
+    );
+
+    // A canonical-carrier tool under a subtract mode over a swept base routes
+    // too (the corpus's swept x canonical form, e.g. cutting a canonical
+    // cylinder through a lofted shell): in-envelope, one routed row.
+    let swept_canonical = vec![
+        FacadeOp::PushPart,
+        spline_carrier(),
+        FacadeOp::Loft,
+        FacadeOp::Mode {
+            value: ModeValue::Subtract,
+        },
+        FacadeOp::Cylinder {
+            radius: 1.0,
+            height: 2.0,
+        },
+        FacadeOp::ExportStl {
+            path: "cut_cylinder.stl".to_string(),
+        },
+        FacadeOp::Pop,
+    ];
+    let report = run(swept_canonical)
+        .expect("a swept x canonical boolean routes into the certified entry in-envelope"); // H-3: the certified verdict is the assertion
+    assert_eq!(
+        routed_boolean_rows(&report)
+            .as_array()
+            .map(|rows| rows.len())
+            .unwrap_or(0),
+        1,
+        "the swept x canonical pair is recorded as one routed row"
+    );
+
+    // Controls: canonical x canonical boolean and the TR-NRB-001 STEP boundary
+    // are untouched by the routing (no routed row for a canonical pair; the
+    // STEP-out refusal of a swept product still carries the NonCanonicalCarrier
+    // envelope case).
+    let canonical = vec![
+        FacadeOp::PushPart,
+        FacadeOp::Box {
+            length: 2.0,
+            width: 3.0,
+            height: 1.0,
+        },
+        FacadeOp::Mode {
+            value: ModeValue::Subtract,
+        },
+        FacadeOp::Box {
+            length: 1.0,
+            width: 1.0,
+            height: 1.0,
+        },
+        FacadeOp::ExportStep {
+            path: "canonical.step".to_string(),
+        },
+        FacadeOp::Pop,
+    ];
+    let report = run(canonical).expect("canonical x canonical boolean STEP is in envelope"); // H-3: the landed S1 control
+    assert!(
+        routed_boolean_rows(&report)
+            .as_array()
+            .is_none_or(|rows| rows.is_empty())
+    );
+    assert!(!report.constructive);
+
+    let swept_step = vec![
+        FacadeOp::PushPart,
+        spline_carrier(),
+        FacadeOp::Loft,
+        FacadeOp::ExportStep {
+            path: "swept.step".to_string(),
+        },
+        FacadeOp::Pop,
+    ];
+    let step_refusal = run(swept_step).expect_err("STEP out of a swept part must refuse typed"); // H-3: TR-NRB-001 control
+    assert!(
+        matches!(
+            step_refusal,
+            Refusal::UnsupportedEnvelope(EnvelopeCase::NonCanonicalCarrier)
+        ),
+        "TR-NRB-001 STEP-out of constructive geometry must stay typed, got {step_refusal:?}"
+    );
+}
+
+// ---------------------------------------------------------------------------
+// Test 2 (corpus lift): every lifted skip row runs green through the door
+// ---------------------------------------------------------------------------
+
+/// Spawns the harness door for one corpus row and returns its stdout JSON
+/// record (the runner's `run_one` shape, replicated here so a lifted row —
+/// not yet on the canonical runner set — can be proven green).
+fn door_run(
+    corpus: &Path,
+    row: &compat::manifest::ManifestRow,
+    stl_path: &Path,
+) -> serde_json::Value {
+    let tree = corpus.join(&row.tree);
+    let args_json = serde_json::to_string(&row.args).expect("the manifest args serialize"); // H-3: machine-produced manifest data
+    let output = Command::new("python")
+        .arg(corpus.join("door.py"))
+        .arg(&tree)
+        .arg(&row.module)
+        .arg(&row.entry)
+        .arg(&args_json)
+        .arg(stl_path)
+        .output()
+        .unwrap_or_else(|e| panic!("cannot spawn the door for {}: {e}", row.id));
+    assert!(
+        output.status.success(),
+        "the door process must exit cleanly for {}:\n{}",
+        row.id,
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let record: serde_json::Value = serde_json::from_slice(&output.stdout)
+        .unwrap_or_else(|e| panic!("the door must emit a JSON record for {}: {e}", row.id));
+    assert!(
+        record
+            .get("ok")
+            .and_then(serde_json::Value::as_bool)
+            .unwrap_or(false),
+        "the door run of {} must be ok: {}",
+        row.id,
+        record.get("error").cloned().unwrap_or_default()
+    );
+    record
+}
+
+/// Asserts a green door-run evidence triple for one row: geometry facts
+/// (solid_count/volume/bbox) + a non-empty binary STL (the report record is
+/// the stdout JSON itself).
+fn assert_green_door_evidence(corpus: &Path, row: &compat::manifest::ManifestRow) {
+    let out_dir = scratch_dir(&format!("lift_{}", row.id.replace('/', "_")));
+    std::fs::create_dir_all(&out_dir)
+        .unwrap_or_else(|e| panic!("cannot create scratch dir {}: {e}", out_dir.display()));
+    let stl_path = out_dir.join(format!("{}.stl", row.id.replace('/', "__")));
+    let record = door_run(corpus, row, &stl_path);
+
+    let facts = record
+        .get("facts")
+        .and_then(serde_json::Value::as_object)
+        .unwrap_or_else(|| panic!("row {} must carry geometry facts", row.id));
+    assert!(
+        facts
+            .get("solid_count")
+            .and_then(serde_json::Value::as_i64)
+            .is_some_and(|n| n > 0),
+        "row {} must report a positive solid count",
+        row.id
+    );
+    assert!(
+        facts
+            .get("volume")
+            .and_then(serde_json::Value::as_f64)
+            .is_some(),
+        "row {} must report a volume fact",
+        row.id
+    );
+    assert!(
+        facts
+            .get("bbox")
+            .and_then(serde_json::Value::as_array)
+            .is_some_and(|corners| corners.len() == 2),
+        "row {} must report a two-corner bounding box",
+        row.id
+    );
+    let triangles = record
+        .get("stl")
+        .and_then(|stl| stl.get("triangles"))
+        .and_then(serde_json::Value::as_i64)
+        .unwrap_or(0);
+    assert!(triangles > 0, "row {} STL must carry triangles", row.id);
+    let stl_len = std::fs::metadata(&stl_path)
+        .map(|m| m.len())
+        .unwrap_or_else(|e| panic!("row {} must produce an STL file: {e}", row.id));
+    assert!(
+        stl_len > 84,
+        "row {} STL is not a valid binary STL ({} bytes)",
+        row.id,
+        stl_len
+    );
+    let _ = std::fs::remove_dir_all(&out_dir);
+}
+
+/// PB-011 required test 2: every row this packet lifts from `corpus/ttc/
+/// SKIPS.json` runs green through the harness door (geometry facts + report
+/// record + STL). The lifted set is read from the machine-checked evidence
+/// this packet wrote into the SKIPS rows (`PB-011 LIFT EVIDENCE` note marker);
+/// an empty lifted set fails the test — lifting is the point.
+#[test]
+fn lifted_skip_rows_run_green() {
+    let corpus = corpus_dir();
+    let manifest = compat::manifest::load_manifest(&corpus).expect("the corpus manifest must load"); // H-3: validated corpus input, read-only
+    let skips =
+        compat::skips::load_skips(&corpus, &manifest).expect("the skips file must validate"); // H-3: validated corpus input, read-only
+
+    let lifted: Vec<String> = skips
+        .rows
+        .iter()
+        .filter(|skip| skip.note.contains("PB-011 LIFT EVIDENCE"))
+        .map(|skip| skip.id.clone())
+        .collect();
+    assert!(
+        !lifted.is_empty(),
+        "the lifted set must be non-empty — lifting is the point of PB-011"
+    );
+
+    for id in &lifted {
+        let row = manifest
+            .rows
+            .iter()
+            .find(|row| &row.id == id)
+            .unwrap_or_else(|| panic!("lifted row {id} must be enrolled on the manifest")); // H-3: skips/manifest 1:1 is machine-checked
+        assert_green_door_evidence(&corpus, row);
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Test 3 (G5 cutaway): the partial-arc revolve path coverage
+// ---------------------------------------------------------------------------
+
+/// PB-011 required test 3 (audit G5, decision 4): the falcon cutaway's
+/// partial-arc revolve path — the sectioned center-core tank barrel and
+/// interstage shells driven by `arc`/`start` on `eng.revolved_solid`/`shell`
+/// over `CUT_START=135`/`CUT_ARC=270` — runs through the harness door green on
+/// top of PB-014's partial-arc revolve capability. The coverage claim is
+/// asserted against the vendored code path, then executed.
+#[test]
+fn cutaway_partial_arc_revolve_coverage() {
+    let corpus = corpus_dir();
+    let manifest = compat::manifest::load_manifest(&corpus).expect("the corpus manifest must load"); // H-3: validated corpus input, read-only
+    let cutaway = manifest
+        .rows
+        .iter()
+        .find(|row| row.id == "falcon_heavy/cutaway")
+        .expect("the cutaway row must be enrolled on the manifest"); // H-3: manifest row set is fixed
+    assert_eq!(cutaway.entry, "build_vehicle");
+    assert_eq!(
+        cutaway.args,
+        vec![serde_json::Value::Bool(true)],
+        "the cutaway row runs build_vehicle(cutaway=True)"
+    );
+
+    // Coverage: the vendored code path is partial-arc revolves (revolution_arc
+    // + start), not boolean sectioning. Assert the driving constants and the
+    // cutaway arc/start route exist in the vendored lib module.
+    let falcon_common = corpus.join("trees/falcon_heavy/src/lib/falcon_common.py");
+    let source = std::fs::read_to_string(&falcon_common)
+        .unwrap_or_else(|e| panic!("the vendored falcon_common.py must be readable: {e}")); // H-3: read-only vendored corpus
+    assert!(
+        source.contains("CUT_START, CUT_ARC = 135.0, 270.0"),
+        "the cutaway opening constants must drive the partial-arc revolves"
+    );
+    assert!(
+        source.contains("arc, start = (CUT_ARC, CUT_START) if cutaway else (360.0, 0.0)"),
+        "build_vehicle(cutaway=True) must select the partial arc"
+    );
+    assert!(
+        source.contains("revolved_solid("),
+        "the sectioned barrel must be built by the partial-arc revolve helper"
+    );
+    assert!(
+        source.contains("sectioned=cutaway"),
+        "the cutaway flag must reach the sectioned tank/interstage builders"
+    );
+
+    // The row's skip note records the same classification (PB-014 corrected
+    // the mis-description; PB-011 records the lift evidence).
+    let skips =
+        compat::skips::load_skips(&corpus, &manifest).expect("the skips file must validate"); // H-3: validated corpus input, read-only
+    let cutaway_skip = skips
+        .rows
+        .iter()
+        .find(|skip| skip.id == "falcon_heavy/cutaway")
+        .expect("the cutaway skip row must exist"); // H-3: skips/manifest 1:1 is machine-checked
+    assert!(
+        cutaway_skip.note.contains("partial-arc revolves")
+            && cutaway_skip.note.contains("PB-011 LIFT EVIDENCE"),
+        "the cutaway skip note must record the partial-arc revolve path and the PB-011 lift evidence"
+    );
+
+    // Executed: build_vehicle(cutaway=True) runs green through the harness
+    // door with geometry facts + STL (the partial-arc revolve coverage run).
+    assert_green_door_evidence(&corpus, cutaway);
+}
