@@ -30,6 +30,10 @@ pub mod classify;
 /// BG-SOL-RW4-ASSEMBLE: the assembler and the `boolean()` entry.
 pub mod assemble;
 
+/// DEF-SEEDRAY-A: certified interval ray×carrier crossings for the four
+/// seed-ray carriers (standalone; does not touch the live classify path).
+pub mod ray_cert;
+
 /// BIE-006-CLASSIFY: the sweep lift/path adapters + windowed sweep output
 /// (the pipeline tie-in that lets a `SpineFrameSweep` face through the funnel).
 mod sweep_lift;
