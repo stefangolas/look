@@ -687,6 +687,14 @@ fn create_new_side(
     };
     let fillet_surface = Box::new(fillet_curve.surface().clone());
     let new_curve = IntersectionCurve::new(side_surface, fillet_surface, fillet_curve);
+    // DEF-FILLET-IDENTITY decision (scope item 2): this file is a PROTO-ONLY
+    // prototype (`mod experiment` is commented out of fillet/mod.rs; nothing
+    // here is compiled into the landed path). The in-place curve mutation
+    // below is the pre-BG-CE-003-MIGRATE form. The landed path must NEVER
+    // reintroduce it: it is forbidden by the replacement doctrine. Any port
+    // of this prototype must replace the seam with `Edge::with_curve` and
+    // propagate that one replacement into every face holding the seam (see
+    // fillet/mod.rs `fillet_with_side`, DEF-FILLET-IDENTITY).
     fillet_edge.set_curve(new_curve.into());
     let mut new_face = Face::new(new_boundaries, side.surface());
     if !side.orientation() {
