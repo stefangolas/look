@@ -229,9 +229,18 @@ fn brep_volume_matches_facet_on_small_case() {
 #[test]
 fn concave_u_chute_refuses_on_the_facet_path() {
     use showcases::profile::u_chute;
+    use truck_base::cgmath64::InnerSpace;
     use truck_geometry::constructive::{FrameLaw, ProfileLaw, SamplingPolicy, SpineFrameRecipe};
 
-    let profile = u_chute(1.2, 0.54, 0.072, 0.096).expect("u profile builds");
+    // PB-003-CONCAVE-CAPS (e4537d4) landed the deterministic ear-clip cap
+    // path: a concave ring is TRIANGULATED on the facet path, never refused.
+    // This expectation flipped WITH that capability landing (deliberate, not
+    // weakened): the concave U-chute BUILDS, and the flip pins the strongest
+    // honest claims the run supports — a clean-winding certified mesh whose
+    // signed volume and world bounds agree with the analytic reference facts.
+    let (width, wall_height, wall_thickness, floor_thickness) = (1.2, 0.54, 0.072, 0.096);
+    let profile =
+        u_chute(width, wall_height, wall_thickness, floor_thickness).expect("u profile builds");
     let spine = LineSpine {
         start: truck_base::cgmath64::Point3::new(0.0, 0.0, 0.0),
         end: truck_base::cgmath64::Point3::new(0.0, 0.0, 1.0),
@@ -239,16 +248,72 @@ fn concave_u_chute_refuses_on_the_facet_path() {
     let recipe = SpineFrameRecipe::new(
         spine,
         ProfileLaw::Constant(profile),
-        FrameLaw::FixedPlane { normal: truck_base::cgmath64::Vector3::unit_x() },
+        FrameLaw::FixedPlane {
+            normal: truck_base::cgmath64::Vector3::unit_x(),
+        },
     );
-    let stations = SamplingPolicy::UniformCount { spine: 8 }.resolve(0.0, 1.0).expect("stations");
-    let result = truck_modeling::facet_sweep::facet_sweep(&recipe, &stations, 8);
-    match result {
-        Err(e) => assert!(
-            format!("{e:?}").contains("InvalidInput"),
-            "concave caps must refuse typed, got {e:?}"
+    let stations = SamplingPolicy::UniformCount { spine: 8 }
+        .resolve(0.0, 1.0)
+        .expect("stations");
+    let realized = match truck_modeling::facet_sweep::facet_sweep(&recipe, &stations, 8) {
+        Ok(realized) => realized,
+        Err(error) => panic!(
+            "concave U-chute must BUILD on the facet path (PB-003-CONCAVE-CAPS \
+             ear-clips non-convex caps now), refused with {error:?}"
         ),
-        Ok(_) => panic!("concave U-chute must refuse on the facet path"),
+    };
+
+    assert_eq!(
+        realized.audit.winding_violations, 0,
+        "the ear-clipped concave caps must close the mesh"
+    );
+    assert_eq!(
+        realized.verdict,
+        truck_modeling::facet_sweep::FacetVerdict::CertifiedWithinTolerance,
+        "a clean winding audit with a finite nonzero volume certifies"
+    );
+
+    // Analytic reference facts (closed form, independent of the facet path):
+    // the U cross-section is a floor slab over the inner width plus two wall
+    // columns of `wall_thickness` x `wall_height`; the straight unit sweep is
+    // the prism of that area (constant profile, no holonomy).
+    let inner_half = width / 2.0 - wall_thickness;
+    let cross_section_area =
+        2.0 * inner_half * floor_thickness + 2.0 * wall_thickness * wall_height;
+    let reference_volume = cross_section_area * (spine.end - spine.start).magnitude();
+    assert!(
+        (realized.audit.signed_volume - reference_volume).abs() / reference_volume <= 1.0e-6,
+        "built volume {} must pin the analytic prism volume {}",
+        realized.audit.signed_volume,
+        reference_volume
+    );
+
+    // World bounds: the FixedPlane { unit_x } frame maps profile-up onto
+    // `-unit_y` and profile-across onto `unit_x`, swept along +z, so the mesh
+    // envelope is exactly `[-hw, hw] x [-wall_height, 0] x [0, 1]`.
+    let mut lo = [f64::INFINITY; 3];
+    let mut hi = [f64::NEG_INFINITY; 3];
+    for p in realized.mesh.positions() {
+        lo[0] = lo[0].min(p.x);
+        lo[1] = lo[1].min(p.y);
+        lo[2] = lo[2].min(p.z);
+        hi[0] = hi[0].max(p.x);
+        hi[1] = hi[1].max(p.y);
+        hi[2] = hi[2].max(p.z);
+    }
+    let expected_lo = [-width / 2.0, -wall_height, 0.0];
+    let expected_hi = [width / 2.0, 0.0, 1.0];
+    for axis in 0..3 {
+        assert!(
+            (lo[axis] - expected_lo[axis]).abs() <= 1.0e-9
+                && (hi[axis] - expected_hi[axis]).abs() <= 1.0e-9,
+            "axis {axis} mesh bounds [{}, {}] must pin the analytic envelope \
+             [{}, {}]",
+            lo[axis],
+            hi[axis],
+            expected_lo[axis],
+            expected_hi[axis]
+        );
     }
 }
 
