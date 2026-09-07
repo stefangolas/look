@@ -1390,6 +1390,126 @@ pub fn construct_square_system(
     SquareSystem3::from_sides(side_a, side_b, identity).map_err(SsiRefusal::from)
 }
 
+// ---------------------------------------------------------------------------
+// CFP-008-STAGNATION: cone-overlap non-shrink detection and the CTE route
+// ---------------------------------------------------------------------------
+//
+// The funnel's degenerate tail (spec §3, decision 6; §2 F-C6) is a near-tangent
+// pair whose per-box Gauss-map cones keep overlapping as the box subdivides:
+// the old loop spun until its budget reported `Unresolved`. This section is the
+// booked CFP-008 route: the certified cone-overlap outcome of two consecutive
+// subdivision levels is compared EXACTLY, and a non-shrink (the cones overlap
+// at both recorded depths, so no strictly-positive shrink was certified) routes
+// the pair to the landed CTE cascade ([`crate::tangency::cascade::classify_box`])
+// through its published entry instead of burning more subdivision budget. The
+// cascade's verdict is returned verbatim; a box the cascade cannot certify keeps
+// the typed fail-closed `Unresolved` residual or the typed refusal. Never a
+// panic, never a guess, never a silent downgrade.
+
+use crate::cfp::fixtures::ConeOverlapRecord;
+use crate::tangency::cascade::classify_box;
+use crate::tangency::graph::CertifiedGraph;
+use crate::tangency::qpoly::QPoly;
+use crate::tangency::shapes::{ChartMinorGrids, ContactVerdict};
+use crate::tangency::tsystem::TSystem;
+use crate::tangency::TangencyRefusal;
+use truck_base::evidence::Budget;
+
+/// Whether the certified cone-overlap outcome recorded at `later` failed to
+/// shrink from the outcome recorded at `earlier` (two consecutive subdivision
+/// levels, in the fixed subdivision order).
+///
+/// The overlap measure is the certified interval-cone outcome of CFP-001's
+/// sub-box cones (spec §3, Gauss-map certificates); a pair whose cones still
+/// overlap at the later depth has NOT shrunk by any strictly-positive certified
+/// margin — the recorded overlap persisted. The level comparison is exact:
+/// never a naked float comparison, never an epsilon (H-3).
+pub fn cone_overlap_did_not_shrink(earlier: &ConeOverlapRecord, later: &ConeOverlapRecord) -> bool {
+    earlier.cones_overlap && later.cones_overlap
+}
+
+/// The certified cascade inputs of one routed box: the `system`/`graph`/
+/// `minors`/`tsys`/`box` inputs of the landed [`classify_box`] entry bundled
+/// verbatim so the CFP-008 route stays a small pure consumer.
+#[derive(Debug, Clone)]
+pub struct CascadeClassifyInput<'a> {
+    /// The stored square system of the routed pair.
+    pub system: &'a SquareSystem3,
+    /// The certified (H-graph) content over the box.
+    pub graph: &'a CertifiedGraph,
+    /// The chart-minor grids of the chart.
+    pub minors: &'a ChartMinorGrids,
+    /// The deflated `T = (G1, G2, M1, M2)` system of the chart.
+    pub tsys: &'a TSystem,
+    /// The box being classified.
+    pub b: &'a [(f64, f64); 4],
+}
+
+/// The outcome of the CFP-008 stagnation route on one recorded subdivision
+/// sequence.
+///
+/// Deterministic by construction: the recorded levels are seen in fixed order,
+/// the route is a pure function of the recorded levels and the certified
+/// cascade inputs, and identical ordered input yields an identical outcome
+/// field-for-field.
+#[derive(Debug, Clone, PartialEq)]
+#[allow(clippy::large_enum_variant)] // the cascade verdict is carried verbatim, boxed nowhere (CertifiedPairResult precedent)
+pub enum StagnationOutcome {
+    /// The recorded cone-overlap measure shrank (or the pair was never
+    /// overlapping): no stagnation is certified and the funnel keeps its normal
+    /// subdivision course. No cascade entry, no subdivision budget spent here.
+    Progress,
+    /// Cone overlap failed to shrink between the recorded levels: the pair is
+    /// routed to the landed CTE cascade, whose verdict is returned verbatim — a
+    /// certified `A1Isolated`/`A1Node`/`A2Branch`/`Transversal`/`Empty`
+    /// verdict, or the cascade's typed fail-closed `Unresolved` residual with
+    /// its cell when the cascade cannot certify the routed box.
+    RoutedToCascade(ContactVerdict<QPoly>),
+    /// The routed box refused classification inside the cascade (an invalid
+    /// box or an unavailable hull enclosure): the typed refusal is carried
+    /// verbatim — fail-closed, never a panic, never a guess.
+    CascadeRefused(TangencyRefusal),
+}
+
+/// The CFP-008 route: when cone overlap does not shrink between subdivision
+/// levels, classify the pair through the landed CTE cascade instead of burning
+/// the funnel's subdivision budget.
+///
+/// `records` is the subdivision sequence in fixed order; the route compares the
+/// two consecutive recorded levels exactly ([`cone_overlap_did_not_shrink`]).
+/// When no stagnation is certified the outcome is [`StagnationOutcome::Progress`]
+/// and the funnel keeps subdividing; when the recorded overlap persisted the
+/// pair is handed to [`classify_box`] through its published entry (the
+/// "A1/A2 vocabulary" of `tangency/cascade.rs`), returning the cascade's
+/// verdict verbatim. A box the cascade refuses is carried as the typed
+/// [`StagnationOutcome::CascadeRefused`] refusal — the old budget-burn arm is
+/// never taken for the F-C6 class.
+pub fn route_stagnation(
+    records: &[ConeOverlapRecord],
+    input: &CascadeClassifyInput<'_>,
+    budget: &mut Budget,
+) -> StagnationOutcome {
+    // The two consecutive recorded levels in fixed order; fewer than two
+    // recorded levels means nothing to compare yet.
+    let [.., earlier, later] = records else {
+        return StagnationOutcome::Progress;
+    };
+    if !cone_overlap_did_not_shrink(earlier, later) {
+        return StagnationOutcome::Progress;
+    }
+    match classify_box(
+        input.system,
+        input.graph,
+        input.minors,
+        input.tsys,
+        input.b,
+        budget,
+    ) {
+        Ok(verdict) => StagnationOutcome::RoutedToCascade(verdict),
+        Err(refusal) => StagnationOutcome::CascadeRefused(refusal),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

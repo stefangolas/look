@@ -1049,9 +1049,14 @@ pub(crate) mod test_kit {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::cfp::fixtures::{ConeOverlapRecord, Fc6StagnationFixture};
+    use crate::ssi::{route_stagnation, CascadeClassifyInput, StagnationOutcome};
     use crate::tangency::fixtures::{
         F3PlaneSphereFixture, F4SaddleFixture, F6CrossingPlanesFixture,
     };
+    use crate::tangency::graph::certify_graph;
+    use crate::tangency::minors::build_chart_minors;
+    use crate::tangency::shapes::{ChartMinorNet, Rank2Pivot};
 
     /// A fully built F3/F4 classification input: system, chart, certified
     /// graph, deflated system, and the box.
@@ -1195,5 +1200,231 @@ mod tests {
             first, second,
             "classify_box must be field-for-field deterministic"
         );
+    }
+
+    // -----------------------------------------------------------------------
+    // CFP-008-STAGNATION: the F-C6 class routes to the landed CTE cascade
+    // -----------------------------------------------------------------------
+
+    /// Run the CFP-008 stagnation route on one recorded subdivision sequence
+    /// and one certified classify input.
+    fn run_stagnation_route(
+        records: &[ConeOverlapRecord],
+        system: &SquareSystem3,
+        chart: &Rank2Chart,
+        graph: &CertifiedGraph,
+        tsys: &TSystem,
+        b: &Box4,
+        budget: &mut Budget,
+    ) -> StagnationOutcome {
+        let input = CascadeClassifyInput {
+            system,
+            graph,
+            minors: chart.minors(),
+            tsys,
+            b,
+        };
+        route_stagnation(records, &input, budget)
+    }
+
+    /// The F5 (A₂ parabola) square system driven through the A1 classifier's
+    /// public inputs: a near-tangent contact whose deflated root set is a
+    /// curve, so the A1 cascade cannot certify it (the contact belongs to the
+    /// A₂ route). The cascade refuses with the typed fail-closed `Unresolved`.
+    fn fc6_refusing_input() -> (SquareSystem3, Rank2Chart, CertifiedGraph, TSystem, Box4) {
+        let g0 =
+            test_kit::monomial_grid4((2, 2, 2, 1), &[([1, 0, 0, 0], 1.0), ([0, 0, 1, 0], -1.0)]);
+        let g1 =
+            test_kit::monomial_grid4((2, 2, 2, 1), &[([0, 1, 0, 0], 1.0), ([0, 0, 0, 1], -1.0)]);
+        let g2 = test_kit::monomial_grid4(
+            (2, 2, 2, 1),
+            &[
+                ([0, 0, 2, 0], 1.0),
+                ([0, 0, 1, 0], -1.0),
+                ([0, 0, 0, 0], 0.25),
+            ],
+        );
+        let system = SquareSystem3::new(
+            [g0, g1, g2],
+            (2, 2, 2, 1),
+            (0.0, 1.0, 0.0, 1.0, 0.0, 1.0, 0.0, 1.0),
+        )
+        .expect("the F5 classify system admits");
+
+        let pivot = Rank2Pivot::new(2, (0, 1)).expect("the F5 pivot admits");
+        let placeholder =
+            ChartMinorNet::new([1, 1, 1, 1], vec![1.0; 16]).expect("a valid placeholder minor net");
+        let template = Rank2Chart::new(
+            pivot,
+            CertifiedInterval { lo: 0.5, hi: 1.5 },
+            ChartMinorGrids::new(placeholder.clone(), placeholder)
+                .expect("a valid placeholder minor grid"),
+        )
+        .expect("the F5 template chart admits");
+        let minors = build_chart_minors(&system, &template).expect("the F5 chart minors build");
+        let chart = Rank2Chart::new(pivot, CertifiedInterval { lo: 0.5, hi: 1.5 }, minors)
+            .expect("the F5 chart admits");
+
+        let b: Box4 = [(0.3, 0.7), (0.3, 0.7), (0.4, 0.6), (0.4, 0.6)];
+        let graph = certify_graph(&system, &chart, b).expect("the F5 graph certifies on the box");
+        let tsys = TSystem::from_deflated(&system, &chart).expect("the F5 deflated system builds");
+        (system, chart, graph, tsys, b)
+    }
+
+    #[test]
+    fn stagnation_routes_to_cascade_fc6() {
+        // F-C6 (spec §2): a designed near-tangency pair whose per-box cones
+        // stay overlapping at three successive depths. The CFP-008 route must
+        // fire on the recorded non-shrink and return the cascade's verdict for
+        // the F-C6 class pair (the F4 A₁⁻ saddle node), NOT a budget-burn
+        // Unresolved.
+        let fixture = Fc6StagnationFixture::new();
+        fixture.admit().expect("the F-C6 ground truth admits");
+        assert_eq!(fixture.expected_routing, "cascade");
+        assert_eq!(fixture.expected_verdict, "A1Node");
+
+        // Every consecutive recorded level pair certifies non-shrink: the cones
+        // keep overlapping at every depth.
+        for pair in fixture.records.windows(2) {
+            assert!(
+                crate::ssi::cone_overlap_did_not_shrink(&pair[0], &pair[1]),
+                "F-C6 cones stay overlapping between consecutive levels"
+            );
+        }
+
+        let system = test_kit::f4_system();
+        let (chart, graph, tsys, b) = a1_input(&system);
+        let mut budget = Budget::new(256, 0, 0);
+        let outcome = run_stagnation_route(
+            &fixture.records,
+            &system,
+            &chart,
+            &graph,
+            &tsys,
+            &b,
+            &mut budget,
+        );
+        match outcome {
+            StagnationOutcome::RoutedToCascade(ContactVerdict::A1Node(_)) => {}
+            other => {
+                panic!("F-C6 must route to the cascade with the A1Node verdict, got {other:?}")
+            }
+        }
+    }
+
+    #[test]
+    fn cascade_verdict_replaces_budget_burn() {
+        // The funnel's old behavior for the F-C6 class was budget-burn
+        // `Unresolved` (subdivide until the budget reports exhaustion). The
+        // CFP-008 route replaces it: the F-C6 class pair (the F4 A₁⁻ saddle
+        // node) routes to the cascade and returns the certified A1Node verdict
+        // — the budget-burn `Unresolved` is GONE for this class.
+        let fixture = Fc6StagnationFixture::new();
+        fixture.admit().expect("the F-C6 ground truth admits");
+        let system = test_kit::f4_system();
+        let (chart, graph, tsys, b) = a1_input(&system);
+        let mut budget = Budget::new(256, 0, 0);
+        let outcome = run_stagnation_route(
+            &fixture.records,
+            &system,
+            &chart,
+            &graph,
+            &tsys,
+            &b,
+            &mut budget,
+        );
+        assert!(
+            matches!(
+                outcome,
+                StagnationOutcome::RoutedToCascade(ContactVerdict::A1Node(_))
+            ),
+            "the budget-burn Unresolved is gone for the F-C6 class, got {outcome:?}"
+        );
+
+        // A pair the cascade itself refuses (the F5 A₂-parabola contact driven
+        // through the A1 classifier) keeps the typed fail-closed `Unresolved`
+        // residual — never a panic, never a guess, never a silent downgrade.
+        let (refuse_system, refuse_chart, refuse_graph, refuse_tsys, refuse_b) =
+            fc6_refusing_input();
+        let mut refuse_budget = Budget::new(256, 0, 0);
+        let outcome = run_stagnation_route(
+            &fixture.records,
+            &refuse_system,
+            &refuse_chart,
+            &refuse_graph,
+            &refuse_tsys,
+            &refuse_b,
+            &mut refuse_budget,
+        );
+        match outcome {
+            StagnationOutcome::RoutedToCascade(ContactVerdict::Unresolved { .. }) => {}
+            other => panic!(
+                "the cascade-refusing pair must keep the typed fail-closed Unresolved, got {other:?}"
+            ),
+        }
+    }
+
+    #[test]
+    fn stagnation_detection_deterministic() {
+        // Same subdivision sequence twice -> identical detection decision and
+        // verdict (byte-identical RESULT payload): the levels are seen in fixed
+        // order and the route is a pure function of the recorded levels and the
+        // certified cascade inputs.
+        let fixture = Fc6StagnationFixture::new();
+        let system = test_kit::f4_system();
+        let (chart, graph, tsys, b) = a1_input(&system);
+
+        // The shrinking negative control: level 0 overlaps, level 1 separates.
+        let shrinking = [
+            ConeOverlapRecord {
+                depth: 0,
+                cones_overlap: true,
+            },
+            ConeOverlapRecord {
+                depth: 1,
+                cones_overlap: false,
+            },
+        ];
+
+        let run = |records: &[ConeOverlapRecord], budget: &mut Budget| -> StagnationOutcome {
+            run_stagnation_route(records, &system, &chart, &graph, &tsys, &b, budget)
+        };
+
+        // The detection decision itself is deterministic on the recorded pair.
+        let fc6_decision =
+            || crate::ssi::cone_overlap_did_not_shrink(&fixture.records[0], &fixture.records[1]);
+        assert_eq!(fc6_decision(), fc6_decision());
+        assert!(fc6_decision(), "the F-C6 pair certifies non-shrink");
+        let shrink_decision =
+            || crate::ssi::cone_overlap_did_not_shrink(&shrinking[0], &shrinking[1]);
+        assert_eq!(shrink_decision(), shrink_decision());
+        assert!(!shrink_decision(), "the shrinking pair certifies a shrink");
+
+        // The F-C6 sequence: twice -> identical decision and verdict.
+        let mut first_budget = Budget::new(256, 0, 0);
+        let first = run(&fixture.records, &mut first_budget);
+        let mut second_budget = Budget::new(256, 0, 0);
+        let second = run(&fixture.records, &mut second_budget);
+        assert_eq!(first, second, "the F-C6 route must be deterministic");
+        assert!(
+            matches!(
+                first,
+                StagnationOutcome::RoutedToCascade(ContactVerdict::A1Node(_))
+            ),
+            "the F-C6 deterministic verdict is the cascade's A1Node"
+        );
+
+        // The shrinking sequence: twice -> identical decision (Progress) and no
+        // route fires.
+        let mut third_budget = Budget::new(256, 0, 0);
+        let third = run(&shrinking, &mut third_budget);
+        let mut fourth_budget = Budget::new(256, 0, 0);
+        let fourth = run(&shrinking, &mut fourth_budget);
+        assert_eq!(
+            third, fourth,
+            "the shrinking-sequence decision must be deterministic"
+        );
+        assert_eq!(third, StagnationOutcome::Progress);
+        assert_eq!(fourth, StagnationOutcome::Progress);
     }
 }
