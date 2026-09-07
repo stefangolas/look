@@ -244,3 +244,6 @@
 {"id": "DEF-CDT-INVW32", "slot": "0", "verdict": "LANDED", "worker_commit": "2e882ad", "model": "deepseek/deepseek-v4-flash", "note": "overnight mechanical landing (scoped check green)", "closed": "2026-09-07"}
 {"id": "DEF-CDT-INVW32", "slot": 0, "verdict": "LANDED", "worker_commit": "2e882ad", "model": "deepseek/deepseek-v4-flash", "note": "adjudicated landing (scoped check green)", "closed": "2026-09-07"}
 {"id": "DEF-VENDOR-FIXTURES", "slot": 1, "verdict": "LANDED", "worker_commit": "d6796fd", "model": "deepseek/deepseek-v4-flash", "note": "adjudicated landing; finding: legacy tessellation cannot close analytic-surface shells (booked DEF-TESS-ANALYTIC-SEAM)", "closed": "2026-09-07"}
+{"id": "DEF-FILLET-IDENTITY", "slot": "3", "verdict": "LANDED", "worker_commit": "c0752df", "model": "deepseek/deepseek-v4-flash", "note": "overnight mechanical landing (scoped check green)", "closed": "2026-09-07"}
+{"id": "DEF-BRACKET-GOLDEN", "slot": "4", "verdict": "LANDED", "worker_commit": "cafa70d", "model": "deepseek/deepseek-v4-flash", "note": "overnight mechanical landing (scoped check green)", "closed": "2026-09-07"}
+{"id": "DEF-FILLET-IDENTITY", "slot": 3, "verdict": "LANDED", "worker_commit": "c0752df", "model": "deepseek/deepseek-v4-flash", "note": "adjudicated landing (scoped check green)", "closed": "2026-09-07"}
