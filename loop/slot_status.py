@@ -16,6 +16,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import time
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
@@ -25,11 +26,16 @@ PROCESS_QUERY_LIMITED_INFORMATION = 0x1000
 
 def process_alive(pid):
     """True if a process with this pid exists. OpenProcess rather than
-    shelling out to tasklist -- one syscall instead of a subprocess and a
-    text parse for a yes/no question."""
+    tool queries. Session-54 hardening: a transient OpenProcess failure
+    under peak load (battery compile + workers) read LIVE slots as free
+    and raced re-dispatches (the 22:11 incident) — so a failed probe is
+    retried once before the slot is declared not-alive."""
     handle = ctypes.windll.kernel32.OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, False, pid)
     if not handle:
-        return False
+        time.sleep(0.05)
+        handle = ctypes.windll.kernel32.OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, False, pid)
+        if not handle:
+            return False
     ctypes.windll.kernel32.CloseHandle(handle)
     return True
 

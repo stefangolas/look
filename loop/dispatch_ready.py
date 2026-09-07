@@ -21,6 +21,7 @@ import os
 import re
 import subprocess
 import sys
+import time
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 QUEUE = os.path.join(ROOT, "loop", "cargoq")
@@ -81,6 +82,23 @@ def slot_states():
                 pkt = parts[3][len("packet="):].removesuffix(".md")
             if pkt:
                 slot_of[pkt] = parts[1]
+                # Session-54 belt-and-suspenders: a transient liveness
+                # misread (OpenProcess failing under peak load) read live
+                # slots as free and raced re-dispatches. Events fresher
+                # than 3 minutes force RUNNING regardless of the probe.
+                try:
+                    ev = os.path.join(ROOT, "loop", "slots", parts[1],
+                                      "events.jsonl")
+                    ev_age = time.time() - os.path.getmtime(ev)
+                except OSError:
+                    ev_age = None
+                state = parts[2]
+                if state != "RUNNING" and ev_age is not None and ev_age < 180 \
+                        and pkt and not os.path.isfile(
+                            os.path.join(ROOT, "loop", "slots", parts[1],
+                                         "wt", "RESULT.json")):
+                    state = "RUNNING"
+                    states[parts[1]] = "RUNNING"
                 res = os.path.join(ROOT, "loop", "slots", parts[1],
                                    "wt", "RESULT.json")
                 res_id = None
