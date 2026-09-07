@@ -9,210 +9,133 @@ when they stop being true, never for length. If you are picking this up cold, re
 [`loop/ORCHESTRATOR.md`](ORCHESTRATOR.md)` for how to run the loop, then
 `python loop/slot_status.py`** - nothing else. Do not read `LEDGER.jsonl` whole.
 
-Updated 2026-09-05, session 52 (CC program COMPLETE - battery green).
+Updated 2026-09-06, session 54 (evening) - the mega-session: 5 programs advanced, 2 machinery races fixed, remotes synced.
 
 ## Where we are
 
-- **Program**: the CC program (certified construction: loft / offset-shell /
-  blend) per `docs/CERTIFIED_CONSTRUCTION_BUILD_SPEC.md` +
-  `docs/CERTIFIED_CONSTRUCTION_CONTRACTS.md` (the spine: C1-C9 decisions,
-  S1-S12 seams) is **COMPLETE: 27/27 rows DONE, one battery green at the
-  integrated HEAD** (workspace tests pass with the recorded environmental
-  exclusion, clippy clean on modified files, kernel-gates 111/111).
-- Theory: `docs/CERTIFIED_LOFT_AND_SHELL_THEORY_SPEC.md` (unified v1).
-- **What landed** (all in `vendor/truck/truck-certified/src/construct/` +
-  `truck-evidence/src/clear.rs` + additive `truck-base/src/bvh.rs`):
-  the six primitives (P1 banded certified solve, P2 injectivity radius,
-  P3 graph-disk, P4 argmin-with-margin, P5 ball clearance, P6 identity
-  via EntityId-keyed split registry), the loft family (core, L1r weights,
-  strips + bitwise L3 seams, correspondence, L5 three-valued validity,
-  Gordon), offset/shell (k=3 contact, strata, stars, S1/S1' bridge,
-  sharp/concave completion, canal, conservative t_safe), blends (spine
-  trace with event isolation, variable radius, face consumption, setback
-  corners), and the five B-rep generation defect fixes
-  (CC-DEF-BREP-FIXES: ORI-FRAME x2, SEM-FACET x2, NUM-INTERPOLE).
-- **Machinery added this program** (all in the loop/ harness, all
-  committed with reasoning): supervisor.py (restarts driver+cargoq+
-  watchdog), verifier-first battery gate (no dispatch until green),
-  merge-on-save registry, pending-archive + partial-code archive on
-  left-for-morning, semantic RESULT admission, dispatch_ready BIE/SEM
-  hard-hold + construct/mod.rs exemption, battery clippy parser takes the
-  primary span only, dispatch cap arithmetic re-derived (4 with chrome
-  closed).
-- **BIE program: STARTED 2026-09-05 ~12:15 by the session-53 orchestrator.**
-  Spine + 9 packets were already committed by the arming commit `2fcb1d5`
-  (13 commits back on integration/kernel-bg); all 46 packet anchors
-  re-measured with ZERO drift at `f49f64b` (BIE-000 A5 = 26, matching the
-  table; its stale RESULT template said 25, fixed); the 8 BIE rows flipped
-  BLOCKED→READY; dispatch_ready's BIE/SEM hard-hold guard REMOVED; SEM-PCURVE
-  stays BLOCKED (superseded by owner directive into OCCT-HIGH-ROI-CLUSTER-001,
-  one packet, registered READY, untracked packet committed this session).
-  Dispatch: BIE-000-CONTRACT (shim) + OCCT-HIGH-ROI-CLUSTER-001 first; rolling
-  dispatch handles the rest as deps land.
+- **CTE program: COMPLETE.** 9/9 rows LANDED (CTE-008 battery landed 14:40).
+  The one-verify battery is RE-RUNNING (`loop/battery_cte_*.log`, relaunched
+  after two environmental deaths: 0.1 GB disk, then queue starvation) -
+  adjudicate with the carried evidence in the watch item below.
+- **CL (7/7), BIE, CC, P1-P12, base kernel: COMPLETE** (prior sessions).
+- **BREP program: COMPLETE.** BREP-001A + r2 LANDED. BREP-002 retired
+  SUPERSEDED (CFP-001 r2 landed the identical DSC fix + the sphere-cap admit
+  test; its planar-invariant folds into PB-011).
+- **CFP program: 9/11 LANDED.** Landed: 000/001/002/003/004/005/006/007/009.
+  Remaining: **CFP-008-STAGNATION (dispatchable NOW, anchors pre-cleared)**
+  then **CFP-010-GATES** (needs 008) then the CFP one-verify.
+- **PB program: 11/14 LANDED.** Landed: 000-010, 012 (Hypercar vendored),
+  013 (op capability matrix - the per-op truth source), 014 (circle authoring
+  + partial-arc revolve). Remaining: **PB-011-TTC-PARITY-CHURN** (authored,
+  needs CFP-008/010) - routing + 35 skip lifts, runs last by design.
+- **Issue #1 (look repo) RESOLVED + commented**: the pcurve-master defect
+  (SEM-PCURVE-MASTER-001) was fixed by OCCT-HIGH-ROI-CLUSTER-001 C2; verified
+  end-to-end with the issue's exact reproducer at HEAD (no face loss); fix is
+  on origin/main since 09-05. Comment: issues/1#issuecomment-5563090776.
 
 ## Pick up here
 
-0. `python loop/dispatch_ready.py --dry-run` FIRST (it reads slot ground
-   truth). cargoq + watchdog + supervisor should be alive.
-1. **The BIE program is RUNNING** (see Where we are). Adjudicate slots as
-   they FINISH: scoped checks at merged HEAD, merge `--no-ff` into
-   integration/kernel-bg in spine §7 order, file RESULT to
-   loop/results/<ID>.json, ledger row, note `LANDED <sha>`; rows stay
-   RUNNING until the end-of-program battery. dispatch_ready keeps slots
-   full via the rolling posture. Milestones: push origin main +
-   integration/kernel-bg at the first BIE landing and at battery green;
-   leave one line in STATE when the BIE battery greens.
-2. Any new program: follow the CC pattern - spine doc with pre-made
-   decisions + frozen seams, CC-000-style shim packet, semantic-admission
-   driver, one-verify battery at the end.
-3. The GPU render-side work (bracket fingerprint refresh, draft
-   front-door) is still the render-path owner's, untouched by this
-   program.
-   **CONFIRMED 2026-09-06 (session 54):** `cargo test -p look --test
-   geometry_fingerprint` FAILS at HEAD d0108af —
-   bracket_tessellates_to_a_known_mesh 1860 vs expected 1814;
-   washer_with_circular_edges PASSES (9518, the tolerance-sharp fixture is
-   green). This is the recorded golden-drift class (BG-CG-003
-   "fails identically on the base commit"), BUT the count has moved since
-   that record: 1875 (BG-CG base) → 1860 (now). Suspected author: the CC
-   program's BREP generation defect fixes; NOT verified. Battery
-   consequence: CTE-008's packet carries NO fingerprint-exclusion language,
-   so the battery adjudication must either carry fresh evidence (test
-   failing at the CTE base via throwaway worktree — the count moved, so
-   the BG-CG-era evidence alone is stale) or attribute 1875→1860 to a named
-   landing, or the owner's refresh lands first. Do not touch the golden
-   numbers from this side (AGENTS.md rule; refresh is the render-path
-   owner's).
+0. `python loop/dispatch_ready.py --dry-run` FIRST. cargoq + supervisor +
+   watchdog + janitor should be alive (ports/processes from 09-05/06).
+1. **CFP-008 dispatches immediately** (anchors pre-cleared, A1-A4 ok at
+   HEAD). When it lands: CFP-010 fires (anchors converted to runnable form,
+   all ok) - then the CFP one-verify at integrated HEAD.
+2. **CTE battery adjudication** (when `loop/battery_cte_*.log` shows
+   EXITCODE lines): expect (a) `geometry_fingerprint` bracket golden drift
+   1860 vs 1814 - carried evidence in the watch item below, render-path
+   owner's refresh; (b) clippy ~64 baseline `formal/*` findings -
+   baseline-aware, fails only on files changed since base `876fe14`^; (c)
+   `tests/fillet.rs complex_surface` environmental. Everything else must be
+   green or attributed.
+3. **PB-011 dispatches after CFP-010.** Its lifts reference
+   `docs/OP_CAPABILITY_MATRIX.md` (PB-013's per-op truth source) - flip
+   cells red-to-green per op, one commit per flip. Note: G1 cells are pinned
+   at the STEP-out refusal proxy; PB-011 must EXPOSE the native boolean row
+   in run_facade AND route (decision 1).
+4. **heal ruling still open (owner)**: matrix cell 8 `heal(boolean-result)`
+   = unavailable, no flipper. Recommendation given: client-layer identity
+   (certified booleans produce nothing to heal). f1 rows calling `repair`
+   cannot lift without it.
+5. **Spec 7a ledger** (bridge spec): unowned items needing owner routing -
+   kinematic/animate parity, appearance/stage JSON (render path), facade
+   color op (drop-in doc), release cadence.
+6. **Remotes are SYNCED**: origin/main = origin/integration/kernel-bg =
+   9c14066+ (pushed 20:5x, 203 commits). Binaries NOT current: last release
+   v0.1.0 (July) - the issue-#1 fix is on main but unreleased; tagging needs
+   branch CI + manual release-matrix run (AGENTS Releases).
 
 ## State of the machine, as left
 
-- cargoq RUNNING (port 8231), supervisor RUNNING (restarts driver + cargoq +
-  watchdog every 60s), driver cycling every 5 min.
-- **BIE progress (session 53, ~13:45):** LANDED + merged + pushed:
-  BIE-000-CONTRACT, OCCT-HIGH-ROI-CLUSTER-001, BIE-001-ARITHMETIC,
-  BIE-002-SSI4, BIE-003-CARRIER (r2: SPEC_GAP ripple resolved by widening
-  write_allow over 7 exhaustive-match sites; base-failure claim for
-  constructive_spine_enum x2 verified by throwaway worktree). RUNNING:
-  BIE-004-CLOSURE (slot 0), BIE-005-ARRANGE (slot 1). Tail: BIE-006 (on 005),
-  BIE-007 (on 006), then the battery. Driver fixed (try_land CompletedProcess
-  crash) and rolling; adjudication + merges are automatic unless a stop
-  condition fires.
-- **CARGO.LOCK PRUNE trap ROOT-CAUSED and fixed** (b684ee6, pushed): HEAD's
-  Cargo.lock carried a 17-line stale `showcases` package its committed
-  Cargo.toml never declared, so EVERY slot warm build re-dirtied the tree and
-  run_packet refused dispatch ("N uncommitted change(s)") — this is what made
-  the driver's 11:59 dispatch fail. Regenerated the lock against the
-  committed toml in a throwaway detached worktree and ff-merged. The main
-  tree still carries the OWNER's uncommitted showcases work (Cargo.toml
-  member + regenerated lock; stash "owner showcases wip" kept as backup) —
-  do not commit or revert it, it is render-side work.
-- All work pushed: origin/main + origin/integration/kernel-bg at b684ee6.
-- Disk/RAM: janitor active; cap 4 workers with chrome closed (unchanged).
+- cargoq RUNNING (port 8231), supervisor + watchdog + janitor RUNNING
+  (restarted 09-05), driver cycling every 5 min. Disk 21+ GB after the
+  20:15 crisis (0.1 GB -> janitor reclaimed 22.6 GB).
+- CTE battery running (attempt 3; attempts 1-2 died environmentally: disk
+  exhaustion exit-101, then exit-3 during the 0.1 GB window).
+- The 4 slots: 0 CFP-006 LANDED (67c9a47, driver-adjudicated), 1 PB-014
+  LANDED (ccc5def), 2 PB-014 dup killed + archived (see Session 54 traps),
+  3 CTE-008 FINISHED. Slots re-fork cleanly on next dispatch.
 
 ## The parallelism picture
 
-Unchanged from session 50/51: cargoq serializes all cargo, rolling
-dispatch via dispatch_ready (write-set disjointness + anchor preflight),
-one-verify amendment (single battery at program end), wave workers scoped
-only. The CC program ran 6-wide at peak (warm slots, chrome closed) and
-held 4-wide as the steady state.
+Unchanged: cargoq serializes all cargo; rolling dispatch via
+dispatch_ready (now hardened - see Session 54 traps); cap 4 workers with
+chrome closed; one-verify per program at integrated HEAD. NEW RULE
+(session 54): **a full-workspace battery never runs concurrently with a
+worker's done-when loop** - the battery starved CFP-006's inner loop for
+~3 h through the queue. Batteries run when the worker queue is empty.
 
-- **cargoq ran every queued job in the SERVER's cwd, not the caller's.**
-  The client sent only args+timeout; the server spawned without cwd=.
-  Bare `cargo test -p` / `cargo fmt --all` from slot worktrees silently
-  operated on the MAIN tree all day: wrong-tree worker checks and the
-  main-tree fmt drift that blocked the 401 merge. Only absolute
-  --manifest-path calls were correct. Fix: client sends cwd per job,
-  server spawns with it and logs [cwd=] per job. VALIDATION GAP: the
-  session-50 two-job test checked ordering, not cwd. Also: the first
-  fix dropped the field in do_POST â€” watched fail via a probe project,
-  watched pass end to end.
-- **The one-verify amendment was misread as permitting per-packet
-  verifies â€” 401 ran three, 405 six attempts, the largest sink of the
-  session.** The build spec says the ordinary verifier runs ONCE at the
-  final integrated HEAD. ORCHESTRATOR's "On a verdict" is now marked
-  SUPERSEDED for KV2 packets; the pre-battery landing standard is the
-  orchestrator's own scoped checks (check -p + the packet's test file)
-  at merged HEAD â€” minutes, not hours. If a landing is blocked on more
-  than that, the gate is wrong, not the code.
-- **The battery's gates are baseline-aware, evidence-carrying.**
-  Clippy: a finding fails only if its FILE changed since the program
-  base (the ~63 formal/* findings are byte-identical-to-base; verified
-  by zero commits there since fd65c24). Tests: a failing test is
-  excluded only with carried evidence (bracket canary verified failing
-  at base by throwaway worktree). Both watched failing first (the
-  pre-fix claims.rs findings; the base worktree run). The 17 REAL
-  kernel findings (claims 11, engine 5, tier2 4) were fixed, not
-  allowed away: needless_range_loop allows are statement-level with
-  the matrix-algebra justification, neg_cmp_op_on_partial_ord is the
-  D4 fail-closed discipline (a>=b is wrong on a partial order), and
-  the frozen-shape result_large_err follows the graph.rs precedent.
-- **Per-worker rust-analyzer was the RAM killer (4.1 GB for two)** â€”
-  killed at source (`OPENCODE_CONFIG_CONTENT` lsp:false in the
-  dispatch env) with a janitor backstop that kills only
-  opencode-parented RAs by parentage. The full worker-lean profile
-  also disables the autoformatter (which moves trailing // H-3 markers
-  off their literal line â€” a recorded GATE-2 hazard, not just
-  overhead), snapshots, autoupdate, share, plugins, and external
-  skills scans. Validated live + selftest.
-- **The RAM cap is arithmetic, not folklore** (ORCHESTRATOR now says
-  so): N x (worker host + helpers) + OS baseline + ONE queued spike <=
-  physical RAM. The old "2 open/3 closed" measurement baked in
-  per-worker LSPs; with them gone the cap is 4 (6 re-enters the
-  0xc0000409 zone on a cold warm build). rustc 0xc0000409 anywhere =
-  the inequality violated: shrink, do not retry. Chrome reopening
-  moves the arithmetic again.
-- **`needs` edges are contract dependencies, not postures.** The
-  build-spec booking "Wave 5: serial" was mechanically encoded as
-  needs edges that serialized three packets whose only mutual file was
-  the designed mod.rs one-liner; the owner flattened them. Rule: name
-  the landed contract the consumer actually calls, or do not write the
-  edge.
-- **The watchdog needed four fixes, each caught live**: two instances
-  raced (killed the stale 02:23 pair); a wedged worker sat 2.5h before
-  the wedged branch fired; packet_is_done only checked status DONE so
-  a LANDED packet was re-dispatched (307, twice); restart budget
-  exhaustion left 501 dead with zero forensics. Now: single instance
-  verified, the LANDED <sha> marker counts as done, and the AUTOPSY
-  (`loop/autopsy.py`) gates every restart from the second one â€”
-  RAM_PRESSURE defers without spending budget, provider balance stops
-  cold, SILENT_HANG recovers via `--resume-interrupted` (session
-  survives, WIP intact) instead of a cold reset.
-- **dispatch_ready's dead-branch ran even under --dry-run** (observed:
-  a dry-run reset slot 2 and deleted its stale RESULT) â€” gated, and
-  dry mode now reports DEAD dispatches instead of acting. Two more
-  dispatch blockers: landed() ignored the LANDED marker on a READY row
-  (402 stayed blocked on a merged packet), and new_slot died on
-  "branch already used by worktree" when a previous warm-build failure
-  left the branch orphaned (now auto-released when the holding wt is
-  clean and at-tip, aborted loudly otherwise).
-- **501's design stop was the loop working as designed**: the worker
-  stopped at stop condition 1 (the whole-sweep payload broke two
-  immovable landed constraints; compiler-verified that the
-  constructive Spine enum cannot be the stored payload) and left the
-  tree clean. Resolution = owner amendment in spec 5.10 (window on the
-  closed value, Box<Curve> carrier) folded into the r2 packet, which
-  landed first-try with all landed assertions passing UNCHANGED.
-- **The overnight driver** (`loop/overnight.py`) does mechanical
-  adjudication only (complete/partial-0-fail + scoped check + merge;
-  everything else left for morning) and fires the battery when every
-  row is LANDED and no slot is running. Its own bug â€” hardcoding
-  -p truck-certified for test targets â€” made 501 'fail' for an hour
-  while the test passed 8/8 by hand; the crate now comes from the
-  write path. Sleep was disabled (powercfg) after the recorded
-  overnight-hang class; no workers hung overnight.
-- **307 ENGINEREACH landed PARTIAL (3/5)**: the engine work is real
-  and green, but the two remaining S4A tests live in tracer.rs /
-  kernel_tracer.rs, outside the packet write_allow â€” the booked
-  follow-up packet widens it. The worker's stop conditions and the
-  archived WIP patch (49 KB, loop/slots/0/abandoned-20260903-145502)
-  are the record.
-- **Small trap, third costume**: PowerShell Set-Content writes a BOM
-  (UTF8) / mangles encodings â€” the 12-line H-3 marker edit initially
-  wrote a BOM into a test file (caught by bytes 239 187 191, stripped
-  before it cost a build); a later ASCII Set-Content would have
-  mangled the Â§-signs in atlas.rs doc comments. Edits go through the
-  Edit tool or a script FILE with explicit encoding, always.
+### Session 54 (the mega-session: CFP+PB parity programs, 3 machinery races fixed, 2 orphan recoveries) - paid in full
+
+- **Two silent worker deaths (CTE-007, CFP-001-near-miss): worker commits
+  then dies before writing RESULT.** Recovery that worked: the commit
+  survives on the packet branch - scoped-verify IT (not the wt), merge
+  AS DELIVERED, ledger row notes the anomaly. CTE-007: boolean 33/33 +
+  tangency 39/39 at the commit. Whole-crate clippy/fmt failures are
+  BASELINE - reproduce at base before believing them.
+- **The driver re-forks a FINISHED-without-RESULT slot and loses the
+  uncommitted tail.** CTE-007 died post-commit; the driver's next cycle
+  re-forked the slot; RESULT + uncommitted edits gone (events.jsonl is
+  unlinked on re-dispatch, run_packet:439 - no archive). The commit
+  survived; the tail did not. Machinery gap NOT yet fixed: dead-dispatch
+  recovery should archive WIP before reset.
+- **dispatch_ready's running write-set was status-based** (rows stay
+  READY with LANDED-in-note in this program) so in-flight packets were
+  invisible to the clash check - BREP-002 dispatched into assemble.rs
+  while CFP-001 (same defect, same file) ran. Fixed: running set from
+  slot ground truth (slot_of/states), watched on the exact pair.
+- **The new_slot auto-release orphaned committed work twice** (CFP-001,
+  PB-014): a live worker between commits is clean AND at-tip, so the
+  auto-release detached the branch and checkout -B reset it. Guard added:
+  release refuses when the holding slot's events are <10 min fresh. The
+  worker self-recovers from reflog if it races anyway (CFP-006 did).
+- **Transient liveness misread races the dispatcher** (22:11 incident):
+  OpenProcess failed under peak load, driver saw 0 running with 2 live
+  workers, attempted mass re-dispatch. Fixed: process_alive retries once;
+  dispatch_ready treats events <3 min fresh as RUNNING regardless.
+- **A full-workspace battery starves worker inner loops through cargoq**
+  (~3 h of CFP-006's life). Batteries run when the worker queue is EMPTY.
+  Battery deaths: rustc exit-101 at 0.1 GB disk (the disk signature),
+  exit-3 when killed. Relaunch on a clean disk, never alongside workers.
+- **Anchor drift by predecessor is per-landing, not per-session**: each
+  landing moves the tree - CFP-006 A3 18->19 (CFP-004 added an instrument
+  mention), PB-011 A3 23->35 (PB-012's Hypercar skip rows), CFP-010's
+  anchors had NEVER run (old table format) + a wrong path (implicit2d.rs
+  named truck-certified, landed in truck-evidence). gen_packet --check
+  caught all of them pre-dispatch. Re-measure EVERY packet at dispatch.
+- **PowerShell Select-String lies for anchors**: case-INSENSITIVE (bash
+  grep is the dispatch authority) - instrument 19 vs 18, F-C4 13 vs 8,
+  F-C6 8 vs 5, 'unresolved' lowercase-only in ssi.rs. Measure with bash.
+- **The cargoq client crashes on non-ASCII output** (UnicodeEncodeError,
+  charmap) - a fmt-check exit-1 was the shim crashing, not fmt. Set
+  PYTHONIOENCODING=utf-8 in any script piping cargo output.
+- **The 0.1 GB disk crisis** (battery + 4 workers): janitor reclaimed
+  22.6 GB; rustc exit-101 mid-build is the disk-exhaustion signature;
+  the live-slot protection held (CFP-006 untouched).
+- **PS 5.1 has no ternary** (`? :` is PS 7) and inline python -c with
+  f-strings mangles - script files, always (re-confirmed twice).
+- **The -replace | Set-Content pattern was used once** (PB-010 anchor
+  bump, ASCII, verified byte-clean after) - it worked, but the rule
+  stands: Edit tool or script file, always.
 
 ### Session 50 (the v2 swarm spine; machinery + waves 0-4) - paid in full
 
