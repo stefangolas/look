@@ -8,7 +8,7 @@ degrades every consumer that separates on enclosures. BG-ENC-001 (soundness) is
 ## 1. Status
 
 ```
-Correction landed — validated by F-C0/F-C2
+Closed — correction validated by F-C2 convergence row at integrated HEAD
 ```
 
 Corrected by `CFP-001-LIFT-ENCLOSURE`. `BSplineSurface::enclose` /
@@ -22,7 +22,17 @@ battery `fc2_enclosure_convergence_under_bisection` (strict width decrease down
 the nest) plus `fc2_enclosure_monotonicity` and
 `fc2_enclosure_containment_randomized`; the F1 duplicate-leaf cross-check is
 `fc7_cross_check_evidence_hull_matches_certified_side` (evidence suite).
-Synthetic witnesses only so far — the record stays open.
+
+**Closed by `CFP-010-GATES` against the integrated-HEAD witness.** The F-C2
+convergence row is re-verified at HEAD through the public `EnclosureSurface`
+path in the battery (`fc2_enclosure_battery_green_at_head`,
+`truck-certified/tests/cfp_battery.rs`): on the recorded nest `B₁ ⊃ B₂ ⊃ B₃`
+the sub-box hull widths are non-increasing and strictly decrease (`w₃ < w₁`),
+BG-ENC-002 holds, and containment plus monotonicity are asserted on the same
+data. The V5-boolean consequence (a monotone screen widening, adjudicated
+under the CFP gate) is recorded in `truck-shapeops/tests/cfp_gates.rs`.
+Witnesses remain synthetic (no corpus enclosure timing yet) — the record keeps
+its corpus-witness caveat and is not deleted.
 ```
 
 ## 2. Mathematical objects

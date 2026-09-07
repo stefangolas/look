@@ -22,8 +22,8 @@ cascade this program routes to, landed),
 
 | Tag | Invariant |
 |---|---|
-| BG-ENC-001 | `enclose(B) ⊇ {f(p) : p ∈ B}`. Over-estimation acceptable; under-estimation is the cardinal bug. **Violated today** at `boolean/assemble.rs:338-381` ([`DSC-BOUNDARY-SAMPLE-EXTENT-001`](defects/DSC-BOUNDARY-SAMPLE-EXTENT-001.md)). |
-| BG-ENC-002 | Enclosure width → 0 as box → 0. **Violated today** for every spline carrier: `BSplineSurface::enclose` returns the whole-net box regardless of query (`enclosure.rs:302`; [`NUM-SPLINE-ENCLOSURE-CONVERGENCE-001`](defects/NUM-SPLINE-ENCLOSURE-CONVERGENCE-001.md)). Consequence: any subdivision loop that separates on enclosures cannot terminate on spline pairs today; `normal_cone` never shrinks under subdivision; the Unresolved provenance split is unmeasurable until CFP-001 lands. |
+| BG-ENC-001 | `enclose(B) ⊇ {f(p) : p ∈ B}`. Over-estimation acceptable; under-estimation is the cardinal bug. **Corrected by CFP-001; closed at integrated HEAD by CFP-010 against F-C0** (the violation was the boundary-sample lift screen, `boolean/assemble.rs:338-381`; see [`DSC-BOUNDARY-SAMPLE-EXTENT-001`](defects/DSC-BOUNDARY-SAMPLE-EXTENT-001.md)). |
+| BG-ENC-002 | Enclosure width → 0 as box → 0. **Corrected by CFP-001; closed at integrated HEAD by CFP-010 against F-C2's convergence row** (the violation was the whole-net spline returns, `enclosure.rs:302`; see [`NUM-SPLINE-ENCLOSURE-CONVERGENCE-001`](defects/NUM-SPLINE-ENCLOSURE-CONVERGENCE-001.md)). Sub-box hulls now converge, so subdivision loops that separate on enclosures terminate on spline pairs and `normal_cone` shrinks under subdivision. |
 | BG-ENC-003 | Outward rounding; no fast-math; no FMA contraction (inari compiled `+avx,+fma`). |
 | H-6 | Floats never enter evidence. The certified statement is always the box. |
 | **SFC (search in floats, certify exactly)** | **The program's shared discipline, named because it recurs:** a float heuristic may *search*; the *certificate* is an exact/interval predicate computed independently of the search. Three landed instances: Krawczyk's float preconditioner (validity is Y-independent), float Newton predictors under certified correction, and Theorem 3's GJK hint under exact `Expansion` witness verification. Every float heuristic added anywhere in this program must decompose into (float search, exact verify) or it is refused at review. |
@@ -365,12 +365,25 @@ HEAD after CFP-004 and CFP-005.
 | CFP-006/008 | degenerate tail | seconds → ms on near-tangency (post-CFP-001) |
 | CFP-009 | outer screen | assembly scale only (~1x below ~50 parts) |
 
-**Composed end-to-end, filled only by CFP-002's data:**
+**Composed end-to-end, filled by `CFP-010-GATES`'s measured `f`:**
 `1 / [ (1−f)/g₃×₅ + f/g₄ ]` on the boolean phase, with `f` the stage-5
-plane/quadric×spline share. The pairs do not all multiply — CFP-004 removes a
-class from the sum, and its marginal win depends on landing before CFP-003
-accelerates the path it drains. No combined figure is claimed until `f`
-exists.
+plane/quadric×spline share. The instrument corpus battery
+(`instrument_f_datum_recorded`, `truck-certified/tests/cfp_battery.rs`,
+run with `TRUCK_CFP_INSTRUMENT=1`) measures `f = 4/6 = 0.6667` on its
+deterministic stage-5 entries — four spline×analytic classes and one
+canonical quadric×quadric class, two entries on the latter — recorded
+through the public funnel at integrated HEAD. The pairs do not all multiply
+— CFP-004 removes a class from the sum, and its marginal win depends on
+landing before CFP-003 accelerates the path it drains.
+
+**End-to-end cell (evaluated at `f = 0.6667`):** taking the per-phase claims
+at their geometric midpoints — `g₃×₅ = 10×` (CFP-003's 5–20× subdivision
+phase combined with CFP-005's enumeration) and `g₄ = 22.4×` (CFP-004's 10–50×
+pair mix) — the composed boolean-phase speedup is
+`1 / [ (1 − 0.6667)/10 + 0.6667/22.4 ] ≈ 15.8×`. The figure is a synthetic-
+witness estimate (the corpus `f` needs a real corpus boolean mix, same caveat
+as the defect records' corpus witnesses); it is the deliberately-unfilled cell
+now filled with the measured datum.
 
 **Sizing: ~9.6–13k LOC** including the spine and instrument.
 
