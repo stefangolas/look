@@ -218,14 +218,19 @@ fn unit_square() -> Profile2D {
 }
 
 /// A general cubic B-spline spine (a single cubic Bézier segment — a genuine
-/// non-PH, non-line, non-polyline `Curve`).
+/// non-PH, non-line, non-polyline `Curve`). Planar in the `z = 0` plane so it
+/// certifies under the promotion test's pinned-plane `unit_z` frame law:
+/// ORI-FRAME-ORTHONORMALITY-GATE-001 (CC-DEF-BREP-FIXES) refuses the pinned
+/// plane when the normal is not perpendicular to the spine's tangents, and a
+/// constant normal is perpendicular to them only while the spine stays in one
+/// plane.
 fn cubic_bspline_spine() -> Curve {
     let knot = KnotVec::bezier_knot(3);
     let control = vec![
         Point3::new(0.0, 0.0, 0.0),
-        Point3::new(0.2, 2.0, 0.3),
-        Point3::new(0.4, 1.5, 1.2),
-        Point3::new(0.0, 0.2, 1.6),
+        Point3::new(0.2, 2.0, 0.0),
+        Point3::new(0.4, 1.5, 0.0),
+        Point3::new(0.0, 0.2, 0.0),
     ];
     Curve::BSplineCurve(BSplineCurve::new(knot, control))
 }
@@ -277,11 +282,15 @@ fn spine_enum_dispatches_general_to_the_landed_spine_curve() {
         );
     }
     // The enum is a `SpineCurve` itself: it can ride a recipe's spine slot.
+    // ORI-FRAME-ORTHONORMALITY-GATE-001 (CC-DEF-BREP-FIXES): the pinned plane
+    // normal must be perpendicular to the spine's tangent. The wrapped line
+    // runs along (1, 0.5, 0.25); (0.5, -1, 0) is that perpendicular, so the
+    // recipe's frames certify on the fixture.
     let recipe = SpineFrameRecipe::new(
         wrapped,
         ProfileLaw::Constant(triangle()),
         FrameLaw::FixedPlane {
-            normal: Vector3::unit_x(),
+            normal: Vector3::new(0.5, -1.0, 0.0),
         },
     );
     for &s in &[0.0, 0.5, 1.0] {
@@ -573,8 +582,12 @@ fn frame_data_is_resolution_independent_once_frozen() {
 fn general_spine_becomes_certifiedpatch_not_refused_for_promotion() {
     let curve = cubic_bspline_spine();
     let profile = ProfileLaw::Constant(unit_square());
+    // The cubic fixture is planar in `z = 0`, so the pinned plane normal must
+    // be the plane normal (unit_z), not the stale unit_x: it is perpendicular
+    // to the spine's tangents at every station, and the recipe certifies
+    // through the Frame3 orthonormality gate instead of refusing.
     let frame = FrameLaw::FixedPlane {
-        normal: Vector3::unit_x(),
+        normal: Vector3::unit_z(),
     };
     let tol = DirectTolerance::default().position;
 
