@@ -367,6 +367,7 @@ pub struct FilletWithSide<C, S> {
     pub side1: Option<Face<Point3, C, S>>,
 }
 
+#[allow(clippy::type_complexity)]
 fn create_new_side<C, S>(
     side: &Face<Point3, C, S>,
     fillet_edge: &Edge<Point3, C>,
@@ -374,7 +375,7 @@ fn create_new_side<C, S>(
     corner_vertex_id: VertexID<Point3>,
     left_face_front_edge: &Edge<Point3, C>,
     right_face_back_edge: &Edge<Point3, C>,
-) -> Option<Face<Point3, C, S>>
+) -> Option<(Face<Point3, C, S>, Edge<Point3, C>)>
 where
     C: FilletedCurve<S>,
     S: FilletedSurface<C>,
@@ -395,6 +396,11 @@ where
     // construction moves ahead of the boundary map.
     let new_curve = IntersectionCurve::new(side_surface, fillet_surface, fillet_edge.curve());
     let fillet_edge = fillet_edge.with_curve(new_curve.to_same_geometry());
+    // DEF-FILLET-IDENTITY: the caller must propagate this replacement into the
+    // fillet face's wire too. `fillet_edge` (the fillet-side shared seam) used
+    // to be one shared instance mutated in place; under replacement semantics
+    // the seam must be the SAME new instance in both faces, or the seam shows
+    // up twice under two EdgeIDs and the shell degrades to `Oriented`.
     let new_boundaries = side
         .absolute_boundaries()
         .iter()
@@ -420,7 +426,7 @@ where
     if !side.orientation() {
         new_face.invert();
     }
-    Some(new_face)
+    Some((new_face, fillet_edge))
 }
 
 /// Create fillet with side faces
@@ -442,14 +448,19 @@ where
     ApproxFilletSurface<S, S>: ToSameGeometry<S>,
 {
     let simple_fillet = simple_fillet(face0, face1, filleted_edge_id, radius, tol)?.value;
+    let SimpleFillet {
+        face0: trimmed_face0,
+        face1: trimmed_face1,
+        fillet,
+    } = simple_fillet;
 
     let (front_edge0, back_edge0) = {
-        let fillet_edge_id = simple_fillet.fillet.absolute_boundaries()[0][0].id();
-        find_adjacent_edge(&simple_fillet.face0, fillet_edge_id).ok_or(Refusal::Empty)?
+        let fillet_edge_id = fillet.absolute_boundaries()[0][0].id();
+        find_adjacent_edge(&trimmed_face0, fillet_edge_id).ok_or(Refusal::Empty)?
     };
     let (front_edge1, back_edge1) = {
-        let fillet_edge_id = simple_fillet.fillet.absolute_boundaries()[0][2].id();
-        find_adjacent_edge(&simple_fillet.face1, fillet_edge_id).ok_or(Refusal::Empty)?
+        let fillet_edge_id = fillet.absolute_boundaries()[0][2].id();
+        find_adjacent_edge(&trimmed_face1, fillet_edge_id).ok_or(Refusal::Empty)?
     };
 
     let is_filleted_edge = |edge: &Edge<Point3, C>| edge.id() == filleted_edge_id;
@@ -459,32 +470,52 @@ where
         .ok_or(Refusal::Empty)?;
     let (v0, v1) = filleted_edge.ends();
 
-    let fillet_surface = simple_fillet.fillet.surface();
-    let new_side0 = side0.and_then(|side0| {
-        let fillet_edge = &simple_fillet.fillet.absolute_boundaries()[0][1];
-        create_new_side(
+    // DEF-FILLET-IDENTITY: the cap seam between a side face and the fillet
+    // face is replaced by `create_new_side` (never mutated in place). The
+    // replacement must be propagated into the fillet face's wire as well, so
+    // one seam is ONE Edge instance with ONE EdgeID in both faces; otherwise
+    // `Boundaries::condition()` counts the seam twice under two ids and the
+    // shell comes back `Oriented` instead of `Closed`.
+    let fillet_surface = fillet.surface();
+    let mut fillet_boundary = fillet.absolute_boundaries()[0].clone();
+    let new_side0 = match side0 {
+        Some(side0) => create_new_side(
             side0,
-            fillet_edge,
+            &fillet_boundary[1],
             &fillet_surface,
             v0.id(),
             &front_edge0,
             &back_edge1,
         )
-    });
-    let new_side1 = side1.and_then(|side1| {
-        let fillet_edge = &simple_fillet.fillet.absolute_boundaries()[0][3];
-        create_new_side(
+        .map(|(face, replaced)| {
+            fillet_boundary[1] = replaced;
+            face
+        }),
+        None => None,
+    };
+    let new_side1 = match side1 {
+        Some(side1) => create_new_side(
             side1,
-            fillet_edge,
+            &fillet_boundary[3],
             &fillet_surface,
             v1.id(),
             &front_edge1,
             &back_edge0,
         )
-    });
+        .map(|(face, replaced)| {
+            fillet_boundary[3] = replaced;
+            face
+        }),
+        None => None,
+    };
+    let fillet = Face::new(vec![fillet_boundary], fillet_surface);
     Ok(Certified::new(
         FilletWithSide {
-            simple_fillet,
+            simple_fillet: SimpleFillet {
+                face0: trimmed_face0,
+                face1: trimmed_face1,
+                fillet,
+            },
             side0: new_side0,
             side1: new_side1,
         },
@@ -662,3 +693,287 @@ mod extend_intersection_curve;
 #[cfg(test)]
 mod tests;
 */
+
+// DEF-FILLET-IDENTITY regression: the fillet-with-side seam must be ONE Edge
+// instance / ONE EdgeID shared by the fillet face and its side face. When the
+// migration c5cb4c6 swapped the shared in-place curve write for the
+// replacement API but only inserted the replacement into the side face, the
+// seam leaked into two ids and `Boundaries::condition()` reported `Oriented`.
+// This pins the pairing so the class cannot silently return.
+#[cfg(test)]
+mod def_fillet_identity_regression {
+    use super::*;
+    use derive_more::From;
+
+    #[derive(
+        Clone,
+        Debug,
+        ParametricCurve,
+        BoundedCurve,
+        Cut,
+        SearchNearestParameterD1,
+        ParameterDivision1D,
+        Invertible,
+        From,
+    )]
+    enum Curve {
+        Line(Line<Point3>),
+        Nurbs(NurbsCurve<Vector4>),
+        Parametric(PCurve<BSplineCurve<Point2>, Box<Surface>>),
+        Intersection(IntersectionCurve<Box<Self>, Box<Surface>, Box<Surface>>),
+    }
+
+    impl ToSameGeometry<Curve> for IntersectionCurve<Curve, Surface, Surface> {
+        fn to_same_geometry(&self) -> Curve {
+            let (surface0, surface1, leader) = self.clone().destruct();
+            Curve::Intersection(IntersectionCurve::new(
+                Box::new(surface0),
+                Box::new(surface1),
+                Box::new(leader),
+            ))
+        }
+    }
+
+    impl ToSameGeometry<Curve> for PCurve<BSplineCurve<Point2>, Surface> {
+        fn to_same_geometry(&self) -> Curve {
+            let (curve, surface) = self.clone().decompose();
+            Curve::Parametric(PCurve::new(curve, Box::new(surface)))
+        }
+    }
+
+    #[derive(
+        Clone,
+        Debug,
+        ParametricSurface3D,
+        SearchParameterD2,
+        SearchNearestParameterD2,
+        ParameterDivision2D,
+        From,
+    )]
+    enum Surface {
+        Nurbs(NurbsSurface<Vector4>),
+        Fillet(ApproxFilletSurface<Box<Self>, Box<Self>>),
+        Processor(Processor<Box<Self>, Matrix4>),
+    }
+
+    impl ToSameGeometry<Surface> for ApproxFilletSurface<Surface, Surface> {
+        fn to_same_geometry(&self) -> Surface {
+            Surface::Fillet(self.clone().into())
+        }
+    }
+
+    impl Invertible for Surface {
+        fn invert(&mut self) {
+            match self {
+                Self::Nurbs(surface) => surface.invert(),
+                Self::Fillet(_) => {
+                    let mut processor = Processor::new(Box::new(self.clone()));
+                    processor.invert();
+                    *self = Self::Processor(processor);
+                }
+                Self::Processor(processor) => processor.invert(),
+            }
+        }
+    }
+
+    truck_topology::prelude!(Point3, Curve, Surface);
+
+    /// The closed six-face shell of the `complex_surface` integration test.
+    /// After the fillet-with-side replacement, every cap seam of the fillet
+    /// face must pair with exactly one side face: same EdgeID in both, one
+    /// instance. `shell_condition` must be `Closed` (not `Oriented`).
+    #[test]
+    fn fillet_side_seam_is_one_edge_id() {
+        let p: [Point3; _] = [
+            (-2.0, 1.0, 1.0).into(),
+            (2.0, 1.0, 1.0).into(),
+            (-1.0, 0.0, 1.0).into(),
+            (1.0, 0.0, 1.0).into(),
+            (-2.0, 1.0, 0.0).into(),
+            (2.0, 1.0, 0.0).into(),
+            (-1.0, 0.0, 0.0).into(),
+            (1.0, 0.0, 0.0).into(),
+        ];
+        let v = Vertex::news(p);
+
+        let line = |i: usize, j: usize| -> Edge {
+            let curve = Curve::Line(Line(p[i], p[j]));
+            Edge::new(&v[i], &v[j], curve)
+        };
+
+        let ctrl_pts = [
+            p[2],
+            Point3::new(-0.5, 0.25, 0.75),
+            Point3::new(0.0, -0.25, 1.25),
+            Point3::new(0.5, 0.25, 0.75),
+            p[3],
+        ];
+        let curve = BSplineCurve::new(KnotVec::uniform_knot(2, 3), ctrl_pts.to_vec());
+
+        let edge = [
+            line(0, 1),
+            line(0, 2),
+            line(1, 3),
+            Edge::new(&v[2], &v[3], NurbsCurve::from(curve).into()),
+            line(0, 4),
+            line(2, 6),
+            line(3, 7),
+            line(1, 5),
+            line(4, 6),
+            line(4, 5),
+            line(6, 7),
+            line(5, 7),
+        ];
+
+        let plane = |i: usize, j: usize, k: usize, l: usize| -> Face {
+            let control_points = vec![vec![p[i], p[l]], vec![p[j], p[k]]];
+            let knot_vec = KnotVec::bezier_knot(1);
+            let knot_vecs = (knot_vec.clone(), knot_vec);
+            let bsp: NurbsSurface<Vector4> = BSplineSurface::new(knot_vecs, control_points).into();
+
+            let wire: Wire = [i, j, k, l]
+                .into_iter()
+                .circular_tuple_windows()
+                .map(|(i, j)| {
+                    edge.iter()
+                        .find_map(|edge| {
+                            if edge.front() == &v[i] && edge.back() == &v[j] {
+                                Some(edge.clone())
+                            } else if edge.back() == &v[i] && edge.front() == &v[j] {
+                                Some(edge.inverse())
+                            } else {
+                                None
+                            }
+                        })
+                        .unwrap()
+                })
+                .collect();
+            Face::new(vec![wire], bsp.into())
+        };
+
+        let bsp_surface0 = BSplineSurface::new(
+            (KnotVec::bezier_knot(1), KnotVec::uniform_knot(2, 3)),
+            vec![
+                vec![
+                    p[0],
+                    Point3::new(-1.0, 1.0, 1.0),
+                    Point3::new(0.0, 1.0, 1.0),
+                    Point3::new(1.0, 1.0, 1.0),
+                    p[1],
+                ],
+                ctrl_pts.to_vec(),
+            ],
+        );
+        let surface0: Surface = NurbsSurface::from(bsp_surface0).into();
+        let bsp_surface1 = BSplineSurface::new(
+            (KnotVec::bezier_knot(1), KnotVec::uniform_knot(2, 3)),
+            vec![
+                ctrl_pts.to_vec(),
+                vec![
+                    p[6],
+                    Point3::new(-0.5, 0.0, 0.0),
+                    Point3::new(0.0, 0.0, 0.0),
+                    Point3::new(0.5, 0.0, 0.0),
+                    p[7],
+                ],
+            ],
+        );
+        let surface1: Surface = NurbsSurface::from(bsp_surface1).into();
+
+        let mut shell = Shell::from_iter(vec![
+            Face::new(
+                vec![Wire::from_iter([
+                    edge[1].clone(),
+                    edge[3].clone(),
+                    edge[2].inverse(),
+                    edge[0].inverse(),
+                ])],
+                surface0,
+            ),
+            plane(0, 4, 6, 2),
+            Face::new(
+                vec![Wire::from_iter([
+                    edge[5].clone(),
+                    edge[10].clone(),
+                    edge[6].inverse(),
+                    edge[3].inverse(),
+                ])],
+                surface1,
+            ),
+            plane(3, 7, 5, 1),
+            plane(4, 5, 7, 6),
+            plane(0, 1, 5, 4),
+        ]);
+
+        assert_eq!(shell.shell_condition(), ShellCondition::Closed);
+
+        let FilletWithSide {
+            simple_fillet:
+                SimpleFillet {
+                    face0,
+                    face1,
+                    fillet,
+                },
+            side0,
+            side1,
+        } = fillet_with_side(
+            &shell[0],
+            &shell[2],
+            edge[3].id(),
+            Some(&shell[1]),
+            Some(&shell[3]),
+            0.1,
+            0.001,
+        )
+        .unwrap()
+        .value;
+
+        shell[0] = face0;
+        shell[2] = face1;
+        shell[1] = side0.unwrap();
+        shell[3] = side1.unwrap();
+        shell.push(fillet);
+
+        assert_eq!(shell.shell_condition(), ShellCondition::Closed);
+
+        let fillet_boundary = shell.last().unwrap().absolute_boundaries()[0].clone();
+        let side0 = &shell[1];
+        let side1 = &shell[3];
+
+        // The two cap seams of the fillet strip pair with side0 (index 1) and
+        // side1 (index 3). Each seam id must be held by EXACTLY the fillet
+        // face and its one side face; a leaked second Edge instance shows up
+        // as a seam id that no side face holds (the `Oriented` regression).
+        assert_eq!(
+            side0
+                .edge_iter()
+                .filter(|e| e.id() == fillet_boundary[1].id())
+                .count(),
+            1,
+            "side0 must reference the fillet face's cap-seam edge id at boundary index 1"
+        );
+        assert_eq!(
+            side1
+                .edge_iter()
+                .filter(|e| e.id() == fillet_boundary[3].id())
+                .count(),
+            1,
+            "side1 must reference the fillet face's cap-seam edge id at boundary index 3"
+        );
+        // And the same id must never escape into any third face.
+        assert_eq!(
+            shell
+                .iter()
+                .filter(|face| face.edge_iter().any(|e| e.id() == fillet_boundary[1].id()))
+                .count(),
+            2
+        );
+        assert_eq!(
+            shell
+                .iter()
+                .filter(|face| face.edge_iter().any(|e| e.id() == fillet_boundary[3].id()))
+                .count(),
+            2
+        );
+    }
+}

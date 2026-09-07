@@ -1,0 +1,26 @@
+{
+  "id": "DEF-FILLET-IDENTITY",
+  "status": "DONE",
+  "contracts": ["DEF-FILLET-IDENTITY"],
+  "tests_added": 1,
+  "anchors_verified": {"A1": 1, "A2": 1},
+  "files": {
+    "mod.rs": "vendor/truck/truck-shapeops/src/fillet/mod.rs",
+    "experiment.rs": "vendor/truck/truck-shapeops/src/fillet/experiment.rs"
+  },
+  "notes": "Identity restored in the fillet-with-side seam. Scope decision 1: create_new_side now returns (new_side_face, replaced_seam_edge) and fillet_with_side rebuilds the fillet face wire from the SAME replacement instances at absolute-boundary indices [0][1] (side0 cap) and [0][3] (side1 cap). The seam is again ONE Edge instance / ONE EdgeID in both adjacent faces, so Boundaries::condition() (shell.rs:1184-1190) pairs each seam id and complex_surface's shell comes back Closed (was Oriented at fillet.rs:412). No id-preserving replacement route was available at this layer: truck-topology EdgeID is the curve-Arc pointer identity (edge.id() = ID::new(Arc::as_ptr(&self.curve))) and the entity_id.rs replaced()/OpKind::Replace algebra is a standalone DAG-identity module not wired into the fillet Edge values, so the sanctioned with_curve replacement instance is propagated to both faces - that choice is recorded here. Scope decision 2: experiment.rs:690 (the leftover fillet_edge.set_curve(new_curve.into()) call) is marked PROTO-ONLY in a doc comment - `mod experiment` is commented out of fillet/mod.rs, the file is not compiled into the landed path, and set_curve (in-place mutation) must never be reintroduced (replacement doctrine); the comment names Edge::with_curve + propagate-to-every-face as the porting rule. Regression pin added as an inline #[cfg(test)] module (fillet/mod.rs, fillet_side_seam_is_one_edge_id): it rebuilds the closed complex_surface shell, fillets with both sides, asserts ShellCondition::Closed, and asserts each fillet cap-seam EdgeID appears in EXACTLY the fillet face plus its one side face (index 1 <-> side0, index 3 <-> side1). Verified the pin FAILS (shell Oriented) when the propagation into the fillet wire is removed, i.e. it catches the leaked-second-id class. Anchors A1 (with_curve in mod.rs = 1) and A2 (set_curve in experiment.rs = 1) hold. Stop conditions checked: (1) the fix changes no fillet GEOMETRY - it propagates the exact replacement instance create_new_side already computed and inserted in the side face, reproducing the pre-BG-CE-003-MIGRATE shared-instance semantics (the migration c5cb4c6 changed only the mechanism); (2) the replacement propagates cleanly under the replacement doctrine, no SPEC_GAP. Verdicts: fillet_pp.rs 8/8 green, chamfer.rs 9/9 green, cargo test --lib 64/65 (sole failure healing::tests::step_import = missing resources, recorded pre-existing baseline).",
+  "deviations": [
+    "tests_required lists 'complex_surface green (fillet.rs:383, 412, 417)'. After the fix 383 and 412 are green; the 417 polygon assertion (poly.shell_condition() == Closed after put_together_same_attrs(1e-4)) reports Regular in this environment IDENTICALLY at the pre-migration baseline ddcd706 (verified by a git worktree build+run), so the fully-green complex_surface criterion cannot be produced by an identity-only fix. Per stop condition 1 the fix must not change fillet geometry, so the 417 Regular is recorded as a pre-existing baseline failure (also listed in BG-CE-003-MIGRATE's RESULT.json baseline_failures) rather than as a regression of this packet."
+  ],
+  "baseline_failures": [
+    "truck-shapeops --test fillet complex_surface at fillet.rs:417: the polygon-level assert_eq!(poly.shell_condition(), Closed) reports Regular. This is a PRE-EXISTING environment baseline, not a regression of this packet: the same failure (Regular vs Closed at fillet.rs:417) reproduces at baseline commit ddcd706 (c5cb4c6^, pre-migration) on this host via a git worktree, and BG-CE-003-MIGRATE's RESULT.json already lists 'truck-shapeops --test fillet: complex_surface (shell condition Regular vs Closed at baseline)'. After this fix complex_surface fails at 417 exactly as at baseline instead of at 412 (the Oriented identity leak this packet closes); 383 and 412 are green.",
+    "truck-shapeops --lib healing::tests::step_import: Os NotFound (missing resources/step files) - unchanged pre-existing baseline, outside write_allow."
+  ],
+  "evidence": {
+    "pre_fix": "cargo test -p truck-shapeops --test fillet: complex_surface panics at fillet.rs:412, left: Oriented, right: Closed",
+    "post_fix": "cargo test -p truck-shapeops --test fillet: complex_surface panics at fillet.rs:417, left: Regular, right: Closed (identical to baseline ddcd706); other 5 fillet tests green",
+    "baseline_repro": "git worktree c5cb4c6^ (ddcd706): cargo test -p truck-shapeops --test fillet complex_surface -> panics at fillet.rs:417, left: Regular, right: Closed; shell_condition Closed at 412",
+    "regression_pin": "cargo test -p truck-shapeops --lib def_fillet_identity_regression: ok. 1 passed; with propagation removed it fails (shell Oriented at mod.rs:928)",
+    "tests": "fillet_pp: 8 passed; chamfer: 9 passed; --lib: 64 passed, 1 pre-existing baseline failure (healing::tests::step_import, missing resources)"
+  }
+}
