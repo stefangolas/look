@@ -1,0 +1,68 @@
+{
+  "id": "DEF-VENDOR-FIXTURES",
+  "status": "DONE",
+  "contracts": ["DEF-VENDOR-FIXTURES"],
+  "tests_added": 0,
+  "anchors_verified": {"A1": 1, "A2": 1, "A3": 0},
+  "fixtures": [
+    "vendor/truck/resources/shape/bottle.json",
+    "vendor/truck/resources/shape/punched-cube.json",
+    "vendor/truck/resources/shape/torus-punched-cube.json",
+    "vendor/truck/resources/shape/sphere.json",
+    "vendor/truck/resources/shape/torus.json",
+    "vendor/truck/resources/shape/cube-in-cube.json",
+    "vendor/truck/resources/shape/cube.json",
+    "vendor/truck/resources/shape/large-torus.json"
+  ],
+  "files": {
+    "fixtures_dir": "vendor/truck/resources/shape",
+    "readme": "vendor/truck/resources/shape/README.md",
+    "result": "RESULT.json"
+  },
+  "notes": "Vendored the resources/shape fixture set through the landed kernel. Generator = the committed truck-modeling example programs (vendor/truck/truck-modeling/examples/{bottle,cube,cube-in-cube,punched-cube,torus-punched-cube,sphere,torus}.rs, last touched at da72cd5) run from vendor/truck/resources/shape: each CONSTRUCTS the solid via truck-modeling builder primitives and serializes with serde_json::to_vec_pretty, which emits the CompressedSolid form (Solid serializes as its compress() in truck-topology/src/compress.rs), so every file deserializes as BOTH truck_modeling Solid (validated closed/connected/closed-manifold by Solid::try_new) and CompressedSolid<Point3, Curve, Surface>. The 6 named fixtures are the union of SHAPE_JSONS (bottle, punched-cube, torus-punched-cube, sphere, torus) and SOLID_JSONS (bottle, punched-cube, torus-punched-cube, cube-in-cube); two extra files were required to go green by tests in the SAME two suites (out of the packet's own fixture lists but read by tests in the done-when commands): cube.json (truck-stepio/tests/output/screenshot.rs::cube golden) and large-torus.json (truck-meshalgo/tests/tessellation/triangulation.rs::large_number_meshing). cube.json reproduces the screenshot golden STEP string exactly. Determinism verified: SHA-256 identical before/after regeneration (CompressDirector sorts by insertion index; builders iterate in stored order). Documented regeneration commands + construction parameters + SHA-256 live in vendor/truck/resources/shape/README.md. Anchors at dispatch: A1 = 1 (resources/shape in meshalgo tessellation reading test), A2 = 1 (stepio output topology reading test), A3 = 0 (resources/shape empty/absent at dispatch, the pre-vendoring precondition).",
+  "verification": {
+    "cargo_test_-p_truck-meshalgo_--test_tessellation": "10 tests: 4 passed, 6 failed (see below)",
+    "cargo_test_-p_truck-stepio_--lib": "57 tests: 56 passed, 1 failed (see below)",
+    "cargo_test_-p_truck-stepio_--test_output": "8 passed, 0 failed"
+  },
+  "still_environmental": [
+    {
+      "test": "truck-meshalgo::tests/tessellation/triangulation.rs::compare_occt_mesh",
+      "reason": "Needs resources/obj/by_occt.obj, an OCCT-produced reference mesh absent from the tree; per scope decision 2 it is not faked. Reads fixtures[2] (torus-punched-cube.json) which now loads, then unwraps the missing OBJ (Os NotFound)."
+    },
+    {
+      "test": "truck-meshalgo::tests/tessellation/triangulation.rs::compare_occt_mesh_csolid",
+      "reason": "Same OCCT-side reference data (resources/obj/by_occt.obj) absent; not faked. Also reads fixtures[2] which now loads."
+    },
+    {
+      "test": "truck-shapeops::healing::tests::step_import",
+      "reason": "Out of scope (packet scope decision 4). Needs resources/step/{occt-cylinder,occt-cone,abc-0006,abc-0008,abc-0035}.step absent from the tree, and is #[cfg(feature=\"step-test\")]-gated so it does not run under any of the packet's three done-when commands. Recorded as requested, not modified."
+    }
+  ],
+  "baseline_failures": [
+    {
+      "test": "truck-meshalgo::tests/tessellation/triangulation.rs::special_cylinder",
+      "reason": "Fails WITHOUT any fixture: an in-memory legacy-builder closed cylinder shell triangulates (0.01) + put_together(TOLERANCE*2) to ShellCondition::Oriented, not Closed. Pre-existing fork tessellation behavior on analytic-surface (revolved) closed shells; not fixture data."
+    },
+    {
+      "test": "truck-meshalgo::tests/tessellation/triangulation.rs::special_cylinder_csolid",
+      "reason": "Same as special_cylinder via the compressed path (compress() then triangulate): Oriented != Closed. Fixture-independent."
+    },
+    {
+      "test": "truck-stepio::src/in/step_geometry/geom_impls.rs::builder",
+      "reason": "The in-memory cylinder segment of this lib test (no fixture involved) triangulates (0.1) + put_together(1e-3) to Oriented != Closed (assert at geom_impls.rs:181). The cube, torus, and cylinder-hole segments of the same test pass. Same fork tessellation condition as special_cylinder."
+    }
+  ],
+  "unsatisfiable_reading_tests": [
+    {
+      "test": "truck-meshalgo::tests/tessellation/triangulation.rs::solid_is_closed",
+      "reason": "Reads and tessellates all SHAPE_JSONS. Every vendored fixture deserializes and tessellates, but the mesh-level Closed assert cannot be met in this tree for analytic-surface shapes regardless of fixture data: per-fixture merged-mesh shell condition at the reading pipeline (triangulation 0.01 + put_together TOLERANCE*2 + remove_degenerate/unused) is bottle=Irregular, punched-cube=Oriented, torus-punched-cube=Oriented, sphere=Regular, torus=Oriented; only planar cube/cube-in-cube are Closed. Reproduction on in-memory shapes with no fixtures (special_cylinder, stepio lib geom_impls::builder cylinder) shows the open/irregular seams come from the fork's current tessellation of revolved/analytic-surface closed shells, not from the fixture construction (all fixtures pass Solid::try_new closed/manifold validation at deserialize). Fixing it requires a production-code tessellation change, which the packet forbids."
+    },
+    {
+      "test": "truck-meshalgo::tests/tessellation/triangulation.rs::csolid_is_closed",
+      "reason": "Identical condition through the CompressedSolid path (csolid.triangulation). Same fixture-independent cause as solid_is_closed."
+    }
+  ],
+  "deviation_summary": "Enabling the never-run upstream suites surfaced a fork-wide tessellation condition that is independent of the vendored fixtures: the legacy shell/csolid tessellation leaves seams open or overlapping (Oriented/Irregular/Regular mesh shell conditions instead of Closed) for closed solids containing revolved/analytic surfaces, while planar-only solids are Closed. This defeats the two mesh-closedness reading tests (solid_is_closed, csolid_is_closed) for any honest analytic-surface fixture of these shapes, and also fails the fixture-free special_cylinder / stepio-lib cylinder tests. That is exactly 2 unsatisfiable fixture-reading tests, so the packet's BLOCKED stop condition (more than 2) is not reached, and no fixture hit a kernel-capability gap, so SPEC_GAP does not apply. All fixture-dependent work the packet can do is complete and green where the kernel allows: stepio output suite 8/8 (including the screenshot cube golden), stepio lib 56/57 with the single failure being the fixture-free cylinder segment, meshalgo tessellation reads/tessellates every vendored fixture with 4/10 green and the failures as recorded above. No assertions weakened, no expectations changed, no production code touched, no network used.",
+  "environment_note": "Generation ran on the local machine (x86_64-pc-windows-gnullvm, dev profile). The two OCCT-comparison tests and the shapeops step_import test were not faked and remain as recorded."
+}
