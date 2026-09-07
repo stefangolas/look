@@ -40,25 +40,35 @@ Updated 2026-09-06, session 54 (evening) - the mega-session: 5 programs advanced
 1. **CFP-008 dispatches immediately** (anchors pre-cleared, A1-A4 ok at
    HEAD). When it lands: CFP-010 fires (anchors converted to runnable form,
    all ok) - then the CFP one-verify at integrated HEAD.
-2. **CTE battery adjudication** (when `loop/battery_cte_*.log` shows
-   EXITCODE lines): expect (a) `geometry_fingerprint` bracket golden drift
-   1860 vs 1814 - carried evidence in the watch item below, render-path
-   owner's refresh; (b) clippy ~64 baseline `formal/*` findings -
-   baseline-aware, fails only on files changed since base `876fe14`^; (c)
-   `tests/fillet.rs complex_surface` environmental. Everything else must be
-   green or attributed.
+2. **CTE battery adjudication** - battery DONE 2026-09-06 22:43 (all three
+   `loop/battery_cte_*.log` legs show EXITCODE lines). (a) clippy=101:
+   ADJUDICATED baseline - 65 findings, ALL on files unchanged since
+   `876fe14^` (formal/* zero diffs, projection.rs zero diffs; the lib.rs:4
+   hit is the lint-level-definition note, not a finding). Do not re-derive.
+   (b) test=101 with 0xc0000409 STATUS_STACK_BUFFER_OVERRUN - the recorded
+   memory signature; the battery ran with CFP-008's worker live (a
+   session-54-rule violation), so the leg needs a clean re-run on an EMPTY
+   queue before adjudication. (c) gates=1 is the WSL-stub bash trap, not a
+   gate failure - re-run through the full Git bash path for a real verdict.
+   Carried: `geometry_fingerprint` golden drift 1860 vs 1814 (render-path
+   owner's refresh); `tests/fillet.rs complex_surface` environmental.
+   Everything else must be green or attributed.
 3. **PB-011 dispatches after CFP-010.** Its lifts reference
    `docs/OP_CAPABILITY_MATRIX.md` (PB-013's per-op truth source) - flip
    cells red-to-green per op, one commit per flip. Note: G1 cells are pinned
    at the STEP-out refusal proxy; PB-011 must EXPOSE the native boolean row
    in run_facade AND route (decision 1).
-4. **heal ruling still open (owner)**: matrix cell 8 `heal(boolean-result)`
-   = unavailable, no flipper. Recommendation given: client-layer identity
-   (certified booleans produce nothing to heal). f1 rows calling `repair`
-   cannot lift without it.
-5. **Spec 7a ledger** (bridge spec): unowned items needing owner routing -
-   kinematic/animate parity, appearance/stage JSON (render path), facade
-   color op (drop-in doc), release cadence.
+4. **heal ruling RECEIVED (owner 2026-09-07)**: matrix cell 8
+   `heal(boolean-result)` flips `unavailable` -> `client-layer` identity
+   (certified booleans produce nothing to heal; provenance
+   `corpus/ttc/trees/f1/src/lib/surfaces.py:172` - the corpus helper's own
+   valid-shape early return). Implementation booked: compat-layer heal/
+   repair call site returns input unchanged + emits a warning; the flip is
+   an orchestrator edit (V5-sanctioned), NOT PB-011 scope.
+5. **Spec 7a ledger ROUTED (owner 2026-09-07)**: animate DEFERRED; release
+   cadence = cut when everything is done; appearance JSON + facade color op
+   are PROPOSED (render-path routing / permanent deferral) awaiting owner
+   confirmation. Recorded in docs/TRUCK123D_PY_BRIDGE_SPEC.md section 7a.
 6. **Remotes are SYNCED**: origin/main = origin/integration/kernel-bg =
    9c14066+ (pushed 20:5x, 203 commits). Binaries NOT current: last release
    v0.1.0 (July) - the issue-#1 fix is on main but unreleased; tagging needs

@@ -152,6 +152,37 @@ showcases whether or not the Python layer ships first.
 - **mesh Booleans, fuzzy intent recovery, ShapeFix analogues** — out of
   scope indefinitely; the typed-refusal doctrine is the product.
 
+### 7a. Deferred parity scope — owner-routed items (added 2026-09-06, session 54; rulings 2026-09-07)
+
+The PB-010 parity audit surfaced items that NO active packet covers. They are
+recorded here so they survive session boundaries. Owner rulings of
+2026-09-07:
+
+1. **Animate/kinematic parity — RULED: deferred.** No animate mode for now;
+   the GLB animation-node question stays with the render path. Revisit only
+   on explicit owner request. f1.py's kinematic table rows are recorded as a
+   permanent client-layer deferral, not a pending packet.
+2. **Appearance/stage JSON — PROPOSED (owner confirmation pending):** route
+   to the render-path owner as look-side renderer config, per PB-009
+   decision 4 (material/stage vocabulary is renderer config). The bridge
+   treats `f1_stage.appearance.json` as out of scope.
+3. **Facade color op — PROPOSED (owner confirmation pending):** keep
+   deferred-by-design permanently. Colors already flow end-to-end through
+   the data tables and PB-009's GLB emitter; no `facade.rs` `color` op is
+   planned. Recorded in the drop-in doc's gap list as not-planned.
+4. **Release cadence — RULED: cut when everything is done.** The release
+   (with the issue-#1 pcurve fix) is tagged after the CFP one-verify,
+   PB-011, and the PB one-verify land and are green.
+5. **heal(boolean-result) — RULED: client-layer identity (owner
+   2026-09-07).** The kernel refuses to produce invalid boolean output, so
+   the corpus `repair` helper's own valid-shape early return
+   (`corpus/ttc/trees/f1/src/lib/surfaces.py:172` — `if is_valid_shape(shape):
+   return shape`) IS the semantics: a heal/repair call site in the compat
+   layer returns its input unchanged and emits a visible
+   warning/no-op notice; matrix cell 8 flips `unavailable` → `client-layer`
+   with the identity backed by an executable closed+oriented assertion.
+   ShapeFix analogues remain a non-goal.
+
 ## 8. External corpus harness — earthtojake/text-to-cad (added 2026-09-05)
 
 **Provenance.** `github.com/earthtojake/text-to-cad`, MIT (Thompson Labs
