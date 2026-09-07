@@ -52,7 +52,7 @@ count of `.color` assignment sites and the label count pinned by the vendored
 
 | # | surface id | usage (census 2026-09-06) | compat status | answered-by (bridge rows) |
 |---|---|---|---|---|
-| S1 | `Algebra operators + - &` | 2780 binary `+` `-` `&` (upper bound) | `landed` for canonical×canonical; `deferred-bie` for sweep×canonical/sweep×sweep; corpus rows exercising the deferred forms are `staged-skip` | facade `boolean_op` (`Mode` union/subtract/intersect); BIE-006 unlocks swept pairs |
+| S1 | `Algebra operators + - &` | 2780 binary `+` `-` `&` (upper bound) | `landed` for canonical×canonical AND for the routed swept-carrier forms (spline/swept/revolved carrier classes dispatch through the certified entry, PB-011); `boundary-refusal` for a swept pair coupling a funnel-refused carrier class (torus); remaining `staged-skip` corpus rows carry the machine-checked reason | facade `boolean_op` (`Mode` union/subtract/intersect) on canonical carriers; swept-carrier `Mode` rows route through the certified-entry dispatch (`dispatch_swept_carrier_boolean`, PB-011); BIE-006 stays the resolution for the still-deferred forms |
 | S2 | `Plane/Location algebra (plane * shape, plane.offset(d), Pos, Rotation, Location, Axis)` | 183 | `recorded-client-layer` | frame/placement rows of the submitted session table; `.offset(` is 19 of the 183 and every hit is a `Plane.offset` frame move — no kernel solid-offset hides here |
 | S3 | `Primitives (Box, Cylinder, Sphere, Torus, Compound)` | 126 | `landed` | facade `box`/`cylinder`/`sphere`/`torus`; `Compound`/grouping is assembly emission (PB-006) |
 | S4 | `make_face / topology types (Edge, Face, Wire, Solid, Shape)` | 49 | `landed` | facade `make_face`; topology typing only on the compat side (no kernel geometry in the bridge) |
@@ -65,13 +65,21 @@ count of `.color` assignment sites and the label count pinned by the vendored
 
 **S1 — algebra.** 1107 of the corpus's algebra operators are shape-boolean in
 the upstream audit. Canonical×canonical boolean composition lands on the
-facade's `boolean_op` today; boolean algebra over lofted/swept/revolved
-carriers is a spec §7 non-goal until the BIE program lands sweep-pair
-certification (BIE-006). Every corpus row that boolean-composes swept carriers
-carries the machine-checked skip reason `booleans-on-swept-carriers`
-(`corpus/ttc/SKIPS.json`, `resolved_by: BIE-006`) — the Falcon-Heavy rows that
-are boolean-free run as the canonical subset, and the F1 rows that shell+cut
-lofted geometry are skipped with that reason.
+facade's `boolean_op`; swept-carrier boolean algebra (the corpus's dominant
+verb — 2,780 binary operators upper bound) lands for the routed forms on the
+facade's certified-entry dispatch (PB-011): a `Mode` row over a
+spline/swept/revolved carrier dispatches the carrier pair through
+`dispatch_swept_carrier_boolean`, the facade mirror of the landed CL-006
+solver-entry funnel, and an accepted pair is recorded on the facade report as
+a routed swept-carrier boolean row. A pair coupling a swept carrier with a
+funnel-refused carrier class (torus — excluded from the implicit-reduction
+stage) is answered as the typed, localized refusal, fail-closed. Corpus rows
+that boolean-compose swept carriers still carry the machine-checked skip
+reason `booleans-on-swept-carriers` (`corpus/ttc/SKIPS.json`, `resolved_by:
+BIE-006`) until their door run is green and the row moves to the runnable
+manifest; the Falcon-Heavy rows that are boolean-free run as the canonical
+subset, and the F1 rows that shell+cut lofted geometry are skipped with that
+reason.
 
 **S2 — Plane/Location algebra.** Client-layer arithmetic: `Plane * shape`,
 `Pos`/`Rotation`/`Location`/`Axis` frames, `.moved(...)`, `plane.offset(...)`.

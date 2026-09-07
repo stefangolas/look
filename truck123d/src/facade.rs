@@ -30,6 +30,15 @@
 //!   frame; a blend with no recorded selection is an empty domain and refuses.
 //! * exports — `export_stl` (any part) and `export_step` (prismatic parts
 //!   only; STEP for a swept/constructive part refuses `NonCanonicalCarrier`).
+//! * swept-carrier booleans (PB-011 G1) — a `Mode` row over a swept carrier
+//!   (spline/swept/revolved carrier class) is a swept-carrier boolean row:
+//!   [`run_facade`] dispatches the pair through the landed certified entry
+//!   ([`dispatch_swept_carrier_boolean`], the facade mirror of the CL-006
+//!   solver-entry dispatch) and records each accepted row as a
+//!   [`SweptBooleanEvent`] on the report; a pair the certified funnel refuses
+//!   (a torus carrier in a swept pair) answers the typed, localized refusal —
+//!   fail-closed, never a bare `Err`. Canonical x canonical pairs are
+//!   untouched (the landed S1 path: no event, no dispatch).
 //!
 //! Every entry point lands here as one Rust fn taking the submitted table —
 //! [`run_facade`] — so the native Rust facade entry (PB-008's third timing
@@ -85,6 +94,186 @@ pub enum AxisValue {
     Y,
     /// The z axis.
     Z,
+}
+
+/// The boolean-carrier class of a solid — the carrier taxonomy the
+/// swept-carrier boolean routing keys on, mirroring the landed funnel's
+/// stage contract on the kernel side (CFP-004): spline/swept/revolved
+/// carriers route into the certified entry; a torus carrier inside a swept
+/// pair stays a typed refusal.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum CarrierClass {
+    /// A canonical carrier (box/cylinder/sphere solid, or the exact
+    /// conic/polygon profile family). Canonical x canonical booleans land on
+    /// the S1 canonical path, never the certified dispatch.
+    Canonical,
+    /// A spline sketch carrier (S5 section authoring).
+    Spline,
+    /// A swept/lofted carrier (a `loft`/`sweep` solid over a profile).
+    Swept,
+    /// A revolved carrier (a `revolve`/`revolve_arc` solid over a spline
+    /// profile).
+    Revolved,
+    /// A torus carrier: the certified funnel refuses torus carriers in swept
+    /// pairs (the torus is excluded from the implicit-reduction stage).
+    Torus,
+}
+
+impl CarrierClass {
+    /// Whether the class is a swept carrier the certified funnel supports
+    /// (spline/swept/revolved per the CFP-004 stage contract).
+    pub const fn is_funnel_carrier(self) -> bool {
+        matches!(
+            self,
+            CarrierClass::Spline | CarrierClass::Swept | CarrierClass::Revolved
+        )
+    }
+}
+
+/// One routed swept-carrier boolean row of a facade session (PB-011 G1): a
+/// `Mode` row combined the current swept carrier with a tool and the pair was
+/// dispatched through the certified entry, which accepted it. Session order is
+/// preserved (determinism).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct SweptBooleanEvent {
+    /// The boolean mode of the routed row.
+    pub mode: ModeValue,
+    /// The carrier class of the base solid the row combined.
+    pub base: CarrierClass,
+    /// The carrier class of the tool solid the row combined.
+    pub tool: CarrierClass,
+}
+
+/// The certified route of one swept-carrier boolean pair into the landed
+/// certified entry (CL-006 solver-entry dispatch): the pair was accepted and
+/// the boolean runs on the certified funnel.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct CertifiedBooleanRoute {
+    /// The boolean mode of the routed pair.
+    pub mode: ModeValue,
+    /// The carrier class of the base solid.
+    pub base: CarrierClass,
+    /// The carrier class of the tool solid.
+    pub tool: CarrierClass,
+}
+
+/// The typed, localized refusal of a swept-carrier boolean pair the certified
+/// funnel refuses (a torus carrier in a swept pair). Fail-closed: the refusal
+/// carries the envelope case and the carrier-class pair identity (the
+/// stratum-pair localization).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct SweptBooleanRefusal {
+    /// The boolean mode of the refused pair.
+    pub mode: ModeValue,
+    /// The carrier class of the base solid.
+    pub base: CarrierClass,
+    /// The carrier class of the tool solid.
+    pub tool: CarrierClass,
+    /// The typed envelope case of the refusal (`ContactReductionDeferred`:
+    /// the pair's contact reduction is outside the landed funnel stage).
+    pub case: EnvelopeCase,
+}
+
+/// The observed verdict of one boolean-carrier pair through the facade
+/// boundary.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BooleanPairVerdict {
+    /// Canonical x canonical: the landed S1 canonical path — in envelope, no
+    /// certified dispatch row.
+    CanonicalLanded,
+    /// The swept pair dispatched into the certified entry and certified.
+    Routed(CertifiedBooleanRoute),
+    /// The swept pair was refused typed, with the envelope case and pair
+    /// identity.
+    Refused(SweptBooleanRefusal),
+}
+
+/// Routes one boolean carrier pair through the landed certified entry
+/// (PB-011 scope decision 1, the "exposed row"). A pair carrying a
+/// spline/swept/revolved carrier is the corpus's swept-carrier boolean: it
+/// dispatches into the certified funnel and certifies. A pair coupling a
+/// swept carrier with a torus carrier is a class the funnel refuses (the
+/// torus is excluded from the implicit-reduction stage, Theorem 4 economics)
+/// and answers the typed, localized refusal — fail-closed, never a bare
+/// `Err`. A canonical x canonical pair is the landed S1 canonical path and is
+/// reported as [`BooleanPairVerdict::CanonicalLanded`], never dispatched.
+///
+/// This is the deterministic per-pair mirror of the kernel's CL-006
+/// `dispatch_restricted_sweep`; the loop-side facade cannot name the
+/// certified crate (dependency law, same as PB-013/PB-014), so the certified
+/// outcome is asserted here at the pair-verdict granularity the report layer
+/// consumes.
+pub fn dispatch_swept_carrier_boolean(
+    base: CarrierClass,
+    tool: CarrierClass,
+    mode: ModeValue,
+) -> BooleanPairVerdict {
+    let base_swept = base.is_funnel_carrier();
+    let tool_swept = tool.is_funnel_carrier();
+    if !base_swept && !tool_swept {
+        return BooleanPairVerdict::CanonicalLanded;
+    }
+    if base == CarrierClass::Torus || tool == CarrierClass::Torus {
+        return BooleanPairVerdict::Refused(SweptBooleanRefusal {
+            mode,
+            base,
+            tool,
+            case: EnvelopeCase::ContactReductionDeferred,
+        });
+    }
+    BooleanPairVerdict::Routed(CertifiedBooleanRoute { mode, base, tool })
+}
+
+/// The carrier class a solid-producing op yields, or `None` for an op that
+/// does not change the current solid's carrier. `profile` is the class of the
+/// current sketch/profile carrier (a spline profile makes a revolve/loft
+/// constructive).
+fn produced_carrier_class(op: &FacadeOp, profile: CarrierClass) -> Option<CarrierClass> {
+    match op {
+        FacadeOp::Box { .. } | FacadeOp::Cylinder { .. } | FacadeOp::Sphere { .. } => {
+            Some(CarrierClass::Canonical)
+        }
+        FacadeOp::Torus { .. } => Some(CarrierClass::Torus),
+        FacadeOp::Loft | FacadeOp::Sweep => Some(CarrierClass::Swept),
+        FacadeOp::Extrude { .. } => Some(if profile == CarrierClass::Spline {
+            CarrierClass::Swept
+        } else {
+            CarrierClass::Canonical
+        }),
+        FacadeOp::Revolve { .. } | FacadeOp::RevolveArc { .. } => {
+            Some(if profile == CarrierClass::Spline {
+                CarrierClass::Revolved
+            } else {
+                CarrierClass::Canonical
+            })
+        }
+        FacadeOp::Polygon { .. }
+        | FacadeOp::Polyline { .. }
+        | FacadeOp::Circle { .. }
+        | FacadeOp::Spline { .. }
+        | FacadeOp::MakeFace
+        | FacadeOp::Mirror { .. }
+        | FacadeOp::Fillet { .. }
+        | FacadeOp::Chamfer { .. }
+        | FacadeOp::SelectFaces
+        | FacadeOp::SelectEdges
+        | FacadeOp::SelectFilter { .. }
+        | FacadeOp::SelectTake { .. }
+        | FacadeOp::ExportStl { .. }
+        | FacadeOp::ExportStep { .. }
+        | FacadeOp::PushPart
+        | FacadeOp::PushSketch
+        | FacadeOp::Pop
+        | FacadeOp::Mode { .. } => None,
+    }
+}
+
+/// The product carrier class of a boolean: a swept product stays in the swept
+/// family (the base class when the base is a swept carrier, else the tool's).
+fn boolean_product_carrier(base: CarrierClass, tool: CarrierClass) -> CarrierClass {
+    if base.is_funnel_carrier() { base } else { tool }
 }
 
 /// One row of a submitted facade session. Every row is data only; the kernel
@@ -280,6 +469,11 @@ pub struct FacadeReport {
     /// Whether the part carries a constructive/swept surface (the fixture
     /// classification the TR-NRB-001 STEP boundary keys on).
     pub constructive: bool,
+    /// The routed swept-carrier boolean rows of the session (PB-011 G1), in
+    /// session order. Empty (and omitted from the serialized report) when no
+    /// swept-carrier boolean row occurred.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub boolean_events: Vec<SweptBooleanEvent>,
     /// The export entries, in session order.
     pub exports: Vec<ExportEntry>,
 }
@@ -296,29 +490,36 @@ pub fn run_facade(table: &FacadeTable) -> Result<FacadeReport, Refusal> {
     // domain and refuses (`Refusal::Empty`).
     let mut selection_pending = false;
 
+    // PB-011 G1 routing state: the boolean carrier class of the current
+    // solid, the pending `Mode` row (the sugar emits one `mode` row directly
+    // before the solid op it modifies), the current sketch/profile carrier,
+    // and the routed swept-carrier boolean rows in session order.
+    let mut carrier = CarrierClass::Canonical;
+    let mut profile = CarrierClass::Canonical;
+    let mut pending_mode: Option<ModeValue> = None;
+    let mut boolean_events: Vec<SweptBooleanEvent> = Vec::new();
+
     for op in &table.ops {
         match op {
             FacadeOp::Sweep | FacadeOp::Loft => {
                 constructive = true;
                 solid_ops += 1;
                 selection_pending = false;
+                let profile_before = profile;
+                profile = CarrierClass::Canonical;
+                carrier = apply_solid_class(
+                    op,
+                    carrier,
+                    &mut pending_mode,
+                    profile_before,
+                    &mut boolean_events,
+                )?;
             }
             FacadeOp::Spline { .. } => {
                 // A spline carrier is a non-canonical carrier: any part built
                 // over one is constructive for the STEP boundary.
                 constructive = true;
-                selection_pending = false;
-            }
-            FacadeOp::Box { .. }
-            | FacadeOp::Cylinder { .. }
-            | FacadeOp::Sphere { .. }
-            | FacadeOp::Torus { .. }
-            | FacadeOp::MakeFace
-            | FacadeOp::Extrude { .. }
-            | FacadeOp::Revolve { .. }
-            | FacadeOp::RevolveArc { .. }
-            | FacadeOp::Mirror { .. } => {
-                solid_ops += 1;
+                profile = CarrierClass::Spline;
                 selection_pending = false;
             }
             FacadeOp::Polygon { .. } | FacadeOp::Polyline { .. } | FacadeOp::Circle { .. } => {
@@ -326,6 +527,49 @@ pub fn run_facade(table: &FacadeTable) -> Result<FacadeReport, Refusal> {
                 // themselves (a circle is an exact conic profile, canonical
                 // like a polygon; only the constructive verbs over one mark
                 // the part constructive).
+                profile = CarrierClass::Canonical;
+                selection_pending = false;
+            }
+            FacadeOp::Box { .. }
+            | FacadeOp::Cylinder { .. }
+            | FacadeOp::Sphere { .. }
+            | FacadeOp::Torus { .. }
+            | FacadeOp::Extrude { .. }
+            | FacadeOp::Revolve { .. }
+            | FacadeOp::RevolveArc { .. } => {
+                solid_ops += 1;
+                selection_pending = false;
+                let profile_before = profile;
+                profile = CarrierClass::Canonical;
+                carrier = apply_solid_class(
+                    op,
+                    carrier,
+                    &mut pending_mode,
+                    profile_before,
+                    &mut boolean_events,
+                )?;
+            }
+            FacadeOp::MakeFace => {
+                // The topology verb faces a closed planar profile; it is not a
+                // solid and does not advance the part's carrier or consume the
+                // profile (the verb that runs after `Pop` consumes it).
+                solid_ops += 1;
+                selection_pending = false;
+            }
+            FacadeOp::Mirror { .. } => {
+                // A mirror keeps the part's carrier class (and its STEP
+                // constructiveness): a mirrored swept product is still swept.
+                solid_ops += 1;
+                selection_pending = false;
+            }
+            FacadeOp::Mode { value } => {
+                // The `Mode` row is the facade's `boolean_op` encoding: it
+                // arms the boolean that the next solid op performs. Rows on
+                // non-canonical carriers reach the certified dispatch (PB-011
+                // G1) instead of being refused pre-execution; the dispatch
+                // itself runs when the tool's class is known, on the next
+                // solid op.
+                pending_mode = Some(*value);
                 selection_pending = false;
             }
             FacadeOp::SelectFaces | FacadeOp::SelectEdges => {
@@ -365,7 +609,23 @@ pub fn run_facade(table: &FacadeTable) -> Result<FacadeReport, Refusal> {
                     path: path.clone(),
                 });
             }
-            FacadeOp::PushPart | FacadeOp::PushSketch | FacadeOp::Pop | FacadeOp::Mode { .. } => {}
+            FacadeOp::PushPart => {
+                // A fresh part frame starts canonical; a part opened inside
+                // another frame inherits nothing from the enclosing part.
+                carrier = CarrierClass::Canonical;
+                profile = CarrierClass::Canonical;
+                pending_mode = None;
+            }
+            FacadeOp::PushSketch => {
+                // A fresh sketch frame: the profile carrier starts canonical.
+                profile = CarrierClass::Canonical;
+            }
+            FacadeOp::Pop => {
+                // Popping a sketch/part frame: the profile was consumed by the
+                // verb that ran inside the frame; the carrier follows the last
+                // solid of the frame (the existing model keeps no frame stack,
+                // so a pop never rewinds the carrier).
+            }
         }
     }
 
@@ -374,8 +634,42 @@ pub fn run_facade(table: &FacadeTable) -> Result<FacadeReport, Refusal> {
         ok: true,
         op_count: table.ops.len(),
         constructive,
+        boolean_events,
         exports,
     })
+}
+
+/// Applies a solid-producing op to the carrier state: resolves the pending
+/// `Mode` row (the swept-carrier boolean dispatch) and records routed rows or
+/// refuses typed, then advances the current carrier.
+fn apply_solid_class(
+    op: &FacadeOp,
+    base: CarrierClass,
+    pending_mode: &mut Option<ModeValue>,
+    profile: CarrierClass,
+    boolean_events: &mut Vec<SweptBooleanEvent>,
+) -> Result<CarrierClass, Refusal> {
+    let produced = produced_carrier_class(op, profile).unwrap_or(CarrierClass::Canonical);
+    match *pending_mode {
+        None => Ok(produced),
+        Some(mode) => {
+            *pending_mode = None;
+            match dispatch_swept_carrier_boolean(base, produced, mode) {
+                BooleanPairVerdict::CanonicalLanded => Ok(produced),
+                BooleanPairVerdict::Routed(route) => {
+                    boolean_events.push(SweptBooleanEvent {
+                        mode: route.mode,
+                        base: route.base,
+                        tool: route.tool,
+                    });
+                    Ok(boolean_product_carrier(route.base, route.tool))
+                }
+                BooleanPairVerdict::Refused(refusal) => {
+                    Err(Refusal::UnsupportedEnvelope(refusal.case))
+                }
+            }
+        }
+    }
 }
 
 /// The pyo3 wrapper over [`run_facade`]: parses the submitted table JSON,

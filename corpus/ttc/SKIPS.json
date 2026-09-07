@@ -5,7 +5,7 @@
     "booleans-on-swept-carriers": {
       "resolved_by": "BIE-006",
       "label": "Boolean algebra over lofted/swept/revolved (non-canonical-carrier) geometry",
-      "note": "Canonical-by-canonical booleans are landed; sweep/swept-carrier pairs unlock with the BIE program's sweep-pair certification (BIE-006). A row that boolean-composes lofted/swept shells is not runnable at this program stage and carries this typed reason; the reason row is the machine-checked evidence."
+      "note": "Canonical-by-canonical booleans are landed. PB-011 routes the funnel-supported swept-carrier pairs (spline/swept/revolved carrier classes, the CFP-004 stage contract) through the facade's certified-entry dispatch at the bridge, so a row that boolean-composes only those routed forms is a lift candidate once its door run is green; a pair coupling a swept carrier with a funnel-refused class (torus) stays a typed refusal. This reason row remains the machine-checked evidence for the rows still staged, resolving to the BIE program's sweep-pair certification (BIE-006)."
     },
     "step-out": {
       "resolved_by": "TR-NRB-001",
@@ -14,7 +14,7 @@
     }
   },
   "rows": [
-    {"id": "falcon_heavy/cutaway", "reason": "booleans-on-swept-carriers", "note": "falcon_heavy_cutaway calls build_vehicle(cutaway=True): the 270-deg section opening is built from partial-arc revolves of the center-core tank barrel and interstage shells (CUT_START=135/CUT_ARC=270 in lib/falcon_common.py drive arc/start on eng.revolved_solid/eng.revolved_shell), so the prior 'boolean sectioning' label mis-describes the vendored code path; the row stays staged pending the PB-011 door run."},
+    {"id": "falcon_heavy/cutaway", "reason": "booleans-on-swept-carriers", "note": "falcon_heavy_cutaway calls build_vehicle(cutaway=True): the 270-deg section opening is built from partial-arc revolves of the center-core tank barrel and interstage shells (CUT_START=135/CUT_ARC=270 in lib/falcon_common.py drive arc/start on eng.revolved_solid/eng.revolved_shell), so the prior 'boolean sectioning' label mis-describes the vendored code path. PB-011 LIFT EVIDENCE: the door run is green on the partial-arc revolve capability (PB-014) - build_vehicle(true) runs end to end (door_version 1, type Compound, solid_count 2164, bbox [[-5921.0,-2761.8,-1e-7],[5921.0,2650.0,70000.0]], STL 409322 triangles, ~11 s), and the row's manifest move to the runnable canonical set with its recorded reference fact is the orchestrator corpus-output step."},
     {"id": "f1/airbox", "reason": "booleans-on-swept-carriers", "note": "lib/engine_cover.py build_airbox fuses the lobe/pod/collar swept bodies (_fuse at engine_cover.py) - booleans on swept carriers."},
     {"id": "f1/beam_wing", "reason": "booleans-on-swept-carriers", "note": "lib/rear_wing.py beam/endplate builders cut and trim swept airfoil shells (surfaces.cut at rear_wing.py)."},
     {"id": "f1/corner_fl", "reason": "booleans-on-swept-carriers", "note": "lib/wheels.py build_corner('fl') cuts rim/tyre clearances out of revolved carriers (_cut at wheels.py)."},
