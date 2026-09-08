@@ -1,0 +1,30 @@
+{
+  "id": "DEF-SPINEFRAME-GRAZE-R2",
+  "status": "DONE",
+  "contracts": ["DEF-SPINEFRAME-GRAZE-R2"],
+  "tests_added": 5,
+  "anchors_verified": {"A1": 5, "A2": 1},
+  "files": {
+    "sweep_surface.rs": "vendor/truck/truck-geometry/src/constructive/sweep_surface.rs",
+    "profile.rs": "vendor/truck/truck-geometry/src/constructive/profile.rs",
+    "mod.rs": "vendor/truck/truck-geometry/src/constructive/mod.rs",
+    "spine_frame.rs": "vendor/truck/truck-geometry/src/decorators/spine_frame.rs"
+  },
+  "summary": "The fix lands at the SEARCH layer exactly as scope decision 1(a) sanctions. SpineFrameSweep and the SpineFrameSurface windowed realization decorator now run their generic algo::surface search_parameter / search_nearest_parameter Newton drivers over a domain-clamped evaluation view (SweepWindowClamp, defined in constructive/sweep_surface.rs, pub(crate) re-exported via constructive/mod.rs): every (u, v) is clamped into the sweep's own certified window [s0, s1] x [v0, v1] BEFORE subs/uder/vder (the named, recorded clamp_parameter operation; the returned parameter is clamped too, never silent), the accepted answer still passes the driver's residual gate ctx.near_points, and the central-difference h-step samples are re-clamped so second derivatives cannot leave the window either. The evaluate_position match-unwrap is untouched. The r1 v-domain pad is re-landed as defense in depth: ONE named H-3 constant PROFILE_V_DOMAIN_PAD = 1.75e-6 (1.75x DirectTolerance::parameter, defined on its H-3 line in profile.rs and re-exported through constructive/mod.rs) pads the v-domain refusal at all three sites (ProfileLaw::evaluate profile.rs, profile_derivative_v spine_frame.rs, profile_derivative_s spine_frame.rs), typed InvalidInput beyond it; the pad still refuses the landed -2x probe. truck-geotrait's generic algo::surface::search_parameter and the boolean funnel are untouched. The recorded 10 showcase panic tests are GREEN: battery_waterslide 10/10 (including the r1-related suite) and pb_contract 4/4; constructive_spine_enum 8/8. New regression: a search whose iterate is outside the certified window evaluates clamped and returns the certified-window answer (verified on the v axis at v=-0.25 = 250000x DirectTolerance::parameter and on the spine axis at s=-0.25, through search_parameter, search_nearest_parameter, and the canonical Surface::SpineFrameSurface dispatch).",
+  "notes": "SweepWindowClamp is orientation-safe (min/max over the stored endpoints, so an inverted sweep that swapped v0/v1 still clamps into the same certified interval) and generic over S: SpineCurve, which is why the same view serves the closed whole-sweep value (S = Box<Curve>) and the decorator SpineFrameSurface<S>. All Done-when commands pass: cargo test -p truck-geometry --lib (83 passed, incl. the 5 new unit regressions in sweep_surface.rs's tests module), cargo test -p showcases --tests (battery_waterslide 10 passed, pb_contract 4 passed, battery_construction 6 passed), and cargo test -p truck-geometry --test constructive_spine_enum (8 passed). cargo fmt --check, cargo check -p truck-geometry --all-targets, and cargo clippy -p truck-geometry --all-targets -- -D warnings are clean. Anchors: A1 = 5 panic! sites in decorators/spine_frame.rs (unchanged, no panic added or removed), A2 = 1 DirectTolerance::parameter use in constructive/recipe.rs (recipe.rs untouched).",
+  "evidence": {
+    "out_of_window_search_iterate_evaluates_clamped": "A sweep search seeded with SPHint2D::Parameter(0.5, -0.25) (v = -0.25, 250000x DirectTolerance::parameter below the v0 = 0.0 window edge) returns the certified-window answer (0.5, 0.0) with subs inside DirectTolerance::position of the query; the un-clamped baseline refused at the first evaluation.",
+    "out_of_window_spine_iterate_evaluates_clamped": "A sweep search seeded with SPHint2D::Parameter(-0.25, 0.125) (s below s0 = 0.0 by 250000x the parameter tolerance) returns the clamped window answer (0.0, 0.125) whose position matches the query.",
+    "out_of_window_nearest_iterate_evaluates_clamped": "search_nearest_parameter seeded out-of-window returns a clamped in-window parameter whose subs matches the query within DirectTolerance::position.",
+    "decorator_search_iterate_evaluates_clamped": "The canonical Surface::SpineFrameSurface(sweep) dispatch (the shapeops funnel's actual carrier) runs the clamp for the same out-of-window seed.",
+    "profile_v_domain_pad_sizing_and_witness_rescue": "1.53x < PROFILE_V_DOMAIN_PAD < 2x DirectTolerance::parameter; both recorded r1 v-axis witnesses (-1.2138e-6 = 1.21x, -1.5301e-6 = 1.53x) evaluate Ok under the pad; the -2x and 1+2x probes still refuse typed InvalidInput."
+  },
+  "stop_conditions_checked": {
+    "showcase_dies_at_match_unwrap_with_clamped_search": "NOT triggered: all recorded showcase suites are green under the clamped search; no second funnel path surfaced.",
+    "landed_kernel_test_flips_red": "NOT triggered: truck-geometry lib 83/83, all-targets green, constructive_spine_enum 8/8."
+  },
+  "deviation_notes": [
+    "No deviations. Scope decisions followed: 1(a) domain-clamped evaluation view wrapping the sweep for the SEARCH path (named and recorded, never silent); re-landed the r1 pad as defense in depth (the second net, not the fix); truck-geotrait generic search untouched; the evaluate_position match-unwrap stays because the clamp now enforces its 'inside the validated window' premise.",
+    "PACKET.md/CONTEXT.md show as locally modified in the worktree; that is the dispatch scaffolding written before this run (the files were already modified at dispatch time), not part of this packet's diff."
+  ]
+}

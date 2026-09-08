@@ -19,7 +19,8 @@
 use super::*;
 use crate::constructive::{
     ConstructError, DirectTolerance, Frame3, FrameData, FrameLaw, LineSpine, PolylineSpine,
-    Profile2D, ProfileLaw, ScalarLaw, SpineCurve, SpineFrameRecipe,
+    Profile2D, ProfileLaw, ScalarLaw, SpineCurve, SpineFrameRecipe, SweepWindowClamp,
+    PROFILE_V_DOMAIN_PAD,
 };
 use serde::ser::SerializeStruct;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
@@ -153,7 +154,7 @@ fn profile_derivative_v(
     s: f64,
     v: f64,
 ) -> std::result::Result<Vector2, ConstructError> {
-    if !(0.0..=1.0).contains(&v) {
+    if !(-PROFILE_V_DOMAIN_PAD..=1.0 + PROFILE_V_DOMAIN_PAD).contains(&v) {
         return Err(ConstructError::InvalidInput);
     }
     let k = profile_vertex_count(profile_law);
@@ -173,7 +174,7 @@ fn profile_derivative_s(
     _s: f64,
     v: f64,
 ) -> std::result::Result<Vector2, ConstructError> {
-    if !(0.0..=1.0).contains(&v) {
+    if !(-PROFILE_V_DOMAIN_PAD..=1.0 + PROFILE_V_DOMAIN_PAD).contains(&v) {
         return Err(ConstructError::InvalidInput);
     }
     let k = profile_vertex_count(profile_law);
@@ -584,18 +585,20 @@ impl<S: SpineCurve + Clone> SearchParameter<D2> for SpineFrameSurface<S> {
         hint: H,
         trials: usize,
     ) -> Option<(f64, f64)> {
-        let hint = hint.into();
-        let (urange, vrange) = self.range_tuple();
-        let hint = match hint {
-            SPHint2D::Parameter(u, v) => (u, v),
-            SPHint2D::Range(u, v) => {
-                algo::surface::presearch(self, point, (u, v), PRESEARCH_DIVISION)
-            }
-            SPHint2D::None => {
-                algo::surface::presearch(self, point, (urange, vrange), PRESEARCH_DIVISION)
-            }
-        };
-        algo::surface::search_parameter(self, point, hint, trials)
+        // DEF-SPINEFRAME-GRAZE-R2: this windowed realization decorator is the
+        // SEARCH path's clamped surface (its window is the sweep's certified
+        // window); the generic Newton runs over the clamp view, so iterates
+        // cannot leave the window and the evaluate_position match-unwrap's
+        // "inside the validated window" premise is enforced.
+        SweepWindowClamp::new(
+            &self.recipe,
+            &self.transform,
+            self.s0,
+            self.s1,
+            self.v0,
+            self.v1,
+        )
+        .search_parameter(point, hint.into(), trials)
     }
 }
 
@@ -607,18 +610,15 @@ impl<S: SpineCurve + Clone> SearchNearestParameter<D2> for SpineFrameSurface<S> 
         hint: H,
         trials: usize,
     ) -> Option<(f64, f64)> {
-        let hint = hint.into();
-        let (urange, vrange) = self.range_tuple();
-        let hint = match hint {
-            SPHint2D::Parameter(u, v) => (u, v),
-            SPHint2D::Range(u, v) => {
-                algo::surface::presearch(self, point, (u, v), PRESEARCH_DIVISION)
-            }
-            SPHint2D::None => {
-                algo::surface::presearch(self, point, (urange, vrange), PRESEARCH_DIVISION)
-            }
-        };
-        algo::surface::search_nearest_parameter(self, point, hint, trials)
+        SweepWindowClamp::new(
+            &self.recipe,
+            &self.transform,
+            self.s0,
+            self.s1,
+            self.v0,
+            self.v1,
+        )
+        .search_nearest_parameter(point, hint.into(), trials)
     }
 }
 

@@ -330,8 +330,10 @@ impl Default for DirectTolerance {
 
 pub use errors::ConstructError;
 pub use intersection_carrier::CertifiedImplicitIntersectionCurve;
+pub(crate) use profile::PROFILE_V_DOMAIN_PAD;
 pub use recipe::SpineFrameRecipe;
 pub use recipe::{FrameData, LineSpine, PolylineSpine, Spine, SpineCurve};
 pub use sampling::SamplingPolicy;
 pub use spine_ph::{PendingMembership, PhSpine, RmErfSeptic, RrmfQuintic, SepticMembership};
 pub use sweep_surface::SpineFrameSweep;
+pub(crate) use sweep_surface::SweepWindowClamp;
