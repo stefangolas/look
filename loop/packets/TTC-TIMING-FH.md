@@ -25,7 +25,7 @@ tests_required:
   - facts-match gate green for every timed row (kernel facts == recorded
     reference facts within tolerance)
 anchors:
-  - {id: A1, expect: 14, cmd: "ls corpus/ttc/reference | wc -l"}
+  - {id: A1, expect: 45, cmd: "ls corpus/ttc/reference | wc -l"}
   - {id: A2, expect: 1, cmd: "grep -c 'fn run_one' truck123d/compat/runner.rs"}
 budget:      {turns: 40, ctx_tokens: 140000}
 ```
