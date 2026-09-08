@@ -1,0 +1,28 @@
+{
+  "schema": "ttc_reference.v1",
+  "row_id": "f1/corner_rl",
+  "door_version": "1",
+  "facts": {
+    "solid_count": 21,
+    "volume": 28694504.110574827,
+    "bbox": [
+      [
+        -3960.000041247534,
+        529.9999999,
+        -4.124753454587117e-05
+      ],
+      [
+        -3239.999958752466,
+        982.2246967387263,
+        720.0000412475346
+      ]
+    ],
+    "diag": 1114.1397641304657
+  },
+  "tolerances": {
+    "solid_count": "exact",
+    "volume_rel": 0.0001,
+    "volume_abs": 1e-06,
+    "bbox_abs": 0.001
+  }
+}

@@ -1,0 +1,28 @@
+{
+  "schema": "ttc_reference.v1",
+  "row_id": "hypercar/glazing",
+  "door_version": "1",
+  "facts": {
+    "solid_count": 10,
+    "volume": 20376075.363138314,
+    "bbox": [
+      [
+        -2400.0000001,
+        -946.9855184617783,
+        299.9999998999993
+      ],
+      [
+        2262.5883299281336,
+        946.9855184617717,
+        1141.9758939714661
+      ]
+    ],
+    "diag": 5102.526788779971
+  },
+  "tolerances": {
+    "solid_count": "exact",
+    "volume_rel": 0.0001,
+    "volume_abs": 1e-06,
+    "bbox_abs": 0.001
+  }
+}

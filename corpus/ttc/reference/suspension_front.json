@@ -1,0 +1,28 @@
+{
+  "schema": "ttc_reference.v1",
+  "row_id": "f1/suspension_front",
+  "door_version": "1",
+  "facts": {
+    "solid_count": 89,
+    "volume": 2830278.3104177183,
+    "bbox": [
+      [
+        -384.98101259299125,
+        -774.2386709072523,
+        105.28220559128222
+      ],
+      [
+        411.46699089627356,
+        774.2386709072523,
+        641.0118459481477
+      ]
+    ],
+    "diag": 1821.8446003794743
+  },
+  "tolerances": {
+    "solid_count": "exact",
+    "volume_rel": 0.0001,
+    "volume_abs": 1e-06,
+    "bbox_abs": 0.001
+  }
+}

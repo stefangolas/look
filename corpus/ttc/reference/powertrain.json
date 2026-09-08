@@ -1,0 +1,28 @@
+{
+  "schema": "ttc_reference.v1",
+  "row_id": "hypercar/powertrain",
+  "door_version": "1",
+  "facts": {
+    "solid_count": 114,
+    "volume": 96864421.25360866,
+    "bbox": [
+      [
+        -2391.026924702128,
+        -736.0,
+        256.58052311991855
+      ],
+      [
+        -1209.303247765533,
+        736.0,
+        839.965982632512
+      ]
+    ],
+    "diag": 1975.7513616351794
+  },
+  "tolerances": {
+    "solid_count": "exact",
+    "volume_rel": 0.0001,
+    "volume_abs": 1e-06,
+    "bbox_abs": 0.001
+  }
+}

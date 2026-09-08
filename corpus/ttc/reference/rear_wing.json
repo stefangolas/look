@@ -1,0 +1,28 @@
+{
+  "schema": "ttc_reference.v1",
+  "row_id": "f1/rear_wing",
+  "door_version": "1",
+  "facts": {
+    "solid_count": 18,
+    "volume": 4517710.155138126,
+    "bbox": [
+      [
+        -4139.77199988061,
+        -543.6000001000001,
+        345.2315806151384
+      ],
+      [
+        -3830.0519878248997,
+        543.6000001000001,
+        911.4543175440907
+      ]
+    ],
+    "diag": 1264.3332290650212
+  },
+  "tolerances": {
+    "solid_count": "exact",
+    "volume_rel": 0.0001,
+    "volume_abs": 1e-06,
+    "bbox_abs": 0.001
+  }
+}

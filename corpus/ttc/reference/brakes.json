@@ -1,0 +1,28 @@
+{
+  "schema": "ttc_reference.v1",
+  "row_id": "hypercar/brakes",
+  "door_version": "1",
+  "facts": {
+    "solid_count": 440,
+    "volume": 0,
+    "bbox": [
+      [
+        -1605.4,
+        -922.0,
+        123.74999999999997
+      ],
+      [
+        1592.7,
+        922.0,
+        641.3
+      ]
+    ],
+    "diag": 3727.738941033828
+  },
+  "tolerances": {
+    "solid_count": "exact",
+    "volume_rel": 0.0001,
+    "volume_abs": 1e-06,
+    "bbox_abs": 0.001
+  }
+}

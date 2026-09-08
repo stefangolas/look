@@ -1,0 +1,28 @@
+{
+  "schema": "ttc_reference.v1",
+  "row_id": "f1/drs_actuator",
+  "door_version": "1",
+  "facts": {
+    "solid_count": 26,
+    "volume": 395482.488561973,
+    "bbox": [
+      [
+        -4065.6875301122036,
+        -519.1235619528393,
+        690.3041070959744
+      ],
+      [
+        -3857.310843288624,
+        519.1235619528393,
+        873.7987156896058
+      ]
+    ],
+    "diag": 1074.731689908191
+  },
+  "tolerances": {
+    "solid_count": "exact",
+    "volume_rel": 0.0001,
+    "volume_abs": 1e-06,
+    "bbox_abs": 0.001
+  }
+}

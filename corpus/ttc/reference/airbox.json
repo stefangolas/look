@@ -1,0 +1,28 @@
+{
+  "schema": "ttc_reference.v1",
+  "row_id": "f1/airbox",
+  "door_version": "1",
+  "facts": {
+    "solid_count": 6,
+    "volume": 3078368.2272386835,
+    "bbox": [
+      [
+        -2060.0000001000003,
+        -162.00000010000971,
+        631.9897426194523
+      ],
+      [
+        -1618.4999999,
+        162.00000010000971,
+        919.8912244547674
+      ]
+    ],
+    "diag": 618.6966248083007
+  },
+  "tolerances": {
+    "solid_count": "exact",
+    "volume_rel": 0.0001,
+    "volume_abs": 1e-06,
+    "bbox_abs": 0.001
+  }
+}

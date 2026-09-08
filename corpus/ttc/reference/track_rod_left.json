@@ -1,0 +1,28 @@
+{
+  "schema": "ttc_reference.v1",
+  "row_id": "f1/track_rod_left",
+  "door_version": "1",
+  "facts": {
+    "solid_count": 5,
+    "volume": 117792.2154997286,
+    "bbox": [
+      [
+        111.60111169449846,
+        307.5458786172782,
+        498.2
+      ],
+      [
+        165.45227611354008,
+        746.4541213827217,
+        518.8
+      ]
+    ],
+    "diag": 442.67906374340333
+  },
+  "tolerances": {
+    "solid_count": "exact",
+    "volume_rel": 0.0001,
+    "volume_abs": 1e-06,
+    "bbox_abs": 0.001
+  }
+}

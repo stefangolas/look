@@ -1,0 +1,28 @@
+{
+  "schema": "ttc_reference.v1",
+  "row_id": "falcon_heavy/cutaway",
+  "door_version": "1",
+  "facts": {
+    "solid_count": 2164,
+    "volume": 0,
+    "bbox": [
+      [
+        -5921.02964758637,
+        -2761.7733353381227,
+        -1e-07
+      ],
+      [
+        5921.029647586369,
+        2650.0,
+        70000.00000010002
+      ]
+    ],
+    "diag": 71200.57344580496
+  },
+  "tolerances": {
+    "solid_count": "exact",
+    "volume_rel": 0.0001,
+    "volume_abs": 1e-06,
+    "bbox_abs": 0.001
+  }
+}

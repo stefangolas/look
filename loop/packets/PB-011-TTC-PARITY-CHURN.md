@@ -1,11 +1,11 @@
-# WORK PACKET PB-011-TTC-PARITY-CHURN — corpus parity: route swept-carrier booleans into the landed certified funnel, lift the skips, run everything
+# WORK PACKET PB-011-TTC-PARITY-CHURN — corpus parity: route swept-carrier booleans into the landed certified funnel, lift MONOCOQUE
 
-You are making the vendored text-to-cad corpus (F1, Falcon-Heavy) run
-through the truck123d bridge **on the paths the original repo's code
-exercises**, per the audit's findings. The audit
-(`loop/results/PB-010-TTC-PARITY-AUDIT.json`) is NORMATIVE for scope — read
-it first; its gap_list G1/G3/G5 plus the q1/q2 summaries define the work.
-Do not read other spec files. A genuine gap is a SPEC_GAP: stop and report.
+You are making the F1 monocoque — the survival tub — run through the
+truck123d bridge on the paths the original repo's code exercises, per the
+audit's findings. The audit (`loop/results/PB-010-TTC-PARITY-AUDIT.json`)
+is NORMATIVE for scope. The pre-digested context below is measured — you do
+NOT need to re-read the full census; cite it, don't re-derive it. A genuine
+gap is a SPEC_GAP: stop and report.
 
 ```yaml
 id:          PB-011-TTC-PARITY-CHURN
@@ -32,41 +32,58 @@ read_allow:
   - corpus/ttc/
 tests_required:
   - swept_carrier_booleans_route_to_certified_entry
-  - lifted_skip_rows_run_green
-  - cutaway_partial_arc_revolve_coverage
+  - monocoque_row_lifts_green
 anchors:
   - {id: A1, expect: 3, cmd: "grep -c NonCanonicalCarrier truck123d/src/facade.rs"}
   - {id: A2, expect: 1, cmd: "grep -c 'pub fn' vendor/truck/truck-evidence/src/contact/gff.rs"}
   - {id: A3, expect: 35, cmd: "grep -c booleans-on-swept-carriers corpus/ttc/SKIPS.json"}
-budget:      {turns: 90, ctx_tokens: 200000}
+budget:      {turns: 60, ctx_tokens: 170000}
 ```
 
 H-1: no unwrap/expect without a justified same-line opt-out. H-3
 same-line `// H-3`. H-6: never record Float as Exact.
 
-## Problem — the audit's findings, verbatim scope
+## Pre-digested context (measured 2026-09-07 — cite, don't re-derive)
 
-- **G1 (the core).** The corpus's dominant verb is swept-carrier boolean
-  composition (S1 census: 2,780 binary operators; 21 F1 skip rows +
-  cutaway). The kernel machinery LANDED (BIE family, CL-002/004 dispatch,
-  CL-006 solver entry at `truck-evidence/src/contact/solver_entry.rs`,
-  CFP-004/006/008 funnel stages) — but the FACADE still refuses:
-  `boolean_op` on a non-canonical carrier returns
-  `Refusal::UnsupportedEnvelope(NonCanonicalCarrier)` (facade.rs). The
-  doc row S1 still reads `deferred-bie`. Both are now STALE: route the
-  facade's swept-carrier pairs into the landed certified entry and lift
-  the skips.
-- **G3.** `bd.Circle` closed-profile section authoring has no facade row
-  (S5 lists Spline authoring only) — needed by merlin_common.py:247,
-  cockpit.py:129, wheels/drivetrain rings. Additive authoring entry.
-- **G5.** SKIPS.json's `falcon_heavy/cutaway` note mis-describes the code
-  path: the vendored code is partial-arc revolves
-  (`falcon_common.py:202-206`, `:277-282`), NOT boolean sectioning.
-  Correct the note; lift-readiness keys on partial-arc revolve coverage.
+- **The lift target: `f1/monocoque`** — `corpus/ttc/trees/f1/src/lib/mono_tub.py`,
+  manifest row `f1/monocoque` (module `lib.monocoque`, entry
+  `build_monocoque`). Its op form: the lofted tub skin cut by a cavity
+  (`surfaces.cut` = `cut(swept,canonical)`, census cell 5 — the LARGEST
+  liftable cell, 8 rows) plus proud bosses fused on
+  (`_fuse_proud` = `fuse(swept,canonical)`, cell 2, 2 rows). Both are
+  canonical-tool pairs → the 2-D implicit-reduction path (Theorem 4,
+  `truck-evidence/src/contact/implicit2d.rs`), NOT the 4-D deep end.
+- **The funnel entry to route into:**
+  `truck-evidence/src/contact/solver_entry.rs` (CL-006), reached through
+  the sweep-lift adapters (`truck-shapeops/src/boolean/sweep_lift.rs`,
+  BIE-006) which admit `SpineFrameSweep` faces. Loft faces are
+  BSplineSurface carriers admitted via `truck-certified/src/patch_admit.rs`.
+- **The refusal to replace:** `boolean_op` on a non-canonical carrier
+  returns `Refusal::UnsupportedEnvelope(NonCanonicalCarrier)` in
+  `truck123d/src/facade.rs`; the doc row S1 reads `deferred-bie`.
+- **PB-013 finding (normative):** the G1 capability cells are pinned at
+  the STEP-out refusal proxy because `run_facade` has NO native geometry
+  boolean row for swept carriers — the flip requires BOTH (a) exposing
+  swept-carrier boolean rows through `run_facade`'s table validation and
+  (b) the dispatch itself.
+- **The lift mechanics (evidence-gated):** the monocoque row lifts from
+  SKIPS.json `rows` to the runnable manifest ONLY after its script runs
+  green through the harness door with geometry facts matching the
+  recorded reference (the reference is recorded by the orchestrator's
+  parallel batch — if `corpus/ttc/reference/monocoque.json` exists, use
+  it; if not, run the door once to record it, same as the canonical
+  rows). A run that disagrees with the reference does NOT lift — it
+  files a defect record (new file under docs/defects/, added to
+  write_allow ONLY via an orchestrator amendment — stop and report).
+- **Cell 8 `heal(boolean-result)`:** RULED client-layer identity
+  (owner 2026-09-07; provenance `corpus/ttc/trees/f1/src/lib/
+  surfaces.py:172` — the corpus helper's own valid-shape early return).
+  Not this packet's flip unless free; the ruling is recorded in the
+  spec 7a.
 - **G2 is NOT work** — TR-NRB-001 STEP-out refusal is the recorded
-  boundary (STL/GLB cover render). Do not touch it.
-- **G4 is covered by PB-009** (GLB color/occurrence emission, landed
-  before this packet) — verify parity, do not re-implement.
+  boundary. **G4 is covered by PB-009** — verify parity, do not
+  re-implement. **The remaining F1 rows are PB-011B's** (separate
+  packet, dispatched after this one) — do not lift them here.
 
 ## Scope decisions — pre-made, do not relitigate
 
@@ -76,38 +93,21 @@ same-line `// H-3`. H-6: never record Float as Exact.
    supports (spline/swept/revolved per CFP-004's stage contract); classes
    the funnel refuses (torus, A7) KEEP the typed refusal. Fail-closed:
    every refusal carries the stratum-pair/localization identity.
-   **PB-013 finding (RESULT, normative for this packet):** the G1
-   capability cells were pinned at the STEP-out refusal because
-   `run_facade` has NO native geometry boolean row for swept carriers —
-   the cells are not executable through the runner at all today. The
-   flip therefore requires BOTH: (a) expose swept-carrier boolean rows
-   through `run_facade`'s table validation (Mode rows on non-canonical
-   carriers must reach the certified entry instead of being refused
-   pre-execution), and (b) the dispatch itself. The matrix doc's
-   `flipped-by: PB-011` cells assert through that exposed row.
-2. **Skip lifts are evidence-gated, one row at a time.** A lifted row
-   moves from SKIPS.json `rows` to the runnable manifest ONLY after its
-   script runs green through the harness door (geometry facts + report
-   JSON + STL). A row that runs but disagrees with its recorded reference
-   fact does NOT lift — it files a defect record (new file under
-   docs/defects/, added to write_allow ONLY via an orchestrator
-   amendment — stop and report instead).
+2. **Skip lifts are evidence-gated, one row at a time.** Monocoque is
+   this packet's lift. A lifted row moves from SKIPS.json `rows` to the
+   runnable manifest ONLY after its script runs green through the harness
+   door with facts matching the reference.
 3. **The compat surface S1 row's `deferred-bie` status text updates to
    `landed` for the routed forms** — the machine-check
    (`compat_surface_table_is_complete`) is satisfied by the existing
    SURFACE_ROWS; you update doc status text + the `surface.rs` row
    descriptions if needed, never the 7-row structure.
-4. **Partial-arc revolve (cutaway)** — MOVED TO PB-014-AUTHORING-REVOLVE
-   (landed ahead of this packet): the capability (arc_deg/start_deg
-   trimmed-shell construction) and the SKIPS.json note correction are
-   PB-014's. This packet LIFTS the cutaway row — the green door run on
-   top of PB-014's capability, per the lift discipline below.
-5. **V5, absolute**: landed harness tests (`ttc_harness.rs` existing
+4. **V5, absolute**: landed harness tests (`ttc_harness.rs` existing
    tests) are byte-identical constraints — you ADD tests, never modify
-   landed ones. The `staged_skips_carry_reasons` test may need the lifted
-   rows removed from its EXPECTED set — that is the one sanctioned edit,
-   recorded in RESULT.
-6. **Determinism/cargo rules** as every packet: queue shim, scoped
+   landed ones. The `staged_skips_carry_reasons` test may need the
+   lifted row removed from its EXPECTED set — that is the one sanctioned
+   edit, recorded in RESULT.
+5. **Determinism/cargo rules** as every packet: queue shim, scoped
    commands, no hash-ordered output.
 
 ## Tests required
@@ -116,14 +116,11 @@ same-line `// H-3`. H-6: never record Float as Exact.
    carrier pair that refused `NonCanonicalCarrier` now routes through the
    certified entry and returns a certified verdict (or the typed
    localized refusal — assert WHICH, never a bare `Err`).
-2. `lifted_skip_rows_run_green` — every row you lifted from SKIPS.json
-   runs through the harness door green (this test iterates the lifted
-   set; an empty lifted set fails the test — lifting is the point).
-3. `cutaway_partial_arc_revolve_coverage` — falcon cutaway's
-   partial-arc revolve path runs (or the coverage gap is typed and
-   booked, per decision 4).
+2. `monocoque_row_lifts_green` — the monocoque row's green door run +
+   facts match, iterated from the lifted set (an empty lifted set fails
+   the test — lifting is the point).
 
-## Done when — run these, all must pass
+## Done when
 
 ```
 cargo fmt --check -p truck123d
@@ -142,27 +139,28 @@ Anything outside write_allow — especially `vendor/truck/truck-certified/**`
 python), landed test files (V5), `truck123d/Cargo.toml`/`Cargo.lock`.
 Weakening any landed assertion. Adding `#[ignore]`. Unjustified
 `#[allow]`. Committing to main. Lifting a skip row whose run is not green.
+Lifting rows other than monocoque (they are PB-011B's).
 
 ## Stop conditions
 
 - any anchor count differs → ANCHOR_MISMATCH
-- a lifted-candidate row's green run requires kernel changes outside
-  truck-evidence's landed contact surface → SPEC_GAP naming the gap (do
-  NOT widen into vendor/truck yourself)
-- a run disagrees with its recorded reference fact → stop, file the
-  finding in RESULT (defect-record authoring is an orchestrator
+- the monocoque run disagrees with its recorded reference fact → stop,
+  file the finding in RESULT (defect-record authoring is an orchestrator
   amendment)
+- the kernel run requires kernel changes outside truck-evidence's landed
+  contact surface → SPEC_GAP naming the gap (do NOT widen into
+  vendor/truck yourself)
 - three consecutive failed cargo test runs on the same error → BLOCKED
 
 ## Finish by writing RESULT.json at the WORKTREE ROOT (then COMMIT first)
 
 ```json
 {"id":"PB-011-TTC-PARITY-CHURN","status":"DONE","contracts":["PB-011-TTC-PARITY-CHURN"],
- "tests_added":3,"anchors_verified":{"A1":3,"A2":1,"A3":35},
- "notes":"rows lifted (each with its green-run evidence); rows still skipped and why; the S1 status text change; the cutaway partial-arc finding; any deviation"}
+ "tests_added":2,"anchors_verified":{"A1":3,"A2":1,"A3":35},
+ "notes":"monocoque lift evidence (door facts vs kernel facts); the S1 status text change; any deviation"}
 ```
 
 `status` is one of `DONE`, `ANCHOR_MISMATCH`, `SPEC_GAP`, `BLOCKED`. On any
 non-DONE status also write `QUESTION.md` beside it.
 
-Commit subject: `feat(bridge): corpus parity churn — swept-carrier boolean routing, skip lifts, circle authoring (PB-011-TTC-PARITY-CHURN)`.
+Commit subject: `feat(bridge): corpus parity — swept-carrier boolean routing, monocoque lift (PB-011-TTC-PARITY-CHURN)`.

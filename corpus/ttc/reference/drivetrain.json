@@ -1,0 +1,28 @@
+{
+  "schema": "ttc_reference.v1",
+  "row_id": "f1/drivetrain",
+  "door_version": "1",
+  "facts": {
+    "solid_count": 63,
+    "volume": 41917834.37152804,
+    "bbox": [
+      [
+        -3980.0000001000003,
+        -786.931161547075,
+        121.9269495239429
+      ],
+      [
+        -2879.9999998999997,
+        786.931161547075,
+        470.0041587006346
+      ]
+    ],
+    "diag": 1951.4610823799562
+  },
+  "tolerances": {
+    "solid_count": "exact",
+    "volume_rel": 0.0001,
+    "volume_abs": 1e-06,
+    "bbox_abs": 0.001
+  }
+}

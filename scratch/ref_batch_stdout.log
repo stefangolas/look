@@ -1,0 +1,5 @@
+staged rows: 34 (first: f1/monocoque), width 4
+{"row": "f1/monocoque", "status": "DOOR_ERROR", "wall_s": 47.1, "stderr_tail": "{\n  \"schema\": \"ttc_door_run.v1\",\n  \"door_version\": \"1\",\n  \"ok\": false,\n  \"entry\": \"build_monocoque\",\n  \"error\": {\n    \"kind\": \"ValueError\",\n    \"message\": \"Null TopoDS_Shape object\"\n  }\n}"}
+{"row": "f1/airbox", "status": "ok", "wall_s": 18.0, "solid_count": 6, "triangles": null}
+{"row": "f1/beam_wing", "status": "ok", "wall_s": 7.0, "solid_count": 2, "triangles": null}
+{"row": "f1/corner_fl", "status": "ok", "wall_s": 14.3, "solid_count": 21, "triangles": null}

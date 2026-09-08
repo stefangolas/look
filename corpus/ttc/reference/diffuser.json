@@ -1,0 +1,28 @@
+{
+  "schema": "ttc_reference.v1",
+  "row_id": "f1/diffuser",
+  "door_version": "1",
+  "facts": {
+    "solid_count": 9,
+    "volume": 83412492.68518032,
+    "bbox": [
+      [
+        -3822.8379440250505,
+        -599.2389124300917,
+        44.643778842645865
+      ],
+      [
+        -3119.9999998999992,
+        599.2389124300918,
+        410.53011225294995
+      ]
+    ],
+    "diag": 1436.7334761047232
+  },
+  "tolerances": {
+    "solid_count": "exact",
+    "volume_rel": 0.0001,
+    "volume_abs": 1e-06,
+    "bbox_abs": 0.001
+  }
+}

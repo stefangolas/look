@@ -1,0 +1,28 @@
+{
+  "schema": "ttc_reference.v1",
+  "row_id": "hypercar/lighting",
+  "door_version": "1",
+  "facts": {
+    "solid_count": 92,
+    "volume": 8585650.025805317,
+    "bbox": [
+      [
+        -2403.000565695573,
+        -863.1858774477575,
+        290.6455735181795
+      ],
+      [
+        2297.393302248069,
+        863.2112664103197,
+        743.0001345351695
+      ]
+    ],
+    "diag": 5027.800141313933
+  },
+  "tolerances": {
+    "solid_count": "exact",
+    "volume_rel": 0.0001,
+    "volume_abs": 1e-06,
+    "bbox_abs": 0.001
+  }
+}

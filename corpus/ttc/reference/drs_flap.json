@@ -1,0 +1,28 @@
+{
+  "schema": "ttc_reference.v1",
+  "row_id": "f1/drs_flap",
+  "door_version": "1",
+  "facts": {
+    "solid_count": 9,
+    "volume": 1359986.8418434195,
+    "bbox": [
+      [
+        -4095.672437991785,
+        -533.0,
+        812.7910244945743
+      ],
+      [
+        -3957.541168069602,
+        533.0,
+        946.8103072610794
+      ]
+    ],
+    "diag": 1083.2347002767053
+  },
+  "tolerances": {
+    "solid_count": "exact",
+    "volume_rel": 0.0001,
+    "volume_abs": 1e-06,
+    "bbox_abs": 0.001
+  }
+}

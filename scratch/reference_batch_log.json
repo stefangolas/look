@@ -1,0 +1,207 @@
+[
+  {
+    "row": "f1/monocoque",
+    "status": "SKIP-EXISTS"
+  },
+  {
+    "row": "f1/airbox",
+    "status": "SKIP-EXISTS"
+  },
+  {
+    "row": "f1/beam_wing",
+    "status": "SKIP-EXISTS"
+  },
+  {
+    "row": "f1/corner_fl",
+    "status": "SKIP-EXISTS"
+  },
+  {
+    "row": "f1/corner_fr",
+    "status": "ok",
+    "wall_s": 26.1,
+    "solid_count": 21,
+    "triangles": null
+  },
+  {
+    "row": "f1/corner_rl",
+    "status": "SKIP-EXISTS"
+  },
+  {
+    "row": "f1/corner_rr",
+    "status": "SKIP-EXISTS"
+  },
+  {
+    "row": "f1/details",
+    "status": "SKIP-EXISTS"
+  },
+  {
+    "row": "f1/diffuser",
+    "status": "SKIP-EXISTS"
+  },
+  {
+    "row": "f1/drivetrain",
+    "status": "ok",
+    "wall_s": 72.0,
+    "solid_count": 63,
+    "triangles": null
+  },
+  {
+    "row": "f1/drs_actuator",
+    "status": "ok",
+    "wall_s": 15.0,
+    "solid_count": 26,
+    "triangles": null
+  },
+  {
+    "row": "f1/drs_flap",
+    "status": "ok",
+    "wall_s": 16.2,
+    "solid_count": 9,
+    "triangles": null
+  },
+  {
+    "row": "f1/engine_cover",
+    "status": "ok",
+    "wall_s": 98.3,
+    "solid_count": 44,
+    "triangles": null
+  },
+  {
+    "row": "f1/floor",
+    "status": "ok",
+    "wall_s": 22.2,
+    "solid_count": 20,
+    "triangles": null
+  },
+  {
+    "row": "f1/power_unit",
+    "status": "ok",
+    "wall_s": 85.3,
+    "solid_count": 100,
+    "triangles": null
+  },
+  {
+    "row": "f1/rear_wing",
+    "status": "ok",
+    "wall_s": 24.8,
+    "solid_count": 18,
+    "triangles": null
+  },
+  {
+    "row": "f1/steering_rack",
+    "status": "ok",
+    "wall_s": 20.1,
+    "solid_count": 11,
+    "triangles": null
+  },
+  {
+    "row": "f1/suspension_front",
+    "status": "ok",
+    "wall_s": 30.8,
+    "solid_count": 89,
+    "triangles": null
+  },
+  {
+    "row": "f1/suspension_rear",
+    "status": "ok",
+    "wall_s": 28.8,
+    "solid_count": 99,
+    "triangles": null
+  },
+  {
+    "row": "f1/track_rod_left",
+    "status": "ok",
+    "wall_s": 7.1,
+    "solid_count": 5,
+    "triangles": null
+  },
+  {
+    "row": "f1/track_rod_right",
+    "status": "ok",
+    "wall_s": 5.9,
+    "solid_count": 5,
+    "triangles": null
+  },
+  {
+    "row": "falcon_heavy/cutaway",
+    "status": "ok",
+    "wall_s": 17.0,
+    "solid_count": 2164,
+    "triangles": null
+  },
+  {
+    "row": "hypercar/aero",
+    "status": "ok",
+    "wall_s": 15.2,
+    "solid_count": 24,
+    "triangles": null
+  },
+  {
+    "row": "hypercar/body",
+    "status": "ok",
+    "wall_s": 52.6,
+    "solid_count": 28,
+    "triangles": null
+  },
+  {
+    "row": "hypercar/brakes",
+    "status": "ok",
+    "wall_s": 12.7,
+    "solid_count": 440,
+    "triangles": null
+  },
+  {
+    "row": "hypercar/chassis",
+    "status": "ok",
+    "wall_s": 37.1,
+    "solid_count": 129,
+    "triangles": null
+  },
+  {
+    "row": "hypercar/details",
+    "status": "SKIP-EXISTS"
+  },
+  {
+    "row": "hypercar/glazing",
+    "status": "ok",
+    "wall_s": 29.6,
+    "solid_count": 10,
+    "triangles": null
+  },
+  {
+    "row": "hypercar/hinge",
+    "status": "ok",
+    "wall_s": 15.5,
+    "solid_count": 26,
+    "triangles": null
+  },
+  {
+    "row": "hypercar/interior",
+    "status": "ok",
+    "wall_s": 23.0,
+    "solid_count": 78,
+    "triangles": null
+  },
+  {
+    "row": "hypercar/lighting",
+    "status": "ok",
+    "wall_s": 20.2,
+    "solid_count": 92,
+    "triangles": null
+  },
+  {
+    "row": "hypercar/powertrain",
+    "status": "ok",
+    "wall_s": 11.1,
+    "solid_count": 114,
+    "triangles": null
+  },
+  {
+    "row": "hypercar/suspension_front",
+    "status": "SKIP-EXISTS"
+  },
+  {
+    "row": "hypercar/suspension_rear",
+    "status": "SKIP-EXISTS"
+  }
+]

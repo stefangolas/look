@@ -1,0 +1,28 @@
+{
+  "schema": "ttc_reference.v1",
+  "row_id": "hypercar/interior",
+  "door_version": "1",
+  "facts": {
+    "solid_count": 78,
+    "volume": 232182684.42664355,
+    "bbox": [
+      [
+        -560.0000001000021,
+        -734.3084030511128,
+        289.9999999
+      ],
+      [
+        1080.0000001,
+        734.3084030511128,
+        998.0721587744563
+      ]
+    ],
+    "diag": 2312.5314064883623
+  },
+  "tolerances": {
+    "solid_count": "exact",
+    "volume_rel": 0.0001,
+    "volume_abs": 1e-06,
+    "bbox_abs": 0.001
+  }
+}

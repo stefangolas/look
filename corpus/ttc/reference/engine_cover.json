@@ -1,0 +1,28 @@
+{
+  "schema": "ttc_reference.v1",
+  "row_id": "f1/engine_cover",
+  "door_version": "1",
+  "facts": {
+    "solid_count": 44,
+    "volume": 14538747.894756675,
+    "bbox": [
+      [
+        -3452.0000001000008,
+        -387.0086518782603,
+        309.6892260410611
+      ],
+      [
+        -1699.9999998991964,
+        387.00865187826554,
+        851.1328934991575
+      ]
+    ],
+    "diag": 1990.41905945673
+  },
+  "tolerances": {
+    "solid_count": "exact",
+    "volume_rel": 0.0001,
+    "volume_abs": 1e-06,
+    "bbox_abs": 0.001
+  }
+}

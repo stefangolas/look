@@ -247,3 +247,8 @@
 {"id": "DEF-FILLET-IDENTITY", "slot": "3", "verdict": "LANDED", "worker_commit": "c0752df", "model": "deepseek/deepseek-v4-flash", "note": "overnight mechanical landing (scoped check green)", "closed": "2026-09-07"}
 {"id": "DEF-BRACKET-GOLDEN", "slot": "4", "verdict": "LANDED", "worker_commit": "cafa70d", "model": "deepseek/deepseek-v4-flash", "note": "overnight mechanical landing (scoped check green)", "closed": "2026-09-07"}
 {"id": "DEF-FILLET-IDENTITY", "slot": 3, "verdict": "LANDED", "worker_commit": "c0752df", "model": "deepseek/deepseek-v4-flash", "note": "adjudicated landing (scoped check green)", "closed": "2026-09-07"}
+{"id": "BG-KV2-207B-TRACER-REST", "slot": 0, "verdict": "LANDED", "worker_commit": "7580294", "model": "deepseek/deepseek-v4-flash", "note": "adjudicated landing (scoped check green)", "closed": "2026-09-07"}
+{"id": "BG-KV2-207B-TRACER-REST", "slot": "0", "verdict": "LANDED", "worker_commit": "7580294", "model": "deepseek/deepseek-v4-flash", "note": "overnight mechanical landing (scoped check green)", "closed": "2026-09-07"}
+{"id": "DEF-STALE-CHUTE-FIXEDPLANE", "slot": "1", "verdict": "LANDED", "worker_commit": "86a6f3a", "model": "deepseek/deepseek-v4-flash", "note": "overnight mechanical landing (scoped check green)", "closed": "2026-09-07"}
+{"id": "DEF-SEEDRAY-C", "slot": "3", "verdict": "LANDED", "worker_commit": "86bee1d", "model": "deepseek/deepseek-v4-flash", "note": "overnight mechanical landing (scoped check green)", "closed": "2026-09-07"}
+{"id": "DEF-SEEDRAY-A", "slot": "4", "verdict": "LANDED", "worker_commit": "35c7999", "model": "deepseek/deepseek-v4-flash", "note": "overnight mechanical landing (scoped check green)", "closed": "2026-09-07"}
