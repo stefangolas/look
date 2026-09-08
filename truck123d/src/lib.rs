@@ -21,6 +21,7 @@
 #![doc = include_str!("../README.md")]
 
 mod assembly_emit;
+mod bd_bridge;
 mod exceptions;
 mod facade;
 mod gil;
@@ -67,5 +68,12 @@ pub fn truck123d(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(python::marshal_unresolved, m)?)?;
     m.add_function(wrap_pyfunction!(python::kernel_evidence_compose, m)?)?;
     m.add_function(wrap_pyfunction!(facade::facade_submit, m)?)?;
+    // The drop-in executor binding (TTC-EXECUTOR-BINDING): the two geometry
+    // entries the corpus-door kernel-engine regime drives. Both consume the
+    // same construction-row vocabulary the facade classifier pre-flights and
+    // attach deterministic facts/triangles; refusals map to the typed
+    // exceptions, never a panic.
+    m.add_function(wrap_pyfunction!(bd_bridge::bd_facts, m)?)?;
+    m.add_function(wrap_pyfunction!(bd_bridge::bd_stl, m)?)?;
     Ok(())
 }
