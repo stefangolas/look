@@ -93,7 +93,17 @@ use crate::ssi_types::{KrawczykCertificate3, SideCarrier, SquareSystem3};
 /// certificate preconditions (`DeterminantSpansZero`, `InclusionNotStrict`)
 /// are this module's own named cases, mirroring `bezier_isect`'s
 /// typed-unresolved discipline.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+///
+/// FSSI-000 (FSSI topology contract) adds the two positive-dimension
+/// suspicion halts of the FSSI-001 gate as named cases here —
+/// [`SsiRefusal::TangentCurveSuspected`] and
+/// [`SsiRefusal::CoincidentPatchSuspected`]. They are refusals (the gate
+/// could not decide the box), never a wrong acceptance; the SSI-layer `tag()`
+/// carries the specificity the FSSI-001/002 producers assert against, and
+/// downstream layers fold them onto their existing low-information refusal
+/// shapes. `Eq` is intentionally absent: the new payloads carry `(f64, f64)`
+/// evidence, and nothing in the crate uses these refusals as map keys.
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub enum SsiRefusal {
     /// A pair whose class is outside the spline-admissible shapes. Carries
     /// the DISPATCH widening [`PairUnsupported::UnsupportedPairClass`].
@@ -113,6 +123,27 @@ pub enum SsiRefusal {
     /// A construction outside a frozen rule (the shim's refusing
     /// constructors refused).
     InvalidInput,
+    /// The FSSI-001 positive-dimension suspicion halt: the separable
+    /// tangency-free gate could not decide the box (its undecided measure
+    /// failing to shrink like `2^-4k` at budget exhaustion), so a tangent
+    /// curve is suspected. Carries the undecided measure and its shrink
+    /// exponent at halt. Evidence, never a tolerance. Cannot fire until
+    /// FSSI-001 wires the producer; the arm documents that.
+    TangentCurveSuspected {
+        /// The undecided measure and its shrink exponent at halt (evidence,
+        /// never a tolerance).
+        margin: (f64, f64),
+    },
+    /// The FSSI-001 coincident-carrier suspicion halt: the separable
+    /// tangency-free gate could not decide the box at area scale, so a
+    /// coincident patch is suspected. Carries the undecided measure and its
+    /// shrink exponent at halt. Evidence, never a tolerance. Cannot fire
+    /// until FSSI-001 wires the producer; the arm documents that.
+    CoincidentPatchSuspected {
+        /// The undecided measure and its shrink exponent at halt (evidence,
+        /// never a tolerance).
+        margin: (f64, f64),
+    },
 }
 
 impl SsiRefusal {
@@ -128,6 +159,8 @@ impl SsiRefusal {
             Self::DeterminantSpansZero => "ssi_determinant_spans_zero",
             Self::InclusionNotStrict => "ssi_inclusion_not_strict",
             Self::InvalidInput => "ssi_invalid_input",
+            Self::TangentCurveSuspected { .. } => "ssi_tangent_curve_suspected",
+            Self::CoincidentPatchSuspected { .. } => "ssi_coincident_patch_suspected",
         }
     }
 }
@@ -147,6 +180,50 @@ impl From<Refusal> for SsiRefusal {
 impl From<HullRefusal> for SsiRefusal {
     fn from(refusal: HullRefusal) -> Self {
         Self::Hull(refusal)
+    }
+}
+
+// ---------------------------------------------------------------------------
+// The FSSI fold-verdict carrier (FSSI-000 contract; FSSI-002 populates).
+// ---------------------------------------------------------------------------
+
+/// The refusing-constructor carrier of a certified ordinary fold (FSSI-000
+/// scope decision 1; the FSSI-002 fold packet populates it as a NEW
+/// escalation-lattice tier registered in `docs/CERTIFICATE_MAPPING.md`).
+///
+/// D-shim: a type and a refusing constructor only — nothing here evaluates,
+/// solves, isolates, or certifies numerically. The record carries the chart
+/// whose fold system `E_j = (F, q_j)` certified, the recovered fold sign
+/// `σ ∈ {−1, +1}`, and the certified determinant enclosure
+/// `D(F, q_j)` evidence of the proof. CFP-008 stagnation verdicts stand
+/// unchanged; a genuinely degenerate fold stays a landed refusal.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct FoldCert {
+    /// The chart index whose fold system certified the ordinary fold.
+    pub chart: usize,
+    /// The recovered fold sign `σ`, `+1` or `−1`.
+    pub sigma: i8,
+    /// The certified determinant enclosure of the fold proof, a finite,
+    /// ordered `(lo, hi)` evidence pair (never a tolerance).
+    pub det_enclosure: (f64, f64),
+}
+
+impl FoldCert {
+    /// Construct a fold-verdict record, refusing a malformed one: a `sigma`
+    /// outside `{−1, +1}` or a non-finite / misordered `det_enclosure`.
+    pub fn new(chart: usize, sigma: i8, det_enclosure: (f64, f64)) -> Result<Self, SsiRefusal> {
+        let (lo, hi) = det_enclosure;
+        if !lo.is_finite() || !hi.is_finite() || lo > hi {
+            return Err(SsiRefusal::InvalidInput);
+        }
+        if !matches!(sigma, -1 | 1) {
+            return Err(SsiRefusal::InvalidInput);
+        }
+        Ok(FoldCert {
+            chart,
+            sigma,
+            det_enclosure,
+        })
     }
 }
 
@@ -2284,6 +2361,94 @@ mod tests {
             .expect("the fixture root evaluates");
         for v in values {
             assert!(v.abs() < 1e-9); // H-3
+        }
+    }
+
+    /// FSSI-000 decision 2: the refusal tag strings are stable, asserted by
+    /// name. The two FSSI-001 producer suspicion halts carry the pre-decided
+    /// tags `ssi_tangent_curve_suspected` / `ssi_coincident_patch_suspected`;
+    /// the six landed families keep their recorded tags (V5 identity).
+    #[test]
+    fn refusal_tags_stable() {
+        let cases: [(SsiRefusal, &'static str); 8] = [
+            (
+                SsiRefusal::PairClass(PairUnsupported::UnsupportedPairClass),
+                "pair_unsupported_class",
+            ),
+            (
+                SsiRefusal::Conditioning(Refusal::ConditioningBelowThreshold),
+                "ssi_conditioning",
+            ),
+            (
+                SsiRefusal::Hull(HullRefusal::EnclosureUnavailable),
+                "ssi_hull_enclosure_unavailable",
+            ),
+            (
+                SsiRefusal::DeterminantSpansZero,
+                "ssi_determinant_spans_zero",
+            ),
+            (SsiRefusal::InclusionNotStrict, "ssi_inclusion_not_strict"),
+            (SsiRefusal::InvalidInput, "ssi_invalid_input"),
+            (
+                SsiRefusal::TangentCurveSuspected {
+                    margin: (0.25, 4.0),
+                },
+                "ssi_tangent_curve_suspected",
+            ),
+            (
+                SsiRefusal::CoincidentPatchSuspected {
+                    margin: (0.25, 4.0),
+                },
+                "ssi_coincident_patch_suspected",
+            ),
+        ];
+        for (refusal, expected) in cases {
+            assert_eq!(refusal.tag(), expected, "stable tag of {refusal:?}");
+        }
+        // The suspicion halts refuse with their pre-decided tag regardless of
+        // the recorded margin (evidence, never a tolerance).
+        assert_eq!(
+            SsiRefusal::TangentCurveSuspected { margin: (0.0, 0.0) }.tag(),
+            "ssi_tangent_curve_suspected"
+        );
+        assert_eq!(
+            SsiRefusal::CoincidentPatchSuspected { margin: (0.0, 0.0) }.tag(),
+            "ssi_coincident_patch_suspected"
+        );
+    }
+
+    /// FSSI-000 scope decision 1: [`FoldCert`] is a refusing-constructor
+    /// carrier — a malformed record (non-finite or misordered
+    /// `det_enclosure`, a `sigma` outside `{−1, +1}`) refuses
+    /// `SsiRefusal::InvalidInput`, never a guess. FSSI-002 populates the
+    /// well-formed records; this only freezes the shape.
+    #[test]
+    fn fold_cert_refusing_constructor() {
+        let ok = FoldCert::new(3, 1, (0.5, 2.0)).expect("a well-formed record admits");
+        assert_eq!(ok.chart, 3);
+        assert_eq!(ok.sigma, 1);
+        assert_eq!(ok.det_enclosure, (0.5, 2.0));
+        assert_eq!(
+            FoldCert::new(3, -1, (0.5, 2.0))
+                .expect("sigma = -1 admits")
+                .sigma,
+            -1
+        );
+        for (chart, sigma, det_enclosure) in [
+            (0usize, 0i8, (0.5, 2.0)),    // sigma outside {−1, +1}
+            (0, 2, (0.5, 2.0)),           // sigma outside {−1, +1}
+            (0, 1, (f64::NAN, 2.0)),      // non-finite det_enclosure
+            (0, 1, (0.5, f64::INFINITY)), // non-finite det_enclosure
+            (0, 1, (2.0, 0.5)),           // misordered det_enclosure
+        ] {
+            assert!(
+                matches!(
+                    FoldCert::new(chart, sigma, det_enclosure),
+                    Err(SsiRefusal::InvalidInput)
+                ),
+                "a malformed fold record must refuse InvalidInput, got sigma={sigma} \
+                 det_enclosure={det_enclosure:?}"
+            );
         }
     }
 }

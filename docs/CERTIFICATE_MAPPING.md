@@ -112,6 +112,21 @@ its mapping rows here. All rows were dispatched against the tree 2026-09-05.
 | `A2BranchCurve` producing stub (pending until CTE-005) | pending refusal name `a2_branch_packet_pending`, surfaced through the owning packet's refusal vocabulary | NO new top-level evidence kind. The shape ships behind the pending refusal, the `cone_torus_carrier_packet_pending` precedent (`kernel/rational.rs`): at the shape layer the stub refuses `Refusal::InvalidInput`; the named cause is carried by the producing packet (CTE-005) and asserted by CTE-008's gates. |
 | F1–F7 fixture kit (`tangency/fixtures.rs`) | TEST SUPPORT ONLY — `#[doc(hidden)] pub`, excluded from the certified API surface | A one-line mapping-table note, not a row (the `ssi_fixtures.rs` precedent): no new evidence kind. Ground truths are exact-integer records machine-checked at admission; the F7 rows copy the landed `boolean_m2` fixture *values* read-only. |
 
+## F. FSSI-000 bookings (Fibered SSI topology contract)
+
+The FSSI program (`docs/FSSI_BUILD_SPEC.md`) freezes its refusal names,
+verdict carriers, and evidence mapping here BEFORE any solver code (packet 1
+of 5). All rows dispatched against the tree 2026-09-08. Exactly three rows:
+the fold tier carrier (this packet lands the type), the per-segment
+projection-index booking (the type lands later, in FSSI-003), and the tube
+certificate (consumed landed substrate).
+
+| FSSI evidence kind | Carrier | Booking |
+|---|---|---|
+| Ordinary-fold event (theory §5; FSSI-002): a box the landed path refuses (`Conditioning` / `TraceRefusal::Conditioning`) that one `KrawczykSystem<4>` proof over `E_j = (F, q_j)` with `det D(F, q_j) ≻ 0` certifies as a unique regular ordinary fold | `FoldCert { chart: usize, sigma: i8, det_enclosure: (f64, f64) }` — a NEW refusing-constructor carrier (D-shim: type + refusing constructor only, nothing numeric) in `truck-certified/src/ssi.rs`, registered here as a NEW escalation-lattice tier alongside the CFP-008 stagnation verdicts (which stand unchanged) | FSSI-000 lands the carrier; FSSI-002 populates it through the existing certificate tuple carrying the producing proof. A genuinely degenerate fold stays a landed refusal (`DegenerateFold`-class), never a `FoldCert`. |
+| Per-segment projection index (theory §8; FSSI-003): a bridge segment (`Switched`) must never be re-expressed as a `z_j`-graph | the arc type extension FSSI-003 freezes on the tracer's output arc/vertex types (its `ssi_trace.rs`/`ssi_types.rs` write set) | Booking row only — the type does NOT exist yet. FSSI-003 freezes the index field against the already-landed per-step `chart_box` discipline; FSSI-000 records the mapping before the type is written. |
+| Tube certificate (theory FSSI-6, the uniform parametric Krawczyk tube) | the LANDED parallelotope proof type — `truck_evidence::num::parallelotope` (`StepVerdict` / `ParallelotopeFrame`, the generic `KrawczykSystem<N>` + `KrawczykProof` operator) | Consumed substrate, no new type and no `truck-evidence` edit. The tube's per-step certified boxes are `StepVerdict::Certified` records; `Margin`/`Certificate` evidence rides them verbatim. |
+
 ## Standing rules (both programs)
 
 1. **H-6 method rule.** `Method ∈ {Exact, Interval, Float, None}`

@@ -449,6 +449,18 @@ fn map_ssi_refusal(refusal: SsiRefusal) -> TraceRefusal {
             TraceRefusal::Unresolved(GenericUnresolved::ClusteredRoots)
         }
         SsiRefusal::InvalidInput => TraceRefusal::Conditioning(Refusal::InvalidInput),
+        // FSSI-000 decision 3: the FSSI-001 gate's suspicion halts cannot fire
+        // inside a per-box certifier step until FSSI-001/002 wire the
+        // producers; the arm documents that. They map onto the trace's
+        // outside-the-admitted-envelope named case (the `PairClass` /
+        // `InvalidInput` pattern) — the SSI-layer `tag()` carries the
+        // specificity, never a new `TraceRefusal` arm.
+        SsiRefusal::TangentCurveSuspected { .. } => {
+            TraceRefusal::Conditioning(Refusal::InvalidInput)
+        }
+        SsiRefusal::CoincidentPatchSuspected { .. } => {
+            TraceRefusal::Conditioning(Refusal::InvalidInput)
+        }
     }
 }
 
