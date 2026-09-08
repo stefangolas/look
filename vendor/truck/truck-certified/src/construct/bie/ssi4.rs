@@ -897,6 +897,61 @@ fn cell_box(cell: &WitnessCell) -> [(f64, f64); 4] {
     ]
 }
 
+// ---------------------------------------------------------------------------
+// FSSI-001-GATE: the separable tangency-free screen at the restricted-pair
+// entry (scope decision 1). The restricted charts are evaluated directly (no
+// polynomialization), so the per-side normal enclosures come from the
+// outward-rounded interval partials of [`RestrictedChart`]; the shared gate
+// kernel (`crate::ssi::ssi_gate`) then decides the product cell with the same
+// two-2-D-cone certificate, suspicion halts, and monotone-widening discipline
+// as the SquareSystem3 admission path. This is the seam the restricted-pair
+// dispatch consults below the contact funnel; it never alters a certified
+// verdict (V5: the gate only ever admits or refuses).
+// ---------------------------------------------------------------------------
+
+/// The certified normal-component enclosure of one restricted chart over its
+/// parameter box, from the outward-rounded interval partials (the interval
+/// cross product `∂p0 × ∂p1`, sound but loose — never the naive pairing of
+/// point samples).
+fn restricted_normal_box(
+    chart: &RestrictedChart,
+    box2: crate::ssi::ssi_gate::SideBox,
+) -> Result<crate::ssi::ssi_gate::NormalBox, crate::ssi::SsiRefusal> {
+    let p0 = iv_lo_hi(box2[0].0, box2[0].1);
+    let p1 = iv_lo_hi(box2[1].0, box2[1].1);
+    if p0.is_empty() || p1.is_empty() {
+        return Err(crate::ssi::SsiRefusal::InvalidInput);
+    }
+    let (du, dv) = chart.partials_iv(p0, p1);
+    let cx = du[1] * dv[2] - du[2] * dv[1];
+    let cy = du[2] * dv[0] - du[0] * dv[2];
+    let cz = du[0] * dv[1] - du[1] * dv[0];
+    let to_ci = |iv: Interval| crate::formal::exact::CertifiedInterval {
+        lo: iv.inf(),
+        hi: iv.sup(),
+    };
+    Ok([to_ci(cx), to_ci(cy), to_ci(cz)])
+}
+
+/// The separable tangency-free gate over a restricted-pair product cell (the
+/// FSSI-001 wiring at the ssi4 pair entry).
+///
+/// `cell` is the `(u, v) × (s, t)` product cell of the two carriers. The gate
+/// certifies [`GateAdmission::TangencyFree`] (rank `DF = 3` on `Σ ∩ cell`),
+/// returns the single-level probe verdict, or refuses a typed suspicion — the
+/// identical vocabulary the SquareSystem3 admission path uses, driven by the
+/// shared kernel. Deterministic (fixed level order and cell-split order).
+pub fn gate_admit_restricted_pair(
+    a: &RestrictedChart,
+    b: &RestrictedChart,
+    cell: &WitnessCell,
+    params: &crate::ssi::ssi_gate::GateParams,
+) -> Result<crate::ssi::ssi_gate::GateAdmission, crate::ssi::SsiRefusal> {
+    let side_a = |b2: crate::ssi::ssi_gate::SideBox| restricted_normal_box(a, b2);
+    let side_b = |b2: crate::ssi::ssi_gate::SideBox| restricted_normal_box(b, b2);
+    crate::ssi::ssi_gate::gate_admit(side_a, side_b, [cell.u, cell.v], [cell.s, cell.t], params)
+}
+
 /// The N=3 Krawczyk system over the F-form with one product coordinate fixed:
 /// the square `E×F`/`F×E` boundary-stratum systems and the coordinate slice
 /// solves of the continuation both take this shape.
