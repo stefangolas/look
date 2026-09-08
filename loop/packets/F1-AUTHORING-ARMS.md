@@ -62,6 +62,16 @@ budget:      {turns: 75, ctx_tokens: 190000}
    enclosing F1 rows may still refuse at the booleans (swept×swept) — that
    is the admission program's boundary, NOT this packet's. This packet
    closes the AUTHORING layer only.
+6. **FH-CENSUS additions (2026-09-08 adjudication).** (a) The `extrude`
+   handler (door.py:490) becomes a recording arm: a closed line-loop planar
+   profile extruded along z is an exact prism — facts analytically exact,
+   mesh deterministic (thrust_structure's typed refusal). (b) `tube()` (15
+   uses in the FH corpus, e.g. feed/gas_generator/turbine_exhaust) currently
+   BYPASSES the census vocabulary and dies UNTYPED — it must answer
+   name-for-name: a spline-path tube records as the sweep-as-loft-chain
+   form (scope 2) where the path is piecewise-linear with recorded frames,
+   and refuses TYPED (`unsupported_envelope`) otherwise. An untyped door
+   failure on any census verb is a defect this packet closes.
 
 ## Done when
 
