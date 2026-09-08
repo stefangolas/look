@@ -140,6 +140,12 @@ pub mod plane_sphere;
 pub mod ruled_pair;
 /// BG-ANA-001-SS: sphere × sphere. Scaffolded empty; the packet fills it.
 pub mod sphere_sphere;
+/// BG-ANA-001-TOR: plane × torus sections — the exact circle loci of the
+/// runtime-factorization certificate (TOR-A): axis-perpendicular coaxial
+/// circles, axial profile circles, and the Villarceau bitangent pair, each
+/// emitted only when the section quartic `Q(u, v)` factors into the recovered
+/// circle conics exactly; residual quartics route to the tracer typed.
+pub mod torus_section;
 
 #[cfg(test)]
 mod tests {
