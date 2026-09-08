@@ -197,3 +197,15 @@ pub mod bie;
 /// dispatch rule (nothing is admitted here — widening is ADM-001+, each
 /// behind its admitting test).
 pub mod admission;
+
+/// The extracted-patch type freeze (ADM-SHIM, extends ADM-000-CONTRACT): the
+/// layer-2 representation the admission lemma wave parallelizes against — the
+/// [`TensorBernsteinPatch`](patches::TensorBernsteinPatch) with its certified
+/// positive weight bracket, the five refusing lemma-kernel signatures
+/// (`extract_patches` L1, `patch_product` L2, `normal_numerator` L3,
+/// `deflate_factor`/`seam_identified` L4, and the truck-evidence `num/`
+/// `certified_reciprocal_power` signature alias L5), and the shape that the
+/// shared fixture kit (`tests/patch_fixtures.rs`) builds against. No kernel
+/// body lands here — the shim ships types and refusing constructors only, and
+/// extends, never edits, the landed ADM-000 carriers.
+pub mod patches;
