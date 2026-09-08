@@ -184,6 +184,18 @@ impl From<HullRefusal> for SsiRefusal {
 }
 
 // ---------------------------------------------------------------------------
+// FSSI-001-GATE: the separable tangency-free admission gate.
+// ---------------------------------------------------------------------------
+//
+// The gate's implementation lives in its own file at the crate root (this
+// `#[path]` declaration), so this packet and the admission layers stay
+// write-disjoint on the shim (`ssi_types.rs`); nesting it here gives the gate
+// access to this module's per-side hull substrate without widening any private
+// surface. The gate is compiled once as `crate::ssi::ssi_gate`.
+#[path = "ssi_gate.rs"]
+pub mod ssi_gate;
+
+// ---------------------------------------------------------------------------
 // The FSSI fold-verdict carrier (FSSI-000 contract; FSSI-002 populates).
 // ---------------------------------------------------------------------------
 
