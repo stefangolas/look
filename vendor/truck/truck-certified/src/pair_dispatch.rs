@@ -110,6 +110,21 @@
 //! **not expressible** as a participant. Admission stays monotone (FSSI-EXT):
 //! an extrusion side simply has no arm here and the enumerated refusal below is
 //! the typed no-silent-downgrade surface — the general path keeps the pair.
+//!
+//! # TOR-A registration seam
+//!
+//! The exact plane × torus circle sections (TOR-A, the
+//! `truck-evidence::analytic::torus_section` family) likewise ride the
+//! funnel's `ContactLocus::Analytic` path, not this certified participant
+//! dispatch: the certified participant enum carries Plane / Cylinder / Sphere
+//! only, so a torus side maps to `None` at construction (the typed
+//! no-silent-downgrade refusal for the torus pair books DISPATCH-2). The N1
+//! circle families — axis-perpendicular coaxial circles, axial profile
+//! circles, the Villarceau bitangent pair — emit only behind the per-instance
+//! factorization certificate `Q = C₁·C₂`; the residual spiric sections and any
+//! non-certifiable circle cut stay with the general (traced) path exactly as
+//! before this seam (BG-CAD-P11's `torus_pairs.rs` decisions are the landed
+//! cross-check for that path).
 
 use crate::formal::contact::GenericUnresolved;
 use crate::formal::cylinder::{CertifiedEmbeddedCylinder, CylinderIdentification};
