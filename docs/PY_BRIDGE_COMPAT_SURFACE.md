@@ -23,6 +23,7 @@ build123d API** and the compat surface must answer to it, name for name.
 | `boundary-refusal` | answered as a **typed refusal** (never silent): a name inside a documented kernel boundary refuses with the named case |
 | `staged-skip` | corpus scripts exercising this row in a not-yet-landed form carry a machine-checked skip reason (`corpus/ttc/SKIPS.json`) |
 | `lift-evidence-recorded` | a staged row whose green door run + reference-matched facts are recorded as lift evidence in its SKIPS note (PB-011B's canonical-cutter rows), still staged until the orchestrator's manifest movement |
+| `census-recorded` | a staged row whose SKIPS note carries a typed census record (PB-011C's swept x swept rows: typed-refusal, with the row's OCC door evidence), still staged until the certified funnel admits the class |
 
 ## Corpus and census
 
@@ -53,7 +54,7 @@ count of `.color` assignment sites and the label count pinned by the vendored
 
 | # | surface id | usage (census 2026-09-06) | compat status | answered-by (bridge rows) |
 |---|---|---|---|---|
-| S1 | `Algebra operators + - &` | 2780 binary `+` `-` `&` (upper bound) | `landed` for canonical×canonical AND for the routed swept-carrier forms (spline/swept/revolved carrier classes dispatch through the certified entry, PB-011); `boundary-refusal` for a swept pair coupling a funnel-refused carrier class (torus); `lift-evidence-recorded` for the 12 canonical-cutter F1 rows PB-011B proved green through the door with facts matching their recorded references; the remaining `staged-skip` corpus rows carry the machine-checked reason | facade `boolean_op` (`Mode` union/subtract/intersect) on canonical carriers; swept-carrier `Mode` rows route through the certified-entry dispatch (`dispatch_swept_carrier_boolean`, PB-011); PB-011B recorded the 2-D path lift evidence on the canonical-cutter F1 rows (door run green + facts vs the recorded reference, `PB-011B LIFT EVIDENCE` marker in the row notes); BIE-006 stays the resolution for the still-deferred forms (PB-011C's swept×swept rows) |
+| S1 | `Algebra operators + - &` | 2780 binary `+` `-` `&` (upper bound) | `landed` for canonical×canonical AND for the routed swept-carrier forms (spline/swept/revolved carrier classes dispatch through the certified entry, PB-011); `boundary-refusal` for a swept pair coupling a funnel-refused carrier class (torus); `lift-evidence-recorded` for the 12 canonical-cutter F1 rows PB-011B proved green through the door with facts matching their recorded references; `census-recorded` for the 8 swept x swept F1 rows PB-011C ran census-first (every row filed a typed-refusal census record with its door evidence — the funnel does not admit a boolean between two spline-loft solids end to end, so no C lift); the remaining `staged-skip` corpus rows carry the machine-checked reason | facade `boolean_op` (`Mode` union/subtract/intersect) on canonical carriers; swept-carrier `Mode` rows route through the certified-entry dispatch (`dispatch_swept_carrier_boolean`, PB-011); PB-011B recorded the 2-D path lift evidence on the canonical-cutter F1 rows (door run green + facts vs the recorded reference, `PB-011B LIFT EVIDENCE` marker in the row notes); PB-011C recorded the 4-D path census on the swept x swept rows (typed-refusal, `PB-011C CENSUS` marker in the row notes); BIE-006 stays the resolution for the still-deferred forms |
 | S2 | `Plane/Location algebra (plane * shape, plane.offset(d), Pos, Rotation, Location, Axis)` | 183 | `recorded-client-layer` | frame/placement rows of the submitted session table; `.offset(` is 19 of the 183 and every hit is a `Plane.offset` frame move — no kernel solid-offset hides here |
 | S3 | `Primitives (Box, Cylinder, Sphere, Torus, Compound)` | 126 | `landed` | facade `box`/`cylinder`/`sphere`/`torus`; `Compound`/grouping is assembly emission (PB-006) |
 | S4 | `make_face / topology types (Edge, Face, Wire, Solid, Shape)` | 49 | `landed` | facade `make_face`; topology typing only on the compat side (no kernel geometry in the bridge) |
@@ -87,10 +88,22 @@ pair certifies through the certified-entry dispatch and no typed torus
 refusal was recorded. The rows still carry the machine-checked skip reason
 `booleans-on-swept-carriers` (`corpus/ttc/SKIPS.json`, `resolved_by:
 BIE-006`) — the physical manifest movement to the runnable canonical set is
-the orchestrator corpus-output step, exactly as PB-011's cutaway lift — while
-the F1 rows whose first refusing op is swept×swept (airbox, beam_wing,
-details, drivetrain, drs_flap, engine_cover, power_unit, rear_wing) are
-PB-011C's. The Falcon-Heavy rows that are boolean-free run as the canonical
+the orchestrator corpus-output step, exactly as PB-011's cutaway lift. The F1
+rows whose first refusing op is swept×swept (airbox, beam_wing, details,
+drivetrain, drs_flap, engine_cover, power_unit, rear_wing) were PB-011C's
+4-D path wave. PB-011C ran all eight census-first: none certifies on this
+dispatch — every row's swept-carrier booleans are swept×swept (lofted/swept
+base × lofted/swept tool) carrier pairs the certified funnel does not admit
+end to end today (the fuse(swept,swept)/cut(swept,swept) pair cells answer
+the typed constructive-carrier `NonCanonicalCarrier` refusal at the boolean
+boundary; no landed boolean runs between two spline-loft solids; the
+restricted 4-D arm admits circular-section sweeps only, so no solver budget
+is spent — a typed refusal, not a stagnation). Each row note records a
+`PB-011C CENSUS` typed-refusal record with its OCC-baseline door evidence
+(green; facts reproducing the recorded reference within tolerance; facts
+mismatch: none), the rows carry no lift marker, and they stay staged under
+the machine-checked skip reason (`corpus/ttc/SKIPS.json`, `resolved_by:
+BIE-006`). The Falcon-Heavy rows that are boolean-free run as the canonical
 subset, and the remaining F1 rows that shell+cut lofted geometry are skipped
 with that reason.
 
@@ -165,7 +178,8 @@ from assembly insertion order — not a Python surface the facade answers.
 `truck123d/tests/ttc_harness.rs` (`compat_surface_table_is_complete`) scans
 this file for each of the seven surface ids (`S1`..`S7`) above and for a
 **status token** on each row (one of the `landed`, `recorded-client-layer`,
-`deferred-bie`, `boundary-refusal`, `staged-skip` values). The check is
+`deferred-bie`, `boundary-refusal`, `staged-skip`, `lift-evidence-recorded`,
+`census-recorded` values). The check is
 one-directional: the seven `SURFACE_ROWS` of `compat/surface.rs` are the
 spec §8 counted families, and a doc row beyond them (row S8, PB-009) is not
 rejected. Adding a corpus surface family that spec §8's table does not name

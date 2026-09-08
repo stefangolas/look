@@ -5,7 +5,7 @@
   "booleans-on-swept-carriers": {
    "resolved_by": "BIE-006",
    "label": "Boolean algebra over lofted/swept/revolved (non-canonical-carrier) geometry",
-   "note": "Canonical-by-canonical booleans are landed. PB-011 routes the funnel-supported swept-carrier pairs (spline/swept/revolved carrier classes, the CFP-004 stage contract) through the facade's certified-entry dispatch at the bridge. PB-011B (the 2-D path wave) lifted the 12 canonical-cutter F1 rows: each row's OCC-baseline harness door run is green and its facts match the recorded reference (evidence marker PB-011B LIFT EVIDENCE in the row note), and the four corner rows carry no revolved-circle (torus) carrier in the op path, so no typed torus refusal was recorded; the rows keep this machine-checked reason until the orchestrator's corpus-output step moves them to the runnable canonical set (same protocol as the PB-011 falcon_heavy/cutaway lift). The F1 rows whose first refusing op is swept x swept (airbox, beam_wing, details, drivetrain, drs_flap, engine_cover, power_unit, rear_wing) are PB-011C's. A pair coupling a swept carrier with a funnel-refused class (torus - a revolved-circle carrier) stays a typed refusal (ContactReductionDeferred) and is recorded in the row's note, never lifted. This reason row remains the machine-checked evidence for the rows still staged, resolving to the BIE program's sweep-pair certification (BIE-006)."
+   "note": "Canonical-by-canonical booleans are landed. PB-011 routes the funnel-supported swept-carrier pairs (spline/swept/revolved carrier classes, the CFP-004 stage contract) through the facade's certified-entry dispatch at the bridge. PB-011B (the 2-D path wave) lifted the 12 canonical-cutter F1 rows: each row's OCC-baseline harness door run is green and its facts match the recorded reference (evidence marker PB-011B LIFT EVIDENCE in the row note), and the four corner rows carry no revolved-circle (torus) carrier in the op path, so no typed torus refusal was recorded; the rows keep this machine-checked reason until the orchestrator's corpus-output step moves them to the runnable canonical set (same protocol as the PB-011 falcon_heavy/cutaway lift). The F1 rows whose first refusing op is swept x swept (airbox, beam_wing, details, drivetrain, drs_flap, engine_cover, power_unit, rear_wing) were PB-011C's 4-D path wave. PB-011C ran all eight on this dispatch and NONE certifies - a typed-refusal census row each: every row's swept-carrier booleans are swept x swept (lofted/swept base x lofted/swept tool) carrier pairs the certified funnel does not admit end to end today (the fuse(swept,swept)/cut(swept,swept) pair cells answer the typed constructive-carrier NonCanonicalCarrier refusal at the boolean boundary; no landed boolean runs between two spline-loft solids; the restricted 4-D arm admits circular-section sweeps only, so no solver budget is spent - a typed refusal, not a stagnation), each row note carries a PB-011C CENSUS typed-refusal record with its OCC-baseline door evidence (green, facts reproducing the recorded reference within tolerance; facts mismatch: none), and no row carries a lift marker. The census records which rows refused and books the next funnel program's 4-D admission; the rows stay staged under this reason. A pair coupling a swept carrier with a funnel-refused class (torus - a revolved-circle carrier) stays a typed refusal (ContactReductionDeferred) and is recorded in the row's note, never lifted. This reason row remains the machine-checked evidence for the rows still staged, resolving to the BIE program's sweep-pair certification (BIE-006)."
   },
   "step-out": {
    "resolved_by": "TR-NRB-001",
@@ -22,12 +22,12 @@
   {
    "id": "f1/airbox",
    "reason": "booleans-on-swept-carriers",
-   "note": "lib/engine_cover.py build_airbox fuses the lobe/pod/collar swept bodies (_fuse at engine_cover.py) - booleans on swept carriers."
+   "note": "lib/engine_cover.py build_airbox fuses the lobe/pod/collar swept bodies (_fuse at engine_cover.py) - booleans on swept carriers. PB-011C CENSUS (4-D path wave): typed-refusal - the row's first refusing op is a swept x swept carrier pair (lofted/swept base x lofted/swept tool): the certified funnel does not admit a boolean between two spline-loft solids end to end on this dispatch (the fuse(swept,swept)/cut(swept,swept) pair cells answer the typed constructive-carrier NonCanonicalCarrier refusal at the boolean boundary; the restricted 4-D arm admits circular-section sweeps only, so no solver budget is spent - typed refusal, not stagnation), so no lift marker is recorded and the row stays staged under this reason. Door evidence (OCC baseline door_version 1, PB-011C wave): type Compound, solid_count 6, bbox [[-2060.0,-162.0,632.0],[-1618.5,162.0,919.9]], STL 4003 triangles, ~85 s - the door facts reproduce the recorded reference corpus/ttc/reference/airbox.json within the recorded tolerances (facts mismatch: none)."
   },
   {
    "id": "f1/beam_wing",
    "reason": "booleans-on-swept-carriers",
-   "note": "lib/rear_wing.py beam/endplate builders cut and trim swept airfoil shells (surfaces.cut at rear_wing.py)."
+   "note": "lib/rear_wing.py beam/endplate builders cut and trim swept airfoil shells (surfaces.cut at rear_wing.py). PB-011C CENSUS (4-D path wave): typed-refusal - the row's first refusing op is a swept x swept carrier pair (lofted/swept base x lofted/swept tool): the certified funnel does not admit a boolean between two spline-loft solids end to end on this dispatch (the fuse(swept,swept)/cut(swept,swept) pair cells answer the typed constructive-carrier NonCanonicalCarrier refusal at the boolean boundary; the restricted 4-D arm admits circular-section sweeps only, so no solver budget is spent - typed refusal, not stagnation), so no lift marker is recorded and the row stays staged under this reason. Door evidence (OCC baseline door_version 1, PB-011C wave): type Compound, solid_count 2, bbox [[-4163.3,-433.0,366.3],[-3960.0,433.0,502.0]], STL 1994 triangles, ~15 s - the door facts reproduce the recorded reference corpus/ttc/reference/beam_wing.json within the recorded tolerances (facts mismatch: none)."
   },
   {
    "id": "f1/corner_fl",
@@ -52,7 +52,7 @@
   {
    "id": "f1/details",
    "reason": "booleans-on-swept-carriers",
-   "note": "lib/details.py build_details shells and cuts the mirror/tyre-sensor bodies (surfaces.cut / fuse_all at details.py)."
+   "note": "lib/details.py build_details shells and cuts the mirror/tyre-sensor bodies (surfaces.cut / fuse_all at details.py). PB-011C CENSUS (4-D path wave): typed-refusal - the row's first refusing op is a swept x swept carrier pair (lofted/swept base x lofted/swept tool): the certified funnel does not admit a boolean between two spline-loft solids end to end on this dispatch (the fuse(swept,swept)/cut(swept,swept) pair cells answer the typed constructive-carrier NonCanonicalCarrier refusal at the boolean boundary; the restricted 4-D arm admits circular-section sweeps only, so no solver budget is spent - typed refusal, not stagnation), so no lift marker is recorded and the row stays staged under this reason. Door evidence (OCC baseline door_version 1, PB-011C wave): type Compound, solid_count 54, bbox [[-3939.0,-839.6,84.7],[1187.3,839.6,740.6]], STL 17938 triangles, ~104 s - the door facts reproduce the recorded reference corpus/ttc/reference/details.json within the recorded tolerances (facts mismatch: none)."
   },
   {
    "id": "f1/diffuser",
@@ -62,7 +62,7 @@
   {
    "id": "f1/drivetrain",
    "reason": "booleans-on-swept-carriers",
-   "note": "lib/drivetrain.py build_drivetrain fuses casing/strut/gear bodies (_fuse / .fuse at drivetrain.py)."
+   "note": "lib/drivetrain.py build_drivetrain fuses casing/strut/gear bodies (_fuse / .fuse at drivetrain.py). PB-011C CENSUS (4-D path wave): typed-refusal - the row also carries canonical-tool cuts (cut(swept,canonical)/intersect/cut(canonical,canonical) sub-ops) but its first refusing op is a swept x swept carrier pair (lofted/swept base x lofted/swept tool), so a partial lift applies only if the swept x swept ops certify; the certified funnel does not admit a boolean between two spline-loft solids end to end on this dispatch (the fuse(swept,swept)/cut(swept,swept) pair cells answer the typed constructive-carrier NonCanonicalCarrier refusal at the boolean boundary; the restricted 4-D arm admits circular-section sweeps only, so no solver budget is spent - typed refusal, not stagnation), the swept x swept ops do not certify, and the row files this typed-refusal census (no lift marker, stays staged under this reason). Door evidence (OCC baseline door_version 1, PB-011C wave): type Compound, solid_count 63, bbox [[-3980.0,-786.9,121.9],[-2880.0,786.9,470.0]], STL 60141 triangles, ~229 s - the door facts reproduce the recorded reference corpus/ttc/reference/drivetrain.json within the recorded tolerances (facts mismatch: none)."
   },
   {
    "id": "f1/drs_actuator",
@@ -72,12 +72,12 @@
   {
    "id": "f1/drs_flap",
    "reason": "booleans-on-swept-carriers",
-   "note": "lib/rear_wing.py flap element is trimmed against the endplate by surfaces.cut."
+   "note": "lib/rear_wing.py flap element is trimmed against the endplate by surfaces.cut. PB-011C CENSUS (4-D path wave): typed-refusal - the row's first refusing op is a swept x swept carrier pair (lofted/swept base x lofted/swept tool): the certified funnel does not admit a boolean between two spline-loft solids end to end on this dispatch (the fuse(swept,swept)/cut(swept,swept) pair cells answer the typed constructive-carrier NonCanonicalCarrier refusal at the boolean boundary; the restricted 4-D arm admits circular-section sweeps only, so no solver budget is spent - typed refusal, not stagnation), so no lift marker is recorded and the row stays staged under this reason. Door evidence (OCC baseline door_version 1, PB-011C wave): type Compound, solid_count 9, bbox [[-4095.7,-533.0,812.8],[-3957.5,533.0,946.8]], STL 1902 triangles, ~12 s - the door facts reproduce the recorded reference corpus/ttc/reference/drs_flap.json within the recorded tolerances (facts mismatch: none)."
   },
   {
    "id": "f1/engine_cover",
    "reason": "booleans-on-swept-carriers",
-   "note": "lib/engine_cover.py build_engine_cover fuses the shell and cuts sill/aperture cavities out of swept bodies (_fuse / surfaces.cut at engine_cover.py)."
+   "note": "lib/engine_cover.py build_engine_cover fuses the shell and cuts sill/aperture cavities out of swept bodies (_fuse / surfaces.cut at engine_cover.py). PB-011C CENSUS (4-D path wave): typed-refusal - the row's first refusing op is a swept x swept carrier pair (lofted/swept base x lofted/swept tool): the certified funnel does not admit a boolean between two spline-loft solids end to end on this dispatch (the fuse(swept,swept)/cut(swept,swept) pair cells answer the typed constructive-carrier NonCanonicalCarrier refusal at the boolean boundary; the restricted 4-D arm admits circular-section sweeps only, so no solver budget is spent - typed refusal, not stagnation), so no lift marker is recorded and the row stays staged under this reason. Door evidence (OCC baseline door_version 1, PB-011C wave): type Compound, solid_count 44, bbox [[-3452.0,-387.0,309.7],[-1700.0,387.0,851.1]], STL 11863 triangles, ~88 s - the door facts reproduce the recorded reference corpus/ttc/reference/engine_cover.json within the recorded tolerances (facts mismatch: none)."
   },
   {
    "id": "f1/floor",
@@ -92,12 +92,12 @@
   {
    "id": "f1/power_unit",
    "reason": "booleans-on-swept-carriers",
-   "note": "lib/power_unit.py build_power_unit fuses head/cover/bank bodies (_fuse at power_unit.py)."
+   "note": "lib/power_unit.py build_power_unit fuses head/cover/bank bodies (_fuse at power_unit.py). PB-011C CENSUS (4-D path wave): typed-refusal - the row's first refusing op is a swept x swept carrier pair (lofted/swept base x lofted/swept tool): the certified funnel does not admit a boolean between two spline-loft solids end to end on this dispatch (the fuse(swept,swept)/cut(swept,swept) pair cells answer the typed constructive-carrier NonCanonicalCarrier refusal at the boolean boundary; the restricted 4-D arm admits circular-section sweeps only, so no solver budget is spent - typed refusal, not stagnation), so no lift marker is recorded and the row stays staged under this reason. Door evidence (OCC baseline door_version 1, PB-011C wave): type Compound, solid_count 100, bbox [[-3565.8,-266.6,125.9],[-1590.0,266.6,701.6]], STL 100060 triangles, ~36 s - the door facts reproduce the recorded reference corpus/ttc/reference/power_unit.json within the recorded tolerances (facts mismatch: none)."
   },
   {
    "id": "f1/rear_wing",
    "reason": "booleans-on-swept-carriers",
-   "note": "lib/rear_wing.py build_rear_wing trims the mainplane/endplate pair with cutters (surfaces.cut at rear_wing.py)."
+   "note": "lib/rear_wing.py build_rear_wing trims the mainplane/endplate pair with cutters (surfaces.cut at rear_wing.py). PB-011C CENSUS (4-D path wave): typed-refusal - the row's first refusing op is a swept x swept carrier pair (lofted/swept base x lofted/swept tool): the certified funnel does not admit a boolean between two spline-loft solids end to end on this dispatch (the fuse(swept,swept)/cut(swept,swept) pair cells answer the typed constructive-carrier NonCanonicalCarrier refusal at the boolean boundary; the restricted 4-D arm admits circular-section sweeps only, so no solver budget is spent - typed refusal, not stagnation), so no lift marker is recorded and the row stays staged under this reason. Door evidence (OCC baseline door_version 1, PB-011C wave): type Compound, solid_count 18, bbox [[-4139.8,-543.6,345.2],[-3830.1,543.6,911.5]], STL 14594 triangles, ~30 s - the door facts reproduce the recorded reference corpus/ttc/reference/rear_wing.json within the recorded tolerances (facts mismatch: none)."
   },
   {
    "id": "f1/steering_rack",

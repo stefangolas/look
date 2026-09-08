@@ -28,13 +28,14 @@ pub const SURFACE_ROWS: [(&str, &str); 7] = [
 ];
 
 /// The status-token vocabulary a doc row may carry.
-pub const STATUS_TOKENS: [&str; 6] = [
+pub const STATUS_TOKENS: [&str; 7] = [
     "landed",
     "recorded-client-layer",
     "deferred-bie",
     "boundary-refusal",
     "staged-skip",
     "lift-evidence-recorded",
+    "census-recorded",
 ];
 
 /// The absolute path of the compat-surface doc in this worktree.
