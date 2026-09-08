@@ -34,7 +34,7 @@ tests_required:
 anchors:
   - {id: A1, expect: 1, cmd: "grep -c 'a spline-profile revolve is not a kernel-engine row' corpus/ttc/door.py"}
   - {id: A2, expect: 1, cmd: "grep -c 'fn lathe_volume' truck123d/src/bd_bridge.rs"}
-  - {id: A3, expect: 1, cmd: "grep -c 'revolved_shell' corpus/ttc/trees/falcon_heavy/src/lib/merlin_common.py"}
+  - {id: A3, expect: 7, cmd: "grep -c 'revolved_shell' corpus/ttc/trees/falcon_heavy/src/lib/merlin_common.py"}
 budget:      {turns: 70, ctx_tokens: 190000}
 ```
 
