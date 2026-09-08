@@ -68,7 +68,9 @@ with the refusing-by-default tests green and the anchors holding.
 
 Any numeric method (D-shim). Admitting any real carrier pair (that is
 ADM-001+, each with its admitting test). Widening `split.rs` or `classify.rs`
-(FSSI-LAYER). New base Refusal variants.
+(FSSI-LAYER). New base Refusal variants. H-1: the new module
+(`construct/admission.rs`) carries `#![deny(clippy::unwrap_used)]` — no
+panics anywhere in the admission layer.
 
 ## Stop conditions
 
