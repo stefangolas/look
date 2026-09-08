@@ -1,11 +1,17 @@
-# WORK PACKET FSSI-001-GATE — the separable tangency-free admissibility certificate
+# WORK PACKET FSSI-001-GATE — the separable transversality gate at SSI admission (r2)
+
+r2 (2026-09-08): mechanism CORRECTED per owner Theorem C — the original
+draft claimed the gate proves `Σ ∩ B = ∅`, which is mathematically false
+(transverse surfaces can intersect inside `B`). The gate certifies
+**TRANSVERSALITY** (`rank DF = 3` at every point of `Σ ∩ B`); emptiness of
+`Σ ∩ B` is certified by the separate Bernstein exclusion of `F` itself.
+Write set corrected: the suspicion variants already landed (FSSI-000 r2);
+`ssi_types.rs` is out of scope. Anchors re-measured on the substrate.
 
 FSSI-0 of the theory spec ([`FSSI_BUILD_SPEC.md`](../../docs/FSSI_BUILD_SPEC.md)
-§3, packet 2): discharge `dim Σ = 0` BEFORE the event system, with typed
-refusals. This is the piece that engages the known failure surface —
-near-tangency and coincidence — at SSI admission, below the contact funnel
-(FSSI-LAYER: `truck-shapeops/boolean/classify.rs` is off-limits for the
-whole program; DEF-SEEDRAY-B owns it).
+§3, packet 2): certify transversality at SSI admission, below the contact
+funnel (FSSI-LAYER: `truck-shapeops/boolean/classify.rs` is off-limits for
+the whole program; DEF-SEEDRAY-B owns it).
 
 ```yaml
 id:          FSSI-001-GATE
@@ -16,7 +22,6 @@ depends_on:  [FSSI-000-CONTRACT]
 write_allow:
   - vendor/truck/truck-certified/src/ssi_gate.rs
   - vendor/truck/truck-certified/src/ssi.rs
-  - vendor/truck/truck-certified/src/ssi_types.rs
   - vendor/truck/truck-certified/src/construct/bie/ssi4.rs
   - vendor/truck/truck-certified/tests/ssi_gate_conformance.rs
 read_allow:
@@ -24,28 +29,30 @@ read_allow:
   - vendor/truck/truck-certified/src/
   - vendor/truck/truck-evidence/src/
 tests_required:
-  - gate_admit_certifies_tangency_free_box
+  - gate_admit_certifies_transverse_box
   - tangent_curve_fixture_refuses_named_case
   - coincident_patch_fixture_refuses_named_case
   - near_tangent_rank3_pair_passes_gate
   - loft_apex_pole_fixture_passes_gate
   - v5_pair_identity_on_green_spline_pairs
 anchors:
-  - {id: A1, expect: 1, cmd: "grep -c 'deny(clippy::unwrap_used)' vendor/truck/truck-certified/src/ssi_gate.rs"}
-  - {id: A2, expect: 1, cmd: "grep -c 'pub fn gate_admit' vendor/truck/truck-certified/src/ssi_gate.rs"}
-  - {id: A3, expect: 1, cmd: "grep -c 'TangentCurveSuspected' vendor/truck/truck-certified/tests/ssi_gate_conformance.rs"}
+  - {id: A1, expect: 5, cmd: "grep -c 'TangentCurveSuspected' vendor/truck/truck-certified/src/ssi.rs"}
+  - {id: A2, expect: 1, cmd: "grep -c 'pub struct Ssi4System' vendor/truck/truck-certified/src/construct/bie/ssi4.rs"}
+  - {id: A3, expect: 1, cmd: "grep -c 'hull_bernstein_2d' vendor/truck/truck-certified/src/hull.rs"}
 budget:      {turns: 80, ctx_tokens: 200000}
 ```
 
 ## Pre-digested context
 
-- **The certificate (theory §1.1).** On box `B` with `B ∩ P = ∅`: if the
-  interval enclosure of `‖n_X × n_Y‖(B)` has a strictly positive lower
-  bound, then `Σ ∩ B = ∅` and `rank DF = 3` throughout `B ∩ M`. The test is
-  **separable**: `n_X` depends only on `(u,v)`, `n_Y` only on `(s,t)` —
-  compose through the CFP-003 separability discipline (hull the `(u,v)`
-  slice per `(s,t)` control index, then hull over `(s,t)`); NEVER
-  materialize the O(deg⁴) product grid.
+- **The certificate (Theorem C, corrected 2026-09-08).** On box `B` with
+  `B ∩ P = ∅`: if the interval enclosure of `‖n_X × n_Y‖(B)` has a strictly
+  positive lower bound, then `rank DF = 3` at EVERY point of `Σ ∩ B`
+  (transversality — the intersection through `B` is regular; no tangencies).
+  **This does NOT imply `Σ ∩ B = ∅`** — emptiness is the separate Bernstein
+  exclusion of `F`, never this gate's output. Mechanization: TWO
+  per-surface 2-D normal cones (`cone(a, θ_X)`, `cone(b, θ_Y)`), not a 4-D
+  normal-product field: `δ = min{∠(a,b), π−∠(a,b)} − θ_X − θ_Y > 0 ⇒
+  ‖n_X × n_Y‖ ≥ sin δ > 0`.
 - **The substrate**: `hull_bernstein_2d` / `TensorGrid4` / `bernstein_box4`
   (`hull.rs:95-117`, `interval/bounds.rs:111-208`); normal nets are already
   carried per side by `SquareSystem3`. One interval algebra:

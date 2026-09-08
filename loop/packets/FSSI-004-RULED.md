@@ -28,9 +28,9 @@ tests_required:
   - clipped_generator_domain_crossing_events_certified
   - v5_analytic_pairs_bit_identical
 anchors:
-  - {id: A1, expect: 1, cmd: "grep -c 'deny(clippy::unwrap_used)' vendor/truck/truck-evidence/src/analytic/ruled_pair.rs"}
-  - {id: A2, expect: 1, cmd: "grep -c 'pub fn ruled_pair_locus' vendor/truck/truck-evidence/src/analytic/ruled_pair.rs"}
-  - {id: A3, expect: 1, cmd: "grep -c 'ruled_pair' vendor/truck/truck-certified/src/pair_dispatch.rs"}
+  - {id: A1, expect: 38, cmd: "grep -c 'ContactLocus' vendor/truck/truck-shapeops/src/boolean/split.rs"}
+  - {id: A2, expect: 6, cmd: "grep -c 'pub fn' vendor/truck/truck-certified/src/pair_dispatch.rs"}
+  - {id: A3, expect: 9, cmd: "grep -c 'KrawczykSystem' vendor/truck/truck-evidence/src/num/krawczyk.rs"}
 budget:      {turns: 70, ctx_tokens: 180000}
 ```
 
