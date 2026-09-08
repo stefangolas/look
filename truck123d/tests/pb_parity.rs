@@ -16,6 +16,17 @@
 //! as the landed PB-013/PB-014 suites assert live certification (in-envelope
 //! report semantics). Canonical x canonical pairs are untouched (landed S1).
 //!
+//! PB-011B (the 2-D path wave) extends the lift test to the canonical-cutter
+//! F1 rows (floor/diffuser/suspension x2/steering_rack/track rods x2/
+//! corners x4/drs_actuator): the B lifted set is the SKIPS rows whose note
+//! carries the `PB-011B LIFT EVIDENCE` marker, and each lifted row must run
+//! green through the harness door AND reproduce the recorded OCC reference
+//! facts within tolerance (a green-but-wrong build is a stop-and-file, never
+//! a lift). The corner rows certify through the certified-entry dispatch
+//! because their revolve carriers are spline/line-polyline profiles — no
+//! revolved-circle (torus) carrier is in the op path, so no typed torus
+//! refusal is recorded for them.
+//!
 //! The corpus-side lift tests run the lifted rows through the harness door
 //! (`corpus/ttc/door.py`, OCC baseline regime — a fresh python process per
 //! row) exactly as `compat::runner` runs canonical rows, asserting the row's
@@ -346,14 +357,196 @@ fn assert_green_door_evidence(corpus: &Path, row: &compat::manifest::ManifestRow
         row.id,
         stl_len
     );
+    assert_facts_match_recorded_reference(corpus, row, &parse_run_facts(&record, &row.id));
     let _ = std::fs::remove_dir_all(&out_dir);
 }
 
-/// PB-011 required test 2: every row this packet lifts from `corpus/ttc/
-/// SKIPS.json` runs green through the harness door (geometry facts + report
-/// record + STL). The lifted set is read from the machine-checked evidence
-/// this packet wrote into the SKIPS rows (`PB-011 LIFT EVIDENCE` note marker);
-/// an empty lifted set fails the test — lifting is the point.
+/// Parses a door record's geometry facts into the typed runner facts.
+fn parse_run_facts(record: &serde_json::Value, row_id: &str) -> compat::runner::RunFacts {
+    let facts = record
+        .get("facts")
+        .and_then(serde_json::Value::as_object)
+        .unwrap_or_else(|| panic!("row {row_id} must carry geometry facts"));
+    let solid_count = facts
+        .get("solid_count")
+        .and_then(serde_json::Value::as_i64)
+        .unwrap_or_else(|| panic!("row {row_id} solid_count must be an integer"));
+    let volume = facts
+        .get("volume")
+        .and_then(serde_json::Value::as_f64)
+        .unwrap_or_else(|| panic!("row {row_id} volume must be a number"));
+    let corners = facts
+        .get("bbox")
+        .and_then(serde_json::Value::as_array)
+        .unwrap_or_else(|| panic!("row {row_id} must carry a two-corner bbox"));
+    let mut bbox = [[0.0f64; 3]; 2];
+    for (corner_idx, corner) in corners.iter().enumerate() {
+        let coords = corner
+            .as_array()
+            .unwrap_or_else(|| panic!("row {row_id} bbox corner {corner_idx} must be an array"));
+        for (axis, value) in coords.iter().enumerate() {
+            bbox[corner_idx][axis] = value
+                .as_f64()
+                .unwrap_or_else(|| panic!("row {row_id} bbox coordinate must be a number"));
+        }
+    }
+    compat::runner::RunFacts {
+        solid_count,
+        volume,
+        bbox,
+    }
+}
+
+/// The recorded-reference file for a row id (`<base>.json` under
+/// `corpus/ttc/reference/`, keyed by the row-id basename). The staged rows
+/// carry no manifest `reference` field until the orchestrator's manifest
+/// movement, so the id basename keys the recorded file.
+fn recorded_reference_path(
+    corpus: &Path,
+    row: &compat::manifest::ManifestRow,
+) -> std::path::PathBuf {
+    let base = row
+        .id
+        .rsplit('/')
+        .next()
+        .unwrap_or_else(|| panic!("row id {} must carry a slash", row.id));
+    corpus.join("reference").join(format!("{base}.json"))
+}
+
+/// Asserts a green run's facts match the row's recorded OCC reference within
+/// its recorded tolerances (the facts-vs-reference gate a lift keys on: a
+/// build that is green but wrong geometry is a stop-and-file, never a lift).
+///
+/// The staged-row references carry the door's full facts record (including
+/// `diag`, which the strict `ReferenceFile` deserialization rejects), so the
+/// recorded values are read from the JSON value into the typed structs first
+/// and compared with [`compat::reference::compare_facts`].
+fn assert_facts_match_recorded_reference(
+    corpus: &Path,
+    row: &compat::manifest::ManifestRow,
+    run: &compat::runner::RunFacts,
+) {
+    let path = recorded_reference_path(corpus, row);
+    let text = std::fs::read_to_string(&path).unwrap_or_else(|e| {
+        panic!(
+            "row {} has no recorded reference {}: {e}",
+            row.id,
+            path.display()
+        )
+    });
+    let value: serde_json::Value = serde_json::from_str(&text).unwrap_or_else(|e| {
+        panic!(
+            "row {} recorded reference {} is invalid: {e}",
+            row.id,
+            path.display()
+        )
+    });
+    let reference = reference_from_value(&value).unwrap_or_else(|e| {
+        panic!(
+            "row {} recorded reference {} is not usable: {e}",
+            row.id,
+            path.display()
+        )
+    });
+    compat::reference::compare_facts(&compat::runner::as_geometry_facts(run), &reference)
+        .unwrap_or_else(|e| {
+            panic!(
+                "row {} door-run facts differ from the recorded reference: {e}",
+                row.id
+            )
+        });
+}
+
+/// Builds a typed reference file from a reference JSON value, reading only the
+/// fields the comparison needs (the recorded value may carry extra fields the
+/// door emitted, e.g. `diag`, that the strict struct deserialization rejects).
+fn reference_from_value(
+    value: &serde_json::Value,
+) -> Result<compat::reference::ReferenceFile, String> {
+    let obj = value
+        .as_object()
+        .ok_or_else(|| "reference is not an object".to_string())?;
+    let get = |key: &str| -> Result<&serde_json::Value, String> {
+        obj.get(key)
+            .ok_or_else(|| format!("reference has no {key}"))
+    };
+    let facts = get("facts")?
+        .as_object()
+        .ok_or_else(|| "reference facts is not an object".to_string())?;
+    let fnum = |key: &str| -> Result<f64, String> {
+        facts
+            .get(key)
+            .and_then(serde_json::Value::as_f64)
+            .ok_or_else(|| format!("reference facts.{key} is not a number"))
+    };
+    let bbox_value = facts
+        .get("bbox")
+        .and_then(serde_json::Value::as_array)
+        .ok_or_else(|| "reference facts.bbox is not an array".to_string())?;
+    let mut bbox = [[0.0f64; 3]; 2];
+    for (corner_idx, corner) in bbox_value.iter().enumerate() {
+        let coords = corner
+            .as_array()
+            .ok_or_else(|| "reference bbox corner is not an array".to_string())?;
+        for (axis, coord) in coords.iter().enumerate() {
+            bbox[corner_idx][axis] = coord
+                .as_f64()
+                .ok_or_else(|| "reference bbox coordinate is not a number".to_string())?;
+        }
+    }
+    let tolerances = get("tolerances")?
+        .as_object()
+        .ok_or_else(|| "reference tolerances is not an object".to_string())?;
+    let tnum = |key: &str| -> Result<f64, String> {
+        tolerances
+            .get(key)
+            .and_then(serde_json::Value::as_f64)
+            .ok_or_else(|| format!("reference tolerances.{key} is not a number"))
+    };
+    Ok(compat::reference::ReferenceFile {
+        schema: get("schema")
+            .ok()
+            .and_then(serde_json::Value::as_str)
+            .unwrap_or("")
+            .to_string(),
+        row_id: get("row_id")
+            .ok()
+            .and_then(serde_json::Value::as_str)
+            .unwrap_or("")
+            .to_string(),
+        door_version: get("door_version")
+            .ok()
+            .and_then(serde_json::Value::as_str)
+            .unwrap_or("")
+            .to_string(),
+        facts: compat::reference::GeometryFacts {
+            solid_count: facts
+                .get("solid_count")
+                .and_then(serde_json::Value::as_i64)
+                .ok_or_else(|| "reference facts.solid_count is not an integer".to_string())?,
+            volume: fnum("volume")?,
+            bbox,
+        },
+        tolerances: compat::reference::Tolerances {
+            solid_count: tolerances
+                .get("solid_count")
+                .and_then(serde_json::Value::as_str)
+                .unwrap_or("")
+                .to_string(),
+            volume_rel: tnum("volume_rel")?,
+            volume_abs: tnum("volume_abs")?,
+            bbox_abs: tnum("bbox_abs")?,
+        },
+    })
+}
+
+/// PB-011 required test 2 (PB-011B lift set): every row this packet lifts
+/// from `corpus/ttc/SKIPS.json` runs green through the harness door with
+/// geometry facts + report record + STL, and the green door-run facts match
+/// the row's recorded OCC reference within its recorded tolerances. The B
+/// (canonical-cutter, 2-D path) lifted set is read from the machine-checked
+/// evidence this packet wrote into the SKIPS rows (`PB-011B LIFT EVIDENCE`
+/// note marker); an empty B lifted set fails the test — lifting is the point.
 #[test]
 fn lifted_skip_rows_run_green() {
     let corpus = corpus_dir();
@@ -364,12 +557,12 @@ fn lifted_skip_rows_run_green() {
     let lifted: Vec<String> = skips
         .rows
         .iter()
-        .filter(|skip| skip.note.contains("PB-011 LIFT EVIDENCE"))
+        .filter(|skip| skip.note.contains("PB-011B LIFT EVIDENCE"))
         .map(|skip| skip.id.clone())
         .collect();
     assert!(
         !lifted.is_empty(),
-        "the lifted set must be non-empty — lifting is the point of PB-011"
+        "the B (canonical-cutter) lifted set must be non-empty — lifting is the point of PB-011B"
     );
 
     for id in &lifted {

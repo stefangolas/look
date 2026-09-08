@@ -22,6 +22,7 @@ build123d API** and the compat surface must answer to it, name for name.
 | `deferred-bie` | canonical-carrier forms land today; the sweep/swept-carrier forms wait on BIE (sweep-pair certification) |
 | `boundary-refusal` | answered as a **typed refusal** (never silent): a name inside a documented kernel boundary refuses with the named case |
 | `staged-skip` | corpus scripts exercising this row in a not-yet-landed form carry a machine-checked skip reason (`corpus/ttc/SKIPS.json`) |
+| `lift-evidence-recorded` | a staged row whose green door run + reference-matched facts are recorded as lift evidence in its SKIPS note (PB-011B's canonical-cutter rows), still staged until the orchestrator's manifest movement |
 
 ## Corpus and census
 
@@ -52,7 +53,7 @@ count of `.color` assignment sites and the label count pinned by the vendored
 
 | # | surface id | usage (census 2026-09-06) | compat status | answered-by (bridge rows) |
 |---|---|---|---|---|
-| S1 | `Algebra operators + - &` | 2780 binary `+` `-` `&` (upper bound) | `landed` for canonical×canonical AND for the routed swept-carrier forms (spline/swept/revolved carrier classes dispatch through the certified entry, PB-011); `boundary-refusal` for a swept pair coupling a funnel-refused carrier class (torus); remaining `staged-skip` corpus rows carry the machine-checked reason | facade `boolean_op` (`Mode` union/subtract/intersect) on canonical carriers; swept-carrier `Mode` rows route through the certified-entry dispatch (`dispatch_swept_carrier_boolean`, PB-011); BIE-006 stays the resolution for the still-deferred forms |
+| S1 | `Algebra operators + - &` | 2780 binary `+` `-` `&` (upper bound) | `landed` for canonical×canonical AND for the routed swept-carrier forms (spline/swept/revolved carrier classes dispatch through the certified entry, PB-011); `boundary-refusal` for a swept pair coupling a funnel-refused carrier class (torus); `lift-evidence-recorded` for the 12 canonical-cutter F1 rows PB-011B proved green through the door with facts matching their recorded references; the remaining `staged-skip` corpus rows carry the machine-checked reason | facade `boolean_op` (`Mode` union/subtract/intersect) on canonical carriers; swept-carrier `Mode` rows route through the certified-entry dispatch (`dispatch_swept_carrier_boolean`, PB-011); PB-011B recorded the 2-D path lift evidence on the canonical-cutter F1 rows (door run green + facts vs the recorded reference, `PB-011B LIFT EVIDENCE` marker in the row notes); BIE-006 stays the resolution for the still-deferred forms (PB-011C's swept×swept rows) |
 | S2 | `Plane/Location algebra (plane * shape, plane.offset(d), Pos, Rotation, Location, Axis)` | 183 | `recorded-client-layer` | frame/placement rows of the submitted session table; `.offset(` is 19 of the 183 and every hit is a `Plane.offset` frame move — no kernel solid-offset hides here |
 | S3 | `Primitives (Box, Cylinder, Sphere, Torus, Compound)` | 126 | `landed` | facade `box`/`cylinder`/`sphere`/`torus`; `Compound`/grouping is assembly emission (PB-006) |
 | S4 | `make_face / topology types (Edge, Face, Wire, Solid, Shape)` | 49 | `landed` | facade `make_face`; topology typing only on the compat side (no kernel geometry in the bridge) |
@@ -73,13 +74,25 @@ spline/swept/revolved carrier dispatches the carrier pair through
 solver-entry funnel, and an accepted pair is recorded on the facade report as
 a routed swept-carrier boolean row. A pair coupling a swept carrier with a
 funnel-refused carrier class (torus — excluded from the implicit-reduction
-stage) is answered as the typed, localized refusal, fail-closed. Corpus rows
-that boolean-compose swept carriers still carry the machine-checked skip
-reason `booleans-on-swept-carriers` (`corpus/ttc/SKIPS.json`, `resolved_by:
-BIE-006`) until their door run is green and the row moves to the runnable
-manifest; the Falcon-Heavy rows that are boolean-free run as the canonical
-subset, and the F1 rows that shell+cut lofted geometry are skipped with that
-reason.
+stage) is answered as the typed, localized refusal, fail-closed. The 2-D path
+wave (PB-011B) lifted the 12 canonical-cutter F1 rows whose first refusing op
+is a canonical-tool pair (floor/diffuser/suspension x2/steering_rack/track
+rods x2/corners x4/drs_actuator): each row's OCC-baseline harness door run is
+green and its facts match the recorded `corpus/ttc/reference/*.json` within
+tolerance, and each row now carries the `PB-011B LIFT EVIDENCE` marker in its
+SKIPS note (`lift-evidence-recorded`). The four corner rows were checked for
+the torus caveat: their revolve carriers are spline/line-polyline profiles,
+none is a revolved-circle (torus) carrier, so every cut(revolved, canonical)
+pair certifies through the certified-entry dispatch and no typed torus
+refusal was recorded. The rows still carry the machine-checked skip reason
+`booleans-on-swept-carriers` (`corpus/ttc/SKIPS.json`, `resolved_by:
+BIE-006`) — the physical manifest movement to the runnable canonical set is
+the orchestrator corpus-output step, exactly as PB-011's cutaway lift — while
+the F1 rows whose first refusing op is swept×swept (airbox, beam_wing,
+details, drivetrain, drs_flap, engine_cover, power_unit, rear_wing) are
+PB-011C's. The Falcon-Heavy rows that are boolean-free run as the canonical
+subset, and the remaining F1 rows that shell+cut lofted geometry are skipped
+with that reason.
 
 **S2 — Plane/Location algebra.** Client-layer arithmetic: `Plane * shape`,
 `Pos`/`Rotation`/`Location`/`Axis` frames, `.moved(...)`, `plane.offset(...)`.
