@@ -51,12 +51,16 @@ family already produces these as certified objects; survey rows R0xx, a-bucket
    parallelotope tube continues the curve fiber-by-fiber with certified
    uniqueness per step. **Landed:** `KrawczykSystem<N>` (`num/krawczyk.rs`),
    parallelotope continuation (`num/parallelotope.rs:12-52`).
-5. **Exclusion.** Boxes with no solution must be cheaply and provably
-   excluded. **Landed substrate:** Bernstein exclusion (row 6 above);
-   **FSSI-001 (spec'd, not landed)** adds the separable tangency-free gate —
-   hull of `‖n_X × n_Y‖` as a 2D×2D composition, strictly positive lower
-   bound ⇒ empty intersection and rank-3 throughout, at O(deg²) hull cost
-   instead of O(deg⁴) product materialization.
+5. **Exclusion and transversality.** Boxes with no solution must be
+   cheaply and provably excluded (Bernstein exclusion of `F` itself —
+   landed); separately, the interaction must be certified TRANSVERSE
+   (rank 3) wherever it exists. **Landed substrate:** `bernstein_box4`
+   exclusion; **FSSI-001 (spec'd, corrected 2026-09-08 per owner Theorem
+   C)** is a transversality gate, NOT an exclusion test: positive normal
+   separation `‖n_X × n_Y‖ ≥ sin δ > 0` via two per-surface 2-D normal
+   cones ⇒ `rank DF = 3` at every point of `Σ ∩ B` — it does NOT imply
+   `Σ ∩ B = ∅`. (The original draft's emptiness claim was mathematically
+   false and is corrected in FSSI_BUILD_SPEC.md.)
 6. **The hard strata.** Ordinary folds (where the curve is tangent to a
    chart boundary), tangency curves, coincident patches, and degenerate
    sections (loft apexes) are where interval methods stall. **This is
@@ -88,37 +92,88 @@ family already produces these as certified objects; survey rows R0xx, a-bucket
     **volume of a spline-faced solid is the genuinely new theory bit** —
     see §3.
 
-## 3. The new theory deliverables (the honest delta)
+## 3. The new theory deliverables (revised 2026-09-08 per owner's theorems — replaces the original T1/T2/T3)
 
-Everything in §2 rows 1–5 and 8–9 is landed. Rows 5(partial)–7 are FSSI's
-spec'd program. The admission program itself owns exactly three new pieces:
+The owner's revision replaces the loft-specific admission with ONE generic
+theorem and collapses the pathology taxonomy to two algebraic questions.
+Every claim below was re-derived and checked before acceptance (the
+cancellations and the transversality correction are verified in the
+commit trail). The delta is smaller than the original draft:
 
-- **T1 — Loft-boundary strata.** The loft's own degeneracies (apex poles of
-  a section collapsing to a point, tangent sections, seam edges where the
-  cross-section interpolation closes) must be enumerated as typed strata
-  with exclusion criteria, so the tracer never enters an undefined chart.
-  Proof obligation: every degenerate locus is either excluded by a named
-  enclosure test or refused typed (`DegenerateFold`-class vocabulary per
-  FSSI-REFUSAL). No sampling anywhere.
-- **T2 — Certified volume for spline-faced solids.** Generalization of the
-  landed frustum telescoping (which is the revolved-polygon special case,
-  and of FH-SPLINE-LATHE's segment-moment revolve integral): for a closed,
-  oriented, trimmed spline boundary, `V = (1/3) Σ_patches ∫∫
-  X·(X_u × X_v) du dv` — each patch contribution is a polynomial (or
-  rational, if rational sections) integral over its trimmed domain, computed
-  in the landed exact interval algebra (`formal::exact::CertifiedInterval`),
-  with the trimming curves as integration boundaries handled by the same
-  exact-winding discipline. Proof obligation: the certificate must detect a
-  non-closed or mis-oriented trimmed boundary (the volume certificate is
-  meaningless unless closure is proven first — this is the same discipline
-  as the shell-closure checks the mesher already enforces, lifted to
-  certified arithmetic).
-- **T3 — Admission dispatch.** The boolean boundary routes
-  `(spline-loft, spline-loft)` pairs into the pipeline above, behind typed
-  refusals for every carrier form the pipeline does not yet certify (the
-  NonCanonicalCarrier refusal stays the default; admission widens it case by
-  case, each with its admitting test). Proof obligation: V5-pair identity —
-  every currently-green pair answers bit-identically after admission lands.
+- **T3′ — Exact tensor-spline admission (Theorem A; "essentially no" new
+  theory).** Any positive-weight tensor-spline face admits. On each knot
+  rectangle, Bézier extraction is an exact local change of basis
+  (geometry-preserving), so with `X = Â/Ŵ_X`, `Y = B̂/Ŵ_Y` (tensor-Bernstein,
+  affine spans re-parameterized to `[0,1]²`, weights strictly positive):
+
+  `X(u,v) = Y(s,t)  ⇔  F = Ŵ_Y·Â − Ŵ_X·B̂ = 0`
+
+  — a POLYNOMIAL map, which is exactly what the landed `bernstein_box4`
+  exclusion and `Ssi4System` want. **One representation adapter, not a
+  family of admission cases.** Covers F1 lofts AND Falcon-Heavy
+  spline-profile revolves (a revolved spline profile is the profile spline
+  tensored with rational circle arcs — itself a rational tensor-product
+  surface). Runtime discipline: lazy extraction — control-hull/AABB-cull
+  face pairs, then knot spans; extract only survivors; cache extraction
+  operators per knot configuration. V5 identity is structural: canonical
+  dispatch stays AHEAD of the adapter; the adapter fires only where the old
+  path would return `NonCanonicalCarrier`.
+- **T1′ — Regularity by two algebraic questions (Theorems B1/B2; "tiny").**
+  No pathology taxonomy. The only questions: is the parameterization
+  regular, and is a boundary stratum intentionally collapsed/identified?
+  For rational faces use the polynomial normal numerator
+  `M = W(A_u×A_v) − W_v(A_u×A) − W_u(A×A_v)` (verified: `X_u×X_v = M/W³`,
+  so regularity is a POLYNOMIAL question). (a) **Hemisphere certificate:**
+  pick `c` from the floating midpoint normal, round to dyadic, certify
+  `min(bernstein coefficients of c·M) > 0` ⇒ regular on all of `B`
+  (convex-hull property) — no singularity search unless this cheap test
+  fails. (b) **Collapsed-edge deflation:** a boundary collapsed to `p`
+  gives a known factor `(1−v)` in `M`; divide it out and certify the
+  quotient (`c·M* > 0` ⇒ regular for all `v < 1`, the only rank defect is
+  the intentional collapse); repeat for multiplicity `k` — higher-order
+  collapses handled without a new solver. (c) **Seam identification:**
+  `X(u,0) = X(u,1)` certified exactly by `A_0·W_1 − A_1·W_0 ≡ 0` (aligned
+  degrees/knots); seams are paired BRep edges, not singularities. Outcome
+  space: regular | regular+seam | regular-interior+collapsed-boundary |
+  genuine parameter singularity → typed refusal. No "tangent sections"
+  category — tangent construction sections matter only if they actually
+  force `M = 0`.
+- **T1′/FSSI-001 — Transversality from the same normal cones (Theorem C;
+  "small").** `rank DF < 3` at a solution iff the tangent planes coincide;
+  `inf ‖n_X×n_Y‖ > 0` over normal cones with angular separation
+  `δ > 0 ⇒ ‖n_X×n_Y‖ ≥ sin δ` ⇒ rank 3 at every intersection. One
+  per-surface normal-cone subsystem closes BOTH T1′ regularity and
+  FSSI-001 transversality. **The FSSI spec's original emptiness claim was
+  false and is corrected at the source** (transversality ≠ exclusion;
+  emptiness is Bernstein exclusion of `F`, a separate test).
+- **T2′ — Certified volume (published machinery + one small new
+  primitive).** Polynomial case: Antolin–Hirschler-style boundary
+  reduction — `V = (1/3) Σ ∬ g`, `g = X·(X_u×X_v)` polynomial;
+  `H(u,v) = ∫ g du`, Green ⇒ `∮ H dv`; trim segments Bézier ⇒ the final
+  integrand is a UNIVARIATE Bernstein polynomial, integrated as
+  `Σ pᵢ/(n+1)` — **quadrature-free, published construction**, not new
+  research. Rational case (verified cancellation): `g = P/W³` with
+  `P = A·(A_u×A_v)` — all `W_u, W_v` terms vanish. **Theorem D —
+  certified reciprocal-power polynomialization:** Bernstein weight bounds
+  `0 < w₋ ≤ W ≤ w₊`, `δ = (W−w₀)/w₀`, `|δ| ≤ ρ < 1`; truncate
+  `(1+δ)⁻³` after `m` terms; certified uniform tail
+  `ε_m ≤ w₀⁻³ Σ_{k>m} C(k+2,2)ρᵏ`; `|I − Ĩ| ≤ area(R)·‖P‖∞·ε_m`. One
+  primitive, `certified_reciprocal_power(W, p, target_error) → polynomial
+  + remainder_bound`, generalizes (rational trim pcurves included).
+  Geometric convergence in ρ; subdivide once (de Casteljau) if weights
+  vary violently. Precedent: Krishnamurthy & McMains (trimmed-NURBS
+  moments with rigorous error bounds). FH-SPLINE-LATHE's segment-moment
+  derivation (in flight) is the revolve special case and lands
+  independently; T2′ can absorb it later.
+
+| Piece | Machinery | New theory? |
+|---|---|---|
+| T3′ | lazy exact Bézier extraction → existing `Ssi4System` | essentially no |
+| T1′ | scalar normal hemisphere certificate | tiny |
+| T1′ | exact collapsed-edge factor deflation | yes, but very small |
+| T1′/FSSI-001 | certified normal cones → transversality | small |
+| T2′ polynomial | Green/divergence → trim-line Bernstein integral | published |
+| T2′ rational | reciprocal-power polynomial + rigorous tail | new small primitive |
 
 ## 4. What this program deliberately does NOT do
 

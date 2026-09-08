@@ -122,12 +122,19 @@ Freezes names, signatures, and the mapping table before any solver code.
 
 The separable tangency-free certificate (theory §1), landed at SSI admission.
 
-- **Mechanism.** On box `B` with `B ∩ P = ∅`: enclosure of
-  `‖n_X × n_Y‖(B)` as a **separable 2D×2D composition** — hull `n_X` over
-  the `(u,v)` slice per `(s,t)` control index, then hull over `(s,t)`
-  (the CFP-003 separability discipline; never materialize the O(deg⁴)
-  product). Strictly positive lower bound ⇒ `Σ ∩ B = ∅` and rank 3
-  throughout `B ∩ M`. Straddling zero ⇒ subdivide under the existing
+- **Mechanism (corrected 2026-09-08, owner Theorem C — the original draft
+  claimed the gate proves `Σ ∩ B = ∅`, which is FALSE: transverse surfaces
+  can intersect inside `B`; positive normal separation certifies
+  TRANSVERSALITY, not emptiness):** on box `B` with `B ∩ P = ∅`, certify a
+  strictly positive lower bound on `‖n_X × n_Y‖` over `B` — mechanized as
+  TWO per-surface 2-D normal cones (`cone(a, θ_X)`, `cone(b, θ_Y)` from the
+  hemisphere certificate, not a 4-D normal-product field):
+  `δ = min{∠(a,b), π−∠(a,b)} − θ_X − θ_Y > 0  ⇒  ‖n_X × n_Y‖ ≥ sin δ > 0`.
+  **What this certifies: `rank DF = 3` at every point of `Σ ∩ B`
+  (transversality — the intersection curve through `B` is regular and
+  well-conditioned for continuation; no tangencies).** Emptiness of
+  `Σ ∩ B` is certified by the separate Bernstein exclusion of `F` itself,
+  never by this gate. Straddling zero ⇒ subdivide under the existing
   budget; on budget exhaustion, apply the **positive-dimension suspicion
   halt** and refuse `TangentCurveSuspected` (undecided measure failing to
   shrink like 2⁻⁴ᵏ) or `CoincidentPatchSuspected` (undecided measure at
