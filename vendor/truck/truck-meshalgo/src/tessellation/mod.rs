@@ -661,6 +661,8 @@ impl<C: PolylineableCurve, S: RobustMeshableSurface> RobustMeshableShape
 
 pub mod diagnosis;
 pub mod realization_evidence;
+#[cfg(test)]
+mod seam_dump;
 pub mod source_edge;
 pub use truck_certified::meshable::{MeshableSurface, PreMeshableSurface};
 pub use truck_certified::{domain, formal, source_evidence};
