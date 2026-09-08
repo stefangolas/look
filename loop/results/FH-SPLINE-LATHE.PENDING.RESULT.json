@@ -1,0 +1,85 @@
+{
+  "id": "FH-SPLINE-LATHE",
+  "status": "LANDED-WITH-FINDINGS",
+  "contracts": [
+    "FH-SPLINE-LATHE"
+  ],
+  "tests_added": 9,
+  "anchors_verified": {
+    "A1": 1,
+    "A2": 1,
+    "A3": 7
+  },
+  "summary": "The spline-profile lathe arm lands in the drop-in executor binding: a spline profile edge records its DEFINING samples (the `Edge.make_spline(points)` point list), and the kernel reconstructs the exact interpolating curve OCC's reference revolved (chord-length parameters, clamped cubic with a knot at every sample, C2 interior, endpoint tangents from the degree-3 Lagrange derivative of the first/last four samples) and integrates the TRUE spline by closed-form segment-moment polynomial arithmetic — never a sample-polygon flattening. All-line profiles keep the landed frustum-telescoping facts bit-identical; partial-arc / non-y=0 / open-profile / non-recoverable-spline refusals stay typed; the census vocabulary is unchanged. The previously-refusing `falcon_heavy/nozzle_assembly` row now runs end to end under `door --engine truck` (ok, solid_count 12 exact, bbox equal to the recorded reference within tolerance). Verbatim e2e facts and two measurement/scope findings that keep the literal 'both rows green vs the recorded references' done-when from holding are recorded below: (1) the nozzle row's recorded reference VOLUME is OCC's default `BRepGProp::VolumeProperties` value, which carries a deterministic ~1.16e-4-relative bias on spline surfaces of revolution — the kernel's exact volume equals OCC's Eps-converged volume to ~2e-9 but lies 1.6e-5-relative outside the recorded 1e-4 `volume_rel` band, so the volume fact cannot be green against the reference as recorded; (2) the `mvac` row refuses typed at the thrust-structure gusset `extrude` carrier — a non-lathe carrier outside this packet's lathe arm that needs its own program.",
+  "implementation": {
+    "census": "truck123d SolidSpec::Lathe now carries `profile: Vec<LatheEdge>` (line edges and spline edges recording their samples) instead of a vertex list; the drop-in's revolve records the profile edges with their defining data. door.py Edge.make_spline records which interpolation options were supplied (an option beyond the plain point list is a non-recoverable interpolation and refuses typed). door.py Location answers translation plus pure-z-rotation placements (x/y/z + rz, the landed PartSpec frame) so placed revolve solids (e.g. the nozzle exit stiffener torus) build; non-z placements keep refusing typed. Census names unchanged.",
+    "facts_math": "Per reconstructed spline span, r(u) and z(u) are cubics and the segment's solid-of-revolution volume pi*int r(u)^2 z'(u) du is a degree-8 polynomial integrated term-by-term in closed form (int u^k = 1/(k+1)). bbox comes from the exact reconstructed spans: radius and z extrema solved from the cubic-derivative roots per span. Line edges use the same frustum formula as the landed lathe_volume; an all-line profile is routed back through lathe_volume unchanged, keeping line-profile facts bit-identical (V5 pair: turbopump assembly re-run volume 77563936.47352579 vs recorded 77563936.47352602, relative ~3e-15).",
+    "mesh": "Deterministic STL: each profile edge becomes a boundary polyline (line edges exactly; spline edges at a fixed 4 subdivisions per reconstructed span) swept over the fixed 64 angular segments. All-line profiles produce the byte-identical landed mesh.",
+    "reconstruction_validation": "The reconstructed curve was cross-checked against the actual OCC interpolating spline on the corpus contours (bell 37-sample, chamber, skirt, dome): max curve deviation ~1e-10. Kernel row volume 50350859.12990023 equals OCC's Eps-converged row volume 50350859.244606204 to ~2.3e-9 relative."
+  },
+  "verification": {
+    "cargo_test_lib": "cargo test -p truck123d --lib --locked  -> 14 passed (6 spline/lathe arm tests added)",
+    "cargo_test_ttc_lathe_spline": "cargo test -p truck123d --test ttc_lathe_spline --locked  -> 4 passed",
+    "cargo_test_all_targets": "cargo test -p truck123d --all-targets --locked  -> all green (incl. ttc_harness canonical corpus 3/3 and the full pb_* battery)",
+    "fmt": "cargo fmt --all -- --check clean",
+    "anchors": "A1=1 (door.py refusal message preserved once), A2=1 (fn lathe_volume), A3=7 (revolved_shell)"
+  },
+  "e2e": {
+    "reproduction": "Stage the release/debug cdylib as truck123d.pyd beside the interpreter runtime DLLs (pb_conformance precedent), set PYTHONPATH to the staging dir, then: python corpus/ttc/door.py --engine truck corpus/ttc/trees/falcon_heavy/src lib.merlin_common make_nozzle_assembly '[]' out.stl  (and ... lib.falcon_common make_mvac '[]' out.stl)",
+    "nozzle_assembly_truck": {
+      "ok": true,
+      "door_version": "2",
+      "type": "Compound",
+      "facts": {
+        "solid_count": 12,
+        "volume": 50350859.12990023,
+        "bbox": [[-504.0, -504.0, 0.0], [504.0, 504.0, 1165.0000000000005]]
+      },
+      "stl_triangles": 101632,
+      "recorded_reference": {"volume": 50356695.264747284, "bbox": [[-504.0000001, -504.0000001, -1e-07], [504.0000001, 504.0000001, 1165.0000001]], "solid_count": 12},
+      "facts_gate": {
+        "solid_count": "GREEN exact",
+        "bbox": "GREEN (all corners within 1e-7, tolerance bbox_abs 0.001)",
+        "volume": "RED by 1.6e-5-relative beyond the recorded volume_rel 1e-4 (kernel 50350859.12990023 vs recorded 50356695.264747284, relative -1.159e-4)"
+      }
+    },
+    "mvac_truck": {
+      "ok": false,
+      "door_version": "2",
+      "error": {"kind": "Refused", "message": "Face extrusion is not yet a kernel-engine row"},
+      "note": "After the spline admission the row builds chamber/nozzle spline shells and refuses typed at the first non-lathe carrier (the thrust-structure gusset extrude), so no geometry facts exist; the recorded reference (56 solids, volume 0, bbox [-1462..1462, -2730..2526]) is not reachable until an extrude/sweep carrier program lands."
+    },
+    "turbopump_regression": {
+      "ok": true,
+      "volume": 77563936.47352579,
+      "solid_count": 59,
+      "reference_volume": 77563936.47352602,
+      "volume_rel": "~3e-15 — line-profile facts bit-identical (V5 pair)"
+    }
+  },
+  "findings": [
+    {
+      "id": "F1",
+      "title": "Recorded spline-row reference volumes are OCC default-`BRepGProp` measurements, not the converged volume",
+      "detail": "The corpus references are recorded through build123d `.volume`, which calls `BRepGProp::VolumeProperties(S, Props)` (the no-`Eps` overload). For surfaces of revolution of spline profiles that overload carries a deterministic bias: measured on the actual nozzle solids, liner default 17377411.833862 vs Eps-1e-11 converged 17375101.796963 (+1.330e-4 relative), jacket default 28031928.551406 vs converged 28028402.574677 (+1.258e-4 relative); the row total is biased +1.159e-4 relative (50356695.264747284 default vs 50350859.244606204 converged). The kernel's exact volume (50350859.12990023) equals the converged value to ~2.3e-9, so the RED is a measurement-semantics property of the recorded reference, not a kernel error. The recorded volume_rel 1e-4 is narrower than OCC's own default-vs-converged bias, so NO exact engine can satisfy the recorded nozzle volume tolerance. Resolution: re-record spline-bearing references with a converged volume (e.g. BRepGProp with Eps ~1e-11, or accept the kernel's exact volume) and/or widen the recorded volume_rel for spline rows.",
+      "evidence": "docs-level measurement reproduced with the installed build123d 0.11.1 / cadquery-ocp 7.9.3.1.1 on this machine; OCC door re-runs reproduce the recorded reference exactly, so the recorded reference is deterministic and reproducible."
+    },
+    {
+      "id": "F2",
+      "title": "The mvac row needs non-lathe carriers beyond this packet's lathe arm",
+      "detail": "`make_mvac` composes chamber + thrust structure + turbopump + gas generator + nozzle group. After the spline admission the chamber/nozzle spline shells build, but the row refuses typed at the thrust-structure gusset `bd.extrude(tri, amount=9, both=True)` (and would later need gg feed-line `sweep`s and further placements). The lathe arm does not cover extrude/sweep carriers, the packet forbids widening beyond the lathe arm, and mvac's recorded reference (56 solids) includes those extruded/swept solids — so 'both rows green' requires a separate extrude/sweep authoring program. This packet lands the lathe arm (nozzle now reaches facts) and records the boundary.",
+      "evidence": "verbatim mvac truck-door refusal above; probe of the corpus path shows the refusal occurs inside make_thrust_structure after the chamber/nozzle spline shells build."
+    }
+  ],
+  "stop_conditions": {
+    "recoverable_interpolation": "No SPEC_GAP: build123d `Edge.make_spline(points)` (no options) fixes the OCC chord-length clamped-cubic convention, recoverable from the recorded samples and cross-validated against OCC geometry (~1e-10).",
+    "machine_checked_derivation": "No SPEC_GAP: the segment-moment integral is machine-checked against independent high-order quadrature of the same spans (exact for the degree-8 integrand) in the lib tests, and the full chain matches OCC's converged volume to ~2e-9.",
+    "reference_reachable": "Reference facts fields present for both rows; the nozzle volume gate is not green against the reference AS RECORDED (F1), and mvac cannot reach facts (F2) — both are recorded above as findings, not fabricated."
+  },
+  "notes": "This packet lands the spline-profile lathe arm exactly as designed (exact segment-moment facts over the TRUE spline, no flattening, typed refusals preserved, line-profile V5 pair bit-identical, no census widening). The literal done-when ('both rows green vs the recorded references') cannot hold against the current recorded references for two reasons outside the kernel: the references' spline-row volumes are OCC-default-`BRepGProp` values biased ~1.16e-4 relative over the converged volume (F1), and mvac additionally requires extrude/sweep carriers that are not part of the lathe arm (F2). Per the loop's 'ask whether the gate is wrong before you conclude the worker is', both are reference/scope facts the adjudicator should decide: re-record the spline references converged, and book the extrude/sweep program before mvac timing. The kernel-side work, tests and anchors are all green.",
+  "files": {
+    "door": "corpus/ttc/door.py",
+    "bridge": "truck123d/src/bd_bridge.rs",
+    "test": "truck123d/tests/ttc_lathe_spline.rs"
+  }
+}

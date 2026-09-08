@@ -1,0 +1,34 @@
+{
+  "id": "PB-003-CONCAVE-CAPS",
+  "status": "ANCHOR_MISMATCH",
+  "contracts": ["PB-003-CONCAVE-CAPS"],
+  "stop_condition": 1,
+  "stop_condition_text": "any anchor count differs -> ANCHOR_MISMATCH",
+  "tests_added": 0,
+  "anchors_verified": {
+    "A1": 2,
+    "A2": 0
+  },
+  "supersession": {
+    "in_slot_packet_version": "r1 (pre-amendment; the file this worker was dispatched against at 2026-09-05 14:54:22)",
+    "amended_packet_version": "r2 (AMENDMENT block added by commit 42a80fd, authored 2026-09-05 14:59:04, i.e. AFTER this slot was dispatched at 14:54:13; on integration/kernel-bg HEAD)",
+    "r2_anchor_A2_target": "vendor/truck/truck-meshalgo/Cargo.toml pattern 'truck-modeling' expect 1",
+    "r2_anchor_A2_measured": 1,
+    "r2_anchor_A1_measured": 2,
+    "note": "r2's amended anchors DO reproduce on this tree (A1 = 2 lines in facet_sweep.rs; A2 = 1 line in truck-meshalgo/Cargo.toml, the dev-dependency line). The r2 re-scope replaced the impossible meshalgo-CDT routing with self-contained deterministic ear-clipping in truck-modeling."
+  },
+  "r2_remaining_blocker": {
+    "kind": "SPEC_GAP - r2 is not satisfiable within write_allow on this tree",
+    "detail": "r2 test 1 'concave_ring_caps_through_cdt' requires an L-shaped (non-convex) profile to sweep and cap correctly, and r2 scope item 1/2 make every simple non-convex ring triangulate on the concave arm. The LANDED conformance test vendor/truck/truck-modeling/tests/facet_sweep_conformance.rs::non_convex_cap_refuses (lines 353-364) asserts the EXACT inverse on the SAME fixture class (the recorded L-shape l_shape(), ring_resolution 6): facet_sweep must return Err(ConstructError::InvalidInput). Implementing r2 flips that assertion, so the landed test goes newly-failing at HEAD: the packet's own done-when 'cargo test -p truck-modeling --tests' fails, and the verifier's V5 baseline gate would REJECT (newly failing vs base adc78a9). 'facet_sweep_conformance.rs' is a landed test file OUTSIDE write_allow and is listed under Forbidden, and r2 (unlike r1) books NO inversion and authorizes no edit to it. Needed amendment before a redispatch can land: add vendor/truck/truck-modeling/tests/facet_sweep_conformance.rs to write_allow and book the inversion of non_convex_cap_refuses (replace the refusal assertion with the certified-success assertion, mirroring r2 test 1), OR state explicitly that non_convex_cap_refuses is the assertion r2 inverts.",
+    "landed_test_file": "vendor/truck/truck-modeling/tests/facet_sweep_conformance.rs",
+    "landed_test_fn": "non_convex_cap_refuses",
+    "landed_test_lines": "353-364"
+  },
+  "reproduction": {
+    "A1": "Select-String -Path vendor/truck/truck-modeling/src/facet_sweep.rs -Pattern 'ring_is_convex' -> 2 matching lines (facet_sweep.rs:186, facet_sweep.rs:336), expected 2. Line-based counting is the anchor method (the A1 table value 2 equals matching LINES, and line 186 carries two textual occurrences).",
+    "A2_r1": "Select-String -Path vendor/truck/truck-meshalgo/src/tessellation/triangulation.rs -Pattern 'fn triangulate' -> 0 matching lines, expected 1 (r1 anchor). Corroboration: the substring 'triangulate' appears nowhere in the file as a code symbol (only a doc comment at :4888 uses the word), and 'git log -S \"fn triangulate\" -- vendor/truck/truck-meshalgo/src/tessellation/triangulation.rs' returns 0 commits - the pattern has never existed in the anchor file at any revision reachable from this worktree.",
+    "A2_r2": "Select-String -Path vendor/truck/truck-meshalgo/Cargo.toml -Pattern 'truck-modeling' -> 1 matching line (:44, the [dev-dependencies] entry 'truck-modeling = { version = \"0.6.0\", path = \"../truck-modeling\" }'), expected 1. This is the r2-amended anchor target; it reproduces."
+  },
+  "notes": "Stopped before any implementation, per stop condition 1 against the packet text this slot was dispatched with (r1): its anchor A2 ('fn triangulate' in truck-meshalgo/src/tessellation/triangulation.rs = 1) does not reproduce (0), matching the earlier r1 stop recorded at commit 86e3772. The orchestrator has since amended the packet to r2 (42a80fd), whose anchors DO reproduce here; but r2 still cannot be completed inside write_allow because r2 test 1 (L-shaped profile sweeps and caps correctly) inverts the landed conformance assertion facet_sweep_conformance.rs::non_convex_cap_refuses, whose file is out-of-write_allow and for which r2 books no inversion - see 'r2_remaining_blocker'. No code, test, manifest, doc, or lockfile was changed; the tree is untouched at adc78a9. Also recorded for the orchestrator: this slot's worktree is checked out on branch packet/PB-004-PYO3-CORE (its worker.branch/worker.packet records disagree: worker.packet names PB-003-CONCAVE-CAPS.md, the watchdog last dispatched PB-003 here at 14:54:13, and slot_status.py reports slot 3 = PB-003 RUNNING pid 3920; the slot's forked branch is the PB-004 branch) and, mid-run, the untracked PACKET.md/CONTEXT.md files in the worktree were overwritten with PB-004-PYO3-CORE's text with no corresponding dispatch action (no new pid, worker.packet still PB-003) - a slot/bookkeeping desync that should be reconciled before this slot is reused. RESULT.json is the only addition.",
+  "commit": "RESULT.json committed on packet/PB-004-PYO3-CORE (slot worktree HEAD adc78a9); no source changes to revert."
+}

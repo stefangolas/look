@@ -1,0 +1,41 @@
+{
+  "id": "CC-014-LOFT-VALIDITY",
+  "contract": ["CC-014-LOFT-VALIDITY"],
+  "class": "design",
+  "status": "complete",
+  "commit": "73a2726",
+  "write_set": [
+    "vendor/truck/truck-certified/src/construct/loft_validity.rs",
+    "vendor/truck/truck-certified/src/construct/mod.rs",
+    "vendor/truck/truck-certified/tests/construct_loft_validity.rs"
+  ],
+  "anchors": {
+    "A1_injectivity_radius": 1,
+    "A2_certify_graph_disk": 1,
+    "A3_contact": 1,
+    "A4_rank_margin": 2,
+    "A5_LoftStrips": 1
+  },
+  "scoped_checks": {
+    "cargo check -p truck-certified": "pass",
+    "cargo test -p truck-certified --test construct_loft_validity": "pass (4/4)",
+    "cargo test -p truck-certified --lib loft_validity": "pass (1/1) -- the in-module near-diagonal test"
+  },
+  "tests_required": [
+    "regular_margin_below_eta_j_fails_the_postcondition",
+    "near_diagonal_pairs_are_excluded_by_radius_never_searched",
+    "far_pair_contact_found_reports_unintended_contact",
+    "undecided_pairs_surface_as_inconclusive_never_certified",
+    "graphdisk_discharge_takes_precedence_over_pairwise_search"
+  ],
+  "notes": {
+    "regularity_field_semantics": "LoftValidityCert::regularity is Result<Interval, ConstructRefusal>. Per the packet text 'failure is data + the regularity Result carries the enclosure', a region whose rank_margin certifies a margin enclosure BELOW CC_ETA_J is carried as Ok(margin) -- the enclosure IS the recorded failure data and the caller applies the CC_ETA_J floor read (valid iff margin.lo >= CC_ETA_J). Err(ConditioningBelowThreshold) is produced only when a region's margin could not be certified at all (the map refused the region, i.e. a degenerate/un-enclosable parameterization); the self-contact arm is not run in either failing case (test 1 asserts the below-floor data).",
+    "self_contact_geometry": "map is the certified Euclidean map of the loft; each strip's region is the (u,v) rectangle spanned by the delivered strip surface's own knot ranges (validated compact inside the map's declared domain, read off the patch table). Adjacent strips of the closed-wire cycle (strip j neighbours j-1 and j+1 mod r) share their glued CC-012 P6 seam and are never self-contact candidates; non-adjacent strip pairs are the cross-region candidates.",
+    "graphdisk_discharge_scope": "The whole-region graph-disk discharge (regime b) fires on a region whose certified map data is ONE affine parallelogram (every touched Bezier patch exactly flat with one shared tangent frame, positive certified area margin), discharged through the landed certify_graph_disk decider with a single whole-region DiskPiece (simple projected rim). discharged_by_graphdisk is set when at least one region discharges this way; within-region pairwise search then never runs on the discharged regions (test 5). Curved or creased regions are not discharged at the region level.",
+    "funnel_mapping_table": "The evidence contact funnel (truck_evidence::contact) outcome maps: Ok with a non-empty ContactComplex -> PairVerdict::Contact; Ok with an empty ContactComplex -> PairVerdict::Certified; Err(Refusal::NumericallyUnresolved{..}) -> PairVerdict::Inconclusive; any other Err(Refusal) (e.g. UnsupportedEnvelope) -> propagated Err(ConstructRefusal::InvalidInput). NumericallyUnresolved is never collapsed into Contact and no Inconclusive is ever converted into success. Inconclusive is additionally produced for any budget-exhausted candidate pair (Section 3: never Certified) -- exercised by test 4 with an exhausted ledger.",
+    "funnel_reachability": "The funnel is only reachable on canonical analytic carriers, which this packet obtains by lifting a flat affine region to an exact truck_geometry Plane from the map's Bezier patch data (the S12 affine-support precedent: EXACT zero second-partial grids + one shared source-unit tangent frame). A candidate pair the funnel cannot lift (a generic spline cell) is a refusal of the non-NumericallyUnresolved family and propagates as Err(ConstructRefusal::InvalidInput). Far-pair Contact is exercised in test 3 over coplanar-overlapping flat parallelogram facets of a self-retracing flat loft; budget-exhausted Inconclusive in test 4 on the same geometry with Budget::new(0,0,0).",
+    "near_diagonal_counter": "Stop condition 3: the near-diagonal attempted-pair probe is a #[cfg(test)]-only module (loft_validity::probe) with no shipped signature; it counts the within-region candidate pairs actually submitted to the pair decision. The required near-diagonal test therefore lives IN-MODULE (loft_validity.rs #[cfg(test)] mod tests) where the probe is visible; the other four required tests live in tests/construct_loft_validity.rs. Excluded near-diagonal cell pairs are never searched (test asserts probe count == beyond-delta count).",
+    "budget_discipline": "Each funnel decision draws from the caller's Budget (entry-minus-remaining; contact() itself reports spend the same way). The within-region cell split depth is REGION_SEARCH_DEPTH=3 per axis (an 8x8 dyadic grid), capped by CC_DEPTH_MAX. A candidate pair whose budget is exhausted is Inconclusive, never Certified.",
+    "stop_conditions": "No stop condition triggered as a blocker. Composition only (no new contact solver, hull kernel, or SSI). The funnel Refusal variants map cleanly onto the three PairVerdict outcomes per the table above (stop condition 2): no gap filed, no Inconclusive/Contact collapse. Stop condition 3 satisfied by the cfg(test)-only probe."
+  }
+}

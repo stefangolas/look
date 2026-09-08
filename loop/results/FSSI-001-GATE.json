@@ -1,0 +1,48 @@
+{
+  "packet": "FSSI-001-GATE",
+  "revision": "r2 (2026-09-08, Theorem C mechanism)",
+  "status": "landed",
+  "summary": "Landed the separable tangency-free gate at SSI admission in truck-certified. gate_admit certifies TRANSVERSALITY (rank DF = 3 at every point of Sigma ∩ B) per box via TWO per-surface 2-D normal cones over the product box - never a 4-D normal-product field and never an emptiness claim (emptiness stays the separate Bernstein exclusion of F). Typed suspicion refusals (TangentCurveSuspected / CoincidentPatchSuspected, FSSI-000 r2) are now produced by the gate at admission-budget exhaustion; a loft with a collapsed apex row passes (per-box gate over the surviving-coordinate region); near-tangency with rank 3 passes with the small margin returned, not refused; green spline-pair boxes keep their landed certified verdict class (V5-pair identity, monotone-widening gate).",
+  "writes": {
+    "vendor/truck/truck-certified/src/ssi_gate.rs": "new module: GateParams, GateAdmission (TangencyFree/Subdivide Ok + typed suspicion refusal Err), generic gate_admit over per-side normal-enclosure providers, cone-of-box + certified sin/cos separation via CertifiedInterval only, level-driven product-cell subdivision with the 2^-4k shrink reference, area-scale-stagnation suspicion classifier, SquareSystem3 wrapper gate_square_system with the FSSI-ELEV composed normal nets.",
+    "vendor/truck/truck-certified/src/ssi.rs": "registered ssi_gate as #[path = \"ssi_gate.rs\"] pub mod ssi_gate (nested under the SSI module so the gate reuses the per-side normal-net hull substrate without widening any private surface; lib.rs left untouched). Anchor A1 (5 x 'TangentCurveSuspected' lines) preserved.",
+    "vendor/truck/truck-certified/src/construct/bie/ssi4.rs": "wired the gate at the restricted-pair entry: restricted_normal_box (interval cross of the restricted charts' outward-rounded partials) + public gate_admit_restricted_pair adjacent to certify_restricted_pair. Live call into certify_restricted_pair deliberately NOT made behavior-dependent (see decisions). Anchor A2 preserved.",
+    "vendor/truck/truck-certified/tests/ssi_gate_conformance.rs": "the six required tests + fixture kit (transverse planes, tangent-curve extruded parabola vs plane, coincident bowl, near-tangent epsilon planes, apex-loft with collapsed apex row, green spline-pair V5 battery).",
+    "read-only": "truck-evidence / truck-shapeops / hull.rs / ssi_types.rs / formal / interval untouched."
+  },
+  "tests_required": {
+    "gate_admit_certifies_transverse_box": "pass",
+    "tangent_curve_fixture_refuses_named_case": "pass",
+    "coincident_patch_fixture_refuses_named_case": "pass",
+    "near_tangent_rank3_pair_passes_gate": "pass",
+    "loft_apex_pole_fixture_passes_gate": "pass",
+    "v5_pair_identity_on_green_spline_pairs": "pass"
+  },
+  "anchors": {
+    "A1": {"expect": 5, "measured": 5, "cmd": "grep -c 'TangentCurveSuspected' vendor/truck/truck-certified/src/ssi.rs"},
+    "A2": {"expect": 1, "measured": 1, "cmd": "grep -c 'pub struct Ssi4System' vendor/truck/truck-certified/src/construct/bie/ssi4.rs"},
+    "A3": {"expect": 1, "measured": 1, "cmd": "grep -c 'hull_bernstein_2d' vendor/truck/truck-certified/src/hull.rs"}
+  },
+  "verification": {
+    "cargo fmt --check -p truck-certified": "passes for every written file (ssi.rs, ssi_gate.rs, ssi4.rs, ssi_gate_conformance.rs). The whole-package check additionally reports pre-existing rustfmt drift in 6 untouched files (kernel/claims.rs, kernel/engine.rs, kernel/tier2.rs, tests/construct_{blend,canal,loft_weights}.rs) under the installed rustfmt 1.97; those files are outside write_allow and were reverted, not edited.",
+    "cargo clippy -p truck-certified --all-targets -- -D warnings": "the written code is clippy-clean (verified for src/ssi_gate.rs, src/ssi.rs, src/construct/bie/ssi4.rs and tests/ssi_gate_conformance.rs with cap-lints=warn and with -D warnings filtering to the written files). The whole-crate invocation aborts on 65 pre-existing deny-level clippy errors in untouched files (e.g. formal/xmonotone.rs clone_on_copy, formal/cylinder_lift.rs useless_vec) introduced by the installed clippy 1.97 lints against the pinned baseline; those files are outside write_allow.",
+    "cargo test -p truck-certified --lib --tests": "all green: 667 lib tests + every integration test binary (incl. ssi_gate_conformance 6/6) pass."
+  },
+  "decisions": [
+    "Module registration: ssi_gate.rs is registered as a #[path] child module of crate::ssi (crate::ssi::ssi_gate) so lib.rs (outside write_allow) stays untouched and the gate can reuse the SSI module's private composed-normal-net and 2-D hull substrate (FSSI-ELEV: exact Bernstein product nets, never the naive pairing).",
+    "Verdict vocabulary: per-box {TangencyFree, Subdivide, Suspect(...)} maps onto Result<GateAdmission, SsiRefusal> as Ok(TangencyFree{margin}) / Ok(Subdivide) (single-level probe, GateParams::max_level == 0) / Err(SsiRefusal::*Suspected{margin}) at the admission-budget halt. TangencyFree margin is the certified enclosure of min_{B1xB2} ||n_X x n_Y|| with a strictly positive lower bound (evidence, never a tolerance).",
+    "Suspicion halt: at budget exhaustion the undecided parameter volume history (each level quartering both sides -> cell volume ~ 2^-4k) is classified: u_L/u_0 above STAGNATION_RATIO (area-scale stagnation) -> CoincidentPatchSuspected; otherwise sub-linear shrink -> TangentCurveSuspected. Payload is (undecided measure at halt, per-level shrink exponent). Fires only in the refusal decision.",
+    "Cones are CertifiedInterval-only: anchor = enclosure midpoint m, certified sine half-angle bound s_up = radius_up/|m|_lo < 1 (outward rounding), separation certified by sin(alpha)_lb > s_X_up + s_Y_up (alpha the angle between the anchors; asin-superadditivity argument), margin min|n_X| min|n_Y| (sin alpha - s_X - s_Y). No interval trig, no second interval algebra.",
+    "Gate is D2-unit-weight only on the spline side (non-unit weight carriers refuse InvalidInput); restricted charts are evaluated directly by interval partials (no polynomialization).",
+    "ssi4 live call: the gate is exposed and wired at the restricted-pair entry (gate_admit_restricted_pair next to certify_restricted_pair) but certify_restricted_pair does not branch on it: a whole-carrier box can contain anywhere-parallel normals off the certified branch (e.g. plane x sphere pole), so a live short-circuit would flip a landed green certified verdict (V5). The seam is available to the funnel dispatch; folding is additive and monotone.",
+    "Pole composition (theory 4.1): per-box normal enclosures make a collapsed apex row (zero normal on the v=1 row) invisible to an interior box; boxes straddling the pole subdivide toward it and only the surviving cells must certify. Regression pinned by loft_apex_pole_fixture_passes_gate with a machine-checked collapsed row X(u,1)=(0,0,1).",
+    "The composed normal-net hull over a nondegenerate box is a sound but loose enclosure (interval de Casteljau dependency on the degree-(2m-1,2n-1) net); the apex fixture therefore uses a modest interior box and an admission budget (max_cells 300000, max_level 24) letting the separable cones separate - never tuned by weakening a refused box."
+  ],
+  "stop_conditions": "none triggered: no new hull kernel was required (the separable composition certified on the existing per-side substrate) and the suspicion halt distinguishes area-scale from sub-linear shrinkage on the fixtures via the measured u_L/u_0 ratio.",
+  "notes": [
+    "Write set honored exactly; no truck-shapeops, ssi_types.rs, hull.rs, formal, interval or truck-evidence edit.",
+    "Anchors re-measured on the substrate and holding.",
+    "The two verification commands that sweep whole untouched files (fmt --check, clippy --all-targets) are blocked by pre-existing toolchain drift on this machine (rustfmt/clippy 1.97 vs the pinned baseline); every written file is individually clean. Recorded here rather than silently tuned."
+  ],
+  "commit": "4bbfc49 feat(certified): separable tangency-free gate at SSI admission — typed suspicion refusals, pole composition (FSSI-001)"
+}

@@ -1,0 +1,688 @@
+diff --git a/CONTEXT.md b/CONTEXT.md
+index 881fc33..ce02290 100644
+--- a/CONTEXT.md
++++ b/CONTEXT.md
+@@ -1,401 +1,86 @@
+ # CONTEXT.md - mechanically generated from the tree at dispatch time.
+ # Signatures, callers, tests only. No claims. Regenerated per dispatch.
+ 
+-## WRITE: vendor/truck/truck-certified/src/ssi_trace.rs
+-L93    trait    BranchCertifier - One per-box Krawczyk step, as the loop consumes it.
+-L113   struct   BranchBox - One parameter-box request the loop addresses to a [`BranchCertifier`].
+-L120   impl     BranchBox
+-L151   enum     BranchStep - One certified per-box outcome a [`BranchCertifier`] may report.
+-L174   struct   SwitchReport - A certifier's report of a turning-point switch box.
+-L205   fn       trace_branch - Trace one branch from one isolated Krawczyk seed certificate.
+-L331   fn       classify_branch_germ - Classify the branch germ at an event by reading the next nonzero jet.
+-L691   impl     ProductionCertifier
+-L787   impl     BranchCertifier
+-L813   fn       certified_pair_trace - Trace the certified SSI branch of a rational patch pair from one seed.
+-L977   impl     ScriptedCertifier
+-L992   impl     BranchCertifier
+-L1006  impl     BranchCertifier
+-tests: refuse_ok, fail, seed_certificate, chart_domain, coordinate, step_at, circle_point, branch_point, point_is_on_branch, assert_step_carries_incidence, from_geometry, refusing, step, step, closed_loop_steps, boundary_steps, trace_loop_walks_fixture_closed_loop_to_identity_recurrence, trace_loop_terminates_at_domain_boundary, trace_switch_requires_both_certificates_and_refuses_otherwise, trace_germ_classification_reads_next_nonzero_jet, trace_steps_carry_branch_incidence_records, trace_refusals_are_named_cases
++## WRITE: vendor/truck/truck-shapeops/src/boolean/assemble.rs
++L63    fn       boolean - The regularized Boolean of two single-shell solids (plan Â§4 Phase 4).
++L138   fn       boolean_certified_operands - The self-pair entry gate (T2 Â§5.8 arm 1): a Boolean whose two operands are
++L172   fn       sweep_contact_events - The AABB-screened cross-solid contact sweep over the two solids' lifted
++L265   impl     Aabb
++L783   fn       trim_provenance - Resolves each source section of a concave trim to the shell
++tests: placed_circle, block_profile, box_profile, disk_profile, extrude_shell, plane_face_at_z, cylinder_face, wire_counts, boolean_sweep_produces_the_flagship_event_complex, boolean_difference_flagship_assembles_the_plate_with_hole, boolean_union_intersection_xor_on_the_flagship, boolean_refuses_multishell_input, unit_square_profile, prism_recipe, prism_sweep_solid, prism_storage_recipe, sweep_stratum_lifts_with_window, sweep_pairs_reach_interaction_solver, classifier_seeds_from_arrangement_cells, junction_halves, assembler_emits_windowed_sweep_faces, aabb_contains, fc0_cap_face, fc0_slab_top_face, fc1_trim_face, fc0_defect_counterexample_red_on_sampled_green_on_certified, param_box_derived_from_trim_not_boundary, face_enclosure_used_by_lift_screen, self_pair_rewrites_before_sweep, plane_axis_coord, butt_join_union_drops_shared_wall
+ 
+-## WRITE: vendor/truck/truck-geometry/src/constructive/intersection_carrier.rs
+-L60    struct   IntersectionFrame - The right-handed orthonormal tangent frame at one certified station.
+-L69    impl     IntersectionFrame
+-L73    fn       try_new - Validates and builds a frame: every component finite, every vector unit
+-L106   struct   CertifiedSample - One certified station: a certified polyline vertex with its position, its
+-L119   struct   CarrierCell - A `(u, v) Ã— (s, t)` parameter-cell record â€” the minimal carrier-local
+-L137   struct   CarrierUnresolved - The unresolved witness slot record â€” the minimal carrier-local mirror of
+-L165   struct   CertifiedImplicitIntersectionCurve - The certified implicit intersection curve carrier (BIE-003-CARRIER).
+-L176   impl     CertifiedImplicitIntersectionCurve
+-L180   fn       parameters - The carrier parameters (cumulative chord length of the certified
+-L186   fn       positions - The certified polyline vertices, aligned with [`Self::parameters`].
+-L192   fn       frames - The per-sample tangent frames, aligned with [`Self::parameters`].
+-L203   fn       polyline - The certified polyline â€” the tessellation-facing accessor.
+-L209   fn       unresolved - The unresolved witness slot (`None` when fully certified).
+-L228   fn       try_new - Certified construction from the certified sample stream.
+-L412   impl     ParametricCurve
+-L468   impl     BoundedCurve
+-L470   impl     ParameterDivision1D
+-L502   impl     Cut
+-L549   impl     Invertible
+-L564   impl     Transformed
+-L579   impl     SearchParameter
+-L600   impl     SearchNearestParameter
+-tests: consecutive, arc_frame, quarter_circle_samples, expect_curve, carrier_constructs_from_certified_polyline, carrier_refuses_uncertified_input, carrier_pl_at_tessellation_only
++## WRITE: vendor/truck/truck-shapeops/tests/defect_regressions.rs (MISSING at dispatch time)
+ 
+-## READ: vendor/truck/truck-certified/src/ssi.rs
+-L94    enum     SsiRefusal - Why an SSI square-system or Krawczyk3 operation could not be certified.
+-L115   impl     SsiRefusal
+-L117   fn       tag - A short stable tag, for diagnostics.
+-L132   impl     From
+-L144   impl     From
+-L165   impl     Tensor4
+-L481   fn       partial_enclosure - The certified partial-derivative enclosure of one stored component grid
+-L512   fn       f3_diagonal_derivatives - Build the FROZEN [`SquareSystemInput`] of the reduced square system for a
+-L548   fn       select_continuation_coordinate - Select the continuation coordinate by the FROZEN rule, verbatim.
+-L727   fn       krawczyk3_certificate - Certify a unique root of the reduced square system on the slice
+-L870   struct   RationalBipatch - A certified-admitted rational tensor-Bernstein patch (spline-admissible).
+-L879   impl     RationalBipatch
+-L882   fn       new - Construct a patch, refusing a degree-0 bidegree, empty or ragged
+-L906   fn       m - Bidegree in the first parameter.
+-L911   fn       n - Bidegree in the second parameter.
+-L916   fn       numerator - The homogeneous numerator grids, `(x, y, z)` order.
+-L921   fn       weights - The strictly positive weight grid.
+-L928   enum     SsiParticipant - One side of a square-system construction.
+-L953   fn       construct_square_system - Construct the square surfaceâ€“surface difference system from two
+-L1104  impl     Dense4
+-tests: binom, coord_grid, zero_grid, monomial_grid, parabola_system, from_rows, into_rows, at, second_difference_reference, second_partials_match_finite_difference_on_fixture
++## READ: docs/defects/DSC-BOUNDARY-SAMPLE-EXTENT-001.md
+ 
+-## READ: vendor/truck/truck-certified/src/ssi_types.rs
+-L75    struct   SquareSystem3 - The stored square-system representation (SYSTEM's output contract).
+-L85    impl     SquareSystem3
+-L97    fn       new - Construct a square system from three preformed grids plus the degree and
+-L141   fn       grids - The three stored component grids, in `(x, y, z)` order.
+-L146   fn       degrees - `(m1, n1, m2, n2)` â€” the stored degrees, verbatim.
+-L151   fn       domain_maps - `(u0,u1,v0,v1,s0,s1,t0,t1)` â€” the stored chart rectangles, verbatim.
+-L169   struct   KrawczykCertificate3 - The Krawczyk unique-root certificate (KRAWCZYK3's output contract).
+-L178   impl     KrawczykCertificate3
+-L189   fn       new - Build the certificate from a strict inclusion and an orientation
+-L221   fn       box_x - The box `X`: three axis intervals, verbatim.
+-L226   fn       k_x - The K(X) enclosure, verbatim.
+-L231   fn       det - The determinant enclosure (0 excluded), verbatim.
+-L247   struct   TraceStep - One traced branch box (TRACE's per-step output): the parameter box in the
+-L258   impl     TraceStep
+-L264   fn       new - Build one trace step from the landed types plus the box.
+-L284   fn       chart_box - The trace box in the 4D chart, as `(u,v,s,t)` axis intervals, verbatim.
+-L289   fn       germ - The germ class carried at this box.
+-L294   fn       incidence - The branch incidence record.
+-L299   fn       coordinate - The certified continuation coordinate for this box.
+-L310   enum     TraceOutcome - The outcome of tracing one branch from one seed.
+-L340   enum     TraceRefusal - The trace refusal vocabulary: aliases/wraps of LANDED named cases.
+-L356   impl     TraceRefusal - One trace refusal's stable diagnostic tag.
+-L358   fn       tag - A short stable tag, for diagnostics.
++## READ: vendor/truck/truck-evidence/src/enclosure.rs
++L30    struct   Box3 - An axis-aligned box in 3-space, each coordinate an outward-rounded interval.
++L39    impl     Box3
++L41    fn       empty - The empty box (NaN on every axis).
++L52    fn       point - The degenerate box at a point. Finite coordinates always construct
++L62    fn       contains - Tests whether a point lies inside every coordinate interval.
++L67    fn       width - The width of the widest coordinate interval (0 for a point).
++L77    struct   DirCone - An enclosure of a set of unit directions: an axis plus a half-angle.
++L86    fn       interval_at - A degenerate interval from a runtime `f64`. Finite coordinates always
++L96    fn       cross_box - The interval cross product of two boxes, written out componentwise.
++L111   fn       midpoint_ball_cone - The midpoint-ball direction cone of a derivative box: `Some(cone)` iff
++L136   fn       immersion_lower_bound_box - The smallest `â€–Â·â€–` over a derivative box:
++L154   trait    EnclosureCurve - Certified enclosure interface for parametric curves.
++L177   trait    EnclosureSurface - Certified enclosure interface for parametric surfaces.
++L218   impl     SurfaceCoord
++L230   impl     SurfaceCoord
++L453   impl     EnclosureSurface
++L571   trait    EnclosureVectorField - Certified enclosure interface for vector-valued parametric fields
++L583   trait    EnclosureScalarField2 - Certified enclosure interface for two-variable scalar fields â€” the `F` in
++tests: box3_contains_and_width, point_box_is_degenerate, iv, midpoint_ball_cone_contains_off_axis_directions, midpoint_ball_cone_refuses_when_the_box_straddles_the_origin, cross_box_encloses_the_componentwise_formula, spline_witness, bspline_enclosure_brackets_brute_sample, battery_surface, recorded_box_iv, assert_box_within, fc2_enclosure_containment_randomized, fc2_enclosure_convergence_under_bisection, fc2_enclosure_monotonicity, fc7_next, fc7_ordered_pair, fc7_inputs, fc7_surface, interior_knot_values, certified_per_span_hull, fc7_cross_check_evidence_hull_matches_certified_side
+ 
+-## READ: vendor/truck/truck-certified/src/tangency/ (MISSING at dispatch time)
++## READ: vendor/truck/truck-evidence/src/enclosure_sweep.rs
++L422   fn       box_is_finite - Whether every coordinate interval of a box is finite (a finite bound; the
++L431   impl     EnclosureSurface
++L484   mod      fixtures - The required-test sweep fixtures, shared by the two CL-003 test modules
++L492   fn       unit_square_profile - The unit-square profile ring (CCW in the frame plane).
++L505   fn       straight_spine_sweep - The straight-spine prism sweep: a `Line` spine from the origin to
++L524   fn       curved_spine_sweep - The curved-spine sweep: a quadratic B-spline spine lying in the plane
++L546   fn       scaled_profile_sweep - The scaled-profile sweep: the straight `Line` spine with the unit-square
++L570   fn       required_sweeps - The three required-test sweeps: straight spine, curved spine, and
++tests: iv, interior_sample, assert_box_subset, sweep_enclosure_brackets_brute_sample, sweep_enclosure_is_additive_over_window_split, placed_sweep_enclosure_brackets_brute_sample
+ 
+-## READ: vendor/truck/truck-geometry/src/constructive/intersection_carrier.rs
+-L60    struct   IntersectionFrame - The right-handed orthonormal tangent frame at one certified station.
+-L69    impl     IntersectionFrame
+-L73    fn       try_new - Validates and builds a frame: every component finite, every vector unit
+-L106   struct   CertifiedSample - One certified station: a certified polyline vertex with its position, its
+-L119   struct   CarrierCell - A `(u, v) Ã— (s, t)` parameter-cell record â€” the minimal carrier-local
+-L137   struct   CarrierUnresolved - The unresolved witness slot record â€” the minimal carrier-local mirror of
+-L165   struct   CertifiedImplicitIntersectionCurve - The certified implicit intersection curve carrier (BIE-003-CARRIER).
+-L176   impl     CertifiedImplicitIntersectionCurve
+-L180   fn       parameters - The carrier parameters (cumulative chord length of the certified
+-L186   fn       positions - The certified polyline vertices, aligned with [`Self::parameters`].
+-L192   fn       frames - The per-sample tangent frames, aligned with [`Self::parameters`].
+-L203   fn       polyline - The certified polyline â€” the tessellation-facing accessor.
+-L209   fn       unresolved - The unresolved witness slot (`None` when fully certified).
+-L228   fn       try_new - Certified construction from the certified sample stream.
+-L412   impl     ParametricCurve
+-L468   impl     BoundedCurve
+-L470   impl     ParameterDivision1D
+-L502   impl     Cut
+-L549   impl     Invertible
+-L564   impl     Transformed
+-L579   impl     SearchParameter
+-L600   impl     SearchNearestParameter
+-tests: consecutive, arc_frame, quarter_circle_samples, expect_curve, carrier_constructs_from_certified_polyline, carrier_refuses_uncertified_input, carrier_pl_at_tessellation_only
+-
+-## READ: docs/CARRIER_LIFT_BUILD_SPEC.md
++## READ: vendor/truck/truck-shapeops/src/boolean/{split,classify,mod}.rs (MISSING at dispatch time)
+ 
+ ## CALLER SITES (grep of defining names outside their file)
+-BranchCertifier  vendor\truck\truck-certified\src\ssi_trace.rs:19  //! a [`BranchCertifier`] implemented over W1's landed API (`ssi.rs`) and the
+-BranchCertifier  vendor\truck\truck-certified\src\ssi_trace.rs:22  //! ([`BranchCertifier`], [`BranchBox`], [`BranchStep`]) whose synthetic
+-BranchCertifier  vendor\truck\truck-certified\src\ssi_trace.rs:93  pub(crate) trait BranchCertifier {
+-BranchCertifier  vendor\truck\truck-certified\src\ssi_trace.rs:112  #[allow(dead_code)] // wave-private seam, see [`BranchCertifier`]
+-BranchCertifier  vendor\truck\truck-certified\src\ssi_trace.rs:122  #[allow(dead_code)] // wave-private seam, see [`BranchCertifier`]
+-BranchCertifier  vendor\truck\truck-certified\src\ssi_trace.rs:131  #[allow(dead_code)] // wave-private seam, see [`BranchCertifier`]
+-BranchCertifier  vendor\truck\truck-certified\src\ssi_trace.rs:150  #[allow(dead_code)] // wave-private seam, see [`BranchCertifier`]
+-BranchCertifier  vendor\truck\truck-certified\src\ssi_trace.rs:173  #[allow(dead_code)] // wave-private seam, see [`BranchCertifier`]
+-BranchCertifier  vendor\truck\truck-certified\src\ssi_trace.rs:205  pub(crate) fn trace_branch<C: BranchCertifier>(
+-BranchCertifier  vendor\truck\truck-certified\src\ssi_trace.rs:409  // The production seam (integration amendment): BranchCertifier over W1's API
+-BranchBox  vendor\truck\truck-certified\src\ssi_trace.rs:22  //! ([`BranchCertifier`], [`BranchBox`], [`BranchStep`]) whose synthetic
+-BranchBox  vendor\truck\truck-certified\src\ssi_trace.rs:84  /// shape. The exact shape (`BranchBox` naming, argument order, error side) is
+-BranchBox  vendor\truck\truck-certified\src\ssi_trace.rs:102  fn step(&mut self, hint: &BranchBox) -> Result<BranchStep, TraceRefusal>;
+-BranchBox  vendor\truck\truck-certified\src\ssi_trace.rs:113  pub(crate) struct BranchBox {
+-BranchBox  vendor\truck\truck-certified\src\ssi_trace.rs:214  Some(previous) => BranchBox::advance(previous),
+-BranchBox  vendor\truck\truck-certified\src\ssi_trace.rs:215  None => BranchBox::seed(seed),
+-BranchBox  vendor\truck\truck-certified\src\ssi_trace.rs:788  fn step(&mut self, _hint: &BranchBox) -> Result<BranchStep, TraceRefusal> {
+-BranchBox  vendor\truck\truck-certified\src\ssi_trace.rs:993  fn step(&mut self, _hint: &BranchBox) -> Result<BranchStep, TraceRefusal> {
+-BranchBox  vendor\truck\truck-certified\src\ssi_trace.rs:1007  fn step(&mut self, _hint: &BranchBox) -> Result<BranchStep, TraceRefusal> {
+-BranchBox  vendor\truck\truck-certified\src\ssi_trace.rs:22  //! ([`BranchCertifier`], [`BranchBox`], [`BranchStep`]) whose synthetic
+-BranchBox  vendor\truck\truck-certified\src\ssi_trace.rs:84  /// shape. The exact shape (`BranchBox` naming, argument order, error side) is
+-BranchBox  vendor\truck\truck-certified\src\ssi_trace.rs:102  fn step(&mut self, hint: &BranchBox) -> Result<BranchStep, TraceRefusal>;
+-BranchBox  vendor\truck\truck-certified\src\ssi_trace.rs:113  pub(crate) struct BranchBox {
+-BranchBox  vendor\truck\truck-certified\src\ssi_trace.rs:214  Some(previous) => BranchBox::advance(previous),
+-BranchBox  vendor\truck\truck-certified\src\ssi_trace.rs:215  None => BranchBox::seed(seed),
+-BranchBox  vendor\truck\truck-certified\src\ssi_trace.rs:788  fn step(&mut self, _hint: &BranchBox) -> Result<BranchStep, TraceRefusal> {
+-BranchBox  vendor\truck\truck-certified\src\ssi_trace.rs:993  fn step(&mut self, _hint: &BranchBox) -> Result<BranchStep, TraceRefusal> {
+-BranchBox  vendor\truck\truck-certified\src\ssi_trace.rs:1007  fn step(&mut self, _hint: &BranchBox) -> Result<BranchStep, TraceRefusal> {
+-BranchStep  vendor\truck\truck-certified\src\ssi_trace.rs:22  //! ([`BranchCertifier`], [`BranchBox`], [`BranchStep`]) whose synthetic
+-BranchStep  vendor\truck\truck-certified\src\ssi_trace.rs:102  fn step(&mut self, hint: &BranchBox) -> Result<BranchStep, TraceRefusal>;
+-BranchStep  vendor\truck\truck-certified\src\ssi_trace.rs:148  /// [`BranchStep::EndOfBranch`].
+-BranchStep  vendor\truck\truck-certified\src\ssi_trace.rs:151  pub(crate) enum BranchStep {
+-BranchStep  vendor\truck\truck-certified\src\ssi_trace.rs:189  ///   ([`BranchStep::EndOfBranch`]), ends the branch without a refusal
+-BranchStep  vendor\truck\truck-certified\src\ssi_trace.rs:219  Ok(BranchStep::Advance(step)) => {
+-BranchStep  vendor\truck\truck-certified\src\ssi_trace.rs:234  Ok(BranchStep::EndOfBranch) => {
+-BranchStep  vendor\truck\truck-certified\src\ssi_trace.rs:239  Ok(BranchStep::Switch(report)) => {
+-BranchStep  vendor\truck\truck-certified\src\ssi_trace.rs:670  /// the unit chart is a natural end ([`BranchStep::EndOfBranch`]); a branch
+-BranchStep  vendor\truck\truck-certified\src\ssi_trace.rs:708  fn next_step(&mut self) -> Result<BranchStep, TraceRefusal> {
+-BranchStep  vendor\truck\truck-certified\src\ssi_trace.rs:760  return Ok(BranchStep::EndOfBranch);
+-BranchStep  vendor\truck\truck-certified\src\ssi_trace.rs:780  return Ok(BranchStep::Advance(self.first_step));
+-SwitchReport  vendor\truck\truck-certified\src\ssi_trace.rs:163  Switch(SwitchReport),
+-SwitchReport  vendor\truck\truck-certified\src\ssi_trace.rs:174  pub(crate) struct SwitchReport {
+-SwitchReport  vendor\truck\truck-certified\src\ssi_trace.rs:1067  BranchStep::Switch(SwitchReport {
+-SwitchReport  vendor\truck\truck-certified\src\ssi_trace.rs:1121  BranchStep::Switch(SwitchReport {
+-SwitchReport  vendor\truck\truck-certified\src\ssi_trace.rs:1187  BranchStep::Switch(SwitchReport {
+-SwitchReport  vendor\truck\truck-certified\src\ssi_trace.rs:1227  let mut certifier = ScriptedCertifier::refusing(BranchStep::Switch(SwitchReport {
+-SwitchReport  vendor\truck\truck-certified\src\ssi_trace.rs:1284  BranchStep::Switch(SwitchReport {
+-SwitchReport  vendor\truck\truck-certified\src\ssi_trace.rs:1318  let mut certifier = ScriptedCertifier::refusing(BranchStep::Switch(SwitchReport {
+-trace_branch  vendor\truck\truck-certified\src\ssi_trace.rs:205  pub(crate) fn trace_branch<C: BranchCertifier>(
+-trace_branch  vendor\truck\truck-certified\src\ssi_trace.rs:281  #[allow(dead_code)] // helper of the wave-private trace loop, see [`trace_branch`]
+-trace_branch  vendor\truck\truck-certified\src\ssi_trace.rs:831  Ok(trace_branch(&seed_certificate, UNIT_CHART, &mut certifier))
+-trace_branch  vendor\truck\truck-certified\src\ssi_trace.rs:1073  let outcome = trace_branch(&seed, domain, &mut certifier);
+-trace_branch  vendor\truck\truck-certified\src\ssi_trace.rs:1132  let outcome = trace_branch(&seed, domain, &mut certifier);
+-trace_branch  vendor\truck\truck-certified\src\ssi_trace.rs:1192  let outcome = trace_branch(&seed, domain, &mut certifier);
+-trace_branch  vendor\truck\truck-certified\src\ssi_trace.rs:1231  let outcome = trace_branch(&seed, domain, &mut certifier);
+-trace_branch  vendor\truck\truck-certified\src\ssi_trace.rs:1289  let outcome = trace_branch(&seed, domain, &mut certifier);
+-trace_branch  vendor\truck\truck-certified\src\ssi_trace.rs:1327  match trace_branch(&seed, domain, &mut certifier) {
+-trace_branch  vendor\truck\truck-certified\src\ssi_trace.rs:1353  let outcome = trace_branch(&seed, domain, &mut certifier);
+-trace_branch  vendor\truck\truck-certified\tests\construct_blend.rs:162  let branch = trace_branch_steps(&seed, &RadiusLaw::Constant(0.25), &mut budget)
+-trace_branch  vendor\truck\truck-certified\tests\construct_blend.rs:340  match trace_branch_steps(&seed, &RadiusLaw::Constant(0.25), &mut budget) {
+-classify_branch_germ  vendor\truck\truck-certified\src\ssi_trace.rs:56  //! jet ([`classify_branch_germ`]); its correctness is machine-checked against
+-classify_branch_germ  vendor\truck\truck-certified\src\ssi_trace.rs:294  #[allow(dead_code)] // shared by [`classify_branch_germ`] and the module's cfg(test) certifiers
+-classify_branch_germ  vendor\truck\truck-certified\src\ssi_trace.rs:298  #[allow(dead_code)] // helper of the wave-private germ classifier, see [`classify_branch_germ`]
+-classify_branch_germ  vendor\truck\truck-certified\src\ssi_trace.rs:331  pub(crate) fn classify_branch_germ(
+-classify_branch_germ  vendor\truck\truck-certified\src\ssi_trace.rs:658  let germ = classify_branch_germ(system, box_, event);
+-classify_branch_germ  vendor\truck\truck-certified\src\ssi_trace.rs:1248  classify_branch_germ(&fixture.system, fixture.chart_box, fixture.event);
+-ProductionCertifier  vendor\truck\truck-certified\src\ssi_trace.rs:830  let mut certifier = ProductionCertifier::new(system, first_step, seed);
+-BranchCertifier  vendor\truck\truck-certified\src\ssi_trace.rs:19  //! a [`BranchCertifier`] implemented over W1's landed API (`ssi.rs`) and the
+-BranchCertifier  vendor\truck\truck-certified\src\ssi_trace.rs:22  //! ([`BranchCertifier`], [`BranchBox`], [`BranchStep`]) whose synthetic
+-BranchCertifier  vendor\truck\truck-certified\src\ssi_trace.rs:93  pub(crate) trait BranchCertifier {
+-BranchCertifier  vendor\truck\truck-certified\src\ssi_trace.rs:112  #[allow(dead_code)] // wave-private seam, see [`BranchCertifier`]
+-BranchCertifier  vendor\truck\truck-certified\src\ssi_trace.rs:122  #[allow(dead_code)] // wave-private seam, see [`BranchCertifier`]
+-BranchCertifier  vendor\truck\truck-certified\src\ssi_trace.rs:131  #[allow(dead_code)] // wave-private seam, see [`BranchCertifier`]
+-BranchCertifier  vendor\truck\truck-certified\src\ssi_trace.rs:150  #[allow(dead_code)] // wave-private seam, see [`BranchCertifier`]
+-BranchCertifier  vendor\truck\truck-certified\src\ssi_trace.rs:173  #[allow(dead_code)] // wave-private seam, see [`BranchCertifier`]
+-BranchCertifier  vendor\truck\truck-certified\src\ssi_trace.rs:205  pub(crate) fn trace_branch<C: BranchCertifier>(
+-BranchCertifier  vendor\truck\truck-certified\src\ssi_trace.rs:409  // The production seam (integration amendment): BranchCertifier over W1's API
+-certified_pair_trace  vendor\truck\truck-certified\src\ssi_trace.rs:813  pub fn certified_pair_trace(
+-certified_pair_trace  vendor\truck\truck-certified\tests\ssi_trace.rs:270  // Certified production seam (integration amendment): certified_pair_trace over
+-certified_pair_trace  vendor\truck\truck-certified\tests\ssi_trace.rs:275  use truck_certified::ssi_trace::certified_pair_trace;
+-certified_pair_trace  vendor\truck\truck-certified\tests\ssi_trace.rs:450  let outcome = certified_pair_trace(&p1, &p2, [0.5, 0.5, 0.5, 0.5])
+-certified_pair_trace  vendor\truck\truck-certified\tests\ssi_trace.rs:495  let outcome = certified_pair_trace(&p1, &p2, [0.5, 0.8, 0.5, 0.8])
+-certified_pair_trace  vendor\truck\truck-certified\tests\ssi_trace.rs:525  match certified_pair_trace(&p1, &p2, [0.5, 0.5, 0.5, 0.5]) {
+-ScriptedCertifier  vendor\truck\truck-certified\src\ssi_trace.rs:1064  ScriptedCertifier::from_geometry(closed_loop_steps(&pair, incidence), {
+-ScriptedCertifier  vendor\truck\truck-certified\src\ssi_trace.rs:1120  let mut certifier = ScriptedCertifier::from_geometry(boundary_steps(incidence), {
+-ScriptedCertifier  vendor\truck\truck-certified\src\ssi_trace.rs:1186  let mut certifier = ScriptedCertifier::from_geometry(advance_steps.clone(), {
+-ScriptedCertifier  vendor\truck\truck-certified\src\ssi_trace.rs:1227  let mut certifier = ScriptedCertifier::refusing(BranchStep::Switch(SwitchReport {
+-ScriptedCertifier  vendor\truck\truck-certified\src\ssi_trace.rs:1283  ScriptedCertifier::from_geometry(closed_loop_steps(&pair, incidence), {
+-ScriptedCertifier  vendor\truck\truck-certified\src\ssi_trace.rs:1318  let mut certifier = ScriptedCertifier::refusing(BranchStep::Switch(SwitchReport {
+-BranchCertifier  vendor\truck\truck-certified\src\ssi_trace.rs:19  //! a [`BranchCertifier`] implemented over W1's landed API (`ssi.rs`) and the
+-BranchCertifier  vendor\truck\truck-certified\src\ssi_trace.rs:22  //! ([`BranchCertifier`], [`BranchBox`], [`BranchStep`]) whose synthetic
+-BranchCertifier  vendor\truck\truck-certified\src\ssi_trace.rs:93  pub(crate) trait BranchCertifier {
+-BranchCertifier  vendor\truck\truck-certified\src\ssi_trace.rs:112  #[allow(dead_code)] // wave-private seam, see [`BranchCertifier`]
+-BranchCertifier  vendor\truck\truck-certified\src\ssi_trace.rs:122  #[allow(dead_code)] // wave-private seam, see [`BranchCertifier`]
+-BranchCertifier  vendor\truck\truck-certified\src\ssi_trace.rs:131  #[allow(dead_code)] // wave-private seam, see [`BranchCertifier`]
+-BranchCertifier  vendor\truck\truck-certified\src\ssi_trace.rs:150  #[allow(dead_code)] // wave-private seam, see [`BranchCertifier`]
+-BranchCertifier  vendor\truck\truck-certified\src\ssi_trace.rs:173  #[allow(dead_code)] // wave-private seam, see [`BranchCertifier`]
+-BranchCertifier  vendor\truck\truck-certified\src\ssi_trace.rs:205  pub(crate) fn trace_branch<C: BranchCertifier>(
+-BranchCertifier  vendor\truck\truck-certified\src\ssi_trace.rs:409  // The production seam (integration amendment): BranchCertifier over W1's API
+-BranchCertifier  vendor\truck\truck-certified\src\ssi_trace.rs:19  //! a [`BranchCertifier`] implemented over W1's landed API (`ssi.rs`) and the
+-BranchCertifier  vendor\truck\truck-certified\src\ssi_trace.rs:22  //! ([`BranchCertifier`], [`BranchBox`], [`BranchStep`]) whose synthetic
+-BranchCertifier  vendor\truck\truck-certified\src\ssi_trace.rs:93  pub(crate) trait BranchCertifier {
+-BranchCertifier  vendor\truck\truck-certified\src\ssi_trace.rs:112  #[allow(dead_code)] // wave-private seam, see [`BranchCertifier`]
+-BranchCertifier  vendor\truck\truck-certified\src\ssi_trace.rs:122  #[allow(dead_code)] // wave-private seam, see [`BranchCertifier`]
+-BranchCertifier  vendor\truck\truck-certified\src\ssi_trace.rs:131  #[allow(dead_code)] // wave-private seam, see [`BranchCertifier`]
+-BranchCertifier  vendor\truck\truck-certified\src\ssi_trace.rs:150  #[allow(dead_code)] // wave-private seam, see [`BranchCertifier`]
+-BranchCertifier  vendor\truck\truck-certified\src\ssi_trace.rs:173  #[allow(dead_code)] // wave-private seam, see [`BranchCertifier`]
+-BranchCertifier  vendor\truck\truck-certified\src\ssi_trace.rs:205  pub(crate) fn trace_branch<C: BranchCertifier>(
+-BranchCertifier  vendor\truck\truck-certified\src\ssi_trace.rs:409  // The production seam (integration amendment): BranchCertifier over W1's API
+-IntersectionFrame  vendor\truck\truck-geometry\src\canonical.rs:1769  use crate::constructive::intersection_carrier::{CertifiedSample, IntersectionFrame};
+-IntersectionFrame  vendor\truck\truck-geometry\src\canonical.rs:1773  fn x_frame() -> Option<IntersectionFrame> {
+-IntersectionFrame  vendor\truck\truck-geometry\src\canonical.rs:1776  Some(IntersectionFrame {
+-IntersectionFrame  vendor\truck\truck-geometry\src\constructive\intersection_carrier.rs:79  Ok(IntersectionFrame {
+-IntersectionFrame  vendor\truck\truck-geometry\src\constructive\intersection_carrier.rs:192  pub fn frames(&self) -> &[IntersectionFrame] {
+-IntersectionFrame  vendor\truck\truck-geometry\src\constructive\intersection_carrier.rs:388  fn reorthonormalize(tangent: Vector3, normal: Vector3) -> Option<IntersectionFrame> {
+-IntersectionFrame  vendor\truck\truck-geometry\src\constructive\intersection_carrier.rs:405  Some(IntersectionFrame {
+-IntersectionFrame  vendor\truck\truck-geometry\src\constructive\intersection_carrier.rs:651  fn arc_frame(theta: f64) -> IntersectionFrame {
+-IntersectionFrame  vendor\truck\truck-geometry\src\canonical.rs:1769  use crate::constructive::intersection_carrier::{CertifiedSample, IntersectionFrame};
+-IntersectionFrame  vendor\truck\truck-geometry\src\canonical.rs:1773  fn x_frame() -> Option<IntersectionFrame> {
+-IntersectionFrame  vendor\truck\truck-geometry\src\canonical.rs:1776  Some(IntersectionFrame {
+-IntersectionFrame  vendor\truck\truck-geometry\src\constructive\intersection_carrier.rs:79  Ok(IntersectionFrame {
+-IntersectionFrame  vendor\truck\truck-geometry\src\constructive\intersection_carrier.rs:192  pub fn frames(&self) -> &[IntersectionFrame] {
+-IntersectionFrame  vendor\truck\truck-geometry\src\constructive\intersection_carrier.rs:388  fn reorthonormalize(tangent: Vector3, normal: Vector3) -> Option<IntersectionFrame> {
+-IntersectionFrame  vendor\truck\truck-geometry\src\constructive\intersection_carrier.rs:405  Some(IntersectionFrame {
+-IntersectionFrame  vendor\truck\truck-geometry\src\constructive\intersection_carrier.rs:651  fn arc_frame(theta: f64) -> IntersectionFrame {
+-try_new  vendor\truck\truck-certified\tests\construct_blend.rs:52  SupportChart::try_new(map, REGION, side).expect("the affine face builds a chart")
+-try_new  vendor\truck\truck-certified\tests\construct_blend.rs:57  IBox3::try_new(
+-try_new  vendor\truck\truck-certified\tests\construct_blend.rs:106  BranchSeed::try_new(first, second, box_of([x0, radius, radius]), None, clearance)
+-try_new  vendor\truck\truck-certified\tests\construct_blend.rs:255  let ab = BranchSeed::try_new(
+-try_new  vendor\truck\truck-certified\tests\construct_blend.rs:264  let ac = BranchSeed::try_new(
+-try_new  vendor\truck\truck-certified\tests\construct_blend.rs:273  let bc = BranchSeed::try_new(
+-try_new  vendor\truck\truck-certified\tests\construct_blend_varradius.rs:60  SupportChart::try_new(map, REGION, side).expect("the affine face builds a chart")
+-try_new  vendor\truck\truck-certified\tests\construct_blend_varradius.rs:65  IBox3::try_new(
+-try_new  vendor\truck\truck-certified\tests\construct_blend_varradius.rs:125  BranchSeed::try_new(first, second, box_of([x0, radius, radius]), None, None)
+-try_new  vendor\truck\truck-certified\tests\construct_contact3.rs:85  let seed = IBox4::try_new(lo, hi).expect("the seed box is valid");
+-try_new  vendor\truck\truck-certified\tests\construct_contact3.rs:86  ReducedSystem::try_new(refs, [REGION; 3], eps, &RadiusLaw::Constant(radius), seed)
+-try_new  vendor\truck\truck-certified\tests\construct_contract.rs:209  assert_stub_refuses(WireComplex::try_new());
+-try_new  vendor\truck\truck-geometry\src\arrange.rs:2239  pub fn try_new(samples: Vec<(f64, f64)>, closed: bool, certified: bool) -> Outcome<ChartCurve> {
+-try_new  vendor\truck\truck-geometry\src\arrange.rs:2786  ChartCurve::try_new(samples, closed, true).unwrap().value
+-try_new  vendor\truck\truck-geometry\src\arrange.rs:2797  assert!(ChartCurve::try_new(Vec::new(), false, true).is_err());
+-try_new  vendor\truck\truck-geometry\src\arrange.rs:2798  assert!(ChartCurve::try_new(vec![(0.0, 0.0)], false, true).is_err());
+-try_new  vendor\truck\truck-geometry\src\arrange.rs:2801  ChartCurve::try_new(vec![(0.0, 0.0), (1.0, 0.0), (1.0, 1.0)], true, true,).is_err()
+-try_new  vendor\truck\truck-geometry\src\arrange.rs:2804  assert!(ChartCurve::try_new(vec![(0.0, f64::NAN), (1.0, 0.0)], false, true).is_err());
+-try_new  vendor\truck\truck-geometry\src\arrange.rs:2805  assert!(ChartCurve::try_new(vec![(f64::INFINITY, 0.0), (1.0, 0.0)], false, true).is_err());
+-try_new  vendor\truck\truck-geometry\src\arrange.rs:2808  ChartCurve::try_new(vec![(0.0, 0.0), (0.0, 0.0), (1.0, 0.0)], false, true).is_err()
+-try_new  vendor\truck\truck-geometry\src\arrange.rs:2812  assert!(ChartCurve::try_new(vec![(0.0, 0.0), (1.0, 0.0)], false, false).is_err());
+-try_new  vendor\truck\truck-geometry\src\arrange.rs:2814  assert!(ChartCurve::try_new(
+-try_new  vendor\truck\truck-geometry\src\canonical.rs:1775  Frame3::try_new(Vector3::unit_x(), Vector3::unit_z(), -Vector3::unit_y()).ok()?;
+-try_new  vendor\truck\truck-geometry\src\canonical.rs:1799  match CertifiedImplicitIntersectionCurve::try_new(&samples, None) {
+-CertifiedSample  vendor\truck\truck-certified\src\tangency\a2.rs:1442  let mut out: Vec<A2CertifiedSample> = Vec::new();
+-CertifiedSample  vendor\truck\truck-certified\src\tangency\a2.rs:1522  out.push(A2CertifiedSample {
+-CertifiedSample  vendor\truck\truck-certified\src\tangency\a2.rs:1709  ) -> Result<(A2BranchCurve, Vec<A2CertifiedSample>), TangencyRefusal> {
+-CertifiedSample  vendor\truck\truck-certified\src\tangency\a2.rs:1736  let mut samples: Vec<A2CertifiedSample> = Vec::new();
+-CertifiedSample  vendor\truck\truck-geometry\src\canonical.rs:1769  use crate::constructive::intersection_carrier::{CertifiedSample, IntersectionFrame};
+-CertifiedSample  vendor\truck\truck-geometry\src\canonical.rs:1793  .map(|&position| CertifiedSample {
+-CertifiedSample  vendor\truck\truck-geometry\src\constructive\intersection_carrier.rs:664  fn quarter_circle_samples(stations: usize) -> Vec<CertifiedSample> {
+-CertifiedSample  vendor\truck\truck-geometry\src\constructive\intersection_carrier.rs:680  fn expect_curve(samples: &[CertifiedSample]) -> Option<CertifiedImplicitIntersectionCurve> {
+-CarrierUnresolved  vendor\truck\truck-geometry\src\constructive\intersection_carrier.rs:209  pub fn unresolved(&self) -> Option<CarrierUnresolved> {
+-CertifiedImplicitIntersectionCurve  vendor\truck\truck-geometry\src\canonical.rs:18  use crate::constructive::{CertifiedImplicitIntersectionCurve, SpineFrameSweep};
+-CertifiedImplicitIntersectionCurve  vendor\truck\truck-geometry\src\canonical.rs:64  CertifiedImplicitIntersectionCurve(CertifiedImplicitIntersectionCurve),
+-CertifiedImplicitIntersectionCurve  vendor\truck\truck-geometry\src\canonical.rs:76  Curve::CertifiedImplicitIntersectionCurve(got) => $method(got, $($ver), *),
+-CertifiedImplicitIntersectionCurve  vendor\truck\truck-geometry\src\canonical.rs:90  Curve::CertifiedImplicitIntersectionCurve(got) => {
+-CertifiedImplicitIntersectionCurve  vendor\truck\truck-geometry\src\canonical.rs:91  Curve::CertifiedImplicitIntersectionCurve($method(got, $($ver), *))
+-CertifiedImplicitIntersectionCurve  vendor\truck\truck-geometry\src\canonical.rs:154  fn from(x: CertifiedImplicitIntersectionCurve) -> Self {
+-CertifiedImplicitIntersectionCurve  vendor\truck\truck-geometry\src\canonical.rs:155  Curve::CertifiedImplicitIntersectionCurve(x)
+-CertifiedImplicitIntersectionCurve  vendor\truck\truck-geometry\src\canonical.rs:213  Curve::CertifiedImplicitIntersectionCurve(x) => Ok(x),
+-CertifiedImplicitIntersectionCurve  vendor\truck\truck-geometry\src\canonical.rs:284  Curve::CertifiedImplicitIntersectionCurve(_) => {
+-CertifiedImplicitIntersectionCurve  vendor\truck\truck-geometry\src\canonical.rs:793  Curve::CertifiedImplicitIntersectionCurve(_) => {
+-CertifiedImplicitIntersectionCurve  vendor\truck\truck-geometry\src\canonical.rs:817  Curve::CertifiedImplicitIntersectionCurve(_) => {
+-CertifiedImplicitIntersectionCurve  vendor\truck\truck-geometry\src\canonical.rs:841  Curve::CertifiedImplicitIntersectionCurve(_) => {
+-CertifiedImplicitIntersectionCurve  vendor\truck\truck-geometry\src\canonical.rs:18  use crate::constructive::{CertifiedImplicitIntersectionCurve, SpineFrameSweep};
+-CertifiedImplicitIntersectionCurve  vendor\truck\truck-geometry\src\canonical.rs:64  CertifiedImplicitIntersectionCurve(CertifiedImplicitIntersectionCurve),
+-CertifiedImplicitIntersectionCurve  vendor\truck\truck-geometry\src\canonical.rs:76  Curve::CertifiedImplicitIntersectionCurve(got) => $method(got, $($ver), *),
+-CertifiedImplicitIntersectionCurve  vendor\truck\truck-geometry\src\canonical.rs:90  Curve::CertifiedImplicitIntersectionCurve(got) => {
+-CertifiedImplicitIntersectionCurve  vendor\truck\truck-geometry\src\canonical.rs:91  Curve::CertifiedImplicitIntersectionCurve($method(got, $($ver), *))
+-CertifiedImplicitIntersectionCurve  vendor\truck\truck-geometry\src\canonical.rs:154  fn from(x: CertifiedImplicitIntersectionCurve) -> Self {
+-CertifiedImplicitIntersectionCurve  vendor\truck\truck-geometry\src\canonical.rs:155  Curve::CertifiedImplicitIntersectionCurve(x)
+-CertifiedImplicitIntersectionCurve  vendor\truck\truck-geometry\src\canonical.rs:213  Curve::CertifiedImplicitIntersectionCurve(x) => Ok(x),
+-CertifiedImplicitIntersectionCurve  vendor\truck\truck-geometry\src\canonical.rs:284  Curve::CertifiedImplicitIntersectionCurve(_) => {
+-CertifiedImplicitIntersectionCurve  vendor\truck\truck-geometry\src\canonical.rs:793  Curve::CertifiedImplicitIntersectionCurve(_) => {
+-CertifiedImplicitIntersectionCurve  vendor\truck\truck-geometry\src\canonical.rs:817  Curve::CertifiedImplicitIntersectionCurve(_) => {
+-CertifiedImplicitIntersectionCurve  vendor\truck\truck-geometry\src\canonical.rs:841  Curve::CertifiedImplicitIntersectionCurve(_) => {
+-parameters  vendor\truck\truck-certified\src\hull.rs:271  /// `sub = (lo, hi)` in SOURCE parameters.
+-parameters  vendor\truck\truck-certified\tests\kernel_canal.rs:94  /// `(+z, +y)` side; the contact parameters are `u = x`, `v = r` on `S1` and
+-parameters  vendor\truck\truck-certified\tests\kernel_identity.rs:82  let p1 = sample_parameters(s1);
+-parameters  vendor\truck\truck-certified\tests\kernel_identity.rs:83  let p2 = sample_parameters(s2);
+-parameters  vendor\truck\truck-certified\tests\kernel_tier2.rs:756  // curve parameter and the plane's own parameters) (1/3, 1/3, 2/5),
+-parameters  vendor\truck\truck-certified\src\construct\contact3.rs:29  //! parameters (the normal-field / closest-point parametrization is a local
+-parameters  vendor\truck\truck-certified\src\construct\contact3.rs:35  //! contact parameters, `q_1 = (0, c_y, c_z)` etc.). The reduction is therefore
+-parameters  vendor\truck\truck-certified\src\construct\contact3.rs:327  let pair = self.contact_parameters(support, &centre)?;
+-parameters  vendor\truck\truck-certified\src\construct\contact3.rs:342  fn contact_parameters(
+-parameters  vendor\truck\truck-certified\src\construct\loft_strips.rs:120  /// the matched split parameters (exact existing knot values â€” the split is a
+-parameters  vendor\truck\truck-certified\src\construct\loft_strips.rs:164  // The matched split parameters (validated against the shared knot vector).
+-parameters  vendor\truck\truck-certified\src\construct\loft_strips.rs:165  let params = split_parameters(&shared_knot, splits)?;
+-parameters  vendor\truck\truck-geometry\src\arrange.rs:1461  /// The exact Cramer parameters `(t on l1, u on l2, point)`, refusing when the
+-parameters  vendor\truck\truck-geometry\src\arrange.rs:2832  // crossing sits at (2, 2), at the known dyadic parameters 1.5 and 0.5.
+-parameters  vendor\truck\truck-geometry\tests\constructive_recipe.rs:145  fn profile_evaluation_refuses_nonfinite_parameters() {
+-parameters  vendor\truck\truck-geometry\tests\constructive_recipe.rs:287  fn sampling_custom_parameters_sorts_and_dedupes() {
+-parameters  vendor\truck\truck-geometry\src\constructive\intersection_carrier.rs:19  //! `truck-meshalgo` `EdgeSampleLedger` records (`parameters` + the interned
+-parameters  vendor\truck\truck-geometry\src\constructive\intersection_carrier.rs:166  /// The carrier parameters (cumulative chord length), strictly ascending.
+-parameters  vendor\truck\truck-geometry\src\constructive\intersection_carrier.rs:177  /// The carrier parameters (cumulative chord length of the certified
+-parameters  vendor\truck\truck-geometry\src\constructive\intersection_carrier.rs:180  pub fn parameters(&self) -> &[f64] {
+-parameters  vendor\truck\truck-geometry\src\constructive\intersection_carrier.rs:184  /// The certified polyline vertices, aligned with [`Self::parameters`].
+-parameters  vendor\truck\truck-geometry\src\constructive\intersection_carrier.rs:190  /// The per-sample tangent frames, aligned with [`Self::parameters`].
+-parameters  vendor\truck\truck-geometry\src\constructive\intersection_carrier.rs:244  let mut parameters = Vec::with_capacity(samples.len());
+-parameters  vendor\truck\truck-geometry\src\constructive\intersection_carrier.rs:266  None => parameters.push(0.0),
+-positions  vendor\truck\truck-certified\tests\kernel_contract.rs:704  assert_eq!(fixture.positions.len(), 3);
+-positions  vendor\truck\truck-certified\src\construct\setback.rs:43  //!    EXACTLY: `cross_{i-1}(1) = cross_i(0)`, and the corner positions agree
+-positions  vendor\truck\truck-certified\src\construct\setback.rs:1430  /// The angular positions (in `[0, 2Ï€)`) of a quad's corners around a vertex
+-positions  vendor\truck\truck-certified\src\domain\ambient.rs:21  //! `(Î©, Î›, N, Î£, S, C)` where `C` carries certificates for its propositions.
+-positions  vendor\truck\truck-certified\src\formal\curve_witness.rs:484  /// from the caller's certified vertex positions (the same
+-positions  vendor\truck\truck-certified\src\formal\cylinder_lift.rs:494  let (input, positions) = quad_face(&points);
+-positions  vendor\truck\truck-certified\src\formal\cylinder_lift.rs:509  SourceVertexKey::ShellVertex(index) => positions.get(index).copied(),
+-positions  vendor\truck\truck-certified\src\formal\cylinder_lift.rs:552  let (input, positions) = quad_face(&points);
+-positions  vendor\truck\truck-certified\src\formal\cylinder_lift.rs:567  SourceVertexKey::ShellVertex(index) => positions.get(index).copied(),
+-positions  vendor\truck\truck-certified\src\formal\cylinder_lift.rs:618  let (input, positions) = quad_face(&points);
+-positions  vendor\truck\truck-certified\src\formal\cylinder_lift.rs:632  SourceVertexKey::ShellVertex(index) => positions.get(index).copied(),
+-positions  vendor\truck\truck-certified\src\formal\planar_holes.rs:1182  let positions = match lift_to_3d(&mesh, plane) {
+-positions  vendor\truck\truck-geometry\tests\constructive_spine_enum.rs:536  // Same level twice: byte-identical sample positions (deterministic, frozen).
+-positions  vendor\truck\truck-geometry\src\constructive\frame_transport.rs:69  let mut positions: Vec<Point3> = Vec::with_capacity(stations.len());
+-positions  vendor\truck\truck-geometry\src\constructive\frame_transport.rs:71  positions.push(spine.position_at(station)?);
+-positions  vendor\truck\truck-geometry\src\constructive\intersection_carrier.rs:186  pub fn positions(&self) -> &[Point3] {
+-positions  vendor\truck\truck-geometry\src\constructive\intersection_carrier.rs:245  let mut positions = Vec::with_capacity(samples.len());
+-positions  vendor\truck\truck-geometry\src\constructive\intersection_carrier.rs:276  positions.push(sample.position);
+-positions  vendor\truck\truck-geometry\src\constructive\intersection_carrier.rs:333  let (Some(&pa), Some(&pb)) = (self.positions.get(k), self.positions.get(k + 1)) else {
+-positions  vendor\truck\truck-geometry\src\constructive\intersection_carrier.rs:489  let Some(&position) = self.positions.get(i) else {
+-positions  vendor\truck\truck-geometry\src\constructive\intersection_carrier.rs:534  positions: self.positions.iter().skip(best).copied().collect(),
+-positions  vendor\truck\truck-geometry\src\constructive\intersection_carrier.rs:540  positions: self.positions.iter().take(best + 1).copied().collect(),
+-positions  vendor\truck\truck-geometry\src\constructive\intersection_carrier.rs:556  self.positions.reverse();
+-positions  vendor\truck\truck-geometry\src\constructive\intersection_carrier.rs:566  for (position, frame) in self.positions.iter_mut().zip(self.frames.iter_mut()) {
+-frames  vendor\truck\truck-certified\tests\kernel_engine.rs:1196  "several approaching seeds must build orthonormal frames (built {built})"
+-frames  vendor\truck\truck-certified\src\formal\cone.rs:809  fn the_chart_round_trips_on_the_frames_own_nappe() {
+-frames  vendor\truck\truck-certified\src\construct\bie\ssi4.rs:147  /// Per-sample tangent frames (the parallelotope output).
+-frames  vendor\truck\truck-certified\src\construct\bie\ssi4.rs:1733  let mut frames: Vec<ParallelotopeFrame> = Vec::new();
+-frames  vendor\truck\truck-certified\src\construct\bie\ssi4.rs:1741  return (samples, frames, witness);
+-frames  vendor\truck\truck-certified\src\construct\bie\ssi4.rs:1752  frames.push(frame);
+-frames  vendor\truck\truck-certified\src\construct\bie\ssi4.rs:1754  return (samples, frames, witness);
+-frames  vendor\truck\truck-certified\src\construct\bie\ssi4.rs:1843  frames.push(new_frame);
+-frames  vendor\truck\truck-certified\src\construct\bie\ssi4.rs:1870  (samples, frames, witness)
+-frames  vendor\truck\truck-certified\src\construct\bie\ssi4.rs:1946  let mut frames: Vec<ParallelotopeFrame> = Vec::new();
+-frames  vendor\truck\truck-certified\src\construct\bie\ssi4.rs:1952  frames.append(&mut f);
+-frames  vendor\truck\truck-certified\src\construct\bie\ssi4.rs:2469  assert_eq!(curve.tangent_frames.len(), curve.samples.len());
+-frames  vendor\truck\truck-geometry\tests\constructive_recipe.rs:196  fn recipe_position_refuses_until_frames_land() {
+-frames  vendor\truck\truck-geometry\src\constructive\intersection_carrier.rs:15  //! continuously through its stored frames (a cubic Hermite through the
+-frames  vendor\truck\truck-geometry\src\constructive\intersection_carrier.rs:151  /// continuously through the stored frames (cubic Hermite whose knot tangents
+-frames  vendor\truck\truck-geometry\src\constructive\intersection_carrier.rs:190  /// The per-sample tangent frames, aligned with [`Self::parameters`].
+-frames  vendor\truck\truck-geometry\src\constructive\intersection_carrier.rs:192  pub fn frames(&self) -> &[IntersectionFrame] {
+-frames  vendor\truck\truck-geometry\src\constructive\intersection_carrier.rs:246  let mut frames = Vec::with_capacity(samples.len());
+-frames  vendor\truck\truck-geometry\src\constructive\intersection_carrier.rs:277  frames.push(sample.frame);
+-frames  vendor\truck\truck-geometry\src\constructive\intersection_carrier.rs:310  /// frames. Returns `(position, derivative, second derivative)`.
+-frames  vendor\truck\truck-geometry\src\constructive\intersection_carrier.rs:336  let (Some(&fa), Some(&fb)) = (self.frames.get(k), self.frames.get(k + 1)) else {
+-frames  vendor\truck\truck-geometry\src\constructive\intersection_carrier.rs:535  frames: self.frames.iter().skip(best).copied().collect(),
+-frames  vendor\truck\truck-geometry\src\constructive\intersection_carrier.rs:541  frames: self.frames.iter().take(best + 1).copied().collect(),
+-frames  vendor\truck\truck-geometry\src\constructive\intersection_carrier.rs:557  self.frames.reverse();
+-polyline  vendor\truck\truck-certified\src\pair_dispatch.rs:31  //! polylines in the certified path (F1: certified loci, never approximations).
+-polyline  vendor\truck\truck-certified\src\construct\loft.rs:39  //! 2. **Stationing** ([`chord_length_stations`]): per-section polyline chord
+-polyline  vendor\truck\truck-certified\src\construct\loft.rs:166  /// For each section (in input order) the section's own polyline chord length
+-polyline  vendor\truck\truck-certified\src\formal\support.rs:615  Self::Polyline(_) => "polyline",
+-polyline  vendor\truck\truck-certified\src\formal\support.rs:679  fn polyline_schema(vertices: Vec<Point3>) -> Result<PolylineSchema, CurveSchemaFailure> {
+-polyline  vendor\truck\truck-certified\src\formal\support.rs:701  match polyline_schema(vec![line.0, line.1]) {
+-polyline  vendor\truck\truck-certified\src\formal\support.rs:712  pub fn identify_polyline(curve: &[Point3]) -> CurveSchema {
+-polyline  vendor\truck\truck-certified\src\formal\support.rs:713  match polyline_schema(curve.to_vec()) {
+-polyline  vendor\truck\truck-certified\src\formal\support.rs:735  fn a_degenerate_polyline_is_refused() {
+-polyline  vendor\truck\truck-certified\src\formal\support.rs:737  identify_polyline(&[Point3::new(0.0, 0.0, 0.0)]),
+-polyline  vendor\truck\truck-certified\src\formal\support.rs:741  identify_polyline(&[]).tag(),
+-polyline  vendor\truck\truck-certified\src\formal\support.rs:753  identify_polyline(&broken),
+-polyline  vendor\truck\truck-geometry\src\arrange.rs:2214  /// The samples form the curve's polyline in the surface's own `(s, v)` chart.
+-polyline  vendor\truck\truck-geometry\src\arrange.rs:2217  /// The certified polyline vertices `(s, v)`, in sample order.
+-polyline  vendor\truck\truck-geometry\src\arrange.rs:2291  /// The certified polyline vertices `(s, v)`.
+-polyline  vendor\truck\truck-geometry\src\canonical.rs:1001  /// The spec's algorithm (surface-identity short-circuit, leader-polyline
+-polyline  vendor\truck\truck-geometry\src\canonical.rs:1828  assert_eq!(downcast.polyline(), carrier.polyline());
+-polyline  vendor\truck\truck-geometry\tests\constructive_recipe.rs:21  fn polyline_spine_derivative_refuses_at_corners() {
+-polyline  vendor\truck\truck-geometry\tests\constructive_recipe.rs:40  fn polyline_spine_out_of_domain_refuses() {
+-polyline  vendor\truck\truck-geometry\tests\constructive_spine_enum.rs:296  fn polyline_spine_refuses_as_not_c1_through_the_enum() {
+-polyline  vendor\truck\truck-geometry\tests\constructive_spine_enum.rs:297  let polyline = PolylineSpine::try_new(vec![
+-polyline  vendor\truck\truck-geometry\tests\constructive_spine_enum.rs:303  assert!(polyline.is_some(), "polyline fixture refused");
+-polyline  vendor\truck\truck-geometry\tests\constructive_spine_enum.rs:308  let wrapped = Spine::general(polyline);
+-polyline  vendor\truck\truck-geometry\src\constructive\intersection_carrier.rs:17  //! its polyline form ([`CertifiedImplicitIntersectionCurve::polyline`]) is
+-... (truncated at 400 lines)
++boolean  vendor\truck\truck-shapeops\src\facade.rs:31  //! | `boolean_op` | `boolean::assemble::boolean` via [`Mode`] â†’ [`BoolOp`] |
++boolean  vendor\truck\truck-shapeops\src\facade.rs:54  use crate::boolean::assemble::boolean;
++boolean  vendor\truck\truck-shapeops\src\facade.rs:55  use crate::boolean::BoolOp;
++boolean  vendor\truck\truck-shapeops\src\facade.rs:262  pub fn boolean_op(
++boolean  vendor\truck\truck-shapeops\src\facade.rs:268  boolean(a, mode.bool_op(), b, budget)
++boolean  vendor\truck\truck-shapeops\src\rewrite.rs:56  /// The insertion tolerance class (length), shared with the boolean assembler.
++boolean  vendor\truck\truck-shapeops\src\section.rs:10  //! - composes the two `boolean()` calls (D4), and
++boolean  vendor\truck\truck-shapeops\src\section.rs:16  //! `boolean()` results against the negative halfspace box (`Difference` for
++boolean  vendor\truck\truck-shapeops\src\section.rs:24  //! landed RW-CONIC refusal surface from inside `boolean()` (the booked
++boolean  vendor\truck\truck-shapeops\src\section.rs:50  use crate::boolean::assemble::boolean;
++boolean  vendor\truck\truck-shapeops\src\section.rs:51  use crate::boolean::BoolOp;
++boolean  vendor\truck\truck-shapeops\src\section.rs:506  /// `boolean()` calls against the negative halfspace box, so the landed
++boolean  vendor\truck\truck-evidence\src\contact\mod.rs:87  /// (a `truck-certified` construction no boolean crate can name).
++boolean_certified_operands  vendor\truck\truck-shapeops\src\boolean\assemble.rs:138  pub fn boolean_certified_operands(
++boolean_certified_operands  vendor\truck\truck-shapeops\src\boolean\assemble.rs:2105  let union = boolean_certified_operands(&id, &a, BoolOp::Union, &id, &a, &mut union_budget)
++boolean_certified_operands  vendor\truck\truck-shapeops\src\boolean\assemble.rs:2122  boolean_certified_operands(&id, &a, BoolOp::Intersection, &id, &a, &mut inter_budget)
++boolean_certified_operands  vendor\truck\truck-shapeops\src\boolean\assemble.rs:2139  let empty = boolean_certified_operands(&id, &a, op, &id, &a, &mut budget)
++sweep_contact_events  vendor\truck\truck-shapeops\src\boolean\assemble.rs:7  //! ([`sweep_contact_events`]), the splitter, the classifier, and the decision
++sweep_contact_events  vendor\truck\truck-shapeops\src\boolean\assemble.rs:79  let events = sweep_contact_events(a, b, INSERTION_TOL)?.value;
++sweep_contact_events  vendor\truck\truck-shapeops\src\boolean\assemble.rs:172  pub(crate) fn sweep_contact_events(
++sweep_contact_events  vendor\truck\truck-shapeops\src\boolean\assemble.rs:1167  let events = sweep_contact_events(&solid_a, &solid_b, TOL).unwrap().value;
++sweep_contact_events  vendor\truck\truck-shapeops\src\boolean\assemble.rs:2069  let events = sweep_contact_events(&solid_a, &solid_b, TOL).unwrap().value;
++sweep_contact_events  vendor\truck\truck-shapeops\src\boolean\assemble.rs:2225  let events = sweep_contact_events(&a, &b, TOL)
++Aabb  vendor\truck\truck-shapeops\src\boolean\assemble.rs:267  fn empty() -> Aabb {
++Aabb  vendor\truck\truck-shapeops\src\boolean\assemble.rs:287  fn touches(&self, other: &Aabb) -> bool {
++Aabb  vendor\truck\truck-shapeops\src\boolean\assemble.rs:579  fn face_enclosure(face: &Face<Point3, Curve, Surface>, tol: f64) -> Aabb {
++Aabb  vendor\truck\truck-shapeops\src\boolean\assemble.rs:580  let mut aabb = Aabb::empty();
++Aabb  vendor\truck\truck-shapeops\src\boolean\assemble.rs:620  fn grow_aabb(aabb: &mut Aabb, b: &Box3) {
++Aabb  vendor\truck\truck-shapeops\src\boolean\assemble.rs:672  fn edge_aabb(edge: &Edge<Point3, Curve>, tol: f64) -> Aabb {
++Aabb  vendor\truck\truck-shapeops\src\boolean\assemble.rs:673  let mut aabb = Aabb::empty();
++Aabb  vendor\truck\truck-shapeops\src\boolean\assemble.rs:1849  fn aabb_contains(b: &Aabb, p: Point3) -> bool {
++trim_provenance  vendor\truck\truck-shapeops\tests\cc024_offset_exact.rs:15  //! `boolean::assemble::trim_provenance`.
++trim_provenance  vendor\truck\truck-shapeops\tests\cc024_offset_exact.rs:45  use truck_shapeops::boolean::assemble::trim_provenance;
++trim_provenance  vendor\truck\truck-shapeops\tests\cc024_offset_exact.rs:374  let refs = trim_provenance(&shell, &sources, GEOM_TOL)
++trim_provenance  vendor\truck\truck-shapeops\src\boolean\assemble.rs:783  pub fn trim_provenance(
++
+diff --git a/PACKET.md b/PACKET.md
+index 094ba86..2131d6d 100644
+--- a/PACKET.md
++++ b/PACKET.md
+@@ -1,120 +1,133 @@
+-# WORK PACKET CL-002-SPLINE-ASSEMBLY â€” cross-patch branch stitching
++# WORK PACKET BREP-002-DSC-SCREENS â€” the boolean screen layer becomes certified enclosures
+ 
+-You are stitching per-patch intersection branches into whole carried curves.
+-Everything you need is in this document and
+-`docs/CARRIER_LIFT_BUILD_SPEC.md` (row CL-002, Â§4 gates). Do not read other
+-spec files. If something you need is genuinely missing, that is a SPEC_GAP
+-(see "Stop conditions"): you stop and report, you do not research it.
++You are correcting the last of the open BRep generation defects: the boolean
++entry's rejection screens under-cover curved carriers. Everything you need
++is in this document and the normative record
++`docs/defects/DSC-BOUNDARY-SAMPLE-EXTENT-001.md` â€” read it first. Do not
++read other spec files. If something you need is genuinely missing, that is a
++SPEC_GAP (see "Stop conditions"): you stop and report, you do not research it.
+ 
+ ```yaml
+-id:          CL-002-SPLINE-ASSEMBLY
+-contract:    [CL-002-SPLINE-ASSEMBLY]
+-class:       mechanical
+-crates:      [truck-certified, truck-geometry]
+-depends_on:  [CL-001-SPLINE-LIFT]
++id:          BREP-002-DSC-SCREENS
++contract:    [BREP-002-DSC-SCREENS]
++class:       design
++crates:      [truck-shapeops]
++depends_on:  [CTE-007-T2ARRANGE]
+ write_allow:
+-  - vendor/truck/truck-certified/src/ssi_trace.rs
+-  - vendor/truck/truck-geometry/src/constructive/intersection_carrier.rs
++  - vendor/truck/truck-shapeops/src/boolean/assemble.rs
++  - vendor/truck/truck-shapeops/tests/defect_regressions.rs
+ read_allow:
+-  - vendor/truck/truck-certified/src/ssi.rs
+-  - vendor/truck/truck-certified/src/ssi_types.rs
+-  - vendor/truck/truck-certified/src/tangency/
+-  - vendor/truck/truck-geometry/src/constructive/intersection_carrier.rs
+-  - docs/CARRIER_LIFT_BUILD_SPEC.md
++  - docs/defects/DSC-BOUNDARY-SAMPLE-EXTENT-001.md
++  - vendor/truck/truck-evidence/src/enclosure.rs
++  - vendor/truck/truck-evidence/src/enclosure_sweep.rs
++  - vendor/truck/truck-shapeops/src/boolean/{split,classify,mod}.rs
+ tests_required:
+-  - shared_edge_samples_agree_within_enclosure
+-  - stitched_branch_rides_carrier
+-  - unstitchable_pair_refuses_typed
+-budget:      {turns: 80, ctx_tokens: 160000}
++  - dsc_boundary_sample_extent_001_sphere_cap_screen_admits_the_contact
++  - dsc_boundary_sample_extent_001_planar_faces_screen_unchanged
++budget:      {turns: 70, ctx_tokens: 150000}
+ ```
+ 
+-**Additive constructor** in `intersection_carrier.rs`: H-1 applies â€” no
+-`unwrap_used` without a justified same-line opt-out.
+-
+ ## Problem
+ 
+-The splineÃ—analytic dispatch (CL-001, landed) certifies intersection
+-branches PER PATCH â€” a multi-patch spline carrier produces branch fragments
+-that must stitch into one carried curve where patches share an edge. The
+-stitch certificate asserts the shared-edge samples agree (interval
+-bookkeeping); the stitched branch rides the landed
+-`CertifiedImplicitIntersectionCurve` carrier.
++The boolean entry derives two extents from BOUNDARY-CURVE SAMPLES
++(`face_aabb`, `face_uv_box` in `assemble.rs`) and consumes them as
++enclosures: the 3-D AABB gates the cross-solid sweep, the parameter box
++becomes the stratum's domain. For a curved carrier whose trim interior
++bulges away from its boundary hull (spherical cap, loft panel), both
++under-cover â€” the pair never reaches the contact oracle, and the boolean
++completes with silently missing contact events. No refusal fires anywhere,
++because the oracle was never reached. That is the cardinal failure class
++(BG-ENC-001).
+ 
+ ## Scope decisions â€” pre-made, do not relitigate
+ 
+-1. **The stitch predicate is interval agreement on shared edges**: for two
+-   patches meeting along an edge, the per-patch branch samples restricted
+-   to the shared edge agree within their certified enclosures â€” a
+-   bookkeeping assertion over already-certified data, never a new solve.
+-2. **The carrier is additive**: a new constructor on the landed
+-   `CertifiedImplicitIntersectionCurve` taking stitched fragments; the
+-   landed carrier type and its consumers are untouched (V5).
+-3. **`ssi_trace.rs` is yours this cycle**: extend the trace outcome to
+-   carry stitched branches; `ssi.rs`/`ssi_types.rs` stay read-only.
+-4. **Typed outcomes only**: a pair whose shared-edge samples disagree
+-   beyond enclosures refuses typed (`Unresolved` with the witness) â€” zero
+-   new `Refusal` arms.
++1. **The screen obligation**: `screen âŠ‡ S(T)` (world) and `â–¡uv âŠ‡ T`
++   (parameter). Over-estimation is acceptable (extra pairs admitted, refused
++   typed downstream); UNDER-estimation is the defect.
++2. **Replace the sampled extents with certified enclosures**: world screen =
++   `EnclosureSurface::enclose(parameter_box)` per stratum (every carrier
++   implements it â€” CL-000/CL-003 landed the spline and sweep forms); where
++   width matters, the union of per-knot-span `enclose` boxes over the D1
++   BÃ©zier decomposition the carrier already paid for at admission.
++3. **The uv twin derives from the trim's true parameter extent**, not the
++   boundary-polygon hull.
++4. **The `ee_circle_circle` guard STAYS** â€” the record's falsified-hypothesis
++   section: a documented v1-envelope decision, not a defect.
++5. **V5, absolute**: planar-faced booleans (where the sampled extent happens
++   to be sound) keep byte-identical results; the only behavior change is
++   curved-carrier pairs now reaching the oracle.
++6. **Width regression is measured, not assumed**: the false-positive-pair
++   rate on the corpus is recorded in RESULT (diagonal loft panels are the
++   worst case for a whole-trim enclosure).
+ 
+ ## Anchors â€” measured 2026-09-06 morning, re-check on your branch
+ 
+ | id | file | pattern | expect |
+ |---|---|---|---|
+-| A1 | `truck-certified/src/ssi_trace.rs` | `pub fn certified_pair_trace` | 1 |
+-| A2 | `truck-geometry/src/constructive/intersection_carrier.rs` | `pub struct CertifiedImplicitIntersectionCurve` | 1 |
+-| A3 | `truck-certified/src/ssi_types.rs` | `pub struct TraceStep` | 1 |
++| A1 | `truck-shapeops/src/boolean/assemble.rs` | `fn face_aabb` | 1 |
++| A2 | `truck-shapeops/src/boolean/assemble.rs` | `fn face_uv_box` | 1 |
++| A3 | `truck-evidence/src/enclosure_sweep.rs` | `impl EnclosureSurface for SpineFrameSweep` | 1 |
+ 
+ ## House rules
+ 
+ - **H-1** no unwrap/expect/panic reachable from geometry; **H-3** same-line
+   `// H-3`; **H-6** never record `Float` as `Exact`.
+-- **Determinism**: fixed fragment order; no hash ordering in output.
+-- **All cargo through the queue shim.** Scoped commands only.
++- **Determinism**: fixed pair order; no hash ordering in output.
++- **All cargo through the queue shim.** Scoped commands only:
++  `cargo check -p truck-shapeops`, `cargo test -p truck-shapeops --lib
++  boolean`, `cargo test -p truck-shapeops --test defect_regressions`.
+ 
+ ## Tests required
+ 
+-1. `shared_edge_samples_agree_within_enclosure` â€” two adjacent admitted
+-   patches whose branches share an edge: the stitch predicate certifies on
+-   the shared edge's enclosure.
+-2. `stitched_branch_rides_carrier` â€” the stitched branch constructs the
+-   landed carrier with the fragment provenance intact.
+-3. `unstitchable_pair_refuses_typed` â€” a mismatched pair refuses typed
+-   with the witness, never a silent gap.
++1. `dsc_boundary_sample_extent_001_sphere_cap_screen_admits_the_contact` â€”
++   the record's synthetic counterexample, run redâ†’green: a sphere-cap solid
++   minus a plane slab where the cap's apex contacts below its boundary
++   circle; the screen admits the pair and the intersection fragment is
++   present.
++2. `dsc_boundary_sample_extent_001_planar_faces_screen_unchanged` â€” a
++   planar-faced boolean's pair dispatch set is identical pre/post (V5).
+ 
+ No existing test may be deleted, `#[ignore]`d, or weakened.
+ 
+ ## Done when â€” run these, all must pass
+ 
+ ```
+-cargo fmt --check -p truck-certified -p truck-geometry
+-cargo clippy -p truck-certified -p truck-geometry --all-targets -- -D warnings
+-cargo test -p truck-certified --lib ssi
+-cargo test -p truck-geometry --lib intersection
++cargo fmt --check -p truck-shapeops
++cargo clippy -p truck-shapeops --all-targets -- -D warnings
++cargo test -p truck-shapeops --lib boolean
++cargo test -p truck-shapeops --test defect_regressions
+ ```
+ 
+ Send cargo output to a file and read the tail.
+ 
+ ## Forbidden
+ 
+-Anything outside `write_allow` â€” especially `ssi.rs`, `tangency/**`
+-(additive read), `construct/bie/**`, any landed test file, `Cargo.lock`.
+-Adding `#[ignore]`. Unjustified `#[allow]`. Committing to `main`.
++Anything outside `write_allow` â€” especially `boolean/{split,classify,mod}.rs`,
++`tangency/**`, `truck-evidence/**` (read-only: the enclosure implementations
++are landed), any landed test file, `Cargo.lock`. Adding `#[ignore]`.
++Unjustified `#[allow]`. Committing to `main`.
+ 
+ ## Stop conditions
+ 
+ - any anchor count differs â†’ `ANCHOR_MISMATCH`
+-- no admissible stitch fixture can be built from the landed admission
+-  layer â†’ `SPEC_GAP`, naming the gap
++- the synthetic counterexample cannot be constructed with the landed
++  carrier set â†’ `SPEC_GAP`, naming the missing carrier form
++- the corpus false-positive rate makes the boolean unusably slow â†’
++  `SPEC_GAP` with the measured rate (the per-knot-span variant is the
++  booked fallback â€” try it before stopping)
+ - three consecutive failed `cargo test` runs on the same error â†’ `BLOCKED`
+ 
+ ## Finish by writing `RESULT.json` at the WORKTREE ROOT (then COMMIT first)
+ 
++**COMMIT BEFORE writing `RESULT.json`.**
++
+ ```json
+-{"id":"CL-002-SPLINE-ASSEMBLY","status":"DONE","contracts":["CL-002-SPLINE-ASSEMBLY"],
+- "tests_added":3,"anchors_verified":{"A1":1,"A2":1,"A3":1},
+- "notes":"the stitch predicate's enclosure discipline; fragment provenance shape; any API deviation"}
++{"id":"BREP-002-DSC-SCREENS","status":"DONE","contracts":["BREP-002-DSC-SCREENS"],
++ "tests_added":2,"anchors_verified":{"A1":1,"A2":1,"A3":1},
++ "notes":"screen variant used per carrier class; corpus false-positive-pair rate; planar V5 evidence; any API deviation"}
+ ```
+ 
+ `status` is one of `DONE`, `ANCHOR_MISMATCH`, `SPEC_GAP`, `BLOCKED`. On any
+ non-`DONE` status also write `QUESTION.md` beside it.
+ 
+-Commit subject: `feat(certified): cross-patch branch stitching onto the implicit intersection carrier (CL-002-SPLINE-ASSEMBLY)`.
++Commit subject: `fix(shapeops): boolean screens become certified enclosures (BREP-002-DSC-SCREENS)`.
