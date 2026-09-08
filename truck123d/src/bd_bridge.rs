@@ -75,6 +75,22 @@ pub enum LatheEdge {
     Spline { points: Vec<[f64; 2]> },
 }
 
+/// The census-recorded curve of one profile edge of a general authoring arm
+/// (extrude prism / loft section), in the part's local 3-D frame. A line edge
+/// records its endpoints exactly; a spline edge records its DEFINING samples
+/// (the points the corpus passed to `Edge.make_spline`). The recording scheme
+/// never flattens a spline to a polygon: the carrier keeps the samples and the
+/// arm either integrates the true curve or refuses typed.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
+pub enum ProfileEdge {
+    /// A straight profile edge from `a` to `b`.
+    Line { a: [f64; 3], b: [f64; 3] },
+    /// A spline profile edge: the interpolation samples passed to
+    /// `Edge.make_spline(points)` with no tangents/parameters.
+    Spline { points: Vec<[f64; 3]> },
+}
+
 /// The solid carrier of one construction row.
 ///
 /// Data only: every field is a physical length/angle the corpus script
@@ -125,6 +141,41 @@ pub enum SolidSpec {
         /// for this executor's analytic lathe arm.
         arc_deg: f64,
     },
+    /// `extrude(face, amount, both)`: a closed planar line-loop profile swept
+    /// along its own plane normal. `profile` is the recorded boundary in order
+    /// (part-local 3-D coordinates). The extruded solid is an exact prism: the
+    /// volume is the profile area times the swept length (`amount`, or `2 *
+    /// amount` when `both`), the bbox is the profile support widened along the
+    /// normal, and the mesh sweeps the boundary deterministically.
+    Prism {
+        /// The closed planar line-loop boundary edges, in order.
+        profile: Vec<ProfileEdge>,
+        /// The swept length along the profile-plane normal.
+        amount: f64,
+        /// Extrude on both sides of the profile plane (`both=True`: the total
+        /// extent is `2 * amount`, symmetric about the plane).
+        #[serde(default)]
+        both: bool,
+    },
+    /// `loft(sections)` (and, for a closed station list, the sweep-as-loft-chain
+    /// form): an ordered stack of section profiles, each a closed planar
+    /// line-loop in the part's local 3-D frame, interpolated by matching
+    /// vertices in order (the ruled carrier the recording scheme fixes).
+    ///
+    /// When `closed` is true the row is a halo-style loop: the last station is
+    /// the exact return to the first station and the loft surface closes on
+    /// itself with no end caps. The arm certifies the closure seam with the
+    /// exact aligned-meeting-edge identity (`A0 W1 - A1 W0 == 0`, weights 1 for
+    /// the recorded line carrier); a station list that does not close refuses
+    /// typed with the mismatch evidence.
+    Loft {
+        /// The section profiles, in station order.
+        sections: Vec<Vec<ProfileEdge>>,
+        /// Whether the station list is a closed halo loop (last station == the
+        /// return to the first station).
+        #[serde(default)]
+        closed: bool,
+    },
 }
 
 /// One placed construction row: a solid plus its world frame.
@@ -148,6 +199,14 @@ pub struct PartSpec {
     /// translation).
     #[serde(default)]
     pub rz: f64,
+    /// A placed-carrier reflection about a coordinate plane through the local
+    /// origin, recorded by the mirror arm: `"x"` (YZ plane, x -> -x), `"y"`
+    /// (XZ plane, y -> -y) or `"z"` (XY plane, z -> -z). The reflection is a
+    /// congruence: it applies to the local geometry before the rz rotation and
+    /// translation, facts transform with the placement, and no geometry is
+    /// recomputed.
+    #[serde(default)]
+    pub mirror: Option<String>,
 }
 
 /// A node of the submitted construction tree: either one placed solid (a
@@ -179,6 +238,11 @@ pub struct Facts {
     pub volume: f64,
     /// The axis-aligned bounding box of every part in the tree, `[min, max]`.
     pub bbox: [[f64; 3]; 2],
+    /// The measured seam mismatch of a single-loft tree, when the top node is
+    /// one closed halo loft row: the exact aligned-meeting-edge identity
+    /// (`A0 W1 - A1 W0 == 0`) holds when this is `0.0`. `None` when the tree is
+    /// not a single closed loft part (no seam to certify).
+    pub seam_mismatch: Option<f64>,
 }
 
 // ---------------------------------------------------------------------------
@@ -224,6 +288,18 @@ fn solid_volume(solid: &SolidSpec) -> Result<f64, Refusal> {
             } else {
                 lathe_profile_volume(profile)
             }
+        }
+        SolidSpec::Prism {
+            profile,
+            amount,
+            both,
+        } => {
+            let geom = prism_geom(profile, *amount, *both)?;
+            Ok(geom.volume)
+        }
+        SolidSpec::Loft { sections, closed } => {
+            let validated = loft_sections(sections)?;
+            loft_volume(&validated, *closed)
         }
     }
 }
@@ -752,6 +828,27 @@ fn solid_local_bbox(solid: &SolidSpec) -> Result<[[f64; 3]; 2], Refusal> {
                 lathe_profile_bbox(profile)
             }
         }
+        SolidSpec::Prism {
+            profile,
+            amount,
+            both,
+        } => prism_bbox(profile, *amount, *both),
+        SolidSpec::Loft { sections, .. } => {
+            let validated = loft_sections(sections)?;
+            let mut min = [f64::INFINITY; 3];
+            let mut max = [f64::NEG_INFINITY; 3];
+            for loop3 in &validated.loops {
+                let box3 = loop_bbox(loop3);
+                for axis in 0..3 {
+                    min[axis] = min[axis].min(box3[0][axis]);
+                    max[axis] = max[axis].max(box3[1][axis]);
+                }
+            }
+            if !min[0].is_finite() || !max[0].is_finite() {
+                return Err(Refusal::Empty);
+            }
+            Ok([min, max])
+        }
     }
 }
 
@@ -833,8 +930,427 @@ fn cubic_roots(c: &[f64; 4]) -> Vec<f64> {
     roots
 }
 
-/// The world bounding box of one placed solid: rotate the local bbox corners
-/// about z by `rz`, then translate.
+// ---------------------------------------------------------------------------
+// Authoring arms: 3-D profile helpers (prism extrude / loft / sweep chain)
+// ---------------------------------------------------------------------------
+//
+// The extrude and loft recording arms carry their profiles as closed planar
+// line loops in the part's local 3-D frame. All facts are exact analytic
+// arithmetic over those loops:
+//
+// * `Prism`: the volume is the profile area times the swept length along the
+//   profile-plane normal (OCC's Face-normal extrusion convention: a single-
+//   sided sweep runs +right-hand-normal, `both` sweeps symmetrically), the
+//   bbox is the profile support widened along the normal and the mesh sweeps
+//   the boundary deterministically.
+// * `Loft`: the ruled matched-vertex interpolation. Over each pair of stations
+//   the cross-section polygon area is a quadratic in the stack parameter, so a
+//   chain of two-section lofts is the "segment-moment generalisation" of the
+//   FH-SPLINE-LATHE line-profile revolution (whose frustum telescoping is the
+//   degenerate two-section case). The volume is the exact divergence-form
+//   boundary integral over the loft's faces: each planar cap contributes
+//   `(1/3) n . int x dA` (exact shoelace moments over the cap polygon) and
+//   every ruled side patch between matching edges contributes the exact
+//   bilinear moment `(1/3) int int X.(Xu x Xv) du dv`, evaluated by two-point
+//   Gauss-Legendre quadrature (exact: the integrand is a polynomial of degree
+//   (2,2) in (u, v)). A closed halo row has no end caps; the seam is certified
+//   by the exact aligned-meeting-edge identity on the stations that return to
+//   the start.
+// * `mirror`: a placed-carrier reflection; the solid spec is untouched and the
+//   facts transform with the placement (no geometry recomputation).
+
+/// A closed planar line-loop profile extracted from a recorded profile edge
+/// list.
+struct ProfileLoop {
+    /// The boundary vertices in order (no duplicated closing point).
+    verts: Vec<[f64; 3]>,
+    /// `area_vec / |area_vec|`.
+    normal: [f64; 3],
+    /// The loop's signed area (`|area_vec|`).
+    area: f64,
+    /// The loop scale (max absolute coordinate), used for tolerances.
+    scale: f64,
+}
+
+fn v3_sub(a: [f64; 3], b: [f64; 3]) -> [f64; 3] {
+    [a[0] - b[0], a[1] - b[1], a[2] - b[2]]
+}
+
+fn v3_cross(a: [f64; 3], b: [f64; 3]) -> [f64; 3] {
+    [
+        a[1] * b[2] - a[2] * b[1],
+        a[2] * b[0] - a[0] * b[2],
+        a[0] * b[1] - a[1] * b[0],
+    ]
+}
+
+fn v3_dot(a: [f64; 3], b: [f64; 3]) -> f64 {
+    a[0] * b[0] + a[1] * b[1] + a[2] * b[2]
+}
+
+/// The all-line vertex list of a recorded 3-D profile (one vertex per edge, in
+/// order). `None` when any edge is a spline: a spline carrier cannot be
+/// flattened to its sample polygon, so the caller refuses typed rather than
+/// approximate.
+fn profile3_vertices(profile: &[ProfileEdge]) -> Option<Vec<[f64; 3]>> {
+    let mut out = Vec::with_capacity(profile.len());
+    for edge in profile {
+        match edge {
+            ProfileEdge::Line { a, .. } => out.push(*a),
+            ProfileEdge::Spline { .. } => return None,
+        }
+    }
+    if out.is_empty() {
+        return None;
+    }
+    Some(out)
+}
+
+/// Builds and validates one closed planar line-loop profile.
+fn profile_loop(profile: &[ProfileEdge]) -> Result<ProfileLoop, Refusal> {
+    let verts = profile3_vertices(profile).ok_or_else(|| {
+        // A spline profile edge is not flattenable to its sample polygon; the
+        // recording arm keeps the samples and the fact arm refuses typed.
+        Refusal::UnsupportedEnvelope(EnvelopeCase::NonCanonicalCarrier)
+    })?;
+    if verts.len() < 3 {
+        return Err(Refusal::Empty);
+    }
+    let mut scale = 0.0f64;
+    for v in &verts {
+        for c in v {
+            if !c.is_finite() {
+                return Err(Refusal::Empty);
+            }
+            scale = scale.max(c.abs());
+        }
+    }
+    // The recorded edges must chain into a closed loop: consecutive edges share
+    // their meeting point and the last edge returns to the first vertex. The
+    // maximum gap is the seam mismatch evidence of the carrier.
+    let seam_tol = 1e-9 * (1.0 + scale);
+    let mut max_gap = 0.0f64;
+    let n = verts.len();
+    for i in 0..n {
+        let b = match profile.get(i) {
+            Some(ProfileEdge::Line { b, .. }) => *b,
+            _ => verts[(i + 1) % n],
+        };
+        let next = verts[(i + 1) % n];
+        let gap = if i + 1 < n {
+            v3_norm(v3_sub(b, next))
+        } else {
+            v3_norm(v3_sub(b, verts[0]))
+        };
+        max_gap = max_gap.max(gap);
+    }
+    if max_gap > seam_tol {
+        return Err(Refusal::UnsupportedEnvelope(
+            EnvelopeCase::NonCanonicalCarrier,
+        ));
+    }
+    // Right-hand area vector.
+    let mut ax = 0.0f64;
+    let mut ay = 0.0f64;
+    let mut az = 0.0f64;
+    for i in 0..n {
+        let a = verts[i];
+        let b = verts[(i + 1) % n];
+        ax += a[1] * b[2] - a[2] * b[1];
+        ay += a[2] * b[0] - a[0] * b[2];
+        az += a[0] * b[1] - a[1] * b[0];
+    }
+    let area_vec = [ax * 0.5, ay * 0.5, az * 0.5];
+    let mag = v3_norm(area_vec);
+    if !(mag > 0.0) || !mag.is_finite() {
+        return Err(Refusal::Empty);
+    }
+    let normal = [area_vec[0] / mag, area_vec[1] / mag, area_vec[2] / mag];
+    // The loop must be planar (the recorded surface is elementary).
+    let origin = verts[0];
+    let planarity_tol = 1e-7 * (1.0 + scale);
+    for a in &verts {
+        let rel = v3_sub(*a, origin);
+        if v3_dot(rel, normal).abs() > planarity_tol {
+            return Err(Refusal::UnsupportedEnvelope(
+                EnvelopeCase::NonCanonicalCarrier,
+            ));
+        }
+    }
+    Ok(ProfileLoop {
+        verts,
+        normal,
+        area: mag,
+        scale,
+    })
+}
+
+/// The unit normal of a difference vector, or `None` when it is degenerate.
+fn v3_norm(a: [f64; 3]) -> f64 {
+    v3_dot(a, a).sqrt()
+}
+
+/// The local bounding box and volume of an exact prism extruded from a closed
+/// planar line-loop profile along its plane normal.
+struct PrismGeom {
+    loop3: ProfileLoop,
+    /// Signed start offset along the normal (0 or -amount).
+    t_lo: f64,
+    /// Signed end offset along the normal (amount, or amount when both).
+    t_hi: f64,
+    volume: f64,
+}
+
+fn prism_geom(profile: &[ProfileEdge], amount: f64, both: bool) -> Result<PrismGeom, Refusal> {
+    if !amount.is_finite() || amount <= 0.0 {
+        return Err(Refusal::Empty);
+    }
+    let loop3 = profile_loop(profile)?;
+    let (t_lo, t_hi) = if both {
+        (-amount, amount)
+    } else {
+        (0.0, amount)
+    };
+    let height = t_hi - t_lo;
+    let volume = loop3.area * height;
+    Ok(PrismGeom {
+        loop3,
+        t_lo,
+        t_hi,
+        volume,
+    })
+}
+
+/// The exact local AABB of an extruded prism: the profile loop's support along
+/// each axis, widened by the extrusion range along the plane normal.
+fn prism_bbox(profile: &[ProfileEdge], amount: f64, both: bool) -> Result<[[f64; 3]; 2], Refusal> {
+    let geom = prism_geom(profile, amount, both)?;
+    let n = geom.loop3.normal;
+    let box0 = loop_bbox(&geom.loop3);
+    let mut min = [f64::INFINITY; 3];
+    let mut max = [f64::NEG_INFINITY; 3];
+    for axis in 0..3 {
+        // The t contribution is constant over the cross-section, so the prism
+        // extent is the loop support plus the t range projected on the axis.
+        let (d_min, d_max) = if n[axis] >= 0.0 {
+            (geom.t_lo * n[axis], geom.t_hi * n[axis])
+        } else {
+            (geom.t_hi * n[axis], geom.t_lo * n[axis])
+        };
+        min[axis] = box0[0][axis] + d_min;
+        max[axis] = box0[1][axis] + d_max;
+    }
+    if !min[0].is_finite() || !max[0].is_finite() {
+        return Err(Refusal::Empty);
+    }
+    Ok([min, max])
+}
+
+/// The exact AABB of a profile loop: the support of any axis-aligned linear
+/// function over a polygon is attained at a polygon vertex, so the loop's
+/// bbox over its vertices is exact for the loop region.
+fn loop_bbox(loop3: &ProfileLoop) -> [[f64; 3]; 2] {
+    let mut min = [f64::INFINITY; 3];
+    let mut max = [f64::NEG_INFINITY; 3];
+    for v in &loop3.verts {
+        for axis in 0..3 {
+            min[axis] = min[axis].min(v[axis]);
+            max[axis] = max[axis].max(v[axis]);
+        }
+    }
+    [min, max]
+}
+
+/// The exact volume of a ruled two-section loft between two matched parallel
+/// planar line-loop sections (the "segment moment" of one loft pair). The
+/// cross-section polygon's area is quadratic in the stack parameter, so the
+/// segment volume is the exact Simpson value over the end and mid sections.
+/// (Test-side independent machine check of the divergence-form volume arm.)
+#[cfg(test)]
+fn loft_segment_volume(a: &ProfileLoop, b: &ProfileLoop) -> f64 {
+    let n = a.verts.len();
+    // Mid-section vertices (matched linear interpolation at u = 1/2).
+    let mut mid = Vec::with_capacity(n);
+    for i in 0..n {
+        let p = a.verts[i];
+        let q = b.verts[i];
+        mid.push([
+            0.5 * (p[0] + q[0]),
+            0.5 * (p[1] + q[1]),
+            0.5 * (p[2] + q[2]),
+        ]);
+    }
+    // The mid polygon lies in a plane halfway between the (parallel) section
+    // planes; its right-hand area along the shared normal.
+    let mut cross = 0.0f64;
+    let normal = a.normal;
+    for i in 0..n {
+        let p = mid[i];
+        let q = mid[(i + 1) % n];
+        cross += v3_dot(v3_cross(p, q), normal);
+    }
+    let area_mid = cross * 0.5;
+    // The perpendicular separation of the two section planes.
+    let d = v3_sub(b.verts[0], a.verts[0]);
+    let h = v3_dot(d, normal).abs();
+    // Simpson over the quadratic cross-section area: exact.
+    (h / 6.0) * (a.area + 4.0 * area_mid + b.area)
+}
+
+/// The signed side-patch moment `(1/3) int int X.(Xu x Xv) du dv` of one ruled
+/// patch between the matching edges `(a0 -> a1)` of one section and
+/// `(b0 -> b1)` of the next, evaluated by two-point Gauss-Legendre quadrature
+/// (exact for the polynomial integrand).
+fn side_patch_moment(a0: [f64; 3], a1: [f64; 3], b0: [f64; 3], b1: [f64; 3]) -> f64 {
+    let inv_sqrt3 = 1.0 / 3.0f64.sqrt();
+    let nodes = [0.5 - 0.5 * inv_sqrt3, 0.5 + 0.5 * inv_sqrt3];
+    let da = v3_sub(a1, a0);
+    let db = v3_sub(b1, b0);
+    let ga = v3_sub(b0, a0);
+    let gb = v3_sub(b1, a1);
+    let mut acc = 0.0f64;
+    for ui in nodes {
+        for vi in nodes {
+            // A(u) and B(u).
+            let a = [a0[0] + ui * da[0], a0[1] + ui * da[1], a0[2] + ui * da[2]];
+            let b = [b0[0] + ui * db[0], b0[1] + ui * db[1], b0[2] + ui * db[2]];
+            // X = A + v (B - A); Xu = (1-v) da + v db; Xv = (1-u) ga + u gb.
+            let ab = v3_sub(b, a);
+            let x = [a[0] + vi * ab[0], a[1] + vi * ab[1], a[2] + vi * ab[2]];
+            let xu = [
+                (1.0 - vi) * da[0] + vi * db[0],
+                (1.0 - vi) * da[1] + vi * db[1],
+                (1.0 - vi) * da[2] + vi * db[2],
+            ];
+            let xv = [
+                (1.0 - ui) * ga[0] + ui * gb[0],
+                (1.0 - ui) * ga[1] + ui * gb[1],
+                (1.0 - ui) * ga[2] + ui * gb[2],
+            ];
+            acc += v3_dot(x, v3_cross(xu, xv));
+        }
+    }
+    // 2x2 Gauss: each node weight is 1/4 on [0,1]^2.
+    acc / 12.0
+}
+
+/// A loft arm's per-section data validated for the exact ruled carrier.
+struct LoftSections {
+    loops: Vec<ProfileLoop>,
+}
+
+/// Validates a loft section stack for the exact ruled carrier: every section
+/// must be a closed planar line loop, all sections must carry the same number
+/// of matched vertices, and consecutive sections must stack with their
+/// recorded winding normals (the gate below refuses a non-uniform or folded
+/// frame instead of approximating it).
+fn loft_sections(sections: &[Vec<ProfileEdge>]) -> Result<LoftSections, Refusal> {
+    if sections.len() < 2 {
+        return Err(Refusal::Empty);
+    }
+    let loops: Vec<ProfileLoop> = sections
+        .iter()
+        .map(|s| profile_loop(s))
+        .collect::<Result<_, _>>()?;
+    let count = loops[0].verts.len();
+    for loop3 in &loops {
+        if loop3.verts.len() != count {
+            // A matched ruled carrier needs equal vertex counts.
+            return Err(Refusal::UnsupportedEnvelope(
+                EnvelopeCase::NonCanonicalCarrier,
+            ));
+        }
+    }
+    Ok(LoftSections { loops })
+}
+
+/// The seam certificate of a closed halo loft row: the last station is the
+/// exact return to the first station, so the aligned meeting edges across the
+/// chain closure satisfy `A0 W1 - A1 W0 == 0` (weights 1 for the recorded line
+/// carrier). Returns the maximum mismatch over the aligned station vertices; a
+/// station list that does not close returns `Err` with the mismatch evidence.
+fn loft_seam_mismatch(sections: &LoftSections, closed: bool) -> Result<f64, Refusal> {
+    if !closed {
+        return Ok(f64::INFINITY); // no seam to certify on an open chain
+    }
+    let first = &sections.loops[0];
+    let last = sections.loops.last().ok_or(Refusal::Empty)?;
+    let scale = (first.scale).max(last.scale);
+    let tol = 1e-7 * (1.0 + scale);
+    let n = first.verts.len();
+    let mut max_gap = 0.0f64;
+    for i in 0..n {
+        let gap = v3_norm(v3_sub(first.verts[i], last.verts[i]));
+        max_gap = max_gap.max(gap);
+    }
+    if max_gap > tol {
+        return Err(Refusal::UnsupportedEnvelope(
+            EnvelopeCase::NonCanonicalCarrier,
+        ));
+    }
+    Ok(max_gap)
+}
+
+/// The exact volume of a loft chain. For an open chain the boundary is the
+/// ruled side surface between consecutive stations plus the two end caps; for
+/// a closed halo row the station list returns to its start and the side
+/// surface closes on itself (no caps, the last station repeats the first and
+/// its zero-length wrap segment contributes nothing). The winding direction is
+/// not part of the row data, so the orientation of the recorded loops is
+/// absorbed exactly as in the lathe arm.
+fn loft_volume(sections: &LoftSections, closed: bool) -> Result<f64, Refusal> {
+    let mut total = 0.0f64;
+    let n_sec = sections.loops.len();
+    let segment_count = if closed { n_sec - 1 } else { n_sec - 1 };
+    for j in 0..segment_count {
+        let a = &sections.loops[j];
+        let b = &sections.loops[j + 1];
+        let n = a.verts.len();
+        // Matched ruled side patches between the corresponding edges.
+        for i in 0..n {
+            let a0 = a.verts[i];
+            let a1 = a.verts[(i + 1) % n];
+            let b0 = b.verts[i];
+            let b1 = b.verts[(i + 1) % n];
+            total += side_patch_moment(a0, a1, b0, b1);
+        }
+    }
+    if !closed {
+        // End caps: the recorded section is a flat polygon in the plane
+        // `normal . x = d`, so its outward-facing divergence contribution is
+        // `(1/3) d A`. The outward cap normal is opposite the recorded winding
+        // normal at the first station (interior lies along the chain) and along
+        // it at the last station.
+        let first = &sections.loops[0];
+        let last = sections.loops.last().ok_or(Refusal::Empty)?;
+        let d_first = v3_dot(first.normal, first.verts[0]);
+        let d_last = v3_dot(last.normal, last.verts[0]);
+        let cap_first = -(1.0 / 3.0) * first.area * d_first;
+        let cap_last = (1.0 / 3.0) * last.area * d_last;
+        total += cap_first + cap_last;
+    }
+    if !total.is_finite() {
+        return Err(Refusal::Empty);
+    }
+    Ok(total.abs())
+}
+
+// ---------------------------------------------------------------------------
+// Authoring arms: mirror placed-carrier
+// ---------------------------------------------------------------------------
+
+/// Applies the part's placed-carrier reflection to a local point.
+fn mirror_point(p: [f64; 3], mirror: &str) -> [f64; 3] {
+    match mirror {
+        "x" => [-p[0], p[1], p[2]],
+        "z" => [p[0], p[1], -p[2]],
+        _ => [p[0], -p[1], p[2]],
+    }
+}
+
+/// The world bounding box of one placed solid: mirror the local geometry about
+/// the coordinate plane (when the mirror arm recorded one), rotate the local
+/// bbox corners about z by `rz`, then translate.
 fn part_world_bbox(part: &PartSpec) -> Result<[[f64; 3]; 2], Refusal> {
     let local = solid_local_bbox(&part.solid)?;
     let rz = part.rz.to_radians();
@@ -853,6 +1369,13 @@ fn part_world_bbox(part: &PartSpec) -> Result<[[f64; 3]; 2], Refusal> {
     let mut min = [f64::INFINITY; 3];
     let mut max = [f64::NEG_INFINITY; 3];
     for corner in corners {
+        // The mirror placed-carrier reflects the local bbox before the rz
+        // rotation (a reflection is a congruence: reflecting the AABB of the
+        // local solid is the AABB of the reflected solid).
+        let corner = match part.mirror.as_deref() {
+            Some(axis) => mirror_point(corner, axis),
+            None => corner,
+        };
         let (x, y) = if rz == 0.0 {
             (corner[0], corner[1])
         } else {
@@ -880,11 +1403,35 @@ pub fn tree_facts(root: &TreeNode) -> Result<Facts, Refusal> {
         return Err(Refusal::Empty);
     }
     let volume = top_volume(root)?;
+    let seam_mismatch = top_seam_mismatch(root)?;
     Ok(Facts {
         solid_count: count,
         volume,
         bbox: [min, max],
+        seam_mismatch,
     })
+}
+
+/// The seam certificate of a single closed halo loft row, when the top node is
+/// exactly one part carrying a `closed` loft. A non-closing chain refuses
+/// typed with the mismatch evidence; open chains and non-loft rows carry no
+/// seam (`None`).
+fn top_seam_mismatch(root: &TreeNode) -> Result<Option<f64>, Refusal> {
+    match root {
+        TreeNode::Part { part } => match &part.solid {
+            SolidSpec::Loft { sections, closed } => {
+                let validated = loft_sections(sections)?;
+                let mismatch = loft_seam_mismatch(&validated, *closed)?;
+                if *closed {
+                    Ok(Some(mismatch))
+                } else {
+                    Ok(None)
+                }
+            }
+            _ => Ok(None),
+        },
+        TreeNode::Group { .. } => Ok(None),
+    }
 }
 
 /// Recursively counts every part and unions every part's world bbox.
@@ -957,7 +1504,13 @@ fn append_node_mesh(node: &TreeNode, out: &mut Vec<Triangle>) -> Result<(), Refu
             let cos = rz.cos();
             let sin = rz.sin();
             for tri in local {
-                out.push(place_triangle(tri, cos, sin, part.x, part.y, part.z));
+                // The mirror placed-carrier reflects the local geometry before
+                // the rz rotation and translation (no geometry recomputation).
+                let reflected = match part.mirror.as_deref() {
+                    Some(axis) => reflect_triangle(tri, axis),
+                    None => tri,
+                };
+                out.push(place_triangle(reflected, cos, sin, part.x, part.y, part.z));
             }
             Ok(())
         }
@@ -968,6 +1521,19 @@ fn append_node_mesh(node: &TreeNode, out: &mut Vec<Triangle>) -> Result<(), Refu
             Ok(())
         }
     }
+}
+
+/// Reflects one local triangle across the recorded mirror coordinate plane.
+fn reflect_triangle(tri: Triangle, axis: &str) -> Triangle {
+    let mut reflected = [0.0f64; 9];
+    for vertex in 0..3 {
+        let p = [tri[vertex * 3], tri[vertex * 3 + 1], tri[vertex * 3 + 2]];
+        let q = mirror_point(p, axis);
+        reflected[vertex * 3] = q[0];
+        reflected[vertex * 3 + 1] = q[1];
+        reflected[vertex * 3 + 2] = q[2];
+    }
+    reflected
 }
 
 /// Translates a triangle by the part's world frame.
@@ -1017,7 +1583,122 @@ fn solid_mesh(solid: &SolidSpec) -> Result<Vec<Triangle>, Refusal> {
         SolidSpec::Sphere { radius } => sphere_mesh(*radius),
         SolidSpec::Torus { major, minor } => torus_mesh(*major, *minor),
         SolidSpec::Lathe { profile, .. } => lathe_mesh(profile),
+        SolidSpec::Prism {
+            profile,
+            amount,
+            both,
+        } => prism_mesh(profile, *amount, *both),
+        SolidSpec::Loft { sections, closed } => loft_mesh(sections, *closed),
     }
+}
+
+/// The local mesh of an extruded prism: the profile boundary swept between the
+/// two end planes plus cap fans. Deterministic, closed, no duplicate vertices.
+fn prism_mesh(profile: &[ProfileEdge], amount: f64, both: bool) -> Result<Vec<Triangle>, Refusal> {
+    let geom = prism_geom(profile, amount, both)?;
+    let norm = geom.loop3.normal;
+    let verts = &geom.loop3.verts;
+    let count = verts.len();
+    let centroid = {
+        let mut c = [0.0f64; 3];
+        for v in verts {
+            c[0] += v[0];
+            c[1] += v[1];
+            c[2] += v[2];
+        }
+        let k = 1.0 / count as f64;
+        [c[0] * k, c[1] * k, c[2] * k]
+    };
+    let bottom: Vec<[f64; 3]> = verts
+        .iter()
+        .map(|v| {
+            [
+                v[0] + geom.t_lo * norm[0],
+                v[1] + geom.t_lo * norm[1],
+                v[2] + geom.t_lo * norm[2],
+            ]
+        })
+        .collect();
+    let top: Vec<[f64; 3]> = verts
+        .iter()
+        .map(|v| {
+            [
+                v[0] + geom.t_hi * norm[0],
+                v[1] + geom.t_hi * norm[1],
+                v[2] + geom.t_hi * norm[2],
+            ]
+        })
+        .collect();
+    let cb = [
+        centroid[0] + geom.t_lo * norm[0],
+        centroid[1] + geom.t_lo * norm[1],
+        centroid[2] + geom.t_lo * norm[2],
+    ];
+    let ct = [
+        centroid[0] + geom.t_hi * norm[0],
+        centroid[1] + geom.t_hi * norm[1],
+        centroid[2] + geom.t_hi * norm[2],
+    ];
+    let mut out = Vec::new();
+    for i in 0..count {
+        let j = (i + 1) % count;
+        push_quad(&mut out, bottom[i], bottom[j], top[j], top[i]);
+    }
+    for i in 0..count {
+        let j = (i + 1) % count;
+        push_tri(&mut out, cb, bottom[j], bottom[i]);
+        push_tri(&mut out, ct, top[i], top[j]);
+    }
+    Ok(out)
+}
+
+/// The local mesh of a loft chain: ruled quads between matching vertices of
+/// consecutive sections, plus cap fans on the two end sections of an open
+/// chain. A closed halo row's last station repeats the first station, so the
+/// side surface closes on itself and needs no caps.
+fn loft_mesh(sections: &[Vec<ProfileEdge>], closed: bool) -> Result<Vec<Triangle>, Refusal> {
+    let validated = loft_sections(sections)?;
+    let loops = &validated.loops;
+    let mut out = Vec::new();
+    let seg_count = loops.len() - 1;
+    for j in 0..seg_count {
+        let a = &loops[j];
+        let b = &loops[j + 1];
+        let n = a.verts.len();
+        for i in 0..n {
+            let k = (i + 1) % n;
+            push_quad(&mut out, a.verts[i], a.verts[k], b.verts[k], b.verts[i]);
+        }
+    }
+    if !closed {
+        let first = &loops[0];
+        let last = loops.last().ok_or(Refusal::Empty)?;
+        let c_first = loop_centroid(first);
+        let c_last = loop_centroid(last);
+        let n = first.verts.len();
+        for i in 0..n {
+            let j = (i + 1) % n;
+            push_tri(&mut out, c_first, first.verts[i], first.verts[j]);
+        }
+        let n = last.verts.len();
+        for i in 0..n {
+            let j = (i + 1) % n;
+            push_tri(&mut out, c_last, last.verts[i], last.verts[j]);
+        }
+    }
+    Ok(out)
+}
+
+fn loop_centroid(loop3: &ProfileLoop) -> [f64; 3] {
+    let n = loop3.verts.len();
+    let mut c = [0.0f64; 3];
+    for v in &loop3.verts {
+        c[0] += v[0];
+        c[1] += v[1];
+        c[2] += v[2];
+    }
+    let k = 1.0 / n as f64;
+    [c[0] * k, c[1] * k, c[2] * k]
 }
 
 /// Applies the rotation used for x-axis cylinders: `(x, y, z) -> (z, y, -x)`
@@ -1371,12 +2052,18 @@ pub fn bd_facts(py: Python<'_>, tree_json: &str) -> PyResult<String> {
     let tree = parse_tree(tree_json).map_err(|refusal| refusal_to_pyerr(py, &refusal))?;
     let outcome = crate::gil::with_kernel_gil_released(py, move || tree_facts(&tree));
     match outcome {
-        Ok(facts) => serde_json::to_string(&serde_json::json!({
-            "solid_count": facts.solid_count,
-            "volume": facts.volume,
-            "bbox": facts.bbox,
-        }))
-        .map_err(|e| PyRuntimeError::new_err(format!("facts serialization failed: {e}"))),
+        Ok(facts) => {
+            let mut value = serde_json::json!({
+                "solid_count": facts.solid_count,
+                "volume": facts.volume,
+                "bbox": facts.bbox,
+            });
+            if let Some(mismatch) = facts.seam_mismatch {
+                value["seam_mismatch"] = serde_json::json!(mismatch);
+            }
+            serde_json::to_string(&value)
+                .map_err(|e| PyRuntimeError::new_err(format!("facts serialization failed: {e}")))
+        }
         Err(refusal) => Err(refusal_to_pyerr(py, &refusal)),
     }
 }
@@ -1432,6 +2119,21 @@ mod tests {
                 y,
                 z,
                 rz: 0.0,
+                mirror: None,
+            },
+        }
+    }
+
+    /// Builds a placed part carrying the mirror placed-carrier transform.
+    fn mirrored_part(solid: SolidSpec, axis: &str) -> TreeNode {
+        TreeNode::Part {
+            part: PartSpec {
+                solid,
+                x: 0.0,
+                y: 0.0,
+                z: 0.0,
+                rz: 0.0,
+                mirror: Some(axis.to_string()),
             },
         }
     }
@@ -1836,5 +2538,218 @@ mod tests {
         let points: Vec<[f64; 2]> = vertices.to_vec();
         let expected = lathe_volume(&points).expect("landed lathe volume");
         assert_eq!(facts.volume.to_bits(), expected.to_bits());
+    }
+
+    // -----------------------------------------------------------------------
+    // Authoring arms: extrude prism, loft (with the seam certificate) and the
+    // mirror placed carrier.
+    // -----------------------------------------------------------------------
+
+    /// A closed 3-D line-loop profile from `(x, y, z)` vertices.
+    fn line_loop3(pts: &[[f64; 3]]) -> Vec<ProfileEdge> {
+        pts.iter()
+            .enumerate()
+            .map(|(i, a)| ProfileEdge::Line {
+                a: *a,
+                b: pts[(i + 1) % pts.len()],
+            })
+            .collect()
+    }
+
+    /// A closed unit square in the `z = z0` plane, wound CCW about +z.
+    fn square(z0: f64) -> Vec<ProfileEdge> {
+        line_loop3(&[
+            [0.0, 0.0, z0],
+            [1.0, 0.0, z0],
+            [1.0, 1.0, z0],
+            [0.0, 1.0, z0],
+        ])
+    }
+
+    #[test]
+    fn prism_facts_are_exact_prism_arithmetic() {
+        // The extrusion recording arm: a closed line-loop planar profile swept
+        // along its own plane normal. Volume = area * swept length; `both`
+        // sweeps both directions (total 2*amount), single-sided sweeps +normal.
+        let profile = square(0.0);
+        let both = tree_facts(&part(
+            SolidSpec::Prism {
+                profile: profile.clone(),
+                amount: 3.0,
+                both: true,
+            },
+            0.0,
+            0.0,
+            0.0,
+        ))
+        .expect("a line-loop prism is in envelope");
+        assert!((both.volume - 6.0).abs() < 1e-12);
+        // bbox: the square at z in [-3, 3].
+        assert_eq!(both.bbox[0], [0.0, 0.0, -3.0]);
+        assert_eq!(both.bbox[1], [1.0, 1.0, 3.0]);
+
+        let single = tree_facts(&part(
+            SolidSpec::Prism {
+                profile,
+                amount: 3.0,
+                both: false,
+            },
+            0.0,
+            0.0,
+            0.0,
+        ))
+        .expect("single-sided prism is in envelope");
+        assert!((single.volume - 3.0).abs() < 1e-12);
+        assert_eq!(single.bbox[0], [0.0, 0.0, 0.0]);
+        assert_eq!(single.bbox[1], [1.0, 1.0, 3.0]);
+    }
+
+    #[test]
+    fn loft_volume_matches_the_segment_moment_derivation() {
+        // The loft arm over a parallel two-section stack: the volume is the
+        // exact divergence-form integral over the ruled faces. The degenerate
+        // two-section line-profile case (two identical aligned sections) is a
+        // prism whose volume must be bit-identical to the extrude arm's, and
+        // the general two-section case must equal the Simpson value over the
+        // (quadratic) cross-section area.
+        let a = square(0.0);
+        let b = square(5.0);
+        let solid = SolidSpec::Loft {
+            sections: vec![a, b],
+            closed: false,
+        };
+        let facts = tree_facts(&part(solid.clone(), 0.0, 0.0, 0.0))
+            .expect("a line-section loft is in envelope");
+        // Volume = 1 * 1 * 5.
+        assert!((facts.volume - 5.0).abs() / 5.0 < 1e-12);
+
+        // Two identical sections at z=0 and z=5 through the extrude arm: the
+        // prism arm and the degenerate two-section loft must agree bit for bit.
+        let prism = tree_facts(&part(
+            SolidSpec::Prism {
+                profile: square(0.0),
+                amount: 5.0,
+                both: false,
+            },
+            0.0,
+            0.0,
+            0.0,
+        ))
+        .expect("prism");
+        assert_eq!(facts.volume.to_bits(), prism.volume.to_bits());
+
+        // Coaxial similar sections (a pyramid frustum): the general loft
+        // segment volume equals the independent Simpson machine check and the
+        // closed-form frustum identity h/3 (A0 + A1 + sqrt(A0 A1)) — the same
+        // algebraic special case as the lathe line-profile frustum telescoping.
+        let small = line_loop3(&[
+            [0.0, 0.0, 0.0],
+            [2.0, 0.0, 0.0],
+            [2.0, 2.0, 0.0],
+            [0.0, 2.0, 0.0],
+        ]);
+        let big = line_loop3(&[
+            [0.0, 0.0, 3.0],
+            [4.0, 0.0, 3.0],
+            [4.0, 4.0, 3.0],
+            [0.0, 4.0, 3.0],
+        ]);
+        let a = profile_loop(&small).expect("small loop");
+        let b = profile_loop(&big).expect("big loop");
+        let simpson = loft_segment_volume(&a, &b);
+        let frustum = 3.0 / 3.0 * (a.area + b.area + (a.area * b.area).sqrt());
+        assert!((simpson - frustum).abs() / frustum < 1e-12);
+        let facts = tree_facts(&part(
+            SolidSpec::Loft {
+                sections: vec![small, big],
+                closed: false,
+            },
+            0.0,
+            0.0,
+            0.0,
+        ))
+        .expect("frustum loft");
+        assert!((facts.volume - frustum).abs() / frustum < 1e-12);
+    }
+
+    #[test]
+    fn closed_halo_loft_certifies_its_seam_and_refuses_open_mismatch() {
+        // The halo form: the station list returns to the start, so the aligned
+        // meeting edges across the chain closure satisfy the seam identity and
+        // the facts carry the (zero) mismatch. A station list recorded closed
+        // whose last station does not return refuses typed with the evidence.
+        //
+        // The fixture is a closed ring: a vertical square profile (radial
+        // extent 4..5, height -1..1) sampled every 45 degrees around the z
+        // axis, with the last station the exact return to the first.
+        let mut sections = Vec::new();
+        let make_station = |theta_deg: f64| -> Vec<ProfileEdge> {
+            let th = theta_deg.to_radians();
+            let (c, s) = (th.cos(), th.sin());
+            let mut pts = Vec::new();
+            for (r, h) in [(4.0, -1.0), (5.0, -1.0), (5.0, 1.0), (4.0, 1.0)] {
+                pts.push([r * c, r * s, h]);
+            }
+            line_loop3(&pts)
+        };
+        for i in 0..8 {
+            sections.push(make_station(i as f64 * 45.0));
+        }
+        // The return to the first station is the exact recorded first section
+        // (the halo chain closes onto its own start).
+        sections.push(sections[0].clone());
+        let facts = tree_facts(&part(
+            SolidSpec::Loft {
+                sections,
+                closed: true,
+            },
+            0.0,
+            0.0,
+            0.0,
+        ))
+        .expect("a closing halo chain is in envelope");
+        assert_eq!(facts.seam_mismatch, Some(0.0));
+        assert!(facts.volume > 0.0);
+        assert_eq!(facts.solid_count, 1);
+
+        // A non-closing chain: the recorded last station is shifted off the
+        // return so the aligned meeting edges no longer satisfy the identity.
+        let mut broken = Vec::new();
+        for i in 0..8 {
+            broken.push(make_station(i as f64 * 45.0));
+        }
+        // A perturbed "return": rotated 0.1 degree off the seam.
+        broken.push(make_station(360.1));
+        let refusal = tree_facts(&part(
+            SolidSpec::Loft {
+                sections: broken,
+                closed: true,
+            },
+            0.0,
+            0.0,
+            0.0,
+        ))
+        .expect_err("a non-closing halo chain must refuse typed");
+        assert!(matches!(
+            refusal,
+            Refusal::UnsupportedEnvelope(EnvelopeCase::NonCanonicalCarrier)
+        ));
+    }
+
+    #[test]
+    fn mirror_placed_carrier_transforms_facts_without_recomputing_geometry() {
+        // The mirror arm records a placed-carrier reflection over the census
+        // row: the volume is unchanged, the bbox is reflected about the plane,
+        // and no geometry is recomputed (the solid spec is untouched).
+        let solid = SolidSpec::Prism {
+            profile: square(0.0),
+            amount: 2.0,
+            both: true,
+        };
+        let base = tree_facts(&part(solid.clone(), 10.0, 0.0, 0.0)).expect("unmirrored prism");
+        let mirrored = tree_facts(&mirrored_part(solid, "y")).expect("mirror placed-carrier prism");
+        assert_eq!(base.volume.to_bits(), mirrored.volume.to_bits());
+        assert_eq!(mirrored.bbox[0], [0.0, -1.0, -2.0]);
+        assert_eq!(mirrored.bbox[1], [1.0, 0.0, 2.0]);
     }
 }
