@@ -10277,11 +10277,13 @@ fn wire_grid_segment(
         ) {
             continue;
         }
-        let Some(x) = interval_endpoint_vertex(triangulation, a, b, a_handle, b_handle, t0, uv0)
+        let Some(x) =
+            interval_endpoint_vertex(triangulation, polyline, a, b, a_handle, b_handle, t0, uv0)
         else {
             continue;
         };
-        let Some(y) = interval_endpoint_vertex(triangulation, a, b, a_handle, b_handle, t1, uv1)
+        let Some(y) =
+            interval_endpoint_vertex(triangulation, polyline, a, b, a_handle, b_handle, t1, uv1)
         else {
             continue;
         };
@@ -10296,6 +10298,7 @@ fn wire_grid_segment(
 /// otherwise a vertex at the (trim-exact) boundary UV `uv`.
 fn interval_endpoint_vertex(
     triangulation: &mut Cdt,
+    polyline: &PolyBoundary,
     a: Point2,
     b: Point2,
     a_handle: Option<FixedVertexHandle>,
@@ -10312,7 +10315,58 @@ fn interval_endpoint_vertex(
             return Some(h);
         }
     }
+    // DEF-TESS-ANALYTIC-SEAM-R2: never *invent* a vertex on a real source trim.
+    //
+    // The accuracy wiring resolves every interval boundary to a vertex; when
+    // the boundary is a grid/trim intersection with no grid-earned handle, that
+    // vertex is a brand-new point on the face's own trim. Along a seam shared
+    // with another face the neighbour's triangulation has no such point, so the
+    // unilateral insertion changes this face's seam sample set and the two
+    // sides can never agree (the analytic-shell seam defect). The seam vertices
+    // of a face must be exactly the boundary polyline's own samples: a grid
+    // line reaching a real source-carrying trim segment therefore stops at the
+    // trim's existing vertices instead of earning a new one. Segments that no
+    // source edge describes (synthetic closures, chart seams, and the bare
+    // untagged boundaries the unit tests drive) keep the exact-vertex wiring,
+    // because there is no neighbour whose seam set could diverge.
+    if on_source_trim(polyline, uv) {
+        let sp = SPoint2::new(spade_round(uv.x), spade_round(uv.y));
+        return triangulation
+            .vertices()
+            .find(|v| sp.distance_2(*v.as_ref()) < 1e-12)
+            .map(|v| v.fix());
+    }
     resolve_vertex(triangulation, uv)
+}
+
+/// Whether `uv` lies on a trim segment that a source edge use describes.
+///
+/// A source segment is a piece of the face's own boundary that is a real
+/// topological edge; a grid/trim intersection on it is a point the *shared*
+/// seam the neighbouring face also carries. Synthetic closure and chart-seam
+/// segments have no source use and are not shared geometry.
+fn on_source_trim(polyline: &PolyBoundary, uv: Point2) -> bool {
+    polyline.0.iter().any(|loop_| {
+        let n = loop_.points.len();
+        (0..n).any(|i| {
+            if loop_.origins[i] != SegmentOrigin::Source {
+                return false;
+            }
+            match loop_.source_uses.get(i) {
+                Some(uses) if !uses.is_empty() => {}
+                _ => return false,
+            }
+            let c = loop_.points[i].uv;
+            let e = loop_.points[(i + 1) % n].uv;
+            let seg = e - c;
+            let len2 = seg.magnitude2();
+            let t = match len2 <= f64::EPSILON {
+                true => 0.0,
+                false => ((uv - c).dot(seg) / len2).clamp(0.0, 1.0),
+            };
+            (c + seg * t).distance(uv) <= 1.0e-6
+        })
+    })
 }
 
 /// Intersection parameters of the grid segment `a -> b` with every **source**
