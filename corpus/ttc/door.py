@@ -153,8 +153,10 @@ Axis.Z = Axis((0, 0, 1))
 
 class Location:
     """build123d ``Location``: a placement. The corpus's kernel-engine rows
-    place parts by translation; the two-argument axis-rotation form is not a
-    census carrier the executor answers and refuses typed at use."""
+    place parts by translation or by a pure-z rotation before translation;
+    both are census carriers the executor answers (``x/y/z`` plus ``rz``).
+    A two-argument location whose rotation has a non-z component is not a
+    carrier the executor answers and refuses typed at use."""
 
     def __init__(self, *args):
         if len(args) == 1:
@@ -163,19 +165,44 @@ class Location:
                 position = position.to_tuple()
             if isinstance(position, (tuple, list)) and len(position) == 3:
                 self.x, self.y, self.z = (_num(v) for v in position)
+                self._rz = 0.0
                 self.unsupported_rotation = False
                 return
-        _refuse("Location forms beyond a translation are not census carriers")
+        if len(args) == 2:
+            position = args[0]
+            rotation = args[1]
+            if isinstance(position, Vector):
+                position = position.to_tuple()
+            if (
+                isinstance(position, (tuple, list))
+                and len(position) == 3
+                and isinstance(rotation, (tuple, list))
+                and len(rotation) == 3
+                and _num(rotation[0]) == 0.0
+                and _num(rotation[1]) == 0.0
+            ):
+                self.x, self.y, self.z = (_num(v) for v in position)
+                self._rz = _num(rotation[2])
+                self.unsupported_rotation = False
+                return
+        _refuse("Location forms beyond a translation or pure-z rotation are not census carriers")
 
 
 class Edge:
     """build123d ``Edge``: a curve carrier data row (line or spline)."""
 
-    def __init__(self, kind, p0, p1, points=None):
+    def __init__(self, kind, p0, p1, points=None, options=None):
         self.kind = kind
         self.p0 = p0
         self.p1 = p1
         self.points = points or []
+        # Which ``make_spline`` options beyond the plain point list were
+        # supplied. ``Edge.make_spline(points)`` fixes a recoverable
+        # interpolation convention (the OCC chord-length clamped cubic); any
+        # option (tangents/periodic/parameters/...) changes the curve in a way
+        # the recorded sample list alone cannot recover, so such an edge is
+        # not a kernel-engine row and refuses typed at revolve.
+        self.options = dict(options) if options else {}
 
     @classmethod
     def make_line(cls, p0, p1):
@@ -186,7 +213,12 @@ class Edge:
         pts = [_vector(p) for p in points]
         if len(pts) < 2:
             raise ValueError("spline needs at least two points")
-        return cls("spline", pts[0], pts[-1], points=pts)
+        options = {}
+        if args:
+            options["positional"] = True
+        for key in kwargs:
+            options[key] = True
+        return cls("spline", pts[0], pts[-1], points=pts, options=options)
 
 
 class Wire:
@@ -248,6 +280,9 @@ class _Part(_Shape):
         self._x += loc.x
         self._y += loc.y
         self._z += loc.z
+        rz = getattr(loc, "_rz", 0.0)
+        if rz:
+            self._rz += rz
         return self
 
     def moved(self, loc):
@@ -390,9 +425,13 @@ def Torus(major_radius, minor_radius, major_angle=360.0, mode=None, **kwargs):
 def revolve(shape, axis=None, revolution_arc=360.0, **kwargs):
     """build123d ``revolve(shape, axis, revolution_arc)``.
 
-    The executor's lathe arm covers a closed line-loop profile in the
-    ``y = 0`` plane revolved a full 360 degrees about the z axis. Any other
-    carrier (a spline profile, a partial arc, a non-z axis) refuses typed.
+    The executor's lathe arm covers a closed profile in the ``y = 0`` plane
+    revolved a full 360 degrees about the z axis. The profile may mix straight
+    edges and ``Edge.make_spline(points)`` spline edges (the spline is
+    recorded by its defining samples and the kernel integrates the true
+    interpolating spline, never a flattening polygon). Any other carrier (a
+    partial arc, a non-z axis, an open profile, a spline whose interpolation
+    options the recorded data cannot recover) refuses typed.
     """
     if not isinstance(axis, Axis) or not _close(axis.direction, (0, 0, 1)):
         _refuse("revolve about a non-z axis is not a kernel-engine row")
@@ -403,13 +442,34 @@ def revolve(shape, axis=None, revolution_arc=360.0, **kwargs):
     edges = list(shape.wire.edges)
     if len(edges) < 3:
         _refuse("revolve needs a closed profile")
-    points = []
+    profile = []
     for edge in edges:
-        if edge.kind != "line":
-            _refuse("a spline-profile revolve is not a kernel-engine row")
-        if edge.p0.y != 0.0 or edge.p1.y != 0.0:
-            _refuse("a revolve profile outside the y=0 plane is not a kernel-engine row")
-        points.append([edge.p0.x, edge.p0.z])
+        if edge.kind == "line":
+            if edge.p0.y != 0.0 or edge.p1.y != 0.0:
+                _refuse("a revolve profile outside the y=0 plane is not a kernel-engine row")
+            profile.append(
+                {
+                    "kind": "line",
+                    "a": [edge.p0.x, edge.p0.z],
+                    "b": [edge.p1.x, edge.p1.z],
+                }
+            )
+        elif edge.kind == "spline":
+            if edge.options:
+                # An interpolation option (tangents/periodic/parameters) is not
+                # recoverable from the recorded sample list; never guess one.
+                _refuse("a spline-profile revolve is not a kernel-engine row")
+            for point in edge.points:
+                if point.y != 0.0:
+                    _refuse("a revolve profile outside the y=0 plane is not a kernel-engine row")
+            profile.append(
+                {
+                    "kind": "spline",
+                    "points": [[point.x, point.z] for point in edge.points],
+                }
+            )
+        else:
+            _refuse("this curve carrier is not a lathe profile edge")
     first = edges[0].p0
     last = edges[-1].p1
     if (
@@ -418,7 +478,7 @@ def revolve(shape, axis=None, revolution_arc=360.0, **kwargs):
         or abs(first.z - last.z) > 1e-9
     ):
         _refuse("a revolve profile must close on itself")
-    return _Part({"kind": "lathe", "points": points, "arc_deg": 360.0})
+    return _Part({"kind": "lathe", "profile": profile, "arc_deg": 360.0})
 
 
 def make_face():
