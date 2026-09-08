@@ -219,9 +219,7 @@ pub fn recover_u_v(x: &RuledSpan, y: &RuledSpan, t: f64, s: f64) -> Option<(Inte
 /// guess.
 pub fn ruled_pair(x: &RuledSpan, y: &RuledSpan) -> AnalyticOutcome {
     if !x.structurally_finite() || !y.structurally_finite() {
-        return Err(Refusal::UnsupportedEnvelope(
-            EnvelopeCase::ChartDegenerate,
-        ));
+        return Err(Refusal::UnsupportedEnvelope(EnvelopeCase::ChartDegenerate));
     }
 
     // Carrier validity: the directrix must not be parallel to its own
@@ -229,9 +227,7 @@ pub fn ruled_pair(x: &RuledSpan, y: &RuledSpan) -> AnalyticOutcome {
     if !is_decisively_nonzero_cross(x.directrix, x.generator)
         || !is_decisively_nonzero_cross(y.directrix, y.generator)
     {
-        return Err(Refusal::UnsupportedEnvelope(
-            EnvelopeCase::ChartDegenerate,
-        ));
+        return Err(Refusal::UnsupportedEnvelope(EnvelopeCase::ChartDegenerate));
     }
 
     // The parallel-generator excision (revision-2 scope item 2). With constant
@@ -263,10 +259,9 @@ pub fn ruled_pair(x: &RuledSpan, y: &RuledSpan) -> AnalyticOutcome {
                 AnalyticIntersection::Curve(ExactCurve::Line(Line(p0, p1))),
                 exact_certificate(),
             ),
-            TransverseLocus::Point(p) => Certified::new(
-                AnalyticIntersection::TangentPoint(p),
-                exact_certificate(),
-            ),
+            TransverseLocus::Point(p) => {
+                Certified::new(AnalyticIntersection::TangentPoint(p), exact_certificate())
+            }
             TransverseLocus::Empty => {
                 Certified::new(AnalyticIntersection::Empty, exact_certificate())
             }
@@ -354,7 +349,14 @@ impl ParamClip {
 /// both because `d_i·(d_j × n) = ±‖n‖²` and `d_i·(d_i × n) = 0`. `n·n > 0`
 /// whenever the span is a non-degenerate parallelogram, so no division by zero
 /// is possible.
-fn param_clip(span: RuledSpan, other: Vector3, n: Vector3, invert: bool, lo: f64, hi: f64) -> ParamClip {
+fn param_clip(
+    span: RuledSpan,
+    other: Vector3,
+    n: Vector3,
+    invert: bool,
+    lo: f64,
+    hi: f64,
+) -> ParamClip {
     let denom = n.dot(n);
     let sign = if invert { -1.0 } else { 1.0 };
     ParamClip {
@@ -479,7 +481,12 @@ fn dot_triple(delta: [Interval; 3], w: Vector3, n: [Interval; 3]) -> Interval {
 /// component-wise in interval arithmetic.
 fn dot_vec_iv(dx: f64, dy: f64, dz: f64, n: [Interval; 3]) -> Interval {
     let [nx, ny, nz] = n;
-    dot_vec_iv_at(&[interval_at(dx), interval_at(dy), interval_at(dz)], nx, ny, nz)
+    dot_vec_iv_at(
+        &[interval_at(dx), interval_at(dy), interval_at(dz)],
+        nx,
+        ny,
+        nz,
+    )
 }
 
 /// `delta · (c0, c1, c2)` without any slice indexing (H-1/H-4).

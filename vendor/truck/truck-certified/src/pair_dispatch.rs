@@ -99,6 +99,17 @@
 //! coincidence handling owns it. Coincident planes DO refuse
 //! `PairUnsupported::Overlap` (the 2D pipeline's own meaning: a positive-area
 //! shared region).
+//!
+//! # FSSI-004-RULED registration seam
+//!
+//! The exact ruled × ruled analytic locus (`FSSI-004-RULED`, the
+//! `truck-evidence::analytic::ruled_pair` family) is consumed through the
+//! funnel's `ContactLocus::Analytic` path, not through this certified
+//! participant dispatch: the certified participant enum carries Plane /
+//! Cylinder / Sphere only, and a linear-extrusion or ruled-B-spline carrier is
+//! **not expressible** as a participant. Admission stays monotone (FSSI-EXT):
+//! an extrusion side simply has no arm here and the enumerated refusal below is
+//! the typed no-silent-downgrade surface — the general path keeps the pair.
 
 use crate::formal::contact::GenericUnresolved;
 use crate::formal::cylinder::{CertifiedEmbeddedCylinder, CylinderIdentification};
@@ -277,9 +288,22 @@ pub fn dispatch_pair(
         (CertifiedPairParticipant::Sphere(sa), CertifiedPairParticipant::Sphere(sb)) => {
             sphere_sphere(sa, sb)
         }
-        // After sorting the only remaining combination is cylinder~sphere,
-        // which books as DISPATCH-2 and refuses here.
-        _ => CertifiedPairResult::Unsupported(PairUnsupported::UnsupportedPairClass),
+        // Every remaining combination is enumerated — no catch-all. The
+        // reversed orderings are unreachable after the D-sort; they stay
+        // explicit so rustc enforces that a future participant variant cannot
+        // be dropped from dispatch. The certified participant enum carries no
+        // ruled/extrusion variant (FSSI-004-RULED registration seam: the exact
+        // ruled × ruled analytic locus lives in truck-evidence, F1), so an
+        // extrusion side is not expressible here and refuses typed.
+        (CertifiedPairParticipant::Cylinder(_), CertifiedPairParticipant::Sphere(_)) => {
+            // cylinder~sphere books as DISPATCH-2 and refuses here.
+            CertifiedPairResult::Unsupported(PairUnsupported::UnsupportedPairClass)
+        }
+        (CertifiedPairParticipant::Cylinder(_), CertifiedPairParticipant::Plane(_))
+        | (CertifiedPairParticipant::Sphere(_), CertifiedPairParticipant::Plane(_))
+        | (CertifiedPairParticipant::Sphere(_), CertifiedPairParticipant::Cylinder(_)) => {
+            CertifiedPairResult::Unsupported(PairUnsupported::UnsupportedPairClass)
+        }
     }
 }
 
