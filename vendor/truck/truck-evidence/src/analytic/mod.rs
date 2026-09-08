@@ -131,6 +131,13 @@ pub mod plane_cylinder;
 pub mod plane_plane;
 /// BG-ANA-001-PS: plane × sphere. Scaffolded empty; the packet fills it.
 pub mod plane_sphere;
+/// BG-ANA-002-RULED (FSSI-004-RULED): ruled × ruled — the exact scalar
+/// predicate `λ(t, s) = (B − A)·(d × e)` with rational `u, v` recovery, the
+/// parallel-generator excision (typed refusal), and the certified
+/// domain-crossing events of the bounded ruled spans. Consumed through the
+/// landed transverse `Curve` path in `truck-shapeops/src/boolean/split.rs`;
+/// no splitter change.
+pub mod ruled_pair;
 /// BG-ANA-001-SS: sphere × sphere. Scaffolded empty; the packet fills it.
 pub mod sphere_sphere;
 
