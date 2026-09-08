@@ -84,9 +84,9 @@
 //! carries no `unwrap`, no `expect`, no `panic!` (H-1: the module denies
 //! `clippy::unwrap_used`).
 
+use super::{unit_box, SsiRefusal};
 use crate::formal::exact::CertifiedInterval;
 use crate::ssi_types::{SideCarrier, SquareSystem3};
-use super::{SsiRefusal, unit_box};
 
 /// The certified per-side normal-component enclosure over one side's unit-chart
 /// box: `normal[k]` encloses `{ n_k(p) : p ∈ box }` for `k ∈ {x, y, z}`.
@@ -290,19 +290,13 @@ fn cell_margin(nx: &NormalBox, ny: &NormalBox) -> Option<(f64, f64)> {
     let cross = [
         CertifiedInterval::point(mx[1])
             .mul(&CertifiedInterval::point(my[2]))
-            .sub(
-                &CertifiedInterval::point(mx[2]).mul(&CertifiedInterval::point(my[1])),
-            ),
+            .sub(&CertifiedInterval::point(mx[2]).mul(&CertifiedInterval::point(my[1]))),
         CertifiedInterval::point(mx[2])
             .mul(&CertifiedInterval::point(my[0]))
-            .sub(
-                &CertifiedInterval::point(mx[0]).mul(&CertifiedInterval::point(my[2])),
-            ),
+            .sub(&CertifiedInterval::point(mx[0]).mul(&CertifiedInterval::point(my[2]))),
         CertifiedInterval::point(mx[0])
             .mul(&CertifiedInterval::point(my[1]))
-            .sub(
-                &CertifiedInterval::point(mx[1]).mul(&CertifiedInterval::point(my[0])),
-            ),
+            .sub(&CertifiedInterval::point(mx[1]).mul(&CertifiedInterval::point(my[0]))),
     ];
     let cross2 = cross[0]
         .mul(&cross[0])
@@ -313,7 +307,7 @@ fn cell_margin(nx: &NormalBox, ny: &NormalBox) -> Option<(f64, f64)> {
     let ratio = cross_norm.div(&denom)?;
     let sin_alpha_lb = ratio.lo;
     let s_sum = cx.s_up + cy.s_up;
-    if !sin_alpha_lb.is_finite() || !(sin_alpha_lb > s_sum) {
+    if !sin_alpha_lb.is_finite() || sin_alpha_lb <= s_sum {
         return None;
     }
     // min |n_X| · min |n_Y| · (sin α − s_X − s_Y): certified lower bound of
@@ -324,10 +318,9 @@ fn cell_margin(nx: &NormalBox, ny: &NormalBox) -> Option<(f64, f64)> {
         .sub(&CertifiedInterval::point(cx.s_up))
         .sub(&CertifiedInterval::point(cy.s_up));
     let lo_iv = nx_lb.mul(&ny_lb).mul(&gap);
-    let hi_iv = CertifiedInterval::point(max_norm_ub(nx)).mul(&CertifiedInterval::point(
-        max_norm_ub(ny),
-    ));
-    if !lo_iv.is_finite() || !hi_iv.is_finite() || !(lo_iv.lo > 0.0) {
+    let hi_iv =
+        CertifiedInterval::point(max_norm_ub(nx)).mul(&CertifiedInterval::point(max_norm_ub(ny)));
+    if !lo_iv.is_finite() || !hi_iv.is_finite() || lo_iv.lo <= 0.0 {
         return None;
     }
     Some((lo_iv.lo, hi_iv.hi))
@@ -347,10 +340,8 @@ fn norm_of(m: &[f64; 3]) -> Option<CertifiedInterval> {
 fn undecided_volume(cells: &[(SideBox, SideBox)]) -> f64 {
     let mut vol = 0.0f64;
     for (b1, b2) in cells {
-        vol += (b1[0].1 - b1[0].0)
-            * (b1[1].1 - b1[1].0)
-            * (b2[0].1 - b2[0].0)
-            * (b2[1].1 - b2[1].0);
+        vol +=
+            (b1[0].1 - b1[0].0) * (b1[1].1 - b1[1].0) * (b2[0].1 - b2[0].0) * (b2[1].1 - b2[1].0);
     }
     vol
 }

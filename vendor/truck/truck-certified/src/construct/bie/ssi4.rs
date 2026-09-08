@@ -913,7 +913,10 @@ fn cell_box(cell: &WitnessCell) -> [(f64, f64); 4] {
 /// parameter box, from the outward-rounded interval partials (the interval
 /// cross product `∂p0 × ∂p1`, sound but loose — never the naive pairing of
 /// point samples).
-fn restricted_normal_box(chart: &RestrictedChart, box2: crate::ssi::ssi_gate::SideBox) -> Result<crate::ssi::ssi_gate::NormalBox, crate::ssi::SsiRefusal> {
+fn restricted_normal_box(
+    chart: &RestrictedChart,
+    box2: crate::ssi::ssi_gate::SideBox,
+) -> Result<crate::ssi::ssi_gate::NormalBox, crate::ssi::SsiRefusal> {
     let p0 = iv_lo_hi(box2[0].0, box2[0].1);
     let p1 = iv_lo_hi(box2[1].0, box2[1].1);
     if p0.is_empty() || p1.is_empty() {
@@ -946,13 +949,7 @@ pub fn gate_admit_restricted_pair(
 ) -> Result<crate::ssi::ssi_gate::GateAdmission, crate::ssi::SsiRefusal> {
     let side_a = |b2: crate::ssi::ssi_gate::SideBox| restricted_normal_box(a, b2);
     let side_b = |b2: crate::ssi::ssi_gate::SideBox| restricted_normal_box(b, b2);
-    crate::ssi::ssi_gate::gate_admit(
-        side_a,
-        side_b,
-        [cell.u, cell.v],
-        [cell.s, cell.t],
-        params,
-    )
+    crate::ssi::ssi_gate::gate_admit(side_a, side_b, [cell.u, cell.v], [cell.s, cell.t], params)
 }
 
 /// The N=3 Krawczyk system over the F-form with one product coordinate fixed:
