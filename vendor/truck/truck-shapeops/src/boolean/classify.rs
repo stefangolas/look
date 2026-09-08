@@ -39,6 +39,7 @@ use truck_base::evidence::{
 };
 use truck_evidence::Outcome;
 use truck_geometry::canonical::{Curve, Surface};
+use truck_geometry::specifieds::Torus;
 use truck_geotrait::{
     BoundedCurve, ParametricCurve, ParametricSurface, ParametricSurface3D, SearchParameter,
 };
@@ -567,16 +568,21 @@ fn ray_seed(
     Err(numerically_unresolved())
 }
 
-/// Whether every face of `shell` is one of the four canonical carriers the
-/// ray solve implements; any other arm refuses `NonCanonicalCarrier`.
+/// Whether every face of `shell` is one of the canonical carriers the ray
+/// solve implements (the five analytic arms, torus dispatch extended by
+/// TOR-B — ring tori only); any other arm refuses `NonCanonicalCarrier`.
 fn require_canonical_carriers(shell: &Shell<Point3, Curve, Surface>) -> Result<(), Refusal> {
     for face in shell.face_iter() {
         let canonical = match face.surface() {
             Surface::Plane(_) | Surface::Cylinder(_) | Surface::Cone(_) | Surface::Sphere(_) => {
                 true
             }
-            Surface::Torus(_)
-            | Surface::RevolutedCurve(_)
+            // TOR-B FSSI-EXT: dispatch-table extension only. Horn (`large ==
+            // small`) and spindle (`large < small`) tori are not regular
+            // embedded surfaces and refuse typed, exactly as the landed
+            // `formal/torus.rs` identification rule.
+            Surface::Torus(torus) => torus.large_radius() > torus.small_radius(),
+            Surface::RevolutedCurve(_)
             | Surface::ExtrudedCurve(_)
             | Surface::BSplineSurface(_)
             | Surface::NurbsSurface(_)
@@ -694,14 +700,453 @@ fn surface_ray_crossings(surface: &Surface, p: Point3, d: Vector3) -> Vec<(f64, 
             }
             out
         }
-        Surface::Torus(_)
-        | Surface::RevolutedCurve(_)
+        Surface::Torus(torus) => ray_torus_contacts(torus, p, d)
+            .into_iter()
+            .filter(|contact| contact.kind == TorusRayContactKind::Crossing)
+            .map(|contact| (contact.t, contact.point))
+            .collect(),
+        Surface::RevolutedCurve(_)
         | Surface::ExtrudedCurve(_)
         | Surface::BSplineSurface(_)
         | Surface::NurbsSurface(_)
         | Surface::Processor(_)
         | Surface::SpineFrameSurface(_) => Vec::new(),
     }
+}
+
+// ---------------------------------------------------------------------------
+// the ray-torus quartic solve (TOR-B)
+// ---------------------------------------------------------------------------
+
+/// The signed classification of one real root of the ray-torus quartic
+/// `g(t) = Φ(q₀ + t·v)`.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum TorusRayContactKind {
+    /// An odd-multiplicity root: the certified flank signs on the two sides of
+    /// the isolated root differ, so the ray crosses the surface. Entering/
+    /// exiting is decided downstream by `v·n` exactly as the other arms.
+    Crossing,
+    /// An even-multiplicity contact (a tangent graze or a higher even contact):
+    /// `g` keeps its sign on the two sides of the isolated root, so the ray does
+    /// NOT cross. `g(t) = g′(t) = 0` is never taken as proof of non-crossing —
+    /// the flank signs certify.
+    Grazing,
+}
+
+/// A typed ray-torus contact: one real root of the quartic on the ray, its
+/// point, and the algebraic crossing bit.
+#[derive(Clone, Copy, Debug)]
+pub struct TorusRayContact {
+    /// The ray parameter of the contact.
+    pub t: f64,
+    /// The contact point `p + t·d`.
+    pub point: Point3,
+    /// The algebraic crossing classification of the root.
+    pub kind: TorusRayContactKind,
+}
+
+/// The subdivision depth beyond which a sign-unresolved quartic cell is a
+/// multiple-root candidate (H-3: a dimensionless depth, not a length).
+const TORUS_ROOT_MAX_DEPTH: usize = 96;
+
+/// A multiple-root cell's width floor, in ulps of the cell scale: below this a
+/// cell cannot separate roots further (H-3: a dimensionless parameter width).
+const TORUS_ROOT_FLOOR_ULPS: f64 = 32.0;
+
+/// The relative flank probe, in units of the contact's parameter scale, used to
+/// read the certified flank signs on the two sides of an isolated root
+/// (H-3: a dimensionless relative offset in ray parameters).
+const TORUS_FLANK_RELATIVE: f64 = 1e-6;
+
+/// The relative isolation window for skipping a critical point already
+/// accounted for by an odd crossing root (H-3: dimensionless in ray
+/// parameters).
+const TORUS_CRITICAL_PROXIMITY: f64 = 1e-2;
+
+/// The five coefficients (constant term first) of the ray-torus quartic
+///
+/// `g(t) = Φ(p + t·d)`, with `Φ` the scale-invariant torus form
+/// `K(q·q + R² − r²)² − 4R²(K(q·q) − (q·a)²)` of the theory (T), `q = p − O`.
+/// A [`Surface::Torus`] carrier is always `z`-canonical (`a = ẑ`, `K = 1`), so
+/// the coefficients are exact products/sums of the carrier radii and the ray
+/// data; `g₄ = ‖d‖⁴ > 0`, so the ray solve is always a genuine quartic.
+pub fn ray_torus_quartic(torus: &Torus, p: Point3, d: Vector3) -> [f64; 5] {
+    let q = p - torus.center();
+    let m0 = q.dot(q);
+    let m1 = 2.0 * q.dot(d);
+    let m2 = d.dot(d);
+    let s0 = q.z;
+    let s1 = d.z;
+    let r2 = torus.large_radius() * torus.large_radius();
+    let s2 = torus.small_radius() * torus.small_radius();
+    let c0 = r2 - s2;
+    let m0_c0 = m0 + c0;
+    let four_r2 = 4.0 * r2;
+    [
+        m0_c0 * m0_c0 - four_r2 * (m0 - s0 * s0),
+        2.0 * m0_c0 * m1 - four_r2 * (m1 - 2.0 * s0 * s1),
+        m1 * m1 + 2.0 * m0_c0 * m2 - four_r2 * (m2 - s1 * s1),
+        2.0 * m1 * m2,
+        m2 * m2,
+    ]
+}
+
+/// The typed real contacts of the ray `p + t·d` with the torus surface
+/// (`t ≥ 0`), ascending in `t`. Transverse and other odd-multiplicity crossings
+/// are [`TorusRayContactKind::Crossing`]; tangent grazes and higher even
+/// contacts are [`TorusRayContactKind::Grazing`] — their crossing bit is typed
+/// `false` by the certified flank signs, never by assuming tangency.
+///
+/// Float roots supply the candidates (SFC); the flank-sign comparison on the
+/// two sides of each isolated root certifies the crossing bit: different
+/// signs ⇒ odd-multiplicity crossing, equal signs ⇒ even contact (typed
+/// non-crossing, never assumed from `g(t) = g′(t) = 0`). The
+/// bounding-sphere argument bounds the search domain: every torus point lies
+/// within `R + r` of the centre, so every positive real root lies before the
+/// ray leaves that sphere.
+pub fn ray_torus_contacts(torus: &Torus, p: Point3, d: Vector3) -> Vec<TorusRayContact> {
+    let Some((lo, hi)) = ray_contact_domain(torus, p, d) else {
+        return Vec::new();
+    };
+    let coeffs = ray_torus_quartic(torus, p, d);
+
+    // Odd-multiplicity candidates: sign-change isolation of `g` itself.
+    let mut candidates = subdivide_odd_roots(&coeffs, lo, hi);
+
+    // Even-multiplicity candidates: real critical points of `g` (odd roots of
+    // the derivative cubic) that lie on the surface (`g ≈ 0`). A double or
+    // quadruple contact of `g` is an odd root of `g'`, so the same sign-change
+    // isolation finds its parameter; a triple root of `g` (an odd root) is
+    // already in the `g` list, and its `g'` double root is deliberately not
+    // chased here.
+    let derivative = poly_derivative(&coeffs);
+    for t0 in subdivide_odd_roots(&derivative, lo, hi) {
+        let scale = t0.abs().max(1.0);
+        if candidates
+            .iter()
+            .any(|&r| (r - t0).abs() <= scale * TORUS_CRITICAL_PROXIMITY)
+        {
+            continue;
+        }
+        if poly_eval(&coeffs, t0).abs() > poly_abs_scale(&coeffs, t0) * 1e-9 {
+            continue;
+        }
+        candidates.push(t0);
+    }
+
+    // The certified flank signs decide the crossing bit of every isolated
+    // root: sample the quartic immediately on the two sides, inside a window
+    // free of any other candidate.
+    candidates.sort_by(|a, b| a.total_cmp(b));
+    let mut unique: Vec<f64> = Vec::new();
+    for t in candidates {
+        let scale = t.abs().max(1.0);
+        let dup = unique
+            .last()
+            .is_some_and(|&prev| (t - prev).abs() <= scale * 1e-9);
+        if !dup {
+            unique.push(t);
+        }
+    }
+
+    let mut contacts = Vec::new();
+    for (i, &t) in unique.iter().enumerate() {
+        let scale = t.abs().max(1.0);
+        let left_gap = match i.checked_sub(1).and_then(|j| unique.get(j)) {
+            Some(&prev) => t - prev,
+            None => f64::INFINITY,
+        };
+        let right_gap = match unique.get(i + 1) {
+            Some(&next) => next - t,
+            None => f64::INFINITY,
+        };
+        let gap = left_gap.min(right_gap);
+        let mut delta = if gap.is_finite() {
+            gap * 0.25
+        } else {
+            scale * 0.25
+        };
+        delta = delta.max(scale * TORUS_FLANK_RELATIVE);
+        if gap.is_finite() && delta > gap * 0.49 {
+            delta = gap * 0.49;
+        }
+        let g_lo = poly_eval(&coeffs, t - delta);
+        let g_hi = poly_eval(&coeffs, t + delta);
+        let crossing = (g_lo < 0.0) != (g_hi < 0.0);
+        contacts.push(TorusRayContact {
+            t,
+            point: p + d * t,
+            kind: if crossing {
+                TorusRayContactKind::Crossing
+            } else {
+                TorusRayContactKind::Grazing
+            },
+        });
+    }
+    contacts
+}
+
+/// The positive-`t` parameter window that can contain a torus contact: every
+/// point of the torus is within `R + r` of its centre, so every real root of
+/// the quartic lies before the ray leaves that bounding sphere.
+fn ray_contact_domain(torus: &Torus, p: Point3, d: Vector3) -> Option<(f64, f64)> {
+    let q0 = p - torus.center();
+    let bound = torus.large_radius() + torus.small_radius();
+    let bound2 = bound * bound;
+    let a = d.dot(d);
+    if a <= NORMAL_SLACK {
+        return None;
+    }
+    let b = 2.0 * q0.dot(d);
+    let cc = q0.dot(q0) - bound2;
+    let disc = b * b - 4.0 * a * cc;
+    if disc < 0.0 {
+        return None;
+    }
+    let sq = disc.sqrt();
+    let hi_raw = (-b + sq) / (2.0 * a);
+    let lo_raw = (-b - sq) / (2.0 * a);
+    if hi_raw <= 0.0 {
+        return None;
+    }
+    // Pad past the sphere so a root exactly on the sphere boundary (an outer
+    // equator contact) is interior to the search domain.
+    let span = (hi_raw - lo_raw).abs().max(1.0);
+    let pad = span * 1e-6;
+    let lo = if cc <= 0.0 {
+        0.0
+    } else {
+        (lo_raw - pad).max(0.0)
+    };
+    let hi = hi_raw + pad;
+    if hi <= lo {
+        return None;
+    }
+    Some((lo, hi))
+}
+
+/// Horner evaluation of the monomial polynomial `coeffs` (constant term first)
+/// at `t`.
+fn poly_eval(coeffs: &[f64], t: f64) -> f64 {
+    coeffs.iter().rev().fold(0.0, |acc, c| acc * t + c)
+}
+
+/// A scale for `|g(t)|` comparisons: the sum of the absolute monomial terms,
+/// robust where cancellation makes the value itself unreliable.
+fn poly_abs_scale(coeffs: &[f64], t: f64) -> f64 {
+    let mut scale = 0.0;
+    let mut pow = 1.0;
+    for &c in coeffs {
+        scale += c.abs() * pow;
+        pow *= t;
+        if !pow.is_finite() {
+            break;
+        }
+    }
+    if !scale.is_finite() {
+        return f64::INFINITY;
+    }
+    scale
+}
+
+/// The derivative coefficients (constant term first) of `coeffs`.
+fn poly_derivative(coeffs: &[f64]) -> Vec<f64> {
+    coeffs
+        .iter()
+        .enumerate()
+        .skip(1)
+        .map(|(i, c)| c * i as f64)
+        .collect()
+}
+
+/// Coefficients of `p(lo + w·s)` as a polynomial in `s` (ascending), by Horner
+/// composition with the linear factor `lo + w·s`.
+fn shift_scale(coeffs: &[f64], lo: f64, w: f64) -> Vec<f64> {
+    let mut acc: Vec<f64> = Vec::new();
+    for &c in coeffs.iter().rev() {
+        if acc.is_empty() {
+            acc.push(c);
+            continue;
+        }
+        let mut out = vec![0.0; acc.len() + 1];
+        for (i, v) in acc.iter().copied().enumerate() {
+            if let Some(slot) = out.get_mut(i) {
+                *slot += v * lo;
+            }
+            if let Some(slot) = out.get_mut(i + 1) {
+                *slot += v * w;
+            }
+        }
+        if let Some(slot) = out.first_mut() {
+            *slot += c;
+        }
+        acc = out;
+    }
+    acc
+}
+
+/// The binomial coefficient `C(n, k)`.
+fn comb(n: usize, k: usize) -> u64 {
+    let k = k.min(n - k);
+    let mut c: u64 = 1;
+    for i in 0..k {
+        c = c * (n - i) as u64 / (i + 1) as u64;
+    }
+    c
+}
+
+/// The Bernstein coefficients (over `[0, 1]`) of the monomial polynomial
+/// `power` (ascending), via the exact power-to-Bernstein matrix.
+fn power_to_bernstein(power: &[f64]) -> Vec<f64> {
+    let n = power.len() - 1;
+    let mut out = vec![0.0; power.len()];
+    for (i, slot) in out.iter_mut().enumerate() {
+        for (j, &aj) in power.iter().enumerate().take(i + 1) {
+            *slot += aj * (comb(i, j) as f64) / (comb(n, j) as f64);
+        }
+    }
+    out
+}
+
+/// The Bernstein coefficients of `coeffs` over `[lo, hi]`.
+fn bernstein_over(coeffs: &[f64], lo: f64, hi: f64) -> Vec<f64> {
+    power_to_bernstein(&shift_scale(coeffs, lo, hi - lo))
+}
+
+/// Strict sign changes over `coeffs` after deleting exact zeros, plus whether
+/// any exact zero remains. `(0, false)` is the certified-no-root signature.
+fn bernstein_sign_changes(coeffs: &[f64]) -> (u32, bool) {
+    let mut changes: u32 = 0;
+    let mut has_zero = false;
+    let mut prev: Option<f64> = None;
+    for &c in coeffs {
+        if c == 0.0 {
+            has_zero = true;
+            continue;
+        }
+        if let Some(p) = prev {
+            if (p > 0.0) != (c > 0.0) {
+                changes += 1;
+            }
+        }
+        prev = Some(c);
+    }
+    (changes, has_zero)
+}
+
+/// de Casteljau subdivision at the midpoint (the two child coefficient
+/// sequences, left then right).
+fn split_bernstein(coeffs: &[f64]) -> (Vec<f64>, Vec<f64>) {
+    let mut left = Vec::with_capacity(coeffs.len());
+    let mut right = Vec::with_capacity(coeffs.len());
+    let mut row: Vec<f64> = coeffs.to_vec();
+    left.push(row.first().copied().unwrap_or(0.0));
+    right.push(row.last().copied().unwrap_or(0.0));
+    while row.len() > 1 {
+        let next: Vec<f64> = row
+            .iter()
+            .zip(row.iter().skip(1))
+            .map(|(a, b)| 0.5 * *a + 0.5 * *b)
+            .collect();
+        left.push(next.first().copied().unwrap_or(0.0));
+        right.push(next.last().copied().unwrap_or(0.0));
+        row = next;
+    }
+    right.reverse();
+    (left, right)
+}
+
+/// The real odd-multiplicity roots of `coeffs` over `(lo, hi)`, each refined to
+/// machine precision.
+///
+/// Descartes on the Bernstein coefficients prunes sign-definite cells
+/// (`(0, false)`), emits a cell with exactly one sign change (one odd root,
+/// refined), and keeps subdividing everything else. A cell that cannot separate
+/// further (even-multiplicity contact or an unresolved odd cluster) contributes
+/// its midpoint only when its sign variation is odd — parity of the root count
+/// is preserved without ever guessing a multiplicity.
+fn subdivide_odd_roots(coeffs: &[f64], lo: f64, hi: f64) -> Vec<f64> {
+    let mut out: Vec<f64> = Vec::new();
+    let mut stack: Vec<(f64, f64, Vec<f64>)> = Vec::new();
+    stack.push((lo, hi, bernstein_over(coeffs, lo, hi)));
+    let mut depth = 0usize;
+    while let Some((blo, bhi, bern)) = stack.pop() {
+        let (v, has_zero) = bernstein_sign_changes(&bern);
+        if v == 0 && !has_zero {
+            continue;
+        }
+        if v == 1 {
+            out.push(refine_root(coeffs, blo, bhi));
+            continue;
+        }
+        let scale = blo.abs().max(bhi.abs()).max(1.0);
+        if bhi - blo <= scale * TORUS_ROOT_FLOOR_ULPS * f64::EPSILON
+            || depth >= TORUS_ROOT_MAX_DEPTH
+        {
+            if v % 2 == 1 {
+                out.push(0.5 * (blo + bhi));
+            }
+            continue;
+        }
+        let (left, right) = split_bernstein(&bern);
+        let mid = 0.5 * blo + 0.5 * bhi;
+        depth += 1;
+        stack.push((mid, bhi, right));
+        stack.push((blo, mid, left));
+    }
+    out
+}
+
+/// Bisection then Newton refinement of the single odd root bracketed in
+/// `[lo, hi]` (the function changes sign across the bracket).
+fn refine_root(coeffs: &[f64], lo: f64, hi: f64) -> f64 {
+    let mut a = lo;
+    let mut b = hi;
+    let fa = poly_eval(coeffs, a);
+    if fa == 0.0 {
+        return a;
+    }
+    if poly_eval(coeffs, b) == 0.0 {
+        return b;
+    }
+    for _ in 0..200 {
+        let m = 0.5 * (a + b);
+        let fm = poly_eval(coeffs, m);
+        if fm == 0.0 {
+            return m;
+        }
+        if (fa > 0.0) == (fm > 0.0) {
+            a = m;
+        } else {
+            b = m;
+        }
+        let scale = a.abs().max(b.abs()).max(1.0);
+        if b - a <= scale * 1e-14 {
+            break;
+        }
+    }
+    let mut x = 0.5 * (a + b);
+    let der = poly_derivative(coeffs);
+    for _ in 0..8 {
+        let f = poly_eval(coeffs, x);
+        let fp = poly_eval(&der, x);
+        if fp == 0.0 || !f.is_finite() || !fp.is_finite() {
+            break;
+        }
+        let step = f / fp;
+        if !step.is_finite() {
+            break;
+        }
+        x -= step;
+        if x < lo || x > hi {
+            x = 0.5 * (a + b);
+            break;
+        }
+        if step.abs() <= x.abs().max(1.0) * 1e-15 {
+            break;
+        }
+    }
+    x
 }
 
 // ---------------------------------------------------------------------------
@@ -743,8 +1188,18 @@ fn classify_region(face: &Face<Point3, Curve, Surface>, uv: Point2, tol: f64) ->
                 Some(polygon_rule(&polys, uv, surface.u_period(), tol))
             }
         }
-        Surface::Torus(_)
-        | Surface::RevolutedCurve(_)
+        // TOR-B: a torus face mirrors the cylinder rule — the `u` coordinate
+        // is the revolution period, so a full-period degenerate wire set is a
+        // band (the region is the `v` span); a proper patch uses the polygon
+        // rule with the `u` period for seam deduplication.
+        Surface::Torus(_) => {
+            if band_form(&polys, surface.u_period(), 0) {
+                Some(band_rule(&polys, uv, 1, tol))
+            } else {
+                Some(polygon_rule(&polys, uv, surface.u_period(), tol))
+            }
+        }
+        Surface::RevolutedCurve(_)
         | Surface::ExtrudedCurve(_)
         | Surface::BSplineSurface(_)
         | Surface::NurbsSurface(_)
