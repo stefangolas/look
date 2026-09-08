@@ -36,6 +36,12 @@ pub mod krawczyk;
 /// to track an interaction branch. Additive over the Krawczyk operator; no
 /// geometry of its own.
 pub mod parallelotope;
+/// ADM-L5-RECIPROCAL (Theorem D): the certified reciprocal-power
+/// polynomialization — `certified_reciprocal_power(W, p, target_error)`
+/// returns the exact truncated polynomial `Q_m` and its certified geometric
+/// tail bound. Pure polynomial mathematics; the F1 substrate ADM-003's volume
+/// assembly brackets rational-face integrals with.
+pub mod reciprocal;
 /// BG-NUM-002: certified univariate root isolation (Bernstein/Descartes).
 /// Scaffolded empty; the packet fills it.
 pub mod roots;
