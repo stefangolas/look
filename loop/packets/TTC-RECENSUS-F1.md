@@ -11,7 +11,7 @@ with the refusing op named, as the permanent boundary evidence.
 id:          TTC-RECENSUS-F1
 contract:    [TTC-RECENSUS-F1]
 class:       mechanical
-crates:      []
+crates:      [look]
 depends_on:  [ADM-004-FUNNEL-WIRING, F1-AUTHORING-ARMS]
 write_allow:
   - docs/TTC_CENSUS_FINAL.md

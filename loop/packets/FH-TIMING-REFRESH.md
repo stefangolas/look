@@ -10,7 +10,7 @@ DNF — no timing is published against a red gate.
 id:          FH-TIMING-REFRESH
 contract:    [FH-TIMING-REFRESH]
 class:       mechanical
-crates:      []
+crates:      [look]
 depends_on:  [FH-SPLINE-LATHE, FH-CENSUS]
 write_allow:
   - docs/TT_TIMING_RESULTS.md

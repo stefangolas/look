@@ -11,7 +11,7 @@ are valid outcomes.
 id:          HYPERCAR-CENSUS
 contract:    [HYPERCAR-CENSUS]
 class:       mechanical
-crates:      []
+crates:      [look]
 depends_on:  []
 write_allow:
   - docs/HYPERCAR_CENSUS.md

@@ -12,7 +12,7 @@ against green rows only).
 id:          FH-CENSUS
 contract:    [FH-CENSUS]
 class:       mechanical
-crates:      []
+crates:      [look]
 depends_on:  [FH-SPLINE-LATHE]
 write_allow:
   - docs/FH_CENSUS.md
