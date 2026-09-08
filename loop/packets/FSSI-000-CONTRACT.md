@@ -18,7 +18,7 @@ certify NUMERICALLY refuses.
 id:          FSSI-000-CONTRACT
 contract:    [FSSI-000-CONTRACT]
 class:       design
-crates:      [truck-certified]
+crates:      [truck-certified, look]
 depends_on:  []
 write_allow:
   - vendor/truck/truck-certified/src/ssi.rs
@@ -42,7 +42,7 @@ anchors:
   - {id: A3, expect: 1, cmd: "grep -c 'enum TangencyRefusal' vendor/truck/truck-certified/src/tangency/chart.rs"}
   - {id: A4, expect: 1, cmd: "grep -c 'fn map_ssi' vendor/truck/truck-certified/src/tangency/a2.rs"}
   - {id: A5, expect: 1, cmd: "grep -c 'enum SsiAdmitCause' vendor/truck/truck-certified/src/ssi_admit.rs"}
-  - {id: A6, expect: 1, cmd: "grep -c 'disposition_of_ssi_refusal' tests/certified_phase2_floor.rs"}
+  - {id: A6, expect: 4, cmd: "grep -c 'disposition_of_ssi_refusal' tests/certified_phase2_floor.rs"}
 budget:      {turns: 55, ctx_tokens: 130000}
 ```
 
