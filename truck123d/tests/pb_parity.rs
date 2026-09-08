@@ -17,7 +17,7 @@
 //! as the landed PB-013/PB-014 suites assert live certification (in-envelope
 //! report semantics). Canonical x canonical pairs are untouched (landed S1).
 //!
-//! PB-011B (the 2-D path wave) extends the lift test to the canonical-cutter
+//! PB-011B (the 2-D path wave) extended the lift test to the canonical-cutter
 //! F1 rows (floor/diffuser/suspension x2/steering_rack/track rods x2/
 //! corners x4/drs_actuator): the B lifted set is the SKIPS rows whose note
 //! carries the `PB-011B LIFT EVIDENCE` marker, and each lifted row must run
@@ -27,6 +27,22 @@
 //! because their revolve carriers are spline/line-polyline profiles — no
 //! revolved-circle (torus) carrier is in the op path, so no typed torus
 //! refusal is recorded for them.
+//!
+//! PB-011C (the 4-D path wave) re-scopes the lift test to the swept x swept
+//! F1 rows (airbox/beam_wing/details/drivetrain/drs_flap/engine_cover/
+//! power_unit/rear_wing) and makes the outcome census-first: a row whose
+//! first refusing op is a swept x swept (lofted/swept x lofted/swept) carrier
+//! pair is run for its census verdict, and the certified funnel does not admit
+//! a boolean between two spline-loft solids end to end on this dispatch (the
+//! fuse(swept,swept)/cut(swept,swept) pair cells answer the typed
+//! constructive-carrier `NonCanonicalCarrier` refusal at the boolean boundary;
+//! the restricted 4-D arm admits circular-section sweeps only, so no solver
+//! budget is spent — a typed refusal, not a stagnation). Every C row files a
+//! typed-refusal census record (`PB-011C CENSUS` + `typed-refusal` note
+//! markers) with its green OCC door evidence, never a lift. The C lifted set
+//! (rows carrying the `PB-011C LIFT EVIDENCE` marker) is empty on this
+//! dispatch; an empty C lifted set is acceptable ONLY when every C row files
+//! the typed-refusal census record — the test records which rows refused.
 //!
 //! The corpus-side lift tests run the lifted rows through the harness door
 //! (`corpus/ttc/door.py`, OCC baseline regime — a fresh python process per
@@ -541,13 +557,20 @@ fn reference_from_value(
     })
 }
 
-/// PB-011 required test 2 (PB-011B lift set): every row this packet lifts
+/// PB-011 required test 2 (PB-011C cohort): every row this packet lifts
 /// from `corpus/ttc/SKIPS.json` runs green through the harness door with
 /// geometry facts + report record + STL, and the green door-run facts match
-/// the row's recorded OCC reference within its recorded tolerances. The B
-/// (canonical-cutter, 2-D path) lifted set is read from the machine-checked
-/// evidence this packet wrote into the SKIPS rows (`PB-011B LIFT EVIDENCE`
-/// note marker); an empty B lifted set fails the test — lifting is the point.
+/// the row's recorded OCC reference within its recorded tolerances. The C
+/// (swept x swept, 4-D path) lifted set is read from the machine-checked
+/// evidence a wave writes into the SKIPS rows (`PB-011C LIFT EVIDENCE` note
+/// marker), exactly as B's canonical-cutter lifted set is read. The C cohort
+/// is the eight f1 rows whose first refusing op is a swept x swept carrier
+/// pair (PB-011C's class). The C wave is census-first: a row the certified
+/// funnel does not admit end to end files a typed-refusal census record
+/// (`PB-011C CENSUS` + `typed-refusal` in the row note), never a lift; an
+/// empty C lifted set is acceptable ONLY when every C row files that
+/// typed-refusal census record — the test records which rows refused. Any
+/// other empty-set shape fails (lifting is the point).
 #[test]
 fn lifted_skip_rows_run_green() {
     let corpus = corpus_dir();
@@ -555,22 +578,97 @@ fn lifted_skip_rows_run_green() {
     let skips =
         compat::skips::load_skips(&corpus, &manifest).expect("the skips file must validate"); // H-3: validated corpus input, read-only
 
-    let lifted: Vec<String> = skips
-        .rows
+    // The C cohort: the f1 rows whose first refusing op is a swept x swept
+    // carrier pair (PB-011C's class; PB-011B left them untouched).
+    const C_COHORT: [&str; 8] = [
+        "f1/airbox",
+        "f1/beam_wing",
+        "f1/details",
+        "f1/drivetrain",
+        "f1/drs_flap",
+        "f1/engine_cover",
+        "f1/power_unit",
+        "f1/rear_wing",
+    ];
+    for id in C_COHORT {
+        let manifest_row = manifest
+            .rows
+            .iter()
+            .find(|row| row.id == id)
+            .unwrap_or_else(|| panic!("C cohort row {id} must be enrolled on the manifest")); // H-3: skips/manifest 1:1 is machine-checked
+        assert_eq!(
+            manifest_row.stage,
+            compat::manifest::Stage::Skipped,
+            "C cohort row {id} must stay staged on the manifest"
+        );
+        let skip = skips
+            .rows
+            .iter()
+            .find(|skip| skip.id == id)
+            .unwrap_or_else(|| panic!("C cohort row {id} must carry a skip row")); // H-3: skips/manifest 1:1 is machine-checked
+        assert!(
+            skip.reason.as_deref() == Some("booleans-on-swept-carriers"),
+            "C cohort row {id} must stay staged under the swept-carrier reason"
+        );
+        assert!(
+            !skip.note.contains("PB-011B LIFT EVIDENCE"),
+            "C cohort row {id} is not a PB-011B (canonical-cutter) lift"
+        );
+    }
+    let note_of = |id: &str| -> &str {
+        skips
+            .rows
+            .iter()
+            .find(|skip| skip.id == id)
+            .map(|skip| skip.note.as_str())
+            .unwrap_or("")
+    };
+
+    // The C lifted set: rows carrying the lift marker this wave writes when a
+    // row's swept x swept booleans certify.
+    let lifted: Vec<&str> = C_COHORT
         .iter()
-        .filter(|skip| skip.note.contains("PB-011B LIFT EVIDENCE"))
-        .map(|skip| skip.id.clone())
+        .copied()
+        .filter(|id| note_of(id).contains("PB-011C LIFT EVIDENCE"))
         .collect();
-    assert!(
-        !lifted.is_empty(),
-        "the B (canonical-cutter) lifted set must be non-empty — lifting is the point of PB-011B"
-    );
+
+    if lifted.is_empty() {
+        // Census-first: an empty C lifted set is acceptable ONLY when every C
+        // row files the typed-refusal census record — the census distinguishes
+        // certified-lift / typed-refusal / stagnation / facts mismatch. Record
+        // which rows refused (and fail if any row is missing the census or
+        // filed a non-refusal census instead).
+        let refused: Vec<&str> = C_COHORT
+            .iter()
+            .copied()
+            .filter(|id| {
+                note_of(id).contains("PB-011C CENSUS") && note_of(id).contains("typed-refusal")
+            })
+            .collect();
+        let not_refused: Vec<&str> = C_COHORT
+            .iter()
+            .copied()
+            .filter(|id| !refused.contains(&id))
+            .collect();
+        assert!(
+            not_refused.is_empty(),
+            "the C swept x swept cohort certifies nothing on this dispatch, so every C row must file \
+             a typed-refusal census record (the only legitimate empty C lifted set); rows WITHOUT a \
+             typed-refusal census: {not_refused:?}"
+        );
+        assert_eq!(
+            refused.len(),
+            C_COHORT.len(),
+            "every C row must file a typed-refusal census record; refused rows: {refused:?}"
+        );
+        return;
+    }
 
     for id in &lifted {
         let row = manifest
             .rows
             .iter()
-            .find(|row| &row.id == id)
+            .find(|row| row.id == *id)
             .unwrap_or_else(|| panic!("lifted row {id} must be enrolled on the manifest")); // H-3: skips/manifest 1:1 is machine-checked
         assert_green_door_evidence(&corpus, row);
     }
