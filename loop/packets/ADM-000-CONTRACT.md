@@ -24,7 +24,7 @@ tests_required:
 anchors:
   - {id: A1, expect: 27, cmd: "grep -c 'pub mod' vendor/truck/truck-certified/src/construct/mod.rs"}
   - {id: A2, expect: 1, cmd: "grep -c 'pub struct Ssi4System' vendor/truck/truck-certified/src/construct/bie/ssi4.rs"}
-  - {id: A3, expect: 9, cmd: "grep -c 'bernstein_box4' vendor/truck/truck-certified/src/interval/bounds.rs"}
+  - {id: A3, expect: 7, cmd: "grep -c 'bernstein_box4\\b' vendor/truck/truck-certified/src/interval/bounds.rs"}
 budget:      {turns: 45, ctx_tokens: 120000}
 ```
 
