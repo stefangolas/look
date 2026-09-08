@@ -13,11 +13,14 @@
 //! box and triangle computed by this module is pure, deterministic, analytic
 //! arithmetic over the submitted row set. The supported carrier forms are the
 //! canonical S3/S6 constructions (box/cylinder/sphere/torus primitives and
-//! the full 360° line-profile lathe). A name whose form is outside this
-//! envelope (a spline profile, a partial arc, a swept/lofted carrier) refuses
-//! with the typed kernel refusal (`NonCanonicalCarrier`), which the pyo3
-//! surface maps to the landed `Refused`/`Unresolved` exception classes —
-//! loud, never a silent OCC fallback.
+//! the full 360° lathe over a closed `y = 0` profile — line edges exactly and
+//! spline-profile edges integrated as the TRUE reconstructed interpolating
+//! spline, never a flattening polygon; FH-SPLINE-LATHE). A name whose form is
+//! outside this envelope (a partial arc, a swept/lofted carrier, a spline
+//! profile with a non-recoverable interpolation) refuses with the typed
+//! kernel refusal (`NonCanonicalCarrier`), which the pyo3 surface maps to the
+//! landed `Refused`/`Unresolved` exception classes — loud, never a silent OCC
+//! fallback.
 //!
 //! Determinism: the submitted row set is an ordered tree (the script's
 //! construction log); identical rows produce identical facts and identical
@@ -48,6 +51,29 @@ use crate::marshal::{ExceptionClass, Marshaled, MarshaledPayload};
 use crate::python;
 
 const TAU: f64 = std::f64::consts::TAU;
+
+/// The census-recorded curve of one lathe profile edge, in the `y = 0`
+/// profile plane. Profile coordinates are `(x, z)` with `x >= 0` the revolve
+/// radius (so `y == 0`).
+///
+/// A spline edge records its DEFINING samples (the points the corpus passed
+/// to `Edge.make_spline`, which is how a data-only surface can record the
+/// carrier without any geometry computing in Python). The kernel reconstructs
+/// the interpolating curve from the samples; it never sees a flattening
+/// polygon.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
+pub enum LatheEdge {
+    /// A straight profile edge from `a` to `b`.
+    Line { a: [f64; 2], b: [f64; 2] },
+    /// A spline profile edge: the interpolation samples passed to
+    /// `Edge.make_spline(points)` with no tangents/parameters. The OCC
+    /// interpolation convention is recoverable from the sample list (chord
+    /// length parameters, clamped cubic, endpoint tangents from the Lagrange
+    /// derivative of the first/last four samples), so the recorded data is the
+    /// carrier's defining data.
+    Spline { points: Vec<[f64; 2]> },
+}
 
 /// The solid carrier of one construction row.
 ///
@@ -87,12 +113,14 @@ pub enum SolidSpec {
         /// The minor (tube) radius.
         minor: f64,
     },
-    /// `revolve(face, axis=z, revolution_arc=360)` over a closed line-loop
-    /// profile lying in the `y = 0` plane. `points` are the `(x, z)` profile
-    /// vertices in boundary order (`x` is the revolve radius, so `y == 0`).
+    /// `revolve(face, axis=z, revolution_arc=360)` over a closed profile
+    /// lying in the `y = 0` plane. `profile` is the boundary in order: line
+    /// edges and interpolating-spline edges (whose defining samples the edge
+    /// records). Profile coordinates are `(x, z)` with `x >= 0` the revolve
+    /// radius.
     Lathe {
-        /// The closed `(x, z)` profile vertices, `x >= 0`.
-        points: Vec<[f64; 2]>,
+        /// The closed `(x, z)` profile boundary edges, in order.
+        profile: Vec<LatheEdge>,
         /// The swept arc in degrees. Only the full revolution is in envelope
         /// for this executor's analytic lathe arm.
         arc_deg: f64,
@@ -180,7 +208,7 @@ fn solid_volume(solid: &SolidSpec) -> Result<f64, Refusal> {
             let (major, minor) = (*major, *minor);
             Ok(2.0 * std::f64::consts::PI * std::f64::consts::PI * major * minor * minor)
         }
-        SolidSpec::Lathe { points, arc_deg } => {
+        SolidSpec::Lathe { profile, arc_deg } => {
             if *arc_deg != 360.0 {
                 // The partial-arc form is a certified facade op (PB-014), but
                 // this executor's analytic lathe arm covers the full
@@ -189,9 +217,28 @@ fn solid_volume(solid: &SolidSpec) -> Result<f64, Refusal> {
                     EnvelopeCase::NonCanonicalCarrier,
                 ));
             }
-            lathe_volume(points)
+            if let Some(points) = line_profile_vertices(profile) {
+                // The line-profile arm: the frustum telescoping of the closed
+                // vertex loop, bit-identical to the landed line-profile facts.
+                lathe_volume(&points)
+            } else {
+                lathe_profile_volume(profile)
+            }
         }
     }
+}
+
+/// The closed `(x, z)` vertex loop of an all-line profile, in boundary order.
+/// `None` when any profile edge is a spline (the spline arm then applies).
+fn line_profile_vertices(profile: &[LatheEdge]) -> Option<Vec<[f64; 2]>> {
+    let mut vertices = Vec::with_capacity(profile.len());
+    for edge in profile {
+        match edge {
+            LatheEdge::Line { a, .. } => vertices.push(*a),
+            LatheEdge::Spline { .. } => return None,
+        }
+    }
+    Some(vertices)
 }
 
 /// The volume enclosed by revolving a closed `(x, z)` polygon profile about
@@ -226,6 +273,416 @@ fn lathe_volume(points: &[[f64; 2]]) -> Result<f64, Refusal> {
         return Err(Refusal::Empty);
     }
     Ok(sum.abs())
+}
+
+// ---------------------------------------------------------------------------
+// Spline-profile lathe facts
+// ---------------------------------------------------------------------------
+//
+// A spline profile edge records the samples the corpus passed to
+// `Edge.make_spline(points)`. The kernel reconstructs the interpolating curve
+// the OCC reference revolved — chord-length parameters, a clamped cubic with
+// a knot at every sample, C2 at the interior samples, and endpoint tangents
+// equal to the derivative of the degree-3 Lagrange interpolant of the first
+// (resp. last) four samples. This is exactly the curve `GeomAPI_Interpolate`
+// builds for a non-periodic point list with no tangents (the convention
+// `make_spline(points)` fixes); it is recoverable from the samples, so the
+// arm integrates the TRUE spline and never a flattening polygon.
+//
+// Facts are exact polynomial arithmetic: over one span, `r` and `z` are
+// cubic polynomials in the span parameter, and the segment's solid-of-
+// revolution volume `pi * int r(u)^2 * z'(u) du` is a degree-8 polynomial
+// integral evaluated in closed form (never sampled). The line-profile
+// frustum telescoping in `lathe_volume` is the degree-1 special case and is
+// preserved bit-identical for all-line profiles (see `solid_volume`).
+
+/// One reconstructed spline span, in power basis on `u in [0, 1]`.
+#[derive(Debug, Clone, Copy)]
+struct SpanPoly {
+    /// Radius `r(u)`.
+    r: [f64; 4],
+    /// Axial coordinate `z(u)`.
+    z: [f64; 4],
+}
+
+/// Whether every profile edge is a valid finite carrier at `x >= 0`.
+fn check_profile_edges(profile: &[LatheEdge]) -> Result<(), Refusal> {
+    for edge in profile {
+        match edge {
+            LatheEdge::Line { a, b } => {
+                let (ax, az) = (a[0], a[1]);
+                let (bx, bz) = (b[0], b[1]);
+                if ax < 0.0
+                    || bx < 0.0
+                    || !ax.is_finite()
+                    || !az.is_finite()
+                    || !bx.is_finite()
+                    || !bz.is_finite()
+                {
+                    return Err(Refusal::Empty);
+                }
+            }
+            LatheEdge::Spline { points } => {
+                if points.len() < 2 {
+                    return Err(Refusal::Empty);
+                }
+                for p in points {
+                    let (x, z) = (p[0], p[1]);
+                    if x < 0.0 || !x.is_finite() || !z.is_finite() {
+                        return Err(Refusal::Empty);
+                    }
+                }
+            }
+        }
+    }
+    if profile.len() < 3 {
+        return Err(Refusal::Empty);
+    }
+    Ok(())
+}
+
+/// The volume of a spline-bearing lathe profile: the exact segment-moment sum
+/// over the profile boundary (spline spans integrated by closed-form
+/// polynomial arithmetic, line edges by the frustum formula), absolute value
+/// absorbing the winding.
+fn lathe_profile_volume(profile: &[LatheEdge]) -> Result<f64, Refusal> {
+    check_profile_edges(profile)?;
+    let mut sum = 0.0;
+    for edge in profile {
+        match edge {
+            LatheEdge::Line { a, b } => {
+                let (x0, z0) = (a[0], a[1]);
+                let (x1, z1) = (b[0], b[1]);
+                sum += std::f64::consts::PI / 3.0 * (z1 - z0) * (x0 * x0 + x0 * x1 + x1 * x1);
+            }
+            LatheEdge::Spline { points } => {
+                sum += spline_edge_volume(points)?;
+            }
+        }
+    }
+    if !sum.is_finite() {
+        return Err(Refusal::Empty);
+    }
+    Ok(sum.abs())
+}
+
+/// The signed volume contribution of one spline profile edge: the exact
+/// segment-moment integral `pi * int r(u)^2 z'(u) du` over the whole edge.
+fn spline_edge_volume(points: &[[f64; 2]]) -> Result<f64, Refusal> {
+    let spans = spline_spans(points)?;
+    let mut sum = 0.0;
+    for span in &spans {
+        sum += span_volume(span);
+    }
+    if !sum.is_finite() {
+        return Err(Refusal::Empty);
+    }
+    Ok(sum)
+}
+
+/// The exact `pi * int_0^1 r(u)^2 z'(u) du` of one span. `r(u)` is a cubic
+/// (degree 6 when squared), `z'(u)` a quadratic; the product is degree 8 and
+/// integrates term-by-term (`int u^k = 1/(k+1)`) — no quadrature, no
+/// sampling.
+fn span_volume(span: &SpanPoly) -> f64 {
+    // r(u)^2 in the power basis (degree 6).
+    let mut r2 = [0.0f64; 7];
+    for (i, ri) in span.r.iter().enumerate() {
+        for (j, rj) in span.r.iter().enumerate() {
+            r2[i + j] += ri * rj;
+        }
+    }
+    // z'(u) in the power basis (degree 2).
+    let dz = [span.z[1], 2.0 * span.z[2], 3.0 * span.z[3]];
+    let mut integral = 0.0;
+    for (k, ck) in r2.iter().enumerate() {
+        for (l, dl) in dz.iter().enumerate() {
+            integral += ck * dl / (k + l + 1) as f64;
+        }
+    }
+    std::f64::consts::PI * integral
+}
+
+/// The reconstructed spans of the OCC interpolating curve through the samples.
+fn spline_spans(points: &[[f64; 2]]) -> Result<Vec<SpanPoly>, Refusal> {
+    let n = points.len();
+    if n < 2 {
+        return Err(Refusal::Empty);
+    }
+    for p in points {
+        let (x, z) = (p[0], p[1]);
+        if x < 0.0 || !x.is_finite() || !z.is_finite() {
+            return Err(Refusal::Empty);
+        }
+    }
+    let params = chord_params(points);
+    if n == 2 {
+        // A two-sample spline interpolates the chord itself.
+        let (x0, z0) = (points[0][0], points[0][1]);
+        let (x1, z1) = (points[1][0], points[1][1]);
+        return Ok(vec![SpanPoly {
+            r: [x0, x1 - x0, 0.0, 0.0],
+            z: [z0, z1 - z0, 0.0, 0.0],
+        }]);
+    }
+    if n == 3 {
+        // A three-sample spline is the quadratic through the three points.
+        let t0 = params[0];
+        let t2 = params[2];
+        let u1 = (params[1] - t0) / (t2 - t0);
+        let (x0, z0) = (points[0][0], points[0][1]);
+        let (x2, z2) = (points[2][0], points[2][1]);
+        let (x1, z1) = (points[1][0], points[1][1]);
+        let denom = 2.0 * u1 * (1.0 - u1);
+        let qx1 = (x1 - (1.0 - u1) * (1.0 - u1) * x0 - u1 * u1 * x2) / denom;
+        let qz1 = (z1 - (1.0 - u1) * (1.0 - u1) * z0 - u1 * u1 * z2) / denom;
+        // Quadratic Bezier (x0, qx1, x2) in the power basis over u in [0, 1].
+        let bx = [x0, 2.0 * (qx1 - x0), x0 - 2.0 * qx1 + x2, 0.0];
+        let bz = [z0, 2.0 * (qz1 - z0), z0 - 2.0 * qz1 + z2, 0.0];
+        return Ok(vec![SpanPoly { r: bx, z: bz }]);
+    }
+    let slopes = clamped_slopes(points, &params)?;
+    let mut spans = Vec::with_capacity(n - 1);
+    for i in 0..n - 1 {
+        let h = params.get(i + 1).copied().ok_or(Refusal::Empty)?
+            - params.get(i).copied().ok_or(Refusal::Empty)?;
+        let (x0, z0) = {
+            let p = points.get(i).ok_or(Refusal::Empty)?;
+            (p[0], p[1])
+        };
+        let (x1, z1) = {
+            let p = points.get(i + 1).ok_or(Refusal::Empty)?;
+            (p[0], p[1])
+        };
+        let (s0x, s0z) = {
+            let s = slopes.get(i).ok_or(Refusal::Empty)?;
+            (s[0], s[1])
+        };
+        let (s1x, s1z) = {
+            let s = slopes.get(i + 1).ok_or(Refusal::Empty)?;
+            (s[0], s[1])
+        };
+        let span = SpanPoly {
+            r: hermite_power(x0, x1, h * s0x, h * s1x),
+            z: hermite_power(z0, z1, h * s0z, h * s1z),
+        };
+        spans.push(span);
+    }
+    Ok(spans)
+}
+
+/// The chord-length parameters of the samples.
+fn chord_params(points: &[[f64; 2]]) -> Vec<f64> {
+    let mut params = Vec::with_capacity(points.len());
+    params.push(0.0);
+    for pair in points.windows(2) {
+        let (x0, z0) = (pair[0][0], pair[0][1]);
+        let (x1, z1) = (pair[1][0], pair[1][1]);
+        let dx = x1 - x0;
+        let dz = z1 - z0;
+        let next = params.last().copied().unwrap_or(0.0) + (dx * dx + dz * dz).sqrt();
+        params.push(next);
+    }
+    params
+}
+
+/// The power-basis coefficients of the cubic Hermite interpolant over
+/// `u in [0, 1]` with `C(0)=y0`, `C'(0)=d0`, `C(1)=y1`, `C'(1)=d1`.
+fn hermite_power(y0: f64, y1: f64, d0: f64, d1: f64) -> [f64; 4] {
+    [
+        y0,
+        d0,
+        -3.0 * y0 - 2.0 * d0 + 3.0 * y1 - d1,
+        2.0 * y0 + d0 - 2.0 * y1 + d1,
+    ]
+}
+
+/// The derivative, at its first sample, of the degree-3 Lagrange polynomial
+/// through the four given `(x, z)` samples at their chord parameters.
+fn lagrange_first_tangent(points: &[[f64; 2]], params: &[f64]) -> [f64; 2] {
+    // Closed form for evaluation at node 0 over nodes 0..3:
+    //   L'(x0) = sum_i P_i * l_i'(x0)
+    let l0prime = 1.0 / (params[0] - params[1])
+        + 1.0 / (params[0] - params[2])
+        + 1.0 / (params[0] - params[3]);
+    let l1prime = 1.0 / (params[1] - params[0])
+        * ((params[0] - params[2]) / (params[1] - params[2]))
+        * ((params[0] - params[3]) / (params[1] - params[3]));
+    let l2prime = 1.0 / (params[2] - params[0])
+        * ((params[0] - params[1]) / (params[2] - params[1]))
+        * ((params[0] - params[3]) / (params[2] - params[3]));
+    let l3prime = 1.0 / (params[3] - params[0])
+        * ((params[0] - params[1]) / (params[3] - params[1]))
+        * ((params[0] - params[2]) / (params[3] - params[2]));
+    let mut tx = 0.0;
+    let mut tz = 0.0;
+    let factors = [l0prime, l1prime, l2prime, l3prime];
+    for i in 0..4 {
+        tx += points[i][0] * factors[i];
+        tz += points[i][1] * factors[i];
+    }
+    [tx, tz]
+}
+
+/// The derivative, at its last sample, of the degree-3 Lagrange polynomial
+/// through the four given `(x, z)` samples at their chord parameters.
+fn lagrange_last_tangent(points: &[[f64; 2]], params: &[f64]) -> [f64; 2] {
+    // Closed form for evaluation at node 3 over nodes 0..3.
+    let l0prime = 1.0 / (params[0] - params[3])
+        * ((params[3] - params[1]) / (params[0] - params[1]))
+        * ((params[3] - params[2]) / (params[0] - params[2]));
+    let l1prime = 1.0 / (params[1] - params[3])
+        * ((params[3] - params[0]) / (params[1] - params[0]))
+        * ((params[3] - params[2]) / (params[1] - params[2]));
+    let l2prime = 1.0 / (params[2] - params[3])
+        * ((params[3] - params[0]) / (params[2] - params[0]))
+        * ((params[3] - params[1]) / (params[2] - params[1]));
+    let l3prime = 1.0 / (params[3] - params[0])
+        + 1.0 / (params[3] - params[1])
+        + 1.0 / (params[3] - params[2]);
+    let mut tx = 0.0;
+    let mut tz = 0.0;
+    let factors = [l0prime, l1prime, l2prime, l3prime];
+    for i in 0..4 {
+        tx += points[i][0] * factors[i];
+        tz += points[i][1] * factors[i];
+    }
+    [tx, tz]
+}
+
+/// The clamped cubic spline slopes (first derivatives `d/d(parameter)`) at
+/// every sample: the interior slopes solve the C2 tridiagonal system, the
+/// end slopes are the Lagrange end tangents of the first/last four samples.
+fn clamped_slopes(points: &[[f64; 2]], params: &[f64]) -> Result<Vec<[f64; 2]>, Refusal> {
+    let n = points.len();
+    if n < 4 {
+        return Err(Refusal::Empty);
+    }
+    let first4 = points.get(0..4).ok_or(Refusal::Empty)?;
+    let last4 = points.get(n - 4..).ok_or(Refusal::Empty)?;
+    let first_t = params.get(0..4).ok_or(Refusal::Empty)?;
+    let last_t = params.get(n - 4..).ok_or(Refusal::Empty)?;
+    let mut slopes = vec![[0.0, 0.0]; n];
+    if let Some(first) = slopes.first_mut() {
+        *first = lagrange_first_tangent(first4, first_t);
+    }
+    if let Some(last) = slopes.last_mut() {
+        *last = lagrange_last_tangent(last4, last_t);
+    }
+    let nk = n - 2;
+    let mut h = Vec::with_capacity(n - 1);
+    for i in 0..n - 1 {
+        let hi = params.get(i + 1).copied().ok_or(Refusal::Empty)?
+            - params.get(i).copied().ok_or(Refusal::Empty)?;
+        if hi <= 0.0 || !hi.is_finite() {
+            return Err(Refusal::Empty);
+        }
+        h.push(hi);
+    }
+    let mut delta = Vec::with_capacity(n - 1);
+    for pair in points.windows(2) {
+        let (x0, z0) = (pair[0][0], pair[0][1]);
+        let (x1, z1) = (pair[1][0], pair[1][1]);
+        let len = delta.len();
+        let hi = h.get(len).copied().unwrap_or(1.0);
+        delta.push([(x1 - x0) / hi, (z1 - z0) / hi]);
+    }
+    let mut rhs = vec![[0.0, 0.0]; nk];
+    let mut a = vec![0.0; nk];
+    let mut b = vec![0.0; nk];
+    let mut c = vec![0.0; nk];
+    for row in 0..nk {
+        let i = row + 1;
+        let hi = h.get(i).copied().ok_or(Refusal::Empty)?;
+        let hm = h.get(i - 1).copied().ok_or(Refusal::Empty)?;
+        if let Some(av) = a.get_mut(row) {
+            *av = hi;
+        }
+        if let Some(bv) = b.get_mut(row) {
+            *bv = 2.0 * (hm + hi);
+        }
+        if let Some(cv) = c.get_mut(row) {
+            *cv = hm;
+        }
+        let dprev = delta.get(i - 1).copied().ok_or(Refusal::Empty)?;
+        let dcur = delta.get(i).copied().ok_or(Refusal::Empty)?;
+        let mut r0 = 3.0 * (hi * dprev[0] + hm * dcur[0]);
+        let mut r1 = 3.0 * (hi * dprev[1] + hm * dcur[1]);
+        if i == 1 {
+            let s0 = slopes.get(0).copied().unwrap_or([0.0, 0.0]);
+            r0 -= hi * s0[0];
+            r1 -= hi * s0[1];
+        }
+        if i == n - 2 {
+            let sn = slopes.get(n - 1).copied().unwrap_or([0.0, 0.0]);
+            r0 -= hm * sn[0];
+            r1 -= hm * sn[1];
+        }
+        if let Some(r) = rhs.get_mut(row) {
+            *r = [r0, r1];
+        }
+    }
+    // Thomas algorithm.
+    let mut cp = vec![0.0; nk];
+    let mut dp = vec![[0.0, 0.0]; nk];
+    {
+        let b0 = b.get(0).copied().ok_or(Refusal::Empty)?;
+        if b0 == 0.0 {
+            return Err(Refusal::Empty);
+        }
+        let c0 = c.get(0).copied().unwrap_or(0.0);
+        if let Some(v) = cp.first_mut() {
+            *v = c0 / b0;
+        }
+        let r = rhs.get(0).copied().ok_or(Refusal::Empty)?;
+        if let Some(v) = dp.first_mut() {
+            *v = [r[0] / b0, r[1] / b0];
+        }
+    }
+    for row in 1..nk {
+        let ai = a.get(row).copied().unwrap_or(0.0);
+        let bi = b.get(row).copied().unwrap_or(0.0);
+        let ci = c.get(row).copied().unwrap_or(0.0);
+        let cp_prev = cp.get(row - 1).copied().unwrap_or(0.0);
+        let dp_prev = dp.get(row - 1).copied().unwrap_or([0.0, 0.0]);
+        let r = rhs.get(row).copied().unwrap_or([0.0, 0.0]);
+        let denom = bi - ai * cp_prev;
+        if denom == 0.0 || !denom.is_finite() {
+            return Err(Refusal::Empty);
+        }
+        if row < nk - 1 {
+            if let Some(v) = cp.get_mut(row) {
+                *v = ci / denom;
+            }
+        }
+        let v0 = (r[0] - ai * dp_prev[0]) / denom;
+        let v1 = (r[1] - ai * dp_prev[1]) / denom;
+        if !v0.is_finite() || !v1.is_finite() {
+            return Err(Refusal::Empty);
+        }
+        if let Some(v) = dp.get_mut(row) {
+            *v = [v0, v1];
+        }
+    }
+    let mut x = vec![[0.0, 0.0]; nk];
+    if let Some(last) = x.last_mut() {
+        *last = dp.get(nk - 1).copied().unwrap_or([0.0, 0.0]);
+    }
+    for row in (0..nk - 1).rev() {
+        let dpv = dp.get(row).copied().unwrap_or([0.0, 0.0]);
+        let cpv = cp.get(row).copied().unwrap_or(0.0);
+        let xv = x.get(row + 1).copied().unwrap_or([0.0, 0.0]);
+        if let Some(v) = x.get_mut(row) {
+            *v = [dpv[0] - cpv * xv[0], dpv[1] - cpv * xv[1]];
+        }
+    }
+    for row in 0..nk {
+        let v = x.get(row).copied().unwrap_or([0.0, 0.0]);
+        if let Some(s) = slopes.get_mut(row + 1) {
+            *s = v;
+        }
+    }
+    Ok(slopes)
 }
 
 /// The local bounding box (`[min, max]`) of one unplaced solid.
@@ -274,24 +731,106 @@ fn solid_local_bbox(solid: &SolidSpec) -> Result<[[f64; 3]; 2], Refusal> {
                 [major + minor, major + minor, minor],
             ])
         }
-        SolidSpec::Lathe { points, .. } => {
-            let mut max_r = 0.0f64;
-            let mut z0 = f64::INFINITY;
-            let mut z1 = f64::NEG_INFINITY;
-            for point in points {
-                if point[0] < 0.0 || !point[0].is_finite() || !point[1].is_finite() {
+        SolidSpec::Lathe { profile, .. } => {
+            if let Some(points) = line_profile_vertices(profile) {
+                let mut max_r = 0.0f64;
+                let mut z0 = f64::INFINITY;
+                let mut z1 = f64::NEG_INFINITY;
+                for point in &points {
+                    if point[0] < 0.0 || !point[0].is_finite() || !point[1].is_finite() {
+                        return Err(Refusal::Empty);
+                    }
+                    max_r = max_r.max(point[0]);
+                    z0 = z0.min(point[1]);
+                    z1 = z1.max(point[1]);
+                }
+                if !z0.is_finite() || !z1.is_finite() {
                     return Err(Refusal::Empty);
                 }
-                max_r = max_r.max(point[0]);
-                z0 = z0.min(point[1]);
-                z1 = z1.max(point[1]);
+                Ok([[-max_r, -max_r, z0], [max_r, max_r, z1]])
+            } else {
+                lathe_profile_bbox(profile)
             }
-            if !z0.is_finite() || !z1.is_finite() {
-                return Err(Refusal::Empty);
-            }
-            Ok([[-max_r, -max_r, z0], [max_r, max_r, z1]])
         }
     }
+}
+
+/// The exact axis-aligned bbox of a spline-bearing lathe: `max_r` is the
+/// profile's largest radius and `z` spans the profile's exact extrema (for a
+/// spline edge the cubic span extrema, solved from the derivative roots).
+fn lathe_profile_bbox(profile: &[LatheEdge]) -> Result<[[f64; 3]; 2], Refusal> {
+    check_profile_edges(profile)?;
+    let mut max_r = 0.0f64;
+    let mut z_min = f64::INFINITY;
+    let mut z_max = f64::NEG_INFINITY;
+    for edge in profile {
+        match edge {
+            LatheEdge::Line { a, b } => {
+                for p in [a, b] {
+                    max_r = max_r.max(p[0]);
+                    z_min = z_min.min(p[1]);
+                    z_max = z_max.max(p[1]);
+                }
+            }
+            LatheEdge::Spline { points } => {
+                let spans = spline_spans(points)?;
+                for span in &spans {
+                    let x0 = span.r[0];
+                    let x1 = span.r[0] + span.r[1] + span.r[2] + span.r[3];
+                    max_r = max_r.max(x0).max(x1);
+                    for root in cubic_roots(&span.r) {
+                        max_r = max_r.max(
+                            span.r[0] + root * (span.r[1] + root * (span.r[2] + root * span.r[3])),
+                        );
+                    }
+                    let z0 = span.z[0];
+                    let z1 = span.z[0] + span.z[1] + span.z[2] + span.z[3];
+                    z_min = z_min.min(z0).min(z1);
+                    z_max = z_max.max(z0).max(z1);
+                    for root in cubic_roots(&span.z) {
+                        let vz =
+                            span.z[0] + root * (span.z[1] + root * (span.z[2] + root * span.z[3]));
+                        z_min = z_min.min(vz);
+                        z_max = z_max.max(vz);
+                    }
+                }
+            }
+        }
+    }
+    if !z_min.is_finite() || !z_max.is_finite() || !max_r.is_finite() {
+        return Err(Refusal::Empty);
+    }
+    Ok([[-max_r, -max_r, z_min], [max_r, max_r, z_max]])
+}
+
+/// The roots in `(0, 1)` of the derivative of the cubic with the given power
+/// coefficients `c[0] + c[1] u + c[2] u^2 + c[3] u^3`.
+fn cubic_roots(c: &[f64; 4]) -> Vec<f64> {
+    let mut roots = Vec::with_capacity(2);
+    let a = 3.0 * c[3];
+    let b = 2.0 * c[2];
+    let cc = c[1];
+    if a == 0.0 {
+        // Quadratic (or linear) derivative.
+        if b != 0.0 {
+            let root = -cc / b;
+            if root > 0.0 && root < 1.0 {
+                roots.push(root);
+            }
+        }
+        return roots;
+    }
+    let disc = b * b - 4.0 * a * cc;
+    if disc < 0.0 {
+        return roots;
+    }
+    let sq = disc.sqrt();
+    for root in [(-b + sq) / (2.0 * a), (-b - sq) / (2.0 * a)] {
+        if root > 0.0 && root < 1.0 {
+            roots.push(root);
+        }
+    }
+    roots
 }
 
 /// The world bounding box of one placed solid: rotate the local bbox corners
@@ -477,7 +1016,7 @@ fn solid_mesh(solid: &SolidSpec) -> Result<Vec<Triangle>, Refusal> {
         }
         SolidSpec::Sphere { radius } => sphere_mesh(*radius),
         SolidSpec::Torus { major, minor } => torus_mesh(*major, *minor),
-        SolidSpec::Lathe { points, .. } => lathe_mesh(points),
+        SolidSpec::Lathe { profile, .. } => lathe_mesh(profile),
     }
 }
 
@@ -667,26 +1206,103 @@ fn torus_point(major: f64, minor: f64, ring_angle: f64, tube_angle: f64) -> [f64
     ]
 }
 
-/// A full-revolution lathe mesh: sweep each boundary edge of the profile over
-/// the angular segments. Each edge band is a conical quad strip; no separate
-/// caps are needed because a closed profile's swept boundary covers the whole
-/// surface.
-fn lathe_mesh(points: &[[f64; 2]]) -> Result<Vec<Triangle>, Refusal> {
-    if points.len() < 3 {
+/// The number of linear subdivisions per reconstructed spline span in the
+/// lathe mesh (fixed, deterministic).
+const SPLINE_MESH_STEPS: usize = 4;
+
+/// A full-revolution lathe mesh: sample the profile boundary (line edges
+/// exactly, spline edges at the fixed subdivision of each reconstructed span)
+/// and sweep each consecutive sample segment over the angular segments. Each
+/// band is a conical quad strip; no separate caps are needed because a closed
+/// profile's swept boundary covers the whole surface. For an all-line profile
+/// the ring is exactly the vertex loop, so the mesh is identical to the landed
+/// line-profile mesh.
+fn lathe_mesh(profile: &[LatheEdge]) -> Result<Vec<Triangle>, Refusal> {
+    let ring = profile_ring(profile)?;
+    sweep_ring_mesh(&ring)
+}
+
+/// Appends `p` to the ring unless it equals the current last ring point.
+fn push_ring_point(ring: &mut Vec<[f64; 2]>, p: [f64; 2]) {
+    let duplicate = ring.last().is_some_and(|last| *last == p);
+    if !duplicate {
+        ring.push(p);
+    }
+}
+
+/// The ordered ring of boundary samples of the profile, one point per sample
+/// (no duplicate closing point).
+fn profile_ring(profile: &[LatheEdge]) -> Result<Vec<[f64; 2]>, Refusal> {
+    check_profile_edges(profile)?;
+    let mut ring: Vec<[f64; 2]> = Vec::new();
+    for edge in profile {
+        match edge {
+            LatheEdge::Line { a, b } => {
+                push_ring_point(&mut ring, *a);
+                push_ring_point(&mut ring, *b);
+            }
+            LatheEdge::Spline { points } => {
+                for sample in spline_ring_samples(points)? {
+                    push_ring_point(&mut ring, sample);
+                }
+            }
+        }
+    }
+    // Drop the trailing duplicate of the ring start, if any.
+    if ring.len() > 1 {
+        let first = ring[0];
+        if let Some(last) = ring.last() {
+            if *last == first {
+                ring.pop();
+            }
+        }
+    }
+    Ok(ring)
+}
+
+/// The sampled polyline of one spline profile edge: its exact samples at the
+/// reconstructed span joints plus the fixed interior subdivision of each span.
+fn spline_ring_samples(points: &[[f64; 2]]) -> Result<Vec<[f64; 2]>, Refusal> {
+    let spans = spline_spans(points)?;
+    let mut out = Vec::new();
+    out.push(points[0]);
+    for (i, span) in spans.iter().enumerate() {
+        for s in 1..SPLINE_MESH_STEPS {
+            let u = s as f64 / SPLINE_MESH_STEPS as f64;
+            out.push(eval_span(span, u));
+        }
+        if i + 1 < points.len() {
+            out.push(points[i + 1]);
+        }
+    }
+    Ok(out)
+}
+
+/// Evaluates a reconstructed span at `u in [0, 1]`.
+fn eval_span(span: &SpanPoly, u: f64) -> [f64; 2] {
+    [
+        span.r[0] + u * (span.r[1] + u * (span.r[2] + u * span.r[3])),
+        span.z[0] + u * (span.z[1] + u * (span.z[2] + u * span.z[3])),
+    ]
+}
+
+/// Sweeps the boundary ring over the angular segments.
+fn sweep_ring_mesh(ring: &[[f64; 2]]) -> Result<Vec<Triangle>, Refusal> {
+    if ring.len() < 3 {
         return Err(Refusal::Empty);
     }
-    for point in points {
+    for point in ring {
         if point[0] < 0.0 || !point[0].is_finite() || !point[1].is_finite() {
             return Err(Refusal::Empty);
         }
     }
     let mut out = Vec::new();
-    for edge_index in 0..points.len() {
-        let next = (edge_index + 1) % points.len();
-        let x0 = points[edge_index][0];
-        let z0 = points[edge_index][1];
-        let x1 = points[next][0];
-        let z1 = points[next][1];
+    for ring_index in 0..ring.len() {
+        let next = (ring_index + 1) % ring.len();
+        let x0 = ring[ring_index][0];
+        let z0 = ring[ring_index][1];
+        let x1 = ring[next][0];
+        let z1 = ring[next][1];
         for segment in 0..MESH_SEGMENTS {
             let angle_a = TAU * segment as f64 / MESH_SEGMENTS as f64;
             let angle_b = TAU * (segment + 1) as f64 / MESH_SEGMENTS as f64;
@@ -820,6 +1436,21 @@ mod tests {
         }
     }
 
+    /// Builds an all-line lathe from a closed vertex loop (the census form the
+    /// door's line-profile revolve produces).
+    fn line_lathe(points: &[[f64; 2]], arc_deg: f64) -> SolidSpec {
+        let mut profile = Vec::with_capacity(points.len());
+        for i in 0..points.len() {
+            let b = if i + 1 < points.len() {
+                points[i + 1]
+            } else {
+                points[0]
+            };
+            profile.push(LatheEdge::Line { a: points[i], b });
+        }
+        SolidSpec::Lathe { profile, arc_deg }
+    }
+
     #[test]
     fn primitive_facts_are_analytic() {
         let tree = TreeNode::Group {
@@ -871,15 +1502,15 @@ mod tests {
 
     #[test]
     fn lathe_facts_match_occt_frustum_volume() {
-        let housing = SolidSpec::Lathe {
-            points: vec![
+        let housing = line_lathe(
+            &[
                 [0.001, 1040.0],
                 [95.0, 1110.0],
                 [120.0, 1130.0],
                 [0.001, 1130.0],
             ],
-            arc_deg: 360.0,
-        };
+            360.0,
+        );
         let facts = tree_facts(&part(housing, 470.0, 0.0, 0.0))
             .expect("a full-arc line-profile lathe is in envelope");
         // OCC records the same turbine-housing solid at 1,390,947.111 mm^3.
@@ -890,10 +1521,10 @@ mod tests {
 
     #[test]
     fn partial_arc_lathe_refuses_typed() {
-        let partial = SolidSpec::Lathe {
-            points: vec![[10.0, 0.0], [20.0, 0.0], [20.0, 10.0], [10.0, 10.0]],
-            arc_deg: 270.0,
-        };
+        let partial = line_lathe(
+            &[[10.0, 0.0], [20.0, 0.0], [20.0, 10.0], [10.0, 10.0]],
+            270.0,
+        );
         let refusal = tree_facts(&part(partial, 0.0, 0.0, 0.0))
             .expect_err("a partial-arc lathe is outside this executor's arm");
         assert!(matches!(
@@ -998,10 +1629,10 @@ mod tests {
         // (see partial_arc_lathe_refuses_typed) and the marshal layer maps that
         // refusal to the `Refused` Python exception class — never a panic and
         // never a bare Exception.
-        let partial = SolidSpec::Lathe {
-            points: vec![[10.0, 0.0], [20.0, 0.0], [20.0, 10.0], [10.0, 10.0]],
-            arc_deg: 270.0,
-        };
+        let partial = line_lathe(
+            &[[10.0, 0.0], [20.0, 0.0], [20.0, 10.0], [10.0, 10.0]],
+            270.0,
+        );
         let refusal = tree_facts(&part(partial, 0.0, 0.0, 0.0))
             .expect_err("the partial-arc lathe is outside this executor's arm");
         let marshaled = crate::marshal::Marshaled::from_refusal(&refusal);
@@ -1010,5 +1641,200 @@ mod tests {
             crate::marshal::ExceptionClass::Refused,
             "an unsupported-carrier refusal must surface as the mapped Refused class"
         );
+    }
+
+    // -----------------------------------------------------------------------
+    // Spline-profile lathe facts
+    // -----------------------------------------------------------------------
+
+    /// A synthetic curved shell profile: two dome spline arcs (inner and outer,
+    /// the outer +10 in radius over the same samples) joined by radial caps at
+    /// `z = 0`, mirroring the corpus's `revolved_shell` profile shape.
+    fn dome_shell_profile() -> Vec<LatheEdge> {
+        let inner = [[20.0, 0.0], [38.0, 18.0], [62.0, 18.0], [80.0, 0.0]];
+        let outer = [[90.0, 0.0], [72.0, 18.0], [48.0, 18.0], [30.0, 0.0]];
+        vec![
+            LatheEdge::Spline {
+                points: inner.to_vec(),
+            },
+            LatheEdge::Line {
+                a: inner[3],
+                b: outer[0],
+            },
+            LatheEdge::Spline {
+                points: outer.to_vec(),
+            },
+            LatheEdge::Line {
+                a: outer[3],
+                b: inner[0],
+            },
+        ]
+    }
+
+    /// The 5-point Gauss-Legendre quadrature of `pi * r(u)^2 * z'(u)` over one
+    /// span: exact for the degree-8 integrand, an independent machine check of
+    /// the closed-form segment-moment integral.
+    fn span_volume_by_quadrature(span: &SpanPoly) -> f64 {
+        let nodes = [
+            0.906_179_845_938_664,
+            0.538_469_310_105_683,
+            0.0,
+            -0.538_469_310_105_683,
+            -0.906_179_845_938_664,
+        ];
+        let weights = [
+            0.236_926_885_056_189,
+            0.478_628_670_499_366,
+            0.568_888_888_888_889,
+            0.478_628_670_499_366,
+            0.236_926_885_056_189,
+        ];
+        let mut acc = 0.0;
+        for i in 0..5 {
+            let u = (nodes[i] + 1.0) / 2.0;
+            let x = span.r[0] + u * (span.r[1] + u * (span.r[2] + u * span.r[3]));
+            let dzdu = span.z[1] + u * (2.0 * span.z[2] + u * 3.0 * span.z[3]);
+            acc += weights[i] * x * x * dzdu / 2.0;
+        }
+        std::f64::consts::PI * acc
+    }
+
+    #[test]
+    fn spline_segment_volume_matches_independent_quadrature() {
+        // The closed-form segment-moment integration is machine-checked
+        // against an independent high-order quadrature of the same
+        // reconstructed spans (exact for the degree-8 integrand).
+        for edge in dome_shell_profile() {
+            if let LatheEdge::Spline { points } = edge {
+                let spans = spline_spans(&points).expect("synthetic spline reconstructs");
+                for span in &spans {
+                    let exact = span_volume(span);
+                    let quadrature = span_volume_by_quadrature(span);
+                    assert!(
+                        (exact - quadrature).abs() / exact.abs().max(1e-12) < 1e-9,
+                        "span moment integral drifted: exact {exact} vs quadrature {quadrature}"
+                    );
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn spline_shell_facts_are_not_a_polygon_flattening() {
+        // The spline arm integrates the TRUE reconstructed spline. Flattening
+        // the spline edges to the sample polygon must differ from the exact
+        // facts by more than the facts volume tolerance on this curved
+        // fixture — the deviation is the no-silent-flattening test.
+        let profile = dome_shell_profile();
+        let solid = SolidSpec::Lathe {
+            profile,
+            arc_deg: 360.0,
+        };
+        let facts = tree_facts(&part(solid, 0.0, 0.0, 0.0))
+            .expect("a full-arc spline-profile lathe is in envelope");
+        let exact = facts.volume;
+
+        // The sample-polygon approximation: the same boundary with every
+        // spline edge replaced by straight chords through its samples.
+        let polygon = {
+            let mut vertices: Vec<[f64; 2]> = Vec::new();
+            for edge in dome_shell_profile() {
+                match edge {
+                    LatheEdge::Line { a, b } => {
+                        if vertices.last() != Some(&a) {
+                            vertices.push(a);
+                        }
+                        if vertices.last() != Some(&b) {
+                            vertices.push(b);
+                        }
+                    }
+                    LatheEdge::Spline { points } => {
+                        for p in &points {
+                            if vertices.last() != Some(p) {
+                                vertices.push(*p);
+                            }
+                        }
+                    }
+                }
+            }
+            if vertices.len() > 1 && vertices[0] == *vertices.last().expect("ring nonempty") {
+                vertices.pop();
+            }
+            vertices
+        };
+        let polygon_solid = SolidSpec::Lathe {
+            profile: polygon
+                .iter()
+                .enumerate()
+                .map(|(i, a)| LatheEdge::Line {
+                    a: *a,
+                    b: polygon[(i + 1) % polygon.len()],
+                })
+                .collect(),
+            arc_deg: 360.0,
+        };
+        let polygon_facts = tree_facts(&part(polygon_solid, 0.0, 0.0, 0.0))
+            .expect("the polygon fixture is a line-profile lathe");
+        let deviation = (exact - polygon_facts.volume).abs() / exact;
+        assert!(
+            deviation > 1.0e-4,
+            "the exact spline facts must differ from a sample-polygon flattening by more than \
+             the facts tolerance (deviation {deviation})"
+        );
+    }
+
+    #[test]
+    fn spline_profile_bbox_covers_reconstructed_extrema() {
+        // The profile's largest radius must not be below the exact radius of
+        // the reconstructed spline at its span interiors (sampled finely).
+        let profile = dome_shell_profile();
+        let solid = SolidSpec::Lathe {
+            profile,
+            arc_deg: 360.0,
+        };
+        let bbox = solid_local_bbox(&solid).expect("spline profile bbox");
+        let mut sampled_max_r = 0.0f64;
+        for edge in &dome_shell_profile() {
+            if let LatheEdge::Spline { points } = edge {
+                for span in spline_spans(points).expect("reconstructs") {
+                    for i in 0..=1000 {
+                        let u = i as f64 / 1000.0;
+                        let x = span.r[0] + u * (span.r[1] + u * (span.r[2] + u * span.r[3]));
+                        sampled_max_r = sampled_max_r.max(x);
+                    }
+                }
+            }
+        }
+        assert!(bbox[1][0] + 1e-9 >= sampled_max_r);
+        assert!(bbox[0][0] - 1e-9 <= -sampled_max_r);
+    }
+
+    #[test]
+    fn line_profile_lathe_volume_is_bit_identical_via_profile_form() {
+        // The V5 pair: the profile-edge census form must produce byte-identical
+        // line-profile facts to the landed vertex-loop arm.
+        let vertices = [
+            [10.0, 0.0],
+            [20.0, 0.0],
+            [20.0, 10.0],
+            [15.0, 15.0],
+            [10.0, 10.0],
+        ];
+        let vertex_arm = SolidSpec::Lathe {
+            profile: vertices
+                .iter()
+                .enumerate()
+                .map(|(i, a)| LatheEdge::Line {
+                    a: *a,
+                    b: vertices[(i + 1) % vertices.len()],
+                })
+                .collect(),
+            arc_deg: 360.0,
+        };
+        let facts = tree_facts(&part(vertex_arm, 0.0, 0.0, 0.0)).expect("line profile facts");
+        // The frustum telescoping value, computed with the landed formula.
+        let points: Vec<[f64; 2]> = vertices.to_vec();
+        let expected = lathe_volume(&points).expect("landed lathe volume");
+        assert_eq!(facts.volume.to_bits(), expected.to_bits());
     }
 }
