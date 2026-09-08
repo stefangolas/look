@@ -548,7 +548,15 @@ fn map_ssi(r: SsiRefusal) -> TangencyRefusal {
         | SsiRefusal::DeterminantSpansZero
         | SsiRefusal::InclusionNotStrict
         | SsiRefusal::Conditioning(_)
-        | SsiRefusal::PairClass(_) => TangencyRefusal::Input(Refusal::InvalidInput),
+        | SsiRefusal::PairClass(_)
+        // FSSI-000 decision 4 (FSSI-EXT): the FSSI-001 gate's two suspicion
+        // halts fold onto the existing low-information
+        // `Input(Refusal::InvalidInput)` pattern — NO new `TangencyRefusal`
+        // variant. The SSI-layer `tag()` carries the specificity the
+        // FSSI-001/002 producers assert against; the arms cannot fire until
+        // those producers wire them.
+        | SsiRefusal::TangentCurveSuspected { .. }
+        | SsiRefusal::CoincidentPatchSuspected { .. } => TangencyRefusal::Input(Refusal::InvalidInput),
     }
 }
 
@@ -2120,5 +2128,55 @@ mod tests {
             .expect("the routing evidence is recorded on the attestation");
         assert_eq!(routed.cell(), diagnostic.cell());
         assert_eq!(routed.spend(), diagnostic.spend());
+    }
+
+    /// FSSI-000 decision 4: the module's downstream `SsiRefusal` match
+    /// (`map_ssi`) compiles exhaustively over every variant — including the
+    /// two FSSI-001 suspicion halts — and folds each onto exactly one named
+    /// [`TangencyRefusal`]. The two new cases use the pre-decided
+    /// low-information `Input(Refusal::InvalidInput)` pattern (FSSI-EXT: no
+    /// new `TangencyRefusal` variant); the SSI-layer `tag()` carries the
+    /// specificity. This test is the compile probe: a new `SsiRefusal`
+    /// variant without an arm breaks the exhaustive match below.
+    #[test]
+    fn downstream_matches_exhaustive_compile() {
+        let cases: [(SsiRefusal, &'static str); 8] = [
+            (
+                SsiRefusal::Hull(HullRefusal::EnclosureUnavailable),
+                "tangency_hull_enclosure_unavailable",
+            ),
+            (
+                SsiRefusal::PairClass(
+                    crate::formal::intersection::PairUnsupported::UnsupportedPairClass,
+                ),
+                "tangency_invalid_input",
+            ),
+            (
+                SsiRefusal::Conditioning(Refusal::ConditioningBelowThreshold),
+                "tangency_invalid_input",
+            ),
+            (SsiRefusal::DeterminantSpansZero, "tangency_invalid_input"),
+            (SsiRefusal::InclusionNotStrict, "tangency_invalid_input"),
+            (SsiRefusal::InvalidInput, "tangency_invalid_input"),
+            (
+                SsiRefusal::TangentCurveSuspected {
+                    margin: (0.25, 4.0),
+                },
+                "tangency_invalid_input",
+            ),
+            (
+                SsiRefusal::CoincidentPatchSuspected {
+                    margin: (0.25, 4.0),
+                },
+                "tangency_invalid_input",
+            ),
+        ];
+        for (refusal, expected) in cases {
+            assert_eq!(
+                map_ssi(refusal).tag(),
+                expected,
+                "map_ssi must fold {refusal:?} onto the named {expected} refusal"
+            );
+        }
     }
 }

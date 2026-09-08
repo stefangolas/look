@@ -677,6 +677,17 @@ fn disposition_of_ssi_refusal(refusal: SsiRefusal) -> Disposition {
         SsiRefusal::DeterminantSpansZero => Disposition::Refused(RefusalCause::Singular),
         SsiRefusal::InclusionNotStrict => Disposition::Refused(RefusalCause::NonTransverse),
         SsiRefusal::InvalidInput => Disposition::Refused(RefusalCause::UnsupportedPairClass),
+        // FSSI-000 decision 5: the FSSI-001 gate's two suspicion halts are
+        // refusals, so they land in the refused bucket (existing buckets
+        // unchanged, V5 identity). Neither could certify a transverse
+        // crossing, so both carry the NonTransverse cause; they cannot fire
+        // until FSSI-001 wires the producers.
+        SsiRefusal::TangentCurveSuspected { .. } => {
+            Disposition::Refused(RefusalCause::NonTransverse)
+        }
+        SsiRefusal::CoincidentPatchSuspected { .. } => {
+            Disposition::Refused(RefusalCause::NonTransverse)
+        }
     }
 }
 
@@ -971,6 +982,20 @@ fn floor_refusal_distribution_buckets_are_exhaustive() {
         ),
         (SsiRefusal::DeterminantSpansZero, "singular"),
         (SsiRefusal::InclusionNotStrict, "non_transverse"),
+        // FSSI-000 decision 5: the two suspicion halts land in the refused
+        // bucket (NonTransverse), asserted against the pre-decided tags.
+        (
+            SsiRefusal::TangentCurveSuspected {
+                margin: (0.25, 4.0),
+            },
+            "non_transverse",
+        ),
+        (
+            SsiRefusal::CoincidentPatchSuspected {
+                margin: (0.25, 4.0),
+            },
+            "non_transverse",
+        ),
     ];
     for (refusal, expected) in ssi_cases {
         match disposition_of_ssi_refusal(refusal) {

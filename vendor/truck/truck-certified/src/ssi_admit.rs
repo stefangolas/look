@@ -58,7 +58,11 @@ use truck_geotrait::ParametricSurface;
 /// Named causes only — the landed admission refusal vocabulary and the landed
 /// SSI engine refusal vocabulary, plus the two envelope conditions this arm
 /// owns. There is no catch-all and no new `truck-base` `Refusal` arm.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+///
+/// `Eq` is intentionally absent (FSSI-000 decision 3): the wrapped
+/// [`SsiRefusal`] now carries `(f64, f64)` suspicion evidence, and nothing in
+/// the crate uses this cause as a map key.
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub enum SsiAdmitCause {
     /// The spline carrier's admission refused (CL-000's named gates).
     SplineAdmission(SplineAdmissionRefusal),

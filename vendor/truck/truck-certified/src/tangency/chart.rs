@@ -64,7 +64,11 @@ pub type Box4 = [(f64, f64); 4];
 /// rank-2-admissible) and [`TangencyRefusal::GraphFailure`] (the parametric
 /// contraction failed at the budgeted depth). Every other refusal wraps a
 /// landed [`SsiRefusal`] verbatim (D-reuse — no new top-level evidence kinds).
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+///
+/// `Eq` is intentionally absent (FSSI-000 decision 3): the wrapped
+/// [`SsiRefusal`] now carries `(f64, f64)` suspicion evidence, and nothing in
+/// the crate uses this refusal as a map key.
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub enum TangencyRefusal {
     /// All 18 chart-pivot determinant enclosures contain zero over the box: the
     /// box is not rank-2-admissible.
@@ -89,6 +93,14 @@ impl TangencyRefusal {
                 SsiRefusal::DeterminantSpansZero => "tangency_ssi_determinant_spans_zero",
                 SsiRefusal::InclusionNotStrict => "tangency_ssi_inclusion_not_strict",
                 SsiRefusal::InvalidInput => "tangency_ssi_invalid_input",
+                // FSSI-000 decision 4 (FSSI-EXT): the FSSI-001 gate's
+                // suspicion halts fold onto the existing low-information
+                // pattern here too — the wrapped value still carries the
+                // specificity and the SSI-layer `tag()` carries the naming the
+                // producers assert against. The arm cannot fire until
+                // FSSI-001/002 wire the producers; it documents that.
+                SsiRefusal::TangentCurveSuspected { .. } => "tangency_ssi_invalid_input",
+                SsiRefusal::CoincidentPatchSuspected { .. } => "tangency_ssi_invalid_input",
             },
         }
     }
