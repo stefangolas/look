@@ -190,3 +190,10 @@ pub mod setback;
 /// decision, and the unit-shape fixture kit that later BIE wave packets build
 /// their synthetic fixtures and grading tests against.
 pub mod bie;
+
+/// The swept-pair admission dispatch contract (ADM-000-CONTRACT): the
+/// theorems A–D carrier names, the refusing-by-default Theorem A adapter
+/// signature over the landed homogeneous tensor-spline carrier, and the V5
+/// dispatch rule (nothing is admitted here — widening is ADM-001+, each
+/// behind its admitting test).
+pub mod admission;

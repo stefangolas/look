@@ -175,6 +175,35 @@ commit trail). The delta is smaller than the original draft:
 | T2′ polynomial | Green/divergence → trim-line Bernstein integral | published |
 | T2′ rational | reciprocal-power polynomial + rigorous tail | new small primitive |
 
+**§3 booking surface — ADM-000-CONTRACT (the single registration table,
+frozen 2026-09-08).** ADM-000-CONTRACT freezes the admission contract in
+`truck-certified/src/construct/admission.rs` (`pub mod admission`), registered
+here and nowhere else: the Theorem A adapter signature, the theorems A–D
+carrier names, and the refusing-by-default dispatch rule. Everything refuses
+by default; admission widens case by case behind admitting tests (ADM-001+).
+The adapter fires only where the old path returned `NonCanonicalCarrier` (the
+V5 rule), so no already-green path can reach it. Certificate carriers below
+carry refusing constructors (`ConstructRefusal::Unfrozen`) until
+ADM-002-CERTIFICATES lands their production; the adapter carries the D-shim
+refusal `ConstructRefusal::InvalidInput` until ADM-001-ADAPTER lands its
+constructor.
+
+| Registered carrier (ADM-000) | Frozen shape | Owner theorem | Producing packet |
+|---|---|---|---|
+| `SsiPairSystem` | polynomialized `F = Ŵ_Y·Â − Ŵ_X·B̂` over the extracted spans, wired toward `Ssi4System` | Theorem A result carrier | ADM-001-ADAPTER (constructor) |
+| `RegularPatch` | `{ cone: NormalCone }` | Theorem B1 regularity (hemisphere certificate) | ADM-002-CERTIFICATES |
+| `CollapsedBoundary` | `{ multiplicity: usize }` | Theorem B1 collapsed-edge deflation | ADM-002-CERTIFICATES |
+| `SeamIdentified` | `{ paired: (EdgeId, EdgeId) }` | Theorem B1 seam identification | ADM-002-CERTIFICATES |
+| `TransversePair` | `{ delta: (f64, f64) }` | Theorem C transversality | ADM-002-CERTIFICATES |
+
+**§3 mapping rows (ADM-000-CONTRACT).**
+
+| Source | Target | Notes |
+|---|---|---|
+| `admit_tensor_spline_pair` (Theorem A adapter) | `Ssi4System` (landed, `construct/bie/ssi4.rs`) | the polynomialized F drives the SAME frozen Krawczyk operator; `bie/ssi4.rs` and the operator are untouched (no SPEC_GAP) |
+| certificates (`RegularPatch`, `CollapsedBoundary`, `SeamIdentified`, `TransversePair`) | the landed certificate tuples | the `GateAdmission::TangencyFree { margin }` shape (`ssi_gate.rs`) and the §4 evidence vocabulary; zero new refusal arms |
+| volume primitive (`certified_reciprocal_power`) | ADM-003's booking | Theorem D's reciprocal-power polynomialization is booked by ADM-003-VOLUME, not here |
+
 ## 4. What this program deliberately does NOT do
 
 - No approximate answers, no sampled intersections, no tolerance-tuned
