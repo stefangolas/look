@@ -1,68 +1,71 @@
-# WORK PACKET ADM-003-VOLUME — T2′ certified volume: boundary-reduced Bernstein integration + the rational primitive
+# WORK PACKET ADM-003-VOLUME — assemble certified volume facts over admitted patches (r2: the lemma wave's integration)
 
-Design packet, fourth of the admission program (parallel with ADM-002;
-disjoint files). Lands Theorem D and the published boundary-reduction
-construction: certified volume for spline-faced solids — quadrature-free
-for polynomial faces, polynomial-plus-certified-remainder for rational.
+r2 REWRITE (spine restructure): the reciprocal-power primitive (L5,
+Theorem D) is landed and machine-tested, and the extraction (L1) supplies
+patches. This packet ASSEMBLES the certified volume facts for
+spline-faced solids: the exact face 2-form over extracted patches, the
+trim-boundary reduction consuming L5's primitive, and the closure
+discipline. The algebraic-trim subtlety is CONCENTRATED HERE (the one
+research-adjacent risk in the family).
 
 ```yaml
 id:          ADM-003-VOLUME
 contract:    [ADM-003-VOLUME]
 class:       design
 crates:      [truck-certified, truck-evidence]
-depends_on:  [ADM-001-ADAPTER]
+depends_on:  [ADM-SHIM, ADM-L1-EXTRACT, ADM-L5-RECIPROCAL]
 write_allow:
   - vendor/truck/truck-certified/src/construct/volume_facts.rs
   - vendor/truck/truck-certified/src/construct/mod.rs
-  - vendor/truck/truck-evidence/src/num/reciprocal.rs
-  - vendor/truck/truck-evidence/src/num/mod.rs
-  - vendor/truck/truck-evidence/tests/reciprocal_conformance.rs
+  - vendor/truck/truck-certified/tests/volume_facts_conformance.rs
 read_allow:
   - docs/SWEPT_PAIR_ADMISSION_SPEC.md
-  - vendor/truck/truck-certified/src/
-  - vendor/truck/truck-evidence/src/num/
+  - vendor/truck/truck-evidence/src/num/reciprocal.rs
+  - vendor/truck/truck-certified/src/construct/
 tests_required:
   - frustum_special_case_bit_identical
   - polynomial_face_volume_matches_closed_form
   - rational_face_volume_within_certified_bound
   - unclosed_boundary_detected_not_scored
 anchors:
-  - {id: A1, expect: 9, cmd: "grep -c 'KrawczykSystem' vendor/truck/truck-evidence/src/num/krawczyk.rs"}
-  - {id: A2, expect: 27, cmd: "grep -c 'pub mod' vendor/truck/truck-certified/src/construct/mod.rs"}
-  - {id: A3, expect: 1, cmd: "grep -c 'hull_bernstein_2d' vendor/truck/truck-certified/src/hull.rs"}
-budget:      {turns: 80, ctx_tokens: 200000}
+  - {id: A1, expect: 1, cmd: "grep -c 'TensorBernsteinPatch' vendor/truck/truck-certified/src/construct/patches.rs"}
+  - {id: A2, expect: 1, cmd: "grep -c 'certified_reciprocal_power' vendor/truck/truck-evidence/src/num/reciprocal.rs"}
+  - {id: A3, expect: 1, cmd: "grep -c 'extract_patches' vendor/truck/truck-certified/src/construct/extract.rs"}
+budget:      {turns: 75, ctx_tokens: 200000}
 ```
 
-## Scope decisions (pre-decided per the spec — owner Theorem D)
+## Scope decisions
 
-1. **Polynomial faces (published construction).** `g = X·(X_u×X_v)` is
-   polynomial; `H(u,v) = ∫ g du`; Green ⇒ `∬ g = ∮ H dv`; Bézier trim
-   segments `γ(t)` make the final integrand a UNIVARIATE Bernstein
-   polynomial integrated as `Σ pᵢ/(n+1)` — no quadrature anywhere
-   (Antolin–Hirschler boundary reduction).
-2. **Rational faces (Theorem D — the new small primitive).** The
-   triple-product cancellation `X·(X_u×X_v) = P/W³`, `P = A·(A_u×A_v)`
-   (verified: all `W_u, W_v` terms vanish). New `num/reciprocal.rs`:
-   `certified_reciprocal_power(W, power, target_error) -> (polynomial Q_m,
-   remainder_bound ε_m)` via the geometric series in `δ = (W−w₀)/w₀`,
-   `|δ| ≤ ρ < 1`, tail `ε_m ≤ w₀⁻ᵖ Σ_{k>m} C(k+p−1, p−1) ρᵏ`. The volume
-   error certificate: `|I − Ĩ| ≤ area(R)·‖P‖∞·ε_m`, every term a Bernstein
-   enclosure. Geometric convergence in ρ; subdivide once (de Casteljau) on
-   violent weight variation.
-3. **Closure discipline.** The volume certificate is scored ONLY over a
-   proven-closed, oriented trimmed boundary (`V = (1/3) Σ_patches` with
-   consistent orientation); an unclosed or mis-oriented boundary is
-   DETECTED and refused — never scored. (The same discipline as the
-   mesher's shell-closure checks, lifted to certified arithmetic.)
-4. **V5 anchor.** The landed frustum telescoping (the revolved-polygon
-   special case) must answer bit-identically through the new machinery on
-   its own fixtures — the general construction degenerates to it.
-5. **F1 layer.** The primitive lives in `truck-evidence/src/num/` (the
-   `krawczyk.rs` home); the volume assembly in `construct/` mirrors the
-   landed evidence-consumption pattern. No cross-layer edge beyond the
-   landed seam.
+1. **The exact face 2-form over patches.** Per extracted patch, the
+   divergence-form contribution `V = (1/3)∬ X·(X_u×X_v)` — the
+   integrand assembled from the patch coefficients via the landed product
+   lemma (L2's kernel where products arise). Polynomial faces: exact.
+2. **Rational faces via L5.** The verified cancellation
+   `X·(X_u×X_v) = P/W³`, `P = A·(A_u×A_v)`: the reciprocal-power
+   primitive (L5) polynomializes `W⁻³` with a certified tail; the volume
+   error certificate `|I − Ĩ| ≤ area·‖P‖∞·ε_m` — every factor a Bernstein
+   enclosure.
+3. **The algebraic-trim subtlety (CONCENTRATED HERE — the family's one
+   research-adjacent risk).** Boolean trim boundaries on a spline face are
+   the pullback's algebraic curve `P(s,t) = 0` — NOT parametric
+   polynomials. Certified routes (choose on simplicity): (a) the
+   certified cell decomposition of the face domain (subdivision cells
+   classified by `P`'s sign with the landed exclusion discipline;
+   boundary-cell contributions bounded by the implicit function's
+   certified Lipschitz data — the Krishnamurthy–McMains shape), or (b)
+   Hermite interpolation of the traced curve with a certified error
+   bracket carried into the volume bound. Either route: the volume is a
+   two-sided certified bracket, never a point value pretending
+   exactness. A route that cannot close its bracket → typed refusal of
+   the volume FACT (the geometry may still be certified by the funnel).
+4. **Closure discipline.** Volume is scored only over a proven-closed,
+   oriented boundary (the trimmed patches' union must close — detected
+   via the shared-boundary structure); unclosed ⇒ the fact is refused,
+   never scored.
+5. **V5 anchor.** The landed frustum telescoping answers bit-identically
+   through the new machinery on its own fixtures.
 
-H-1/H-3/H-6, SFC, single-interval-algebra rule: inherited verbatim.
+H-1/H-3/H-6, SFC, single-interval-algebra rule: inherited.
 
 ## Done when
 
@@ -77,17 +80,17 @@ with all four named tests green and the anchors holding.
 
 ## Forbidden
 
-Numerical quadrature. Approximation without a certified remainder bound.
-Weakening landed facts tolerances. Scoring an unproven-closed boundary.
+Numerical quadrature. Uncertified approximation. Scoring an unproven-
+closed boundary. Editing the lemma kernels or the shim's types.
 
 ## Stop conditions
 
-- The trimmed-domain integral needs a representation the landed trim
-  substrate cannot supply → stop-and-file naming the gap (FSSI-003's
-  boundary strata are the follow-up, not this packet's scope growth).
-- Rational weight ranges cannot be bracketed positive on a corpus-derived
-  face → SPEC_GAP with the face class.
+- Neither certified route (a)/(b) closes its bracket on a corpus-derived
+  face → SPEC_GAP with the face class and the bracket data (this is the
+  family's known research risk, pre-escaped: the volume FACT refuses
+  typed while the geometry stays certified).
+- The frustum V5 anchor drifts → a substrate defect, stop-and-file.
 
 ## Finish by writing RESULT.json at the WORKTREE ROOT (then COMMIT first)
 
-Commit subject: `feat(certified): T2-prime certified volume — boundary-reduced Bernstein integration, certified reciprocal-power rational primitive (ADM-003)`.
+Commit subject: `feat(certified): certified volume assembly — exact 2-forms, reciprocal-power rational faces, algebraic-trim brackets (ADM-003)`.
