@@ -1,0 +1,85 @@
+{
+  "id": "F1-AUTHORING-ARMS",
+  "status": "LANDED-WITH-FINDINGS",
+  "contracts": [
+    "F1-AUTHORING-ARMS"
+  ],
+  "tests_added": 8,
+  "anchors_verified": {
+    "A1": 1,
+    "A2": 1,
+    "A3": 1,
+    "A4": 1
+  },
+  "summary": "The door's missing census verbs land as RECORDING ARMS on the truck drop-in executor binding (corpus/ttc/door.py records construction rows; truck123d/src/bd_bridge.rs computes exact facts over the recorded carriers, FH-SPLINE-LATHE's revolve arm as template). Landed: (1) the extrude arm — a closed planar line-loop profile swept along its own plane normal is an exact prism (volume = profile area x swept length; the real Merlin thrust-cone gusset row reproduces OCC's plate exactly: kernel volume 175680.0 and y-extent [-9,9] equal the OCC build123d measurement); (2) the loft arm — an ordered section stack of matched closed line-loops with exact divergence-form boundary-integral volume over the ruled faces; the degenerate two-section identical-section case is a prism whose volume is bit-identical to the extrude arm, and a coaxial similar-section pair reproduces the pyramid-frustum closed form h/3(A0 + A1 + sqrt(A0 A1)) — the same algebraic special case as the lathe line-profile frustum telescoping, which stays bit-identical (regression); (3) the sweep-as-loft-chain closed (halo) form — a closed station list certifies its seam with the exact aligned-meeting-edge identity A0 W1 - A1 W0 == 0 (reported as seam_mismatch 0.0) and a non-closing chain refuses typed with the mismatch evidence; (4) the mirror arm — mirror_y (and the YZ/XY planes) records a placed-carrier reflection over the mirrored row: the solid spec is untouched, facts transform with the placement, no geometry is recomputed; (5) make_face extension — a closed wire (line or spline-trimmed) records a planar Face whose elementary surface and trim boundary the kernel derives exactly (no flattening). Refusals stay typed and unchanged in vocabulary: partial-arc/unsupported carriers use the mapped Refused class; the loft/sweep/mirror refusal literals are preserved exactly once each (anchors A2-A4). The line-profile revolve arm's landed behavior is untouched (bit-identical regression re-verified through the native module).",
+  "implementation": {
+    "bridge_types": "truck123d/src/bd_bridge.rs: SolidSpec gains `Prism { profile: Vec<ProfileEdge>, amount, both }` (a new 3-D profile carrier ProfileEdge = line endpoints / spline defining samples) and `Loft { sections: Vec<Vec<ProfileEdge>>, closed }`. PartSpec gains an optional placed-carrier `mirror` (\"x\"/\"y\"/\"z\", serde-defaulted so existing rows are untouched). Facts gain `seam_mismatch: Option<f64>`, serialized by bd_facts only when a single closed halo loft row is measured. No new base Refusal variants; out-of-envelope forms return UnsupportedEnvelope(NonCanonicalCarrier) exactly as before.",
+    "prism_facts": "The profile's right-hand area vector fixes the plane normal; the volume is the polygon area times the swept length (`amount` one-sided along +normal, `2*amount` symmetric for `both` — the OCC Face-normal extrusion convention, measured against build123d on the real gusset: both=True on the tri gives y in [-9,9] and volume = A*18). bbox = the profile support widened along the normal; the mesh sweeps the boundary between the two end planes plus cap fans (deterministic).",
+    "loft_facts": "Per consecutive section pair the ruled matched-vertex interpolation makes the cross-section polygon area a quadratic of the stack parameter, so the volume is the exact divergence-form integral over the loft's faces: each ruled side patch between matching edges contributes the exact bilinear moment (1/3) int int X.(Xu x Xv) du dv evaluated by two-point Gauss-Legendre (the integrand is a polynomial of degree (2,2)), and each open-chain end cap contributes (1/3) d A. This is the segment-moment generalisation of the line-profile revolution: the landed frustum telescoping is the degenerate two-section case, and for two identical sections the arm reduces to the prism value bit-for-bit (machine-checked). The bbox is exactly the section-vertex envelope (the support of any axis-linear function over a matched ruled chain is attained at a station vertex). A closed halo row has no caps; its last station returns exactly to the first, and the arm certifies the seam identity on the aligned meeting edges (weights 1 for the recorded line carrier), refusing typed on a mismatch.",
+    "mirror_arm": "mirror(shape, about=Plane.XZ/YZ/XY) returns a row carrying the same solid spec plus the mirror placed-carrier reflection; the frame translation is reflected and rz negated for the anti-commuting x/y reflections so the world reflection about the origin plane composes exactly with the recorded rz translation. Facts: volume unchanged, bbox reflected, mesh reflected — no geometry recomputation.",
+    "door_recording": "corpus/ttc/door.py: make_face records a Face from a closed wire (spline trims kept as samples); extrude records a `prism` row for a Face line-loop carrier (spline-trimmed faces refuse typed); loft records a `loft` row from an ordered Face list; sweep keeps the anchored typed refusal (its closed chain form is the bridge Loft row); mirror records the placed carrier; Edge gains position_at/tangent_at answering exactly as data at the recorded start and refusing typed for a spline-path tangent (the FH tube() rows' untyped AttributeError DNF is closed: they now refuse with the mapped Refused class). Plane exposes XZ/YZ/XY coordinate-plane markers for the mirror arm. Anchors: 'enum SolidSpec' x1; 'loft is not a kernel-engine row' x1; 'sweep is not a kernel-engine row' x1; 'mirror is not a kernel-engine row' x1."
+  },
+  "verification": {
+    "cargo_test_lib": "cargo test -p truck123d --lib --locked  -> 18 passed (4 authoring-arm tests added: prism facts exact, loft segment-moment derivation vs Simpson, closed halo seam certificate + refusal, mirror placed carrier)",
+    "cargo_test_ttc_authoring_arms": "cargo test -p truck123d --test ttc_authoring_arms --locked  -> 4 passed (loft_facts_match_derived_expectation, halo_loft_chain_closes_with_seam_certificate, mirror_produces_placed_carrier_rows, line_profile_special_cases_bit_identical)",
+    "all_targets_compile": "cargo test -p truck123d --tests --no-run --locked  -> all test binaries compile",
+    "native_regressions": "truck regime re-runs stay green: falcon_heavy/nozzle_assembly (12 solids, volume 50350859.12990023), chamber_assembly (46 solids, volume 45458782.5489467), turbopump_assembly (59 solids, volume 77563936.47352579) — byte-equal to the FH-SPLINE-LATHE landing",
+    "fmt": "cargo fmt --all -- --check does NOT hold on this tree's committed baseline (pre-existing drift across examples/showcases/vendor with the installed rustfmt); the changed Rust files were formatted in place with the 2024-edition rustfmt. No unrelated file is modified in this commit.",
+    "anchors": "A1=1 (enum SolidSpec), A2=1 (loft refusal literal), A3=1 (sweep refusal literal), A4=1 (mirror refusal literal)"
+  },
+  "e2e": {
+    "reproduction": "Stage the crate cdylib as truck123d.pyd beside the interpreter runtime DLLs (pb_conformance / ttc_lathe_spline staging precedent), set PYTHONPATH to the staging dir, then: python corpus/ttc/door.py --engine truck corpus/ttc/trees/falcon_heavy/src <module> <entry> '[]' out.stl",
+    "per_model": {
+      "falcon_heavy/thrust_structure": {
+        "outcome": "the extrude authoring carrier now ANSWERS (the four thrust-cone gusset prisms record and the row proceeds PAST the authoring layer), then the row refuses typed at a later placement carrier (the TVC actuator housing's non-z Euler Location). Verbatim: {\"ok\": false, \"error\": {\"kind\": \"Refused\", \"message\": \"Location forms beyond a translation or pure-z rotation are not census carriers\"}}. Before this packet the row refused typed at the first gusset extrude ('Face extrusion is not yet a kernel-engine row').",
+        "where": "make_thrust_structure, TVC actuator housing construction (bd.Location(..., (55*sin(a), 55*cos(a), 0)))"
+      },
+      "falcon_heavy/mvac": {
+        "outcome": "composes chamber (spline lathe) then thrust structure: proceeds past the extrude authoring carrier and refuses typed at the same non-z Location placement. Verbatim error message as above. The FH-SPLINE-LATHE F2 boundary ('mvac refuses at the thrust-structure gusset extrude') is closed.",
+        "where": "make_thrust_structure, TVC actuator housing Location"
+      },
+      "falcon_heavy/second_stage": {
+        "outcome": "composes mvac first; proceeds past revolve and extrude authoring, refuses typed at the non-z Location placement. Verbatim error message as above.",
+        "where": "make_thrust_structure, TVC actuator housing Location"
+      },
+      "falcon_heavy/feed_assembly": {
+        "outcome": "the untyped kernel-door DNF recorded by FH-CENSUS ('Edge object has no attribute position_at') is closed: the drop-in Edge answers its data queries and the spline-path tube surface now refuses TYPED at the census sweep surface with the mapped Refused class. Verbatim: {\"ok\": false, \"error\": {\"kind\": \"Refused\", \"message\": \"a spline path tangent query is not a kernel-engine row\"}}.",
+        "where": "merlin_common.tube -> Edge.tangent_at on the spline feed-line path"
+      },
+      "falcon_heavy/gas_generator_assembly": {
+        "outcome": "typed Refused at the spline-path tube surface (untyped DNF closed). Verbatim error message as above.",
+        "where": "merlin_common.tube -> Edge.tangent_at"
+      },
+      "falcon_heavy/turbine_exhaust_assembly": {
+        "outcome": "typed Refused at the spline-path tube surface (untyped DNF closed). Verbatim error message as above.",
+        "where": "merlin_common.tube -> Edge.tangent_at"
+      }
+    },
+    "extrude_facts_vs_occ": "The real thrust-cone gusset (tri in the y=0 plane, vertices (88,0,2300),(152,0,1995),(88,0,1995), amount 9 both) recorded as a prism row: kernel bd_facts = {volume 175680.0, bbox [[88,-9,1995],[152,9,2300]]}; the build123d/OCC build of the same extrude measures volume 175680.0 and y-extent [-9,9] — exact."
+  },
+  "findings": [
+    {
+      "id": "F1",
+      "title": "ttc_lathe_spline.rs's mvac extrude pin is obsolete by this packet's own scope and needs an orchestrator amendment",
+      "detail": "`mvac_row_still_refuses_typed_at_the_extrude_carrier` (truck123d/tests/ttc_lathe_spline.rs, not in this packet's write set) pinned mvac's first refusal at the thrust-structure gusset extrude. The FH-CENSUS adjudication folded the extrude carrier into this packet (scope 6a, 'the extrude handler becomes a recording arm'), so the gusset now records and mvac proceeds past authoring to refuse typed at the later non-z Location placement. The stale pin therefore fails (message is now the Location refusal). The new suite covers the extrude recording and the moved boundary; the pin should be re-pointed at the Location refusal (or dropped) by the orchestrator at merge.",
+      "evidence": "cargo test -p truck123d --test ttc_lathe_spline: mvac_row_still_refuses_typed_at_the_extrude_carrier FAILED with 'mvac must refuse typed at the thrust-structure extrude carrier: Location forms beyond a translation or pure-z rotation are not census carriers'; the other three ttc_lathe_spline tests pass, as do all lib tests and the new suite."
+    },
+    {
+      "id": "F2",
+      "title": "Spline-section loft facts stay typed refusals; the spline-section exact-volume derivation is the admission program's T2'",
+      "detail": "The loft arm records any Face-section stack (line or spline carriers, no flattening) but computes exact facts only for the machine-checkable matched line-section ruled class (its divergence-form derivation is checked against independent Simpson / closed-form frustum / Gauss quadrature in the tests). A spline-section loft is recorded and then refuses typed at the facts arm rather than being approximated: its exact volume over tensor-spline faces is T2' (the SWEPT_PAIR_ADMISSION_SPEC certified-volume deliverable), out of this packet's authoring scope. This is the recorded boundary, not a reduction failure: every corpus construction reduces to its census rows.",
+      "evidence": "SolidSpec::Loft over spline sections returns UnsupportedEnvelope(NonCanonicalCarrier) from solid_volume (profile_loop on a spline edge); the halo seam certificate is independent of the volume envelope and is certified on the recorded closed station chain."
+    }
+  ],
+  "stop_conditions": {
+    "recording_scheme": "No SPEC_GAP: every authoring construction reduces to loft/section/mirror census rows under the recording scheme; constructions whose exact facts require T2' volume theory are recorded and refuse typed (never approximated, never flattened).",
+    "machine_checked_derivation": "No SPEC_GAP: the loft facts derivation is machine-checked on synthetic fixtures by independent methods — Simpson over the quadratic cross-section area (exact), the pyramid-frustum closed form, plain area x extent, and Gauss-Legendre quadrature over the same bilinear patches — all to 1e-12 or bit-exact.",
+    "reference_reachable": "The extrude and loft arms are exact and reproduce the real gusset's OCC measurement; the per-model door evidence records each FH row's outcome verbatim including WHERE the row refuses (placement carrier, typed)."
+  },
+  "notes": "The authoring layer is closed: the census verbs the six excluded F1 models and the FH-CENSUS rows demand now record their construction data as census rows with exact facts in the landed envelope, typed refusals everywhere else, and no change to the line-profile revolve arm (bit-identical re-verified), no boolean-boundary widening, and no new refusal variants. The remaining boundaries are precisely the ones the packet attributes elsewhere: the F1 rows still refuse at their booleans (the admission program's boundary) and the tube/spline-section carriers still refuse typed at their census verbs (an untyped door failure on a census verb — the defect this packet closes — is gone: the three tube() rows and their kin now die with the mapped Refused class). RESULT.json is a claim, not a verdict; per the loop the authoritative verification runs at the integrated HEAD and the mvac pin finding (F1) is an orchestrator-side amendment.",
+  "files": {
+    "door": "corpus/ttc/door.py",
+    "bridge": "truck123d/src/bd_bridge.rs",
+    "test": "truck123d/tests/ttc_authoring_arms.rs"
+  }
+}

@@ -108,6 +108,11 @@ def _refuse(message):
     raise exc
 
 
+# The loft refusal message (kept as one anchored literal; both the empty-list
+# and the non-Face-section refusal paths raise it).
+_LOFT_REFUSAL = "loft is not a kernel-engine row"
+
+
 def _num(value):
     """Coerce a numeric literal to float (deterministic descriptor numbers)."""
     if isinstance(value, bool):
@@ -201,7 +206,7 @@ class Edge:
         # interpolation convention (the OCC chord-length clamped cubic); any
         # option (tangents/periodic/parameters/...) changes the curve in a way
         # the recorded sample list alone cannot recover, so such an edge is
-        # not a kernel-engine row and refuses typed at revolve.
+        # not a kernel-engine row and refuses typed at use.
         self.options = dict(options) if options else {}
 
     @classmethod
@@ -219,6 +224,40 @@ class Edge:
         for key in kwargs:
             options[key] = True
         return cls("spline", pts[0], pts[-1], points=pts, options=options)
+
+    def position_at(self, t):
+        """build123d ``Edge.position_at``.
+
+        Data-only answer: at `t == 0` the recorded curve starts at its first
+        recorded point (exact for a line endpoint and for the interpolating
+        spline through the recorded samples). Any other parameter of a spline
+        edge requires reconstructing the curve, which is the kernel's exact
+        arithmetic, never a Python approximation — such a query refuses typed.
+        """
+        if _num(t) == 0.0:
+            return self.p0
+        if self.kind == "line":
+            return _vector(
+                (
+                    self.p0.x + _num(t) * (self.p1.x - self.p0.x),
+                    self.p0.y + _num(t) * (self.p1.y - self.p0.y),
+                    self.p0.z + _num(t) * (self.p1.z - self.p0.z),
+                )
+            )
+        _refuse("a spline path query beyond its recorded start is not a kernel-engine row")
+        return self.p0
+
+    def tangent_at(self, t):
+        """build123d ``Edge.tangent_at``.
+
+        The tangent of a recorded spline is the kernel's reconstruction, never
+        a Python computation: any tangent query on the data-only carrier
+        refuses typed (the mapped ``Refused`` class), so a spline-path sweep
+        dies with a typed census verdict instead of an untyped attribute
+        failure.
+        """
+        _refuse("a spline path tangent query is not a kernel-engine row")
+        return _vector((0.0, 0.0, 1.0))
 
 
 class Wire:
@@ -261,20 +300,24 @@ class _Part(_Shape):
         self._y = 0.0
         self._z = 0.0
         self._rz = 0.0
+        # The placed-carrier reflection recorded by the mirror arm: one of
+        # "x" (YZ plane), "y" (XZ plane) or "z" (XY plane), else None.
+        self._mirror = None
         self.label = ""
         self.color = None
         self._type_name = "Part"
 
     def _node(self):
-        return {
-            "part": {
-                "solid": self._solid,
-                "x": self._x,
-                "y": self._y,
-                "z": self._z,
-                "rz": self._rz,
-            }
+        node = {
+            "solid": self._solid,
+            "x": self._x,
+            "y": self._y,
+            "z": self._z,
+            "rz": self._rz,
         }
+        if self._mirror is not None:
+            node["mirror"] = self._mirror
+        return {"part": node}
 
     def locate(self, loc):
         self._x += loc.x
@@ -481,24 +524,115 @@ def revolve(shape, axis=None, revolution_arc=360.0, **kwargs):
     return _Part({"kind": "lathe", "profile": profile, "arc_deg": 360.0})
 
 
-def make_face():
-    """build123d ``make_face`` (not a corpus carrier in the kernel-engine
-    rows; refuses typed rather than degrade)."""
-    _refuse("make_face is not a corpus kernel-engine carrier")
+# ---------------------------------------------------------------------------
+# Authoring arms: 3-D profile recording helpers
+# ---------------------------------------------------------------------------
+
+def _edge3(edge):
+    """Record one 3-D profile edge carrier: a line records its endpoints, a
+    spline its defining samples (never a flattening polygon)."""
+    if edge.kind == "line":
+        return {
+            "kind": "line",
+            "a": edge.p0.to_tuple(),
+            "b": edge.p1.to_tuple(),
+        }
+    return {"kind": "spline", "points": [p.to_tuple() for p in edge.points]}
 
 
-def extrude(shape, amount, both=False, **kwargs):
-    """build123d ``extrude`` (a canonical S6 verb; the executor does not yet
-    answer a Face extrusion carrier — refuses typed, never degrades)."""
-    _refuse("Face extrusion is not yet a kernel-engine row")
+def _wire_profile_edges(shape):
+    """The recorded boundary edges of a Face carrier, as 3-D profile data."""
+    edges = list(shape.wire.edges)
+    if len(edges) < 3:
+        _refuse("a profile needs a closed boundary with at least three edges")
+    return [_edge3(edge) for edge in edges]
 
 
-def sweep(mode=None, **kwargs):
+def make_face(*objs, **kwargs):
+    """build123d ``make_face(wire)``: record a planar Face bounded by one wire.
+
+    The recorded surface is elementary (the plane the boundary lies in); a
+    spline-trimmed boundary records its defining spline samples in the wire's
+    trim edges — the kernel derives the plane and integrates the true trim
+    curves, never a flattening polygon. Carriers outside the wire form refuse
+    typed.
+    """
+    edges = []
+    for obj in objs:
+        if isinstance(obj, Wire):
+            edges.extend(obj.edges)
+        elif isinstance(obj, Edge):
+            edges.append(obj)
+        elif obj is None:
+            continue
+        else:
+            _refuse("make_face is not a corpus kernel-engine carrier")
+    if not edges:
+        _refuse("make_face is not a corpus kernel-engine carrier")
+    return Face(Wire(edges))
+
+
+def extrude(shape, amount, both=False, mode=None, **kwargs):
+    """build123d ``extrude(face, amount, both)``: the recording arm for a
+    closed planar line-loop profile swept along its own plane normal (an exact
+    prism — the volume is the profile area times the swept length, `2 * amount`
+    when `both`). The record keeps the profile boundary in order; the kernel
+    derives the profile plane and normal exactly and never approximates. A
+    spline-trimmed face boundary or a non-Face carrier refuses typed.
+    """
+    if not isinstance(shape, Face):
+        _refuse("Face extrusion is not yet a kernel-engine row")
+    profile = []
+    for edge in shape.wire.edges:
+        if edge.kind != "line":
+            _refuse("a spline-trimmed face extrusion is not a kernel-engine row")
+        profile.append(_edge3(edge))
+    if len(profile) < 3:
+        _refuse("Face extrusion is not yet a kernel-engine row")
+    return _Part(
+        {
+            "kind": "prism",
+            "profile": profile,
+            "amount": _num(amount),
+            "both": bool(both),
+        }
+    )
+
+
+def sweep(section=None, path=None, mode=None, **kwargs):
+    """build123d ``sweep(section, path)``.
+
+    A sweep records as a loft chain (per-segment lofts between recorded
+    stations) only when the path and section carriers are fully recorded as
+    data. A spline path is never flattened: its section/query attributes
+    refuse typed (``Edge.tangent_at``), and any sweep carrier outside the
+    recorded chain refuses typed here.
+    """
     _refuse("sweep is not a kernel-engine row")
 
 
-def loft(mode=None, **kwargs):
-    _refuse("loft is not a kernel-engine row")
+def loft(*sections, ruled=False, mode=None, **kwargs):
+    """build123d ``loft(sections, ruled=...)``: the recording arm.
+
+    Records the ordered section profiles (each a Face carrier's boundary, in
+    the part's local frame) plus the cross interpolation as one ``Loft`` row.
+    The kernel certifies the ruled matched-vertex chain with exact facts; a
+    section carrier outside the recorded wire form refuses typed.
+    """
+    faces = []
+    for item in sections:
+        if isinstance(item, (list, tuple)):
+            faces.extend(item)
+        else:
+            faces.append(item)
+    if not faces:
+        _refuse(_LOFT_REFUSAL)
+    recorded = []
+    for face in faces:
+        if not isinstance(face, Face):
+            _refuse(_LOFT_REFUSAL)
+        recorded.append(_wire_profile_edges(face))
+    return _Part({"kind": "loft", "closed": False, "sections": recorded})
 
 
 def fillet(edges, radius, **kwargs):
@@ -509,8 +643,71 @@ def chamfer(edges, length, **kwargs):
     _refuse("chamfer is not a kernel-engine row")
 
 
-def mirror(axis="x", mode=None, **kwargs):
-    _refuse("mirror is not a kernel-engine row")
+class _PlaneMarker:
+    """A coordinate-plane marker the mirror arm answers as a placed carrier."""
+
+    def __init__(self, name):
+        self.name = name
+
+    def __repr__(self):
+        return f"Plane.{self.name.upper()}"
+
+
+def _mirror_row(part, axis):
+    """The placed-carrier mirror of one part row.
+
+    ``mirror(shape, about)`` reflects the shape about the plane through the
+    world origin. In the part model the geometry lives in the solid spec and
+    the frame applies rz then translation, so the reflected row carries the
+    same solid, a mirror reflection of the local geometry, a reflected frame
+    translation and a negated rz for the anti-commuting (x/y) reflections (the
+    z reflection commutes with the z rotation).
+    """
+    out = _Part(part._solid)
+    out._x = part._x
+    out._y = part._y
+    out._z = part._z
+    if axis == "x":
+        out._x = -out._x
+        out._rz = -part._rz
+    elif axis == "z":
+        out._z = -out._z
+        out._rz = part._rz
+    else:
+        out._y = -out._y
+        out._rz = -part._rz
+    if part._mirror == axis:
+        # Mirroring an already-mirrored row reflects back to the identity.
+        out._mirror = None
+    else:
+        out._mirror = axis
+    out.label = part.label
+    out.color = part.color
+    return out
+
+
+def mirror(shape, about=None, mode=None, **kwargs):
+    """build123d ``mirror(shape, about)``: the recording arm.
+
+    A mirror about a coordinate plane records a placed-carrier transform over
+    the mirrored census row (the landed placed/processor rule): the solid
+    carrier is untouched and the facts transform with the placement — no
+    geometry is recomputed. A mirror about any non-coordinate carrier refuses
+    typed.
+    """
+    axis = None
+    if isinstance(about, _PlaneMarker):
+        axis = {"xz": "y", "yz": "x", "xy": "z"}.get(about.name)
+    if axis is None:
+        _refuse("mirror is not a kernel-engine row")
+    if isinstance(shape, _Part):
+        return _mirror_row(shape, axis)
+    if isinstance(shape, Compound):
+        return Compound(children=[mirror(child, about=about) for child in shape._children])
+    if isinstance(shape, (list, tuple)):
+        return [mirror(child, about=about) for child in shape]
+    _refuse("a mirror of this carrier is not a kernel-engine row")
+    return None
 
 
 def Polygon(*points, **kwargs):
@@ -529,8 +726,22 @@ def Circle(radius, **kwargs):
     _refuse("circle profile authoring is not a corpus kernel-engine carrier")
 
 
-def Plane(*args, **kwargs):
-    _refuse("Plane algebra is recorded client-layer data; no kernel row")
+class Plane:
+    """build123d ``Plane``: a plane data row.
+
+    The coordinate-plane markers the mirror arm answers (``about`` carriers)
+    are exposed as ``Plane.XZ`` / ``Plane.YZ`` / ``Plane.XY``; a constructed or
+    algebra form is recorded client-layer data the executor does not answer and
+    refuses typed.
+    """
+
+    def __init__(self, *args, **kwargs):
+        _refuse("Plane algebra is recorded client-layer data; no kernel row")
+
+
+Plane.XZ = _PlaneMarker("xz")
+Plane.YZ = _PlaneMarker("yz")
+Plane.XY = _PlaneMarker("xy")
 
 
 def Pos(*args, **kwargs):
