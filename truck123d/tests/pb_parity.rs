@@ -1,6 +1,7 @@
 //! PB-011 required Rust suite — the corpus-parity churn over the landed
 //! certified funnel (`tests_required`: swept_carrier_booleans_route_to_certified_entry,
-//! lifted_skip_rows_run_green, cutaway_partial_arc_revolve_coverage).
+//! lifted_skip_rows_run_green, cutaway_partial_arc_revolve_coverage,
+//! monocoque_row_lifts_green).
 //!
 //! PB-011 routes the facade's swept-carrier boolean rows into the landed
 //! certified entry (audit G1): the facade's `Mode` row is the `boolean_op`
@@ -449,4 +450,178 @@ fn cutaway_partial_arc_revolve_coverage() {
     // Executed: build_vehicle(cutaway=True) runs green through the harness
     // door with geometry facts + STL (the partial-arc revolve coverage run).
     assert_green_door_evidence(&corpus, cutaway);
+}
+
+// ---------------------------------------------------------------------------
+// Test 4 (monocoque lift): the f1/monocoque row lifts with facts matching the
+// recorded reference
+// ---------------------------------------------------------------------------
+
+/// Loads the recorded reference for a skipped-but-lifted row by id (the
+/// manifest row carries no `reference` field while it is still staged, so the
+/// reference file is addressed directly — same file the orchestrator's
+/// corpus-output step will attach when the row moves to the runnable set).
+fn load_skip_reference(corpus: &Path, id: &str) -> serde_json::Value {
+    let name = id.split('/').next_back().unwrap_or(id); // H-3: row ids are `<family>/<part>`
+    let path = corpus.join("reference").join(format!("{name}.json"));
+    let text = std::fs::read_to_string(&path)
+        .unwrap_or_else(|e| panic!("the recorded reference for {id} must exist: {e}")); // H-3: orchestrator-recorded reference
+    serde_json::from_str(&text)
+        .unwrap_or_else(|e| panic!("the recorded reference for {id} must parse: {e}")) // H-3: orchestrator-recorded reference
+}
+
+/// Asserts a door run's geometry facts match the recorded reference within the
+/// recorded tolerances (solid_count exact; volume relative/absolute; bbox
+/// absolute) — the lift evidence for a skipped-but-lifted row.
+fn assert_facts_match_reference(
+    corpus: &Path,
+    row: &compat::manifest::ManifestRow,
+    record: &serde_json::Value,
+) {
+    let reference = load_skip_reference(corpus, &row.id);
+    let expected_facts = reference
+        .get("facts")
+        .and_then(serde_json::Value::as_object)
+        .unwrap_or_else(|| panic!("reference {} must carry facts", row.id)); // H-3: machine-recorded reference shape
+    let tolerances = reference
+        .get("tolerances")
+        .and_then(serde_json::Value::as_object)
+        .unwrap_or_else(|| panic!("reference {} must carry tolerances", row.id)); // H-3: machine-recorded reference shape
+    let facts = record
+        .get("facts")
+        .and_then(serde_json::Value::as_object)
+        .unwrap_or_else(|| panic!("row {} must carry geometry facts", row.id)); // H-3: the door emits the record
+
+    let got_solids = facts
+        .get("solid_count")
+        .and_then(serde_json::Value::as_i64)
+        .unwrap_or_else(|| panic!("row {} solid_count is missing", row.id)); // H-3: the door emits the record
+    let want_solids = expected_facts
+        .get("solid_count")
+        .and_then(serde_json::Value::as_i64)
+        .unwrap_or_else(|| panic!("reference {} solid_count is missing", row.id)); // H-3: machine-recorded reference shape
+    assert_eq!(
+        got_solids, want_solids,
+        "row {} solid_count must match the recorded reference",
+        row.id
+    );
+
+    let got_volume = facts
+        .get("volume")
+        .and_then(serde_json::Value::as_f64)
+        .unwrap_or_else(|| panic!("row {} volume is missing", row.id)); // H-3: the door emits the record
+    let want_volume = expected_facts
+        .get("volume")
+        .and_then(serde_json::Value::as_f64)
+        .unwrap_or_else(|| panic!("reference {} volume is missing", row.id)); // H-3: machine-recorded reference shape
+    let volume_rel = tolerances
+        .get("volume_rel")
+        .and_then(serde_json::Value::as_f64)
+        .unwrap_or(0.0);
+    let volume_abs = tolerances
+        .get("volume_abs")
+        .and_then(serde_json::Value::as_f64)
+        .unwrap_or(0.0);
+    let volume_ok = if want_volume == 0.0 {
+        (got_volume - want_volume).abs() <= volume_abs
+    } else {
+        ((got_volume - want_volume) / want_volume).abs() <= volume_rel
+    };
+    assert!(
+        volume_ok,
+        "row {} volume {got_volume} must match recorded reference {want_volume} within tolerance",
+        row.id
+    );
+
+    let bbox_abs = tolerances
+        .get("bbox_abs")
+        .and_then(serde_json::Value::as_f64)
+        .unwrap_or(0.0);
+    let got_bbox = facts
+        .get("bbox")
+        .and_then(serde_json::Value::as_array)
+        .unwrap_or_else(|| panic!("row {} bbox is missing", row.id)); // H-3: the door emits the record
+    let want_bbox = expected_facts
+        .get("bbox")
+        .and_then(serde_json::Value::as_array)
+        .unwrap_or_else(|| panic!("reference {} bbox is missing", row.id)); // H-3: machine-recorded reference shape
+    for corner in 0..2 {
+        for axis in 0..3 {
+            let want = want_bbox
+                .get(corner)
+                .and_then(serde_json::Value::as_array)
+                .and_then(|c| c.get(axis))
+                .and_then(serde_json::Value::as_f64)
+                .unwrap_or_else(|| panic!("reference {} bbox coordinate is missing", row.id)); // H-3: machine-recorded reference shape
+            let got = got_bbox
+                .get(corner)
+                .and_then(serde_json::Value::as_array)
+                .and_then(|c| c.get(axis))
+                .and_then(serde_json::Value::as_f64)
+                .unwrap_or_else(|| panic!("row {} bbox coordinate is missing", row.id)); // H-3: the door emits the record
+            assert!(
+                (got - want).abs() <= bbox_abs,
+                "row {} bbox corner {corner} axis {axis} = {got} must match reference {want} within tolerance",
+                row.id
+            );
+        }
+    }
+}
+
+/// PB-011 required test 4 (monocoque lift): the `f1/monocoque` row is in the
+/// lifted set (its SKIPS note carries the `PB-011 LIFT EVIDENCE` marker this
+/// packet wrote) and runs green through the harness door with geometry facts
+/// matching the recorded reference (`corpus/ttc/reference/monocoque.json`).
+/// An empty lifted set fails the test — lifting is the point.
+#[test]
+fn monocoque_row_lifts_green() {
+    let corpus = corpus_dir();
+    let manifest = compat::manifest::load_manifest(&corpus).expect("the corpus manifest must load"); // H-3: validated corpus input, read-only
+    let skips =
+        compat::skips::load_skips(&corpus, &manifest).expect("the skips file must validate"); // H-3: validated corpus input, read-only
+
+    let lifted: Vec<String> = skips
+        .rows
+        .iter()
+        .filter(|skip| skip.note.contains("PB-011 LIFT EVIDENCE"))
+        .map(|skip| skip.id.clone())
+        .collect();
+    assert!(
+        !lifted.is_empty(),
+        "the lifted set must be non-empty — lifting is the point of PB-011"
+    );
+    assert!(
+        lifted.iter().any(|id| id == "f1/monocoque"),
+        "the monocoque row must be in the lifted set"
+    );
+
+    let monocoque = manifest
+        .rows
+        .iter()
+        .find(|row| row.id == "f1/monocoque")
+        .expect("the monocoque row must be enrolled on the manifest"); // H-3: skips/manifest 1:1 is machine-checked
+
+    let out_dir = scratch_dir("monocoque_lift");
+    std::fs::create_dir_all(&out_dir)
+        .unwrap_or_else(|e| panic!("cannot create scratch dir {}: {e}", out_dir.display()));
+    let stl_path = out_dir.join("f1__monocoque.stl");
+    let record = door_run(&corpus, monocoque, &stl_path);
+
+    assert_facts_match_reference(&corpus, monocoque, &record);
+
+    let triangles = record
+        .get("stl")
+        .and_then(|stl| stl.get("triangles"))
+        .and_then(serde_json::Value::as_i64)
+        .unwrap_or(0);
+    assert!(triangles > 0, "the monocoque STL must carry triangles");
+    let stl_len = std::fs::metadata(&stl_path)
+        .map(|m| m.len())
+        .unwrap_or_else(|e| panic!("the monocoque run must produce an STL file: {e}"));
+    assert!(
+        stl_len > 84,
+        "the monocoque STL is not a valid binary STL ({} bytes)",
+        stl_len
+    );
+    let _ = std::fs::remove_dir_all(&out_dir);
 }
