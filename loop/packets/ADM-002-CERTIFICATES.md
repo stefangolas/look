@@ -23,9 +23,9 @@ tests_required:
   - certificates_compose_with_fssi001_gate
   - subdivision_stall_refuses_typed_not_silent
 anchors:
-  - {id: A1, expect: 1, cmd: "grep -c 'TensorBernsteinPatch' vendor/truck/truck-certified/src/construct/patches.rs"}
-  - {id: A2, expect: 1, cmd: "grep -c 'extract_patches' vendor/truck/truck-certified/src/construct/extract.rs"}
-  - {id: A3, expect: 1, cmd: "grep -c 'certified_reciprocal_power' vendor/truck/truck-evidence/src/num/reciprocal.rs"}
+  - {id: A1, expect: 15, cmd: "grep -c 'TensorBernsteinPatch' vendor/truck/truck-certified/src/construct/patches.rs"}
+  - {id: A2, expect: 3, cmd: "grep -c 'extract_patches' vendor/truck/truck-certified/src/construct/extract.rs"}
+  - {id: A3, expect: 3, cmd: "grep -c 'certified_reciprocal_power' vendor/truck/truck-evidence/src/num/reciprocal.rs"}
 budget:      {turns: 60, ctx_tokens: 170000}
 ```
 

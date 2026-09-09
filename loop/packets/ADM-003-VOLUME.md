@@ -28,9 +28,9 @@ tests_required:
   - rational_face_volume_within_certified_bound
   - unclosed_boundary_detected_not_scored
 anchors:
-  - {id: A1, expect: 1, cmd: "grep -c 'TensorBernsteinPatch' vendor/truck/truck-certified/src/construct/patches.rs"}
-  - {id: A2, expect: 1, cmd: "grep -c 'certified_reciprocal_power' vendor/truck/truck-evidence/src/num/reciprocal.rs"}
-  - {id: A3, expect: 1, cmd: "grep -c 'extract_patches' vendor/truck/truck-certified/src/construct/extract.rs"}
+  - {id: A1, expect: 15, cmd: "grep -c 'TensorBernsteinPatch' vendor/truck/truck-certified/src/construct/patches.rs"}
+  - {id: A2, expect: 3, cmd: "grep -c 'certified_reciprocal_power' vendor/truck/truck-evidence/src/num/reciprocal.rs"}
+  - {id: A3, expect: 3, cmd: "grep -c 'extract_patches' vendor/truck/truck-certified/src/construct/extract.rs"}
 budget:      {turns: 75, ctx_tokens: 200000}
 ```
 

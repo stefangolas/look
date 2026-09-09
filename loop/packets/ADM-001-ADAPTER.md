@@ -26,9 +26,9 @@ tests_required:
   - non_admitted_carriers_still_refuse_typed
   - v5_pair_identity_battery_green
 anchors:
-  - {id: A1, expect: 1, cmd: "grep -c 'TensorBernsteinPatch' vendor/truck/truck-certified/src/construct/patches.rs"}
+  - {id: A1, expect: 15, cmd: "grep -c 'TensorBernsteinPatch' vendor/truck/truck-certified/src/construct/patches.rs"}
   - {id: A2, expect: 1, cmd: "grep -c 'pub struct Ssi4System' vendor/truck/truck-certified/src/construct/bie/ssi4.rs"}
-  - {id: A3, expect: 1, cmd: "grep -c 'extract_patches' vendor/truck/truck-certified/src/construct/extract.rs"}
+  - {id: A3, expect: 3, cmd: "grep -c 'extract_patches' vendor/truck/truck-certified/src/construct/extract.rs"}
 budget:      {turns: 65, ctx_tokens: 180000}
 ```
 
