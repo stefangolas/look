@@ -21,3 +21,9 @@ Judgment-required items appended each operator cycle. Newest at the bottom.
   doc-production) passes, merge --no-ff and file `loop/results/FH-TIMING-REFRESH.json`.
   IMPORTANT: do NOT re-fork slot 0 until this lands or is closed - the unlanded
   RESULT.json in the worktree is the only copy.
+
+- RESOLVED SUPERSEDED 20:46 UTC (same cycle): the session-56 handoff landed it
+  concurrently - merge 0daf8d6 + row LANDED c94d043 are now in
+  integration/kernel-bg (verified: c94d043 is an ancestor of HEAD). No action
+  needed; slot 0's leftover worktree RESULT is stale residue and is safe for
+  dispatch_ready to recycle.

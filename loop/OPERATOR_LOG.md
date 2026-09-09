@@ -41,5 +41,15 @@ Actions:
 
 Escalations: 1 (FH-TIMING-REFRESH landing; see OPERATOR_ESCALATIONS.md).
 
-Leaving: 3 workers RUNNING (ADM-L1/L2/L3), heartbeat alive, disk ~5 GB is the
-current blocker for ADM-L4's dispatch into slot 0.
+CORRECTION (same cycle, 00:50 UTC): a CONCURRENT writer was active - the
+session-56 handoff committed 846a0e5 at 20:46 local, landing FH-TIMING-REFRESH
+(merge 0daf8d6, row LANDED c94d043) and rewriting STATE.md against verified
+reality. My STATE splice was superseded by that more complete rewrite (kept the
+concurrent version - it is authoritative and accurate). The FH escalation is
+marked RESOLVED SUPERSEDED. Lesson for future cycles: check `git log` recency
+before assuming you are the only writer; a mid-cycle landing can invalidate both
+an escalation and a STATE edit.
+
+Leaving: 3 workers RUNNING (ADM-L1/L2/L3), exactly one heartbeat (29152) +
+watchdog (29364) + driver (14484), disk ~5.3 GB is the current blocker for
+ADM-L4's dispatch into the freed slot 0.
