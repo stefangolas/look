@@ -156,13 +156,24 @@ def try_land(slot_dir, slot_no, rows, order, reg_path):
     if isinstance(sc, dict):
         stopped = bool(sc.get("triggered"))
     elif isinstance(sc, str):
-        # Workers have written prose here ("none triggered: ...") — recorded
-        # 2026-09-08 when ADM-L1/L3 crash-looped the driver (str.get ->
-        # AttributeError every supervisor restart). A string that asserts a
-        # trigger without saying "none" is treated as stopped; anything else
-        # is prose meaning no stop fired. Logged so adjudication sees it.
+        # Workers have written prose here ("none triggered: ..." and, three
+        # strikes 2026-09-08/09 (ADM-L4, ADM-003, ADM-002), "NOT triggered.
+        # ...") — recorded 2026-09-08 when ADM-L1/L3 crash-looped the driver
+        # (str.get -> AttributeError every supervisor restart). The prose is
+        # a stop assertion ONLY when it asserts a trigger POSITIVELY: a
+        # negated phrase ("not/none/no trigger...") or a leading negation
+        # means NO stop fired. Direction-safe: a false "not stopped" still
+        # fails the `good` status check below, so a genuinely stopped worker
+        # is never landed; a false "stopped" only ever strands (LEFT-FOR-
+        # MORNING), which the RESULT archive survives.
         low = sc.strip().lower()
-        stopped = ("triggered" in low) and not low.startswith(("none", "no "))
+        negated = (
+            low.startswith(("none", "no ", "not "))
+            or "not triggered" in low
+            or "none triggered" in low
+            or "no trigger" in low
+        )
+        stopped = ("triggered" in low) and not negated
         if stopped:
             log(f"slot {slot_no}: stop_conditions prose asserts a trigger: "
                 f"{sc[:120]!r}")
