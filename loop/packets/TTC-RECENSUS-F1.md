@@ -24,7 +24,7 @@ read_allow:
 tests_required: []
 anchors:
   - {id: A1, expect: 48, cmd: "grep -c '\"id\"' corpus/ttc/MANIFEST.json"}
-  - {id: A2, expect: 9, cmd: "grep -c 'median' docs/TT_TIMING_RESULTS.md"}
+  - {id: A2, expect: 21, cmd: "grep -c 'median' docs/TT_TIMING_RESULTS.md"}
 budget:      {turns: 60, ctx_tokens: 170000}
 ```
 
