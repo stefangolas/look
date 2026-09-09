@@ -192,13 +192,38 @@ the admission.rs write set. ADM-003-VOLUME still running (slot 1, pid
 29208, unchanged from 03:40Z). Registry: nothing to flip (ADM-004 needs
 001/002/003, TOR-C needs 001/002 - both correct). Nothing to land: slots
 2-6 FINISHED residue all landed (ledger rows present). Health: disk 10.5
-GB free (above the 8 GB floor, below the 15 GB janitor goal), RAM 4.1 GB
-free, cargoq ok (queued 0, ping ok), heartbeat 1 (29152, dispatched
-ADM-002 this cycle - functioning), watchdog 1 (29364, no recent ACTION
-lines), operator runner 0 in the process scan (this operator instance is
-live directly; do not spawn a second runner while I run). STILL TWO
-supervisors (35200 + 24272). Open human items: F1 mvac-pin amendment;
-supervisor duplication; NEW ADM-001 failed-check adjudication.]
+  GB free (above the 8 GB floor, below the 15 GB janitor goal), RAM 4.1 GB
+  free, cargoq ok (queued 0, ping ok), heartbeat 1 (29152, dispatched
+  ADM-002 this cycle - functioning), watchdog 1 (29364, no recent ACTION
+  lines), operator runner 0 in the process scan (this operator instance is
+  live directly; do not spawn a second runner while I run). STILL TWO
+  supervisors (35200 + 24272). Open human items: F1 mvac-pin amendment;
+  supervisor duplication; NEW ADM-001 failed-check adjudication.]
+
+[operator 2026-09-09T04:56Z - volatile refresh. Board now: 1 RUNNING /
+1 landed-this-cycle. **ADM-003-VOLUME LANDED BY THE OPERATOR** (merge
+9e86346, bookkeeping f45da69): the worker commit 4de25d9 sat FINISHED in
+slot 1 with RESULT status done since ~04:47Z, but the overnight driver
+LEFT FOR MORNING at 00:47:52 local on the DOCUMENTED prose-stop_conditions
+bug (the worker's "NOT triggered. ..." string contains "triggered" and
+does not start with "none"/"no ", so overnight.py:165 parsed it stopped)
+- the same class that stranded ADM-L4. Operator ran the harness scoped
+check at the warm slot-1 worktree (cargo check -p truck-certified +
+truck-evidence --locked green, volume_facts_conformance 9/9 incl. all
+four named tests), merged --no-ff into integration/kernel-bg, filed
+loop/results/ADM-003-VOLUME.json, removed the wt-root RESULT copy, row
+flipped status DONE + LANDED marker. Slot 1 now IDLE. ADM-002-CERTIFICATES
+still RUNNING slot 0 (pid 30612, events fresh, 10 changed files - making
+progress). Health: disk 5.6 GB free - BELOW the 8 GB floor (the two live
+targets are eating it; do not run whole-tree cargo while ADM-002 builds),
+RAM 4.2 GB free, cargoq ok (queued 0), heartbeat 1 (29152), watchdog 1
+(29364), TWO supervisors (35200 + 24272, open). Registry: ADM-004 now
+needs only ADM-001 + ADM-002 (003 landed) - still correctly BLOCKED;
+TOR-C needs 001/002 - correct; DEF-SEEDRAY-B dep DEF-SEEDRAY-A is landed
+but the row stays BLOCKED on the SEEDRAY-B frontier-review human item.
+ADM-001 failed-check adjudication remains OPEN and the PACKETS row is
+still READY - the heartbeat WILL re-fork it the moment ADM-002 frees the
+admission.rs write set; keep it adjudicated before that slot frees.]
 
 ## The parallelism picture
 

@@ -212,3 +212,20 @@ Leaving: 2 RUNNING (ADM-002 slot 0, ADM-003 slot 1); ADM-001 unlanded +
 escalated (commit e076c1f preserved on its packet branch); disk 10.5 GB
 free; escalations carried (F1 mvac-pin, duplicate supervisors) + 1 new
 (ADM-001 failed check). Operator runner count 0 observed - see STATE.
+
+## 2026-09-09 04:56 UTC (operator)
+
+Board at start: 2 RUNNING (ADM-002-CERTIFICATES slot 0 pid 30612, ADM-003-VOLUME slot 1 pid 29208); slots 2-6 FINISHED residue (all landed packets: L2/L3/F1/CL-005/CL-006 - verified ancestors of integration/kernel-bg + ledger rows present), slot 7 IDLE. Heartbeat exactly 1 (29152); watchdog 1 (29364); cargoq OK (queued 0, ping ok); disk 5.6 GB free (BELOW the 8 GB floor); RAM 4.2 GB free; TWO supervisors (35200 + 24272) - open escalation, unchanged.
+
+Findings:
+- **ADM-003-VOLUME finished ~04:47Z (worker commit 4de25d9, RESULT status done) but the overnight driver LEFT FOR MORNING at 00:47:52 local** on the documented prose-stop_conditions bug: the worker's stop_conditions string begins "NOT triggered. ..." - it contains "triggered" and does not start with "none"/"no ", so overnight.py:165 parsed it as stopped=True (same class that stranded ADM-L4). Not landed, no ledger row, RESULT only in the slot worktree.
+- Registry sweep: no BLOCKED row has all deps landed except ADM-004 (needs 001/002/003 - 003 now landed, still gated on 001+002) and TOR-C (needs 001/002) - both correct. DEF-SEEDRAY-B dep (DEF-SEEDRAY-A) is landed but the row is BLOCKED on the SEEDRAY-B frontier-review human item - not flipped.
+- dispatch_ready --dry-run: dispatched 0, correct (ADM-001 deferred by write-set clash with RUNNING ADM-002 on admission.rs).
+
+Actions:
+- **LANDED ADM-003-VOLUME** (operator landing, the driver would never land it): ran the harness scoped check at the warm slot-1 worktree (cargo check -p truck-certified green 31s, -p truck-evidence green, cargo test -p truck-certified --test volume_facts_conformance 9/9 incl. all four named tests), merge --no-ff 9e86346, filed loop/results/ADM-003-VOLUME.json, removed the wt-root RESULT copy (loop/slots/1/wt/RESULT.json), appended the ledger row, flipped the PACKETS row to status DONE + LANDED 4de25d9 marker, committed f45da69. Slot 1 now IDLE.
+- Nothing else to land (slots 2-6 residue all landed). Nothing stuck to unblock (running slot events fresh). No anchor/registry fixes needed.
+- dispatch_ready --dry-run only (heartbeat live - double-dispatch rule).
+- STATE.md volatile refresh appended ([operator 2026-09-09T04:56Z]).
+
+Leaving: 1 RUNNING (ADM-002 slot 0); ADM-003 LANDED (slot 1 freed); disk 5.6 GB free - BELOW THE 8 GB FLOOR (do not run whole-tree cargo while ADM-002 builds); escalations carried (F1 mvac-pin amendment, duplicate supervisors, ADM-001 failed-check adjudication - still OPEN and the row is still READY, re-fork risk when ADM-002's slot frees). Operator runner count 0 observed (this instance runs directly).
