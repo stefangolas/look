@@ -1280,23 +1280,69 @@ def Torus(major_radius, minor_radius, major_angle=360.0, mode=None, **kwargs):
 def revolve(shape, axis=None, revolution_arc=360.0, **kwargs):
     """build123d ``revolve(shape, axis, revolution_arc)``.
 
-    The executor's lathe arm covers a closed profile in the ``y = 0`` plane
-    revolved a full 360 degrees about the z axis. The profile may mix straight
-    edges and ``Edge.make_spline(points)`` spline edges (the spline is
-    recorded by its defining samples and the kernel integrates the true
-    interpolating spline, never a flattening polygon). Any other carrier (a
-    partial arc, a non-z axis, an open profile, a spline whose interpolation
-    options the recorded data cannot recover) refuses typed.
+    The executor's lathe arm covers a closed planar profile turned a full 360
+    degrees about a recorded axis. The profile may mix straight edges and
+    ``Edge.make_spline(points)`` spline edges (the spline is recorded by its
+    defining samples and the kernel integrates the true interpolating spline,
+    never a flattening polygon). The z-axis form keeps the recorded legacy row
+    shape bit-for-bit; an expressible non-z axis (build123d ``Axis`` or a
+    ``Vector`` direction) is recorded in the same local ``(radius, axial)``
+    plane convention and the landed frame row carries the axis as a full
+    orthonormal ``rotation`` (local z to the recorded axis direction). A
+    partial arc, a degenerate axis, a profile that is not a single-sided
+    meridian generator about the axis, an open profile, or a spline whose
+    interpolation options the recorded data cannot recover refuses typed.
     """
-    if not isinstance(axis, Axis) or not _close(axis.direction, (0, 0, 1)):
-        _refuse("revolve about a non-z axis is not a kernel-engine row")
     if not isinstance(shape, Face):
         _refuse("revolve of a non-Face shape is not a kernel-engine row")
     if _num(revolution_arc) != 360.0:
         _refuse("a partial-arc revolve is outside the executor's lathe arm")
+    unit = _axis_unit(axis)
+    if unit is None:
+        _refuse("DegenerateRevolveAxis: a zero-length axis is not a kernel-engine row")
     edges = shape.edges
     if len(edges) < 3:
         _refuse("revolve needs a closed profile")
+    if _is_z_axis(unit):
+        profile = _legacy_z_profile(edges)
+        frame = None
+    else:
+        profile, frame = _axis_profile(edges, unit)
+    first = edges[0].p0
+    last = edges[-1].p1
+    if (
+        abs(first.x - last.x) > 1e-9
+        or abs(first.y - last.y) > 1e-9
+        or abs(first.z - last.z) > 1e-9
+    ):
+        _refuse("a revolve profile must close on itself")
+    part = _Part({"kind": "lathe", "profile": profile, "arc_deg": 360.0})
+    if frame is not None:
+        part._rot = frame
+        part._rz = 0.0
+    return part
+
+
+def _axis_unit(axis):
+    """The unit axis direction tuple of an ``Axis`` or ``Vector`` (data only;
+    any other carrier refuses typed). ``None`` marks a degenerate axis."""
+    if isinstance(axis, Axis):
+        direction = _point3(axis.direction)
+    elif isinstance(axis, Vector):
+        direction = axis.to_tuple()
+    else:
+        _refuse("DegenerateRevolveAxis: an axis direction carrier is required")
+        return None
+    unit = _vnormalize(direction)
+    if _vlen(unit) == 0.0 or not all(math.isfinite(v) for v in unit):
+        return None
+    return unit
+
+
+def _legacy_z_profile(edges):
+    """The legacy z-axis profile: every recorded edge point lies in the ``y =
+    0`` plane and the profile coordinate pair is the recorded ``(radius x,
+    axial z)`` of the world point (bit-identical row shape)."""
     profile = []
     for edge in edges:
         if edge.kind == "line":
@@ -1325,15 +1371,96 @@ def revolve(shape, axis=None, revolution_arc=360.0, **kwargs):
             )
         else:
             _refuse("this curve carrier is not a lathe profile edge")
-    first = edges[0].p0
-    last = edges[-1].p1
-    if (
-        abs(first.x - last.x) > 1e-9
-        or abs(first.y - last.y) > 1e-9
-        or abs(first.z - last.z) > 1e-9
-    ):
-        _refuse("a revolve profile must close on itself")
-    return _Part({"kind": "lathe", "profile": profile, "arc_deg": 360.0})
+    return profile
+
+
+def _axis_profile(edges, unit):
+    """The profile of a non-z axis expressed in the local ``(radius >= 0,
+    axial)`` plane convention of the recorded axis, plus the full orthonormal
+    frame whose local z is the recorded axis direction (the landed
+    composition ``world = translate(o) ∘ R ∘ M``).
+
+    The profile must be a single-sided meridian generator about the axis
+    through the frame origin: the perpendicular component of every recorded
+    point is parallel to one common ray (never folded across the axis). A
+    profile not expressible exactly that way refuses typed naming the gap.
+    """
+    reference = _axis_ray(edges, unit)
+    if reference is None:
+        _refuse("the profile lying on the axis is not a kernel-engine row")
+    profile = []
+    for edge in edges:
+        if edge.kind == "line":
+            profile.append(
+                {
+                    "kind": "line",
+                    "a": _axis_point(edge.p0.to_tuple(), unit, reference),
+                    "b": _axis_point(edge.p1.to_tuple(), unit, reference),
+                }
+            )
+        elif edge.kind == "spline":
+            if edge.options:
+                # An interpolation option (tangents/periodic/parameters) is not
+                # recoverable from the recorded sample list; never guess one.
+                _refuse("a spline-profile revolve is not a kernel-engine row")
+            profile.append(
+                {
+                    "kind": "spline",
+                    "points": [
+                        _axis_point(point.to_tuple(), unit, reference)
+                        for point in edge.points
+                    ],
+                }
+            )
+        else:
+            _refuse("this curve carrier is not a lathe profile edge")
+    return profile, _axis_frame(unit, reference)
+
+
+def _axis_ray(edges, unit):
+    """The reference perpendicular ray shared by every recorded point of a
+    single-sided meridian profile (``None`` when no point leaves the axis)."""
+    for edge in edges:
+        for point in edge.points:
+            perp = _axis_perp(point.to_tuple(), unit)
+            if _vlen(perp) > 0.0:
+                return _vnormalize(perp)
+    return None
+
+
+def _axis_perp(point, unit):
+    """The component of ``point`` perpendicular to the recorded axis."""
+    axial = _vdot(point, unit)
+    return _vsub(point, _vscaled(unit, axial))
+
+
+def _axis_point(point, unit, reference):
+    """The ``(radius, axial)`` plane coordinates of one profile point.
+
+    A point whose perpendicular component folds across the recorded axis
+    (opposite the single-sided reference ray) cannot be a lathe generator
+    exactly; refuse typed naming the gap. Radius is the non-negative in-plane
+    coordinate along the reference ray, never a folded magnitude.
+    """
+    axial = _vdot(point, unit)
+    perp = _axis_perp(point, unit)
+    radius = _vdot(perp, reference)
+    if radius < -1e-9:
+        _refuse("a profile crossing the recorded axis is not a kernel-engine row")
+    radius = max(radius, 0.0)
+    return [radius, axial]
+
+
+def _axis_frame(unit, reference):
+    """The orthonormal rotation columns taking the local z-lathe to the
+    recorded axis: local z to ``unit``, local x to the reference ray, and the
+    fixed-order completion for local y."""
+    x_dir = reference
+    z_dir = unit
+    y_dir = _vnormalize(_vcross(z_dir, x_dir))
+    if _vlen(y_dir) < 1e-12:
+        _refuse("an axis parallel to its profile ray is not a kernel-engine row")
+    return (x_dir, y_dir, z_dir)
 
 
 # ---------------------------------------------------------------------------
