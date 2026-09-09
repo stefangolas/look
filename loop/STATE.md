@@ -157,6 +157,25 @@ assemblies dispatching to slots 0/1/2; the heartbeat's next cycle (max 3
 workers) should dispatch them. F1 (slot 4) mvac-pin amendment + the
 supervisor duplication remain the two open human items.]
 
+[operator 2026-09-09T03:59Z - volatile refresh. Board now: 2 RUNNING /
+0 landed-this-cycle. The heartbeat dispatched the first two assemblies at
+~03:40Z: ADM-001-ADAPTER -> slot 0 (pid 30856), ADM-003-VOLUME -> slot 1
+(pid 29208), both making progress (events fresh, several files changed
+vs base). ADM-002-CERTIFICATES is READY with all deps landed but is
+CORRECTLY deferred by dispatch_ready: write-set clash with a RUNNING row
+(vendor/truck/truck-certified/src/construct/admission.rs, shared with
+ADM-001) - it will dispatch when ADM-001's slot frees. Registry checked:
+no BLOCKED row has all deps landed except ADM-004 (needs 001/002/003,
+correct) and TOR-C (needs 001/002, correct); nothing to flip. Nothing to
+land: slots 2-6 FINISHED residue are all landed packets (L2/L3/F1/CL-005/
+CL-006 ledger rows present). Health: disk 12.3 GB free (above the 8 GB
+floor, below the 15 GB janitor goal), RAM 4.3 GB free, cargoq ok (queued
+0), heartbeat 1 (29152), watchdog 1 (29364), operator runner 1. STILL TWO
+supervisors (35200 PyManager + 24272 pythoncore) - open escalation, but
+only ONE overnight.py driver child exists (of 24272) so no double-merge
+risk this cycle. F1 (slot 4) mvac-pin amendment + the supervisor
+duplication remain the two open human items.]
+
 ## The parallelism picture
 
 The lemma wave (L1-L4, pure functions over the frozen shim type) is

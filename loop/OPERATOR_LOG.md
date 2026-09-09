@@ -134,3 +134,35 @@ Actions:
 Leaving: 0 running; ADM-001/002/003 READY awaiting the heartbeat; disk 13.2
 GB free (the janitor still short of its 15 GB goal); escalations carried +
 1 new (driver never filed L1/L2/L3 RESULT copies).
+
+## 2026-09-09 03:59 UTC (operator)
+
+Board at start: 2 RUNNING (ADM-001-ADAPTER slot 0 pid 30856, ADM-003-
+VOLUME slot 1 pid 29208, dispatched by the heartbeat ~03:40Z, both making
+progress); slots 2-6 FINISHED residue (all landed packets: L2/L3/F1/CL-005/
+CL-006), slot 7 IDLE. Heartbeat exactly 1 (29152); watchdog 1 (29364);
+cargoq OK (queued 0, ping ok); disk 12.3 GB free; RAM 4.3 GB free; TWO
+supervisors (35200 + 24272) - open escalation, unchanged.
+
+Findings:
+- ADM-002-CERTIFICATES is READY with all deps landed (SHIM/L1/L3/L4) but
+  dispatch_ready correctly defers it: write-set clash with a RUNNING row on
+  vendor/truck/truck-certified/src/construct/admission.rs (shared with
+  ADM-001). Correct cascade - it should dispatch when ADM-001's slot frees.
+- Registry sweep: no BLOCKED row has all deps landed except ADM-004 (needs
+  001/002/003) and TOR-C (needs 001/002) - both correct. Nothing to flip.
+- Only ONE overnight.py driver exists (child of supervisor 24272); the two
+  supervisor processes are the known open escalation - no double-merge risk
+  this cycle.
+
+Actions:
+- Nothing to land (all FINISHED residue already landed; ledger verified).
+  Nothing stuck to unblock. No anchor/registry fixes needed.
+- dispatch_ready --dry-run only (heartbeat live - double-dispatch rule):
+  confirms 2 running / ADM-002 write-set clash / dispatched 0, correct.
+- STATE.md volatile refresh appended ([operator 2026-09-09T03:59Z]).
+
+Leaving: 2 RUNNING (ADM-001, ADM-003); ADM-002 deferred by write-set clash;
+disk 12.3 GB free (above the 8 GB floor, below the 15 GB janitor goal);
+escalations carried (F1 mvac-pin amendment + duplicate supervisors), none
+new.
