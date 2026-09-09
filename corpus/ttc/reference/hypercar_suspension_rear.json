@@ -1,0 +1,28 @@
+{
+  "schema": "ttc_reference.v1",
+  "row_id": "hypercar/suspension_rear",
+  "door_version": "1",
+  "facts": {
+    "solid_count": 101,
+    "volume": 23256590.982795388,
+    "bbox": [
+      [
+        -1824.3723643070684,
+        -830.0,
+        156.5
+      ],
+      [
+        -1091.360761096649,
+        830.0,
+        826.5995168533354
+      ]
+    ],
+    "diag": 1934.4093085301733
+  },
+  "tolerances": {
+    "solid_count": "exact",
+    "volume_rel": 0.0001,
+    "volume_abs": 1e-06,
+    "bbox_abs": 0.001
+  }
+}

@@ -1,0 +1,71 @@
+{
+  "id": "REF-RECORD-HYPERCAR",
+  "status": "DONE",
+  "contracts": ["REF-RECORD-HYPERCAR"],
+  "tests_added": 0,
+  "anchors_verified": {"A1": 14, "A2": 48},
+  "anchors_note": "A1 = 14 (`grep -c 'hypercar' corpus/ttc/MANIFEST.json`) holds. A2 measures 48 reference jsons at finish; the packet's expect of 45 was the pre-recording count on this branch (the anchor was word-boundary-measured at registration against the tree with the three hypercar rows still UNSTAGED). The +3 delta is exactly the packet's own deliverable (the three new hypercar-prefixed reference files); the f1 oracle files were not touched, so A2 re-measures 45 + 3 = 48 by construction.",
+  "summary": "The three UNSTAGED hypercar rows (hypercar/details, hypercar/suspension_front, hypercar/suspension_rear) are recorded and staged. Naming-convention choice: hypercar-prefixed reference short names (`corpus/ttc/reference/hypercar_details.json`, `hypercar_suspension_front.json`, `hypercar_suspension_rear.json`) + explicit `reference` pointer fields on the three hypercar manifest rows (the manifest's own pointer convention, hypercar/wheels precedent) - the f1 rows' oracle files (details.json / suspension_front.json / suspension_rear.json, row_id f1/*) and the f1 manifest entries are untouched. This is the least-surface fix: the suffix-derived short-name mapping breaks only for these three collided names, so only those three rows gain a pointer and no f1 row or f1 reference is edited. OCC-door recording (corpus/ttc/door.py --engine occ, door_version 1, one fresh python per row, serial, quiet machine) ran 3/3 green and every re-run reproduced the recorded facts BIT-IDENTICALLY (solid_count exact; volume and bbox equal to the recorded doubles; STL triangle counts equal) - no OCC-DNF. Row evidence (OCC door): hypercar/details Compound 101 solids / 22454 STL tris / wall 114.178 s (build 94.857 s); hypercar/suspension_front Compound 260 solids / 64604 STL tris / wall 39.863 s (build 34.525 s); hypercar/suspension_rear Compound 101 solids / 177811 STL tris / wall 243.03 s (build 200.071 s). The three reference files carry the recorded-facts shape (schema ttc_reference.v1, row_id hypercar/*, door_version 1, facts solid_count/volume/bbox/diag, tolerances) exactly as the existing 45 references were recorded. The manifest rows now point at the new references (stage stays `skipped` - the rows' booleans-on-swept-carriers SKIPS reason is unchanged; staging means the next kernel-door census no longer fires the UNSTAGED stop for them). Anchors hold (A1=14; A2 re-measured 48 post-recording as documented above).",
+  "naming_convention": {
+    "choice": "hypercar-prefixed reference files plus explicit manifest reference pointers on the three hypercar rows",
+    "rationale": "The reference-file short names `details.json` / `suspension_front.json` / `suspension_rear.json` are the f1 rows' oracles (row_id f1/*) and are never overwritten. New hypercar references therefore use hypercar-prefixed short names (reference/hypercar_<system>.json) and the three hypercar manifest rows gain an explicit `reference` pointer naming the file - the same pointer convention the manifest already uses for hypercar/wheels. The other nine staged hypercar rows keep the un-collided suffix short-name mapping (aero.json ... wheels.json), and the f1 manifest entries are not edited (their oracles remain discoverable under the unchanged suffix mapping). Surface touched: 3 new reference files + 3 hypercar manifest rows only.",
+    "f1_oracle": "corpus/ttc/reference/details.json, suspension_front.json, suspension_rear.json carry row_id f1/* and are byte-unchanged (git status confirms no edit); the f1 manifest rows carry no reference pointer and were not edited."
+  },
+  "recording": {
+    "protocol": "corpus/ttc/door.py --engine occ (OCC baseline, door_version 1), one fresh python per row, serial, quiet machine - the recorded census protocol (PB-011C) applied verbatim; wall_s is the OCC-baseline door-process wall of the single evidence run per row; the reference files carry the recorded facts shape of the existing 45 references (schema ttc_reference.v1, row_id, door_version 1, facts solid_count/volume/bbox/diag, tolerances solid_count exact / volume_rel 1e-4 / volume_abs 1e-6 / bbox_abs 1e-3).",
+    "environment": "Windows x86_64 (win32); Python 3.14.3; build123d 0.11.1; cadquery-ocp 7.9.3.1.1; corpus tree at worktree HEAD 57aa9ad, branch packet/REF-RECORD-HYPERCAR; corpus rows invoked exactly per MANIFEST module/entry/args (module lib.details|lib.suspension_front|lib.suspension_rear, entry build, args []).",
+    "rows": [
+      {
+        "row": "hypercar/details",
+        "reference": "hypercar_details.json",
+        "occ_evidence": {"door_version": "1", "ok": true, "type": "Compound", "solid_count": 101, "volume": 5334900.016204721, "bbox": [[-2404.2, -1063.0601242446264, 380.8618431847634], [2259.3585764605086, 1063.0601242446264, 936.229941528647]], "diag": 5155.346703352982, "stl_triangles": 22454, "wall_s": 114.178, "build_seconds": 94.857},
+        "repro_evidence": {"ok": true, "bit_identical": true, "solid_count": 101, "volume": 5334900.016204721, "bbox": [[-2404.2, -1063.0601242446264, 380.8618431847634], [2259.3585764605086, 1063.0601242446264, 936.229941528647]], "diag": 5155.346703352982, "stl_triangles": 22454, "wall_s": 93.035, "build_seconds": 80.734}
+      },
+      {
+        "row": "hypercar/suspension_front",
+        "reference": "hypercar_suspension_front.json",
+        "occ_evidence": {"door_version": "1", "ok": true, "type": "Compound", "solid_count": 260, "volume": 0, "bbox": [[941.0906851188882, -822.0, 138.52827413060027], [1543.199612460303, 822.0, 619.172150237279]], "diag": 1815.5686976876093, "stl_triangles": 64604, "wall_s": 39.863, "build_seconds": 34.525},
+        "repro_evidence": {"ok": true, "bit_identical": true, "solid_count": 260, "volume": 0, "bbox": [[941.0906851188882, -822.0, 138.52827413060027], [1543.199612460303, 822.0, 619.172150237279]], "diag": 1815.5686976876093, "stl_triangles": 64604, "wall_s": 28.408, "build_seconds": 23.479},
+        "note": "The OCC door measures volume 0.0 for this Compound on both the evidence run and the re-run (bit-identical, recorded as measured); the door is the differential oracle and its measured doubles are recorded verbatim."
+      },
+      {
+        "row": "hypercar/suspension_rear",
+        "reference": "hypercar_suspension_rear.json",
+        "occ_evidence": {"door_version": "1", "ok": true, "type": "Compound", "solid_count": 101, "volume": 23256590.982795388, "bbox": [[-1824.3723643070684, -830.0, 156.5], [-1091.360761096649, 830.0, 826.5995168533354]], "diag": 1934.4093085301733, "stl_triangles": 177811, "wall_s": 243.03, "build_seconds": 200.071},
+        "repro_evidence": {"ok": true, "bit_identical": true, "solid_count": 101, "volume": 23256590.982795388, "bbox": [[-1824.3723643070684, -830.0, 156.5], [-1091.360761096649, 830.0, 826.5995168533354]], "diag": 1934.4093085301733, "stl_triangles": 177811, "wall_s": 251.069, "build_seconds": 209.192}
+      }
+    ]
+  },
+  "stop_conditions": {
+    "occ_dnf": "did not fire (3/3 OCC evidence runs green; each row reproduced bit-identically on its single serial re-run)",
+    "flake_regime": "hypercar/suspension_rear's first evidence attempt crashed native with empty stdout (the documented OCC flake regime); the protocol's single serial-and-quiet re-run was green and reproduced bit-identically across the re-run and the later repro run (three green runs, identical doubles) - no second flake fired, so no stop."
+  },
+  "findings": [
+    {
+      "id": "F1",
+      "title": "The three unstaged hypercar rows are recorded and staged without touching the f1 oracles",
+      "detail": "hypercar/details, hypercar/suspension_front and hypercar/suspension_rear now have recorded OCC references under hypercar-prefixed names (reference/hypercar_*.json) and their manifest rows point at them via explicit `reference` fields, so the next kernel-door census resolves each row's baseline and no UNSTAGED stop fires. The f1 rows' reference files and manifest entries are byte-unchanged."
+    },
+    {
+      "id": "F2",
+      "title": "OCC-baseline evidence recorded: details 101 solids/22454 tris, suspension_front 260 solids/64604 tris, suspension_rear 101 solids/177811 tris",
+      "detail": "Wall times (door process wall, the census convention) range 39.9-243.0 s; every re-run reproduced the recorded doubles bit-identically, so the corpus now carries trustworthy OCC baselines for all three rows to compare kernel facts against once the authoring surface lifts."
+    },
+    {
+      "id": "F3",
+      "title": "suspension_front measures volume 0.0 under the OCC door (bit-identical across runs), recorded as measured",
+      "detail": "The door is the differential oracle; the reference records the OCC-measured doubles verbatim (260 solids, volume 0.0, bbox diag 1815.57, 64604 STL tris). Reproduced exactly on the re-run."
+    }
+  ],
+  "verification": {
+    "reference_shape": "the three new reference files match the recorded-facts shape of the existing 45 references (schema ttc_reference.v1, door_version 1, facts solid_count/volume/bbox/diag, tolerances block) - validated by reading the files and by the manifest rows now resolving to them",
+    "bit_identical": "each row re-run once (serial, quiet): facts equal to the recorded doubles exactly and STL triangle counts equal - 3/3 bit-identical",
+    "anchors": "A1 = 14 (holds; the manifest still has 14 'hypercar'-containing lines - no row was added); A2 re-measured 48 (45 recorded references + the packet's 3 new hypercar-prefixed files; f1 oracles untouched)",
+    "forbidden_touched": "no existing reference file edited, no kernel or bridge file touched, no f1 manifest entry edited, door.py not modified (git status: corpus/ttc/MANIFEST.json modified + the 3 new reference files untracked; nothing else)"
+  },
+  "notes": "Mechanical recording packet: no code, no tests, no geometry semantics decided. The reference corpus and manifest carry the deliverable; the RESULT claims are the three recorded OCC reference files, the bit-identical re-runs, and the manifest pointer updates. Commit subject as documented in the packet.",
+  "files": {
+    "recorded_references": ["corpus/ttc/reference/hypercar_details.json", "corpus/ttc/reference/hypercar_suspension_front.json", "corpus/ttc/reference/hypercar_suspension_rear.json"],
+    "manifest": "corpus/ttc/MANIFEST.json"
+  }
+}
