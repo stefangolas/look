@@ -247,3 +247,14 @@ pub mod normal_cone;
 /// and the exact seam-identity verdict (`A₀W₁ − A₁W₀ ≡ 0` over aligned
 /// boundaries). Pure exact algebra; no corpus contact and no shim edit.
 pub mod deflate;
+
+/// The certified volume assembly (ADM-003-VOLUME): the divergence-form face
+/// 2-form over the L1-extracted patches — EXACT for polynomial faces (the
+/// degree-grown density net integrated by the exact Bernstein formula),
+/// certified via the landed L5 reciprocal-power primitive for rational faces
+/// (`|V − Ṽ| ≤ (1/3)·‖P‖∞·e_m`, every factor a Bernstein enclosure), the
+/// certified algebraic-trim cell bracket (route (a)) over the pullback
+/// polynomial `P(s,t) = 0`, and the closure discipline over the
+/// shared-boundary structure — volume is scored only over a proven-closed,
+/// oriented boundary, and a fact whose bracket cannot close refuses typed.
+pub mod volume_facts;
