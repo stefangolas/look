@@ -78,7 +78,16 @@
 //! **H-1.** This module carries `#![deny(clippy::unwrap_used)]`, no `unwrap`,
 //! no `expect`, no `panic!`, and no module-level `allow`.
 
+use crate::construct::deflate::{
+    certify_deflated_interior, deflate_factor, seam_identified, DeflatedNumerator,
+};
+use crate::construct::normal_cone::{
+    assemble_normal_numerator, hemisphere_certificate, midpoint_normal_direction, normal_cone,
+    NormalNumerator,
+};
+use crate::construct::patches::{PatchParent, PatchSide, TensorBernsteinPatch};
 use crate::construct::refusal::ConstructRefusal;
+use crate::construct::Interval;
 use truck_geometry::prelude::{BSplineSurface, Vector4};
 
 /// The polynomialized swept-pair interaction system (Theorem A result carrier).
@@ -260,6 +269,644 @@ impl TransversePair {
     pub fn try_new(_delta: (f64, f64)) -> Result<Self, ConstructRefusal> {
         Err(ConstructRefusal::Unfrozen)
     }
+}
+
+// ---------------------------------------------------------------------------
+// ADM-002-CERTIFICATES — the certificate assembly.
+//
+// This section lands the production of the Theorem B1/B2/C certificates: the
+// four-outcome dispatch that composes the landed lemma kernels (L1 extraction
+// substrate, L3 normal numerator / hemisphere certificate / normal cone, L4
+// deflation / seam identity) into a per-face typed verdict. It is ASSEMBLY
+// ONLY: no lemma kernel body and no shim type is edited here, and the frozen
+// ADM-000 refusing constructors above are untouched. The dispatch PRODUCES the
+// frozen carrier values ([`RegularPatch`], [`CollapsedBoundary`],
+// [`SeamIdentified`], [`TransversePair`]) from the lemma outputs.
+//
+// **The four-outcome space (spec Theorem B1 outcome claim).** Every admitted
+// patch resolves to exactly one of four verdicts ([`AdmissionCertificate`]):
+// regular (the whole-span hemisphere pass), regular+seam (an exactly
+// identified paired edge), regular-interior+collapsed-boundary (an exactly
+// collapsed edge deflated by L4 and the quotient re-certified), or a typed
+// refusal with the recorded evidence (a genuine parameter singularity — never
+// silent). A patch that fits none of these four is a SPEC_GAP.
+//
+// **The dispatch.** Per patch the assembly tries, in order:
+// 1. **Hemisphere pass ⇒ regular.** The L3 hemisphere certificate
+//    (`min(bernstein coefficients of c·M) > 0` over the span) over the float
+//    midpoint normal (and, failing that, the six unit-axis probes). The
+//    certified cone payload is derived from the certificate direction and its
+//    certified margin over the coefficient net.
+// 2. **Collapse detected ⇒ deflate then re-certify the interior.** An exact
+//    boundary collapse is divided out by the L4 kernel; the deflated interior
+//    is re-certified by the quotient hemisphere test, and the multiplicity is
+//    recorded in a [`CollapsedBoundary`].
+// 3. **Seam identity ⇒ paired edges.** Two patches whose shared boundary
+//    curves coincide exactly close as a [`SeamIdentified`] edge pair (an
+//    intentional coincidence, not a singularity).
+// 4. **Subdivision under budget; exhaustion ⇒ typed refusal.** Certificate
+//    failures subdivide the span dyadically (per-cell normal-cone
+//    certification) under the [`CertificateBudget`]; budget exhaustion returns
+//    the [`GenuineSingularity`](AdmissionCertificate::GenuineSingularity)
+//    verdict carrying the [`StallRecord`] — never silent.
+//
+// **FSSI-001 substrate handoff.** The normal-cone subsystem (L3) closes BOTH
+// Theorem B1 regularity and Theorem C transversality. [`certify_transverse_pair`]
+// composes two certified cones into the Theorem C [`TransversePair`] with the
+// identical superadditive margin arithmetic the landed gate (`ssi_gate.rs`)
+// applies to its per-side cones; the gate itself is untouched.
+// ---------------------------------------------------------------------------
+
+/// The default subdivision depth of a span certificate (scope decision 3).
+const DEFAULT_SUBDIVISION_DEPTH: usize = 12;
+
+/// The default number of unresolved dyadic cells allowed at one subdivision
+/// level of a span certificate (scope decision 3).
+const DEFAULT_SUBDIVISION_CELLS: usize = 4096;
+
+/// The parameter midpoint of every float search in this module (the same
+/// mid-square rule the L3 lemma kernel uses).
+const SPAN_MIDPOINT: f64 = 0.5;
+
+/// The six unit-axis probe directions of the hemisphere search: pure float
+/// search candidates (SFC — the certificate is the interval evaluation), never
+/// certified bounds.
+const AXIS_SEARCH_DIRECTIONS: [[f64; 3]; 6] = [
+    [1.0, 0.0, 0.0],
+    [-1.0, 0.0, 0.0],
+    [0.0, 1.0, 0.0],
+    [0.0, -1.0, 0.0],
+    [0.0, 0.0, 1.0],
+    [0.0, 0.0, -1.0],
+];
+
+/// A compact sub-rectangle `((u_lo, u_hi), (v_lo, v_hi))` of the unit square
+/// `[0, 1]²` (the dyadic cells of a span's subdivision).
+pub type UnitBox2 = ((f64, f64), (f64, f64));
+
+/// The dyadic subdivision budget of one span certificate (scope decision 3).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct CertificateBudget {
+    /// The largest subdivision depth (number of halving steps per axis) before
+    /// the certificate stalls.
+    pub max_depth: usize,
+    /// The largest number of unresolved dyadic cells the certificate may hold
+    /// at one level before it stalls.
+    pub max_cells: usize,
+}
+
+impl Default for CertificateBudget {
+    fn default() -> Self {
+        CertificateBudget {
+            max_depth: DEFAULT_SUBDIVISION_DEPTH,
+            max_cells: DEFAULT_SUBDIVISION_CELLS,
+        }
+    }
+}
+
+/// The recorded stall of a budget-exhausted span certificate (scope decision
+/// 3): certificate failures subdivide under budget; budget exhaustion is a
+/// typed refusal with this record — never silent.
+#[derive(Debug, Clone, PartialEq)]
+pub struct StallRecord {
+    /// The typed refusal of the stall.
+    pub cause: ConstructRefusal,
+    /// The subdivision depth reached before the budget halted the search.
+    pub depth_reached: usize,
+    /// The number of dyadic cells still unresolved at the halt.
+    pub unresolved_cells: usize,
+    /// The best certified margin observed (`margin.lo` of the hemisphere
+    /// certificate at the midpoint direction), or `None` when no hemisphere
+    /// certificate fired at all.
+    pub best_margin: Option<f64>,
+}
+
+/// The certified regularity evidence of one extracted span (ADM-002 output).
+///
+/// `regular` carries the certified normal cone of the regular region: the whole
+/// span when the hemisphere certificate fired, or the deflated interior (the
+/// quotient `M*` of the exactly divided boundary factor) when [`CollapsedBoundary`]
+/// records a deflation. A whole-box span has `collapsed == None`; a deflated
+/// span records the divided multiplicity.
+#[derive(Debug, Clone, PartialEq)]
+pub struct SpanCertificate {
+    /// The parent face (and optional boundary edge) of the certified span.
+    pub parent: PatchParent,
+    /// The unit-square region of the span the certificate covers (the whole
+    /// span, or a dyadic cell when the certificate came from subdivision).
+    pub region: UnitBox2,
+    /// The certified regularity of the span.
+    pub regular: RegularPatch,
+    /// The deflation record when the regularity is the deflated interior.
+    pub collapsed: Option<CollapsedBoundary>,
+}
+
+/// The four-outcome certificate space (Theorem B1 outcome claim) of an
+/// admitted patch family.
+///
+/// The dispatch is EXHAUSTIVE: every fixture of the admission kit resolves to
+/// exactly one of these four verdicts. A patch family that fits none of them is
+/// a SPEC_GAP (the theory doc's outcome claim would be falsified).
+#[derive(Debug, Clone, PartialEq)]
+pub enum AdmissionCertificate {
+    /// Every span certified regular on its whole box (hemisphere pass); no
+    /// deflation, no seam.
+    Regular {
+        /// The certified regular spans of the family.
+        spans: Vec<SpanCertificate>,
+    },
+    /// The family's spans certify regular and an exactly identified seam pairs
+    /// two of the family's BRep edges.
+    RegularWithSeam {
+        /// The certified regular spans of the family.
+        spans: Vec<SpanCertificate>,
+        /// The certified seam of the family.
+        seam: SeamIdentified,
+    },
+    /// Some span's exactly collapsed boundary was deflated (L4) and its
+    /// interior re-certified regular.
+    RegularInteriorCollapsedBoundary {
+        /// The certified regular spans of the family (deflated spans carry
+        /// their [`CollapsedBoundary`]).
+        spans: Vec<SpanCertificate>,
+    },
+    /// A genuine parameter singularity: the span could not be certified even
+    /// under the subdivision budget, refused typed with the recorded stall —
+    /// never silent.
+    GenuineSingularity {
+        /// The never-silent stall record of the refusal.
+        stall: StallRecord,
+    },
+}
+
+impl AdmissionCertificate {
+    /// A short stable tag of the outcome, for diagnostics.
+    pub fn tag(&self) -> &'static str {
+        match self {
+            Self::Regular { .. } => "regular",
+            Self::RegularWithSeam { .. } => "regular_with_seam",
+            Self::RegularInteriorCollapsedBoundary { .. } => "regular_interior_collapsed_boundary",
+            Self::GenuineSingularity { .. } => "genuine_singularity",
+        }
+    }
+}
+
+/// The certified two-cone angular-separation gap of Theorem C: `sin α − s_X −
+/// s_Y` with `sin α` the sine of the (projective) angle between the certified
+/// anchors, in the superadditive margin shape the landed gate applies. `None`
+/// when the cones do not certify separation.
+fn angular_separation_gap(a: &NormalCone, b: &NormalCone) -> Option<f64> {
+    let sin_alpha = certified_sin_angle(a.anchor, b.anchor)?;
+    let gap = Interval::point(sin_alpha)
+        .sub(&Interval::point(a.s_up))
+        .sub(&Interval::point(b.s_up));
+    if gap.lo.is_finite() && gap.lo > 0.0 {
+        Some(gap.lo)
+    } else {
+        None
+    }
+}
+
+/// A certified lower bound of `sin ∠(a, b)` between two unit-ish float
+/// directions (the anchors of two certified cones), outward-rounded.
+fn certified_sin_angle(a: [f64; 3], b: [f64; 3]) -> Option<f64> {
+    if a.iter().any(|c| !c.is_finite()) || b.iter().any(|c| !c.is_finite()) {
+        return None;
+    }
+    let cross = [
+        Interval::point(a[1])
+            .mul(&Interval::point(b[2]))
+            .sub(&Interval::point(a[2]).mul(&Interval::point(b[1]))),
+        Interval::point(a[2])
+            .mul(&Interval::point(b[0]))
+            .sub(&Interval::point(a[0]).mul(&Interval::point(b[2]))),
+        Interval::point(a[0])
+            .mul(&Interval::point(b[1]))
+            .sub(&Interval::point(a[1]).mul(&Interval::point(b[0]))),
+    ];
+    let mut cross2 = Interval::point(0.0);
+    for iv in &cross {
+        cross2 = cross2.add(&iv.mul(iv));
+    }
+    let cross_norm = cross2.sqrt()?;
+    let a_norm = norm_enclosure(a)?;
+    let b_norm = norm_enclosure(b)?;
+    let denom = a_norm.hi * b_norm.hi;
+    if !denom.is_finite() || denom <= 0.0 {
+        return None;
+    }
+    let sin_alpha = Interval::point(cross_norm.lo).div(&Interval::point(denom))?;
+    if sin_alpha.lo.is_finite() {
+        Some(sin_alpha.lo)
+    } else {
+        None
+    }
+}
+
+/// The certified enclosure `[|v|_lo, |v|_hi]` of the norm of a float vector.
+fn norm_enclosure(v: [f64; 3]) -> Option<Interval> {
+    let mut acc = Interval::point(0.0);
+    for x in &v {
+        let iv = Interval::point(*x);
+        acc = acc.add(&iv.mul(&iv));
+    }
+    acc.sqrt()
+}
+
+/// The certified normal-cone separation certificate of a patch pair (Theorem
+/// C, scope decision 2): compose two certified cones into the transversality
+/// certificate of the pair's product box.
+///
+/// `delta = (lo, hi)` is a certified enclosure of the minimal cross-product
+/// magnitude `‖n̂_X × n̂_Y‖` over the product box for the UNIT normal
+/// directions of the two cones: `lo = sin α − s_X − s_Y > 0` (the certified
+/// angular-separation gap, the identical superadditive margin the landed gate
+/// derives from its per-side cones) and `hi = 1`. A strictly positive `lo`
+/// certifies `rank DF = 3` on `Σ ∩ B` (the FSSI-001 substrate handoff — the
+/// gate itself is untouched; it consumes the normal enclosures this cone data
+/// certifies). Refuses [`ConstructRefusal::ConditioningBelowThreshold`] when
+/// the cones do not separate.
+pub fn certify_transverse_pair(
+    a: &NormalCone,
+    b: &NormalCone,
+) -> Result<TransversePair, ConstructRefusal> {
+    match angular_separation_gap(a, b) {
+        Some(lo) => Ok(TransversePair { delta: (lo, 1.0) }),
+        None => Err(ConstructRefusal::ConditioningBelowThreshold),
+    }
+}
+
+/// The same Theorem C certificate over two admitted regular patches: their
+/// certified cones are the payload.
+pub fn certify_regular_pair_transverse(
+    a: &RegularPatch,
+    b: &RegularPatch,
+) -> Result<TransversePair, ConstructRefusal> {
+    certify_transverse_pair(&a.cone, &b.cone)
+}
+
+/// The whole unit square as a [`UnitBox2`].
+fn whole_span_box() -> UnitBox2 {
+    ((0.0, 1.0), (0.0, 1.0))
+}
+
+/// The four dyadic quadrants of a unit-square box.
+fn quadrants(b: UnitBox2) -> [UnitBox2; 4] {
+    let ((u_lo, u_hi), (v_lo, v_hi)) = b;
+    let u_mid = 0.5 * (u_lo + u_hi);
+    let v_mid = 0.5 * (v_lo + v_hi);
+    [
+        ((u_lo, u_mid), (v_lo, v_mid)),
+        ((u_mid, u_hi), (v_lo, v_mid)),
+        ((u_lo, u_mid), (v_mid, v_hi)),
+        ((u_mid, u_hi), (v_mid, v_hi)),
+    ]
+}
+
+/// The certified normal cone of a scalar-dotted field net: given the row-major
+/// `R³` coefficient net of the field, the float anchor direction `c`, and the
+/// certified lower bound `margin_lo` of `min(c·field)` over the box (the
+/// certificate that every coefficient — and hence every field value — lies in
+/// the open hemisphere about `c`).
+///
+/// The bound is the DIRECTIONAL one: a Bernstein field value is a convex
+/// combination of its coefficients, so `∠(field(u, v), c) ≤ max_i ∠(coeff_i, c)`
+/// over the whole box (`c·field ≥ margin_lo > 0` keeps every angle acute), and
+/// `sin ∠(coeff_i, c)` is bounded outward-rounded coefficient by coefficient.
+/// `s_up` is the certified maximum; `None` when it does not stay strictly below
+/// `1` (no single hemisphere certifies).
+fn cone_from_net(
+    coeffs: &[[f64; 3]],
+    degree: (usize, usize),
+    anchor: [f64; 3],
+    margin_lo: f64,
+) -> Option<NormalCone> {
+    let (du, dv) = degree;
+    let width = dv + 1;
+    if coeffs.is_empty()
+        || coeffs.len() != (du + 1) * width
+        || anchor.iter().any(|c| !c.is_finite())
+        || !margin_lo.is_finite()
+        || margin_lo <= 0.0
+    {
+        return None;
+    }
+    let a_norm = norm_enclosure(anchor)?;
+    if !a_norm.lo.is_finite() || a_norm.lo <= 0.0 {
+        return None;
+    }
+    let mut s_up = 0.0f64;
+    for coeff in coeffs {
+        let c_norm = norm_enclosure(*coeff)?;
+        if !c_norm.lo.is_finite() || c_norm.lo <= 0.0 {
+            return None;
+        }
+        let cross = [
+            Interval::point(coeff[1])
+                .mul(&Interval::point(anchor[2]))
+                .sub(&Interval::point(coeff[2]).mul(&Interval::point(anchor[1]))),
+            Interval::point(coeff[2])
+                .mul(&Interval::point(anchor[0]))
+                .sub(&Interval::point(coeff[0]).mul(&Interval::point(anchor[2]))),
+            Interval::point(coeff[0])
+                .mul(&Interval::point(anchor[1]))
+                .sub(&Interval::point(coeff[1]).mul(&Interval::point(anchor[0]))),
+        ];
+        // A certified upper bound of |coeff × anchor|: per-axis abs-upper
+        // squares (a colinear coefficient crosses to a zero-containing interval,
+        // which is why the signed square is never formed).
+        let mut cross2 = Interval::point(0.0);
+        for iv in &cross {
+            let far = iv.lo.abs().max(iv.hi.abs());
+            cross2 = cross2.add(&Interval::point(far).mul(&Interval::point(far)));
+        }
+        let cross_hi = cross2.sqrt()?.hi;
+        let denom = Interval::point(c_norm.lo).mul(&Interval::point(a_norm.lo));
+        let sin_i = Interval::point(cross_hi).div(&denom)?.hi;
+        if sin_i > s_up {
+            s_up = sin_i;
+        }
+    }
+    if !s_up.is_finite() || s_up >= 1.0 {
+        return None;
+    }
+    Some(NormalCone { anchor, s_up })
+}
+
+/// The whole-box hemisphere certificate: certify regularity over the whole span
+/// by the L3 hemisphere test, searching the float midpoint normal first and the
+/// six unit-axis probes after, and derive the certified cone payload from the
+/// certificate that fires.
+fn whole_box_regular_span(
+    patch: &TensorBernsteinPatch,
+    m: &NormalNumerator,
+) -> Option<SpanCertificate> {
+    let mut directions: Vec<[f64; 3]> = Vec::new();
+    if let Some(mid) = midpoint_normal_direction(patch) {
+        directions.push(mid);
+    }
+    directions.extend_from_slice(&AXIS_SEARCH_DIRECTIONS);
+    for dir in directions {
+        let cert = match hemisphere_certificate(m, dir) {
+            Ok(c) => c,
+            Err(_) => continue,
+        };
+        if !cert.certified {
+            continue;
+        }
+        if let Some(cone) = cone_from_net(m.coeffs(), m.degree(), cert.direction, cert.margin.lo) {
+            return Some(SpanCertificate {
+                parent: patch.parent(),
+                region: whole_span_box(),
+                regular: RegularPatch { cone },
+                collapsed: None,
+            });
+        }
+    }
+    None
+}
+
+/// A float search direction for a deflated quotient's interior certificate: the
+/// normalized field value at the span midpoint (and, as fallbacks, its
+/// negation and the six unit-axis probes).
+fn quotient_candidate_directions(quotient: &DeflatedNumerator) -> Vec<[f64; 3]> {
+    let mut dirs: Vec<[f64; 3]> = Vec::new();
+    if let Some(center) = normalize_float(eval_net_at(
+        quotient.coeffs(),
+        quotient.degree(),
+        SPAN_MIDPOINT,
+        SPAN_MIDPOINT,
+    )) {
+        dirs.push(center);
+        dirs.push([-center[0], -center[1], -center[2]]);
+    }
+    dirs.extend_from_slice(&AXIS_SEARCH_DIRECTIONS);
+    dirs
+}
+
+/// The collapsed-edge deflation certificate: find the exactly collapsed
+/// boundary side, divide the known factor out (L4), and certify the deflated
+/// interior — producing the [`CollapsedBoundary`] record and the certified
+/// interior regular patch.
+fn deflated_span_certificate(patch: &TensorBernsteinPatch) -> Option<SpanCertificate> {
+    const SIDES: [PatchSide; 4] = [
+        PatchSide::SideUMin,
+        PatchSide::SideUMax,
+        PatchSide::SideVMin,
+        PatchSide::SideVMax,
+    ];
+    for side in SIDES {
+        let deflation = match deflate_factor(patch, side) {
+            Ok(d) => d,
+            Err(_) => continue,
+        };
+        if deflation.multiplicity() == 0 {
+            continue;
+        }
+        let quotient = deflation.quotient();
+        for dir in quotient_candidate_directions(quotient) {
+            let margin = match certify_deflated_interior(&deflation, dir) {
+                Ok(margin) => margin,
+                Err(_) => continue,
+            };
+            if let Some(cone) = cone_from_net(quotient.coeffs(), quotient.degree(), dir, margin) {
+                return Some(SpanCertificate {
+                    parent: patch.parent(),
+                    region: whole_span_box(),
+                    regular: RegularPatch { cone },
+                    collapsed: Some(CollapsedBoundary {
+                        multiplicity: deflation.multiplicity(),
+                    }),
+                });
+            }
+        }
+    }
+    None
+}
+
+/// The subdivision certifier (scope decision 3): certify the remaining dyadic
+/// cells of a span by per-cell normal cones under the budget. Every cell
+/// certified returns its spans; an unresolved cell at the budget is the
+/// never-silent typed refusal with the stall record.
+fn subdivide_span(
+    m: &NormalNumerator,
+    parent: PatchParent,
+    best_margin: Option<f64>,
+    budget: &CertificateBudget,
+) -> Result<Vec<SpanCertificate>, StallRecord> {
+    let mut level: Vec<UnitBox2> = vec![whole_span_box()];
+    let mut depth = 0usize;
+    let mut spans: Vec<SpanCertificate> = Vec::new();
+    loop {
+        let mut next: Vec<UnitBox2> = Vec::new();
+        for cell in level {
+            match normal_cone(m, cell) {
+                Some(cone) => spans.push(SpanCertificate {
+                    parent,
+                    region: cell,
+                    regular: RegularPatch { cone },
+                    collapsed: None,
+                }),
+                None => next.extend(quadrants(cell)),
+            }
+        }
+        if next.is_empty() {
+            return Ok(spans);
+        }
+        if depth + 1 >= budget.max_depth || next.len() > budget.max_cells {
+            return Err(StallRecord {
+                cause: ConstructRefusal::ConditioningBelowThreshold,
+                depth_reached: depth + 1,
+                unresolved_cells: next.len(),
+                best_margin,
+            });
+        }
+        level = next;
+        depth += 1;
+    }
+}
+
+/// The per-span certification: the four-outcome dispatch for one extracted
+/// span, in the fixed order of scope decision 1 — hemisphere pass ⇒ regular;
+/// collapse ⇒ deflate then re-certify the interior; else subdivide under
+/// budget and stall typed at exhaustion.
+fn certify_span(
+    patch: &TensorBernsteinPatch,
+    budget: &CertificateBudget,
+) -> Result<Vec<SpanCertificate>, StallRecord> {
+    let m = match assemble_normal_numerator(patch) {
+        Ok(m) => m,
+        Err(cause) => {
+            return Err(StallRecord {
+                cause,
+                depth_reached: 0,
+                unresolved_cells: 1,
+                best_margin: None,
+            })
+        }
+    };
+    if let Some(span) = whole_box_regular_span(patch, &m) {
+        return Ok(vec![span]);
+    }
+    let best_margin = match midpoint_normal_direction(patch) {
+        Some(dir) => match hemisphere_certificate(&m, dir) {
+            Ok(cert) => Some(cert.margin.lo),
+            Err(_) => None,
+        },
+        None => None,
+    };
+    if let Some(span) = deflated_span_certificate(patch) {
+        return Ok(vec![span]);
+    }
+    subdivide_span(&m, patch.parent(), best_margin, budget)
+}
+
+/// The admission dispatch over a patch family (the extracted spans of an
+/// admitting unit): certify every span, resolve the family's seam identities,
+/// and return the exhaustive four-outcome verdict.
+pub fn certify_patch_family(
+    patches: &[TensorBernsteinPatch],
+    budget: &CertificateBudget,
+) -> AdmissionCertificate {
+    let mut spans: Vec<SpanCertificate> = Vec::new();
+    for patch in patches {
+        match certify_span(patch, budget) {
+            Ok(mut span) => spans.append(&mut span),
+            Err(stall) => return AdmissionCertificate::GenuineSingularity { stall },
+        }
+    }
+    // Seam identity: the first exactly identified patch pair, in fixed order.
+    for i in 0..patches.len() {
+        for j in (i + 1)..patches.len() {
+            let (ea, eb) = match (patches[i].parent().edge, patches[j].parent().edge) {
+                (Some(ea), Some(eb)) => (ea, eb),
+                _ => continue,
+            };
+            match seam_identified(&patches[i], &patches[j]) {
+                Ok(true) => {
+                    return AdmissionCertificate::RegularWithSeam {
+                        spans,
+                        seam: SeamIdentified { paired: (ea, eb) },
+                    }
+                }
+                _ => continue,
+            }
+        }
+    }
+    if spans.iter().any(|s| s.collapsed.is_some()) {
+        AdmissionCertificate::RegularInteriorCollapsedBoundary { spans }
+    } else {
+        AdmissionCertificate::Regular { spans }
+    }
+}
+
+/// Normalize a nonzero float vector (the SFC float search; `None` on a
+/// degenerate or non-finite vector).
+fn normalize_float(v: Option<[f64; 3]>) -> Option<[f64; 3]> {
+    let v = v?;
+    if v.iter().any(|c| !c.is_finite()) {
+        return None;
+    }
+    let norm = (v[0] * v[0] + v[1] * v[1] + v[2] * v[2]).sqrt();
+    if !norm.is_finite() || norm <= 0.0 {
+        return None;
+    }
+    Some([v[0] / norm, v[1] / norm, v[2] / norm])
+}
+
+/// The plain-float tensor-Bernstein evaluation of a flat row-major `R³` net at
+/// `(u, v)` (the SFC float searches of the certificate; never a certificate).
+fn eval_net_at(coeffs: &[[f64; 3]], degree: (usize, usize), u: f64, v: f64) -> Option<[f64; 3]> {
+    let (du, dv) = degree;
+    let width = dv + 1;
+    if coeffs.is_empty() || coeffs.len() != (du + 1) * width {
+        return None;
+    }
+    let bu = bernstein_weights(du, u)?;
+    let bv = bernstein_weights(dv, v)?;
+    let mut acc = [0.0f64; 3];
+    for i in 0..=du {
+        for j in 0..=dv {
+            let c = coeffs[i * width + j];
+            let factor = bu[i] * bv[j];
+            acc[0] += factor * c[0];
+            acc[1] += factor * c[1];
+            acc[2] += factor * c[2];
+        }
+    }
+    if acc.iter().all(|c| c.is_finite()) {
+        Some(acc)
+    } else {
+        None
+    }
+}
+
+/// The degree-`degree` Bernstein basis values `Bᵢ(degree)(t)`, or `None` when
+/// the evaluation point is outside `[0, 1]`.
+fn bernstein_weights(degree: usize, t: f64) -> Option<Vec<f64>> {
+    if !t.is_finite() || !(0.0..=1.0).contains(&t) {
+        return None;
+    }
+    let mut out = Vec::with_capacity(degree + 1);
+    for i in 0..=degree {
+        let c = binomial(degree, i);
+        out.push(c * t.powi(i as i32) * (1.0 - t).powi((degree - i) as i32));
+    }
+    Some(out)
+}
+
+/// The exact integer binomial `C(n, k)` as a float (the span degrees stay
+/// small, so the product loop is exact-safe).
+fn binomial(n: usize, k: usize) -> f64 {
+    if k > n {
+        return 0.0;
+    }
+    let k = k.min(n - k);
+    let mut r = 1.0f64;
+    for t in 1..=k {
+        r = r * (n - k + t) as f64 / t as f64;
+    }
+    r
 }
 
 #[cfg(test)]
