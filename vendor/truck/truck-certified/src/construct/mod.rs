@@ -209,3 +209,10 @@ pub mod admission;
 /// body lands here — the shim ships types and refusing constructors only, and
 /// extends, never edits, the landed ADM-000 carriers.
 pub mod patches;
+
+/// The L1 exact Bézier-extraction lemma body (ADM-L1-EXTRACT): the production
+/// [`extract_patches`](extract::extract_patches) over the frozen homogeneous
+/// tensor-spline face carrier — per-knot-rectangle extraction to
+/// tensor-Bernstein form with certified positive weight brackets (the shim's
+/// refusing `patches::extract_patches` twin stays untouched).
+pub mod extract;
