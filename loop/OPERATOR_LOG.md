@@ -476,3 +476,49 @@ actively working); slot 0 REF-RECORD-HYPERCAR landed residue inert; SWEEP-PATH
 READY gated on FRAME-REVOLVE; cargoq UP; heartbeat 1; orchestrator session pid
 17740 LIVE; disk 16.9 GB free; RAM 4.7 GB free; escalations carried (supervisor
 duplication + wedged cargoq guard, slot-4 F1 residue, TOR-C flip).
+
+## Operator cycle 2026-09-09 21:15Z (fresh spawn, direct run; orchestrator LIVE)
+
+Board at start: 1 RUNNING / 0 landed-this-cycle. FRAME-REVOLVE slot 7 RUNNING
+(pid 26464, events <1 min fresh, ~1.5 h in, still pre-commit on bd_bridge.rs).
+Slot 0 FINISHED residue REF-RECORD-HYPERCAR (driver-LANDED 20:20Z, 251f368
+ancestor). Slots 1-6 FINISHED/IDLE landed residue; slot 4 = F1 landed residue
+still parking the driver's dispatch arm. Substrate healthy: heartbeat exactly 1
+(27440; the probe's second match was my own charter cmdline, self-match trap),
+watchdog 1 (28440), cargoq UP (ping ok, queued 0), operator runner 1 (29776),
+overnight driver 1 (28824), orchestrator session LIVE (opencode pid 17740),
+disk 16.2 GB free (above the 8 GB floor AND the 15 GB janitor goal), RAM 5.1 GB
+free.
+
+Actions:
+- Health sweep done (see board above). Real-heartbeat count re-verified by
+  command-line anchor (dispatch_heartbeat.ps1), exactly one PID 27440.
+- Landing: nothing to land. HEAD unchanged since the 20:52Z operator commit
+  (720516f); no FINISHED slot carries an unlanded DONE RESULT (FRAME-REVOLVE is
+  RUNNING pre-commit, not FINISHED). Slots 1-6 residue remain landed packets.
+- Unblock: nothing stuck. FRAME-REVOLVE slot 7 RUNNING with fresh events
+  (events bytes growing 1236431 -> 1241367 across the cycle); slots 1-6 residue
+  are landed packets, not stuck workers; no worker stopped on a QUESTION.
+- Registry hygiene: nothing flipped. Verified programmatically: READY rows
+  WITHOUT a 'landed <sha>' note marker = exactly {FRAME-REVOLVE (running),
+  SWEEP-PATH (gated on FRAME-REVOLVE)}; dispatch_ready --dry-run 'dispatched 0'
+  is REAL idle. BLOCKED rows with deps all landed = none dispatchable (TOR-C
+  deps ADM-001/002 LANDED but orchestrator-held - orchestrator LIVE; the rest
+  owner-cancelled/human-gated/superseded/parked). gen_packet/packet_lint not
+  run - no READY candidate gated on anchors this cycle.
+- dispatch_ready --dry-run only (heartbeat live - double-dispatch rule):
+  dispatched 0, workers ~1/4, SWEEP-PATH blocked on FRAME-REVOLVE (correct).
+- ESCALATIONS: none new this cycle. Carried open items stand: duplicate
+  supervisors (27392 PyManager + 15100 pythoncore child, only ONE overnight.py
+  child = no double-merge risk) + the wedged cargoq supervisor restart guard;
+  slot-4 F1 wt RESULT residue parking the driver's dispatch arm (overnight.log
+  every 5-min cycle: LEFT FOR MORNING + 'landing/running phase - no dispatch');
+  TOR-C flip-or-pin.
+- STATE.md volatile refresh appended + ground-truth pointer updated
+  ([operator 2026-09-09T21:15Z]).
+
+Leaving: 1 RUNNING (FRAME-REVOLVE slot 7, pid 26464, pre-commit, healthy,
+actively working); slot 0 REF-RECORD-HYPERCAR landed residue inert; SWEEP-PATH
+READY gated on FRAME-REVOLVE; cargoq UP; heartbeat 1; orchestrator session pid
+17740 LIVE; disk 16.2 GB free; RAM 5.1 GB free; escalations carried (supervisor
+duplication + wedged cargoq guard, slot-4 F1 residue, TOR-C flip).

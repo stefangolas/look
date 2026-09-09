@@ -15,12 +15,12 @@ program, and the operator agent.
 ## Where we are
 
 > LATEST GROUND TRUTH: read the newest `[operator ...]` block in "State of
-> the machine, as left" (2026-09-09T20:52Z). [operator 2026-09-09T20:52Z
+> the machine, as left" (2026-09-09T21:15Z). [operator 2026-09-09T21:15Z
 > ground-truth note: quiet healthy cycle, nothing to land/flip/unblock.
-> REF-RECORD-HYPERCAR is LANDED (driver, merge 71154b1, RESULT 3d70e09,
-> row a18899b) and FRAME-REVOLVE slot 7 RUNNING (pid 26464, actively
-> editing bd_bridge.rs, events fresh). SWEEP-PATH READY correctly gated on
-> FRAME-REVOLVE; the READY-without-landed-marker set is exactly
+> REF-RECORD-HYPERCAR is LANDED residue (inert) and FRAME-REVOLVE slot 7
+> still RUNNING (pid 26464, events <1 min fresh, actively editing
+> bd_bridge.rs, ~1.5 h in, still pre-commit). SWEEP-PATH READY correctly
+> gated on FRAME-REVOLVE; the READY-without-landed-marker set is exactly
 > {FRAME-REVOLVE, SWEEP-PATH}, so dispatch-0 is real idle, not a filter bug.
 > Substrate all nominal (heartbeat 27440, watchdog 28440, cargoq UP,
 > driver 28824 cycling but parked on the slot-4 F1 residue). The
@@ -421,6 +421,34 @@ parked on the slot-4 residue), TWO supervisors (27392 PyManager + 15100
 pythoncore child - carried duplication class; only ONE overnight.py child = no
 double-merge risk). Disk 16.9 GB free (above the 15 GB janitor goal), RAM 4.7
 GB free. Open human items (carried, unchanged): duplicate supervisors + the
+wedged cargoq supervisor restart guard; slot-4 F1 wt RESULT residue cleanup
+(clearing it un-parks the driver's dispatch arm); TOR-C flip-or-pin decision
+(deps landed, orchestrator LIVE - its call).]
+
+[operator 2026-09-09T21:15Z - volatile refresh. Quiet healthy cycle: nothing to
+land, nothing to unblock, nothing to flip, no dispatch (heartbeat-owned). Board
+now: 1 RUNNING / 0 landed-this-cycle. FRAME-REVOLVE (slot 7, pid 26464) still
+RUNNING pre-commit, events <1 min fresh, ~1.5 h in, still actively editing
+bd_bridge.rs (events bytes growing) - do not touch. REF-RECORD-HYPERCAR (slot 0
+FINISHED residue) remains driver-LANDED (251f368 ancestor of HEAD, merge
+71154b1, RESULT 3d70e09); nothing to re-land. Slots 1-6 residue all landed
+(verified as ancestors in prior cycles; HEAD unchanged since 720516f - no new
+landings this cycle). Registry verified programmatically: READY rows WITHOUT a
+'landed <sha>' note marker = exactly {FRAME-REVOLVE (running), SWEEP-PATH
+(gated on FRAME-REVOLVE)} - dispatch_ready --dry-run 'dispatched 0' is REAL
+idle; the ~72 other READY rows carry genuine landed markers. BLOCKED rows with
+deps all landed = none dispatchable: TOR-C (deps ADM-001/002 LANDED) stays
+orchestrator-held per the standing escalation (orchestrator LIVE, pid 17740);
+DEF-SEEDRAY-B human-gated; DEF-SEEDRAY-A dep landed; DEF-TESS-ANALYTIC-SEAM
+superseded by its -R2; BG-AUD-FIX-004/SEM-PCURVE-MASTER-001-FIX/BG-CK-SPLINE-
+CENSUS/DEF-SPINEFRAME-GRAZE owner-parked - nothing flipped. Health: heartbeat 1
+(27440, next cycle ~17:19 local), watchdog 1 (28440), cargoq UP (ping ok,
+queued 0), operator runner 1 (29776 - this instance's runner), overnight
+driver 1 (28824, cycling, parked on the slot-4 residue), orchestrator session
+LIVE (opencode 17740), TWO supervisors (27392 PyManager + 15100 pythoncore
+child - carried duplication class; only ONE overnight.py child = no double-merge
+risk). Disk 16.2 GB free (above the 8 GB floor AND the 15 GB janitor goal), RAM
+5.1 GB free. Open human items (carried, unchanged): duplicate supervisors + the
 wedged cargoq supervisor restart guard; slot-4 F1 wt RESULT residue cleanup
 (clearing it un-parks the driver's dispatch arm); TOR-C flip-or-pin decision
 (deps landed, orchestrator LIVE - its call).]
