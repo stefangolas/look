@@ -15,17 +15,20 @@ program, and the operator agent.
 ## Where we are
 
 > LATEST GROUND TRUTH: read the newest `[operator ...]` block in "State of
-> the machine, as left" (2026-09-09T21:15Z). [operator 2026-09-09T21:15Z
-> ground-truth note: quiet healthy cycle, nothing to land/flip/unblock.
-> REF-RECORD-HYPERCAR is LANDED residue (inert) and FRAME-REVOLVE slot 7
-> still RUNNING (pid 26464, events <1 min fresh, actively editing
-> bd_bridge.rs, ~1.5 h in, still pre-commit). SWEEP-PATH READY correctly
-> gated on FRAME-REVOLVE; the READY-without-landed-marker set is exactly
-> {FRAME-REVOLVE, SWEEP-PATH}, so dispatch-0 is real idle, not a filter bug.
-> Substrate all nominal (heartbeat 27440, watchdog 28440, cargoq UP,
-> driver 28824 cycling but parked on the slot-4 F1 residue). The
-> orchestrator session is LIVE (opencode pid 17740) - verify against its
-> current work before acting on stale items.]
+> the machine, as left" (2026-09-09T22:07Z). [operator 2026-09-09T22:07Z
+> ground-truth note: **FRAME-REVOLVE finished mid-cycle (worker commit
+> b667a85) and is NOT operator-landable** - RESULT status LANDED (not
+> DONE) + its own verification records a FAILING sub-case
+> (revolve_refusals_stay_typed_after_spline_admission non_z_axis in
+> truck123d/tests/ttc_lathe_spline.rs, out-of-write-scope, mvac-pin-class
+> finding F1); the overnight driver attempted a landing 18:05 local, hit a
+> merge conflict on the harness artifacts CONTEXT.md/PACKET.md the worker
+> committed, aborted cleanly (no MERGE_HEAD, b667a85 unmerged, wt RESULT
+> intact); it will conflict-abort every 5-min cycle until adjudicated.
+> ESCALATED 22:06Z. Everything else idle: slots 0-6 landed residue,
+> SWEEP-PATH READY gated on FRAME-REVOLVE, dispatch-0 real idle. Substrate
+> nominal (heartbeat 27440, watchdog 28440, cargoq UP, driver 28824,
+> operator runner 29776). Orchestrator session LIVE (opencode pid 17740).]
 
 - **THE FIRST KERNEL-VS-OCC TIMING COMPARISON IS BANKED** (FH-TIMING-REFRESH,
   landed c94d043): turbopump_assembly **0.097 s kernel vs 4.866 s OCC**,
@@ -452,6 +455,38 @@ risk). Disk 16.2 GB free (above the 8 GB floor AND the 15 GB janitor goal), RAM
 wedged cargoq supervisor restart guard; slot-4 F1 wt RESULT residue cleanup
 (clearing it un-parks the driver's dispatch arm); TOR-C flip-or-pin decision
 (deps landed, orchestrator LIVE - its call).]
+
+[operator 2026-09-09T22:07Z - volatile refresh. Board now: 0 RUNNING / 0
+landed-this-cycle. **FRAME-REVOLVE (slot 7) finished mid-cycle: worker commit
+b667a85 (parent 57aa9ad, an ancestor of HEAD) + RESULT.json status LANDED - NOT
+operator-landable** (two independent triggers: status != DONE; and the RESULT's
+own verification records `revolve_refusals_stay_typed_after_spline_admission`
+non_z_axis FAILING in truck123d/tests/ttc_lathe_spline.rs - a file outside the
+packet write scope - so the packet done-when is not green at b667a85). The
+overnight driver attempted the landing at 18:05 local and hit a merge conflict
+on CONTEXT.md/PACKET.md (harness artifacts the worker committed into b667a85) -
+it aborted cleanly (`git merge --abort`; verified no MERGE_HEAD, b667a85 NOT an
+ancestor of HEAD, wt RESULT intact); it will retry + conflict-abort every 5-min
+cycle until adjudicated (noise, not harm). ESCALATED 2026-09-09T22:06Z (mvac-pin
+adjudication question + harness-artifact-safe merge recipe). Do NOT re-fork slot
+7 until adjudicated - the slot-wt RESULT is the only copy (the driver's
+merge-conflict path does not archive a PENDING copy). REF-RECORD-HYPERCAR (slot
+0) confirmed driver-LANDED residue (251f368 ancestor of HEAD); slots 1-6 residue
+all landed (ancestors). Registry: READY rows without a landed-note marker =
+exactly {FRAME-REVOLVE (finished, RESULT holds the slot assigned so
+dispatch_ready skips it), SWEEP-PATH (gated on FRAME-REVOLVE)}; dispatch_ready
+--dry-run 'dispatched 0' is REAL idle. BLOCKED rows with deps all landed = none
+dispatchable (TOR-C orchestrator-held per the standing escalation; the rest
+owner-parked/human-gated/superseded) - nothing flipped. Health: heartbeat 1
+(27440), watchdog 1 (28440), cargoq UP (ping ok, queued 0, running false),
+operator runner 1 (29776), overnight driver 1 (28824), orchestrator session
+LIVE (opencode pid 17740), TWO supervisors (27392 PyManager + 15100 pythoncore
+child - carried duplication class; only ONE overnight.py child = no double-merge
+risk). Disk 15.7 GB free (above the 8 GB floor AND the 15 GB janitor goal), RAM
+4.9 GB free. Open human items: (NEW) FRAME-REVOLVE landing adjudication (status
+LANDED + mvac-pin-class F1 + harness-artifact merge conflict); carried
+unchanged - duplicate supervisors + the wedged cargoq supervisor restart guard;
+slot-4 F1 wt RESULT residue; TOR-C flip-or-pin decision.]
 
 ## The parallelism picture
 

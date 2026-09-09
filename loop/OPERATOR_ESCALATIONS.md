@@ -185,3 +185,38 @@ Judgment-required items appended each operator cycle. Newest at the bottom.
 - Carried (now current pids): duplicate supervisors 27392 (PyManager) + 15100
   (pythoncore, child of 27392 - likely the PyManager-shim spawn pattern); only
   ONE overnight.py child (28824) = no double-merge risk this cycle.
+
+## 2026-09-09 22:06 UTC - FRAME-REVOLVE finished but NOT landable (status LANDED, mvac-pin finding); driver merge-conflict-aborts every cycle
+
+- What: FRAME-REVOLVE (slot 7) went FINISHED ~22:00Z, worker commit b667a85
+  (parent 57aa9ad, which IS an ancestor of integration/kernel-bg HEAD). RESULT.json
+  in the slot wt has status "LANDED" (not DONE) and carries finding F1: the
+  mvac-pin class. The packet's own done-when is NOT green at the commit - the
+  RESULT's own verification records `revolve_refusals_stay_typed_after_spline_
+  admission` FAILED on its non_z_axis sub-case in truck123d/tests/ttc_lathe_
+  spline.rs (file OUTSIDE this packet's write scope) because an axis-aligned (x)
+  ring revolve is now a recorded carrier. The three named kernel tests in
+  bd_bridge.rs are green (RESULT: lib 25 passed), but a full
+  `cargo test -p truck123d --lib --tests` exits nonzero. Two independent
+  do-not-land triggers per the charter (status != DONE; scoped check not green).
+- Driver behavior: overnight.py treats status "landed" as good and attempted a
+  landing at 18:05:00 local, but the merge CONFLICTED on CONTEXT.md/PACKET.md
+  (harness artifacts the worker committed into b667a85) and it aborted cleanly
+  (`git merge --abort`; no MERGE_HEAD, b667a85 NOT merged, wt RESULT intact). It
+  will retry and abort identically every 5-min cycle - noise, not harm.
+- Why it needs a human: this is the mvac-pin adjudication class. The F1 finding
+  argues the non_z_axis typed-refusal pin should move (x-axis ring revolve is now
+  expressible), mirroring the mvac pin the orchestrator adjudicated by amendment
+  (5f1396d/da76ec0). Likely resolution: land b667a85 excluding the worker's
+  CONTEXT.md/PACKET.md edits (merge --no-ff, then `git checkout HEAD -- CONTEXT.md
+  PACKET.md` before committing, or amend the worker commit to drop them), file
+  loop/results/FRAME-REVOLVE.json, then re-point the ttc_lathe_spline.rs pin in a
+  small amendment (out-of-write-scope, orchestrator-owned, same as mvac). SWEEP-
+  PATH (READY) is gated on FRAME-REVOLVE landing.
+- Start here: `git -C C:\Users\stefa\look show b667a85 --stat`; adjudicate the F1
+  pin move; merge per the harness-artifact-safe recipe above. Do NOT re-fork slot
+  7 until adjudicated - the RESULT.json in the slot wt is the only copy (the
+  driver's merge-conflict path does not archive a PENDING copy).
+- Carried (unchanged): duplicate supervisors 27392 + 15100; wedged cargoq
+  supervisor restart guard; slot-4 F1 wt RESULT residue parking the driver's
+  dispatch arm; TOR-C flip-or-pin (orchestrator LIVE - its call).

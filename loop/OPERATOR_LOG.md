@@ -522,3 +522,57 @@ actively working); slot 0 REF-RECORD-HYPERCAR landed residue inert; SWEEP-PATH
 READY gated on FRAME-REVOLVE; cargoq UP; heartbeat 1; orchestrator session pid
 17740 LIVE; disk 16.2 GB free; RAM 5.1 GB free; escalations carried (supervisor
 duplication + wedged cargoq guard, slot-4 F1 residue, TOR-C flip).
+
+## 2026-09-09 22:07 UTC (operator cycle)
+
+Board at start: 1 RUNNING (FRAME-REVOLVE slot 7, pid 26464) which went FINISHED
+mid-cycle; slots 0-6 FINISHED/IDLE landed residue; nothing else running.
+
+Health sweep:
+- slot_status: slot 7 flipped RUNNING->FINISHED mid-cycle; worker commit b667a85
+  on packet/FRAME-REVOLVE; RESULT.json present (status LANDED); worker process
+  exited.
+- cargoq UP (ping ok, queued 0, running false); heartbeat exactly 1 (27440,
+  verified by command-line anchor after the self-match trap); watchdog 1 (28440);
+  operator runner 1 (29776); overnight driver 1 (28824); orchestrator session
+  pid 17740 LIVE. Disk 15.7 GB free (above the 8 GB floor AND the 15 GB janitor
+  goal); RAM 4.9 GB free.
+
+Actions:
+- Health sweep done (see above).
+- Landing: NOTHING LANDED. FRAME-REVOLVE is the only freshly-FINISHED slot and is
+  NOT operator-landable: (1) RESULT status is "LANDED", not DONE; (2) the RESULT's
+  own verification records a failing sub-case - `revolve_refusals_stay_typed_
+  after_spline_admission` non_z_axis in truck123d/tests/ttc_lathe_spline.rs (file
+  outside the packet write scope) - so the packet done-when is not green at
+  b667a85. It carries an mvac-pin-class finding F1. The overnight driver attempted
+  a landing at 18:05:00 local, hit a merge conflict on CONTEXT.md/PACKET.md
+  (harness artifacts the worker committed), aborted cleanly (verified: no
+  MERGE_HEAD, b667a85 NOT an ancestor of HEAD). ESCALATED 2026-09-09T22:06Z with
+  the adjudication question + harness-artifact-safe merge recipe. Slots 0-6
+  residue verified all-landed in prior cycles; slot 0 REF-RECORD-HYPERCAR landed
+  residue (251f368 ancestor, driver-filed).
+- Unblock: nothing stuck. No IDLE/DEAD slot >15 min holding work; slot 1 IDLE is
+  ADM-003 landed residue.
+- Registry hygiene: nothing flipped. Re-verified: no BLOCKED row with all deps
+  landed is dispatchable (TOR-C deps ADM-001/002 LANDED but orchestrator-held per
+  the standing escalation; the rest owner-cancelled/human-gated/superseded/
+  parked). READY rows without a landed-note marker = exactly {FRAME-REVOLVE
+  (finished, RESULT holds the slot assigned - dispatch_ready skips it),
+  SWEEP-PATH (gated on FRAME-REVOLVE)} - so dispatch_ready 'dispatched 0' is real
+  idle.
+- dispatch_ready --dry-run only (heartbeat live - no manual dispatch): dispatched
+  0, SWEEP-PATH blocked on FRAME-REVOLVE (correct).
+- ESCALATIONS: one new item - FRAME-REVOLVE landing blocked on status LANDED +
+  mvac-pin finding + harness-artifact merge conflict (2026-09-09T22:06Z).
+- STATE.md volatile refresh appended + ground-truth pointer updated
+  ([operator 2026-09-09T22:07Z]).
+
+Leaving: 0 RUNNING / 0 landed-this-cycle. FRAME-REVOLVE slot 7 FINISHED with an
+unlandable RESULT (escalated, RESULT preserved in the slot wt - do NOT re-fork);
+slots 0-6 landed residue; SWEEP-PATH READY gated on FRAME-REVOLVE; cargoq UP;
+heartbeat 1 (27440); watchdog 1 (28440); overnight driver 1 (28824, will
+conflict-abort on slot 7 each cycle until adjudicated); orchestrator session pid
+17740 LIVE; disk 15.7 GB free; RAM 4.9 GB free. Escalations carried: FRAME-
+REVOLVE landing adjudication (NEW); duplicate supervisors 27392 + 15100; wedged
+cargoq restart guard; slot-4 F1 wt RESULT residue; TOR-C flip-or-pin.
