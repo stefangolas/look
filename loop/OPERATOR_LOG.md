@@ -229,3 +229,67 @@ Actions:
 - STATE.md volatile refresh appended ([operator 2026-09-09T04:56Z]).
 
 Leaving: 1 RUNNING (ADM-002 slot 0); ADM-003 LANDED (slot 1 freed); disk 5.6 GB free - BELOW THE 8 GB FLOOR (do not run whole-tree cargo while ADM-002 builds); escalations carried (F1 mvac-pin amendment, duplicate supervisors, ADM-001 failed-check adjudication - still OPEN and the row is still READY, re-fork risk when ADM-002's slot frees). Operator runner count 0 observed (this instance runs directly).
+
+## 2026-09-09 05:20 UTC (operator)
+
+Board at start: 1 RUNNING (ADM-001-ADAPTER slot 0 pid 11104, re-forked
+05:08:33Z by the heartbeat from base 6fcd8aa = integration HEAD incl. the
+ADM-003 merge; events fresh); slots 2-6 FINISHED residue (all landed packets:
+ADM-L2/L3, F1-AUTHORING-ARMS, CL-005/CL-006 - ledger rows present + ancestor
+checks pass), slot 1 IDLE (ADM-003-VOLUME, landed last cycle), slot 7 IDLE.
+Heartbeat exactly 1 (29152); watchdog 1 (29364, no recent ACTION lines);
+cargoq OK (queued 0, ping ok); disk 19.3 GB free (recovered - the janitor
+reclaimed, now above the 8 GB floor); RAM 4.1 GB free; TWO supervisors
+(35200 + 24272) - open escalation, unchanged (only ONE overnight.py child
+37284 under 24272, no double-merge risk this cycle). Operator runner 1
+(32616, this instance).
+
+Findings:
+- **ADM-001-ADAPTER was re-forked un-adjudicated as the 04:30/04:56
+  escalations warned** - the heartbeat dispatched it to slot 0 at 05:08:33Z
+  (pid 11104) from clean base 6fcd8aa; events show it re-pulling e076c1f's
+  admission.rs + admission_conformance.rs content and proceeding (4 files
+  changed). The fresh run is the natural adjudicator of the 04:17Z
+  admission_conformance failure: if that was load/recycle, it lands; if
+  genuine, its own done-when checks fail. Did NOT kill it (live worker making
+  progress).
+- **ADM-002-CERTIFICATES (worker commit 93a3001) finished but is NOT landed
+  and its driver scoped-check verdict is UNTRUSTWORTHY**: overnight.log
+  logged "admission_certificates failed" at 01:08:57 local, 24s AFTER the
+  heartbeat re-forked the slot to ADM-001 (01:08:33 local) - the check raced
+  the worktree reset (same signature as ADM-001's own 04:17Z verdict ~90s
+  after its 04:15:55Z re-fork). Both failures may be recycle-race artifacts.
+  ADM-002's RESULT.json copy is LOST (no copy in loop/results, slot 0 wt
+  root, or repo root); 93a3001 preserved on packet/ADM-002-CERTIFICATES.
+  dispatch_ready defers ADM-002 only by the write-set clash with the RUNNING
+  ADM-001 (admission.rs) - it will re-fork fresh when ADM-001 frees.
+- Registry sweep: ADM-004 needs 001/002 (both unlanded) - BLOCKED correct;
+  TOR-C needs 001/002 - BLOCKED correct; TTC-RECENSUS-F1 needs ADM-004 -
+  BLOCKED correct; DEF-SEEDRAY-B dep (DEF-SEEDRAY-A) READY-landed but stays
+  BLOCKED on the SEEDRAY-B frontier-review human item - not flipped. No other
+  BLOCKED row has all deps landed (legacy OWNER_BLOCKED rows: BG-AUD-FIX-004,
+  SEM-PCURVE-MASTER-001-FIX, DEF-SPINEFRAME-GRAZE, BG-CK-SPLINE-CENSUS all
+  carry explicit owner/superseded/gate notes - correctly not flipped).
+
+Actions:
+- Nothing landed (the only FINISHED-with-RESULT slots are landed packets;
+  ADM-002 is a failed-check-with-recycle-race, NOT landable - escalated
+  instead; ADM-001 is mid-run).
+- Nothing stuck to unblock (slot 0 RUNNING with fresh events; no IDLE/DEAD
+  worker with a QUESTION to answer).
+- No anchor/lint fixes needed (nothing dispatching on FIXABLE grounds; the
+  heartbeat owns dispatch and is live - dry-run only, double-dispatch rule).
+- dispatch_ready --dry-run: dispatched 0, correct (ADM-001 running; ADM-002
+  deferred by write-set clash on admission.rs).
+- ESCALATED ADM-002 failed-check recycle-race + the check-vs-worktree
+  machinery question + re-dispatch note (2026-09-09 05:20 UTC,
+  OPERATOR_ESCALATIONS.md); re-confirmed ADM-001 re-forked un-adjudicated
+  with the re-run as adjudicator.
+- STATE.md volatile refresh appended ([operator 2026-09-09T05:20Z]).
+
+Leaving: 1 RUNNING (ADM-001 slot 0 pid 11104 - the natural adjudication of
+the 04:17Z failure); ADM-002 unlanded + escalated (commit 93a3001 preserved
+on packet/ADM-002-CERTIFICATES; will re-fork fresh when ADM-001 frees
+admission.rs); disk 19.3 GB free; escalations carried (F1 mvac-pin
+amendment, duplicate supervisors, ADM-001 + ADM-002 failed-check
+adjudications).

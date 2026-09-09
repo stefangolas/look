@@ -225,6 +225,41 @@ ADM-001 failed-check adjudication remains OPEN and the PACKETS row is
 still READY - the heartbeat WILL re-fork it the moment ADM-002 frees the
 admission.rs write set; keep it adjudicated before that slot frees.]
 
+[operator 2026-09-09T05:20Z - volatile refresh. Board now: 1 RUNNING /
+0 landed-this-cycle. **ADM-001-ADAPTER was re-forked un-adjudicated as
+warned** (slot 0, pid 11104, re-forked 05:08:33Z by the heartbeat from
+clean base 6fcd8aa = integration HEAD incl. the ADM-003 merge; events
+fresh, 4 files changed, re-pulling the e076c1f admission content). The
+re-run is now the natural adjudicator of the 04:17Z admission_conformance
+failure - watch its outcome rather than killing it (a live worker making
+progress). **ADM-002-CERTIFICATES (worker commit 93a3001) is NOT landed
+and its driver scoped-check verdict is UNTRUSTWORTHY**: overnight.log
+logged the admission_certificates failure at 01:08:57 local, 24s AFTER
+the heartbeat re-forked the slot to ADM-001 (01:08:33 local) - the same
+recycle-race signature as ADM-001's own 04:17Z verdict (~90s after the
+04:15:55Z re-fork). Both check failures may be artifacts of checking a
+worktree mid-reset. ADM-002 RESULT.json copy LOST (third occurrence of
+the driver-files-never / recycle-destroys class); 93a3001 preserved on
+packet/ADM-002-CERTIFICATES. dispatch_ready defers ADM-002 only by the
+write-set clash with the RUNNING ADM-001 (admission.rs) - it WILL re-fork
+fresh when ADM-001 frees. I did not land 93a3001 out-of-order (would
+double-merge admission.rs against the live ADM-001 run). Escalated
+2026-09-09T05:20Z with the race evidence + the overnight.py
+check-on-worktree question. Health: disk 19.3 GB free (recovered - above
+the 8 GB floor, the janitor reclaimed), RAM 4.1 GB free, cargoq ok
+(queued 0), heartbeat 1 (29152), watchdog 1 (29364), operator runner 1
+(32616, this instance), TWO supervisors (35200 + 24272, open - only ONE
+overnight.py child 37284 under 24272, no double-merge risk this cycle).
+Registry: ADM-004 needs 001/002 (both unlanded) - BLOCKED correct; TOR-C
+needs 001/002 - BLOCKED correct; TTC-RECENSUS-F1 needs ADM-004 - BLOCKED
+correct; DEF-SEEDRAY-B dep DEF-SEEDRAY-A is READY-landed but stays BLOCKED
+on the SEEDRAY-B frontier-review human item; nothing to flip. Nothing to
+land: slots 2-6 FINISHED residue all landed packets (L2/L3/F1/CL-005/
+CL-006 ledger rows + ancestor checks pass), slot 1 IDLE after the ADM-003
+operator landing, slot 7 IDLE empty. Open human items: F1 mvac-pin
+amendment; supervisor duplication; ADM-001 + ADM-002 failed-check
+adjudications (re-runs in flight as adjudicator).]
+
 ## The parallelism picture
 
 The lemma wave (L1-L4, pure functions over the frozen shim type) is
