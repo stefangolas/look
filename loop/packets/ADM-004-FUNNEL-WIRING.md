@@ -10,7 +10,7 @@ the loop.
 id:          ADM-004-FUNNEL-WIRING
 contract:    [ADM-004-FUNNEL-WIRING]
 class:       design
-crates:      [truck-certified, truck-shapeops, truck123d]
+crates:      [truck-certified, truck-shapeops, truck123d, look]
 depends_on:  [ADM-002-CERTIFICATES, ADM-003-VOLUME]
 write_allow:
   - vendor/truck/truck-certified/src/construct/admission.rs
@@ -28,7 +28,7 @@ tests_required:
 anchors:
   - {id: A1, expect: 38, cmd: "grep -c 'ContactLocus' vendor/truck/truck-shapeops/src/boolean/split.rs"}
   - {id: A2, expect: 1, cmd: "grep -c 'pub fn run_facade' truck123d/src/facade.rs"}
-  - {id: A3, expect: 27, cmd: "grep -c 'pub mod' vendor/truck/truck-certified/src/construct/mod.rs"}
+  - {id: A3, expect: 34, cmd: "grep -c 'pub mod' vendor/truck/truck-certified/src/construct/mod.rs"}
 budget:      {turns: 75, ctx_tokens: 190000}
 ```
 
