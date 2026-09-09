@@ -134,6 +134,29 @@ landed-note bookkeeping; ADM-001/002/003 BLOCKED rows have ALL deps landed
 now and can flip READY. F1-AUTHORING-ARMS (slot 4) is LANDED-WITH-FINDINGS
 and needs the orchestrator mvac-pin amendment to free its slot.]
 
+[operator 2026-09-09T03:36Z - volatile refresh after the ADM-001/002/003
+unblock. Board now: 0 running, slots 0-6 FINISHED/IDLE residue (all of it
+landed packets), heartbeat 1 (29152), watchdog 1 (29364), cargoq ok,
+STILL TWO supervisors (35200 + 24272 - escalated, do not let a live
+worker finish while this is un-adjudicated: a duplicate driver could
+double-merge). Disk 13.2 GB free; RAM 5.5 GB free. THE DISPATCH-0 MYSTERY
+IS RESOLVED, and the idle was CORRECT: every READY row carries a genuine
+driver-appended "landed <sha> (overnight...)" marker whose commit IS an
+ancestor of integration/kernel-bg (checked all 71; only PB-010's a5f0585
+is not an ancestor - a survey whose marker is its filing commit, benign).
+dispatch_ready was correctly skipping them; the ONLY unlanded dispatchable
+work was ADM-001/002/003, BLOCKED with all deps landed. THIS CYCLE:
+flipped ADM-001/ADM-002/ADM-003 BLOCKED->READY (bac0890) after re-measuring
+their anchors against the post-lemma-wave tree (TensorBernsteinPatch 1->15,
+extract_patches 1->3, certified_reciprocal_power 1->3; gen_packet --check +
+packet_lint both green); filed the ADM-L1/L2/L3 RESULT.json from the slot
+worktrees (c3f89e4) - the overnight driver merged them but never filed the
+RESULT, and the heartbeat recycling slots 1-3 for the assemblies would have
+destroyed the only copies. dispatch_ready --dry-run now shows the three
+assemblies dispatching to slots 0/1/2; the heartbeat's next cycle (max 3
+workers) should dispatch them. F1 (slot 4) mvac-pin amendment + the
+supervisor duplication remain the two open human items.]
+
 ## The parallelism picture
 
 The lemma wave (L1-L4, pure functions over the frozen shim type) is

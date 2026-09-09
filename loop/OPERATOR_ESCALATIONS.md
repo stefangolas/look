@@ -56,3 +56,25 @@ Judgment-required items appended each operator cycle. Newest at the bottom.
   (C:\Program Files\PyManager\python.exe loop/supervisor.py) AND 24272
   (pythoncore-3.14 loop/supervisor.py). Session-56 paid for the duplicate-driver
   class; confirm which is canonical and kill the stale one.
+
+## 2026-09-09 03:36 UTC - three items carried / re-confirmed
+
+- **Duplicate supervisors STILL alive** (re-confirmed 03:27Z): 35200 (PyManager
+  loop/supervisor.py) + 24272 (pythoncore loop/supervisor.py), both since
+  09-05 11:28. The overnight driver keeps logging "landing/running phase - no
+  dispatch" in the else branch (rows_done_now is False because BG-KV2-207B-
+  TRACER-REST is READY), so neither supervisor's dispatch arm is live, but a
+  duplicate driver could double-merge the moment a FINISHED DONE slot appears.
+  A human should confirm which supervisor is canonical and kill the stale one.
+- **F1-AUTHORING-ARMS mvac-pin amendment still open** (slot 4 residue, F1
+  finding: re-point mvac_row_still_refuses_typed_at_the_extrude_carrier in
+  truck123d/tests/ttc_lathe_spline.rs at the non-z Location refusal; row is DONE,
+  merge 27ad2ce landed). Driver logs "LEFT FOR MORNING" every cycle.
+- **NEW - overnight driver merged ADM-L1/L2/L3 but never filed their
+  RESULT.json.** loop/results had no L1/L2/L3 copy (only the slot-wt copies
+  existed). I filed them this cycle (c3f89e4) before the heartbeat recycled
+  slots 1-3 for the ADM assemblies. Root cause worth a human look:
+  overnight.py try_land's RESULT-filing branch (line ~221) only fires when the
+  merge carries RESULT.json into the REPO ROOT working tree; if the root file
+  was already consumed/unlinked it silently skips filing. Start from
+  loop/results/ADM-L1-EXTRACT.json and the LEDGER.
