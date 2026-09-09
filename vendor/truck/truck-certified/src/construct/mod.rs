@@ -209,3 +209,14 @@ pub mod admission;
 /// body lands here — the shim ships types and refusing constructors only, and
 /// extends, never edits, the landed ADM-000 carriers.
 pub mod patches;
+
+/// The polynomial normal numerator and the hemisphere certificate
+/// (ADM-L3-NORMALCONE, lemma 3): pure functions over the frozen
+/// [`TensorBernsteinPatch`](patches::TensorBernsteinPatch) — the exact
+/// Bernstein-net assembly `M = W(Aᵤ×Aᵥ) − Wᵥ(Aᵤ×A) − Wᵤ(A×Aᵥ)` behind
+/// `Xᵤ×Xᵥ = M/W³`, the Theorem B1 hemisphere certificate
+/// (`min(bernstein coefficients of c·M) > 0` over a box, returning the
+/// verdict + the coefficient net), and the per-box normal-cone extraction from
+/// `M`'s Bernstein hull in the landed [`admission::NormalCone`] shape
+/// (Theorem C's exact input, shared with FSSI-001).
+pub mod normal_cone;
