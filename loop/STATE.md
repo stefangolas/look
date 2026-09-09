@@ -15,8 +15,8 @@ program, and the operator agent.
 ## Where we are
 
 > LATEST GROUND TRUTH: read the newest `[operator ...]` block in "State of
-> the machine, as left" (2026-09-09T22:35Z). [operator 2026-09-09T22:35Z
-> ground-truth note: unchanged quiet board since the 22:07Z cycle -
+> the machine, as left" (2026-09-09T23:15Z). [operator 2026-09-09T23:15Z
+> ground-truth note: unchanged quiet board since the 22:35Z cycle -
 > FRAME-REVOLVE (slot 7) still FINISHED and NOT operator-landable (RESULT
 > status LANDED + mvac-pin-class finding F1, done-when red on the
 > out-of-scope non_z_axis pin; worker commit b667a85 unmerged, wt RESULT
@@ -27,10 +27,10 @@ program, and the operator agent.
 > rows without a landed marker = exactly {FRAME-REVOLVE, SWEEP-PATH}).
 > Registry: nothing flipable (TOR-C stays orchestrator-held; the 6 other
 > BLOCKED rows owner-parked/human-gated/superseded). Substrate nominal
-> (heartbeat 27440, watchdog 28440, cargoq UP on 25356, driver 28824,
-> operator runner 29776; two supervisors 27392+15100 carried; two
-> cargoq/server.py 27568+25356 carried-flagged, port owned by 25356).
-> Orchestrator session LIVE (opencode pid 17740).]
+> (heartbeat 27440, watchdog 28440, cargoq UP on 25356, driver 28824 with
+> one child 25952, operator runner 29776; two supervisors 27392+15100
+> carried; two cargoq/server.py 27568+25356 carried-flagged, port owned by
+> 25356). Orchestrator session LIVE (opencode pid 17740).]
 
 - **THE FIRST KERNEL-VS-OCC TIMING COMPARISON IS BANKED** (FH-TIMING-REFRESH,
   landed c94d043): turbopump_assembly **0.097 s kernel vs 4.866 s OCC**,
@@ -514,6 +514,35 @@ janitor goal); RAM 5.3 GB free. Open human items (carried, unchanged): FRAME-
 REVOLVE landing adjudication; duplicate supervisors + the wedged cargoq
 supervisor restart guard; slot-4 F1 wt RESULT residue parking the driver's
 dispatch arm; TOR-C flip-or-pin decision.]
+
+[operator 2026-09-09T23:15Z - volatile refresh. Board now: 0 RUNNING / 0
+landed-this-cycle. Quiet healthy cycle - the board is unchanged since the
+22:35Z cycle (HEAD e9cc4a7, the 22:35Z operator STATE commit; no new landings
+since): FRAME-REVOLVE (slot 7) still FINISHED with the unlandable RESULT
+(status LANDED + mvac-pin finding F1, b667a85 NOT an ancestor of HEAD -
+re-verified this cycle; no MERGE_HEAD, driver's conflict-abort tree clean;
+escalated 22:06Z, do NOT re-fork slot 7 until adjudicated). Slots 0-6
+FINISHED/IDLE residue all landed (251f368, e33c4dd, e9d885a, 3c2109b, ee97499,
+713f205, 4de25d9 - ancestor checks re-run this cycle, all True). Registry
+re-verified programmatically: READY rows WITHOUT a 'landed <sha>' note marker =
+exactly {FRAME-REVOLVE (finished, RESULT holds slot assigned), SWEEP-PATH
+(gated on FRAME-REVOLVE)}; dispatch_ready --dry-run 'dispatched 0' is REAL
+idle. BLOCKED rows with deps all landed = none dispatchable (TOR-C deps
+ADM-001/002 landed but orchestrator-held per the standing escalation;
+BG-AUD-FIX-004 OWNER_BLOCKED, SEM-PCURVE-MASTER-001-FIX SUPERSEDED,
+BG-CK-SPLINE-CENSUS owner-cancelled, DEF-SPINEFRAME-GRAZE/
+DEF-TESS-ANALYTIC-SEAM/DEF-SEEDRAY-B owner-parked/human-gated - nothing
+flipped). Health: heartbeat exactly 1 (27440), watchdog 1 (28440), cargoq UP
+(ping ok, queued 0, running false; port 8231 owned by server.py 25356; two
+cargoq/server.py 27568 + 25356 carried-flagged, functional), operator runner
+1 (29776), overnight driver 1 (28824 with ONE child 25952), orchestrator
+session LIVE (opencode pid 17740), TWO supervisors (27392 PyManager + 15100
+pythoncore child - carried; only ONE overnight.py driver child = no double-merge
+risk). Disk 19.6 GB free (above the 8 GB floor AND the 15 GB janitor goal); RAM
+4.7 GB free. Open human items (carried, unchanged): FRAME-REVOLVE landing
+adjudication; duplicate supervisors + the wedged cargoq supervisor restart
+guard; slot-4 F1 wt RESULT residue parking the driver's dispatch arm; TOR-C
+flip-or-pin decision.]
 
 ## The parallelism picture
 
