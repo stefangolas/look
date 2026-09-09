@@ -553,3 +553,17 @@ Kernel raw samples (5 measured fresh door runs, seconds):
    was re-checked idle immediately after the series. No contended measurement
    was recorded.
 
+# TTC-RECENSUS-F1 — F1 closing re-census (no F1 row flips; no new kernel column)
+
+The F1 closing re-census (`docs/TTC_CENSUS_FINAL.md`) re-ran all 21 F1 manifest rows
+through the kernel door at this worktree HEAD (`07b2090`, post-ADM-004 / post
+F1-AUTHORING-ARMS). **No F1 row certified on that dispatch** — 0 green rows out of 21
+(12 typed-refusal at authoring carriers — `Plane` frame algebra / `Pos` / `Spline`
+profile authoring — and 9 kernel-door DNF, untyped, on the drop-in `Vector` data-row
+surface), so no kernel timing column is appended here and no F1 row's timing is
+published. The existing F1 rows' records above are the standing timing content; the
+census's timing statement is that the F1 kernel timing column stays closed row by row
+only for green rows, and none flipped. OCC-baseline door runs reproduced every F1
+row's recorded reference bit-identically (21/21), so the recorded facts gate did not
+drift and no OCC flake was recorded.
+
