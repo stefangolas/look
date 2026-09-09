@@ -14,6 +14,12 @@ program, and the operator agent.
 
 ## Where we are
 
+> LATEST GROUND TRUTH: read the newest `[operator ...]` block in "State of
+> the machine, as left" (2026-09-09T05:47Z). Hot item: ADM-001 re-run
+> (8f6a549) is adjudicated GREEN but RESULT-less and escalated for a human
+> landing before ADM-002 frees the admission.rs write set and ping-pongs a
+> third re-run. 1 RUNNING (ADM-002 slot 0).
+
 - **THE FIRST KERNEL-VS-OCC TIMING COMPARISON IS BANKED** (FH-TIMING-REFRESH,
   landed c94d043): turbopump_assembly **0.097 s kernel vs 4.866 s OCC**,
   chamber_assembly 0.111 vs 4.766, fairing 0.096 vs 4.563 - medians over
@@ -259,6 +265,33 @@ CL-006 ledger rows + ancestor checks pass), slot 1 IDLE after the ADM-003
 operator landing, slot 7 IDLE empty. Open human items: F1 mvac-pin
 amendment; supervisor duplication; ADM-001 + ADM-002 failed-check
 adjudications (re-runs in flight as adjudicator).]
+
+[operator 2026-09-09T05:47Z - volatile refresh. Board now: 1 RUNNING /
+0 landed-this-cycle. **ADM-002-CERTIFICATES RUNNING slot 0 (pid 19500,
+dispatched 01:43:41 local by the heartbeat ~1 min after ADM-001's re-run
+committed; events fresh, fmt-checking truck-certified at 01:48 local) - it
+will strand the same way unless a human lands ADM-001 first.** ADM-001
+re-run ADJUDICATED GREEN: worker commit 8f6a549 (base 6fcd8aa) with its own
+final done-when green in cargoq server.log (01:39:35 local check --locked -p
+truck-certified exit 0 + test --locked -p truck-certified --test
+admission_conformance exit 0) - the 04:17Z failure was a recycle artifact.
+BUT its RESULT.json was destroyed by the slot recycle again (4th occurrence);
+no copy anywhere, so NOT operator-landable - escalated 05:47Z with the
+evidence + the ORCHESTRATOR never-filed-RESULT landing protocol. The
+ADM-001(READY)/ADM-002(READY) pair now ping-pongs on admission.rs: each frees
+the write set the other needs, and every re-fork loses the ~1-min heartbeat
+vs ~5-min driver landing race. Slots 1-7 residue all landed (F1 row DONE, so
+slot 4 inert). Health: disk 13.8 GB free (above the 8 GB floor, below the 15
+GB janitor goal), RAM 4.7 GB free, cargoq ok (queued 0), heartbeat 1
+(29152), watchdog 1 (29364, no ACTION lines since 09-07 = no misfires), TWO
+supervisors (35200 + 24272, open - only ONE overnight.py child 37284, no
+double-merge risk). Registry: ADM-004 needs 001/002/003 - BLOCKED correct;
+TOR-C needs 001/002 - correct; TTC-RECENSUS-F1 needs ADM-004 - correct;
+nothing to flip. Nothing to land this cycle. Open human items: (NEW, hot)
+land ADM-001 8f6a549 before ADM-002 frees the write set or pin the row;
+F1 mvac-pin amendment; supervisor duplication; the driver-check-vs-recycle
+race + driver-never-files-RESULT machinery gaps; overnight.py 'NOT
+triggered.' prose-stop bug.]
 
 ## The parallelism picture
 

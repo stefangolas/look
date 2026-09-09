@@ -293,3 +293,23 @@ on packet/ADM-002-CERTIFICATES; will re-fork fresh when ADM-001 frees
 admission.rs); disk 19.3 GB free; escalations carried (F1 mvac-pin
 amendment, duplicate supervisors, ADM-001 + ADM-002 failed-check
 adjudications).
+
+## Operator cycle 2026-09-09 05:46Z (fresh spawn, direct run)
+
+Board at start: 1 RUNNING (ADM-002-CERTIFICATES slot 0 pid 19500, dispatched 01:43:41 local = 05:43:41Z - git=base no-work yet, events fresh, making progress: fmt check on truck-certified at 01:48 local); slots 1-7 IDLE/FINISHED residue all landed (L2/L3/F1/CL-005/CL-006 ledger rows + ancestor checks pass; slot 1 = ADM-003 landed residue). Heartbeat exactly 1 (29152); watchdog 1 (29364, no recent ACTION lines); cargoq ok (queued 0, ping ok); operator runner 1 (32616, this instance); TWO supervisors (35200 + 24272 - open escalation, did not touch). Disk 13.8 GB free (above 8 GB floor, below 15 GB janitor goal); RAM 4.7 GB free.
+
+Reconstruction this cycle:
+- ADM-001 re-run (pid 11104, base 6fcd8aa) finished ~05:43Z with commit 8f6a549 on packet/ADM-001-ADAPTER. The heartbeat recycled slot 0 to ADM-002 at 01:43:41 local (~1 min after the commit) BEFORE the overnight driver's next cycle - RESULT.json destroyed (4th occurrence of the driver-never-files / recycle-destroys class). No RESULT survives anywhere.
+- ADJUDICATION ANSWERED via cargoq server.log: the ADM-001 re-run's OWN final done-when checks ran 01:39:35-01:39:37 local - 'check --locked -p truck-certified' exit 0 and 'test --locked -p truck-certified --test admission_conformance' exit 0 at cwd slots/0/wt. admission_conformance PASSES at the re-run's worktree. The 04:17Z failure was a recycle/load artifact, confirmed. 8f6a549 is a mechanically-good commit (check + named test green at the worker's own run).
+- BUT: no RESULT.json -> per charter ADM-001 is NOT landable by the operator (hard rule: never merge without a RESULT.json status DONE; RESULTs are never operator-written). Escalated with the green evidence + landing recommendation.
+
+Actions:
+- Health sweep done (see board above). Watchdog quiet (no ACTION lines since 09-07 = no misfire redispatch risk).
+- Nothing landed (no FINISHED slot with RESULT status DONE whose merge is missing - all residue landed; ADM-001 escalated instead).
+- Nothing stuck to unblock (slot 0 RUNNING with fresh events).
+- Registry: nothing to flip (ADM-004 needs 001/002/003 correct; TOR-C needs 001/002 correct; TTC-RECENSUS-F1 needs ADM-004 correct; F1-AUTHORING-ARMS row DONE so slot 4 residue inert).
+- dispatch_ready NOT run manually (heartbeat live - double-dispatch rule; heartbeat is correctly deferring ADM-001 by the admission.rs write-set clash with RUNNING ADM-002).
+- ESCALATED ADM-001 green-but-RESULT-less landing + the structural ADM-001/ADM-002 re-fork ping-pong (2026-09-09 05:47 UTC).
+- STATE.md volatile refresh appended ([operator 2026-09-09T05:47Z]).
+
+Leaving: 1 RUNNING (ADM-002 slot 0 pid 19500); ADM-001 commit 8f6a549 green-but-unlanded, RESULT lost, escalated; disk 13.8 GB free; escalations carried (F1 mvac-pin amendment, duplicate supervisors, ADM-001 RESULT-loss + landing, driver-check-vs-recycle race).
