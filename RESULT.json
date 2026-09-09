@@ -1,0 +1,60 @@
+{
+  "id": "FH-TIMING-REFRESH",
+  "status": "LANDED",
+  "contracts": [
+    "FH-TIMING-REFRESH"
+  ],
+  "tests_added": 0,
+  "anchors_verified": {
+    "A1": 9,
+    "A2": 1
+  },
+  "summary": "Filled the Falcon-Heavy kernel timing column in docs/TT_TIMING_RESULTS.md for every FH row whose kernel facts gate is GREEN at this HEAD. Re-adjudicated every FH canonical row's kernel-door gate (one fresh `door.py --engine truck` process per row, door_version 2) at worktree HEAD 34bcc5a, then ran the BENCHMARKS-protocol timing series (release regime, quiet window, one unmeasured conditioning run per engine per row, five measured runs per engine per row, fresh python process per run, median reported, raw samples retained, alternating launch order) on the GREEN rows. Green rows at this HEAD: falcon_heavy/turbopump_assembly, falcon_heavy/chamber_assembly, falcon_heavy/fairing (kernel facts match the recorded OCC references within the recorded tolerances). Medians (fresh door-process wall, seconds): turbopump_assembly occ 4.866 / kernel 0.097; chamber_assembly occ 4.766 / kernel 0.111; fairing occ 4.563 / kernel 0.096. The two TTC-TIMING-FH headline rows stay DNF with moved adjudications: nozzle_assembly now RUNS to kernel facts but its recorded reference volume is OCC default-BRepGProp biased (kernel volume 50350859.12990023 is 1.159e-4 rel outside the recorded volume_rel 1e-4 band - no exact engine can satisfy it as recorded; FH-SPLINE-LATHE finding F1), so it is DNF-FACTS with that delta; mvac refuses typed at the non-z Euler Location placement in make_thrust_structure (Location forms beyond a translation or pure-z rotation are not census carriers), so no kernel facts exist. No kernel timing was published against any RED gate; no contended measurements were made.",
+  "adjudication": {
+    "green_rows": [
+      "falcon_heavy/turbopump_assembly",
+      "falcon_heavy/chamber_assembly",
+      "falcon_heavy/fairing"
+    ],
+    "red_rows": {
+      "falcon_heavy/nozzle_assembly": "DNF-FACTS - kernel runs end to end (12 solids, bbox and solid_count GREEN) but volume 50350859.12990023 vs recorded 50356695.264747284 is 1.159e-4 rel outside the recorded volume_rel 1e-4 band; the recorded reference is OCC default-BRepGProp biased (FH-SPLINE-LATHE F1)",
+      "falcon_heavy/mvac": "DNF - Refused typed: Location forms beyond a translation or pure-z rotation are not census carriers (TVC actuator-housing placement in make_thrust_structure)",
+      "falcon_heavy/thrust_structure": "DNF - Refused typed at the same non-z Location carrier",
+      "falcon_heavy/second_stage": "DNF - Refused typed at the same non-z Location carrier (composes mvac)",
+      "falcon_heavy/engine_prototype": "DNF - Refused typed at the same non-z Location carrier",
+      "falcon_heavy/vehicle": "DNF - Refused typed at the same non-z Location carrier (composes mvac)",
+      "falcon_heavy/gas_generator_assembly": "DNF - Refused typed at the tube() spline-path sweep",
+      "falcon_heavy/turbine_exhaust_assembly": "DNF - Refused typed at the tube() spline-path sweep",
+      "falcon_heavy/feed_assembly": "DNF - Refused typed at the tube() spline-path sweep",
+      "falcon_heavy/harness_assembly": "DNF - Refused typed at the tube() spline-path sweep"
+    }
+  },
+  "verification": {
+    "release_build": "cargo build --release --locked green; cargo build --release -p truck123d --locked green (release regime)",
+    "native_module": "release truck123d.dll staged as truck123d.pyd, importable from a real CPython 3.14 interpreter (import truck123d; issubclass(truck123d.Refused, truck123d.TruckError) True)",
+    "facts_gate": "OCC gate: every OCC measured run reproduced the recorded reference facts exactly for all three green rows (fact sets byte-identical across all five measured runs per row). Kernel gate GREEN: turbopump_assembly volume_rel ~3e-15, chamber_assembly volume_rel 4.8e-6, fairing volume_rel 3.7e-5; solid_count exact and bbox within bbox_abs 1e-3 on every run (fact sets identical across all five measured runs per row)."
+  },
+  "results": {
+    "falcon_heavy/turbopump_assembly": {
+      "occ": {"verdict": "green", "facts_match": "GREEN", "median_wall_s": 4.866, "median_build_s": 3.927, "stl_triangles": 8830, "raw_wall_s": [4.866, 4.866, 5.092, 4.633, 4.631]},
+      "truck": {"verdict": "green", "facts_match": "GREEN", "median_wall_s": 0.097, "median_build_s": 0.003, "stl_triangles": 35352, "raw_wall_s": [0.1, 0.097, 0.103, 0.087, 0.082]}
+    },
+    "falcon_heavy/chamber_assembly": {
+      "occ": {"verdict": "green", "facts_match": "GREEN", "median_wall_s": 4.766, "median_build_s": 3.875, "stl_triangles": 5457, "raw_wall_s": [4.742, 5.327, 5.18, 4.715, 4.766]},
+      "truck": {"verdict": "green", "facts_match": "GREEN", "median_wall_s": 0.111, "median_build_s": 0.004, "stl_triangles": 27520, "raw_wall_s": [0.112, 0.111, 0.102, 0.097, 0.111]}
+    },
+    "falcon_heavy/fairing": {
+      "occ": {"verdict": "green", "facts_match": "GREEN", "median_wall_s": 4.563, "median_build_s": 3.728, "stl_triangles": 784, "raw_wall_s": [4.56, 5.015, 4.563, 4.545, 4.957]},
+      "truck": {"verdict": "green", "facts_match": "GREEN", "median_wall_s": 0.096, "median_build_s": 0.004, "stl_triangles": 11032, "raw_wall_s": [0.099, 0.095, 0.084, 0.096, 0.106]}
+    }
+  },
+  "stop_conditions": {
+    "quiet_window": "Held. The measured series started only after the cargo queue (127.0.0.1:8231/ping) reported running:false with zero queued jobs and no cargo/rustc process existed (a concurrent build in flight was waited out - 2 minutes). The queue was re-checked idle immediately after the series. No contended measurement was recorded.",
+    "kernel_facts_mismatch": "DNF-FACTS recorded for nozzle_assembly with the delta (kernel volume 50350859.12990023 vs recorded 50356695.264747284, rel -1.159e-4 beyond the recorded volume_rel 1e-4). No kernel timing published against any RED gate.",
+    "corpus_and_bridge": "Untouched. write_allow honoured: only docs/TT_TIMING_RESULTS.md was edited; corpus/ttc and truck123d (bridge) were read-only."
+  },
+  "notes": "Packet scope resolved empirically at this HEAD: FH-SPLINE-LATHE and the authoring arms have landed since the FH packet was authored, so the FH kernel-door gates were swept across all thirteen canonical FH rows rather than assumed. Turbopump_assembly, chamber_assembly and fairing are the facts-GREEN rows at HEAD 34bcc5a; the two TTC-TIMING-FH headline rows (nozzle_assembly, mvac) are RED at their current carriers (reference-volume semantics per FH-SPLINE-LATHE F1; the non-z Euler Location placement carrier) and keep DNF records. The kernel fresh-door-process walls (~0.10 s median on all three green rows) are dominated by interpreter spawn; the kernel build+facts+STL inside the process are milliseconds, versus OCC build_seconds ~3.7-3.9 s - same fresh-process footing on both sides (TTC-TIMING-FH method note preserved in the doc). The results doc retains the TTC-TIMING-MONO and TTC-TIMING-FH historical sections unchanged (the latter under a 'superseded' banner) and appends the FH-TIMING-REFRESH section.",
+  "files": {
+    "write": "docs/TT_TIMING_RESULTS.md"
+  }
+}

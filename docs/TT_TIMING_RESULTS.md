@@ -114,6 +114,15 @@ and no timing is published against a red facts gate.
 
 # TTC-TIMING-FH — Falcon-Heavy rows (nozzle_assembly, mvac)
 
+> **Superseded (FH-TIMING-REFRESH).** The section below records the initial FH
+> kernel-door adjudication at HEAD `cdd4480`, where the truck regime refused
+> both rows typed on the first spline-profile revolve before any geometry fact
+> existed. That lathe boundary landed since (FH-SPLINE-LATHE) together with the
+> authoring arms (extrude/loft/sweep-chain/mirror), so every FH canonical row's
+> kernel-door gate was re-adjudicated at HEAD `34bcc5a` under FH-TIMING-REFRESH
+> — see that section below for the current facts-gate verdicts and the three
+> green rows' kernel timing column. The historical record is kept intact.
+
 First OCCT-vs-truck per-model timing run over Falcon-Heavy canonical rows. The
 method is the packet's plain door protocol (no hand-transcribed drivers, no
 bypass): both engines run the SAME vendored corpus scripts through the door
@@ -286,3 +295,261 @@ geometry fact exists. Refusal recorded verbatim (`door --engine truck` exit 1,
    sampled-contour lathe on the executor side) — the FH canonical rows are the
    natural first rows for that lift, and until it lands the OCC column above
    is the one-sided baseline only.
+
+# FH-TIMING-REFRESH — Falcon-Heavy kernel timing column, facts-gated
+
+Second Falcon-Heavy timing run (FH-TIMING-REFRESH) at a later worktree HEAD
+than the TTC-TIMING-FH record above. Since that run, FH-SPLINE-LATHE landed the
+spline-profile lathe arm and the authoring arms (extrude/loft/sweep-chain/
+mirror/make_face) on the truck drop-in, so the FH kernel-door gates were
+re-adjudicated at this HEAD before any timing: every FH canonical row was run
+once through `corpus/ttc/door.py --engine truck` (the kernel-engine door
+regime, `door_version 2`, one fresh Python process per row), and the kernel
+facts were compared to the recorded OCC reference facts within the recorded
+tolerances (`corpus/ttc/reference/*.json`). Every row whose kernel facts gate
+is GREEN then carries the full BENCHMARKS-protocol timing series below — OCC
+baseline and kernel, one unmeasured conditioning run per engine per row, five
+measured runs per engine per row, median reported, raw samples retained,
+alternating launch order. Rows with a RED gate stay DNF — no timing is
+published against a red facts gate (no cross-row averages, no driver tuning, no
+debug builds).
+
+## Machine / environment (FH-TIMING-REFRESH run)
+
+- Windows x86_64 (win32), measured 2026-09-08 in a quiet window of the
+  autobuild loop (no concurrent `cargo`/`rustc`/test process during the
+  measured runs; the cargo queue was idle immediately before and after the
+  series).
+- Python 3.14.3; `build123d` 0.11.1; `cadquery-ocp` 7.9.3.1.1 (OCC baseline).
+- Door versions: `occ` regime `door_version 1`; `truck` (kernel) regime
+  `door_version 2` over the release-built `truck123d` native module at this
+  worktree HEAD (`cargo build --release --locked` and
+  `cargo build --release -p truck123d --locked` green; `truck123d.dll`
+  staged as `truck123d.pyd`, importable from a real 3.14 interpreter).
+- Worktree HEAD `34bcc5a`, branch `packet/FH-TIMING-REFRESH`.
+- References: `corpus/ttc/reference/chamber_assembly.json`,
+  `corpus/ttc/reference/turbopump_assembly.json`,
+  `corpus/ttc/reference/fairing.json` (the green rows), plus the existing
+  `nozzle_assembly.json` / `mvac.json` for the re-adjudicated red rows.
+- For every row the reported wall time is the whole fresh door-process wall per
+  measured run (spawn to the stdout JSON record), which puts both engines on
+  equal footing: in the truck regime the deterministic kernel executor computes
+  the volume/bbox facts and the STL tessellation inside the door process after
+  the script's build wall, so a `build_seconds`-only column would hide the
+  kernel's geometry time while including all of OCC's. The door's own
+  `build_seconds` samples are retained alongside for transparency.
+
+## Facts-gate adjudication — FH canonical rows at this HEAD
+
+| row | kernel door (`door_version 2`) | facts gate vs recorded reference |
+|---|---|---|
+| falcon_heavy/turbopump_assembly | runs end to end (59 solids) | GREEN — timed below |
+| falcon_heavy/chamber_assembly | runs end to end (46 solids) | GREEN — timed below |
+| falcon_heavy/fairing | runs end to end (4 solids) | GREEN — timed below |
+| falcon_heavy/nozzle_assembly | runs end to end (12 solids) | RED — volume 1.159e-4 rel beyond the recorded `volume_rel` 1e-4 band (kernel 50350859.12990023 vs recorded 50356695.264747284); solid_count/bbox GREEN → DNF-FACTS |
+| falcon_heavy/mvac | Refused typed at the thrust-structure TVC housing `Location` | RED — no kernel facts exist → DNF |
+| falcon_heavy/thrust_structure | Refused typed at the same `Location` carrier | RED — no kernel facts exist → DNF |
+| falcon_heavy/second_stage | Refused typed at the same `Location` carrier (composes mvac) | RED → DNF |
+| falcon_heavy/engine_prototype | Refused typed at the same `Location` carrier | RED → DNF |
+| falcon_heavy/vehicle | Refused typed at the same `Location` carrier (composes mvac) | RED → DNF |
+| falcon_heavy/gas_generator_assembly | Refused typed at the `tube()` spline-path sweep | RED → DNF |
+| falcon_heavy/turbine_exhaust_assembly | Refused typed at the `tube()` spline-path sweep | RED → DNF |
+| falcon_heavy/feed_assembly | Refused typed at the `tube()` spline-path sweep | RED → DNF |
+| falcon_heavy/harness_assembly | Refused typed at the `tube()` spline-path sweep | RED → DNF |
+
+Three FH rows carry a GREEN kernel facts gate at this HEAD and are timed below;
+the ten RED rows publish no kernel timing (DNF kept). Two adjudications moved
+since the TTC-TIMING-FH record: the spline-profile lathe boundary that stopped
+both headline rows is closed, so the rows were re-adjudicated at their current
+carrier instead of the old "spline-profile revolve" refusal —
+
+- **nozzle_assembly** now runs to kernel facts, but its recorded reference
+  volume is OCC's default-`BRepGProp` measurement, which carries a
+  deterministic ~1.16e-4-relative bias on spline surfaces of revolution
+  (FH-SPLINE-LATHE finding F1). The kernel's exact volume
+  (50350859.12990023) equals OCC's Eps-converged value to ~2e-9 yet lies
+  1.159e-4-relative outside the recorded `volume_rel` 1e-4 band, so **no exact
+  engine can satisfy the recorded nozzle `volume_rel`**. The gate is RED and
+  the row is DNF-FACTS with that delta — no kernel timing is published.
+- **mvac** proceeds through the chamber/nozzle spline shells and the
+  thrust-cone-gusset extrude, then refuses typed at the first non-z Euler
+  `Location` placement (the TVC actuator housing in `make_thrust_structure`,
+  `bd.Location(..., (55*sin(a), 55*cos(a), 0))`). Verbatim (`door --engine
+  truck` exit 1, `door_version 2`; the drop-in maps every typed refusal to the
+  standard payload):
+
+```json
+{
+  "kind": "Refused",
+  "message": "Location forms beyond a translation or pure-z rotation are not census carriers",
+  "payload": {"case": "unsupported_envelope", "envelope": "non_canonical_carrier"}
+}
+```
+
+The four `tube()` rows (`gas_generator_assembly`, `turbine_exhaust_assembly`,
+`feed_assembly`, `harness_assembly`) refuse typed at the spline-path sweep
+surface the FH-CENSUS recorded as an untyped door DNF; the authoring arms
+closed that defect and the rows now die with the mapped `Refused` class
+(`"a spline path tangent query is not a kernel-engine row"`). All of these stay
+DNF rows under their RED facts gate.
+
+## falcon_heavy/turbopump_assembly — turbopump package (`make_turbopump_assembly`, `lib.merlin_common`)
+
+The row builds the turbopump package from cylinder/sphere primitives and
+line-loop revolves (volute, impeller-ish disks, housings, flanges) plus the
+spline-contour feed-line stubs — 59 solids, no boolean ops, no spline-profile
+lathe carriers in the authoring path. Recorded reference facts:
+`solid_count 59`, `volume 77563936.47352602`,
+`bbox [[-162.0, -172.0000001, 1040.0], [672.5, 172.0000001, 2018.0]]`.
+
+| engine | verdict | facts-match | wall median (s) | build median (s) | STL triangles |
+|---|---:|---:|---:|---:|---:|
+| occ | green | GREEN | 4.866 | 3.927 | 8830 |
+| truck (kernel) | green | GREEN | 0.097 | 0.003 | 35352 |
+
+Every measured run reproduced its engine's facts deterministically. OCC facts
+equal the recorded reference exactly; kernel facts match within the recorded
+tolerances: `solid_count 59` exact, kernel volume 77563936.47352579 vs recorded
+77563936.47352602 (`volume_rel` ~3e-15 — the line-profile facts stay
+bit-identical to the FH-SPLINE-LATHE V5 pair), bbox within `bbox_abs` 1e-3. The
+kernel wall median (~0.097 s) is dominated by the fresh interpreter spawn; the
+kernel build + facts + STL are milliseconds — the same fresh-process footing
+the OCC column reports.
+
+OCC raw samples (5 measured fresh door runs, seconds):
+
+| run | door process wall | door `build_seconds` |
+|---|---:|---:|
+| 1 | 4.866 | 3.964 |
+| 2 | 4.866 | 3.927 |
+| 3 | 5.092 | 4.182 |
+| 4 | 4.633 | 3.754 |
+| 5 | 4.631 | 3.708 |
+| median | 4.866 | 3.927 |
+
+Kernel raw samples (5 measured fresh door runs, seconds):
+
+| run | door process wall | door `build_seconds` |
+|---|---:|---:|
+| 1 | 0.100 | 0.004 |
+| 2 | 0.097 | 0.003 |
+| 3 | 0.103 | 0.004 |
+| 4 | 0.087 | 0.003 |
+| 5 | 0.082 | 0.003 |
+| median | 0.097 | 0.003 |
+
+## falcon_heavy/chamber_assembly — regeneratively cooled chamber (`make_chamber_assembly`, `lib.merlin_common`)
+
+The row builds the chamber liner/jacket as sampled-contour spline-profile
+revolved shells over `chamber_gas_contour()` plus the flange/ring/bolt
+primitives — 46 solids, no boolean ops. Recorded reference facts:
+`solid_count 46`, `volume 45459001.162568755`,
+`bbox [[-249.0, -249.0, 1164.9999999], [249.0, 249.0, 2124.0]]`.
+
+| engine | verdict | facts-match | wall median (s) | build median (s) | STL triangles |
+|---|---:|---:|---:|---:|---:|
+| occ | green | GREEN | 4.766 | 3.875 | 5457 |
+| truck (kernel) | green | GREEN | 0.111 | 0.004 | 27520 |
+
+Every measured run reproduced its engine's facts deterministically. OCC facts
+equal the recorded reference exactly; kernel facts match within the recorded
+tolerances: `solid_count 46` exact, kernel volume 45458782.5489467 vs recorded
+45459001.162568755 (`volume_rel` 4.8e-6), bbox within `bbox_abs` 1e-3.
+
+OCC raw samples (5 measured fresh door runs, seconds):
+
+| run | door process wall | door `build_seconds` |
+|---|---:|---:|
+| 1 | 4.742 | 3.875 |
+| 2 | 5.327 | 4.255 |
+| 3 | 5.180 | 4.263 |
+| 4 | 4.715 | 3.773 |
+| 5 | 4.766 | 3.834 |
+| median | 4.766 | 3.875 |
+
+Kernel raw samples (5 measured fresh door runs, seconds):
+
+| run | door process wall | door `build_seconds` |
+|---|---:|---:|
+| 1 | 0.112 | 0.003 |
+| 2 | 0.111 | 0.004 |
+| 3 | 0.102 | 0.004 |
+| 4 | 0.097 | 0.003 |
+| 5 | 0.111 | 0.004 |
+| median | 0.111 | 0.004 |
+
+## falcon_heavy/fairing — payload fairing (`make_fairing`, `lib.falcon_common`)
+
+The row builds the two payload-fairing half shells (spline-profile revolved
+over the ogive contour) plus tip and base collars — 4 solids, no boolean ops.
+Recorded reference facts: `solid_count 4`, `volume 11027028467.643568`,
+`bbox [[-2761.7733353381223, -2761.7733353381223, 56849.9999999],
+[2761.7733353381223, 2761.7733353381223, 70000.0000001]]`.
+
+| engine | verdict | facts-match | wall median (s) | build median (s) | STL triangles |
+|---|---:|---:|---:|---:|---:|
+| occ | green | GREEN | 4.563 | 3.728 | 784 |
+| truck (kernel) | green | GREEN | 0.096 | 0.004 | 11032 |
+
+Every measured run reproduced its engine's facts deterministically. OCC facts
+equal the recorded reference exactly; kernel facts match within the recorded
+tolerances: `solid_count 4` exact, kernel volume 11027439648.490429 vs recorded
+11027028467.643568 (`volume_rel` 3.7e-5), bbox within `bbox_abs` 1e-3 (kernel
+bbox [[-2761.773335238123, -2761.773335238123, 56850.0],
+[2761.773335238123, 2761.773335238123, 70000.0]]). The OCC door tessellates
+this 15 km-diagonal smooth shell coarsely at the deflection rule
+(`max(diag * 2e-4, 0.01)`), hence 784 OCC triangles vs the kernel's
+deterministic 11032-triangle mesh.
+
+OCC raw samples (5 measured fresh door runs, seconds):
+
+| run | door process wall | door `build_seconds` |
+|---|---:|---:|
+| 1 | 4.560 | 3.696 |
+| 2 | 5.015 | 4.111 |
+| 3 | 4.563 | 3.728 |
+| 4 | 4.545 | 3.660 |
+| 5 | 4.957 | 4.082 |
+| median | 4.563 | 3.728 |
+
+Kernel raw samples (5 measured fresh door runs, seconds):
+
+| run | door process wall | door `build_seconds` |
+|---|---:|---:|
+| 1 | 0.099 | 0.003 |
+| 2 | 0.095 | 0.003 |
+| 3 | 0.084 | 0.004 |
+| 4 | 0.096 | 0.004 |
+| 5 | 0.106 | 0.004 |
+| median | 0.096 | 0.004 |
+
+## Findings — stop-condition record (FH-TIMING-REFRESH)
+
+1. Three FH rows carry a GREEN kernel facts gate at this HEAD — turbopump_assembly,
+   chamber_assembly, fairing — and each was timed on both engines in one quiet
+   window (conditioning + 5 measured runs per engine, raw samples above). The
+   kernel fresh door-process wall is ~0.10 s median on all three against
+   ~4.6–4.9 s for OCC — a per-row ~45–50x fresh-door-process ratio — with the
+   kernel's own build + facts + STL inside the process at milliseconds and the
+   remainder interpreter spawn, and OCC's at ~3.7–3.9 s `build_seconds` plus
+   import/tessellation overhead. These are per-row numbers on one machine, not
+   a cross-row claim; no cross-row averages are computed.
+2. The two TTC-TIMING-FH headline rows stay DNF but for moved reasons:
+   `nozzle_assembly` runs to kernel facts yet its recorded reference volume is
+   OCC-default-`BRepGProp` biased (kernel volume is 1.159e-4-relative outside
+   the recorded 1e-4 band — no exact engine can satisfy it as recorded;
+   FH-SPLINE-LATHE F1, re-record-converged resolution still open), and `mvac`
+   refuses typed at the non-z Euler `Location` placement carrier inside
+   `make_thrust_structure`. No kernel timing is published against either RED
+   gate.
+3. The remaining FH canonical rows (thrust_structure, second_stage,
+   engine_prototype, vehicle; gas_generator_assembly, turbine_exhaust_assembly,
+   feed_assembly, harness_assembly) refuse typed at the same two carrier
+   surfaces (non-z `Location` placement; `tube()` spline-path sweep). They keep
+   DNF rows until those carriers are answered; the sweep table above is the
+   per-row verdict record.
+4. Quiet-window stop condition: the measured series started only after the
+   cargo queue was idle and no `cargo`/`rustc`/test process existed; the queue
+   was re-checked idle immediately after the series. No contended measurement
+   was recorded.
+
