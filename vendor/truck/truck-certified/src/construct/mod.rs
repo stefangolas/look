@@ -209,3 +209,12 @@ pub mod admission;
 /// body lands here — the shim ships types and refusing constructors only, and
 /// extends, never edits, the landed ADM-000 carriers.
 pub mod patches;
+
+/// The collapsed-edge deflation and seam-identification kernels (ADM-L4, the
+/// Theorem B1 computational layer over the ADM-SHIM frozen patch type): exact
+/// factor division of the known boundary factor out of the polynomial normal
+/// numerator (zero remainder proven on exact zero slices, iterated to the
+/// multiplicity `k`), the deflated hemisphere certificate over the quotient,
+/// and the exact seam-identity verdict (`A₀W₁ − A₁W₀ ≡ 0` over aligned
+/// boundaries). Pure exact algebra; no corpus contact and no shim edit.
+pub mod deflate;
