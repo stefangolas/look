@@ -176,6 +176,30 @@ only ONE overnight.py driver child exists (of 24272) so no double-merge
 risk this cycle. F1 (slot 4) mvac-pin amendment + the supervisor
 duplication remain the two open human items.]
 
+[operator 2026-09-09T04:30Z - volatile refresh. Board now: 2 RUNNING /
+0 landed-this-cycle. ADM-001-ADAPTER finished its run in slot 0 and the
+heartbeat re-forked slot 0 to ADM-002-CERTIFICATES at ~04:15:55Z (pid
+30612, events fresh) - the write-set cascade worked. BUT the overnight
+driver's scoped check of ADM-001 FAILED at 04:17Z ("test truck-certified:
+admission_conformance failed; left for morning", overnight.log 00:17:04
+local) - ADM-001 is NOT landed, worker commit e076c1f sits on
+packet/ADM-001-ADAPTER, and its RESULT.json copy was destroyed by the
+slot re-fork ~90s before the verdict (no copy anywhere). ESCALATED
+2026-09-09T04:30Z: the failure needs adjudication (genuine defect vs
+driver artifact) BEFORE the row re-dispatches - the PACKETS row is still
+READY and dispatch_ready WILL re-fork ADM-001 the moment ADM-002 frees
+the admission.rs write set. ADM-003-VOLUME still running (slot 1, pid
+29208, unchanged from 03:40Z). Registry: nothing to flip (ADM-004 needs
+001/002/003, TOR-C needs 001/002 - both correct). Nothing to land: slots
+2-6 FINISHED residue all landed (ledger rows present). Health: disk 10.5
+GB free (above the 8 GB floor, below the 15 GB janitor goal), RAM 4.1 GB
+free, cargoq ok (queued 0, ping ok), heartbeat 1 (29152, dispatched
+ADM-002 this cycle - functioning), watchdog 1 (29364, no recent ACTION
+lines), operator runner 0 in the process scan (this operator instance is
+live directly; do not spawn a second runner while I run). STILL TWO
+supervisors (35200 + 24272). Open human items: F1 mvac-pin amendment;
+supervisor duplication; NEW ADM-001 failed-check adjudication.]
+
 ## The parallelism picture
 
 The lemma wave (L1-L4, pure functions over the frozen shim type) is

@@ -78,3 +78,36 @@ Judgment-required items appended each operator cycle. Newest at the bottom.
   merge carries RESULT.json into the REPO ROOT working tree; if the root file
   was already consumed/unlinked it silently skips filing. Start from
   loop/results/ADM-L1-EXTRACT.json and the LEDGER.
+
+## 2026-09-09 04:30 UTC - ADM-001-ADAPTER scoped check NOT green; row still READY and re-dispatchable
+
+- What: ADM-001-ADAPTER (slot 0, dispatched ~03:40Z by the heartbeat) finished
+  its run; worker commit e076c1f (admission.rs +409/-46, admission_conformance.rs
+  +796, parent 428bbff) sits on packet/ADM-001-ADAPTER. The overnight driver's
+  scoped check FAILED at 04:17Z and logged "slot 0: ADM-001-ADAPTER scoped check
+  NOT green (test truck-certified:admission_conformance failed); left for
+  morning" (overnight.log, 00:17:04 local). NOT landed, and I did NOT land it -
+  per the charter a failed done-when check blocks landing.
+- Why it needs a human: is the admission_conformance failure a GENUINE defect in
+  e076c1f or a driver artifact (load/RAM at check time, wrong base)? Disk was
+  ~10-12 GB free at 04:17Z (not ENOSPC). The check command is
+  `cargo test -p truck-certified --lib --tests` at a worktree at e076c1f (or at
+  merged HEAD after `git merge --no-ff e076c1f`); the four named tests are
+  polynomialized_F_zeros_equal_direct_difference_on_fixture,
+  ruled_section_loft_pair_admits_and_certifies,
+  non_admitted_carriers_still_refuse_typed, v5_pair_identity_battery_green.
+- Machinery gap (second occurrence of the class): ADM-001's RESULT.json copy was
+  LOST - the heartbeat re-forked slot 0 to ADM-002 at 04:15:55Z (dispatch_
+  heartbeat.log 00:15:55 local) ~90s BEFORE the driver logged the failed check.
+  No ADM-001 RESULT survives anywhere (checked loop/results, slot 0 wt root, repo
+  root). The 03:36 escalation (driver never files RESULTs) is the same root
+  cause family.
+- Re-dispatch risk: the PACKETS row is still READY (no landed marker), and
+  dispatch_ready --dry-run confirms it WILL dispatch ADM-001 again the moment
+  ADM-002 frees the admission.rs write set - a ~40-min redo that will reproduce
+  the same failing test if the defect is genuine. Recommend adjudicating the test
+  failure before letting the heartbeat re-fork it, or pinning the row.
+- Start here: `git show e076c1f --stat`; check out e076c1f in a throwaway
+  worktree and run `cargo test -p truck-certified --test admission_conformance`
+  (quiet machine, after the two live workers' cargo settles). If green -> land
+  mechanically; if red -> decide fix (worker amendment) vs SPEC_GAP.

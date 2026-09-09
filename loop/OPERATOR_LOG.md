@@ -166,3 +166,49 @@ Leaving: 2 RUNNING (ADM-001, ADM-003); ADM-002 deferred by write-set clash;
 disk 12.3 GB free (above the 8 GB floor, below the 15 GB janitor goal);
 escalations carried (F1 mvac-pin amendment + duplicate supervisors), none
 new.
+
+## 2026-09-09 04:30 UTC (operator)
+
+Board at start: 2 RUNNING (ADM-002-CERTIFICATES slot 0 pid 30612,
+ADM-003-VOLUME slot 1 pid 29208); slots 2-6 FINISHED residue (all landed
+packets), slot 7 IDLE. Heartbeat exactly 1 (29152); watchdog 1 (29364, no
+recent ACTION lines); cargoq OK (queued 0); disk 10.5 GB free; RAM 4.1 GB
+free; TWO supervisors (35200 + 24272) - open escalation, unchanged.
+operator_runner count 0 (this instance is running directly; did not spawn
+a second runner to avoid a double-operator race).
+
+Findings:
+- **ADM-001-ADAPTER finished but its scoped check FAILED and the slot was
+  recycled before the verdict.** Reconstructed from dispatch_heartbeat.log
+  + overnight.log: heartbeat dispatched ADM-001 (pid 30856) + ADM-003
+  (pid 29208) ~03:40Z; ADM-001 finished ~04:1xZ; heartbeat re-forked slot
+  0 to ADM-002-CERTIFICATES at 04:15:55Z (00:15:55 local); the overnight
+  driver then logged at 04:17:04Z (00:17:04 local) "ADM-001-ADAPTER scoped
+  check NOT green (test truck-certified:admission_conformance failed);
+  left for morning". ADM-001 is NOT landed; worker commit e076c1f (parent
+  428bbff) is on packet/ADM-001-ADAPTER; no ADM-001 RESULT.json survives
+  anywhere (checked loop/results, slot 0 wt root, repo root). The failed
+  check blocks landing per the charter.
+- dispatch_ready --dry-run: dispatched 0, correct (ADM-001 deferred by
+  write-set clash with RUNNING ADM-002 on admission.rs). NOTE: the ADM-001
+  PACKETS row is still READY with no landed marker, so dispatch_ready will
+  re-fork ADM-001 the moment ADM-002 frees the write set - a redo that
+  would reproduce the same failing test if the defect is genuine.
+
+Actions:
+- Nothing landed (the only FINISHED-with-RESULT slots are landed packets;
+  ADM-001 is a failed-check, NOT landable - escalated instead).
+- Nothing stuck to unblock (no IDLE/DEAD >15 min; running slots have fresh
+  events).
+- Registry: nothing to flip (ADM-004 needs 001/002/003, TOR-C needs
+  001/002 - both correct).
+- ESCALATED ADM-001 failed-check adjudication (2026-09-09 04:30 UTC,
+  OPERATOR_ESCALATIONS.md): re-run command + the four named tests + the
+  re-dispatch risk + the RESULT-copy loss (second occurrence of the driver-
+  never-files-RESULT class, now with a heartbeat-recycle destroy).
+- STATE.md volatile refresh appended ([operator 2026-09-09T04:30Z]).
+
+Leaving: 2 RUNNING (ADM-002 slot 0, ADM-003 slot 1); ADM-001 unlanded +
+escalated (commit e076c1f preserved on its packet branch); disk 10.5 GB
+free; escalations carried (F1 mvac-pin, duplicate supervisors) + 1 new
+(ADM-001 failed check). Operator runner count 0 observed - see STATE.
