@@ -152,7 +152,22 @@ def try_land(slot_dir, slot_no, rows, order, reg_path):
         return
     status = (result.get("status") or result.get("outcome") or "").lower()
     fails = result.get("fail_count")
-    stopped = bool((result.get("stop_conditions") or {}).get("triggered"))
+    sc = result.get("stop_conditions")
+    if isinstance(sc, dict):
+        stopped = bool(sc.get("triggered"))
+    elif isinstance(sc, str):
+        # Workers have written prose here ("none triggered: ...") — recorded
+        # 2026-09-08 when ADM-L1/L3 crash-looped the driver (str.get ->
+        # AttributeError every supervisor restart). A string that asserts a
+        # trigger without saying "none" is treated as stopped; anything else
+        # is prose meaning no stop fired. Logged so adjudication sees it.
+        low = sc.strip().lower()
+        stopped = ("triggered" in low) and not low.startswith(("none", "no "))
+        if stopped:
+            log(f"slot {slot_no}: stop_conditions prose asserts a trigger: "
+                f"{sc[:120]!r}")
+    else:
+        stopped = False
     good = status in ("complete", "partial", "done", "landed", "completed")
     if stopped or not good or (isinstance(fails, int) and fails > 0):
         # Session-51 harness gap: worktree recycles destroyed two unlanded
