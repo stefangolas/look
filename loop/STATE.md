@@ -15,14 +15,13 @@ program, and the operator agent.
 ## Where we are
 
 > LATEST GROUND TRUTH: read the newest `[operator ...]` block in "State of
-> the machine, as left" (2026-09-09T06:1xZ). Hot item: the ADM-001/ADM-002
-> admission.rs ping-pong has NOT landed anything (the overnight driver is in
-> permanent LEFT-FOR-MORNING on the F1 slot-4 judgment residue AND on its own
-> prose-stop misparse) - ADM-001 is on its THIRD re-run (slot 0, pid 19604,
-> mid-done-when) and ADM-002's finished commit b3c1346 has a PRESERVED RESULT
-> (loop/results/ADM-002-CERTIFICATES.PENDING.RESULT.json, status done). Both
-> need the orchestrator never-filed-RESULT landing protocol; land ADM-001
-> (8f6a549, wip-ref-preserved) FIRST, then ADM-002. 1 RUNNING (ADM-001 slot 0).
+> the machine, as left" (2026-09-09T20:2xZ). [operator 2026-09-09T20:2xZ
+> ground-truth note: the ADM saga is CLOSED; the DOOR-GAP program is in
+> flight - REF-RECORD-HYPERCAR LANDED 2026-09-09 20:20Z (driver, merge
+> 71154b1, RESULT filed, row flipped a18899b), FRAME-REVOLVE slot 7 RUNNING
+> (pid 26464, pre-commit, healthy), SWEEP-PATH READY gated on FRAME-REVOLVE.
+> The orchestrator session is LIVE (opencode pid 17740 since 07:20) -
+> verify against its current work before acting on stale items.]
 
 - **THE FIRST KERNEL-VS-OCC TIMING COMPARISON IS BANKED** (FH-TIMING-REFRESH,
   landed c94d043): turbopump_assembly **0.097 s kernel vs 4.866 s OCC**,
@@ -334,6 +333,60 @@ ADM-002 b3c1346 (RESULTs now preserved/reconstructible); F1 mvac-pin amendment;
 duplicate supervisors; driver-never-files-RESULT + check-vs-recycle races;
 overnight.py 'NOT triggered.' prose-stop bug (now stranded ADM-L4, ADM-003,
 AND ADM-002 - three strikes).]
+
+[operator 2026-09-09T15:56Z - volatile refresh after the substrate restart
+(~15:48Z, orchestrator-driven) and the door-gap dispatch. Board now: 2 RUNNING
+/ 0 landed-this-cycle. REF-RECORD-HYPERCAR slot 0 (worker opencode 2976, forked
+15:45Z, mid door.py --engine occ hypercar reference record - child pids 2196/
+3524/4960; events fresh) and FRAME-REVOLVE slot 7 (worker opencode 13844,
+forked 15:42Z, events fresh) - both pre-commit, making progress. Slots 1-6
+FINISHED/IDLE residue all landed (CL-005/CL-006/ADM-L2/L3 ledger rows +
+ancestor checks; slot 1 = ADM-003 landed residue; slot 4 = F1 landed residue
+whose stale 'landed-with-findings' wt RESULT still parks the overnight driver's
+dispatch arm every 5-min cycle - escalated, does NOT block the driver's per-slot
+landing attempts at slots 0/7). Registry: SWEEP-PATH READY correctly gated on
+FRAME-REVOLVE (dispatch dry-run: dispatched 0, workers 2/4); nothing to flip
+(TOR-C deps ADM-001/002 now LANDED per 3ef4dab - flip decision escalated to the
+live orchestrator). Health: heartbeat 1 (27440), operator runner 1 (29776),
+watchdog 1 (28440), overnight driver 1 (28824, cycling since 15:48:15, parked on
+slot-4 dispatch arm), TWO supervisors (27392 PyManager + 15100 pythoncore child
+- carried duplication class, only ONE overnight child = no double-merge risk),
+cargoq DOWN since ~02:29 (server.log exit 1073807364; the supervisor restart
+guard never fired - log shows start lines only, no cargoq-restart line) ->
+OPERATOR RESTARTED cargoq 15:54Z (ping ok, queued 0). Disk 17.4 GB free (above
+8 GB floor, below the 15 GB janitor goal); RAM 4.1 GB free. THE ORCHESTRATOR IS
+LIVE at opencode pid 17740 (since 07:20; commits c104511/57aa9ad/d8025d8/3c65c6a
+are this session) - the operator cycled conservatively and did not touch running
+workers or the slot-4 residue. Open human items: (resolved-this-cycle: the
+ADM-001/002 never-filed-RESULT saga - both LANDED b805ddd/345e635, rows LANDED
+ 3ef4dab; prose-stop bug FIXED d8025d8); duplicate supervisors + the wedged
+ cargoq restart guard; slot-4 F1 residue cleanup; TOR-C flip decision.]
+
+[operator 2026-09-09T20:2xZ - volatile refresh. Board now: 1 RUNNING /
+1 landed-this-cycle. **REF-RECORD-HYPERCAR (slot 0) LANDED BY THE OVERNIGHT
+DRIVER mid-cycle** (~20:20Z: worker commit 251f368 merged 71154b1, RESULT
+filed 3d70e09 to loop/results/REF-RECORD-HYPERCAR.json, registry row flipped
+a18899b; 251f368 is now an ancestor of HEAD - the operator's own landing prep
+was superseded by the driver, verified clean, nothing to re-land). The three
+hypercar rows (details/suspension_front/suspension_rear) are recorded under
+hypercar-prefixed references with bit-identical OCC re-runs; f1 oracles
+untouched. FRAME-REVOLVE (slot 7, pid 26464) still RUNNING pre-commit, events
+~2 min fresh, healthy (forked 15:42Z, ~40 min in). Slots 1-6 FINISHED/IDLE
+residue all landed (ADM-L2/L3/CL-005/CL-006/F1 ledger rows + ancestor checks;
+slot 1 = ADM-003 landed residue; slot 4 = F1 landed residue still parking the
+driver's dispatch arm on its stale wt RESULT - carried). Registry: nothing to
+flip this cycle (SWEEP-PATH READY correctly gated on the RUNNING FRAME-REVOLVE;
+TOR-C BLOCKED with deps ADM-001/002 landed stays orchestrator-held per the
+standing escalation; DEF-SEEDRAY-B human-gated; DEF-TESS-ANALYTIC-SEAM superseded
+by its -R2; BG-AUD-FIX-004/SEM-PCURVE-MASTER-001-FIX/BG-CK-SPLINE-CENSUS parked
+BLOCKED from closed programs - not flipped). dispatch_ready --dry-run:
+dispatched 0, workers ~1/4 (correct - heartbeat 27440 live, cycling, logging
+'SWEEP-PATH blocked on FRAME-REVOLVE'; no manual dispatch while it runs).
+Health: heartbeat 1 (27440), watchdog 1 (28440), cargoq UP (ping ok, queued 0,
+operator-restarted 15:54Z last cycle), disk 17.3 GB free, RAM 4.9 GB free.
+Open human items (carried): duplicate supervisors (27392 + 15100) + the wedged
+cargoq supervisor restart guard; slot-4 F1 wt RESULT residue cleanup; TOR-C
+flip-or-pin decision.]
 
 ## The parallelism picture
 
