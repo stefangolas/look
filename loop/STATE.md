@@ -37,8 +37,10 @@ program, and the operator agent.
 - **The admission program is MID-WAVE (the spine restructure)**: ADM-000
   (contract) landed; ADM-SHIM (the extracted-patch type freeze) landed;
   ADM-L5 (the certified reciprocal-power primitive, Theorem D) landed;
-  **ADM-L1/L2/L3 RUNNING now** (extraction, product, normal-cone lemmas);
-  ADM-L4 queued READY. Then the assembly packets ADM-001/002/003
+  **ADM-L1/L2/L3 LANDED 2026-09-08 ~21:09-21:22** (extraction, product,
+  normal-cone lemmas - L2/L3 by orchestrator-resolved mod.rs merges, then
+  the driver filed the bookkeeping); **ADM-L4 RUNNING in slot 0** (deepseek,
+  dispatched 20:53). Then the assembly packets ADM-001/002/003
   (rewritten to CONSUME the proven lemmas), ADM-004 (funnel wiring + V5
   battery), TTC-RECENSUS-F1 (the closing re-census).
 - **The census maps exist for every family**: F1 complete (12 lifted, 9
@@ -61,8 +63,8 @@ program, and the operator agent.
 
 ## Pick up here
 
-0. `python loop/slot_status.py` - expect ADM-L1/L2/L3 RUNNING (the lemma
-   wave); FH-TIMING-REFRESH landed; the heartbeat (exactly ONE powershell
+0. `python loop/slot_status.py` - expect ADM-L4 RUNNING in slot 0 and
+   slots 1-3 FINISHED/landed residue (ADM-L1/L2/L3 landed 2026-09-08); the heartbeat (exactly ONE powershell
    matching dispatch_heartbeat) and the operator runner (exactly ONE
    matching operator_runner.ps1) alive.
 1. **Adjudicate landings mechanically**: FINISHED slot + RESULT status DONE
@@ -115,6 +117,32 @@ The operator + heartbeat + driver keep every freed slot filling without
 human input. Full F1 + FH coverage = the admission chain closing + the
 reference re-recording + the torus corner flips; every packet is
 registered with measured anchors and a committed spec.
+
+
+### Session 57 (2026-09-08 evening, ~21:30) - paid in full
+
+- **A RESULT.json schema drift crash-looped the overnight driver for ~20
+  min.** ADM-L1 and ADM-L3 wrote `stop_conditions` as PROSE ("none
+  triggered: ...") where the driver expected a dict; `str.get` ->
+  AttributeError killed every driver instance inside one cycle, and the
+  supervisor dutifully restarted it into the same crash every 60s (12+
+  starts in overnight.log). Fix (594f07b): overnight.py treats a string as
+  stopped only if it asserts a trigger without saying "none"; logged for
+  adjudication. The packet schema for RESULT.json clearly under-specifies
+  this field - if a fourth worker writes prose, the driver now survives.
+- **The janitor's disk reclaim manufactured a FALSE scoped-check failure.**
+  At 20:53 disk was ~5.3 GB; the janitor wiped the just-finished lemma
+  slots' targets; the driver's scoped check for ADM-L1 then failed on
+  `check -p truck-certified` at 21:04 with the machine effectively out of
+  disk mid-build. Manual re-run at 19.4 GB free: green in 39s. Before
+  believing a compile-failure verdict from any gate, check
+  `Get-PSDrive C` - ENOSPC masquerades as a code defect.
+- **L2/L3's mod.rs conflicts were the expected wave-textual kind** (each
+  branch appended one `pub mod` + doc comment at the end of
+  `construct/mod.rs`). Resolved by orchestrator integration merges
+  (071b7b9, f97398e, all three modules kept, check green); the driver then
+  landed both via its already-up-to-date path. The driver itself
+  correctly aborted rather than guessing - that behavior is right.
 
 
 ### Session 56 (the timing numbers, the admission spine, the operator agent) - paid in full
