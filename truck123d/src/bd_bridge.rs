@@ -178,6 +178,37 @@ pub enum SolidSpec {
     },
 }
 
+/// The recorded full orthonormal placement rotation of one part (the frame
+/// generalization of the pure-z rotation). The columns are the world
+/// images of the part-local x, y and z axes after the placement rotation: a
+/// local point `p` maps to `x_dir * p.x + y_dir * p.y + z_dir * p.z`. The
+/// client records an orthonormal frame (fixed-order Gram-Schmidt); volume is
+/// invariant under `R` and only the world bbox and mesh re-derive from it.
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct RotationFrame {
+    /// The world image of the part-local x axis.
+    pub x_dir: [f64; 3],
+    /// The world image of the part-local y axis.
+    pub y_dir: [f64; 3],
+    /// The world image of the part-local z axis.
+    pub z_dir: [f64; 3],
+}
+
+impl RotationFrame {
+    /// Applies the recorded orthonormal rotation to a local point.
+    fn apply(self, p: [f64; 3]) -> [f64; 3] {
+        let [x0, x1, x2] = self.x_dir;
+        let [y0, y1, y2] = self.y_dir;
+        let [z0, z1, z2] = self.z_dir;
+        [
+            x0 * p[0] + y0 * p[1] + z0 * p[2],
+            x1 * p[0] + y1 * p[1] + z1 * p[2],
+            x2 * p[0] + y2 * p[1] + z2 * p[2],
+        ]
+    }
+}
+
 /// One placed construction row: a solid plus its world frame.
 ///
 /// The corpus places parts by translation (`.moved`/`.locate`) and, for the
@@ -199,6 +230,12 @@ pub struct PartSpec {
     /// translation).
     #[serde(default)]
     pub rz: f64,
+    /// The full orthonormal placement rotation recorded from an authoring
+    /// frame (a `Plane`/`Pos`/`Rotation` frame row). When present it replaces
+    /// the pure-z rotation exactly (`world = translate(o) ∘ R ∘ M`); a row
+    /// without it keeps the pure-z rotation path byte-identical.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub rotation: Option<RotationFrame>,
     /// A placed-carrier reflection about a coordinate plane through the local
     /// origin, recorded by the mirror arm: `"x"` (YZ plane, x -> -x), `"y"`
     /// (XZ plane, y -> -y) or `"z"` (XY plane, z -> -z). The reflection is a
@@ -1350,9 +1387,12 @@ fn mirror_point(p: [f64; 3], mirror: &str) -> [f64; 3] {
 
 /// The world bounding box of one placed solid: mirror the local geometry about
 /// the coordinate plane (when the mirror arm recorded one), rotate the local
-/// bbox corners about z by `rz`, then translate.
+/// bbox corners by the recorded frame (or by the pure-z `rz` when no frame was
+/// recorded), then translate. The AABB of the 8 rotated local corners is the
+/// exact world bbox under the orthonormal placement rotation.
 fn part_world_bbox(part: &PartSpec) -> Result<[[f64; 3]; 2], Refusal> {
     let local = solid_local_bbox(&part.solid)?;
+    let frame = part.rotation;
     let rz = part.rz.to_radians();
     let cos = rz.cos();
     let sin = rz.sin();
@@ -1376,15 +1416,25 @@ fn part_world_bbox(part: &PartSpec) -> Result<[[f64; 3]; 2], Refusal> {
             Some(axis) => mirror_point(corner, axis),
             None => corner,
         };
-        let (x, y) = if rz == 0.0 {
-            (corner[0], corner[1])
-        } else {
-            (
-                corner[0] * cos - corner[1] * sin,
-                corner[0] * sin + corner[1] * cos,
-            )
+        let point = match frame {
+            Some(rotation) => {
+                // The recorded full orthonormal frame replaces the pure-z
+                // rotation: the AABB of the 8 rotated local corners is exact.
+                let p = rotation.apply(corner);
+                [p[0] + part.x, p[1] + part.y, p[2] + part.z]
+            }
+            None => {
+                let (x, y) = if rz == 0.0 {
+                    (corner[0], corner[1])
+                } else {
+                    (
+                        corner[0] * cos - corner[1] * sin,
+                        corner[0] * sin + corner[1] * cos,
+                    )
+                };
+                [x + part.x, y + part.y, corner[2] + part.z]
+            }
         };
-        let point = [x + part.x, y + part.y, corner[2] + part.z];
         for axis in 0..3 {
             min[axis] = min[axis].min(point[axis]);
             max[axis] = max[axis].max(point[axis]);
@@ -1500,17 +1550,28 @@ fn append_node_mesh(node: &TreeNode, out: &mut Vec<Triangle>) -> Result<(), Refu
     match node {
         TreeNode::Part { part } => {
             let local = solid_mesh(&part.solid)?;
-            let rz = part.rz.to_radians();
-            let cos = rz.cos();
-            let sin = rz.sin();
-            for tri in local {
-                // The mirror placed-carrier reflects the local geometry before
-                // the rz rotation and translation (no geometry recomputation).
-                let reflected = match part.mirror.as_deref() {
-                    Some(axis) => reflect_triangle(tri, axis),
-                    None => tri,
-                };
-                out.push(place_triangle(reflected, cos, sin, part.x, part.y, part.z));
+            // The mirror placed-carrier reflects the local geometry before
+            // the rz rotation and translation (no geometry recomputation).
+            let reflected: Vec<Triangle> = local
+                .iter()
+                .map(|tri| match part.mirror.as_deref() {
+                    Some(axis) => reflect_triangle(*tri, axis),
+                    None => *tri,
+                })
+                .collect();
+            if let Some(frame) = part.rotation {
+                // The recorded full orthonormal frame transforms the mesh
+                // per-vertex (never recomputed geometry).
+                for tri in reflected {
+                    out.push(place_triangle_frame(tri, frame, part.x, part.y, part.z));
+                }
+            } else {
+                let rz = part.rz.to_radians();
+                let cos = rz.cos();
+                let sin = rz.sin();
+                for tri in reflected {
+                    out.push(place_triangle(tri, cos, sin, part.x, part.y, part.z));
+                }
             }
             Ok(())
         }
@@ -1551,6 +1612,22 @@ fn place_triangle(tri: Triangle, cos: f64, sin: f64, x: f64, y: f64, z: f64) -> 
         placed[vertex * 3] = px + x;
         placed[vertex * 3 + 1] = py + y;
         placed[vertex * 3 + 2] = vz + z;
+    }
+    placed
+}
+
+/// Translates a triangle by the part's world frame carrying a recorded full
+/// orthonormal rotation (the frame replaces the pure-z rotation path).
+fn place_triangle_frame(tri: Triangle, frame: RotationFrame, x: f64, y: f64, z: f64) -> Triangle {
+    let mut placed = [0.0f64; 9];
+    for vertex in 0..3 {
+        let vx = tri[vertex * 3];
+        let vy = tri[vertex * 3 + 1];
+        let vz = tri[vertex * 3 + 2];
+        let p = frame.apply([vx, vy, vz]);
+        placed[vertex * 3] = p[0] + x;
+        placed[vertex * 3 + 1] = p[1] + y;
+        placed[vertex * 3 + 2] = p[2] + z;
     }
     placed
 }
@@ -2119,6 +2196,7 @@ mod tests {
                 y,
                 z,
                 rz: 0.0,
+                rotation: None,
                 mirror: None,
             },
         }
@@ -2133,6 +2211,7 @@ mod tests {
                 y: 0.0,
                 z: 0.0,
                 rz: 0.0,
+                rotation: None,
                 mirror: Some(axis.to_string()),
             },
         }
@@ -2751,5 +2830,185 @@ mod tests {
         assert_eq!(base.volume.to_bits(), mirrored.volume.to_bits());
         assert_eq!(mirrored.bbox[0], [0.0, -1.0, -2.0]);
         assert_eq!(mirrored.bbox[1], [1.0, 0.0, 2.0]);
+    }
+
+    // -----------------------------------------------------------------------
+    // Authoring frames: the full orthonormal placement rotation and the door's
+    // Plane-frame / Pos / Vector client rows (AUTHOR-FRAME-CARRIERS).
+    // -----------------------------------------------------------------------
+
+    /// The corpus `ttc` directory that owns `door.py` (the door-driven
+    /// authoring tests below import it from a real interpreter).
+    fn corpus_ttc_dir() -> std::path::PathBuf {
+        std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("..")
+            .join("corpus")
+            .join("ttc")
+    }
+
+    /// Runs `python -c <script>` with the corpus `ttc` directory as its sole
+    /// positional argument and returns stdout. The corpus door's authoring
+    /// rows are pure client-side data, so no native-module staging is needed.
+    fn run_door_python(script: &str) -> String {
+        let output = std::process::Command::new("python")
+            .arg("-c")
+            .arg(script)
+            .arg(corpus_ttc_dir())
+            .output()
+            .expect("spawn python for the door row");
+        assert!(
+            output.status.success(),
+            "python failed:\nstdout:{}\nstderr:{}",
+            String::from_utf8_lossy(&output.stdout),
+            String::from_utf8_lossy(&output.stderr)
+        );
+        String::from_utf8_lossy(&output.stdout).to_string()
+    }
+
+    #[test]
+    fn placed_frame_facts_match_unplaced_facts_under_rigid_motion() {
+        // Placed-frame rigidity: a solid under an ARBITRARY orthonormal frame
+        // reports the unplaced facts volume-wise EXACTLY (placement never
+        // recomputes volume) and bbox-wise as the AABB of the 8 rotated local
+        // corners. The fixture is an exact 90-degree frame about z: the local
+        // 20 x 10 x 30 box maps its x/y extents onto y/x, unchanged z.
+        let solid = SolidSpec::Box {
+            length: 20.0,
+            width: 10.0,
+            height: 30.0,
+        };
+        let unplaced = tree_facts(&part(solid.clone(), 0.0, 0.0, 0.0)).expect("unplaced box");
+        // The placed row is submitted as the recorded JSON (the pure-z field is
+        // defaulted): an exact 90-degree orthonormal frame about z.
+        let placed_json = serde_json::json!({
+            "part": {
+                "solid": { "kind": "box", "length": 20.0, "width": 10.0, "height": 30.0 },
+                "x": 7.0,
+                "y": -3.0,
+                "z": 2.0,
+                "rotation": {
+                    "x_dir": [0.0, 1.0, 0.0],
+                    "y_dir": [-1.0, 0.0, 0.0],
+                    "z_dir": [0.0, 0.0, 1.0]
+                }
+            }
+        });
+        let placed = parse_tree(&placed_json.to_string()).expect("frame-placed box row");
+        let facts = tree_facts(&placed).expect("frame-placed box");
+        assert_eq!(
+            facts.volume.to_bits(),
+            unplaced.volume.to_bits(),
+            "volume must be invariant under the placement rotation"
+        );
+        assert_eq!(facts.solid_count, 1);
+        // Rotated-AABB identity: local x range [-10, 10] maps to world y, local
+        // y range [-5, 5] maps to world -x, z unchanged; then translated.
+        assert_eq!(facts.bbox[0], [2.0, -13.0, -13.0]);
+        assert_eq!(facts.bbox[1], [12.0, 7.0, 17.0]);
+    }
+
+    #[test]
+    fn plane_frame_extrude_answers_world_facts() {
+        // The Plane frame row is client-side data: a unit square drawn in the
+        // `Plane(origin=(50,0,0), x_dir=(0,1,0), z_dir=(1,0,0))` section frame
+        // is recorded by the door at its world location, and a single-sided
+        // extrude of that Plane-frame face answers WORLD facts (an exact prism
+        // spanning x in [50, 60], volume 10). The refusal surface of the old
+        // `Plane` stub is gone on this carrier.
+        let script = r#"
+import json, sys
+sys.path.insert(0, sys.argv[1])
+import door
+bd = door._build_truck_module()
+
+def v(x, y, z):
+    return door.Vector(x, y, z)
+
+# A unit square, CCW in the section plane's local (u, v) frame.
+wire = door.Wire([
+    door.Edge.make_line(v(0, 0, 0), v(1, 0, 0)),
+    door.Edge.make_line(v(1, 0, 0), v(1, 1, 0)),
+    door.Edge.make_line(v(1, 1, 0), v(0, 1, 0)),
+    door.Edge.make_line(v(0, 1, 0), v(0, 0, 0)),
+])
+plane = door.Plane(origin=(50.0, 0.0, 0.0), x_dir=(0.0, 1.0, 0.0), z_dir=(1.0, 0.0, 0.0))
+face = plane * bd.make_face(wire)
+part = bd.extrude(face, amount=10.0, both=False)
+node = part._node()
+assert node["part"]["solid"]["kind"] == "prism", node
+print(json.dumps(node))
+"#;
+        let stdout = run_door_python(script);
+        let tree = parse_tree(&stdout).expect("the door prism row must parse");
+        let facts = tree_facts(&tree).expect("a Plane-frame extrude is in envelope");
+        assert_eq!(facts.solid_count, 1);
+        assert!((facts.volume - 10.0).abs() / 10.0 < 1e-12);
+        // World facts: the section plane at x = 50 and its unit square.
+        assert_eq!(facts.bbox[0], [50.0, 0.0, 0.0]);
+        assert_eq!(facts.bbox[1], [60.0, 1.0, 1.0]);
+    }
+
+    #[test]
+    fn pos_placed_assembly_counts_solids() {
+        // Pos placement records a translation frame row; a multi-solid
+        // assembly placed by `Pos` still reports its placed solid count (and
+        // the placed union bbox).
+        let script = r#"
+import json, sys
+sys.path.insert(0, sys.argv[1])
+import door
+bd = door._build_truck_module()
+
+box = bd.Pos(10.0, 20.0, 0.0) * bd.Box(1, 1, 1)
+sphere = bd.Pos(0.0, 0.0, 5.0) * bd.Sphere(2.0)
+group = bd.Compound(children=[box, sphere])
+node = group._node()
+assert node["group"][0]["part"]["x"] == 10.0, node
+assert node["group"][1]["part"]["x"] == 0.0, node
+print(json.dumps(node))
+"#;
+        let stdout = run_door_python(script);
+        let tree = parse_tree(&stdout).expect("the Pos-placed assembly must parse");
+        let facts = tree_facts(&tree).expect("Pos-placed primitives are in envelope");
+        assert_eq!(facts.solid_count, 2);
+        // Placed union AABB: the box at (10, 20, 0) spans x in [9.5, 10.5] and
+        // the sphere at (0, 0, 5) spans x/y in [-2, 2], z in [3, 7].
+        assert_eq!(facts.bbox[0], [-2.0, -2.0, -0.5]);
+        assert_eq!(facts.bbox[1], [10.5, 20.5, 7.0]);
+    }
+
+    #[test]
+    fn vector_surface_answers_direction_math() {
+        // The Vector attribute surface is pure client-side data (never a
+        // kernel row): normalized / dot / cross / length and the scalar and
+        // difference arithmetic the census DNF rows call must all answer.
+        let script = r#"
+import json, sys
+sys.path.insert(0, sys.argv[1])
+import door
+
+a = door.Vector(3.0, 0.0, 4.0)
+assert abs(a.length - 5.0) < 1e-12
+n = a.normalized()
+assert abs(n.length - 1.0) < 1e-12
+assert abs(n.x - 0.6) < 1e-12 and abs(n.z - 0.8) < 1e-12
+assert abs(n.dot(a) - 5.0) < 1e-9
+c = door.Vector(0.0, 1.0, 0.0).cross(door.Vector(1.0, 0.0, 0.0))
+assert abs(c.z + 1.0) < 1e-12, c
+d = door.Vector(5.0, 1.0, 1.0) - door.Vector(1.0, 1.0, 1.0)
+assert d.to_tuple() == (4.0, 0.0, 0.0)
+e = door.Vector(1.0, 2.0, 3.0) * 2.0
+assert e.to_tuple() == (2.0, 4.0, 6.0)
+f = 3.0 * door.Vector(0.0, 1.0, 0.0)
+assert f.to_tuple() == (0.0, 3.0, 0.0)
+g = -door.Vector(0.0, 0.0, 2.0)
+assert g.to_tuple() == (0.0, 0.0, -2.0)
+assert door.Vector(2, 0, 0).X == 2 and door.Vector(0, 7, 0).Y == 7 and door.Vector(0, 0, 9).Z == 9
+print(json.dumps({"ok": True, "length": a.length}))
+"#;
+        let stdout = run_door_python(script);
+        let record: serde_json::Value = serde_json::from_str(stdout.trim()).expect("vector json");
+        assert_eq!(record["ok"], true);
+        assert_eq!(record["length"], 5.0);
     }
 }

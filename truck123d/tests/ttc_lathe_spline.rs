@@ -453,11 +453,15 @@ fn nozzle_assembly_truck_door_now_reaches_facts() {
     assert_eq!(again["facts"], *facts, "truck facts must be deterministic");
 }
 
-/// The mvac row's boundary: after the spline admission its first refusing
-/// carrier is a non-lathe carrier (the thrust-structure gusset extrude), which
-/// stays a typed refusal — no silent fallback.
+/// The mvac row's boundary: after the frame-carrier cure (AUTHOR-FRAME-CARRIERS)
+/// the thrust-structure gusset extrude is answered, and the first refusing
+/// carrier deepened to the spline-path tangent query (the sweep-along-spline
+/// path), which stays a typed refusal — no silent fallback.
+/// (Orchestrator amendment of the obsolete extrude pin, adjudicated 2026-09-09:
+/// the pinned carrier was cured by the landed frame carriers, so the pin moves
+/// to the recorded next boundary, never away from typed.)
 #[test]
-fn mvac_row_still_refuses_typed_at_the_extrude_carrier() {
+fn mvac_row_still_refuses_typed_at_the_spline_path_sweep_carrier() {
     let output = python_command()
         .arg(door_path())
         .arg("--engine")
@@ -477,7 +481,7 @@ fn mvac_row_still_refuses_typed_at_the_extrude_carrier() {
     assert_eq!(record["error"]["kind"], "Refused");
     let message = record["error"]["message"].as_str().unwrap_or("");
     assert!(
-        message.contains("Face extrusion is not yet a kernel-engine row"),
-        "mvac must refuse typed at the thrust-structure extrude carrier: {message}"
+        message.contains("a spline path tangent query is not a kernel-engine row"),
+        "mvac must refuse typed at the spline-path sweep carrier: {message}"
     );
 }
