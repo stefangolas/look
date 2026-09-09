@@ -1,0 +1,33 @@
+{
+  "id": "ADM-001-ADAPTER",
+  "contract": [
+    "ADM-001-ADAPTER"
+  ],
+  "status": "done",
+  "commit": "565ba8b",
+  "branch": "packet/ADM-001-ADAPTER",
+  "model": "deepseek/deepseek-v4-flash",
+  "tests_added": 4,
+  "summary": "ADM-001-ADAPTER assembles the landed extraction (ADM-L1) and product (ADM-L2) lemmas into the polynomialized pair system F over each span-pair, feeds the landed Ssi4System, and admits the first pair class (ruled-section lofts) behind its admitting test, in src/construct/admission.rs (+ bie/ssi4.rs wiring, tests/admission_conformance.rs new). The adapter is reachable ONLY where the old path returned NonCanonicalCarrier (the ADM-000 dispatch rule); non-admitted carriers still refuse typed; every landed green pair answers bit-identically (V5 battery). This RESULT is orchestrated-filed under the never-filed-RESULT protocol: the worker's own RESULT.json was destroyed by the slot recycle before the driver processed it (4th occurrence of the class; the overnight driver was in permanent LEFT-FOR-MORNING so nothing would file it). The worker's own final done-when checks for the adjudicated prior re-run 8f6a549 (identical content on the earlier base) were green in cargoq server.log 01:39 local; commit 565ba8b (3rd re-run, base 4d979e8) was scoped-verified independently by the orchestrator at landing.",
+  "anchors": {
+    "A1_patches_rs_TensorBernsteinPatch_15": "15 OK (re-measured at landing)",
+    "A2_ssi4_rs_Ssi4System_1": "1 OK (re-measured at landing)",
+    "A3_extract_rs_extract_patches_3": "3 OK (re-measured at landing)"
+  },
+  "tests_required": {
+    "polynomialized_F_zeros_equal_direct_difference_on_fixture": "pass (tests/admission_conformance.rs) - 4/4 at worker commit 565ba8b (slot-1 worktree, warm target) AND at merged HEAD b805ddd",
+    "ruled_section_loft_pair_admits_and_certifies": "pass (same runs)",
+    "non_admitted_carriers_still_refuse_typed": "pass (same runs)",
+    "v5_pair_identity_battery_green": "pass (same runs)"
+  },
+  "done_when": {
+    "cargo_fmt_check_p_truck_certified": "NOT held at the committed baseline (pre-existing rustfmt 1.9.0 drift class, files outside this packet's write_allow; same recorded class as ADM-L1..L4 and ADM-003 rows)",
+    "cargo_clippy_p_truck_certified_all_targets_D_warnings": "NOT held at baseline (pre-existing deny-level clippy-1.97 drift across pre-existing files; the recorded drift class)",
+    "cargo_test_p_truck_certified_lib_tests": "covered by the scoped protocol: cargo check --locked -p truck-certified exit 0 + cargo test --locked -p truck-certified --test admission_conformance 4/4 at both the worker commit and merged HEAD"
+  },
+  "stop_conditions": "none triggered (worker prose RESULT lost with the slot recycle; no trigger assertion was ever recorded for this packet in any surviving log)",
+  "deviations": [
+    "RESULT reconstructed by the orchestrator under the never-filed-RESULT landing protocol (OPERATOR_ESCALATIONS 2026-09-09T05:47Z/06:1xZ escalations): scoped-verify the worker commit, merge --no-ff, file RESULT, ledger row, flip registry row. The worker's RESULT.json was lost to the heartbeat slot recycle before the driver processed the slot."
+  ],
+  "notes": "Landing chain: worker commits e076c1f (1st run, check-failed verdict = recycle artifact) -> 8f6a549 (2nd run, adjudicated GREEN by the operator via cargoq evidence, orphaned by the 06:04Z re-fork, preserved at refs/wip/ADM-001-8f6a549-green-adjudicated) -> 565ba8b (3rd run, base 4d979e8, branch tip, LANDED here as merge b805ddd). The reboot at 02:34:48 local killed the machinery mid-done-when; no worker content was lost (all three commits survive)."
+}
