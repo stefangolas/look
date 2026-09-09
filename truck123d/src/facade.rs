@@ -30,15 +30,20 @@
 //!   frame; a blend with no recorded selection is an empty domain and refuses.
 //! * exports — `export_stl` (any part) and `export_step` (prismatic parts
 //!   only; STEP for a swept/constructive part refuses `NonCanonicalCarrier`).
-//! * swept-carrier booleans (PB-011 G1) — a `Mode` row over a swept carrier
-//!   (spline/swept/revolved carrier class) is a swept-carrier boolean row:
-//!   [`run_facade`] dispatches the pair through the landed certified entry
+//! * swept-carrier booleans (PB-011 G1, ADM-004-FUNNEL-WIRING) — a `Mode` row
+//!   over a swept carrier (spline/swept/revolved carrier class) is a
+//!   swept-carrier boolean row: [`run_facade`] consults admission (the ADM-000
+//!   dispatch rule — canonical dispatch stays ahead) and dispatches the
+//!   admitted pair through the landed certified entry
 //!   ([`dispatch_swept_carrier_boolean`], the facade mirror of the CL-006
-//!   solver-entry dispatch) and records each accepted row as a
-//!   [`SweptBooleanEvent`] on the report; a pair the certified funnel refuses
-//!   (a torus carrier in a swept pair) answers the typed, localized refusal —
-//!   fail-closed, never a bare `Err`. Canonical x canonical pairs are
-//!   untouched (the landed S1 path: no event, no dispatch).
+//!   solver-entry dispatch), recording each accepted row as a
+//!   [`SweptBooleanEvent`] on the report. A pair the certified funnel refuses
+//!   answers the typed, localized refusal — a torus carrier in a swept pair is
+//!   `ContactReductionDeferred`, and a both-Swept pair (two spline-loft
+//!   solids, not admitted at the carrier-class granularity) keeps the
+//!   constructive-carrier `NonCanonicalCarrier` refusal at the boolean
+//!   boundary — fail-closed, never a bare `Err`. Canonical x canonical pairs
+//!   are untouched (the landed S1 path: no event, no dispatch).
 //!
 //! Every entry point lands here as one Rust fn taking the submitted table —
 //! [`run_facade`] — so the native Rust facade entry (PB-008's third timing
@@ -160,9 +165,12 @@ pub struct CertifiedBooleanRoute {
 }
 
 /// The typed, localized refusal of a swept-carrier boolean pair the certified
-/// funnel refuses (a torus carrier in a swept pair). Fail-closed: the refusal
-/// carries the envelope case and the carrier-class pair identity (the
-/// stratum-pair localization).
+/// funnel refuses. Fail-closed: the refusal carries the envelope case and the
+/// carrier-class pair identity (the stratum-pair localization). The envelope
+/// case is [`EnvelopeCase::ContactReductionDeferred`] for a torus carrier in a
+/// swept pair, and [`EnvelopeCase::NonCanonicalCarrier`] for a swept pair the
+/// admission consult keeps outside the certified funnel (the constructive-
+/// carrier refusal at the boolean boundary).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct SweptBooleanRefusal {
     /// The boolean mode of the refused pair.
@@ -171,8 +179,7 @@ pub struct SweptBooleanRefusal {
     pub base: CarrierClass,
     /// The carrier class of the tool solid.
     pub tool: CarrierClass,
-    /// The typed envelope case of the refusal (`ContactReductionDeferred`:
-    /// the pair's contact reduction is outside the landed funnel stage).
+    /// The typed envelope case of the refusal.
     pub case: EnvelopeCase,
 }
 
@@ -190,15 +197,40 @@ pub enum BooleanPairVerdict {
     Refused(SweptBooleanRefusal),
 }
 
+/// The ADM-004 admission consult for one swept-carrier class pair (the facade
+/// mirror of the ADM-000 dispatch rule, wired by ADM-004-FUNNEL-WIRING):
+/// whether the certified funnel admits the pair at the carrier-class
+/// granularity the facade owns.
+///
+/// The certified funnel admits swept-carrier booleans end to end for the
+/// classes whose faces the Theorem A adapter serves (ADM-001+) — a swept pair
+/// against a canonical or revolved carrier, and the routed corner/shell pairs
+/// of the PB-011 waves. A pair coupling TWO lofted/swept carriers (the
+/// `Swept` × `Swept` cell — a boolean between two spline-loft solids) is the
+/// pair cell the certified funnel does NOT admit end to end at this coarse
+/// granularity (the PB-011C census): the admitted subclass (ruled-section
+/// lofts) is finer than a carrier class, so the class pair keeps the typed
+/// constructive-carrier refusal at the boolean boundary. Canonical dispatch
+/// stays ahead; the consult fires only where the old path refused
+/// `NonCanonicalCarrier`.
+fn swept_pair_is_admitted(base: CarrierClass, tool: CarrierClass) -> bool {
+    !(base == CarrierClass::Swept && tool == CarrierClass::Swept)
+}
+
 /// Routes one boolean carrier pair through the landed certified entry
 /// (PB-011 scope decision 1, the "exposed row"). A pair carrying a
 /// spline/swept/revolved carrier is the corpus's swept-carrier boolean: it
-/// dispatches into the certified funnel and certifies. A pair coupling a
-/// swept carrier with a torus carrier is a class the funnel refuses (the
-/// torus is excluded from the implicit-reduction stage, Theorem 4 economics)
-/// and answers the typed, localized refusal — fail-closed, never a bare
-/// `Err`. A canonical x canonical pair is the landed S1 canonical path and is
-/// reported as [`BooleanPairVerdict::CanonicalLanded`], never dispatched.
+/// consults admission (ADM-004-FUNNEL-WIRING, the ADM-000 dispatch rule) and
+/// dispatches into the certified funnel when the class pair is admitted. A
+/// both-Swept pair (two spline-loft solids) is not admitted at the carrier-
+/// class granularity and keeps the typed constructive-carrier
+/// `NonCanonicalCarrier` refusal at the boolean boundary (the PB-011C census
+/// verdict); a pair coupling a swept carrier with a torus carrier is a class
+/// the funnel refuses (the torus is excluded from the implicit-reduction
+/// stage, Theorem 4 economics) and answers the typed, localized
+/// `ContactReductionDeferred` refusal — fail-closed, never a bare `Err`. A
+/// canonical x canonical pair is the landed S1 canonical path and is reported
+/// as [`BooleanPairVerdict::CanonicalLanded`], never dispatched.
 ///
 /// This is the deterministic per-pair mirror of the kernel's CL-006
 /// `dispatch_restricted_sweep`; the loop-side facade cannot name the
@@ -221,6 +253,17 @@ pub fn dispatch_swept_carrier_boolean(
             base,
             tool,
             case: EnvelopeCase::ContactReductionDeferred,
+        });
+    }
+    // The admission consult (scope decision 2): run_facade consults admission
+    // BEFORE the `NonCanonicalCarrier` refusal — canonical dispatch stays
+    // ahead, and a not-yet-admitted carrier pair keeps the exact refusal.
+    if !swept_pair_is_admitted(base, tool) {
+        return BooleanPairVerdict::Refused(SweptBooleanRefusal {
+            mode,
+            base,
+            tool,
+            case: EnvelopeCase::NonCanonicalCarrier,
         });
     }
     BooleanPairVerdict::Routed(CertifiedBooleanRoute { mode, base, tool })
