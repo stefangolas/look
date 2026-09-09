@@ -46,13 +46,13 @@
     {"id": "hypercar/body", "family": "hypercar", "tree": "trees/hypercar/src", "module": "lib.body", "entry": "build", "args": [], "stage": "skipped"},
     {"id": "hypercar/brakes", "family": "hypercar", "tree": "trees/hypercar/src", "module": "lib.brakes", "entry": "build", "args": [], "stage": "skipped"},
     {"id": "hypercar/chassis", "family": "hypercar", "tree": "trees/hypercar/src", "module": "lib.chassis", "entry": "build", "args": [], "stage": "skipped"},
-    {"id": "hypercar/details", "family": "hypercar", "tree": "trees/hypercar/src", "module": "lib.details", "entry": "build", "args": [], "stage": "skipped", "reference": "hypercar_details.json"},
+    {"id": "hypercar/details", "family": "hypercar", "tree": "trees/hypercar/src", "module": "lib.details", "entry": "build", "args": [], "stage": "skipped"},
     {"id": "hypercar/glazing", "family": "hypercar", "tree": "trees/hypercar/src", "module": "lib.glazing", "entry": "build", "args": [], "stage": "skipped"},
     {"id": "hypercar/hinge", "family": "hypercar", "tree": "trees/hypercar/src", "module": "lib.hinge", "entry": "build", "args": [], "stage": "skipped"},
     {"id": "hypercar/interior", "family": "hypercar", "tree": "trees/hypercar/src", "module": "lib.interior", "entry": "build", "args": [], "stage": "skipped"},
     {"id": "hypercar/lighting", "family": "hypercar", "tree": "trees/hypercar/src", "module": "lib.lighting", "entry": "build", "args": [], "stage": "skipped"},
     {"id": "hypercar/powertrain", "family": "hypercar", "tree": "trees/hypercar/src", "module": "lib.powertrain", "entry": "build", "args": [], "stage": "skipped"},
-    {"id": "hypercar/suspension_front", "family": "hypercar", "tree": "trees/hypercar/src", "module": "lib.suspension_front", "entry": "build", "args": [], "stage": "skipped", "reference": "hypercar_suspension_front.json"},
-    {"id": "hypercar/suspension_rear", "family": "hypercar", "tree": "trees/hypercar/src", "module": "lib.suspension_rear", "entry": "build", "args": [], "stage": "skipped", "reference": "hypercar_suspension_rear.json"}
+    {"id": "hypercar/suspension_front", "family": "hypercar", "tree": "trees/hypercar/src", "module": "lib.suspension_front", "entry": "build", "args": [], "stage": "skipped"},
+    {"id": "hypercar/suspension_rear", "family": "hypercar", "tree": "trees/hypercar/src", "module": "lib.suspension_rear", "entry": "build", "args": [], "stage": "skipped"}
   ]
 }
