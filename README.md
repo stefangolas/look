@@ -351,7 +351,7 @@ cargo test --release --test gpu_smoke -- --ignored --nocapture --test-threads=1
 `cargo check --locked --all-targets` and `cargo test --locked --all-targets` use
 the default (debug) profile and cover the full target set, including the probes.
 
-See [architecture](docs/ARCHITECTURE.md), [cross-platform testing](docs/CROSS_PLATFORM_TESTING.md),
+See [cross-platform testing](docs/CROSS_PLATFORM_TESTING.md),
 and [AGENTS.md](AGENTS.md). GitHub Actions builds and smoke-tests release
 binaries for Linux, Windows, and macOS on x64 and ARM64.
 
