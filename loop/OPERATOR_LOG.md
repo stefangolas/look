@@ -576,3 +576,61 @@ conflict-abort on slot 7 each cycle until adjudicated); orchestrator session pid
 17740 LIVE; disk 15.7 GB free; RAM 4.9 GB free. Escalations carried: FRAME-
 REVOLVE landing adjudication (NEW); duplicate supervisors 27392 + 15100; wedged
 cargoq restart guard; slot-4 F1 wt RESULT residue; TOR-C flip-or-pin.
+
+## 2026-09-09 22:35 UTC (operator cycle)
+
+Board at start: 0 RUNNING / 0 landed-this-cycle. Everything FINISHED/IDLE
+residue; the board is unchanged since the 22:07Z cycle (HEAD faae9c3).
+
+Health sweep:
+- slot_status: 0 running; slot 7 FRAME-REVOLVE FINISHED residue (git=packet/
+  FRAME-REVOLVE@b667a85, RESULT.json present, 30.5 min-old events); slots 0-6
+  FINISHED/IDLE landed residue.
+- cargoq UP (ping {"ok":true,"queued":0,"running":false}; port 8231 owned by
+  server.py 25356). NOTE: two cargoq/server.py processes observed (27568 +
+  25356) - the same duplication shape flagged 06:1xZ and carried; functional
+  (one owns the port), not killed.
+- heartbeat exactly 1 (27440, anchored on the dispatch_heartbeat.ps1 command
+  line; the second process-scan match was my own charter cmdline - self-match
+  trap); operator runner 1 (29776 - this instance); watchdog 1 (28440);
+  overnight driver 1 (28824); TWO supervisors (27392 PyManager + 15100
+  pythoncore child - carried duplication class; only ONE overnight.py child =
+  no double-merge risk). Orchestrator session pid 17740 LIVE.
+- Disk 16.1 GB free (above the 8 GB floor AND the 15 GB janitor goal); RAM 5.3
+  GB free.
+
+Actions:
+- Health sweep done (see board above).
+- Landing: NOTHING LANDED. Re-verified FRAME-REVOLVE (slot 7) remains NOT
+  operator-landable: RESULT status LANDED (not DONE), mvac-pin-class finding
+  F1 (out-of-write-scope failing sub-case in truck123d/tests/ttc_lathe_spline
+  .rs), b667a85 NOT an ancestor of HEAD, no MERGE_HEAD (driver's 18:05 local
+  conflict-abort left a clean tree). Already ESCALATED 2026-09-09T22:06Z - not
+  re-escalated (no change since; a duplicate line adds noise). Slots 0-6
+  residue all landed packets (verified as ancestors in prior cycles; HEAD
+  unchanged since faae9c3 - no new landings this cycle).
+- Unblock: nothing stuck. No IDLE/DEAD worker >15 min holding work (slot 1 IDLE
+  is ADM-003 landed residue; slot 7 is adjudication-parked, not stuck-worker).
+- Registry hygiene: nothing flipped. Verified programmatically: READY rows
+  WITHOUT a 'landed <sha>' note marker = exactly {FRAME-REVOLVE (finished,
+  RESULT holds the slot assigned - dispatch_ready skips it), SWEEP-PATH (gated
+  on FRAME-REVOLVE)}; dispatch_ready --dry-run 'dispatched 0' is REAL idle.
+  BLOCKED rows with deps all landed = none dispatchable (TOR-C deps ADM-001/002
+  LANDED but orchestrator-held per the standing escalation; the 6 others
+  owner-parked/human-gated/superseded/cancelled).
+- dispatch_ready --dry-run only (heartbeat live - no manual dispatch): dispatched
+  0, SWEEP-PATH blocked on FRAME-REVOLVE (correct), 8 free slots.
+- ESCALATIONS: none new this cycle (FRAME-REVOLVE already escalated 22:06Z;
+  carried items unchanged).
+- STATE.md volatile refresh appended + ground-truth pointer updated
+  ([operator 2026-09-09T22:35Z]).
+
+Leaving: 0 RUNNING / 0 landed-this-cycle. FRAME-REVOLVE slot 7 FINISHED with an
+unlandable RESULT (escalated 22:06Z, wt RESULT preserved - do NOT re-fork);
+slots 0-6 landed residue; SWEEP-PATH READY gated on FRAME-REVOLVE; cargoq UP
+(ping ok; note the two-server duplication, functional); heartbeat 1 (27440);
+watchdog 1 (28440); overnight driver 1 (28824, conflict-aborts on slot 7 each
+cycle until adjudicated); orchestrator session pid 17740 LIVE; disk 16.1 GB
+free; RAM 5.3 GB free. Escalations carried (unchanged): FRAME-REVOLVE landing
+adjudication; duplicate supervisors 27392 + 15100 + the wedged cargoq restart
+guard; slot-4 F1 wt RESULT residue; TOR-C flip-or-pin.

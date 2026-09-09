@@ -15,20 +15,22 @@ program, and the operator agent.
 ## Where we are
 
 > LATEST GROUND TRUTH: read the newest `[operator ...]` block in "State of
-> the machine, as left" (2026-09-09T22:07Z). [operator 2026-09-09T22:07Z
-> ground-truth note: **FRAME-REVOLVE finished mid-cycle (worker commit
-> b667a85) and is NOT operator-landable** - RESULT status LANDED (not
-> DONE) + its own verification records a FAILING sub-case
-> (revolve_refusals_stay_typed_after_spline_admission non_z_axis in
-> truck123d/tests/ttc_lathe_spline.rs, out-of-write-scope, mvac-pin-class
-> finding F1); the overnight driver attempted a landing 18:05 local, hit a
-> merge conflict on the harness artifacts CONTEXT.md/PACKET.md the worker
-> committed, aborted cleanly (no MERGE_HEAD, b667a85 unmerged, wt RESULT
-> intact); it will conflict-abort every 5-min cycle until adjudicated.
-> ESCALATED 22:06Z. Everything else idle: slots 0-6 landed residue,
-> SWEEP-PATH READY gated on FRAME-REVOLVE, dispatch-0 real idle. Substrate
-> nominal (heartbeat 27440, watchdog 28440, cargoq UP, driver 28824,
-> operator runner 29776). Orchestrator session LIVE (opencode pid 17740).]
+> the machine, as left" (2026-09-09T22:35Z). [operator 2026-09-09T22:35Z
+> ground-truth note: unchanged quiet board since the 22:07Z cycle -
+> FRAME-REVOLVE (slot 7) still FINISHED and NOT operator-landable (RESULT
+> status LANDED + mvac-pin-class finding F1, done-when red on the
+> out-of-scope non_z_axis pin; worker commit b667a85 unmerged, wt RESULT
+> intact, escalated 22:06Z); the overnight driver 28824 will keep
+> conflict-aborting on the harness artifacts every 5-min cycle until a
+> human adjudicates - do NOT re-fork slot 7. Slots 0-6 landed residue.
+> SWEEP-PATH READY gated on FRAME-REVOLVE; dispatch 0 = real idle (READY
+> rows without a landed marker = exactly {FRAME-REVOLVE, SWEEP-PATH}).
+> Registry: nothing flipable (TOR-C stays orchestrator-held; the 6 other
+> BLOCKED rows owner-parked/human-gated/superseded). Substrate nominal
+> (heartbeat 27440, watchdog 28440, cargoq UP on 25356, driver 28824,
+> operator runner 29776; two supervisors 27392+15100 carried; two
+> cargoq/server.py 27568+25356 carried-flagged, port owned by 25356).
+> Orchestrator session LIVE (opencode pid 17740).]
 
 - **THE FIRST KERNEL-VS-OCC TIMING COMPARISON IS BANKED** (FH-TIMING-REFRESH,
   landed c94d043): turbopump_assembly **0.097 s kernel vs 4.866 s OCC**,
@@ -487,6 +489,31 @@ risk). Disk 15.7 GB free (above the 8 GB floor AND the 15 GB janitor goal), RAM
 LANDED + mvac-pin-class F1 + harness-artifact merge conflict); carried
 unchanged - duplicate supervisors + the wedged cargoq supervisor restart guard;
 slot-4 F1 wt RESULT residue; TOR-C flip-or-pin decision.]
+
+[operator 2026-09-09T22:35Z - volatile refresh. Board now: 0 RUNNING / 0
+landed-this-cycle. Quiet healthy cycle - the board is unchanged since the 22:07Z
+cycle (HEAD faae9c3): FRAME-REVOLVE (slot 7) still FINISHED with the unlandable
+RESULT (status LANDED + mvac-pin finding F1, b667a85 NOT an ancestor of HEAD -
+re-verified; escalated 22:06Z, do NOT re-fork slot 7 until adjudicated). Slots
+0-6 FINISHED/IDLE residue all landed (251f368, 4de25d9, e33c4dd, e9d885a,
+3c2109b, ee97499, 713f205 - verified in prior cycles, HEAD unchanged since).
+Registry re-verified programmatically: READY rows WITHOUT a 'landed <sha>' note
+marker = exactly {FRAME-REVOLVE (finished, RESULT holds slot assigned), SWEEP-
+PATH (gated on FRAME-REVOLVE)}; dispatch_ready --dry-run 'dispatched 0' is REAL
+idle. BLOCKED rows with deps all landed = none dispatchable (TOR-C deps
+ADM-001/002 LANDED but orchestrator-held per the standing escalation; the 6
+others owner-parked/human-gated/superseded/cancelled - nothing flipped).
+Health: heartbeat exactly 1 (27440, command-line anchored), watchdog 1 (28440),
+cargoq UP (ping ok, queued 0, running false; port 8231 owned by server.py 25356;
+TWO cargoq/server.py processes 27568 + 25356 - the carried-flagged duplication
+shape, functional, not killed), operator runner 1 (29776), overnight driver 1
+(28824), orchestrator session LIVE (opencode pid 17740), TWO supervisors (27392
+PyManager + 15100 pythoncore child - carried; only ONE overnight.py child = no
+double-merge risk). Disk 16.1 GB free (above the 8 GB floor AND the 15 GB
+janitor goal); RAM 5.3 GB free. Open human items (carried, unchanged): FRAME-
+REVOLVE landing adjudication; duplicate supervisors + the wedged cargoq
+supervisor restart guard; slot-4 F1 wt RESULT residue parking the driver's
+dispatch arm; TOR-C flip-or-pin decision.]
 
 ## The parallelism picture
 
