@@ -143,3 +143,45 @@ Judgment-required items appended each operator cycle. Newest at the bottom.
 - **F1 slot-4 residue is now load-bearing for the WHOLE landing pipeline**: clearing it (the mvac-pin amendment to truck123d/tests/ttc_lathe_spline.rs re-pointing mvac_row_still_refuses_typed_at_the_extrude_carrier) un-parks the driver. Without it, even the driver-side fix for the prose-stop bug would not resume landings.
 - Start here: land ADM-001 8f6a549 (git merge --no-ff 8f6a549 into integration/kernel-bg after scoped-verifying; file the RESULT per the protocol), then ADM-002 b3c1346 (RESULT at loop/results/ADM-002-CERTIFICATES.PENDING.RESULT.json). Then fix overnight.py:165 (treat str stop_conditions as stopped only on a positive trigger assertion, NOT 'NOT|none|no ' preceding 'trigger') and adjudicate the F1 mvac-pin amendment to un-park the driver.
 - Carried (unchanged): duplicate supervisors 35200 + 24272; two cargoq/server.py observed (8132 + 12504, ping/queue fine - flagged, not adjudicated); driver-never-files-RESULT machinery gap; check-vs-recycle race.
+
+## 2026-09-09 15:56 UTC - RESOLVED the ADM saga; NEW: cargoq guard wedged + slot-4 residue + TOR-C flip decision
+
+- **RESOLVED / close the 04:30-06:1x ADM escalations**: the ADM-001/ADM-002
+  never-filed-RESULT saga is CLOSED by the orchestrator - ADM-001 landed as
+  b805ddd (worker 565ba8b, 3rd re-run), ADM-002 landed as 345e635 (worker
+  5a44609), rows LANDED in 3ef4dab (verified ancestors of integration/kernel-bg
+  HEAD). ADM-004, TTC-RECENSUS-F1, AUTHOR-FRAME-CARRIERS and the F1 mvac-pin
+  amendment (5f1396d/da76ec0) are all landed. The overnight.py prose-stop bug is
+  FIXED (d8025d8). Nothing to land from the ADM era.
+- **NEW - cargoq was DOWN and the supervisor restart guard is wedged.** cargoq
+  server.log died 02:29:54 (exit 1073807364) and never returned; the supervisor
+  (restarted 15:48 by the launcher, then 15:51:17Z by the orchestrator session)
+  logged only its start lines - no 'cargoq server not running - restarting' line
+  ever, even though cargoq was down for 13 hours. supervisor.py:45's
+  alive('cargoq') probe appears to false-positive on launcher/orchestrator
+  powershell command lines that contain the literal text 'cargoq' (the 15:48
+  bootstrap's instance-count probe does), OR the supervisor wedges inside its
+  WMI alive() subprocess. The OPERATOR restarted the cargoq server directly at
+  15:54Z (ping OK, queued 0) - but the guard itself needs a human look (alive()
+  should probe the server port, not process command lines). Start here:
+  supervisor.py:27-48 and the 15:48/15:51 bootstrap command lines.
+- **Slot-4 F1 residue still parks the overnight driver's dispatch arm** even
+  though the F1 packet is fully resolved (row DONE, ledger LANDED, mvac-pin
+  amendment landed, RESULT archived in loop/results/F1-AUTHORING-ARMS*.json).
+  The stale 'landed-with-findings' RESULT.json in the slot-4 worktree root makes
+  overnight.py log 'LEFT FOR MORNING' every 5-min cycle (dispatch arm parked;
+  per-slot landing attempts at other slots still run, so slots 0/7 are NOT
+  blocked). run_packet --reset-only reports the slot bookkeeping-clean, so the
+  residue is the wt-root file itself. Recommend the orchestrator clear it
+  (heartbeat recycle on the next slot-4 assignment, or a wt-root RESULT.json
+  delete commit) to silence the park.
+- **TOR-C is BLOCKED with all deps now landed** (needs ADM-001-ADAPTER +
+  ADM-002-CERTIFICATES; both LANDED per 3ef4dab). Per the registry rule it
+  qualifies to flip BLOCKED->READY, and the owner ruling ('dispatch after
+  ADM-001+ADM-002 land') is now satisfied. NOT flipped by the operator: the
+  orchestrator session is LIVE and sequencing the door-gap program (last commit
+  3c65c6a = SWEEP-PATH registered), and a flip would dispatch a heavy third
+  worker. Flip+dispatch or pin is the orchestrator's call.
+- Carried (now current pids): duplicate supervisors 27392 (PyManager) + 15100
+  (pythoncore, child of 27392 - likely the PyManager-shim spawn pattern); only
+  ONE overnight.py child (28824) = no double-merge risk this cycle.
