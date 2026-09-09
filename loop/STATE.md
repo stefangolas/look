@@ -7,99 +7,189 @@ lines and must be rewritten each time. "Traps" and everything below it is
 session and removed only when they stop being true, never for length. If
 you are picking this up cold, read **this file, then
 [`loop/ORCHESTRATOR.md`](ORCHESTRATOR.md)` for how to run the loop, then
-`python loop/slot_status.py`** - nothing else. Do not read `LEDGER.jsonl`
-whole.
+`python loop/slot_status.py`** - nothing else.
 
-Updated 2026-09-07 (late), session 55 - the DEF wave + the TTC chain.
+Updated 2026-09-08 (evening), session 56 - the timing numbers, the admission
+program, and the operator agent.
 
 ## Where we are
 
-- **CTE, CL, BIE, CC, P1-P12, base kernel, BREP, CFP: COMPLETE.**
-- **PB program: PB-011 r1 LANDED 2a12623** (swept-carrier boolean routing
-  +787 LOC; cutaway lifted green ~11 s / 409k tris; the facade dispatch is
-  a MIRROR of the CL-006 solver-entry dispatch per the dependency law).
-  **PB-011 r2 RUNNING** (slot 1): the MONOCOQUE lift - the first
-  kernel-side corpus geometry - was blocked by a PRE-EXISTING
-  python314.dll loader issue in the truck123d lib test exe under the
-  cargoq server env (fails at base; verified by stashing); the worker is
-  mid-fix (interpreter dir on PATH).
-- **Reference capital COMPLETE: all 34 staged rows have recorded OCC
-  reference facts** (`corpus/ttc/reference/*.json`; wall times in
-  `scratch/reference_batch_log.json`). OCC column of the timing table is
-  measured; **the truck column does not exist yet** - the first number is
-  monocoque, from PB-011 r2's lift.
-- **OCC is FLAKY on real geometry under load**: the monocoque door run
-  threw `Null TopoDS_Shape` 1-in-3 under 4-way concurrency, deterministic
-  (42.8 s, 2 solids, volume 6.348e8, 6971 tris) when quiet. Reference
-  recorded; the flakiness is a finding (the corpus author's
-  repair-everything culture exists for this; our determinism contract is
-  the demo).
-- **DEF wave: landed** - CDT invariant test repair, vendor fixtures (8
-  shape JSONs via the committed generator examples; resources/shape was
-  never vendored), fillet identity (complex_surface Closed again),
-  SEEDRAY-A (interval ray-crossing primitives), SEEDRAY-C (avoidance
-  audit doc + probe - **READY FOR THE USER'S FRONTIER REVIEW**,
-  `docs/AUDIT_SEEDRAY_AVOIDANCE.md`), tracer escalation-lattice
-  remainder (BG-KV2-207B: kernel_tracer 8/8 - the 3.65x single-pass hull
-  inflation mechanism, net-restriction fix).
-- **BLOCKED with findings:** DEF-TESS-ANALYTIC-SEAM r1 (density-agreement
-  reverted on planar impact) -> **R2 booked** (EdgeID-keyed seam
-  contracts, diagnose-first); DEF-SPINEFRAME-GRAZE r1 (pad ladder proved
-  the funnel's unclamped Newton ranges 2300x out of domain) -> **R2
-  registered** (search-layer clamp).
-- **TTC chain booked in the right order:** PB-011B (12 canonical-cutter
-  F1 lifts, 2-D path) -> PB-011C (8 swept-x-swept rows, census-first) ->
-  per-model timing (TTC-TIMING-FH/MONO) through the executor binding.
-  Torus-contact program booking doc: `docs/TORUS_CONTACT_PROGRAM.md`.
-  The excluded six (front_wing, cockpit, nose, sidepods, cooling, halo)
-  stay refused pending owner decision.
+- **THE FIRST KERNEL-VS-OCC TIMING COMPARISON IS BANKED** (FH-TIMING-REFRESH,
+  landed c94d043): turbopump_assembly **0.097 s kernel vs 4.866 s OCC**,
+  chamber_assembly 0.111 vs 4.766, fairing 0.096 vs 4.563 - medians over
+  five measured runs, facts gates GREEN on BOTH engines, raw samples in
+  `docs/TT_TIMING_RESULTS.md`. Scope honesty: the lathe/primitive class is
+  the kernel's home turf (analytic facts + deterministic mesh); the harder
+  rows are DNF pending admission.
+- **The authoring layer is CLOSED** (F1-AUTHORING-ARMS landed): loft,
+  sweep-as-loft-chain, mirror, extrude, make_face, tube-census-coverage all
+  record as kernel rows with exact facts. F1 rows now refuse at the BOOLEAN
+  boundary (the admission program's) - the authoring verbs are done.
+- **The FSSI gate/locus layer is LANDED**: FSSI-000 (contract), FSSI-001
+  (transversality gate, corrected Theorem C mechanism), FSSI-004 (ruled x
+  ruled closed-form loci).
+- **The torus program's first two packets are LANDED**: TOR-A (torus x plane
+  exact circle loci via the Villarceau factorization certificate - axial,
+  coaxial, bitangent cases), TOR-B (ray-torus quartic crossings in
+  classify). Theory v2 is committed and frontier-reviewed
+  (`docs/TORUS_CONTACT_THEORY.md` - N1 completeness PROVEN, N3* narrowing,
+  the 2-D implicit-pullback fast path).
+- **The admission program is MID-WAVE (the spine restructure)**: ADM-000
+  (contract) landed; ADM-SHIM (the extracted-patch type freeze) landed;
+  ADM-L5 (the certified reciprocal-power primitive, Theorem D) landed;
+  **ADM-L1/L2/L3 RUNNING now** (extraction, product, normal-cone lemmas);
+  ADM-L4 queued READY. Then the assembly packets ADM-001/002/003
+  (rewritten to CONSUME the proven lemmas), ADM-004 (funnel wiring + V5
+  battery), TTC-RECENSUS-F1 (the closing re-census).
+- **The census maps exist for every family**: F1 complete (12 lifted, 9
+  measured boundaries), FH complete (6 rows mapped: 3 typed now-cleared by
+  the lathe arm, 3 typed pending tube/sweep admission), hypercar mapped
+  (10 typed/DNF + 3 UNSTAGED).
+- **LANDED-WITH-FINDINGS adjudications pending follow-up**: (F1) the
+  spline-row OCC references are default-BRepGProp biased ~1.16e-4 relative
+  vs converged - RE-RECORD converged (orchestrator-direct, blocks
+  nozzle/mvac timing not generation); (F2) mvac needs the extrude/sweep
+  arms (landed in F1-AUTHORING-ARMS).
+- **The excluded-six annex is written** (`docs/EXCLUDED_SIX_DEMAND_MAP.md`):
+  4 real scripts + halo (mono_halo.py, a sweep-as-loft-chain) + cooling
+  (NO script - drops out). Theory delta: essentially none beyond the
+  admission program. Owner decisions pending (annex section 6).
+- **The operator agent is LIVE** (`loop/OPERATOR_CHARTER.md` +
+  `operator_runner.ps1`): deepseek, spawned fresh every 20 min, killed at
+  15, PID-file singleton, bounded authority (mechanical unblocks + STATE
+  volatile currency), escalations to `loop/OPERATOR_ESCALATIONS.md`.
 
 ## Pick up here
 
-0. `python loop/dispatch_ready.py --dry-run` FIRST. Two workers may be
-   mid-flight or finished: **PB-011 r2** (slot 1 - adjudicate the
-   monocoque lift: facts vs `corpus/ttc/reference/monocoque.json`: 2
-   solids, volume 6.348e8, 6971 tris; capture the kernel WALL TIME - the
-   first truck number) and **TTC-EXECUTOR-BINDING** (slot 0).
-1. After r2 lands: **PB-011B dispatches** (write-set clash holds it while
-   r2 runs - that is correct), then **PB-011C** after B.
-2. After the binding lands: **TTC-TIMING-FH + TTC-TIMING-MONO dispatch**
-   - per-model timing through `door.py --engine truck`, three columns
-   (time/verdict/facts), BENCHMARKS protocol (release, quiet machine,
-   alternating, medians). Results into `docs/TT_TIMING_RESULTS.md`.
-3. **USER ACTION pending:** fire the frontier review of
-   `docs/AUDIT_SEEDRAY_AVOIDANCE.md` -> unblocks **SEEDRAY-B** (already
-   READY-gated on it per the M9 split; A is landed).
-4. Dispatch **DEF-TESS-ANALYTIC-SEAM-R2** and **DEF-SPINEFRAME-GRAZE-R2**
-   (both READY) into free slots - staggered, the warm-build memory deaths
-   (0xc0000409) happen at 4 concurrent builders.
-5. The monocoque comparison verdict: OCC-DNF(flaky) vs kernel - if the
-   funnel certifies the tub, the facts gate is "builds at all +
-   invariants" (OCC has no reference for it beyond the flaky one; the
-   recorded one is good).
-6. Adjudication reminders: the driver's 5-min cycles land finished rows
-   themselves - check `git log --grep` before hand-merging; NEVER write
-   "landed <hex>" in a registry note unless the row IS landed (the
-   dispatcher's LANDED_RE marker check; bit us twice this session).
+0. `python loop/slot_status.py` - expect ADM-L1/L2/L3 RUNNING (the lemma
+   wave); FH-TIMING-REFRESH landed; the heartbeat (exactly ONE powershell
+   matching dispatch_heartbeat) and the operator runner (exactly ONE
+   matching operator_runner.ps1) alive.
+1. **Adjudicate landings mechanically**: FINISHED slot + RESULT status DONE
+   + packet's named tests green at merged HEAD -> merge --no-ff, file
+   RESULT to loop/results/, ledger row, flip DONE. Anything else ->
+   escalate per `loop/OPERATOR_CHARTER.md` (the operator may have already
+   done it - check OPERATOR_LOG.md and the ledger first).
+2. **The dispatch cascade runs itself**: L1-L3 land -> ADM-001+002
+   dispatch; L4 lands -> ADM-003; assemblies land -> ADM-004 -> TTC-
+   RECENSUS-F1. The heartbeat (10-min cycles) + driver (5-min landings)
+   carry it; the operator unblocks the mechanical tail. Verify the chain
+   is moving every few hours; do not run manual dispatch_ready while the
+   heartbeat is live (the double-dispatch race cost ADM-L5 a duplicate and
+   FH-TIMING-REFRESH its slot - single-instance rules are in the traps).
+3. **Direct tasks** (no packet): (a) re-record the spline-row OCC
+   references CONVERGED (the ~1.16e-4 BRepGProp bias - the door's facts
+   path needs the converged call); (b) stage the five excluded scripts
+   (manifest rows + references) after the owner confirms annex section 6.
+4. **TOR-C** is booked-for-completeness (owner ruling: every landed-carrier
+   pair cell must go green; the census gates scheduling/fixtures, not
+   inclusion). Dispatch after ADM-001+ADM-002 land (it instantiates them).
+   Est ~1-2 loop-days post-review.
+5. **Human items**: the SEEDRAY-B frontier review; the excluded-six annex
+   section 6 decisions; DeepSeek balance (the 402 class killed two workers
+   once already - the WIP-commit + resume recovery works, see traps).
+6. The torus theory review statement (`docs/TORUS_SECTION_THEORY.md`,
+   questions Q1-Q6) went to a frontier agent - Q1 (census completeness)
+   came back PROVEN in v2; check for its remaining answers.
 
 ## State of the machine, as left
 
-- cargoq + supervisor + watchdog + janitor + driver RUNNING (from 09-05).
-- Workers: PB-011 r2 (slot 1) + TTC-EXECUTOR-BINDING (slot 0) RUNNING.
-- Disk ~20 GB free. RAM 15.7 GB total, ~5 GB free at 2 workers - the
-  0xc0000409 warm-build deaths happen at 4 concurrent builders; stagger.
-- The reference batch (scratch/batch_references.py) is COMPLETE (34/34
-  keys); its log is the complexity ranking (engine_cover 98.3 s, power_unit
-  85.3 s, drivetrain 72.0 s, hypercar/body 52.6 s top measured; monocoque
-  DNF).
+- 4 workers: ADM-L1 (slot 1), ADM-L2 (slot 2), ADM-L3 (slot 3) + slot 0
+  was FH-TIMING-REFRESH (landed, freed).
+- Substrate: heartbeat 1 instance, operator runner 1 instance, watchdog
+  alive (pid 29364), cargoq healthy, driver/supervisor alive (BUT see the
+  session-56 traps: it skipped one landing and duplicated itself once).
+- **Disk ~5.4 GB free - LOW** (pagefile 8.1 GB, three live worker targets
+  ~1 GB each and growing). The janitor is short of its 15 GB goal. If
+  rustc exits 101 appears, clean `loop/slots/*/target` + root `target/`
+  and consider the reboot (the pagefile does not shrink while live).
+- RAM ~3.6 GB free at 4 workers - the cold-warm-build 0xc0000409 zone;
+  chrome is closed (helps). Do not raise the worker cap.
 
 ## The parallelism picture
 
-Unchanged: cargoq serializes all cargo; rolling dispatch via
-dispatch_ready; cap 4 workers BUT stagger big warm builds (the memory
-deaths); one-verify per program at integrated HEAD. The TTC chain is the
-critical path: r2 -> B -> C with the binding in parallel; the timing
-packets close it.
+The lemma wave (L1-L4, pure functions over the frozen shim type) is
+5-wide-parallelizable and nearly done; the assemblies are 3-wide; ADM-004
+and the re-census are serial closers. TOR-C branches after ADM-001/002.
+The operator + heartbeat + driver keep every freed slot filling without
+human input. Full F1 + FH coverage = the admission chain closing + the
+reference re-recording + the torus corner flips; every packet is
+registered with measured anchors and a committed spec.
+
+
+### Session 56 (the timing numbers, the admission spine, the operator agent) - paid in full
+
+- **The LANDED_RE trap hit a THIRD time - from my own hand.** Writing
+  "dep PB-011B LANDED 2400e06" in a READY row's note made the dispatcher
+  silently skip it (the marker means "row already landed"). The registry
+  was swept; the rule is absolute: the pattern `landed <hex>` appears in a
+  note ONLY when the row IS landed; status is the truth.
+- **The anchor ritual re-measures at EVERY dispatch** - three post-landing
+  drifts caught pre-dispatch in one day (TensorBernsteinPatch x15 after
+  the shim landed, admit_tensor_spline_pair x4, reference files 14->45).
+  Anchors written as post-landing values are pre-dispatch-INVALID (the
+  original FSSI-001/004 drafts) - anchor on the measured substrate.
+- **Conflict resolution in marker-bearing files is SEMANTIC.** Resolving
+  the SKIPS.json merge with `--theirs` silently dropped the monocoque
+  LIFT EVIDENCE marker - and the lifted-set machine check READS that
+  marker, so the parity test failed at merged HEAD. Marker-bearing files
+  (SKIPS notes, dispositions) get hand-reviewed unions, never side
+  selection. The runtime-factorization probe caught it in one test run.
+- **The driver landed r2 in SPLIT commits** (merge first, the worker's
+  SKIPS/pb_parity edits in later commits) - which manufactured a merge
+  conflict for the next packet and briefly stranded a load-bearing note.
+  Landing drift is real: diff the landed tree against expectations.
+- **Two pipelines, two verdicts: the monocoque DNF.** The lift evidence
+  ran green through the FACADE path; the timing table measures the DOOR
+  path - which refused the authoring carriers. The lift and the door were
+  never the same pipeline; smoke-test the EXACT path a packet measures
+  before booking its numbers.
+- **The capability matrix falsifies plausible claims.** "Fillets on
+  spline carriers have no representation" died against matrix row 14
+  (fillet LANDED certified - the CC spine-based blend program). Check
+  `docs/OP_CAPABILITY_MATRIX.md` BEFORE declaring a gap.
+- **The dispatcher has a dir-prefix clash blind spot**: dir writes
+  (`truck123d/src/`) do not set-intersect with file writes
+  (`truck123d/src/facade.rs`) - two packets raced unflagged. Fix pending.
+- **The driver is fallible**: it skipped B's landing for 90 min and was
+  observed duplicated (two supervisor processes). Landing drift is real:
+  diff the ledger against FINISHED slots every few hours.
+- **The 402 recovery works and is cheap**: API-balance death mid-run ->
+  commit the WIP as `WIP: interrupted...` on the packet branch, then
+  `run_packet --resume --session-id <id>` - 2,600 lines of dead workers'
+  work completed to landing. The dirty-worktree guard blocks bare
+  --resume; the WIP commit satisfies it.
+- **The double-heartbeat race is real**: two heartbeat instances
+  double-dispatched (ADM-L5 ran twice; FH-TIMING-REFRESH lost its slot
+  mid-run). Exactly one heartbeat, verified by count; never run a manual
+  dispatch_ready while one is live.
+- **Process filters self-match**: any `Where-Object CommandLine -match
+  '<pattern>'` probe matches the probing shell itself (the pattern is in
+  its own command line). Exclude `$PID` or you kill/query yourself.
+- **The untracked-spec class**: docs/FSSI_BUILD_SPEC.md and its packets
+  were never committed - slot worktrees could never see them, and no git
+  provenance existed. Specs land committed BEFORE the packets that cite
+  them.
+- **Spec mis-citations propagate into packet anchors**: the FSSI spec
+  cited `SsiRefusal` at `ssi_types.rs:97-116` (the CFP shim - the enum
+  actually lives at `ssi.rs:97`); the packet inherited it and failed its
+  own preflight. Re-author on the MEASURED substrate; fix the spec at the
+  source.
+- **The frontier review earned its cost**: it proved the section-class
+  completeness (Q1), corrected the false emptiness claim in FSSI-001
+  (transversality, not exclusion), narrowed N3 to Gauss-map folds, and
+  contributed the 2-D implicit-pullback fast path. Route theorem
+  statements through it before packets are authored from them.
+- **Toolchain drift breaks whole-file sweeps**: fmt --check / clippy
+  --all-targets fail on the ACTIVE toolchain (1.97 vs pinned) on files
+  the packet never touched - per-file clean, recorded, and carried to the
+  program-end battery (FSSI-001, TOR-B notes). Verify the "pre-existing"
+  claim at base before accepting it.
+- **The first timing numbers needed three generations of infrastructure**:
+  the executor binding (the flight layer), the lathe arm (the carrier),
+  the reference honesty (the gate) - and the result is ~50x on the
+  lathe/primitive class with facts GREEN on both engines. The DNF rows
+  are as valuable: each names its exact missing carrier.
 
 ### Session 55 (the DEF wave + the TTC chain + the LANDED_RE trap) - paid in full
 
