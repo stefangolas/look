@@ -15,10 +15,14 @@ program, and the operator agent.
 ## Where we are
 
 > LATEST GROUND TRUTH: read the newest `[operator ...]` block in "State of
-> the machine, as left" (2026-09-09T05:47Z). Hot item: ADM-001 re-run
-> (8f6a549) is adjudicated GREEN but RESULT-less and escalated for a human
-> landing before ADM-002 frees the admission.rs write set and ping-pongs a
-> third re-run. 1 RUNNING (ADM-002 slot 0).
+> the machine, as left" (2026-09-09T06:1xZ). Hot item: the ADM-001/ADM-002
+> admission.rs ping-pong has NOT landed anything (the overnight driver is in
+> permanent LEFT-FOR-MORNING on the F1 slot-4 judgment residue AND on its own
+> prose-stop misparse) - ADM-001 is on its THIRD re-run (slot 0, pid 19604,
+> mid-done-when) and ADM-002's finished commit b3c1346 has a PRESERVED RESULT
+> (loop/results/ADM-002-CERTIFICATES.PENDING.RESULT.json, status done). Both
+> need the orchestrator never-filed-RESULT landing protocol; land ADM-001
+> (8f6a549, wip-ref-preserved) FIRST, then ADM-002. 1 RUNNING (ADM-001 slot 0).
 
 - **THE FIRST KERNEL-VS-OCC TIMING COMPARISON IS BANKED** (FH-TIMING-REFRESH,
   landed c94d043): turbopump_assembly **0.097 s kernel vs 4.866 s OCC**,
@@ -292,6 +296,44 @@ land ADM-001 8f6a549 before ADM-002 frees the write set or pin the row;
 F1 mvac-pin amendment; supervisor duplication; the driver-check-vs-recycle
 race + driver-never-files-RESULT machinery gaps; overnight.py 'NOT
 triggered.' prose-stop bug.]
+
+[operator 2026-09-09T06:1xZ - volatile refresh. Board now: 1 RUNNING / 0
+landed-this-cycle. **ADM-001-ADAPTER is on its THIRD re-run** (slot 0, pid
+19604, forked 06:04:37Z by the heartbeat from clean base 4d979e8 = integration
+HEAD; events fresh; was mid-done-when this cycle - running full truck-certified
+tests + clippy through cargoq). **ADM-002-CERTIFICATES finished its re-run as
+b3c1346** (parent 531b370, the same two-file assembly as the lost 93a3001,
+deliberately re-landed) - NOT landed, and the overnight driver PARKED it at
+01:59:57 local on the SAME prose-stop misparse ('NOT triggered. ...' parsed as
+a trigger -> LEFT FOR MORNING), archiving a PENDING RESULT first. THAT ARCHIVE
+SURVIVES: loop/results/ADM-002-CERTIFICATES.PENDING.RESULT.json (status done,
+commit b3c1346) - the first ADM-001/002 RESULT to survive, so ADM-002 is NOW
+operator-landable IN PRINCIPLE once the live ADM-001 write-set frees. The
+05:20 escalation's "RESULT lost" claim is superseded for ADM-002 (but stands
+for ADM-001's 8f6a549 - the driver never processed that slot before the
+recycle). **ADM-001's adjudicated-green 8f6a549 was ORPHANED by the 06:04Z
+re-fork** (branch reset to base; reflog @{1}) - I preserved it at
+refs/wip/ADM-001-8f6a549-green-adjudicated so the human landing has it. Driver
+37284 confirmed in PERMANENT LEFT-FOR-MORNING (every 5-min cycle 01:19-02:10
+local logs only F1 slot-4 judgment + no-dispatch; it will NOT land ADM-001/002
+even when they finish). Landing order for the human: ADM-001 (8f6a549) FIRST,
+then ADM-002 (b3c1346) or let ADM-002's next auto-run absorb ADM-001 - do NOT
+land ADM-002 while ADM-001's live run is mid-file on admission.rs (semantic
+double-merge). Health: disk 12.8 GB free (above the 8 GB floor, below the 15
+GB janitor goal), RAM 4.7 GB free, cargoq ok (queued 0, 1 running = the ADM-001
+worker's clippy; NOTE two cargoq/server.py observed 8132 PyManager + 12504
+pythoncore-child - same duplication shape as the supervisors, flagging),
+heartbeat 1 (29152), watchdog 1 (29364, no ACTION lines since 09-07 = no
+misfire risk), operator runner 1, TWO supervisors (35200 + 24272, open - only
+ONE overnight.py child 37284, no double-merge risk). Registry: ADM-004 needs
+001/002/003 - BLOCKED correct; TOR-C needs 001/002 - BLOCKED correct;
+TTC-RECENSUS-F1 needs ADM-004 - BLOCKED correct; nothing to flip. Nothing to
+land this cycle (slots 2-6 residue landed; 8f6a549 + b3c1346 both escalate per
+the never-filed-RESULT protocol). Open human items: land ADM-001 8f6a549 then
+ADM-002 b3c1346 (RESULTs now preserved/reconstructible); F1 mvac-pin amendment;
+duplicate supervisors; driver-never-files-RESULT + check-vs-recycle races;
+overnight.py 'NOT triggered.' prose-stop bug (now stranded ADM-L4, ADM-003,
+AND ADM-002 - three strikes).]
 
 ## The parallelism picture
 

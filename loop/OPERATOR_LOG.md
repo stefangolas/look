@@ -313,3 +313,23 @@ Actions:
 - STATE.md volatile refresh appended ([operator 2026-09-09T05:47Z]).
 
 Leaving: 1 RUNNING (ADM-002 slot 0 pid 19500); ADM-001 commit 8f6a549 green-but-unlanded, RESULT lost, escalated; disk 13.8 GB free; escalations carried (F1 mvac-pin amendment, duplicate supervisors, ADM-001 RESULT-loss + landing, driver-check-vs-recycle race).
+
+## Operator cycle 2026-09-09 06:11Z (fresh spawn, direct run)
+
+Board at start: 1 RUNNING (ADM-001-ADAPTER slot 0 pid 19604 - its THIRD re-run, forked 06:04:37Z by the heartbeat from clean base 4d979e8 = integration HEAD; events fresh, mid-done-when this cycle: full truck-certified tests then clippy through cargoq pid 5268); slot 1 IDLE (ADM-003 landed residue, inert); slots 2-6 FINISHED residue all landed (ledger rows + ancestor checks at 05:47); slot 7 IDLE empty. Heartbeat exactly 1 (29152); watchdog 1 (29364, no ACTION lines since 09-07 = no misfire redispatch risk); operator runner 1; TWO supervisors (35200 PyManager + 24272 pythoncore, ONE overnight.py child 37284 - no double-merge risk); TWO cargoq/server.py observed (8132 PyManager + 12504 pythoncore-child; ping ok queued 0 running 1 - flagged, not touched). Disk 12.8 GB free (above 8 GB floor, below 15 GB janitor goal); RAM 4.7 GB free.
+
+Reconstruction this cycle:
+- ADM-002's re-run (pid 19500, dispatched 05:43:41Z) FINISHED committing b3c1346 (parent 531b370; same two-file certificate assembly as the lost 93a3001, deliberately re-landed). The overnight driver's 01:59:57-local cycle read it: status done, but overnight.py:165 misparsed the prose stop_conditions ('NOT triggered. ...' -> stopped=True) -> 'LEFT FOR MORNING (judgment required)' -> will NOT land. THIRD ADM packet stranded by this exact bug (ADM-L4, ADM-003, now ADM-002).
+- KEY NEW FACT: the driver's LEFT-FOR-MORNING path archived the RESULT first: loop/results/ADM-002-CERTIFICATES.PENDING.RESULT.json EXISTS (status done, commit b3c1346). The 05:20 escalation's 'ADM-002 RESULT lost' is SUPERSEDED - ADM-002 now has a preserved RESULT and is landable in principle (same ritual as the ADM-003/ADM-L4 operator landings) once the live ADM-001 write-set on admission.rs frees and the landing-order question resolves.
+- ADM-001's adjudicated-green commit 8f6a549 was ORPHANED by the 06:04:37Z re-fork (packet branch reset to base 4d979e8; 8f6a549 survived only in the branch reflog @{1}). I preserved it: refs/wip/ADM-001-8f6a549-green-adjudicated -> 8f6a549. No ADM-001 RESULT anywhere (4th loss stands; no PENDING archive - the driver never processed that slot).
+
+Actions:
+- Health sweep done (see board above).
+- Nothing landed. Slots 2-6 residue all landed; ADM-001 (8f6a549, RESULT-less) and ADM-002 (b3c1346, RESULT preserved) both escalate per the never-filed-RESULT protocol. I did NOT land ADM-002 b3c1346 now: its parent 531b370 contains no ADM-001 content while ADM-001 is LIVE mid-run on admission.rs from a base with no ADM-002 content - whichever lands second needs a semantic admission.rs merge; landing ADM-002 first while ADM-001 runs is the wrong-unblock class (two prior cycles declined it). Landing order for the human: ADM-001 (8f6a549) first, then ADM-002 (b3c1346) or its next auto-run absorbing ADM-001.
+- Nothing stuck to unblock (slot 0 RUNNING with fresh events; no IDLE/DEAD worker with a QUESTION to answer; slot 1/7 IDLE are landed/empty residue, not stuck).
+- Registry hygiene: nothing to flip (ADM-004 needs 001/002/003 correct; TOR-C needs 001/002 correct; TTC-RECENSUS-F1 needs ADM-004 correct). No newly-READY rows to anchor/lint.
+- dispatch_ready NOT run manually (heartbeat live - double-dispatch rule). --dry-run: dispatched 0, correct (ADM-002 deferred only by the admission.rs write-set clash with the RUNNING ADM-001).
+- ESCALATED (2026-09-09 06:1xZ): the driver is in PERMANENT LEFT-FOR-MORNING (every 5-min cycle 01:19-02:10 local logs only F1 slot-4 judgment + no-dispatch), so NOTHING will land ADM-001/002 mechanically; ADM-002 now has a preserved RESULT (PENDING archive) changing the landing math; ADM-001's 8f6a549 preserved at a wip ref; driver stranded a THIRD ADM packet on the prose-stop bug.
+- STATE.md volatile refresh appended ([operator 2026-09-09T06:1xZ]).
+
+Leaving: 1 RUNNING (ADM-001 slot 0 pid 19604, 3rd re-run, mid-done-when); ADM-002 commit b3c1346 with PRESERVED RESULT (PENDING archive) - land after ADM-001; ADM-001 8f6a549 green-adjudicated, RESULT-less, preserved at refs/wip/ADM-001-8f6a549-green-adjudicated; driver parked for morning (will land nothing); disk 12.8 GB free; escalations carried (land ADM-001 then ADM-002, F1 mvac-pin amendment, duplicate supervisors, driver-never-files-RESULT + check-vs-recycle races, prose-stop bug x3).
