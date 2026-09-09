@@ -216,3 +216,15 @@ pub mod patches;
 /// tensor-Bernstein form with certified positive weight brackets (the shim's
 /// refusing `patches::extract_patches` twin stays untouched).
 pub mod extract;
+/// The L2 tensor-Bernstein product lemma (ADM-L2-PRODUCT): the landed kernel
+/// bodies over the frozen patch type — the exact degree-grown product of two
+/// [`TensorBernsteinPatch`](patches::TensorBernsteinPatch)es (the coefficient
+/// convolution along each dimension, with the degree growth recorded on the
+/// result, never hidden) and the exact degree-elevation helper. Pure
+/// coefficient algebra in [`Expansion`](crate::formal::exact::Expansion)
+/// arithmetic: nothing searches, nothing samples. The frozen
+/// [`patches::patch_product`] stub stays refusing `Unfrozen` in the shim;
+/// this module is where the L2 bodies land behind their admitting
+/// conformance tests.
+pub mod prod;
+
