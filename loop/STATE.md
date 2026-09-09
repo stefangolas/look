@@ -15,13 +15,17 @@ program, and the operator agent.
 ## Where we are
 
 > LATEST GROUND TRUTH: read the newest `[operator ...]` block in "State of
-> the machine, as left" (2026-09-09T20:2xZ). [operator 2026-09-09T20:2xZ
-> ground-truth note: the ADM saga is CLOSED; the DOOR-GAP program is in
-> flight - REF-RECORD-HYPERCAR LANDED 2026-09-09 20:20Z (driver, merge
-> 71154b1, RESULT filed, row flipped a18899b), FRAME-REVOLVE slot 7 RUNNING
-> (pid 26464, pre-commit, healthy), SWEEP-PATH READY gated on FRAME-REVOLVE.
-> The orchestrator session is LIVE (opencode pid 17740 since 07:20) -
-> verify against its current work before acting on stale items.]
+> the machine, as left" (2026-09-09T20:52Z). [operator 2026-09-09T20:52Z
+> ground-truth note: quiet healthy cycle, nothing to land/flip/unblock.
+> REF-RECORD-HYPERCAR is LANDED (driver, merge 71154b1, RESULT 3d70e09,
+> row a18899b) and FRAME-REVOLVE slot 7 RUNNING (pid 26464, actively
+> editing bd_bridge.rs, events fresh). SWEEP-PATH READY correctly gated on
+> FRAME-REVOLVE; the READY-without-landed-marker set is exactly
+> {FRAME-REVOLVE, SWEEP-PATH}, so dispatch-0 is real idle, not a filter bug.
+> Substrate all nominal (heartbeat 27440, watchdog 28440, cargoq UP,
+> driver 28824 cycling but parked on the slot-4 F1 residue). The
+> orchestrator session is LIVE (opencode pid 17740) - verify against its
+> current work before acting on stale items.]
 
 - **THE FIRST KERNEL-VS-OCC TIMING COMPARISON IS BANKED** (FH-TIMING-REFRESH,
   landed c94d043): turbopump_assembly **0.097 s kernel vs 4.866 s OCC**,
@@ -387,6 +391,39 @@ operator-restarted 15:54Z last cycle), disk 17.3 GB free, RAM 4.9 GB free.
 Open human items (carried): duplicate supervisors (27392 + 15100) + the wedged
 cargoq supervisor restart guard; slot-4 F1 wt RESULT residue cleanup; TOR-C
 flip-or-pin decision.]
+
+[operator 2026-09-09T20:52Z - volatile refresh. Quiet healthy cycle: nothing to
+land, nothing to unblock, nothing to flip, no dispatch (heartbeat-owned). Board
+now: 1 RUNNING / 0 landed-this-cycle. FRAME-REVOLVE (slot 7, pid 26464) still
+RUNNING pre-commit, events fresh (~0.4 min at scan), actively editing
+bd_bridge.rs (worker text mid-flight on the z-path legacy-identity + Vector/
+frame tests) - do not touch. REF-RECORD-HYPERCAR (slot 0 FINISHED residue)
+confirmed LANDED: worker commit 251f368 is an ancestor of HEAD (driver merge
+71154b1, RESULT filed 3d70e09, row flip a18899b); nothing to re-land. Slots
+1-6 residue all landed and verified as ancestors this cycle (4de25d9, e33c4dd,
+e9d885a, 3c2109b, ee97499, 713f205; ledger rows present); slot 4 = F1 landed
+residue whose stale 'landed-with-findings' wt RESULT still parks the overnight
+driver's dispatch arm every 5-min cycle (overnight.log 16:35-16:50 local:
+'LEFT FOR MORNING' + 'landing/running phase - no dispatch' - carried, does NOT
+block per-slot landing attempts). Registry verified programmatically: BLOCKED
+rows whose deps are all landed = NONE dispatchable (TOR-C needs ADM-001/002,
+both LANDED, stays orchestrator-held per the standing escalation;
+BG-CK-SPLINE-CENSUS owner-cancelled; DEF-SEEDRAY-B human-gated;
+DEF-TESS-ANALYTIC-SEAM superseded by its -R2; BG-AUD-FIX-004/
+SEM-PCURVE-MASTER-001-FIX owner-parked). READY rows WITHOUT a LANDED-note
+marker = exactly {FRAME-REVOLVE (running), SWEEP-PATH (gated on
+FRAME-REVOLVE)} - so dispatch_ready --dry-run's 'dispatched 0' is REAL idle,
+not the session-53 silent-filter bug; all ~70 other READY rows carry genuine
+'landed <sha>' markers. Health: heartbeat 1 (27440, last cycle 16:48 local,
+dispatched 0 SWEEP-PATH blocked), watchdog 1 (28440), cargoq UP (ping 200,
+queued 0), operator runner 1 (29776), overnight driver 1 (28824, cycling,
+parked on the slot-4 residue), TWO supervisors (27392 PyManager + 15100
+pythoncore child - carried duplication class; only ONE overnight.py child = no
+double-merge risk). Disk 16.9 GB free (above the 15 GB janitor goal), RAM 4.7
+GB free. Open human items (carried, unchanged): duplicate supervisors + the
+wedged cargoq supervisor restart guard; slot-4 F1 wt RESULT residue cleanup
+(clearing it un-parks the driver's dispatch arm); TOR-C flip-or-pin decision
+(deps landed, orchestrator LIVE - its call).]
 
 ## The parallelism picture
 

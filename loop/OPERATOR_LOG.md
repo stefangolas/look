@@ -429,3 +429,50 @@ REF-RECORD-HYPERCAR slot 0 LANDED by the driver (residue now inert); SWEEP-PATH
 READY gated on FRAME-REVOLVE; cargoq UP; heartbeat 1; orchestrator session pid
 17740 LIVE; disk 17.3 GB free; escalations carried (supervisor duplication +
 wedged cargoq guard, slot-4 F1 residue, TOR-C flip).
+
+## Operator cycle 2026-09-09 20:52Z (fresh spawn, direct run; orchestrator LIVE)
+
+Board at start: 1 RUNNING / 0 landed-this-cycle. FRAME-REVOLVE slot 7 RUNNING
+(pid 26464, events ~0.4 min fresh - actively editing bd_bridge.rs, worker text
+mid-flight on the z-path legacy-identity + Vector/frame kernel tests). Slot 0
+FINISHED residue REF-RECORD-HYPERCAR (landed by the driver 20:20Z, 251f368).
+Slots 1-6 FINISHED/IDLE landed residue (ADM-L2/L3/CL-005/CL-006/F1/ADM-003
+ledger rows); slot 4 = F1 landed residue still parking the driver's dispatch
+arm. Substrate healthy: heartbeat exactly 1 (27440, real - a second match was
+my own charter cmdline, self-match trap), watchdog 1 (28440), cargoq UP (ping
+200, queued 0), operator runner 1 (29776), overnight driver 1 (28824), disk
+16.9 GB free (above the 15 GB janitor goal), RAM 4.7 GB free.
+
+Actions:
+- Health sweep done (see board above). Double-heartbeat probe self-matched my own
+  spawn cmdline (the charter text contains 'dispatch_heartbeat') and was
+  discounted; the genuine heartbeat is exactly PID 27440.
+- Landing: nothing to land. Verified ALL FINISHED-slot worker commits are
+  ancestors of HEAD this cycle (251f368, 4de25d9, e33c4dd, e9d885a, 3c2109b,
+  ee97499, 713f205 - all ANCESTOR). REF-RECORD-HYPERCAR's driver landing
+  (merge 71154b1, RESULT 3d70e09, row a18899b) is complete; no re-land.
+- Unblock: nothing stuck. FRAME-REVOLVE slot 7 RUNNING with fresh events and a
+  live worker; slots 1-6 residue are landed packets, not stuck workers; no
+  worker stopped on a QUESTION.
+- Registry hygiene: nothing flipped. Verified programmatically that the only
+  READY rows WITHOUT a 'landed <sha>' note marker are {FRAME-REVOLVE (running),
+  SWEEP-PATH (gated on FRAME-REVOLVE)} - so dispatch 0 is REAL idle, not the
+  session-53 silent-filter bug. BLOCKED rows with deps all landed = none
+  dispatchable (TOR-C needs ADM-001/002 both LANDED but stays orchestrator-held
+  per the standing escalation; the rest are owner-cancelled/human-gated/
+  superseded/parked). gen_packet/packet_lint not run - no READY candidate was
+  gated on anchors this cycle.
+- dispatch_ready --dry-run only (heartbeat live - double-dispatch rule):
+  dispatched 0, workers ~1/4, SWEEP-PATH blocked on FRAME-REVOLVE (correct).
+- ESCALATIONS: none new this cycle. Carried open items stand: duplicate
+  supervisors (27392 + 15100) + the wedged cargoq supervisor restart guard;
+  slot-4 F1 wt RESULT residue parking the driver's dispatch arm (overnight.log
+  16:35-16:50 local: every 5-min cycle logs LEFT FOR MORNING + 'landing/running
+  phase - no dispatch'); TOR-C flip-or-pin.
+- STATE.md volatile refresh appended ([operator 2026-09-09T20:52Z]).
+
+Leaving: 1 RUNNING (FRAME-REVOLVE slot 7, pid 26464, pre-commit, healthy,
+actively working); slot 0 REF-RECORD-HYPERCAR landed residue inert; SWEEP-PATH
+READY gated on FRAME-REVOLVE; cargoq UP; heartbeat 1; orchestrator session pid
+17740 LIVE; disk 16.9 GB free; RAM 4.7 GB free; escalations carried (supervisor
+duplication + wedged cargoq guard, slot-4 F1 residue, TOR-C flip).
