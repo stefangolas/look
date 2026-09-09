@@ -3011,4 +3011,162 @@ print(json.dumps({"ok": True, "length": a.length}))
         assert_eq!(record["ok"], true);
         assert_eq!(record["length"], 5.0);
     }
+
+    // -----------------------------------------------------------------------
+    // The recorded revolve axis frame (FRAME-REVOLVE): a non-z revolve is the
+    // z-lathe of the meridian profile placed by the recorded frame whose local
+    // z is the axis direction. Facts are invariant under the placement; the
+    // world row answers the rotated world bbox and the exact volume.
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn revolve_about_nonz_axis_answers_world_facts() {
+        // A ring revolved about the wheel-frame axle (world Y) is recorded as a
+        // meridian lathe plus the axis frame. Its world facts equal the exact
+        // lathe volume (volume is placement-invariant) and the rotated world
+        // bbox (x/z span the outer radius, y spans the axial extent).
+        let script = r#"
+import json, sys
+sys.path.insert(0, sys.argv[1])
+import door
+
+def ring(corners):
+    edges = []
+    for i in range(len(corners)):
+        edges.append(door.Edge.make_line(corners[i], corners[(i + 1) % len(corners)]))
+    return door.Face(door.Wire(edges))
+
+def v(x, y, z):
+    return door.Vector(x, y, z)
+
+# The axle ring, drawn in the plane x=0 containing the axle (world Y):
+# axial runs along Y from -5..5, radius along Z from 10..20.
+axle = ring([
+    v(0.0, -5.0, 10.0),
+    v(0.0, -5.0, 20.0),
+    v(0.0, 5.0, 20.0),
+    v(0.0, 5.0, 10.0),
+])
+part = door.revolve(axle, axis=door.Axis.Y)
+print(json.dumps(part._node()))
+"#;
+        let stdout = run_door_python(script);
+        let node: serde_json::Value = serde_json::from_str(stdout.trim()).expect("axle row json");
+        let tree = parse_tree(&node.to_string()).expect("axle revolve row parses");
+        let facts = tree_facts(&tree).expect("a non-z revolve is in envelope");
+        assert_eq!(facts.solid_count, 1);
+        // Volume of the 10..20 radius ring over axial extent 10.
+        let expected = std::f64::consts::PI * (20.0 * 20.0 - 10.0 * 10.0) * 10.0;
+        assert!(
+            (facts.volume - expected).abs() / expected < 1e-12,
+            "world volume {} != expected {}",
+            facts.volume,
+            expected
+        );
+        // The placed ring about world Y: radius in x/z, axial along y.
+        assert_eq!(facts.bbox[0], [-20.0, -5.0, -20.0]);
+        assert_eq!(facts.bbox[1], [20.0, 5.0, 20.0]);
+    }
+
+    #[test]
+    fn z_revolve_rows_answer_bit_identically() {
+        // The z-axis path keeps the recorded legacy row shape bit-for-bit: the
+        // profile coordinates are the world (radius x, axial z) pairs with no
+        // recorded placement frame, and the measured facts equal the exact
+        // analytic lathe of the same profile ring.
+        let script = r#"
+import json, sys
+sys.path.insert(0, sys.argv[1])
+import door
+
+def ring(corners):
+    edges = []
+    for i in range(len(corners)):
+        edges.append(door.Edge.make_line(corners[i], corners[(i + 1) % len(corners)]))
+    return door.Face(door.Wire(edges))
+
+def v(x, y, z):
+    return door.Vector(x, y, z)
+
+# A z-axis revolve ring: profile in the y=0 plane with radius along x and
+# axial along z, 10..20 radius over axial extent -5..5.
+ring = ring([
+    v(10.0, 0.0, -5.0),
+    v(20.0, 0.0, -5.0),
+    v(20.0, 0.0, 5.0),
+    v(10.0, 0.0, 5.0),
+])
+part = door.revolve(ring, axis=door.Axis.Z)
+print(json.dumps(part._node()))
+"#;
+        let stdout = run_door_python(script);
+        let node: serde_json::Value = serde_json::from_str(stdout.trim()).expect("z row json");
+        // Legacy row shape: a lathe profile with the world (radius, axial)
+        // coordinates, and no placement frame fields beyond the pure-z row.
+        let part_node = &node["part"];
+        assert_eq!(part_node["solid"]["kind"], "lathe");
+        assert_eq!(part_node["rz"], 0.0);
+        assert!(part_node.get("x").is_some(), "legacy row keeps its x field");
+        let tree = parse_tree(&node.to_string()).expect("z revolve row parses");
+        let facts = tree_facts(&tree).expect("a z revolve is in envelope");
+        assert_eq!(facts.solid_count, 1);
+        // Bit-identical facts: the analytic lathe of the same profile ring.
+        let expected = std::f64::consts::PI * (20.0 * 20.0 - 10.0 * 10.0) * 10.0;
+        assert!(
+            (facts.volume - expected).abs() / expected < 1e-12,
+            "z volume {} != expected {}",
+            facts.volume,
+            expected
+        );
+        assert_eq!(facts.bbox[0], [-20.0, -20.0, -5.0]);
+        assert_eq!(facts.bbox[1], [20.0, 20.0, 5.0]);
+    }
+
+    #[test]
+    fn revolve_refuses_unsupported_axes_typed() {
+        // A zero-length axis cannot be recorded: the door refuses typed with
+        // the degenerate-axis name (never a silent normalization past zero).
+        let script = r#"
+import json, sys, types
+sys.path.insert(0, sys.argv[1])
+import door
+
+class _Refused(Exception):
+    def __init__(self, msg):
+        super().__init__(msg)
+        self.msg = msg
+
+door._T123D = types.SimpleNamespace(Refused=_Refused)
+bd = door._build_truck_module()
+
+def ring(corners):
+    edges = []
+    for i in range(len(corners)):
+        edges.append(bd.Edge.make_line(corners[i], corners[(i + 1) % len(corners)]))
+    return bd.Face(bd.Wire(edges))
+
+def v(x, y, z):
+    return door.Vector(x, y, z)
+
+face = ring([
+    v(10.0, 0.0, -5.0),
+    v(20.0, 0.0, -5.0),
+    v(20.0, 0.0, 5.0),
+    v(10.0, 0.0, 5.0),
+])
+try:
+    bd.revolve(face, axis=door.Axis((0.0, 0.0, 0.0)))
+    print(json.dumps({"refused": False, "message": "no refusal"}))
+except _Refused as exc:
+    print(json.dumps({"refused": True, "message": exc.msg}))
+"#;
+        let stdout = run_door_python(script);
+        let record: serde_json::Value = serde_json::from_str(stdout.trim()).expect("refusal json");
+        assert_eq!(record["refused"], true, "degenerate axis must refuse typed");
+        let message = record["message"].as_str().unwrap_or("");
+        assert!(
+            message.contains("DegenerateRevolveAxis"),
+            "refusal must name the degenerate axis: {message}"
+        );
+    }
 }

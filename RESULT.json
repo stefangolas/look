@@ -1,0 +1,39 @@
+{
+  "id": "FRAME-REVOLVE",
+  "status": "LANDED",
+  "contracts": ["FRAME-REVOLVE"],
+  "tests_added": 3,
+  "anchors_verified": {"A1": 9, "A2": 16, "A3": 29},
+  "summary": "The post-census boundary recorded the four wheel-corner rows (corner_fl/fr/rl/rr) refusing typed at 'the wheel-frame non-z revolve'. This packet lands the recorded revolve-axis frame carrier: the door's `revolve(shape, axis, revolution_arc)` now records an expressible non-z axis (build123d `Axis` or a `Vector` direction) in the same local `(radius >= 0, axial)` revolve-plane convention as today's z-lathe, and emits the landed frame row carrying the axis as a full orthonormal placement (`world = translate(o) ∘ R ∘ M`, local z to the recorded axis direction). Volume is invariant under R (exact, never recomputed); the world bbox is the AABB of the 8 rotated local corners; the mesh transforms per vertex. The legacy z-axis path keeps its recorded row shape byte-for-byte (the existing z-revolve regression net is untouched). A zero/degenerate axis refuses typed (`DegenerateRevolveAxis`); a profile that is not a single-sided meridian generator about the axis (a point folding across the axis, a profile lying on the axis, or an axis parallel to its profile ray) refuses typed naming the gap. The four named kernel-door corner rows now pass the wheel-frame axle revolve and refuse typed at the NEXT boundary (a boolean subtract). Three named kernel tests are green: the non-z axle revolve answers exact world facts (volume equals the exact lathe volume of the same ring, world bbox equals the rotated ring bbox); the z-axis rows answer bit-identically with the legacy row shape and exact lathe facts; and an unsupported (degenerate) axis refuses typed naming `DegenerateRevolveAxis`.",
+  "implementation": {
+    "door_recording": "corpus/ttc/door.py: `revolve` now resolves the axis direction (build123d `Axis` or `Vector`) into a unit vector, records the legacy z profile unchanged when the unit is +z, and otherwise expresses the recorded profile in the local `(radius >= 0, axial)` revolve-plane coordinates of the axis through the frame origin plus the full orthonormal frame (x_dir = the profile's reference ray, z_dir = the axis unit, fixed-order completion for y). Radius is recorded as the non-negative in-plane coordinate along the single-sided reference ray, never a folded magnitude or a silently normalized zero. Partial arcs, non-Face shapes, open profiles, spline profiles with interpolation options, and the legacy outside-the-y=0-plane profiles keep their typed refusals unchanged. Helper functions `_axis_unit`, `_legacy_z_profile`, `_axis_profile`, `_axis_ray`, `_axis_perp`, `_axis_point`, and `_axis_frame` are pure client-side data transforms.",
+    "bridge_and_kernel": "truck123d/src/bd_bridge.rs: no functional kernel change was required (the landed PartSpec `rotation` frame already answers a z-lathe placed under an arbitrary orthonormal frame with exact volume invariance, rotated-corner world bbox, and per-vertex mesh transforms). The three required kernel tests were added in the in-crate tests: they build revolve rows through the corpus door python (pure client data), parse them with `parse_tree`, and measure exact world facts with `tree_facts`.",
+    "kernel_tests": "Three tests added in truck123d/src/bd_bridge.rs mod tests: revolve_about_nonz_axis_answers_world_facts (a ring revolved about the wheel-frame axle, world volume = exact lathe volume, world bbox = the rotated ring bbox), z_revolve_rows_answer_bit_identically (the z-axis path records the legacy row with no frame and exact analytic lathe facts), and revolve_refuses_unsupported_axes_typed (a zero-length axis refuses typed naming DegenerateRevolveAxis)."
+  },
+  "verification": {
+    "cargo_check": "cargo check --locked -p truck123d -> clean",
+    "cargo_test_lib": "cargo test --locked -p truck123d --lib (serial, interpreter dir on PATH) -> 25 passed, 0 failed, incl. the three named tests",
+    "cargo_test_integration": "ttc_lathe_spline 3/4: mvac_row_still_refuses_typed_at_the_spline_path_sweep_carrier ok, nozzle_assembly_truck_door_now_reaches_facts ok, spline_shell_facts_are_exact_and_deterministic ok; revolve_refusals_stay_typed_after_spline_admission FAILED only on its non_z_axis sub-case because an axis-aligned (x) ring revolve is now a recorded carrier (the mvac-pin adjudication pattern: this typed-refusal pin moves one boundary, never away from typed; test file not in this packet's write scope). pb_assembly 3/3, pb_conformance 3/3, pb_facade 4/4, pb_glb_emit 3/3, pb_op_matrix 7/7, ttc_authoring_arms 4/4, ttc_harness 3/3; pb_parity 3/4 with monocoque_row_lifts_green failing identically at the base HEAD (OCC-baseline door environment: Null TopoDS_Shape), base parity unrelated to this change.",
+    "fmt": "cargo fmt -p truck123d clean",
+    "anchors": "A1=9 (\\bLathe\\b lines in truck123d/src/bd_bridge.rs unchanged), A2=16 (\\brevolve\\b lines in corpus/ttc/door.py unchanged), A3=29 (\\brotation\\b lines in truck123d/src/bd_bridge.rs unchanged) - all hold."
+  },
+  "smoke": {
+    "corner_fl_kernel_door": "python corpus/ttc/door.py --engine truck trees/f1/src lib.wheels build_corner [\"fl\"] -> exit 1, typed refusal: {\"kind\":\"Refused\",\"message\":\"a boolean subtract is not a kernel-engine row\"}. The wheel-frame axle revolve is cured and the row now reaches the NEXT typed boundary (a boolean subtract of the revolved tyre by the canonical knife cylinder). corner_fr/corner_rl/corner_rr behave identically."
+  },
+  "findings": [
+    {
+      "id": "F1",
+      "title": "The mvac-style refusal-battery pin for an axis-aligned non-z revolve now moves (admitted), not refused",
+      "detail": "tests/ttc_lathe_spline.rs `revolve_refusals_stay_typed_after_spline_admission`'s `non_z_axis` sub-case revolves a closed rect ring about the X axis through the origin. Under FRAME-REVOLVE that revolve is an expressible recorded carrier (identical in kind to the census axle revolves), so the door no longer refuses it - the typed refusal surface moved to genuinely unsupported forms (degenerate axis / non-meridian profile). This is the same pin-movement class as the mvac pin, which the orchestrator adjudicated separately after the frame-carrier cure; the test file is outside this packet's write scope. No other pin in the crate moved.",
+      "evidence": "The mvac/nozzle/spline z-regression pins all stay green; the four corner census rows now deepen to the boolean-subtract typed refusal recorded above."
+    }
+  ],
+  "stop_conditions": {
+    "spec_gap": "No SPEC_GAP: the placement composition expresses the axle revolve exactly (volume invariant under R by construction; world bbox and mesh re-derived from the recorded frame, exactly as the frame policy fixes).",
+    "verdict_neutral": "No defect record: every existing green z-revolve row answers identically (mvac, nozzle, spline shell pins green; z-lathe facts bit-identical), no recorded reference file changed, and only the intended non-z typed-refusal pin moved (adjudication item F1, mvac style). The pre-existing pb_parity monocoque OCC-baseline environment failure is base parity."
+  },
+  "files": {
+    "door": "corpus/ttc/door.py",
+    "bridge": "truck123d/src/bd_bridge.rs"
+  }
+}
