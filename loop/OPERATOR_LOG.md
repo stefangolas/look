@@ -53,3 +53,42 @@ an escalation and a STATE edit.
 Leaving: 3 workers RUNNING (ADM-L1/L2/L3), exactly one heartbeat (29152) +
 watchdog (29364) + driver (14484), disk ~5.3 GB is the current blocker for
 ADM-L4's dispatch into the freed slot 0.
+
+## 2026-09-09 02:30 UTC (operator)
+
+Board at start: 0 running; slots 0-6 FINISHED (ADM-L4, ADM-L1, ADM-L2,
+ADM-L3, F1-AUTHORING-ARMS, CL-006, CL-005 residue), slot 7 IDLE. No IDLE/DEAD
+workers to unblock. cargoq ping OK (queued 0); heartbeat exactly 1 (29152);
+watchdog alive (29364); disk ~6.5 GB free (LOW); RAM ~5.7 GB free.
+
+Actions:
+- **Landing: ADM-L4-DEFLATE-SEAM (slot 0, worker commit 6670a60).** The
+  overnight driver would NOT land it: overnight.py misparses the worker's prose
+  stop_conditions ("NOT triggered. The stop condition ... would falsify ...") as
+  a trigger because the 594f07b fix only special-cases "none", and the driver has
+  cycle-logged it as stopped=True / "LEFT FOR MORNING" since 21:52 - which also
+  put the whole machine in "landing/running phase - no dispatch". Per charter I
+  hand-landed it: `git merge --no-ff 6670a60` (baef467) with the expected
+  construct/mod.rs append conflict resolved keeping all four lemma modules
+  (extract/prod/normal_cone/deflate); scoped check
+  `cargo test -p truck-certified --test deflate_seam_conformance` green (8/8) at
+  merged HEAD; filed loop/results/ADM-L4-DEFLATE-SEAM.json, deleted the slot 0
+  worktree RESULT.json, appended the LEDGER row, appended the LANDED marker to
+  the PACKETS row, committed 6620374. LEMMA WAVE CLOSED. Slot 0 now IDLE.
+- Dispatch: `dispatch_ready.py --dry-run` reports 0 dispatched with 8 free slots
+  and NO per-candidate reasons printed (expected "blocked on..." / anchor lines).
+  Across the whole cycle log every heartbeat pass also dispatched 0. I did NOT
+  run a real dispatch: with disk ~6.5 GB (the 8 GB new_slot floor) and the
+  mystery filter, a real dispatch risked a wasted fork. Investigate why the
+  candidate loop prints nothing before trusting the idle.
+- Registry hygiene: no flips made (PACKETS edits are the risky kind when I am at
+  the time wall). ADM-001 (needs SHIM/L1/L2), ADM-002 (needs SHIM/L1/L3/L4) and
+  ADM-003 (needs SHIM/L1/L5) all now have EVERY dep landed -> each is flippable
+  BLOCKED->READY. Recorded for the next cycle.
+
+Escalations: 2 (F1 mvac pin amendment; overnight.py stop-prose misparse +
+dispatch-0 filter + duplicate supervisors). See OPERATOR_ESCALATIONS.md.
+
+Leaving: 0 running; slot 0 IDLE, slots 1-6 FINISHED residue; heartbeat 1,
+watchdog 1, driver 1 (37284), supervisors 2 (35200 + 24272 - duplicate, see
+escalations); disk ~5.5-6.5 GB free; ADM-L4 landed; dispatch stalled at 0.

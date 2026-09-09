@@ -27,3 +27,32 @@ Judgment-required items appended each operator cycle. Newest at the bottom.
   integration/kernel-bg (verified: c94d043 is an ancestor of HEAD). No action
   needed; slot 0's leftover worktree RESULT is stale residue and is safe for
   dispatch_ready to recycle.
+
+## 2026-09-09 02:30 UTC - four items
+
+- **F1-AUTHORING-ARMS (slot 4, LANDED-WITH-FINDINGS) needs an orchestrator
+  amendment to free its slot.** The worker's F1 finding names an obsolete pin:
+  `mvac_row_still_refuses_typed_at_the_extrude_carrier` in
+  truck123d/tests/ttc_lathe_spline.rs now FAILS because the extrude carrier
+  records (this packet's own scope folded it in) and mvac proceeds to refuse
+  typed at the later non-z Location placement. Driver logs it "LEFT FOR MORNING
+  (judgment required)" every cycle. Start here: re-point that test at the
+  Location refusal per the packet's finding F1, then the merge (3c2109b is the
+  worker commit; its integration merge is already done, so this is the pin fix +
+  slot 4 residue cleanup).
+- **overnight.py stop-condition prose parse is still wrong for the "NOT
+  triggered." class.** 594f07b special-cases "none"; a string beginning "NOT
+  triggered." (ADM-L4) still trips it as stopped=True, so the driver never lands
+  such rows AND holds dispatch in "landing/running phase" forever. I bypassed it
+  for ADM-L4 by hand-landing. Fix suggestion: treat str stop_conditions as
+  stopped only when a trigger is asserted positively (e.g. regex on
+  "trigger(ed|s)?" NOT preceded by "NOT|none|no ").
+- **dispatch_ready is dispatching 0 with 8 free slots and prints NO per-candidate
+  reasons** (only "slots: ..." + "dispatched 0"). Every READY row seems to be
+  silent-filtered (status/landed-note/assigned/dead) yet ADM-001/002/003 now have
+  all deps landed and many legacy READY rows exist. Look at the candidate loop
+  (loop/dispatch_ready.py ~line 5500) before trusting the machine idle by choice.
+- **Duplicate supervisors observed** 2026-09-09 02:1xZ: python 35200
+  (C:\Program Files\PyManager\python.exe loop/supervisor.py) AND 24272
+  (pythoncore-3.14 loop/supervisor.py). Session-56 paid for the duplicate-driver
+  class; confirm which is canonical and kill the stale one.

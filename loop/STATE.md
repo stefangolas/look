@@ -39,10 +39,17 @@ program, and the operator agent.
   ADM-L5 (the certified reciprocal-power primitive, Theorem D) landed;
   **ADM-L1/L2/L3 LANDED 2026-09-08 ~21:09-21:22** (extraction, product,
   normal-cone lemmas - L2/L3 by orchestrator-resolved mod.rs merges, then
-  the driver filed the bookkeeping); **ADM-L4 RUNNING in slot 0** (deepseek,
-  dispatched 20:53). Then the assembly packets ADM-001/002/003
-  (rewritten to CONSUME the proven lemmas), ADM-004 (funnel wiring + V5
-  battery), TTC-RECENSUS-F1 (the closing re-census).
+  the driver filed the bookkeeping); **ADM-L4-DEFLATE-SEAM LANDED by the
+  operator 2026-09-08 22:2x local** (merge baef467, mod.rs conflict resolved
+  keeping all four lemma modules; deflate_seam_conformance 8/8 green at
+  merged HEAD; bookkeeping 6620374) - the driver would NOT land it (it
+  misparses the worker's prose "NOT triggered." stop_conditions as a
+  trigger - the fix 594f07b only covers "none triggered", overnight.py
+  needs the NOT- case). THE LEMMA WAVE IS NOW CLOSED; the assembly deps are
+  all landed, so ADM-001/002/003 can flip BLOCKED->READY. Then the assembly
+  packets ADM-001/002/003 (rewritten to CONSUME the proven lemmas),
+  ADM-004 (funnel wiring + V5 battery), TTC-RECENSUS-F1 (the closing
+  re-census). [operator 2026-09-09T02:2xZ]
 - **The census maps exist for every family**: F1 complete (12 lifted, 9
   measured boundaries), FH complete (6 rows mapped: 3 typed now-cleared by
   the lathe arm, 3 typed pending tube/sweep admission), hypercar mapped
@@ -63,10 +70,17 @@ program, and the operator agent.
 
 ## Pick up here
 
-0. `python loop/slot_status.py` - expect ADM-L4 RUNNING in slot 0 and
-   slots 1-3 FINISHED/landed residue (ADM-L1/L2/L3 landed 2026-09-08); the heartbeat (exactly ONE powershell
+0. `python loop/slot_status.py` - expect slots 1-6 FINISHED residue (L1/L2/
+   L3 landed, F1-AUTHORING-ARMS landed-with-findings in slot 4 - needs an
+   orchestrator amendment of the obsolete mvac-extrude pin in
+   truck123d/tests/ttc_lathe_spline.rs, see F1 finding), slot 0 IDLE (ADM-L4
+   landed by the operator, 2026-09-08), the heartbeat (exactly ONE powershell
    matching dispatch_heartbeat) and the operator runner (exactly ONE
-   matching operator_runner.ps1) alive.
+   matching operator_runner.ps1) alive. dispatch_ready is currently
+   dispatching 0 even with slots free - see OPERATOR_LOG 2026-09-09 (the
+   candidate loop prints no reasons; suspected all READY rows filtered by
+   landed-note/assigned bookkeeping - investigate before trusting the
+   machine is idle by choice). [operator 2026-09-09T02:2xZ]
 1. **Adjudicate landings mechanically**: FINISHED slot + RESULT status DONE
    + packet's named tests green at merged HEAD -> merge --no-ff, file
    RESULT to loop/results/, ledger row, flip DONE. Anything else ->
@@ -101,12 +115,24 @@ program, and the operator agent.
 - Substrate: heartbeat 1 instance, operator runner 1 instance, watchdog
   alive (pid 29364), cargoq healthy, driver/supervisor alive (BUT see the
   session-56 traps: it skipped one landing and duplicated itself once).
+  NOTE: TWO supervisor.py processes observed 2026-09-09 02:1xZ (pids 35200
+  PyManager-python + 24272 pythoncore) - the session-56 duplicate-driver
+  class; adjudicate.
 - **Disk ~5.4 GB free - LOW** (pagefile 8.1 GB, three live worker targets
   ~1 GB each and growing). The janitor is short of its 15 GB goal. If
   rustc exits 101 appears, clean `loop/slots/*/target` + root `target/`
   and consider the reboot (the pagefile does not shrink while live).
 - RAM ~3.6 GB free at 4 workers - the cold-warm-build 0xc0000409 zone;
   chrome is closed (helps). Do not raise the worker cap.
+
+[operator 2026-09-09T02:2xZ - volatile refresh after the ADM-L4 operator
+landing. Board now: 0 running / 6 FINISHED residue (L1,L2,L3,F1,CL-005,
+CL-006) / slot 0 IDLE after L4. Disk was 6.5 GB free at 02:1xZ; RAM 5.7 GB
+free; heartbeat 1, watchdog alive, cargoq ok, TWO supervisors. dispatch
+blocked at 0 while slots hold FINISHED RESULT residue and rows carry
+landed-note bookkeeping; ADM-001/002/003 BLOCKED rows have ALL deps landed
+now and can flip READY. F1-AUTHORING-ARMS (slot 4) is LANDED-WITH-FINDINGS
+and needs the orchestrator mvac-pin amendment to free its slot.]
 
 ## The parallelism picture
 
