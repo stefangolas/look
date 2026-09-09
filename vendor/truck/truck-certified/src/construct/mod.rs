@@ -209,3 +209,15 @@ pub mod admission;
 /// body lands here — the shim ships types and refusing constructors only, and
 /// extends, never edits, the landed ADM-000 carriers.
 pub mod patches;
+
+/// The L2 tensor-Bernstein product lemma (ADM-L2-PRODUCT): the landed kernel
+/// bodies over the frozen patch type — the exact degree-grown product of two
+/// [`TensorBernsteinPatch`](patches::TensorBernsteinPatch)es (the coefficient
+/// convolution along each dimension, with the degree growth recorded on the
+/// result, never hidden) and the exact degree-elevation helper. Pure
+/// coefficient algebra in [`Expansion`](crate::formal::exact::Expansion)
+/// arithmetic: nothing searches, nothing samples. The frozen
+/// [`patches::patch_product`] stub stays refusing `Unfrozen` in the shim;
+/// this module is where the L2 bodies land behind their admitting
+/// conformance tests.
+pub mod prod;
