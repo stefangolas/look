@@ -87,8 +87,10 @@
 //! extracts that survivor's knot spans (the fixed `HullAabbThenKnotSpan`
 //! order's second step), assembling the span-pair system over the extracted
 //! spans in the fixed row-major `(x-span, y-span)` order. Span-level culling
-//! and the operator cache belong to the downstream funnel enumeration
-//! (ADM-004-FUNNEL-WIRING), which consumes this carrier's span-pair shape.
+//! and the operator cache belong to the funnel enumeration (ADM-004-FUNNEL-WIRING
+//! lands the certified pair-cut row [`certify_admitted_cut_pair`] on this
+//! carrier's span-pair shape; the Krawczyk operator is instantiated by the FSSI
+//! solver layer downstream).
 //!
 //! **Theorems B1/B2/C — the certificate carriers.** [`RegularPatch`] (the
 //! Theorem B1 hemisphere regularity certificate over a face patch, carrying
@@ -143,7 +145,11 @@ use truck_geometry::prelude::{BSplineSurface, Vector4};
 /// ordinal 0) and of the `Y` face (face ordinal 1), plus, per span pair, the
 /// exact clearing term patches of the L2 product lemma over the pair's shared
 /// chart. The carrier performs no solving: the Krawczyk operator is
-/// instantiated downstream on this input shape (ADM-004-FUNNEL-WIRING).
+/// instantiated downstream on this input shape — ADM-004-FUNNEL-WIRING lands
+/// the integrated per-pair cut row
+/// ([`certify_admitted_cut_pair`](crate::construct::admission::certify_admitted_cut_pair))
+/// that wires this carrier with the certificate assembly and the Theorem C
+/// transversality certificate.
 ///
 /// ADM-001 lands the constructor (the assembly over the proven lemmas) and
 /// widens the adapter to the first admitted class (ruled-section lofts, scope
@@ -1084,6 +1090,134 @@ fn certify_span(
     subdivide_span(&m, patch.parent(), best_margin, budget)
 }
 
+// ---------------------------------------------------------------------------
+// ADM-004-FUNNEL-WIRING — the admitted-pair cut row.
+//
+// This section wires the landed admission pieces into the boolean boundary for
+// ONE face pair of a swept-pair cut: the Theorem A adapter (ADM-001) admits
+// the pair, the certificate assembly (ADM-002) certifies both faces' extracted
+// span families, and the Theorem C transversality certificate (ADM-002)
+// closes the pair over the shared whole-span product chart. The assembled row
+// is the deterministic per-pair carrier the funnel enumeration below and the
+// registered certified solver consume (the locus emission into the landed
+// `ContactLocus` vocabulary rides those registered arms — never a splitter
+// edit, FSSI-LAYER).
+//
+// **Admission consult (V5).** The entry calls the refusing-by-default adapter
+// first: a pair outside the admitted class keeps the adapter's exact typed
+// refusal, so nothing already-green can reach the certificates (admission
+// widens monotonically or not at all).
+//
+// **Determinism.** Same pair → identical assembly rows → identical
+// certificates and identical transverse margin: the row's `Debug` rendering is
+// bit-identical on identical input (the binding's determinism rule, extended
+// to admitted pairs).
+// ---------------------------------------------------------------------------
+
+/// One certified cut row of the admitted pair pipeline (ADM-004-FUNNEL-WIRING):
+/// the integrated per-pair outcome of the admission consult at the boolean
+/// boundary for a pair of faces of two swept carriers.
+///
+/// The row carries the Theorem A assembled polynomialized system ([`system`]),
+/// both faces' certified span-family outcomes ([`x_certificate`] /
+/// [`y_certificate`]), and the Theorem C transversality certificate
+/// ([`transverse`]) — the certified `‖n̂_X × n̂_Y‖ ≥ lo > 0` margin over the
+/// shared whole-span product chart. The Krawczyk operator is instantiated
+/// downstream on the carried [`SsiPairSystem`] span-pair shape (the FSSI
+/// solver layer), never here.
+#[derive(Clone, Debug)]
+pub struct CertifiedCutPair {
+    /// The Theorem A polynomialized pair system of the admitted pair.
+    pub system: SsiPairSystem,
+    /// The certified span-family outcome of the `X` face (face ordinal 0).
+    pub x_certificate: AdmissionCertificate,
+    /// The certified span-family outcome of the `Y` face (face ordinal 1).
+    pub y_certificate: AdmissionCertificate,
+    /// The Theorem C transversality certificate over the shared whole-span
+    /// product chart (a strictly positive certified margin when present).
+    pub transverse: TransversePair,
+}
+
+impl CertifiedCutPair {
+    /// The number of enumerated span pairs of the admitted system (the funnel
+    /// enumeration consumes this carrier's span-pair shape).
+    pub fn span_pair_count(&self) -> usize {
+        self.system.span_pair_count()
+    }
+
+    /// The certified whole-box regularity payload of the `X` face family
+    /// (the span certificate covering the whole span, when the family has
+    /// one).
+    pub fn x_whole_box_regular(&self) -> Option<&RegularPatch> {
+        whole_box_regular_cone(&self.x_certificate)
+    }
+
+    /// The certified whole-box regularity payload of the `Y` face family
+    /// (the span certificate covering the whole span, when the family has
+    /// one).
+    pub fn y_whole_box_regular(&self) -> Option<&RegularPatch> {
+        whole_box_regular_cone(&self.y_certificate)
+    }
+}
+
+/// The whole-span regularity certificate of a certified face family: the
+/// FIRST certified span covering the whole unit square with no deflation
+/// record (the payload whose cone closes the Theorem C transversality
+/// certificate over the shared whole-span product chart). `None` when the
+/// family has no such span (a subdivided or deflated-only family, or a typed
+/// singularity stall).
+fn whole_box_regular_cone(certificate: &AdmissionCertificate) -> Option<&RegularPatch> {
+    let spans = match certificate {
+        AdmissionCertificate::Regular { spans }
+        | AdmissionCertificate::RegularWithSeam { spans, .. }
+        | AdmissionCertificate::RegularInteriorCollapsedBoundary { spans } => spans,
+        AdmissionCertificate::GenuineSingularity { .. } => return None,
+    };
+    spans
+        .iter()
+        .find(|s| s.region == whole_span_box() && s.collapsed.is_none())
+        .map(|s| &s.regular)
+}
+
+/// The ADM-004 certified cut of one admitted face pair: wire the landed
+/// admission pieces (adapter + certificates + transversality) into the boolean
+/// boundary for the admitted pair and return the deterministic
+/// [`CertifiedCutPair`] row.
+///
+/// **Pipeline.** (1) The Theorem A adapter ([`admit_tensor_spline_pair`])
+/// admits the pair behind the refusing-by-default dispatch rule — a
+/// not-yet-admitted carrier pair keeps the adapter's exact typed refusal
+/// (V5). (2) The certificate assembly ([`certify_patch_family`]) certifies
+/// each face's extracted span family. (3) The two faces' whole-box regular
+/// cones compose into the Theorem C [`TransversePair`] via
+/// [`certify_transverse_pair`]; a family without a whole-box regular span, or
+/// a pair whose cones do not certify separation, refuses
+/// [`ConstructRefusal::ConditioningBelowThreshold`] typed (the shared
+/// whole-span product chart is not certifiably transverse).
+///
+/// Deterministic: identical input produces a bit-identical row.
+pub fn certify_admitted_cut_pair(
+    x: &BSplineSurface<Vector4>,
+    y: &BSplineSurface<Vector4>,
+    domain_hint: &AdmitDomainHint,
+    budget: &CertificateBudget,
+) -> Result<CertifiedCutPair, ConstructRefusal> {
+    let system = admit_tensor_spline_pair(x, y, domain_hint)?;
+    let x_certificate = certify_patch_family(system.x_spans(), budget);
+    let y_certificate = certify_patch_family(system.y_spans(), budget);
+    let x_regular = whole_box_regular_cone(&x_certificate)
+        .ok_or(ConstructRefusal::ConditioningBelowThreshold)?;
+    let y_regular = whole_box_regular_cone(&y_certificate)
+        .ok_or(ConstructRefusal::ConditioningBelowThreshold)?;
+    let transverse = certify_transverse_pair(&x_regular.cone, &y_regular.cone)?;
+    Ok(CertifiedCutPair {
+        system,
+        x_certificate,
+        y_certificate,
+        transverse,
+    })
+}
+
 /// The admission dispatch over a patch family (the extracted spans of an
 /// admitting unit): certify every span, resolve the family's seam identities,
 /// and return the exhaustive four-outcome verdict.
@@ -1214,6 +1348,54 @@ mod tests {
         BSplineSurface::new(knots, control_points)
     }
 
+    /// A shallow parabolic-profile loft face
+    /// `X(u, v) = (u, v, u + c·u²)` — bidegree `(2, 1)`, every extracted span
+    /// linear in the loft axis `v` (the ADM-001 admitted class shape), unit
+    /// weights. The normals `(−(1 + 2c·u), 0, 1)` lie in the `xz` plane near
+    /// the `(−1, 0, 1)` direction with a small certified spread.
+    fn shallow_loft_xz(c: f64) -> BSplineSurface<Vector4> {
+        let knots = (
+            KnotVec::from(vec![0.0f64, 0.0, 0.0, 1.0, 1.0, 1.0]),
+            KnotVec::from(vec![0.0f64, 0.0, 1.0, 1.0]),
+        );
+        let u_coeff = [0.0, 0.5, 1.0];
+        let profile = [0.0f64, 0.5, 1.0 + c];
+        let v_coeff = [0.0, 1.0];
+        let mut control_points: Vec<Vec<Vector4>> = Vec::new();
+        for (&u, &z) in u_coeff.iter().zip(profile.iter()) {
+            let mut row: Vec<Vector4> = Vec::new();
+            for &v in &v_coeff {
+                row.push(Vector4::new(u, v, z, 1.0));
+            }
+            control_points.push(row);
+        }
+        BSplineSurface::new(knots, control_points)
+    }
+
+    /// A shallow parabolic-profile loft face
+    /// `Y(u, v) = (u, u + c·u², v)` — bidegree `(2, 1)`, every extracted span
+    /// linear in the loft axis `v` (the ADM-001 admitted class shape), unit
+    /// weights. The normals `(1 + 2c·u, −1, 0)` lie in the `xy` plane near the
+    /// `(1, −1, 0)` direction with a small certified spread.
+    fn shallow_loft_xy(c: f64) -> BSplineSurface<Vector4> {
+        let knots = (
+            KnotVec::from(vec![0.0f64, 0.0, 0.0, 1.0, 1.0, 1.0]),
+            KnotVec::from(vec![0.0f64, 0.0, 1.0, 1.0]),
+        );
+        let u_coeff = [0.0, 0.5, 1.0];
+        let profile = [0.0f64, 0.5, 1.0 + c];
+        let v_coeff = [0.0, 1.0];
+        let mut control_points: Vec<Vec<Vector4>> = Vec::new();
+        for (&u, &y) in u_coeff.iter().zip(profile.iter()) {
+            let mut row: Vec<Vector4> = Vec::new();
+            for &v in &v_coeff {
+                row.push(Vector4::new(u, y, v, 1.0));
+            }
+            control_points.push(row);
+        }
+        BSplineSurface::new(knots, control_points)
+    }
+
     /// A ruled-section loft face `X(u, v) = (u + offset_x, u², v)` — bidegree
     /// `(2, 1)`, every extracted span linear in the loft axis `v` (the ADM-001
     /// admitted class shape), unit weights.
@@ -1312,5 +1494,89 @@ mod tests {
             CullingOrder::HullAabbThenKnotSpan.tag(),
             "hull_aabb_then_knot_span"
         );
+    }
+
+    #[test]
+    fn certify_admitted_cut_pair_wires_admission_end_to_end() {
+        // ADM-004-FUNNEL-WIRING: the certified cut of one admitted face pair
+        // wires the landed pieces — the Theorem A adapter admits, the ADM-002
+        // certificate assembly certifies both faces, and the Theorem C
+        // transversality certificate closes the shared whole-span product
+        // chart. The fixture: two shallow parabolic-profile ruled-section loft
+        // faces whose certified normal cones separate — `X = (u, v, u + c·u²)`
+        // (normals near the `xz`-plane direction `(−1, 0, 1)`) against
+        // `Y = (u, u + c·u², v)` (normals near the `xy`-plane direction
+        // `(1, −1, 0)`) — so the certified cut certifies with a strictly
+        // positive transverse margin.
+        let x = shallow_loft_xz(0.05);
+        let y = shallow_loft_xy(0.05);
+        let hint = AdmitDomainHint {
+            order: CullingOrder::HullAabbThenKnotSpan,
+        };
+        let budget = CertificateBudget::default();
+
+        let run = || match certify_admitted_cut_pair(&x, &y, &hint, &budget) {
+            Ok(row) => row,
+            Err(refusal) => panic!("the admitted pair cut must certify, refused {refusal:?}"),
+        };
+
+        let first = run();
+        assert_eq!(
+            first.system.span_pair_count(),
+            1,
+            "the single-span fixture assembles one span pair"
+        );
+        assert_eq!(
+            first.x_certificate.tag(),
+            "regular",
+            "the X face family certifies regular over its whole span"
+        );
+        assert_eq!(
+            first.y_certificate.tag(),
+            "regular",
+            "the Y face family certifies regular over its whole span"
+        );
+        assert!(
+            first.x_whole_box_regular().is_some() && first.y_whole_box_regular().is_some(),
+            "both faces carry a whole-box regularity certificate"
+        );
+        assert!(
+            first.transverse.delta.0 > 0.0 && first.transverse.delta.0 < first.transverse.delta.1,
+            "the certified cut closes with a strictly positive transverse margin: {:?}",
+            first.transverse.delta
+        );
+
+        // Determinism: an identical second cut is bit-identical (the binding's
+        // determinism rule, extended to the admitted pair pipeline).
+        let second = run();
+        assert_eq!(
+            format!("{first:?}"),
+            format!("{second:?}"),
+            "an identical admitted pair cut answers bit-identically"
+        );
+    }
+
+    #[test]
+    fn certify_admitted_cut_pair_keeps_admission_refusals_unchanged() {
+        // A general spline-section pair (NOT the admitted ruled-section class)
+        // keeps the adapter's exact typed refusal through the cut entry (V5:
+        // nothing already-green reaches the certificates, admission widens
+        // monotonically or not at all).
+        let x = bezier_patch(0.0);
+        let y = bezier_patch(3.0);
+        let hint = AdmitDomainHint {
+            order: CullingOrder::HullAabbThenKnotSpan,
+        };
+        let budget = CertificateBudget::default();
+        let run = || certify_admitted_cut_pair(&x, &y, &hint, &budget);
+        for attempt in ["first", "identical second"] {
+            match run() {
+                Err(ConstructRefusal::InvalidInput) => {}
+                other => panic!(
+                    "{attempt} run: a non-admitted carrier pair must keep its typed \
+                     InvalidInput refusal (V5, no verdict flip), got {other:?}"
+                ),
+            }
+        }
     }
 }
