@@ -1,89 +1,69 @@
-# WORK PACKET TRIM-EXTRUDE-CTOR — the spline-trimmed extrude constructor (door-callable)
+# WORK PACKET MONO-3-BLADE-MEMBERS-MIRROR — plate-section members and mirror of kernel rows
 
-The four rows (rear_wing, suspension_front, suspension_rear, steering_rack)
-refuse typed at "the spline-trimmed extrude": an extrusion whose boundary is
-cut by a spline curve. Every theoretical ingredient is LANDED — the trim
-clip (`truck-certified/src/kernel/trimclip.rs`, R9 crossings +
-`TrimCrossing` nodes + winding classification), the B-rep promotion, the
-ADM-003 algebraic-trim volume brackets (route (a) over the pullback
-polynomial), and CG-BINDING's exports. This packet composes them into ONE
-door-callable constructor: extrude the profile in its local frame, cut the
-result by the recorded spline trim curve, emit facts (volume bracket /
-world bbox / mesh) and refuse typed wherever the composition cannot close.
+The corpus's monocoque/nose/rear_wing build blade members — rim bead, roll
+hoop, hoop stays, headrest bosses, wishbone fairings — through
+`surfaces.swept_plate` / `surfaces.blade_path` / `surfaces.blade_member`
+(surfaces.py), and mirror them with `surfaces.mirror_y`. The R2 census names
+`mirror_y` a typed refusal on kernel rows ("a mirror of this carrier is not a
+kernel-engine row"); the member carriers route through the landed sweep
+machinery but their plate-section idiom is unlanded.
 
 ```yaml
-id:          TRIM-EXTRUDE-CTOR
-contract:    [TRIM-EXTRUDE-CTOR]
-class:       design
+id:          MONO-3-BLADE-MEMBERS-MIRROR
+contract:    [MONO-3-BLADE-MEMBERS-MIRROR]
+class:       mechanical
 crates:      [truck123d]
-depends_on:  [CG-BINDING]
+depends_on:  [MONO-2-NSTATION-LOFT]
 write_allow:
-  - truck123d/src/binding.rs
   - truck123d/src/bd_bridge.rs
-  - corpus/ttc/door.py
 read_allow:
-  - loop/results/CG-BINDING.json
-  - docs/CONSTRUCTIVE_GEOMETRY_KERNEL_SPEC_V2.md
-  - docs/TTC_CENSUS_FINAL.md
-tests_required:
-  - spline_trim_extrude_volume_matches_recorded_reference
-  - trim_crossings_are_certified_nodes_not_coordinates
-  - self_crossing_trim_loop_refuses_typed
-  - full_extrude_without_trim_answers_bit_identically
+  - truck123d/src/binding.rs
+  - docs/MONO_CLOSURE_BOOKING.md
+  - corpus/ttc/trees/f1/src/lib/surfaces.py
+  - corpus/ttc/trees/f1/src/lib/mono_tub.py
+tests_required: []
 anchors:
-  - {id: T1, expect: 9, cmd: "grep -c 'TrimCrossing' vendor/truck/truck-certified/src/kernel/trimclip.rs"}
-  - {id: T2, expect: 5, cmd: "grep -c '\\<algebraic\\>' truck123d/src/binding.rs"}
-  - {id: T3, expect: 1, cmd: "grep -c '\\<trim\\>' corpus/ttc/door.py"}
-budget:      {turns: 70, ctx_tokens: 190000}
+  - {id: A1, expect: 0,  cmd: "grep -c 'swept_plate\\|blade_member\\|blade_path' truck123d/src/bd_bridge.rs"}
+  - {id: A2, expect: 30, cmd: "grep -ci 'mirror' truck123d/src/bd_bridge.rs"}
+budget:      {turns: 50, ctx_tokens: 150000}
 ```
 
-## Scope decisions (pre-decided)
+## Method
 
-1. **One export, composed.** `binding_trim_extrude` (new pyo3 export in
-   binding.rs): profile data row + trim curve data row in; certified volume
-   bracket + realization data out. It composes the landed stages IN ORDER —
-   local-frame extrude (the landed frame carrier), pullback polynomial,
-   R9 crossings via the trim clip, winding classification, ADM-003 bracket —
-   and NEVER reimplements any stage (no trim math in the bridge layer).
-2. **The door idiom.** The shim's trim-carrier rows (whatever the corpus
-   scripts write — `bd.split`, `bd.trim`, extrude-then-cut-by-spline —
-   match the corpus's actual idiom recorded in the four rows) flip to the
-   constructor. Any trim class the composition cannot close (self-crossing
-   loops, multiple nested loops beyond the clip's discipline, tangential
-   trim) refuses TYPED naming it (`Refuse(TrimClipFailed)` family —
-   Inconclusive, never silent, per spec §9.4).
-3. **Facts gate discipline.** The four rows facts-match their recorded
-   OCC references EXACTLY or refuse typed. No OCC runs (owner directive);
-   the recorded references are the oracle. A `TrimClipFailed` on a row is a
-   valid recorded verdict; an untyped failure is not.
-4. **V5 net.** A plain extrude with NO trim answers bit-identically through
-   the new path (the no-trim degenerate case must not change landed
-   behavior); all landed rows keep their verdicts.
+1. **Trace first (stop condition 1).** Read `surfaces.swept_plate`,
+   `surfaces.blade_path`, `surfaces.blade_member` end to end and record the
+   exact drop-in op sequence each invokes (profile author -> placement ->
+   loft/sweep -> thickening). The carrier mapping must name the landed
+   machinery each step rides (SWEEP-PATH's spline-path sweep; MONO-2's loft
+   for any stacked-station member). If an idiom has no landed carrier, record
+   it as a named gap — do not improvise one.
+2. **Plate-section members.** Implement the swept-member carrier for the
+   traced idioms: plate profile swept along its recorded path, certified
+   volume through the same per-patch `volume_facts` accounting as MONO-2
+   (a member is a two-section degenerate case plus wall bands — derive the
+   certificate from the sweep carrier's existing facts, do not invent a new
+   integrator).
+3. **Mirror of kernel rows.** Mirror_y (and mirror about the recorded plane
+   generally) of a kernel row is an exact isometry: transform every control
+   point by the recorded reflection; the volume's magnitude is invariant and
+   orientation flips (a one-line certificate from the change-of-variables
+   theorem). The mirrored row reuses the original's patch grid — no
+   re-approximation. `mirror(mirror(x)) = x` exactly (test it bit-level).
+4. All cargo through the queue; no OCC anywhere.
 
 ## Done when
 
-```
-cargo check --locked -p truck123d
-cargo test --locked -p truck123d --lib --tests   (serial, interpreter dir on PATH)
-```
-
-with the four named tests green and a kernel-door smoke over the four
-trim-stopped rows (one fresh python per row, serial) recorded in the RESULT:
-green-with-facts-match or typed-refusal naming the open carrier.
-
-## Forbidden
-
-Any trim math in bd_bridge/door layers (composition only). Approximate
-brackets. Silent winding-number shortcuts. Editing recorded references.
-Widening the clip discipline past the spec's §9.4 refusal.
+- check/lib tests green including: `mirror_is_exact_isometry`,
+  `mirror_twice_is_identity`, `member_volume_certified_bracket`,
+  `member_refuses_open_path_typed` (if the traced idiom refuses open paths —
+  match whatever the landed sweep carrier refuses).
+- fmt/clippy clean on added lines; A1 drifts 0 -> >= 1 (record post-work).
+- The traced op-sequence table (step 1) is committed into RESULT.json notes —
+  it is the evidence that the mapping is complete.
 
 ## Stop conditions
 
-- The corpus's actual trim idiom cannot map onto the constructor's input
-  rows → SPEC_GAP naming the recorded carrier collision.
-- A certified crossing cannot isolate at depth_max on a corpus row →
-  record `TrimClipFailed` (correct verdict), not a retry loop.
+- A member idiom whose trace does not resolve to landed carriers: stop, name
+  the gap, typed refusal stays. No ruled-substitution, no tolerance stretch.
 
-## Finish by writing RESULT.json at the WORKTREE ROOT (then COMMIT first)
-
-Commit subject: `feat(bridge): the spline-trimmed extrude constructor — certified trim clip composed to the door (TRIM-EXTRUDE-CTOR)`.
+Write RESULT.json AT THE WORKTREE ROOT.

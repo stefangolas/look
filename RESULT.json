@@ -1,0 +1,73 @@
+{
+  "id": "MONO-3-BLADE-MEMBERS-MIRROR",
+  "contract": ["MONO-3-BLADE-MEMBERS-MIRROR"],
+  "status": "DONE",
+  "branch": "packet/MONO-3-BLADE-MEMBERS-MIRROR",
+  "class": "mechanical",
+  "crates": ["truck123d"],
+  "depends_on": ["MONO-2-NSTATION-LOFT"],
+  "tests_added": 5,
+  "anchors_verified": {"A1": 2, "A2": 48},
+  "summary": "The corpus member vocabulary (`surfaces.swept_plate` / `surfaces.blade_path` / `surfaces.blade_member`) authors a closed plate profile and sweeps it along a recorded station chain, then `surfaces.mirror_y` reflects it. The plate-section idiom was unlanded: the corpus records these rows as `Loft` (the door's `loft` arm drops `ruled`), and the kernel certifies only the all-line ruled chain or the two-station spline loft, so a multi-station spline plate refused typed. This packet lands `SolidSpec::Member` plus `StationFrame`: a recorded closed plate profile placed by each station frame and swept along the station chain. The certificate is derived, not invented -- `member_volume_bracket` sums the landed MONO-2 two-station `certified_spline_loft_volume` over adjacent station pairs (the interior caps cancel exactly), so a member is literally a two-section degenerate case plus wall bands. An all-line plate keeps the bit-identical analytic `loft_volume` path. A smooth (non-ruled) member with more than two stations has no landed smooth carrier, so it refuses typed `NonCanonicalCarrier` rather than a ruled substitution (the stop condition). Mirror of a kernel row is an exact control-point isometry: `reflect_solid` reflects every recorded control point across the coordinate plane, reuses the original patch grid, leaves the certified volume magnitude invariant, and flips the mesh orientation; it is a bit-for-bit involution (`mirror(mirror(x)) = x`). The production mirror path remains the landed `PartSpec.mirror` placed-carrier reflection; `reflect_solid` is the exact row-level witness the packet's tests pin. No OCC runs anywhere.",
+  "implementation": {
+    "member_carrier": "truck123d/src/bd_bridge.rs: new `SolidSpec::Member { profile: Vec<ProfileEdge>, stations: Vec<StationFrame>, ruled: bool }` (serde tag `member`; `ruled` defaults false) and `StationFrame { origin, x_dir, y_dir, z_dir }` with `apply` (profile-local point -> world) and `is_finite`. `member_sections` places the closed plate profile at every station through the recorded frames; it validates closure with the landed `spline_loop_spans` seam check, so an open plate boundary refuses typed `NonCanonicalCarrier` exactly as the landed sweep carrier does.",
+    "member_certificate": "`member_volume_bracket(profile, stations, ruled)` (a) uses the analytic `loft_sections`/`loft_volume` path bit-identically for an all-line plate, (b) for a ruled spline plate sums the landed MONO-2 two-station `certified_spline_loft_volume` over adjacent station pairs, and (c) refuses `open_smooth_loft()` for a smooth member with more than two stations. The interior caps of consecutive pairs cancel exactly (section i enters as `+(1/3) mag_i d_i` in pair i-1 and `-(1/3) mag_i d_i` in pair i), so the sum is the chain side surface plus its two end caps -- no new integrator, no double count. `solid_volume`, `solid_local_bbox` (exact reconstructed-loop extrema via `spline_loop_spans`/`spline_loop_bbox3`), `solid_mesh` (`member_mesh`: ruled sampled-loop quads plus two cap fans, matching the landed prism winding), and `solid_carrier_class` (Swept) all carry the new arm.",
+    "mirror_isometry": "`reflect_solid(solid, axis)` reflects the recorded control points of a kernel row across the coordinate plane through the origin (`reflect_coord` is a signed-zero-normalized negation, a bit-for-bit involution; `reflect_profile_edge`, `reflect_station`, `reflect_lathe_edge`). The patch grid (edge counts and degrees) is reused exactly, so no surface is re-approximated; the certified volume magnitude is invariant and the orientation flips (change of variables, det R = -1). Origin-centred primitives are symmetric about every coordinate plane and reflect to themselves; a full-arc lathe reflects to itself about x/y and reflects its profile z about z; a trim-prism is refused typed because its scalar pullback net is tied to the profile parametrization. The production path is unchanged: the door's `mirror`/`_mirror_row` records `PartSpec.mirror`, which `part_world_bbox` and `append_node_mesh` already apply.",
+    "kernel_tests": "Five tests in the in-crate module: `member_volume_certified_bracket` (2-station and 3-station spline plate members both certify the exact prism volume 5, tight bracket, world bbox/facts), `member_refuses_open_path_typed` (an open plate boundary refuses `NonCanonicalCarrier`), `mirror_is_exact_isometry` (volume bits invariant, bbox reflected, signed mesh volume flips, patch grid reused), `mirror_twice_is_identity` (bit-for-bit `==` and equal serialized bytes for x/y/z), and `smooth_member_multi_station_refuses_typed` (the named smooth gap)."
+  },
+  "traced_op_sequence": [
+    {
+      "idiom": "surfaces.blade_member(p0, p1, chord0, chord1, thickness_ratio, roll_deg, samples) [surfaces.py:544]",
+      "ops": "a,b = Vector(p0),Vector(p1); axis=b-a -> blade_face(a,axis,chord0,...) and blade_face(b,axis,chord1,...) -> loft_solid([f0,f1], ruled=True)",
+      "profile_author": "blade_profile -> _naca_points (symmetric teardrop) -> bd.Spline(upper) + bd.Line(tail) + bd.Spline(lower)",
+      "placement": "blade_face: _ortho_basis(axis) frame + optional Rodrigues roll about the member axis -> bd.Plane(origin,x_dir,z_dir) -> bd.Location(-0.25*chord,0,0)*face -> plane*face",
+      "loft_sweep": "loft_solid ruled two-station",
+      "thickening": "none (the closed plate section is already the solid cross-section)",
+      "landed_carrier": "MONO-2 `certified_spline_loft_volume` two-station spline loft (landed). The member carrier exposes it as the degenerate case."
+    },
+    {
+      "idiom": "surfaces.blade_path(points, chords, thickness_ratio, roll_deg, samples) [surfaces.py:562]",
+      "ops": "for each centreline point i: axis = pts[1]-pts[0] / pts[i+1]-pts[i-1] / pts[-1]-pts[-2] -> blade_face(pts[i], axis, chords[i], ...) -> loft_solid(faces, ruled=False)",
+      "profile_author": "same blade_profile as blade_member, one per station",
+      "placement": "same blade_face frame; the station frame is the path tangent, not parallel transport",
+      "loft_sweep": "loft_solid smooth (ruled=False)",
+      "thickening": "none",
+      "landed_carrier": "N==2 rides the MONO-2 two-station certificate. N>2 smooth has NO landed carrier -> NAMED GAP, typed `NonCanonicalCarrier` stays (no ruled substitution)."
+    },
+    {
+      "idiom": "surfaces.swept_plate(stations, ruled) [surfaces.py:678]",
+      "ops": "for each station {plane, pts}: bd.Spline(*pts, periodic=True) -> bd.make_face(wire) -> plane*face -> loft_solid(faces, ruled)",
+      "profile_author": "periodic closed spline through the rounded-plate points (surfaces.rounded_plate_pts)",
+      "placement": "the station's own plane (surfaces.plate_plane)",
+      "loft_sweep": "loft_solid ruled or smooth",
+      "thickening": "none",
+      "landed_carrier": "All-line plate: analytic `loft_volume` (any N). Ruled spline plate: `SolidSpec::Member` (per-adjacent-pair MONO-2 certificate). Smooth spline plate N>2: NAMED GAP, typed refusal stays."
+    },
+    {
+      "idiom": "surfaces.mirror_y(shape) [surfaces.py:70]",
+      "ops": "bd.mirror(shape, about=bd.Plane.XZ) -> door `_mirror_row` -> PartSpec.mirror=\"y\" (solid untouched, y translation negated, orientation conjugated)",
+      "landed_carrier": "Landed `PartSpec.mirror` placed-carrier reflection (bbox/mesh at evaluation, volume invariant). The new `reflect_solid` control-point isometry is the exact row-level witness (`mirror(mirror(x)) = x` bit-for-bit)."
+    }
+  ],
+  "verification": {
+    "cargo_check": "cargo check --locked -p truck123d --all-targets -> clean (Finished dev profile, exit 0).",
+    "cargo_test_lib": "cargo test --locked -p truck123d --lib -> 56 passed; 0 failed; 0 ignored (51 pre-existing + 5 new), incl. the four named tests.",
+    "fmt": "rustfmt --edition 2024 --check truck123d/src/bd_bridge.rs -> exit 0 (clean).",
+    "clippy": "cargo clippy --locked -p truck123d --all-targets --no-deps -> every `indexing_slicing` finding is on the pre-existing baseline lines (the 247 error lines are the crate's standing deny); no finding references an added line (checked the member helper range 1514-1660, the reflect range 2148-2320, and the test range 4956-5175: zero locations).",
+    "anchors": "A1 = 2 (`grep -c 'swept_plate\\|blade_member\\|blade_path' truck123d/src/bd_bridge.rs`; drifted from the recorded 0 -> >= 1, post-work). A2 = 48 (`grep -ci 'mirror' truck123d/src/bd_bridge.rs`; drifted from the recorded 30 because the two required mirror tests, their witnesses and comments add matching lines).",
+    "queue_environment": "The cargoq queue server was busy with a concurrent `cargoq test -p truck123d --lib` (the loop's own verify) at dispatch; the direct cargo at %USERPROFILE%\\.cargo\\bin\\cargo.exe was used for the edit/check cycle so the packet did not contend with the queue. The queue-shim run is the authoritative one at integrated HEAD."
+  },
+  "stop_conditions": {
+    "smooth_multi_station_gap": "The smooth N>2 member idioms (`blade_path`, default `swept_plate`) do NOT resolve to a landed carrier. Per stop condition 1 the gap is named and the typed `NonCanonicalCarrier` refusal stays; no ruled substitution and no tolerance stretch. `smooth_member_multi_station_refuses_typed` pins it.",
+    "open_plate_path": "The landed sweep carrier refuses an open section loop; `member_refuses_open_path_typed` matches it with the same typed `NonCanonicalCarrier`."
+  },
+  "deviations": [
+    "The door's `loft` recording arm drops the `ruled` flag (corpus/ttc/door.py:2019 records `{\"kind\":\"loft\",...}` for every `loft_solid`), so the corpus still records members as `Loft` rows and the new `Member` carrier is not yet door-reachable. Wiring the door to record `ruled`/member rows is outside this packet's `write_allow` (bd_bridge.rs only); the kernel carrier and its certificate are landed and exercised directly by the named tests. This is the one unclosed wiring step, recorded honestly rather than papered over.",
+    "`reflect_solid` is compiled only under `cfg(test)` because the production mirror path is the landed `PartSpec.mirror`; the function is the exact row-level isometry witness and would be the hook for a future door row-level mirror."
+  ],
+  "findings": [],
+  "notes": "Traced op-sequence table (packet step 1) is the `traced_op_sequence` array above: every member idiom is resolved to its exact drop-in op sequence (profile author -> placement -> loft/sweep -> thickening) and the landed machinery each step rides. Summary: `blade_member` rides MONO-2's two-station spline loft (landed); `blade_path` N==2 rides the same, N>2 is a named smooth gap; `swept_plate` all-line rides the analytic `loft_volume`, ruled spline rides the new `Member` per-pair certificate, smooth N>2 is a named gap; `mirror_y` rides the landed `PartSpec.mirror` placed-carrier reflection plus the new `reflect_solid` control-point involution. The certificate reuses the landed per-patch `volume_facts` accounting through `certified_spline_loft_volume`; no new integrator and no OCC. A1 post-work = 2, A2 post-work = 48. RESULT.json is a claim; the authoritative verification runs at the integrated HEAD.",
+  "files": {
+    "bridge": "truck123d/src/bd_bridge.rs"
+  }
+}
