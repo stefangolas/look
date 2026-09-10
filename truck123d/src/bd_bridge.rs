@@ -1775,7 +1775,9 @@ fn station_params(loops: &[Vec<SpanPoly3>]) -> Result<Vec<f64>, Refusal> {
 /// moments, returned as `(value, lo, hi)`. A stack whose section spans do not
 /// match (the u-unification cannot be completed by knot insertion alone)
 /// refuses typed naming the open smooth carrier.
-fn certified_spline_loft_volume(sections: &[Vec<ProfileEdge>]) -> Result<(f64, f64, f64), Refusal> {
+fn spline_loft_volume_rows(
+    sections: &[Vec<ProfileEdge>],
+) -> Result<(Vec<crate::python::binding::VolumeRow>, Vec<Vec<SpanPoly3>>), Refusal> {
     if sections.len() < 2 {
         return Err(Refusal::Empty);
     }
@@ -1794,9 +1796,7 @@ fn certified_spline_loft_volume(sections: &[Vec<ProfileEdge>]) -> Result<(f64, f
     }
     let v = station_params(&loops)?;
     let station_count = loops.len();
-    let mut value = 0.0f64;
-    let mut lo = 0.0f64;
-    let mut hi = 0.0f64;
+    let mut volume_rows = Vec::new();
     for span_index in 0..span_count {
         // The four u-control rows of this span, one 3-D value per station.
         let mut rows: [Vec<[f64; 3]>; 4] = [
@@ -1830,28 +1830,36 @@ fn certified_spline_loft_volume(sections: &[Vec<ProfileEdge>]) -> Result<(f64, f
                 numerator.push(segment.get(segment_index).cloned().ok_or(Refusal::Empty)?);
             }
             let weights = vec![vec![1.0f64; cols]; 4];
-            let row = crate::python::binding::VolumeRow {
+            volume_rows.push(crate::python::binding::VolumeRow {
                 numerator,
                 weights,
                 orientation: 1.0,
-            };
-            let json =
-                crate::python::binding::volume_facts(&row).map_err(|_| open_smooth_loft())?;
-            let outcome: serde_json::Value =
-                serde_json::from_str(&json).map_err(|_| Refusal::Empty)?;
-            value += outcome
-                .get("value")
-                .and_then(serde_json::Value::as_f64)
-                .ok_or(Refusal::Empty)?;
-            lo += outcome
-                .pointer("/bracket/lo")
-                .and_then(serde_json::Value::as_f64)
-                .ok_or(Refusal::Empty)?;
-            hi += outcome
-                .pointer("/bracket/hi")
-                .and_then(serde_json::Value::as_f64)
-                .ok_or(Refusal::Empty)?;
+            });
         }
+    }
+    Ok((volume_rows, loops))
+}
+
+fn certified_spline_loft_volume(sections: &[Vec<ProfileEdge>]) -> Result<(f64, f64, f64), Refusal> {
+    let (rows, loops) = spline_loft_volume_rows(sections)?;
+    let mut value = 0.0f64;
+    let mut lo = 0.0f64;
+    let mut hi = 0.0f64;
+    for row in &rows {
+        let json = crate::python::binding::volume_facts(row).map_err(|_| open_smooth_loft())?;
+        let outcome: serde_json::Value = serde_json::from_str(&json).map_err(|_| Refusal::Empty)?;
+        value += outcome
+            .get("value")
+            .and_then(serde_json::Value::as_f64)
+            .ok_or(Refusal::Empty)?;
+        lo += outcome
+            .pointer("/bracket/lo")
+            .and_then(serde_json::Value::as_f64)
+            .ok_or(Refusal::Empty)?;
+        hi += outcome
+            .pointer("/bracket/hi")
+            .and_then(serde_json::Value::as_f64)
+            .ok_or(Refusal::Empty)?;
     }
 
     // The planar end caps: `(1/3) d A` with the recorded-loop winding, exactly
@@ -3799,6 +3807,911 @@ pub fn write_tree_stl(root: &TreeNode, path: &str) -> Result<u64, Refusal> {
     }
     std::fs::write(path, bytes).map_err(|_| Refusal::Empty)?;
     Ok(count)
+}
+
+// ---------------------------------------------------------------------------
+// MONO-5-RAY-CLASSIFY -- certified point-vs-spline-solid membership
+// ---------------------------------------------------------------------------
+//
+// The wave-3 boolean solver consumes a certified membership primitive: for a
+// point `p` and a spline-patch-bounded solid `S` -- a finite oriented 2-cycle
+// of tensor-Bernstein patches, exactly the shape the landed loft/member rows
+// assemble (`spline_loft_volume_rows`) -- decide `p in int S` / `p not in S` /
+// typed-indeterminate, with certificates.
+//
+// **The mechanism is NAMED (wave-3 amendment 3): certified ray x bicubic root
+// isolation.** A recorded-direction ray `r(t) = p + t d` is cast from `p`; the
+// ray's crossings with every bicubic (tensor-Bernstein) patch are isolated by
+// 1-D certified bracketing -- Bernstein clipping over the patch domain, with
+// the ray-parameter interval derived per sub-patch by outward-rounded interval
+// arithmetic -- and the signed crossings are counted. 1-D bracketing is
+// strictly easier than the 4-D contact problem and reuses the landed interval
+// discipline. Every numeric decision is an outward-rounded interval decision;
+// no sampling and no naked-f64 verdict.
+//
+// **Weights admission.** The corpus's lofts/members are non-rational: this
+// primitive certifies `weights == 1` for every consumed patch and refuses a
+// rational weight field typed. (The landed `VolumeRow` weight path covers the
+// rational case elsewhere; here the admitted carrier is the non-rational
+// polynomial net.)
+//
+// **Refusal / retry contract.** A non-transversal ray (grazing, tangent, or
+// coplanar with a patch) leaves crossing enclosures that never separate; the
+// clipping loop's leaf cap and depth cap detect this and return the typed
+// `MembershipIndeterminate`, and the caller retries with a fresh recorded
+// direction up to `RETRY_BOUND`. Failure of every direction is itself the
+// typed indeterminate -- never a guessed classification.
+//
+// **Termination is a theorem obligation, not a tuning knob.** For a
+// transversal ray/patch configuration the crossing is an isolated point in
+// `(u, v)`; the Bernstein hull property makes every box at positive distance
+// from the crossing exclude at finite depth, so the worklist empties. A
+// configuration whose worklist does not empty (or whose surviving leaves do
+// not shrink) is refused, never tuned.
+//
+// The public entry points are the follow-on boolean solver's surface; until
+// that consumer lands they are reached only from the in-crate suite, so the
+// module is scoped `allow(dead_code)` exactly as the sibling binding export
+// module is.
+#[allow(dead_code)]
+pub mod membership {
+    use serde::Serialize;
+
+    use crate::python::binding::VolumeRow;
+
+    /// The number of fresh recorded directions attempted after the caller's
+    /// first direction before the typed indeterminate is returned.
+    pub const RETRY_BOUND: usize = 8;
+
+    /// The subdivision depth cap of the certified clipping loop. Termination
+    /// for an admitted (transversal) ray/patch configuration is a theorem
+    /// obligation; the cap only bounds the work for the refused cases.
+    const MAX_DEPTH: u32 = 80;
+
+    /// The per-patch surviving-box cap. A non-transversal (grazing/coplanar)
+    /// ray leaves a positive-dimensional surviving set whose box count grows
+    /// with subdivision; hitting the cap is the refusal signal.
+    const MAX_LEAVES: usize = 4096;
+
+    /// The relative isolation tolerance: a surviving leaf is certified once
+    /// the diameter of its patch enclosure is no larger than this fraction of
+    /// the solid's bounding diameter.
+    const ISOLATION_TOL: f64 = 1.0e-9;
+
+    /// The cluster-extent guard: a merged crossing whose patch enclosure is
+    /// wider than this multiple of the isolation tolerance may be two
+    /// crossings under a grazing ray, so it is refused rather than counted.
+    const CLUSTER_TOL_FACTOR: f64 = 64.0;
+
+    /// The certified membership verdict.
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+    #[serde(rename_all = "snake_case")]
+    pub enum MembershipVerdict {
+        /// The point is certified in the solid's interior.
+        Inside,
+        /// The point is certified outside the solid.
+        Outside,
+        /// No recorded direction certified the membership; retry with another
+        /// direction or treat the point as unresolved.
+        Indeterminate,
+    }
+
+    /// The typed refusal of a membership query.
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+    #[serde(rename_all = "snake_case")]
+    pub enum MembershipRefusal {
+        /// The ray met the boundary non-transversally (grazing/tangent/coplanar)
+        /// or the clipping loop did not isolate a crossing within budget.
+        MembershipIndeterminate,
+        /// A consumed patch row is malformed (a caller defect).
+        MalformedPatch,
+        /// A consumed patch carries a non-constant rational weight field; this
+        /// arm admits the non-rational (weights == 1) corpus carrier.
+        RationalWeights,
+    }
+
+    /// The crossing evidence of one certified ray/patch crossing.
+    #[derive(Debug, Clone, PartialEq, Serialize)]
+    pub struct CrossingEvidence {
+        /// The index of the patch in the consumed patch set.
+        pub patch: usize,
+        /// The certified ray-parameter interval of the crossing.
+        pub t_lo: f64,
+        /// The certified ray-parameter interval of the crossing.
+        pub t_hi: f64,
+        /// The certified patch-domain `u` interval of the crossing.
+        pub u_lo: f64,
+        /// The certified patch-domain `u` interval of the crossing.
+        pub u_hi: f64,
+        /// The certified patch-domain `v` interval of the crossing.
+        pub v_lo: f64,
+        /// The certified patch-domain `v` interval of the crossing.
+        pub v_hi: f64,
+        /// The interval-certified sign of `d . n_P` (`+1` or `-1`).
+        pub normal_sign: i8,
+    }
+
+    /// The certificate of one membership query.
+    #[derive(Debug, Clone, PartialEq, Serialize)]
+    pub struct MembershipCertificate {
+        /// The certified verdict.
+        pub verdict: MembershipVerdict,
+        /// The number of recorded directions attempted (the 0-based index of
+        /// the successful direction; `RETRY_BOUND` when every direction
+        /// failed).
+        pub attempts: usize,
+        /// The direction that produced the verdict (the caller's direction on
+        /// the first attempt, a recorded fresh direction otherwise).
+        pub direction: [f64; 3],
+        /// The certified crossings of the accepted cast.
+        pub crossings: Vec<CrossingEvidence>,
+        /// The typed refusal when the verdict is `Indeterminate`.
+        #[serde(skip_serializing_if = "Option::is_none")]
+        pub refusal: Option<MembershipRefusal>,
+    }
+
+    // -- outward-rounded interval discipline (inari-style) -------------------
+
+    /// A closed interval with outward-rounded endpoints. The only numeric
+    /// shape the crossing loop reasons over.
+    #[derive(Debug, Clone, Copy)]
+    struct Iv {
+        lo: f64,
+        hi: f64,
+    }
+
+    impl Iv {
+        fn point(x: f64) -> Iv {
+            Iv { lo: x, hi: x }
+        }
+        fn unit() -> Iv {
+            Iv { lo: 0.0, hi: 1.0 }
+        }
+        fn add(self, o: Iv) -> Iv {
+            Iv {
+                lo: down(self.lo + o.lo),
+                hi: up(self.hi + o.hi),
+            }
+        }
+        fn sub(self, o: Iv) -> Iv {
+            Iv {
+                lo: down(self.lo - o.hi),
+                hi: up(self.hi - o.lo),
+            }
+        }
+        fn mul(self, o: Iv) -> Iv {
+            let candidates = [
+                self.lo * o.lo,
+                self.lo * o.hi,
+                self.hi * o.lo,
+                self.hi * o.hi,
+            ];
+            let mut lo = f64::INFINITY;
+            let mut hi = f64::NEG_INFINITY;
+            for value in candidates {
+                lo = lo.min(down(value));
+                hi = hi.max(up(value));
+            }
+            Iv { lo, hi }
+        }
+        fn scale(self, s: f64) -> Iv {
+            self.mul(Iv::point(s))
+        }
+        fn contains_zero(self) -> bool {
+            self.lo <= 0.0 && self.hi >= 0.0
+        }
+        fn width(self) -> f64 {
+            self.hi - self.lo
+        }
+        fn mid(self) -> f64 {
+            0.5 * (self.lo + self.hi)
+        }
+    }
+
+    /// The next representable float below `x` (outward rounding).
+    fn down(x: f64) -> f64 {
+        if x.is_finite() { x.next_down() } else { x }
+    }
+
+    /// The next representable float above `x` (outward rounding).
+    fn up(x: f64) -> f64 {
+        if x.is_finite() { x.next_up() } else { x }
+    }
+
+    fn ipow(x: Iv, n: usize) -> Iv {
+        let mut acc = Iv::point(1.0);
+        for _ in 0..n {
+            acc = acc.mul(x);
+        }
+        acc
+    }
+
+    /// The binomial coefficient `C(n, k)` as an `f64` (exact for the small
+    /// degrees this arm uses).
+    fn binomial(n: usize, k: usize) -> f64 {
+        if k > n {
+            return 0.0;
+        }
+        let k = k.min(n - k);
+        let mut out = 1.0f64;
+        for i in 0..k {
+            out = out * (n - i) as f64 / (i + 1) as f64;
+        }
+        out
+    }
+
+    /// The interval Bernstein basis of `degree` over the interval `t`.
+    fn bernstein_iv(degree: usize, t: Iv) -> Vec<Iv> {
+        let s = Iv::point(1.0).sub(t);
+        let mut out = Vec::with_capacity(degree + 1);
+        for i in 0..=degree {
+            out.push(
+                Iv::point(binomial(degree, i))
+                    .mul(ipow(s, degree - i))
+                    .mul(ipow(t, i)),
+            );
+        }
+        out
+    }
+
+    /// The scalar Bernstein basis of `degree` at the point `t`.
+    fn bernstein_f64(degree: usize, t: f64) -> Vec<f64> {
+        let s = 1.0 - t;
+        let mut out = Vec::with_capacity(degree + 1);
+        for i in 0..=degree {
+            out.push(binomial(degree, i) * s.powi((degree - i) as i32) * t.powi(i as i32));
+        }
+        out
+    }
+
+    // -- patch data ----------------------------------------------------------
+
+    /// One validated non-rational tensor-Bernstein patch (weights certified
+    /// `== 1`), with its recorded orientation sign.
+    struct Patch {
+        rows: usize,
+        cols: usize,
+        data: Vec<[f64; 3]>,
+        orientation: f64,
+    }
+
+    fn parse_patch(row: &VolumeRow) -> Result<Patch, MembershipRefusal> {
+        let rows = row.numerator.len();
+        let cols = row.numerator.first().map_or(0, Vec::len);
+        if rows < 2 || cols < 2 || row.weights.len() != rows {
+            return Err(MembershipRefusal::MalformedPatch);
+        }
+        let mut data = Vec::with_capacity(rows.saturating_mul(cols));
+        for (i, num_row) in row.numerator.iter().enumerate() {
+            if num_row.len() != cols {
+                return Err(MembershipRefusal::MalformedPatch);
+            }
+            let weight_row = row
+                .weights
+                .get(i)
+                .ok_or(MembershipRefusal::MalformedPatch)?;
+            if weight_row.len() != cols {
+                return Err(MembershipRefusal::MalformedPatch);
+            }
+            for (j, a) in num_row.iter().enumerate() {
+                let w = weight_row
+                    .get(j)
+                    .copied()
+                    .ok_or(MembershipRefusal::MalformedPatch)?;
+                if w != 1.0 {
+                    return Err(MembershipRefusal::RationalWeights);
+                }
+                if !a.iter().all(|c| c.is_finite()) {
+                    return Err(MembershipRefusal::MalformedPatch);
+                }
+                data.push(*a);
+            }
+        }
+        if !row.orientation.is_finite() || row.orientation == 0.0 {
+            return Err(MembershipRefusal::MalformedPatch);
+        }
+        Ok(Patch {
+            rows,
+            cols,
+            data,
+            orientation: row.orientation,
+        })
+    }
+
+    /// The coordinate-wise enclosure of the patch over the parameter box
+    /// `u x v` (the interval-Bernstein sum `sum B_i(u) B_j(v) A_ij`; the
+    /// enclosure is outward-rounded and shrinks to the patch point as the box
+    /// shrinks).
+    fn patch_range(patch: &Patch, u: Iv, v: Iv) -> ([f64; 3], [f64; 3]) {
+        let bu = bernstein_iv(patch.rows - 1, u);
+        let bv = bernstein_iv(patch.cols - 1, v);
+        let mut sum = [Iv::point(0.0); 3];
+        for i in 0..patch.rows {
+            let bui = bu.get(i).copied().unwrap_or_else(|| Iv::point(0.0));
+            for j in 0..patch.cols {
+                let bvj = bv.get(j).copied().unwrap_or_else(|| Iv::point(0.0));
+                let coeff = bui.mul(bvj);
+                let index = i * patch.cols + j;
+                if let Some([x, y, z]) = patch.data.get(index).copied() {
+                    for (axis, value) in [x, y, z].into_iter().enumerate() {
+                        let term = coeff.scale(value);
+                        if let Some(slot) = sum.get_mut(axis) {
+                            *slot = (*slot).add(term);
+                        }
+                    }
+                }
+            }
+        }
+        (
+            [sum[0].lo, sum[1].lo, sum[2].lo],
+            [sum[0].hi, sum[1].hi, sum[2].hi],
+        )
+    }
+
+    /// The interval enclosure of `dP/du` over the parameter box `u x v`.
+    fn patch_derivative_u(patch: &Patch, u: Iv, v: Iv) -> [Iv; 3] {
+        let mut acc = [Iv::point(0.0); 3];
+        if patch.rows < 2 {
+            return acc;
+        }
+        let bu = bernstein_iv(patch.rows - 2, u);
+        let bv = bernstein_iv(patch.cols - 1, v);
+        let factor = (patch.rows - 1) as f64;
+        for i in 0..(patch.rows - 1) {
+            let bui = bu.get(i).copied().unwrap_or_else(|| Iv::point(0.0));
+            for j in 0..patch.cols {
+                let bvj = bv.get(j).copied().unwrap_or_else(|| Iv::point(0.0));
+                let coeff = Iv::point(factor).mul(bui).mul(bvj);
+                let a = patch
+                    .data
+                    .get(i * patch.cols + j)
+                    .copied()
+                    .unwrap_or([0.0; 3]);
+                let b = patch
+                    .data
+                    .get((i + 1) * patch.cols + j)
+                    .copied()
+                    .unwrap_or([0.0; 3]);
+                for (axis, (av, bv_)) in a.iter().zip(b.iter()).enumerate() {
+                    let term = coeff.scale(bv_ - av);
+                    if let Some(slot) = acc.get_mut(axis) {
+                        *slot = (*slot).add(term);
+                    }
+                }
+            }
+        }
+        acc
+    }
+
+    /// The interval enclosure of `dP/dv` over the parameter box `u x v`.
+    fn patch_derivative_v(patch: &Patch, u: Iv, v: Iv) -> [Iv; 3] {
+        let mut acc = [Iv::point(0.0); 3];
+        if patch.cols < 2 {
+            return acc;
+        }
+        let bu = bernstein_iv(patch.rows - 1, u);
+        let bv = bernstein_iv(patch.cols - 2, v);
+        let factor = (patch.cols - 1) as f64;
+        for i in 0..patch.rows {
+            let bui = bu.get(i).copied().unwrap_or_else(|| Iv::point(0.0));
+            for j in 0..(patch.cols - 1) {
+                let bvj = bv.get(j).copied().unwrap_or_else(|| Iv::point(0.0));
+                let coeff = Iv::point(factor).mul(bui).mul(bvj);
+                let a = patch
+                    .data
+                    .get(i * patch.cols + j)
+                    .copied()
+                    .unwrap_or([0.0; 3]);
+                let b = patch
+                    .data
+                    .get(i * patch.cols + (j + 1))
+                    .copied()
+                    .unwrap_or([0.0; 3]);
+                for (axis, (av, bv_)) in a.iter().zip(b.iter()).enumerate() {
+                    let term = coeff.scale(bv_ - av);
+                    if let Some(slot) = acc.get_mut(axis) {
+                        *slot = (*slot).add(term);
+                    }
+                }
+            }
+        }
+        acc
+    }
+
+    /// The interval enclosure of the patch normal `P_u x P_v`.
+    fn normal_interval(patch: &Patch, u: Iv, v: Iv) -> [Iv; 3] {
+        let du = patch_derivative_u(patch, u, v);
+        let dv = patch_derivative_v(patch, u, v);
+        [
+            du[1].mul(dv[2]).sub(du[2].mul(dv[1])),
+            du[2].mul(dv[0]).sub(du[0].mul(dv[2])),
+            du[0].mul(dv[1]).sub(du[1].mul(dv[0])),
+        ]
+    }
+
+    /// The interval enclosure of `n . d`.
+    fn dot_direction(normal: [Iv; 3], direction: [f64; 3]) -> Iv {
+        normal[0]
+            .scale(direction[0])
+            .add(normal[1].scale(direction[1]))
+            .add(normal[2].scale(direction[2]))
+    }
+
+    /// The pointwise derivative `dP/du` at `(u, v)` (used only for the
+    /// subdivision-direction heuristic, never for a verdict).
+    fn derivative_point_u(patch: &Patch, u: f64, v: f64) -> [f64; 3] {
+        let mut acc = [0.0f64; 3];
+        if patch.rows < 2 {
+            return acc;
+        }
+        let bu = bernstein_f64(patch.rows - 2, u);
+        let bv = bernstein_f64(patch.cols - 1, v);
+        let factor = (patch.rows - 1) as f64;
+        for i in 0..(patch.rows - 1) {
+            let bui = bu.get(i).copied().unwrap_or(0.0);
+            for j in 0..patch.cols {
+                let bvj = bv.get(j).copied().unwrap_or(0.0);
+                let coeff = factor * bui * bvj;
+                let a = patch
+                    .data
+                    .get(i * patch.cols + j)
+                    .copied()
+                    .unwrap_or([0.0; 3]);
+                let b = patch
+                    .data
+                    .get((i + 1) * patch.cols + j)
+                    .copied()
+                    .unwrap_or([0.0; 3]);
+                for (slot, (av, bv_)) in acc.iter_mut().zip(a.iter().zip(b.iter())) {
+                    *slot += coeff * (bv_ - av);
+                }
+            }
+        }
+        acc
+    }
+
+    /// The pointwise derivative `dP/dv` at `(u, v)` (split heuristic only).
+    fn derivative_point_v(patch: &Patch, u: f64, v: f64) -> [f64; 3] {
+        let mut acc = [0.0f64; 3];
+        if patch.cols < 2 {
+            return acc;
+        }
+        let bu = bernstein_f64(patch.rows - 1, u);
+        let bv = bernstein_f64(patch.cols - 2, v);
+        let factor = (patch.cols - 1) as f64;
+        for i in 0..patch.rows {
+            let bui = bu.get(i).copied().unwrap_or(0.0);
+            for j in 0..(patch.cols - 1) {
+                let bvj = bv.get(j).copied().unwrap_or(0.0);
+                let coeff = factor * bui * bvj;
+                let a = patch
+                    .data
+                    .get(i * patch.cols + j)
+                    .copied()
+                    .unwrap_or([0.0; 3]);
+                let b = patch
+                    .data
+                    .get(i * patch.cols + (j + 1))
+                    .copied()
+                    .unwrap_or([0.0; 3]);
+                for (slot, (av, bv_)) in acc.iter_mut().zip(a.iter().zip(b.iter())) {
+                    *slot += coeff * (bv_ - av);
+                }
+            }
+        }
+        acc
+    }
+
+    fn norm3(value: [f64; 3]) -> f64 {
+        (value[0] * value[0] + value[1] * value[1] + value[2] * value[2]).sqrt()
+    }
+
+    // -- certified clipping loop --------------------------------------------
+
+    /// One surviving clipping box: a certified crossing enclosure candidate.
+    struct Leaf {
+        u: Iv,
+        v: Iv,
+        t: Iv,
+        lo: [f64; 3],
+        hi: [f64; 3],
+    }
+
+    /// The ray-parameter interval over which the ray meets the axis-aligned
+    /// box `[lo, hi]`, clipped to `[0, t_cap]`; `None` when the ray misses.
+    fn ray_slab(
+        point: [f64; 3],
+        direction: [f64; 3],
+        lo: [f64; 3],
+        hi: [f64; 3],
+        t_cap: f64,
+    ) -> Option<Iv> {
+        let mut t = Iv { lo: 0.0, hi: t_cap };
+        for axis in 0..3 {
+            let p = point.get(axis).copied().unwrap_or(0.0);
+            let d = direction.get(axis).copied().unwrap_or(0.0);
+            let l = lo.get(axis).copied().unwrap_or(f64::NEG_INFINITY);
+            let h = hi.get(axis).copied().unwrap_or(f64::INFINITY);
+            if d != 0.0 {
+                let a = (l - p) / d;
+                let b = (h - p) / d;
+                let (s_lo, s_hi) = if a <= b { (a, b) } else { (b, a) };
+                t.lo = t.lo.max(down(s_lo));
+                t.hi = t.hi.min(up(s_hi));
+            } else if p < l || p > h {
+                return None;
+            }
+            if t.lo > t.hi {
+                return None;
+            }
+        }
+        Some(t)
+    }
+
+    /// Bernstein-clip one patch's parameter domain against the ray, collecting
+    /// the surviving crossing enclosures. The hull property makes every box at
+    /// positive distance from a transversal crossing exclude at finite depth;
+    /// a positive-dimensional surviving set (grazing/coplanar) hits the leaf
+    /// cap or the depth cap and is refused.
+    fn isolate_patch_leaves(
+        patch: &Patch,
+        point: [f64; 3],
+        direction: [f64; 3],
+        t_cap: f64,
+        iso_tol: f64,
+    ) -> Result<Vec<Leaf>, MembershipRefusal> {
+        let mut leaves = Vec::new();
+        let mut stack: Vec<(Iv, Iv, u32)> = vec![(Iv::unit(), Iv::unit(), 0)];
+        while let Some((u, v, depth)) = stack.pop() {
+            let (lo, hi) = patch_range(patch, u, v);
+            let Some(t) = ray_slab(point, direction, lo, hi, t_cap) else {
+                continue;
+            };
+            let [sx, sy, sz] = [hi[0] - lo[0], hi[1] - lo[1], hi[2] - lo[2]];
+            let diameter = (sx * sx + sy * sy + sz * sz).sqrt();
+            if diameter <= iso_tol {
+                leaves.push(Leaf { u, v, t, lo, hi });
+                if leaves.len() > MAX_LEAVES {
+                    return Err(MembershipRefusal::MembershipIndeterminate);
+                }
+            } else if depth >= MAX_DEPTH {
+                return Err(MembershipRefusal::MembershipIndeterminate);
+            } else {
+                let u_score = norm3(derivative_point_u(patch, u.mid(), v.mid())) * u.width();
+                let v_score = norm3(derivative_point_v(patch, u.mid(), v.mid())) * v.width();
+                if u_score >= v_score {
+                    let mid = u.mid();
+                    stack.push((Iv { lo: u.lo, hi: mid }, v, depth + 1));
+                    stack.push((Iv { lo: mid, hi: u.hi }, v, depth + 1));
+                } else {
+                    let mid = v.mid();
+                    stack.push((u, Iv { lo: v.lo, hi: mid }, depth + 1));
+                    stack.push((u, Iv { lo: mid, hi: v.hi }, depth + 1));
+                }
+                if stack.len() > MAX_LEAVES {
+                    return Err(MembershipRefusal::MembershipIndeterminate);
+                }
+            }
+        }
+        Ok(leaves)
+    }
+
+    /// Merges a cluster of adjacent leaves around one crossing and certifies
+    /// its normal sign. A cluster wider than the cluster guard is refused.
+    fn finish_cluster(
+        patch: &Patch,
+        direction: [f64; 3],
+        cluster: &[Leaf],
+        iso_tol: f64,
+    ) -> Result<CrossingEvidence, MembershipRefusal> {
+        let mut t_lo = f64::INFINITY;
+        let mut t_hi = f64::NEG_INFINITY;
+        let mut u_lo = f64::INFINITY;
+        let mut u_hi = f64::NEG_INFINITY;
+        let mut v_lo = f64::INFINITY;
+        let mut v_hi = f64::NEG_INFINITY;
+        let mut lo = [f64::INFINITY; 3];
+        let mut hi = [f64::NEG_INFINITY; 3];
+        for leaf in cluster {
+            t_lo = t_lo.min(leaf.t.lo);
+            t_hi = t_hi.max(leaf.t.hi);
+            u_lo = u_lo.min(leaf.u.lo);
+            u_hi = u_hi.max(leaf.u.hi);
+            v_lo = v_lo.min(leaf.v.lo);
+            v_hi = v_hi.max(leaf.v.hi);
+            for (axis, value) in leaf.lo.into_iter().enumerate() {
+                if let Some(slot) = lo.get_mut(axis) {
+                    *slot = (*slot).min(value);
+                }
+            }
+            for (axis, value) in leaf.hi.into_iter().enumerate() {
+                if let Some(slot) = hi.get_mut(axis) {
+                    *slot = (*slot).max(value);
+                }
+            }
+        }
+        let [sx, sy, sz] = [hi[0] - lo[0], hi[1] - lo[1], hi[2] - lo[2]];
+        let diameter = (sx * sx + sy * sy + sz * sz).sqrt();
+        if diameter > iso_tol * CLUSTER_TOL_FACTOR {
+            return Err(MembershipRefusal::MembershipIndeterminate);
+        }
+        let normal = normal_interval(patch, Iv { lo: u_lo, hi: u_hi }, Iv { lo: v_lo, hi: v_hi });
+        let dn = dot_direction(normal, direction);
+        let sign = if dn.lo > 0.0 {
+            1
+        } else if dn.hi < 0.0 {
+            -1
+        } else {
+            return Err(MembershipRefusal::MembershipIndeterminate);
+        };
+        Ok(CrossingEvidence {
+            patch: 0,
+            t_lo,
+            t_hi,
+            u_lo,
+            u_hi,
+            v_lo,
+            v_hi,
+            normal_sign: sign,
+        })
+    }
+
+    /// The certified crossings of one patch under one ray.
+    fn patch_crossings(
+        patch: &Patch,
+        point: [f64; 3],
+        direction: [f64; 3],
+        t_cap: f64,
+        iso_tol: f64,
+    ) -> Result<Vec<CrossingEvidence>, MembershipRefusal> {
+        let mut sorted = isolate_patch_leaves(patch, point, direction, t_cap, iso_tol)?;
+        if sorted.is_empty() {
+            return Ok(Vec::new());
+        }
+        sorted.sort_by(|a, b| {
+            a.t.lo
+                .partial_cmp(&b.t.lo)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
+        let mut crossings = Vec::new();
+        let mut cluster: Vec<Leaf> = Vec::new();
+        let mut cluster_hi = f64::NEG_INFINITY;
+        for leaf in sorted {
+            if !cluster.is_empty() && leaf.t.lo <= cluster_hi {
+                cluster_hi = cluster_hi.max(leaf.t.hi);
+                cluster.push(leaf);
+                continue;
+            }
+            if !cluster.is_empty() {
+                crossings.push(finish_cluster(patch, direction, &cluster, iso_tol)?);
+            }
+            cluster_hi = leaf.t.hi;
+            cluster.clear();
+            cluster.push(leaf);
+        }
+        if !cluster.is_empty() {
+            crossings.push(finish_cluster(patch, direction, &cluster, iso_tol)?);
+        }
+        Ok(crossings)
+    }
+
+    // -- ray cast and verdict ------------------------------------------------
+
+    fn solid_bounds(patches: &[Patch]) -> Option<([f64; 3], [f64; 3])> {
+        let mut lo = [f64::INFINITY; 3];
+        let mut hi = [f64::NEG_INFINITY; 3];
+        let mut any = false;
+        for patch in patches {
+            for control in &patch.data {
+                any = true;
+                for (axis, value) in control.iter().enumerate() {
+                    if let Some(slot) = lo.get_mut(axis) {
+                        *slot = (*slot).min(*value);
+                    }
+                    if let Some(slot) = hi.get_mut(axis) {
+                        *slot = (*slot).max(*value);
+                    }
+                }
+            }
+        }
+        if any { Some((lo, hi)) } else { None }
+    }
+
+    fn solid_scale(patches: &[Patch]) -> f64 {
+        match solid_bounds(patches) {
+            Some((lo, hi)) => {
+                let [sx, sy, sz] = [hi[0] - lo[0], hi[1] - lo[1], hi[2] - lo[2]];
+                let diameter = (sx * sx + sy * sy + sz * sz).sqrt();
+                if diameter.is_finite() && diameter > 0.0 {
+                    diameter
+                } else {
+                    1.0
+                }
+            }
+            None => 1.0,
+        }
+    }
+
+    fn normalize(direction: [f64; 3]) -> Option<[f64; 3]> {
+        let norm = norm3(direction);
+        if norm.is_finite() && norm > 0.0 {
+            Some([
+                direction[0] / norm,
+                direction[1] / norm,
+                direction[2] / norm,
+            ])
+        } else {
+            None
+        }
+    }
+
+    /// Casts one ray and returns its certified crossings, in ray-parameter
+    /// order. A point strictly outside the patch control hull is certified
+    /// outside by the Bernstein hull property (zero crossings). A shared
+    /// edge/vertex hit (two patches at one ray parameter) is refused.
+    fn cast_ray(
+        point: [f64; 3],
+        direction: [f64; 3],
+        patches: &[Patch],
+    ) -> Result<Vec<CrossingEvidence>, MembershipRefusal> {
+        let Some(unit) = normalize(direction) else {
+            return Err(MembershipRefusal::MembershipIndeterminate);
+        };
+        let Some((lo, hi)) = solid_bounds(patches) else {
+            return Err(MembershipRefusal::MalformedPatch);
+        };
+        for axis in 0..3 {
+            let p = point.get(axis).copied().unwrap_or(0.0);
+            let l = lo.get(axis).copied().unwrap_or(f64::NEG_INFINITY);
+            let h = hi.get(axis).copied().unwrap_or(f64::INFINITY);
+            if p < l || p > h {
+                return Ok(Vec::new());
+            }
+        }
+        let mut t_cap = f64::INFINITY;
+        for axis in 0..3 {
+            let p = point.get(axis).copied().unwrap_or(0.0);
+            let d = unit.get(axis).copied().unwrap_or(0.0);
+            let l = lo.get(axis).copied().unwrap_or(f64::NEG_INFINITY);
+            let h = hi.get(axis).copied().unwrap_or(f64::INFINITY);
+            if d > 0.0 {
+                t_cap = t_cap.min((h - p) / d);
+            } else if d < 0.0 {
+                t_cap = t_cap.min((l - p) / d);
+            }
+        }
+        if !t_cap.is_finite() || t_cap <= 0.0 {
+            return Ok(Vec::new());
+        }
+        let iso_tol = ISOLATION_TOL * solid_scale(patches);
+        let mut all: Vec<CrossingEvidence> = Vec::new();
+        for (index, patch) in patches.iter().enumerate() {
+            let mut crossings = patch_crossings(patch, point, unit, t_cap, iso_tol)?;
+            for crossing in &mut crossings {
+                crossing.patch = index;
+            }
+            all.extend(crossings);
+        }
+        all.sort_by(|a, b| {
+            a.t_lo
+                .partial_cmp(&b.t_lo)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
+        for pair in all.windows(2) {
+            let [a, b] = pair else { continue };
+            if a.patch != b.patch && b.t_lo <= a.t_hi {
+                return Err(MembershipRefusal::MembershipIndeterminate);
+            }
+        }
+        // A crossing at the ray origin means the point lies on the boundary:
+        // the strict interior/not-interior question is degenerate, so refuse
+        // rather than count a zero-length crossing.
+        if all.iter().any(|crossing| crossing.t_lo <= iso_tol) {
+            return Err(MembershipRefusal::MembershipIndeterminate);
+        }
+        Ok(all)
+    }
+
+    fn verdict_of(crossings: &[CrossingEvidence]) -> MembershipVerdict {
+        let signed: i64 = crossings
+            .iter()
+            .map(|crossing| i64::from(crossing.normal_sign))
+            .sum();
+        if signed != 0 {
+            MembershipVerdict::Inside
+        } else {
+            MembershipVerdict::Outside
+        }
+    }
+
+    /// A deterministic fresh direction from the recorded seed (splitmix64):
+    /// pseudo-random but bit-reproducible, so a rerun retries identically.
+    fn retry_direction(seed: u64, attempt: usize) -> [f64; 3] {
+        let mut z = seed.wrapping_add(0x9E37_79B9_7F4A_7C15u64.wrapping_mul(attempt as u64 + 1));
+        z = (z ^ (z >> 30)).wrapping_mul(0xBF58_476D_1CE4_E5B9);
+        z = (z ^ (z >> 27)).wrapping_mul(0x94D0_49BB_1331_11EB);
+        z ^= z >> 31;
+        let a = (z & 0xFFFF_FFFF) as f64 / u32::MAX as f64;
+        let b = ((z >> 32) & 0xFFFF_FFFF) as f64 / u32::MAX as f64;
+        let theta = std::f64::consts::TAU * a;
+        let cos_phi = 2.0 * b - 1.0;
+        let sin_phi = (1.0 - cos_phi * cos_phi).sqrt();
+        [sin_phi * theta.cos(), sin_phi * theta.sin(), cos_phi]
+    }
+
+    /// The single-cast primitive: classify `point` against the closed
+    /// tensor-Bernstein patch set with exactly the given `direction`. A
+    /// non-transversal configuration returns the typed
+    /// [`MembershipRefusal::MembershipIndeterminate`] -- never a guessed
+    /// classification.
+    pub fn classify_ray(
+        point: [f64; 3],
+        direction: [f64; 3],
+        patches: &[VolumeRow],
+    ) -> Result<MembershipVerdict, MembershipRefusal> {
+        let (verdict, _) = classify_ray_with_evidence(point, direction, patches)?;
+        Ok(verdict)
+    }
+
+    /// The single-cast primitive with its crossing-evidence certificate.
+    pub fn classify_ray_with_evidence(
+        point: [f64; 3],
+        direction: [f64; 3],
+        patches: &[VolumeRow],
+    ) -> Result<(MembershipVerdict, Vec<CrossingEvidence>), MembershipRefusal> {
+        if patches.is_empty() {
+            return Err(MembershipRefusal::MalformedPatch);
+        }
+        if !point.iter().all(|c| c.is_finite()) {
+            return Err(MembershipRefusal::MalformedPatch);
+        }
+        let parsed = patches
+            .iter()
+            .map(parse_patch)
+            .collect::<Result<Vec<_>, _>>()?;
+        let crossings = cast_ray(point, direction, &parsed)?;
+        let verdict = verdict_of(&crossings);
+        Ok((verdict, crossings))
+    }
+
+    /// The retry contract: attempt the caller's `direction`, then up to
+    /// [`RETRY_BOUND`] fresh deterministic directions derived from `seed`; the
+    /// first certified verdict wins. Failure of every direction is the typed
+    /// indeterminate certificate.
+    pub fn classify_point(
+        point: [f64; 3],
+        direction: [f64; 3],
+        patches: &[VolumeRow],
+        seed: u64,
+    ) -> MembershipCertificate {
+        let mut last_refusal = MembershipRefusal::MembershipIndeterminate;
+        for attempt in 0..=RETRY_BOUND {
+            let candidate = if attempt == 0 {
+                direction
+            } else {
+                retry_direction(seed, attempt - 1)
+            };
+            match classify_ray_with_evidence(point, candidate, patches) {
+                Ok((verdict, crossings)) => {
+                    return MembershipCertificate {
+                        verdict,
+                        attempts: attempt,
+                        direction: normalize(candidate).unwrap_or(candidate),
+                        crossings,
+                        refusal: None,
+                    };
+                }
+                Err(refusal) => last_refusal = refusal,
+            }
+        }
+        MembershipCertificate {
+            verdict: MembershipVerdict::Indeterminate,
+            attempts: RETRY_BOUND,
+            direction: normalize(direction).unwrap_or(direction),
+            crossings: Vec::new(),
+            refusal: Some(last_refusal),
+        }
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -6187,5 +7100,209 @@ print(json.dumps([z_row, loft_row]))
             refusal,
             Refusal::UnsupportedEnvelope(EnvelopeCase::NonCanonicalCarrier)
         ));
+    }
+
+    // -----------------------------------------------------------------------
+    // MONO-5-RAY-CLASSIFY: certified point-vs-spline-solid membership.
+    // -----------------------------------------------------------------------
+
+    /// One planar quad as a bicubic tensor-Bernstein patch (the exact tensor
+    /// degree elevation of the bilinear corner map), weights one.
+    fn quad_patch(
+        c00: [f64; 3],
+        c10: [f64; 3],
+        c11: [f64; 3],
+        c01: [f64; 3],
+    ) -> crate::python::binding::VolumeRow {
+        let e0 = [1.0, 2.0 / 3.0, 1.0 / 3.0, 0.0];
+        let e1 = [0.0, 1.0 / 3.0, 2.0 / 3.0, 1.0];
+        let corners = [[c00, c01], [c10, c11]];
+        let mut numerator = vec![vec![[0.0f64; 3]; 4]; 4];
+        for i in 0..4 {
+            for j in 0..4 {
+                let mut acc = [0.0f64; 3];
+                for (a, pair) in corners.iter().enumerate() {
+                    for (b, corner) in pair.iter().enumerate() {
+                        let wa = if a == 0 { e0[i] } else { e1[i] };
+                        let wb = if b == 0 { e0[j] } else { e1[j] };
+                        let coeff = wa * wb;
+                        for (slot, value) in acc.iter_mut().zip(corner.iter()) {
+                            *slot += coeff * value;
+                        }
+                    }
+                }
+                numerator[i][j] = acc;
+            }
+        }
+        crate::python::binding::VolumeRow {
+            numerator,
+            weights: vec![vec![1.0f64; 4]; 4],
+            orientation: 1.0,
+        }
+    }
+
+    /// The six outward-oriented faces of the unit cube `[0, 1]^3`.
+    fn cube_patches() -> Vec<crate::python::binding::VolumeRow> {
+        vec![
+            quad_patch([0., 0., 0.], [1., 0., 0.], [1., 1., 0.], [0., 1., 0.]),
+            quad_patch([0., 0., 1.], [0., 1., 1.], [1., 1., 1.], [1., 0., 1.]),
+            quad_patch([0., 0., 0.], [0., 1., 0.], [0., 1., 1.], [0., 0., 1.]),
+            quad_patch([1., 0., 0.], [1., 0., 1.], [1., 1., 1.], [1., 1., 0.]),
+            quad_patch([0., 0., 0.], [0., 0., 1.], [1., 0., 1.], [1., 0., 0.]),
+            quad_patch([0., 1., 0.], [1., 1., 0.], [1., 1., 1.], [0., 1., 1.]),
+        ]
+    }
+
+    /// The closed 2-cycle of a two-station square-section loft: the landed
+    /// `spline_loft_volume_rows` side patches plus the two planar end caps.
+    fn closed_loft_rows() -> Vec<crate::python::binding::VolumeRow> {
+        let sections = vec![spline_square(0.0), spline_square(5.0)];
+        let (mut patches, _) =
+            spline_loft_volume_rows(&sections).expect("the two-station loft assembles");
+        patches.push(quad_patch(
+            [0., 0., 0.],
+            [1., 0., 0.],
+            [1., 1., 0.],
+            [0., 1., 0.],
+        ));
+        patches.push(quad_patch(
+            [0., 0., 5.],
+            [0., 1., 5.],
+            [1., 1., 5.],
+            [1., 0., 5.],
+        ));
+        patches
+    }
+
+    #[test]
+    fn membership_prism_row_known_answers() {
+        let patches = cube_patches();
+        assert_eq!(
+            membership::classify_ray([0.5, 0.5, 0.5], [0.3, 0.7, 0.2], &patches),
+            Ok(membership::MembershipVerdict::Inside)
+        );
+        for point in [
+            [2.0, 0.5, 0.5],
+            [-0.5, 0.5, 0.5],
+            [0.5, 2.0, 0.5],
+            [0.5, -0.5, 0.5],
+            [0.5, 0.5, 2.0],
+            [0.5, 0.5, -0.5],
+        ] {
+            assert_eq!(
+                membership::classify_ray(point, [0.3, 0.7, 0.2], &patches),
+                Ok(membership::MembershipVerdict::Outside),
+                "point {point:?} must be certified outside"
+            );
+        }
+    }
+
+    #[test]
+    fn membership_two_station_loft_crossings_hand_derivable() {
+        let patches = closed_loft_rows();
+        // Inside the tube: a vertical ray crosses the top cap exactly once.
+        assert_eq!(
+            membership::classify_ray([0.5, 0.5, 2.5], [0.0, 0.0, 1.0], &patches),
+            Ok(membership::MembershipVerdict::Inside)
+        );
+        // A horizontal ray from inside crosses one side face.
+        assert_eq!(
+            membership::classify_ray([0.5, 0.5, 2.5], [1.0, 0.0, 0.0], &patches),
+            Ok(membership::MembershipVerdict::Inside)
+        );
+        // Above and below the tube: certified outside.
+        assert_eq!(
+            membership::classify_ray([0.5, 0.5, 6.0], [0.0, 0.0, 1.0], &patches),
+            Ok(membership::MembershipVerdict::Outside)
+        );
+        assert_eq!(
+            membership::classify_ray([0.5, 0.5, -1.0], [0.0, 0.0, 1.0], &patches),
+            Ok(membership::MembershipVerdict::Outside)
+        );
+    }
+
+    #[test]
+    fn membership_near_boundary_brackets_are_tight() {
+        let patches = cube_patches();
+        let (verdict, crossings) = membership::classify_ray_with_evidence(
+            [0.5, 0.5, 1.0 - 1.0e-3],
+            [0.0, 0.0, 1.0],
+            &patches,
+        )
+        .expect("a transversal near-boundary ray certifies");
+        assert_eq!(verdict, membership::MembershipVerdict::Inside);
+        assert_eq!(crossings.len(), 1);
+        let crossing = crossings.first().expect("one crossing");
+        assert!(crossing.t_lo <= 1.0e-3 && 1.0e-3 <= crossing.t_hi);
+        assert!(
+            crossing.t_hi - crossing.t_lo < 1.0e-6,
+            "the crossing bracket must be tight: [{}, {}]",
+            crossing.t_lo,
+            crossing.t_hi
+        );
+        assert_eq!(
+            membership::classify_ray([0.5, 0.5, 1.0 + 1.0e-3], [0.0, 0.0, 1.0], &patches),
+            Ok(membership::MembershipVerdict::Outside)
+        );
+    }
+
+    #[test]
+    fn membership_grazing_rays_refuse_typed() {
+        let patches = cube_patches();
+        // A ray lying in the z=0 face plane is non-transversal: the clipping
+        // loop never separates the surviving set and the cast is refused.
+        assert_eq!(
+            membership::classify_ray([0.5, 0.5, 0.0], [1.0, 0.0, 0.0], &patches),
+            Err(membership::MembershipRefusal::MembershipIndeterminate)
+        );
+    }
+
+    #[test]
+    fn membership_retry_contract_recovers_from_an_edge_hit() {
+        let patches = cube_patches();
+        // The body diagonal exits through the (1, 1, 1) corner shared by three
+        // patches: refused as non-transversal, then recovered by a fresh
+        // recorded direction -- never a wrong answer.
+        assert_eq!(
+            membership::classify_ray([0.5, 0.5, 0.5], [1.0, 1.0, 1.0], &patches),
+            Err(membership::MembershipRefusal::MembershipIndeterminate)
+        );
+        let certificate =
+            membership::classify_point([0.5, 0.5, 0.5], [1.0, 1.0, 1.0], &patches, 0x1234);
+        assert_eq!(certificate.verdict, membership::MembershipVerdict::Inside);
+        assert!(certificate.attempts >= 1);
+        assert!(certificate.refusal.is_none());
+    }
+
+    #[test]
+    fn membership_landed_loft_rows_round_trip() {
+        let patches = closed_loft_rows();
+        let inside = membership::classify_point([0.5, 0.5, 2.5], [0.11, 0.23, 0.31], &patches, 7);
+        assert_eq!(inside.verdict, membership::MembershipVerdict::Inside);
+        assert!(inside.refusal.is_none());
+        let outside = membership::classify_point([3.0, 3.0, 2.5], [0.11, 0.23, 0.31], &patches, 7);
+        assert_eq!(outside.verdict, membership::MembershipVerdict::Outside);
+        assert!(outside.refusal.is_none());
+    }
+
+    #[test]
+    fn membership_refuses_rational_and_malformed_rows_typed() {
+        let mut rational = cube_patches();
+        if let Some(first) = rational.first_mut() {
+            first.weights = vec![vec![2.0; 4]; 4];
+        }
+        assert_eq!(
+            membership::classify_ray([0.5, 0.5, 0.5], [1.0, 0.0, 0.0], &rational),
+            Err(membership::MembershipRefusal::RationalWeights)
+        );
+        let malformed = vec![crate::python::binding::VolumeRow {
+            numerator: vec![vec![[0.0; 3]; 1]; 1],
+            weights: vec![vec![1.0; 1]; 1],
+            orientation: 1.0,
+        }];
+        assert_eq!(
+            membership::classify_ray([0.5, 0.5, 0.5], [1.0, 0.0, 0.0], &malformed),
+            Err(membership::MembershipRefusal::MalformedPatch)
+        );
     }
 }
