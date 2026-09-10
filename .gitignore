@@ -12,3 +12,8 @@ test_viewer.html
 # Generated census artifacts
 no_odd_parity_census.csv
 
+
+root harness artifacts (worker slot artifacts must never be tracked)
+/RESULT.json
+/CONTEXT.md
+/PACKET.md
