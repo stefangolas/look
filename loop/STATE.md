@@ -15,9 +15,9 @@ program, and the operator agent.
 ## Where we are
 
 > LATEST GROUND TRUTH: read the newest `[operator ...]` block in "State of
-> the machine, as left" (2026-09-10T10:25Z). [operator 2026-09-10T10:25Z
+> the machine, as left" (2026-09-10T10:46Z). [operator 2026-09-10T10:46Z
 > ground-truth note: 0 RUNNING / 0 landed-this-cycle. Quiet healthy pass, HEAD
-> 1a6e218 (the 10:00Z operator commit) - no work moved this cycle. Landing
+> 3c2dbbf (the 10:25Z operator commit) - no work moved this cycle. Landing
 > re-verified by command: `git merge-base --is-ancestor` exit 0 for all eight
 > checked commits against integration/kernel-bg (SWEEP-PATH 0056f01,
 > ADM-L2-PRODUCT e33c4dd, ADM-L3-NORMALCONE e9d885a, F1-AUTHORING-ARMS 3c2109b,
@@ -43,7 +43,7 @@ program, and the operator agent.
 > child of 27828), cargoq UP (ping ok, queued 0, running false; single
 > server.py 28544). TWO supervisors (19172 PyManager + 27828 pythoncore child -
 > carried duplication class; only ONE overnight.py child = no double-merge
-> risk). Disk 22.7 GiB free; RAM 5.33 GiB free. No new escalation; open human
+> risk). Disk 22.6 GiB free; RAM 5.25 GiB free. No new escalation; open human
 > items carried unchanged.]
 
 - **THE FIRST KERNEL-VS-OCC TIMING COMPARISON IS BANKED** (FH-TIMING-REFRESH,
@@ -1363,6 +1363,43 @@ PyManager + 27828 pythoncore child - carried duplication class; only ONE
 overnight.py child = no double-merge risk). Disk 22.7 GiB free (above the 8 GB
 floor AND the 15 GB janitor goal); RAM 5.33 GiB free. No new escalation;
 carried human items unchanged: FRAME-REVOLVE F1 non_z_axis pin amendment
+(ttc_lathe_spline.rs:255); duplicate supervisors + the lagging cargoq restart
+guard; slot-4 + slot-7 wt RESULT residue parking the driver's dispatch arm;
+TOR-C flip-or-pin (orchestrator-held).]
+
+[operator 2026-09-10T10:46Z - volatile refresh. Quiet healthy cycle: nothing to
+land, nothing to unblock, nothing to flip, no manual dispatch (heartbeat live).
+Board now: 0 RUNNING / 0 landed-this-cycle. HEAD 3c2dbbf (the 10:25Z operator
+commit) - no work moved this cycle. Landing re-verified by command: `git
+merge-base --is-ancestor` exit 0 for all eight checked commits against
+integration/kernel-bg (SWEEP-PATH 0056f01, ADM-L2-PRODUCT e33c4dd,
+ADM-L3-NORMALCONE e9d885a, F1-AUTHORING-ARMS 3c2109b, CL-006-SOLVER-ENTRY
+ee97499, CL-005-EXACT-CONTACT 713f205, ADM-003 4de25d9, FRAME-REVOLVE b667a85);
+no FINISHED slot carries an unlanded DONE RESULT. Slot wt RESULT statuses read
+directly: slot 0 LANDED, slot 1 none (clean detached HEAD 4de25d9, no RESULT -
+stale ADM-003 residue, not stuck), slot 2 DONE, slot 3 done, slot 4
+LANDED-WITH-FINDINGS, slots 5/6 DONE, slot 7 LANDED (redundant FRAME-REVOLVE,
+no commit, base eafdc80) - none operator-landable. Nothing to unblock (0
+RUNNING; no IDLE/DEAD >15 min holding work; no QUESTION; zero cargo/rustc).
+Registry re-verified programmatically (last-wins dedup + case-folded
+landed-note match, exactly dispatch_ready's landed(); an initial inline check
+over-reported 73 READY unmarked due to a regex-escape slip, corrected by
+re-running with the dispatcher's exact `landed [0-9a-f]{7,}` pattern): 308
+unique rows - 228 DONE, 73 READY, 7 BLOCKED; READY rows WITHOUT a landed marker
+= NONE; BLOCKED-with-all-deps-landed = 7, all correctly parked (BG-AUD-FIX-004
+OWNER_BLOCKED, BG-CK-SPLINE-CENSUS owner-cancelled, SEM-PCURVE-MASTER-001-FIX
+SUPERSEDED, DEF-SPINEFRAME-GRAZE SPEC_GAP->-R2, DEF-TESS-ANALYTIC-SEAM
+superseded by -R2, DEF-SEEDRAY-B human-gated, TOR-C orchestrator-held). Nothing
+flipped. dispatch_ready --dry-run --max-workers=4: "slots: 8 (0 running, 8
+free); slot-assigned packets: 7; dispatched 0; workers now ~0/4" = REAL idle;
+no manual dispatch (heartbeat live). Health: heartbeat exactly 1 (27872),
+watchdog 1 (24472), operator runner 1 (27876), overnight driver 1 (26920, child
+of 27828), cargoq UP (ping ok, queued 0, running false; single server.py 28544).
+TWO supervisors (19172 PyManager + 27828 pythoncore child - carried duplication
+class; only ONE overnight.py child = no double-merge risk). Disk 22.6 GiB free
+(above the 8 GB floor AND the 15 GB janitor goal); RAM 5.25 GiB free.
+Orchestrator session live (opencode 14776). No new escalation; carried human
+items unchanged: FRAME-REVOLVE F1 non_z_axis pin amendment
 (ttc_lathe_spline.rs:255); duplicate supervisors + the lagging cargoq restart
 guard; slot-4 + slot-7 wt RESULT residue parking the driver's dispatch arm;
 TOR-C flip-or-pin (orchestrator-held).]

@@ -1862,3 +1862,48 @@ slot 7 redundant FRAME-REVOLVE residue; cargoq UP; heartbeat 1; operator runner
 1; driver 1; watchdog 1; TWO supervisors; disk 22.7 GiB free; RAM 5.33 GiB free.
 Escalations carried: F1 non_z_axis pin amendment; duplicate supervisors +
 lagging cargoq guard; slot-4 + slot-7 wt RESULT residue; TOR-C flip-or-pin.
+
+===== operator cycle 2026-09-10T10:46Z =====
+Board: 0 RUNNING / 0 landed-this-cycle / 0 unblocked / 0 flipped.
+
+Health sweep (step 1): heartbeat exactly 1 (27872); watchdog 1 (24472); operator
+runner 1 (27876); overnight driver 1 (26920, child of 27828); cargoq UP (ping ok,
+queued 0, running false; single server.py 28544); zero cargo/rustc processes.
+Disk 22.6 GiB free (above the 8 GB floor and the 15 GB janitor goal); RAM 5.25
+GiB free. TWO supervisors (19172 PyManager + 27828 pythoncore child) - carried
+duplication class, only one overnight.py child so no double-merge risk.
+Orchestrator session live (opencode 14776).
+
+Actions:
+- Landing (step 2): NOTHING to land. git merge-base --is-ancestor exit 0 for all
+  eight checked commits against integration/kernel-bg (SWEEP-PATH 0056f01,
+  ADM-L2-PRODUCT e33c4dd, ADM-L3-NORMALCONE e9d885a, F1-AUTHORING-ARMS 3c2109b,
+  CL-006-SOLVER-ENTRY ee97499, CL-005-EXACT-CONTACT 713f205, ADM-003 4de25d9,
+  FRAME-REVOLVE b667a85). Slot wt RESULT read directly: slot0 LANDED, slot1 none
+  (clean detached HEAD 4de25d9), slot2 DONE, slot3 done, slot4
+  LANDED-WITH-FINDINGS, slot5 DONE, slot6 DONE, slot7 LANDED (redundant, no
+  commit, base eafdc80). No FINISHED slot carries an unlanded DONE RESULT.
+- Unblock (step 3): nothing stuck (0 RUNNING; no IDLE/DEAD >15 min holding work;
+  no QUESTION; zero cargo/rustc). Slot 1 stale ADM-003 residue, not stuck.
+- Registry hygiene (step 4): 308 unique rows - 228 DONE, 73 READY, 7 BLOCKED.
+  NOTE: a first inline check over-reported "73 READY without landed marker" from
+  a regex-escape slip (`\\s` vs `\s`); re-running with dispatch_ready's exact
+  `landed [0-9a-f]{7,}` pattern on the lowercased note gives READY-unmarked =
+  NONE (all 73 carry the driver's landed <sha> note; dispatcher correctly skips).
+  BLOCKED-with-all-deps-landed = 7, all correctly parked: BG-AUD-FIX-004
+  (OWNER_BLOCKED), BG-CK-SPLINE-CENSUS (owner-cancelled), SEM-PCURVE-MASTER-001-FIX
+  (SUPERSEDED), DEF-SPINEFRAME-GRAZE (SPEC_GAP->-R2 READY), DEF-TESS-ANALYTIC-SEAM
+  (superseded by -R2), DEF-SEEDRAY-B (human-gated), TOR-C (orchestrator-held).
+  Nothing flipped.
+- Dispatch (step 5): dispatch_ready.py --dry-run --max-workers=4 -> "slots: 8
+  (0 running, 8 free); slot-assigned packets: 7; dispatched 0; workers now ~0/4"
+  = REAL idle. No manual dispatch (heartbeat live).
+- STATE.md volatile refresh + LATEST GROUND TRUTH pointer updated ([operator
+  2026-09-10T10:46Z]).
+- No new escalation.
+
+Leaving: 0 RUNNING; slots 0-6 landed residue; slot 1 IDLE ADM-003 residue;
+slot 7 redundant FRAME-REVOLVE residue; cargoq UP; heartbeat 1; operator runner
+1; driver 1; watchdog 1; TWO supervisors; disk 22.6 GiB free; RAM 5.25 GiB free.
+Escalations carried: F1 non_z_axis pin amendment; duplicate supervisors +
+lagging cargoq guard; slot-4 + slot-7 wt RESULT residue; TOR-C flip-or-pin.
