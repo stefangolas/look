@@ -1,15 +1,27 @@
-# WORK PACKET MONO-2-NSTATION-LOFT — the certified N-station smooth loft (pinned OCCT convention)
+# WORK PACKET MONO-2-NSTATION-LOFT — the certified N-station smooth loft (kernel-CANONICAL convention; amended after the annex-A falsification)
 
 BRIDGE-LOFT-FACTS certifies only two-station smooth lofts (its honesty line:
 a 3+-station smooth loft's station parameterization is a convention the
-recorded data does not carry). The convention is now PINNED by measurement
-(`docs/MONO_CLOSURE_BOOKING.md` annex A — synthetic-probe evidence): OCCT
-`BRepOffsetAPI_ThruSections` smooth lofts interpolate sections with
-**chord-length station parameters**, **exact section hit** (u-unification is
-geometry-preserving knot insertion), and a v-direction that is a **global
-polynomial of degree N-1 for N <= 9** and a **C2 cubic spline with knots AT
-the chord-length station parameters for N >= 10**. This packet generalizes
-the landed two-station certified arm to N stations under that law.
+recorded data does not carry). This packet generalizes the landed two-station
+certified arm to N stations under the kernel's CANONICAL convention:
+
+- **Station parameters:** chord-length on the section stack (cumulative
+  centroid distance, normalized to [0,1]).
+- **v-direction:** exact C2 interpolation across stations — global polynomial
+  of degree N-1 for N <= 9; C2 cubic spline with knots at the station
+  parameters for N >= 10.
+- **u-direction:** exact section unification by knot insertion only.
+
+**OCCT honesty note (annex A correction, bc5439b):** OCCT's smooth
+ThruSections is a tolerance-driven APPROXIMATION (`GeomFill_AppSurf`,
+chord-length params, C2, degree 2..8 fit-selected — source-cited by the
+falsifying stop) — the original annex law ("pinned OCCT convention") was
+over-extrapolated from one synthetic family. The corpus's recorded references
+embed OCCT's approximant output. The kernel certifies ITS canonical surface
+exactly; the recorded references adjudicate EMPIRICALLY at the census re-run:
+rows inside the recorded band flip green, rows outside record a typed refusal
+carrying the measured delta. No approximant replication inside the kernel; no
+tolerance stretch anywhere.
 
 This is the dominant carrier of the F1 family: the post-chain census (R2)
 names it the first refusing carrier of beam_wing, drs_flap, power_unit,
@@ -45,13 +57,16 @@ budget:      {turns: 55, ctx_tokens: 170000}
    u-knot structure by knot insertion ONLY (geometry-preserving). No
    approximation anywhere in the u direction.
 3. **Station law.** v_i = chord-length parameter of section i (cumulative
-   centroid-to-centroid distance, normalized to [0,1] — probe annex A3).
+   centroid-to-centroid distance, normalized to [0,1] — canonical choice;
+   OCCT also uses chord-length parameterization per its source, so this is
+   the expectation-consistent choice).
 4. **v-interpolation.** N <= 9: the unique global polynomial of degree N-1
    interpolating the section control rows at v_i, degree-elevated to Bernstein
    per span (no spans — one v segment). N >= 10: the C2 cubic interpolating
-   spline with knots AT the v_i (the same banded second-derivative system
-   OCCT solves; the annex pins the system). Both routes end in the same
-   representation: a grid of bicubic tensor-Bernstein patches.
+   spline with knots AT the v_i (the standard banded second-derivative
+   system). Both routes end in the same representation: a grid of bicubic
+   tensor-Bernstein patches. This is the KERNEL-CANONICAL surface, certified
+   as built — it is not claimed to reproduce OCCT's approximant bit-for-bit.
 5. **Certified volume.** V = sum over patches of
    `crate::python::binding::volume_facts` (the sanctioned plain-data entry,
    one `VolumeRow` per patch) + the exact planar end-cap moments (the landed
@@ -61,25 +76,24 @@ budget:      {turns: 55, ctx_tokens: 170000}
    extended to the v spans; deterministic tessellation generalizes
    `spline_loft_mesh` (rows on the surface's own knots, per the corpus's
    section-law note).
-7. **Fixtures (one-time, committed).** Record a small synthetic suite with
-   OCC ONCE (the probe protocol, `scratch/probe_thrussections_*.py` is the
-   pattern): N in {3, 5, 9, 10, 16} synthetic section stacks — recorded
-   volume/bbox committed as fixtures. The kernel gate: facts within the
-   recorded band, plus the kernel's own certificate brackets (the certificate
-   is the primary oracle; the OCC fixture proves convention fidelity).
-   NO OCC run happens inside the kernel or tests at runtime.
+7. **Fixtures (diagnostic, one-time, committed).** Record a small synthetic
+   suite with OCC ONCE (the probe protocol): N in {3, 5, 9, 10, 16} synthetic
+   section stacks — recorded volume/bbox committed as fixtures, used as
+   DIAGNOSTIC deltas (how far the OCCT approximant sits from the canonical
+   interpolant per N), NOT as gates. The kernel's own certificate brackets
+   are the gate. NO OCC run happens inside the kernel or tests at runtime.
 8. All cargo through the queue. `corpus/ttc/reference/*.json` and
    `corpus/ttc/MANIFEST.json` are read-only.
 
 ## Done when
 
-- `cargo check --locked -p truck123d` clean; `cargo test --locked -p
-  truck123d --lib -- --test-threads=1` green including:
+- check + full lib tests green including:
   - `line_loft_rows_answer_bit_identically` (the landed two-station regression
     stays green, UNMODIFIED),
-  - `nstation_volume_matches_recorded_fixture` for every N fixture,
-  - `nstation_certificate_brackets_reference` (kernel bracket contains the
-    recorded value, width within the band),
+  - `nstation_volume_brackets_canonical_surface` (the kernel certificate
+    brackets the canonical interpolant's volume, width within the band),
+  - `nstation_fixture_deltas_recorded` (per-N OCCT-vs-canonical delta recorded
+    as diagnostic data),
   - `nstation_refuses_still_typed_for_open_chains` (open chains keep the
     landed typed refusal),
   - `nstation_42_station_timing_kernel_class` (a 42-station synthetic completes
@@ -91,10 +105,12 @@ budget:      {turns: 55, ctx_tokens: 170000}
 
 ## Stop conditions
 
-- If OCCT's N=9/10 degree-law boundary or the knots-at-stations system does
-  not reproduce on a fixture (i.e., the annex law is wrong at some N), STOP,
-  record the failing N and the observed structure — the annex is amended
-  before the packet proceeds. Never stretch a band to fit.
+- If the canonical v-interpolation system cannot be completed as specified
+  (a section stack whose station parameters or knot structure defeat the
+  banded solve), STOP, record the exact obstruction and the failing stack —
+  the convention is amended by the orchestrator before the packet proceeds.
+  Never stretch a band to fit. (Precedent: the 2026-09-10 stop that falsified
+  annex A's OCCT claims — stopping was correct.)
 - If a section stack's u-unification cannot be completed by knot insertion
   alone (the corpus's crease-corner sections are two cubics meeting at an
   angle — verify they unify), record the exact obstruction; that is new
