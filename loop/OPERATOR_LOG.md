@@ -2307,3 +2307,45 @@ Leaving: 1 RUNNING (TRIM-EXTRUDE-CTOR slot 0, healthy, resumed by the
 orchestrator); HEAD 1293615 (orchestrator session handoff commit); nothing
 unlanded; 7 BLOCKED correctly parked; cargoq UP; heartbeat 1; driver 1;
 watchdog 1; TWO supervisors; disk 15.71 GB free; RAM 4.34 GB free.
+
+## 2026-09-10 14:34 UTC (operator) - quiet healthy; TRIM landed, TTC-RECENSUS dispatched
+
+- Health sweep: `slot_status.py` -> 1 RUNNING (slot 0 TTC-RECENSUS-F1-R2, pid
+  29628, events ~3.5 min fresh, 2 files changed, branch
+  packet/TTC-RECENSUS-F1-R2@de33f33 = base, no commit yet) / slot 1 IDLE (stale
+  ADM-003 residue, no RESULT) / slots 2-7 FINISHED landed residue. cargoq ping
+  ok (queued 0, running true = the worker's build; server 28544 + child 22608).
+  cargoq server.log confirms the live job: `cargo build --release --locked -p
+  truck123d` in slot 0 wt, START 10:29:20 local (14:29:20Z), no DONE yet ->
+  the worker is mid-build, healthy, do not touch. Heartbeat exactly 1 (27872;
+  the second CommandLine hit 5220 was the probing shell self-matching the
+  pattern), operator runner 1 (27876), watchdog 1 (29264), overnight driver 1
+  (26920), TWO supervisors (19172 + 27828 - carried duplication class; only ONE
+  overnight.py child = no double-merge risk). Disk 16.65 GiB free (above 8 GB
+  floor and 15 GB janitor goal); RAM 6.26 GiB free.
+- Land (step 2): nothing. `git merge-base --is-ancestor` exit 0 for
+  0056f01/e33c4dd/e9d885a/3c2109b/ee97499/713f205/4de25d9/b667a85 against
+  integration/kernel-bg. Slot wt RESULT statuses: slot 0 none (RUNNING), slot 1
+  none (stale ADM-003 residue), slot 2 DONE, slot 3 done, slot 4
+  LANDED-WITH-FINDINGS, slots 5/6 DONE, slot 7 LANDED (redundant). No FINISHED
+  slot holds an unlanded DONE RESULT. The 14:09/14:15Z prediction is confirmed:
+  TRIM-EXTRUDE-CTOR landed (HEAD de33f33) and TTC-RECENSUS-F1-R2 auto-dispatched.
+- Unblock (step 3): nothing. Slot 0 RUNNING and making progress; no IDLE/DEAD
+  >15 min holding work; no QUESTION; 3 cargo/rustc processes = the worker's.
+- Registry hygiene (step 4): 313 rows - 230 DONE, 76 READY, 7 BLOCKED. READY
+  rows WITHOUT a landed marker = exactly {TTC-RECENSUS-F1-R2} (the running
+  packet). BLOCKED-with-all-deps-landed = 7, all correctly parked
+  (BG-AUD-FIX-004 OWNER_BLOCKED, BG-CK-SPLINE-CENSUS owner-cancelled,
+  SEM-PCURVE-MASTER-001-FIX SUPERSEDED, DEF-SPINEFRAME-GRAZE SPEC_GAP->-R2,
+  DEF-TESS-ANALYTIC-SEAM superseded by -R2, DEF-SEEDRAY-B human-gated, TOR-C
+  orchestrator-held). Nothing flipped.
+- Dispatch (step 5): `dispatch_ready.py --dry-run --max-workers=4` ->
+  "slots: 8 (1 running, 7 free); slot-assigned packets: 6; dispatched 0;
+  workers now ~1/4" = REAL idle; no manual dispatch (heartbeat owns it).
+- STATE.md volatile refresh ([operator 2026-09-10T14:34Z]).
+- No new escalation (nothing judgment-requiring surfaced).
+
+Leaving: 1 RUNNING (TTC-RECENSUS-F1-R2 slot 0, healthy, mid release build);
+HEAD de33f33 (TRIM-EXTRUDE-CTOR landed); nothing unlanded; 7 BLOCKED correctly
+parked; cargoq UP; heartbeat 1; driver 1; watchdog 1; TWO supervisors; disk
+16.65 GiB free; RAM 6.26 GiB free.

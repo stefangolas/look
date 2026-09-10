@@ -1757,8 +1757,47 @@ janitor goal); RAM 7.2 GB free. Carried human items unchanged: FRAME-REVOLVE
 F1 non_z_axis pin amendment (ttc_lathe_spline.rs:255); duplicate supervisors
 + the lagging cargoq restart guard; slot-4 + slot-7 wt RESULT residue
 parking the driver's dispatch arm; TOR-C flip-or-pin (orchestrator-held);
-the RESULT-recycle race + overnight.py's guarantee-merge-abort on
-interrupted cycles.]
+  the RESULT-recycle race + overnight.py's guarantee-merge-abort on
+  interrupted cycles.]
+
+[operator 2026-09-10T14:34Z - volatile refresh. Quiet healthy cycle: nothing to
+land, nothing to unblock, nothing to flip, no manual dispatch (heartbeat live).
+Board now: 1 RUNNING / 0 landed-this-cycle. HEAD de33f33 (TRIM-EXTRUDE-CTOR row
+LANDED, overnight) - the 14:09/14:15Z prediction is confirmed: TRIM landed and
+TTC-RECENSUS-F1-R2 auto-dispatched. **TTC-RECENSUS-F1-R2 is RUNNING in slot 0
+(pid 29628, events ~3.5 min fresh, 2 files changed, branch
+packet/TTC-RECENSUS-F1-R2@de33f33 = base, no commit yet); the cargoq server.log
+shows the live job `cargo build --release --locked -p truck123d` in the slot 0
+wt (START 14:29:20Z, no DONE) - the worker is mid-build, healthy, do not touch.**
+Landing re-verified by command: `git merge-base --is-ancestor` exit 0 for
+0056f01/e33c4dd/e9d885a/3c2109b/ee97499/713f205/4de25d9/b667a85 against
+integration/kernel-bg; no FINISHED slot holds an unlanded DONE RESULT - nothing
+operator-landable. Slot wt RESULT statuses: slot 0 none (RUNNING), slot 1 none
+(clean detached HEAD 4de25d9 - stale ADM-003 residue, not stuck), slot 2 DONE,
+slot 3 done, slot 4 LANDED-WITH-FINDINGS, slots 5/6 DONE, slot 7 LANDED
+(redundant FRAME-REVOLVE, no commit). Nothing to unblock (0 IDLE/DEAD >15 min
+holding work; no QUESTION; 3 cargo/rustc processes = the running worker's).
+Registry re-verified programmatically: 313 rows - 230 DONE, 76 READY, 7
+BLOCKED; READY rows WITHOUT a landed marker = exactly {TTC-RECENSUS-F1-R2 (the
+running packet)}; BLOCKED-with-all-deps-landed = 7, all correctly parked -
+BG-AUD-FIX-004 (OWNER_BLOCKED), BG-CK-SPLINE-CENSUS (owner-cancelled),
+SEM-PCURVE-MASTER-001-FIX (SUPERSEDED), DEF-SPINEFRAME-GRAZE (SPEC_GAP -> -R2),
+DEF-TESS-ANALYTIC-SEAM (superseded by -R2), DEF-SEEDRAY-B (human-gated on the
+SEEDRAY-B frontier review), TOR-C (orchestrator-held) - nothing flipped.
+dispatch_ready --dry-run --max-workers=4: "slots: 8 (1 running, 7 free);
+slot-assigned packets: 6; dispatched 0; workers now ~1/4" = REAL idle; no manual
+dispatch (heartbeat live). Health: heartbeat exactly 1 (27872; the second
+CommandLine hit was the probing shell self-matching the pattern), operator
+runner 1 (27876), watchdog 1 (29264), overnight driver 1 (26920), cargoq UP
+(ping ok, queued 0, running true = the worker's build; server 28544 + child
+22608). TWO supervisors (19172 PyManager + 27828 pythoncore child - carried
+duplication class; only ONE overnight.py child = no double-merge risk). Disk
+16.65 GiB free (above the 8 GB floor AND the 15 GB janitor goal); RAM 6.26 GiB
+free. No new escalation; carried human items unchanged: FRAME-REVOLVE F1
+non_z_axis pin amendment (ttc_lathe_spline.rs:255); duplicate supervisors + the
+lagging cargoq restart guard; slot-4 + slot-7 wt RESULT residue parking the
+driver's dispatch arm; TOR-C flip-or-pin (orchestrator-held); the RESULT-recycle
+race + overnight.py's guarantee-merge-abort on interrupted cycles.]
 
 ## The parallelism picture
 
