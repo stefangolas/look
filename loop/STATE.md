@@ -1730,6 +1730,36 @@ items unchanged: FRAME-REVOLVE F1 non_z_axis pin amendment
 guard; slot-4 + slot-7 wt RESULT residue parking the driver's dispatch arm;
 TOR-C flip-or-pin (orchestrator-held).]
 
+[orchestrator 2026-09-10T14:15Z - monitoring refresh. CORRECTION to the
+handoff block above (its text predates its own commit order): **BRIDGE-LOFT-
+FACTS IS LANDED** - orchestrator squash-union landing 7d4f5fe (RESULT filed
+66cd011, ledger row present, registry row DONE, the 13:52Z +238 unstaged
+bd_bridge.rs addendum resolved - main worktree clean of it). Landing
+coherence spot-checked by command: the boolean arm IS in bd_bridge.rs at
+HEAD (BooleanNode/boolean_events tree dispatch through boolean_dispatch,
+bd_bridge.rs:1967) AND the loft-facts arm (certified_spline_loft_volume,
+spline_loft_mesh) - both arms coexist as the ledger claims. Board: 1 RUNNING
+(TRIM-EXTRUDE-CTOR slot 0, pid 28868, resumed from WIP 1d2e411, events ~2
+min fresh, actively editing binding.rs) / 0 landed-this-session. **merge-tree
+dry-run of packet/TRIM-EXTRUDE-CTOR@1d2e411 vs integration HEAD: CLEAN
+(exit 0)** - the predicted bd_bridge.rs CODE conflict has NOT materialized in
+the WIP diff (so far the worker has touched binding.rs, not bd_bridge.rs);
+re-check against the FINAL commit before trusting a clean landing. On TRIM
+finish: the driver lands it, then TTC-RECENSUS-F1-R2 (READY, anchored
+A1=48/A2=21) auto-dispatches - NO OCC runs (owner directive stands). Driver
+cycling every 5 min, parked on the slot-4 F1 'landed-with-findings' judgment
+(carried; noise, not harm - does not block per-slot landings or the
+heartbeat's dispatch arm). Watchdog quiet (last ACTION 08:54 disk reclaim,
+no misfires). Health: heartbeat 1 (27872), watchdog 1 (29264), operator
+runner 1 (27876), driver 1 (26920), cargoq UP (ping ok, queued 0, running
+false at scan). Disk 16.8 GB free (above the 8 GB floor AND the 15 GB
+janitor goal); RAM 7.2 GB free. Carried human items unchanged: FRAME-REVOLVE
+F1 non_z_axis pin amendment (ttc_lathe_spline.rs:255); duplicate supervisors
++ the lagging cargoq restart guard; slot-4 + slot-7 wt RESULT residue
+parking the driver's dispatch arm; TOR-C flip-or-pin (orchestrator-held);
+the RESULT-recycle race + overnight.py's guarantee-merge-abort on
+interrupted cycles.]
+
 ## The parallelism picture
 
 The lemma wave (L1-L4, pure functions over the frozen shim type) is
