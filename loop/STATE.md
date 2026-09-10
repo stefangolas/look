@@ -15,22 +15,21 @@ program, and the operator agent.
 ## Where we are
 
 > LATEST GROUND TRUTH: read the newest `[operator ...]` block in "State of
-> the machine, as left" (2026-09-10T01:59Z). [operator 2026-09-10T01:59Z
-> ground-truth note: SUBSTRATE RESTARTED ~01:55Z (21:55 local) - heartbeat,
-> operator runner, watchdog, overnight driver and cargoq all respawned; the
-> supervisor's own guard recovered cargoq (pid 28544, HTTP 200) and the
-> driver (pid 26920) at 01:57Z with a ~2-min lag. Board: 1 RUNNING
-> (SWEEP-PATH, slot 0, events fresh) / 0 landed-this-cycle. Slots 1-6
-> landed residue; slot 7 is the redundant FRAME-REVOLVE residue (RESULT
-> status LANDED, no commit). Nothing to land (all worker commits are
-> ancestors of HEAD c7911f7), nothing to unblock, nothing to flip (only
-> BLOCKED-with-deps-landed = BG-CK-SPLINE-CENSUS owner-CANCELLED; TOR-C
-> orchestrator-held). dispatch_ready --dry-run: dispatched 0 (real idle -
-> SWEEP-PATH running). Health: heartbeat 1 (27872), operator runner 1
-> (27876), watchdog 1 (24472), driver 1 (26920), cargoq UP; TWO supervisors
-> (19172 + 27828) carried. Disk 21.7 GB free; RAM 5.0 GB free. Old
-> orchestrator pid 17740 gone; 3 opencode processes observed
-> (14776/27196/28356).]
+> the machine, as left" (2026-09-10T02:23Z). [operator 2026-09-10T02:23Z
+> ground-truth note: 0 RUNNING / 1 landed-this-cycle. **SWEEP-PATH (slot 0)
+> FINISHED and LANDED by the overnight driver** (worker commit 0056f01,
+> merge c9a4e17, RESULT filed 5a2b152, row flip b016fe9; 0056f01 is an
+> ancestor of HEAD b016fe9 - nothing to re-land). Slots 1-6 landed residue;
+> slot 7 is the redundant FRAME-REVOLVE residue (RESULT status LANDED, no
+> commit) - carried. Nothing to land, nothing to unblock, nothing to flip
+> (BLOCKED-with-deps-landed = BG-CK-SPLINE-CENSUS owner-CANCELLED,
+> DEF-TESS-ANALYTIC-SEAM superseded by its -R2, DEF-SEEDRAY-B human-gated,
+> TOR-C orchestrator-held). READY rows without a landed marker = NONE;
+> dispatch_ready --dry-run "dispatched 0; workers 0/4" = REAL idle. Health:
+> heartbeat 1 (27872), operator runner 1 (27876), watchdog 1 (24472), driver
+> 1 (26920), cargoq UP (queued 0, running false); TWO supervisors (19172 +
+> 27828) carried. Disk 24.7 GB free; RAM 6.2 GB free. Old orchestrator pid
+> 17740 still gone.]
 
 - **THE FIRST KERNEL-VS-OCC TIMING COMPARISON IS BANKED** (FH-TIMING-REFRESH,
   landed c94d043): turbopump_assembly **0.097 s kernel vs 4.866 s OCC**,
@@ -606,6 +605,35 @@ F1 non_z_axis pin amendment (ttc_lathe_spline.rs:255); duplicate
 supervisors + the lagging cargoq restart guard; slot-4 + slot-7 wt RESULT
 residue parking the driver's dispatch arm; TOR-C flip-or-pin (orchestrator
 LIVE).]
+
+[operator 2026-09-10T02:23Z - volatile refresh. Board now: 0 RUNNING / 1
+landed-this-cycle. **SWEEP-PATH (slot 0) FINISHED and LANDED by the overnight
+driver mid-cycle**: worker commit 0056f01, driver merge c9a4e17 (scoped check
+green, one-verify amendment), RESULT filed 5a2b152 to loop/results/, row
+flipped DONE b016fe9 - 0056f01 is now an ancestor of HEAD b016fe9 (verified),
+so nothing to re-land. Slot 0 is FINISHED landed residue; slot 1 IDLE
+(ADM-003 landed residue); slots 2-6 FINISHED landed residue (e33c4dd/e9d885a/
+3c2109b/ee97499/713f205, all ancestors). Slot 7 is the redundant
+FRAME-REVOLVE residue (RESULT status LANDED, NO commit, base eafdc80) - not
+operator-landable, carried. Nothing to unblock (no RUNNING worker; no
+IDLE/DEAD >15 min holding work; no QUESTION). Registry re-verified
+programmatically: READY rows WITHOUT a 'landed <sha>' note marker = NONE;
+BLOCKED-with-all-deps-landed = BG-CK-SPLINE-CENSUS (note CANCELLED BY OWNER),
+DEF-TESS-ANALYTIC-SEAM (superseded by DEF-TESS-ANALYTIC-SEAM-R2, which is
+READY), DEF-SEEDRAY-B (human-gated on the SEEDRAY-B frontier review),
+TOR-C (orchestrator-held per the standing escalation) - nothing to flip.
+dispatch_ready --dry-run: "dispatched 0; workers ~0/4" = REAL idle (heartbeat
+live; no manual dispatch). Health: heartbeat exactly 1 (27872), operator
+runner 1 (27876), watchdog 1 (24472), overnight driver 1 (26920, only ONE
+overnight.py child = no double-merge risk), cargoq UP (ping ok, queued 0,
+running false; port 8231 owned by server.py 28544); TWO supervisors (19172
+PyManager + 27828 pythoncore - carried duplication class). Disk 24.7 GB free
+(above the 8 GB floor AND the 15 GB janitor goal); RAM 6.2 GB free. Old
+orchestrator pid 17740 still gone. Open human items (carried, unchanged):
+FRAME-REVOLVE F1 non_z_axis pin amendment (ttc_lathe_spline.rs:255);
+duplicate supervisors + the lagging cargoq restart guard; slot-4 + slot-7 wt
+RESULT residue parking the driver's dispatch arm; TOR-C flip-or-pin
+(orchestrator LIVE).]
 
 ## The parallelism picture
 

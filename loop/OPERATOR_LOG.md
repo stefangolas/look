@@ -800,3 +800,44 @@ redundant FRAME-REVOLVE residue; cargoq UP; heartbeat 1; driver 1; watchdog 1;
 TWO supervisors; disk 21.7 GB free; RAM 5.0 GB free. Escalations carried: F1
 non_z_axis pin amendment; duplicate supervisors + lagging cargoq guard; slot-4
 + slot-7 wt RESULT residue; TOR-C flip-or-pin.
+
+## 2026-09-10 02:23Z - quiet cycle; SWEEP-PATH landed by the driver
+
+Board: 0 RUNNING / 1 landed-this-cycle / 0 blocked-dispatchable. Slots 0-6
+FINISHED/IDLE landed residue; slot 7 redundant FRAME-REVOLVE residue.
+
+Health (all measured this cycle):
+- heartbeat exactly 1 (27872, dispatch_heartbeat.ps1); operator runner 1
+  (27876); watchdog 1 (24472); overnight driver 1 (26920, ONE overnight.py
+  child); cargoq UP (ping `{"ok":true,"queued":0,"running":false}`).
+- disk 24.7 GB free (above the 8 GB floor AND the 15 GB janitor goal);
+  RAM 6.2 GB free.
+- TWO supervisors (19172 PyManager + 27828 pythoncore) - carried duplication
+  class; only ONE overnight.py driver = no double-merge risk this cycle.
+
+Actions:
+- Health sweep done (see board above).
+- Landing: NOTHING to land. **SWEEP-PATH (slot 0) was already LANDED by the
+  overnight driver mid-cycle** - worker commit 0056f01, merge c9a4e17, RESULT
+  filed 5a2b152, row flip b016fe9; `merge-base --is-ancestor 0056f01
+  integration/kernel-bg` exit 0, so nothing to re-land. Slot 7's redundant
+  RESULT has no commit (status LANDED, not DONE) - not operator-landable.
+- Unblock: nothing stuck (0 RUNNING; no IDLE/DEAD >15 min holding work; no
+  QUESTION).
+- Registry hygiene: READY rows without a landed marker = NONE. BLOCKED-with-
+  all-deps-landed = BG-CK-SPLINE-CENSUS (CANCELLED BY OWNER),
+  DEF-TESS-ANALYTIC-SEAM (superseded by -R2, which is READY), DEF-SEEDRAY-B
+  (human-gated on the SEEDRAY-B frontier review), TOR-C (orchestrator-held).
+  Nothing flipped - all four are correctly parked.
+- Dispatch: `dispatch_ready.py --dry-run --max-workers=4` -> "dispatched 0;
+  workers now ~0/4" = REAL idle. No manual dispatch (heartbeat live).
+- STATE.md volatile refresh + LATEST GROUND TRUTH pointer updated ([operator
+  2026-09-10T02:23Z]).
+- No new escalation (nothing judgment-requiring surfaced this cycle); carried
+  items unchanged.
+
+Leaving: 0 RUNNING; slots 0-6 landed residue; slot 7 redundant FRAME-REVOLVE
+residue; cargoq UP; heartbeat 1; driver 1; watchdog 1; TWO supervisors; disk
+24.7 GB free; RAM 6.2 GB free. Escalations carried: F1 non_z_axis pin
+amendment; duplicate supervisors + lagging cargoq guard; slot-4 + slot-7 wt
+RESULT residue; TOR-C flip-or-pin.
