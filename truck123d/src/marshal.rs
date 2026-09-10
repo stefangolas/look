@@ -29,6 +29,12 @@ use truck_base::evidence::{
     Budget, Certificate, EnvelopeCase, Method, Modulus, ModulusShape, Prop, Refusal, Truth,
     UnresolvedWitness,
 };
+// CG-BINDING: the certified funnel's refusal vocabularies. Reaching them here
+// is exactly the one sanctioned manifest edge (recorded in src/binding.rs);
+// the construct/kernel refusal kinds are translated into the SAME typed door
+// vocabulary the base `Refusal` mapping already produces, never a bare string.
+use truck_certified::construct::refusal::ConstructRefusal;
+use truck_certified::kernel::evidence::RefusalKind;
 
 /// The two-class Python exception hierarchy (PB-000 §2):
 /// `TruckError` → `Refused` | `Unresolved`. This enum is the class tag of a
@@ -446,4 +452,219 @@ pub fn ledger_from_budget(budget: &Budget) -> Ledger {
         newton: budget.newton,
         depth: budget.depth,
     }
+}
+
+// ---------------------------------------------------------------------------
+// CG-BINDING — the total certified-refusal -> typed-door-vocabulary mapping.
+//
+// The base `Refusal` mapping above is the PB-000 §2 table. The certified
+// funnel (`truck-certified`) refuses through two OTHER vocabularies — the
+// construct-layer `ConstructRefusal` (CC-000-C4) and the kernel-v2
+// `RefusalKind` (§17) — and those refusals must reach the corpus door as the
+// same typed cases, never as a bare string and never by approximation. Per
+// `docs/CERTIFICATE_MAPPING.md` §C row 1, every construct-stage refusal maps
+// onto the single booked `construct_refused` door case (the detailed variant
+// rides the payload). A kind the table does not name is itself a typed
+// `UnmappedRefusal` — a defect signal, never silent.
+// ---------------------------------------------------------------------------
+
+/// The typed door-refusal vocabulary: the base `Refusal` cases of the frozen
+/// §2 table plus the two certified-funnel cases. A `DoorCase` is a named
+/// cause, never a bare string.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum DoorCase {
+    /// `Refusal::Empty` — an empty operation domain.
+    Empty,
+    /// `Refusal::UnsupportedEnvelope` — a carrier/envelope the funnel refuses.
+    UnsupportedEnvelope,
+    /// `Refusal::NumericallyUnresolved` — the budget was exhausted.
+    NumericallyUnresolved,
+    /// `Refusal::CompositionMarginExhausted`.
+    CompositionMarginExhausted,
+    /// `Refusal::InputOutsideBackwardBudget`.
+    InputOutsideBackwardBudget,
+    /// `Refusal::Contradictory` — conflicting evidence.
+    Contradictory,
+    /// `Refusal::Collapsed` — an exact object collapsed.
+    Collapsed,
+    /// `Refusal::ForwardToleranceExceeded`.
+    ForwardToleranceExceeded,
+    /// A construct-stage refusal (CERTIFICATE_MAPPING §C row 1).
+    ConstructRefused,
+    /// A certified refusal kind with no booked door mapping: the defect
+    /// signal. Never silent, never approximated.
+    UnmappedRefusal,
+}
+
+/// The marshaled form of an unmapped certified refusal kind (the defect
+/// signal). Carries the offending kind name so the defect is traceable; it is
+/// raised as a `Refused` exception like every other typed refusal, never as a
+/// bare `Exception`.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct UnmappedRefusal {
+    /// The certified refusal kind with no booked mapping.
+    pub kind: String,
+}
+
+impl UnmappedRefusal {
+    /// Names the unmapped kind.
+    pub fn new(kind: impl Into<String>) -> Self {
+        Self { kind: kind.into() }
+    }
+
+    /// The typed door case of this defect signal.
+    pub fn door_case(&self) -> DoorCase {
+        DoorCase::UnmappedRefusal
+    }
+
+    /// The marshaled `Refused` form of the defect signal.
+    pub fn marshaled(&self) -> Marshaled {
+        Marshaled::from_unmapped_refusal(self)
+    }
+}
+
+/// The `RefusedPayload` skeleton of one named door case (every optional field
+/// absent). Shared by the certified-refusal marshaling helpers.
+fn refused_payload(case: &str) -> RefusedPayload {
+    RefusedPayload {
+        case: case.to_string(),
+        envelope: None,
+        stage: None,
+        prop: None,
+        left: None,
+        right: None,
+        reason: None,
+        certificate: None,
+        bound: None,
+        allowed: None,
+    }
+}
+
+impl Marshaled {
+    /// Marshals a construct-stage `ConstructRefusal` into the typed door
+    /// vocabulary (CERTIFICATE_MAPPING §C row 1): the single booked
+    /// `construct_refused` case, with the construct variant tag carried on the
+    /// payload's `stage` field. Total over the frozen 14-variant set.
+    pub fn from_construct_refusal(refusal: ConstructRefusal) -> Marshaled {
+        let mut payload = refused_payload("construct_refused");
+        payload.envelope = Some("construct_refused".to_string());
+        payload.stage = Some(refusal.tag().to_string());
+        Marshaled {
+            class: ExceptionClass::Refused,
+            message: format!("kernel construct refusal: {}", refusal.tag()),
+            payload: MarshaledPayload::Refused(payload),
+        }
+    }
+
+    /// Marshals an unmapped certified refusal kind as the typed
+    /// [`UnmappedRefusal`] defect signal: `Refused` class, `unmapped_refusal`
+    /// case, the offending kind on the payload. Never a bare string, never a
+    /// silent approximation.
+    pub fn from_unmapped_refusal(refusal: &UnmappedRefusal) -> Marshaled {
+        let mut payload = refused_payload("unmapped_refusal");
+        payload.stage = Some(refusal.kind.clone());
+        Marshaled {
+            class: ExceptionClass::Refused,
+            message: format!("kernel refusal kind has no door mapping: {}", refusal.kind),
+            payload: MarshaledPayload::Refused(payload),
+        }
+    }
+}
+
+/// The snake_case name of a landed kernel-v2 `RefusalKind` (the §17
+/// taxonomy). Exhaustive over the frozen 25-variant set; a new variant breaks
+/// this function on purpose (the mapping table must be extended by spec edit,
+/// not by a silent wildcard).
+// The door-vocabulary surface is consumed by `binding.rs` (and the follow-on
+// door-shim flip); `lib.rs` is outside this packet's write set, so the items
+// cannot be added to the crate-root re-export list yet.
+#[allow(dead_code)]
+pub fn kernel_refusal_kind_name(kind: RefusalKind) -> &'static str {
+    match kind {
+        RefusalKind::SpineNotC1 => "spine_not_c1",
+        RefusalKind::FrameSingular => "frame_singular",
+        RefusalKind::ProfileCollapse => "profile_collapse",
+        RefusalKind::ProfileCorrespondenceMismatch => "profile_correspondence_mismatch",
+        RefusalKind::NonFinite => "non_finite",
+        RefusalKind::WindingAuditFailed => "winding_audit_failed",
+        RefusalKind::NonDyadicSharedRequest => "non_dyadic_shared_request",
+        RefusalKind::CarrierSingularity => "carrier_singularity",
+        RefusalKind::ChartExhausted => "chart_exhausted",
+        RefusalKind::TranscendentalCarrier => "transcendental_carrier",
+        RefusalKind::WeightDegenerate => "weight_degenerate",
+        RefusalKind::DeckExhausted => "deck_exhausted",
+        RefusalKind::Conditioning => "conditioning",
+        RefusalKind::TangentialCurve => "tangential_curve",
+        RefusalKind::HighOrderJet => "high_order_jet",
+        RefusalKind::IncompleteStartSet => "incomplete_start_set",
+        RefusalKind::R5EnclosureFailed => "r5_enclosure_failed",
+        RefusalKind::TrimClipFailed => "trim_clip_failed",
+        RefusalKind::NearOverlap => "near_overlap",
+        RefusalKind::OffsetDegenerate => "offset_degenerate",
+        RefusalKind::OffsetSwallowtail => "offset_swallowtail",
+        RefusalKind::CornerUnsolved => "corner_unsolved",
+        RefusalKind::SliverOrNearOverlap => "sliver_or_near_overlap",
+        RefusalKind::ClaimRefuted => "claim_refuted",
+        RefusalKind::Budget => "budget",
+    }
+}
+
+/// The door case of a landed kernel-v2 `RefusalKind` name. Every §17 variant
+/// is booked here; a name the table does not hold is the typed
+/// [`DoorCase::UnmappedRefusal`] defect signal — never silent, never a guess.
+#[allow(dead_code)]
+pub fn door_case_of_kernel_refusal_name(name: &str) -> DoorCase {
+    match name {
+        // The construct/carrier classes (CERTIFICATE_MAPPING §C row 1).
+        "spine_not_c1"
+        | "frame_singular"
+        | "profile_collapse"
+        | "profile_correspondence_mismatch" => DoorCase::ConstructRefused,
+        // The unsupported-envelope classes.
+        "non_dyadic_shared_request" | "carrier_singularity" | "transcendental_carrier" => {
+            DoorCase::UnsupportedEnvelope
+        }
+        // The contradictory-evidence classes.
+        "winding_audit_failed" | "weight_degenerate" | "near_overlap" | "claim_refuted" => {
+            DoorCase::Contradictory
+        }
+        // The collapse classes.
+        "offset_degenerate" | "offset_swallowtail" => DoorCase::Collapsed,
+        // The forward-tolerance class.
+        "non_finite" => DoorCase::ForwardToleranceExceeded,
+        // Every inconclusive-class §17 variant is the budget/conditioning
+        // unresolved door case.
+        "chart_exhausted"
+        | "deck_exhausted"
+        | "conditioning"
+        | "tangential_curve"
+        | "high_order_jet"
+        | "incomplete_start_set"
+        | "r5_enclosure_failed"
+        | "trim_clip_failed"
+        | "corner_unsolved"
+        | "sliver_or_near_overlap"
+        | "budget" => DoorCase::NumericallyUnresolved,
+        _ => DoorCase::UnmappedRefusal,
+    }
+}
+
+/// The door case of a landed kernel-v2 `RefusalKind`. Total over the frozen
+/// 25-variant set; the name table is the single mapping source.
+#[allow(dead_code)]
+pub fn door_case_of_kernel_refusal_kind(kind: RefusalKind) -> DoorCase {
+    door_case_of_kernel_refusal_name(kernel_refusal_kind_name(kind))
+}
+
+/// The door case of a construct-stage `ConstructRefusal`. Per
+/// CERTIFICATE_MAPPING §C row 1 every construct-stage failure maps onto the
+/// single booked `construct_refused` case; the variant detail rides the
+/// payload (`Marshaled::from_construct_refusal`). Total over the frozen
+/// 14-variant set.
+#[allow(dead_code)]
+pub fn door_case_of_construct_refusal(refusal: ConstructRefusal) -> DoorCase {
+    let _ = refusal.tag();
+    DoorCase::ConstructRefused
 }

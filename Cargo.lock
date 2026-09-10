@@ -2431,6 +2431,7 @@ dependencies = [
  "serde_json",
  "truck-assembly",
  "truck-base",
+ "truck-certified",
 ]
 
 [[package]]
