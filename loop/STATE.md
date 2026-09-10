@@ -2054,6 +2054,46 @@ cargoq restart guard; slot-4 + slot-7 wt RESULT residue; TOR-C flip-or-pin;
 heartbeat slot-liveness duplicate-dispatch bug (the MONO-2 root cause). NEW
 escalation: the MONO-row registry schema gap.]
 
+[operator 2026-09-10T17:23Z - volatile refresh. Board now: 0 RUNNING / 0
+landed-this-cycle / 0 unblocked / 1 flipped. **MONO-3-BLADE-MEMBERS-MIRROR
+LANDED** (overnight driver, one-verify amendment): worker ee3dd4b, merge
+f8fc2e3, RESULT filed 93b045f, row flipped DONE 2546f1b; ee3dd4b is an
+ancestor of integration/kernel-bg (re-verified). Note: the worker committed
+its packet bundle (CONTEXT.md/PACKET.md/RESULT.json harness artifacts) into
+ee3dd4b and the driver merged it - the pre-existing tracked-artifact pattern,
+not new; RESULT.json is filed in loop/results/. THE ACTION: flipped
+MONO-4-TRIM-IDIOMS BLOCKED->READY (dep MONO-2 landed, and MONO-3 now landed
+so the shared bd_bridge.rs serialization reason is gone; gen_packet --check +
+packet_lint green via dispatch_ready preflight). dispatch_ready --dry-run now:
+"MONO-4-TRIM-IDIOMS -> slot 0; dispatched 1" - the live heartbeat will
+dispatch it (no manual dispatch). Landing re-verified by command:
+`git merge-base --is-ancestor` exit 0 for all slot worker commits; no FINISHED
+slot holds an unlanded DONE RESULT. Slot 0 = MONO-3 landed residue; slot 1 =
+duplicate MONO-2 residue (wt RESULT DONE, no commit, base e37938a - an
+ancestor of HEAD, moot); slots 2-7 landed residue. Registry re-derived
+(last-wins dedup): 317 rows - 230 DONE, 80 READY, 7 BLOCKED; READY rows
+WITHOUT a (case-folded) landed marker = exactly {MONO-4 (released,
+heartbeat-pending)}; BLOCKED-with-all-deps-landed = the carried 7 owner-parked
+(BG-AUD-FIX-004, BG-CK-SPLINE-CENSUS, SEM-PCURVE-MASTER-001-FIX,
+DEF-SPINEFRAME-GRAZE, DEF-TESS-ANALYTIC-SEAM, DEF-SEEDRAY-B, TOR-C). Nothing
+to unblock (no RUNNING worker; no IDLE/DEAD >15 min holding work; no
+QUESTION). NOTE: the overnight driver is running a scoped check in slot 1
+(cargoq running: `test -p truck123d --lib -- --test-threads=1` in slots/1/wt,
+started 13:18:49 local after the prior run crashed exit 3221225781 =
+0xC0000409, the RAM-zone signature; RAM 6.1 GB free now, the retry is
+healthy) - not operator-landable, do not disturb. Health: heartbeat exactly 1
+(27872), operator runner 1 (27876), watchdog 1 (29264), overnight driver 1
+(26920), cargoq UP (ping ok, queued 0, running true; single server.py). TWO
+supervisors (19172 PyManager + 27828 pythoncore - carried duplication class;
+only ONE overnight.py child = no double-merge risk). Disk 17.1 GB free (15.9
+GiB, above the 8 GB floor and the 15 GB janitor goal); RAM 6.1 GB free.
+Carried human items unchanged: FRAME-REVOLVE F1 non_z_axis pin amendment
+(ttc_lathe_spline.rs:255); duplicate supervisors + lagging cargoq restart
+guard; slot-1/4/7 wt RESULT residue; TOR-C flip-or-pin; heartbeat
+slot-liveness duplicate-dispatch bug; MONO-row registry schema gap
+(depends_on/write_allow unread by dispatch_ready - safe now: MONO-4 is the
+only dispatcher-visible READY row, so no second bd_bridge writer).]
+
 ## The parallelism picture
 
 The lemma wave (L1-L4, pure functions over the frozen shim type) is

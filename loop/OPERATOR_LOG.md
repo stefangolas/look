@@ -2631,3 +2631,38 @@ operator cycle commit; nothing unlanded; 8 BLOCKED correctly parked (7 carried
 + MONO-4 held); 79 READY (78 carried landed-marked + MONO-3); cargoq UP;
 heartbeat 1; driver 1; watchdog 1; TWO supervisors; disk 16.0 GiB free; RAM 5.8
 GiB free.
+
+## 2026-09-10 17:23 UTC - operator cycle
+
+- Health: heartbeat 1 (27872), operator runner 1 (27876), watchdog 1 (29264),
+  overnight driver 1 (26920), cargoq UP (ping ok, queued 0, running true =
+  slot-1 scoped check; single server.py). Disk 17.1 GB free; RAM 6.1 GB free.
+  TWO supervisors (19172 + 27828) carried.
+- Land (step 2): nothing landable. MONO-3-BLADE-MEMBERS-MIRROR was already
+  landed by the overnight driver (worker ee3dd4b, merge f8fc2e3, RESULT
+  93b045f, row DONE 2546f1b); ee3dd4b is an ancestor of integration/kernel-bg
+  (re-verified by `git merge-base --is-ancestor`). Slot 0 = MONO-3 landed
+  residue; slot 1 = duplicate MONO-2 residue (RESULT DONE, no commit, base
+  e37938a ancestor of HEAD - moot); slots 2-7 landed residue (all ancestors).
+- Unblock (step 3): none - no RUNNING worker, no IDLE/DEAD >15 min holding
+  work, no QUESTION. The overnight driver's slot-1 scoped check is running
+  (cargoq `test -p truck123d --lib -- --test-threads=1`; the prior run exited
+  3221225781 = 0xC0000409 RAM-zone, the retry is healthy) - not disturbed.
+- Registry hygiene (step 4): flipped MONO-4-TRIM-IDIOMS BLOCKED->READY. Its
+  dep MONO-2 is landed and MONO-3 (the other bd_bridge.rs writer) has now
+  landed, so the serialization reason the 16:57Z cycle held it is gone.
+  dispatch_ready preflight green; `--dry-run` now "MONO-4-TRIM-IDIOMS ->
+  slot 0; dispatched 1". 317 rows: 230 DONE, 80 READY, 7 BLOCKED; the only
+  dispatcher-visible READY row (no landed marker) is MONO-4.
+- Dispatch (step 5): `dispatch_ready.py --dry-run --max-workers=4` only (no
+  manual dispatch - heartbeat live; it will dispatch MONO-4 next cycle).
+- STATE.md volatile refresh ([operator 2026-09-10T17:23Z]).
+- No new escalation. Carried human items unchanged (FRAME-REVOLVE F1
+  non_z_axis pin; duplicate supervisors + lagging cargoq restart guard;
+  slot-1/4/7 wt RESULT residue; TOR-C flip-or-pin; heartbeat slot-liveness
+  duplicate-dispatch bug; MONO-row registry schema gap).
+
+Leaving: 0 RUNNING (MONO-4 released, heartbeat-pending); HEAD 2546f1b plus the
+operator cycle commit; nothing unlanded; 7 BLOCKED correctly parked; 80 READY
+(79 landed-marked + MONO-4); cargoq UP; heartbeat 1; driver 1; watchdog 1; TWO
+supervisors; disk 17.1 GB free; RAM 6.1 GB free.
