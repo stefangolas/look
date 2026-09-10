@@ -15,18 +15,21 @@ program, and the operator agent.
 ## Where we are
 
 > LATEST GROUND TRUTH: read the newest `[operator ...]` block in "State of
-> the machine, as left" (2026-09-10T03:08Z). [operator 2026-09-10T03:08Z
+> the machine, as left" (2026-09-10T03:29Z). [operator 2026-09-10T03:29Z
 > ground-truth note: 0 RUNNING / 0 landed-this-cycle. Quiet healthy pass, HEAD
-> 04de6ac unchanged since the 02:45Z operator commit. All slot worker commits
-> (0056f01/e33c4dd/e9d885a/3c2109b/ee97499/713f205/4de25d9) re-verified
-> ancestors of integration/kernel-bg this cycle; slot 7 is the redundant
-> FRAME-REVOLVE residue (wt RESULT status LANDED, no commit) and slot 4 the F1
-> LANDED-WITH-FINDINGS residue. Nothing to land/unblock/flip; READY rows
-> without a landed marker = NONE; dispatch_ready --dry-run "dispatched 0;
-> workers 0/4" = REAL idle. Health: heartbeat 1 (27872, last cycle 03:05Z),
-> operator runner 1 (27876), watchdog 1 (24472), overnight driver 1 (26920, one
-> child), cargoq UP (ping ok, queued 0, running false); TWO supervisors (19172
-> + 27828) carried. Disk 22.9 GB free; RAM 5.6 GB free. Open human items
+> bb2463a (the 03:08Z operator commit) - no work moved this cycle. All slot
+> worker commits (0056f01/e33c4dd/e9d885a/3c2109b/ee97499/713f205/4de25d9) plus
+> b667a85 re-verified ancestors of integration/kernel-bg; slot 0 = SWEEP-PATH
+> landed residue and slot 7 = redundant FRAME-REVOLVE residue (both wt RESULT
+> status LANDED, no commit) - neither operator-landable. Nothing to
+> land/unblock/flip; READY rows without a landed marker = NONE;
+> dispatch_ready --dry-run "dispatched 0; workers 0/4" = REAL idle. Health:
+> heartbeat exactly 1 (27872; the "2" a prior scan reported was the inspecting
+> shell matching its own `-match dispatch_heartbeat` pattern - an anchored
+> `-File dispatch_heartbeat.ps1` scan confirms 1), operator runner 1 (27876),
+> watchdog 1 (24472), overnight driver 1 (26920, one child), cargoq UP (ping
+> ok, queued 0, running false; single server.py 28544); TWO supervisors (19172
+> + 27828) carried. Disk 22.9 GB free; RAM 5.5 GB free. Open human items
 > carried unchanged.]
 
 - **THE FIRST KERNEL-VS-OCC TIMING COMPARISON IS BANKED** (FH-TIMING-REFRESH,
@@ -686,6 +689,41 @@ free. Open human items (carried, unchanged): FRAME-REVOLVE F1 non_z_axis pin
 amendment (ttc_lathe_spline.rs:255); duplicate supervisors + the lagging cargoq
 restart guard; slot-4 + slot-7 wt RESULT residue parking the driver's dispatch
 arm; TOR-C flip-or-pin (orchestrator-held).]
+
+[operator 2026-09-10T03:29Z - volatile refresh. Quiet healthy cycle: nothing to
+land, nothing to unblock, nothing to flip, no dispatch (heartbeat-owned). Board
+now: 0 RUNNING / 0 landed-this-cycle. HEAD bb2463a (the 03:08Z operator commit)
+- no work moved this cycle. All slot worker commits re-verified ancestors of
+integration/kernel-bg this cycle (0056f01, e33c4dd, e9d885a, 3c2109b, ee97499,
+713f205, 4de25d9, plus b667a85 the orchestrator-landed FRAME-REVOLVE); slot 0 =
+SWEEP-PATH landed residue (wt RESULT status LANDED, worker 0056f01 already an
+ancestor); slot 1 = ADM-003 landed residue; slots 2-6 landed residue (slot 4 =
+F1 LANDED-WITH-FINDINGS); slot 7 = redundant FRAME-REVOLVE residue (wt RESULT
+status LANDED, no commit, base eafdc80) - not operator-landable. Nothing to
+unblock (no RUNNING worker; no IDLE/DEAD >15 min holding work; no QUESTION).
+Registry re-verified programmatically (case-folded note match, matching
+dispatch_ready): READY rows WITHOUT a 'landed <sha>' note marker = NONE;
+BLOCKED-with-all-deps-landed = BG-AUD-FIX-004 (OWNER_BLOCKED), BG-CK-SPLINE-
+CENSUS (owner-cancelled), SEM-PCURVE-MASTER-001-FIX (SUPERSEDED), DEF-
+SPINEFRAME-GRAZE (owner-parked/SPEC_GAP), DEF-TESS-ANALYTIC-SEAM (superseded by
+DEF-TESS-ANALYTIC-SEAM-R2, which is READY), DEF-SEEDRAY-B (human-gated on the
+SEEDRAY-B frontier review), TOR-C (needs ADM-001/002, both LANDED; orchestrator-
+held per the standing escalation) - nothing flipped, all correctly parked.
+dispatch_ready --dry-run: "dispatched 0; workers ~0/4" = REAL idle (heartbeat
+live; no manual dispatch). Health: heartbeat exactly 1 (27872, last cycle
+03:05:48Z; an earlier operator scan reported "2" because the inspecting shell's
+own command line matched the `-match dispatch_heartbeat` pattern - the anchored
+`-File dispatch_heartbeat.ps1` scan shows 1, NO double-heartbeat to reap),
+operator runner 1 (27876), watchdog 1 (24472), overnight driver 1 (26920, child
+of 27828, cycling every 5 min, parked on the slot-4 F1 judgment), cargoq UP
+(ping ok, queued 0, running false; single server.py 28544). TWO supervisors
+(19172 PyManager + 27828 pythoncore - carried duplication class; only ONE
+overnight.py child = no double-merge risk). Disk 22.9 GB free (above the 8 GB
+floor AND the 15 GB janitor goal); RAM 5.5 GB free. Open human items (carried,
+unchanged): FRAME-REVOLVE F1 non_z_axis pin amendment (ttc_lathe_spline.rs:255);
+duplicate supervisors + the lagging cargoq restart guard; slot-4 + slot-7 wt
+RESULT residue parking the driver's dispatch arm; TOR-C flip-or-pin
+(orchestrator-held).]
 
 ## The parallelism picture
 
