@@ -5441,9 +5441,14 @@ only remaining gate, deps ADM-001/002 are LANDED. Ruling recorded in the
 row's note. Board re-verified: 2 RUNNING (slot 0 MONO-6-SWEPT-BOOLEANS,
 slot 1 SOLVER-SURVEY-A, both events fresh), slots 2-7 landed/stale
 residue, nothing operator-landable (all FINISHED tips ancestors of
-integration/kernel-bg). RAM was 1.98 GB free at session start - the third
-worker was therefore NOT added despite free slots; standing practice
-holds (no cold warm builds until RAM frees, chrome closed). Next actions
+integration/kernel-bg). RAM was 1.98 GB free at session start and fell to
+0.64 GB mid-session - chrome (19 procs, 3.5 GB) was found OPEN in
+violation of standing practice and closed (recoverable, session restore);
+the residual baseline is 3 opencode + Code + rust-analyzer + claude +
+Dropbox + Discord + Defender + ~1 GB Memory Compression - owner apps,
+left alone. The third worker was therefore NOT added despite free slots;
+no cold warm builds until RAM frees. cargoq healthy (ping ok, queued 0).
+Next actions
 unchanged: on MONO-6 landing -> author MONO-7-ROW-ASSEMBLY from its
 RESULT, then the R3 census under the new oracle policy; on SURVEY-A
 landing -> SOLVER-CHECKER unblocks.]
