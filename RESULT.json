@@ -1,0 +1,58 @@
+{
+  "id": "BRIDGE-BOOLEANS",
+  "status": "LANDED",
+  "contracts": ["BRIDGE-BOOLEANS"],
+  "tests_added": 5,
+  "anchors_verified": {"A1": 0, "A2": 2, "A3": 1},
+  "summary": "The door shim's boolean verbs flip name-for-name. `_Shape.__sub__`/`__add__`/`__and__` and the `fuse`/`cut`/`intersect` methods no longer refuse at the verb: they record a BooleanOp row `{mode, a, b}` and dispatch it through the certified funnel at record time, so a refused pair raises its typed refusal immediately (never a silent fallback). The dispatch is placement-blind (scope decision 2): each operand's LOCAL solid classifies into the facade's carrier taxonomy (box/cylinder/sphere/prism/line-lathe -> canonical, spline-profile lathe -> revolved, loft/sweep -> swept, torus -> torus) and the operand's recorded frame composes after. A routed pair records the certified event `{mode, base, tool}` on the measured facts; a canonical x canonical pair lands on the canonical path (no event); a both-swept pair keeps the typed `NonCanonicalCarrier` refusal and a torus-in-a-swept-pair keeps `ContactReductionDeferred`, both naming the carrier class. Depth-1 only (scope decision 3): a boolean of a boolean result refuses typed naming `BooleanResultOperand` rather than silently recursing. The bridge's tree executor gains the Boolean node, dispatches every row, records the routed events in script order, and measures/meshes the row's base operand. Five named tests green. Admission is unchanged (widened not at all).",
+  "implementation": {
+    "door_recording": "corpus/ttc/door.py: `_Shape._boolean(other, mode)` refuses a non-kernel operand, builds the `{mode, a, b}` row through `_boolean_node` (which refuses a depth-2 chain typed naming `BooleanResultOperand`), dispatches it at record time through `_T123D.bd_facts` (so the typed refusal surfaces before the corpus's `repair`/`is_valid_shape` can swallow it), and returns a `_BooleanResult`. `__sub__`/`__add__`/`__and__` map to `subtract`/`union`/`intersect`; `fuse`/`cut`/`intersect` reduce over their tool list. `_BooleanResult` is a `_Shape` carrying the recorded row and delegating all facts to the native executor. Placed operands keep their recorded frame on their own node; the row never rewrites it.",
+    "bridge_and_kernel": "truck123d/src/bd_bridge.rs: new `BooleanNode { mode: ModeValue, a, b }` and `TreeNode::Boolean { boolean }` (serde untagged, key `boolean`); `Facts` gains `boolean_events: Vec<SweptBooleanEvent>`. `solid_carrier_class` maps a `SolidSpec` to the facade's `CarrierClass` (local geometry only); `node_carrier_class` refuses a boolean operand typed (depth-1) and classifies a group by its first part; `dispatch_boolean` calls `crate::facade::dispatch_swept_carrier_boolean` and returns the routed `SweptBooleanEvent` or the typed envelope case; `collect_boolean_events` validates every row and collects the events in script order. `count_and_union`, `top_volume`, `top_seam_mismatch` and `append_node_mesh` dispatch a Boolean node and recurse into its base operand (the certified row's measured geometry is its base); `bd_facts` serializes `boolean_events` when non-empty.",
+    "facade": "truck123d/src/facade.rs: no change required. The existing admission consult (`dispatch_swept_carrier_boolean`) already routes/refuses the carrier-class pair and returns the certified `CertifiedBooleanRoute` the shim records; the packet's write_allow lists facade.rs but the landed consult is exactly the router this flip consumes.",
+    "kernel_tests": "Five tests added in truck123d/src/bd_bridge.rs mod tests: `cut_swept_canonical_certifies_end_to_end` (a ruled loft cut by a box routes; event mode subtract, base swept, tool canonical; the row measures its base), `fuse_swept_swept_certifies_end_to_end` (a ruled loft fused with a spline-profile revolve routes; event mode union, base swept, tool revolved), `intersect_swept_canonical_certifies_end_to_end` (a spline-profile revolve intersected with a box routes; event mode intersect), `placed_operands_transform_to_canonical_before_dispatch` (a placed loft's event carries the LOCAL swept class while the measured world bbox carries the placement), and `refused_pairs_still_refuse_typed_unchanged` (swept x swept -> NonCanonicalCarrier, torus-in-a-swept-pair -> ContactReductionDeferred, canonical x canonical -> no event)."
+  },
+  "verification": {
+    "cargo_check": "cargo check --locked -p truck123d -> clean",
+    "cargo_test_lib": "cargo test --locked -p truck123d --lib -- --test-threads=1 -> 38 passed, 0 failed, incl. the five named tests",
+    "cargo_test_integration": "cargo test --locked -p truck123d --lib --tests -- --test-threads=1: lib 38/38, pb_assembly 3/3, pb_conformance 3/3, pb_facade 4/4, pb_glb_emit 3/3, pb_op_matrix 7/7, pb_parity 4/4, ttc_authoring_arms 4/4, ttc_harness 3/3, ttc_lathe_spline 2/4. The two ttc_lathe_spline failures are pre-existing at the base HEAD and unrelated to this packet: `mvac_row_still_refuses_typed_at_the_spline_path_sweep_carrier` (its pin already moved to the circle profile carrier under SWEEP-PATH, recorded in loop/results/SWEEP-PATH.json) and `revolve_refusals_stay_typed_after_spline_admission` (its non_z_axis sub-case was cured by FRAME-REVOLVE, recorded in loop/results/FRAME-REVOLVE.json). The test file is outside this packet's write scope.",
+    "fmt": "cargo fmt -p truck123d -- --check -> bd_bridge.rs clean (the repo-wide check reports only pre-existing diffs in files this packet never opened)",
+    "clippy": "cargo clippy -p truck123d --all-targets --message-format=short --no-deps -> no finding on any of the 332 added lines (the crate's baseline `indexing_slicing` deny errors are all on pre-existing lines; the added `bd_facts` event insert uses `as_object_mut().insert` rather than indexing)",
+    "anchors": "A1=0 (`grep -c 'binding_boolean_dispatch' truck123d/src/bd_bridge.rs`), A2=2 (`grep -c '\\<certified\\>' truck123d/src/bd_bridge.rs`), A3=1 (`grep -c '\\<cut\\>' corpus/ttc/door.py`) - all hold under Git Bash grep."
+  },
+  "smoke": {
+    "protocol": "one fresh `python corpus/ttc/door.py --engine truck corpus/ttc/trees/f1/src <module> <entry> [] <stl>` per row, serial, with the release-stage `truck123d` module rebuilt at this HEAD and the interpreter dir on PATH; no OCC runs (the recorded references are the oracle).",
+    "f1/airbox": "exit 1, typed `Refused` with payload `{\"case\": \"unsupported_envelope\", \"envelope\": \"non_canonical_carrier\"}`. The row reaches its boolean (`ring_o - ring_i`, engine_cover.py:1029) and the dispatch refuses the carrier-class pair typed, naming the class.",
+    "f1/details": "exit 1, typed `Refused` with payload `{\"case\": \"unsupported_envelope\", \"envelope\": \"non_canonical_carrier\"}`. The row reaches a boolean (`surfaces.cut` / `fuse_all`) and the dispatch refuses the carrier-class pair typed.",
+    "f1/monocoque": "exit 1, typed `Refused` `an OCC probe of a kernel-engine row is not a kernel-engine row` (payload `non_canonical_carrier`). The row's `surfaces.obox(skin)` OCC probe (mono_tub.py:526) stops it one carrier BEFORE the boolean; the boolean (`surfaces.cut(skin, _cavity())`, mono_tub.py:529) is never reached. Typed, never untyped; the earlier boundary is an authoring-surface gap outside this packet.",
+    "verdict": "No smoke row routed, so no facts gate ran and no row flipped. The F1 rows' first boolean is swept x swept (the PB-011C census verdict), which the admission consult refuses typed; the refusal names the carrier class for airbox/details. No untyped failure occurred."
+  },
+  "findings": [
+    {
+      "id": "F1",
+      "title": "The two pre-existing ttc_lathe_spline failures are unchanged",
+      "detail": "`mvac_row_still_refuses_typed_at_the_spline_path_sweep_carrier` fails at the circle section profile (its pin moved under SWEEP-PATH) and `revolve_refusals_stay_typed_after_spline_admission` fails on its non_z_axis sub-case (cured by FRAME-REVOLVE). Both fail identically at the base HEAD; the test file is outside this packet's write scope. Recorded here so the orchestrator can apply the same amendment ritual as 5f1396d.",
+      "evidence": "cargo test --locked -p truck123d --lib --tests -- --test-threads=1; loop/results/SWEEP-PATH.json F1/F2 and loop/results/FRAME-REVOLVE.json record the same two boundaries."
+    },
+    {
+      "id": "F2",
+      "title": "monocoque stops at an OCC probe one carrier before its boolean",
+      "detail": "`surfaces.obox(skin)` (corpus/ttc/trees/f1/src/lib/surfaces.py:223) calls `BRepBndLib.AddOptimal_s(shape.wrapped, ...)`; on the truck regime `_Shape.wrapped` refuses typed. The row therefore never reaches `surfaces.cut(skin, _cavity())`. This is a shallower authoring-surface boundary than the packet's chosen boolean boundary, and it is typed (`Refused`), not an untyped failure. No boolean dispatch is exercised for this row.",
+      "evidence": "traceback recorded from a direct `lib.monocoque.build_monocoque()` call under the truck alias; the door smoke JSON above."
+    },
+    {
+      "id": "F3",
+      "title": "A routed boolean row measures its base operand; the product's realization is the booked follow-up",
+      "detail": "The certified funnel's boolean entry certifies the carrier pair (admission + the Theorem C transversality route), not a realized product boundary. The shim records the certified event and measures the row's base operand; the routed product's own volume/bbox/mesh is the constructive-geometry realization the DOOR_GAP_AUDIT books as the CG program's later milestone. No smoke row routed, so this is unexercised by the corpus rows on this dispatch.",
+      "evidence": "the five named tests assert the routed event and the base-operand facts; loop/audits/DOOR_GAP_AUDIT-2026-09-09.md item 1."
+    }
+  ],
+  "stop_conditions": {
+    "spec_gap": "No SPEC_GAP fired: every routed pair's verdict expresses as the recorded door boolean event `{mode, base, tool}`, and every refused pair carries its typed envelope case. The routed product's realized geometry is the booked CG follow-up, not a missing door fact for this routing packet; no smoke row routed, so the routed-pair-can't-express case was not reached.",
+    "verdict_neutral": "No defect record: no landed green row flipped. Admission is unchanged (widened not at all); the refused pair cells answer exactly the landed PB-011C census refusals (NonCanonicalCarrier for swept x swept, ContactReductionDeferred for a torus carrier). The five named tests are green."
+  },
+  "notes": "The shim dispatches at `crate::facade::dispatch_swept_carrier_boolean` (the admission consult the binding's `boolean_dispatch` composes) rather than at the binding's cone-level certificate, because `binding::boolean_dispatch` requires certified normal-cone witnesses that the door's recorded data rows do not carry; fabricating cones would be a tolerance stretch and would make every routed pair fail the transversality certificate. Anchor A1 (0 occurrences of the pyo3 export name `binding_boolean_dispatch` in bd_bridge.rs) is satisfied; the dispatch uses the same admission consult the export wraps, so the routed/refused verdicts are identical to the binding's facade stage. facade.rs required no change. RESULT.json is a claim; the authoritative verification runs at the integrated HEAD.",
+  "files": {
+    "door": "corpus/ttc/door.py",
+    "bridge": "truck123d/src/bd_bridge.rs"
+  }
+}

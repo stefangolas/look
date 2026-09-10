@@ -47,6 +47,7 @@ use pyo3::prelude::*;
 use serde::{Deserialize, Serialize};
 use truck_base::evidence::{EnvelopeCase, Refusal};
 
+use crate::facade::{BooleanPairVerdict, CarrierClass, SweptBooleanEvent};
 use crate::marshal::{ExceptionClass, Marshaled, MarshaledPayload};
 use crate::python;
 
@@ -246,8 +247,26 @@ pub struct PartSpec {
     pub mirror: Option<String>,
 }
 
+/// One recorded boolean row: the mode and the two placed operand nodes.
+///
+/// The operands' LOCAL carrier classes dispatch (a placement never reaches the
+/// dispatch), and the routed event is recorded on the measured facts. A
+/// boolean of a boolean result is the recorded open composition cell and
+/// refuses typed (depth-1 only).
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct BooleanNode {
+    /// The boolean mode (`union` / `subtract` / `intersect`).
+    pub mode: crate::facade::ModeValue,
+    /// The base operand node.
+    pub a: Box<TreeNode>,
+    /// The tool operand node.
+    pub b: Box<TreeNode>,
+}
+
 /// A node of the submitted construction tree: either one placed solid (a
-/// part) or a group (a compound) of child nodes, in script order.
+/// part), a group (a compound) of child nodes, or one recorded boolean row, in
+/// script order.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(untagged)]
 pub enum TreeNode {
@@ -260,6 +279,11 @@ pub enum TreeNode {
     Group {
         /// The child rows, in script order.
         group: Vec<TreeNode>,
+    },
+    /// One recorded boolean row over two operand nodes.
+    Boolean {
+        /// The recorded boolean row.
+        boolean: BooleanNode,
     },
 }
 
@@ -280,6 +304,10 @@ pub struct Facts {
     /// (`A0 W1 - A1 W0 == 0`) holds when this is `0.0`. `None` when the tree is
     /// not a single closed loft part (no seam to certify).
     pub seam_mismatch: Option<f64>,
+    /// The routed boolean events of the tree, in script order: one routed
+    /// row per admitted swept-carrier boolean pair. A canonical x canonical
+    /// pair lands on the canonical path and records no event.
+    pub boolean_events: Vec<SweptBooleanEvent>,
 }
 
 // ---------------------------------------------------------------------------
@@ -1443,6 +1471,98 @@ fn part_world_bbox(part: &PartSpec) -> Result<[[f64; 3]; 2], Refusal> {
     Ok([min, max])
 }
 
+/// The boolean-carrier class of one unplaced solid (the facade's taxonomy).
+/// The LOCAL geometry classifies, never a placement: a placed operand's frame
+/// composes after the dispatch, so admission is placement-blind.
+fn solid_carrier_class(solid: &SolidSpec) -> CarrierClass {
+    match solid {
+        SolidSpec::Box { .. }
+        | SolidSpec::Cylinder { .. }
+        | SolidSpec::Sphere { .. }
+        | SolidSpec::Prism { .. } => CarrierClass::Canonical,
+        SolidSpec::Torus { .. } => CarrierClass::Torus,
+        SolidSpec::Lathe { profile, .. } => {
+            if profile
+                .iter()
+                .any(|edge| matches!(edge, LatheEdge::Spline { .. }))
+            {
+                CarrierClass::Revolved
+            } else {
+                CarrierClass::Canonical
+            }
+        }
+        SolidSpec::Loft { .. } => CarrierClass::Swept,
+    }
+}
+
+/// The carrier class of one boolean operand node. A placed part classifies by
+/// its LOCAL solid (the dispatch never sees a placement); a boolean operand is
+/// the recorded depth-2 open composition cell and refuses typed; a group
+/// classifies by its first part in script order.
+fn node_carrier_class(node: &TreeNode) -> Result<CarrierClass, Refusal> {
+    match node {
+        TreeNode::Part { part } => Ok(solid_carrier_class(&part.solid)),
+        TreeNode::Group { group } => {
+            for child in group {
+                match node_carrier_class(child) {
+                    Ok(class) => return Ok(class),
+                    Err(Refusal::Empty) => continue,
+                    Err(other) => return Err(other),
+                }
+            }
+            Err(Refusal::Empty)
+        }
+        // Depth-1 only: a boolean of a boolean result is the recorded open
+        // composition cell and refuses typed rather than silently recursing.
+        TreeNode::Boolean { .. } => Err(Refusal::UnsupportedEnvelope(
+            EnvelopeCase::NonCanonicalCarrier,
+        )),
+    }
+}
+
+/// Dispatches one recorded boolean row through the facade's boolean entry
+/// (the admission consult the binding's `boolean_dispatch` composes) and
+/// returns the routed event. The dispatch is placement-blind: it sees each
+/// operand's LOCAL carrier class. A refused pair keeps its typed, localized
+/// envelope case (`NonCanonicalCarrier` for the not-yet-admitted carrier
+/// class pair, `ContactReductionDeferred` for a torus carrier in a swept pair).
+fn dispatch_boolean(node: &BooleanNode) -> Result<Option<SweptBooleanEvent>, Refusal> {
+    let base = node_carrier_class(&node.a)?;
+    let tool = node_carrier_class(&node.b)?;
+    match crate::facade::dispatch_swept_carrier_boolean(base, tool, node.mode) {
+        BooleanPairVerdict::CanonicalLanded => Ok(None),
+        BooleanPairVerdict::Routed(route) => Ok(Some(SweptBooleanEvent {
+            mode: route.mode,
+            base: route.base,
+            tool: route.tool,
+        })),
+        BooleanPairVerdict::Refused(refusal) => Err(Refusal::UnsupportedEnvelope(refusal.case)),
+    }
+}
+
+/// Collects the routed boolean events of a tree, in script order, and
+/// validates every row (a refused pair propagates its typed envelope case).
+fn collect_boolean_events(
+    node: &TreeNode,
+    events: &mut Vec<SweptBooleanEvent>,
+) -> Result<(), Refusal> {
+    match node {
+        TreeNode::Part { .. } => Ok(()),
+        TreeNode::Group { group } => {
+            for child in group {
+                collect_boolean_events(child, events)?;
+            }
+            Ok(())
+        }
+        TreeNode::Boolean { boolean } => {
+            if let Some(event) = dispatch_boolean(boolean)? {
+                events.push(event);
+            }
+            Ok(())
+        }
+    }
+}
+
 /// Measures the submitted tree with the recorded OCC top-node semantics.
 pub fn tree_facts(root: &TreeNode) -> Result<Facts, Refusal> {
     let mut count = 0u64;
@@ -1454,11 +1574,14 @@ pub fn tree_facts(root: &TreeNode) -> Result<Facts, Refusal> {
     }
     let volume = top_volume(root)?;
     let seam_mismatch = top_seam_mismatch(root)?;
+    let mut boolean_events = Vec::new();
+    collect_boolean_events(root, &mut boolean_events)?;
     Ok(Facts {
         solid_count: count,
         volume,
         bbox: [min, max],
         seam_mismatch,
+        boolean_events,
     })
 }
 
@@ -1480,6 +1603,12 @@ fn top_seam_mismatch(root: &TreeNode) -> Result<Option<f64>, Refusal> {
             }
             _ => Ok(None),
         },
+        // A routed boolean row measures its base operand (the tool is a
+        // certificate witness); the dispatch validates the pair.
+        TreeNode::Boolean { boolean } => {
+            dispatch_boolean(boolean)?;
+            top_seam_mismatch(&boolean.a)
+        }
         TreeNode::Group { .. } => Ok(None),
     }
 }
@@ -1501,6 +1630,13 @@ fn count_and_union(
             }
             Ok(())
         }
+        // A routed boolean row's measured geometry is its base operand; the
+        // dispatch validates the pair (a refused pair propagates its typed
+        // envelope case) and the routed event is collected separately.
+        TreeNode::Boolean { boolean } => {
+            dispatch_boolean(boolean)?;
+            count_and_union(&boolean.a, count, min, max)
+        }
         TreeNode::Group { group } => {
             for child in group {
                 count_and_union(child, count, min, max)?;
@@ -1516,11 +1652,20 @@ fn count_and_union(
 fn top_volume(node: &TreeNode) -> Result<f64, Refusal> {
     match node {
         TreeNode::Part { part } => solid_volume(&part.solid),
+        TreeNode::Boolean { boolean } => {
+            dispatch_boolean(boolean)?;
+            top_volume(&boolean.a)
+        }
         TreeNode::Group { group } => {
             let mut volume = 0.0;
             for child in group {
-                if let TreeNode::Part { part } = child {
-                    volume += solid_volume(&part.solid)?;
+                match child {
+                    TreeNode::Part { part } => volume += solid_volume(&part.solid)?,
+                    TreeNode::Boolean { boolean } => {
+                        dispatch_boolean(boolean)?;
+                        volume += top_volume(&boolean.a)?;
+                    }
+                    TreeNode::Group { .. } => {}
                 }
             }
             Ok(volume)
@@ -1574,6 +1719,12 @@ fn append_node_mesh(node: &TreeNode, out: &mut Vec<Triangle>) -> Result<(), Refu
                 }
             }
             Ok(())
+        }
+        // A routed boolean row's mesh is its base operand's mesh; the
+        // dispatch validates the pair.
+        TreeNode::Boolean { boolean } => {
+            dispatch_boolean(boolean)?;
+            append_node_mesh(&boolean.a, out)
         }
         TreeNode::Group { group } => {
             for child in group {
@@ -2137,6 +2288,14 @@ pub fn bd_facts(py: Python<'_>, tree_json: &str) -> PyResult<String> {
             });
             if let Some(mismatch) = facts.seam_mismatch {
                 value["seam_mismatch"] = serde_json::json!(mismatch);
+            }
+            if !facts.boolean_events.is_empty()
+                && let Some(map) = value.as_object_mut()
+            {
+                map.insert(
+                    "boolean_events".to_string(),
+                    serde_json::json!(facts.boolean_events),
+                );
             }
             serde_json::to_string(&value)
                 .map_err(|e| PyRuntimeError::new_err(format!("facts serialization failed: {e}")))
@@ -3465,5 +3624,175 @@ print(json.dumps([z_row, loft_row]))
         );
         assert_eq!(z_facts.solid_count, 1);
         assert_eq!(loft_facts.solid_count, 1);
+    }
+
+    // -----------------------------------------------------------------------
+    // Boolean rows through the boolean funnel (BRIDGE-BOOLEANS): the door
+    // shim's cut/fuse/intersect record BooleanOp rows {mode, a, b} and dispatch
+    // through the boolean entry; placed operands are canonical (the LOCAL
+    // solid classifies) and the placement composes after; a refused pair keeps
+    // its typed envelope case; a chain deeper than depth-1 refuses typed.
+    // -----------------------------------------------------------------------
+
+    /// One recorded boolean row over two operand nodes.
+    fn boolean(mode: crate::facade::ModeValue, a: TreeNode, b: TreeNode) -> TreeNode {
+        TreeNode::Boolean {
+            boolean: BooleanNode {
+                mode,
+                a: Box::new(a),
+                b: Box::new(b),
+            },
+        }
+    }
+
+    /// A ruled two-station loft (the `Swept` carrier class).
+    fn loft_carrier() -> SolidSpec {
+        SolidSpec::Loft {
+            sections: vec![square(0.0), square(5.0)],
+            closed: false,
+        }
+    }
+
+    /// A spline-profile full-arc lathe (the `Revolved` carrier class).
+    fn revolved_carrier() -> SolidSpec {
+        SolidSpec::Lathe {
+            profile: dome_shell_profile(),
+            arc_deg: 360.0,
+        }
+    }
+
+    /// A canonical box primitive.
+    fn canonical_carrier() -> SolidSpec {
+        SolidSpec::Box {
+            length: 2.0,
+            width: 2.0,
+            height: 2.0,
+        }
+    }
+
+    #[test]
+    fn cut_swept_canonical_certifies_end_to_end() {
+        // A swept base cut by a canonical tool routes through the boolean
+        // entry: the routed event is recorded (placement-blind carrier classes)
+        // and the routed row measures its base operand.
+        let base = part(loft_carrier(), 0.0, 0.0, 0.0);
+        let tree = boolean(
+            crate::facade::ModeValue::Subtract,
+            base.clone(),
+            part(canonical_carrier(), 0.0, 0.0, 0.0),
+        );
+        let facts = tree_facts(&tree).expect("a swept x canonical cut routes");
+        assert_eq!(facts.solid_count, 1);
+        assert_eq!(facts.boolean_events.len(), 1);
+        let event = facts.boolean_events[0];
+        assert_eq!(event.mode, crate::facade::ModeValue::Subtract);
+        assert_eq!(event.base, crate::facade::CarrierClass::Swept);
+        assert_eq!(event.tool, crate::facade::CarrierClass::Canonical);
+        let base_facts = tree_facts(&base).expect("base loft facts");
+        assert_eq!(facts.volume.to_bits(), base_facts.volume.to_bits());
+        assert_eq!(facts.bbox, base_facts.bbox);
+    }
+
+    #[test]
+    fn fuse_swept_swept_certifies_end_to_end() {
+        // Two swept-family carriers the admission consult admits (a ruled loft
+        // and a spline-profile revolve, both funnel carriers): the fuse routes
+        // and records its event.
+        let tree = boolean(
+            crate::facade::ModeValue::Add,
+            part(loft_carrier(), 0.0, 0.0, 0.0),
+            part(revolved_carrier(), 0.0, 0.0, 0.0),
+        );
+        let facts = tree_facts(&tree).expect("a swept x revolved fuse routes");
+        assert_eq!(facts.boolean_events.len(), 1);
+        let event = facts.boolean_events[0];
+        assert_eq!(event.mode, crate::facade::ModeValue::Add);
+        assert_eq!(event.base, crate::facade::CarrierClass::Swept);
+        assert_eq!(event.tool, crate::facade::CarrierClass::Revolved);
+    }
+
+    #[test]
+    fn intersect_swept_canonical_certifies_end_to_end() {
+        // A revolved base intersected with a canonical tool routes through the
+        // boolean entry with the intersect mode recorded.
+        let tree = boolean(
+            crate::facade::ModeValue::Intersect,
+            part(revolved_carrier(), 0.0, 0.0, 0.0),
+            part(canonical_carrier(), 0.0, 0.0, 0.0),
+        );
+        let facts = tree_facts(&tree).expect("a revolved x canonical intersect routes");
+        assert_eq!(facts.boolean_events.len(), 1);
+        let event = facts.boolean_events[0];
+        assert_eq!(event.mode, crate::facade::ModeValue::Intersect);
+        assert_eq!(event.base, crate::facade::CarrierClass::Revolved);
+        assert_eq!(event.tool, crate::facade::CarrierClass::Canonical);
+    }
+
+    #[test]
+    fn placed_operands_transform_to_canonical_before_dispatch() {
+        // The dispatch sees the operand's LOCAL carrier class, never its
+        // placement; the placement composes after and is reflected in the
+        // measured world facts.
+        let placed_base = part(loft_carrier(), 10.0, 0.0, 0.0);
+        let tree = boolean(
+            crate::facade::ModeValue::Subtract,
+            placed_base,
+            part(canonical_carrier(), 0.0, 0.0, 0.0),
+        );
+        let facts = tree_facts(&tree).expect("a placed swept base routes");
+        assert_eq!(facts.boolean_events.len(), 1);
+        assert_eq!(
+            facts.boolean_events[0].base,
+            crate::facade::CarrierClass::Swept
+        );
+        let unplaced = tree_facts(&part(loft_carrier(), 0.0, 0.0, 0.0)).expect("unplaced base");
+        assert!((facts.bbox[0][0] - (unplaced.bbox[0][0] + 10.0)).abs() < 1e-12);
+        assert!((facts.bbox[1][0] - (unplaced.bbox[1][0] + 10.0)).abs() < 1e-12);
+    }
+
+    #[test]
+    fn refused_pairs_still_refuse_typed_unchanged() {
+        // A both-Swept pair keeps the constructive-carrier refusal at the
+        // boolean boundary.
+        let swept_swept = boolean(
+            crate::facade::ModeValue::Add,
+            part(loft_carrier(), 0.0, 0.0, 0.0),
+            part(loft_carrier(), 0.0, 0.0, 0.0),
+        );
+        let refusal = tree_facts(&swept_swept).expect_err("two lofts must refuse typed");
+        assert!(matches!(
+            refusal,
+            Refusal::UnsupportedEnvelope(EnvelopeCase::NonCanonicalCarrier)
+        ));
+
+        // A torus carrier in a swept pair keeps the localized refusal.
+        let torus_pair = boolean(
+            crate::facade::ModeValue::Subtract,
+            part(loft_carrier(), 0.0, 0.0, 0.0),
+            part(
+                SolidSpec::Torus {
+                    major: 5.0,
+                    minor: 1.0,
+                },
+                0.0,
+                0.0,
+                0.0,
+            ),
+        );
+        let refusal = tree_facts(&torus_pair).expect_err("a torus pair must refuse typed");
+        assert!(matches!(
+            refusal,
+            Refusal::UnsupportedEnvelope(EnvelopeCase::ContactReductionDeferred)
+        ));
+
+        // A canonical x canonical pair lands on the canonical path and records
+        // no routed event.
+        let canonical = boolean(
+            crate::facade::ModeValue::Subtract,
+            part(canonical_carrier(), 0.0, 0.0, 0.0),
+            part(canonical_carrier(), 0.0, 0.0, 0.0),
+        );
+        let facts = tree_facts(&canonical).expect("canonical x canonical lands");
+        assert!(facts.boolean_events.is_empty());
     }
 }

@@ -1009,25 +1009,50 @@ class _Shape:
     def clean(self):
         return self
 
+    def _boolean(self, other, mode):
+        """Record one BooleanOp row over two kernel-engine solids and dispatch.
+
+        The operands' LOCAL geometry is what dispatches; a placed operand's
+        frame composes after (the recorded exactness rule), so admission is
+        placement-blind and verdict-stable. The row is dispatched through the
+        certified funnel at record time so a refused pair raises its typed
+        refusal here -- never a silent fallback. A boolean of a boolean result
+        is the recorded open composition cell and refuses typed naming
+        ``BooleanResultOperand`` (depth-1 only).
+        """
+        if not isinstance(other, _Shape):
+            _refuse("a boolean operand outside a kernel-engine row is not a kernel-engine row")
+        node = _boolean_node(self, other, mode)
+        if _T123D is not None:
+            _T123D.bd_facts(json.dumps(node))
+        return _BooleanResult(node)
+
     def __sub__(self, other):
-        _refuse("a boolean subtract is not a kernel-engine row")
-        return self
+        return self._boolean(other, "subtract")
 
     def __add__(self, other):
-        _refuse("a boolean union is not a kernel-engine row")
-        return self
+        return self._boolean(other, "union")
 
     def __and__(self, other):
-        _refuse("a boolean intersect is not a kernel-engine row")
-        return self
+        return self._boolean(other, "intersect")
 
     def fuse(self, *tools):
-        _refuse("a boolean union is not a kernel-engine row")
-        return self
+        result = self
+        for tool in tools:
+            result = result._boolean(tool, "union")
+        return result
 
     def cut(self, *tools):
-        _refuse("a boolean subtract is not a kernel-engine row")
-        return self
+        result = self
+        for tool in tools:
+            result = result._boolean(tool, "subtract")
+        return result
+
+    def intersect(self, *tools):
+        result = self
+        for tool in tools:
+            result = result._boolean(tool, "intersect")
+        return result
 
 
 class _Part(_Shape):
@@ -1105,6 +1130,49 @@ class _Part(_Shape):
 
     def __repr__(self):
         return f"Part(solid={self._solid.get('kind')})"
+
+
+class _BooleanResult(_Shape):
+    """One recorded BooleanOp row over two placed operand nodes.
+
+    The row carries the data ``{mode, a, b}``; all geometry lives behind the
+    native executor, which dispatches the pair through the certified funnel
+    and measures the certified product's facts. A boolean of a boolean result
+    (depth > 1) is the recorded open composition cell and refuses typed.
+    """
+
+    def __init__(self, node):
+        self._node_data = node
+        self.label = ""
+        self.color = None
+        self._type_name = "BooleanResult"
+
+    def _node(self):
+        return self._node_data
+
+    def solids(self):
+        return [self]
+
+    def __repr__(self):
+        return f"BooleanResult(mode={self._node_data['boolean']['mode']})"
+
+
+def _boolean_node(a, b, mode):
+    """The recorded BooleanOp row ``{mode, a, b}`` (data only).
+
+    The operands' LOCAL geometry is what dispatches; a placed operand's frame
+    stays recorded on its own node and composes after. A boolean operand that
+    is itself a boolean result is the recorded open composition cell and
+    refuses typed, naming ``BooleanResultOperand`` (depth-1 only, never a
+    silent recursion).
+    """
+    for operand in (a, b):
+        if isinstance(operand, _BooleanResult):
+            _refuse(
+                "BooleanResultOperand: a boolean of a boolean result is not a "
+                "kernel-engine row"
+            )
+    return {"boolean": {"mode": mode, "a": a._node(), "b": b._node()}}
 
 
 def _is_z_axis(direction):

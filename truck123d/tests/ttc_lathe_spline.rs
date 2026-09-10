@@ -221,7 +221,7 @@ def closed_face(lines):
     edges = [bd.Edge.make_line(a, b) for (a, b) in lines]
     return bd.Face(bd.Wire(edges))
 
-def check(name, fn, expect_message):
+def check(name, fn, expect_message, answered=False):
     try:
         fn()
     except _Refused as exc:
@@ -233,8 +233,11 @@ def check(name, fn, expect_message):
     except Exception as exc:
         print(json.dumps({"case": name, "wrong": type(exc).__name__, "message": str(exc)}))
         sys.exit(3)
-    print(json.dumps({"case": name, "refused": False}))
-    sys.exit(4)
+    # The carrier landed (FRAME-REVOLVE): the case now ANSWERS. Continue the
+    # battery instead of exiting 4 (orchestrator pin amendment 2026-09-10).
+    print(json.dumps({"case": name, "refused": False, "answered": True}))
+    if not answered:
+        sys.exit(4)
 
 def rect_lines(y1, y2):
     return [
@@ -250,11 +253,12 @@ check(
     lambda: bd.revolve(closed_face(rect_lines(0.0, 0.0)), axis=bd.Axis.Z, revolution_arc=270.0),
     "a partial-arc revolve is outside the executor's lathe arm",
 )
-# non-z axis
+# non-z axis (LANDED: FRAME-REVOLVE — the carrier answers; pin amended)
 check(
     "non_z_axis",
     lambda: bd.revolve(closed_face(rect_lines(0.0, 0.0)), axis=door.Axis((1, 0, 0))),
     "revolve about a non-z axis is not a kernel-engine row",
+    answered=True,
 )
 # non-Face
 check(
@@ -337,6 +341,13 @@ print(json.dumps({"case": "spline_admitted", "refused": False, "edges": len(soli
         let refused = record["refused"].as_bool().unwrap_or(false);
         if case == "spline_admitted" {
             assert!(!refused, "a plain spline-profile revolve must be admitted");
+        } else if case == "non_z_axis" {
+            // Orchestrator pin amendment 2026-09-10 (BRIDGE-BOOLEANS landing
+            // adjudication): the non-z revolve carrier is LANDED
+            // (FRAME-REVOLVE, merge 39e9550) — the case now ANSWERS, which is
+            // the verdict improvement the landing exists for. The partial-arc
+            // case stays typed (outside the lathe arm's arc discipline).
+            assert!(!refused, "the non-z revolve carrier is landed and answers");
         } else {
             assert!(refused, "case {case} must refuse typed");
         }
@@ -480,8 +491,14 @@ fn mvac_row_still_refuses_typed_at_the_spline_path_sweep_carrier() {
     assert_eq!(record["ok"], false);
     assert_eq!(record["error"]["kind"], "Refused");
     let message = record["error"]["message"].as_str().unwrap_or("");
+    // Orchestrator pin amendment 2026-09-10 (BRIDGE-BOOLEANS landing
+    // adjudication): the spline-path tangent query is ANSWERED (SWEEP-PATH),
+    // so mvac's recorded boundary moved one carrier deeper — the swept tube's
+    // CIRCLE profile is not answered exactly by the sweep arm. The pin moves
+    // with it, deeper, never away from typed. (Third move of this pin:
+    // extrude -> spline-path sweep -> circle-profile sweep section.)
     assert!(
-        message.contains("a spline path tangent query is not a kernel-engine row"),
-        "mvac must refuse typed at the spline-path sweep carrier: {message}"
+        message.contains("a circle profile is not answered exactly by a kernel-engine row"),
+        "mvac must refuse typed at the circle-profile sweep-section carrier: {message}"
     );
 }
