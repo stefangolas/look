@@ -2490,3 +2490,63 @@ Leaving: 2 RUNNING (MONO-1 slot 0, MONO-2 slot 1, both healthy early-build);
 HEAD 855255d; nothing unlanded; 9 BLOCKED correctly parked; 78 READY correctly
 parked pending the final one-verify battery; cargoq UP; heartbeat 1; driver 1;
 watchdog 1; TWO supervisors; disk 14.9 GB free; RAM 4.2 GB free.
+
+## [operator 2026-09-10T16:10Z] quiet healthy cycle; MONO-1 landed, MONO-2 running
+
+- Health sweep: `slot_status.py` -> 1 RUNNING. slot 0 MONO-1-DATA-ROWS
+  FINISHED (RESULT DONE, branch @ f07e93d); slot 1 MONO-2-NSTATION-LOFT
+  RUNNING (cmd pid 17728, events ~12:09 local fresh, changed=3, branch @
+  e37938a = base, no commit) - healthy, do not touch; slots 2-7 FINISHED
+  landed residue (slot 7 wt RESULT is BRIDGE-BOOLEANS status LANDED, stale
+  artifact). cargoq ping ok (queued 0, running true = the MONO-2 build).
+  Heartbeat exactly 1 (27872; second match was this probing shell). Watchdog 1
+  (29264). operator runner 1 (27876; second match the probing shell).
+  overnight driver 1 (26920). TWO supervisors (19172 + 27828 - carried
+  duplication class; only ONE overnight.py child = no double-merge risk).
+  Disk 17.8 GiB free; RAM 5.7 GiB free; cargo/rustc live (the worker's build).
+- Land (step 2): **MONO-1-DATA-ROWS already LANDED before this cycle** - worker
+  commit f07e93d `git merge-base --is-ancestor` exit 0 against
+  integration/kernel-bg; RESULT status DONE filed at
+  loop/results/MONO-1-DATA-ROWS.json; ledger row present; registry row READY
+  with the driver's `LANDED f07e93d` marker = correct one-verify parked state.
+  Nothing to land. Re-verified all slot worker commits ancestors of
+  integration/kernel-bg by command (f07e93d/197c924/4de25d9/e33c4dd/e9d885a/
+  3c2109b/ee97499/713f205/b667a85/39e9550/5cf4811/dd092a6/c0329e0). Slot wt
+  RESULT statuses: 0 DONE (landed), 1 none (RUNNING), 2 DONE, 3 done, 4
+  LANDED-WITH-FINDINGS, 5/6 DONE, 7 LANDED. No FINISHED slot holds an unlanded
+  DONE RESULT.
+- Worker-scope observation (not operator-actionable): the MONO-2 worker also
+  touched `truck123d/tests/ttc_hazard_battery.rs` (31 lines, pure rustfmt
+  comment-alignment reflow) outside its bd_bridge.rs write_allow. Verified the
+  slot wt `PACKET.md` matches the amended HEAD packet (no diff), so the worker
+  has the canonical-loft instructions despite base SHA e37938a; the
+  out-of-scope file is cosmetic and will surface at the final battery. Logged
+  for the orchestrator, not escalated (a live healthy worker, do not touch).
+- Unblock (step 3): nothing. slot 1 healthy and progressing; 0 IDLE/DEAD
+  >15 min holding work; no live QUESTION.md; no 402.
+- Registry hygiene (step 4): 317 rows - 230 DONE, 78 READY, 9 BLOCKED
+  (re-derived programmatically, last-wins + case-folded landed-marker, exactly
+  dispatch_ready's `landed()`). READY-without-landed-marker = exactly
+  {MONO-2-NSTATION-LOFT (running)}. BLOCKED-with-all-deps-landed = the carried
+  7 owner-parked (BG-AUD-FIX-004 OWNER_BLOCKED, BG-CK-SPLINE-CENSUS
+  owner-cancelled, SEM-PCURVE-MASTER-001-FIX SUPERSEDED, DEF-SPINEFRAME-GRAZE
+  SPEC_GAP -> -R2, DEF-TESS-ANALYTIC-SEAM superseded by -R2, DEF-SEEDRAY-B
+  human-gated, TOR-C orchestrator-held). MONO-3/MONO-4 correctly stay BLOCKED
+  on the running MONO-2. Nothing flipped.
+- Dispatch (step 5): `dispatch_ready.py --dry-run --max-workers=4` ->
+  "slots: 8 (1 running, 7 free); slot-assigned packets: 7; dispatched 0;
+  workers now ~1/4" = REAL idle; no manual dispatch (heartbeat live; the
+  earlier `run_packet FAILED` line in dispatch_heartbeat.log is the pre-manual
+  -spawn attempt, superseded by the live worker).
+- STATE.md volatile refresh ([operator 2026-09-10T16:10Z]) - both "Where we
+  are" ground-truth pointer and a new "State of the machine, as left" block.
+- No new escalation. Carried human items unchanged: FRAME-REVOLVE F1
+  non_z_axis pin amendment (ttc_lathe_spline.rs:255); duplicate supervisors +
+  lagging cargoq restart guard; slot-4 + slot-7 wt RESULT residue; TOR-C
+  flip-or-pin (orchestrator-held); RESULT-recycle race + overnight.py
+  guarantee-merge-abort on interrupted cycles.
+
+Leaving: 1 RUNNING (MONO-2 slot 1, healthy); HEAD fd28892; nothing unlanded;
+9 BLOCKED correctly parked; 78 READY correctly parked pending the final
+one-verify battery; cargoq UP; heartbeat 1; driver 1; watchdog 1; TWO
+supervisors; disk 17.8 GiB free; RAM 5.7 GiB free.

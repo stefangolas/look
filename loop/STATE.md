@@ -64,35 +64,39 @@ Owner context for the next session, in order:
 ## Where we are
 
 > LATEST GROUND TRUTH: read the newest `[operator ...]` block in "State of
-> the machine, as left" (2026-09-10T15:46Z). [operator 2026-09-10T15:46Z
+> the machine, as left" (2026-09-10T16:10Z). [operator 2026-09-10T16:10Z
 > ground-truth note: **QUIET HEALTHY CYCLE; the MONO-CLOSURE wave is running.**
-> Board: 2 RUNNING (MONO-1-DATA-ROWS slot 0 pid 14448; MONO-2-NSTATION-LOFT
-> slot 1 pid 23944 - both branches at base e37938a with no commits and events
-> <2 min fresh = early build phase, healthy, do not touch) / 0 landed-this-cycle
-> / 0 unblocked / 0 flipped. HEAD 855255d (MONO-5-BRIDGE-SPLIT authored ON
-> DECK, unregistered, above e37938a the MONO-CLOSURE booking). All slot worker
-> commits re-verified ancestors of integration/kernel-bg
-> (197c924/4de25d9/e33c4dd/e9d885a/3c2109b/ee97499/713f205/b667a85/39e9550/
-> 5cf4811) - no FINISHED slot holds an unlanded DONE RESULT; slots 2-7 are
-> stale landed residue. Registry: 317 rows - 230 DONE, 78 READY, 9 BLOCKED. The
-> 9 BLOCKED all correctly parked (the carried 7: BG-AUD-FIX-004 OWNER_BLOCKED,
-> BG-CK-SPLINE-CENSUS owner-cancelled, SEM-PCURVE-MASTER-001-FIX SUPERSEDED,
-> DEF-SPINEFRAME-GRAZE SPEC_GAP->-R2, DEF-TESS-ANALYTIC-SEAM superseded by -R2,
-> DEF-SEEDRAY-B human-gated, TOR-C orchestrator-held; plus MONO-3-BLADE-MEMBERS-
-> MIRROR and MONO-4-TRIM-IDIOMS, which serialize after the still-running MONO-2
-> on the shared bd_bridge.rs write set) - nothing flipped. dispatch_ready
-> --max-workers=4 (real run): "slots: 8 (2 running, 6 free); slot-assigned
-> packets: 7; dispatched 0; workers now ~2/4" = REAL idle by choice (MONO-3/4
-> blocked, MONO-5 on deck); no manual dispatch (heartbeat live). Health:
-> heartbeat exactly 1 (27872), watchdog 1 (29264), overnight driver 1 (26920),
-> cargoq UP (ping ok, queued 0, running false), TWO supervisors (19172 + 27828 -
-> carried duplication class; only ONE overnight.py child = no double-merge
-> risk). Disk was 12.3 GB free at entry (< the 15 GB goal); janitor
-> `ensure --need 15` reclaimed the idle slot-7 target (~2.8 GB) -> 14.9 GB free
-> (above the 8 GB floor; live slot-0/1 targets left intact); RAM 4.2 GB free.
-> Carried human items unchanged: FRAME-REVOLVE F1 non_z_axis pin amendment
-> (ttc_lathe_spline.rs:255); duplicate supervisors + the lagging cargoq restart
-> guard; slot-4 + slot-7 wt RESULT residue; TOR-C flip-or-pin
+> Board: 1 RUNNING (MONO-2-NSTATION-LOFT slot 1, cmd pid 17728, events fresh
+> ~12:09 local, bd_bridge.rs +949 lines uncommitted - healthy, do not touch) /
+> 0 landed-this-cycle (MONO-1 was already landed before this cycle) / 0
+> unblocked / 0 flipped. HEAD fd28892. **MONO-1-DATA-ROWS is LANDED**: worker
+> commit f07e93d is an ancestor of integration/kernel-bg; RESULT status DONE
+> filed at loop/results/MONO-1-DATA-ROWS.json; ledger row present; registry
+> row READY with the driver's `LANDED f07e93d` marker = correct parked state
+> under the one-verify amendment (nothing to re-land). All slot worker commits
+> re-verified ancestors of integration/kernel-bg
+> (f07e93d/197c924/4de25d9/e33c4dd/e9d885a/3c2109b/ee97499/713f205/b667a85/
+> 39e9550/5cf4811/dd092a6/c0329e0) - no FINISHED slot holds an unlanded DONE
+> RESULT. Registry re-derived: 317 rows - 230 DONE, 78 READY, 9 BLOCKED;
+> READY-without-landed-marker = exactly {MONO-2-NSTATION-LOFT (running)};
+> BLOCKED-with-all-deps-landed = the carried 7 owner-parked
+> (BG-AUD-FIX-004/BG-CK-SPLINE-CENSUS/SEM-PCURVE-MASTER-001-FIX/
+> DEF-SPINEFRAME-GRAZE/DEF-TESS-ANALYTIC-SEAM/DEF-SEEDRAY-B/TOR-C); MONO-3/
+> MONO-4 stay BLOCKED on the running MONO-2 - nothing flipped.
+> dispatch_ready --dry-run --max-workers=4: "slots: 8 (1 running, 7 free);
+> slot-assigned packets: 7; dispatched 0; workers now ~1/4" = REAL idle; no
+> manual dispatch (heartbeat live). Health: heartbeat exactly 1 (27872),
+> watchdog 1 (29264), operator runner 1 (27876), overnight driver 1 (26920),
+> cargoq UP (ping 200, queued 0, running true = the MONO-2 build), TWO
+> supervisors (19172 PyManager + 27828 pythoncore - carried duplication class;
+> only ONE overnight.py child = no double-merge risk). Disk 17.8 GiB free
+> (above the 8 GB floor AND the 15 GB janitor goal); RAM 5.7 GiB free.
+> Observation (not operator-actionable): the MONO-2 worker also touched
+> truck123d/tests/ttc_hazard_battery.rs (31 lines, cosmetic rustfmt comment
+> reflow - outside its bd_bridge.rs write_allow; flag for the final battery /
+> orchestrator). Carried human items unchanged: FRAME-REVOLVE F1 non_z_axis
+> pin amendment (ttc_lathe_spline.rs:255); duplicate supervisors + the lagging
+> cargoq restart guard; slot-4 + slot-7 wt RESULT residue; TOR-C flip-or-pin
 > (orchestrator-held); the RESULT-recycle race + overnight.py's
 > guarantee-merge-abort on interrupted cycles.]
 
@@ -1953,6 +1957,42 @@ human items on return: wave-3 amendments incorporation + MONO-5 booking; the
 wave-2 projections to verify (5 loft rows green with timing after MONO-2);
 carried: duplicate supervisors, slot-4/slot-7 wt RESULT residue, TOR-C
 flip-or-pin, FRAME-REVOLVE F1 non_z_axis pin amendment.]
+
+[operator 2026-09-10T16:10Z - volatile refresh. Board now: 1 RUNNING / 0
+landed-this-cycle / 0 unblocked / 0 flipped. **MONO-1-DATA-ROWS LANDED before
+this cycle** (worker f07e93d an ancestor of integration/kernel-bg; RESULT filed
+loop/results/MONO-1-DATA-ROWS.json; ledger row; registry READY + `LANDED
+f07e93d` marker = correct one-verify parked state). **MONO-2-NSTATION-LOFT
+RUNNING slot 1** (cmd pid 17728, events ~12:09 local fresh, bd_bridge.rs +949
+lines uncommitted, cargo/rustc live through cargoq) - the HANDOFF's
+stop-adjudicated amended redispatch, healthy, do not touch; the wt PACKET.md
+matches the amended HEAD packet (verified), so the worker has the canonical-loft
+instructions despite its base SHA e37938a. Landing re-verified by command:
+`git merge-base --is-ancestor` exit 0 for f07e93d/197c924/4de25d9/e33c4dd/
+e9d885a/3c2109b/ee97499/713f205/b667a85/39e9550/5cf4811/dd092a6/c0329e0; no
+FINISHED slot holds an unlanded DONE RESULT. Slot wt RESULT statuses: slot 0
+DONE (MONO-1, landed), slot 1 none (RUNNING), slot 2 DONE, slot 3 done, slot 4
+LANDED-WITH-FINDINGS, slots 5/6 DONE, slot 7 LANDED (BRIDGE-BOOLEANS residue, no
+operator action). Nothing to unblock (slot 1 healthy; no IDLE/DEAD >15 min
+holding work; no live QUESTION). Registry re-derived programmatically (last-wins
++ case-folded landed-marker): 317 rows - 230 DONE, 78 READY, 9 BLOCKED;
+READY-without-landed-marker = exactly {MONO-2 (running)}; BLOCKED-with-all-
+deps-landed = the carried 7 owner-parked - nothing flipped (MONO-3/4 correctly
+BLOCKED on MONO-2). dispatch_ready --dry-run --max-workers=4: "slots: 8 (1
+running, 7 free); slot-assigned packets: 7; dispatched 0; workers now ~1/4" =
+REAL idle; no manual dispatch (heartbeat live). Health: heartbeat exactly 1
+(27872), watchdog 1 (29264), operator runner 1 (27876), overnight driver 1
+(26920), cargoq UP (ping 200, queued 0, running true). TWO supervisors (19172
+PyManager + 27828 pythoncore - carried duplication class; only ONE overnight.py
+child = no double-merge risk). Disk 17.8 GiB free (above the 8 GB floor AND the
+15 GB janitor goal); RAM 5.7 GiB free. No new escalation; observation logged:
+the MONO-2 worker's ttc_hazard_battery.rs touch is cosmetic rustfmt reflow
+outside its write_allow (final-battery/orchestrator concern). Carried human
+items unchanged: FRAME-REVOLVE F1 non_z_axis pin amendment
+(ttc_lathe_spline.rs:255); duplicate supervisors + the lagging cargoq restart
+guard; slot-4 + slot-7 wt RESULT residue; TOR-C flip-or-pin
+(orchestrator-held); the RESULT-recycle race + overnight.py's
+guarantee-merge-abort on interrupted cycles.]
 
 ## The parallelism picture
 
