@@ -120,3 +120,35 @@ row — no tolerance stretch, no approximant replication inside the kernel).
 OCC synthetic fixtures in the packet become DIAGNOSTIC (delta measurement),
 not gates. The two-station arm is untouched (linear v is exact for both
 algorithms).
+
+---
+
+## Annex C — ORACLE POLICY CHANGE (owner directive, 2026-09-10 ~18:2xZ)
+
+"The certification stamp is not useful. We are not benchmarking against
+whatever heuristic OCCT uses to draw its features."
+
+Effective immediately:
+
+1. **The kernel's own certificates are the certification.** A row is green
+   when the kernel CONSTRUCTS it and its facts are internally certified:
+   volume by the per-patch certificate brackets (the landed Theorem-D
+   machinery), solid_count constructively, bbox carrier-derived, mesh
+   emitted deterministically. No comparison against OCCT-derived recorded
+   numbers gates anything.
+2. **The recorded references become DIAGNOSTICS.** They are still computed
+   and reported next to every result as structural sanity deltas (a 2x
+   volume delta would still indicate a real bug), but they gate nothing.
+   The 1e-4 band against OCC is retired as a gate; it remains a reported
+   diagnostic column.
+3. **What was lost is stated honestly:** the corpus no longer proves
+   compatibility with the incumbent ecosystem; it proves mathematical
+   self-consistency plus construction completeness. The known-answer
+   validation obligations (closed-form analytic pairs with truth derived
+   by hand) are UNCHANGED - those test the math, not OCCT.
+4. **MONO-6 proceeds unchanged** - its contact-cover machinery and
+   closed-form validation are exactly what the new policy needs; its
+   recorded-reference comparison is reinterpreted at adjudication as a
+   diagnostic.
+5. The census re-run (R3) gates on kernel-internal certification under
+   this policy; its packet will be authored when MONO-6/MONO-7 land.
