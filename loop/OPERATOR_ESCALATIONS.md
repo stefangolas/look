@@ -615,7 +615,67 @@ Judgment-required items appended each operator cycle. Newest at the bottom.
   `loop/slots/0/wt/loop/solver_coverage/fragments/D.json`;
   `grep -n 'SOLVER-SURVEY-A' loop/PACKETS.jsonl`.
 
+## 2026-09-10 21:57 UTC - LOOP-WIDE DISPATCH STALL (blocking): integration HEAD tracks a root RESULT.json; new_slot stages its deletion, run_packet refuses the dirty tree
+
+- What: `git ls-tree HEAD` at integration/kernel-bg 436e734 shows root harness
+  artifacts tracked: `RESULT.json` (blob bcbd652 = the SOLVER-SURVEY-D result,
+  committed by d0f708a "survey(SOLVER-SURVEY-D): ... orchestrator commit
+  (skipped-commit-step)"), plus `CONTEXT.md` and `PACKET.md`. Every `new_slot`
+  forks from this HEAD, so every new slot inherits the tracked `RESULT.json`.
+  `new_slot.py:201-204`'s stale-root-artifact guard then runs `git rm -fq
+  RESULT.json`, which leaves the worktree with a STAGED DELETION. `run_packet.py`
+  (dirty filter at run_packet.py:306) excludes only PACKET.md/CONTEXT.md/
+  worker.*, NOT RESULT.json, so it refuses: "slot N has 1 uncommitted change(s)
+  from an earlier run." dispatch_ready's sequence (reset-only -> new_slot ->
+  run_packet, dispatch_ready.py:223/225/231) can therefore never complete a
+  dispatch.
+- Evidence: heartbeat log 2026-09-10 17:46:56 local - `MONO-6-SWEPT-BOOLEANS:
+  run_packet FAILED` (slot 0 dirty) and `SOLVER-SURVEY-A: new_slot FAILED`
+  (warm build). Reproduced by hand this cycle: after `python loop/new_slot.py
+  --slot 1 --branch packet/SOLVER-SURVEY-A --no-warm` (which printed "removed
+  stale RESULT.json inherited from the fork base"), `python loop/run_packet.py
+  --slot 1 --packet loop/packets/SOLVER-SURVEY-A.md` refused with the same
+  message. `git status` in slots 0 and 1 was `D  RESULT.json`.
+- Effect: BOTH now-dispatchable rows (MONO-6-SWEPT-BOOLEANS, SOLVER-SURVEY-A)
+  are undispatchable and every future fork from HEAD is poisoned. The loop is
+  fully stalled; this is why dispatch_ready reports 2 candidates that never
+  land.
+- Fix (orchestrator/owner - a repo-file edit, outside the operator's 3-file
+  limit): remove the root artifacts from integration/kernel-bg and commit, e.g.
+  `git -C C:\Users\stefa\look rm RESULT.json CONTEXT.md PACKET.md` then commit.
+  The filed copy survives at `loop/results/SOLVER-SURVEY-D.json` (verified
+  present). Then the heartbeat's next cycle dispatches MONO-6 + SURVEY-A.
+- Machinery alternative: make `run_packet.py`'s dirty filter ignore a staged
+  deletion of a root harness artifact, or have `new_slot` remove the stale
+  artifact in a way that leaves the index clean.
+- Start from: `git -C C:\Users\stefa\look ls-tree HEAD --name-only`;
+  `loop/dispatch_heartbeat.log` (tail); `loop/new_slot.py:193-204`;
+  `loop/run_packet.py:306`.
+
+## 2026-09-10 21:57 UTC - dispatch_ready.py warms class:survey slots (should pass --no-warm)
+
+- What: `new_slot.py` documents `--no-warm` for `class: survey` ("a survey slot
+  needs no target/: the worker never runs cargo ... costs ~5.6 min and ~1-2 GB").
+  `dispatch_ready.py:225` calls `new_slot.py --slot N --branch X` unconditionally,
+  so survey slots are warmed. SOLVER-SURVEY-A's warm build crashed
+  `cargo check --workspace --all-targets exit 101 (0xc0000409
+  STATUS_STACK_BUFFER_OVERRUN)` under 2.4 GB free RAM.
+- Fix: `dispatch_ready.py` should read the row's `class` and pass `--no-warm`
+  when it is `survey`.
+- Start from: `loop/dispatch_ready.py:225`; `loop/new_slot.py:80-83,216-226`.
+
+## 2026-09-10 21:57 UTC - low RAM (2.4 GB free) is the 0xc0000409 zone
+
+- 15.7 GB total, 2.4 GB free at 21:5xZ with NO cargo/rustc running. Baseline
+  consumers: 2x opencode, chrome x2, Discord, Dropbox, Code, claude, MsMpEng,
+  msedgewebview2. `janitor.py ram` frees nothing (no opencode-parented
+  rust-analyzer exists). Any cold `cargo check --workspace` is a 4-8 GB spike.
+  Recommend the owner free RAM (close chrome/Discord/Code) before re-dispatching
+  MONO-6, or lower `--max-workers`.
+- Start from: `python loop/janitor.py status`; `python loop/janitor.py ram`.
+
 - Carried (unchanged): FRAME-REVOLVE F1 non_z_axis pin amendment
   (truck123d/tests/ttc_lathe_spline.rs:255); duplicate supervisors + lagging
   cargoq restart guard; slot-4/7 wt RESULT residue; TOR-C flip-or-pin;
-  heartbeat slot-liveness duplicate-dispatch bug; MONO-row registry schema gap.
+  heartbeat slot-liveness duplicate-dispatch bug; MONO-row registry schema gap;
+  overnight.py:222-226 false-landing root cause.

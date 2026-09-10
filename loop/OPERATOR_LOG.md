@@ -3157,9 +3157,61 @@ RAM 1.6-1.8 GiB free (no cargo/rustc running).
   the SURVEY-A ineffective restore, and the overnight.py:222-226 root cause
   remain escalated from 19:54Z; carried.
 
-Leaving: 0 RUNNING; HEAD 78fc776; SOLVER-SURVEY-D falsely marked landed
-(D.json at refs/wip/SOLVER-SURVEY-D-fragment 1470e72 + slot-0 wt);
-SOLVER-SURVEY-A READY-but-marker-blocked; MONO-5 falsely marked landed; MONO-6 +
-SOLVER-CHECKER correctly BLOCKED; nothing unlanded; cargoq UP; heartbeat 1;
-operator runner 1; driver 1; watchdog 1; TWO supervisors; disk 12.8 GiB free;
-RAM 1.6 GiB free.
+## [operator 2026-09-10T21:57Z] CRITICAL: loop-wide dispatch stall found - integration HEAD tracks a root RESULT.json; nothing landable
+
+Board: 0 RUNNING / 0 landed-this-cycle / 0 unblocked / 0 flipped. HEAD 436e734
+(the 17:13 local orchestrator SURVEY-A note repair) - no work moved this cycle.
+Disk 15.7 GiB free, RAM 2.4 GiB free (no cargo/rustc running).
+
+- **Health (step 1)**: heartbeat exactly 1 (27872, `-File
+  dispatch_heartbeat.ps1`; the broad scan's 3 hits were this shell + the
+  operator launcher self-matching `dispatch_heartbeat` in the embedded charter
+  text - the documented false positive, no double heartbeat), watchdog 1 (29264,
+  `python watchdog.py`), operator runner 1, overnight driver 1 (26920, child of
+  27828), cargoq UP (ping 200, queued 0, running false), orchestrator session
+  LIVE (opencode 23052). TWO supervisors (19172 PyManager + 27828 pythoncore -
+  carried duplication class; only ONE overnight.py child = no double-merge
+  risk). Disk 15.7 GiB (>= the 15 GB goal); RAM 2.4 GiB (below the 3 GB floor,
+  no build running).
+- **Land (step 2)**: nothing operator-landable. Re-verified by command: all
+  eight slot tips are ancestors of integration/kernel-bg with 0 unmerged commits
+  (slot 0 = packet/MONO-6-SWEPT-BOOLEANS, slot 1 = packet/SOLVER-SURVEY-A, slot 2
+  c3bc1a1, slot 3 e6553db, slot 4 3c2109b LANDED-WITH-FINDINGS, slot 5 ee97499,
+  slot 6 713f205, slot 7 b667a85). No FINISHED slot carries an unlanded DONE
+  RESULT.
+- **Unblock (step 3) - FOUND THE STALL**: both READY rows (MONO-6-SWEPT-BOOLEANS,
+  SOLVER-SURVEY-A) are undispatchable. Root cause: integration HEAD 436e734
+  TRACKS a root `RESULT.json` (blob bcbd652 = the SOLVER-SURVEY-D result,
+  committed by d0f708a) plus `CONTEXT.md`/`PACKET.md`. `new_slot.py:201-204`
+  `git rm`s the tracked RESULT.json on every fork (staged deletion), and
+  `run_packet.py`'s dirty filter ignores PACKET.md/CONTEXT.md but NOT
+  RESULT.json, so it refuses "slot N has 1 uncommitted change(s)". Reproduced by
+  hand. Operator actions: reset the slot-0 and slot-1 worktrees clean (both held
+  only the staged RESULT.json deletion); ran `new_slot.py --slot 1 --branch
+  packet/SOLVER-SURVEY-A --no-warm` (succeeded, printed "removed stale
+  RESULT.json inherited from the fork base") but the follow-up `run_packet.py`
+  still refused on the same artifact. Did NOT remove the tracked root artifact -
+  a repo-file edit outside the operator's 3-file limit -> ESCALATED. No other
+  IDLE/DEAD >15 min slot held work; no live QUESTION. Slots 0/1 left clean at
+  436e734.
+- **Registry (step 4)**: `dispatch_ready.py --dry-run --max-workers=4` reports
+  exactly 2 dispatchable - MONO-6-SWEPT-BOOLEANS -> slot 0, SOLVER-SURVEY-A ->
+  slot 1 (both genuinely READY; MONO-6's deps MONO-5 f6ad2eb + MONO-2 landed,
+  SURVEY-A has no deps). BLOCKED-with-all-deps-landed = SOLVER-CHECKER (dep
+  SURVEY-A unlanded - correct) + the carried 7 owner-parked/human-gated/
+  superseded. Nothing flipped.
+- **Dispatch (step 5)**: did NOT run a full manual dispatch - the heartbeat's
+  own cycle (21:46:56Z local) fails on the root-artifact bug above, and a manual
+  `new_slot --no-warm` for SURVEY-A was blocked by the same bug. No double
+  dispatch.
+- **STATE.md (step 6)**: appended the [operator 2026-09-10T21:57Z] volatile
+  block.
+- **Escalation (step 7)**: THREE new items in OPERATOR_ESCALATIONS.md - (1) the
+  tracked root RESULT.json/CONTEXT.md/PACKET.md loop-wide stall (blocking);
+  (2) dispatch_ready warms class:survey slots (needs --no-warm); (3) RAM 2.4 GiB
+  / 0xc0000409 zone.
+
+Leaving: 0 RUNNING; HEAD 436e734; slots 0/1 clean; MONO-6-SWEPT-BOOLEANS +
+SOLVER-SURVEY-A READY but UNDISPATCHABLE until the tracked root RESULT.json is
+removed; cargoq UP; heartbeat 1; operator runner 1; driver 1; watchdog 1; TWO
+supervisors; disk 15.7 GiB free; RAM 2.4 GiB free.

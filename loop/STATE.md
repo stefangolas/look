@@ -5341,3 +5341,42 @@ not touched).
   duplicate supervisors + lagging cargoq restart guard; slot-4/7 wt RESULT
   residue; TOR-C flip-or-pin; overnight.py false-landing ROOT CAUSE; MONO-row
   registry schema gap.]
+
+[operator 2026-09-10T21:57Z - volatile refresh + CRITICAL FINDING: the loop is
+FULLY STALLED on a tracked root harness artifact. Board now: 0 RUNNING / 0
+landed-this-cycle / 0 unblocked (mechanically) / 0 flipped. HEAD 436e734 (the
+17:13 local orchestrator SURVEY-A note repair). Landing re-verified by command:
+all eight slot tips are ancestors of integration/kernel-bg with 0 unmerged
+commits (slot 0 = packet/MONO-6-SWEPT-BOOLEANS, slot 1 = packet/SOLVER-SURVEY-A,
+slot 2 SURVEY-B c3bc1a1, slot 3 SURVEY-C e6553db, slot 4 F1 3c2109b
+LANDED-WITH-FINDINGS, slot 5 CL-006 ee97499, slot 6 CL-005 713f205, slot 7
+FRAME-REVOLVE b667a85); no FINISHED slot carries an unlanded DONE RESULT -
+nothing to land. THE BLOCKER (new this cycle, escalated 21:57Z): integration HEAD
+436e734 TRACKS a root `RESULT.json` (blob bcbd652 = the SOLVER-SURVEY-D result,
+committed by d0f708a) plus `CONTEXT.md` and `PACKET.md`. `new_slot.py:201-204`'s
+stale-artifact guard `git rm`s the tracked RESULT.json on every fork, leaving a
+STAGED DELETION; `run_packet.py` then refuses "slot N has 1 uncommitted
+change(s)" because its dirty filter (run_packet.py:306) ignores
+PACKET.md/CONTEXT.md but NOT RESULT.json. The heartbeat's last cycle (21:46:56Z
+local) therefore failed BOTH now-dispatchable rows: MONO-6-SWEPT-BOOLEANS (slot
+0 dirty) and SOLVER-SURVEY-A (slot 1 warm build 0xc0000409 under 2.4 GB RAM).
+Reproduced by hand; the fix is a one-line repo commit (remove the root
+artifacts) that is OUTSIDE the operator's 3-file limit - see ESCALATIONS.
+SECOND FINDING: dispatch_ready.py:225 warms `class: survey` slots though
+new_slot.py documents `--no-warm` for them (the pointless warm build is what
+crashed). THIRD: RAM 2.4 GB free (no cargo/rustc; baseline opencode x2 + chrome +
+Discord + Dropbox + Code + claude), the 0xc0000409 zone - do not force a cold
+warm build until RAM frees. Operator actions this cycle: reset the slot-0/slot-1
+worktrees to clean (both only held the staged RESULT.json deletion); ran
+`new_slot --slot 1 --branch packet/SOLVER-SURVEY-A --no-warm` (succeeded) but
+`run_packet` then refused on the same dirty artifact, so SURVEY-A is NOT
+dispatched; did NOT touch the tracked root artifact (hard limit). Slots 0 and 1
+left clean at 436e734. Health: heartbeat exactly 1 (27872 - the 3-match scan was
+this shell + the operator launcher self-matching `dispatch_heartbeat`), watchdog
+1 (29264), operator runner 1, overnight driver 1 (26920), cargoq UP (ping ok,
+queued 0), orchestrator session LIVE (opencode 23052); TWO supervisors (19172 +
+27828 - carried). Disk 15.7 GB free (>= 15 GB goal). Open human items: (NEW,
+blocking) remove the tracked root RESULT.json/CONTEXT.md/PACKET.md; (NEW)
+dispatch_ready survey --no-warm; (NEW) free RAM; carried - FRAME-REVOLVE F1
+non_z_axis pin amendment, duplicate supervisors, slot-4/7 wt RESULT residue,
+TOR-C flip-or-pin.]
