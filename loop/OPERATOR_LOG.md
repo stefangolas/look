@@ -3316,3 +3316,84 @@ Leaving: 1 RUNNING (MONO-6 slot 0); HEAD 6233aff; A.json preserved at
 refs/wip/SOLVER-SURVEY-A-fragment 9ed8d16; SOLVER-CHECKER BLOCKED (dep A
 unlanded); heartbeat 1 (27872); watchdog 1 (29264); cargoq UP; disk 21.4 GiB
 free; RAM 5.1 GB free.
+
+## [operator 2026-09-10T23:17Z] cycle report - the driver cleared the backlog mid-cycle
+
+- **Health (step 1)**: GREEN. ping `{"ok":true,"queued":1,"running":true}`;
+  heartbeat scan returned 2 and operator_runner scan returned 2, but in BOTH
+  cases one match was THIS operator's own query command line (the CIM filter
+  matches itself) - the only real heartbeat is powershell 27872 (created 9/9
+  21:55) and the only real operator runner is 27876 (the one that spawned this
+  instance). watchdog exactly 1 (python 29264). Disk 21.2 GiB free (above the
+  15 GB goal); RAM 5.0 GB free. No double-heartbeat.
+- **Landing (step 2)**: initially appeared to be NOTHING operator-landable
+  (slots 2-7 landed residue). Mid-cycle the **overnight driver (PID 26920, live)**
+  cleared two items itself:
+  - MONO-6-SWEPT-BOOLEANS: the driver first FALSE-landed it (cb2e3e1 changed
+    only loop/PACKETS.jsonl; note claimed `LANDED 436e734` = the BASE commit;
+    9th strike of the overnight.py:222-226 no-op-merge class), then committed the
+    worker's uncommitted deliverable as aa18e32 ("as delivered,
+    skipped-commit-step") and merged it for real - HEAD bb15fa1, contact_cover
+    now in HEAD. The operator had staged a safety `git stash create` but the
+    worktree was already clean after aa18e32, so no preservation ref was created.
+    Did NOT race the driver.
+  - SOLVER-SURVEY-A: RESOLVED - A.json now tracked in HEAD, merge bfa63f7,
+    ledger row + DONE flip 7af2bad. The 8th-strike blocker is gone.
+- **Unblock (step 3)**: nothing. No real IDLE/DEAD >15 min, no QUESTION, no 402.
+  slot_status shows slot 2 `DEAD? pid=18924`, but PID 18924 is a CHROME process
+  (started 19:13) - a probe false-positive on an already-landed survey, not a
+  worker.
+- **Registry (step 4)**: 324 rows - 237 DONE / 79 READY / 8 BLOCKED. No flips:
+  the 8 BLOCKED are BG-AUD-FIX-004 OWNER_BLOCKED, BG-CK-SPLINE-CENSUS
+  owner-cancelled, SEM-PCURVE-MASTER-001-FIX SUPERSEDED, DEF-SPINEFRAME-GRAZE r1
+  SPEC_GAP, DEF-TESS-ANALYTIC-SEAM (dep DEF-VENDOR-FIXTURES READY), DEF-SEEDRAY-B
+  (dep DEF-SEEDRAY-A READY), TOR-C (RULED PIN not flip), SOLVER-CHECKER.
+  **SOLVER-CHECKER is now unblocked-by-deps** (A/B/C/D.json all tracked) but was
+  NOT flipped: the 22:47Z escalation reserved the flip for a human, and its
+  crates=[] fails the CRATES_NONEMPTY lint.
+- **Dispatch (step 5)**: `dispatch_ready --dry-run --max-workers=4` ->
+  "dispatched 0; workers now ~1/4". Heartbeat is live - no manual dispatch run.
+- **STATE.md (step 6)**: rewrote the "Where we are" LATEST GROUND TRUTH note and
+  appended the [operator 2026-09-10T23:17Z] block at the end of the file.
+- **Escalation (step 7)**: see OPERATOR_ESCALATIONS 23:17Z - overnight.py:222-226
+  recurred (9th strike, cb2e3e1, self-corrected); SOLVER-SURVEY-A resolved;
+  SOLVER-CHECKER now unblocked-by-deps, safe to flip.
+
+Leaving: 0 RUNNING; HEAD bb15fa1 (MONO-6 landed for real); SOLVER-SURVEY-A landed
+(bfa63f7/7af2bad); SOLVER-CHECKER unblocked-by-deps but still BLOCKED; heartbeat 1
+(27872); watchdog 1 (29264); cargoq UP; disk 21.2 GiB free; RAM 5.0 GB free.
+
+## 2026-09-10 23:40 UTC (operator cycle)
+
+- **Health sweep (step 1)**: heartbeat exactly 1 (27872; the second
+  `dispatch_heartbeat` match was this shell self-matching), watchdog 1 (29264),
+  operator runner 1 (27876), overnight driver 1 (26920, child of 27828), cargoq
+  UP (ping ok, queued 0, running false; single server.py 28544). TWO supervisors
+  (19172 PyManager + 27828 pythoncore child - carried duplication class; only ONE
+  overnight.py child = no double-merge risk). Disk 21.4 GiB free (above the 15 GB
+  goal); RAM 3.1 GB free (above the 3 GB floor).
+- **Land (step 2)**: nothing. `git merge-base --is-ancestor aa18e32
+  integration/kernel-bg` exit 0 (slot 0 MONO-6 landed). Slot wt RESULT statuses:
+  slot 0 DONE (landed), slot 1 none (RUNNING), slot 2 "complete", slot 3 DONE,
+  slot 4 LANDED-WITH-FINDINGS (carried), slots 5/6 DONE, slot 7 LANDED (redundant,
+  no commit) - none operator-landable.
+- **Unblock (step 3)**: none. Slot 1 SOLVER-CHECKER RUNNING healthy (pid 27600,
+  session ses_f72548988ffe44pJSzze1M6iH0, events <1 min fresh, writing the AND-OR
+  checker python script); no IDLE/DEAD >15 min, no QUESTION, no APIError 402.
+- **Registry (step 4)**: 324 unique rows - 239 DONE / 78 READY / 7 BLOCKED. The 7
+  BLOCKED are all correctly parked (BG-AUD-FIX-004 OWNER_BLOCKED, BG-CK-SPLINE-
+  CENSUS owner-cancelled, SEM-PCURVE-MASTER-001-FIX SUPERSEDED, DEF-SPINEFRAME-
+  GRAZE SPEC_GAP, DEF-TESS-ANALYTIC-SEAM dep READY, DEF-SEEDRAY-B dep READY, TOR-C
+  PIN-ruled). Nothing flipped. (HEAD adef3a6 already carries the SOLVER-CHECKER
+  BLOCKED->READY flip + preflight green; the heartbeat dispatched it.)
+- **Dispatch (step 5)**: `dispatch_ready --dry-run --max-workers=4` ->
+  "slots: 8 (1 running, 7 free); slot-assigned packets: 7; dispatched 0; workers
+  now ~1/4" = REAL idle. Heartbeat is live - no manual dispatch run.
+- **STATE.md (step 6)**: rewrote the "Where we are" LATEST GROUND TRUTH note and
+  appended the [operator 2026-09-10T23:40Z] block at the end of the file.
+- **Escalation (step 7)**: none new. Carried: overnight.py:222-226 no-op-merge
+  class (9 strikes); duplicate supervisors + lagging cargoq restart guard;
+  slot-4/7 wt RESULT residue; MONO-row registry schema gap.
+
+Leaving: 1 RUNNING (SOLVER-CHECKER slot 1); HEAD adef3a6; heartbeat 1 (27872);
+watchdog 1 (29264); cargoq UP; disk 21.4 GiB free; RAM 3.1 GB free.

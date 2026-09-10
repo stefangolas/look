@@ -755,3 +755,32 @@ Judgment-required items appended each operator cycle. Newest at the bottom.
 - Start from: `loop/overnight.py:222-226`;
   `git show refs/wip/SOLVER-SURVEY-A-fragment`; `loop/slots/1/wt/RESULT.json`;
   `grep -n 'SOLVER-SURVEY-A' loop/PACKETS.jsonl`.
+
+## 2026-09-10 23:17 UTC - UPDATE: SOLVER-SURVEY-A RESOLVED; 9th false landing (MONO-6, self-corrected); SOLVER-CHECKER now unblocked
+
+- **RESOLVED (by the overnight driver, not the operator): SOLVER-SURVEY-A.**
+  A.json (579,713 b, 279 rules) is now tracked in HEAD; landed via merge
+  bfa63f7, ledger row + DONE flip 7af2bad. The 8th-strike blocker is gone and
+  the 22:47Z escalation's items 1 (land A.json) is done. The operator did NOT
+  have to act; it observed the driver do it mid-cycle.
+- **9th strike of the overnight.py:222-226 no-op-merge class: MONO-6-SWEPT-BOOLEANS.**
+  At 19:14:25 local the driver committed cb2e3e1 "MONO-6 row LANDED" changing
+  ONLY loop/PACKETS.jsonl, with the note `LANDED 436e734` - 436e734 is the
+  packet branch BASE, not worker work (the worker's +1155-line
+  truck123d/src/bd_bridge.rs change was uncommitted in slot 0). Unlike the
+  survey strikes, the driver then SELF-CORRECTED: at 19:16:44 it committed the
+  deliverable as aa18e32 ("as delivered, skipped-commit-step") and at ~19:17 it
+  landed it for real (HEAD bb15fa1; `git grep -c contact_cover HEAD --
+  truck123d/src/bd_bridge.rs` = 3). So this strike cost no work this time, but
+  the root cause is unchanged and the next strike may not self-correct.
+- **Root cause still open: `loop/overnight.py:222-226`** - a landing must
+  REQUIRE a committed worker diff (`head != base`; a no-op merge = NOT LANDED).
+  Now NINE strikes. This is the single highest-value human fix in the loop.
+- **SOLVER-CHECKER is now unblocked-by-deps** (SOLVER-SURVEY-A/B/C/D.json all
+  tracked in HEAD). The 22:47Z escalation's item 3 condition is met: it is now
+  safe to flip SOLVER-CHECKER READY. The operator deliberately did NOT flip it
+  (that flip was reserved for a human) and notes one dispatch caveat: its
+  `crates: []` will fail the CRATES_NONEMPTY lint, so give it a crate (or
+  exempt the checker class) when flipping.
+- Start from: `loop/overnight.py:222-226`; `git show cb2e3e1`; `git show
+  bb15fa1`; `grep -n 'SOLVER-CHECKER' loop/PACKETS.jsonl`.

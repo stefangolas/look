@@ -76,18 +76,28 @@ corrected, annex C = ORACLE POLICY CHANGE), then docs/SOLVER_COVERAGE_SPEC.md
 ## Where we are
 
 > LATEST GROUND TRUTH: read the newest `[operator ...]` block in "State of
-> the machine, as left" (2026-09-10T22:47Z). [operator 2026-09-10T22:47Z
-> ground-truth note: 1 RUNNING (slot 0 MONO-6-SWEPT-BOOLEANS, pid 14596,
-> events <1 min fresh); 0 landed-this-cycle; nothing operator-landable (slots
-> 1-7 FINISHED residue, all tips ancestors of integration/kernel-bg); NEW 8th
-> FALSE LANDING - SOLVER-SURVEY-A: HEAD 6233aff changed only PACKETS.jsonl,
-> A.json (579,713 b) is untracked in slot 1 wt and in NO commit (HEAD tracks
-> B/C/D.json only), row READY with a false "LANDED 7591ed2" note; preserved as
-> refs/wip/SOLVER-SURVEY-A-fragment 9ed8d16; did NOT land, did NOT flip
-> SOLVER-CHECKER (dep A unlanded). HEAD 6233aff; registry 324 rows - 237 DONE /
-> 79 READY / 8 BLOCKED, nothing flippable; dispatch_ready dispatched 0 (real
-> idle, heartbeat-owned); disk 21.4 GiB free (above the 15 GB goal); RAM 5.1 GB
-> free; heartbeat 1, watchdog 1, cargoq UP.]
+> the machine, as left" (2026-09-10T23:40Z). [operator 2026-09-10T23:40Z
+> ground-truth note: 1 RUNNING / 0 operator-landable. SOLVER-CHECKER was flipped
+> BLOCKED->READY (HEAD adef3a6, all four survey fragments landed) and the
+> heartbeat dispatched it to slot 1 (pid 27600, session
+> ses_f72548988ffe44pJSzze1M6iH0, events fresh, writing the AND-OR checker python
+> script) - healthy, not touched. Slot 0 MONO-6 FINISHED @aa18e32 and LANDED
+> (ancestor of HEAD, exit 0); slots 2-7 FINISHED landed residue (slot 2
+> status=complete, 3/5/6 DONE, slot 4 LANDED-WITH-FINDINGS carried, slot 7
+> redundant LANDED) - nothing operator-landable. Registry 324 rows - 239 DONE /
+> 78 READY / 7 BLOCKED; the 7 BLOCKED all correctly parked (BG-AUD-FIX-004
+> OWNER_BLOCKED, BG-CK-SPLINE-CENSUS owner-cancelled, SEM-PCURVE-MASTER-001-FIX
+> SUPERSEDED, DEF-SPINEFRAME-GRAZE SPEC_GAP, DEF-TESS-ANALYTIC-SEAM dep READY,
+> DEF-SEEDRAY-B dep READY, TOR-C PIN-ruled); nothing flipped. dispatch_ready
+> --dry-run --max-workers=4: "dispatched 0; workers now ~1/4" = REAL idle
+> (heartbeat-owned; no manual dispatch). Health: heartbeat exactly 1 (27872),
+> watchdog 1 (29264), operator runner 1 (27876), overnight driver 1 (26920),
+> cargoq UP (ping ok, queued 0, running false; single server.py 28544); TWO
+> supervisors (19172 + 27828, carried duplication class; only ONE overnight.py
+> child = no double-merge risk). Disk 21.4 GiB free (above the 15 GB goal); RAM
+> 3.1 GB free (above the 3 GB floor; no cargo/rustc spike). Open human items
+> carried: fix overnight.py:222-226 (9 strikes); duplicate supervisors + lagging
+> cargoq restart guard; slot-4/7 wt RESULT residue; MONO-row registry schema gap.]
 
 - **THE FIRST KERNEL-VS-OCC TIMING COMPARISON IS BANKED** (FH-TIMING-REFRESH,
   landed c94d043): turbopump_assembly **0.097 s kernel vs 4.866 s OCC**,
@@ -5536,3 +5546,74 @@ unread by dispatch_ready); duplicate supervisors; slot-4/7 wt RESULT residue.]
   ambiguity was surfaced by the band-risk analysis, priced by the
   fixture diagnostics, and closed by an owner directive - recorded as
   annex C with the honest loss statement (compatibility claims retired).
+
+[operator 2026-09-10T23:17Z - volatile refresh. Board now: 0 RUNNING / 0
+landed-by-operator. **The overnight driver (PID 26920, live) cleared the whole
+backlog during this cycle, so there was nothing for the operator to land:**
+(a) MONO-6-SWEPT-BOOLEANS - the driver false-landed it first (cb2e3e1 changed
+only loop/PACKETS.jsonl; claimed LANDED 436e734 = the BASE commit; 9th strike of
+the overnight.py:222-226 no-op-merge class), then committed the worker's
+uncommitted deliverable as aa18e32 ("as delivered, skipped-commit-step") and
+landed it for real (HEAD bb15fa1; `git grep -c contact_cover HEAD --
+truck123d/src/bd_bridge.rs` = 3). The operator did NOT race it; no refs/wip
+preservation was needed (worktree clean after aa18e32). (b) SOLVER-SURVEY-A -
+RESOLVED by the driver: A.json (579,713 b, 279 rules) now tracked in HEAD,
+landed via merge bfa63f7, ledger row + DONE flip 7af2bad. The 8th-strike
+blocker is gone. All 8 slots FINISHED (slot 0 MONO-6 @aa18e32, slot 1
+SOLVER-SURVEY-A @99c1639, slot 2 SOLVER-SURVEY-B @c3bc1a1 [slot_status shows
+"DEAD? pid 18924" but 18924 is a CHROME process - a probe false-positive, not a
+worker], slot 3 C @e6553db, slot 4 F1 @3c2109b, slot 5 CL-006 @ee97499, slot 6
+CL-005 @713f205, slot 7 FRAME-REVOLVE @5cf4811). Nothing to unblock (no real
+IDLE/DEAD >15 min, no QUESTION, no APIError 402). Registry: 324 rows - 237 DONE
+/ 79 READY / 8 BLOCKED. Nothing flipped: the 8 BLOCKED rows are BG-AUD-FIX-004
+OWNER_BLOCKED, BG-CK-SPLINE-CENSUS owner-cancelled, SEM-PCURVE-MASTER-001-FIX
+SUPERSEDED, DEF-SPINEFRAME-GRAZE r1 SPEC_GAP, DEF-TESS-ANALYTIC-SEAM (dep
+DEF-VENDOR-FIXTURES still READY), DEF-SEEDRAY-B (dep DEF-SEEDRAY-A READY), TOR-C
+(RULED PIN not flip), SOLVER-CHECKER. **SOLVER-CHECKER is now
+unblocked-by-deps** (A/B/C/D.json all tracked in HEAD) but was deliberately NOT
+flipped: the 22:47Z escalation reserved that flip for a human, and its crates=[]
+would fail the CRATES_NONEMPTY lint on dispatch. dispatch_ready --dry-run
+--max-workers=4: "dispatched 0; workers now ~1/4" (heartbeat-owned; no manual
+dispatch run - the heartbeat is live). Health: heartbeat exactly 1 (27872;
+the apparent "2" was this operator's own query matching its command line),
+watchdog 1 (29264), cargoq UP (ping ok), supervisors 2, disk 21.2 GiB free
+(above the 15 GB goal), RAM 5.0 GB free. Open human items: (1, hot) fix
+overnight.py:222-226 - now 9 strikes; MONO-6 self-corrected only because the
+driver re-ran the commit step, and each strike risks a slot re-fork wiping the
+uncommitted deliverable; (2) flip SOLVER-CHECKER READY now that all four
+  fragments are truly landed. Carried: MONO-row schema gap (depends_on/write_allow
+  unread by dispatch_ready); duplicate supervisors; slot-4/7 wt RESULT residue.]
+
+[operator 2026-09-10T23:40Z - volatile refresh. Quiet healthy cycle: nothing to
+land, nothing to unblock, nothing to flip, no manual dispatch (heartbeat live).
+Board now: 1 RUNNING / 0 landed-this-cycle. HEAD adef3a6 ("SOLVER-CHECKER
+BLOCKED->READY (all four survey fragments landed); preflight green"). The
+human/orchestrator flip landed and the heartbeat dispatched SOLVER-CHECKER to
+slot 1 (pid 27600, session ses_f72548988ffe44pJSzze1M6iH0, events <1 min fresh,
+writing the AND-OR semantic solver-coverage checker python script per its
+events) - healthy, not touched. Slot 0 MONO-6-SWEPT-BOOLEANS FINISHED @aa18e32
+and LANDED (`git merge-base --is-ancestor aa18e32 integration/kernel-bg` exit 0).
+Slots 2-7 FINISHED landed residue; wt RESULT statuses read directly: slot 2
+"complete", slot 3 DONE, slot 4 LANDED-WITH-FINDINGS (carried), slots 5/6 DONE,
+slot 7 LANDED (redundant, no commit) - none operator-landable. Nothing to unblock
+(1 healthy RUNNING worker; no IDLE/DEAD >15 min; no QUESTION; no APIError 402).
+Registry re-verified by script (last-wins dedup): 324 unique rows - 239 DONE /
+78 READY / 7 BLOCKED; the 7 BLOCKED all correctly parked (BG-AUD-FIX-004
+OWNER_BLOCKED, BG-CK-SPLINE-CENSUS owner-cancelled, SEM-PCURVE-MASTER-001-FIX
+SUPERSEDED, DEF-SPINEFRAME-GRAZE SPEC_GAP->-R2, DEF-TESS-ANALYTIC-SEAM dep
+DEF-VENDOR-FIXTURES READY, DEF-SEEDRAY-B dep DEF-SEEDRAY-A READY, TOR-C
+PIN-ruled) - nothing flipped. dispatch_ready --dry-run --max-workers=4:
+"slots: 8 (1 running, 7 free); slot-assigned packets: 7; dispatched 0; workers
+now ~1/4" = REAL idle; no manual dispatch (heartbeat live). Health: heartbeat
+exactly 1 (27872; anchored `-File dispatch_heartbeat.ps1` scan - the second
+match was this shell self-matching the pattern), watchdog 1 (29264), operator
+runner 1 (27876), overnight driver 1 (26920, child of 27828), cargoq UP (ping
+ok, queued 0, running false; single server.py 28544). TWO supervisors (19172
+PyManager + 27828 pythoncore child - carried duplication class; only ONE
+overnight.py child = no double-merge risk). Disk 21.4 GiB free (above the 8 GB
+floor AND the 15 GB janitor goal); RAM 3.1 GiB free (above the 3 GB floor; no
+cargo/rustc running). No new escalation (nothing judgment-requiring surfaced);
+carried human items unchanged: fix overnight.py:222-226 no-op-merge class (9
+strikes); duplicate supervisors + the lagging cargoq restart guard; slot-4/7 wt
+RESULT residue; MONO-row registry schema gap (depends_on/write_allow unread by
+dispatch_ready).]
