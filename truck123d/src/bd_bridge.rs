@@ -1048,19 +1048,29 @@ fn solid_local_bbox(solid: &SolidSpec) -> Result<[[f64; 3]; 2], Refusal> {
                 return Ok([min, max]);
             }
             // The ruled side surface is linear in the station axis, so the
-            // exact AABB is the union of the two section loops' exact AABBs.
-            if sections.len() != 2 {
+            // exact AABB is the union of the section loops' exact AABBs; for
+            // N > 2 the canonical v-interpolation can bulge past the sections,
+            // so the surface's control-net AABB (the Bernstein convex-hull
+            // enclosure) is unioned in.
+            if sections.len() < 2 {
                 return Err(open_smooth_loft());
             }
-            let first = spline_loop_spans(sections.first().ok_or(Refusal::Empty)?)?;
-            let last = spline_loop_spans(sections.get(1).ok_or(Refusal::Empty)?)?;
-            let box_a = spline_loop_bbox3(&first)?;
-            let box_b = spline_loop_bbox3(&last)?;
             let mut min = [f64::INFINITY; 3];
             let mut max = [f64::NEG_INFINITY; 3];
-            for axis in 0..3 {
-                min[axis] = box_a[0][axis].min(box_b[0][axis]);
-                max[axis] = box_a[1][axis].max(box_b[1][axis]);
+            for section in sections {
+                let spans = spline_loop_spans(section)?;
+                let box3 = spline_loop_bbox3(&spans)?;
+                for axis in 0..3 {
+                    min[axis] = min[axis].min(box3[0][axis]);
+                    max[axis] = max[axis].max(box3[1][axis]);
+                }
+            }
+            if sections.len() > 2 {
+                let enclosure = nstation_control_enclosure(sections)?;
+                for axis in 0..3 {
+                    min[axis] = min[axis].min(enclosure[0][axis]);
+                    max[axis] = max[axis].max(enclosure[1][axis]);
+                }
             }
             if !min[0].is_finite() || !max[0].is_finite() {
                 return Err(Refusal::Empty);
@@ -1186,13 +1196,25 @@ fn cubic_roots(c: &[f64; 4]) -> Vec<f64> {
 // convention the landed lathe arm reconstructs `Edge.make_spline` with), never
 // a flattening polygon.
 //
-// **The honesty line (scope decision 1).** The smooth station interpolation is
-// exactly determined by the recorded data only for a two-station loft, where
-// the smooth surface IS the ruled surface (every interpolation degree reduces
-// to the linear one across two stations). A three-or-more-station smooth
-// loft's station parameterization is an OCC `ThruSections` convention the row
-// does not record, so the arm refuses TYPED naming the open smooth carrier
-// rather than substituting a ruled approximation.
+// **The kernel-canonical N-station convention (MONO-2-NSTATION-LOFT).** The
+// recorded section stack determines a canonical smooth surface exactly:
+//
+// * the station parameter `v_i` is the cumulative centroid-to-centroid chord
+//   length of the section stack, normalized to `[0, 1]`;
+// * the `u` direction is the landed per-section reconstruction (each recorded
+//   span normalized to `[0, 1]`), unified across stations by span index only —
+//   the section curves are never approximated and a stack whose spans do not
+//   match refuses typed;
+// * the `v` direction is the unique global polynomial of degree `N - 1`
+//   interpolating the section control rows for `N <= 9`, and the natural C2
+//   cubic spline with knots AT the station parameters for `N >= 10`.
+//
+// This surface is certified as built; it is NOT claimed to reproduce OCC's
+// tolerance-driven `GeomFill_AppSurf` approximant bit-for-bit. OCC's own
+// smooth `ThruSections` is an approximation (chord-length parameters, C2,
+// degree 2..8 fit-selected), so the recorded references adjudicate the
+// canonical surface empirically at the census re-run, never by approximation
+// inside this arm.
 
 /// One reconstructed 3-D spline span in the power basis over `u in [0, 1]`.
 #[derive(Debug, Clone, Copy)]
@@ -1429,58 +1451,403 @@ fn spline_loop_bbox3(spans: &[SpanPoly3]) -> Result<[[f64; 3]; 2], Refusal> {
     Ok([min, max])
 }
 
-/// The certified volume of a two-station spline-section loft: every ruled side
-/// patch's face form through the sanctioned `binding_volume_facts` entry plus
-/// the exact planar end-cap moments, returned as `(value, lo, hi)`. Any other
-/// section stack refuses typed naming the open smooth carrier.
+/// The binomial coefficient `C(n, k)` as an `f64` (exact for the small degrees
+/// this arm uses; `0` when `k > n`).
+fn binomial_f64(n: usize, k: usize) -> f64 {
+    if k > n {
+        return 0.0;
+    }
+    let k = k.min(n - k);
+    let mut out = 1.0f64;
+    for i in 0..k {
+        out = out * (n - i) as f64 / (i + 1) as f64;
+    }
+    out
+}
+
+/// Solves the dense `n x n` system `a x = b` in place (Gaussian elimination
+/// with partial pivoting); `a` is destroyed and `b` becomes the solution. A
+/// singular system refuses typed. Deterministic, fixed pivot order.
+fn solve_dense(a: &mut [Vec<f64>], b: &mut [f64]) -> Result<(), Refusal> {
+    let n = b.len();
+    if a.len() != n {
+        return Err(Refusal::Empty);
+    }
+    for col in 0..n {
+        let mut piv = col;
+        let mut best = a
+            .get(col)
+            .and_then(|row| row.get(col))
+            .copied()
+            .unwrap_or(0.0)
+            .abs();
+        for row in (col + 1)..n {
+            let value = a
+                .get(row)
+                .and_then(|r| r.get(col))
+                .copied()
+                .unwrap_or(0.0)
+                .abs();
+            if value > best {
+                best = value;
+                piv = row;
+            }
+        }
+        if !(best > 0.0) {
+            return Err(open_smooth_loft());
+        }
+        if piv != col {
+            a.swap(piv, col);
+            b.swap(piv, col);
+        }
+        let pivot = a
+            .get(col)
+            .and_then(|row| row.get(col))
+            .copied()
+            .ok_or(Refusal::Empty)?;
+        let pivot_row = a.get(col).cloned().ok_or(Refusal::Empty)?;
+        let rhs_col = *b.get(col).ok_or(Refusal::Empty)?;
+        for row in (col + 1)..n {
+            let factor = a.get(row).and_then(|r| r.get(col)).copied().unwrap_or(0.0) / pivot;
+            if let Some(r) = a.get_mut(row) {
+                for (cell, p) in r.iter_mut().zip(pivot_row.iter()) {
+                    *cell -= factor * p;
+                }
+            }
+            *b.get_mut(row).ok_or(Refusal::Empty)? -= factor * rhs_col;
+        }
+    }
+    for row in (0..n).rev() {
+        let mut sum = *b.get(row).ok_or(Refusal::Empty)?;
+        let r = a.get(row).ok_or(Refusal::Empty)?;
+        for col in (row + 1)..n {
+            sum -= r.get(col).copied().unwrap_or(0.0) * *b.get(col).ok_or(Refusal::Empty)?;
+        }
+        let diag = r.get(row).copied().unwrap_or(0.0);
+        if !(diag.abs() > 0.0) {
+            return Err(open_smooth_loft());
+        }
+        *b.get_mut(row).ok_or(Refusal::Empty)? = sum / diag;
+    }
+    Ok(())
+}
+
+/// The Bernstein coefficients (degree `n - 1`) of the unique polynomial
+/// interpolating `values` at the strictly increasing nodes `v`.
+fn bernstein_interp_global(values: &[[f64; 3]], v: &[f64]) -> Result<Vec<[f64; 3]>, Refusal> {
+    let n = values.len();
+    if n == 0 || v.len() != n {
+        return Err(Refusal::Empty);
+    }
+    // The Bernstein collocation matrix `B_j^{n-1}(v_i)`.
+    let mut collocation = vec![vec![0.0f64; n]; n];
+    for (i, node) in v.iter().enumerate() {
+        let row = collocation.get_mut(i).ok_or(Refusal::Empty)?;
+        for (j, cell) in row.iter_mut().enumerate() {
+            let mut value = binomial_f64(n - 1, j);
+            for _ in 0..j {
+                value *= *node;
+            }
+            for _ in 0..(n - 1 - j) {
+                value *= 1.0 - *node;
+            }
+            *cell = value;
+        }
+    }
+    let mut out = vec![[0.0f64; 3]; n];
+    for comp in 0..3 {
+        let mut rhs: Vec<f64> = values
+            .iter()
+            .map(|p| match comp {
+                0 => p[0],
+                1 => p[1],
+                _ => p[2],
+            })
+            .collect();
+        let mut matrix = collocation.clone();
+        solve_dense(&mut matrix, &mut rhs)?;
+        for (slot, value) in out.iter_mut().zip(rhs.iter()) {
+            match comp {
+                0 => slot[0] = *value,
+                1 => slot[1] = *value,
+                _ => slot[2] = *value,
+            }
+        }
+    }
+    Ok(out)
+}
+
+/// The natural C2 cubic spline's second derivatives `M_i = y''(v_i)` at the
+/// nodes: the standard banded second-derivative system with natural ends
+/// (`M_0 = M_{n-1} = 0`), solved by the Thomas algorithm, one `R^3` value per
+/// node.
+fn natural_spline_second_derivs(values: &[[f64; 3]], h: &[f64]) -> Result<Vec<[f64; 3]>, Refusal> {
+    let n = values.len();
+    let mut m = vec![[0.0f64; 3]; n];
+    if n <= 2 {
+        return Ok(m);
+    }
+    let inner = n - 2;
+    let mut lower = vec![0.0f64; inner];
+    let mut diag = vec![0.0f64; inner];
+    let mut upper = vec![0.0f64; inner];
+    let mut rhs = vec![[0.0f64; 3]; inner];
+    for i in 0..inner {
+        let node = i + 1;
+        let hm = *h.get(node - 1).ok_or(Refusal::Empty)?;
+        let hp = *h.get(node).ok_or(Refusal::Empty)?;
+        let ym = *values.get(node - 1).ok_or(Refusal::Empty)?;
+        let y0 = *values.get(node).ok_or(Refusal::Empty)?;
+        let yp = *values.get(node + 1).ok_or(Refusal::Empty)?;
+        *lower.get_mut(i).ok_or(Refusal::Empty)? = hm;
+        *diag.get_mut(i).ok_or(Refusal::Empty)? = 2.0 * (hm + hp);
+        *upper.get_mut(i).ok_or(Refusal::Empty)? = hp;
+        *rhs.get_mut(i).ok_or(Refusal::Empty)? = [
+            6.0 * ((yp[0] - y0[0]) / hp - (y0[0] - ym[0]) / hm),
+            6.0 * ((yp[1] - y0[1]) / hp - (y0[1] - ym[1]) / hm),
+            6.0 * ((yp[2] - y0[2]) / hp - (y0[2] - ym[2]) / hm),
+        ];
+    }
+    for i in 1..inner {
+        let w = *lower.get(i).ok_or(Refusal::Empty)? / *diag.get(i - 1).ok_or(Refusal::Empty)?;
+        let u = *upper.get(i - 1).ok_or(Refusal::Empty)?;
+        *diag.get_mut(i).ok_or(Refusal::Empty)? -= w * u;
+        let prev = *rhs.get(i - 1).ok_or(Refusal::Empty)?;
+        let cur = rhs.get_mut(i).ok_or(Refusal::Empty)?;
+        cur[0] -= w * prev[0];
+        cur[1] -= w * prev[1];
+        cur[2] -= w * prev[2];
+    }
+    let mut x = vec![[0.0f64; 3]; inner];
+    let last = inner - 1;
+    let d_last = *diag.get(last).ok_or(Refusal::Empty)?;
+    if !(d_last.abs() > 0.0) {
+        return Err(open_smooth_loft());
+    }
+    let r_last = *rhs.get(last).ok_or(Refusal::Empty)?;
+    if let Some(slot) = x.get_mut(last) {
+        *slot = [r_last[0] / d_last, r_last[1] / d_last, r_last[2] / d_last];
+    }
+    for i in (0..last).rev() {
+        let d = *diag.get(i).ok_or(Refusal::Empty)?;
+        let u = *upper.get(i).ok_or(Refusal::Empty)?;
+        let next = *x.get(i + 1).ok_or(Refusal::Empty)?;
+        let r = *rhs.get(i).ok_or(Refusal::Empty)?;
+        if let Some(slot) = x.get_mut(i) {
+            *slot = [
+                (r[0] - u * next[0]) / d,
+                (r[1] - u * next[1]) / d,
+                (r[2] - u * next[2]) / d,
+            ];
+        }
+    }
+    for (i, value) in x.iter().enumerate() {
+        if let Some(slot) = m.get_mut(i + 1) {
+            *slot = *value;
+        }
+    }
+    Ok(m)
+}
+
+/// The Bernstein controls of the natural C2 cubic spline interpolating
+/// `values` at the strictly increasing nodes `v`, one four-control span per
+/// interval (each span's local parameter is `[0, 1]`).
+fn bernstein_interp_spline(values: &[[f64; 3]], v: &[f64]) -> Result<Vec<[[f64; 3]; 4]>, Refusal> {
+    let n = values.len();
+    if n < 2 || v.len() != n {
+        return Err(Refusal::Empty);
+    }
+    let mut h = Vec::with_capacity(n - 1);
+    for i in 0..(n - 1) {
+        let hi = *v.get(i + 1).ok_or(Refusal::Empty)? - *v.get(i).ok_or(Refusal::Empty)?;
+        if !(hi > 0.0) || !hi.is_finite() {
+            return Err(open_smooth_loft());
+        }
+        h.push(hi);
+    }
+    let m = natural_spline_second_derivs(values, &h)?;
+    let mut out = vec![[[0.0f64; 3]; 4]; n - 1];
+    for i in 0..(n - 1) {
+        let hi = *h.get(i).ok_or(Refusal::Empty)?;
+        let mi = *m.get(i).ok_or(Refusal::Empty)?;
+        let mi1 = *m.get(i + 1).ok_or(Refusal::Empty)?;
+        let yi = *values.get(i).ok_or(Refusal::Empty)?;
+        let yi1 = *values.get(i + 1).ok_or(Refusal::Empty)?;
+        let c2 = [
+            hi * hi * mi[0] / 2.0,
+            hi * hi * mi[1] / 2.0,
+            hi * hi * mi[2] / 2.0,
+        ];
+        let c3 = [
+            hi * hi * (mi1[0] - mi[0]) / 6.0,
+            hi * hi * (mi1[1] - mi[1]) / 6.0,
+            hi * hi * (mi1[2] - mi[2]) / 6.0,
+        ];
+        let c1 = [
+            (yi1[0] - yi[0]) - c2[0] - c3[0],
+            (yi1[1] - yi[1]) - c2[1] - c3[1],
+            (yi1[2] - yi[2]) - c2[2] - c3[2],
+        ];
+        let c0 = yi;
+        let bx = cubic_bernstein(&[c0[0], c1[0], c2[0], c3[0]]);
+        let by = cubic_bernstein(&[c0[1], c1[1], c2[1], c3[1]]);
+        let bz = cubic_bernstein(&[c0[2], c1[2], c2[2], c3[2]]);
+        let span = [
+            [bx[0], by[0], bz[0]],
+            [bx[1], by[1], bz[1]],
+            [bx[2], by[2], bz[2]],
+            [bx[3], by[3], bz[3]],
+        ];
+        if let Some(slot) = out.get_mut(i) {
+            *slot = span;
+        }
+    }
+    Ok(out)
+}
+
+/// The canonical v-segments (each a run of Bernstein controls) of the
+/// interpolant of `values` at the station parameters `v`: one global segment
+/// of degree `N - 1` for `N <= 9`, the natural C2 cubic spans otherwise.
+fn v_segments(values: &[[f64; 3]], v: &[f64]) -> Result<Vec<Vec<[f64; 3]>>, Refusal> {
+    if values.len() <= 9 {
+        Ok(vec![bernstein_interp_global(values, v)?])
+    } else {
+        Ok(bernstein_interp_spline(values, v)?
+            .into_iter()
+            .map(|span| span.to_vec())
+            .collect())
+    }
+}
+
+/// The canonical station parameters of a section stack: the cumulative
+/// centroid-to-centroid chord length, normalized to `[0, 1]`.
+fn station_params(loops: &[Vec<SpanPoly3>]) -> Result<Vec<f64>, Refusal> {
+    if loops.len() < 2 {
+        return Err(Refusal::Empty);
+    }
+    let mut params = Vec::with_capacity(loops.len());
+    let mut previous: Option<[f64; 3]> = None;
+    let mut total = 0.0f64;
+    for loop3 in loops {
+        let samples = sample_loop3(loop3);
+        if samples.is_empty() {
+            return Err(Refusal::Empty);
+        }
+        let centroid = centroid3(&samples);
+        if let Some(prev) = previous {
+            let dx = centroid[0] - prev[0];
+            let dy = centroid[1] - prev[1];
+            let dz = centroid[2] - prev[2];
+            total += (dx * dx + dy * dy + dz * dz).sqrt();
+        }
+        previous = Some(centroid);
+        params.push(total);
+    }
+    if !(total > 0.0) || !total.is_finite() {
+        return Err(open_smooth_loft());
+    }
+    for param in &mut params {
+        *param /= total;
+    }
+    for pair in params.windows(2) {
+        if !(pair[1] > pair[0]) {
+            return Err(open_smooth_loft());
+        }
+    }
+    Ok(params)
+}
+
+/// The certified volume of an N-station spline-section loft under the
+/// kernel-canonical convention: every side patch's face form through the
+/// sanctioned `binding_volume_facts` entry plus the exact planar end-cap
+/// moments, returned as `(value, lo, hi)`. A stack whose section spans do not
+/// match (the u-unification cannot be completed by knot insertion alone)
+/// refuses typed naming the open smooth carrier.
 fn certified_spline_loft_volume(sections: &[Vec<ProfileEdge>]) -> Result<(f64, f64, f64), Refusal> {
-    if sections.len() != 2 {
+    if sections.len() < 2 {
+        return Err(Refusal::Empty);
+    }
+    let mut loops: Vec<Vec<SpanPoly3>> = Vec::with_capacity(sections.len());
+    for section in sections {
+        loops.push(spline_loop_spans(section)?);
+    }
+    let span_count = loops.first().map(Vec::len).unwrap_or(0);
+    if span_count == 0 {
         return Err(open_smooth_loft());
     }
-    let first = spline_loop_spans(sections.first().ok_or(Refusal::Empty)?)?;
-    let last = spline_loop_spans(sections.get(1).ok_or(Refusal::Empty)?)?;
-    if first.is_empty() || first.len() != last.len() {
-        return Err(open_smooth_loft());
+    for loop3 in &loops {
+        if loop3.len() != span_count {
+            return Err(open_smooth_loft());
+        }
     }
+    let v = station_params(&loops)?;
+    let station_count = loops.len();
     let mut value = 0.0f64;
     let mut lo = 0.0f64;
     let mut hi = 0.0f64;
-    for (a, b) in first.iter().zip(last.iter()) {
-        let ba = span3_bernstein(a);
-        let bb = span3_bernstein(b);
-        let mut numerator: Vec<Vec<[f64; 3]>> = Vec::with_capacity(4);
-        for i in 0..4 {
-            numerator.push(vec![
-                *ba.get(i).ok_or(Refusal::Empty)?,
-                *bb.get(i).ok_or(Refusal::Empty)?,
-            ]);
+    for span_index in 0..span_count {
+        // The four u-control rows of this span, one 3-D value per station.
+        let mut rows: [Vec<[f64; 3]>; 4] = [
+            Vec::with_capacity(station_count),
+            Vec::with_capacity(station_count),
+            Vec::with_capacity(station_count),
+            Vec::with_capacity(station_count),
+        ];
+        for loop3 in &loops {
+            let span = loop3.get(span_index).ok_or(Refusal::Empty)?;
+            for (row, control) in rows.iter_mut().zip(span3_bernstein(span).iter()) {
+                row.push(*control);
+            }
         }
-        let weights = vec![vec![1.0, 1.0]; 4];
-        let row = crate::python::binding::VolumeRow {
-            numerator,
-            weights,
-            orientation: 1.0,
-        };
-        let json = crate::python::binding::volume_facts(&row).map_err(|_| open_smooth_loft())?;
-        let outcome: serde_json::Value = serde_json::from_str(&json).map_err(|_| Refusal::Empty)?;
-        value += outcome
-            .get("value")
-            .and_then(serde_json::Value::as_f64)
-            .ok_or(Refusal::Empty)?;
-        lo += outcome
-            .pointer("/bracket/lo")
-            .and_then(serde_json::Value::as_f64)
-            .ok_or(Refusal::Empty)?;
-        hi += outcome
-            .pointer("/bracket/hi")
-            .and_then(serde_json::Value::as_f64)
-            .ok_or(Refusal::Empty)?;
+        let mut segments: Vec<Vec<Vec<[f64; 3]>>> = Vec::with_capacity(4);
+        for row in &rows {
+            segments.push(v_segments(row, &v)?);
+        }
+        let segment_count = segments.first().map(Vec::len).unwrap_or(0);
+        for segment_index in 0..segment_count {
+            let cols = segments
+                .first()
+                .and_then(|s| s.get(segment_index))
+                .map(Vec::len)
+                .unwrap_or(0);
+            if cols == 0 {
+                return Err(Refusal::Empty);
+            }
+            let mut numerator: Vec<Vec<[f64; 3]>> = Vec::with_capacity(4);
+            for segment in &segments {
+                numerator.push(segment.get(segment_index).cloned().ok_or(Refusal::Empty)?);
+            }
+            let weights = vec![vec![1.0f64; cols]; 4];
+            let row = crate::python::binding::VolumeRow {
+                numerator,
+                weights,
+                orientation: 1.0,
+            };
+            let json =
+                crate::python::binding::volume_facts(&row).map_err(|_| open_smooth_loft())?;
+            let outcome: serde_json::Value =
+                serde_json::from_str(&json).map_err(|_| Refusal::Empty)?;
+            value += outcome
+                .get("value")
+                .and_then(serde_json::Value::as_f64)
+                .ok_or(Refusal::Empty)?;
+            lo += outcome
+                .pointer("/bracket/lo")
+                .and_then(serde_json::Value::as_f64)
+                .ok_or(Refusal::Empty)?;
+            hi += outcome
+                .pointer("/bracket/hi")
+                .and_then(serde_json::Value::as_f64)
+                .ok_or(Refusal::Empty)?;
+        }
     }
 
     // The planar end caps: `(1/3) d A` with the recorded-loop winding, exactly
     // as the landed line-loft arm's cap terms.
-    let area_a = spline_loop_area_vector(&first);
-    let area_b = spline_loop_area_vector(&last);
+    let first = loops.first().ok_or(Refusal::Empty)?;
+    let last = loops.last().ok_or(Refusal::Empty)?;
+    let area_a = spline_loop_area_vector(first);
+    let area_b = spline_loop_area_vector(last);
     let mag_a = v3_norm(area_a);
     let mag_b = v3_norm(area_b);
     if !(mag_a > 0.0) || !(mag_b > 0.0) {
@@ -1636,6 +2003,57 @@ fn member_mesh(sections: &[Vec<ProfileEdge>]) -> Result<Vec<Triangle>, Refusal> 
     Ok(out)
 }
 
+/// A certified axis-aligned enclosure of the canonical N-station surface: the
+/// AABB of the surface's Bernstein control net (the convex-hull enclosure,
+/// which covers the v-interpolation's bulge past the section loops).
+fn nstation_control_enclosure(sections: &[Vec<ProfileEdge>]) -> Result<[[f64; 3]; 2], Refusal> {
+    let mut loops: Vec<Vec<SpanPoly3>> = Vec::with_capacity(sections.len());
+    for section in sections {
+        loops.push(spline_loop_spans(section)?);
+    }
+    let span_count = loops.first().map(Vec::len).unwrap_or(0);
+    if span_count == 0 {
+        return Err(open_smooth_loft());
+    }
+    for loop3 in &loops {
+        if loop3.len() != span_count {
+            return Err(open_smooth_loft());
+        }
+    }
+    let v = station_params(&loops)?;
+    let station_count = loops.len();
+    let mut min = [f64::INFINITY; 3];
+    let mut max = [f64::NEG_INFINITY; 3];
+    for span_index in 0..span_count {
+        let mut rows: [Vec<[f64; 3]>; 4] = [
+            Vec::with_capacity(station_count),
+            Vec::with_capacity(station_count),
+            Vec::with_capacity(station_count),
+            Vec::with_capacity(station_count),
+        ];
+        for loop3 in &loops {
+            let span = loop3.get(span_index).ok_or(Refusal::Empty)?;
+            for (row, control) in rows.iter_mut().zip(span3_bernstein(span).iter()) {
+                row.push(*control);
+            }
+        }
+        for row in &rows {
+            for segment in v_segments(row, &v)? {
+                for control in segment {
+                    for (axis, value) in control.iter().enumerate() {
+                        min[axis] = min[axis].min(*value);
+                        max[axis] = max[axis].max(*value);
+                    }
+                }
+            }
+        }
+    }
+    if !min[0].is_finite() || !max[0].is_finite() {
+        return Err(Refusal::Empty);
+    }
+    Ok([min, max])
+}
+
 /// Evaluates a reconstructed 3-D span at `u in [0, 1]`.
 fn eval_span3(span: &SpanPoly3, u: f64) -> [f64; 3] {
     [
@@ -1668,46 +2086,68 @@ fn centroid3(points: &[[f64; 3]]) -> [f64; 3] {
     [c[0] * k, c[1] * k, c[2] * k]
 }
 
-/// The deterministic local mesh of a two-station spline-section loft: ruled
-/// quads between the sampled reconstructed loops plus the two end-cap fans.
+/// The deterministic local mesh of an N-station spline-section loft: ruled
+/// quads between consecutive sampled reconstructed loops plus the two end-cap
+/// fans. A stack whose section spans do not match refuses typed.
 fn spline_loft_mesh(sections: &[Vec<ProfileEdge>]) -> Result<Vec<Triangle>, Refusal> {
-    if sections.len() != 2 {
+    if sections.len() < 2 {
+        return Err(Refusal::Empty);
+    }
+    let mut loops: Vec<Vec<SpanPoly3>> = Vec::with_capacity(sections.len());
+    for section in sections {
+        loops.push(spline_loop_spans(section)?);
+    }
+    let span_count = loops.first().map(Vec::len).unwrap_or(0);
+    if span_count == 0 {
         return Err(open_smooth_loft());
     }
-    let first = spline_loop_spans(sections.first().ok_or(Refusal::Empty)?)?;
-    let last = spline_loop_spans(sections.get(1).ok_or(Refusal::Empty)?)?;
-    if first.is_empty() || first.len() != last.len() {
-        return Err(open_smooth_loft());
+    for loop3 in &loops {
+        if loop3.len() != span_count {
+            return Err(open_smooth_loft());
+        }
     }
-    let pa = sample_loop3(&first);
-    let pb = sample_loop3(&last);
-    let count = pa.len();
+    let sampled: Vec<Vec<[f64; 3]>> = loops.iter().map(|loop3| sample_loop3(loop3)).collect();
+    let count = sampled.first().map(Vec::len).unwrap_or(0);
+    if count == 0 {
+        return Err(Refusal::Empty);
+    }
+    for points in &sampled {
+        if points.len() != count {
+            return Err(open_smooth_loft());
+        }
+    }
     let mut out = Vec::new();
-    for i in 0..count {
-        let j = (i + 1) % count;
-        push_quad(
-            &mut out,
-            *pa.get(i).ok_or(Refusal::Empty)?,
-            *pa.get(j).ok_or(Refusal::Empty)?,
-            *pb.get(j).ok_or(Refusal::Empty)?,
-            *pb.get(i).ok_or(Refusal::Empty)?,
-        );
+    for window in sampled.windows(2) {
+        let pa = window.first().ok_or(Refusal::Empty)?;
+        let pb = window.get(1).ok_or(Refusal::Empty)?;
+        for i in 0..count {
+            let j = (i + 1) % count;
+            push_quad(
+                &mut out,
+                *pa.get(i).ok_or(Refusal::Empty)?,
+                *pa.get(j).ok_or(Refusal::Empty)?,
+                *pb.get(j).ok_or(Refusal::Empty)?,
+                *pb.get(i).ok_or(Refusal::Empty)?,
+            );
+        }
     }
-    let ca = centroid3(&pa);
-    let cb = centroid3(&pb);
+    let first_points = sampled.first().ok_or(Refusal::Empty)?;
+    let last_points = sampled.last().ok_or(Refusal::Empty)?;
+    let ca = centroid3(first_points);
+    let cb = centroid3(last_points);
     for i in 0..count {
         let j = (i + 1) % count;
         push_tri(
             &mut out,
             ca,
-            *pa.get(i).ok_or(Refusal::Empty)?,
-            *pa.get(j).ok_or(Refusal::Empty)?,
+            *first_points.get(i).ok_or(Refusal::Empty)?,
+            *first_points.get(j).ok_or(Refusal::Empty)?,
         );
         push_tri(
             &mut out,
             cb,
-            *pb.get(i).ok_or(Refusal::Empty)?,
-            *pb.get(j).ok_or(Refusal::Empty)?,
+            *last_points.get(i).ok_or(Refusal::Empty)?,
+            *last_points.get(j).ok_or(Refusal::Empty)?,
         );
     }
     Ok(out)
@@ -4622,82 +5062,174 @@ print(json.dumps([z_row, loft_row]))
         0.118_463_442_528_094_6,
     ];
 
-    /// The derivative of a reconstructed 3-D span at `u`.
-    fn span3_derivative(span: &SpanPoly3, u: f64) -> [f64; 3] {
-        [
-            span.x[1] + u * (2.0 * span.x[2] + u * 3.0 * span.x[3]),
-            span.y[1] + u * (2.0 * span.y[2] + u * 3.0 * span.y[3]),
-            span.z[1] + u * (2.0 * span.z[2] + u * 3.0 * span.z[3]),
-        ]
+    /// Evaluates a 1-D Bernstein segment (controls of any degree) at `t`,
+    /// returning `(value, derivative)` by de Casteljau.
+    fn bernstein_eval(controls: &[[f64; 3]], t: f64) -> ([f64; 3], [f64; 3]) {
+        let n = controls.len();
+        if n == 0 {
+            return ([0.0; 3], [0.0; 3]);
+        }
+        let mut work: Vec<[f64; 3]> = controls.to_vec();
+        for level in (1..n).rev() {
+            for i in 0..level {
+                let a = work[i];
+                let b = work[i + 1];
+                work[i] = [
+                    a[0] * (1.0 - t) + b[0] * t,
+                    a[1] * (1.0 - t) + b[1] * t,
+                    a[2] * (1.0 - t) + b[2] * t,
+                ];
+            }
+        }
+        let value = work[0];
+        let mut deriv: Vec<[f64; 3]> = Vec::with_capacity(n.saturating_sub(1));
+        for i in 0..(n - 1) {
+            let a = controls[i];
+            let b = controls[i + 1];
+            let k = (n - 1) as f64;
+            deriv.push([k * (b[0] - a[0]), k * (b[1] - a[1]), k * (b[2] - a[2])]);
+        }
+        let (dval, _) = bernstein_eval(&deriv, t);
+        (value, dval)
     }
 
-    /// The exact side-surface divergence-form integral of a two-station ruled
-    /// spline loft, computed independently of the kernel's Bernstein route by
-    /// 5x2 Gauss-Legendre quadrature (exact: the integrand is bidegree (8, 2)).
+    /// The cubic Bernstein basis values and derivatives at `t`.
+    fn cubic_basis(t: f64) -> ([f64; 4], [f64; 4]) {
+        let s = 1.0 - t;
+        (
+            [s * s * s, 3.0 * s * s * t, 3.0 * s * t * t, t * t * t],
+            [
+                -3.0 * s * s,
+                3.0 * s * s - 6.0 * s * t,
+                6.0 * s * t - 3.0 * t * t,
+                3.0 * t * t,
+            ],
+        )
+    }
+
+    /// The exact side-surface divergence-form integral of the canonical
+    /// N-station spline loft, computed independently of the kernel's exact
+    /// expansion route by 5x5 Gauss-Legendre quadrature (exact: the integrand
+    /// is bidegree (8, 8) at worst, and 5-point Gauss is exact through degree
+    /// 9 per axis).
     fn gauss_side_volume(sections: &[Vec<ProfileEdge>]) -> f64 {
-        let a = spline_loop_spans(&sections[0]).expect("reconstruct first");
-        let b = spline_loop_spans(&sections[1]).expect("reconstruct last");
-        let inv3 = 1.0 / 3.0f64.sqrt();
-        let nodes2 = [0.5 - 0.5 * inv3, 0.5 + 0.5 * inv3];
-        let weights2 = [0.5, 0.5];
+        let mut loops: Vec<Vec<SpanPoly3>> = Vec::with_capacity(sections.len());
+        for section in sections {
+            loops.push(spline_loop_spans(section).expect("reconstruct"));
+        }
+        let v = station_params(&loops).expect("station params");
+        let span_count = loops[0].len();
         let mut total = 0.0;
-        for (sa, sb) in a.iter().zip(b.iter()) {
-            for (iu, &u) in GAUSS5_NODES.iter().enumerate() {
-                let aval = eval_span3(sa, u);
-                let bval = eval_span3(sb, u);
-                let da = span3_derivative(sa, u);
-                let db = span3_derivative(sb, u);
-                for (iv, &v) in nodes2.iter().enumerate() {
-                    let x = [
-                        (1.0 - v) * aval[0] + v * bval[0],
-                        (1.0 - v) * aval[1] + v * bval[1],
-                        (1.0 - v) * aval[2] + v * bval[2],
-                    ];
-                    let xu = [
-                        (1.0 - v) * da[0] + v * db[0],
-                        (1.0 - v) * da[1] + v * db[1],
-                        (1.0 - v) * da[2] + v * db[2],
-                    ];
-                    let xv = [bval[0] - aval[0], bval[1] - aval[1], bval[2] - aval[2]];
-                    total += GAUSS5_WEIGHTS[iu] * weights2[iv] * v3_dot(x, v3_cross(xu, xv)) / 3.0;
+        for span_index in 0..span_count {
+            let mut rows: [Vec<[f64; 3]>; 4] = [Vec::new(), Vec::new(), Vec::new(), Vec::new()];
+            for loop3 in &loops {
+                let controls = span3_bernstein(&loop3[span_index]);
+                for k in 0..4 {
+                    rows[k].push(controls[k]);
+                }
+            }
+            let segments: Vec<Vec<Vec<[f64; 3]>>> = rows
+                .iter()
+                .map(|row| v_segments(row, &v).expect("v segments"))
+                .collect();
+            for segment_index in 0..segments[0].len() {
+                for (iu, &u) in GAUSS5_NODES.iter().enumerate() {
+                    let (bu, dbu) = cubic_basis(u);
+                    for (iv, &vv) in GAUSS5_NODES.iter().enumerate() {
+                        let mut x = [0.0f64; 3];
+                        let mut xu = [0.0f64; 3];
+                        let mut xv = [0.0f64; 3];
+                        for k in 0..4 {
+                            let (val, dval) = bernstein_eval(&segments[k][segment_index], vv);
+                            for d in 0..3 {
+                                x[d] += bu[k] * val[d];
+                                xu[d] += dbu[k] * val[d];
+                                xv[d] += bu[k] * dval[d];
+                            }
+                        }
+                        total +=
+                            GAUSS5_WEIGHTS[iu] * GAUSS5_WEIGHTS[iv] * v3_dot(x, v3_cross(xu, xv))
+                                / 3.0;
+                    }
                 }
             }
         }
         total
     }
 
+    /// One section of the one-time OCC fixture family (MONO-2 step 7): four
+    /// quadratic spline edges bulging outward from a square of side `scale`
+    /// centered on the section origin at station `z`.
+    fn nstation_lens(z: f64, scale: f64) -> Vec<ProfileEdge> {
+        let corners: [[f64; 2]; 4] = [[0.0, 0.0], [1.0, 0.0], [1.0, 1.0], [0.0, 1.0]];
+        let center: [f64; 2] = [0.5, 0.5];
+        let mut edges = Vec::with_capacity(4);
+        for i in 0..4 {
+            let a = corners[i];
+            let b = corners[(i + 1) % 4];
+            let mid = [0.5 * (a[0] + b[0]), 0.5 * (a[1] + b[1])];
+            let dx = mid[0] - center[0];
+            let dy = mid[1] - center[1];
+            let len = (dx * dx + dy * dy).sqrt();
+            let outward = [mid[0] + 0.15 * dx / len, mid[1] + 0.15 * dy / len];
+            let point = |q: [f64; 2]| [scale * (q[0] - 0.5), scale * (q[1] - 0.5), z];
+            edges.push(ProfileEdge::Spline {
+                points: vec![point(a), point(outward), point(b)],
+            });
+        }
+        edges
+    }
+
+    /// The synthetic N-station stack of the one-time OCC fixture suite.
+    fn nstation_sections(n: usize) -> Vec<Vec<ProfileEdge>> {
+        let mut out = Vec::with_capacity(n);
+        for i in 0..n {
+            let scale = 1.0 + 0.06 * i as f64;
+            let z = 2.0 * i as f64 + 0.05 * (i * i) as f64;
+            out.push(nstation_lens(z, scale));
+        }
+        out
+    }
+
     #[test]
-    fn spline_section_loft_volume_certified_bracket() {
-        // A genuinely curved spline-section loft certifies through the binding:
-        // the returned bracket encloses the value, the bracket is tight, and
-        // the value matches an independent Gauss-Legendre integration of the
-        // same ruled surface plus the exact planar caps.
-        let sections = vec![spline_lens(0.0), spline_lens(5.0)];
-        let (value, lo, hi) = certified_spline_loft_volume(&sections)
-            .expect("a two-station spline-section loft certifies");
-        assert!(
-            lo <= value && value <= hi,
-            "the bracket [{lo}, {hi}] must enclose {value}"
-        );
-        assert!(
-            (hi - lo) < 1.0e-6,
-            "the certified bracket is tight: [{lo}, {hi}]"
-        );
-        let first = spline_loop_spans(&sections[0]).expect("first loop");
-        let last = spline_loop_spans(&sections[1]).expect("last loop");
-        let av = spline_loop_area_vector(&first);
-        let bv = spline_loop_area_vector(&last);
-        let ma = v3_norm(av);
-        let mb = v3_norm(bv);
-        let pa = [first[0].x[0], first[0].y[0], first[0].z[0]];
-        let pb = [last[0].x[0], last[0].y[0], last[0].z[0]];
-        let caps = -(1.0 / 3.0) * ma * v3_dot([av[0] / ma, av[1] / ma, av[2] / ma], pa)
-            + (1.0 / 3.0) * mb * v3_dot([bv[0] / mb, bv[1] / mb, bv[2] / mb], pb);
-        let expected = gauss_side_volume(&sections) + caps;
-        assert!(
-            (value - expected.abs()).abs() < 1.0e-9,
-            "the certified value {value} must match the independent {expected}"
-        );
+    fn nstation_volume_brackets_canonical_surface() {
+        // The N-station canonical surface certifies through the binding: the
+        // bracket encloses the value, is tight, and matches an independent
+        // 5x5 Gauss-Legendre integration of the same tensor-Bernstein patches
+        // plus the exact planar end caps. The landed two-station case is
+        // included so the generalization does not regress it.
+        for sections in [
+            vec![spline_lens(0.0), spline_lens(5.0)],
+            vec![spline_lens(0.0), spline_lens(2.0), spline_lens(5.0)],
+            nstation_sections(9),
+            nstation_sections(10),
+        ] {
+            let (value, lo, hi) =
+                certified_spline_loft_volume(&sections).expect("the canonical stack certifies");
+            assert!(
+                lo <= value && value <= hi,
+                "the bracket [{lo}, {hi}] must enclose {value}"
+            );
+            assert!(
+                (hi - lo) < 1.0e-6 * (1.0 + value.abs()),
+                "the certified bracket is tight: [{lo}, {hi}]"
+            );
+            let first = spline_loop_spans(&sections[0]).expect("first loop");
+            let last = spline_loop_spans(sections.last().expect("last")).expect("last loop");
+            let av = spline_loop_area_vector(&first);
+            let bv = spline_loop_area_vector(&last);
+            let ma = v3_norm(av);
+            let mb = v3_norm(bv);
+            let pa = [first[0].x[0], first[0].y[0], first[0].z[0]];
+            let pb = [last[0].x[0], last[0].y[0], last[0].z[0]];
+            let caps = -(1.0 / 3.0) * ma * v3_dot([av[0] / ma, av[1] / ma, av[2] / ma], pa)
+                + (1.0 / 3.0) * mb * v3_dot([bv[0] / mb, bv[1] / mb, bv[2] / mb], pb);
+            let expected = gauss_side_volume(&sections) + caps;
+            assert!(
+                (value - expected.abs()).abs() < 1.0e-8 * (1.0 + value.abs()),
+                "the certified value {value} must match the independent {expected}"
+            );
+        }
     }
 
     #[test]
@@ -4755,34 +5287,130 @@ print(json.dumps([z_row, loft_row]))
     }
 
     #[test]
-    fn unmatched_loft_carrier_refuses_typed() {
-        // A three-station smooth spline loft: the station interpolation is not
-        // recorded, so the arm refuses typed naming the open smooth carrier.
-        let three = SolidSpec::Loft {
-            sections: vec![spline_lens(0.0), spline_lens(2.0), spline_lens(5.0)],
+    fn nstation_refuses_still_typed_for_open_chains() {
+        // A stack whose section spans do not match cannot be unified by knot
+        // insertion alone: the landed typed refusal is preserved.
+        let mut six_span = spline_square(0.0);
+        six_span[0] = ProfileEdge::Spline {
+            points: vec![
+                [0.0, 0.0, 0.0],
+                [0.3, 0.0, 0.0],
+                [0.6, 0.0, 0.0],
+                [1.0, 0.0, 0.0],
+            ],
+        };
+        let mismatched = SolidSpec::Loft {
+            sections: vec![six_span, spline_square(5.0)],
             closed: false,
         };
-        let refusal = tree_facts(&part(three, 0.0, 0.0, 0.0))
-            .expect_err("three smooth stations must refuse typed");
+        let refusal = tree_facts(&part(mismatched, 0.0, 0.0, 0.0))
+            .expect_err("a mismatched span stack must refuse typed");
         assert!(matches!(
             refusal,
             Refusal::UnsupportedEnvelope(EnvelopeCase::NonCanonicalCarrier)
         ));
 
-        // Mismatched section span counts refuse typed too.
-        let mismatched = SolidSpec::Loft {
-            sections: vec![
-                spline_square(0.0),
-                line_loop3(&[[0.0, 0.0, 5.0], [1.0, 0.0, 5.0], [0.5, 1.0, 5.0]]),
-            ],
-            closed: false,
+        // A closed smooth halo chain has no end-cap certificate and keeps the
+        // landed typed refusal.
+        let closed = SolidSpec::Loft {
+            sections: nstation_sections(4),
+            closed: true,
         };
-        let refusal = tree_facts(&part(mismatched, 0.0, 0.0, 0.0))
-            .expect_err("mismatched sections must refuse typed");
+        let refusal = tree_facts(&part(closed, 0.0, 0.0, 0.0))
+            .expect_err("a closed smooth chain must refuse typed");
         assert!(matches!(
             refusal,
             Refusal::UnsupportedEnvelope(EnvelopeCase::NonCanonicalCarrier)
         ));
+
+        // A section loop that does not close keeps the landed typed refusal.
+        let open_loop = vec![
+            ProfileEdge::Spline {
+                points: vec![[0.0, 0.0, 0.0], [1.0, 0.0, 0.0], [1.0, 1.0, 0.0]],
+            },
+            ProfileEdge::Spline {
+                points: vec![[1.0, 1.0, 0.0], [0.0, 1.0, 0.0], [0.2, 0.2, 0.0]],
+            },
+        ];
+        let non_closing = SolidSpec::Loft {
+            sections: vec![open_loop, spline_square(5.0)],
+            closed: false,
+        };
+        let refusal = tree_facts(&part(non_closing, 0.0, 0.0, 0.0))
+            .expect_err("a non-closing section loop must refuse typed");
+        assert!(matches!(
+            refusal,
+            Refusal::UnsupportedEnvelope(EnvelopeCase::NonCanonicalCarrier)
+        ));
+    }
+
+    #[test]
+    fn nstation_fixture_deltas_recorded() {
+        // The one-time OCC diagnostics (the probe protocol, MONO-2 step 7):
+        // synthetic N-station stacks with OCC's smooth-loft volume recorded.
+        // The kernel's canonical surface is NOT OCC's approximant, so the
+        // per-N delta is recorded as DIAGNOSTIC data, never gated; the
+        // kernel's own certificate brackets are the gate. No OCC run happens
+        // here.
+        let fixtures: [(usize, f64); 5] = [
+            (3, 6.625_709_132_106_989),
+            (5, 15.613_697_373_247_499),
+            (9, 42.735_598_479_334_96),
+            (10, 51.836_528_398_090_365),
+            (16, 132.168_754_551_587_88),
+        ];
+        let mut recorded = Vec::new();
+        for (n, occ_volume) in fixtures {
+            let facts = tree_facts(&part(
+                SolidSpec::Loft {
+                    sections: nstation_sections(n),
+                    closed: false,
+                },
+                0.0,
+                0.0,
+                0.0,
+            ))
+            .expect("the canonical stack measures");
+            assert_eq!(facts.solid_count, 1);
+            let value = facts.volume;
+            assert!(
+                value.is_finite() && value > 0.0,
+                "N={n}: canonical volume {value}"
+            );
+            let delta = (value - occ_volume).abs();
+            let relative = delta / occ_volume.abs();
+            assert!(
+                relative.is_finite() && relative < 0.5,
+                "N={n}: the canonical-vs-OCC delta {relative} is not a gross error"
+            );
+            recorded.push((n, value, occ_volume, delta));
+        }
+        for (n, value, occ_volume, delta) in &recorded {
+            println!("MONO-2 fixture N={n}: canonical={value} occ={occ_volume} abs_delta={delta}");
+        }
+        assert_eq!(recorded.len(), 5);
+    }
+
+    #[test]
+    fn nstation_42_station_timing_kernel_class() {
+        // The monocoque tub's scale: a 42-station synthetic canonical loft
+        // measures in kernel-class time (no OCC, no approximation).
+        let solid = SolidSpec::Loft {
+            sections: nstation_sections(42),
+            closed: false,
+        };
+        let start = std::time::Instant::now();
+        let facts = tree_facts(&part(solid, 0.0, 0.0, 0.0)).expect("the 42-station tub measures");
+        let elapsed = start.elapsed();
+        assert!(facts.volume.is_finite() && facts.volume > 0.0);
+        assert!(
+            elapsed.as_secs_f64() < 30.0,
+            "the 42-station canonical measurement took {elapsed:?}"
+        );
+        println!(
+            "MONO-2 42-station canonical volume {} in {elapsed:?}",
+            facts.volume
+        );
     }
 
     // Boolean rows through the boolean funnel (BRIDGE-BOOLEANS): the door
