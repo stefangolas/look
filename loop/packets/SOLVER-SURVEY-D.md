@@ -28,7 +28,7 @@ read_allow:
   - corpus/ttc/door.py
 tests_required: []
 anchors:
-  - {id: A1, expect: 177, cmd: "grep -cE 'fn [a-z_]+' truck123d/src/bd_bridge.rs"}
+  - {id: A1, expect: 185, cmd: "grep -cE 'fn [a-z_]+' truck123d/src/bd_bridge.rs"}
   - {id: A2, expect: 7,  cmd: "grep -cE 'fn member_[a-z_]+\\(' truck123d/src/bd_bridge.rs"}
 budget:      {turns: 55, ctx_tokens: 180000}
 ```
