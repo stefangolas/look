@@ -30,7 +30,7 @@ tests_required:
   - z_revolve_and_loft_rows_answer_bit_identically
 anchors:
   - {id: A1, expect: 6, cmd: "grep -c 'sweep' corpus/ttc/door.py"}
-  - {id: A2, expect: 6, cmd: "grep -c 'tangent' corpus/ttc/door.py"}
+  - {id: A2, expect: 7, cmd: "grep -c 'tangent' corpus/ttc/door.py"}
   - {id: A3, expect: 2, cmd: "grep -c 'position_at' corpus/ttc/door.py"}
 budget:      {turns: 60, ctx_tokens: 160000}
 ```
