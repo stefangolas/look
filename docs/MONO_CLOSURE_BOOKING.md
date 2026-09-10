@@ -92,3 +92,31 @@ packet graph; program booking is valid iff the union of its packets covers
 every gap cell of its target rows; `door --trace-carriers` (soft-refusal
 execution, logging the real carrier sequence) is the ground-truth instrument
 the static sweep defers to. Both are loop-side; neither is a packet.
+
+---
+
+## Annex A CORRECTION (2026-09-10 ~16:20Z) — the annex law was FALSIFIED; canonical decision recorded
+
+MONO-2's worker (stop-condition-1, the guard working as designed) falsified
+annex A's A2/A4 by measurement + OCCT source: OCCT's smooth ThruSections is
+`BRepOffsetAPI_ThruSections::CreateSmoothed` -> `GeomFill_AppSurf(degmin=2,
+degmax, pres3d)` with `Approx_ChordLength` and C2 continuity — a
+TOLERANCE-DRIVEN APPROXIMATION whose v-degree (2..8) is data-dependent, not a
+function of N. The annex's "exact section hit" and "degree N-1 / knots-at-
+stations" claims described one synthetic family's outcomes (the probe's
+sampling floor could not separate exact from within-1e-7). A3 (chord-length
+station parameters) SURVIVES (source: myParamType = Approx_ChordLength).
+
+OWNER DIRECTIVE APPLIED ("we don't need to match OCCT's exact output — a good,
+justifiable, expectation-consistent answer"): the kernel pins a CANONICAL
+smooth-loft convention — exact C2 interpolation across chord-length station
+parameters (global degree N-1 for N<=9; C2 cubic with knots at stations for
+N>=10) — and certifies ITS surface rigorously via the landed per-patch
+machinery. The corpus's recorded references (OCCT approximant output) remain
+the facts oracle and adjudicate EMPIRICALLY at the census re-run: rows whose
+canonical-loft facts land inside the recorded band flip green; rows outside
+record a typed refusal carrying the measured delta (honest DNF-FACTS for that
+row — no tolerance stretch, no approximant replication inside the kernel).
+OCC synthetic fixtures in the packet become DIAGNOSTIC (delta measurement),
+not gates. The two-station arm is untouched (linear v is exact for both
+algorithms).
