@@ -1,0 +1,680 @@
+{
+  "id": "SOLVER-SURVEY-B",
+  "packet": "SOLVER-SURVEY-B",
+  "status": "complete",
+  "class": "survey",
+  "contract": [
+    "SOLVER-SURVEY-B"
+  ],
+  "fragment": "loop/solver_coverage/fragments/B.json",
+  "anchors": [
+    {
+      "id": "A1",
+      "expect": 11,
+      "actual": 11,
+      "ok": true,
+      "cmd": "grep -ci 'transversal' vendor/truck/truck-certified/src/construct/admission.rs"
+    },
+    {
+      "id": "A2",
+      "expect": 3,
+      "actual": 3,
+      "ok": true,
+      "cmd": "grep -c 'pub fn' vendor/truck/truck-certified/src/kernel/minor_algebra.rs"
+    }
+  ],
+  "census": {
+    "rules_extracted": 205,
+    "by_file": {
+      "vendor/truck/truck-certified/src/construct/admission.rs": 26,
+      "vendor/truck/truck-certified/src/construct/bie/closure.rs": 7,
+      "vendor/truck/truck-certified/src/construct/bie/mod.rs": 6,
+      "vendor/truck/truck-certified/src/construct/bie/ssi4.rs": 11,
+      "vendor/truck/truck-certified/src/construct/blend.rs": 21,
+      "vendor/truck/truck-certified/src/construct/blend_varradius.rs": 9,
+      "vendor/truck/truck-certified/src/construct/contact3.rs": 7,
+      "vendor/truck/truck-certified/src/formal/ambient.rs": 4,
+      "vendor/truck/truck-certified/src/formal/bezier.rs": 2,
+      "vendor/truck/truck-certified/src/formal/bezier_isect.rs": 3,
+      "vendor/truck/truck-certified/src/formal/common_arc.rs": 3,
+      "vendor/truck/truck-certified/src/formal/cone.rs": 2,
+      "vendor/truck/truck-certified/src/formal/cone_band.rs": 3,
+      "vendor/truck/truck-certified/src/formal/contact.rs": 3,
+      "vendor/truck/truck-certified/src/formal/curve2d.rs": 2,
+      "vendor/truck/truck-certified/src/formal/curve_witness.rs": 3,
+      "vendor/truck/truck-certified/src/formal/cylinder.rs": 2,
+      "vendor/truck/truck-certified/src/formal/cylinder_arrangement.rs": 2,
+      "vendor/truck/truck-certified/src/formal/cylinder_band.rs": 3,
+      "vendor/truck/truck-certified/src/formal/cylinder_cover.rs": 2,
+      "vendor/truck/truck-certified/src/formal/cylinder_face.rs": 1,
+      "vendor/truck/truck-certified/src/formal/cylinder_lift.rs": 3,
+      "vendor/truck/truck-certified/src/formal/cylinder_mesh.rs": 2,
+      "vendor/truck/truck-certified/src/formal/deck.rs": 3,
+      "vendor/truck/truck-certified/src/formal/envelope.rs": 3,
+      "vendor/truck/truck-certified/src/formal/evidence.rs": 3,
+      "vendor/truck/truck-certified/src/formal/exact.rs": 2,
+      "vendor/truck/truck-certified/src/formal/intersection.rs": 3,
+      "vendor/truck/truck-certified/src/formal/numeric.rs": 2,
+      "vendor/truck/truck-certified/src/formal/outcome.rs": 4,
+      "vendor/truck/truck-certified/src/formal/planar_developed.rs": 3,
+      "vendor/truck/truck-certified/src/formal/planar_holes.rs": 4,
+      "vendor/truck/truck-certified/src/formal/planar_slice.rs": 4,
+      "vendor/truck/truck-certified/src/formal/quotient.rs": 4,
+      "vendor/truck/truck-certified/src/formal/rank1_annulus.rs": 4,
+      "vendor/truck/truck-certified/src/formal/span.rs": 4,
+      "vendor/truck/truck-certified/src/formal/sphere.rs": 3,
+      "vendor/truck/truck-certified/src/formal/support.rs": 3,
+      "vendor/truck/truck-certified/src/formal/torus.rs": 3,
+      "vendor/truck/truck-certified/src/formal/torus_cell.rs": 3,
+      "vendor/truck/truck-certified/src/formal/torus_circle.rs": 3,
+      "vendor/truck/truck-certified/src/formal/torus_outcome.rs": 1,
+      "vendor/truck/truck-certified/src/formal/torus_realize.rs": 3,
+      "vendor/truck/truck-certified/src/formal/xmonotone.rs": 3,
+      "vendor/truck/truck-certified/src/tangency/gates.rs": 12,
+      "vendor/truck/truck-certified/src/tangency/tsystem.rs": 1
+    },
+    "by_kind": {
+      "assembler": 36,
+      "classifier": 62,
+      "gate": 47,
+      "reduction": 22,
+      "solver": 38
+    },
+    "by_confidence": {
+      "high": 196,
+      "low": 1,
+      "medium": 8
+    },
+    "theory_only_count": 8,
+    "theory_only_rules": [
+      "BIE-CARRIER-DECISION-8-1",
+      "BLEND-EVENT-RANK-FOCAL",
+      "FORMAL-AMBIENT-PERIOD-NUMERICALLY",
+      "TORUS-REALIZE-FUTURE-MIXED-WINDING-BASIS",
+      "ENVELOPE-CATEGORICAL-FEATURE-EXCLUSION-WITNESS",
+      "OUTCOME-REALIZATION-PRESERVES-VALIDITY",
+      "SPAN-RATIONAL-BEZIER-THEORY",
+      "SPAN-CROSSING-CLASSIFICATION-THEORY"
+    ],
+    "unmodeled_values_count": 46,
+    "unmodeled_values": [
+      "!unmodeled:2D developed x-monotone pieces (line/circular arc)",
+      "!unmodeled:ConstructRefusal (assemble_normal_numerator cause)",
+      "!unmodeled:Curve::CertifiedImplicitIntersectionCurve (planned BIE-003 variant)",
+      "!unmodeled:String",
+      "!unmodeled:String (certify_a2 error, Debug-formatted)",
+      "!unmodeled:String (classify_box error, Debug-formatted)",
+      "!unmodeled:TangencyRefusal (propagated from from_system_grid / from_net)",
+      "!unmodeled:assembled polynomialized F; zero set not yet certified",
+      "!unmodeled:caller assertion carries no certificate authority",
+      "!unmodeled:certifiably exterior",
+      "!unmodeled:class line outside dispatcher admitted set",
+      "!unmodeled:combined three-stage torus pipeline outcome",
+      "!unmodeled:conservative outward-rounded enclosure",
+      "!unmodeled:contiguous compatible-integer sub-interval of the conservative range",
+      "!unmodeled:deferred in GEN-001E",
+      "!unmodeled:each support must be affine over its certified region (identically zero second-partial Bernstein coefficient grids over every touched patch, with one shared tangent frame)",
+      "!unmodeled:every touched patch must be exactly flat and share one tangent frame (the CC-020 offset-corner class)",
+      "!unmodeled:evidence contradicts itself",
+      "!unmodeled:exact clearing identity; zeros of F equal zeros of X-Y",
+      "!unmodeled:face proved outside declared envelope",
+      "!unmodeled:general common component, deferred",
+      "!unmodeled:integer deck group Z on one periodic developed axis plus one structural-zero axis",
+      "!unmodeled:mixed-winding cell (1,1)",
+      "!unmodeled:no certified source-declared join",
+      "!unmodeled:not applicable (refusal record)",
+      "!unmodeled:not applicable (value record)",
+      "!unmodeled:not certifiable under declared numerical policy",
+      "!unmodeled:outside declared envelope",
+      "!unmodeled:positive-dimensional connected overlap component (not a zero set)",
+      "!unmodeled:positive-length overlap is 1D; triple intersections deferred to ARR-003",
+      "!unmodeled:rank exceeds envelope r_max",
+      "!unmodeled:rank-2 geometric placement unsupported",
+      "!unmodeled:resolve ambient lattice rank from per-axis period evidence",
+      "!unmodeled:same support circle",
+      "!unmodeled:single-level probe verdict (GateAdmission probe arm)",
+      "!unmodeled:sound enclosure of the exact result",
+      "!unmodeled:sound superset of the true interval",
+      "!unmodeled:strict separation or Undecidable, never an epsilon comparison",
+      "!unmodeled:surface identification, not a curve-pair relation",
+      "!unmodeled:test oracle assertion",
+      "!unmodeled:the certified upper bound of ∂_λ[(c − G(λ))·G′(λ)] = −‖G′‖² + (c − G)·G″ must be strictly negative over the compact guide sub-region",
+      "!unmodeled:the local uniqueness gate over the window certifies the strictly-negative foot derivative for the whole centre enclosure",
+      "!unmodeled:two developed axis-aligned enclosures in the universal cover",
+      "!unmodeled:two or more inequivalent admissible readings",
+      "!unmodeled:two source-curve occurrences (developed 2D curves); no 2x2/2x1/1x1 relation matrix",
+      "!unmodeled:valid geometry outside admitted envelope"
+    ],
+    "axis_coverage": {
+      "!unmodeled:a1_definite_bowl": {
+        "use_count": 1,
+        "values": {
+          "true": 1
+        }
+      },
+      "!unmodeled:a1_indefinite_saddle": {
+        "use_count": 1,
+        "values": {
+          "true": 1
+        }
+      },
+      "!unmodeled:a1_minus_saddle_node": {
+        "use_count": 1,
+        "values": {
+          "true": 1
+        }
+      },
+      "!unmodeled:a1_plus_definite": {
+        "use_count": 1,
+        "values": {
+          "true": 1
+        }
+      },
+      "!unmodeled:a2_branch": {
+        "use_count": 1,
+        "values": {
+          "true": 1
+        }
+      },
+      "!unmodeled:a2_exact_data": {
+        "use_count": 1,
+        "values": {
+          "A2ExactData": 1
+        }
+      },
+      "!unmodeled:a2_parabola": {
+        "use_count": 1,
+        "values": {
+          "(u − s, v − t, (s − 1/2)²)": 1
+        }
+      },
+      "!unmodeled:admitted_class": {
+        "use_count": 1,
+        "values": {
+          "ruled-section-loft pair (v-degree 1)": 1
+        }
+      },
+      "!unmodeled:anchor": {
+        "use_count": 1,
+        "values": {
+          "[f64; 3]": 1
+        }
+      },
+      "!unmodeled:boundary_collapse": {
+        "use_count": 1,
+        "values": {
+          "exact factor (1−v)^k": 1
+        }
+      },
+      "!unmodeled:budget": {
+        "use_count": 2,
+        "values": {
+          "subdiv=256, dim=0, cert=0": 1,
+          "subdiv=4096, dim=0, cert=0": 1
+        }
+      },
+      "!unmodeled:certificate_budget": {
+        "use_count": 2,
+        "values": {
+          "CertificateBudget": 2
+        }
+      },
+      "!unmodeled:certificate_outcome": {
+        "use_count": 2,
+        "values": {
+          "Regular | RegularWithSeam | RegularInteriorCollapsedBoundary | GenuineSingularity": 1,
+          "not GenuineSingularity": 1
+        }
+      },
+      "!unmodeled:certified_cone_pair": {
+        "use_count": 1,
+        "values": {
+          "separated": 1
+        }
+      },
+      "!unmodeled:certified_graph": {
+        "use_count": 1,
+        "values": {
+          "CertifiedGraph": 1
+        }
+      },
+      "!unmodeled:certified_verdict_kind": {
+        "use_count": 1,
+        "values": {
+          "Transversal | Empty | A1Isolated | A1Node | A2Branch": 1
+        }
+      },
+      "!unmodeled:chart_minor_grids": {
+        "use_count": 2,
+        "values": {
+          "ChartMinorGrids": 2
+        }
+      },
+      "!unmodeled:chart_pivot": {
+        "use_count": 1,
+        "values": {
+          "Rank2Chart pivot": 1
+        }
+      },
+      "!unmodeled:coefficient_net": {
+        "use_count": 1,
+        "values": {
+          "non-empty, shape (du+1)*(dv+1), finite, margin_lo > 0": 1
+        }
+      },
+      "!unmodeled:cone": {
+        "use_count": 1,
+        "values": {
+          "NormalCone": 1
+        }
+      },
+      "!unmodeled:contact_verdict": {
+        "use_count": 2,
+        "values": {
+          "ContactVerdict<QPoly>": 2
+        }
+      },
+      "!unmodeled:deflated_system": {
+        "use_count": 1,
+        "values": {
+          "T = (G1, G2, M1, M2) over unit chart": 1
+        }
+      },
+      "!unmodeled:deflated_tsystem": {
+        "use_count": 1,
+        "values": {
+          "TSystem": 1
+        }
+      },
+      "!unmodeled:deflation_multiplicity": {
+        "use_count": 1,
+        "values": {
+          "k > 0": 1
+        }
+      },
+      "!unmodeled:delta": {
+        "use_count": 1,
+        "values": {
+          "(lo, hi) with lo > 0": 1
+        }
+      },
+      "!unmodeled:exact_admission": {
+        "use_count": 1,
+        "values": {
+          "all fixtures admit": 1
+        }
+      },
+      "!unmodeled:extracted_span_family": {
+        "use_count": 1,
+        "values": {
+          "non-empty": 1
+        }
+      },
+      "!unmodeled:f4_verdict": {
+        "use_count": 1,
+        "values": {
+          "A1Node": 1
+        }
+      },
+      "!unmodeled:finite_unit_directions": {
+        "use_count": 1,
+        "values": {
+          "true": 1
+        }
+      },
+      "!unmodeled:fixture_kit": {
+        "use_count": 1,
+        "values": {
+          "F1–F6": 1
+        }
+      },
+      "!unmodeled:hemisphere_search": {
+        "use_count": 1,
+        "values": {
+          "midpoint normal then six unit-axis probes": 1
+        }
+      },
+      "!unmodeled:krawczyk_n4": {
+        "use_count": 1,
+        "values": {
+          "KrawczykSystem<4> instantiated": 1
+        }
+      },
+      "!unmodeled:margin_lo": {
+        "use_count": 1,
+        "values": {
+          "sin α − s_X − s_Y > 0": 1
+        }
+      },
+      "!unmodeled:multiplicity": {
+        "use_count": 1,
+        "values": {
+          "usize": 1
+        }
+      },
+      "!unmodeled:norm_enclosure": {
+        "use_count": 1,
+        "values": {
+          "[|v|_lo, |v|_hi]": 1
+        }
+      },
+      "!unmodeled:normal_cone": {
+        "use_count": 1,
+        "values": {
+          "s_up < 1": 1
+        }
+      },
+      "!unmodeled:normal_cone_pair": {
+        "use_count": 1,
+        "values": {
+          "certified anchors + s_up": 1
+        }
+      },
+      "!unmodeled:paired_edges": {
+        "use_count": 1,
+        "values": {
+          "(EdgeId, EdgeId)": 1
+        }
+      },
+      "!unmodeled:parent_face_ordinal": {
+        "use_count": 1,
+        "values": {
+          "0 or 1": 1
+        }
+      },
+      "!unmodeled:r1_gate": {
+        "use_count": 1,
+        "values": {
+          "no runtime call site evaluates T1.4 identity": 1
+        }
+      },
+      "!unmodeled:r3_gate_fixture": {
+        "use_count": 1,
+        "values": {
+          "true": 1
+        }
+      },
+      "!unmodeled:rank_DF": {
+        "use_count": 1,
+        "values": {
+          "3": 1
+        }
+      },
+      "!unmodeled:regular_patch_pair": {
+        "use_count": 1,
+        "values": {
+          "certified cones": 1
+        }
+      },
+      "!unmodeled:s_up": {
+        "use_count": 1,
+        "values": {
+          "f64 < 1": 1
+        }
+      },
+      "!unmodeled:sin_angle_lower_bound": {
+        "use_count": 1,
+        "values": {
+          "outward-rounded": 1
+        }
+      },
+      "!unmodeled:square_system_3": {
+        "use_count": 1,
+        "values": {
+          "SquareSystem3": 1
+        }
+      },
+      "!unmodeled:subdivision_budget": {
+        "use_count": 1,
+        "values": {
+          "max_depth, max_cells": 1
+        }
+      },
+      "!unmodeled:t1_7_witness": {
+        "use_count": 2,
+        "values": {
+          "ExactVanishingWitness<QPoly>": 1,
+          "s = a = 1, q = s − 1/2, w₁ = w₂ = 0": 1
+        }
+      },
+      "!unmodeled:transversal": {
+        "use_count": 1,
+        "values": {
+          "true": 1
+        }
+      },
+      "!unmodeled:transversal_crossing_planes": {
+        "use_count": 1,
+        "values": {
+          "true": 1
+        }
+      },
+      "!unmodeled:unit_weight_grid": {
+        "use_count": 1,
+        "values": {
+          "true": 1
+        }
+      },
+      "!unmodeled:unresolved": {
+        "use_count": 1,
+        "values": {
+          "true": 1
+        }
+      },
+      "!unmodeled:whole_span_product_chart": {
+        "use_count": 1,
+        "values": {
+          "certifiably transverse": 1
+        }
+      },
+      "foot.derivative_strictly_negative": {
+        "use_count": 2,
+        "values": {
+          "!unmodeled:the certified upper bound of ∂_λ[(c − G(λ))·G′(λ)] = −‖G′‖² + (c − G)·G″ must be strictly negative over the compact guide sub-region": 1,
+          "!unmodeled:the local uniqueness gate over the window certifies the strictly-negative foot derivative for the whole centre enclosure": 1
+        }
+      },
+      "global.knowledge": {
+        "use_count": 153,
+        "values": {
+          "!unmodeled:caller assertion carries no certificate authority": 1,
+          "!unmodeled:combined three-stage torus pipeline outcome": 1,
+          "!unmodeled:evidence contradicts itself": 2,
+          "!unmodeled:face proved outside declared envelope": 1,
+          "!unmodeled:outside declared envelope": 1,
+          "!unmodeled:rank exceeds envelope r_max": 1,
+          "!unmodeled:two or more inequivalent admissible readings": 2,
+          "all_components": 19,
+          "complete_locus": 17,
+          "local_only(refused)": 1,
+          "local_only(residual)": 52,
+          "local_only(residual: Err of StageEvaluation, never a StageOutcome variant)": 1,
+          "local_only(residual: authority minted only inside formal subtree)": 1,
+          "local_only(residual: carries that stage's product only)": 1,
+          "local_only(residual: compare periods/translations, never key maps on them)": 1,
+          "local_only(residual: conservative superset; false positives allowed, false negatives P0)": 1,
+          "local_only(residual: exactly two pairwise participants)": 1,
+          "local_only(residual: fact about this run, not the face)": 1,
+          "local_only(residual: finite and > 0)": 1,
+          "local_only(residual: finite and >= 0)": 1,
+          "local_only(residual: gauge-normalized relative labels)": 1,
+          "local_only(residual: no raw f64 in a formal certificate)": 1,
+          "local_only(residual: one event's incidences under one ambient context)": 1,
+          "local_only(residual: one stage, not the face)": 1,
+          "local_only(residual: pairwise GEN-001 level; ARR-003 may aggregate N-way later)": 1,
+          "local_only(residual: pairwise adapter; no multi-branch merge)": 1,
+          "local_only(residual: pairwise only)": 1,
+          "local_only(residual: pairwise support identity only)": 1,
+          "local_only(residual: pairwise support-curve count, not finite-piece count)": 1,
+          "local_only(residual: per-consumer policy, no total order)": 1,
+          "local_only(residual: per-proposition authority status)": 1,
+          "local_only(residual: property of this run, not of the face)": 1,
+          "local_only(residual: proved neither NaN nor infinity)": 1,
+          "local_only(residual: run resource envelope)": 1,
+          "local_only(scope exclusion)": 1,
+          "loop_free": 14,
+          "seed_complete": 13,
+          "unknown": 4
+        }
+      },
+      "goal": {
+        "use_count": 165,
+        "values": {
+          "!unmodeled:class line outside dispatcher admitted set": 1,
+          "!unmodeled:no certified source-declared join": 1,
+          "!unmodeled:not certifiable under declared numerical policy": 2,
+          "!unmodeled:rank-2 geometric placement unsupported": 1,
+          "!unmodeled:resolve ambient lattice rank from per-axis period evidence": 1,
+          "!unmodeled:valid geometry outside admitted envelope": 2,
+          "complete_locus": 26,
+          "local_contact": 49,
+          "material_class": 32,
+          "mesh": 19,
+          "no_intersection": 15,
+          "valid_brep": 16
+        }
+      },
+      "relation.incidence": {
+        "use_count": 78,
+        "values": {
+          "!unmodeled:certifiably exterior": 1,
+          "domain_edge": 19,
+          "domain_interior(residual)": 36,
+          "domain_interior(residual: A7 seam/endpoint copy selection)": 1,
+          "domain_interior(residual: uniquely certified 2π lift)": 1,
+          "knot_span_boundary": 7,
+          "seam": 13
+        }
+      },
+      "relation.local_dim": {
+        "use_count": 108,
+        "values": {
+          "!unmodeled:positive-length overlap is 1D; triple intersections deferred to ARR-003": 1,
+          "0": 23,
+          "1": 49,
+          "2": 22,
+          "residual": 13
+        }
+      },
+      "relation.src_dims": {
+        "use_count": 97,
+        "values": {
+          "!unmodeled:2D developed x-monotone pieces (line/circular arc)": 1,
+          "!unmodeled:integer deck group Z on one periodic developed axis plus one structural-zero axis": 1,
+          "!unmodeled:mixed-winding cell (1,1)": 1,
+          "!unmodeled:not applicable (refusal record)": 1,
+          "!unmodeled:not applicable (value record)": 1,
+          "!unmodeled:surface identification, not a curve-pair relation": 1,
+          "!unmodeled:two developed axis-aligned enclosures in the universal cover": 1,
+          "!unmodeled:two source-curve occurrences (developed 2D curves); no 2x2/2x1/1x1 relation matrix": 1,
+          "1x1": 1,
+          "2x1": 18,
+          "2x2": 70
+        }
+      },
+      "relation.zero_set": {
+        "use_count": 164,
+        "values": {
+          "!unmodeled:assembled polynomialized F; zero set not yet certified": 1,
+          "!unmodeled:conservative outward-rounded enclosure": 1,
+          "!unmodeled:contiguous compatible-integer sub-interval of the conservative range": 1,
+          "!unmodeled:exact clearing identity; zeros of F equal zeros of X-Y": 1,
+          "!unmodeled:general common component, deferred": 1,
+          "!unmodeled:positive-dimensional connected overlap component (not a zero set)": 1,
+          "!unmodeled:same support circle": 1,
+          "!unmodeled:sound enclosure of the exact result": 1,
+          "!unmodeled:sound superset of the true interval": 1,
+          "!unmodeled:strict separation or Undecidable, never an epsilon comparison": 1,
+          "certified_empty": 21,
+          "rank_deficient(residual)": 13,
+          "regular": 85,
+          "unknown": 35
+        }
+      },
+      "rep.bernstein_chart": {
+        "use_count": 23,
+        "values": {
+          "!unmodeled:deferred in GEN-001E": 1,
+          "false": 3,
+          "true": 19
+        }
+      },
+      "rep.canonical_carrier": {
+        "use_count": 50,
+        "values": {
+          "false": 2,
+          "true": 48
+        }
+      },
+      "rep.construction_witness": {
+        "use_count": 74,
+        "values": {
+          "true": 74
+        }
+      },
+      "rep.exact_implicit": {
+        "use_count": 39,
+        "values": {
+          "false": 17,
+          "true": 22
+        }
+      },
+      "rep.param_map_inverse": {
+        "use_count": 23,
+        "values": {
+          "true": 23
+        }
+      },
+      "rep.rational_positive_weights": {
+        "use_count": 17,
+        "values": {
+          "false": 3,
+          "true": 14
+        }
+      },
+      "support.affine_class": {
+        "use_count": 2,
+        "values": {
+          "!unmodeled:each support must be affine over its certified region (identically zero second-partial Bernstein coefficient grids over every touched patch, with one shared tangent frame)": 1,
+          "!unmodeled:every touched patch must be exactly flat and share one tangent frame (the CC-020 offset-corner class)": 1
+        }
+      }
+    },
+    "ssi4_krawczyk": {
+      "literal_token_mentions_in_ssi4": 49,
+      "operator_consumption_sites": 22,
+      "transformation_sites": {
+        "exclusion": 5,
+        "uniqueness": 8,
+        "existence": 3,
+        "refinement": 6
+      },
+      "rule_sites": {
+        "SSI4-BOUNDARY-STRATUM-SEEDING": 3,
+        "SSI4-CERTIFIED-CHART-CURVE-CONTRACT": 1,
+        "SSI4-ENTRY-REDUCTION": 6,
+        "SSI4-FSSI-TANGENCY-FREE-GATE": 1,
+        "SSI4-KRAWCZYK-EXCLUSION": 5,
+        "SSI4-KRAWCZYK-EXISTENCE": 3,
+        "SSI4-KRAWCZYK-REFINEMENT": 6,
+        "SSI4-KRAWCZYK-UNIQUENESS": 8,
+        "SSI4-MINOR-SIGN-PREDICATE": 4,
+        "SSI4-PARALLELOTOPE-CONTINUATION": 1,
+        "SSI4-SWEEP-SWEEP-UNRESOLVED": 2
+      }
+    },
+    "source_validation": {
+      "method": "each rule's source.file must exist, source.line be in range, and a symbol identifier token appear within +/-2 lines",
+      "bad_count": 0
+    }
+  },
+  "structural_findings": [
+    "admission.rs: the schema has no field for the exhaustive AdmissionCertificate four-way dispatch type itself (only its tag arm and its certify_patch_family producer are rows), and no place for propagated-but-unnamed refusal payloads (TangencyRefusal, String-wrapped classify_box/certify_a2/fixture errors, and assemble_normal_numerator's cause); these are recorded as !unmodeled values.",
+    "ssi4.rs: the packet's '49 sites' is the literal-token count of 'Krawczyk' in the file (doc/type/import lines included), not operator call sites. Actual operator outcome-consumption sites sum to 22 across the four transformations (exclusion 5, uniqueness 8, existence 3, refinement 6). No distinct KrawczykProof::Existence variant is landed; existence is co-delivered by KrawczykProof::Unique, so SSI4-KRAWCZYK-EXISTENCE is confidence medium.",
+    "blend: EventKind::Rank and EventKind::Focal are declared vocabulary but are never produced by locate_event (only Trim/Collision/ThirdFace), so BLEND-EVENT-RANK-FOCAL is marked theory-only.",
+    "formal/torus_cell.rs: module doc says meridian-bounded cells are refused, but certify_loop/certify_torus_annular_cell_with_witnesses admit meridian pairs (stale doc vs code). formal/torus_realize.rs: module doc says 'no production mesh' yet the same file implements realize_torus_annulus. develop_torus_annulus refuses Meridian while realize_torus_annulus supports it (develop/realize scope mismatch).",
+    "formal foundational modules (evidence, envelope, outcome, numeric, exact) carry no relation geometry, so many axis values there are honest !unmodeled findings rather than populated axes.",
+    "Some agents recorded fixture-specific axis ids (e.g. !unmodeled:a1_definite_bowl, support.affine_class) and value-level residual refinements (local_only(residual: ...)); these are recorded verbatim as abstraction-gap findings and are the checker's open-world input."
+  ],
+  "notes": "Rule-table extraction for the certified construction and admission subsystem. Scope: construct/admission.rs, construct/bie/{mod,closure,ssi4}, construct/contact3.rs, construct/blend.rs, construct/blend_varradius.rs, tangency/gates.rs, tangency/tsystem.rs, and all formal/* doc modules. Krawczyk/ssi4 machinery is grouped by transformation (exclusion, uniqueness, existence, refinement) rather than per call site, per packet method 3. Admission gates model both admitted and refused outcomes, with the exact refusal variant listed. Theory-only rows (calls empty, note='theory-only') are kept distinct from implemented rows, per packet method 2. Fragment written to loop/solver_coverage/fragments/B.json; all 205 rule source citations passed the file/line/symbol validation gate."
+}
