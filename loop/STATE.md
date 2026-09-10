@@ -1914,6 +1914,46 @@ ttc_lathe_spline.rs:255; duplicate supervisors + lagging cargoq restart guard;
 slot-4 + slot-7 wt RESULT residue; TOR-C flip-or-pin; RESULT-recycle race +
 overnight.py guarantee-merge-abort on interrupted cycles).]
 
+[orchestrator 2026-09-10T16:05Z - MONO-CLOSURE program booked; owner departing;
+autonomous run. THE DISPATCH LADDER: MONO-1-DATA-ROWS RUNNING slot 0 (pid
+14448) and MONO-2-NSTATION-LOFT RUNNING slot 1 (pid 23944, manually spawned -
+see wedge note) - the only parallel pair (binding.rs+marshal.rs vs
+bd_bridge.rs; owner directive: NO same-file parallelism, serial tail by
+default). On MONO-2 land: MONO-3-BLADE-MEMBERS-MIRROR dispatches (dep landed,
+bd_bridge.rs frees), then MONO-4-TRIM-IDIOMS serially after MONO-3. Each
+lands via the driver's normal cycle (merge --no-ff, RESULT to loop/results/,
+ledger row, flip DONE); on a bd_bridge.rs landing conflict use the proven
+union procedure (66cd011 precedent). MONO-5-BRIDGE-SPLIT is ON DECK,
+UNREGISTERED (loop/packets/MONO-5-BRIDGE-SPLIT.md, commit 855255d) - dispatch
+ONLY if the serial tail is measured as the bottleneck; its purpose is
+conflict-avoidance (disjoint modules), never worker stacking. WAVE 3 (the
+boolean frontier): the frontier model's contact-cover theory was REVIEWED and
+ACCEPTED WITH FOUR AMENDMENTS (verdict + amendment list committed in
+docs/MONO_WAVE3_THEORY_BRIEF.md, 9be72b7: facts-gate sufficiency lemmas -
+solid_count constructive via door.py:1153 + bbox extremes-survive; Lemma-3
+separable-test proof fix; named membership mechanism; weights admission).
+MONO-5-SWEPT-BOOLEANS is booked ONLY after the amendments are incorporated;
+the orchestrator (not a worker) owns that incorporation. The booking doc with
+the PINNED ThruSections convention is docs/MONO_CLOSURE_BOOKING.md annex A
+(chord-length stations, exact section hit, degree N-1 for N<=9 / C2
+knots-at-stations for N>=10 - probe scripts committed in scratch/).
+MACHINERY NOTE (new trap class): the heartbeat wedged this session - six
+cycles logging 'dispatched 0; workers now ~0/3' while slot 0 actually ran,
+and MONO-2's slot forked WITHOUT a worker spawn (half-forked slot). Recovery
+that worked: manual run_packet fresh dispatch on the half-forked slot (branch
+at base, nothing lost). If the ladder stalls with an IDLE slot whose branch
+is at base and no live worker: spawn manually via
+`python loop/run_packet.py --slot N --packet loop/packets/<P>.md` with the
+cargoq shim on PATH. Health at departure: heartbeat 1 (27872), operator
+runner 1 (27876), driver 1 (26920), watchdog 1 (29264), cargoq UP (ping ok,
+queued 0), disk 17.9 GB free, RAM 6.9 GB free, 2 workers running. The hazard
+battery (truck123d/tests/ttc_hazard_battery.rs, census gate now OPEN) runs
+orchestrator-side through cargoq ONLY when the worker queue is empty. Open
+human items on return: wave-3 amendments incorporation + MONO-5 booking; the
+wave-2 projections to verify (5 loft rows green with timing after MONO-2);
+carried: duplicate supervisors, slot-4/slot-7 wt RESULT residue, TOR-C
+flip-or-pin, FRAME-REVOLVE F1 non_z_axis pin amendment.]
+
 ## The parallelism picture
 
 The lemma wave (L1-L4, pure functions over the frozen shim type) is
