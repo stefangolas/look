@@ -1956,3 +1956,118 @@ heartbeat 1; operator runner 1; driver 1; watchdog 1; TWO supervisors; disk
 18.02 GiB free; RAM 1.62 GiB free. Escalations carried: F1 non_z_axis pin
 amendment; duplicate supervisors + lagging cargoq guard; slot-4 + slot-7 wt
 RESULT residue; TOR-C flip-or-pin.
+
+===== operator cycle 2026-09-10T11:33Z =====
+Board: 0 RUNNING / 0 landed-this-cycle / 0 unblocked / 0 flipped.
+
+Health sweep (step 1): heartbeat exactly 1 (27872, anchored `-File
+dispatch_heartbeat.ps1`); watchdog 1 (24472); operator runner 1 (27876);
+overnight driver 1 (26920, child of 27828); cargoq UP (ping ok, queued 0,
+running false); no cargo/rustc/worker processes. Disk 17.9 GiB free (above the
+8 GB floor and the 15 GB janitor goal); RAM 5.4 GiB free (healthy - the slot-0
+build has finished). TWO supervisors (19172 PyManager + 27828 pythoncore child)
+- carried duplication class; only ONE overnight.py child = no double-merge
+risk. HEAD 58d1e05.
+
+Actions:
+- Landing (step 2): NOTHING to land. CG-BINDING was landed by the overnight
+  driver at 58d1e05 (merge 8229c84) BEFORE this cycle. `git merge-base
+  --is-ancestor` exit 0 for all seven slot commits against integration/kernel-bg
+  (CG-BINDING dd092a6, SWEEP-PATH 0056f01, ADM-L2-PRODUCT e33c4dd,
+  ADM-L3-NORMALCONE e9d885a, F1-AUTHORING-ARMS 3c2109b, CL-006-SOLVER-ENTRY
+  ee97499, CL-005-EXACT-CONTACT 713f205, ADM-003 4de25d9, FRAME-REVOLVE
+  b667a85). Slot wt RESULT read directly (loop/slots/<i>/wt/RESULT.json):
+  slot0 LANDED (CG-BINDING), slot1 none (clean detached HEAD 4de25d9 - stale
+  ADM-003 residue, not stuck), slot2 DONE, slot3 done, slot4
+  LANDED-WITH-FINDINGS (do-not-land, already escalated), slots5/6 DONE, slot7
+  LANDED (redundant FRAME-REVOLVE, no commit). No FINISHED slot carries an
+  unlanded DONE RESULT.
+- Unblock (step 3): nothing stuck (0 RUNNING; no IDLE/DEAD >15 min holding
+  work; no QUESTION; no cargo/rustc).
+- Registry hygiene (step 4): 309 unique rows - 228 DONE, 74 READY, 7 BLOCKED.
+  READY rows WITHOUT the dispatcher's case-folded `landed <sha>` marker = NONE
+  (dispatcher correctly skips). BLOCKED rows whose `needs` are all landed = all
+  7, correctly parked: BG-AUD-FIX-004 (OWNER_BLOCKED), BG-CK-SPLINE-CENSUS
+  (owner-cancelled; needs BG-CK-P0-PREVALENCE landed), SEM-PCURVE-MASTER-001-FIX
+  (SUPERSEDED), DEF-SPINEFRAME-GRAZE (SPEC_GAP->-R2), DEF-TESS-ANALYTIC-SEAM
+  (superseded by -R2; needs DEF-VENDOR-FIXTURES landed), DEF-SEEDRAY-B
+  (human-gated; needs DEF-SEEDRAY-A landed), TOR-C (orchestrator-held; needs
+  ADM-001/002 landed). Nothing flipped.
+- Dispatch (step 5): dispatch_ready.py --max-workers=4 -> "slots: 8 (0 running,
+  8 free); slot-assigned packets: 7; dispatched 0; workers now ~0/4" = REAL
+  idle. No manual dispatch (heartbeat live).
+- STATE.md volatile refresh + LATEST GROUND TRUTH pointer updated ([operator
+  2026-09-10T11:33Z]).
+- NEW ESCALATION filed: program is dispatch-idle after CG-BINDING landed; the
+  only remaining program step is the single end-of-program verify battery
+  (owner/orchestrator), plus the F1-AUTHORING-ARMS LANDED-WITH-FINDINGS
+  judgment.
+
+Leaving: 0 RUNNING; slots 0-7 landed/residue; cargoq UP; heartbeat 1; operator
+runner 1; driver 1; watchdog 1; TWO supervisors; disk 17.9 GiB free; RAM 5.4
+GiB free. Escalations carried: F1 non_z_axis pin amendment; duplicate
+supervisors + lagging cargoq guard; slot-4 + slot-7 wt RESULT residue; TOR-C
+flip-or-pin.
+
+
+===== operator cycle 2026-09-10T11:57Z =====
+Board: 0 RUNNING / 0 landed-this-cycle / 0 unblocked / 0 flipped / 2 new
+READY rows registered by the orchestrator (BINDING-2 wave).
+
+Health sweep (step 1): heartbeat exactly 1 (27872, anchored `-File
+dispatch_heartbeat.ps1`; the broad CommandLine match self-matched the probing
+shell - PID-detail listing confirmed one); watchdog 1 (24472, last poll
+11:54Z, no ACTION lines); operator runner 1 (27876); overnight driver 1
+(26920, child of 27828, cycling every 5 min, parked on the slot-4 F1
+judgment); cargoq UP (ping ok, queued 0); zero cargo/rustc/worker processes.
+Disk 19.07 GiB free (above the 8 GB floor and the 15 GB janitor goal); RAM
+5.4 GiB free. TWO supervisors (19172 PyManager + 27828 pythoncore child) -
+carried duplication class; only ONE overnight.py child = no double-merge
+risk. Orchestrator session live (opencode 14776). HEAD 26d5aa1.
+
+Actions:
+- Landing (step 2): NOTHING to land. git merge-base --is-ancestor exit 0 for
+  all nine slot commits against integration/kernel-bg (dd092a6 CG-BINDING,
+  0056f01 SWEEP-PATH, e33c4dd ADM-L2, e9d885a ADM-L3, 3c2109b F1,
+  ee97499 CL-006, 713f205 CL-005, 4de25d9 ADM-003, b667a85 FRAME-REVOLVE).
+  Slot wt RESULT read directly: slot0 done (CG-BINDING), slot1 none (clean
+  detached HEAD 4de25d9), slot2 DONE, slot3 done, slot4 LANDED-WITH-FINDINGS
+  (do-not-land), slot5 DONE, slot6 DONE, slot7 LANDED (redundant, no commit).
+  No FINISHED slot carries an unlanded DONE RESULT.
+- Unblock (step 3): nothing stuck (0 RUNNING; no IDLE/DEAD >15 min holding
+  work; no QUESTION; zero cargo/rustc). Slot 1 stale ADM-003 residue, not
+  stuck.
+- Registry hygiene (step 4): 311 unique rows - 228 DONE, 76 READY, 7 BLOCKED.
+  READY rows WITHOUT the dispatcher's case-folded `landed <sha>` marker =
+  exactly {BRIDGE-BOOLEANS, BRIDGE-LOFT-FACTS} - a NEW BINDING-2 wave the
+  orchestrator registered (and committed, 26d5aa1) after the 11:33Z cycle
+  (both depends_on CG-BINDING; both write bd_bridge.rs/facade.rs/door.py, so
+  they write-set-clash and serialize). Both pass gen_packet --check (all
+  anchors hold) and packet_lint (clean); dep CG-BINDING landed; dispatch_ready
+  --dry-run now shows them -> slots 0/1, "dispatched 2; workers now ~2/4".
+  This is why the 11:33Z cycle read "dispatched 0": the rows did not exist
+  yet. BLOCKED-with-all-deps-landed = the same 7, all correctly parked
+  (BG-AUD-FIX-004 OWNER_BLOCKED, BG-CK-SPLINE-CENSUS owner-cancelled,
+  SEM-PCURVE-MASTER-001-FIX SUPERSEDED, DEF-SPINEFRAME-GRAZE SPEC_GAP->-R2,
+  DEF-TESS-ANALYTIC-SEAM superseded by -R2, DEF-SEEDRAY-B human-gated, TOR-C
+  orchestrator-held). Nothing flipped.
+- Dispatch (step 5): dispatch_ready.py --dry-run --max-workers=4 -> "slots: 8
+  (0 running, 8 free); slot-assigned packets: 7; BRIDGE-BOOLEANS -> slot 0;
+  BRIDGE-LOFT-FACTS -> slot 1; dispatched 2; workers now ~2/4". NO manual
+  dispatch - the live heartbeat (last cycle 07:50:57 local = 11:50Z) owns
+  dispatch; a manual run would race it (double-dispatch trap).
+- STATE.md volatile refresh + LATEST GROUND TRUTH pointer updated ([operator
+  2026-09-10T11:57Z]).
+- NEW (low) ESCALATION: the 11:33Z operator cycle wrote its three loop files
+  but never committed them (HEAD's newest operator commit was 76de2a9 11:09Z;
+  the 11:33Z STATE/LOG/ESCALATIONS deltas were sitting uncommitted in the
+  working tree). This cycle committed them together with its own refresh -
+  see OPERATOR_ESCALATIONS.
+
+Leaving: 0 RUNNING; slots 0-7 landed/residue; two BINDING-2 READY rows
+queued for the heartbeat; cargoq UP; heartbeat 1; operator runner 1; driver 1;
+watchdog 1; TWO supervisors; disk 19.07 GiB free; RAM 5.4 GiB free.
+Escalations carried: F1 non_z_axis pin amendment; duplicate supervisors +
+lagging cargoq guard; slot-4 + slot-7 wt RESULT residue; TOR-C flip-or-pin.
+NEW: 11:33Z operator cycle left its loop files uncommitted (recovered this
+cycle).

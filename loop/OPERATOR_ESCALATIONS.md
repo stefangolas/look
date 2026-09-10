@@ -257,3 +257,48 @@ Judgment-required items appended each operator cycle. Newest at the bottom.
 - Carried (unchanged): FRAME-REVOLVE F1 non_z_axis pin amendment
   (ttc_lathe_spline.rs:255); slot-4 + slot-7 wt RESULT residue parking the
   driver's dispatch arm; TOR-C flip-or-pin (orchestrator LIVE).
+
+## 2026-09-10 11:33Z - program is DISPATCH-IDLE after CG-BINDING landed; final verify battery outstanding
+
+- What: the overnight driver landed the last booked long pole, CG-BINDING (the
+  pyo3 translation) at 58d1e05 (merge 8229c84). This cycle re-derived the board
+  by command: 0 RUNNING, `dispatch_ready --max-workers=4` reports 0 dispatched,
+  every READY row carries a landed marker, and all 7 BLOCKED rows have all deps
+  landed (all parked for owner/orchestrator). There is therefore nothing left
+  for the loop to dispatch or land. The remaining program step is the SINGLE
+  end-of-program verify battery at the integrated HEAD (the one-verify
+  amendment), which is orchestrator/owner work, not operator work.
+- Also outstanding (unchanged): F1-AUTHORING-ARMS sits LANDED-WITH-FINDINGS in
+  slot 4 and the driver logs it "LEFT FOR MORNING (judgment required)"; and the
+  FRAME-REVOLVE F1 non_z_axis pin (ttc_lathe_spline.rs:255) is still unamended,
+  so `cargo test -p truck123d --tests` is expected red at HEAD.
+- Start here: `git -C C:\Users\stefa\look log --oneline -3 integration/kernel-bg`
+  (HEAD 58d1e05); `python loop/dispatch_ready.py --max-workers=4`; then run the
+  end-of-program verification campaign against HEAD.
+- Carried (unchanged): duplicate supervisors 19172 + 27828; lagging cargoq
+  restart guard; slot-4 + slot-7 wt RESULT residue parking the driver's dispatch
+  arm; TOR-C flip-or-pin (orchestrator-held).
+
+
+## 2026-09-10 11:57 UTC - the 11:33Z operator cycle left its loop files UNCOMMITTED (machinery gap, recovered)
+
+- What: the 11:33Z operator cycle wrote its three deliverables (loop/STATE.md,
+  loop/OPERATOR_LOG.md, loop/OPERATOR_ESCALATIONS.md) but never committed them
+  - HEAD's newest operator commit was 76de2a9 (the 11:09Z cycle); the 11:33Z
+  STATE/LOG/ESCALATIONS deltas sat uncommitted in the working tree (`git
+  status`: ` M loop/STATE.md`, ` M loop/OPERATOR_LOG.md`, ` M
+  loop/OPERATOR_ESCALATIONS.md`). `git log --all --grep=11:33` finds no commit
+  anywhere. The 11:57Z operator committed them together with its own refresh,
+  so the content is preserved (the files were on disk the whole time, so
+  cold-start readers still saw them).
+- Why it needs a human: low-severity recurrence of the
+  "cycle-ends-before-its-commit" class. If a later cycle had hard-reset or
+  checked out the tree, the previous cycle's STATE/LOG/ESCALATIONS edits would
+  be lost, and stale STATE is the loop's most expensive failure mode. Worth a
+  look at the operator runner's kill-at-15 vs finish-under-12 budget: the
+  11:33Z instance may have been killed after its report writes but before its
+  commit step.
+- Start here: loop/operator_runner.ps1 (the runner's kill timing) and the
+  OPERATOR_LOG 11:33Z entry (its report reads as complete, so the kill most
+  likely landed after the writes but before the commit). The 11:57Z commit
+  carries both the 11:33Z and 11:57Z deltas.
