@@ -13,53 +13,65 @@ Updated 2026-09-10, session 57/58 (overnight + the door-gap chain). Read the
 operator blocks below first — the machine has been running autonomously and
 they are current.
 
-## HANDOFF (2026-09-10 ~10:30 local, orchestrator session) — the door-gap chain
+## HANDOFF (2026-09-10 ~18:25 local, orchestrator session 58) — the MONO-CLOSURE program + the solver-coverage wave + THE ORACLE POLICY CHANGE
 
-Owner context for the next session, in order:
+Read this, then docs/MONO_CLOSURE_BOOKING.md (program spine; annex A
+corrected, annex C = ORACLE POLICY CHANGE), then docs/SOLVER_COVERAGE_SPEC.md
+(the second program spine), then python loop/slot_status.py.
 
-1. **The door-gap chain is ~2 packets from closing.** In flight:
-   TRIM-EXTRUDE-CTOR (slot 0, pid 28868, RESUMED — it hung mid-API-step
-   ~16 min; killed the opencode child 28156 (NOT the launcher wrapper —
-   the wrapper is a decoy, the opencode.exe child holds events.jsonl),
-   WIP committed 1d2e411, resumed via run_packet --resume --session-id
-   ses_f747fe945ffe5IE0U2nVLH22TZ). On its finish: the driver lands it
-   (harness-conflict auto-resolve is live, commit c7911f7) — but expect a
-   CODE conflict in bd_bridge.rs (its base predates BRIDGE-LOFT-FACTS);
-   the union procedure is proven (see 66cd011: assemble both complete
-   sections, brace-check, suite green). Then TTC-RECENSUS-F1-R2
-   (registered READY, anchored A1=48/A2=21) auto-dispatches: the census +
-   kernel timing columns, NO OCC runs (owner directive — recorded
-   references are the oracle; nozzle/mvac stay DNF-FACTS until the owner
-   reverses it, they need one OCC re-record).
-2. **Landed this stretch** (all verified): CG-BINDING (the manifest-edge
-   amendment + 3 exports — the dependency wall is DOWN), FRAME-REVOLVE,
-   SWEEP-PATH (driver, autonomous), BRIDGE-BOOLEANS + BRIDGE-LOFT-FACTS
-   (both arms coexist on bd_bridge), REF-RECORD-HYPERCAR (3 hypercar rows
-   staged). Pins were adjudicated twice as boundaries moved deeper (mvac:
-   extrude -> spline-path sweep -> circle-profile sweep-section;
-   non_z_axis revolve -> answered). The pattern: pins move deeper-or-
-   answered, never away from discipline.
-3. **The hazard battery is booked**: truck123d/tests/ttc_hazard_battery.rs
-   (38 fixtures, ignore-gated, discipline-asserting, strict mode via
-   HAZARD_BATTERY_STRICT=1) + hazard tree corpus/ttc/trees/hazard. Run it
-   AFTER the census. The remaining-arms map is
-   loop/audits/HAZARD_PATH_AUDIT-2026-09-10.md (9 packets, ~2.7-4.7k LOC;
-   P1 contact-export and P2 shell-arm are the corpus-valuable ones; P9
-   blend-on-spline is the hard one; P10 chain-closure is theory-gated).
-4. **Machinery fixes landed** (c7911f7 et al): overnight.py prose-stop
-   negation fix, harness-bundle auto-resolve in the landing merge. STILL
-   OPEN: the heartbeat recycle destroying FINISHED workers' RESULTs (5th
-   strike 08:41 — the operator preserves refs/wip and the orchestrator
-   lands via never-filed-RESULT, but the structural fix (archive RESULT
-   before re-fork) is NOT done). The opencode-child-holds-events.jsonl
-   lesson: find the real worker via psutil open_files, not the launcher pid.
-5. **Docs were pruned** (8b28449: stale evidence/maps to history) and two
-   audits committed: DOOR-GAP-AUDIT (the wall + the 6-item path) and
-   HAZARD-PATH-AUDIT. The corpus verb inventory (grep bd.* across trees)
-   is the ground truth for what the corpus actually uses — RectangleRounded
-   (69 uses!), Align (45), Cone (5), Helix (3), Ellipse (3), make_hull (2),
-   FilletPolyline (1) are corpus-used and NOT in the drop-in vocabulary.
-
+1. **ORACLE POLICY CHANGE (owner directive, annex C, commit 4e6694d) — the
+   defining event.** Kernel certificates ARE the certification: a row is
+   green when the kernel constructs it + volume carries its own certificate
+   bracket + solid_count constructive + bbox carrier-derived + mesh emits.
+   The recorded OCC references are DIAGNOSTICS (reported, gate nothing).
+   The 1e-4 band vs OCC is retired as a gate. The TTC-RECENSUS-F1-R2
+   verdicts (0 green / 15 typed / 6 DNF) were adjudicated under the OLD
+   policy — the R3 census (not yet authored) re-judges under the new one.
+   Scenario B (canonical-vs-OCCT band) is DISSOLVED, not pending.
+2. **RUNNING NOW: MONO-6-SWEPT-BOOLEANS** (slot 0, the contact-cover
+   certified boolean volume solver — the tub/cavity volume verdict and the
+   biggest packet of the program). SURVEY-A re-dispatch pending on slot 1
+   (forked; first run fragment lost to the untracked-file recycle gap —
+   see traps). When MONO-6 lands: author MONO-7-ROW-ASSEMBLY from its
+   RESULT (the group/styled/clean pass-throughs + per-row facts + timing),
+   then the R3 census under the new policy -> F1 rows flip on kernel-
+   internal certification. FH re-census rides the same policy (FH is the
+   home turf; most boundaries already cleared by landed arms).
+3. **Landed this session (all scoped-verified):** MONO-1-DATA-ROWS,
+   MONO-2-NSTATION-LOFT (canonical convention; annex A OCCT law falsified
+   by stop-condition-1 — GeomFill_AppSurf is a tolerance APPROXIMATION,
+   source-cited), MONO-3-BLADE-MEMBERS-MIRROR, MONO-4-TRIM-IDIOMS
+   (recovered from recycle archive), MONO-5-RAY-CLASSIFY (recovered,
+   1161 lines, membership primitive, lib 68/68), MONO-6 RUNNING;
+   SOLVER-SURVEY-B (205 rules), C (77), D (routing W_code); the SOLVER-
+   COVERAGE wave booked (spec + 4 surveys + checker); TTC-RECENSUS-F1-R2
+   landed under old policy; MONO-5 = wave-3 amendment 3 (named membership).
+   The wave-3 frontier theory (contact covers) was REVIEWED and ACCEPTED
+   with four amendments, all incorporated into MONO-6\'s packet.
+4. **Traps paid THIS session (details in the stable section, Session 58):**
+   untracked files are NOT archived at slot re-fork (two fragment losses);
+   driver no-op landings (base-commit merges + premature row flips) and
+   stale-read registry clobbers (lost-update race, twice); LANDED_RE trap
+   5th+6th strikes (never write landed-hex in a note unless landed);
+   cargoq server env does not inherit dispatch-client PATH (test-exe
+   DLL_NOT_FOUND -> run scoped verification with the interpreter dir on
+   PATH, direct cargo, fallback.log records the bypass); concurrent warm
+   builds crash (rustc exit 101 at low RAM — serialize them); anchor drift
+   is per-landing (re-measure at dispatch — three drifts today).
+5. **Machinery at handoff:** heartbeat 27872, operator runner 27876,
+   driver 26920, watchdog 29264, cargoq ok, disk 13.8 GB, RAM 0.6 GB free
+   (LOW — MONO-6 worker resident; do not stack workers; chrome closed).
+   The driver parks on the carried slot-4 F1 residue every 5 min (noise).
+   Carried: TOR-C flip-or-pin; duplicate supervisors; the operator fixed a
+   loop-wide dispatch stall mid-session (7591ed2: tracked root RESULT.json
+   poisoned new_slot forks).
+6. **The two programs, one sentence each:** MONO-CLOSURE = every mechanical
+   carrier for the F1 rows is LANDED; wave-3 implementation is live
+   (membership done, boolean solver running); after MONO-6+MONO-7+R3 the
+   F1 rows flip on kernel-internal certification and FH rides along.
+   SOLVER-COVERAGE = 3 of 4 rule-table fragments extracted (B 205 rules /
+   C 77 / D routing); A re-running; SOLVER-CHECKER computes the first
+   symbolic audit (retrodiction + deliberate-gap proofs) when A lands.
 
 ## Where we are
 
@@ -5380,3 +5392,54 @@ blocking) remove the tracked root RESULT.json/CONTEXT.md/PACKET.md; (NEW)
 dispatch_ready survey --no-warm; (NEW) free RAM; carried - FRAME-REVOLVE F1
 non_z_axis pin amendment, duplicate supervisors, slot-4/7 wt RESULT residue,
 TOR-C flip-or-pin.]
+
+### Session 58 (the MONO program, the coverage wave, the oracle policy change) - paid in full
+
+- **Untracked deliverables are not archived at slot re-fork.** The archive
+  captures tracked-file modifications only; a survey worker wrote its
+  fragment as a NEW file, the heartbeat re-forked the slot, the fragment
+  was destroyed, and the driver flipped the row over no content. Hit
+  twice (SURVEY-A; nearly MONO-5). The archive-recovery protocol that
+  worked twice: `git apply --stat` the newest abandoned-*.patch, apply to
+  a temp worktree at the packet branch, scoped-verify (check + lib serial
+  with the interpreter dir on PATH), commit AS DELIVERED, merge.
+- **The driver no-op landing class:** it merges the slot branch tip
+  whatever it is - a base commit (no content) merges "successfully" and
+  the row flips LANDED over nothing. Combined with its stale-read
+  registry writes (it committed PACKETS.jsonl from a view that predated
+  the orchestrator's flips - the lost-update race, twice), ground truth
+  diverged from bookkeeping in both directions. Repair: reconcile from
+  git history (what did the landing commit actually contain?); the
+  reconciler script pattern (scratch/reconcile_mono4_surveys.py).
+- **LANDED_RE, 5th and 6th strikes, both self-inflicted in one hour:**
+  "dep MONO-4 LANDED 852763c" in a flip note and "dep MONO-5 landed
+  f6ad2eb" in another - the dispatcher skips any row whose note matches
+  landed-hex. The rule is absolute: the pattern appears ONLY when the row
+  IS landed; status fields carry truth; flip-notes say "done <sha>".
+- **cargoq server env does not inherit dispatch-client PATH.** The
+  queue's server was started by the supervisor; its env is fixed at
+  server start. A scoped-verification run needing python314.dll on PATH
+  fails with STATUS_DLL_NOT_FOUND through the queue no matter what the
+  client exports. Workaround: run the verification cargo directly (the
+  bypass is recorded in fallback.log by design). The worker's own runs
+  worked because their shells inherited the interpreter dir.
+- **Two concurrent warm builds crash.** Full-workspace `cargo check`
+  warm builds (the new_slot spike) run concurrently when two packets
+  dispatch in one cycle - rustc exit 101 at low RAM baseline (chrome/
+  Dropbox/VS Code resident). Serialize: dispatch the critical path,
+  let the next slot warm after. Closing chrome is standing practice.
+- **Anchor drift is per-landing, re-measure at every dispatch** - three
+  drifts today (SURVEY-D 177->185 fn count; MONO-6 VolumeRow 1->13;
+  SURVEY-A needed re-measure after repair). The ritual is cheap; the
+  H-8 mismatch at dispatch is the system working.
+- **A worker stop-condition FALSIFIED the orchestrator's probe
+  conclusion** (MONO-2 stop #1: annex A's "pinned OCCT convention" was
+  one synthetic family's outcome; OCCT is GeomFill_AppSurf - a tolerance
+  approximation, source-cited). The stop was correct, the tree untouched,
+  the packet amended. Stopping is the deliverable; the falsification
+  cost one worker run and bought the truth.
+- **The oracle policy change resolved a two-week ambiguity** (recorded
+  OCC references vs kernel certificates). The resolution pattern: the
+  ambiguity was surfaced by the band-risk analysis, priced by the
+  fixture diagnostics, and closed by an owner directive - recorded as
+  annex C with the honest loss statement (compatibility claims retired).
