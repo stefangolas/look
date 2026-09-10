@@ -27,7 +27,7 @@ read_allow:
 tests_required: []
 anchors:
   - {id: A1, expect: 0,  cmd: "grep -c 'contact_cover' truck123d/src/bd_bridge.rs"}
-  - {id: A2, expect: 1,  cmd: "grep -c 'VolumeRow' truck123d/src/bd_bridge.rs"}
+  - {id: A2, expect: 13, cmd: "grep -c 'VolumeRow' truck123d/src/bd_bridge.rs"}
   - {id: A3, expect: 7,  cmd: "grep -cE 'fn member_[a-z_]+\\(' truck123d/src/bd_bridge.rs"}
 budget:      {turns: 70, ctx_tokens: 200000}
 ```
