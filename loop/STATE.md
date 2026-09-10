@@ -64,29 +64,23 @@ Owner context for the next session, in order:
 ## Where we are
 
 > LATEST GROUND TRUTH: read the newest `[operator ...]` block in "State of
-> the machine, as left" (2026-09-10T19:54Z). [operator 2026-09-10T19:54Z
-> ground-truth note: **7th FALSE LANDING - SOLVER-SURVEY-D**, and
-> SOLVER-SURVEY-A is still marker-blocked. The overnight driver logged
-> `15:35:08 slot 0: SOLVER-SURVEY-D LANDED at 906dc59`, but 906dc59 is the
-> packet BASE (branch tip == base, no worker commit) and HEAD 9e19077 touched
-> only `loop/PACKETS.jsonl` (appended `LANDED 906dc59` to the READY row's
-> note). The survey work IS real but uncommitted: slot 0 wt holds an untracked
-> `loop/solver_coverage/fragments/D.json` (170,327 b) + a status-DONE
-> RESULT.json; `git ls-tree HEAD loop/solver_coverage/fragments/` = B.json,
-> C.json only (D absent). The appended note makes dispatch_ready's `landed()`
-> SKIP SOLVER-SURVEY-D forever. SOLVER-SURVEY-A is status=READY but its note
-> still carries `LANDED cc38b4f` (an ancestor = base), so it is ALSO skipped;
-> commit 877efa2 ("restored READY") did not clear the marker and A has no
-> fragment anywhere. PRESERVED the at-risk D.json at
-> `refs/wip/SOLVER-SURVEY-D-fragment` = 1470e72 (the SURVEY-A
-> untracked-wiped-by-re-fork class). Board: 0 RUNNING / 0 landable / 0
-> unblocked; HEAD 9e19077. Nothing operator-landable. MONO-6 + SOLVER-CHECKER
-> stay BLOCKED (real deps unlanded; do NOT flip). The false-landing ROOT CAUSE
-> (overnight.py:222-226 merges the slot-wt HEAD even when the worker never
-> committed) is STILL OPEN - 7th strike. Health: heartbeat 1 (27872),
-> watchdog 1 (29264), operator runner 1 (27876), driver 1 (26920), cargoq UP;
-> TWO supervisors (carried). Disk 13.6 GiB free, RAM 2.31 GiB free (no
-> cargo/rustc running; below the 3 GB floor).]
+> the machine, as left" (2026-09-10T20:17Z). [operator 2026-09-10T20:17Z
+> ground-truth note: quiet cycle, nothing operator-landable. Board 0 RUNNING /
+> 0 landable / 0 unblocked / 0 flipped; HEAD 4c2bc1c (the 19:54Z operator
+> commit). Every slot tip is an ancestor of integration/kernel-bg with 0
+> unmerged commits; slot 0 (SOLVER-SURVEY-D) has a status-DONE RESULT but NO
+> worker commit (tip 906dc59 == base) so it is NOT operator-landable - the 7th
+> false landing stands (D.json still untracked in slot 0 wt + preserved at
+> `refs/wip/SOLVER-SURVEY-D-fragment` 1470e72). The 19:54Z escalations stand:
+> land D's fragment + correct the false `LANDED 906dc59`; clear
+> SOLVER-SURVEY-A's false `LANDED cc38b4f`; MONO-5's false `LANDED b34ec4e`
+> (WIP in slot-0 abandoned patch); do NOT flip MONO-6/SOLVER-CHECKER. The
+> driver is parked (LEFT FOR MORNING on the slot-4 F1 LANDED-WITH-FINDINGS
+> judgment) so the loop is stalled pending the false-landing reconciliation -
+> orchestrator/owner work. Health: heartbeat 1 (27872), watchdog 1 (29264),
+> operator runner 1 (27876), driver 1 (26920), cargoq UP; TWO supervisors
+> (carried). Disk 13.7 GiB free, RAM 1.9 GiB free (no cargo/rustc running;
+> below the 3 GB floor).]
 
 - **THE FIRST KERNEL-VS-OCC TIMING COMPARISON IS BANKED** (FH-TIMING-REFRESH,
   landed c94d043): turbopump_assembly **0.097 s kernel vs 4.866 s OCC**,
@@ -2251,6 +2245,50 @@ human items unchanged: FRAME-REVOLVE F1 non_z_axis pin amendment
 (ttc_lathe_spline.rs:255); duplicate supervisors + the lagging cargoq restart
 guard; slot-1/2/4/7 wt RESULT residue; TOR-C flip-or-pin; heartbeat
 slot-liveness duplicate-dispatch bug; MONO-row registry schema gap.]
+
+[operator 2026-09-10T20:17Z - volatile refresh. Quiet healthy cycle: nothing to
+land, nothing to unblock, nothing to flip, no manual dispatch (heartbeat live).
+Board now: 0 RUNNING / 0 landed-this-cycle / 0 unblocked / 0 flipped. HEAD
+4c2bc1c (the 19:54Z operator commit) - no work moved this cycle. Landing
+re-verified by command (`git merge-base --is-ancestor` + `git rev-list --count
+HEAD..tip`): every slot tip is an ancestor of integration/kernel-bg with 0
+unmerged commits (slot 0 906dc59, slot 1 94fec19, slot 2 c3bc1a1, slot 3
+e6553db, slot 4 3c2109b, slot 5 ee97499, slot 6 713f205, slot 7 5cf4811). slot
+0 (SOLVER-SURVEY-D) wt RESULT is status DONE but the branch tip == base (no
+worker commit) and D.json is untracked - the 7th false landing stands, NOT
+operator-landable (a survey's uncommitted fragment is orchestrator-amendment
+work per ORCHESTRATOR.md's skipped-commit-step protocol). slot 3
+(SOLVER-SURVEY-C) DONE already landed; slot 4 F1 LANDED-WITH-FINDINGS; slot 7
+FRAME-REVOLVE LANDED redundant; slots 1/2/5/6 landed residue. Nothing to
+unblock (0 RUNNING; no IDLE/DEAD >15 min holding work; no live QUESTION; zero
+cargo/rustc). Registry re-derived: 324 rows - 235 DONE, 80 READY, 9 BLOCKED;
+READY-without-landed-marker = NONE (SURVEY-A and SURVEY-D both carry false
+`LANDED` markers so landed() skips them); BLOCKED-with-all-deps-landed = the
+carried 7 owner-parked/human-gated/superseded (BG-AUD-FIX-004 OWNER_BLOCKED,
+BG-CK-SPLINE-CENSUS owner-cancelled, SEM-PCURVE-MASTER-001-FIX SUPERSEDED,
+DEF-SPINEFRAME-GRAZE SPEC_GAP->-R2, DEF-TESS-ANALYTIC-SEAM superseded by -R2,
+DEF-SEEDRAY-B human-gated, TOR-C orchestrator-held) + MONO-6 (dep MONO-5
+falsely landed) + SOLVER-CHECKER (deps = the 4 survey fragments, D unlanded) -
+all correctly parked, nothing flipped (MONO-6/SOLVER-CHECKER deliberately NOT
+flipped). dispatch_ready --dry-run --max-workers=4: "slots: 8 (0 running, 8
+free); slot-assigned packets: 5; dispatched 0; workers now ~0/4" = REAL idle;
+no manual dispatch (heartbeat live, last cycle 16:09 local dispatched 0). The
+driver is parked (overnight.log 16:15:42 local: slot 4 F1 LANDED-WITH-FINDINGS
+-> LEFT FOR MORNING; then "landing/running phase - no dispatch" every 5 min),
+so the loop is stalled pending the false-landing reconciliation
+(orchestrator/owner work). Health: heartbeat exactly 1 (27872), watchdog 1
+(29264), operator runner 1 (27876), overnight driver 1 (26920), cargoq UP
+(ping 200, queued 0, running false); TWO supervisors (19172 PyManager + 27828
+pythoncore - carried duplication class; only ONE overnight.py child = no
+double-merge risk). Disk 13.7 GiB free (above the 8 GB floor, below the 15 GB
+goal); RAM 1.9 GiB free (below the 3 GB floor, but no build running; janitor
+reports 13.7 GB disk / 1.9 GB RAM, slot-0 targets 1.4 GB). No new escalation
+(the 7th false landing + the SURVEY-A ineffective restore were escalated at
+19:54Z; carried). Carried human items unchanged: FRAME-REVOLVE F1 non_z_axis
+pin amendment (ttc_lathe_spline.rs:255); duplicate supervisors + the lagging
+cargoq restart guard; slot-0/2/4/7 wt RESULT residue; TOR-C flip-or-pin;
+overnight.py:222-226 false-landing ROOT CAUSE (7th strike); MONO-row registry
+schema gap.]
 
 ## The parallelism picture
 

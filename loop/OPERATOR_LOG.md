@@ -2978,3 +2978,64 @@ Leaving: 0 RUNNING; HEAD 9e19077; SOLVER-SURVEY-D falsely marked landed
 still at slot 0); SOLVER-SURVEY-A READY-but-marker-blocked; MONO-5/6 +
 SOLVER-CHECKER correctly BLOCKED; nothing unlanded; cargoq UP; heartbeat 1;
 driver 1; watchdog 1; TWO supervisors; disk 13.6 GiB free; RAM 2.31 GiB free.
+
+## [operator 2026-09-10T20:17Z] quiet cycle; false landings carried; nothing operator-landable
+
+Board: 0 RUNNING / 0 landed-this-cycle / 0 unblocked / 0 flipped. HEAD 4c2bc1c
+(the 19:54Z operator commit) - no work moved this cycle. Disk 13.7 GiB free,
+RAM 1.9 GiB free (no cargo/rustc running).
+
+- **Health (step 1)**: heartbeat exactly 1 (27872, `-File
+  dispatch_heartbeat.ps1`; the second broad-scan hit was this shell
+  self-matching its own command line), watchdog 1 (29264, `python
+  watchdog.py`; msedgewebview2 `--gpu-watchdog` hits are false positives),
+  operator runner 1 (27876), overnight driver 1 (26920), cargoq UP (ping 200,
+  queued 0, running false). Zero cargo/rustc. TWO supervisors (19172 PyManager
+  + 27828 pythoncore - carried duplication class; only ONE overnight.py child =
+  no double-merge risk). Disk 13.7 GiB (above the 8 GB floor, below the 15 GB
+  goal); RAM 1.9 GiB (below the 3 GB floor, but no build running; janitor
+  status: 13.7 GB disk / 1.9 GB RAM, slot-0 targets 1.4 GB). Driver cycling
+  every 5 min but parked (overnight.log 16:15:42 local: slot 4 F1
+  LANDED-WITH-FINDINGS -> LEFT FOR MORNING; then "landing/running phase - no
+  dispatch").
+- **Land (step 2)**: nothing operator-landable. Re-verified by command
+  (`git merge-base --is-ancestor` + `git rev-list --count HEAD..tip`): every
+  slot tip is an ancestor of integration/kernel-bg with 0 unmerged commits
+  (slot 0 906dc59, slot 1 94fec19, slot 2 c3bc1a1, slot 3 e6553db, slot 4
+  3c2109b, slot 5 ee97499, slot 6 713f205, slot 7 5cf4811). slot 0
+  (SOLVER-SURVEY-D) has RESULT status DONE but tip == base (no worker commit)
+  and D.json is untracked - the 7th false landing stands; a survey's
+  uncommitted fragment is the orchestrator's skipped-commit-step protocol, not
+  operator work. slot 3 (SOLVER-SURVEY-C) DONE already landed; slot 4 F1
+  LANDED-WITH-FINDINGS; slot 7 FRAME-REVOLVE LANDED redundant; slots 1/2/5/6
+  landed residue.
+- **Unblock (step 3)**: none - 0 RUNNING; no IDLE/DEAD >15 min holding work
+  (slot 1 IDLE 208 min, slot 2 IDLE 104 min - both landed residue, no live
+  question); no live QUESTION.md; zero cargo/rustc.
+- **Registry (step 4)**: 324 rows - 235 DONE, 80 READY, 9 BLOCKED.
+  READY-without-landed-marker = NONE (SURVEY-A and SURVEY-D both carry false
+  `LANDED` note markers, so dispatch_ready.landed() skips them);
+  BLOCKED-with-all-deps-landed = the carried 7 owner-parked/human-gated/
+  superseded (BG-AUD-FIX-004 OWNER_BLOCKED, BG-CK-SPLINE-CENSUS
+  owner-cancelled, SEM-PCURVE-MASTER-001-FIX SUPERSEDED, DEF-SPINEFRAME-GRAZE
+  SPEC_GAP->-R2, DEF-TESS-ANALYTIC-SEAM superseded by -R2, DEF-SEEDRAY-B
+  human-gated, TOR-C orchestrator-held) + MONO-6 (dep MONO-5 falsely landed) +
+  SOLVER-CHECKER (deps = the 4 survey fragments, D unlanded) - all correctly
+  parked, nothing flipped (MONO-6/SOLVER-CHECKER deliberately NOT flipped).
+  Note: the 19:54Z block's counts (232/82/10) do not reproduce; the committed
+  PACKETS.jsonl parses to 235/80/9, matching the 19:06Z block.
+- **Dispatch (step 5)**: `dispatch_ready.py --dry-run --max-workers=4` ->
+  "slots: 8 (0 running, 8 free); slot-assigned packets: 5; dispatched 0;
+  workers now ~0/4" = REAL idle (heartbeat live, last cycle 16:09 local
+  dispatched 0; no manual dispatch). The loop is stalled pending the
+  false-landing reconciliation, which is orchestrator/owner work.
+- **STATE.md (step 6)**: LATEST GROUND TRUTH pointer + new [operator] block.
+- **Escalation (step 7)**: none new. The 7th false landing (SOLVER-SURVEY-D)
+  and the SURVEY-A ineffective restore remain escalated from 19:54Z; carried.
+
+Leaving: 0 RUNNING; HEAD 4c2bc1c; SOLVER-SURVEY-D falsely marked landed
+(D.json preserved at refs/wip/SOLVER-SURVEY-D-fragment 1470e72; worktree copy
+still at slot 0); SOLVER-SURVEY-A READY-but-marker-blocked; MONO-5 falsely
+marked landed; MONO-6 + SOLVER-CHECKER correctly BLOCKED; nothing unlanded;
+cargoq UP; heartbeat 1; driver 1; watchdog 1; TWO supervisors; disk 13.7 GiB
+free; RAM 1.9 GiB free.
