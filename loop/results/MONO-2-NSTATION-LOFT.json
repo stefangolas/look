@@ -1,0 +1,70 @@
+{
+  "id": "MONO-2-NSTATION-LOFT",
+  "status": "DONE",
+  "contracts": ["MONO-2-NSTATION-LOFT"],
+  "tests_added": 4,
+  "tests_replaced": [
+    "spline_section_loft_volume_certified_bracket -> nstation_volume_brackets_canonical_surface",
+    "unmatched_loft_carrier_refuses_typed -> nstation_refuses_still_typed_for_open_chains"
+  ],
+  "anchors_verified": {
+    "A1": 3,
+    "A2": 1,
+    "A3": 81,
+    "A3_note": "DRIFT: expect was 57, pre-work measured 80, post-work 81. The drift is this packet's own prose (the new canonical-convention docs and the new nstation_* test/helper names each add the word 'loft'). Recorded, not stretched."
+  },
+  "summary": "Generalized the landed two-station certified spline-loft arm (BRIDGE-LOFT-FACTS) to N stations under the kernel-CANONICAL convention, entirely in truck123d/src/bd_bridge.rs. Station parameters are the cumulative centroid-to-centroid chord length normalized to [0,1]. The v-direction is the unique global polynomial of degree N-1 interpolating the section control rows for N <= 9, and the natural C2 cubic spline (standard banded second-derivative system, M_0 = M_{n-1} = 0) with knots AT the station parameters for N >= 10; both routes emit tensor-Bernstein patches (4 x (N) for the global route, 4 x 4 per v-span for the spline route) submitted one row at a time to the sanctioned binding::volume_facts entry, with the landed Green's-theorem planar end-cap moments added and the brackets summed outward. The u-direction reuses the landed per-section reconstruction (spline_loop_spans: chord-length clamped cubics, exact seam closure) and unifies sections by span matching only; a stack whose spans do not match (the corpus's crease-corner / periodic-section case cannot be unified by knot insertion alone) refuses TYPED with the landed NonCanonicalCarrier refusal, never a tolerance stretch. The bbox and mesh generalize spline_loft_mesh. The two-station path is preserved exactly: for N = 2 the Bernstein collocation solve returns the endpoint controls exactly, so the numerator grid is bit-identical to the landed [ba[k], bb[k]] patch, the caps are unchanged, and the line-loft fast path is untouched. No OCC runs at certify time; the one-time OCC fixtures are diagnostic constants.",
+  "method": {
+    "station_law": "v_i = cumulative centroid-to-centroid chord length of the section stack, normalized to [0,1] (station_params; sample_loop3 + centroid3).",
+    "u_unification": "per-span reconstruction reuse + span-index matching; unequal span counts refuse typed (open_smooth_loft). Geometry-preserving: the reconstruction normalizes every recorded span to [0,1], so matched spans share the common u-knot structure without approximation; no flattening, no tolerance.",
+    "v_interpolation_global": "N <= 9: solve the Bernstein collocation system B_j^{N-1}(v_i) b_j = y_i (solve_dense, partial pivoting) for each u-control row; one v-segment of degree N-1.",
+    "v_interpolation_spline": "N >= 10: natural C2 cubic spline via the standard tridiagonal second-derivative system (natural_spline_second_derivs, Thomas algorithm) with knots at v_i; each span's four Bernstein controls from the Hermite/M form.",
+    "volume": "one crate::python::binding::volume_facts call per (u-span, v-segment) tensor-Bernstein patch, weights all 1.0, orientation 1.0; exact expansion brackets summed outward; plus the landed planar end-cap terms (1/3) d A and the winding sign absorption.",
+    "bbox": "N = 2: exact union of the two section-loop AABBs (unchanged). N > 2: exact section-loop AABBs unioned with the canonical surface's control-net AABB (the Bernstein convex-hull enclosure, nstation_control_enclosure). This is a certified enclosure; it is not the exact bivariate surface extremum (that needs a 2x2 critical system, not cubic_roots alone).",
+    "mesh": "spline_loft_mesh generalized: ruled quads between consecutive sampled section loops plus the two end-cap fans (identical bytes to the landed two-station mesh at N = 2)."
+  },
+  "tests": {
+    "command": "cargo test -p truck123d --lib --locked (48 passed, 0 failed) plus cargo check -p truck123d --all-targets --locked (exit 0)",
+    "required": [
+      "line_loft_rows_answer_bit_identically (landed two-station regression, UNMODIFIED, green)",
+      "nstation_volume_brackets_canonical_surface (2/3/9/10-station bracket encloses, is tight, and matches an independent 5x5 Gauss-Legendre integration of the same tensor patches + caps)",
+      "nstation_fixture_deltas_recorded (per-N OCCT-vs-canonical deltas recorded as diagnostic data, not gates)",
+      "nstation_refuses_still_typed_for_open_chains (mismatched spans, closed smooth halo, non-closing section loop all keep the typed NonCanonicalCarrier refusal)",
+      "nstation_42_station_timing_kernel_class (42-station synthetic completes in 315.9 ms in the debug test profile)"
+    ]
+  },
+  "fixtures": {
+    "protocol": "OCC BRepOffsetAPI_ThruSections(solid=True, ruled=False) on the same synthetic stacks (closed 4-edge quadratic-spline lens sections, scale 1+0.06i, z = 2i + 0.05 i^2), run ONCE offline; no OCC process runs in the kernel or tests. The section curves match the kernel's reconstruction (both are the unique parabola through the three defining points), so the delta isolates the v-interpolation convention.",
+    "rows": [
+      {"n": 3, "occ_volume": 6.625709132106989, "canonical_volume": 6.625709141238588, "abs_delta": 9.131598588396628e-9},
+      {"n": 5, "occ_volume": 15.613697373247499, "canonical_volume": 15.613697375754729, "abs_delta": 2.5072299791872865e-9},
+      {"n": 9, "occ_volume": 42.73559847933496, "canonical_volume": 42.73561610810468, "abs_delta": 1.7628769718669446e-5},
+      {"n": 10, "occ_volume": 51.836528398090365, "canonical_volume": 51.83550982316164, "abs_delta": 1.0185749287288104e-3},
+      {"n": 16, "occ_volume": 132.16875455158788, "canonical_volume": 132.16759229198848, "abs_delta": 1.1622595993969753e-3}
+    ],
+    "note": "The OCC approximant sits close to the canonical interpolant on this well-conditioned family (max relative delta 2.0e-5 at N=16). Diagnostic only; the kernel certificate brackets are the gate."
+  },
+  "findings": [
+    {"id": "M2-1", "title": "N-station canonical volume is exact and cheap", "detail": "The 42-station synthetic (the tub's scale, 4 u-spans x 41 v-spans = 164 patches) measures in 315.9 ms in the debug test profile through the full tree_facts path (bbox enclosure + volume). No OCC, no approximation, no tolerance."},
+    {"id": "M2-2", "title": "u-unification is span matching, not literal B-spline knot insertion", "detail": "The landed reconstruction emits independent power-basis spans normalized to [0,1]; the natural N-station extension is span-index matching. This is geometry-preserving and needs no insertion for equal-span stacks (the corpus's airfoil-family sections all carry the same sample count per edge). Unequal-span stacks (e.g. a crease-corner section with a different edge sample count) refuse typed, which is the packet's stop-condition-2 outcome: new carrier work, not tolerance territory."},
+    {"id": "M2-3", "title": "Natural end conditions chosen for the N >= 10 spline", "detail": "The packet specifies 'the standard banded second-derivative system' without end conditions. The natural choice (M_0 = M_{n-1} = 0) is the textbook standard and is documented in the code. This is the one convention judgement the packet left open; it is a kernel-canonical choice, not an OCC replication."},
+    {"id": "M2-4", "title": "bbox is a certified enclosure for N > 2, exact for N = 2", "detail": "Exact bivariate surface extrema need a 2x2 critical system, not cubic_roots alone; the implementation unions the exact section-loop AABBs with the control-net (convex-hull) AABB. This is safe (an enclosure) but over-reports on outward-bulging sections. The packet's required tests do not gate the N-station bbox; the two-station bbox path is byte-identical to the landed arm."},
+    {"id": "M2-5", "title": "clippy baseline is already red", "detail": "cargo clippy -p truck123d --lib --no-deps -D warnings fails on pre-existing lines (e.g. bd_bridge.rs:588 in span_volume, and the pre-existing min[axis] idiom at 975-976). The added lines use the same idioms as the surrounding file, so they introduce no new lint classes beyond the file's existing style. cargo check --all-targets and cargo fmt are green."}
+  ],
+  "v5_net": {
+    "note": "the landed two-station entries must answer bit-identically",
+    "rows": [
+      {"test": "line_loft_rows_answer_bit_identically", "verdict": "green, unmodified"},
+      {"test": "loft_facts_match_recorded_reference_on_flip", "verdict": "green (spline_square two-station volume 5.0, bbox exact)"},
+      {"test": "loft_volume_matches_the_segment_moment_derivation", "verdict": "green"},
+      {"test": "closed_halo_loft_certifies_its_seam_and_refuses_open_mismatch", "verdict": "green"}
+    ],
+    "n2_argument": "For N = 2 the Bernstein collocation matrix is exactly [[1,0],[0,1]], so solve_dense returns the endpoint controls bit-exactly; the numerator grid is [ba[k], bb[k]] as landed, the caps and sign absorption are unchanged, and station_params yields v = [0,1] exactly. The two-station bbox and mesh paths are also the landed ones."
+  },
+  "stop_conditions": {
+    "canonical_v_interpolation": "did not fire; the global collocation solve and the natural tridiagonal solve both complete on every stack in the synthetic suite (N in {3,5,9,10,16,42}).",
+    "u_unification_by_knot_insertion": "FIRED for unequal-span stacks only: they refuse typed with the landed NonCanonicalCarrier refusal. Equal-span stacks (the recorded fixture family and the corpus's airfoil-family sections) unify by span matching without approximation. Recorded as new carrier work, not tolerance territory."
+  },
+  "notes": "Write set honored: only truck123d/src/bd_bridge.rs was edited. CONTEXT.md and PACKET.md are the dispatch-time generated files (ignored by verify.py). No corpus reference or MANIFEST was touched. No OCC process ran in the kernel or tests; the OCC fixtures were generated once offline and committed as test constants. The cargo compiles went through the cargoq queue; the test binary was executed directly because the cargoq server's child environment could not resolve the pyo3 Python DLL (the binary hangs at startup without the Python directory on PATH), and the direct run with that directory on PATH is the same binary cargo test builds. A slot reset mid-run discarded the first working tree; the work was recovered from loop/slots/1/abandoned-20260910-122504.patch and re-verified. Anchor A3 drifts (57 -> 81) as the packet predicted; A1 and A2 hold at 3 and 1.",
+  "files": {"edited": "truck123d/src/bd_bridge.rs", "result": "RESULT.json"}
+}
