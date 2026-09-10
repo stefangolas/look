@@ -3215,3 +3215,63 @@ Leaving: 0 RUNNING; HEAD 436e734; slots 0/1 clean; MONO-6-SWEPT-BOOLEANS +
 SOLVER-SURVEY-A READY but UNDISPATCHABLE until the tracked root RESULT.json is
 removed; cargoq UP; heartbeat 1; operator runner 1; driver 1; watchdog 1; TWO
 supervisors; disk 15.7 GiB free; RAM 2.4 GiB free.
+
+## [operator 2026-09-10T22:23Z] UNBLOCK: SOLVER-SURVEY-A re-dispatched via the step-3c run_packet path (new_slot bypassed)
+
+Board: 2 RUNNING (slot 0 MONO-6-SWEPT-BOOLEANS pid 14596; slot 1
+SOLVER-SURVEY-A pid 24416, dispatched by this operator) / 0 landed-this-cycle /
+1 unblocked / 0 flipped. HEAD 059c588 (the session-58 orchestrator handoff).
+
+- **Health (step 1)**: heartbeat exactly 1 (27872, anchored `-File
+  dispatch_heartbeat.ps1`), watchdog 1 (29264), operator runner 1 (27876),
+  overnight driver 1 (26920), cargoq UP (ping 200, queued 0, running false);
+  TWO supervisors (19172 + 27828 - carried duplication class); orchestrator
+  session LIVE (3 opencode). Disk 13.9 GiB free (below the 15 GB goal, above
+  the 8 GB floor); RAM 1.9 GiB free (below the 3 GB floor, no cargo/rustc).
+- **Land (step 2)**: nothing operator-landable. `git merge-base --is-ancestor`
+  exit 0 vs integration/kernel-bg for SOLVER-SURVEY-C e6553db, F1 3c2109b,
+  CL-006 ee97499, CL-005 713f205, FRAME-REVOLVE b667a85, SURVEY-B c3bc1a1; no
+  FINISHED slot holds an unlanded DONE RESULT (slots 4/5/6 landed residue; slot
+  3 SURVEY-C landed; slot 7 BRIDGE-BOOLEANS status LANDED, redundant, no
+  commit).
+- **Unblock (step 3) - THE ACTION**: slot 1 was a DEAD dispatch of
+  SOLVER-SURVEY-A (no commit, no RESULT, no question, events 334 min old) whose
+  only dirt was a staged deletion of the tracked root RESULT.json. The
+  heartbeat's dispatch_ready path fails it every cycle because `new_slot`
+  re-stages that deletion and `run_packet`'s dirty filter (run_packet.py:306)
+  ignores PACKET.md/CONTEXT.md but NOT RESULT.json. The operator used the
+  documented step-3c path and SKIPPED new_slot: `run_packet --slot 1
+  --reset-only --packet loop/packets/SOLVER-SURVEY-A.md` (archive_and_reset's
+  `git reset --hard HEAD` restored the tracked RESULT.json -> clean; archived 1
+  change to loop/slots/1/abandoned-20260910-182246.patch), then `run_packet
+  --slot 1 --packet loop/packets/SOLVER-SURVEY-A.md` (cargoq PATH +
+  CARGO_BUILD_JOBS=2) -> "started pid 24416". slot_status now shows slot 1
+  RUNNING SOLVER-SURVEY-A, events growing. No new_slot means no re-staged
+  deletion. This clears the ONLY other READY-without-marker row; when SURVEY-A
+  lands, SOLVER-CHECKER (depends_on SURVEY-A/B/C/D) can flip.
+- **Registry (step 4)**: 324 rows - 237 DONE, 79 READY, 8 BLOCKED.
+  READY-without-landed-marker = exactly {MONO-6 (running), SOLVER-SURVEY-A
+  (running)}. BLOCKED-with-all-deps-landed = the carried 7 owner-parked/
+  human-gated/superseded (BG-AUD-FIX-004 OWNER_BLOCKED, BG-CK-SPLINE-CENSUS
+  owner-cancelled, SEM-PCURVE-MASTER-001-FIX SUPERSEDED, DEF-SPINEFRAME-GRAZE
+  SPEC_GAP, DEF-TESS-ANALYTIC-SEAM superseded, DEF-SEEDRAY-B human-gated,
+  TOR-C orchestrator-held) PLUS SOLVER-CHECKER (depends_on SURVEY-A, unlanded -
+  correctly BLOCKED). Nothing flipped.
+- **Dispatch (step 5)**: `dispatch_ready --dry-run --max-workers=4` -> "slots:
+  8 (1 running, 7 free); SOLVER-SURVEY-A -> slot 1; dispatched 1". No manual
+  dispatch_ready (heartbeat live; the operator's run_packet re-dispatch is the
+  step-3c action, not the dispatcher).
+- **STATE.md (step 6)**: appended the [operator 2026-09-10T22:23Z] block and
+  refreshed the "Where we are" LATEST GROUND TRUTH pointer (was stale at
+  20:40Z).
+- **Escalation (step 7)**: re-flagged the tracked root RESULT.json at HEAD
+  059c588 (the orchestrator's session-58 handoff claims the stall was fixed by
+  7591ed2, but the artifact is still tracked and the heartbeat still fails);
+  the operator's bypass works for a single slot but the dispatcher path does
+  not.
+
+Leaving: 2 RUNNING (MONO-6 slot 0, SURVEY-A slot 1); HEAD 059c588; nothing
+operator-landable; the tracked root RESULT.json still blocks the heartbeat's
+dispatch path (operator bypassed it for SURVEY-A); cargoq UP; heartbeat 1;
+operator runner 1; driver 1; watchdog 1; TWO supervisors; disk 13.9 GiB free;
+RAM 1.9 GiB free.

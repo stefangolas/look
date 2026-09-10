@@ -76,23 +76,16 @@ corrected, annex C = ORACLE POLICY CHANGE), then docs/SOLVER_COVERAGE_SPEC.md
 ## Where we are
 
 > LATEST GROUND TRUTH: read the newest `[operator ...]` block in "State of
-> the machine, as left" (2026-09-10T20:40Z). [operator 2026-09-10T20:40Z
-> ground-truth note: quiet healthy cycle, nothing operator-landable. Board 0
-> RUNNING / 0 landable / 0 unblocked / 0 flipped; HEAD 3dc8ec7 (the 20:17Z
-> operator commit). Every slot tip is an ancestor of integration/kernel-bg
-> with 0 unmerged commits; slot 0 (SOLVER-SURVEY-D) has a status-DONE RESULT
-> but NO worker commit (tip 906dc59 == base) so it is NOT operator-landable -
-> the 7th false landing stands (D.json still untracked in slot 0 wt + preserved
-> at `refs/wip/SOLVER-SURVEY-D-fragment` 1470e72). The 19:54Z escalations
-> stand: land D's fragment + correct the false `LANDED 906dc59`; clear
-> SOLVER-SURVEY-A's false `LANDED cc38b4f`; MONO-5's false `LANDED b34ec4e`
-> (WIP in slot-0 abandoned patch); do NOT flip MONO-6/SOLVER-CHECKER. The
-> driver is parked (LEFT FOR MORNING on the slot-4 F1 LANDED-WITH-FINDINGS
-> judgment) so the loop is stalled pending the false-landing reconciliation -
-> orchestrator/owner work. Health: heartbeat 1 (27872), watchdog 1 (29264),
-> operator runner 1 (27876), driver 1 (26920), cargoq UP; TWO supervisors
-> (carried). Disk 13.8 GiB free, RAM 2.1 GiB free (no cargo/rustc running;
-> below the 3 GB floor).]
+> the machine, as left" (2026-09-10T22:23Z). [operator 2026-09-10T22:23Z
+> ground-truth note: 2 RUNNING (slot 0 MONO-6-SWEPT-BOOLEANS; slot 1
+> SOLVER-SURVEY-A, re-dispatched by the operator this cycle via the step-3c
+> run_packet path); nothing operator-landable (all FINISHED slot tips are
+> ancestors of integration/kernel-bg); the tracked root RESULT.json still
+> blocks the heartbeat's dispatch path - the operator bypassed it for SURVEY-A
+> but the dispatcher path still fails; HEAD 059c588; registry 324 rows - 237
+> DONE / 79 READY / 8 BLOCKED, nothing flippable; disk 13.9 GiB free (below the
+> 15 GB goal, above the 8 GB floor); RAM 1.9 GiB free (below the 3 GB floor, no
+> cargo/rustc).]
 
 - **THE FIRST KERNEL-VS-OCC TIMING COMPARISON IS BANKED** (FH-TIMING-REFRESH,
   landed c94d043): turbopump_assembly **0.097 s kernel vs 4.866 s OCC**,
@@ -5392,6 +5385,40 @@ blocking) remove the tracked root RESULT.json/CONTEXT.md/PACKET.md; (NEW)
 dispatch_ready survey --no-warm; (NEW) free RAM; carried - FRAME-REVOLVE F1
 non_z_axis pin amendment, duplicate supervisors, slot-4/7 wt RESULT residue,
 TOR-C flip-or-pin.]
+
+[operator 2026-09-10T22:23Z - volatile refresh + UNBLOCK: SOLVER-SURVEY-A
+re-dispatched. Board now: 2 RUNNING (slot 0 MONO-6-SWEPT-BOOLEANS pid 14596,
+events fresh; slot 1 SOLVER-SURVEY-A pid 24416, dispatched by the operator this
+cycle) / 0 landed-this-cycle / 1 unblocked / 0 flipped. HEAD 059c588 (the
+session-58 orchestrator handoff). Landing re-verified: all FINISHED slot tips are
+ancestors of integration/kernel-bg (SOLVER-SURVEY-C e6553db, F1 3c2109b, CL-006
+ee97499, CL-005 713f205, FRAME-REVOLVE b667a85, SURVEY-B c3bc1a1) - nothing
+operator-landable. **UNBLOCK**: the 21:57Z root-RESULT.json stall STILL STANDS at
+HEAD 059c588 (RESULT.json + CONTEXT.md + PACKET.md remain tracked), so the
+heartbeat's dispatch_ready still fails SURVEY-A: new_slot re-stages the tracked
+RESULT.json deletion and run_packet refuses. The operator re-dispatched SURVEY-A
+by the documented step-3c path WITHOUT new_slot - `run_packet --slot 1
+--reset-only` (archive_and_reset restores the tracked RESULT.json via `git reset
+--hard`, clearing the staged deletion; archived 1 change) then `run_packet --slot
+1 --packet loop/packets/SOLVER-SURVEY-A.md` -> started pid 24416, events
+growing. This clears the only other READY-without-marker row; when SURVEY-A
+lands, SOLVER-CHECKER (depends_on SURVEY-A/B/C/D) can flip. Registry: 324 rows -
+237 DONE, 79 READY, 8 BLOCKED; READY-without-marker = {MONO-6 (running),
+SOLVER-SURVEY-A (running)}; BLOCKED-with-all-deps-landed = the carried 7
+owner-parked/human-gated/superseded + SOLVER-CHECKER (correctly blocked on
+unlanded SURVEY-A) - nothing flipped. Dispatch: `dispatch_ready --dry-run
+--max-workers=4` -> "slots: 8 (1 running, 7 free); SOLVER-SURVEY-A -> slot 1;
+dispatched 1"; no manual dispatch_ready (heartbeat live; the operator's
+run_packet re-dispatch IS the step-3c action). Health: heartbeat exactly 1
+(27872), watchdog 1 (29264), operator runner 1 (27876), overnight driver 1
+(26920), cargoq UP (ping 200, queued 0, running false); TWO supervisors (19172 +
+27828 - carried); orchestrator session LIVE (3 opencode). Disk 13.9 GiB free
+(below the 15 GB goal, above the 8 GB floor); RAM 1.9 GiB free (below the 3 GB
+floor, no cargo/rustc). Open human items: (carried, still blocks the NEXT
+heartbeat dispatch) remove the tracked root RESULT.json/CONTEXT.md/PACKET.md from
+integration - the operator's new_slot bypass works but the dispatcher path does
+not; carried - FRAME-REVOLVE F1 non_z_axis pin amendment, duplicate supervisors,
+slot-4/7 wt RESULT residue, TOR-C flip-or-pin.]
 
 ### Session 58 (the MONO program, the coverage wave, the oracle policy change) - paid in full
 

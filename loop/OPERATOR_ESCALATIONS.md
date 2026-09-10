@@ -679,3 +679,27 @@ Judgment-required items appended each operator cycle. Newest at the bottom.
   cargoq restart guard; slot-4/7 wt RESULT residue; TOR-C flip-or-pin;
   heartbeat slot-liveness duplicate-dispatch bug; MONO-row registry schema gap;
   overnight.py:222-226 false-landing root cause.
+
+## 2026-09-10 22:23 UTC - tracked root RESULT.json STILL blocks the heartbeat dispatch path (21:57Z fix NOT applied)
+
+- What: HEAD 059c588 still tracks root `RESULT.json`, `CONTEXT.md`, `PACKET.md`
+  (`git ls-tree HEAD`). The session-58 handoff (item 5) says "the operator fixed
+  a loop-wide dispatch stall mid-session (7591ed2: tracked root RESULT.json
+  poisoned new_slot forks)" - but only the slot worktrees were cleaned; the
+  tracked artifact remains, so `new_slot` re-stages its deletion on every fork
+  and `run_packet` refuses. The 18:14:53 heartbeat log still shows
+  `SOLVER-SURVEY-A: run_packet FAILED - slot 1 has 1 uncommitted change(s)`.
+- Operator workaround applied this cycle (documented step-3c, NOT a repo edit):
+  `run_packet --slot 1 --reset-only` then `run_packet --slot 1 --packet
+  loop/packets/SOLVER-SURVEY-A.md`, skipping new_slot - SURVEY-A now RUNNING
+  (pid 24416). This does NOT fix the dispatcher path; the NEXT heartbeat
+  dispatch (e.g. SOLVER-CHECKER after SURVEY-A lands, MONO-7) will fail the same
+  way.
+- Fix (orchestrator/owner - outside the operator's 3-file limit):
+  `git -C C:\Users\stefa\look rm RESULT.json CONTEXT.md PACKET.md` then commit.
+  Filed copy survives at loop/results/SOLVER-SURVEY-D.json. Alternatively patch
+  `new_slot.py:201-207` to not `git rm` tracked artifacts, or add RESULT.json to
+  `run_packet.py:306`'s dirty-filter ignore list.
+- Start from: `git -C C:\Users\stefa\look ls-tree HEAD --name-only`;
+  `loop/dispatch_heartbeat.log` (tail); `loop/new_slot.py:193-207`;
+  `loop/run_packet.py:301-312`.
