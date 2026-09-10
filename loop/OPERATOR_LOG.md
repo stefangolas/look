@@ -2924,3 +2924,57 @@ Leaving: 1 RUNNING (SOLVER-SURVEY-D, slot 0, healthy); HEAD 906dc59; MONO-5
 falsely marked landed (WIP preserved in the slot-0 abandoned patch); MONO-6
 correctly BLOCKED; nothing unlanded; cargoq UP; heartbeat 1; driver 1;
 watchdog 1; TWO supervisors; disk 13.2 GiB free; RAM 2.72 GiB free.
+
+## [operator 2026-09-10T19:54Z] 7th false landing (SOLVER-SURVEY-D); SURVEY-A marker-blocked; D.json preserved; nothing landable
+
+Board: 0 RUNNING / 0 landed-this-cycle / 0 unblocked / 0 flipped. HEAD 9e19077.
+Disk 13.6 GiB free, RAM 2.31 GiB free (no cargo/rustc running).
+
+- **Health (step 1)**: heartbeat exactly 1 (27872, `-File
+  dispatch_heartbeat.ps1`; the second scan hit was this shell self-matching the
+  pattern), watchdog 1 (29264, `python watchdog.py`; the msedgewebview2
+  "gpu-watchdog" hits are false positives), operator runner 1 (27876, second
+  hit = this shell), overnight driver 1 (26920, `python overnight.py`), cargoq
+  UP (ping 200, queued 0, running false). Zero cargo/rustc. TWO supervisors
+  (carried duplication class; only ONE overnight.py child = no double-merge
+  risk). Disk 13.6 GiB (above the 8 GB floor, below the 15 GB goal); RAM 2.31
+  GiB (below the 3 GB floor, but no build running). Orchestrator session live
+  (opencode 23052).
+- **Land (step 2)**: nothing operator-landable. slot 0 FINISHED (SOLVER-
+  SURVEY-D) has RESULT status DONE but NO worker commit (tip 906dc59 == base);
+  its D.json is untracked - a survey's deliverable is not a mergeable commit
+  and the row is falsely marked landed. slot 3 FINISHED (SOLVER-SURVEY-C)
+  already landed (C.json in HEAD). Slots 1/2/4/5/6/7 are landed/stale residue
+  (slot 1 clean detached 4de25d9; slot 2 B landed; slot 4 F1
+  LANDED-WITH-FINDINGS; slots 5/6 DONE; slot 7 LANDED redundant).
+- **Unblock (step 3)**: none - 0 RUNNING; no IDLE/DEAD >15 min holding work
+  (slot 1 IDLE 185 min, slot 2 IDLE 82 min - both landed residue, no live
+  question); no live QUESTION.md; zero cargo/rustc.
+- **Preserve (step 3, work-at-risk)**: committed the untracked survey-D
+  fragment to `refs/wip/SOLVER-SURVEY-D-fragment` = 1470e72 (worktree file
+  left untracked/unstaged) - the SURVEY-A untracked-wiped-by-re-fork class.
+- **Registry (step 4)**: 324 rows - 232 DONE, 82 READY, 10 BLOCKED.
+  READY-without-landed-marker = NONE (SURVEY-A and SURVEY-D both carry false
+  `LANDED` note markers so `landed()` skips them; the 5 slot-assigned residue
+  rows are skipped by slot ground truth). BLOCKED-with-all-deps-landed = the
+  carried owner-parked set (BG-AUD-FIX-004 OWNER_BLOCKED, BG-CK-SPLINE-CENSUS
+  owner-cancelled, SEM-PCURVE-MASTER-001-FIX SUPERSEDED, DEF-SPINEFRAME-GRAZE
+  SPEC_GAP->-R2, DEF-TESS-ANALYTIC-SEAM superseded by -R2, DEF-SEEDRAY-B
+  human-gated, TOR-C orchestrator-held) + MONO-6 (dep MONO-5 falsely landed)
+  + SOLVER-CHECKER (deps = the 4 survey fragments; D unlanded) - all correctly
+  parked, nothing flipped (MONO-6/SOLVER-CHECKER deliberately NOT flipped).
+- **Dispatch (step 5)**: `dispatch_ready.py --dry-run --max-workers=4` ->
+  "slots: 8 (0 running, 8 free); slot-assigned packets: 5; dispatched 0;
+  workers now ~0/4" = REAL idle (heartbeat live, last cycle 19:49Z dispatched
+  0; no manual dispatch). The driver is parked (LEFT FOR MORNING on the slot-4
+  F1 judgment), so the loop is stalled pending the false-landing reconciliation.
+- **STATE.md (step 6)**: LATEST GROUND TRUTH pointer + new [operator] block.
+- **Escalation (step 7)**: filed the 7th false landing (SOLVER-SURVEY-D) +
+  the SURVEY-A ineffective-restore marker in OPERATOR_ESCALATIONS.md, with the
+  preserved D.json ref and the exact recovery commands.
+
+Leaving: 0 RUNNING; HEAD 9e19077; SOLVER-SURVEY-D falsely marked landed
+(D.json preserved at refs/wip/SOLVER-SURVEY-D-fragment 1470e72; worktree copy
+still at slot 0); SOLVER-SURVEY-A READY-but-marker-blocked; MONO-5/6 +
+SOLVER-CHECKER correctly BLOCKED; nothing unlanded; cargoq UP; heartbeat 1;
+driver 1; watchdog 1; TWO supervisors; disk 13.6 GiB free; RAM 2.31 GiB free.

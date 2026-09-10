@@ -574,6 +574,47 @@ Judgment-required items appended each operator cycle. Newest at the bottom.
   `loop/slots/0/abandoned-20260910-152616.patch`; `git show 906dc59`;
   `grep -ci classify truck123d/src/bd_bridge.rs`.
 
+## 2026-09-10 19:54 UTC - 7th FALSE LANDING: SOLVER-SURVEY-D (base merged; D.json uncommitted) + SOLVER-SURVEY-A still marker-blocked
+
+- What: `overnight.log` `09-10 15:35:08 slot 0: SOLVER-SURVEY-D LANDED at
+  906dc59`. 906dc59 is the packet BASE (packet/SOLVER-SURVEY-D tip == base, no
+  worker commit); HEAD 9e19077 touched only `loop/PACKETS.jsonl` (appended
+  `LANDED 906dc59` to the READY row's note). The survey work IS real but
+  uncommitted: slot 0 wt holds an untracked
+  `loop/solver_coverage/fragments/D.json` (170,327 b, 5015 lines) + a
+  status-DONE `RESULT.json`; `git ls-tree HEAD loop/solver_coverage/fragments/`
+  = B.json, C.json only (D absent). Same `overnight.py:222-226` root cause as
+  the 18:38Z cluster and the 19:33Z MONO-5 strike.
+- Why it matters now: the appended `LANDED 906dc59` note makes
+  `dispatch_ready.landed()` (status==done OR note matches `landed [0-9a-f]{7,}`)
+  SKIP SOLVER-SURVEY-D forever while its fragment is missing from HEAD.
+- SECOND stranded row, same class: **SOLVER-SURVEY-A is status=READY but its
+  note still carries `LANDED cc38b4f`** (cc38b4f is an ancestor = the base), so
+  `landed()` returns True and the dispatcher skips it too. Commit 877efa2
+  ("row restored READY for re-dispatch") did NOT clear the note marker, so the
+  restore was ineffective - SURVEY-A has no fragment in HEAD and no RESULT.
+- Preserved (operator): the at-risk untracked D.json - it would be wiped by any
+  slot-0 re-fork (the SURVEY-A archive-gap class) - is committed to
+  `refs/wip/SOLVER-SURVEY-D-fragment` = 1470e72, worktree file left
+  untracked/unstaged. Recover with
+  `git show 1470e72:loop/solver_coverage/fragments/D.json`.
+- What a human should do:
+  1. Fix `loop/overnight.py:222-226` so a landing REQUIRES a committed worker
+     diff (`head != base`); same item as the 18:38Z + 19:33Z escalations - now
+     the 7th strike. Until fixed, every survey / skipped-commit worker
+     false-lands its row and self-blocks via the LANDED_RE trap.
+  2. Land SOLVER-SURVEY-D's D.json (from `refs/wip/SOLVER-SURVEY-D-fragment`
+     or the slot-0 wt) + its RESULT, then correct the false `LANDED 906dc59`
+     note.
+  3. Clear the false `LANDED cc38b4f` marker from SOLVER-SURVEY-A's note so
+     `dispatch_ready` re-dispatches it (no fragment exists anywhere).
+  4. Do NOT flip MONO-6-SWEPT-BOOLEANS / SOLVER-CHECKER until their real deps
+     are landed.
+- Start from: `loop/overnight.py:222-226`;
+  `git show refs/wip/SOLVER-SURVEY-D-fragment`;
+  `loop/slots/0/wt/loop/solver_coverage/fragments/D.json`;
+  `grep -n 'SOLVER-SURVEY-A' loop/PACKETS.jsonl`.
+
 - Carried (unchanged): FRAME-REVOLVE F1 non_z_axis pin amendment
   (truck123d/tests/ttc_lathe_spline.rs:255); duplicate supervisors + lagging
   cargoq restart guard; slot-4/7 wt RESULT residue; TOR-C flip-or-pin;
