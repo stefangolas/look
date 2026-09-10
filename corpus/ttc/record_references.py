@@ -15,6 +15,15 @@ DOOR = os.path.join(ROOT, "door.py")
 TREES = os.path.join(ROOT, "trees")
 
 ROWS = [
+    # The six rows staged 2026-09-10 (annex EXCLUDED_SIX_DEMAND_MAP s6.1,
+    # owner decision 1). Recorded as DIAGNOSTICS under the oracle policy
+    # change (commit 4e6694d) - a reference mismatch never gates a verdict.
+    ("f1/front_wing", "front_wing", "lib.front_wing", "build_front_wing", []),
+    ("f1/cockpit", "cockpit", "lib.cockpit", "build_cockpit", []),
+    ("f1/nose", "nose", "lib.nose", "build_nose", []),
+    ("f1/sidepod_left", "sidepod_left", "lib.sidepods", "build_sidepod", ["left"]),
+    ("f1/sidepod_right", "sidepod_right", "lib.sidepods", "build_sidepod", ["right"]),
+    ("f1/halo", "halo", "lib.mono_halo", "build_halo_bodies", []),
     ("falcon_heavy/nozzle_assembly", "nozzle_assembly", "lib.merlin_common", "make_nozzle_assembly", []),
     ("falcon_heavy/chamber_assembly", "chamber_assembly", "lib.merlin_common", "make_chamber_assembly", []),
     ("falcon_heavy/thrust_structure", "thrust_structure", "lib.merlin_common", "make_thrust_structure", []),
