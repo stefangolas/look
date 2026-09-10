@@ -115,3 +115,21 @@ stays ahead; new arms fire only where the old path returned
    sites + halo loft-chain arm).
 3. Confirm fillet handling: no action (landed op; blocking issue is
    admission), per §3.
+
+## 6.1 DECIDED (2026-09-10, owner, in session)
+
+All three section-6 decisions answered YES by the owner (recorded in this
+session):
+
+1. The five real scripts are ADMITTED to staging; cooling confirmed dropped
+   out (no script exists). Staging is now a direct orchestrator task, not a
+   pending ask.
+2. The authoring-arm packet's extended scope is AUTHORIZED (A2's five
+   refusal sites + the halo loft-chain arm).
+3. Fillet handling confirmed as NO ACTION (landed op stands; the blocking
+   issue is admission, per A3).
+
+Re-triage note: section 6 was authored before the 2026-09-10 oracle policy
+change (commit 4e6694d); under the new policy staging carries no
+compatibility-claim concession, so these decisions were auto-resolvable in
+retrospect. The annex gate should not have stayed pending that long.
