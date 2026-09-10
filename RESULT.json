@@ -1,0 +1,440 @@
+{
+  "id": "SOLVER-SURVEY-D",
+  "contract": [
+    "SOLVER-SURVEY-D"
+  ],
+  "class": "survey",
+  "status": "DONE",
+  "fragment": "loop/solver_coverage/fragments/D.json",
+  "anchors_verified": {
+    "A1": 185,
+    "A2": 7
+  },
+  "census": {
+    "rules_extracted": 93,
+    "rules_by_kind": {
+      "gate": 34,
+      "assembler": 23,
+      "classifier": 19,
+      "solver": 16,
+      "reduction": 1
+    },
+    "confidence": {
+      "high": 93
+    },
+    "per_axis_coverage": {
+      "!unmodeled:route": 2,
+      "!unmodeled:engine": 5,
+      "goal": 67,
+      "!unmodeled:alias": 1,
+      "rep.construction_witness": 22,
+      "global.knowledge": 36,
+      "!unmodeled:trigger": 1,
+      "!unmodeled:payload": 1,
+      "!unmodeled:vocabulary": 1,
+      "!unmodeled:operand_depth": 1,
+      "!unmodeled:mode": 3,
+      "rep.canonical_carrier": 14,
+      "!unmodeled:revolution_arc": 1,
+      "!unmodeled:axis": 3,
+      "!unmodeled:boundary": 1,
+      "!unmodeled:section": 1,
+      "!unmodeled:path": 1,
+      "!unmodeled:sections": 1,
+      "!unmodeled:about": 1,
+      "!unmodeled:prior_mirror": 1,
+      "!unmodeled:op": 8,
+      "!unmodeled:carrier": 2,
+      "!unmodeled:kind": 9,
+      "!unmodeled:rotation": 1,
+      "!unmodeled:major_angle": 1,
+      "rep.param_map_inverse": 2,
+      "!unmodeled:frame_form": 1,
+      "!unmodeled:instances": 1,
+      "!unmodeled:entry": 4,
+      "!unmodeled:outcome": 1,
+      "!unmodeled:pending_mode": 1,
+      "!unmodeled:base_tool_class": 1,
+      "!unmodeled:pair": 2,
+      "!unmodeled:constructive": 1,
+      "!unmodeled:selection_pending": 1,
+      "!unmodeled:profile": 9,
+      "!unmodeled:base_tool": 3,
+      "rep.bernstein_chart": 6,
+      "!unmodeled:value": 1,
+      "!unmodeled:frame_op": 1,
+      "!unmodeled:tree": 4,
+      "!unmodeled:json": 1,
+      "!unmodeled:node": 5,
+      "!unmodeled:arc_deg": 1,
+      "!unmodeled:trim_net": 2,
+      "!unmodeled:closed": 1,
+      "!unmodeled:stations": 3,
+      "!unmodeled:placement": 1,
+      "!unmodeled:ruled": 1,
+      "!unmodeled:json_tag": 1,
+      "!unmodeled:cones": 1,
+      "!unmodeled:row": 7,
+      "!unmodeled:trim_curve": 1,
+      "!unmodeled:refusal": 5,
+      "!unmodeled:envelope": 1,
+      "!unmodeled:name": 1,
+      "!unmodeled:error": 1
+    },
+    "unmodeled_values": [
+      "!unmodeled:engine=occ|truck",
+      "!unmodeled:cadgen.build123d alias",
+      "!unmodeled:drop-in bd module",
+      "!unmodeled:boolean mode union|subtract|intersect",
+      "!unmodeled:operand depth <=1",
+      "!unmodeled:revolution_arc=360.0",
+      "!unmodeled:axis carrier Axis|Vector",
+      "!unmodeled:boundary line-loop|spline-trimmed",
+      "!unmodeled:path line|spline",
+      "!unmodeled:section line-loop Face",
+      "!unmodeled:about Plane.XY|XZ|YZ",
+      "!unmodeled:prior_mirror none|same axis",
+      "!unmodeled:carrier closed conic profile",
+      "!unmodeled:rotation (0,0,0)|(90,0,0)|(0,90,0)",
+      "!unmodeled:major_angle=360.0",
+      "!unmodeled:frame_form translation|euler|full orthonormal",
+      "!unmodeled:vocabulary _TRUCK_NAMES",
+      "!unmodeled:instances (prototype, location, name)",
+      "!unmodeled:entry truck facts measurement",
+      "!unmodeled:op Shape.cast",
+      "!unmodeled:op OCC probe",
+      "!unmodeled:op Fillet|Chamfer",
+      "!unmodeled:entry facade table (NOT called by door.py)",
+      "!unmodeled:op FacadeOp tag",
+      "!unmodeled:pending_mode none|union|subtract|intersect",
+      "!unmodeled:base_tool_class CarrierClass pair",
+      "!unmodeled:constructive bool",
+      "!unmodeled:selection_pending bool",
+      "!unmodeled:profile CarrierClass",
+      "!unmodeled:frame_op push_part|push_sketch|pop",
+      "!unmodeled:tree TreeNode JSON",
+      "!unmodeled:json construction tree",
+      "!unmodeled:node Part|Boolean|Group",
+      "!unmodeled:node Part(Loft closed)|other",
+      "!unmodeled:kind SolidSpec tag",
+      "!unmodeled:arc_deg=360.0",
+      "!unmodeled:profile line|spline",
+      "!unmodeled:profile empty base + closed spline curve, or line base + trim",
+      "!unmodeled:trim_net empty|recorded pullback net",
+      "!unmodeled:closed bool",
+      "!unmodeled:stations >=2 StationFrame",
+      "!unmodeled:placement mirror? + rotation|rz + translation",
+      "!unmodeled:ruled bool",
+      "!unmodeled:axis x|y|z",
+      "!unmodeled:json_tag kind",
+      "!unmodeled:cones ConeRow pair",
+      "!unmodeled:row VolumeRow (numerator+weights+orientation)",
+      "!unmodeled:row TrimRow (density+trim+tolerance)",
+      "!unmodeled:trim_curve empty|closed control loop <=16 pts",
+      "!unmodeled:row profile+amount+both+trim+tolerance",
+      "!unmodeled:row ShapeRow",
+      "!unmodeled:row ShapeRow(closed,oriented)",
+      "!unmodeled:python module surface",
+      "!unmodeled:refusal base Refusal variant",
+      "!unmodeled:envelope EnvelopeCase",
+      "!unmodeled:refusal ConstructRefusal (14 variants)",
+      "!unmodeled:refusal certified RefusalKind with no booked door mapping",
+      "!unmodeled:kind RefusalKind",
+      "!unmodeled:name snake_case RefusalKind name",
+      "!unmodeled:error BindingError",
+      "!unmodeled:refusal base Refusal"
+    ],
+    "distinct_unmodeled_values": 61,
+    "abstraction_gap_axis_keys": 51,
+    "distinct_refusal_labels": 113,
+    "consumes_evidence_types": 73,
+    "produces_evidence_types": 75,
+    "matrix_cells_cited": 26,
+    "routing_gaps": 9,
+    "refusal_surface_entries": 8,
+    "reaches_resolved_rule_ids": 10,
+    "reaches_unresolved_symbols": 4
+  },
+  "anchors": {
+    "A1": {
+      "cmd": "grep -cE 'fn [a-z_]+' truck123d/src/bd_bridge.rs",
+      "expect": 185,
+      "observed": 185,
+      "held": true
+    },
+    "A2": {
+      "cmd": "grep -cE 'fn member_[a-z_]+\\(', truck123d/src/bd_bridge.rs",
+      "expect": 7,
+      "observed": 7,
+      "held": true
+    }
+  },
+  "pub_entry_census": {
+    "note": "Every pub entry in the read scope is accounted for as a rule, grouped under a dispatch arm, or noted as a pure data carrier/accessor. See fragment notes for the grouped/noted lists.",
+    "bd_bridge_rules": 33,
+    "facade_rules": 15,
+    "binding_rules": 11,
+    "marshal_rules": 8,
+    "door_rules": 26
+  },
+  "routing_gaps": [
+    {
+      "id": "RG-1",
+      "kind": "ROUTING_GAP",
+      "title": "certified swept-carrier boolean dispatch is unreachable from the bridge/door path",
+      "matrix_cells": [
+        "fuse(swept,canonical)",
+        "cut(swept,canonical)",
+        "intersect(swept,canonical)",
+        "cut(revolved,canonical)"
+      ],
+      "missing_rule": "ADMISSION-CERTIFY-TRANSVERSE-PAIR"
+    },
+    {
+      "id": "RG-2",
+      "kind": "ROUTING_GAP",
+      "title": "binding.rs pyo3 exports are not registered in the module",
+      "matrix_cells": [
+        "cut(swept,canonical)",
+        "validity-check"
+      ],
+      "missing_rule": null
+    },
+    {
+      "id": "RG-3",
+      "kind": "ROUTING_GAP",
+      "title": "certified solver registry is never populated on the door path",
+      "matrix_cells": [
+        "cut(swept,canonical)"
+      ],
+      "missing_rule": null
+    },
+    {
+      "id": "RG-4",
+      "kind": "VERTICAL_GAP",
+      "title": "boolean product is never computed; only the base operand is measured",
+      "matrix_cells": [
+        "cut(canonical,canonical)",
+        "fuse(swept,canonical)"
+      ],
+      "missing_rule": null
+    },
+    {
+      "id": "RG-5",
+      "kind": "ROUTING_GAP",
+      "title": "partial-arc revolve matrix cell unreachable through the door",
+      "matrix_cells": [
+        "revolve(partial-arc,spline-profile)"
+      ],
+      "missing_rule": null
+    },
+    {
+      "id": "RG-6",
+      "kind": "ROUTING_GAP",
+      "title": "circle/fillet/chamfer matrix cells certified but refused by the door drop-in",
+      "matrix_cells": [
+        "fillet(edge-selector)",
+        "chamfer(edge-selector)",
+        "author(circle-profile)"
+      ],
+      "missing_rule": null
+    },
+    {
+      "id": "RG-7",
+      "kind": "ROUTING_GAP",
+      "title": "facade table path and bridge path are disjoint; door measures only the bridge",
+      "matrix_cells": [
+        "revolve(partial-arc,spline-profile)",
+        "fillet(edge-selector)",
+        "chamfer(edge-selector)",
+        "author(circle-profile)",
+        "step-export(constructive)"
+      ],
+      "missing_rule": null
+    },
+    {
+      "id": "RG-8",
+      "kind": "ROUTING_GAP",
+      "title": "engine regime divergence: occ path serves what truck refuses",
+      "matrix_cells": [
+        "author(circle-profile)",
+        "fillet(edge-selector)",
+        "chamfer(edge-selector)",
+        "revolve(partial-arc,spline-profile)"
+      ],
+      "missing_rule": null
+    },
+    {
+      "id": "RG-9",
+      "kind": "ROUTING_GAP",
+      "title": "reflect_solid is test-only; production mirror is placed-carrier only",
+      "matrix_cells": [
+        "mirror(axis-plane)"
+      ],
+      "missing_rule": null
+    }
+  ],
+  "matrix_cells": [
+    {
+      "index": 1,
+      "cell": "fuse(swept,swept)",
+      "current": "refuses(NonCanonicalCarrier)",
+      "route_rows": 4
+    },
+    {
+      "index": 2,
+      "cell": "fuse(swept,canonical)",
+      "current": "refuses(NonCanonicalCarrier)",
+      "route_rows": 3
+    },
+    {
+      "index": 3,
+      "cell": "cut(swept,swept)",
+      "current": "refuses(NonCanonicalCarrier)",
+      "route_rows": 3
+    },
+    {
+      "index": 4,
+      "cell": "cut(revolved,canonical)",
+      "current": "refuses(NonCanonicalCarrier)",
+      "route_rows": 3
+    },
+    {
+      "index": 5,
+      "cell": "cut(swept,canonical)",
+      "current": "refuses(NonCanonicalCarrier)",
+      "route_rows": 5
+    },
+    {
+      "index": 6,
+      "cell": "intersect(swept,canonical)",
+      "current": "refuses(NonCanonicalCarrier)",
+      "route_rows": 2
+    },
+    {
+      "index": 7,
+      "cell": "cut(canonical,canonical)",
+      "current": "certified",
+      "route_rows": 3
+    },
+    {
+      "index": 8,
+      "cell": "heal(boolean-result)",
+      "current": "unavailable",
+      "route_rows": 0
+    },
+    {
+      "index": 9,
+      "cell": "revolve(full,spline-profile)",
+      "current": "certified",
+      "route_rows": 3
+    },
+    {
+      "index": 10,
+      "cell": "revolve(partial-arc,spline-profile)",
+      "current": "certified",
+      "route_rows": 2
+    },
+    {
+      "index": 11,
+      "cell": "sweep(spine,closed-section)",
+      "current": "certified",
+      "route_rows": 4
+    },
+    {
+      "index": 12,
+      "cell": "loft(spline-section)",
+      "current": "certified",
+      "route_rows": 4
+    },
+    {
+      "index": 13,
+      "cell": "extrude(profile)",
+      "current": "certified",
+      "route_rows": 5
+    },
+    {
+      "index": 14,
+      "cell": "fillet(edge-selector)",
+      "current": "certified",
+      "route_rows": 2
+    },
+    {
+      "index": 15,
+      "cell": "chamfer(edge-selector)",
+      "current": "certified",
+      "route_rows": 2
+    },
+    {
+      "index": 16,
+      "cell": "mirror(axis-plane)",
+      "current": "certified",
+      "route_rows": 4
+    },
+    {
+      "index": 17,
+      "cell": "author(spline-profile)",
+      "current": "certified",
+      "route_rows": 4
+    },
+    {
+      "index": 18,
+      "cell": "author(polyline-profile)",
+      "current": "certified",
+      "route_rows": 1
+    },
+    {
+      "index": 19,
+      "cell": "author(circle-profile)",
+      "current": "certified",
+      "route_rows": 2
+    },
+    {
+      "index": 20,
+      "cell": "validity-check",
+      "current": "client-layer",
+      "route_rows": 4
+    },
+    {
+      "index": 21,
+      "cell": "primitive(canonical-solid)",
+      "current": "certified",
+      "route_rows": 6
+    },
+    {
+      "index": 22,
+      "cell": "compound(group)",
+      "current": "certified",
+      "route_rows": 4
+    },
+    {
+      "index": 23,
+      "cell": "label",
+      "current": "client-layer",
+      "route_rows": 2
+    },
+    {
+      "index": 24,
+      "cell": "color",
+      "current": "client-layer",
+      "route_rows": 1
+    },
+    {
+      "index": 25,
+      "cell": "placement",
+      "current": "client-layer",
+      "route_rows": 3
+    },
+    {
+      "index": 26,
+      "cell": "step-export(constructive)",
+      "current": "refuses(NonCanonicalCarrier)",
+      "route_rows": 3
+    }
+  ],
+  "stop_conditions": {
+    "structural_mismatch_triggered": false,
+    "detail": "No in-scope routing construct required a schema amendment. Every dispatch arm is expressible as a RULE row with a discriminator, preconditions/outcomes on the frozen axes, refusals, evidence types, and calls. The 61 unmodeled values are value/axis-level abstraction-gap findings (the axes carry no carrier-class or op-name value), which section 1 of the spec makes first-class, not a shape failure."
+  },
+  "notes": "SOLVER-SURVEY-D fragment written to loop/solver_coverage/fragments/D.json per docs/SOLVER_COVERAGE_SPEC.md section 1 (RULES schema, open-world at the value level) and the SOLVER-SURVEY-A method applied verbatim, with the D-scope additions: each row records the match/discriminator that selects the arm, the bridge entry it calls, and the kernel rule ids it reaches; every typed refusal the routing layer emits is listed (refusal_surface); each OP_CAPABILITY_MATRIX cell touched by an arm is cited (matrix_cells, all 26 cells); the door.py engine switch and op dispatch are routing rows with both occ and truck paths recorded where they diverge. Scope: truck123d/src/bd_bridge.rs (6191 lines; anchors A1=185, A2=7 hold), binding.rs, marshal.rs, facade.rs, lib.rs, python.rs; corpus/ttc/door.py; docs/OP_CAPABILITY_MATRIX.md cross-referenced only. 93 routing rows, 61 distinct unmodeled values, 113 distinct refusal labels, 26 matrix cells, 9 routing gaps, 8 refusal-surface entries. Resolved reaches into fragments A-C: C-SPLIT-TRIM-CLIP, C-SPLIT-CERTIFY-CROSSINGS, C-SPLIT-CERTIFY-OFF-LOOP, C-CLASSIFY-WINDING-NUMBER, C-CLASSIFY-SAMPLE-INSIDE, C-GATE-BEZIERLEAF1-TRY-NEW, C-GATE-POINTCERT-TRY-NEW, C-GATE-ARCCERT-TRY-NEW, C-GATE-FRAME-TRY-NEW, ADMISSION-CERTIFY-TRANSVERSE-PAIR; unresolved symbols stay exact paths (construct::volume_facts::certify_patch_form, construct::volume_facts::certify_algebraic_trim_bracket, construct::bie::ssi4::register_restricted_pair_solver, ssi_admit::register_ssi_admit_solver) because they fall outside the A-C read scopes and fragment A is not yet filed. The central W_code finding: the certified boolean dispatch (binding::boolean_dispatch -> certify_transverse_pair) and its solver registration are unreachable from the bridge/door path (RG-1/RG-2/RG-3), and the boolean product is never computed -- only the base operand is measured (RG-4). The coarse OP_CAPABILITY_MATRIX cells 2-6 read 'refuses' but the semantic route is 'facade-mirror Routed, certified product never computed'; cells 10/14/15/19 read 'certified' but the door drop-in refuses them (RG-5/RG-6). This is the refinement relation that kills the one-corpus-model-per-cell blind spot."
+}
