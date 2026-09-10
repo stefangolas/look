@@ -2129,6 +2129,51 @@ pin amendment (ttc_lathe_spline.rs:255); duplicate supervisors + lagging cargoq
 restart guard; slot-1/4/7 wt RESULT residue; TOR-C flip-or-pin; heartbeat
 slot-liveness duplicate-dispatch bug; MONO-row registry schema gap.]
 
+[operator 2026-09-10T18:14Z - volatile refresh. Board now: 1 RUNNING / 0
+landed-this-cycle / 0 unblocked / 0 flipped. **MONO-4-TRIM-IDIOMS still RUNNING
+in slot 0** (worker shim cmd pid 27652; events 0.2 min fresh; 3 files changed;
+branch packet/MONO-4-TRIM-IDIOMS@641b120 = base, no commit yet) - healthy, do
+not touch. **THE LOOP IS ACTIVE**: the live orchestrator session committed the
+SOLVER-COVERAGE wave this cycle window (c9f39a3 wave-3 packets MONO-5/MONO-6
+registered BLOCKED behind MONO-4; 8634167 SOLVER-COVERAGE spine + 4 survey
+packets + checker registered; c33c9bd SOLVER-CHECKER crates scoped) - HEAD now
+c33c9bd. Landing re-verified by command: `git merge-base --is-ancestor` exit 0
+for all nine checked commits against integration/kernel-bg (e33c4dd, e9d885a,
+3c2109b, ee97499, 713f205, 4de25d9, b667a85, 026b4e9, 5cf4811 all YES); no
+FINISHED slot holds an unlanded DONE RESULT. Slot wt RESULT statuses read
+directly: slot 0 none (RUNNING MONO-4), slot 1 none (IDLE 81 min, clean
+detached HEAD 026b4e9 = landed duplicate-MONO-2 residue - stale, not stuck),
+slot 2 DONE, slot 3 done, slot 4 LANDED-WITH-FINDINGS, slots 5/6 DONE (all tips
+ancestors), slot 7 LANDED (BRIDGE-BOOLEANS redundant residue, tip 5cf4811
+ancestor) - none operator-landable. Nothing to unblock (1 RUNNING healthy; no
+IDLE/DEAD >15 min holding work; no QUESTION; 0 stray cargo/rustc beyond MONO-4's
+queued test). Registry re-derived (last-wins dedup): 324 rows - 232 DONE, 82
+READY, 10 BLOCKED; READY-without-landed-marker = {MONO-4 (running),
+SOLVER-SURVEY-A/B/C/D}; BLOCKED-with-all-deps-landed = the carried owner-parked
+set (BG-AUD-FIX-004 OWNER_BLOCKED, BG-CK-SPLINE-CENSUS owner-cancelled,
+SEM-PCURVE-MASTER-001-FIX SUPERSEDED, DEF-SPINEFRAME-GRAZE SPEC_GAP->-R2); the
+other six BLOCKED (DEF-TESS-ANALYTIC-SEAM, DEF-SEEDRAY-B, TOR-C, MONO-5, MONO-6,
+SOLVER-CHECKER) have genuinely unmet deps - nothing flipped. dispatch_ready
+--dry-run --max-workers=4: "slots: 8 (1 running, 6 free); slot-assigned packets:
+6; SOLVER-SURVEY-A -> slot 1, SOLVER-SURVEY-B -> slot 3, SOLVER-SURVEY-C -> slot
+4; dispatched 3; workers now ~4/4" = REAL dispatchable work (the survey wave is
+read-only, low build cost); no manual dispatch (heartbeat live, last cycle
+14:06:14 local = 18:06Z predates the 18:09-18:10Z registration, so its next
+cycle picks them up). Health: heartbeat exactly 1 (27872), watchdog 1 (29264),
+operator runner 1 (27876), overnight driver 1 (26920, cycling every 5 min,
+parked on the slot-4 F1 judgment), cargoq UP (ping ok, queued 0, running true =
+MONO-4's `test -p truck123d --profile quick --lib idiom`; single server.py;
+fallback.log quiet since 2026-09-07). TWO supervisors (19172 PyManager + 27828
+pythoncore child - carried duplication class; only ONE overnight.py child = no
+double-merge risk). Disk 20.5 GB free (above the 8 GB floor AND the 15 GB
+janitor goal - no janitor action needed this cycle); RAM 3.47 GB free (above the
+3 GB floor but LOW - the 3 survey dispatches are read-only, low-spike). No new
+escalation; carried human items unchanged: FRAME-REVOLVE F1 non_z_axis pin
+amendment (ttc_lathe_spline.rs:255); duplicate supervisors + lagging cargoq
+restart guard; slot-1/4/7 wt RESULT residue; TOR-C flip-or-pin
+(orchestrator-held); heartbeat slot-liveness duplicate-dispatch bug; MONO-row
+registry schema gap.]
+
 ## The parallelism picture
 
 The lemma wave (L1-L4, pure functions over the frozen shim type) is

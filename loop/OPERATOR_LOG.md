@@ -2712,3 +2712,58 @@ supervisors; disk 17.1 GB free; RAM 6.1 GB free.
 Leaving: 1 RUNNING (MONO-4, slot 0); HEAD 9dcbde9; nothing unlanded; 7 BLOCKED
 correctly parked; 80 READY (79 landed-marked + MONO-4); cargoq UP; heartbeat 1;
 driver 1; watchdog 1; TWO supervisors; disk 19.5 GB free; RAM 5.3 GB free.
+
+## 2026-09-10T18:14Z - operator cycle (MONO-4 running; SOLVER-COVERAGE wave booked + dispatchable)
+
+- Health sweep (step 1): heartbeat exactly 1 (27872, last cycle 14:06:14 local =
+  18:06Z, "dispatched 0; workers ~1/3"), watchdog 1 (29264), operator runner 1
+  (27876), overnight driver 1 (26920, cycling every 5 min, parked on the slot-4
+  F1 judgment), cargoq UP (ping ok, queued 0, running true = MONO-4's `test -p
+  truck123d --profile quick --lib idiom`; single server.py; fallback.log quiet
+  since 2026-09-07). Disk 20.5 GB free (above the 8 GB floor and the 15 GB
+  janitor goal - no janitor action). RAM 3.47 GB free (above the 3 GB floor but
+  LOW). TWO supervisors (19172 PyManager + 27828 pythoncore child - carried
+  duplication class; only ONE overnight.py child = no double-merge risk).
+- **MONO-4-TRIM-IDIOMS is RUNNING in slot 0** (worker shim cmd pid 27652, events
+  0.2 min fresh, 3 files changed, branch packet/MONO-4-TRIM-IDIOMS@641b120 =
+  base, no commit yet) - healthy; not touched.
+- **Orchestrator session is LIVE and moving**: HEAD advanced from 9dcbde9 to
+  c33c9bd this cycle window - c9f39a3 (wave-3 MONO-5-RAY-CLASSIFY +
+  MONO-6-SWEPT-BOOLEANS registered BLOCKED behind MONO-4), 8634167
+  (SOLVER-COVERAGE wave booked: spine spec + 4 survey packets + checker
+  registered), c33c9bd (SOLVER-CHECKER crates scoped). Read-only wave, no clash
+  with the MONO ladder.
+- Land (step 2): nothing. Every slot worker commit re-verified ancestor of
+  integration/kernel-bg by `git merge-base --is-ancestor` (e33c4dd, e9d885a,
+  3c2109b, ee97499, 713f205, 4de25d9, b667a85, 026b4e9, 5cf4811 all YES). Slot 2
+  DONE / slot 3 done / slots 5,6 DONE (tips ancestors); slot 4
+  LANDED-WITH-FINDINGS; slot 7 LANDED (BRIDGE-BOOLEANS redundant residue, tip
+  5cf4811 ancestor); slot 1 IDLE 81 min, no RESULT, detached HEAD 026b4e9
+  ancestor (duplicate-MONO-2 residue - stale, not stuck). None
+  operator-landable.
+- Unblock (step 3): none - 1 RUNNING healthy, no IDLE/DEAD >15 min holding
+  work, no QUESTION, no stray cargo/rustc beyond MONO-4's queued test.
+- Registry hygiene (step 4): nothing to flip. 324 rows (last-wins dedup): 232
+  DONE, 82 READY, 10 BLOCKED. READY-without-landed-marker = {MONO-4 (running),
+  SOLVER-SURVEY-A/B/C/D}. BLOCKED-with-all-deps-landed = the carried owner-parked
+  set (BG-AUD-FIX-004 OWNER_BLOCKED, BG-CK-SPLINE-CENSUS owner-cancelled,
+  SEM-PCURVE-MASTER-001-FIX SUPERSEDED, DEF-SPINEFRAME-GRAZE SPEC_GAP->-R2);
+  the other six BLOCKED (DEF-TESS-ANALYTIC-SEAM, DEF-SEEDRAY-B, TOR-C, MONO-5,
+  MONO-6, SOLVER-CHECKER) have genuinely unmet deps.
+- Dispatch (step 5): `dispatch_ready.py --dry-run --max-workers=4` only (no
+  manual dispatch - heartbeat live). Output: "slots: 8 (1 running, 6 free);
+  slot-assigned packets: 6; SOLVER-SURVEY-A -> slot 1, SOLVER-SURVEY-B -> slot
+  3, SOLVER-SURVEY-C -> slot 4; dispatched 3; workers now ~4/4". The heartbeat's
+  last cycle (18:06Z) predates the 18:09-18:10Z registration, so its next cycle
+  dispatches them. The survey wave is read-only (no Rust, skips cargo gates),
+  so the low RAM is not a spike concern.
+- STATE.md volatile refresh ([operator 2026-09-10T18:14Z]).
+- No new escalation. Carried human items unchanged: FRAME-REVOLVE F1 non_z_axis
+  pin amendment (ttc_lathe_spline.rs:255); duplicate supervisors + lagging
+  cargoq restart guard; slot-1/4/7 wt RESULT residue; TOR-C flip-or-pin;
+  heartbeat slot-liveness duplicate-dispatch bug; MONO-row registry schema gap.
+
+Leaving: 1 RUNNING (MONO-4, slot 0); HEAD c33c9bd; nothing unlanded; 10 BLOCKED
+correctly parked; 82 READY (77 landed-marked + MONO-4 + 4 SOLVER-SURVEY);
+cargoq UP; heartbeat 1; driver 1; watchdog 1; TWO supervisors; disk 20.5 GB
+free; RAM 3.47 GB free.
