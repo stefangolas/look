@@ -567,3 +567,26 @@ only for green rows, and none flipped. OCC-baseline door runs reproduced every F
 row's recorded reference bit-identically (21/21), so the recorded facts gate did not
 drift and no OCC flake was recorded.
 
+# TTC-RECENSUS-F1-R2 — F1 post-chain re-census (no F1 row green; no new kernel column)
+
+The post-door-gap-chain F1 re-census (`docs/TTC_CENSUS_FINAL.md`, HEAD
+`de33f33`, release-built `truck123d`) re-ran all 21 F1 manifest rows through the
+kernel door (`corpus/ttc/door.py --engine truck`, `door_version 2`, one fresh
+Python process per row, serial, quiet machine) and compared the kernel facts
+against the recorded references (`corpus/ttc/reference/*.json`; `solid_count`
+exact, `volume`/`bbox` in the recorded bands). **Zero rows are facts-green** —
+0 green, 15 typed-refusal (multi-station spline loft / native boolean / trim
+constructor / mirror / OCC-probe), 6 kernel-door DNF (untyped corner
+`surfaces.bbox` and floor-loft builder). No OCC process ran; the recorded
+references were the sole oracle.
+
+Because no row flipped green, no F1 row carries a kernel timing column and no
+timing is published against a red facts gate. The F1 kernel timing column
+therefore stays closed, and the standing FH timing content above is unchanged.
+
+The V5 net holds: the three previously-green FH timing rows answer
+bit-identically on the release build at this HEAD — `turbopump_assembly`
+(solid_count 59, volume 77563936.47352579, 35352 triangles), `chamber_assembly`
+(46, 45458782.5489467, 27520) and `fairing` (4, 11027439648.490429, 11032) — so
+no verdict flip occurred on a landed row.
+
