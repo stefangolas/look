@@ -2296,13 +2296,17 @@ def main() -> int:
     try:
         obj = run_entry(tree_src, module, entry, args)
     except Exception as exc:  # noqa: BLE001 - the door reports typed failure
+        error = {"kind": type(exc).__name__, "message": str(exc)}
+        payload = getattr(exc, "payload", None)
+        if payload is not None:
+            error["payload"] = payload
         record = {
             "schema": "ttc_door_run.v1",
             "door_version": door_version,
             "engine": ENGINE,
             "ok": False,
             "entry": entry,
-            "error": {"kind": type(exc).__name__, "message": str(exc)},
+            "error": error,
         }
         json.dump(record, sys.stdout, indent=2)
         return 1
@@ -2319,6 +2323,10 @@ def main() -> int:
 
             bd.export_stl(obj, stl_path, tolerance=tolerance, angular_tolerance=0.5)
     except Exception as exc:  # noqa: BLE001 - a refused export is a typed verdict
+        error = {"kind": type(exc).__name__, "message": str(exc)}
+        payload = getattr(exc, "payload", None)
+        if payload is not None:
+            error["payload"] = payload
         record = {
             "schema": "ttc_door_run.v1",
             "door_version": door_version,
@@ -2326,7 +2334,7 @@ def main() -> int:
             "ok": False,
             "entry": entry,
             "module": module,
-            "error": {"kind": type(exc).__name__, "message": str(exc)},
+            "error": error,
         }
         json.dump(record, sys.stdout, indent=2)
         return 1

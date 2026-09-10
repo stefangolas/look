@@ -85,10 +85,9 @@ use truck_certified::construct::patches::{PatchParent, TensorBernsteinPatch};
 use truck_certified::construct::volume_facts::{
     VolumeOptions, certify_algebraic_trim_bracket, certify_patch_form,
 };
+use truck_certified::kernel::Interval;
 use truck_certified::kernel::certs::{ArcCert, Frame, PointCert};
-use truck_certified::kernel::evidence::{
-    Refusal as KernelRefusal, RefusalEvidence, RefusalKind,
-};
+use truck_certified::kernel::evidence::{Refusal as KernelRefusal, RefusalEvidence, RefusalKind};
 use truck_certified::kernel::graph::{
     AnyArc, Approx, Arc, ArcEnd, ArcId, Break, CertifiedGraph, ChartId, HermiteSegment,
     HermiteSpline, Node, NodeCert, NodeId, Param, Point4, TopoNode,
@@ -97,7 +96,6 @@ use truck_certified::kernel::patch::{IBox, IBox2};
 use truck_certified::kernel::residual::ResidualId;
 use truck_certified::kernel::residuals_r89::BezierLeaf1;
 use truck_certified::kernel::trimclip::{TrimLoop, trim_clip};
-use truck_certified::kernel::Interval;
 
 use crate::bd_bridge::{ProfileEdge, Triangle};
 
@@ -469,6 +467,12 @@ const TRIM_EXTRUDE_RHO: f64 = 0.125;
 /// The one lifted chart the constructor's trim clip certifies in.
 const TRIM_EXTRUDE_CHART: ChartId = ChartId(0);
 
+/// The constructor's control-point envelope for the R9 clip. The clip's
+/// subdivision is exponential in the leaf degree, so a corpus spline recorded
+/// as one high-degree control loop refuses typed rather than running an
+/// unbounded isolation.
+const MAX_TRIM_CONTROL_POINTS: usize = 16;
+
 /// The spline-trimmed extrude row: the base profile plus the recorded closed
 /// spline curve and (optionally) the recorded pullback net.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -668,10 +672,10 @@ fn bbox_rect(points: &[[f64; 2]]) -> Vec<[f64; 2]> {
     let mut lo = [f64::INFINITY; 2];
     let mut hi = [f64::NEG_INFINITY; 2];
     for p in points {
-        for axis in 0..2 {
-            lo[axis] = lo[axis].min(p[axis]);
-            hi[axis] = hi[axis].max(p[axis]);
-        }
+        lo[0] = lo[0].min(p[0]);
+        lo[1] = lo[1].min(p[1]);
+        hi[0] = hi[0].max(p[0]);
+        hi[1] = hi[1].max(p[1]);
     }
     vec![
         [lo[0], lo[1]],
@@ -737,12 +741,16 @@ fn polygon_edges(polygon: &[[f64; 2]], plane: &PlaneBasis) -> Vec<ProfileEdge> {
 }
 
 /// A certified point certificate over a degenerate box at a chart point.
+// Refusal carries Option<PartialGraph> by frozen §2 shape; large-Err is allowed (BG-KV2-000).
+#[allow(clippy::result_large_err)]
 fn cert_at(point: [f64; 2]) -> Result<PointCert, KernelRefusal> {
     let box_ = IBox2::try_new([point[0], point[1]], [point[0], point[1]])?;
     PointCert::try_new(ResidualId::R1, box_, TRIM_EXTRUDE_RHO)
 }
 
 /// A certified boundary node on the constructor's chart at a chart point.
+// Refusal carries Option<PartialGraph> by frozen §2 shape; large-Err is allowed (BG-KV2-000).
+#[allow(clippy::result_large_err)]
 fn boundary_node(id: usize, point: [f64; 2]) -> Result<Node, KernelRefusal> {
     let at = Point4 {
         p1: Param::try_new(TRIM_EXTRUDE_CHART, 0, point[0], point[1])?,
@@ -758,6 +766,8 @@ fn boundary_node(id: usize, point: [f64; 2]) -> Result<Node, KernelRefusal> {
 
 /// A certified straight ordinary arc between two chart points over unit
 /// parameter, referencing the two node ends.
+// Refusal carries Option<PartialGraph> by frozen §2 shape; large-Err is allowed (BG-KV2-000).
+#[allow(clippy::result_large_err)]
 fn straight_arc(
     id: usize,
     from: [f64; 2],
@@ -809,6 +819,8 @@ fn straight_arc(
 
 /// The certified graph of a closed chart polygon (boundary nodes + straight
 /// ordinary arcs, in order).
+// Refusal carries Option<PartialGraph> by frozen §2 shape; large-Err is allowed (BG-KV2-000).
+#[allow(clippy::result_large_err)]
 fn build_graph(polygon: &[[f64; 2]]) -> Result<CertifiedGraph, KernelRefusal> {
     let n = polygon.len();
     let mut nodes = Vec::with_capacity(n);
@@ -842,6 +854,8 @@ fn build_graph(polygon: &[[f64; 2]]) -> Result<CertifiedGraph, KernelRefusal> {
 }
 
 /// The closed rational Bézier trim leaf of the recorded control points.
+// Refusal carries Option<PartialGraph> by frozen §2 shape; large-Err is allowed (BG-KV2-000).
+#[allow(clippy::result_large_err)]
 fn bezier_trim_leaf(trim2: &[[f64; 2]]) -> Result<BezierLeaf1, KernelRefusal> {
     if trim2.len() < 2 {
         return Err(KernelRefusal::new(
@@ -853,10 +867,7 @@ fn bezier_trim_leaf(trim2: &[[f64; 2]]) -> Result<BezierLeaf1, KernelRefusal> {
         ));
     }
     let degree = trim2.len() - 1;
-    let control: Vec<[f64; 4]> = trim2
-        .iter()
-        .map(|p| [p[0], p[1], 0.0, 1.0])
-        .collect();
+    let control: Vec<[f64; 4]> = trim2.iter().map(|p| [p[0], p[1], 0.0, 1.0]).collect();
     BezierLeaf1::try_new(degree, control, TRIM_EXTRUDE_CHART)
 }
 
@@ -881,10 +892,8 @@ fn orient(a: [f64; 2], b: [f64; 2], c: [f64; 2]) -> f64 {
 fn control_polygon_self_intersects(points: &[[f64; 2]]) -> bool {
     let n = points.len();
     for i in 0..n {
-        let (Some(a0), Some(a1)) = (
-            points.get(i).copied(),
-            points.get((i + 1) % n).copied(),
-        ) else {
+        let (Some(a0), Some(a1)) = (points.get(i).copied(), points.get((i + 1) % n).copied())
+        else {
             continue;
         };
         for j in (i + 1)..n {
@@ -892,10 +901,8 @@ fn control_polygon_self_intersects(points: &[[f64; 2]]) -> bool {
             if j == i + 1 || (i == 0 && j + 1 == n) {
                 continue;
             }
-            let (Some(b0), Some(b1)) = (
-                points.get(j).copied(),
-                points.get((j + 1) % n).copied(),
-            ) else {
+            let (Some(b0), Some(b1)) = (points.get(j).copied(), points.get((j + 1) % n).copied())
+            else {
                 continue;
             };
             if segments_cross(a0, a1, b0, b1) {
@@ -917,10 +924,9 @@ fn bezier_samples(control: &[[f64; 2]], steps: usize) -> Vec<[f64; 2]> {
         while level.len() > 1 {
             let mut next = Vec::with_capacity(level.len() - 1);
             for pair in level.windows(2) {
-                next.push([
-                    mt * pair[0][0] + t * pair[1][0],
-                    mt * pair[0][1] + t * pair[1][1],
-                ]);
+                if let [a, b] = pair {
+                    next.push([mt * a[0] + t * b[0], mt * a[1] + t * b[1]]);
+                }
             }
             level = next;
         }
@@ -936,9 +942,7 @@ fn bezier_samples(control: &[[f64; 2]], steps: usize) -> Vec<[f64; 2]> {
 /// volume through the ADM-003 pullback-net engine.
 pub fn trim_extrude(row: &TrimExtrudeRow) -> Result<TrimExtrudeOutcome, BindingError> {
     if !(row.amount.is_finite() && row.amount > 0.0) {
-        return Err(malformed(
-            "trim-extrude amount must be finite and positive",
-        ));
+        return Err(malformed("trim-extrude amount must be finite and positive"));
     }
     if !(row.tolerance.is_finite() && row.tolerance > 0.0) {
         return Err(malformed(
@@ -994,20 +998,42 @@ pub fn trim_extrude(row: &TrimExtrudeRow) -> Result<TrimExtrudeOutcome, BindingE
                 .to_string(),
         ));
     }
-    let graph = build_graph(&base2).map_err(|r| {
-        BindingError::Refusal(Box::new(marshal_kernel_refusal(&r)))
-    })?;
-    let leaf = bezier_trim_leaf(&trim2).map_err(|r| {
-        BindingError::Refusal(Box::new(marshal_kernel_refusal(&r)))
-    })?;
+    // The certified volume bracket is assembled over the recorded pullback net.
+    // Without it the ADM-003 bracket cannot close, so the constructor refuses
+    // TYPED before paying for the crossing isolation — never an unbounded
+    // subdivision on a curve whose kept region is not recorded.
+    if row.trim_net.is_empty() {
+        return Err(trim_clip_failed(
+            "trim_pullback_missing",
+            "the spline curve has no recorded pullback net; the ADM-003 bracket \
+             cannot be assembled, refusing TrimClipFailed (Inconclusive)"
+                .to_string(),
+        ));
+    }
+    // The R9 clip certifies low-degree chart leaves; a corpus spline recorded
+    // as one high-degree control loop is outside that discipline and refuses
+    // typed rather than exploding the subdivision.
+    if trim2.len() > MAX_TRIM_CONTROL_POINTS {
+        return Err(trim_clip_failed(
+            "trim_degree_out_of_envelope",
+            format!(
+                "the trim control loop carries {} points, above the constructor's \
+                 {MAX_TRIM_CONTROL_POINTS}-point envelope; refusing TrimClipFailed (Inconclusive)",
+                trim2.len()
+            ),
+        ));
+    }
+    let graph = build_graph(&base2)
+        .map_err(|r| BindingError::Refusal(Box::new(marshal_kernel_refusal(&r))))?;
+    let leaf = bezier_trim_leaf(&trim2)
+        .map_err(|r| BindingError::Refusal(Box::new(marshal_kernel_refusal(&r))))?;
     let trim_loop = TrimLoop {
         chart: TRIM_EXTRUDE_CHART,
         curve: leaf,
         closed: true,
     };
-    let clipped = trim_clip(&graph, &[trim_loop]).map_err(|r| {
-        BindingError::Refusal(Box::new(marshal_kernel_refusal(&r)))
-    })?;
+    let clipped = trim_clip(&graph, &[trim_loop])
+        .map_err(|r| BindingError::Refusal(Box::new(marshal_kernel_refusal(&r))))?;
     let crossings: Vec<TrimCrossingRecord> = clipped
         .nodes
         .iter()
@@ -1021,14 +1047,6 @@ pub fn trim_extrude(row: &TrimExtrudeRow) -> Result<TrimExtrudeOutcome, BindingE
     let retained_arcs = clipped.arcs.len();
 
     // 4. The certified volume bracket over the recorded pullback net.
-    if row.trim_net.is_empty() {
-        return Err(trim_clip_failed(
-            "trim_pullback_missing",
-            "the spline curve has no recorded pullback net; the ADM-003 bracket \
-             cannot be assembled, refusing TrimClipFailed (Inconclusive)"
-                .to_string(),
-        ));
-    }
     let height = if row.both {
         2.0 * row.amount
     } else {
@@ -1463,7 +1481,10 @@ mod tests {
         );
         for crossing in &outcome.crossings {
             assert_eq!(crossing.kind, "trim_crossing");
-            assert!(crossing.certified, "every crossing node is certified exactly");
+            assert!(
+                crossing.certified,
+                "every crossing node is certified exactly"
+            );
         }
     }
 
