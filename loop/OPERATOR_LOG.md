@@ -2438,3 +2438,55 @@ Leaving: 0 RUNNING (door-gap chain closed); HEAD 035effd; nothing unlanded;
 7 BLOCKED correctly parked; 76 READY correctly parked pending the final
 one-verify battery; cargoq UP; heartbeat 1; driver 1; watchdog 1; TWO
 supervisors; disk 16.5 GiB free; RAM 6.0 GiB free.
+
+## [operator 2026-09-10T15:46Z] quiet healthy cycle; MONO-CLOSURE wave running
+
+- Health sweep: `slot_status.py` -> 2 RUNNING. slot 0 MONO-1-DATA-ROWS
+  (pid 14448, events ~1.7 min old, branch packet/MONO-1-DATA-ROWS @ e37938a =
+  base, no commits yet, changed=2) and slot 1 MONO-2-NSTATION-LOFT (pid 23944,
+  events ~0.1 min old, same base/no-commits shape) = both healthy in early
+  build phase. Slots 2-7 FINISHED landed residue. cargoq ping ok (queued 0,
+  running false). Heartbeat exactly 1 (27872; other matches were my own
+  probing shell and the operator-runner cmd line). Watchdog 1 (29264).
+  overnight driver 1 (26920). TWO supervisors (19172 + 27828 - carried
+  duplication class; only ONE overnight.py child = no double-merge risk).
+  Disk 12.3 GB free at entry (< 15 GB goal); RAM 4.2 GB free. 0 cargo/rustc.
+- Land (step 2): nothing. HEAD 855255d (MONO-5 authored ON DECK, above the
+  MONO-CLOSURE booking e37938a). Re-verified by command:
+  `git merge-base --is-ancestor` exit 0 against HEAD for every slot worker
+  commit (197c924/4de25d9/e33c4dd/e9d885a/3c2109b/ee97499/713f205/b667a85/
+  39e9550/5cf4811). All slot wt RESULTs are stale filed copies; no FINISHED
+  slot holds an unlanded DONE RESULT. slot 4 F1-AUTHORING-ARMS is
+  LANDED-WITH-FINDINGS (already filed, carried escalation) - not landed.
+- Unblock (step 3): nothing. 0 IDLE/DEAD >15 min holding work; no live
+  QUESTION.md (slot 5's is a stale 2026-09-05 CC-013 file, unrelated to its
+  landed CL-006 assignment); zero cargo/rustc.
+- Registry hygiene (step 4): 317 rows - 230 DONE, 78 READY, 9 BLOCKED.
+  Nothing flipped. The 9 BLOCKED are all correctly parked: the carried 7
+  (BG-AUD-FIX-004 OWNER_BLOCKED, BG-CK-SPLINE-CENSUS owner-cancelled,
+  SEM-PCURVE-MASTER-001-FIX SUPERSEDED, DEF-SPINEFRAME-GRAZE SPEC_GAP -> -R2,
+  DEF-TESS-ANALYTIC-SEAM superseded by -R2, DEF-SEEDRAY-B human-gated, TOR-C
+  orchestrator-held) plus MONO-3-BLADE-MEMBERS-MIRROR and MONO-4-TRIM-IDIOMS,
+  whose notes state they serialize after the still-running MONO-2 on the
+  shared bd_bridge.rs write set (empty `needs` = booking posture, not a
+  missing dep). No READY row is dispatchable (all carry landed markers).
+- Dispatch (step 5): `dispatch_ready.py --max-workers=4` ->
+  "slots: 8 (2 running, 6 free); slot-assigned packets: 7; dispatched 0;
+  workers now ~2/4" = REAL idle by choice (MONO-3/4 blocked, MONO-5 on deck);
+  no manual dispatch (heartbeat live).
+- Disk action: `janitor.py ensure --need 15` reclaimed the idle slot-7 target
+  (~2.8 GB) -> 14.9 GB free (above the 8 GB floor; live slot-0/1 targets left
+  intact). Still ~0.1 GB shy of the 15 GB goal.
+- STATE.md volatile refresh ([operator 2026-09-10T15:46Z]) - both "Where we
+  are" ground-truth pointer and a new "State of the machine, as left" block.
+- No new escalation (nothing judgment-requiring surfaced). Carried human
+  items unchanged: FRAME-REVOLVE F1 non_z_axis pin amendment
+  (ttc_lathe_spline.rs:255); duplicate supervisors + lagging cargoq restart
+  guard; slot-4 + slot-7 wt RESULT residue; TOR-C flip-or-pin
+  (orchestrator-held); RESULT-recycle race + overnight.py guarantee-merge-abort
+  on interrupted cycles.
+
+Leaving: 2 RUNNING (MONO-1 slot 0, MONO-2 slot 1, both healthy early-build);
+HEAD 855255d; nothing unlanded; 9 BLOCKED correctly parked; 78 READY correctly
+parked pending the final one-verify battery; cargoq UP; heartbeat 1; driver 1;
+watchdog 1; TWO supervisors; disk 14.9 GB free; RAM 4.2 GB free.

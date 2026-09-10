@@ -64,33 +64,37 @@ Owner context for the next session, in order:
 ## Where we are
 
 > LATEST GROUND TRUTH: read the newest `[operator ...]` block in "State of
-> the machine, as left" (2026-09-10T14:09Z). [operator 2026-09-10T14:09Z
-> ground-truth note: **QUIET HEALTHY CYCLE.** Board: 1 RUNNING (TRIM-EXTRUDE-
-> CTOR slot 0, pid 28868, RESUMED by the orchestrator after an API-step hang,
-> events ~0.2 min fresh - healthy, do not touch) / 0 landed-this-cycle. HEAD
-> 1293615 (the orchestrator's session handoff commit). All slot worker commits
-> re-verified ancestors of integration/kernel-bg (e33c4dd/e9d885a/3c2109b/
-> ee97499/713f205/4de25d9/b667a85/5cf4811/c0329e0); 8b46b64 (BRIDGE-LOFT-FACTS)
-> is NOT a direct ancestor but its row is DONE via the orchestrator's
-> squash-union landing 7d4f5fe - the 13:50Z "DONE-but-UNLANDED/conflict" item is
-> RESOLVED. Nothing operator-landable. Registry: 7 BLOCKED rows, all with deps
-> landed, all correctly parked (BG-AUD-FIX-004 OWNER_BLOCKED, BG-CK-SPLINE-
-> CENSUS owner-cancelled, SEM-PCURVE-MASTER-001-FIX SUPERSEDED, DEF-SPINEFRAME-
-> GRAZE SPEC_GAP->-R2, DEF-TESS-ANALYTIC-SEAM superseded by -R2, DEF-SEEDRAY-B
-> human-gated, TOR-C orchestrator-held) - nothing flipped. dispatch_ready
-> --dry-run: "slots: 8 (1 running, 7 free); TTC-RECENSUS-F1-R2 blocked on
-> TRIM-EXTRUDE-CTOR; dispatched 0; workers ~1/4" = REAL idle; no manual dispatch
-> (heartbeat live). Health: heartbeat exactly 1 (27872), operator runner 1
-> (27876), watchdog 1 (29264), overnight driver 1 (26920), cargoq UP (ping ok,
-> queued 0, running false), TWO supervisors (19172 + 27828 - carried
-> duplication class; only ONE overnight.py child = no double-merge risk). Disk
-> 15.71 GB free (above the 8 GB floor and the 15 GB janitor goal); RAM 4.34 GB
-> free. Orchestrator session live (opencode 14776). Carried human items:
-> FRAME-REVOLVE F1 non_z_axis pin amendment (ttc_lathe_spline.rs:255); duplicate
-> supervisors + the lagging cargoq restart guard; slot-4 + slot-7 wt RESULT
-> residue parking the driver's dispatch arm; TOR-C flip-or-pin
-> (orchestrator-held); the RESULT-recycle race + the driver's scoped_check
-> deriving crates/tests from write paths.]
+> the machine, as left" (2026-09-10T15:46Z). [operator 2026-09-10T15:46Z
+> ground-truth note: **QUIET HEALTHY CYCLE; the MONO-CLOSURE wave is running.**
+> Board: 2 RUNNING (MONO-1-DATA-ROWS slot 0 pid 14448; MONO-2-NSTATION-LOFT
+> slot 1 pid 23944 - both branches at base e37938a with no commits and events
+> <2 min fresh = early build phase, healthy, do not touch) / 0 landed-this-cycle
+> / 0 unblocked / 0 flipped. HEAD 855255d (MONO-5-BRIDGE-SPLIT authored ON
+> DECK, unregistered, above e37938a the MONO-CLOSURE booking). All slot worker
+> commits re-verified ancestors of integration/kernel-bg
+> (197c924/4de25d9/e33c4dd/e9d885a/3c2109b/ee97499/713f205/b667a85/39e9550/
+> 5cf4811) - no FINISHED slot holds an unlanded DONE RESULT; slots 2-7 are
+> stale landed residue. Registry: 317 rows - 230 DONE, 78 READY, 9 BLOCKED. The
+> 9 BLOCKED all correctly parked (the carried 7: BG-AUD-FIX-004 OWNER_BLOCKED,
+> BG-CK-SPLINE-CENSUS owner-cancelled, SEM-PCURVE-MASTER-001-FIX SUPERSEDED,
+> DEF-SPINEFRAME-GRAZE SPEC_GAP->-R2, DEF-TESS-ANALYTIC-SEAM superseded by -R2,
+> DEF-SEEDRAY-B human-gated, TOR-C orchestrator-held; plus MONO-3-BLADE-MEMBERS-
+> MIRROR and MONO-4-TRIM-IDIOMS, which serialize after the still-running MONO-2
+> on the shared bd_bridge.rs write set) - nothing flipped. dispatch_ready
+> --max-workers=4 (real run): "slots: 8 (2 running, 6 free); slot-assigned
+> packets: 7; dispatched 0; workers now ~2/4" = REAL idle by choice (MONO-3/4
+> blocked, MONO-5 on deck); no manual dispatch (heartbeat live). Health:
+> heartbeat exactly 1 (27872), watchdog 1 (29264), overnight driver 1 (26920),
+> cargoq UP (ping ok, queued 0, running false), TWO supervisors (19172 + 27828 -
+> carried duplication class; only ONE overnight.py child = no double-merge
+> risk). Disk was 12.3 GB free at entry (< the 15 GB goal); janitor
+> `ensure --need 15` reclaimed the idle slot-7 target (~2.8 GB) -> 14.9 GB free
+> (above the 8 GB floor; live slot-0/1 targets left intact); RAM 4.2 GB free.
+> Carried human items unchanged: FRAME-REVOLVE F1 non_z_axis pin amendment
+> (ttc_lathe_spline.rs:255); duplicate supervisors + the lagging cargoq restart
+> guard; slot-4 + slot-7 wt RESULT residue; TOR-C flip-or-pin
+> (orchestrator-held); the RESULT-recycle race + overnight.py's
+> guarantee-merge-abort on interrupted cycles.]
 
 - **THE FIRST KERNEL-VS-OCC TIMING COMPARISON IS BANKED** (FH-TIMING-REFRESH,
   landed c94d043): turbopump_assembly **0.097 s kernel vs 4.866 s OCC**,
@@ -1875,6 +1879,40 @@ non_z_axis pin amendment (ttc_lathe_spline.rs:255); duplicate supervisors + the
 lagging cargoq restart guard; slot-4 + slot-7 wt RESULT residue parking the
 driver's dispatch arm; TOR-C flip-or-pin (orchestrator-held); the RESULT-recycle
 race + overnight.py's guarantee-merge-abort on interrupted cycles.]
+
+[operator 2026-09-10T15:46Z - volatile refresh. Quiet healthy cycle; the
+MONO-CLOSURE wave is running. Board: 2 RUNNING / 0 landed-this-cycle / 0
+unblocked / 0 flipped. HEAD 855255d (MONO-5-BRIDGE-SPLIT authored ON DECK,
+unregistered). RUNNING: MONO-1-DATA-ROWS (slot 0, pid 14448) and
+MONO-2-NSTATION-LOFT (slot 1, pid 23944); both branches sit at base e37938a
+with no commits and events <2 min fresh = early build phase, healthy. Landing
+re-verified by command: `git merge-base --is-ancestor` exit 0 against HEAD for
+every slot worker commit (197c924/4de25d9/e33c4dd/e9d885a/3c2109b/ee97499/
+713f205/b667a85/39e9550/5cf4811); no FINISHED slot holds an unlanded DONE
+RESULT; slots 2-7 are stale landed residue (slot 5 also carries a stale
+2026-09-05 CC-013 QUESTION.md, unrelated to its landed CL-006 assignment).
+Nothing to unblock (0 IDLE/DEAD >15 min holding work; no live QUESTION.md; zero
+cargo/rustc). Registry re-verified: 317 rows - 230 DONE, 78 READY, 9 BLOCKED.
+The 9 BLOCKED are all correctly parked: the carried 7 (BG-AUD-FIX-004
+OWNER_BLOCKED, BG-CK-SPLINE-CENSUS owner-cancelled, SEM-PCURVE-MASTER-001-FIX
+SUPERSEDED, DEF-SPINEFRAME-GRAZE SPEC_GAP -> -R2, DEF-TESS-ANALYTIC-SEAM
+superseded by -R2, DEF-SEEDRAY-B human-gated, TOR-C orchestrator-held) plus the
+MONO program's MONO-3 and MONO-4, whose notes state they serialize after
+MONO-2 on the shared bd_bridge.rs write set (MONO-2 still RUNNING) - empty
+`needs` is a booking posture, not a missing dep, so NOT flipped.
+dispatch_ready --max-workers=4 (real run): "slots: 8 (2 running, 6 free);
+slot-assigned packets: 7; dispatched 0; workers now ~2/4" = REAL idle by
+choice; no manual dispatch (heartbeat live). Health: heartbeat exactly 1
+(27872), watchdog 1 (29264), overnight driver 1 (26920), cargoq UP (ping ok,
+queued 0, running false); TWO supervisors (19172 + 27828 - carried duplication
+class; only ONE overnight.py child = no double-merge risk). Disk was 12.3 GB
+free at entry (< the 15 GB goal); the janitor `ensure --need 15` reclaimed the
+idle slot-7 target (~2.8 GB) -> 14.9 GB free (above the 8 GB floor; live
+slot-0/1 targets untouched); RAM 4.2 GB free. No new escalation; carried human
+items unchanged (FRAME-REVOLVE F1 non_z_axis pin amendment
+ttc_lathe_spline.rs:255; duplicate supervisors + lagging cargoq restart guard;
+slot-4 + slot-7 wt RESULT residue; TOR-C flip-or-pin; RESULT-recycle race +
+overnight.py guarantee-merge-abort on interrupted cycles).]
 
 ## The parallelism picture
 
