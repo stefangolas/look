@@ -703,3 +703,17 @@ Judgment-required items appended each operator cycle. Newest at the bottom.
 - Start from: `git -C C:\Users\stefa\look ls-tree HEAD --name-only`;
   `loop/dispatch_heartbeat.log` (tail); `loop/new_slot.py:193-207`;
   `loop/run_packet.py:301-312`.
+
+## 2026-09-10 ~23:00 UTC - RESOLVED: tracked root artifacts removed (orchestrator)
+
+- The 21:57Z/22:23Z dispatch-stall escalation is FIXED by orchestrator commit
+  b60c168: root RESULT.json/CONTEXT.md/PACKET.md untracked (git rm --cached,
+  local copies kept) + gitignore entries for all three so the class cannot
+  recur. Filed copy loop/results/SOLVER-SURVEY-D.json confirmed present
+  before removal.
+- Verified after the commit: dispatch_ready --dry-run --max-workers=4 reports
+  'dispatched 0; workers now ~2/4' with no dirty-artifact refusal - the
+  heartbeat's next_slot path should fork cleanly. The new_slot.py guard
+  (lines 201-207) remains in place as belt-and-braces for QUESTION.md.
+- Workers unaffected: slot 0 MONO-6 and slot 1 SURVEY-A were running on slot
+  branches at the time; no rebase required (fork bases unchanged).

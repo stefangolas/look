@@ -5420,6 +5420,34 @@ integration - the operator's new_slot bypass works but the dispatcher path does
 not; carried - FRAME-REVOLVE F1 non_z_axis pin amendment, duplicate supervisors,
 slot-4/7 wt RESULT residue, TOR-C flip-or-pin.]
 
+[orchestrator 2026-09-10T23:0xZ - three carried items adjudicated, board
+unchanged. 1) THE TRACKED ROOT ARTIFACT STALL IS FIXED: commit b60c168
+untracks root RESULT.json/CONTEXT.md/PACKET.md (git rm --cached, local
+copies kept) and gitignores all three; loop/results/SOLVER-SURVEY-D.json
+confirmed present first. Verified post-commit: dispatch_ready --dry-run
+--max-workers=4 reports "dispatched 0; workers now ~2/4" with NO
+dirty-artifact refusal - the heartbeat's new_slot fork path is clean for
+the next dispatch (SOLVER-CHECKER when SURVEY-A lands, MONO-7 after
+MONO-6). Escalation 21:57Z/22:23Z marked RESOLVED in OPERATOR_ESCALATIONS.
+2) THE FRAME-REVOLVE F1 non_z_axis PIN ITEM IS CLOSED - it was already
+done: 9b9ad96 moved the pin (non_z_axis revolve flips to answered,
+sweep-section pin moves to the circle-profile sweep carrier) and 5cf4811
+taught the refusal battery answered=True outcomes; the carried-item list
+was stale on this. 3) TOR-C flip-or-pin RULED: PIN, not flip. The row is
+a booking stub (no packet file, empty write set) and the R3 census (post
+MONO-6+MONO-7) supplies its real-geometry fixtures - flipping READY now
+would dispatch the heartbeat after a nonexistent packet; authoring is the
+only remaining gate, deps ADM-001/002 are LANDED. Ruling recorded in the
+row's note. Board re-verified: 2 RUNNING (slot 0 MONO-6-SWEPT-BOOLEANS,
+slot 1 SOLVER-SURVEY-A, both events fresh), slots 2-7 landed/stale
+residue, nothing operator-landable (all FINISHED tips ancestors of
+integration/kernel-bg). RAM was 1.98 GB free at session start - the third
+worker was therefore NOT added despite free slots; standing practice
+holds (no cold warm builds until RAM frees, chrome closed). Next actions
+unchanged: on MONO-6 landing -> author MONO-7-ROW-ASSEMBLY from its
+RESULT, then the R3 census under the new oracle policy; on SURVEY-A
+landing -> SOLVER-CHECKER unblocks.]
+
 ### Session 58 (the MONO program, the coverage wave, the oracle policy change) - paid in full
 
 - **Untracked deliverables are not archived at slot re-fork.** The archive
