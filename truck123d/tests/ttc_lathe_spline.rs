@@ -221,7 +221,7 @@ def closed_face(lines):
     edges = [bd.Edge.make_line(a, b) for (a, b) in lines]
     return bd.Face(bd.Wire(edges))
 
-def check(name, fn, expect_message):
+def check(name, fn, expect_message, answered=False):
     try:
         fn()
     except _Refused as exc:
@@ -233,8 +233,11 @@ def check(name, fn, expect_message):
     except Exception as exc:
         print(json.dumps({"case": name, "wrong": type(exc).__name__, "message": str(exc)}))
         sys.exit(3)
-    print(json.dumps({"case": name, "refused": False}))
-    sys.exit(4)
+    # The carrier landed (FRAME-REVOLVE): the case now ANSWERS. Continue the
+    # battery instead of exiting 4 (orchestrator pin amendment 2026-09-10).
+    print(json.dumps({"case": name, "refused": False, "answered": True}))
+    if not answered:
+        sys.exit(4)
 
 def rect_lines(y1, y2):
     return [
@@ -250,11 +253,12 @@ check(
     lambda: bd.revolve(closed_face(rect_lines(0.0, 0.0)), axis=bd.Axis.Z, revolution_arc=270.0),
     "a partial-arc revolve is outside the executor's lathe arm",
 )
-# non-z axis
+# non-z axis (LANDED: FRAME-REVOLVE — the carrier answers; pin amended)
 check(
     "non_z_axis",
     lambda: bd.revolve(closed_face(rect_lines(0.0, 0.0)), axis=door.Axis((1, 0, 0))),
     "revolve about a non-z axis is not a kernel-engine row",
+    answered=True,
 )
 # non-Face
 check(
