@@ -1119,6 +1119,475 @@ pub fn binding_trim_extrude(py: Python<'_>, row_json: &str) -> PyResult<String> 
         .map_err(|e| to_pyerr(py, e))
 }
 
+// ===========================================================================
+// MONO-1-DATA-ROWS — kernel-native probe data rows.
+//
+// The corpus helpers (`corpus/ttc/trees/f1/src/lib/surfaces.py`) probe
+// `shape.wrapped` for `bbox`, `obox`, `is_valid_shape` and face counts. On a
+// kernel-engine row the drop-in's `wrapped` cannot serve an OCC probe, so the
+// row instead carries the kernel's own certificates and these exports answer
+// from them:
+//
+//   * `bbox` / `obox` — the rigorous carrier-derived box. Every boundary patch
+//     is a rational tensor-Bernstein patch `X = Â/Ŵ` with certified positive
+//     weights, so its affine control net `Â_ij / Ŵ_ij` bounds the patch by the
+//     convex-hull property. A patch whose hull is looser than the fixture slack
+//     is subdivided (exact geometry-preserving Bernstein de Casteljau) until
+//     every leaf hull is within the slack; the union hull is the certified
+//     bound. `obox` is the same bound carried into the row's recorded frame
+//     (the `lo, hi` corner-pair form the corpus helper consumes).
+//   * `is_valid_shape` — the landed closed/oriented 2-cycle invariant the row
+//     recorded at construction. Never an OCC probe.
+//   * `face_count` — the number of patches of the row's boundary grid.
+//
+// Every returned number is a certified bound, never a sampling; the dense
+// sampling below appears only in the tests that assert the bound's tightness.
+// ===========================================================================
+
+/// The certified bbox slack target: a leaf is accepted once its affine control
+/// hull is no wider than this (the packet's 1 mm fixture target).
+const DATA_ROW_BBOX_SLACK: f64 = 1.0;
+
+/// The subdivision depth cap of the certified bbox refinement. A patch whose
+/// hull cannot reach the slack within the cap is still bounded by its (looser)
+/// leaf hulls — the returned number is always a certified bound.
+const DATA_ROW_BBOX_MAX_DEPTH: u32 = 8;
+
+/// One rational tensor-Bernstein patch data row: the numerator grid `Â` and the
+/// same-shape weight grid `Ŵ` (rows over `u`, columns over `v`), exactly the
+/// shape the landed [`TensorBernsteinPatch`] consumes.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct PatchRow {
+    /// The row-major `R³` numerator grid `Â`.
+    pub numerator: Vec<Vec<[f64; 3]>>,
+    /// The same-shape scalar weight grid `Ŵ`.
+    pub weights: Vec<Vec<f64>>,
+}
+
+/// The recorded orthonormal frame of a placed shape row: origin plus the
+/// rotation columns `(x_dir, y_dir, z_dir)`.
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct FrameRow {
+    /// The frame origin (the translation).
+    pub origin: [f64; 3],
+    /// The world image of the local `+x` axis.
+    pub x_dir: [f64; 3],
+    /// The world image of the local `+y` axis.
+    pub y_dir: [f64; 3],
+    /// The world image of the local `+z` axis.
+    pub z_dir: [f64; 3],
+}
+
+/// A kernel-native shape data row: the boundary grid of rational patches plus
+/// the constructive closed/oriented invariant recorded at construction. The
+/// same row surface carries a `Face`, a `Shell` or a `Solid`.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct ShapeRow {
+    /// The boundary grid: one [`PatchRow`] per boundary face.
+    pub patches: Vec<PatchRow>,
+    /// The landed closed 2-cycle invariant (every boundary side is glued
+    /// exactly once).
+    pub closed: bool,
+    /// The landed consistent-orientation invariant.
+    pub oriented: bool,
+    /// The recorded placement frame, when the row is placed.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub frame: Option<FrameRow>,
+}
+
+/// The certified bound of one shape row: `[lo, hi]` corner points.
+#[derive(Debug, Clone, PartialEq, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct BboxOutcome {
+    /// Always `true` on the `Ok` path.
+    pub ok: bool,
+    /// The certified bound corner pair `[lo, hi]`.
+    pub bbox: [[f64; 3]; 2],
+    /// The number of refined control-net leaves the bound was assembled from.
+    pub leaves: usize,
+}
+
+/// The constructive validity answer of one shape row.
+#[derive(Debug, Clone, PartialEq, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct ValidityOutcome {
+    /// Always `true` on the `Ok` path.
+    pub ok: bool,
+    /// The closed/oriented 2-cycle invariant the row recorded.
+    pub valid: bool,
+    /// The recorded closed invariant.
+    pub closed: bool,
+    /// The recorded oriented invariant.
+    pub oriented: bool,
+}
+
+/// The face-count answer of one shape row: the number of patches of the
+/// boundary grid.
+#[derive(Debug, Clone, PartialEq, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct FaceCountOutcome {
+    /// Always `true` on the `Ok` path.
+    pub ok: bool,
+    /// The number of boundary patches.
+    pub n_faces: usize,
+}
+
+/// A homogeneous `[x, y, z, w]` control net over a patch's unit square.
+#[derive(Debug, Clone)]
+struct Net4 {
+    rows: usize,
+    cols: usize,
+    data: Vec<[f64; 4]>,
+}
+
+impl Net4 {
+    /// Validates a patch row through the landed refusing constructor and reads
+    /// its homogeneous control net. A malformed grid (or a non-positive weight)
+    /// marshals the construct refusal typed.
+    fn from_row(row: &PatchRow) -> Result<Net4, BindingError> {
+        let _validated = TensorBernsteinPatch::try_new(
+            row.numerator.clone(),
+            row.weights.clone(),
+            unit_domain(),
+            PatchParent::new(0, None),
+        )
+        .map_err(|refusal| {
+            BindingError::Refusal(Box::new(Marshaled::from_construct_refusal(refusal)))
+        })?;
+        let rows = row.weights.len();
+        let cols = row.weights.first().map_or(0, |weight_row| weight_row.len());
+        let mut data = Vec::with_capacity(rows.saturating_mul(cols));
+        for (num_row, weight_row) in row.numerator.iter().zip(row.weights.iter()) {
+            for (a, w) in num_row.iter().zip(weight_row.iter()) {
+                data.push([a[0], a[1], a[2], *w]);
+            }
+        }
+        Ok(Net4 { rows, cols, data })
+    }
+
+    /// The homogeneous coefficient at `(i, j)`, when in range.
+    fn get(&self, i: usize, j: usize) -> Option<[f64; 4]> {
+        self.data
+            .get(i.checked_mul(self.cols)?.checked_add(j)?)
+            .copied()
+    }
+
+    /// Overwrites the homogeneous coefficient at `(i, j)`, when in range.
+    fn set(&mut self, i: usize, j: usize, value: [f64; 4]) {
+        if let Some(slot) = i
+            .checked_mul(self.cols)
+            .and_then(|base| base.checked_add(j))
+            .and_then(|idx| self.data.get_mut(idx))
+        {
+            *slot = value;
+        }
+    }
+
+    /// The affine control point `Â_ij / Ŵ_ij`, when in range and non-degenerate.
+    fn affine(&self, i: usize, j: usize) -> Option<[f64; 3]> {
+        let h = self.get(i, j)?;
+        if h[3] == 0.0 {
+            return None;
+        }
+        Some([h[0] / h[3], h[1] / h[3], h[2] / h[3]])
+    }
+
+    /// The net carried into a recorded frame (exact rigid motion applied to the
+    /// homogeneous numerator: `Â ↦ R·Â + origin·Ŵ`, weights unchanged).
+    fn transformed(&self, frame: &FrameRow) -> Net4 {
+        let data = self
+            .data
+            .iter()
+            .map(|h| {
+                let w = h[3];
+                let x = h[0] / w;
+                let y = h[1] / w;
+                let z = h[2] / w;
+                let wx =
+                    frame.origin[0] + frame.x_dir[0] * x + frame.y_dir[0] * y + frame.z_dir[0] * z;
+                let wy =
+                    frame.origin[1] + frame.x_dir[1] * x + frame.y_dir[1] * y + frame.z_dir[1] * z;
+                let wz =
+                    frame.origin[2] + frame.x_dir[2] * x + frame.y_dir[2] * y + frame.z_dir[2] * z;
+                [wx * w, wy * w, wz * w, w]
+            })
+            .collect();
+        Net4 {
+            rows: self.rows,
+            cols: self.cols,
+            data,
+        }
+    }
+}
+
+/// The linear interpolation of two homogeneous coefficients.
+fn lerp4(a: [f64; 4], b: [f64; 4], t: f64) -> [f64; 4] {
+    [
+        a[0] + (b[0] - a[0]) * t,
+        a[1] + (b[1] - a[1]) * t,
+        a[2] + (b[2] - a[2]) * t,
+        a[3] + (b[3] - a[3]) * t,
+    ]
+}
+
+/// The exact Bernstein de Casteljau split of a homogeneous net at `t` along the
+/// requested axis (geometry-preserving: the two leaves re-cover the patch).
+fn split_net(net: &Net4, along_u: bool, t: f64) -> (Net4, Net4) {
+    let lines = if along_u { net.cols } else { net.rows };
+    let seq_len = if along_u { net.rows } else { net.cols };
+    let mut lo = Net4 {
+        rows: net.rows,
+        cols: net.cols,
+        data: vec![[0.0; 4]; net.data.len()],
+    };
+    let mut hi = lo.clone();
+    if lines == 0 || seq_len == 0 {
+        return (lo, hi);
+    }
+    for line in 0..lines {
+        let mut level: Vec<[f64; 4]> = Vec::with_capacity(seq_len);
+        for k in 0..seq_len {
+            let (i, j) = if along_u { (k, line) } else { (line, k) };
+            if let Some(h) = net.get(i, j) {
+                level.push(h);
+            }
+        }
+        if let (Some(first), Some(last)) = (level.first().copied(), level.last().copied()) {
+            let (i0, j0) = if along_u { (0, line) } else { (line, 0) };
+            lo.set(i0, j0, first);
+            let last_index = seq_len.saturating_sub(1);
+            let (i1, j1) = if along_u {
+                (last_index, line)
+            } else {
+                (line, last_index)
+            };
+            hi.set(i1, j1, last);
+        }
+        for r in 1..seq_len {
+            let mut next: Vec<[f64; 4]> = Vec::with_capacity(level.len().saturating_sub(1));
+            for pair in level.windows(2) {
+                if let [a, b] = pair {
+                    next.push(lerp4(*a, *b, t));
+                }
+            }
+            if let Some(v) = next.first().copied() {
+                let (i, j) = if along_u { (r, line) } else { (line, r) };
+                lo.set(i, j, v);
+            }
+            if let Some(v) = next.last().copied() {
+                let target = seq_len.saturating_sub(1).saturating_sub(r);
+                let (i, j) = if along_u {
+                    (target, line)
+                } else {
+                    (line, target)
+                };
+                hi.set(i, j, v);
+            }
+            level = next;
+        }
+    }
+    (lo, hi)
+}
+
+/// The coordinate-wise hull of a homogeneous net's affine control points.
+fn net_affine_hull(net: &Net4) -> ([f64; 3], [f64; 3]) {
+    let mut lo = [f64::INFINITY; 3];
+    let mut hi = [f64::NEG_INFINITY; 3];
+    for h in &net.data {
+        if h[3] == 0.0 {
+            continue;
+        }
+        let x = h[0] / h[3];
+        let y = h[1] / h[3];
+        let z = h[2] / h[3];
+        lo[0] = lo[0].min(x);
+        lo[1] = lo[1].min(y);
+        lo[2] = lo[2].min(z);
+        hi[0] = hi[0].max(x);
+        hi[1] = hi[1].max(y);
+        hi[2] = hi[2].max(z);
+    }
+    (lo, hi)
+}
+
+/// The coordinate-wise extent of a hull.
+fn hull_span(lo: [f64; 3], hi: [f64; 3]) -> [f64; 3] {
+    [hi[0] - lo[0], hi[1] - lo[1], hi[2] - lo[2]]
+}
+
+/// The Euclidean diameter of a hull's extent (the bound's over-report).
+fn span_diameter(span: [f64; 3]) -> f64 {
+    (span[0] * span[0] + span[1] * span[1] + span[2] * span[2]).sqrt()
+}
+
+/// Merges a hull into an accumulator.
+fn merge_hull(lo: &mut [f64; 3], hi: &mut [f64; 3], a: [f64; 3], b: [f64; 3]) {
+    lo[0] = lo[0].min(a[0]);
+    lo[1] = lo[1].min(a[1]);
+    lo[2] = lo[2].min(a[2]);
+    hi[0] = hi[0].max(b[0]);
+    hi[1] = hi[1].max(b[1]);
+    hi[2] = hi[2].max(b[2]);
+}
+
+/// The `u`-direction control-net extent (the split-direction heuristic).
+fn net_extent_u(net: &Net4) -> f64 {
+    if net.rows < 2 {
+        return 0.0;
+    }
+    let mut extent = 0.0_f64;
+    for j in 0..net.cols {
+        if let (Some(a), Some(b)) = (net.affine(0, j), net.affine(net.rows - 1, j)) {
+            extent = extent.max(norm3(sub3(b, a)));
+        }
+    }
+    extent
+}
+
+/// The `v`-direction control-net extent (the split-direction heuristic).
+fn net_extent_v(net: &Net4) -> f64 {
+    if net.cols < 2 {
+        return 0.0;
+    }
+    let mut extent = 0.0_f64;
+    for i in 0..net.rows {
+        if let (Some(a), Some(b)) = (net.affine(i, 0), net.affine(i, net.cols - 1)) {
+            extent = extent.max(norm3(sub3(b, a)));
+        }
+    }
+    extent
+}
+
+/// The rigorous bound of one patch: subdivide until every leaf's affine control
+/// hull is within the slack (or the depth cap), and return the union hull.
+fn patch_rigorous_bbox(net: Net4) -> ([f64; 3], [f64; 3], usize) {
+    let mut lo = [f64::INFINITY; 3];
+    let mut hi = [f64::NEG_INFINITY; 3];
+    let mut leaves = 0usize;
+    let mut stack: Vec<(Net4, u32)> = vec![(net, 0)];
+    while let Some((current, depth)) = stack.pop() {
+        let (leaf_lo, leaf_hi) = net_affine_hull(&current);
+        let span = hull_span(leaf_lo, leaf_hi);
+        if span_diameter(span) <= DATA_ROW_BBOX_SLACK || depth >= DATA_ROW_BBOX_MAX_DEPTH {
+            merge_hull(&mut lo, &mut hi, leaf_lo, leaf_hi);
+            leaves += 1;
+        } else {
+            let along_u = net_extent_u(&current) > net_extent_v(&current);
+            let (a, b) = split_net(&current, along_u, 0.5);
+            stack.push((a, depth + 1));
+            stack.push((b, depth + 1));
+        }
+    }
+    (lo, hi, leaves)
+}
+
+/// The rigorous bound of a whole shape row (optionally carried into its
+/// recorded frame).
+fn shape_bbox_bound(
+    row: &ShapeRow,
+    apply_frame: bool,
+) -> Result<([f64; 3], [f64; 3], usize), BindingError> {
+    if row.patches.is_empty() {
+        return Err(malformed("a kernel shape row carries no boundary patches"));
+    }
+    let mut lo = [f64::INFINITY; 3];
+    let mut hi = [f64::NEG_INFINITY; 3];
+    let mut leaves = 0usize;
+    for patch in &row.patches {
+        let net = Net4::from_row(patch)?;
+        let net = match (apply_frame, row.frame) {
+            (true, Some(frame)) => net.transformed(&frame),
+            _ => net,
+        };
+        let (patch_lo, patch_hi, patch_leaves) = patch_rigorous_bbox(net);
+        merge_hull(&mut lo, &mut hi, patch_lo, patch_hi);
+        leaves += patch_leaves;
+    }
+    Ok((lo, hi, leaves))
+}
+
+/// The carrier-derived rigorous bound of a kernel shape row (the corpus `bbox`
+/// probe surface): `[lo, hi]` corner points, every number a certified bound.
+pub fn bbox_facts(row: &ShapeRow) -> Result<String, BindingError> {
+    let (lo, hi, leaves) = shape_bbox_bound(row, false)?;
+    to_json(&BboxOutcome {
+        ok: true,
+        bbox: [lo, hi],
+        leaves,
+    })
+}
+
+/// The corpus `obox` probe surface: the same rigorous bound carried into the
+/// row's recorded frame (the `lo, hi` corner-point form the helper consumes).
+pub fn obox_facts(row: &ShapeRow) -> Result<String, BindingError> {
+    let (lo, hi, leaves) = shape_bbox_bound(row, true)?;
+    to_json(&BboxOutcome {
+        ok: true,
+        bbox: [lo, hi],
+        leaves,
+    })
+}
+
+/// The corpus `is_valid_shape` probe surface: the landed closed/oriented
+/// 2-cycle invariant the row recorded at construction. Never an OCC probe; a
+/// malformed boundary grid marshals its construct refusal typed.
+pub fn is_valid_shape(row: &ShapeRow) -> Result<String, BindingError> {
+    for patch in &row.patches {
+        let _validated = Net4::from_row(patch)?;
+    }
+    let valid = !row.patches.is_empty() && row.closed && row.oriented;
+    to_json(&ValidityOutcome {
+        ok: true,
+        valid,
+        closed: row.closed,
+        oriented: row.oriented,
+    })
+}
+
+/// The corpus face-count probe surface: the number of patches of the row's
+/// boundary grid.
+pub fn face_count(row: &ShapeRow) -> Result<String, BindingError> {
+    to_json(&FaceCountOutcome {
+        ok: true,
+        n_faces: row.patches.len(),
+    })
+}
+
+/// The pyo3 export of [`bbox_facts`].
+#[pyfunction]
+pub fn binding_bbox(py: Python<'_>, row_json: &str) -> PyResult<String> {
+    let row: ShapeRow = serde_json::from_str(row_json)
+        .map_err(|e| PyValueError::new_err(format!("invalid shape row JSON: {e}")))?;
+    bbox_facts(&row).map_err(|e| to_pyerr(py, e))
+}
+
+/// The pyo3 export of [`obox_facts`].
+#[pyfunction]
+pub fn binding_obox(py: Python<'_>, row_json: &str) -> PyResult<String> {
+    let row: ShapeRow = serde_json::from_str(row_json)
+        .map_err(|e| PyValueError::new_err(format!("invalid shape row JSON: {e}")))?;
+    obox_facts(&row).map_err(|e| to_pyerr(py, e))
+}
+
+/// The pyo3 export of [`is_valid_shape`].
+#[pyfunction]
+pub fn binding_is_valid_shape(py: Python<'_>, row_json: &str) -> PyResult<String> {
+    let row: ShapeRow = serde_json::from_str(row_json)
+        .map_err(|e| PyValueError::new_err(format!("invalid shape row JSON: {e}")))?;
+    is_valid_shape(&row).map_err(|e| to_pyerr(py, e))
+}
+
+/// The pyo3 export of [`face_count`].
+#[pyfunction]
+pub fn binding_face_count(py: Python<'_>, row_json: &str) -> PyResult<String> {
+    let row: ShapeRow = serde_json::from_str(row_json)
+        .map_err(|e| PyValueError::new_err(format!("invalid shape row JSON: {e}")))?;
+    face_count(&row).map_err(|e| to_pyerr(py, e))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1562,5 +2031,217 @@ mod tests {
         assert_eq!(outcome.bracket.lo.to_bits(), outcome.bracket.hi.to_bits());
         assert!(outcome.crossings.is_empty());
         assert_eq!(outcome.retained_arcs, 0);
+    }
+
+    // -----------------------------------------------------------------------
+    // MONO-1-DATA-ROWS: kernel-native probe data rows.
+    // -----------------------------------------------------------------------
+
+    /// The bilinear patch `X(u, v) = (2u, 3v, 5)` — a known control hull.
+    fn flat_patch_row() -> PatchRow {
+        PatchRow {
+            numerator: vec![
+                vec![[0.0, 0.0, 5.0], [0.0, 3.0, 5.0]],
+                vec![[2.0, 0.0, 5.0], [2.0, 3.0, 5.0]],
+            ],
+            weights: vec![vec![1.0, 1.0], vec![1.0, 1.0]],
+        }
+    }
+
+    /// The curved patch `X(u, v) = (u, v, 100·2u(1−u))`: its `z` control hull
+    /// is `[0, 100]` while the surface's `z` range is `[0, 50]`.
+    fn curved_patch_row() -> PatchRow {
+        PatchRow {
+            numerator: vec![
+                vec![[0.0, 0.0, 0.0], [0.0, 1.0, 0.0]],
+                vec![[0.5, 0.0, 100.0], [0.5, 1.0, 100.0]],
+                vec![[1.0, 0.0, 0.0], [1.0, 1.0, 0.0]],
+            ],
+            weights: vec![vec![1.0, 1.0], vec![1.0, 1.0], vec![1.0, 1.0]],
+        }
+    }
+
+    fn shape_row(patches: Vec<PatchRow>, closed: bool, oriented: bool) -> ShapeRow {
+        ShapeRow {
+            patches,
+            closed,
+            oriented,
+            frame: None,
+        }
+    }
+
+    /// Reads the `[lo, hi]` corner pair out of a `bbox`/`obox` outcome.
+    fn bbox_corners(json: &str) -> ([f64; 3], [f64; 3]) {
+        let value: serde_json::Value = serde_json::from_str(json).expect("bbox outcome json");
+        let corners = value["bbox"].as_array().expect("bbox corner pair");
+        let read = |corner: &serde_json::Value| -> [f64; 3] {
+            let coords = corner.as_array().expect("corner");
+            [
+                coords[0].as_f64().expect("x"),
+                coords[1].as_f64().expect("y"),
+                coords[2].as_f64().expect("z"),
+            ]
+        };
+        (read(&corners[0]), read(&corners[1]))
+    }
+
+    /// The binomial coefficient `C(n, k)` as an `f64`.
+    fn binomial(n: usize, k: usize) -> f64 {
+        let mut value = 1.0_f64;
+        for i in 0..k {
+            value = value * (n - i) as f64 / (i + 1) as f64;
+        }
+        value
+    }
+
+    /// The scalar Bernstein basis function `B_{i,n}(t)`.
+    fn bernstein(i: usize, n: usize, t: f64) -> f64 {
+        binomial(n, i) * t.powi(i as i32) * (1.0 - t).powi((n - i) as i32)
+    }
+
+    /// The exact rational patch point at `(u, v)` (a test-only dense sampler).
+    fn patch_point(row: &PatchRow, u: f64, v: f64) -> [f64; 3] {
+        let m = row.numerator.len() - 1;
+        let n = row.numerator[0].len() - 1;
+        let mut numerator = [0.0_f64; 3];
+        let mut weight = 0.0_f64;
+        for i in 0..=m {
+            for j in 0..=n {
+                let b = bernstein(i, m, u) * bernstein(j, n, v);
+                let a = row.numerator[i][j];
+                numerator[0] += b * a[0];
+                numerator[1] += b * a[1];
+                numerator[2] += b * a[2];
+                weight += b * row.weights[i][j];
+            }
+        }
+        [
+            numerator[0] / weight,
+            numerator[1] / weight,
+            numerator[2] / weight,
+        ]
+    }
+
+    #[test]
+    fn bbox_is_control_hull_bound() {
+        // The bilinear patch's affine control hull is exact, so the certified
+        // bound must equal it: the bracket is the control-hull bound.
+        let row = shape_row(vec![flat_patch_row()], true, true);
+        let (lo, hi) = bbox_corners(&bbox_facts(&row).expect("bbox"));
+        assert_eq!(lo, [0.0, 0.0, 5.0]);
+        assert_eq!(hi, [2.0, 3.0, 5.0]);
+
+        // The obox surface is the same bound (the row carries no frame).
+        let (obox_lo, obox_hi) = bbox_corners(&obox_facts(&row).expect("obox"));
+        assert_eq!(obox_lo, lo);
+        assert_eq!(obox_hi, hi);
+    }
+
+    #[test]
+    fn bbox_subdivides_to_slack() {
+        // The raw control hull's z range is [0, 100] against a surface range of
+        // [0, 50]; the subdivision must tighten the bound to within the 1 mm
+        // slack of a dense sampling.
+        let row = shape_row(vec![curved_patch_row()], true, true);
+        let (lo, hi) = bbox_corners(&bbox_facts(&row).expect("bbox"));
+        let samples = 128;
+        let mut z_min = f64::INFINITY;
+        let mut z_max = f64::NEG_INFINITY;
+        for i in 0..=samples {
+            for j in 0..=samples {
+                let u = i as f64 / samples as f64;
+                let v = j as f64 / samples as f64;
+                let p = patch_point(&curved_patch_row(), u, v);
+                z_min = z_min.min(p[2]);
+                z_max = z_max.max(p[2]);
+            }
+        }
+        assert!(
+            lo[2] <= z_min + 1.0e-9,
+            "the bound must enclose the surface"
+        );
+        assert!(
+            hi[2] >= z_max - 1.0e-9,
+            "the bound must enclose the surface"
+        );
+        assert!(
+            z_min - lo[2] <= 1.0 + 1.0e-6,
+            "the lower bound must be within the 1 mm slack"
+        );
+        assert!(
+            hi[2] - z_max <= 1.0 + 1.0e-6,
+            "the upper bound must be within the 1 mm slack"
+        );
+        assert!(
+            hi[2] < 99.0,
+            "subdivision must tighten the loose control hull (was 100)"
+        );
+    }
+
+    #[test]
+    fn validity_row_answers_constructive_invariant() {
+        // The row answers the recorded closed/oriented 2-cycle invariant, not
+        // an OCC probe.
+        let valid = shape_row(vec![flat_patch_row()], true, true);
+        let value: serde_json::Value =
+            serde_json::from_str(&is_valid_shape(&valid).expect("valid")).expect("json");
+        assert_eq!(value["valid"], serde_json::Value::Bool(true));
+        assert_eq!(value["closed"], serde_json::Value::Bool(true));
+        assert_eq!(value["oriented"], serde_json::Value::Bool(true));
+
+        let open = shape_row(vec![flat_patch_row()], false, true);
+        let value: serde_json::Value =
+            serde_json::from_str(&is_valid_shape(&open).expect("open")).expect("json");
+        assert_eq!(value["valid"], serde_json::Value::Bool(false));
+
+        let unoriented = shape_row(vec![flat_patch_row()], true, false);
+        let value: serde_json::Value =
+            serde_json::from_str(&is_valid_shape(&unoriented).expect("unoriented")).expect("json");
+        assert_eq!(value["valid"], serde_json::Value::Bool(false));
+    }
+
+    #[test]
+    fn face_count_row_matches_grid() {
+        let row = shape_row(
+            vec![flat_patch_row(), curved_patch_row(), flat_patch_row()],
+            true,
+            true,
+        );
+        let value: serde_json::Value =
+            serde_json::from_str(&face_count(&row).expect("face count")).expect("json");
+        assert_eq!(value["n_faces"].as_u64(), Some(3));
+    }
+
+    #[test]
+    fn data_row_refusals_stay_typed() {
+        // A non-positive weight cannot certify the patch: the refusing
+        // constructor marshals the typed construct-refusal door case.
+        let bad = PatchRow {
+            numerator: vec![vec![[0.0, 0.0, 0.0], [1.0, 0.0, 0.0]]],
+            weights: vec![vec![1.0, -1.0]],
+        };
+        let row = shape_row(vec![bad], true, true);
+        match bbox_facts(&row) {
+            Err(BindingError::Refusal(marshaled)) => {
+                assert_eq!(marshaled.class, ExceptionClass::Refused);
+                match marshaled.payload {
+                    MarshaledPayload::Refused(payload) => {
+                        assert_eq!(payload.case, "construct_refused");
+                    }
+                    MarshaledPayload::Unresolved(_) => {
+                        panic!("a construct refusal must marshal as the Refused class")
+                    }
+                }
+            }
+            other => panic!("a non-positive weight must refuse typed, got {other:?}"),
+        }
+
+        // An empty boundary grid is a caller defect: typed Malformed, never a
+        // panic and never an approximation.
+        let empty = shape_row(Vec::new(), true, true);
+        assert!(matches!(
+            bbox_facts(&empty),
+            Err(BindingError::Malformed(_))
+        ));
     }
 }
