@@ -11,7 +11,7 @@ binding demonstrations.
 id:          SOLVER-CHECKER
 contract:    [SOLVER-CHECKER]
 class:       mechanical
-crates:      []
+crates:      [look]
 depends_on:  [SOLVER-SURVEY-A, SOLVER-SURVEY-B, SOLVER-SURVEY-C, SOLVER-SURVEY-D]
 write_allow:
   - loop/solver_coverage
