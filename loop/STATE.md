@@ -9,8 +9,57 @@ you are picking this up cold, read **this file, then
 [`loop/ORCHESTRATOR.md`](ORCHESTRATOR.md)` for how to run the loop, then
 `python loop/slot_status.py`** - nothing else.
 
-Updated 2026-09-08 (evening), session 56 - the timing numbers, the admission
-program, and the operator agent.
+Updated 2026-09-10, session 57/58 (overnight + the door-gap chain). Read the
+operator blocks below first — the machine has been running autonomously and
+they are current.
+
+## HANDOFF (2026-09-10 ~10:30 local, orchestrator session) — the door-gap chain
+
+Owner context for the next session, in order:
+
+1. **The door-gap chain is ~2 packets from closing.** In flight:
+   TRIM-EXTRUDE-CTOR (slot 0, pid 28868, RESUMED — it hung mid-API-step
+   ~16 min; killed the opencode child 28156 (NOT the launcher wrapper —
+   the wrapper is a decoy, the opencode.exe child holds events.jsonl),
+   WIP committed 1d2e411, resumed via run_packet --resume --session-id
+   ses_f747fe945ffe5IE0U2nVLH22TZ). On its finish: the driver lands it
+   (harness-conflict auto-resolve is live, commit c7911f7) — but expect a
+   CODE conflict in bd_bridge.rs (its base predates BRIDGE-LOFT-FACTS);
+   the union procedure is proven (see 66cd011: assemble both complete
+   sections, brace-check, suite green). Then TTC-RECENSUS-F1-R2
+   (registered READY, anchored A1=48/A2=21) auto-dispatches: the census +
+   kernel timing columns, NO OCC runs (owner directive — recorded
+   references are the oracle; nozzle/mvac stay DNF-FACTS until the owner
+   reverses it, they need one OCC re-record).
+2. **Landed this stretch** (all verified): CG-BINDING (the manifest-edge
+   amendment + 3 exports — the dependency wall is DOWN), FRAME-REVOLVE,
+   SWEEP-PATH (driver, autonomous), BRIDGE-BOOLEANS + BRIDGE-LOFT-FACTS
+   (both arms coexist on bd_bridge), REF-RECORD-HYPERCAR (3 hypercar rows
+   staged). Pins were adjudicated twice as boundaries moved deeper (mvac:
+   extrude -> spline-path sweep -> circle-profile sweep-section;
+   non_z_axis revolve -> answered). The pattern: pins move deeper-or-
+   answered, never away from discipline.
+3. **The hazard battery is booked**: truck123d/tests/ttc_hazard_battery.rs
+   (38 fixtures, ignore-gated, discipline-asserting, strict mode via
+   HAZARD_BATTERY_STRICT=1) + hazard tree corpus/ttc/trees/hazard. Run it
+   AFTER the census. The remaining-arms map is
+   loop/audits/HAZARD_PATH_AUDIT-2026-09-10.md (9 packets, ~2.7-4.7k LOC;
+   P1 contact-export and P2 shell-arm are the corpus-valuable ones; P9
+   blend-on-spline is the hard one; P10 chain-closure is theory-gated).
+4. **Machinery fixes landed** (c7911f7 et al): overnight.py prose-stop
+   negation fix, harness-bundle auto-resolve in the landing merge. STILL
+   OPEN: the heartbeat recycle destroying FINISHED workers' RESULTs (5th
+   strike 08:41 — the operator preserves refs/wip and the orchestrator
+   lands via never-filed-RESULT, but the structural fix (archive RESULT
+   before re-fork) is NOT done). The opencode-child-holds-events.jsonl
+   lesson: find the real worker via psutil open_files, not the launcher pid.
+5. **Docs were pruned** (8b28449: stale evidence/maps to history) and two
+   audits committed: DOOR-GAP-AUDIT (the wall + the 6-item path) and
+   HAZARD-PATH-AUDIT. The corpus verb inventory (grep bd.* across trees)
+   is the ground truth for what the corpus actually uses — RectangleRounded
+   (69 uses!), Align (45), Cone (5), Helix (3), Ellipse (3), make_hull (2),
+   FilletPolyline (1) are corpus-used and NOT in the drop-in vocabulary.
+
 
 ## Where we are
 
