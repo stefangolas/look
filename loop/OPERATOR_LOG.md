@@ -2224,5 +2224,49 @@ landed; TRIM-EXTRUDE-CTOR queued behind the running row; cargoq UP; heartbeat
 Escalations: NEW partial-resolve note (BRIDGE-BOOLEANS landed; the BRIDGE-
 LOFT-FACTS merge-conflict risk is now live); carried (unchanged) RESULT-recycle
 race + driver scoped_check bug; FRAME-REVOLVE F1 non_z_axis pin amendment;
-duplicate supervisors + cargoq restart guard; slot-4 + slot-7 wt RESULT
-residue; TOR-C flip-or-pin.
+  duplicate supervisors + cargoq restart guard; slot-4 + slot-7 wt RESULT
+  residue; TOR-C flip-or-pin.
+
+## 2026-09-10 13:50 UTC (operator)
+
+Board: 1 RUNNING (TRIM-EXTRUDE-CTOR slot 0) / 0 landed / 0 unblocked / 0 flipped.
+HEAD e700246.
+
+- Health (step 1): heartbeat exactly 1 (27872), operator runner 1, watchdog 1
+  (24472), overnight driver 1 (26920), cargoq UP (ping ok, queued 0). Disk 15.05
+  GB free (above the 8 GB floor, AT the 15 GB goal); RAM 3.73 GB free. TWO
+  supervisors (carried). slot_status: slot 0 RUNNING TRIM-EXTRUDE-CTOR (pid
+  16168, events fresh); slot 1 IDLE stale ADM-003 residue; slots 2-7 FINISHED
+  landed residue.
+- Landing (step 2): nothing operator-landable. BRIDGE-LOFT-FACTS (slot 0's
+  predecessor) finished with a DONE RESULT (commit 8b46b64, RESULT verified via
+  `git show 8b46b64:RESULT.json`) but its landing merge CONFLICTS with the landed
+  BRIDGE-BOOLEANS in bd_bridge.rs -> per the charter, a non-mechanical conflict
+  is not operator-landable. The driver logged the conflict at 09:26 and left a
+  SECOND merge in progress at 09:33:57 (MERGE_HEAD=8b46b64, `UU bd_bridge.rs`).
+  All other slot commits (e33c4dd, e9d885a, 3c2109b, ee97499, 713f205, 4de25d9,
+  5cf4811, b667a85, dd092a6, c0329e0) re-verified ancestors of integration/
+  kernel-bg.
+- Unblock (step 3): no stuck slot worker (slot 0 running healthy; slot 1 landed
+  residue, not holding work; no QUESTION). The MAIN WORKTREE was mid-merge (the
+  driver's landing cycle was interrupted) -> ACTION: `git merge --abort` (exit
+  0), restoring integration/kernel-bg to e700246. No committed work lost
+  (8b46b64 intact on its branch). Escalated.
+- Registry (step 4): 312 rows - 229 DONE, 76 READY, 7 BLOCKED. READY-without-
+  marker = {BRIDGE-LOFT-FACTS (unlanded/conflict), TRIM-EXTRUDE-CTOR (running)};
+  the 7 BLOCKED all correctly parked - nothing flipped. gen_packet --check on
+  BRIDGE-LOFT-FACTS: the mid-merge tree gave false A1/A3 mismatches; clean HEAD
+  gives only A3 40 vs expected 37 (+3 drift from BRIDGE-BOOLEANS) - NOT
+  re-measured this cycle (the packet's premise is stale/conflicting; escalate).
+- Dispatch (step 5): dispatch_ready --dry-run -> "BRIDGE-LOFT-FACTS: write-set
+  clash with a RUNNING row; dispatched 0; workers ~1/4". REAL idle; no manual
+  dispatch (heartbeat owns it).
+- STATE.md volatile refresh + LATEST GROUND TRUTH pointer updated ([operator
+  2026-09-10T13:50Z]).
+- NEW ESCALATION: the mid-merge main worktree (driver interrupted abort) + the
+  BRIDGE-LOFT-FACTS rebase/resolve.
+
+Leaving: 1 RUNNING (TRIM-EXTRUDE-CTOR slot 0, healthy); integration/kernel-bg
+clean at e700246 (mid-merge aborted); BRIDGE-LOFT-FACTS DONE-but-unlanded
+(8b46b64, conflict); cargoq UP; heartbeat 1; driver 1; watchdog 1; TWO
+supervisors; disk 15.05 GB free; RAM 3.73 GB free.

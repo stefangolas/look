@@ -355,3 +355,35 @@ Judgment-required items appended each operator cycle. Newest at the bottom.
   finished slot's RESULT.json before landing; the driver's scoped_check derives
   crates/tests from write paths, so a truck123d packet with no vendor/truck
   write paths gates nothing.
+
+## 2026-09-10 13:50 UTC - main worktree left MID-MERGE by the driver (MERGE_HEAD + UU bd_bridge.rs); operator aborted to restore clean integration
+
+- What: on arrival this cycle, integration/kernel-bg (the main worktree,
+  C:\Users\stefa\look) was mid-merge: `MERGE_HEAD` = 8b46b64 (BRIDGE-LOFT-FACTS),
+  `.git/MERGE_HEAD` mtime 09:33:57 local, `git status` showed `UU
+  truck123d/src/bd_bridge.rs` (unresolved conflict markers) plus staged harness
+  artifacts `M PACKET.md` / `A RESULT.json`. The driver had logged a
+  conflict-ABORT for this packet at 09:26:27 local, so the 09:33:57 merge was a
+  LATER attempt whose `git merge --abort` (overnight.py:250) never ran
+  (interrupted cycle). This is worse than the logged "aborted, left for morning"
+  state: a half-finished merge blocks every subsequent landing and any `git
+  commit` (git refuses while unmerged paths exist).
+- Operator action (mechanical restoration; no merge, no conflict resolution):
+  `git merge --abort` -> exit 0; HEAD back to e700246, no MERGE_HEAD, only the
+  pre-existing modified battery/cargoq logs remain. Nothing was lost: 8b46b64
+  (and its RESULT.json, status DONE) is intact on packet/BRIDGE-LOFT-FACTS and
+  at `git show 8b46b64:RESULT.json`.
+- Still open (human) - the conflict itself: BRIDGE-LOFT-FACTS (8b46b64, DONE
+  RESULT) conflicts with the landed BRIDGE-BOOLEANS in truck123d/src/bd_bridge.rs
+  (and PACKET.md). This is the 12:43Z "bypassed serialization" item materialized.
+  The landing owner must rebase/resolve. Start from
+  `git merge-tree integration/kernel-bg packet/BRIDGE-LOFT-FACTS` (or
+  `git rebase integration/kernel-bg packet/BRIDGE-LOFT-FACTS`).
+- Anchor hygiene warning: while the tree was mid-merge, `gen_packet --check
+  loop/packets/BRIDGE-LOFT-FACTS.md` reported A1=2/A3=57 (conflict-tree values).
+  On the CLEAN HEAD the real counts are A1=0, A2=0, A3=40 vs the packet's
+  expected A3=37 - a +3 drift from the BRIDGE-BOOLEANS landing, NOT the conflict.
+  Do NOT re-measure anchors from a conflicted tree.
+- Also (machinery): overnight.py must guarantee `git merge --abort` on an
+  interrupted cycle (or the supervisor should detect a lingering MERGE_HEAD and
+  clean it), else a killed landing cycle wedges the integration worktree.
