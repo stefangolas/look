@@ -2270,3 +2270,40 @@ Leaving: 1 RUNNING (TRIM-EXTRUDE-CTOR slot 0, healthy); integration/kernel-bg
 clean at e700246 (mid-merge aborted); BRIDGE-LOFT-FACTS DONE-but-unlanded
 (8b46b64, conflict); cargoq UP; heartbeat 1; driver 1; watchdog 1; TWO
 supervisors; disk 15.05 GB free; RAM 3.73 GB free.
+
+## 2026-09-10 14:09 UTC (operator) - quiet healthy; BRIDGE-LOFT-FACTS item resolved by orchestrator
+
+- Health sweep: `slot_status.py` -> 1 RUNNING (slot 0 TRIM-EXTRUDE-CTOR, pid
+  28868, events 0.2 min fresh, healthy) / slot 1 IDLE (stale ADM-003 residue) /
+  slots 2-7 FINISHED landed residue. cargoq ping ok (queued 0, running false).
+  Heartbeat exactly 1 (27872; broad CommandLine scan self-matched the probing
+  shell + this operator's own opencode command line), operator runner 1 (27876),
+  watchdog 1 (29264, child of supervisor 27828), overnight driver 1 (26920),
+  TWO supervisors (19172 + 27828 - carried duplication; only ONE overnight.py
+  child = no double-merge risk). Disk 15.71 GB free (above 8 GB floor and 15 GB
+  janitor goal); RAM 4.34 GB free.
+- Land (step 2): nothing. `git merge-base --is-ancestor` exit 0 for e33c4dd/
+  e9d885a/3c2109b/ee97499/713f205/4de25d9/b667a85/5cf4811/c0329e0; 8b46b64
+  (BRIDGE-LOFT-FACTS) is not a direct ancestor but its row is DONE via the
+  orchestrator's squash-union landing 7d4f5fe -> the 13:50Z "DONE-but-UNLANDED/
+  conflict" escalation is RESOLVED. No FINISHED slot holds an unlanded DONE
+  RESULT.
+- Unblock (step 3): nothing. Slot 0 RUNNING and making progress; no IDLE/DEAD
+  >15 min holding work; no QUESTION; zero cargo/rustc processes.
+- Registry hygiene (step 4): 7 BLOCKED rows, all deps landed, all correctly
+  parked (BG-AUD-FIX-004 OWNER_BLOCKED, BG-CK-SPLINE-CENSUS owner-cancelled,
+  SEM-PCURVE-MASTER-001-FIX SUPERSEDED, DEF-SPINEFRAME-GRAZE SPEC_GAP->-R2,
+  DEF-TESS-ANALYTIC-SEAM superseded by -R2, DEF-SEEDRAY-B human-gated, TOR-C
+  orchestrator-held). Nothing flipped.
+- Dispatch (step 5): `dispatch_ready.py --dry-run --max-workers=4` ->
+  "slots: 8 (1 running, 7 free); slot-assigned packets: 6; TTC-RECENSUS-F1-R2:
+  blocked on ['TRIM-EXTRUDE-CTOR']; dispatched 0; workers now ~1/4" = REAL idle;
+  no manual dispatch (heartbeat owns it).
+- STATE.md volatile refresh + LATEST GROUND TRUTH pointer updated ([operator
+  2026-09-10T14:09Z]).
+- No new escalation (nothing judgment-requiring surfaced).
+
+Leaving: 1 RUNNING (TRIM-EXTRUDE-CTOR slot 0, healthy, resumed by the
+orchestrator); HEAD 1293615 (orchestrator session handoff commit); nothing
+unlanded; 7 BLOCKED correctly parked; cargoq UP; heartbeat 1; driver 1;
+watchdog 1; TWO supervisors; disk 15.71 GB free; RAM 4.34 GB free.

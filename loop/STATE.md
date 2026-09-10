@@ -64,34 +64,33 @@ Owner context for the next session, in order:
 ## Where we are
 
 > LATEST GROUND TRUTH: read the newest `[operator ...]` block in "State of
-> the machine, as left" (2026-09-10T13:50Z). [operator 2026-09-10T13:50Z
-> ground-truth note: **THE MAIN WORKTREE WAS LEFT MID-MERGE BY THE DRIVER
-> (MERGE_HEAD=8b46b64 BRIDGE-LOFT-FACTS, `UU bd_bridge.rs`, mtime 09:33:57
-> local - the 09:33 landing cycle's `git merge --abort` never ran); the
-> operator ran `git merge --abort` (exit 0) so integration/kernel-bg is clean
-> at e700246 again - nothing lost (8b46b64 + its DONE RESULT intact on
-> packet/BRIDGE-LOFT-FACTS).** Board: 1 RUNNING (TRIM-EXTRUDE-CTOR slot 0,
-> healthy) / 0 landed-this-cycle. **BRIDGE-LOFT-FACTS is DONE-but-UNLANDED**:
-> its merge CONFLICTS with the landed BRIDGE-BOOLEANS in bd_bridge.rs -> human
-> rebase/resolve (escalated; not operator-landable). Registry re-derived: 312
-> rows - 229 DONE, 76 READY, 7 BLOCKED; READY-without-marker = {BRIDGE-LOFT-
-> FACTS (unlanded/conflict), TRIM-EXTRUDE-CTOR (running)}; BLOCKED-with-all-
-> deps-landed = the same 7 correctly parked (BG-AUD-FIX-004 OWNER_BLOCKED,
-> BG-CK-SPLINE-CENSUS owner-cancelled, SEM-PCURVE-MASTER-001-FIX SUPERSEDED,
-> DEF-SPINEFRAME-GRAZE SPEC_GAP->-R2, DEF-TESS-ANALYTIC-SEAM superseded by -R2,
-> DEF-SEEDRAY-B human-gated, TOR-C orchestrator-held). Anchor warning:
-> gen_packet --check gave FALSE A1/A3 mismatches from the mid-merge tree; on
-> clean HEAD A1=0/A2=0/A3=40 vs expected 37 (+3 drift from BRIDGE-BOOLEANS) -
-> NOT re-measured. dispatch_ready --dry-run: 0 dispatchable (write-set clash);
-> NO manual dispatch (heartbeat live). Health: heartbeat 1 (27872), operator
-> runner 1, watchdog 1 (24472), overnight driver 1 (26920), cargoq UP (ping ok,
+> the machine, as left" (2026-09-10T14:09Z). [operator 2026-09-10T14:09Z
+> ground-truth note: **QUIET HEALTHY CYCLE.** Board: 1 RUNNING (TRIM-EXTRUDE-
+> CTOR slot 0, pid 28868, RESUMED by the orchestrator after an API-step hang,
+> events ~0.2 min fresh - healthy, do not touch) / 0 landed-this-cycle. HEAD
+> 1293615 (the orchestrator's session handoff commit). All slot worker commits
+> re-verified ancestors of integration/kernel-bg (e33c4dd/e9d885a/3c2109b/
+> ee97499/713f205/4de25d9/b667a85/5cf4811/c0329e0); 8b46b64 (BRIDGE-LOFT-FACTS)
+> is NOT a direct ancestor but its row is DONE via the orchestrator's
+> squash-union landing 7d4f5fe - the 13:50Z "DONE-but-UNLANDED/conflict" item is
+> RESOLVED. Nothing operator-landable. Registry: 7 BLOCKED rows, all with deps
+> landed, all correctly parked (BG-AUD-FIX-004 OWNER_BLOCKED, BG-CK-SPLINE-
+> CENSUS owner-cancelled, SEM-PCURVE-MASTER-001-FIX SUPERSEDED, DEF-SPINEFRAME-
+> GRAZE SPEC_GAP->-R2, DEF-TESS-ANALYTIC-SEAM superseded by -R2, DEF-SEEDRAY-B
+> human-gated, TOR-C orchestrator-held) - nothing flipped. dispatch_ready
+> --dry-run: "slots: 8 (1 running, 7 free); TTC-RECENSUS-F1-R2 blocked on
+> TRIM-EXTRUDE-CTOR; dispatched 0; workers ~1/4" = REAL idle; no manual dispatch
+> (heartbeat live). Health: heartbeat exactly 1 (27872), operator runner 1
+> (27876), watchdog 1 (29264), overnight driver 1 (26920), cargoq UP (ping ok,
 > queued 0, running false), TWO supervisors (19172 + 27828 - carried
-> duplication class). Disk 15.05 GB free (AT the 15 GB goal); RAM 3.73 GB free.
-> Carried human items: FRAME-REVOLVE F1 non_z_axis pin amendment
-> (ttc_lathe_spline.rs:255); duplicate supervisors + the lagging cargoq restart
-> guard; slot-4 + slot-7 wt RESULT residue parking the driver's dispatch arm;
-> TOR-C flip-or-pin (orchestrator-held); the RESULT-recycle race + the driver's
-> scoped_check deriving crates/tests from write paths.]
+> duplication class; only ONE overnight.py child = no double-merge risk). Disk
+> 15.71 GB free (above the 8 GB floor and the 15 GB janitor goal); RAM 4.34 GB
+> free. Orchestrator session live (opencode 14776). Carried human items:
+> FRAME-REVOLVE F1 non_z_axis pin amendment (ttc_lathe_spline.rs:255); duplicate
+> supervisors + the lagging cargoq restart guard; slot-4 + slot-7 wt RESULT
+> residue parking the driver's dispatch arm; TOR-C flip-or-pin
+> (orchestrator-held); the RESULT-recycle race + the driver's scoped_check
+> deriving crates/tests from write paths.]
 
 - **THE FIRST KERNEL-VS-OCC TIMING COMPARISON IS BANKED** (FH-TIMING-REFRESH,
   landed c94d043): turbopump_assembly **0.097 s kernel vs 4.866 s OCC**,
@@ -1690,6 +1689,46 @@ worktree is never left mid-merge; carried - FRAME-REVOLVE F1 non_z_axis pin
 amendment (ttc_lathe_spline.rs:255); duplicate supervisors + lagging cargoq
 restart guard; slot-4 + slot-7 wt RESULT residue; TOR-C flip-or-pin; the
 RESULT-recycle race + driver scoped_check.]
+
+[operator 2026-09-10T14:09Z - volatile refresh. Quiet healthy cycle: nothing to
+land, nothing to unblock, nothing to flip, no manual dispatch (heartbeat live).
+Board now: 1 RUNNING / 0 landed-this-cycle. HEAD 1293615 (the orchestrator's
+session handoff commit) - no work moved this cycle. **TRIM-EXTRUDE-CTOR is
+RUNNING in slot 0 (pid 28868, resumed by the orchestrator after an API-step
+hang; events ~0.2 min fresh, 2 files changed, branch
+packet/TRIM-EXTRUDE-CTOR@1d2e411) - healthy, do not touch.** Landing re-verified
+by command: `git merge-base --is-ancestor` exit 0 for e33c4dd/e9d885a/3c2109b/
+ee97499/713f205/4de25d9/b667a85/5cf4811/c0329e0 against integration/kernel-bg;
+8b46b64 (BRIDGE-LOFT-FACTS) is NOT a direct ancestor but its row is DONE via the
+orchestrator's squash-union landing 7d4f5fe, so the 13:50Z "DONE-but-UNLANDED/
+conflict" item is RESOLVED. No FINISHED slot holds an unlanded DONE RESULT -
+nothing operator-landable. Slot wt RESULT statuses: slot 0 none (RUNNING), slot 1
+none (clean detached HEAD 4de25d9 - stale ADM-003 residue, not stuck), slot 2
+DONE, slot 3 done, slot 4 LANDED-WITH-FINDINGS, slots 5/6 DONE, slot 7 LANDED
+(redundant FRAME-REVOLVE, no commit). Nothing to unblock (0 IDLE/DEAD >15 min
+holding work; no QUESTION; zero cargo/rustc processes). Registry re-verified
+programmatically: 7 BLOCKED rows, all with deps landed, all correctly parked -
+BG-AUD-FIX-004 (OWNER_BLOCKED), BG-CK-SPLINE-CENSUS (owner-cancelled),
+SEM-PCURVE-MASTER-001-FIX (SUPERSEDED), DEF-SPINEFRAME-GRAZE (SPEC_GAP -> -R2),
+DEF-TESS-ANALYTIC-SEAM (superseded by -R2), DEF-SEEDRAY-B (human-gated on the
+SEEDRAY-B frontier review), TOR-C (orchestrator-held) - nothing flipped.
+dispatch_ready --dry-run --max-workers=4: "slots: 8 (1 running, 7 free);
+slot-assigned packets: 6; TTC-RECENSUS-F1-R2: blocked on ['TRIM-EXTRUDE-CTOR'];
+dispatched 0; workers now ~1/4" = REAL idle; no manual dispatch (heartbeat
+live). Health: heartbeat exactly 1 (27872; anchored `-File
+dispatch_heartbeat.ps1` scan - the broad CommandLine match self-matched the
+probing shell and this operator's own opencode command line, which embeds the
+charter text), operator runner 1 (27876), watchdog 1 (29264, child of supervisor
+27828), overnight driver 1 (26920, child of 27828), cargoq UP (ping ok, queued
+0, running false). TWO supervisors (19172 PyManager + 27828 pythoncore child -
+carried duplication class; only ONE overnight.py child = no double-merge risk).
+Disk 15.71 GB free (above the 8 GB floor and the 15 GB janitor goal); RAM 4.34
+GB free. Orchestrator session live (opencode 14776; handoff commit 1293615). No
+new escalation; the 13:50Z BRIDGE-LOFT-FACTS item is resolved. Carried human
+items unchanged: FRAME-REVOLVE F1 non_z_axis pin amendment
+(ttc_lathe_spline.rs:255); duplicate supervisors + the lagging cargoq restart
+guard; slot-4 + slot-7 wt RESULT residue parking the driver's dispatch arm;
+TOR-C flip-or-pin (orchestrator-held).]
 
 ## The parallelism picture
 
