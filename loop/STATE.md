@@ -1843,6 +1843,39 @@ guard; slot-4 + slot-7 wt RESULT residue parking the driver's dispatch arm; TOR-
 flip-or-pin (orchestrator-held); the RESULT-recycle race + overnight.py's
 guarantee-merge-abort on interrupted cycles.]
 
+[operator 2026-09-10T15:22Z - volatile refresh. Quiet healthy cycle, 20 min
+after 14:56Z; state unchanged. Board: 0 RUNNING / 0 landed-this-cycle / 0
+unblocked / 0 flipped. HEAD 035effd (the 14:56Z operator cycle commit); the
+door-gap chain remains CLOSED - no packet running, no worker holding work.
+Landing re-verified by command: `git merge-base --is-ancestor` exit 0 against
+HEAD for every slot worker commit
+(197c924/4de25d9/e33c4dd/e9d885a/ee97499/713f205/b667a85/39e9550/5cf4811); no
+FINISHED slot holds an unlanded DONE RESULT. Slot wt RESULT statuses unchanged:
+slot 0 DONE, slot 1 none (clean stale ADM-003 residue), slot 2 DONE, slot 3
+done, slot 4 LANDED-WITH-FINDINGS, slots 5/6 DONE, slot 7 LANDED (redundant).
+Nothing to unblock (0 IDLE/DEAD >15 min holding work; no QUESTION.md; zero
+cargo/rustc). Registry re-verified: 313 rows - 230 DONE, 76 READY, 7 BLOCKED.
+The 76 READY rows all carry landed markers = correct parked state under the
+one-verify amendment; BLOCKED-with-all-deps-landed = 7, all correctly parked
+(BG-AUD-FIX-004 OWNER_BLOCKED, BG-CK-SPLINE-CENSUS owner-cancelled,
+SEM-PCURVE-MASTER-001-FIX SUPERSEDED, DEF-SPINEFRAME-GRAZE SPEC_GAP -> -R2,
+DEF-TESS-ANALYTIC-SEAM superseded by -R2, DEF-SEEDRAY-B human-gated on the
+SEEDRAY-B frontier review, TOR-C orchestrator-held) - nothing flipped.
+`gen_packet --check-all` exceeds 180 s (own child killed); no READY row is
+dispatchable so the anchor sweep is moot. dispatch_ready --dry-run
+--max-workers=4: "slots: 8 (0 running, 8 free); slot-assigned packets: 6;
+dispatched 0; workers now ~0/4" = REAL idle; no manual dispatch (heartbeat
+live). Health: heartbeat exactly 1 (27872), operator runner 1 (27876), watchdog
+1 (29264), overnight driver 1 (26920), cargoq UP (ping ok, queued 0, running
+false; server 28544). TWO supervisors (19172 PyManager + 27828 pythoncore -
+carried duplication class; only ONE overnight.py child = no double-merge risk).
+Disk 16.5 GiB free (above the 8 GB floor AND the 15 GB janitor goal); RAM 6.0
+GiB free. No new escalation; carried human items unchanged: FRAME-REVOLVE F1
+non_z_axis pin amendment (ttc_lathe_spline.rs:255); duplicate supervisors + the
+lagging cargoq restart guard; slot-4 + slot-7 wt RESULT residue parking the
+driver's dispatch arm; TOR-C flip-or-pin (orchestrator-held); the RESULT-recycle
+race + overnight.py's guarantee-merge-abort on interrupted cycles.]
+
 ## The parallelism picture
 
 The lemma wave (L1-L4, pure functions over the frozen shim type) is

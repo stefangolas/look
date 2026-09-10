@@ -2394,3 +2394,47 @@ Leaving: 0 RUNNING (door-gap chain closed); HEAD 2ad55c7 (TTC-RECENSUS-F1-R2
 landed); nothing unlanded; 7 BLOCKED correctly parked; 76 READY correctly
 parked pending the final one-verify battery; cargoq UP; heartbeat 1; driver 1;
 watchdog 1; TWO supervisors; disk 16.61 GiB free; RAM 6.24 GiB free.
+
+## [operator 2026-09-10T15:22Z] quiet healthy cycle (20 min after 14:56Z; state unchanged)
+
+- Health sweep: `slot_status.py` -> 0 RUNNING; slot 0 FINISHED
+  (TTC-RECENSUS-F1-R2, RESULT DONE, landed); slot 1 IDLE (stale ADM-003
+  residue, no RESULT); slots 2-7 FINISHED landed residue. cargoq ping ok
+  (queued 0, running false). Heartbeat exactly 1 (27872; the second hit was
+  my own probing shell self-matching the pattern). Watchdog 1 (29264).
+  overnight driver 1 (26920). cargoq server 28544. TWO supervisors (19172
+  PyManager + 27828 pythoncore - carried duplication class; only ONE
+  overnight.py child = no double-merge risk). Disk 16.5 GiB free (> 15 GB
+  janitor goal); RAM 6.0 GiB free. 0 cargo/rustc processes.
+- Land (step 2): nothing. HEAD 035effd (operator cycle 14:56Z). Re-verified
+  by command: `git merge-base --is-ancestor` exit 0 against HEAD for every
+  slot worker commit (197c924/4de25d9/e33c4dd/e9d885a/ee97499/713f205/
+  b667a85/39e9550/5cf4811). No FINISHED slot holds an unlanded DONE RESULT.
+- Unblock (step 3): nothing. 0 IDLE/DEAD >15 min holding work; no
+  QUESTION.md anywhere; zero cargo/rustc.
+- Registry hygiene (step 4): 313 rows - 230 DONE, 76 READY, 7 BLOCKED. The
+  76 READY rows all carry landed markers = correct parked state under the
+  one-verify amendment (flip DONE only at the final integrated-HEAD
+  battery). BLOCKED-with-all-deps-landed = 7, all correctly parked
+  (BG-AUD-FIX-004 OWNER_BLOCKED, BG-CK-SPLINE-CENSUS owner-cancelled,
+  SEM-PCURVE-MASTER-001-FIX SUPERSEDED, DEF-SPINEFRAME-GRAZE SPEC_GAP->-R2,
+  DEF-TESS-ANALYTIC-SEAM superseded by -R2, DEF-SEEDRAY-B human-gated, TOR-C
+  orchestrator-held). Nothing flipped. NOTE: `gen_packet.py --check-all`
+  exceeds 180 s (killed my own timed-out child); since no READY row is
+  dispatchable (all carry landed markers -> dispatcher skips), the anchor
+  sweep is moot this cycle. No per-packet anchor failure surfaced.
+- Dispatch (step 5): `dispatch_ready.py --dry-run --max-workers=4` ->
+  "slots: 8 (0 running, 8 free); slot-assigned packets: 6; dispatched 0;
+  workers now ~0/4" = REAL idle; no manual dispatch (heartbeat live).
+- STATE.md volatile refresh ([operator 2026-09-10T15:22Z]).
+- No new escalation (nothing judgment-requiring surfaced). Carried human
+  items unchanged: FRAME-REVOLVE F1 non_z_axis pin amendment
+  (ttc_lathe_spline.rs:255); duplicate supervisors + lagging cargoq restart
+  guard; slot-4 + slot-7 wt RESULT residue; TOR-C flip-or-pin
+  (orchestrator-held); RESULT-recycle race + overnight.py
+  guarantee-merge-abort on interrupted cycles.
+
+Leaving: 0 RUNNING (door-gap chain closed); HEAD 035effd; nothing unlanded;
+7 BLOCKED correctly parked; 76 READY correctly parked pending the final
+one-verify battery; cargoq UP; heartbeat 1; driver 1; watchdog 1; TWO
+supervisors; disk 16.5 GiB free; RAM 6.0 GiB free.
