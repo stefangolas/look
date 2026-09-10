@@ -32,7 +32,7 @@ tests_required:
   - full_extrude_without_trim_answers_bit_identically
 anchors:
   - {id: T1, expect: 9, cmd: "grep -c 'TrimCrossing' vendor/truck/truck-certified/src/kernel/trimclip.rs"}
-  - {id: T2, expect: 9, cmd: "grep -c 'algebraic' truck123d/src/binding.rs"}
+  - {id: T2, expect: 5, cmd: "grep -c '\\<algebraic\\>' truck123d/src/binding.rs"}
   - {id: T3, expect: 1, cmd: "grep -c '\\<trim\\>' corpus/ttc/door.py"}
 budget:      {turns: 70, ctx_tokens: 190000}
 ```

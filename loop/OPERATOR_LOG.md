@@ -2128,3 +2128,57 @@ heartbeat 1; operator runner 1; watchdog 1; driver 1; TWO supervisors; disk
 Escalations carried (unchanged): F1 non_z_axis pin amendment; duplicate
 supervisors + lagging cargoq restart guard; slot-4 + slot-7 wt RESULT residue;
 TOR-C flip-or-pin.
+
+## 2026-09-10 12:43 UTC (operator)
+
+Board: 1 RUNNING / 0 landed-this-cycle. HEAD 1c24aab (the orchestrator's
+hazard-audit commit; the operator's 12:19Z commit ca8dad8 is an ancestor).
+
+- Health sweep (step 1): slot_status -> slot 0 FINISHED at scan start
+  (BRIDGE-BOOLEANS, RESULT.json present, worker commit c0329e0), slot 1 IDLE
+  stale ADM-003 residue, slots 2-7 FINISHED landed residue. cargoq UP (ping
+  200, queued 0, running false). Heartbeat exactly 1 (27872; the count-2 scan
+  was the probing shell self-matching the `-File dispatch_heartbeat.ps1`
+  pattern - documented false positive), operator runner 1 (27876; same
+  self-match), watchdog 1 (24472), overnight driver 1 (26920), TWO supervisors
+  (19172 PyManager + 27828 pythoncore - carried duplication class, only ONE
+  overnight.py child). Disk 14.6 GB free (above the 8 GB floor, below the 15
+  GB janitor goal); RAM 5.3 GB free.
+- Landing (step 2): NOTHING operator-landable. Slot 0's BRIDGE-BOOLEANS
+  RESULT.json had status "LANDED" (not DONE) and its commit c0329e0 was NOT an
+  ancestor of integration/kernel-bg -> per the charter (status != DONE) do NOT
+  land. I read the full RESULT at 12:41Z (5 named tests green per the worker;
+  cargo test --lib --tests has the 2 known pre-existing ttc_lathe_spline
+  failures). **Then the heartbeat's 08:41:52 local cycle re-forked slot 0 to
+  BRIDGE-LOFT-FACTS and DESTROYED the RESULT.json**; the driver's 08:42:01
+  cycle then logged "slot 0: FINISHED without RESULT; left for morning". The
+  commit c0329e0 survives on packet/BRIDGE-BOOLEANS; I preserved it at
+  refs/wip/BRIDGE-BOOLEANS-c0329e0-preserved. All eight other slot commits
+  re-verified ancestors of integration/kernel-bg.
+- Unblock (step 3): nothing stuck. Slot 0 is now RUNNING BRIDGE-LOFT-FACTS
+  (pid 28120, events fresh) - do not touch. No IDLE/DEAD >15 min holding work;
+  no live QUESTION.
+- Registry hygiene (step 4): 312 unique rows - 228 DONE, 77 READY, 7 BLOCKED.
+  READY rows WITHOUT the dispatcher's case-folded `landed <sha>` marker =
+  exactly {BRIDGE-BOOLEANS (unlanded), BRIDGE-LOFT-FACTS (running),
+  TRIM-EXTRUDE-CTOR (write-set clash)}. BLOCKED-with-all-deps-landed = the same
+  7, all correctly parked - nothing flipped. FIXED the one fixable lint:
+  TRIM-EXTRUDE-CTOR T2 ANCHOR_PREFIX_AMBIGUITY ('algebraic' prefix-matched
+  algebraic_trim_bracket/algebraically) -> tightened to '\<algebraic\>',
+  expect 9->5 (re-measured under Git Bash grep); gen_packet --check +
+  packet_lint now clean.
+- Dispatch (step 5): NO manual dispatch - the live heartbeat dispatched
+  BRIDGE-LOFT-FACTS into slot 0 at 08:41:52 local; TRIM-EXTRUDE-CTOR correctly
+  deferred on the write-set clash. dispatch_ready --dry-run agrees.
+- STATE.md volatile refresh + LATEST GROUND TRUTH pointer updated ([operator
+  2026-09-10T12:43Z]).
+
+Leaving: 1 RUNNING (BRIDGE-LOFT-FACTS slot 0, pid 28120, healthy); slots 1-7
+landed residue; BRIDGE-BOOLEANS unlanded (commit preserved, will re-dispatch or
+be human-landed); TRIM-EXTRUDE-CTOR queued behind the BRIDGE pair; cargoq UP;
+heartbeat 1; operator runner 1; watchdog 1; driver 1; TWO supervisors; disk
+14.6 GB free; RAM 5.3 GB free.
+Escalations: NEW BRIDGE-BOOLEANS landing decision + the RESULT-recycle race +
+the bypassed BRIDGE serialization + the driver's wrong scoped_check; carried
+(unchanged) F1 non_z_axis pin amendment; duplicate supervisors + lagging cargoq
+restart guard; slot-4 + slot-7 wt RESULT residue; TOR-C flip-or-pin.

@@ -302,3 +302,37 @@ Judgment-required items appended each operator cycle. Newest at the bottom.
   OPERATOR_LOG 11:33Z entry (its report reads as complete, so the kill most
   likely landed after the writes but before the commit). The 11:57Z commit
   carries both the 11:33Z and 11:57Z deltas.
+
+## 2026-09-10 12:43 UTC - BRIDGE-BOOLEANS unlanded, RESULT destroyed by the recycle race; serialization bypassed
+
+- What: BRIDGE-BOOLEANS finished in slot 0 (worker commit c0329e0, RESULT.json
+  status "LANDED", 5 named tests green per the worker). The heartbeat's
+  08:41:52 local cycle re-forked slot 0 to dispatch BRIDGE-LOFT-FACTS ~9s
+  before the overnight driver's 08:42:01 landing cycle, which then logged
+  "slot 0: FINISHED without RESULT; left for morning". The unlanded RESULT.json
+  was destroyed (5th occurrence of the driver-files-never /
+  recycle-destroys-RESULT class). c0329e0 is preserved at
+  refs/wip/BRIDGE-BOOLEANS-c0329e0-preserved (and on packet/BRIDGE-BOOLEANS).
+- Why it needs a human: the packet is unlanded, its registry row is READY with
+  no landed marker, so dispatch_ready WILL re-dispatch it (wasting a worker run)
+  once the write set frees. Deciding whether to land c0329e0 as-is or let it
+  re-run is judgment (the charter's non-DONE/destroyed-RESULT rule says the
+  operator must not land it). Compounding: BRIDGE-LOFT-FACTS was forked from
+  1c24aab WITHOUT the BRIDGE-BOOLEANS changes to the same files
+  (truck123d/src/bd_bridge.rs, corpus/ttc/door.py), so the second to land will
+  conflict - the intended serialization was bypassed because BRIDGE-BOOLEANS
+  had finished (not RUNNING) when the heartbeat dispatched.
+- Also: the overnight driver's scoped_check derives crates from the row's
+  write paths (only vendor/truck/* -> crates) and test pairs from
+  vendor/truck/*/tests/*.rs in the packet text. For BRIDGE-BOOLEANS both are
+  empty, so it falls back to `cargo check -p truck-certified` and runs NO named
+  tests - had the RESULT survived, the driver would have landed a truck123d
+  packet without gating its 5 named tests.
+- Start here: `git log --oneline -1 c0329e0`; `git show --stat
+  refs/wip/BRIDGE-BOOLEANS-c0329e0-preserved`; the RESULT content is
+  reconstructible from the packet's done-when + the 5 named tests in
+  truck123d/src/bd_bridge.rs. Fix candidates: (a) dispatch_ready must treat a
+  FINISHED-but-unlanded slot as holding the write set until the row is
+  LANDED/DONE; (b) the driver's packet_tests_and_crates should read the
+  packet's `crates:`/`tests_required:` yaml, not the write paths; (c) the
+  heartbeat must archive the slot RESULT before any recycle.

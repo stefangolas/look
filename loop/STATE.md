@@ -15,36 +15,41 @@ program, and the operator agent.
 ## Where we are
 
 > LATEST GROUND TRUTH: read the newest `[operator ...]` block in "State of
-> the machine, as left" (2026-09-10T12:19Z). [operator 2026-09-10T12:19Z
-> ground-truth note: **BRIDGE-BOOLEANS IS RUNNING (slot 0) and BRIDGE-LOFT-FACTS
-> is queued behind it on the write-set.** Board: 1 RUNNING / 0 landed-this-cycle.
-> Slot 0 = BRIDGE-BOOLEANS (pid 12948, worker events ~10 min fresh, actively
-> cargo-checking truck123d green through cargoq) - healthy, do not touch. All
-> nine slot worker commits re-verified ancestors of integration/kernel-bg
-> (dd092a6 CG-BINDING, 0056f01, e33c4dd, e9d885a, 3c2109b, ee97499, 713f205,
-> 4de25d9, b667a85) - nothing to land. Slots 1-7 landed/residue (slot 7 =
-> redundant FRAME-REVOLVE, wt RESULT status LANDED no commit - not
-> operator-landable). Nothing to unblock (no IDLE/DEAD >15 min holding work;
-> no live QUESTION - the slot-5 QUESTION.md is stale residue from landed
-> CL-006). Registry re-derived by command: 311 unique rows - 228 DONE, 76
-> READY, 7 BLOCKED; READY rows WITHOUT a landed marker = exactly
-> {BRIDGE-BOOLEANS (running), BRIDGE-LOFT-FACTS (write-set clash)}; BLOCKED-
-> with-all-deps-landed = the same 7 correctly parked (BG-AUD-FIX-004
+> the machine, as left" (2026-09-10T12:43Z). [operator 2026-09-10T12:43Z
+> ground-truth note: **BRIDGE-LOFT-FACTS IS RUNNING (slot 0, pid 28120, events
+> fresh, forked 08:41:52 local from base 1c24aab) - healthy, do not touch.**
+> Board: 1 RUNNING / 0 landed-this-cycle. **BRIDGE-BOOLEANS IS UNLANDED: its
+> worker commit c0329e0 is preserved but its RESULT.json was DESTROYED** - the
+> 08:41:52 heartbeat recycle re-forked slot 0 to BRIDGE-LOFT-FACTS ~9s before
+> the driver's 08:42:01 landing cycle, so the driver logged "slot 0: FINISHED
+> without RESULT; left for morning" (5th occurrence of the recycle-destroys-
+> RESULT class). The commit is preserved at
+> `refs/wip/BRIDGE-BOOLEANS-c0329e0-preserved`; the registry row is still
+> READY (no landed marker) so dispatch_ready WILL re-dispatch it once the
+> write set frees. Serialization was bypassed: BRIDGE-LOFT-FACTS (same write
+> set: bd_bridge.rs + door.py) forked from 1c24aab WITHOUT the BRIDGE-BOOLEANS
+> changes, so the second to land will conflict. ESCALATED 12:43Z (land
+> c0329e0 vs re-run; the RESULT-recycle race; the driver's scoped_check
+> deriving crates=[truck-certified]/tests=[] for a truck123d packet). Registry
+> re-derived by command: 312 unique rows - 228 DONE, 77 READY, 7 BLOCKED;
+> READY rows WITHOUT a landed marker = exactly {BRIDGE-BOOLEANS (unlanded),
+> BRIDGE-LOFT-FACTS (running), TRIM-EXTRUDE-CTOR (write-set clash)};
+> BLOCKED-with-all-deps-landed = the same 7 correctly parked (BG-AUD-FIX-004
 > OWNER_BLOCKED, BG-CK-SPLINE-CENSUS owner-cancelled, SEM-PCURVE-MASTER-001-FIX
 > SUPERSEDED, DEF-SPINEFRAME-GRAZE SPEC_GAP->-R2, DEF-TESS-ANALYTIC-SEAM
-> superseded by -R2, DEF-SEEDRAY-B human-gated, TOR-C orchestrator-held) -
-> nothing flipped. dispatch_ready --dry-run: BRIDGE-LOFT-FACTS correctly deferred
-> (write-set clash with the RUNNING BRIDGE-BOOLEANS), dispatched 0; NO manual
-> dispatch (heartbeat owns it). Health: heartbeat exactly 1 (27872), watchdog 1
-> (24472), operator runner 1 (27876), overnight driver 1 (26920, child of
-> 27828), cargoq UP (ping 200, queued 0, running true = the slot-0 cargo
-> check); TWO supervisors (19172 + 27828 - carried duplication class; only ONE
-> overnight.py child = no double-merge risk). Disk 13.7 GB free (above the
-> 8 GB floor, below the 15 GB janitor goal); RAM 3.5 GB free. Carried human
-> items unchanged: FRAME-REVOLVE F1 non_z_axis pin amendment
-> (ttc_lathe_spline.rs:255); duplicate supervisors + lagging cargoq restart
-> guard; slot-4 + slot-7 wt RESULT residue parking the driver's dispatch arm;
-> TOR-C flip-or-pin (orchestrator-held).]
+> superseded by -R2, DEF-SEEDRAY-B human-gated, TOR-C orchestrator-held).
+> TRIM-EXTRUDE-CTOR anchor T2 fixed (prefix ambiguity: 'algebraic' ->
+> '\<algebraic\>', 9->5) - gen_packet --check + packet_lint clean. Slots 1-7
+> landed residue (0056f01/e33c4dd/e9d885a/3c2109b/ee97499/713f205/4de25d9/
+> b667a85 all ancestors). Nothing else to land/unblock/flip; NO manual
+> dispatch (heartbeat live). Health: heartbeat 1 (27872), operator runner 1
+> (27876), watchdog 1 (24472), overnight driver 1 (26920), cargoq UP (ping
+> 200, queued 0), TWO supervisors (19172 + 27828 - carried duplication
+> class). Disk 14.6 GB free (above the 8 GB floor, below the 15 GB janitor
+> goal); RAM 5.3 GB free. Carried human items unchanged: FRAME-REVOLVE F1
+> non_z_axis pin amendment (ttc_lathe_spline.rs:255); duplicate supervisors +
+> the lagging cargoq restart guard; slot-4 + slot-7 wt RESULT residue parking
+> the driver's dispatch arm; TOR-C flip-or-pin (orchestrator-held).]
 
 - **THE FIRST KERNEL-VS-OCC TIMING COMPARISON IS BANKED** (FH-TIMING-REFRESH,
   landed c94d043): turbopump_assembly **0.097 s kernel vs 4.866 s OCC**,
@@ -1561,6 +1566,32 @@ items unchanged: FRAME-REVOLVE F1 non_z_axis pin amendment
 (ttc_lathe_spline.rs:255); duplicate supervisors + the lagging cargoq restart
 guard; slot-4 + slot-7 wt RESULT residue parking the driver's dispatch arm;
 TOR-C flip-or-pin (orchestrator-held).]
+
+[operator 2026-09-10T12:43Z - volatile refresh. Board now: 1 RUNNING / 0
+landed-this-cycle. **BRIDGE-BOOLEANS UNLANDED + its RESULT.json DESTROYED by
+the 08:41:52 heartbeat recycle; BRIDGE-LOFT-FACTS now RUNNING slot 0 (pid
+28120, forked from base 1c24aab, healthy).** The worker commit c0329e0 is
+preserved at `refs/wip/BRIDGE-BOOLEANS-c0329e0-preserved` (branch
+packet/BRIDGE-BOOLEANS); the driver's 08:42:01 cycle logged "slot 0: FINISHED
+without RESULT; left for morning". The registry row is READY with no landed
+marker, so the packet will re-dispatch (or a human lands c0329e0) - ESCALATED
+12:43Z, including the bypassed serialization (BRIDGE-LOFT-FACTS forked without
+BRIDGE-BOOLEANS, so the second to land conflicts on bd_bridge.rs/door.py) and
+the driver's scoped_check deriving crates=[truck-certified]/tests=[] for this
+truck123d packet (its named tests would not have been gated). Landing
+re-verified: all eight other slot commits are ancestors of integration/
+kernel-bg; only c0329e0 is unlanded. Registry re-derived: 312 rows - 228 DONE,
+77 READY, 7 BLOCKED; READY-without-marker = {BRIDGE-BOOLEANS, BRIDGE-LOFT-
+FACTS, TRIM-EXTRUDE-CTOR}; BLOCKED-with-all-deps-landed = the same 7 correctly
+parked (nothing flipped). FIXED: TRIM-EXTRUDE-CTOR T2 anchor prefix ambiguity
+('algebraic' -> '\<algebraic\>', expect 9->5), gen_packet --check + lint
+green. Health: heartbeat 1 (27872), operator runner 1 (27876), watchdog 1
+(24472), overnight driver 1 (26920), cargoq UP (ping 200, queued 0), TWO
+supervisors (19172 + 27828 - carried); disk 14.6 GB free, RAM 5.3 GB free.
+Open human items (carried): FRAME-REVOLVE F1 non_z_axis pin amendment
+(ttc_lathe_spline.rs:255); duplicate supervisors + the lagging cargoq restart
+guard; slot-4 + slot-7 wt RESULT residue; TOR-C flip-or-pin; NEW BRIDGE-
+BOOLEANS landing decision.]
 
 ## The parallelism picture
 
