@@ -1633,3 +1633,59 @@ Leaving: 0 RUNNING; slots 0-6 landed residue; slot 1 IDLE ADM-003 residue; slot
 driver 1; watchdog 1; TWO supervisors; disk 22.6 GiB free; RAM 4.9 GiB free.
 Escalations carried: F1 non_z_axis pin amendment; duplicate supervisors +
 lagging cargoq guard; slot-4 + slot-7 wt RESULT residue; TOR-C flip-or-pin.
+
+## 2026-09-10 08:52 UTC (operator)
+
+Board at start: 0 running; slots 0-7 FINISHED/IDLE landed residue (slot 1 IDLE
+stale detached HEAD 4de25d9, no RESULT; slot 7 redundant FRAME-REVOLVE). No
+IDLE/DEAD >15 min holding work.
+
+Health sweep:
+- heartbeat exactly 1 (27872). The anchored `-File dispatch_heartbeat.ps1`
+  pattern returned 0 this cycle and looked like a dead heartbeat; the cause is
+  the pattern, not the process: the real command line is `-File
+  C:\Users\stefa\look\loop\dispatch_heartbeat.ps1`, so the full path sits
+  between `-File` and the script name and breaks that literal. An unfiltered
+  `Name='powershell.exe'` listing confirmed exactly one heartbeat (27872) and
+  one operator runner (27876) - NO double-heartbeat to reap. Last heartbeat
+  cycle 08:47:58Z dispatched 0, workers ~0/3.
+- watchdog 1 (24472); overnight driver 1 (26920, child of 27828); cargoq UP
+  (ping ok, queued 0, running false; single server.py 28544; fallback.log quiet
+  since 2026-09-07); zero cargo/rustc processes. Disk 22.5 GiB free; RAM 5.0
+  GiB free. TWO supervisors (19172 PyManager + 27828 pythoncore child) -
+  carried duplication class, only one overnight.py child.
+
+Actions:
+- Landing: NOTHING to land. `git merge-base --is-ancestor` exit 0 for all
+  eight checked commits against integration/kernel-bg (SWEEP-PATH 0056f01,
+  ADM-L2-PRODUCT e33c4dd, ADM-L3-NORMALCONE e9d885a, F1-AUTHORING-ARMS 3c2109b,
+  CL-006-SOLVER-ENTRY ee97499, CL-005-EXACT-CONTACT 713f205, FRAME-REVOLVE
+  b667a85, ADM-003 4de25d9). Slot wt RESULT read directly: slot0 LANDED, slot1
+  none, slot2 DONE, slot3 done, slot4 LANDED-WITH-FINDINGS, slot5 DONE, slot6
+  DONE, slot7 LANDED (no commit, base eafdc80). No FINISHED slot carries an
+  unlanded DONE RESULT.
+- Unblock: nothing stuck (0 RUNNING; no IDLE/DEAD >15 min holding work; no
+  QUESTION; zero cargo/rustc). Slot 1 stale ADM-003 residue, not stuck.
+- Registry hygiene (script with last-wins dedup + case-folded landed-note
+  match, exactly dispatch_ready's `landed()`): 308 unique rows - 228 DONE, 73
+  READY, 7 BLOCKED. READY rows WITHOUT a landed marker = NONE (all 73 carry the
+  driver's `landed <sha>` note; dispatcher correctly skips them).
+  BLOCKED-with-all-deps-landed = 7, all correctly parked - BG-AUD-FIX-004
+  (OWNER_BLOCKED), BG-CK-SPLINE-CENSUS (owner-cancelled),
+  SEM-PCURVE-MASTER-001-FIX (SUPERSEDED), DEF-SPINEFRAME-GRAZE (SPEC_GAP -> -R2
+  READY), DEF-TESS-ANALYTIC-SEAM (superseded by -R2), DEF-SEEDRAY-B
+  (human-gated), TOR-C (needs ADM-001/002, both LANDED; orchestrator-held).
+  Nothing flipped.
+- Dispatch: `dispatch_ready.py --dry-run --max-workers=4` -> "slots: 8 (0
+  running, 8 free); slot-assigned packets: 7; dispatched 0; workers now ~0/4" =
+  REAL idle. No manual dispatch (heartbeat live).
+- STATE.md volatile refresh + LATEST GROUND TRUTH pointer updated ([operator
+  2026-09-10T08:52Z]).
+- No new escalation (nothing judgment-requiring surfaced this cycle); carried
+  items unchanged.
+
+Leaving: 0 RUNNING; slots 0-6 landed residue; slot 1 IDLE ADM-003 residue; slot
+7 redundant FRAME-REVOLVE residue; cargoq UP; heartbeat 1; operator runner 1;
+driver 1; watchdog 1; TWO supervisors; disk 22.5 GiB free; RAM 5.0 GiB free.
+Escalations carried: F1 non_z_axis pin amendment; duplicate supervisors +
+lagging cargoq guard; slot-4 + slot-7 wt RESULT residue; TOR-C flip-or-pin.
