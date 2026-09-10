@@ -464,11 +464,17 @@ fn solid_volume(solid: &SolidSpec) -> Result<f64, Refusal> {
             trim_curve,
             trim_net,
             tolerance,
-        } => crate::python::binding::trim_extrude_solid(
-            profile, *amount, *both, trim_curve, trim_net, *tolerance,
-        )
-        .map(|facts| facts.volume)
-        .map_err(trim_binding_error_to_refusal),
+        } => {
+            if is_spline_profile_prism(profile, trim_curve, trim_net) {
+                return spline_profile_prism_facts(trim_curve, *amount, *both)
+                    .map(|(volume, _, _)| volume);
+            }
+            crate::python::binding::trim_extrude_solid(
+                profile, *amount, *both, trim_curve, trim_net, *tolerance,
+            )
+            .map(|facts| facts.volume)
+            .map_err(trim_binding_error_to_refusal)
+        }
         SolidSpec::Loft { sections, closed } => {
             // The landed analytic ruled arm stays the fast path for the class
             // it already certifies (V5: bit-identical). A spline-section
@@ -1026,11 +1032,17 @@ fn solid_local_bbox(solid: &SolidSpec) -> Result<[[f64; 3]; 2], Refusal> {
             trim_curve,
             trim_net,
             tolerance,
-        } => crate::python::binding::trim_extrude_solid(
-            profile, *amount, *both, trim_curve, trim_net, *tolerance,
-        )
-        .map(|facts| facts.bbox)
-        .map_err(trim_binding_error_to_refusal),
+        } => {
+            if is_spline_profile_prism(profile, trim_curve, trim_net) {
+                return spline_profile_prism_facts(trim_curve, *amount, *both)
+                    .map(|(_, bbox, _)| bbox);
+            }
+            crate::python::binding::trim_extrude_solid(
+                profile, *amount, *both, trim_curve, trim_net, *tolerance,
+            )
+            .map(|facts| facts.bbox)
+            .map_err(trim_binding_error_to_refusal)
+        }
         SolidSpec::Loft { sections, .. } => {
             if let Ok(validated) = loft_sections(sections) {
                 let mut min = [f64::INFINITY; 3];
@@ -2790,8 +2802,24 @@ fn solid_carrier_class(solid: &SolidSpec) -> CarrierClass {
         SolidSpec::Box { .. }
         | SolidSpec::Cylinder { .. }
         | SolidSpec::Sphere { .. }
-        | SolidSpec::Prism { .. }
-        | SolidSpec::TrimPrism { .. } => CarrierClass::Canonical,
+        | SolidSpec::Prism { .. } => CarrierClass::Canonical,
+        // The corpus spline-profile extrude carries a spline side surface, so
+        // it classifies as the `Swept` carrier the facade's `Extrude` over a
+        // spline profile produces; a line-base trim row keeps the canonical
+        // class. A boolean coupling two spline-carried solids is the wave-3
+        // frontier and refuses typed at the boolean boundary.
+        SolidSpec::TrimPrism {
+            profile,
+            trim_curve,
+            trim_net,
+            ..
+        } => {
+            if is_spline_profile_prism(profile, trim_curve, trim_net) {
+                CarrierClass::Swept
+            } else {
+                CarrierClass::Canonical
+            }
+        }
         SolidSpec::Torus { .. } => CarrierClass::Torus,
         SolidSpec::Lathe { profile, .. } => {
             if profile
@@ -3142,11 +3170,17 @@ fn solid_mesh(solid: &SolidSpec) -> Result<Vec<Triangle>, Refusal> {
             trim_curve,
             trim_net,
             tolerance,
-        } => crate::python::binding::trim_extrude_solid(
-            profile, *amount, *both, trim_curve, trim_net, *tolerance,
-        )
-        .map(|facts| facts.mesh)
-        .map_err(trim_binding_error_to_refusal),
+        } => {
+            if is_spline_profile_prism(profile, trim_curve, trim_net) {
+                return spline_profile_prism_facts(trim_curve, *amount, *both)
+                    .map(|(_, _, mesh)| mesh);
+            }
+            crate::python::binding::trim_extrude_solid(
+                profile, *amount, *both, trim_curve, trim_net, *tolerance,
+            )
+            .map(|facts| facts.mesh)
+            .map_err(trim_binding_error_to_refusal)
+        }
         SolidSpec::Loft { sections, closed } => loft_mesh(sections, *closed),
         SolidSpec::Member {
             profile, stations, ..
@@ -3216,6 +3250,163 @@ pub(crate) fn prism_mesh(
         push_tri(&mut out, ct, top[i], top[j]);
     }
     Ok(out)
+}
+
+// ---------------------------------------------------------------------------
+// MONO-4-TRIM-IDIOMS: the corpus spline-profile extrude idiom.
+// ---------------------------------------------------------------------------
+//
+// `surfaces.rounded_plate_pts` / `suspension._plate` author a closed plate
+// section as ONE periodic spline and extrude it symmetrically:
+//
+//     bd.extrude(plane * bd.make_face(bd.Spline(*pts, periodic=True)),
+//                amount, both=True)
+//
+// (the rear-wing louvre cutters, `rear_wing.py:390`; the suspension `_plate`
+// profiles, `suspension.py:162`). The door records that composition as a
+// `trim_prism` row with an EMPTY line base profile and no pullback net: the
+// recorded spline curve is the base profile, not a trim. The landed trim
+// constructor reads a spline carrier as a trim loop over the base's bounding
+// rectangle and refuses typed (`trim_pullback_missing`) because no pullback
+// net is recorded. The idiom is not a trim at all -- it is the local-frame
+// extrude stage over a closed spline base loop -- so this arm realizes it
+// exactly with the landed clamped-cubic reconstruction and the Green's-theorem
+// loop area the lathe/loft/member arms already integrate. No intersection
+// between spline-carried solids is involved; a later `surfaces.cut` of such a
+// prism against a spline-carried shell is the wave-3 boolean frontier and
+// stays a typed refusal at the boolean boundary.
+
+/// Whether a trim-prism row records the corpus spline-profile extrude idiom:
+/// no line base profile, no recorded pullback net, and a closed recorded
+/// spline curve (the base profile). Anything else keeps the landed trim
+/// constructor's own classification and refusal.
+fn is_spline_profile_prism(
+    profile: &[ProfileEdge],
+    trim_curve: &[[f64; 3]],
+    trim_net: &[Vec<f64>],
+) -> bool {
+    profile.is_empty() && trim_net.is_empty() && trim_curve.len() >= 3
+}
+
+/// The realized `(volume, local_bbox, local_mesh)` of one spline-profile
+/// prism row.
+type SplinePrismFacts = (f64, [[f64; 3]; 2], Vec<Triangle>);
+
+/// The exact local facts of the spline-profile extrude idiom: the prism over
+/// the reconstructed closed spline loop, swept along the loop's plane normal.
+/// An open recorded carrier refuses typed (`NonCanonicalCarrier`), never a
+/// bounded guess.
+fn spline_profile_prism_facts(
+    trim_curve: &[[f64; 3]],
+    amount: f64,
+    both: bool,
+) -> Result<SplinePrismFacts, Refusal> {
+    if !amount.is_finite() || amount <= 0.0 {
+        return Err(Refusal::Empty);
+    }
+    let mut scale = 0.0f64;
+    for p in trim_curve {
+        for c in p {
+            if !c.is_finite() {
+                return Err(Refusal::Empty);
+            }
+            scale = scale.max(c.abs());
+        }
+    }
+    let spans = spline_spans3(trim_curve)?;
+    let first = spans.first().ok_or(Refusal::Empty)?;
+    let last = spans.last().ok_or(Refusal::Empty)?;
+    let start = [first.x[0], first.y[0], first.z[0]];
+    let end = [
+        last.x[0] + last.x[1] + last.x[2] + last.x[3],
+        last.y[0] + last.y[1] + last.y[2] + last.y[3],
+        last.z[0] + last.z[1] + last.z[2] + last.z[3],
+    ];
+    if v3_norm(v3_sub(end, start)) > 1.0e-9 * (1.0 + scale) {
+        return Err(open_smooth_loft());
+    }
+    let area_vec = spline_loop_area_vector(&spans);
+    let area = v3_norm(area_vec);
+    if !area.is_finite() || area <= 0.0 {
+        return Err(Refusal::Empty);
+    }
+    let normal = [area_vec[0] / area, area_vec[1] / area, area_vec[2] / area];
+    let (t_lo, t_hi) = if both {
+        (-amount, amount)
+    } else {
+        (0.0, amount)
+    };
+    let volume = area * (t_hi - t_lo);
+
+    // The exact local AABB: the loop's span-extrema box widened along the
+    // sweep normal (the sweep parameter is independent of the cross-section).
+    let [b_lo, b_hi] = spline_loop_bbox3(&spans)?;
+    let mut min = [f64::INFINITY; 3];
+    let mut max = [f64::NEG_INFINITY; 3];
+    for (((normal_axis, lo), hi), (b_lo_axis, b_hi_axis)) in normal
+        .iter()
+        .zip(min.iter_mut())
+        .zip(max.iter_mut())
+        .zip(b_lo.iter().zip(b_hi.iter()))
+    {
+        let (d_min, d_max) = if *normal_axis >= 0.0 {
+            (t_lo * normal_axis, t_hi * normal_axis)
+        } else {
+            (t_hi * normal_axis, t_lo * normal_axis)
+        };
+        *lo = *b_lo_axis + d_min;
+        *hi = *b_hi_axis + d_max;
+    }
+    if !min[0].is_finite() || !max[0].is_finite() {
+        return Err(Refusal::Empty);
+    }
+
+    // The deterministic swept mesh: the sampled reconstructed loop at the two
+    // sweep planes plus the two cap fans (the spline-profile `prism_mesh`).
+    let profile = sample_loop3(&spans);
+    let count = profile.len();
+    if count < 3 {
+        return Err(Refusal::Empty);
+    }
+    let mut bottom = Vec::with_capacity(count);
+    let mut top = Vec::with_capacity(count);
+    for v in &profile {
+        bottom.push([
+            v[0] + t_lo * normal[0],
+            v[1] + t_lo * normal[1],
+            v[2] + t_lo * normal[2],
+        ]);
+        top.push([
+            v[0] + t_hi * normal[0],
+            v[1] + t_hi * normal[1],
+            v[2] + t_hi * normal[2],
+        ]);
+    }
+    let cb = centroid3(&bottom);
+    let ct = centroid3(&top);
+    let mut mesh = Vec::new();
+    for i in 0..count {
+        let j = (i + 1) % count;
+        let (Some(b0), Some(b1)) = (bottom.get(i), bottom.get(j)) else {
+            return Err(Refusal::Empty);
+        };
+        let (Some(t0), Some(t1)) = (top.get(i), top.get(j)) else {
+            return Err(Refusal::Empty);
+        };
+        push_quad(&mut mesh, *b0, *b1, *t1, *t0);
+    }
+    for i in 0..count {
+        let j = (i + 1) % count;
+        let (Some(b0), Some(b1)) = (bottom.get(i), bottom.get(j)) else {
+            return Err(Refusal::Empty);
+        };
+        let (Some(t0), Some(t1)) = (top.get(i), top.get(j)) else {
+            return Err(Refusal::Empty);
+        };
+        push_tri(&mut mesh, cb, *b1, *b0);
+        push_tri(&mut mesh, ct, *t0, *t1);
+    }
+    Ok((volume, [min, max], mesh))
 }
 
 /// The local mesh of a loft chain: ruled quads between matching vertices of
@@ -5795,6 +5986,203 @@ print(json.dumps([z_row, loft_row]))
         };
         let refusal = tree_facts(&part(smooth, 0.0, 0.0, 0.0))
             .expect_err("a smooth multi-station member must refuse typed");
+        assert!(matches!(
+            refusal,
+            Refusal::UnsupportedEnvelope(EnvelopeCase::NonCanonicalCarrier)
+        ));
+    }
+
+    // -----------------------------------------------------------------------
+    // MONO-4-TRIM-IDIOMS: the trim constructor's corpus spline-profile idiom.
+    //
+    // The corpus authors a closed plate section as ONE periodic spline and
+    // extrudes it symmetrically (`bd.extrude(plane * make_face(
+    // bd.Spline(*pts, periodic=True)), amount, both=True)`): the rear-wing
+    // louvre cutters (`rear_wing.py:390`) and the suspension `_plate` profiles
+    // (`suspension.py:162`). The door records a `trim_prism` row with an empty
+    // line profile and no pullback net; the recorded spline IS the base
+    // profile, so the arm realizes the local-frame extrude over the closed
+    // spline loop. Everything outside the idiom keeps its typed refusal.
+    // -----------------------------------------------------------------------
+
+    /// The corpus `rounded_plate_pts` outline (`surfaces.py:656`): a rounded
+    /// rectangle centred on the origin, `samples + 1` points per corner, in
+    /// the `z = 0` chart. First point != last (the door appends the closure).
+    fn rounded_plate_loop(length: f64, height: f64, corner: f64, samples: usize) -> Vec<[f64; 3]> {
+        let (hl, hh, r) = (length / 2.0, height / 2.0, corner);
+        let corners = [
+            (hl - r, hh - r, 0.0f64),
+            (-hl + r, hh - r, std::f64::consts::FRAC_PI_2),
+            (-hl + r, -hh + r, std::f64::consts::PI),
+            (hl - r, -hh + r, 3.0 * std::f64::consts::FRAC_PI_2),
+        ];
+        let mut pts = Vec::new();
+        for (cu, cv, a0) in corners {
+            for i in 0..=samples {
+                let a = a0 + std::f64::consts::FRAC_PI_2 * i as f64 / samples as f64;
+                pts.push([cu + r * a.cos(), cv + r * a.sin(), 0.0]);
+            }
+        }
+        pts
+    }
+
+    /// The door's closing rule: the recorded spline loop repeats its first
+    /// point when the carrier does not already return to it.
+    fn closed_curve(loop_pts: &[[f64; 3]]) -> Vec<[f64; 3]> {
+        let mut curve = loop_pts.to_vec();
+        if curve.first() != curve.last()
+            && let Some(first) = curve.first().copied()
+        {
+            curve.push(first);
+        }
+        curve
+    }
+
+    /// The door's `trim_prism` row for `extrude(spline_face, amount, both)`:
+    /// an empty line profile, the closed recorded spline curve, no pullback
+    /// net.
+    fn spline_prism_row(loop_pts: &[[f64; 3]], amount: f64, both: bool) -> SolidSpec {
+        SolidSpec::TrimPrism {
+            profile: Vec::new(),
+            amount,
+            both,
+            trim_curve: closed_curve(loop_pts),
+            trim_net: Vec::new(),
+            tolerance: 1.0e-3,
+        }
+    }
+
+    #[test]
+    fn louver_idiom_composes_certified() {
+        // The louvre cutter: an 86 x 6.8 rounded plate (corner 3.2) as one
+        // periodic spline, extruded +-40 symmetrically about its plane
+        // (`rear_wing.py:390`). The row certifies as the exact prism over the
+        // reconstructed closed spline loop.
+        let loop_pts = rounded_plate_loop(86.0, 6.8, 3.2, 5);
+        let row = spline_prism_row(&loop_pts, 40.0, true);
+        let facts = tree_facts(&part(row.clone(), 0.0, 0.0, 0.0))
+            .expect("the louvre spline-profile extrude is in the constructor envelope");
+        assert!(facts.volume > 0.0);
+
+        // The volume is the reconstructed loop's exact area times the swept
+        // height (2 * 40): the certified value and the landed span-area
+        // reconstruction must agree.
+        let spans = spline_spans3(&closed_curve(&loop_pts)).expect("the loop reconstructs");
+        let area = v3_norm(spline_loop_area_vector(&spans));
+        let expected = area * 80.0;
+        assert!(
+            (facts.volume - expected).abs() <= 1.0e-9 * (1.0 + expected),
+            "certified volume {} must equal area * height {}",
+            facts.volume,
+            expected
+        );
+
+        // The extrusion is along the loop plane normal (z here): the world
+        // bbox is the loop box widened by +-40.
+        assert_eq!(facts.bbox[0][2], -40.0);
+        assert_eq!(facts.bbox[1][2], 40.0);
+        assert!(facts.bbox[0][0] <= -43.0 + 1.0e-9);
+        assert!(facts.bbox[1][0] >= 43.0 - 1.0e-9);
+        assert!(facts.bbox[0][1] <= -3.4 + 1.0e-9);
+        assert!(facts.bbox[1][1] >= 3.4 - 1.0e-9);
+
+        // The realized mesh is closed and its signed volume tracks the exact
+        // prism value to the sampling floor.
+        let mesh = solid_mesh(&row).expect("the spline-profile prism meshes");
+        assert!(!mesh.is_empty());
+        let signed = signed_mesh_volume(&mesh).abs();
+        assert!(
+            (signed - facts.volume).abs() / facts.volume < 1.0e-3,
+            "mesh signed volume {signed} must track the certified {}",
+            facts.volume
+        );
+    }
+
+    #[test]
+    fn suspension_plate_idiom_composes_certified() {
+        // The suspension `_plate` (`suspension.py:160`): a closed plate
+        // outline as one periodic spline, extruded symmetrically. A second
+        // representative outline exercises the same constructor path.
+        let loop_pts = rounded_plate_loop(30.0, 58.0, 13.0, 6);
+        let row = spline_prism_row(&loop_pts, 12.5, true);
+        let facts = tree_facts(&part(row.clone(), 0.0, 0.0, 0.0))
+            .expect("the suspension plate spline-profile extrude is in envelope");
+        assert!(facts.volume > 0.0);
+        let spans = spline_spans3(&closed_curve(&loop_pts)).expect("the loop reconstructs");
+        let area = v3_norm(spline_loop_area_vector(&spans));
+        let expected = area * 25.0;
+        assert!((facts.volume - expected).abs() <= 1.0e-9 * (1.0 + expected));
+        assert_eq!(facts.bbox[0][2], -12.5);
+        assert_eq!(facts.bbox[1][2], 12.5);
+        // The idiom classifies as the swept carrier the facade's spline
+        // extrude produces, so a spline x spline boolean stays the wave-3
+        // typed refusal.
+        assert_eq!(
+            solid_carrier_class(&row),
+            crate::facade::CarrierClass::Swept
+        );
+    }
+
+    #[test]
+    fn constructor_envelope_still_refuses_unknown_idioms_typed() {
+        // An open recorded spline carrier is not a closed base profile: the
+        // arm refuses typed, never a bounded guess.
+        let open_row = SolidSpec::TrimPrism {
+            profile: Vec::new(),
+            amount: 1.0,
+            both: false,
+            trim_curve: vec![
+                [0.0, 0.0, 0.0],
+                [1.0, 0.0, 0.0],
+                [1.0, 1.0, 0.0],
+                [0.0, 1.0, 0.0],
+            ],
+            trim_net: Vec::new(),
+            tolerance: 1.0e-3,
+        };
+        let refusal = tree_facts(&part(open_row, 0.0, 0.0, 0.0))
+            .expect_err("an open spline profile must refuse typed");
+        assert!(matches!(
+            refusal,
+            Refusal::UnsupportedEnvelope(EnvelopeCase::NonCanonicalCarrier)
+        ));
+
+        // A line base profile with a recorded spline trim and no pullback net
+        // is the landed constructor's real-trim carrier: it still refuses the
+        // named pullback gap rather than being read as a spline base profile.
+        let line_trim = SolidSpec::TrimPrism {
+            profile: vec![
+                ProfileEdge::Line {
+                    a: [0.0, 0.0, 0.0],
+                    b: [1.0, 0.0, 0.0],
+                },
+                ProfileEdge::Line {
+                    a: [1.0, 0.0, 0.0],
+                    b: [1.0, 1.0, 0.0],
+                },
+                ProfileEdge::Line {
+                    a: [1.0, 1.0, 0.0],
+                    b: [0.0, 1.0, 0.0],
+                },
+                ProfileEdge::Line {
+                    a: [0.0, 1.0, 0.0],
+                    b: [0.0, 0.0, 0.0],
+                },
+            ],
+            amount: 1.0,
+            both: false,
+            trim_curve: vec![
+                [0.25, 0.25, 0.0],
+                [0.75, 0.25, 0.0],
+                [0.75, 0.75, 0.0],
+                [0.25, 0.75, 0.0],
+                [0.25, 0.25, 0.0],
+            ],
+            trim_net: Vec::new(),
+            tolerance: 1.0e-3,
+        };
+        let refusal = tree_facts(&part(line_trim, 0.0, 0.0, 0.0))
+            .expect_err("a line-base trim with no pullback net must refuse typed");
         assert!(matches!(
             refusal,
             Refusal::UnsupportedEnvelope(EnvelopeCase::NonCanonicalCarrier)
