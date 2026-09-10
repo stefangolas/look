@@ -337,6 +337,13 @@ print(json.dumps({"case": "spline_admitted", "refused": False, "edges": len(soli
         let refused = record["refused"].as_bool().unwrap_or(false);
         if case == "spline_admitted" {
             assert!(!refused, "a plain spline-profile revolve must be admitted");
+        } else if case == "non_z_axis" {
+            // Orchestrator pin amendment 2026-09-10 (BRIDGE-BOOLEANS landing
+            // adjudication): the non-z revolve carrier is LANDED
+            // (FRAME-REVOLVE, merge 39e9550) — the case now ANSWERS, which is
+            // the verdict improvement the landing exists for. The partial-arc
+            // case stays typed (outside the lathe arm's arc discipline).
+            assert!(!refused, "the non-z revolve carrier is landed and answers");
         } else {
             assert!(refused, "case {case} must refuse typed");
         }
@@ -480,8 +487,14 @@ fn mvac_row_still_refuses_typed_at_the_spline_path_sweep_carrier() {
     assert_eq!(record["ok"], false);
     assert_eq!(record["error"]["kind"], "Refused");
     let message = record["error"]["message"].as_str().unwrap_or("");
+    // Orchestrator pin amendment 2026-09-10 (BRIDGE-BOOLEANS landing
+    // adjudication): the spline-path tangent query is ANSWERED (SWEEP-PATH),
+    // so mvac's recorded boundary moved one carrier deeper — the swept tube's
+    // CIRCLE profile is not answered exactly by the sweep arm. The pin moves
+    // with it, deeper, never away from typed. (Third move of this pin:
+    // extrude -> spline-path sweep -> circle-profile sweep section.)
     assert!(
-        message.contains("a spline path tangent query is not a kernel-engine row"),
-        "mvac must refuse typed at the spline-path sweep carrier: {message}"
+        message.contains("a circle profile is not answered exactly by a kernel-engine row"),
+        "mvac must refuse typed at the circle-profile sweep-section carrier: {message}"
     );
 }
