@@ -4798,3 +4798,29 @@ Repairs landed this session (do not re-do): new_slot cleans untracked dispatch a
 Recurring pattern to watch: **row-filing lag** — try_land merges + appends the LANDED note, but the status field lags READY; the LANDED marker in the note is ground truth (dispatch_ready already honors it). Flip stale READY rows to DONE when adjudicating, or the dispatcher re-runs landed work (CTE-001's branch label was force-reset by exactly this).
 
 Watch items for the next session: CTE-007's RESULT (the arrangement + self-pair rewrite + H-atom strata — the biggest remaining surface); BREP-001A's acceptance gates (apex_only 0→~46 triangles, ctc_02 both-encodings metamorphic, blob count ≤ 10); the -p look --test geometry_fingerprint failure seen in stale slot output (verify at HEAD before the battery); BREP-002 dispatches automatically when CTE-007 lands.
+
+[orchestrator 2026-09-10T16:35Z - FINAL pre-departure correction; supersedes
+the 16:05Z block's MONO-2 lines. Events since: (1) MONO-1-DATA-ROWS LANDED
+(driver, 6492ad3; worker f07e93d) — slot 0 free. (2) MONO-2's first worker
+fired stop-condition-1 and FALSIFIED annex A: OCCT smooth ThruSections is
+GeomFill_AppSurf — a tolerance-driven approximation (chord-length params, C2,
+degree 2..8 fit-selected), NOT an interpolation with a degree law in N. The
+stop was correct and the tree untouched; the falsification is committed
+(bc5439b annex correction). (3) OWNER DIRECTIVE APPLIED: kernel pins a
+CANONICAL smooth loft (exact C2 interpolation, chord-length stations, degree
+N-1 for N<=9 / C2 cubic knots-at-stations for N>=10), certifies ITS surface,
+and the recorded references adjudicate EMPIRICALLY at census — in-band rows
+flip green, out-of-band rows record typed refusals with measured deltas.
+MONO-2 packet amended accordingly (171ef6e), lint clean, REDISPATCHED slot 1
+(pid 17728, fresh worker). (4) Wave-3 frontier return reviewed: contact-cover
+formulation ACCEPTED with four amendments (9be72b7) — amendments are
+ORCHESTRATOR work before MONO-5-SWEPT-BOOLEANS books. The ladder: MONO-2
+running; on land, MONO-3 then MONO-4 serially; MONO-5-BRIDGE-SPLIT stays on
+deck/unregistered; no same-file parallelism (owner steering). If the ladder
+stalls on a half-forked slot: manual `run_packet` spawn with the cargoq shim
+(recovery proven twice this session). Health: 1 worker + free slot 0,
+heartbeat/watchdog/driver/operator alive, cargoq ok, disk 17.9 GB, RAM 6.9
+GB. RETURN CHECKLIST: adjudicate MONO-2 landing (canonical-loft facts);
+verify wave-2 row flips at a census re-run; incorporate the four wave-3
+amendments then book MONO-5-SWEPT-BOOLEANS; the hazard battery runs when the
+queue is empty.]
