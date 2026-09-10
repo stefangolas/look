@@ -239,3 +239,21 @@ Judgment-required items appended each operator cycle. Newest at the bottom.
   each 5-min cycle. Clear both wt-root RESULT files (or let a recycle do it).
 - Carried (unchanged): duplicate supervisors 27392 + 15100; wedged cargoq
   supervisor restart guard; TOR-C flip-or-pin (orchestrator LIVE - its call).
+
+## 2026-09-10 01:59Z - substrate restarted ~01:55Z; new PIDs; duplicate supervisors persist
+
+- What: the substrate restarted ~01:55Z (21:55 local). All substrate PIDs
+  changed: heartbeat 27872, operator runner 27876, watchdog 24472, overnight
+  driver 26920, cargoq 28544; the old orchestrator opencode 17740 is gone and 3
+  opencode processes are now observed (14776/27196/28356) - a human should
+  confirm which is the orchestrator session. The supervisor's restart guard DID
+  recover cargoq + the driver on its own ~2 min after the restart (cargoq now
+  answers HTTP 200), so the carried "wedged guard" concern is downgraded to a
+  ~2-min lag, but the supervisor duplication persists (now 19172 PyManager +
+  27828 pythoncore) and each duplicate can independently start a driver/cargoq -
+  the double-merge hazard class. Adjudicate/de-duplicate the twin supervisors.
+- Start here: `Get-CimInstance Win32_Process | ? { $_.CommandLine -match
+  'supervisor.py' }`; `Get-Content loop\supervisor.log -Tail 15`.
+- Carried (unchanged): FRAME-REVOLVE F1 non_z_axis pin amendment
+  (ttc_lathe_spline.rs:255); slot-4 + slot-7 wt RESULT residue parking the
+  driver's dispatch arm; TOR-C flip-or-pin (orchestrator LIVE).

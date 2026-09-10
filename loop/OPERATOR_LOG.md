@@ -748,3 +748,55 @@ row DONE; SWEEP-PATH preflight-green awaiting the heartbeat's dispatch; slots
 amendment; duplicate supervisors + wedged cargoq restart guard; slot-4 (and now
 slot-7) wt RESULT residue parking the driver's dispatch arm; TOR-C
 flip-or-pin.
+
+## 2026-09-10 01:59 UTC (operator cycle)
+
+Board at start: 1 RUNNING / 0 landed-this-cycle. slot 0 RUNNING SWEEP-PATH
+(cmd pid 1100, events 0.9 min fresh, 4 changed). Slots 1-6 FINISHED/IDLE
+landed residue; slot 7 STALLED = redundant FRAME-REVOLVE residue (RESULT
+status LANDED, no commit, stale pid 26328). Health at first poll: cargoq ping
+HTTP 000 (down), heartbeat appeared to be 2 (27948+27872), RAM 1.5 GB free -
+all three were transient.
+
+Findings:
+- **The substrate restarted ~01:55Z (21:55 local).** Heartbeat (27872),
+  operator runner (27876), watchdog (24472), overnight driver (26920) and
+  cargoq (28544) are all new PIDs; the old orchestrator session opencode 17740
+  is gone and 3 opencode processes are now observed (14776/27196/28356).
+- **cargoq + the overnight driver came back on their own.** The supervisor's
+  restart guard fired on its ~60s cycle (supervisor.log 21:57:27 driver,
+  21:57:34 cargoq); cargoq now answers HTTP 200. So the carried "wedged cargoq
+  guard" is not fully wedged - it just lags a restart by ~2 min. My first-poll
+  "cargoq down / 2 heartbeats" readings were taken before that cycle; the
+  heartbeat count re-read to exactly 1 (27948 was a transient/exiting process).
+- **The "2 overnight drivers" count was the process-filter self-match trap**:
+  the probing PowerShell command line contained the regex `overnight\.py`, so
+  it counted itself. A direct listing showed exactly one driver (26920).
+- **RAM 1.5 GB at first poll was a transient build peak** (slot 0's door.py
+  child); re-measured 5.0 GB free minutes later. Disk 21.7 GB free.
+
+Actions:
+- Health sweep done (see board above).
+- Landing: NOTHING to land. All worker commits are ancestors of HEAD c7911f7
+  (4de25d9/e33c4dd/e9d885a/3c2109b/ee97499/713f205 all True; b667a85 True).
+  Slot 7's redundant RESULT has no commit (status LANDED, not DONE).
+- Unblock: nothing stuck (slot 0 RUNNING with fresh events; no IDLE/DEAD >15
+  min holding work; no QUESTION). Slot 7 is DONE-row residue, not a live
+  worker - no resume/reset.
+- Registry hygiene: BLOCKED-with-all-deps-landed = only BG-CK-SPLINE-CENSUS
+  (note = CANCELLED BY OWNER) - not flipped. TOR-C (needs ADM-001/002, both
+  LANDED by note marker) stays orchestrator-held per the standing escalation.
+  READY rows without a landed marker = only SWEEP-PATH (running), so
+  dispatch_ready --dry-run "dispatched 0; workers ~1/4" is REAL idle, not the
+  silent-filter bug. No anchor re-measure needed (SWEEP-PATH already running).
+- Dispatch: dry-run only (heartbeat live - double-dispatch rule).
+- ESCALATED (2026-09-10T01:59Z): substrate restart + new PIDs; the duplicate
+  supervisors persist (now 19172 + 27828) and the guard lag; carried items.
+- STATE.md volatile refresh + ground-truth pointer updated ([operator
+  2026-09-10T01:59Z]).
+
+Leaving: 1 RUNNING (SWEEP-PATH slot 0, fresh); slots 1-6 landed residue; slot 7
+redundant FRAME-REVOLVE residue; cargoq UP; heartbeat 1; driver 1; watchdog 1;
+TWO supervisors; disk 21.7 GB free; RAM 5.0 GB free. Escalations carried: F1
+non_z_axis pin amendment; duplicate supervisors + lagging cargoq guard; slot-4
++ slot-7 wt RESULT residue; TOR-C flip-or-pin.

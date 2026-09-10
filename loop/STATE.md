@@ -15,23 +15,22 @@ program, and the operator agent.
 ## Where we are
 
 > LATEST GROUND TRUTH: read the newest `[operator ...]` block in "State of
-> the machine, as left" (2026-09-10T01:28Z). [operator 2026-09-10T01:28Z
-> ground-truth note: FRAME-REVOLVE is now LANDED - orchestrator merge
-> 39e9550 (worker b667a85), row flipped DONE ca4a498. A redundant heartbeat
-> re-fork ran FRAME-REVOLVE again in slot 7 (the row was READY with no
-> landed marker); it finished with RESULT status LANDED and NO commit (the
-> carrier was already present) - residue, not landable. The operator added
-> the missing registry marker and re-measured SWEEP-PATH's A2 anchor 6->7
-> (the FRAME-REVOLVE landing added a 'tangent' mention in corpus/ttc/door.py;
-> commit 32d967f). SWEEP-PATH now preflights green and dispatch_ready
-> --dry-run shows it -> slot 0 (dispatched 1); the live heartbeat will
-> dispatch. Registry: nothing flipable (BLOCKED-with-deps-landed =
-> BG-CK-SPLINE-CENSUS owner-CANCELLED, DEF-TESS-ANALYTIC-SEAM superseded by
-> -R2, DEF-SEEDRAY-B human-gated, TOR-C orchestrator-held). Substrate
-> nominal (heartbeat 27440, watchdog 28440, cargoq UP, driver 28824,
-> operator runner 29776; two supervisors 27392+15100 and two cargoq/server.py
-> 27568+25356 carried; orchestrator session LIVE opencode 17740). Disk
-> ~18.7 GB free; RAM 3.8 GB free.]
+> the machine, as left" (2026-09-10T01:59Z). [operator 2026-09-10T01:59Z
+> ground-truth note: SUBSTRATE RESTARTED ~01:55Z (21:55 local) - heartbeat,
+> operator runner, watchdog, overnight driver and cargoq all respawned; the
+> supervisor's own guard recovered cargoq (pid 28544, HTTP 200) and the
+> driver (pid 26920) at 01:57Z with a ~2-min lag. Board: 1 RUNNING
+> (SWEEP-PATH, slot 0, events fresh) / 0 landed-this-cycle. Slots 1-6
+> landed residue; slot 7 is the redundant FRAME-REVOLVE residue (RESULT
+> status LANDED, no commit). Nothing to land (all worker commits are
+> ancestors of HEAD c7911f7), nothing to unblock, nothing to flip (only
+> BLOCKED-with-deps-landed = BG-CK-SPLINE-CENSUS owner-CANCELLED; TOR-C
+> orchestrator-held). dispatch_ready --dry-run: dispatched 0 (real idle -
+> SWEEP-PATH running). Health: heartbeat 1 (27872), operator runner 1
+> (27876), watchdog 1 (24472), driver 1 (26920), cargoq UP; TWO supervisors
+> (19172 + 27828) carried. Disk 21.7 GB free; RAM 5.0 GB free. Old
+> orchestrator pid 17740 gone; 3 opencode processes observed
+> (14776/27196/28356).]
 
 - **THE FIRST KERNEL-VS-OCC TIMING COMPARISON IS BANKED** (FH-TIMING-REFRESH,
   landed c94d043): turbopump_assembly **0.097 s kernel vs 4.866 s OCC**,
@@ -573,6 +572,40 @@ amendment is the likely follow-up; slot-4 F1 wt RESULT residue still parks the
 driver's dispatch arm, and slot 7 now carries the same-shaped redundant RESULT
 (status LANDED, no commit); duplicate supervisors + the wedged cargoq restart
 guard; TOR-C flip-or-pin.]
+
+[operator 2026-09-10T01:59Z - volatile refresh. Board now: 1 RUNNING / 0
+landed-this-cycle. **THE SUBSTRATE RESTARTED ~01:55Z (21:55 local)** - the
+heartbeat (27872), operator runner (27876), watchdog (24472), overnight
+driver (26920) and cargoq (28544) are all new PIDs; the old orchestrator
+session opencode 17740 is gone and 3 opencode processes are now observed
+(14776/27196/28356). The supervisor's own restart guard fired on its cycle
+(21:57:27 driver, 21:57:34 cargoq) and cargoq answers HTTP 200 - so the
+"wedged cargoq guard" is not fully wedged, it just lags the restart by
+~2 min. **SWEEP-PATH is RUNNING in slot 0** (cmd pid 1100, worker events
+<1 min fresh, 4 files changed; door.py child live) - the heartbeat
+dispatched it this cycle; do not touch. Slots 1-6 FINISHED/IDLE residue all
+landed (ADM-003 4de25d9, ADM-L2 e33c4dd, ADM-L3 e9d885a, F1 3c2109b, CL-006
+ee97499, CL-005 713f205; all re-verified ancestors of HEAD c7911f7). Slot 7
+STALLED = the redundant FRAME-REVOLVE residue (RESULT status LANDED, NO
+commit, stale pid 26328 gone; row DONE so dispatch_ready skips it) - not
+operator-landable, carried residue. Nothing to land this cycle. Registry
+verified programmatically: BLOCKED-with-all-deps-landed = only
+BG-CK-SPLINE-CENSUS (note says CANCELLED BY OWNER - not flipped); TOR-C
+(needs ADM-001/002, both LANDED by note marker) stays orchestrator-held per
+the standing escalation. READY rows without a landed marker = only
+SWEEP-PATH (running) - dispatch_ready --dry-run "dispatched 0; workers
+~1/4" is REAL idle, not the silent-filter bug. Nothing to unblock (no
+IDLE/DEAD>15min holding work, no QUESTION). Health: heartbeat exactly 1
+(27872), operator runner 1 (27876), watchdog 1 (24472), overnight driver 1
+(26920), cargoq UP (ping 200, queued 0), TWO supervisors (19172 PyManager +
+27828 pythoncore - carried duplication class; only ONE overnight.py driver,
+no double-merge risk this cycle). Disk 21.7 GB free (above the 8 GB floor
+AND the 15 GB janitor goal); RAM 5.0 GB free (was transiently 1.5 GB during
+slot 0's build peak - recovered). Open human items (carried): FRAME-REVOLVE
+F1 non_z_axis pin amendment (ttc_lathe_spline.rs:255); duplicate
+supervisors + the lagging cargoq restart guard; slot-4 + slot-7 wt RESULT
+residue parking the driver's dispatch arm; TOR-C flip-or-pin (orchestrator
+LIVE).]
 
 ## The parallelism picture
 
