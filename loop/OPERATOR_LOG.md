@@ -981,6 +981,55 @@ residue; cargoq UP; heartbeat 1; driver 1; watchdog 1; TWO supervisors; disk
 duplicate supervisors + lagging cargoq guard; slot-4 + slot-7 wt RESULT residue;
 TOR-C flip-or-pin.
 
+## 2026-09-10 04:16Z - quiet pass (0 RUNNING; nothing to land/flip/unblock; slot-2 stale pid gone; dispatch real idle)
+
+Board: 0 RUNNING / 0 landed-this-cycle. HEAD 9c3c061 (the 03:52Z operator
+commit) - no work moved this cycle.
+
+Health (all measured this cycle):
+- heartbeat exactly 1 (27872; anchored `-File dispatch_heartbeat.ps1` scan - the
+  cmd.exe match is this operator's own spawn, not a heartbeat). Last heartbeat
+  cycle 04:06:07Z, dispatched 0. operator runner 1 (27876); watchdog 1 (24472,
+  last poll 04:14Z); overnight driver 1 (26920, one conhost child, cycling every
+  5 min, parked on the slot-4 F1 judgment).
+- cargoq UP (`{"ok":true,"queued":0,"running":false}`; single server.py 28544;
+  fallback.log quiet since 2026-09-07).
+- TWO supervisors (19172 PyManager + 27828 pythoncore) - carried duplication
+  class; only ONE overnight.py driver = no double-merge risk this cycle.
+- disk 23.0 GB free (above the 8 GB floor AND the 15 GB janitor goal); RAM 5.7 GB
+  free. No cargo/rustc process alive.
+
+Actions:
+- Landing: NOTHING to land. Re-ran `merge-base --is-ancestor` for every slot
+  worker commit (0056f01/e33c4dd/e9d885a/3c2109b/ee97499/713f205/4de25d9) plus
+  b667a85 against integration/kernel-bg - all exit 0. Slot RESULT statuses:
+  slot0 LANDED, slot2 DONE, slot3 done, slot4 LANDED-WITH-FINDINGS, slot5 DONE,
+  slot6 DONE, slot7 LANDED (no commit, base eafdc80); slot1 IDLE (no RESULT).
+  No FINISHED slot carries an unlanded DONE RESULT.
+- Unblock: nothing stuck. slot 2's "DEAD?" reading was stale bookkeeping - pid
+  19224 is GONE (process scan empty), its RESULT is DONE and e33c4dd is an
+  ancestor, so no reset/redispatch. No RUNNING worker; no QUESTION.
+- Registry hygiene (re-derived programmatically with the case-folded landed-note
+  match dispatch_ready uses): READY rows WITHOUT a 'landed <sha>' note marker =
+  NONE (73 READY rows, all marked). BLOCKED-with-all-deps-landed = BG-AUD-FIX-004
+  (OWNER_BLOCKED), BG-CK-SPLINE-CENSUS (owner-cancelled), SEM-PCURVE-MASTER-001-FIX
+  (SUPERSEDED), DEF-SPINEFRAME-GRAZE (SPEC_GAP -> -R2), DEF-TESS-ANALYTIC-SEAM
+  (superseded by DEF-TESS-ANALYTIC-SEAM-R2, READY), DEF-SEEDRAY-B (human-gated on
+  the SEEDRAY-B frontier review), TOR-C (needs ADM-001/002, both LANDED;
+  orchestrator-held). Nothing flipped - all correctly parked.
+- Dispatch: `dispatch_ready.py --max-workers=4` -> "dispatched 0; workers now
+  ~0/4" = REAL idle. No manual dispatch (heartbeat live).
+- STATE.md volatile refresh + LATEST GROUND TRUTH pointer updated ([operator
+  2026-09-10T04:16Z]).
+- No new escalation (nothing judgment-requiring surfaced this cycle); carried
+  items unchanged.
+
+Leaving: 0 RUNNING; slots 0-6 landed residue; slot 7 redundant FRAME-REVOLVE
+residue; cargoq UP; heartbeat 1; driver 1; watchdog 1; TWO supervisors; disk
+23.0 GB free; RAM 5.7 GB free. Escalations carried: F1 non_z_axis pin amendment;
+duplicate supervisors + lagging cargoq guard; slot-4 + slot-7 wt RESULT residue;
+TOR-C flip-or-pin.
+
 ## 2026-09-10 03:52 UTC (operator cycle)
 
 Board: 0 RUNNING / 0 landed-this-cycle. HEAD 34825e2 (the 03:29Z operator
