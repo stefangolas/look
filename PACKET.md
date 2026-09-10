@@ -1,63 +1,67 @@
-# WORK PACKET FRAME-REVOLVE — the non-z revolve carrier: record the revolve axis as a frame
+# WORK PACKET SWEEP-PATH — the spline-path sweep carrier: exact path queries + the recording arm
 
-The post-census boundary records the four wheel-corner rows (corner_fl/fr/
-rl/rr) refusing typed at "the wheel-frame non-z revolve". The lathe arm is
-z-axis-only by profile-plane convention; the landed general-frame placement
-(world = translate(o) ∘ R ∘ M, volume invariant under R, exact) makes a
-revolve about an arbitrary axis a pure composition. No new theory.
+The post-census boundary records mvac refusing typed at "a spline path
+tangent query is not a kernel-engine row", and the door shim's `sweep`
+refuses everything (`"sweep is not a kernel-engine row"`). The kernel-side
+sweep-as-loft-chain row is landed (F1-AUTHORING-ARMS); the bridge already
+reconstructs the interpolating spline EXACTLY for volumes (the Lagrange/
+Hermite machinery behind `spline_edge_volume`). This packet answers the path
+queries with that same exact math and lands the sweep recording arm. No new
+theory; one frame-law pin (scope 2).
 
 ```yaml
-id:          FRAME-REVOLVE
-contract:    [FRAME-REVOLVE]
+id:          SWEEP-PATH
+contract:    [SWEEP-PATH]
 class:       design
 crates:      [truck123d]
-depends_on:  [AUTHOR-FRAME-CARRIERS]
+depends_on:  [FRAME-REVOLVE]
 write_allow:
   - truck123d/src/bd_bridge.rs
   - truck123d/src/facade.rs
   - corpus/ttc/door.py
 read_allow:
   - loop/results/AUTHOR-FRAME-CARRIERS.json
+  - loop/results/FRAME-REVOLVE.json
   - docs/TTC_CENSUS_FINAL.md
 tests_required:
-  - revolve_about_nonz_axis_answers_world_facts
-  - z_revolve_rows_answer_bit_identically
-  - revolve_refuses_unsupported_axes_typed
+  - spline_path_position_and_tangent_answer_exactly
+  - sweep_line_path_records_loft_chain
+  - sweep_spline_path_records_stations
+  - z_revolve_and_loft_rows_answer_bit_identically
 anchors:
-  - {id: A1, expect: 9,  cmd: "grep -c '\\<Lathe\\>' truck123d/src/bd_bridge.rs"}
-  - {id: A2, expect: 16, cmd: "grep -c '\\<revolve\\>' corpus/ttc/door.py"}
-  - {id: A3, expect: 29, cmd: "grep -c '\\<rotation\\>' truck123d/src/bd_bridge.rs"}
-budget:      {turns: 55, ctx_tokens: 150000}
+  - {id: A1, expect: 6, cmd: "grep -c 'sweep' corpus/ttc/door.py"}
+  - {id: A2, expect: 7, cmd: "grep -c 'tangent' corpus/ttc/door.py"}
+  - {id: A3, expect: 2, cmd: "grep -c 'position_at' corpus/ttc/door.py"}
+budget:      {turns: 60, ctx_tokens: 160000}
 ```
 
 ## Scope decisions (pre-decided)
 
-1. **Composition, not a new kernel.** The revolve is built in its LOCAL frame
-   exactly as today's z-axis lathe (profile in the (x, z) revolve-plane
-   convention), then placed by the landed general frame taking local z to the
-   recorded axis direction. Facts: volume is invariant under the placement
-   rotation (exact, never recomputed); world bbox = AABB of the rotated local
-   corners; mesh triangles transform per-vertex. All of this machinery landed
-   in AUTHOR-FRAME-CARRIERS — reuse it, do not parallel-implement it.
-2. **Axis recording.** The shim's `revolve(shape, axis=..., revolution_arc=...)`
-   records the axis as a direction vector (build123d `Axis` or a Vector); the
-   bridge stores the revolve as (profile, arc, frame). An axis-aligned revolve
-   (x or y) is the same composition with the corresponding rotation. The
-   legacy z-revolve path keeps its exact recorded row shape bit-for-bit (V5:
-   every landed green row answers identically — the z rows are the regression
-   net).
-3. **Typed refusal for genuinely unsupported axes.** A zero/degenerate axis
-   vector refuses typed (`DegenerateRevolveAxis`); an axis not expressible as
-   the landed frame composition refuses typed naming the gap. Never
-   approximate, never normalize silently past a zero vector.
-4. **Determinism carried verbatim**: fixed-order orthonormalization (the
-   AUTHOR-FRAME-CARRIERS Gram-Schmidt order), fixed-order float reductions,
-   no hash-iteration-dependent output.
-5. **No OCC runs.** The recorded references are unchanged; verification is
-   kernel-door smoke on the four wheel-corner rows + the named tests. A row
-   that flips must facts-match its recorded reference EXACTLY (solid_count,
-   volume to the recorded doubles, STL triangles); a facts mismatch is a
-   defect record, not a tolerance stretch.
+1. **Exact path queries.** `Edge.position_at` / `tangent_at` on a recorded
+   spline answer through the SAME exact interpolant the bridge's volume arms
+   use (the recorded-sample Hermite/Lagrange reconstruction, fixed-order) —
+   never a Python-side approximation, never a refinement-dependent answer.
+   `position_at` stops refusing mid-interval; `tangent_at` returns the exact
+   interpolated derivative. Endpoints stay exact.
+2. **The frame-transport pin (the one decision).** A sweep walks the path
+   with per-station frames. The pinned law: parallel-transport-style frames
+   computed by the SAME fixed-order double-reflection discipline at the
+   recorded station list, stored as recipe data (the spec §5.3 FrameData
+   pattern) — resolution-independent once frozen, recorded, never
+   recomputed from a different station set. Refuse a path with a
+   zero-tangent station typed (`DegenerateSweepPath`). Do NOT implement a
+   validated ODE integrator (the spec forbids it); do not use Frenet.
+3. **The recording arm.** `sweep(section, path)`: a line path records the
+   landed straight-sweep carrier; a spline path records a loft chain over
+   the recorded stations (the landed sweep-as-loft-chain row), with section
+   frames per scope 2. Section carriers outside the recorded vocabulary
+   refuse typed naming the gap. `fillet`/`chamfer` on swept rows refuse
+   typed exactly as today.
+4. **V5 net.** Every landed green row (lofts, revolves, z-rows) answers
+   bit-identically; the battery tests pin it.
+5. **No OCC runs.** Kernel-door smoke on mvac (one fresh python, serial);
+   expected green-with-facts-match OR a typed refusal naming the NEXT
+   boundary; never untyped, never a tolerance stretch.
 
 ## Done when
 
@@ -66,26 +70,21 @@ cargo check --locked -p truck123d
 cargo test --locked -p truck123d --lib --tests   (serial, interpreter dir on PATH)
 ```
 
-with the three named tests green — in particular the rigidity property
-(a non-z-axis revolve's facts equal the z-revolve-of-the-rotated-profile's
-facts volume-wise exactly), and a kernel-door smoke run of corner_fl (one
-fresh python, serial) whose verdict is recorded in the RESULT: expected
-either green with facts matching the recorded reference, or a typed refusal
-naming the NEXT boundary (both are valid verdicts; an untyped failure is
-not).
+with the four named tests green and the mvac smoke verdict recorded in the
+RESULT.
 
 ## Forbidden
 
-vendor/truck/** edits. Approximate facts. Silent axis normalization past
-zero. Changing any recorded reference file. Weakening the z-revolve rows'
-bit-identity.
+vendor/truck/** edits. Approximate tangents. Frenet framing. Editing
+recorded references. Weakening landed rows' bit-identity.
 
 ## Stop conditions
 
-- The placement composition cannot express an axle revolve exactly →
-  SPEC_GAP naming the quantity.
+- The exact interpolant cannot answer the tangent (degenerate stations) →
+  typed refusal, not SPEC_GAP, unless the CLASS is unexpressible — then
+  SPEC_GAP naming it.
 - Any existing green row flips verdict → defect record, stop-and-file (V5).
 
 ## Finish by writing RESULT.json at the WORKTREE ROOT (then COMMIT first)
 
-Commit subject: `feat(bridge): the non-z revolve carrier — recorded axis frames over the landed placement (FRAME-REVOLVE)`.
+Commit subject: `feat(bridge): the spline-path sweep carrier — exact path queries, recorded station frames (SWEEP-PATH)`.

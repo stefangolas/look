@@ -1,0 +1,48 @@
+{
+  "id": "SWEEP-PATH",
+  "status": "LANDED",
+  "contracts": ["SWEEP-PATH"],
+  "tests_added": 4,
+  "anchors_verified": {"A1": 6, "A2": 7, "A3": 2},
+  "summary": "The post-census boundary recorded mvac refusing typed at 'a spline path tangent query is not a kernel-engine row', and the door shim's `sweep` refused everything. This packet answers the path queries with the SAME exact interpolant the volume arms use and lands the sweep recording arm. `Edge.position_at` stops refusing mid-interval: a line answers its exact linear arithmetic and a spline answers the recorded-sample Hermite/Lagrange reconstruction (chord-length parameters, clamped cubic, endpoint slopes from the degree-3 Lagrange interpolant of the first/last four samples) - never a Python-side approximation, never a refinement-dependent answer, endpoints exact. `Edge.tangent_at` returns the exact interpolated derivative of the same reconstruction, for lines and splines alike. The frame-transport pin: a sweep walks the recorded station list (a line's two endpoints, a spline's recorded samples) with parallel-transport-style frames computed by the fixed-order double-reflection discipline, stored as recipe data; a zero-direction station refuses typed (`DegenerateSweepPath`); no ODE integrator and no Frenet. The recording arm `sweep(section, path)` records a line path as the landed two-station straight-sweep loft chain and a spline path as the loft chain over its recorded stations (one section per station, placed by the transported frames); a section outside the recorded line-loop vocabulary or a path outside the recorded line/spline edge vocabulary refuses typed naming the gap; `fillet`/`chamfer` keep their typed refusals. The V5 net: the door-recorded z-revolve and loft rows answer bit-identically to the landed kernel arms. Four named tests green. The mvac kernel-door smoke now refuses typed at the NEXT boundary (the circle section profile carrier).",
+  "implementation": {
+    "exact_path_queries": "corpus/ttc/door.py: new pure-data helpers `_chord_params`, `_hermite_power`, `_lagrange_end_slope`, `_clamped_slopes`, `_path_spans`, `_span_value`, `_span_slope`, `_path_span_at`, `_path_point`, `_path_derivative`, `_path_directions`, and `_path_points` reconstruct the same fixed-order interpolant the kernel's `spline_spans`/`spline_edge_volume` use. `Edge.position_at` answers a line by exact linear arithmetic and a spline through `_path_point`; `Edge.tangent_at` answers a line's constant direction and a spline's exact derivative through `_path_derivative` (with respect to the normalized parameter). A spline carrying interpolation options the samples cannot recover refuses typed.",
+    "frame_law": "corpus/ttc/door.py: `_transport_frames` implements the fixed-order double-reflection parallel-transport discipline over the recorded station list (z = unit station direction, x = the transported reference, y = z cross x); `_section_reference` picks the deterministic initial in-plane reference from the section's first recorded edge. A zero station direction refuses typed (`DegenerateSweepPath`). No ODE integrator, no Frenet.",
+    "recording_arm": "corpus/ttc/door.py: `sweep(section, path)` resolves the path edge (`_path_edge`: a line/spline `Edge`, or a one-edge `Wire`), the all-line closed section loop (`_section_loop`), and the station data (`_station_data`), then records `{\"kind\": \"loft\", \"closed\": false, \"sections\": [...]}` with one section per station placed by the transported frames (`_place_loop`). The section is read through the station-0 frame and written through each station frame, so a line path records the two-station straight sweep and a spline path records the station chain. A non-Face or spline-trimmed section, or a path outside the recorded edge vocabulary, refuses typed naming the gap.",
+    "bridge_and_kernel": "truck123d/src/bd_bridge.rs: no functional kernel change was required (the landed `Loft` arm already answers the recorded station chain exactly - ruled matched-vertex volume, world bbox, mesh). The four required tests were added in the in-crate tests.",
+    "kernel_tests": "Four tests added in truck123d/src/bd_bridge.rs mod tests: `spline_path_position_and_tangent_answer_exactly` (a planar spline path queried at five parameters; every answer compared to the bridge's own `spline_spans` reconstruction, endpoints exact), `sweep_line_path_records_loft_chain` (a line path records the two-station straight-sweep loft with volume 5), `sweep_spline_path_records_stations` (a spline path records one station per recorded sample; the section centroids land on the samples), and `z_revolve_and_loft_rows_answer_bit_identically` (the door-recorded z-revolve and loft rows answer bit-identically to the landed arms)."
+  },
+  "verification": {
+    "cargo_check": "cargo check --locked -p truck123d -> clean",
+    "cargo_test_lib": "cargo test --locked -p truck123d --lib (interpreter dir on PATH) -> 29 passed, 0 failed, incl. the four named tests",
+    "cargo_test_integration": "cargo test --locked -p truck123d --lib --tests --no-fail-fast: pb_assembly 3/3, pb_conformance 3/3, pb_facade 4/4, pb_glb_emit 3/3, pb_op_matrix 7/7, pb_parity 4/4, ttc_authoring_arms 4/4, ttc_harness 3/3, ttc_lathe_spline 2/4. The two ttc_lathe_spline failures are (a) `mvac_row_still_refuses_typed_at_the_spline_path_sweep_carrier`, whose recorded boundary this packet moves (see smoke; the pin needs the orchestrator amendment ritual) and (b) `revolve_refusals_stay_typed_after_spline_admission`, whose non_z_axis sub-case was already failing at base HEAD (FRAME-REVOLVE cure, recorded in loop/results/FRAME-REVOLVE).",
+    "fmt": "cargo fmt -p truck123d -- --check -> clean",
+    "clippy": "cargo clippy -p truck123d --all-targets --no-deps -> no finding on any added line (the 211 pre-existing `indexing_slicing` errors are the crate's baseline deny, all below the added range)",
+    "anchors": "A1=6 (`grep -c 'sweep' corpus/ttc/door.py`), A2=7 (`grep -c 'tangent' corpus/ttc/door.py`), A3=2 (`grep -c 'position_at' corpus/ttc/door.py`) - all hold"
+  },
+  "smoke": {
+    "mvac_kernel_door": "python corpus/ttc/door.py --engine truck corpus/ttc/trees/falcon_heavy/src lib.falcon_common make_mvac [] <stl> -> exit 1, typed refusal: {\"kind\":\"Refused\",\"message\":\"a circle profile is not answered exactly by a kernel-engine row\"}. The spline-path tangent query is cured, so `make_gas_generator_assembly`'s `tube` now builds its section (`path.position_at(0)`, `path.tangent_at(0)`) and refuses at the NEXT boundary: the `Circle(radius)` section carrier. Typed, never untyped, never a tolerance stretch."
+  },
+  "findings": [
+    {
+      "id": "F1",
+      "title": "The mvac spline-path sweep pin moves to the next typed boundary (the circle section profile)",
+      "detail": "tests/ttc_lathe_spline.rs `mvac_row_still_refuses_typed_at_the_spline_path_sweep_carrier` expected the `a spline path tangent query is not a kernel-engine row` refusal (amended by orchestrator commit 5f1396d after F1-AUTHORING-ARMS). SWEEP-PATH answers that tangent query exactly, so `merlin_common.tube` now reaches `bd.Circle(radius)` and refuses `a circle profile is not answered exactly by a kernel-engine row`. This is the scope-5 expected boundary move (a typed refusal naming the NEXT boundary); the test file is outside this packet's write scope, so the pin needs the same orchestrator amendment ritual as 5f1396d. No green row flipped; the four named tests are green.",
+      "evidence": "The mvac door run recorded above; `nozzle_assembly_truck_door_now_reaches_facts` and `spline_shell_facts_are_exact_and_deterministic` stay green."
+    },
+    {
+      "id": "F2",
+      "title": "The pre-existing ttc_lathe_spline non_z_axis pin failure is unchanged",
+      "detail": "`revolve_refusals_stay_typed_after_spline_admission`'s `non_z_axis` sub-case was already failing at base HEAD (FRAME-REVOLVE cured the axis-aligned non-z revolve; recorded in loop/results/FRAME-REVOLVE). This packet does not touch it and does not change its verdict."
+    }
+  ],
+  "stop_conditions": {
+    "exact_interpolant": "No SPEC_GAP: the recorded-sample reconstruction is recoverable (the same fixed-order Hermite/Lagrange interpolant the volume arms use); a repeated station (zero chord) or zero station direction refuses typed `DegenerateSweepPath`, never approximated.",
+    "verdict_neutral": "No defect record: the four named tests are green, the door-recorded z-revolve and loft rows answer bit-identically to the landed arms, and the only moved verdict is the intended mvac pin (scope 5)."
+  },
+  "notes": "The packet lands the exact path queries (position_at mid-interval and tangent_at for lines and splines through the same fixed-order interpolant as the volume arms), the parallel-transport double-reflection station frames as recorded recipe data, and the `sweep` recording arm (line path -> two-station straight-sweep loft chain; spline path -> station chain; typed refusals for open section/path carriers and zero-direction stations). The exact path query is answered by the same exact arithmetic in the drop-in rather than a new pyo3 entry because the packet's write_allow is bd_bridge.rs / facade.rs / door.py only (no lib.rs registration surface); the test `spline_path_position_and_tangent_answer_exactly` compares every door answer to the bridge's own `spline_spans` reconstruction. facade.rs required no change. RESULT.json is a claim; the authoritative verification runs at the integrated HEAD.",
+  "files": {
+    "door": "corpus/ttc/door.py",
+    "bridge": "truck123d/src/bd_bridge.rs"
+  }
+}

@@ -14,7 +14,7 @@ L1447  fn       tree_facts - Measures the submitted tree with the recorded OCC t
 L2095  fn       write_tree_stl - Writes the tree's triangle soup as a binary STL file at `path`, returning
 L2128  fn       bd_facts - The pyo3 measurement entry: takes the construction tree JSON and returns
 L2151  fn       bd_stl - The pyo3 export entry: writes the construction tree's STL to `path` and
-tests: part, mirrored_part, line_lathe, primitive_facts_are_analytic, lathe_facts_match_occt_frustum_volume, partial_arc_lathe_refuses_typed, stl_writer_emits_binary_stl, drop_in_module_answers_census_vocabulary_name_for_name, unsupported_carrier_refusal_maps_to_the_refused_exception_class, dome_shell_profile, span_volume_by_quadrature, spline_segment_volume_matches_independent_quadrature, spline_shell_facts_are_not_a_polygon_flattening, spline_profile_bbox_covers_reconstructed_extrema, line_profile_lathe_volume_is_bit_identical_via_profile_form, line_loop3, square, prism_facts_are_exact_prism_arithmetic, loft_volume_matches_the_segment_moment_derivation, closed_halo_loft_certifies_its_seam_and_refuses_open_mismatch, mirror_placed_carrier_transforms_facts_without_recomputing_geometry, corpus_ttc_dir, run_door_python, placed_frame_facts_match_unplaced_facts_under_rigid_motion, plane_frame_extrude_answers_world_facts, pos_placed_assembly_counts_solids, vector_surface_answers_direction_math
+tests: part, mirrored_part, line_lathe, primitive_facts_are_analytic, lathe_facts_match_occt_frustum_volume, partial_arc_lathe_refuses_typed, stl_writer_emits_binary_stl, drop_in_module_answers_census_vocabulary_name_for_name, unsupported_carrier_refusal_maps_to_the_refused_exception_class, dome_shell_profile, span_volume_by_quadrature, spline_segment_volume_matches_independent_quadrature, spline_shell_facts_are_not_a_polygon_flattening, spline_profile_bbox_covers_reconstructed_extrema, line_profile_lathe_volume_is_bit_identical_via_profile_form, line_loop3, square, prism_facts_are_exact_prism_arithmetic, loft_volume_matches_the_segment_moment_derivation, closed_halo_loft_certifies_its_seam_and_refuses_open_mismatch, mirror_placed_carrier_transforms_facts_without_recomputing_geometry, corpus_ttc_dir, run_door_python, placed_frame_facts_match_unplaced_facts_under_rigid_motion, plane_frame_extrude_answers_world_facts, pos_placed_assembly_counts_solids, vector_surface_answers_direction_math, revolve_about_nonz_axis_answers_world_facts, z_revolve_rows_answer_bit_identically, revolve_refuses_unsupported_axes_typed
 
 ## WRITE: truck123d/src/facade.rs
 L82    enum     ModeValue - The `Mode` algebra vocabulary (§3.2): build123d's `Add`/`Subtract`/
@@ -38,6 +38,8 @@ L725   fn       facade_submit - The pyo3 wrapper over [`run_facade`]: parses the
 ## WRITE: corpus/ttc/door.py
 
 ## READ: loop/results/AUTHOR-FRAME-CARRIERS.json
+
+## READ: loop/results/FRAME-REVOLVE.json (MISSING at dispatch time)
 
 ## READ: docs/TTC_CENSUS_FINAL.md
 

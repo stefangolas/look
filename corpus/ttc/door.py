@@ -735,30 +735,44 @@ class Edge:
 
         ``t == 0``/``t == 1`` are the recorded endpoints (exact for a line and
         for the interpolating spline through the recorded samples). A line
-        edge answers any parameter by its exact linear arithmetic; any other
-        spline parameter requires reconstructing the curve, which is the
-        kernel's exact arithmetic -- never a Python approximation.
+        edge answers any parameter by its exact linear arithmetic; a spline
+        answers through the same fixed-order interpolation the volume arms
+        reconstruct -- never a Python approximation.
         """
         t = _num(t)
-        if t == 0.0:
-            return self.p0
-        if t == 1.0:
-            return self.p1
         if self.kind == "line":
+            if t == 0.0:
+                return self.p0
+            if t == 1.0:
+                return self.p1
             return Vector(
                 self.p0.x + t * (self.p1.x - self.p0.x),
                 self.p0.y + t * (self.p1.y - self.p0.y),
                 self.p0.z + t * (self.p1.z - self.p0.z),
             )
-        _refuse("a spline path query beyond its recorded start is not a kernel-engine row")
+        if self.kind == "spline":
+            return Vector(*_path_point(_path_points(self), t))
+        _refuse("this path carrier has no recorded interpolation")
         return self.p0
 
     def tangent_at(self, t):
-        """The tangent of a recorded spline is the kernel's reconstruction,
-        never a Python computation: any tangent query on the data-only carrier
-        refuses typed."""
-        _refuse("a spline path tangent query is not a kernel-engine row")
-        return Vector(0.0, 0.0, 1.0)
+        """The exact tangent of the recorded curve at ``t``.
+
+        A line's tangent is its constant recorded direction; a spline's
+        tangent is the derivative of the same fixed-order interpolant the
+        volume arms reconstruct. Endpoints stay exact.
+        """
+        t = _num(t)
+        if self.kind == "line":
+            return Vector(
+                self.p1.x - self.p0.x,
+                self.p1.y - self.p0.y,
+                self.p1.z - self.p0.z,
+            )
+        if self.kind == "spline":
+            return Vector(*_path_derivative(_path_points(self), t))
+        _refuse("this path carrier has no recorded derivative")
+        return Vector(0.0, 0.0, 0.0)
 
 
 def Spline(*points, periodic=False, **kwargs):
@@ -1492,6 +1506,373 @@ def _wire_profile_edges(shape):
     return [_edge3(edge) for edge in edges]
 
 
+# ---------------------------------------------------------------------------
+# Exact path reconstruction and station-frame transport: a recorded line or
+# spline path is answered by the SAME fixed-order interpolation the kernel
+# volume arms reconstruct (chord-length parameters, clamped cubic, endpoint
+# slopes from the degree-3 Lagrange interpolant of the first/last four
+# samples). Pure data arithmetic -- never an approximation.
+# ---------------------------------------------------------------------------
+
+
+def _chord_params(pts):
+    """The chord-length parameters of the recorded station points."""
+    params = [0.0]
+    for i in range(1, len(pts)):
+        dx = pts[i][0] - pts[i - 1][0]
+        dy = pts[i][1] - pts[i - 1][1]
+        dz = pts[i][2] - pts[i - 1][2]
+        params.append(params[-1] + math.sqrt(dx * dx + dy * dy + dz * dz))
+    return params
+
+
+def _hermite_power(y0, y1, d0, d1):
+    """The power-basis cubic Hermite coefficients over the span parameter."""
+    return [
+        y0,
+        d0,
+        -3.0 * y0 - 2.0 * d0 + 3.0 * y1 - d1,
+        2.0 * y0 + d0 - 2.0 * y1 + d1,
+    ]
+
+
+def _lagrange_end_slope(pts, params, first):
+    """The derivative at the first (or last) node of the degree-3 Lagrange
+    interpolant through the four given samples at their chord parameters."""
+    p = params
+    if first:
+        factors = [
+            1.0 / (p[0] - p[1]) + 1.0 / (p[0] - p[2]) + 1.0 / (p[0] - p[3]),
+            1.0 / (p[1] - p[0]) * ((p[0] - p[2]) / (p[1] - p[2]))
+            * ((p[0] - p[3]) / (p[1] - p[3])),
+            1.0 / (p[2] - p[0]) * ((p[0] - p[1]) / (p[2] - p[1]))
+            * ((p[0] - p[3]) / (p[2] - p[3])),
+            1.0 / (p[3] - p[0]) * ((p[0] - p[1]) / (p[3] - p[1]))
+            * ((p[0] - p[2]) / (p[3] - p[2])),
+        ]
+    else:
+        factors = [
+            1.0 / (p[0] - p[3]) * ((p[3] - p[1]) / (p[0] - p[1]))
+            * ((p[3] - p[2]) / (p[0] - p[2])),
+            1.0 / (p[1] - p[3]) * ((p[3] - p[0]) / (p[1] - p[0]))
+            * ((p[3] - p[2]) / (p[1] - p[2])),
+            1.0 / (p[2] - p[3]) * ((p[3] - p[0]) / (p[2] - p[0]))
+            * ((p[3] - p[1]) / (p[2] - p[1])),
+            1.0 / (p[3] - p[0]) + 1.0 / (p[3] - p[1]) + 1.0 / (p[3] - p[2]),
+        ]
+    out = []
+    for component in range(3):
+        acc = 0.0
+        for i in range(4):
+            acc += pts[i][component] * factors[i]
+        out.append(acc)
+    return out
+
+
+def _clamped_slopes(pts, params):
+    """The clamped cubic slopes at every station: the interior slopes solve
+    the C2 tridiagonal system, the end slopes are the Lagrange end slopes."""
+    n = len(pts)
+    slopes = [[0.0, 0.0, 0.0] for _ in range(n)]
+    slopes[0] = _lagrange_end_slope(pts[0:4], params[0:4], True)
+    slopes[n - 1] = _lagrange_end_slope(pts[n - 4:n], params[n - 4:n], False)
+    nk = n - 2
+    h = [params[i + 1] - params[i] for i in range(n - 1)]
+    delta = [
+        [(pts[i + 1][c] - pts[i][c]) / h[i] for c in range(3)]
+        for i in range(n - 1)
+    ]
+    a = [0.0] * nk
+    b = [0.0] * nk
+    c = [0.0] * nk
+    rhs = [[0.0, 0.0, 0.0] for _ in range(nk)]
+    for row in range(nk):
+        i = row + 1
+        a[row] = h[i]
+        b[row] = 2.0 * (h[i - 1] + h[i])
+        c[row] = h[i - 1]
+        for component in range(3):
+            value = 3.0 * (h[i] * delta[i - 1][component]
+                           + h[i - 1] * delta[i][component])
+            if i == 1:
+                value -= h[i] * slopes[0][component]
+            if i == n - 2:
+                value -= h[i - 1] * slopes[n - 1][component]
+            rhs[row][component] = value
+    cp = [0.0] * nk
+    dp = [[0.0, 0.0, 0.0] for _ in range(nk)]
+    b0 = b[0]
+    if b0 == 0.0:
+        _refuse("DegenerateSweepPath: a repeated path station has no direction")
+    cp[0] = c[0] / b0
+    dp[0] = [rhs[0][component] / b0 for component in range(3)]
+    for row in range(1, nk):
+        denom = b[row] - a[row] * cp[row - 1]
+        if denom == 0.0:
+            _refuse("DegenerateSweepPath: a repeated path station has no direction")
+        if row < nk - 1:
+            cp[row] = c[row] / denom
+        for component in range(3):
+            dp[row][component] = (
+                rhs[row][component] - a[row] * dp[row - 1][component]
+            ) / denom
+    x = [[0.0, 0.0, 0.0] for _ in range(nk)]
+    x[nk - 1] = dp[nk - 1]
+    for row in range(nk - 2, -1, -1):
+        for component in range(3):
+            x[row][component] = dp[row][component] - cp[row] * x[row + 1][component]
+    for row in range(nk):
+        slopes[row + 1] = x[row]
+    return slopes
+
+
+def _path_spans(pts):
+    """The reconstructed spans of the recorded station interpolant plus the
+    chord parameters; one span per consecutive station pair."""
+    n = len(pts)
+    if n < 2:
+        _refuse("DegenerateSweepPath: a path needs at least two recorded stations")
+    params = _chord_params(pts)
+    for i in range(1, n):
+        if not (params[i] > params[i - 1]):
+            _refuse("DegenerateSweepPath: a repeated path station has no direction")
+    if n == 2:
+        return [[[pts[0][c], pts[1][c] - pts[0][c], 0.0, 0.0] for c in range(3)]], params
+    if n == 3:
+        u1 = (params[1] - params[0]) / (params[2] - params[0])
+        denom = 2.0 * u1 * (1.0 - u1)
+        if denom == 0.0:
+            _refuse("DegenerateSweepPath: a repeated path station has no direction")
+        span = []
+        for c in range(3):
+            p0, p1, p2 = pts[0][c], pts[1][c], pts[2][c]
+            q1 = (p1 - (1.0 - u1) * (1.0 - u1) * p0 - u1 * u1 * p2) / denom
+            span.append([p0, 2.0 * (q1 - p0), p0 - 2.0 * q1 + p2, 0.0])
+        return [span], params
+    slopes = _clamped_slopes(pts, params)
+    spans = []
+    for i in range(n - 1):
+        h = params[i + 1] - params[i]
+        spans.append([
+            _hermite_power(pts[i][c], pts[i + 1][c], h * slopes[i][c],
+                           h * slopes[i + 1][c])
+            for c in range(3)
+        ])
+    return spans, params
+
+
+def _span_value(span, u):
+    """The value of one reconstructed span at the span parameter ``u``."""
+    return [
+        coeff[0] + u * (coeff[1] + u * (coeff[2] + u * coeff[3]))
+        for coeff in span
+    ]
+
+
+def _span_slope(span, u):
+    """The derivative of one reconstructed span at the span parameter ``u``."""
+    return [
+        coeff[1] + u * (2.0 * coeff[2] + u * 3.0 * coeff[3])
+        for coeff in span
+    ]
+
+
+def _path_span_at(pts, t):
+    """The span index and span parameter of the normalized parameter ``t``,
+    plus the spans and chord parameters."""
+    spans, params = _path_spans(pts)
+    total = params[-1]
+    if t <= 0.0:
+        return spans, params, 0, 0.0, total
+    if t >= 1.0:
+        return spans, params, len(pts) - 2, 1.0, total
+    s = t * total
+    j = 0
+    while j + 1 < len(pts) - 1 and s > params[j + 1]:
+        j += 1
+    h = params[j + 1] - params[j]
+    return spans, params, j, (s - params[j]) / h, total
+
+
+def _path_point(pts, t):
+    """The exact interpolated point at the normalized parameter ``t``."""
+    spans, _params, j, u, _total = _path_span_at(pts, t)
+    if t <= 0.0:
+        return list(pts[0])
+    if t >= 1.0:
+        return list(pts[-1])
+    return _span_value(spans[j], u)
+
+
+def _path_derivative(pts, t):
+    """The exact interpolated derivative (with respect to the normalized
+    parameter) at ``t``."""
+    spans, params, j, u, total = _path_span_at(pts, t)
+    h = params[j + 1] - params[j]
+    slope = _span_slope(spans[j], u)
+    return [slope[c] * total / h for c in range(3)]
+
+
+def _path_directions(pts):
+    """The exact interpolated derivative at every recorded station."""
+    n = len(pts)
+    spans, params = _path_spans(pts)
+    total = params[-1]
+    if n == 2:
+        return [_span_slope(spans[0], 0.0)] * 2
+    if n == 3:
+        return [_span_slope(spans[0], params[i] / total) for i in range(n)]
+    slopes = _clamped_slopes(pts, params)
+    return [[slopes[i][c] * total for c in range(3)] for i in range(n)]
+
+
+def _path_points(edge):
+    """The recorded samples of a recoverable spline path edge; an
+    interpolation option the recorded data cannot recover refuses typed."""
+    if edge.options:
+        _refuse("a path spline with interpolation options is not a kernel-engine row")
+    return [point.to_tuple() for point in edge.points]
+
+
+def _path_edge(path):
+    """The recorded line/spline edge carrier of a path (a one-edge Wire is the
+    same carrier); anything else refuses typed naming the open carrier."""
+    if isinstance(path, Edge):
+        return path
+    if isinstance(path, Wire) and len(path.edges) == 1:
+        return path.edges[0]
+    _refuse("a path outside the recorded line/spline edge carrier is not a kernel-engine row")
+    return None
+
+
+def _section_loop(section):
+    """The recorded closed line-loop boundary of a section: every edge must be
+    a recorded straight edge (the landed loft-section vocabulary); a
+    spline-trimmed or non-Face section refuses typed naming the open carrier."""
+    if not isinstance(section, Face):
+        _refuse("a section outside the recorded Face carrier is not a kernel-engine row")
+    loop = []
+    for edge in section.edges:
+        if edge.kind != "line":
+            _refuse("a spline-trimmed section boundary is not a kernel-engine row")
+        loop.append(edge)
+    if len(loop) < 3:
+        _refuse("a section needs a closed boundary with at least three edges")
+    return loop
+
+
+def _station_data(edge):
+    """The recorded station points of a path and their exact path directions."""
+    pts = [point.to_tuple() for point in edge.points]
+    if edge.kind == "line":
+        direction = _vsub(pts[1], pts[0])
+        if _vlen(direction) == 0.0:
+            _refuse("DegenerateSweepPath: a station direction is zero")
+        return pts, [direction, list(direction)]
+    if edge.kind == "spline":
+        pts = _path_points(edge)
+        directions = _path_directions(pts)
+        for direction in directions:
+            if _vlen(direction) == 0.0:
+                _refuse("DegenerateSweepPath: a station direction is zero")
+        return pts, directions
+    _refuse("a path outside the recorded line/spline edge carrier is not a kernel-engine row")
+    return [], []
+
+
+def _section_reference(loop, z_axis):
+    """A deterministic in-plane reference axis for a section (the first
+    recorded edge direction projected into the section plane)."""
+    if loop:
+        direction = _vsub(loop[0].p1.to_tuple(), loop[0].p0.to_tuple())
+        projected = _vsub(direction, _vscaled(z_axis, _vdot(direction, z_axis)))
+        if _vlen(projected) > 0.0:
+            return _vnormalize(projected)
+    return _perp_any(z_axis)
+
+
+def _transport_frames(stations, directions, reference):
+    """The parallel-transport station frames, computed by the fixed-order
+    double-reflection discipline. Each frame is (origin, x_dir, y_dir,
+    z_dir): z is the unit station direction, x the transported reference,
+    y = z cross x. A zero station direction refuses
+    (``DegenerateSweepPath``)."""
+    z_axes = []
+    for direction in directions:
+        length = _vlen(direction)
+        if length == 0.0:
+            _refuse("DegenerateSweepPath: a station direction is zero")
+        z_axes.append(_vscaled(direction, 1.0 / length))
+    frames = []
+    ref = reference
+    previous_z = z_axes[0]
+    x_axis = _vsub(ref, _vscaled(z_axes[0], _vdot(ref, z_axes[0])))
+    if _vlen(x_axis) == 0.0:
+        x_axis = _perp_any(z_axes[0])
+    x_axis = _vnormalize(x_axis)
+    y_axis = _vnormalize(_vcross(z_axes[0], x_axis))
+    frames.append((stations[0], x_axis, y_axis, z_axes[0]))
+    for i in range(1, len(stations)):
+        chord = _vsub(stations[i], stations[i - 1])
+        chord_len = _vdot(chord, chord)
+        if chord_len > 0.0:
+            reflected_ref = _vsub(
+                ref, _vscaled(chord, 2.0 * _vdot(chord, ref) / chord_len)
+            )
+            reflected_z = _vsub(
+                previous_z,
+                _vscaled(chord, 2.0 * _vdot(chord, previous_z) / chord_len),
+            )
+            axis = _vsub(z_axes[i], reflected_z)
+            axis_len = _vdot(axis, axis)
+            if axis_len > 0.0:
+                ref = _vsub(
+                    reflected_ref,
+                    _vscaled(axis, 2.0 * _vdot(axis, reflected_ref) / axis_len),
+                )
+        x_axis = _vsub(ref, _vscaled(z_axes[i], _vdot(ref, z_axes[i])))
+        if _vlen(x_axis) == 0.0:
+            x_axis = _perp_any(z_axes[i])
+        x_axis = _vnormalize(x_axis)
+        y_axis = _vnormalize(_vcross(z_axes[i], x_axis))
+        frames.append((stations[i], x_axis, y_axis, z_axes[i]))
+        ref = x_axis
+        previous_z = z_axes[i]
+    return frames
+
+
+def _frame_local(frame, point):
+    """The frame-local coordinates of one world point."""
+    origin, x_axis, y_axis, z_axis = frame
+    rel = _vsub(point, origin)
+    return (_vdot(rel, x_axis), _vdot(rel, y_axis), _vdot(rel, z_axis))
+
+
+def _frame_world(frame, local):
+    """The world point of one frame-local coordinate triple."""
+    origin, x_axis, y_axis, z_axis = frame
+    return (
+        origin[0] + local[0] * x_axis[0] + local[1] * y_axis[0] + local[2] * z_axis[0],
+        origin[1] + local[0] * x_axis[1] + local[1] * y_axis[1] + local[2] * z_axis[1],
+        origin[2] + local[0] * x_axis[2] + local[1] * y_axis[2] + local[2] * z_axis[2],
+    )
+
+
+def _place_loop(loop, base_frame, frame):
+    """The section boundary placed by ``frame`` (its recorded station-0
+    coordinates are read through ``base_frame``)."""
+    placed = []
+    for edge in loop:
+        a = _frame_local(base_frame, edge.p0.to_tuple())
+        b = _frame_local(base_frame, edge.p1.to_tuple())
+        placed.append({
+            "kind": "line",
+            "a": list(_frame_world(frame, a)),
+            "b": list(_frame_world(frame, b)),
+        })
+    return placed
+
+
 def extrude(shape, amount, both=False, mode=None, **kwargs):
     """build123d ``extrude(face, amount, both)``: the recording arm for a
     closed planar line-loop profile swept along its own plane normal (an exact
@@ -1520,15 +1901,24 @@ def extrude(shape, amount, both=False, mode=None, **kwargs):
 
 
 def sweep(section=None, path=None, mode=None, **kwargs):
-    """build123d ``sweep(section, path)``.
+    """build123d ``sweep(section, path)``: the sweep recording arm.
 
-    A sweep records as a loft chain (per-segment lofts between recorded
-    stations) only when the path and section carriers are fully recorded as
-    data. A spline path is never flattened: its section/query attributes
-    refuse typed (``Edge.tangent_at``), and any sweep carrier outside the
-    recorded chain refuses typed here.
-    """
-    _refuse("sweep is not a kernel-engine row")
+    A sweep records a loft chain between the recorded stations. A line path
+    records the landed two-station straight-sweep chain; a spline path
+    records the chain over its recorded samples. Each station places the
+    section through the fixed-order double-reflection frames (parallel
+    transport, never Frenet). A section outside the recorded line-loop
+    vocabulary, or a sweep path outside the recorded edge vocabulary,
+    refuses typed naming the open carrier; a zero-direction station refuses
+    (``DegenerateSweepPath``). The tangent queries answer through the same
+    exact interpolant the volume arms reconstruct."""
+    edge = _path_edge(path)
+    loop = _section_loop(section)
+    stations, directions = _station_data(edge)
+    reference = _section_reference(loop, _vnormalize(directions[0]))
+    frames = _transport_frames(stations, directions, reference)
+    sections = [_place_loop(loop, frames[0], frame) for frame in frames]
+    return _Part({"kind": "loft", "closed": False, "sections": sections})
 
 
 def loft(*sections, ruled=False, mode=None, **kwargs):

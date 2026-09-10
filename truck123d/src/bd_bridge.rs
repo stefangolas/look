@@ -3169,4 +3169,301 @@ except _Refused as exc:
             "refusal must name the degenerate axis: {message}"
         );
     }
+
+    // -----------------------------------------------------------------------
+    // The spline-path sweep carrier (SWEEP-PATH): exact path queries, the
+    // recorded station frames, and the V5 net over the landed loft/revolve
+    // rows.
+    // -----------------------------------------------------------------------
+
+    /// The bridge's exact reconstruction of a planar path at the normalized
+    /// parameter `t`: position and derivative with respect to `t`. The path
+    /// lies in the `(x, z)` plane, so the bridge's 2-D `spline_spans` is the
+    /// same fixed-order interpolant the volume arms use.
+    fn span_derivative(span: &SpanPoly, u: f64, total: f64, h: f64) -> [f64; 3] {
+        [
+            (span.r[1] + u * (2.0 * span.r[2] + u * 3.0 * span.r[3])) * total / h,
+            0.0,
+            (span.z[1] + u * (2.0 * span.z[2] + u * 3.0 * span.z[3])) * total / h,
+        ]
+    }
+
+    fn bridge_path_query(samples: &[[f64; 2]], t: f64) -> ([f64; 3], [f64; 3]) {
+        let n = samples.len();
+        let params = chord_params(samples);
+        let total = params[n - 1];
+        let spans = spline_spans(samples).expect("the planar path reconstructs");
+        if t <= 0.0 {
+            let h = params[1] - params[0];
+            return (
+                [samples[0][0], 0.0, samples[0][1]],
+                span_derivative(&spans[0], 0.0, total, h),
+            );
+        }
+        if t >= 1.0 {
+            let h = params[n - 1] - params[n - 2];
+            return (
+                [samples[n - 1][0], 0.0, samples[n - 1][1]],
+                span_derivative(&spans[n - 2], 1.0, total, h),
+            );
+        }
+        let s = t * total;
+        let mut j = 0;
+        while j + 1 < n - 1 && s > params[j + 1] {
+            j += 1;
+        }
+        let h = params[j + 1] - params[j];
+        let u = (s - params[j]) / h;
+        let value = eval_span(&spans[j], u);
+        (
+            [value[0], 0.0, value[1]],
+            span_derivative(&spans[j], u, total, h),
+        )
+    }
+
+    #[test]
+    fn spline_path_position_and_tangent_answer_exactly() {
+        // The door's exact path query must answer through the SAME fixed-order
+        // interpolant the volume arms reconstruct: a planar spline path is
+        // queried at interior parameters and every answer is compared to the
+        // bridge's own `spline_spans` reconstruction of the same samples.
+        let script = r#"
+import json, sys
+sys.path.insert(0, sys.argv[1])
+import door
+
+pts = [door.Vector(0.0, 0.0, 0.0), door.Vector(1.0, 0.0, 2.0),
+       door.Vector(3.0, 0.0, 1.0), door.Vector(4.0, 0.0, 3.0)]
+edge = door.Edge.make_spline(pts)
+rows = []
+for t in (0.0, 0.25, 0.5, 0.75, 1.0):
+    p = edge.position_at(t)
+    d = edge.tangent_at(t)
+    rows.append({"t": t, "p": list(p.to_tuple()), "d": list(d.to_tuple())})
+print(json.dumps(rows))
+"#;
+        let stdout = run_door_python(script);
+        let rows: Vec<serde_json::Value> =
+            serde_json::from_str(stdout.trim()).expect("path query rows parse");
+        assert_eq!(rows.len(), 5);
+        let samples = [[0.0, 0.0], [1.0, 2.0], [3.0, 1.0], [4.0, 3.0]];
+        for row in rows {
+            let t = row["t"].as_f64().expect("t");
+            let p = row["p"].as_array().expect("p");
+            let d = row["d"].as_array().expect("d");
+            let (want_p, want_d) = bridge_path_query(&samples, t);
+            for axis in 0..3 {
+                let got_p = p[axis].as_f64().expect("position coordinate");
+                let got_d = d[axis].as_f64().expect("derivative coordinate");
+                assert!(
+                    (got_p - want_p[axis]).abs() <= 1e-12 * (1.0 + want_p[axis].abs()),
+                    "position at t={t} axis {axis}: {got_p} vs {}",
+                    want_p[axis]
+                );
+                assert!(
+                    (got_d - want_d[axis]).abs() <= 1e-12 * (1.0 + want_d[axis].abs()),
+                    "derivative at t={t} axis {axis}: {got_d} vs {}",
+                    want_d[axis]
+                );
+            }
+            assert_eq!(p[1].as_f64().expect("y"), 0.0, "the path lies in y = 0");
+        }
+        // Endpoints stay exact.
+        let first = bridge_path_query(&samples, 0.0);
+        let last = bridge_path_query(&samples, 1.0);
+        assert_eq!(first.0, [0.0, 0.0, 0.0]);
+        assert_eq!(last.0, [4.0, 0.0, 3.0]);
+    }
+
+    #[test]
+    fn sweep_line_path_records_loft_chain() {
+        // A line path records the landed two-station straight-sweep chain: a
+        // unit square swept along +z by 5 is an exact prism (volume 5) whose
+        // recorded row is the landed loft carrier.
+        let script = r#"
+import json, sys
+sys.path.insert(0, sys.argv[1])
+import door
+
+def v(x, y, z):
+    return door.Vector(x, y, z)
+
+wire = door.Wire([
+    door.Edge.make_line(v(0.0, 0.0, 0.0), v(1.0, 0.0, 0.0)),
+    door.Edge.make_line(v(1.0, 0.0, 0.0), v(1.0, 1.0, 0.0)),
+    door.Edge.make_line(v(1.0, 1.0, 0.0), v(0.0, 1.0, 0.0)),
+    door.Edge.make_line(v(0.0, 1.0, 0.0), v(0.0, 0.0, 0.0)),
+])
+section = door.Face(wire)
+path = door.Edge.make_line(v(0.0, 0.0, 0.0), v(0.0, 0.0, 5.0))
+print(json.dumps(door.sweep(section, path)._node()))
+"#;
+        let stdout = run_door_python(script);
+        let tree = parse_tree(&stdout).expect("sweep row parses");
+        let sections = match &tree {
+            TreeNode::Part { part } => match &part.solid {
+                SolidSpec::Loft { sections, closed } => {
+                    assert!(!*closed, "a straight sweep is an open chain");
+                    sections.clone()
+                }
+                other => panic!("a line-path sweep must record a loft, got {other:?}"),
+            },
+            _ => panic!("a sweep row must be a single placed part"),
+        };
+        assert_eq!(sections.len(), 2, "a line path records two stations");
+        assert_eq!(sections[0].len(), 4);
+        assert_eq!(sections[1].len(), 4);
+        // The second station is the first translated along +z by 5.
+        let first = match &sections[0][0] {
+            ProfileEdge::Line { a, .. } => *a,
+            _ => panic!("a sweep section is all line edges"),
+        };
+        let second = match &sections[1][0] {
+            ProfileEdge::Line { a, .. } => *a,
+            _ => panic!("a sweep section is all line edges"),
+        };
+        assert!((second[0] - first[0]).abs() < 1e-12);
+        assert!((second[1] - first[1]).abs() < 1e-12);
+        assert!((second[2] - first[2] - 5.0).abs() < 1e-12);
+        let facts = tree_facts(&tree).expect("a straight sweep is in envelope");
+        assert_eq!(facts.solid_count, 1);
+        assert!((facts.volume - 5.0).abs() / 5.0 < 1e-12);
+        assert_eq!(facts.bbox[0], [0.0, 0.0, 0.0]);
+        assert_eq!(facts.bbox[1], [1.0, 1.0, 5.0]);
+    }
+
+    #[test]
+    fn sweep_spline_path_records_stations() {
+        // A spline path records one loft station per recorded sample; the
+        // station frames carry the section centroid onto each sample.
+        let script = r#"
+import json, sys
+sys.path.insert(0, sys.argv[1])
+import door
+
+def v(x, y, z):
+    return door.Vector(x, y, z)
+
+path = door.Edge.make_spline([v(0.0, 0.0, 0.0), v(1.0, 0.0, 0.0),
+                              v(2.0, 0.0, 1.0), v(3.0, 0.0, 2.0)])
+plane = door.Plane(origin=path.position_at(0), z_dir=path.tangent_at(0))
+wire = door.Wire([
+    door.Edge.make_line(v(-0.5, -0.5, 0.0), v(0.5, -0.5, 0.0)),
+    door.Edge.make_line(v(0.5, -0.5, 0.0), v(0.5, 0.5, 0.0)),
+    door.Edge.make_line(v(0.5, 0.5, 0.0), v(-0.5, 0.5, 0.0)),
+    door.Edge.make_line(v(-0.5, 0.5, 0.0), v(-0.5, -0.5, 0.0)),
+])
+section = plane * door.Face(wire)
+node = door.sweep(section, path)._node()
+stations = [list(point.to_tuple()) for point in path.points]
+print(json.dumps({"node": node, "stations": stations}))
+"#;
+        let stdout = run_door_python(script);
+        let record: serde_json::Value =
+            serde_json::from_str(stdout.trim()).expect("spline sweep json");
+        let tree = parse_tree(&record["node"].to_string()).expect("spline sweep row parses");
+        let sections = match &tree {
+            TreeNode::Part { part } => match &part.solid {
+                SolidSpec::Loft { sections, .. } => sections.clone(),
+                other => panic!("a spline-path sweep must record a loft, got {other:?}"),
+            },
+            _ => panic!("a sweep row must be a single placed part"),
+        };
+        assert_eq!(sections.len(), 4, "one station per recorded path sample");
+        let stations = record["stations"].as_array().expect("stations");
+        for (i, section) in sections.iter().enumerate() {
+            let mut centroid = [0.0f64; 3];
+            for edge in section {
+                let a = match edge {
+                    ProfileEdge::Line { a, .. } => *a,
+                    _ => panic!("a sweep section is all line edges"),
+                };
+                for axis in 0..3 {
+                    centroid[axis] += a[axis];
+                }
+            }
+            let count = section.len() as f64;
+            let station = stations[i].as_array().expect("station");
+            for axis in 0..3 {
+                let want = station[axis].as_f64().expect("station coordinate");
+                assert!(
+                    (centroid[axis] / count - want).abs() < 1e-9 * (1.0 + want.abs()),
+                    "station {i} axis {axis}: centroid {} vs {want}",
+                    centroid[axis] / count
+                );
+            }
+        }
+        let facts = tree_facts(&tree).expect("a spline-path sweep is in envelope");
+        assert_eq!(facts.solid_count, 1);
+        assert!(facts.volume > 0.0);
+    }
+
+    #[test]
+    fn z_revolve_and_loft_rows_answer_bit_identically() {
+        // V5 net: the door-recorded z-revolve row and two-station loft row
+        // answer bit-identically to the landed kernel arms.
+        let script = r#"
+import json, sys
+sys.path.insert(0, sys.argv[1])
+import door
+
+def v(x, y, z):
+    return door.Vector(x, y, z)
+
+def square(z):
+    pts = [(0.0, 0.0, z), (1.0, 0.0, z), (1.0, 1.0, z), (0.0, 1.0, z)]
+    return door.Face(door.Wire([
+        door.Edge.make_line(v(*pts[i]), v(*pts[(i + 1) % 4])) for i in range(4)
+    ]))
+
+ring = door.Face(door.Wire([
+    door.Edge.make_line(v(10.0, 0.0, -5.0), v(20.0, 0.0, -5.0)),
+    door.Edge.make_line(v(20.0, 0.0, -5.0), v(20.0, 0.0, 5.0)),
+    door.Edge.make_line(v(20.0, 0.0, 5.0), v(10.0, 0.0, 5.0)),
+    door.Edge.make_line(v(10.0, 0.0, 5.0), v(10.0, 0.0, -5.0)),
+]))
+z_row = door.revolve(ring, axis=door.Axis.Z)._node()
+loft_row = door.loft([square(0.0), square(5.0)], ruled=False)._node()
+print(json.dumps([z_row, loft_row]))
+"#;
+        let stdout = run_door_python(script);
+        let rows: Vec<serde_json::Value> =
+            serde_json::from_str(stdout.trim()).expect("landed row json");
+        let z_tree = parse_tree(&rows[0].to_string()).expect("z row parses");
+        let loft_tree = parse_tree(&rows[1].to_string()).expect("loft row parses");
+        let z_facts = tree_facts(&z_tree).expect("z revolve facts");
+        let loft_facts = tree_facts(&loft_tree).expect("loft facts");
+        let z_landed = tree_facts(&part(
+            line_lathe(
+                &[[10.0, -5.0], [20.0, -5.0], [20.0, 5.0], [10.0, 5.0]],
+                360.0,
+            ),
+            0.0,
+            0.0,
+            0.0,
+        ))
+        .expect("landed z lathe");
+        assert_eq!(
+            z_facts.volume.to_bits(),
+            z_landed.volume.to_bits(),
+            "the door z-revolve row must answer bit-identically to the landed lathe arm"
+        );
+        let loft_landed = tree_facts(&part(
+            SolidSpec::Loft {
+                sections: vec![square(0.0), square(5.0)],
+                closed: false,
+            },
+            0.0,
+            0.0,
+            0.0,
+        ))
+        .expect("landed loft");
+        assert_eq!(
+            loft_facts.volume.to_bits(),
+            loft_landed.volume.to_bits(),
+            "the door loft row must answer bit-identically to the landed loft arm"
+        );
+        assert_eq!(z_facts.solid_count, 1);
+        assert_eq!(loft_facts.solid_count, 1);
+    }
 }
