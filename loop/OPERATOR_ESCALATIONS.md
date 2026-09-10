@@ -717,3 +717,41 @@ Judgment-required items appended each operator cycle. Newest at the bottom.
   (lines 201-207) remains in place as belt-and-braces for QUESTION.md.
 - Workers unaffected: slot 0 MONO-6 and slot 1 SURVEY-A were running on slot
   branches at the time; no rebase required (fork bases unchanged).
+
+## 2026-09-10 22:47 UTC - 8th FALSE LANDING: SOLVER-SURVEY-A (base merged; A.json uncommitted; row marker self-blocks)
+
+- What: HEAD 6233aff "loop: SOLVER-SURVEY-A row LANDED (overnight)" changed
+  ONLY `loop/PACKETS.jsonl` (1 insertion) - it flipped the row over no content.
+  The row (still status READY) now carries a false `LANDED 7591ed2` note;
+  7591ed2 is the operator's 21:57Z dispatch-stall commit, not worker work. The
+  real deliverable `loop/solver_coverage/fragments/A.json` (579,713 b, RESULT
+  status DONE, 279 rules) exists ONLY as an untracked file in
+  `loop/slots/1/wt`; `git ls-files loop/solver_coverage/fragments` =
+  B/C/D.json only and `git log --all -- .../A.json` is EMPTY. Same
+  `overnight.py:222-226` root cause as the 18:38Z/19:33Z/19:54Z cluster - now
+  the 8th strike.
+- Why it matters now: `dispatch_ready`'s LANDED_RE skips the row (note matches
+  `landed [0-9a-f]{7,}`), so SOLVER-SURVEY-A never re-dispatches while its
+  fragment is missing. **SOLVER-CHECKER (`depends_on` SURVEY-A/B/C/D) is
+  therefore NOT dispatchable**: A is the one unlanded dep. `gen_packet --check`
+  + `packet_lint` on SOLVER-CHECKER are BOTH green - the dependency gate is the
+  only blocker. Do NOT flip SOLVER-CHECKER.
+- Preserved (operator): A.json committed to
+  `refs/wip/SOLVER-SURVEY-A-fragment` = 9ed8d16 (17,723 lines) via a
+  temp-index commit-tree; the slot-1 worktree file left untracked/unstaged.
+  Recover with `git show 9ed8d16:loop/solver_coverage/fragments/A.json`.
+- What a human should do:
+  1. Land A.json from `refs/wip/SOLVER-SURVEY-A-fragment`
+     (`python loop/scripts/validate_survey.py` it, then commit AS DELIVERED per
+     the skipped-commit-step protocol) and clear the false `LANDED 7591ed2`
+     marker from the row note so the row reads DONE truthfully.
+  2. Fix `loop/overnight.py:222-226` so a landing REQUIRES a committed worker
+     diff (`head != base` / a no-op merge = NOT LANDED). Same item as the
+     18:38Z + 19:33Z + 19:54Z escalations - now the 8th strike; every
+     skipped-commit survey/worker self-blocks via the LANDED_RE trap until it
+     is fixed.
+  3. Only after A.json is landed: flip SOLVER-CHECKER READY (all four fragments
+     then truly present in HEAD).
+- Start from: `loop/overnight.py:222-226`;
+  `git show refs/wip/SOLVER-SURVEY-A-fragment`; `loop/slots/1/wt/RESULT.json`;
+  `grep -n 'SOLVER-SURVEY-A' loop/PACKETS.jsonl`.

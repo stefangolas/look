@@ -3275,3 +3275,44 @@ operator-landable; the tracked root RESULT.json still blocks the heartbeat's
 dispatch path (operator bypassed it for SURVEY-A); cargoq UP; heartbeat 1;
 operator runner 1; driver 1; watchdog 1; TWO supervisors; disk 13.9 GiB free;
 RAM 1.9 GiB free.
+
+---
+
+## [operator 2026-09-10T22:47Z] Board: 1 RUNNING (slot 0 MONO-6-SWEPT-BOOLEANS) / 0 landed-this-cycle / 8 BLOCKED
+
+- **Health (step 1)**: slot_status: slot 0 RUNNING MONO-6-SWEPT-BOOLEANS (pid
+  14596, events 0.3 min fresh, 2 files changed) healthy; slots 1-7 FINISHED
+  residue. cargoq ping `{"ok":true,"queued":0,"running":true}` (running = slot
+  0's build). Disk 21.4 GiB free (above the 15 GB goal); RAM 5.1 GB free.
+  Heartbeat scan returned 2 but one was THIS operator's own query command - the
+  only real heartbeat is 27872 (created 9/9 21:55). Watchdog scan returned 5 but
+  four were msedgewebview2 `--gpu-watchdog` matches + this query - the only real
+  watchdog is python 29264 (created 9/10 10:05). Exactly one of each.
+- **Landing (step 2)**: NOTHING operator-landable. Slots 2-7 FINISHED tips
+  (c3bc1a1/e6553db/3c2109b/ee97499/713f205/5cf4811) all ancestors of
+  integration/kernel-bg. **NEW: SOLVER-SURVEY-A (slot 1) is the 8th FALSE
+  LANDING** - see ESCALATIONS 22:47Z. HEAD 6233aff changed only PACKETS.jsonl;
+  the row note claims `LANDED 7591ed2` (the operator's own dispatch-stall
+  commit), and A.json (579,713 b) is untracked in slot 1 wt with `git log --all
+  -- .../A.json` EMPTY. Preserved A.json as refs/wip/SOLVER-SURVEY-A-fragment =
+  9ed8d16 (17,723 lines) via a temp-index commit-tree; worktree file left
+  untracked. Did NOT land and did NOT flip SOLVER-CHECKER.
+- **Unblock (step 3)**: no IDLE/DEAD >15 min slots, no QUESTION, no 402 -
+  nothing to do.
+- **Registry (step 4)**: 324 rows - 237 DONE / 79 READY / 8 BLOCKED.
+  BLOCKED-with-all-deps-truly-landed = NONE (SOLVER-CHECKER's dep A is the
+  unlanded one; the other 7 owner-parked/human-gated/superseded/cancelled).
+  `gen_packet --check` + `packet_lint` on SOLVER-CHECKER: both clean - the only
+  gate is the unlanded dep. Nothing flipped, no anchor drift, no lint fixes.
+- **Dispatch (step 5)**: `dispatch_ready --max-workers=4` -> "dispatched 0;
+  workers now ~1/4" = REAL idle. Heartbeat live (27872) - no manual dispatch.
+- **STATE.md (step 6)**: refreshed the "Where we are" LATEST GROUND TRUTH note
+  and appended the [operator 2026-09-10T22:47Z] block before the Session-58
+  traps.
+- **Escalation (step 7)**: 8th false landing (overnight.py:222-226) + the A.json
+  preserve ref; do not flip SOLVER-CHECKER until A.json lands.
+
+Leaving: 1 RUNNING (MONO-6 slot 0); HEAD 6233aff; A.json preserved at
+refs/wip/SOLVER-SURVEY-A-fragment 9ed8d16; SOLVER-CHECKER BLOCKED (dep A
+unlanded); heartbeat 1 (27872); watchdog 1 (29264); cargoq UP; disk 21.4 GiB
+free; RAM 5.1 GB free.

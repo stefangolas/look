@@ -76,16 +76,18 @@ corrected, annex C = ORACLE POLICY CHANGE), then docs/SOLVER_COVERAGE_SPEC.md
 ## Where we are
 
 > LATEST GROUND TRUTH: read the newest `[operator ...]` block in "State of
-> the machine, as left" (2026-09-10T22:23Z). [operator 2026-09-10T22:23Z
-> ground-truth note: 2 RUNNING (slot 0 MONO-6-SWEPT-BOOLEANS; slot 1
-> SOLVER-SURVEY-A, re-dispatched by the operator this cycle via the step-3c
-> run_packet path); nothing operator-landable (all FINISHED slot tips are
-> ancestors of integration/kernel-bg); the tracked root RESULT.json still
-> blocks the heartbeat's dispatch path - the operator bypassed it for SURVEY-A
-> but the dispatcher path still fails; HEAD 059c588; registry 324 rows - 237
-> DONE / 79 READY / 8 BLOCKED, nothing flippable; disk 13.9 GiB free (below the
-> 15 GB goal, above the 8 GB floor); RAM 1.9 GiB free (below the 3 GB floor, no
-> cargo/rustc).]
+> the machine, as left" (2026-09-10T22:47Z). [operator 2026-09-10T22:47Z
+> ground-truth note: 1 RUNNING (slot 0 MONO-6-SWEPT-BOOLEANS, pid 14596,
+> events <1 min fresh); 0 landed-this-cycle; nothing operator-landable (slots
+> 1-7 FINISHED residue, all tips ancestors of integration/kernel-bg); NEW 8th
+> FALSE LANDING - SOLVER-SURVEY-A: HEAD 6233aff changed only PACKETS.jsonl,
+> A.json (579,713 b) is untracked in slot 1 wt and in NO commit (HEAD tracks
+> B/C/D.json only), row READY with a false "LANDED 7591ed2" note; preserved as
+> refs/wip/SOLVER-SURVEY-A-fragment 9ed8d16; did NOT land, did NOT flip
+> SOLVER-CHECKER (dep A unlanded). HEAD 6233aff; registry 324 rows - 237 DONE /
+> 79 READY / 8 BLOCKED, nothing flippable; dispatch_ready dispatched 0 (real
+> idle, heartbeat-owned); disk 21.4 GiB free (above the 15 GB goal); RAM 5.1 GB
+> free; heartbeat 1, watchdog 1, cargoq UP.]
 
 - **THE FIRST KERNEL-VS-OCC TIMING COMPARISON IS BANKED** (FH-TIMING-REFRESH,
   landed c94d043): turbopump_assembly **0.097 s kernel vs 4.866 s OCC**,
@@ -5452,6 +5454,37 @@ Next actions
 unchanged: on MONO-6 landing -> author MONO-7-ROW-ASSEMBLY from its
 RESULT, then the R3 census under the new oracle policy; on SURVEY-A
 landing -> SOLVER-CHECKER unblocks.]
+
+[operator 2026-09-10T22:47Z - volatile refresh. Board now: 1 RUNNING / 0
+landed-this-cycle. **8th FALSE LANDING discovered: SOLVER-SURVEY-A.** HEAD
+6233aff ("row LANDED") changed only loop/PACKETS.jsonl; the claimed worker
+commit 7591ed2 is the operator's 21:57Z dispatch-stall commit (3 harness
+docs). A.json (579,713 b, 279 rules, RESULT status DONE) exists ONLY as an
+untracked file in slot 1's worktree; `git ls-files loop/solver_coverage/
+fragments` = B/C/D.json only and `git log --all -- .../A.json` is EMPTY, so
+the fragment is in NO commit - the overnight.py:222-226 merge-the-base class
+(8th strike). The row is READY but its note carries a false `LANDED 7591ed2`,
+so dispatch_ready's LANDED_RE skips it (self-blocked). Preserved the at-risk
+fragment as `refs/wip/SOLVER-SURVEY-A-fragment` = 9ed8d16 (17,723 lines) via
+commit-tree, worktree file left untracked. Did NOT land (no worker commit,
+the documented false-landing class is human-adjudicated) and did NOT flip
+SOLVER-CHECKER (its dep SOLVER-SURVEY-A is the unlanded one). gen_packet
+--check + packet_lint on SOLVER-CHECKER are BOTH green, but the dependency
+gate is real. Slot 0 MONO-6-SWEPT-BOOLEANS RUNNING healthy (pid 14596, events
+0.3 min fresh, 2 files changed). Slots 1-7 FINISHED residue; slots 2-7 tips
+(c3bc1a1/e6553db/3c2109b/ee97499/713f205/5cf4811) all ancestors of
+integration/kernel-bg. Nothing to unblock (no IDLE/DEAD >15 min, no
+QUESTION). Registry: 324 rows - 237 DONE / 79 READY / 8 BLOCKED;
+BLOCKED-with-all-deps-truly-landed = NONE (SOLVER-CHECKER's A unlanded; the
+other 7 owner-parked/human-gated/superseded/cancelled) - nothing flipped.
+dispatch_ready --max-workers=4: "dispatched 0; workers now ~1/4" = REAL idle
+(heartbeat-owned, no manual dispatch). Health: heartbeat exactly 1 (27872),
+watchdog exactly 1 (29264), cargoq UP (ping ok, queued 0, running true = slot
+0 build), disk 21.4 GiB free (above the 15 GB goal), RAM 5.1 GB free. Open
+human items: (NEW, hot) fix overnight.py:222-226 and land A.json from
+refs/wip/SOLVER-SURVEY-A-fragment; then clear the false LANDED marker and
+SOLVER-CHECKER unblocks. Carried: MONO-row schema gap (depends_on/write_allow
+unread by dispatch_ready); duplicate supervisors; slot-4/7 wt RESULT residue.]
 
 ### Session 58 (the MONO program, the coverage wave, the oracle policy change) - paid in full
 
