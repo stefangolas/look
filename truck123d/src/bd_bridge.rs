@@ -363,8 +363,17 @@ fn solid_volume(solid: &SolidSpec) -> Result<f64, Refusal> {
             Ok(geom.volume)
         }
         SolidSpec::Loft { sections, closed } => {
-            let validated = loft_sections(sections)?;
-            loft_volume(&validated, *closed)
+            // The landed analytic ruled arm stays the fast path for the class
+            // it already certifies (V5: bit-identical). A spline-section
+            // carrier falls to the certified smooth arm; a closed halo chain
+            // has no smooth certificate.
+            if let Ok(validated) = loft_sections(sections) {
+                return loft_volume(&validated, *closed);
+            }
+            if *closed {
+                return Err(open_smooth_loft());
+            }
+            certified_spline_loft_volume(sections).map(|(value, _, _)| value)
         }
     }
 }
@@ -899,15 +908,35 @@ fn solid_local_bbox(solid: &SolidSpec) -> Result<[[f64; 3]; 2], Refusal> {
             both,
         } => prism_bbox(profile, *amount, *both),
         SolidSpec::Loft { sections, .. } => {
-            let validated = loft_sections(sections)?;
+            if let Ok(validated) = loft_sections(sections) {
+                let mut min = [f64::INFINITY; 3];
+                let mut max = [f64::NEG_INFINITY; 3];
+                for loop3 in &validated.loops {
+                    let box3 = loop_bbox(loop3);
+                    for axis in 0..3 {
+                        min[axis] = min[axis].min(box3[0][axis]);
+                        max[axis] = max[axis].max(box3[1][axis]);
+                    }
+                }
+                if !min[0].is_finite() || !max[0].is_finite() {
+                    return Err(Refusal::Empty);
+                }
+                return Ok([min, max]);
+            }
+            // The ruled side surface is linear in the station axis, so the
+            // exact AABB is the union of the two section loops' exact AABBs.
+            if sections.len() != 2 {
+                return Err(open_smooth_loft());
+            }
+            let first = spline_loop_spans(sections.first().ok_or(Refusal::Empty)?)?;
+            let last = spline_loop_spans(sections.get(1).ok_or(Refusal::Empty)?)?;
+            let box_a = spline_loop_bbox3(&first)?;
+            let box_b = spline_loop_bbox3(&last)?;
             let mut min = [f64::INFINITY; 3];
             let mut max = [f64::NEG_INFINITY; 3];
-            for loop3 in &validated.loops {
-                let box3 = loop_bbox(loop3);
-                for axis in 0..3 {
-                    min[axis] = min[axis].min(box3[0][axis]);
-                    max[axis] = max[axis].max(box3[1][axis]);
-                }
+            for axis in 0..3 {
+                min[axis] = box_a[0][axis].min(box_b[0][axis]);
+                max[axis] = box_a[1][axis].max(box_b[1][axis]);
             }
             if !min[0].is_finite() || !max[0].is_finite() {
                 return Err(Refusal::Empty);
@@ -993,6 +1022,421 @@ fn cubic_roots(c: &[f64; 4]) -> Vec<f64> {
         }
     }
     roots
+}
+
+// ---------------------------------------------------------------------------
+// Spline-section loft facts: the certified smooth-volume arm
+// (BRIDGE-LOFT-FACTS)
+// ---------------------------------------------------------------------------
+//
+// A spline-section loft's exact volume is a kernel volume fact over the smooth
+// surface's L1-extracted tensor-Bernstein patches (ADM-003). The bridge cannot
+// name the kernel's `BSplineSurface<Vector4>` carrier directly (the one
+// sanctioned crate edge exposes only the stabilized facade's plain-data
+// entries), so it assembles the smooth surface's patches itself from the
+// recorded section curves and submits every patch to the sanctioned
+// `binding_volume_facts` entry, summing the certified brackets. The section
+// curves are reconstructed exactly (chord-length parameters, clamped cubic,
+// endpoint tangents from the degree-3 Lagrange interpolant — the same
+// convention the landed lathe arm reconstructs `Edge.make_spline` with), never
+// a flattening polygon.
+//
+// **The honesty line (scope decision 1).** The smooth station interpolation is
+// exactly determined by the recorded data only for a two-station loft, where
+// the smooth surface IS the ruled surface (every interpolation degree reduces
+// to the linear one across two stations). A three-or-more-station smooth
+// loft's station parameterization is an OCC `ThruSections` convention the row
+// does not record, so the arm refuses TYPED naming the open smooth carrier
+// rather than substituting a ruled approximation.
+
+/// One reconstructed 3-D spline span in the power basis over `u in [0, 1]`.
+#[derive(Debug, Clone, Copy)]
+struct SpanPoly3 {
+    /// The x component `x(u)`.
+    x: [f64; 4],
+    /// The y component `y(u)`.
+    y: [f64; 4],
+    /// The z component `z(u)`.
+    z: [f64; 4],
+}
+
+/// The typed refusal of a loft carrier whose smooth surface the recorded data
+/// does not determine (the open smooth carrier), never an approximation.
+fn open_smooth_loft() -> Refusal {
+    Refusal::UnsupportedEnvelope(EnvelopeCase::NonCanonicalCarrier)
+}
+
+/// The chord-length parameters of the 3-D samples.
+fn chord_params3(points: &[[f64; 3]]) -> Vec<f64> {
+    let mut params = Vec::with_capacity(points.len());
+    params.push(0.0);
+    for pair in points.windows(2) {
+        let dx = pair[1][0] - pair[0][0];
+        let dy = pair[1][1] - pair[0][1];
+        let dz = pair[1][2] - pair[0][2];
+        let next = params.last().copied().unwrap_or(0.0) + (dx * dx + dy * dy + dz * dz).sqrt();
+        params.push(next);
+    }
+    params
+}
+
+/// The power-basis quadratic span through three samples at normalized
+/// parameter `u1` (the 3-D specialization of the landed 2-D arm).
+fn quadratic_span3(p0: f64, p1: f64, p2: f64, u1: f64, denom: f64) -> [f64; 4] {
+    let q1 = (p1 - (1.0 - u1) * (1.0 - u1) * p0 - u1 * u1 * p2) / denom;
+    [p0, 2.0 * (q1 - p0), p0 - 2.0 * q1 + p2, 0.0]
+}
+
+/// The reconstructed spans of the 3-D OCC interpolating curve through the
+/// samples: the same fixed-order clamped cubic the landed lathe arm uses,
+/// component-wise.
+fn spline_spans3(points: &[[f64; 3]]) -> Result<Vec<SpanPoly3>, Refusal> {
+    let n = points.len();
+    if n < 2 {
+        return Err(Refusal::Empty);
+    }
+    for p in points {
+        if !p.iter().all(|c| c.is_finite()) {
+            return Err(Refusal::Empty);
+        }
+    }
+    let params = chord_params3(points);
+    if n == 2 {
+        let a = points[0];
+        let b = points[1];
+        return Ok(vec![SpanPoly3 {
+            x: [a[0], b[0] - a[0], 0.0, 0.0],
+            y: [a[1], b[1] - a[1], 0.0, 0.0],
+            z: [a[2], b[2] - a[2], 0.0, 0.0],
+        }]);
+    }
+    if n == 3 {
+        let u1 = (params[1] - params[0]) / (params[2] - params[0]);
+        let denom = 2.0 * u1 * (1.0 - u1);
+        if denom == 0.0 || !denom.is_finite() {
+            return Err(Refusal::Empty);
+        }
+        return Ok(vec![SpanPoly3 {
+            x: quadratic_span3(points[0][0], points[1][0], points[2][0], u1, denom),
+            y: quadratic_span3(points[0][1], points[1][1], points[2][1], u1, denom),
+            z: quadratic_span3(points[0][2], points[1][2], points[2][2], u1, denom),
+        }]);
+    }
+    let xy: Vec<[f64; 2]> = points.iter().map(|p| [p[0], p[1]]).collect();
+    let xz: Vec<[f64; 2]> = points.iter().map(|p| [p[0], p[2]]).collect();
+    let sxy = clamped_slopes(&xy, &params)?;
+    let sxz = clamped_slopes(&xz, &params)?;
+    let mut spans = Vec::with_capacity(n - 1);
+    for i in 0..n - 1 {
+        let h = params.get(i + 1).copied().ok_or(Refusal::Empty)?
+            - params.get(i).copied().ok_or(Refusal::Empty)?;
+        let p0 = points.get(i).ok_or(Refusal::Empty)?;
+        let p1 = points.get(i + 1).ok_or(Refusal::Empty)?;
+        let s0xy = sxy.get(i).ok_or(Refusal::Empty)?;
+        let s1xy = sxy.get(i + 1).ok_or(Refusal::Empty)?;
+        let s0xz = sxz.get(i).ok_or(Refusal::Empty)?;
+        let s1xz = sxz.get(i + 1).ok_or(Refusal::Empty)?;
+        spans.push(SpanPoly3 {
+            x: hermite_power(p0[0], p1[0], h * s0xy[0], h * s1xy[0]),
+            y: hermite_power(p0[1], p1[1], h * s0xy[1], h * s1xy[1]),
+            z: hermite_power(p0[2], p1[2], h * s0xz[1], h * s1xz[1]),
+        });
+    }
+    Ok(spans)
+}
+
+/// The degree-3 Bernstein controls of a power-basis cubic (exact degree
+/// elevation is a no-op here: a lower-degree span carries zero high
+/// coefficients).
+fn cubic_bernstein(p: &[f64; 4]) -> [f64; 4] {
+    [
+        p[0],
+        p[0] + p[1] / 3.0,
+        p[0] + 2.0 * p[1] / 3.0 + p[2] / 3.0,
+        p[0] + p[1] + p[2] + p[3],
+    ]
+}
+
+/// The `4 x 3` Bernstein control row of one reconstructed span.
+fn span3_bernstein(span: &SpanPoly3) -> [[f64; 3]; 4] {
+    let bx = cubic_bernstein(&span.x);
+    let by = cubic_bernstein(&span.y);
+    let bz = cubic_bernstein(&span.z);
+    [
+        [bx[0], by[0], bz[0]],
+        [bx[1], by[1], bz[1]],
+        [bx[2], by[2], bz[2]],
+        [bx[3], by[3], bz[3]],
+    ]
+}
+
+/// The reconstructed spans of a closed section loop (line and spline edges),
+/// with the exact seam closure checked. Every edge's recorded end must meet the
+/// next edge's recorded start and the last must return to the first.
+fn spline_loop_spans(profile: &[ProfileEdge]) -> Result<Vec<SpanPoly3>, Refusal> {
+    if profile.is_empty() {
+        return Err(Refusal::Empty);
+    }
+    let mut spans: Vec<SpanPoly3> = Vec::new();
+    let mut starts: Vec<[f64; 3]> = Vec::new();
+    let mut ends: Vec<[f64; 3]> = Vec::new();
+    for edge in profile {
+        match edge {
+            ProfileEdge::Line { a, b } => {
+                if !a.iter().all(|c| c.is_finite()) || !b.iter().all(|c| c.is_finite()) {
+                    return Err(Refusal::Empty);
+                }
+                starts.push(*a);
+                ends.push(*b);
+                spans.push(SpanPoly3 {
+                    x: [a[0], b[0] - a[0], 0.0, 0.0],
+                    y: [a[1], b[1] - a[1], 0.0, 0.0],
+                    z: [a[2], b[2] - a[2], 0.0, 0.0],
+                });
+            }
+            ProfileEdge::Spline { points } => {
+                if points.len() < 2 {
+                    return Err(Refusal::Empty);
+                }
+                starts.push(*points.first().ok_or(Refusal::Empty)?);
+                ends.push(*points.last().ok_or(Refusal::Empty)?);
+                spans.extend(spline_spans3(points)?);
+            }
+        }
+    }
+    let count = starts.len();
+    if count < 2 {
+        return Err(open_smooth_loft());
+    }
+    let mut scale = 0.0f64;
+    for p in starts.iter().chain(ends.iter()) {
+        for c in p {
+            scale = scale.max(c.abs());
+        }
+    }
+    let tol = 1e-9 * (1.0 + scale);
+    for i in 0..count {
+        let next = starts.get((i + 1) % count).ok_or(Refusal::Empty)?;
+        let gap = v3_norm(v3_sub(*ends.get(i).ok_or(Refusal::Empty)?, *next));
+        if !(gap <= tol) {
+            return Err(open_smooth_loft());
+        }
+    }
+    Ok(spans)
+}
+
+/// The exact `int_0^1 a(u) b(u) du` of two power-basis polynomials.
+fn poly_integral(a: &[f64; 4], b: &[f64; 4]) -> f64 {
+    let mut acc = 0.0;
+    for (i, ai) in a.iter().enumerate() {
+        for (j, bj) in b.iter().enumerate() {
+            acc += ai * bj / ((i + j + 1) as f64);
+        }
+    }
+    acc
+}
+
+/// The signed half area moment `(1/2) int_0^1 r(u) x r'(u) du` of one span.
+fn span_area_moment(span: &SpanPoly3) -> [f64; 3] {
+    let dx = [span.x[1], 2.0 * span.x[2], 3.0 * span.x[3], 0.0];
+    let dy = [span.y[1], 2.0 * span.y[2], 3.0 * span.y[3], 0.0];
+    let dz = [span.z[1], 2.0 * span.z[2], 3.0 * span.z[3], 0.0];
+    [
+        0.5 * (poly_integral(&span.y, &dz) - poly_integral(&span.z, &dy)),
+        0.5 * (poly_integral(&span.z, &dx) - poly_integral(&span.x, &dz)),
+        0.5 * (poly_integral(&span.x, &dy) - poly_integral(&span.y, &dx)),
+    ]
+}
+
+/// The signed area vector of a closed reconstructed loop (Green's theorem).
+fn spline_loop_area_vector(spans: &[SpanPoly3]) -> [f64; 3] {
+    let mut area = [0.0f64; 3];
+    for span in spans {
+        let moment = span_area_moment(span);
+        area[0] += moment[0];
+        area[1] += moment[1];
+        area[2] += moment[2];
+    }
+    area
+}
+
+/// The exact local AABB of a closed reconstructed loop: the span endpoints plus
+/// every interior extremum of each cubic component.
+fn spline_loop_bbox3(spans: &[SpanPoly3]) -> Result<[[f64; 3]; 2], Refusal> {
+    let mut min = [f64::INFINITY; 3];
+    let mut max = [f64::NEG_INFINITY; 3];
+    for span in spans {
+        for (axis, coeffs) in [&span.x, &span.y, &span.z].into_iter().enumerate() {
+            let start = coeffs[0];
+            let end = coeffs[0] + coeffs[1] + coeffs[2] + coeffs[3];
+            min[axis] = min[axis].min(start).min(end);
+            max[axis] = max[axis].max(start).max(end);
+            for root in cubic_roots(coeffs) {
+                let value = coeffs[0] + root * (coeffs[1] + root * (coeffs[2] + root * coeffs[3]));
+                min[axis] = min[axis].min(value);
+                max[axis] = max[axis].max(value);
+            }
+        }
+    }
+    if !min[0].is_finite() || !max[0].is_finite() {
+        return Err(Refusal::Empty);
+    }
+    Ok([min, max])
+}
+
+/// The certified volume of a two-station spline-section loft: every ruled side
+/// patch's face form through the sanctioned `binding_volume_facts` entry plus
+/// the exact planar end-cap moments, returned as `(value, lo, hi)`. Any other
+/// section stack refuses typed naming the open smooth carrier.
+fn certified_spline_loft_volume(sections: &[Vec<ProfileEdge>]) -> Result<(f64, f64, f64), Refusal> {
+    if sections.len() != 2 {
+        return Err(open_smooth_loft());
+    }
+    let first = spline_loop_spans(sections.first().ok_or(Refusal::Empty)?)?;
+    let last = spline_loop_spans(sections.get(1).ok_or(Refusal::Empty)?)?;
+    if first.is_empty() || first.len() != last.len() {
+        return Err(open_smooth_loft());
+    }
+    let mut value = 0.0f64;
+    let mut lo = 0.0f64;
+    let mut hi = 0.0f64;
+    for (a, b) in first.iter().zip(last.iter()) {
+        let ba = span3_bernstein(a);
+        let bb = span3_bernstein(b);
+        let mut numerator: Vec<Vec<[f64; 3]>> = Vec::with_capacity(4);
+        for i in 0..4 {
+            numerator.push(vec![
+                *ba.get(i).ok_or(Refusal::Empty)?,
+                *bb.get(i).ok_or(Refusal::Empty)?,
+            ]);
+        }
+        let weights = vec![vec![1.0, 1.0]; 4];
+        let row = crate::python::binding::VolumeRow {
+            numerator,
+            weights,
+            orientation: 1.0,
+        };
+        let json = crate::python::binding::volume_facts(&row).map_err(|_| open_smooth_loft())?;
+        let outcome: serde_json::Value = serde_json::from_str(&json).map_err(|_| Refusal::Empty)?;
+        value += outcome
+            .get("value")
+            .and_then(serde_json::Value::as_f64)
+            .ok_or(Refusal::Empty)?;
+        lo += outcome
+            .pointer("/bracket/lo")
+            .and_then(serde_json::Value::as_f64)
+            .ok_or(Refusal::Empty)?;
+        hi += outcome
+            .pointer("/bracket/hi")
+            .and_then(serde_json::Value::as_f64)
+            .ok_or(Refusal::Empty)?;
+    }
+
+    // The planar end caps: `(1/3) d A` with the recorded-loop winding, exactly
+    // as the landed line-loft arm's cap terms.
+    let area_a = spline_loop_area_vector(&first);
+    let area_b = spline_loop_area_vector(&last);
+    let mag_a = v3_norm(area_a);
+    let mag_b = v3_norm(area_b);
+    if !(mag_a > 0.0) || !(mag_b > 0.0) {
+        return Err(open_smooth_loft());
+    }
+    let normal_a = [area_a[0] / mag_a, area_a[1] / mag_a, area_a[2] / mag_a];
+    let normal_b = [area_b[0] / mag_b, area_b[1] / mag_b, area_b[2] / mag_b];
+    let start_a = first.first().ok_or(Refusal::Empty)?;
+    let start_b = last.first().ok_or(Refusal::Empty)?;
+    let point_a = [start_a.x[0], start_a.y[0], start_a.z[0]];
+    let point_b = [start_b.x[0], start_b.y[0], start_b.z[0]];
+    let cap_a = -(1.0 / 3.0) * mag_a * v3_dot(normal_a, point_a);
+    let cap_b = (1.0 / 3.0) * mag_b * v3_dot(normal_b, point_b);
+    value += cap_a + cap_b;
+    lo += cap_a + cap_b;
+    hi += cap_a + cap_b;
+    if !value.is_finite() || !lo.is_finite() || !hi.is_finite() {
+        return Err(Refusal::Empty);
+    }
+    if value < 0.0 {
+        Ok((value.abs(), -hi, -lo))
+    } else {
+        Ok((value, lo, hi))
+    }
+}
+
+/// Evaluates a reconstructed 3-D span at `u in [0, 1]`.
+fn eval_span3(span: &SpanPoly3, u: f64) -> [f64; 3] {
+    [
+        span.x[0] + u * (span.x[1] + u * (span.x[2] + u * span.x[3])),
+        span.y[0] + u * (span.y[1] + u * (span.y[2] + u * span.y[3])),
+        span.z[0] + u * (span.z[1] + u * (span.z[2] + u * span.z[3])),
+    ]
+}
+
+/// Samples every span of a closed reconstructed loop at `MESH_SEGMENTS` steps.
+fn sample_loop3(spans: &[SpanPoly3]) -> Vec<[f64; 3]> {
+    let mut out = Vec::with_capacity(spans.len() * MESH_SEGMENTS);
+    for span in spans {
+        for step in 0..MESH_SEGMENTS {
+            out.push(eval_span3(span, step as f64 / MESH_SEGMENTS as f64));
+        }
+    }
+    out
+}
+
+/// The centroid of a point cloud.
+fn centroid3(points: &[[f64; 3]]) -> [f64; 3] {
+    let mut c = [0.0f64; 3];
+    for p in points {
+        c[0] += p[0];
+        c[1] += p[1];
+        c[2] += p[2];
+    }
+    let k = 1.0 / (points.len() as f64);
+    [c[0] * k, c[1] * k, c[2] * k]
+}
+
+/// The deterministic local mesh of a two-station spline-section loft: ruled
+/// quads between the sampled reconstructed loops plus the two end-cap fans.
+fn spline_loft_mesh(sections: &[Vec<ProfileEdge>]) -> Result<Vec<Triangle>, Refusal> {
+    if sections.len() != 2 {
+        return Err(open_smooth_loft());
+    }
+    let first = spline_loop_spans(sections.first().ok_or(Refusal::Empty)?)?;
+    let last = spline_loop_spans(sections.get(1).ok_or(Refusal::Empty)?)?;
+    if first.is_empty() || first.len() != last.len() {
+        return Err(open_smooth_loft());
+    }
+    let pa = sample_loop3(&first);
+    let pb = sample_loop3(&last);
+    let count = pa.len();
+    let mut out = Vec::new();
+    for i in 0..count {
+        let j = (i + 1) % count;
+        push_quad(
+            &mut out,
+            *pa.get(i).ok_or(Refusal::Empty)?,
+            *pa.get(j).ok_or(Refusal::Empty)?,
+            *pb.get(j).ok_or(Refusal::Empty)?,
+            *pb.get(i).ok_or(Refusal::Empty)?,
+        );
+    }
+    let ca = centroid3(&pa);
+    let cb = centroid3(&pb);
+    for i in 0..count {
+        let j = (i + 1) % count;
+        push_tri(
+            &mut out,
+            ca,
+            *pa.get(i).ok_or(Refusal::Empty)?,
+            *pa.get(j).ok_or(Refusal::Empty)?,
+        );
+        push_tri(
+            &mut out,
+            cb,
+            *pb.get(i).ok_or(Refusal::Empty)?,
+            *pb.get(j).ok_or(Refusal::Empty)?,
+        );
+    }
+    Ok(out)
 }
 
 // ---------------------------------------------------------------------------
@@ -1593,10 +2037,17 @@ fn top_seam_mismatch(root: &TreeNode) -> Result<Option<f64>, Refusal> {
     match root {
         TreeNode::Part { part } => match &part.solid {
             SolidSpec::Loft { sections, closed } => {
-                let validated = loft_sections(sections)?;
-                let mismatch = loft_seam_mismatch(&validated, *closed)?;
-                if *closed {
-                    Ok(Some(mismatch))
+                if let Ok(validated) = loft_sections(sections) {
+                    let mismatch = loft_seam_mismatch(&validated, *closed)?;
+                    if *closed {
+                        Ok(Some(mismatch))
+                    } else {
+                        Ok(None)
+                    }
+                } else if *closed {
+                    // A closed halo chain has no smooth certificate: the seam
+                    // identity is only defined over the recorded line carrier.
+                    Err(open_smooth_loft())
                 } else {
                     Ok(None)
                 }
@@ -1885,6 +2336,14 @@ fn prism_mesh(profile: &[ProfileEdge], amount: f64, both: bool) -> Result<Vec<Tr
 /// chain. A closed halo row's last station repeats the first station, so the
 /// side surface closes on itself and needs no caps.
 fn loft_mesh(sections: &[Vec<ProfileEdge>], closed: bool) -> Result<Vec<Triangle>, Refusal> {
+    // The certified spline-section class meshes through the reconstructed
+    // ruled surface; a closed smooth chain has no certificate.
+    if loft_sections(sections).is_err() {
+        if closed {
+            return Err(open_smooth_loft());
+        }
+        return spline_loft_mesh(sections);
+    }
     let validated = loft_sections(sections)?;
     let loops = &validated.loops;
     let mut out = Vec::new();
@@ -3627,6 +4086,245 @@ print(json.dumps([z_row, loft_row]))
     }
 
     // -----------------------------------------------------------------------
+
+    // Spline-section loft facts through the certified volume arm
+    // (BRIDGE-LOFT-FACTS): the smooth two-station class certifies through the
+    // binding, the landed line class stays bit-identical, and a smooth carrier
+    // the recorded data does not determine refuses typed.
+    // -----------------------------------------------------------------------
+
+    /// A closed section loop of four spline edges, each through its two corners
+    /// and their midpoint (collinear): geometrically a unit square, carried by
+    /// `ProfileEdge::Spline` so the analytic line arm refuses it.
+    fn spline_square(z0: f64) -> Vec<ProfileEdge> {
+        let corners = [
+            [0.0, 0.0, z0],
+            [1.0, 0.0, z0],
+            [1.0, 1.0, z0],
+            [0.0, 1.0, z0],
+        ];
+        let mut edges = Vec::with_capacity(4);
+        for i in 0..4 {
+            let a = corners[i];
+            let b = corners[(i + 1) % 4];
+            let mid = [
+                0.5 * (a[0] + b[0]),
+                0.5 * (a[1] + b[1]),
+                0.5 * (a[2] + b[2]),
+            ];
+            edges.push(ProfileEdge::Spline {
+                points: vec![a, mid, b],
+            });
+        }
+        edges
+    }
+
+    /// A closed section loop of four quadratic spline edges bulging outward
+    /// from the unit square: a genuinely curved spline section carrier.
+    fn spline_lens(z0: f64) -> Vec<ProfileEdge> {
+        let corners = [
+            [0.0, 0.0, z0],
+            [1.0, 0.0, z0],
+            [1.0, 1.0, z0],
+            [0.0, 1.0, z0],
+        ];
+        let center = [0.5, 0.5, z0];
+        let mut edges = Vec::with_capacity(4);
+        for i in 0..4 {
+            let a = corners[i];
+            let b = corners[(i + 1) % 4];
+            let mid = [0.5 * (a[0] + b[0]), 0.5 * (a[1] + b[1]), z0];
+            let dx = mid[0] - center[0];
+            let dy = mid[1] - center[1];
+            let len = (dx * dx + dy * dy).sqrt();
+            let outward = [mid[0] + 0.15 * dx / len, mid[1] + 0.15 * dy / len, z0];
+            edges.push(ProfileEdge::Spline {
+                points: vec![a, outward, b],
+            });
+        }
+        edges
+    }
+
+    /// The 5-point Gauss-Legendre nodes on `[0, 1]`.
+    const GAUSS5_NODES: [f64; 5] = [
+        0.046_910_077_030_668_0,
+        0.230_765_344_947_158_5,
+        0.5,
+        0.769_234_655_052_841_5,
+        0.953_089_922_969_332_0,
+    ];
+    /// The 5-point Gauss-Legendre weights on `[0, 1]`.
+    const GAUSS5_WEIGHTS: [f64; 5] = [
+        0.118_463_442_528_094_6,
+        0.239_314_335_249_683_2,
+        0.284_444_444_444_444_4,
+        0.239_314_335_249_683_2,
+        0.118_463_442_528_094_6,
+    ];
+
+    /// The derivative of a reconstructed 3-D span at `u`.
+    fn span3_derivative(span: &SpanPoly3, u: f64) -> [f64; 3] {
+        [
+            span.x[1] + u * (2.0 * span.x[2] + u * 3.0 * span.x[3]),
+            span.y[1] + u * (2.0 * span.y[2] + u * 3.0 * span.y[3]),
+            span.z[1] + u * (2.0 * span.z[2] + u * 3.0 * span.z[3]),
+        ]
+    }
+
+    /// The exact side-surface divergence-form integral of a two-station ruled
+    /// spline loft, computed independently of the kernel's Bernstein route by
+    /// 5x2 Gauss-Legendre quadrature (exact: the integrand is bidegree (8, 2)).
+    fn gauss_side_volume(sections: &[Vec<ProfileEdge>]) -> f64 {
+        let a = spline_loop_spans(&sections[0]).expect("reconstruct first");
+        let b = spline_loop_spans(&sections[1]).expect("reconstruct last");
+        let inv3 = 1.0 / 3.0f64.sqrt();
+        let nodes2 = [0.5 - 0.5 * inv3, 0.5 + 0.5 * inv3];
+        let weights2 = [0.5, 0.5];
+        let mut total = 0.0;
+        for (sa, sb) in a.iter().zip(b.iter()) {
+            for (iu, &u) in GAUSS5_NODES.iter().enumerate() {
+                let aval = eval_span3(sa, u);
+                let bval = eval_span3(sb, u);
+                let da = span3_derivative(sa, u);
+                let db = span3_derivative(sb, u);
+                for (iv, &v) in nodes2.iter().enumerate() {
+                    let x = [
+                        (1.0 - v) * aval[0] + v * bval[0],
+                        (1.0 - v) * aval[1] + v * bval[1],
+                        (1.0 - v) * aval[2] + v * bval[2],
+                    ];
+                    let xu = [
+                        (1.0 - v) * da[0] + v * db[0],
+                        (1.0 - v) * da[1] + v * db[1],
+                        (1.0 - v) * da[2] + v * db[2],
+                    ];
+                    let xv = [bval[0] - aval[0], bval[1] - aval[1], bval[2] - aval[2]];
+                    total += GAUSS5_WEIGHTS[iu] * weights2[iv] * v3_dot(x, v3_cross(xu, xv)) / 3.0;
+                }
+            }
+        }
+        total
+    }
+
+    #[test]
+    fn spline_section_loft_volume_certified_bracket() {
+        // A genuinely curved spline-section loft certifies through the binding:
+        // the returned bracket encloses the value, the bracket is tight, and
+        // the value matches an independent Gauss-Legendre integration of the
+        // same ruled surface plus the exact planar caps.
+        let sections = vec![spline_lens(0.0), spline_lens(5.0)];
+        let (value, lo, hi) = certified_spline_loft_volume(&sections)
+            .expect("a two-station spline-section loft certifies");
+        assert!(
+            lo <= value && value <= hi,
+            "the bracket [{lo}, {hi}] must enclose {value}"
+        );
+        assert!(
+            (hi - lo) < 1.0e-6,
+            "the certified bracket is tight: [{lo}, {hi}]"
+        );
+        let first = spline_loop_spans(&sections[0]).expect("first loop");
+        let last = spline_loop_spans(&sections[1]).expect("last loop");
+        let av = spline_loop_area_vector(&first);
+        let bv = spline_loop_area_vector(&last);
+        let ma = v3_norm(av);
+        let mb = v3_norm(bv);
+        let pa = [first[0].x[0], first[0].y[0], first[0].z[0]];
+        let pb = [last[0].x[0], last[0].y[0], last[0].z[0]];
+        let caps = -(1.0 / 3.0) * ma * v3_dot([av[0] / ma, av[1] / ma, av[2] / ma], pa)
+            + (1.0 / 3.0) * mb * v3_dot([bv[0] / mb, bv[1] / mb, bv[2] / mb], pb);
+        let expected = gauss_side_volume(&sections) + caps;
+        assert!(
+            (value - expected.abs()).abs() < 1.0e-9,
+            "the certified value {value} must match the independent {expected}"
+        );
+    }
+
+    #[test]
+    fn loft_facts_match_recorded_reference_on_flip() {
+        // The recorded reference for the equivalent line-loop prism is 5.0
+        // (the landed line-loft arm's exact value). The spline-section carrier
+        // flips from the analytic arm's typed refusal to the certified arm's
+        // answer, matching the reference exactly.
+        let sections = vec![spline_square(0.0), spline_square(5.0)];
+        assert!(
+            loft_sections(&sections).is_err(),
+            "the analytic line arm must refuse the spline carrier"
+        );
+        let facts = tree_facts(&part(
+            SolidSpec::Loft {
+                sections: sections.clone(),
+                closed: false,
+            },
+            0.0,
+            0.0,
+            0.0,
+        ))
+        .expect("the spline-section loft certifies");
+        let reference = 5.0f64;
+        assert!(
+            (facts.volume - reference).abs() < 1.0e-9,
+            "spline-section facts {} must match the recorded reference {reference}",
+            facts.volume
+        );
+        assert_eq!(facts.solid_count, 1);
+        assert_eq!(facts.bbox[0], [0.0, 0.0, 0.0]);
+        assert_eq!(facts.bbox[1], [1.0, 1.0, 5.0]);
+    }
+
+    #[test]
+    fn line_loft_rows_answer_bit_identically() {
+        // V5 net: the landed line-section loft rows answer bit-identically
+        // through the facts arm (the analytic ruled path stays the fast path).
+        let a = square(0.0);
+        let b = square(5.0);
+        let facts = tree_facts(&part(
+            SolidSpec::Loft {
+                sections: vec![a.clone(), b.clone()],
+                closed: false,
+            },
+            0.0,
+            0.0,
+            0.0,
+        ))
+        .expect("line-section loft");
+        let validated = loft_sections(&[a, b]).expect("line sections");
+        let landed = loft_volume(&validated, false).expect("landed volume");
+        assert_eq!(facts.volume.to_bits(), landed.to_bits());
+        assert_eq!(facts.volume.to_bits(), 5.0f64.to_bits());
+    }
+
+    #[test]
+    fn unmatched_loft_carrier_refuses_typed() {
+        // A three-station smooth spline loft: the station interpolation is not
+        // recorded, so the arm refuses typed naming the open smooth carrier.
+        let three = SolidSpec::Loft {
+            sections: vec![spline_lens(0.0), spline_lens(2.0), spline_lens(5.0)],
+            closed: false,
+        };
+        let refusal = tree_facts(&part(three, 0.0, 0.0, 0.0))
+            .expect_err("three smooth stations must refuse typed");
+        assert!(matches!(
+            refusal,
+            Refusal::UnsupportedEnvelope(EnvelopeCase::NonCanonicalCarrier)
+        ));
+
+        // Mismatched section span counts refuse typed too.
+        let mismatched = SolidSpec::Loft {
+            sections: vec![
+                spline_square(0.0),
+                line_loop3(&[[0.0, 0.0, 5.0], [1.0, 0.0, 5.0], [0.5, 1.0, 5.0]]),
+            ],
+            closed: false,
+        };
+        let refusal = tree_facts(&part(mismatched, 0.0, 0.0, 0.0))
+            .expect_err("mismatched sections must refuse typed");
+        assert!(matches!(
+            refusal,
+            Refusal::UnsupportedEnvelope(EnvelopeCase::NonCanonicalCarrier)
+        ));
+    }
+
     // Boolean rows through the boolean funnel (BRIDGE-BOOLEANS): the door
     // shim's cut/fuse/intersect record BooleanOp rows {mode, a, b} and dispatch
     // through the boolean entry; placed operands are canonical (the LOCAL
