@@ -158,6 +158,34 @@ pub enum SolidSpec {
         #[serde(default)]
         both: bool,
     },
+    /// The spline-trimmed extrude constructor row (TRIM-EXTRUDE-CTOR): the
+    /// base profile plus a recorded closed spline trim curve and (optionally)
+    /// the trim's algebraic pullback net. The composition itself lives in the
+    /// binding layer (`crate::python::binding::trim_extrude`); this arm is a
+    /// pure pass-through so the door vocabulary reaches the constructor and
+    /// the facts/mesh re-enter the normal executor path.
+    TrimPrism {
+        /// The base profile boundary edges (line loop; a spline edge is a
+        /// recorded trim carrier the constructor classifies).
+        profile: Vec<ProfileEdge>,
+        /// The swept length along the profile-plane normal.
+        amount: f64,
+        /// Extrude symmetrically about the profile plane.
+        #[serde(default)]
+        both: bool,
+        /// The closed spline curve control points (first == last for a closed
+        /// loop); empty for a full extrude.
+        #[serde(default)]
+        trim_curve: Vec<[f64; 3]>,
+        /// The curve's pullback net (row-major Bernstein grid over
+        /// the unit square, `>= 0` kept); empty when only the parametric curve
+        /// is recorded.
+        #[serde(default)]
+        trim_net: Vec<Vec<f64>>,
+        /// The requested certified bracket tolerance.
+        #[serde(default = "default_trim_tolerance")]
+        tolerance: f64,
+    },
     /// `loft(sections)` (and, for a closed station list, the sweep-as-loft-chain
     /// form): an ordered stack of section profiles, each a closed planar
     /// line-loop in the part's local 3-D frame, interpolated by matching
@@ -177,6 +205,12 @@ pub enum SolidSpec {
         #[serde(default)]
         closed: bool,
     },
+}
+
+/// The default certified bracket tolerance of a trim-prism row (the door's
+/// recorded `1e-3`; dimensionless, per ADM-003's trim tolerance scale).
+fn default_trim_tolerance() -> f64 {
+    1.0e-3
 }
 
 /// The recorded full orthonormal placement rotation of one part (the frame
@@ -362,6 +396,18 @@ fn solid_volume(solid: &SolidSpec) -> Result<f64, Refusal> {
             let geom = prism_geom(profile, *amount, *both)?;
             Ok(geom.volume)
         }
+        SolidSpec::TrimPrism {
+            profile,
+            amount,
+            both,
+            trim_curve,
+            trim_net,
+            tolerance,
+        } => crate::python::binding::trim_extrude_solid(
+            profile, *amount, *both, trim_curve, trim_net, *tolerance,
+        )
+        .map(|facts| facts.volume)
+        .map_err(trim_binding_error_to_refusal),
         SolidSpec::Loft { sections, closed } => {
             let validated = loft_sections(sections)?;
             loft_volume(&validated, *closed)
@@ -898,6 +944,18 @@ fn solid_local_bbox(solid: &SolidSpec) -> Result<[[f64; 3]; 2], Refusal> {
             amount,
             both,
         } => prism_bbox(profile, *amount, *both),
+        SolidSpec::TrimPrism {
+            profile,
+            amount,
+            both,
+            trim_curve,
+            trim_net,
+            tolerance,
+        } => crate::python::binding::trim_extrude_solid(
+            profile, *amount, *both, trim_curve, trim_net, *tolerance,
+        )
+        .map(|facts| facts.bbox)
+        .map_err(trim_binding_error_to_refusal),
         SolidSpec::Loft { sections, .. } => {
             let validated = loft_sections(sections)?;
             let mut min = [f64::INFINITY; 3];
@@ -1157,16 +1215,21 @@ fn v3_norm(a: [f64; 3]) -> f64 {
 
 /// The local bounding box and volume of an exact prism extruded from a closed
 /// planar line-loop profile along its plane normal.
-struct PrismGeom {
+pub(crate) struct PrismGeom {
     loop3: ProfileLoop,
     /// Signed start offset along the normal (0 or -amount).
     t_lo: f64,
     /// Signed end offset along the normal (amount, or amount when both).
     t_hi: f64,
-    volume: f64,
+    /// The exact prism volume.
+    pub(crate) volume: f64,
 }
 
-fn prism_geom(profile: &[ProfileEdge], amount: f64, both: bool) -> Result<PrismGeom, Refusal> {
+pub(crate) fn prism_geom(
+    profile: &[ProfileEdge],
+    amount: f64,
+    both: bool,
+) -> Result<PrismGeom, Refusal> {
     if !amount.is_finite() || amount <= 0.0 {
         return Err(Refusal::Empty);
     }
@@ -1188,7 +1251,11 @@ fn prism_geom(profile: &[ProfileEdge], amount: f64, both: bool) -> Result<PrismG
 
 /// The exact local AABB of an extruded prism: the profile loop's support along
 /// each axis, widened by the extrusion range along the plane normal.
-fn prism_bbox(profile: &[ProfileEdge], amount: f64, both: bool) -> Result<[[f64; 3]; 2], Refusal> {
+pub(crate) fn prism_bbox(
+    profile: &[ProfileEdge],
+    amount: f64,
+    both: bool,
+) -> Result<[[f64; 3]; 2], Refusal> {
     let geom = prism_geom(profile, amount, both)?;
     let n = geom.loop3.normal;
     let box0 = loop_bbox(&geom.loop3);
@@ -1479,7 +1546,8 @@ fn solid_carrier_class(solid: &SolidSpec) -> CarrierClass {
         SolidSpec::Box { .. }
         | SolidSpec::Cylinder { .. }
         | SolidSpec::Sphere { .. }
-        | SolidSpec::Prism { .. } => CarrierClass::Canonical,
+        | SolidSpec::Prism { .. }
+        | SolidSpec::TrimPrism { .. } => CarrierClass::Canonical,
         SolidSpec::Torus { .. } => CarrierClass::Torus,
         SolidSpec::Lathe { profile, .. } => {
             if profile
@@ -1679,7 +1747,7 @@ fn top_volume(node: &TreeNode) -> Result<f64, Refusal> {
 
 /// One triangle: nine `f64` coordinates (three `x y z` vertices), world
 /// space.
-type Triangle = [f64; 9];
+pub(crate) type Triangle = [f64; 9];
 
 /// The angular resolution of the mesh (fixed, deterministic).
 const MESH_SEGMENTS: usize = 64;
@@ -1816,13 +1884,29 @@ fn solid_mesh(solid: &SolidSpec) -> Result<Vec<Triangle>, Refusal> {
             amount,
             both,
         } => prism_mesh(profile, *amount, *both),
+        SolidSpec::TrimPrism {
+            profile,
+            amount,
+            both,
+            trim_curve,
+            trim_net,
+            tolerance,
+        } => crate::python::binding::trim_extrude_solid(
+            profile, *amount, *both, trim_curve, trim_net, *tolerance,
+        )
+        .map(|facts| facts.mesh)
+        .map_err(trim_binding_error_to_refusal),
         SolidSpec::Loft { sections, closed } => loft_mesh(sections, *closed),
     }
 }
 
 /// The local mesh of an extruded prism: the profile boundary swept between the
 /// two end planes plus cap fans. Deterministic, closed, no duplicate vertices.
-fn prism_mesh(profile: &[ProfileEdge], amount: f64, both: bool) -> Result<Vec<Triangle>, Refusal> {
+pub(crate) fn prism_mesh(
+    profile: &[ProfileEdge],
+    amount: f64,
+    both: bool,
+) -> Result<Vec<Triangle>, Refusal> {
     let geom = prism_geom(profile, amount, both)?;
     let norm = geom.loop3.normal;
     let verts = &geom.loop3.verts;
@@ -2271,6 +2355,19 @@ pub fn write_tree_stl(root: &TreeNode, path: &str) -> Result<u64, Refusal> {
 /// Parses a submitted construction tree JSON.
 fn parse_tree(tree_json: &str) -> Result<TreeNode, Refusal> {
     serde_json::from_str(tree_json).map_err(|_| Refusal::Empty)
+}
+
+/// Maps the trim-extrude constructor's typed error back to the executor's
+/// typed kernel refusal. The constructor owns the precise kernel kind; the
+/// executor's `Refusal` vocabulary carries the typed envelope case the door
+/// already re-marshals, so no refusal is ever lost or turned into a panic.
+fn trim_binding_error_to_refusal(error: crate::python::binding::BindingError) -> Refusal {
+    match error {
+        crate::python::binding::BindingError::Malformed(_) => Refusal::Empty,
+        crate::python::binding::BindingError::Refusal(_) => {
+            Refusal::UnsupportedEnvelope(EnvelopeCase::NonCanonicalCarrier)
+        }
+    }
 }
 
 /// The pyo3 measurement entry: takes the construction tree JSON and returns
