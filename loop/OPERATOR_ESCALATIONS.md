@@ -387,3 +387,16 @@ Judgment-required items appended each operator cycle. Newest at the bottom.
 - Also (machinery): overnight.py must guarantee `git merge --abort` on an
   interrupted cycle (or the supervisor should detect a lingering MERGE_HEAD and
   clean it), else a killed landing cycle wedges the integration worktree.
+- POST-COMMIT ADDENDUM (2026-09-10T13:52Z): minutes after the operator's
+  `git merge --abort` (reflog HEAD@{1}/{2} "reset: moving to HEAD") and the
+  operator commit 80087ab, `git status` showed a NEW unstaged, marker-free
+  modification: `truck123d/src/bd_bridge.rs` +238 insertions vs HEAD (mtime
+  09:46:31 local), NO MERGE_HEAD, nothing staged. It is not the operator's doing
+  (the commit touched only the three loop files) and it is NOT a clean revert of
+  the conflict. Most likely the overnight driver's next landing cycle re-merged
+  BRIDGE-LOFT-FACTS and left the auto-merged worktree change behind without
+  committing or aborting. The operator did NOT touch it (destroying in-progress
+  work is out of scope). A human should decide: `git diff -- truck123d/src/
+  bd_bridge.rs` and either commit it as the BRIDGE-LOFT-FACTS resolution or
+  `git checkout -- truck123d/src/bd_bridge.rs` (8b46b64 is safe on its branch).
+  This is the same driver-interrupted-landing class as the MERGE_HEAD item.
