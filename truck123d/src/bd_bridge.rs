@@ -205,6 +205,26 @@ pub enum SolidSpec {
         #[serde(default)]
         closed: bool,
     },
+    /// A plate-section structural member: one closed planar plate profile (the
+    /// corpus `blade_profile` / `rounded_plate_pts` section) placed by each
+    /// recorded station frame and swept along the station chain. This is the
+    /// kernel realization of the corpus member vocabulary
+    /// (`surfaces.swept_plate` / `surfaces.blade_path` / `surfaces.blade_member`
+    /// in `corpus/ttc/trees/f1/src/lib/surfaces.py`): a member is a two-section
+    /// degenerate case plus wall bands, so its certified facts ride the landed
+    /// MONO-2 two-station loft certificate per adjacent station pair rather
+    /// than a new integrator.
+    Member {
+        /// The closed plate cross-section, in the station-0 local frame.
+        profile: Vec<ProfileEdge>,
+        /// The recorded station frames, in path order (`>= 2` stations).
+        stations: Vec<StationFrame>,
+        /// The station chain is a ruled sweep (piecewise-linear between
+        /// stations). A smooth (`ruled = false`) member with more than two
+        /// stations has no landed smooth carrier and refuses typed.
+        #[serde(default)]
+        ruled: bool,
+    },
 }
 
 /// The default certified bracket tolerance of a trim-prism row (the door's
@@ -241,6 +261,47 @@ impl RotationFrame {
             x1 * p[0] + y1 * p[1] + z1 * p[2],
             x2 * p[0] + y2 * p[1] + z2 * p[2],
         ]
+    }
+}
+
+/// One recorded member station: the origin plus the orthonormal frame that
+/// places the plate profile at that station (local x/y span the plate, local z
+/// is the path tangent). A member's section at the station is the profile
+/// mapped through `p -> origin + x_dir * p.x + y_dir * p.y + z_dir * p.z`.
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct StationFrame {
+    /// The world origin of the station.
+    pub origin: [f64; 3],
+    /// The world image of the profile-local x axis.
+    pub x_dir: [f64; 3],
+    /// The world image of the profile-local y axis.
+    pub y_dir: [f64; 3],
+    /// The world image of the profile-local z axis (the path tangent).
+    pub z_dir: [f64; 3],
+}
+
+impl StationFrame {
+    /// Applies the recorded station placement to a profile-local point.
+    fn apply(self, p: [f64; 3]) -> [f64; 3] {
+        let [x, y, z] = p;
+        let [ox, oy, oz] = self.origin;
+        let [xx, xy, xz] = self.x_dir;
+        let [yx, yy, yz] = self.y_dir;
+        let [zx, zy, zz] = self.z_dir;
+        [
+            ox + xx * x + yx * y + zx * z,
+            oy + xy * x + yy * y + zy * z,
+            oz + xz * x + yz * y + zz * z,
+        ]
+    }
+
+    /// Whether every recorded frame coordinate is finite.
+    fn is_finite(self) -> bool {
+        self.origin.iter().all(|c| c.is_finite())
+            && self.x_dir.iter().all(|c| c.is_finite())
+            && self.y_dir.iter().all(|c| c.is_finite())
+            && self.z_dir.iter().all(|c| c.is_finite())
     }
 }
 
@@ -421,6 +482,11 @@ fn solid_volume(solid: &SolidSpec) -> Result<f64, Refusal> {
             }
             certified_spline_loft_volume(sections).map(|(value, _, _)| value)
         }
+        SolidSpec::Member {
+            profile,
+            stations,
+            ruled,
+        } => member_volume_bracket(profile, stations, *ruled).map(|(value, _, _)| value),
     }
 }
 
@@ -1001,6 +1067,27 @@ fn solid_local_bbox(solid: &SolidSpec) -> Result<[[f64; 3]; 2], Refusal> {
             }
             Ok([min, max])
         }
+        SolidSpec::Member {
+            profile, stations, ..
+        } => {
+            let sections = member_sections(profile, stations)?;
+            let mut min = [f64::INFINITY; 3];
+            let mut max = [f64::NEG_INFINITY; 3];
+            for section in &sections {
+                let spans = spline_loop_spans(section)?;
+                let box3 = spline_loop_bbox3(&spans)?;
+                for ((min_axis, lo), (max_axis, hi)) in
+                    min.iter_mut().zip(box3[0]).zip(max.iter_mut().zip(box3[1]))
+                {
+                    *min_axis = min_axis.min(lo);
+                    *max_axis = max_axis.max(hi);
+                }
+            }
+            if !min[0].is_finite() || !max[0].is_finite() {
+                return Err(Refusal::Empty);
+            }
+            Ok([min, max])
+        }
     }
 }
 
@@ -1418,6 +1505,135 @@ fn certified_spline_loft_volume(sections: &[Vec<ProfileEdge>]) -> Result<(f64, f
     } else {
         Ok((value, lo, hi))
     }
+}
+
+/// Places the recorded plate profile at every station, producing the section
+/// chain the landed loft arms consume. The profile must be a closed loop (the
+/// landed sweep carrier's own closure check): an open plate boundary refuses
+/// typed `NonCanonicalCarrier` rather than being approximated.
+fn member_sections(
+    profile: &[ProfileEdge],
+    stations: &[StationFrame],
+) -> Result<Vec<Vec<ProfileEdge>>, Refusal> {
+    if stations.len() < 2 {
+        return Err(Refusal::Empty);
+    }
+    // The plate section must be a closed loop; `spline_loop_spans` is the
+    // landed seam check the sweep carrier uses, so an open boundary refuses
+    // with exactly the same typed case.
+    spline_loop_spans(profile)?;
+    let mut sections = Vec::with_capacity(stations.len());
+    for station in stations {
+        if !station.is_finite() {
+            return Err(Refusal::Empty);
+        }
+        let mut edges = Vec::with_capacity(profile.len());
+        for edge in profile {
+            match edge {
+                ProfileEdge::Line { a, b } => edges.push(ProfileEdge::Line {
+                    a: station.apply(*a),
+                    b: station.apply(*b),
+                }),
+                ProfileEdge::Spline { points } => edges.push(ProfileEdge::Spline {
+                    points: points.iter().map(|p| station.apply(*p)).collect(),
+                }),
+            }
+        }
+        sections.push(edges);
+    }
+    Ok(sections)
+}
+
+/// The certified volume bracket of a plate-section member: the exact analytic
+/// arm for an all-line plate, otherwise the sum of the landed MONO-2
+/// two-station certificates over adjacent station pairs. The interior caps of
+/// consecutive pairs cancel exactly, so the sum is the chain's side surface
+/// plus its two end caps -- "a two-section degenerate case plus wall bands".
+/// A smooth member with more than two stations has no landed carrier and
+/// refuses typed (never a ruled substitution).
+fn member_volume_bracket(
+    profile: &[ProfileEdge],
+    stations: &[StationFrame],
+    ruled: bool,
+) -> Result<(f64, f64, f64), Refusal> {
+    let sections = member_sections(profile, stations)?;
+    if let Ok(validated) = loft_sections(&sections) {
+        let value = loft_volume(&validated, false)?;
+        return Ok((value, value, value));
+    }
+    if !ruled && sections.len() > 2 {
+        return Err(open_smooth_loft());
+    }
+    let mut value = 0.0f64;
+    let mut lo = 0.0f64;
+    let mut hi = 0.0f64;
+    for pair in sections.windows(2) {
+        let (pair_value, pair_lo, pair_hi) = certified_spline_loft_volume(pair)?;
+        value += pair_value;
+        lo += pair_lo;
+        hi += pair_hi;
+    }
+    if !value.is_finite() || !lo.is_finite() || !hi.is_finite() {
+        return Err(Refusal::Empty);
+    }
+    Ok((value, lo, hi))
+}
+
+/// The local mesh of a plate-section member: ruled quads between the sampled
+/// reconstructed loops of consecutive stations plus the two end-cap fans. The
+/// sampled loops are the same reconstruction the certificate integrates.
+fn member_mesh(sections: &[Vec<ProfileEdge>]) -> Result<Vec<Triangle>, Refusal> {
+    if sections.len() < 2 {
+        return Err(Refusal::Empty);
+    }
+    let loops: Vec<Vec<[f64; 3]>> = sections
+        .iter()
+        .map(|section| spline_loop_spans(section).map(|spans| sample_loop3(&spans)))
+        .collect::<Result<_, _>>()?;
+    let count = loops.first().ok_or(Refusal::Empty)?.len();
+    if count == 0 {
+        return Err(Refusal::Empty);
+    }
+    for loop3 in &loops {
+        if loop3.len() != count {
+            return Err(open_smooth_loft());
+        }
+    }
+    let mut out = Vec::new();
+    for pair in loops.windows(2) {
+        let a = pair.first().ok_or(Refusal::Empty)?;
+        let b = pair.get(1).ok_or(Refusal::Empty)?;
+        for i in 0..count {
+            let k = (i + 1) % count;
+            push_quad(
+                &mut out,
+                *a.get(i).ok_or(Refusal::Empty)?,
+                *a.get(k).ok_or(Refusal::Empty)?,
+                *b.get(k).ok_or(Refusal::Empty)?,
+                *b.get(i).ok_or(Refusal::Empty)?,
+            );
+        }
+    }
+    let first = loops.first().ok_or(Refusal::Empty)?;
+    let last = loops.last().ok_or(Refusal::Empty)?;
+    let c_first = centroid3(first);
+    let c_last = centroid3(last);
+    for i in 0..count {
+        let k = (i + 1) % count;
+        push_tri(
+            &mut out,
+            c_first,
+            *first.get(k).ok_or(Refusal::Empty)?,
+            *first.get(i).ok_or(Refusal::Empty)?,
+        );
+        push_tri(
+            &mut out,
+            c_last,
+            *last.get(i).ok_or(Refusal::Empty)?,
+            *last.get(k).ok_or(Refusal::Empty)?,
+        );
+    }
+    Ok(out)
 }
 
 /// Evaluates a reconstructed 3-D span at `u in [0, 1]`.
@@ -1924,6 +2140,150 @@ fn mirror_point(p: [f64; 3], mirror: &str) -> [f64; 3] {
     }
 }
 
+/// The signed-zero-normalized reflection of one coordinate: `x -> -x` except
+/// that a zero keeps its bit pattern. This is mathematically the negation and a
+/// bit-for-bit involution (`reflect_coord(reflect_coord(x)) == x`), so a double
+/// reflection is the exact identity.
+#[cfg(test)]
+fn reflect_coord(value: f64) -> f64 {
+    if value == 0.0 { value } else { -value }
+}
+
+/// Reflects a local point across the recorded coordinate plane.
+#[cfg(test)]
+fn reflect_point3(p: [f64; 3], axis: &str) -> [f64; 3] {
+    let [x, y, z] = p;
+    match axis {
+        "x" => [reflect_coord(x), y, z],
+        "z" => [x, y, reflect_coord(z)],
+        _ => [x, reflect_coord(y), z],
+    }
+}
+
+/// Reflects one recorded profile edge's control points.
+#[cfg(test)]
+fn reflect_profile_edge(edge: &ProfileEdge, axis: &str) -> ProfileEdge {
+    match edge {
+        ProfileEdge::Line { a, b } => ProfileEdge::Line {
+            a: reflect_point3(*a, axis),
+            b: reflect_point3(*b, axis),
+        },
+        ProfileEdge::Spline { points } => ProfileEdge::Spline {
+            points: points.iter().map(|p| reflect_point3(*p, axis)).collect(),
+        },
+    }
+}
+
+/// Reflects one recorded station frame across the coordinate plane: the origin
+/// and each axis direction reflect, so the placed profile reflects exactly.
+#[cfg(test)]
+fn reflect_station(station: &StationFrame, axis: &str) -> StationFrame {
+    StationFrame {
+        origin: reflect_point3(station.origin, axis),
+        x_dir: reflect_point3(station.x_dir, axis),
+        y_dir: reflect_point3(station.y_dir, axis),
+        z_dir: reflect_point3(station.z_dir, axis),
+    }
+}
+
+/// Reflects one lathe profile edge (the `(x, z)` profile plane). Only the `z`
+/// reflection is representable as the same `x >= 0` profile.
+#[cfg(test)]
+fn reflect_lathe_edge(edge: &LatheEdge) -> LatheEdge {
+    let reflect = |p: [f64; 2]| {
+        let [x, z] = p;
+        [x, reflect_coord(z)]
+    };
+    match edge {
+        LatheEdge::Line { a, b } => LatheEdge::Line {
+            a: reflect(*a),
+            b: reflect(*b),
+        },
+        LatheEdge::Spline { points } => LatheEdge::Spline {
+            points: points.iter().map(|p| reflect(*p)).collect(),
+        },
+    }
+}
+
+/// Reflects one kernel row's control points across a coordinate plane through
+/// the origin: an exact isometry whose patch grid (edge counts and degrees) is
+/// reused exactly, so no surface is re-approximated. The magnitude of every
+/// certified fact is invariant and the orientation flips (the change-of-
+/// variables theorem, `det R = -1`). `reflect_solid` is an involution:
+/// `reflect_solid(reflect_solid(x)) == x` bit-for-bit.
+#[cfg(test)]
+fn reflect_solid(solid: &SolidSpec, axis: &str) -> Result<SolidSpec, Refusal> {
+    let reflected = match solid {
+        // The origin-centred primitives are symmetric about every coordinate
+        // plane through the origin, so the reflection leaves them unchanged.
+        SolidSpec::Box { .. }
+        | SolidSpec::Cylinder { .. }
+        | SolidSpec::Sphere { .. }
+        | SolidSpec::Torus { .. } => solid.clone(),
+        SolidSpec::Lathe { profile, arc_deg } => {
+            if axis == "z" {
+                SolidSpec::Lathe {
+                    profile: profile.iter().map(reflect_lathe_edge).collect(),
+                    arc_deg: *arc_deg,
+                }
+            } else {
+                // A full revolution is symmetric about any plane through its
+                // axis; the recorded `(x, z)` profile is unchanged.
+                solid.clone()
+            }
+        }
+        SolidSpec::Prism {
+            profile,
+            amount,
+            both,
+        } => SolidSpec::Prism {
+            profile: profile
+                .iter()
+                .map(|edge| reflect_profile_edge(edge, axis))
+                .collect(),
+            amount: *amount,
+            both: *both,
+        },
+        // The trim carrier's scalar pullback net is tied to the profile
+        // parametrization, so its reflection is not representable as the same
+        // row; refuse typed rather than record a mismatched net.
+        SolidSpec::TrimPrism { .. } => {
+            return Err(Refusal::UnsupportedEnvelope(
+                EnvelopeCase::NonCanonicalCarrier,
+            ));
+        }
+        SolidSpec::Loft { sections, closed } => SolidSpec::Loft {
+            sections: sections
+                .iter()
+                .map(|section| {
+                    section
+                        .iter()
+                        .map(|edge| reflect_profile_edge(edge, axis))
+                        .collect()
+                })
+                .collect(),
+            closed: *closed,
+        },
+        SolidSpec::Member {
+            profile,
+            stations,
+            ruled,
+        } => SolidSpec::Member {
+            // The profile is recorded in station-local coordinates, so the
+            // world reflection acts on the station frames: reflecting both the
+            // profile and the frame would cancel. The placed section
+            // `origin + x_dir * x + y_dir * y + z_dir * z` reflects exactly.
+            profile: profile.clone(),
+            stations: stations
+                .iter()
+                .map(|station| reflect_station(station, axis))
+                .collect(),
+            ruled: *ruled,
+        },
+    };
+    Ok(reflected)
+}
+
 /// The world bounding box of one placed solid: mirror the local geometry about
 /// the coordinate plane (when the mirror arm recorded one), rotate the local
 /// bbox corners by the recorded frame (or by the pure-z `rz` when no frame was
@@ -2003,7 +2363,7 @@ fn solid_carrier_class(solid: &SolidSpec) -> CarrierClass {
                 CarrierClass::Canonical
             }
         }
-        SolidSpec::Loft { .. } => CarrierClass::Swept,
+        SolidSpec::Loft { .. } | SolidSpec::Member { .. } => CarrierClass::Swept,
     }
 }
 
@@ -2348,6 +2708,9 @@ fn solid_mesh(solid: &SolidSpec) -> Result<Vec<Triangle>, Refusal> {
         .map(|facts| facts.mesh)
         .map_err(trim_binding_error_to_refusal),
         SolidSpec::Loft { sections, closed } => loft_mesh(sections, *closed),
+        SolidSpec::Member {
+            profile, stations, ..
+        } => member_mesh(&member_sections(profile, stations)?),
     }
 }
 
@@ -4589,5 +4952,224 @@ print(json.dumps([z_row, loft_row]))
         );
         let facts = tree_facts(&canonical).expect("canonical x canonical lands");
         assert!(facts.boolean_events.is_empty());
+    }
+
+    // -----------------------------------------------------------------------
+    // Plate-section members and the exact mirror isometry
+    // (MONO-3-BLADE-MEMBERS-MIRROR). The corpus member vocabulary
+    // (`surfaces.swept_plate` / `surfaces.blade_path` / `surfaces.blade_member`)
+    // authors a closed plate profile and sweeps it along a recorded station
+    // chain; the member carrier places the profile by each station frame and
+    // rides the landed MONO-2 loft certificate per adjacent pair. Mirroring a
+    // kernel row reflects its control points exactly (no re-approximation) and
+    // is an involution.
+    // -----------------------------------------------------------------------
+
+    /// One identity station frame at `z`.
+    fn member_station(z: f64) -> StationFrame {
+        StationFrame {
+            origin: [0.0, 0.0, z],
+            x_dir: [1.0, 0.0, 0.0],
+            y_dir: [0.0, 1.0, 0.0],
+            z_dir: [0.0, 0.0, 1.0],
+        }
+    }
+
+    /// A three-station ruled plate member: the unit-square plate carried by
+    /// spline edges swept along +z.
+    fn member_fixture() -> SolidSpec {
+        SolidSpec::Member {
+            profile: spline_square(0.0),
+            stations: vec![
+                member_station(0.0),
+                member_station(2.5),
+                member_station(5.0),
+            ],
+            ruled: true,
+        }
+    }
+
+    /// The signed enclosed volume of a closed triangle soup about the origin
+    /// (the orientation witness of the mirror isometry).
+    fn signed_mesh_volume(triangles: &[Triangle]) -> f64 {
+        let mut total = 0.0f64;
+        for tri in triangles {
+            let a = [tri[0], tri[1], tri[2]];
+            let b = [tri[3], tri[4], tri[5]];
+            let c = [tri[6], tri[7], tri[8]];
+            total += v3_dot(a, v3_cross(b, c)) / 6.0;
+        }
+        total
+    }
+
+    #[test]
+    fn member_volume_certified_bracket() {
+        // The plate-section member certifies through the landed MONO-2
+        // two-station certificate summed over adjacent station pairs. The
+        // fixture is the unit-square plate carried by spline edges, so the
+        // recorded reference is the exact prism volume 5.
+        let profile = spline_square(0.0);
+        let two = vec![member_station(0.0), member_station(5.0)];
+        let (value, lo, hi) =
+            member_volume_bracket(&profile, &two, true).expect("two-station member");
+        assert!(
+            lo <= value && value <= hi,
+            "bracket [{lo}, {hi}] must enclose {value}"
+        );
+        assert!(
+            (hi - lo) < 1.0e-6,
+            "the certified bracket is tight: [{lo}, {hi}]"
+        );
+        assert!(
+            (value - 5.0).abs() < 1.0e-9,
+            "member volume {value} must match 5"
+        );
+
+        // Three stations: the interior caps of the two pairs cancel exactly,
+        // so the chain still measures the same prism volume (no double count).
+        let three_stations = vec![
+            member_station(0.0),
+            member_station(2.5),
+            member_station(5.0),
+        ];
+        let (chain, chain_lo, chain_hi) =
+            member_volume_bracket(&profile, &three_stations, true).expect("three-station member");
+        assert!(chain_lo <= chain && chain <= chain_hi);
+        assert!(
+            (chain - 5.0).abs() < 1.0e-9,
+            "chain volume {chain} must match 5"
+        );
+        let three = SolidSpec::Member {
+            profile,
+            stations: three_stations,
+            ruled: true,
+        };
+        let facts = tree_facts(&part(three, 0.0, 0.0, 0.0)).expect("member facts");
+        assert!((facts.volume - 5.0).abs() < 1.0e-9);
+        assert_eq!(facts.bbox[0], [0.0, 0.0, 0.0]);
+        assert_eq!(facts.bbox[1], [1.0, 1.0, 5.0]);
+        assert_eq!(facts.solid_count, 1);
+    }
+
+    #[test]
+    fn member_refuses_open_path_typed() {
+        // An open plate boundary is not a closed section loop: the member
+        // refuses typed with the landed sweep carrier's `NonCanonicalCarrier`,
+        // never a flattening or a tolerance stretch.
+        let open = vec![
+            ProfileEdge::Line {
+                a: [0.0, 0.0, 0.0],
+                b: [1.0, 0.0, 0.0],
+            },
+            ProfileEdge::Line {
+                a: [1.0, 0.0, 0.0],
+                b: [1.0, 1.0, 0.0],
+            },
+            ProfileEdge::Line {
+                a: [1.0, 1.0, 0.0],
+                b: [0.0, 1.0, 0.0],
+            },
+        ];
+        let member = SolidSpec::Member {
+            profile: open,
+            stations: vec![member_station(0.0), member_station(5.0)],
+            ruled: true,
+        };
+        let refusal = tree_facts(&part(member, 0.0, 0.0, 0.0))
+            .expect_err("an open member plate must refuse typed");
+        assert!(matches!(
+            refusal,
+            Refusal::UnsupportedEnvelope(EnvelopeCase::NonCanonicalCarrier)
+        ));
+    }
+
+    #[test]
+    fn mirror_is_exact_isometry() {
+        // Reflecting a member row across y = 0 is an exact isometry: the
+        // certified volume is invariant in magnitude, the world bbox is the
+        // reflected bbox, and the mesh orientation flips (det R = -1). The
+        // mirrored row reuses the original's patch grid.
+        let member = member_fixture();
+        let base = tree_facts(&part(member.clone(), 0.0, 0.0, 0.0)).expect("base member");
+        let mirrored = tree_facts(&mirrored_part(member.clone(), "y")).expect("mirrored member");
+        assert_eq!(
+            base.volume.to_bits(),
+            mirrored.volume.to_bits(),
+            "the volume magnitude is invariant under the reflection"
+        );
+        assert_eq!(
+            mirrored.bbox[0],
+            [base.bbox[0][0], -base.bbox[1][1], base.bbox[0][2]]
+        );
+        assert_eq!(
+            mirrored.bbox[1],
+            [base.bbox[1][0], -base.bbox[0][1], base.bbox[1][2]]
+        );
+        // Orientation flips: the signed mesh volume negates.
+        let base_signed = signed_mesh_volume(&solid_mesh(&member).expect("base mesh"));
+        let mirror_solid = reflect_solid(&member, "y").expect("control-point reflection");
+        let mirror_signed = signed_mesh_volume(&solid_mesh(&mirror_solid).expect("mirror mesh"));
+        assert!(base_signed * mirror_signed < 0.0, "orientation must flip");
+        assert!(
+            (base_signed.abs() - mirror_signed.abs()).abs() <= 1.0e-9 * (1.0 + base_signed.abs())
+        );
+        // The patch grid is reused: same station count and edge count.
+        match (&member, &mirror_solid) {
+            (
+                SolidSpec::Member {
+                    profile: pa,
+                    stations: sa,
+                    ..
+                },
+                SolidSpec::Member {
+                    profile: pb,
+                    stations: sb,
+                    ..
+                },
+            ) => {
+                assert_eq!(pa.len(), pb.len());
+                assert_eq!(sa.len(), sb.len());
+            }
+            _ => panic!("the member fixture must reflect to a member"),
+        }
+    }
+
+    #[test]
+    fn mirror_twice_is_identity() {
+        // The control-point reflection is a bit-for-bit involution: mirroring
+        // twice returns the original row exactly (serialized bytes equal).
+        let member = member_fixture();
+        for axis in ["x", "y", "z"] {
+            let once = reflect_solid(&member, axis).expect("first reflection");
+            let twice = reflect_solid(&once, axis).expect("second reflection");
+            assert_eq!(twice, member, "mirror(mirror(x)) = x for axis {axis}");
+            assert_eq!(
+                serde_json::to_string(&twice).expect("twice json"),
+                serde_json::to_string(&member).expect("member json"),
+                "the double reflection is bit-for-bit identical"
+            );
+        }
+    }
+
+    #[test]
+    fn smooth_member_multi_station_refuses_typed() {
+        // A smooth (non-ruled) member with more than two stations has no landed
+        // smooth carrier: the typed refusal stays rather than a ruled
+        // substitution.
+        let smooth = SolidSpec::Member {
+            profile: spline_square(0.0),
+            stations: vec![
+                member_station(0.0),
+                member_station(2.5),
+                member_station(5.0),
+            ],
+            ruled: false,
+        };
+        let refusal = tree_facts(&part(smooth, 0.0, 0.0, 0.0))
+            .expect_err("a smooth multi-station member must refuse typed");
+        assert!(matches!(
+            refusal,
+            Refusal::UnsupportedEnvelope(EnvelopeCase::NonCanonicalCarrier)
+        ));
     }
 }
