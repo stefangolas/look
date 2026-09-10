@@ -1,0 +1,143 @@
+{
+  "id": "SOLVER-SURVEY-C",
+  "contract": ["SOLVER-SURVEY-C"],
+  "class": "survey",
+  "status": "DONE",
+  "fragment": "loop/solver_coverage/fragments/C.json",
+  "anchors_verified": {
+    "A1": 28,
+    "A2": 5
+  },
+  "census": {
+    "rules_extracted": 77,
+    "rules_by_kind": {
+      "solver": 9,
+      "classifier": 20,
+      "assembler": 9,
+      "gate": 26,
+      "reduction": 13
+    },
+    "confidence": {
+      "high": 77,
+      "medium": 0,
+      "low": 0
+    },
+    "per_axis_coverage": {
+      "relation.src_dims": 16,
+      "relation.zero_set": 51,
+      "relation.local_dim": 17,
+      "relation.incidence": 7,
+      "rep.bernstein_chart": 13,
+      "rep.rational_positive_weights": 18,
+      "rep.exact_implicit": 4,
+      "rep.canonical_carrier": 14,
+      "rep.construction_witness": 40,
+      "rep.param_map_inverse": 11,
+      "global.knowledge": 26,
+      "goal": 64
+    },
+    "unmodeled_values": [
+      "!unmodeled:same_chart",
+      "!unmodeled:point-vs-curve",
+      "!unmodeled:trim_loop_closed",
+      "!unmodeled:trim_in_same_chart",
+      "!unmodeled:sample_off_loop_obligation",
+      "!unmodeled:square_arity_n",
+      "!unmodeled:4x4 (product chart)",
+      "!unmodeled:deck_integer",
+      "!unmodeled:chart_periodic",
+      "!unmodeled:kappa_below_KAPPA_MAX",
+      "!unmodeled:rank_3",
+      "!unmodeled:z_hat_finite",
+      "!unmodeled:rho_acceptance",
+      "!unmodeled:residual_not_r2",
+      "!unmodeled:c1_within_EPS_REP",
+      "!unmodeled:arc_is_one_chart_run",
+      "!unmodeled:approx_endpoint_matches_chain_ends",
+      "!unmodeled:one_chart_run",
+      "!unmodeled:identity_rules_only",
+      "!unmodeled:near_pair",
+      "!unmodeled:crossing_is_r9",
+      "!unmodeled:interior_in_run",
+      "!unmodeled:interior_order",
+      "!unmodeled:c1_rho",
+      "!unmodeled:tangency_opt_in",
+      "!unmodeled:knot_class",
+      "!unmodeled:approx_nonempty",
+      "!unmodeled:identity_graph_leaf",
+      "!unmodeled:paired_domain",
+      "!unmodeled:exhaustive_claim_flag",
+      "!unmodeled:provenance_not_certificate",
+      "!unmodeled:expected_kind",
+      "!unmodeled:seed_interior",
+      "!unmodeled:seed_on_curve",
+      "!unmodeled:complement_boxes",
+      "!unmodeled:inner_subbox",
+      "!unmodeled:face_axis",
+      "!unmodeled:endpoint_box_inside_unit_chart",
+      "!unmodeled:every_arc_end_resolves",
+      "!unmodeled:eight_conditions",
+      "!unmodeled:one_periodic_chart_chain",
+      "!unmodeled:finite_hermite_ends",
+      "!unmodeled:orthonormal_basis",
+      "!unmodeled:n0_unit",
+      "!unmodeled:gap_contains_zero",
+      "!unmodeled:no_tolerance",
+      "!unmodeled:in_atlas_patch",
+      "!unmodeled:fail-closed named refusal",
+      "!unmodeled:explicit backing override",
+      "!unmodeled:mid-build partial graph"
+    ],
+    "distinct_unmodeled_values": 50,
+    "abstraction_gap_axis_keys": 48,
+    "distinct_refusal_labels": 26,
+    "consumes_evidence_types": 76,
+    "produces_evidence_types": 85,
+    "krawczyk_sites_engine_rs": 28,
+    "krawczyk_rule_rows": 3
+  },
+  "vertical_gaps": [
+    {
+      "id": "VG-1",
+      "transition": "certify_off_loop -> winding_number",
+      "detail": "winding_number's soundness precondition is the caller's certified-off-loop property, but its signature takes only [f64; 2] and does not carry the OffLoopCert that certify_off_loop produced. sample_inside is the only composer and discards the evidence. The off-loop guarantee is NOT carried across the transition.",
+      "consumer_rule": "C-CLASSIFY-WINDING-NUMBER",
+      "producer_rule": "C-SPLIT-CERTIFY-OFF-LOOP"
+    },
+    {
+      "id": "VG-2",
+      "transition": "trim_clip -> CertifiedGraph consumer",
+      "detail": "trim_clip computes the winding classification but the frozen CertifiedGraph has no per-arc winding field (assemble.rs records the frozen-shape amendment as NOT made); the winding survives only as the discard/retain decision, not as evidence on the emitted graph.",
+      "consumer_rule": "C-SPLIT-TRIM-CLIP",
+      "producer_rule": "C-SPLIT-TRIM-CLIP"
+    },
+    {
+      "id": "VG-3",
+      "transition": "deck_identify -> promote (S9b seam)",
+      "detail": "assemble.rs condition 3 (monotone arclength reparameterization / EdgeSampleLedger) is NOT reachable through this tree's public path; deck_identify records winding on SegmentBreak::DeckStep breaks and promote.rs re-derives the arclength table from the approximant.",
+      "consumer_rule": "C-ASSEMBLE-PROMOTE",
+      "producer_rule": "C-ASSEMBLE-DECK-IDENTIFY"
+    },
+    {
+      "id": "VG-4",
+      "transition": "topology -> trimclip (S3c pcurve seam)",
+      "detail": "trimclip does not extract polynomial pcurves from topology; an arc is clippable only when its certified trace is the straight segment between its certified chart ends (arc_pcurve_leaf recovers a degree-1 BezierLeaf1), otherwise TrimClipFailed.",
+      "consumer_rule": "C-SPLIT-TRIM-CLIP",
+      "producer_rule": "crate::kernel::trimclip::arc_pcurve_leaf"
+    },
+    {
+      "id": "VG-5",
+      "transition": "claimed topology -> claims.rs LeafPair",
+      "detail": "claims.rs LeafPair is defined locally because the census's landed seam is not present in the tree and the serial dependency BG-KV2-502-S9B is not merged.",
+      "consumer_rule": "C-GATE-LEAFPAIR-TRY-NEW",
+      "producer_rule": null
+    }
+  ],
+  "theory_only_rows": [
+    {
+      "rule_id": "C-ASSEMBLE-ATLAS-TRY-NEW",
+      "detail": "atlas.rs cone and torus chart leaves certify NOTHING on box claims: ChartPatch::regularity/weight_bound return ClaimVerdict::Inconclusive(CONE_FORM_PENDING / TORUS_FORM_PENDING) and enclose/derivs/normal_cone return the no-certificate NaN markers. Only the chart STRUCTURE (ids, regions, apex-excluding boxes, transitions, degeneracy routing) is landed."
+    }
+  ],
+  "notes": "SOLVER-SURVEY-C fragment written to loop/solver_coverage/fragments/C.json per docs/SOLVER_COVERAGE_SPEC.md section 1 schema (open-world value level) and the SOLVER-SURVEY-A method applied verbatim. Scope: the boolean stage machinery (split -> classify -> decide -> assemble) in vendor/truck/truck-certified/src/kernel (trimclip.rs, assemble.rs, atlas.rs, sheet.rs, engine.rs, residuals_r89.rs, promote.rs, patch.rs, certs.rs, evidence.rs, claims.rs). 77 rule rows cover every proof-bearing public entry point; pure accessors and implementation-detail helpers are enumerated in the fragment's notes. Krawczyk sites in engine.rs (28 case-insensitive occurrences, anchor A1) are grouped into 3 transformation rows (krawczyk_c1 n=2, krawczyk_c1_n3 n=3, krawczyk_c1_n4 n=4; same Lemma 8.0 + 8.2 transformation, three distinct certificate carriers) plus the distinct Theorem 8.1 tube transformation (c2_certify_tube4), per the B-packet grouping convention. Anchor A2 ('pub fn' in assemble.rs) = 5. FragmentMesh / material-state classifier rules named in the packet method are NOT present in the C read scope (grep-confirmed); the landed C-scope classifier vocabulary is ComponentKind + trim winding/inside + sheet/degeneracy classifiers; the FragmentMesh/material surface lives in truck-shapeops, outside this packet's read scope (scope boundary, not a vertical gap). No structural-mismatch STOP was triggered: every in-scope construct is expressible in the RULES schema; the 50 unmodeled values are value/axis-level abstraction-gap findings, not shape failures."
+}
