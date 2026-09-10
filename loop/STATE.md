@@ -1799,6 +1799,50 @@ lagging cargoq restart guard; slot-4 + slot-7 wt RESULT residue parking the
 driver's dispatch arm; TOR-C flip-or-pin (orchestrator-held); the RESULT-recycle
 race + overnight.py's guarantee-merge-abort on interrupted cycles.]
 
+[operator 2026-09-10T14:56Z - volatile refresh. Quiet healthy cycle: nothing to
+land, nothing to unblock, nothing to flip, no manual dispatch (heartbeat live).
+Board now: 0 RUNNING / 1 landed-this-cycle. HEAD 2ad55c7 ("loop:
+TTC-RECENSUS-F1-R2 row LANDED (overnight)") - the 14:34Z running packet FINISHED
+and the overnight driver landed it: slot 0 FINISHED, RESULT status DONE, worker
+commit 197c924 an ancestor of integration/kernel-bg; the driver's landing chain
+e95738b (RESULT filed) + 2ad55c7 (row LANDED) is at HEAD. **The whole door-gap
+chain is now CLOSED - no packet is running.** Landing re-verified by command: all
+76 READY rows carry a landed marker and every marker commit is an ancestor of
+integration/kernel-bg EXCEPT PB-010-TTC-PARITY-AUDIT's a5f0585 (the known-benign
+survey filing-commit marker, carried). No FINISHED slot holds an unlanded DONE
+RESULT - nothing operator-landable. Slot wt RESULT statuses: slot 0 DONE
+(TTC-RECENSUS-F1-R2, landed; only harness CONTEXT.md/PACKET.md dirty), slot 1
+none (clean detached HEAD 4de25d9 - stale ADM-003 residue), slot 2 DONE, slot 3
+done, slot 4 LANDED-WITH-FINDINGS, slots 5/6 DONE, slot 7 LANDED (redundant
+FRAME-REVOLVE). Nothing to unblock (0 IDLE/DEAD >15 min holding work; no
+QUESTION.md anywhere; zero cargo/rustc processes - cargoq idle). Registry
+re-verified programmatically: 313 rows - 230 DONE, 76 READY, 7 BLOCKED. Under the
+one-verify amendment READY-with-landed-marker is the correct parked state (rows
+flip DONE only at the final integrated-HEAD battery), so the 76 READY rows are
+correctly parked, not stale. BLOCKED-with-all-deps-landed = 7, all correctly
+parked (BG-AUD-FIX-004 OWNER_BLOCKED, BG-CK-SPLINE-CENSUS owner-cancelled,
+SEM-PCURVE-MASTER-001-FIX SUPERSEDED, DEF-SPINEFRAME-GRAZE SPEC_GAP -> -R2,
+DEF-TESS-ANALYTIC-SEAM superseded by -R2, DEF-SEEDRAY-B human-gated on the
+SEEDRAY-B frontier review, TOR-C orchestrator-held) - nothing flipped.
+dispatch_ready --dry-run --max-workers=4: "slots: 8 (0 running, 8 free);
+slot-assigned packets: 6; dispatched 0; workers now ~0/4" = REAL idle; no manual
+dispatch (heartbeat live). Health: heartbeat exactly 1 (27872; the second
+anchored-scan hit was the probing shell self-matching `-File .*dispatch_heartbeat`
+in its own command line), operator runner 1 (27876, pid file matches), watchdog 1
+(29264), overnight driver 1 (26920), cargoq UP (ping ok, queued 0, running false).
+TWO supervisors (19172 PyManager + 27828 pythoncore child - carried duplication
+class; only ONE overnight.py child = no double-merge risk). Orchestrator session
+live (opencode 23052, started 10:09 local). Disk 16.61 GiB free (above the 8 GB
+floor AND the 15 GB janitor goal); RAM 6.24 GiB free. Main worktree carries the
+orchestrator session's untracked WIP (ASSEMBLY_PLACEMENT_*.md, BREP_*.md,
+FORMULA1_*.md, benchmarks/*, docs/defects/*) + modified loop logs - not operator
+scope; the orchestrator is live and owns them. No new escalation; carried human
+items unchanged: FRAME-REVOLVE F1 non_z_axis pin amendment
+(ttc_lathe_spline.rs:255); duplicate supervisors + the lagging cargoq restart
+guard; slot-4 + slot-7 wt RESULT residue parking the driver's dispatch arm; TOR-C
+flip-or-pin (orchestrator-held); the RESULT-recycle race + overnight.py's
+guarantee-merge-abort on interrupted cycles.]
+
 ## The parallelism picture
 
 The lemma wave (L1-L4, pure functions over the frozen shim type) is

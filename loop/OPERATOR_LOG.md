@@ -2349,3 +2349,48 @@ Leaving: 1 RUNNING (TTC-RECENSUS-F1-R2 slot 0, healthy, mid release build);
 HEAD de33f33 (TRIM-EXTRUDE-CTOR landed); nothing unlanded; 7 BLOCKED correctly
 parked; cargoq UP; heartbeat 1; driver 1; watchdog 1; TWO supervisors; disk
 16.65 GiB free; RAM 6.26 GiB free.
+
+## 2026-09-10 14:56 UTC (operator) - quiet healthy; door-gap chain closed (TTC-RECENSUS landed, 0 running)
+
+- Health sweep: `slot_status.py` -> 0 RUNNING / slot 0 FINISHED
+  (TTC-RECENSUS-F1-R2, RESULT DONE, worker commit 197c924) / slot 1 IDLE (stale
+  ADM-003 residue, no RESULT) / slots 2-7 FINISHED landed residue. cargoq ping
+  ok (queued 0, running false), 0 cargo/rustc processes. Heartbeat exactly 1
+  (27872; the second anchored-scan hit was the probing shell self-matching
+  `-File .*dispatch_heartbeat` in its own command line), operator runner 1
+  (27876, pid file matches), watchdog 1 (29264), overnight driver 1 (26920),
+  TWO supervisors (19172 + 27828 - carried duplication class; only ONE
+  overnight.py child = no double-merge risk). Orchestrator session live (opencode
+  23052, started 10:09 local). Disk 16.61 GiB free (above 8 GB floor and 15 GB
+  janitor goal); RAM 6.24 GiB free.
+- Land (step 2): nothing. HEAD 2ad55c7 ("loop: TTC-RECENSUS-F1-R2 row LANDED
+  (overnight)") = the driver's landing chain e95738b (RESULT filed) + 2ad55c7
+  (row LANDED); 197c924 is an ancestor of integration/kernel-bg. All 76 READY
+  rows carry a landed marker and every marker commit is an ancestor EXCEPT
+  PB-010-TTC-PARITY-AUDIT's a5f0585 (known-benign survey filing-commit marker,
+  carried). Slot wt RESULT statuses: slot 0 DONE, slot 1 none (stale ADM-003
+  residue), slot 2 DONE, slot 3 done, slot 4 LANDED-WITH-FINDINGS, slots 5/6
+  DONE, slot 7 LANDED (redundant). No FINISHED slot holds an unlanded DONE
+  RESULT. **The door-gap chain is CLOSED - no packet is running.**
+- Unblock (step 3): nothing. 0 IDLE/DEAD >15 min holding work; no QUESTION.md
+  anywhere; zero cargo/rustc processes.
+- Registry hygiene (step 4): 313 rows - 230 DONE, 76 READY, 7 BLOCKED. The 76
+  READY rows all carry landed markers = the correct parked state under the
+  one-verify amendment (rows flip DONE only at the final integrated-HEAD
+  battery). BLOCKED-with-all-deps-landed = 7, all correctly parked
+  (BG-AUD-FIX-004 OWNER_BLOCKED, BG-CK-SPLINE-CENSUS owner-cancelled,
+  SEM-PCURVE-MASTER-001-FIX SUPERSEDED, DEF-SPINEFRAME-GRAZE SPEC_GAP->-R2,
+  DEF-TESS-ANALYTIC-SEAM superseded by -R2, DEF-SEEDRAY-B human-gated, TOR-C
+  orchestrator-held). Nothing flipped.
+- Dispatch (step 5): `dispatch_ready.py --dry-run --max-workers=4` ->
+  "slots: 8 (0 running, 8 free); slot-assigned packets: 6; dispatched 0;
+  workers now ~0/4" = REAL idle; no manual dispatch (heartbeat owns it).
+- STATE.md volatile refresh ([operator 2026-09-10T14:56Z]).
+- No new escalation (nothing judgment-requiring surfaced). Main worktree carries
+  the live orchestrator session's untracked WIP (ASSEMBLY_PLACEMENT_*.md,
+  BREP_*.md, FORMULA1_*.md, benchmarks/*, docs/defects/*) - not operator scope.
+
+Leaving: 0 RUNNING (door-gap chain closed); HEAD 2ad55c7 (TTC-RECENSUS-F1-R2
+landed); nothing unlanded; 7 BLOCKED correctly parked; 76 READY correctly
+parked pending the final one-verify battery; cargoq UP; heartbeat 1; driver 1;
+watchdog 1; TWO supervisors; disk 16.61 GiB free; RAM 6.24 GiB free.
