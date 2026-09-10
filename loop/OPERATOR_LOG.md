@@ -2182,3 +2182,47 @@ Escalations: NEW BRIDGE-BOOLEANS landing decision + the RESULT-recycle race +
 the bypassed BRIDGE serialization + the driver's wrong scoped_check; carried
 (unchanged) F1 non_z_axis pin amendment; duplicate supervisors + lagging cargoq
 restart guard; slot-4 + slot-7 wt RESULT residue; TOR-C flip-or-pin.
+
+## 2026-09-10 13:06 UTC - operator cycle (quiet-healthy; BRIDGE-BOOLEANS landed, disk reclaimed)
+
+- Board: 1 RUNNING (BRIDGE-LOFT-FACTS slot 0, pid 28120, events fresh) / 0
+  landed-this-cycle / 7 BLOCKED. Registry re-derived: 312 rows - 229 DONE,
+  76 READY, 7 BLOCKED.
+- Health (step 1): heartbeat exactly 1 (27872; the count-2 scan is the probing
+  shell self-matching the -File pattern - documented false positive); operator
+  runner 1; watchdog 1 (24472); overnight driver 1 (26920); cargoq UP (ping
+  200, queued 0, running false). TWO supervisors (19172 PyManager + 27828
+  pythoncore - carried duplication class; one overnight.py child). Disk was
+  13.2 GB free (below the 15 GB goal) -> ACTION: `python loop/janitor.py
+  ensure --need 15` reclaimed ~4.3 GB -> 17.3 GB free. RAM 5.9 GB free.
+- Landing (step 2): NOTHING operator-landable. All slot commits (2-7:
+  e33c4dd/e9d885a/3c2109b/ee97499/713f205/5cf4811) re-verified ancestors of
+  integration/kernel-bg. **BRIDGE-BOOLEANS is now DONE/landed** (orchestrator
+  commits 4e99196/9c4ac9e/b82b035; c0329e0 ancestor) - the 12:43Z escalation
+  is resolved. Slots 1-7 are landed/stale residue.
+- Unblock (step 3): nothing stuck. Slot 0 RUNNING healthy; slot 1 IDLE/stale
+  (ADM-003-VOLUME already DONE - no re-dispatch; dispatch_ready already treats
+  the slot free). No live QUESTION, no APIError.
+- Registry hygiene (step 4): nothing to flip. The 7 BLOCKED rows re-read and
+  all correctly parked: BG-AUD-FIX-004 OWNER_BLOCKED, BG-CK-SPLINE-CENSUS
+  owner-cancelled, SEM-PCURVE-MASTER-001-FIX SUPERSEDED, DEF-SPINEFRAME-GRAZE
+  SPEC_GAP->-R2, DEF-TESS-ANALYTIC-SEAM (deps READY), DEF-SEEDRAY-B (deps
+  READY), TOR-C (deps READY, orchestrator-held). No READY packet failed
+  gen_packet --check / packet_lint this cycle (TRIM-EXTRUDE-CTOR preflight
+  clean).
+- Dispatch (step 5): `dispatch_ready --dry-run` reports 0 dispatchable -
+  TRIM-EXTRUDE-CTOR write-set clashes with the running BRIDGE-LOFT-FACTS on
+  corpus/ttc/door.py + truck123d/src/bd_bridge.rs. NO manual dispatch; the
+  live heartbeat owns dispatch.
+- STATE.md volatile refresh + LATEST GROUND TRUTH pointer updated ([operator
+  2026-09-10T13:06Z]).
+
+Leaving: 1 RUNNING (BRIDGE-LOFT-FACTS slot 0, healthy); BRIDGE-BOOLEANS
+landed; TRIM-EXTRUDE-CTOR queued behind the running row; cargoq UP; heartbeat
+1; watchdog 1; driver 1; TWO supervisors (carried); disk 17.3 GB free; RAM
+5.9 GB free.
+Escalations: NEW partial-resolve note (BRIDGE-BOOLEANS landed; the BRIDGE-
+LOFT-FACTS merge-conflict risk is now live); carried (unchanged) RESULT-recycle
+race + driver scoped_check bug; FRAME-REVOLVE F1 non_z_axis pin amendment;
+duplicate supervisors + cargoq restart guard; slot-4 + slot-7 wt RESULT
+residue; TOR-C flip-or-pin.

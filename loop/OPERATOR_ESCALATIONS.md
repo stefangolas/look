@@ -336,3 +336,22 @@ Judgment-required items appended each operator cycle. Newest at the bottom.
   LANDED/DONE; (b) the driver's packet_tests_and_crates should read the
   packet's `crates:`/`tests_required:` yaml, not the write paths; (c) the
   heartbeat must archive the slot RESULT before any recycle.
+
+## 2026-09-10 13:06 UTC - PARTIAL RESOLVE: BRIDGE-BOOLEANS landed; BRIDGE-LOFT-FACTS merge-conflict risk now live
+
+- Resolved: the 12:43Z "BRIDGE-BOOLEANS unlanded, RESULT destroyed" item.
+  BRIDGE-BOOLEANS is now status DONE and c0329e0 is an ancestor of
+  integration/kernel-bg (orchestrator commits 4e99196 "row LANDED", 9c4ac9e,
+  b82b035). No re-dispatch risk; the land-vs-rerun decision is moot.
+- Still open (human): the intended serialization between BRIDGE-BOOLEANS and
+  BRIDGE-LOFT-FACTS was bypassed, and BRIDGE-LOFT-FACTS (running slot 0,
+  forked from 1c24aab) touches the SAME files (corpus/ttc/door.py,
+  truck123d/src/bd_bridge.rs). BRIDGE-BOOLEANS is now on integration, so when
+  BRIDGE-LOFT-FACTS lands it will conflict on those files - not the one-line
+  `pub mod` kind. The landing owner must resolve bd_bridge.rs / door.py.
+  Start from `git -C C:\Users\stefa\look merge-tree integration/kernel-bg
+  packet/BRIDGE-LOFT-FACTS`.
+- Still open (human, carried from 12:43Z): the heartbeat recycle can destroy a
+  finished slot's RESULT.json before landing; the driver's scoped_check derives
+  crates/tests from write paths, so a truck123d packet with no vendor/truck
+  write paths gates nothing.
