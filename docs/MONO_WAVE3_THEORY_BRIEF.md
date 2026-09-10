@@ -168,3 +168,45 @@ loop (packet, worker, gates), consuming the landed interfaces; its acceptance
 criterion is the corpus's boolean rows (airbox, details, drivetrain) flipping
 green against their recorded references, and finally the monocoque row's
 cut/fuse cells.
+
+---
+
+## REVIEW VERDICT (orchestrator, 2026-09-10 ~16:00Z) — ACCEPTED WITH FOUR AMENDMENTS
+
+The frontier return ("Certified Boolean Volume by Contact Covers") was
+reviewed line by line. The reduction (1)-(2), the degree arithmetic (g_P:(8,8)),
+the cell bracket (5)-(6) (edge cases checked), Theorem 1, Theorem 2 (Minkowski
+accounting), Theorem 4 (regular-value convergence), and the Krawczyk two-chart
+claim are CORRECT. The contact-cover formulation REPLACES this brief's
+section-4 enclosure accounting (strictly simpler: no certified inside/outside
+regions, no delta budget, error-directed refinement via E(R); curve chaining
+correctly dropped for volume purposes).
+
+Feasibility measured for the tub: eps = 6.3e4 mm^3; a station-resolution
+unresolved cell carries E ~ 1e3 mm^3 — the budget closes at shallow depth.
+
+AMENDMENTS REQUIRED BEFORE MONO-5-SWEPT-BOOLEANS IS BOOKED:
+
+1. Facts-gate sufficiency lemmas (the theory is volume-only; the corpus gate
+   wants solid_count, volume, bbox):
+   - solid_count is CONSTRUCTIVE in the drop-in (BooleanResult.solids() ->
+     [self], door.py:1153) — state as a lemma, no topology certification.
+   - bbox of A\B: EXTREMES-SURVIVE theorem — if B's certified bbox is
+     separated from each of A's extreme slabs (interval check on landed bbox
+     machinery), then bbox(A\B) = bbox(A) exactly; otherwise typed refusal
+     (name the case). Holds numerically for the tub pair with real margin.
+2. Lemma 3 proof fix: the algorithm's test is the SEPARABLE range bracket
+   (11), not the F-hull; termination for it needs the closest-pair argument
+   (at the minimizing pair some coordinate differs by >= d/sqrt(3); boxes
+   shrinking around that pair eventually separate ranges). Conclusion stands.
+3. Name the membership mechanism (section 9 assumes it): certified ray x
+   bicubic root isolation (1-D certified bracketing) or a confirmed
+   SEEDRAY-A coverage statement for spline-patch solids. The retry semantics
+   as written are fine; the mechanism must be named.
+4. Weights admission: certify weights == 1 (corpus lofts are non-rational) or
+   note the landed VolumeRow weight field covers the rational case. One line;
+   the (8,8) polynomial claim assumes non-rational as written.
+
+With these four incorporated, MONO-5-SWEPT-BOOLEANS is booked against the
+returned document as its spec; validation obligations (section 13) are
+endorsed as written, including the tub-skin/cavity end-to-end case.
