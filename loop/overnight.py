@@ -225,10 +225,32 @@ def try_land(slot_dir, slot_no, rows, order, reg_path):
              f"merge: {pid} - overnight mechanical landing (scoped check "
              f"green: {why}; one-verify amendment)", head])
     if m.returncode != 0:
-        git(["merge", "--abort"])
-        log(f"slot {slot_no}: {pid} merge CONFLICT - aborted, left for "
-            f"morning")
-        return
+        # The recurring wedge (2026-09-09, ~3h lost on FRAME-REVOLVE): the
+        # worker commits its CONTEXT.md/PACKET.md/RESULT.json harness bundles
+        # and every consecutive landing merge conflicts on them — slot
+        # bookkeeping, never packet content. If the conflict is confined to
+        # those three files, take the worker's versions (the next dispatch
+        # rewrites them anyway) and continue; any code-path conflict still
+        # aborts for morning adjudication.
+        dirty = git(["diff", "--name-only", "--diff-filter=U"]).stdout.split()
+        harness = {"CONTEXT.md", "PACKET.md", "RESULT.json"}
+        if dirty and set(dirty) <= harness:
+            for f in dirty:
+                git(["checkout", "--theirs", "--", f])
+                git(["add", "--", f])
+            m2 = git(["commit", "--no-edit",
+                      "-m", f"merge: {pid} - harness-bundle conflicts resolved "
+                      f"(worker versions; the recorded dance)"])
+            if m2.returncode != 0:
+                git(["merge", "--abort"])
+                log(f"slot {slot_no}: {pid} harness-conflict commit failed - "
+                    f"aborted, left for morning")
+                return
+        else:
+            git(["merge", "--abort"])
+            log(f"slot {slot_no}: {pid} merge CONFLICT (code files: "
+                f"{dirty}) - aborted, left for morning")
+            return
     # file the RESULT, drop the root copy if the merge carried it
     root_res = ROOT / "RESULT.json"
     if root_res.exists():
