@@ -1,0 +1,5015 @@
+{
+  "fragment": "D",
+  "scope": "code routing table (W_code) for the bridge/door layer: truck123d/src/bd_bridge.rs, binding.rs, marshal.rs, facade.rs, lib.rs; corpus/ttc/door.py engine/op dispatch; cross-referenced to docs/OP_CAPABILITY_MATRIX.md cells",
+  "rules": [
+    {
+      "rule_id": "D-DOOR-MAIN-ENGINE-SWITCH",
+      "kind": "gate",
+      "source": {
+        "file": "corpus/ttc/door.py",
+        "symbol": "door.main",
+        "line": 2273
+      },
+      "discriminator": "argv[0] == \"--engine\" -> ENGINE = argv[1] (occ default, truck the kernel regime)",
+      "matrix_cell": null,
+      "preconditions": [
+        {
+          "axis": "!unmodeled:engine",
+          "value": "!unmodeled:ENGINE in {occ,truck}"
+        }
+      ],
+      "outcomes": [
+        {
+          "variant": "ENGINE=occ",
+          "postconditions": [
+            {
+              "axis": "!unmodeled:route",
+              "value": "!unmodeled:install_cadgen_alias -> real build123d (OCC baseline)"
+            },
+            {
+              "axis": "goal",
+              "value": "mesh"
+            }
+          ]
+        },
+        {
+          "variant": "ENGINE=truck",
+          "postconditions": [
+            {
+              "axis": "!unmodeled:route",
+              "value": "!unmodeled:install_truck_alias -> drop-in over truck123d.bd_facts/bd_stl"
+            },
+            {
+              "axis": "goal",
+              "value": "mesh"
+            }
+          ]
+        }
+      ],
+      "refusals": [],
+      "consumes_evidence": [
+        "argv"
+      ],
+      "produces_evidence": [
+        "ENGINE",
+        "door_version (TRUCK_DOOR_VERSION=2 vs DOOR_VERSION=1)"
+      ],
+      "calls": [
+        "door.run_entry",
+        "door.geometry_facts",
+        "door._truck_export_stl",
+        "build123d.export_stl"
+      ],
+      "theorem_comment": "``--engine`` selects the regime: ``occ`` (default, the OCC baseline) or ``truck`` (the kernel-engine regime landed by TTC-EXECUTOR-BINDING ...).",
+      "confidence": "high"
+    },
+    {
+      "rule_id": "D-DOOR-RUN-ENTRY",
+      "kind": "gate",
+      "source": {
+        "file": "corpus/ttc/door.py",
+        "symbol": "door.run_entry",
+        "line": 2212
+      },
+      "discriminator": "ENGINE == \"truck\" -> install_truck_alias(); else install_cadgen_alias()",
+      "matrix_cell": null,
+      "preconditions": [
+        {
+          "axis": "!unmodeled:engine",
+          "value": "!unmodeled:ENGINE"
+        }
+      ],
+      "outcomes": [
+        {
+          "variant": "truck path",
+          "postconditions": [
+            {
+              "axis": "!unmodeled:alias",
+              "value": "!unmodeled:cadgen.build123d := truck drop-in"
+            },
+            {
+              "axis": "goal",
+              "value": "mesh"
+            }
+          ]
+        },
+        {
+          "variant": "occ path",
+          "postconditions": [
+            {
+              "axis": "!unmodeled:alias",
+              "value": "!unmodeled:cadgen.build123d := genuine build123d"
+            },
+            {
+              "axis": "goal",
+              "value": "mesh"
+            }
+          ]
+        }
+      ],
+      "refusals": [],
+      "consumes_evidence": [
+        "module",
+        "entry",
+        "args"
+      ],
+      "produces_evidence": [
+        "result object",
+        "Compound wrapper for list results"
+      ],
+      "calls": [
+        "door.install_truck_alias",
+        "door.install_cadgen_alias"
+      ],
+      "theorem_comment": "The kernel-engine regime: the alias installs the truck drop-in module (bd_bridge over truck123d) instead of build123d.",
+      "confidence": "high"
+    },
+    {
+      "rule_id": "D-DOOR-INSTALL-TRUCK-ALIAS",
+      "kind": "assembler",
+      "source": {
+        "file": "corpus/ttc/door.py",
+        "symbol": "door.install_truck_alias",
+        "line": 78
+      },
+      "discriminator": "installs the build123d-named data-recording surface; all geometry deferred to truck123d.bd_facts/bd_stl",
+      "matrix_cell": null,
+      "preconditions": [
+        {
+          "axis": "!unmodeled:engine",
+          "value": "!unmodeled:truck"
+        }
+      ],
+      "outcomes": [
+        {
+          "variant": "cadgen.build123d := _build_truck_module()",
+          "postconditions": [
+            {
+              "axis": "goal",
+              "value": "mesh"
+            },
+            {
+              "axis": "rep.construction_witness",
+              "value": "true"
+            }
+          ]
+        }
+      ],
+      "refusals": [],
+      "consumes_evidence": [
+        "truck123d module"
+      ],
+      "produces_evidence": [
+        "drop-in bd module",
+        "cadgen.compound_from_instances"
+      ],
+      "calls": [
+        "door._build_truck_module",
+        "truck123d.bd_facts",
+        "truck123d.bd_stl"
+      ],
+      "theorem_comment": "A name whose carrier form the executor does not cover raises the mapped ``truck123d.Refused`` exception -- loud, never a silent fallback to OCC.",
+      "confidence": "high"
+    },
+    {
+      "rule_id": "D-DOOR-INSTALL-CADGEN-ALIAS",
+      "kind": "assembler",
+      "source": {
+        "file": "corpus/ttc/door.py",
+        "symbol": "door.install_cadgen_alias",
+        "line": 2191
+      },
+      "discriminator": "ENGINE != truck -> genuine build123d (OCC) is the dispatch target",
+      "matrix_cell": null,
+      "preconditions": [
+        {
+          "axis": "!unmodeled:engine",
+          "value": "!unmodeled:occ"
+        }
+      ],
+      "outcomes": [
+        {
+          "variant": "cadgen.build123d := real build123d",
+          "postconditions": [
+            {
+              "axis": "!unmodeled:route",
+              "value": "!unmodeled:OCC kernel, no truck routing"
+            },
+            {
+              "axis": "goal",
+              "value": "mesh"
+            }
+          ]
+        }
+      ],
+      "refusals": [],
+      "consumes_evidence": [
+        "build123d package"
+      ],
+      "produces_evidence": [
+        "OCC shape tree"
+      ],
+      "calls": [
+        "build123d.Compound",
+        "build123d.export_stl"
+      ],
+      "theorem_comment": "Answer the corpus imports ``cadgen.build123d`` ... with the genuine build123d package.",
+      "confidence": "high"
+    },
+    {
+      "rule_id": "D-DOOR-REFUSE",
+      "kind": "gate",
+      "source": {
+        "file": "corpus/ttc/door.py",
+        "symbol": "door._refuse",
+        "line": 117
+      },
+      "discriminator": "every drop-in arm whose carrier form the executor cannot answer calls _refuse(message)",
+      "matrix_cell": "step-export(constructive)",
+      "preconditions": [
+        {
+          "axis": "!unmodeled:trigger",
+          "value": "!unmodeled:carrier form outside executor envelope"
+        }
+      ],
+      "outcomes": [
+        {
+          "variant": "raise truck123d.Refused",
+          "postconditions": [
+            {
+              "axis": "!unmodeled:payload",
+              "value": "!unmodeled:{case: unsupported_envelope, envelope: non_canonical_carrier}"
+            },
+            {
+              "axis": "global.knowledge",
+              "value": "local_only(residual)"
+            }
+          ]
+        }
+      ],
+      "refusals": [
+        "truck123d.Refused(case=unsupported_envelope, envelope=non_canonical_carrier)"
+      ],
+      "consumes_evidence": [
+        "message string"
+      ],
+      "produces_evidence": [
+        "Refused exception payload"
+      ],
+      "calls": [
+        "truck123d.Refused"
+      ],
+      "theorem_comment": "Raise the mapped truck exception for a name the executor cannot answer (typed, never a bare Exception or a silent fallback).",
+      "confidence": "high"
+    },
+    {
+      "rule_id": "D-DOOR-BUILD-TRUCK-MODULE",
+      "kind": "assembler",
+      "source": {
+        "file": "corpus/ttc/door.py",
+        "symbol": "door._build_truck_module",
+        "line": 2158
+      },
+      "discriminator": "_TRUCK_NAMES census vocabulary answered name-for-name; Shape/Solid mixins add cast/make_cylinder/make_sphere",
+      "matrix_cell": "primitive(canonical-solid)",
+      "preconditions": [
+        {
+          "axis": "!unmodeled:vocabulary",
+          "value": "!unmodeled:_TRUCK_NAMES (29 names)"
+        }
+      ],
+      "outcomes": [
+        {
+          "variant": "bd module with every census name",
+          "postconditions": [
+            {
+              "axis": "goal",
+              "value": "valid_brep"
+            }
+          ]
+        }
+      ],
+      "refusals": [
+        "Shape.cast (door.py:2169)",
+        "unknown Plane/Rotation/Location forms"
+      ],
+      "consumes_evidence": [
+        "globals() drop-in classes"
+      ],
+      "produces_evidence": [
+        "bd module",
+        "bd.Mode{ADD,SUBTRACT,INTERSECT}"
+      ],
+      "calls": [
+        "door.Vector",
+        "door.Plane",
+        "door.Pos",
+        "door.Location",
+        "door.Rotation",
+        "door.Edge.make_line",
+        "door.Edge.make_spline"
+      ],
+      "theorem_comment": "Every name is answered (signatures never improved); names whose carrier form the landed executor cannot answer refuse with the mapped typed exception.",
+      "confidence": "high"
+    },
+    {
+      "rule_id": "D-DOOR-BOOLEAN-OP",
+      "kind": "gate",
+      "source": {
+        "file": "corpus/ttc/door.py",
+        "symbol": "door._Shape._boolean / door._boolean_node",
+        "line": 1012
+      },
+      "discriminator": "operator/mode union|subtract|intersect over two _Shape operands; a _BooleanResult operand refuses BooleanResultOperand (depth-1 only)",
+      "matrix_cell": "cut(canonical,canonical)",
+      "preconditions": [
+        {
+          "axis": "!unmodeled:mode",
+          "value": "!unmodeled:union|subtract|intersect"
+        },
+        {
+          "axis": "!unmodeled:operand_depth",
+          "value": "!unmodeled:<=1"
+        }
+      ],
+      "outcomes": [
+        {
+          "variant": "_BooleanResult node {boolean:{mode,a,b}}",
+          "postconditions": [
+            {
+              "axis": "goal",
+              "value": "valid_brep"
+            },
+            {
+              "axis": "rep.construction_witness",
+              "value": "true"
+            }
+          ]
+        },
+        {
+          "variant": "_T123D.bd_facts dispatched at record time",
+          "postconditions": [
+            {
+              "axis": "goal",
+              "value": "volume_bracket"
+            },
+            {
+              "axis": "global.knowledge",
+              "value": "local_only(residual)"
+            }
+          ]
+        }
+      ],
+      "refusals": [
+        "_refuse(\"a boolean operand outside a kernel-engine row ...\")",
+        "_refuse(\"BooleanResultOperand: a boolean of a boolean result ...\")"
+      ],
+      "consumes_evidence": [
+        "_Shape",
+        "ModeValue"
+      ],
+      "produces_evidence": [
+        "_BooleanResult",
+        "boolean_events"
+      ],
+      "calls": [
+        "door._boolean_node",
+        "truck123d.bd_facts"
+      ],
+      "theorem_comment": "The operands' LOCAL geometry is what dispatches; a placed operand's frame composes after (the recorded exactness rule), so admission is placement-blind and verdict-stable.",
+      "confidence": "high"
+    },
+    {
+      "rule_id": "D-DOOR-REVOLVE",
+      "kind": "gate",
+      "source": {
+        "file": "corpus/ttc/door.py",
+        "symbol": "door.revolve",
+        "line": 1362
+      },
+      "discriminator": "Face profile + full 360 arc -> lathe row (z-axis legacy or non-z axis profile+frame); partial arc / non-Face / degenerate axis / open profile / spline-with-options refuse",
+      "matrix_cell": "revolve(full,spline-profile)",
+      "preconditions": [
+        {
+          "axis": "!unmodeled:revolution_arc",
+          "value": "!unmodeled:360.0"
+        },
+        {
+          "axis": "!unmodeled:axis",
+          "value": "!unmodeled:Axis|Vector"
+        }
+      ],
+      "outcomes": [
+        {
+          "variant": "_Part{kind:lathe, profile, arc_deg:360.0}",
+          "postconditions": [
+            {
+              "axis": "goal",
+              "value": "volume_bracket"
+            },
+            {
+              "axis": "rep.canonical_carrier",
+              "value": "true"
+            }
+          ]
+        }
+      ],
+      "refusals": [
+        "_refuse(\"a partial-arc revolve is outside the executor's lathe arm\")",
+        "_refuse(\"DegenerateRevolveAxis: a zero-length axis ...\")",
+        "_refuse(\"revolve needs a closed profile\")",
+        "_refuse(\"a revolve profile outside the y=0 plane ...\")",
+        "_refuse(\"a spline-profile revolve is not a kernel-engine row\")",
+        "_refuse(\"a profile crossing the recorded axis ...\")",
+        "_refuse(\"the profile lying on the axis ...\")",
+        "_refuse(\"an axis parallel to its profile ray ...\")"
+      ],
+      "consumes_evidence": [
+        "Face",
+        "Axis|Vector"
+      ],
+      "produces_evidence": [
+        "SolidSpec::Lathe",
+        "RotationFrame"
+      ],
+      "calls": [
+        "door._legacy_z_profile",
+        "door._axis_profile",
+        "door._axis_unit",
+        "door._axis_frame",
+        "truck123d.bd_facts"
+      ],
+      "theorem_comment": "A partial arc, a degenerate axis, a profile that is not a single-sided meridian generator about the axis, an open profile, or a spline whose interpolation options the recorded data cannot recover refuses typed.",
+      "confidence": "high"
+    },
+    {
+      "rule_id": "D-DOOR-EXTRUDE",
+      "kind": "gate",
+      "source": {
+        "file": "corpus/ttc/door.py",
+        "symbol": "door.extrude",
+        "line": 1944
+      },
+      "discriminator": "Face boundary all-line -> prism row; boundary carrying a recorded spline -> trim_prism row dispatched through bd_facts at record time",
+      "matrix_cell": "extrude(profile)",
+      "preconditions": [
+        {
+          "axis": "!unmodeled:boundary",
+          "value": "!unmodeled:line-loop|spline-trimmed"
+        }
+      ],
+      "outcomes": [
+        {
+          "variant": "_Part{kind:prism}",
+          "postconditions": [
+            {
+              "axis": "goal",
+              "value": "volume_bracket"
+            },
+            {
+              "axis": "rep.canonical_carrier",
+              "value": "true"
+            }
+          ]
+        },
+        {
+          "variant": "_Part{kind:trim_prism}",
+          "postconditions": [
+            {
+              "axis": "goal",
+              "value": "volume_bracket"
+            },
+            {
+              "axis": "rep.construction_witness",
+              "value": "true"
+            }
+          ]
+        }
+      ],
+      "refusals": [
+        "_refuse(\"Face extrusion is not yet a kernel-engine row\")",
+        "trim_prism constructor typed refusal surfaced at record time"
+      ],
+      "consumes_evidence": [
+        "Face"
+      ],
+      "produces_evidence": [
+        "SolidSpec::Prism",
+        "SolidSpec::TrimPrism"
+      ],
+      "calls": [
+        "door._edge3",
+        "truck123d.bd_facts",
+        "crate::python::binding::trim_extrude_solid"
+      ],
+      "theorem_comment": "A boundary carrying a recorded spline edge is the spline-trimmed extrude constructor row (`trim_prism`) ... The row is dispatched through the native facts entry at record time.",
+      "confidence": "high"
+    },
+    {
+      "rule_id": "D-DOOR-SWEEP",
+      "kind": "gate",
+      "source": {
+        "file": "corpus/ttc/door.py",
+        "symbol": "door.sweep",
+        "line": 1998
+      },
+      "discriminator": "line path -> 2-station loft chain; spline path -> chain over recorded samples; section outside line-loop vocabulary refuses",
+      "matrix_cell": "sweep(spine,closed-section)",
+      "preconditions": [
+        {
+          "axis": "!unmodeled:path",
+          "value": "!unmodeled:line|spline"
+        },
+        {
+          "axis": "!unmodeled:section",
+          "value": "!unmodeled:line-loop Face"
+        }
+      ],
+      "outcomes": [
+        {
+          "variant": "_Part{kind:loft, closed:false, sections}",
+          "postconditions": [
+            {
+              "axis": "goal",
+              "value": "volume_bracket"
+            },
+            {
+              "axis": "global.knowledge",
+              "value": "local_only(residual)"
+            }
+          ]
+        }
+      ],
+      "refusals": [
+        "_refuse(\"a path outside the recorded line/spline edge carrier ...\")",
+        "_refuse(\"a section outside the recorded Face carrier ...\")",
+        "_refuse(\"a spline-trimmed section boundary ...\")",
+        "_refuse(\"DegenerateSweepPath: ...\")"
+      ],
+      "consumes_evidence": [
+        "Face",
+        "Edge|Wire"
+      ],
+      "produces_evidence": [
+        "SolidSpec::Loft"
+      ],
+      "calls": [
+        "door._path_edge",
+        "door._section_loop",
+        "door._station_data",
+        "door._transport_frames",
+        "door._place_loop"
+      ],
+      "theorem_comment": "Each station places the section through the fixed-order double-reflection frames (parallel transport, never Frenet).",
+      "confidence": "high"
+    },
+    {
+      "rule_id": "D-DOOR-LOFT",
+      "kind": "gate",
+      "source": {
+        "file": "corpus/ttc/door.py",
+        "symbol": "door.loft",
+        "line": 2019
+      },
+      "discriminator": "ordered Face section list -> Loft row; non-Face section or empty list -> _LOFT_REFUSAL",
+      "matrix_cell": "loft(spline-section)",
+      "preconditions": [
+        {
+          "axis": "!unmodeled:sections",
+          "value": "!unmodeled:ordered Face list"
+        }
+      ],
+      "outcomes": [
+        {
+          "variant": "_Part{kind:loft, closed:false, sections}",
+          "postconditions": [
+            {
+              "axis": "goal",
+              "value": "volume_bracket"
+            },
+            {
+              "axis": "rep.construction_witness",
+              "value": "true"
+            }
+          ]
+        }
+      ],
+      "refusals": [
+        "_refuse(_LOFT_REFUSAL)",
+        "_refuse at facts arm for a spline-section smooth volume"
+      ],
+      "consumes_evidence": [
+        "Face"
+      ],
+      "produces_evidence": [
+        "SolidSpec::Loft"
+      ],
+      "calls": [
+        "door._wire_profile_edges",
+        "truck123d.bd_facts"
+      ],
+      "theorem_comment": "The kernel certifies the ruled matched-vertex chain with exact facts for all-line sections; a spline-section loft's smooth-surface volume is an open carrier the executor refuses typed at the facts arm.",
+      "confidence": "high"
+    },
+    {
+      "rule_id": "D-DOOR-MIRROR",
+      "kind": "gate",
+      "source": {
+        "file": "corpus/ttc/door.py",
+        "symbol": "door.mirror / door._mirror_row",
+        "line": 2083
+      },
+      "discriminator": "about is a coordinate Plane (XY->z, XZ->y, YZ->x); any other carrier or a second different plane refuses",
+      "matrix_cell": "mirror(axis-plane)",
+      "preconditions": [
+        {
+          "axis": "!unmodeled:about",
+          "value": "!unmodeled:Plane.XY|XZ|YZ"
+        },
+        {
+          "axis": "!unmodeled:prior_mirror",
+          "value": "!unmodeled:none|same axis"
+        }
+      ],
+      "outcomes": [
+        {
+          "variant": "_Part with mirror axis recorded (placed-carrier transform)",
+          "postconditions": [
+            {
+              "axis": "goal",
+              "value": "volume_bracket"
+            },
+            {
+              "axis": "rep.construction_witness",
+              "value": "true"
+            }
+          ]
+        }
+      ],
+      "refusals": [
+        "_refuse(\"mirror is not a kernel-engine row\")",
+        "_refuse(\"a double mirror over two planes ...\")",
+        "_refuse(\"a mirror of this carrier ...\")"
+      ],
+      "consumes_evidence": [
+        "_Part|Compound|Face|Edge"
+      ],
+      "produces_evidence": [
+        "PartSpec.mirror"
+      ],
+      "calls": [
+        "door._mirror_row",
+        "crate::bd_bridge::mirror_point",
+        "crate::bd_bridge::part_world_bbox",
+        "crate::bd_bridge::reflect_triangle"
+      ],
+      "theorem_comment": "A mirror about a coordinate plane records a placed-carrier transform over the mirrored census row (the landed placed/processor rule): the solid carrier is untouched and the facts transform with the placement -- no geometry is recomputed.",
+      "confidence": "high"
+    },
+    {
+      "rule_id": "D-DOOR-FILLET",
+      "kind": "gate",
+      "source": {
+        "file": "corpus/ttc/door.py",
+        "symbol": "door.fillet",
+        "line": 2045
+      },
+      "discriminator": "any fillet call -> immediate typed refusal (no edge topology on the drop-in)",
+      "matrix_cell": "fillet(edge-selector)",
+      "preconditions": [
+        {
+          "axis": "!unmodeled:op",
+          "value": "!unmodeled:fillet"
+        }
+      ],
+      "outcomes": [],
+      "refusals": [
+        "_refuse(\"fillet is not a kernel-engine row\")"
+      ],
+      "consumes_evidence": [
+        "edges",
+        "radius"
+      ],
+      "produces_evidence": [],
+      "calls": [],
+      "theorem_comment": "An empty entity selection: the drop-in records no fillet/chamfer edge topology, so ``shape.edges()``/``shape.faces()`` yield nothing and the corpus's ``safe_fillet``/``safe_chamfer`` ladders return the shape.",
+      "confidence": "high"
+    },
+    {
+      "rule_id": "D-DOOR-CHAMFER",
+      "kind": "gate",
+      "source": {
+        "file": "corpus/ttc/door.py",
+        "symbol": "door.chamfer",
+        "line": 2049
+      },
+      "discriminator": "any chamfer call -> immediate typed refusal",
+      "matrix_cell": "chamfer(edge-selector)",
+      "preconditions": [
+        {
+          "axis": "!unmodeled:op",
+          "value": "!unmodeled:chamfer"
+        }
+      ],
+      "outcomes": [],
+      "refusals": [
+        "_refuse(\"chamfer is not a kernel-engine row\")"
+      ],
+      "consumes_evidence": [
+        "edges",
+        "length"
+      ],
+      "produces_evidence": [],
+      "calls": [],
+      "theorem_comment": "See door.fillet: the drop-in records no edge topology for a blend arm.",
+      "confidence": "high"
+    },
+    {
+      "rule_id": "D-DOOR-CIRCLE",
+      "kind": "gate",
+      "source": {
+        "file": "corpus/ttc/door.py",
+        "symbol": "door.Circle",
+        "line": 800
+      },
+      "discriminator": "any Circle(radius) -> immediate typed refusal (a circle is an exact conic, not a recoverable line/spline carrier)",
+      "matrix_cell": "author(circle-profile)",
+      "preconditions": [
+        {
+          "axis": "!unmodeled:carrier",
+          "value": "!unmodeled:closed conic profile"
+        }
+      ],
+      "outcomes": [],
+      "refusals": [
+        "_refuse(\"a circle profile is not answered exactly by a kernel-engine row\")"
+      ],
+      "consumes_evidence": [
+        "radius"
+      ],
+      "produces_evidence": [],
+      "calls": [],
+      "theorem_comment": "A circle is an exact conic, not a recoverable line/spline carrier: feeding it to ``loft``/``extrude``/``revolve`` cannot be answered exactly by the landed executor, so the carrier keeps its typed refusal.",
+      "confidence": "high"
+    },
+    {
+      "rule_id": "D-DOOR-BOX",
+      "kind": "classifier",
+      "source": {
+        "file": "corpus/ttc/door.py",
+        "symbol": "door.Box",
+        "line": 1304
+      },
+      "discriminator": "Box(length,width,height) -> SolidSpec::Box",
+      "matrix_cell": "primitive(canonical-solid)",
+      "preconditions": [
+        {
+          "axis": "!unmodeled:kind",
+          "value": "!unmodeled:box"
+        }
+      ],
+      "outcomes": [
+        {
+          "variant": "_Part{kind:box}",
+          "postconditions": [
+            {
+              "axis": "rep.canonical_carrier",
+              "value": "true"
+            },
+            {
+              "axis": "goal",
+              "value": "volume_bracket"
+            }
+          ]
+        }
+      ],
+      "refusals": [],
+      "consumes_evidence": [
+        "length",
+        "width",
+        "height"
+      ],
+      "produces_evidence": [
+        "SolidSpec::Box"
+      ],
+      "calls": [],
+      "theorem_comment": "build123d ``Box(length, width, height)`` (centered on the origin).",
+      "confidence": "high"
+    },
+    {
+      "rule_id": "D-DOOR-CYLINDER",
+      "kind": "gate",
+      "source": {
+        "file": "corpus/ttc/door.py",
+        "symbol": "door.Cylinder / door._cylinder_axis",
+        "line": 1332
+      },
+      "discriminator": "rotation (0,0,0)->z, (90,0,0)->y, (0,90,0)->x; z-rotated or other rotations refuse",
+      "matrix_cell": "primitive(canonical-solid)",
+      "preconditions": [
+        {
+          "axis": "!unmodeled:rotation",
+          "value": "!unmodeled:(0,0,0)|(90,0,0)|(0,90,0)"
+        }
+      ],
+      "outcomes": [
+        {
+          "variant": "_Part{kind:cylinder, axis}",
+          "postconditions": [
+            {
+              "axis": "rep.canonical_carrier",
+              "value": "true"
+            },
+            {
+              "axis": "goal",
+              "value": "volume_bracket"
+            }
+          ]
+        }
+      ],
+      "refusals": [
+        "_refuse(\"z-rotated cylinders are not a kernel-engine row\")",
+        "_refuse(\"this cylinder rotation is not a census carrier\")"
+      ],
+      "consumes_evidence": [
+        "radius",
+        "height",
+        "rotation"
+      ],
+      "produces_evidence": [
+        "SolidSpec::Cylinder"
+      ],
+      "calls": [],
+      "theorem_comment": "build123d ``Cylinder(radius, height)`` (centered, z-axis by default).",
+      "confidence": "high"
+    },
+    {
+      "rule_id": "D-DOOR-SPHERE",
+      "kind": "classifier",
+      "source": {
+        "file": "corpus/ttc/door.py",
+        "symbol": "door.Sphere",
+        "line": 1344
+      },
+      "discriminator": "Sphere(radius) -> SolidSpec::Sphere",
+      "matrix_cell": "primitive(canonical-solid)",
+      "preconditions": [
+        {
+          "axis": "!unmodeled:kind",
+          "value": "!unmodeled:sphere"
+        }
+      ],
+      "outcomes": [
+        {
+          "variant": "_Part{kind:sphere}",
+          "postconditions": [
+            {
+              "axis": "rep.canonical_carrier",
+              "value": "true"
+            },
+            {
+              "axis": "goal",
+              "value": "volume_bracket"
+            }
+          ]
+        }
+      ],
+      "refusals": [],
+      "consumes_evidence": [
+        "radius"
+      ],
+      "produces_evidence": [
+        "SolidSpec::Sphere"
+      ],
+      "calls": [],
+      "theorem_comment": "build123d ``Sphere(radius)`` (centered on the origin).",
+      "confidence": "high"
+    },
+    {
+      "rule_id": "D-DOOR-TORUS",
+      "kind": "gate",
+      "source": {
+        "file": "corpus/ttc/door.py",
+        "symbol": "door.Torus",
+        "line": 1349
+      },
+      "discriminator": "major_angle == 360 -> SolidSpec::Torus; partial-arc torus refuses",
+      "matrix_cell": "primitive(canonical-solid)",
+      "preconditions": [
+        {
+          "axis": "!unmodeled:major_angle",
+          "value": "!unmodeled:360.0"
+        }
+      ],
+      "outcomes": [
+        {
+          "variant": "_Part{kind:torus}",
+          "postconditions": [
+            {
+              "axis": "rep.canonical_carrier",
+              "value": "true"
+            },
+            {
+              "axis": "goal",
+              "value": "volume_bracket"
+            }
+          ]
+        }
+      ],
+      "refusals": [
+        "_refuse(\"a partial-arc torus is not a kernel-engine row\")"
+      ],
+      "consumes_evidence": [
+        "major_radius",
+        "minor_radius",
+        "major_angle"
+      ],
+      "produces_evidence": [
+        "SolidSpec::Torus"
+      ],
+      "calls": [],
+      "theorem_comment": "build123d ``Torus(major_radius, minor_radius)`` (centered, z-axis).",
+      "confidence": "high"
+    },
+    {
+      "rule_id": "D-DOOR-PROFILE-CARRIERS",
+      "kind": "assembler",
+      "source": {
+        "file": "corpus/ttc/door.py",
+        "symbol": "door.Edge.make_line / Edge.make_spline / door.Spline / door.Line / door.Polyline / door.Polygon / door.make_face",
+        "line": 717
+      },
+      "discriminator": "recorded defining samples only (line endpoints or spline sample list); never a flattening polygon",
+      "matrix_cell": "author(polyline-profile)",
+      "preconditions": [
+        {
+          "axis": "!unmodeled:carrier",
+          "value": "!unmodeled:line|spline|wire|face"
+        }
+      ],
+      "outcomes": [
+        {
+          "variant": "Edge{kind,points}/Wire{edges}/Face{edges}",
+          "postconditions": [
+            {
+              "axis": "rep.construction_witness",
+              "value": "true"
+            },
+            {
+              "axis": "goal",
+              "value": "valid_brep"
+            }
+          ]
+        }
+      ],
+      "refusals": [
+        "_refuse(\"a polygon profile needs at least three points\")",
+        "_refuse(\"make_face is not a corpus kernel-engine carrier\")",
+        "_refuse(\"this path carrier has no recorded interpolation\")"
+      ],
+      "consumes_evidence": [
+        "points"
+      ],
+      "produces_evidence": [
+        "Edge",
+        "Wire",
+        "Face"
+      ],
+      "calls": [],
+      "theorem_comment": "The edge records its DEFINING samples (the points the corpus passed) as a data row; a consuming verb answers exactly where the executor can ... and refuses typed where the exact carrier is genuinely open.",
+      "confidence": "high"
+    },
+    {
+      "rule_id": "D-DOOR-FRAMES",
+      "kind": "assembler",
+      "source": {
+        "file": "corpus/ttc/door.py",
+        "symbol": "door.Vector / door.Plane / door.Pos / door.Location / door.Rotation / door.Rot / door._Frame",
+        "line": 146
+      },
+      "discriminator": "Vector is pure client-side direction data; Plane/Pos/Location/Rotation record an orthonormal frame; frame*shape records the placement",
+      "matrix_cell": "placement",
+      "preconditions": [
+        {
+          "axis": "!unmodeled:frame_form",
+          "value": "!unmodeled:translation|euler|full orthonormal"
+        }
+      ],
+      "outcomes": [
+        {
+          "variant": "PartSpec{x,y,z,rz,rotation,mirror}",
+          "postconditions": [
+            {
+              "axis": "rep.param_map_inverse",
+              "value": "true"
+            },
+            {
+              "axis": "goal",
+              "value": "valid_brep"
+            }
+          ]
+        }
+      ],
+      "refusals": [
+        "_refuse(\"Plane forms beyond a frame row are not census carriers\")",
+        "_refuse(\"Location forms beyond a frame row are not census carriers\")",
+        "_refuse(\"Rotation forms beyond an Euler frame ...\")"
+      ],
+      "consumes_evidence": [
+        "origin",
+        "x_dir",
+        "z_dir",
+        "euler_deg"
+      ],
+      "produces_evidence": [
+        "RotationFrame"
+      ],
+      "calls": [
+        "door._euler_rotation",
+        "door._mmul",
+        "door._axis_angle_frame"
+      ],
+      "theorem_comment": "``Plane(origin, x_dir, z_dir)`` and the ``Plane.XY/XZ/YZ`` markers record an orthonormal frame ... placing algebra (``frame * shape``) records the placement.",
+      "confidence": "high"
+    },
+    {
+      "rule_id": "D-DOOR-COMPOUND",
+      "kind": "assembler",
+      "source": {
+        "file": "corpus/ttc/door.py",
+        "symbol": "door.Compound",
+        "line": 1268
+      },
+      "discriminator": "children/obj list -> group node; _leaves() flattens for solids()",
+      "matrix_cell": "compound(group)",
+      "preconditions": [
+        {
+          "axis": "!unmodeled:kind",
+          "value": "!unmodeled:compound"
+        }
+      ],
+      "outcomes": [
+        {
+          "variant": "TreeNode::Group{group}",
+          "postconditions": [
+            {
+              "axis": "goal",
+              "value": "valid_brep"
+            }
+          ]
+        }
+      ],
+      "refusals": [],
+      "consumes_evidence": [
+        "children"
+      ],
+      "produces_evidence": [
+        "TreeNode::Group"
+      ],
+      "calls": [
+        "crate::bd_bridge::count_and_union",
+        "crate::bd_bridge::top_volume"
+      ],
+      "theorem_comment": "build123d ``Compound``: a group of child construction rows.",
+      "confidence": "high"
+    },
+    {
+      "rule_id": "D-DOOR-CADGEN-COMPOUND",
+      "kind": "assembler",
+      "source": {
+        "file": "corpus/ttc/door.py",
+        "symbol": "door._compound_from_instances (both aliases)",
+        "line": 100
+      },
+      "discriminator": "list of (prototype, location, name) -> placed.moved(location) then Compound",
+      "matrix_cell": "compound(group)",
+      "preconditions": [
+        {
+          "axis": "!unmodeled:instances",
+          "value": "!unmodeled:(prototype, location, name) list"
+        }
+      ],
+      "outcomes": [
+        {
+          "variant": "Compound of placed instances",
+          "postconditions": [
+            {
+              "axis": "goal",
+              "value": "valid_brep"
+            }
+          ]
+        }
+      ],
+      "refusals": [],
+      "consumes_evidence": [
+        "instances"
+      ],
+      "produces_evidence": [
+        "Compound"
+      ],
+      "calls": [
+        "door._Frame.__mul__",
+        "door._locate_in_place"
+      ],
+      "theorem_comment": "``compound_from_instances`` (a cadgen composition helper the Falcon-Heavy tree uses to place repeated engine instances) is answered with the equivalent plain build123d composition.",
+      "confidence": "high"
+    },
+    {
+      "rule_id": "D-DOOR-FACTS",
+      "kind": "gate",
+      "source": {
+        "file": "corpus/ttc/door.py",
+        "symbol": "door.geometry_facts / door._Shape._facts",
+        "line": 2237
+      },
+      "discriminator": "obj.solids()/obj.volume/obj.bounding_box() -> _T123D.bd_facts(node JSON)",
+      "matrix_cell": "validity-check",
+      "preconditions": [
+        {
+          "axis": "!unmodeled:entry",
+          "value": "!unmodeled:truck facts measurement"
+        }
+      ],
+      "outcomes": [
+        {
+          "variant": "{solid_count, volume, bbox, diag}",
+          "postconditions": [
+            {
+              "axis": "goal",
+              "value": "volume_bracket"
+            },
+            {
+              "axis": "global.knowledge",
+              "value": "local_only(residual)"
+            }
+          ]
+        }
+      ],
+      "refusals": [
+        "facts[\"err:<type>\"] recorded per-field on any exception (door reports, never crashes)"
+      ],
+      "consumes_evidence": [
+        "TreeNode JSON"
+      ],
+      "produces_evidence": [
+        "Facts JSON"
+      ],
+      "calls": [
+        "truck123d.bd_facts",
+        "crate::bd_bridge::tree_facts"
+      ],
+      "theorem_comment": "All geometry lives behind the native executor; this side only records data and frames.",
+      "confidence": "high"
+    },
+    {
+      "rule_id": "D-DOOR-EXPORT-STL",
+      "kind": "gate",
+      "source": {
+        "file": "corpus/ttc/door.py",
+        "symbol": "door.export_stl / door._truck_export_stl",
+        "line": 2115
+      },
+      "discriminator": "ENGINE==truck -> _T123D.bd_stl(node); else bd.export_stl(tolerance=diag*2e-4, angular_tolerance=0.5)",
+      "matrix_cell": "step-export(constructive)",
+      "preconditions": [
+        {
+          "axis": "!unmodeled:engine",
+          "value": "!unmodeled:truck|occ"
+        }
+      ],
+      "outcomes": [
+        {
+          "variant": "{triangles:n}",
+          "postconditions": [
+            {
+              "axis": "goal",
+              "value": "mesh"
+            },
+            {
+              "axis": "rep.construction_witness",
+              "value": "true"
+            }
+          ]
+        }
+      ],
+      "refusals": [
+        "door main catches a refused export as a typed verdict (record.ok=false)"
+      ],
+      "consumes_evidence": [
+        "TreeNode JSON",
+        "path"
+      ],
+      "produces_evidence": [
+        "binary STL"
+      ],
+      "calls": [
+        "truck123d.bd_stl",
+        "crate::bd_bridge::write_tree_stl",
+        "build123d.export_stl"
+      ],
+      "theorem_comment": "The kernel executor writes the deterministic triangle soup of the submitted construction tree.",
+      "confidence": "high"
+    },
+    {
+      "rule_id": "D-DOOR-SHAPE-CAST",
+      "kind": "gate",
+      "source": {
+        "file": "corpus/ttc/door.py",
+        "symbol": "door._build_truck_module._ShapeMixin.cast",
+        "line": 2166
+      },
+      "discriminator": "Shape.cast(wrapped) -> typed refusal (no OCC wrapping)",
+      "matrix_cell": null,
+      "preconditions": [
+        {
+          "axis": "!unmodeled:op",
+          "value": "!unmodeled:Shape.cast"
+        }
+      ],
+      "outcomes": [],
+      "refusals": [
+        "_refuse(\"Shape.cast is not a kernel-engine row\")"
+      ],
+      "consumes_evidence": [
+        "wrapped"
+      ],
+      "produces_evidence": [],
+      "calls": [],
+      "theorem_comment": "A corpus helper that probes the wrapped OCC shape of a kernel-engine data row cannot be served: refuse typed rather than pass `None` into OCP.",
+      "confidence": "high"
+    },
+    {
+      "rule_id": "D-DOOR-OCC-PROBE",
+      "kind": "gate",
+      "source": {
+        "file": "corpus/ttc/door.py",
+        "symbol": "door._Shape.wrapped",
+        "line": 976
+      },
+      "discriminator": "any access to .wrapped on a truck row -> typed refusal",
+      "matrix_cell": null,
+      "preconditions": [
+        {
+          "axis": "!unmodeled:op",
+          "value": "!unmodeled:OCC probe"
+        }
+      ],
+      "outcomes": [],
+      "refusals": [
+        "_refuse(\"an OCC probe of a kernel-engine row is not a kernel-engine row\")"
+      ],
+      "consumes_evidence": [],
+      "produces_evidence": [],
+      "calls": [],
+      "theorem_comment": "An OCC probe of a kernel-engine data row cannot be served: refuse typed rather than pass `None` into OCP (which would die as an untyped TypeError).",
+      "confidence": "high"
+    },
+    {
+      "rule_id": "D-DOOR-MAIN-RECORD",
+      "kind": "assembler",
+      "source": {
+        "file": "corpus/ttc/door.py",
+        "symbol": "door.main",
+        "line": 2295
+      },
+      "discriminator": "build then facts then export; any exception is reported as a typed ttc_door_run.v1 record (ok=false)",
+      "matrix_cell": null,
+      "preconditions": [
+        {
+          "axis": "!unmodeled:outcome",
+          "value": "!unmodeled:ok|typed failure"
+        }
+      ],
+      "outcomes": [
+        {
+          "variant": "record ok=true with facts and triangle count",
+          "postconditions": [
+            {
+              "axis": "goal",
+              "value": "mesh"
+            }
+          ]
+        },
+        {
+          "variant": "record ok=false with error.kind and payload",
+          "postconditions": [
+            {
+              "axis": "global.knowledge",
+              "value": "local_only(residual)"
+            }
+          ]
+        }
+      ],
+      "refusals": [
+        "typed exception marshaled into the record (never an untyped crash)"
+      ],
+      "consumes_evidence": [
+        "result object"
+      ],
+      "produces_evidence": [
+        "ttc_door_run.v1 record"
+      ],
+      "calls": [
+        "door.run_entry",
+        "door.geometry_facts",
+        "door._truck_export_stl",
+        "door.triangle_count"
+      ],
+      "theorem_comment": "The door reports typed failure ... wall time is recorded but never asserted.",
+      "confidence": "high"
+    },
+    {
+      "rule_id": "D-FACADE-SUBMIT",
+      "kind": "gate",
+      "source": {
+        "file": "truck123d/src/facade.rs",
+        "symbol": "crate::facade::facade_submit",
+        "line": 725
+      },
+      "discriminator": "pyo3 entry: parse FacadeTable JSON -> run_facade; a refusal is marshaled to Refused/Unresolved",
+      "matrix_cell": null,
+      "preconditions": [
+        {
+          "axis": "!unmodeled:entry",
+          "value": "!unmodeled:facade table (NOT called by door.py)"
+        }
+      ],
+      "outcomes": [
+        {
+          "variant": "facade_report.v1 JSON",
+          "postconditions": [
+            {
+              "axis": "goal",
+              "value": "valid_brep"
+            }
+          ]
+        },
+        {
+          "variant": "typed Refused/Unresolved exception",
+          "postconditions": [
+            {
+              "axis": "global.knowledge",
+              "value": "local_only(residual)"
+            }
+          ]
+        }
+      ],
+      "refusals": [
+        "PyValueError(invalid facade table JSON)",
+        "marshaled kernel refusal"
+      ],
+      "consumes_evidence": [
+        "FacadeTable"
+      ],
+      "produces_evidence": [
+        "FacadeReport",
+        "Refused|Unresolved"
+      ],
+      "calls": [
+        "crate::facade::run_facade",
+        "crate::marshal::Marshaled::from_refusal",
+        "crate::python::marshal_refused"
+      ],
+      "theorem_comment": "The pyo3 wrapper over [`run_facade`]: parses the submitted table JSON, runs the facade, and returns the report JSON.",
+      "confidence": "high"
+    },
+    {
+      "rule_id": "D-FACADE-RUN",
+      "kind": "assembler",
+      "source": {
+        "file": "truck123d/src/facade.rs",
+        "symbol": "crate::facade::run_facade",
+        "line": 527
+      },
+      "discriminator": "ordered FacadeOp match: Sweep|Loft, Spline, Polygon|Polyline|Circle, primitives+Extrude|Revolve|RevolveArc, MakeFace, Mirror, Mode, selectors, Fillet|Chamfer, ExportStl, ExportStep, PushPart, PushSketch, Pop",
+      "matrix_cell": null,
+      "preconditions": [
+        {
+          "axis": "!unmodeled:op",
+          "value": "!unmodeled:FacadeOp tag"
+        }
+      ],
+      "outcomes": [
+        {
+          "variant": "FacadeReport{schema,ok,op_count,constructive,boolean_events,exports}",
+          "postconditions": [
+            {
+              "axis": "goal",
+              "value": "valid_brep"
+            }
+          ]
+        }
+      ],
+      "refusals": [
+        "Refusal::Empty (empty export domain / blend with no selection)",
+        "Refusal::UnsupportedEnvelope(NonCanonicalCarrier) (constructive STEP export)"
+      ],
+      "consumes_evidence": [
+        "FacadeTable"
+      ],
+      "produces_evidence": [
+        "FacadeReport"
+      ],
+      "calls": [
+        "crate::facade::apply_solid_class",
+        "crate::facade::produced_carrier_class",
+        "crate::facade::dispatch_swept_carrier_boolean"
+      ],
+      "theorem_comment": "Every entry point lands here as one Rust fn taking the submitted table -- [`run_facade`] -- so the native Rust facade entry calls the same fn without Python.",
+      "confidence": "high"
+    },
+    {
+      "rule_id": "D-FACADE-SOLID-OP",
+      "kind": "gate",
+      "source": {
+        "file": "truck123d/src/facade.rs",
+        "symbol": "crate::facade::apply_solid_class",
+        "line": 688
+      },
+      "discriminator": "pending_mode None -> advance carrier; Some(mode) -> dispatch_swept_carrier_boolean(base, produced, mode)",
+      "matrix_cell": null,
+      "preconditions": [
+        {
+          "axis": "!unmodeled:pending_mode",
+          "value": "!unmodeled:none|union|subtract|intersect"
+        }
+      ],
+      "outcomes": [
+        {
+          "variant": "Ok(produced carrier)",
+          "postconditions": [
+            {
+              "axis": "goal",
+              "value": "valid_brep"
+            }
+          ]
+        },
+        {
+          "variant": "Routed -> push SweptBooleanEvent",
+          "postconditions": [
+            {
+              "axis": "global.knowledge",
+              "value": "local_only(residual)"
+            }
+          ]
+        }
+      ],
+      "refusals": [
+        "Refusal::UnsupportedEnvelope(refusal.case) on a refused pair"
+      ],
+      "consumes_evidence": [
+        "CarrierClass",
+        "ModeValue"
+      ],
+      "produces_evidence": [
+        "CarrierClass",
+        "SweptBooleanEvent"
+      ],
+      "calls": [
+        "crate::facade::dispatch_swept_carrier_boolean",
+        "crate::facade::boolean_product_carrier"
+      ],
+      "theorem_comment": "Resolves the pending `Mode` row (the swept-carrier boolean dispatch) and records routed rows or refuses typed, then advances the current carrier.",
+      "confidence": "high"
+    },
+    {
+      "rule_id": "D-FACADE-BOOLEAN-DISPATCH",
+      "kind": "solver",
+      "source": {
+        "file": "truck123d/src/facade.rs",
+        "symbol": "crate::facade::dispatch_swept_carrier_boolean",
+        "line": 240
+      },
+      "discriminator": "carrier-class pair + mode; canonical x canonical -> CanonicalLanded; torus -> ContactReductionDeferred; not admitted -> NonCanonicalCarrier; else Routed",
+      "matrix_cell": "cut(swept,canonical)",
+      "preconditions": [
+        {
+          "axis": "!unmodeled:base_tool_class",
+          "value": "!unmodeled:CarrierClass pair"
+        },
+        {
+          "axis": "!unmodeled:mode",
+          "value": "!unmodeled:union|subtract|intersect"
+        }
+      ],
+      "outcomes": [
+        {
+          "variant": "BooleanPairVerdict::CanonicalLanded",
+          "postconditions": [
+            {
+              "axis": "goal",
+              "value": "valid_brep"
+            },
+            {
+              "axis": "global.knowledge",
+              "value": "local_only(residual)"
+            }
+          ]
+        },
+        {
+          "variant": "BooleanPairVerdict::Routed(CertifiedBooleanRoute)",
+          "postconditions": [
+            {
+              "axis": "goal",
+              "value": "valid_brep"
+            },
+            {
+              "axis": "rep.construction_witness",
+              "value": "true"
+            }
+          ]
+        },
+        {
+          "variant": "BooleanPairVerdict::Refused(SweptBooleanRefusal)",
+          "postconditions": [
+            {
+              "axis": "global.knowledge",
+              "value": "local_only(residual)"
+            }
+          ]
+        }
+      ],
+      "refusals": [
+        "EnvelopeCase::ContactReductionDeferred (torus in a swept pair)",
+        "EnvelopeCase::NonCanonicalCarrier (both-Swept / not admitted)"
+      ],
+      "consumes_evidence": [
+        "CarrierClass",
+        "ModeValue"
+      ],
+      "produces_evidence": [
+        "BooleanPairVerdict",
+        "CertifiedBooleanRoute",
+        "SweptBooleanRefusal"
+      ],
+      "calls": [
+        "crate::facade::swept_pair_is_admitted",
+        "CarrierClass::is_funnel_carrier"
+      ],
+      "theorem_comment": "This is the deterministic per-pair mirror of the kernel's CL-006 `dispatch_restricted_sweep`; the loop-side facade cannot name the certified crate ... so the certified outcome is asserted here at the pair-verdict granularity the report layer consumes.",
+      "confidence": "high"
+    },
+    {
+      "rule_id": "D-FACADE-ADMISSION-CONSULT",
+      "kind": "gate",
+      "source": {
+        "file": "truck123d/src/facade.rs",
+        "symbol": "crate::facade::swept_pair_is_admitted",
+        "line": 216
+      },
+      "discriminator": "admit unless (base == Swept && tool == Swept)",
+      "matrix_cell": "fuse(swept,swept)",
+      "preconditions": [
+        {
+          "axis": "!unmodeled:pair",
+          "value": "!unmodeled:CarrierClass x CarrierClass"
+        }
+      ],
+      "outcomes": [
+        {
+          "variant": "true (admitted)",
+          "postconditions": [
+            {
+              "axis": "goal",
+              "value": "valid_brep"
+            }
+          ]
+        },
+        {
+          "variant": "false (both Swept)",
+          "postconditions": [
+            {
+              "axis": "global.knowledge",
+              "value": "local_only(residual)"
+            }
+          ]
+        }
+      ],
+      "refusals": [
+        "EnvelopeCase::NonCanonicalCarrier (routed by the caller)"
+      ],
+      "consumes_evidence": [
+        "CarrierClass"
+      ],
+      "produces_evidence": [
+        "bool"
+      ],
+      "calls": [],
+      "theorem_comment": "A pair coupling TWO lofted/swept carriers (the `Swept` x `Swept` cell) is the pair cell the certified funnel does NOT admit end to end at this coarse granularity (the PB-011C census).",
+      "confidence": "high"
+    },
+    {
+      "rule_id": "D-FACADE-TORUS-REFUSAL",
+      "kind": "gate",
+      "source": {
+        "file": "truck123d/src/facade.rs",
+        "symbol": "crate::facade::dispatch_swept_carrier_boolean (torus arm)",
+        "line": 250
+      },
+      "discriminator": "base == Torus || tool == Torus -> ContactReductionDeferred",
+      "matrix_cell": "intersect(swept,canonical)",
+      "preconditions": [
+        {
+          "axis": "!unmodeled:pair",
+          "value": "!unmodeled:pair carrying CarrierClass::Torus"
+        }
+      ],
+      "outcomes": [
+        {
+          "variant": "Refused(ContactReductionDeferred)",
+          "postconditions": [
+            {
+              "axis": "global.knowledge",
+              "value": "local_only(residual)"
+            }
+          ]
+        }
+      ],
+      "refusals": [
+        "EnvelopeCase::ContactReductionDeferred"
+      ],
+      "consumes_evidence": [
+        "CarrierClass"
+      ],
+      "produces_evidence": [
+        "SweptBooleanRefusal"
+      ],
+      "calls": [],
+      "theorem_comment": "a pair coupling a swept carrier with a torus carrier is a class the funnel refuses (the torus is excluded from the implicit-reduction stage, Theorem 4 economics) and answers the typed, localized `ContactReductionDeferred` refusal.",
+      "confidence": "high"
+    },
+    {
+      "rule_id": "D-FACADE-EXPORT-STEP",
+      "kind": "gate",
+      "source": {
+        "file": "truck123d/src/facade.rs",
+        "symbol": "crate::facade::run_facade (ExportStep arm)",
+        "line": 638
+      },
+      "discriminator": "constructive == true -> NonCanonicalCarrier; solid_ops == 0 -> Empty; else record export_step",
+      "matrix_cell": "step-export(constructive)",
+      "preconditions": [
+        {
+          "axis": "!unmodeled:constructive",
+          "value": "!unmodeled:bool"
+        }
+      ],
+      "outcomes": [
+        {
+          "variant": "ExportEntry{op:\"export_step\"}",
+          "postconditions": [
+            {
+              "axis": "goal",
+              "value": "valid_brep"
+            }
+          ]
+        }
+      ],
+      "refusals": [
+        "Refusal::Empty (no solid ops)",
+        "Refusal::UnsupportedEnvelope(EnvelopeCase::NonCanonicalCarrier)"
+      ],
+      "consumes_evidence": [
+        "path"
+      ],
+      "produces_evidence": [
+        "ExportEntry"
+      ],
+      "calls": [],
+      "theorem_comment": "TR-NRB-001: STEP out of constructive/swept surfaces is a typed kernel refusal, never a silent STL fallback.",
+      "confidence": "high"
+    },
+    {
+      "rule_id": "D-FACADE-BLEND-EMPTY",
+      "kind": "gate",
+      "source": {
+        "file": "truck123d/src/facade.rs",
+        "symbol": "crate::facade::run_facade (Fillet|Chamfer arm)",
+        "line": 622
+      },
+      "discriminator": "selection_pending == false -> Refusal::Empty",
+      "matrix_cell": "fillet(edge-selector)",
+      "preconditions": [
+        {
+          "axis": "!unmodeled:selection_pending",
+          "value": "!unmodeled:bool"
+        }
+      ],
+      "outcomes": [
+        {
+          "variant": "blend row consumed",
+          "postconditions": [
+            {
+              "axis": "goal",
+              "value": "valid_brep"
+            }
+          ]
+        }
+      ],
+      "refusals": [
+        "Refusal::Empty"
+      ],
+      "consumes_evidence": [
+        "SelectFaces|SelectEdges"
+      ],
+      "produces_evidence": [],
+      "calls": [],
+      "theorem_comment": "A blend row must bind the selection rows recorded immediately before it in the same frame; a blend with no recorded selection is an empty edge domain and refuses (`Refusal::Empty`).",
+      "confidence": "high"
+    },
+    {
+      "rule_id": "D-FACADE-PRODUCED-CLASS",
+      "kind": "classifier",
+      "source": {
+        "file": "truck123d/src/facade.rs",
+        "symbol": "crate::facade::produced_carrier_class",
+        "line": 276
+      },
+      "discriminator": "op -> carrier class; Extrude/Revolve/RevolveArc key on the profile carrier (Spline -> Swept/Revolved)",
+      "matrix_cell": "loft(spline-section)",
+      "preconditions": [
+        {
+          "axis": "!unmodeled:op",
+          "value": "!unmodeled:FacadeOp"
+        },
+        {
+          "axis": "!unmodeled:profile",
+          "value": "!unmodeled:CarrierClass"
+        }
+      ],
+      "outcomes": [
+        {
+          "variant": "Some(Canonical)",
+          "postconditions": [
+            {
+              "axis": "rep.canonical_carrier",
+              "value": "true"
+            }
+          ]
+        },
+        {
+          "variant": "Some(Swept|Revolved|Torus)",
+          "postconditions": [
+            {
+              "axis": "rep.construction_witness",
+              "value": "true"
+            }
+          ]
+        },
+        {
+          "variant": "None (op changes no solid carrier)",
+          "postconditions": [
+            {
+              "axis": "global.knowledge",
+              "value": "local_only(residual)"
+            }
+          ]
+        }
+      ],
+      "refusals": [],
+      "consumes_evidence": [
+        "FacadeOp",
+        "CarrierClass"
+      ],
+      "produces_evidence": [
+        "CarrierClass"
+      ],
+      "calls": [],
+      "theorem_comment": "The carrier class a solid-producing op yields, or `None` for an op that does not change the current solid's carrier.",
+      "confidence": "high"
+    },
+    {
+      "rule_id": "D-FACADE-BOOLEAN-PRODUCT",
+      "kind": "classifier",
+      "source": {
+        "file": "truck123d/src/facade.rs",
+        "symbol": "crate::facade::boolean_product_carrier",
+        "line": 318
+      },
+      "discriminator": "base is a funnel carrier -> base, else tool",
+      "matrix_cell": "fuse(swept,canonical)",
+      "preconditions": [
+        {
+          "axis": "!unmodeled:base_tool",
+          "value": "!unmodeled:CarrierClass pair"
+        }
+      ],
+      "outcomes": [
+        {
+          "variant": "CarrierClass",
+          "postconditions": [
+            {
+              "axis": "rep.construction_witness",
+              "value": "true"
+            }
+          ]
+        }
+      ],
+      "refusals": [],
+      "consumes_evidence": [
+        "CarrierClass"
+      ],
+      "produces_evidence": [
+        "CarrierClass"
+      ],
+      "calls": [
+        "CarrierClass::is_funnel_carrier"
+      ],
+      "theorem_comment": "The product carrier class of a boolean: a swept product stays in the swept family (the base class when the base is a swept carrier, else the tool's).",
+      "confidence": "high"
+    },
+    {
+      "rule_id": "D-FACADE-SPLINE-CARRIER",
+      "kind": "classifier",
+      "source": {
+        "file": "truck123d/src/facade.rs",
+        "symbol": "crate::facade::run_facade (Spline arm)",
+        "line": 561
+      },
+      "discriminator": "Spline op -> constructive=true, profile=Spline",
+      "matrix_cell": "author(spline-profile)",
+      "preconditions": [
+        {
+          "axis": "!unmodeled:op",
+          "value": "!unmodeled:Spline"
+        }
+      ],
+      "outcomes": [
+        {
+          "variant": "profile := CarrierClass::Spline",
+          "postconditions": [
+            {
+              "axis": "rep.bernstein_chart",
+              "value": "true"
+            }
+          ]
+        }
+      ],
+      "refusals": [],
+      "consumes_evidence": [
+        "points",
+        "periodic"
+      ],
+      "produces_evidence": [
+        "CarrierClass::Spline"
+      ],
+      "calls": [],
+      "theorem_comment": "A spline carrier is a non-canonical carrier: any part built over one is constructive for the STEP boundary.",
+      "confidence": "high"
+    },
+    {
+      "rule_id": "D-FACADE-SKETCH-CARRIER",
+      "kind": "classifier",
+      "source": {
+        "file": "truck123d/src/facade.rs",
+        "symbol": "crate::facade::run_facade (Polygon|Polyline|Circle arm)",
+        "line": 568
+      },
+      "discriminator": "Polygon/Polyline/Circle -> profile=Canonical (not constructive by themselves)",
+      "matrix_cell": "author(circle-profile)",
+      "preconditions": [
+        {
+          "axis": "!unmodeled:op",
+          "value": "!unmodeled:Polygon|Polyline|Circle"
+        }
+      ],
+      "outcomes": [
+        {
+          "variant": "profile := CarrierClass::Canonical",
+          "postconditions": [
+            {
+              "axis": "rep.canonical_carrier",
+              "value": "true"
+            }
+          ]
+        }
+      ],
+      "refusals": [],
+      "consumes_evidence": [
+        "points|radius"
+      ],
+      "produces_evidence": [
+        "CarrierClass::Canonical"
+      ],
+      "calls": [],
+      "theorem_comment": "A circle is an exact conic profile, canonical like a polygon; only the constructive verbs over one mark the part constructive.",
+      "confidence": "high"
+    },
+    {
+      "rule_id": "D-FACADE-MODE-ROW",
+      "kind": "gate",
+      "source": {
+        "file": "truck123d/src/facade.rs",
+        "symbol": "crate::facade::run_facade (Mode arm)",
+        "line": 608
+      },
+      "discriminator": "Mode{value} -> pending_mode = Some(value); armed until the next solid op",
+      "matrix_cell": "cut(swept,canonical)",
+      "preconditions": [
+        {
+          "axis": "!unmodeled:value",
+          "value": "!unmodeled:union|subtract|intersect"
+        }
+      ],
+      "outcomes": [
+        {
+          "variant": "pending_mode armed",
+          "postconditions": [
+            {
+              "axis": "global.knowledge",
+              "value": "local_only(residual)"
+            }
+          ]
+        }
+      ],
+      "refusals": [],
+      "consumes_evidence": [
+        "ModeValue"
+      ],
+      "produces_evidence": [
+        "pending_mode"
+      ],
+      "calls": [
+        "crate::facade::apply_solid_class"
+      ],
+      "theorem_comment": "The `Mode` row is the facade's `boolean_op` encoding: it arms the boolean that the next solid op performs.",
+      "confidence": "high"
+    },
+    {
+      "rule_id": "D-FACADE-MIRROR-ROW",
+      "kind": "gate",
+      "source": {
+        "file": "truck123d/src/facade.rs",
+        "symbol": "crate::facade::run_facade (Mirror arm)",
+        "line": 602
+      },
+      "discriminator": "Mirror{axis} -> solid_ops+=1, carrier unchanged (a mirrored swept product is still swept)",
+      "matrix_cell": "mirror(axis-plane)",
+      "preconditions": [
+        {
+          "axis": "!unmodeled:axis",
+          "value": "!unmodeled:x|y|z"
+        }
+      ],
+      "outcomes": [
+        {
+          "variant": "carrier preserved",
+          "postconditions": [
+            {
+              "axis": "rep.construction_witness",
+              "value": "true"
+            }
+          ]
+        }
+      ],
+      "refusals": [],
+      "consumes_evidence": [
+        "AxisValue"
+      ],
+      "produces_evidence": [],
+      "calls": [],
+      "theorem_comment": "A mirror keeps the part's carrier class (and its STEP constructiveness): a mirrored swept product is still swept.",
+      "confidence": "high"
+    },
+    {
+      "rule_id": "D-FACADE-PUSH-POP",
+      "kind": "assembler",
+      "source": {
+        "file": "truck123d/src/facade.rs",
+        "symbol": "crate::facade::run_facade (PushPart|PushSketch|Pop arms)",
+        "line": 655
+      },
+      "discriminator": "PushPart resets carrier+profile+pending_mode; PushSketch resets profile; Pop is a no-op on the carrier",
+      "matrix_cell": null,
+      "preconditions": [
+        {
+          "axis": "!unmodeled:frame_op",
+          "value": "!unmodeled:push_part|push_sketch|pop"
+        }
+      ],
+      "outcomes": [
+        {
+          "variant": "frame state",
+          "postconditions": [
+            {
+              "axis": "goal",
+              "value": "valid_brep"
+            }
+          ]
+        }
+      ],
+      "refusals": [],
+      "consumes_evidence": [],
+      "produces_evidence": [
+        "CarrierClass",
+        "profile"
+      ],
+      "calls": [],
+      "theorem_comment": "A fresh part frame starts canonical; a part opened inside another frame inherits nothing from the enclosing part.",
+      "confidence": "high"
+    },
+    {
+      "rule_id": "D-BRIDGE-BD-FACTS",
+      "kind": "gate",
+      "source": {
+        "file": "truck123d/src/bd_bridge.rs",
+        "symbol": "crate::bd_bridge::bd_facts",
+        "line": 3829
+      },
+      "discriminator": "pyo3 entry: parse_tree -> tree_facts under GIL release; serialize {solid_count,volume,bbox[,seam_mismatch][,boolean_events]}",
+      "matrix_cell": null,
+      "preconditions": [
+        {
+          "axis": "!unmodeled:tree",
+          "value": "!unmodeled:TreeNode JSON"
+        }
+      ],
+      "outcomes": [
+        {
+          "variant": "facts JSON",
+          "postconditions": [
+            {
+              "axis": "goal",
+              "value": "volume_bracket"
+            },
+            {
+              "axis": "global.knowledge",
+              "value": "local_only(residual)"
+            }
+          ]
+        }
+      ],
+      "refusals": [
+        "Refusal::Empty (parse failure)",
+        "typed kernel refusal marshaled by refusal_to_pyerr"
+      ],
+      "consumes_evidence": [
+        "TreeNode JSON"
+      ],
+      "produces_evidence": [
+        "Facts JSON"
+      ],
+      "calls": [
+        "crate::bd_bridge::parse_tree",
+        "crate::bd_bridge::tree_facts",
+        "crate::gil::with_kernel_gil_released"
+      ],
+      "theorem_comment": "The pyo3 measurement entry: takes the construction tree JSON and returns the facts JSON (`{solid_count, volume, bbox}`).",
+      "confidence": "high"
+    },
+    {
+      "rule_id": "D-BRIDGE-BD-STL",
+      "kind": "gate",
+      "source": {
+        "file": "truck123d/src/bd_bridge.rs",
+        "symbol": "crate::bd_bridge::bd_stl",
+        "line": 3860
+      },
+      "discriminator": "pyo3 entry: parse_tree -> write_tree_stl under GIL release; returns {triangles:n}",
+      "matrix_cell": null,
+      "preconditions": [
+        {
+          "axis": "!unmodeled:tree",
+          "value": "!unmodeled:TreeNode JSON"
+        }
+      ],
+      "outcomes": [
+        {
+          "variant": "{triangles:n}",
+          "postconditions": [
+            {
+              "axis": "goal",
+              "value": "mesh"
+            }
+          ]
+        }
+      ],
+      "refusals": [
+        "Refusal::Empty (parse failure or empty triangle soup)",
+        "typed kernel refusal marshaled by refusal_to_pyerr"
+      ],
+      "consumes_evidence": [
+        "TreeNode JSON",
+        "path"
+      ],
+      "produces_evidence": [
+        "binary STL"
+      ],
+      "calls": [
+        "crate::bd_bridge::parse_tree",
+        "crate::bd_bridge::write_tree_stl",
+        "crate::gil::with_kernel_gil_released"
+      ],
+      "theorem_comment": "The pyo3 export entry: writes the construction tree's STL to `path` and returns `{\"triangles\": n}`.",
+      "confidence": "high"
+    },
+    {
+      "rule_id": "D-BRIDGE-PARSE-TREE",
+      "kind": "gate",
+      "source": {
+        "file": "truck123d/src/bd_bridge.rs",
+        "symbol": "crate::bd_bridge::parse_tree",
+        "line": 3809
+      },
+      "discriminator": "serde_json from_str into TreeNode (untagged Part|Group|Boolean); any parse error -> Refusal::Empty",
+      "matrix_cell": null,
+      "preconditions": [
+        {
+          "axis": "!unmodeled:json",
+          "value": "!unmodeled:construction tree"
+        }
+      ],
+      "outcomes": [
+        {
+          "variant": "TreeNode",
+          "postconditions": [
+            {
+              "axis": "goal",
+              "value": "valid_brep"
+            }
+          ]
+        }
+      ],
+      "refusals": [
+        "Refusal::Empty (malformed tree)"
+      ],
+      "consumes_evidence": [
+        "JSON"
+      ],
+      "produces_evidence": [
+        "TreeNode"
+      ],
+      "calls": [
+        "serde_json::from_str"
+      ],
+      "theorem_comment": "Parses a submitted construction tree JSON.",
+      "confidence": "high"
+    },
+    {
+      "rule_id": "D-BRIDGE-TREE-FACTS",
+      "kind": "assembler",
+      "source": {
+        "file": "truck123d/src/bd_bridge.rs",
+        "symbol": "crate::bd_bridge::tree_facts",
+        "line": 2907
+      },
+      "discriminator": "count_and_union then top_volume then top_seam_mismatch then collect_boolean_events; empty tree -> Empty",
+      "matrix_cell": null,
+      "preconditions": [
+        {
+          "axis": "!unmodeled:tree",
+          "value": "!unmodeled:TreeNode"
+        }
+      ],
+      "outcomes": [
+        {
+          "variant": "Facts{solid_count,volume,bbox,seam_mismatch,boolean_events}",
+          "postconditions": [
+            {
+              "axis": "goal",
+              "value": "volume_bracket"
+            }
+          ]
+        }
+      ],
+      "refusals": [
+        "Refusal::Empty (count==0 or non-finite bbox)"
+      ],
+      "consumes_evidence": [
+        "TreeNode"
+      ],
+      "produces_evidence": [
+        "Facts"
+      ],
+      "calls": [
+        "crate::bd_bridge::count_and_union",
+        "crate::bd_bridge::top_volume",
+        "crate::bd_bridge::top_seam_mismatch",
+        "crate::bd_bridge::collect_boolean_events"
+      ],
+      "theorem_comment": "Measures the submitted tree with the recorded OCC top-node semantics.",
+      "confidence": "high"
+    },
+    {
+      "rule_id": "D-BRIDGE-COUNT-UNION",
+      "kind": "assembler",
+      "source": {
+        "file": "truck123d/src/bd_bridge.rs",
+        "symbol": "crate::bd_bridge::count_and_union",
+        "line": 2964
+      },
+      "discriminator": "Part -> count++ + union part_world_bbox; Boolean -> dispatch_boolean then recurse base a; Group -> recurse children",
+      "matrix_cell": null,
+      "preconditions": [
+        {
+          "axis": "!unmodeled:node",
+          "value": "!unmodeled:Part|Boolean|Group"
+        }
+      ],
+      "outcomes": [
+        {
+          "variant": "(count,min,max)",
+          "postconditions": [
+            {
+              "axis": "goal",
+              "value": "volume_bracket"
+            }
+          ]
+        }
+      ],
+      "refusals": [
+        "Refusal::Empty from part_world_bbox",
+        "dispatch_boolean refusal propagated"
+      ],
+      "consumes_evidence": [
+        "TreeNode"
+      ],
+      "produces_evidence": [
+        "solid_count",
+        "bbox"
+      ],
+      "calls": [
+        "crate::bd_bridge::part_world_bbox",
+        "crate::bd_bridge::dispatch_boolean"
+      ],
+      "theorem_comment": "Recursively counts every part and unions every part's world bbox.",
+      "confidence": "high"
+    },
+    {
+      "rule_id": "D-BRIDGE-TOP-VOLUME",
+      "kind": "assembler",
+      "source": {
+        "file": "truck123d/src/bd_bridge.rs",
+        "symbol": "crate::bd_bridge::top_volume",
+        "line": 2999
+      },
+      "discriminator": "Part -> solid_volume; Boolean -> dispatch_boolean then volume of base a; Group -> sum immediate child Parts/Booleans only (nested groups contribute nothing)",
+      "matrix_cell": null,
+      "preconditions": [
+        {
+          "axis": "!unmodeled:node",
+          "value": "!unmodeled:Part|Boolean|Group"
+        }
+      ],
+      "outcomes": [
+        {
+          "variant": "f64 volume",
+          "postconditions": [
+            {
+              "axis": "goal",
+              "value": "volume_bracket"
+            }
+          ]
+        }
+      ],
+      "refusals": [
+        "solid_volume refusal propagated"
+      ],
+      "consumes_evidence": [
+        "TreeNode"
+      ],
+      "produces_evidence": [
+        "volume"
+      ],
+      "calls": [
+        "crate::bd_bridge::solid_volume",
+        "crate::bd_bridge::dispatch_boolean"
+      ],
+      "theorem_comment": "A group sums only its immediate child parts (nested groups contribute nothing, mirroring the OCC `Compound` measurement the reference was recorded with).",
+      "confidence": "high"
+    },
+    {
+      "rule_id": "D-BRIDGE-TOP-SEAM",
+      "kind": "gate",
+      "source": {
+        "file": "truck123d/src/bd_bridge.rs",
+        "symbol": "crate::bd_bridge::top_seam_mismatch",
+        "line": 2932
+      },
+      "discriminator": "single Part with Loft{closed:true} -> loft_seam_mismatch; closed smooth -> open_smooth_loft; Boolean -> dispatch then base a; Group -> None",
+      "matrix_cell": null,
+      "preconditions": [
+        {
+          "axis": "!unmodeled:node",
+          "value": "!unmodeled:Part(Loft closed)|other"
+        }
+      ],
+      "outcomes": [
+        {
+          "variant": "Some(mismatch)",
+          "postconditions": [
+            {
+              "axis": "goal",
+              "value": "valid_brep"
+            },
+            {
+              "axis": "rep.construction_witness",
+              "value": "true"
+            }
+          ]
+        },
+        {
+          "variant": "None (no seam)",
+          "postconditions": [
+            {
+              "axis": "goal",
+              "value": "valid_brep"
+            }
+          ]
+        }
+      ],
+      "refusals": [
+        "Refusal::UnsupportedEnvelope(NonCanonicalCarrier) (non-closing halo chain)",
+        "open_smooth_loft (closed smooth chain)"
+      ],
+      "consumes_evidence": [
+        "TreeNode"
+      ],
+      "produces_evidence": [
+        "seam_mismatch Option<f64>"
+      ],
+      "calls": [
+        "crate::bd_bridge::loft_sections",
+        "crate::bd_bridge::loft_seam_mismatch",
+        "crate::bd_bridge::dispatch_boolean"
+      ],
+      "theorem_comment": "The seam certificate of a single closed halo loft row ... the aligned meeting edges across the chain closure satisfy `A0 W1 - A1 W0 == 0`.",
+      "confidence": "high"
+    },
+    {
+      "rule_id": "D-BRIDGE-COLLECT-BOOLEAN-EVENTS",
+      "kind": "assembler",
+      "source": {
+        "file": "truck123d/src/bd_bridge.rs",
+        "symbol": "crate::bd_bridge::collect_boolean_events",
+        "line": 2885
+      },
+      "discriminator": "Part -> noop; Group -> recurse; Boolean -> dispatch_boolean, push event if Some",
+      "matrix_cell": "cut(swept,canonical)",
+      "preconditions": [
+        {
+          "axis": "!unmodeled:node",
+          "value": "!unmodeled:Part|Boolean|Group"
+        }
+      ],
+      "outcomes": [
+        {
+          "variant": "Vec<SweptBooleanEvent>",
+          "postconditions": [
+            {
+              "axis": "global.knowledge",
+              "value": "local_only(residual)"
+            }
+          ]
+        }
+      ],
+      "refusals": [
+        "dispatch_boolean refusal propagated"
+      ],
+      "consumes_evidence": [
+        "TreeNode"
+      ],
+      "produces_evidence": [
+        "SweptBooleanEvent"
+      ],
+      "calls": [
+        "crate::bd_bridge::dispatch_boolean"
+      ],
+      "theorem_comment": "Collects the routed boolean events of a tree, in script order, and validates every row.",
+      "confidence": "high"
+    },
+    {
+      "rule_id": "D-BRIDGE-DISPATCH-BOOLEAN",
+      "kind": "gate",
+      "source": {
+        "file": "truck123d/src/bd_bridge.rs",
+        "symbol": "crate::bd_bridge::dispatch_boolean",
+        "line": 2869
+      },
+      "discriminator": "node_carrier_class(a), node_carrier_class(b) -> facade::dispatch_swept_carrier_boolean(base, tool, mode); CanonicalLanded -> None; Routed -> Some(event); Refused -> Err",
+      "matrix_cell": "cut(swept,canonical)",
+      "preconditions": [
+        {
+          "axis": "!unmodeled:base_tool",
+          "value": "!unmodeled:CarrierClass pair"
+        },
+        {
+          "axis": "!unmodeled:mode",
+          "value": "!unmodeled:ModeValue"
+        }
+      ],
+      "outcomes": [
+        {
+          "variant": "Ok(None) canonical landed",
+          "postconditions": [
+            {
+              "axis": "goal",
+              "value": "valid_brep"
+            }
+          ]
+        },
+        {
+          "variant": "Ok(Some(SweptBooleanEvent)) routed",
+          "postconditions": [
+            {
+              "axis": "goal",
+              "value": "valid_brep"
+            },
+            {
+              "axis": "global.knowledge",
+              "value": "local_only(residual)"
+            }
+          ]
+        }
+      ],
+      "refusals": [
+        "Refusal::UnsupportedEnvelope(refusal.case)"
+      ],
+      "consumes_evidence": [
+        "BooleanNode",
+        "CarrierClass"
+      ],
+      "produces_evidence": [
+        "SweptBooleanEvent"
+      ],
+      "calls": [
+        "crate::bd_bridge::node_carrier_class",
+        "crate::facade::dispatch_swept_carrier_boolean"
+      ],
+      "theorem_comment": "Dispatches one recorded boolean row through the facade's boolean entry ... and returns the routed event. The dispatch is placement-blind: it sees each operand's LOCAL carrier class.",
+      "confidence": "high"
+    },
+    {
+      "rule_id": "D-BRIDGE-NODE-CARRIER-CLASS",
+      "kind": "classifier",
+      "source": {
+        "file": "truck123d/src/bd_bridge.rs",
+        "symbol": "crate::bd_bridge::node_carrier_class",
+        "line": 2842
+      },
+      "discriminator": "Part -> solid_carrier_class(local solid); Group -> first part in order; Boolean -> Refusal::UnsupportedEnvelope(NonCanonicalCarrier) (depth-2)",
+      "matrix_cell": null,
+      "preconditions": [
+        {
+          "axis": "!unmodeled:node",
+          "value": "!unmodeled:Part|Group|Boolean"
+        }
+      ],
+      "outcomes": [
+        {
+          "variant": "CarrierClass",
+          "postconditions": [
+            {
+              "axis": "goal",
+              "value": "valid_brep"
+            }
+          ]
+        }
+      ],
+      "refusals": [
+        "Refusal::Empty (empty group)",
+        "Refusal::UnsupportedEnvelope(NonCanonicalCarrier) (boolean operand)"
+      ],
+      "consumes_evidence": [
+        "TreeNode"
+      ],
+      "produces_evidence": [
+        "CarrierClass"
+      ],
+      "calls": [
+        "crate::bd_bridge::solid_carrier_class"
+      ],
+      "theorem_comment": "A placed part classifies by its LOCAL solid (the dispatch never sees a placement); a boolean operand is the recorded depth-2 open composition cell and refuses typed.",
+      "confidence": "high"
+    },
+    {
+      "rule_id": "D-BRIDGE-SOLID-CARRIER-CLASS",
+      "kind": "classifier",
+      "source": {
+        "file": "truck123d/src/bd_bridge.rs",
+        "symbol": "crate::bd_bridge::solid_carrier_class",
+        "line": 2800
+      },
+      "discriminator": "Box|Cylinder|Sphere|Prism -> Canonical; TrimPrism -> Swept if spline idiom else Canonical; Torus -> Torus; Lathe -> Revolved if any spline edge else Canonical; Loft|Member -> Swept",
+      "matrix_cell": "cut(swept,canonical)",
+      "preconditions": [
+        {
+          "axis": "!unmodeled:kind",
+          "value": "!unmodeled:SolidSpec tag"
+        }
+      ],
+      "outcomes": [
+        {
+          "variant": "CarrierClass::Canonical",
+          "postconditions": [
+            {
+              "axis": "rep.canonical_carrier",
+              "value": "true"
+            }
+          ]
+        },
+        {
+          "variant": "CarrierClass::Swept|Revolved|Torus",
+          "postconditions": [
+            {
+              "axis": "rep.construction_witness",
+              "value": "true"
+            }
+          ]
+        }
+      ],
+      "refusals": [],
+      "consumes_evidence": [
+        "SolidSpec"
+      ],
+      "produces_evidence": [
+        "CarrierClass"
+      ],
+      "calls": [
+        "crate::bd_bridge::is_spline_profile_prism"
+      ],
+      "theorem_comment": "The corpus spline-profile extrude carries a spline side surface, so it classifies as the `Swept` carrier the facade's `Extrude` over a spline profile produces; a line-base trim row keeps the canonical class.",
+      "confidence": "high"
+    },
+    {
+      "rule_id": "D-BRIDGE-VOLUME-PRIMITIVES",
+      "kind": "solver",
+      "source": {
+        "file": "truck123d/src/bd_bridge.rs",
+        "symbol": "crate::bd_bridge::solid_volume (Box|Cylinder|Sphere|Torus arms)",
+        "line": 414
+      },
+      "discriminator": "SolidSpec tag -> closed-form volume",
+      "matrix_cell": "primitive(canonical-solid)",
+      "preconditions": [
+        {
+          "axis": "!unmodeled:kind",
+          "value": "!unmodeled:box|cylinder|sphere|torus"
+        },
+        {
+          "axis": "rep.canonical_carrier",
+          "value": "true"
+        }
+      ],
+      "outcomes": [
+        {
+          "variant": "Ok(f64)",
+          "postconditions": [
+            {
+              "axis": "goal",
+              "value": "volume_bracket"
+            },
+            {
+              "axis": "global.knowledge",
+              "value": "local_only(residual)"
+            }
+          ]
+        }
+      ],
+      "refusals": [],
+      "consumes_evidence": [
+        "SolidSpec"
+      ],
+      "produces_evidence": [
+        "volume f64"
+      ],
+      "calls": [],
+      "theorem_comment": "The analytic volume of one unplaced solid.",
+      "confidence": "high"
+    },
+    {
+      "rule_id": "D-BRIDGE-VOLUME-LATHE",
+      "kind": "solver",
+      "source": {
+        "file": "truck123d/src/bd_bridge.rs",
+        "symbol": "crate::bd_bridge::solid_volume (Lathe arm)",
+        "line": 435
+      },
+      "discriminator": "arc_deg != 360 -> NonCanonicalCarrier; all-line profile -> lathe_volume (frustum telescoping); spline profile -> lathe_profile_volume (true reconstructed interpolant)",
+      "matrix_cell": "revolve(full,spline-profile)",
+      "preconditions": [
+        {
+          "axis": "!unmodeled:arc_deg",
+          "value": "!unmodeled:360.0"
+        },
+        {
+          "axis": "!unmodeled:profile",
+          "value": "!unmodeled:line|spline"
+        }
+      ],
+      "outcomes": [
+        {
+          "variant": "Ok(f64)",
+          "postconditions": [
+            {
+              "axis": "goal",
+              "value": "volume_bracket"
+            },
+            {
+              "axis": "global.knowledge",
+              "value": "local_only(residual)"
+            }
+          ]
+        }
+      ],
+      "refusals": [
+        "Refusal::UnsupportedEnvelope(NonCanonicalCarrier) (partial arc)",
+        "Refusal::Empty (degenerate profile)"
+      ],
+      "consumes_evidence": [
+        "SolidSpec::Lathe"
+      ],
+      "produces_evidence": [
+        "volume f64"
+      ],
+      "calls": [
+        "crate::bd_bridge::line_profile_vertices",
+        "crate::bd_bridge::lathe_volume",
+        "crate::bd_bridge::lathe_profile_volume"
+      ],
+      "theorem_comment": "The partial-arc form is a certified facade op (PB-014), but this executor's analytic lathe arm covers the full revolution; a partial arc refuses typed, never approximates.",
+      "confidence": "high"
+    },
+    {
+      "rule_id": "D-BRIDGE-VOLUME-PRISM",
+      "kind": "solver",
+      "source": {
+        "file": "truck123d/src/bd_bridge.rs",
+        "symbol": "crate::bd_bridge::solid_volume (Prism arm)",
+        "line": 452
+      },
+      "discriminator": "prism_geom over the closed planar line-loop profile; spline edge -> NonCanonicalCarrier via profile_loop",
+      "matrix_cell": "extrude(profile)",
+      "preconditions": [
+        {
+          "axis": "!unmodeled:profile",
+          "value": "!unmodeled:closed planar line-loop"
+        },
+        {
+          "axis": "rep.canonical_carrier",
+          "value": "true"
+        }
+      ],
+      "outcomes": [
+        {
+          "variant": "Ok(geom.volume)",
+          "postconditions": [
+            {
+              "axis": "goal",
+              "value": "volume_bracket"
+            }
+          ]
+        }
+      ],
+      "refusals": [
+        "Refusal::Empty (amount non-finite/non-positive)",
+        "Refusal::UnsupportedEnvelope(NonCanonicalCarrier) (spline edge / non-planar / seam gap)"
+      ],
+      "consumes_evidence": [
+        "SolidSpec::Prism"
+      ],
+      "produces_evidence": [
+        "volume f64"
+      ],
+      "calls": [
+        "crate::bd_bridge::prism_geom",
+        "crate::bd_bridge::profile_loop"
+      ],
+      "theorem_comment": "The extruded solid is an exact prism: the volume is the profile area times the swept length (`amount`, or `2 * amount` when `both`).",
+      "confidence": "high"
+    },
+    {
+      "rule_id": "D-BRIDGE-VOLUME-TRIMPRISM",
+      "kind": "solver",
+      "source": {
+        "file": "truck123d/src/bd_bridge.rs",
+        "symbol": "crate::bd_bridge::solid_volume (TrimPrism arm)",
+        "line": 460
+      },
+      "discriminator": "is_spline_profile_prism -> spline_profile_prism_facts (exact reconstructed spline loop prism); else binding::trim_extrude_solid (algebraic trim constructor)",
+      "matrix_cell": "extrude(profile)",
+      "preconditions": [
+        {
+          "axis": "!unmodeled:profile",
+          "value": "!unmodeled:empty base + closed spline curve, or line base + trim"
+        },
+        {
+          "axis": "!unmodeled:trim_net",
+          "value": "!unmodeled:empty|recorded pullback net"
+        }
+      ],
+      "outcomes": [
+        {
+          "variant": "Ok(volume) spline idiom",
+          "postconditions": [
+            {
+              "axis": "goal",
+              "value": "volume_bracket"
+            },
+            {
+              "axis": "rep.bernstein_chart",
+              "value": "true"
+            }
+          ]
+        },
+        {
+          "variant": "Ok(volume) algebraic trim",
+          "postconditions": [
+            {
+              "axis": "goal",
+              "value": "volume_bracket"
+            },
+            {
+              "axis": "rep.construction_witness",
+              "value": "true"
+            }
+          ]
+        }
+      ],
+      "refusals": [
+        "Refusal::UnsupportedEnvelope(NonCanonicalCarrier) via trim_binding_error_to_refusal",
+        "Refusal::Empty (malformed trim row)",
+        "open_smooth_loft (open spline loop)"
+      ],
+      "consumes_evidence": [
+        "SolidSpec::TrimPrism"
+      ],
+      "produces_evidence": [
+        "volume f64"
+      ],
+      "calls": [
+        "crate::bd_bridge::is_spline_profile_prism",
+        "crate::bd_bridge::spline_profile_prism_facts",
+        "crate::python::binding::trim_extrude_solid"
+      ],
+      "theorem_comment": "The composition itself lives in the binding layer (`crate::python::binding::trim_extrude`); this arm is a pure pass-through so the door vocabulary reaches the constructor.",
+      "confidence": "high"
+    },
+    {
+      "rule_id": "D-BRIDGE-VOLUME-LOFT",
+      "kind": "solver",
+      "source": {
+        "file": "truck123d/src/bd_bridge.rs",
+        "symbol": "crate::bd_bridge::solid_volume (Loft arm)",
+        "line": 478
+      },
+      "discriminator": "loft_sections Ok -> loft_volume (exact ruled, bit-identical V5); else closed -> open_smooth_loft; else certified_spline_loft_volume (smooth certified bracket)",
+      "matrix_cell": "loft(spline-section)",
+      "preconditions": [
+        {
+          "axis": "!unmodeled:profile",
+          "value": "!unmodeled:all-line matched loop|spline-section"
+        },
+        {
+          "axis": "!unmodeled:closed",
+          "value": "!unmodeled:bool"
+        }
+      ],
+      "outcomes": [
+        {
+          "variant": "Ok(loft_volume) ruled",
+          "postconditions": [
+            {
+              "axis": "goal",
+              "value": "volume_bracket"
+            },
+            {
+              "axis": "rep.canonical_carrier",
+              "value": "true"
+            }
+          ]
+        },
+        {
+          "variant": "Ok(certified bracket) smooth",
+          "postconditions": [
+            {
+              "axis": "goal",
+              "value": "volume_bracket"
+            },
+            {
+              "axis": "rep.construction_witness",
+              "value": "true"
+            }
+          ]
+        }
+      ],
+      "refusals": [
+        "Refusal::UnsupportedEnvelope(NonCanonicalCarrier) (unequal vertex counts)",
+        "open_smooth_loft (closed smooth chain / open carrier)"
+      ],
+      "consumes_evidence": [
+        "SolidSpec::Loft"
+      ],
+      "produces_evidence": [
+        "volume f64"
+      ],
+      "calls": [
+        "crate::bd_bridge::loft_sections",
+        "crate::bd_bridge::loft_volume",
+        "crate::bd_bridge::certified_spline_loft_volume",
+        "crate::bd_bridge::open_smooth_loft"
+      ],
+      "theorem_comment": "The landed analytic ruled arm stays the fast path for the class it already certifies (V5: bit-identical). A spline-section carrier falls to the certified smooth arm; a closed halo chain has no smooth certificate.",
+      "confidence": "high"
+    },
+    {
+      "rule_id": "D-BRIDGE-VOLUME-MEMBER",
+      "kind": "solver",
+      "source": {
+        "file": "truck123d/src/bd_bridge.rs",
+        "symbol": "crate::bd_bridge::solid_volume (Member arm)",
+        "line": 491
+      },
+      "discriminator": "member_volume_bracket(profile, stations, ruled): all-line plate -> exact loft_volume; else sum MONO-2 two-station certificates; smooth >2 stations -> open_smooth_loft",
+      "matrix_cell": "sweep(spine,closed-section)",
+      "preconditions": [
+        {
+          "axis": "!unmodeled:profile",
+          "value": "!unmodeled:closed plate loop"
+        },
+        {
+          "axis": "!unmodeled:stations",
+          "value": "!unmodeled:>=2 StationFrame"
+        }
+      ],
+      "outcomes": [
+        {
+          "variant": "Ok(bracket)",
+          "postconditions": [
+            {
+              "axis": "goal",
+              "value": "volume_bracket"
+            },
+            {
+              "axis": "global.knowledge",
+              "value": "local_only(residual)"
+            }
+          ]
+        }
+      ],
+      "refusals": [
+        "Refusal::Empty (stations < 2 / non-finite)",
+        "open_smooth_loft (smooth member > 2 stations)",
+        "spline_loop_spans refusal (open plate boundary)"
+      ],
+      "consumes_evidence": [
+        "SolidSpec::Member"
+      ],
+      "produces_evidence": [
+        "volume f64"
+      ],
+      "calls": [
+        "crate::bd_bridge::member_volume_bracket",
+        "crate::bd_bridge::member_sections",
+        "crate::bd_bridge::certified_spline_loft_volume"
+      ],
+      "theorem_comment": "A member is a two-section degenerate case plus wall bands, so its certified facts ride the landed MONO-2 two-station loft certificate per adjacent station pair rather than a new integrator.",
+      "confidence": "high"
+    },
+    {
+      "rule_id": "D-BRIDGE-BBOX-LOCAL",
+      "kind": "solver",
+      "source": {
+        "file": "truck123d/src/bd_bridge.rs",
+        "symbol": "crate::bd_bridge::solid_local_bbox",
+        "line": 957
+      },
+      "discriminator": "per SolidSpec tag; Lathe line vs spline; TrimPrism spline idiom vs constructor; Loft ruled vs smooth (+ control-net enclosure for N>2); Member via spline_loop_bbox3",
+      "matrix_cell": null,
+      "preconditions": [
+        {
+          "axis": "!unmodeled:kind",
+          "value": "!unmodeled:SolidSpec tag"
+        }
+      ],
+      "outcomes": [
+        {
+          "variant": "[[f64;3];2]",
+          "postconditions": [
+            {
+              "axis": "goal",
+              "value": "volume_bracket"
+            },
+            {
+              "axis": "global.knowledge",
+              "value": "local_only(residual)"
+            }
+          ]
+        }
+      ],
+      "refusals": [
+        "Refusal::Empty (non-finite / degenerate)",
+        "Refusal::UnsupportedEnvelope(NonCanonicalCarrier) (via sub-arms)"
+      ],
+      "consumes_evidence": [
+        "SolidSpec"
+      ],
+      "produces_evidence": [
+        "local AABB"
+      ],
+      "calls": [
+        "crate::bd_bridge::prism_bbox",
+        "crate::bd_bridge::lathe_profile_bbox",
+        "crate::bd_bridge::spline_profile_prism_facts",
+        "crate::python::binding::trim_extrude_solid",
+        "crate::bd_bridge::nstation_control_enclosure"
+      ],
+      "theorem_comment": "The exact AABB of a profile loop: the support of any axis-aligned linear function over a polygon is attained at a polygon vertex, so the loop's bbox over its vertices is exact for the loop region.",
+      "confidence": "high"
+    },
+    {
+      "rule_id": "D-BRIDGE-BBOX-WORLD",
+      "kind": "solver",
+      "source": {
+        "file": "truck123d/src/bd_bridge.rs",
+        "symbol": "crate::bd_bridge::part_world_bbox",
+        "line": 2744
+      },
+      "discriminator": "local bbox -> mirror_point if part.mirror -> RotationFrame.apply (or rz rotation) -> translate (x,y,z); AABB of 8 corners",
+      "matrix_cell": "placement",
+      "preconditions": [
+        {
+          "axis": "!unmodeled:placement",
+          "value": "!unmodeled:mirror? + rotation|rz + translation"
+        }
+      ],
+      "outcomes": [
+        {
+          "variant": "[[f64;3];2] world AABB",
+          "postconditions": [
+            {
+              "axis": "goal",
+              "value": "volume_bracket"
+            },
+            {
+              "axis": "rep.param_map_inverse",
+              "value": "true"
+            }
+          ]
+        }
+      ],
+      "refusals": [
+        "solid_local_bbox refusal propagated"
+      ],
+      "consumes_evidence": [
+        "PartSpec",
+        "local AABB"
+      ],
+      "produces_evidence": [
+        "world AABB"
+      ],
+      "calls": [
+        "crate::bd_bridge::solid_local_bbox",
+        "crate::bd_bridge::mirror_point",
+        "crate::bd_bridge::RotationFrame::apply"
+      ],
+      "theorem_comment": "The AABB of the 8 rotated local corners is the exact world bbox under the orthonormal placement rotation.",
+      "confidence": "high"
+    },
+    {
+      "rule_id": "D-BRIDGE-MESH-DISPATCH",
+      "kind": "assembler",
+      "source": {
+        "file": "truck123d/src/bd_bridge.rs",
+        "symbol": "crate::bd_bridge::solid_mesh / append_node_mesh",
+        "line": 3134
+      },
+      "discriminator": "per SolidSpec tag; Part applies mirror then rotation/rz then translation; Boolean -> base a; Group -> children",
+      "matrix_cell": null,
+      "preconditions": [
+        {
+          "axis": "!unmodeled:kind",
+          "value": "!unmodeled:SolidSpec tag"
+        }
+      ],
+      "outcomes": [
+        {
+          "variant": "Vec<Triangle>",
+          "postconditions": [
+            {
+              "axis": "goal",
+              "value": "mesh"
+            }
+          ]
+        }
+      ],
+      "refusals": [
+        "sub-arm Refusal::Empty",
+        "dispatch_boolean refusal for Boolean nodes"
+      ],
+      "consumes_evidence": [
+        "TreeNode",
+        "SolidSpec"
+      ],
+      "produces_evidence": [
+        "Triangle soup"
+      ],
+      "calls": [
+        "crate::bd_bridge::box_mesh",
+        "crate::bd_bridge::cylinder_z_mesh",
+        "crate::bd_bridge::sphere_mesh",
+        "crate::bd_bridge::torus_mesh",
+        "crate::bd_bridge::lathe_mesh",
+        "crate::bd_bridge::prism_mesh",
+        "crate::bd_bridge::loft_mesh",
+        "crate::bd_bridge::member_mesh",
+        "crate::bd_bridge::reflect_triangle",
+        "crate::bd_bridge::place_triangle_frame"
+      ],
+      "theorem_comment": "The mirror placed-carrier reflects the local geometry before the rz rotation and translation (no geometry recomputation).",
+      "confidence": "high"
+    },
+    {
+      "rule_id": "D-BRIDGE-MESH-LATHE",
+      "kind": "assembler",
+      "source": {
+        "file": "truck123d/src/bd_bridge.rs",
+        "symbol": "crate::bd_bridge::lathe_mesh / profile_ring / sweep_ring_mesh",
+        "line": 3666
+      },
+      "discriminator": "line edges exactly; spline edges sampled at fixed SPLINE_MESH_STEPS per reconstructed span; ring swept over MESH_SEGMENTS",
+      "matrix_cell": "revolve(full,spline-profile)",
+      "preconditions": [
+        {
+          "axis": "!unmodeled:profile",
+          "value": "!unmodeled:line|spline"
+        },
+        {
+          "axis": "rep.canonical_carrier",
+          "value": "true"
+        }
+      ],
+      "outcomes": [
+        {
+          "variant": "Vec<Triangle>",
+          "postconditions": [
+            {
+              "axis": "goal",
+              "value": "mesh"
+            }
+          ]
+        }
+      ],
+      "refusals": [
+        "Refusal::Empty (ring < 3 / non-finite / negative radius)"
+      ],
+      "consumes_evidence": [
+        "SolidSpec::Lathe"
+      ],
+      "produces_evidence": [
+        "Triangle soup"
+      ],
+      "calls": [
+        "crate::bd_bridge::check_profile_edges",
+        "crate::bd_bridge::spline_ring_samples",
+        "crate::bd_bridge::sweep_ring_mesh"
+      ],
+      "theorem_comment": "For an all-line profile the ring is exactly the vertex loop, so the mesh is identical to the landed line-profile mesh.",
+      "confidence": "high"
+    },
+    {
+      "rule_id": "D-BRIDGE-MESH-PRISM",
+      "kind": "assembler",
+      "source": {
+        "file": "truck123d/src/bd_bridge.rs",
+        "symbol": "crate::bd_bridge::prism_mesh",
+        "line": 3193
+      },
+      "discriminator": "prism_geom -> side quads between bottom/top rings plus cap fans",
+      "matrix_cell": "extrude(profile)",
+      "preconditions": [
+        {
+          "axis": "rep.canonical_carrier",
+          "value": "true"
+        }
+      ],
+      "outcomes": [
+        {
+          "variant": "Vec<Triangle>",
+          "postconditions": [
+            {
+              "axis": "goal",
+              "value": "mesh"
+            }
+          ]
+        }
+      ],
+      "refusals": [
+        "prism_geom refusal (Empty / NonCanonicalCarrier)"
+      ],
+      "consumes_evidence": [
+        "SolidSpec::Prism"
+      ],
+      "produces_evidence": [
+        "Triangle soup"
+      ],
+      "calls": [
+        "crate::bd_bridge::prism_geom",
+        "crate::bd_bridge::push_quad",
+        "crate::bd_bridge::push_tri"
+      ],
+      "theorem_comment": "The local mesh of an extruded prism: the profile boundary swept between the two end planes plus cap fans. Deterministic, closed, no duplicate vertices.",
+      "confidence": "high"
+    },
+    {
+      "rule_id": "D-BRIDGE-MESH-LOFT",
+      "kind": "assembler",
+      "source": {
+        "file": "truck123d/src/bd_bridge.rs",
+        "symbol": "crate::bd_bridge::loft_mesh",
+        "line": 3416
+      },
+      "discriminator": "loft_sections Ok -> ruled quads + end caps; else closed -> open_smooth_loft; else spline_loft_mesh",
+      "matrix_cell": "loft(spline-section)",
+      "preconditions": [
+        {
+          "axis": "!unmodeled:profile",
+          "value": "!unmodeled:line|spline"
+        }
+      ],
+      "outcomes": [
+        {
+          "variant": "Vec<Triangle>",
+          "postconditions": [
+            {
+              "axis": "goal",
+              "value": "mesh"
+            }
+          ]
+        }
+      ],
+      "refusals": [
+        "open_smooth_loft (closed smooth chain)",
+        "spline_loft_mesh refusal"
+      ],
+      "consumes_evidence": [
+        "SolidSpec::Loft"
+      ],
+      "produces_evidence": [
+        "Triangle soup"
+      ],
+      "calls": [
+        "crate::bd_bridge::loft_sections",
+        "crate::bd_bridge::spline_loft_mesh"
+      ],
+      "theorem_comment": "The certified spline-section class meshes through the reconstructed ruled surface; a closed smooth chain has no certificate.",
+      "confidence": "high"
+    },
+    {
+      "rule_id": "D-BRIDGE-MESH-MEMBER",
+      "kind": "assembler",
+      "source": {
+        "file": "truck123d/src/bd_bridge.rs",
+        "symbol": "crate::bd_bridge::member_mesh",
+        "line": 1964
+      },
+      "discriminator": "member_sections -> spline_loop_spans/sample_loop3 per station -> ruled quads + end-cap fans",
+      "matrix_cell": "sweep(spine,closed-section)",
+      "preconditions": [
+        {
+          "axis": "!unmodeled:stations",
+          "value": "!unmodeled:>=2"
+        }
+      ],
+      "outcomes": [
+        {
+          "variant": "Vec<Triangle>",
+          "postconditions": [
+            {
+              "axis": "goal",
+              "value": "mesh"
+            }
+          ]
+        }
+      ],
+      "refusals": [
+        "Refusal::Empty (sections < 2 / empty loop)",
+        "open_smooth_loft (mismatched loop counts)"
+      ],
+      "consumes_evidence": [
+        "SolidSpec::Member"
+      ],
+      "produces_evidence": [
+        "Triangle soup"
+      ],
+      "calls": [
+        "crate::bd_bridge::spline_loop_spans",
+        "crate::bd_bridge::sample_loop3",
+        "crate::bd_bridge::push_quad",
+        "crate::bd_bridge::push_tri"
+      ],
+      "theorem_comment": "The sampled loops are the same reconstruction the certificate integrates.",
+      "confidence": "high"
+    },
+    {
+      "rule_id": "D-BRIDGE-SPLINE-LOFT-CERT",
+      "kind": "solver",
+      "source": {
+        "file": "truck123d/src/bd_bridge.rs",
+        "symbol": "crate::bd_bridge::certified_spline_loft_volume",
+        "line": 1778
+      },
+      "discriminator": "spline_loop_spans per section; equal span counts; station_params; per-span Bernstein grids -> binding::volume_facts (certify_patch_form); plus exact end-cap moments",
+      "matrix_cell": "loft(spline-section)",
+      "preconditions": [
+        {
+          "axis": "!unmodeled:profile",
+          "value": "!unmodeled:spline closed loops, matched spans"
+        },
+        {
+          "axis": "rep.bernstein_chart",
+          "value": "true"
+        }
+      ],
+      "outcomes": [
+        {
+          "variant": "Ok((value, lo, hi))",
+          "postconditions": [
+            {
+              "axis": "goal",
+              "value": "volume_bracket"
+            },
+            {
+              "axis": "rep.construction_witness",
+              "value": "true"
+            },
+            {
+              "axis": "global.knowledge",
+              "value": "local_only(residual)"
+            }
+          ]
+        }
+      ],
+      "refusals": [
+        "Refusal::Empty (sections < 2 / span mismatch / non-finite)",
+        "open_smooth_loft (span count 0 / unequal loops / zero area)"
+      ],
+      "consumes_evidence": [
+        "sections"
+      ],
+      "produces_evidence": [
+        "certified volume bracket"
+      ],
+      "calls": [
+        "crate::bd_bridge::spline_loop_spans",
+        "crate::bd_bridge::station_params",
+        "crate::bd_bridge::v_segments",
+        "crate::python::binding::volume_facts",
+        "construct::volume_facts::certify_patch_form"
+      ],
+      "theorem_comment": "The section ... is assembled over the sanctioned `binding_volume_facts` entry, summing the certified brackets ... plus the exact planar end-cap moments.",
+      "confidence": "high"
+    },
+    {
+      "rule_id": "D-BRIDGE-MEMBER-BRACKET",
+      "kind": "solver",
+      "source": {
+        "file": "truck123d/src/bd_bridge.rs",
+        "symbol": "crate::bd_bridge::member_volume_bracket",
+        "line": 1933
+      },
+      "discriminator": "member_sections -> loft_sections Ok => exact loft_volume; !ruled && >2 => open_smooth_loft; else sum certified_spline_loft_volume over adjacent pairs",
+      "matrix_cell": "sweep(spine,closed-section)",
+      "preconditions": [
+        {
+          "axis": "!unmodeled:ruled",
+          "value": "!unmodeled:bool"
+        },
+        {
+          "axis": "!unmodeled:stations",
+          "value": "!unmodeled:>=2"
+        }
+      ],
+      "outcomes": [
+        {
+          "variant": "Ok((value,lo,hi))",
+          "postconditions": [
+            {
+              "axis": "goal",
+              "value": "volume_bracket"
+            },
+            {
+              "axis": "global.knowledge",
+              "value": "local_only(residual)"
+            }
+          ]
+        }
+      ],
+      "refusals": [
+        "open_smooth_loft (smooth member with >2 stations)",
+        "Refusal::Empty (non-finite)"
+      ],
+      "consumes_evidence": [
+        "profile",
+        "stations",
+        "ruled"
+      ],
+      "produces_evidence": [
+        "certified volume bracket"
+      ],
+      "calls": [
+        "crate::bd_bridge::member_sections",
+        "crate::bd_bridge::loft_sections",
+        "crate::bd_bridge::loft_volume",
+        "crate::bd_bridge::certified_spline_loft_volume"
+      ],
+      "theorem_comment": "The interior caps of consecutive pairs cancel exactly, so the sum is the chain's side surface plus its two end caps -- 'a two-section degenerate case plus wall bands'.",
+      "confidence": "high"
+    },
+    {
+      "rule_id": "D-BRIDGE-MIRROR-PLACED",
+      "kind": "classifier",
+      "source": {
+        "file": "truck123d/src/bd_bridge.rs",
+        "symbol": "crate::bd_bridge::mirror_point / reflect_triangle",
+        "line": 2587
+      },
+      "discriminator": "mirror axis \"x\"|\"z\"|else \"y\" applied to local points/triangles and local bbox before placement",
+      "matrix_cell": "mirror(axis-plane)",
+      "preconditions": [
+        {
+          "axis": "!unmodeled:axis",
+          "value": "!unmodeled:x|y|z"
+        }
+      ],
+      "outcomes": [
+        {
+          "variant": "reflected local point/triangle",
+          "postconditions": [
+            {
+              "axis": "goal",
+              "value": "valid_brep"
+            },
+            {
+              "axis": "rep.construction_witness",
+              "value": "true"
+            }
+          ]
+        }
+      ],
+      "refusals": [],
+      "consumes_evidence": [
+        "PartSpec.mirror"
+      ],
+      "produces_evidence": [
+        "reflected geometry"
+      ],
+      "calls": [],
+      "theorem_comment": "The mirror placed-carrier reflects the local geometry before the rz rotation and translation (no geometry recomputation).",
+      "confidence": "high"
+    },
+    {
+      "rule_id": "D-BRIDGE-WRITE-STL",
+      "kind": "assembler",
+      "source": {
+        "file": "truck123d/src/bd_bridge.rs",
+        "symbol": "crate::bd_bridge::write_tree_stl",
+        "line": 3783
+      },
+      "discriminator": "tree_mesh -> binary STL (80-byte header, u32 count, per-tri zero normal + 3 f32 vertices + u16 attr)",
+      "matrix_cell": null,
+      "preconditions": [
+        {
+          "axis": "!unmodeled:tree",
+          "value": "!unmodeled:TreeNode"
+        }
+      ],
+      "outcomes": [
+        {
+          "variant": "Ok(triangle_count)",
+          "postconditions": [
+            {
+              "axis": "goal",
+              "value": "mesh"
+            }
+          ]
+        }
+      ],
+      "refusals": [
+        "Refusal::Empty (empty triangle soup / count overflow / write failure)"
+      ],
+      "consumes_evidence": [
+        "TreeNode"
+      ],
+      "produces_evidence": [
+        "binary STL"
+      ],
+      "calls": [
+        "crate::bd_bridge::tree_mesh"
+      ],
+      "theorem_comment": "Writes the tree's triangle soup as a binary STL file at `path`, returning the triangle count.",
+      "confidence": "high"
+    },
+    {
+      "rule_id": "D-BRIDGE-SOLIDSPEC-SERDE",
+      "kind": "classifier",
+      "source": {
+        "file": "truck123d/src/bd_bridge.rs",
+        "symbol": "crate::bd_bridge::SolidSpec (serde tag=\"kind\")",
+        "line": 101
+      },
+      "discriminator": "serde internally-tagged enum on \"kind\": box|cylinder|sphere|torus|lathe|prism|trim_prism|loft|member; deny_unknown_fields",
+      "matrix_cell": null,
+      "preconditions": [
+        {
+          "axis": "!unmodeled:json_tag",
+          "value": "!unmodeled:kind"
+        }
+      ],
+      "outcomes": [
+        {
+          "variant": "SolidSpec variant",
+          "postconditions": [
+            {
+              "axis": "goal",
+              "value": "valid_brep"
+            }
+          ]
+        }
+      ],
+      "refusals": [
+        "serde unknown variant/field -> parse_tree Refusal::Empty"
+      ],
+      "consumes_evidence": [
+        "JSON"
+      ],
+      "produces_evidence": [
+        "SolidSpec"
+      ],
+      "calls": [],
+      "theorem_comment": "The solid carrier of one construction row. Data only: every field is a physical length/angle the corpus script computed.",
+      "confidence": "high"
+    },
+    {
+      "rule_id": "D-BINDING-REGISTER-ENTRIES",
+      "kind": "assembler",
+      "source": {
+        "file": "truck123d/src/binding.rs",
+        "symbol": "crate::python::binding::register_certified_entries",
+        "line": 276
+      },
+      "discriminator": "registers the restricted-pair solver and the SSI-admit solver into the truck-evidence trait-object registries",
+      "matrix_cell": "cut(swept,canonical)",
+      "preconditions": [
+        {
+          "axis": "!unmodeled:entry",
+          "value": "!unmodeled:called only from binding::boolean_dispatch"
+        }
+      ],
+      "outcomes": [
+        {
+          "variant": "registry slots populated (set-once)",
+          "postconditions": [
+            {
+              "axis": "rep.construction_witness",
+              "value": "true"
+            },
+            {
+              "axis": "global.knowledge",
+              "value": "local_only(residual)"
+            }
+          ]
+        }
+      ],
+      "refusals": [],
+      "consumes_evidence": [],
+      "produces_evidence": [
+        "registered solver engines"
+      ],
+      "calls": [
+        "construct::bie::ssi4::register_restricted_pair_solver",
+        "ssi_admit::register_ssi_admit_solver"
+      ],
+      "reaches": [
+        "construct::bie::ssi4::register_restricted_pair_solver",
+        "ssi_admit::register_ssi_admit_solver"
+      ],
+      "theorem_comment": "The concrete 'call the impls through the trait objects' step: the certified impls land in the registry slots the funnel dispatches through.",
+      "confidence": "high"
+    },
+    {
+      "rule_id": "D-BINDING-BOOLEAN-DISPATCH",
+      "kind": "solver",
+      "source": {
+        "file": "truck123d/src/binding.rs",
+        "symbol": "crate::python::binding::boolean_dispatch",
+        "line": 286
+      },
+      "discriminator": "register_certified_entries -> facade mirror verdict; Routed -> certify_transverse_pair over recorded cones; CanonicalLanded/Refused -> typed outcome",
+      "matrix_cell": "cut(swept,canonical)",
+      "preconditions": [
+        {
+          "axis": "!unmodeled:base_tool",
+          "value": "!unmodeled:CarrierClass pair"
+        },
+        {
+          "axis": "!unmodeled:cones",
+          "value": "!unmodeled:ConeRow pair"
+        }
+      ],
+      "outcomes": [
+        {
+          "variant": "BooleanOutcome{verdict:canonical_landed}",
+          "postconditions": [
+            {
+              "axis": "goal",
+              "value": "valid_brep"
+            }
+          ]
+        },
+        {
+          "variant": "BooleanOutcome{verdict:routed, transverse:Bracket}",
+          "postconditions": [
+            {
+              "axis": "goal",
+              "value": "valid_brep"
+            },
+            {
+              "axis": "rep.construction_witness",
+              "value": "true"
+            }
+          ]
+        },
+        {
+          "variant": "BooleanOutcome{verdict:refused, envelope}",
+          "postconditions": [
+            {
+              "axis": "global.knowledge",
+              "value": "local_only(residual)"
+            }
+          ]
+        }
+      ],
+      "refusals": [
+        "Marshaled construct refusal from certify_transverse_pair",
+        "EnvelopeCase::ContactReductionDeferred / NonCanonicalCarrier via the facade mirror"
+      ],
+      "consumes_evidence": [
+        "BooleanRow",
+        "ConeRow"
+      ],
+      "produces_evidence": [
+        "BooleanOutcome",
+        "Bracket"
+      ],
+      "calls": [
+        "crate::python::binding::register_certified_entries",
+        "crate::facade::dispatch_swept_carrier_boolean",
+        "construct::admission::certify_transverse_pair",
+        "crate::marshal::Marshaled::from_construct_refusal"
+      ],
+      "reaches": [
+        "ADMISSION-CERTIFY-TRANSVERSE-PAIR"
+      ],
+      "theorem_comment": "A routed pair actually runs the certified Theorem C transversality certificate over the row's recorded certified normal cones and returns the certified `\u2016n_X \u00d7 n_Y\u2016` bracket.",
+      "confidence": "high"
+    },
+    {
+      "rule_id": "D-BINDING-VOLUME-FACTS",
+      "kind": "solver",
+      "source": {
+        "file": "truck123d/src/binding.rs",
+        "symbol": "crate::python::binding::volume_facts",
+        "line": 334
+      },
+      "discriminator": "TensorBernsteinPatch::try_new over the recorded grids -> certify_patch_form with orientation; bracket out",
+      "matrix_cell": "loft(spline-section)",
+      "preconditions": [
+        {
+          "axis": "!unmodeled:row",
+          "value": "!unmodeled:VolumeRow (numerator+weights+orientation)"
+        },
+        {
+          "axis": "rep.bernstein_chart",
+          "value": "true"
+        }
+      ],
+      "outcomes": [
+        {
+          "variant": "VolumeOutcome{ok,bracket,value,certified_error,faces,patches}",
+          "postconditions": [
+            {
+              "axis": "goal",
+              "value": "volume_bracket"
+            },
+            {
+              "axis": "rep.construction_witness",
+              "value": "true"
+            }
+          ]
+        }
+      ],
+      "refusals": [
+        "Marshaled construct refusal (patch/volume)"
+      ],
+      "consumes_evidence": [
+        "VolumeRow"
+      ],
+      "produces_evidence": [
+        "Bracket",
+        "VolumeOutcome"
+      ],
+      "calls": [
+        "construct::patches::TensorBernsteinPatch::try_new",
+        "construct::volume_facts::certify_patch_form",
+        "crate::marshal::Marshaled::from_construct_refusal"
+      ],
+      "reaches": [
+        "construct::volume_facts::certify_patch_form"
+      ],
+      "theorem_comment": "The certified volume-facts entry: assemble the recorded patch row and run the landed certified face-form volume fact, returning its two-sided bracket.",
+      "confidence": "high"
+    },
+    {
+      "rule_id": "D-BINDING-TRIM-FACTS",
+      "kind": "solver",
+      "source": {
+        "file": "truck123d/src/binding.rs",
+        "symbol": "crate::python::binding::trim_facts",
+        "line": 364
+      },
+      "discriminator": "certify_algebraic_trim_bracket(density, trim, tolerance) -> two-sided integral bracket",
+      "matrix_cell": "extrude(profile)",
+      "preconditions": [
+        {
+          "axis": "!unmodeled:row",
+          "value": "!unmodeled:TrimRow (density+trim+tolerance)"
+        }
+      ],
+      "outcomes": [
+        {
+          "variant": "TrimOutcome{ok,bracket}",
+          "postconditions": [
+            {
+              "axis": "goal",
+              "value": "volume_bracket"
+            },
+            {
+              "axis": "rep.construction_witness",
+              "value": "true"
+            }
+          ]
+        }
+      ],
+      "refusals": [
+        "Marshaled construct refusal"
+      ],
+      "consumes_evidence": [
+        "TrimRow"
+      ],
+      "produces_evidence": [
+        "Bracket",
+        "TrimOutcome"
+      ],
+      "calls": [
+        "construct::volume_facts::certify_algebraic_trim_bracket",
+        "crate::marshal::Marshaled::from_construct_refusal"
+      ],
+      "reaches": [
+        "construct::volume_facts::certify_algebraic_trim_bracket"
+      ],
+      "theorem_comment": "The certified trim-facts entry for the algebraic-trim path: run the landed certified algebraic-trim bracket engine over the recorded pullback nets.",
+      "confidence": "high"
+    },
+    {
+      "rule_id": "D-BINDING-TRIM-EXTRUDE",
+      "kind": "assembler",
+      "source": {
+        "file": "truck123d/src/binding.rs",
+        "symbol": "crate::python::binding::trim_extrude",
+        "line": 943
+      },
+      "discriminator": "fit_plane -> line_loop_vertices or bbox_rect; no trim -> prism_geom; self-crossing -> TrimClipFailed; no net -> trim_pullback_missing; degree > 16 -> trim_degree_out_of_envelope; else build_graph + bezier_trim_leaf + trim_clip + certify_algebraic_trim_bracket",
+      "matrix_cell": "extrude(profile)",
+      "preconditions": [
+        {
+          "axis": "!unmodeled:trim_curve",
+          "value": "!unmodeled:empty|closed control loop <=16 pts"
+        },
+        {
+          "axis": "!unmodeled:trim_net",
+          "value": "!unmodeled:empty|recorded pullback net"
+        },
+        {
+          "axis": "rep.bernstein_chart",
+          "value": "true"
+        }
+      ],
+      "outcomes": [
+        {
+          "variant": "TrimExtrudeOutcome{ok,bracket,value,bbox,crossings,retained_arcs}",
+          "postconditions": [
+            {
+              "axis": "goal",
+              "value": "volume_bracket"
+            },
+            {
+              "axis": "rep.construction_witness",
+              "value": "true"
+            },
+            {
+              "axis": "global.knowledge",
+              "value": "local_only(residual)"
+            }
+          ]
+        }
+      ],
+      "refusals": [
+        "MalformedRow (amount/tolerance/profile/plane)",
+        "RefusalKind::TrimClipFailed (trim_loop_self_crossing, trim_pullback_missing, trim_degree_out_of_envelope)",
+        "kernel refusal from build_graph/bezier_trim_leaf/trim_clip"
+      ],
+      "consumes_evidence": [
+        "TrimExtrudeRow",
+        "ProfileEdge"
+      ],
+      "produces_evidence": [
+        "TrimExtrudeOutcome",
+        "TrimCrossingRecord"
+      ],
+      "calls": [
+        "crate::python::binding::fit_plane",
+        "crate::python::binding::line_loop_vertices",
+        "crate::python::binding::control_polygon_self_intersects",
+        "crate::python::binding::build_graph",
+        "crate::python::binding::bezier_trim_leaf",
+        "kernel::trimclip::trim_clip",
+        "construct::volume_facts::certify_algebraic_trim_bracket"
+      ],
+      "reaches": [
+        "C-SPLIT-TRIM-CLIP",
+        "C-GATE-BEZIERLEAF1-TRY-NEW",
+        "C-GATE-POINTCERT-TRY-NEW",
+        "C-GATE-ARCCERT-TRY-NEW",
+        "C-GATE-FRAME-TRY-NEW",
+        "C-SPLIT-CERTIFY-CROSSINGS",
+        "C-SPLIT-CERTIFY-OFF-LOOP",
+        "C-CLASSIFY-WINDING-NUMBER",
+        "C-CLASSIFY-SAMPLE-INSIDE"
+      ],
+      "theorem_comment": "A trim class the composition cannot close (a self-crossing control loop, a trim with no recorded pullback net, a stalled R9 isolation) refuses TYPED naming the `TrimClipFailed` family -- Inconclusive, never silent (\u00a79.4).",
+      "confidence": "high"
+    },
+    {
+      "rule_id": "D-BINDING-TRIM-EXTRUDE-SOLID",
+      "kind": "assembler",
+      "source": {
+        "file": "truck123d/src/binding.rs",
+        "symbol": "crate::python::binding::trim_extrude_solid",
+        "line": 1075
+      },
+      "discriminator": "trim_extrude(row) then prism_mesh over the reconstructed base profile",
+      "matrix_cell": "extrude(profile)",
+      "preconditions": [
+        {
+          "axis": "!unmodeled:row",
+          "value": "!unmodeled:profile+amount+both+trim+tolerance"
+        }
+      ],
+      "outcomes": [
+        {
+          "variant": "TrimExtrudeFacts{volume,bbox,mesh}",
+          "postconditions": [
+            {
+              "axis": "goal",
+              "value": "mesh"
+            },
+            {
+              "axis": "global.knowledge",
+              "value": "local_only(residual)"
+            }
+          ]
+        }
+      ],
+      "refusals": [
+        "BindingError::Malformed",
+        "BindingError::Refusal (TrimClipFailed family)"
+      ],
+      "consumes_evidence": [
+        "ProfileEdge",
+        "trim curve",
+        "trim net"
+      ],
+      "produces_evidence": [
+        "TrimExtrudeFacts",
+        "Triangle soup"
+      ],
+      "calls": [
+        "crate::python::binding::trim_extrude",
+        "crate::python::binding::fit_plane",
+        "crate::bd_bridge::prism_mesh"
+      ],
+      "reaches": [
+        "C-SPLIT-TRIM-CLIP"
+      ],
+      "theorem_comment": "The realized facts of one trim-prism row: the certified volume value plus the deterministic local mesh of the base extrusion.",
+      "confidence": "high"
+    },
+    {
+      "rule_id": "D-BINDING-DATA-ROW-BBOX",
+      "kind": "solver",
+      "source": {
+        "file": "truck123d/src/binding.rs",
+        "symbol": "crate::python::binding::bbox_facts",
+        "line": 1514
+      },
+      "discriminator": "ShapeRow -> patch_rigorous_bbox (Bernstein hull subdivision to DATA_ROW_BBOX_SLACK)",
+      "matrix_cell": "validity-check",
+      "preconditions": [
+        {
+          "axis": "!unmodeled:row",
+          "value": "!unmodeled:ShapeRow"
+        },
+        {
+          "axis": "rep.bernstein_chart",
+          "value": "true"
+        }
+      ],
+      "outcomes": [
+        {
+          "variant": "certified bbox JSON",
+          "postconditions": [
+            {
+              "axis": "goal",
+              "value": "volume_bracket"
+            }
+          ]
+        }
+      ],
+      "refusals": [
+        "BindingError::Malformed",
+        "BindingError::Refusal"
+      ],
+      "consumes_evidence": [
+        "ShapeRow"
+      ],
+      "produces_evidence": [
+        "certified bbox"
+      ],
+      "calls": [
+        "crate::python::binding::patch_rigorous_bbox",
+        "crate::python::binding::shape_bbox_bound"
+      ],
+      "reaches": [],
+      "theorem_comment": "Every boundary patch is a rational tensor-Bernstein patch `X = \u00c2/\u0174` with certified positive weights, so its affine control net `\u00c2_ij / \u0174_ij` bounds the patch by the convex-hull property.",
+      "confidence": "high"
+    },
+    {
+      "rule_id": "D-BINDING-DATA-ROW-OBOX",
+      "kind": "solver",
+      "source": {
+        "file": "truck123d/src/binding.rs",
+        "symbol": "crate::python::binding::obox_facts",
+        "line": 1525
+      },
+      "discriminator": "ShapeRow -> bbox bound carried into the recorded frame (lo,hi corner-pair form)",
+      "matrix_cell": "validity-check",
+      "preconditions": [
+        {
+          "axis": "!unmodeled:row",
+          "value": "!unmodeled:ShapeRow"
+        }
+      ],
+      "outcomes": [
+        {
+          "variant": "oriented bbox JSON",
+          "postconditions": [
+            {
+              "axis": "goal",
+              "value": "volume_bracket"
+            }
+          ]
+        }
+      ],
+      "refusals": [
+        "BindingError::Malformed",
+        "BindingError::Refusal"
+      ],
+      "consumes_evidence": [
+        "ShapeRow"
+      ],
+      "produces_evidence": [
+        "oriented bbox"
+      ],
+      "calls": [
+        "crate::python::binding::bbox_facts"
+      ],
+      "reaches": [],
+      "theorem_comment": "`obox` is the same bound carried into the row's recorded frame (the `lo, hi` corner-pair form the corpus helper consumes).",
+      "confidence": "high"
+    },
+    {
+      "rule_id": "D-BINDING-DATA-ROW-VALID",
+      "kind": "classifier",
+      "source": {
+        "file": "truck123d/src/binding.rs",
+        "symbol": "crate::python::binding::is_valid_shape",
+        "line": 1537
+      },
+      "discriminator": "ShapeRow closed && oriented -> the recorded 2-cycle invariant (never an OCC probe)",
+      "matrix_cell": "validity-check",
+      "preconditions": [
+        {
+          "axis": "!unmodeled:row",
+          "value": "!unmodeled:ShapeRow(closed,oriented)"
+        }
+      ],
+      "outcomes": [
+        {
+          "variant": "validity JSON",
+          "postconditions": [
+            {
+              "axis": "goal",
+              "value": "valid_brep"
+            }
+          ]
+        }
+      ],
+      "refusals": [
+        "BindingError::Malformed"
+      ],
+      "consumes_evidence": [
+        "ShapeRow"
+      ],
+      "produces_evidence": [
+        "validity verdict"
+      ],
+      "calls": [],
+      "reaches": [],
+      "theorem_comment": "`is_valid_shape` -- the landed closed/oriented 2-cycle invariant the row recorded at construction. Never an OCC probe.",
+      "confidence": "high"
+    },
+    {
+      "rule_id": "D-BINDING-DATA-ROW-FACE-COUNT",
+      "kind": "classifier",
+      "source": {
+        "file": "truck123d/src/binding.rs",
+        "symbol": "crate::python::binding::face_count",
+        "line": 1552
+      },
+      "discriminator": "ShapeRow -> number of patches of the boundary grid",
+      "matrix_cell": "validity-check",
+      "preconditions": [
+        {
+          "axis": "!unmodeled:row",
+          "value": "!unmodeled:ShapeRow"
+        }
+      ],
+      "outcomes": [
+        {
+          "variant": "face count JSON",
+          "postconditions": [
+            {
+              "axis": "goal",
+              "value": "valid_brep"
+            }
+          ]
+        }
+      ],
+      "refusals": [
+        "BindingError::Malformed"
+      ],
+      "consumes_evidence": [
+        "ShapeRow"
+      ],
+      "produces_evidence": [
+        "face count"
+      ],
+      "calls": [],
+      "reaches": [],
+      "theorem_comment": "`face_count` -- the number of patches of the row's boundary grid.",
+      "confidence": "high"
+    },
+    {
+      "rule_id": "D-BINDING-PYO3-UNREGISTERED",
+      "kind": "gate",
+      "source": {
+        "file": "truck123d/src/lib.rs",
+        "symbol": "crate::truck123d (pymodule registration)",
+        "line": 62
+      },
+      "discriminator": "module registers only marshal_refused, marshal_unresolved, kernel_evidence_compose, facade_submit, bd_facts, bd_stl; the binding.rs #[pyfunction]s are NOT registered",
+      "matrix_cell": null,
+      "preconditions": [
+        {
+          "axis": "!unmodeled:entry",
+          "value": "!unmodeled:python module surface"
+        }
+      ],
+      "outcomes": [
+        {
+          "variant": "bd_facts/bd_stl/facade_submit reachable from Python",
+          "postconditions": [
+            {
+              "axis": "goal",
+              "value": "mesh"
+            }
+          ]
+        },
+        {
+          "variant": "binding_boolean_dispatch/volume_facts/trim_facts/trim_extrude/bbox/obox/is_valid_shape/face_count unreachable from Python",
+          "postconditions": [
+            {
+              "axis": "global.knowledge",
+              "value": "local_only(residual)"
+            }
+          ]
+        }
+      ],
+      "refusals": [],
+      "consumes_evidence": [],
+      "produces_evidence": [
+        "python module surface"
+      ],
+      "calls": [
+        "crate::marshal::marshal_refused",
+        "crate::marshal::marshal_unresolved",
+        "crate::python::kernel_evidence_compose",
+        "crate::facade::facade_submit",
+        "crate::bd_bridge::bd_facts",
+        "crate::bd_bridge::bd_stl"
+      ],
+      "reaches": [],
+      "theorem_comment": "The drop-in executor binding (TTC-EXECUTOR-BINDING): the two geometry entries the corpus-door kernel-engine regime drives.",
+      "confidence": "high"
+    },
+    {
+      "rule_id": "D-MARSHAL-FROM-REFUSAL",
+      "kind": "classifier",
+      "source": {
+        "file": "truck123d/src/marshal.rs",
+        "symbol": "crate::marshal::Marshaled::from_refusal",
+        "line": 144
+      },
+      "discriminator": "exhaustive match on the base Refusal variant -> Refused|Unresolved typed payload",
+      "matrix_cell": null,
+      "preconditions": [
+        {
+          "axis": "!unmodeled:refusal",
+          "value": "!unmodeled:base Refusal variant"
+        }
+      ],
+      "outcomes": [
+        {
+          "variant": "ExceptionClass::Refused (Empty, UnsupportedEnvelope, CompositionMarginExhausted, InputOutsideBackwardBudget, Contradictory, Collapsed, ForwardToleranceExceeded)",
+          "postconditions": [
+            {
+              "axis": "global.knowledge",
+              "value": "local_only(residual)"
+            }
+          ]
+        },
+        {
+          "variant": "ExceptionClass::Unresolved (NumericallyUnresolved{spent,witness})",
+          "postconditions": [
+            {
+              "axis": "global.knowledge",
+              "value": "unknown"
+            }
+          ]
+        }
+      ],
+      "refusals": [
+        "the mapped RefusedPayload.case (empty, unsupported_envelope, ..., forward_tolerance_exceeded)",
+        "UnresolvedPayload{kappa,witness}"
+      ],
+      "consumes_evidence": [
+        "Refusal"
+      ],
+      "produces_evidence": [
+        "Marshaled",
+        "RefusedPayload",
+        "UnresolvedPayload"
+      ],
+      "calls": [
+        "crate::marshal::envelope_case_name",
+        "crate::marshal::witness_name",
+        "crate::marshal::prop_name",
+        "crate::marshal::truth_name",
+        "crate::marshal::collapse_reason_name"
+      ],
+      "reaches": [],
+      "theorem_comment": "The match is exhaustive: adding a `Refusal` variant later breaks this function on purpose.",
+      "confidence": "high"
+    },
+    {
+      "rule_id": "D-MARSHAL-ENVELOPE-CASE",
+      "kind": "classifier",
+      "source": {
+        "file": "truck123d/src/marshal.rs",
+        "symbol": "crate::marshal::envelope_case_name",
+        "line": 297
+      },
+      "discriminator": "EnvelopeCase -> snake_case name (6 variants)",
+      "matrix_cell": null,
+      "preconditions": [
+        {
+          "axis": "!unmodeled:envelope",
+          "value": "!unmodeled:EnvelopeCase"
+        }
+      ],
+      "outcomes": [
+        {
+          "variant": "chart_degenerate|reach_too_small|non_canonical_carrier|non_positive_nurbs_weight|contact_reduction_deferred|construct_refused",
+          "postconditions": [
+            {
+              "axis": "global.knowledge",
+              "value": "local_only(residual)"
+            }
+          ]
+        }
+      ],
+      "refusals": [],
+      "consumes_evidence": [
+        "EnvelopeCase"
+      ],
+      "produces_evidence": [
+        "&'static str"
+      ],
+      "calls": [],
+      "reaches": [],
+      "theorem_comment": "`EnvelopeCase` -> snake_case name. Exhaustive; the six payloads of \u00a72.",
+      "confidence": "high"
+    },
+    {
+      "rule_id": "D-MARSHAL-FROM-CONSTRUCT-REFUSAL",
+      "kind": "classifier",
+      "source": {
+        "file": "truck123d/src/marshal.rs",
+        "symbol": "crate::marshal::Marshaled::from_construct_refusal",
+        "line": 550
+      },
+      "discriminator": "ConstructRefusal -> single booked door case construct_refused, variant tag on payload.stage",
+      "matrix_cell": null,
+      "preconditions": [
+        {
+          "axis": "!unmodeled:refusal",
+          "value": "!unmodeled:ConstructRefusal (14 variants)"
+        }
+      ],
+      "outcomes": [
+        {
+          "variant": "Refused{case:construct_refused,envelope:construct_refused,stage:<tag>}",
+          "postconditions": [
+            {
+              "axis": "global.knowledge",
+              "value": "local_only(residual)"
+            }
+          ]
+        }
+      ],
+      "refusals": [
+        "construct_refused"
+      ],
+      "consumes_evidence": [
+        "ConstructRefusal"
+      ],
+      "produces_evidence": [
+        "Marshaled"
+      ],
+      "calls": [
+        "crate::marshal::refused_payload"
+      ],
+      "reaches": [],
+      "theorem_comment": "Every construct-stage refusal maps onto the single booked `construct_refused` door case (the detailed variant rides the payload).",
+      "confidence": "high"
+    },
+    {
+      "rule_id": "D-MARSHAL-FROM-UNMAPPED",
+      "kind": "classifier",
+      "source": {
+        "file": "truck123d/src/marshal.rs",
+        "symbol": "crate::marshal::Marshaled::from_unmapped_refusal",
+        "line": 565
+      },
+      "discriminator": "UnmappedRefusal -> Refused{case:unmapped_refusal, stage:kind}",
+      "matrix_cell": null,
+      "preconditions": [
+        {
+          "axis": "!unmodeled:refusal",
+          "value": "!unmodeled:certified RefusalKind with no booked door mapping"
+        }
+      ],
+      "outcomes": [
+        {
+          "variant": "Refused{case:unmapped_refusal}",
+          "postconditions": [
+            {
+              "axis": "global.knowledge",
+              "value": "local_only(residual)"
+            }
+          ]
+        }
+      ],
+      "refusals": [
+        "unmapped_refusal (defect signal, never silent)"
+      ],
+      "consumes_evidence": [
+        "UnmappedRefusal"
+      ],
+      "produces_evidence": [
+        "Marshaled"
+      ],
+      "calls": [
+        "crate::marshal::refused_payload"
+      ],
+      "reaches": [],
+      "theorem_comment": "Marshals an unmapped certified refusal kind as the typed [`UnmappedRefusal`] defect signal: `Refused` class, `unmapped_refusal` case ... never a bare string, never a silent approximation.",
+      "confidence": "high"
+    },
+    {
+      "rule_id": "D-MARSHAL-KERNEL-KIND-NAME",
+      "kind": "classifier",
+      "source": {
+        "file": "truck123d/src/marshal.rs",
+        "symbol": "crate::marshal::kernel_refusal_kind_name",
+        "line": 584
+      },
+      "discriminator": "RefusalKind -> snake_case name (25 variants)",
+      "matrix_cell": null,
+      "preconditions": [
+        {
+          "axis": "!unmodeled:kind",
+          "value": "!unmodeled:RefusalKind"
+        }
+      ],
+      "outcomes": [
+        {
+          "variant": "snake_case name",
+          "postconditions": [
+            {
+              "axis": "global.knowledge",
+              "value": "local_only(residual)"
+            }
+          ]
+        }
+      ],
+      "refusals": [],
+      "consumes_evidence": [
+        "RefusalKind"
+      ],
+      "produces_evidence": [
+        "&'static str"
+      ],
+      "calls": [],
+      "reaches": [],
+      "theorem_comment": "Exhaustive over the frozen 25-variant set; a new variant breaks this function on purpose (the mapping table must be extended by spec edit, not by a silent wildcard).",
+      "confidence": "high"
+    },
+    {
+      "rule_id": "D-MARSHAL-DOOR-CASE-KIND",
+      "kind": "classifier",
+      "source": {
+        "file": "truck123d/src/marshal.rs",
+        "symbol": "crate::marshal::door_case_of_kernel_refusal_kind",
+        "line": 657
+      },
+      "discriminator": "RefusalKind -> name -> DoorCase",
+      "matrix_cell": null,
+      "preconditions": [
+        {
+          "axis": "!unmodeled:kind",
+          "value": "!unmodeled:RefusalKind"
+        }
+      ],
+      "outcomes": [
+        {
+          "variant": "DoorCase",
+          "postconditions": [
+            {
+              "axis": "global.knowledge",
+              "value": "local_only(residual)"
+            }
+          ]
+        }
+      ],
+      "refusals": [
+        "DoorCase::UnmappedRefusal (unbooked name)"
+      ],
+      "consumes_evidence": [
+        "RefusalKind"
+      ],
+      "produces_evidence": [
+        "DoorCase"
+      ],
+      "calls": [
+        "crate::marshal::kernel_refusal_kind_name",
+        "crate::marshal::door_case_of_kernel_refusal_name"
+      ],
+      "reaches": [],
+      "theorem_comment": "Total over the frozen 25-variant set; the name table is the single mapping source.",
+      "confidence": "high"
+    },
+    {
+      "rule_id": "D-MARSHAL-DOOR-CASE-NAME",
+      "kind": "classifier",
+      "source": {
+        "file": "truck123d/src/marshal.rs",
+        "symbol": "crate::marshal::door_case_of_kernel_refusal_name",
+        "line": 618
+      },
+      "discriminator": "name -> DoorCase; construct/carrier -> ConstructRefused; envelope -> UnsupportedEnvelope; contradictory -> Contradictory; collapse -> Collapsed; non_finite -> ForwardToleranceExceeded; inconclusive -> NumericallyUnresolved; else UnmappedRefusal",
+      "matrix_cell": null,
+      "preconditions": [
+        {
+          "axis": "!unmodeled:name",
+          "value": "!unmodeled:snake_case RefusalKind name"
+        }
+      ],
+      "outcomes": [
+        {
+          "variant": "DoorCase",
+          "postconditions": [
+            {
+              "axis": "global.knowledge",
+              "value": "local_only(residual)"
+            }
+          ]
+        }
+      ],
+      "refusals": [
+        "DoorCase::UnmappedRefusal"
+      ],
+      "consumes_evidence": [
+        "name"
+      ],
+      "produces_evidence": [
+        "DoorCase"
+      ],
+      "calls": [],
+      "reaches": [],
+      "theorem_comment": "Every \u00a717 variant is booked here; a name the table does not hold is the typed [`DoorCase::UnmappedRefusal`] defect signal -- never silent, never a guess.",
+      "confidence": "high"
+    },
+    {
+      "rule_id": "D-BRIDGE-REFUSAL-PYERR",
+      "kind": "gate",
+      "source": {
+        "file": "truck123d/src/bd_bridge.rs",
+        "symbol": "crate::bd_bridge::refusal_to_pyerr",
+        "line": 3874
+      },
+      "discriminator": "Refusal -> Marshaled::from_refusal -> marshal_refused|marshal_unresolved",
+      "matrix_cell": null,
+      "preconditions": [
+        {
+          "axis": "!unmodeled:refusal",
+          "value": "!unmodeled:base Refusal"
+        }
+      ],
+      "outcomes": [
+        {
+          "variant": "Refused|Unresolved exception",
+          "postconditions": [
+            {
+              "axis": "global.knowledge",
+              "value": "local_only(residual)"
+            }
+          ]
+        }
+      ],
+      "refusals": [
+        "typed exception only; never a bare Exception"
+      ],
+      "consumes_evidence": [
+        "Refusal"
+      ],
+      "produces_evidence": [
+        "Refused|Unresolved"
+      ],
+      "calls": [
+        "crate::marshal::Marshaled::from_refusal",
+        "crate::python::marshal_refused",
+        "crate::python::marshal_unresolved"
+      ],
+      "reaches": [
+        "D-MARSHAL-FROM-REFUSAL"
+      ],
+      "theorem_comment": "Maps a typed kernel refusal to the mapped Python exception (the landed `Refused`/`Unresolved` classes), never a bare `Exception`.",
+      "confidence": "high"
+    },
+    {
+      "rule_id": "D-BRIDGE-TRIM-BINDING-ERROR",
+      "kind": "reduction",
+      "source": {
+        "file": "truck123d/src/bd_bridge.rs",
+        "symbol": "crate::bd_bridge::trim_binding_error_to_refusal",
+        "line": 3817
+      },
+      "discriminator": "BindingError::Malformed -> Refusal::Empty; BindingError::Refusal(_) -> Refusal::UnsupportedEnvelope(NonCanonicalCarrier)",
+      "matrix_cell": "extrude(profile)",
+      "preconditions": [
+        {
+          "axis": "!unmodeled:error",
+          "value": "!unmodeled:BindingError"
+        }
+      ],
+      "outcomes": [
+        {
+          "variant": "Refusal",
+          "postconditions": [
+            {
+              "axis": "global.knowledge",
+              "value": "local_only(residual)"
+            }
+          ]
+        }
+      ],
+      "refusals": [
+        "Refusal::Empty",
+        "Refusal::UnsupportedEnvelope(NonCanonicalCarrier)"
+      ],
+      "consumes_evidence": [
+        "BindingError"
+      ],
+      "produces_evidence": [
+        "Refusal"
+      ],
+      "calls": [],
+      "reaches": [],
+      "theorem_comment": "The executor's `Refusal` vocabulary carries the typed envelope case the door already re-marshals, so no refusal is ever lost or turned into a panic.",
+      "confidence": "high"
+    },
+    {
+      "rule_id": "D-FACADE-REFUSAL-PYERR",
+      "kind": "gate",
+      "source": {
+        "file": "truck123d/src/facade.rs",
+        "symbol": "crate::facade::facade_submit (error arm)",
+        "line": 732
+      },
+      "discriminator": "run_facade Err(refusal) -> Marshaled::from_refusal -> marshal_refused|marshal_unresolved",
+      "matrix_cell": null,
+      "preconditions": [
+        {
+          "axis": "!unmodeled:refusal",
+          "value": "!unmodeled:base Refusal"
+        }
+      ],
+      "outcomes": [
+        {
+          "variant": "Refused|Unresolved exception",
+          "postconditions": [
+            {
+              "axis": "global.knowledge",
+              "value": "local_only(residual)"
+            }
+          ]
+        }
+      ],
+      "refusals": [
+        "typed exception only"
+      ],
+      "consumes_evidence": [
+        "Refusal"
+      ],
+      "produces_evidence": [
+        "Refused|Unresolved"
+      ],
+      "calls": [
+        "crate::marshal::Marshaled::from_refusal",
+        "crate::python::marshal_refused",
+        "crate::python::marshal_unresolved"
+      ],
+      "reaches": [
+        "D-MARSHAL-FROM-REFUSAL"
+      ],
+      "theorem_comment": "A typed kernel refusal ... raises the `Refused`/`Unresolved` exception with the marshaled payload -- never a bare `Exception`.",
+      "confidence": "high"
+    }
+  ],
+  "unmodeled_values": [
+    "!unmodeled:engine=occ|truck",
+    "!unmodeled:cadgen.build123d alias",
+    "!unmodeled:drop-in bd module",
+    "!unmodeled:boolean mode union|subtract|intersect",
+    "!unmodeled:operand depth <=1",
+    "!unmodeled:revolution_arc=360.0",
+    "!unmodeled:axis carrier Axis|Vector",
+    "!unmodeled:boundary line-loop|spline-trimmed",
+    "!unmodeled:path line|spline",
+    "!unmodeled:section line-loop Face",
+    "!unmodeled:about Plane.XY|XZ|YZ",
+    "!unmodeled:prior_mirror none|same axis",
+    "!unmodeled:carrier closed conic profile",
+    "!unmodeled:rotation (0,0,0)|(90,0,0)|(0,90,0)",
+    "!unmodeled:major_angle=360.0",
+    "!unmodeled:frame_form translation|euler|full orthonormal",
+    "!unmodeled:vocabulary _TRUCK_NAMES",
+    "!unmodeled:instances (prototype, location, name)",
+    "!unmodeled:entry truck facts measurement",
+    "!unmodeled:op Shape.cast",
+    "!unmodeled:op OCC probe",
+    "!unmodeled:op Fillet|Chamfer",
+    "!unmodeled:entry facade table (NOT called by door.py)",
+    "!unmodeled:op FacadeOp tag",
+    "!unmodeled:pending_mode none|union|subtract|intersect",
+    "!unmodeled:base_tool_class CarrierClass pair",
+    "!unmodeled:constructive bool",
+    "!unmodeled:selection_pending bool",
+    "!unmodeled:profile CarrierClass",
+    "!unmodeled:frame_op push_part|push_sketch|pop",
+    "!unmodeled:tree TreeNode JSON",
+    "!unmodeled:json construction tree",
+    "!unmodeled:node Part|Boolean|Group",
+    "!unmodeled:node Part(Loft closed)|other",
+    "!unmodeled:kind SolidSpec tag",
+    "!unmodeled:arc_deg=360.0",
+    "!unmodeled:profile line|spline",
+    "!unmodeled:profile empty base + closed spline curve, or line base + trim",
+    "!unmodeled:trim_net empty|recorded pullback net",
+    "!unmodeled:closed bool",
+    "!unmodeled:stations >=2 StationFrame",
+    "!unmodeled:placement mirror? + rotation|rz + translation",
+    "!unmodeled:ruled bool",
+    "!unmodeled:axis x|y|z",
+    "!unmodeled:json_tag kind",
+    "!unmodeled:cones ConeRow pair",
+    "!unmodeled:row VolumeRow (numerator+weights+orientation)",
+    "!unmodeled:row TrimRow (density+trim+tolerance)",
+    "!unmodeled:trim_curve empty|closed control loop <=16 pts",
+    "!unmodeled:row profile+amount+both+trim+tolerance",
+    "!unmodeled:row ShapeRow",
+    "!unmodeled:row ShapeRow(closed,oriented)",
+    "!unmodeled:python module surface",
+    "!unmodeled:refusal base Refusal variant",
+    "!unmodeled:envelope EnvelopeCase",
+    "!unmodeled:refusal ConstructRefusal (14 variants)",
+    "!unmodeled:refusal certified RefusalKind with no booked door mapping",
+    "!unmodeled:kind RefusalKind",
+    "!unmodeled:name snake_case RefusalKind name",
+    "!unmodeled:error BindingError",
+    "!unmodeled:refusal base Refusal"
+  ],
+  "matrix_cells": [
+    {
+      "index": 1,
+      "cell": "fuse(swept,swept)",
+      "current": "refuses(NonCanonicalCarrier)",
+      "routes": [
+        "D-FACADE-ADMISSION-CONSULT",
+        "D-FACADE-BOOLEAN-DISPATCH",
+        "D-BRIDGE-DISPATCH-BOOLEAN",
+        "D-DOOR-BOOLEAN-OP"
+      ],
+      "refinement": "both-Swept refuses at the facade admission consult (D-FACADE-ADMISSION-CONSULT) and the refusal propagates through D-BRIDGE-DISPATCH-BOOLEAN as Refusal::UnsupportedEnvelope(NonCanonicalCarrier); the door's _boolean row surfaces it at record time. The coarse cell 'refuses' is one semantic route, not one corpus model."
+    },
+    {
+      "index": 2,
+      "cell": "fuse(swept,canonical)",
+      "current": "refuses(NonCanonicalCarrier)",
+      "routes": [
+        "D-FACADE-BOOLEAN-DISPATCH",
+        "D-BRIDGE-DISPATCH-BOOLEAN",
+        "D-BINDING-BOOLEAN-DISPATCH"
+      ],
+      "refinement": "the facade mirror now answers Routed for a swept x canonical pair (not admitted == false only for Swept x Swept), but the bridge records a SweptBooleanEvent and measures the base operand; the certified transversality route (D-BINDING-BOOLEAN-DISPATCH -> ADMISSION-CERTIFY-TRANSVERSE-PAIR) is NOT reached. Cell 'refuses' vs code 'facade-mirror Routed, no certified dispatch' is a ROUTING GAP."
+    },
+    {
+      "index": 3,
+      "cell": "cut(swept,swept)",
+      "current": "refuses(NonCanonicalCarrier)",
+      "routes": [
+        "D-FACADE-ADMISSION-CONSULT",
+        "D-FACADE-BOOLEAN-DISPATCH",
+        "D-BRIDGE-DISPATCH-BOOLEAN"
+      ],
+      "refinement": "same both-Swept admission refusal; the corpus cut(swept,swept) rows never reach a certified boolean."
+    },
+    {
+      "index": 4,
+      "cell": "cut(revolved,canonical)",
+      "current": "refuses(NonCanonicalCarrier)",
+      "routes": [
+        "D-BRIDGE-SOLID-CARRIER-CLASS",
+        "D-FACADE-BOOLEAN-DISPATCH",
+        "D-DOOR-REVOLVE"
+      ],
+      "refinement": "a spline-profile Lathe classifies Revolved (D-BRIDGE-SOLID-CARRIER-CLASS); the pair routes at the facade mirror but the certified dispatch is unreachable (same gap as cell 2)."
+    },
+    {
+      "index": 5,
+      "cell": "cut(swept,canonical)",
+      "current": "refuses(NonCanonicalCarrier)",
+      "routes": [
+        "D-BRIDGE-SOLID-CARRIER-CLASS",
+        "D-FACADE-BOOLEAN-DISPATCH",
+        "D-BRIDGE-DISPATCH-BOOLEAN",
+        "D-DOOR-LOFT",
+        "D-DOOR-EXTRUDE"
+      ],
+      "refinement": "loft/member/trim-prism spline carriers classify Swept; the canonical cutter routes at the facade mirror; no certified product computed. The cell is the G1 frontier."
+    },
+    {
+      "index": 6,
+      "cell": "intersect(swept,canonical)",
+      "current": "refuses(NonCanonicalCarrier)",
+      "routes": [
+        "D-FACADE-BOOLEAN-DISPATCH",
+        "D-BRIDGE-DISPATCH-BOOLEAN"
+      ],
+      "refinement": "same route as cell 5 with mode=intersect; also the torus-in-swept-pair ContactReductionDeferred branch (D-FACADE-TORUS-REFUSAL)."
+    },
+    {
+      "index": 7,
+      "cell": "cut(canonical,canonical)",
+      "current": "certified",
+      "routes": [
+        "D-DOOR-BOOLEAN-OP",
+        "D-BRIDGE-DISPATCH-BOOLEAN",
+        "D-FACADE-BOOLEAN-DISPATCH"
+      ],
+      "refinement": "both operands canonical -> BooleanPairVerdict::CanonicalLanded (no event); the bridge then measures the BASE operand's volume/bbox/mesh (top_volume/count_and_union/append_node_mesh recurse the base a). The subtraction product is NOT differenced; the 'certified' cell is an S1 measurement route, not a computed boolean in this executor."
+    },
+    {
+      "index": 8,
+      "cell": "heal(boolean-result)",
+      "current": "unavailable",
+      "routes": [],
+      "refinement": "no routing arm in door.py, bd_bridge.rs, binding.rs or facade.rs names heal; no facade/compat row exists. Consistent with the cell."
+    },
+    {
+      "index": 9,
+      "cell": "revolve(full,spline-profile)",
+      "current": "certified",
+      "routes": [
+        "D-DOOR-REVOLVE",
+        "D-BRIDGE-VOLUME-LATHE",
+        "D-BRIDGE-MESH-LATHE"
+      ],
+      "refinement": "full-arc spline-profile Lathe -> lathe_profile_volume (true reconstructed interpolant) + lathe_mesh; the coarse 'certified' refines into line-profile (frustum) and spline-profile (reconstructed cubic) semantic routes."
+    },
+    {
+      "index": 10,
+      "cell": "revolve(partial-arc,spline-profile)",
+      "current": "certified",
+      "routes": [
+        "D-DOOR-REVOLVE",
+        "D-BRIDGE-VOLUME-LATHE"
+      ],
+      "refinement": "DIVERGENCE: the facade PB-014 flip marks the cell certified, but the door drop-in refuses any revolution_arc != 360 (D-DOOR-REVOLVE) and bd_bridge's Lathe arm refuses arc_deg != 360 (D-BRIDGE-VOLUME-LATHE, NonCanonicalCarrier). The coarse matrix cell is not reachable through the door path; the landed route is the facade table only (D-FACADE-RUN produced_carrier_class), which the door never calls."
+    },
+    {
+      "index": 11,
+      "cell": "sweep(spine,closed-section)",
+      "current": "certified",
+      "routes": [
+        "D-DOOR-SWEEP",
+        "D-BRIDGE-VOLUME-MEMBER",
+        "D-BRIDGE-VOLUME-LOFT",
+        "D-BRIDGE-MESH-MEMBER"
+      ],
+      "refinement": "the door sweep records a loft chain; the executor certifies the all-line ruled chain and the spline member via the MONO-2 bracket. A closed-circle section is refused by door.Circle (D-DOOR-CIRCLE), so the Merlin closed-section sweep is not routed through the truck door."
+    },
+    {
+      "index": 12,
+      "cell": "loft(spline-section)",
+      "current": "certified",
+      "routes": [
+        "D-DOOR-LOFT",
+        "D-BRIDGE-VOLUME-LOFT",
+        "D-BRIDGE-SPLINE-LOFT-CERT",
+        "D-BRIDGE-MESH-LOFT"
+      ],
+      "refinement": "all-line matched sections -> exact ruled loft_volume; spline sections -> certified_spline_loft_volume via binding::volume_facts (certify_patch_form); closed smooth chain -> open_smooth_loft. The coarse cell refines into three semantic routes."
+    },
+    {
+      "index": 13,
+      "cell": "extrude(profile)",
+      "current": "certified",
+      "routes": [
+        "D-DOOR-EXTRUDE",
+        "D-BRIDGE-VOLUME-PRISM",
+        "D-BRIDGE-VOLUME-TRIMPRISM",
+        "D-BINDING-TRIM-EXTRUDE",
+        "D-BINDING-TRIM-EXTRUDE-SOLID"
+      ],
+      "refinement": "all-line profile -> prism_geom; spline profile with empty net -> spline_profile_prism_facts; line base + trim net -> binding::trim_extrude_solid -> trim_clip + certify_algebraic_trim_bracket. Three distinct semantic routes behind one cell."
+    },
+    {
+      "index": 14,
+      "cell": "fillet(edge-selector)",
+      "current": "certified",
+      "routes": [
+        "D-DOOR-FILLET",
+        "D-FACADE-BLEND-EMPTY"
+      ],
+      "refinement": "DIVERGENCE: the truck door refuses every fillet (D-DOOR-FILLET); the facade table has a Fillet row that only refuses an empty selection (D-FACADE-BLEND-EMPTY) and otherwise consumes it. The cell 'certified' is the facade/BRep route; the door drop-in has no route."
+    },
+    {
+      "index": 15,
+      "cell": "chamfer(edge-selector)",
+      "current": "certified",
+      "routes": [
+        "D-DOOR-CHAMFER",
+        "D-FACADE-BLEND-EMPTY"
+      ],
+      "refinement": "same divergence as fillet: door refuses all, facade consumes with a selection."
+    },
+    {
+      "index": 16,
+      "cell": "mirror(axis-plane)",
+      "current": "certified",
+      "routes": [
+        "D-DOOR-MIRROR",
+        "D-BRIDGE-MIRROR-PLACED",
+        "D-BRIDGE-BBOX-WORLD",
+        "D-FACADE-MIRROR-ROW"
+      ],
+      "refinement": "the door records a placed-carrier mirror (PartSpec.mirror) reflected in mirror_point/part_world_bbox/reflect_triangle; the facade row preserves the carrier. reflect_solid is #[cfg(test)] only, so no production route reflects the SolidSpec."
+    },
+    {
+      "index": 17,
+      "cell": "author(spline-profile)",
+      "current": "certified",
+      "routes": [
+        "D-DOOR-PROFILE-CARRIERS",
+        "D-DOOR-SWEEP",
+        "D-DOOR-LOFT",
+        "D-FACADE-SPLINE-CARRIER"
+      ],
+      "refinement": "spline samples are recorded as defining data (never flattened); the consuming verb decides the exactness. The facade Spline row sets profile=Spline."
+    },
+    {
+      "index": 18,
+      "cell": "author(polyline-profile)",
+      "current": "certified",
+      "routes": [
+        "D-DOOR-PROFILE-CARRIERS"
+      ],
+      "refinement": "Polyline/Polygon record line edges; a polygon is a closed wire of line edges."
+    },
+    {
+      "index": 19,
+      "cell": "author(circle-profile)",
+      "current": "certified",
+      "routes": [
+        "D-DOOR-CIRCLE",
+        "D-FACADE-SKETCH-CARRIER"
+      ],
+      "refinement": "DIVERGENCE: the PB-014 flip marks the cell certified and the facade table has a Circle row (profile=Canonical, D-FACADE-SKETCH-CARRIER), but door.Circle always refuses (D-DOOR-CIRCLE). The door drop-in has no circle route."
+    },
+    {
+      "index": 20,
+      "cell": "validity-check",
+      "current": "client-layer",
+      "routes": [
+        "D-DOOR-FACTS",
+        "D-BINDING-DATA-ROW-VALID",
+        "D-BINDING-DATA-ROW-BBOX",
+        "D-BINDING-DATA-ROW-FACE-COUNT"
+      ],
+      "refinement": "door.is_valid is a data check on bd_facts volume; the binding data-row entries (is_valid_shape/bbox/face_count) exist but are unregistered (D-BINDING-PYO3-UNREGISTERED)."
+    },
+    {
+      "index": 21,
+      "cell": "primitive(canonical-solid)",
+      "current": "certified",
+      "routes": [
+        "D-DOOR-BOX",
+        "D-DOOR-CYLINDER",
+        "D-DOOR-SPHERE",
+        "D-DOOR-TORUS",
+        "D-BRIDGE-VOLUME-PRIMITIVES",
+        "D-BRIDGE-MESH-PRIMITIVES"
+      ],
+      "refinement": "each primitive is an analytic closed-form volume/bbox/mesh route; cylinder axis and torus partial-arc are typed refusals inside the cell."
+    },
+    {
+      "index": 22,
+      "cell": "compound(group)",
+      "current": "certified",
+      "routes": [
+        "D-DOOR-COMPOUND",
+        "D-DOOR-CADGEN-COMPOUND",
+        "D-BRIDGE-COUNT-UNION",
+        "D-BRIDGE-TOP-VOLUME"
+      ],
+      "refinement": "the group node's volume sums only immediate child Parts/Booleans (nested groups contribute nothing), mirroring the recorded OCC Compound measurement."
+    },
+    {
+      "index": 23,
+      "cell": "label",
+      "current": "client-layer",
+      "routes": [
+        "D-DOOR-COMPOUND",
+        "D-DOOR-INSTALL-TRUCK-ALIAS"
+      ],
+      "refinement": "label is recorded on the Python data row only; the truck node JSON carries no label field, so the label never crosses into the executor."
+    },
+    {
+      "index": 24,
+      "cell": "color",
+      "current": "client-layer",
+      "routes": [
+        "D-DOOR-COMPOUND"
+      ],
+      "refinement": "color is recorded on the Python row only; no truck node field carries it (GLB emission is a separate surface)."
+    },
+    {
+      "index": 25,
+      "cell": "placement",
+      "current": "client-layer",
+      "routes": [
+        "D-DOOR-FRAMES",
+        "D-BRIDGE-BBOX-WORLD",
+        "D-BRIDGE-MESH-DISPATCH"
+      ],
+      "refinement": "frames are recorded client-side and applied in the executor's bbox/mesh placement (RotationFrame/rz/mirror); the kernel sees placement as data, never as geometry."
+    },
+    {
+      "index": 26,
+      "cell": "step-export(constructive)",
+      "current": "refuses(NonCanonicalCarrier)",
+      "routes": [
+        "D-DOOR-REFUSE",
+        "D-FACADE-EXPORT-STEP",
+        "D-DOOR-EXPORT-STL"
+      ],
+      "refinement": "the door always exports STL (never STEP); the facade's ExportStep row refuses constructive parts with NonCanonicalCarrier. The door never calls facade_submit, so the TR-NRB-001 refusal is only reachable through the facade table."
+    }
+  ],
+  "routing_gaps": [
+    {
+      "id": "RG-1",
+      "kind": "ROUTING_GAP",
+      "title": "certified swept-carrier boolean dispatch is unreachable from the bridge/door path",
+      "detail": "bd_bridge::dispatch_boolean (bd_bridge.rs:2869) consults only facade::dispatch_swept_carrier_boolean (the pure-Rust admission mirror). When that returns BooleanPairVerdict::Routed, bd_bridge records a SweptBooleanEvent and then measures the BASE operand (top_volume/count_and_union/append_node_mesh recurse boolean.a). It never calls crate::python::binding::boolean_dispatch (binding.rs:286), which is the only route to construct::admission::certify_transverse_pair (fragment B rule ADMISSION-CERTIFY-TRANSVERSE-PAIR). W_theory contains the Theorem C transversality rule; W_code never reaches it. The coarse matrix cells 2-6 read 'refuses' but the semantic route is 'facade-mirror Routed, product never computed'.",
+      "producer_rule": "D-BINDING-BOOLEAN-DISPATCH",
+      "consumer_rule": "D-BRIDGE-DISPATCH-BOOLEAN",
+      "missing_rule": "ADMISSION-CERTIFY-TRANSVERSE-PAIR",
+      "matrix_cells": [
+        "fuse(swept,canonical)",
+        "cut(swept,canonical)",
+        "intersect(swept,canonical)",
+        "cut(revolved,canonical)"
+      ]
+    },
+    {
+      "id": "RG-2",
+      "kind": "ROUTING_GAP",
+      "title": "binding.rs pyo3 exports are not registered in the module",
+      "detail": "lib.rs::truck123d (lib.rs:62) registers only marshal_refused, marshal_unresolved, kernel_evidence_compose, facade_submit, bd_facts, bd_stl. The eight binding.rs #[pyfunction]s (binding_boolean_dispatch, binding_volume_facts, binding_trim_facts, binding_trim_extrude, binding_bbox, binding_obox, binding_is_valid_shape, binding_face_count) are never added, so Python cannot call them. door.py calls only _T123D.bd_facts, _T123D.bd_stl and _T123D.Refused. The certified boolean entry the door shim was supposed to flip against is unreachable.",
+      "producer_rule": "D-BINDING-PYO3-UNREGISTERED",
+      "consumer_rule": "D-DOOR-FACTS",
+      "missing_rule": null,
+      "matrix_cells": [
+        "cut(swept,canonical)",
+        "validity-check"
+      ]
+    },
+    {
+      "id": "RG-3",
+      "kind": "ROUTING_GAP",
+      "title": "certified solver registry is never populated on the door path",
+      "detail": "register_certified_entries (binding.rs:276) is called only from binding::boolean_dispatch, which RG-1 shows is unreachable. Therefore construct::bie::ssi4::register_restricted_pair_solver and ssi_admit::register_ssi_admit_solver never run for a door submission; the truck-evidence trait-object registry slots the funnel dispatches through stay empty.",
+      "producer_rule": "D-BINDING-REGISTER-ENTRIES",
+      "consumer_rule": null,
+      "missing_rule": null,
+      "matrix_cells": [
+        "cut(swept,canonical)"
+      ]
+    },
+    {
+      "id": "RG-4",
+      "kind": "VERTICAL_GAP",
+      "title": "boolean product is never computed; only the base operand is measured",
+      "detail": "For every boolean node (canonical x canonical included), top_volume/count_and_union/append_node_mesh recurse the base operand a and ignore b. Canonical x canonical reports CanonicalLanded and measures a; swept pairs record an event and measure a. No subtraction/union/intersection of the two solids is realized in the executor, so the door's volume/bbox/STL describe the base operand, not the boolean result.",
+      "producer_rule": "D-BRIDGE-DISPATCH-BOOLEAN",
+      "consumer_rule": "D-BRIDGE-TOP-VOLUME",
+      "missing_rule": null,
+      "matrix_cells": [
+        "cut(canonical,canonical)",
+        "fuse(swept,canonical)"
+      ]
+    },
+    {
+      "id": "RG-5",
+      "kind": "ROUTING_GAP",
+      "title": "partial-arc revolve matrix cell unreachable through the door",
+      "detail": "OP_CAPABILITY_MATRIX cell 10 (revolve(partial-arc,spline-profile)) is marked certified (flipped by PB-014). The door drop-in refuses revolution_arc != 360 (door.py:1380) and bd_bridge's Lathe volume/bbox/mesh arms refuse arc_deg != 360 with NonCanonicalCarrier (bd_bridge.rs:436). The landed PB-014 route is the facade RevolveArc row (facade.rs:417), which only runs through facade_submit -- a surface door.py never calls. The coarse cell and the door code disagree.",
+      "producer_rule": "D-FACADE-RUN",
+      "consumer_rule": "D-BRIDGE-VOLUME-LATHE",
+      "missing_rule": null,
+      "matrix_cells": [
+        "revolve(partial-arc,spline-profile)"
+      ]
+    },
+    {
+      "id": "RG-6",
+      "kind": "ROUTING_GAP",
+      "title": "circle/fillet/chamfer matrix cells certified but refused by the door drop-in",
+      "detail": "Cells 14 (fillet), 15 (chamfer) and 19 (author(circle-profile)) are marked certified, and the facade table has Fillet/Chamfer/Circle rows. The door drop-in refuses all three unconditionally (door.py:2046, 2050, 807) because it records no edge topology and no conic profile. The facade rows are only reachable through facade_submit, which door.py never calls.",
+      "producer_rule": "D-FACADE-RUN",
+      "consumer_rule": "D-DOOR-CIRCLE",
+      "missing_rule": null,
+      "matrix_cells": [
+        "fillet(edge-selector)",
+        "chamfer(edge-selector)",
+        "author(circle-profile)"
+      ]
+    },
+    {
+      "id": "RG-7",
+      "kind": "ROUTING_GAP",
+      "title": "facade table path and bridge path are disjoint; door measures only the bridge",
+      "detail": "door.py routes through install_truck_alias -> bd_facts/bd_stl (bd_bridge.rs). It never calls facade_submit/run_facade. So all facade.rs swept-carrier routing (PB-011 G1), the ExportStep TR-NRB-001 refusal, and the Fillet/Chamfer/Circle/RevolveArc rows are dead relative to the door: 'the lift ran green through the FACADE path but the timing measured the DOOR path'.",
+      "producer_rule": "D-FACADE-SUBMIT",
+      "consumer_rule": "D-DOOR-RUN-ENTRY",
+      "missing_rule": null,
+      "matrix_cells": [
+        "revolve(partial-arc,spline-profile)",
+        "fillet(edge-selector)",
+        "chamfer(edge-selector)",
+        "author(circle-profile)",
+        "step-export(constructive)"
+      ]
+    },
+    {
+      "id": "RG-8",
+      "kind": "ROUTING_GAP",
+      "title": "engine regime divergence: occ path serves what truck refuses",
+      "detail": "door.py --engine occ installs genuine build123d (install_cadgen_alias) and bd.export_stl, so Circle, fillet, chamfer, partial-arc revolve/torus and booleans all run on OCC. The same corpus entry under --engine truck hits the typed refusals above. A green truck lift therefore certifies only the routes the drop-in answers; an occ measurement of the same entry is a different dispatch graph.",
+      "producer_rule": "D-DOOR-INSTALL-CADGEN-ALIAS",
+      "consumer_rule": "D-DOOR-INSTALL-TRUCK-ALIAS",
+      "missing_rule": null,
+      "matrix_cells": [
+        "author(circle-profile)",
+        "fillet(edge-selector)",
+        "chamfer(edge-selector)",
+        "revolve(partial-arc,spline-profile)"
+      ]
+    },
+    {
+      "id": "RG-9",
+      "kind": "ROUTING_GAP",
+      "title": "reflect_solid is test-only; production mirror is placed-carrier only",
+      "detail": "reflect_solid (bd_bridge.rs:2667) carries #[cfg(test)], so no production route reflects a SolidSpec through the volume/bbox/mesh arms. The production mirror is the placed-carrier PartSpec.mirror consumed by part_world_bbox/append_node_mesh/mirror_point. Any theory rule about reflecting the solid's carrier is reached only by the test suite, not by a door submission.",
+      "producer_rule": "D-BRIDGE-MIRROR-PLACED",
+      "consumer_rule": "D-DOOR-MIRROR",
+      "missing_rule": null,
+      "matrix_cells": [
+        "mirror(axis-plane)"
+      ]
+    }
+  ],
+  "refusal_surface": [
+    {
+      "case": "empty",
+      "class": "Refused",
+      "emitted_by": "D-BRIDGE-PARSE-TREE / D-BRIDGE-TREE-FACTS / D-BRIDGE-COUNT-UNION / D-BRIDGE-TOP-VOLUME / D-BRIDGE-VOLUME-* / D-BRIDGE-BBOX-LOCAL / D-BRIDGE-MESH-* / D-FACADE-RUN (ExportStl/ExportStep no solid; blend no selection)",
+      "trigger": "malformed tree JSON, empty tree, empty group, non-finite/degenerate profile or amount, empty triangle soup, blend with no selection, export with no solid",
+      "arm": "match arm returns Err(Refusal::Empty)"
+    },
+    {
+      "case": "unsupported_envelope / non_canonical_carrier",
+      "class": "Refused",
+      "emitted_by": "D-DOOR-REFUSE / D-BRIDGE-VOLUME-LATHE / D-BRIDGE-VOLUME-PRISM / D-BRIDGE-VOLUME-LOFT / D-BRIDGE-NODE-CARRIER-CLASS / D-BRIDGE-TRIM-BINDING-ERROR / D-FACADE-EXPORT-STEP",
+      "trigger": "partial-arc lathe, spline/non-planar/non-closing profile, unequal loft vertex counts, boolean operand (depth-2), constructive STEP export, trim constructor refusal",
+      "arm": "Refusal::UnsupportedEnvelope(EnvelopeCase::NonCanonicalCarrier) -> Refused payload {case:unsupported_envelope, envelope:non_canonical_carrier}"
+    },
+    {
+      "case": "unsupported_envelope / contact_reduction_deferred",
+      "class": "Refused",
+      "emitted_by": "D-FACADE-TORUS-REFUSAL / D-FACADE-BOOLEAN-DISPATCH",
+      "trigger": "base or tool CarrierClass::Torus in a swept-carrier boolean pair",
+      "arm": "Refusal::UnsupportedEnvelope(EnvelopeCase::ContactReductionDeferred)"
+    },
+    {
+      "case": "trim_clip_failed",
+      "class": "Refused",
+      "emitted_by": "D-BINDING-TRIM-EXTRUDE (via trim_clip_failed) / D-BRIDGE-VOLUME-TRIMPRISM",
+      "trigger": "trim_loop_self_crossing, trim_pullback_missing, trim_degree_out_of_envelope, stalled R9 isolation",
+      "arm": "KernelRefusal::new(RefusalKind::TrimClipFailed, Predicate{name,detail}) -> marshal_kernel_refusal -> Refused"
+    },
+    {
+      "case": "construct_refused",
+      "class": "Refused",
+      "emitted_by": "D-BINDING-BOOLEAN-DISPATCH / D-BINDING-VOLUME-FACTS / D-BINDING-TRIM-FACTS / D-MARSHAL-FROM-CONSTRUCT-REFUSAL",
+      "trigger": "any ConstructRefusal from certify_transverse_pair, TensorBernsteinPatch::try_new, certify_patch_form, certify_algebraic_trim_bracket",
+      "arm": "Marshaled::from_construct_refusal -> Refused{case:construct_refused, stage:<tag>}"
+    },
+    {
+      "case": "unmapped_refusal",
+      "class": "Refused",
+      "emitted_by": "D-MARSHAL-DOOR-CASE-NAME / D-MARSHAL-FROM-UNMAPPED",
+      "trigger": "a certified RefusalKind with no booked door mapping",
+      "arm": "UnmappedRefusal -> Refused{case:unmapped_refusal, stage:<kind>}"
+    },
+    {
+      "case": "numerically_unresolved (kappa/witness)",
+      "class": "Unresolved",
+      "emitted_by": "D-MARSHAL-FROM-REFUSAL / D-BRIDGE-REFUSAL-PYERR / D-FACADE-REFUSAL-PYERR",
+      "trigger": "Refusal::NumericallyUnresolved{spent,witness} (budget exhausted)",
+      "arm": "MarshaledPayload::Unresolved(UnresolvedPayload{kappa,witness})"
+    },
+    {
+      "case": "malformed_row (ValueError)",
+      "class": "caller-defect",
+      "emitted_by": "D-BINDING-TRIM-EXTRUDE / D-BINDING-VOLUME-FACTS / D-BINDING-TRIM-FACTS / D-BINDING-DATA-ROW-*",
+      "trigger": "non-finite/zero amount or tolerance, degenerate/collinear profile, no recorded points, serde failure",
+      "arm": "BindingError::Malformed -> PyValueError (never a kernel refusal)"
+    }
+  ],
+  "notes": "SCOPE: SOLVER-SURVEY-D is the W_code routing survey for the bridge/door layer. Files read: truck123d/src/bd_bridge.rs (6191 lines, anchors A1=185 fn [a-z_] and A2=7 fn member_[a-z_]( verified), binding.rs, marshal.rs, facade.rs, lib.rs, python.rs; corpus/ttc/door.py; docs/OP_CAPABILITY_MATRIX.md (cross-referenced, not re-derived). The rules are routing rows, not math rows: each row records the discriminator that selects the arm, the bridge entry it calls, and the kernel rule ids it REACHES via fragments A-C. Resolved reaches reference fragment rule ids (C-SPLIT-TRIM-CLIP, C-GATE-BEZIERLEAF1-TRY-NEW, C-GATE-POINTCERT-TRY-NEW, C-GATE-ARCCERT-TRY-NEW, C-GATE-FRAME-TRY-NEW, C-SPLIT-CERTIFY-CROSSINGS, C-SPLIT-CERTIFY-OFF-LOOP, C-CLASSIFY-WINDING-NUMBER, C-CLASSIFY-SAMPLE-INSIDE, ADMISSION-CERTIFY-TRANSVERSE-PAIR) and D-scope rule ids; unresolved kernel symbols stay exact paths (construct::volume_facts::certify_patch_form, construct::volume_facts::certify_algebraic_trim_bracket, construct::bie::ssi4::register_restricted_pair_solver, ssi_admit::register_ssi_admit_solver) because they fall outside the A-C read scopes (fragment A is not yet filed at this dispatch). Every pub entry point in the read scope is accounted for: rule rows cover the proof-bearing dispatchers; pure data/accessor items are noted here as grouped or non-routing. bd_bridge.rs non-row pub items: LatheEdge/ProfileEdge/SolidSpec/RotationFrame/StationFrame/PartSpec/BooleanNode/TreeNode/Facts/Triangle are data carriers (SolidSpec and TreeNode serde dispatch are row D-BRIDGE-SOLIDSPEC-SERDE and the tree-node arms); prism_geom/prism_bbox/prism_mesh are grouped under D-BRIDGE-VOLUME-PRISM / D-BRIDGE-BBOX-LOCAL / D-BRIDGE-MESH-PRISM; write_tree_stl/bd_facts/bd_stl/tree_facts are rows. facade.rs non-row pub items: ModeValue/AxisValue/CarrierClass/SweptBooleanEvent/CertifiedBooleanRoute/SweptBooleanRefusal/BooleanPairVerdict/FacadeOp/FacadeTable/ExportEntry/FacadeReport/REPORT_SCHEMA are data carriers or outcomes consumed by the facade rows; CarrierClass::is_funnel_carrier is grouped under D-FACADE-BOOLEAN-DISPATCH and D-FACADE-BOOLEAN-PRODUCT. binding.rs non-row pub items: Bracket/MalformedRow/BindingError/ConeRow/BooleanRow/BooleanOutcome/VolumeRow/VolumeOutcome/TrimRow/TrimOutcome/TrimExtrudeRow/TrimCrossingRecord/TrimExtrudeOutcome/TrimExtrudeFacts/PatchRow are data carriers; ConeRow::to_cone is grouped under D-BINDING-BOOLEAN-DISPATCH; the eight binding #[pyfunction] wrappers are grouped under D-BINDING-PYO3-UNREGISTERED and their inner fns have rows. marshal.rs non-row pub items: ExceptionClass/RefusedPayload/Ledger/UnresolvedPayload/Marshaled/MarshaledPayload/DoorCase/UnmappedRefusal are data carriers; UnmappedRefusal::new/door_case/marshaled are grouped under D-MARSHAL-FROM-UNMAPPED; witness_name/prop_name/truth_name/collapse_reason_name/method_name/ledger_from_budget/door_case_of_construct_refusal are pure name/ledger accessors grouped under D-MARSHAL-FROM-REFUSAL and D-MARSHAL-KERNEL-KIND-NAME. door.py is a fixture harness: its _TRUCK_NAMES vocabulary, frame algebra helpers, profile reconstruction helpers and STL writer are grouped under their dispatch rows. No structural-mismatch STOP was triggered: every in-scope routing construct is expressible in the RULES schema; the unmodeled values are value/axis-level abstraction-gap findings (the axes have no carrier-class or op-name value), not shape failures. The nine routing gaps are the W_code vs W_theory delta: RG-1/RG-2/RG-3 are the certified boolean dispatch unreachable, RG-4 is the never-computed boolean product, RG-5/RG-6/RG-7 are the facade-table vs door-bridge divergence that refines the coarse OP_CAPABILITY_MATRIX cells, RG-8 is the occ/truck engine divergence, RG-9 is the test-only solid reflection. matrix_cells carries the coarse-cell -> semantic-route refinement relation for all 26 cells."
+}
