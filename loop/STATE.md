@@ -2330,6 +2330,55 @@ supervisors + the lagging cargoq restart guard; slot-0/2/4/7 wt RESULT residue;
 TOR-C flip-or-pin; overnight.py:222-226 false-landing ROOT CAUSE (7th strike);
 MONO-row registry schema gap.]
 
+[operator 2026-09-10T21:04Z - volatile refresh. Quiet healthy cycle: nothing to
+land, nothing to unblock, nothing to flip, no manual dispatch (heartbeat live).
+Board now: 0 RUNNING / 0 landed-this-cycle / 0 unblocked / 0 flipped. HEAD
+78fc776 (the 20:40Z operator commit) - no work moved this cycle. Landing
+re-verified by command (`git merge-base --is-ancestor` + `git rev-list --count
+integration/kernel-bg..tip`): every slot tip is an ancestor with 0 unmerged
+commits (slot 0 906dc59, slot 1 94fec19, slot 2 c3bc1a1, slot 3 e6553db, slot 4
+3c2109b, slot 5 ee97499, slot 6 713f205, slot 7 5cf4811). slot 0
+(SOLVER-SURVEY-D) wt RESULT is status DONE but tip == base (no worker commit)
+and D.json is untracked - the 7th false landing stands, NOT operator-landable
+(D.json preserved at `refs/wip/SOLVER-SURVEY-D-fragment` 1470e72 + slot-0 wt).
+slot 3 SOLVER-SURVEY-C DONE already landed (B.json/C.json tracked); slot 4 F1
+LANDED-WITH-FINDINGS; slot 7 FRAME-REVOLVE LANDED redundant; slots 1/2/5/6
+landed residue. Nothing to unblock (0 RUNNING; slot 1 IDLE 254 min / slot 2 IDLE
+150 min - both landed residue; no live QUESTION; zero cargo/rustc). Registry
+re-derived by script (case-folded landed-note match, matching
+dispatch_ready.landed()): 324 rows - 235 DONE, 80 READY, 9 BLOCKED.
+READY-without-landed-marker = NONE (SURVEY-A + SURVEY-D carry false `LANDED`
+markers so landed() skips them); BLOCKED-with-all-deps-landed = the carried 7
+owner-parked/human-gated/superseded (BG-AUD-FIX-004 OWNER_BLOCKED,
+BG-CK-SPLINE-CENSUS owner-cancelled, SEM-PCURVE-MASTER-001-FIX SUPERSEDED,
+DEF-SPINEFRAME-GRAZE SPEC_GAP->-R2, DEF-TESS-ANALYTIC-SEAM superseded by -R2,
+DEF-SEEDRAY-B human-gated, TOR-C orchestrator-held) + MONO-6 (dep MONO-5 falsely
+landed) + SOLVER-CHECKER (deps = the 4 survey fragments, D unlanded) - all
+correctly parked, nothing flipped (MONO-6/SOLVER-CHECKER deliberately NOT
+flipped). dispatch_ready --dry-run --max-workers=4: "slots: 8 (0 running, 8
+free); slot-assigned packets: 5; dispatched 0; workers now ~0/4" = REAL idle
+(heartbeat live, last cycle 21:00Z dispatched 0). The driver is parked
+(overnight.log 17:01:30 local: slot 4 F1 LANDED-WITH-FINDINGS -> LEFT FOR
+MORNING; then "landing/running phase - no dispatch"), so the loop is stalled
+pending the false-landing reconciliation (orchestrator/owner work). Health:
+heartbeat exactly 1 (27872, `-File dispatch_heartbeat.ps1`; the second broad-scan
+hit was this shell self-matching), watchdog 1 (29264, `python watchdog.py`; the
+msedgewebview2 `--gpu-watchdog` hits are false positives), operator runner 1
+(27876, pid file matches), overnight driver 1 (26920), cargoq UP (ping 200,
+queued 0, running false); TWO supervisors (19172 PyManager + 27828 pythoncore -
+carried duplication class; only ONE overnight.py child = no double-merge risk).
+Disk 12.8 GiB free (above the 8 GB floor, below the 15 GB goal); RAM 1.6-1.8 GiB
+free (below the 3 GB floor, but no build running; janitor status 12.8 GB disk /
+1.6 GB RAM, slot-0 targets 1.4 GB). Did NOT run the janitor: the untracked
+slot-0 D.json is the only worktree copy and a re-fork/reclaim could wipe it (the
+SURVEY-A archive-gap class); disk is above the floor and nothing is pending
+dispatch. No new escalation (the 7th false landing + the SURVEY-A ineffective
+restore + the overnight.py:222-226 root cause remain escalated from 19:54Z;
+carried). Carried human items unchanged: FRAME-REVOLVE F1 non_z_axis pin
+amendment (ttc_lathe_spline.rs:255); duplicate supervisors + the lagging cargoq
+restart guard; slot-0/2/4/7 wt RESULT residue; TOR-C flip-or-pin; overnight.py
+false-landing ROOT CAUSE (7th strike); MONO-row registry schema gap.]
+
 ## The parallelism picture
 
 The lemma wave (L1-L4, pure functions over the frozen shim type) is
