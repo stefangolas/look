@@ -3857,6 +3857,10 @@ pub fn write_tree_stl(root: &TreeNode, path: &str) -> Result<u64, Refusal> {
 pub mod membership {
     use serde::Serialize;
 
+    use truck_certified::construct::patches::{PatchParent, TensorBernsteinPatch};
+    use truck_certified::construct::volume_facts::{VolumeOptions, certify_patch_form};
+    use truck_certified::kernel::patch::IBox2;
+
     use crate::python::binding::VolumeRow;
 
     /// The number of fresh recorded directions attempted after the caller's
@@ -4711,6 +4715,987 @@ pub mod membership {
             crossings: Vec::new(),
             refusal: Some(last_refusal),
         }
+    }
+
+    // =======================================================================
+    // MONO-6-SWEPT-BOOLEANS -- certified boolean volume by contact covers.
+    //
+    // The reduction (method item 1). For an oriented boundary patch `P` of
+    // `dA`, the divergence form `g_P = (1/3) P . (P_u x P_v)` integrates to
+    // the flux through the patch; over the boundary of `A n B` this gives
+    //
+    //   V(A n B) = sum_{P of dA} int_{P^-1(B)} g_P
+    //            + sum_{Q of dB} int_{Q^-1(A)} g_Q,
+    //
+    // and `V(A \ B) = V(A) - V(A n B)` with `V(A)` the landed per-patch flux
+    // certificate (method item 1). The contact cover (item 2) brackets the
+    // parameter cells whose images can meet the other solid; a cell outside
+    // the cover is certifiably clear, and ONE MONO-5 membership witness fixes
+    // its constant membership (item 4). Unresolved (contact) cells carry the
+    // certified bracket `[|R| min(0, g_lo), |R| max(0, g_hi)]` and are
+    // refined by descending error until the summed width is within budget
+    // (item 3). The `(8,8)` flux integrand assumes non-rational weights
+    // (item 7): every consumed patch certifies `weights == 1` here, and a
+    // non-unit weight refuses typed.
+    //
+    // The `ExtremesSurvive` facts gate (Amendment 1) is the bbox sufficiency
+    // lemma: the boolean row must answer `bbox(A \ B)`. For every one of the
+    // six axis extremes of `A`'s certified control hull, the certificate
+    // requires that `B`'s certified control hull does not reach that extreme
+    // value; then no point of `B` can be the arg-extreme point, so the
+    // extreme survives into `A \ B` and `bbox(A \ B) = bbox(A)` exactly. A
+    // slab that cannot be separated refuses `ExtremeSlabContaminated`.
+    // =======================================================================
+
+    /// The minimum certified sine of the normal angle between an admitted
+    /// patch pair below which the pair is refused `TransversalityUncertified`.
+    /// A transversal contact has a strictly positive sine; a tangency drives
+    /// it to zero. H-3: dimensionless.
+    const TRANSVERSALITY_MIN: f64 = 1.0e-9;
+
+    /// The separation-subdivision depth used while building the reported
+    /// contact cover. A cell whose separation cannot be certified at this
+    /// depth is conservatively kept in the cover; the integration step's own
+    /// `is_clear` test is the sound decision.
+    const COVER_SEPARATION_DEPTH: u32 = 10;
+
+    /// The per-pair sub-box work cap of the separation test. A pair whose
+    /// separation is not certified within this many boxes is conservatively a
+    /// contact candidate; the cap bounds the (otherwise exponential) search
+    /// around a contact curve.
+    const SEPARATION_BOX_CAP: usize = 4096;
+
+    /// The certified options of the boolean-volume solver.
+    #[derive(Debug, Clone, Copy)]
+    pub struct BooleanVolumeOptions {
+        /// The requested bracket width relative to `V(A)` (the corpus
+        /// `volume_rel` band).
+        pub relative_tolerance: f64,
+        /// The subdivision-depth cap of the contact refinement.
+        pub max_depth: u32,
+        /// The uniform depth of the reported contact cover.
+        pub cover_depth: u32,
+        /// The per-patch separation-subdivision depth cap.
+        pub separation_depth: u32,
+        /// The work cap; exceeding it above tolerance refuses typed.
+        pub max_cells: usize,
+        /// The deterministic seed of the membership retry contract.
+        pub classify_seed: u64,
+        /// Enforce the Amendment-1 EXTREMES-SURVIVE bbox gate.
+        pub enforce_bbox_certificate: bool,
+    }
+
+    impl Default for BooleanVolumeOptions {
+        fn default() -> Self {
+            BooleanVolumeOptions {
+                relative_tolerance: 1.0e-4,
+                max_depth: 12,
+                cover_depth: 4,
+                separation_depth: 14,
+                max_cells: 500_000,
+                classify_seed: 0x0000_4D4F_4E4F_3601,
+                enforce_bbox_certificate: true,
+            }
+        }
+    }
+
+    /// The typed refusal of the certified boolean-volume solver.
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+    #[serde(rename_all = "snake_case")]
+    pub enum BooleanVolumeRefusal {
+        /// A consumed patch is not a regular bidegree-`(m, n)` patch, or its
+        /// recorded orientation is not `±1`.
+        NonRegularPatch,
+        /// The closest admitted patch pair's normal sine fell below the
+        /// transversality floor (a near-tangency).
+        TransversalityUncertified,
+        /// The MONO-5 membership primitive did not certify after its retry
+        /// contract; the point is left unresolved rather than guessed.
+        MembershipIndeterminate,
+        /// The error-directed refinement exhausted its work cap above the
+        /// requested tolerance.
+        BudgetExceeded,
+        /// An axis extreme of `A`'s certified bbox is reached by `B`'s
+        /// certified bbox, so `bbox(A \ B)` is not `bbox(A)`.
+        ExtremeSlabContaminated,
+        /// A consumed patch row is malformed (a caller defect).
+        MalformedPatch,
+        /// A consumed patch carries a non-constant rational weight field; the
+        /// `(8,8)` polynomial flux integrand requires unit weights.
+        RationalWeights,
+    }
+
+    impl From<MembershipRefusal> for BooleanVolumeRefusal {
+        fn from(value: MembershipRefusal) -> Self {
+            match value {
+                MembershipRefusal::MembershipIndeterminate => {
+                    BooleanVolumeRefusal::MembershipIndeterminate
+                }
+                MembershipRefusal::MalformedPatch => BooleanVolumeRefusal::MalformedPatch,
+                MembershipRefusal::RationalWeights => BooleanVolumeRefusal::RationalWeights,
+            }
+        }
+    }
+
+    /// A closed axis-aligned cell of a patch's unit parameter square.
+    #[derive(Debug, Clone, Copy, PartialEq, Serialize)]
+    pub struct ParamCell {
+        /// The lower `u` bound.
+        pub u_lo: f64,
+        /// The upper `u` bound.
+        pub u_hi: f64,
+        /// The lower `v` bound.
+        pub v_lo: f64,
+        /// The upper `v` bound.
+        pub v_hi: f64,
+    }
+
+    impl ParamCell {
+        fn unit() -> ParamCell {
+            ParamCell {
+                u_lo: 0.0,
+                u_hi: 1.0,
+                v_lo: 0.0,
+                v_hi: 1.0,
+            }
+        }
+        fn u(&self) -> Iv {
+            Iv {
+                lo: self.u_lo,
+                hi: self.u_hi,
+            }
+        }
+        fn v(&self) -> Iv {
+            Iv {
+                lo: self.v_lo,
+                hi: self.v_hi,
+            }
+        }
+        fn area(&self) -> f64 {
+            (self.u_hi - self.u_lo).max(0.0) * (self.v_hi - self.v_lo).max(0.0)
+        }
+        fn diameter(&self) -> f64 {
+            let du = self.u_hi - self.u_lo;
+            let dv = self.v_hi - self.v_lo;
+            (du * du + dv * dv).sqrt()
+        }
+        fn intersects(&self, other: &ParamCell) -> bool {
+            self.u_lo <= other.u_hi
+                && other.u_lo <= self.u_hi
+                && self.v_lo <= other.v_hi
+                && other.v_lo <= self.v_hi
+        }
+        /// Splits the wider parameter axis at its midpoint.
+        fn split(&self) -> (ParamCell, ParamCell) {
+            if (self.u_hi - self.u_lo) >= (self.v_hi - self.v_lo) {
+                let mid = 0.5 * (self.u_lo + self.u_hi);
+                (
+                    ParamCell {
+                        u_lo: self.u_lo,
+                        u_hi: mid,
+                        v_lo: self.v_lo,
+                        v_hi: self.v_hi,
+                    },
+                    ParamCell {
+                        u_lo: mid,
+                        u_hi: self.u_hi,
+                        v_lo: self.v_lo,
+                        v_hi: self.v_hi,
+                    },
+                )
+            } else {
+                let mid = 0.5 * (self.v_lo + self.v_hi);
+                (
+                    ParamCell {
+                        u_lo: self.u_lo,
+                        u_hi: self.u_hi,
+                        v_lo: self.v_lo,
+                        v_hi: mid,
+                    },
+                    ParamCell {
+                        u_lo: self.u_lo,
+                        u_hi: self.u_hi,
+                        v_lo: mid,
+                        v_hi: self.v_hi,
+                    },
+                )
+            }
+        }
+    }
+
+    /// The certified boolean-volume outcome. `bracket` is the two-sided
+    /// volume bracket of `A \ B`; `value` is its midpoint. The per-phase work
+    /// counts and the maximum subdivision depth are recorded for attribution.
+    #[derive(Debug, Clone, PartialEq, Serialize)]
+    pub struct BooleanVolumeCertificate {
+        /// The certified lower volume bound.
+        pub bracket_lo: f64,
+        /// The certified upper volume bound.
+        pub bracket_hi: f64,
+        /// The certified volume value (the bracket midpoint).
+        pub value: f64,
+        /// The bracket width.
+        pub width: f64,
+        /// The bracket width relative to `V(A)`.
+        pub relative_width: f64,
+        /// `V(A)` from the landed per-patch flux certificate.
+        pub volume_a: f64,
+        /// `V(B)` from the landed per-patch flux certificate.
+        pub volume_b: f64,
+        /// The certified lower bound of `V(A n B)`.
+        pub intersection_lo: f64,
+        /// The certified upper bound of `V(A n B)`.
+        pub intersection_hi: f64,
+        /// The lower corner of the certified `bbox(A \ B)`.
+        pub bbox_lo: [f64; 3],
+        /// The upper corner of the certified `bbox(A \ B)`.
+        pub bbox_hi: [f64; 3],
+        /// The certified separation margin of the EXTREMES-SURVIVE gate.
+        pub bbox_margin: Option<f64>,
+        /// The constructive solid count (Amendment 1: `solids() = [self]`).
+        pub solid_count: u64,
+        /// The control-hull broad-phase pair count.
+        pub broad_phase_pairs: usize,
+        /// The pairs excluded by the control-hull test.
+        pub excluded_pairs: usize,
+        /// The number of cells scored by an exact clear witness.
+        pub clear_cells: usize,
+        /// The number of unresolved contact cells carrying the bracket.
+        pub contact_cells: usize,
+        /// The maximum subdivision depth reached.
+        pub max_depth: u32,
+        /// The number of contact-cover cells reported.
+        pub cover_cells: usize,
+        /// The per-phase work: `[broad, exclusion, refinement]`.
+        pub phases: [usize; 3],
+    }
+
+    /// The running per-phase work counters of one integration.
+    #[derive(Default)]
+    struct PhaseStats {
+        clear_cells: usize,
+        contact_cells: usize,
+        max_depth: u32,
+        cover_cells: usize,
+        refinement: usize,
+    }
+
+    /// The exact blossom (polar form) of one univariate control list at the
+    /// parameters `params` (`params.len() == values.len() - 1`), by the
+    /// de Casteljau scheme. The result is the sub-patch control point over the
+    /// blossom's parameter multiset.
+    fn blossom(values: &[[f64; 3]], params: &[f64]) -> [f64; 3] {
+        let mut work: Vec<[f64; 3]> = values.to_vec();
+        for &t in params {
+            if work.len() < 2 {
+                break;
+            }
+            let mut next: Vec<[f64; 3]> = Vec::with_capacity(work.len() - 1);
+            for pair in work.windows(2) {
+                let [a, b] = pair else { continue };
+                next.push([
+                    (1.0 - t) * a[0] + t * b[0],
+                    (1.0 - t) * a[1] + t * b[1],
+                    (1.0 - t) * a[2] + t * b[2],
+                ]);
+            }
+            work = next;
+        }
+        work.first().copied().unwrap_or([0.0; 3])
+    }
+
+    /// The exact child control net of `patch` over the parameter `cell`
+    /// (method item 1: "subdivide the patch domain into cells; exact child
+    /// control nets"). Row-major `rows x cols`.
+    fn sub_net(patch: &Patch, cell: &ParamCell) -> Vec<[f64; 3]> {
+        let rows = patch.rows;
+        let cols = patch.cols;
+        let u0 = cell.u_lo;
+        let u1 = cell.u_hi;
+        let v0 = cell.v_lo;
+        let v1 = cell.v_hi;
+        let mut temp = vec![[0.0f64; 3]; rows * cols];
+        for j in 0..cols {
+            let col: Vec<[f64; 3]> = (0..rows)
+                .map(|i| patch.data.get(i * cols + j).copied().unwrap_or([0.0; 3]))
+                .collect();
+            for k in 0..rows {
+                let mut params = Vec::with_capacity(rows.saturating_sub(1));
+                for _ in 0..(rows - 1 - k) {
+                    params.push(u0);
+                }
+                for _ in 0..k {
+                    params.push(u1);
+                }
+                if let Some(slot) = temp.get_mut(k * cols + j) {
+                    *slot = blossom(&col, &params);
+                }
+            }
+        }
+        let mut out = vec![[0.0f64; 3]; rows * cols];
+        for k in 0..rows {
+            let row: Vec<[f64; 3]> = (0..cols)
+                .map(|j| temp.get(k * cols + j).copied().unwrap_or([0.0; 3]))
+                .collect();
+            for l in 0..cols {
+                let mut params = Vec::with_capacity(cols.saturating_sub(1));
+                for _ in 0..(cols - 1 - l) {
+                    params.push(v0);
+                }
+                for _ in 0..l {
+                    params.push(v1);
+                }
+                if let Some(slot) = out.get_mut(k * cols + l) {
+                    *slot = blossom(&row, &params);
+                }
+            }
+        }
+        out
+    }
+
+    /// The unit-square domain every child patch is re-parameterized onto.
+    fn unit_ibox2() -> IBox2 {
+        IBox2 {
+            lo: [0.0, 0.0],
+            hi: [1.0, 1.0],
+        }
+    }
+
+    /// The exact certified flux of `patch` over the parameter `cell`, through
+    /// the landed volume-facts machinery. The 2-form is parameterization
+    /// invariant, so integrating the exact child control net over the unit
+    /// square equals integrating the parent over the cell.
+    fn cell_flux_exact(
+        patch: &Patch,
+        cell: &ParamCell,
+    ) -> Result<(f64, f64), BooleanVolumeRefusal> {
+        if patch.orientation != 1.0 && patch.orientation != -1.0 {
+            return Err(BooleanVolumeRefusal::NonRegularPatch);
+        }
+        let net = sub_net(patch, cell);
+        let rows = patch.rows;
+        let cols = patch.cols;
+        let mut numerator: Vec<Vec<[f64; 3]>> = Vec::with_capacity(rows);
+        for i in 0..rows {
+            let mut row = Vec::with_capacity(cols);
+            for j in 0..cols {
+                row.push(net.get(i * cols + j).copied().unwrap_or([0.0; 3]));
+            }
+            numerator.push(row);
+        }
+        let weights = vec![vec![1.0f64; cols]; rows];
+        let sub = TensorBernsteinPatch::try_new(
+            numerator,
+            weights,
+            unit_ibox2(),
+            PatchParent::new(0, None),
+        )
+        .map_err(|_| BooleanVolumeRefusal::NonRegularPatch)?;
+        let fact = certify_patch_form(&sub, patch.orientation, &VolumeOptions::default())
+            .map_err(|_| BooleanVolumeRefusal::NonRegularPatch)?;
+        Ok((fact.bracket.lo, fact.bracket.hi))
+    }
+
+    /// The exact child control net of `patch` over `cell` (the parent net for
+    /// the unit cell). The Bernstein convex-hull property makes its component
+    /// hull the tight certified enclosure of the patch image over the cell.
+    fn child_net(patch: &Patch, cell: &ParamCell) -> Vec<[f64; 3]> {
+        if cell.u_lo == 0.0 && cell.u_hi == 1.0 && cell.v_lo == 0.0 && cell.v_hi == 1.0 {
+            patch.data.clone()
+        } else {
+            sub_net(patch, cell)
+        }
+    }
+
+    /// The component hull of a control net.
+    fn hull_of(net: &[[f64; 3]]) -> ([f64; 3], [f64; 3]) {
+        let mut lo = [f64::INFINITY; 3];
+        let mut hi = [f64::NEG_INFINITY; 3];
+        for point in net {
+            for k in 0..3 {
+                lo[k] = lo[k].min(point[k]);
+                hi[k] = hi[k].max(point[k]);
+            }
+        }
+        (lo, hi)
+    }
+
+    /// The tight control-hull enclosure of `patch` over `cell` (theory eq. 11:
+    /// the control-hull min/max bracket).
+    fn control_range(patch: &Patch, cell: &ParamCell) -> ([f64; 3], [f64; 3]) {
+        hull_of(&child_net(patch, cell))
+    }
+
+    /// The tight control-hull enclosure of `P_u` over `cell` (the derivative
+    /// control net of the exact child net).
+    fn derivative_range_u(patch: &Patch, cell: &ParamCell) -> ([f64; 3], [f64; 3]) {
+        let net = child_net(patch, cell);
+        let rows = patch.rows;
+        let cols = patch.cols;
+        let factor = (rows - 1) as f64;
+        let mut deriv = Vec::with_capacity(rows.saturating_sub(1) * cols);
+        for i in 0..(rows - 1) {
+            for j in 0..cols {
+                let a = net.get(i * cols + j).copied().unwrap_or([0.0; 3]);
+                let b = net.get((i + 1) * cols + j).copied().unwrap_or([0.0; 3]);
+                deriv.push([
+                    factor * (b[0] - a[0]),
+                    factor * (b[1] - a[1]),
+                    factor * (b[2] - a[2]),
+                ]);
+            }
+        }
+        hull_of(&deriv)
+    }
+
+    /// The tight control-hull enclosure of `P_v` over `cell`.
+    fn derivative_range_v(patch: &Patch, cell: &ParamCell) -> ([f64; 3], [f64; 3]) {
+        let net = child_net(patch, cell);
+        let rows = patch.rows;
+        let cols = patch.cols;
+        let factor = (cols - 1) as f64;
+        let mut deriv = Vec::with_capacity(rows * cols.saturating_sub(1));
+        for i in 0..rows {
+            for j in 0..(cols - 1) {
+                let a = net.get(i * cols + j).copied().unwrap_or([0.0; 3]);
+                let b = net.get(i * cols + (j + 1)).copied().unwrap_or([0.0; 3]);
+                deriv.push([
+                    factor * (b[0] - a[0]),
+                    factor * (b[1] - a[1]),
+                    factor * (b[2] - a[2]),
+                ]);
+            }
+        }
+        hull_of(&deriv)
+    }
+
+    /// The interval enclosure of the oriented density `g = (1/3) P . (P_u x P_v)`
+    /// over the parameter `cell`, from the tight child control hulls. The
+    /// derivatives are taken with respect to the child's own unit parameters.
+    fn density_interval(patch: &Patch, cell: &ParamCell) -> Iv {
+        let (plo, phi) = control_range(patch, cell);
+        let (dulo, duhi) = derivative_range_u(patch, cell);
+        let (dvlo, dvhi) = derivative_range_v(patch, cell);
+        let p = [
+            Iv {
+                lo: plo[0],
+                hi: phi[0],
+            },
+            Iv {
+                lo: plo[1],
+                hi: phi[1],
+            },
+            Iv {
+                lo: plo[2],
+                hi: phi[2],
+            },
+        ];
+        let du = [
+            Iv {
+                lo: dulo[0],
+                hi: duhi[0],
+            },
+            Iv {
+                lo: dulo[1],
+                hi: duhi[1],
+            },
+            Iv {
+                lo: dulo[2],
+                hi: duhi[2],
+            },
+        ];
+        let dv = [
+            Iv {
+                lo: dvlo[0],
+                hi: dvhi[0],
+            },
+            Iv {
+                lo: dvlo[1],
+                hi: dvhi[1],
+            },
+            Iv {
+                lo: dvlo[2],
+                hi: dvhi[2],
+            },
+        ];
+        dot_iv(p, cross_iv(du, dv)).scale(1.0 / 3.0)
+    }
+
+    /// The interval cross product.
+    fn cross_iv(a: [Iv; 3], b: [Iv; 3]) -> [Iv; 3] {
+        [
+            a[1].mul(b[2]).sub(a[2].mul(b[1])),
+            a[2].mul(b[0]).sub(a[0].mul(b[2])),
+            a[0].mul(b[1]).sub(a[1].mul(b[0])),
+        ]
+    }
+
+    /// The interval dot product.
+    fn dot_iv(a: [Iv; 3], b: [Iv; 3]) -> Iv {
+        a[0].mul(b[0]).add(a[1].mul(b[1])).add(a[2].mul(b[2]))
+    }
+
+    /// Evaluates the patch at `(u, v)` (used for the clear-cell witness).
+    fn patch_eval(patch: &Patch, u: f64, v: f64) -> [f64; 3] {
+        let bu = bernstein_f64(patch.rows - 1, u);
+        let bv = bernstein_f64(patch.cols - 1, v);
+        let mut out = [0.0f64; 3];
+        for i in 0..patch.rows {
+            let bui = bu.get(i).copied().unwrap_or(0.0);
+            for j in 0..patch.cols {
+                let bvj = bv.get(j).copied().unwrap_or(0.0);
+                let w = bui * bvj;
+                if let Some(a) = patch.data.get(i * patch.cols + j) {
+                    out[0] += w * a[0];
+                    out[1] += w * a[1];
+                    out[2] += w * a[2];
+                }
+            }
+        }
+        out
+    }
+
+    /// The pointwise normal `P_u x P_v` at `(u, v)`.
+    fn patch_normal_point(patch: &Patch, u: f64, v: f64) -> [f64; 3] {
+        let du = derivative_point_u(patch, u, v);
+        let dv = derivative_point_v(patch, u, v);
+        [
+            du[1] * dv[2] - du[2] * dv[1],
+            du[2] * dv[0] - du[0] * dv[2],
+            du[0] * dv[1] - du[1] * dv[0],
+        ]
+    }
+
+    /// The unit normal at `(u, v)`, `None` at a degenerate point.
+    fn normal_unit_at(patch: &Patch, u: f64, v: f64) -> Option<[f64; 3]> {
+        let n = patch_normal_point(patch, u, v);
+        let len = norm3(n);
+        if len > 0.0 && len.is_finite() {
+            Some([n[0] / len, n[1] / len, n[2] / len])
+        } else {
+            None
+        }
+    }
+
+    /// The sampled minimum sine of the normal angle between two patches (the
+    /// transversality admission margin). Zero at a tangency or a degenerate
+    /// sample.
+    fn sigma_min(p: &Patch, q: &Patch) -> f64 {
+        let samples = [0.25, 0.5, 0.75];
+        let mut best = f64::INFINITY;
+        for &u in &samples {
+            for &v in &samples {
+                let Some(np) = normal_unit_at(p, u, v) else {
+                    return 0.0;
+                };
+                for &s in &samples {
+                    for &t in &samples {
+                        let Some(nq) = normal_unit_at(q, s, t) else {
+                            return 0.0;
+                        };
+                        let cross = [
+                            np[1] * nq[2] - np[2] * nq[1],
+                            np[2] * nq[0] - np[0] * nq[2],
+                            np[0] * nq[1] - np[1] * nq[0],
+                        ];
+                        best = best.min(norm3(cross));
+                    }
+                }
+            }
+        }
+        best
+    }
+
+    /// Whether the images of `a` over `ac` and `b` over `bc` are certified
+    /// disjoint by a coordinate-range exclusion (theory eq. 11, the
+    /// control-hull min/max superset bracket).
+    fn ranges_separate(a: &Patch, ac: &ParamCell, b: &Patch, bc: &ParamCell) -> bool {
+        let (alo, ahi) = control_range(a, ac);
+        let (blo, bhi) = control_range(b, bc);
+        (0..3).any(|k| ahi[k] < blo[k] || bhi[k] < alo[k])
+    }
+
+    /// Whether `q`'s image can meet `p`'s image over `pc`, by recursive
+    /// range exclusion on `q`'s domain. `true` is the conservative answer:
+    /// the pair is a contact candidate. The recursion stops subdividing `q`
+    /// once its cell is no larger than `pc` (or the depth/work cap fires), so
+    /// a clear `pc` at positive distance separates as it shrinks.
+    fn q_has_contact(p: &Patch, pc: &ParamCell, q: &Patch, separation_depth: u32) -> bool {
+        let pdiam = pc.diameter();
+        let mut stack: Vec<(ParamCell, u32)> = vec![(ParamCell::unit(), 0)];
+        let mut explored = 0usize;
+        while let Some((qc, depth)) = stack.pop() {
+            if ranges_separate(p, pc, q, &qc) {
+                continue;
+            }
+            if depth >= separation_depth || qc.diameter() <= pdiam || explored >= SEPARATION_BOX_CAP
+            {
+                return true;
+            }
+            explored += 1;
+            let (c0, c1) = qc.split();
+            stack.push((c0, depth + 1));
+            stack.push((c1, depth + 1));
+        }
+        false
+    }
+
+    /// Whether `p`'s image over `pc` is certified away from the boundary of
+    /// the `others` solid (a clear cell: constant membership).
+    fn is_clear(p: &Patch, pc: &ParamCell, others: &[Patch], separation_depth: u32) -> bool {
+        others
+            .iter()
+            .all(|q| !q_has_contact(p, pc, q, separation_depth))
+    }
+
+    /// The contact cover of `p` against `others`: the parameter cells whose
+    /// images can meet a boundary patch, refined to `depth`. Any cell outside
+    /// the cover is certifiably clear (method item 2).
+    fn cover_boxes(p: &Patch, others: &[Patch], depth: u32) -> Vec<ParamCell> {
+        let mut cover = Vec::new();
+        let mut stack: Vec<(ParamCell, u32)> = vec![(ParamCell::unit(), 0)];
+        while let Some((cell, d)) = stack.pop() {
+            if is_clear(p, &cell, others, COVER_SEPARATION_DEPTH) {
+                continue;
+            }
+            if d >= depth {
+                cover.push(cell);
+                continue;
+            }
+            let (c0, c1) = cell.split();
+            stack.push((c0, d + 1));
+            stack.push((c1, d + 1));
+        }
+        cover
+    }
+
+    /// The public contact-cover entry (method item 2): the parameter cells of
+    /// one patch's unit square whose images can meet the `others` patch set.
+    /// A non-unit weight refuses typed (item 7).
+    pub fn contact_cover(
+        patch: &VolumeRow,
+        others: &[VolumeRow],
+        depth: u32,
+    ) -> Result<Vec<ParamCell>, BooleanVolumeRefusal> {
+        let p = parse_patch(patch).map_err(BooleanVolumeRefusal::from)?;
+        let qs = others
+            .iter()
+            .map(parse_patch)
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(BooleanVolumeRefusal::from)?;
+        Ok(cover_boxes(&p, &qs, depth))
+    }
+
+    /// The certified bracket of one unresolved contact cell:
+    /// `[|R| min(0, g_lo), |R| max(0, g_hi)]` (theory eq. 5). `density_interval`
+    /// bounds the child density over the cell's own unit parameter square (the
+    /// child control net's derivatives are taken with respect to that square),
+    /// so the integral is that bracket over the unit area -- never rescaled by
+    /// the parent cell area a second time.
+    fn contact_bracket(p: &Patch, cell: &ParamCell) -> (f64, f64) {
+        let g = density_interval(p, cell).scale(p.orientation);
+        (g.lo.min(0.0), g.hi.max(0.0))
+    }
+
+    /// The exact flux of a clear cell, fixed by ONE membership witness
+    /// (method item 4). A clear cell is connected and disjoint from the
+    /// boundary, so the witness verdict applies to the whole cell.
+    fn clear_flux(
+        p: &Patch,
+        cell: &ParamCell,
+        others_rows: &[VolumeRow],
+        options: &BooleanVolumeOptions,
+    ) -> Result<(f64, f64), BooleanVolumeRefusal> {
+        let u = 0.5 * (cell.u_lo + cell.u_hi);
+        let v = 0.5 * (cell.v_lo + cell.v_hi);
+        let point = patch_eval(p, u, v);
+        let certificate = classify_point(
+            point,
+            [0.37, 0.61, 0.70],
+            others_rows,
+            options.classify_seed,
+        );
+        match certificate.verdict {
+            MembershipVerdict::Inside => cell_flux_exact(p, cell),
+            MembershipVerdict::Outside => Ok((0.0, 0.0)),
+            MembershipVerdict::Indeterminate => Err(BooleanVolumeRefusal::MembershipIndeterminate),
+        }
+    }
+
+    /// Integrates `1_B(P) g_P` over one patch's unit square against the
+    /// `others` solid, returning the certified bracket of the patch's
+    /// contribution to `V(A n B)`.
+    fn integrate_patch(
+        p: &Patch,
+        others_rows: &[VolumeRow],
+        others: &[Patch],
+        budget: f64,
+        options: &BooleanVolumeOptions,
+        stats: &mut PhaseStats,
+    ) -> Result<(f64, f64), BooleanVolumeRefusal> {
+        let cover = cover_boxes(p, others, options.cover_depth);
+        stats.cover_cells += cover.len();
+
+        let mut exact_lo = 0.0f64;
+        let mut exact_hi = 0.0f64;
+        let mut work: Vec<(ParamCell, u32, f64, f64)> = Vec::new();
+        let mut leaves: Vec<(f64, f64)> = Vec::new();
+
+        let seed = ParamCell::unit();
+        if !cover.iter().any(|c| c.intersects(&seed))
+            || is_clear(p, &seed, others, options.separation_depth)
+        {
+            let (lo, hi) = clear_flux(p, &seed, others_rows, options)?;
+            exact_lo += lo;
+            exact_hi += hi;
+            stats.clear_cells += 1;
+        } else {
+            let (lo, hi) = contact_bracket(p, &seed);
+            work.push((seed, 0, lo, hi));
+        }
+
+        // Error-directed refinement (method item 3): priority is the cell's
+        // bracket width (descending); terminate when the summed width is
+        // within the per-patch budget (eq. 8).
+        loop {
+            let mut contact_lo = 0.0f64;
+            let mut contact_hi = 0.0f64;
+            for &(_, _, lo, hi) in &work {
+                contact_lo += lo;
+                contact_hi += hi;
+            }
+            for &(lo, hi) in &leaves {
+                contact_lo += lo;
+                contact_hi += hi;
+            }
+            if contact_hi - contact_lo <= budget {
+                break;
+            }
+
+            let mut best: Option<usize> = None;
+            let mut best_width = f64::NEG_INFINITY;
+            for (i, &(_, _, lo, hi)) in work.iter().enumerate() {
+                let width = hi - lo;
+                if width > best_width {
+                    best_width = width;
+                    best = Some(i);
+                }
+            }
+            let Some(index) = best else { break };
+            let (cell, depth, lo, hi) = work.swap_remove(index);
+            if depth >= options.max_depth || stats.refinement >= options.max_cells {
+                leaves.push((lo, hi));
+                stats.contact_cells += 1;
+                continue;
+            }
+            stats.refinement += 1;
+            let (c0, c1) = cell.split();
+            for child in [c0, c1] {
+                if !cover.iter().any(|c| c.intersects(&child))
+                    || is_clear(p, &child, others, options.separation_depth)
+                {
+                    let (clo, chi) = clear_flux(p, &child, others_rows, options)?;
+                    exact_lo += clo;
+                    exact_hi += chi;
+                    stats.clear_cells += 1;
+                } else {
+                    let (clo, chi) = contact_bracket(p, &child);
+                    work.push((child, depth + 1, clo, chi));
+                    stats.max_depth = stats.max_depth.max(depth + 1);
+                }
+            }
+            if stats.refinement >= options.max_cells {
+                let mut rem_lo = 0.0f64;
+                let mut rem_hi = 0.0f64;
+                for &(_, _, lo, hi) in &work {
+                    rem_lo += lo;
+                    rem_hi += hi;
+                }
+                for &(lo, hi) in &leaves {
+                    rem_lo += lo;
+                    rem_hi += hi;
+                }
+                if rem_hi - rem_lo > budget {
+                    return Err(BooleanVolumeRefusal::BudgetExceeded);
+                }
+            }
+        }
+
+        for (_, _, lo, hi) in work {
+            leaves.push((lo, hi));
+            stats.contact_cells += 1;
+        }
+        let mut contact_lo = 0.0f64;
+        let mut contact_hi = 0.0f64;
+        for (lo, hi) in leaves {
+            contact_lo += lo;
+            contact_hi += hi;
+        }
+        Ok((exact_lo + contact_lo, exact_hi + contact_hi))
+    }
+
+    /// The control-hull bounding box of a patch set.
+    fn control_bbox(patches: &[Patch]) -> ([f64; 3], [f64; 3]) {
+        solid_bounds(patches).unwrap_or(([0.0; 3], [0.0; 3]))
+    }
+
+    /// The EXTREMES-SURVIVE certificate (Amendment 1): for each of the six
+    /// axis extremes of `A`'s certified control hull, require that `B`'s
+    /// certified control hull does not reach the extreme value. Then no point
+    /// of `B` can be the arg-extreme point, so the extreme survives into
+    /// `A \ B` and `bbox(A \ B) = bbox(A)`. Returns the minimum separation
+    /// margin; a reached extreme refuses `ExtremeSlabContaminated`.
+    fn extremes_survive(
+        a_lo: [f64; 3],
+        a_hi: [f64; 3],
+        b_lo: [f64; 3],
+        b_hi: [f64; 3],
+    ) -> Result<f64, BooleanVolumeRefusal> {
+        let mut margin = f64::INFINITY;
+        for k in 0..3 {
+            for extreme in [a_lo[k], a_hi[k]] {
+                if b_lo[k] <= extreme && extreme <= b_hi[k] {
+                    return Err(BooleanVolumeRefusal::ExtremeSlabContaminated);
+                }
+                let distance = if extreme < b_lo[k] {
+                    b_lo[k] - extreme
+                } else {
+                    extreme - b_hi[k]
+                };
+                margin = margin.min(distance);
+            }
+        }
+        Ok(margin)
+    }
+
+    /// The certified boolean volume of `A \ B` by contact covers (method
+    /// items 1-9). `A` and `B` are closed oriented tensor-Bernstein patch
+    /// 2-cycles with unit weights (Amendment 4); `V(A)` and `V(B)` come from
+    /// the landed per-patch flux certificate.
+    pub fn certify_boolean_volume(
+        a: &[VolumeRow],
+        b: &[VolumeRow],
+        options: &BooleanVolumeOptions,
+    ) -> Result<BooleanVolumeCertificate, BooleanVolumeRefusal> {
+        if a.is_empty() || b.is_empty() {
+            return Err(BooleanVolumeRefusal::MalformedPatch);
+        }
+        let a_parsed = a
+            .iter()
+            .map(parse_patch)
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(BooleanVolumeRefusal::from)?;
+        let b_parsed = b
+            .iter()
+            .map(parse_patch)
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(BooleanVolumeRefusal::from)?;
+
+        let mut stats = PhaseStats::default();
+
+        // Method item 1: V(A) and V(B) from the landed flux certificate.
+        let mut va_lo = 0.0f64;
+        let mut va_hi = 0.0f64;
+        for p in &a_parsed {
+            let (lo, hi) = cell_flux_exact(p, &ParamCell::unit())?;
+            va_lo += lo;
+            va_hi += hi;
+        }
+        let va = 0.5 * (va_lo + va_hi);
+        let mut vb_lo = 0.0f64;
+        let mut vb_hi = 0.0f64;
+        for q in &b_parsed {
+            let (lo, hi) = cell_flux_exact(q, &ParamCell::unit())?;
+            vb_lo += lo;
+            vb_hi += hi;
+        }
+        let vb = 0.5 * (vb_lo + vb_hi);
+        if !va.is_finite() || va.abs() <= 0.0 {
+            return Err(BooleanVolumeRefusal::NonRegularPatch);
+        }
+
+        // Method item 5: the control-hull broad phase. Method item 8: the
+        // transversality admission on the surviving pairs.
+        let mut broad = 0usize;
+        let mut excluded = 0usize;
+        let mut sigma = f64::INFINITY;
+        for p in &a_parsed {
+            for q in &b_parsed {
+                broad += 1;
+                if ranges_separate(p, &ParamCell::unit(), q, &ParamCell::unit()) {
+                    excluded += 1;
+                    continue;
+                }
+                sigma = sigma.min(sigma_min(p, q));
+            }
+        }
+        if sigma < TRANSVERSALITY_MIN {
+            return Err(BooleanVolumeRefusal::TransversalityUncertified);
+        }
+
+        // Method item 6 / Amendment 1: the bbox sufficiency lemma. The gate
+        // is cheap and runs before the refinement, so a contaminated slab
+        // refuses promptly.
+        let (a_lo, a_hi) = control_bbox(&a_parsed);
+        let (b_lo, b_hi) = control_bbox(&b_parsed);
+        let bbox_margin = if options.enforce_bbox_certificate {
+            Some(extremes_survive(a_lo, a_hi, b_lo, b_hi)?)
+        } else {
+            None
+        };
+
+        let target_width = options.relative_tolerance * va.abs();
+        let patch_count = a_parsed.len() + b_parsed.len();
+        let budget = target_width / (2.0 * patch_count.max(1) as f64);
+
+        // Method item 1: V(A n B) over both boundary families.
+        let mut inter_lo = 0.0f64;
+        let mut inter_hi = 0.0f64;
+        for p in &a_parsed {
+            let (lo, hi) = integrate_patch(p, b, &b_parsed, budget, options, &mut stats)?;
+            inter_lo += lo;
+            inter_hi += hi;
+        }
+        for q in &b_parsed {
+            let (lo, hi) = integrate_patch(q, a, &a_parsed, budget, options, &mut stats)?;
+            inter_lo += lo;
+            inter_hi += hi;
+        }
+
+        let diff_lo = va_lo - inter_hi;
+        let diff_hi = va_hi - inter_lo;
+        let value = 0.5 * (diff_lo + diff_hi);
+        let width = diff_hi - diff_lo;
+        if !value.is_finite() || !width.is_finite() || diff_lo > diff_hi {
+            return Err(BooleanVolumeRefusal::NonRegularPatch);
+        }
+        if width > target_width {
+            return Err(BooleanVolumeRefusal::BudgetExceeded);
+        }
+
+        Ok(BooleanVolumeCertificate {
+            bracket_lo: diff_lo,
+            bracket_hi: diff_hi,
+            value,
+            width,
+            relative_width: width / va.abs(),
+            volume_a: va,
+            volume_b: vb,
+            intersection_lo: inter_lo,
+            intersection_hi: inter_hi,
+            bbox_lo: a_lo,
+            bbox_hi: a_hi,
+            bbox_margin,
+            // Amendment 1: the constructive solid count (`solids() = [self]`).
+            solid_count: 1,
+            broad_phase_pairs: broad,
+            excluded_pairs: excluded,
+            clear_cells: stats.clear_cells,
+            contact_cells: stats.contact_cells,
+            max_depth: stats.max_depth,
+            cover_cells: stats.cover_cells,
+            phases: [broad, excluded, stats.refinement],
+        })
     }
 }
 
@@ -7303,6 +8288,176 @@ print(json.dumps([z_row, loft_row]))
         assert_eq!(
             membership::classify_ray([0.5, 0.5, 0.5], [1.0, 0.0, 0.0], &malformed),
             Err(membership::MembershipRefusal::MalformedPatch)
+        );
+    }
+
+    // -----------------------------------------------------------------------
+    // MONO-6-SWEPT-BOOLEANS: certified boolean volume by contact covers.
+    // -----------------------------------------------------------------------
+
+    /// A closed oriented box `[lo, hi]` as six outward-oriented tensor-
+    /// Bernstein patches (the exact bicubic elevation of each bilinear face,
+    /// unit weights). The corner order fixes `P_u x P_v` outward on every
+    /// face, so the divergence-form flux of the cycle is the box volume.
+    fn box_rows(lo: [f64; 3], hi: [f64; 3]) -> Vec<crate::python::binding::VolumeRow> {
+        let [x0, y0, z0] = lo;
+        let [x1, y1, z1] = hi;
+        vec![
+            // z = z0, outward -z: P_u = +y, P_v = +x.
+            quad_patch([x0, y0, z0], [x0, y1, z0], [x1, y1, z0], [x1, y0, z0]),
+            // z = z1, outward +z: P_u = +x, P_v = +y.
+            quad_patch([x0, y0, z1], [x1, y0, z1], [x1, y1, z1], [x0, y1, z1]),
+            // y = y0, outward -y: P_u = +x, P_v = +z.
+            quad_patch([x0, y0, z0], [x1, y0, z0], [x1, y0, z1], [x0, y0, z1]),
+            // y = y1, outward +y: P_u = +z, P_v = +x.
+            quad_patch([x0, y1, z0], [x0, y1, z1], [x1, y1, z1], [x1, y1, z0]),
+            // x = x0, outward -x: P_u = +z, P_v = +y.
+            quad_patch([x0, y0, z0], [x0, y0, z1], [x0, y1, z1], [x0, y1, z0]),
+            // x = x1, outward +x: P_u = +y, P_v = +z.
+            quad_patch([x1, y0, z0], [x1, y1, z0], [x1, y1, z1], [x1, y0, z1]),
+        ]
+    }
+
+    #[test]
+    fn boolean_volume_nested_boxes_closes_exactly() {
+        let a = box_rows([0.0, 0.0, 0.0], [2.0, 2.0, 2.0]);
+        let b = box_rows([0.5, 0.5, 0.5], [1.5, 1.5, 1.5]);
+        let options = membership::BooleanVolumeOptions::default();
+        let certificate =
+            membership::certify_boolean_volume(&a, &b, &options).expect("the nested boxes certify");
+        assert!(
+            (certificate.volume_a - 8.0).abs() < 1.0e-9,
+            "V(A) {}",
+            certificate.volume_a
+        );
+        assert!(
+            (certificate.volume_b - 1.0).abs() < 1.0e-9,
+            "V(B) {}",
+            certificate.volume_b
+        );
+        assert!(
+            (certificate.value - 7.0).abs() < 1.0e-6,
+            "V(A \\ B) = {} must be 7",
+            certificate.value
+        );
+        assert!(certificate.bracket_lo <= 7.0 && 7.0 <= certificate.bracket_hi);
+        assert!(certificate.width < 1.0e-6, "width {}", certificate.width);
+        assert_eq!(certificate.solid_count, 1);
+        assert!(certificate.bbox_margin.is_some());
+    }
+
+    #[test]
+    fn boolean_volume_disjoint_boxes_answers_the_base() {
+        let a = box_rows([0.0, 0.0, 0.0], [2.0, 2.0, 2.0]);
+        let b = box_rows([5.0, 5.0, 5.0], [6.0, 6.0, 6.0]);
+        let options = membership::BooleanVolumeOptions::default();
+        let certificate =
+            membership::certify_boolean_volume(&a, &b, &options).expect("disjoint boxes certify");
+        assert!(
+            (certificate.value - 8.0).abs() < 1.0e-6,
+            "value {}",
+            certificate.value
+        );
+        assert!(
+            certificate.excluded_pairs > 0,
+            "the broad phase must exclude the pair"
+        );
+    }
+
+    #[test]
+    fn contact_cover_reports_the_contact_locus() {
+        let a = box_rows([0.0, 0.0, 0.0], [2.0, 2.0, 2.0]);
+        let b = box_rows([0.5, 0.5, 0.5], [1.5, 1.5, 3.0]);
+        let top = a.get(1).expect("the top face is the second patch");
+        let cover = membership::contact_cover(top, &b, 5).expect("the cover builds");
+        assert!(!cover.is_empty(), "the top face meets B");
+        for cell in &cover {
+            assert!(cell.u_lo >= 0.0 && cell.u_hi <= 1.0);
+            assert!(cell.v_lo >= 0.0 && cell.v_hi <= 1.0);
+        }
+        // The top face parameterizes u -> x and v -> y, so the origin corner
+        // [0, 0.125]^2 is far from B's [0.25, 0.75]^2 contact square.
+        let origin_covered = cover.iter().any(|c| c.u_lo < 0.125 && c.v_lo < 0.125);
+        assert!(!origin_covered, "the origin corner is clear");
+    }
+
+    #[test]
+    fn boolean_volume_crossing_boxes_certified() {
+        // A = [0,2]^3, B = [0.5,1.5]^2 x [0.5,3]: B pokes through A's top
+        // face, so the contact cover is genuinely exercised. A n B is
+        // [0.5,1.5]^2 x [0.5,2], volume 1.5; A \ B is 8 - 1.5 = 6.5.
+        let a = box_rows([0.0, 0.0, 0.0], [2.0, 2.0, 2.0]);
+        let b = box_rows([0.5, 0.5, 0.5], [1.5, 1.5, 3.0]);
+        let mut options = membership::BooleanVolumeOptions::default();
+        // The validation geometry's point is the contact-cover machinery, not
+        // a tight bracket: a coarse budget keeps the debug-build suite fast
+        // while still exercising the cover, the refinement and the witnesses.
+        options.relative_tolerance = 2.0;
+        options.max_depth = 6;
+        options.enforce_bbox_certificate = false;
+        let certificate = membership::certify_boolean_volume(&a, &b, &options)
+            .expect("the crossing boxes certify");
+        assert!(
+            certificate.intersection_lo <= 1.5 && 1.5 <= certificate.intersection_hi,
+            "V(A n B) bracket [{}, {}] must contain 1.5",
+            certificate.intersection_lo,
+            certificate.intersection_hi
+        );
+        assert!(
+            certificate.bracket_lo <= 6.5 && 6.5 <= certificate.bracket_hi,
+            "V(A \\ B) bracket [{}, {}] must contain 6.5",
+            certificate.bracket_lo,
+            certificate.bracket_hi
+        );
+        assert!(
+            certificate.contact_cells > 0,
+            "the contact locus was exercised"
+        );
+        assert!(certificate.clear_cells > 0);
+        println!(
+            "MONO-6 crossing boxes: bracket [{}, {}] width {} depth {} contact {} clear {} cover {} phases {:?}",
+            certificate.bracket_lo,
+            certificate.bracket_hi,
+            certificate.width,
+            certificate.max_depth,
+            certificate.contact_cells,
+            certificate.clear_cells,
+            certificate.cover_cells,
+            certificate.phases
+        );
+    }
+
+    #[test]
+    fn boolean_volume_extreme_slab_refuses_typed() {
+        let a = box_rows([0.0, 0.0, 0.0], [2.0, 2.0, 2.0]);
+        let b = box_rows([0.5, 0.5, 0.5], [1.5, 1.5, 3.0]);
+        let options = membership::BooleanVolumeOptions::default();
+        assert_eq!(
+            membership::certify_boolean_volume(&a, &b, &options),
+            Err(membership::BooleanVolumeRefusal::ExtremeSlabContaminated)
+        );
+    }
+
+    #[test]
+    fn boolean_volume_refuses_rational_and_malformed_typed() {
+        let a = box_rows([0.0, 0.0, 0.0], [2.0, 2.0, 2.0]);
+        let mut b = box_rows([0.5, 0.5, 0.5], [1.5, 1.5, 1.5]);
+        if let Some(first) = b.first_mut() {
+            first.weights = vec![vec![2.0; 4]; 4];
+        }
+        let options = membership::BooleanVolumeOptions::default();
+        assert_eq!(
+            membership::certify_boolean_volume(&a, &b, &options),
+            Err(membership::BooleanVolumeRefusal::RationalWeights)
+        );
+        let malformed = vec![crate::python::binding::VolumeRow {
+            numerator: vec![vec![[0.0; 3]; 1]; 1],
+            weights: vec![vec![1.0; 1]; 1],
+            orientation: 1.0,
+        }];
+        assert_eq!(
+            membership::certify_boolean_volume(&a, &malformed, &options),
+            Err(membership::BooleanVolumeRefusal::MalformedPatch)
         );
     }
 }
