@@ -2550,3 +2550,84 @@ Leaving: 1 RUNNING (MONO-2 slot 1, healthy); HEAD fd28892; nothing unlanded;
 9 BLOCKED correctly parked; 78 READY correctly parked pending the final
 one-verify battery; cargoq UP; heartbeat 1; driver 1; watchdog 1; TWO
 supervisors; disk 17.8 GiB free; RAM 5.7 GiB free.
+
+## [operator 2026-09-10T16:33Z] DUPLICATE MONO-2 worker (slot 0 + slot 1) after the heartbeat reset a live worker's worktree
+
+- Health sweep: `slot_status.py` -> 2 RUNNING, BOTH MONO-2-NSTATION-LOFT.
+  slot 0 (pid 25604, forked 12:25:06 local, branch
+  packet/MONO-2-NSTATION-LOFT@c6bd3fb, events fresh) and slot 1 (pid 17728, the
+  original 16:10Z worker, session since 12:01, detached e37938a, events fresh).
+  Slots 2-7 FINISHED landed residue. cargoq ping 200 (queued 0); heartbeat
+  exactly 1 (27872); operator runner 1 (27876); watchdog 1 (29264); overnight
+  driver 1 (26920); ONE cargoq/server.py (28544); TWO supervisors (19172
+  PyManager + 27828 pythoncore - carried duplication class; only ONE
+  overnight.py child = no double-merge risk). Disk 16.7 GiB free; RAM 5.1 GiB.
+- Land (step 2): nothing. Re-verified by `git merge-base --is-ancestor` (exit 0
+  against HEAD c6bd3fb) for f07e93d/e33c4dd/e9d885a/3c2109b/ee97499/713f205/
+  4de25d9/b667a85/5cf4811; no FINISHED slot holds an unlanded DONE RESULT.
+- Unblock (step 3): nothing. No IDLE/DEAD >15 min holding work; no live
+  QUESTION; no 402.
+- Registry hygiene (step 4): 317 rows - 230 DONE, 78 READY, 9 BLOCKED;
+  READY-without-landed-marker = exactly {MONO-2 (in flight)};
+  BLOCKED-with-all-deps-landed = the carried 7 owner-parked plus MONO-3/MONO-4
+  (empty `needs`, BLOCKED on the running MONO-2). Nothing flipped.
+- Dispatch (step 5): `dispatch_ready.py --dry-run --max-workers=4` ->
+  "slots: 8 (2 running, 6 free); slot-assigned packets: 6; dispatched 0;
+  workers now ~2/4" (it now sees both). No manual dispatch.
+- ESCALATED 2026-09-10T16:33Z (NEW, hot): duplicate MONO-2 workers + the
+  heartbeat resetting a live worker's worktree. Evidence: heartbeat log
+  12:04/12:14 "1 running" -> 12:25 "0 running, 7 free" and dispatched MONO-2 to
+  slot 0; slot-1 reflog "checkout packet/MONO-2-NSTATION-LOFT -> detached
+  e37938a" + "reset integration/kernel-bg"; work archived to
+  loop/slots/1/abandoned-20260910-122504.patch (73 KB); run_packet
+  PermissionError on the locked events.jsonl. Did NOT kill either live worker.
+- STATE.md volatile refresh ([operator 2026-09-10T16:33Z]) - LATEST GROUND
+  TRUTH pointer + new "State of the machine, as left" block.
+
+Leaving: 2 RUNNING (duplicate MONO-2, slots 0+1, healthy but redundant);
+HEAD c6bd3fb; nothing unlanded; 9 BLOCKED correctly parked; 78 READY correctly
+parked pending the final one-verify battery; cargoq UP; heartbeat 1; driver 1;
+watchdog 1; TWO supervisors; disk 16.7 GiB free; RAM 5.1 GiB free.
+
+## [operator 2026-09-10T16:57Z] MONO-2 landed -> MONO-3 released; MONO-4 held on the registry schema gap
+
+- Health sweep: `slot_status.py` -> 0 RUNNING, all 8 slots FINISHED. slots 0/1
+  are the two (now-finished) duplicate MONO-2 workers with stale wt RESULT.json
+  (status DONE); slots 2-7 landed residue. Heartbeat exactly 1 (27872);
+  watchdog 1 (29264); overnight driver 1 (26920); cargoq UP (ping ok, queued 0,
+  single server.py 28544); operator runner 1 (27876, this instance runs as
+  opencode 31696); TWO supervisors (19172 PyManager + 27828 pythoncore -
+  carried; only ONE overnight.py child = no double-merge risk). Disk 16.0 GiB
+  free; RAM 5.8 GiB free.
+- Land (step 2): nothing. `git merge-base --is-ancestor` exit 0 against HEAD
+  2d5da63 for 0056f01/e33c4dd/e9d885a/3c2109b/ee97499/713f205/4de25d9/b667a85/
+  c6bd3fb; no FINISHED slot holds an unlanded DONE RESULT. MONO-2 was landed by
+  the driver at ~16:50Z (commit 2d5da63; registry note "LANDED c6bd3fb").
+- Unblock (step 3): nothing (no RUNNING worker; no IDLE/DEAD >15 min holding
+  work; no QUESTION; no 402).
+- Registry hygiene (step 4): 317 rows - 230 DONE, 78 READY, 9 BLOCKED. Flipped
+  MONO-3-BLADE-MEMBERS-MIRROR BLOCKED->READY (its sole `depends_on` MONO-2 is
+  landed; `gen_packet --check` A1=0/A2=30 ok, `packet_lint` clean). Did NOT
+  flip MONO-4-TRIM-IDIOMS: the 4 MONO rows' `depends_on`/`write_allow` keys are
+  not read by dispatch_ready, so releasing both would put two workers on
+  bd_bridge.rs at once. Escalated the schema gap. Carried 7 owner-parked
+  BLOCKED rows unchanged.
+- Dispatch (step 5): `dispatch_ready.py --dry-run --max-workers=4` ->
+  "slots: 8 (0 running, 8 free); slot-assigned packets: 6; MONO-3 ->
+  slot 0; dispatched 1". No manual dispatch (heartbeat live; it will dispatch
+  MONO-3 on its next cycle).
+- ESCALATED 2026-09-10T16:57Z: MONO-row registry schema gap
+  (`depends_on`/`write_allow` vs `needs`/`writes`) - see OPERATOR_ESCALATIONS.
+- STATE.md volatile refresh ([operator 2026-09-10T16:57Z]) - pointer +
+  "State of the machine, as left" block.
+- No other escalation. Carried human items unchanged: FRAME-REVOLVE F1
+  non_z_axis pin amendment; duplicate supervisors + lagging cargoq restart
+  guard; slot-4/7 (and now 0/1) wt RESULT residue; TOR-C flip-or-pin;
+  heartbeat slot-liveness duplicate-dispatch bug; overnight.py
+  guarantee-merge-abort.
+
+Leaving: 0 RUNNING (MONO-3 released, heartbeat-pending); HEAD 2d5da63 plus the
+operator cycle commit; nothing unlanded; 8 BLOCKED correctly parked (7 carried
++ MONO-4 held); 79 READY (78 carried landed-marked + MONO-3); cargoq UP;
+heartbeat 1; driver 1; watchdog 1; TWO supervisors; disk 16.0 GiB free; RAM 5.8
+GiB free.

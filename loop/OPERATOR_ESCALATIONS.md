@@ -400,3 +400,74 @@ Judgment-required items appended each operator cycle. Newest at the bottom.
   bd_bridge.rs` and either commit it as the BRIDGE-LOFT-FACTS resolution or
   `git checkout -- truck123d/src/bd_bridge.rs` (8b46b64 is safe on its branch).
   This is the same driver-interrupted-landing class as the MERGE_HEAD item.
+
+## 2026-09-10 16:33 UTC - DUPLICATE MONO-2 worker (slot 0 + slot 1) after the heartbeat reset a LIVE worker's worktree
+
+- What: `python loop/slot_status.py` shows TWO RUNNING slots on the same packet,
+  MONO-2-NSTATION-LOFT: slot 0 (cmd pid 25604, forked 12:25:06 local, branch
+  `packet/MONO-2-NSTATION-LOFT@c6bd3fb`) and slot 1 (cmd pid 17728, the original
+  16:10Z worker, opencode session started 12:01, now detached HEAD `e37938a`).
+  Both are alive and both are queued through cargoq on the same tests
+  (`test -p truck123d --lib line_loft_rows_answer_bit_identically`,
+  `check -p truck123d`). This wastes a worker slot and risks two writers to the
+  same packet.
+- Why (evidence): the heartbeat's slot-liveness check lost the LIVE slot-1
+  worker during its long silent cargo build. `loop/dispatch_heartbeat.log`:
+  12:04:52 and 12:14:56 both report "1 running, 7 free"; 12:25:00 reports
+  "0 running, 7 free" and dispatches MONO-2 to slot 0. In that same 12:25 cycle
+  it re-forked slot 1 (git reflog in `loop/slots/1/wt`: "checkout: moving from
+  packet/MONO-2-NSTATION-LOFT to e37938a" then "reset: moving to
+  integration/kernel-bg"), ARCHIVING the worker's uncommitted +949-line diff to
+  `loop/slots/1/abandoned-20260910-122504.patch` (73097 bytes, 12:25:04). The
+  run_packet then FAILED with `PermissionError: [WinError 32] ... slots\1\
+  events.jsonl` (locked by the still-live worker pid 17728), so the OLD worker
+  kept running on the freshly reset tree while a NEW duplicate was spawned in
+  slot 0. Net: two independent workers on one packet, and slot 1's in-progress
+  work exists only in the abandoned patch.
+- Operator action: NONE beyond recording. Both workers are alive and making
+  progress; the charter forbids killing/restarting a live worker. Did not touch
+  either worker, did not dispatch, did not reset.
+- What a human should do (in order):
+  1. Decide which worker to keep. If slot 1: recover its work with
+     `git -C loop/slots/1/wt apply loop/slots/1/abandoned-20260910-122504.patch`
+     (verify against the current amended packet first). If slot 0: kill the
+     slot-1 worker (pid 17728) and its cargoq jobs, then let slot 0 finish. Do
+     NOT let both commit - slot 0 holds the branch, slot 1 is detached, so a
+     slot-1 checkout/commit could move the branch under slot 0.
+  2. Fix the heartbeat's slot-liveness detection: a slot with a live
+     `worker.pid` must count as running even if `events.jsonl` is momentarily
+     stale during a long cargo build.
+  3. Guard `run_packet`/`new_slot` re-fork behind a live-pid check so a reset
+     cannot run out from under a worker (the events.jsonl PermissionError is the
+     only reason this reset did not also destroy the live session).
+- Start from: `python loop/slot_status.py`;
+  `git -C loop/slots/1/wt reflog`;
+  `Get-Content loop/slots/1/abandoned-20260910-122504.patch | Select-Object -First 40`.
+
+## 2026-09-10 16:57 UTC - MONO-row registry schema gap: dispatch_ready cannot see `depends_on`/`write_allow`
+
+- What: the 4 MONO-CLOSURE rows (MONO-1..MONO-4) are the only registry rows
+  using the new schema keys `depends_on` and `write_allow`; the other 313 use
+  `needs` and `writes`. `dispatch_ready.py` reads only `needs` (line 186) and
+  `writes` (line 192), so for the MONO rows the dependency gate AND the
+  write-set clash check are both no-ops. Consequence: nothing serializes
+  MONO-3/MONO-4 on their shared `truck123d/src/bd_bridge.rs` write set; if both
+  are READY at once the heartbeat would dispatch two concurrent writers to the
+  same file (the exact same-file-parallelism hazard the 16:35Z orchestrator
+  note forbids).
+- Operator action: flipped MONO-3-BLADE-MEMBERS-MIRROR BLOCKED->READY (dep
+  MONO-2 landed; anchors + lint green). Left MONO-4-TRIM-IDIOMS BLOCKED so
+  only one bd_bridge.rs writer can ever be live. `dispatch_ready --dry-run`
+  confirms exactly one dispatch (MONO-3 -> slot 0).
+- What a human should do: normalize the MONO rows to the dispatcher schema
+  (`depends_on` -> `needs`, `write_allow` -> `writes`) or teach dispatch_ready
+  to read both key pairs; then MONO-4 can be flipped READY and will serialize
+  automatically behind MONO-3. Start from `loop/dispatch_ready.py:186` and
+  `loop/dispatch_ready.py:192`, then re-run
+  `python loop/dispatch_ready.py --dry-run`.
+- Carried (unchanged): FRAME-REVOLVE F1 non_z_axis pin amendment
+  (truck123d/tests/ttc_lathe_spline.rs:255); duplicate supervisors + lagging
+  cargoq restart guard; slot-4 + slot-7 wt RESULT residue; TOR-C flip-or-pin;
+  heartbeat slot-liveness duplicate-dispatch bug (root cause of the 16:33Z
+  MONO-2 duplicate; now moot for that packet but structurally unfixed);
+  overnight.py guarantee-merge-abort on interrupted cycles.
