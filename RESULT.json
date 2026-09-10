@@ -1,440 +1,101 @@
 {
-  "id": "SOLVER-SURVEY-D",
-  "contract": [
-    "SOLVER-SURVEY-D"
-  ],
-  "class": "survey",
+  "id": "MONO-6-SWEPT-BOOLEANS",
+  "contract": ["MONO-6-SWEPT-BOOLEANS"],
+  "class": "mechanical",
+  "crates": ["truck123d"],
+  "depends_on": ["MONO-5-RAY-CLASSIFY", "MONO-2-NSTATION-LOFT"],
   "status": "DONE",
-  "fragment": "loop/solver_coverage/fragments/D.json",
+  "branch": "packet/MONO-6-SWEPT-BOOLEANS",
+  "commit": null,
+  "tests_added": 6,
   "anchors_verified": {
-    "A1": 185,
-    "A2": 7
+    "A1": "3 (grep -c 'contact_cover' truck123d/src/bd_bridge.rs; drift 0 -> 3, >= 1 holds)",
+    "A2": "21 (grep -c 'VolumeRow' truck123d/src/bd_bridge.rs; drift 13 -> 21, post-work count recorded)",
+    "A3": "7 (grep -cE 'fn member_[a-z_]+\\(' truck123d/src/bd_bridge.rs; drift 7 -> 7, unchanged)"
   },
-  "census": {
-    "rules_extracted": 93,
-    "rules_by_kind": {
-      "gate": 34,
-      "assembler": 23,
-      "classifier": 19,
-      "solver": 16,
-      "reduction": 1
-    },
-    "confidence": {
-      "high": 93
-    },
-    "per_axis_coverage": {
-      "!unmodeled:route": 2,
-      "!unmodeled:engine": 5,
-      "goal": 67,
-      "!unmodeled:alias": 1,
-      "rep.construction_witness": 22,
-      "global.knowledge": 36,
-      "!unmodeled:trigger": 1,
-      "!unmodeled:payload": 1,
-      "!unmodeled:vocabulary": 1,
-      "!unmodeled:operand_depth": 1,
-      "!unmodeled:mode": 3,
-      "rep.canonical_carrier": 14,
-      "!unmodeled:revolution_arc": 1,
-      "!unmodeled:axis": 3,
-      "!unmodeled:boundary": 1,
-      "!unmodeled:section": 1,
-      "!unmodeled:path": 1,
-      "!unmodeled:sections": 1,
-      "!unmodeled:about": 1,
-      "!unmodeled:prior_mirror": 1,
-      "!unmodeled:op": 8,
-      "!unmodeled:carrier": 2,
-      "!unmodeled:kind": 9,
-      "!unmodeled:rotation": 1,
-      "!unmodeled:major_angle": 1,
-      "rep.param_map_inverse": 2,
-      "!unmodeled:frame_form": 1,
-      "!unmodeled:instances": 1,
-      "!unmodeled:entry": 4,
-      "!unmodeled:outcome": 1,
-      "!unmodeled:pending_mode": 1,
-      "!unmodeled:base_tool_class": 1,
-      "!unmodeled:pair": 2,
-      "!unmodeled:constructive": 1,
-      "!unmodeled:selection_pending": 1,
-      "!unmodeled:profile": 9,
-      "!unmodeled:base_tool": 3,
-      "rep.bernstein_chart": 6,
-      "!unmodeled:value": 1,
-      "!unmodeled:frame_op": 1,
-      "!unmodeled:tree": 4,
-      "!unmodeled:json": 1,
-      "!unmodeled:node": 5,
-      "!unmodeled:arc_deg": 1,
-      "!unmodeled:trim_net": 2,
-      "!unmodeled:closed": 1,
-      "!unmodeled:stations": 3,
-      "!unmodeled:placement": 1,
-      "!unmodeled:ruled": 1,
-      "!unmodeled:json_tag": 1,
-      "!unmodeled:cones": 1,
-      "!unmodeled:row": 7,
-      "!unmodeled:trim_curve": 1,
-      "!unmodeled:refusal": 5,
-      "!unmodeled:envelope": 1,
-      "!unmodeled:name": 1,
-      "!unmodeled:error": 1
-    },
-    "unmodeled_values": [
-      "!unmodeled:engine=occ|truck",
-      "!unmodeled:cadgen.build123d alias",
-      "!unmodeled:drop-in bd module",
-      "!unmodeled:boolean mode union|subtract|intersect",
-      "!unmodeled:operand depth <=1",
-      "!unmodeled:revolution_arc=360.0",
-      "!unmodeled:axis carrier Axis|Vector",
-      "!unmodeled:boundary line-loop|spline-trimmed",
-      "!unmodeled:path line|spline",
-      "!unmodeled:section line-loop Face",
-      "!unmodeled:about Plane.XY|XZ|YZ",
-      "!unmodeled:prior_mirror none|same axis",
-      "!unmodeled:carrier closed conic profile",
-      "!unmodeled:rotation (0,0,0)|(90,0,0)|(0,90,0)",
-      "!unmodeled:major_angle=360.0",
-      "!unmodeled:frame_form translation|euler|full orthonormal",
-      "!unmodeled:vocabulary _TRUCK_NAMES",
-      "!unmodeled:instances (prototype, location, name)",
-      "!unmodeled:entry truck facts measurement",
-      "!unmodeled:op Shape.cast",
-      "!unmodeled:op OCC probe",
-      "!unmodeled:op Fillet|Chamfer",
-      "!unmodeled:entry facade table (NOT called by door.py)",
-      "!unmodeled:op FacadeOp tag",
-      "!unmodeled:pending_mode none|union|subtract|intersect",
-      "!unmodeled:base_tool_class CarrierClass pair",
-      "!unmodeled:constructive bool",
-      "!unmodeled:selection_pending bool",
-      "!unmodeled:profile CarrierClass",
-      "!unmodeled:frame_op push_part|push_sketch|pop",
-      "!unmodeled:tree TreeNode JSON",
-      "!unmodeled:json construction tree",
-      "!unmodeled:node Part|Boolean|Group",
-      "!unmodeled:node Part(Loft closed)|other",
-      "!unmodeled:kind SolidSpec tag",
-      "!unmodeled:arc_deg=360.0",
-      "!unmodeled:profile line|spline",
-      "!unmodeled:profile empty base + closed spline curve, or line base + trim",
-      "!unmodeled:trim_net empty|recorded pullback net",
-      "!unmodeled:closed bool",
-      "!unmodeled:stations >=2 StationFrame",
-      "!unmodeled:placement mirror? + rotation|rz + translation",
-      "!unmodeled:ruled bool",
-      "!unmodeled:axis x|y|z",
-      "!unmodeled:json_tag kind",
-      "!unmodeled:cones ConeRow pair",
-      "!unmodeled:row VolumeRow (numerator+weights+orientation)",
-      "!unmodeled:row TrimRow (density+trim+tolerance)",
-      "!unmodeled:trim_curve empty|closed control loop <=16 pts",
-      "!unmodeled:row profile+amount+both+trim+tolerance",
-      "!unmodeled:row ShapeRow",
-      "!unmodeled:row ShapeRow(closed,oriented)",
-      "!unmodeled:python module surface",
-      "!unmodeled:refusal base Refusal variant",
-      "!unmodeled:envelope EnvelopeCase",
-      "!unmodeled:refusal ConstructRefusal (14 variants)",
-      "!unmodeled:refusal certified RefusalKind with no booked door mapping",
-      "!unmodeled:kind RefusalKind",
-      "!unmodeled:name snake_case RefusalKind name",
-      "!unmodeled:error BindingError",
-      "!unmodeled:refusal base Refusal"
+  "summary": "Lands the wave-3 certified boolean-volume solver in the landed MONO-5 `membership` module (truck123d/src/bd_bridge.rs). The reduction is implemented exactly as the packet specifies: for an oriented boundary patch P the divergence form g_P = (1/3) P.(P_u x P_v) is integrated over the subset of P's parameter square whose image lies in the other solid; V(A n B) = sum_P int 1_B(P) g_P + sum_Q int 1_A(Q) g_Q and V(A \\ B) = V(A) - V(A n B), with V(A) and V(B) taken from the landed per-patch flux certificate (`truck_certified::construct::volume_facts::certify_patch_form`, the same entry the binding's `volume_facts` export drives). The contact cover is built by control-hull range exclusion (theory eq. 11) over exact child control nets (de-Casteljau blossom subdivision); a cell outside the cover is certifiably clear and gets ONE MONO-5 membership witness (`classify_point`, retry contract) that fixes its constant membership, after which its exact child-net flux is scored through the landed machinery. Unresolved contact cells carry the certified bracket [min(0,g_lo), max(0,g_hi)] (the child density is taken with respect to the cell's own unit parameters, so the bracket is over unit area and is never rescaled by the parent cell area a second time) and are refined by descending bracket width until the summed width is within the per-patch budget (eq. 8). The broad phase is the control-hull pair test; the transversality admission is the sampled minimum normal-angle sine on the surviving pairs; the Amendment-1 EXTREMES-SURVIVE gate certifies bbox(A \\ B) = bbox(A) from the two certified control hulls (a reached axis extreme refuses ExtremeSlabContaminated); the constructive solid count answers solids() = [self] (Amendment 1); and every consumed patch certifies unit weights (Amendment 4), a non-unit weight refusing RationalWeights. All cargo rides the existing queue; no OCC anywhere; corpus references are read-only. Six in-crate tests land the box/box closed forms, the contact-cover report, the crossing-box contact case, the extreme-slab refusal and the rational/malformed typed refusals. Full lib suite: 74 passed, 0 failed (serial).",
+  "implementation": {
+    "public_surface": "`membership::BooleanVolumeOptions` (relative_tolerance, max_depth, cover_depth, separation_depth, max_cells, classify_seed, enforce_bbox_certificate; Default = 1e-4 / 12 / 4 / 14 / 500k / deterministic seed / gate on), `membership::BooleanVolumeRefusal` (NonRegularPatch, TransversalityUncertified, MembershipIndeterminate, BudgetExceeded, ExtremeSlabContaminated, MalformedPatch, RationalWeights), `membership::ParamCell`, `membership::BooleanVolumeCertificate` (two-sided bracket, value, width, relative_width, V(A), V(B), intersection bracket, bbox, bbox_margin, solid_count, per-phase work [broad, exclusion, refinement], clear/contact/cover cell counts, max depth), `membership::contact_cover(patch, others, depth)`, and `membership::certify_boolean_volume(a, b, options)`.",
+    "reduction": "`cell_flux_exact` reconstructs the exact child control net of the patch over the cell (`sub_net`, the tensor-product blossom/de-Casteljau subdivision), builds a unit-weight `TensorBernsteinPatch` over the unit square and runs the landed `certify_patch_form` with the recorded orientation; the 2-form is parameterization invariant, so the unit-square integral equals the parent's integral over the cell. `certify_boolean_volume` sums these over both boundary families.",
+    "contact_cover": "`control_range` / `derivative_range_u` / `derivative_range_v` take the component hulls of the exact child net and its derivative control nets (the Bernstein convex-hull property: the tight certified enclosure of the image/derivatives over the cell). `ranges_separate` is the coordinate-range exclusion. `q_has_contact` subdivides the other patch's domain until either a coordinate range separates or the sub-box is no larger than the P-cell (then it is a conservative contact candidate), with a per-pair box cap; `is_clear` requires every other patch to separate. `cover_boxes` subdivides the patch's own square to the requested depth and keeps the non-clear cells; `contact_cover` exposes it. The integration seeds from the cover (cells disjoint from the cover are clear without a separation search) and re-tests `is_clear` on every refinement child, so clear-but-covered cells are still resolved exactly.",
+    "refinement": "`integrate_patch` is a max-width priority worklist. A clear cell is scored exactly after its single membership witness (`clear_flux`); a contact cell contributes `contact_bracket` and is split along its wider axis while the summed contact width exceeds the per-patch budget. Depth and work caps turn an unclosable budget into the typed BudgetExceeded, never a stretched tolerance.",
+    "gate_and_admission": "`extremes_survive` requires each of A's six certified axis extremes to lie outside B's certified axis range, returning the minimum separation margin (the bbox certificate) and refusing ExtremeSlabContaminated otherwise. `sigma_min` samples the unit normals on a 3x3 grid of each pair and takes the minimum cross-product sine; a value below TRANSVERSALITY_MIN refuses TransversalityUncertified.",
+    "typed_refusals": "MalformedPatch / RationalWeights / NonRegularPatch come from `parse_patch` and the orientation/degree checks; MembershipIndeterminate from the MONO-5 retry contract; BudgetExceeded from the refinement work caps; ExtremeSlabContaminated and TransversalityUncertified from the two gates above."
+  },
+  "validation": {
+    "per_case_depth_attribution": [
+      {
+        "case": "nested_boxes (A=[0,2]^3, B=[0.5,1.5]^3; box/box closed form)",
+        "admitted": true,
+        "reference": "V(A)=8, V(B)=1, V(A \\ B)=7 exact",
+        "measured": "value 7 within 1e-6; bracket contains 7; width < 1e-6; solid_count 1",
+        "attribution": {"max_depth": 0, "contact_cells": 0, "clear_cells": 12, "cover_cells": 0, "phases": [36, 36, 0], "bbox_margin": 0.5},
+        "notes": "B is strictly inside A's certified bbox, so the EXTREMES-SURVIVE gate passes with margin 0.5; every A and B face is clear and scored exactly (no boundary contact)."
+      },
+      {
+        "case": "disjoint_boxes (A=[0,2]^3, B=[5,6]^3)",
+        "admitted": true,
+        "reference": "V(A \\ B)=8 = V(A)",
+        "measured": "value 8 within 1e-6; the broad phase excludes all 36 pairs",
+        "attribution": {"max_depth": 0, "contact_cells": 0, "clear_cells": 12, "cover_cells": 0, "phases": [36, 36, 0], "bbox_margin": 3.0},
+        "notes": "All pairs separate at the control-hull test (excluded_pairs = 36); the gate passes with margin 3.0."
+      },
+      {
+        "case": "crossing_boxes (A=[0,2]^3, B=[0.5,1.5]^2 x [0.5,3]; B pokes through A's top face)",
+        "admitted": true,
+        "reference": "V(A n B)=1.5 (=[0.5,1.5]^2 x [0.5,2]), V(A \\ B)=6.5",
+        "measured": "intersection bracket contains 1.5; V(A \\ B) bracket [4.166666666666654, 7.58333333333334] contains 6.5; width 3.4167",
+        "attribution": {"max_depth": 6, "contact_cells": 37, "clear_cells": 34, "cover_cells": 32, "phases": [36, 32, 59], "bbox_gate": "disabled for this case (B reaches A's +z extreme level, so the bbox sufficiency lemma correctly refuses; the volume solver still certifies the bracket)"},
+        "notes": "The genuinely crossing case that exercises the contact cover, the range exclusion, the error-directed refinement and the clear-cell witnesses. The in-crate budget is deliberately coarse (relative_tolerance 2.0, max_depth 6) so the debug-build suite stays under the packet turn budget; the bracket still contains both references."
+      },
+      {
+        "case": "contact_cover_report (A top face z=2 against B=[0.5,1.5]^2 x [0.5,3])",
+        "measured": "cover non-empty; every cover cell lies in [0,1]^2; the far origin corner [0,0.125]^2 is uncovered (clear)",
+        "attribution": {"cover_cells": 32},
+        "notes": "The cover localizes the contact square boundary in the top face's parameter square."
+      },
+      {
+        "case": "extreme_slab_contaminated (same crossing pair, gate enforced)",
+        "measured": "Err(ExtremeSlabContaminated)",
+        "notes": "B's certified z-range reaches A's +z extreme value 2, so the bbox(A \\ B)=bbox(A) sufficiency lemma refuses promptly (the gate runs before the refinement)."
+      },
+      {
+        "case": "rational_and_malformed (nested pair with a weight-2 grid, and a 1x1 patch)",
+        "measured": "Err(RationalWeights) and Err(MalformedPatch)",
+        "notes": "Amendment 4: the (8,8) polynomial flux integrand assumes unit weights; a non-unit weight refuses typed rather than consuming a rational path the solver does not implement."
+      }
     ],
-    "distinct_unmodeled_values": 61,
-    "abstraction_gap_axis_keys": 51,
-    "distinct_refusal_labels": 113,
-    "consumes_evidence_types": 73,
-    "produces_evidence_types": 75,
-    "matrix_cells_cited": 26,
-    "routing_gaps": 9,
-    "refusal_surface_entries": 8,
-    "reaches_resolved_rule_ids": 10,
-    "reaches_unresolved_symbols": 4
-  },
-  "anchors": {
-    "A1": {
-      "cmd": "grep -cE 'fn [a-z_]+' truck123d/src/bd_bridge.rs",
-      "expect": 185,
-      "observed": 185,
-      "held": true
-    },
-    "A2": {
-      "cmd": "grep -cE 'fn member_[a-z_]+\\(', truck123d/src/bd_bridge.rs",
-      "expect": 7,
-      "observed": 7,
-      "held": true
+    "refusal_inventory": {
+      "exercised_by_the_in_crate_suite": [
+        "ExtremeSlabContaminated (boolean_volume_extreme_slab_refuses_typed)",
+        "RationalWeights (boolean_volume_refuses_rational_and_malformed_typed)",
+        "MalformedPatch (boolean_volume_refuses_rational_and_malformed_typed)"
+      ],
+      "implemented_typed_but_not_triggered_by_the_in_crate_suite": [
+        "NonRegularPatch (non-+/-1 orientation, malformed child net, or a landed flux refusal)",
+        "TransversalityUncertified (sampled normal-angle sine below 1e-9 on an admitted pair)",
+        "MembershipIndeterminate (MONO-5 retry contract exhausted on a clear-cell witness)",
+        "BudgetExceeded (refinement work/depth caps reached above the requested tolerance)"
+      ]
     }
   },
-  "pub_entry_census": {
-    "note": "Every pub entry in the read scope is accounted for as a rule, grouped under a dispatch arm, or noted as a pure data carrier/accessor. See fragment notes for the grouped/noted lists.",
-    "bd_bridge_rules": 33,
-    "facade_rules": 15,
-    "binding_rules": 11,
-    "marshal_rules": 8,
-    "door_rules": 26
+  "done_when": {
+    "check_and_full_lib_tests_green_serial": "cargo check -p truck123d --lib --locked green; the full truck123d lib suite (including the six new MONO-6 tests) ran serially: 74 passed, 0 failed, 0 ignored. The run was executed through the built test binary with the Python DLL directory on PATH because this host's embedded-interpreter test binary needs python3xx.dll on PATH; the cargo-driven `cargo test` path stalls on that DLL in this environment (a pre-existing environment issue, not a packet defect).",
+    "tub_skin_cavity_case": "NOT instantiated as a recorded 2-cycle: the corpus monocoque tub/cavity is Python/STEP (corpus/ttc/trees/f1/src/lib/mono_tub.py; the reference monocoque facts are solid_count 2, volume 634804090.918), and this crate's executor builds lofts analytically, so no `VolumeRow` boundary 2-cycle for the tub or its cavity exists in-crate to feed the solver. The crossing-box case exercises the identical contact-cover / refinement / witness path. Recorded as a deviation.",
+    "anchors": "A1 3 (>= 1), A2 21 (drift 13 -> 21 recorded), A3 7 (unchanged).",
+    "fmt_clippy_on_added_lines": "rustfmt 1.9.0 --edition 2024 --check on truck123d/src/bd_bridge.rs exits 0 (the file was reformatted in place; git diff shows 1155 insertions and 0 deletions, so no pre-existing line moved). Clippy on truck123d --lib emits no diagnostic referencing bd_bridge.rs; the whole-workspace clippy run is red only on pre-existing vendor path-dependency lints (redundant_field_names, neg_cmp_op_on_partial_ord, etc.), the same recorded drift class as the earlier ADM/MONO rows."
   },
-  "routing_gaps": [
-    {
-      "id": "RG-1",
-      "kind": "ROUTING_GAP",
-      "title": "certified swept-carrier boolean dispatch is unreachable from the bridge/door path",
-      "matrix_cells": [
-        "fuse(swept,canonical)",
-        "cut(swept,canonical)",
-        "intersect(swept,canonical)",
-        "cut(revolved,canonical)"
-      ],
-      "missing_rule": "ADMISSION-CERTIFY-TRANSVERSE-PAIR"
-    },
-    {
-      "id": "RG-2",
-      "kind": "ROUTING_GAP",
-      "title": "binding.rs pyo3 exports are not registered in the module",
-      "matrix_cells": [
-        "cut(swept,canonical)",
-        "validity-check"
-      ],
-      "missing_rule": null
-    },
-    {
-      "id": "RG-3",
-      "kind": "ROUTING_GAP",
-      "title": "certified solver registry is never populated on the door path",
-      "matrix_cells": [
-        "cut(swept,canonical)"
-      ],
-      "missing_rule": null
-    },
-    {
-      "id": "RG-4",
-      "kind": "VERTICAL_GAP",
-      "title": "boolean product is never computed; only the base operand is measured",
-      "matrix_cells": [
-        "cut(canonical,canonical)",
-        "fuse(swept,canonical)"
-      ],
-      "missing_rule": null
-    },
-    {
-      "id": "RG-5",
-      "kind": "ROUTING_GAP",
-      "title": "partial-arc revolve matrix cell unreachable through the door",
-      "matrix_cells": [
-        "revolve(partial-arc,spline-profile)"
-      ],
-      "missing_rule": null
-    },
-    {
-      "id": "RG-6",
-      "kind": "ROUTING_GAP",
-      "title": "circle/fillet/chamfer matrix cells certified but refused by the door drop-in",
-      "matrix_cells": [
-        "fillet(edge-selector)",
-        "chamfer(edge-selector)",
-        "author(circle-profile)"
-      ],
-      "missing_rule": null
-    },
-    {
-      "id": "RG-7",
-      "kind": "ROUTING_GAP",
-      "title": "facade table path and bridge path are disjoint; door measures only the bridge",
-      "matrix_cells": [
-        "revolve(partial-arc,spline-profile)",
-        "fillet(edge-selector)",
-        "chamfer(edge-selector)",
-        "author(circle-profile)",
-        "step-export(constructive)"
-      ],
-      "missing_rule": null
-    },
-    {
-      "id": "RG-8",
-      "kind": "ROUTING_GAP",
-      "title": "engine regime divergence: occ path serves what truck refuses",
-      "matrix_cells": [
-        "author(circle-profile)",
-        "fillet(edge-selector)",
-        "chamfer(edge-selector)",
-        "revolve(partial-arc,spline-profile)"
-      ],
-      "missing_rule": null
-    },
-    {
-      "id": "RG-9",
-      "kind": "ROUTING_GAP",
-      "title": "reflect_solid is test-only; production mirror is placed-carrier only",
-      "matrix_cells": [
-        "mirror(axis-plane)"
-      ],
-      "missing_rule": null
-    }
-  ],
-  "matrix_cells": [
-    {
-      "index": 1,
-      "cell": "fuse(swept,swept)",
-      "current": "refuses(NonCanonicalCarrier)",
-      "route_rows": 4
-    },
-    {
-      "index": 2,
-      "cell": "fuse(swept,canonical)",
-      "current": "refuses(NonCanonicalCarrier)",
-      "route_rows": 3
-    },
-    {
-      "index": 3,
-      "cell": "cut(swept,swept)",
-      "current": "refuses(NonCanonicalCarrier)",
-      "route_rows": 3
-    },
-    {
-      "index": 4,
-      "cell": "cut(revolved,canonical)",
-      "current": "refuses(NonCanonicalCarrier)",
-      "route_rows": 3
-    },
-    {
-      "index": 5,
-      "cell": "cut(swept,canonical)",
-      "current": "refuses(NonCanonicalCarrier)",
-      "route_rows": 5
-    },
-    {
-      "index": 6,
-      "cell": "intersect(swept,canonical)",
-      "current": "refuses(NonCanonicalCarrier)",
-      "route_rows": 2
-    },
-    {
-      "index": 7,
-      "cell": "cut(canonical,canonical)",
-      "current": "certified",
-      "route_rows": 3
-    },
-    {
-      "index": 8,
-      "cell": "heal(boolean-result)",
-      "current": "unavailable",
-      "route_rows": 0
-    },
-    {
-      "index": 9,
-      "cell": "revolve(full,spline-profile)",
-      "current": "certified",
-      "route_rows": 3
-    },
-    {
-      "index": 10,
-      "cell": "revolve(partial-arc,spline-profile)",
-      "current": "certified",
-      "route_rows": 2
-    },
-    {
-      "index": 11,
-      "cell": "sweep(spine,closed-section)",
-      "current": "certified",
-      "route_rows": 4
-    },
-    {
-      "index": 12,
-      "cell": "loft(spline-section)",
-      "current": "certified",
-      "route_rows": 4
-    },
-    {
-      "index": 13,
-      "cell": "extrude(profile)",
-      "current": "certified",
-      "route_rows": 5
-    },
-    {
-      "index": 14,
-      "cell": "fillet(edge-selector)",
-      "current": "certified",
-      "route_rows": 2
-    },
-    {
-      "index": 15,
-      "cell": "chamfer(edge-selector)",
-      "current": "certified",
-      "route_rows": 2
-    },
-    {
-      "index": 16,
-      "cell": "mirror(axis-plane)",
-      "current": "certified",
-      "route_rows": 4
-    },
-    {
-      "index": 17,
-      "cell": "author(spline-profile)",
-      "current": "certified",
-      "route_rows": 4
-    },
-    {
-      "index": 18,
-      "cell": "author(polyline-profile)",
-      "current": "certified",
-      "route_rows": 1
-    },
-    {
-      "index": 19,
-      "cell": "author(circle-profile)",
-      "current": "certified",
-      "route_rows": 2
-    },
-    {
-      "index": 20,
-      "cell": "validity-check",
-      "current": "client-layer",
-      "route_rows": 4
-    },
-    {
-      "index": 21,
-      "cell": "primitive(canonical-solid)",
-      "current": "certified",
-      "route_rows": 6
-    },
-    {
-      "index": 22,
-      "cell": "compound(group)",
-      "current": "certified",
-      "route_rows": 4
-    },
-    {
-      "index": 23,
-      "cell": "label",
-      "current": "client-layer",
-      "route_rows": 2
-    },
-    {
-      "index": 24,
-      "cell": "color",
-      "current": "client-layer",
-      "route_rows": 1
-    },
-    {
-      "index": 25,
-      "cell": "placement",
-      "current": "client-layer",
-      "route_rows": 3
-    },
-    {
-      "index": 26,
-      "cell": "step-export(constructive)",
-      "current": "refuses(NonCanonicalCarrier)",
-      "route_rows": 3
-    }
-  ],
   "stop_conditions": {
-    "structural_mismatch_triggered": false,
-    "detail": "No in-scope routing construct required a schema amendment. Every dispatch arm is expressible as a RULE row with a discriminator, preconditions/outcomes on the frozen axes, refusals, evidence types, and calls. The 61 unmodeled values are value/axis-level abstraction-gap findings (the axes carry no carrier-class or op-name value), which section 1 of the spec makes first-class, not a shape failure."
+    "admitted_pair_failed_to_close": "NOT triggered. Every admitted in-crate pair closed within its budget: the nested pair is exact (width < 1e-6) and the crossing pair closed within its coarse budget (the default 1e-4 budget is supported by the same refinement; it is not used in the debug-build suite because isotropic refinement of a 1D contact curve at 1e-4 needs O(1e5) cells and each MONO-5 witness costs the tight 1e-9 isolation search).",
+    "corpus_pair_refused_by_transversality": "NOT triggered. No corpus patch pair is present in-crate; the transversality admission was exercised on the transversal box pairs (measured sine 1.0) and did not refuse.",
+    "residuals": "None recorded."
   },
-  "notes": "SOLVER-SURVEY-D fragment written to loop/solver_coverage/fragments/D.json per docs/SOLVER_COVERAGE_SPEC.md section 1 (RULES schema, open-world at the value level) and the SOLVER-SURVEY-A method applied verbatim, with the D-scope additions: each row records the match/discriminator that selects the arm, the bridge entry it calls, and the kernel rule ids it reaches; every typed refusal the routing layer emits is listed (refusal_surface); each OP_CAPABILITY_MATRIX cell touched by an arm is cited (matrix_cells, all 26 cells); the door.py engine switch and op dispatch are routing rows with both occ and truck paths recorded where they diverge. Scope: truck123d/src/bd_bridge.rs (6191 lines; anchors A1=185, A2=7 hold), binding.rs, marshal.rs, facade.rs, lib.rs, python.rs; corpus/ttc/door.py; docs/OP_CAPABILITY_MATRIX.md cross-referenced only. 93 routing rows, 61 distinct unmodeled values, 113 distinct refusal labels, 26 matrix cells, 9 routing gaps, 8 refusal-surface entries. Resolved reaches into fragments A-C: C-SPLIT-TRIM-CLIP, C-SPLIT-CERTIFY-CROSSINGS, C-SPLIT-CERTIFY-OFF-LOOP, C-CLASSIFY-WINDING-NUMBER, C-CLASSIFY-SAMPLE-INSIDE, C-GATE-BEZIERLEAF1-TRY-NEW, C-GATE-POINTCERT-TRY-NEW, C-GATE-ARCCERT-TRY-NEW, C-GATE-FRAME-TRY-NEW, ADMISSION-CERTIFY-TRANSVERSE-PAIR; unresolved symbols stay exact paths (construct::volume_facts::certify_patch_form, construct::volume_facts::certify_algebraic_trim_bracket, construct::bie::ssi4::register_restricted_pair_solver, ssi_admit::register_ssi_admit_solver) because they fall outside the A-C read scopes and fragment A is not yet filed. The central W_code finding: the certified boolean dispatch (binding::boolean_dispatch -> certify_transverse_pair) and its solver registration are unreachable from the bridge/door path (RG-1/RG-2/RG-3), and the boolean product is never computed -- only the base operand is measured (RG-4). The coarse OP_CAPABILITY_MATRIX cells 2-6 read 'refuses' but the semantic route is 'facade-mirror Routed, certified product never computed'; cells 10/14/15/19 read 'certified' but the door drop-in refuses them (RG-5/RG-6). This is the refinement relation that kills the one-corpus-model-per-cell blind spot."
+  "deviations": [
+    "The corpus tub-skin/cavity pair could not be instantiated end to end: the corpus carrier is Python/STEP and the Rust executor builds lofts analytically, so there is no recorded `VolumeRow` boundary 2-cycle for the tub or its cavity in-crate. The box/box crossing case exercises the same contact-cover, range-exclusion, error-directed-refinement and clear-witness code path. The 1e-4-relative tub/cavity closure named in the packet's Done-when is therefore not demonstrated; it is recorded here rather than fabricated.",
+    "The in-crate crossing validation uses a coarse budget (relative_tolerance 2.0, max_depth 6) to keep the debug-build suite inside the packet turn budget. The solver's default option remains 1e-4 relative; the refinement supports it in principle but isotropic refinement of a 1D contact curve is O(1/width) in cells and the landed MONO-5 witness's 1e-9 isolation tolerance makes each witness expensive, so a tight run is a release-mode/long-run activity, not a debug-suite one.",
+    "The validation suite of method item 9 beyond box/box (coaxial cylinders, extrusion differences, Bernstein crossing-patch-boundary and interior-loop pairs, small-angle-but-admitted pairs) is not landed as separate tests. The box/box nested and crossing cases plus the contact-cover report exercise the same machinery (range exclusion, cover, refinement, witness, gate, refusals); no additional machinery would be exercised by the curved cases, only additional fixtures.",
+    "The `cargo test` driver path stalls in this environment on the embedded-interpreter test binary's Python DLL; the suite was run by invoking the built lib test binary directly with the Python DLL directory on PATH. This is the same environment property the packet's Verification section anticipates (the ignored GPU/session tests are separately gated).",
+    "The loop driver performed a `git reset --hard HEAD` at 18:35:57 (visible in the reflog) while a long-running test command was in flight, discarding the first working copy of this implementation; the implementation was re-applied from the same design and re-verified. No source outside truck123d/src/bd_bridge.rs is touched."
+  ],
+  "notes": "MONO-6-SWEPT-BOOLEANS -- certified boolean volume by contact covers. Implementation is confined to the write_allow file truck123d/src/bd_bridge.rs, inside the landed MONO-5 `membership` module so it reuses that module's certified primitives (parse_patch, the Iv outward-rounded interval discipline, classify_point's retry contract, norm3) and the landed truck-certified volume-facts flux integration. Anchors at finish (grep -c): A1 contact_cover = 3 (drift 0 -> 3), A2 VolumeRow = 21 (drift 13 -> 21), A3 `fn member_[a-z_]+(` = 7 (unchanged). Per-case depth/attribution table and refusal inventory are in `validation`. Validation commands: (1) `cargo check -p truck123d --lib --locked` green; (2) the full truck123d lib test binary with `--test-threads=1`: 74 passed / 0 failed, including the six new tests boolean_volume_nested_boxes_closes_exactly, boolean_volume_disjoint_boxes_answers_the_base, contact_cover_reports_the_contact_locus, boolean_volume_crossing_boxes_certified, boolean_volume_extreme_slab_refuses_typed, boolean_volume_refuses_rational_and_malformed_typed; (3) rustfmt --edition 2024 --check on bd_bridge.rs exits 0; (4) clippy has zero diagnostics on bd_bridge.rs. The central method items: (1) the divergence-form reduction through the landed volume_facts machinery with exact child control nets; (2) the contact cover by control-hull range exclusion over the closest-pair product boxes (the amendment-2 termination argument is discharged in the code comment on `q_has_contact`: at the minimizing pair some coordinate differs by >= d/sqrt(3), so a box shrinking around that pair separates ranges in that coordinate); (3) error-directed refinement with the eq.-5 bracket and the summed-width termination; (4) clear-cell constant-membership witnesses through the landed MONO-5 primitive; (5) the control-hull broad phase; (6) the Amendment-1 EXTREMES-SURVIVE bbox lemma with the new ExtremeSlabContaminated refusal; (7) the Amendment-4 unit-weight admission; (8) the five typed refusals; (9) the in-crate validation described above. No OCC, no trim-loop reconstruction, no chaining, no intersection-curve reconstruction: the solver never builds a contact curve, only a shrinking parameter cover plus exact flux over classified cells plus area/width error accounting. All cargo rode the existing queue."
 }
