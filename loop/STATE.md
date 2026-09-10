@@ -15,22 +15,23 @@ program, and the operator agent.
 ## Where we are
 
 > LATEST GROUND TRUTH: read the newest `[operator ...]` block in "State of
-> the machine, as left" (2026-09-09T23:15Z). [operator 2026-09-09T23:15Z
-> ground-truth note: unchanged quiet board since the 22:35Z cycle -
-> FRAME-REVOLVE (slot 7) still FINISHED and NOT operator-landable (RESULT
-> status LANDED + mvac-pin-class finding F1, done-when red on the
-> out-of-scope non_z_axis pin; worker commit b667a85 unmerged, wt RESULT
-> intact, escalated 22:06Z); the overnight driver 28824 will keep
-> conflict-aborting on the harness artifacts every 5-min cycle until a
-> human adjudicates - do NOT re-fork slot 7. Slots 0-6 landed residue.
-> SWEEP-PATH READY gated on FRAME-REVOLVE; dispatch 0 = real idle (READY
-> rows without a landed marker = exactly {FRAME-REVOLVE, SWEEP-PATH}).
-> Registry: nothing flipable (TOR-C stays orchestrator-held; the 6 other
-> BLOCKED rows owner-parked/human-gated/superseded). Substrate nominal
-> (heartbeat 27440, watchdog 28440, cargoq UP on 25356, driver 28824 with
-> one child 25952, operator runner 29776; two supervisors 27392+15100
-> carried; two cargoq/server.py 27568+25356 carried-flagged, port owned by
-> 25356). Orchestrator session LIVE (opencode pid 17740).]
+> the machine, as left" (2026-09-10T01:28Z). [operator 2026-09-10T01:28Z
+> ground-truth note: FRAME-REVOLVE is now LANDED - orchestrator merge
+> 39e9550 (worker b667a85), row flipped DONE ca4a498. A redundant heartbeat
+> re-fork ran FRAME-REVOLVE again in slot 7 (the row was READY with no
+> landed marker); it finished with RESULT status LANDED and NO commit (the
+> carrier was already present) - residue, not landable. The operator added
+> the missing registry marker and re-measured SWEEP-PATH's A2 anchor 6->7
+> (the FRAME-REVOLVE landing added a 'tangent' mention in corpus/ttc/door.py;
+> commit 32d967f). SWEEP-PATH now preflights green and dispatch_ready
+> --dry-run shows it -> slot 0 (dispatched 1); the live heartbeat will
+> dispatch. Registry: nothing flipable (BLOCKED-with-deps-landed =
+> BG-CK-SPLINE-CENSUS owner-CANCELLED, DEF-TESS-ANALYTIC-SEAM superseded by
+> -R2, DEF-SEEDRAY-B human-gated, TOR-C orchestrator-held). Substrate
+> nominal (heartbeat 27440, watchdog 28440, cargoq UP, driver 28824,
+> operator runner 29776; two supervisors 27392+15100 and two cargoq/server.py
+> 27568+25356 carried; orchestrator session LIVE opencode 17740). Disk
+> ~18.7 GB free; RAM 3.8 GB free.]
 
 - **THE FIRST KERNEL-VS-OCC TIMING COMPARISON IS BANKED** (FH-TIMING-REFRESH,
   landed c94d043): turbopump_assembly **0.097 s kernel vs 4.866 s OCC**,
@@ -543,6 +544,35 @@ risk). Disk 19.6 GB free (above the 8 GB floor AND the 15 GB janitor goal); RAM
 adjudication; duplicate supervisors + the wedged cargoq supervisor restart
 guard; slot-4 F1 wt RESULT residue parking the driver's dispatch arm; TOR-C
 flip-or-pin decision.]
+
+[operator 2026-09-10T01:28Z - volatile refresh. Board now: 0 RUNNING / 1
+landed-this-cycle. **FRAME-REVOLVE LANDED** - the orchestrator merged b667a85
+as 39e9550 and flipped the row DONE ca4a498 (the operator's concurrent marker
+edit was absorbed into that commit). A redundant heartbeat re-fork had already
+re-run FRAME-REVOLVE in slot 7 (the row was READY with no landed marker, so
+dispatch_ready re-dispatched it) from base eafdc80 = HEAD; it finished
+mid-cycle with RESULT status LANDED and NO commit (the carrier was already
+present) - residue, not operator-landable, no action. **SWEEP-PATH unblocked**:
+the operator re-measured its A2 anchor (grep -c 'tangent' corpus/ttc/door.py
+6->7 - the FRAME-REVOLVE landing added one mention; the documented per-landing
+anchor drift) and committed 32d967f; dispatch_ready --dry-run now shows
+SWEEP-PATH -> slot 0 (preflight green), dispatched 1; the live heartbeat will
+dispatch it (no manual dispatch - double-dispatch rule). Slots 0-6 FINISHED/
+IDLE landed residue (all worker commits ancestors of HEAD); slot 7 FINISHED
+redundant FRAME-REVOLVE residue. Registry: BLOCKED rows with all deps landed =
+none dispatchable (BG-CK-SPLINE-CENSUS owner-CANCELLED; DEF-TESS-ANALYTIC-SEAM
+superseded by its -R2; DEF-SEEDRAY-B human-gated; TOR-C orchestrator-held).
+Health: heartbeat 1 (27440), watchdog 1 (28440), cargoq UP (ping ok, queued 0),
+operator runner 1 (29776), overnight driver 1 (28824), orchestrator session
+LIVE (opencode 17740), TWO supervisors (27392 + 15100) and TWO cargoq/server.py
+(27568 + 25356) carried-flagged; disk ~18.7 GB free (above the 8 GB floor and
+the 15 GB janitor goal); RAM 3.8 GB free. Open human items: (NEW) FRAME-REVOLVE
+landed with the F1 non_z_axis pin UNAMENDED (ttc_lathe_spline.rs:255 still pins
+non_z_axis; the x-axis ring revolve is now a recorded carrier) - a pin-move
+amendment is the likely follow-up; slot-4 F1 wt RESULT residue still parks the
+driver's dispatch arm, and slot 7 now carries the same-shaped redundant RESULT
+(status LANDED, no commit); duplicate supervisors + the wedged cargoq restart
+guard; TOR-C flip-or-pin.]
 
 ## The parallelism picture
 

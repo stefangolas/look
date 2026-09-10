@@ -687,3 +687,64 @@ cycle until adjudicated); orchestrator session pid 17740 LIVE; disk 19.6 GB
 free; RAM 4.7 GB free. Escalations carried (unchanged): FRAME-REVOLVE landing
 adjudication; duplicate supervisors 27392 + 15100 + the wedged cargoq restart
 guard; slot-4 F1 wt RESULT residue; TOR-C flip-or-pin.
+
+## 2026-09-10 01:28 UTC (operator cycle)
+
+Board at start: 0 RUNNING / 0 landed-this-cycle at first poll (slot 7 showed
+RUNNING pid 26328, events 0.1 min fresh). Slots 0-6 FINISHED/IDLE landed
+residue; slot 7 RUNNING FRAME-REVOLVE. Health: heartbeat 1 (27440), watchdog 1
+(28440), cargoq UP (ping ok, queued 0), operator runner 1 (29776), overnight
+driver 1 (28824), TWO supervisors (27392 + 15100) and TWO cargoq/server.py
+(27568 + 25356) carried-flagged; disk 18.7 GB free; RAM 3.83 GB free;
+orchestrator session LIVE (opencode 17740).
+
+Findings:
+- **The board moved since the 23:15Z cycle: FRAME-REVOLVE was LANDED by the
+  orchestrator** (merge 39e9550 of worker b667a85; b667a85 is now an ancestor
+  of HEAD). The orchestrator then flipped the row DONE and committed ca4a498
+  ("FRAME-REVOLVE row LANDED ... cascade unblocks SWEEP-PATH") WHILE this
+  operator cycle was running - the operator's concurrent registry-marker edit
+  was absorbed into that commit (the row now reads status DONE + "LANDED
+  b667a85 ... operator added ..." + "LANDED 39e9550 (orchestrator)").
+- **A redundant heartbeat re-fork had run FRAME-REVOLVE a second time in slot
+  7** because the row was still READY with no landed marker (dispatch_ready's
+  landed() = status DONE or a `landed <hex>` note). It forked from base eafdc80
+  (= HEAD, already containing b667a85) and finished mid-cycle with RESULT status
+  LANDED and NO commit (the carrier was already present; only CONTEXT.md
+  modified). Not operator-landable (status != DONE, no commit) - left as
+  residue. Root cause = the orchestrator's landing omitted the registry marker.
+- **SWEEP-PATH was gated but its preflight failed on anchor drift**: A2
+  `grep -c 'tangent' corpus/ttc/door.py` expected 6, tree has 7 - the
+  FRAME-REVOLVE landing added a 'tangent' mention (the documented per-landing
+  anchor drift). Re-measured the anchor myself (PowerShell count = 7) and
+  updated the expect per the charter's anchor ritual.
+
+Actions:
+- Health sweep done (see board above).
+- Landing: NOTHING to land. All FINISHED-slot worker commits are ancestors of
+  HEAD (251f368/e33c4dd/e9d885a/3c2109b/ee97499/713f205/4de25d9/b667a85 all
+  True). Slot 7's redundant RESULT has no commit.
+- Unblock: nothing stuck (slot 7 was RUNNING with fresh events; no
+  IDLE/DEAD >15 min holding work; no QUESTION).
+- Registry hygiene: FRAME-REVOLVE READY->DONE was completed by the orchestrator
+  (ca4a498). Re-measured and committed SWEEP-PATH's A2 anchor (32d967f).
+  Verified BLOCKED-with-all-deps-landed = none dispatchable (BG-CK-SPLINE-CENSUS
+  owner-CANCELLED, DEF-TESS-ANALYTIC-SEAM superseded by -R2, DEF-SEEDRAY-B
+  human-gated, TOR-C orchestrator-held) - no flips.
+- Dispatch: dispatch_ready --dry-run only (heartbeat live - double-dispatch
+  rule): SWEEP-PATH -> slot 0, dispatched 1, workers 0/4. Heartbeat will
+  dispatch.
+- ESCALATED (2026-09-10T01:2xZ): FRAME-REVOLVE landed with the F1 non_z_axis
+  pin unamended (ttc_lathe_spline.rs:255) - a pin-move amendment is the likely
+  follow-up; slot-7 redundant FRAME-REVOLVE RESULT residue (same shape as the
+  slot-4 park).
+- STATE.md volatile refresh + ground-truth pointer updated ([operator
+  2026-09-10T01:28Z]).
+
+Leaving: 0 RUNNING (slot 7 finished its redundant run); FRAME-REVOLVE LANDED +
+row DONE; SWEEP-PATH preflight-green awaiting the heartbeat's dispatch; slots
+0-6 landed residue; cargoq UP; heartbeat 1; orchestrator session LIVE; disk
+18.7 GB free; RAM 3.8 GB free. Escalations carried: F1 non_z_axis pin
+amendment; duplicate supervisors + wedged cargoq restart guard; slot-4 (and now
+slot-7) wt RESULT residue parking the driver's dispatch arm; TOR-C
+flip-or-pin.

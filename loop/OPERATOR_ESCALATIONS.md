@@ -220,3 +220,22 @@ Judgment-required items appended each operator cycle. Newest at the bottom.
 - Carried (unchanged): duplicate supervisors 27392 + 15100; wedged cargoq
   supervisor restart guard; slot-4 F1 wt RESULT residue parking the driver's
   dispatch arm; TOR-C flip-or-pin (orchestrator LIVE - its call).
+
+## 2026-09-10 01:2xZ - FRAME-REVOLVE landed with the F1 non_z_axis pin UNAMENDED; slot-7 redundant re-fork residue
+
+- What: FRAME-REVOLVE was landed by the orchestrator (merge 39e9550 of worker
+  b667a85; row DONE ca4a498) but the F1 finding's recommended follow-up did NOT
+  land: `truck123d/tests/ttc_lathe_spline.rs` still pins `non_z_axis` at line
+  255 (`revolve_refusals_stay_typed_after_spline_admission`), while the x-axis
+  ring revolve is now a recorded carrier. `cargo test -p truck123d --tests` is
+  therefore expected to fail at HEAD (the packet's own RESULT recorded it red).
+  Either amend the pin (mirroring the mvac-extrude pin move 5f1396d) or record
+  the acceptance explicitly. Start here: `git -C C:\Users\stefa\look show
+  b667a85 --stat`; ttc_lathe_spline.rs:200-260.
+- Also: a redundant heartbeat re-fork ran FRAME-REVOLVE again in slot 7 (the row
+  was READY with no landed marker at re-fork time), finishing with a RESULT
+  status LANDED and NO commit. The slot-7 wt RESULT is now residue of the same
+  shape as the slot-4 F1 park; both park the overnight driver's dispatch arm
+  each 5-min cycle. Clear both wt-root RESULT files (or let a recycle do it).
+- Carried (unchanged): duplicate supervisors 27392 + 15100; wedged cargoq
+  supervisor restart guard; TOR-C flip-or-pin (orchestrator LIVE - its call).
