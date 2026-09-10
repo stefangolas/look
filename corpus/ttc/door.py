@@ -1943,29 +1943,56 @@ def _place_loop(loop, base_frame, frame):
 
 def extrude(shape, amount, both=False, mode=None, **kwargs):
     """build123d ``extrude(face, amount, both)``: the recording arm for a
-    closed planar line-loop profile swept along its own plane normal (an exact
-    prism -- the volume is the profile area times the swept length, `2 * amount`
-    when `both`). The record keeps the profile boundary in order; the kernel
-    derives the profile plane and normal exactly and never approximates. A
-    spline-trimmed face boundary or a non-Face carrier refuses typed.
+    closed planar profile swept along its own plane normal.
+
+    An all-line boundary records the exact prism row (the volume is the profile
+    area times the swept length, `2 * amount` when `both`). A boundary carrying
+    a recorded spline edge is the spline-trimmed extrude constructor row
+    (`trim_prism`): the line edges are the base profile and the recorded spline
+    samples are the closed spline carrier the binding's constructor classifies.
+    The row is dispatched through the native facts entry at record time, so a
+    spline class the composition cannot close surfaces its typed refusal here --
+    never a silent fallback.
     """
     if not isinstance(shape, Face):
         _refuse("Face extrusion is not yet a kernel-engine row")
-    profile = []
+    lines = []
+    spline_points = []
     for edge in shape.edges:
-        if edge.kind != "line":
-            _refuse("a spline-trimmed face extrusion is not a kernel-engine row")
-        profile.append(_edge3(edge))
-    if len(profile) < 3:
+        if edge.kind == "line":
+            lines.append(_edge3(edge))
+        else:
+            spline_points.extend(point.to_tuple() for point in edge.points)
+    if not lines and not spline_points:
         _refuse("Face extrusion is not yet a kernel-engine row")
-    return _Part(
+    if not spline_points:
+        if len(lines) < 3:
+            _refuse("Face extrusion is not yet a kernel-engine row")
+        return _Part(
+            {
+                "kind": "prism",
+                "profile": lines,
+                "amount": _num(amount),
+                "both": bool(both),
+            }
+        )
+    curve = list(spline_points)
+    if curve[0] != curve[-1]:
+        curve.append(curve[0])
+    part = _Part(
         {
-            "kind": "prism",
-            "profile": profile,
+            "kind": "trim_prism",
+            "profile": lines,
             "amount": _num(amount),
             "both": bool(both),
+            "trim_curve": curve,
+            "trim_net": [],
+            "tolerance": 1.0e-3,
         }
     )
+    if _T123D is not None:
+        _T123D.bd_facts(json.dumps(part._node()))
+    return part
 
 
 def sweep(section=None, path=None, mode=None, **kwargs):
@@ -2269,13 +2296,17 @@ def main() -> int:
     try:
         obj = run_entry(tree_src, module, entry, args)
     except Exception as exc:  # noqa: BLE001 - the door reports typed failure
+        error = {"kind": type(exc).__name__, "message": str(exc)}
+        payload = getattr(exc, "payload", None)
+        if payload is not None:
+            error["payload"] = payload
         record = {
             "schema": "ttc_door_run.v1",
             "door_version": door_version,
             "engine": ENGINE,
             "ok": False,
             "entry": entry,
-            "error": {"kind": type(exc).__name__, "message": str(exc)},
+            "error": error,
         }
         json.dump(record, sys.stdout, indent=2)
         return 1
@@ -2292,6 +2323,10 @@ def main() -> int:
 
             bd.export_stl(obj, stl_path, tolerance=tolerance, angular_tolerance=0.5)
     except Exception as exc:  # noqa: BLE001 - a refused export is a typed verdict
+        error = {"kind": type(exc).__name__, "message": str(exc)}
+        payload = getattr(exc, "payload", None)
+        if payload is not None:
+            error["payload"] = payload
         record = {
             "schema": "ttc_door_run.v1",
             "door_version": door_version,
@@ -2299,7 +2334,7 @@ def main() -> int:
             "ok": False,
             "entry": entry,
             "module": module,
-            "error": {"kind": type(exc).__name__, "message": str(exc)},
+            "error": error,
         }
         json.dump(record, sys.stdout, indent=2)
         return 1

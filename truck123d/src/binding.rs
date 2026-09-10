@@ -78,14 +78,26 @@ use pyo3::prelude::*;
 use serde::{Deserialize, Serialize};
 
 use crate::facade::{self, BooleanPairVerdict, CarrierClass, ModeValue};
-use crate::marshal::{ExceptionClass, Marshaled, MarshaledPayload};
+use crate::marshal::{ExceptionClass, Marshaled, MarshaledPayload, RefusedPayload};
 
 use truck_certified::construct::admission::{NormalCone, certify_transverse_pair};
 use truck_certified::construct::patches::{PatchParent, TensorBernsteinPatch};
 use truck_certified::construct::volume_facts::{
     VolumeOptions, certify_algebraic_trim_bracket, certify_patch_form,
 };
-use truck_certified::kernel::patch::IBox2;
+use truck_certified::kernel::Interval;
+use truck_certified::kernel::certs::{ArcCert, Frame, PointCert};
+use truck_certified::kernel::evidence::{Refusal as KernelRefusal, RefusalEvidence, RefusalKind};
+use truck_certified::kernel::graph::{
+    AnyArc, Approx, Arc, ArcEnd, ArcId, Break, CertifiedGraph, ChartId, HermiteSegment,
+    HermiteSpline, Node, NodeCert, NodeId, Param, Point4, TopoNode,
+};
+use truck_certified::kernel::patch::{IBox, IBox2};
+use truck_certified::kernel::residual::ResidualId;
+use truck_certified::kernel::residuals_r89::BezierLeaf1;
+use truck_certified::kernel::trimclip::{TrimLoop, trim_clip};
+
+use crate::bd_bridge::{ProfileEdge, Triangle};
 
 /// A closed two-sided bracket `[lo, hi]`. The only numeric shape an export
 /// ever returns: no float crosses the boundary without its enclosing bracket.
@@ -417,6 +429,696 @@ pub fn binding_trim_facts(py: Python<'_>, row_json: &str) -> PyResult<String> {
     trim_facts(&row).map_err(|e| to_pyerr(py, e))
 }
 
+// ===========================================================================
+// TRIM-EXTRUDE-CTOR — the spline-trimmed extrude constructor.
+//
+// One export composes the LANDED stages in order and never reimplements any
+// of them:
+//
+//   1. local-frame extrude   — the recorded profile is projected into its own
+//                              plane and swept along the plane normal (the
+//                              landed `bd_bridge` prism geometry);
+//   2. pullback polynomial   — the volume-form pullback is the constant
+//                              density net `height` over the unit square (the
+//                              extrusion's Jacobian is constant);
+//   3. R9 crossings          — `trim_clip` certifies the crossings of the
+//                              profile's arcs against the closed spline trim
+//                              loop and stamps them as `TopoNode::TrimCrossing`
+//                              nodes (never bare coordinates);
+//   4. winding classification — `trim_clip`'s sound `certify_off_loop` +
+//                              `winding_number` composition classifies the
+//                              retained sub-arcs;
+//   5. ADM-003 bracket        — `certify_algebraic_trim_bracket` integrates the
+//                              density over the recorded pullback net
+//                              and returns the certified two-sided bracket.
+//
+// A trim class the composition cannot close (a self-crossing control loop, a
+// trim with no recorded pullback net, a stalled R9 isolation) refuses TYPED
+// naming the `TrimClipFailed` family — Inconclusive, never silent (§9.4).
+// ===========================================================================
+
+/// The certified bracket tolerance of a trim-extrude row (dimensionless).
+const TRIM_EXTRUDE_TOLERANCE: f64 = 1.0e-3;
+
+/// The certified contraction rate of the constructor's crossing certificates
+/// (`<= RHO_MAX`).
+const TRIM_EXTRUDE_RHO: f64 = 0.125;
+
+/// The one lifted chart the constructor's trim clip certifies in.
+const TRIM_EXTRUDE_CHART: ChartId = ChartId(0);
+
+/// The constructor's control-point envelope for the R9 clip. The clip's
+/// subdivision is exponential in the leaf degree, so a corpus spline recorded
+/// as one high-degree control loop refuses typed rather than running an
+/// unbounded isolation.
+const MAX_TRIM_CONTROL_POINTS: usize = 16;
+
+/// The spline-trimmed extrude row: the base profile plus the recorded closed
+/// spline curve and (optionally) the recorded pullback net.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct TrimExtrudeRow {
+    /// The base profile boundary edges (a line loop; a spline edge is a
+    /// recorded trim carrier the constructor classifies).
+    pub profile: Vec<ProfileEdge>,
+    /// The swept length along the profile-plane normal.
+    pub amount: f64,
+    /// Extrude symmetrically about the profile plane.
+    #[serde(default)]
+    pub both: bool,
+    /// The closed spline curve control points (first == last for a closed
+    /// loop); empty for a full extrude.
+    #[serde(default)]
+    pub trim_curve: Vec<[f64; 3]>,
+    /// The curve's pullback net (row-major Bernstein grid over the unit
+    /// square, `>= 0` kept); empty when only the parametric curve is
+    /// recorded.
+    #[serde(default)]
+    pub trim_net: Vec<Vec<f64>>,
+    /// The requested certified bracket tolerance.
+    #[serde(default = "default_trim_extrude_tolerance")]
+    pub tolerance: f64,
+}
+
+/// The default certified bracket tolerance of a trim-extrude row.
+fn default_trim_extrude_tolerance() -> f64 {
+    TRIM_EXTRUDE_TOLERANCE
+}
+
+/// One certified trim crossing record: the crossing is a `TrimCrossing` node
+/// (certified exactly), never a bare coordinate pair.
+#[derive(Debug, Clone, PartialEq, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct TrimCrossingRecord {
+    /// Always `"trim_crossing"`: the node kind the clip stamped.
+    pub kind: &'static str,
+    /// Whether the node carries an exact certificate.
+    pub certified: bool,
+    /// The certified chart point `(u, v)` of the crossing.
+    pub point: [f64; 2],
+}
+
+/// The certified outcome of one spline-trimmed extrude.
+#[derive(Debug, Clone, PartialEq, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct TrimExtrudeOutcome {
+    /// Always `true` on the `Ok` path.
+    pub ok: bool,
+    /// The certified two-sided volume bracket.
+    pub bracket: Bracket,
+    /// The certified volume value (the bracket midpoint).
+    pub value: f64,
+    /// The local-frame bounding box of the extruded realization.
+    pub bbox: [[f64; 3]; 2],
+    /// The certified trim crossings, in certified arc-parameter order.
+    pub crossings: Vec<TrimCrossingRecord>,
+    /// The number of retained (inside) sub-arcs of the clip.
+    pub retained_arcs: usize,
+}
+
+/// The realized facts of one trim-prism row (the executor's shape): the
+/// certified volume value, the local bbox and the deterministic mesh.
+pub struct TrimExtrudeFacts {
+    /// The certified volume value (the bracket midpoint).
+    pub volume: f64,
+    /// The local-frame bounding box.
+    pub bbox: [[f64; 3]; 2],
+    /// The local triangle soup (the base realization).
+    pub mesh: Vec<Triangle>,
+}
+
+/// An orthonormal basis of the recorded profile's plane.
+struct PlaneBasis {
+    origin: [f64; 3],
+    u: [f64; 3],
+    v: [f64; 3],
+    #[allow(dead_code)]
+    normal: [f64; 3],
+}
+
+impl PlaneBasis {
+    /// The chart coordinates of a world point in the profile plane.
+    fn project(&self, p: [f64; 3]) -> [f64; 2] {
+        let d = sub3(p, self.origin);
+        [dot3(d, self.u), dot3(d, self.v)]
+    }
+
+    /// The world point of a chart coordinate pair.
+    fn lift(&self, p: [f64; 2]) -> [f64; 3] {
+        [
+            self.origin[0] + self.u[0] * p[0] + self.v[0] * p[1],
+            self.origin[1] + self.u[1] * p[0] + self.v[1] * p[1],
+            self.origin[2] + self.u[2] * p[0] + self.v[2] * p[1],
+        ]
+    }
+}
+
+fn sub3(a: [f64; 3], b: [f64; 3]) -> [f64; 3] {
+    [a[0] - b[0], a[1] - b[1], a[2] - b[2]]
+}
+
+fn cross3(a: [f64; 3], b: [f64; 3]) -> [f64; 3] {
+    [
+        a[1] * b[2] - a[2] * b[1],
+        a[2] * b[0] - a[0] * b[2],
+        a[0] * b[1] - a[1] * b[0],
+    ]
+}
+
+fn dot3(a: [f64; 3], b: [f64; 3]) -> f64 {
+    a[0] * b[0] + a[1] * b[1] + a[2] * b[2]
+}
+
+fn norm3(a: [f64; 3]) -> f64 {
+    dot3(a, a).sqrt()
+}
+
+fn normalize3(a: [f64; 3]) -> [f64; 3] {
+    let n = norm3(a);
+    [a[0] / n, a[1] / n, a[2] / n]
+}
+
+/// The malformed-row error (a caller defect, distinct from a kernel refusal).
+fn malformed(detail: &str) -> BindingError {
+    BindingError::Malformed(MalformedRow {
+        detail: detail.to_string(),
+    })
+}
+
+/// A typed `TrimClipFailed` refusal (Inconclusive) — the named §9.4 refusal.
+fn trim_clip_failed(name: &'static str, detail: String) -> BindingError {
+    BindingError::Refusal(Box::new(marshal_kernel_refusal(&KernelRefusal::new(
+        RefusalKind::TrimClipFailed,
+        RefusalEvidence::Predicate { name, detail },
+    ))))
+}
+
+/// Marshals a certified-kernel `Refusal` into the typed door vocabulary. The
+/// kind names the case; the door class is always `Refused` (the payload carries
+/// the precise kind, so the door can distinguish the `TrimClipFailed` family
+/// without a lossy re-marshal).
+fn marshal_kernel_refusal(refusal: &KernelRefusal) -> Marshaled {
+    let case = crate::marshal::kernel_refusal_kind_name(refusal.kind);
+    Marshaled {
+        class: ExceptionClass::Refused,
+        message: format!("kernel refusal: {case}"),
+        payload: MarshaledPayload::Refused(RefusedPayload {
+            case: case.to_string(),
+            envelope: None,
+            stage: None,
+            prop: None,
+            left: None,
+            right: None,
+            reason: None,
+            certificate: None,
+            bound: None,
+            allowed: None,
+        }),
+    }
+}
+
+/// The recorded points of a profile edge list and a trim curve.
+fn gather_points(profile: &[ProfileEdge], trim: &[[f64; 3]]) -> Vec<[f64; 3]> {
+    let mut out = Vec::new();
+    for edge in profile {
+        match edge {
+            ProfileEdge::Line { a, b } => {
+                out.push(*a);
+                out.push(*b);
+            }
+            ProfileEdge::Spline { points } => out.extend(points.iter().copied()),
+        }
+    }
+    out.extend(trim.iter().copied());
+    out
+}
+
+/// The closed line-loop vertices of a profile, `None` when any edge is a
+/// spline (a spline profile is a trim carrier, not a flattenable base loop).
+fn line_loop_vertices(profile: &[ProfileEdge]) -> Option<Vec<[f64; 3]>> {
+    let mut out = Vec::new();
+    for edge in profile {
+        match edge {
+            ProfileEdge::Line { a, .. } => out.push(*a),
+            ProfileEdge::Spline { .. } => return None,
+        }
+    }
+    if out.len() >= 3 { Some(out) } else { None }
+}
+
+/// The bounding rectangle of a chart point set (the fallback base profile of
+/// a spline-only trim carrier).
+fn bbox_rect(points: &[[f64; 2]]) -> Vec<[f64; 2]> {
+    let mut lo = [f64::INFINITY; 2];
+    let mut hi = [f64::NEG_INFINITY; 2];
+    for p in points {
+        lo[0] = lo[0].min(p[0]);
+        lo[1] = lo[1].min(p[1]);
+        hi[0] = hi[0].max(p[0]);
+        hi[1] = hi[1].max(p[1]);
+    }
+    vec![
+        [lo[0], lo[1]],
+        [hi[0], lo[1]],
+        [hi[0], hi[1]],
+        [lo[0], hi[1]],
+    ]
+}
+
+/// Builds and validates the profile plane from the recorded points.
+fn fit_plane(points: &[[f64; 3]]) -> Result<PlaneBasis, BindingError> {
+    let p0 = match points.first() {
+        Some(p) => *p,
+        None => return Err(malformed("trim-extrude row has no recorded points")),
+    };
+    let mut u_raw = None;
+    for p in points.iter().skip(1) {
+        let d = sub3(*p, p0);
+        if norm3(d) > 1.0e-12 {
+            u_raw = Some(d);
+            break;
+        }
+    }
+    let u_raw = match u_raw {
+        Some(u) => u,
+        None => return Err(malformed("trim-extrude profile is degenerate")),
+    };
+    let mut normal = None;
+    for p in points.iter() {
+        let c = cross3(u_raw, sub3(*p, p0));
+        if norm3(c) > 1.0e-12 {
+            normal = Some(c);
+            break;
+        }
+    }
+    let normal = match normal {
+        Some(n) => n,
+        None => return Err(malformed("trim-extrude profile is collinear")),
+    };
+    let u = normalize3(u_raw);
+    let normal = normalize3(normal);
+    let v = cross3(normal, u);
+    Ok(PlaneBasis {
+        origin: p0,
+        u,
+        v,
+        normal,
+    })
+}
+
+/// Builds the recorded 3-D line edges of a closed chart polygon in the plane.
+fn polygon_edges(polygon: &[[f64; 2]], plane: &PlaneBasis) -> Vec<ProfileEdge> {
+    let n = polygon.len();
+    polygon
+        .iter()
+        .zip(polygon.iter().cycle().skip(1))
+        .take(n)
+        .map(|(a, b)| ProfileEdge::Line {
+            a: plane.lift(*a),
+            b: plane.lift(*b),
+        })
+        .collect()
+}
+
+/// A certified point certificate over a degenerate box at a chart point.
+// Refusal carries Option<PartialGraph> by frozen §2 shape; large-Err is allowed (BG-KV2-000).
+#[allow(clippy::result_large_err)]
+fn cert_at(point: [f64; 2]) -> Result<PointCert, KernelRefusal> {
+    let box_ = IBox2::try_new([point[0], point[1]], [point[0], point[1]])?;
+    PointCert::try_new(ResidualId::R1, box_, TRIM_EXTRUDE_RHO)
+}
+
+/// A certified boundary node on the constructor's chart at a chart point.
+// Refusal carries Option<PartialGraph> by frozen §2 shape; large-Err is allowed (BG-KV2-000).
+#[allow(clippy::result_large_err)]
+fn boundary_node(id: usize, point: [f64; 2]) -> Result<Node, KernelRefusal> {
+    let at = Point4 {
+        p1: Param::try_new(TRIM_EXTRUDE_CHART, 0, point[0], point[1])?,
+        p2: Param::try_new(TRIM_EXTRUDE_CHART, 0, point[0], point[1])?,
+    };
+    Ok(Node {
+        id: NodeId(id),
+        at,
+        kind: TopoNode::Boundary,
+        cert: NodeCert::Exact(cert_at(point)?),
+    })
+}
+
+/// A certified straight ordinary arc between two chart points over unit
+/// parameter, referencing the two node ends.
+// Refusal carries Option<PartialGraph> by frozen §2 shape; large-Err is allowed (BG-KV2-000).
+#[allow(clippy::result_large_err)]
+fn straight_arc(
+    id: usize,
+    from: [f64; 2],
+    to: [f64; 2],
+    first: ArcEnd,
+    second: ArcEnd,
+) -> Result<Arc<4>, KernelRefusal> {
+    let z_hat = [from[0], from[1], 0.0, 1.0];
+    let q = [
+        [1.0, 0.0, 0.0, 0.0],
+        [0.0, 1.0, 0.0, 0.0],
+        [0.0, 0.0, 1.0, 0.0],
+        [0.0, 0.0, 0.0, 1.0],
+    ];
+    let q_tau = [1.0, 0.0, 0.0, 0.0];
+    let q_perp = [
+        [0.0, 1.0, 0.0, 0.0],
+        [0.0, 0.0, 1.0, 0.0],
+        [0.0, 0.0, 0.0, 1.0],
+        [1.0, 0.0, 0.0, 0.0],
+    ];
+    let a = [[0.0; 4]; 4];
+    let frame = Frame::try_new(z_hat, q, q_tau, q_perp, a)?;
+    let i_tau = Interval { lo: 0.0, hi: 1.0 };
+    let b_perp = IBox::<4>::try_new([-1.0; 4], [1.0; 4])?;
+    let arc_cert = ArcCert::try_new(
+        ResidualId::R1,
+        frame,
+        i_tau,
+        b_perp,
+        TRIM_EXTRUDE_RHO,
+        vec![[0.0, 0.0]; 4],
+        None,
+    )?;
+    let d = [to[0] - from[0], to[1] - from[1], 0.0];
+    let spline = HermiteSpline::try_new(vec![HermiteSegment {
+        p0: [from[0], from[1], 0.0],
+        p1: [to[0], to[1], 0.0],
+        t0: d,
+        t1: d,
+    }])?;
+    Ok(Arc {
+        id: ArcId(id),
+        approx: Approx { gamma: spline },
+        cert: arc_cert,
+        ends: (first, second),
+    })
+}
+
+/// The certified graph of a closed chart polygon (boundary nodes + straight
+/// ordinary arcs, in order).
+// Refusal carries Option<PartialGraph> by frozen §2 shape; large-Err is allowed (BG-KV2-000).
+#[allow(clippy::result_large_err)]
+fn build_graph(polygon: &[[f64; 2]]) -> Result<CertifiedGraph, KernelRefusal> {
+    let n = polygon.len();
+    let mut nodes = Vec::with_capacity(n);
+    for (i, p) in polygon.iter().enumerate() {
+        nodes.push(boundary_node(i, *p)?);
+    }
+    let mut arcs: Vec<AnyArc> = Vec::with_capacity(n);
+    for (i, (from, to)) in polygon
+        .iter()
+        .zip(polygon.iter().cycle().skip(1))
+        .take(n)
+        .enumerate()
+    {
+        let arc = straight_arc(
+            i,
+            *from,
+            *to,
+            ArcEnd::Topo(NodeId(i)),
+            ArcEnd::Topo(NodeId((i + 1) % n)),
+        )?;
+        arcs.push(AnyArc::Ordinary(arc));
+    }
+    let breaks: Vec<Break> = Vec::new();
+    Ok(CertifiedGraph {
+        nodes,
+        breaks,
+        arcs,
+        sheets: Vec::new(),
+        exhaustive: false,
+    })
+}
+
+/// The closed rational Bézier trim leaf of the recorded control points.
+// Refusal carries Option<PartialGraph> by frozen §2 shape; large-Err is allowed (BG-KV2-000).
+#[allow(clippy::result_large_err)]
+fn bezier_trim_leaf(trim2: &[[f64; 2]]) -> Result<BezierLeaf1, KernelRefusal> {
+    if trim2.len() < 2 {
+        return Err(KernelRefusal::new(
+            RefusalKind::TrimClipFailed,
+            RefusalEvidence::Predicate {
+                name: "trim_curve_too_short",
+                detail: "a closed trim curve needs at least two control points".to_string(),
+            },
+        ));
+    }
+    let degree = trim2.len() - 1;
+    let control: Vec<[f64; 4]> = trim2.iter().map(|p| [p[0], p[1], 0.0, 1.0]).collect();
+    BezierLeaf1::try_new(degree, control, TRIM_EXTRUDE_CHART)
+}
+
+/// Whether two closed chart segments properly intersect.
+fn segments_cross(a0: [f64; 2], a1: [f64; 2], b0: [f64; 2], b1: [f64; 2]) -> bool {
+    let d1 = orient(b0, b1, a0);
+    let d2 = orient(b0, b1, a1);
+    let d3 = orient(a0, a1, b0);
+    let d4 = orient(a0, a1, b1);
+    ((d1 > 0.0 && d2 < 0.0) || (d1 < 0.0 && d2 > 0.0))
+        && ((d3 > 0.0 && d4 < 0.0) || (d3 < 0.0 && d4 > 0.0))
+}
+
+/// The signed area of the triangle `(a, b, c)` (the orientation predicate).
+fn orient(a: [f64; 2], b: [f64; 2], c: [f64; 2]) -> f64 {
+    (b[0] - a[0]) * (c[1] - a[1]) - (b[1] - a[1]) * (c[0] - a[0])
+}
+
+/// Whether the control polygon of a closed trim loop self-intersects. A
+/// self-crossing loop cannot be certified by the clip's winding discipline;
+/// the constructor refuses it typed rather than approximating.
+fn control_polygon_self_intersects(points: &[[f64; 2]]) -> bool {
+    let n = points.len();
+    for i in 0..n {
+        let (Some(a0), Some(a1)) = (points.get(i).copied(), points.get((i + 1) % n).copied())
+        else {
+            continue;
+        };
+        for j in (i + 1)..n {
+            // Adjacent segments share an endpoint; skip them.
+            if j == i + 1 || (i == 0 && j + 1 == n) {
+                continue;
+            }
+            let (Some(b0), Some(b1)) = (points.get(j).copied(), points.get((j + 1) % n).copied())
+            else {
+                continue;
+            };
+            if segments_cross(a0, a1, b0, b1) {
+                return true;
+            }
+        }
+    }
+    false
+}
+
+/// The chart samples of a closed Bézier trim leaf (deterministic fixed-order
+/// de Casteljau subdivision, used only for the realization mesh).
+fn bezier_samples(control: &[[f64; 2]], steps: usize) -> Vec<[f64; 2]> {
+    let mut out = Vec::with_capacity(steps);
+    for step in 0..steps {
+        let t = step as f64 / steps as f64;
+        let mut level: Vec<[f64; 2]> = control.to_vec();
+        let mt = 1.0 - t;
+        while level.len() > 1 {
+            let mut next = Vec::with_capacity(level.len() - 1);
+            for pair in level.windows(2) {
+                if let [a, b] = pair {
+                    next.push([mt * a[0] + t * b[0], mt * a[1] + t * b[1]]);
+                }
+            }
+            level = next;
+        }
+        if let Some(p) = level.first() {
+            out.push(*p);
+        }
+    }
+    out
+}
+
+/// The composition: extrude the profile, cut it by the recorded spline trim,
+/// certify the crossings and classify the retained region, and bracket the
+/// volume through the ADM-003 pullback-net engine.
+pub fn trim_extrude(row: &TrimExtrudeRow) -> Result<TrimExtrudeOutcome, BindingError> {
+    if !(row.amount.is_finite() && row.amount > 0.0) {
+        return Err(malformed("trim-extrude amount must be finite and positive"));
+    }
+    if !(row.tolerance.is_finite() && row.tolerance > 0.0) {
+        return Err(malformed(
+            "trim-extrude tolerance must be finite and positive",
+        ));
+    }
+    let points = gather_points(&row.profile, &row.trim_curve);
+    let plane = fit_plane(&points)?;
+
+    // 1. The local-frame base profile.
+    let line_vertices = line_loop_vertices(&row.profile);
+    let base2: Vec<[f64; 2]> = match line_vertices {
+        Some(verts) => verts.iter().map(|p| plane.project(*p)).collect(),
+        None => {
+            if row.trim_curve.is_empty() {
+                return Err(malformed(
+                    "a spline profile with no trim curve is not a constructor row",
+                ));
+            }
+            let trim2: Vec<[f64; 2]> = row.trim_curve.iter().map(|p| plane.project(*p)).collect();
+            bbox_rect(&trim2)
+        }
+    };
+    let base_edges = polygon_edges(&base2, &plane);
+
+    // 2. No trim: the plain extruded prism, bit-identical to the landed arm.
+    if row.trim_curve.is_empty() {
+        let volume = crate::bd_bridge::prism_geom(&base_edges, row.amount, row.both)
+            .map_err(|r| BindingError::Refusal(Box::new(Marshaled::from_refusal(&r))))?
+            .volume;
+        let bbox = crate::bd_bridge::prism_bbox(&base_edges, row.amount, row.both)
+            .map_err(|r| BindingError::Refusal(Box::new(Marshaled::from_refusal(&r))))?;
+        return Ok(TrimExtrudeOutcome {
+            ok: true,
+            bracket: Bracket {
+                lo: volume,
+                hi: volume,
+            },
+            value: volume,
+            bbox,
+            crossings: Vec::new(),
+            retained_arcs: 0,
+        });
+    }
+
+    // 3. The closed spline trim curve, in the same chart as the base arcs.
+    let trim2: Vec<[f64; 2]> = row.trim_curve.iter().map(|p| plane.project(*p)).collect();
+    if control_polygon_self_intersects(&trim2) {
+        return Err(trim_clip_failed(
+            "trim_loop_self_crossing",
+            "the recorded trim control loop self-intersects; the clip's winding discipline \
+             cannot classify it, refusing TrimClipFailed (Inconclusive)"
+                .to_string(),
+        ));
+    }
+    // The certified volume bracket is assembled over the recorded pullback net.
+    // Without it the ADM-003 bracket cannot close, so the constructor refuses
+    // TYPED before paying for the crossing isolation — never an unbounded
+    // subdivision on a curve whose kept region is not recorded.
+    if row.trim_net.is_empty() {
+        return Err(trim_clip_failed(
+            "trim_pullback_missing",
+            "the spline curve has no recorded pullback net; the ADM-003 bracket \
+             cannot be assembled, refusing TrimClipFailed (Inconclusive)"
+                .to_string(),
+        ));
+    }
+    // The R9 clip certifies low-degree chart leaves; a corpus spline recorded
+    // as one high-degree control loop is outside that discipline and refuses
+    // typed rather than exploding the subdivision.
+    if trim2.len() > MAX_TRIM_CONTROL_POINTS {
+        return Err(trim_clip_failed(
+            "trim_degree_out_of_envelope",
+            format!(
+                "the trim control loop carries {} points, above the constructor's \
+                 {MAX_TRIM_CONTROL_POINTS}-point envelope; refusing TrimClipFailed (Inconclusive)",
+                trim2.len()
+            ),
+        ));
+    }
+    let graph = build_graph(&base2)
+        .map_err(|r| BindingError::Refusal(Box::new(marshal_kernel_refusal(&r))))?;
+    let leaf = bezier_trim_leaf(&trim2)
+        .map_err(|r| BindingError::Refusal(Box::new(marshal_kernel_refusal(&r))))?;
+    let trim_loop = TrimLoop {
+        chart: TRIM_EXTRUDE_CHART,
+        curve: leaf,
+        closed: true,
+    };
+    let clipped = trim_clip(&graph, &[trim_loop])
+        .map_err(|r| BindingError::Refusal(Box::new(marshal_kernel_refusal(&r))))?;
+    let crossings: Vec<TrimCrossingRecord> = clipped
+        .nodes
+        .iter()
+        .filter(|node| node.kind == TopoNode::TrimCrossing)
+        .map(|node| TrimCrossingRecord {
+            kind: "trim_crossing",
+            certified: matches!(node.cert, NodeCert::Exact(_)),
+            point: [node.at.p1.u, node.at.p1.v],
+        })
+        .collect();
+    let retained_arcs = clipped.arcs.len();
+
+    // 4. The certified volume bracket over the recorded pullback net.
+    let height = if row.both {
+        2.0 * row.amount
+    } else {
+        row.amount
+    };
+    let density = vec![vec![height]];
+    let bracket = certify_algebraic_trim_bracket(&density, &row.trim_net, row.tolerance)
+        .map_err(|r| BindingError::Refusal(Box::new(Marshaled::from_construct_refusal(r))))?;
+    let bbox = crate::bd_bridge::prism_bbox(&base_edges, row.amount, row.both)
+        .map_err(|r| BindingError::Refusal(Box::new(Marshaled::from_refusal(&r))))?;
+    Ok(TrimExtrudeOutcome {
+        ok: true,
+        bracket: Bracket {
+            lo: bracket.lo,
+            hi: bracket.hi,
+        },
+        value: 0.5 * (bracket.lo + bracket.hi),
+        bbox,
+        crossings,
+        retained_arcs,
+    })
+}
+
+/// The realized facts of one trim-prism row: the certified volume value plus
+/// the deterministic local mesh of the base extrusion.
+pub fn trim_extrude_solid(
+    profile: &[ProfileEdge],
+    amount: f64,
+    both: bool,
+    trim: &[[f64; 3]],
+    trim_net: &[Vec<f64>],
+    tolerance: f64,
+) -> Result<TrimExtrudeFacts, BindingError> {
+    let row = TrimExtrudeRow {
+        profile: profile.to_vec(),
+        amount,
+        both,
+        trim_curve: trim.to_vec(),
+        trim_net: trim_net.to_vec(),
+        tolerance,
+    };
+    let outcome = trim_extrude(&row)?;
+    let points = gather_points(&row.profile, &row.trim_curve);
+    let plane = fit_plane(&points)?;
+    let line_vertices = line_loop_vertices(&row.profile);
+    let base2: Vec<[f64; 2]> = match line_vertices {
+        Some(verts) => verts.iter().map(|p| plane.project(*p)).collect(),
+        None => {
+            let trim2: Vec<[f64; 2]> = row.trim_curve.iter().map(|p| plane.project(*p)).collect();
+            bezier_samples(&trim2, 64)
+        }
+    };
+    let base_edges = polygon_edges(&base2, &plane);
+    let mesh = crate::bd_bridge::prism_mesh(&base_edges, amount, both)
+        .map_err(|r| BindingError::Refusal(Box::new(Marshaled::from_refusal(&r))))?;
+    Ok(TrimExtrudeFacts {
+        volume: outcome.value,
+        bbox: outcome.bbox,
+        mesh,
+    })
+}
+
+/// The pyo3 export of [`trim_extrude`].
+#[pyfunction]
+pub fn binding_trim_extrude(py: Python<'_>, row_json: &str) -> PyResult<String> {
+    let row: TrimExtrudeRow = serde_json::from_str(row_json)
+        .map_err(|e| PyValueError::new_err(format!("invalid trim-extrude row JSON: {e}")))?;
+    trim_extrude(&row)
+        .and_then(|outcome| to_json(&outcome))
+        .map_err(|e| to_pyerr(py, e))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -672,5 +1374,193 @@ mod tests {
             trim_facts(&trim).expect("second trim"),
             "trim facts must be bit-identical"
         );
+    }
+
+    // -----------------------------------------------------------------------
+    // TRIM-EXTRUDE-CTOR: the spline-trimmed extrude constructor.
+    // -----------------------------------------------------------------------
+
+    /// The unit-square base profile (four line edges, closed, in the local
+    /// `z = 0` chart).
+    fn square_profile() -> Vec<ProfileEdge> {
+        vec![
+            ProfileEdge::Line {
+                a: [0.0, 0.0, 0.0],
+                b: [1.0, 0.0, 0.0],
+            },
+            ProfileEdge::Line {
+                a: [1.0, 0.0, 0.0],
+                b: [1.0, 1.0, 0.0],
+            },
+            ProfileEdge::Line {
+                a: [1.0, 1.0, 0.0],
+                b: [0.0, 1.0, 0.0],
+            },
+            ProfileEdge::Line {
+                a: [0.0, 1.0, 0.0],
+                b: [0.0, 0.0, 0.0],
+            },
+        ]
+    }
+
+    /// A closed square trim loop strictly inside the unit square (a smooth
+    /// Bézier loop through its corners; no crossings with the base boundary).
+    fn inner_square_trim() -> Vec<[f64; 3]> {
+        vec![
+            [0.25, 0.25, 0.0],
+            [0.75, 0.25, 0.0],
+            [0.75, 0.75, 0.0],
+            [0.25, 0.75, 0.0],
+            [0.25, 0.25, 0.0],
+        ]
+    }
+
+    /// The pullback net of the quarter unit disk `1 - u^2 - v^2`
+    /// over the unit square (`>= 0` kept), degree `(2, 2)`.
+    fn quarter_disk_trim_net() -> Vec<Vec<f64>> {
+        vec![
+            vec![1.0, 1.0, 0.0],
+            vec![1.0, 1.0, 0.0],
+            vec![0.0, 0.0, -1.0],
+        ]
+    }
+
+    #[test]
+    fn spline_trim_extrude_volume_matches_recorded_reference() {
+        // The composition runs the local-frame extrude, the R9 crossings via
+        // the trim clip, the winding classification and the ADM-003 pullback
+        // bracket. The recorded reference volume of the unit-square base
+        // trimmed by the quarter-disk pullback is `height * pi/4`; the
+        // certified two-sided bracket must contain it.
+        let height = 2.0;
+        let row = TrimExtrudeRow {
+            profile: square_profile(),
+            amount: height,
+            both: false,
+            trim_curve: inner_square_trim(),
+            trim_net: quarter_disk_trim_net(),
+            tolerance: 1.0e-3,
+        };
+        let outcome = trim_extrude(&row).expect("the trim bracket must certify");
+        let reference = height * std::f64::consts::PI / 4.0;
+        assert!(
+            outcome.bracket.lo <= reference && reference <= outcome.bracket.hi,
+            "the certified bracket [{}, {}] must contain the recorded reference {}",
+            outcome.bracket.lo,
+            outcome.bracket.hi,
+            reference
+        );
+        assert!(outcome.bracket.lo <= outcome.bracket.hi);
+        assert!(outcome.ok);
+    }
+
+    #[test]
+    fn trim_crossings_are_certified_nodes_not_coordinates() {
+        // The base square is crossed by the closed trim loop; the clip's
+        // crossings are certified `TopoNode::TrimCrossing` nodes (exact
+        // certificates), never bare coordinate pairs.
+        let trim = vec![
+            [0.5, -0.5, 0.0],
+            [1.5, 0.5, 0.0],
+            [0.5, 1.5, 0.0],
+            [-0.5, 0.5, 0.0],
+            [0.5, -0.5, 0.0],
+        ];
+        let row = TrimExtrudeRow {
+            profile: square_profile(),
+            amount: 1.0,
+            both: false,
+            trim_curve: trim,
+            trim_net: vec![vec![1.0]],
+            tolerance: 1.0e-3,
+        };
+        let outcome = trim_extrude(&row).expect("the clip must certify the crossings");
+        assert!(
+            !outcome.crossings.is_empty(),
+            "a crossing trim loop must stamp at least one TrimCrossing node"
+        );
+        for crossing in &outcome.crossings {
+            assert_eq!(crossing.kind, "trim_crossing");
+            assert!(
+                crossing.certified,
+                "every crossing node is certified exactly"
+            );
+        }
+    }
+
+    #[test]
+    fn self_crossing_trim_loop_refuses_typed() {
+        // A figure-eight control loop self-intersects: the clip's winding
+        // discipline cannot classify it, so the constructor refuses the named
+        // TrimClipFailed family — Inconclusive, never a silent approximation.
+        let trim = vec![
+            [0.2, 0.2, 0.0],
+            [0.8, 0.8, 0.0],
+            [0.2, 0.8, 0.0],
+            [0.8, 0.2, 0.0],
+            [0.2, 0.2, 0.0],
+        ];
+        let row = TrimExtrudeRow {
+            profile: square_profile(),
+            amount: 1.0,
+            both: false,
+            trim_curve: trim,
+            trim_net: vec![vec![1.0]],
+            tolerance: 1.0e-3,
+        };
+        match trim_extrude(&row) {
+            Err(BindingError::Refusal(marshaled)) => {
+                assert_eq!(marshaled.class, ExceptionClass::Refused);
+                match marshaled.payload {
+                    MarshaledPayload::Refused(payload) => {
+                        assert_eq!(payload.case, "trim_clip_failed");
+                    }
+                    MarshaledPayload::Unresolved(_) => {
+                        panic!("the trim-clip failure must marshal as a typed Refused payload")
+                    }
+                }
+            }
+            other => panic!("a self-crossing trim loop must refuse typed, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn full_extrude_without_trim_answers_bit_identically() {
+        // The no-trim degenerate case must not change the landed prism facts:
+        // the constructor's value is bit-identical to the plain extrude arm.
+        let profile = square_profile();
+        let row = TrimExtrudeRow {
+            profile: profile.clone(),
+            amount: 3.0,
+            both: false,
+            trim_curve: Vec::new(),
+            trim_net: Vec::new(),
+            tolerance: 1.0e-3,
+        };
+        let outcome = trim_extrude(&row).expect("the full extrude must answer");
+        let tree = crate::bd_bridge::TreeNode::Part {
+            part: crate::bd_bridge::PartSpec {
+                solid: crate::bd_bridge::SolidSpec::Prism {
+                    profile,
+                    amount: 3.0,
+                    both: false,
+                },
+                x: 0.0,
+                y: 0.0,
+                z: 0.0,
+                rz: 0.0,
+                rotation: None,
+                mirror: None,
+            },
+        };
+        let facts = crate::bd_bridge::tree_facts(&tree).expect("plain prism facts");
+        assert_eq!(
+            outcome.value.to_bits(),
+            facts.volume.to_bits(),
+            "the no-trim path must be bit-identical to the landed prism arm"
+        );
+        assert_eq!(outcome.bracket.lo.to_bits(), outcome.bracket.hi.to_bits());
+        assert!(outcome.crossings.is_empty());
+        assert_eq!(outcome.retained_arcs, 0);
     }
 }
