@@ -471,3 +471,110 @@ Judgment-required items appended each operator cycle. Newest at the bottom.
   heartbeat slot-liveness duplicate-dispatch bug (root cause of the 16:33Z
   MONO-2 duplicate; now moot for that packet but structurally unfixed);
   overnight.py guarantee-merge-abort on interrupted cycles.
+
+## 2026-09-10 18:38 UTC - FALSE LANDINGS: the driver merges the BASE when a worker wrote a RESULT but never committed (MONO-4 + SOLVER-SURVEY-C)
+
+- What: `overnight.py`'s landing path (`loop/overnight.py:222-226`) takes
+  `head = git rev-parse --short HEAD` **in the slot worktree** and runs
+  `git merge --no-ff <head>`. When a worker finishes with a DONE/complete
+  RESULT but exits before committing (the skipped-commit-step class already
+  recorded 4x, e.g. MONO-2 026b4e9), the branch tip is still the packet BASE,
+  so the "merge" is a no-op ("Already up to date", returncode 0) and the
+  driver still files the row and appends `LANDED <base>`. The worker's real,
+  uncommitted work is never landed and is destroyed when the heartbeat
+  re-forks the slot. Two false landings observed this cycle:
+  - **MONO-4-TRIM-IDIOMS**: `overnight.log 09-10 14:28:33 slot 0:
+    MONO-4-TRIM-IDIOMS LANDED at 641b120`. 641b120 is the 17:23Z **operator**
+    commit (the base that flipped MONO-4 READY), not worker work. HEAD cc38b4f
+    touched only `loop/PACKETS.jsonl`;
+    `git grep spline_profile_prism_facts HEAD -- truck123d/src/bd_bridge.rs`
+    is EMPTY (the 405-line idiom implementation is absent). Slot 0 was then
+    re-forked to `packet/SOLVER-SURVEY-A` (slot-0 reflog HEAD@{1}) and the
+    worktree work + RESULT.json were discarded. **The work is preserved** at
+    `loop/slots/0/abandoned-20260910-143257.patch` (30,756 b; contains the
+    bd_bridge.rs diff and the untracked RESULT.json content) and in the worker
+    session `ses_f73947dc8ffeCJdwH4f17cGmp9` inside
+    `loop/slots/0/events.jsonl` (329 refs - but this file will be overwritten
+    when the SURVEY-A worker writes; the patch is the durable artifact).
+  - **SOLVER-SURVEY-C**: `overnight.log 09-10 14:35:25 slot 3:
+    SOLVER-SURVEY-C LANDED at 86d28a3`. 86d28a3 is the operator base; HEAD
+    21be490 touched only `loop/PACKETS.jsonl`;
+    `git ls-files loop/solver_coverage/fragments` is EMPTY - the 123 KB
+    `C.json` deliverable is NOT in HEAD. **SOLVER-SURVEY-B** (RESULT status
+    `complete`, a `good` status at overnight.py:182) will be false-landed the
+    same way on the next driver cycle; its 403 KB `B.json` is still untracked
+    in `loop/slots/2/wt`.
+- Operator action: preserved the at-risk survey fragments as refs via
+  commit-tree (worktree files left untracked/unstaged):
+  `refs/wip/SOLVER-SURVEY-B-fragment` = 0a4b4c7,
+  `refs/wip/SOLVER-SURVEY-C-fragment` = 7f11452. Did NOT merge, land, relaunch,
+  or edit any packet/registry semantics. Did NOT touch MONO-4's false DONE row
+  (PACKETS.jsonl is outside the operator's allowed files).
+- What a human should do:
+  1. Fix `overnight.py` so a landing REQUIRES the worker's changes to be
+     committed - either commit the slot worktree "AS DELIVERED" before merging
+     (the MONO-2 026b4e9 precedent) or treat `head == base` / a no-op merge as
+     NOT LANDED (leave for morning). The scoped check should also run on the
+     committed candidate, not a mid-reset worktree.
+  2. Re-land MONO-4 from `loop/slots/0/abandoned-20260910-143257.patch`
+     (apply onto integration/kernel-bg, run the packet's scoped check, then
+     correct the row's false `LANDED 641b120` note).
+  3. Re-land the survey fragments from `refs/wip/SOLVER-SURVEY-{B,C}-fragment`
+     (or re-dispatch those survey packets); SOLVER-CHECKER depends on all four
+     fragments. Note the driver may already have flipped C (and soon B) DONE.
+  4. Do NOT flip MONO-5-RAY-CLASSIFY / MONO-6-SWEPT-BOOLEANS READY until the
+     real MONO-4 code is landed - they `depends_on` MONO-4, and dispatch_ready
+     does not read `depends_on`, so a manual flip would run them against a HEAD
+     missing the trim idiom.
+- Start from: `loop/overnight.py:222-226`;
+  `loop/slots/0/abandoned-20260910-143257.patch`;
+  `git show refs/wip/SOLVER-SURVEY-B-fragment`;
+  `git show refs/wip/SOLVER-SURVEY-C-fragment`.
+
+- Carried (unchanged): FRAME-REVOLVE F1 non_z_axis pin amendment
+  (truck123d/tests/ttc_lathe_spline.rs:255); duplicate supervisors + lagging
+  cargoq restart guard; slot-1/4/7 wt RESULT residue; TOR-C flip-or-pin;
+  heartbeat slot-liveness duplicate-dispatch bug; MONO-row registry schema gap.
+
+## 2026-09-10 19:33 UTC - 6th FALSE LANDING: MONO-5-RAY-CLASSIFY (driver landed the base b34ec4e; mechanism absent)
+
+- What: `overnight.log` `09-10 15:24:59 slot 0: MONO-5-RAY-CLASSIFY LANDED at
+  b34ec4e`. b34ec4e is the packet BASE (the READY flip), not worker work. The
+  landing commit 906dc59 (HEAD) changed only `loop/PACKETS.jsonl` - it appended
+  `LANDED b34ec4e (overnight, one-verify amendment)` to the READY row's note.
+  The real mechanism is ABSENT from HEAD: in `truck123d/src/bd_bridge.rs`,
+  `grep -ci classify` = 0 and `grep -ci bicubic` = 0, while the packet's
+  done-when requires A2/A3 to drift 0 -> >=1. Same `overnight.py:222-226` root
+  cause as the 18:38Z MONO-4/SOLVER-SURVEY cluster: it merges the slot-wt HEAD
+  even when the worker never committed.
+- Why it matters now: the appended `LANDED b34ec4e` note makes dispatch_ready's
+  `landed()` SKIP the MONO-5 row forever (the LANDED_RE trap), so MONO-5 will
+  never re-dispatch while its code is missing. MONO-6-SWEPT-BOOLEANS
+  (`needs: [MONO-5, MONO-2]`) reads all-deps-landed and would be the next
+  false-frontier if anyone flips it.
+- Work preserved: the MONO-5 worker's WIP is in
+  `loop/slots/0/abandoned-20260910-152616.patch` (`git apply --stat`: 1161-line
+  bd_bridge.rs diff, incl. the `// MONO-5-RAY-CLASSIFY -- certified
+  point-vs-spline-solid membership` section, plus CONTEXT.md/PACKET.md harness
+  artifacts). The worker session was wiped by the slot-0 re-fork to
+  SOLVER-SURVEY-D. `packet/MONO-5-RAY-CLASSIFY` tip is b34ec4e (base) - no
+  worker commit exists.
+- What a human should do:
+  1. Adjudicate MONO-5: apply `abandoned-20260910-152616.patch` onto
+     integration/kernel-bg (strip the CONTEXT.md/PACKET.md hunks - harness
+     artifacts), run the packet's scoped check + A2/A3 anchors, and if green
+     land AS DELIVERED and correct the row's false `LANDED b34ec4e` note.
+     Otherwise re-flip the row READY (remove the false landed marker so
+     dispatch_ready re-dispatches it).
+  2. Fix `overnight.py:222-226` so a landing REQUIRES a committed worker diff
+     (treat `head == base` / a no-op merge as NOT LANDED). Same item as the
+     18:38Z escalation - now the 6th strike.
+  3. Do NOT flip MONO-6-SWEPT-BOOLEANS until MONO-5's real code is landed.
+- Start from: `loop/overnight.py:222-226`;
+  `loop/slots/0/abandoned-20260910-152616.patch`; `git show 906dc59`;
+  `grep -ci classify truck123d/src/bd_bridge.rs`.
+
+- Carried (unchanged): FRAME-REVOLVE F1 non_z_axis pin amendment
+  (truck123d/tests/ttc_lathe_spline.rs:255); duplicate supervisors + lagging
+  cargoq restart guard; slot-4/7 wt RESULT residue; TOR-C flip-or-pin;
+  heartbeat slot-liveness duplicate-dispatch bug; MONO-row registry schema gap.

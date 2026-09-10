@@ -2885,3 +2885,42 @@ reset clean and SOLVER-SURVEY-D queued for the heartbeat; nothing unlanded; 9
 BLOCKED correctly parked; 80 READY (78 landed-marked + MONO-5 running +
 SOLVER-SURVEY-D); cargoq UP; heartbeat 1; driver 1; watchdog 1; TWO supervisors;
 disk 10.0 GiB free; RAM 1.24 GiB free (MONO-5 build spike - LOW).
+
+## [operator 2026-09-10T19:33Z] 6th false landing (MONO-5); SURVEY-D running; nothing landable
+
+Board: 1 RUNNING (SOLVER-SURVEY-D, slot 0) / 0 landed / 0 unblocked / 0 flipped.
+HEAD 906dc59. Disk 13.2 GiB free, RAM 2.72 GiB free.
+
+- **Health (step 1)**: heartbeat exactly 1 (27872, `-File
+  dispatch_heartbeat.ps1`), watchdog 1 (29264), operator runner 1 (27876),
+  overnight driver 1 (26920), cargoq UP (ping 200, queued 0, running false).
+  No cargo/rustc running. TWO supervisors (19172 + 27828 - carried duplication
+  class; only ONE overnight.py child). Disk 13.2 GiB (above the 8 GB floor,
+  below the 15 GB goal); RAM 2.72 GiB (below the 3 GB floor, no build running).
+- **Land (step 2)**: nothing operator-landable. Ancestor checks green for all
+  slot tips; slot RESULTs all landed/residue (slot 4 LANDED-WITH-FINDINGS
+  carried; fragments B/C tracked and results filed).
+- **Unblock (step 3)**: none - slot 0 RUNNING healthy (worker shim pid 32472,
+  session ses_f73343e3dffe5Px7IqSNvihtrk, events <1 min fresh); slots 1-7 stale
+  landed residue, no held QUESTION.
+- **Registry (step 4)**: 324 rows - 235 DONE, 80 READY, 9 BLOCKED.
+  READY-without-landed-marker = {SOLVER-SURVEY-D running}. BLOCKED-with-all-deps
+  = the carried 7 owner-parked/human-gated/superseded + MONO-6 (its MONO-5 dep
+  reads landed ONLY via the false marker) - nothing flipped.
+- **Dispatch (step 5)**: `dispatch_ready.py --dry-run --max-workers=4` ->
+  "slots: 8 (1 running, 7 free); dispatched 0; workers now ~1/4" = REAL idle; no
+  manual dispatch (heartbeat live, dispatched SURVEY-D to slot 0 at 19:26:09Z).
+- **HEADLINE - 6th FALSE LANDING**: overnight.log 15:24:59 landed MONO-5 at
+  b34ec4e (the base). 906dc59 (HEAD) touched only PACKETS.jsonl, appending
+  `LANDED b34ec4e` to the READY row's note -> dispatcher now skips MONO-5
+  forever. Mechanism absent (classify=0, bicubic=0 in bd_bridge.rs). WIP
+  preserved in `loop/slots/0/abandoned-20260910-152616.patch` (1161-line
+  bd_bridge.rs diff). Escalated; do NOT flip MONO-6.
+- **STATE.md (step 6)**: LATEST GROUND TRUTH pointer + new [operator] block.
+- **Escalation (step 7)**: filed the MONO-5 false-landing item in
+  OPERATOR_ESCALATIONS.md.
+
+Leaving: 1 RUNNING (SOLVER-SURVEY-D, slot 0, healthy); HEAD 906dc59; MONO-5
+falsely marked landed (WIP preserved in the slot-0 abandoned patch); MONO-6
+correctly BLOCKED; nothing unlanded; cargoq UP; heartbeat 1; driver 1;
+watchdog 1; TWO supervisors; disk 13.2 GiB free; RAM 2.72 GiB free.
