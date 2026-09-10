@@ -15,19 +15,19 @@ program, and the operator agent.
 ## Where we are
 
 > LATEST GROUND TRUTH: read the newest `[operator ...]` block in "State of
-> the machine, as left" (2026-09-10T02:45Z). [operator 2026-09-10T02:45Z
+> the machine, as left" (2026-09-10T03:08Z). [operator 2026-09-10T03:08Z
 > ground-truth note: 0 RUNNING / 0 landed-this-cycle. Quiet healthy pass, HEAD
-> unchanged since the 02:23Z operator commit (d5819b4). All slot worker
-> commits (0056f01/e33c4dd/e9d885a/3c2109b/ee97499/713f205) re-verified
+> 04de6ac unchanged since the 02:45Z operator commit. All slot worker commits
+> (0056f01/e33c4dd/e9d885a/3c2109b/ee97499/713f205/4de25d9) re-verified
 > ancestors of integration/kernel-bg this cycle; slot 7 is the redundant
-> FRAME-REVOLVE residue (wt RESULT status LANDED, no commit). Nothing to
-> land/unblock/flip; READY rows without a landed marker = NONE; dispatch_ready
-> --dry-run "dispatched 0; workers 0/4" = REAL idle. Health: heartbeat 1
-> (27872), operator runner 1 (27876), watchdog 1 (24472), overnight driver 1
-> (26920, one child), cargoq UP (ping ok, queued 0, running false;
-> fallback.log quiet since 2026-09-07); TWO supervisors (19172 + 27828)
-> carried. Disk 23.0 GB free; RAM 5.6 GB free. Open human items carried
-> unchanged.]
+> FRAME-REVOLVE residue (wt RESULT status LANDED, no commit) and slot 4 the F1
+> LANDED-WITH-FINDINGS residue. Nothing to land/unblock/flip; READY rows
+> without a landed marker = NONE; dispatch_ready --dry-run "dispatched 0;
+> workers 0/4" = REAL idle. Health: heartbeat 1 (27872, last cycle 03:05Z),
+> operator runner 1 (27876), watchdog 1 (24472), overnight driver 1 (26920, one
+> child), cargoq UP (ping ok, queued 0, running false); TWO supervisors (19172
+> + 27828) carried. Disk 22.9 GB free; RAM 5.6 GB free. Open human items
+> carried unchanged.]
 
 - **THE FIRST KERNEL-VS-OCC TIMING COMPARISON IS BANKED** (FH-TIMING-REFRESH,
   landed c94d043): turbopump_assembly **0.097 s kernel vs 4.866 s OCC**,
@@ -656,6 +656,36 @@ free. Open human items (carried, unchanged): FRAME-REVOLVE F1 non_z_axis pin
 amendment (ttc_lathe_spline.rs:255); duplicate supervisors + the lagging cargoq
 restart guard; slot-4 + slot-7 wt RESULT residue parking the driver's dispatch
 arm; TOR-C flip-or-pin (orchestrator LIVE).]
+
+[operator 2026-09-10T03:08Z - volatile refresh. Quiet healthy cycle: nothing to
+land, nothing to unblock, nothing to flip, no dispatch (heartbeat-owned). Board
+now: 0 RUNNING / 0 landed-this-cycle. HEAD 04de6ac (the 02:45Z operator commit)
+- unchanged this cycle. All slot worker commits re-verified ancestors of
+integration/kernel-bg this cycle (0056f01, e33c4dd, e9d885a, 3c2109b, ee97499,
+713f205, 4de25d9); slot 0 = SWEEP-PATH landed residue; slot 1 = ADM-003 landed
+residue; slots 2-6 landed residue (slot 4 = F1 LANDED-WITH-FINDINGS); slot 7 =
+redundant FRAME-REVOLVE residue (wt RESULT status LANDED, no commit, base
+eafdc80) - not operator-landable. Nothing to unblock (no RUNNING worker; no
+IDLE/DEAD >15 min holding work; no QUESTION). Registry re-verified
+programmatically (case-folded note match, matching dispatch_ready): READY rows
+WITHOUT a 'landed <sha>' note marker = NONE; BLOCKED-with-all-deps-landed =
+BG-CK-SPLINE-CENSUS (note CANCELLED BY OWNER), DEF-TESS-ANALYTIC-SEAM
+(superseded by DEF-TESS-ANALYTIC-SEAM-R2, which is READY), DEF-SEEDRAY-B
+(human-gated on the SEEDRAY-B frontier review), TOR-C (needs ADM-001/002, both
+LANDED; orchestrator-held per the standing escalation) - nothing flipped, all
+four correctly parked. dispatch_ready --dry-run: "dispatched 0; workers ~0/4"
+= REAL idle (heartbeat live; no manual dispatch). Health: heartbeat exactly 1
+(27872, last cycle 03:05:48Z), operator runner 1 (27876), watchdog 1 (24472,
+last poll 03:04Z), overnight driver 1 (26920, child of 27828, cycling every 5
+min, parked on the slot-4 F1 judgment), cargoq UP (ping ok, queued 0, running
+false; single server.py 28544 - the earlier cargoq duplication resolved on the
+01:55Z restart); TWO supervisors (19172 PyManager + 27828 pythoncore - carried
+duplication class; only ONE overnight.py child = no double-merge risk). Disk
+22.9 GB free (above the 8 GB floor AND the 15 GB janitor goal); RAM 5.6 GB
+free. Open human items (carried, unchanged): FRAME-REVOLVE F1 non_z_axis pin
+amendment (ttc_lathe_spline.rs:255); duplicate supervisors + the lagging cargoq
+restart guard; slot-4 + slot-7 wt RESULT residue parking the driver's dispatch
+arm; TOR-C flip-or-pin (orchestrator-held).]
 
 ## The parallelism picture
 
