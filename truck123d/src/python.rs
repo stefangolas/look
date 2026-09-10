@@ -14,6 +14,13 @@ use crate::marshal::{ExceptionClass, Marshaled, RefusedPayload, UnresolvedPayloa
 use crate::{Refused, Unresolved};
 use truck_base::evidence::{Modulus, ModulusShape, Refusal};
 
+// CG-BINDING: the certified-funnel binding module (the pyo3 translation over
+// the stabilized facade). `lib.rs` is outside this packet's write set, so the
+// module is declared from its sibling source file here rather than from the
+// crate root; the module body and its three exports live in `binding.rs`.
+#[path = "binding.rs"]
+pub mod binding;
+
 /// Opaque kernel-solid handle (PB-004 scope decision 2): no kernel type is
 /// ever a `#[pyclass]`. This class owns the Rust-side value behind a closed
 /// door; the concrete kernel `Solid` is injected by PB-006 (the assembly
