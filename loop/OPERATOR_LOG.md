@@ -2767,3 +2767,121 @@ Leaving: 1 RUNNING (MONO-4, slot 0); HEAD c33c9bd; nothing unlanded; 10 BLOCKED
 correctly parked; 82 READY (77 landed-marked + MONO-4 + 4 SOLVER-SURVEY);
 cargoq UP; heartbeat 1; driver 1; watchdog 1; TWO supervisors; disk 20.5 GB
 free; RAM 3.47 GB free.
+
+## [operator 2026-09-10T18:38Z] FALSE LANDINGS: driver merged the base for MONO-4 and SOLVER-SURVEY-C; work preserved
+
+Board: 1 RUNNING (SOLVER-SURVEY-A, slot 0) / 0 landable / 0 unblocked / 0
+flipped. HEAD 21be490. Disk 16.8 GiB free, RAM 6.5 GiB free.
+
+- **Health (step 1)**: heartbeat exactly 1 (27872, `-File
+  dispatch_heartbeat.ps1`; the broad `-match` scan's extra hits were this
+  shell + a transient cmd), watchdog 1 (29264), operator runner 1 (27876),
+  overnight driver 1 (26920), cargoq UP (ping 200, queued 0, running false).
+  Disk 16.8 GiB (above the 8 GB floor and the 15 GB janitor goal); RAM 6.5
+  GiB. TWO supervisors (carried duplication class). No action.
+- **Land (step 2)**: NOTHING landable - and the headline finding: the
+  overnight driver is FALSE-LANDING. `overnight.py:222-226` merges
+  `rev-parse HEAD` of the slot wt; when a worker wrote a DONE/complete RESULT
+  but never committed, that is the packet BASE, so the no-op merge still files
+  the row and appends `LANDED <base>`. Confirmed twice:
+  - `14:28:33 slot 0: MONO-4-TRIM-IDIOMS LANDED at 641b120` - 641b120 is the
+    17:23Z operator commit (the base), HEAD cc38b4f touched only
+    PACKETS.jsonl, and `spline_profile_prism_facts` is ABSENT from HEAD's
+    bd_bridge.rs. Slot 0 was re-forked to SOLVER-SURVEY-A and the 405-line
+    work + RESULT.json were discarded; the work survives in
+    `loop/slots/0/abandoned-20260910-143257.patch` (30,756 b).
+  - `14:35:25 slot 3: SOLVER-SURVEY-C LANDED at 86d28a3` - 86d28a3 is the
+    operator base, HEAD 21be490 touched only PACKETS.jsonl,
+    `git ls-files loop/solver_coverage/fragments` is EMPTY (the 123 KB C.json
+    is not in HEAD). SOLVER-SURVEY-B (status `complete`) is queued for the
+    same false landing next driver cycle.
+- **Preservation (within the charter's WIP-preservation precedent)**: created
+  `refs/wip/SOLVER-SURVEY-B-fragment` (0a4b4c7) and
+  `refs/wip/SOLVER-SURVEY-C-fragment` (7f11452) from the untracked fragments
+  via `git add`+`write-tree`+`commit-tree`+`update-ref` then `reset` (files
+  left untracked). Did NOT merge/land/relaunch; did NOT edit PACKETS.jsonl.
+- **Unblock (step 3)**: none - SOLVER-SURVEY-A running healthy; slots 1/2/3/7
+  stale residue with no held QUESTION.
+- **Registry hygiene (step 4)**: nothing flipped. MONO-4's row is falsely
+  DONE with a `LANDED 641b120` marker (a landmine: the dispatcher now skips
+  it) but PACKETS.jsonl is outside the operator's files - escalated. MONO-5/6
+  correctly stay BLOCKED (their `depends_on` MONO-4 is not truly landed, and
+  dispatch_ready ignores `depends_on` anyway). The carried 7 owner-parked
+  BLOCKED rows unchanged.
+- **Dispatch (step 5)**: `dispatch_ready.py --dry-run --max-workers=4` only
+  (heartbeat live; no manual dispatch): "slots: 8 (1 running, 7 free);
+  SOLVER-SURVEY-D -> slot 1; dispatched 1; workers now ~2/4".
+- **STATE.md (step 6)**: volatile pointer + new [operator] block updated.
+- **Escalation (step 7)**: filed the MONO-4/SOLVER-SURVEY false-landing
+  cluster (what/why/exact commands) in OPERATOR_ESCALATIONS.md.
+
+Leaving: 1 RUNNING (SOLVER-SURVEY-A, slot 0); HEAD 21be490; MONO-4 and
+SOLVER-SURVEY-C falsely marked DONE by the driver (work preserved:
+slot-0 abandoned patch + refs/wip survey fragments); SOLVER-SURVEY-B pending
+the same fate; 7 owner-parked BLOCKED correctly parked; cargoq UP; heartbeat
+1; driver 1; watchdog 1; TWO supervisors; disk 16.8 GiB free; RAM 6.5 GiB
+free.
+
+## [operator 2026-09-10T19:06Z] false-landing cluster RESOLVED; slot-1 reset unblocked SOLVER-SURVEY-D; MONO-5 running
+
+- Health sweep (step 1): `slot_status.py` -> 1 RUNNING. slot 0 MONO-5-RAY-CLASSIFY
+  (pid 20936, events <1 min fresh, branch packet/MONO-5-RAY-CLASSIFY@b34ec4e =
+  base, no commit, session ses_f734bf668ffe2Z9kj5ODu0Fab3) - healthy, not
+  touched. Slots 1-7 IDLE/FINISHED residue. cargoq ping ok (queued 0, running
+  false). Heartbeat exactly 1 (27872; the second broad-match was this probing
+  shell), watchdog 1 (29264), operator runner 1 (27876), overnight driver 1
+  (26920), TWO supervisors (19172 PyManager + 27828 pythoncore - carried
+  duplication class; only ONE overnight.py child = no double-merge risk). Disk
+  **8.92 GiB free** (below the 15 GB goal, above the 8 GB floor); RAM **1.24-1.86
+  GiB free** (MONO-5 build spike; below the 3 GB floor).
+- Orchestrator activity since 18:38Z (read from `git log`): the false-landing
+  cluster was RECOVERED - MONO-4 (852763c; `git grep -c
+  spline_profile_prism_facts HEAD -- truck123d/src/bd_bridge.rs` = 4) and the
+  SOLVER-SURVEY-B/C fragments (`git ls-files loop/solver_coverage/fragments` =
+  B.json, C.json) are in HEAD; MONO-5 re-flipped READY (b34ec4e). HEAD b34ec4e.
+- Land (step 2): nothing. `git merge-base --is-ancestor` exit 0 vs HEAD for all
+  slot tips (026b4e9, c3bc1a1, e6553db, 3c2109b, ee97499, 713f205, 5cf4811,
+  852763c). Slot wt RESULT statuses: slot 3 DONE, slot 4 LANDED-WITH-FINDINGS
+  (carried), slots 5/6 DONE, slot 7 LANDED (redundant FRAME-REVOLVE residue, no
+  commit) - none operator-landable.
+- **Unblock (step 3) - ACTION TAKEN:** the heartbeat's last logged cycle
+  (`loop/dispatch_heartbeat.log` 15:02:23 local) dispatched MONO-5 to slot 0 but
+  FAILED SOLVER-SURVEY-D on slot 1: `new_slot FAILED: git checkout -B
+  packet/SOLVER-SURVEY-D failed in slots\1\wt: Your local changes to CONTEXT.md/
+  PACKET.md would be overwritten by checkout`. Slot 1 was IDLE (pid none, events
+  137 min stale, tip 026b4e9 = the landed MONO-2 commit, no RESULT) holding
+  modified tracked harness artifacts (CONTEXT.md/PACKET.md). Operator ran the
+  documented manual reset (`git -C loop/slots/1/wt reset --hard HEAD; git -C
+  loop/slots/1/wt clean -fd`) - no live pid, no work lost, tip an ancestor.
+  After: slot 1 clean; `dispatch_ready.py --dry-run --max-workers=4` ->
+  "SOLVER-SURVEY-D -> slot 1; dispatched 1" with no failure. The live heartbeat
+  will dispatch it (no manual dispatch).
+- Registry hygiene (step 4): 324 rows - 235 DONE, 80 READY, 9 BLOCKED.
+  READY-without-landed-marker = exactly {MONO-5-RAY-CLASSIFY (running),
+  SOLVER-SURVEY-D (dispatchable)}; BLOCKED = the carried 7 owner-parked
+  (BG-AUD-FIX-004 OWNER_BLOCKED, BG-CK-SPLINE-CENSUS owner-cancelled,
+  SEM-PCURVE-MASTER-001-FIX SUPERSEDED, DEF-SPINEFRAME-GRAZE SPEC_GAP->-R2,
+  DEF-TESS-ANALYTIC-SEAM superseded by -R2, DEF-SEEDRAY-B human-gated, TOR-C
+  orchestrator-held) + MONO-6-SWEPT-BOOLEANS (depends_on MONO-5, running) +
+  SOLVER-CHECKER (depends_on SURVEY-D, unlanded) - all correctly parked, nothing
+  flipped.
+- Dispatch (step 5): `dispatch_ready.py --dry-run --max-workers=4` only (no
+  manual dispatch - heartbeat live).
+- Disk action: `python loop/janitor.py ensure --need 15` reclaimed ~1.4 GB ->
+  10.0 GiB free (still short of the 15 GB goal; live slot-0 target protected by
+  the janitor's process scan).
+- STATE.md volatile refresh ([operator 2026-09-10T19:06Z]) - LATEST GROUND
+  TRUTH pointer + new "State of the machine, as left" block.
+- No new escalation (the 18:38Z false-landing work was recovered, but its ROOT
+  CAUSE - overnight.py:222-226 merges the slot-wt HEAD even when the worker never
+  committed - is STILL OPEN and carried). Carried human items unchanged:
+  FRAME-REVOLVE F1 non_z_axis pin amendment (ttc_lathe_spline.rs:255); duplicate
+  supervisors + lagging cargoq restart guard; slot-4/7 wt RESULT residue; TOR-C
+  flip-or-pin; heartbeat slot-liveness duplicate-dispatch bug; MONO-row registry
+  schema gap.
+
+Leaving: 1 RUNNING (MONO-5-RAY-CLASSIFY, slot 0, healthy); HEAD b34ec4e; slot 1
+reset clean and SOLVER-SURVEY-D queued for the heartbeat; nothing unlanded; 9
+BLOCKED correctly parked; 80 READY (78 landed-marked + MONO-5 running +
+SOLVER-SURVEY-D); cargoq UP; heartbeat 1; driver 1; watchdog 1; TWO supervisors;
+disk 10.0 GiB free; RAM 1.24 GiB free (MONO-5 build spike - LOW).
