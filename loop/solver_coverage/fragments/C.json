@@ -1,0 +1,2671 @@
+{
+  "fragment": "C",
+  "scope": "boolean stage machinery: split -> classify -> decide -> assemble",
+  "rules": [
+    {
+      "rule_id": "C-SPLIT-CERTIFY-CROSSINGS",
+      "kind": "solver",
+      "source": {
+        "file": "vendor/truck/truck-certified/src/kernel/trimclip.rs",
+        "symbol": "crate::kernel::trimclip::certify_crossings",
+        "line": 341
+      },
+      "preconditions": [
+        {"axis": "relation.src_dims", "value": "1x1"},
+        {"axis": "relation.zero_set", "value": "regular"},
+        {"axis": "rep.bernstein_chart", "value": "true"},
+        {"axis": "rep.rational_positive_weights", "value": "true"},
+        {"axis": "!unmodeled:same_chart", "value": "!unmodeled:a.chart == b.chart"}
+      ],
+      "outcomes": [
+        {
+          "variant": "ClaimVerdict::Proven(Vec<CertifiedCrossing>)",
+          "postconditions": [
+            {"axis": "relation.local_dim", "value": "0"},
+            {"axis": "relation.zero_set", "value": "regular"},
+            {"axis": "global.knowledge", "value": "local_only(residual)"},
+            {"axis": "rep.construction_witness", "value": "true"},
+            {"axis": "goal", "value": "local_contact"}
+          ]
+        },
+        {
+          "variant": "ClaimVerdict::Disproven(Refusal)",
+          "postconditions": [
+            {"axis": "relation.zero_set", "value": "certified_empty"},
+            {"axis": "global.knowledge", "value": "local_only(residual)"}
+          ]
+        }
+      ],
+      "refusals": [
+        "RefusalKind::TrimClipFailed (trim_crossing_depth_max)",
+        "RefusalKind::ClaimRefuted (r9_requires_one_chart, crossing_unit_box_refused)",
+        "RefusalKind::ChartExhausted (r9_requires_one_chart via R9System::try_new)",
+        "RefusalKind::WeightDegenerate (pair_weight_bound, PointCert::try_new)",
+        "RefusalKind::NonFinite (PointCert::try_new)",
+        "ClaimVerdict::Disproven(RefusalKind::ClaimRefuted, c1_k_disjoint_no_root_in_box)",
+        "ClaimVerdict::Inconclusive(c1_arity_mismatch_box_dimension, c1_eval_arity_mismatch, c1_jac_arity_mismatch, c1_midpoint_jacobian_singular, c1_enclosure_not_finite, c1_inclusion_not_strict, c1_rho_not_finite, c1_rho_exceeds_rho_max)"
+      ],
+      "consumes_evidence": [
+        "BezierLeaf1",
+        "CertifiedPositive",
+        "R9System",
+        "DEPTH_MAX"
+      ],
+      "produces_evidence": [
+        "CertifiedCrossing",
+        "PointCert (ResidualId::R9)",
+        "Vec<CertifiedCrossing>"
+      ],
+      "calls": [
+        "crate::kernel::residuals_r89::R9System::try_new",
+        "crate::kernel::engine::krawczyk_c1",
+        "crate::kernel::certs::PointCert::try_new",
+        "crate::kernel::trimclip::residual_excludes_zero",
+        "crate::kernel::trimclip::bisect2",
+        "crate::kernel::trimclip::pair_weight_bound",
+        "crate::kernel::trimclip::crossing_chart_point"
+      ],
+      "theorem_comment": "The R9 C1 certificate (krawczyk_c1 over the S1A seam) isolates a unique root of J(t, r) = C1(t) - C2(r) in the certified (t, r) box; ... Every certified root of one (pcurve, trim) residual is unique per 8.2 inside its own certified box and the subdivision boxes are pairwise disjoint, so two TrimCrossing nodes of one clip never witness the same root (4.2 Rule A holds by construction).",
+      "confidence": "high"
+    },
+    {
+      "rule_id": "C-SPLIT-CERTIFY-OFF-LOOP",
+      "kind": "solver",
+      "source": {
+        "file": "vendor/truck/truck-certified/src/kernel/trimclip.rs",
+        "symbol": "crate::kernel::trimclip::certify_off_loop",
+        "line": 430
+      },
+      "preconditions": [
+        {"axis": "relation.src_dims", "value": "!unmodeled:point-vs-curve"},
+        {"axis": "relation.zero_set", "value": "certified_empty"},
+        {"axis": "rep.bernstein_chart", "value": "true"},
+        {"axis": "rep.rational_positive_weights", "value": "true"}
+      ],
+      "outcomes": [
+        {
+          "variant": "Construction::Ok(OffLoopCert)",
+          "postconditions": [
+            {"axis": "relation.zero_set", "value": "certified_empty"},
+            {"axis": "rep.construction_witness", "value": "true"},
+            {"axis": "global.knowledge", "value": "local_only(residual)"},
+            {"axis": "goal", "value": "material_class"}
+          ]
+        }
+      ],
+      "refusals": [
+        "RefusalKind::TrimClipFailed (sample_off_loop_depth_max)"
+      ],
+      "consumes_evidence": [
+        "TrimLoop",
+        "BezierLeaf1",
+        "DEPTH_MAX"
+      ],
+      "produces_evidence": [
+        "OffLoopCert",
+        "CertifiedExclusion",
+        "Interval separation"
+      ],
+      "calls": [
+        "crate::kernel::trimclip::point_trim_coeffs",
+        "crate::kernel::trimclip::hull1"
+      ],
+      "theorem_comment": "The R9 distance-positivity data: over a partition of the trim parameter [0, 1], at least one cross-multiplied residual component excludes zero on every box, so no trim parameter maps the curve onto the sample. This is the precondition that makes the 9.4 winding-number classification SOUND (a closed plane curve about a point certified OFF the loop).",
+      "confidence": "high"
+    },
+    {
+      "rule_id": "C-CLASSIFY-WINDING-NUMBER",
+      "kind": "solver",
+      "source": {
+        "file": "vendor/truck/truck-certified/src/kernel/trimclip.rs",
+        "symbol": "crate::kernel::trimclip::winding_number",
+        "line": 528
+      },
+      "preconditions": [
+        {"axis": "relation.src_dims", "value": "1x1"},
+        {"axis": "relation.zero_set", "value": "regular"},
+        {"axis": "rep.bernstein_chart", "value": "true"},
+        {"axis": "rep.rational_positive_weights", "value": "true"},
+        {"axis": "!unmodeled:trim_loop_closed", "value": "!unmodeled:TrimLoop.closed == true"},
+        {"axis": "!unmodeled:sample_off_loop_obligation", "value": "!unmodeled:caller owes certify_off_loop; NOT carried in the signature"}
+      ],
+      "outcomes": [
+        {
+          "variant": "Construction::Ok(i64)",
+          "postconditions": [
+            {"axis": "relation.local_dim", "value": "0"},
+            {"axis": "global.knowledge", "value": "local_only(residual)"},
+            {"axis": "goal", "value": "material_class"}
+          ]
+        }
+      ],
+      "refusals": [
+        "RefusalKind::ClaimRefuted (trim_loop_open_no_winding)",
+        "RefusalKind::TrimClipFailed (winding_endpoint_sign_depth_max, winding_same_sign_depth_max, winding_refine_depth_max)"
+      ],
+      "consumes_evidence": [
+        "TrimLoop",
+        "BezierLeaf1",
+        "DEPTH_MAX"
+      ],
+      "produces_evidence": [
+        "i64 winding index"
+      ],
+      "calls": [
+        "crate::kernel::trimclip::certified_point_sign",
+        "crate::kernel::trimclip::y_direction_sign",
+        "crate::kernel::trimclip::hull1",
+        "crate::kernel::trimclip::bernstein_mul",
+        "crate::hull::bernstein_derivative_1d"
+      ],
+      "theorem_comment": "The ray-crossing count in the plane with certified sign discipline: ... The caller owes the sample's certified-off-loop property (certify_off_loop) - that is what makes this index SOUND (9.4).",
+      "confidence": "high"
+    },
+    {
+      "rule_id": "C-CLASSIFY-SAMPLE-INSIDE",
+      "kind": "classifier",
+      "source": {
+        "file": "vendor/truck/truck-certified/src/kernel/trimclip.rs",
+        "symbol": "crate::kernel::trimclip::sample_inside",
+        "line": 1071
+      },
+      "preconditions": [
+        {"axis": "relation.src_dims", "value": "!unmodeled:point-vs-curve"},
+        {"axis": "!unmodeled:trim_loop_closed", "value": "!unmodeled:TrimLoop.closed == true"}
+      ],
+      "outcomes": [
+        {
+          "variant": "Construction::Ok(bool)",
+          "postconditions": [
+            {"axis": "goal", "value": "material_class"},
+            {"axis": "global.knowledge", "value": "local_only(residual)"}
+          ]
+        }
+      ],
+      "refusals": [
+        "RefusalKind::TrimClipFailed (from certify_off_loop and winding_number)",
+        "RefusalKind::ClaimRefuted (trim_loop_open_no_winding from winding_number)"
+      ],
+      "consumes_evidence": [
+        "TrimLoop",
+        "BezierLeaf1"
+      ],
+      "produces_evidence": [
+        "bool inside"
+      ],
+      "calls": [
+        "crate::kernel::trimclip::certify_off_loop",
+        "crate::kernel::trimclip::winding_number"
+      ],
+      "theorem_comment": "This is the SOUND composition of 9.4 step 5: the sample is first certified OFF the loop by R9 distance-positivity data, and only then is the winding number (a classical, exactly-computable index with no cancellation ambiguity) evaluated.",
+      "confidence": "high"
+    },
+    {
+      "rule_id": "C-SPLIT-TRIM-CLIP",
+      "kind": "assembler",
+      "source": {
+        "file": "vendor/truck/truck-certified/src/kernel/trimclip.rs",
+        "symbol": "crate::kernel::trimclip::trim_clip",
+        "line": 777
+      },
+      "preconditions": [
+        {"axis": "relation.src_dims", "value": "1x1"},
+        {"axis": "rep.construction_witness", "value": "true"},
+        {"axis": "!unmodeled:trim_in_same_chart", "value": "!unmodeled:trim.chart == arc pcurve chart"},
+        {"axis": "!unmodeled:trim_loop_closed", "value": "!unmodeled:every TrimLoop.closed == true"}
+      ],
+      "outcomes": [
+        {
+          "variant": "Construction::Ok(CertifiedGraph)",
+          "postconditions": [
+            {"axis": "rep.construction_witness", "value": "true"},
+            {"axis": "global.knowledge", "value": "local_only(residual)"},
+            {"axis": "goal", "value": "valid_brep"}
+          ]
+        }
+      ],
+      "refusals": [
+        "RefusalKind::ClaimRefuted (trim_loop_open_cannot_bound, trimclip_unclippable_arc_family)",
+        "RefusalKind::TrimClipFailed (from certify_crossings and certify_off_loop)",
+        "RefusalKind::NonFinite (Param::try_new)",
+        "RefusalKind::ClaimRefuted (HermiteSpline::try_new)"
+      ],
+      "consumes_evidence": [
+        "CertifiedGraph",
+        "TrimLoop",
+        "Node",
+        "AnyArc",
+        "NodeCert",
+        "ArcCert"
+      ],
+      "produces_evidence": [
+        "CertifiedGraph",
+        "Node (TopoNode::TrimCrossing)",
+        "AnyArc (retained sub-arcs)"
+      ],
+      "calls": [
+        "crate::kernel::trimclip::clip_arc",
+        "crate::kernel::trimclip::certify_crossings",
+        "crate::kernel::trimclip::certify_off_loop",
+        "crate::kernel::trimclip::winding_number",
+        "crate::kernel::trimclip::sample_inside",
+        "crate::kernel::trimclip::build_piece",
+        "crate::kernel::trimclip::event_node",
+        "crate::kernel::trimclip::build_sub_arc",
+        "crate::kernel::trimclip::arc_chart_ends",
+        "crate::kernel::trimclip::arc_pcurve_leaf"
+      ],
+      "theorem_comment": "trim_clip(graph, trims) implements 9.4 steps 3-6 over the input CertifiedGraph: certified R9 crossings of each arc's pcurve against each closed trim curve of the SAME chart become TopoNode::TrimCrossing nodes; the arcs are split at those crossings; sub-arcs are classified by the winding number of the closed trim loop about a certified-off interior sample; outside sub-arcs are discarded.",
+      "confidence": "high"
+    },
+    {
+      "rule_id": "C-SPLIT-CLIP-ARC",
+      "kind": "classifier",
+      "source": {
+        "file": "vendor/truck/truck-certified/src/kernel/trimclip.rs",
+        "symbol": "crate::kernel::trimclip::clip_arc",
+        "line": 833
+      },
+      "preconditions": [
+        {"axis": "!unmodeled:arc_chart_ends_resolve", "value": "!unmodeled:both arc ends resolve to nodes on one common chart"}
+      ],
+      "outcomes": [
+        {"variant": "ClipOutcome::Untouched", "postconditions": [{"axis": "global.knowledge", "value": "local_only(residual)"}]},
+        {"variant": "ClipOutcome::ClippedAway", "postconditions": [{"axis": "goal", "value": "material_class"}]},
+        {"variant": "ClipOutcome::Retained(Vec<AnyArc>)", "postconditions": [{"axis": "rep.construction_witness", "value": "true"}, {"axis": "goal", "value": "valid_brep"}]}
+      ],
+      "refusals": [
+        "RefusalKind::ClaimRefuted (trimclip_unclippable_arc_family)",
+        "RefusalKind::TrimClipFailed (from certify_crossings)"
+      ],
+      "consumes_evidence": [
+        "AnyArc",
+        "Node",
+        "TrimLoop"
+      ],
+      "produces_evidence": [
+        "ClipOutcome",
+        "AnyArc"
+      ],
+      "calls": [
+        "crate::kernel::trimclip::arc_chart_ends",
+        "crate::kernel::trimclip::arc_pcurve_leaf",
+        "crate::kernel::trimclip::certify_crossings",
+        "crate::kernel::trimclip::sample_inside",
+        "crate::kernel::trimclip::build_piece",
+        "crate::kernel::trimclip::event_node"
+      ],
+      "theorem_comment": "The retained sub-arcs are the certified open runs between consecutive crossing zones (and between a crossing zone and the original arc end). A crossing zone itself is the split marker, never a sub-arc.",
+      "confidence": "high"
+    },
+    {
+      "rule_id": "C-SPLIT-BUILD-PIECE",
+      "kind": "classifier",
+      "source": {
+        "file": "vendor/truck/truck-certified/src/kernel/trimclip.rs",
+        "symbol": "crate::kernel::trimclip::build_piece",
+        "line": 966
+      },
+      "preconditions": [
+        {"axis": "!unmodeled:sample_off_loop_obligation", "value": "!unmodeled:sample certified off EVERY closed loop before winding"}
+      ],
+      "outcomes": [
+        {"variant": "Construction::Ok(Some(AnyArc))", "postconditions": [{"axis": "goal", "value": "valid_brep"}]},
+        {"variant": "Construction::Ok(None)", "postconditions": [{"axis": "goal", "value": "material_class"}]}
+      ],
+      "refusals": [
+        "RefusalKind::ClaimRefuted (trimclip_unclippable_arc_family)",
+        "RefusalKind::TrimClipFailed (from sample_inside)"
+      ],
+      "consumes_evidence": [
+        "AnyArc",
+        "BezierLeaf1",
+        "TrimLoop"
+      ],
+      "produces_evidence": [
+        "AnyArc"
+      ],
+      "calls": [
+        "crate::kernel::trimclip::chart_point",
+        "crate::kernel::trimclip::sample_inside",
+        "crate::kernel::trimclip::build_sub_arc"
+      ],
+      "theorem_comment": "The sample is certified off EVERY closed loop before any winding is evaluated (the SOUND use), then classified.",
+      "confidence": "high"
+    },
+    {
+      "rule_id": "C-SPLIT-BUILD-SUB-ARC",
+      "kind": "assembler",
+      "source": {
+        "file": "vendor/truck/truck-certified/src/kernel/trimclip.rs",
+        "symbol": "crate::kernel::trimclip::build_sub_arc",
+        "line": 1009
+      },
+      "preconditions": [
+        {"axis": "!unmodeled:arc_family", "value": "!unmodeled:Ordinary | Difference only"}
+      ],
+      "outcomes": [
+        {"variant": "Construction::Ok(AnyArc)", "postconditions": [{"axis": "rep.construction_witness", "value": "true"}, {"axis": "goal", "value": "valid_brep"}]}
+      ],
+      "refusals": [
+        "RefusalKind::ClaimRefuted (trimclip_unclippable_arc_family)",
+        "RefusalKind::NonFinite (HermiteSpline::try_new)"
+      ],
+      "consumes_evidence": [
+        "AnyArc",
+        "BezierLeaf1",
+        "ArcCert"
+      ],
+      "produces_evidence": [
+        "AnyArc (narrowed i_tau)",
+        "HermiteSpline"
+      ],
+      "calls": [
+        "crate::kernel::trimclip::chart_point",
+        "crate::kernel::graph::HermiteSpline::try_new"
+      ],
+      "theorem_comment": "Build the retained sub-arc over the certified pcurve parameter range [piece_lo, piece_hi]: a fresh linear Hermite witness over the sub-segment and a clone of the input arc's tube certificate narrowed to the sub-range.",
+      "confidence": "high"
+    },
+    {
+      "rule_id": "C-SPLIT-EVENT-NODE",
+      "kind": "assembler",
+      "source": {
+        "file": "vendor/truck/truck-certified/src/kernel/trimclip.rs",
+        "symbol": "crate::kernel::trimclip::event_node",
+        "line": 931
+      },
+      "preconditions": [
+        {"axis": "rep.construction_witness", "value": "true"}
+      ],
+      "outcomes": [
+        {"variant": "Construction::Ok(Node)", "postconditions": [{"axis": "relation.local_dim", "value": "0"}, {"axis": "rep.construction_witness", "value": "true"}]}
+      ],
+      "refusals": [
+        "RefusalKind::NonFinite (Param::try_new)"
+      ],
+      "consumes_evidence": [
+        "CertifiedCrossing",
+        "PointCert (ResidualId::R9)"
+      ],
+      "produces_evidence": [
+        "Node (TopoNode::TrimCrossing, NodeCert::Exact)"
+      ],
+      "calls": [
+        "crate::kernel::graph::Param::try_new"
+      ],
+      "theorem_comment": "the trim boundary endpoints become TopoNode::TrimCrossing nodes, which increase graph valence and are not SegmentBreaks.",
+      "confidence": "high"
+    },
+    {
+      "rule_id": "C-CLASSIFY-EXACT-SHEET",
+      "kind": "classifier",
+      "source": {
+        "file": "vendor/truck/truck-certified/src/kernel/sheet.rs",
+        "symbol": "crate::kernel::sheet::exact_sheet",
+        "line": 363
+      },
+      "preconditions": [
+        {"axis": "relation.src_dims", "value": "2x2"},
+        {"axis": "rep.bernstein_chart", "value": "true"},
+        {"axis": "rep.canonical_carrier", "value": "true"},
+        {"axis": "rep.param_map_inverse", "value": "true"}
+      ],
+      "outcomes": [
+        {"variant": "ClaimVerdict::Proven(SheetCert)", "postconditions": [{"axis": "relation.local_dim", "value": "2"}, {"axis": "relation.zero_set", "value": "regular"}, {"axis": "rep.construction_witness", "value": "true"}, {"axis": "goal", "value": "material_class"}]},
+        {"variant": "ClaimVerdict::Disproven(Refusal)", "postconditions": [{"axis": "relation.zero_set", "value": "certified_empty"}, {"axis": "goal", "value": "no_intersection"}]}
+      ],
+      "refusals": [
+        "RefusalKind::NearOverlap (exact_sheet_representational_equality_refuted)",
+        "ClaimVerdict::Inconclusive(REASON_OUT_OF_CERTIFIED_DOMAIN)",
+        "ClaimVerdict::Inconclusive(REASON_EQUALITY_INCONCLUSIVE)",
+        "ClaimVerdict::Inconclusive(REASON_SIGN_NOT_CONSTANT)",
+        "RefusalKind::WeightDegenerate (from SheetCert::try_new via CertifiedNonzero)"
+      ],
+      "consumes_evidence": [
+        "CertifiedPatch",
+        "PsiMap",
+        "IBox2"
+      ],
+      "produces_evidence": [
+        "SheetCert",
+        "SignCert"
+      ],
+      "calls": [
+        "crate::kernel::sheet::representational_equality",
+        "crate::kernel::sheet::normal_dot_sign",
+        "crate::kernel::certs::SheetCert::try_new",
+        "crate::kernel::sheet::near_overlap"
+      ],
+      "theorem_comment": "A Sheet is legal on a box D iff: (1) a certified psi : D -> D2 exists ...; (2) S1(u,v) = S2(psi(u,v)) by certified representational equality ...; (3) n1 . (n2 o psi) is certified of constant sign ...; (4) det Dpsi is certified nonzero.",
+      "confidence": "high"
+    },
+    {
+      "rule_id": "C-CLASSIFY-REPRESENTATIONAL-EQUALITY",
+      "kind": "classifier",
+      "source": {
+        "file": "vendor/truck/truck-certified/src/kernel/sheet.rs",
+        "symbol": "crate::kernel::sheet::representational_equality",
+        "line": 286
+      },
+      "preconditions": [
+        {"axis": "rep.bernstein_chart", "value": "true"},
+        {"axis": "!unmodeled:no_tolerance", "value": "!unmodeled:bit-identical enclosures only; no tolerance comparison"}
+      ],
+      "outcomes": [
+        {"variant": "SheetEquality::Equal", "postconditions": [{"axis": "relation.zero_set", "value": "certified_empty"}, {"axis": "goal", "value": "material_class"}]},
+        {"variant": "SheetEquality::Refuted", "postconditions": [{"axis": "relation.zero_set", "value": "regular"}, {"axis": "goal", "value": "no_intersection"}]},
+        {"variant": "SheetEquality::Inconclusive", "postconditions": [{"axis": "relation.zero_set", "value": "unknown"}]}
+      ],
+      "refusals": [],
+      "consumes_evidence": [
+        "CertifiedPatch",
+        "PsiMap",
+        "IBox2"
+      ],
+      "produces_evidence": [
+        "SheetEquality"
+      ],
+      "calls": [
+        "crate::kernel::sheet::grid_edges",
+        "crate::kernel::sheet::refine_boxes",
+        "crate::kernel::sheet::separated",
+        "crate::kernel::sheet::box3_finite"
+      ],
+      "theorem_comment": "Refutation runs first over the certified grid vertices: two certified enclosures that are disjoint in any coordinate at a vertex certify that the surfaces differ there, so the exact-sheet claim is refuted (Refuse(NearOverlap), Disproven of ExactSheet). No tolerance participates anywhere on this path.",
+      "confidence": "high"
+    },
+    {
+      "rule_id": "C-CLASSIFY-NORMAL-DOT-SIGN",
+      "kind": "classifier",
+      "source": {
+        "file": "vendor/truck/truck-certified/src/kernel/sheet.rs",
+        "symbol": "crate::kernel::sheet::normal_dot_sign",
+        "line": 329
+      },
+      "preconditions": [
+        {"axis": "rep.bernstein_chart", "value": "true"},
+        {"axis": "rep.param_map_inverse", "value": "true"}
+      ],
+      "outcomes": [
+        {"variant": "ClaimVerdict::Proven(SignCert::Positive)", "postconditions": [{"axis": "relation.zero_set", "value": "certified_empty"}]},
+        {"variant": "ClaimVerdict::Proven(SignCert::Negative)", "postconditions": [{"axis": "relation.zero_set", "value": "certified_empty"}]},
+        {"variant": "ClaimVerdict::Inconclusive(Reason)", "postconditions": [{"axis": "relation.zero_set", "value": "unknown"}]}
+      ],
+      "refusals": [
+        "ClaimVerdict::Inconclusive(REASON_OUT_OF_CERTIFIED_DOMAIN)",
+        "ClaimVerdict::Inconclusive(REASON_SIGN_NOT_CONSTANT)"
+      ],
+      "consumes_evidence": [
+        "CertifiedPatch",
+        "DerivativeEnclosure",
+        "PsiMap"
+      ],
+      "produces_evidence": [
+        "SignCert"
+      ],
+      "calls": [
+        "crate::kernel::sheet::cross3",
+        "crate::kernel::sheet::dot3",
+        "crate::kernel::sheet::box3_finite",
+        "crate::kernel::sheet::axis"
+      ],
+      "theorem_comment": "The interval dot product over the box with a certified sign margin (lower bound strictly positive, or upper bound strictly negative) is the certified constant-sign output; anything else is Inconclusive - the sign is never guessed.",
+      "confidence": "high"
+    },
+    {
+      "rule_id": "C-CLASSIFY-PSIMAP-TRY-NEW",
+      "kind": "gate",
+      "source": {
+        "file": "vendor/truck/truck-certified/src/kernel/sheet.rs",
+        "symbol": "crate::kernel::sheet::PsiMap::try_new",
+        "line": 132
+      },
+      "preconditions": [
+        {"axis": "rep.param_map_inverse", "value": "true"}
+      ],
+      "outcomes": [
+        {"variant": "Result::Ok(PsiMap)", "postconditions": [{"axis": "rep.param_map_inverse", "value": "true"}, {"axis": "rep.canonical_carrier", "value": "true"}]}
+      ],
+      "refusals": [
+        "RefusalKind::NonFinite (psi_map_data_not_finite)",
+        "RefusalKind::ClaimRefuted (psi_identity_coefficients_mismatch, psi_bilinear_uv_twist_not_representable, psi_recognized_carrier_is_closed_form)",
+        "RefusalKind::WeightDegenerate (psi_affine_det_zero)"
+      ],
+      "consumes_evidence": [
+        "PsiMapKind"
+      ],
+      "produces_evidence": [
+        "PsiMap"
+      ],
+      "calls": [
+        "crate::kernel::sheet::affine_det"
+      ],
+      "theorem_comment": "PsiMapKind::Identity and PsiMapKind::Affine are constructible; PsiMapKind::Bilinear is refused ... PsiMapKind::RecognizedCarrier is refused too: a recognized carrier's closed-form correspondence is the exact Identity/Affine map over the shared chart.",
+      "confidence": "high"
+    },
+    {
+      "rule_id": "C-CLASSIFY-PSIMAP-IDENTITY",
+      "kind": "gate",
+      "source": {
+        "file": "vendor/truck/truck-certified/src/kernel/sheet.rs",
+        "symbol": "crate::kernel::sheet::PsiMap::identity",
+        "line": 201
+      },
+      "preconditions": [],
+      "outcomes": [
+        {"variant": "Result::Ok(PsiMap)", "postconditions": [{"axis": "rep.param_map_inverse", "value": "true"}, {"axis": "rep.canonical_carrier", "value": "true"}]}
+      ],
+      "refusals": [
+        "RefusalKind::ClaimRefuted (psi_identity_coefficients_mismatch; unreachable for the constant identity data)"
+      ],
+      "consumes_evidence": [],
+      "produces_evidence": [
+        "PsiMap"
+      ],
+      "calls": [
+        "crate::kernel::sheet::PsiMap::try_new"
+      ],
+      "theorem_comment": "The certified identity map (recognized-carrier closed form over a shared chart, and the identity leaf correspondence).",
+      "confidence": "high"
+    },
+    {
+      "rule_id": "C-CLASSIFY-PSIMAP-IMAGE-BOX",
+      "kind": "reduction",
+      "source": {
+        "file": "vendor/truck/truck-certified/src/kernel/sheet.rs",
+        "symbol": "crate::kernel::sheet::PsiMap::image_box",
+        "line": 232
+      },
+      "preconditions": [
+        {"axis": "rep.param_map_inverse", "value": "true"}
+      ],
+      "outcomes": [
+        {"variant": "IBox2 (outward-rounded image)", "postconditions": [{"axis": "rep.param_map_inverse", "value": "true"}, {"axis": "rep.construction_witness", "value": "true"}]}
+      ],
+      "refusals": [],
+      "consumes_evidence": [
+        "PsiMap",
+        "IBox2"
+      ],
+      "produces_evidence": [
+        "IBox2"
+      ],
+      "calls": [],
+      "theorem_comment": "The certified image of the box d under the map (4.2 Rule B's outward-rounded transport). The exact identity map transports a box to itself with no arithmetic ... every genuinely nontrivial affine image is pushed one ULP outward per bound.",
+      "confidence": "high"
+    },
+    {
+      "rule_id": "C-CLASSIFY-DEGENERACY",
+      "kind": "classifier",
+      "source": {
+        "file": "vendor/truck/truck-certified/src/kernel/atlas.rs",
+        "symbol": "crate::kernel::atlas::ChartAtlas::classify_degeneracy",
+        "line": 423
+      },
+      "preconditions": [
+        {"axis": "rep.canonical_carrier", "value": "true"},
+        {"axis": "!unmodeled:in_atlas_patch", "value": "!unmodeled:p is one of this atlas's own ChartPatch leaves (address identity)"}
+      ],
+      "outcomes": [
+        {"variant": "DegeneracyRoute::SwitchChart", "postconditions": [{"axis": "relation.incidence", "value": "seam"}, {"axis": "global.knowledge", "value": "local_only(residual)"}, {"axis": "goal", "value": "valid_brep"}]},
+        {"variant": "DegeneracyRoute::CarrierSingular", "postconditions": [{"axis": "relation.zero_set", "value": "rank_deficient(residual)"}, {"axis": "goal", "value": "no_intersection"}]}
+      ],
+      "refusals": [
+        "DegeneracyRoute::CarrierSingular (out-of-atlas patch; no partner certifies the pole image)"
+      ],
+      "consumes_evidence": [
+        "CertifiedPatch",
+        "IBox2",
+        "Chart"
+      ],
+      "produces_evidence": [
+        "DegeneracyRoute"
+      ],
+      "calls": [
+        "crate::kernel::atlas::ChartAtlas::route_for",
+        "crate::kernel::atlas::same_patch",
+        "crate::kernel::patch::CertifiedPatch::regularity"
+      ],
+      "theorem_comment": "The two outcomes are DegeneracyRoute::SwitchChart - the box reached a chart pole whose image is certified regular on the partner chart ... - and DegeneracyRoute::CarrierSingular - the box reached a genuine carrier singularity (the cone apex) or no partner can certify the image.",
+      "confidence": "high"
+    },
+    {
+      "rule_id": "C-CLASSIFY-EGF2",
+      "kind": "classifier",
+      "source": {
+        "file": "vendor/truck/truck-certified/src/kernel/atlas.rs",
+        "symbol": "crate::kernel::atlas::classify_egf2",
+        "line": 207
+      },
+      "preconditions": [
+        {"axis": "rep.bernstein_chart", "value": "true"}
+      ],
+      "outcomes": [
+        {"variant": "ClaimVerdict::Proven(CertifiedPositive)", "postconditions": [{"axis": "relation.zero_set", "value": "regular"}, {"axis": "goal", "value": "material_class"}]},
+        {"variant": "ClaimVerdict::Disproven(Degeneracy)", "postconditions": [{"axis": "relation.zero_set", "value": "rank_deficient(residual)"}, {"axis": "goal", "value": "no_intersection"}]},
+        {"variant": "ClaimVerdict::Inconclusive(Reason)", "postconditions": [{"axis": "relation.zero_set", "value": "unknown"}]}
+      ],
+      "refusals": [
+        "ClaimVerdict::Inconclusive(OUT_OF_ATLAS)",
+        "ClaimVerdict::Disproven(RefusalKind::CarrierSingularity via Degeneracy)"
+      ],
+      "consumes_evidence": [
+        "CertifiedInterval",
+        "IBox2"
+      ],
+      "produces_evidence": [
+        "CertifiedPositive",
+        "Degeneracy"
+      ],
+      "calls": [
+        "crate::kernel::atlas::positive_bound"
+      ],
+      "theorem_comment": "with the 3.2 analytic convention (a positive rational function is degenerate only where it is exactly zero, so no TOL_JACOBIAN floor participates).",
+      "confidence": "high"
+    },
+    {
+      "rule_id": "C-CLASSIFY-WEIGHT",
+      "kind": "classifier",
+      "source": {
+        "file": "vendor/truck/truck-certified/src/kernel/atlas.rs",
+        "symbol": "crate::kernel::atlas::classify_weight",
+        "line": 227
+      },
+      "preconditions": [
+        {"axis": "rep.rational_positive_weights", "value": "true"}
+      ],
+      "outcomes": [
+        {"variant": "ClaimVerdict::Proven(CertifiedPositive)", "postconditions": [{"axis": "rep.rational_positive_weights", "value": "true"}, {"axis": "relation.zero_set", "value": "regular"}]},
+        {"variant": "ClaimVerdict::Disproven(Pole)", "postconditions": [{"axis": "relation.zero_set", "value": "rank_deficient(residual)"}]},
+        {"variant": "ClaimVerdict::Inconclusive(Reason)", "postconditions": [{"axis": "relation.zero_set", "value": "unknown"}]}
+      ],
+      "refusals": [
+        "ClaimVerdict::Inconclusive(OUT_OF_ATLAS)"
+      ],
+      "consumes_evidence": [
+        "CertifiedInterval",
+        "IBox2"
+      ],
+      "produces_evidence": [
+        "CertifiedPositive",
+        "Pole"
+      ],
+      "calls": [
+        "crate::kernel::atlas::positive_bound"
+      ],
+      "theorem_comment": "Classify a denominator enclosure into the weight-bound claim.",
+      "confidence": "high"
+    },
+    {
+      "rule_id": "C-CLASSIFY-BOX-REACHES-POLE",
+      "kind": "classifier",
+      "source": {
+        "file": "vendor/truck/truck-certified/src/kernel/atlas.rs",
+        "symbol": "crate::kernel::atlas::Chart::box_reaches_pole",
+        "line": 349
+      },
+      "preconditions": [],
+      "outcomes": [
+        {"variant": "bool", "postconditions": [{"axis": "relation.incidence", "value": "!unmodeled:pole-locus overlap"}]}
+      ],
+      "refusals": [],
+      "consumes_evidence": [
+        "Chart",
+        "IBox2"
+      ],
+      "produces_evidence": [
+        "bool"
+      ],
+      "calls": [
+        "crate::kernel::atlas::boxes_overlap"
+      ],
+      "theorem_comment": "Whether the box intersects the chart's internal degeneracy locus.",
+      "confidence": "high"
+    },
+    {
+      "rule_id": "C-GATE-LATTICE-TRY-NEW",
+      "kind": "gate",
+      "source": {
+        "file": "vendor/truck/truck-certified/src/kernel/atlas.rs",
+        "symbol": "crate::kernel::atlas::ChartLattice::try_new",
+        "line": 274
+      },
+      "preconditions": [],
+      "outcomes": [
+        {"variant": "Construction::Ok(ChartLattice)", "postconditions": [{"axis": "rep.canonical_carrier", "value": "true"}]}
+      ],
+      "refusals": [
+        "RefusalKind::NonFinite (lattice_period_not_finite)",
+        "RefusalKind::ClaimRefuted (lattice_period_nonpositive)"
+      ],
+      "consumes_evidence": [],
+      "produces_evidence": [
+        "ChartLattice"
+      ],
+      "calls": [],
+      "theorem_comment": "Only exact generators are stored (an uncertified declared period is never a deck generator).",
+      "confidence": "high"
+    },
+    {
+      "rule_id": "C-ASSEMBLE-ATLAS-TRY-NEW",
+      "kind": "assembler",
+      "source": {
+        "file": "vendor/truck/truck-certified/src/kernel/atlas.rs",
+        "symbol": "crate::kernel::atlas::ChartAtlas::try_new",
+        "line": 379
+      },
+      "preconditions": [
+        {"axis": "rep.canonical_carrier", "value": "true"}
+      ],
+      "outcomes": [
+        {"variant": "Construction::Ok(ChartAtlas)", "postconditions": [{"axis": "rep.canonical_carrier", "value": "true"}, {"axis": "rep.construction_witness", "value": "true"}, {"axis": "goal", "value": "valid_brep"}]}
+      ],
+      "refusals": [
+        "RefusalKind::ClaimRefuted (atlas_cylinder_data, atlas_sphere_data, atlas_cone_data, atlas_torus_data, cone_height_degenerate)",
+        "RefusalKind::CarrierSingularity (cone_axis_not_coordinate, torus_axis_not_coordinate)"
+      ],
+      "consumes_evidence": [
+        "RationalCarrier"
+      ],
+      "produces_evidence": [
+        "ChartAtlas",
+        "Chart",
+        "ChartLattice",
+        "Partner"
+      ],
+      "calls": [
+        "crate::kernel::atlas::plane_charts",
+        "crate::kernel::atlas::cylinder_charts",
+        "crate::kernel::atlas::sphere_charts",
+        "crate::kernel::atlas::cone_charts",
+        "crate::kernel::atlas::torus_charts"
+      ],
+      "theorem_comment": "The admission route of the cone/torus carriers: the chart family is constructed here (the 3.3 bookkeeping), where the Wave-1 kernel::rational::admit refusal (with its pending name) remains available for out-of-atlas carriers.",
+      "confidence": "high"
+    },
+    {
+      "rule_id": "C-REDUCTION-LIFT",
+      "kind": "reduction",
+      "source": {
+        "file": "vendor/truck/truck-certified/src/kernel/atlas.rs",
+        "symbol": "crate::kernel::atlas::ChartAtlas::lift",
+        "line": 466
+      },
+      "preconditions": [
+        {"axis": "rep.canonical_carrier", "value": "true"},
+        {"axis": "!unmodeled:chart_periodic", "value": "!unmodeled:chart has an exact u deck generator"}
+      ],
+      "outcomes": [
+        {"variant": "Construction::Ok(Param)", "postconditions": [{"axis": "!unmodeled:deck_integer", "value": "!unmodeled:canonical u in [0, period); deck carries winding"}, {"axis": "rep.construction_witness", "value": "true"}, {"axis": "goal", "value": "valid_brep"}]}
+      ],
+      "refusals": [
+        "RefusalKind::ClaimRefuted (lift_chart_not_periodic, lift_chart_mismatch)",
+        "RefusalKind::DeckExhausted (deck_exhausted_lift via lift_periodic)",
+        "RefusalKind::NonFinite (lift_raw_not_finite via lift_periodic)"
+      ],
+      "consumes_evidence": [
+        "ChartAtlas",
+        "Param"
+      ],
+      "produces_evidence": [
+        "Param (deck, u, v)"
+      ],
+      "calls": [
+        "crate::kernel::atlas::lift_periodic",
+        "crate::kernel::atlas::ChartAtlas::u_period"
+      ],
+      "theorem_comment": "The lift never wraps an already-lifted coordinate: Param(5.9) stays 5.9 (deck 0), and the developed 6.4 lifts to deck +1 with canonical u = 6.4 - period. The edge bound is the 0.4 ceiling.",
+      "confidence": "high"
+    },
+    {
+      "rule_id": "C-REDUCTION-LIFT-PERIODIC",
+      "kind": "reduction",
+      "source": {
+        "file": "vendor/truck/truck-certified/src/kernel/atlas.rs",
+        "symbol": "crate::kernel::atlas::lift_periodic",
+        "line": 1233
+      },
+      "preconditions": [
+        {"axis": "!unmodeled:chart_periodic", "value": "!unmodeled:period > 0 finite"}
+      ],
+      "outcomes": [
+        {"variant": "Construction::Ok(Param)", "postconditions": [{"axis": "!unmodeled:deck_integer", "value": "!unmodeled:|deck - from.deck| <= DECK_MAX"}, {"axis": "rep.construction_witness", "value": "true"}]}
+      ],
+      "refusals": [
+        "RefusalKind::NonFinite (lift_raw_not_finite)",
+        "RefusalKind::ClaimRefuted (lift_chart_mismatch)",
+        "RefusalKind::DeckExhausted (deck_exhausted_lift)"
+      ],
+      "consumes_evidence": [
+        "Param",
+        "ChartId",
+        "DECK_MAX"
+      ],
+      "produces_evidence": [
+        "Param"
+      ],
+      "calls": [
+        "crate::kernel::atlas::unwrap_deck",
+        "crate::kernel::graph::Param::try_new"
+      ],
+      "theorem_comment": "The 0.4 ceiling is enforced per edge: |deck - from.deck| > DECK_MAX refuses RefusalKind::DeckExhausted (Inconclusive).",
+      "confidence": "high"
+    },
+    {
+      "rule_id": "C-REDUCTION-POLE-TO-PARTNER",
+      "kind": "reduction",
+      "source": {
+        "file": "vendor/truck/truck-certified/src/kernel/atlas.rs",
+        "symbol": "crate::kernel::atlas::pole_to_partner",
+        "line": 649
+      },
+      "preconditions": [
+        {"axis": "rep.canonical_carrier", "value": "true"},
+        {"axis": "rep.param_map_inverse", "value": "true"}
+      ],
+      "outcomes": [
+        {"variant": "Option::Some([f64; 2])", "postconditions": [{"axis": "relation.incidence", "value": "seam"}, {"axis": "rep.param_map_inverse", "value": "true"}]},
+        {"variant": "Option::None", "postconditions": [{"axis": "relation.zero_set", "value": "unknown"}]}
+      ],
+      "refusals": [
+        "Option::None (non-finite arithmetic)"
+      ],
+      "consumes_evidence": [
+        "pole chart (u, v)"
+      ],
+      "produces_evidence": [
+        "[f64; 2] partner chart point"
+      ],
+      "calls": [],
+      "theorem_comment": "A pole-chart point (u, v) = (tan(theta/2), tan(phi/2)) maps onto the partner stereographic chart at (U, V) = (u(1 - v^2)/(1 + v^2), 2uv/(1 + v^2)) - the partner's (0, 0) is the same pole, and an arc crossing u = v = 0 continues there with no valence change.",
+      "confidence": "high"
+    },
+    {
+      "rule_id": "C-REDUCTION-POLE-TO-PARTNER-BOX",
+      "kind": "reduction",
+      "source": {
+        "file": "vendor/truck/truck-certified/src/kernel/atlas.rs",
+        "symbol": "crate::kernel::atlas::pole_to_partner_box",
+        "line": 667
+      },
+      "preconditions": [
+        {"axis": "rep.canonical_carrier", "value": "true"}
+      ],
+      "outcomes": [
+        {"variant": "Option::Some(IBox2)", "postconditions": [{"axis": "relation.incidence", "value": "seam"}, {"axis": "rep.construction_witness", "value": "true"}]},
+        {"variant": "Option::None", "postconditions": [{"axis": "relation.zero_set", "value": "unknown"}]}
+      ],
+      "refusals": [
+        "Option::None (non-finite transported arithmetic)"
+      ],
+      "consumes_evidence": [
+        "IBox2"
+      ],
+      "produces_evidence": [
+        "IBox2"
+      ],
+      "calls": [
+        "crate::formal::exact::CertifiedInterval arithmetic"
+      ],
+      "theorem_comment": "The outward-rounded box transport of pole_to_partner: the exact rational transition evaluated on the box as a CertifiedInterval map, so the result provably contains the image of every point of the box.",
+      "confidence": "high"
+    },
+    {
+      "rule_id": "C-DECIDE-KRAWCZYK-C1",
+      "kind": "solver",
+      "source": {
+        "file": "vendor/truck/truck-certified/src/kernel/engine.rs",
+        "symbol": "crate::kernel::engine::krawczyk_c1",
+        "line": 249
+      },
+      "preconditions": [
+        {"axis": "relation.src_dims", "value": "1x1"},
+        {"axis": "relation.zero_set", "value": "regular"},
+        {"axis": "!unmodeled:square_arity_n", "value": "!unmodeled:g.arity() == 2"},
+        {"axis": "rep.rational_positive_weights", "value": "true"}
+      ],
+      "outcomes": [
+        {"variant": "ClaimVerdict::Proven(PointCert)", "postconditions": [{"axis": "relation.local_dim", "value": "0"}, {"axis": "relation.zero_set", "value": "regular"}, {"axis": "global.knowledge", "value": "local_only(residual)"}, {"axis": "rep.construction_witness", "value": "true"}, {"axis": "goal", "value": "local_contact"}]},
+        {"variant": "ClaimVerdict::Disproven(Refusal)", "postconditions": [{"axis": "relation.zero_set", "value": "certified_empty"}]},
+        {"variant": "ClaimVerdict::Inconclusive(Reason)", "postconditions": [{"axis": "relation.zero_set", "value": "unknown"}]}
+      ],
+      "refusals": [
+        "RefusalKind::WeightDegenerate (c1_weights_empty)",
+        "RefusalKind::NonFinite (c1_radius_nonpositive)",
+        "RefusalKind::ClaimRefuted (c1_k_disjoint_no_root_in_box)",
+        "ClaimVerdict::Inconclusive(c1_arity_mismatch_box_dimension, c1_eval_arity_mismatch, c1_jac_arity_mismatch, c1_midpoint_jacobian_singular, c1_enclosure_not_finite, c1_inclusion_not_strict, c1_rho_not_finite, c1_rho_exceeds_rho_max)"
+      ],
+      "consumes_evidence": [
+        "SquareResidualEval",
+        "IBox2",
+        "CertifiedPositive",
+        "RHO_MAX"
+      ],
+      "produces_evidence": [
+        "PointCert (ResidualId::R1 stamped by the engine)"
+      ],
+      "calls": [
+        "crate::kernel::engine::radii2",
+        "crate::kernel::engine::inv2_iv",
+        "crate::kernel::engine::classify_axis",
+        "crate::kernel::engine::rho2",
+        "crate::kernel::certs::PointCert::try_new"
+      ],
+      "theorem_comment": "In the square C1 the Krawczyk image K(B) is classified exactly: strictly inside B componentwise -> candidate Proven; disjoint from B -> Disproven (no root in B); overlapping but not strictly inside -> Inconclusive.",
+      "confidence": "high"
+    },
+    {
+      "rule_id": "C-DECIDE-KRAWCZYK-C1-N3",
+      "kind": "solver",
+      "source": {
+        "file": "vendor/truck/truck-certified/src/kernel/engine.rs",
+        "symbol": "crate::kernel::engine::krawczyk_c1_n3",
+        "line": 1868
+      },
+      "preconditions": [
+        {"axis": "relation.src_dims", "value": "2x1"},
+        {"axis": "relation.zero_set", "value": "regular"},
+        {"axis": "!unmodeled:square_arity_n", "value": "!unmodeled:g.arity() == 3"},
+        {"axis": "rep.rational_positive_weights", "value": "true"}
+      ],
+      "outcomes": [
+        {"variant": "ClaimVerdict::Proven(PointCert3)", "postconditions": [{"axis": "relation.local_dim", "value": "0"}, {"axis": "relation.zero_set", "value": "regular"}, {"axis": "global.knowledge", "value": "local_only(residual)"}, {"axis": "rep.construction_witness", "value": "true"}, {"axis": "goal", "value": "local_contact"}]},
+        {"variant": "ClaimVerdict::Disproven(Refusal)", "postconditions": [{"axis": "relation.zero_set", "value": "certified_empty"}]},
+        {"variant": "ClaimVerdict::Inconclusive(Reason)", "postconditions": [{"axis": "relation.zero_set", "value": "unknown"}]}
+      ],
+      "refusals": [
+        "RefusalKind::WeightDegenerate (c1_n3_weights_empty)",
+        "RefusalKind::NonFinite (c1_n3_radius_nonpositive)",
+        "RefusalKind::ClaimRefuted (c1_n3_k_disjoint_no_root_in_box)",
+        "ClaimVerdict::Inconclusive(c1_n3_arity_mismatch_box_dimension, c1_n3_eval_arity_mismatch, c1_n3_jac_arity_mismatch, c1_n3_midpoint_jacobian_singular, c1_n3_enclosure_not_finite, c1_n3_inclusion_not_strict, c1_n3_rho_not_finite, c1_n3_rho_exceeds_rho_max)"
+      ],
+      "consumes_evidence": [
+        "SquareResidualEval",
+        "IBox3",
+        "CertifiedPositive",
+        "RHO_MAX"
+      ],
+      "produces_evidence": [
+        "PointCert3 (ResidualId::R1 stamped by the engine)"
+      ],
+      "calls": [
+        "crate::kernel::engine::radii3",
+        "crate::kernel::engine::inv3_iv",
+        "crate::kernel::engine::classify_axis",
+        "crate::kernel::engine::rho3",
+        "crate::kernel::certs::PointCert3::try_new"
+      ],
+      "theorem_comment": "The arity-3 C1 entry (R8-class): identical operator discipline to krawczyk_c1 (Lemma 8.0 + 8.2), on the n=3 adjugate/det path, emitting a PointCert3. Weight bounds remain the 7.1 value argument.",
+      "confidence": "high"
+    },
+    {
+      "rule_id": "C-DECIDE-KRAWCZYK-C1-N4",
+      "kind": "solver",
+      "source": {
+        "file": "vendor/truck/truck-certified/src/kernel/engine.rs",
+        "symbol": "crate::kernel::engine::krawczyk_c1_n4",
+        "line": 2194
+      },
+      "preconditions": [
+        {"axis": "relation.src_dims", "value": "!unmodeled:4x4 (product chart)"},
+        {"axis": "relation.zero_set", "value": "regular"},
+        {"axis": "!unmodeled:square_arity_n", "value": "!unmodeled:g.arity() == 4"},
+        {"axis": "rep.rational_positive_weights", "value": "true"}
+      ],
+      "outcomes": [
+        {"variant": "ClaimVerdict::Proven(PointCert4)", "postconditions": [{"axis": "relation.local_dim", "value": "0"}, {"axis": "relation.zero_set", "value": "regular"}, {"axis": "global.knowledge", "value": "local_only(residual)"}, {"axis": "rep.construction_witness", "value": "true"}, {"axis": "goal", "value": "local_contact"}]},
+        {"variant": "ClaimVerdict::Disproven(Refusal)", "postconditions": [{"axis": "relation.zero_set", "value": "certified_empty"}]},
+        {"variant": "ClaimVerdict::Inconclusive(Reason)", "postconditions": [{"axis": "relation.zero_set", "value": "unknown"}]}
+      ],
+      "refusals": [
+        "RefusalKind::WeightDegenerate (c1_n4_weights_empty)",
+        "RefusalKind::NonFinite (c1_n4_radius_nonpositive)",
+        "RefusalKind::ClaimRefuted (c1_n4_k_disjoint_no_root_in_box)",
+        "ClaimVerdict::Inconclusive(c1_n4_arity_mismatch_box_dimension, c1_n4_eval_arity_mismatch, c1_n4_jac_arity_mismatch, c1_n4_midpoint_jacobian_singular, c1_n4_enclosure_not_finite, c1_n4_inclusion_not_strict, c1_n4_rho_not_finite, c1_n4_rho_exceeds_rho_max)"
+      ],
+      "consumes_evidence": [
+        "SquareResidualEval",
+        "IBox4",
+        "CertifiedPositive",
+        "RHO_MAX"
+      ],
+      "produces_evidence": [
+        "PointCert4 (ResidualId::R1 stamped by the engine)"
+      ],
+      "calls": [
+        "crate::kernel::engine::radii4",
+        "crate::kernel::engine::inv4_iv",
+        "crate::kernel::engine::classify_axis",
+        "crate::kernel::engine::rho4",
+        "crate::kernel::certs::PointCert4::try_new"
+      ],
+      "theorem_comment": "The arity-4 C1 entry (R3-class): identical operator discipline to krawczyk_c1 / krawczyk_c1_n3 (Lemma 8.0 + 8.2), on the n=4 adjugate/det path, emitting a PointCert4.",
+      "confidence": "high"
+    },
+    {
+      "rule_id": "C-DECIDE-BUILD-FRAME4",
+      "kind": "reduction",
+      "source": {
+        "file": "vendor/truck/truck-certified/src/kernel/engine.rs",
+        "symbol": "crate::kernel::engine::build_frame4",
+        "line": 775
+      },
+      "preconditions": [
+        {"axis": "!unmodeled:z_hat_finite", "value": "!unmodeled:z_hat finite chart point"},
+        {"axis": "!unmodeled:rank_3", "value": "!unmodeled:maximal-minor kernel direction non-degenerate (rank 3)"}
+      ],
+      "outcomes": [
+        {"variant": "Construction::Ok((Frame<4>, [f64; 4]))", "postconditions": [{"axis": "rep.construction_witness", "value": "true"}, {"axis": "rep.canonical_carrier", "value": "true"}, {"axis": "goal", "value": "local_contact"}]}
+      ],
+      "refusals": [
+        "RefusalKind::NonFinite (frame_z_hat_not_finite)",
+        "RefusalKind::Conditioning (frame_partials_unavailable, frame_kernel_direction_degenerate, frame_two_pass_residual_above_gate, frame_perp_basis_degenerate, frame_perp_jacobian_singular, frame_kappa_not_finite)",
+        "RefusalKind::ClaimRefuted (frame_q_tau_not_unit, frame_q_column_not_unit, frame_q_columns_not_orthogonal, frame_q_tau_not_column_zero_of_q, frame_q_perp_not_complement_of_q_tau via Frame::try_new)"
+      ],
+      "consumes_evidence": [
+        "SquareSystem3",
+        "TOL_JACOBIAN"
+      ],
+      "produces_evidence": [
+        "Frame<4>",
+        "kernel direction m [f64; 4]"
+      ],
+      "calls": [
+        "crate::kernel::engine::frame4_impl",
+        "crate::kernel::engine::kernel_minors",
+        "crate::kernel::engine::certified_float_partials",
+        "crate::kernel::certs::Frame::try_new"
+      ],
+      "theorem_comment": "The perpendicular basis by TWO-PASS (reorthogonalized) Gram-Schmidt in FIXED index order ... If a residual dot still exceeds TOL_JACOBIAN after two passes, the input is genuinely near-rank-collapse and this refuses Conditioning (Inconclusive) - the caller subdivides.",
+      "confidence": "high"
+    },
+    {
+      "rule_id": "C-DECIDE-FRAME4-KAPPA-REPORT",
+      "kind": "classifier",
+      "source": {
+        "file": "vendor/truck/truck-certified/src/kernel/engine.rs",
+        "symbol": "crate::kernel::engine::frame4_kappa_report",
+        "line": 956
+      },
+      "preconditions": [
+        {"axis": "!unmodeled:rank_3", "value": "!unmodeled:same as build_frame4"}
+      ],
+      "outcomes": [
+        {"variant": "Construction::Ok((Frame<4>, FrameKappaReport))", "postconditions": [{"axis": "rep.construction_witness", "value": "true"}, {"axis": "!unmodeled:kappa_below_KAPPA_MAX", "value": "!unmodeled:rebuild_recommended = kappa > KAPPA_MAX"}]}
+      ],
+      "refusals": [
+        "same refusal set as crate::kernel::engine::build_frame4"
+      ],
+      "consumes_evidence": [
+        "SquareSystem3",
+        "KAPPA_MAX"
+      ],
+      "produces_evidence": [
+        "Frame<4>",
+        "FrameKappaReport"
+      ],
+      "calls": [
+        "crate::kernel::engine::frame4_impl"
+      ],
+      "theorem_comment": "A kappa above KAPPA_MAX marks the frame rebuild-recommended in the certificate evidence (spec 10.1's rebuild rule: re-factor only when kappa(DF Q_perp) > kappa_max). The build gate itself stays the orthonormality check in build_frame4; this report never refuses an orthonormal frame.",
+      "confidence": "high"
+    },
+    {
+      "rule_id": "C-DECIDE-C2-CERTIFY-TUBE4",
+      "kind": "solver",
+      "source": {
+        "file": "vendor/truck/truck-certified/src/kernel/engine.rs",
+        "symbol": "crate::kernel::engine::c2_certify_tube4",
+        "line": 1211
+      },
+      "preconditions": [
+        {"axis": "relation.src_dims", "value": "2x1"},
+        {"axis": "relation.zero_set", "value": "regular"},
+        {"axis": "rep.rational_positive_weights", "value": "true"},
+        {"axis": "!unmodeled:kappa_below_KAPPA_MAX", "value": "!unmodeled:midpoint perpendicular conditioning <= KAPPA_MAX"}
+      ],
+      "outcomes": [
+        {"variant": "ClaimVerdict::Proven(ArcCert<4>)", "postconditions": [{"axis": "relation.local_dim", "value": "1"}, {"axis": "global.knowledge", "value": "local_only(residual)"}, {"axis": "rep.construction_witness", "value": "true"}, {"axis": "goal", "value": "local_contact"}]},
+        {"variant": "ClaimVerdict::Disproven(Refusal)", "postconditions": [{"axis": "relation.zero_set", "value": "certified_empty"}]},
+        {"variant": "ClaimVerdict::Inconclusive(Reason)", "postconditions": [{"axis": "relation.zero_set", "value": "unknown"}]}
+      ],
+      "refusals": [
+        "RefusalKind::WeightDegenerate (tube_weights_empty)",
+        "RefusalKind::ClaimRefuted (tube_i_tau_invalid)",
+        "RefusalKind::NonFinite (tube_radius_nonpositive)",
+        "RefusalKind::Conditioning (via ArcCert::try_new R2_never_reaches_C2 / rho)",
+        "ClaimVerdict::Inconclusive(tube_partials_unavailable, tube_midpoint_jacobian_singular, tube_midpoint_conditioning, tube_joint_box_outside_chart_domain, tube_slice_box_outside_chart_domain, tube_value_enclosure_failed, tube_jacobian_enclosure_failed, tube_enclosure_not_finite, tube_perpendicular_image_not_strict, tube_rho_not_finite, tube_rho_exceeds_rho_max, tube_box_lift_failed)"
+      ],
+      "consumes_evidence": [
+        "SquareSystem3",
+        "Frame<4>",
+        "Interval",
+        "IBox<3>",
+        "CertifiedPositive"
+      ],
+      "produces_evidence": [
+        "ArcCert<4> (ResidualId::R1)"
+      ],
+      "calls": [
+        "crate::kernel::engine::chart_point",
+        "crate::kernel::engine::certified_float_partials",
+        "crate::kernel::engine::perp_jacobian",
+        "crate::kernel::engine::frame_tube_chart_box",
+        "crate::kernel::engine::system_values",
+        "crate::kernel::engine::system_jacobian",
+        "crate::kernel::engine::classify_axis",
+        "crate::kernel::certs::ArcCert::try_new"
+      ],
+      "theorem_comment": "The 8.3 one-dimensional (tube) certificate over the R1 family at n = 4 (the recorded F3 amendment: the 3x3 perpendicular system is evaluated over the JOINT box (I_tau, B_perp) in frame coordinates). ... a perpendicular image that is not strictly inside B_perp is Inconclusive (shrink-and-retry is licensed).",
+      "confidence": "high"
+    },
+    {
+      "rule_id": "C-DECIDE-TUBE-REACH-PROBE",
+      "kind": "solver",
+      "source": {
+        "file": "vendor/truck/truck-certified/src/kernel/engine.rs",
+        "symbol": "crate::kernel::engine::tube_reach_probe",
+        "line": 1689
+      },
+      "preconditions": [
+        {"axis": "!unmodeled:rank_3", "value": "!unmodeled:seed frames (frame4_impl)"}
+      ],
+      "outcomes": [
+        {"variant": "ProbeReport", "postconditions": [{"axis": "global.knowledge", "value": "local_only(residual)"}, {"axis": "goal", "value": "local_contact"}]}
+      ],
+      "refusals": [
+        "ProbeReport { frame_ok: false, note: Some(predicate), no_reach: true } (seed frame refused)"
+      ],
+      "consumes_evidence": [
+        "SquareSystem3",
+        "Frame<4>",
+        "CertifiedPositive"
+      ],
+      "produces_evidence": [
+        "ProbeReport"
+      ],
+      "calls": [
+        "crate::kernel::engine::frame4_impl",
+        "crate::kernel::engine::probe_tau_reach",
+        "crate::kernel::engine::probe_perp_min",
+        "crate::kernel::engine::probe_arc_certifies",
+        "crate::kernel::engine::c2_certify_tube4"
+      ],
+      "theorem_comment": "The returned ProbeReport is the PUBLISHED characteristic (spec 18): profile, do not tune against it.",
+      "confidence": "high"
+    },
+    {
+      "rule_id": "C-DECIDE-R8-EVAL",
+      "kind": "reduction",
+      "source": {
+        "file": "vendor/truck/truck-certified/src/kernel/residuals_r89.rs",
+        "symbol": "crate::kernel::residuals_r89::R8System (SquareResidualEval)",
+        "line": 373
+      },
+      "preconditions": [
+        {"axis": "relation.src_dims", "value": "2x1"},
+        {"axis": "rep.bernstein_chart", "value": "true"},
+        {"axis": "rep.rational_positive_weights", "value": "true"}
+      ],
+      "outcomes": [
+        {"variant": "Vec<Interval> (H(t,u,v), 3 components)", "postconditions": [{"axis": "relation.zero_set", "value": "regular"}, {"axis": "rep.exact_implicit", "value": "true"}]}
+      ],
+      "refusals": [
+        "vacuous unbounded Interval (box axis leaves the unit domain or hull refusal)"
+      ],
+      "consumes_evidence": [
+        "BezierLeaf1",
+        "BezierLeaf"
+      ],
+      "produces_evidence": [
+        "Interval residual",
+        "Interval Jacobian enclosure"
+      ],
+      "calls": [
+        "crate::hull::hull_bernstein_1d",
+        "crate::hull::hull_bernstein_2d",
+        "crate::kernel::residuals_r89::surface_grid",
+        "crate::kernel::residuals_r89::surface_grid_deriv"
+      ],
+      "theorem_comment": "A Proven C1 over a box IS the transversality certificate det DH != 0, i.e. C'(t) not in T(u,v) on the box. A tangential input is therefore never Proven.",
+      "confidence": "high"
+    },
+    {
+      "rule_id": "C-DECIDE-R9-EVAL",
+      "kind": "reduction",
+      "source": {
+        "file": "vendor/truck/truck-certified/src/kernel/residuals_r89.rs",
+        "symbol": "crate::kernel::residuals_r89::R9System (SquareResidualEval)",
+        "line": 489
+      },
+      "preconditions": [
+        {"axis": "relation.src_dims", "value": "1x1"},
+        {"axis": "rep.bernstein_chart", "value": "true"},
+        {"axis": "rep.rational_positive_weights", "value": "true"}
+      ],
+      "outcomes": [
+        {"variant": "Vec<Interval> (J(t,r), 2 components)", "postconditions": [{"axis": "relation.zero_set", "value": "regular"}, {"axis": "rep.exact_implicit", "value": "true"}]}
+      ],
+      "refusals": [
+        "vacuous unbounded Interval (box axis leaves the unit domain or hull refusal)"
+      ],
+      "consumes_evidence": [
+        "BezierLeaf1"
+      ],
+      "produces_evidence": [
+        "Interval residual",
+        "Interval Jacobian enclosure"
+      ],
+      "calls": [
+        "crate::hull::hull_bernstein_1d"
+      ],
+      "theorem_comment": "The n=2 C1 entry (krawczyk_c1) composes the 2D Krawczyk arm of the S2A seam ... no second 2D engine is forked here.",
+      "confidence": "high"
+    },
+    {
+      "rule_id": "C-GATE-R8SYSTEM-TRY-NEW",
+      "kind": "gate",
+      "source": {
+        "file": "vendor/truck/truck-certified/src/kernel/residuals_r89.rs",
+        "symbol": "crate::kernel::residuals_r89::R8System::try_new",
+        "line": 353
+      },
+      "preconditions": [
+        {"axis": "rep.rational_positive_weights", "value": "true"}
+      ],
+      "outcomes": [
+        {"variant": "Construction::Ok(R8System)", "postconditions": [{"axis": "relation.src_dims", "value": "2x1"}, {"axis": "rep.bernstein_chart", "value": "true"}, {"axis": "rep.rational_positive_weights", "value": "true"}]}
+      ],
+      "refusals": [
+        "RefusalKind::ClaimRefuted (bezier1_zero_degree, bezier1_control_count_mismatch, bezier_zero_degree, bezier_control_count_mismatch)",
+        "RefusalKind::NonFinite (bezier1_coordinate_not_finite, bezier_coordinate_not_finite)",
+        "RefusalKind::WeightDegenerate (bezier1_control_weight_not_positive, bezier_control_weight_not_positive)",
+        "RefusalKind::TranscendentalCarrier (r89_curve_transcendental_carrier)"
+      ],
+      "consumes_evidence": [
+        "BezierLeaf1",
+        "BezierLeaf"
+      ],
+      "produces_evidence": [
+        "R8System"
+      ],
+      "calls": [
+        "crate::kernel::residuals_r89::validate_curve_leaf",
+        "crate::kernel::residuals_r89::validate_surface_leaf"
+      ],
+      "theorem_comment": "Build the R8 system, refusing a curve or surface leaf that is not a certified rational homogeneous net (non-finite, zero-degree, or non-positive-weight data) or a transcendental-carrier curve.",
+      "confidence": "high"
+    },
+    {
+      "rule_id": "C-GATE-R9SYSTEM-TRY-NEW",
+      "kind": "gate",
+      "source": {
+        "file": "vendor/truck/truck-certified/src/kernel/residuals_r89.rs",
+        "symbol": "crate::kernel::residuals_r89::R9System::try_new",
+        "line": 457
+      },
+      "preconditions": [
+        {"axis": "rep.rational_positive_weights", "value": "true"},
+        {"axis": "!unmodeled:same_chart", "value": "!unmodeled:a.chart == b.chart"}
+      ],
+      "outcomes": [
+        {"variant": "Construction::Ok(R9System)", "postconditions": [{"axis": "relation.src_dims", "value": "1x1"}, {"axis": "rep.bernstein_chart", "value": "true"}, {"axis": "!unmodeled:same_chart", "value": "!unmodeled:one lifted chart"}]}
+      ],
+      "refusals": [
+        "RefusalKind::ChartExhausted (r9_requires_one_chart)",
+        "RefusalKind::ClaimRefuted (bezier1_zero_degree, bezier1_control_count_mismatch)",
+        "RefusalKind::NonFinite (bezier1_coordinate_not_finite)",
+        "RefusalKind::WeightDegenerate (bezier1_control_weight_not_positive)",
+        "RefusalKind::TranscendentalCarrier (r89_curve_transcendental_carrier)"
+      ],
+      "consumes_evidence": [
+        "BezierLeaf1"
+      ],
+      "produces_evidence": [
+        "R9System"
+      ],
+      "calls": [
+        "crate::kernel::residuals_r89::validate_curve_leaf"
+      ],
+      "theorem_comment": "Build the R9 system from two curve leaves, refusing a non-rational leaf ... and refusing leaves in different lifted charts with the r9_requires_one_chart predicate.",
+      "confidence": "high"
+    },
+    {
+      "rule_id": "C-GATE-BEZIERLEAF1-TRY-NEW",
+      "kind": "gate",
+      "source": {
+        "file": "vendor/truck/truck-certified/src/kernel/residuals_r89.rs",
+        "symbol": "crate::kernel::residuals_r89::BezierLeaf1::try_new",
+        "line": 158
+      },
+      "preconditions": [],
+      "outcomes": [
+        {"variant": "Construction::Ok(BezierLeaf1)", "postconditions": [{"axis": "rep.bernstein_chart", "value": "true"}, {"axis": "rep.rational_positive_weights", "value": "true"}, {"axis": "rep.construction_witness", "value": "true"}]}
+      ],
+      "refusals": [
+        "RefusalKind::ClaimRefuted (bezier1_zero_degree, bezier1_control_count_mismatch)",
+        "RefusalKind::NonFinite (bezier1_coordinate_not_finite)",
+        "RefusalKind::WeightDegenerate (bezier1_control_weight_not_positive)"
+      ],
+      "consumes_evidence": [
+        "CurveCarrierKind",
+        "ChartId"
+      ],
+      "produces_evidence": [
+        "BezierLeaf1"
+      ],
+      "calls": [
+        "crate::kernel::residuals_r89::validate_curve_net"
+      ],
+      "theorem_comment": "Construct only through BezierLeaf1::try_new, which refuses a zero degree, a mismatched control count, non-finite coordinates, and a non-positive control weight - the same discipline as the landed BezierLeaf.",
+      "confidence": "high"
+    },
+    {
+      "rule_id": "C-DECIDE-BOUNDARY-CROSSING",
+      "kind": "reduction",
+      "source": {
+        "file": "vendor/truck/truck-certified/src/kernel/claims.rs",
+        "symbol": "crate::kernel::claims::BoundaryCrossing (SquareResidualEval)",
+        "line": 659
+      },
+      "preconditions": [
+        {"axis": "relation.src_dims", "value": "1x1"},
+        {"axis": "!unmodeled:face_axis", "value": "!unmodeled:axis in {0 (u face), 1 (v face)}"}
+      ],
+      "outcomes": [
+        {"variant": "Vec<Interval> (g(u,v), c - f)", "postconditions": [{"axis": "relation.incidence", "value": "domain_edge"}, {"axis": "goal", "value": "valid_brep"}]}
+      ],
+      "refusals": [
+        "Vec::new() (box arity mismatch)"
+      ],
+      "consumes_evidence": [
+        "BezierLeaf (first)",
+        "BezierLeaf (second)"
+      ],
+      "produces_evidence": [
+        "Interval residual",
+        "Interval Jacobian enclosure"
+      ],
+      "calls": [
+        "crate::kernel::patch::CertifiedPatch::enclose",
+        "crate::kernel::patch::CertifiedPatch::derivs"
+      ],
+      "theorem_comment": "The square 2D residual (g(u, v), c - f) over the shared chart: the difference-curve height and the face-coordinate equation. axis is 0 for the u face and 1 for the v face; f is the face value.",
+      "confidence": "high"
+    },
+    {
+      "rule_id": "C-DECIDE-CERTIFY-ENDPOINT",
+      "kind": "solver",
+      "source": {
+        "file": "vendor/truck/truck-certified/src/kernel/claims.rs",
+        "symbol": "crate::kernel::claims::certify_endpoint",
+        "line": 715
+      },
+      "preconditions": [
+        {"axis": "relation.incidence", "value": "domain_edge"},
+        {"axis": "!unmodeled:endpoint_box_inside_unit_chart", "value": "!unmodeled:u_lo >= 0 && u_hi <= 1 && v_lo >= 0 && v_hi <= 1"}
+      ],
+      "outcomes": [
+        {"variant": "Result::Ok(CertifiedEndpoint)", "postconditions": [{"axis": "relation.local_dim", "value": "0"}, {"axis": "relation.incidence", "value": "domain_edge"}, {"axis": "rep.construction_witness", "value": "true"}, {"axis": "goal", "value": "valid_brep"}]}
+      ],
+      "refusals": [
+        "Err(P_ENDPOINTS = endpoints-via-C1)",
+        "Err(P_ENDPOINTS:inconclusive)"
+      ],
+      "consumes_evidence": [
+        "LeafPair",
+        "Point4 seed",
+        "Frame<4> direction",
+        "IBox<4> domain"
+      ],
+      "produces_evidence": [
+        "CertifiedEndpoint",
+        "PointCert (R1-stamped crossing)"
+      ],
+      "calls": [
+        "crate::kernel::claims::pivot_face",
+        "crate::kernel::certs::CertifiedPositive::try_new",
+        "crate::kernel::engine::krawczyk_c1",
+        "crate::kernel::claims::chart_to_point4"
+      ],
+      "theorem_comment": "each end of the certified chain is where the plane curve meets a claim-domain face; the crossing is the unique root of the square 2D residual (g(u, v), c - f) ..., certified by engine::krawczyk_c1 over an interior box of the shared chart.",
+      "confidence": "high"
+    },
+    {
+      "rule_id": "C-ASSEMBLE-REGIONS-IDENTIFY",
+      "kind": "classifier",
+      "source": {
+        "file": "vendor/truck/truck-certified/src/kernel/assemble.rs",
+        "symbol": "crate::kernel::assemble::regions_identify",
+        "line": 173
+      },
+      "preconditions": [
+        {"axis": "rep.construction_witness", "value": "true"},
+        {"axis": "!unmodeled:identity_rules_only", "value": "!unmodeled:identity decided by Rules A/B/C, never by proximity"}
+      ],
+      "outcomes": [
+        {"variant": "IdentityVerdict::CertifiedEqual { rule }", "postconditions": [{"axis": "relation.zero_set", "value": "certified_empty"}, {"axis": "rep.construction_witness", "value": "true"}, {"axis": "goal", "value": "valid_brep"}]},
+        {"variant": "IdentityVerdict::NotCertified", "postconditions": [{"axis": "relation.zero_set", "value": "unknown"}]}
+      ],
+      "refusals": [],
+      "consumes_evidence": [
+        "PointCert",
+        "PointCert union certificates (ResidualId, PointCert)"
+      ],
+      "produces_evidence": [
+        "IdentityVerdict",
+        "IdentityRule"
+      ],
+      "calls": [
+        "crate::kernel::identity::rule_a",
+        "crate::kernel::identity::rule_c"
+      ],
+      "theorem_comment": "Rule A is tried against every caller union certificate (the same-residual containment test); Rule C goes through the typed implication relation. Anything ambiguous is IdentityVerdict::NotCertified.",
+      "confidence": "high"
+    },
+    {
+      "rule_id": "C-ASSEMBLE-C1-BOUND-OF",
+      "kind": "reduction",
+      "source": {
+        "file": "vendor/truck/truck-certified/src/kernel/assemble.rs",
+        "symbol": "crate::kernel::assemble::c1_bound_of",
+        "line": 199
+      },
+      "preconditions": [
+        {"axis": "!unmodeled:finite_hermite_ends", "value": "!unmodeled:stored Hermite endpoint and tangent finite"}
+      ],
+      "outcomes": [
+        {"variant": "Result::Ok(f64)", "postconditions": [{"axis": "relation.zero_set", "value": "regular"}, {"axis": "rep.construction_witness", "value": "true"}, {"axis": "goal", "value": "valid_brep"}]}
+      ],
+      "refusals": [
+        "RefusalKind::NonFinite (glue_c1_difference_not_finite, glue_c1_difference_overflows)"
+      ],
+      "consumes_evidence": [
+        "HermiteEnd"
+      ],
+      "produces_evidence": [
+        "certified C1 agreement bound f64"
+      ],
+      "calls": [],
+      "theorem_comment": "The certified bound is the maximum outward-rounded magnitude over the position and tangent components. It is a plain enclosure comparison: the two arcs either agree within EPS_REP or they do not - there is no snapping, ever.",
+      "confidence": "high"
+    },
+    {
+      "rule_id": "C-ASSEMBLE-GLUE",
+      "kind": "assembler",
+      "source": {
+        "file": "vendor/truck/truck-certified/src/kernel/assemble.rs",
+        "symbol": "crate::kernel::assemble::glue",
+        "line": 240
+      },
+      "preconditions": [
+        {"axis": "rep.construction_witness", "value": "true"},
+        {"axis": "!unmodeled:identity_rules_only", "value": "!unmodeled:endpoint regions identify under a 4.2 rule"},
+        {"axis": "!unmodeled:c1_within_EPS_REP", "value": "!unmodeled:C1 bound <= EPS_REP"}
+      ],
+      "outcomes": [
+        {"variant": "Construction::Ok(GlueCert)", "postconditions": [{"axis": "relation.zero_set", "value": "certified_empty"}, {"axis": "rep.construction_witness", "value": "true"}, {"axis": "goal", "value": "valid_brep"}]}
+      ],
+      "refusals": [
+        "RefusalKind::SliverOrNearOverlap (endpoint_regions_not_certified_equal)",
+        "RefusalKind::NonFinite (glue_c1_difference_not_finite, glue_c1_difference_overflows)",
+        "RefusalKind::ClaimRefuted (tube_overlap_c1_bound_negative, tube_overlap_c1_bound_exceeds_eps_rep)"
+      ],
+      "consumes_evidence": [
+        "GlueSide",
+        "PointCert",
+        "TubeOverlapCert union certificates"
+      ],
+      "produces_evidence": [
+        "GlueCert",
+        "TubeOverlapCert",
+        "IdentityRule"
+      ],
+      "calls": [
+        "crate::kernel::assemble::regions_identify",
+        "crate::kernel::assemble::c1_bound_of",
+        "crate::kernel::certs::TubeOverlapCert::try_new"
+      ],
+      "theorem_comment": "The tube-overlap condition (condition 1) and the C1-agreement condition (condition 2) must BOTH certify ... Tubes overlapping whose endpoints do NOT match under any rule of 4.2 are refused RefusalKind::SliverOrNearOverlap (Inconclusive) - a near pair is refused, never snapped.",
+      "confidence": "high"
+    },
+    {
+      "rule_id": "C-ASSEMBLE-DECK-IDENTIFY",
+      "kind": "assembler",
+      "source": {
+        "file": "vendor/truck/truck-certified/src/kernel/assemble.rs",
+        "symbol": "crate::kernel::assemble::deck_identify",
+        "line": 289
+      },
+      "preconditions": [
+        {"axis": "!unmodeled:one_periodic_chart_chain", "value": "!unmodeled:chain on one periodic chart, canonical u in [0, period)"},
+        {"axis": "!unmodeled:deck_integer", "value": "!unmodeled:per-arc displacement end.deck - start.deck exact i64"}
+      ],
+      "outcomes": [
+        {"variant": "Construction::Ok(Vec<Break>)", "postconditions": [{"axis": "!unmodeled:deck_integer", "value": "!unmodeled:DeckStep breaks carry the winding"}, {"axis": "rep.construction_witness", "value": "true"}, {"axis": "goal", "value": "valid_brep"}]}
+      ],
+      "refusals": [
+        "RefusalKind::NonFinite (deck_period_not_finite, deck_raw_not_finite, deck_seam_not_finite)",
+        "RefusalKind::ClaimRefuted (deck_period_nonpositive, chain_junction_disconnected, deck_chain_crosses_charts, deck_param_not_canonical, deck_arc_zero_run, deck_loop_displacement_inconsistent)",
+        "RefusalKind::DeckExhausted (deck_max_exceeded)",
+        "RefusalKind::SliverOrNearOverlap (deck_loop_endpoints_not_rule_b_certified)"
+      ],
+      "consumes_evidence": [
+        "ChainArc",
+        "ChainEnd",
+        "PointCert union certificates"
+      ],
+      "produces_evidence": [
+        "Break (SegmentBreak::DeckStep)",
+        "TubeOverlapCert"
+      ],
+      "calls": [
+        "crate::kernel::assemble::raw_u",
+        "crate::kernel::assemble::append_crossings",
+        "crate::kernel::assemble::build_deck_break",
+        "crate::kernel::assemble::seam_model_point",
+        "crate::kernel::identity::rule_b_transport",
+        "crate::kernel::assemble::regions_identify",
+        "crate::kernel::certs::TubeOverlapCert::try_new"
+      ],
+      "theorem_comment": "A chain whose first-start and last-end endpoints lie on the same chart with equal canonical (u, v) differs by an exact integer deck translation; when the two endpoint regions also identify under Rule B ... the chain closes as a loop. The displacement is the loop's winding and is carried by the emitted deck-step breaks.",
+      "confidence": "high"
+    },
+    {
+      "rule_id": "C-ASSEMBLE-ASSEMBLE",
+      "kind": "assembler",
+      "source": {
+        "file": "vendor/truck/truck-certified/src/kernel/assemble.rs",
+        "symbol": "crate::kernel::assemble::assemble",
+        "line": 556
+      },
+      "preconditions": [
+        {"axis": "!unmodeled:every_arc_end_resolves", "value": "!unmodeled:ArcEnd::Topo -> Node (Exact|AtTolerance); ArcEnd::Seg -> Break"}
+      ],
+      "outcomes": [
+        {"variant": "Construction::Ok(CertifiedGraph)", "postconditions": [{"axis": "goal", "value": "valid_brep"}, {"axis": "rep.construction_witness", "value": "true"}]}
+      ],
+      "refusals": [
+        "RefusalKind::ClaimRefuted (assembled_end_resolves_to_missing_node, assembled_end_resolves_to_missing_break)"
+      ],
+      "consumes_evidence": [
+        "AnyArc",
+        "Break",
+        "Node",
+        "NodeCert"
+      ],
+      "produces_evidence": [
+        "CertifiedGraph"
+      ],
+      "calls": [
+        "crate::kernel::assemble::arc_ends"
+      ],
+      "theorem_comment": "Validation: every ArcEnd::Topo resolves to a Node whose NodeCert is Exact or AtTolerance (the exhaustive two-variant match below is the shape pin - a Refuse certificate would not compile); every ArcEnd::Seg resolves to a Break ... A reference that does not resolve refuses RefusalKind::ClaimRefuted.",
+      "confidence": "high"
+    },
+    {
+      "rule_id": "C-ASSEMBLE-PROMOTE",
+      "kind": "assembler",
+      "source": {
+        "file": "vendor/truck/truck-certified/src/kernel/promote.rs",
+        "symbol": "crate::kernel::promote::promote",
+        "line": 277
+      },
+      "preconditions": [
+        {"axis": "!unmodeled:eight_conditions", "value": "!unmodeled:8.14.3 conditions walked in order"},
+        {"axis": "!unmodeled:arc_is_one_chart_run", "value": "!unmodeled:single chart run, canonical ends"},
+        {"axis": "!unmodeled:approx_endpoint_matches_chain_ends", "value": "!unmodeled:approximant first/last == chain ends"}
+      ],
+      "outcomes": [
+        {"variant": "Construction::Ok(PromotedEdge)", "postconditions": [{"axis": "goal", "value": "valid_brep"}, {"axis": "rep.construction_witness", "value": "true"}, {"axis": "global.knowledge", "value": "local_only(residual)"}]}
+      ],
+      "refusals": [
+        "RefusalKind::ClaimRefuted (promote_arc_crosses_charts, promote_period_missing_for_deck, promote_end_param_not_canonical, promote_arc_zero_run, promote_approx_empty, promote_approx_endpoint_mismatch, promote_trim_crossing_not_r9_certified, promote_interior_outside_run, promote_interior_not_ordered, promote_edge_zero_length)",
+        "RefusalKind::NonFinite (promote_end_param_not_finite, promote_end_point_not_finite, promote_period_not_finite, promote_approx_not_finite, promote_arclength_not_finite, promote_cert_box_not_finite, promote_cert_rho_not_finite, promote_raw_not_finite)",
+        "RefusalKind::DeckExhausted (promote_deck_max_exceeded)",
+        "RefusalKind::SliverOrNearOverlap (sliver_near_overlap_refuses_never_snap)",
+        "RefusalKind::Conditioning (promote_endpoint_not_c1)",
+        "RefusalKind::TangentialCurve (promote_tangency_at_tolerance_requires_opt_in)"
+      ],
+      "consumes_evidence": [
+        "ChainArc",
+        "PromoContext",
+        "PointCert",
+        "NodeCert",
+        "InteriorEvent"
+      ],
+      "produces_evidence": [
+        "PromotedEdge",
+        "SharedEnd",
+        "Pcurve",
+        "EdgeKnot",
+        "ArclengthParam"
+      ],
+      "calls": [
+        "crate::kernel::promote::condition_run",
+        "crate::kernel::promote::condition_endpoint_identity",
+        "crate::kernel::promote::condition_trim_events",
+        "crate::kernel::promote::condition_interior_order",
+        "crate::kernel::promote::condition_endpoint_c1",
+        "crate::kernel::promote::build_knots",
+        "crate::kernel::promote::build_arclength",
+        "crate::kernel::promote::condition_tangency_gate"
+      ],
+      "theorem_comment": "Promote an assembled chain arc to a model edge record, walking the eight 14.3 conditions in order ... Each failing condition is a NAMED refusal carrying the evidence the spec names for it.",
+      "confidence": "high"
+    },
+    {
+      "rule_id": "C-GATE-PROMOTE-CONDITION-RUN",
+      "kind": "gate",
+      "source": {
+        "file": "vendor/truck/truck-certified/src/kernel/promote.rs",
+        "symbol": "crate::kernel::promote::condition_run",
+        "line": 359
+      },
+      "preconditions": [
+        {"axis": "!unmodeled:one_chart_run", "value": "!unmodeled:start.at.chart == end.at.chart"},
+        {"axis": "!unmodeled:deck_integer", "value": "!unmodeled:span and endpoint deck magnitudes <= DECK_MAX"}
+      ],
+      "outcomes": [
+        {"variant": "Result::Ok(())", "postconditions": [{"axis": "!unmodeled:deck_integer", "value": "!unmodeled:developed run strictly positive"}, {"axis": "goal", "value": "valid_brep"}]}
+      ],
+      "refusals": [
+        "RefusalKind::ClaimRefuted (promote_arc_crosses_charts, promote_period_missing_for_deck, promote_end_param_not_canonical, promote_arc_zero_run, promote_approx_empty, promote_approx_endpoint_mismatch)",
+        "RefusalKind::NonFinite (promote_end_param_not_finite, promote_end_point_not_finite, promote_period_not_finite, promote_approx_not_finite)",
+        "RefusalKind::DeckExhausted (promote_deck_max_exceeded)"
+      ],
+      "consumes_evidence": [
+        "ChainArc",
+        "PromoContext",
+        "HermiteSpline"
+      ],
+      "produces_evidence": [],
+      "calls": [
+        "crate::kernel::promote::raw_u",
+        "crate::kernel::promote::deck_exhausted"
+      ],
+      "theorem_comment": "Condition 1: the arc is a single chart run with finite, canonical stored ends, a deck magnitude inside DECK_MAX ... a strictly positive developed run, and a model-space approximant whose stored ends agree with the chain ends.",
+      "confidence": "high"
+    },
+    {
+      "rule_id": "C-GATE-PROMOTE-ENDPOINT-IDENTITY",
+      "kind": "gate",
+      "source": {
+        "file": "vendor/truck/truck-certified/src/kernel/promote.rs",
+        "symbol": "crate::kernel::promote::condition_endpoint_identity",
+        "line": 484
+      },
+      "preconditions": [
+        {"axis": "!unmodeled:near_pair", "value": "!unmodeled:stored ends overlap within EPS_REP"},
+        {"axis": "!unmodeled:identity_rules_only", "value": "!unmodeled:Rules A/B/C, never proximity"}
+      ],
+      "outcomes": [
+        {"variant": "Result::Ok(())", "postconditions": [{"axis": "relation.zero_set", "value": "certified_empty"}, {"axis": "goal", "value": "valid_brep"}]}
+      ],
+      "refusals": [
+        "RefusalKind::SliverOrNearOverlap (sliver_near_overlap_refuses_never_snap)",
+        "RefusalKind::NonFinite (from rule_b_transport)"
+      ],
+      "consumes_evidence": [
+        "ChainEnd",
+        "PointCert",
+        "PointCert union certificates"
+      ],
+      "produces_evidence": [],
+      "calls": [
+        "crate::kernel::identity::rule_b_transport",
+        "crate::kernel::assemble::regions_identify"
+      ],
+      "theorem_comment": "an arc whose stored ends overlap in model space (within the representation gap) must certify as ONE shared C1 node under the LANDED A4.2 rules ... never proximity. Tubes overlap but no A4.2 rule identifies the endpoints -> RefusalKind::SliverOrNearOverlap ... a near pair is refused, never snapped.",
+      "confidence": "high"
+    },
+    {
+      "rule_id": "C-GATE-PROMOTE-TRIM-EVENTS",
+      "kind": "gate",
+      "source": {
+        "file": "vendor/truck/truck-certified/src/kernel/promote.rs",
+        "symbol": "crate::kernel::promote::condition_trim_events",
+        "line": 510
+      },
+      "preconditions": [
+        {"axis": "relation.src_dims", "value": "1x1"},
+        {"axis": "!unmodeled:crossing_is_r9", "value": "!unmodeled:Crossing event cert.residual == ResidualId::R9"}
+      ],
+      "outcomes": [
+        {"variant": "Result::Ok(())", "postconditions": [{"axis": "rep.construction_witness", "value": "true"}, {"axis": "goal", "value": "valid_brep"}]}
+      ],
+      "refusals": [
+        "RefusalKind::ClaimRefuted (promote_trim_crossing_not_r9_certified)"
+      ],
+      "consumes_evidence": [
+        "InteriorEvent",
+        "PointCert (ResidualId)"
+      ],
+      "produces_evidence": [],
+      "calls": [],
+      "theorem_comment": "Condition 3 (spec 14.3 condition 3): trim events in one chart route through the landed R9 residual (kernel::residuals_r89). An interior trim crossing whose certificate is not the one-chart R9 residual is refused.",
+      "confidence": "high"
+    },
+    {
+      "rule_id": "C-GATE-PROMOTE-INTERIOR-ORDER",
+      "kind": "gate",
+      "source": {
+        "file": "vendor/truck/truck-certified/src/kernel/promote.rs",
+        "symbol": "crate::kernel::promote::condition_interior_order",
+        "line": 531
+      },
+      "preconditions": [
+        {"axis": "!unmodeled:interior_in_run", "value": "!unmodeled:interior events strictly inside the developed run, ordered, distinct"}
+      ],
+      "outcomes": [
+        {"variant": "Result::Ok(())", "postconditions": [{"axis": "!unmodeled:interior_order", "value": "!unmodeled:finite certified C1 points in traversal order"}, {"axis": "goal", "value": "valid_brep"}]}
+      ],
+      "refusals": [
+        "RefusalKind::ClaimRefuted (promote_interior_outside_run, promote_interior_not_ordered)",
+        "RefusalKind::Conditioning (promote_endpoint_not_c1 via c1_rho)",
+        "RefusalKind::NonFinite (promote_cert_box_not_finite, promote_cert_rho_not_finite, promote_raw_not_finite)"
+      ],
+      "consumes_evidence": [
+        "InteriorEvent",
+        "PointCert"
+      ],
+      "produces_evidence": [],
+      "calls": [
+        "crate::kernel::promote::raw_u",
+        "crate::kernel::promote::c1_rho"
+      ],
+      "theorem_comment": "Condition 4: the interior events are finite, certified C1 points strictly inside the arc's developed run, in traversal order and distinct.",
+      "confidence": "high"
+    },
+    {
+      "rule_id": "C-GATE-PROMOTE-ENDPOINT-C1",
+      "kind": "gate",
+      "source": {
+        "file": "vendor/truck/truck-certified/src/kernel/promote.rs",
+        "symbol": "crate::kernel::promote::condition_endpoint_c1",
+        "line": 574
+      },
+      "preconditions": [
+        {"axis": "!unmodeled:c1_rho", "value": "!unmodeled:rho finite and <= RHO_MAX"}
+      ],
+      "outcomes": [
+        {"variant": "Result::Ok(())", "postconditions": [{"axis": "relation.zero_set", "value": "regular"}, {"axis": "goal", "value": "valid_brep"}]}
+      ],
+      "refusals": [
+        "RefusalKind::Conditioning (promote_endpoint_not_c1)",
+        "RefusalKind::NonFinite (promote_cert_box_not_finite, promote_cert_rho_not_finite)"
+      ],
+      "consumes_evidence": [
+        "ChainEnd",
+        "PointCert",
+        "NodeCert"
+      ],
+      "produces_evidence": [],
+      "calls": [
+        "crate::kernel::promote::c1_rho"
+      ],
+      "theorem_comment": "Condition 5: the endpoint C1 certificates - each stored endpoint region of the arc and the certificate of each shared end node - are certified C1 (finite, contraction rate at or below RHO_MAX).",
+      "confidence": "high"
+    },
+    {
+      "rule_id": "C-GATE-PROMOTE-TANGENCY-GATE",
+      "kind": "gate",
+      "source": {
+        "file": "vendor/truck/truck-certified/src/kernel/promote.rs",
+        "symbol": "crate::kernel::promote::condition_tangency_gate",
+        "line": 618
+      },
+      "preconditions": [
+        {"axis": "relation.zero_set", "value": "rank_deficient(residual)"},
+        {"axis": "!unmodeled:tangency_opt_in", "value": "!unmodeled:TangencyOptIn::Admit"}
+      ],
+      "outcomes": [
+        {"variant": "Result::Ok(())", "postconditions": [{"axis": "goal", "value": "valid_brep"}]}
+      ],
+      "refusals": [
+        "RefusalKind::TangentialCurve (promote_tangency_at_tolerance_requires_opt_in)"
+      ],
+      "consumes_evidence": [
+        "NodeCert::AtTolerance(ContactCert)",
+        "TangencyOptIn"
+      ],
+      "produces_evidence": [],
+      "calls": [],
+      "theorem_comment": "Condition 8 (spec 14.3 condition 8): an end node carrying the 10.3 tangency-at-tolerance tag ... refuses the promotion UNLESS the context carries the explicit typed opt-in TangencyOptIn::Admit.",
+      "confidence": "high"
+    },
+    {
+      "rule_id": "C-CLASSIFY-PROMOTE-KNOT-MULTIPLICITY",
+      "kind": "classifier",
+      "source": {
+        "file": "vendor/truck/truck-certified/src/kernel/promote.rs",
+        "symbol": "crate::kernel::promote::knot_multiplicity",
+        "line": 641
+      },
+      "preconditions": [
+        {"axis": "!unmodeled:knot_class", "value": "!unmodeled:KnotClass::Crossing | KnotClass::Cusp"}
+      ],
+      "outcomes": [
+        {"variant": "usize (2 for Crossing)", "postconditions": [{"axis": "relation.local_dim", "value": "0"}, {"axis": "goal", "value": "valid_brep"}]},
+        {"variant": "usize (3 for Cusp)", "postconditions": [{"axis": "relation.zero_set", "value": "rank_deficient(residual)"}, {"axis": "goal", "value": "valid_brep"}]}
+      ],
+      "refusals": [],
+      "consumes_evidence": [
+        "KnotClass"
+      ],
+      "produces_evidence": [
+        "knot multiplicity usize"
+      ],
+      "calls": [],
+      "theorem_comment": "The 14.3 knot-multiplicity table (condition 6): a transversal trim crossing joins two 1-complex branches in the chart (knot multiplicity 2); an A2 cusp degenerates the tangent (knot multiplicity 3).",
+      "confidence": "high"
+    },
+    {
+      "rule_id": "C-REDUCTION-PROMOTE-ARCLENGTH",
+      "kind": "reduction",
+      "source": {
+        "file": "vendor/truck/truck-certified/src/kernel/promote.rs",
+        "symbol": "crate::kernel::promote::build_arclength",
+        "line": 654
+      },
+      "preconditions": [
+        {"axis": "!unmodeled:approx_nonempty", "value": "!unmodeled:segments non-empty"}
+      ],
+      "outcomes": [
+        {"variant": "Result::Ok(ArclengthParam)", "postconditions": [{"axis": "rep.construction_witness", "value": "true"}, {"axis": "goal", "value": "mesh"}]}
+      ],
+      "refusals": [
+        "RefusalKind::NonFinite (promote_arclength_not_finite)",
+        "RefusalKind::ClaimRefuted (promote_edge_zero_length)"
+      ],
+      "consumes_evidence": [
+        "HermiteSegment"
+      ],
+      "produces_evidence": [
+        "ArclengthParam",
+        "ArclengthRow"
+      ],
+      "calls": [
+        "crate::kernel::promote::chord_length"
+      ],
+      "theorem_comment": "Condition 7 (spec 14.3 condition 7): the exported arclength parameterization and its position table. ... a zero-total-length edge is not a model edge and is refused.",
+      "confidence": "high"
+    },
+    {
+      "rule_id": "C-GATE-LEAFPAIR-TRY-NEW",
+      "kind": "gate",
+      "source": {
+        "file": "vendor/truck/truck-certified/src/kernel/claims.rs",
+        "symbol": "crate::kernel::claims::LeafPair::try_new",
+        "line": 256
+      },
+      "preconditions": [
+        {"axis": "rep.canonical_carrier", "value": "true"},
+        {"axis": "!unmodeled:identity_graph_leaf", "value": "!unmodeled:unit-weight graph leaf over the identity chart (x=u abscissa, y=v abscissa)"},
+        {"axis": "!unmodeled:paired_domain", "value": "!unmodeled:claim domain compact sub-box with u1-u2 and v1-v2 ranges equal"}
+      ],
+      "outcomes": [
+        {"variant": "Construction::Ok(LeafPair)", "postconditions": [{"axis": "rep.bernstein_chart", "value": "true"}, {"axis": "rep.rational_positive_weights", "value": "true"}, {"axis": "goal", "value": "complete_locus"}]}
+      ],
+      "refusals": [
+        "RefusalKind::ClaimRefuted (claims_leaf_zero_degree, claims_leaf_control_count_mismatch, claims_leaf_not_finite, claims_leaf_weight_not_unit, claims_leaf_not_identity_graph, claims_domain_outside_unit_chart, claims_domain_degenerate_axis, claims_domain_u_axes_misaligned, claims_domain_v_axes_misaligned, claims_tier2_direction_not_finite, claims_system_refused)"
+      ],
+      "consumes_evidence": [
+        "BezierLeaf",
+        "ChartId",
+        "IBox<4>"
+      ],
+      "produces_evidence": [
+        "LeafPair",
+        "SquareSystem3"
+      ],
+      "calls": [
+        "crate::kernel::claims::validate_graph_leaf",
+        "crate::kernel::claims::build_pair_system"
+      ],
+      "theorem_comment": "In that arrangement the R1 zero set Z is the diagonal lift of the plane difference curve g = h1 - h2, so every component is an ordinary R1 tube chain whose nodes are the crossings of g = 0 with the claim-domain boundary.",
+      "confidence": "high"
+    },
+    {
+      "rule_id": "C-CLASSIFY-CERTIFY-CLAIMED",
+      "kind": "classifier",
+      "source": {
+        "file": "vendor/truck/truck-certified/src/kernel/claims.rs",
+        "symbol": "crate::kernel::claims::certify_claimed",
+        "line": 1183
+      },
+      "preconditions": [
+        {"axis": "goal", "value": "complete_locus"},
+        {"axis": "!unmodeled:exhaustive_claim_flag", "value": "!unmodeled:claim.exhaustive == true"}
+      ],
+      "outcomes": [
+        {"variant": "ClaimVerdict::Proven(CertifiedGraph)", "postconditions": [{"axis": "global.knowledge", "value": "all_components"}, {"axis": "rep.construction_witness", "value": "true"}, {"axis": "goal", "value": "complete_locus"}]},
+        {"variant": "ClaimVerdict::Disproven(ClaimRefutation)", "postconditions": [{"axis": "global.knowledge", "value": "local_only(residual)"}, {"axis": "goal", "value": "no_intersection"}]},
+        {"variant": "ClaimVerdict::Inconclusive(Refusal)", "postconditions": [{"axis": "global.knowledge", "value": "unknown"}]}
+      ],
+      "refusals": [
+        "RefusalKind::ClaimRefuted (claims_nonexhaustive_not_certifiable, claims_component_not_certified, claims_endpoint_not_certified)",
+        "RefusalKind::IncompleteStartSet (targeted_completeness_not_discharged)"
+      ],
+      "consumes_evidence": [
+        "LeafPair",
+        "TopologyClaim",
+        "ClaimedComponent",
+        "ArcCert<4>",
+        "PointCert"
+      ],
+      "produces_evidence": [
+        "CertifiedGraph (exhaustive)",
+        "Node (TopoNode::Boundary)",
+        "AnyArc::Ordinary"
+      ],
+      "calls": [
+        "crate::kernel::claims::certify_component",
+        "crate::kernel::claims::build_graph_content",
+        "crate::kernel::claims::discharge_completeness"
+      ],
+      "theorem_comment": "For an exhaustive claim the item-3 targeted completeness runs over the complement of the certified tubes (Tier-1 and Tier-2 exclusion); only a discharged complement yields the Proven arm with a fully certified graph.",
+      "confidence": "high"
+    },
+    {
+      "rule_id": "C-CLASSIFY-CLAIM-CLAIMED",
+      "kind": "classifier",
+      "source": {
+        "file": "vendor/truck/truck-certified/src/kernel/claims.rs",
+        "symbol": "crate::kernel::claims::claim_claimed",
+        "line": 1239
+      },
+      "preconditions": [
+        {"axis": "goal", "value": "complete_locus"},
+        {"axis": "!unmodeled:provenance_not_certificate", "value": "!unmodeled:provenance is never a certificate (D6)"}
+      ],
+      "outcomes": [
+        {"variant": "ClaimVerdict::Proven(ClaimedGraph)", "postconditions": [{"axis": "global.knowledge", "value": "local_only(residual)"}, {"axis": "goal", "value": "valid_brep"}]},
+        {"variant": "ClaimVerdict::Disproven(ClaimRefutation)", "postconditions": [{"axis": "goal", "value": "no_intersection"}]},
+        {"variant": "ClaimVerdict::Inconclusive(Refusal)", "postconditions": [{"axis": "global.knowledge", "value": "unknown"}]}
+      ],
+      "refusals": [
+        "RefusalKind::ClaimRefuted (claims_component_not_certified, claims_endpoint_not_certified)"
+      ],
+      "consumes_evidence": [
+        "LeafPair",
+        "TopologyClaim",
+        "Provenance"
+      ],
+      "produces_evidence": [
+        "ClaimedGraph",
+        "Provenance"
+      ],
+      "calls": [
+        "crate::kernel::claims::certify_component",
+        "crate::kernel::claims::build_graph_content"
+      ],
+      "theorem_comment": "This is the non-exhaustive path and the trusted-provenance opt-in: the item-3 complement exclusion is NOT run ... and the output is a ClaimedGraph - a type distinct from CertifiedGraph, so a Boolean requiring closure rejects it by type (D6).",
+      "confidence": "high"
+    },
+    {
+      "rule_id": "C-CLASSIFY-CERTIFY-COMPONENT",
+      "kind": "classifier",
+      "source": {
+        "file": "vendor/truck/truck-certified/src/kernel/claims.rs",
+        "symbol": "crate::kernel::claims::certify_component",
+        "line": 809
+      },
+      "preconditions": [
+        {"axis": "!unmodeled:expected_kind", "value": "!unmodeled:expected == ComponentKind::Ordinary"},
+        {"axis": "!unmodeled:seed_interior", "value": "!unmodeled:seed strictly inside the claim domain"},
+        {"axis": "!unmodeled:seed_on_curve", "value": "!unmodeled:seed not certified OFF the intersection"}
+      ],
+      "outcomes": [
+        {"variant": "Result::Ok(CertifiedTube)", "postconditions": [{"axis": "relation.local_dim", "value": "1"}, {"axis": "rep.construction_witness", "value": "true"}, {"axis": "global.knowledge", "value": "local_only(residual)"}, {"axis": "goal", "value": "complete_locus"}]},
+        {"variant": "Result::Err(ComponentFailure::Refuted(ClaimRefutation))", "postconditions": [{"axis": "global.knowledge", "value": "local_only(residual)"}]},
+        {"variant": "Result::Err(ComponentFailure::Inconclusive(Refusal))", "postconditions": [{"axis": "global.knowledge", "value": "unknown"}]}
+      ],
+      "refusals": [
+        "P_TUBE_CHAIN (tube-chain-via-C2)",
+        "P_ENDPOINTS (endpoints-via-C1)",
+        "P_NODES (nodes-via-A4.2)",
+        "RefusalKind::ClaimRefuted (claims_component_not_certified, claims_endpoint_not_certified)"
+      ],
+      "consumes_evidence": [
+        "LeafPair",
+        "ClaimedComponent",
+        "Frame<4>"
+      ],
+      "produces_evidence": [
+        "CertifiedTube",
+        "ArcCert<4>",
+        "CertifiedEndpoint"
+      ],
+      "calls": [
+        "crate::kernel::claims::seed_off_curve",
+        "crate::kernel::engine::build_frame4",
+        "crate::kernel::claims::ray_box_range",
+        "crate::kernel::claims::attempt_tube",
+        "crate::kernel::claims::tube_chart_box",
+        "crate::kernel::claims::clip_to_domain",
+        "crate::kernel::claims::certify_endpoint",
+        "crate::kernel::assemble::regions_identify"
+      ],
+      "theorem_comment": "The certified model is the shared-chart graph arrangement ... the three predicates of spec 15 item 1 are all expressible through the landed seams: tube-chain-via-C2, endpoints-via-C1, nodes-via-A4.2.",
+      "confidence": "high"
+    },
+    {
+      "rule_id": "C-CLASSIFY-DISCHARGE-COMPLETENESS",
+      "kind": "classifier",
+      "source": {
+        "file": "vendor/truck/truck-certified/src/kernel/claims.rs",
+        "symbol": "crate::kernel::claims::discharge_completeness",
+        "line": 1111
+      },
+      "preconditions": [
+        {"axis": "goal", "value": "complete_locus"},
+        {"axis": "!unmodeled:complement_boxes", "value": "!unmodeled:claim domain minus certified tubes as axis slabs"}
+      ],
+      "outcomes": [
+        {"variant": "ClaimVerdict::Proven(())", "postconditions": [{"axis": "global.knowledge", "value": "complete_locus"}, {"axis": "goal", "value": "complete_locus"}]},
+        {"variant": "ClaimVerdict::Inconclusive(Refusal)", "postconditions": [{"axis": "global.knowledge", "value": "unknown"}]}
+      ],
+      "refusals": [
+        "RefusalKind::IncompleteStartSet (targeted_completeness_not_discharged)"
+      ],
+      "consumes_evidence": [
+        "LeafPair",
+        "CertifiedTube"
+      ],
+      "produces_evidence": [
+        "completeness discharge ()"
+      ],
+      "calls": [
+        "crate::kernel::claims::claim_domain_box",
+        "crate::kernel::claims::complement_boxes",
+        "crate::kernel::tier1::tier1_loop_free",
+        "crate::kernel::tier2::tier2_start_set"
+      ],
+      "theorem_comment": "Completeness is discharged exactly when every complement box has an empty Tier-2 start set: a non-empty start set or a refused search certifies an additional component hiding in the complement, so the exhaustive claim is not certified.",
+      "confidence": "high"
+    },
+    {
+      "rule_id": "C-REDUCTION-SUBTRACT-BOX",
+      "kind": "reduction",
+      "source": {
+        "file": "vendor/truck/truck-certified/src/kernel/claims.rs",
+        "symbol": "crate::kernel::claims::subtract_box",
+        "line": 1042
+      },
+      "preconditions": [
+        {"axis": "!unmodeled:inner_subbox", "value": "!unmodeled:inner is a sub-box of outer"}
+      ],
+      "outcomes": [
+        {"variant": "Construction::Ok(Vec<IBox<4>>)", "postconditions": [{"axis": "global.knowledge", "value": "local_only(residual)"}, {"axis": "goal", "value": "complete_locus"}]}
+      ],
+      "refusals": [
+        "RefusalKind::ClaimRefuted (claims_subtract_low_slab_refused, claims_subtract_high_slab_refused)"
+      ],
+      "consumes_evidence": [
+        "IBox<4>"
+      ],
+      "produces_evidence": [
+        "Vec<IBox<4>> complement slabs"
+      ],
+      "calls": [
+        "crate::kernel::patch::IBox::try_new"
+      ],
+      "theorem_comment": "Subtract an inner box from an outer box (the inner box must be a sub-box of the outer). The returned axis slabs together cover the difference.",
+      "confidence": "high"
+    },
+    {
+      "rule_id": "C-REDUCTION-COMPLEMENT-BOXES",
+      "kind": "reduction",
+      "source": {
+        "file": "vendor/truck/truck-certified/src/kernel/claims.rs",
+        "symbol": "crate::kernel::claims::complement_boxes",
+        "line": 1078
+      },
+      "preconditions": [
+        {"axis": "!unmodeled:complement_boxes", "value": "!unmodeled:domain minus each certified tube chart box"}
+      ],
+      "outcomes": [
+        {"variant": "Construction::Ok(Vec<IBox<4>>)", "postconditions": [{"axis": "goal", "value": "complete_locus"}, {"axis": "global.knowledge", "value": "local_only(residual)"}]}
+      ],
+      "refusals": [
+        "RefusalKind::ClaimRefuted (from subtract_box)"
+      ],
+      "consumes_evidence": [
+        "IBox<4>",
+        "CertifiedTube"
+      ],
+      "produces_evidence": [
+        "Vec<IBox<4>> complement boxes"
+      ],
+      "calls": [
+        "crate::kernel::claims::subtract_box"
+      ],
+      "theorem_comment": "The complement boxes of the claim domain minus each certified tube's parameter box (box subtraction over the landed IBox shape).",
+      "confidence": "high"
+    },
+    {
+      "rule_id": "C-GATE-IBOX-TRY-NEW",
+      "kind": "gate",
+      "source": {
+        "file": "vendor/truck/truck-certified/src/kernel/patch.rs",
+        "symbol": "crate::kernel::patch::IBox::try_new",
+        "line": 138
+      },
+      "preconditions": [],
+      "outcomes": [
+        {"variant": "Result::Ok(IBox<N>)", "postconditions": [{"axis": "rep.construction_witness", "value": "true"}]}
+      ],
+      "refusals": [
+        "RefusalKind::NonFinite (ibox_bound_not_finite)",
+        "RefusalKind::ClaimRefuted (ibox_inverted)"
+      ],
+      "consumes_evidence": [],
+      "produces_evidence": [
+        "IBox<N>"
+      ],
+      "calls": [],
+      "theorem_comment": "Build a box, refusing non-finite bounds or any inverted axis (lo[i] > hi[i]).",
+      "confidence": "high"
+    },
+    {
+      "rule_id": "C-GATE-CERTIFIED-POSITIVE-TRY-NEW",
+      "kind": "gate",
+      "source": {
+        "file": "vendor/truck/truck-certified/src/kernel/patch.rs",
+        "symbol": "crate::kernel::patch::CertifiedPositive::try_new",
+        "line": 166
+      },
+      "preconditions": [],
+      "outcomes": [
+        {"variant": "Result::Ok(CertifiedPositive)", "postconditions": [{"axis": "rep.rational_positive_weights", "value": "true"}]}
+      ],
+      "refusals": [
+        "RefusalKind::NonFinite (positive_bound_not_finite)",
+        "RefusalKind::WeightDegenerate (positive_bound_not_strictly_positive)"
+      ],
+      "consumes_evidence": [],
+      "produces_evidence": [
+        "CertifiedPositive"
+      ],
+      "calls": [],
+      "theorem_comment": "Build a certified positive bound, refusing a non-finite or non-positive value. A non-positive value degenerates the positive certificate.",
+      "confidence": "high"
+    },
+    {
+      "rule_id": "C-GATE-CERTIFIED-NONZERO-TRY-NEW",
+      "kind": "gate",
+      "source": {
+        "file": "vendor/truck/truck-certified/src/kernel/patch.rs",
+        "symbol": "crate::kernel::patch::CertifiedNonzero::try_new",
+        "line": 195
+      },
+      "preconditions": [],
+      "outcomes": [
+        {"variant": "Result::Ok(CertifiedNonzero)", "postconditions": [{"axis": "rep.exact_implicit", "value": "true"}]}
+      ],
+      "refusals": [
+        "RefusalKind::NonFinite (nonzero_bound_not_finite)",
+        "RefusalKind::WeightDegenerate (nonzero_bound_is_zero)"
+      ],
+      "consumes_evidence": [],
+      "produces_evidence": [
+        "CertifiedNonzero"
+      ],
+      "calls": [],
+      "theorem_comment": "Build a certified non-zero bound, refusing a non-finite or exactly-zero value. An exactly-zero value degenerates the non-zero certificate.",
+      "confidence": "high"
+    },
+    {
+      "rule_id": "C-GATE-CONE-TRY-NEW",
+      "kind": "gate",
+      "source": {
+        "file": "vendor/truck/truck-certified/src/kernel/patch.rs",
+        "symbol": "crate::kernel::patch::Cone::try_new",
+        "line": 224
+      },
+      "preconditions": [],
+      "outcomes": [
+        {"variant": "Result::Ok(Cone)", "postconditions": [{"axis": "rep.canonical_carrier", "value": "true"}]}
+      ],
+      "refusals": [
+        "RefusalKind::ClaimRefuted (cone_half_angle_out_of_range, cone_axis_not_unit)",
+        "RefusalKind::NonFinite (cone_axis_not_finite)"
+      ],
+      "consumes_evidence": [],
+      "produces_evidence": [
+        "Cone"
+      ],
+      "calls": [
+        "crate::kernel::patch::is_unit"
+      ],
+      "theorem_comment": "Build a normal cone, refusing a half-angle outside [0, PI) and a non-unit axis (unit slack EPS_REP).",
+      "confidence": "high"
+    },
+    {
+      "rule_id": "C-GATE-FRAME-TRY-NEW",
+      "kind": "gate",
+      "source": {
+        "file": "vendor/truck/truck-certified/src/kernel/certs.rs",
+        "symbol": "crate::kernel::certs::Frame::try_new",
+        "line": 210
+      },
+      "preconditions": [
+        {"axis": "!unmodeled:orthonormal_basis", "value": "!unmodeled:q orthonormal, q_tau unit, q_perp the complement"}
+      ],
+      "outcomes": [
+        {"variant": "Result::Ok(Frame<N>)", "postconditions": [{"axis": "rep.construction_witness", "value": "true"}, {"axis": "rep.canonical_carrier", "value": "true"}]}
+      ],
+      "refusals": [
+        "RefusalKind::NonFinite (frame_data_not_finite)",
+        "RefusalKind::ClaimRefuted (frame_q_tau_not_unit, frame_q_column_not_unit, frame_q_columns_not_orthogonal, frame_q_tau_not_column_zero_of_q, frame_q_perp_not_complement_of_q_tau)"
+      ],
+      "consumes_evidence": [],
+      "produces_evidence": [
+        "Frame<N>"
+      ],
+      "calls": [
+        "crate::kernel::certs::all_finite_frame",
+        "crate::kernel::certs::is_unit_vector",
+        "crate::kernel::certs::dot_vector",
+        "crate::kernel::certs::vector_close"
+      ],
+      "theorem_comment": "the unit requirements are on the frame basis: q_tau unit, Q orthonormal ... N is 2..=7 in practice; for N = 1 nothing is checked beyond finiteness.",
+      "confidence": "high"
+    },
+    {
+      "rule_id": "C-GATE-POINTCERT-TRY-NEW",
+      "kind": "gate",
+      "source": {
+        "file": "vendor/truck/truck-certified/src/kernel/certs.rs",
+        "symbol": "crate::kernel::certs::PointCert::try_new",
+        "line": 299
+      },
+      "preconditions": [
+        {"axis": "!unmodeled:rho_acceptance", "value": "!unmodeled:rho finite and <= RHO_MAX"}
+      ],
+      "outcomes": [
+        {"variant": "Result::Ok(PointCert)", "postconditions": [{"axis": "relation.local_dim", "value": "0"}, {"axis": "rep.construction_witness", "value": "true"}]}
+      ],
+      "refusals": [
+        "RefusalKind::NonFinite (point_rho_not_finite)",
+        "RefusalKind::Conditioning (point_rho_exceeds_rho_max)"
+      ],
+      "consumes_evidence": [
+        "ResidualId",
+        "IBox2"
+      ],
+      "produces_evidence": [
+        "PointCert"
+      ],
+      "calls": [],
+      "theorem_comment": "Build a point certificate, refusing a rho > RHO_MAX (Lemma 8.0's contraction acceptance) or a non-finite rho.",
+      "confidence": "high"
+    },
+    {
+      "rule_id": "C-GATE-ARCCERT-TRY-NEW",
+      "kind": "gate",
+      "source": {
+        "file": "vendor/truck/truck-certified/src/kernel/certs.rs",
+        "symbol": "crate::kernel::certs::ArcCert::try_new",
+        "line": 328
+      },
+      "preconditions": [
+        {"axis": "!unmodeled:rho_acceptance", "value": "!unmodeled:rho finite and <= RHO_MAX"},
+        {"axis": "!unmodeled:residual_not_r2", "value": "!unmodeled:residual != ResidualId::R2 (8.3 ban)"}
+      ],
+      "outcomes": [
+        {"variant": "Result::Ok(ArcCert<N>)", "postconditions": [{"axis": "relation.local_dim", "value": "1"}, {"axis": "rep.construction_witness", "value": "true"}, {"axis": "rep.rational_positive_weights", "value": "true"}]}
+      ],
+      "refusals": [
+        "RefusalKind::Conditioning (R2_never_reaches_C2 with VerdictClass::Inconclusive, arc_rho_exceeds_rho_max)",
+        "RefusalKind::NonFinite (arc_rho_not_finite)",
+        "RefusalKind::ClaimRefuted (arc_jac_encl_empty, arc_weights_empty)"
+      ],
+      "consumes_evidence": [
+        "ResidualId",
+        "Frame<N>",
+        "Interval",
+        "IBox<N>",
+        "CertifiedPositive"
+      ],
+      "produces_evidence": [
+        "ArcCert<N>"
+      ],
+      "calls": [],
+      "theorem_comment": "The load-bearing 8.3 ban is typed: an ArcCert whose residual is R2 refuses with the exact packet spelling RefusalKind::Conditioning + VerdictClass::Inconclusive + predicate R2_never_reaches_C2.",
+      "confidence": "high"
+    },
+    {
+      "rule_id": "C-GATE-CONTACTCERT-TRY-NEW",
+      "kind": "gate",
+      "source": {
+        "file": "vendor/truck/truck-certified/src/kernel/certs.rs",
+        "symbol": "crate::kernel::certs::ContactCert::try_new",
+        "line": 395
+      },
+      "preconditions": [
+        {"axis": "relation.zero_set", "value": "rank_deficient(residual)"},
+        {"axis": "!unmodeled:gap_contains_zero", "value": "!unmodeled:0 in gap AND width(gap) <= TOL_INTERSECTION"}
+      ],
+      "outcomes": [
+        {"variant": "Result::Ok(ContactCert)", "postconditions": [{"axis": "relation.zero_set", "value": "rank_deficient(residual)"}, {"axis": "relation.local_dim", "value": "residual"}, {"axis": "goal", "value": "local_contact"}]}
+      ],
+      "refusals": [
+        "RefusalKind::ClaimRefuted (contact_gap_excludes_zero)",
+        "RefusalKind::R5EnclosureFailed (contact_gap_width_exceeds_tolerance)"
+      ],
+      "consumes_evidence": [
+        "PointCert",
+        "Interval",
+        "SignCert",
+        "TOL_INTERSECTION"
+      ],
+      "produces_evidence": [
+        "ContactCert"
+      ],
+      "calls": [],
+      "theorem_comment": "A tolerance-tagged contact claim never unifies with an exact certificate: ContactCert is the Proven case only; the Disproven (0 not in gap) and Inconclusive outcomes are ClaimVerdict arms owned by the S5a packet, not this type.",
+      "confidence": "high"
+    },
+    {
+      "rule_id": "C-GATE-GRAPHCERT-TRY-NEW",
+      "kind": "gate",
+      "source": {
+        "file": "vendor/truck/truck-certified/src/kernel/certs.rs",
+        "symbol": "crate::kernel::certs::GraphCert::try_new",
+        "line": 431
+      },
+      "preconditions": [
+        {"axis": "!unmodeled:n0_unit", "value": "!unmodeled:n0 unit to TOL_JACOBIAN"}
+      ],
+      "outcomes": [
+        {"variant": "Result::Ok(GraphCert)", "postconditions": [{"axis": "rep.exact_implicit", "value": "true"}, {"axis": "goal", "value": "valid_brep"}]}
+      ],
+      "refusals": [
+        "RefusalKind::NonFinite (graph_cert_n0_not_finite)",
+        "RefusalKind::ClaimRefuted (graph_cert_n0_not_unit)",
+        "RefusalKind::WeightDegenerate (nonzero_bound_is_zero via CertifiedNonzero)"
+      ],
+      "consumes_evidence": [
+        "IBox2"
+      ],
+      "produces_evidence": [
+        "GraphCert"
+      ],
+      "calls": [
+        "crate::kernel::certs::CertifiedNonzero::try_new"
+      ],
+      "theorem_comment": "Build a graph certificate, refusing a non-unit n0 (unit slack TOL_JACOBIAN).",
+      "confidence": "high"
+    },
+    {
+      "rule_id": "C-GATE-SHEETCERT-TRY-NEW",
+      "kind": "gate",
+      "source": {
+        "file": "vendor/truck/truck-certified/src/kernel/certs.rs",
+        "symbol": "crate::kernel::certs::SheetCert::try_new",
+        "line": 460
+      },
+      "preconditions": [
+        {"axis": "rep.param_map_inverse", "value": "true"}
+      ],
+      "outcomes": [
+        {"variant": "Result::Ok(SheetCert)", "postconditions": [{"axis": "relation.local_dim", "value": "2"}, {"axis": "rep.param_map_inverse", "value": "true"}, {"axis": "goal", "value": "material_class"}]}
+      ],
+      "refusals": [
+        "RefusalKind::WeightDegenerate (nonzero_bound_is_zero via CertifiedNonzero)"
+      ],
+      "consumes_evidence": [
+        "IBox2",
+        "PsiMapKind"
+      ],
+      "produces_evidence": [
+        "SheetCert"
+      ],
+      "calls": [
+        "crate::kernel::certs::CertifiedNonzero::try_new"
+      ],
+      "theorem_comment": "Build a sheet certificate, refusing a degenerate (0) map determinant.",
+      "confidence": "high"
+    },
+    {
+      "rule_id": "C-GATE-TUBEOVERLAPCERT-TRY-NEW",
+      "kind": "gate",
+      "source": {
+        "file": "vendor/truck/truck-certified/src/kernel/certs.rs",
+        "symbol": "crate::kernel::certs::TubeOverlapCert::try_new",
+        "line": 475
+      },
+      "preconditions": [
+        {"axis": "!unmodeled:c1_within_EPS_REP", "value": "!unmodeled:0 <= c1_bound <= EPS_REP"}
+      ],
+      "outcomes": [
+        {"variant": "Result::Ok(TubeOverlapCert)", "postconditions": [{"axis": "relation.zero_set", "value": "certified_empty"}, {"axis": "goal", "value": "valid_brep"}]}
+      ],
+      "refusals": [
+        "RefusalKind::NonFinite (tube_overlap_shared_point_not_finite, tube_overlap_c1_bound_not_finite)",
+        "RefusalKind::ClaimRefuted (tube_overlap_c1_bound_negative, tube_overlap_c1_bound_exceeds_eps_rep)"
+      ],
+      "consumes_evidence": [],
+      "produces_evidence": [
+        "TubeOverlapCert"
+      ],
+      "calls": [],
+      "theorem_comment": "Build a tube-overlap certificate, refusing a c1_bound > EPS_REP and any non-finite data.",
+      "confidence": "high"
+    },
+    {
+      "rule_id": "C-GATE-POINTCERT3-TRY-NEW",
+      "kind": "gate",
+      "source": {
+        "file": "vendor/truck/truck-certified/src/kernel/certs.rs",
+        "symbol": "crate::kernel::certs::PointCert3::try_new",
+        "line": 569
+      },
+      "preconditions": [
+        {"axis": "!unmodeled:rho_acceptance", "value": "!unmodeled:rho finite and <= RHO_MAX"}
+      ],
+      "outcomes": [
+        {"variant": "Result::Ok(PointCert3)", "postconditions": [{"axis": "relation.local_dim", "value": "0"}, {"axis": "rep.construction_witness", "value": "true"}]}
+      ],
+      "refusals": [
+        "RefusalKind::NonFinite (point3_rho_not_finite, point3_box_not_finite)",
+        "RefusalKind::Conditioning (point3_rho_exceeds_rho_max)"
+      ],
+      "consumes_evidence": [
+        "ResidualId",
+        "IBox3"
+      ],
+      "produces_evidence": [
+        "PointCert3"
+      ],
+      "calls": [],
+      "theorem_comment": "the spec's PointCert { box_: IBox } is spelled arity-specifically at n = 2 (PointCert) and n = 3 (PointCert3).",
+      "confidence": "high"
+    },
+    {
+      "rule_id": "C-GATE-POINTCERT4-TRY-NEW",
+      "kind": "gate",
+      "source": {
+        "file": "vendor/truck/truck-certified/src/kernel/certs.rs",
+        "symbol": "crate::kernel::certs::PointCert4::try_new",
+        "line": 635
+      },
+      "preconditions": [
+        {"axis": "!unmodeled:rho_acceptance", "value": "!unmodeled:rho finite and <= RHO_MAX"}
+      ],
+      "outcomes": [
+        {"variant": "Result::Ok(PointCert4)", "postconditions": [{"axis": "relation.local_dim", "value": "0"}, {"axis": "rep.construction_witness", "value": "true"}]}
+      ],
+      "refusals": [
+        "RefusalKind::NonFinite (point4_rho_not_finite, point4_box_not_finite)",
+        "RefusalKind::Conditioning (point4_rho_exceeds_rho_max)"
+      ],
+      "consumes_evidence": [
+        "ResidualId",
+        "IBox4"
+      ],
+      "produces_evidence": [
+        "PointCert4"
+      ],
+      "calls": [],
+      "theorem_comment": "This type is ADDITIVE, exactly as PointCert3 is: ... the spec's PointCert { box_: IBox } is spelled arity-specifically at n = 2, 3, and 4.",
+      "confidence": "high"
+    },
+    {
+      "rule_id": "C-CLASSIFY-REFUSAL-NEW",
+      "kind": "classifier",
+      "source": {
+        "file": "vendor/truck/truck-certified/src/kernel/evidence.rs",
+        "symbol": "crate::kernel::evidence::Refusal::new",
+        "line": 107
+      },
+      "preconditions": [],
+      "outcomes": [
+        {"variant": "Refusal", "postconditions": [{"axis": "goal", "value": "!unmodeled:fail-closed named refusal"}]}
+      ],
+      "refusals": [],
+      "consumes_evidence": [
+        "RefusalKind",
+        "RefusalEvidence"
+      ],
+      "produces_evidence": [
+        "Refusal",
+        "VerdictClass"
+      ],
+      "calls": [
+        "crate::kernel::evidence::default_backing"
+      ],
+      "theorem_comment": "Build a refusal with the kind's 17 default backing.",
+      "confidence": "high"
+    },
+    {
+      "rule_id": "C-CLASSIFY-REFUSAL-WITH-BACKING",
+      "kind": "classifier",
+      "source": {
+        "file": "vendor/truck/truck-certified/src/kernel/evidence.rs",
+        "symbol": "crate::kernel::evidence::Refusal::with_backing",
+        "line": 122
+      },
+      "preconditions": [],
+      "outcomes": [
+        {"variant": "Refusal", "postconditions": [{"axis": "goal", "value": "!unmodeled:explicit backing override"}]}
+      ],
+      "refusals": [],
+      "consumes_evidence": [
+        "RefusalKind",
+        "VerdictClass",
+        "RefusalEvidence"
+      ],
+      "produces_evidence": [
+        "Refusal"
+      ],
+      "calls": [],
+      "theorem_comment": "Used where a 17 kind legitimately splits between the two classes - the 7.1 WeightDegenerate Disproven-or-Inconclusive pair - and for the load-bearing 8.3 R2_never_reaches_C2 refusal.",
+      "confidence": "high"
+    },
+    {
+      "rule_id": "C-ASSEMBLE-REFUSAL-WITH-PARTIAL",
+      "kind": "assembler",
+      "source": {
+        "file": "vendor/truck/truck-certified/src/kernel/evidence.rs",
+        "symbol": "crate::kernel::evidence::Refusal::with_partial",
+        "line": 136
+      },
+      "preconditions": [],
+      "outcomes": [
+        {"variant": "Refusal (partial attached)", "postconditions": [{"axis": "goal", "value": "!unmodeled:mid-build partial graph"}]}
+      ],
+      "refusals": [],
+      "consumes_evidence": [
+        "Refusal",
+        "PartialGraph"
+      ],
+      "produces_evidence": [
+        "Refusal"
+      ],
+      "calls": [],
+      "theorem_comment": "Attach the partially assembled graph carried by a mid-build refusal.",
+      "confidence": "high"
+    },
+    {
+      "rule_id": "C-CLASSIFY-DEFAULT-BACKING",
+      "kind": "classifier",
+      "source": {
+        "file": "vendor/truck/truck-certified/src/kernel/evidence.rs",
+        "symbol": "crate::kernel::evidence::default_backing",
+        "line": 236
+      },
+      "preconditions": [],
+      "outcomes": [
+        {"variant": "VerdictClass::Inconclusive", "postconditions": [{"axis": "goal", "value": "!unmodeled:DeckExhausted | Conditioning | TangentialCurve | HighOrderJet | IncompleteStartSet | R5EnclosureFailed | TrimClipFailed | CornerUnsolved | SliverOrNearOverlap | Budget"}]},
+        {"variant": "VerdictClass::Disproven", "postconditions": [{"axis": "goal", "value": "!unmodeled:SpineNotC1 | FrameSingular | ProfileCollapse | ProfileCorrespondenceMismatch | NonFinite | WindingAuditFailed | NonDyadicSharedRequest | CarrierSingularity | ChartExhausted | TranscendentalCarrier | WeightDegenerate | NearOverlap | OffsetDegenerate | OffsetSwallowtail | ClaimRefuted"}]}
+      ],
+      "refusals": [],
+      "consumes_evidence": [
+        "RefusalKind"
+      ],
+      "produces_evidence": [
+        "VerdictClass"
+      ],
+      "calls": [],
+      "theorem_comment": "The 17 backing class of each RefusalKind, exactly per the spec table.",
+      "confidence": "high"
+    }
+  ],
+  "unmodeled_values": [
+    "!unmodeled:same_chart",
+    "!unmodeled:point-vs-curve",
+    "!unmodeled:trim_loop_closed",
+    "!unmodeled:trim_in_same_chart",
+    "!unmodeled:sample_off_loop_obligation",
+    "!unmodeled:square_arity_n",
+    "!unmodeled:4x4 (product chart)",
+    "!unmodeled:deck_integer",
+    "!unmodeled:chart_periodic",
+    "!unmodeled:kappa_below_KAPPA_MAX",
+    "!unmodeled:rank_3",
+    "!unmodeled:z_hat_finite",
+    "!unmodeled:rho_acceptance",
+    "!unmodeled:residual_not_r2",
+    "!unmodeled:c1_within_EPS_REP",
+    "!unmodeled:arc_is_one_chart_run",
+    "!unmodeled:approx_endpoint_matches_chain_ends",
+    "!unmodeled:one_chart_run",
+    "!unmodeled:identity_rules_only",
+    "!unmodeled:near_pair",
+    "!unmodeled:crossing_is_r9",
+    "!unmodeled:interior_in_run",
+    "!unmodeled:interior_order",
+    "!unmodeled:c1_rho",
+    "!unmodeled:tangency_opt_in",
+    "!unmodeled:knot_class",
+    "!unmodeled:approx_nonempty",
+    "!unmodeled:identity_graph_leaf",
+    "!unmodeled:paired_domain",
+    "!unmodeled:exhaustive_claim_flag",
+    "!unmodeled:provenance_not_certificate",
+    "!unmodeled:expected_kind",
+    "!unmodeled:seed_interior",
+    "!unmodeled:seed_on_curve",
+    "!unmodeled:complement_boxes",
+    "!unmodeled:inner_subbox",
+    "!unmodeled:face_axis",
+    "!unmodeled:endpoint_box_inside_unit_chart",
+    "!unmodeled:every_arc_end_resolves",
+    "!unmodeled:eight_conditions",
+    "!unmodeled:one_periodic_chart_chain",
+    "!unmodeled:finite_hermite_ends",
+    "!unmodeled:orthonormal_basis",
+    "!unmodeled:n0_unit",
+    "!unmodeled:gap_contains_zero",
+    "!unmodeled:no_tolerance",
+    "!unmodeled:in_atlas_patch",
+    "!unmodeled:fail-closed named refusal",
+    "!unmodeled:explicit backing override",
+    "!unmodeled:mid-build partial graph"
+  ],
+  "notes": "SCOPE: SOLVER-SURVEY-C covers the boolean stage machinery (split -> classify -> decide -> assemble) in vendor/truck/truck-certified/src/kernel: trimclip.rs, assemble.rs, atlas.rs, sheet.rs, engine.rs, residuals_r89.rs, promote.rs, plus the shim/evidence modules patch.rs, certs.rs, evidence.rs, claims.rs. 76 rule rows: every proof-bearing public entry point is a row; pure accessors are excluded here by name (they consume/produce no proof-bearing evidence): PsiMap::kind/coeffs/offset/det_value, ChartLattice::u_generator/v_generator, ChartAtlas::kind/charts/chart/u_period, Chart::id, BezierLeaf1 is a gate, R8System::curve/surface, R9System::a/b, CertifiedPositive::value, CertifiedNonzero::value. Internal stage helpers not promoted to rows (they are implementation detail of a row that calls them): trimclip point_trim_coeffs/hull1/de_casteljau_f64/chart_point/crossing_chart_point/binom/bernstein_mul/residual_excludes_zero/bisect2/arc_chart_ends/node_at/arc_pcurve_leaf/any_arc_id/ClipState; assemble raw_u/append_crossings/build_deck_break/seam_model_point/arc_ends/mid3/deck_exhausted; atlas ci/square/axes/box3/no_patch_*/positive_bound/plane_charts/cylinder_charts/sphere_charts/cone_charts/torus_charts/circle_frame/cone_apex_clearance/unwrap_deck/sphere_weight/pole_weight/south_sphere_*/pole_sphere_*/hemisphere_cone/cross_box/boxes_overlap/same_patch/route_for; sheet affine_det/grid_edges/refine_boxes/axis/box3_finite/cross3/dot3/separated/near_overlap; engine centre2/radii2/det2_iv/inv2_iv/matmul2/matvec2/centred_dx2/mag/rho2/classify_axis/frame4_impl/Grid4/hull_grid4/hull_2d_interval/to_unit_interval/chart_rects/to_unit_box/system_grid/component_value/component_partial/point_box/certified_float_partials/det3_f64/inv3_f64/norm_inf3/kernel_minors/dot4/matmul3_iv/matvec3_iv/chart_point/perp_jacobian/frame_tube_chart_box/system_values/system_jacobian/zero_grid/grid_second_partial/component_second_partial/system_hessian/centred_dx3_axis/centre3/radii3/det3_iv/inv3_iv/centred_dx3/rho3/minor3_iv/det4_iv/inv4_iv/matmul4_iv/matvec4_iv/centred_dx4/rho4/probe_*; residuals_r89 unbounded/hull1/hull2/coeff/coeff_deriv/validate_curve_net/validate_curve_leaf/validate_surface_leaf/surface_grid/surface_grid_deriv; promote c1_rho/chord_length/rebase/sliver_refusal/deck_exhausted/fmt3/non_finite/build_knots; claims refusal/caller_refusal/validate_graph_leaf/build_pair_system/claim_domain_box/seed_to_chart/chart_to_point4/point_box/model_point/tube_chart_box/clip_to_domain/ray_box_range/attempt_tube/chart_centerline/pivot_face/seed_off_curve/build_graph_content/incomplete_start_set_refusal; certs dot_vector/is_unit_vector/vector_close/all_finite_frame; graph Param::try_new/HermiteSpline::try_new. PACKET METHOD 4 (Krawczyk grouping): engine.rs has 28 case-insensitive 'krawczyk' sites (anchor A1), all inside three distinct transformation carriers - the n=2 C1 (krawczyk_c1), n=3 C1 (krawczyk_c1_n3), n=4 C1 (krawczyk_c1_n4). They implement the SAME theorem transformation (Lemma 8.0 contraction + 8.2 Krawczyk existence/uniqueness/exclusion) at three arities with three distinct certificate carriers (PointCert, PointCert3, PointCert4); they are recorded as three rows, not 28, per the B-packet convention. The tube (Theorem 8.1) is a DIFFERENT transformation and is its own row (c2_certify_tube4). VERTICAL GAP (packet method 1, recorded not fixed): (a) winding_number's soundness precondition is the caller's certified-off-loop property, but its signature takes only [f64; 2] and does not carry the OffLoopCert that certify_off_loop produced; sample_inside is the only caller that composes them and it re-derives/discards the evidence. The off-loop guarantee is therefore NOT carried across the certify_off_loop -> winding_number transition. (b) trim_clip consumes certified crossings and produces a CertifiedGraph with TopoNode::TrimCrossing nodes, but the frozen CertifiedGraph has no per-arc winding field (assemble.rs records this as a frozen-shape amendment that is NOT made); the winding computed during classification is carried only as the discard/retain decision, not as evidence on the emitted graph. (c) the S9b seam: assemble.rs condition 3 (monotone arclength reparameterization / EdgeSampleLedger) is NOT reachable through this tree's public path; deck_identify records the winding on SegmentBreak::DeckStep breaks instead, and promote.rs re-derives the arclength table from the approximant. (d) the S3c pcurve seam: trimclip does not extract polynomial pcurves from topology; an arc is clippable only when its certified trace is the straight segment between its certified chart ends (arc_pcurve_leaf recovers a degree-1 BezierLeaf1), otherwise TrimClipFailed. (e) claims.rs LeafPair is defined locally because the census's landed seam is not present in the tree and BG-KV2-502-S9B is not merged. THEORY-ONLY / PENDING-CODE ROWS (B-packet method 2 distinction preserved): atlas.rs cone and torus chart leaves certify NOTHING on box claims - ChartPatch::regularity/weight_bound return ClaimVerdict::Inconclusive(CONE_FORM_PENDING / TORUS_FORM_PENDING) and enclose/derivs/normal_cone return the no-certificate NaN markers; only the chart STRUCTURE (ids, regions, apex-excluding boxes, transitions, degeneracy routing) is landed. FRAGMENT/MESH CLASSIFICATION (packet method 2): the packet names FragmentMesh, material states, and winding as C-scope classifier rules. FragmentMesh and the material-state variants are NOT present anywhere in vendor/truck/truck-certified/src/kernel (grep confirms); the landed C-scope classifier vocabulary is ComponentKind (claims.rs) and the winding/inside classifier (trimclip.rs), plus the sheet/degeneracy classifiers. The FragmentMesh/material-state surface lives in truck-shapeops (see loop/results/BG-SOL-RW2-SPLIT.json), outside this packet's read scope - recorded as a scope boundary, not a vertical gap. TRIMCROSSING/R9 EVIDENCE (packet method 3): CertifiedCrossing (PointCert R9-stamped + chart point), CertifiedExclusion, and OffLoopCert are the crossing record types; certify_crossings constructs CertifiedCrossing, event_node lifts it to a TopoNode::TrimCrossing Node with NodeCert::Exact, and promote's condition_trim_events gates that a Crossing event carries ResidualId::R9. ANCHORS: A1 = 28 (grep -ci krawczyk engine.rs), A2 = 5 (grep -c 'pub fn' assemble.rs) - both hold at this revision. No subsystem required a STOP for structural mismatch: every in-scope construct is expressible in the RULES schema (the unmodeled values above are value-level !unmodeled findings, not shape failures)."
+}
