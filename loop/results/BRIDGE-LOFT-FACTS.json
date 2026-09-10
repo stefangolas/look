@@ -1,0 +1,60 @@
+{
+  "id": "BRIDGE-LOFT-FACTS",
+  "status": "DONE",
+  "contracts": ["BRIDGE-LOFT-FACTS"],
+  "tests_added": 4,
+  "anchors_verified": {
+    "A1": 0,
+    "A2": 0,
+    "A3": 37,
+    "note": "The three anchors are the packet's dispatch-time baseline and all held at dispatch (A1/A2 zero `binding_volume_facts`/`TensorBernsteinPatch` in bd_bridge.rs; A3 37 `\\<loft\\>` lines). Post-work they read A1=2 (the two doc-comment references to the sanctioned entry), A2=0 (the arm consumes the binding's plain-data `VolumeRow`, never the kernel patch type), A3=54 (the new arm's prose and tests). The anchors are pre-dispatch reality checks, not postconditions."
+  },
+  "summary": "The bridge's Loft facts arm now consumes the CG-BINDING volume entry. `solid_volume`, `solid_local_bbox`, `top_seam_mismatch` and `loft_mesh` for `SolidSpec::Loft` first run the landed analytic line-section ruled arm (V5: bit-identical, the fast path for the class it already certifies); when that arm refuses a spline-section carrier, the new certified smooth arm reconstructs each section loop exactly (chord-length clamped cubic, component-wise — the same `Edge.make_spline` convention the landed lathe arm uses, never a flattening polygon), assembles the ruled smooth surface's tensor-Bernstein patches, and submits every patch to the sanctioned `crate::python::binding::volume_facts` entry, summing the certified brackets and adding the exact planar end-cap moments. The certified class is the two-station loft, where the smooth station interpolation is exactly determined by the recorded data (every interpolation degree reduces to the linear one across two stations) — the smooth surface IS the ruled surface, so the recorded reference is reproduced exactly. A three-or-more-station smooth spline loft's station parameterization is an OCC `ThruSections` convention the row does not record, so the arm refuses TYPED naming the open smooth carrier (`unsupported_envelope`/`non_canonical_carrier`) rather than substituting a ruled approximation (scope decision 1; the packet's stop condition). No tolerance is stretched, no recorded reference edited, and the landed line-loft verdicts are untouched. `facade.rs` and `corpus/ttc/door.py` were in the write set but required no change (the door already records spline sections and the carrier routing already reaches the facts arm).",
+  "implementation": {
+    "bridge_types": "truck123d/src/bd_bridge.rs: `SpanPoly3` (a 3-D power-basis cubic span); `chord_params3`; `quadratic_span3`; `spline_spans3` (the 3-D reconstruction, reusing the landed 2-D `clamped_slopes`/`hermite_power` component-wise); `cubic_bernstein` and `span3_bernstein` (exact power->Bernstein degree-3 controls); `spline_loop_spans` (a closed section loop of line/spline edges with the exact seam-closure check); `poly_integral`/`span_area_moment`/`spline_loop_area_vector` (Green's-theorem signed area vector); `spline_loop_bbox3` (exact span extrema via `cubic_roots`); `certified_spline_loft_volume` (per-patch `crate::python::binding::volume_facts` + exact caps, returns `(value, lo, hi)`); `eval_span3`/`sample_loop3`/`centroid3`/`spline_loft_mesh` (the deterministic ruled tessellation).",
+    "dispatch": "`solid_volume(SolidSpec::Loft)` -> analytic `loft_sections`/`loft_volume` when it certifies, else (open chain) `certified_spline_loft_volume`; `solid_local_bbox` -> union of the two sections' exact AABBs on the fallback; `top_seam_mismatch` -> `Ok(None)` for an open spline loft and typed refusal for a closed one; `loft_mesh` -> `spline_loft_mesh` on the fallback.",
+    "refusal": "`open_smooth_loft()` = `Refusal::UnsupportedEnvelope(EnvelopeCase::NonCanonicalCarrier)`, the landed mapped refusal (the door marshals it to `{\"case\": \"unsupported_envelope\", \"envelope\": \"non_canonical_carrier\"}`). Every failure path is this typed value; there is no untyped path and no approximation.",
+    "binding_consumption": "The arm calls `crate::python::binding::volume_facts(&VolumeRow { numerator, weights, orientation })` — the Rust fn behind the pyo3 `binding_volume_facts` export — once per ruled patch. The numerator is the 4x2 Bernstein net `[[A_0,B_0],...,[A_3,B_3]]` of the two spans, the weights are all 1 (the exact polynomial route), and the orientation is +1; the cap terms carry the recorded-loop winding exactly as the landed line-loft arm's caps. The bridge never names `truck_geometry` and never names `TensorBernsteinPatch`.",
+    "facade": "No change required. The Loft carrier is already classified `Swept`; the facts arm is reached from `bd_facts`/`bd_stl`, not the facade router.",
+    "door": "No change required. `corpus/ttc/door.py`'s `loft` already records the spline-section boundary via `_wire_profile_edges` (never a flattening polygon) and the facts/STL arm is where the corpus rows stop."
+  },
+  "verification": {
+    "cargo_check": "cargo check --locked -p truck123d -> clean (Finished)",
+    "cargo_test_lib": "cargo test --locked -p truck123d --lib -- --test-threads=1 -> 37 passed, 0 failed, including the four named tests: spline_section_loft_volume_certified_bracket, loft_facts_match_recorded_reference_on_flip, line_loft_rows_answer_bit_identically, unmatched_loft_carrier_refuses_typed.",
+    "cargo_test_integration": "Serial per-binary at this HEAD: pb_assembly 3/3, pb_conformance 3/3, pb_facade 4/4, pb_glb_emit 3/3, pb_op_matrix 7/7, pb_parity 4/4 (900 s, real corpus door runs), ttc_authoring_arms 4/4, ttc_harness 3/3, ttc_hazard_battery 0/1 (ignored, as designed). ttc_lathe_spline 2/4: `mvac_row_still_refuses_typed_at_the_spline_path_sweep_carrier` (its pin moved to the circle-profile carrier under SWEEP-PATH) and `revolve_refusals_stay_typed_after_spline_admission` (its non-z-axis sub-case cured by FRAME-REVOLVE) fail; both are base-known pre-existing failures on a test file outside this packet's write scope, recorded identically by BRIDGE-BOOLEANS F1.",
+    "fmt": "rustfmt --edition 2024 truck123d/src/bd_bridge.rs -> clean (no bd_bridge.rs diff under `cargo fmt -p truck123d -- --check`; the only remaining crate fmt diffs are the pre-existing ones in truck123d/tests/ttc_hazard_battery.rs, a file this packet never opened).",
+    "anchors": "A1 `grep -c 'binding_volume_facts' truck123d/src/bd_bridge.rs` = 0 at dispatch (2 post-work, both doc comments), A2 `grep -c 'TensorBernsteinPatch' truck123d/src/bd_bridge.rs` = 0, A3 `grep -c '\\<loft\\>' truck123d/src/bd_bridge.rs` = 37 at dispatch — all under Git Bash grep."
+  },
+  "smoke": {
+    "protocol": "Kernel door only (`door.py --engine truck`), one fresh Python process per row, serial, with the crate cdylib built at this HEAD staged as `truck123d.pyd` beside the interpreter runtime and the interpreter dir on PATH; no OCC runs (the recorded references are the oracle). The four F1 rows AUTHOR-FRAME-CARRIERS recorded as stopping at the spline-section loft facts/STL arm were run: f1/beam_wing, f1/drs_flap, f1/track_rod_left, f1/track_rod_right.",
+    "results": [
+      {"row": "f1/beam_wing", "module": "lib.rear_wing", "entry": "build_beam_wing", "verdict": "typed-refusal", "kind": "Refused", "message": "kernel refusal: unsupported_envelope"},
+      {"row": "f1/drs_flap", "module": "lib.rear_wing", "entry": "build_drs_flap", "verdict": "typed-refusal", "kind": "Refused", "message": "kernel refusal: unsupported_envelope"},
+      {"row": "f1/track_rod_left", "module": "lib.suspension", "entry": "build_track_rod", "args": ["left"], "verdict": "typed-refusal", "kind": "Refused", "message": "kernel refusal: unsupported_envelope"},
+      {"row": "f1/track_rod_right", "module": "lib.suspension", "entry": "build_track_rod", "args": ["right"], "verdict": "typed-refusal", "kind": "Refused", "message": "kernel refusal: unsupported_envelope"}
+    ],
+    "verdict": "All four rows are TYPED refusals naming the non-canonical (open smooth) carrier — zero untyped failures, zero tolerance stretches, zero recorded-reference edits. Each row is a 15-station smooth spline loft: its OCC station-interpolation convention is not in the recorded data, so the packet's stop condition applies and the typed refusal IS the deliverable for the row. No row flips green (a green row would require certifying the un-recorded OCC smooth surface exactly)."
+  },
+  "findings": [
+    {
+      "id": "F1",
+      "title": "The two pre-existing ttc_lathe_spline failures are unchanged",
+      "detail": "`mvac_row_still_refuses_typed_at_the_spline_path_sweep_carrier` fails at its pinned spline-path tangent-query message (the pin moved to the circle-profile carrier under SWEEP-PATH) and `revolve_refusals_stay_typed_after_spline_admission` fails on its non-z-axis sub-case (cured by FRAME-REVOLVE). Both fail identically at the base HEAD; the test file is outside this packet's write scope. Recorded for the orchestrator's amendment ritual (the same class BRIDGE-BOOLEANS F1 and the F1-AUTHORING-ARMS F1 recorded).",
+      "evidence": "serial ttc_lathe_spline run at this HEAD; loop/results/BRIDGE-BOOLEANS.json F1, loop/results/SWEEP-PATH.json, loop/results/FRAME-REVOLVE.json."
+    },
+    {
+      "id": "F2",
+      "title": "The certified smooth class is the two-station loft; the multi-station corpus rows refuse typed",
+      "detail": "The bridge can consume only the sanctioned facade's plain-data `VolumeRow` (one tensor-Bernstein patch); it cannot name the kernel `BSplineSurface<Vector4>` carrier (the crate's single sanctioned edge exposes no geometry types) and therefore cannot build the kernel's general `construct::loft` surface. For a two-station loft the smooth station interpolation is exactly determined by the recorded data (linear), so the arm certifies the smooth surface's volume exactly and reproduces the recorded reference. For three or more stations the OCC `ThruSections` station parameterization is not recorded, so certifying any reconstructed surface would be the ruled-substitution / tolerance-stretch the packet forbids. The four loft-stopped corpus rows are all 15-station smooth lofts and therefore refuse typed — the packet's stop condition.",
+      "evidence": "the smoke above; the four named tests."
+    }
+  ],
+  "stop_conditions": {
+    "smooth_volume_uncertifiable": "FIRED for the four corpus rows, as the packet permits: the smooth-surface volume cannot be certified exactly through the landed machinery because the recorded row does not carry OCC's station-interpolation convention, so the typed refusal naming the open carrier is the deliverable. The refusal is expressible typed (`UnsupportedEnvelope(NonCanonicalCarrier)` -> `{\"case\": \"unsupported_envelope\", \"envelope\": \"non_canonical_carrier\"}`), so no SPEC_GAP.",
+    "verdict_neutral": "No landed green row flipped: the analytic line-section ruled arm is the untouched fast path (bit-identical, `line_loft_rows_answer_bit_identically`), no recorded reference was edited, no tolerance was stretched, and no OCC run was made."
+  },
+  "notes": "The arm consumes the binding at `crate::python::binding::volume_facts` (the Rust fn behind the pyo3 `binding_volume_facts` export), as the packet directs; it never names `truck_geometry` or `TensorBernsteinPatch`. The two-station class is the largest class the recorded data determines exactly, so it is the honest certified surface; the packet's `monocoque tub / engine_cover / beam_wing / drs_flap / floor/diffuser` rows are all multi-station and stay typed per the stop condition. `facade.rs` and `corpus/ttc/door.py` required no change. RESULT.json is a claim; the authoritative verification runs at the integrated HEAD.",
+  "files": {
+    "bridge": "truck123d/src/bd_bridge.rs"
+  }
+}
