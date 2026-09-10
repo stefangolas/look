@@ -2666,3 +2666,49 @@ Leaving: 0 RUNNING (MONO-4 released, heartbeat-pending); HEAD 2546f1b plus the
 operator cycle commit; nothing unlanded; 7 BLOCKED correctly parked; 80 READY
 (79 landed-marked + MONO-4); cargoq UP; heartbeat 1; driver 1; watchdog 1; TWO
 supervisors; disk 17.1 GB free; RAM 6.1 GB free.
+
+## 2026-09-10T17:46Z - operator cycle (MONO-4 running; disk reclaimed)
+
+- Health sweep (step 1): heartbeat exactly 1 (27872, last cycle 13:46:05 local,
+  "dispatched 0; workers ~1/3"), watchdog 1 (29264), operator runner 1 (27876),
+  overnight driver 1 (26920), cargoq UP (ping ok, queued 0, running false),
+  cargo/rustc processes 0. Disk was **12.2 GB free - BELOW the 15 GB goal**
+  (MONO-4's build spike; was 17.1 GB at 17:23Z). RAM 3.3 GB free at scan.
+- **MONO-4-TRIM-IDIOMS is RUNNING in slot 0** (worker shim cmd pid 27652, events
+  fresh <1 min, branch packet/MONO-4-TRIM-IDIOMS@641b120 = base, no commit yet)
+  - the live heartbeat dispatched it after the 17:23Z cycle. Healthy; not
+  touched.
+- Land (step 2): nothing. Every slot worker commit re-verified ancestor of
+  integration/kernel-bg by `git merge-base --is-ancestor` (e33c4dd, e9d885a,
+  3c2109b, ee97499, 713f205, 4de25d9, b667a85, c6bd3fb, ee3dd4b, 0056f01 all
+  YES). Slot 2 DONE / slot 3 done / slots 5,6 DONE (tips ancestors); slot 4
+  LANDED-WITH-FINDINGS; slot 7 LANDED (redundant, no commit); slot 1 IDLE
+  duplicate-MONO-2 residue (no RESULT, tip 026b4e9 ancestor - moot). None
+  operator-landable.
+- Unblock (step 3): none - 1 RUNNING healthy, no IDLE/DEAD >15 min holding
+  work, no QUESTION, 0 cargo/rustc processes.
+- Registry hygiene (step 4): nothing to flip. 317 rows (last-wins dedup): 230
+  DONE, 80 READY, 7 BLOCKED. READY-without-landed-marker = exactly {MONO-4
+  (running)}. BLOCKED-with-all-deps-landed = the carried 7 owner-parked
+  (BG-AUD-FIX-004 OWNER_BLOCKED, BG-CK-SPLINE-CENSUS owner-cancelled,
+  SEM-PCURVE-MASTER-001-FIX SUPERSEDED, DEF-SPINEFRAME-GRAZE SPEC_GAP->-R2,
+  DEF-TESS-ANALYTIC-SEAM superseded by -R2, DEF-SEEDRAY-B human-gated, TOR-C
+  orchestrator-held).
+- Dispatch (step 5): `dispatch_ready.py --dry-run --max-workers=4` only (no
+  manual dispatch - heartbeat live). Output: "slots: 8 (1 running, 7 free);
+  slot-assigned packets: 6; dispatched 0; workers now ~1/4" = REAL idle.
+- **ACTION: `python loop/janitor.py ensure --need 15`** - disk below the 15 GB
+  goal while MONO-4 builds. Reclaimed 5.7 GB (repo-root target 3.0 GB + idle
+  slot-1 targets 2.7 GB) -> 19.5 GB free. Live slot 0 protected by the
+  janitor's process-scan; no work lost.
+- STATE.md volatile refresh ([operator 2026-09-10T17:46Z]).
+- No new escalation. Carried human items unchanged: FRAME-REVOLVE F1 non_z_axis
+  pin amendment (ttc_lathe_spline.rs:255); duplicate supervisors + lagging
+  cargoq restart guard; slot-1/4/7 wt RESULT residue; TOR-C flip-or-pin;
+  heartbeat slot-liveness duplicate-dispatch bug; MONO-row registry schema gap
+  (depends_on/write_allow unread by dispatch_ready - safe now: MONO-4 is the
+  only dispatcher-visible READY row).
+
+Leaving: 1 RUNNING (MONO-4, slot 0); HEAD 9dcbde9; nothing unlanded; 7 BLOCKED
+correctly parked; 80 READY (79 landed-marked + MONO-4); cargoq UP; heartbeat 1;
+driver 1; watchdog 1; TWO supervisors; disk 19.5 GB free; RAM 5.3 GB free.

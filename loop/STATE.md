@@ -2092,7 +2092,42 @@ Carried human items unchanged: FRAME-REVOLVE F1 non_z_axis pin amendment
 guard; slot-1/4/7 wt RESULT residue; TOR-C flip-or-pin; heartbeat
 slot-liveness duplicate-dispatch bug; MONO-row registry schema gap
 (depends_on/write_allow unread by dispatch_ready - safe now: MONO-4 is the
-only dispatcher-visible READY row, so no second bd_bridge writer).]
+  only dispatcher-visible READY row, so no second bd_bridge writer).]
+
+[operator 2026-09-10T17:46Z - volatile refresh. Board now: 1 RUNNING / 0
+landed-this-cycle / 0 unblocked / 0 flipped. **MONO-4-TRIM-IDIOMS is RUNNING in
+slot 0** (worker shim cmd pid 27652; events fresh <1 min; branch
+packet/MONO-4-TRIM-IDIOMS@641b120 = base, no commit yet) - the live heartbeat
+dispatched it this cycle (dispatch_heartbeat.log 13:46:05 local: "slots: 8 (1
+running, 7 free); dispatched 0; workers ~1/3"). Nothing to land: every slot
+worker commit re-verified ancestor of integration/kernel-bg this cycle
+(e33c4dd, e9d885a, 3c2109b, ee97499, 713f205, 4de25d9, b667a85, c6bd3fb,
+ee3dd4b, 0056f01 all YES); no FINISHED slot holds an unlanded DONE RESULT
+(slot 2 DONE, slot 3 done, slots 5/6 DONE - all tips ancestors; slot 4
+LANDED-WITH-FINDINGS; slot 7 LANDED redundant, no commit; slot 1 IDLE
+duplicate-MONO-2 residue, no RESULT, tip 026b4e9 ancestor - moot). Nothing to
+unblock (1 RUNNING healthy; no IDLE/DEAD >15 min holding work; no QUESTION; 0
+cargo/rustc processes at scan). Registry re-derived (last-wins dedup): 317 rows
+- 230 DONE, 80 READY, 7 BLOCKED; READY-without-landed-marker = exactly {MONO-4
+(running)}; BLOCKED-with-all-deps-landed = the carried 7 owner-parked
+(BG-AUD-FIX-004 OWNER_BLOCKED, BG-CK-SPLINE-CENSUS owner-cancelled,
+SEM-PCURVE-MASTER-001-FIX SUPERSEDED, DEF-SPINEFRAME-GRAZE SPEC_GAP->-R2,
+DEF-TESS-ANALYTIC-SEAM superseded by -R2, DEF-SEEDRAY-B human-gated, TOR-C
+orchestrator-held) - nothing flipped. dispatch_ready --dry-run --max-workers=4:
+"slots: 8 (1 running, 7 free); slot-assigned packets: 6; dispatched 0; workers
+now ~1/4" = REAL idle; no manual dispatch (heartbeat live). **ACTION THIS
+CYCLE: ran `python loop/janitor.py ensure --need 15`** - disk had fallen to
+12.2 GB (below the 15 GB goal; MONO-4's build spike) and the janitor reclaimed
+5.7 GB (repo-root target 3.0 GB + idle slot-1 targets 2.7 GB) -> **19.5 GB
+free**; live slot 0 protected by the janitor's process-scan. Health: heartbeat
+exactly 1 (27872; last cycle 13:46:05 local, dispatched 0), watchdog 1 (29264),
+operator runner 1 (27876), overnight driver 1 (26920), cargoq UP (ping ok,
+queued 0, running false); RAM 5.3 GB free. TWO supervisors (19172 PyManager +
+27828 pythoncore - carried duplication class; only ONE overnight.py child = no
+double-merge risk). Carried human items unchanged: FRAME-REVOLVE F1 non_z_axis
+pin amendment (ttc_lathe_spline.rs:255); duplicate supervisors + lagging cargoq
+restart guard; slot-1/4/7 wt RESULT residue; TOR-C flip-or-pin; heartbeat
+slot-liveness duplicate-dispatch bug; MONO-row registry schema gap.]
 
 ## The parallelism picture
 
