@@ -76,26 +76,27 @@ corrected, annex C = ORACLE POLICY CHANGE), then docs/SOLVER_COVERAGE_SPEC.md
 ## Where we are
 
 > LATEST GROUND TRUTH: read the newest `[operator ...]` block in "State of
-> the machine, as left" (2026-09-11T04:46Z). [operator 2026-09-11T04:46Z
-> ground-truth note: 3 RUNNING / 2 driver-landed-mid-cycle (RDEF-M2 + RDEF-M3)
-> / 0 landed-by-operator. HEAD `4f6bd92` (**RDEF-M2-REGIME-SANDWICH row LANDED
-> (overnight)**; RDEF-M2 merge `c2e9310`, RDEF-M3 merge `f1e10f0`). RUNNING:
-> **AUTHOR-WIRE-MIRROR-ARM (slot 0, pid 4356, re-forked fresh 04:39Z)**,
-> **DOOR-PARTIAL-ARC-FLIP (slot 1, pid 11936, productive - holds the branch,
-> 4 changed files)** and **DOOR-PARTIAL-ARC-FLIP (slot 2, pid 6820, ZOMBIE:
-> detached HEAD `6073d52`, 0 changed, its worktree reset at 04:22:46Z but the
-> worker survived)**. The slots-1+2 pair is a DOUBLE-DISPATCH - the heartbeat
-> re-sent the packet to slot 1 at 04:22:40Z because slot 2's worker was in a
-> >3-min test step and `dispatch_ready`'s 180s freshness guard read the slot
-> as free; escalated, neither worker killed (see ESCALATIONS). Slots 3-7
-> landed residue. Registry: nothing flippable this cycle; RDEF-M4's deps are
-> now landed but its packet fails preflight (stale new-file anchor A1 +
-> missing H-1) - escalated, not flipped; RG-23/RG-9 READY rows have no packet
-> file - escalated. Health: heartbeat exactly 1 (27872), operator_runner 1
-> (27876), watchdog 1 (29264), cargoq UP (queued 7, running true). Disk 10.0
-> GiB free (above the 8 GB floor, below the 15 GB goal); RAM 3.9 GiB free.
-> Carried: DOOR-PARTIAL-ARC-FLIP write_allow amendment; duplicate supervisors
-> + lagging cargoq restart guard; slot-4/7 wt RESULT residue.]
+> the machine, as left" (2026-09-11T05:59Z). [operator 2026-09-11T05:59Z
+> ground-truth note: 1 RUNNING / 1 driver-landed-mid-cycle (DOOR-PARTIAL-ARC-FLIP)
+> / 0 landed-by-operator. HEAD `dd102eb` (**DOOR-PARTIAL-ARC-FLIP row LANDED
+> (overnight)**; worker `f49fdf4` -> merge `4c2554f`, slot 2 won the
+> double-dispatch - the 04:46Z/05:34Z escalation is RESOLVED). RUNNING:
+> **AUTHOR-CENSUS-NAMES (slot 0, pid 23920, dispatched 05:54:52Z, productive -
+> events growing, 1 changed file, RESULT.json staged)**. Slots 1-7 FINISHED
+> landed residue (slot 1 = DOOR status-DONE/no-commit divergent worktree, now
+> moot since f49fdf4 landed; slot 4 = F1 LANDED-WITH-FINDINGS parking the
+> driver's dispatch arm; slot 7 = redundant FRAME-REVOLVE). Registry: nothing
+> flipped. **TTC-RECENSUS-F1-R3 is flippable in principle** (deps MONO-7
+> `20b808f` + AUTHOR-EXT-FILLET-HALO both landed; preflight green) but its own
+> DISPATCH SEQUENCE note holds it until the board is otherwise idle - slot 0 is
+> RUNNING, so NOT flipped; RDEF-M4 preflight-fail (carried); RG-23/RG-9 READY
+> with no packet (carried); MONO-10 deps landed but no packet - escalated.
+> Health: heartbeat exactly 1 (27872), operator_runner 1 (27876), watchdog 1
+> (29264), one overnight driver (24864), cargoq UP (queued 0). Disk 11.6 GiB
+> free (janitor reclaimed 3.5 GB from 8.5; above the 8 GB floor, below the 15
+> GB goal); RAM 5.0 GiB free. Carried: FRAME-REVOLVE F1 non_z_axis pin;
+> duplicate supervisors (19172+27828) + lagging cargoq guard; slot-4/7 wt
+> RESULT residue; TOR-C flip-or-pin; R3 dispatch-sequence hold.]
 
 - **THE FIRST KERNEL-VS-OCC TIMING COMPARISON IS BANKED** (FH-TIMING-REFRESH,
   landed c94d043): turbopump_assembly **0.097 s kernel vs 4.866 s OCC**,
@@ -6094,3 +6095,34 @@ still preflight-fail (no packet file) - carried.
 Leaving: 0 RUNNING; HEAD 52ad82b; heartbeat 1 (27872); operator_runner 1
 (27876); watchdog 1 (29264); ONE overnight driver (24864); TWO supervisors;
 cargoq UP (queued 3, one orphaned test exe); disk 15.9 GiB free; RAM 4.9 GiB.]
+
+[operator 2026-09-11T05:59Z - volatile refresh. Board now: 1 RUNNING / 1
+driver-landed-mid-cycle / 0 landed-by-operator. **DOOR-PARTIAL-ARC-FLIP LANDED
+by the overnight driver mid-cycle**: worker `f49fdf4` (slot 2) merged `4c2554f`,
+row flipped `dd102eb` (both verified ancestors of HEAD) - the slots-1+2
+DOUBLE-DISPATCH adjudicated itself (slot 2 won; slot 1's status-DONE/no-commit
+divergent worktree is now moot). The 04:46Z/05:34Z DOOR escalation is RESOLVED.
+RUNNING: **AUTHOR-CENSUS-NAMES (slot 0, pid 23920, dispatched 05:54:52Z, events
+growing 640K->808K, 1 changed file, productive - do not touch)**. Slots 1-7
+FINISHED landed residue (slot 1 = DOOR divergent no-commit worktree; slot 4 =
+F1 LANDED-WITH-FINDINGS parking the driver's dispatch arm; slot 7 = redundant
+FRAME-REVOLVE). Nothing operator-landable. Nothing stuck (no IDLE/DEAD >15 min,
+no QUESTION, no 402). Registry: nothing flipped. **TTC-RECENSUS-F1-R3's deps
+(MONO-7 `20b808f` + AUTHOR-EXT-FILLET-HALO) are both landed and its preflight is
+green (gen_packet --check A1/A2/A3 hold; packet_lint clean), but its own
+DISPATCH SEQUENCE note requires the board to be otherwise idle before the
+BLOCKED->READY flip - slot 0 is RUNNING, so NOT flipped (revisit when idle).**
+RDEF-M4 preflight-fail (stale new-file anchor A1: classify.rs absent +
+H1_NEW_MODULE) carried; RG-23/RG-9 READY with no packet carried; MONO-10 deps
+landed (MONO-8 DONE) but no packet file - escalated. Dispatch: dry-run only
+(heartbeat live) - dispatched 0, workers 1/4; the three READY-no-marker rows
+(AUTHOR-WIRE-MIRROR-ARM, RG-23, RG-9) all write-set-clash with the running
+AUTHOR-CENSUS-NAMES (door.py / bd_bridge.rs). REAL idle. Health: heartbeat
+exactly 1 (27872), operator_runner 1 (27876), watchdog 1 (29264), ONE overnight
+driver (24864), cargoq UP (queued 0), TWO supervisors (19172 + 27828, carried)
++ TWO cargoq/server.py (28544 + 34564, carried). Disk 11.6 GiB free (janitor
+reclaimed 3.5 GB from 8.5; above the 8 GB floor, below the 15 GB goal); RAM 5.0
+GiB free. Open human items (carried): FRAME-REVOLVE F1 non_z_axis pin
+(ttc_lathe_spline.rs:255); duplicate supervisors + lagging cargoq restart
+guard; slot-4/7 wt RESULT residue; TOR-C flip-or-pin; (new) MONO-10 missing
+packet; R3 held for an idle board.]

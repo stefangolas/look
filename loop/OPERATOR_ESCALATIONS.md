@@ -1207,3 +1207,26 @@ Judgment-required items appended each operator cycle. Newest at the bottom.
   command-line match) so only one driver is ever started.
 - Start from: `loop/supervisor.py:27-48`; `loop/supervisor.log` (the two
   "overnight driver not running - starting" lines at 21:53:58 / 22:30:59).
+
+## 2026-09-11 05:59 UTC (operator) - MONO-10-CERTIFIED-BOUNDARY-MESH: deps landed, no packet file
+
+- What: registry row `MONO-10-CERTIFIED-BOUNDARY-MESH` is BLOCKED with
+  `depends_on: ['MONO-8-SWEPT-ADMISSION-WIRING']`; MONO-8 is DONE, so all deps
+  are landed and step 4 would flip it READY - but the row has no `packet` field
+  and `loop/packets/MONO-10-CERTIFIED-BOUNDARY-MESH.md` does not exist, so a
+  flip would dispatch nothing (or fail preflight).
+- Why the operator can't: authoring a packet is out of operator scope
+  (new-packet authoring is an orchestrator/human task). The row note records THE
+  RENDER GAP and says the faithful boolean boundary mesh is "pending the owner
+  ruling" - it may be deliberately un-authored.
+- Action needed: either author the MONO-10 packet (owner ruling permitting) or
+  record the hold in the row note so step 4 stops treating it as flippable.
+- Start from: `grep -n 'MONO-10' loop/PACKETS.jsonl`; the row note.
+
+## 2026-09-11 05:59 UTC (operator) - DOOR-PARTIAL-ARC-FLIP double-dispatch RESOLVED (info)
+
+- The 04:46Z/05:34Z escalation (slots 1+2 double-dispatched DOOR-PARTIAL-ARC-FLIP;
+  slot 1 status-DONE/no-commit `start_angle`/5-tests vs slot 2 committed
+  `f49fdf4` `start_deg`/3-tests) is closed by the overnight driver: slot 2's
+  `f49fdf4` merged `4c2554f`, row flipped `dd102eb` (both ancestors of HEAD).
+  Slot 1's divergent worktree is moot. No operator action.

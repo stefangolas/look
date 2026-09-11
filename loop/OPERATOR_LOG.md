@@ -3974,3 +3974,53 @@ bug; MONO-row schema gap.
 
 Leaving: 0 RUNNING; HEAD 52ad82b; one overnight driver (24864); cargoq UP;
 disk 15.9 GiB free; RAM 4.9 GiB.
+
+## 2026-09-11 05:59 UTC (operator)
+
+Board: 1 RUNNING / 1 driver-landed-mid-cycle / 0 landed-by-operator / 0
+unblocked / 0 flipped. HEAD `dd102eb`. slot 0 AUTHOR-CENSUS-NAMES RUNNING;
+slots 1-7 FINISHED landed residue.
+
+Health sweep (step 1): heartbeat exactly 1 (27872; the broad scan self-matched
+this shell, PID-detail listing confirmed one), operator_runner 1 (27876),
+watchdog 1 (29264), ONE overnight driver (24864, alive; overnight.log cycling to
+05:57Z), cargoq UP (ping ok, queued 0, running false). Disk 8.5 GiB free at
+scan -> `janitor.py ensure --need 15` reclaimed 3.5 GB -> 11.6 GiB (above the
+8 GB floor, below the 15 GB goal; STILL SHORT). RAM 5.0 GiB. TWO supervisors
+(19172 parent + 27828 child, carried) and TWO cargoq/server.py (28544 + 34564,
+carried) - duplication classes, functional.
+
+Actions:
+- Landing (step 2): NOTHING operator-landable. **DOOR-PARTIAL-ARC-FLIP was
+  landed by the overnight driver mid-cycle** (slot 2 `f49fdf4` merged `4c2554f`,
+  row `dd102eb`; f49fdf4 + 4c2554f verified ancestors of HEAD). This RESOLVES
+  the 04:46Z/05:34Z slots-1+2 double-dispatch escalation: slot 2 won; slot 1's
+  status-DONE/no-commit divergent worktree is moot. Slots 3/5/6/7 commits are
+  landed residue; slot 4 = F1 LANDED-WITH-FINDINGS.
+- Unblock (step 3): nothing stuck. Slot 0 (AUTHOR-CENSUS-NAMES, pid 23920,
+  dispatched 05:54:52Z) is alive and productive (events grew 640K->808K, 1
+  changed file) - do not touch. No IDLE/DEAD >15 min holding work, no QUESTION,
+  no 402.
+- Registry (step 4): nothing flipped. **TTC-RECENSUS-F1-R3 is flippable in
+  principle** - deps MONO-7-ROW-ASSEMBLY (`20b808f`, orchestrator-adjudicated,
+  ancestor) and AUTHOR-EXT-FILLET-HALO (DONE) are landed and its preflight is
+  green (gen_packet --check A1/A2/A3 hold; packet_lint clean) - BUT its own
+  DISPATCH SEQUENCE note says flip only when the board is otherwise idle and
+  the census needs a quiet machine; slot 0 is RUNNING, so NOT flipped. RDEF-M4
+  preflight still fails (stale anchor A1: classify.rs absent + H1_NEW_MODULE) -
+  carried. RG-23/RG-9 READY with no packet file - carried. MONO-10 deps landed
+  (MONO-8 DONE) but no packet file - escalated.
+- Dispatch (step 5): dry-run only (heartbeat live; no manual dispatch per the
+  double-dispatch rule): dispatched 0, workers ~1/4; the three READY rows
+  without a landed marker (AUTHOR-WIRE-MIRROR-ARM, RG-23, RG-9) all write-set-
+  clash with the running AUTHOR-CENSUS-NAMES (door.py / bd_bridge.rs). REAL
+  idle.
+- STATE (step 6): refreshed the LATEST GROUND TRUTH note + appended the
+  `[operator 2026-09-11T05:59Z]` block.
+- Escalations (step 7): NEW MONO-10 missing packet; DOOR double-dispatch
+  resolved (noted). Carried: FRAME-REVOLVE F1 pin; duplicate supervisors +
+  lagging cargoq guard; slot-4/7 wt RESULT residue; TOR-C; RDEF-M4; RG-23/RG-9.
+
+Leaving: 1 RUNNING; HEAD dd102eb; heartbeat 1 (27872); operator_runner 1
+(27876); watchdog 1 (29264); ONE overnight driver (24864); cargoq UP; disk 11.6
+GiB free; RAM 5.0 GiB.
