@@ -7724,3 +7724,29 @@ SPEC_GAP rebooking (amend + redispatch after the break); RG-23/RG-9 missing
 packet files; FRAME-REVOLVE F1 non_z_axis pin (ttc_lathe_spline.rs:255);
 duplicate supervisors + lagging cargoq restart guard; slot-4/7 wt RESULT
 residue; TOR-C flip-or-pin; schedule.py 'needs' crash.]
+
+[BREAK LIFTED 2026-09-11 ~17:0xZ (owner session, interactive) - the owner
+directed the F1/hypercar packet send in-session; the 11:45Z break ends for
+this send. SENT: (1) AUTHOR-CENSUS-NAMES AMENDED per the parked QUESTION
+46ff8cc (executor conic/arc carriers: ProfileEdge::Ellipse + arc edges for
+RectangleRounded through profile_loop + SolidSpec::Cone, DOOR-CIRCLE-FLIP
+precedent; anchors A3-A5 added) - RESUMING ACTION 2 of the BREAK block.
+(2) Four NEW packets registered READY per the owner SHORT-TERM ROADMAP
+steps 2-4: FHC-EX-A-CLOSED-LOOP-SHELL (halo/nose/sidepods + cockpit
+diagnosis), FHC-EX-B-SPLINE-LOFT-OPERANDS (spline lofts as boolean
+operands + hypercar band lofts + aero/brakes diagnosis), FHC-TRIM-
+EXTRUDE-ENVELOPE (rear_wing/steering_rack/suspension x2), FHC-MIRROR-FORM
+(drs_actuator). All serial on the shared bd_bridge.rs + door.py write set;
+EX-A -> EX-B -> TRIM -> MIRROR chain, after CENSUS-NAMES. All five
+gen_packet --check + packet_lint GREEN at HEAD cb1fabf; anchors measured
+there, re-measure-at-dispatch noted in each packet. Full spec: docs/
+F1_HYPERCAR_COMPLETION_BUILD_SPEC.md. RESUMING ACTION 1 (dispatch
+RDEF-M3) is ALREADY SATISFIED: RDEF-M2 3f09bf8 + RDEF-M3 3bd9398 verified
+ancestors of HEAD by merge-base - registry rows RECONCILED READY->DONE
+(the documented drift class). RDEF-M2's trigger re-checked via R3: 0
+NonTransversalContact/BudgetExhausted - stays fired-off. Harness cheapies
+(roadmap step 1) NOT packeted: monocoque/engine_cover re-judge +
+vehicle/second_stage/cutaway census delta + loft-None trio are
+orchestrator-direct census tasks; RegularPolygon rides CENSUS-NAMES.
+Dispatch is the heartbeat's (no manual dispatch - double-dispatch rule);
+owner-session commit records the lift.

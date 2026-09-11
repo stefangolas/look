@@ -23,8 +23,21 @@ tests_required: [truck123d/tests/census_names.rs]
 anchors:
   - {id: A1, expect: 0, cmd: "grep -c 'RectangleRounded' corpus/ttc/door.py"}
   - {id: A2, expect: 0, cmd: "grep -c 'make_hull' corpus/ttc/door.py"}
-budget:      {turns: 55, ctx_tokens: 180000}
+  - {id: A3, expect: 0, cmd: "grep -c 'Ellipse' truck123d/src/bd_bridge.rs"}
+  - {id: A4, expect: 0, cmd: "grep -c 'SolidSpec::Cone' truck123d/src/bd_bridge.rs"}
+  - {id: A5, expect: 1, cmd: "grep -c 'enum ProfileEdge' truck123d/src/bd_bridge.rs"}
+budget:      {turns: 70, ctx_tokens: 220000}
 ```
+
+AMENDED 2026-09-11 (owner session) per the parked SPEC_GAP QUESTION
+(slot-0 tip `46ff8cc`, measured at its worktree HEAD `82dcf32`): the
+executor section vocabulary `ProfileEdge` (bd_bridge.rs) carries exactly
+`Line`/`Spline`/`Circle` — **no ellipse carrier and no arc carrier** — and
+`SolidSpec` carries no `Cone`. TIER A therefore needs real executor
+carriers, exactly the DOOR-CIRCLE-FLIP precedent (which landed
+`ProfileEdge::Circle`). A3–A5 are the executor pre-state anchors; the
+anchor set was re-measured at HEAD `cb1fabf` (A1/A2 = 0, A3 = 0, A4 = 0,
+A5 = 1). Re-measure at dispatch.
 
 ## Pre-made judgements (tiered by what the kernel can answer EXACTLY)
 
@@ -44,9 +57,13 @@ budget:      {turns: 55, ctx_tokens: 180000}
 3. Every TIER A name must round-trip exact facts; every TIER B name
    must refuse TYPED (never AttributeError). The hypercar corpus rows
    then produce honest verdicts either way.
-4. bd_bridge.rs is in the write set ONLY for the Cone SolidSpec
-   variant; if TIER A turns out to need more bridge surface than
-   that, STOP with QUESTION.md.
+4. **AMENDED** — bd_bridge.rs is in the write set for the executor
+   carriers TIER A needs, following DOOR-CIRCLE-FLIP: `ProfileEdge::Ellipse`
+   (exact analytic profile carrier), the arc segments
+   `RectangleRounded` needs (exact quarter-arc edges composing a closed
+   profile through `profile_loop`), and the `SolidSpec::Cone` canonical
+   variant. These are the QUESTION's named gap; nothing further. If more
+   bridge surface than that turns out to be needed, STOP with QUESTION.md.
 
 ## Method
 
