@@ -1441,3 +1441,25 @@ CARRIED (unchanged): FRAME-REVOLVE F1 non_z_axis pin amendment
 residue parking the driver's dispatch arm; TOR-C flip-or-pin (orchestrator
 call); MONO-10 missing packet; RDEF-M4 H-8 stale anchor; duplicate-driver
 probe fix.
+
+---
+
+[operator 2026-09-11T09:41Z - new + carried]
+
+NEW - `loop/schedule.py` crashes on the current registry schema:
+- What: `python loop/schedule.py` raises `KeyError: 'needs'` at schedule.py:45
+  (`if any(n not in done for n in r['needs'])`). ~31 registry rows carry
+  `depends_on` and have no `needs` key, so the frontier loop crashes on the
+  first such READY row.
+- Why the operator can't: schedule.py is not one of the three files the
+  operator may edit; the fix is a one-line harness change.
+- Action needed: normalize the key, e.g.
+  `if any(n not in done for n in r.get('needs', r.get('depends_on', []))):`.
+  `dispatch_ready.py` is the dispatch authority and is unaffected - this is a
+  query/debug primitive only, so priority is low.
+- Start from: `loop/schedule.py:45`.
+
+CARRIED (unchanged): AUTHOR-CENSUS-NAMES SPEC_GAP rebooking; RG-23/RG-9
+missing packet files; FRAME-REVOLVE F1 non_z_axis pin amendment
+(ttc_lathe_spline.rs:255); duplicate supervisors (19172+27828) + lagging cargoq
+restart guard; slot-4 + slot-7 wt RESULT residue; TOR-C flip-or-pin.

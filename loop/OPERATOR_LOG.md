@@ -4453,3 +4453,56 @@ TOR-C flip-or-pin (orchestrator-held).
 Leaving: 0 RUNNING; HEAD e405a1e; heartbeat 1 (27872); operator_runner 1
 (27876); watchdog 1 (29264); ONE overnight driver (24864); TWO supervisors
 (carried); cargoq UP (queued 0); disk 12.8 GiB free; RAM 4.96 GiB.
+
+[operator 2026-09-11T09:41Z] QUIET HEALTHY CYCLE - nothing landable,
+unblockable, flippable, or dispatchable. Board: 0 RUNNING / 0
+landed-this-cycle / 0 unblocked / 0 flipped / 0 dispatched. HEAD 321c216.
+
+- Step 1 health: slot_status 8/8 FINISHED/IDLE, no live worker; cargoq UP (ping
+  ok, queued 0, running false); heartbeat exactly 1 (27872; the extra
+  CommandLine match was this probing shell), operator_runner 1 (27876),
+  watchdog 1 (29264), ONE overnight driver (24864, cycling, parked on slot-0
+  SPEC_GAP + slot-4 F1); TWO supervisors (19172 PyManager + 27828 pythoncore
+  child - carried duplication class; only ONE overnight.py child = no
+  double-merge risk); two cargoq/server.py (28544+34564 - carried). Disk 13.88
+  GiB free at entry; RAM 5.00 GiB.
+- Step 2 land: `git merge-base --is-ancestor` vs HEAD 321c216: True for
+  e6553db/3c2109b/ee97499/713f205/5cf4811 + 329f6ab/19acb3e; False for 46ff8cc
+  (slot-0 SPEC_GAP tip). Slot wt RESULT: slot 0 SPEC_GAP (no file in write_allow
+  edited; escalated geometry rebooking), slot 1 "complete" (redundant
+  AUTHOR-WIRE-MIRROR-ARM duplicate, no commit), slot 2 IDLE (landed 19acb3e),
+  slot 3 DONE, slot 4 LANDED-WITH-FINDINGS, slots 5/6 DONE, slot 7 LANDED -
+  nothing DONE-and-unlanded. Nothing to merge.
+- Step 3 unblock: 0 RUNNING; no IDLE/DEAD >15 min holding work; no QUESTION;
+  zero cargo/rustc processes. Nothing to resume/redispatch.
+- Step 4 registry: 11 BLOCKED rows, all parked deliberately (BG-AUD-FIX-004
+  OWNER_BLOCKED; BG-CK-SPLINE-CENSUS owner-cancelled; SEM-PCURVE-MASTER-001-FIX
+  SUPERSEDED; DEF-SPINEFRAME-GRAZE -> -R2; DEF-TESS-ANALYTIC-SEAM -> -R2;
+  DEF-SEEDRAY-B human-gated; TOR-C orchestrator-held; TTC-RECENSUS-F1-R3 gated;
+  MONO-10/RDEF-M4/RDEF-M5 owner-decision) - none flipped. READY-not-landed =
+  {AUTHOR-CENSUS-NAMES (slot-assigned), RG-23, RG-9}; RG-23/RG-9 have EMPTY
+  packet fields (authoring, carried). Nothing mechanically fixable.
+  NEW HARNESS DEFECT: `python loop/schedule.py` crashes `KeyError: 'needs'` at
+  schedule.py:45 - ~31 rows carry `depends_on`, not `needs`; dispatch_ready
+  (the authority) is unaffected. Cannot fix (schedule.py outside the operator's
+  three-file authority) -> escalated.
+- Step 5 dispatch: `dispatch_ready --dry-run --max-workers=4` -> "slots: 8 (0
+  running, 8 free); slot-assigned packets: 6; dispatched 0; workers now ~0/4";
+  only RG-23/RG-9 flagged. REAL idle. No manual dispatch (heartbeat live).
+- Step 5b disk: `janitor.py ensure --need 15` -> reclaimed ~0.0 -> 12.92 GiB
+  free (above 8 GB floor, below 15 GiB goal; nothing reclaimable while no
+  worker target is idle-freed).
+- Step 6 STATE: prepended the 09:41Z LATEST GROUND TRUTH block (09:19Z marked
+  SUPERSEDED) + appended the 09:41Z machine block.
+- Step 7: this entry.
+
+Escalations: NEW - schedule.py KeyError 'needs' (harness, one-line fix:
+`r.get('needs', r.get('depends_on', []))` at schedule.py:45). Carried:
+AUTHOR-CENSUS-NAMES SPEC_GAP (rebooking); RG-23/RG-9 missing packet files;
+FRAME-REVOLVE F1 non_z_axis pin (ttc_lathe_spline.rs:255); duplicate
+supervisors + lagging cargoq restart guard; slot-4/7 wt RESULT residue;
+TOR-C flip-or-pin (orchestrator-held).
+
+Leaving: 0 RUNNING; HEAD 321c216; heartbeat 1 (27872); operator_runner 1
+(27876); watchdog 1 (29264); ONE overnight driver (24864); TWO supervisors
+(carried); cargoq UP (queued 0); disk 12.92 GiB free; RAM 5.00 GiB.

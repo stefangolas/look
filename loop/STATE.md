@@ -75,6 +75,31 @@ corrected, annex C = ORACLE POLICY CHANGE), then docs/SOLVER_COVERAGE_SPEC.md
 
 ## Where we are
 
+> LATEST GROUND TRUTH [operator 2026-09-11T09:41Z]: 0 RUNNING / 0
+> landed-this-cycle / 0 unblocked / 0 flipped / 0 dispatched. HEAD `321c216`
+> (the 09:19Z operator commit). **QUIET HEALTHY CYCLE - the board is unchanged
+> from the 09:19Z cycle, re-derived by command.** slot_status: all 8 slots
+> FINISHED/IDLE, no live worker. Slot 0 AUTHOR-CENSUS-NAMES wt RESULT SPEC_GAP
+> (escalated geometry rebooking; NOT landable). Slot 1 wt RESULT status
+> "complete" (redundant AUTHOR-WIRE-MIRROR-ARM duplicate, packet DONE, no
+> commit - not landable). Slot 2 IDLE (landed `19acb3e`); slots 3-7 landed
+> residue (e6553db/3c2109b/ee97499/713f205/5cf4811 + 329f6ab/19acb3e all
+> re-verified ancestors of HEAD this cycle; only 46ff8cc, the slot-0 SPEC_GAP
+> tip, is not). Nothing to unblock (0 RUNNING, no QUESTION). Registry
+> re-derived: all 11 BLOCKED rows carry deliberate park notes (OWNER_BLOCKED /
+> owner-cancelled / SUPERSEDED / gated / owner-decision) - none mechanically
+> flippable. dispatch_ready flagged only RG-23/RG-9, both with EMPTY packet
+> fields (authoring, carried). `dispatch_ready --dry-run --max-workers=4`:
+> "dispatched 0; workers now ~0/4". **NEW harness defect escalated: `schedule.py`
+> crashes with KeyError 'needs' at schedule.py:45 - ~31 registry rows carry
+> `depends_on`, not `needs`; dispatch_ready (the authority) is unaffected.**
+> Health: heartbeat exactly 1 (27872), operator_runner 1 (27876), watchdog 1
+> (29264), ONE overnight driver (24864); TWO supervisors (19172+27828) carried;
+> cargoq UP (ping ok, queued 0, running false); disk 12.92 GiB free (janitor
+> ensure --need 15 reclaimed ~0.0 - nothing reclaimable; above the 8 GB floor,
+> below the 15 GiB goal); RAM 5.00 GiB.
+>
+> --- SUPERSEDED 2026-09-11T09:19Z note (kept for history) follows ---
 > LATEST GROUND TRUTH [operator 2026-09-11T09:19Z]: 0 RUNNING / 0
 > landed-this-cycle / 0 unblocked / 0 flipped / 0 dispatched. HEAD `e405a1e`
 > (the 08:55Z operator commit). **QUIET HEALTHY CYCLE - the board is unchanged
@@ -6636,3 +6661,35 @@ RG-23/RG-9 missing packet files; FRAME-REVOLVE F1 non_z_axis pin amendment
 (ttc_lathe_spline.rs:255); duplicate supervisors + the lagging cargoq restart
 guard; slot-4 + slot-7 wt RESULT residue parking the driver's dispatch arm;
 TOR-C flip-or-pin (orchestrator-held).]
+
+[operator 2026-09-11T09:41Z - volatile refresh. Quiet healthy cycle: nothing to
+land, nothing to unblock, nothing to flip, no manual dispatch (heartbeat live).
+Board now: 0 RUNNING / 0 landed-this-cycle. HEAD 321c216 (the 09:19Z operator
+commit) - no work moved this cycle. Landing re-verified by command: `git
+merge-base --is-ancestor` True for e6553db/3c2109b/ee97499/713f205/5cf4811 and
+329f6ab/19acb3e against integration/kernel-bg; only 46ff8cc (slot-0
+AUTHOR-CENSUS-NAMES SPEC_GAP tip) is NOT an ancestor. Slot wt RESULT read
+directly: slot 0 SPEC_GAP, slot 1 "complete" (redundant duplicate, no commit),
+slot 2 IDLE (landed 19acb3e), slot 3 DONE, slot 4 LANDED-WITH-FINDINGS, slots
+5/6 DONE, slot 7 LANDED - none operator-landable. Nothing to unblock (0
+RUNNING; no QUESTION; zero cargo/rustc processes). Registry re-derived: 11
+BLOCKED rows, all parked deliberately (BG-AUD-FIX-004 OWNER_BLOCKED,
+BG-CK-SPLINE-CENSUS owner-cancelled, SEM-PCURVE-MASTER-001-FIX SUPERSEDED,
+DEF-SPINEFRAME-GRAZE -> -R2, DEF-TESS-ANALYTIC-SEAM -> -R2, DEF-SEEDRAY-B
+human-gated, TOR-C orchestrator-held, TTC-RECENSUS-F1-R3 gated,
+MONO-10/RDEF-M4/RDEF-M5 owner-decision) - none flipped; READY-not-landed =
+{AUTHOR-CENSUS-NAMES (slot-assigned), RG-23, RG-9} (last two EMPTY packet =
+authoring). `dispatch_ready --dry-run --max-workers=4`: "slots: 8 (0 running, 8
+free); slot-assigned packets: 6; dispatched 0; workers now ~0/4" = REAL idle.
+NEW: `python loop/schedule.py` crashes `KeyError: 'needs'` at schedule.py:45 -
+the registry has rows with `depends_on` and no `needs`; dispatch_ready is
+unaffected; escalated (outside operator's three-file authority). Heartbeat
+cycling (05:40 local cycle, "dispatched 0"). Health: heartbeat 1 (27872),
+operator_runner 1 (27876), watchdog 1 (29264), ONE overnight driver (24864);
+TWO supervisors (19172+27828) carried; cargoq UP (ping ok, queued 0, running
+false; two server.py 28544+34564 carried); disk 12.92 GiB free (janitor
+reclaimed ~0.0; above 8 GB floor, below 15 GiB goal); RAM 5.00 GiB. Carried
+human items unchanged: AUTHOR-CENSUS-NAMES SPEC_GAP; RG-23/RG-9 missing packet
+files; FRAME-REVOLVE F1 non_z_axis pin (ttc_lathe_spline.rs:255); duplicate
+supervisors + lagging cargoq restart guard; slot-4/7 wt RESULT residue;
+TOR-C flip-or-pin; schedule.py 'needs' crash (new).]
