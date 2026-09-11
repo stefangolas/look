@@ -720,7 +720,21 @@ class Edge:
     at record time: the consuming arm either answers the exact carrier or
     refuses typed."""
 
-    __slots__ = ("kind", "points", "p0", "p1", "options", "center", "radius", "normal")
+    __slots__ = (
+        "kind",
+        "points",
+        "p0",
+        "p1",
+        "options",
+        "center",
+        "radius",
+        "normal",
+        "x_dir",
+        "x_radius",
+        "y_radius",
+        "start_angle",
+        "end_angle",
+    )
 
     def __init__(self, kind, points, options=None):
         pts = _pad_3(points)
@@ -734,6 +748,11 @@ class Edge:
         self.center = None
         self.radius = None
         self.normal = None
+        self.x_dir = None
+        self.x_radius = None
+        self.y_radius = None
+        self.start_angle = None
+        self.end_angle = None
 
     @property
     def wrapped(self):
@@ -783,6 +802,54 @@ class Edge:
         obj.center = Vector(*_point3(center))
         obj.radius = _num(radius)
         obj.normal = Vector(*_vnormalize(_point3(normal)))
+        return obj
+
+    @classmethod
+    def make_ellipse(cls, center, x_radius, y_radius, normal, x_dir):
+        """A closed ellipse edge: exact centre, semi-axes and plane frame.
+
+        ``x_dir`` is the unit in-plane direction of ``x_radius``; the
+        ``y_radius`` axis is ``normal cross x_dir`` (fixed right-handed
+        convention). The exact conic is recorded, never flattened.
+        """
+        obj = cls.__new__(cls)
+        obj.kind = "ellipse"
+        obj.points = []
+        obj.p0 = None
+        obj.p1 = None
+        obj.options = {}
+        obj.center = Vector(*_point3(center))
+        obj.radius = None
+        obj.normal = Vector(*_vnormalize(_point3(normal)))
+        obj.x_dir = Vector(*_vnormalize(_point3(x_dir)))
+        obj.x_radius = _num(x_radius)
+        obj.y_radius = _num(y_radius)
+        obj.start_angle = None
+        obj.end_angle = None
+        return obj
+
+    @classmethod
+    def make_arc(cls, center, radius, normal, x_dir, start_angle, end_angle):
+        """A circular arc edge: exact centre, radius, plane frame and angles.
+
+        The arc runs counter-clockwise from ``start_angle`` to ``end_angle``
+        (degrees) about ``+normal``, with ``x_dir`` the angle-zero direction.
+        The exact conic is recorded, never flattened.
+        """
+        obj = cls.__new__(cls)
+        obj.kind = "arc"
+        obj.points = []
+        obj.p0 = None
+        obj.p1 = None
+        obj.options = {}
+        obj.center = Vector(*_point3(center))
+        obj.radius = _num(radius)
+        obj.normal = Vector(*_vnormalize(_point3(normal)))
+        obj.x_dir = Vector(*_vnormalize(_point3(x_dir)))
+        obj.x_radius = None
+        obj.y_radius = None
+        obj.start_angle = _num(start_angle)
+        obj.end_angle = _num(end_angle)
         return obj
 
     def position_at(self, t):
@@ -881,6 +948,168 @@ def Circle(radius, **kwargs):
     return circle(radius, **kwargs)
 
 
+def Ellipse(x_radius, y_radius, rotation=0.0, **kwargs):
+    """build123d ``Ellipse(x_radius, y_radius)`` -- the exact closed-ellipse
+    section carrier.
+
+    The ellipse records its exact centre, semi-axes and in-plane frame (the
+    ``x_radius`` axis is the local +X direction, the ``y_radius`` axis its
+    fixed right-handed completion). Like the circle carrier the kernel answers
+    the analytic area/extrema and never flattens the conic. An option outside
+    the recorded exact vocabulary refuses typed naming the option.
+    """
+    if kwargs:
+        option = sorted(kwargs)[0]
+        _refuse(
+            "an ellipse option is not answered exactly by a kernel-engine row: "
+            + option
+        )
+    a = _num(x_radius)
+    b = _num(y_radius)
+    if not math.isfinite(a) or not math.isfinite(b) or a <= 0.0 or b <= 0.0:
+        _refuse(
+            "an ellipse semi-axis outside the recorded exact vocabulary is not "
+            "a kernel-engine row"
+        )
+    edge = Edge.make_ellipse(
+        (0.0, 0.0, 0.0), a, b, (0.0, 0.0, 1.0), (1.0, 0.0, 0.0)
+    )
+    face = Face(Wire([edge]))
+    if _num(rotation) != 0.0:
+        return Rotation(0.0, 0.0, _num(rotation)) * face
+    return face
+
+
+def RegularPolygon(radius, side_count, rotation=0.0, major_radius=True, **kwargs):
+    """build123d ``RegularPolygon(radius, side_count)`` -- a regular polygon
+    profile (a polygon with a vertex count), routed through the existing
+    polygon profile handler.
+
+    The vertices are the inscribed points at ``rotation + k * 2*pi/n`` in the
+    local XY plane, so the recorded carrier is the exact closed line loop the
+    polygon handler already answers.
+    """
+    r = _num(radius)
+    try:
+        n = int(side_count)
+    except (TypeError, ValueError):
+        _refuse("a polygon side count outside the recorded vocabulary is not a kernel-engine row")
+        return None
+    if not math.isfinite(r) or r <= 0.0 or n < 3:
+        _refuse(
+            "a regular polygon outside the recorded exact vocabulary is not a "
+            "kernel-engine row"
+        )
+    theta0 = math.radians(_num(rotation))
+    pts = []
+    for k in range(n):
+        theta = theta0 + 2.0 * math.pi * k / n
+        pts.append((r * math.cos(theta), r * math.sin(theta), 0.0))
+    return Face(
+        Wire([Edge.make_line(pts[i], pts[(i + 1) % n]) for i in range(n)])
+    )
+
+
+def RectangleRounded(width, height, radius, rotation=0.0, **kwargs):
+    """build123d ``RectangleRounded(width, height, radius)`` -- a closed
+    rounded-rectangle profile: four straight edges plus four exact quarter-arc
+    corner segments.
+
+    The profile is centered on the local origin (``width`` along +X, ``height``
+    along +Y); ``rotation`` (degrees) rotates it about +Z. The corner arcs are
+    exact circular quarter arcs recorded in the line/arc section vocabulary, so
+    the kernel answers the exact area and extrema rather than a chord polygon.
+    """
+    w = _num(width)
+    h = _num(height)
+    r = _num(radius)
+    if (
+        not math.isfinite(w)
+        or not math.isfinite(h)
+        or not math.isfinite(r)
+        or w <= 0.0
+        or h <= 0.0
+        or r <= 0.0
+        or 2.0 * r > min(w, h)
+    ):
+        _refuse(
+            "a rounded rectangle outside the recorded exact vocabulary is not "
+            "a kernel-engine row"
+        )
+    hw = 0.5 * w
+    hh = 0.5 * h
+    z = (0.0, 0.0, 1.0)
+    x = (1.0, 0.0, 0.0)
+    lines = [
+        ((-hw + r, -hh, 0.0), (hw - r, -hh, 0.0)),
+        ((hw, -hh + r, 0.0), (hw, hh - r, 0.0)),
+        ((hw - r, hh, 0.0), (-hw + r, hh, 0.0)),
+        ((-hw, hh - r, 0.0), (-hw, -hh + r, 0.0)),
+    ]
+    arcs = [
+        ((hw - r, -hh + r, 0.0), -90.0, 0.0),
+        ((hw - r, hh - r, 0.0), 0.0, 90.0),
+        ((-hw + r, hh - r, 0.0), 90.0, 180.0),
+        ((-hw + r, -hh + r, 0.0), 180.0, 270.0),
+    ]
+    edges = []
+    for i in range(4):
+        edges.append(Edge.make_line(lines[i][0], lines[i][1]))
+        center, start, end = arcs[i]
+        edges.append(Edge.make_arc(center, r, z, x, start, end))
+    face = Face(Wire(edges))
+    if _num(rotation) != 0.0:
+        return Rotation(0.0, 0.0, _num(rotation)) * face
+    return face
+
+
+def Helix(*args, **kwargs):
+    """build123d ``Helix(pitch, height, radius)`` -- a helical path carrier.
+
+    TIER B: the path carrier needs a helical sweep extension the landed
+    executor does not carry, so the name refuses TYPED naming the open
+    carrier (never an AttributeError).
+    """
+    _refuse("Helix: a helical path carrier is not a kernel-engine row")
+
+
+def FilletPolyline(*args, **kwargs):
+    """build123d ``FilletPolyline(points, radius=...)`` -- a filleted polyline
+    profile carrier.
+
+    TIER B: the carrier needs the fillet-arm composition the landed executor
+    does not carry, so the name refuses TYPED naming the open carrier.
+    """
+    _refuse("FilletPolyline: a fillet-arm polyline carrier is not a kernel-engine row")
+
+
+def make_hull(*args, **kwargs):
+    """build123d ``make_hull(edges)`` -- a convex-hull construction.
+
+    TIER B: the convex-hull operation is a new construction class the landed
+    executor does not carry, so the name refuses TYPED naming the open
+    carrier.
+    """
+    _refuse("make_hull: a convex-hull construction is not a kernel-engine row")
+
+
+class _Align:
+    """build123d ``Align`` -- placement metadata (MIN/CENTER/MAX).
+
+    Pure pass-through metadata: the value is recorded with the construction row
+    and never changes the measured geometry, so the name is answered exactly
+    (the corpus passes it as an ``align=`` keyword).
+    """
+
+    __slots__ = ()
+    MIN = "min"
+    CENTER = "center"
+    MAX = "max"
+
+
+Align = _Align()
+
+
 def Polyline(*points, **kwargs):
     """build123d ``Polyline`` -- an open polyline profile edge (a data row of
     line segments). Feeding it to a profile verb answers exactly where the
@@ -977,6 +1206,31 @@ def _place_edges(frame, edges):
             center = frame._map_point(edge.center.to_tuple())
             normal = _vnormalize(frame._map_dir(edge.normal.to_tuple()))
             out.append(Edge.make_circle(center, edge.radius, normal))
+            continue
+        if edge.kind == "ellipse":
+            center = frame._map_point(edge.center.to_tuple())
+            normal = _vnormalize(frame._map_dir(edge.normal.to_tuple()))
+            x_dir = _vnormalize(frame._map_dir(edge.x_dir.to_tuple()))
+            out.append(
+                Edge.make_ellipse(
+                    center, edge.x_radius, edge.y_radius, normal, x_dir
+                )
+            )
+            continue
+        if edge.kind == "arc":
+            center = frame._map_point(edge.center.to_tuple())
+            normal = _vnormalize(frame._map_dir(edge.normal.to_tuple()))
+            x_dir = _vnormalize(frame._map_dir(edge.x_dir.to_tuple()))
+            out.append(
+                Edge.make_arc(
+                    center,
+                    edge.radius,
+                    normal,
+                    x_dir,
+                    edge.start_angle,
+                    edge.end_angle,
+                )
+            )
             continue
         pts = [frame._map_point(p.to_tuple()) for p in edge.points]
         out.append(Edge(edge.kind, pts, options=edge.options))
@@ -1564,6 +1818,24 @@ def Sphere(radius, mode=None, **kwargs):
     return _Part({"kind": "sphere", "radius": _num(radius)})
 
 
+def Cone(bottom_radius, top_radius, height, mode=None, align=None, **kwargs):
+    """build123d ``Cone(bottom_radius, top_radius, height)`` -- the canonical
+    frustum solid (centered on the origin, z axis by default).
+
+    The canonical SolidSpec carrier: the exact volume and extrema are analytic.
+    A zero top radius is the full cone. ``align`` is placement metadata carried
+    verbatim and never changes the measured geometry.
+    """
+    return _Part(
+        {
+            "kind": "cone",
+            "bottom_radius": _num(bottom_radius),
+            "top_radius": _num(top_radius),
+            "height": _num(height),
+        }
+    )
+
+
 def Torus(major_radius, minor_radius, major_angle=360.0, mode=None, **kwargs):
     """build123d ``Torus(major_radius, minor_radius)`` (centered, z-axis)."""
     if _num(major_angle) != 360.0:
@@ -1789,6 +2061,25 @@ def _edge3(edge):
             "center": edge.center.to_tuple(),
             "radius": edge.radius,
             "normal": edge.normal.to_tuple(),
+        }
+    if edge.kind == "ellipse":
+        return {
+            "kind": "ellipse",
+            "center": edge.center.to_tuple(),
+            "x_radius": edge.x_radius,
+            "y_radius": edge.y_radius,
+            "normal": edge.normal.to_tuple(),
+            "x_dir": edge.x_dir.to_tuple(),
+        }
+    if edge.kind == "arc":
+        return {
+            "kind": "arc",
+            "center": edge.center.to_tuple(),
+            "radius": edge.radius,
+            "normal": edge.normal.to_tuple(),
+            "x_dir": edge.x_dir.to_tuple(),
+            "start_angle": edge.start_angle,
+            "end_angle": edge.end_angle,
         }
     return {"kind": "spline", "points": [p.to_tuple() for p in edge.points]}
 
@@ -2052,8 +2343,9 @@ def _section_loop(section):
     if not isinstance(section, Face):
         _refuse("a section outside the recorded Face carrier is not a kernel-engine row")
     loop = list(section.edges)
-    # A single exact circle edge is a whole section (the PB-014 carrier).
-    if len(loop) == 1 and loop[0].kind == "circle":
+    # A single exact circle or ellipse edge is a whole section (the PB-014
+    # carrier; the ellipse is the same exact-conic treatment).
+    if len(loop) == 1 and loop[0].kind in ("circle", "ellipse"):
         return loop
     for edge in loop:
         if edge.kind != "line":
@@ -2085,10 +2377,11 @@ def _station_data(edge):
 def _section_reference(loop, z_axis):
     """A deterministic in-plane reference axis for a section (the first
     recorded edge direction projected into the section plane)."""
-    if loop and loop[0].kind == "circle":
-        # A circle is rotationally symmetric: any deterministic in-plane axis
-        # serves as the transport reference (the recorded carrier is
-        # centre/radius/normal only, so the choice carries no data).
+    if loop and loop[0].kind in ("circle", "ellipse"):
+        # A circle is rotationally symmetric (any deterministic in-plane axis
+        # serves); an ellipse records its own major-axis direction.
+        if loop[0].kind == "ellipse":
+            return _vnormalize(loop[0].x_dir.to_tuple())
         return _perp_any(z_axis)
     if loop:
         direction = _vsub(loop[0].p1.to_tuple(), loop[0].p0.to_tuple())
@@ -2196,6 +2489,33 @@ def _place_loop(loop, base_frame, frame):
                 "normal": list(_frame_world_dir(frame, local_normal)),
             })
             continue
+        if edge.kind == "ellipse":
+            local_center = _frame_local(base_frame, edge.center.to_tuple())
+            local_normal = _frame_local_dir(base_frame, edge.normal.to_tuple())
+            local_x = _frame_local_dir(base_frame, edge.x_dir.to_tuple())
+            placed.append({
+                "kind": "ellipse",
+                "center": list(_frame_world(frame, local_center)),
+                "x_radius": edge.x_radius,
+                "y_radius": edge.y_radius,
+                "normal": list(_frame_world_dir(frame, local_normal)),
+                "x_dir": list(_frame_world_dir(frame, local_x)),
+            })
+            continue
+        if edge.kind == "arc":
+            local_center = _frame_local(base_frame, edge.center.to_tuple())
+            local_normal = _frame_local_dir(base_frame, edge.normal.to_tuple())
+            local_x = _frame_local_dir(base_frame, edge.x_dir.to_tuple())
+            placed.append({
+                "kind": "arc",
+                "center": list(_frame_world(frame, local_center)),
+                "radius": edge.radius,
+                "normal": list(_frame_world_dir(frame, local_normal)),
+                "x_dir": list(_frame_world_dir(frame, local_x)),
+                "start_angle": edge.start_angle,
+                "end_angle": edge.end_angle,
+            })
+            continue
         a = _frame_local(base_frame, edge.p0.to_tuple())
         b = _frame_local(base_frame, edge.p1.to_tuple())
         placed.append({
@@ -2221,22 +2541,36 @@ def extrude(shape, amount, both=False, mode=None, **kwargs):
     """
     if not isinstance(shape, Face):
         _refuse("Face extrusion is not yet a kernel-engine row")
+    profile = []
     lines = []
     spline_points = []
     for edge in shape.edges:
         if edge.kind == "line":
-            lines.append(_edge3(edge))
-        else:
+            record = _edge3(edge)
+            lines.append(record)
+            profile.append(record)
+        elif edge.kind == "spline":
             spline_points.extend(point.to_tuple() for point in edge.points)
-    if not lines and not spline_points:
+        elif edge.kind in ("circle", "ellipse", "arc"):
+            # The exact analytic profile carriers (circle/ellipse/arc) record
+            # their defining data, never a flattening polygon.
+            profile.append(_edge3(edge))
+        else:
+            _refuse("this profile edge carrier is not a kernel-engine row")
+    if not profile and not spline_points:
         _refuse("Face extrusion is not yet a kernel-engine row")
     if not spline_points:
-        if len(lines) < 3:
+        # A single exact conic edge is a whole closed section; any other
+        # profile needs at least three boundary edges.
+        single_conic = (
+            len(profile) == 1 and profile[0].get("kind") in ("circle", "ellipse")
+        )
+        if len(profile) < 3 and not single_conic:
             _refuse("Face extrusion is not yet a kernel-engine row")
         return _Part(
             {
                 "kind": "prism",
-                "profile": lines,
+                "profile": profile,
                 "amount": _num(amount),
                 "both": bool(both),
             }
@@ -2420,6 +2754,25 @@ def _mirror_edge(edge, axis):
             edge.radius,
             _reflect_point(axis, edge.normal.to_tuple()),
         )
+    if edge.kind == "ellipse":
+        return Edge.make_ellipse(
+            _reflect_point(axis, edge.center.to_tuple()),
+            edge.x_radius,
+            edge.y_radius,
+            _reflect_point(axis, edge.normal.to_tuple()),
+            _reflect_point(axis, edge.x_dir.to_tuple()),
+        )
+    if edge.kind == "arc":
+        # A reflection reverses the arc's traversal, so the reflected carrier
+        # is the same circle swept from `-end` to `-start`.
+        return Edge.make_arc(
+            _reflect_point(axis, edge.center.to_tuple()),
+            edge.radius,
+            _reflect_point(axis, edge.normal.to_tuple()),
+            _reflect_point(axis, edge.x_dir.to_tuple()),
+            -edge.end_angle,
+            -edge.start_angle,
+        )
     if edge.kind in ("line", "spline"):
         points = [_reflect_point(axis, p.to_tuple()) for p in edge.points]
         return Edge(edge.kind, points, options=edge.options)
@@ -2540,6 +2893,7 @@ _TRUCK_NAMES = [
     "Polyline",
     "Spline",
     "Circle",
+    "Ellipse",
     "Line",
     "Rot",
     "make_face",
@@ -2547,6 +2901,13 @@ _TRUCK_NAMES = [
     "Plane",
     "Pos",
     "Rotation",
+    "Align",
+    "Cone",
+    "RegularPolygon",
+    "RectangleRounded",
+    "Helix",
+    "FilletPolyline",
+    "make_hull",
 ]
 
 
