@@ -380,6 +380,15 @@ class _Frame:
             self.o[2] + xd[2] * p[0] + yd[2] * p[1] + zd[2] * p[2],
         )
 
+    def _map_dir(self, v):
+        """The frame's rotation applied to one direction (no translation)."""
+        xd, yd, zd = self.x_dir, self.y_dir, self.z_dir
+        return (
+            xd[0] * v[0] + yd[0] * v[1] + zd[0] * v[2],
+            xd[1] * v[0] + yd[1] * v[1] + zd[1] * v[2],
+            xd[2] * v[0] + yd[2] * v[1] + zd[2] * v[2],
+        )
+
     def _compose_after(self, other):
         """This frame applied after ``other`` (a locator): R = self.R ∘ other.R,
         o = self.o + self.R(other.o)."""
@@ -696,9 +705,14 @@ def _pad_3(points):
 
 
 class Edge:
-    """build123d ``Edge``: a curve carrier data row (line or spline)."""
+    """build123d ``Edge``: a curve carrier data row (line, spline or circle).
 
-    __slots__ = ("kind", "points", "p0", "p1", "options")
+    A line records its endpoints; a spline its defining samples; a circle its
+    exact centre, radius and plane normal. None of the three is ever flattened
+    at record time: the consuming arm either answers the exact carrier or
+    refuses typed."""
+
+    __slots__ = ("kind", "points", "p0", "p1", "options", "center", "radius", "normal")
 
     def __init__(self, kind, points, options=None):
         pts = _pad_3(points)
@@ -709,6 +723,9 @@ class Edge:
         self.p0 = self.points[0]
         self.p1 = self.points[-1]
         self.options = dict(options) if options else {}
+        self.center = None
+        self.radius = None
+        self.normal = None
 
     @property
     def wrapped(self):
@@ -745,6 +762,20 @@ class Edge:
         for key in kwargs:
             options[key] = True
         return cls("spline", pts, options=options)
+
+    @classmethod
+    def make_circle(cls, center, radius, normal):
+        """A closed circle edge: exact centre, radius and plane normal."""
+        obj = cls.__new__(cls)
+        obj.kind = "circle"
+        obj.points = []
+        obj.p0 = None
+        obj.p1 = None
+        obj.options = {}
+        obj.center = Vector(*_point3(center))
+        obj.radius = _num(radius)
+        obj.normal = Vector(*_vnormalize(_point3(normal)))
+        return obj
 
     def position_at(self, t):
         """The curve at parameter ``t`` as recorded data.
@@ -813,15 +844,33 @@ def Line(p0, p1):
     return Edge.make_line(p0, p1)
 
 
-def Circle(radius, **kwargs):
-    """build123d ``Circle(radius)`` -- a closed circular profile edge.
+def circle(radius, **kwargs):
+    """build123d ``Circle(radius)`` -- the exact closed-circle section carrier.
 
-    A circle is an exact conic, not a recoverable line/spline carrier: feeding
-    it to ``loft``/``extrude``/``revolve`` cannot be answered exactly by the
-    landed executor, so the carrier keeps its typed refusal (it names the open
-    circle-profile carrier, never approximates it)."""
-    _refuse("a circle profile is not answered exactly by a kernel-engine row")
-    return None
+    The circle records its exact centre, radius and plane normal (the PB-014
+    circle carrier); the kernel answers its analytic area/extrema and the
+    loft/sweep arms integrate the true conic, never a flattening polygon. A
+    circle option outside the recorded exact vocabulary (an arc size, a
+    centred/rotated form) refuses typed naming the option."""
+    if kwargs:
+        option = sorted(kwargs)[0]
+        _refuse(
+            "a circle option is not answered exactly by a kernel-engine row: "
+            + option
+        )
+    value = _num(radius)
+    if not isinstance(value, float) or not math.isfinite(value) or value <= 0.0:
+        _refuse(
+            "a circle radius outside the recorded exact vocabulary is not a "
+            "kernel-engine row"
+        )
+    edge = Edge.make_circle((0.0, 0.0, 0.0), value, (0.0, 0.0, 1.0))
+    return Face(Wire([edge]))
+
+
+def Circle(radius, **kwargs):
+    """build123d ``Circle(radius)`` -- the exact closed-circle section carrier."""
+    return circle(radius, **kwargs)
 
 
 def Polyline(*points, **kwargs):
@@ -916,6 +965,11 @@ class Face:
 def _place_edges(frame, edges):
     out = []
     for edge in edges:
+        if edge.kind == "circle":
+            center = frame._map_point(edge.center.to_tuple())
+            normal = _vnormalize(frame._map_dir(edge.normal.to_tuple()))
+            out.append(Edge.make_circle(center, edge.radius, normal))
+            continue
         pts = [frame._map_point(p.to_tuple()) for p in edge.points]
         out.append(Edge(edge.kind, pts, options=edge.options))
     return out
@@ -1583,6 +1637,13 @@ def _edge3(edge):
             "a": edge.p0.to_tuple(),
             "b": edge.p1.to_tuple(),
         }
+    if edge.kind == "circle":
+        return {
+            "kind": "circle",
+            "center": edge.center.to_tuple(),
+            "radius": edge.radius,
+            "normal": edge.normal.to_tuple(),
+        }
     return {"kind": "spline", "points": [p.to_tuple() for p in edge.points]}
 
 
@@ -1844,11 +1905,13 @@ def _section_loop(section):
     spline-trimmed or non-Face section refuses typed naming the open carrier."""
     if not isinstance(section, Face):
         _refuse("a section outside the recorded Face carrier is not a kernel-engine row")
-    loop = []
-    for edge in section.edges:
+    loop = list(section.edges)
+    # A single exact circle edge is a whole section (the PB-014 carrier).
+    if len(loop) == 1 and loop[0].kind == "circle":
+        return loop
+    for edge in loop:
         if edge.kind != "line":
             _refuse("a spline-trimmed section boundary is not a kernel-engine row")
-        loop.append(edge)
     if len(loop) < 3:
         _refuse("a section needs a closed boundary with at least three edges")
     return loop
@@ -1876,6 +1939,11 @@ def _station_data(edge):
 def _section_reference(loop, z_axis):
     """A deterministic in-plane reference axis for a section (the first
     recorded edge direction projected into the section plane)."""
+    if loop and loop[0].kind == "circle":
+        # A circle is rotationally symmetric: any deterministic in-plane axis
+        # serves as the transport reference (the recorded carrier is
+        # centre/radius/normal only, so the choice carries no data).
+        return _perp_any(z_axis)
     if loop:
         direction = _vsub(loop[0].p1.to_tuple(), loop[0].p0.to_tuple())
         projected = _vsub(direction, _vscaled(z_axis, _vdot(direction, z_axis)))
@@ -1941,6 +2009,22 @@ def _frame_local(frame, point):
     return (_vdot(rel, x_axis), _vdot(rel, y_axis), _vdot(rel, z_axis))
 
 
+def _frame_local_dir(frame, vector):
+    """The frame-local coordinates of one world direction (rotation only)."""
+    _, x_axis, y_axis, z_axis = frame
+    return (_vdot(vector, x_axis), _vdot(vector, y_axis), _vdot(vector, z_axis))
+
+
+def _frame_world_dir(frame, local):
+    """The world direction of one frame-local coordinate triple."""
+    _, x_axis, y_axis, z_axis = frame
+    return (
+        local[0] * x_axis[0] + local[1] * y_axis[0] + local[2] * z_axis[0],
+        local[0] * x_axis[1] + local[1] * y_axis[1] + local[2] * z_axis[1],
+        local[0] * x_axis[2] + local[1] * y_axis[2] + local[2] * z_axis[2],
+    )
+
+
 def _frame_world(frame, local):
     """The world point of one frame-local coordinate triple."""
     origin, x_axis, y_axis, z_axis = frame
@@ -1956,6 +2040,16 @@ def _place_loop(loop, base_frame, frame):
     coordinates are read through ``base_frame``)."""
     placed = []
     for edge in loop:
+        if edge.kind == "circle":
+            local_center = _frame_local(base_frame, edge.center.to_tuple())
+            local_normal = _frame_local_dir(base_frame, edge.normal.to_tuple())
+            placed.append({
+                "kind": "circle",
+                "center": list(_frame_world(frame, local_center)),
+                "radius": edge.radius,
+                "normal": list(_frame_world_dir(frame, local_normal)),
+            })
+            continue
         a = _frame_local(base_frame, edge.p0.to_tuple())
         b = _frame_local(base_frame, edge.p1.to_tuple())
         placed.append({

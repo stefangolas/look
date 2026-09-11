@@ -647,6 +647,9 @@ fn gather_points(profile: &[ProfileEdge], trim: &[[f64; 3]]) -> Vec<[f64; 3]> {
                 out.push(*b);
             }
             ProfileEdge::Spline { points } => out.extend(points.iter().copied()),
+            // A circle section is not a point-list carrier; the trim-extrude
+            // constructor's point fit does not consume it.
+            ProfileEdge::Circle { .. } => {}
         }
     }
     out.extend(trim.iter().copied());
@@ -660,7 +663,7 @@ fn line_loop_vertices(profile: &[ProfileEdge]) -> Option<Vec<[f64; 3]>> {
     for edge in profile {
         match edge {
             ProfileEdge::Line { a, .. } => out.push(*a),
-            ProfileEdge::Spline { .. } => return None,
+            ProfileEdge::Spline { .. } | ProfileEdge::Circle { .. } => return None,
         }
     }
     if out.len() >= 3 { Some(out) } else { None }
