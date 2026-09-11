@@ -76,23 +76,27 @@ corrected, annex C = ORACLE POLICY CHANGE), then docs/SOLVER_COVERAGE_SPEC.md
 ## Where we are
 
 > LATEST GROUND TRUTH: read the newest `[operator ...]` block in "State of
-> the machine, as left" (2026-09-11T02:59Z). [operator 2026-09-11T02:59Z
-> ground-truth note: 2 RUNNING / 0 landed-by-operator. **RDEF-M1-LATTICE-V2
-> LANDED** (HEAD `4d8b233`, worker `d1e6d0d`, row DONE); **MONO-9-FUSE-FOLD
-> (slot 0, pid 29240) RUNNING** and **DOOR-PARTIAL-ARC-FLIP (slot 1, pid
-> 28308) RUNNING** (the escalated SPEC_GAP packet re-dispatched un-amended -
-> it will re-strand; needs the write_allow amendment) - both events fresh, do
-> not touch. Operator FLIPPED RDEF-M2 + RDEF-M3 BLOCKED->READY (deps landed;
-> RDEF-M3 H-1 lint fixed) and committed `21203ea`; dry-run dispatch shows
-> RDEF-M3 -> slot 2 (RDEF-M2 deferred on a write-set clash). Registry: 343
-> rows (245 DONE / 86 READY / 11 BLOCKED / 1 SUPERSEDED). Health: heartbeat
-> exactly 1 (27872), watchdog 1 (29264), operator runner 1 (27876), cargoq UP
-> (queued 0, running true). Disk 10.4 GiB free (above 8 GB floor, below 15 GB
-> goal); RAM 2.25 GiB free - LOW (below the 3 GB check; 0xc0000409 warm-build
-> zone if a third worker warms). Open human items: the 02:31Z RAM/paging
-> escalation; DOOR-PARTIAL-ARC-FLIP write_allow amendment; MONO-7 D1+D2
-> re-verify; duplicate supervisors + lagging cargoq restart guard; slot-4/7 wt
-> RESULT residue; MONO/RDEF registry schema gap.]
+> the machine, as left" (2026-09-11T03:49Z). [operator 2026-09-11T03:49Z
+> ground-truth note: 3 RUNNING / 0 landed-by-operator. HEAD `6073d52` - the
+> orchestrator's **MONO-9-FUSE-FOLD LANDED** (`2dff4c7`) plus the **MONO-9
+> ledger + DONE flip** (`6073d52`); the 03:25Z MONO-9 stale-READY escalation is
+> RESOLVED. RUNNING: **RDEF-M2-REGIME-SANDWICH (slot 0, pid 32688)**,
+> **RDEF-M3-WITNESS-TIER (slot 1, pid 27280)** and **DOOR-PARTIAL-ARC-FLIP
+> (slot 2, pid 6820)** - all three events 7-9 min old, 3-4 files changed,
+> pre-commit, healthy; do not touch. **AUTHOR-WIRE-MIRROR-ARM: the re-fork
+> HAPPENED** (slot 2 was recycled to DOOR-PARTIAL-ARC-FLIP); the uncommitted
+> work is gone from the worktree and survives ONLY in the operator backup
+> `%TEMP%\opencode\slot2-AUTHOR-WIRE-MIRROR-ARM\` (wire_mirror_arm.rs 13,816 B,
+> door.py.patch 3,418 B, RESULT.json 7,377 B) and the slot-2 abandoned patch
+> `abandoned-20260910-233105.patch` (3,407 B). Row still READY; will re-dispatch
+> fresh when the door.py write-set clash clears. Registry (last-wins): 345 rows
+> (248 DONE / 85 READY / 11 BLOCKED / 1 SUPERSEDED); nothing flippable. Health:
+> heartbeat exactly 1 (27872), watchdog 1 (29264), cargoq UP (queued 2, running
+> true = the live workers' jobs). Disk 8.4 GiB free (janitor reclaimed ~1.2 GiB
+> repo-root target; above the 8 GB floor, below the 15 GB goal); RAM 3.6 GiB
+> free. Carried: duplicate supervisors (19172 + 27828), duplicate overnight.py
+> (24864 + 11272), duplicate cargoq server (28544 + 34564); DOOR-PARTIAL-ARC-FLIP
+> write_allow amendment; slot-4/7 wt RESULT residue.]
 
 - **THE FIRST KERNEL-VS-OCC TIMING COMPARISON IS BANKED** (FH-TIMING-REFRESH,
   landed c94d043): turbopump_assembly **0.097 s kernel vs 4.866 s OCC**,
@@ -5874,3 +5878,89 @@ retry-once-then-free-memory path, already escalated at 02:31Z). Open human items
 re-strand); the 02:31Z RAM/paging exhaustion; MONO-7 D1+D2 re-verify; duplicate
 supervisors + lagging cargoq restart guard; slot-4/7 wt RESULT residue; MONO/RDEF
 registry schema gap.]
+
+[operator 2026-09-11T03:25Z - volatile refresh. Board now: 2 RUNNING / 0
+landed-by-operator. HEAD `2dff4c7` (the orchestrator's **MONO-9-FUSE-FOLD
+LANDED**; worker `88380b5` committed as-delivered; registry row still READY
+with no landed marker - escalated). RUNNING: RDEF-M2-REGIME-SANDWICH (slot 0,
+pid 32688, events 1.2 min old) and RDEF-M3-WITNESS-TIER (slot 1, pid 27280,
+events 0.1 min old) - both just dispatched from base `2dff4c7`, changed=0 (no
+work yet), do not touch. **URGENT: slot 2 AUTHOR-WIRE-MIRROR-ARM FINISHED
+(worker pid 24012 gone) with UNCOMMITTED work** - `wt/RESULT.json` status
+LANDED but branch `packet/AUTHOR-WIRE-MIRROR-ARM` still at base `4d8b233`:
+`corpus/ttc/door.py` modified (+49/-3) and `truck123d/tests/wire_mirror_arm.rs`
+untracked (13,816 B). `dispatch_ready --dry-run` selects DOOR-PARTIAL-ARC-FLIP
+-> slot 2, so the next heartbeat `new_slot` re-fork will `clean -fdx` the
+untracked test away (archive_and_reset only LISTS untracked files). Escalated
+to OPERATOR_ESCALATIONS (URGENT); the orchestrator is LIVE (opencode pid
+15404) to apply the skipped-commit-step protocol (commit as delivered).
+Landing (step 2): nothing else - slots 3-7 landed residue, the two running
+workers have no commits. Unblock (step 3): none - no IDLE/DEAD >15 min holding
+work; no QUESTION; no 402. Registry hygiene (step 4): nothing flipped; census
+(last-wins) 343 rows - 245 DONE / 86 READY / 11 BLOCKED / 1 SUPERSEDED; the 11
+BLOCKED all correctly parked (BG-CK-SPLINE-CENSUS owner-cancelled,
+DEF-TESS-ANALYTIC-SEAM superseded by -R2, DEF-SEEDRAY-B human-gated, TOR-C
+orchestrator-held, TTC-RECENSUS-F1-R3 idle-board-gated, MONO-10 unauthored;
+RDEF-M4/M5 deps unlanded). Dispatch (step 5): no manual dispatch (heartbeat
+live); `dispatch_ready --dry-run --max-workers=4` = dispatched 1
+(DOOR-PARTIAL-ARC-FLIP -> slot 2), workers ~3/4. Health: heartbeat exactly 1
+(27872), watchdog 1 (29264), operator runner 1 (27876), cargoq UP (ping ok,
+queued 0, running false). Disk 11.0 GiB free (above the 8 GB floor, below the
+15 GB goal); RAM 4.99 GiB free. Carried duplication class, not killed: TWO
+supervisors (19172 + 27828), TWO overnight.py (24864 + 11272), TWO cargoq
+server.py (28544 + 34564). Open human items: (NEW) slot 2 skipped-commit +
+imminent re-fork loss; (NEW) MONO-9 stale READY row; carried - DOOR-PARTIAL-
+ARC-FLIP write_allow amendment; the 02:31Z RAM/paging exhaustion; MONO-7 D1+D2
+re-verify; duplicate supervisors + lagging cargoq restart guard; slot-4/7 wt
+RESULT residue.]
+
+[operator 2026-09-11T03:49Z - volatile refresh. Board now: 3 RUNNING / 0
+landed-by-operator. HEAD `6073d52` (`MONO-9 ledger + DONE flip`); the 03:25Z
+MONO-9 stale-READY escalation is RESOLVED (row status DONE). RUNNING and
+healthy (events 7-9 min old, 3-4 files changed, pre-commit - do not touch):
+RDEF-M2-REGIME-SANDWICH (slot 0, pid 32688), RDEF-M3-WITNESS-TIER (slot 1, pid
+27280), DOOR-PARTIAL-ARC-FLIP (slot 2, pid 6820, the re-fork that superseded
+AUTHOR-WIRE-MIRROR-ARM).
+- **Land (step 2):** nothing operator-landable. All five FINISHED slot worker
+  commits are ancestors of `integration/kernel-bg` (`e6553db` SOLVER-SURVEY-C,
+  `3c2109b` F1-AUTHORING-ARMS, `ee97499` CL-006, `713f205` CL-005, `5cf4811`
+  slot-7 FRAME-REVOLVE) - stale residue, not pending landings. Slot 4
+  F1-AUTHORING-ARMS carries RESULT status LANDED-WITH-FINDINGS but was already
+  landed (merge `27ad2ce`) and its F1 mvac-pin finding adjudicated (`5f1396d`);
+  no new escalation. Slot 7's wt RESULT names BRIDGE-BOOLEANS while the row is
+  FRAME-REVOLVE - both already landed; harness residue only.
+- **Unblock (step 3):** none - three live workers making progress, no
+  IDLE/DEAD >15 min holding work, no QUESTION, no APIError 402.
+- **Registry hygiene (step 4):** nothing flipped. Census (last-wins): 345 rows
+  - 248 DONE / 85 READY / 11 BLOCKED / 1 SUPERSEDED. The 11 BLOCKED are all
+  correctly parked (BG-AUD-FIX-004 OWNER_BLOCKED; SEM-PCURVE-MASTER-001-FIX
+  superseded; BG-CK-SPLINE-CENSUS note ends CANCELLED BY OWNER; DEF-SPINEFRAME-
+  GRAZE r1 SPEC_GAP; DEF-TESS-ANALYTIC-SEAM superseded by -R2; DEF-SEEDRAY-B
+  human-gated; TOR-C orchestrator-held; TTC-RECENSUS-F1-R3 MONO-7/idle-board
+  gated; MONO-10 owner scope-decision; RDEF-M4/M5 parked). No BLOCKED row has
+  all deps landed without one of those park reasons.
+- **Dispatch (step 5):** no manual dispatch (heartbeat live). `dispatch_ready
+  --dry-run --max-workers=4` = `dispatched 0; workers ~3/4`; the only READY
+  candidates (AUTHOR-WIRE-MIRROR-ARM, AUTHOR-CENSUS-NAMES, RG-23-CERTIFIED-
+  ENTRY-WIRING, RG-9-REFLECT-SOLID-PRODUCTION) are all write-set clash-deferred
+  against the running rows on `corpus/ttc/door.py` / `truck123d/src/
+  bd_bridge.rs`. This is REAL idle, not the silent-filter bug.
+- **Disk (step 1):** 7.3 GiB free was BELOW the 8 GB floor; ran `python
+  loop/janitor.py ensure --need 10` - reclaimed ~1.2 GiB (repo-root `target/`)
+  -> 8.4 GiB free. Live slots 0-2 hold ~10 GiB (unreclaimable); no TEMP
+  baseline leaks; no idle slot targets remain. Above the floor, below the 15 GB
+  goal.
+- **Health:** heartbeat exactly 1 (27872), watchdog 1 (29264), cargoq UP
+  (queued 2, running true = the live workers' cargoq jobs), operator runner 1.
+  RAM 3.6 GiB free. Carried duplication class, NOT killed: TWO supervisors
+  (19172 + 27828), TWO overnight.py (24864 + 11272), TWO cargoq/server.py
+  (28544 + 34564).
+- **Escalations (step 7):** UPDATED the 03:25Z AUTHOR-WIRE-MIRROR-ARM entry -
+  the re-fork is now CONFIRMED DONE and the uncommitted work is destroyed from
+  the worktree; it survives ONLY in the operator backup + the slot-2 abandoned
+  patch (see OPERATOR_ESCALATIONS). Carried: DOOR-PARTIAL-ARC-FLIP write_allow
+  amendment (re-running now); duplicate supervisors + lagging cargoq restart
+  guard; slot-4/7 wt RESULT residue.
+
+Leaving: 3 RUNNING; HEAD 6073d52; heartbeat 1 (27872); watchdog 1 (29264);
+cargoq UP; disk 8.4 GiB free; RAM 3.6 GiB free.]

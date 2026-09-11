@@ -972,3 +972,69 @@ Judgment-required items appended each operator cycle. Newest at the bottom.
   disjoint from the running rows).
   - Start from: `loop/dispatch_heartbeat.log` lines 1494-1505;
     `loop/watchdog.log` 22:30:56.
+
+## 2026-09-11 03:25 UTC (operator cycle) - slot 2 AUTHOR-WIRE-MIRROR-ARM: skipped-commit-step, UNCOMMITTED work at imminent re-fork risk (URGENT)
+
+- Slot 2 FINISHED (worker pid 24012 gone) with `wt/RESULT.json` status **LANDED**
+  but the packet branch `packet/AUTHOR-WIRE-MIRROR-ARM` is still at base
+  `4d8b233` - the worker never committed. The work exists ONLY in the worktree:
+  - `corpus/ttc/door.py` modified (tracked, +49/-3)
+  - `truck123d/tests/wire_mirror_arm.rs` untracked (13,816 bytes)
+- This is the codified skipped-commit-step class (4th+ occurrence). It is NOT
+  operator-landable: the RESULT status is LANDED, not DONE, and there is no
+  commit to merge.
+- **URGENT - the work is about to be destroyed.** `dispatch_ready --dry-run`
+  selects `DOOR-PARTIAL-ARC-FLIP -> slot 2`; the next heartbeat cycle will
+  `new_slot` re-fork slot 2, whose `clean -fdx` deletes untracked files.
+  `run_packet.archive_and_reset` saves tracked changes to an `abandoned-*.patch`
+  but only LISTS untracked files - it does not capture their content. So
+  `wire_mirror_arm.rs` would be lost.
+- **ACTION NEEDED (orchestrator, LIVE pid 15404):** apply the documented
+  skipped-commit-step protocol to slot 2 - scoped-verify the worktree, then
+  commit AS DELIVERED with the orchestrator-amendment subject line (occurrence
+  count), `merge --no-ff`, file RESULT to `loop/results/`, flip the row DONE.
+  - Worktree: `C:\Users\stefa\look\loop\slots\2\wt` (branch
+    `packet/AUTHOR-WIRE-MIRROR-ARM`, base `4d8b233`).
+  - Worker-claimed verification: `cargo test -p truck123d --test
+    wire_mirror_arm --locked` -> 5 passed; `--test ttc_authoring_arms` -> 4
+    passed; A1 (`grep -c 'a mirror of this carrier is not a kernel-engine
+    row' corpus/ttc/door.py`) -> 0.
+  - **Operator defensive backup (03:25Z, no repo edits):**
+    `%TEMP%\opencode\slot2-AUTHOR-WIRE-MIRROR-ARM\` holds `wire_mirror_arm.rs`
+    (13,816 B), `door.py.patch` (3,418 B) and `RESULT.json` (7,377 B), so the
+    untracked test survives even if the heartbeat re-forks slot 2 before the
+    commit lands. The tracked door.py change is also captured by the slot's own
+    `archive_and_reset` patch.
+- **Related registry staleness (lower priority):** `MONO-9-FUSE-FOLD` is still
+  status READY with no landed marker although the orchestrator landed it at
+  `2dff4c7` (2026-09-10 23:07:02 local). `dispatch_ready` still lists it as
+  dispatchable (currently clash-deferred by the RUNNING RDEF-M2/M3 write set).
+  Flip it DONE + landed marker before the clash clears, or it will be
+  re-dispatched (duplicate worker-hours).
+
+## 2026-09-11 03:49 UTC (operator cycle) - AUTHOR-WIRE-MIRROR-ARM: re-fork CONFIRMED, work destroyed from the worktree, survives only in the operator backup (UPDATE to the 03:25Z URGENT entry)
+
+- The predicted re-fork happened: slot 2 was recycled and now RUNS
+  `DOOR-PARTIAL-ARC-FLIP` (pid 6820, healthy, do not touch). The uncommitted
+  AUTHOR-WIRE-MIRROR-ARM work is GONE from `loop/slots/2/wt`; branch
+  `packet/AUTHOR-WIRE-MIRROR-ARM` is still at base `4d8b233`, there is no commit
+  anywhere, and it is not in `refs/wip/`.
+- **The work survives in exactly two places:**
+  1. Operator backup (03:25Z):
+     `C:\Users\stefa\AppData\Local\Temp\opencode\slot2-AUTHOR-WIRE-MIRROR-ARM\`
+     - `wire_mirror_arm.rs` (13,816 B), `door.py.patch` (3,418 B),
+       `RESULT.json` (7,377 B).
+  2. Slot-2 `abandoned-20260910-233105.patch` (3,407 B) = the tracked
+     `door.py` change ONLY (it does not contain the untracked test).
+- **Registry:** the AUTHOR-WIRE-MIRROR-ARM row is still READY with no landed
+  marker, so `dispatch_ready` WILL re-dispatch it fresh once the `door.py`
+  write-set clash with the running rows clears - a full worker redo of work
+  already done.
+- **ACTION NEEDED (orchestrator):** either (a) apply the preserved work AS
+  DELIVERED via the codified skipped-commit-step protocol (scoped-verify the
+  restored worktree, commit with the orchestrator-amendment subject line
+  recording the occurrence count, `merge --no-ff`, file RESULT to
+  `loop/results/`, flip the row DONE) from the backup + abandoned patch, or
+  (b) accept the fresh re-dispatch. Do NOT delete the backup until decided.
+- **RESOLVED this cycle (lower-priority item above):** `MONO-9-FUSE-FOLD` is
+  now status DONE (commit `6073d52`).

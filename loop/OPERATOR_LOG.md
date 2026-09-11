@@ -3675,3 +3675,100 @@ un-amended by the heartbeat - will re-strand).
 
 Leaving: 2 RUNNING; HEAD 21203ea (registry commit); heartbeat 1 (27872);
 watchdog 1 (29264); cargoq UP; disk 10.4 GiB free; RAM 2.25 GiB free (LOW).
+
+## [operator 2026-09-11T03:25Z]
+
+Board: 2 RUNNING / 0 landed-this-cycle. RUNNING: RDEF-M2-REGIME-SANDWICH
+(slot 0, pid 32688, events 1.2 min old) and RDEF-M3-WITNESS-TIER (slot 1,
+pid 27280, events 0.1 min old) - both just dispatched from base 2dff4c7,
+changed=0 (no work yet); do not touch. HEAD 2dff4c7 (the orchestrator's
+MONO-9-FUSE-FOLD landing).
+- **Health:** heartbeat exactly 1 (27872), watchdog 1 (29264), operator runner
+  1 (27876), cargoq UP (ping ok, queued 0, running false). Disk 11.0 GiB free
+  (above the 8 GB floor, below the 15 GB goal); RAM 4.99 GiB free. Carried
+  duplication class, NOT killed (not my predecessors): TWO supervisors
+  (19172 + 27828), TWO overnight.py (24864 + 11272), TWO cargoq/server.py
+  (28544 + 34564).
+- **Land (step 2):** none operator-landable. Slot 2 AUTHOR-WIRE-MIRROR-ARM
+  `wt/RESULT.json` status is **LANDED** (not DONE) and its branch is at base
+  with UNCOMMITTED work -> do NOT land; ESCALATED (URGENT, see
+  OPERATOR_ESCALATIONS). Slots 3-7 are landed residue; the two running workers
+  have no commits yet.
+- **Unblock (step 3):** none - no IDLE/DEAD >15 min holding work; no QUESTION;
+  no APIError 402.
+- **Registry hygiene (step 4):** nothing flipped. Census (last-wins dedup):
+  343 rows - 245 DONE / 86 READY / 11 BLOCKED / 1 SUPERSEDED. READY rows
+  WITHOUT a landed marker = 8: MONO-9-FUSE-FOLD (LANDED at 2dff4c7 but row not
+  flipped - escalated), DOOR-PARTIAL-ARC-FLIP, AUTHOR-WIRE-MIRROR-ARM,
+  AUTHOR-CENSUS-NAMES, RG-23-CERTIFIED-ENTRY-WIRING,
+  RG-9-REFLECT-SOLID-PRODUCTION, RDEF-M2, RDEF-M3. BLOCKED-with-all-deps-
+  landed all correctly parked: BG-CK-SPLINE-CENSUS (owner-cancelled),
+  DEF-TESS-ANALYTIC-SEAM (superseded by -R2), DEF-SEEDRAY-B (human-gated),
+  TOR-C (orchestrator-held), TTC-RECENSUS-F1-R3 (needs idle board), MONO-10
+  (unauthored/owner-gated); RDEF-M4/M5 parked (deps unlanded).
+- **Dispatch (step 5):** no manual dispatch (heartbeat live). `dispatch_ready
+  --dry-run --max-workers=4`: `dispatched 1` (DOOR-PARTIAL-ARC-FLIP -> slot 2;
+  MONO-9, AUTHOR-CENSUS-NAMES, RG-23, RG-9 clash-deferred on bd_bridge.rs);
+  workers ~3/4.
+- **Escalations (step 7):** (NEW, URGENT) slot 2 skipped-commit + imminent
+  re-fork loss; (NEW, lower) MONO-9 stale READY row. Carried:
+  DOOR-PARTIAL-ARC-FLIP write_allow amendment; 02:31Z RAM/paging; MONO-7 D1+D2
+  re-verify; duplicate supervisors + lagging cargoq restart guard; slot-4/7 wt
+  RESULT residue.
+- **STATE (step 6):** updated the LATEST GROUND TRUTH note + appended the
+  [operator 2026-09-11T03:25Z] block.
+
+Leaving: 2 RUNNING; HEAD 2dff4c7; heartbeat 1 (27872); watchdog 1 (29264);
+operator runner 1 (27876); cargoq UP; disk 11.0 GiB free; RAM 4.99 GiB free.
+
+## [operator 2026-09-11T03:49Z]
+
+Board: **3 RUNNING / 0 landed-by-operator / 11 BLOCKED**. HEAD `6073d52`
+(`MONO-9 ledger + DONE flip`). RUNNING, all healthy (events 7-9 min old,
+changed 3-4, pre-commit - do not touch): RDEF-M2-REGIME-SANDWICH (slot 0, pid
+32688), RDEF-M3-WITNESS-TIER (slot 1, pid 27280), DOOR-PARTIAL-ARC-FLIP (slot
+2, pid 6820).
+
+- **Health (step 1):** heartbeat exactly 1 (27872; my probe's own cmdline
+  inflated the raw count to 2 - anchored on the `.ps1` file), watchdog 1
+  (29264), cargoq UP (`/ping` queued 2, running true = the live workers'
+  jobs). Disk **7.3 GiB free was BELOW the 8 GB floor**; ran `python
+  loop/janitor.py ensure --need 10` -> reclaimed ~1.2 GiB (repo-root `target/`)
+  -> **8.4 GiB free**. RAM 3.6 GiB free. No `look-verify-baseline-*` TEMP
+  leaks; no idle slot targets left to reclaim (live slots 0-2 hold ~10 GiB).
+- **Land (step 2):** nothing operator-landable. Re-ran ancestry on all five
+  FINISHED slot worker commits - `e6553db` (SOLVER-SURVEY-C), `3c2109b`
+  (F1-AUTHORING-ARMS), `ee97499` (CL-006), `713f205` (CL-005), `5cf4811`
+  (slot-7 FRAME-REVOLVE) - **all ancestors of `integration/kernel-bg`** = stale
+  residue. Slot 4 F1-AUTHORING-ARMS RESULT status LANDED-WITH-FINDINGS is
+  already landed (`27ad2ce`) with its mvac-pin finding adjudicated (`5f1396d`),
+  so no escalation; slot 7's wt RESULT names BRIDGE-BOOLEANS while the row is
+  FRAME-REVOLVE - both landed, harness residue.
+- **Unblock (step 3):** none - three live workers making progress, no
+  IDLE/DEAD >15 min holding work, no QUESTION, no APIError 402.
+- **Registry hygiene (step 4):** nothing flipped. Census (last-wins): 345 rows
+  - 248 DONE / 85 READY / 11 BLOCKED / 1 SUPERSEDED. All 11 BLOCKED are
+  correctly parked (owner-blocked / superseded / owner-cancelled / SPEC_GAP /
+  human-gated / orchestrator-held / idle-board-gated / scope-decision / deps
+  unlanded). No BLOCKED row has all deps landed without a park reason.
+- **Dispatch (step 5):** no manual dispatch (heartbeat live). `dispatch_ready
+  --dry-run --max-workers=4` = `dispatched 0; workers ~3/4`; the only READY
+  candidates (AUTHOR-WIRE-MIRROR-ARM, AUTHOR-CENSUS-NAMES,
+  RG-23-CERTIFIED-ENTRY-WIRING, RG-9-REFLECT-SOLID-PRODUCTION) are all
+  write-set clash-deferred against the running rows on `corpus/ttc/door.py` /
+  `truck123d/src/bd_bridge.rs`. REAL idle, not the silent-filter bug.
+- **Escalations (step 7):** UPDATED the 03:25Z AUTHOR-WIRE-MIRROR-ARM entry -
+  the re-fork is CONFIRMED DONE and the uncommitted work is destroyed from the
+  worktree; it survives only in the operator backup
+  (`%TEMP%\opencode\slot2-AUTHOR-WIRE-MIRROR-ARM\`) + the slot-2
+  `abandoned-20260910-233105.patch`. Row still READY -> will re-dispatch fresh
+  when the door.py clash clears. Carried: DOOR-PARTIAL-ARC-FLIP write_allow
+  amendment; duplicate supervisors + lagging cargoq restart guard; slot-4/7 wt
+  RESULT residue.
+- **RESOLVED this cycle:** the 03:25Z MONO-9-FUSE-FOLD stale-READY escalation -
+  row is now DONE (`6073d52`).
+- **STATE (step 6):** updated the LATEST GROUND TRUTH note + appended the
+  `[operator 2026-09-11T03:49Z]` block.
+
+Leaving: 3 RUNNING; HEAD 6073d52; heartbeat 1 (27872); watchdog 1 (29264);
+cargoq UP; disk 8.4 GiB free; RAM 3.6 GiB free.
