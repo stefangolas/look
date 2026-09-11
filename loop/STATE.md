@@ -76,28 +76,27 @@ corrected, annex C = ORACLE POLICY CHANGE), then docs/SOLVER_COVERAGE_SPEC.md
 ## Where we are
 
 > LATEST GROUND TRUTH: read the newest `[operator ...]` block in "State of
-> the machine, as left" (2026-09-11T02:07Z). [operator 2026-09-11T02:07Z
-> ground-truth note: 2 RUNNING / 0 landed-by-operator. **AUTHOR-EXT-FILLET-HALO
-> (slot 0, pid 30004) RUNNING** (door.py + bd_bridge.rs + binding.rs + new
-> fillet_halo_arms.rs; cargo/rustc live) and **RDEF-M1-LATTICE-V2 (slot 2, pid
-> 31876) RUNNING** (heartbeat dispatched it this cycle after the operator's
-> flip) - do not touch. The 01:01Z RG-4 false-landing is RESOLVED: `340b395`
-> was landed for real at `1660cd0` and the row flipped DONE; DOOR-CIRCLE-FLIP
-> (`dd2959d`) and MONO-8 (`af9eef0`) also landed and are DONE. Operator action
-> this cycle: flipped MONO-9-FUSE-FOLD + RDEF-M1-LATTICE-V2 BLOCKED->READY at
-> `47553c2` (deps MONO-8/RDEF-M0 landed; gen_packet --check green) - RDEF-M1
-> dispatched, MONO-9 correctly write-set-clashed with the RUNNING slot 0.
-> Registry: 343 rows (243 DONE / 86 READY / 13 BLOCKED / 1 SUPERSEDED).
-> Health: heartbeat exactly 1 (27872), watchdog 1 (29264), operator runner 1
-> (27876), overnight driver 1 (24864, restarted 21:53:58 local), cargoq UP
-> (28544, ping 200, queued 0), TWO supervisors (19172 + 27828, carried; only
-> ONE overnight.py child = no double-merge risk). Disk 13.1 GiB free (above
-> the 8 GB floor, below the 15 GB goal); RAM 3.9 GiB free. Open human items:
-> MONO-7 D1+D2 re-verify; `packet_tests_and_crates` crate derivation;
-> overnight.py:222-226; duplicate supervisors + lagging cargoq restart guard;
-> slot-4/7 wt RESULT residue; MONO/RDEF registry schema gap (rows carry
-> `depends_on`, but dispatch_ready gates on `needs` - flip only after checking
-> `depends_on` by hand).]
+> the machine, as left" (2026-09-11T02:31Z). [operator 2026-09-11T02:31Z
+> ground-truth note: 2 RUNNING / 0 landed-by-operator. **MONO-9-FUSE-FOLD
+> (slot 0, pid 29240) RUNNING** and **RDEF-M1-LATTICE-V2 (slot 2, pid 31876)
+> RUNNING** - both events fresh, do not touch. AUTHOR-EXT-FILLET-HALO LANDED
+> (HEAD `0669572`, worker `b5bbaf9`) and its row is DONE. Two judgment items
+> escalated this cycle: (1) DOOR-PARTIAL-ARC-FLIP finished `SPEC_GAP` (packet
+> premise false - the door's truck regime refuses partial arcs in bd_bridge;
+> needs a write_allow amendment) and its slot RESULT was destroyed by the
+> 22:28Z recycle - full finding preserved in OPERATOR_ESCALATIONS; (2)
+> AUTHOR-WIRE-MIRROR-ARM's slot-1 warm build failed with the RAM-zone
+> signature (`0xc0000409`/cargo exit 101) - slot-1 target cleaned, heartbeat
+> to retry once, escalate if it recurs. Registry: 343 rows (243 DONE / 86
+> READY / 13 BLOCKED / 1 SUPERSEDED); nothing flippable (R3 must wait for an
+> idle board per the recorded sequence). Health: heartbeat exactly 1 (27872),
+> watchdog 1 (29264), operator runner 1 (27876), overnight driver 1 (24864),
+> cargoq UP (28544), TWO supervisors (19172 + 27828, carried). Disk 9.1 GiB
+> free (above the 8 GB floor, below the 15 GB goal); RAM 2.1 GiB free - LOW
+> (paging file exhausted, WinError 1455). Open human items: the two new
+> escalations; MONO-7 D1+D2 re-verify; `packet_tests_and_crates` crate
+> derivation; overnight.py:222-226; duplicate supervisors + lagging cargoq
+> restart guard; slot-4/7 wt RESULT residue; MONO/RDEF registry schema gap.]
 
 - **THE FIRST KERNEL-VS-OCC TIMING COMPARISON IS BANKED** (FH-TIMING-REFRESH,
   landed c94d043): turbopump_assembly **0.097 s kernel vs 4.866 s OCC**,
@@ -5797,3 +5796,52 @@ residue; and the MONO/RDEF registry schema gap - **dispatch_ready.py:186 gates
 dependencies on `needs`, but the MONO/RDEF rows carry `depends_on`; a BLOCKED
 row must be flipped only after checking `depends_on` by hand** (this cycle did
 so; RDEF-M1's empty `needs` happened to agree).]
+
+[operator 2026-09-11T02:31Z - volatile refresh. Board now: 2 RUNNING / 0
+landed-by-operator. **AUTHOR-EXT-FILLET-HALO LANDED** by the driver (HEAD
+`0669572`, worker `b5bbaf9`, row DONE) - its slot 0 was then re-forked to
+MONO-9-FUSE-FOLD (pid 29240, events <1 min fresh) and RDEF-M1-LATTICE-V2 is
+still RUNNING (slot 2, pid 31876, events fresh) - do not touch either.
+**TWO JUDGMENT ITEMS ESCALATED (step 7):** (1) DOOR-PARTIAL-ARC-FLIP finished
+`status SPEC_GAP` in slot 1 (worker RESULT 22:22Z): the packet premise is false
+- the facade partial-arc op computes no geometry and the door's truck regime
+routes through bd_bridge, which refuses every arc_deg != 360.0
+(bd_bridge.rs:530-538; asserted at :7001); the required "both green facts"
+cannot exist without editing bd_bridge.rs (outside write_allow), and flipping
+door.py alone would regress ttc_lathe_spline.rs:250-255. Recommended amendment
+= widen write_allow + re-book as the executor partial-arc lathe arm. **The slot
+was re-forked to AUTHOR-WIRE-MIRROR-ARM at 22:28Z and the RESULT.json
+destroyed** (untracked-file recycle gap, 13th+ occurrence) - the full finding
+is preserved verbatim in OPERATOR_ESCALATIONS. (2) AUTHOR-WIRE-MIRROR-ARM's
+22:28Z slot-1 dispatch FAILED its warm build (`0xc0000409
+STATUS_STACK_BUFFER_OVERRUN` -> `cargo check --workspace --all-targets exit
+101`) - the documented RAM-zone signature. Operator cleaned `loop/slots/1/target`
+(watchdog had reclaimed 1.0 GB at 22:23:35 but left a locked stub) and did NOT
+manually re-warm (heartbeat owns new_slot; stacking a third workspace build at
+2.1 GB free is the crash zone). Heartbeat retries next cycle; if it fails again,
+free memory first (four resident opencode.exe ~2.6 GB; pagefile exhausted,
+WinError 1455). **Landing (step 2):** nothing to land - every FINISHED slot's
+worker commit is an ancestor of integration/kernel-bg (SOLVER-SURVEY-C
+e6553db, F1 3c2109b, CL-006 ee97499, CL-005 713f205, FRAME-REVOLVE 5cf4811);
+slot 1 is now IDLE AUTHOR-WIRE-MIRROR-ARM residue (fresh failed dispatch).
+**Unblock (step 3):** none - no IDLE/DEAD >15 min holding work; no QUESTION; no
+APIError 402. **Registry hygiene (step 4):** nothing flippable. BLOCKED-with-
+all-deps-landed checked on `depends_on`: BG-CK-SPLINE-CENSUS (owner-cancelled),
+SEM-PCURVE-MASTER-001-FIX (SUPERSEDED), DEF-SPINEFRAME-GRAZE (owner-parked),
+DEF-TESS-ANALYTIC-SEAM (superseded by -R2), DEF-SEEDRAY-B (human-gated),
+TOR-C (orchestrator-held), TTC-RECENSUS-F1-R3 (deps MONO-7 + AUTHOR-EXT now
+landed BUT the recorded 275e97e sequence says flip only at an IDLE board after
+the PARTIAL-ARC/MONO-9 pair drains - board is NOT idle, so NOT flipped),
+MONO-10 (packet unauthored/owner-gated), RDEF-M2/M3/M4/M5 (deps unlanded).
+**Dispatch (step 5):** no manual dispatch (heartbeat live). `dispatch_ready
+--dry-run --max-workers=4` earlier showed `dispatched 1` (AUTHOR-WIRE-MIRROR-ARM
+-> slot 1) which the heartbeat attempted at 22:28Z and the warm build failed as
+above. Health: heartbeat exactly 1 (27872), watchdog 1 (29264), operator runner
+1 (27876), overnight driver 1 (24864), cargoq UP (ping 200, queued 0), TWO
+supervisors (19172 PyManager + 27828 pythoncore - carried duplication class).
+Disk 9.1 GiB free (above the 8 GB floor, below the 15 GB goal); RAM 2.1 GiB free
+(LOW - below the 3 GB check; paging file too small, WinError 1455; the operator
+shells themselves hit CLR HRESULT 80004005). Open human items: (NEW) the two
+escalations above; carried - MONO-7 D1+D2 re-verify; `packet_tests_and_crates`
+crate derivation; overnight.py:222-226; duplicate supervisors + lagging cargoq
+restart guard; slot-4/7 wt RESULT residue; MONO/RDEF registry schema gap.]

@@ -905,3 +905,70 @@ Judgment-required items appended each operator cycle. Newest at the bottom.
   to READY. Start from: `loop/dispatch_ready.py` lines 134-188 and
   `loop/PACKETS.jsonl` (the MONO-9 / RDEF-M1 rows). Carried; no owner decision
   requested.
+
+## 2026-09-11 02:31 UTC (operator cycle) - DOOR-PARTIAL-ARC-FLIP SPEC_GAP (packet premise false; needs write_allow amendment)
+
+- **DOOR-PARTIAL-ARC-FLIP finished with `status: SPEC_GAP`** (slot 1, worker
+  RESULT written 2026-09-10 22:22 local). Not operator-landable (status != DONE).
+  The worker STOPPED at the packet's judgement 3 rather than paper over a
+  contract mismatch. **The slot was re-forked to AUTHOR-WIRE-MIRROR-ARM at
+  22:28Z and the RESULT.json destroyed** (untracked-file recycle gap); the full
+  finding is preserved verbatim below.
+- **Finding (RESULT notes, verbatim):** "STOPPED at the packet's judgement 3 (a
+  contract mismatch is a finding, not something to paper over). The packet's
+  premise is false: the facade's landed partial-arc op (facade.rs:417-422
+  RevolveArc, certified by run_facade at facade.rs:527) is a ledger/envelope
+  classification that computes no geometry and is not on the door path. The
+  door's truck regime measures through truck123d.bd_facts/bd_stl = bd_bridge
+  (lib.rs:76-77), and bd_bridge refuses every partial arc: SolidSpec::Lathe has
+  only arc_deg and deny_unknown_fields (bd_bridge.rs:163-169, 125), and
+  solid_volume returns Refusal::UnsupportedEnvelope(NonCanonicalCarrier) for
+  arc_deg != 360.0 (bd_bridge.rs:530-538). This is an asserted executor contract
+  (bd_bridge.rs:7001 partial_arc_lathe_refuses_typed). Empirical probe
+  (pre-built pyd at loop/slots/0/stage_pyd, arm unchanged in HEAD): 360.0 OK
+  volume 9424.77796076938; 270.0 and 70.0 both Refused: kernel refusal:
+  unsupported_envelope. Therefore the required 'both green facts' cannot exist
+  without editing truck123d/src/bd_bridge.rs (partial-arc lathe facts/bbox/mesh
+  with the two planar caps), which is outside write_allow. Flipping door.py
+  alone would also regress truck123d/tests/ttc_lathe_spline.rs:250-255 (outside
+  write_allow), which pins the door refusal. Anchors: A1 still 1 (the
+  door.py:1459-1460 refusal was NOT flipped; flipping it alone is strictly
+  worse). No test file added. Full analysis and the recommended amendment
+  (widen write_allow to bd_bridge.rs + ttc_lathe_spline.rs, re-book as the
+  executor partial-arc lathe arm) in QUESTION.md."
+- **ACTION NEEDED (human/orchestrator):** adjudicate the SPEC_GAP. The
+  recommended amendment is a packet semantic rewrite (widen `write_allow` to
+  `truck123d/src/bd_bridge.rs` + `truck123d/tests/ttc_lathe_spline.rs`, re-book
+  as the executor partial-arc lathe arm) - outside operator authority. Until
+  amended, DOOR-PARTIAL-ARC-FLIP stays READY and will re-dispatch/re-strand.
+  - Start from: `git show 45ed5d5` (the anchor fix); the packet
+    `loop/packets/DOOR-PARTIAL-ARC-FLIP.md`; `truck123d/src/bd_bridge.rs:163-169,
+    530-538, 7001`; `truck123d/tests/ttc_lathe_spline.rs:250-255`.
+- **Machinery:** the slot-1 recycle destroyed the only RESULT copy (the 13th+
+  occurrence of the untracked-file recycle gap). The full text is preserved in
+  this escalation so the finding is not lost.
+
+## 2026-09-11 02:31 UTC (operator cycle) - slot-1 warm-build failure (RAM-zone signature) + resource exhaustion
+
+- **AUTHOR-WIRE-MIRROR-ARM's 22:28:21Z dispatch to slot 1 failed its warm build:**
+  `exit code: 0xc0000409, STATUS_STACK_BUFFER_OVERRUN` then `cargo check
+  --workspace --all-targets exit 101` (heartbeat log lines 1497-1500). This is
+  the documented RAM-zone signature.
+- **Resource state at 02:31Z:** RAM 2.1 GiB free (below the 3 GB check), disk
+  9.1 GiB free (above the 8 GB floor, below the 15 GB goal), paging file too
+  small (`WinError 1455` in watchdog.log 22:30:56; the operator's own PowerShell
+  shells failed to start the CLR, HRESULT 80004005). Four opencode.exe processes
+  resident (~2.6 GB). Two workers (MONO-9 slot 0, RDEF-M1 slot 2) are alive and
+  making progress - do not disturb.
+- **Operator action:** cleaned `loop/slots/1/target` (the watchdog had reclaimed
+  1.0 GB at 22:23:35 but left a locked stub). Did NOT manually re-warm: the
+  heartbeat owns new_slot/warm builds and will retry on its next cycle; stacking
+  a third full workspace build at 2.1 GB free is the exact 0xc0000409 zone.
+- **ACTION NEEDED if it recurs:** the next heartbeat warm build for slot 1 is
+  the documented "retry once". If it fails again (second failure), free memory
+  before retrying: close/restart the surplus opencode sessions (four resident),
+  and/or increase/rebuild the pagefile (it does not shrink while live). The
+  dispatch of AUTHOR-WIRE-MIRROR-ARM is otherwise correct (READY, write set
+  disjoint from the running rows).
+  - Start from: `loop/dispatch_heartbeat.log` lines 1494-1505;
+    `loop/watchdog.log` 22:30:56.

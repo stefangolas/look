@@ -3599,3 +3599,51 @@ from 10.3 during this cycle's scoped build; above the 8 GB floor but LOW); RAM
 Leaving: 2 RUNNING (AUTHOR-EXT-FILLET-HALO slot 0, RDEF-M1-LATTICE-V2 slot 2);
 HEAD 47553c2; heartbeat 1 (27872); watchdog 1 (29264); cargoq UP; disk 13.1 GiB
 free; RAM 3.9 GiB free.
+
+## [operator 2026-09-11T02:31Z] Board: 2 RUNNING / 0 landed-by-operator / 13 BLOCKED - two escalations (DOOR-PARTIAL-ARC SPEC_GAP + slot-1 warm-build failure)
+
+- **Health sweep (step 1):** heartbeat exactly 1 (27872, anchored `-File
+  ...dispatch_heartbeat.ps1` scan), operator runner 1 (27876), watchdog 1
+  (29264), overnight driver 1 (24864, child of 27828), cargoq UP (ping 200,
+  queued 0, running false; single server.py 28544), TWO supervisors (19172
+  PyManager + 27828 pythoncore child - carried duplication class; only ONE
+  overnight.py child = no double-merge risk). Disk 9.1 GiB free (above the 8 GB
+  floor, below the 15 GB goal); RAM 2.1 GiB free - **BELOW the 3 GB check**;
+  paging file too small (watchdog.log 22:30:56 WinError 1455); the operator's
+  own PowerShell probes failed to start the CLR (HRESULT 80004005).
+- **Landing (step 2):** nothing to land. Every FINISHED slot's worker commit is
+  an ancestor of integration/kernel-bg (SOLVER-SURVEY-C e6553db, F1 3c2109b,
+  CL-006 ee97499, CL-005 713f205, FRAME-REVOLVE 5cf4811). AUTHOR-EXT-FILLET-HALO
+  landed (HEAD 0669572, worker b5bbaf9). Slot 1 held DOOR-PARTIAL-ARC-FLIP
+  `status SPEC_GAP` - not operator-landable.
+- **Unblock (step 3):** none - no IDLE/DEAD >15 min holding work; no QUESTION;
+  no APIError 402. Both RUNNING workers (MONO-9 slot 0, RDEF-M1 slot 2) have
+  fresh events - do not touch.
+- **Registry hygiene (step 4):** nothing flipped. BLOCKED-with-all-deps-landed
+  (checked on `depends_on`): all correctly parked - BG-CK-SPLINE-CENSUS
+  (owner-cancelled), SEM-PCURVE-MASTER-001-FIX (SUPERSEDED), DEF-SPINEFRAME-GRAZE
+  (owner-parked), DEF-TESS-ANALYTIC-SEAM (superseded by -R2), DEF-SEEDRAY-B
+  (human-gated), TOR-C (orchestrator-held), TTC-RECENSUS-F1-R3 (deps MONO-7 +
+  AUTHOR-EXT landed but the recorded 275e97e sequence requires an idle board
+  after the PARTIAL-ARC/MONO-9 pair drains - board not idle), MONO-10 (packet
+  unauthored/owner-gated), RDEF-M2/M3/M4/M5 (deps unlanded). Registry: 343
+  rows - 243 DONE / 86 READY / 13 BLOCKED / 1 SUPERSEDED.
+- **Dispatch (step 5):** no manual dispatch (heartbeat live). `dispatch_ready
+  --dry-run --max-workers=4` showed `dispatched 1` (AUTHOR-WIRE-MIRROR-ARM ->
+  slot 1); the live heartbeat attempted it at 22:28:21Z and the warm build
+  FAILED (`0xc0000409 STATUS_STACK_BUFFER_OVERRUN` -> `cargo check --workspace
+  --all-targets exit 101`). Operator cleaned `loop/slots/1/target` (watchdog had
+  reclaimed 1.0 GB at 22:23:35, leaving a locked stub) and did NOT manually
+  re-warm (heartbeat owns it; stacking a third workspace build at 2.1 GB free is
+  the documented crash zone). ESCALATED the failure + resource state.
+- **Escalations (step 7):** (1) DOOR-PARTIAL-ARC-FLIP SPEC_GAP - packet premise
+  false; needs a write_allow amendment; the slot-1 recycle destroyed the RESULT
+  (full text preserved in OPERATOR_ESCALATIONS). (2) slot-1 warm-build failure
+  + RAM/paging exhaustion - heartbeat retries once; escalate/free memory if it
+  recurs.
+- **STATE.md (step 6):** updated the LATEST GROUND TRUTH note and appended the
+  [operator 2026-09-11T02:31Z] block.
+
+Leaving: 2 RUNNING (MONO-9-FUSE-FOLD slot 0, RDEF-M1-LATTICE-V2 slot 2);
+HEAD 0669572; heartbeat 1 (27872); watchdog 1 (29264); cargoq UP; disk 9.1 GiB
+free; RAM 2.1 GiB free (LOW).
