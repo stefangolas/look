@@ -1060,3 +1060,56 @@ Judgment-required items appended each operator cycle. Newest at the bottom.
   (`%TEMP%\opencode\slot2-AUTHOR-WIRE-MIRROR-ARM\` + slot-2 abandoned patch);
   DOOR-PARTIAL-ARC-FLIP write_allow amendment; duplicate supervisors + lagging
   cargoq restart guard; slot-4/7 wt RESULT residue.
+
+## 2026-09-11 04:46 UTC (operator cycle) - HARNESS: DOOR-PARTIAL-ARC-FLIP double-dispatched (slots 1+2); dispatch_ready's 180s liveness guard is shorter than a long test step
+
+- **slots 1 and 2 are BOTH running `DOOR-PARTIAL-ARC-FLIP`.** slot 1
+  (pid 11936) holds branch `packet/DOOR-PARTIAL-ARC-FLIP`, 4 changed files,
+  events fresh, actively editing `bd_bridge.rs` - the productive one. slot 2
+  (pid 6820 + opencode 1208) is **detached HEAD `6073d52`, 0 changed**, worker
+  alive with fresh events, but its worktree was **RESET at 04:22:46Z**
+  (`loop/slots/2/abandoned-20260911-002246.patch` = 730 lines of prior
+  `door.py` work). Two concurrent door runs violate the serial-door rule
+  ("Door runs are serial (the flake regime) - never concurrent").
+- **Root cause (precise):** `dispatch_ready.py:96` (session-54
+  belt-and-suspenders) forces RUNNING only when `events.jsonl` is <180s old.
+  slot 2's worker was in a >3-minute `door_partial_arc_flip` test step, so
+  `slot_status.py` read the slot as free; the heartbeat re-dispatched the same
+  packet into slot 1 at 04:22:40Z (`dispatch_heartbeat.log`) while slot 2's
+  worker was alive. The reset archived slot 2's tracked `door.py` work but the
+  worker process survived and is now operating on a reset tree.
+- **The operator did NOT kill either worker** (both alive; the 04:20Z operator
+  flagged slot 2 "do not touch"; killing live workers is outside operator
+  authority).
+- **ACTION NEEDED (orchestrator/human):** (1) decide whether to kill slot 2's
+  zombie (`cmd` pid 6820 + `opencode` 1208; its branch was taken by slot 1, so
+  it can only commit to detached HEAD) and confirm slot 1's branch is
+  authoritative; (2) raise the 180s freshness guard and/or use the cargoq
+  running-job signal so a long test step cannot be misread as a dead slot.
+  Preserved work is in `loop/slots/2/abandoned-20260911-002246.patch`.
+
+## 2026-09-11 04:46 UTC (operator cycle) - REGISTRY: RDEF-M4 deps now landed but its packet fails preflight; RG-23/RG-9 READY rows have no packet file
+
+- **RDEF-M3-WITNESS-TIER landed** (`3bd9398`, merge `f1e10f0`) and
+  **RDEF-M2-REGIME-SANDWICH landed** (`3f09bf8`, merge `c2e9310`); both rows
+  stay `status: READY` but carry `LANDED <sha>` note markers, which
+  `dispatch_ready.landed()` treats as truth - so the dispatcher is correct and
+  the census status field is merely behind by 2 (cosmetic; no dispatch risk).
+- **RDEF-M4-NUMERIC-TIER** (BLOCKED, deps `[RDEF-M3-WITNESS-TIER]`) now has all
+  deps landed and is flippable BLOCKED->READY per the step-4 rule, **but its
+  packet fails preflight:** (a) `packet_lint` `H1_NEW_MODULE` - `write_allow`
+  creates new vendor `.rs` files but the packet lacks the H-1
+  `#![deny(clippy::unwrap_used)]` statement; (b) `gen_packet --check` `A1` -
+  `grep -c 'collinear_normal' vendor/truck/truck-certified/src/tangency/classify.rs`
+  greps a file that does not exist yet (new-file anchor; grep errors instead of
+  returning 0). (a) is mechanical; (b) needs an authoring decision (point A1 at
+  an existing file, or exempt new-file anchors). Fix both, then flip M4 READY.
+- **RG-23-CERTIFIED-ENTRY-WIRING and RG-9-REFLECT-SOLID-PRODUCTION** are READY
+  with `packet: ""`; `loop/packets/<id>.md` do not exist. Every heartbeat's
+  `dispatch_ready` preflight fails them ("ANCHOR CHECK FAILED" = `gen_packet`
+  FileNotFoundError). They need authoring or parking. (23 last-wins READY rows
+  share the empty-packet shape; the other 20 are deps-gated.)
+- **RESOLVED this cycle:** the 03:25Z AUTHOR-WIRE-MIRROR-ARM preserved-work
+  decision - the dispatcher chose the fresh re-dispatch; slot 0 re-forked the
+  packet at 04:39Z (pid 4356). The `%TEMP%\opencode\slot2-AUTHOR-WIRE-MIRROR-ARM\`
+  backup + slot-2 patch may be discarded once that run lands.

@@ -3818,3 +3818,62 @@ pid 6820 `cmd`, events ~13 min old, 5 cargo/rustc live, last event a mid-test
 
 Leaving: 2 RUNNING; HEAD 752658e; heartbeat 1 (27872); watchdog 1 (29264);
 cargoq UP (queued 2); disk 9.2 GiB free; RAM 3.1 GiB free.
+
+## [operator 2026-09-11T04:46Z]
+
+Board: **3 RUNNING / 0 landed-by-operator / 2 driver-landed-mid-cycle**. HEAD
+`4f6bd92` (`RDEF-M2-REGIME-SANDWICH row LANDED (overnight)`; merges `c2e9310`
+M2, `f1e10f0` M3). RUNNING: AUTHOR-WIRE-MIRROR-ARM (slot 0, pid 4356, fresh
+re-fork 04:39Z), DOOR-PARTIAL-ARC-FLIP (slot 1, pid 11936, productive - holds
+the branch, 4 changed), DOOR-PARTIAL-ARC-FLIP (slot 2, pid 6820, ZOMBIE -
+detached HEAD `6073d52`, 0 changed, worktree reset 04:22:46Z).
+
+- **Health (step 1):** heartbeat exactly 1 (27872; anchored on
+  `dispatch_heartbeat.ps1`), operator_runner 1 (27876), watchdog 1 (29264),
+  cargoq UP (`/ping` queued 7, running true). Disk 10.0 GiB free (above the 8
+  GB floor, below the 15 GB goal); RAM 3.9 GiB free. No `look-verify-baseline-*`
+  TEMP leaks. Carried duplication class NOT killed: TWO supervisors (19172 +
+  27828), TWO overnight.py (24864 + 11272), TWO cargoq/server.py (28544 +
+  34564).
+- **Land (step 2):** nothing operator-landable. RDEF-M2/M3 landed by the
+  overnight driver (worker commits `3f09bf8` / `3bd9398` both ancestors of
+  `integration/kernel-bg`; ledger rows present). Their registry rows stay
+  `status: READY` but carry `LANDED <sha>` note markers - `dispatch_ready.landed()`
+  treats the marker as truth, so the dispatcher is correct and the census
+  status field is merely behind by 2 (cosmetic). Slots 3-7 FINISHED residue all
+  ancestors (`e6553db`/`3c2109b`/`ee97499`/`713f205`/`5cf4811` re-verified).
+- **Unblock (step 3):** no IDLE/DEAD >15 min, no QUESTION, no APIError 402
+  (slots 0-2 `worker.err` empty). **Anomaly: DOOR-PARTIAL-ARC-FLIP is
+  double-dispatched in slots 1 and 2.** Root cause: `dispatch_ready.py:96`'s
+  180s event-freshness belt-and-suspenders is shorter than slot 2's >3-min
+  `door_partial_arc_flip` test step, so the heartbeat read slot 2 as free and
+  re-dispatched the same packet into slot 1 at 04:22:40Z; the reset archived
+  slot 2's 730-line `door.py` work (`abandoned-20260911-002246.patch`) but the
+  worker survived. Neither worker killed (both alive; slot 2 was flagged
+  do-not-touch by the 04:20Z operator; killing live workers is outside operator
+  authority). Escalated.
+- **Registry hygiene (step 4):** nothing flipped. RDEF-M4-NUMERIC-TIER
+  (BLOCKED, deps `[RDEF-M3]`) now has all deps landed and is flippable per the
+  step-4 rule, but its packet fails preflight - `packet_lint` `H1_NEW_MODULE`
+  (missing H-1 statement) and `gen_packet --check` `A1` (anchor greps
+  `classify.rs`, a file that does not exist yet). The anchor is semantic ->
+  escalated, not flipped. RG-23-CERTIFIED-ENTRY-WIRING and
+  RG-9-REFLECT-SOLID-PRODUCTION are READY with `packet: ""` and no packet file
+  - every heartbeat preflight fails them. Escalated. Census (last-wins): 343
+  rows - 246 DONE / 85 READY / 11 BLOCKED / 1 SUPERSEDED; all 11 BLOCKED
+  correctly parked (owner-blocked / superseded / owner-cancelled / SPEC_GAP /
+  human-gated / orchestrator-held / idle-board-gated / scope-decision / deps
+  unlanded).
+- **Dispatch (step 5):** no manual dispatch (heartbeat live). `dispatch_ready
+  --dry-run --max-workers=4` = `dispatched 0; workers ~3/4`; only candidates
+  AUTHOR-CENSUS-NAMES (door.py write-set clash), RG-23 + RG-9 (missing packet
+  files). REAL idle, not the silent-filter bug.
+- **Escalations (step 7):** appended the DOOR double-dispatch (harness) and the
+  RDEF-M4/RG-23/RG-9 registry findings; marked the 03:25Z
+  AUTHOR-WIRE-MIRROR-ARM preserved-work item RESOLVED by fresh re-dispatch
+  (slot 0 re-forked at 04:39Z).
+- **STATE (step 6):** updated the LATEST GROUND TRUTH note + appended the
+  `[operator 2026-09-11T04:46Z]` block.
+
+Leaving: 3 RUNNING; HEAD 4f6bd92; heartbeat 1 (27872); watchdog 1 (29264);
+cargoq UP; disk 10.0 GiB free; RAM 3.9 GiB free.

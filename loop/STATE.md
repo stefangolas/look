@@ -76,26 +76,26 @@ corrected, annex C = ORACLE POLICY CHANGE), then docs/SOLVER_COVERAGE_SPEC.md
 ## Where we are
 
 > LATEST GROUND TRUTH: read the newest `[operator ...]` block in "State of
-> the machine, as left" (2026-09-11T04:20Z). [operator 2026-09-11T04:20Z
-> ground-truth note: 2 RUNNING / 1 driver-landed-mid-cycle / 0 landed-by-
-> operator. HEAD `752658e` (**RDEF-M3-WITNESS-TIER row LANDED (overnight)**).
-> RUNNING: **RDEF-M2-REGIME-SANDWICH (slot 0, pid 32688, healthy)** and
-> **DOOR-PARTIAL-ARC-FLIP (slot 2, pid 6820 `cmd`)** - slot 2 events ~13 min
-> old but 5 cargo/rustc live and last event a mid-test `step_start`: SLOW,
-> ALIVE, do not touch. **RDEF-M3-WITNESS-TIER (slot 1) is LANDED** (`3bd9398`
-> ancestor of HEAD, driver merge `752658e`); the driver's 00:12:26 "scoped
-> check NOT green" was a gnullvm DLL/PATH artifact - it is ABSENT from
-> `cargoq/server.log`, while the worker's queued run was `DONE exit=0 in 5s` at
-> 23:55:51 just before commit `3bd9398` - so it self-resolved and needs no
-> human action (see ESCALATIONS). Slots 3-7 landed residue. Registry: nothing
-> flippable this cycle. Health: heartbeat exactly 1 (27872; raw 2 = probe
-> cmdline), operator_runner 1, watchdog 1 (29264), cargoq UP (queued 2, running
-> true). Disk was **6.78 GiB (below the 8 GB floor)**; `janitor.py ensure
-> --need 10` reclaimed ~3.1 GiB -> **9.2 GiB free (still short of 10)**; RAM
-> 3.1 GiB free. Carried: AUTHOR-WIRE-MIRROR-ARM preserved-work decision
-> (`%TEMP%\opencode\slot2-AUTHOR-WIRE-MIRROR-ARM\` + slot-2 abandoned patch);
-> DOOR-PARTIAL-ARC-FLIP write_allow amendment; duplicate supervisors + lagging
-> cargoq restart guard; slot-4/7 wt RESULT residue.]
+> the machine, as left" (2026-09-11T04:46Z). [operator 2026-09-11T04:46Z
+> ground-truth note: 3 RUNNING / 2 driver-landed-mid-cycle (RDEF-M2 + RDEF-M3)
+> / 0 landed-by-operator. HEAD `4f6bd92` (**RDEF-M2-REGIME-SANDWICH row LANDED
+> (overnight)**; RDEF-M2 merge `c2e9310`, RDEF-M3 merge `f1e10f0`). RUNNING:
+> **AUTHOR-WIRE-MIRROR-ARM (slot 0, pid 4356, re-forked fresh 04:39Z)**,
+> **DOOR-PARTIAL-ARC-FLIP (slot 1, pid 11936, productive - holds the branch,
+> 4 changed files)** and **DOOR-PARTIAL-ARC-FLIP (slot 2, pid 6820, ZOMBIE:
+> detached HEAD `6073d52`, 0 changed, its worktree reset at 04:22:46Z but the
+> worker survived)**. The slots-1+2 pair is a DOUBLE-DISPATCH - the heartbeat
+> re-sent the packet to slot 1 at 04:22:40Z because slot 2's worker was in a
+> >3-min test step and `dispatch_ready`'s 180s freshness guard read the slot
+> as free; escalated, neither worker killed (see ESCALATIONS). Slots 3-7
+> landed residue. Registry: nothing flippable this cycle; RDEF-M4's deps are
+> now landed but its packet fails preflight (stale new-file anchor A1 +
+> missing H-1) - escalated, not flipped; RG-23/RG-9 READY rows have no packet
+> file - escalated. Health: heartbeat exactly 1 (27872), operator_runner 1
+> (27876), watchdog 1 (29264), cargoq UP (queued 7, running true). Disk 10.0
+> GiB free (above the 8 GB floor, below the 15 GB goal); RAM 3.9 GiB free.
+> Carried: DOOR-PARTIAL-ARC-FLIP write_allow amendment; duplicate supervisors
+> + lagging cargoq restart guard; slot-4/7 wt RESULT residue.]
 
 - **THE FIRST KERNEL-VS-OCC TIMING COMPARISON IS BANKED** (FH-TIMING-REFRESH,
   landed c94d043): turbopump_assembly **0.097 s kernel vs 4.866 s OCC**,
@@ -5963,3 +5963,43 @@ AUTHOR-WIRE-MIRROR-ARM).
 
 Leaving: 3 RUNNING; HEAD 6073d52; heartbeat 1 (27872); watchdog 1 (29264);
 cargoq UP; disk 8.4 GiB free; RAM 3.6 GiB free.]
+
+[operator 2026-09-11T04:46Z - volatile refresh. Board now: 3 RUNNING / 0
+landed-by-operator / 2 driver-landed-mid-cycle. HEAD `4f6bd92`
+(`RDEF-M2-REGIME-SANDWICH row LANDED (overnight)`; merges c2e9310 M2 / f1e10f0
+M3). RUNNING: AUTHOR-WIRE-MIRROR-ARM (slot 0, pid 4356, fresh re-fork 04:39Z,
+2 changed, events 0.0 min); DOOR-PARTIAL-ARC-FLIP (slot 1, pid 11936, holds
+branch packet/DOOR-PARTIAL-ARC-FLIP, 4 changed, events ~5 min - productive);
+DOOR-PARTIAL-ARC-FLIP (slot 2, pid 6820, ZOMBIE: detached HEAD 6073d52, 0
+changed, worktree reset 04:22:46Z, worker alive).
+- **Land (step 2):** nothing operator-landable. RDEF-M2/M3 landed by the
+  overnight driver (worker commits 3f09bf8 / 3bd9398 both ancestors of
+  integration/kernel-bg; ledger rows present); their registry rows stay status
+  READY with `LANDED <sha>` note markers, which dispatch_ready.landed() treats
+  as truth, so no dispatch risk (census status field behind by 2). Slots 3-7
+  FINISHED residue all ancestors (e6553db/3c2109b/ee97499/713f205/5cf4811
+  re-verified).
+- **Unblock (step 3):** no IDLE/DEAD >15 min, no QUESTION, no 402 (slots 0-2
+  worker.err empty). The slots-1+2 DOOR-PARTIAL-ARC-FLIP DOUBLE-DISPATCH is
+  the anomaly: escalated, neither worker killed.
+- **Registry hygiene (step 4):** nothing flipped. RDEF-M4-NUMERIC-TIER deps
+  now landed (M3 marker) but its packet fails preflight (stale new-file anchor
+  A1 + H1_NEW_MODULE) - escalated, not flipped. RG-23/RG-9 READY rows have no
+  packet file - escalated. Census (last-wins): 343 rows - 246 DONE / 85 READY
+  / 11 BLOCKED / 1 SUPERSEDED; all 11 BLOCKED correctly parked.
+- **Dispatch (step 5):** no manual dispatch (heartbeat live).
+  `dispatch_ready --dry-run --max-workers=4` = `dispatched 0; workers ~3/4`;
+  only candidates AUTHOR-CENSUS-NAMES (door.py clash), RG-23 + RG-9 (missing
+  packets). REAL idle.
+- **Health (step 1):** heartbeat exactly 1 (27872), operator_runner 1 (27876),
+  watchdog 1 (29264), cargoq UP (queued 7, running true). Disk 10.0 GiB free
+  (above the 8 GB floor, below the 15 GB goal); RAM 3.9 GiB free. Carried
+  duplication class NOT killed: TWO supervisors (19172 + 27828), TWO
+  overnight.py (24864 + 11272), TWO cargoq/server.py (28544 + 34564).
+- **Escalations (step 7):** appended the DOOR double-dispatch (harness: 180s
+  freshness guard < long test step) and the RDEF-M4/RG-23/RG-9 registry
+  findings; marked the AUTHOR-WIRE-MIRROR-ARM preserved-work item resolved by
+  fresh re-dispatch.
+
+Leaving: 3 RUNNING; HEAD 4f6bd92; heartbeat 1 (27872); watchdog 1 (29264);
+cargoq UP; disk 10.0 GiB free; RAM 3.9 GiB free.]
