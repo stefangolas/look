@@ -57,13 +57,21 @@ pub fn generate_html_viewer(
                 .transform_point3(glam::Vec3::from(v.position));
             let n = (instance.normal_transform * glam::Vec3::from(v.normal)).normalize_or_zero();
             // Per-vertex source colour when the geometry carries one (STEP face
-            // colours, glTF COLOR_0); identity otherwise, so the neutral base
-            // colour is left untouched.
+            // colours, glTF COLOR_0); the instance material's
+            // `baseColorFactor` otherwise, so glTF parts render with their
+            // source material colours. Identity white only when neither
+            // exists (plain STL), leaving the neutral base untouched.
             let color = geom
                 .source_attributes
                 .as_deref()
                 .and_then(|attributes| attributes.get(index))
                 .map(|attributes| attributes.color)
+                .or_else(|| {
+                    scene
+                        .materials
+                        .get(instance.material)
+                        .map(|m| m.base_color_factor)
+                })
                 .unwrap_or([1.0; 4]);
 
             flat_positions.push(p.x);
@@ -629,7 +637,7 @@ pub fn generate_html_viewer(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::scene::{Bounds, Geometry, Instance, Vertex};
+    use crate::scene::{AlphaMode, Bounds, Geometry, Instance, SourceMaterial, Vertex};
 
     #[test]
     fn test_generate_html_viewer_embedding() {
@@ -666,11 +674,31 @@ mod tests {
             node_name: None,
         };
 
+        // The geometry carries no per-vertex source attributes, so the
+        // viewer must fall back to the instance material's baseColorFactor.
+        let material_color = [0.9f32, 0.2, 0.1, 1.0];
         let scene = CompiledScene {
             source_hash: "test".to_string(),
             geometries: vec![geom],
             instances: vec![inst],
-            materials: vec![],
+            materials: vec![SourceMaterial {
+                name: Some("test_material".to_string()),
+                base_color_factor: material_color,
+                base_color_texture: None,
+                metallic_factor: 0.0,
+                roughness_factor: 0.5,
+                metallic_roughness_texture: None,
+                normal_texture: None,
+                normal_scale: 1.0,
+                occlusion_texture: None,
+                occlusion_strength: 1.0,
+                emissive_factor: [0.0; 3],
+                emissive_texture: None,
+                unlit: false,
+                alpha_mode: AlphaMode::Opaque,
+                alpha_cutoff: 0.5,
+                double_sided: false,
+            }],
             textures: vec![],
             bounds: Bounds {
                 min: [0.0, 0.0, 0.0],
@@ -718,5 +746,17 @@ mod tests {
             "generated GLSL contains a double-negation literal"
         );
         assert!(html.contains("vec3 fillDir = normalize(vec3("));
+
+        // Visual parity: the material's baseColorFactor must ride into the
+        // embedded vertex-color buffer (3 vertices x RGBA).
+        let mut expected_colors = Vec::new();
+        for _ in 0..3 {
+            expected_colors.extend_from_slice(&material_color);
+        }
+        let expected_b64 = base64_encode(bytemuck::cast_slice::<f32, u8>(&expected_colors));
+        assert!(
+            html.contains(&expected_b64),
+            "generated viewer must embed the material base color"
+        );
     }
 }
