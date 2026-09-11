@@ -1230,3 +1230,38 @@ Judgment-required items appended each operator cycle. Newest at the bottom.
   `f49fdf4` `start_deg`/3-tests) is closed by the overnight driver: slot 2's
   `f49fdf4` merged `4c2554f`, row flipped `dd102eb` (both ancestors of HEAD).
   Slot 1's divergent worktree is moot. No operator action.
+
+## 2026-09-11 06:23 UTC (operator) - AUTHOR-CENSUS-NAMES SPEC_GAP: TIER A needs executor conic/arc carriers beyond the write allowance (packet judgement 4 STOP)
+
+- What: slot 0 (AUTHOR-CENSUS-NAMES) FINISHED with `QUESTION.md`, no
+  `RESULT.json`, no files edited (committed `70e6947` on
+  `packet/AUTHOR-CENSUS-NAMES`, preserved at
+  `refs/wip/AUTHOR-CENSUS-NAMES-70e6947-question`). The packet's judgement 4
+  says: "if TIER A turns out to need more bridge surface than that, STOP with
+  QUESTION.md." TIER A does: `Ellipse` and `RectangleRounded` cannot be
+  recorded as exact facts on the landed executor carriers -
+  `ProfileEdge` (bd_bridge.rs:99-122) has only `Line`/`Spline`/`Circle`, there
+  is no ellipse carrier and no arc carrier, and `profile_loop` rejects a
+  `Circle` mixed with any other edge. The packet's own done-criterion
+  ("RectangleRounded profile extruded, aligned, coned" green) is therefore
+  unreachable within the write set. The other three TIER A names
+  (`Align`/`Cone`/`RegularPolygon`) and the three TIER B typed refusals DO fit
+  the allowance (per the worker's analysis).
+- Why the operator can't: choosing between widening the write set to new
+  executor carriers (`ProfileEdge::Ellipse`, `ProfileEdge::Arc` + mixed
+  line/arc loop support, exact area/support/mesh/loft arms) and re-scoping the
+  packet is a design/geometry-judgment adjudication - explicitly outside
+  operator authority, and the packet itself directed the STOP. Same class as
+  DOOR-CIRCLE-FLIP.
+- Action needed: (1) adjudicate - widen the write set and rebook the carrier
+  work as a truck123d mechanical packet (DOOR-CIRCLE-FLIP precedent), OR
+  re-scope AUTHOR-CENSUS-NAMES to `Align`/`Cone`/`RegularPolygon` + the three
+  TIER B refusals and book `Ellipse`/`RectangleRounded` as a follow-up;
+  (2) amend `loop/packets/AUTHOR-CENSUS-NAMES.md`; (3) PIN the row NOW:
+  `dispatch_ready` does not recognize `QUESTION.md` as a terminal state, so it
+  reports slot 0 as a DEAD dispatch and WILL reset+delete+redispatch
+  AUTHOR-CENSUS-NAMES on the next heartbeat cycle, reproducing the same
+  QUESTION and burning worker cycles (a question loop).
+- Start from: `loop/slots/0/wt/QUESTION.md`; `git show 70e6947`;
+  `loop/packets/AUTHOR-CENSUS-NAMES.md` (judgement 4); `grep -n 'ProfileEdge'
+  truck123d/src/bd_bridge.rs`.
