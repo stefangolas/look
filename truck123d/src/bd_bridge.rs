@@ -4993,10 +4993,85 @@ fn loft_cap_row(
     })
 }
 
+/// The exact planar end cap of one section loop as a fan of `4 x 2`
+/// tensor-Bernstein patches: for every span, the patch whose `v = 0` boundary
+/// is the exact reconstructed span curve and whose `v = 1` boundary collapses
+/// to the loop centroid. When the section is planar the fan lies in that
+/// plane, tiles the cap region exactly, and shares every radial boundary with
+/// its neighbour; the loop's own span curves are the cap boundary, so the
+/// extracted 2-cycle closes against the loft sides. `outward` fixes the
+/// orientation (a negative area-vector projection flips the patch columns). A
+/// section with no exact planar cap (a genuinely non-planar boundary) refuses
+/// `ExtractionUnavailable` rather than being approximated.
+fn loft_cap_fan(
+    loop_spans: &[SpanPoly3],
+    outward: [f64; 3],
+) -> Result<Vec<Patch>, SweptAdmissionRefusal> {
+    if loop_spans.is_empty() {
+        return Err(SweptAdmissionRefusal::ExtractionUnavailable);
+    }
+    let sampled = sample_loop3(loop_spans);
+    if sampled.is_empty() {
+        return Err(SweptAdmissionRefusal::ExtractionUnavailable);
+    }
+    let centroid = centroid3(&sampled);
+    let area = spline_loop_area_vector(loop_spans);
+    let area_mag = v3_norm(area);
+    if !area_mag.is_finite() || area_mag <= 0.0 {
+        return Err(SweptAdmissionRefusal::ExtractionUnavailable);
+    }
+    let normal = [area[0] / area_mag, area[1] / area_mag, area[2] / area_mag];
+    let mut scale = 0.0f64;
+    for point in &sampled {
+        for coordinate in point {
+            scale = scale.max(coordinate.abs());
+        }
+    }
+    let planarity = 1.0e-7 * (1.0 + scale);
+    for point in &sampled {
+        if v3_dot(v3_sub(*point, centroid), normal).abs() > planarity {
+            return Err(SweptAdmissionRefusal::ExtractionUnavailable);
+        }
+    }
+    let flip = v3_dot(area, outward) < 0.0;
+    let mut rows = Vec::with_capacity(loop_spans.len());
+    for span in loop_spans {
+        let mut numerator = Vec::with_capacity(4);
+        for control in span3_bernstein(span) {
+            numerator.push(if flip {
+                vec![centroid, control]
+            } else {
+                vec![control, centroid]
+            });
+        }
+        rows.push(crate::python::binding::VolumeRow {
+            numerator,
+            weights: vec![vec![1.0f64; 2]; 4],
+            orientation: 1.0,
+        });
+    }
+    Ok(rows)
+}
+
+/// The extracted end-cap rows of one section loop: the exact planar quad when
+/// the loop is four straight spans (the landed fast path, bit-identical), the
+/// exact planar fan otherwise. A section whose boundary has no exact planar
+/// cap refuses typed.
+fn loft_end_caps(
+    loop_spans: &[SpanPoly3],
+    outward: [f64; 3],
+) -> Result<Vec<Patch>, SweptAdmissionRefusal> {
+    match loft_cap_row(loop_spans, outward) {
+        Ok(row) => Ok(vec![row]),
+        Err(_) => loft_cap_fan(loop_spans, outward),
+    }
+}
+
 /// The local tensor-Bernstein patch 2-cycle of one landed solid carrier. The
 /// extracted vocabulary is the exact one: axis-aligned boxes and the
-/// loft/member carriers whose sections are straight quadrilateral loops (so
-/// their planar end caps are exact); everything else refuses typed.
+/// loft/member carriers whose sections are planar loops (the exact planar
+/// quad cap, or the exact planar fan for a curved section boundary);
+/// everything else refuses typed.
 fn extract_local_patches(solid: &SolidSpec) -> Result<Vec<Patch>, SweptAdmissionRefusal> {
     match solid {
         SolidSpec::Box {
@@ -5022,8 +5097,8 @@ fn extract_local_patches(solid: &SolidSpec) -> Result<Vec<Patch>, SweptAdmission
                     .ok_or(SweptAdmissionRefusal::ExtractionUnavailable)?;
                 let [dx, dy, dz] = loft_direction(&loops)?;
                 let backward = [-dx, -dy, -dz];
-                patches.push(loft_cap_row(first, backward)?);
-                patches.push(loft_cap_row(last, [dx, dy, dz])?);
+                patches.extend(loft_end_caps(first, backward)?);
+                patches.extend(loft_end_caps(last, [dx, dy, dz])?);
             }
             Ok(patches)
         }
@@ -5050,8 +5125,8 @@ fn extract_local_patches(solid: &SolidSpec) -> Result<Vec<Patch>, SweptAdmission
                 .ok_or(SweptAdmissionRefusal::ExtractionUnavailable)?;
             let [dx, dy, dz] = loft_direction(&loops)?;
             let backward = [-dx, -dy, -dz];
-            patches.push(loft_cap_row(first, backward)?);
-            patches.push(loft_cap_row(last, [dx, dy, dz])?);
+            patches.extend(loft_end_caps(first, backward)?);
+            patches.extend(loft_end_caps(last, [dx, dy, dz])?);
             Ok(patches)
         }
         _ => Err(SweptAdmissionRefusal::ExtractionUnavailable),
@@ -11317,15 +11392,18 @@ print(json.dumps([z_row, loft_row]))
     }
 
     /// A closed section loop of four quadratic spline edges bulging outward
-    /// from the unit square: a genuinely curved spline section carrier.
-    fn spline_lens(z0: f64) -> Vec<ProfileEdge> {
+    /// from a square of side `scale` centred on `(0.5, 0.5)`: a genuinely
+    /// curved spline section carrier.
+    fn spline_lens_scaled(z0: f64, scale: f64) -> Vec<ProfileEdge> {
+        let c = 0.5;
+        let h = 0.5 * scale;
         let corners = [
-            [0.0, 0.0, z0],
-            [1.0, 0.0, z0],
-            [1.0, 1.0, z0],
-            [0.0, 1.0, z0],
+            [c - h, c - h, z0],
+            [c + h, c - h, z0],
+            [c + h, c + h, z0],
+            [c - h, c + h, z0],
         ];
-        let center = [0.5, 0.5, z0];
+        let center = [c, c, z0];
         let mut edges = Vec::with_capacity(4);
         for i in 0..4 {
             let a = corners[i];
@@ -11340,6 +11418,11 @@ print(json.dumps([z_row, loft_row]))
             });
         }
         edges
+    }
+
+    /// The unit-square curved spline section (the original fixture).
+    fn spline_lens(z0: f64) -> Vec<ProfileEdge> {
+        spline_lens_scaled(z0, 1.0)
     }
 
     /// The 5-point Gauss-Legendre nodes on `[0, 1]`.
@@ -12963,14 +13046,32 @@ print(json.dumps([z_row, loft_row]))
             extract_patches(&part(smooth_member, 0.0, 0.0, 0.0)),
             Err(SweptAdmissionRefusal::ExtractionUnavailable)
         );
-        // A curved-section loft is outside the exact-cap vocabulary too.
+    }
+
+    #[test]
+    fn swept_admission_curved_planar_section_extracts_fan_caps() {
+        // A curved but PLANAR spline section now extracts: the end cap is the
+        // exact planar fan (the span curves are the cap boundary), so the
+        // extracted 2-cycle closes against the loft sides.
         let curved = SolidSpec::Loft {
             sections: vec![spline_lens(0.0), spline_lens(5.0)],
             closed: false,
         };
-        assert_eq!(
-            extract_patches(&part(curved, 0.0, 0.0, 0.0)),
-            Err(SweptAdmissionRefusal::ExtractionUnavailable)
+        let extracted = extract_patches(&part(curved.clone(), 0.0, 0.0, 0.0))
+            .expect("a planar curved section extracts through the fan cap");
+        // Four side patches plus a multi-span fan cap at each end.
+        assert!(extracted.len() > 6, "fan caps present: {}", extracted.len());
+        // Two coincident curved lofts extract both 2-cycles (fan caps included)
+        // but meet non-transversally; the landed theory refuses typed rather
+        // than certifying an inadmissible pair.
+        let pair = boolean(
+            crate::facade::ModeValue::Add,
+            part(curved.clone(), 0.0, 0.0, 0.0),
+            part(curved, 0.0, 0.0, 0.0),
         );
+        assert!(matches!(
+            tree_facts(&pair),
+            Err(Refusal::UnsupportedEnvelope(_))
+        ));
     }
 }
