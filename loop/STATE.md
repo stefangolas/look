@@ -76,28 +76,39 @@ corrected, annex C = ORACLE POLICY CHANGE), then docs/SOLVER_COVERAGE_SPEC.md
 ## Where we are
 
 > LATEST GROUND TRUTH: read the newest `[operator ...]` block in "State of
-> the machine, as left" (2026-09-10T23:40Z). [operator 2026-09-10T23:40Z
-> ground-truth note: 1 RUNNING / 0 operator-landable. SOLVER-CHECKER was flipped
-> BLOCKED->READY (HEAD adef3a6, all four survey fragments landed) and the
-> heartbeat dispatched it to slot 1 (pid 27600, session
-> ses_f72548988ffe44pJSzze1M6iH0, events fresh, writing the AND-OR checker python
-> script) - healthy, not touched. Slot 0 MONO-6 FINISHED @aa18e32 and LANDED
-> (ancestor of HEAD, exit 0); slots 2-7 FINISHED landed residue (slot 2
-> status=complete, 3/5/6 DONE, slot 4 LANDED-WITH-FINDINGS carried, slot 7
-> redundant LANDED) - nothing operator-landable. Registry 324 rows - 239 DONE /
-> 78 READY / 7 BLOCKED; the 7 BLOCKED all correctly parked (BG-AUD-FIX-004
-> OWNER_BLOCKED, BG-CK-SPLINE-CENSUS owner-cancelled, SEM-PCURVE-MASTER-001-FIX
-> SUPERSEDED, DEF-SPINEFRAME-GRAZE SPEC_GAP, DEF-TESS-ANALYTIC-SEAM dep READY,
-> DEF-SEEDRAY-B dep READY, TOR-C PIN-ruled); nothing flipped. dispatch_ready
-> --dry-run --max-workers=4: "dispatched 0; workers now ~1/4" = REAL idle
-> (heartbeat-owned; no manual dispatch). Health: heartbeat exactly 1 (27872),
-> watchdog 1 (29264), operator runner 1 (27876), overnight driver 1 (26920),
-> cargoq UP (ping ok, queued 0, running false; single server.py 28544); TWO
-> supervisors (19172 + 27828, carried duplication class; only ONE overnight.py
-> child = no double-merge risk). Disk 21.4 GiB free (above the 15 GB goal); RAM
-> 3.1 GB free (above the 3 GB floor; no cargo/rustc spike). Open human items
-> carried: fix overnight.py:222-226 (9 strikes); duplicate supervisors + lagging
-> cargoq restart guard; slot-4/7 wt RESULT residue; MONO-row registry schema gap.]
+> the machine, as left" (2026-09-11T00:05Z). [operator 2026-09-11T00:05Z
+> ground-truth note: 0 RUNNING / 2 landed-this-cycle. **MONO-7-ROW-ASSEMBLY
+> (slot 0) and SOLVER-CHECKER (slot 1) BOTH finished DONE with their work
+> UNCOMMITTED** (the skipped-commit class; branches at base, no worker commit) -
+> the overnight driver's next cycle would have no-op-merged the base and marked
+> both LANDED while losing the work (10th/11th strikes of overnight.py:222-226).
+> The operator committed both AS DELIVERED (`20b808f` MONO-7, `46ba171`
+> SOLVER-CHECKER) + `refs/wip/*-as-delivered`; the driver's 20:05:32Z cycle then
+> performed REAL merges (MONO-7 `adc6151` row `8ffdf72`; SOLVER-CHECKER
+> `01fc99c` row `e57f36a`), both now ancestors of integration HEAD - work
+> preserved. **MONO-7 landed WITH TWO UNADDRESSED FINDINGS** (escalated
+> 00:05Z): D1 `truck123d/src/binding.rs:2011` PartSpec literal is outside
+> write_allow (V1 SCOPE_VIOLATION; 2-line mechanical ripple); D2 the new
+> `timing` columns break `ttc_lathe_spline.rs:392,464` whole-JSON determinism
+> assertions (packet judgement 4 intended timing to be gated only `>= 0.0`; the
+> test must pop `timing` before comparing) - the driver's scoped check did NOT
+> catch it because `packet_tests_and_crates` only matches `vendor/truck/**`
+> test paths, so any truck123d packet is checked against `truck-certified` with
+> NO tests (vacuous green). Registry: 324 rows - MONO-7 + SOLVER-CHECKER now
+> LANDED; AUTHOR-EXT-FILLET-HALO / MONO-8 (need MONO-7) and TTC-RECENSUS-F1-R3
+> (need MONO-7+AUTHOR-EXT) are now unblocked-by-deps but stay BLOCKED until
+> flipped. dispatch_ready --dry-run: "slots: 8 (0 running, 8 free);
+> slot-assigned packets: 7; dispatched 0" = REAL idle (heartbeat-owned; no
+> manual dispatch). Health: heartbeat exactly 1 (27872; second CIM match was
+> this shell self-matching), watchdog 1 (29264), operator runner 1 (27876),
+> overnight driver 1 (26920), cargoq UP (ping ok, queued 0, running false;
+> single server.py 28544); TWO supervisors (19172 + 27828, carried; only ONE
+> overnight.py child = no double-merge risk). Disk 17.4 GiB free (above the
+> 8 GB floor AND 15 GB goal); RAM 5.3 GiB free. Open human items: (NEW/hot)
+> amend MONO-7 D1+D2 then re-verify; fix `packet_tests_and_crates` crate
+> derivation; fix overnight.py:222-226 (now 11 strikes); carried - duplicate
+> supervisors + lagging cargoq restart guard; slot-4/7 wt RESULT residue;
+> MONO-row registry schema gap.]
 
 - **THE FIRST KERNEL-VS-OCC TIMING COMPARISON IS BANKED** (FH-TIMING-REFRESH,
   landed c94d043): turbopump_assembly **0.097 s kernel vs 4.866 s OCC**,
@@ -5617,3 +5628,50 @@ carried human items unchanged: fix overnight.py:222-226 no-op-merge class (9
 strikes); duplicate supervisors + the lagging cargoq restart guard; slot-4/7 wt
 RESULT residue; MONO-row registry schema gap (depends_on/write_allow unread by
 dispatch_ready).]
+
+[operator 2026-09-11T00:05Z - volatile refresh. Board now: 0 RUNNING / 2
+landed-this-cycle. **THE SKIPPED-COMMIT DOUBLE STRIKE + OPERATOR PRESERVATION.**
+Both live workers finished mid-cycle with RESULT status DONE and their work
+UNCOMMITTED: slot 0 MONO-7-ROW-ASSEMBLY (4 files modified/untracked at base
+a113b39) and slot 1 SOLVER-CHECKER (6 untracked artifacts at base adef3a6).
+The overnight driver reads `wt/RESULT.json`, accepts status "done", runs a
+scoped check that - because `packet_tests_and_crates` only recognizes
+`vendor/truck/**` test paths - fell back to `cargo check -p truck-certified`
+with NO tests (vacuous green), then would `merge --no-ff <head>` where head =
+the BASE (no worker commit): a no-op merge that marks the row LANDED and
+leaves the work uncommitted for the next recycle to destroy (the
+overnight.py:222-226 class, now strikes 10 and 11). The operator committed
+both AS DELIVERED (`20b808f` MONO-7, `46ba171` SOLVER-CHECKER) and created
+`refs/wip/MONO-7-as-delivered` + `refs/wip/SOLVER-CHECKER-as-delivered`. The
+driver's 20:05:32Z cycle then merged the real commits (MONO-7 `adc6151` row
+`8ffdf72`; SOLVER-CHECKER `01fc99c` row `e57f36a`); both are ancestors of
+integration/kernel-bg - the work is preserved and the landings are truthful
+(non-no-op). **MONO-7 landed with two unaddressed findings (ESCALATED 00:05Z,
+do not treat MONO-7 as done):** D1 `binding.rs:2011` PartSpec literal outside
+write_allow (V1 SCOPE_VIOLATION; 2-line ripple); D2 the new `timing` columns
+break `ttc_lathe_spline.rs:392,464` whole-JSON determinism assertions - the
+packet's own judgement 4 says timing must be gated only `>= 0.0`, so the test
+must pop `timing` before comparing. The operator did NOT merge/amend/edit
+tests (charter: escalate judgment). Nothing else operator-landable; slots 2-7
+FINISHED landed residue (slot 4 F1 landed-with-findings, slot 7 redundant
+FRAME-REVOLVE). Nothing to unblock (no RUNNING worker; no IDLE/DEAD >15 min;
+no QUESTION; no APIError 402). Registry: MONO-7 + SOLVER-CHECKER now LANDED;
+AUTHOR-EXT-FILLET-HALO + MONO-8 (dep MONO-7) and TTC-RECENSUS-F1-R3 (deps
+MONO-7+AUTHOR-EXT) are now unblocked-by-deps but remain BLOCKED until a human/
+orchestrator flips them (no mechanical flip authority this cycle - the
+registry rows need `depends_on`/write-set re-derivation). dispatch_ready
+--dry-run --max-workers=4: "slots: 8 (0 running, 8 free); slot-assigned
+packets: 7; dispatched 0" = REAL idle; no manual dispatch (heartbeat live).
+Health: heartbeat exactly 1 (27872; the second CIM match was this shell
+self-matching the pattern), watchdog 1 (29264), operator runner 1 (27876),
+overnight driver 1 (26920, child of 27828), cargoq UP (ping ok, queued 0,
+running false; single server.py 28544); TWO supervisors (19172 PyManager +
+27828 pythoncore child - carried duplication class; only ONE overnight.py
+child = no double-merge risk). Disk 17.4 GiB free (above the 8 GB floor AND
+the 15 GB janitor goal); RAM 5.3 GiB free. Open human items: (NEW/hot) amend
+MONO-7 D1+D2 then re-verify the merged HEAD; (NEW) fix
+`packet_tests_and_crates` to derive crates/tests from the row's actual write
+paths (truck123d packets are currently checked against truck-certified with no
+tests); fix overnight.py:222-226 (now 11 strikes); carried - duplicate
+supervisors + lagging cargoq restart guard; slot-4/7 wt RESULT residue;
+MONO-row registry schema gap.]

@@ -3397,3 +3397,56 @@ Leaving: 0 RUNNING; HEAD bb15fa1 (MONO-6 landed for real); SOLVER-SURVEY-A lande
 
 Leaving: 1 RUNNING (SOLVER-CHECKER slot 1); HEAD adef3a6; heartbeat 1 (27872);
 watchdog 1 (29264); cargoq UP; disk 21.4 GiB free; RAM 3.1 GB free.
+
+## 2026-09-11 00:05 UTC (operator cycle)
+
+- **Health sweep (step 1)**: heartbeat exactly 1 (27872, anchored
+  `-File dispatch_heartbeat.ps1`; the second CIM match was this shell
+  self-matching the pattern - the known false positive). watchdog 1 (29264),
+  operator runner 1 (27876), overnight driver 1 (26920, child of 27828),
+  cargoq UP (ping ok, queued 0, running false; single server.py 28544). TWO
+  supervisors (19172 PyManager + 27828 pythoncore child - carried duplication
+  class; only ONE overnight.py child = no double-merge risk). Disk 17.4 GiB
+  free (above the 8 GB floor and 15 GB goal); RAM 5.3 GiB free.
+- **Land (step 2) - the skipped-commit double strike**: slots 0 (MONO-7-
+  ROW-ASSEMBLY) and 1 (SOLVER-CHECKER) finished DONE with their work
+  UNCOMMITTED (branches at base a113b39 / adef3a6). `overnight.py:216-226`
+  would have run `cargo check -p truck-certified` (its
+  `packet_tests_and_crates` only matches `vendor/truck/**` test paths, so
+  truck123d/loop packets fall back to truck-certified with NO tests) and then
+  no-op-merged the base, marking both LANDED and losing the work (strikes
+  10/11). Operator committed both AS DELIVERED - `20b808f` MONO-7 (4 files,
+  +740/-10), `46ba171` SOLVER-CHECKER (6 files, +20002) - and created
+  `refs/wip/MONO-7-as-delivered` + `refs/wip/SOLVER-CHECKER-as-delivered`. The
+  driver's 20:05:32Z cycle then merged the real commits (MONO-7 `adc6151` row
+  `8ffdf72`; SOLVER-CHECKER `01fc99c` row `e57f36a`); both verified ancestors
+  of integration/kernel-bg. Work preserved; landings truthful (non-no-op).
+  Operator did NOT merge, amend packet semantics, or edit tests.
+- **MONO-7 findings (not addressed - escalated)**: D1
+  `truck123d/src/binding.rs:2011` constructs a `PartSpec` literal and is in
+  read_allow, not write_allow (V1 SCOPE_VIOLATION; the documented two-line
+  ripple precedent). D2 the new `timing` columns make
+  `ttc_lathe_spline.rs:392` (`first == second`) and `:464`
+  (`assert_eq!(again["facts"], *facts)`) fail, because both compare the whole
+  `bd_facts` JSON string; the packet's judgement 4 says timing is gated only
+  `>= 0.0`, so the test must pop `timing` before comparing. Neither was
+  verified by the operator (budget); both are the worker's recorded findings.
+- **Unblock (step 3)**: none. No RUNNING worker (both finished), no
+  IDLE/DEAD >15 min holding work, no QUESTION, no APIError 402.
+- **Registry (step 4)**: MONO-7 + SOLVER-CHECKER rows now LANDED. Their
+  dependents AUTHOR-EXT-FILLET-HALO + MONO-8 (dep MONO-7) and
+  TTC-RECENSUS-F1-R3 (deps MONO-7+AUTHOR-EXT) are now unblocked-by-deps but
+  stay BLOCKED - no mechanical flip authority (needs write-set/dep
+  re-derivation and authoring). The carried 7 parked BLOCKED rows unchanged.
+- **Dispatch (step 5)**: `dispatch_ready --dry-run --max-workers=4` ->
+  "slots: 8 (0 running, 8 free); slot-assigned packets: 7; dispatched 0" =
+  REAL idle; heartbeat is live - no manual dispatch.
+- **STATE.md (step 6)**: rewrote the "LATEST GROUND TRUTH" note and appended
+  the [operator 2026-09-11T00:05Z] block at the end.
+- **Escalation (step 7)**: see OPERATOR_ESCALATIONS 00:05Z - MONO-7 D1+D2
+  amendments; the `packet_tests_and_crates` wrong-crate scoped check; the
+  overnight.py:222-226 class now 11 strikes.
+
+Leaving: 0 RUNNING; HEAD e57f36a (MONO-7 adc6151 + SOLVER-CHECKER 01fc99c
+landed); heartbeat 1 (27872); watchdog 1 (29264); cargoq UP; disk 17.4 GiB
+free; RAM 5.3 GiB free.

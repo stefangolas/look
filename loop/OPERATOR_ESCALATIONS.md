@@ -784,3 +784,55 @@ Judgment-required items appended each operator cycle. Newest at the bottom.
   exempt the checker class) when flipping.
 - Start from: `loop/overnight.py:222-226`; `git show cb2e3e1`; `git show
   bb15fa1`; `grep -n 'SOLVER-CHECKER' loop/PACKETS.jsonl`.
+
+## 2026-09-11 00:05 UTC - MONO-7 landed with TWO unaddressed findings; the driver's scoped check is the wrong crate; no-op-merge class now 11 strikes
+
+- **MONO-7-ROW-ASSEMBLY is LANDED (merge `adc6151`, row `8ffdf72`) but is NOT
+  green - do not treat it as done.** The operator preserved the worker's
+  skipped-commit work (`20b808f`, ref `refs/wip/MONO-7-as-delivered`) and the
+  driver merged it. Two amendments are required before the merged HEAD can be
+  trusted:
+  1. **D1 - write_allow ripple.** `truck123d/src/binding.rs:2011` constructs a
+     `PartSpec { ... }` literal (in `#[cfg(test)] mod tests`) and is in
+     read_allow, not write_allow. Adding the `label`/`color` fields breaks it;
+     the worker added `label: None, color: None` (2 lines). V1 will report
+     SCOPE_VIOLATION. Fix: widen MONO-7's write_allow to include
+     `truck123d/src/binding.rs` (the BG-NUM-001-FILLET ripple precedent), or
+     accept the as-delivered amendment.
+  2. **D2 - determinism test regression.** The new `timing` columns
+     (`construct_ms`/`facts_ms`/`mesh_ms`) make
+     `truck123d/tests/ttc_lathe_spline.rs:392` (`assert first == second`) and
+     `:464` (`assert_eq!(again["facts"], *facts, ...)`) fail, because both
+     compare the whole `bd_facts` JSON string. The packet's judgement 4 states
+     timing is gated only `>= 0.0`, so the correct amendment is to pop `timing`
+     before comparing (or compare the unchanged keys). NOTE: the operator did
+     NOT run the test (budget) - confirm the failure, then amend the test (a
+     test file, not kernel code).
+  - Start from: `git show 20b808f`; `git -C loop/slots/0/wt show` is gone after
+    recycle, use `refs/wip/MONO-7-as-delivered`;
+    `grep -n 'first == second\|again\["facts"\]' truck123d/tests/ttc_lathe_spline.rs`;
+    `grep -n 'timing' truck123d/src/bd_bridge.rs`.
+- **The driver's scoped check is the wrong crate - a NEW root cause for
+  false greens.** `overnight.py:packet_tests_and_crates` (lines 84-101)
+  derives test pairs ONLY from `vendor/truck/<crate>/tests/<stem>.rs` and
+  crates ONLY from write paths starting `vendor/truck/`. Every `truck123d` /
+  loop / corpus packet therefore falls back to `crates=["truck-certified"]`
+  and `pairs=[]` - `scoped_check` runs `cargo check -p truck-certified` and
+  ZERO tests, so it is vacuously green and the packet lands with any
+  regression. This is how MONO-7's D2 reached integration. Fix: derive crates
+  from the row's write paths generally (root-crate `truck123d`), and add the
+  packet's `tests_required` / `write_allow` test files as test pairs.
+  - Start from: `loop/overnight.py:84-118`; `grep -n 'packet_tests_and_crates'
+    loop/overnight.py`.
+- **overnight.py:222-226 no-op-merge class is now 11 strikes (10 + 11 this
+  cycle).** MONO-7 and SOLVER-CHECKER both finished DONE with uncommitted work;
+  the driver would have no-op-merged the base and marked both LANDED while
+  losing the work. The operator pre-empted it by committing both as delivered;
+  the driver then merged the real commits. The fix remains: a landing must
+  REQUIRE `head != base` (a no-op merge = NOT LANDED). Same item as the
+  18:38Z / 19:33Z / 19:54Z / 23:17Z escalations.
+  - Start from: `loop/overnight.py:222-226`; `git show adc6151`; `git show
+    01fc99c`; `git show 20b808f`; `git show 46ba171`.
+- **SOLVER-CHECKER landed** (merge `01fc99c`, row `e57f36a`; preserved from
+  skipped-commit at `46ba171`, ref `refs/wip/SOLVER-CHECKER-as-delivered`) -
+  no amendment needed; informational.
