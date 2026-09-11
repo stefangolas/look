@@ -57,6 +57,12 @@ use self::membership::BooleanVolumeRefusal;
 
 const TAU: f64 = std::f64::consts::TAU;
 
+/// The node count of the equal-spaced trigonometric rule used for the exact
+/// circle-loft side moment. The integrand is a trigonometric polynomial of
+/// degree at most three, and the rule is exact for degrees below the node
+/// count, so this is a fixed, deterministic exact integration.
+const CIRCLE_QUAD: usize = 16;
+
 /// The census-recorded curve of one lathe profile edge, in the `y = 0`
 /// profile plane. Profile coordinates are `(x, z)` with `x >= 0` the revolve
 /// radius (so `y == 0`).
@@ -94,6 +100,21 @@ pub enum ProfileEdge {
     /// A spline profile edge: the interpolation samples passed to
     /// `Edge.make_spline(points)` with no tangents/parameters.
     Spline { points: Vec<[f64; 3]> },
+    /// A closed circular section edge (the PB-014 circle carrier): an exact
+    /// conic recorded by its centre, radius and the unit normal of its plane.
+    /// The circle is never flattened to a polygon at record time; the kernel
+    /// derives a deterministic in-plane basis from `normal`, computes the
+    /// analytic extrema and tessellates only where a triangle mesh is asked
+    /// for. A single circle edge is a whole section.
+    Circle {
+        /// The circle centre in the part-local frame.
+        center: [f64; 3],
+        /// The circle radius.
+        radius: f64,
+        /// The unit normal of the circle's plane (defines its orientation and
+        /// the deterministic in-plane parameterization).
+        normal: [f64; 3],
+    },
 }
 
 /// The solid carrier of one construction row.
@@ -297,6 +318,20 @@ impl StationFrame {
             ox + xx * x + yx * y + zx * z,
             oy + xy * x + yy * y + zy * z,
             oz + xz * x + yz * y + zz * z,
+        ]
+    }
+
+    /// Applies the recorded station placement to a profile-local direction
+    /// (the rotation only, no translation).
+    fn apply_dir(self, p: [f64; 3]) -> [f64; 3] {
+        let [x, y, z] = p;
+        let [xx, xy, xz] = self.x_dir;
+        let [yx, yy, yz] = self.y_dir;
+        let [zx, zy, zz] = self.z_dir;
+        [
+            xx * x + yx * y + zx * z,
+            xy * x + yy * y + zy * z,
+            xz * x + yz * y + zz * z,
         ]
     }
 
@@ -1416,6 +1451,38 @@ fn spline_loop_spans(profile: &[ProfileEdge]) -> Result<Vec<SpanPoly3>, Refusal>
     if profile.is_empty() {
         return Err(Refusal::Empty);
     }
+    // A single circle edge is tessellated deterministically into line spans
+    // for the arms that consume a span loop (closure is exact by construction).
+    if let [
+        ProfileEdge::Circle {
+            center,
+            radius,
+            normal,
+        },
+    ] = profile
+    {
+        let (_circle, verts) = circle_from_edge(*center, *radius, *normal)?;
+        let count = verts.len();
+        let mut spans = Vec::with_capacity(count);
+        for i in 0..count {
+            let a = verts[i];
+            let b = verts[(i + 1) % count];
+            spans.push(SpanPoly3 {
+                x: [a[0], b[0] - a[0], 0.0, 0.0],
+                y: [a[1], b[1] - a[1], 0.0, 0.0],
+                z: [a[2], b[2] - a[2], 0.0, 0.0],
+            });
+        }
+        return Ok(spans);
+    }
+    if profile
+        .iter()
+        .any(|edge| matches!(edge, ProfileEdge::Circle { .. }))
+    {
+        return Err(Refusal::UnsupportedEnvelope(
+            EnvelopeCase::NonCanonicalCarrier,
+        ));
+    }
     let mut spans: Vec<SpanPoly3> = Vec::new();
     let mut starts: Vec<[f64; 3]> = Vec::new();
     let mut ends: Vec<[f64; 3]> = Vec::new();
@@ -1440,6 +1507,13 @@ fn spline_loop_spans(profile: &[ProfileEdge]) -> Result<Vec<SpanPoly3>, Refusal>
                 starts.push(*points.first().ok_or(Refusal::Empty)?);
                 ends.push(*points.last().ok_or(Refusal::Empty)?);
                 spans.extend(spline_spans3(points)?);
+            }
+            // Mixed circle edges were rejected above; a lone circle returns
+            // early with its deterministic tessellation.
+            ProfileEdge::Circle { .. } => {
+                return Err(Refusal::UnsupportedEnvelope(
+                    EnvelopeCase::NonCanonicalCarrier,
+                ));
             }
         }
     }
@@ -1984,6 +2058,15 @@ fn member_sections(
                 ProfileEdge::Spline { points } => edges.push(ProfileEdge::Spline {
                     points: points.iter().map(|p| station.apply(*p)).collect(),
                 }),
+                ProfileEdge::Circle {
+                    center,
+                    radius,
+                    normal,
+                } => edges.push(ProfileEdge::Circle {
+                    center: station.apply(*center),
+                    radius: *radius,
+                    normal: station.apply_dir(*normal),
+                }),
             }
         }
         sections.push(edges);
@@ -2263,16 +2346,116 @@ fn spline_loft_mesh(sections: &[Vec<ProfileEdge>]) -> Result<Vec<Triangle>, Refu
 //   facts transform with the placement (no geometry recomputation).
 
 /// A closed planar line-loop profile extracted from a recorded profile edge
-/// list.
+/// list, or an exact circle section.
 struct ProfileLoop {
-    /// The boundary vertices in order (no duplicated closing point).
+    /// The boundary vertices in order (no duplicated closing point). For a
+    /// circle section this is the deterministic `MESH_SEGMENTS`-gon
+    /// tessellation used by the mesh arm; the analytic arms use `circle`.
     verts: Vec<[f64; 3]>,
     /// `area_vec / |area_vec|`.
     normal: [f64; 3],
-    /// The loop's signed area (`|area_vec|`).
+    /// The loop's signed area (`|area_vec|`; `pi r^2` for a circle section).
     area: f64,
     /// The loop scale (max absolute coordinate), used for tolerances.
     scale: f64,
+    /// The exact circle carrier when this section is a single recorded circle.
+    circle: Option<CircleGeom>,
+}
+
+/// The exact geometry of one recorded circle section: its centre, radius and
+/// a deterministic right-handed in-plane basis `(u, v)` with `u x v == normal`.
+#[derive(Debug, Clone, Copy)]
+struct CircleGeom {
+    /// The circle centre.
+    center: [f64; 3],
+    /// The circle radius.
+    radius: f64,
+    /// The first in-plane basis vector.
+    u: [f64; 3],
+    /// The second in-plane basis vector (`u x v` is the plane normal).
+    v: [f64; 3],
+}
+
+impl CircleGeom {
+    /// The unit plane normal (`u x v`).
+    fn normal(self) -> [f64; 3] {
+        v3_cross(self.u, self.v)
+    }
+
+    /// The circle point at angle `theta` with `c = cos(theta)`, `s = sin(theta)`.
+    fn point(self, c: f64, s: f64) -> [f64; 3] {
+        [
+            self.center[0] + self.radius * (c * self.u[0] + s * self.v[0]),
+            self.center[1] + self.radius * (c * self.u[1] + s * self.v[1]),
+            self.center[2] + self.radius * (c * self.u[2] + s * self.v[2]),
+        ]
+    }
+
+    /// The circle's tangent `d/dtheta` at `theta` (given `c`, `s`).
+    fn tangent(self, c: f64, s: f64) -> [f64; 3] {
+        [
+            self.radius * (-s * self.u[0] + c * self.v[0]),
+            self.radius * (-s * self.u[1] + c * self.v[1]),
+            self.radius * (-s * self.u[2] + c * self.v[2]),
+        ]
+    }
+}
+
+/// A deterministic unit vector perpendicular to the unit vector `n` (the same
+/// fixed-order choice the door's `Plane` makes: prefer world x, fall back to
+/// world y when `n` is near the x axis).
+fn perp_unit(n: [f64; 3]) -> [f64; 3] {
+    let reference = if n[0].abs() < 0.9 {
+        [1.0, 0.0, 0.0]
+    } else {
+        [0.0, 1.0, 0.0]
+    };
+    let d = v3_dot(reference, n);
+    let p = [
+        reference[0] - d * n[0],
+        reference[1] - d * n[1],
+        reference[2] - d * n[2],
+    ];
+    let mag = v3_norm(p);
+    if mag > 1.0e-12 {
+        [p[0] / mag, p[1] / mag, p[2] / mag]
+    } else {
+        [0.0, 0.0, 1.0]
+    }
+}
+
+/// Validates one recorded circle edge and builds its exact geometry plus the
+/// deterministic `MESH_SEGMENTS`-gon tessellation.
+fn circle_from_edge(
+    center: [f64; 3],
+    radius: f64,
+    normal: [f64; 3],
+) -> Result<(CircleGeom, Vec<[f64; 3]>), Refusal> {
+    if !radius.is_finite() || !(radius > 0.0) {
+        return Err(Refusal::Empty);
+    }
+    if !center.iter().all(|c| c.is_finite()) || !normal.iter().all(|c| c.is_finite()) {
+        return Err(Refusal::Empty);
+    }
+    let mag = v3_norm(normal);
+    if !mag.is_finite() || !(mag > 0.0) {
+        return Err(Refusal::Empty);
+    }
+    let n = [normal[0] / mag, normal[1] / mag, normal[2] / mag];
+    let u = perp_unit(n);
+    let v = v3_cross(n, u);
+    let geom = CircleGeom {
+        center,
+        radius,
+        u,
+        v,
+    };
+    let mut verts = Vec::with_capacity(MESH_SEGMENTS);
+    for k in 0..MESH_SEGMENTS {
+        let theta = TAU * k as f64 / MESH_SEGMENTS as f64;
+        verts.push(geom.point(theta.cos(), theta.sin()));
+    }
+    Ok((geom, verts))
 }
 
 fn v3_sub(a: [f64; 3], b: [f64; 3]) -> [f64; 3] {
@@ -2300,7 +2483,7 @@ fn profile3_vertices(profile: &[ProfileEdge]) -> Option<Vec<[f64; 3]>> {
     for edge in profile {
         match edge {
             ProfileEdge::Line { a, .. } => out.push(*a),
-            ProfileEdge::Spline { .. } => return None,
+            ProfileEdge::Spline { .. } | ProfileEdge::Circle { .. } => return None,
         }
     }
     if out.is_empty() {
@@ -2311,6 +2494,39 @@ fn profile3_vertices(profile: &[ProfileEdge]) -> Option<Vec<[f64; 3]>> {
 
 /// Builds and validates one closed planar line-loop profile.
 fn profile_loop(profile: &[ProfileEdge]) -> Result<ProfileLoop, Refusal> {
+    // A single recorded circle edge is a whole section: build the exact conic
+    // carrier (analytic area/extrema) plus its deterministic tessellation.
+    if let [
+        ProfileEdge::Circle {
+            center,
+            radius,
+            normal,
+        },
+    ] = profile
+    {
+        let (circle, verts) = circle_from_edge(*center, *radius, *normal)?;
+        let mut scale = 0.0f64;
+        for c in center.iter().chain(normal.iter()) {
+            scale = scale.max(c.abs());
+        }
+        scale = scale.max(v3_norm(*center) + radius);
+        return Ok(ProfileLoop {
+            verts,
+            normal: circle.normal(),
+            area: std::f64::consts::PI * radius * radius,
+            scale,
+            circle: Some(circle),
+        });
+    }
+    if profile
+        .iter()
+        .any(|edge| matches!(edge, ProfileEdge::Circle { .. }))
+    {
+        // A circle edge mixed with other edges is not a recorded section.
+        return Err(Refusal::UnsupportedEnvelope(
+            EnvelopeCase::NonCanonicalCarrier,
+        ));
+    }
     let verts = profile3_vertices(profile).ok_or_else(|| {
         // A spline profile edge is not flattenable to its sample polygon; the
         // recording arm keeps the samples and the fact arm refuses typed.
@@ -2385,6 +2601,7 @@ fn profile_loop(profile: &[ProfileEdge]) -> Result<ProfileLoop, Refusal> {
         normal,
         area: mag,
         scale,
+        circle: None,
     })
 }
 
@@ -2462,6 +2679,19 @@ pub(crate) fn prism_bbox(
 /// function over a polygon is attained at a polygon vertex, so the loop's
 /// bbox over its vertices is exact for the loop region.
 fn loop_bbox(loop3: &ProfileLoop) -> [[f64; 3]; 2] {
+    if let Some(circle) = loop3.circle {
+        // The analytic extrema of a circle: along axis `e`, the support of
+        // `c + r (cos t u + sin t v)` is `c_e +- r sqrt(u_e^2 + v_e^2)`.
+        let mut min = [0.0f64; 3];
+        let mut max = [0.0f64; 3];
+        for axis in 0..3 {
+            let extent = circle.radius
+                * (circle.u[axis] * circle.u[axis] + circle.v[axis] * circle.v[axis]).sqrt();
+            min[axis] = circle.center[axis] - extent;
+            max[axis] = circle.center[axis] + extent;
+        }
+        return [min, max];
+    }
     let mut min = [f64::INFINITY; 3];
     let mut max = [f64::NEG_INFINITY; 3];
     for v in &loop3.verts {
@@ -2565,9 +2795,11 @@ fn loft_sections(sections: &[Vec<ProfileEdge>]) -> Result<LoftSections, Refusal>
         .map(|s| profile_loop(s))
         .collect::<Result<_, _>>()?;
     let count = loops[0].verts.len();
+    let circle = loops[0].circle.is_some();
     for loop3 in &loops {
-        if loop3.verts.len() != count {
-            // A matched ruled carrier needs equal vertex counts.
+        if loop3.verts.len() != count || loop3.circle.is_some() != circle {
+            // A matched ruled carrier needs equal vertex counts and a single
+            // section kind (all polygon or all exact circle).
             return Err(Refusal::UnsupportedEnvelope(
                 EnvelopeCase::NonCanonicalCarrier,
             ));
@@ -2603,6 +2835,57 @@ fn loft_seam_mismatch(sections: &LoftSections, closed: bool) -> Result<f64, Refu
     Ok(max_gap)
 }
 
+/// The exact divergence-form side moment of one ruled patch between two exact
+/// circle sections. With `A(t) = c0 + r0 (cos t u0 + sin t v0)` and
+/// `D(t) = B(t) - A(t)`, the side integrand
+/// `X.(X_t x X_theta)` is a trigonometric polynomial of degree at most three,
+/// so the fixed `CIRCLE_QUAD`-node equal-spaced rule integrates it exactly.
+fn circle_pair_side_moment(a: &CircleGeom, b: &CircleGeom) -> f64 {
+    let mut acc = 0.0f64;
+    for k in 0..CIRCLE_QUAD {
+        let theta = TAU * k as f64 / CIRCLE_QUAD as f64;
+        let c = theta.cos();
+        let s = theta.sin();
+        let ap = a.point(c, s);
+        let adir = a.tangent(c, s);
+        let bp = b.point(c, s);
+        let d = v3_sub(bp, ap);
+        let ddir = v3_sub(b.tangent(c, s), adir);
+        // int_0^1 X.(X_theta x X_t) dt =
+        //   A.(A' x D) + (1/2)( D.(A' x D) + A.(D' x D) )
+        let term = v3_dot(ap, v3_cross(adir, d))
+            + 0.5 * (v3_dot(d, v3_cross(adir, d)) + v3_dot(ap, v3_cross(ddir, d)));
+        acc += term;
+    }
+    (1.0 / 3.0) * (TAU / CIRCLE_QUAD as f64) * acc
+}
+
+/// The exact volume of a loft chain whose sections are all exact circles. The
+/// ruled side surface between consecutive sections is integrated exactly by
+/// the trigonometric quadrature and the two planar end caps contribute the
+/// same `(1/3) n . c A` divergence moment the polygon arm uses.
+fn circle_loft_volume(sections: &LoftSections, closed: bool) -> Result<f64, Refusal> {
+    let n_sec = sections.loops.len();
+    let mut total = 0.0f64;
+    for j in 0..(n_sec - 1) {
+        let a = sections.loops[j].circle.ok_or(Refusal::Empty)?;
+        let b = sections.loops[j + 1].circle.ok_or(Refusal::Empty)?;
+        total += circle_pair_side_moment(&a, &b);
+    }
+    if !closed {
+        let first = &sections.loops[0];
+        let last = sections.loops.last().ok_or(Refusal::Empty)?;
+        let ca = first.circle.ok_or(Refusal::Empty)?;
+        let cb = last.circle.ok_or(Refusal::Empty)?;
+        total += -(1.0 / 3.0) * first.area * v3_dot(ca.normal(), ca.center);
+        total += (1.0 / 3.0) * last.area * v3_dot(cb.normal(), cb.center);
+    }
+    if !total.is_finite() {
+        return Err(Refusal::Empty);
+    }
+    Ok(total.abs())
+}
+
 /// The exact volume of a loft chain. For an open chain the boundary is the
 /// ruled side surface between consecutive stations plus the two end caps; for
 /// a closed halo row the station list returns to its start and the side
@@ -2611,6 +2894,9 @@ fn loft_seam_mismatch(sections: &LoftSections, closed: bool) -> Result<f64, Refu
 /// not part of the row data, so the orientation of the recorded loops is
 /// absorbed exactly as in the lathe arm.
 fn loft_volume(sections: &LoftSections, closed: bool) -> Result<f64, Refusal> {
+    if sections.loops.iter().all(|loop3| loop3.circle.is_some()) {
+        return circle_loft_volume(sections, closed);
+    }
     let mut total = 0.0f64;
     let n_sec = sections.loops.len();
     let segment_count = if closed { n_sec - 1 } else { n_sec - 1 };
@@ -2690,6 +2976,15 @@ fn reflect_profile_edge(edge: &ProfileEdge, axis: &str) -> ProfileEdge {
         },
         ProfileEdge::Spline { points } => ProfileEdge::Spline {
             points: points.iter().map(|p| reflect_point3(*p, axis)).collect(),
+        },
+        ProfileEdge::Circle {
+            center,
+            radius,
+            normal,
+        } => ProfileEdge::Circle {
+            center: reflect_point3(*center, axis),
+            radius: *radius,
+            normal: reflect_point3(*normal, axis),
         },
     }
 }
@@ -6435,9 +6730,35 @@ pub mod membership {
 // pyo3 surface
 // ---------------------------------------------------------------------------
 
-/// Parses a submitted construction tree JSON.
-fn parse_tree(tree_json: &str) -> Result<TreeNode, Refusal> {
-    serde_json::from_str(tree_json).map_err(|_| Refusal::Empty)
+/// Parses a submitted construction tree JSON. The serde diagnostic is carried
+/// out as text so a vocabulary gap (an unrecorded `kind`) is NAMED to the
+/// caller instead of collapsing to the generic empty-domain refusal.
+fn parse_tree(tree_json: &str) -> Result<TreeNode, String> {
+    serde_json::from_str(tree_json).map_err(|error| error.to_string())
+}
+
+/// Maps a construction-tree parse failure to the typed `Refused` exception,
+/// carrying the serde diagnostic (the vocabulary gap) in the payload `case`
+/// and the exception message. Never a bare `Exception`, never a silent
+/// generic refusal.
+fn parse_error_to_pyerr(py: Python<'_>, message: &str) -> PyErr {
+    let payload = crate::marshal::RefusedPayload {
+        case: format!("vocabulary gap: {message}"),
+        envelope: Some("vocabulary_gap".to_string()),
+        stage: None,
+        prop: None,
+        left: None,
+        right: None,
+        reason: None,
+        certificate: None,
+        bound: None,
+        allowed: None,
+    };
+    let payload_json = serde_json::to_string(&payload).unwrap_or_else(|_| "{}".to_string());
+    match python::marshal_refused(py, &payload_json) {
+        Ok(value) => PyErr::from_value(value.bind(py).clone()),
+        Err(error) => error,
+    }
 }
 
 /// Maps the trim-extrude constructor's typed error back to the executor's
@@ -6461,7 +6782,7 @@ pub fn bd_facts(py: Python<'_>, tree_json: &str) -> PyResult<String> {
     // the facts phase is the native measurement of that tree. Both are
     // diagnostic columns for the census protocol and gate nothing.
     let construct_started = std::time::Instant::now();
-    let tree = parse_tree(tree_json).map_err(|refusal| refusal_to_pyerr(py, &refusal))?;
+    let tree = parse_tree(tree_json).map_err(|message| parse_error_to_pyerr(py, &message))?;
     let construct_ms = construct_started.elapsed().as_secs_f64() * 1000.0;
     let facts_started = std::time::Instant::now();
     let outcome = crate::gil::with_kernel_gil_released(py, move || tree_facts(&tree));
@@ -6515,7 +6836,7 @@ pub fn bd_facts(py: Python<'_>, tree_json: &str) -> PyResult<String> {
 /// column (the wall-clock mesh phase), never a gate.
 #[pyfunction]
 pub fn bd_stl(py: Python<'_>, tree_json: &str, path: &str) -> PyResult<String> {
-    let tree = parse_tree(tree_json).map_err(|refusal| refusal_to_pyerr(py, &refusal))?;
+    let tree = parse_tree(tree_json).map_err(|message| parse_error_to_pyerr(py, &message))?;
     let owned_path = path.to_string();
     let mesh_started = std::time::Instant::now();
     let outcome =
@@ -7059,6 +7380,89 @@ mod tests {
         assert!((single.volume - 3.0).abs() < 1e-12);
         assert_eq!(single.bbox[0], [0.0, 0.0, 0.0]);
         assert_eq!(single.bbox[1], [1.0, 1.0, 3.0]);
+    }
+
+    /// One exact circle section edge with the given centre/radius and a `+z`
+    /// plane normal.
+    fn circle_section(center: [f64; 3], radius: f64) -> Vec<ProfileEdge> {
+        vec![ProfileEdge::Circle {
+            center,
+            radius,
+            normal: [0.0, 0.0, 1.0],
+        }]
+    }
+
+    #[test]
+    fn circle_loft_facts_are_exact_and_analytic() {
+        // A cylinder loft (two equal circles): volume pi r^2 h and the exact
+        // circle AABB.
+        let cylinder = SolidSpec::Loft {
+            sections: vec![
+                circle_section([0.0, 0.0, 0.0], 2.0),
+                circle_section([0.0, 0.0, 10.0], 2.0),
+            ],
+            closed: false,
+        };
+        let facts =
+            tree_facts(&part(cylinder.clone(), 0.0, 0.0, 0.0)).expect("circle cylinder loft");
+        let expected = std::f64::consts::PI * 4.0 * 10.0;
+        assert!((facts.volume - expected).abs() / expected < 1e-12);
+        assert_eq!(facts.bbox, [[-2.0, -2.0, 0.0], [2.0, 2.0, 10.0]]);
+        assert_eq!(facts.solid_count, 1);
+
+        // A coaxial frustum: the exact `pi h/3 (r0^2 + r0 r1 + r1^2)`.
+        let frustum = SolidSpec::Loft {
+            sections: vec![
+                circle_section([0.0, 0.0, 0.0], 3.0),
+                circle_section([0.0, 0.0, 4.0], 1.0),
+            ],
+            closed: false,
+        };
+        let facts = tree_facts(&part(frustum, 0.0, 0.0, 0.0)).expect("circle frustum");
+        let expected = std::f64::consts::PI * 4.0 / 3.0 * (9.0 + 3.0 + 1.0);
+        assert!((facts.volume - expected).abs() / expected < 1e-12);
+
+        // An oblique parallel frustum obeys Cavalieri: the lateral offset of
+        // the centres does not change the volume.
+        let oblique = SolidSpec::Loft {
+            sections: vec![
+                circle_section([0.0, 0.0, 0.0], 2.0),
+                circle_section([5.0, 0.0, 3.0], 2.0),
+            ],
+            closed: false,
+        };
+        let facts = tree_facts(&part(oblique, 0.0, 0.0, 0.0)).expect("oblique circle loft");
+        let expected = std::f64::consts::PI * 3.0 * 4.0;
+        assert!((facts.volume - expected).abs() / expected < 1e-12);
+        assert_eq!(facts.bbox, [[-2.0, -2.0, 0.0], [7.0, 2.0, 3.0]]);
+
+        // A tilted circle's analytic AABB is the exact conic extrema, not the
+        // inscribed polygon's.
+        let tilted = SolidSpec::Loft {
+            sections: vec![
+                vec![ProfileEdge::Circle {
+                    center: [0.0, 0.0, 0.0],
+                    radius: 2.0,
+                    normal: [1.0, 0.0, 0.0],
+                }],
+                vec![ProfileEdge::Circle {
+                    center: [4.0, 0.0, 0.0],
+                    radius: 2.0,
+                    normal: [1.0, 0.0, 0.0],
+                }],
+            ],
+            closed: false,
+        };
+        let facts = tree_facts(&part(tilted, 0.0, 0.0, 0.0)).expect("tilted circle loft");
+        assert_eq!(facts.bbox, [[0.0, -2.0, -2.0], [4.0, 2.0, 2.0]]);
+        let expected = std::f64::consts::PI * 4.0 * 4.0;
+        assert!((facts.volume - expected).abs() / expected < 1e-12);
+
+        // The mesh is deterministic and uses the fixed tessellation.
+        let first = solid_mesh(&cylinder).expect("circle mesh");
+        let second = solid_mesh(&cylinder).expect("circle mesh again");
+        assert_eq!(first, second);
+        assert_eq!(first.len(), 2 * MESH_SEGMENTS + 2 * MESH_SEGMENTS);
     }
 
     #[test]

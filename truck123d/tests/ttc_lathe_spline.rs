@@ -483,15 +483,16 @@ fn nozzle_assembly_truck_door_now_reaches_facts() {
     );
 }
 
-/// The mvac row's boundary: after the frame-carrier cure (AUTHOR-FRAME-CARRIERS)
-/// the thrust-structure gusset extrude is answered, and the first refusing
-/// carrier deepened to the spline-path tangent query (the sweep-along-spline
-/// path), which stays a typed refusal — no silent fallback.
-/// (Orchestrator amendment of the obsolete extrude pin, adjudicated 2026-09-09:
-/// the pinned carrier was cured by the landed frame carriers, so the pin moves
-/// to the recorded next boundary, never away from typed.)
+/// The mvac row's boundary: the swept tube's circle section is now answered by
+/// the exact circle carrier (DOOR-CIRCLE-FLIP), so the row runs end to end
+/// under the truck engine and reproduces the recorded OCC reference facts
+/// (solid_count 56 and the exact union bbox). The pin moved from "refuses
+/// typed at the circle-profile sweep-section carrier" to "answered with the
+/// recorded reference facts", never away from a checked contract. (Fourth move
+/// of this pin: extrude -> spline-path sweep -> circle-profile sweep section ->
+/// answered.)
 #[test]
-fn mvac_row_still_refuses_typed_at_the_spline_path_sweep_carrier() {
+fn mvac_row_answers_with_the_circle_carrier_and_matches_the_reference() {
     let output = python_command()
         .arg(door_path())
         .arg("--engine")
@@ -504,20 +505,39 @@ fn mvac_row_still_refuses_typed_at_the_spline_path_sweep_carrier() {
         .output()
         .expect("spawn mvac truck door");
     let stdout = String::from_utf8_lossy(&output.stdout);
-    // The door exits nonzero with a machine-readable refusal record.
-    assert!(!output.status.success());
-    let record: serde_json::Value = serde_json::from_str(stdout.trim()).expect("refusal json");
-    assert_eq!(record["ok"], false);
-    assert_eq!(record["error"]["kind"], "Refused");
-    let message = record["error"]["message"].as_str().unwrap_or("");
-    // Orchestrator pin amendment 2026-09-10 (BRIDGE-BOOLEANS landing
-    // adjudication): the spline-path tangent query is ANSWERED (SWEEP-PATH),
-    // so mvac's recorded boundary moved one carrier deeper — the swept tube's
-    // CIRCLE profile is not answered exactly by the sweep arm. The pin moves
-    // with it, deeper, never away from typed. (Third move of this pin:
-    // extrude -> spline-path sweep -> circle-profile sweep section.)
     assert!(
-        message.contains("a circle profile is not answered exactly by a kernel-engine row"),
-        "mvac must refuse typed at the circle-profile sweep-section carrier: {message}"
+        output.status.success(),
+        "mvac must now answer with the circle carrier:\nstdout:{stdout}\nstderr:{}",
+        String::from_utf8_lossy(&output.stderr)
     );
+    let record: serde_json::Value = serde_json::from_str(stdout.trim()).expect("mvac json");
+    assert_eq!(record["ok"], true);
+    let reference: serde_json::Value = serde_json::from_str(
+        &std::fs::read_to_string(reference_dir().join("mvac.json")).expect("mvac reference"),
+    )
+    .expect("mvac reference json");
+    let facts = &record["facts"];
+    assert_eq!(
+        facts["solid_count"], reference["facts"]["solid_count"],
+        "mvac solid count must match the recorded reference"
+    );
+    let got = facts["bbox"].as_array().expect("bbox");
+    let want = reference["facts"]["bbox"]
+        .as_array()
+        .expect("reference bbox");
+    for corner in 0..2 {
+        for axis in 0..3 {
+            let g = got[corner][axis].as_f64().expect("bbox coordinate");
+            let w = want[corner][axis]
+                .as_f64()
+                .expect("reference bbox coordinate");
+            assert!(
+                (g - w).abs() <= 1e-3,
+                "mvac bbox corner {corner} axis {axis}: {g} vs recorded {w}"
+            );
+        }
+    }
+    // The recorded reference volume is 0 (the compound's immediate-child
+    // measurement), so the answered row must reproduce it.
+    assert_eq!(facts["volume"].as_f64().expect("volume"), 0.0);
 }
