@@ -232,14 +232,16 @@ triangle density for time and memory):
 | stage | OCCT (build123d) | kernel (`truck123d`) |
 |---|---:|---:|
 | geometry build (2,142 solids) | 3.84 s | 0.012–0.026 s |
-| build → artifacts on disk | 27.4–28.2 s → 47 MB GLB | 0.85–0.96 s @ 25 mm → 44 MB STL + 17 MB GLB |
-| peak process memory | 1,569–1,572 MiB | 218 MiB @ 25 mm / 1,565 MiB @ 0.4 mm |
-| render → PNG (`look render`) | 2.08–2.15 s | 0.77–1.14 s |
+| build → artifacts on disk | 27.4–28.2 s → 47 MB GLB | 3.1–3.3 s @ 0.4 mm (shipped demo) → 117 MB GLB + 213 MB STL · 0.85–0.96 s @ 25 mm → 44 MB STL + 17 MB GLB |
+| peak process memory | 1,569–1,572 MiB | 1,565 MiB @ 0.4 mm (shipped demo) · 218 MiB @ 25 mm |
+| render → PNG (`look render`) | 2.08–2.15 s (from its 47 MB GLB) | 0.77–1.14 s (from the 17 MB fast-path GLB) |
 
 The kernel geometry build is deflection-invariant; mesh emission scales with
-the requested density. At full 0.4 mm precision the kernel writes a *denser*
-artifact than the OCCT reference (117 MB vs 47 MB GLB) in 3.1–3.3 s — memory
-parity, ~9x the speed. See
+the requested density. The demo ships 0.4 mm — at that precision the kernel
+writes a *denser* artifact than the OCCT reference (117 MB vs 47 MB GLB) in
+3.1–3.3 s with memory parity (~9x the speed); at `--deflection 25` the same
+pipeline drops to 0.85–0.96 s and 218 MiB, trading triangle density for the
+difference. See
 [`docs/TT_TIMING_RESULTS.md`](docs/TT_TIMING_RESULTS.md) for the per-row
 series and `scratch/fh_render/TIMING.md` for the raw samples.
 
