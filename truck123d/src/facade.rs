@@ -341,7 +341,8 @@ fn produced_carrier_class(op: &FacadeOp, profile: CarrierClass) -> Option<Carrie
         | FacadeOp::PushPart
         | FacadeOp::PushSketch
         | FacadeOp::Pop
-        | FacadeOp::Mode { .. } => None,
+        | FacadeOp::Mode { .. }
+        | FacadeOp::SandwichProbe(_) => None,
     }
 }
 
@@ -349,6 +350,85 @@ fn produced_carrier_class(op: &FacadeOp, profile: CarrierClass) -> Option<Carrie
 /// family (the base class when the base is a swept carrier, else the tool's).
 fn boolean_product_carrier(base: CarrierClass, tool: CarrierClass) -> CarrierClass {
     if base.is_funnel_carrier() { base } else { tool }
+}
+
+/// One tensor-Bernstein patch row of an RDEF-M2 regime/sandwich probe. The
+/// row is the same exact data shape the bridge's recorded patch rows carry:
+/// a row-major `R³` numerator grid, the same-shape scalar weight grid, and the
+/// outward-orientation sign.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct SandwichPatchRow {
+    /// The row-major `R³` numerator grid.
+    pub numerator: Vec<Vec<[f64; 3]>>,
+    /// The same-shape scalar weight grid.
+    pub weights: Vec<Vec<f64>>,
+    /// The outward-orientation sign `±1`.
+    pub orientation: f64,
+}
+
+/// The RDEF-M2 regime/sandwich door probe (the CHK-9 reachability surface): a
+/// pair of recorded patch 2-cycles, the boolean mode, and the certified
+/// options. The bridge runs the (T)/(G) admission dichotomy (Lemma D) and the
+/// tangential sandwich volume rule (Lemma S) and reports the certified outcome.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct SandwichProbeRow {
+    /// The base operand's patch cycle.
+    pub base: Vec<SandwichPatchRow>,
+    /// The tool operand's patch cycle.
+    pub tool: Vec<SandwichPatchRow>,
+    /// The boolean mode of the pair.
+    pub mode: ModeValue,
+    /// The requested sandwich bracket width.
+    pub tolerance: f64,
+    /// The subdivision cell cap of the schedule.
+    pub max_cells: usize,
+    /// Whether an exact common-carrier certificate (W2) is recorded for the
+    /// pair; it resolves coincidence exactly.
+    pub shared_carrier: bool,
+    /// Whether the fast Bernstein control-net range path is available.
+    pub bernstein_chart: bool,
+    /// Whether the fast path's positive-weight precondition holds.
+    pub rational_positive_weights: bool,
+}
+
+/// The certified outcome of one RDEF-M2 probe. `refusal` names the typed
+/// sandwich refusal tag (spec section 6) when the rule could not certify the
+/// bracket; `floor` carries the coincidence floor when that is the refusal.
+#[derive(Debug, Clone, PartialEq, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct SandwichOutcome {
+    /// Always `true` on the report path; present so the record is
+    /// self-describing.
+    pub ok: bool,
+    /// `transversal` | `tangential` (the certified regime of the pair).
+    pub regime: String,
+    /// `bernstein` | `fallback` (the range function the rule consumed).
+    pub range_path: String,
+    /// The certified volume of the base operand.
+    pub volume_a: f64,
+    /// The certified volume of the tool operand.
+    pub volume_b: f64,
+    /// The certified tangential sandwich bound.
+    pub sandwich_bound: f64,
+    /// The certified lower bracket bound of the boolean volume.
+    pub bracket_lo: f64,
+    /// The certified upper bracket bound of the boolean volume.
+    pub bracket_hi: f64,
+    /// The bracket width.
+    pub width: f64,
+    /// The number of undecided cells the schedule refined.
+    pub undecided_cells: usize,
+    /// The number of subdivision steps performed.
+    pub refined_cells: usize,
+    /// The typed sandwich refusal tag, when the rule refused.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub refusal: Option<String>,
+    /// The coincidence floor when the refusal is
+    /// `CoincidenceWithoutExactCarrier`.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub floor: Option<f64>,
 }
 
 /// One row of a submitted facade session. Every row is data only; the kernel
@@ -506,6 +586,11 @@ pub enum FacadeOp {
         /// The requested output path.
         path: String,
     },
+    /// RDEF-M2-REGIME-SANDWICH: a certified (T)/(G) regime and tangential
+    /// sandwich volume probe over two recorded patch 2-cycles. The bridge runs
+    /// the admission dichotomy and the sandwich rule and records the certified
+    /// outcome on the report; the row is the CHK-9 door reachability surface.
+    SandwichProbe(SandwichProbeRow),
 }
 
 /// The submitted session table: the ordered operation log a builder session
@@ -532,7 +617,7 @@ pub struct ExportEntry {
 }
 
 /// The deterministic ledger [`run_facade`] returns for an in-envelope table.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct FacadeReport {
     /// The report schema tag (`facade_report.v1`).
@@ -549,6 +634,10 @@ pub struct FacadeReport {
     /// swept-carrier boolean row occurred.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub boolean_events: Vec<SweptBooleanEvent>,
+    /// The RDEF-M2 regime/sandwich probe outcome, when the session ran one
+    /// (omitted otherwise).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub sandwich: Option<SandwichOutcome>,
     /// The export entries, in session order.
     pub exports: Vec<ExportEntry>,
 }
@@ -573,6 +662,7 @@ pub fn run_facade(table: &FacadeTable) -> Result<FacadeReport, Refusal> {
     let mut profile = CarrierClass::Canonical;
     let mut pending_mode: Option<ModeValue> = None;
     let mut boolean_events: Vec<SweptBooleanEvent> = Vec::new();
+    let mut sandwich: Option<SandwichOutcome> = None;
 
     for op in &table.ops {
         match op {
@@ -701,6 +791,14 @@ pub fn run_facade(table: &FacadeTable) -> Result<FacadeReport, Refusal> {
                 // solid of the frame (the existing model keeps no frame stack,
                 // so a pop never rewinds the carrier).
             }
+            FacadeOp::SandwichProbe(probe) => {
+                // RDEF-M2: run the (T)/(G) admission dichotomy and the
+                // tangential sandwich volume rule over the recorded patch
+                // 2-cycles. The probe is a door reachability surface: it does
+                // not touch the carrier state or the export ledger.
+                selection_pending = false;
+                sandwich = Some(crate::bd_bridge::certify_sandwich_probe(probe));
+            }
         }
     }
 
@@ -710,6 +808,7 @@ pub fn run_facade(table: &FacadeTable) -> Result<FacadeReport, Refusal> {
         op_count: table.ops.len(),
         constructive,
         boolean_events,
+        sandwich,
         exports,
     })
 }

@@ -3956,30 +3956,38 @@ fn top_volume_bracket(node: &TreeNode) -> Result<[f64; 2], Refusal> {
 type Patch = crate::python::binding::VolumeRow;
 
 /// The typed stage of a `Swept x Swept` admission failure. The stage name is
-/// the measurement instrument; the three cases are never collapsed.
+/// the measurement instrument; the cases are never collapsed. RDEF-M2 replaced
+/// the single `NonTransversalContact` stage with the (T)/(G) regime split: a
+/// pair the transversality gate refuses now resolves to a certified sandwich
+/// bracket, or to one of the named regime/sandwich refusals below.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SweptAdmissionRefusal {
     /// The operand's carrier is outside the extracted vocabulary (or its
     /// section caps cannot be represented exactly).
     ExtractionUnavailable,
-    /// The extracted surfaces meet non-transversally on the work box (a
-    /// tangential or coincident contact locus).
-    NonTransversalContact,
+    /// `d_u x d_v` cannot be certified nonzero on an operand patch.
+    SingularParametrization,
+    /// The (G) cell fails graph injectivity.
+    GraphNotInjective,
+    /// Coincidence without an exact common-carrier certificate.
+    CoincidenceWithoutExactCarrier,
     /// The error schedule did not reach the budget within the subdivision cap.
     BudgetExhausted,
 }
 
 /// The boundary marshaling of one admission stage onto the frozen kernel
-/// refusal vocabulary. `ExtractionUnavailable` keeps the landed
-/// `NonCanonicalCarrier` carrier refusal; `NonTransversalContact` names the
-/// deferred contact reduction; `BudgetExhausted` is the typed unresolved
-/// budget refusal.
+/// refusal vocabulary. `ExtractionUnavailable` and `SingularParametrization`
+/// keep the landed `NonCanonicalCarrier` carrier refusal; the regime/sandwich
+/// refusals name the deferred contact reduction; `BudgetExhausted` is the
+/// typed unresolved budget refusal.
 fn swept_refusal_to_refusal(stage: SweptAdmissionRefusal) -> Refusal {
     match stage {
-        SweptAdmissionRefusal::ExtractionUnavailable => {
+        SweptAdmissionRefusal::ExtractionUnavailable
+        | SweptAdmissionRefusal::SingularParametrization => {
             Refusal::UnsupportedEnvelope(EnvelopeCase::NonCanonicalCarrier)
         }
-        SweptAdmissionRefusal::NonTransversalContact => {
+        SweptAdmissionRefusal::GraphNotInjective
+        | SweptAdmissionRefusal::CoincidenceWithoutExactCarrier => {
             Refusal::UnsupportedEnvelope(EnvelopeCase::ContactReductionDeferred)
         }
         SweptAdmissionRefusal::BudgetExhausted => Refusal::NumericallyUnresolved {
@@ -4281,6 +4289,12 @@ fn extract_patches(row: &TreeNode) -> Result<Vec<(Patch, i8)>, SweptAdmissionRef
 /// boolean pair: extract both operands, then run the certified solver (whose
 /// landed transversality admission is the FSSI-001 twin). A refusal names the
 /// stage that failed.
+///
+/// RDEF-M2 amends the gate: a pair the landed transversality admission refuses
+/// (`TransversalityUncertified`) is no longer a single `NonTransversalContact`
+/// dead end. The regime dichotomy (Lemma D) splits it into (T)/(G); a (G) pair
+/// runs the tangential sandwich volume rule (Lemma S) and returns a certified
+/// bracket or one of the named regime/sandwich refusals.
 fn admit_swept_pair(
     boolean: &BooleanNode,
 ) -> Result<membership::BooleanVolumeCertificate, SweptAdmissionRefusal> {
@@ -4289,17 +4303,88 @@ fn admit_swept_pair(
     let a_rows: Vec<Patch> = a.into_iter().map(|(row, _)| row).collect();
     let b_rows: Vec<Patch> = b.into_iter().map(|(row, _)| row).collect();
     let options = membership::BooleanVolumeOptions::default();
-    membership::certify_boolean_volume(&a_rows, &b_rows, &options).map_err(
-        |refusal| match refusal {
-            membership::BooleanVolumeRefusal::TransversalityUncertified => {
-                SweptAdmissionRefusal::NonTransversalContact
+    match membership::certify_boolean_volume(&a_rows, &b_rows, &options) {
+        Ok(certificate) => Ok(certificate),
+        Err(membership::BooleanVolumeRefusal::TransversalityUncertified) => {
+            // RDEF-M2: the regime split. The sandwich rule carries the bracket
+            // for the tangential (G) cell and reports its own named refusals.
+            let scale = a_rows
+                .iter()
+                .chain(b_rows.iter())
+                .flat_map(|row| row.numerator.iter().flatten())
+                .flat_map(|p| p.iter())
+                .fold(1.0f64, |acc, c| acc.max(c.abs()));
+            let sandwich_options = membership::SandwichOptions {
+                tolerance: options.relative_tolerance * scale,
+                max_cells: options.max_cells,
+                shared_carrier: false,
+                bernstein_chart: true,
+                rational_positive_weights: true,
+            };
+            match membership::certify_sandwich(&a_rows, &b_rows, boolean.mode, &sandwich_options) {
+                Ok(certificate) => Ok(sandwich_to_boolean_certificate(
+                    &certificate,
+                    &a_rows,
+                    &b_rows,
+                )),
+                Err(membership::SandwichRefusal::SingularParametrization) => {
+                    Err(SweptAdmissionRefusal::SingularParametrization)
+                }
+                Err(membership::SandwichRefusal::GraphNotInjective) => {
+                    Err(SweptAdmissionRefusal::GraphNotInjective)
+                }
+                Err(membership::SandwichRefusal::CoincidenceWithoutExactCarrier { .. }) => {
+                    Err(SweptAdmissionRefusal::CoincidenceWithoutExactCarrier)
+                }
+                Err(membership::SandwichRefusal::BudgetExhausted { .. }) => {
+                    Err(SweptAdmissionRefusal::BudgetExhausted)
+                }
+                Err(membership::SandwichRefusal::MalformedPatch) => {
+                    Err(SweptAdmissionRefusal::ExtractionUnavailable)
+                }
             }
-            membership::BooleanVolumeRefusal::BudgetExceeded => {
-                SweptAdmissionRefusal::BudgetExhausted
-            }
-            _ => SweptAdmissionRefusal::ExtractionUnavailable,
+        }
+        Err(membership::BooleanVolumeRefusal::BudgetExceeded) => {
+            Err(SweptAdmissionRefusal::BudgetExhausted)
+        }
+        Err(_) => Err(SweptAdmissionRefusal::ExtractionUnavailable),
+    }
+}
+
+/// Lifts the sandwich certificate into the boolean-volume certificate shape the
+/// interval-valued volume fact consumes.
+fn sandwich_to_boolean_certificate(
+    certificate: &membership::SandwichCertificate,
+    a_rows: &[Patch],
+    b_rows: &[Patch],
+) -> membership::BooleanVolumeCertificate {
+    let width = certificate.width;
+    membership::BooleanVolumeCertificate {
+        bracket_lo: certificate.bracket_lo,
+        bracket_hi: certificate.bracket_hi,
+        value: 0.5 * (certificate.bracket_lo + certificate.bracket_hi),
+        width,
+        relative_width: if certificate.volume_a.abs() > 0.0 {
+            width / certificate.volume_a.abs()
+        } else {
+            0.0
         },
-    )
+        volume_a: certificate.volume_a,
+        volume_b: certificate.volume_b,
+        intersection_lo: 0.0,
+        intersection_hi: certificate.sandwich_bound,
+        bbox_lo: [0.0; 3],
+        bbox_hi: [0.0; 3],
+        bbox_margin: None,
+        solid_count: 1,
+        broad_phase_pairs: a_rows.len().saturating_mul(b_rows.len()),
+        excluded_pairs: 0,
+        clear_cells: 0,
+        contact_cells: certificate.undecided_cells,
+        max_depth: 0,
+        cover_cells: 0,
+        phases: [0, 0, certificate.refined_cells],
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -7353,6 +7438,1084 @@ pub mod membership {
             cover_cells: stats.cover_cells,
             phases: [stats.cover_cells, stats.clear_cells, stats.refinement],
         })
+    }
+
+    // -----------------------------------------------------------------------
+    // RDEF-M2-REGIME-SANDWICH -- the (T)/(G) admission dichotomy (Lemma D,
+    // section 3.1) and the tangential sandwich volume rule (Lemma S with
+    // obligations S1-S3, section 4). The regime split amends the MONO-8 gate:
+    // a pair the landed transversality admission refuses (`TransversalityUncertified`)
+    // is admitted here as (T) (the exact solver's path) or (G) (the sandwich),
+    // or refuses with a named tag (section 6).
+    //
+    // The range function is parameterised (section 4.3): the fast Bernstein
+    // control-net slabs when the patch is a positive-weight Bernstein chart,
+    // and a mandatory generic interval fallback otherwise (the regression trap:
+    // a control-net-only rule fires on only a fraction of the rank-deficient
+    // states).
+    //
+    // Open question 6 (does `ADMISSION-WHOLE-BOX-REGULAR-CONE` expose normal
+    // cones Lemma D can reuse?): YES. `certify_patch_family` returns the
+    // `AdmissionCertificate` whose whole-box `SpanCertificate.regular.cone` is
+    // exactly the `NormalCone { anchor, s_up }` Lemma D's phi/Theta arithmetic
+    // consumes. `patch_cone` below reuses it directly; no cone is recomputed.
+    // -----------------------------------------------------------------------
+
+    use std::collections::BinaryHeap;
+
+    use truck_certified::construct::admission::NormalCone;
+    use truck_certified::construct::normal_cone::midpoint_normal_direction;
+
+    /// The regime of one admitted patch pair (Lemma D, section 3.1).
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+    #[serde(rename_all = "snake_case")]
+    pub enum SurfaceRegime {
+        /// (T): every pair of normals is non-parallel (`phi - Theta > 0` and
+        /// `phi + Theta < pi`).
+        Transversal,
+        /// (G): every pair of normals has a nonzero component on the graph axis
+        /// (`phi + Theta < pi/2` or `phi - Theta > pi/2`).
+        Tangential,
+    }
+
+    /// The named refusal of the regime admission (section 6).
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+    #[serde(rename_all = "snake_case")]
+    pub enum RegimeRefusal {
+        /// `d_u x d_v` cannot be certified nonzero on a patch.
+        SingularParametrization,
+        /// The (G) cell fails graph injectivity after the subdivision budget.
+        GraphNotInjective,
+    }
+
+    /// The certified regime admission of one patch pair.
+    #[derive(Debug, Clone, Copy, PartialEq, Serialize)]
+    pub struct RegimeAdmission {
+        /// The certified regime.
+        pub regime: SurfaceRegime,
+        /// The base patch's outward graph axis (the certified cone anchor,
+        /// normalized).
+        pub axis: [f64; 3],
+        /// A certified lower bound of the anchor angle `phi`.
+        pub phi_lo: f64,
+        /// A certified upper bound of the cone half-angle sum `Theta`.
+        pub theta_hi: f64,
+    }
+
+    /// The range function a (G) pair consumed (section 4.3).
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+    #[serde(rename_all = "snake_case")]
+    pub enum RangePath {
+        /// The Bernstein control-net fast path (positive weights).
+        Bernstein,
+        /// The mandatory generic interval fallback.
+        Fallback,
+    }
+
+    /// The named refusal of the sandwich rule (section 6).
+    #[derive(Debug, Clone, Copy, PartialEq, Serialize)]
+    #[serde(rename_all = "snake_case")]
+    pub enum SandwichRefusal {
+        /// `d_u x d_v` cannot be certified nonzero on a patch.
+        SingularParametrization,
+        /// The (G) cell fails graph injectivity.
+        GraphNotInjective,
+        /// Coincidence without an exact common-carrier certificate.
+        CoincidenceWithoutExactCarrier {
+            /// The bracket floor `overlap_area * f`.
+            floor: f64,
+        },
+        /// The error schedule did not reach the requested tolerance.
+        BudgetExhausted {
+            /// The achieved sandwich bound.
+            achieved_width: f64,
+        },
+        /// A consumed patch row is malformed (a caller defect).
+        MalformedPatch,
+    }
+
+    /// The certified tangential sandwich outcome of one `A op B` volume.
+    #[derive(Debug, Clone, PartialEq, Serialize)]
+    pub struct SandwichCertificate {
+        /// The certified volume of the base operand.
+        pub volume_a: f64,
+        /// The certified volume of the tool operand.
+        pub volume_b: f64,
+        /// The certified tangential sandwich bound.
+        pub sandwich_bound: f64,
+        /// The certified lower bracket bound of the boolean volume.
+        pub bracket_lo: f64,
+        /// The certified upper bracket bound of the boolean volume.
+        pub bracket_hi: f64,
+        /// The bracket width.
+        pub width: f64,
+        /// The overall regime of the pair family.
+        pub regime: SurfaceRegime,
+        /// The range function consumed.
+        pub range_path: RangePath,
+        /// The number of undecided (G) cells carrying the bracket.
+        pub undecided_cells: usize,
+        /// The number of subdivision steps performed.
+        pub refined_cells: usize,
+        /// The coincidence floor when the certificate is the exact-carrier
+        /// coincidence case.
+        pub floor: Option<f64>,
+    }
+
+    /// The certified options of the sandwich rule.
+    #[derive(Debug, Clone, Copy)]
+    pub struct SandwichOptions {
+        /// The requested bracket width.
+        pub tolerance: f64,
+        /// The subdivision cell cap.
+        pub max_cells: usize,
+        /// Whether an exact common-carrier certificate (W2) is recorded.
+        pub shared_carrier: bool,
+        /// Whether the Bernstein chart fast path is available.
+        pub bernstein_chart: bool,
+        /// Whether the fast path's positive-weight precondition holds.
+        pub rational_positive_weights: bool,
+    }
+
+    impl Default for SandwichOptions {
+        fn default() -> Self {
+            SandwichOptions {
+                tolerance: 1.0e-4,
+                max_cells: 65536,
+                shared_carrier: false,
+                bernstein_chart: true,
+                rational_positive_weights: true,
+            }
+        }
+    }
+
+    /// The maximum subdivision depth of the sandwich schedule.
+    const SANDWICH_MAX_DEPTH: u32 = 24;
+
+    /// The coincidence floor factor `f = c * u * scale` (section 4.4).
+    const SANDWICH_FLOOR_FACTOR: f64 = 64.0;
+
+    /// A parsed raw rational tensor-Bernstein patch (row-major).
+    #[derive(Clone)]
+    struct RawPatch {
+        rows: usize,
+        cols: usize,
+        num: Vec<[f64; 3]>,
+        weights: Vec<f64>,
+        orientation: f64,
+    }
+
+    /// One undecided (G) cell of the schedule: the pair indices, the two
+    /// parameter cells, the graph axis and its plane basis, and the current
+    /// contribution key `|R| * max(0, -h_lo)`.
+    #[derive(Clone, Copy)]
+    struct SandwichCell {
+        id: u64,
+        depth: u32,
+        ia: usize,
+        ib: usize,
+        a: ParamCell,
+        b: ParamCell,
+        axis: [f64; 3],
+        e1: [f64; 3],
+        e2: [f64; 3],
+        key: f64,
+    }
+
+    impl PartialEq for SandwichCell {
+        fn eq(&self, other: &Self) -> bool {
+            self.id == other.id
+        }
+    }
+
+    impl Eq for SandwichCell {}
+
+    impl PartialOrd for SandwichCell {
+        fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+            Some(self.cmp(other))
+        }
+    }
+
+    impl Ord for SandwichCell {
+        fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+            // A max-heap by key; ties are broken by the smaller cell id so the
+            // schedule is deterministic (spec section 4.4/8).
+            self.key
+                .total_cmp(&other.key)
+                .then_with(|| other.id.cmp(&self.id))
+        }
+    }
+
+    fn normalize3(v: [f64; 3]) -> Option<[f64; 3]> {
+        let n = super::v3_norm(v);
+        if !n.is_finite() || n <= 0.0 {
+            return None;
+        }
+        Some([v[0] / n, v[1] / n, v[2] / n])
+    }
+
+    /// A deterministic orthonormal basis `(e1, e2)` of the plane perpendicular
+    /// to the unit axis `a`.
+    fn project_basis(a: [f64; 3]) -> Option<([f64; 3], [f64; 3])> {
+        let helper = if a[2].abs() < 0.9 {
+            [0.0, 0.0, 1.0]
+        } else {
+            [1.0, 0.0, 0.0]
+        };
+        let e1 = normalize3(super::v3_cross(a, helper))?;
+        let e2 = super::v3_cross(a, e1);
+        Some((e1, e2))
+    }
+
+    fn scalar_hull(vals: &[f64]) -> Iv {
+        let mut lo = f64::INFINITY;
+        let mut hi = f64::NEG_INFINITY;
+        for &v in vals {
+            if v < lo {
+                lo = v;
+            }
+            if v > hi {
+                hi = v;
+            }
+        }
+        Iv {
+            lo: down(lo),
+            hi: up(hi),
+        }
+    }
+
+    /// The interval quotient `a / b`, `None` when `b` straddles zero.
+    fn iv_div(a: Iv, b: Iv) -> Option<Iv> {
+        if b.lo <= 0.0 && b.hi >= 0.0 {
+            return None;
+        }
+        let mut lo = f64::INFINITY;
+        let mut hi = f64::NEG_INFINITY;
+        for &x in &[a.lo, a.hi] {
+            for &y in &[b.lo, b.hi] {
+                let v = x / y;
+                if !v.is_finite() {
+                    return None;
+                }
+                lo = lo.min(down(v));
+                hi = hi.max(up(v));
+            }
+        }
+        if lo <= hi { Some(Iv { lo, hi }) } else { None }
+    }
+
+    fn parse_raw(row: &VolumeRow) -> Result<RawPatch, SandwichRefusal> {
+        let rows = row.numerator.len();
+        let cols = row.numerator.first().map_or(0, Vec::len);
+        if rows < 2 || cols < 2 || row.weights.len() != rows {
+            return Err(SandwichRefusal::MalformedPatch);
+        }
+        let mut num = Vec::with_capacity(rows.saturating_mul(cols));
+        let mut weights = Vec::with_capacity(rows.saturating_mul(cols));
+        for (i, num_row) in row.numerator.iter().enumerate() {
+            if num_row.len() != cols {
+                return Err(SandwichRefusal::MalformedPatch);
+            }
+            let w_row = row.weights.get(i).ok_or(SandwichRefusal::MalformedPatch)?;
+            if w_row.len() != cols {
+                return Err(SandwichRefusal::MalformedPatch);
+            }
+            for (j, a) in num_row.iter().enumerate() {
+                let w = w_row
+                    .get(j)
+                    .copied()
+                    .ok_or(SandwichRefusal::MalformedPatch)?;
+                if !w.is_finite() || !a.iter().all(|c| c.is_finite()) {
+                    return Err(SandwichRefusal::MalformedPatch);
+                }
+                num.push(*a);
+                weights.push(w);
+            }
+        }
+        if !row.orientation.is_finite() || row.orientation == 0.0 {
+            return Err(SandwichRefusal::MalformedPatch);
+        }
+        Ok(RawPatch {
+            rows,
+            cols,
+            num,
+            weights,
+            orientation: row.orientation,
+        })
+    }
+
+    fn sub_raw_num(patch: &RawPatch, cell: &ParamCell) -> Vec<[f64; 3]> {
+        let p = Patch {
+            rows: patch.rows,
+            cols: patch.cols,
+            data: patch.num.clone(),
+            orientation: 1.0,
+        };
+        sub_net(&p, cell)
+    }
+
+    fn sub_raw_weight(patch: &RawPatch, cell: &ParamCell) -> Vec<f64> {
+        let data: Vec<[f64; 3]> = patch.weights.iter().map(|&w| [w, 0.0, 0.0]).collect();
+        let p = Patch {
+            rows: patch.rows,
+            cols: patch.cols,
+            data,
+            orientation: 1.0,
+        };
+        sub_net(&p, cell).into_iter().map(|v| v[0]).collect()
+    }
+
+    fn project_scalar(net: &[[f64; 3]], e: [f64; 3]) -> Vec<f64> {
+        net.iter().map(|p| super::v3_dot(e, *p)).collect()
+    }
+
+    fn deriv_u_scalar(net: &[f64], rows: usize, cols: usize) -> Vec<f64> {
+        let factor = (rows - 1) as f64;
+        let mut out = Vec::with_capacity(rows.saturating_sub(1).saturating_mul(cols));
+        for i in 0..rows.saturating_sub(1) {
+            for j in 0..cols {
+                let a = net.get(i * cols + j).copied().unwrap_or(0.0);
+                let b = net.get((i + 1) * cols + j).copied().unwrap_or(0.0);
+                out.push(factor * (b - a));
+            }
+        }
+        out
+    }
+
+    fn deriv_v_scalar(net: &[f64], rows: usize, cols: usize) -> Vec<f64> {
+        let factor = (cols - 1) as f64;
+        let mut out = Vec::with_capacity(rows.saturating_mul(cols.saturating_sub(1)));
+        for i in 0..rows {
+            for j in 0..cols.saturating_sub(1) {
+                let a = net.get(i * cols + j).copied().unwrap_or(0.0);
+                let b = net.get(i * cols + (j + 1)).copied().unwrap_or(0.0);
+                out.push(factor * (b - a));
+            }
+        }
+        out
+    }
+
+    /// The projected control-box hull `(lo, hi)` of a patch cell (positive
+    /// weights; the rational control points `num_i / w_i` are the convex-hull
+    /// generators of the surface).
+    fn projected_bbox(
+        num: &[[f64; 3]],
+        weights: &[f64],
+        e1: [f64; 3],
+        e2: [f64; 3],
+    ) -> Option<([f64; 2], [f64; 2])> {
+        let mut lo = [f64::INFINITY; 2];
+        let mut hi = [f64::NEG_INFINITY; 2];
+        for (p, &w) in num.iter().zip(weights.iter()) {
+            let q = if w > 0.0 {
+                [p[0] / w, p[1] / w, p[2] / w]
+            } else {
+                *p
+            };
+            let x = super::v3_dot(e1, q);
+            let y = super::v3_dot(e2, q);
+            if !x.is_finite() || !y.is_finite() {
+                return None;
+            }
+            lo[0] = lo[0].min(x);
+            hi[0] = hi[0].max(x);
+            lo[1] = lo[1].min(y);
+            hi[1] = hi[1].max(y);
+        }
+        if lo[0] <= hi[0] && lo[1] <= hi[1] {
+            Some((lo, hi))
+        } else {
+            None
+        }
+    }
+
+    /// The range enclosure `(lo, hi)` of `axis . P` over the cell. The fast
+    /// path is the Bernstein control-net slab (a convex combination with the
+    /// positive weights `B_i w_i`); the fallback is the natural interval
+    /// extension of the rational function `(axis . A) / W`.
+    fn height_range(
+        num: &[[f64; 3]],
+        weights: &[f64],
+        axis: [f64; 3],
+        fast: bool,
+    ) -> Result<(f64, f64), SandwichRefusal> {
+        if fast {
+            let mut lo = f64::INFINITY;
+            let mut hi = f64::NEG_INFINITY;
+            for (p, &w) in num.iter().zip(weights.iter()) {
+                if w <= 0.0 {
+                    return Err(SandwichRefusal::SingularParametrization);
+                }
+                let h = super::v3_dot(axis, *p) / w;
+                if !h.is_finite() {
+                    return Err(SandwichRefusal::MalformedPatch);
+                }
+                lo = lo.min(h);
+                hi = hi.max(h);
+            }
+            Ok((down(lo), up(hi)))
+        } else {
+            let mut a_lo = f64::INFINITY;
+            let mut a_hi = f64::NEG_INFINITY;
+            for p in num {
+                let v = super::v3_dot(axis, *p);
+                a_lo = a_lo.min(v);
+                a_hi = a_hi.max(v);
+            }
+            let mut w_lo = f64::INFINITY;
+            let mut w_hi = f64::NEG_INFINITY;
+            for &w in weights {
+                w_lo = w_lo.min(w);
+                w_hi = w_hi.max(w);
+            }
+            let iv = iv_div(Iv { lo: a_lo, hi: a_hi }, Iv { lo: w_lo, hi: w_hi })
+                .ok_or(SandwichRefusal::SingularParametrization)?;
+            Ok((iv.lo, iv.hi))
+        }
+    }
+
+    /// The G-INJ sufficient condition (section 3.1): every matrix in the
+    /// interval hull of the 2x2 Jacobian of `pi o P` over the cell is
+    /// nonsingular.
+    fn graph_injective(patch: &RawPatch, cell: &ParamCell, e1: [f64; 3], e2: [f64; 3]) -> bool {
+        let num = sub_raw_num(patch, cell);
+        let w = sub_raw_weight(patch, cell);
+        let rows = patch.rows;
+        let cols = patch.cols;
+        let w_iv = scalar_hull(&w);
+        if w_iv.lo <= 0.0 {
+            return false;
+        }
+        let mut jac = [[Iv::point(0.0); 2]; 2];
+        for (k, e) in [e1, e2].into_iter().enumerate() {
+            let a = project_scalar(&num, e);
+            let a_u = deriv_u_scalar(&a, rows, cols);
+            let a_v = deriv_v_scalar(&a, rows, cols);
+            let w_u = deriv_u_scalar(&w, rows, cols);
+            let w_v = deriv_v_scalar(&w, rows, cols);
+            let Some(p_iv) = iv_div(scalar_hull(&a), w_iv) else {
+                return false;
+            };
+            let Some(du) = iv_div(scalar_hull(&a_u).sub(p_iv.mul(scalar_hull(&w_u))), w_iv) else {
+                return false;
+            };
+            let Some(dv) = iv_div(scalar_hull(&a_v).sub(p_iv.mul(scalar_hull(&w_v))), w_iv) else {
+                return false;
+            };
+            if let Some(slot) = jac.get_mut(k) {
+                slot[0] = du;
+                slot[1] = dv;
+            }
+        }
+        let det = jac[0][0].mul(jac[1][1]).sub(jac[0][1].mul(jac[1][0]));
+        det.lo > 0.0 || det.hi < 0.0
+    }
+
+    /// The certified upper bound of `sqrt(iv)` (`None` when `iv.hi < 0`).
+    fn iv_sqrt(iv: Iv) -> Option<Iv> {
+        if iv.hi < 0.0 || !iv.hi.is_finite() {
+            return None;
+        }
+        let hi = iv.hi.sqrt();
+        if !hi.is_finite() {
+            return None;
+        }
+        Some(Iv {
+            lo: down(iv.lo.max(0.0).sqrt()),
+            hi: up(hi),
+        })
+    }
+
+    /// A certified lower bound of the norm of every vector in the interval box
+    /// (the axis mignitudes in quadrature).
+    fn mignitude3(n: &[Iv; 3]) -> f64 {
+        let mut acc = Iv::point(0.0);
+        for iv in n {
+            let mig = if iv.lo > 0.0 {
+                iv.lo
+            } else if iv.hi < 0.0 {
+                -iv.hi
+            } else {
+                0.0
+            };
+            acc = acc.add(Iv::point(mig).mul(Iv::point(mig)));
+        }
+        iv_sqrt(acc).map_or(0.0, |v| v.lo)
+    }
+
+    /// The interval hull of the homogeneous normal numerator
+    /// `N = P_u x P_v = ((A_u W - A W_u) x (A_v W - A W_v)) / W^4` over the
+    /// whole patch box. This is the same normal-cone mathematics the landed
+    /// `ADMISSION-WHOLE-BOX-REGULAR-CONE` assembly uses, evaluated directly on
+    /// the homogeneous control hulls so it certifies every orientation (the
+    /// landed `certify_patch_family` whole-box path rejects the negatively
+    /// oriented planar faces).
+    fn normal_hull(raw: &RawPatch) -> Option<[Iv; 3]> {
+        let cell = ParamCell::unit();
+        let p = Patch {
+            rows: raw.rows,
+            cols: raw.cols,
+            data: raw.num.clone(),
+            orientation: 1.0,
+        };
+        let wp = Patch {
+            rows: raw.rows,
+            cols: raw.cols,
+            data: raw.weights.iter().map(|&w| [w, 0.0, 0.0]).collect(),
+            orientation: 1.0,
+        };
+        let (alo, ahi) = control_range(&p, &cell);
+        let (aulo, auhi) = derivative_range_u(&p, &cell);
+        let (avlo, avhi) = derivative_range_v(&p, &cell);
+        let (wlo, whi) = control_range(&wp, &cell);
+        let (wulo, wuhi) = derivative_range_u(&wp, &cell);
+        let (wvlo, wvhi) = derivative_range_v(&wp, &cell);
+        let w = Iv {
+            lo: wlo[0],
+            hi: whi[0],
+        };
+        if w.lo <= 0.0 {
+            return None;
+        }
+        let wu = Iv {
+            lo: wulo[0],
+            hi: wuhi[0],
+        };
+        let wv = Iv {
+            lo: wvlo[0],
+            hi: wvhi[0],
+        };
+        let w2 = w.mul(w);
+        let mut pu = [Iv::point(0.0); 3];
+        let mut pv = [Iv::point(0.0); 3];
+        for k in 0..3 {
+            let a = Iv {
+                lo: alo[k],
+                hi: ahi[k],
+            };
+            let au = Iv {
+                lo: aulo[k],
+                hi: auhi[k],
+            };
+            let av = Iv {
+                lo: avlo[k],
+                hi: avhi[k],
+            };
+            pu[k] = iv_div(au.mul(w).sub(a.mul(wu)), w2)?;
+            pv[k] = iv_div(av.mul(w).sub(a.mul(wv)), w2)?;
+        }
+        Some([
+            pu[1].mul(pv[2]).sub(pu[2].mul(pv[1])),
+            pu[2].mul(pv[0]).sub(pu[0].mul(pv[2])),
+            pu[0].mul(pv[1]).sub(pu[1].mul(pv[0])),
+        ])
+    }
+
+    /// The whole-box certified normal cone of one patch row. The anchor is the
+    /// float midpoint normal (the landed SFC search); the cone bound `s_up` is
+    /// the certified `|n x anchor| / (|n| |anchor|)` maximum over the
+    /// homogeneous normal hull (`normal_hull`), which certifies `s_up < 1` on
+    /// the whole box.
+    fn patch_cone(row: &VolumeRow) -> Result<NormalCone, RegimeRefusal> {
+        let raw = parse_raw(row).map_err(|_| RegimeRefusal::SingularParametrization)?;
+        let patch = TensorBernsteinPatch::try_new(
+            row.numerator.clone(),
+            row.weights.clone(),
+            unit_ibox2(),
+            PatchParent::new(0, None),
+        )
+        .map_err(|_| RegimeRefusal::SingularParametrization)?;
+        let anchor = midpoint_normal_direction(&patch)
+            .and_then(normalize3)
+            .ok_or(RegimeRefusal::SingularParametrization)?;
+        let n = normal_hull(&raw).ok_or(RegimeRefusal::SingularParametrization)?;
+        let cx = n[1]
+            .mul(Iv::point(anchor[2]))
+            .sub(n[2].mul(Iv::point(anchor[1])));
+        let cy = n[2]
+            .mul(Iv::point(anchor[0]))
+            .sub(n[0].mul(Iv::point(anchor[2])));
+        let cz = n[0]
+            .mul(Iv::point(anchor[1]))
+            .sub(n[1].mul(Iv::point(anchor[0])));
+        let mut w2 = Iv::point(0.0);
+        for c in [cx, cy, cz] {
+            let far = c.lo.abs().max(c.hi.abs());
+            w2 = w2.add(Iv::point(far).mul(Iv::point(far)));
+        }
+        let w_max = iv_sqrt(w2)
+            .ok_or(RegimeRefusal::SingularParametrization)?
+            .hi;
+        let n_min = mignitude3(&n);
+        let a_iv = Iv::point(anchor[0])
+            .mul(Iv::point(anchor[0]))
+            .add(Iv::point(anchor[1]).mul(Iv::point(anchor[1])))
+            .add(Iv::point(anchor[2]).mul(Iv::point(anchor[2])));
+        let a_lo = iv_sqrt(a_iv)
+            .ok_or(RegimeRefusal::SingularParametrization)?
+            .lo;
+        if !w_max.is_finite()
+            || !n_min.is_finite()
+            || !a_lo.is_finite()
+            || n_min <= 0.0
+            || a_lo <= 0.0
+        {
+            return Err(RegimeRefusal::SingularParametrization);
+        }
+        let s_up = up(w_max / (n_min * a_lo));
+        if !s_up.is_finite() || s_up >= 1.0 {
+            return Err(RegimeRefusal::SingularParametrization);
+        }
+        Ok(NormalCone { anchor, s_up })
+    }
+
+    /// The Lemma D dichotomy over two already-certified normal cones. The cone
+    /// computation is the expensive step, so `certify_sandwich` caches the
+    /// per-patch cones and calls this for every pair.
+    fn admit_regime_from_cones(
+        cone_a: &NormalCone,
+        cone_b: &NormalCone,
+    ) -> Result<RegimeAdmission, RegimeRefusal> {
+        let a = normalize3(cone_a.anchor).ok_or(RegimeRefusal::SingularParametrization)?;
+        let b = normalize3(cone_b.anchor).ok_or(RegimeRefusal::SingularParametrization)?;
+        let dot = super::v3_dot(a, b).clamp(-1.0, 1.0);
+        let cross = super::v3_norm(super::v3_cross(a, b));
+        let phi = cross.atan2(dot);
+        let phi_lo = down(phi);
+        let phi_hi = up(phi);
+        let s_a = cone_a.s_up.clamp(0.0, 1.0);
+        let s_b = cone_b.s_up.clamp(0.0, 1.0);
+        let theta_hi = up(s_a.asin() + s_b.asin());
+        if theta_hi >= std::f64::consts::FRAC_PI_4 {
+            return Err(RegimeRefusal::SingularParametrization);
+        }
+        let pi = std::f64::consts::PI;
+        let transversal = (phi_lo - theta_hi) > 0.0 && (phi_hi + theta_hi) < pi;
+        let tangential = (phi_hi + theta_hi) < std::f64::consts::FRAC_PI_2
+            || (phi_lo - theta_hi) > std::f64::consts::FRAC_PI_2;
+        let regime = if transversal {
+            SurfaceRegime::Transversal
+        } else if tangential {
+            SurfaceRegime::Tangential
+        } else {
+            return Err(RegimeRefusal::SingularParametrization);
+        };
+        Ok(RegimeAdmission {
+            regime,
+            axis: a,
+            phi_lo,
+            theta_hi,
+        })
+    }
+
+    fn regime_refusal_to_sandwich(refusal: RegimeRefusal) -> SandwichRefusal {
+        match refusal {
+            RegimeRefusal::SingularParametrization => SandwichRefusal::SingularParametrization,
+            RegimeRefusal::GraphNotInjective => SandwichRefusal::GraphNotInjective,
+        }
+    }
+
+    /// The certified volume of a closed oriented rational patch cycle, via the
+    /// landed face-form certificate.
+    fn exact_volume(rows: &[VolumeRow]) -> Result<f64, SandwichRefusal> {
+        let mut lo = 0.0f64;
+        let mut hi = 0.0f64;
+        for row in rows {
+            let patch = TensorBernsteinPatch::try_new(
+                row.numerator.clone(),
+                row.weights.clone(),
+                unit_ibox2(),
+                PatchParent::new(0, None),
+            )
+            .map_err(|_| SandwichRefusal::MalformedPatch)?;
+            let fact = certify_patch_form(&patch, row.orientation, &VolumeOptions::default())
+                .map_err(|_| SandwichRefusal::MalformedPatch)?;
+            lo += fact.bracket.lo;
+            hi += fact.bracket.hi;
+        }
+        Ok(0.5 * (lo + hi))
+    }
+
+    fn rows_equal(a: &VolumeRow, b: &VolumeRow) -> bool {
+        a.orientation == b.orientation && a.numerator == b.numerator && a.weights == b.weights
+    }
+
+    /// The coincidence floor `overlap_area * f` of the W2-less coincidence
+    /// case (section 4.4).
+    fn coincidence_floor(rows: &[RawPatch], axis: [f64; 3]) -> Result<f64, SandwichRefusal> {
+        let Some(first) = rows.first() else {
+            return Err(SandwichRefusal::MalformedPatch);
+        };
+        let (e1, e2) = project_basis(axis).ok_or(SandwichRefusal::SingularParametrization)?;
+        let (lo, hi) = projected_bbox(&first.num, &first.weights, e1, e2)
+            .ok_or(SandwichRefusal::SingularParametrization)?;
+        let area = (hi[0] - lo[0]) * (hi[1] - lo[1]);
+        let mut scale = 1.0f64;
+        for p in &first.num {
+            for c in p {
+                scale = scale.max(c.abs());
+            }
+        }
+        Ok(area * SANDWICH_FLOOR_FACTOR * f64::EPSILON * scale)
+    }
+
+    /// The per-cell contribution `|R| * max(0, -h_lo)`. `None` when the
+    /// projected overlap is empty or the overlap thickness is zero (the cell
+    /// is resolved).
+    #[allow(clippy::too_many_arguments)]
+    fn sandwich_cell(
+        id: u64,
+        depth: u32,
+        ia: usize,
+        ib: usize,
+        patch_a: &RawPatch,
+        patch_b: &RawPatch,
+        cell_a: ParamCell,
+        cell_b: ParamCell,
+        axis: [f64; 3],
+        e1: [f64; 3],
+        e2: [f64; 3],
+        fast: bool,
+    ) -> Result<Option<SandwichCell>, SandwichRefusal> {
+        let num_a = sub_raw_num(patch_a, &cell_a);
+        let w_a = sub_raw_weight(patch_a, &cell_a);
+        let num_b = sub_raw_num(patch_b, &cell_b);
+        let w_b = sub_raw_weight(patch_b, &cell_b);
+        let Some((alo, ahi)) = projected_bbox(&num_a, &w_a, e1, e2) else {
+            return Err(SandwichRefusal::SingularParametrization);
+        };
+        let Some((blo, bhi)) = projected_bbox(&num_b, &w_b, e1, e2) else {
+            return Err(SandwichRefusal::SingularParametrization);
+        };
+        let area = (ahi[0].min(bhi[0]) - alo[0].max(blo[0])).max(0.0)
+            * (ahi[1].min(bhi[1]) - alo[1].max(blo[1])).max(0.0);
+        if area <= 0.0 {
+            return Ok(None);
+        }
+        let (_pa_lo, pa_hi) = height_range(&num_a, &w_a, axis, fast)?;
+        let (pb_lo, _pb_hi) = height_range(&num_b, &w_b, axis, fast)?;
+        let h_lo = down(pb_lo - pa_hi);
+        let h_hi = up(_pb_hi - _pa_lo);
+        // The spec's undecided test (section 4.4): only a cell whose h-enclosure
+        // straddles zero carries sandwich uncertainty. A cell whose enclosure
+        // excludes zero is certified resolved and contributes nothing.
+        if h_lo > 0.0 || h_hi < 0.0 {
+            return Ok(None);
+        }
+        let thickness = (-h_lo).max(0.0);
+        let key = area * thickness;
+        if !key.is_finite() {
+            return Err(SandwichRefusal::MalformedPatch);
+        }
+        if key <= 0.0 {
+            return Ok(None);
+        }
+        Ok(Some(SandwichCell {
+            id,
+            depth,
+            ia,
+            ib,
+            a: cell_a,
+            b: cell_b,
+            axis,
+            e1,
+            e2,
+            key,
+        }))
+    }
+
+    /// The tangential sandwich volume rule of `A op B` (Lemma S with
+    /// obligations S1-S3). Returns the certified bracket or a named refusal.
+    pub fn certify_sandwich(
+        base: &[VolumeRow],
+        tool: &[VolumeRow],
+        mode: ModeValue,
+        options: &SandwichOptions,
+    ) -> Result<SandwichCertificate, SandwichRefusal> {
+        if base.is_empty() || tool.is_empty() {
+            return Err(SandwichRefusal::MalformedPatch);
+        }
+        let mut a_raw: Vec<RawPatch> = Vec::with_capacity(base.len());
+        for row in base {
+            a_raw.push(parse_raw(row)?);
+        }
+        let mut b_raw: Vec<RawPatch> = Vec::with_capacity(tool.len());
+        for row in tool {
+            b_raw.push(parse_raw(row)?);
+        }
+
+        let va = exact_volume(base)?;
+        let vb = exact_volume(tool)?;
+
+        // The per-patch normal cones (the expensive `certify_patch_family`
+        // step) are computed once and reused for every pair.
+        let mut a_cones: Vec<NormalCone> = Vec::with_capacity(base.len());
+        for row in base {
+            a_cones.push(patch_cone(row).map_err(regime_refusal_to_sandwich)?);
+        }
+        let mut b_cones: Vec<NormalCone> = Vec::with_capacity(tool.len());
+        for row in tool {
+            b_cones.push(patch_cone(row).map_err(regime_refusal_to_sandwich)?);
+        }
+
+        // W2: an exact common carrier resolves coincidence exactly.
+        let identical =
+            base.len() == tool.len() && base.iter().zip(tool.iter()).all(|(x, y)| rows_equal(x, y));
+        if identical {
+            let cone_a = a_cones.first().ok_or(SandwichRefusal::MalformedPatch)?;
+            let cone_b = b_cones.first().ok_or(SandwichRefusal::MalformedPatch)?;
+            let admission =
+                admit_regime_from_cones(cone_a, cone_b).map_err(regime_refusal_to_sandwich)?;
+            if options.shared_carrier {
+                let (lo, hi) = match mode {
+                    ModeValue::Add => (va, va),
+                    ModeValue::Subtract => (0.0, 0.0),
+                    ModeValue::Intersect => (va, va),
+                };
+                return Ok(SandwichCertificate {
+                    volume_a: va,
+                    volume_b: vb,
+                    sandwich_bound: 0.0,
+                    bracket_lo: lo,
+                    bracket_hi: hi,
+                    width: hi - lo,
+                    regime: SurfaceRegime::Tangential,
+                    range_path: RangePath::Bernstein,
+                    undecided_cells: 0,
+                    refined_cells: 0,
+                    floor: None,
+                });
+            }
+            let floor = coincidence_floor(&a_raw, admission.axis)?;
+            return Err(SandwichRefusal::CoincidenceWithoutExactCarrier { floor });
+        }
+
+        let fast = options.bernstein_chart && options.rational_positive_weights;
+        let mut heap: BinaryHeap<SandwichCell> = BinaryHeap::new();
+        let mut next_id = 0u64;
+        let mut total = 0.0f64;
+        let mut undecided = 0usize;
+        let mut refined = 0usize;
+        let mut any_tangential = false;
+
+        for (ia, ra) in a_raw.iter().enumerate() {
+            let cone_a = a_cones.get(ia).ok_or(SandwichRefusal::MalformedPatch)?;
+            for (ib, rb) in b_raw.iter().enumerate() {
+                let cone_b = b_cones.get(ib).ok_or(SandwichRefusal::MalformedPatch)?;
+                let admission =
+                    admit_regime_from_cones(cone_a, cone_b).map_err(regime_refusal_to_sandwich)?;
+                if admission.regime == SurfaceRegime::Transversal {
+                    continue;
+                }
+                any_tangential = true;
+                let axis = admission.axis;
+                let (e1, e2) =
+                    project_basis(axis).ok_or(SandwichRefusal::SingularParametrization)?;
+                let cell_a = ParamCell::unit();
+                let cell_b = ParamCell::unit();
+                if !graph_injective(ra, &cell_a, e1, e2) || !graph_injective(rb, &cell_b, e1, e2) {
+                    return Err(SandwichRefusal::GraphNotInjective);
+                }
+                if let Some(cell) = sandwich_cell(
+                    next_id, 0, ia, ib, ra, rb, cell_a, cell_b, axis, e1, e2, fast,
+                )? {
+                    next_id += 1;
+                    total += cell.key;
+                    undecided += 1;
+                    heap.push(cell);
+                }
+            }
+        }
+
+        // The schedule (section 4.4): refine the top key until the total is at
+        // most the requested tolerance; ties are broken by cell id.
+        while total > options.tolerance {
+            let Some(top) = heap.pop() else {
+                break;
+            };
+            total -= top.key;
+            if top.depth >= SANDWICH_MAX_DEPTH || refined >= options.max_cells {
+                return Err(SandwichRefusal::BudgetExhausted {
+                    achieved_width: total + top.key,
+                });
+            }
+            let da = top.a.diameter();
+            let db = top.b.diameter();
+            let mut children: Vec<(ParamCell, ParamCell)> = Vec::with_capacity(2);
+            if da >= db {
+                let (a1, a2) = top.a.split();
+                children.push((a1, top.b));
+                children.push((a2, top.b));
+            } else {
+                let (b1, b2) = top.b.split();
+                children.push((top.a, b1));
+                children.push((top.a, b2));
+            }
+            let ra = a_raw.get(top.ia).ok_or(SandwichRefusal::MalformedPatch)?;
+            let rb = b_raw.get(top.ib).ok_or(SandwichRefusal::MalformedPatch)?;
+            for (ca, cb) in children {
+                if !graph_injective(ra, &ca, top.e1, top.e2)
+                    || !graph_injective(rb, &cb, top.e1, top.e2)
+                {
+                    return Err(SandwichRefusal::GraphNotInjective);
+                }
+                if let Some(child) = sandwich_cell(
+                    next_id,
+                    top.depth + 1,
+                    top.ia,
+                    top.ib,
+                    ra,
+                    rb,
+                    ca,
+                    cb,
+                    top.axis,
+                    top.e1,
+                    top.e2,
+                    fast,
+                )? {
+                    next_id += 1;
+                    total += child.key;
+                    heap.push(child);
+                }
+            }
+            refined += 1;
+        }
+
+        let s = total;
+        // The bracket assumes the operands are closed oriented solids
+        // (`V_A, V_B >= 0`). Open patch cycles carry a signed flux; the
+        // formula clamps to keep a well-formed bracket, and the sandwich bound
+        // (the rule's real payload) is unaffected.
+        let (lo, hi) = match mode {
+            ModeValue::Add => {
+                let sum = va + vb;
+                let lower = (sum - s).max(0.0);
+                (lower, sum.max(lower))
+            }
+            ModeValue::Subtract => {
+                let upper = va.max(0.0);
+                ((upper - s).max(0.0), upper)
+            }
+            ModeValue::Intersect => (0.0, s.max(0.0)),
+        };
+        if !lo.is_finite() || !hi.is_finite() || lo > hi {
+            return Err(SandwichRefusal::MalformedPatch);
+        }
+        Ok(SandwichCertificate {
+            volume_a: va,
+            volume_b: vb,
+            sandwich_bound: s,
+            bracket_lo: lo,
+            bracket_hi: hi,
+            width: hi - lo,
+            regime: if any_tangential {
+                SurfaceRegime::Tangential
+            } else {
+                SurfaceRegime::Transversal
+            },
+            range_path: if fast {
+                RangePath::Bernstein
+            } else {
+                RangePath::Fallback
+            },
+            undecided_cells: undecided,
+            refined_cells: refined,
+            floor: None,
+        })
+    }
+}
+
+// ---------------------------------------------------------------------------
+// RDEF-M2-REGIME-SANDWICH -- the door-facing probe.
+// ---------------------------------------------------------------------------
+
+/// The RDEF-M2 door probe (CHK-9 reachability): run the (T)/(G) admission
+/// dichotomy and the tangential sandwich volume rule over the submitted patch
+/// 2-cycles and marshal the outcome. A refusal is reported as a named tag
+/// (never a panic, never a silent zero), so the door can distinguish the
+/// regime split's certified bracket from every typed refusal.
+pub fn certify_sandwich_probe(
+    row: &crate::facade::SandwichProbeRow,
+) -> crate::facade::SandwichOutcome {
+    let to_rows = |patches: &[crate::facade::SandwichPatchRow]| {
+        patches
+            .iter()
+            .map(|p| crate::python::binding::VolumeRow {
+                numerator: p.numerator.clone(),
+                weights: p.weights.clone(),
+                orientation: p.orientation,
+            })
+            .collect::<Vec<_>>()
+    };
+    let base = to_rows(&row.base);
+    let tool = to_rows(&row.tool);
+    let options = membership::SandwichOptions {
+        tolerance: row.tolerance,
+        max_cells: row.max_cells,
+        shared_carrier: row.shared_carrier,
+        bernstein_chart: row.bernstein_chart,
+        rational_positive_weights: row.rational_positive_weights,
+    };
+    match membership::certify_sandwich(&base, &tool, row.mode, &options) {
+        Ok(cert) => crate::facade::SandwichOutcome {
+            ok: true,
+            regime: match cert.regime {
+                membership::SurfaceRegime::Transversal => "transversal".to_string(),
+                membership::SurfaceRegime::Tangential => "tangential".to_string(),
+            },
+            range_path: match cert.range_path {
+                membership::RangePath::Bernstein => "bernstein".to_string(),
+                membership::RangePath::Fallback => "fallback".to_string(),
+            },
+            volume_a: cert.volume_a,
+            volume_b: cert.volume_b,
+            sandwich_bound: cert.sandwich_bound,
+            bracket_lo: cert.bracket_lo,
+            bracket_hi: cert.bracket_hi,
+            width: cert.width,
+            undecided_cells: cert.undecided_cells,
+            refined_cells: cert.refined_cells,
+            refusal: None,
+            floor: cert.floor,
+        },
+        Err(refusal) => {
+            let (tag, floor) = match refusal {
+                membership::SandwichRefusal::SingularParametrization => {
+                    ("singular_parametrization".to_string(), None)
+                }
+                membership::SandwichRefusal::GraphNotInjective => {
+                    ("graph_not_injective".to_string(), None)
+                }
+                membership::SandwichRefusal::CoincidenceWithoutExactCarrier { floor } => {
+                    ("coincidence_without_exact_carrier".to_string(), Some(floor))
+                }
+                membership::SandwichRefusal::BudgetExhausted { .. } => {
+                    ("budget_exhausted".to_string(), None)
+                }
+                membership::SandwichRefusal::MalformedPatch => {
+                    ("malformed_patch".to_string(), None)
+                }
+            };
+            let achieved = match refusal {
+                membership::SandwichRefusal::BudgetExhausted { achieved_width } => achieved_width,
+                _ => 0.0,
+            };
+            crate::facade::SandwichOutcome {
+                ok: true,
+                regime: "unknown".to_string(),
+                range_path: "unknown".to_string(),
+                volume_a: 0.0,
+                volume_b: 0.0,
+                sandwich_bound: achieved,
+                bracket_lo: 0.0,
+                bracket_hi: 0.0,
+                width: 0.0,
+                undecided_cells: 0,
+                refined_cells: 0,
+                refusal: Some(tag),
+                floor,
+            }
+        }
     }
 }
 
@@ -10520,8 +11683,11 @@ print(json.dumps([z_row, loft_row]))
     }
 
     #[test]
-    fn swept_admission_tangential_pair_refuses_non_transversal() {
-        // Two coincident straight lofts extract but meet non-transversally.
+    fn swept_admission_tangential_pair_refuses_coincidence_without_carrier() {
+        // Two coincident straight lofts extract but meet non-transversally. The
+        // RDEF-M2 regime split admits them as (G) and the sandwich rule detects
+        // the exact coincidence: with no recorded common carrier the pair
+        // refuses `CoincidenceWithoutExactCarrier`.
         let node = boolean(
             crate::facade::ModeValue::Add,
             part(straight_loft(3, 0.0, 1.0, 0.0, 0.0, 1.0), 0.0, 0.0, 0.0),
@@ -10532,7 +11698,7 @@ print(json.dumps([z_row, loft_row]))
         };
         assert_eq!(
             admit_swept_pair(boolean),
-            Err(SweptAdmissionRefusal::NonTransversalContact)
+            Err(SweptAdmissionRefusal::CoincidenceWithoutExactCarrier)
         );
         // The boundary marshals the stage onto the localized contact case.
         assert!(matches!(
