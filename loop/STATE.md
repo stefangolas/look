@@ -75,6 +75,39 @@ corrected, annex C = ORACLE POLICY CHANGE), then docs/SOLVER_COVERAGE_SPEC.md
 
 ## Where we are
 
+> LATEST GROUND TRUTH [operator 2026-09-11T18:35Z]: 0 RUNNING / 0
+> landed-this-cycle / 0 unblocked / 0 flipped / 0 dispatched. HEAD `4784035`
+> (moved since the 18:11Z note: `4784035` readme benchmark table leads with the
+> shipped 0.4 mm demo deflection - an owner/README commit, not a loop landing).
+> All 8 slots FINISHED/IDLE landed residue; every tip (43e26c9/329f6ab/c3df084/
+> e6553db/3c2109b/ee97499/713f205/5cf4811) re-verified an ancestor of HEAD this
+> cycle - nothing landable. RESULT statuses read directly: slot0 `LANDED`,
+> slot1 `complete`, slot3 `DONE`, slot4 `LANDED-WITH-FINDINGS`, slot5/6 `DONE`,
+> slot7 `LANDED` (none is a fresh DONE awaiting merge). **Frontier unchanged and
+> still STALLED ON DISK: FHC-EX-A-CLOSED-LOOP-SHELL is READY; dispatch_ready
+> --dry-run would dispatch it to slot 0 (FHC-EX-B / FHC-TRIM-EXTRUDE-ENVELOPE /
+> FHC-MIRROR-FORM serial behind it) but new_slot refuses - DISK 5.7 GiB free is
+> BELOW the 8 GB floor and the janitor reclaimed ~0.0 (pool exhausted: no
+> target/ dirs anywhere, no TEMP look-verify-baseline-* leaks; the bulk is
+> untracked human scratch/ 1.73 GB, not loop-owned).** RAM 2.7 GiB free (LOW).
+> Registry re-derived by command: 349 rows = 253 DONE / 85 READY / 10 BLOCKED /
+> 1 SUPERSEDED; none of the 10 BLOCKED rows is mechanically flippable (each
+> carries a deliberate hold/gate: OWNER_BLOCKED, booking gate, SUPERSEDED,
+> registered defect, owner-decision, milestone, or unmet needs). RG-23/RG-9 are
+> READY with `packet: ''` (empty) = authoring gap, carried. Health: heartbeat
+> exactly 1 (27872, log 6 min fresh), operator_runner 1 (27876), watchdog 1
+> (29264), ONE overnight driver (24864), TWO supervisors (19172+27828) + TWO
+> cargoq servers (28544+34564) carried; cargoq UP (queued 0, running false). No
+> manual dispatch (heartbeat owns it; disk-floor blocked anyway). Root worktree
+> carries the live human-session WIP (untracked scratch/ 1.73 GB, benchmarks/,
+> loop/baselines/; tracked loop/cargoq/server.log + M loop/LEDGER.jsonl driver
+> append) - untouched, reported not actioned. Carried human items: disk below
+> floor blocks dispatch; RG-23/RG-9 missing packet files; RDEF-M4 re-scope;
+> MONO-10 owner R3-mesh decision; FRAME-REVOLVE F1 non_z_axis pin; duplicate
+> supervisors + lagging cargoq restart guard; TOR-C flip-or-pin; schedule.py
+> 'needs' crash.
+>
+> --- SUPERSEDED 2026-09-11T18:11Z note (kept for history) follows ---
 > LATEST GROUND TRUTH [operator 2026-09-11T18:11Z]: 0 RUNNING / 0
 > landed-this-cycle / 0 unblocked / 0 flipped / 0 dispatched. HEAD `2706af4`
 > (moved since the 17:52Z note: `54d0713` merge AUTHOR-CENSUS-NAMES - overnight
@@ -7959,3 +7992,22 @@ overnight driver (24864), TWO supervisors (19172+27828) + TWO cargoq servers
 leaks. Root worktree: human-session WIP untouched. No manual dispatch (heartbeat
 owns it; disk-floor blocked anyway). Leaving: 0 RUNNING; HEAD 2706af4 + this
 cycle's STATE/log/escalation commit.]
+
+[operator 2026-09-11T18:35Z - volatile refresh. Board: 0 RUNNING / 0
+landed-this-cycle / 0 unblocked / 0 flipped / 0 dispatched. HEAD `4784035`
+(one owner README commit since the 18:11Z note). All 8 slots FINISHED/IDLE
+landed residue - every tip (43e26c9/329f6ab/c3df084/e6553db/3c2109b/ee97499/
+713f205/5cf4811) re-verified an ancestor of HEAD; RESULT statuses read directly
+(slot0 LANDED, slot1 complete, slot3 DONE, slot4 LANDED-WITH-FINDINGS, slot5/6
+DONE, slot7 LANDED); nothing landable. Frontier unchanged and STALLED ON DISK:
+FHC-EX-A-CLOSED-LOOP-SHELL READY, would dispatch to slot 0, but new_slot refuses
+(DISK 5.7 GiB < 8 GB floor; janitor reclaimed ~0.0 - no target/ dirs, no TEMP
+baseline leaks; bulk is untracked human scratch/ 1.73 GB). RAM 2.7 GiB (LOW).
+Registry 349 = 253 DONE / 85 READY / 10 BLOCKED / 1 SUPERSEDED; none flippable;
+RG-23/RG-9 packet:'' = authoring gap. Health: heartbeat exactly 1 (27872, 6 min
+fresh), operator_runner 1 (27876), watchdog 1 (29264), ONE overnight driver
+(24864), TWO supervisors (19172+27828) + TWO cargoq servers (28544+34564)
+carried; cargoq UP (queued 0, running false). No manual dispatch (heartbeat owns
+it; disk-floor blocked anyway). Root worktree: human-session WIP untouched. No
+new escalation (disk below floor already carried). Leaving: 0 RUNNING; HEAD
+4784035 + this cycle's STATE/log/escalation commit.]

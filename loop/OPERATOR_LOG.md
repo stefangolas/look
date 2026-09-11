@@ -5681,3 +5681,54 @@ Leaving: 0 RUNNING; HEAD `2706af4` + this cycle's STATE/log/escalation commit;
 heartbeat 1 (27872); operator_runner 1 (27876); watchdog 1 (29264); ONE
 overnight driver; TWO supervisors (carried); cargoq UP (queued 0, running
 false); disk 5.8 GiB free (LOW, below floor); RAM 1.6-2.7 GiB.
+
+
+## 2026-09-11 18:35 UTC - operator cycle (one pass)
+
+Board: 0 RUNNING / 0 landed-this-cycle / 0 unblocked / 0 flipped / 0
+dispatched. HEAD `4784035` (one owner README commit since the 18:11Z note).
+
+- Step 1 health sweep: `slot_status.py` -> all 8 slots FINISHED/IDLE, no live
+  worker. `curl 127.0.0.1:8231/ping` -> ok, queued 0, running false. Heartbeat
+  exactly 1 (27872; dispatch_heartbeat.log 6 min fresh = within its 10-min
+  cycle). watchdog 1 (29264). DISK 5.7 GB free (BELOW the 15 GB goal and the
+  8 GB floor); RAM 2.7 GB (BELOW the 3 GB threshold; no worker resident). No
+  TEMP look-verify-baseline-* leaks; no root/slot `target/` dirs. Two
+  supervisors (19172+27828) + two cargoq servers (28544+34564) carried.
+- Step 2 land mechanically landable: all 8 worker tips (43e26c9/329f6ab/c3df084/
+  e6553db/3c2109b/ee97499/713f205/5cf4811) verified ancestors of HEAD by
+  `git merge-base --is-ancestor`. RESULT statuses read directly: slot0 LANDED,
+  slot1 complete, slot3 DONE, slot4 LANDED-WITH-FINDINGS, slot5/6 DONE, slot7
+  LANDED. Nothing landable (no fresh DONE; no merge needed).
+- Step 3 unblock stuck workers: none. No IDLE/DEAD slot holds uncommitted work;
+  no live worker to preserve; no QUESTION to answer.
+- Step 4 registry hygiene: re-derived 349 rows = 253 DONE / 85 READY / 10
+  BLOCKED / 1 SUPERSEDED. None of the 10 BLOCKED rows is mechanically flippable
+  (each carries a deliberate hold/gate). RG-23/RG-9 are READY with `packet: ''`
+  (empty) -> missing packet files = authoring gap, carried; no anchor-count
+  drift to re-measure. `janitor ensure --need 15` -> reclaimed ~0.0 -> 5.7 GB
+  (pool exhausted).
+- Step 5 dispatch: NOT run manually. The heartbeat (27872) owns dispatch and
+  runs `dispatch_ready.py --max-workers=3` every 10 min; a manual run would race
+  it (the documented double-dispatch landmine). Read its latest output instead:
+  "FHC-EX-A-CLOSED-LOOP-SHELL -> slot 0; new_slot FAILED: 5.6 GB free below the
+  8.0 GB floor; dispatched 0". Frontier STALLED ON DISK.
+- Step 6 STATE: prepended the 18:35Z LATEST GROUND TRUTH block (18:11Z marked
+  SUPERSEDED) + appended the volatile refresh at file end. Traps/history
+  untouched.
+- Step 7: this entry.
+
+Escalations: none NEW. CARRIED - disk 5.7 GiB below the 8 GB floor stalls the
+FHC-EX frontier; RG-23/RG-9 missing packet files; RDEF-M4 re-scope; MONO-10
+owner R3-mesh decision; FRAME-REVOLVE F1 non_z_axis pin; duplicate supervisors +
+lagging cargoq restart guard; TOR-C flip-or-pin; schedule.py 'needs' crash.
+
+Worktree note (reported, not actioned): root tree carries the live human-session
+WIP (untracked scratch/ 1.73 GB, benchmarks/, loop/baselines/; tracked
+loop/cargoq/server.log; the uncommitted `M loop/LEDGER.jsonl` driver append) -
+untouched.
+
+Leaving: 0 RUNNING; HEAD `4784035` + this cycle's STATE/log/escalation commit;
+heartbeat 1 (27872); operator_runner 1 (27876); watchdog 1 (29264); ONE overnight
+driver (24864); TWO supervisors + TWO cargoq servers carried; cargoq UP (queued
+0, running false); disk 5.7 GiB free (LOW, below floor); RAM 2.7 GiB.

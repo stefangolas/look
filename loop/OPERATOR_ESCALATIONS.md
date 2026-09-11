@@ -1607,3 +1607,15 @@ uncommitted - left for the orchestrator, no dispatch impact.
   restart guard; TOR-C flip-or-pin; schedule.py 'needs' crash.
 - Start from: `Get-PSDrive C`; `python loop/janitor.py status`;
   `python loop/dispatch_ready.py --dry-run --max-workers=4`.
+
+## 2026-09-11 18:35 UTC - CARRIED (no new item): DISK 5.7 GiB still below the 8 GB floor
+
+- Re-derived this cycle: `janitor ensure --need 15` -> reclaimed ~0.0 -> 5.7 GB
+  free (STILL SHORT). No root/slot `target/` dirs exist; no TEMP
+  look-verify-baseline-* leaks. Frontier unchanged: FHC-EX-A-CLOSED-LOOP-SHELL
+  READY but `new_slot` refuses below the floor, so the FHC chain stays stalled.
+- Action needed (human/owner): free C: space outside the loop to reach 8 GB.
+  Carried unchanged: RG-23/RG-9 missing packet files (`packet: ''`); RDEF-M4
+  re-scope; MONO-10 owner R3-mesh decision; FRAME-REVOLVE F1 non_z_axis pin;
+  duplicate supervisors + lagging cargoq restart guard; TOR-C flip-or-pin;
+  schedule.py 'needs' crash.
