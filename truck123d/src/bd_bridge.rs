@@ -1683,9 +1683,7 @@ fn spline_loop_spans(profile: &[ProfileEdge]) -> Result<Vec<SpanPoly3>, Refusal>
     if profile.iter().any(|edge| {
         matches!(
             edge,
-            ProfileEdge::Circle { .. }
-                | ProfileEdge::Ellipse { .. }
-                | ProfileEdge::Arc { .. }
+            ProfileEdge::Circle { .. } | ProfileEdge::Ellipse { .. } | ProfileEdge::Arc { .. }
         )
     }) {
         return Err(Refusal::UnsupportedEnvelope(
@@ -1719,9 +1717,7 @@ fn spline_loop_spans(profile: &[ProfileEdge]) -> Result<Vec<SpanPoly3>, Refusal>
             }
             // Mixed conic/arc edges were rejected above; a lone circle or
             // ellipse returns early with its deterministic tessellation.
-            ProfileEdge::Circle { .. }
-            | ProfileEdge::Ellipse { .. }
-            | ProfileEdge::Arc { .. } => {
+            ProfileEdge::Circle { .. } | ProfileEdge::Ellipse { .. } | ProfileEdge::Arc { .. } => {
                 return Err(Refusal::UnsupportedEnvelope(
                     EnvelopeCase::NonCanonicalCarrier,
                 ));
@@ -3092,7 +3088,8 @@ fn curved_loop(profile: &[ProfileEdge]) -> Result<ProfileLoop, Refusal> {
                 start_angle,
                 end_angle,
             } => {
-                if !radius.is_finite() || !(*radius > 0.0) || !center.iter().all(|c| c.is_finite()) {
+                if !radius.is_finite() || !(*radius > 0.0) || !center.iter().all(|c| c.is_finite())
+                {
                     return Err(Refusal::Empty);
                 }
                 let (u, v) = conic_frame(*normal, *x_dir)?;

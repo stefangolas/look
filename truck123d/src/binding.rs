@@ -899,9 +899,7 @@ fn gather_points(profile: &[ProfileEdge], trim: &[[f64; 3]]) -> Vec<[f64; 3]> {
             ProfileEdge::Spline { points } => out.extend(points.iter().copied()),
             // A conic/arc section is not a point-list carrier; the trim-extrude
             // constructor's point fit does not consume it.
-            ProfileEdge::Circle { .. }
-            | ProfileEdge::Ellipse { .. }
-            | ProfileEdge::Arc { .. } => {}
+            ProfileEdge::Circle { .. } | ProfileEdge::Ellipse { .. } | ProfileEdge::Arc { .. } => {}
         }
     }
     out.extend(trim.iter().copied());
