@@ -756,6 +756,10 @@ class Edge:
 
     @property
     def wrapped(self):
+        # An OCC probe of a kernel-engine curve row cannot be served: refuse
+        # typed (never pass `None` into OCP, which dies as an untyped
+        # TypeError). Mirrors the placed-row `_Shape.wrapped` refusal.
+        _refuse("an OCC probe of a kernel-engine row is not a kernel-engine row")
         return None
 
     def to_tuple(self):
@@ -1141,6 +1145,9 @@ class Wire:
 
     @property
     def wrapped(self):
+        # An OCC probe of a kernel-engine wire row cannot be served: refuse
+        # typed, never pass `None` into OCP.
+        _refuse("an OCC probe of a kernel-engine row is not a kernel-engine row")
         return None
 
     def __iter__(self):
@@ -1190,6 +1197,10 @@ class Face:
 
     @property
     def wrapped(self):
+        # An OCC probe of a kernel-engine face row cannot be served: refuse
+        # typed, never pass `None` into OCP (the corpus's `_prism_estimate`
+        # sanity check probes a section face's bounds).
+        _refuse("an OCC probe of a kernel-engine row is not a kernel-engine row")
         return None
 
     def __iter__(self):

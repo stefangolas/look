@@ -1646,9 +1646,94 @@ fn linear_spans(verts: &[[f64; 3]]) -> Vec<SpanPoly3> {
     spans
 }
 
+/// The recorded start and end of one section edge (the curve's traversal).
+/// `None` for a carrier the section loop does not consume as a span.
+fn profile_edge_endpoints(edge: &ProfileEdge) -> Option<([f64; 3], [f64; 3])> {
+    match edge {
+        ProfileEdge::Line { a, b } => Some((*a, *b)),
+        ProfileEdge::Spline { points } => Some((*points.first()?, *points.last()?)),
+        ProfileEdge::Circle { .. } | ProfileEdge::Ellipse { .. } | ProfileEdge::Arc { .. } => None,
+    }
+}
+
+/// The same recorded section edge traversed in the opposite direction: a line
+/// swaps its endpoints and a spline reverses its defining samples. The
+/// reconstruction of a reversed edge is the exact reverse curve (the clamped
+/// cubic interpolation is symmetric in its data), never a re-approximation.
+fn reverse_profile_edge(edge: &ProfileEdge) -> ProfileEdge {
+    match edge {
+        ProfileEdge::Line { a, b } => ProfileEdge::Line { a: *b, b: *a },
+        ProfileEdge::Spline { points } => ProfileEdge::Spline {
+            points: points.iter().rev().copied().collect(),
+        },
+        other => other.clone(),
+    }
+}
+
+/// Orients a recorded section boundary into one connected closed ring.
+///
+/// A section is a CLOSED loop of mixed line/spline edges, but the authoring
+/// surface may record its edges without a consistent traversal: `top + tail +
+/// bottom` records both spline surfaces from the same start vertex, so the
+/// closing edge must be reversed before the ring connects. Starting from the
+/// first recorded edge, each following edge is chosen as the first remaining
+/// edge whose start meets the running end (kept) or whose end meets it
+/// (reversed). A boundary already recorded as a connected loop keeps its
+/// recorded order bit-for-bit; a boundary that cannot be connected refuses
+/// typed naming the open carrier.
+fn orient_profile_ring(profile: &[ProfileEdge]) -> Result<Vec<ProfileEdge>, Refusal> {
+    let mut scale = 0.0f64;
+    for edge in profile {
+        let (a, b) = profile_edge_endpoints(edge).ok_or_else(open_smooth_loft)?;
+        for p in [a, b] {
+            for c in p {
+                if !c.is_finite() {
+                    return Err(Refusal::Empty);
+                }
+                scale = scale.max(c.abs());
+            }
+        }
+    }
+    let tol = 1e-9 * (1.0 + scale);
+    let mut remaining: Vec<ProfileEdge> = profile.to_vec();
+    let first = remaining.remove(0);
+    let mut ring: Vec<ProfileEdge> = vec![first];
+    let mut current_end = profile_edge_endpoints(ring.first().ok_or(Refusal::Empty)?)
+        .ok_or(Refusal::Empty)?
+        .1;
+    while !remaining.is_empty() {
+        let mut chosen: Option<(usize, bool)> = None;
+        for (index, edge) in remaining.iter().enumerate() {
+            let (start, end) = profile_edge_endpoints(edge).ok_or(Refusal::Empty)?;
+            if v3_norm(v3_sub(current_end, start)) <= tol {
+                chosen = Some((index, false));
+                break;
+            }
+            if v3_norm(v3_sub(current_end, end)) <= tol {
+                chosen = Some((index, true));
+                break;
+            }
+        }
+        let Some((index, reversed)) = chosen else {
+            return Err(open_smooth_loft());
+        };
+        let mut edge = remaining.remove(index);
+        if reversed {
+            edge = reverse_profile_edge(&edge);
+        }
+        current_end = profile_edge_endpoints(&edge).ok_or(Refusal::Empty)?.1;
+        ring.push(edge);
+    }
+    Ok(ring)
+}
+
 /// The reconstructed spans of a closed section loop (line and spline edges),
 /// with the exact seam closure checked. Every edge's recorded end must meet the
-/// next edge's recorded start and the last must return to the first.
+/// next edge's recorded start and the last must return to the first. The
+/// recorded edges are first oriented into one connected ring (see
+/// [`orient_profile_ring`]); a single spline edge is a closed ring whose
+/// defining samples close on the start vertex (the landed spline-profile
+/// extrude convention).
 fn spline_loop_spans(profile: &[ProfileEdge]) -> Result<Vec<SpanPoly3>, Refusal> {
     if profile.is_empty() {
         return Err(Refusal::Empty);
@@ -1680,6 +1765,12 @@ fn spline_loop_spans(profile: &[ProfileEdge]) -> Result<Vec<SpanPoly3>, Refusal>
         let (_ellipse, verts) = ellipse_from_edge(*center, *x_radius, *y_radius, *normal, *x_dir)?;
         return Ok(linear_spans(&verts));
     }
+    // A single spline edge is the corpus's periodic outline carrier: the
+    // section is a closed ring through its defining samples, closed on the
+    // start vertex (the landed spline-profile extrude convention).
+    if let [ProfileEdge::Spline { points }] = profile {
+        return closed_spline_spans(points);
+    }
     if profile.iter().any(|edge| {
         matches!(
             edge,
@@ -1690,10 +1781,11 @@ fn spline_loop_spans(profile: &[ProfileEdge]) -> Result<Vec<SpanPoly3>, Refusal>
             EnvelopeCase::NonCanonicalCarrier,
         ));
     }
+    let ring = orient_profile_ring(profile)?;
     let mut spans: Vec<SpanPoly3> = Vec::new();
     let mut starts: Vec<[f64; 3]> = Vec::new();
     let mut ends: Vec<[f64; 3]> = Vec::new();
-    for edge in profile {
+    for edge in &ring {
         match edge {
             ProfileEdge::Line { a, b } => {
                 if !a.iter().all(|c| c.is_finite()) || !b.iter().all(|c| c.is_finite()) {
@@ -1743,6 +1835,33 @@ fn spline_loop_spans(profile: &[ProfileEdge]) -> Result<Vec<SpanPoly3>, Refusal>
         }
     }
     Ok(spans)
+}
+
+/// The closed span loop of a single spline section edge. The defining samples
+/// are closed on the start vertex (the landed spline-profile extrude
+/// convention: a periodic outline records no duplicated closing sample, so the
+/// first sample is appended before the clamped-cubic reconstruction). An open
+/// carrier with fewer than three defining samples refuses typed.
+fn closed_spline_spans(points: &[[f64; 3]]) -> Result<Vec<SpanPoly3>, Refusal> {
+    if points.len() < 3 {
+        return Err(Refusal::Empty);
+    }
+    let mut scale = 0.0f64;
+    for p in points {
+        for c in p {
+            if !c.is_finite() {
+                return Err(Refusal::Empty);
+            }
+            scale = scale.max(c.abs());
+        }
+    }
+    let mut closed = points.to_vec();
+    let first = *points.first().ok_or(Refusal::Empty)?;
+    let last = *points.last().ok_or(Refusal::Empty)?;
+    if v3_norm(v3_sub(last, first)) > 1e-9 * (1.0 + scale) {
+        closed.push(first);
+    }
+    spline_spans3(&closed)
 }
 
 /// The exact `int_0^1 a(u) b(u) du` of two power-basis polynomials.
