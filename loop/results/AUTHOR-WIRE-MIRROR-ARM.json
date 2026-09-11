@@ -1,0 +1,11 @@
+{
+  "id": "AUTHOR-WIRE-MIRROR-ARM",
+  "contract": ["AUTHOR-WIRE-MIRROR-ARM"],
+  "class": "mechanical",
+  "status": "DONE",
+  "tests_added": 4,
+  "anchors_verified": {
+    "A1": 0
+  },
+  "notes": "door.py's mirror arm now dispatches wire/edge carriers (judgement 1): _mirror_edge reflects the recorded control data of one edge exactly (line endpoints, spline defining samples, circle centre + plane normal with invariant radius) and _mirror_wire reflects every edge in place, preserving the recorded edge order. No re-interpolation and no resampling: the reflected Edge/Wire is rebuilt from the reflected numbers and then feeds the EXISTING make_face/loft section paths unchanged (judgement 3). mirror() still admits only Plane.YZ/Plane.XZ/Plane.XY; a free-plane mirror refuses typed through truck123d.Refused, same as the part arm (judgement 2). The generic unsupported-carrier fallbacks now name the carrier type in the refusal message (the old 'a mirror of this carrier is not a kernel-engine row' literal is gone; anchor A1 -> 0). Tests (truck123d/tests/wire_mirror_arm.rs, 4/4 green): mirrored_spline_wire_records_reflected_control_data (x -> -x about Plane.YZ, y/z unchanged), mirrored_line_records_reflected_endpoints (y -> -y about Plane.XZ), mirrored_free_plane_wire_refuses_typed, and mirrored_wire_lofts_green (a mirrored closed polygon wire -> make_face -> loft to an offset copy answers solid_count 1, volume 20.0, finite bbox). Scoped check: cargo test -p truck123d --test wire_mirror_arm --locked (4 passed); cargo fmt -p truck123d -- --check reports no diff in the new file (the only diffs are pre-existing baseline drift in ttc_hazard_battery.rs). No kernel/bridge changes: the mirrored wire is client-layer data consumed by the landed section paths."
+}
