@@ -75,6 +75,35 @@ corrected, annex C = ORACLE POLICY CHANGE), then docs/SOLVER_COVERAGE_SPEC.md
 
 ## Where we are
 
+> LATEST GROUND TRUTH [operator 2026-09-11T08:02Z]: 3 RUNNING (all
+> AUTHOR-WIRE-MIRROR-ARM) / 0 landed-by-operator / 0 unblocked / 0 flipped /
+> 0 dispatched. HEAD `6b25068` (the 07:42Z operator commit). **ALL THREE
+> running slots are AUTHOR-WIRE-MIRROR-ARM (TRIPLE-DISPATCH) AND ALL THREE ARE
+> ALIVE AND PROGRESSING**: slot 0 cmd 18540 -> opencode 31940, slot 1 cmd
+> 32348 -> opencode 26564 (events fresh, changed=1 untracked
+> `truck123d/tests/wire_mirror_arm.rs`), slot 2 cmd 21184 -> opencode 480.
+> **THE HANG CLEARED 07:55:43Z**: cargoq TIMEOUT-reaped the second `cargo test
+> --locked -p truck123d --lib`; all three workers resumed and are issuing
+> cargo (slot 0 `test --lib mirror` START 08:00:19Z; slots 1/2 `test
+> wire_mirror_arm` exit 101). `slot_status` reads slot 0 STALLED (events
+> 25 min old) but its cargoq job STARTED 08:00:19Z - the 180s freshness guard
+> is misreading a live worker, exactly the class escalated below. **DISK FLOOR
+> STILL THE ONLY GUARD**: the 07:55:18Z heartbeat read 0 running and tried
+> AUTHOR-WIRE-MIRROR-ARM -> slot 3 + AUTHOR-CENSUS-NAMES -> slot 4; BOTH
+> new_slot FAILED on the 8 GB floor (5.9 GiB free). DO NOT reclaim disk / DO
+> NOT manually dispatch until the row is pinned. Nothing operator-landable:
+> FINISHED tips e6553db/3c2109b/ee97499/713f205/5cf4811 all verified ancestors
+> of integration HEAD `6b25068` (re-derived this cycle). Registry: RG-23 and
+> RG-9 rows are READY with an EMPTY `packet` field (no packet file exists) -
+> authoring, not an anchor fix; AUTHOR-CENSUS-NAMES held (write-set clash with
+> the running door.py lane); AUTHOR-WIRE-MIRROR-ARM row itself has no `landed`
+> marker and reads READY (the redispatch root). Health: heartbeat exactly 1
+> (27872), operator_runner 1 (27876), watchdog 1 (29264), overnight driver 1
+> (24864); TWO supervisors (19172+27828) + TWO cargoq/server.py (28544+34564)
+> carried; disk 5.9 GiB free, RAM 3.5 GiB. ESCALATED 08:02Z: pin the row NOW
+> and fix the freshness guard - the disk floor is the only remaining guard.
+>
+> --- SUPERSEDED 2026-09-11T07:42Z note (kept for history) follows ---
 > LATEST GROUND TRUTH [operator 2026-09-11T07:42Z]: 3 RUNNING (all
 > AUTHOR-WIRE-MIRROR-ARM) / 0 landed-by-operator / 0 unblocked / 0 flipped /
 > 0 dispatched (heartbeat live; disk floor blocks new_slot). HEAD `06c4d11`.
@@ -2467,6 +2496,32 @@ FRAME-REVOLVE F1 non_z_axis pin (ttc_lathe_spline.rs:255); duplicate
 supervisors + duplicate cargoq guard; slot-4/7 wt RESULT residue; TOR-C
 flip-or-pin; MONO-10 missing packet; RDEF-M4 H-8 stale anchor;
 AUTHOR-CENSUS-NAMES SPEC_GAP question loop; duplicate-driver probe fix.]
+
+[operator 2026-09-11T08:02Z - volatile refresh. Board now: 3 RUNNING (slots
+0/1/2, triple-dispatched AUTHOR-WIRE-MIRROR-ARM, ALL workers alive) / 0
+landed-this-cycle / 0 unblocked / 0 flipped / 0 dispatched. HEAD 6b25068
+(07:42Z operator commit). THE HANG CLEARED 07:55:43Z (cargoq TIMEOUT-reaped
+the second `cargo test --locked -p truck123d --lib`); all three workers
+resumed and are issuing cargo (slot 0 `--lib mirror` START 08:00:19Z; slots
+1/2 `wire_mirror_arm` exit 101). slot_status's STALLED on slot 0 is a false
+negative (its cargoq job is seconds old) - the freshness-guard class, not a
+dead worker; DO NOT reset. Landing: nothing - all FINISHED tips
+(e6553db/3c2109b/ee97499/713f205/5cf4811) re-verified ancestors of
+integration HEAD 6b25068. Unblock: nothing safe. Registry: RG-23/RG-9 READY
+rows have an EMPTY `packet` field (no packet file) -> authoring, escalated;
+AUTHOR-CENSUS-NAMES held on the door.py write-set clash. Dispatch: NOT run
+manually (heartbeat live); the 07:55:18Z heartbeat dispatched 0 (both
+candidates blocked by the 8 GB floor). Did NOT reclaim disk - the floor is
+still the only guard against a 4th duplicate while any worker can block >180s
+on cargoq. Health: heartbeat exactly 1 (27872), operator_runner 1 (27876),
+watchdog 1 (29264), overnight driver 1 (24864); TWO supervisors
+(19172+27828) + TWO cargoq/server.py (28544+34564) carried; disk 5.9 GiB
+free, RAM 3.5 GiB. Carried human items unchanged: pin/amend
+AUTHOR-WIRE-MIRROR-ARM + fix the freshness guard + scope off the hanging
+test; FRAME-REVOLVE F1 non_z_axis pin; duplicate supervisors + duplicate
+cargoq guard; slot-4/7 wt RESULT residue; TOR-C flip-or-pin; MONO-10 missing
+packet; RDEF-M4 H-8 stale anchor; AUTHOR-CENSUS-NAMES SPEC_GAP question
+loop; duplicate-driver probe fix.]
 
 ## The parallelism picture
 

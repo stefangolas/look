@@ -4253,3 +4253,53 @@ AUTHOR-WIRE-MIRROR-ARM); HEAD 06c4d11; heartbeat 1 (27872); operator_runner 1
 (27876); watchdog 1 (29264); overnight driver 1 (24864); TWO supervisors; TWO
 cargoq servers; cargoq UP (running true, queued 4); disk 6.5 GiB free; RAM
 3.78 GiB.
+
+===== operator 2026-09-11T08:02Z (cycle) =====
+
+Health sweep: slot_status -> 3 slots on AUTHOR-WIRE-MIRROR-ARM (slot 0
+STALLED by events-age, slot 1 RUNNING, slot 2 RUNNING); 5 FINISHED (3-7).
+cargoq UP (running true, queued 3). Heartbeat exactly 1 (27872; the 34496
+"second" was this shell self-matching). watchdog 1 (29264). operator_runner 1
+(27876). overnight driver 1 (24864). Disk 5.9 GiB free (below the 15 GB goal
+and 8 GB new_slot floor); RAM 3.5 GiB.
+
+Actions:
+- Landing (step 2): NOTHING. Re-verified by `git merge-base --is-ancestor`:
+  e6553db/3c2109b/ee97499/713f205/5cf4811 all ancestors of integration HEAD
+  6b25068. No FINISHED slot unlanded.
+- Unblock (step 3): the hang CLEARED at 07:55:43Z (cargoq TIMEOUT-reaped the
+  second `cargo test --locked -p truck123d --lib`). All three workers are
+  ALIVE (cmd 18540/32348/21184; opencode 31940/26564/480) and issuing cargo
+  (slot 0 `--lib mirror` START 08:00:19Z; slots 1/2 `wire_mirror_arm` exit
+  101). slot 0's STALLED is a freshness-guard false negative, not a dead
+  worker. Nothing to unblock; did NOT reset/redispatch a duplicate (outside
+  authority, and the failure mode).
+- Registry (step 4): RG-23-CERTIFIED-ENTRY-WIRING and
+  RG-9-REFLECT-SOLID-PRODUCTION rows are READY but their `packet` field is
+  EMPTY (no packet file) - this is missing-authoring, NOT an anchor-count
+  mismatch, so the anchor ritual does not apply. Escalated. AUTHOR-CENSUS-NAMES
+  READY but write-set clashes with the running door.py lane; held.
+  AUTHOR-WIRE-MIRROR-ARM row is READY with no `landed` marker (the redispatch
+  root); pinning is registry/semantic -> escalated.
+- Dispatch (step 5): NOT run manually (heartbeat live; manual dispatch races
+  it). The 07:55:18Z heartbeat cycle read 0 running and tried
+  AUTHOR-WIRE-MIRROR-ARM -> slot 3 + AUTHOR-CENSUS-NAMES -> slot 4; BOTH
+  new_slot FAILED on the 8 GB floor. dispatched 0.
+- Disk (step 1/5): deliberately did NOT reclaim. The 8 GB floor is still the
+  only guard against a 4th duplicate: any worker that blocks >180s on cargoq
+  is read as DEAD by the heartbeat's freshness guard. Freeing disk would
+  re-open the runaway into a 3.5 GiB-RAM machine.
+- STATE (step 6): replaced the LATEST GROUND TRUTH block (07:42Z marked
+  SUPERSEDED) + appended the 08:02Z machine block.
+- Report (step 7): this entry.
+
+Escalations: 08:02Z addendum - hang cleared but the pin/freshness-guard root
+causes remain; the disk floor is the only guard. RG-23/RG-9 rows have no
+packet file (empty `packet` field). Carried: everything from 07:12Z/07:16Z/
+07:42Z.
+
+Leaving: 3 RUNNING (slots 0/1/2, triple-dispatched AUTHOR-WIRE-MIRROR-ARM,
+all alive); HEAD 6b25068; heartbeat 1 (27872); operator_runner 1 (27876);
+watchdog 1 (29264); overnight driver 1 (24864); TWO supervisors
+(19172+27828); TWO cargoq servers (28544+34564); cargoq UP (running true,
+queued 3); disk 5.9 GiB free; RAM 3.5 GiB.

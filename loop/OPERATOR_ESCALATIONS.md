@@ -1362,3 +1362,39 @@ Judgment-required items appended each operator cycle. Newest at the bottom.
   `loop/dispatch_heartbeat.log` (the 07:35Z cycle, new_slot floor failures);
   `loop/packets/AUTHOR-WIRE-MIRROR-ARM.md`; `loop/slots/1/wt` (the one live
   copy: untracked `truck123d/tests/wire_mirror_arm.rs`).
+
+## 2026-09-11 08:02 UTC (operator) - AUTHOR-WIRE-MIRROR-ARM: hang cleared, but the pin + freshness-guard root causes remain; the 8 GB disk floor is still the only guard
+
+- What: cargoq TIMEOUT-reaped the second `cargo test --locked -p truck123d
+  --lib` at 07:55:43Z. All three triple-dispatched workers (slots 0/1/2, branch
+  packet/AUTHOR-WIRE-MIRROR-ARM) resumed and are issuing cargo: slot 0
+  `test --lib mirror` START 08:00:19Z; slots 1/2 `test wire_mirror_arm` exit
+  101. The 07:55:18Z heartbeat still read 0 running (180s freshness guard) and
+  tried to dispatch AUTHOR-WIRE-MIRROR-ARM -> slot 3 + AUTHOR-CENSUS-NAMES ->
+  slot 4; BOTH new_slot FAILED on the 8 GB floor (5.9 GiB free). So the floor
+  is still the only thing preventing a 4th duplicate, exactly as at 07:42Z.
+- New precise fact: the AUTHOR-WIRE-MIRROR-ARM registry row is `status=READY`,
+  `packet=loop/packets/AUTHOR-WIRE-MIRROR-ARM.md`, and carries NO `landed`
+  marker (note ends "... QUEUE-2 (door.py lane: after PARTIAL-ARC) - dispatched
+  2026-09-10 shipping wave"). That is why dispatch_ready treats it as
+  dispatchable.
+- New precise fact: RG-23-CERTIFIED-ENTRY-WIRING and
+  RG-9-REFLECT-SOLID-PRODUCTION are `status=READY` with an EMPTY `packet`
+  field - there is NO packet file. gen_packet --check crashes on the missing
+  path (FileNotFoundError), which the dispatcher renders as "ANCHOR CHECK
+  FAILED". These need authoring, not an anchor re-measure.
+- Why the operator can't: pinning a registry row, fixing the freshness guard,
+  authoring a packet, and scoping the packet off the hanging test are all
+  semantic/harness changes outside the three-file operator authority; killing
+  a live worker or resetting a duplicate slot is also outside authority.
+- Action needed: (1) PIN or amend the AUTHOR-WIRE-MIRROR-ARM row NOW; (2) fix
+  `unanswerable_arc_lathe_refuses_typed` or scope the packet's done-when off
+  the full `cargo test -p truck123d`/`--lib` suite; (3) fix the freshness guard
+  so a worker blocked on a cargoq step is not read as dead; (4) author the
+  RG-23/RG-9 packets or park the rows; (5) then reclaim disk (5.9 GiB free is
+  below the 8 GB new_slot floor, so the loop is frozen until then).
+- Start from: `loop/PACKETS.jsonl` (the AUTHOR-WIRE-MIRROR-ARM, RG-23, RG-9
+  rows); `loop/cargoq/server.log` (07:55:43Z TIMEOUT);
+  `loop/dispatch_heartbeat.log` (07:55:18Z cycle, floor failures);
+  `loop/slots/1/wt` (the one live copy: untracked
+  `truck123d/tests/wire_mirror_arm.rs`).
