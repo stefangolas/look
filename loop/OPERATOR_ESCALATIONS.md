@@ -1733,3 +1733,29 @@ uncommitted - left for the orchestrator, no dispatch impact.
   `loop/dispatch_heartbeat.log`.
 - Also carried: disk 3.95 GiB (below the 8 GB floor; janitor pool = only the two
   live slots' targets); RAM 2.58 GiB (below the 3 GB threshold).
+
+## 2026-09-11 22:10 UTC - CARRIED (no new item): duplicate FHC-EX-B now wedged in cargoq on the swept_admission lib test
+
+- Re-derived this cycle: the duplicate is UNCHANGED (slots 0+1, both live, both
+  STALLED-blocked on cargoq). The queue is running slot 1's IDENTICAL
+  `cargo test --profile quick -p truck123d --lib swept_admission --locked`
+  (slot 0's run timed out 17:38:15 after the 2400s limit; slot 1's started
+  17:38:15, times out ~18:18), with slot 0's `qbuild -p truck123d` queued behind.
+  Both workers' events 13.5/12.5 min old at 18:09 (bare waits, not dead); both
+  processes alive. Neither killed/reset (charter: do not disturb a live worker).
+- Why it matters: two worker-hours spent on one packet; the `swept_admission`
+  lib test is an unbounded-time sink (a worker self-initiated broad `--lib` run,
+  not the packet's required `truck123d/tests/extraction_breadth_b.rs`) and it has
+  now wedged the whole cargoq queue for ~40 min twice in a row.
+- Action needed (human/orchestrator): (1) decide which FHC-EX-B branch to keep
+  once one returns a DONE RESULT; (2) fix `dispatch_ready`'s dead-dispatch
+  detection to use `slot_status.py`'s process scan, not the branch tip; (3)
+  scope/timeout the worker's self-initiated broad `--lib` runs so one cannot wedge
+  the queue. Start from `loop/dispatch_ready.py`, `loop/cargoq/server.log`
+  (17:38:15), `loop/dispatch_heartbeat.log`.
+- Also carried: disk 3.48 GiB (below the 8 GB floor; janitor pool = only the two
+  live slots' targets); RAM 3.07 GiB (at the 3 GB threshold). RG-23/RG-9 missing
+  packet files; RDEF-M4 re-scope; MONO-10 owner R3-mesh decision; FRAME-REVOLVE F1
+  non_z_axis pin; duplicate supervisors + lagging cargoq restart guard; TOR-C
+  flip-or-pin; schedule.py 'needs' crash; slot-4/7 wt RESULT residue; CL-005/CL-006
+  READY-but-landed bookkeeping.

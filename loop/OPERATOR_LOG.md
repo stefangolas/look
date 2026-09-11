@@ -6215,3 +6215,53 @@ loop/baselines/) - untouched.
 Leaving: 2 RUNNING (slots 0+1, duplicate FHC-EX-B); HEAD `de0d010` + this cycle's
 STATE/log commit; heartbeat 1; operator_runner 1; watchdog 1; cargoq UP (running
 true); disk 3.95 GiB; RAM 2.58 GiB.
+
+## 2026-09-11 22:10 UTC (operator)
+
+Board at start: 2 RUNNING (slots 0+1, DUPLICATE FHC-EX-B-SPLINE-LOFT-OPERANDS),
+slots 2-7 FINISHED/IDLE landed residue, HEAD `02bab71` (the 21:45Z operator commit,
+no new commits). The two FHC-EX-B workers are both blocked in the cargoq queue on
+`cargo test --profile quick -p truck123d --lib swept_admission --locked` (slot 0's
+run timed out 17:38:15 after 2400s; slot 1's identical test started 17:38:15 and
+times out ~18:18). Neither killed/reset (charter: do not disturb a live worker).
+
+Health sweep:
+- heartbeat 1 (27872), operator_runner 1 (27876), watchdog 1 (29264), overnight
+  driver 1 (24864); TWO supervisors (19172+27828) + TWO cargoq servers
+  (28544+34564) carried; cargoq UP (ping queued 1, running true).
+- Disk 3.48 GiB free (below the 8 GB floor; janitor pool = only the two LIVE slots'
+  targets, nothing reclaimable). RAM 3.07 GiB free (at the 3 GB threshold).
+
+Actions:
+- Landing: NOTHING. Residue tips c3df084/e6553db/3c2109b/ee97499/713f205/5cf4811
+  all re-verified ancestors of HEAD by `git merge-base --is-ancestor`; slot 4 =
+  LANDED-WITH-FINDINGS (not landable); slot 0's SPEC_GAP tip 46ff8cc not an ancestor.
+- Dispatch: did NOT run the real dispatcher. `dispatch_ready --dry-run
+  --max-workers=4` -> "slots: 8 (1 running, 6 free); slot-assigned packets: 5;
+  dispatched 0; workers now ~1/4"; no dead-dispatch false positive this pass, but
+  disk is below the floor and the intermittent false positive would destroy the live
+  slot-1 worker. Nothing dispatchable (RG-23/RG-9 clash on the running bd_bridge.rs;
+  FHC chain serial).
+- Registry: re-derived by command 350 = 254 DONE / 85 READY / 10 BLOCKED / 1
+  SUPERSEDED; none mechanically flippable.
+- STATE: COLLAPSED the accumulated SUPERSEDED ground-truth chain in "Where we are"
+  (had grown past 1,200 lines; the charter caps the volatile part at ~120). The
+  prior refreshes are pure volatile snapshots and remain in git history; stable
+  traps below were untouched. Replaced with a fresh LATEST GROUND TRUTH
+  [2026-09-11T22:10Z].
+- This entry.
+
+Escalations: CARRIED - duplicate FHC-EX-B dispatch (slots 0+1) still live and now
+serializing on the swept_admission lib test; disk 3.48 GiB below floor; RAM 3.07
+GiB; RG-23/RG-9 missing packet files; RDEF-M4 re-scope; MONO-10 owner R3-mesh
+decision; FRAME-REVOLVE F1 non_z_axis pin; duplicate supervisors + lagging cargoq
+restart guard; TOR-C flip-or-pin; schedule.py 'needs' crash; slot-4/7 wt RESULT
+residue; CL-005/CL-006 READY-but-landed bookkeeping.
+
+Worktree note (reported, not actioned): root tree carries the live human-session
+WIP (M README.md, M loop/cargoq/server.log, untracked benchmarks/ + loop/baselines/)
+- untouched.
+
+Leaving: 2 RUNNING (slots 0+1, duplicate FHC-EX-B); HEAD `02bab71` + this cycle's
+STATE/log commit; heartbeat 1; operator_runner 1; watchdog 1; cargoq UP; disk 3.48
+GiB; RAM 3.07 GiB.
