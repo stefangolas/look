@@ -52,6 +52,7 @@ use truck_certified::kernel::patch::IBox2;
 use crate::facade::{BooleanPairVerdict, CarrierClass, SweptBooleanEvent};
 use crate::marshal::{ExceptionClass, Marshaled, MarshaledPayload};
 use crate::python;
+use crate::python::binding::{EdgeSelectorRow, FilletBaseRow, FilletRefusal, FilletRow};
 
 use self::membership::BooleanVolumeRefusal;
 
@@ -408,6 +409,24 @@ pub struct BooleanNode {
     pub b: Box<TreeNode>,
 }
 
+/// One recorded fillet row: the base part node, the blend radius and the
+/// recorded edge selectors.
+///
+/// Depth-1 only, the same discipline as [`BooleanNode`]: `base` must be a part
+/// node. A fillet of a group or of another op node is the recorded open
+/// composition cell and refuses typed naming the carrier (never a silent
+/// recursion).
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct FilletNode {
+    /// The base operand node (must be a part).
+    pub base: Box<TreeNode>,
+    /// The requested blend radius.
+    pub radius: f64,
+    /// The recorded edge selectors, in script order.
+    pub edges: Vec<EdgeSelectorRow>,
+}
+
 /// A node of the submitted construction tree: either one placed solid (a
 /// part), a group (a compound) of child nodes, or one recorded boolean row, in
 /// script order.
@@ -439,6 +458,27 @@ pub enum TreeNode {
         /// The recorded boolean row.
         boolean: BooleanNode,
     },
+    /// One recorded fillet row over a base part node (AUTHOR-EXT-FILLET-HALO).
+    Fillet {
+        /// The recorded fillet row.
+        fillet: FilletNode,
+    },
+}
+
+/// The certified blend fact of a single fillet top node (AUTHOR-EXT-FILLET-HALO):
+/// the landed blend profile certificate the recorded edge selectors produced.
+/// `None` when the tree is not a single fillet node.
+#[derive(Debug, Clone, PartialEq, Serialize)]
+pub struct BlendFacts {
+    /// The blend kind (`"fillet"`).
+    pub kind: &'static str,
+    /// The certified blend radius.
+    pub radius: f64,
+    /// The number of resolved (certified) edges.
+    pub edges: usize,
+    /// The maximum certified L2 control width of the resolved edge cross
+    /// fields (exactly zero for an exactly recovered constant field).
+    pub max_profile_width: f64,
 }
 
 /// The measured facts of a submitted construction tree.
@@ -470,6 +510,9 @@ pub struct Facts {
     /// row per admitted swept-carrier boolean pair. A canonical x canonical
     /// pair lands on the canonical path and records no event.
     pub boolean_events: Vec<SweptBooleanEvent>,
+    /// The certified blend fact of a single fillet top node, when present
+    /// (AUTHOR-EXT-FILLET-HALO). `None` for every non-fillet tree.
+    pub blend: Option<BlendFacts>,
     /// The top node's recorded label, when present (client metadata carried
     /// verbatim; never read by any semantic path).
     pub label: Option<String>,
@@ -2808,11 +2851,12 @@ fn loft_sections(sections: &[Vec<ProfileEdge>]) -> Result<LoftSections, Refusal>
     Ok(LoftSections { loops })
 }
 
-/// The seam certificate of a closed halo loft row: the last station is the
-/// exact return to the first station, so the aligned meeting edges across the
-/// chain closure satisfy `A0 W1 - A1 W0 == 0` (weights 1 for the recorded line
-/// carrier). Returns the maximum mismatch over the aligned station vertices; a
-/// station list that does not close returns `Err` with the mismatch evidence.
+/// The seam certificate of a closed halo loft row (the `closed_loop`
+/// certificate): the last station is the exact return to the first station, so
+/// the aligned meeting edges across the chain closure satisfy
+/// `A0 W1 - A1 W0 == 0` (weights 1 for the recorded line carrier). Returns the
+/// maximum mismatch over the aligned station vertices; a station list that
+/// does not close returns `Err` with the mismatch evidence.
 fn loft_seam_mismatch(sections: &LoftSections, closed: bool) -> Result<f64, Refusal> {
     if !closed {
         return Ok(f64::INFINITY); // no seam to certify on an open chain
@@ -3220,6 +3264,11 @@ fn node_carrier_class(node: &TreeNode) -> Result<CarrierClass, Refusal> {
         TreeNode::Boolean { .. } => Err(Refusal::UnsupportedEnvelope(
             EnvelopeCase::NonCanonicalCarrier,
         )),
+        // A fillet node is an op node, not a part: a boolean over one (or a
+        // fillet over one) is the depth-2 open cell and refuses typed.
+        TreeNode::Fillet { .. } => Err(Refusal::UnsupportedEnvelope(
+            EnvelopeCase::NonCanonicalCarrier,
+        )),
     }
 }
 
@@ -3263,6 +3312,12 @@ fn collect_boolean_events(
             }
             Ok(())
         }
+        // A fillet row validates its depth-1 base and recurses into it; the
+        // blend certificate is measured separately by `top_blend`.
+        TreeNode::Fillet { fillet } => {
+            fillet_base_part(fillet)?;
+            collect_boolean_events(&fillet.base, events)
+        }
     }
 }
 
@@ -3284,6 +3339,7 @@ pub fn tree_facts(root: &TreeNode) -> Result<Facts, Refusal> {
     let seam_mismatch = top_seam_mismatch(root)?;
     let mut boolean_events = Vec::new();
     collect_boolean_events(root, &mut boolean_events)?;
+    let blend = top_blend(root)?;
     let (label, color, rows) = top_metadata(root)?;
     Ok(Facts {
         solid_count: count,
@@ -3292,10 +3348,83 @@ pub fn tree_facts(root: &TreeNode) -> Result<Facts, Refusal> {
         bbox: [min, max],
         seam_mismatch,
         boolean_events,
+        blend,
         label,
         color,
         rows,
     })
+}
+
+/// The certified blend fact of a single fillet top node (AUTHOR-EXT-FILLET-HALO):
+/// the base must be a part (depth-1), its recorded carrier must be in the
+/// fillet vocabulary, and every recorded edge selector must resolve. A
+/// non-fillet top node carries no blend.
+fn top_blend(root: &TreeNode) -> Result<Option<BlendFacts>, Refusal> {
+    match root {
+        TreeNode::Fillet { fillet } => Ok(Some(fillet_blend(fillet)?)),
+        _ => Ok(None),
+    }
+}
+
+/// The depth-1 base part of a fillet node, or the typed refusal naming the
+/// open carrier. A fillet of a group or of another op node is the recorded
+/// open composition cell and never recurses silently.
+fn fillet_base_part(fillet: &FilletNode) -> Result<&PartSpec, Refusal> {
+    match fillet.base.as_ref() {
+        TreeNode::Part { part } => Ok(part),
+        TreeNode::Group { .. } | TreeNode::Boolean { .. } | TreeNode::Fillet { .. } => Err(
+            Refusal::UnsupportedEnvelope(EnvelopeCase::NonCanonicalCarrier),
+        ),
+    }
+}
+
+/// The certified blend fact of one fillet node: dispatch the recorded base
+/// carrier + radius + edge selectors into the landed blend profile machinery
+/// (`binding::fillet_facts`). An unresolvable selector and a certified-solve
+/// refusal both surface typed; nothing is approximated.
+fn fillet_blend(fillet: &FilletNode) -> Result<BlendFacts, Refusal> {
+    let part = fillet_base_part(fillet)?;
+    let base = match &part.solid {
+        SolidSpec::Box {
+            length,
+            width,
+            height,
+        } => FilletBaseRow::Box {
+            length: *length,
+            width: *width,
+            height: *height,
+        },
+        _ => {
+            return Err(Refusal::UnsupportedEnvelope(
+                EnvelopeCase::NonCanonicalCarrier,
+            ));
+        }
+    };
+    let row = FilletRow {
+        base,
+        radius: fillet.radius,
+        edges: fillet.edges.clone(),
+    };
+    let outcome = crate::python::binding::fillet_facts(&row).map_err(fillet_refusal_to_refusal)?;
+    Ok(BlendFacts {
+        kind: "fillet",
+        radius: outcome.radius,
+        edges: outcome.edges,
+        max_profile_width: outcome.max_profile_width,
+    })
+}
+
+/// Maps the binding-layer fillet refusal into the executor's refusal
+/// vocabulary: an unresolvable selector names the open carrier
+/// (`NonCanonicalCarrier`), an invalid request is the empty domain, and a
+/// certified blend refusal keeps the construct layer's case.
+fn fillet_refusal_to_refusal(refusal: FilletRefusal) -> Refusal {
+    match refusal {
+        FilletRefusal::InvalidInput => Refusal::Empty,
+        FilletRefusal::UnresolvableEdge | FilletRefusal::Blend(_) => {
+            Refusal::UnsupportedEnvelope(EnvelopeCase::NonCanonicalCarrier)
+        }
+    }
 }
 
 /// The top node's recorded metadata plus, for a group top node, the per-row
@@ -3320,6 +3449,7 @@ fn top_metadata(
             Ok((label.clone(), color.clone(), Some(rows)))
         }
         TreeNode::Boolean { .. } => Ok((None, None, None)),
+        TreeNode::Fillet { .. } => Ok((None, None, None)),
     }
 }
 
@@ -3334,6 +3464,7 @@ fn child_row_facts(node: &TreeNode) -> Result<RowFacts, Refusal> {
         TreeNode::Part { part } => part.label.clone(),
         TreeNode::Group { label, .. } => label.clone(),
         TreeNode::Boolean { .. } => None,
+        TreeNode::Fillet { .. } => None,
     };
     Ok(RowFacts {
         label,
@@ -3374,6 +3505,11 @@ fn top_seam_mismatch(root: &TreeNode) -> Result<Option<f64>, Refusal> {
             dispatch_boolean(boolean)?;
             top_seam_mismatch(&boolean.a)
         }
+        // A fillet row measures its base operand; the base must be a part.
+        TreeNode::Fillet { fillet } => {
+            fillet_base_part(fillet)?;
+            top_seam_mismatch(&fillet.base)
+        }
         TreeNode::Group { .. } => Ok(None),
     }
 }
@@ -3401,6 +3537,13 @@ fn count_and_union(
         TreeNode::Boolean { boolean } => {
             dispatch_boolean(boolean)?;
             count_and_union(&boolean.a, count, min, max)
+        }
+        // A fillet row's measured geometry is its base operand; the blend
+        // certificate is validated here (so a nested fillet is certified too)
+        // and measured separately by `top_blend` for a fillet top node.
+        TreeNode::Fillet { fillet } => {
+            fillet_blend(fillet)?;
+            count_and_union(&fillet.base, count, min, max)
         }
         TreeNode::Group { group, .. } => {
             for child in group {
@@ -3652,12 +3795,18 @@ fn top_volume_bracket(node: &TreeNode) -> Result<[f64; 2], Refusal> {
                 Ok([volume, volume])
             }
         }
+        // A fillet row's interval-valued volume fact is its base part's
+        // (the blend is a local certificate on the base).
+        TreeNode::Fillet { fillet } => {
+            fillet_base_part(fillet)?;
+            top_volume_bracket(&fillet.base)
+        }
         TreeNode::Group { group, .. } => {
             let mut lo = 0.0;
             let mut hi = 0.0;
             for child in group {
                 match child {
-                    TreeNode::Part { .. } | TreeNode::Boolean { .. } => {
+                    TreeNode::Part { .. } | TreeNode::Boolean { .. } | TreeNode::Fillet { .. } => {
                         let [clo, chi] = top_volume_bracket(child)?;
                         lo += clo;
                         hi += chi;
@@ -4004,7 +4153,7 @@ fn extract_local_patches(solid: &SolidSpec) -> Result<Vec<Patch>, SweptAdmission
 fn extract_patches(row: &TreeNode) -> Result<Vec<(Patch, i8)>, SweptAdmissionRefusal> {
     let part = match row {
         TreeNode::Part { part } => part,
-        TreeNode::Group { .. } | TreeNode::Boolean { .. } => {
+        TreeNode::Group { .. } | TreeNode::Boolean { .. } | TreeNode::Fillet { .. } => {
             // Depth-1 only: a boolean of a boolean (or a compound operand) is
             // the recorded open composition cell and is not extracted.
             return Err(SweptAdmissionRefusal::ExtractionUnavailable);
@@ -4101,6 +4250,9 @@ fn append_node_mesh(node: &TreeNode, out: &mut Vec<Triangle>) -> Result<(), Refu
             dispatch_boolean(boolean)?;
             append_node_mesh(&boolean.a, out)
         }
+        // A fillet row's mesh is its base part's mesh (the blend certificate
+        // is validated by the facts path).
+        TreeNode::Fillet { fillet } => append_node_mesh(&fillet.base, out),
         TreeNode::Group { group, .. } => {
             for child in group {
                 append_node_mesh(child, out)?;
@@ -6803,6 +6955,11 @@ pub fn bd_facts(py: Python<'_>, tree_json: &str) -> PyResult<String> {
             }
             if let Some(mismatch) = facts.seam_mismatch {
                 value["seam_mismatch"] = serde_json::json!(mismatch);
+            }
+            if let Some(blend) = &facts.blend
+                && let Some(map) = value.as_object_mut()
+            {
+                map.insert("blend".to_string(), serde_json::json!(blend));
             }
             if let Some(rows) = &facts.rows {
                 value["rows"] = serde_json::json!(rows);
