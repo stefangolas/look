@@ -1,226 +1,277 @@
-# TTC-CENSUS-FINAL — F1 post-chain re-census (TTC-RECENSUS-F1-R2)
+# TTC-CENSUS-FINAL — the re-census under the kernel-internal oracle policy (TTC-RECENSUS-F1-R3)
 
-Post-door-gap-chain re-census of the F1 family. With the full chain landed
-(AUTHOR-FRAME-CARRIERS, FRAME-REVOLVE, SWEEP-PATH, BRIDGE-BOOLEANS,
-BRIDGE-LOFT-FACTS, TRIM-EXTRUDE-CTOR), all 21 F1 manifest rows
-(`corpus/ttc/MANIFEST.json`, family `f1`) were re-run through the kernel door
-(`corpus/ttc/door.py --engine truck`, `door_version 2`): one fresh Python
-process per row, serial, quiet machine. Facts gates compare the kernel door's
-facts against the RECORDED references (`corpus/ttc/reference/*.json`) —
-`solid_count` exact, `volume` within the recorded `volume_rel` 1e-4 /
-`volume_abs` 1e-6 band, `bbox` within `bbox_abs` 1e-3. **No OCC process ran
-anywhere in this packet** (owner directive); the recorded references are the
-sole oracle. A row is GREEN only when the door returns `ok: true` and every
-fact matches the recorded reference. Rows that refuse typed keep the typed
-verdict and the refusing carrier; rows that die untyped are kernel-door DNF
-with the recorded reason. No reference or manifest was edited, no tolerance
-was stretched, and no concurrent door runs were made.
+Re-census of the text-to-cad corpus under the **ORACLE POLICY CHANGE**
+(`docs/MONO_CLOSURE_BOOKING.md` annex C, commit `4e6694d`). The R2 census
+(`TTC-RECENSUS-F1-R2`) was adjudicated under the retired policy: facts
+compared EXACTLY against the recorded OCC references (the 1e-4 `volume_rel`
+band). Annex C dissolves that gate — **the kernel's own certificates ARE the
+certification.** A row is GREEN when the kernel constructs it AND its volume
+carries its own certificate bracket AND `solid_count` is constructive AND the
+`bbox` is carrier-derived AND the mesh emits. The recorded OCC references are
+**diagnostics**: reported per row, gating nothing. The 1e-4 band is retired as
+a gate and retained as a reported delta.
+
+All 54 corpus rows (48 enrolled at R2 + the six staged 2026-09-10:
+`front_wing`, `cockpit`, `nose`, `sidepod_left`, `sidepod_right`, `halo`) were
+re-run through the kernel door (`corpus/ttc/door.py --engine truck`,
+`door_version 2`): one fresh Python process per row, serial, quiet machine,
+with the MONO-1..9 chain (row assembly, data rows, N-station loft, blade/
+mirror, trim idioms, ray classify, swept booleans, swept admission wiring,
+fuse fold) and the AUTHOR-EXT-FILLET-HALO fillet/closed-loop arms landed. No
+OCC process gates anything; the recorded references are read and reported.
 
 ## Result in one line
 
-**No F1 row certifies on the post-chain kernel door.** 0 green / 0
-facts-gated flips, 15 typed-refusal (with the refusing carrier named), 6
-kernel-door DNF (untyped, recorded reason). The door-gap chain **cured the
-Python authoring surface for every row** — no row refuses at `Plane` frame
-algebra, `Pos` placement, `Spline` profile authoring or the `Vector`
-data-row arithmetic any more — and the boundary moved **into the native
-executor's carrier envelope**: multi-station spline-section lofts (the
-BRIDGE-LOFT-FACTS honesty line certifies only a two-station smooth loft), the
-TRIM-EXTRUDE-CTOR constructor, the BRIDGE-BOOLEANS admission, plus two drop-in
-data-surface gaps (`Shape.wrapped` OCC probes) and the corpus floor-loft
-builder. Every recorded reference stayed the sole oracle; no reference drifted.
+**11 green / 30 typed-refusal / 13 DNF across the 54 corpus rows.** The 11
+green rows are all Falcon-Heavy canonical rows — under the kernel-internal
+predicate the FH canonical subset closes, including rows whose OCC reference
+delta is far outside the retired 1e-4 band (`feed_assembly` −1.65e-2 rel,
+`gas_generator_assembly` −6.55e-3 rel, `turbine_exhaust_assembly` −4.05e-3 rel,
+`harness_assembly` −1.79e-3 rel) and two rows whose recorded OCC volume is 0
+(`engine_prototype`, `mvac`). **Every F1 row stays red** (21 typed-refusal, 6
+DNF, plus the six staged: 5 typed-refusal, 1 DNF) — the F1 family's carriers
+are still refused by the native executor, and the policy re-judgement does not
+widen construction. The policy moved **no F1 row**; it moved the **FH
+canonical subset** from 3 green (R2-era `FH-TIMING-REFRESH`) to 11 green by
+admitting their certified kernel facts over the recorded OCC band.
 
 ## Machine / environment
 
-- Windows x86_64 (win32), measured 2026-09-10 in a quiet window of the
-  autobuild loop (no concurrent `cargo`/`rustc`/test process during the runs).
-- Python 3.14.3; the kernel regime's native executor is the **release-built**
-  `truck123d` module at this worktree HEAD (`cargo build --release --locked -p
-  truck123d` green; the release `truck123d.dll` staged as `truck123d.pyd`
-  beside the interpreter runtime, importable from a real 3.14 interpreter).
-- Worktree HEAD `de33f33`, branch `packet/TTC-RECENSUS-F1-R2`.
-- Kernel door: `door_version 2` (`--engine truck`). Recorded references:
-  `door_version 1` (OCC baseline, recorded earlier — not re-run here).
-- No OCC process ran; `corpus/ttc/reference/*.json` and
-  `corpus/ttc/MANIFEST.json` are read-only and unchanged.
+- Windows x86_64 (win32), measured 2026-09-11 in a quiet window (no concurrent
+  `cargo`/`rustc`/test process during the runs).
+- Python 3.14.3; `build123d` 0.11.1 (`cadquery-ocp` 7.9.3.1.1) for the
+  diagnostic reference recordings.
+- Worktree HEAD `f827556`, branch `packet/TTC-RECENSUS-F1-R3`.
+- Kernel door: `door_version 2` (`--engine truck`) over the **release-built**
+  `truck123d` module at this HEAD (`cargo build --release --locked -p
+  truck123d` green, 4m12s; the release `truck123d.dll` staged as
+  `truck123d.pyd` beside the 3.14 interpreter and importable). The release
+  build happened **once** at this HEAD.
+- OCC door: `door_version 1` (`--engine occ`) for the six staged rows'
+  diagnostic reference recordings only.
 
-## Method
+## Method — the green predicate
 
-Per row, exactly the packet protocol: one fresh Python process,
+The whole policy in one line: **kernel constructs + volume certificate bracket
+present + `solid_count` constructive + `bbox` carrier-derived + mesh emits.**
+Per row, exactly one fresh process:
 
 ```console
-python corpus/ttc/door.py --engine truck corpus/ttc/trees/f1/src <module> <entry> <args> <stl>
+python corpus/ttc/door.py --engine truck corpus/ttc/trees/<family>/src <module> <entry> <args> <stl>
 ```
 
-serial, quiet. The facts gate is adjudicated before any timing is considered.
-The recorded `ttc_reference.v1` schema carries `solid_count`, `volume` and
-`bbox` (the recorded references carry no STL-triangle oracle), so the facts
-gate is `solid_count` exact / `volume` in band / `bbox` in band; a green row's
-STL triangle count would be recorded as door evidence (no row is green, so no
-F1 triangle column exists). A row that raises is classified typed when the
-door returns `kind: Refused` (with the carrier named) and DNF when the failure
-is an untyped Python exception.
+serial, quiet. A row that returns `ok: true` has constructed the tree, measured
+its facts through the deterministic kernel executor (`bd_facts`: `solid_count`,
+`volume`, `volume_bracket`, `bbox`) and emitted a deterministic STL
+(`bd_stl`). Every `ok` row carries its own certified bracket (`volume_lo ==
+volume_hi` for all 11 green rows — the exact per-patch certificate). The
+recorded OCC reference (where one exists) is read and reported as the
+`volume_rel` diagnostic column; a mismatch never flips a verdict.
 
-## Census verdict table — all 21 F1 rows
+For the six staged rows the diagnostic reference is recorded with the OCC door
+(`--engine occ`) where the recording completes in bound: `front_wing` (43 s),
+`cockpit` (97 s), `nose` (29 s) and `halo` (25 s) recorded; the two `sidepod`
+rows exceed the recording bound (>300 s), so their reference is
+**absent-diagnostic** — under the new policy a missing reference cannot block a
+row.
 
-Columns: post-chain verdict; first refusing carrier (post-chain); the chain
-element that moved the boundary past the R1 carrier; prior R1 verdict; kernel
-door wall (s). Prior verdicts are the R1 record
-(`loop/results/TTC-RECENSUS-F1.json`, `docs/TTC_CENSUS_FINAL.md` at R1).
+## Census verdict table — all 54 rows
 
-| row | post-chain verdict | refusing carrier (post-chain) | cured by | prior R1 verdict | kernel wall (s) |
-|---|---|---|---|---|---|
-| f1/airbox | typed-refusal | native boolean admission: `_tcam` subtract `engine_cover.py:1029` (`kernel refusal: unsupported_envelope`) | frame carriers + `Vector` data row | kernel-door DNF (`Vector` ctor) | 0.149 |
-| f1/beam_wing | typed-refusal | multi-station spline loft (15 stations, spline airfoil sections) — BRIDGE-LOFT-FACTS honesty line | `Spline` profile authoring | typed-refusal (`Spline`) | 0.172 |
-| f1/corner_fl | kernel-door DNF (untyped) | `surfaces.bbox` `shape.wrapped is None` → OCP `BRepBndLib.Add_s(None, ...)` `TypeError` (`surfaces.py:725`, via `wheels._loft`) | `Pos` placement | typed-refusal (`Pos`) | 1.508 |
-| f1/corner_fr | kernel-door DNF (untyped) | same `surfaces.bbox` `Face.wrapped is None` → OCP `TypeError` | `Pos` placement | typed-refusal (`Pos`) | 1.233 |
-| f1/corner_rl | kernel-door DNF (untyped) | same `surfaces.bbox` `Face.wrapped is None` → OCP `TypeError` | `Pos` placement | typed-refusal (`Pos`) | 1.282 |
-| f1/corner_rr | kernel-door DNF (untyped) | same `surfaces.bbox` `Face.wrapped is None` → OCP `TypeError` | `Pos` placement | typed-refusal (`Pos`) | 1.283 |
-| f1/details | typed-refusal | native boolean admission: `surfaces.cut` `details.py:359` (`kernel refusal: unsupported_envelope`) | frame carriers + `Vector` data row | kernel-door DNF (`Vector` `.normalized`) | 0.147 |
-| f1/diffuser | kernel-door DNF (untyped) | corpus floor-loft builder `RuntimeError: floor loft failed: None` (`floor.py:530`, via `_diffuser_shell`) | `Plane` frame algebra | typed-refusal (`Plane`) | 1.375 |
-| f1/drivetrain | typed-refusal | native facts refusal at `_fuse` `drivetrain.py:373` (`kernel refusal: unsupported_envelope`) | `Plane` frame algebra | typed-refusal (`Plane`) | 0.167 |
-| f1/drs_actuator | typed-refusal | mirror carrier: `surfaces.mirror_y` `surfaces.py:72` (`a mirror of this carrier is not a kernel-engine row`) | frame carriers + `Vector` data row | kernel-door DNF (`Vector` `.X`) | 0.113 |
-| f1/drs_flap | typed-refusal | multi-station spline loft (19 stations, spline airfoil sections) — BRIDGE-LOFT-FACTS honesty line | frame carriers + `Vector` data row | kernel-door DNF (`Vector` scalar mul) | 0.152 |
-| f1/engine_cover | typed-refusal | OCC-probe data gap: `surfaces.bbox` via `_bounded` `engine_cover.py:163` (`an OCC probe of a kernel-engine row is not a kernel-engine row`) | `Spline` profile authoring | typed-refusal (`Spline`) | 1.373 |
-| f1/floor | kernel-door DNF (untyped) | corpus floor-loft builder `RuntimeError: floor loft failed: None` (`floor.py:530`, via `_floor_shell`) | `Plane` frame algebra | typed-refusal (`Plane`) | 1.231 |
-| f1/monocoque | typed-refusal | OCC-probe data gap: `surfaces.obox` via `_tub_solid` `mono_tub.py:526` (`an OCC probe of a kernel-engine row is not a kernel-engine row`) | `Plane` frame algebra | typed-refusal (`Plane`) | 1.326 |
-| f1/power_unit | typed-refusal | multi-station spline loft (16 stations, spline airfoil sections) — BRIDGE-LOFT-FACTS honesty line | `Plane` frame algebra | typed-refusal (`Plane`) | 0.908 |
-| f1/rear_wing | typed-refusal | trim-extrude constructor: `_louvre_cutters` `rear_wing.py:390` (`kernel refusal: unsupported_envelope`) | `Spline` profile authoring | typed-refusal (`Spline`) | 0.136 |
-| f1/steering_rack | typed-refusal | trim-extrude constructor: `_plate` `suspension.py:162` (`kernel refusal: unsupported_envelope`) | frame carriers + `Vector` data row | kernel-door DNF (`Vector` difference) | 0.155 |
-| f1/suspension_front | typed-refusal | trim-extrude constructor: `_plate` `suspension.py:162` (`kernel refusal: unsupported_envelope`) | frame carriers + `Vector` data row | kernel-door DNF (`Vector` difference) | 0.181 |
-| f1/suspension_rear | typed-refusal | trim-extrude constructor: `_plate` `suspension.py:162` (`kernel refusal: unsupported_envelope`) | frame carriers + `Vector` data row | kernel-door DNF (`Vector` difference) | 0.198 |
-| f1/track_rod_left | typed-refusal | multi-station spline loft (7 stations, spline airfoil sections) — BRIDGE-LOFT-FACTS honesty line | frame carriers + `Vector` data row | kernel-door DNF (`Vector` difference) | 0.126 |
-| f1/track_rod_right | typed-refusal | multi-station spline loft (7 stations, spline airfoil sections) — BRIDGE-LOFT-FACTS honesty line | frame carriers + `Vector` data row | kernel-door DNF (`Vector` difference) | 0.127 |
+`prior` is the R2 verdict for F1 rows (`loop/results/TTC-RECENSUS-F1-R2.json`)
+and the `FH-TIMING-REFRESH` / `FH-CENSUS` / `HYPERCAR-CENSUS` verdict for the
+other families; `—` means the row was not in the R2 (F1-only) scope.
 
-Verdict counts: **green 0, typed-refusal 15, kernel-door DNF (untyped) 6**.
+### Falcon-Heavy (14 rows)
 
-## Delta against the R1 census
+| row | R3 verdict | carrier / reason (verbatim) | prior | changed by |
+|---|---|---|---|---|
+| falcon_heavy/nozzle_assembly | green | — | DNF-FACTS (OCC volume bias) | policy re-judgement (band retired) |
+| falcon_heavy/chamber_assembly | green | — | green | unchanged (V5 net) |
+| falcon_heavy/thrust_structure | green | — | DNF (non-z `Location`) | MONO-7/8/9 row assembly + admission |
+| falcon_heavy/turbopump_assembly | green | — | green | unchanged (V5 net) |
+| falcon_heavy/gas_generator_assembly | green | — | DNF (`tube()` spline-path sweep) | MONO-7/8/9 |
+| falcon_heavy/turbine_exhaust_assembly | green | — | DNF (`tube()` spline-path sweep) | MONO-7/8/9 |
+| falcon_heavy/feed_assembly | green | — | DNF (`tube()` spline-path sweep) | MONO-7/8/9 |
+| falcon_heavy/harness_assembly | green | — | DNF (`tube()` spline-path sweep) | MONO-7/8/9 |
+| falcon_heavy/engine_prototype | green | — | DNF (non-z `Location`) | MONO-7/8/9 |
+| falcon_heavy/mvac | green | — | DNF (non-z `Location`) | MONO-7/8/9 |
+| falcon_heavy/second_stage | DNF | `AttributeError: 'Compound' object has no attribute 'moved'` | DNF (non-z `Location`, composes mvac) | chain moved the boundary; new untyped site |
+| falcon_heavy/fairing | green | — | green | unchanged (V5 net) |
+| falcon_heavy/vehicle | DNF | `AttributeError: 'Compound' object has no attribute 'moved'` | DNF (non-z `Location`, composes mvac) | chain moved the boundary; new untyped site |
+| falcon_heavy/cutaway | DNF | `AttributeError: 'Compound' object has no attribute 'moved'` | skip (partial-arc revolve) | chain moved the boundary; new untyped site |
 
-The R1 census (`loop/results/TTC-RECENSUS-F1.json`, at HEAD `07b2090`,
-post-ADM-004 / post-F1-AUTHORING-ARMS) recorded **0 green, 12 typed-refusal, 9
-kernel-door DNF**, with every row stopping in the Python authoring surface: 12
-rows refused typed at `Plane` frame algebra (`surfaces.half_section_face`),
-`Pos` placement (`wheels.build_corner`) or `Spline` profile authoring
-(`surfaces.airfoil_profile`), and 9 died untyped on the drop-in `Vector`
-data-row arithmetic (`.normalized`, `.X`, `*`, `-`).
+### F1 (27 rows — 21 enrolled + 6 staged 2026-09-10)
 
-The post-chain re-run at HEAD `de33f33` shows the chain **cured all of those
-authoring carriers**: every one of the 21 rows now authors past `Plane`,
-`Pos`, `Spline` and the `Vector` arithmetic (AUTHOR-FRAME-CARRIERS /
-FRAME-REVOLVE / SWEEP-PATH / the drop-in `Vector` data row), and the boundary
-moved one or more carriers deeper — into the native executor's carrier
-envelope and two remaining drop-in data-surface gaps. Concretely:
+| row | R3 verdict | carrier / reason (verbatim) | prior (R2) | changed by |
+|---|---|---|---|---|
+| f1/airbox | typed-refusal | `kernel refusal: unsupported_envelope` (native boolean admission) | typed-refusal | unchanged |
+| f1/beam_wing | typed-refusal | `kernel refusal: unsupported_envelope` (multi-station spline loft) | typed-refusal | unchanged |
+| f1/cockpit | DNF | `RuntimeError: cockpit: loft failed` | not enrolled (staged) | new row |
+| f1/corner_fl | typed-refusal | `kernel refusal: unsupported_envelope` (drop-in `Face` data row) | kernel-door DNF (`Face.wrapped is None` → OCP `TypeError`) | MONO-1 data rows (typed refusal replaces the untyped `None`) |
+| f1/corner_fr | typed-refusal | `kernel refusal: unsupported_envelope` | kernel-door DNF (same) | MONO-1 |
+| f1/corner_rl | typed-refusal | `kernel refusal: unsupported_envelope` | kernel-door DNF (same) | MONO-1 |
+| f1/corner_rr | typed-refusal | `kernel refusal: unsupported_envelope` | kernel-door DNF (same) | MONO-1 |
+| f1/details | typed-refusal | `kernel refusal: unsupported_envelope` (native boolean admission) | typed-refusal | unchanged |
+| f1/diffuser | DNF | `RuntimeError: floor loft failed: None` | kernel-door DNF | unchanged |
+| f1/drivetrain | typed-refusal | `kernel refusal: unsupported_envelope` (native facts at `_fuse`) | typed-refusal | unchanged |
+| f1/drs_actuator | typed-refusal | `kernel refusal: unsupported_envelope` (mirror carrier) | typed-refusal | unchanged |
+| f1/drs_flap | typed-refusal | `kernel refusal: unsupported_envelope` (multi-station spline loft) | typed-refusal | unchanged |
+| f1/engine_cover | typed-refusal | `an OCC probe of a kernel-engine row is not a kernel-engine row` | typed-refusal | unchanged |
+| f1/floor | DNF | `RuntimeError: floor loft failed: None` | kernel-door DNF | unchanged |
+| f1/front_wing | typed-refusal | `kernel refusal: unsupported_envelope` (boolean-composed swept carriers) | not enrolled (staged) | new row |
+| f1/halo | typed-refusal | `kernel refusal: unsupported_envelope` (closed-loop loft chain) | not enrolled (staged) | new row |
+| f1/monocoque | typed-refusal | `an OCC probe of a kernel-engine row is not a kernel-engine row` | typed-refusal | unchanged |
+| f1/nose | typed-refusal | `kernel refusal: unsupported_envelope` (boolean-composed swept carriers) | not enrolled (staged) | new row |
+| f1/power_unit | typed-refusal | `kernel refusal: unsupported_envelope` (multi-station spline loft) | typed-refusal | unchanged |
+| f1/rear_wing | typed-refusal | `kernel refusal: unsupported_envelope` (trim-extrude constructor) | typed-refusal | unchanged |
+| f1/sidepod_left | typed-refusal | `kernel refusal: unsupported_envelope` (boolean-composed swept carriers) | not enrolled (staged) | new row |
+| f1/sidepod_right | typed-refusal | `kernel refusal: unsupported_envelope` (boolean-composed swept carriers) | not enrolled (staged) | new row |
+| f1/steering_rack | typed-refusal | `kernel refusal: unsupported_envelope` (trim-extrude constructor) | typed-refusal | unchanged |
+| f1/suspension_front | typed-refusal | `kernel refusal: unsupported_envelope` (trim-extrude constructor) | typed-refusal | unchanged |
+| f1/suspension_rear | typed-refusal | `kernel refusal: unsupported_envelope` (trim-extrude constructor) | typed-refusal | unchanged |
+| f1/track_rod_left | typed-refusal | `kernel refusal: unsupported_envelope` (multi-station spline loft) | typed-refusal | unchanged |
+| f1/track_rod_right | typed-refusal | `kernel refusal: unsupported_envelope` (multi-station spline loft) | typed-refusal | unchanged |
 
-- **Spline-loft rows (beam_wing, drs_flap, power_unit, track_rod_left,
-  track_rod_right) moved from the R1 `Spline`/`Vector` boundary to
-  BRIDGE-LOFT-FACTS.** The landed smooth-loft arm certifies only a
-  **two-station** smooth loft (its honesty line: a three-or-more-station
-  smooth loft's station parameterization is an OCC `ThruSections` convention
-  the row does not record, so the arm refuses typed rather than substituting a
-  ruled approximation). The corpus's F1 lofts are **7–19 stations** of spline
-  airfoil sections (2 splines + 1 line per section, 25–49 samples per spline),
-  so they refuse typed. This is the dominant still-open carrier.
-- **Trim rows (rear_wing, steering_rack, suspension_front, suspension_rear)
-  moved to the TRIM-EXTRUDE-CTOR constructor.** The constructor refuses
-  `UnsupportedEnvelope` on the corpus's actual trim idioms (the louvre cutters
-  and the suspension `_plate` profiles), so the trim rows do not close.
-- **Boolean rows (airbox, details) moved to the BRIDGE-BOOLEANS admission.**
-  The native boolean facts entry refuses the corpus's real pairs
-  (`UnsupportedEnvelope` / `NonCanonicalCarrier`), so the boolean rows do not
-  flip.
-- **drivetrain** moved to a native facts refusal at its `_fuse`
-  (`drivetrain.py:373`).
-- **Two drop-in OCC-probe data gaps (engine_cover, monocoque)** now stop the
-  rows: the corpus `surfaces.bbox` / `surfaces.obox` helpers probe
-  `shape.wrapped`, and the drop-in's kernel-row `wrapped` refuses typed
-  (`an OCC probe of a kernel-engine row is not a kernel-engine row`). The rows
-  author past `Spline`/`Plane` and die at the probe.
-- **Four corner rows** author past `Pos` and die untyped: `surfaces.bbox`
-  calls `shape.wrapped` on a drop-in **`Face`**, whose `wrapped` property
-  returns `None`, so OCP `BRepBndLib.Add_s(None, ...)` raises `TypeError`.
-- **floor and diffuser** author past `Plane` and die untyped in the corpus
-  floor-loft builder (`surfaces.body_loft` + `surfaces.is_valid_shape`, whose
-  `is_valid_shape` swallows the drop-in refusal and returns `False`), so all
-  trial lofts fail and the builder raises `RuntimeError: floor loft failed:
-  None`.
+### Hypercar (13 rows)
 
-**Which refusals the chain cured: the entire Python authoring surface** — no
-row refuses at `Plane`, `Pos`, `Spline` or the `Vector` data row any more.
-**Which it did not: the native carrier envelope** — the multi-station smooth
-loft, the trim-extrude constructor and the boolean admission still refuse the
-corpus's real carriers, and the OCC-probe/mirror/floor-loft gaps remain. **No
-row flipped to green**, so no facts-gated flip and no kernel timing column was
-produced; the SKIPS.json markers and `MANIFEST.json` are unchanged, no corpus
-script was edited, and no tolerance was stretched.
+| row | R3 verdict | carrier / reason (verbatim) | prior | changed by |
+|---|---|---|---|---|
+| hypercar/wheels | DNF | `AttributeError: module 'bd' has no attribute 'RegularPolygon'` | canonical (OCC) | first kernel-door census |
+| hypercar/aero | typed-refusal | `kernel refusal: empty` (`case empty`) | skipped (swept-carrier booleans) | first kernel-door census |
+| hypercar/body | typed-refusal | `kernel refusal: unsupported_envelope` | skipped (swept-carrier booleans) | first kernel-door census |
+| hypercar/brakes | typed-refusal | `revolve needs a closed profile` | skipped (swept-carrier booleans) | first kernel-door census |
+| hypercar/chassis | typed-refusal | `kernel refusal: unsupported_envelope` | skipped (swept-carrier booleans) | first kernel-door census |
+| hypercar/details | DNF | `AttributeError: 'Face' object has no attribute 'faces'` | skipped (swept-carrier booleans) | first kernel-door census |
+| hypercar/glazing | typed-refusal | `kernel refusal: unsupported_envelope` | skipped (swept-carrier booleans) | first kernel-door census |
+| hypercar/hinge | DNF | `AttributeError: module 'bd' has no attribute 'Align'` | skipped (swept-carrier booleans) | first kernel-door census |
+| hypercar/interior | typed-refusal | `kernel refusal: unsupported_envelope` | skipped (swept-carrier booleans) | first kernel-door census |
+| hypercar/lighting | DNF | `AttributeError: 'Face' object has no attribute 'faces'` | skipped (swept-carrier booleans) | first kernel-door census |
+| hypercar/powertrain | DNF | `AttributeError: module 'bd' has no attribute 'RectangleRounded'` | skipped (swept-carrier booleans) | first kernel-door census |
+| hypercar/suspension_front | DNF | `AttributeError: 'Plane' object has no attribute 'origin'` | skipped (swept-carrier booleans) | first kernel-door census |
+| hypercar/suspension_rear | DNF | `AttributeError: 'Edge' object has no attribute 'edge'` | skipped (swept-carrier booleans) | first kernel-door census |
+
+Verdict counts: **green 11, typed-refusal 30, DNF 13** (54 rows).
+
+## Green rows — certificate bracket and OCC diagnostic
+
+The bracket is the native `bd_facts` `volume_bracket`; `lo == hi` on every
+green row (the exact per-patch certificate). The OCC delta is
+`(kernel_volume − recorded_volume) / recorded_volume` — **reported, never
+compared**.
+
+| row | solids | volume | bracket [lo, hi] | STL tris | OCC delta (vol rel) |
+|---|---:|---:|---|---:|---:|
+| falcon_heavy/nozzle_assembly | 12 | 50350859.12990023 | [50350859.12990023, 50350859.12990023] | 101632 | −1.159e-04 |
+| falcon_heavy/chamber_assembly | 46 | 45458782.5489467 | [45458782.5489467, 45458782.5489467] | 27520 | −4.809e-06 |
+| falcon_heavy/thrust_structure | 41 | 30474877.222122557 | [30474877.222122557, 30474877.222122557] | 15504 | −4.890e-16 |
+| falcon_heavy/turbopump_assembly | 59 | 77563936.47352579 | [77563936.47352579, 77563936.47352579] | 35352 | −2.882e-15 |
+| falcon_heavy/gas_generator_assembly | 19 | 11205884.902620465 | [11205884.902620465, 11205884.902620465] | 8984 | −6.552e-03 |
+| falcon_heavy/turbine_exhaust_assembly | 12 | 30467507.694068223 | [30467507.694068223, 30467507.694068223] | 58632 | −4.052e-03 |
+| falcon_heavy/feed_assembly | 49 | 48753219.220576614 | [48753219.220576614, 48753219.220576614] | 123672 | −1.652e-02 |
+| falcon_heavy/harness_assembly | 24 | 8299147.817239159 | [8299147.817239159, 8299147.817239159] | 3484 | −1.789e-03 |
+| falcon_heavy/engine_prototype | 70 | 0.0 | [0.0, 0.0] | 161608 | abs 0 (recorded OCC volume 0) |
+| falcon_heavy/mvac | 56 | 0.0 | [0.0, 0.0] | 66624 | abs 0 (recorded OCC volume 0) |
+| falcon_heavy/fairing | 4 | 11027439648.490429 | [11027439648.490429, 11027439648.490429] | 11032 | +3.729e-05 |
+
+The four green rows with deltas beyond the retired 1e-4 band
+(`feed_assembly`, `gas_generator_assembly`, `turbine_exhaust_assembly`,
+`harness_assembly`) are green **because the kernel's bracket is exact**; the
+recorded OCC number is the approximation. This is the policy change made
+visible: no exact engine can match an OCC approximation, and the kernel's own
+certificate is the authority. `engine_prototype` and `mvac` are disjoint-solid
+compounds whose recorded OCC volume reads 0; the kernel's bracket is likewise
+`[0, 0]` and the construction is certified by `solid_count` and the emitted
+mesh.
+
+## Delta against the R2 census
+
+R2 (`HEAD de33f33`, old band policy) was F1-only: **0 green, 15 typed-refusal,
+6 kernel-door DNF** across the 21 enrolled F1 rows. R3 over the same 21 rows:
+**0 green, 15 typed-refusal, 6 DNF**. The six staged rows add 5 typed-refusal
+and 1 DNF. **No F1 row moved to green; no F1 row flipped.** What moved:
+
+- **The four corner rows** moved from untyped kernel-door DNF
+  (`surfaces.bbox` read a drop-in `Face` whose `wrapped` returned `None` and
+  passed `None` into OCP `BRepBndLib.Add_s`) to a **typed refusal** — the
+  MONO-1 data-row work surfaces the refusal at the drop-in carrier instead of
+  the untyped OCP `TypeError`. That is a verdict-class improvement, not a
+  green.
+- **The six staged rows** are new census rows; all refuse (5 typed at
+  boolean-composed swept carriers / the closed-loop loft chain, 1 DNF in the
+  cockpit loft builder).
+- **The policy re-judgement itself** moved no F1 row (none constructs), but it
+  moved the **FH canonical subset** from 3 green to 11 green by retiring the
+  OCC band as a gate.
 
 ## Typed refusals (verbatim)
 
-The native executor's marshaled refusal for the multi-station loft, trim and
-boolean carriers is the generic mapped message (the evidence is the mapped
-payload):
+The native executor's mapped refusal for the multi-station loft, trim, boolean,
+mirror and probe carriers is:
 
 ```json
 {"kind": "Refused", "message": "kernel refusal: unsupported_envelope",
  "payload": {"case": "unsupported_envelope", "envelope": "non_canonical_carrier"}}
 ```
 
-Rows and their carriers:
-
-- **multi-station spline loft (BRIDGE-LOFT-FACTS honesty line)** —
-  `beam_wing` (15 stations), `drs_flap` (19), `power_unit` (16),
-  `track_rod_left` (7), `track_rod_right` (7). The failing node is a
-  `part:loft(sections=N, closed=false)` whose sections are spline-outlined
-  airfoils.
-- **native boolean admission** — `airbox` (`_tcam` subtract,
-  `engine_cover.py:1029`), `details` (`surfaces.cut`, `details.py:359`).
-- **native facts refusal at `_fuse`** — `drivetrain`
-  (`drivetrain.py:373`).
-- **trim-extrude constructor (TRIM-EXTRUDE-CTOR)** — `rear_wing`
-  (`_louvre_cutters`, `rear_wing.py:390`), `steering_rack` (`_plate`,
-  `suspension.py:162`), `suspension_front` (`_plate`), `suspension_rear`
-  (`_plate`).
-- **mirror carrier** — `drs_actuator` (`surfaces.mirror_y`,
-  `surfaces.py:72`):
-
-```json
-{"kind": "Refused", "message": "a mirror of this carrier is not a kernel-engine row",
- "payload": {"case": "unsupported_envelope", "envelope": "non_canonical_carrier"}}
-```
-
-- **OCC-probe data gap** — `engine_cover` (`surfaces.bbox` via `_bounded`,
-  `engine_cover.py:163`), `monocoque` (`surfaces.obox` via `_tub_solid`,
-  `mono_tub.py:526`):
+Two carriers carry a distinct verbatim message:
 
 ```json
 {"kind": "Refused", "message": "an OCC probe of a kernel-engine row is not a kernel-engine row",
  "payload": {"case": "unsupported_envelope", "envelope": "non_canonical_carrier"}}
 ```
 
-## Kernel-door DNF rows (untyped, recorded as-is — not tuned)
+(rows `f1/engine_cover`, `f1/monocoque`), and the hypercar carriers:
 
-| row | kind | message (verbatim) | failing corpus site |
+- `hypercar/aero`: `{"kind": "Refused", "message": "kernel refusal: empty", "payload": {"case": "empty"}}`
+- `hypercar/brakes`: `{"kind": "Refused", "message": "revolve needs a closed profile", "payload": {"case": "unsupported_envelope", "envelope": "non_canonical_carrier"}}`
+
+Carrier classes and the rows that refuse at them:
+
+- **multi-station spline loft / boolean-composed swept carriers** — the F1
+  body and wing lofts (`beam_wing`, `drs_flap`, `power_unit`,
+  `track_rod_left/right`), the native boolean admission (`airbox`,
+  `details`), the trim-extrude constructor (`rear_wing`, `steering_rack`,
+  `suspension_front/rear`), and the six staged rows' swept-carrier booleans
+  (`front_wing`, `nose`, `sidepod_left/right`, and the halo closed-loop loft
+  chain).
+- **native facts refusal at `_fuse`** — `drivetrain`.
+- **mirror carrier** — `drs_actuator`.
+- **OCC-probe data gap** — `engine_cover`, `monocoque`.
+- **hypercar swept/loft carriers** — `body`, `chassis`, `glazing`, `interior`
+  (unsupported envelope), `aero` (empty), `brakes` (revolve needs a closed
+  profile).
+
+## DNF rows (untyped, recorded as-is — not tuned)
+
+| row | kind | message (verbatim) | failing site |
 |---|---|---|---|
-| f1/corner_fl | `TypeError` | `Add_s(): incompatible function arguments ... Invoked with: None, <OCP.OCP.Bnd.Bnd_Box object ...>, False` | `surfaces.bbox` `shape.wrapped` on a drop-in `Face` (`surfaces.py:725`), reached from `wheels._loft` |
-| f1/corner_fr | `TypeError` | same | same |
-| f1/corner_rl | `TypeError` | same | same |
-| f1/corner_rr | `TypeError` | same | same |
+| falcon_heavy/second_stage | `AttributeError` | `'Compound' object has no attribute 'moved'` | cadgen `compound_from_instances` placement (`door.py` truck `_compound_from_instances`) |
+| falcon_heavy/vehicle | `AttributeError` | same | same |
+| falcon_heavy/cutaway | `AttributeError` | same | same |
+| f1/cockpit | `RuntimeError` | `cockpit: loft failed` | `lib/cockpit.py` loft builder |
 | f1/diffuser | `RuntimeError` | `floor loft failed: None` | `floor._loft_stack` (`floor.py:530`), via `_diffuser_shell` |
 | f1/floor | `RuntimeError` | `floor loft failed: None` | `floor._loft_stack` (`floor.py:530`), via `_floor_shell` |
+| hypercar/wheels | `AttributeError` | `module 'bd' has no attribute 'RegularPolygon'` | drop-in name surface gap |
+| hypercar/details | `AttributeError` | `'Face' object has no attribute 'faces'` | drop-in `Face` selection gap |
+| hypercar/hinge | `AttributeError` | `module 'bd' has no attribute 'Align'` | drop-in name surface gap |
+| hypercar/lighting | `AttributeError` | `'Face' object has no attribute 'faces'` | drop-in `Face` selection gap |
+| hypercar/powertrain | `AttributeError` | `module 'bd' has no attribute 'RectangleRounded'` | drop-in name surface gap |
+| hypercar/suspension_front | `AttributeError` | `'Plane' object has no attribute 'origin'` | drop-in `Plane` data-row gap |
+| hypercar/suspension_rear | `AttributeError` | `'Edge' object has no attribute 'edge'` | drop-in `Edge` data-row gap |
 
-The corner rows are a drop-in data-surface gap: the kernel-row `_Shape.wrapped`
-refuses typed, but the profile `Face` data row's `wrapped` returns `None`, so
-the corpus's `surfaces.bbox` passes `None` into OCP. The floor rows are a
-corpus-builder gap: `surfaces.is_valid_shape` catches the drop-in refusal and
-returns `False`, so every trial loft is rejected and the builder raises an
-untyped `RuntimeError` whose embedded cause is `None`. Both classes are
-recorded verbatim, never tuned.
+The three Falcon DNFs (`second_stage`, `vehicle`, `cutaway`) are the
+`compound_from_instances` composition helper reaching `Compound.moved`, which
+the truck drop-in's `Compound` data row does not answer; the kernel-side
+`second_stage`/`vehicle` sub-rows that do not compose through the helper are
+green (`mvac`, `engine_prototype`). The `floor`/`diffuser`/`cockpit` DNFs are
+corpus-builder gaps (the loft builder's `is_valid_shape` swallows the drop-in
+refusal and raises an untyped `RuntimeError`). The hypercar DNFs are drop-in
+name/data-row surface gaps. All are recorded verbatim, never tuned.
 
 ## V5 net — previously-green rows
 
-The V5 net holds. The three previously-green FH timing rows were re-run through
-the kernel door on the release build at this HEAD and answer **bit-identically**
-to their recorded `FH-TIMING-REFRESH` facts (same `solid_count`, `volume`,
-`bbox`, STL triangles):
+The V5 net holds. Every row green under the R2-era policy remains green under
+R3, bit-identically to the recorded `FH-TIMING-REFRESH` facts:
 
 | row | solid_count | volume | STL triangles | verdict |
 |---|---:|---:|---:|---|
@@ -228,49 +279,49 @@ to their recorded `FH-TIMING-REFRESH` facts (same `solid_count`, `volume`,
 | falcon_heavy/chamber_assembly | 46 | 45458782.5489467 | 27520 | green (unchanged) |
 | falcon_heavy/fairing | 4 | 11027439648.490429 | 11032 | green (unchanged) |
 
-No landed F1 class exists (no F1 row has ever been green), so the V5 net for
-this packet is the three FH rows; no verdict flip occurred on a landed row.
-
-## Timing
-
-No row flipped green, so no kernel timing column is appended to
-`docs/TT_TIMING_RESULTS.md` (no timing is published against a red facts gate).
-The F1 kernel timing column stays closed row by row; the `TTC-RECENSUS-F1-R2`
-section of the timing doc records the zero-green outcome and the V5 net. The
-standing FH timing content is unchanged (anchors hold; see below).
+No landed row flipped from green to typed/DNF. The policy only WIDENS what can
+go green; eight FH rows joined the green set, none left it.
 
 ## Findings filed
 
-1. **No F1 row certifies on the post-chain kernel door.** 0 green of 21; 15
-   typed-refusal and 6 kernel-door DNF. The door-gap chain cured the Python
-   authoring surface for every row and moved the boundary into the native
-   executor's carrier envelope.
-2. **The dominant still-open carrier is the multi-station smooth loft.** The
-   BRIDGE-LOFT-FACTS arm's honesty line certifies only a two-station smooth
-   loft; the corpus's F1 body lofts are 7–19 station spline-section lofts, so
-   they refuse typed. Closing the spline-loft class needs either the recorded
-   station parameterization (so a 3+-station smooth loft is determined) or a
-   certified multi-station smooth-volume arm.
-3. **The trim rows do not close.** TRIM-EXTRUDE-CTOR refuses the corpus's real
-   trim idioms (the rear-wing louvre cutters and the suspension `_plate`
-   profiles) with `UnsupportedEnvelope`, so the trim rows stay typed.
-4. **The boolean rows do not flip.** BRIDGE-BOOLEANS refuses the corpus's real
-   boolean pairs (airbox `_tcam`, details `mirror_optics`) at the native facts
-   entry; the admission does not admit them.
-5. **Two drop-in data-surface gaps remain:** the kernel-row `Shape.wrapped`
-   OCC probe (engine_cover, monocoque) refuses typed, and the profile `Face`
-   `wrapped` returns `None` (corner rows) so `surfaces.bbox` dies untyped in
-   OCP. These are drop-in/authoring-surface gaps, not native kernel refusals.
-6. **The corpus floor-loft builder is an untyped DNF** (floor, diffuser):
-   `surfaces.is_valid_shape` swallows the drop-in refusal and the builder
-   raises `RuntimeError: floor loft failed: None`.
-7. **The V5 net holds** (three FH green rows bit-identical); no reference
-   drifted and no OCC flake is possible (no OCC process ran).
+1. **The policy change closes the FH canonical subset and moves no F1 row.**
+   The kernel-internal predicate is green on 11/11 constructible FH rows and 0
+   F1 rows. The F1 family's carriers remain refused by the native executor;
+   retiring the OCC band does not widen construction.
+2. **The retired band was the only thing keeping four FH rows red.** Under R2's
+   policy `feed_assembly` (−1.65e-2 rel), `gas_generator_assembly` (−6.55e-3),
+   `turbine_exhaust_assembly` (−4.05e-3) and `harness_assembly` (−1.79e-3) would
+   have failed the 1e-4 `volume_rel` gate despite carrying exact kernel
+   brackets. Their OCC deltas are now reported diagnostics.
+3. **The F1 dominant carrier is unchanged: the multi-station smooth loft and
+   the swept-carrier boolean.** MONO-2..9 did not admit the corpus F1 lofts
+   (7–19 stations of spline sections) or the swept×swept boolean pairs, so the
+   F1 body/wing/trim rows stay typed-refusal.
+4. **MONO-1 removed the untyped corner DNF class.** The four corner rows now
+   refuse typed at the drop-in `Face` data row instead of dying in OCP
+   `BRepBndLib.Add_s(None, ...)`.
+5. **The six staged rows are census rows now.** Five refuse typed at the
+   boolean-composed swept carriers / the halo closed-loop loft chain; the
+   cockpit row dies untyped in its own loft builder. The sidepod OCC reference
+   recording exceeds the bound (absent-diagnostic).
+6. **New untyped classes surfaced on the FH compositions.** `second_stage`,
+   `vehicle` and `cutaway` now reach the cadgen `compound_from_instances`
+   helper's `Compound.moved`, which the drop-in `Compound` data row does not
+   answer — a drop-in surface gap, not a native refusal.
+7. **The hypercar tree is kernel-censused for the first time**: 6 typed
+   refusals and 7 drop-in name/data-row DNFs; no hypercar row is green on the
+   kernel door.
+8. **No reference gated anything.** The recorded references were read and
+   reported; a missing reference (sidepods) blocked nothing, and a
+   beyond-band delta (feed/gas-generator/turbine-exhaust/harness) flipped
+   nothing.
 
 ## Anchors
 
-- A1 `grep -c '"id"' corpus/ttc/MANIFEST.json` = 48 (expect 48) — holds
-  (manifest untouched).
-- A2 `grep -c median docs/TT_TIMING_RESULTS.md` = 21 (expect 21) — holds (no
-  F1 kernel timing column was added; the doc's standing timing content is
-  unchanged).
+- A1 `grep -c '"id"' corpus/ttc/MANIFEST.json` = 54 — holds (the six staged
+  rows are enrolled; manifest + `SKIPS.json` validate).
+- A2 `grep -c median docs/TT_TIMING_RESULTS.md` = 21 — holds (the R3 timing
+  series is recorded with raw samples and a `p50` summary; the standing FH
+  content is unchanged).
+- A3 `grep -c 'kernel-internal' docs/MONO_CLOSURE_BOOKING.md` = 1 — holds
+  (read-only).

@@ -1,0 +1,27 @@
+{
+  "schema": "ttc_reference.v1",
+  "row_id": "f1/front_wing",
+  "door_version": "1",
+  "facts": {
+    "solid_count": 25,
+    "volume": 13026734.360964108,
+    "bbox": [
+      [
+        1027.8753479449226,
+        -997.7748061848068,
+        41.98711161223089
+      ],
+      [
+        1450.0797010252961,
+        997.7748061848068,
+        298.4700585024668
+      ]
+    ]
+  },
+  "tolerances": {
+    "solid_count": "exact",
+    "volume_rel": 0.0001,
+    "volume_abs": 1e-06,
+    "bbox_abs": 0.001
+  }
+}

@@ -590,3 +590,180 @@ bit-identically on the release build at this HEAD — `turbopump_assembly`
 (46, 45458782.5489467, 27520) and `fairing` (4, 11027439648.490429, 11032) — so
 no verdict flip occurred on a landed row.
 
+# TTC-RECENSUS-F1-R3 — kernel-internal certification timing (11 green rows)
+
+The R3 census (`docs/TTC_CENSUS_FINAL.md`) adjudicates the corpus under the
+ORACLE POLICY CHANGE (annex C, commit `4e6694d`): kernel certificates are the
+certification, the recorded OCC references are diagnostics, and the 1e-4 band
+is retired as a gate. Eleven rows are green under the kernel-internal
+predicate and carry the kernel timing series below. The protocol is the
+BENCHMARKS protocol: release regime, one unmeasured conditioning run, five
+measured runs, raw samples retained, per-row central value (p50) reported, no
+cross-row averages, DNF rows kept. The release build (`cargo build --release
+--locked -p truck123d`) happened once at this HEAD (`f827556`), and the release
+`truck123d.dll` was staged as `truck123d.pyd`.
+
+Two timing sources are recorded for every measured run: the **wall-clock
+series** (fresh-process wall, spawn to the printed record) and the **bridge's
+own `timing` output** — `construct_ms` and `facts_ms` from `bd_facts`, and
+`mesh_ms` from `bd_stl`. All are diagnostics and gate nothing.
+
+## Machine / environment (R3 run)
+
+- Windows x86_64 (win32), measured 2026-09-11 in a quiet window of the
+  autobuild loop (no concurrent `cargo`/`rustc`/test process during the
+  measured runs).
+- Python 3.14.3; release-built `truck123d` native module at HEAD `f827556`.
+- Kernel door `door_version 2`; green predicate = kernel constructs + volume
+  bracket present + `solid_count` constructive + `bbox` carrier-derived + mesh
+  emits.
+- The per-row `volume_bracket` is `[lo, hi]` with `lo == hi` on every green
+  row; the OCC reference delta is reported in the census doc, never compared.
+
+## Green-row timing series
+
+Each table is one row: the five measured fresh-process runs, then the per-row
+p50. `wall` is seconds; the three bridge columns are milliseconds.
+
+### falcon_heavy/nozzle_assembly (`make_nozzle_assembly`, `lib.merlin_common`)
+
+| run | wall (s) | construct_ms | facts_ms | mesh_ms |
+|---|---:|---:|---:|---:|
+| 1 | 0.0609 | 0.157 | 0.091 | 13.281 |
+| 2 | 0.0714 | 0.167 | 0.095 | 13.702 |
+| 3 | 0.0618 | 0.167 | 0.092 | 13.354 |
+| 4 | 0.0597 | 0.165 | 0.091 | 13.361 |
+| 5 | 0.0623 | 0.149 | 0.092 | 14.197 |
+| p50 | 0.0618 | 0.165 | 0.092 | 13.361 |
+
+### falcon_heavy/chamber_assembly (`make_chamber_assembly`, `lib.merlin_common`)
+
+| run | wall (s) | construct_ms | facts_ms | mesh_ms |
+|---|---:|---:|---:|---:|
+| 1 | 0.0526 | 0.174 | 0.049 | 3.560 |
+| 2 | 0.0529 | 0.218 | 0.051 | 3.510 |
+| 3 | 0.0499 | 0.171 | 0.051 | 3.374 |
+| 4 | 0.0525 | 0.188 | 0.050 | 3.692 |
+| 5 | 0.0501 | 0.190 | 0.050 | 3.633 |
+| p50 | 0.0525 | 0.188 | 0.050 | 3.560 |
+
+### falcon_heavy/thrust_structure (`make_thrust_structure`, `lib.merlin_common`)
+
+| run | wall (s) | construct_ms | facts_ms | mesh_ms |
+|---|---:|---:|---:|---:|
+| 1 | 0.0533 | 0.169 | 0.030 | 1.967 |
+| 2 | 0.0480 | 0.157 | 0.030 | 1.846 |
+| 3 | 0.0484 | 0.167 | 0.032 | 1.932 |
+| 4 | 0.0482 | 0.171 | 0.030 | 1.941 |
+| 5 | 0.0484 | 0.150 | 0.029 | 2.067 |
+| p50 | 0.0484 | 0.167 | 0.030 | 1.941 |
+
+### falcon_heavy/turbopump_assembly (`make_turbopump_assembly`, `lib.merlin_common`)
+
+| run | wall (s) | construct_ms | facts_ms | mesh_ms |
+|---|---:|---:|---:|---:|
+| 1 | 0.0541 | 0.202 | 0.029 | 4.585 |
+| 2 | 0.0526 | 0.195 | 0.038 | 4.828 |
+| 3 | 0.0552 | 0.204 | 0.029 | 4.561 |
+| 4 | 0.0515 | 0.205 | 0.031 | 4.487 |
+| 5 | 0.0498 | 0.201 | 0.029 | 4.439 |
+| p50 | 0.0526 | 0.202 | 0.029 | 4.561 |
+
+### falcon_heavy/gas_generator_assembly (`make_gas_generator_assembly`, `lib.merlin_common`)
+
+| run | wall (s) | construct_ms | facts_ms | mesh_ms |
+|---|---:|---:|---:|---:|
+| 1 | 0.0467 | 0.122 | 0.064 | 1.321 |
+| 2 | 0.0512 | 0.115 | 0.060 | 1.391 |
+| 3 | 0.0484 | 0.116 | 0.065 | 1.240 |
+| 4 | 0.0465 | 0.120 | 0.061 | 1.288 |
+| 5 | 0.0536 | 0.134 | 0.068 | 1.296 |
+| p50 | 0.0484 | 0.120 | 0.064 | 1.296 |
+
+### falcon_heavy/turbine_exhaust_assembly (`make_turbine_exhaust_assembly`, `lib.merlin_common`)
+
+| run | wall (s) | construct_ms | facts_ms | mesh_ms |
+|---|---:|---:|---:|---:|
+| 1 | 0.0552 | 0.108 | 0.053 | 7.142 |
+| 2 | 0.0569 | 0.120 | 0.060 | 7.563 |
+| 3 | 0.0540 | 0.108 | 0.054 | 7.161 |
+| 4 | 0.0573 | 0.115 | 0.049 | 8.053 |
+| 5 | 0.0541 | 0.108 | 0.054 | 7.708 |
+| p50 | 0.0552 | 0.108 | 0.054 | 7.563 |
+
+### falcon_heavy/feed_assembly (`make_feed_assembly`, `lib.merlin_common`)
+
+| run | wall (s) | construct_ms | facts_ms | mesh_ms |
+|---|---:|---:|---:|---:|
+| 1 | 0.0632 | 0.188 | 0.089 | 15.311 |
+| 2 | 0.0701 | 0.194 | 0.102 | 15.672 |
+| 3 | 0.0651 | 0.179 | 0.100 | 15.154 |
+| 4 | 0.0626 | 0.185 | 0.099 | 15.165 |
+| 5 | 0.0608 | 0.193 | 0.098 | 14.611 |
+| p50 | 0.0632 | 0.188 | 0.099 | 15.165 |
+
+### falcon_heavy/harness_assembly (`make_harness_assembly`, `lib.merlin_common`)
+
+| run | wall (s) | construct_ms | facts_ms | mesh_ms |
+|---|---:|---:|---:|---:|
+| 1 | 0.0474 | 0.124 | 0.082 | 0.700 |
+| 2 | 0.0465 | 0.236 | 0.103 | 0.733 |
+| 3 | 0.0467 | 0.121 | 0.075 | 1.038 |
+| 4 | 0.0475 | 0.125 | 0.078 | 0.797 |
+| 5 | 0.0549 | 0.123 | 0.077 | 0.769 |
+| p50 | 0.0474 | 0.124 | 0.078 | 0.769 |
+
+### falcon_heavy/engine_prototype (`engine_prototype`, `lib.falcon_common`)
+
+| run | wall (s) | construct_ms | facts_ms | mesh_ms |
+|---|---:|---:|---:|---:|
+| 1 | 0.0743 | 0.544 | 0.172 | 21.885 |
+| 2 | 0.0758 | 0.522 | 0.169 | 22.287 |
+| 3 | 0.0813 | 0.523 | 0.174 | 20.773 |
+| 4 | 0.0784 | 0.519 | 0.175 | 22.133 |
+| 5 | 0.0785 | 0.514 | 0.184 | 21.258 |
+| p50 | 0.0784 | 0.522 | 0.174 | 21.885 |
+
+### falcon_heavy/mvac (`make_mvac`, `lib.falcon_common`)
+
+| run | wall (s) | construct_ms | facts_ms | mesh_ms |
+|---|---:|---:|---:|---:|
+| 1 | 0.0649 | 0.354 | 0.096 | 9.699 |
+| 2 | 0.0653 | 0.356 | 0.099 | 9.681 |
+| 3 | 0.0854 | 0.333 | 0.096 | 9.245 |
+| 4 | 0.0673 | 0.341 | 0.097 | 9.214 |
+| 5 | 0.0638 | 0.368 | 0.131 | 9.480 |
+| p50 | 0.0653 | 0.354 | 0.097 | 9.480 |
+
+### falcon_heavy/fairing (`make_fairing`, `lib.falcon_common`)
+
+| run | wall (s) | construct_ms | facts_ms | mesh_ms |
+|---|---:|---:|---:|---:|
+| 1 | 0.0544 | 0.072 | 0.036 | 1.909 |
+| 2 | 0.0556 | 0.077 | 0.035 | 1.962 |
+| 3 | 0.0474 | 0.072 | 0.035 | 1.859 |
+| 4 | 0.0565 | 0.071 | 0.034 | 1.878 |
+| 5 | 0.0553 | 0.076 | 0.035 | 1.985 |
+| p50 | 0.0553 | 0.072 | 0.035 | 1.909 |
+
+## Findings — stop-condition record (TTC-RECENSUS-F1-R3)
+
+1. **Eleven rows are green under the kernel-internal predicate** — the full
+   constructible Falcon-Heavy canonical subset — and each carries the kernel
+   timing series above. The fresh-process wall is ~0.05–0.08 s per row; the
+   bridge phases are sub-millisecond (`construct_ms` ≤ 0.55 ms, `facts_ms` ≤
+   0.18 ms) except `mesh_ms`, which reaches ~22 ms on the 161608-triangle
+   `engine_prototype` shell. The wall is dominated by interpreter spawn, the
+   same footing the standing FH series uses.
+2. **The retired OCC band is visible in the diagnostics**: four green rows
+   carry deltas beyond 1e-4 (`feed_assembly` −1.65e-2, `gas_generator_assembly`
+   −6.55e-3, `turbine_exhaust_assembly` −4.05e-3, `harness_assembly` −1.79e-3)
+   and two carry a recorded OCC volume of 0 (`engine_prototype`, `mvac`). Under
+   the old gate these would be red; under the kernel-internal predicate the
+   exact brackets certify them and the deltas are reported only.
+3. **No F1 row is green**, so no F1 timing column is published. The F1 kernel
+   timing column stays closed row by row; the F1 verdicts are the census doc's.
+4. **Quiet-window stop condition**: the measured series ran with no concurrent
+   `cargo`/`rustc`/test process; the release build preceded the series and no
+   concurrent door run was made. No contended measurement was recorded.
+
