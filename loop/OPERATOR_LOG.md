@@ -3647,3 +3647,31 @@ free; RAM 3.9 GiB free.
 Leaving: 2 RUNNING (MONO-9-FUSE-FOLD slot 0, RDEF-M1-LATTICE-V2 slot 2);
 HEAD 0669572; heartbeat 1 (27872); watchdog 1 (29264); cargoq UP; disk 9.1 GiB
 free; RAM 2.1 GiB free (LOW).
+
+## [operator 2026-09-11T02:59Z]
+
+Board: 2 RUNNING / 0 landed-this-cycle. RUNNING: MONO-9-FUSE-FOLD (slot 0,
+pid 29240) and DOOR-PARTIAL-ARC-FLIP (slot 1, pid 28308, re-dispatched
+un-amended by the heartbeat - will re-strand).
+- Health: heartbeat 1 (27872), watchdog 1 (29264), operator runner 1 (27876),
+  cargoq UP (ping ok, queued 0, running true), disk 10.4 GiB free (above 8 GB
+  floor, below 15 GB goal), RAM 2.25 GiB free (LOW, below the 3 GB check).
+- Land (step 2): none. RDEF-M1-LATTICE-V2 confirmed LANDED (d1e6d0d ancestor of
+  integration/kernel-bg; row DONE); all FINISHED slot commits are ancestors.
+- Unblock (step 3): none (no IDLE/DEAD >15 min holding work; no QUESTION; no 402).
+- Registry hygiene (step 4): FLIPPED RDEF-M2-REGIME-SANDWICH +
+  RDEF-M3-WITNESS-TIER BLOCKED->READY (deps RDEF-M1 + MONO-8 landed). RDEF-M3
+  failed packet_lint H1_NEW_MODULE -> added the H-1 house-rule statement
+  (`#![deny(clippy::unwrap_used)]`), a documented mechanical lint fix.
+  gen_packet --check + packet_lint both green. Committed 21203ea.
+- Dispatch (step 5): no manual dispatch (heartbeat live). dispatch_ready
+  --dry-run --max-workers=4: dispatched 1 (RDEF-M3 -> slot 2); RDEF-M2 correctly
+  deferred (write-set clash bd_bridge.rs/facade.rs with a RUNNING row); workers
+  ~3/4.
+- Escalations (step 7): none new. Carried: DOOR-PARTIAL-ARC-FLIP write_allow
+  amendment (now re-running, will re-strand); 02:31Z RAM/paging exhaustion.
+- STATE (step 6): updated the LATEST GROUND TRUTH note + appended the
+  [operator 2026-09-11T02:59Z] block.
+
+Leaving: 2 RUNNING; HEAD 21203ea (registry commit); heartbeat 1 (27872);
+watchdog 1 (29264); cargoq UP; disk 10.4 GiB free; RAM 2.25 GiB free (LOW).

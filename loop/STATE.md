@@ -76,27 +76,23 @@ corrected, annex C = ORACLE POLICY CHANGE), then docs/SOLVER_COVERAGE_SPEC.md
 ## Where we are
 
 > LATEST GROUND TRUTH: read the newest `[operator ...]` block in "State of
-> the machine, as left" (2026-09-11T02:31Z). [operator 2026-09-11T02:31Z
-> ground-truth note: 2 RUNNING / 0 landed-by-operator. **MONO-9-FUSE-FOLD
-> (slot 0, pid 29240) RUNNING** and **RDEF-M1-LATTICE-V2 (slot 2, pid 31876)
-> RUNNING** - both events fresh, do not touch. AUTHOR-EXT-FILLET-HALO LANDED
-> (HEAD `0669572`, worker `b5bbaf9`) and its row is DONE. Two judgment items
-> escalated this cycle: (1) DOOR-PARTIAL-ARC-FLIP finished `SPEC_GAP` (packet
-> premise false - the door's truck regime refuses partial arcs in bd_bridge;
-> needs a write_allow amendment) and its slot RESULT was destroyed by the
-> 22:28Z recycle - full finding preserved in OPERATOR_ESCALATIONS; (2)
-> AUTHOR-WIRE-MIRROR-ARM's slot-1 warm build failed with the RAM-zone
-> signature (`0xc0000409`/cargo exit 101) - slot-1 target cleaned, heartbeat
-> to retry once, escalate if it recurs. Registry: 343 rows (243 DONE / 86
-> READY / 13 BLOCKED / 1 SUPERSEDED); nothing flippable (R3 must wait for an
-> idle board per the recorded sequence). Health: heartbeat exactly 1 (27872),
-> watchdog 1 (29264), operator runner 1 (27876), overnight driver 1 (24864),
-> cargoq UP (28544), TWO supervisors (19172 + 27828, carried). Disk 9.1 GiB
-> free (above the 8 GB floor, below the 15 GB goal); RAM 2.1 GiB free - LOW
-> (paging file exhausted, WinError 1455). Open human items: the two new
-> escalations; MONO-7 D1+D2 re-verify; `packet_tests_and_crates` crate
-> derivation; overnight.py:222-226; duplicate supervisors + lagging cargoq
-> restart guard; slot-4/7 wt RESULT residue; MONO/RDEF registry schema gap.]
+> the machine, as left" (2026-09-11T02:59Z). [operator 2026-09-11T02:59Z
+> ground-truth note: 2 RUNNING / 0 landed-by-operator. **RDEF-M1-LATTICE-V2
+> LANDED** (HEAD `4d8b233`, worker `d1e6d0d`, row DONE); **MONO-9-FUSE-FOLD
+> (slot 0, pid 29240) RUNNING** and **DOOR-PARTIAL-ARC-FLIP (slot 1, pid
+> 28308) RUNNING** (the escalated SPEC_GAP packet re-dispatched un-amended -
+> it will re-strand; needs the write_allow amendment) - both events fresh, do
+> not touch. Operator FLIPPED RDEF-M2 + RDEF-M3 BLOCKED->READY (deps landed;
+> RDEF-M3 H-1 lint fixed) and committed `21203ea`; dry-run dispatch shows
+> RDEF-M3 -> slot 2 (RDEF-M2 deferred on a write-set clash). Registry: 343
+> rows (245 DONE / 86 READY / 11 BLOCKED / 1 SUPERSEDED). Health: heartbeat
+> exactly 1 (27872), watchdog 1 (29264), operator runner 1 (27876), cargoq UP
+> (queued 0, running true). Disk 10.4 GiB free (above 8 GB floor, below 15 GB
+> goal); RAM 2.25 GiB free - LOW (below the 3 GB check; 0xc0000409 warm-build
+> zone if a third worker warms). Open human items: the 02:31Z RAM/paging
+> escalation; DOOR-PARTIAL-ARC-FLIP write_allow amendment; MONO-7 D1+D2
+> re-verify; duplicate supervisors + lagging cargoq restart guard; slot-4/7 wt
+> RESULT residue; MONO/RDEF registry schema gap.]
 
 - **THE FIRST KERNEL-VS-OCC TIMING COMPARISON IS BANKED** (FH-TIMING-REFRESH,
   landed c94d043): turbopump_assembly **0.097 s kernel vs 4.866 s OCC**,
@@ -5845,3 +5841,36 @@ shells themselves hit CLR HRESULT 80004005). Open human items: (NEW) the two
 escalations above; carried - MONO-7 D1+D2 re-verify; `packet_tests_and_crates`
 crate derivation; overnight.py:222-226; duplicate supervisors + lagging cargoq
 restart guard; slot-4/7 wt RESULT residue; MONO/RDEF registry schema gap.]
+
+[operator 2026-09-11T02:59Z - volatile refresh. Board now: 2 RUNNING / 0
+landed-by-operator. **RDEF-M1-LATTICE-V2 LANDED** (HEAD `4d8b233`, worker
+`d1e6d0d`, row DONE) - its slot 2 is FINISHED landed residue. RUNNING:
+MONO-9-FUSE-FOLD (slot 0, pid 29240, events fresh) and DOOR-PARTIAL-ARC-FLIP
+(slot 1, pid 28308, events fresh, base 1817bc9, changed=0 - the heartbeat
+RE-DISPATCHED the escalated SPEC_GAP packet un-amended; it will re-strand
+unless the write_allow amendment lands - see OPERATOR_ESCALATIONS) - do not
+touch either. **Registry hygiene (step 4): FLIPPED RDEF-M2-REGIME-SANDWICH +
+RDEF-M3-WITNESS-TIER BLOCKED->READY** (deps now satisfied: RDEF-M1 DONE +
+MONO-8-SWEPT-ADMISSION-WIRING DONE); RDEF-M3 failed packet_lint H1_NEW_MODULE,
+so the operator added the H-1 house-rule statement (`#![deny(clippy::unwrap_used)]`)
+- a documented mechanical lint fix, not a semantic edit; both `gen_packet
+--check` + `packet_lint` green; committed `21203ea`. The other 11 BLOCKED rows
+remain correctly parked (owner-cancelled / OWNER_BLOCKED / SUPERSEDED /
+human-gated / orchestrator-held / sequence-gated / unauthored). **Dispatch
+(step 5):** no manual dispatch (heartbeat live); `dispatch_ready --dry-run
+--max-workers=4` = dispatched 1 (RDEF-M3 -> slot 2), RDEF-M2 correctly deferred
+on a write-set clash with a RUNNING row (bd_bridge.rs/facade.rs), workers ~3/4.
+Landing (step 2): nothing - every FINISHED slot's worker commit is an ancestor
+of integration/kernel-bg (RDEF-M1 d1e6d0d, SOLVER-SURVEY-C e6553db, F1 3c2109b,
+CL-006 ee97499, CL-005 713f205, FRAME-REVOLVE 5cf4811). Unblock (step 3): none -
+no IDLE/DEAD >15 min holding work; no QUESTION; no 402. Health: heartbeat exactly
+1 (27872), watchdog 1 (29264), operator runner 1 (27876), cargoq UP (ping ok,
+queued 0, running true). Disk 10.4 GiB free (above the 8 GB floor, below the
+15 GB goal); **RAM 2.25 GiB free - LOW, below the 3 GB check** (two workers +
+heartbeat resident; the heartbeat's RDEF-M3 dispatch adds a third worker - the
+documented 0xc0000409 warm-build zone; if that warm build fails it is the
+retry-once-then-free-memory path, already escalated at 02:31Z). Open human items
+(carried): DOOR-PARTIAL-ARC-FLIP write_allow amendment (now re-running, will
+re-strand); the 02:31Z RAM/paging exhaustion; MONO-7 D1+D2 re-verify; duplicate
+supervisors + lagging cargoq restart guard; slot-4/7 wt RESULT residue; MONO/RDEF
+registry schema gap.]
