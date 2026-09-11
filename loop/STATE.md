@@ -75,6 +75,43 @@ corrected, annex C = ORACLE POLICY CHANGE), then docs/SOLVER_COVERAGE_SPEC.md
 
 ## Where we are
 
+> LATEST GROUND TRUTH [operator 2026-09-11T20:37Z]: 1 RUNNING / 0
+> landed-this-cycle / 0 unblocked / 0 flipped / 0 dispatched. HEAD `4e5633d`
+> (the 20:16Z operator commit; no new commits since). **FHC-EX-B-SPLINE-LOFT-OPERANDS
+> is RUNNING in slot 0** (worker cmd pid 10504 -> opencode 2384, session
+> ses_f6dda1e31ffePZufbaRlRmdTja; events ~5 min old at exit but live and
+> progressing - it had just written a `run_door.py` driver into TEMP and started
+> the next step; git packet/FHC-EX-B-SPLINE-LOFT-OPERANDS@4e5633d = base,
+> pre-commit; changed=0). DO NOT disturb - the heartbeat dispatched it after
+> FHC-EX-A landed, so the FHC chain is moving. Slots 1-7 FINISHED/IDLE landed
+> residue; every tip (329f6ab/c3df084/e6553db/3c2109b/ee97499/713f205/5cf4811)
+> re-verified an ancestor of HEAD by `git merge-base --is-ancestor`; nothing
+> landable (slot1 RESULT status `complete`, slot3/5/6 `DONE`, slot4
+> `LANDED-WITH-FINDINGS`, slot7 `LANDED` - none is a fresh DONE awaiting merge;
+> the DONE ones are all already landed). Registry re-derived by command: 350 rows
+> = 254 DONE / 85 READY / 10 BLOCKED / 1 SUPERSEDED; none of the 10 BLOCKED rows
+> is mechanically flippable (OWNER_BLOCKED / CANCELLED BY OWNER / SUPERSEDED /
+> registered defect / unmet READY deps DEF-VENDOR-FIXTURES + DEF-SEEDRAY-A /
+> TOR-C pinned on authoring / MONO-10 owner R3-mesh decision / RDEF-M4 M0
+> tangency adjudication / RDEF-M5 needs RDEF-M4). `dispatch_ready --dry-run
+> --max-workers=4`: "slots: 8 (1 running, 7 free); slot-assigned packets: 6;
+> dispatched 0; workers now ~1/4" - RG-23/RG-9 clash with the RUNNING slot-0
+> `truck123d/src/bd_bridge.rs` (their packet files remain MISSING = authoring gap,
+> carried); FHC-TRIM-EXTRUDE-ENVELOPE -> FHC-MIRROR-FORM -> BD-EMIT-MESH-CACHE
+> serial behind FHC-EX-B. Health: heartbeat exactly 1 (27872), operator_runner 1
+> (27876), watchdog 1 (29264), cargoq UP (ping ok, queued 0, running false); TWO
+> supervisors (19172+27828) carried. DISK 9.88 GiB free (above the 8 GB floor,
+> below the 15 GB goal). RAM 3.74 GiB free (above the 3 GB threshold; one worker
+> resident). Carried: CL-005/CL-006 rows are READY but their tips are merged into
+> HEAD and carry `LANDED` notes (`landed()` skips them; status bookkeeping only,
+> orchestrator's); FRAME-REVOLVE F1 non_z_axis pin; duplicate supervisors; slot wt
+> RESULT residue. Root worktree carries live human-session WIP (M README.md, M
+> loop/LEDGER.jsonl, M loop/cargoq/server.log, untracked benchmarks/ +
+> loop/baselines/) - untouched. Leaving: 1 RUNNING (slot 0 FHC-EX-B); HEAD
+> `4e5633d` + this cycle's STATE/log commit.
+>
+> --- SUPERSEDED 2026-09-11T20:16Z note (kept for history) follows ---
+>
 > LATEST GROUND TRUTH [operator 2026-09-11T20:16Z]: 0 RUNNING / 1
 > landed-this-cycle / 0 dispatched. HEAD `d1e2e37` (merge
 > packet/FHC-EX-A-CLOSED-LOOP-SHELL, --no-ff). **FHC-EX-A LANDED by the

@@ -5969,3 +5969,61 @@ the ledger/registry/RESULT/STATE/packet-anchor changes.
 Leaving: 0 RUNNING; HEAD `d1e2e37` + this cycle's STATE/log/packet-anchor
 commit; heartbeat 1 (27872); operator_runner 1 (27876); watchdog 1 (29264);
 cargoq UP (queued 0, running false); disk 8.88 GiB free; RAM 4.27 GiB.
+
+## 2026-09-11 20:37 UTC (operator)
+
+Board at start: 1 RUNNING (slot 0 FHC-EX-B-SPLINE-LOFT-OPERANDS), slots 1-7
+FINISHED/IDLE landed residue. HEAD `4e5633d`. Program: MONO-CLOSURE + the FHC
+(feature/hypercar) chain; FHC-EX-A landed last cycle, so the frontier is
+FHC-EX-B -> FHC-TRIM-EXTRUDE-ENVELOPE -> FHC-MIRROR-FORM -> BD-EMIT-MESH-CACHE.
+
+Health sweep:
+- slot_status: slot 0 RUNNING (cmd pid 10504, events fresh), all 7 others
+  FINISHED/IDLE.
+- cargoq ping OK (queued 0, running false). Heartbeat exactly ONE (27872;
+  the other regex matches were this operator's own opencode/query command
+  lines). operator_runner 1 (27876). Watchdog 1 (29264; the 6324/6432 matches
+  are ms-teams `--gpu-watchdog`). TWO supervisors carried (19172 PyManager +
+  27828 pythoncore).
+- Disk 9.88 GiB free (above the 8 GB floor, below the 15 GB goal). RAM 3.74
+  GiB free (above the 3 GB threshold). Zero cargo/rustc resident at sweep time.
+
+Actions:
+- Step 2 (land): nothing landable. Slots 1-7 tips all re-verified ancestors of
+  HEAD (`git merge-base --is-ancestor`): 329f6ab/c3df084/e6553db/3c2109b/ee97499/
+  713f205/5cf4811. RESULT statuses read directly: slot1 `complete`, slot3/5/6
+  `DONE`, slot4 `LANDED-WITH-FINDINGS`, slot7 `LANDED` (id BRIDGE-BOOLEANS) -
+  none is a fresh DONE awaiting merge; the DONE ones are already landed.
+- Step 3 (unblock): no IDLE/DEAD >15 min worker. Slot 0 is live and progressing
+  (opencode pid 2384 under cmd 10504, session
+  ses_f6dda1e31ffePZufbaRlRmdTja; last events show it writing `run_door.py` to
+  TEMP and starting a step). DO NOT disturb - left untouched.
+- Step 4 (registry): 350 rows = 254 DONE / 85 READY / 10 BLOCKED / 1 SUPERSEDED.
+  Re-derived every BLOCKED row's needs: BG-CK-P0-PREVALENCE DONE,
+  MONO-8-SWEPT-ADMISSION-WIRING DONE, RDEF-M2/M3 DONE; DEF-VENDOR-FIXTURES and
+  DEF-SEEDRAY-A are READY not DONE; TOR-C pinned on authoring (no packet file);
+  the rest carry OWNER_BLOCKED / CANCELLED BY OWNER / SUPERSEDED / registered
+  defect / owner-decision / milestone holds. None flippable. No anchor-ritual
+  re-measure needed (the dispatcher preflight passed the candidates).
+- Step 5 (dispatch): `dispatch_ready --dry-run --max-workers=4` -> "slots: 8
+  (1 running, 7 free); slot-assigned packets: 6; dispatched 0; workers now ~1/4".
+  RG-23/RG-9 clash with the RUNNING slot-0 bd_bridge.rs (their packet files
+  remain MISSING = carried authoring gap); FHC-TRIM -> FHC-MIRROR -> BD-EMIT
+  serial behind FHC-EX-B. No manual dispatch (heartbeat live; single-instance).
+- Step 6 STATE: rewrote the "Where we are" LATEST GROUND TRUTH block as
+  [operator 2026-09-11T20:37Z] and demoted the 20:16Z block to SUPERSEDED.
+  Traps/history untouched.
+- Step 7: this entry.
+
+Escalations: none NEW. CARRIED - RG-23/RG-9 missing packet files (authoring);
+RDEF-M4 re-scope; MONO-10 owner R3-mesh decision; FRAME-REVOLVE F1 non_z_axis
+pin; duplicate supervisors + lagging cargoq restart guard; TOR-C flip-or-pin;
+schedule.py 'needs' crash; CL-005/CL-006 READY-but-landed status bookkeeping.
+
+Worktree note (reported, not actioned): root tree carries the live human-session
+WIP (M README.md, M loop/LEDGER.jsonl, M loop/cargoq/server.log, untracked
+benchmarks/ + loop/baselines/) - untouched.
+
+Leaving: 1 RUNNING (slot 0 FHC-EX-B); HEAD `4e5633d` + this cycle's STATE/log
+commit; heartbeat 1 (27872); operator_runner 1 (27876); watchdog 1 (29264);
+cargoq UP (queued 0, running false); disk 9.88 GiB free; RAM 3.74 GiB.
