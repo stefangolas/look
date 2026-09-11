@@ -6,7 +6,7 @@
   "type": "object",
   "required": ["fragment", "rules"],
   "properties": {
-    "fragment": {"type": "string", "enum": ["A", "B", "C", "D"]},
+    "fragment": {"type": "string", "enum": ["A", "B", "C", "D", "E"]},
     "rules": {"type": "array", "items": {"$ref": "#/definitions/rule"}},
     "unmodeled_values": {"type": ["array", "null"], "items": {"type": "string"}},
     "unmodeled_axis_keys": {"type": ["array", "null"], "items": {"type": "string"}},
@@ -56,7 +56,7 @@
         "produces_evidence": {"type": "array", "items": {"type": "string"}},
         "calls": {"type": "array", "items": {"type": "string"}},
         "theorem_comment": {"type": "string"},
-        "confidence": {"type": "string", "enum": ["high", "medium", "low"]}
+        "confidence": {"type": "string", "enum": ["high", "medium", "low", "proposed"]}
       },
       "additionalProperties": true
     }

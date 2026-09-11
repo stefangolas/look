@@ -33,6 +33,7 @@ from __future__ import annotations
 
 import argparse
 import collections
+import contextlib
 import itertools
 import json
 import sys
@@ -846,7 +847,7 @@ def region_key(state):
     )
 
 
-def compute_goal(goal, compiled, strict_compiled=None):
+def compute_goal(goal, compiled, strict_compiled=None, compute_strict=True):
     """Compute one goal's proof-state accounting.
 
     * FAIL-CLOSED coverage (CHK-3, renamed): the old winning region. A state is
@@ -856,13 +857,20 @@ def compute_goal(goal, compiled, strict_compiled=None):
       refusal branch (`CompiledRule.strict_ok`).
     * PROVED / REFUTED / UNDECIDED (CHK-1): the winning region, the refuted
       region, and the rest. Only the last is a gap.
+
+    `compute_strict=False` skips the strict fixed point (the RDEF-M1 v2
+    projection reports fail-closed only; strict is a production-lattice
+    metric).
     """
     if strict_compiled is None:
         strict_compiled = [r for r in compiled if r.strict_ok]
     w, witness = fixpoint(goal, compiled)
     winning = materialize_winning(goal, w)
-    w_strict, _ = fixpoint(goal, strict_compiled, track_witness=False)
-    strict_winning = materialize_winning(goal, w_strict)
+    if compute_strict:
+        w_strict, _ = fixpoint(goal, strict_compiled, track_witness=False)
+        strict_winning = materialize_winning(goal, w_strict)
+    else:
+        w_strict, strict_winning = [], set()
     g = _v("goal", goal)
     a_g = []
     for st in NON_GOAL_STATES:
@@ -934,7 +942,477 @@ def minimal_missing_cubes(missing):
     return cubes
 
 
-def write_state_json(goal_reports, census):
+# ==========================================================================
+# RDEF-M1-LATTICE-V2: lattice v2 (CHK-5/CHK-6), fragment E (CHK-8), dual-mode
+# knowledge lift (CHK-7) and reachability (CHK-9).
+#
+# The production v1 lattice above is untouched: fragment E is PROPOSED and is
+# never merged into the production numbers. The v2 projection is computed by
+# temporarily swapping the lattice globals (`lattice_v2`), recompiling the
+# merged A-D rows plus fragment E in lattice-v2 terms, and restoring them.
+# ==========================================================================
+
+V2_AXES = [
+    ("relation.src_dims", ["2x2", "2x1", "1x1"]),
+    ("relation.zero_set", ["certified_empty", "regular", "rank_deficient(residual)",
+                           "unknown", "tangent_point", "tangent_crossing",
+                           "tangent_curve", "tangent_higher", "coincident",
+                           "near_degenerate(residual)"]),
+    ("relation.local_dim", ["0", "1", "2", "residual"]),
+    ("relation.incidence", ["domain_interior(residual)", "seam",
+                            "knot_span_boundary", "domain_edge"]),
+    ("relation.regime", ["unknown(residual)", "transversal", "tangential",
+                         "singular_param"]),
+    ("relation.volume_evidence", ["none(residual)", "sandwich_bounded"]),
+    ("rep.bernstein_chart", ["false", "true"]),
+    ("rep.rational_positive_weights", ["false", "true"]),
+    ("rep.exact_implicit", ["false", "true"]),
+    ("rep.canonical_carrier", ["false", "true"]),
+    ("rep.construction_witness", ["false", "true"]),
+    ("rep.param_map_inverse", ["false", "true"]),
+    ("global.knowledge", ["local_only(residual)", "loop_free", "seed_complete",
+                          "all_components", "complete_locus"]),
+    ("goal", ["no_intersection", "local_contact", "complete_locus", "material_class",
+              "valid_brep", "volume_bracket", "mesh"]),
+]
+
+#: CHK-5. Each new rank-deficient zero-set child fixes `local_dim`.
+V2_CHILD_LOCAL_DIM = {
+    "tangent_point": "0",
+    "tangent_crossing": "1",
+    "tangent_curve": "1",
+    "tangent_higher": "0",
+    "coincident": "src_min",
+    "near_degenerate(residual)": "residual",
+}
+
+#: The children accepted by local_contact / valid_brep / mesh (CHK-6). They
+#: do NOT accept `near_degenerate(residual)`, which is a named refusal.
+V2_RANK_DEF_CHILDREN = ["rank_deficient(residual)", "tangent_point",
+                        "tangent_crossing", "tangent_curve", "tangent_higher",
+                        "coincident"]
+
+#: The classified children exist only in the tangential regime (they are the
+#: output of the tangency classifier). `near_degenerate(residual)` is excluded:
+#: it is a refusal state that can arise before the regime is pinned.
+V2_CLASSIFIED_CHILDREN = {"tangent_point", "tangent_crossing", "tangent_curve",
+                          "tangent_higher", "coincident"}
+
+#: The zero-set values the M1 acceptance counts as rank-deficient. The residual
+#: parent and the certified children are the audited gap; `near_degenerate` is a
+#: named refusal (NearDegenerate) and is reported separately.
+V2_RANK_DEF_ZERO_SETS = set(V2_RANK_DEF_CHILDREN) | {"near_degenerate(residual)"}
+V2_ACCEPTANCE_ZERO_SETS = set(V2_RANK_DEF_CHILDREN)
+
+V2_INCIDENCE = ["domain_interior(residual)", "seam", "knot_span_boundary", "domain_edge"]
+
+
+def feasible_v2(state) -> bool:
+    """Tightened T_geom for lattice v2.
+
+    v1 (CHK-2) plus:
+
+    * each new rank-deficient child fixes `local_dim` (CHK-5); `coincident`
+      fixes it to the smaller source dimension;
+    * `volume_evidence = sandwich_bounded` only exists in the tangential
+      regime (the sandwich rule's admission precondition).
+    """
+    if not feasible(state):
+        return False
+    zs = _state_value(state, "relation.zero_set")
+    src = _state_value(state, "relation.src_dims")
+    ld = _state_value(state, "relation.local_dim")
+    fixed = V2_CHILD_LOCAL_DIM.get(zs)
+    if fixed is not None:
+        want = {"2x2": "2", "2x1": "1", "1x1": "1"}[src] if fixed == "src_min" else fixed
+        if ld != want:
+            return False
+    if _state_value(state, "relation.volume_evidence") == "sandwich_bounded":
+        if _state_value(state, "relation.regime") != "tangential":
+            return False
+    # A transversal admission certifies a regular (or empty) zero set; a
+    # rank-deficient zero set under the transversal regime is infeasible.
+    if _state_value(state, "relation.regime") == "transversal":
+        if zs not in ("regular", "certified_empty"):
+            return False
+    # A classified tangency child is a tangential-regime object.
+    if zs in V2_CLASSIFIED_CHILDREN and _state_value(state, "relation.regime") != "tangential":
+        return False
+    return True
+
+
+def goal_targets_v2(goal):
+    """CHK-6 revised goal predicates (lattice-v2 terms).
+
+    `volume_bracket` is not a product: it is handled by `predicate_cubes_v2`.
+    """
+    rd = list(V2_RANK_DEF_CHILDREN)
+    if goal == "no_intersection":
+        return {"relation.zero_set": ["certified_empty"]}
+    if goal == "local_contact":
+        return {"relation.zero_set": ["regular"] + rd,
+                "relation.local_dim": ["0", "1", "2"]}
+    if goal == "complete_locus":
+        return {"global.knowledge": ["complete_locus"]}
+    if goal == "material_class":
+        return {"relation.zero_set": ["certified_empty", "regular", "rank_deficient(residual)"],
+                "relation.incidence": list(V2_INCIDENCE)}
+    if goal == "valid_brep":
+        return {"relation.zero_set": ["certified_empty", "regular"] + rd,
+                "relation.local_dim": ["0", "1", "2"],
+                "relation.incidence": ["seam", "knot_span_boundary", "domain_edge"]}
+    if goal == "volume_bracket":
+        raise ValueError("volume_bracket is not a product predicate")
+    if goal == "mesh":
+        return {"relation.zero_set": ["certified_empty", "regular"] + rd,
+                "relation.local_dim": ["0", "1", "2"]}
+    raise ValueError(goal)
+
+
+def _predicate_cubes_generic(goal, allowed):
+    g = _v("goal", goal)
+    axes = sorted(allowed, key=lambda a: AXIS_INDEX[a])
+    out = []
+    for combo in itertools.product(*[allowed[a] for a in axes]):
+        c = [None] * N
+        for a, val in zip(axes, combo):
+            c[AXIS_INDEX[a]] = _v(a, val)
+        c[GOAL_IDX] = g
+        out.append(tuple(c))
+    return out
+
+
+def predicate_cubes_v2(goal):
+    """CHK-6: `volume_bracket` accepts `volume_evidence = sandwich_bounded`."""
+    if goal != "volume_bracket":
+        return _predicate_cubes_generic(goal, goal_targets_v2(goal))
+    g = _v("goal", "volume_bracket")
+    out = []
+    for zs in ("certified_empty", "regular"):
+        for kn in ("all_components", "complete_locus"):
+            c = [None] * N
+            c[AXIS_INDEX["relation.zero_set"]] = _v("relation.zero_set", zs)
+            c[AXIS_INDEX["global.knowledge"]] = _v("global.knowledge", kn)
+            c[GOAL_IDX] = g
+            out.append(tuple(c))
+    for kn in ("all_components", "complete_locus"):
+        c = [None] * N
+        c[AXIS_INDEX["relation.volume_evidence"]] = _v("relation.volume_evidence", "sandwich_bounded")
+        c[AXIS_INDEX["global.knowledge"]] = _v("global.knowledge", kn)
+        c[GOAL_IDX] = g
+        out.append(tuple(c))
+    return out
+
+
+def region_key_v2(state):
+    return (
+        VALUES["relation.src_dims"][state[AXIS_INDEX["relation.src_dims"]]],
+        VALUES["relation.zero_set"][state[AXIS_INDEX["relation.zero_set"]]],
+        VALUES["relation.local_dim"][state[AXIS_INDEX["relation.local_dim"]]],
+        VALUES["global.knowledge"][state[AXIS_INDEX["global.knowledge"]]],
+        VALUES["relation.regime"][state[AXIS_INDEX["relation.regime"]]],
+        VALUES["relation.volume_evidence"][state[AXIS_INDEX["relation.volume_evidence"]]],
+    )
+
+
+def minimal_missing_cubes_v2(missing):
+    proj_axes = [AXIS_INDEX[a] for a in
+                 ("relation.src_dims", "relation.zero_set", "relation.local_dim",
+                  "relation.incidence", "global.knowledge", "relation.regime",
+                  "relation.volume_evidence")]
+    patterns = collections.defaultdict(set)
+    for s in missing:
+        patterns[tuple(s[i] for i in proj_axes)].add(s)
+    cubes = []
+    for pattern in sorted(patterns):
+        cubes.append({
+            "relation.src_dims": VALUES["relation.src_dims"][pattern[0]],
+            "relation.zero_set": VALUES["relation.zero_set"][pattern[1]],
+            "relation.local_dim": VALUES["relation.local_dim"][pattern[2]],
+            "relation.incidence": VALUES["relation.incidence"][pattern[3]],
+            "global.knowledge": VALUES["global.knowledge"][pattern[4]],
+            "relation.regime": VALUES["relation.regime"][pattern[5]],
+            "relation.volume_evidence": VALUES["relation.volume_evidence"][pattern[6]],
+            "state_count": len(patterns[pattern]),
+        })
+    return cubes
+
+
+_V2_NON_GOAL_STATES = None
+
+
+@contextlib.contextmanager
+def lattice_v2():
+    """Run the checker core on the lattice-v2 axes, then restore v1 exactly."""
+    global _V2_NON_GOAL_STATES
+    g = globals()
+    names = ["AXES", "AXIS_NAMES", "AXIS_INDEX", "VALUES", "GOAL_IDX", "GOALS", "N",
+             "REFINABLE", "goal_targets", "region_key", "minimal_missing_cubes",
+             "predicate_cubes", "NON_GOAL_STATES"]
+    saved = {n: g[n] for n in names}
+    g["AXES"] = V2_AXES
+    g["AXIS_NAMES"] = [a for a, _ in V2_AXES]
+    g["AXIS_INDEX"] = {a: i for i, a in enumerate(g["AXIS_NAMES"])}
+    g["VALUES"] = {a: v for a, v in V2_AXES}
+    g["GOAL_IDX"] = g["AXIS_INDEX"]["goal"]
+    g["GOALS"] = list(g["VALUES"]["goal"])
+    g["N"] = len(V2_AXES)
+    ref = dict(REFINABLE)
+    ref["relation.regime"] = {"unknown(residual)"}
+    ref["relation.volume_evidence"] = {"none(residual)"}
+    ref["relation.zero_set"] = {"unknown", "near_degenerate(residual)"}
+    g["REFINABLE"] = ref
+    g["goal_targets"] = goal_targets_v2
+    g["region_key"] = region_key_v2
+    g["minimal_missing_cubes"] = minimal_missing_cubes_v2
+    g["predicate_cubes"] = predicate_cubes_v2
+    if _V2_NON_GOAL_STATES is None:
+        _V2_NON_GOAL_STATES = enumerate_non_goal_states(feasible_v2)
+    g["NON_GOAL_STATES"] = _V2_NON_GOAL_STATES
+    try:
+        yield
+    finally:
+        for n in names:
+            g[n] = saved[n]
+
+
+def _expand_rule_unions(rule):
+    """Expand `a|b` precondition values into one row per combination.
+
+    Lattice-v2 fragment rows write unions (`zero_set = unknown|rank_def...`)
+    because the spec's preconditions are set membership; the checker's compiled
+    precondition is a single concrete value per axis.
+    """
+    choices = []
+    for p in rule.get("preconditions", []):
+        v = p.get("value")
+        if isinstance(v, str) and "|" in v and not v.startswith("!unmodeled:"):
+            choices.append((p.get("axis"), v.split("|")))
+        else:
+            choices.append((p.get("axis"), [v]))
+    for combo in itertools.product(*[opts for _, opts in choices]):
+        r = dict(rule)
+        r["preconditions"] = [{"axis": a, "value": val}
+                              for (a, _), val in zip(choices, combo)]
+        yield r
+
+
+def compile_rules_v2(rules):
+    out = []
+    for r in rules:
+        for er in _expand_rule_unions(r):
+            out.append(CompiledRule(er))
+    return out
+
+
+def load_fragment_e():
+    with open(FRAG_DIR / "E.json", encoding="utf-8") as fh:
+        return json.load(fh)
+
+
+def fragment_e_rules(lift, w4=False):
+    """Fragment E rows.
+
+    CHK-7: `lift` adds the OBL-K knowledge-lift projection as a separate
+    modelling rule. The sandwich rule itself never changes `global.knowledge`
+    (the spec's OBL-K is exactly whether it may); the lift rule raises the low
+    knowledge values to `all_components` for the tangential volume region.
+
+    W4 (`E-TANGENCY-WITNESS-ZERO-BOUND`) is off by default (spec section 5.2);
+    `w4=True` enables that proposed route for an explicit projection.
+    """
+    frag = load_fragment_e()
+    rules = []
+    for r in frag.get("rules", []):
+        if r["rule_id"] == "E-TANGENCY-WITNESS-ZERO-BOUND" and not w4:
+            continue
+        r = dict(r)
+        r["_frag"] = "E"
+        rules.append(r)
+    if lift:
+        rules.append({
+            "rule_id": "E-OBL-K-KNOWLEDGE-LIFT",
+            "kind": "reduction",
+            "source": {
+                "file": "docs/RANK_DEFICIENT_CONTACT_SPEC.md",
+                "symbol": "section 4.5 OBL-K (CHK-7 knowledge lift)",
+                "line": 260,
+            },
+            "preconditions": [
+                {"axis": "relation.regime", "value": "tangential"},
+                {"axis": "goal", "value": "volume_bracket"},
+                {"axis": "global.knowledge",
+                 "value": "local_only(residual)|loop_free|seed_complete|all_components"},
+            ],
+            "outcomes": [
+                {"variant": "AllComponents",
+                 "postconditions": [{"axis": "global.knowledge", "value": "all_components"}]},
+            ],
+            "refusals": [],
+            "consumes_evidence": ["SandwichCoverage"],
+            "produces_evidence": ["GlobalKnowledgeLift"],
+            "calls": ["E-VOLUME-TANGENTIAL-SANDWICH"],
+            "theorem_comment": (
+                "OBL-K: undecided pairs are covered exhaustively, so the sandwich "
+                "rule may raise global.knowledge to all_components for the region it "
+                "covers, for volume_bracket only. Modelled separately so the CHK-7 "
+                "lift projection is explicit."
+            ),
+            "confidence": "proposed",
+            "_frag": "E",
+        })
+    return rules
+
+
+def fragment_e_rule_ids():
+    return [r["rule_id"] for r in load_fragment_e().get("rules", [])]
+
+
+WITNESS_AXES = {
+    "relation.src_dims": "2x2",
+    "relation.zero_set": "rank_deficient(residual)",
+    "relation.local_dim": "0",
+    "global.knowledge": "local_only(residual)",
+    "relation.regime": "unknown(residual)",
+    "relation.volume_evidence": "none(residual)",
+}
+
+
+def _annotate_v2_rep(rep, goal):
+    """RDEF-M1 acceptance annotations, computed on the v2 globals."""
+    rd_idx = AXIS_INDEX["relation.zero_set"]
+    src_idx = AXIS_INDEX["relation.src_dims"]
+    reg_idx = AXIS_INDEX["relation.regime"]
+    rd_set = {VALUES["relation.zero_set"].index(z) for z in V2_RANK_DEF_ZERO_SETS}
+    acc_set = {VALUES["relation.zero_set"].index(z) for z in V2_ACCEPTANCE_ZERO_SETS}
+    missing = rep["missing"]
+    rep["v2_rank_def_undecided"] = sum(1 for s in missing if s[rd_idx] in rd_set)
+    rep["v2_residual_undecided"] = sum(
+        1 for s in missing
+        if VALUES["relation.zero_set"][s[rd_idx]] == "rank_deficient(residual)")
+    rep["v2_near_degenerate_undecided"] = sum(
+        1 for s in missing
+        if VALUES["relation.zero_set"][s[rd_idx]] == "near_degenerate(residual)")
+    # The M1 acceptance is the in-scope audited gap: surface-surface (2x2) rank
+    # deficient volume states in the regimes fragment E resolves. The 1x1/2x1
+    # knowledge-lifting gap is out of scope (spec section 1.3); singular_param
+    # and near_degenerate are named refusals, reported separately.
+    in_scope = 0
+    named_refusal = 0
+    for s in missing:
+        if s[rd_idx] not in acc_set:
+            continue
+        src = VALUES["relation.src_dims"][s[src_idx]]
+        regime = VALUES["relation.regime"][s[reg_idx]]
+        if src == "2x2" and regime in ("unknown(residual)", "tangential"):
+            in_scope += 1
+        elif regime == "singular_param":
+            named_refusal += 1
+    rep["v2_rank_def_undecided_in_scope_2x2"] = in_scope
+    rep["v2_rank_def_undecided_named_refusal"] = named_refusal
+    gidx = VALUES["goal"].index(goal)
+    widx = {AXIS_INDEX[a]: VALUES[a].index(v) for a, v in WITNESS_AXES.items()}
+    states = [s for s in NON_GOAL_STATES if all(s[i] == v for i, v in widx.items())]
+    win = 0
+    for st in states:
+        s = list(st)
+        s[GOAL_IDX] = gidx
+        if tuple(s) in rep["winning"]:
+            win += 1
+    rep["v2_witness_cell_states"] = len(states)
+    rep["v2_witness_cell_winning"] = win
+    rep["v2_witness_cell_proved"] = win > 0
+    rep["v2_rank_def_cells"] = minimal_missing_cubes_v2(
+        [s for s in missing if s[rd_idx] in rd_set])
+
+
+def compute_goal_v2(goal, compiled):
+    """Fail-closed accounting for the v2 projection.
+
+    Same fixed point as `compute_goal` but without the (expensive) region
+    classification or the strict metric: the RDEF-M1 acceptance needs W_G, the
+    undecided set and the witness-cell annotation, not the per-region table.
+    """
+    w, witness = fixpoint(goal, compiled)
+    winning = materialize_winning(goal, w)
+    g = _v("goal", goal)
+    a_g = []
+    for st in NON_GOAL_STATES:
+        s = list(st)
+        s[GOAL_IDX] = g
+        a_g.append(tuple(s))
+    refuted_states = [s for s in a_g if s not in winning and refuted(goal, s)]
+    missing = [s for s in a_g if s not in winning and not refuted(goal, s)]
+    rep = {
+        "goal": goal, "A_G": len(a_g), "W_G": len(winning), "M_G": len(missing),
+        "R_G": len(refuted_states), "U_G": len(missing), "cubes": len(w),
+        "winning_cube_set": w, "winning": winning, "missing": missing,
+        "witness": witness,
+    }
+    _annotate_v2_rep(rep, goal)
+    return rep
+
+
+def v2_projection(include_e, lift, goals=None, w4=False):
+    frags = load_fragments()
+    merged, conflicts, per_fragment, duplicate_rows, rows_read = merge_rules(frags)
+    rules = list(merged)
+    if include_e:
+        rules = rules + fragment_e_rules(lift, w4=w4)
+    reps = {}
+    with lattice_v2():
+        compiled = compile_rules_v2(rules)
+        for goal in (goals or GOALS):
+            reps[goal] = compute_goal_v2(goal, compiled)
+    return {
+        "include_fragment_e": include_e,
+        "knowledge_lift": lift,
+        "w4_enabled": w4,
+        "compiled_rows": len(compiled),
+        "goals": reps,
+    }
+
+
+def compute_reachability_v2(proposed_reps):
+    """CHK-9: is every new rule reachable from the door/bridge path?
+
+    Code routing (fragment D `reaches`) is the W_code side. Because fragment E
+    is proposed and not yet wired, the checker also reports whether each rule is
+    the first witness of a winning cube (`first_witness_in_model`); a rule that
+    is neither reached in code nor a first witness is the clearest routing gap.
+    """
+    frags = load_fragments()
+    d = frags["D"]
+    reached = set()
+    for r in d.get("rules", []):
+        for x in r.get("reaches", []) or []:
+            reached.add(x)
+    first_witness = set()
+    for rep in proposed_reps.values():
+        for c in rep["winning_cube_set"]:
+            rid = rep["witness"].get(c)
+            if rid:
+                first_witness.add(rid)
+    rows = []
+    for r in load_fragment_e().get("rules", []):
+        rid = r["rule_id"]
+        in_door = rid in reached
+        rows.append({
+            "rule_id": rid,
+            "reachable_from_door": in_door,
+            "routing_gap": not in_door,
+            "first_witness_in_model": rid in first_witness,
+            "calls": list(r.get("calls", []) or []),
+        })
+    return {
+        "door_reached_targets": sorted(reached),
+        "rules": rows,
+        "routing_gaps": [x["rule_id"] for x in rows if x["routing_gap"]],
+    }
+
+
+def write_state_json(goal_reports, census, v2=None):
+
     payload = {
         "schema": "solver-coverage-state.v2",
         "rdef_m0": {
@@ -977,6 +1455,9 @@ def write_state_json(goal_reports, census):
             "missing_cells": minimal_missing_cubes(rep["missing"]),
             "refuted_cells": minimal_missing_cubes(rep["refuted"]),
         }
+    if v2 is not None:
+        payload["lattice_v2"] = v2["lattice"]
+        payload["fragment_e"] = v2["fragment_e"]
     with open(STATE_PATH, "w", encoding="utf-8") as fh:
         json.dump(payload, fh, indent=1, ensure_ascii=False)
 
@@ -1439,6 +1920,128 @@ def run():
               f"cubes={rep['cubes']}")
 
     routing = compute_routing(compiled, goal_reports, frags)
+
+    # ---- RDEF-M1 lattice v2 / fragment E dual-mode projections (CHK-5..9) --
+    print("[checker] RDEF-M1: computing lattice-v2 fragment-E projections ...")
+    v2_prod = v2_projection(include_e=False, lift=False, goals=["volume_bracket"])
+    v2_no_lift = v2_projection(include_e=True, lift=False, goals=["volume_bracket"])
+    v2_lift = v2_projection(include_e=True, lift=True)
+    reach = compute_reachability_v2(v2_lift["goals"])
+
+    vol_prod = v2_prod["goals"]["volume_bracket"]
+    vol_no_lift = v2_no_lift["goals"]["volume_bracket"]
+    vol_lift = v2_lift["goals"]["volume_bracket"]
+    acceptance = {
+        "scope": "surface-surface (src_dims=2x2) rank-deficient volume_bracket, "
+                 "regimes {unknown(residual), tangential}; 1x1/2x1 is the out-of-scope "
+                 "section 1.3 knowledge-lifting gap and singular_param is a named refusal",
+        "volume_bracket_rank_def_undecided_in_scope_lift": vol_lift["v2_rank_def_undecided_in_scope_2x2"],
+        "volume_bracket_rank_def_undecided_in_scope_no_lift": vol_no_lift["v2_rank_def_undecided_in_scope_2x2"],
+        "volume_bracket_rank_def_undecided_in_scope_production": vol_prod["v2_rank_def_undecided_in_scope_2x2"],
+        "volume_bracket_rank_def_undecided_all_lift": vol_lift["v2_rank_def_undecided"],
+        "volume_bracket_rank_def_undecided_all_no_lift": vol_no_lift["v2_rank_def_undecided"],
+        "volume_bracket_rank_def_undecided_all_production": vol_prod["v2_rank_def_undecided"],
+        "volume_bracket_named_refusal_lift": vol_lift["v2_rank_def_undecided_named_refusal"],
+        "retrodiction_witness_cell": dict(WITNESS_AXES),
+        "retrodiction_witness_states": vol_lift["v2_witness_cell_states"],
+        "retrodiction_witness_proved_lift": vol_lift["v2_witness_cell_proved"],
+        "retrodiction_witness_proved_no_lift": vol_no_lift["v2_witness_cell_proved"],
+        "retrodiction_witness_proved_production": vol_prod["v2_witness_cell_proved"],
+    }
+    acceptance["acceptance_holds"] = (
+        acceptance["volume_bracket_rank_def_undecided_in_scope_lift"] == 0
+        and acceptance["retrodiction_witness_proved_lift"])
+
+    def _proj_summary(proj):
+        out = {}
+        for goal, rep in proj["goals"].items():
+            out[goal] = {
+                "A_G": rep["A_G"], "W_G": rep["W_G"], "M_G": rep["M_G"],
+                "U_G": rep["U_G"], "R_G": rep["R_G"],
+                "rank_def_undecided": rep.get("v2_rank_def_undecided"),
+                "rank_def_undecided_in_scope_2x2": rep.get("v2_rank_def_undecided_in_scope_2x2"),
+                "rank_def_undecided_named_refusal": rep.get("v2_rank_def_undecided_named_refusal"),
+            }
+        return out
+
+    # section 1.3 residual gaps (reported, not hidden) on the production
+    # tightened v1 lattice.
+    def _src_of(s):
+        return VALUES["relation.src_dims"][s[AXIS_INDEX["relation.src_dims"]]]
+
+    residual_gaps = {
+        "spec_section_1_3_declared": {
+            "volume_bracket_1x1_2x1_knowledge_lift": 5760,
+            "no_intersection_1x1_2x1_unknown_vertical": 5760,
+            "valid_brep_2x1_partial": 1920,
+        },
+        "observed": {},
+    }
+    for rep in goal_reports:
+        if rep["goal"] == "volume_bracket":
+            residual_gaps["observed"]["volume_bracket_2x1"] = sum(
+                1 for s in rep["missing"] if _src_of(s) == "2x1")
+            residual_gaps["observed"]["volume_bracket_1x1"] = sum(
+                1 for s in rep["missing"] if _src_of(s) == "1x1")
+        if rep["goal"] == "no_intersection":
+            residual_gaps["observed"]["no_intersection_1x1_2x1_unknown"] = sum(
+                1 for s in rep["missing"]
+                if _src_of(s) in ("1x1", "2x1")
+                and VALUES["relation.zero_set"][s[AXIS_INDEX["relation.zero_set"]]] == "unknown")
+        if rep["goal"] == "valid_brep":
+            residual_gaps["observed"]["valid_brep_2x1_partial"] = sum(
+                1 for s in rep["missing"] if _src_of(s) == "2x1")
+    residual_gaps["matches_spec_section_1_3"] = (
+        residual_gaps["observed"]["volume_bracket_2x1"] == 5760
+        and residual_gaps["observed"]["no_intersection_1x1_2x1_unknown"] == 5760
+        and residual_gaps["observed"]["valid_brep_2x1_partial"] == 1920)
+
+    v2_payload = {
+        "lattice": {
+            "axes": {a: vals for a, vals in V2_AXES},
+            "t_geom": [
+                "rep.canonical_carrier=true => rep.exact_implicit=true",
+                "relation.src_dims=2x2 and relation.zero_set=regular => relation.local_dim=1",
+                "relation.src_dims in {1x1,2x1} => relation.local_dim <= 1",
+                "relation.src_dims in {1x1,2x1} and relation.zero_set=regular => relation.local_dim=0",
+                "relation.zero_set=certified_empty => relation.local_dim=0",
+                "relation.zero_set=tangent_point => relation.local_dim=0",
+                "relation.zero_set=tangent_crossing => relation.local_dim=1",
+                "relation.zero_set=tangent_curve => relation.local_dim=1",
+                "relation.zero_set=tangent_higher => relation.local_dim=0",
+                "relation.zero_set=coincident => relation.local_dim=min(src_dims)",
+                "relation.zero_set=near_degenerate(residual) => relation.local_dim=residual",
+                "relation.volume_evidence=sandwich_bounded => relation.regime=tangential",
+            ],
+            "feasible_fact_states": len(_V2_NON_GOAL_STATES),
+        },
+        "fragment_e": {
+            "confidence": "proposed",
+            "rule_ids": fragment_e_rule_ids(),
+            "schema": "loop/solver_coverage/schema.json",
+            "never_merged_into_production": True,
+            "projections": {
+                "production_a_d": {
+                    "description": "v2 lattice, merged A-D only (no fragment E)",
+                    "include_fragment_e": False, "knowledge_lift": False,
+                    "goals": _proj_summary(v2_prod),
+                },
+                "proposed_no_lift": {
+                    "description": "v2 lattice, A-D + fragment E, OBL-K knowledge lift OFF",
+                    "include_fragment_e": True, "knowledge_lift": False,
+                    "goals": _proj_summary(v2_no_lift),
+                },
+                "proposed_lift": {
+                    "description": "v2 lattice, A-D + fragment E, OBL-K knowledge lift ON",
+                    "include_fragment_e": True, "knowledge_lift": True,
+                    "goals": _proj_summary(v2_lift),
+                },
+            },
+            "acceptance": acceptance,
+            "reachability": reach,
+        },
+    }
+
     write_state_json(goal_reports, {
         "per_fragment": census["per_fragment"],
         "rows_read": census["rows_read"],
@@ -1452,7 +2055,7 @@ def run():
         "medium_confidence": census["medium_confidence"],
         "unmodeled_value_list": [[v, n] for v, n in values.most_common()],
         "unmodeled_axis_key_list": [[k, n] for k, n in axes.most_common()],
-    })
+    }, v2=v2_payload)
 
     routing["deliberate_gap_note"] = (
         "The deliberate-gap run is committed at `docs/SOLVER_COVERAGE_AUDIT.deliberate-gap.md`.")
@@ -1542,35 +2145,120 @@ def run():
         for r in goal_reports
     }
     pcm = sum(1 for c in conflicts if c.get("kind") == "postcondition_claim_mismatch")
+    state_text = STATE_PATH.read_text(encoding="utf-8")
+    state_fragment_e_lines = sum(1 for line in state_text.splitlines() if "fragment_e" in line)
     result = {
-        "id": "RDEF-M0-CHECKER-ACCOUNTING",
-        "packet": "RDEF-M0-CHECKER-ACCOUNTING",
-        "contract": ["RDEF-M0-CHECKER-ACCOUNTING"],
+        "id": "RDEF-M1-LATTICE-V2",
+        "packet": "RDEF-M1-LATTICE-V2",
+        "contract": ["RDEF-M1-LATTICE-V2"],
         "status": "DONE",
         "branch": current_branch(),
-        "anchors": {"A1": pcm, "A1_expected": 2, "A1_holds": pcm == 2},
+        "anchors": {
+            "A1": state_fragment_e_lines,
+            "A1_cmd": "grep -c 'fragment_e' loop/solver_coverage/state.json",
+            "A1_nonzero": state_fragment_e_lines > 0,
+        },
         "summary": (
-            "RDEF-M0 checker accounting: CHK-1 three-way PROVED/REFUTED/UNDECIDED with the "
-            "section-2 refutation predicates; CHK-2 tightened T_geom "
-            f"({tightening['before_states']} -> {tightening['after_states']} feasible fact "
-            "states) with before/after counts; CHK-3 renamed fail-closed coverage and added "
-            "strict coverage; CHK-4 pinned `regular` to regular-where-nonempty and re-audited "
-            "the cascade routes (none changed status); the three v1 conflicts adjudicated "
-            "against the source tree and applied to the merged model."
+            "RDEF-M1 lattice v2: CHK-5 added the relation.regime and "
+            "relation.volume_evidence axes and the six rank-deficient zero-set children "
+            "with their fixed local_dims; CHK-6 revised the goal predicates so "
+            "volume_bracket accepts volume_evidence=sandwich_bounded; CHK-7 runs the "
+            "OBL-K knowledge lift ON and OFF and reports both; CHK-8 encoded the nine "
+            "section-7 rules as fragment E with confidence=proposed, kept out of the "
+            "production numbers; CHK-9 checked reachability of every new rule. "
+            f"Acceptance (lift ON, in-scope 2x2): volume_bracket rank-deficient "
+            f"UNDECIDED = {acceptance['volume_bracket_rank_def_undecided_in_scope_lift']}, "
+            f"retrodiction witness proved = {acceptance['retrodiction_witness_proved_lift']}."
         ),
-        "rule_census": {
-            "per_fragment": census["per_fragment"],
-            "rows_read": census["rows_read"],
-            "merged_rows": census["merged_rows"],
-            "duplicate_rows": census["duplicate_rows"],
-            "conflicts_found": len(conflicts),
-            "conflicts": conflicts,
-            "unmodeled_values": census["unmodeled_values"],
-            "unmodeled_axis_keys": census["unmodeled_axis_keys"],
-            "low_confidence": census["low_confidence"],
-            "medium_confidence": census["medium_confidence"],
+        "m1": {
+            "chk5_lattice_v2": {
+                "new_axes": {
+                    "relation.regime": ["unknown(residual)", "transversal",
+                                        "tangential", "singular_param"],
+                    "relation.volume_evidence": ["none(residual)", "sandwich_bounded"],
+                },
+                "new_zero_set_children": V2_CHILD_LOCAL_DIM,
+                "feasible_fact_states": len(_V2_NON_GOAL_STATES),
+                "t_geom_additions": [
+                    "each new child fixes relation.local_dim (coincident = smaller source dimension)",
+                    "relation.volume_evidence=sandwich_bounded => relation.regime=tangential",
+                ],
+            },
+            "chk6_goal_predicates": {
+                "volume_bracket": "knowledge in {all_components, complete_locus} AND "
+                                  "(zero_set in {certified_empty, regular} OR "
+                                  "volume_evidence=sandwich_bounded)",
+                "accepts_new_children": ["local_contact", "valid_brep", "mesh"],
+                "rejects_near_degenerate": ["local_contact", "valid_brep", "mesh"],
+                "material_class_unchanged": True,
+            },
+            "chk7_dual_mode": {
+                "obligation": "OBL-K (section 4.5) is not discharged",
+                "lift_on": _proj_summary(v2_lift)["volume_bracket"],
+                "lift_off": _proj_summary(v2_no_lift)["volume_bracket"],
+                "production_a_d": _proj_summary(v2_prod)["volume_bracket"],
+            },
+            "chk8_fragment_e": {
+                "rule_ids": fragment_e_rule_ids(),
+                "confidence": "proposed",
+                "merged_into_production": False,
+                "projection": _proj_summary(v2_lift),
+                "projection_lift_off": _proj_summary(v2_no_lift),
+            },
+            "chk9_reachability": reach,
+            "acceptance": acceptance,
+            "residual_gaps_section_1_3": residual_gaps,
+        },
+        "notes": (
+            "M1 modelling notes. (1) Schema: loop/solver_coverage/schema.json; "
+            "`!unmodeled` preconditions live in the preconditions array with the "
+            "`!unmodeled:` prefix (Q1). (2) OBL-S1 (sandwich/flux-bracket "
+            "composition) is unresolved and modelled as an additive "
+            "volume_evidence axis (Q2). (3) The 1x1/2x1 volume measure is not "
+            "determined from the model and stays an [ASM] (Q3). (4) `regular` "
+            "means regular-where-nonempty, decided in M0 (Q4). (5) The admission "
+            "rule's Transversal outcome refines zero_set to regular and local_dim "
+            "to 1 (a transversal contact is regular); the preconditions name the "
+            "local_dim axis as a union so the refinement is modelled. (6) The M1 "
+            "acceptance is scoped to the audited 2x2 gap; the 1x1/2x1 "
+            "knowledge-lifting gap is out of scope and reported, and "
+            "singular_param/near_degenerate are named refusals. (7) All nine "
+            "fragment-E rules are flagged as routing gaps because they are "
+            "proposed and not wired into the door/bridge path; W4 is off by "
+            "default and excluded from the default projection."
+        ),
+        "open_questions_section_11": {
+            "q1_fragment_schema": (
+                "The schema is loop/solver_coverage/schema.json (rule_id, kind, source, "
+                "preconditions, outcomes, refusals, consumes_evidence, produces_evidence, "
+                "calls, theorem_comment, confidence). Fragment E is encoded as "
+                "loop/solver_coverage/fragments/E.json; the fragment enum gained \"E\" and "
+                "the confidence enum gained \"proposed\". `!unmodeled` preconditions go in "
+                "the preconditions array as axis/value strings prefixed `!unmodeled:` "
+                "(fragment E has four such axis keys); CompiledRule abstracts them and they "
+                "never enter the coverage arithmetic."
+            ),
+            "q2_obl_s1_composition": (
+                "Unresolved. The checker models the sandwich as an additive "
+                "relation.volume_evidence axis and does not claim that the contact-cover "
+                "flux bracket composes with the sandwich term. OBL-S1 remains a kernel "
+                "proof obligation for M2."
+            ),
+            "q3_1x1_2x1_measure": (
+                "Not determined from the model. Lattice v2 applies the same "
+                "volume_evidence=sandwich_bounded axis to all src_dims; whether the "
+                "curve-relation volume measure is the trim-arrangement area feeding the "
+                "flux bracket is recorded as [ASM] to confirm in M2 (spec section 3.2)."
+            ),
+            "q4_regular_nonempty": (
+                "Decided in M0 (docs/SOLVER_COVERAGE_SPEC.md section 6.1): `regular` means "
+                "\"regular where nonempty\"; it does not assert nonemptiness, so it does "
+                "not refute no_intersection."
+            ),
         },
         "rdef_m0": {
+            "id": "RDEF-M0-CHECKER-ACCOUNTING",
+            "anchors": {"A1": pcm, "A1_expected": 2, "A1_holds": pcm == 2},
             "chk1_three_way": three_way,
             "chk2_tightening": {
                 "feasible_fact_states_before": tightening["before_states"],
@@ -1603,10 +2291,13 @@ def run():
         "demonstration_deliberate_gap": gap_evidence,
         "artifacts": [
             "loop/solver_coverage/checker.py",
+            "loop/solver_coverage/schema.json",
+            "loop/solver_coverage/fragments/E.json",
             "loop/solver_coverage/state.json",
             "loop/solver_coverage/test_checker.py",
             "docs/SOLVER_COVERAGE_AUDIT.md",
             "docs/SOLVER_COVERAGE_AUDIT.deliberate-gap.md",
+            "docs/SOLVER_COVERAGE_SPEC.md",
         ],
     }
     with open(RESULT_PATH, "w", encoding="utf-8") as fh:
