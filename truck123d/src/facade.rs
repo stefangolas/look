@@ -205,27 +205,27 @@ pub enum BooleanPairVerdict {
 /// The certified funnel admits swept-carrier booleans end to end for the
 /// classes whose faces the Theorem A adapter serves (ADM-001+) — a swept pair
 /// against a canonical or revolved carrier, and the routed corner/shell pairs
-/// of the PB-011 waves. A pair coupling TWO lofted/swept carriers (the
-/// `Swept` × `Swept` cell — a boolean between two spline-loft solids) is the
-/// pair cell the certified funnel does NOT admit end to end at this coarse
-/// granularity (the PB-011C census): the admitted subclass (ruled-section
-/// lofts) is finer than a carrier class, so the class pair keeps the typed
-/// constructive-carrier refusal at the boolean boundary. Canonical dispatch
-/// stays ahead; the consult fires only where the old path refused
-/// `NonCanonicalCarrier`.
+/// of the PB-011 waves. MONO-8-SWEPT-ADMISSION-WIRING widens the consult to the
+/// `Swept` × `Swept` cell: the executor now extracts both operands' patch
+/// 2-cycles and routes the pair through the fixed gate order (extraction →
+/// transversality → solver), so the fine-grained verdict — a certified bracket
+/// or the typed stage refusal — is decided at the geometry granularity rather
+/// than by the carrier class. The class-level consult therefore admits every
+/// pair carrying a funnel carrier; canonical dispatch stays ahead, and the
+/// consult fires only where the old path refused `NonCanonicalCarrier`.
 fn swept_pair_is_admitted(base: CarrierClass, tool: CarrierClass) -> bool {
-    !(base == CarrierClass::Swept && tool == CarrierClass::Swept)
+    base.is_funnel_carrier() || tool.is_funnel_carrier()
 }
 
 /// Routes one boolean carrier pair through the landed certified entry
 /// (PB-011 scope decision 1, the "exposed row"). A pair carrying a
 /// spline/swept/revolved carrier is the corpus's swept-carrier boolean: it
 /// consults admission (ADM-004-FUNNEL-WIRING, the ADM-000 dispatch rule) and
-/// dispatches into the certified funnel when the class pair is admitted. A
-/// both-Swept pair (two spline-loft solids) is not admitted at the carrier-
-/// class granularity and keeps the typed constructive-carrier
-/// `NonCanonicalCarrier` refusal at the boolean boundary (the PB-011C census
-/// verdict); a pair coupling a swept carrier with a torus carrier is a class
+/// dispatches into the certified funnel when the class pair is admitted. The
+/// `Swept` × `Swept` cell is admitted by MONO-8-SWEPT-ADMISSION-WIRING: the
+/// executor extracts both operands and runs the fixed gate order, so the pair
+/// routes here and the fine-grained verdict is the executor's typed stage
+/// refusal. A pair coupling a swept carrier with a torus carrier is a class
 /// the funnel refuses (the torus is excluded from the implicit-reduction
 /// stage, Theorem 4 economics) and answers the typed, localized
 /// `ContactReductionDeferred` refusal — fail-closed, never a bare `Err`. A
@@ -257,7 +257,7 @@ pub fn dispatch_swept_carrier_boolean(
     }
     // The admission consult (scope decision 2): run_facade consults admission
     // BEFORE the `NonCanonicalCarrier` refusal — canonical dispatch stays
-    // ahead, and a not-yet-admitted carrier pair keeps the exact refusal.
+    // ahead, and a pair outside the funnel carriers keeps the exact refusal.
     if !swept_pair_is_admitted(base, tool) {
         return BooleanPairVerdict::Refused(SweptBooleanRefusal {
             mode,
