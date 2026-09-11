@@ -75,46 +75,43 @@ corrected, annex C = ORACLE POLICY CHANGE), then docs/SOLVER_COVERAGE_SPEC.md
 
 ## Where we are
 
-> LATEST GROUND TRUTH [operator 2026-09-11T22:57Z / 18:57 local]: 1 RUNNING /
-> 0 landed-this-cycle / 0 unblocked / 0 flipped / 0 dispatched. HEAD `3d78cee`
-> (the owner-session commit that RESOLVED the FHC-EX-B duplicate: slot 1 killed +
-> reset-only, slot 0 kept, + a 29 GB cache cleanup; no new commits since).
-> **The duplicate is CLOSED — do not re-dispatch slot 1's copy.** Slot 0 is
-> RUNNING FHC-EX-B-SPLINE-LOFT-OPERANDS (worker cmd 10504; events 4.7 min fresh;
-> changed=2; wt `M truck123d/src/bd_bridge.rs` + new
-> `truck123d/tests/extraction_breadth_b.rs`) — LIVE, progressing, keep.
-> Slot 1 is now IDLE (pid=-, changed=0, git=packet@7830086 =base, no work) —
-> the reaped duplicate; it holds no RESULT/commit/question and must NOT be
-> re-dispatched while slot 0 owns the packet (same write set).
-> Slots 2-7 FINISHED/IDLE landed residue; every tip
-> (4e5633d/7830086/c3df084/e6553db/3c2109b/ee97499/713f205/5cf4811) re-verified
-> an ancestor of HEAD this cycle by `git merge-base --is-ancestor` — NOTHING
-> landable (slot 2 TTC-RECENSUS-F1-R3, slot 3 SOLVER-SURVEY-C, slot 4
-> F1-AUTHORING-ARMS, slot 5 CL-006, slot 6 CL-005, slot 7 FRAME-REVOLVE, all
-> landed). `dispatch_ready --dry-run --max-workers=4`: "slots: 8 (1 running, 7
-> free); slot-assigned packets: 5; dispatched 0; workers now ~1/4". Nothing
-> dispatchable: FHC-TRIM -> FHC-MIRROR -> BD-EMIT serial behind the RUNNING
-> FHC-EX-B; RG-23/RG-9 still ANCHOR CHECK FAILED (registry rows carry
-> `"packet": ""` — packet files never authored; authoring is out of charter).
-> Real dispatcher NOT run (heartbeat live = double-dispatch rule; nothing ready).
-> Registry re-derived by command: 10 BLOCKED rows, none cleanly flippable —
-> BG-AUD-FIX-004 OWNER_BLOCKED, BG-CK-SPLINE-CENSUS owner-CANCELLED,
-> SEM-PCURVE-MASTER-001-FIX SUPERSEDED, DEF-SPINEFRAME-GRAZE re-aimed at -R2,
-> DEF-TESS-ANALYTIC-SEAM r1 (superseded by -R2 READY), DEF-SEEDRAY-B human-gated
-> (frontier review), TOR-C PINNED (no packet, orchestrator-held), MONO-10
-> owner-gated on the R3 mesh predicate, RDEF-M5 dep M4 BLOCKED, RDEF-M4 dep M3
-> DONE but its note requires the M0 tangency adjudication (no M0 row) — escalate,
-> do not flip.
-> Health: heartbeat exactly 1 (27872, `dispatch_heartbeat.ps1`; the second scan
-> hit was this operator's own command line, which embeds the filter text),
-> operator_runner 1 (27876), watchdog 1 (29264), cargoq UP (ping ok, queued 0,
-> running false). Disk 30.9 GB free (above the 8 GB floor AND the 15 GB goal);
-> RAM 3.21 GB free (just above the 3 GB threshold; one worker resident — do not
-> stack a second). Root worktree carries live human-session WIP (M README.md,
-> M loop/cargoq/server.log, untracked benchmarks/ + loop/baselines/) — untouched,
-> reported not actioned.
-> Leaving: 1 RUNNING (slot 0, FHC-EX-B); slot 1 IDLE (resolved duplicate); HEAD
-> `3d78cee` + this cycle's STATE/log/escalation commit.
+> LATEST GROUND TRUTH [operator 2026-09-11T23:19Z / 19:19 local]: 0 RUNNING /
+> 1 landed-since-prior-block (FHC-EX-B, by the overnight driver) / 0 unblocked /
+> 0 flipped / 0 dispatched. HEAD `c139afb` (worker `af9f421` -> merge `e18c1d0`
+> -> row-LANDED `c139afb`; **FHC-EX-B-SPLINE-LOFT-OPERANDS is LANDED**). Slot 0 is
+> FINISHED landed residue (`git=HEAD@af9f421`); slot 1 IDLE is the resolved
+> FHC-EX-B duplicate (`git=packet@7830086 =base`, no work) — **do NOT re-dispatch
+> slot 1's copy**. Slots 2-7 FINISHED/IDLE landed residue. Every slot tip
+> (af9f421/7830086/c3df084/e6553db/3c2109b/ee97499/713f205/5cf4811) re-verified an
+> ancestor of HEAD this cycle by `git merge-base --is-ancestor` — NOTHING
+> landable.
+> `dispatch_ready --dry-run --max-workers=4`: "slots: 8 (0 running, 8 free);
+> dispatched 1; workers now ~1/4" — **FHC-TRIM-EXTRUDE-ENVELOPE is now UNBLOCKED
+> and targets slot 0**; FHC-MIRROR-FORM -> BD-EMIT-MESH-CACHE remain serial behind
+> it. Real dispatcher NOT run (heartbeat live = double-dispatch rule; the heartbeat
+> will dispatch FHC-TRIM on its next cycle). RG-23/RG-9 still ANCHOR CHECK FAILED
+> (registry rows carry `"packet": ""` — packet files never authored; authoring is
+> out of charter).
+> Registry re-derived by command: 350 = 254 DONE / 85 READY / 10 BLOCKED / 1
+> SUPERSEDED; none cleanly flippable — BG-AUD-FIX-004 OWNER_BLOCKED,
+> BG-CK-SPLINE-CENSUS owner-CANCELLED, SEM-PCURVE-MASTER-001-FIX SUPERSEDED,
+> DEF-SPINEFRAME-GRAZE re-aimed at -R2, DEF-TESS-ANALYTIC-SEAM r1 (superseded by
+> -R2 READY), DEF-SEEDRAY-B human-gated (frontier review), TOR-C PINNED (no packet,
+> orchestrator-held), MONO-10 owner-gated on the R3 mesh predicate, RDEF-M5 dep M4
+> BLOCKED, RDEF-M4 dep M3 DONE but its note requires the M0 tangency adjudication
+> (no M0 row) — escalate, do not flip.
+> Health: heartbeat exactly 1 (27872, `dispatch_heartbeat.ps1`), operator_runner 1
+> (27876), watchdog 1 (29264), overnight driver 1 (24864), cargoq UP (ping ok,
+> queued 0, running false). Disk 32.6 GB free (above the 8 GB floor AND the 15 GB
+> goal); RAM 3.8 GB free (above the 3 GB threshold; zero workers resident). Root
+> worktree carries live human-session WIP (M README.md, M loop/LEDGER.jsonl,
+> M loop/cargoq/server.log, untracked benchmarks/ + loop/baselines/ + scratch/) —
+> untouched, reported not actioned.
+> Carried escalation: TWO supervisors (19172 PyManager + 27828 pythoncore) — the
+> duplication class; only ONE overnight driver child, so no double-merge risk.
+> Leaving: 0 RUNNING; slot 0 FINISHED landed residue (free for FHC-TRIM); slot 1
+> IDLE (resolved duplicate, do not re-dispatch); HEAD `c139afb` + this cycle's
+> STATE/log commit.
 >
 > NOTE: this cycle replaced the prior collapsed block with a fresh one to keep the
 > volatile section at ~1 block (charter cap ~120 lines). Prior cycles' refreshes are

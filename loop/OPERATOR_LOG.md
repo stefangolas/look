@@ -6368,3 +6368,57 @@ Leaving: 1 RUNNING (slot 0, FHC-EX-B progressing); slot 1 IDLE (resolved
 duplicate, do not re-dispatch); HEAD `3d78cee` + this cycle's STATE/log/escalation
 commit; heartbeat 1; operator_runner 1; watchdog 1; cargoq UP; disk 30.9 GiB;
 RAM ~3.2 GiB.
+
+## 2026-09-11 23:19 UTC (operator)
+
+Board at start: 0 RUNNING, 0 IDLE-with-work; slots 0-7 FINISHED/IDLE landed
+residue. **FHC-EX-B-SPLINE-LOFT-OPERANDS LANDED by the overnight driver between
+cycles**: worker `af9f421` -> merge `e18c1d0` -> row-LANDED `c139afb` (= HEAD).
+Slot 0 is FINISHED landed residue; slot 1 IDLE is the resolved duplicate.
+
+Health sweep:
+- heartbeat exactly 1 (27872, command-line anchored to dispatch_heartbeat.ps1);
+  operator_runner 1 (27876); watchdog 1 (29264); overnight driver 1 (24864).
+  cargoq ping OK (queued 0, running false).
+- Disk 32.6 GB free (above the 8 GB floor AND the 15 GB goal). RAM 3.8 GB free
+  (above the 3 GB threshold; zero workers resident).
+
+Actions:
+- Land check: all 9 tips re-verified ancestors of `integration/kernel-bg` via
+  `git merge-base --is-ancestor` (af9f421/7830086/c3df084/e6553db/3c2109b/
+  ee97499/713f205/5cf4811 + d1e2e37) -> NOTHING landable. Slot 1 carries no
+  RESULT/commit/question and its duplicate was already resolved by the owner
+  session (3d78cee) -> did NOT re-dispatch (same write set as slot 0's landed
+  packet).
+- Unblock: no IDLE/DEAD >15 min holding work; no QUESTION. Nothing to resume.
+- Registry hygiene: 350 = 254 DONE / 85 READY / 10 BLOCKED / 1 SUPERSEDED;
+  none cleanly flippable (same carried 10: BG-AUD-FIX-004 OWNER_BLOCKED,
+  BG-CK-SPLINE-CENSUS owner-CANCELLED, SEM-PCURVE-MASTER-001-FIX SUPERSEDED,
+  DEF-SPINEFRAME-GRAZE re-aimed at -R2, DEF-TESS-ANALYTIC-SEAM r1 superseded by
+  -R2 READY, DEF-SEEDRAY-B human-gated, TOR-C PINNED, MONO-10 owner-gated,
+  RDEF-M5 dep M4 BLOCKED, RDEF-M4 M0-adjudication). No anchor/lint-fixable
+  failures on READY rows (RG-23/RG-9 are the missing-packet-file class).
+- `dispatch_ready --dry-run --max-workers=4`: "slots: 8 (0 running, 8 free);
+  dispatched 1; workers now ~1/4" -> **FHC-TRIM-EXTRUDE-ENVELOPE now UNBLOCKED
+  and targets slot 0**; FHC-MIRROR-FORM -> BD-EMIT-MESH-CACHE serial behind it.
+  Real dispatcher NOT run (heartbeat live = double-dispatch rule; the heartbeat
+  will dispatch FHC-TRIM next cycle). RG-23/RG-9 still ANCHOR CHECK FAILED
+  (registry `"packet": ""` = files never authored; authoring out of charter).
+- STATE: replaced the volatile ground-truth block with a fresh [operator
+  2026-09-11T23:19Z] block (single block; stable traps untouched).
+- This entry.
+
+Escalations: no new item. Carried unchanged: RG-23/RG-9 missing packet files;
+RDEF-M4 M0-adjudication re-scope; MONO-10 owner R3-mesh decision; FRAME-REVOLVE
+F1 non_z_axis pin; duplicate supervisors + lagging cargoq restart guard; TOR-C
+flip-or-pin; slot-4/7 wt RESULT residue; CL-005/CL-006 READY-but-landed
+bookkeeping; schedule.py 'needs' crash.
+
+Worktree note (reported, not actioned): root tree carries live human-session WIP
+(M README.md, M loop/LEDGER.jsonl, M loop/cargoq/server.log, untracked
+benchmarks/ + loop/baselines/ + scratch/).
+
+Leaving: 0 RUNNING; slot 0 FINISHED landed residue (free for FHC-TRIM); slot 1
+IDLE (resolved duplicate, do not re-dispatch); HEAD `c139afb` + this cycle's
+STATE/log commit; heartbeat 1; operator_runner 1; watchdog 1; cargoq UP; disk
+32.6 GiB; RAM ~3.8 GiB.
