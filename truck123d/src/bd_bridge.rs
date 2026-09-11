@@ -3707,7 +3707,9 @@ fn node_box_patches(
 ) -> Result<Vec<crate::python::binding::VolumeRow>, BooleanVolumeRefusal> {
     match node {
         TreeNode::Part { part } => placed_box_patches(part),
-        TreeNode::Boolean { .. } | TreeNode::Group { .. } => {
+        // A fillet as a boolean operand is the recorded open composition cell
+        // (FilletNode depth-1 discipline): refuse typed, never recurse.
+        TreeNode::Fillet { .. } | TreeNode::Boolean { .. } | TreeNode::Group { .. } => {
             Err(BooleanVolumeRefusal::BooleanProductVolumeUnavailable)
         }
     }
