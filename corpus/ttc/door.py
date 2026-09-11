@@ -100,7 +100,15 @@ def install_truck_alias():
     def _compound_from_instances(name, instances):
         objs = []
         for prototype, location, instance_name in instances:
-            placed = prototype.moved(location)
+            if isinstance(prototype, Compound):
+                # Compound.moved is pure (returns a placed copy).
+                placed = prototype.moved(location)
+            elif isinstance(prototype, _Part):
+                # _Part.moved is in place by design (the recorded rz path);
+                # copy first so a shared prototype is not accumulated.
+                placed = prototype._copy().moved(location)
+            else:
+                _refuse("instance prototype is not a part or compound carrier")
             placed.label = instance_name
             objs.append(placed)
         return bd.Compound(obj=objs, children=objs, label=name)
@@ -1477,24 +1485,29 @@ class Compound(_Shape):
         """build123d ``Compound.children``: the direct child shapes."""
         return self._children
 
-    def locate(self, loc):
-        """Group placement: compose the frame onto every child leaf.
+    def _copy(self):
+        """Deep placement copy: children are duplicated (geometry shared),
+        mirroring build123d's pure ``.moved`` semantics. Shared prototypes
+        placed N times must yield N independent placements (the cadgen
+        compound_from_instances path reuses one prototype object)."""
+        out = Compound(label=self.label)
+        out.color = self.color
+        for child in self._children:
+            if isinstance(child, (Compound, _Part)):
+                out._children.append(child._copy())
+            else:
+                _refuse("compound copy over a non-part child carrier")
+        return out
 
-        The cadgen ``compound_from_instances`` path places whole sub-assembly
-        prototypes (which arrive as ``Compound`` nodes) via ``.moved`` — the
-        vehicle/second_stage/cutaway rows died here with AttributeError before
-        this method existed (2026-09-11, harness fix, recorded in STATE)."""
+    def locate(self, loc):
+        """Pure group placement: returns a placed COPY of the subtree."""
         if not isinstance(loc, _Frame):
             _refuse("locate expects a frame carrier")
             return self
-        for child in self._children:
-            if isinstance(child, Compound):
-                child.locate(loc)
-            elif isinstance(child, _Part):
-                _locate_in_place(child, loc)
-            else:
-                _refuse("compound placement over a non-part child carrier")
-        return self
+        out = self._copy()
+        for leaf in out._leaves():
+            _locate_in_place(leaf, loc)
+        return out
 
     def moved(self, loc):
         return self.locate(loc)
