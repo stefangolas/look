@@ -6843,3 +6843,36 @@ goal); RAM 4.88 GiB. Carried human items unchanged: AUTHOR-CENSUS-NAMES SPEC_GAP
 RG-23/RG-9 missing packet files; FRAME-REVOLVE F1 non_z_axis pin
 (ttc_lathe_spline.rs:255); duplicate supervisors + lagging cargoq restart guard;
 slot-4/7 wt RESULT residue; TOR-C flip-or-pin; schedule.py 'needs' crash.]
+
+[orchestrator HANDOFF 2026-09-11 ~11:0xZ - session close. Read this, then
+ORCHESTRATOR.md, then slot_status.py. THE CENSUS IS RUNNING: R3
+(TTC-RECENSUS-F1-R3, pid 35048, slot 2) - 54 rows serial, 2-4h, first
+verdict table + kernel timing columns. DO NOT disturb the machine while
+it runs (quiet-machine discipline). LANDED since the session-58 handoff:
+MONO-8 (extraction adapter + Swept x Swept dispatch), MONO-9 (the fold -
+compound membership indicator, chained composition), RG-4 (boolean
+product facts - the base-operand defect), DOOR-CIRCLE-FLIP
+(ProfileEdge::Circle executor carrier), AUTHOR-EXT (fillet arm +
+closed-loop certificate), DOOR-PARTIAL-ARC (executor lathe arm),
+WIRE-MIRROR, RDEF-M0 + RDEF-M1 (lattice v2 + fragment E; M1 acceptance
+met - retrodiction witness PROVED under lift-ON), plus harness fixes
+(overnight.py no-op guard + root-crate scoped-check derivation -
+RESTARTED driver 24864 runs patched code; schedule.py KeyError fix).
+All FH machinery is landed; all F1 machinery except RDEF-M2 (CONDITIONAL
+- dispatch only if R3 shows NonTransversalContact/BudgetExhausted
+refusals on real rows) and RDEF-M3/M4/M5 (NOT on the corpus verdict
+path). OPEN ITEMS for the next session: (1) R3 adjudication - the
+verdict table + refusal list decides M2; (2) CENSUS-NAMES QUESTION
+parked at 46ff8cc - third facade-vs-executor conflation (Ellipse/
+RectangleRounded need executor conic/arc carriers) - amend like the
+circle flip, redispatch AFTER the census drains; (3) PARTIAL-ARC/
+MONO-8/older rows: registry status fields drifted from landed markers
+twice more tonight - reconcile from git history before trusting READY
+rows; (4) MONO-10 mesh-predicate ruling still parked with the owner;
+(5) TOR-C still pinned (booking stub). Substrate: heartbeat 27872,
+operator runner 27876, driver 24864 (patched), watchdog 29264,
+cargoq healthy. Rule reminders that paid tonight: workers stop honestly
+at gaps (3 QUESTION/SPEC_GAP cycles, all correctly); skipped-commit-step
+is near-universal - commit AS DELIVERED after scoped checks; never trust
+a swarm claim of already-landed without grepping bd_bridge.rs (facade
+ledger != executor, hit 3x).
