@@ -5555,3 +5555,61 @@ intact); HEAD `9eb53e3` + this cycle's STATE/log edits; heartbeat 1 (27872);
 operator_runner 1 (27876); watchdog 1 (29264); ONE overnight driver; TWO
 supervisors (carried); cargoq UP (running true); disk 4.5 GiB free (LOW, below
 floor); RAM 3.5 GiB.
+
+[operator 2026-09-11T17:52Z]
+
+Board: 0 RUNNING / 0 landed-this-cycle / 0 unblocked / 0 flipped / 0 dispatched.
+HEAD `9616df0` (the 17:26Z operator commit; no new commits since).
+
+- Step 1 health: `slot_status.py` -> slot 0 FINISHED (AUTHOR-CENSUS-NAMES,
+  RESULT present, events 2.5 min old), slots 1-7 FINISHED/IDLE. cargoq UP
+  (ping {"ok":true,"queued":0,"running":false}). Heartbeat exactly 1 (27872; the
+  extra process-scan match is this operator's own query line), operator_runner 1
+  (27876), watchdog 1 (29264), ONE overnight driver (24864), TWO supervisors
+  (19172+27828, carried). **DISK 2.68 GiB at entry - BELOW the 8 GB floor.**
+  `janitor ensure --need 15` reclaimed ~4.2 -> 6.4 GiB (STILL SHORT; slot-0
+  target now 0.0 GB). RAM 3.61 GiB free. No TEMP look-verify-baseline-* leaks.
+- Step 2 landing: slot 0 FINISHED but RESULT status `"LANDED"` (not DONE) with
+  findings F1-F4, incl. F4 = out-of-`write_allow` binding.rs edit flagged for
+  adjudication -> NOT landable; ESCALATED. Slots 1-7 tips (329f6ab/c3df084/
+  e6553db/3c2109b/ee97499/713f205/5cf4811) all re-verified ancestors of HEAD;
+  slot 1 RESULT `complete`, slot 4 `LANDED-WITH-FINDINGS`, slot 7 `LANDED` -
+  none DONE. Nothing merged.
+- Step 3 unblock: no IDLE/DEAD worker with work to rescue. Slot 0 just finished
+  (not stuck); slot 2 IDLE is landed TTC-RECENSUS-F1-R3 residue (row DONE) - not
+  reset (its packet is already landed; nothing dispatchable to refill with).
+- Step 4 registry hygiene: re-derived by command - 349 rows = 253 DONE / 85
+  READY / 10 BLOCKED / 1 SUPERSEDED. Every BLOCKED row with all needs landed
+  carries a deliberate hold/gate (BG-AUD-FIX-004 OWNER_BLOCKED; BG-CK-SPLINE-
+  CENSUS booking gate 4; SEM-PCURVE-MASTER-001-FIX SUPERSEDED; DEF-SPINEFRAME-
+  GRAZE SPEC_GAP; TOR-C orchestrator-held; MONO-10 owner-decision; RDEF-M4/M5
+  milestone). RDEF-M4 remains the only flip candidate but FAILS preflight (A1
+  stale anchor `vendor/truck/truck-certified/src/tangency/classify.rs` absent +
+  H1_NEW_MODULE) = re-scope, not a re-measurable expect -> not flipped. No READY
+  row needs an anchor re-measure or a mechanical lint fix (dispatch_ready's own
+  preflight flagged only RG-23/RG-9, whose packet FILES ARE MISSING = authoring
+  gap).
+- Step 5 dispatch: `dispatch_ready --dry-run --max-workers=4` -> "slots: 8
+  (0 running, 8 free); slot-assigned packets: 6; dispatched 0". Slot 0 is now
+  correctly ASSIGNED (its RESULT id matches the packet) so the dispatcher no
+  longer labels it a DEAD dispatch. RG-23/RG-9 ANCHOR CHECK FAILED (missing
+  files); the four FHC packets are serial on AUTHOR-CENSUS-NAMES. NO manual
+  dispatch (the heartbeat owns dispatch; 0 dispatchable anyway).
+- Step 6 STATE: prepended the 17:52Z LATEST GROUND TRUTH block (17:26Z marked
+  SUPERSEDED) + appended the volatile refresh at file end. Traps/history
+  untouched.
+- Step 7: this entry.
+
+Escalations: one NEW - slot 0 AUTHOR-CENSUS-NAMES FINISHED with RESULT status
+"LANDED" (not DONE) + F4 out-of-scope binding.rs edit -> adjudicate, then land
+(the FHC chain is serial on it; RESULT.json is untracked so preserve before any
+re-fork). One UPDATED - disk below floor. RDEF-M4 / RG-23 / RG-9 carried.
+Worktree note (reported, not actioned): root tree carries the live human-session
+WIP (tracked `loop/cargoq/server.log` + untracked docs/benchmarks/scratch) -
+untouched.
+
+Leaving: 0 RUNNING (slot 0 FINISHED, unlanded/escalated); HEAD `9616df0` + this
+cycle's STATE/log/escalation commit; heartbeat 1 (27872); operator_runner 1
+(27876); watchdog 1 (29264); ONE overnight driver; TWO supervisors (carried);
+cargoq UP (queued 0, running false); disk 6.4 GiB free (LOW, below floor); RAM
+3.6 GiB.

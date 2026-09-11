@@ -1533,3 +1533,44 @@ PRODUCTION.md` = False). `dispatch_ready` reports ANCHOR CHECK FAILED with empty
 content, i.e. the missing-file authoring gap. The write-set clash is a SEPARATE
 reason they cannot dispatch concurrently with slot 0; it is not the preflight
 failure. Both packets must be authored before either can dispatch.
+
+## 2026-09-11 17:52 UTC - NEW: slot 0 AUTHOR-CENSUS-NAMES FINISHED with RESULT status "LANDED" (not DONE) + an out-of-scope finding
+
+- What: slot 0 (AUTHOR-CENSUS-NAMES) is now FINISHED. The worker committed
+  ccec2e1 + rustfmt 43e26c9 on branch `packet/AUTHOR-CENSUS-NAMES` (base df81808,
+  which IS an ancestor of HEAD `9616df0`); branch diff vs base = 4 files /
+  +1511 -107 (corpus/ttc/door.py +385, truck123d/src/bd_bridge.rs +840,
+  truck123d/src/binding.rs +9, truck123d/tests/census_names.rs +384). RESULT.json
+  status is **"LANDED", not "DONE"**, and it carries findings F1-F4: F1 harness
+  reset the slot mid-session (work redone); F2 a single conic edge is now a whole
+  extrusion section; F3 TIER-B typed refusals; **F4 `truck123d/src/binding.rs`
+  is OUTSIDE the packet's `write_allow` (read_allow only) - a compile-forced
+  wildcard-arm edit the worker flagged "for adjudication" (the DOOR-CIRCLE-FLIP
+  `ProfileEdge::Circle` collateral precedent)**.
+- Why the operator can't: the charter's landing gate requires RESULT status DONE;
+  "LANDED" is not DONE, and the RESULT carries findings. Both are explicit
+  do-not-land triggers (the FRAME-REVOLVE precedent: status LANDED -> the
+  operator did not land; the orchestrator did). The F4 scope question is
+  packet-semantics adjudication, which the operator may not decide. The packet's
+  done-when is CLAIMED green (cargo check -p truck123d clean; census_names 8
+  passed; lib 82 passed; door_circle_flip/ttc_lathe_spline/ttc_authoring_arms
+  4/4 each) but the operator did NOT re-run them (not landing; disk below floor).
+- Why it matters: the four FHC-EX packets (`needs: [AUTHOR-CENSUS-NAMES]`) are
+  serial on this row, so the owner's F1/hypercar send is stalled until it lands
+  or is adjudicated. And **RESULT.json is gitignored/untracked in the slot wt
+  (NOT on the branch)** - the next heartbeat re-fork destroys it (the known
+  recycle-destroys-RESULT class). The code itself is safe on the branch.
+- Action needed (orchestrator/human): adjudicate F4 (accept the precedented
+  binding.rs collateral, or require a packet re-scope), then land
+  `packet/AUTHOR-CENSUS-NAMES` (merge --no-ff; scoped-verify `cargo check -p
+  truck123d` + `cargo test -p truck123d --test census_names`; file
+  `loop/results/AUTHOR-CENSUS-NAMES.json`; flip the row DONE). Preserve the
+  RESULT.json before any slot re-fork.
+- Start from: `git -C loop/slots/0/wt log --oneline -3`; `git -C
+  loop/slots/0/wt diff --stat df81808..43e26c9`; `loop/slots/0/wt/RESULT.json`;
+  `loop/packets/AUTHOR-CENSUS-NAMES.md`.
+
+UPDATED (operator 2026-09-11T17:52Z): DISK re-confirmed BELOW the 8 GB floor -
+entered 2.68 GiB, `janitor ensure --need 15` reclaimed ~4.2 -> 6.4 GiB (STILL
+SHORT; the slot-0 target is now 0.0 GB, nothing else reclaimable). RG-23/RG-9
+still missing packet files; RDEF-M4 still preflight-fails. Carried unchanged.

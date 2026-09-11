@@ -75,6 +75,46 @@ corrected, annex C = ORACLE POLICY CHANGE), then docs/SOLVER_COVERAGE_SPEC.md
 
 ## Where we are
 
+> LATEST GROUND TRUTH [operator 2026-09-11T17:52Z]: 0 RUNNING / 0
+> landed-this-cycle / 0 unblocked / 0 flipped / 0 dispatched. HEAD `9616df0`
+> (the 17:26Z operator commit; no new commits since). **Slot 0 AUTHOR-CENSUS-NAMES
+> has FINISHED** since the 17:26Z note (the hung lib test cleared; the worker
+> committed ccec2e1 + rustfmt 43e26c9 on `packet/AUTHOR-CENSUS-NAMES`; branch
+> diff vs base df81808 = 4 files / +1511 -107: corpus/ttc/door.py +385,
+> truck123d/src/bd_bridge.rs +840, truck123d/src/binding.rs +9,
+> truck123d/tests/census_names.rs +384). RESULT.json status is **"LANDED", not
+> "DONE"**, and carries findings F1-F4 (F4 = an out-of-`write_allow`
+> `truck123d/src/binding.rs` edit the worker flagged "for adjudication", the
+> DOOR-CIRCLE-FLIP compile-forced collateral). Per the charter (status != DONE
+> + findings) the slot is **NOT landable by the operator - ESCALATED**; the FHC
+> chain is serial on it. NOTE: RESULT.json is gitignored/untracked (NOT on the
+> branch) - any heartbeat re-fork destroys it; the code is safe on the branch.
+> Slots 1-7 FINISHED/IDLE landed residue (329f6ab/c3df084/e6553db/3c2109b/
+> ee97499/713f205/5cf4811 all re-verified ancestors of HEAD); slot 1 RESULT
+> `complete`, slot 4 = LANDED-WITH-FINDINGS, slot 7 = LANDED; nothing landable.
+> Registry 349 rows = 253 DONE / 85 READY / 10 BLOCKED / 1 SUPERSEDED; every
+> BLOCKED row with all needs landed carries a deliberate hold/gate (OWNER_BLOCKED
+> / booking gate / SUPERSEDED / SPEC_GAP / orchestrator-held / owner-decision /
+> milestone) and RDEF-M4 preflight-fails (A1 stale anchor
+> vendor/truck/truck-certified/src/tangency/classify.rs absent + H1_NEW_MODULE) =
+> re-scope, not re-measure - none mechanically flippable. `dispatch_ready
+> --dry-run --max-workers=4`: "slots: 8 (0 running, 8 free); slot-assigned
+> packets: 6; dispatched 0"; slot 0 is now correctly ASSIGNED (its RESULT id
+> matches the packet) so the dispatcher no longer labels it DEAD; RG-23/RG-9
+> packet files MISSING; the four FHC packets serial on CENSUS-NAMES. Health:
+> heartbeat exactly 1 (27872), operator_runner 1 (27876), watchdog 1 (29264),
+> ONE overnight driver, TWO supervisors carried; cargoq UP (ping ok, queued 0,
+> running false). **DISK 2.68 GiB at entry (BELOW the 8 GB floor) -> janitor
+> ensure --need 15 reclaimed ~4.2 -> 6.4 GiB (STILL SHORT; slot-0 target now
+> 0.0 GB, nothing else reclaimable).** RAM 3.6 GiB free. No TEMP
+> look-verify-baseline-* leaks. Root worktree carries the live human-session WIP
+> (tracked loop/cargoq/server.log + untracked docs/benchmarks/scratch) -
+> untouched, reported not actioned. Carried human items unchanged: RG-23/RG-9
+> missing packet files; RDEF-M4 re-scope; FRAME-REVOLVE F1 non_z_axis pin;
+> duplicate supervisors + lagging cargoq restart guard; slot-4/7 wt RESULT
+> residue; TOR-C flip-or-pin; schedule.py 'needs' crash.
+>
+> --- SUPERSEDED 2026-09-11T17:26Z note (kept for history) follows ---
 > LATEST GROUND TRUTH [operator 2026-09-11T17:26Z]: 1 RUNNING / 0
 > landed-this-cycle / 0 unblocked / 0 flipped / 0 dispatched. HEAD `9eb53e3`
 > (the 16:59Z operator commit; no new commits since). Slot 0 RUNNING/STALLED
@@ -7850,3 +7890,19 @@ dispatcher was NOT run; 0 dispatchable. Health: heartbeat 1 (27872),
 operator_runner 1 (27876), watchdog 1 (29264), cargoq UP (running true = the
 hung test). DISK 4.5 GiB free (below 8 GB floor, nothing reclaimable); RAM 3.5
 GiB. One escalation: slot-0 hung lib test.]
+
+[operator 2026-09-11T17:52Z - volatile refresh. Board: 0 RUNNING / 0
+landed-this-cycle / 0 flipped / 0 dispatched. Slot 0 AUTHOR-CENSUS-NAMES
+FINISHED (committed ccec2e1+43e26c9 on packet/AUTHOR-CENSUS-NAMES; RESULT status
+"LANDED" + findings F1-F4 -> NOT landable per charter, ESCALATED; the code is
+safe on the branch, but RESULT.json is untracked/gitignored so a re-fork destroys
+it). Slots 1-7 landed residue, all tips ancestors of HEAD `9616df0`; nothing
+landable. Registry 349 = 253 DONE / 85 READY / 10 BLOCKED / 1 SUPERSEDED; none
+flippable (all holds/gates; RDEF-M4 preflight-fails = re-scope). dispatch_ready
+--dry-run: 0 dispatchable (RG-23/RG-9 files missing; FHC chain serial on
+CENSUS-NAMES). Health: heartbeat 1 (27872), operator_runner 1 (27876), watchdog
+1 (29264), ONE overnight driver, TWO supervisors carried; cargoq UP (queued 0,
+running false). DISK entered 2.68 GiB -> janitor reclaimed ~4.2 -> 6.4 GiB
+(below 8 GB floor); RAM 3.6 GiB. One new escalation: slot-0 AUTHOR-CENSUS-NAMES
+LANDED-not-DONE + out-of-scope binding.rs finding. Leaving: 0 RUNNING; HEAD
+9616df0 + this cycle's commit.]
