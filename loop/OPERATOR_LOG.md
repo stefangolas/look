@@ -4195,3 +4195,18 @@ Leaving: 2 RUNNING (slots 0+1, double-dispatched AUTHOR-WIRE-MIRROR-ARM); HEAD
 329f6ab; heartbeat 1 (27872); operator_runner 1 (27876); watchdog 1 (29264); ONE
 overnight driver (24864); TWO supervisors; cargoq UP (running true); disk 9.3
 GiB free; RAM 3.8 GiB.
+
+Addendum 07:16Z: the 07:12:10Z heartbeat cycle reset slot 1 (archiving its live
+work to `loop/slots/1/abandoned-20260911-031216.patch`, 3503 B) and dispatched a
+THIRD run into slot 2 (cmd 21184, forked 07:14:57Z). Board is now a
+TRIPLE-DISPATCH on `packet/AUTHOR-WIRE-MIRROR-ARM` (slots 0/1/2, all workers
+alive). Root cause unchanged: the hung full `cargo test --locked -p truck123d`
+(`unanswerable_arc_lathe_refuses_typed`, test exe pid 34104 since 06:36:09Z)
+wedges cargoq's queue; every waiter ages past the 180s freshness guard and gets
+reset. STATE ground-truth note + ESCALATIONS updated; nothing landable; no manual
+dispatch.
+
+Leaving (corrected): 3 RUNNING (slots 0+1+2, TRIPLE-dispatched
+AUTHOR-WIRE-MIRROR-ARM); HEAD 329f6ab; heartbeat 1 (27872); operator_runner 1
+(27876); watchdog 1 (29264); ONE overnight driver (24864); TWO supervisors;
+cargoq UP (running true); disk ~9.3 GiB free; RAM ~3.8 GiB.
