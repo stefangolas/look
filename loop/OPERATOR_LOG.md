@@ -4210,3 +4210,46 @@ Leaving (corrected): 3 RUNNING (slots 0+1+2, TRIPLE-dispatched
 AUTHOR-WIRE-MIRROR-ARM); HEAD 329f6ab; heartbeat 1 (27872); operator_runner 1
 (27876); watchdog 1 (29264); ONE overnight driver (24864); TWO supervisors;
 cargoq UP (running true); disk ~9.3 GiB free; RAM ~3.8 GiB.
+
+===== operator 2026-09-11T07:42Z (cycle) =====
+
+Health sweep: slot_status -> 3 RUNNING/STALLED (slots 0/1/2 all
+AUTHOR-WIRE-MIRROR-ARM), 5 FINISHED (3-7). cargoq UP (running true = the
+replacement `cargo test --locked -p truck123d --lib`, queued 4). Heartbeat
+exactly 1 (27872) - the "2" my broad scan saw was this shell self-matching;
+watchdog 1 (29264). Disk 6.51 GiB free (BELOW the 15 GB goal and the 8 GB
+new_slot floor); RAM 3.78 GiB.
+
+Actions:
+- Landing (step 2): NOTHING operator-landable. Re-verified by
+  `git merge-base --is-ancestor`: e6553db/3c2109b/ee97499/713f205/5cf4811 +
+  f49fdf4/b667a85/39e9550/86d28a3/46ba171/0056f01 all ancestors of
+  integration/kernel-bg HEAD 06c4d11. slot 4 F1 = LANDED-WITH-FINDINGS;
+  slot 7 wt RESULT = BRIDGE-BOOLEANS LANDED residue.
+- Unblock (step 3): NOTHING safely unblockable. All three slots are the SAME
+  packet (triple-dispatch); resetting/redispatching a duplicate is exactly the
+  failure mode, and killing a live worker is outside authority. The 06:35Z
+  hung job was reaped at 07:15:34Z, but the replacement --lib job re-hung on
+  `unanswerable_arc_lathe_refuses_typed` (test exe PID 9356 alive at 07:38Z).
+- Registry (step 4): nothing flipped (BLOCKED rows owner-parked/human-gated/
+  superseded or unmet deps; TTC-RECENSUS-F1-R3 held for a quiet board).
+- Dispatch (step 5): NOT run manually (heartbeat live; a manual dispatch races
+  it). The 07:35Z heartbeat's own run is the dispatch evidence: it read 0
+  running and tried AUTHOR-WIRE-MIRROR-ARM -> slot 3 + AUTHOR-CENSUS-NAMES ->
+  slot 4, and BOTH new_slot calls FAILED on the 8 GB floor. Dispatched 0.
+- Disk (step 1/5): deliberately did NOT run janitor/reclaim. The 8 GB floor is
+  currently the ONLY guard preventing a 4th duplicate dispatch of the unpinned
+  row; freeing disk would spawn it into a 3.78 GiB-RAM machine.
+- STATE (step 6): replaced the LATEST GROUND TRUTH note with the 07:42Z block
+  (07:16Z marked SUPERSEDED) + appended the 07:42Z machine block.
+- Report (step 7): this entry.
+
+Escalations: 07:42Z addendum - the hung-test root cause RECURRED after the
+07:15Z reap, and the disk floor (not the freshness guard) is now the only thing
+stopping duplicates. Pin the row NOW. Carried: everything from 07:12Z/07:16Z.
+
+Leaving: 3 RUNNING/STALLED (slots 0/1/2, triple-dispatched
+AUTHOR-WIRE-MIRROR-ARM); HEAD 06c4d11; heartbeat 1 (27872); operator_runner 1
+(27876); watchdog 1 (29264); overnight driver 1 (24864); TWO supervisors; TWO
+cargoq servers; cargoq UP (running true, queued 4); disk 6.5 GiB free; RAM
+3.78 GiB.

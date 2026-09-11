@@ -75,7 +75,37 @@ corrected, annex C = ORACLE POLICY CHANGE), then docs/SOLVER_COVERAGE_SPEC.md
 
 ## Where we are
 
-> LATEST GROUND TRUTH: read the newest `[operator ...]` block in "State of
+> LATEST GROUND TRUTH [operator 2026-09-11T07:42Z]: 3 RUNNING (all
+> AUTHOR-WIRE-MIRROR-ARM) / 0 landed-by-operator / 0 unblocked / 0 flipped /
+> 0 dispatched (heartbeat live; disk floor blocks new_slot). HEAD `06c4d11`.
+> **ALL THREE running slots are AUTHOR-WIRE-MIRROR-ARM (TRIPLE-DISPATCH)**:
+> slot 0 cmd 18540 (events fresh ~2 min, changed=0), slot 1 cmd 32348 (STALLED
+> ~22 min, changed=1 untracked `truck123d/tests/wire_mirror_arm.rs`), slot 2
+> cmd 21184 (STALLED ~16 min, changed=0). **THE 06:35Z HANG CLEARED BUT
+> RECURRED**: cargoq TIMEOUT-reaped the `cargo test --locked -p truck123d` at
+> 07:15:34Z, then a NEW `cargo test --locked -p truck123d --lib` started
+> 07:15:43Z whose test exe `truck123d-361b704ce0515825.exe` (PID 9356) is
+> still alive at ~07:38Z - the SAME pre-existing `unanswerable_arc_lathe_
+> refuses_typed` hang, due to re-reap ~07:55Z. cargoq UP (running true = that
+> lib job, queued 4). **THE 8 GB DISK FLOOR (6.5 GiB free) IS NOW THE ONLY
+> GUARD AGAINST A 4TH DUPLICATE DISPATCH**: the 07:35Z heartbeat read 0
+> running (180s freshness guard) and tried AUTHOR-WIRE-MIRROR-ARM -> slot 3 +
+> AUTHOR-CENSUS-NAMES -> slot 4; BOTH `new_slot` FAILED on the floor. **DO NOT
+> reclaim disk / DO NOT manually dispatch until the row is pinned or the
+> guard fixed** - freeing disk spawns a 4th duplicate, and RAM is only
+> 3.78 GiB free. Nothing operator-landable: every FINISHED slot tip
+> (e6553db/3c2109b/ee97499/713f205/5cf4811 + f49fdf4/b667a85/39e9550/86d28a3/
+> 46ba171/0056f01) verified ancestor of integration/kernel-bg; slot 4 F1 =
+> LANDED-WITH-FINDINGS, slot 7 = BRIDGE-BOOLEANS LANDED residue. Registry:
+> nothing flipped (BLOCKED rows owner-parked/human-gated/superseded or unmet
+> deps; TTC-RECENSUS-F1-R3 held for a quiet board). Health: heartbeat exactly
+> 1 (27872), operator_runner 1 (27876), watchdog 1 (29264), overnight driver 1
+> (24864); TWO supervisors (19172+27828) + TWO cargoq/server.py (28544+34564)
+> carried; disk 6.5 GiB free, RAM 3.78 GiB. ESCALATED 07:42Z: pin the row NOW
+> - the disk floor is the only remaining guard.
+>
+> --- SUPERSEDED 2026-09-11T07:16Z note (kept for history) follows ---
+> read the newest `[operator ...]` block in "State of
 > the machine, as left" (2026-09-11T07:16Z). [operator 2026-09-11T07:16Z
 > ground-truth note: 3 RUNNING / 0 landed-by-operator / 0 unblocked / 0 flipped.
 > HEAD `329f6ab` (the 06:47Z operator STATE commit). **ALL THREE running slots
@@ -2412,6 +2442,31 @@ carried). Carried human items unchanged: FRAME-REVOLVE F1 non_z_axis pin
 amendment (ttc_lathe_spline.rs:255); duplicate supervisors + the lagging cargoq
 restart guard; slot-0/2/4/7 wt RESULT residue; TOR-C flip-or-pin; overnight.py
 false-landing ROOT CAUSE (7th strike); MONO-row registry schema gap.]
+
+[operator 2026-09-11T07:42Z - volatile refresh. Board now: 3 RUNNING/STALLED
+(triple-dispatched AUTHOR-WIRE-MIRROR-ARM slots 0/1/2) / 0 landed-this-cycle /
+0 unblocked / 0 flipped / 0 dispatched. HEAD 06c4d11 (07:16Z operator commit).
+The 06:35Z hung `cargo test --locked -p truck123d` was cargoq-reaped at
+07:15:34Z, but the replacement `cargo test --locked -p truck123d --lib`
+(07:15:43Z) hit the SAME pre-existing `unanswerable_arc_lathe_refuses_typed`
+hang (test exe PID 9356 alive at 07:38Z; due to re-reap ~07:55Z), so cargoq is
+wedged again. The 07:35Z heartbeat read 0 running and attempted a 4th/5th
+dispatch; BOTH new_slot calls FAILED on the 8 GB disk floor (6.5 GiB free) -
+the floor is now the ONLY thing preventing more duplicates. DO NOT run the
+janitor/reclaim disk and DO NOT manually dispatch until the row is pinned or
+the freshness guard fixed. Nothing operator-landable (all slot tips ancestors
+of HEAD; F1 LANDED-WITH-FINDINGS; slot 7 BRIDGE-BOOLEANS LANDED residue).
+Nothing to unblock without killing a live worker or redispatching a duplicate
+(both outside authority). Registry: nothing flipped. Health: heartbeat 1
+(27872), operator runner 1 (27876), watchdog 1 (29264), overnight driver 1
+(24864), cargoq UP (running true, queued 4); TWO supervisors (19172+27828) +
+TWO cargoq/server.py (28544+34564) carried duplication classes. Disk 6.5 GiB
+free; RAM 3.78 GiB free. Carried human items unchanged: pin/amend
+AUTHOR-WIRE-MIRROR-ARM + fix the freshness guard + scope off the hanging test;
+FRAME-REVOLVE F1 non_z_axis pin (ttc_lathe_spline.rs:255); duplicate
+supervisors + duplicate cargoq guard; slot-4/7 wt RESULT residue; TOR-C
+flip-or-pin; MONO-10 missing packet; RDEF-M4 H-8 stale anchor;
+AUTHOR-CENSUS-NAMES SPEC_GAP question loop; duplicate-driver probe fix.]
 
 ## The parallelism picture
 

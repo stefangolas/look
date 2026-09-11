@@ -1334,3 +1334,31 @@ Judgment-required items appended each operator cycle. Newest at the bottom.
   `abandoned-20260911-031216.patch`, plus the older slot-1 DOOR archive
   `abandoned-20260911-024948.patch`. Pin the row NOW - each 10-min heartbeat
   cycle can reset another worker and spawn another duplicate.
+
+## 2026-09-11 07:42 UTC (operator) - AUTHOR-WIRE-MIRROR-ARM: hung-test root cause RECURRED after the 07:15Z reap; the 8 GB disk floor is now the only guard against a 4th duplicate
+
+- What: the 06:35:34Z hung `cargo test --locked -p truck123d` was reaped by
+  cargoq at 07:15:34Z, but the replacement job `cargo test --locked -p
+  truck123d --lib` (started 07:15:43Z) hit the SAME pre-existing
+  `unanswerable_arc_lathe_refuses_typed` hang - test exe
+  `truck123d-361b704ce0515825.exe` PID 9356 still alive at 07:38Z, due to
+  re-reap ~07:55Z. cargoq is wedged again (running true, queued 4).
+- Consequence: the 07:35Z heartbeat read 0 running (180s freshness guard) and
+  tried to dispatch a 4th/5th worker; BOTH `new_slot` calls FAILED on the 8 GB
+  disk floor (6.5 GiB free). The floor - not the guard - is the only thing
+  preventing another duplicate. DO NOT reclaim disk or run the janitor until
+  the row is pinned; freeing disk would spawn a 4th duplicate into a 3.78
+  GiB-RAM machine (0xc0000409 zone).
+- Why the operator can't: pinning the row / fixing the freshness guard /
+  scoping the packet off the hanging test are harness/semantic changes;
+  killing a live worker or resetting a duplicate slot is outside authority.
+- Action needed: (1) PIN or amend the AUTHOR-WIRE-MIRROR-ARM row NOW (its note
+  carries no `landed` marker so it reads READY and the heartbeat keeps
+  re-dispatching it); (2) fix `unanswerable_arc_lathe_refuses_typed` or scope
+  the packet's done-when off the full `cargo test -p truck123d`/`--lib` suite;
+  (3) fix the freshness guard so a worker blocked on a cargoq step is not read
+  as dead; (4) then reclaim disk.
+- Start from: `loop/cargoq/server.log` (07:15:34Z TIMEOUT, 07:15:43Z restart);
+  `loop/dispatch_heartbeat.log` (the 07:35Z cycle, new_slot floor failures);
+  `loop/packets/AUTHOR-WIRE-MIRROR-ARM.md`; `loop/slots/1/wt` (the one live
+  copy: untracked `truck123d/tests/wire_mirror_arm.rs`).
