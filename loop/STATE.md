@@ -75,6 +75,51 @@ corrected, annex C = ORACLE POLICY CHANGE), then docs/SOLVER_COVERAGE_SPEC.md
 
 ## Where we are
 
+> LATEST GROUND TRUTH [operator 2026-09-11T21:45Z]: 2 RUNNING / 0
+> landed-this-cycle / 0 unblocked / 0 flipped / 0 dispatched. HEAD `de0d010`
+> (the 21:22Z operator commit; no new commits since). **FHC-EX-B-SPLINE-LOFT-OPERANDS
+> is STILL RUNNING IN BOTH slot 0 AND slot 1 - the duplicate dispatch PERSISTS**
+> (escalated 21:00Z, carried; no human action yet; do not disturb live workers).
+> NEW this cycle: slot 0's self-initiated broad `cargo test --profile quick -p
+> truck123d --lib swept_admission --locked` TIMED OUT at 17:38:15 local after the
+> 2400s cargoq limit (server.log), and the queue immediately began slot 1's
+> IDENTICAL `--lib swept_admission` test (START 17:38:15) - so the duplicate pair
+> is now serializing on a 40-min test that already timed out once. Both workers
+> are LIVE and progressing (slot 0: cmd 10504 / opencode 2384 / session
+> ses_f6dda1e31ffePZufbaRlRmdTja, watching a fresh rustc build - pids 13440/28368
+> at 17:39; slot 1: cmd 20780 / opencode 31040 / session
+> ses_f6dc55f58ffep4TZZSPRw0gQCf, waiting on its queued cargoq job). Neither was
+> killed or reset. `dispatch_ready --dry-run --max-workers=4`: "slots: 8 (2
+> running, 6 free); slot-assigned packets: 5; dispatched 0; workers now ~2/4" -
+> NO dead-dispatch false positive THIS pass (both slots detected running), but the
+> real dispatcher was NOT run (disk below floor + the intermittent false positive
+> seen at 21:22Z would destroy the live slot-1 worker). Nothing dispatchable:
+> RG-23/RG-9 clash with the running `truck123d/src/bd_bridge.rs` (their packet
+> files remain MISSING = authoring gap, carried); FHC-TRIM -> FHC-MIRROR ->
+> BD-EMIT serial behind FHC-EX-B. Slots 2-7 FINISHED/IDLE landed residue; every
+> tip (c3df084/e6553db/3c2109b/ee97499/713f205/5cf4811) re-verified an ancestor
+> of HEAD by `git merge-base --is-ancestor` - NOTHING landable (slot 2 =
+> TTC-RECENSUS-F1-R3 DONE landed, slot 3 SOLVER-SURVEY-C DONE, slot 4
+> F1-AUTHORING-ARMS LANDED-WITH-FINDINGS, slot 5 CL-006 DONE, slot 6 CL-005 DONE,
+> slot 7 FRAME-REVOLVE LANDED). Registry re-derived by command: 350 rows = 254
+> DONE / 85 READY / 10 BLOCKED / 1 SUPERSEDED; 9 of the 10 BLOCKED rows carry a
+> deliberate hold (OWNER_BLOCKED / SUPERSEDED / registered defect / booking gate /
+> owner-decision / milestone) and RDEF-M5 needs RDEF-M4 - none mechanically
+> flippable. Health: heartbeat exactly 1 (27872, `dispatch_heartbeat.ps1`),
+> operator_runner 1 (27876), watchdog 1 (29264), cargoq UP (ping queued 0,
+> running true = the slot-1 swept_admission test); TWO supervisors (19172+27828)
+> and TWO cargoq servers (28544+34564) carried; ONE overnight driver (24864).
+> DISK 3.95 GiB free (BELOW the 8 GB floor; `janitor.py status` pool = only the
+> two LIVE slots' targets: slot 0 1.0+0.7 GB, slot 1 1.0+1.4 GB - nothing
+> reclaimable; no root target/, no TEMP look-verify-baseline-* leaks). RAM 2.58
+> GiB free (BELOW the 3 GB threshold; two workers resident - do not stack). Root
+> worktree carries live human-session WIP (M README.md, M loop/cargoq/server.log,
+> untracked benchmarks/ + loop/baselines/) - untouched, reported not actioned.
+> Leaving: 2 RUNNING (slots 0+1, duplicate FHC-EX-B); HEAD `de0d010` + this
+> cycle's STATE/log commit.
+>
+> --- SUPERSEDED 2026-09-11T21:22Z note (kept for history) follows ---
+>
 > LATEST GROUND TRUTH [operator 2026-09-11T21:22Z]: 2 RUNNING / 0
 > landed-this-cycle / 0 unblocked / 0 flipped / 0 dispatched. HEAD `02a8d44`
 > (the 21:00Z operator commit; no new commits since). **FHC-EX-B-SPLINE-LOFT-OPERANDS

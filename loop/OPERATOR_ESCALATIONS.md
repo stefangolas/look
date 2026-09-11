@@ -1707,3 +1707,29 @@ uncommitted - left for the orchestrator, no dispatch impact.
   16:45 + 21:22 `loop/dispatch_heartbeat.log` / dry-run output.
 - Also carried: disk 4.7 GiB free (below the 8 GB floor; only the two live slots'
   targets exist, nothing reclaimable).
+
+## 2026-09-11 21:45 UTC - CARRIED + new detail: duplicate FHC-EX-B now serializing on a timed-out lib test
+
+- Re-derived this cycle: the duplicate is UNCHANGED (slots 0+1, both live). NEW
+  detail: slot 0's worker-initiated `cargo test --profile quick -p truck123d
+  --lib swept_admission --locked` TIMED OUT at 17:38:15 local after the 2400s
+  cargoq limit (server.log), and the queue immediately started slot 1's IDENTICAL
+  `--lib swept_admission` test (START 17:38:15). So the duplicate pair now
+  serializes on a 40-min test that already timed out once; a second timeout is
+  likely (~18:18 local). Both workers are live (slot 0 watching a fresh rustc
+  build; slot 1 waiting on the queued job) and were NOT killed/reset.
+- Why it matters: two worker-hours are being spent on one packet, and the
+  `swept_admission` lib test is an unbounded-time sink (a worker self-initiated
+  broad `--lib` run, not the packet's required test
+  `truck123d/tests/extraction_breadth_b.rs`). If both workers keep retrying it,
+  the cargoq queue stays wedged.
+- Action needed (human/orchestrator): (1) decide which FHC-EX-B branch to keep
+  once one returns a DONE RESULT; (2) fix `dispatch_ready`'s dead-dispatch
+  detection to use `slot_status.py`'s process scan, not the branch tip (it
+  false-positived at 21:22Z; it did NOT fire this pass at 21:45Z, so it is
+  intermittent); (3) consider whether the `swept_admission` lib test needs a
+  timeout/targeted scope so it cannot wedge the queue. Start from
+  `loop/dispatch_ready.py`, `loop/cargoq/server.log` (17:38:15), and
+  `loop/dispatch_heartbeat.log`.
+- Also carried: disk 3.95 GiB (below the 8 GB floor; janitor pool = only the two
+  live slots' targets); RAM 2.58 GiB (below the 3 GB threshold).

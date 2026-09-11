@@ -6155,3 +6155,63 @@ Leaving: 2 RUNNING (slots 0+1, duplicate FHC-EX-B); HEAD `02a8d44` + this
 cycle's STATE/log commit; heartbeat 1 (27872); operator_runner 1 (27876);
 watchdog 1 (29264); cargoq UP (queued 1, running true); disk 4.7 GiB free; RAM
 ~3.4 GiB.
+
+## 2026-09-11 21:45 UTC (operator)
+
+Board at start: 2 RUNNING (slots 0+1, duplicate FHC-EX-B-SPLINE-LOFT-OPERANDS),
+slots 2-7 FINISHED/IDLE landed residue; HEAD `de0d010`; registry 350 = 254 DONE /
+85 READY / 10 BLOCKED / 1 SUPERSEDED.
+
+Health sweep:
+- slot_status: slots 0+1 RUNNING, events 4.8 / 2.4 min old; slots 2-7 residue.
+- cargoq ping OK (queued 0, running true). server.log: slot 0's
+  `cargo test --profile quick -p truck123d --lib swept_admission --locked`
+  TIMED OUT 17:38:15 after 2400s; slot 1's identical `--lib swept_admission`
+  START 17:38:15. fallback.log newest DIRECT 13:42 (stale; no new bypass).
+- Heartbeat exactly 1 (27872 `dispatch_heartbeat.ps1`); operator_runner 1 (27876);
+  watchdog 1 (29264); overnight driver 1 (24864); supervisors 2 (19172+27828)
+  and cargoq servers 2 (28544+34564) carried.
+- Disk 3.95 GiB free (Get-PSDrive) / janitor 3.9 GB - BELOW the 8 GB floor.
+  RAM 2.58 GiB - BELOW the 3 GB threshold (two workers resident).
+  No TEMP look-verify-baseline-* leaks. janitor pool = the two live slots only.
+
+Value check (running slots):
+- slot 0: last tool = bash `Get-Date; Start-Sleep 120; Get-Process rustc,cargo`
+  - actively watching a fresh rustc build (pids 13440/28368, started 17:39);
+  its swept_admission test had just timed out. PROGRESS, not a spiral.
+- slot 1: last tool = bash waiting on its cargoq job; it saw the 17:38:15
+  START for slots\1\wt. WAITING on cargo, PROGRESS.
+
+Actions:
+- Landing: nothing. No FINISHED slot carries a fresh DONE RESULT; all residue
+  tips (c3df084/e6553db/3c2109b/ee97499/713f205/5cf4811) re-verified ancestors
+  of HEAD by `git merge-base --is-ancestor`; slot 4 = LANDED-WITH-FINDINGS
+  (not landable).
+- Registry hygiene: 10 BLOCKED rows re-derived; 9 carry a deliberate hold, RDEF-M5
+  needs RDEF-M4 - none mechanically flippable. No anchor re-measures (RG-23/RG-9
+  fail on MISSING packet files, not counts).
+- Dispatch: did NOT run the real dispatcher. `dispatch_ready --dry-run
+  --max-workers=4` -> "slots: 8 (2 running, 6 free); slot-assigned packets: 5;
+  dispatched 0; workers now ~2/4"; no dead-dispatch false positive THIS pass, but
+  disk is below the floor (new_slot would refuse) and the 21:22Z false positive
+  would destroy the live slot-1 worker. Nothing dispatchable anyway (RG-23/RG-9
+  clash on the running bd_bridge.rs; FHC chain serial).
+- STATE: inserted a new "Where we are" LATEST GROUND TRUTH [operator
+  2026-09-11T21:45Z] block (demoting 21:22Z to SUPERSEDED); traps/history untouched.
+- This entry.
+
+Escalations: CARRIED - duplicate FHC-EX-B dispatch (slots 0+1) still live, now
+serializing on a 40-min `swept_admission` lib test that timed out once; disk
+3.95 GiB below the 8 GB floor; RAM 2.58 GiB below the 3 GB threshold; RG-23/RG-9
+missing packet files; RDEF-M4 re-scope; MONO-10 owner R3-mesh decision;
+FRAME-REVOLVE F1 non_z_axis pin; duplicate supervisors + lagging cargoq restart
+guard; TOR-C flip-or-pin; schedule.py 'needs' crash; slot-4/7 wt RESULT residue;
+CL-005/CL-006 READY-but-landed status bookkeeping.
+
+Worktree note (reported, not actioned): root tree carries the live human-session
+WIP (M README.md, M loop/cargoq/server.log, untracked benchmarks/ +
+loop/baselines/) - untouched.
+
+Leaving: 2 RUNNING (slots 0+1, duplicate FHC-EX-B); HEAD `de0d010` + this cycle's
+STATE/log commit; heartbeat 1; operator_runner 1; watchdog 1; cargoq UP (running
+true); disk 3.95 GiB; RAM 2.58 GiB.
