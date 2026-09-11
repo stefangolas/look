@@ -75,6 +75,47 @@ corrected, annex C = ORACLE POLICY CHANGE), then docs/SOLVER_COVERAGE_SPEC.md
 
 ## Where we are
 
+> LATEST GROUND TRUTH [operator 2026-09-11T16:34Z]: 0 RUNNING / 0
+> landed-this-cycle / 0 unblocked / 0 flipped / 0 dispatched. HEAD `9ba5654`
+> (the 16:13Z operator commit; no new commits since). **OWNER BREAK STILL IN
+> FORCE** (95b0bb8, 11:45Z; no break-lift commit exists - the end-of-file
+> SHORT-TERM ROADMAP extends the BREAK's RESUMING ACTIONS, it does not resume
+> the loop). Quiet posture is the owner's and not mine to lift - no dispatch,
+> no flips. All 8 slots FINISHED/IDLE, no live worker (zero cargo/rustc; the two
+> opencode procs are this operator 34900 + the human session 11240). Slot 0
+> AUTHOR-CENSUS-NAMES wt RESULT SPEC_GAP + QUESTION.md (geometry rebooking; NOT
+> landable; tip 46ff8cc NOT an ancestor of HEAD - re-verified). Slot 1
+> AUTHOR-WIRE-MIRROR-ARM wt RESULT "complete" (redundant; tip 329f6ab = ancestor,
+> no work). Slot 2 IDLE residue (c3df084 ancestor); slots 3-7 landed residue
+> (e6553db/ee97499/713f205/3c2109b/5cf4811 all re-verified ancestors of HEAD this
+> cycle; slot 4 = LANDED-WITH-FINDINGS, not landable). Registry re-derived by
+> command: 345 rows = 251 DONE / 83 READY / 10 BLOCKED / 1 SUPERSEDED; 5 of the
+> 10 BLOCKED rows have all needs landed but each carries a deliberate hold
+> (BG-AUD-FIX-004 OWNER_BLOCKED; SEM-PCURVE-MASTER-001-FIX SUPERSEDED;
+> DEF-SPINEFRAME-GRAZE SPEC_GAP; BG-CK-SPLINE-CENSUS booking gate; MONO-10
+> owner-decision) and the other 5 have unmet deps (DEF-TESS-ANALYTIC-SEAM needs
+> DEF-VENDOR-FIXTURES; DEF-SEEDRAY-B needs DEF-SEEDRAY-A; TOR-C needs
+> ADM-001-ADAPTER + ADM-002-CERTIFICATES; RDEF-M4 needs RDEF-M3; RDEF-M5 needs
+> RDEF-M2/M3/M4) - none mechanically flippable. `dispatch_ready --dry-run
+> --max-workers=4`: "slots: 8 (0 running, 8 free); slot-assigned packets: 6;
+> dispatched 0; workers now ~0/4"; only RG-23/RG-9 flagged (ANCHOR CHECK FAILED -
+> both packet files MISSING, loop/packets/RG-23-CERTIFIED-ENTRY-WIRING.md and
+> RG-9-REFLECT-SOLID-PRODUCTION.md absent = authoring gap, carried). Health:
+> heartbeat exactly 1 (27872; the 2nd match is this operator's own query line),
+> operator_runner 1 (27876), watchdog 1 (29264), ONE overnight driver (24864),
+> TWO supervisors (19172+27828 carried), TWO cargoq servers (28544+34564 carried);
+> cargoq UP (ping ok, queued 0, running false). DISK 8.99 GiB free (above the
+> 8 GB floor, below the 15 GiB goal; janitor status 9.0 GB disk / 5.1 GB RAM -
+> nothing reclaimable). RAM 5.11 GiB free (healthy). No TEMP
+> look-verify-baseline-* leaks. No new escalation. Root worktree carries the live
+> human-session WIP (tracked `loop/cargoq/server.log` + many untracked
+> docs/benchmarks/baselines) - left untouched, reported not actioned. Carried
+> human items unchanged: AUTHOR-CENSUS-NAMES SPEC_GAP rebooking; RG-23/RG-9
+> missing packet files; FRAME-REVOLVE F1 non_z_axis pin (ttc_lathe_spline.rs:255);
+> duplicate supervisors + lagging cargoq restart guard; slot-4/7 wt RESULT
+> residue; TOR-C flip-or-pin; schedule.py 'needs' crash.
+>
+> --- SUPERSEDED 2026-09-11T16:13Z note (kept for history) follows ---
 > LATEST GROUND TRUTH [operator 2026-09-11T16:13Z]: 0 RUNNING / 0
 > landed-this-cycle / 0 unblocked / 0 flipped / 0 dispatched. HEAD `6ebda1f`
 > (the 15:49Z operator commit; no new commits since). **OWNER BREAK STILL IN
@@ -7647,3 +7688,39 @@ RG-23/RG-9 missing packet files; FRAME-REVOLVE F1 non_z_axis pin
 slot-4/7 wt RESULT residue; TOR-C flip-or-pin; schedule.py 'needs' crash.]
 
 [SHORT-TERM ROADMAP 2026-09-11 ~15:3xZ (owner-directed, the F1/hypercar gap-closure plan; supersedes nothing - the RESUMING ACTIONS in the BREAK block above stand, this extends them). Family states: F1 30 rows all red (20 extraction-breadth, 4 trim-extrude envelope, 1 mirror form, 2 marquee instrumentation (monocoque/engine_cover never had a kernel verdict), 3 DNF loft-None crash rows); hypercar 13 rows mostly red (body/chassis/glazing/interior = same extraction class, wheels = missing RegularPolygon drop-in name, aero = empty refusal, brakes = revolve-needs-closed-profile). RDEF-M2 confirmed zero transversality/budget failures - the F1/hypercar wall is ADMISSIBILITY (extraction/envelope), not solver numerics. ORDER: (1) harness cheapies ~6 rows: RegularPolygon name, loft-None trio diagnosis, monocoque+engine_cover kernel re-judge (post placement-purity fixes), census delta on vehicle/second_stage/cutaway (shim-fixed, DNF records stale); (2) EXTRACTION BREADTH ~24 rows across F1+hypercar, likely 2-3 packets: closed-loop loft chains (halo), shelled/composed loft bodies (nose/cockpit/sidepods), spline lofts as boolean operands (airbox/details/beam_wing/drs_flap/power_unit/track rods); (3) trim-extrude envelope extension (rear_wing/steering_rack/suspension x2); (4) mirror carrier form (drs_actuator); (5) optional per-part volumetric oracle (label-joined kernel-vs-OCC per-solid diff) to localize the feed/gas_generator/turbine_exhaust deltas. RENDER PIPELINE STATE (owner-directed no-packet session, commits ce8f2b9/86e6ac8/4fcee0e/784eeb8/f9a5381/f59569b pushed to origin main): bd_stl optional deflection (None = fingerprint rule bit-for-bit), new bd_glb colored indexed GLB (default 0.4mm), door --glb/--deflection flags, look ui colors fixed (glTF baseColorFactor x COLOR_0), --performance booking flag. Full-vehicle stage timings at 0.4mm (6.75M tris): construct 9ms; bd_glb emit 1033ms (mesh_ms 1012 - meshing dominates, dedup+write ~20ms); bd_stl emit ~1109ms. BOTTLENECK: the door meshes the tree TWICE (once per artifact, ~2.1s of the 3.1-3.3s wall) - a shared single mesh pass (per-part mesh consumed by both the STL soup writer and the GLB assembler) would cut ~1s and is the next cheap render-pipeline win. Peak memory at this density is OCC-parity (1,565 vs 1,570 MiB); at 25mm it is 218 MiB / 0.9s wall for both artifacts.]
+
+[operator 2026-09-11T16:34Z - volatile refresh. **OWNER BREAK STILL IN FORCE**
+(95b0bb8, 11:45Z; no break-lift commit - the end-of-file SHORT-TERM ROADMAP
+extends the RESUMING ACTIONS, it does not resume). Quiet cycle: 0 landed / 0
+unblocked / 0 flipped / 0 dispatched. Board: 0 RUNNING / 0 landed-this-cycle.
+HEAD `9ba5654` (the 16:13Z operator commit; no new commits since). All 8 slots
+FINISHED/IDLE, no live worker (zero cargo/rustc; opencode = this operator 34900
++ human session 11240). Slot 0 AUTHOR-CENSUS-NAMES wt RESULT SPEC_GAP +
+QUESTION.md - not landable, carried (tip 46ff8cc not an ancestor of HEAD). Slot
+1 AUTHOR-WIRE-MIRROR-ARM wt RESULT "complete" - redundant (row landed
+38d3534/d500dcc; tip 329f6ab ancestor, no work). Slots 2-7 landed residue
+(c3df084/e6553db/3c2109b/ee97499/713f205/5cf4811 all re-verified ancestors of
+HEAD by merge-base; slot 4 = LANDED-WITH-FINDINGS). Nothing to unblock (no
+RUNNING worker; slot 2 IDLE is landed residue). Registry re-derived: 345 rows =
+251 DONE / 83 READY / 10 BLOCKED / 1 SUPERSEDED; 5 BLOCKED rows have all needs
+landed but carry deliberate holds (BG-AUD-FIX-004 OWNER_BLOCKED;
+SEM-PCURVE-MASTER-001-FIX SUPERSEDED; DEF-SPINEFRAME-GRAZE SPEC_GAP;
+BG-CK-SPLINE-CENSUS booking gate; MONO-10 owner-decision) and 5 have unmet deps
+(DEF-TESS-ANALYTIC-SEAM, DEF-SEEDRAY-B, TOR-C, RDEF-M4, RDEF-M5) - none
+mechanically flippable. `dispatch_ready --dry-run --max-workers=4`: "slots: 8
+(0 running, 8 free); slot-assigned packets: 6; dispatched 0; workers now ~0/4";
+only RG-23/RG-9 flagged ANCHOR CHECK FAILED (empty packet files = authoring). NO
+manual dispatch (owner break + heartbeat owns dispatch). Health: heartbeat
+exactly 1 (27872; the 2nd match is this operator's own query line),
+operator_runner 1 (27876), watchdog 1 (29264), ONE overnight driver (24864), TWO
+supervisors (19172+27828) carried, TWO cargoq servers (28544+34564) carried;
+cargoq UP (ping ok, queued 0, running false); disk 8.99 GiB free (above the 8 GB
+floor, below the 15 GiB goal; janitor status 9.0 GB disk / 5.1 GB RAM - nothing
+reclaimable); RAM 5.11 GiB free (healthy); no TEMP look-verify-baseline-* leaks.
+Root worktree: tracked modification `loop/cargoq/server.log` + many untracked
+docs/benchmarks/baselines (live human-session WIP) - left untouched, reported not
+actioned. No new escalation. Carried human items unchanged: AUTHOR-CENSUS-NAMES
+SPEC_GAP rebooking (amend + redispatch after the break); RG-23/RG-9 missing
+packet files; FRAME-REVOLVE F1 non_z_axis pin (ttc_lathe_spline.rs:255);
+duplicate supervisors + lagging cargoq restart guard; slot-4/7 wt RESULT
+residue; TOR-C flip-or-pin; schedule.py 'needs' crash.]
