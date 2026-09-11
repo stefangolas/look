@@ -3199,9 +3199,11 @@ fn solid_carrier_class(solid: &SolidSpec) -> CarrierClass {
 }
 
 /// The carrier class of one boolean operand node. A placed part classifies by
-/// its LOCAL solid (the dispatch never sees a placement); a boolean operand is
-/// the recorded depth-2 open composition cell and refuses typed; a group
-/// classifies by its first part in script order.
+/// its LOCAL solid (the dispatch never sees a placement); a boolean result
+/// operand classifies by its BASE operand's local carrier (MONO-9: the fold
+/// contributes the operand's extracted patches, so a pure union/cut chain is
+/// admitted where the old depth-1 rule refused); a group classifies by its
+/// first part in script order.
 fn node_carrier_class(node: &TreeNode) -> Result<CarrierClass, Refusal> {
     match node {
         TreeNode::Part { part } => Ok(solid_carrier_class(&part.solid)),
@@ -3215,11 +3217,9 @@ fn node_carrier_class(node: &TreeNode) -> Result<CarrierClass, Refusal> {
             }
             Err(Refusal::Empty)
         }
-        // Depth-1 only: a boolean of a boolean result is the recorded open
-        // composition cell and refuses typed rather than silently recursing.
-        TreeNode::Boolean { .. } => Err(Refusal::UnsupportedEnvelope(
-            EnvelopeCase::NonCanonicalCarrier,
-        )),
+        // MONO-9: a boolean result operand contributes its base carrier's
+        // extracted patches (a pure union/cut fold), never the depth-1 refusal.
+        TreeNode::Boolean { boolean } => node_carrier_class(&boolean.a),
     }
 }
 
@@ -3601,7 +3601,14 @@ fn boolean_product_volume_certified(boolean: &BooleanNode) -> Result<f64, Boolea
 /// swept tool) refuses typed rather than reporting the base operand's volume.
 fn boolean_product_volume(boolean: &BooleanNode) -> Result<f64, Refusal> {
     dispatch_boolean(boolean)?;
-    boolean_product_volume_certified(boolean).map_err(|refusal| match refusal {
+    boolean_product_volume_certified(boolean).map_err(boolean_volume_refusal_to_refusal)
+}
+
+/// Maps the certified boolean-volume refusal onto the executor's frozen typed
+/// kernel refusal vocabulary: the contact/membership indeterminacies name the
+/// deferred contact reduction, every other case names the open carrier.
+fn boolean_volume_refusal_to_refusal(refusal: BooleanVolumeRefusal) -> Refusal {
+    match refusal {
         BooleanVolumeRefusal::TransversalityUncertified
         | BooleanVolumeRefusal::MembershipIndeterminate => {
             Refusal::UnsupportedEnvelope(EnvelopeCase::ContactReductionDeferred)
@@ -3614,7 +3621,96 @@ fn boolean_product_volume(boolean: &BooleanNode) -> Result<f64, Refusal> {
         | BooleanVolumeRefusal::BooleanProductVolumeUnavailable => {
             Refusal::UnsupportedEnvelope(EnvelopeCase::NonCanonicalCarrier)
         }
-    })
+    }
+}
+
+/// Flattens a same-mode boolean tree into its recorded operand list (base
+/// first, then every tool in recorded order). A nested boolean of a DIFFERENT
+/// mode stays a leaf: it is the open composition cell and its extraction
+/// refuses typed downstream. Returns `None` when the node is not a boolean.
+fn fold_operands(node: &TreeNode) -> Option<(crate::facade::ModeValue, Vec<&TreeNode>)> {
+    let TreeNode::Boolean { boolean } = node else {
+        return None;
+    };
+    let mode = boolean.mode;
+    let mut operands: Vec<&TreeNode> = Vec::new();
+    fold_collect(node, mode, &mut operands);
+    Some((mode, operands))
+}
+
+/// Recursively collects the operands of one same-mode fold, in recorded order.
+fn fold_collect<'a>(
+    node: &'a TreeNode,
+    mode: crate::facade::ModeValue,
+    out: &mut Vec<&'a TreeNode>,
+) {
+    match node {
+        TreeNode::Boolean { boolean } if boolean.mode == mode => {
+            fold_collect(&boolean.a, mode, out);
+            fold_collect(&boolean.b, mode, out);
+        }
+        _ => out.push(node),
+    }
+}
+
+/// Whether a boolean node is a multi-operand fold (a depth-2+ chain): the
+/// depth-1 pair keeps the landed pairwise product path bit-for-bit, and only
+/// the chained composition dispatches through the MONO-9 fold evaluator.
+fn is_fold_chain(node: &TreeNode) -> bool {
+    match node {
+        TreeNode::Boolean { boolean } => {
+            matches!(*boolean.a, TreeNode::Boolean { .. })
+                || matches!(*boolean.b, TreeNode::Boolean { .. })
+        }
+        _ => false,
+    }
+}
+
+/// The certified multi-operand fold volume of one chained boolean node. Every
+/// operand is extracted through the landed MONO-8 adapter (a pure union/cut
+/// fold contributes its EXTRACTED PATCHES; a mixed-mode nesting, a non-patch
+/// carrier or an uncertifiable contact refuses typed, never approximates) and
+/// the single compound-indicator evaluator runs the fold. No intermediate
+/// union is constructed.
+fn boolean_fold_volume(node: &TreeNode) -> Result<membership::FoldVolumeCertificate, Refusal> {
+    let Some((mode, operands)) = fold_operands(node) else {
+        return Err(Refusal::UnsupportedEnvelope(
+            EnvelopeCase::NonCanonicalCarrier,
+        ));
+    };
+    if operands.len() < 2 {
+        return Err(Refusal::UnsupportedEnvelope(
+            EnvelopeCase::NonCanonicalCarrier,
+        ));
+    }
+    // The mode dispatch (judgement 4): the chained carrier consult the depth-1
+    // refusal used to reject. A refused pair propagates its typed, localized
+    // case; canonical operands record no row.
+    let mut classes: Vec<CarrierClass> = Vec::with_capacity(operands.len());
+    for operand in &operands {
+        classes.push(node_carrier_class(operand)?);
+    }
+    let Some((base_class, tool_classes)) = classes.split_first() else {
+        return Err(Refusal::Empty);
+    };
+    crate::facade::dispatch_swept_carrier_fold(*base_class, tool_classes, mode)
+        .map_err(|refusal| Refusal::UnsupportedEnvelope(refusal.case))?;
+
+    let mut rows: Vec<Vec<crate::python::binding::VolumeRow>> = Vec::with_capacity(operands.len());
+    for operand in &operands {
+        let extracted = extract_patches(operand).map_err(swept_refusal_to_refusal)?;
+        rows.push(extracted.into_iter().map(|(row, _)| row).collect());
+    }
+    let Some((base_rows, tool_rows)) = rows.split_first() else {
+        return Err(Refusal::Empty);
+    };
+    membership::certify_fold_volume(
+        base_rows,
+        tool_rows,
+        mode,
+        &membership::BooleanVolumeOptions::default(),
+    )
+    .map_err(boolean_volume_refusal_to_refusal)
 }
 
 /// The measured volume of a top node: a group sums only its immediate child
@@ -3642,7 +3738,12 @@ fn top_volume_bracket(node: &TreeNode) -> Result<[f64; 2], Refusal> {
             Ok([volume, volume])
         }
         TreeNode::Boolean { boolean } => {
-            if swept_swept(boolean)? {
+            if is_fold_chain(node) {
+                // MONO-9: a chained composition is the compound-indicator fold;
+                // no intermediate union is constructed.
+                let certificate = boolean_fold_volume(node)?;
+                Ok([certificate.bracket_lo, certificate.bracket_hi])
+            } else if swept_swept(boolean)? {
                 match admit_swept_pair(boolean) {
                     Ok(certificate) => Ok([certificate.bracket_lo, certificate.bracket_hi]),
                     Err(stage) => Err(swept_refusal_to_refusal(stage)),
@@ -4881,6 +4982,7 @@ pub mod membership {
     use truck_certified::construct::volume_facts::{VolumeOptions, certify_patch_form};
     use truck_certified::kernel::patch::IBox2;
 
+    use crate::facade::ModeValue;
     use crate::python::binding::VolumeRow;
 
     /// The number of fresh recorded directions attempted after the caller's
@@ -5092,6 +5194,7 @@ pub mod membership {
 
     /// One validated non-rational tensor-Bernstein patch (weights certified
     /// `== 1`), with its recorded orientation sign.
+    #[derive(Clone)]
     struct Patch {
         rows: usize,
         cols: usize,
@@ -6722,6 +6825,377 @@ pub mod membership {
             max_depth: stats.max_depth,
             cover_cells: stats.cover_cells,
             phases: [broad, excluded, stats.refinement],
+        })
+    }
+
+    // =======================================================================
+    // MONO-9-FUSE-FOLD -- the multi-operand compound-indicator fold.
+    //
+    // The fold is per-tool flux against a COMPOUND membership indicator, not a
+    // pairwise fold (a union of patch 2-cycles is not a patch 2-cycle). For
+    // each operand boundary patch P_k the divergence form
+    // `g_P = (1/3) P . (P_u x P_v)` is integrated over the cells whose image
+    // lies on the final solid's boundary: the boolean membership function must
+    // be SENSITIVE to operand k's own membership there. The MONO-5 primitive
+    // evaluates the sample point against every OTHER operand directly
+    // (multi-solid membership); no intermediate union is ever constructed.
+    // One evaluator, three modes:
+    //
+    //   union      sensitive  <=>  every other operand is OUTSIDE
+    //   intersect  sensitive  <=>  every other operand is INSIDE
+    //   subtract   base       <=>  every tool is OUTSIDE            (sign +1)
+    //              tool k     <=>  base INSIDE and every other tool OUTSIDE
+    //                                                               (sign -1)
+    //
+    // The bracket is the interval sum of the per-operand signed brackets, with
+    // the width budget split across the operands (judgement 2).
+    // =======================================================================
+
+    /// The certified outcome of one multi-operand fold.
+    #[derive(Debug, Clone, PartialEq, Serialize)]
+    pub struct FoldVolumeCertificate {
+        /// The certified lower volume bound.
+        pub bracket_lo: f64,
+        /// The certified upper volume bound.
+        pub bracket_hi: f64,
+        /// The certified volume value (the bracket midpoint).
+        pub value: f64,
+        /// The bracket width.
+        pub width: f64,
+        /// The bracket width relative to `V(base)`.
+        pub relative_width: f64,
+        /// `V(base)` from the landed per-patch flux certificate.
+        pub volume_base: f64,
+        /// The per-operand signed contribution brackets, base first.
+        pub operand_brackets: Vec<[f64; 2]>,
+        /// The per-operand signed contribution midpoints, base first.
+        pub operand_volumes: Vec<f64>,
+        /// The number of tool operands in the fold.
+        pub fold_count: usize,
+        /// The constructive solid count (the fold is one solid).
+        pub solid_count: u64,
+        /// The number of cells scored by an exact clear witness.
+        pub clear_cells: usize,
+        /// The number of unresolved contact cells carrying the bracket.
+        pub contact_cells: usize,
+        /// The maximum subdivision depth reached.
+        pub max_depth: u32,
+        /// The number of contact-cover cells reported.
+        pub cover_cells: usize,
+        /// The per-phase work: `[cover, clear, refinement]`.
+        pub phases: [usize; 3],
+    }
+
+    /// The signed orientation a boolean mode gives one operand of the fold:
+    /// `+1` for every operand of a union/intersect, `+1` for the base and
+    /// `-1` for each tool of a subtract (the remaining solid's outward normal
+    /// on a removed tool's boundary points opposite the tool's own).
+    fn fold_sign(index: usize, mode: ModeValue) -> f64 {
+        match mode {
+            ModeValue::Subtract if index > 0 => -1.0,
+            _ => 1.0,
+        }
+    }
+
+    /// The self-operand context of one fold integration: which recorded operand
+    /// boundary is being integrated, its patch-set rows and the fold mode.
+    struct FoldOperand<'a> {
+        rows: &'a [Vec<VolumeRow>],
+        index: usize,
+        mode: ModeValue,
+    }
+
+    impl FoldOperand<'_> {
+        /// The signed orientation this operand carries in the fold.
+        fn sign(&self) -> f64 {
+            fold_sign(self.index, self.mode)
+        }
+    }
+
+    /// The compound-indicator sensitivity of one operand boundary point: does
+    /// flipping operand `self.index`'s own membership change the boolean
+    /// function, holding every other operand's membership fixed? The MONO-5
+    /// primitive evaluates the sample point against EVERY other operand
+    /// separately (multi-solid membership), never a reconstructed union.
+    fn compound_indicator(
+        point: [f64; 3],
+        operand: &FoldOperand<'_>,
+        options: &BooleanVolumeOptions,
+    ) -> Result<bool, BooleanVolumeRefusal> {
+        for (j, rows) in operand.rows.iter().enumerate() {
+            if j == operand.index {
+                continue;
+            }
+            let certificate =
+                classify_point(point, [0.37, 0.61, 0.70], rows, options.classify_seed);
+            let inside = match certificate.verdict {
+                MembershipVerdict::Inside => true,
+                MembershipVerdict::Outside => false,
+                MembershipVerdict::Indeterminate => {
+                    return Err(BooleanVolumeRefusal::MembershipIndeterminate);
+                }
+            };
+            let required = match operand.mode {
+                ModeValue::Add => false,
+                ModeValue::Intersect => true,
+                ModeValue::Subtract => {
+                    if operand.index == 0 {
+                        false
+                    } else {
+                        j == 0
+                    }
+                }
+            };
+            if inside != required {
+                return Ok(false);
+            }
+        }
+        Ok(true)
+    }
+
+    /// The exact signed flux of a clear cell, fixed by ONE compound-indicator
+    /// witness. A clear cell is connected and disjoint from every other
+    /// operand's boundary, so each other operand's membership is constant on
+    /// it and the compound sensitivity is constant too.
+    fn fold_clear_flux(
+        p: &Patch,
+        cell: &ParamCell,
+        operand: &FoldOperand<'_>,
+        options: &BooleanVolumeOptions,
+    ) -> Result<(f64, f64), BooleanVolumeRefusal> {
+        let u = 0.5 * (cell.u_lo + cell.u_hi);
+        let v = 0.5 * (cell.v_lo + cell.v_hi);
+        let point = patch_eval(p, u, v);
+        if !compound_indicator(point, operand, options)? {
+            return Ok((0.0, 0.0));
+        }
+        let (lo, hi) = cell_flux_exact(p, cell)?;
+        let sign = operand.sign();
+        Ok(if sign >= 0.0 { (lo, hi) } else { (-hi, -lo) })
+    }
+
+    /// Integrates the signed flux of one operand patch against the compound
+    /// indicator of every other operand, returning the certified bracket of
+    /// the patch's contribution to the fold.
+    fn integrate_patch_fold(
+        p: &Patch,
+        operand: &FoldOperand<'_>,
+        others: &[Patch],
+        budget: f64,
+        options: &BooleanVolumeOptions,
+        stats: &mut PhaseStats,
+    ) -> Result<(f64, f64), BooleanVolumeRefusal> {
+        let cover = cover_boxes(p, others, options.cover_depth);
+        stats.cover_cells += cover.len();
+        let sign = operand.sign();
+
+        let mut exact_lo = 0.0f64;
+        let mut exact_hi = 0.0f64;
+        let mut work: Vec<(ParamCell, u32, f64, f64)> = Vec::new();
+        let mut leaves: Vec<(f64, f64)> = Vec::new();
+
+        let seed = ParamCell::unit();
+        if !cover.iter().any(|c| c.intersects(&seed))
+            || is_clear(p, &seed, others, options.separation_depth)
+        {
+            let (lo, hi) = fold_clear_flux(p, &seed, operand, options)?;
+            exact_lo += lo;
+            exact_hi += hi;
+            stats.clear_cells += 1;
+        } else {
+            let (lo, hi) = contact_bracket(p, &seed);
+            let (lo, hi) = if sign >= 0.0 { (lo, hi) } else { (-hi, -lo) };
+            work.push((seed, 0, lo, hi));
+        }
+
+        loop {
+            let mut contact_lo = 0.0f64;
+            let mut contact_hi = 0.0f64;
+            for &(_, _, lo, hi) in &work {
+                contact_lo += lo;
+                contact_hi += hi;
+            }
+            for &(lo, hi) in &leaves {
+                contact_lo += lo;
+                contact_hi += hi;
+            }
+            if contact_hi - contact_lo <= budget {
+                break;
+            }
+
+            let mut best: Option<usize> = None;
+            let mut best_width = f64::NEG_INFINITY;
+            for (i, &(_, _, lo, hi)) in work.iter().enumerate() {
+                let width = hi - lo;
+                if width > best_width {
+                    best_width = width;
+                    best = Some(i);
+                }
+            }
+            let Some(index) = best else { break };
+            let (cell, depth, lo, hi) = work.swap_remove(index);
+            if depth >= options.max_depth || stats.refinement >= options.max_cells {
+                leaves.push((lo, hi));
+                stats.contact_cells += 1;
+                continue;
+            }
+            stats.refinement += 1;
+            let (c0, c1) = cell.split();
+            for child in [c0, c1] {
+                if !cover.iter().any(|c| c.intersects(&child))
+                    || is_clear(p, &child, others, options.separation_depth)
+                {
+                    let (clo, chi) = fold_clear_flux(p, &child, operand, options)?;
+                    exact_lo += clo;
+                    exact_hi += chi;
+                    stats.clear_cells += 1;
+                } else {
+                    let (clo, chi) = contact_bracket(p, &child);
+                    let (clo, chi) = if sign >= 0.0 {
+                        (clo, chi)
+                    } else {
+                        (-chi, -clo)
+                    };
+                    work.push((child, depth + 1, clo, chi));
+                    stats.max_depth = stats.max_depth.max(depth + 1);
+                }
+            }
+            if stats.refinement >= options.max_cells {
+                let mut rem_lo = 0.0f64;
+                let mut rem_hi = 0.0f64;
+                for &(_, _, lo, hi) in &work {
+                    rem_lo += lo;
+                    rem_hi += hi;
+                }
+                for &(lo, hi) in &leaves {
+                    rem_lo += lo;
+                    rem_hi += hi;
+                }
+                if rem_hi - rem_lo > budget {
+                    return Err(BooleanVolumeRefusal::BudgetExceeded);
+                }
+            }
+        }
+
+        for (_, _, lo, hi) in work {
+            leaves.push((lo, hi));
+            stats.contact_cells += 1;
+        }
+        let mut contact_lo = 0.0f64;
+        let mut contact_hi = 0.0f64;
+        for (lo, hi) in leaves {
+            contact_lo += lo;
+            contact_hi += hi;
+        }
+        Ok((exact_lo + contact_lo, exact_hi + contact_hi))
+    }
+
+    /// The certified multi-operand fold volume of `base op tools...` (MONO-9,
+    /// theory statement section 4). `base` is the first recorded operand and
+    /// `tools` the remaining operands in recorded order; `mode` is the single
+    /// fold mode. Every operand is a closed oriented unit-weight patch
+    /// 2-cycle. No intermediate union is constructed.
+    pub fn certify_fold_volume(
+        base: &[VolumeRow],
+        tools: &[Vec<VolumeRow>],
+        mode: ModeValue,
+        options: &BooleanVolumeOptions,
+    ) -> Result<FoldVolumeCertificate, BooleanVolumeRefusal> {
+        if base.is_empty() || tools.iter().any(|tool| tool.is_empty()) {
+            return Err(BooleanVolumeRefusal::MalformedPatch);
+        }
+        let mut operands_rows: Vec<Vec<VolumeRow>> = Vec::with_capacity(tools.len() + 1);
+        operands_rows.push(base.to_vec());
+        for tool in tools {
+            operands_rows.push(tool.clone());
+        }
+        let mut operands: Vec<Vec<Patch>> = Vec::with_capacity(operands_rows.len());
+        for rows in &operands_rows {
+            operands.push(
+                rows.iter()
+                    .map(parse_patch)
+                    .collect::<Result<Vec<_>, _>>()
+                    .map_err(BooleanVolumeRefusal::from)?,
+            );
+        }
+
+        // V(base) from the landed per-patch flux certificate (the budget base).
+        let Some((base_patches, _)) = operands.split_first() else {
+            return Err(BooleanVolumeRefusal::MalformedPatch);
+        };
+        let mut va_lo = 0.0f64;
+        let mut va_hi = 0.0f64;
+        for p in base_patches {
+            let (lo, hi) = cell_flux_exact(p, &ParamCell::unit())?;
+            va_lo += lo;
+            va_hi += hi;
+        }
+        let va = 0.5 * (va_lo + va_hi);
+        if !va.is_finite() || va.abs() <= 0.0 {
+            return Err(BooleanVolumeRefusal::NonRegularPatch);
+        }
+
+        let target_width = options.relative_tolerance * va.abs();
+        let operand_count = operands.len();
+        let total_patches: usize = operands.iter().map(Vec::len).sum();
+        let budget = target_width / total_patches.max(1) as f64;
+
+        let mut stats = PhaseStats::default();
+        let mut total_lo = 0.0f64;
+        let mut total_hi = 0.0f64;
+        let mut operand_brackets: Vec<[f64; 2]> = Vec::with_capacity(operand_count);
+        let mut operand_volumes: Vec<f64> = Vec::with_capacity(operand_count);
+        for (k, patches) in operands.iter().enumerate() {
+            let others: Vec<Patch> = operands
+                .iter()
+                .enumerate()
+                .filter(|(j, _)| *j != k)
+                .flat_map(|(_, ps)| ps.iter().cloned())
+                .collect();
+            let mut k_lo = 0.0f64;
+            let mut k_hi = 0.0f64;
+            let operand = FoldOperand {
+                rows: &operands_rows,
+                index: k,
+                mode,
+            };
+            for p in patches {
+                let (lo, hi) =
+                    integrate_patch_fold(p, &operand, &others, budget, options, &mut stats)?;
+                k_lo += lo;
+                k_hi += hi;
+            }
+            operand_brackets.push([k_lo, k_hi]);
+            operand_volumes.push(0.5 * (k_lo + k_hi));
+            total_lo += k_lo;
+            total_hi += k_hi;
+        }
+
+        let value = 0.5 * (total_lo + total_hi);
+        let width = total_hi - total_lo;
+        if !value.is_finite() || !width.is_finite() || total_lo > total_hi {
+            return Err(BooleanVolumeRefusal::NonRegularPatch);
+        }
+        if width > target_width {
+            return Err(BooleanVolumeRefusal::BudgetExceeded);
+        }
+
+        Ok(FoldVolumeCertificate {
+            bracket_lo: total_lo,
+            bracket_hi: total_hi,
+            value,
+            width,
+            relative_width: width / va.abs(),
+            volume_base: va,
+            operand_brackets,
+            operand_volumes,
+            fold_count: tools.len(),
+            solid_count: 1,
+            clear_cells: stats.clear_cells,
+            contact_cells: stats.contact_cells,
+            max_depth: stats.max_depth,
+            cover_cells: stats.cover_cells,
+            phases: [stats.cover_cells, stats.clear_cells, stats.refinement],
         })
     }
 }
