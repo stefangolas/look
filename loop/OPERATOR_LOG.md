@@ -5843,3 +5843,73 @@ Leaving: 0 RUNNING; HEAD `3080c20` + this cycle's STATE/log/escalation commit;
 heartbeat 1 (27872); operator_runner 1 (27876); watchdog 1 (29264); TWO
 supervisors + TWO cargoq servers carried; cargoq UP (queued 0, running false);
 disk 5.5 GiB free (LOW, below floor); RAM 4.42 GiB.
+
+## 2026-09-11 19:44 UTC - operator cycle (one pass)
+
+Board: 1 RUNNING / 0 landed-this-cycle / 0 unblocked / 0 flipped / 0
+dispatched. HEAD `5a95bd6` (new since the 19:21Z operator commit `a38f482`:
+`5a95bd6` authors the BD-EMIT-MESH-CACHE packet on the docket - memoized
+tessellation keyed (spec-hash, deflection, color), `needs` FHC-MIRROR-FORM).
+
+- Step 1 health sweep: `slot_status.py` -> 1 RUNNING (slot 0
+  FHC-EX-A-CLOSED-LOOP-SHELL, pid 28692, opencode 25288, events 4.1 min fresh at
+  entry) / 7 FINISHED-IDLE. `curl 127.0.0.1:8231/ping` -> ok, queued 0, running
+  false. Heartbeat exactly 1 (27872; `dispatch_heartbeat.log` last line 15:40:59
+  local = within its 10-min cycle). operator_runner 1 (27876). watchdog 1
+  (29264). ONE overnight driver (24864). TWO supervisors (19172+27828) + TWO
+  cargoq servers (28544+34564) carried (documented duplication class; only one
+  overnight child = no double-merge risk). DISK 5.9 GB free (BELOW the 15 GB
+  goal and the 8 GB floor); RAM 3.79 GB free (above the 3 GB threshold; one
+  worker resident). No TEMP look-verify-baseline-* leaks; no root `target/`.
+- Step 2 land mechanically landable: nothing landable. All seven FINISHED/IDLE
+  worker tips (329f6ab/e6553db/3c2109b/ee97499/713f205/5cf4811/c3df084) verified
+  ancestors of HEAD by `git merge-base --is-ancestor` (only the stale slot-0
+  SPEC_GAP tip 46ff8cc is not). RESULT statuses read directly: slot1 complete,
+  slot3/5/6 DONE, slot4 LANDED-WITH-FINDINGS, slot7 LANDED - none is a fresh
+  DONE awaiting merge. No merge performed.
+- Step 3 unblock stuck workers: none. Slot 0 is RUNNING and making progress
+  (opencode session `ses_f6e0c5510ffeDkEY8laClGYwfi`; last event 15:43:39 local
+  - it copied `target/quick/truck123d.dll` into the pythoncore dir and has
+  changed `truck123d/src/bd_bridge.rs`; git packet/FHC-EX-A-CLOSED-LOOP-SHELL@
+  `5a95bd6` = base, pre-commit). DO NOT disturb. No IDLE/DEAD slot holds
+  uncommitted work; no QUESTION to answer.
+- Step 4 registry hygiene: re-derived by command - 350 rows = 253 DONE / 86
+  READY / 10 BLOCKED / 1 SUPERSEDED (the 350th row is the new BD-EMIT-MESH-CACHE
+  READY packet from `5a95bd6`). None of the 10 BLOCKED rows is mechanically
+  flippable: needs unmet (DEF-VENDOR-FIXTURES / DEF-SEEDRAY-A / ADM-001-ADAPTER /
+  ADM-002-CERTIFICATES are READY not DONE) or a deliberate hold (BG-AUD-FIX-004
+  OWNER_BLOCKED; BG-CK-SPLINE-CENSUS booking gate; SEM-PCURVE-MASTER-001-FIX
+  SUPERSEDED; DEF-SPINEFRAME-GRAZE registered defect; MONO-10 owner-decision;
+  RDEF-M4/M5 milestone gates; TOR-C pinned on authoring). RG-23/RG-9 are READY
+  with MISSING packet files = authoring gap, carried; the wider READY-with-empty-
+  packet set (BIE-000..007, PB-000/002/003/004/006/007/008, CL-000/005/006,
+  OCCT-HIGH-ROI, TOR-A/B) is the same authoring gap - not operator-authorable. No
+  anchor-count drift to re-measure.
+- Step 5 dispatch: NOT run manually. The heartbeat (27872) owns dispatch (the
+  documented single-instance rule; it runs `dispatch_ready.py --max-workers=3`
+  every 10 min); a manual run would race it. **The heartbeat DID dispatch**:
+  `dispatch_heartbeat.log` records FHC-EX-A-CLOSED-LOOP-SHELL -> slot 0,
+  "started pid 28692", "dispatched 1; workers now ~1/3" at 15:40:59 local
+  (19:30:59Z). The frontier is no longer stalled: FHC-EX-A is live and the
+  remaining FHC chain (EX-B / TRIM-EXTRUDE-ENVELOPE / MIRROR-FORM) + the new
+  BD-EMIT-MESH-CACHE are serial behind it. Disk 5.9 GB would refuse any further
+  NEW fork now, but slot 0 already holds the live worker.
+- Step 6 STATE: prepended the 19:44Z LATEST GROUND TRUTH block (19:21Z marked
+  SUPERSEDED) + appended this log entry. Traps/history untouched.
+- Step 7: this entry.
+
+Escalations: none NEW. CARRIED - disk 5.9 GiB below the 8 GB floor would block
+any new dispatch once slot 0 frees (the janitor pool is exhausted); RG-23/RG-9
+missing packet files; RDEF-M4 re-scope; MONO-10 owner R3-mesh decision;
+FRAME-REVOLVE F1 non_z_axis pin; duplicate supervisors + lagging cargoq restart
+guard; TOR-C flip-or-pin; schedule.py 'needs' crash.
+
+Worktree note (reported, not actioned): root tree carries the live human-session
+WIP (M README.md, M loop/LEDGER.jsonl, M loop/cargoq/server.log, untracked
+benchmarks/ + loop/baselines/) - untouched.
+
+Leaving: 1 RUNNING (slot 0 FHC-EX-A-CLOSED-LOOP-SHELL, live and progressing);
+HEAD `5a95bd6` + this cycle's STATE/log commit; heartbeat 1 (27872);
+operator_runner 1 (27876); watchdog 1 (29264); ONE overnight driver; TWO
+supervisors + TWO cargoq servers carried; cargoq UP (queued 0, running false);
+disk 5.9 GiB free (LOW, below floor); RAM 3.79 GiB.

@@ -75,6 +75,44 @@ corrected, annex C = ORACLE POLICY CHANGE), then docs/SOLVER_COVERAGE_SPEC.md
 
 ## Where we are
 
+> LATEST GROUND TRUTH [operator 2026-09-11T19:44Z]: 1 RUNNING / 0
+> landed-this-cycle / 0 unblocked / 0 flipped / 0 dispatched. HEAD `5a95bd6`
+> (new since the 19:21Z operator commit `a38f482`: `5a95bd6` authors the
+> BD-EMIT-MESH-CACHE packet on the docket - memoized tessellation keyed
+> (spec-hash, deflection, color), `needs` FHC-MIRROR-FORM). **THE FRONTIER IS
+> MOVING AGAIN**: the heartbeat dispatched FHC-EX-A-CLOSED-LOOP-SHELL -> slot 0
+> at 19:30:59Z (worker pid 28692, opencode 25288; events 4 min fresh at entry;
+> changed=1 `truck123d/src/bd_bridge.rs`; git
+> packet/FHC-EX-A-CLOSED-LOOP-SHELL@5a95bd6 = base pre-commit, mid inner loop -
+> DO NOT disturb). Slots 1-7 FINISHED/IDLE landed residue; every tip
+> (329f6ab/e6553db/3c2109b/ee97499/713f205/5cf4811/c3df084) re-verified an
+> ancestor of HEAD by `git merge-base --is-ancestor`; nothing landable.
+> Registry re-derived by command: 350 rows = 253 DONE / 86 READY / 10 BLOCKED /
+> 1 SUPERSEDED; none of the 10 BLOCKED rows is mechanically flippable (each
+> carries a deliberate hold or unmet dep: OWNER_BLOCKED / SUPERSEDED / booking
+> gate / registered defect / owner-decision / milestone / unmet needs). READY
+> rows with an empty `packet` field remain the carried authoring gap (BIE-000..007,
+> PB-000/002/003/004/006/007/008, CL-000/005/006, OCCT-HIGH-ROI, TOR-A/B,
+> RG-23/RG-9) - not operator-authorable.
+> **DISK 5.9 GiB free (BELOW the 8 GB floor)** - the heartbeat's `new_slot` would
+> refuse any NEW fork now, but slot 0 already holds the live FHC-EX-A worker;
+> `janitor ensure --need 15` pool is exhausted (no root target/, no TEMP
+> look-verify-baseline-* leaks; bulk is untracked human scratch/). RAM 3.79 GiB
+> free (above the 3 GB threshold; one worker resident). Health: heartbeat exactly
+> 1 (27872), operator_runner 1 (27876), watchdog 1 (29264), ONE overnight driver
+> (24864), TWO supervisors (19172+27828) + TWO cargoq servers (28544+34564)
+> carried; cargoq UP (ping ok, queued 0, running false). No manual dispatch
+> (heartbeat owns it; disk-floor blocked anyway). Root worktree carries the live
+> human-session WIP (M README.md, M loop/LEDGER.jsonl, M loop/cargoq/server.log,
+> untracked benchmarks/ + loop/baselines/) - untouched, reported not actioned.
+> Carried human items: disk below floor blocks new dispatch; RG-23/RG-9 missing
+> packet files; RDEF-M4 re-scope; MONO-10 owner R3-mesh decision; FRAME-REVOLVE
+> F1 non_z_axis pin; duplicate supervisors + lagging cargoq restart guard; TOR-C
+> flip-or-pin; schedule.py 'needs' crash. Leaving: 1 RUNNING (slot 0 FHC-EX-A);
+> HEAD `5a95bd6` + this cycle's STATE/log commit.
+>
+> --- SUPERSEDED 2026-09-11T19:21Z note (kept for history) follows ---
+>
 > LATEST GROUND TRUTH [operator 2026-09-11T19:21Z]: 0 RUNNING / 0
 > landed-this-cycle / 0 unblocked / 0 flipped / 0 dispatched. HEAD `3080c20`
 > (the 18:57Z operator commit; no new commits since). All 8 slots FINISHED/IDLE
