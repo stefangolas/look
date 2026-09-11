@@ -75,6 +75,47 @@ corrected, annex C = ORACLE POLICY CHANGE), then docs/SOLVER_COVERAGE_SPEC.md
 
 ## Where we are
 
+> LATEST GROUND TRUTH [operator 2026-09-11T14:18Z]: 0 RUNNING / 0
+> landed-this-cycle / 0 unblocked / 0 flipped / 0 dispatched. HEAD `fbe452a`
+> (two owner commits since the 13:33Z operator commit `c679dda`: `ce8f2b9`
+> kernel optional mesh deflection + colored indexed GLB emission (bd_glb);
+> `fbe452a` STATE trap note for the owner-directed no-packet kernel change).
+> **OWNER BREAK STILL IN FORCE** (95b0bb8, 11:45Z; the end-of-file BREAK block
+> says "Nothing is dispatched now by owner instruction"; no break-lift commit
+> exists - the newest end-of-file block is an OWNER-DIRECTED NO-PACKET KERNEL
+> CHANGE, not a resume). The quiet posture is the owner's and not mine to lift -
+> no dispatch, no flips. All 8 slots FINISHED/IDLE, no live worker (zero
+> cargo/rustc; opencode = this operator + the human session). Slot 0
+> AUTHOR-CENSUS-NAMES wt RESULT SPEC_GAP + QUESTION.md (geometry rebooking; NOT
+> landable; tip 46ff8cc not an ancestor of HEAD). Slot 1 AUTHOR-WIRE-MIRROR-ARM
+> wt RESULT "complete" (redundant; row landed 38d3534/d500dcc; tip 329f6ab =
+> ancestor, no work). Slots 2-7 landed residue (c3df084/e6553db/3c2109b/ee97499/
+> 713f205/5cf4811 all re-verified ancestors of HEAD this cycle). Registry
+> re-derived by command: 345 rows = 251 DONE / 83 READY / 10 BLOCKED / 1
+> SUPERSEDED; none of the 10 BLOCKED rows is flippable (BG-AUD-FIX-004
+> OWNER_BLOCKED; BG-CK-SPLINE-CENSUS booking gate; SEM-PCURVE-MASTER-001-FIX
+> superseded; DEF-SPINEFRAME-GRAZE SPEC_GAP re-aimed; DEF-TESS-ANALYTIC-SEAM /
+> DEF-SEEDRAY-B / RDEF-M4 / RDEF-M5 unmet deps; TOR-C orchestrator-held;
+> MONO-10 owner-decision). `dispatch_ready --dry-run --max-workers=4`: "slots: 8
+> (0 running, 8 free); slot-assigned packets: 6; dispatched 0; workers now
+> ~0/4"; only RG-23/RG-9 flagged (ANCHOR CHECK FAILED, empty packet files =
+> authoring, carried). Health: heartbeat exactly 1 (27872), operator_runner
+> exactly 1 (27876), watchdog 1 (29264), ONE overnight driver (24864), TWO
+> supervisors (19172+27828) carried; cargoq UP (ping ok, queued 0, running
+> false); disk 9.3 GiB free (above the 8 GB floor, below the 15 GiB goal;
+> janitor status: 9.3 GB disk / 2.8 GB RAM - nothing reclaimable); RAM 2.8 GiB
+> free (LOW - under the 3 GB charter threshold, but no worker resident; do not
+> stack workers); no TEMP look-verify-baseline-* leaks. Root worktree: only
+> tracked modification is `loop/cargoq/server.log` (not mine - left untouched);
+> the previously-flagged uncommitted `truck123d/src/bd_bridge.rs` +
+> `truck123d/src/lib.rs` edits are now committed in `ce8f2b9` (owner). No new
+> escalation. Carried human items unchanged: AUTHOR-CENSUS-NAMES SPEC_GAP
+> rebooking (amend + redispatch after the break); RG-23/RG-9 missing packet
+> files; FRAME-REVOLVE F1 non_z_axis pin (ttc_lathe_spline.rs:255); duplicate
+> supervisors + lagging cargoq restart guard; slot-4/7 wt RESULT residue; TOR-C
+> flip-or-pin; schedule.py 'needs' crash.
+>
+> --- SUPERSEDED 2026-09-11T13:33Z note (kept for history) follows ---
 > LATEST GROUND TRUTH [operator 2026-09-11T13:33Z]: 0 RUNNING / 0
 > landed-this-cycle / 0 unblocked / 0 flipped / 0 dispatched. HEAD `16402bc`
 > (the 13:09Z operator commit; no new commits since). **OWNER BREAK STILL IN
@@ -7340,3 +7381,38 @@ duplicate supervisors + lagging cargoq restart guard; slot-4/7 wt RESULT
 residue; TOR-C flip-or-pin; schedule.py 'needs' crash.]
 
 [OWNER-DIRECTED NO-PACKET KERNEL CHANGE 2026-09-11 ~14:3xZ (session, interactive). The owner directed in-session implementation bypassing the packet loop; recorded per the rules. (1) truck123d bd_stl gained optional deflection (None = landed MESH_SEGMENTS rule bit-for-bit; vehicle fingerprint 4,461,816 re-verified) + new bd_glb colored indexed GLB entry via the landed glb_emit; deflection threads cylinder/sphere/torus/lathe segment counts. Commit ce8f2b9; truck123d tests 82/82. (2) door.py --glb PATH --deflection F flags on the truck engine. (3) look ui viewer colors fixed (src/ui.rs commits 4fcee0e + 784eeb8: glTF baseColorFactor x COLOR_0 semantics - the first or_else version never fired because compile_glb fabricates synthetic identity COLOR_0; CAUGHT by decoding the embedded color buffer, not by the test - the byte-verified test passed on the synthetic-scene path while the real loader path was white). Vehicle numbers: kernel door + fingerprint STL (43.9MB) + colored GLB (17.3MB @ 25mm deflection, 920,660 tris) = 0.85-0.96s wall, 218 MiB peak vs OCC build+GLB 27.4-28.2s / 1,570 MiB. NOTE for the next census: bd_stl signature is backward compatible (optional arg); the R3 census STL fingerprints are unaffected (verified). The .pyd at the interpreter dir must be re-staged from target/release/truck123d.dll after any truck123d rebuild (cargo test STATUS_DLL_NOT_FOUND = interpreter dir missing from PATH, the documented cargoq trap).]
+
+[operator 2026-09-11T14:18Z - volatile refresh. **OWNER BREAK STILL IN FORCE**
+(95b0bb8, 11:45Z; no break-lift commit). Quiet cycle: 0 landed / 0 unblocked /
+0 flipped / 0 dispatched. Board: 0 RUNNING / 0 landed-this-cycle. HEAD `fbe452a`
+(two owner commits since the 13:33Z operator commit c679dda: `ce8f2b9` kernel
+optional mesh deflection + colored indexed GLB emission (bd_glb); `fbe452a`
+STATE trap note). All 8 slots FINISHED/IDLE, no live worker (0 cargo/rustc;
+opencode = this operator + human session). Slot 0 AUTHOR-CENSUS-NAMES wt RESULT
+SPEC_GAP + QUESTION.md - not landable, carried (tip 46ff8cc not an ancestor of
+HEAD). Slot 1 AUTHOR-WIRE-MIRROR-ARM wt RESULT "complete" - redundant (row
+landed 38d3534/d500dcc; tip 329f6ab ancestor, no work). Slots 2-7 landed residue
+(c3df084/e6553db/3c2109b/ee97499/713f205/5cf4811 all re-verified ancestors of
+HEAD by merge-base). Nothing to unblock (no RUNNING worker; slot 2 IDLE is
+landed residue). Registry re-derived: 345 rows = 251 DONE / 83 READY / 10
+BLOCKED / 1 SUPERSEDED; none of the 10 BLOCKED rows is flippable
+(BG-AUD-FIX-004 OWNER_BLOCKED; BG-CK-SPLINE-CENSUS booking gate;
+SEM-PCURVE-MASTER-001-FIX superseded; DEF-SPINEFRAME-GRAZE SPEC_GAP re-aimed;
+DEF-TESS-ANALYTIC-SEAM / DEF-SEEDRAY-B / RDEF-M4 / RDEF-M5 unmet deps; TOR-C
+orchestrator-held; MONO-10 owner-decision). `dispatch_ready --dry-run
+--max-workers=4`: "slots: 8 (0 running, 8 free); slot-assigned packets: 6;
+dispatched 0; workers now ~0/4"; only RG-23/RG-9 flagged ANCHOR CHECK FAILED
+(empty packet files = authoring). NO manual dispatch (owner break + heartbeat
+owns dispatch). Health: heartbeat exactly 1 (27872), operator_runner 1 (27876),
+watchdog 1 (29264), ONE overnight driver (24864), TWO supervisors (19172+27828)
+carried; cargoq UP (ping ok, queued 0, running false); disk 9.3 GiB free (above
+the 8 GB floor, below the 15 GiB goal; janitor status: 9.3 GB disk / 2.8 GB RAM
+- nothing reclaimable); RAM 2.8 GiB free (LOW - under the 3 GB charter
+threshold, but no worker resident); no TEMP look-verify-baseline-* leaks. Root
+worktree: only tracked modification is `loop/cargoq/server.log` (not mine - left
+untouched); the previously-flagged uncommitted bd_bridge.rs/lib.rs edits are now
+committed in `ce8f2b9`. No new escalation. Carried human items unchanged:
+AUTHOR-CENSUS-NAMES SPEC_GAP rebooking (amend + redispatch after the break);
+RG-23/RG-9 missing packet files; FRAME-REVOLVE F1 non_z_axis pin
+(ttc_lathe_spline.rs:255); duplicate supervisors + lagging cargoq restart guard;
+slot-4/7 wt RESULT residue; TOR-C flip-or-pin; schedule.py 'needs' crash.]

@@ -5058,3 +5058,42 @@ Leaving: 0 RUNNING; HEAD 16402bc (plus the STATE/log edits this cycle);
 heartbeat 1 (27872); operator_runner 1 (27876); watchdog 1 (29264); ONE
 overnight driver (24864); TWO supervisors (carried); cargoq UP (queued 0);
 disk 10.0 GiB free; RAM 4.75 GiB. Board quiet by owner instruction.
+
+[operator 2026-09-11T14:18Z]
+- Step 1 health sweep: slot_status all 8 slots FINISHED/IDLE, no live worker
+  (0 cargo/rustc; opencode = this operator + human session). cargoq ping
+  {ok, queued 0, running false}. Heartbeat exactly 1 (27872), operator_runner
+  exactly 1 (27876), watchdog 1 (29264), ONE overnight driver (24864), TWO
+  supervisors (19172+27828, carried). Disk 9.3 GB free (>8 GB floor, <15 GB
+  goal), RAM 2.8 GB free (LOW, no worker resident). No TEMP
+  look-verify-baseline-* leaks.
+- Step 2 landing: HEAD moved to fbe452a (owner ce8f2b9 kernel deflection+GLB,
+  fbe452a STATE trap note). Nothing landable: slot 0 SPEC_GAP (carried), slot 1
+  "complete" redundant, slots 2-7 tips all ancestors of HEAD by merge-base
+  (c3df084/e6553db/3c2109b/ee97499/713f205/5cf4811); only 46ff8cc (slot-0
+  SPEC_GAP) is not. No FINISHED+DONE+unlanded packet.
+- Step 3 unblock: 0 RUNNING; no IDLE/DEAD worker without a RESULT; slot 0
+  QUESTION already escalated (geometry rebooking). Nothing to unblock.
+- Step 4 registry hygiene: 345 rows = 251 DONE / 83 READY / 10 BLOCKED / 1
+  SUPERSEDED (re-derived). All 10 BLOCKED rows carry deliberate park/gate notes
+  or unmet deps - none mechanically flippable. RG-23/RG-9 READY with empty
+  packet fields = authoring, not the anchor ritual (no anchor to re-measure).
+- Step 5 dispatch: dispatch_ready --dry-run --max-workers=4 -> "dispatched 0;
+  workers now ~0/4"; only RG-23/RG-9 flagged. NO manual dispatch: owner BREAK
+  still in force (95b0bb8; no break-lift commit) and the heartbeat owns dispatch.
+- Step 6 STATE: prepended the 14:18Z LATEST GROUND TRUTH block (13:33Z marked
+  SUPERSEDED) + appended the 14:18Z machine block.
+- Step 7: this entry.
+
+Escalations: none new. Worktree note: the root tree's only tracked modification
+is loop/cargoq/server.log (not mine - left untouched); the previously-flagged
+uncommitted truck123d/src/bd_bridge.rs + lib.rs edits are now committed in
+ce8f2b9 (owner). Carried: AUTHOR-CENSUS-NAMES SPEC_GAP rebooking; RG-23/RG-9
+missing packet files; FRAME-REVOLVE F1 non_z_axis pin (ttc_lathe_spline.rs:255);
+duplicate supervisors + lagging cargoq restart guard; slot-4/7 wt RESULT
+residue; TOR-C flip-or-pin; schedule.py 'needs' crash.
+
+Leaving: 0 RUNNING; HEAD fbe452a (plus the STATE/log edits this cycle);
+heartbeat 1 (27872); operator_runner 1 (27876); watchdog 1 (29264); ONE
+overnight driver (24864); TWO supervisors (carried); cargoq UP (queued 0);
+disk 9.3 GiB free; RAM 2.8 GiB. Board quiet by owner instruction.
