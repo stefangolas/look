@@ -1113,3 +1113,49 @@ Judgment-required items appended each operator cycle. Newest at the bottom.
   decision - the dispatcher chose the fresh re-dispatch; slot 0 re-forked the
   packet at 04:39Z (pid 4356). The `%TEMP%\opencode\slot2-AUTHOR-WIRE-MIRROR-ARM\`
   backup + slot-2 patch may be discarded once that run lands.
+
+## 2026-09-11 05:13 UTC (operator cycle) - DUPLICATE overnight DRIVERS (double-merge risk); AUTHOR-WIRE-MIRROR-ARM skipped-commit work re-forked (recoverable)
+
+- **URGENT - TWO live `overnight.py` drivers.** pids 24864 (started 09-10
+  21:53:58) and 11272 (started 09-10 22:30:59), both children of supervisor
+  27828. `overnight.log` prints every line twice (01:01-01:07 local), so both
+  are actively driving; `supervisor.log` shows two "overnight driver not
+  running - starting" lines (21:53:58, 22:30:59) - its liveness probe missed
+  the first. A duplicate driver can double-merge / double-file. Operator
+  authority forbids killing them. ACTION: kill one (keep the elder 24864) and
+  fix the supervisor's driver-liveness probe; until then every newly landable
+  packet is exposed to a double-merge race.
+- **AUTHOR-WIRE-MIRROR-ARM (skipped-commit) work was re-forked away.** The
+  slot-0 run finished with RESULT status DONE but skipped its commit; the
+  driver correctly refused a no-op merge at 01:07:02. At 01:09:41 the
+  heartbeat's `dispatch_ready` re-forked slot 0 to AUTHOR-CENSUS-NAMES (row
+  READY with no landed marker), archiving the tracked `corpus/ttc/door.py`
+  change to `loop/slots/0/abandoned-20260911-010949.patch` and destroying the
+  untracked test file `truck123d/tests/wire_mirror_arm.rs` (the documented
+  untracked-file recycle gap). RECOVERABLE MATERIAL: (a) the slot-0 door.py
+  change in that patch (`_mirror_point` / `_mirror_edge` / `_mirror_wire`); the
+  slot-0 RESULT.json content is reproduced in OPERATOR_LOG 2026-09-11T05:13Z;
+  (b) an EARLIER slot-2 attempt backup at
+  `%TEMP%\opencode\slot2-AUTHOR-WIRE-MIRROR-ARM\` (`door.py.patch` with the
+  `_reflect_point` variant, `wire_mirror_arm.rs` 13816 B, `RESULT.json`).
+  ACTION: orchestrator scoped-verify + commit-as-delivered ONE attempt (slot-0
+  patch + reconstruct its test, or the slot-2 backup), then land; or redispatch
+  fresh. PIN the row before the next dispatch_ready cycle so it is not re-forked
+  a third time.
+- **AUTHOR-CENSUS-NAMES warm build failed on slot 0** (exit 4294967295 =
+  0xFFFFFFFF, the RAM/OOM-zone signature) at 01:09:41, with disk at 6 GB.
+  `new_slot`'s `cargo check --workspace --all-targets` died. ACTION: clean slot
+  0 targets, retry the warm build once under low load; a second failure is the
+  RAM-cap/disk issue.
+- **Disk 6.0 GB at cycle start (below the 8 GB floor).** `janitor.py ensure
+  --need 15` reclaimed ~4.6 GB -> 10.2 GB (still below the 15 GB goal). Live
+  targets: slot 0 2.3+2.4 GB, slot 1 1.8 GB, slot 2 3.4+1.0 GB (slot 2's zombie
+  holds the 3.4 GB wt target).
+- **Duplicate heartbeat spawn source (investigate).** A second
+  `dispatch_heartbeat.ps1` (pid 32664) appeared at 01:07:41 parented to this
+  operator cycle's opencode wrapper (18652); killed. If a fresh heartbeat is
+  spawned at every operator cycle, find the spawner (opencode session init?).
+- **Carried:** duplicate supervisors (19172 PyManager + 27828 pythoncore child,
+  parent/child - likely one logical supervisor); RDEF-M4-NUMERIC-TIER preflight
+  (stale new-file anchor A1 + H1_NEW_MODULE); RG-23/RG-9 READY with no packet
+  file.

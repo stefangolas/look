@@ -3877,3 +3877,54 @@ detached HEAD `6073d52`, 0 changed, worktree reset 04:22:46Z).
 
 Leaving: 3 RUNNING; HEAD 4f6bd92; heartbeat 1 (27872); watchdog 1 (29264);
 cargoq UP; disk 10.0 GiB free; RAM 3.9 GiB free.
+
+## 2026-09-11 05:13 UTC (operator cycle)
+
+- **Board:** 1 RUNNING (DOOR-PARTIAL-ARC-FLIP, slot 1, pid 11936, productive,
+  4 changed, events ~5 min) / 1 ZOMBIE (DOOR-PARTIAL-ARC-FLIP slot 2, pid 6820,
+  detached 6073d52, worktree untouched this cycle - carried escalation) /
+  0 landed-by-operator. Slot 0 = FAILED-DISPATCH residue (re-forked to
+  AUTHOR-CENSUS-NAMES by the 01:09:41 heartbeat; `new_slot` warm build FAILED
+  exit 4294967295, no worker; branch packet/AUTHOR-CENSUS-NAMES, 0 changed).
+  Slots 3-7 FINISHED landed residue. HEAD 7aba476.
+- **Health (step 1):** heartbeat had TWO instances - incumbent 27872 (9/9) and
+  pid 32664 (spawned 01:07:41, parent = this cycle's opencode wrapper 18652).
+  Killed 32664; heartbeat now exactly 1 (27872). operator_runner 1 (27876),
+  watchdog 1 (29264), cargoq UP (queued 7, running true). Disk 6.0 GiB free at
+  scan (BELOW the 8 GB floor); `python loop/janitor.py ensure --need 15`
+  reclaimed ~4.6 GB -> 10.2 GiB (above floor, below the 15 GB goal). RAM 3.6 GiB.
+  TWO supervisors (19172 PyManager + 27828 pythoncore child) and TWO
+  cargoq/server.py - carried duplication class, not killed.
+- **Land (step 2):** nothing operator-landable. AUTHOR-WIRE-MIRROR-ARM (slot 0)
+  finished RESULT status DONE but SKIPPED ITS COMMIT; the driver correctly
+  refused the no-op merge at 01:07:02 ("0 commits ahead - skipped-commit
+  class"), and the 01:09:41 heartbeat re-forked slot 0 away, so the worktree
+  work is gone. Preserved for recovery: the tracked `corpus/ttc/door.py` change
+  in `loop/slots/0/abandoned-20260911-010949.patch` (uses `_mirror_point` /
+  `_mirror_edge` / `_mirror_wire`; A1 -> 0); the untracked
+  `truck123d/tests/wire_mirror_arm.rs` was LOST (untracked-file recycle gap).
+  The earlier slot-2 attempt survives at
+  `%TEMP%\opencode\slot2-AUTHOR-WIRE-MIRROR-ARM\` (`door.py.patch`,
+  `wire_mirror_arm.rs` 13816 B, `RESULT.json`). The slot-0 RESULT.json content
+  (for recovery): status DONE, class mechanical, crates [truck123d], no commit,
+  4 tests (mirrored_spline_wire_reflects_control_points,
+  mirrored_line_wire_reflects_endpoints, mirrored_free_plane_wire_refuses_typed,
+  mirrored_wire_lofts_green), A1 -> 0, files corpus/ttc/door.py +
+  truck123d/tests/wire_mirror_arm.rs, one finding W1 (half-section wire
+  ordering deferred). ESCALATED, not landed.
+- **Unblock (step 3):** no IDLE/DEAD >15 min holding work, no QUESTION, no 402.
+- **Registry hygiene (step 4):** nothing flipped. RDEF-M4-NUMERIC-TIER deps
+  landed but its packet fails preflight (stale new-file anchor A1 +
+  H1_NEW_MODULE) - carried from 04:46Z. RG-23/RG-9 READY with no packet file -
+  carried.
+- **Dispatch (step 5):** no manual dispatch (heartbeat live). The heartbeat's
+  own 01:09:41 cycle dispatched 0 (AUTHOR-CENSUS-NAMES warm build failed;
+  RG-23/RG-9 preflight failed).
+- **Escalations (step 7):** DUPLICATE overnight drivers (pids 24864 + 11272,
+  both children of 27828, overnight.log lines duplicated - double-merge risk);
+  AUTHOR-WIRE-MIRROR-ARM recovery; AUTHOR-CENSUS-NAMES warm-build RAM failure;
+  disk below goal; duplicate-heartbeat spawn source.
+- **STATE (step 6):** appended the `[operator 2026-09-11T05:13Z]` block.
+
+Leaving: 1 RUNNING (+1 zombie); HEAD 7aba476; heartbeat 1 (27872); watchdog 1
+(29264); cargoq UP; disk 10.2 GiB free; RAM 3.6 GiB free.

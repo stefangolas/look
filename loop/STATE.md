@@ -6003,3 +6003,44 @@ changed, worktree reset 04:22:46Z, worker alive).
 
 Leaving: 3 RUNNING; HEAD 4f6bd92; heartbeat 1 (27872); watchdog 1 (29264);
 cargoq UP; disk 10.0 GiB free; RAM 3.9 GiB free.]
+
+[operator 2026-09-11T05:13Z - volatile refresh. Board now: 1 RUNNING / 1 ZOMBIE
+/ 0 landed-by-operator. HEAD `7aba476` (the 04:46Z operator STATE commit).
+RUNNING: DOOR-PARTIAL-ARC-FLIP (slot 1, pid 11936, holds
+packet/DOOR-PARTIAL-ARC-FLIP, 4 changed, events ~5 min - productive).
+ZOMBIE: DOOR-PARTIAL-ARC-FLIP (slot 2, pid 6820, detached 6073d52, 4 changed,
+worktree untouched this cycle - carried escalation, do not touch). Slot 0 =
+FAILED-DISPATCH residue: the 01:09:41 heartbeat re-forked it to
+AUTHOR-CENSUS-NAMES but `new_slot`'s warm build FAILED exit 4294967295
+(RAM-zone), no worker; branch packet/AUTHOR-CENSUS-NAMES, 0 changed. Slots 3-7
+FINISHED landed residue.
+- **Health (step 1):** heartbeat had TWO instances - incumbent 27872 (9/9) and
+  pid 32664 (spawned 01:07:41, parent = this cycle's opencode wrapper 18652).
+  Killed 32664; heartbeat now exactly 1 (27872). operator_runner 1 (27876),
+  watchdog 1 (29264), cargoq UP (queued 7, running true). Disk 6.0 GiB free at
+  scan (BELOW the 8 GB floor); `janitor.py ensure --need 15` reclaimed ~4.6 GB
+  -> 10.2 GiB (above floor, below the 15 GB goal). RAM 3.6 GiB.
+- **Land (step 2):** nothing operator-landable. AUTHOR-WIRE-MIRROR-ARM (slot 0)
+  finished RESULT status DONE but SKIPPED ITS COMMIT; the driver refused the
+  no-op merge at 01:07:02 (correct, skipped-commit class), and the 01:09:41
+  heartbeat re-forked slot 0 away. Tracked door.py change preserved in
+  `loop/slots/0/abandoned-20260911-010949.patch` (`_mirror_point` /
+  `_mirror_edge` / `_mirror_wire`, A1 -> 0); the untracked test
+  `truck123d/tests/wire_mirror_arm.rs` was LOST (untracked-file recycle gap).
+  Earlier slot-2 attempt survives at
+  `%TEMP%\opencode\slot2-AUTHOR-WIRE-MIRROR-ARM\`. ESCALATED for orchestrator
+  scoped-verify + commit-as-delivered; PIN the row so dispatch_ready does not
+  re-fork it a third time.
+- **Unblock (step 3):** no IDLE/DEAD >15 min holding work, no QUESTION, no 402.
+- **Registry (step 4):** nothing flipped. RDEF-M4-NUMERIC-TIER preflight (stale
+  new-file anchor A1 + H1_NEW_MODULE) and RG-23/RG-9 (missing packets) carried.
+- **Dispatch (step 5):** no manual dispatch (heartbeat live); its 01:09:41 cycle
+  dispatched 0 (AUTHOR-CENSUS-NAMES warm build failed; RG-23/RG-9 preflight).
+- **Escalations (step 7):** DUPLICATE overnight drivers (pids 24864 + 11272,
+  both children of supervisor 27828; overnight.log prints every line twice -
+  double-merge risk, operator may not kill); AUTHOR-WIRE-MIRROR-ARM recovery;
+  AUTHOR-CENSUS-NAMES warm-build RAM failure; disk below goal; duplicate
+  heartbeat spawn source.
+
+Leaving: 1 RUNNING (+1 zombie); HEAD 7aba476; heartbeat 1 (27872); watchdog 1
+(29264); cargoq UP; disk 10.2 GiB free; RAM 3.6 GiB free.]
