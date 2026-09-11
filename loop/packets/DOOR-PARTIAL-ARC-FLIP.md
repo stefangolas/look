@@ -14,14 +14,33 @@ crates:      [truck123d]
 depends_on:  []
 write_allow:
   - corpus/ttc/door.py
+  - truck123d/src/bd_bridge.rs
   - truck123d/tests/door_partial_arc_flip.rs
+  - truck123d/tests/ttc_lathe_spline.rs
 read_allow:
   - truck123d/src/facade.rs
 tests_required: [truck123d/tests/door_partial_arc_flip.rs]
 anchors:
   - {id: A1, expect: 1, cmd: "grep -c 'a partial-arc revolve is outside the executor' corpus/ttc/door.py"}
-budget:      {turns: 30, ctx_tokens: 100000}
+budget:      {turns: 55, ctx_tokens: 180000}
 ```
+
+## QUESTION.md AMENDMENT (2026-09-11, first run SPEC_GAP — adjudicated)
+
+The first run STOPPED with SPEC_GAP: the "PB-014 partial-arc op is
+landed" claim is true of the facade CLASSIFIER LEDGER only — the
+executor has NO partial-arc lathe arm (the same facade-ledger-vs-
+executor conflation as the circle flip). The operator's recommended
+amendment is adopted; write set widened accordingly:
+
+1b. Add the executor partial-arc lathe arm in `bd_bridge.rs` (the
+    lathe carrier records/realizes `revolution_arc` + `start_angle`
+    exactly; sites named in the escalation: bd_bridge.rs:163-169,
+    530-538, 7001).
+1c. `truck123d/tests/ttc_lathe_spline.rs:250-255` pins the old
+    partial-arc refusal — move the pin deeper-or-answered.
+1d. The door arm (original judgement 1) stays, now backed by the
+    executor arm; full-360 rows serialize unchanged.
 
 ## Pre-made judgements
 
