@@ -9066,10 +9066,11 @@ pub fn bd_stl(
 /// The pyo3 render-artifact entry: writes the construction tree as a colored
 /// indexed GLB (one node per placed part, material colors from the recorded
 /// client metadata) and returns `{"parts": n, "triangles": n, "mesh_ms": f64}`.
-/// `deflection` of `None` keeps the landed fixed-resolution deterministic
-/// mesh; the certification artifact remains the STL path.
+/// The shipped default deflection is 0.4 mm (the public demo density); pass
+/// `None` explicitly for the landed fixed-resolution deterministic mesh. The
+/// certification artifact remains the STL path.
 #[pyfunction]
-#[pyo3(signature = (tree_json, path, deflection = None))]
+#[pyo3(signature = (tree_json, path, deflection = 0.4))]
 pub fn bd_glb(
     py: Python<'_>,
     tree_json: &str,

@@ -2670,8 +2670,10 @@ def _truck_export_stl(obj, stl_path: str, deflection=None) -> None:
 def _truck_export_glb(obj, glb_path: str, deflection=None) -> None:
     """Export the tree as a colored indexed GLB (one node per placed part,
     material colors from the recorded client metadata) - the render
-    artifact. The certification artifact stays the STL path."""
-    _T123D.bd_glb(json.dumps(obj._node()), str(glb_path), deflection)
+    artifact. Ships at 0.4 mm deflection (the public demo density); pass
+    --deflection explicitly to override. The certification artifact stays
+    the STL path, which still defaults to the dense deterministic rule."""
+    _T123D.bd_glb(json.dumps(obj._node()), str(glb_path), 0.4 if deflection is None else deflection)
 
 
 def main() -> int:
