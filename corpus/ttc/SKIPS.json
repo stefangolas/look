@@ -125,6 +125,36 @@
    "note": "lib/suspension.py build_track_rod('right') bores the rod eyes (_cut at suspension.py). PB-011B LIFT EVIDENCE (2-D path wave): the canonical-cutter door run is green (OCC baseline door_version 1, type Compound, solid_count 5, bbox [[111.6,-746.5,498.2],[165.5,-307.5,518.8]], STL 1908 triangles, ~3.907 s) and the door-run facts match the recorded reference corpus/ttc/reference/track_rod_right.json within the recorded tolerances (solid_count exact, volume_rel 1e-4, bbox_abs 1e-3); the row's first refusing op is a canonical-tool pair (a cut of a swept/revolved carrier by a canonical tool) that routes through the certified-entry dispatch - a 2-D-path lift; the manifest move to the runnable canonical set with the recorded reference fact is the orchestrator corpus-output step."
   },
   {
+   "id": "f1/cockpit",
+   "reason": "booleans-on-swept-carriers",
+   "note": "lib/cockpit.py build_cockpit shells the cockpit surround from 15 rounded-plate sample sections and 3 body lofts (surfaces.section_face / body_loft), cut by 15 boolean ops (surfaces.cut); OCC reference recorded (door_version 1, solid_count 168, STL 77908 triangles, ~97 s). The row is a boolean-composed swept-carrier part the kernel refuses typed (unsupported_envelope) and its OCC runtime is outside the tractable regime, so it stays staged under this reason."
+  },
+  {
+   "id": "f1/front_wing",
+   "reason": "booleans-on-swept-carriers",
+   "note": "lib/front_wing.py build_front_wing lofts 5 wing elements through spanwise stations (surfaces.wing_element), adds 5 swept plates and a blade path over NACA sections, and trims with 15 cuts; OCC reference recorded (door_version 1, solid_count 25, STL 44294 triangles, ~43 s). The row is a boolean-composed swept-carrier part the kernel refuses typed (unsupported_envelope), so it stays staged under this reason."
+  },
+  {
+   "id": "f1/halo",
+   "reason": "booleans-on-swept-carriers",
+   "note": "lib/mono_halo.py build_halo_bodies builds one continuous titanium loop on a central blade pillar: the discrete-station sweep reduces to a closed chain of station lofts (a T1-prime seam closure) cut by the pillar booleans; OCC reference recorded (door_version 1, solid_count 14, STL 5566 triangles, ~25 s). The kernel refuses the closed-loop loft chain typed (unsupported_envelope), so the row stays staged under this reason."
+  },
+  {
+   "id": "f1/nose",
+   "reason": "booleans-on-swept-carriers",
+   "note": "lib/nose.py build_nose shells the nose from 9 body lofts and 4 half-section faces over superellipse sections, with 2 blade members and 2 cuts; OCC reference recorded (door_version 1, solid_count 51, STL 17990 triangles, ~29 s). The row is a boolean-composed swept-carrier part the kernel refuses typed (unsupported_envelope), so it stays staged under this reason."
+  },
+  {
+   "id": "f1/sidepod_left",
+   "reason": "booleans-on-swept-carriers",
+   "note": "lib/sidepods.py build_sidepod('left') shells the sidepod from 9 section faces and 6 body lofts, cut 26 times, mirrored (2 mirror_y), fused once and finished with one safe_fillet. The OCC reference recording exceeds the recording bound (>300 s) so the reference is absent-diagnostic; the kernel refuses the boolean-composed swept carriers typed (unsupported_envelope), so the row stays staged under this reason."
+  },
+  {
+   "id": "f1/sidepod_right",
+   "reason": "booleans-on-swept-carriers",
+   "note": "lib/sidepods.py build_sidepod('right') shells the sidepod from 9 section faces and 6 body lofts, cut 26 times, mirrored (2 mirror_y), fused once and finished with one safe_fillet. The OCC reference recording exceeds the recording bound (>300 s) so the reference is absent-diagnostic; the kernel refuses the boolean-composed swept carriers typed (unsupported_envelope), so the row stays staged under this reason."
+  },
+  {
    "id": "hypercar/aero",
    "reason": "booleans-on-swept-carriers",
    "note": "lib/aero.py build() intersects/subtracts the lofted master body (S.body_master, 26 spline-section loft, lib/surfaces.py:415-416) and lofted devices: _nose_body/_tail_body aero.py:57/:66, splitter/turning-vane/dive-plane blades aero.py:235/:258/:286, diffuser env/cavity/fin chain aero.py:374-396, rear tray aero.py:422, endplate - wing aero.py:521, pylon (lofted strut - tail body - wing) aero.py:578 - loft-carrier x canonical and loft x loft booleans."
