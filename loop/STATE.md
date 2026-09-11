@@ -75,6 +75,44 @@ corrected, annex C = ORACLE POLICY CHANGE), then docs/SOLVER_COVERAGE_SPEC.md
 
 ## Where we are
 
+> LATEST GROUND TRUTH [operator 2026-09-11T21:00Z]: 2 RUNNING / 0
+> landed-this-cycle / 0 unblocked / 0 flipped / 0 dispatched. HEAD `7830086`
+> (the 20:37Z operator commit; no new commits since). **FHC-EX-B-SPLINE-LOFT-OPERANDS
+> is RUNNING in BOTH slot 0 AND slot 1 - a DUPLICATE dispatch.** The heartbeat
+> sent it to slot 0 at 16:25:50 local (pid 10504) and AGAIN to slot 1 at 16:45:55
+> local (pid 20780) after `dispatch_ready`'s dead-dispatch check false-positived
+> on slot 0 (its branch tip had 0 commits ahead of base mid-work, which the check
+> reads as a dead dispatch; see `loop/dispatch_heartbeat.log` 16:45:55 "slots: 8
+> (0 running, 7 free)"). Both workers are live and progressing (slot 0 opencode
+> pid 2384 session ses_f6dda1e31ffePZufbaRlRmdTja; slot 1 opencode pid 31040
+> session ses_f6dc55f58ffep4TZZSPRw0gQCf; events 0.9/3.5 min fresh at sweep), both
+> editing the same write-set `truck123d/src/bd_bridge.rs`. The operator did NOT
+> kill or reset either (charter forbids disturbing a live worker) - ESCALATED as
+> a duplicate dispatch. `dispatch_ready --dry-run --max-workers=4`: "slots: 8
+> (2 running, 6 free); slot-assigned packets: 5; dispatched 0; workers now ~2/4" -
+> no dispatchable READY packet (RG-23/RG-9 clash with the running bd_bridge.rs;
+> FHC-TRIM -> FHC-MIRROR -> BD-EMIT serial behind FHC-EX-B). Slots 2-7
+> FINISHED/IDLE landed residue; every tip
+> (c3df084/e6553db/3c2109b/ee97499/713f205/5cf4811) re-verified an ancestor of HEAD
+> by `git merge-base --is-ancestor`; slot 2 = TTC-RECENSUS-F1-R3 (row DONE, landed
+> de6bfc6; idle residue, not stuck), slot 3/5/6 RESULT DONE (already landed),
+> slot 4 LANDED-WITH-FINDINGS (not landable, carried), slot 7 LANDED. Nothing
+> landable. Registry re-derived by command: 350 rows = 254 DONE / 85 READY /
+> 10 BLOCKED / 1 SUPERSEDED; none of the 10 BLOCKED is mechanically flippable
+> (owner holds, milestone gates, TOR-C pinned on authoring, MONO-10 owner R3-mesh
+> decision, RDEF-M4/M5 milestone, unmet READY deps). Health: heartbeat exactly 1
+> (27872), operator_runner 1 (27876), watchdog 1 (29264), cargoq UP (ping ok,
+> queued 0, running true = the workers' cargo test); TWO supervisors (19172+27828)
+> and TWO cargoq servers (28544+34564) carried. DISK 4.8 GiB free (BELOW the 8 GB
+> floor; janitor pool exhausted - only the two live slots' targets exist, nothing
+> reclaimable). RAM ~2.7-3.4 GiB free (at/below the 3 GB threshold; two workers
+> resident - do not stack). Root worktree carries live human-session WIP
+> (M README.md, M loop/cargoq/server.log, untracked benchmarks/ + loop/baselines/)
+> - untouched, reported not actioned. Leaving: 2 RUNNING (slots 0+1, duplicate
+> FHC-EX-B); HEAD `7830086` + this cycle's STATE/log commit.
+>
+> --- SUPERSEDED 2026-09-11T20:37Z note (kept for history) follows ---
+>
 > LATEST GROUND TRUTH [operator 2026-09-11T20:37Z]: 1 RUNNING / 0
 > landed-this-cycle / 0 unblocked / 0 flipped / 0 dispatched. HEAD `4e5633d`
 > (the 20:16Z operator commit; no new commits since). **FHC-EX-B-SPLINE-LOFT-OPERANDS
@@ -3578,6 +3616,39 @@ RG-23/RG-9 missing packets; FRAME-REVOLVE F1 non_z_axis pin
 (ttc_lathe_spline.rs:255); duplicate supervisors + lagging cargoq restart guard;
 slot-4/7 wt RESULT residue; TOR-C flip-or-pin; MONO-10 owner decision; RDEF-M4
 H-8 stale anchor; schedule.py 'needs' KeyError.]
+
+[operator 2026-09-11T21:00Z - volatile refresh. Board now: 2 RUNNING / 0
+landed-this-cycle / 0 unblocked / 0 flipped / 0 dispatched. HEAD 7830086
+(20:37Z operator commit). **DUPLICATE DISPATCH: FHC-EX-B-SPLINE-LOFT-OPERANDS
+is live in BOTH slot 0 (cmd pid 10504, opencode 2384, session
+ses_f6dda1e31ffePZufbaRlRmdTja) and slot 1 (cmd pid 20780, opencode 31040,
+session ses_f6dc55f58ffep4TZZSPRw0gQCf).** The heartbeat sent it to slot 0 at
+16:25:50 local and again to slot 1 at 16:45:55 local; `dispatch_heartbeat.log`
+shows the 16:45:55 cycle reporting "slots: 8 (0 running, 7 free)" - the
+dead-dispatch check false-positived on slot 0 while its worker was alive
+mid-work (branch tip 0 commits ahead of base). Both edit the same write-set
+truck123d/src/bd_bridge.rs. Operator did NOT kill/reset either (charter forbids
+disturbing a live worker) - escalated. Slots 2-7 FINISHED/IDLE landed residue:
+slot 2 TTC-RECENSUS-F1-R3 (row DONE, landed de6bfc6; idle, not stuck), slot 3
+SOLVER-SURVEY-C DONE, slot 4 F1-AUTHORING-ARMS LANDED-WITH-FINDINGS (not
+landable), slot 5 CL-006-SOLVER-ENTRY DONE, slot 6 CL-005-EXACT-CONTACT DONE,
+slot 7 BRIDGE-BOOLEANS LANDED; every tip
+(c3df084/e6553db/3c2109b/ee97499/713f205/5cf4811) an ancestor of HEAD. Registry:
+350 rows = 254 DONE / 85 READY / 10 BLOCKED / 1 SUPERSEDED; none of the 10
+BLOCKED flippable. dispatch_ready --dry-run --max-workers=4: "slots: 8 (2
+running, 6 free); slot-assigned 5; dispatched 0; workers now ~2/4". Health:
+heartbeat 1 (27872), operator runner 1 (27876), watchdog 1 (29264), cargoq UP
+(queued 0, running true = the workers' cargo test); TWO supervisors
+(19172+27828) + TWO cargoq servers (28544+34564) carried. DISK 4.8 GiB free
+(BELOW the 8 GB floor; janitor pool exhausted - only the two live slots'
+targets exist). RAM ~2.7-3.4 GiB free (at/below the 3 GB threshold; two workers
+resident - do not stack). Root worktree carries live human-session WIP
+(M README.md, M loop/cargoq/server.log, untracked benchmarks/ + loop/baselines/)
+- untouched, reported not actioned. Carried human items unchanged: duplicate
+dispatch of FHC-EX-B (NEW this cycle); disk below floor; RG-23/RG-9 missing
+packets; FRAME-REVOLVE F1 non_z_axis pin; duplicate supervisors + lagging cargoq
+restart guard; slot-4/7 wt RESULT residue; TOR-C flip-or-pin; MONO-10 owner
+decision; RDEF-M4 H-8 stale anchor; schedule.py 'needs' KeyError.]
 
 ## The parallelism picture
 

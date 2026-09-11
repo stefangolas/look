@@ -6027,3 +6027,75 @@ benchmarks/ + loop/baselines/) - untouched.
 Leaving: 1 RUNNING (slot 0 FHC-EX-B); HEAD `4e5633d` + this cycle's STATE/log
 commit; heartbeat 1 (27872); operator_runner 1 (27876); watchdog 1 (29264);
 cargoq UP (queued 0, running false); disk 9.88 GiB free; RAM 3.74 GiB.
+
+## 2026-09-11 21:00 UTC (operator)
+
+Board at start: 2 RUNNING (slot 0 AND slot 1 both FHC-EX-B-SPLINE-LOFT-OPERANDS),
+slots 2-7 FINISHED/IDLE landed residue. HEAD `7830086` (the 20:37Z operator
+commit). Program: MONO-CLOSURE + the FHC chain; frontier FHC-EX-B -> FHC-TRIM ->
+FHC-MIRROR -> BD-EMIT.
+
+Health sweep:
+- slot_status: slot 0 RUNNING (cmd pid 10504, events 0.9 min old, changed=1),
+  slot 1 RUNNING (cmd pid 20780, events 3.5 min old, changed=0), slots 2-7
+  FINISHED/IDLE. Both workers are the SAME packet.
+- cargoq ping OK (queued 0, running true = the workers' `swept_admission` test).
+  Heartbeat exactly ONE (27872) - the count-2 readings were this operator's own
+  query command lines (transient pid 30820 matched both regexes, gone on recheck).
+  operator_runner 1 (27876). Watchdog 1 (29264). TWO supervisors carried
+  (19172 PyManager + 27828 pythoncore). TWO cargoq servers carried
+  (28544 + 34564).
+- Disk 4.8 GiB free (janitor status; Get-PSDrive 5.2 GiB) - BELOW the 8 GB
+  floor. RAM 2.72 GiB free (below the 3 GB threshold); janitor reports 3.4 GB.
+  Two workers resident - do not stack.
+
+Actions:
+- Step 2 (land): nothing landable. Slots 2-7 tips all re-verified ancestors of
+  HEAD (`git merge-base --is-ancestor`):
+  c3df084/e6553db/3c2109b/ee97499/713f205/5cf4811. wt RESULT statuses read
+  directly: slot 2 none (row TTC-RECENSUS-F1-R3 is DONE + landed de6bfc6 - idle
+  residue), slot 3 DONE, slot 4 LANDED-WITH-FINDINGS, slot 5 DONE, slot 6 DONE,
+  slot 7 LANDED. The DONE ones are already landed; slot 4 is not landable
+  (carried).
+- Step 3 (unblock): no IDLE/DEAD >15 min worker needing reset (slot 2's idle is
+  landed residue, its row DONE). **NEW FINDING: slot 0 and slot 1 are both
+  running FHC-EX-B - a duplicate dispatch.** `dispatch_heartbeat.log` shows the
+  heartbeat dispatched it to slot 0 at 16:25:50 local and to slot 1 at 16:45:55
+  local; the 16:45:55 cycle reported "slots: 8 (0 running, 7 free)" - the
+  dead-dispatch check false-positived on slot 0 while its worker was alive
+  mid-work (branch tip 0 commits ahead of base). Both workers live and
+  progressing, both editing truck123d/src/bd_bridge.rs. Operator did NOT kill or
+  reset either (charter: never disturb a live worker) - ESCALATED.
+- Step 4 (registry): re-derived by command: 350 rows = 254 DONE / 85 READY /
+  10 BLOCKED / 1 SUPERSEDED. Re-checked all 10 BLOCKED rows' notes: every one
+  carries a deliberate hold (OWNER_BLOCKED / CANCELLED BY OWNER / SUPERSEDED /
+  registered defect / owner-decision / milestone gate / TOR-C pinned on
+  authoring / MONO-10 owner R3-mesh decision) or an unmet READY dep. None
+  flippable. No anchor-ritual re-measure needed.
+- Step 5 (dispatch): `dispatch_ready --dry-run --max-workers=4` -> "slots: 8
+  (2 running, 6 free); slot-assigned packets: 5; dispatched 0; workers now ~2/4".
+  RG-23/RG-9 clash with the running bd_bridge.rs (their packet files remain
+  MISSING = carried authoring gap); FHC-TRIM -> FHC-MIRROR -> BD-EMIT serial
+  behind FHC-EX-B. No manual dispatch (heartbeat live; single-instance; disk
+  below floor; two workers already resident).
+- Step 6 STATE: rewrote the "Where we are" LATEST GROUND TRUTH block as
+  [operator 2026-09-11T21:00Z] (demoted 20:37Z to SUPERSEDED) and appended a
+  matching "State of the machine, as left" refresh block. Traps/history
+  untouched.
+- Step 7: this entry.
+
+Escalations: NEW - duplicate dispatch of FHC-EX-B (slots 0+1), see
+OPERATOR_ESCALATIONS. CARRIED - disk 4.8 GiB below the 8 GB floor; RG-23/RG-9
+missing packet files; RDEF-M4 re-scope; MONO-10 owner R3-mesh decision;
+FRAME-REVOLVE F1 non_z_axis pin; duplicate supervisors + lagging cargoq restart
+guard; TOR-C flip-or-pin; schedule.py 'needs' crash; slot-4/7 wt RESULT residue;
+CL-005/CL-006 READY-but-landed status bookkeeping.
+
+Worktree note (reported, not actioned): root tree carries the live human-session
+WIP (M README.md, M loop/cargoq/server.log, untracked benchmarks/ +
+loop/baselines/) - untouched.
+
+Leaving: 2 RUNNING (slots 0+1, duplicate FHC-EX-B); HEAD `7830086` + this
+cycle's STATE/log commit; heartbeat 1 (27872); operator_runner 1 (27876);
+watchdog 1 (29264); cargoq UP (queued 0, running true); disk 4.8 GiB free; RAM
+~2.7 GiB.

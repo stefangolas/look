@@ -1646,3 +1646,39 @@ uncommitted - left for the orchestrator, no dispatch impact.
   re-scope; MONO-10 owner R3-mesh decision; FRAME-REVOLVE F1 non_z_axis pin;
   duplicate supervisors + lagging cargoq restart guard; TOR-C flip-or-pin;
   schedule.py 'needs' crash.
+
+## 2026-09-11 21:00 UTC - NEW: duplicate dispatch of FHC-EX-B-SPLINE-LOFT-OPERANDS (slots 0 AND 1)
+
+- The heartbeat dispatched FHC-EX-B to slot 0 at 16:25:50 local (cmd pid 10504,
+  opencode 2384, session ses_f6dda1e31ffePZufbaRlRmdTja) and then AGAIN to slot 1
+  at 16:45:55 local (cmd pid 20780, opencode 31040, session
+  ses_f6dc55f58ffep4TZZSPRw0gQCf). `loop/dispatch_heartbeat.log` shows the
+  16:45:55 cycle reporting "slots: 8 (0 running, 7 free)" - i.e. `dispatch_ready`'s
+  dead-dispatch check false-positived on slot 0 while its worker was alive and
+  mid-work (its branch tip had 0 commits ahead of base, which the check reads as a
+  dead dispatch).
+- Both workers are live and progressing (events 0.9/3.5 min fresh at sweep) and
+  both edit the same write-set `truck123d/src/bd_bridge.rs`. The operator did NOT
+  kill or reset either (the charter forbids disturbing a live worker).
+- Why it matters: two workers are being paid for the same packet, and their
+  branches will collide on merge. At most one is needed; the second is wasted
+  worker-hours and doubles the RAM/disk pressure while the machine is already
+  below the disk floor.
+- Action needed (human/orchestrator): decide which branch to keep. When the first
+  finishes with a DONE RESULT, land it and discard (or compare) the other. Also
+  fix `dispatch_ready`'s dead-dispatch detection so a live worker whose branch tip
+  has 0 commits ahead is not classified dead (ground truth is the process scan in
+  `slot_status.py`, not the branch tip). Start from `loop/dispatch_ready.py` and
+  the 2026-09-11 16:45 `loop/dispatch_heartbeat.log` entry.
+
+## 2026-09-11 21:00 UTC - CARRIED (no new item): DISK 4.8 GiB still below the 8 GB floor
+
+- Re-derived this cycle: `janitor.py status` -> 4.8 GB free; the only reclaimable
+  targets are the TWO LIVE slots' `target/` + `wt/target/` (slot 0: 1.0 + 0.7 GB;
+  slot 1: 1.0 + 0.6 GB), which must not be touched while their workers run. No
+  root `target/`, no TEMP look-verify-baseline-* leaks. Nothing reclaimable.
+- Action needed (human/owner): free C: space outside the loop to reach 8 GB.
+  Carried unchanged: RG-23/RG-9 missing packet files (`packet: ''`); RDEF-M4
+  re-scope; MONO-10 owner R3-mesh decision; FRAME-REVOLVE F1 non_z_axis pin;
+  duplicate supervisors + lagging cargoq restart guard; TOR-C flip-or-pin;
+  schedule.py 'needs' crash.
