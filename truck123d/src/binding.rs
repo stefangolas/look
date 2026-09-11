@@ -2020,6 +2020,8 @@ mod tests {
                 rz: 0.0,
                 rotation: None,
                 mirror: None,
+                label: None,
+                color: None,
             },
         };
         let facts = crate::bd_bridge::tree_facts(&tree).expect("plain prism facts");

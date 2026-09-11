@@ -136,6 +136,22 @@ def _num(value):
     return value
 
 
+def _color_record(color):
+    """The recorded textual form of a client color (pure metadata).
+
+    A string color is carried verbatim; an RGB(A) tuple/list is recorded as its
+    JSON array text so the native row always carries a stable string. The value
+    is never read by any semantic path (classification, facts arithmetic,
+    meshing); it is metadata only.
+    """
+    if isinstance(color, str):
+        return color
+    try:
+        return json.dumps(color)
+    except (TypeError, ValueError):
+        return str(color)
+
+
 # ---------------------------------------------------------------------------
 # Vector: the corpus direction-math data row (pure client-side data, never a
 # kernel row). `normalized`, `dot`, `cross`, `length` and the scalar /
@@ -1007,6 +1023,8 @@ class _Shape:
         return _EmptySelection()
 
     def clean(self):
+        """The identity: cleanliness is recorded client metadata, not a bridge
+        round-trip, so the row passes through unchanged."""
         return self
 
     def _boolean(self, other, mode):
@@ -1086,6 +1104,10 @@ class _Part(_Shape):
             }
         if self._mirror is not None:
             node["mirror"] = self._mirror
+        if self.label:
+            node["label"] = self.label
+        if self.color is not None:
+            node["color"] = _color_record(self.color)
         return {"part": node}
 
     def _copy(self):
@@ -1280,7 +1302,10 @@ class Compound(_Shape):
             self._children = []
 
     def _node(self):
-        return {"group": [child._node() for child in self._children]}
+        node = {"group": [child._node() for child in self._children]}
+        if self.label:
+            node["label"] = self.label
+        return node
 
     def _leaves(self):
         out = []
