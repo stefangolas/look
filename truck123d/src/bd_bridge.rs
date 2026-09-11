@@ -13,13 +13,16 @@
 //! box and triangle computed by this module is pure, deterministic, analytic
 //! arithmetic over the submitted row set. The supported carrier forms are the
 //! canonical S3/S6 constructions (box/cylinder/sphere/torus primitives and
-//! the full 360° lathe over a closed `y = 0` profile — line edges exactly and
+//! the lathe over a closed `y = 0` profile — line edges exactly and
 //! spline-profile edges integrated as the TRUE reconstructed interpolating
-//! spline, never a flattening polygon; FH-SPLINE-LATHE). A name whose form is
-//! outside this envelope (a partial arc, a swept/lofted carrier, a spline
-//! profile with a non-recoverable interpolation) refuses with the typed
-//! kernel refusal (`NonCanonicalCarrier`), which the pyo3 surface maps to the
-//! landed `Refused`/`Unresolved` exception classes — loud, never a silent OCC
+//! spline, never a flattening polygon; FH-SPLINE-LATHE). The lathe arm covers
+//! the full 360° revolution and a partial-arc wedge over
+//! `[start_deg, start_deg + arc_deg]`, with the two planar caps closed
+//! (DOOR-PARTIAL-ARC-FLIP). A name whose form is outside this envelope (a
+//! swept/lofted carrier, a spline profile with a non-recoverable
+//! interpolation, an arc outside `(0, 360]`) refuses with the typed kernel
+//! refusal (`NonCanonicalCarrier`), which the pyo3 surface maps to the landed
+//! `Refused`/`Unresolved` exception classes — loud, never a silent OCC
 //! fallback.
 //!
 //! Determinism: the submitted row set is an ordered tree (the script's
@@ -156,17 +159,23 @@ pub enum SolidSpec {
         /// The minor (tube) radius.
         minor: f64,
     },
-    /// `revolve(face, axis=z, revolution_arc=360)` over a closed profile
-    /// lying in the `y = 0` plane. `profile` is the boundary in order: line
-    /// edges and interpolating-spline edges (whose defining samples the edge
-    /// records). Profile coordinates are `(x, z)` with `x >= 0` the revolve
-    /// radius.
+    /// `revolve(face, axis=z, revolution_arc=..., start_angle=...)` over a
+    /// closed profile lying in the `y = 0` plane. `profile` is the boundary in
+    /// order: line edges and interpolating-spline edges (whose defining
+    /// samples the edge records). Profile coordinates are `(x, z)` with
+    /// `x >= 0` the revolve radius. The wedge is swept over the angular range
+    /// `[start_deg, start_deg + arc_deg]`; the full 360-degree revolution is
+    /// the special case the analytic arm has always certified.
     Lathe {
         /// The closed `(x, z)` profile boundary edges, in order.
         profile: Vec<LatheEdge>,
-        /// The swept arc in degrees. Only the full revolution is in envelope
-        /// for this executor's analytic lathe arm.
+        /// The swept arc in degrees, in `(0, 360]`.
         arc_deg: f64,
+        /// The v-range start of the swept arc, in degrees. A full-360 row
+        /// ignores it (the revolution is rotationally symmetric); a partial
+        /// row realizes it exactly.
+        #[serde(default)]
+        start_deg: f64,
     },
     /// `extrude(face, amount, both)`: a closed planar line-loop profile swept
     /// along its own plane normal. `profile` is the recorded boundary in order
@@ -570,21 +579,26 @@ fn solid_volume(solid: &SolidSpec) -> Result<f64, Refusal> {
             let (major, minor) = (*major, *minor);
             Ok(2.0 * std::f64::consts::PI * std::f64::consts::PI * major * minor * minor)
         }
-        SolidSpec::Lathe { profile, arc_deg } => {
-            if *arc_deg != 360.0 {
-                // The partial-arc form is a certified facade op (PB-014), but
-                // this executor's analytic lathe arm covers the full
-                // revolution; a partial arc refuses typed, never approximates.
-                return Err(Refusal::UnsupportedEnvelope(
-                    EnvelopeCase::NonCanonicalCarrier,
-                ));
-            }
-            if let Some(points) = line_profile_vertices(profile) {
+        SolidSpec::Lathe {
+            profile,
+            arc_deg,
+            start_deg,
+        } => {
+            let arc = validate_lathe_arc(*arc_deg, *start_deg)?;
+            let full = if let Some(points) = line_profile_vertices(profile) {
                 // The line-profile arm: the frustum telescoping of the closed
                 // vertex loop, bit-identical to the landed line-profile facts.
-                lathe_volume(&points)
+                lathe_volume(&points)?
             } else {
-                lathe_profile_volume(profile)
+                lathe_profile_volume(profile)?
+            };
+            if arc == 360.0 {
+                Ok(full)
+            } else {
+                // The wedge is the full solid intersected with an angular
+                // sector, so its volume is the full volume scaled by the
+                // swept fraction — exact, never a sampled approximation.
+                Ok(full * (arc / 360.0))
             }
         }
         SolidSpec::Prism {
@@ -1137,27 +1151,11 @@ fn solid_local_bbox(solid: &SolidSpec) -> Result<[[f64; 3]; 2], Refusal> {
                 [major + minor, major + minor, minor],
             ])
         }
-        SolidSpec::Lathe { profile, .. } => {
-            if let Some(points) = line_profile_vertices(profile) {
-                let mut max_r = 0.0f64;
-                let mut z0 = f64::INFINITY;
-                let mut z1 = f64::NEG_INFINITY;
-                for point in &points {
-                    if point[0] < 0.0 || !point[0].is_finite() || !point[1].is_finite() {
-                        return Err(Refusal::Empty);
-                    }
-                    max_r = max_r.max(point[0]);
-                    z0 = z0.min(point[1]);
-                    z1 = z1.max(point[1]);
-                }
-                if !z0.is_finite() || !z1.is_finite() {
-                    return Err(Refusal::Empty);
-                }
-                Ok([[-max_r, -max_r, z0], [max_r, max_r, z1]])
-            } else {
-                lathe_profile_bbox(profile)
-            }
-        }
+        SolidSpec::Lathe {
+            profile,
+            arc_deg,
+            start_deg,
+        } => lathe_wedge_bbox(profile, *arc_deg, *start_deg),
         SolidSpec::Prism {
             profile,
             amount,
@@ -1251,19 +1249,22 @@ fn solid_local_bbox(solid: &SolidSpec) -> Result<[[f64; 3]; 2], Refusal> {
     }
 }
 
-/// The exact axis-aligned bbox of a spline-bearing lathe: `max_r` is the
-/// profile's largest radius and `z` spans the profile's exact extrema (for a
-/// spline edge the cubic span extrema, solved from the derivative roots).
-fn lathe_profile_bbox(profile: &[LatheEdge]) -> Result<[[f64; 3]; 2], Refusal> {
+/// The exact radial and axial extents of the closed profile region: the
+/// radius interval `[r_min, r_max]` and the axial interval `[z_min, z_max]`.
+/// For a spline edge the extrema are the cubic span extrema (solved from the
+/// derivative roots), never a sampled bound.
+fn lathe_profile_extents(profile: &[LatheEdge]) -> Result<([f64; 2], [f64; 2]), Refusal> {
     check_profile_edges(profile)?;
-    let mut max_r = 0.0f64;
+    let mut r_min = f64::INFINITY;
+    let mut r_max = f64::NEG_INFINITY;
     let mut z_min = f64::INFINITY;
     let mut z_max = f64::NEG_INFINITY;
     for edge in profile {
         match edge {
             LatheEdge::Line { a, b } => {
                 for p in [a, b] {
-                    max_r = max_r.max(p[0]);
+                    r_min = r_min.min(p[0]);
+                    r_max = r_max.max(p[0]);
                     z_min = z_min.min(p[1]);
                     z_max = z_max.max(p[1]);
                 }
@@ -1271,13 +1272,15 @@ fn lathe_profile_bbox(profile: &[LatheEdge]) -> Result<[[f64; 3]; 2], Refusal> {
             LatheEdge::Spline { points } => {
                 let spans = spline_spans(points)?;
                 for span in &spans {
-                    let x0 = span.r[0];
-                    let x1 = span.r[0] + span.r[1] + span.r[2] + span.r[3];
-                    max_r = max_r.max(x0).max(x1);
+                    let r0 = span.r[0];
+                    let r1 = span.r[0] + span.r[1] + span.r[2] + span.r[3];
+                    r_min = r_min.min(r0).min(r1);
+                    r_max = r_max.max(r0).max(r1);
                     for root in cubic_roots(&span.r) {
-                        max_r = max_r.max(
-                            span.r[0] + root * (span.r[1] + root * (span.r[2] + root * span.r[3])),
-                        );
+                        let vr =
+                            span.r[0] + root * (span.r[1] + root * (span.r[2] + root * span.r[3]));
+                        r_min = r_min.min(vr);
+                        r_max = r_max.max(vr);
                     }
                     let z0 = span.z[0];
                     let z1 = span.z[0] + span.z[1] + span.z[2] + span.z[3];
@@ -1293,10 +1296,79 @@ fn lathe_profile_bbox(profile: &[LatheEdge]) -> Result<[[f64; 3]; 2], Refusal> {
             }
         }
     }
-    if !z_min.is_finite() || !z_max.is_finite() || !max_r.is_finite() {
+    if !r_min.is_finite() || !r_max.is_finite() || !z_min.is_finite() || !z_max.is_finite() {
         return Err(Refusal::Empty);
     }
-    Ok([[-max_r, -max_r, z_min], [max_r, max_r, z_max]])
+    Ok(([r_min, r_max], [z_min, z_max]))
+}
+
+/// The exact local axis-aligned bbox of a lathe wedge swept over
+/// `[start_deg, start_deg + arc_deg]`. The axial range is the profile's exact
+/// axial extents; the transverse range is the support of `r cos` / `r sin`
+/// over the swept sector, attained at the sector endpoints or at the cardinal
+/// angles inside the sector. The full revolution reduces to the landed
+/// symmetric `[-max_r, max_r]` box.
+fn lathe_wedge_bbox(
+    profile: &[LatheEdge],
+    arc_deg: f64,
+    start_deg: f64,
+) -> Result<[[f64; 3]; 2], Refusal> {
+    let arc = validate_lathe_arc(arc_deg, start_deg)?;
+    let (r, z) = lathe_profile_extents(profile)?;
+    if arc == 360.0 {
+        return Ok([[-r[1], -r[1], z[0]], [r[1], r[1], z[1]]]);
+    }
+    let theta0 = start_deg.rem_euclid(360.0).to_radians();
+    let theta1 = theta0 + arc.to_radians();
+    let (min_x, max_x, min_y, max_y) = sector_extents(r[0], r[1], theta0, theta1);
+    Ok([[min_x, min_y, z[0]], [max_x, max_y, z[1]]])
+}
+
+/// The support of `r cos(theta)` / `r sin(theta)` over `r in [r_min, r_max]`
+/// and `theta in [theta0, theta1]`: the transverse AABB of the swept sector.
+/// The extrema are attained at the sector endpoints or at the cardinal angles
+/// inside the sector, so only those candidates are tested (exact, no sampling).
+fn sector_extents(r_min: f64, r_max: f64, theta0: f64, theta1: f64) -> (f64, f64, f64, f64) {
+    let half_pi = std::f64::consts::FRAC_PI_2;
+    let mut min_x = f64::INFINITY;
+    let mut max_x = f64::NEG_INFINITY;
+    let mut min_y = f64::INFINITY;
+    let mut max_y = f64::NEG_INFINITY;
+    let first = (theta0 / half_pi).floor() as i64 - 1;
+    let last = (theta1 / half_pi).ceil() as i64 + 1;
+    let mut candidates: Vec<f64> = vec![theta0, theta1];
+    let mut k = first;
+    while k <= last {
+        let angle = k as f64 * half_pi;
+        if angle >= theta0 - 1e-12 && angle <= theta1 + 1e-12 {
+            candidates.push(angle);
+        }
+        k += 1;
+    }
+    for theta in candidates {
+        let (sin, cos) = theta.sin_cos();
+        for radius in [r_min, r_max] {
+            let x = radius * cos;
+            let y = radius * sin;
+            min_x = min_x.min(x);
+            max_x = max_x.max(x);
+            min_y = min_y.min(y);
+            max_y = max_y.max(y);
+        }
+    }
+    (min_x, max_x, min_y, max_y)
+}
+
+/// Validates a lathe wedge's angular data: the arc is in `(0, 360]` and the
+/// start is finite. An unanswerable angle is the typed envelope refusal, never
+/// a silent full revolution or a clamped arc.
+fn validate_lathe_arc(arc_deg: f64, start_deg: f64) -> Result<f64, Refusal> {
+    if !arc_deg.is_finite() || arc_deg <= 0.0 || arc_deg > 360.0 || !start_deg.is_finite() {
+        return Err(Refusal::UnsupportedEnvelope(
+            EnvelopeCase::NonCanonicalCarrier,
+        ));
+    }
+    Ok(arc_deg)
 }
 
 /// The roots in `(0, 1)` of the derivative of the cubic with the given power
@@ -3079,16 +3151,38 @@ fn reflect_solid(solid: &SolidSpec, axis: &str) -> Result<SolidSpec, Refusal> {
         | SolidSpec::Cylinder { .. }
         | SolidSpec::Sphere { .. }
         | SolidSpec::Torus { .. } => solid.clone(),
-        SolidSpec::Lathe { profile, arc_deg } => {
+        SolidSpec::Lathe {
+            profile,
+            arc_deg,
+            start_deg,
+        } => {
             if axis == "z" {
                 SolidSpec::Lathe {
                     profile: profile.iter().map(reflect_lathe_edge).collect(),
                     arc_deg: *arc_deg,
+                    start_deg: *start_deg,
                 }
-            } else {
+            } else if *arc_deg >= 360.0 {
                 // A full revolution is symmetric about any plane through its
                 // axis; the recorded `(x, z)` profile is unchanged.
                 solid.clone()
+            } else {
+                // A partial wedge reflected about a plane through the z axis
+                // maps the angular interval `[t0, t1]` to `[pi - t1, pi - t0]`
+                // for the YZ plane (x -> -x) and to `[-t1, -t0]` for the XZ
+                // plane (y -> -y); both are the same `(x, z)` profile with a
+                // recorded start. In degrees: `start' = 180 - (start + arc)`
+                // and `start' = -(start + arc)` respectively.
+                let start = if axis == "y" {
+                    -(*start_deg + *arc_deg)
+                } else {
+                    180.0 - (*start_deg + *arc_deg)
+                };
+                SolidSpec::Lathe {
+                    profile: profile.clone(),
+                    arc_deg: *arc_deg,
+                    start_deg: start,
+                }
             }
         }
         SolidSpec::Prism {
@@ -4527,7 +4621,11 @@ fn solid_mesh(solid: &SolidSpec) -> Result<Vec<Triangle>, Refusal> {
         }
         SolidSpec::Sphere { radius } => sphere_mesh(*radius),
         SolidSpec::Torus { major, minor } => torus_mesh(*major, *minor),
-        SolidSpec::Lathe { profile, .. } => lathe_mesh(profile),
+        SolidSpec::Lathe {
+            profile,
+            arc_deg,
+            start_deg,
+        } => lathe_mesh(profile, *arc_deg, *start_deg),
         SolidSpec::Prism {
             profile,
             amount,
@@ -5026,16 +5124,26 @@ fn torus_point(major: f64, minor: f64, ring_angle: f64, tube_angle: f64) -> [f64
 /// lathe mesh (fixed, deterministic).
 const SPLINE_MESH_STEPS: usize = 4;
 
-/// A full-revolution lathe mesh: sample the profile boundary (line edges
-/// exactly, spline edges at the fixed subdivision of each reconstructed span)
-/// and sweep each consecutive sample segment over the angular segments. Each
-/// band is a conical quad strip; no separate caps are needed because a closed
-/// profile's swept boundary covers the whole surface. For an all-line profile
-/// the ring is exactly the vertex loop, so the mesh is identical to the landed
-/// line-profile mesh.
-fn lathe_mesh(profile: &[LatheEdge]) -> Result<Vec<Triangle>, Refusal> {
+/// A lathe mesh: sample the profile boundary (line edges exactly, spline edges
+/// at the fixed subdivision of each reconstructed span) and sweep each
+/// consecutive sample segment over the angular segments. A full revolution is
+/// the closed band surface (a closed profile's swept boundary covers the whole
+/// surface, so no caps are needed); a partial arc additionally closes the two
+/// planar cut faces at the sector endpoints (DOOR-PARTIAL-ARC-FLIP). For an
+/// all-line profile the ring is exactly the vertex loop, so the
+/// full-revolution mesh is identical to the landed line-profile mesh.
+fn lathe_mesh(
+    profile: &[LatheEdge],
+    arc_deg: f64,
+    start_deg: f64,
+) -> Result<Vec<Triangle>, Refusal> {
+    let arc = validate_lathe_arc(arc_deg, start_deg)?;
     let ring = profile_ring(profile)?;
-    sweep_ring_mesh(&ring)
+    if arc == 360.0 {
+        return sweep_ring_mesh(&ring);
+    }
+    let theta0 = start_deg.rem_euclid(360.0).to_radians();
+    sweep_ring_mesh_arc(&ring, theta0, arc.to_radians())
 }
 
 /// Appends `p` to the ring unless it equals the current last ring point.
@@ -5130,6 +5238,88 @@ fn sweep_ring_mesh(ring: &[[f64; 2]]) -> Result<Vec<Triangle>, Refusal> {
         }
     }
     Ok(out)
+}
+
+/// The number of angular segments a partial-arc sweep is subdivided into: the
+/// full-revolution angular resolution, so a wedge's bands have the same arc
+/// length as the full mesh's bands (deterministic, at least one segment).
+fn arc_segments(arc: f64) -> usize {
+    let per_segment = TAU / MESH_SEGMENTS as f64;
+    let segments = (arc / per_segment).ceil() as usize;
+    segments.max(1)
+}
+
+/// Sweeps the boundary ring over a partial angular sector `[theta0, theta0 +
+/// arc]` and closes the two planar caps at the sector endpoints. The side
+/// surface is the same conical quad strip as the full sweep, restricted to the
+/// sector; the caps are centroid fans of the sampled ring, so the mesh is
+/// closed against the side surface.
+fn sweep_ring_mesh_arc(ring: &[[f64; 2]], theta0: f64, arc: f64) -> Result<Vec<Triangle>, Refusal> {
+    if ring.len() < 3 {
+        return Err(Refusal::Empty);
+    }
+    for point in ring {
+        if point[0] < 0.0 || !point[0].is_finite() || !point[1].is_finite() {
+            return Err(Refusal::Empty);
+        }
+    }
+    let segments = arc_segments(arc);
+    let mut out = Vec::new();
+    let closed = ring.iter().chain(ring.iter().take(1));
+    let mut previous: Option<[f64; 2]> = None;
+    for point in closed {
+        if let Some(prev) = previous {
+            let x0 = prev[0];
+            let z0 = prev[1];
+            let x1 = point[0];
+            let z1 = point[1];
+            for segment in 0..segments {
+                let angle_a = theta0 + arc * segment as f64 / segments as f64;
+                let angle_b = theta0 + arc * (segment + 1) as f64 / segments as f64;
+                let a = [x0 * angle_a.cos(), x0 * angle_a.sin(), z0];
+                let b = [x0 * angle_b.cos(), x0 * angle_b.sin(), z0];
+                let c = [x1 * angle_b.cos(), x1 * angle_b.sin(), z1];
+                let d = [x1 * angle_a.cos(), x1 * angle_a.sin(), z1];
+                push_quad(&mut out, a, b, c, d);
+            }
+        }
+        previous = Some(*point);
+    }
+    append_lathe_cap(&mut out, ring, theta0);
+    append_lathe_cap(&mut out, ring, theta0 + arc);
+    Ok(out)
+}
+
+/// Appends the planar cap of the profile region at the given sweep angle as a
+/// centroid fan over the sampled boundary ring. Every cap point lies in the
+/// plane at `theta`, so the fan is the region's planar triangulation.
+fn append_lathe_cap(out: &mut Vec<Triangle>, ring: &[[f64; 2]], theta: f64) {
+    let count = ring.len();
+    if count < 3 {
+        return;
+    }
+    let mut center_r = 0.0;
+    let mut center_z = 0.0;
+    for point in ring {
+        center_r += point[0];
+        center_z += point[1];
+    }
+    let scale = 1.0 / count as f64;
+    let center_r = center_r * scale;
+    let center_z = center_z * scale;
+    let (sin, cos) = theta.sin_cos();
+    let center = [center_r * cos, center_r * sin, center_z];
+    let closed = ring.iter().chain(ring.iter().take(1));
+    let mut previous: Option<[f64; 2]> = None;
+    for point in closed {
+        if let Some(p) = previous {
+            let q = *point;
+            let a = [p[0] * cos, p[0] * sin, p[1]];
+            let b = [q[0] * cos, q[0] * sin, q[1]];
+            push_tri(out, center, a, b);
+        }
+        previous = Some(*point);
+    }
 }
 
 /// Appends one triangle.
@@ -8722,7 +8912,11 @@ mod tests {
             };
             profile.push(LatheEdge::Line { a: points[i], b });
         }
-        SolidSpec::Lathe { profile, arc_deg }
+        SolidSpec::Lathe {
+            profile,
+            arc_deg,
+            start_deg: 0.0,
+        }
     }
 
     #[test]
@@ -8796,17 +8990,19 @@ mod tests {
     }
 
     #[test]
-    fn partial_arc_lathe_refuses_typed() {
-        let partial = line_lathe(
-            &[[10.0, 0.0], [20.0, 0.0], [20.0, 10.0], [10.0, 10.0]],
-            270.0,
-        );
-        let refusal = tree_facts(&part(partial, 0.0, 0.0, 0.0))
-            .expect_err("a partial-arc lathe is outside this executor's arm");
-        assert!(matches!(
-            refusal,
-            Refusal::UnsupportedEnvelope(EnvelopeCase::NonCanonicalCarrier)
-        ));
+    fn unanswerable_arc_lathe_refuses_typed() {
+        // A partial-arc revolve is landed (DOOR-PARTIAL-ARC-FLIP), but an arc
+        // outside `(0, 360]` is not answerable: it refuses typed, never a
+        // silent full revolution or a clamped sweep.
+        for arc in [0.0, -45.0, 400.0, f64::NAN] {
+            let bad = line_lathe(&[[10.0, 0.0], [20.0, 0.0], [20.0, 10.0], [10.0, 10.0]], arc);
+            let refusal = tree_facts(&part(bad, 0.0, 0.0, 0.0))
+                .expect_err("an arc outside (0, 360] is outside the lathe arm");
+            assert!(matches!(
+                refusal,
+                Refusal::UnsupportedEnvelope(EnvelopeCase::NonCanonicalCarrier)
+            ));
+        }
     }
 
     #[test]
@@ -8904,15 +9100,12 @@ mod tests {
     fn unsupported_carrier_refusal_maps_to_the_refused_exception_class() {
         // A refusal on an unmapped/unsupported carrier form is typed end to
         // end: the executor produces `UnsupportedEnvelope(NonCanonicalCarrier)`
-        // (see partial_arc_lathe_refuses_typed) and the marshal layer maps that
-        // refusal to the `Refused` Python exception class — never a panic and
-        // never a bare Exception.
-        let partial = line_lathe(
-            &[[10.0, 0.0], [20.0, 0.0], [20.0, 10.0], [10.0, 10.0]],
-            270.0,
-        );
+        // (see unanswerable_arc_lathe_refuses_typed) and the marshal layer maps
+        // that refusal to the `Refused` Python exception class — never a panic
+        // and never a bare Exception.
+        let partial = line_lathe(&[[10.0, 0.0], [20.0, 0.0], [20.0, 10.0], [10.0, 10.0]], 0.0);
         let refusal = tree_facts(&part(partial, 0.0, 0.0, 0.0))
-            .expect_err("the partial-arc lathe is outside this executor's arm");
+            .expect_err("an unanswerable arc is outside this executor's arm");
         let marshaled = crate::marshal::Marshaled::from_refusal(&refusal);
         assert_eq!(
             marshaled.class,
@@ -9007,6 +9200,7 @@ mod tests {
         let solid = SolidSpec::Lathe {
             profile,
             arc_deg: 360.0,
+            start_deg: 0.0,
         };
         let facts = tree_facts(&part(solid, 0.0, 0.0, 0.0))
             .expect("a full-arc spline-profile lathe is in envelope");
@@ -9050,6 +9244,7 @@ mod tests {
                 })
                 .collect(),
             arc_deg: 360.0,
+            start_deg: 0.0,
         };
         let polygon_facts = tree_facts(&part(polygon_solid, 0.0, 0.0, 0.0))
             .expect("the polygon fixture is a line-profile lathe");
@@ -9069,6 +9264,7 @@ mod tests {
         let solid = SolidSpec::Lathe {
             profile,
             arc_deg: 360.0,
+            start_deg: 0.0,
         };
         let bbox = solid_local_bbox(&solid).expect("spline profile bbox");
         let mut sampled_max_r = 0.0f64;
@@ -9108,6 +9304,7 @@ mod tests {
                 })
                 .collect(),
             arc_deg: 360.0,
+            start_deg: 0.0,
         };
         let facts = tree_facts(&part(vertex_arm, 0.0, 0.0, 0.0)).expect("line profile facts");
         // The frustum telescoping value, computed with the landed formula.
@@ -10506,6 +10703,7 @@ print(json.dumps([z_row, loft_row]))
         SolidSpec::Lathe {
             profile: dome_shell_profile(),
             arc_deg: 360.0,
+            start_deg: 0.0,
         }
     }
 

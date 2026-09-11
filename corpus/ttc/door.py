@@ -1224,12 +1224,30 @@ class _Part(_Shape):
         self._type_name = "Part"
 
     def _node(self):
+        solid = self._solid
+        rz = self._rz
+        # A partial-arc lathe's placement z-rotation is exactly a shift of the
+        # recorded sweep start (the kernel realizes `start_deg`); fold it into
+        # the lathe row so the wedge bbox and caps are exact rather than a
+        # rotated-AABB over-approximation. Full-360 rows keep the legacy `rz`
+        # path byte-identically (the revolution is rotationally symmetric).
+        if (
+            self._rot is None
+            and self._mirror is None
+            and rz != 0.0
+            and isinstance(solid, dict)
+            and solid.get("kind") == "lathe"
+            and solid.get("arc_deg", 360.0) != 360.0
+        ):
+            solid = dict(solid)
+            solid["start_deg"] = solid.get("start_deg", 0.0) + rz
+            rz = 0.0
         node = {
-            "solid": self._solid,
+            "solid": solid,
             "x": self._x,
             "y": self._y,
             "z": self._z,
-            "rz": self._rz,
+            "rz": rz,
         }
         if self._rot is not None:
             node["rotation"] = {
@@ -1519,11 +1537,11 @@ def Torus(major_radius, minor_radius, major_angle=360.0, mode=None, **kwargs):
     )
 
 
-def revolve(shape, axis=None, revolution_arc=360.0, **kwargs):
+def revolve(shape, axis=None, revolution_arc=360.0, start_angle=0.0, **kwargs):
     """build123d ``revolve(shape, axis, revolution_arc)``.
 
-    The executor's lathe arm covers a closed planar profile turned a full 360
-    degrees about a recorded axis. The profile may mix straight edges and
+    The executor's lathe arm covers a closed planar profile turned about a
+    recorded axis. The profile may mix straight edges and
     ``Edge.make_spline(points)`` spline edges (the spline is recorded by its
     defining samples and the kernel integrates the true interpolating spline,
     never a flattening polygon). The z-axis form keeps the recorded legacy row
@@ -1531,14 +1549,17 @@ def revolve(shape, axis=None, revolution_arc=360.0, **kwargs):
     ``Vector`` direction) is recorded in the same local ``(radius, axial)``
     plane convention and the landed frame row carries the axis as a full
     orthonormal ``rotation`` (local z to the recorded axis direction). A
-    partial arc, a degenerate axis, a profile that is not a single-sided
-    meridian generator about the axis, an open profile, or a spline whose
-    interpolation options the recorded data cannot recover refuses typed.
+    partial arc is recorded verbatim as ``arc_deg`` plus ``start_deg`` (the
+    kernel PB-014 partial-arc op consumes them and closes the two planar caps);
+    the corpus's ``start_deg`` placement is realized by the z-rotation, which
+    folds into the recorded ``start_deg`` exactly. A degenerate axis, a profile
+    that is not a single-sided meridian generator about the axis, an open
+    profile, or a spline whose interpolation options the recorded data cannot
+    recover refuses typed.
     """
     if not isinstance(shape, Face):
         _refuse("revolve of a non-Face shape is not a kernel-engine row")
-    if _num(revolution_arc) != 360.0:
-        _refuse("a partial-arc revolve is outside the executor's lathe arm")
+    arc_deg = _num(revolution_arc)
     unit = _axis_unit(axis)
     if unit is None:
         _refuse("DegenerateRevolveAxis: a zero-length axis is not a kernel-engine row")
@@ -1558,7 +1579,11 @@ def revolve(shape, axis=None, revolution_arc=360.0, **kwargs):
         or abs(first.z - last.z) > 1e-9
     ):
         _refuse("a revolve profile must close on itself")
-    part = _Part({"kind": "lathe", "profile": profile, "arc_deg": 360.0})
+    solid = {"kind": "lathe", "profile": profile, "arc_deg": arc_deg}
+    start_deg = _num(start_angle)
+    if start_deg != 0.0:
+        solid["start_deg"] = start_deg
+    part = _Part(solid)
     if frame is not None:
         part._rot = frame
         part._rz = 0.0
