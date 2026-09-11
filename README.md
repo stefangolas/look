@@ -1,16 +1,18 @@
 # look
 
-`look` is a native command-line utility that turns GLB, STL, and STEP models
-into PNG images. Its basic purpose is to let a person, script, or software agent
-inspect a 3D model without opening a full CAD application or browser-based
-viewer.
+`look` is two things in one native binary.
 
-<img src="docs/assets/falcon_heavy_demo.gif" width="640" alt="Falcon Heavy assembly — 2,142 parts built by the certified kernel, orbited in the look interactive viewer">
+**A renderer.** GLB, STL, and STEP models become PNG images and an interactive
+viewer — GPU-rendered, automatically framed, in roughly a second on a typical
+laptop. No CAD application to open, no converter to configure, no browser
+pipeline to build.
 
-The Falcon Heavy above is the end-to-end demo: 2,142 parts built and certified
-by the kernel in ~0.02 s, written as a colored indexed GLB with per-part
-materials, and opened in the interactive viewer — see
-[the demo walkthrough](#demo-build-view-measure--the-falcon-heavy-end-to-end).
+**A model generation pipeline.** A Python API with exact build123d syntax
+drives a certified constructive-geometry kernel: your existing build123d
+scripts run unmodified, every part is built and certified by the kernel
+(volumes carry exact certificates, refusals state their reason), and the
+result ships as a colored indexed GLB with per-part materials — plus the
+fingerprint STL, measurements, and timing columns for CI.
 
 STEP files are CAD boundary representations rather than meshes, so `look`
 tessellates them on load. That happens inside the binary — there is nothing to
@@ -19,6 +21,13 @@ install and no converter to configure:
 ```console
 look part.step --output part.png
 ```
+
+<img src="docs/assets/falcon_heavy_demo.gif" width="640" alt="Falcon Heavy assembly — 2,142 parts built by the certified kernel, orbited in the look interactive viewer">
+
+The Falcon Heavy above is the end-to-end demo: 2,142 parts built and certified
+by the kernel in ~0.02 s, written as a colored indexed GLB with per-part
+materials, and opened in the interactive viewer — see
+[the demo walkthrough](#demo-build-view-measure--the-falcon-heavy-end-to-end).
 
 <img src="docs/images/damaged-helmet-look-vs-f3d.png" width="640" alt="Khronos Damaged Helmet rendered side by side by look and F3D 3.5">
 
@@ -186,6 +195,18 @@ look ui core_xy.step --output core_xy_viewer.html --json
 ```
 
 ## Demo: build, view, measure — the Falcon Heavy end to end
+
+Models are authored in **exact build123d syntax** — the kernel answers the
+same names (`Cylinder`, `Location`, `Compound`, `Pos`, `Plane`, `mirror`,
+...) as the build123d API, so existing scripts run unmodified:
+
+```python
+from cadgen import build123d as bd
+
+part = bd.Cylinder(radius=r, height=z1 - z0).locate(bd.Location((x, y, (z0 + z1) / 2)))
+part = part.moved(bd.Location((x, y, 0)))
+engine = bd.Compound(obj=parts, children=parts, label=label)
+```
 
 The repository ships a text-to-CAD corpus with a door script that builds every
 model on the kernel engine and exports both a certification artifact (binary
