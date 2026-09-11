@@ -95,6 +95,27 @@ def test_conflicts_ignore_unmodeled_silence():
             assert all(claim["postconditions"] for claim in c["claims"]), c
 
 
+def test_m1_lattice_v2_acceptance():
+    """RDEF-M1: under fragment E the 2x2 rank-deficient volume_bracket gap
+    closes in lift mode and the retrodiction witness flips to PROVED; the
+    proposed rules stay out of the production projection and the no-lift
+    projection keeps the gap (CHK-7 dual mode)."""
+    def vol(include_e, lift):
+        return checker.v2_projection(include_e=include_e, lift=lift,
+                                     goals=["volume_bracket"])["goals"]["volume_bracket"]
+
+    production = vol(False, False)
+    assert not production["v2_witness_cell_proved"]
+    assert production["v2_rank_def_undecided_in_scope_2x2"] > 0
+
+    lift = vol(True, True)
+    assert lift["v2_rank_def_undecided_in_scope_2x2"] == 0
+    assert lift["v2_witness_cell_proved"]
+
+    no_lift = vol(True, False)
+    assert no_lift["v2_rank_def_undecided_in_scope_2x2"] > 0
+
+
 if __name__ == "__main__":
     tests = [v for k, v in sorted(globals().items()) if k.startswith("test_") and callable(v)]
     failed = 0

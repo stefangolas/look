@@ -1,0 +1,261 @@
+{
+  "fragment": "E",
+  "notes": "Fragment E of docs/RANK_DEFICIENT_CONTACT_SPEC.md section 7 (RDEF-M1-LATTICE-V2). Every rule is PROPOSED (confidence: proposed) and is never merged into the production A-D coverage numbers; the checker reports it as a separate projection. Preconditions/outcomes are written in lattice-v2 terms. A precondition value joined with '|' is a union the v2 compiler expands into one row per value. local_dim appears in the admission/classifier preconditions as a union because lattice v2 lets a rule transform local_dim only when it names that axis (the residual parent has no certified local dimension); this is a checker-modelling device recorded in RESULT notes.",
+  "unmodeled_values": [
+    "!unmodeled:carriers in {plane, sphere, cylinder, cone}",
+    "!unmodeled:provenance or exact carrier equality evidence",
+    "!unmodeled:rational input (STEP decimals are exact rationals)",
+    "!unmodeled:W4 separation bound enabled"
+  ],
+  "unmodeled_axis_keys": [],
+  "skipped": [],
+  "rules": [
+    {
+      "rule_id": "E-ADMISSION-REGIME-DICHOTOMY",
+      "kind": "gate",
+      "source": {
+        "file": "docs/RANK_DEFICIENT_CONTACT_SPEC.md",
+        "symbol": "section 3.1 Lemma D / section 7 E-ADMISSION-REGIME-DICHOTOMY",
+        "line": 372
+      },
+      "preconditions": [
+        {"axis": "relation.src_dims", "value": "2x2"},
+        {"axis": "relation.zero_set", "value": "unknown|rank_deficient(residual)"},
+        {"axis": "relation.local_dim", "value": "0|1|2|residual"},
+        {"axis": "relation.regime", "value": "unknown(residual)"}
+      ],
+      "outcomes": [
+        {
+          "variant": "Transversal",
+          "postconditions": [
+            {"axis": "relation.regime", "value": "transversal"},
+            {"axis": "relation.zero_set", "value": "regular"},
+            {"axis": "relation.local_dim", "value": "1"}
+          ]
+        },
+        {
+          "variant": "Tangential",
+          "postconditions": [
+            {"axis": "relation.regime", "value": "tangential"}
+          ]
+        }
+      ],
+      "refusals": ["SingularParametrization", "GraphNotInjective"],
+      "consumes_evidence": ["NormalConeHalfAngles", "ProjectedJacobianIntervalHull"],
+      "produces_evidence": ["AdmissionRegime"],
+      "calls": ["ADMISSION-WHOLE-BOX-REGULAR-CONE"],
+      "theorem_comment": "Lemma D [OBL]: with Theta < pi/4 at least one of (T) transversal (phi-Theta>0, phi+Theta<pi) or (G) tangential (phi+Theta<pi/2 or phi-Theta>pi/2) holds. Tie rule: if (T) certifies use (T), otherwise (G); the two paths must agree where both certify. A (G) cell that fails G-INJ is subdivided or refuses GraphNotInjective.",
+      "confidence": "proposed"
+    },
+    {
+      "rule_id": "E-ADMISSION-REGIME-DICHOTOMY-1D",
+      "kind": "gate",
+      "source": {
+        "file": "docs/RANK_DEFICIENT_CONTACT_SPEC.md",
+        "symbol": "section 3.2 lower dimensions / section 7 E-ADMISSION-REGIME-DICHOTOMY-1D",
+        "line": 373
+      },
+      "preconditions": [
+        {"axis": "relation.src_dims", "value": "2x1|1x1"},
+        {"axis": "relation.zero_set", "value": "unknown|rank_deficient(residual)"},
+        {"axis": "relation.local_dim", "value": "0|1|residual"},
+        {"axis": "relation.regime", "value": "unknown(residual)"}
+      ],
+      "outcomes": [
+        {
+          "variant": "Transversal",
+          "postconditions": [
+            {"axis": "relation.regime", "value": "transversal"},
+            {"axis": "relation.zero_set", "value": "regular"},
+            {"axis": "relation.local_dim", "value": "0"}
+          ]
+        },
+        {
+          "variant": "Tangential",
+          "postconditions": [
+            {"axis": "relation.regime", "value": "tangential"}
+          ]
+        }
+      ],
+      "refusals": ["SingularParametrization", "GraphNotInjective"],
+      "consumes_evidence": ["EdgeTangentGate", "CurvePairTangentGate"],
+      "produces_evidence": ["AdmissionRegime"],
+      "calls": [],
+      "theorem_comment": "Analogous 1D dichotomy [OBL]: 2x1 uses |t.n|>0 for (T) and ||t x n||>0 for (G); 1x1 uses |t1 x t2|>0 for (T) and |t1.t2|>0 for (G); scalar h on a 1D interval.",
+      "confidence": "proposed"
+    },
+    {
+      "rule_id": "E-VOLUME-TANGENTIAL-SANDWICH",
+      "kind": "solver",
+      "source": {
+        "file": "docs/RANK_DEFICIENT_CONTACT_SPEC.md",
+        "symbol": "section 4.2 Lemma S / section 7 E-VOLUME-TANGENTIAL-SANDWICH",
+        "line": 374
+      },
+      "preconditions": [
+        {"axis": "relation.regime", "value": "tangential"},
+        {"axis": "goal", "value": "volume_bracket"}
+      ],
+      "outcomes": [
+        {
+          "variant": "SandwichBounded",
+          "postconditions": [
+            {"axis": "relation.volume_evidence", "value": "sandwich_bounded"}
+          ]
+        }
+      ],
+      "refusals": ["BudgetExhausted", "CoincidenceWithoutExactCarrier"],
+      "consumes_evidence": ["RangeEnclosure", "ProjectedAreaBound", "SandwichSchedule"],
+      "produces_evidence": ["SandwichBound"],
+      "calls": ["E-ADMISSION-REGIME-DICHOTOMY"],
+      "theorem_comment": "Lemma S [OBL]: |vol S* - vol S~| <= sum_pairs |R| * sup_R |h|; if the enclosure of h excludes 0 the pair is certified disjoint. The rule is parameterised by a range function and has NO rep-flag precondition: the Bernstein fast path versus the generic fallback is an implementation detail and must not narrow the rule. OBL-K: until proved, run with and without the global.knowledge=all_components lift.",
+      "confidence": "proposed"
+    },
+    {
+      "rule_id": "E-TANGENCY-WITNESS-QUADRIC-PENCIL",
+      "kind": "classifier",
+      "source": {
+        "file": "docs/RANK_DEFICIENT_CONTACT_SPEC.md",
+        "symbol": "section 5.2 W1 / section 7 E-TANGENCY-WITNESS-QUADRIC-PENCIL",
+        "line": 375
+      },
+      "preconditions": [
+        {"axis": "relation.zero_set", "value": "rank_deficient(residual)"},
+        {"axis": "relation.local_dim", "value": "0|1|2|residual"},
+        {"axis": "rep.canonical_carrier", "value": "true"},
+        {"axis": "!unmodeled:carriers in {plane, sphere, cylinder, cone}", "value": "true"}
+      ],
+      "outcomes": [
+        {"variant": "TangentPoint", "postconditions": [{"axis": "relation.zero_set", "value": "tangent_point"}, {"axis": "relation.local_dim", "value": "0"}]},
+        {"variant": "TangentCrossing", "postconditions": [{"axis": "relation.zero_set", "value": "tangent_crossing"}, {"axis": "relation.local_dim", "value": "1"}]},
+        {"variant": "TangentCurve", "postconditions": [{"axis": "relation.zero_set", "value": "tangent_curve"}, {"axis": "relation.local_dim", "value": "1"}]},
+        {"variant": "TangentHigher", "postconditions": [{"axis": "relation.zero_set", "value": "tangent_higher"}, {"axis": "relation.local_dim", "value": "0"}]},
+        {"variant": "Coincident", "postconditions": [{"axis": "relation.zero_set", "value": "coincident"}, {"axis": "relation.local_dim", "value": "2"}]}
+      ],
+      "refusals": [],
+      "consumes_evidence": ["CanonicalCarrier", "ExactImplicit"],
+      "produces_evidence": ["QuadricPencilClass"],
+      "calls": [],
+      "theorem_comment": "W1 exact classification of quadric pencils [LIT: Dupont-Lazard-Lazard-Petitjean, Parts I-III; Levin]. Tori are quartic and excluded; they go to the numeric tier.",
+      "confidence": "proposed"
+    },
+    {
+      "rule_id": "E-TANGENCY-WITNESS-SHARED-CARRIER",
+      "kind": "classifier",
+      "source": {
+        "file": "docs/RANK_DEFICIENT_CONTACT_SPEC.md",
+        "symbol": "section 5.2 W2 / section 7 E-TANGENCY-WITNESS-SHARED-CARRIER",
+        "line": 376
+      },
+      "preconditions": [
+        {"axis": "relation.zero_set", "value": "rank_deficient(residual)"},
+        {"axis": "relation.local_dim", "value": "0|1|2|residual"},
+        {"axis": "!unmodeled:provenance or exact carrier equality evidence", "value": "true"}
+      ],
+      "outcomes": [
+        {"variant": "Coincident", "postconditions": [{"axis": "relation.zero_set", "value": "coincident"}, {"axis": "relation.local_dim", "value": "2"}]}
+      ],
+      "refusals": [],
+      "consumes_evidence": ["FaceProvenance", "SourceEntityId", "CarrierDefinition"],
+      "produces_evidence": ["CoincidenceWitness"],
+      "calls": [],
+      "theorem_comment": "W2: shared source entity or identical carrier via importer FaceProvenance/SourceEntityId, or exact equality of carrier definitions in exact rational arithmetic. Never decided by sampling.",
+      "confidence": "proposed"
+    },
+    {
+      "rule_id": "E-TANGENCY-WITNESS-CONSTRUCTION",
+      "kind": "classifier",
+      "source": {
+        "file": "docs/RANK_DEFICIENT_CONTACT_SPEC.md",
+        "symbol": "section 5.2 W3 / section 7 E-TANGENCY-WITNESS-CONSTRUCTION",
+        "line": 377
+      },
+      "preconditions": [
+        {"axis": "relation.zero_set", "value": "rank_deficient(residual)"},
+        {"axis": "relation.local_dim", "value": "0|1|2|residual"},
+        {"axis": "rep.construction_witness", "value": "true"}
+      ],
+      "outcomes": [
+        {"variant": "TangentCurve", "postconditions": [{"axis": "relation.zero_set", "value": "tangent_curve"}, {"axis": "relation.local_dim", "value": "1"}]}
+      ],
+      "refusals": [],
+      "consumes_evidence": ["ConstructionWitness"],
+      "produces_evidence": ["TangentCurveWitness"],
+      "calls": [],
+      "theorem_comment": "W3: rep.construction_witness from fillet or blend construction where the contact curve is known by construction. The construction must emit the certificate, not merely a flag.",
+      "confidence": "proposed"
+    },
+    {
+      "rule_id": "E-TANGENCY-NUMERIC-COLLINEAR-NORMAL",
+      "kind": "classifier",
+      "source": {
+        "file": "docs/RANK_DEFICIENT_CONTACT_SPEC.md",
+        "symbol": "section 5.3 collinear-normal system / section 7 E-TANGENCY-NUMERIC-COLLINEAR-NORMAL",
+        "line": 378
+      },
+      "preconditions": [
+        {"axis": "relation.regime", "value": "tangential"},
+        {"axis": "relation.zero_set", "value": "rank_deficient(residual)"},
+        {"axis": "relation.local_dim", "value": "0|1|2|residual"}
+      ],
+      "outcomes": [
+        {"variant": "CertifiedEmpty", "postconditions": [{"axis": "relation.zero_set", "value": "certified_empty"}, {"axis": "relation.local_dim", "value": "0"}]},
+        {"variant": "Regular", "postconditions": [{"axis": "relation.zero_set", "value": "regular"}, {"axis": "relation.local_dim", "value": "1"}]}
+      ],
+      "refusals": ["NearDegenerate", "HighOrderJet", "BoundaryTangency"],
+      "consumes_evidence": ["CollinearNormalSystem", "KrawczykSystem"],
+      "produces_evidence": ["CriticalPointCertificate"],
+      "calls": ["TANGENCY-SYSTEM-FROM-DEFLATED"],
+      "theorem_comment": "Collinear-normal system in original parameters (P-Q).Pu=0, (P-Q).Pv=0, Qs.(Pu x Pv)=0, Qt.(Pu x Pv)=0; solutions are common-normal points, the critical points of h [LIT: Sederberg-Meyers]. Clip to isolate, then Krawczyk for a unique simple root. The numeric tier cannot emit tangent_point, tangent_crossing, tangent_curve or coincident; only witnesses can.",
+      "confidence": "proposed"
+    },
+    {
+      "rule_id": "E-TANGENCY-NUMERIC-1D",
+      "kind": "classifier",
+      "source": {
+        "file": "docs/RANK_DEFICIENT_CONTACT_SPEC.md",
+        "symbol": "section 5.6 lower dimensions / section 7 E-TANGENCY-NUMERIC-1D",
+        "line": 379
+      },
+      "preconditions": [
+        {"axis": "relation.src_dims", "value": "2x1|1x1"},
+        {"axis": "relation.regime", "value": "tangential"},
+        {"axis": "relation.local_dim", "value": "0|1|residual"}
+      ],
+      "outcomes": [
+        {"variant": "CertifiedEmpty", "postconditions": [{"axis": "relation.zero_set", "value": "certified_empty"}, {"axis": "relation.local_dim", "value": "0"}]},
+        {"variant": "Regular", "postconditions": [{"axis": "relation.zero_set", "value": "regular"}, {"axis": "relation.local_dim", "value": "0"}]}
+      ],
+      "refusals": ["NearDegenerate", "HighOrderJet", "BoundaryTangency"],
+      "consumes_evidence": ["ScalarIntervalRoot", "CubicClipping"],
+      "produces_evidence": ["CriticalPointCertificate"],
+      "calls": [],
+      "theorem_comment": "1D classifier: simple zeros of scalar h are transverse points; double zeros are tangent points; higher-order zeros are tangent_higher; h=0 means overlap or edge-on-face and needs a witness. Cubic clipping with Krawczyk certification.",
+      "confidence": "proposed"
+    },
+    {
+      "rule_id": "E-TANGENCY-WITNESS-ZERO-BOUND",
+      "kind": "classifier",
+      "source": {
+        "file": "docs/RANK_DEFICIENT_CONTACT_SPEC.md",
+        "symbol": "section 5.2 W4 / section 7 E-TANGENCY-WITNESS-ZERO-BOUND",
+        "line": 380
+      },
+      "preconditions": [
+        {"axis": "relation.zero_set", "value": "near_degenerate(residual)"},
+        {"axis": "!unmodeled:rational input (STEP decimals are exact rationals)", "value": "true"},
+        {"axis": "!unmodeled:W4 separation bound enabled", "value": "true"}
+      ],
+      "outcomes": [
+        {"variant": "TangentPoint", "postconditions": [{"axis": "relation.zero_set", "value": "tangent_point"}, {"axis": "relation.local_dim", "value": "0"}]},
+        {"variant": "TangentCrossing", "postconditions": [{"axis": "relation.zero_set", "value": "tangent_crossing"}, {"axis": "relation.local_dim", "value": "1"}]}
+      ],
+      "refusals": ["BudgetExhausted"],
+      "consumes_evidence": ["EvaluationSeparationBound"],
+      "produces_evidence": ["ZeroCertification"],
+      "calls": [],
+      "theorem_comment": "W4: evaluation or separation bounds on rational input decide h(c)=0; OFF BY DEFAULT and budgeted. Only witnesses W1-W3 emit the topology classes; W4 is the last-resort numeric witness.",
+      "confidence": "proposed"
+    }
+  ]
+}

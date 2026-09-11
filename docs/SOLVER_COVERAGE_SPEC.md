@@ -195,6 +195,122 @@ source tree; the verdict is applied to the merged model by `ADJUDICATIONS`
 | `postcondition_claim_mismatch` `exclude_rec` `ExclusionEvidence::NoRootFiveEq` | the minimal claim `{relation.zero_set: certified_empty}` is source-faithful; the `global.knowledge=local_only(residual)` restatement is the bottom of the knowledge order and is dropped | `vendor/truck/truck-certified/src/tangency/exclude.rs:166-211` |
 | `postcondition_claim_mismatch` `CurveSpan2::RationalBezier` | the declared-only claim `{goal: complete_locus}` is source-faithful; the variant's rep flags are not certified here | `vendor/truck/truck-certified/src/formal/span.rs:119-137` |
 
-The `TANGENCY-TSYSTEM-FROM-DEFLATED` adjudication is the precondition that
+The `TANGENCY-SYSTEM-FROM-DEFLATED` adjudication is the precondition that
 `docs/RANK_DEFICIENT_CONTACT_SPEC.md` section 5.3 places on M4's deflation
 reuse.
+
+## 7. RDEF-M1 lattice v2, fragment E, dual-mode projection (CHK-5 to CHK-9)
+
+Milestone M1 of `docs/RANK_DEFICIENT_CONTACT_SPEC.md` (packet
+`RDEF-M1-LATTICE-V2`, owner proxy 2026-09-10). The production v1 lattice of
+sections 1-6 is unchanged. The v2 lattice and fragment E are a **separate
+projection**: `checker.lattice_v2` swaps the lattice globals, recompiles the
+merged A-D rows plus fragment E in lattice-v2 terms, computes, and restores
+v1. Fragment E is `confidence: proposed` and is never merged into the
+production numbers; `state.json` carries both under `lattice` (v1) and
+`lattice_v2` / `fragment_e` (M1).
+
+### 7.1 CHK-5 - lattice v2 axes and children
+
+Two axes are added:
+
+| axis | values |
+|---|---|
+| `relation.regime` | `unknown(residual)`, `transversal`, `tangential`, `singular_param` |
+| `relation.volume_evidence` | `none(residual)`, `sandwich_bounded` |
+
+`relation.zero_set` gains six children under the `rank_deficient` parent. Each
+fixes `local_dim` (enforced by `feasible_v2`):
+
+| child | `local_dim` |
+|---|---|
+| `tangent_point` | `0` |
+| `tangent_crossing` | `1` |
+| `tangent_curve` | `1` |
+| `tangent_higher` | `0` |
+| `coincident` | smaller source dimension (`2x2 -> 2`, `2x1/1x1 -> 1`) |
+| `near_degenerate(residual)` | `residual` |
+
+T_geom v2 adds, beyond the M0 constraints: the fixed child dimensions above;
+`volume_evidence = sandwich_bounded => regime = tangential`; a transversal
+regime implies a regular or empty zero set; and a classified child
+(`tangent_*`, `coincident`) exists only in the tangential regime. Feasible
+fact states on the v2 lattice: **145920** (vs 24960 tightened v1).
+
+### 7.2 CHK-6 - revised goal predicates
+
+`volume_bracket` is proved when `knowledge in {all_components,
+complete_locus}` **and** (`zero_set in {certified_empty, regular}` **or**
+`volume_evidence = sandwich_bounded`). The union is not a product, so
+`predicate_cubes_v2` emits two cube families. `local_contact`, `valid_brep`
+and `mesh` accept the new children with a determined `local_dim` and do **not**
+accept `near_degenerate`; `material_class` is unchanged.
+
+### 7.3 CHK-7 - dual mode (OBL-K knowledge lift)
+
+OBL-K (rank-deficient spec section 4.5) is not discharged. The checker runs
+both modes and reports both:
+
+- **lift off:** the sandwich rule sets `volume_evidence=sandwich_bounded` only.
+- **lift on:** an explicit proposed modelling rule
+  `E-OBL-K-KNOWLEDGE-LIFT` (not one of the nine section-7 rules) raises
+  `global.knowledge` to `all_components` for the tangential `volume_bracket`
+  region.
+
+### 7.4 CHK-8 - fragment E (nine proposed rules)
+
+The nine rules of `docs/RANK_DEFICIENT_CONTACT_SPEC.md` section 7 are encoded
+in `loop/solver_coverage/fragments/E.json` with `confidence: proposed`. The
+schema (`loop/solver_coverage/schema.json`) gained `"E"` in the fragment enum
+and `"proposed"` in the confidence enum. Union precondition values
+(`a|b`) are expanded into one compiled row per value. A proposed rule can
+refine `rank_deficient(residual)` only by naming it (the v1 sink property is
+preserved for the production lattice).
+
+### 7.5 CHK-9 - reachability
+
+`compute_reachability_v2` compares every fragment-E rule against fragment D's
+door/bridge `reaches` set. Because fragment E is proposed and unwired, **all
+nine rules are flagged as routing gaps** (none is named in `reaches`). The
+report also records `first_witness_in_model`. The `E-TANGENCY-WITNESS-ZERO-BOUND`
+(W4) rule is excluded from the default projection because W4 is off by default
+(rank-deficient spec section 5.2); enabling it is an explicit `w4=True`
+projection.
+
+### 7.6 Open questions (rank-deficient spec section 11, Q1-Q4)
+
+1. **Fragment schema / `!unmodeled`.** The schema is
+   `loop/solver_coverage/schema.json`. `!unmodeled` preconditions go in the
+   `preconditions` array as axis/value strings prefixed `!unmodeled:`
+   (fragment E has four such axis keys). `CompiledRule` abstracts them; they
+   never enter the arithmetic.
+2. **OBL-S1 composition.** Unresolved. The checker models the sandwich as an
+   additive `relation.volume_evidence` axis and does not claim that the
+   contact-cover flux bracket composes with the sandwich term.
+3. **1x1/2x1 volume measure.** Not determined from the model. Lattice v2
+   applies the same `volume_evidence` axis to all `src_dims`; the actual
+   curve-relation measure remains an [ASM] to confirm in M2.
+4. **Does `regular` mean nonempty?** Decided in M0 (section 6.1): `regular`
+   means "regular where nonempty"; it does not assert nonemptiness.
+
+### 7.7 M1 acceptance
+
+The M1 acceptance is the in-scope audited gap: surface-surface (`2x2`)
+rank-deficient `volume_bracket`, regimes `{unknown(residual), tangential}`.
+`1x1/2x1` is the out-of-scope section 1.3 knowledge-lifting gap; `singular_param`
+is a named refusal (`SingularParametrization`).
+
+| projection | in-scope rank-deficient UNDECIDED | witness cell proved |
+|---|---:|---|
+| production (A-D) | 17664 | no |
+| proposed, lift off | 5760 | yes |
+| proposed, lift on | **0** | **yes** |
+
+The retrodiction witness cell
+`2x2 / rank_deficient(residual) / local_dim 0 / local_only(residual) /
+regime unknown / volume_evidence none / volume_bracket` (192 concrete states)
+flips to PROVED under fragment E. The section 1.3 residual gaps are reported,
+not hidden: `volume_bracket` 5760 (`2x1`) + 5760 (`1x1`),
+`no_intersection` 5760 (`unknown`, 1x1/2x1), `valid_brep` 1920 (`2x1`), which
+match the spec's declared section 1.3 counts.
+
