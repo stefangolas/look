@@ -4404,3 +4404,52 @@ TOR-C flip-or-pin (orchestrator-held).
 Leaving: 0 RUNNING; HEAD 6d00f3e; heartbeat 1 (27872); operator_runner 1
 (27876); watchdog 1 (29264); ONE overnight driver (24864); TWO supervisors
 (carried); cargoq UP (queued 0); disk 12.88 GiB free; RAM 4.75 GiB.
+
+================================================================
+[operator 2026-09-11T09:19Z] QUIET HEALTHY CYCLE - nothing landable,
+unblockable, flippable, or dispatchable. Board unchanged from the 08:55Z cycle,
+re-derived by command.
+
+- Step 1 health: slot_status = all 8 slots FINISHED/IDLE, no live worker.
+  cargoq UP (ping {"ok":true,"queued":0,"running":false}). Heartbeat exactly 1
+  (27872), operator_runner 1 (27876), watchdog 1 (29264), ONE overnight driver
+  (24864); TWO supervisors (19172+27828) carried. Disk 12.8 GiB free (above the
+  8 GB floor, below the 15 GiB goal); RAM 4.96 GiB. NOTE: the raw process scan
+  self-matched this probe's own command text (22224 in heartbeat+operator_runner,
+  31192/34204 in the cargoq/heartbeat scans) - the anchored PID detail confirms
+  one of each; no double-heartbeat to reap.
+- Step 2 land: `git merge-base --is-ancestor` against integration/kernel-bg
+  (HEAD e405a1e): e6553db/3c2109b/ee97499/713f205/5cf4811 + 329f6ab/19acb3e all
+  True; 46ff8cc (slot 0) False. wt RESULT statuses: slot 0 SPEC_GAP, slot 1
+  "complete" (no commit), slot 2 none (IDLE, landed 19acb3e), slot 3 DONE,
+  slot 4 LANDED-WITH-FINDINGS, slots 5/6 DONE, slot 7 LANDED. Nothing with a
+  DONE RESULT is unlanded -> nothing to merge.
+- Step 3 unblock: 0 RUNNING; no IDLE/DEAD >15 min holding work; no QUESTION;
+  zero cargo/rustc processes. Nothing to resume or redispatch.
+- Step 4 registry: re-derived with dispatch_ready's exact landed() (note
+  lower-cased): 343 unique rows - 247 DONE, 84 READY, 11 BLOCKED, 1 SUPERSEDED.
+  READY-not-landed = exactly {AUTHOR-CENSUS-NAMES (slot-assigned), RG-23, RG-9}
+  - the last two have EMPTY packet fields (authoring, carried). The 8 BLOCKED
+  rows with all needs satisfied all carry deliberate park notes (OWNER_BLOCKED /
+  owner-cancelled / SUPERSEDED / gated / owner-decision) - none mechanically
+  flippable. Nothing to fix.
+- Step 5 dispatch: `dispatch_ready --dry-run --max-workers=4` -> "slots: 8 (0
+  running, 8 free); slot-assigned packets: 6; dispatched 0; workers now ~0/4";
+  only RG-23/RG-9 flagged. REAL idle. No manual dispatch (heartbeat live; the
+  double-dispatch rule).
+- Step 5b disk: `janitor.py ensure --need 15` -> reclaimed ~0.0 GB -> 12.8 GB
+  free (STILL SHORT of the 15 GB goal; nothing reclaimable while no worker
+  target is idle-freed). Above the 8 GB floor; no live worker at risk.
+- Step 6 STATE: prepended the 09:19Z LATEST GROUND TRUTH block (08:55Z marked
+  SUPERSEDED) + appended the 09:19Z machine block.
+- Step 7: this entry.
+
+Escalations: none new. Carried: AUTHOR-CENSUS-NAMES SPEC_GAP (rebooking);
+RG-23/RG-9 missing packet files; FRAME-REVOLVE F1 non_z_axis pin amendment
+(ttc_lathe_spline.rs:255); duplicate supervisors + the lagging cargoq restart
+guard; slot-4 + slot-7 wt RESULT residue parking the driver's dispatch arm;
+TOR-C flip-or-pin (orchestrator-held).
+
+Leaving: 0 RUNNING; HEAD e405a1e; heartbeat 1 (27872); operator_runner 1
+(27876); watchdog 1 (29264); ONE overnight driver (24864); TWO supervisors
+(carried); cargoq UP (queued 0); disk 12.8 GiB free; RAM 4.96 GiB.
