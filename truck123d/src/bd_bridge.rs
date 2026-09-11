@@ -7463,9 +7463,8 @@ pub mod membership {
 
     use std::collections::BinaryHeap;
 
-    use truck_certified::construct::admission::{
-        AdmissionCertificate, CertificateBudget, NormalCone, certify_patch_family,
-    };
+    use truck_certified::construct::admission::NormalCone;
+    use truck_certified::construct::normal_cone::midpoint_normal_direction;
 
     /// The regime of one admitted patch pair (Lemma D, section 3.1).
     #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
@@ -7921,9 +7920,113 @@ pub mod membership {
         det.lo > 0.0 || det.hi < 0.0
     }
 
-    /// The whole-box certified normal cone of one patch row, reusing the
-    /// landed `ADMISSION-WHOLE-BOX-REGULAR-CONE` certificate assembly.
+    /// The certified upper bound of `sqrt(iv)` (`None` when `iv.hi < 0`).
+    fn iv_sqrt(iv: Iv) -> Option<Iv> {
+        if iv.hi < 0.0 || !iv.hi.is_finite() {
+            return None;
+        }
+        let hi = iv.hi.sqrt();
+        if !hi.is_finite() {
+            return None;
+        }
+        Some(Iv {
+            lo: down(iv.lo.max(0.0).sqrt()),
+            hi: up(hi),
+        })
+    }
+
+    /// A certified lower bound of the norm of every vector in the interval box
+    /// (the axis mignitudes in quadrature).
+    fn mignitude3(n: &[Iv; 3]) -> f64 {
+        let mut acc = Iv::point(0.0);
+        for iv in n {
+            let mig = if iv.lo > 0.0 {
+                iv.lo
+            } else if iv.hi < 0.0 {
+                -iv.hi
+            } else {
+                0.0
+            };
+            acc = acc.add(Iv::point(mig).mul(Iv::point(mig)));
+        }
+        iv_sqrt(acc).map_or(0.0, |v| v.lo)
+    }
+
+    /// The interval hull of the homogeneous normal numerator
+    /// `N = P_u x P_v = ((A_u W - A W_u) x (A_v W - A W_v)) / W^4` over the
+    /// whole patch box. This is the same normal-cone mathematics the landed
+    /// `ADMISSION-WHOLE-BOX-REGULAR-CONE` assembly uses, evaluated directly on
+    /// the homogeneous control hulls so it certifies every orientation (the
+    /// landed `certify_patch_family` whole-box path rejects the negatively
+    /// oriented planar faces).
+    fn normal_hull(raw: &RawPatch) -> Option<[Iv; 3]> {
+        let cell = ParamCell::unit();
+        let p = Patch {
+            rows: raw.rows,
+            cols: raw.cols,
+            data: raw.num.clone(),
+            orientation: 1.0,
+        };
+        let wp = Patch {
+            rows: raw.rows,
+            cols: raw.cols,
+            data: raw.weights.iter().map(|&w| [w, 0.0, 0.0]).collect(),
+            orientation: 1.0,
+        };
+        let (alo, ahi) = control_range(&p, &cell);
+        let (aulo, auhi) = derivative_range_u(&p, &cell);
+        let (avlo, avhi) = derivative_range_v(&p, &cell);
+        let (wlo, whi) = control_range(&wp, &cell);
+        let (wulo, wuhi) = derivative_range_u(&wp, &cell);
+        let (wvlo, wvhi) = derivative_range_v(&wp, &cell);
+        let w = Iv {
+            lo: wlo[0],
+            hi: whi[0],
+        };
+        if w.lo <= 0.0 {
+            return None;
+        }
+        let wu = Iv {
+            lo: wulo[0],
+            hi: wuhi[0],
+        };
+        let wv = Iv {
+            lo: wvlo[0],
+            hi: wvhi[0],
+        };
+        let w2 = w.mul(w);
+        let mut pu = [Iv::point(0.0); 3];
+        let mut pv = [Iv::point(0.0); 3];
+        for k in 0..3 {
+            let a = Iv {
+                lo: alo[k],
+                hi: ahi[k],
+            };
+            let au = Iv {
+                lo: aulo[k],
+                hi: auhi[k],
+            };
+            let av = Iv {
+                lo: avlo[k],
+                hi: avhi[k],
+            };
+            pu[k] = iv_div(au.mul(w).sub(a.mul(wu)), w2)?;
+            pv[k] = iv_div(av.mul(w).sub(a.mul(wv)), w2)?;
+        }
+        Some([
+            pu[1].mul(pv[2]).sub(pu[2].mul(pv[1])),
+            pu[2].mul(pv[0]).sub(pu[0].mul(pv[2])),
+            pu[0].mul(pv[1]).sub(pu[1].mul(pv[0])),
+        ])
+    }
+
+    /// The whole-box certified normal cone of one patch row. The anchor is the
+    /// float midpoint normal (the landed SFC search); the cone bound `s_up` is
+    /// the certified `|n x anchor| / (|n| |anchor|)` maximum over the
+    /// homogeneous normal hull (`normal_hull`), which certifies `s_up < 1` on
+    /// the whole box.
     fn patch_cone(row: &VolumeRow) -> Result<NormalCone, RegimeRefusal> {
+        let raw = parse_raw(row).map_err(|_| RegimeRefusal::SingularParametrization)?;
         let patch = TensorBernsteinPatch::try_new(
             row.numerator.clone(),
             row.weights.clone(),
@@ -7931,27 +8034,53 @@ pub mod membership {
             PatchParent::new(0, None),
         )
         .map_err(|_| RegimeRefusal::SingularParametrization)?;
-        let certificate = certify_patch_family(&[patch], &CertificateBudget::default());
-        let spans = match certificate {
-            AdmissionCertificate::Regular { spans }
-            | AdmissionCertificate::RegularWithSeam { spans, .. }
-            | AdmissionCertificate::RegularInteriorCollapsedBoundary { spans } => spans,
-            AdmissionCertificate::GenuineSingularity { .. } => {
-                return Err(RegimeRefusal::SingularParametrization);
-            }
-        };
-        spans
-            .into_iter()
-            .find(|s| s.region == ((0.0, 1.0), (0.0, 1.0)))
-            .map(|s| s.regular.cone)
-            .ok_or(RegimeRefusal::SingularParametrization)
+        let anchor = midpoint_normal_direction(&patch)
+            .and_then(normalize3)
+            .ok_or(RegimeRefusal::SingularParametrization)?;
+        let n = normal_hull(&raw).ok_or(RegimeRefusal::SingularParametrization)?;
+        let cx = n[1]
+            .mul(Iv::point(anchor[2]))
+            .sub(n[2].mul(Iv::point(anchor[1])));
+        let cy = n[2]
+            .mul(Iv::point(anchor[0]))
+            .sub(n[0].mul(Iv::point(anchor[2])));
+        let cz = n[0]
+            .mul(Iv::point(anchor[1]))
+            .sub(n[1].mul(Iv::point(anchor[0])));
+        let mut w2 = Iv::point(0.0);
+        for c in [cx, cy, cz] {
+            let far = c.lo.abs().max(c.hi.abs());
+            w2 = w2.add(Iv::point(far).mul(Iv::point(far)));
+        }
+        let w_max = iv_sqrt(w2)
+            .ok_or(RegimeRefusal::SingularParametrization)?
+            .hi;
+        let n_min = mignitude3(&n);
+        let a_iv = Iv::point(anchor[0])
+            .mul(Iv::point(anchor[0]))
+            .add(Iv::point(anchor[1]).mul(Iv::point(anchor[1])))
+            .add(Iv::point(anchor[2]).mul(Iv::point(anchor[2])));
+        let a_lo = iv_sqrt(a_iv)
+            .ok_or(RegimeRefusal::SingularParametrization)?
+            .lo;
+        if !w_max.is_finite() || !n_min.is_finite() || !a_lo.is_finite() || n_min <= 0.0 || a_lo <= 0.0
+        {
+            return Err(RegimeRefusal::SingularParametrization);
+        }
+        let s_up = up(w_max / (n_min * a_lo));
+        if !s_up.is_finite() || s_up >= 1.0 {
+            return Err(RegimeRefusal::SingularParametrization);
+        }
+        Ok(NormalCone { anchor, s_up })
     }
 
-    /// The Lemma D admission dichotomy with the tie rule (if (T) certifies,
-    /// use (T); otherwise (G)).
-    fn admit_regime(row_a: &VolumeRow, row_b: &VolumeRow) -> Result<RegimeAdmission, RegimeRefusal> {
-        let cone_a = patch_cone(row_a)?;
-        let cone_b = patch_cone(row_b)?;
+    /// The Lemma D dichotomy over two already-certified normal cones. The cone
+    /// computation is the expensive step, so `certify_sandwich` caches the
+    /// per-patch cones and calls this for every pair.
+    fn admit_regime_from_cones(
+        cone_a: &NormalCone,
+        cone_b: &NormalCone,
+    ) -> Result<RegimeAdmission, RegimeRefusal> {
         let a = normalize3(cone_a.anchor).ok_or(RegimeRefusal::SingularParametrization)?;
         let b = normalize3(cone_b.anchor).ok_or(RegimeRefusal::SingularParametrization)?;
         let dot = super::v3_dot(a, b).clamp(-1.0, 1.0);
@@ -8071,6 +8200,13 @@ pub mod membership {
         let (_pa_lo, pa_hi) = height_range(&num_a, &w_a, axis, fast)?;
         let (pb_lo, _pb_hi) = height_range(&num_b, &w_b, axis, fast)?;
         let h_lo = down(pb_lo - pa_hi);
+        let h_hi = up(_pb_hi - _pa_lo);
+        // The spec's undecided test (section 4.4): only a cell whose h-enclosure
+        // straddles zero carries sandwich uncertainty. A cell whose enclosure
+        // excludes zero is certified resolved and contributes nothing.
+        if h_lo > 0.0 || h_hi < 0.0 {
+            return Ok(None);
+        }
         let thickness = (-h_lo).max(0.0);
         let key = area * thickness;
         if !key.is_finite() {
@@ -8116,15 +8252,25 @@ pub mod membership {
         let va = exact_volume(base)?;
         let vb = exact_volume(tool)?;
 
+        // The per-patch normal cones (the expensive `certify_patch_family`
+        // step) are computed once and reused for every pair.
+        let mut a_cones: Vec<NormalCone> = Vec::with_capacity(base.len());
+        for row in base {
+            a_cones.push(patch_cone(row).map_err(regime_refusal_to_sandwich)?);
+        }
+        let mut b_cones: Vec<NormalCone> = Vec::with_capacity(tool.len());
+        for row in tool {
+            b_cones.push(patch_cone(row).map_err(regime_refusal_to_sandwich)?);
+        }
+
         // W2: an exact common carrier resolves coincidence exactly.
         let identical = base.len() == tool.len()
             && base.iter().zip(tool.iter()).all(|(x, y)| rows_equal(x, y));
         if identical {
-            let admission = admit_regime(
-                base.first().ok_or(SandwichRefusal::MalformedPatch)?,
-                tool.first().ok_or(SandwichRefusal::MalformedPatch)?,
-            )
-            .map_err(regime_refusal_to_sandwich)?;
+            let cone_a = a_cones.first().ok_or(SandwichRefusal::MalformedPatch)?;
+            let cone_b = b_cones.first().ok_or(SandwichRefusal::MalformedPatch)?;
+            let admission =
+                admit_regime_from_cones(cone_a, cone_b).map_err(regime_refusal_to_sandwich)?;
             if options.shared_carrier {
                 let (lo, hi) = match mode {
                     ModeValue::Add => (va, va),
@@ -8158,10 +8304,11 @@ pub mod membership {
         let mut any_tangential = false;
 
         for (ia, ra) in a_raw.iter().enumerate() {
+            let cone_a = a_cones.get(ia).ok_or(SandwichRefusal::MalformedPatch)?;
             for (ib, rb) in b_raw.iter().enumerate() {
-                let row_a = base.get(ia).ok_or(SandwichRefusal::MalformedPatch)?;
-                let row_b = tool.get(ib).ok_or(SandwichRefusal::MalformedPatch)?;
-                let admission = admit_regime(row_a, row_b).map_err(regime_refusal_to_sandwich)?;
+                let cone_b = b_cones.get(ib).ok_or(SandwichRefusal::MalformedPatch)?;
+                let admission =
+                    admit_regime_from_cones(cone_a, cone_b).map_err(regime_refusal_to_sandwich)?;
                 if admission.regime == SurfaceRegime::Transversal {
                     continue;
                 }
@@ -11582,39 +11729,5 @@ print(json.dumps([z_row, loft_row]))
             extract_patches(&part(curved, 0.0, 0.0, 0.0)),
             Err(SweptAdmissionRefusal::ExtractionUnavailable)
         );
-    }
-
-    #[test]
-    fn rdef_m2_debug_probe() {
-        let a = box_patch_rows([0.0, 0.0, 0.0], [1.0, 1.0, 1.0]);
-        let b = box_patch_rows([0.25, 0.25, 0.9], [0.75, 0.75, 1.9]);
-        for tolerance in [1.0e-3, 1.0] {
-            let opts = membership::SandwichOptions {
-                tolerance,
-                max_cells: 65536,
-                shared_carrier: false,
-                bernstein_chart: true,
-                rational_positive_weights: true,
-            };
-            let r = membership::certify_sandwich(
-                &a,
-                &b,
-                crate::facade::ModeValue::Subtract,
-                &opts,
-            );
-            eprintln!("DEBUG tolerance={tolerance}: {r:?}");
-        }
-        // The identical shared-carrier case.
-        let opts = membership::SandwichOptions {
-            tolerance: 1.0e-6,
-            max_cells: 65536,
-            shared_carrier: true,
-            bernstein_chart: true,
-            rational_positive_weights: true,
-        };
-        let r = membership::certify_sandwich(&a, &a, crate::facade::ModeValue::Add, &opts);
-        eprintln!("DEBUG identical shared: {r:?}");
-        let r = membership::certify_sandwich(&a, &a, crate::facade::ModeValue::Add, &membership::SandwichOptions { shared_carrier: false, tolerance: 0.0, ..opts });
-        eprintln!("DEBUG identical nocarrier: {r:?}");
     }
 }
