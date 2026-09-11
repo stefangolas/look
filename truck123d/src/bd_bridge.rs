@@ -51,6 +51,8 @@ use crate::facade::{BooleanPairVerdict, CarrierClass, SweptBooleanEvent};
 use crate::marshal::{ExceptionClass, Marshaled, MarshaledPayload};
 use crate::python;
 
+use self::membership::BooleanVolumeRefusal;
+
 const TAU: f64 = std::f64::consts::TAU;
 
 /// The census-recorded curve of one lathe profile edge, in the `y = 0`
@@ -410,7 +412,9 @@ pub struct Facts {
     /// The volume of the measured top node, following the recorded OCC
     /// compound semantics the reference was measured with: a group's volume
     /// is the sum over its *immediate child parts only* (nested groups
-    /// contribute nothing); a part's volume is its own.
+    /// contribute nothing); a part's volume is its own; a boolean row is the
+    /// PRODUCT's certified volume (the landed MONO-6 contact-cover
+    /// certificate), never the base operand's.
     pub volume: f64,
     /// The axis-aligned bounding box of every part in the tree, `[min, max]`.
     pub bbox: [[f64; 3]; 2],
@@ -3098,24 +3102,227 @@ fn count_and_union(
     }
 }
 
+/// Applies one placed row's world placement to a local point: the recorded
+/// mirror reflection first, then the full orthonormal frame (or the pure-z
+/// `rz`), then the translation — the exact composition `part_world_bbox`
+/// applies to the local bbox corners.
+fn place_part_point(part: &PartSpec, p: [f64; 3]) -> [f64; 3] {
+    let p = match part.mirror.as_deref() {
+        Some(axis) => mirror_point(p, axis),
+        None => p,
+    };
+    match part.rotation {
+        Some(rotation) => {
+            let r = rotation.apply(p);
+            [r[0] + part.x, r[1] + part.y, r[2] + part.z]
+        }
+        None => {
+            let rz = part.rz.to_radians();
+            let (x, y) = if rz == 0.0 {
+                (p[0], p[1])
+            } else {
+                let (sin, cos) = rz.sin_cos();
+                (p[0] * cos - p[1] * sin, p[0] * sin + p[1] * cos)
+            };
+            [x + part.x, y + part.y, p[2] + part.z]
+        }
+    }
+}
+
+/// The exact bicubic tensor-Bernstein elevation of the bilinear map through
+/// four corners (unit weights), carrying the given outward-orientation sign.
+/// The elevation is exact, so the patch is the planar quad itself and the
+/// certified flux of the cycle is the enclosed volume.
+fn boolean_quad_patch(
+    c00: [f64; 3],
+    c10: [f64; 3],
+    c11: [f64; 3],
+    c01: [f64; 3],
+    orientation: f64,
+) -> crate::python::binding::VolumeRow {
+    let e0 = [1.0, 2.0 / 3.0, 1.0 / 3.0, 0.0];
+    let e1 = [0.0, 1.0 / 3.0, 2.0 / 3.0, 1.0];
+    let corners = [[c00, c01], [c10, c11]];
+    let mut numerator = vec![vec![[0.0f64; 3]; 4]; 4];
+    for (i, row) in numerator.iter_mut().enumerate() {
+        let wu0 = e0.get(i).copied().unwrap_or(0.0);
+        let wu1 = e1.get(i).copied().unwrap_or(0.0);
+        for (j, slot) in row.iter_mut().enumerate() {
+            let wv0 = e0.get(j).copied().unwrap_or(0.0);
+            let wv1 = e1.get(j).copied().unwrap_or(0.0);
+            let mut acc = [0.0f64; 3];
+            for (a, pair) in corners.iter().enumerate() {
+                let wu = if a == 0 { wu0 } else { wu1 };
+                for (b, corner) in pair.iter().enumerate() {
+                    let wv = if b == 0 { wv0 } else { wv1 };
+                    let coeff = wu * wv;
+                    for (acc_slot, value) in acc.iter_mut().zip(corner.iter()) {
+                        *acc_slot += coeff * value;
+                    }
+                }
+            }
+            *slot = acc;
+        }
+    }
+    crate::python::binding::VolumeRow {
+        numerator,
+        weights: vec![vec![1.0f64; 4]; 4],
+        orientation,
+    }
+}
+
+/// The six outward-oriented faces of one placed canonical box as patch rows in
+/// world coordinates, or the typed `BooleanProductVolumeUnavailable` refusal
+/// when the solid is not the canonical box the certified contact-cover solver
+/// consumes. A placed mirror reflection flips the orientation (`det = -1`), so
+/// the patch sign is carried explicitly and the flux stays the enclosed
+/// volume.
+fn placed_box_patches(
+    part: &PartSpec,
+) -> Result<Vec<crate::python::binding::VolumeRow>, BooleanVolumeRefusal> {
+    let (length, width, height) = match &part.solid {
+        SolidSpec::Box {
+            length,
+            width,
+            height,
+        } => (*length, *width, *height),
+        _ => return Err(BooleanVolumeRefusal::BooleanProductVolumeUnavailable),
+    };
+    if !(length.is_finite() && width.is_finite() && height.is_finite())
+        || length <= 0.0
+        || width <= 0.0
+        || height <= 0.0
+    {
+        return Err(BooleanVolumeRefusal::BooleanProductVolumeUnavailable);
+    }
+    let (hx, hy, hz) = (0.5 * length, 0.5 * width, 0.5 * height);
+    let (x0, x1) = (-hx, hx);
+    let (y0, y1) = (-hy, hy);
+    let (z0, z1) = (-hz, hz);
+    let orientation = if part.mirror.is_some() { -1.0 } else { 1.0 };
+    let c = |x: f64, y: f64, z: f64| place_part_point(part, [x, y, z]);
+    Ok(vec![
+        boolean_quad_patch(
+            c(x0, y0, z0),
+            c(x0, y1, z0),
+            c(x1, y1, z0),
+            c(x1, y0, z0),
+            orientation,
+        ),
+        boolean_quad_patch(
+            c(x0, y0, z1),
+            c(x1, y0, z1),
+            c(x1, y1, z1),
+            c(x0, y1, z1),
+            orientation,
+        ),
+        boolean_quad_patch(
+            c(x0, y0, z0),
+            c(x1, y0, z0),
+            c(x1, y0, z1),
+            c(x0, y0, z1),
+            orientation,
+        ),
+        boolean_quad_patch(
+            c(x0, y1, z0),
+            c(x0, y1, z1),
+            c(x1, y1, z1),
+            c(x1, y1, z0),
+            orientation,
+        ),
+        boolean_quad_patch(
+            c(x0, y0, z0),
+            c(x0, y0, z1),
+            c(x0, y1, z1),
+            c(x0, y1, z0),
+            orientation,
+        ),
+        boolean_quad_patch(
+            c(x1, y0, z0),
+            c(x1, y1, z0),
+            c(x1, y1, z1),
+            c(x1, y0, z1),
+            orientation,
+        ),
+    ])
+}
+
+/// The patch rows of one boolean operand: a placed canonical box's six faces,
+/// or the typed open-carrier refusal for any other node (a swept/lofted solid,
+/// a nested group, a nested boolean).
+fn node_box_patches(
+    node: &TreeNode,
+) -> Result<Vec<crate::python::binding::VolumeRow>, BooleanVolumeRefusal> {
+    match node {
+        TreeNode::Part { part } => placed_box_patches(part),
+        TreeNode::Boolean { .. } | TreeNode::Group { .. } => {
+            Err(BooleanVolumeRefusal::BooleanProductVolumeUnavailable)
+        }
+    }
+}
+
+/// The certified product volume of one canonical boolean row: `V(A op B)` from
+/// the landed MONO-6 contact-cover certificate (PB-011B's canonical volume
+/// authority). Both operands must be placed canonical boxes; any other carrier
+/// is the open (unmeasured) case and refuses typed
+/// `BooleanProductVolumeUnavailable`. Subtract reads the certificate's `A \ B`
+/// bracket; intersect reads its `A n B` bracket; union is the exact
+/// inclusion-exclusion `V(A) + V(B) - V(A n B)` over the same certified facts.
+fn boolean_product_volume_certified(boolean: &BooleanNode) -> Result<f64, BooleanVolumeRefusal> {
+    let a = node_box_patches(&boolean.a)?;
+    let b = node_box_patches(&boolean.b)?;
+    let certificate =
+        membership::certify_boolean_volume(&a, &b, &membership::BooleanVolumeOptions::default())?;
+    let intersection = 0.5 * (certificate.intersection_lo + certificate.intersection_hi);
+    let value = match boolean.mode {
+        crate::facade::ModeValue::Subtract => certificate.value,
+        crate::facade::ModeValue::Add => certificate.volume_a + certificate.volume_b - intersection,
+        crate::facade::ModeValue::Intersect => intersection,
+    };
+    if value.is_finite() {
+        Ok(value)
+    } else {
+        Err(BooleanVolumeRefusal::BooleanProductVolumeUnavailable)
+    }
+}
+
+/// The product volume of one boolean row, mapped onto the executor's typed
+/// kernel refusal. The product's certified facts are the landed MONO-6
+/// contact-cover certificate; an open carrier (any non-box operand, e.g. a
+/// swept tool) refuses typed rather than reporting the base operand's volume.
+fn boolean_product_volume(boolean: &BooleanNode) -> Result<f64, Refusal> {
+    dispatch_boolean(boolean)?;
+    boolean_product_volume_certified(boolean).map_err(|refusal| match refusal {
+        BooleanVolumeRefusal::TransversalityUncertified
+        | BooleanVolumeRefusal::MembershipIndeterminate => {
+            Refusal::UnsupportedEnvelope(EnvelopeCase::ContactReductionDeferred)
+        }
+        BooleanVolumeRefusal::NonRegularPatch
+        | BooleanVolumeRefusal::BudgetExceeded
+        | BooleanVolumeRefusal::ExtremeSlabContaminated
+        | BooleanVolumeRefusal::MalformedPatch
+        | BooleanVolumeRefusal::RationalWeights
+        | BooleanVolumeRefusal::BooleanProductVolumeUnavailable => {
+            Refusal::UnsupportedEnvelope(EnvelopeCase::NonCanonicalCarrier)
+        }
+    })
+}
+
 /// The measured volume of a top node: a group sums only its immediate child
 /// parts (nested groups contribute nothing, mirroring the OCC `Compound`
-/// measurement the reference was recorded with); a part is its own volume.
+/// measurement the reference was recorded with); a part is its own volume; a
+/// boolean row is the PRODUCT's certified volume (never the base operand's).
 fn top_volume(node: &TreeNode) -> Result<f64, Refusal> {
     match node {
         TreeNode::Part { part } => solid_volume(&part.solid),
-        TreeNode::Boolean { boolean } => {
-            dispatch_boolean(boolean)?;
-            top_volume(&boolean.a)
-        }
+        TreeNode::Boolean { boolean } => boolean_product_volume(boolean),
         TreeNode::Group { group, .. } => {
             let mut volume = 0.0;
             for child in group {
                 match child {
                     TreeNode::Part { part } => volume += solid_volume(&part.solid)?,
                     TreeNode::Boolean { boolean } => {
-                        dispatch_boolean(boolean)?;
-                        volume += top_volume(&boolean.a)?;
+                        volume += boolean_product_volume(boolean)?;
                     }
                     TreeNode::Group { .. } => {}
                 }
@@ -4920,6 +5127,13 @@ pub mod membership {
         /// A consumed patch carries a non-constant rational weight field; the
         /// `(8,8)` polynomial flux integrand requires unit weights.
         RationalWeights,
+        /// The product volume cannot be measured: an operand carrier is not a
+        /// patch-representable canonical solid (an open/swept carrier), so the
+        /// certified contact-cover solver has no product facts to consume. The
+        /// measured product is unavailable; a refusal is the correct interim
+        /// verdict (the MONO-8 certified bracket is the open carrier), never the
+        /// base operand's volume.
+        BooleanProductVolumeUnavailable,
     }
 
     impl From<MembershipRefusal> for BooleanVolumeRefusal {
@@ -7682,82 +7896,99 @@ print(json.dumps([z_row, loft_row]))
 
     #[test]
     fn cut_swept_canonical_certifies_end_to_end() {
-        // A swept base cut by a canonical tool routes through the boolean
-        // entry: the routed event is recorded (placement-blind carrier classes)
-        // and the routed row measures its base operand.
-        let base = part(loft_carrier(), 0.0, 0.0, 0.0);
-        let tree = boolean(
-            crate::facade::ModeValue::Subtract,
-            base.clone(),
-            part(canonical_carrier(), 0.0, 0.0, 0.0),
-        );
-        let facts = tree_facts(&tree).expect("a swept x canonical cut routes");
-        assert_eq!(facts.solid_count, 1);
-        assert_eq!(facts.boolean_events.len(), 1);
-        let event = facts.boolean_events[0];
+        // A swept base cut by a canonical tool routes through the boolean entry
+        // (the routed event is recorded placement-blind), but the product
+        // volume is the open MONO-8 carrier: the boolean facts refuse typed
+        // naming the open carrier instead of silently reporting the base
+        // operand's volume.
+        let node = BooleanNode {
+            mode: crate::facade::ModeValue::Subtract,
+            a: Box::new(part(loft_carrier(), 0.0, 0.0, 0.0)),
+            b: Box::new(part(canonical_carrier(), 0.0, 0.0, 0.0)),
+        };
+        let event = dispatch_boolean(&node)
+            .expect("a swept x canonical cut routes")
+            .expect("the routed row records an event");
         assert_eq!(event.mode, crate::facade::ModeValue::Subtract);
         assert_eq!(event.base, crate::facade::CarrierClass::Swept);
         assert_eq!(event.tool, crate::facade::CarrierClass::Canonical);
-        let base_facts = tree_facts(&base).expect("base loft facts");
-        assert_eq!(facts.volume.to_bits(), base_facts.volume.to_bits());
-        assert_eq!(facts.bbox, base_facts.bbox);
+        let refusal = tree_facts(&TreeNode::Boolean { boolean: node })
+            .expect_err("the swept product volume is unavailable");
+        assert!(matches!(
+            refusal,
+            Refusal::UnsupportedEnvelope(EnvelopeCase::NonCanonicalCarrier)
+        ));
     }
 
     #[test]
     fn fuse_swept_swept_certifies_end_to_end() {
         // Two swept-family carriers the admission consult admits (a ruled loft
         // and a spline-profile revolve, both funnel carriers): the fuse routes
-        // and records its event.
-        let tree = boolean(
-            crate::facade::ModeValue::Add,
-            part(loft_carrier(), 0.0, 0.0, 0.0),
-            part(revolved_carrier(), 0.0, 0.0, 0.0),
-        );
-        let facts = tree_facts(&tree).expect("a swept x revolved fuse routes");
-        assert_eq!(facts.boolean_events.len(), 1);
-        let event = facts.boolean_events[0];
+        // and records its event; the product volume (two open carriers) refuses
+        // typed rather than measuring the base.
+        let node = BooleanNode {
+            mode: crate::facade::ModeValue::Add,
+            a: Box::new(part(loft_carrier(), 0.0, 0.0, 0.0)),
+            b: Box::new(part(revolved_carrier(), 0.0, 0.0, 0.0)),
+        };
+        let event = dispatch_boolean(&node)
+            .expect("a swept x revolved fuse routes")
+            .expect("the routed row records an event");
         assert_eq!(event.mode, crate::facade::ModeValue::Add);
         assert_eq!(event.base, crate::facade::CarrierClass::Swept);
         assert_eq!(event.tool, crate::facade::CarrierClass::Revolved);
+        assert!(tree_facts(&TreeNode::Boolean { boolean: node }).is_err());
     }
 
     #[test]
     fn intersect_swept_canonical_certifies_end_to_end() {
         // A revolved base intersected with a canonical tool routes through the
-        // boolean entry with the intersect mode recorded.
-        let tree = boolean(
-            crate::facade::ModeValue::Intersect,
-            part(revolved_carrier(), 0.0, 0.0, 0.0),
-            part(canonical_carrier(), 0.0, 0.0, 0.0),
-        );
-        let facts = tree_facts(&tree).expect("a revolved x canonical intersect routes");
-        assert_eq!(facts.boolean_events.len(), 1);
-        let event = facts.boolean_events[0];
+        // boolean entry with the intersect mode recorded; the product volume of
+        // the open revolved carrier refuses typed.
+        let node = BooleanNode {
+            mode: crate::facade::ModeValue::Intersect,
+            a: Box::new(part(revolved_carrier(), 0.0, 0.0, 0.0)),
+            b: Box::new(part(canonical_carrier(), 0.0, 0.0, 0.0)),
+        };
+        let event = dispatch_boolean(&node)
+            .expect("a revolved x canonical intersect routes")
+            .expect("the routed row records an event");
         assert_eq!(event.mode, crate::facade::ModeValue::Intersect);
         assert_eq!(event.base, crate::facade::CarrierClass::Revolved);
         assert_eq!(event.tool, crate::facade::CarrierClass::Canonical);
+        assert!(tree_facts(&TreeNode::Boolean { boolean: node }).is_err());
     }
 
     #[test]
     fn placed_operands_transform_to_canonical_before_dispatch() {
         // The dispatch sees the operand's LOCAL carrier class, never its
         // placement; the placement composes after and is reflected in the
-        // measured world facts.
+        // measured world facts. The product volume of the placed swept base
+        // refuses typed (the open carrier).
         let placed_base = part(loft_carrier(), 10.0, 0.0, 0.0);
-        let tree = boolean(
-            crate::facade::ModeValue::Subtract,
-            placed_base,
-            part(canonical_carrier(), 0.0, 0.0, 0.0),
-        );
-        let facts = tree_facts(&tree).expect("a placed swept base routes");
-        assert_eq!(facts.boolean_events.len(), 1);
-        assert_eq!(
-            facts.boolean_events[0].base,
-            crate::facade::CarrierClass::Swept
-        );
-        let unplaced = tree_facts(&part(loft_carrier(), 0.0, 0.0, 0.0)).expect("unplaced base");
-        assert!((facts.bbox[0][0] - (unplaced.bbox[0][0] + 10.0)).abs() < 1e-12);
-        assert!((facts.bbox[1][0] - (unplaced.bbox[1][0] + 10.0)).abs() < 1e-12);
+        let node = BooleanNode {
+            mode: crate::facade::ModeValue::Subtract,
+            a: Box::new(placed_base),
+            b: Box::new(part(canonical_carrier(), 0.0, 0.0, 0.0)),
+        };
+        let event = dispatch_boolean(&node)
+            .expect("a placed swept base routes")
+            .expect("the routed row records an event");
+        assert_eq!(event.base, crate::facade::CarrierClass::Swept);
+        let unplaced_tree = part(loft_carrier(), 0.0, 0.0, 0.0);
+        let unplaced = match &unplaced_tree {
+            TreeNode::Part { part } => part_world_bbox(part).expect("unplaced base bbox"),
+            _ => panic!("the reference operand is a placed part"),
+        };
+        match &*node.a {
+            TreeNode::Part { part: placed } => {
+                let placed_bbox = part_world_bbox(placed).expect("placed base bbox");
+                assert!((placed_bbox[0][0] - (unplaced[0][0] + 10.0)).abs() < 1e-12);
+                assert!((placed_bbox[1][0] - (unplaced[1][0] + 10.0)).abs() < 1e-12);
+            }
+            _ => panic!("the boolean base operand is a placed part"),
+        }
+        assert!(tree_facts(&TreeNode::Boolean { boolean: node }).is_err());
     }
 
     #[test]
@@ -7795,15 +8026,64 @@ print(json.dumps([z_row, loft_row]))
             Refusal::UnsupportedEnvelope(EnvelopeCase::ContactReductionDeferred)
         ));
 
-        // A canonical x canonical pair lands on the canonical path and records
-        // no routed event.
+        // A canonical x canonical pair lands on the canonical path, records no
+        // routed event, and measures the PRODUCT volume (a nested canonical
+        // tool cut out of the canonical base).
         let canonical = boolean(
             crate::facade::ModeValue::Subtract,
             part(canonical_carrier(), 0.0, 0.0, 0.0),
-            part(canonical_carrier(), 0.0, 0.0, 0.0),
+            part(
+                SolidSpec::Box {
+                    length: 1.0,
+                    width: 1.0,
+                    height: 1.0,
+                },
+                0.0,
+                0.0,
+                0.0,
+            ),
         );
         let facts = tree_facts(&canonical).expect("canonical x canonical lands");
         assert!(facts.boolean_events.is_empty());
+        assert!(
+            (facts.volume - 7.0).abs() < 1.0e-4,
+            "the canonical cut measures the product 7, got {}",
+            facts.volume
+        );
+    }
+
+    #[test]
+    fn boolean_product_volume_refuses_unavailable_carrier_typed() {
+        // The canonical product is measured by the landed MONO-6 certificate; a
+        // swept operand is the open carrier and refuses the typed
+        // `BooleanProductVolumeUnavailable` (never the base operand's volume).
+        let canonical = BooleanNode {
+            mode: crate::facade::ModeValue::Subtract,
+            a: Box::new(part(canonical_carrier(), 0.0, 0.0, 0.0)),
+            b: Box::new(part(
+                SolidSpec::Box {
+                    length: 1.0,
+                    width: 1.0,
+                    height: 1.0,
+                },
+                0.0,
+                0.0,
+                0.0,
+            )),
+        };
+        let volume =
+            boolean_product_volume_certified(&canonical).expect("the canonical product measures");
+        assert!((volume - 7.0).abs() < 1.0e-4, "product volume {volume}");
+
+        let swept = BooleanNode {
+            mode: crate::facade::ModeValue::Subtract,
+            a: Box::new(part(canonical_carrier(), 0.0, 0.0, 0.0)),
+            b: Box::new(part(loft_carrier(), 0.0, 0.0, 0.0)),
+        };
+        assert_eq!(
+            boolean_product_volume_certified(&swept),
+            Err(membership::BooleanVolumeRefusal::BooleanProductVolumeUnavailable)
+        );
     }
 
     // -----------------------------------------------------------------------
