@@ -120,6 +120,45 @@ pub enum ProfileEdge {
         /// the deterministic in-plane parameterization).
         normal: [f64; 3],
     },
+    /// A closed elliptic section edge (the exact analytic ellipse carrier): a
+    /// conic recorded by its centre, its two semi-axes and its in-plane frame.
+    /// `x_dir` is the unit in-plane direction of `x_radius`; the `y_radius`
+    /// axis is `normal x x_dir` (fixed right-handed convention). The ellipse
+    /// is never flattened to a polygon at record time; the kernel derives the
+    /// analytic area/extrema and tessellates only where a triangle mesh is
+    /// asked for. A single ellipse edge is a whole section.
+    Ellipse {
+        /// The ellipse centre in the part-local frame.
+        center: [f64; 3],
+        /// The semi-axis along `x_dir`.
+        x_radius: f64,
+        /// The semi-axis along `normal x x_dir`.
+        y_radius: f64,
+        /// The unit normal of the ellipse plane.
+        normal: [f64; 3],
+        /// The unit in-plane direction of `x_radius`.
+        x_dir: [f64; 3],
+    },
+    /// A circular arc profile edge (the exact quarter-arc segment vocabulary
+    /// the rounded-rectangle profile composes): a conic recorded by its
+    /// centre, radius, in-plane frame and angular span. The arc runs
+    /// counter-clockwise from `start_angle` to `end_angle` (degrees) about
+    /// `+normal`, with `x_dir` the angle-zero direction. The exact conic is
+    /// never flattened at record time.
+    Arc {
+        /// The arc centre in the part-local frame.
+        center: [f64; 3],
+        /// The arc radius.
+        radius: f64,
+        /// The unit normal of the arc plane.
+        normal: [f64; 3],
+        /// The unit in-plane angle-zero direction.
+        x_dir: [f64; 3],
+        /// The arc start angle in degrees (inclusive).
+        start_angle: f64,
+        /// The arc end angle in degrees (exclusive of the closing sweep).
+        end_angle: f64,
+    },
 }
 
 /// The solid carrier of one construction row.
@@ -147,6 +186,17 @@ pub enum SolidSpec {
         /// The cylinder axis (`"z"`, `"x"` or `"y"` — the corpus's Euler
         /// rotation applied to the default z axis).
         axis: String,
+    },
+    /// `Cone(bottom_radius, top_radius, height)`, centered on the local
+    /// origin, on the local z axis. A frustum: `top_radius == 0` is the full
+    /// cone. The analytic volume and extrema are exact.
+    Cone {
+        /// The bottom (z = -height/2) radius.
+        bottom_radius: f64,
+        /// The top (z = +height/2) radius.
+        top_radius: f64,
+        /// The height along the z axis.
+        height: f64,
     },
     /// `Sphere(radius)`.
     Sphere {
@@ -571,6 +621,14 @@ fn solid_volume(solid: &SolidSpec) -> Result<f64, Refusal> {
         SolidSpec::Cylinder { radius, height, .. } => {
             let (radius, height) = (*radius, *height);
             Ok(std::f64::consts::PI * radius * radius * height)
+        }
+        SolidSpec::Cone {
+            bottom_radius,
+            top_radius,
+            height,
+        } => {
+            let (r0, r1, height) = (*bottom_radius, *top_radius, *height);
+            Ok(std::f64::consts::PI / 3.0 * height * (r0 * r0 + r0 * r1 + r1 * r1))
         }
         SolidSpec::Sphere { radius } => {
             let radius = *radius;
@@ -1145,6 +1203,18 @@ fn solid_local_bbox(solid: &SolidSpec) -> Result<[[f64; 3]; 2], Refusal> {
             let radius = *radius;
             Ok([[-radius, -radius, -radius], [radius, radius, radius]])
         }
+        SolidSpec::Cone {
+            bottom_radius,
+            top_radius,
+            height,
+        } => {
+            let (r0, r1, height) = (*bottom_radius, *top_radius, *height);
+            let radius = r0.max(r1);
+            Ok([
+                [-radius, -radius, -height / 2.0],
+                [radius, radius, height / 2.0],
+            ])
+        }
         SolidSpec::Torus { major, minor } => {
             let (major, minor) = (*major, *minor);
             Ok([
@@ -1560,6 +1630,22 @@ fn span3_bernstein(span: &SpanPoly3) -> [[f64; 3]; 4] {
     ]
 }
 
+/// The line spans of a deterministic closed vertex tessellation.
+fn linear_spans(verts: &[[f64; 3]]) -> Vec<SpanPoly3> {
+    let count = verts.len();
+    let mut spans = Vec::with_capacity(count);
+    for i in 0..count {
+        let a = verts[i];
+        let b = verts[(i + 1) % count];
+        spans.push(SpanPoly3 {
+            x: [a[0], b[0] - a[0], 0.0, 0.0],
+            y: [a[1], b[1] - a[1], 0.0, 0.0],
+            z: [a[2], b[2] - a[2], 0.0, 0.0],
+        });
+    }
+    spans
+}
+
 /// The reconstructed spans of a closed section loop (line and spline edges),
 /// with the exact seam closure checked. Every edge's recorded end must meet the
 /// next edge's recorded start and the last must return to the first.
@@ -1567,8 +1653,9 @@ fn spline_loop_spans(profile: &[ProfileEdge]) -> Result<Vec<SpanPoly3>, Refusal>
     if profile.is_empty() {
         return Err(Refusal::Empty);
     }
-    // A single circle edge is tessellated deterministically into line spans
-    // for the arms that consume a span loop (closure is exact by construction).
+    // A single circle or ellipse edge is tessellated deterministically into
+    // line spans for the arms that consume a span loop (closure is exact by
+    // construction).
     if let [
         ProfileEdge::Circle {
             center,
@@ -1578,23 +1665,29 @@ fn spline_loop_spans(profile: &[ProfileEdge]) -> Result<Vec<SpanPoly3>, Refusal>
     ] = profile
     {
         let (_circle, verts) = circle_from_edge(*center, *radius, *normal)?;
-        let count = verts.len();
-        let mut spans = Vec::with_capacity(count);
-        for i in 0..count {
-            let a = verts[i];
-            let b = verts[(i + 1) % count];
-            spans.push(SpanPoly3 {
-                x: [a[0], b[0] - a[0], 0.0, 0.0],
-                y: [a[1], b[1] - a[1], 0.0, 0.0],
-                z: [a[2], b[2] - a[2], 0.0, 0.0],
-            });
-        }
-        return Ok(spans);
+        return Ok(linear_spans(&verts));
     }
-    if profile
-        .iter()
-        .any(|edge| matches!(edge, ProfileEdge::Circle { .. }))
+    if let [
+        ProfileEdge::Ellipse {
+            center,
+            x_radius,
+            y_radius,
+            normal,
+            x_dir,
+        },
+    ] = profile
     {
+        let (_ellipse, verts) = ellipse_from_edge(*center, *x_radius, *y_radius, *normal, *x_dir)?;
+        return Ok(linear_spans(&verts));
+    }
+    if profile.iter().any(|edge| {
+        matches!(
+            edge,
+            ProfileEdge::Circle { .. }
+                | ProfileEdge::Ellipse { .. }
+                | ProfileEdge::Arc { .. }
+        )
+    }) {
         return Err(Refusal::UnsupportedEnvelope(
             EnvelopeCase::NonCanonicalCarrier,
         ));
@@ -1624,9 +1717,11 @@ fn spline_loop_spans(profile: &[ProfileEdge]) -> Result<Vec<SpanPoly3>, Refusal>
                 ends.push(*points.last().ok_or(Refusal::Empty)?);
                 spans.extend(spline_spans3(points)?);
             }
-            // Mixed circle edges were rejected above; a lone circle returns
-            // early with its deterministic tessellation.
-            ProfileEdge::Circle { .. } => {
+            // Mixed conic/arc edges were rejected above; a lone circle or
+            // ellipse returns early with its deterministic tessellation.
+            ProfileEdge::Circle { .. }
+            | ProfileEdge::Ellipse { .. }
+            | ProfileEdge::Arc { .. } => {
                 return Err(Refusal::UnsupportedEnvelope(
                     EnvelopeCase::NonCanonicalCarrier,
                 ));
@@ -2183,6 +2278,34 @@ fn member_sections(
                     radius: *radius,
                     normal: station.apply_dir(*normal),
                 }),
+                ProfileEdge::Ellipse {
+                    center,
+                    x_radius,
+                    y_radius,
+                    normal,
+                    x_dir,
+                } => edges.push(ProfileEdge::Ellipse {
+                    center: station.apply(*center),
+                    x_radius: *x_radius,
+                    y_radius: *y_radius,
+                    normal: station.apply_dir(*normal),
+                    x_dir: station.apply_dir(*x_dir),
+                }),
+                ProfileEdge::Arc {
+                    center,
+                    radius,
+                    normal,
+                    x_dir,
+                    start_angle,
+                    end_angle,
+                } => edges.push(ProfileEdge::Arc {
+                    center: station.apply(*center),
+                    radius: *radius,
+                    normal: station.apply_dir(*normal),
+                    x_dir: station.apply_dir(*x_dir),
+                    start_angle: *start_angle,
+                    end_angle: *end_angle,
+                }),
             }
         }
         sections.push(edges);
@@ -2461,21 +2584,43 @@ fn spline_loft_mesh(sections: &[Vec<ProfileEdge>]) -> Result<Vec<Triangle>, Refu
 // * `mirror`: a placed-carrier reflection; the solid spec is untouched and the
 //   facts transform with the placement (no geometry recomputation).
 
-/// A closed planar line-loop profile extracted from a recorded profile edge
-/// list, or an exact circle section.
+/// The recorded kind of one validated closed section loop. Only `Polygon` and
+/// `Circle` sections carry the exact ruled-loft arms; an `Ellipse` or `Curved`
+/// (line + arc) section is answered by the prism arm but refuses typed in the
+/// loft arm rather than being approximated by its chord polygon.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum LoopKind {
+    /// An all-straight-edge closed loop.
+    Polygon,
+    /// A single exact circle edge.
+    Circle,
+    /// A single exact ellipse edge.
+    Ellipse,
+    /// A closed loop containing exact circular arc segments (and lines).
+    Curved,
+}
+
+/// A closed planar profile extracted from a recorded profile edge list: an
+/// all-line loop, an exact circle/ellipse section, or a line+arc loop.
 struct ProfileLoop {
     /// The boundary vertices in order (no duplicated closing point). For a
-    /// circle section this is the deterministic `MESH_SEGMENTS`-gon
-    /// tessellation used by the mesh arm; the analytic arms use `circle`.
+    /// curved section this is the deterministic tessellation used by the mesh
+    /// arm; the analytic arms use `circle`/`ellipse` or the exact edge data.
     verts: Vec<[f64; 3]>,
     /// `area_vec / |area_vec|`.
     normal: [f64; 3],
-    /// The loop's signed area (`|area_vec|`; `pi r^2` for a circle section).
+    /// The loop's exact signed area (`|area_vec|`; `pi r^2` for a circle
+    /// section, `pi a b` for an ellipse section, the Green's-theorem sum for a
+    /// line+arc loop).
     area: f64,
     /// The loop scale (max absolute coordinate), used for tolerances.
     scale: f64,
     /// The exact circle carrier when this section is a single recorded circle.
     circle: Option<CircleGeom>,
+    /// The exact local AABB of the loop (analytic for conics and arcs).
+    bbox: [[f64; 3]; 2],
+    /// The recorded loop kind (gates the exact loft arms).
+    kind: LoopKind,
 }
 
 /// The exact geometry of one recorded circle section: its centre, radius and
@@ -2515,6 +2660,109 @@ impl CircleGeom {
             self.radius * (-s * self.u[2] + c * self.v[2]),
         ]
     }
+}
+
+/// The exact geometry of one recorded ellipse section: its centre, the two
+/// semi-axes and a right-handed in-plane basis `(u, v)` with `u x v == normal`
+/// and `u` the `x_radius` axis.
+#[derive(Debug, Clone, Copy)]
+struct EllipseGeom {
+    /// The ellipse centre.
+    center: [f64; 3],
+    /// The semi-axis along `u`.
+    x_radius: f64,
+    /// The semi-axis along `v`.
+    y_radius: f64,
+    /// The `x_radius` in-plane basis vector.
+    u: [f64; 3],
+    /// The `y_radius` in-plane basis vector.
+    v: [f64; 3],
+}
+
+impl EllipseGeom {
+    /// The unit plane normal (`u x v`).
+    fn normal(self) -> [f64; 3] {
+        v3_cross(self.u, self.v)
+    }
+
+    /// The ellipse point at angle `theta` with `c = cos(theta)`, `s = sin(theta)`.
+    fn point(self, c: f64, s: f64) -> [f64; 3] {
+        [
+            self.center[0] + self.x_radius * c * self.u[0] + self.y_radius * s * self.v[0],
+            self.center[1] + self.x_radius * c * self.u[1] + self.y_radius * s * self.v[1],
+            self.center[2] + self.x_radius * c * self.u[2] + self.y_radius * s * self.v[2],
+        ]
+    }
+}
+
+/// Validates one recorded ellipse edge and builds its exact geometry plus the
+/// deterministic `MESH_SEGMENTS`-gon tessellation.
+fn ellipse_from_edge(
+    center: [f64; 3],
+    x_radius: f64,
+    y_radius: f64,
+    normal: [f64; 3],
+    x_dir: [f64; 3],
+) -> Result<(EllipseGeom, Vec<[f64; 3]>), Refusal> {
+    if !x_radius.is_finite() || !(x_radius > 0.0) || !y_radius.is_finite() || !(y_radius > 0.0) {
+        return Err(Refusal::Empty);
+    }
+    if !center.iter().all(|c| c.is_finite())
+        || !normal.iter().all(|c| c.is_finite())
+        || !x_dir.iter().all(|c| c.is_finite())
+    {
+        return Err(Refusal::Empty);
+    }
+    let mag = v3_norm(normal);
+    if !mag.is_finite() || !(mag > 0.0) {
+        return Err(Refusal::Empty);
+    }
+    let n = [normal[0] / mag, normal[1] / mag, normal[2] / mag];
+    let xmag = v3_norm(x_dir);
+    if !xmag.is_finite() || !(xmag > 0.0) {
+        return Err(Refusal::Empty);
+    }
+    let mut u = [x_dir[0] / xmag, x_dir[1] / xmag, x_dir[2] / xmag];
+    // Project the recorded x direction into the plane and renormalize so the
+    // recorded frame is exactly orthonormal even under small round-off.
+    let d = v3_dot(u, n);
+    u = [u[0] - d * n[0], u[1] - d * n[1], u[2] - d * n[2]];
+    let umag = v3_norm(u);
+    if !(umag > 1.0e-12) {
+        return Err(Refusal::UnsupportedEnvelope(
+            EnvelopeCase::NonCanonicalCarrier,
+        ));
+    }
+    u = [u[0] / umag, u[1] / umag, u[2] / umag];
+    let v = v3_cross(n, u);
+    let geom = EllipseGeom {
+        center,
+        x_radius,
+        y_radius,
+        u,
+        v,
+    };
+    let mut verts = Vec::with_capacity(MESH_SEGMENTS);
+    for k in 0..MESH_SEGMENTS {
+        let theta = TAU * k as f64 / MESH_SEGMENTS as f64;
+        verts.push(geom.point(theta.cos(), theta.sin()));
+    }
+    Ok((geom, verts))
+}
+
+/// The exact local AABB of one ellipse: along axis `e`, the support of
+/// `c + a cos(theta) u + b sin(theta) v` is `c_e +- sqrt((a u_e)^2 + (b v_e)^2)`.
+fn ellipse_bbox(geom: &EllipseGeom) -> [[f64; 3]; 2] {
+    let mut min = [0.0f64; 3];
+    let mut max = [0.0f64; 3];
+    for axis in 0..3 {
+        let extent = ((geom.x_radius * geom.u[axis]).powi(2)
+            + (geom.y_radius * geom.v[axis]).powi(2))
+        .sqrt();
+        min[axis] = geom.center[axis] - extent;
+        max[axis] = geom.center[axis] + extent;
+    }
+    [min, max]
 }
 
 /// A deterministic unit vector perpendicular to the unit vector `n` (the same
@@ -2591,15 +2839,18 @@ fn v3_dot(a: [f64; 3], b: [f64; 3]) -> f64 {
 }
 
 /// The all-line vertex list of a recorded 3-D profile (one vertex per edge, in
-/// order). `None` when any edge is a spline: a spline carrier cannot be
-/// flattened to its sample polygon, so the caller refuses typed rather than
+/// order). `None` when any edge is a spline or a conic: such a carrier cannot
+/// be flattened to its sample polygon, so the caller refuses typed rather than
 /// approximate.
 fn profile3_vertices(profile: &[ProfileEdge]) -> Option<Vec<[f64; 3]>> {
     let mut out = Vec::with_capacity(profile.len());
     for edge in profile {
         match edge {
             ProfileEdge::Line { a, .. } => out.push(*a),
-            ProfileEdge::Spline { .. } | ProfileEdge::Circle { .. } => return None,
+            ProfileEdge::Spline { .. }
+            | ProfileEdge::Circle { .. }
+            | ProfileEdge::Ellipse { .. }
+            | ProfileEdge::Arc { .. } => return None,
         }
     }
     if out.is_empty() {
@@ -2608,41 +2859,8 @@ fn profile3_vertices(profile: &[ProfileEdge]) -> Option<Vec<[f64; 3]>> {
     Some(out)
 }
 
-/// Builds and validates one closed planar line-loop profile.
-fn profile_loop(profile: &[ProfileEdge]) -> Result<ProfileLoop, Refusal> {
-    // A single recorded circle edge is a whole section: build the exact conic
-    // carrier (analytic area/extrema) plus its deterministic tessellation.
-    if let [
-        ProfileEdge::Circle {
-            center,
-            radius,
-            normal,
-        },
-    ] = profile
-    {
-        let (circle, verts) = circle_from_edge(*center, *radius, *normal)?;
-        let mut scale = 0.0f64;
-        for c in center.iter().chain(normal.iter()) {
-            scale = scale.max(c.abs());
-        }
-        scale = scale.max(v3_norm(*center) + radius);
-        return Ok(ProfileLoop {
-            verts,
-            normal: circle.normal(),
-            area: std::f64::consts::PI * radius * radius,
-            scale,
-            circle: Some(circle),
-        });
-    }
-    if profile
-        .iter()
-        .any(|edge| matches!(edge, ProfileEdge::Circle { .. }))
-    {
-        // A circle edge mixed with other edges is not a recorded section.
-        return Err(Refusal::UnsupportedEnvelope(
-            EnvelopeCase::NonCanonicalCarrier,
-        ));
-    }
+/// The closed loop vertex list of one all-line profile plus its exact AABB.
+fn polygon_loop(profile: &[ProfileEdge]) -> Result<ProfileLoop, Refusal> {
     let verts = profile3_vertices(profile).ok_or_else(|| {
         // A spline profile edge is not flattenable to its sample polygon; the
         // recording arm keeps the samples and the fact arm refuses typed.
@@ -2652,12 +2870,17 @@ fn profile_loop(profile: &[ProfileEdge]) -> Result<ProfileLoop, Refusal> {
         return Err(Refusal::Empty);
     }
     let mut scale = 0.0f64;
+    let mut min = [f64::INFINITY; 3];
+    let mut max = [f64::NEG_INFINITY; 3];
     for v in &verts {
-        for c in v {
+        for axis in 0..3 {
+            let c = v[axis];
             if !c.is_finite() {
                 return Err(Refusal::Empty);
             }
             scale = scale.max(c.abs());
+            min[axis] = min[axis].min(c);
+            max[axis] = max[axis].max(c);
         }
     }
     // The recorded edges must chain into a closed loop: consecutive edges share
@@ -2684,7 +2907,8 @@ fn profile_loop(profile: &[ProfileEdge]) -> Result<ProfileLoop, Refusal> {
             EnvelopeCase::NonCanonicalCarrier,
         ));
     }
-    // Right-hand area vector.
+    // Right-hand area vector (the exact shoelace, bit-identical to the landed
+    // line-profile arm).
     let mut ax = 0.0f64;
     let mut ay = 0.0f64;
     let mut az = 0.0f64;
@@ -2718,7 +2942,336 @@ fn profile_loop(profile: &[ProfileEdge]) -> Result<ProfileLoop, Refusal> {
         area: mag,
         scale,
         circle: None,
+        bbox: [min, max],
+        kind: LoopKind::Polygon,
     })
+}
+
+/// The sweep end angle of one recorded arc, normalized to be `>= start` (the
+/// recorded CCW span).
+fn arc_end_radians(start_deg: f64, end_deg: f64) -> f64 {
+    let start = start_deg.to_radians();
+    let mut end = end_deg.to_radians();
+    while end < start {
+        end += TAU;
+    }
+    end
+}
+
+/// The unit in-plane frame of a recorded arc/ellipse: `(u, v)` with `u` the
+/// recorded `x_dir` projected into the plane and `v = normal x u`.
+fn conic_frame(normal: [f64; 3], x_dir: [f64; 3]) -> Result<([f64; 3], [f64; 3]), Refusal> {
+    let mag = v3_norm(normal);
+    if !mag.is_finite() || !(mag > 0.0) {
+        return Err(Refusal::Empty);
+    }
+    let n = [normal[0] / mag, normal[1] / mag, normal[2] / mag];
+    let xmag = v3_norm(x_dir);
+    if !xmag.is_finite() || !(xmag > 0.0) {
+        return Err(Refusal::Empty);
+    }
+    let u0 = [x_dir[0] / xmag, x_dir[1] / xmag, x_dir[2] / xmag];
+    let d = v3_dot(u0, n);
+    let u1 = [u0[0] - d * n[0], u0[1] - d * n[1], u0[2] - d * n[2]];
+    let umag = v3_norm(u1);
+    if !(umag > 1.0e-12) {
+        return Err(Refusal::UnsupportedEnvelope(
+            EnvelopeCase::NonCanonicalCarrier,
+        ));
+    }
+    let u = [u1[0] / umag, u1[1] / umag, u1[2] / umag];
+    Ok((u, v3_cross(n, u)))
+}
+
+/// The point of one recorded arc at angle `theta` (radians).
+fn arc_point(center: [f64; 3], radius: f64, u: [f64; 3], v: [f64; 3], theta: f64) -> [f64; 3] {
+    let c = theta.cos();
+    let s = theta.sin();
+    [
+        center[0] + radius * (c * u[0] + s * v[0]),
+        center[1] + radius * (c * u[1] + s * v[1]),
+        center[2] + radius * (c * u[2] + s * v[2]),
+    ]
+}
+
+/// The exact Green's-theorem area-vector contribution of one circular arc:
+/// `(1/2) int X x X' dtheta` over `[a, b]`.
+fn arc_area_vector(
+    center: [f64; 3],
+    radius: f64,
+    u: [f64; 3],
+    v: [f64; 3],
+    a: f64,
+    b: f64,
+) -> [f64; 3] {
+    let cu = v3_cross(center, u);
+    let cv = v3_cross(center, v);
+    let uxv = v3_cross(u, v);
+    let dc = b.cos() - a.cos();
+    let ds = b.sin() - a.sin();
+    let dt = b - a;
+    let s = [
+        radius * (dc * cu[0] + ds * cv[0]) + radius * radius * dt * uxv[0],
+        radius * (dc * cu[1] + ds * cv[1]) + radius * radius * dt * uxv[1],
+        radius * (dc * cu[2] + ds * cv[2]) + radius * radius * dt * uxv[2],
+    ];
+    [0.5 * s[0], 0.5 * s[1], 0.5 * s[2]]
+}
+
+/// The exact AABB of one circular arc: the endpoints plus the in-span critical
+/// angles where the per-axis derivative vanishes.
+fn arc_bbox(
+    center: [f64; 3],
+    radius: f64,
+    u: [f64; 3],
+    v: [f64; 3],
+    a: f64,
+    b: f64,
+) -> [[f64; 3]; 2] {
+    let mut min = [f64::INFINITY; 3];
+    let mut max = [f64::NEG_INFINITY; 3];
+    for axis in 0..3 {
+        let ue = u[axis];
+        let ve = v[axis];
+        let star = ve.atan2(ue);
+        let mut candidates = [a, b, a, a, a, a, a, a, a, a];
+        let mut count = 2usize;
+        for k in -2..=2 {
+            let t = star + k as f64 * std::f64::consts::PI;
+            if t >= a - 1.0e-12 && t <= b + 1.0e-12 && count < candidates.len() {
+                candidates[count] = t;
+                count += 1;
+            }
+            let t2 = star + std::f64::consts::PI + k as f64 * std::f64::consts::PI;
+            if t2 >= a - 1.0e-12 && t2 <= b + 1.0e-12 && count < candidates.len() {
+                candidates[count] = t2;
+                count += 1;
+            }
+        }
+        for t in candidates.iter().take(count) {
+            let value = center[axis] + radius * (t.cos() * ue + t.sin() * ve);
+            min[axis] = min[axis].min(value);
+            max[axis] = max[axis].max(value);
+        }
+    }
+    [min, max]
+}
+
+/// Builds and validates one closed line+arc profile: the exact Green's-theorem
+/// area vector, the analytic arc extrema and the deterministic tessellation.
+fn curved_loop(profile: &[ProfileEdge]) -> Result<ProfileLoop, Refusal> {
+    let mut verts: Vec<[f64; 3]> = Vec::new();
+    let mut area_vec = [0.0f64; 3];
+    let mut min = [f64::INFINITY; 3];
+    let mut max = [f64::NEG_INFINITY; 3];
+    let mut scale = 0.0f64;
+    let mut starts: Vec<[f64; 3]> = Vec::new();
+    let mut ends: Vec<[f64; 3]> = Vec::new();
+    for edge in profile {
+        match edge {
+            ProfileEdge::Line { a, b } => {
+                if !a.iter().all(|c| c.is_finite()) || !b.iter().all(|c| c.is_finite()) {
+                    return Err(Refusal::Empty);
+                }
+                starts.push(*a);
+                ends.push(*b);
+                verts.push(*a);
+                let cross = v3_cross(*a, *b);
+                for axis in 0..3 {
+                    area_vec[axis] += 0.5 * cross[axis];
+                    scale = scale.max(a[axis].abs()).max(b[axis].abs());
+                    min[axis] = min[axis].min(a[axis]).min(b[axis]);
+                    max[axis] = max[axis].max(a[axis]).max(b[axis]);
+                }
+            }
+            ProfileEdge::Arc {
+                center,
+                radius,
+                normal,
+                x_dir,
+                start_angle,
+                end_angle,
+            } => {
+                if !radius.is_finite() || !(*radius > 0.0) || !center.iter().all(|c| c.is_finite()) {
+                    return Err(Refusal::Empty);
+                }
+                let (u, v) = conic_frame(*normal, *x_dir)?;
+                let a = start_angle.to_radians();
+                let b = arc_end_radians(*start_angle, *end_angle);
+                if !(b > a) {
+                    return Err(Refusal::UnsupportedEnvelope(
+                        EnvelopeCase::NonCanonicalCarrier,
+                    ));
+                }
+                let start = arc_point(*center, *radius, u, v, a);
+                let end = arc_point(*center, *radius, u, v, b);
+                starts.push(start);
+                ends.push(end);
+                let contribution = arc_area_vector(*center, *radius, u, v, a, b);
+                for axis in 0..3 {
+                    area_vec[axis] += contribution[axis];
+                }
+                let [bmin, bmax] = arc_bbox(*center, *radius, u, v, a, b);
+                for axis in 0..3 {
+                    min[axis] = min[axis].min(bmin[axis]);
+                    max[axis] = max[axis].max(bmax[axis]);
+                }
+                for c in center.iter() {
+                    scale = scale.max(c.abs());
+                }
+                scale = scale.max(v3_norm(*center) + radius);
+                // The deterministic tessellation: push the arc start and its
+                // interior samples (the end is the next edge's start).
+                let span = (b - a).abs();
+                let segments = ((span / TAU * MESH_SEGMENTS as f64).round() as usize).max(1);
+                for i in 0..segments {
+                    let t = a + span * i as f64 / segments as f64;
+                    verts.push(arc_point(*center, *radius, u, v, t));
+                }
+            }
+            ProfileEdge::Spline { .. }
+            | ProfileEdge::Circle { .. }
+            | ProfileEdge::Ellipse { .. } => {
+                return Err(Refusal::UnsupportedEnvelope(
+                    EnvelopeCase::NonCanonicalCarrier,
+                ));
+            }
+        }
+    }
+    if verts.len() < 3 {
+        return Err(Refusal::Empty);
+    }
+    // The recorded edges must chain into a closed loop.
+    let seam_tol = 1e-9 * (1.0 + scale);
+    let count = starts.len();
+    for i in 0..count {
+        let next = starts.get((i + 1) % count).ok_or(Refusal::Empty)?;
+        let gap = v3_norm(v3_sub(*ends.get(i).ok_or(Refusal::Empty)?, *next));
+        if !(gap <= seam_tol) {
+            return Err(Refusal::UnsupportedEnvelope(
+                EnvelopeCase::NonCanonicalCarrier,
+            ));
+        }
+    }
+    let mag = v3_norm(area_vec);
+    if !(mag > 0.0) || !mag.is_finite() {
+        return Err(Refusal::Empty);
+    }
+    let normal = [area_vec[0] / mag, area_vec[1] / mag, area_vec[2] / mag];
+    let origin = verts[0];
+    let planarity_tol = 1e-7 * (1.0 + scale);
+    for a in &verts {
+        let rel = v3_sub(*a, origin);
+        if v3_dot(rel, normal).abs() > planarity_tol {
+            return Err(Refusal::UnsupportedEnvelope(
+                EnvelopeCase::NonCanonicalCarrier,
+            ));
+        }
+    }
+    Ok(ProfileLoop {
+        verts,
+        normal,
+        area: mag,
+        scale,
+        circle: None,
+        bbox: [min, max],
+        kind: LoopKind::Curved,
+    })
+}
+
+/// Builds and validates one closed planar profile.
+fn profile_loop(profile: &[ProfileEdge]) -> Result<ProfileLoop, Refusal> {
+    // A single recorded circle edge is a whole section: build the exact conic
+    // carrier (analytic area/extrema) plus its deterministic tessellation.
+    if let [
+        ProfileEdge::Circle {
+            center,
+            radius,
+            normal,
+        },
+    ] = profile
+    {
+        let (circle, verts) = circle_from_edge(*center, *radius, *normal)?;
+        let mut scale = 0.0f64;
+        for c in center.iter().chain(normal.iter()) {
+            scale = scale.max(c.abs());
+        }
+        scale = scale.max(v3_norm(*center) + radius);
+        let mut min = [0.0f64; 3];
+        let mut max = [0.0f64; 3];
+        for axis in 0..3 {
+            let extent =
+                radius * (circle.u[axis] * circle.u[axis] + circle.v[axis] * circle.v[axis]).sqrt();
+            min[axis] = center[axis] - extent;
+            max[axis] = center[axis] + extent;
+        }
+        return Ok(ProfileLoop {
+            verts,
+            normal: circle.normal(),
+            area: std::f64::consts::PI * radius * radius,
+            scale,
+            circle: Some(circle),
+            bbox: [min, max],
+            kind: LoopKind::Circle,
+        });
+    }
+    // A single recorded ellipse edge is a whole section: the exact analytic
+    // ellipse carrier (area/extrema) plus its deterministic tessellation.
+    if let [
+        ProfileEdge::Ellipse {
+            center,
+            x_radius,
+            y_radius,
+            normal,
+            x_dir,
+        },
+    ] = profile
+    {
+        let (ellipse, verts) = ellipse_from_edge(*center, *x_radius, *y_radius, *normal, *x_dir)?;
+        let mut scale = 0.0f64;
+        for c in center.iter().chain(normal.iter()).chain(x_dir.iter()) {
+            scale = scale.max(c.abs());
+        }
+        scale = scale.max(v3_norm(*center) + x_radius.max(*y_radius));
+        return Ok(ProfileLoop {
+            verts,
+            normal: ellipse.normal(),
+            area: std::f64::consts::PI * x_radius * y_radius,
+            scale,
+            circle: None,
+            bbox: ellipse_bbox(&ellipse),
+            kind: LoopKind::Ellipse,
+        });
+    }
+    if profile.iter().any(|edge| {
+        matches!(
+            edge,
+            ProfileEdge::Circle { .. } | ProfileEdge::Ellipse { .. }
+        )
+    }) {
+        // A circle/ellipse edge mixed with other edges is not a recorded
+        // section.
+        return Err(Refusal::UnsupportedEnvelope(
+            EnvelopeCase::NonCanonicalCarrier,
+        ));
+    }
+    if profile
+        .iter()
+        .any(|edge| matches!(edge, ProfileEdge::Spline { .. }))
+    {
+        // A spline profile edge is not flattenable to its sample polygon; the
+        // recording arm keeps the samples and the fact arm refuses typed.
+        return Err(Refusal::UnsupportedEnvelope(
+            EnvelopeCase::NonCanonicalCarrier,
+        ));
+    }
+    if profile
+        .iter()
+        .all(|edge| matches!(edge, ProfileEdge::Line { .. }))
+    {
+        return polygon_loop(profile);
+    }
+    curved_loop(profile)
 }
 
 /// The unit normal of a difference vector, or `None` when it is degenerate.
@@ -2791,32 +3344,12 @@ pub(crate) fn prism_bbox(
     Ok([min, max])
 }
 
-/// The exact AABB of a profile loop: the support of any axis-aligned linear
-/// function over a polygon is attained at a polygon vertex, so the loop's
-/// bbox over its vertices is exact for the loop region.
+/// The exact AABB of a profile loop. It is computed at validation time: the
+/// vertex support for an all-line loop, the analytic extrema for a circle or
+/// ellipse section, and the endpoint/critical-angle extrema for a line+arc
+/// loop.
 fn loop_bbox(loop3: &ProfileLoop) -> [[f64; 3]; 2] {
-    if let Some(circle) = loop3.circle {
-        // The analytic extrema of a circle: along axis `e`, the support of
-        // `c + r (cos t u + sin t v)` is `c_e +- r sqrt(u_e^2 + v_e^2)`.
-        let mut min = [0.0f64; 3];
-        let mut max = [0.0f64; 3];
-        for axis in 0..3 {
-            let extent = circle.radius
-                * (circle.u[axis] * circle.u[axis] + circle.v[axis] * circle.v[axis]).sqrt();
-            min[axis] = circle.center[axis] - extent;
-            max[axis] = circle.center[axis] + extent;
-        }
-        return [min, max];
-    }
-    let mut min = [f64::INFINITY; 3];
-    let mut max = [f64::NEG_INFINITY; 3];
-    for v in &loop3.verts {
-        for axis in 0..3 {
-            min[axis] = min[axis].min(v[axis]);
-            max[axis] = max[axis].max(v[axis]);
-        }
-    }
-    [min, max]
+    loop3.bbox
 }
 
 /// The exact volume of a ruled two-section loft between two matched parallel
@@ -2911,9 +3444,16 @@ fn loft_sections(sections: &[Vec<ProfileEdge>]) -> Result<LoftSections, Refusal>
         .map(|s| profile_loop(s))
         .collect::<Result<_, _>>()?;
     let count = loops[0].verts.len();
-    let circle = loops[0].circle.is_some();
+    let kind = loops[0].kind;
+    if !matches!(kind, LoopKind::Polygon | LoopKind::Circle) {
+        // An ellipse or line+arc section has no exact ruled-loft carrier: it is
+        // not approximated by its chord polygon.
+        return Err(Refusal::UnsupportedEnvelope(
+            EnvelopeCase::NonCanonicalCarrier,
+        ));
+    }
     for loop3 in &loops {
-        if loop3.verts.len() != count || loop3.circle.is_some() != circle {
+        if loop3.verts.len() != count || loop3.kind != kind {
             // A matched ruled carrier needs equal vertex counts and a single
             // section kind (all polygon or all exact circle).
             return Err(Refusal::UnsupportedEnvelope(
@@ -3103,6 +3643,36 @@ fn reflect_profile_edge(edge: &ProfileEdge, axis: &str) -> ProfileEdge {
             radius: *radius,
             normal: reflect_point3(*normal, axis),
         },
+        ProfileEdge::Ellipse {
+            center,
+            x_radius,
+            y_radius,
+            normal,
+            x_dir,
+        } => ProfileEdge::Ellipse {
+            center: reflect_point3(*center, axis),
+            x_radius: *x_radius,
+            y_radius: *y_radius,
+            normal: reflect_point3(*normal, axis),
+            x_dir: reflect_point3(*x_dir, axis),
+        },
+        // A reflection reverses the arc traversal: the reflected carrier is
+        // the same circle swept from `-end` to `-start`.
+        ProfileEdge::Arc {
+            center,
+            radius,
+            normal,
+            x_dir,
+            start_angle,
+            end_angle,
+        } => ProfileEdge::Arc {
+            center: reflect_point3(*center, axis),
+            radius: *radius,
+            normal: reflect_point3(*normal, axis),
+            x_dir: reflect_point3(*x_dir, axis),
+            start_angle: -*end_angle,
+            end_angle: -*start_angle,
+        },
     }
 }
 
@@ -3152,6 +3722,25 @@ fn reflect_solid(solid: &SolidSpec, axis: &str) -> Result<SolidSpec, Refusal> {
         | SolidSpec::Cylinder { .. }
         | SolidSpec::Sphere { .. }
         | SolidSpec::Torus { .. } => solid.clone(),
+        // A frustum is symmetric about the x/y planes; the z reflection swaps
+        // the two radii.
+        SolidSpec::Cone {
+            bottom_radius,
+            top_radius,
+            height,
+        } => SolidSpec::Cone {
+            bottom_radius: if axis == "z" {
+                *top_radius
+            } else {
+                *bottom_radius
+            },
+            top_radius: if axis == "z" {
+                *bottom_radius
+            } else {
+                *top_radius
+            },
+            height: *height,
+        },
         SolidSpec::Lathe {
             profile,
             arc_deg,
@@ -3304,6 +3893,7 @@ fn solid_carrier_class(solid: &SolidSpec) -> CarrierClass {
         SolidSpec::Box { .. }
         | SolidSpec::Cylinder { .. }
         | SolidSpec::Sphere { .. }
+        | SolidSpec::Cone { .. }
         | SolidSpec::Prism { .. } => CarrierClass::Canonical,
         // The corpus spline-profile extrude carries a spline side surface, so
         // it classifies as the `Swept` carrier the facade's `Extrude` over a
@@ -4641,6 +5231,11 @@ fn solid_mesh(solid: &SolidSpec, deflection: Option<f64>) -> Result<Vec<Triangle
             })
         }
         SolidSpec::Sphere { radius } => sphere_mesh(*radius, deflection),
+        SolidSpec::Cone {
+            bottom_radius,
+            top_radius,
+            height,
+        } => cone_z_mesh(*bottom_radius, *top_radius, *height, deflection),
         SolidSpec::Torus { major, minor } => torus_mesh(*major, *minor, deflection),
         SolidSpec::Lathe {
             profile,
@@ -5040,6 +5635,70 @@ fn cylinder_z_mesh(
             let (x0, y0) = ring_point(&ring, segment);
             let (x1, y1) = ring_point(&ring, next);
             push_tri(&mut out, [0.0, 0.0, z], [x0, y0, z], [x1, y1, z]);
+        }
+    }
+    Ok(out)
+}
+
+/// A z-axis frustum mesh (bottom radius `r0` at `z = -h/2`, top radius `r1` at
+/// `z = +h/2`). A zero radius degenerates its cap to the axis point.
+fn cone_z_mesh(
+    bottom_radius: f64,
+    top_radius: f64,
+    height: f64,
+    deflection: Option<f64>,
+) -> Result<Vec<Triangle>, Refusal> {
+    if !bottom_radius.is_finite()
+        || !top_radius.is_finite()
+        || !height.is_finite()
+        || bottom_radius < 0.0
+        || top_radius < 0.0
+        || height <= 0.0
+        || bottom_radius == 0.0 && top_radius == 0.0
+    {
+        return Err(Refusal::Empty);
+    }
+    let segments = sweep_segments(bottom_radius.max(top_radius), deflection);
+    let bottom = ring_points(bottom_radius, segments);
+    let top = ring_points(top_radius, segments);
+    let z_bottom = -height / 2.0;
+    let z_top = height / 2.0;
+    let mut out = Vec::new();
+    for segment in 0..segments {
+        let next = segment + 1;
+        let (bx0, by0) = ring_point(&bottom, segment);
+        let (bx1, by1) = ring_point(&bottom, next);
+        let (tx0, ty0) = ring_point(&top, segment);
+        let (tx1, ty1) = ring_point(&top, next);
+        push_quad(
+            &mut out,
+            [bx0, by0, z_bottom],
+            [bx1, by1, z_bottom],
+            [tx1, ty1, z_top],
+            [tx0, ty0, z_top],
+        );
+    }
+    for segment in 0..segments {
+        let next = segment + 1;
+        let (bx0, by0) = ring_point(&bottom, segment);
+        let (bx1, by1) = ring_point(&bottom, next);
+        if bottom_radius > 0.0 {
+            push_tri(
+                &mut out,
+                [0.0, 0.0, z_bottom],
+                [bx0, by0, z_bottom],
+                [bx1, by1, z_bottom],
+            );
+        }
+        let (tx0, ty0) = ring_point(&top, segment);
+        let (tx1, ty1) = ring_point(&top, next);
+        if top_radius > 0.0 {
+            push_tri(
+                &mut out,
+                [0.0, 0.0, z_top],
+                [tx1, ty1, z_top],
+                [tx0, ty0, z_top],
+            );
         }
     }
     Ok(out)
