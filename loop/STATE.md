@@ -77,7 +77,7 @@ corrected, annex C = ORACLE POLICY CHANGE), then docs/SOLVER_COVERAGE_SPEC.md
 
 > LATEST GROUND TRUTH [operator 2026-09-11T08:36Z]: 0 RUNNING / 1
 > landed-by-operator (AUTHOR-WIRE-MIRROR-ARM bookkeeping completed) / 0
-> unblocked / 0 flipped / 0 dispatched. HEAD `0039227`. **THE TRIPLE-DISPATCH
+> unblocked / 0 flipped / 0 dispatched. HEAD `05795af`. **THE TRIPLE-DISPATCH
 > CLEARED**: all three AUTHOR-WIRE-MIRROR-ARM workers finished; slot 2 committed
 > `19acb3e` (RESULT DONE), the overnight driver merged it as `38d3534` and added a
 > landed-note, and the operator completed the bookkeeping the driver skipped:
@@ -95,8 +95,9 @@ corrected, annex C = ORACLE POLICY CHANGE), then docs/SOLVER_COVERAGE_SPEC.md
 > before). `dispatch_ready --dry-run`: dispatched 0; only RG-23/RG-9 flagged,
 > both on missing packets. Health: heartbeat exactly 1 (27872), operator_runner
 > 1 (27876), watchdog 1 (29264), overnight driver 1 (24864); TWO supervisors
-> (19172+27828) carried; disk 11.5 GiB free (above the 8 GB floor, below the 15
-> GB goal), RAM 4.4 GiB; cargoq UP (queued 0).
+> (19172+27828) carried; disk 11.5 GiB free at cycle entry, 8.58 GiB at exit
+> (the scoped test build in slot 2 consumed ~3 GiB; slot 2 is now IDLE, so the
+> janitor can reclaim its target), RAM 4.4-4.8 GiB; cargoq UP (queued 0).
 >
 > --- SUPERSEDED 2026-09-11T08:02Z note (kept for history) follows ---
 > LATEST GROUND TRUTH [operator 2026-09-11T08:02Z]: 3 RUNNING (all
@@ -6500,6 +6501,8 @@ STATE header) shows all eight slots FINISHED and no live worker; the prior
   rebooking: widen write set to add `ProfileEdge::Ellipse` + an arc edge, or
   re-scope to the names that fit); RG-23/RG-9 missing packet files (authoring).
 
-Leaving: 0 RUNNING; HEAD `0039227`; heartbeat 1 (27872); operator_runner 1
+Leaving: 0 RUNNING; HEAD `05795af`; heartbeat 1 (27872); operator_runner 1
 (27876); watchdog 1 (29264); ONE overnight driver (24864); TWO supervisors
-(carried); cargoq UP (queued 0); disk 11.52 GiB free; RAM 4.43 GiB.]
+(carried); cargoq UP (queued 0); disk 8.58 GiB free (the scoped test build
+consumed ~3 GiB; slot 2 now IDLE, janitor may reclaim its target); RAM 4.81
+GiB.]
