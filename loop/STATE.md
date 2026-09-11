@@ -75,6 +75,42 @@ corrected, annex C = ORACLE POLICY CHANGE), then docs/SOLVER_COVERAGE_SPEC.md
 
 ## Where we are
 
+> LATEST GROUND TRUTH [operator 2026-09-11T15:26Z]: 0 RUNNING / 0
+> landed-this-cycle / 0 unblocked / 0 flipped / 0 dispatched. HEAD `1138aa1`
+> (FOUR owner commits since the 15:05Z operator commit `8ec1dbb`: `86e6ac8`
+> kernel optional mesh deflection + colored indexed GLB emission; `f9a5381`
+> look --performance booking + README demo; `f59569b` rustfmt perf/bd_bridge;
+> `1138aa1` docs lead with renderer + build123d pipeline). **OWNER BREAK STILL
+> IN FORCE** (95b0bb8, 11:45Z; no break-lift commit exists). The quiet posture
+> is the owner's and not mine to lift - no dispatch, no flips. All 8 slots
+> FINISHED/IDLE, no live worker (zero cargo/rustc; opencode = this operator +
+> the human session). Slot 0 AUTHOR-CENSUS-NAMES wt RESULT SPEC_GAP + QUESTION.md
+> (geometry rebooking; NOT landable; tip 46ff8cc not an ancestor of HEAD -
+> re-verified). Slot 1 AUTHOR-WIRE-MIRROR-ARM wt RESULT "complete" (redundant;
+> tip 329f6ab = ancestor, no work). Slots 2-7 landed residue
+> (c3df084/e6553db/3c2109b/ee97499/713f205/5cf4811 all re-verified ancestors of
+> HEAD this cycle). Registry re-derived by command: 345 rows = 251 DONE / 83
+> READY / 10 BLOCKED / 1 SUPERSEDED; none of the 10 BLOCKED rows is mechanically
+> flippable (OWNER_BLOCKED / owner-cancelled / superseded / SPEC_GAP re-aimed /
+> owner-decision / milestone gates / unmet READY deps / TOR-C pinned on
+> authoring). `dispatch_ready --dry-run --max-workers=4`: "slots: 8 (0 running,
+> 8 free); slot-assigned packets: 6; dispatched 0; workers now ~0/4"; only
+> RG-23/RG-9 flagged (ANCHOR CHECK FAILED; registry packet:"" = authoring gap,
+> carried). Health: heartbeat exactly 1 (27872; the extra match is this
+> operator's own query line), operator_runner 1 (27876), watchdog 1 (29264), ONE
+> overnight driver (24864), TWO supervisors (19172+27828) carried; cargoq UP
+> (ping ok, queued 0, running false); **DISK ENTERED AT 6.2 GiB** -> `janitor
+> ensure --need 15` reclaimed ~2.1 GB -> 8.2 GiB (above the 8 GB floor, below
+> the 15 GiB goal; pool exhausted); RAM 5.7 GiB free (healthy). No TEMP
+> look-verify-baseline-* leaks. No new escalation. Root worktree carries the
+> live human-session WIP (tracked `loop/cargoq/server.log` + many untracked
+> docs/benchmarks/baselines) - left untouched, reported not actioned. Carried
+> human items unchanged: AUTHOR-CENSUS-NAMES SPEC_GAP rebooking; RG-23/RG-9
+> empty packet files; FRAME-REVOLVE F1 non_z_axis pin (ttc_lathe_spline.rs:255);
+> duplicate supervisors + lagging cargoq restart guard; slot-4/7 wt RESULT
+> residue; TOR-C flip-or-pin; schedule.py 'needs' crash.
+>
+> --- SUPERSEDED 2026-09-11T15:05Z note (kept for history) follows ---
 > LATEST GROUND TRUTH [operator 2026-09-11T15:05Z]: 0 RUNNING / 0
 > landed-this-cycle / 0 unblocked / 0 flipped / 0 dispatched. HEAD `67de35c`
 > (the 14:40Z operator commit; no new commits since). Root worktree carries a
