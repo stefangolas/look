@@ -19,7 +19,7 @@ read_allow:
   - truck123d/src/facade.rs
 tests_required: [truck123d/tests/door_partial_arc_flip.rs]
 anchors:
-  - {id: A1, expect: 1, cmd: "grep -c \"a partial-arc revolve is outside the executor's lathe arm\" corpus/ttc/door.py"}
+  - {id: A1, expect: 1, cmd: "grep -c 'a partial-arc revolve is outside the executor' corpus/ttc/door.py"}
 budget:      {turns: 30, ctx_tokens: 100000}
 ```
 
