@@ -1,0 +1,809 @@
+{
+ "id": "RDEF-M1-LATTICE-V2",
+ "packet": "RDEF-M1-LATTICE-V2",
+ "contract": [
+  "RDEF-M1-LATTICE-V2"
+ ],
+ "status": "DONE",
+ "branch": "packet/RDEF-M1-LATTICE-V2",
+ "anchors": {
+  "A1": 4,
+  "A1_cmd": "grep -c 'fragment_e' loop/solver_coverage/state.json",
+  "A1_nonzero": true
+ },
+ "summary": "RDEF-M1 lattice v2: CHK-5 added the relation.regime and relation.volume_evidence axes and the six rank-deficient zero-set children with their fixed local_dims; CHK-6 revised the goal predicates so volume_bracket accepts volume_evidence=sandwich_bounded; CHK-7 runs the OBL-K knowledge lift ON and OFF and reports both; CHK-8 encoded the nine section-7 rules as fragment E with confidence=proposed, kept out of the production numbers; CHK-9 checked reachability of every new rule. Acceptance (lift ON, in-scope 2x2): volume_bracket rank-deficient UNDECIDED = 0, retrodiction witness proved = True.",
+ "m1": {
+  "chk5_lattice_v2": {
+   "new_axes": {
+    "relation.regime": [
+     "unknown(residual)",
+     "transversal",
+     "tangential",
+     "singular_param"
+    ],
+    "relation.volume_evidence": [
+     "none(residual)",
+     "sandwich_bounded"
+    ]
+   },
+   "new_zero_set_children": {
+    "tangent_point": "0",
+    "tangent_crossing": "1",
+    "tangent_curve": "1",
+    "tangent_higher": "0",
+    "coincident": "src_min",
+    "near_degenerate(residual)": "residual"
+   },
+   "feasible_fact_states": 145920,
+   "t_geom_additions": [
+    "each new child fixes relation.local_dim (coincident = smaller source dimension)",
+    "relation.volume_evidence=sandwich_bounded => relation.regime=tangential"
+   ]
+  },
+  "chk6_goal_predicates": {
+   "volume_bracket": "knowledge in {all_components, complete_locus} AND (zero_set in {certified_empty, regular} OR volume_evidence=sandwich_bounded)",
+   "accepts_new_children": [
+    "local_contact",
+    "valid_brep",
+    "mesh"
+   ],
+   "rejects_near_degenerate": [
+    "local_contact",
+    "valid_brep",
+    "mesh"
+   ],
+   "material_class_unchanged": true
+  },
+  "chk7_dual_mode": {
+   "obligation": "OBL-K (section 4.5) is not discharged",
+   "lift_on": {
+    "A_G": 145920,
+    "W_G": 116736,
+    "M_G": 29184,
+    "U_G": 29184,
+    "R_G": 0,
+    "rank_def_undecided": 15360,
+    "rank_def_undecided_in_scope_2x2": 0,
+    "rank_def_undecided_named_refusal": 9600
+   },
+   "lift_off": {
+    "A_G": 145920,
+    "W_G": 78720,
+    "M_G": 67200,
+    "U_G": 67200,
+    "R_G": 0,
+    "rank_def_undecided": 41856,
+    "rank_def_undecided_in_scope_2x2": 5760,
+    "rank_def_undecided_named_refusal": 9600
+   },
+   "production_a_d": {
+    "A_G": 145920,
+    "W_G": 58368,
+    "M_G": 87552,
+    "U_G": 87552,
+    "R_G": 0,
+    "rank_def_undecided": 62208,
+    "rank_def_undecided_in_scope_2x2": 17664,
+    "rank_def_undecided_named_refusal": 9600
+   }
+  },
+  "chk8_fragment_e": {
+   "rule_ids": [
+    "E-ADMISSION-REGIME-DICHOTOMY",
+    "E-ADMISSION-REGIME-DICHOTOMY-1D",
+    "E-VOLUME-TANGENTIAL-SANDWICH",
+    "E-TANGENCY-WITNESS-QUADRIC-PENCIL",
+    "E-TANGENCY-WITNESS-SHARED-CARRIER",
+    "E-TANGENCY-WITNESS-CONSTRUCTION",
+    "E-TANGENCY-NUMERIC-COLLINEAR-NORMAL",
+    "E-TANGENCY-NUMERIC-1D",
+    "E-TANGENCY-WITNESS-ZERO-BOUND"
+   ],
+   "confidence": "proposed",
+   "merged_into_production": false,
+   "projection": {
+    "no_intersection": {
+     "A_G": 145920,
+     "W_G": 49920,
+     "M_G": 69120,
+     "U_G": 69120,
+     "R_G": 26880,
+     "rank_def_undecided": 36480,
+     "rank_def_undecided_in_scope_2x2": 9600,
+     "rank_def_undecided_named_refusal": 0
+    },
+    "local_contact": {
+     "A_G": 145920,
+     "W_G": 131520,
+     "M_G": 0,
+     "U_G": 0,
+     "R_G": 14400,
+     "rank_def_undecided": 0,
+     "rank_def_undecided_in_scope_2x2": 0,
+     "rank_def_undecided_named_refusal": 0
+    },
+    "complete_locus": {
+     "A_G": 145920,
+     "W_G": 145920,
+     "M_G": 0,
+     "U_G": 0,
+     "R_G": 0,
+     "rank_def_undecided": 0,
+     "rank_def_undecided_in_scope_2x2": 0,
+     "rank_def_undecided_named_refusal": 0
+    },
+    "material_class": {
+     "A_G": 145920,
+     "W_G": 117120,
+     "M_G": 28800,
+     "U_G": 28800,
+     "R_G": 0,
+     "rank_def_undecided": 28800,
+     "rank_def_undecided_in_scope_2x2": 9600,
+     "rank_def_undecided_named_refusal": 0
+    },
+    "valid_brep": {
+     "A_G": 145920,
+     "W_G": 134400,
+     "M_G": 11520,
+     "U_G": 11520,
+     "R_G": 0,
+     "rank_def_undecided": 6240,
+     "rank_def_undecided_in_scope_2x2": 0,
+     "rank_def_undecided_named_refusal": 720
+    },
+    "volume_bracket": {
+     "A_G": 145920,
+     "W_G": 116736,
+     "M_G": 29184,
+     "U_G": 29184,
+     "R_G": 0,
+     "rank_def_undecided": 15360,
+     "rank_def_undecided_in_scope_2x2": 0,
+     "rank_def_undecided_named_refusal": 9600
+    },
+    "mesh": {
+     "A_G": 145920,
+     "W_G": 145920,
+     "M_G": 0,
+     "U_G": 0,
+     "R_G": 0,
+     "rank_def_undecided": 0,
+     "rank_def_undecided_in_scope_2x2": 0,
+     "rank_def_undecided_named_refusal": 0
+    }
+   },
+   "projection_lift_off": {
+    "volume_bracket": {
+     "A_G": 145920,
+     "W_G": 78720,
+     "M_G": 67200,
+     "U_G": 67200,
+     "R_G": 0,
+     "rank_def_undecided": 41856,
+     "rank_def_undecided_in_scope_2x2": 5760,
+     "rank_def_undecided_named_refusal": 9600
+    }
+   }
+  },
+  "chk9_reachability": {
+   "door_reached_targets": [
+    "ADMISSION-CERTIFY-TRANSVERSE-PAIR",
+    "C-CLASSIFY-SAMPLE-INSIDE",
+    "C-CLASSIFY-WINDING-NUMBER",
+    "C-GATE-ARCCERT-TRY-NEW",
+    "C-GATE-BEZIERLEAF1-TRY-NEW",
+    "C-GATE-FRAME-TRY-NEW",
+    "C-GATE-POINTCERT-TRY-NEW",
+    "C-SPLIT-CERTIFY-CROSSINGS",
+    "C-SPLIT-CERTIFY-OFF-LOOP",
+    "C-SPLIT-TRIM-CLIP",
+    "D-MARSHAL-FROM-REFUSAL",
+    "construct::bie::ssi4::register_restricted_pair_solver",
+    "construct::volume_facts::certify_algebraic_trim_bracket",
+    "construct::volume_facts::certify_patch_form",
+    "ssi_admit::register_ssi_admit_solver"
+   ],
+   "rules": [
+    {
+     "rule_id": "E-ADMISSION-REGIME-DICHOTOMY",
+     "reachable_from_door": false,
+     "routing_gap": true,
+     "first_witness_in_model": true,
+     "calls": [
+      "ADMISSION-WHOLE-BOX-REGULAR-CONE"
+     ]
+    },
+    {
+     "rule_id": "E-ADMISSION-REGIME-DICHOTOMY-1D",
+     "reachable_from_door": false,
+     "routing_gap": true,
+     "first_witness_in_model": true,
+     "calls": []
+    },
+    {
+     "rule_id": "E-VOLUME-TANGENTIAL-SANDWICH",
+     "reachable_from_door": false,
+     "routing_gap": true,
+     "first_witness_in_model": true,
+     "calls": [
+      "E-ADMISSION-REGIME-DICHOTOMY"
+     ]
+    },
+    {
+     "rule_id": "E-TANGENCY-WITNESS-QUADRIC-PENCIL",
+     "reachable_from_door": false,
+     "routing_gap": true,
+     "first_witness_in_model": false,
+     "calls": []
+    },
+    {
+     "rule_id": "E-TANGENCY-WITNESS-SHARED-CARRIER",
+     "reachable_from_door": false,
+     "routing_gap": true,
+     "first_witness_in_model": false,
+     "calls": []
+    },
+    {
+     "rule_id": "E-TANGENCY-WITNESS-CONSTRUCTION",
+     "reachable_from_door": false,
+     "routing_gap": true,
+     "first_witness_in_model": false,
+     "calls": []
+    },
+    {
+     "rule_id": "E-TANGENCY-NUMERIC-COLLINEAR-NORMAL",
+     "reachable_from_door": false,
+     "routing_gap": true,
+     "first_witness_in_model": true,
+     "calls": [
+      "TANGENCY-SYSTEM-FROM-DEFLATED"
+     ]
+    },
+    {
+     "rule_id": "E-TANGENCY-NUMERIC-1D",
+     "reachable_from_door": false,
+     "routing_gap": true,
+     "first_witness_in_model": false,
+     "calls": []
+    },
+    {
+     "rule_id": "E-TANGENCY-WITNESS-ZERO-BOUND",
+     "reachable_from_door": false,
+     "routing_gap": true,
+     "first_witness_in_model": false,
+     "calls": []
+    }
+   ],
+   "routing_gaps": [
+    "E-ADMISSION-REGIME-DICHOTOMY",
+    "E-ADMISSION-REGIME-DICHOTOMY-1D",
+    "E-VOLUME-TANGENTIAL-SANDWICH",
+    "E-TANGENCY-WITNESS-QUADRIC-PENCIL",
+    "E-TANGENCY-WITNESS-SHARED-CARRIER",
+    "E-TANGENCY-WITNESS-CONSTRUCTION",
+    "E-TANGENCY-NUMERIC-COLLINEAR-NORMAL",
+    "E-TANGENCY-NUMERIC-1D",
+    "E-TANGENCY-WITNESS-ZERO-BOUND"
+   ]
+  },
+  "acceptance": {
+   "scope": "surface-surface (src_dims=2x2) rank-deficient volume_bracket, regimes {unknown(residual), tangential}; 1x1/2x1 is the out-of-scope section 1.3 knowledge-lifting gap and singular_param is a named refusal",
+   "volume_bracket_rank_def_undecided_in_scope_lift": 0,
+   "volume_bracket_rank_def_undecided_in_scope_no_lift": 5760,
+   "volume_bracket_rank_def_undecided_in_scope_production": 17664,
+   "volume_bracket_rank_def_undecided_all_lift": 15360,
+   "volume_bracket_rank_def_undecided_all_no_lift": 41856,
+   "volume_bracket_rank_def_undecided_all_production": 62208,
+   "volume_bracket_named_refusal_lift": 9600,
+   "retrodiction_witness_cell": {
+    "relation.src_dims": "2x2",
+    "relation.zero_set": "rank_deficient(residual)",
+    "relation.local_dim": "0",
+    "global.knowledge": "local_only(residual)",
+    "relation.regime": "unknown(residual)",
+    "relation.volume_evidence": "none(residual)"
+   },
+   "retrodiction_witness_states": 192,
+   "retrodiction_witness_proved_lift": true,
+   "retrodiction_witness_proved_no_lift": true,
+   "retrodiction_witness_proved_production": false,
+   "acceptance_holds": true
+  },
+  "residual_gaps_section_1_3": {
+   "spec_section_1_3_declared": {
+    "volume_bracket_1x1_2x1_knowledge_lift": 5760,
+    "no_intersection_1x1_2x1_unknown_vertical": 5760,
+    "valid_brep_2x1_partial": 1920
+   },
+   "observed": {
+    "no_intersection_1x1_2x1_unknown": 5760,
+    "valid_brep_2x1_partial": 1920,
+    "volume_bracket_2x1": 5760,
+    "volume_bracket_1x1": 5760
+   },
+   "matches_spec_section_1_3": true
+  }
+ },
+ "notes": "M1 modelling notes. (1) Schema: loop/solver_coverage/schema.json; `!unmodeled` preconditions live in the preconditions array with the `!unmodeled:` prefix (Q1). (2) OBL-S1 (sandwich/flux-bracket composition) is unresolved and modelled as an additive volume_evidence axis (Q2). (3) The 1x1/2x1 volume measure is not determined from the model and stays an [ASM] (Q3). (4) `regular` means regular-where-nonempty, decided in M0 (Q4). (5) The admission rule's Transversal outcome refines zero_set to regular and local_dim to 1 (a transversal contact is regular); the preconditions name the local_dim axis as a union so the refinement is modelled. (6) The M1 acceptance is scoped to the audited 2x2 gap; the 1x1/2x1 knowledge-lifting gap is out of scope and reported, and singular_param/near_degenerate are named refusals. (7) All nine fragment-E rules are flagged as routing gaps because they are proposed and not wired into the door/bridge path; W4 is off by default and excluded from the default projection.",
+ "open_questions_section_11": {
+  "q1_fragment_schema": "The schema is loop/solver_coverage/schema.json (rule_id, kind, source, preconditions, outcomes, refusals, consumes_evidence, produces_evidence, calls, theorem_comment, confidence). Fragment E is encoded as loop/solver_coverage/fragments/E.json; the fragment enum gained \"E\" and the confidence enum gained \"proposed\". `!unmodeled` preconditions go in the preconditions array as axis/value strings prefixed `!unmodeled:` (fragment E has four such axis keys); CompiledRule abstracts them and they never enter the coverage arithmetic.",
+  "q2_obl_s1_composition": "Unresolved. The checker models the sandwich as an additive relation.volume_evidence axis and does not claim that the contact-cover flux bracket composes with the sandwich term. OBL-S1 remains a kernel proof obligation for M2.",
+  "q3_1x1_2x1_measure": "Not determined from the model. Lattice v2 applies the same volume_evidence=sandwich_bounded axis to all src_dims; whether the curve-relation volume measure is the trim-arrangement area feeding the flux bracket is recorded as [ASM] to confirm in M2 (spec section 3.2).",
+  "q4_regular_nonempty": "Decided in M0 (docs/SOLVER_COVERAGE_SPEC.md section 6.1): `regular` means \"regular where nonempty\"; it does not assert nonemptiness, so it does not refute no_intersection."
+ },
+ "rdef_m0": {
+  "id": "RDEF-M0-CHECKER-ACCOUNTING",
+  "anchors": {
+   "A1": 2,
+   "A1_expected": 2,
+   "A1_holds": true
+  },
+  "chk1_three_way": {
+   "no_intersection": {
+    "A_G": 24960,
+    "proved": 7680,
+    "refuted": 9600,
+    "undecided": 7680
+   },
+   "local_contact": {
+    "A_G": 24960,
+    "proved": 22080,
+    "refuted": 2880,
+    "undecided": 0
+   },
+   "complete_locus": {
+    "A_G": 24960,
+    "proved": 24960,
+    "refuted": 0,
+    "undecided": 0
+   },
+   "material_class": {
+    "A_G": 24960,
+    "proved": 24960,
+    "refuted": 0,
+    "undecided": 0
+   },
+   "valid_brep": {
+    "A_G": 24960,
+    "proved": 23040,
+    "refuted": 0,
+    "undecided": 1920
+   },
+   "volume_bracket": {
+    "A_G": 24960,
+    "proved": 9600,
+    "refuted": 0,
+    "undecided": 15360
+   },
+   "mesh": {
+    "A_G": 24960,
+    "proved": 24960,
+    "refuted": 0,
+    "undecided": 0
+   }
+  },
+  "chk2_tightening": {
+   "feasible_fact_states_before": 43200,
+   "feasible_fact_states_after": 24960,
+   "before": {
+    "no_intersection": {
+     "A_G": 43200,
+     "W_G": 16320,
+     "M_G": 26880
+    },
+    "local_contact": {
+     "A_G": 43200,
+     "W_G": 31680,
+     "M_G": 11520
+    },
+    "complete_locus": {
+     "A_G": 43200,
+     "W_G": 43200,
+     "M_G": 0
+    },
+    "material_class": {
+     "A_G": 43200,
+     "W_G": 43200,
+     "M_G": 0
+    },
+    "valid_brep": {
+     "A_G": 43200,
+     "W_G": 39360,
+     "M_G": 3840
+    },
+    "volume_bracket": {
+     "A_G": 43200,
+     "W_G": 17856,
+     "M_G": 25344
+    },
+    "mesh": {
+     "A_G": 43200,
+     "W_G": 43200,
+     "M_G": 0
+    }
+   },
+   "after": {
+    "no_intersection": {
+     "A_G": 24960,
+     "W_G": 7680,
+     "M_G": 17280
+    },
+    "local_contact": {
+     "A_G": 24960,
+     "W_G": 22080,
+     "M_G": 2880
+    },
+    "complete_locus": {
+     "A_G": 24960,
+     "W_G": 24960,
+     "M_G": 0
+    },
+    "material_class": {
+     "A_G": 24960,
+     "W_G": 24960,
+     "M_G": 0
+    },
+    "valid_brep": {
+     "A_G": 24960,
+     "W_G": 23040,
+     "M_G": 1920
+    },
+    "volume_bracket": {
+     "A_G": 24960,
+     "W_G": 9600,
+     "M_G": 15360
+    },
+    "mesh": {
+     "A_G": 24960,
+     "W_G": 24960,
+     "M_G": 0
+    }
+   }
+  },
+  "chk3_coverage_metrics": {
+   "no_intersection": {
+    "A_G": 24960,
+    "fail_closed_proved": 7680,
+    "fail_closed_pct": 30.77,
+    "strict_proved": 7680,
+    "strict_pct": 30.77,
+    "refuted": 9600,
+    "undecided": 7680
+   },
+   "local_contact": {
+    "A_G": 24960,
+    "fail_closed_proved": 22080,
+    "fail_closed_pct": 88.46,
+    "strict_proved": 19200,
+    "strict_pct": 76.92,
+    "refuted": 2880,
+    "undecided": 0
+   },
+   "complete_locus": {
+    "A_G": 24960,
+    "fail_closed_proved": 24960,
+    "fail_closed_pct": 100.0,
+    "strict_proved": 4992,
+    "strict_pct": 20.0,
+    "refuted": 0,
+    "undecided": 0
+   },
+   "material_class": {
+    "A_G": 24960,
+    "fail_closed_proved": 24960,
+    "fail_closed_pct": 100.0,
+    "strict_proved": 24960,
+    "strict_pct": 100.0,
+    "refuted": 0,
+    "undecided": 0
+   },
+   "valid_brep": {
+    "A_G": 24960,
+    "fail_closed_proved": 23040,
+    "fail_closed_pct": 92.31,
+    "strict_proved": 16800,
+    "strict_pct": 67.31,
+    "refuted": 0,
+    "undecided": 1920
+   },
+   "volume_bracket": {
+    "A_G": 24960,
+    "fail_closed_proved": 9600,
+    "fail_closed_pct": 38.46,
+    "strict_proved": 6144,
+    "strict_pct": 24.62,
+    "refuted": 0,
+    "undecided": 15360
+   },
+   "mesh": {
+    "A_G": 24960,
+    "fail_closed_proved": 24960,
+    "fail_closed_pct": 100.0,
+    "strict_proved": 22080,
+    "strict_pct": 88.46,
+    "refuted": 0,
+    "undecided": 0
+   }
+  },
+  "chk4_regular": {
+   "semantics": "regular where nonempty",
+   "cascade_routes_reaudited": [
+    "TANGENCY-CASCADE-REFINE-EMPTY",
+    "TANGENCY-CASCADE-STAGE3-CRITICAL-VALUE",
+    "TANGENCY-CASCADE-CLASSIFY-BOX"
+   ],
+   "routes_changed_status": []
+  },
+  "adjudications": [
+   {
+    "kind": "rule_id_content_mismatch",
+    "rule_id": "TANGENCY-TSYSTEM-FROM-DEFLATED",
+    "verdict": "fragment B is source-faithful; fragment A over-claims",
+    "keep_fragment": "B",
+    "evidence": "vendor/truck/truck-certified/src/tangency/tsystem.rs:82-96",
+    "rationale": "TSystem::from_deflated only constructs T = (G1, G2, M1, M2) from a stored SquareSystem3 and its Rank2Chart (lines 86-95). It emits neither a construction witness nor an exact-implicit predicate, so fragment A's frozen-axis outcomes rep.construction_witness=true and rep.exact_implicit=true are unsupported. Fragment B models exactly what the source does: the unit-chart rows and the KrawczykSystem<4> instantiation, with no frozen-axis claim."
+   },
+   {
+    "kind": "postcondition_claim_mismatch",
+    "symbol": "crate::tangency::exclude::exclude_rec",
+    "variant": "ExclusionEvidence::NoRootFiveEq",
+    "verdict": "the minimal claim {relation.zero_set: certified_empty} is source-faithful",
+    "drop_postconditions": [
+     {
+      "axis": "global.knowledge",
+      "value": "local_only(residual)"
+     }
+    ],
+    "evidence": "vendor/truck/truck-certified/src/tangency/exclude.rs:166-211",
+    "rationale": "exclude_rec returns NoRootFiveEq { spend } when a single equation is separated from zero (line 176) or when a 4-of-5 square subsystem has no Krawczyk root (line 187). Either way it certifies that the five-equation system has no root, i.e. relation.zero_set = certified_empty, and it raises no global knowledge. The extra global.knowledge = local_only(residual) is the bottom of the knowledge order: a no-op restatement, not a disagreeing claim."
+   },
+   {
+    "kind": "postcondition_claim_mismatch",
+    "symbol": "formal::span::CurveSpan2",
+    "variant": "CurveSpan2::RationalBezier",
+    "verdict": "the declared-only claim {goal: complete_locus} is source-faithful",
+    "drop_postconditions": [
+     {
+      "axis": "rep.bernstein_chart",
+      "value": "true"
+     },
+     {
+      "axis": "rep.rational_positive_weights",
+      "value": "true"
+     }
+    ],
+    "evidence": "vendor/truck/truck-certified/src/formal/span.rs:119-137",
+    "rationale": "span.rs declares the RationalBezier(RationalBezierSpan2) variant so the contract's variant set is frozen before any code depends on it; its constructor and certified operations land in GEN-001B (lines 13-15, 119-122). Being the variant does not itself certify rep.bernstein_chart or rep.rational_positive_weights. SPAN-FAMILY-INDEPENDENT-CONTRACT over-claims those flags; SPAN-RATIONAL-BEZIER-THEORY records the declaration only."
+   }
+  ]
+ },
+ "lattice": {
+  "feasible_fact_states": 24960,
+  "goals": {
+   "no_intersection": {
+    "A_G": 24960,
+    "W_G": 7680,
+    "M_G": 7680
+   },
+   "local_contact": {
+    "A_G": 24960,
+    "W_G": 22080,
+    "M_G": 0
+   },
+   "complete_locus": {
+    "A_G": 24960,
+    "W_G": 24960,
+    "M_G": 0
+   },
+   "material_class": {
+    "A_G": 24960,
+    "W_G": 24960,
+    "M_G": 0
+   },
+   "valid_brep": {
+    "A_G": 24960,
+    "W_G": 23040,
+    "M_G": 1920
+   },
+   "volume_bracket": {
+    "A_G": 24960,
+    "W_G": 9600,
+    "M_G": 15360
+   },
+   "mesh": {
+    "A_G": 24960,
+    "W_G": 24960,
+    "M_G": 0
+   }
+  }
+ },
+ "demonstration_retrodiction": {
+  "goal": "volume_bracket",
+  "rank_deficient_residual_uncovered": true,
+  "detail": "**RETRODICTION HOLDS.** For the swept-operand boolean volume goal (`goal=volume_bracket` over a `2x2` surface relation, the `cut(swept,*)` / `fuse(swept,*)` class of the op-capability matrix), the rank-deficient residual parent is **UNCOVERED (theory gap)**. The checker re-derives the gap the loop historically discovered reactively over four census rounds: no rule whose goal precondition is `volume_bracket` (or absent) refines `relation.zero_set=rank_deficient(residual)` into `regular` or `certified_empty`, so the residual cannot reach a volume-proving state.\nWitness cell: `relation.src_dims=2x2, relation.zero_set=rank_deficient(residual), relation.local_dim=0, global.knowledge=local_only(residual), goal=volume_bracket`."
+ },
+ "demonstration_deliberate_gap": {
+  "removed_rule": "C-CLASSIFY-DISCHARGE-COMPLETENESS",
+  "orphaned_cells": [
+   {
+    "goal": "complete_locus",
+    "count": 15264,
+    "cells": [
+     {
+      "relation.src_dims": "2x2",
+      "relation.zero_set": "rank_deficient(residual)",
+      "relation.local_dim": "0",
+      "relation.incidence": "domain_interior(residual)",
+      "global.knowledge": "local_only(residual)",
+      "state_count": 48
+     },
+     {
+      "relation.src_dims": "2x2",
+      "relation.zero_set": "rank_deficient(residual)",
+      "relation.local_dim": "0",
+      "relation.incidence": "domain_interior(residual)",
+      "global.knowledge": "loop_free",
+      "state_count": 48
+     },
+     {
+      "relation.src_dims": "2x2",
+      "relation.zero_set": "rank_deficient(residual)",
+      "relation.local_dim": "0",
+      "relation.incidence": "domain_interior(residual)",
+      "global.knowledge": "seed_complete",
+      "state_count": 48
+     },
+     {
+      "relation.src_dims": "2x2",
+      "relation.zero_set": "rank_deficient(residual)",
+      "relation.local_dim": "0",
+      "relation.incidence": "domain_interior(residual)",
+      "global.knowledge": "all_components",
+      "state_count": 48
+     },
+     {
+      "relation.src_dims": "2x2",
+      "relation.zero_set": "rank_deficient(residual)",
+      "relation.local_dim": "0",
+      "relation.incidence": "seam",
+      "global.knowledge": "local_only(residual)",
+      "state_count": 48
+     },
+     {
+      "relation.src_dims": "2x2",
+      "relation.zero_set": "rank_deficient(residual)",
+      "relation.local_dim": "0",
+      "relation.incidence": "seam",
+      "global.knowledge": "loop_free",
+      "state_count": 48
+     },
+     {
+      "relation.src_dims": "2x2",
+      "relation.zero_set": "rank_deficient(residual)",
+      "relation.local_dim": "0",
+      "relation.incidence": "seam",
+      "global.knowledge": "seed_complete",
+      "state_count": 48
+     },
+     {
+      "relation.src_dims": "2x2",
+      "relation.zero_set": "rank_deficient(residual)",
+      "relation.local_dim": "0",
+      "relation.incidence": "seam",
+      "global.knowledge": "all_components",
+      "state_count": 48
+     },
+     {
+      "relation.src_dims": "2x2",
+      "relation.zero_set": "rank_deficient(residual)",
+      "relation.local_dim": "0",
+      "relation.incidence": "knot_span_boundary",
+      "global.knowledge": "local_only(residual)",
+      "state_count": 48
+     },
+     {
+      "relation.src_dims": "2x2",
+      "relation.zero_set": "rank_deficient(residual)",
+      "relation.local_dim": "0",
+      "relation.incidence": "knot_span_boundary",
+      "global.knowledge": "loop_free",
+      "state_count": 48
+     },
+     {
+      "relation.src_dims": "2x2",
+      "relation.zero_set": "rank_deficient(residual)",
+      "relation.local_dim": "0",
+      "relation.incidence": "knot_span_boundary",
+      "global.knowledge": "seed_complete",
+      "state_count": 48
+     },
+     {
+      "relation.src_dims": "2x2",
+      "relation.zero_set": "rank_deficient(residual)",
+      "relation.local_dim": "0",
+      "relation.incidence": "knot_span_boundary",
+      "global.knowledge": "all_components",
+      "state_count": 48
+     },
+     {
+      "relation.src_dims": "2x2",
+      "relation.zero_set": "rank_deficient(residual)",
+      "relation.local_dim": "0",
+      "relation.incidence": "domain_edge",
+      "global.knowledge": "local_only(residual)",
+      "state_count": 48
+     },
+     {
+      "relation.src_dims": "2x2",
+      "relation.zero_set": "rank_deficient(residual)",
+      "relation.local_dim": "0",
+      "relation.incidence": "domain_edge",
+      "global.knowledge": "loop_free",
+      "state_count": 48
+     },
+     {
+      "relation.src_dims": "2x2",
+      "relation.zero_set": "rank_deficient(residual)",
+      "relation.local_dim": "0",
+      "relation.incidence": "domain_edge",
+      "global.knowledge": "seed_complete",
+      "state_count": 48
+     },
+     {
+      "relation.src_dims": "2x2",
+      "relation.zero_set": "rank_deficient(residual)",
+      "relation.local_dim": "0",
+      "relation.incidence": "domain_edge",
+      "global.knowledge": "all_components",
+      "state_count": 48
+     },
+     {
+      "relation.src_dims": "2x2",
+      "relation.zero_set": "rank_deficient(residual)",
+      "relation.local_dim": "1",
+      "relation.incidence": "domain_interior(residual)",
+      "global.knowledge": "local_only(residual)",
+      "state_count": 48
+     },
+     {
+      "relation.src_dims": "2x2",
+      "relation.zero_set": "rank_deficient(residual)",
+      "relation.local_dim": "1",
+      "relation.incidence": "domain_interior(residual)",
+      "global.knowledge": "seed_complete",
+      "state_count": 48
+     },
+     {
+      "relation.src_dims": "2x2",
+      "relation.zero_set": "rank_deficient(residual)",
+      "relation.local_dim": "1",
+      "relation.incidence": "domain_interior(residual)",
+      "global.knowledge": "all_components",
+      "state_count": 48
+     },
+     {
+      "relation.src_dims": "2x2",
+      "relation.zero_set": "rank_deficient(residual)",
+      "relation.local_dim": "1",
+      "relation.incidence": "seam",
+      "global.knowledge": "local_only(residual)",
+      "state_count": 48
+     }
+    ]
+   }
+  ],
+  "suggested_rule": "SSI4-KRAWCZYK-UNIQUENESS",
+  "suggested_rule_orphaned": 0
+ },
+ "artifacts": [
+  "loop/solver_coverage/checker.py",
+  "loop/solver_coverage/schema.json",
+  "loop/solver_coverage/fragments/E.json",
+  "loop/solver_coverage/state.json",
+  "loop/solver_coverage/test_checker.py",
+  "docs/SOLVER_COVERAGE_AUDIT.md",
+  "docs/SOLVER_COVERAGE_AUDIT.deliberate-gap.md",
+  "docs/SOLVER_COVERAGE_SPEC.md"
+ ]
+}
