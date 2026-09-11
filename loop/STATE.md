@@ -76,11 +76,14 @@ corrected, annex C = ORACLE POLICY CHANGE), then docs/SOLVER_COVERAGE_SPEC.md
 ## Where we are
 
 > LATEST GROUND TRUTH: read the newest `[operator ...]` block in "State of
-> the machine, as left" (2026-09-11T07:12Z). [operator 2026-09-11T07:12Z
-> ground-truth note: 2 RUNNING / 0 landed-by-operator / 0 unblocked / 0 flipped.
-> HEAD `329f6ab` (the 06:47Z operator STATE commit). **BOTH running slots are
-> AUTHOR-WIRE-MIRROR-ARM - a DOUBLE-DISPATCH** (slot 0 cmd 18540 -> opencode
-> 31940, forked 06:29:36Z; slot 1 cmd 32348 -> opencode 26564, forked 06:52:05Z).
+> the machine, as left" (2026-09-11T07:16Z). [operator 2026-09-11T07:16Z
+> ground-truth note: 3 RUNNING / 0 landed-by-operator / 0 unblocked / 0 flipped.
+> HEAD `329f6ab` (the 06:47Z operator STATE commit). **ALL THREE running slots
+> are AUTHOR-WIRE-MIRROR-ARM - a TRIPLE-DISPATCH** (slot 0 cmd 18540 -> opencode
+> 31940, forked 06:29:36Z; slot 1 cmd 32348 -> opencode 26564, forked 06:52:05Z,
+> worktree reset 07:12:16Z and archived to
+> `loop/slots/1/abandoned-20260911-031216.patch`, 3503 B; slot 2 cmd 21184,
+> forked 07:14:57Z by the 07:12:10Z heartbeat cycle).
 > Both are WEDGED on one hung `cargo test --locked -p truck123d` (cargoq running
 > job START 06:35:34Z, cwd slot 0; the `unanswerable_arc_lathe_refuses_typed`
 > pre-existing hang - test exe `truck123d-361b704ce0515825.exe` pid 34104 since
@@ -6297,3 +6300,24 @@ Leaving: 2 RUNNING (slots 0+1, double-dispatched AUTHOR-WIRE-MIRROR-ARM); HEAD
 329f6ab; heartbeat 1 (27872); operator_runner 1 (27876); watchdog 1 (29264); ONE
 overnight driver (24864); TWO supervisors; cargoq UP (running true); disk 9.3
 GiB free; RAM 3.8 GiB.]
+
+[operator 2026-09-11T07:16Z - addendum. The 07:12:10Z heartbeat cycle did
+exactly what the 07:12Z block predicted: it read the blocked slot-1 worker as
+DEAD, RESET slot 1 (archiving its live AUTHOR-WIRE-MIRROR-ARM work to
+`loop/slots/1/abandoned-20260911-031216.patch`, 3503 B) and dispatched a THIRD
+run of the same packet into slot 2 (cmd 21184, forked 07:14:57Z, branch
+`packet/AUTHOR-WIRE-MIRROR-ARM`). So the board is now a TRIPLE-DISPATCH:
+slots 0, 1 and 2 all on AUTHOR-WIRE-MIRROR-ARM, all three worker processes still
+alive (18540/31940, 32348/26564, 21184). The root cause is unchanged: the
+packet's done-when runs the full `cargo test --locked -p truck123d`, which is
+HUNG on the pre-existing `unanswerable_arc_lathe_refuses_typed` test
+(`truck123d-361b704ce0515825.exe` pid 34104 since 06:36:09Z, cargo.exe
+34152/19112 since 06:35:34Z) and wedges cargoq's single queue; every worker that
+waits on it ages past the heartbeat's 180s freshness guard and gets reset. The
+hung job's 40-min cargoq timeout should reap it ~07:15:34Z. Nothing
+operator-landable; no manual dispatch; recovery pointers in ESCALATIONS.
+
+Leaving: 3 RUNNING (slots 0+1+2, TRIPLE-dispatched AUTHOR-WIRE-MIRROR-ARM); HEAD
+329f6ab; heartbeat 1 (27872); operator_runner 1 (27876); watchdog 1 (29264); ONE
+overnight driver (24864); TWO supervisors; cargoq UP (running true); disk ~9.3
+GiB free; RAM ~3.8 GiB.]

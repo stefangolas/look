@@ -1325,3 +1325,12 @@ Judgment-required items appended each operator cycle. Newest at the bottom.
 - Start from: `loop/dispatch_heartbeat.log` (the 06:49:41Z cycle); `loop/cargoq/
   server.log` tail (the hung `cargo test --locked -p truck123d`);
   `git -C loop/slots/1/wt status`; `loop/packets/AUTHOR-WIRE-MIRROR-ARM.md`.
+- UPDATE 07:16Z: the 07:12:10Z heartbeat cycle confirmed the loop - it reset
+  slot 1 and archived its live work to
+  `loop/slots/1/abandoned-20260911-031216.patch` (3503 B), then dispatched a
+  THIRD run into slot 2 (cmd 21184, forked 07:14:57Z). All three workers (slots
+  0/1/2) are still alive on branch `packet/AUTHOR-WIRE-MIRROR-ARM`. Recovery
+  archives now: slot 0 `abandoned-20260911-024947.patch`, slot 1
+  `abandoned-20260911-031216.patch`, plus the older slot-1 DOOR archive
+  `abandoned-20260911-024948.patch`. Pin the row NOW - each 10-min heartbeat
+  cycle can reset another worker and spawn another duplicate.
