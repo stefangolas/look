@@ -17,3 +17,6 @@ root harness artifacts (worker slot artifacts must never be tracked)
 /RESULT.json
 /CONTEXT.md
 /PACKET.md
+
+# machine-local agent guidance
+/AGENTS.local.md

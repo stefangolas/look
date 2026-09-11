@@ -1,5 +1,8 @@
 # Agent guide
 
+Machine- and session-specific guidance lives in `AGENTS.local.md`
+(untracked). Read it if present; it never overrides the invariants here.
+
 ## Product boundary
 
 `look` is a native GLB/STL screenshot executable optimized for time to a usable
@@ -7,21 +10,14 @@ image. Keep the hot path small. Do not add browser, GUI, plugin, conversion, or
 general scene-framework dependencies unless a measured user requirement needs
 them.
 
-## Kernel solver program
+## Kernel program law
 
-The base kernel loop is FINISHED (76/76), BG-AUDIT-001 closed (17/17), the
-solver family is landed, and the build123d coverage program is complete
-(P1–P12). The next program is the **constructive geometry kernel**:
-`docs/CONSTRUCTIVE_GEOMETRY_PLAN.md` is the approved design — a spine/frame
-constructive recipe with explicit frame laws, a direct facet realization
-backend emitting exact shared-topology `PolygonMesh` (no sewing, no welding),
-topology-preserving tessellation, reduced manifold diagnostics, and
-certificate integration into the existing evidence types. The kernel-side
-design spec lives in the truck-fork repo; the loop-side plan books the
-contract and packet graph. Kernel code changes only through the packet /
-worker / `verify.py` loop (see `loop/ORCHESTRATOR.md`); `vendor/truck/**` is
-off-limits to direct editing. The pyo3 binding translation over the
-stabilized facade is booked and deferred behind the CG core.
+Kernel code changes only through the packet / worker / `verify.py` loop (see
+`loop/ORCHESTRATOR.md`); `vendor/truck/**` is off-limits to direct editing. The
+pyo3 binding translation over the stabilized facade is booked and deferred
+behind the CG core. The approved kernel design is
+`docs/CONSTRUCTIVE_GEOMETRY_PLAN.md`; current program status lives in
+`loop/STATE.md` — never in this file.
 
 ## Use look efficiently
 
@@ -125,11 +121,6 @@ cargo build --release --locked
 Quick runtime is not comparable to release runtime; the two artifact paths make
 a mix-up visible, but only if you keep pointing scripts at `target/release/`.
 
-On this machine the active host is `x86_64-pc-windows-gnullvm`. Ordinary native
-builds must not pass `--target x86_64-pc-windows-gnullvm`: it is the host, and
-specifying it creates a separate Cargo target-artifact tree and doubles
-proc-macro compilation.
-
 ## Performance work
 
 Benchmark release builds. Retain raw samples and the hardware fingerprint from
@@ -145,35 +136,8 @@ Use physical recorded hardware for published latency claims. Hosted virtual,
 partitioned, and software GPUs provide correctness evidence only. See
 `docs/BENCHMARKS.md` and `docs/CROSS_PLATFORM_TESTING.md`.
 
-Optimize from timings and Amdahl's law. In the resident path PNG encoding and
-file output currently dominate; GPU draw submission is already sub-millisecond
-for the benchmark atlas. Validate any low-level change end to end rather than
-assuming fewer API calls improve wall time.
-
-### STEP vs OCCT
-
-The `core_xy.step` assembly in the home directory is a local reference model
-(9.1 MB, 5,670 faces). On this machine `look` renders it fresh in about 2.0 s at
-512x512 versus about 6.4 s for OCCT through F3D 3.5 (`--force-reader=STEP`), a
-3.2x gap, because the Part 21 parser and tessellation complete well inside the
-process and adapter startup floor. Do not quote that ratio as a universal STEP
-claim: it is one assembly on one GPU.
-
-To re-measure against OCCT, use the exact commands in the README's
-"Reproducing the core_xy STEP comparison" section rather than improvising: one
-unmeasured conditioning launch per tool, alternating launch order, median of
-five measured launches, `look render --preset f3d-match` versus
-`f3d-console --no-config --force-reader=STEP`, 512x512 front orthographic,
-no AA/AO/tone-mapping, `#252525` background, and success judged by whether a PNG
-was produced. `benchmarks/step-vs-f3d.ps1` exists for the NIST corpus and is
-not wired to `core_xy.step`. F3D reads STEP through its bundled OpenCASCADE
-plugin, so this compares whole pipelines (parse, tessellate, render). Confirm
-the F3D PNG contains the model — the F3D GUI start page can make a mis-served
-file look like a successful render.
-
-Verify output fidelity alongside speed, not just timing: compare foreground
-bounding boxes and luminance coverage on the produced PNGs so a blank or
-mis-framed OCCT render cannot be reported as a win.
+Optimize from timings and Amdahl's law. Validate any low-level change end to
+end rather than assuming fewer API calls improve wall time.
 
 ## Releases
 
