@@ -49,6 +49,10 @@ truck-certified --lib --locked` + the new test file serially); the
 `valid_brep`/`complete_locus` rows re-audited in the checker. Write
 RESULT.json AT THE WORKTREE ROOT.
 
+## House rules
+
+- H-1: new modules carry `#![deny(clippy::unwrap_used)]`.
+
 ## Forbidden
 
 No tolerance. No numeric classification in this packet (M4). No
