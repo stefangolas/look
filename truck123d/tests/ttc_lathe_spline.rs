@@ -6,16 +6,17 @@
 //!
 //! 1. `revolve_refusals_stay_typed_after_spline_admission` — the refusal
 //!    battery is run in a real python process against the door's drop-in:
-//!    a partial-arc revolve, a profile outside the `y = 0` plane, an open
-//!    profile, a spline edge whose interpolation options the recorded data
-//!    cannot recover, a non-z axis and a non-Face revolve all still refuse
-//!    typed (the `Refused` class carrying the unchanged refusal messages).
-//!    A plain spline-profile revolve is now admitted and records its defining
-//!    samples.
+//!    a profile outside the `y = 0` plane, an open profile, a spline edge
+//!    whose interpolation options the recorded data cannot recover and a
+//!    non-Face revolve all still refuse typed (the `Refused` class carrying
+//!    the unchanged refusal messages). A plain spline-profile revolve is now
+//!    admitted and records its defining samples, and a partial-arc revolve is
+//!    admitted by the landed executor lathe arm (DOOR-PARTIAL-ARC-FLIP).
 //! 2. `spline_shell_facts_are_exact_and_deterministic` — the native facts
 //!    arm, driven through `bd_facts` in a real python process over a
 //!    spline-bearing shell row, is deterministic (two submissions, byte-equal
-//!    facts) and refuses the partial-arc form typed.
+//!    facts); the partial-arc form answers with the exact scaled wedge volume,
+//!    and an unanswerable angle refuses typed.
 //! 3. `nozzle_assembly_truck_door_now_reaches_facts` — the canonical
 //!    `falcon_heavy/nozzle_assembly` row, which refused typed on its first
 //!    spline-profile revolve before this packet, now runs end to end under
@@ -247,11 +248,12 @@ def rect_lines(y1, y2):
         (v(10, y2, 10), v(10, y1, 0)),
     ]
 
-# partial arc
+# partial arc (LANDED: DOOR-PARTIAL-ARC-FLIP — the carrier answers; pin moved)
 check(
     "partial_arc",
     lambda: bd.revolve(closed_face(rect_lines(0.0, 0.0)), axis=bd.Axis.Z, revolution_arc=270.0),
     "a partial-arc revolve is outside the executor's lathe arm",
+    answered=True,
 )
 # non-z axis (LANDED: FRAME-REVOLVE — the carrier answers; pin amended)
 check(
@@ -341,13 +343,14 @@ print(json.dumps({"case": "spline_admitted", "refused": False, "edges": len(soli
         let refused = record["refused"].as_bool().unwrap_or(false);
         if case == "spline_admitted" {
             assert!(!refused, "a plain spline-profile revolve must be admitted");
-        } else if case == "non_z_axis" {
+        } else if case == "non_z_axis" || case == "partial_arc" {
             // Orchestrator pin amendment 2026-09-10 (BRIDGE-BOOLEANS landing
             // adjudication): the non-z revolve carrier is LANDED
             // (FRAME-REVOLVE, merge 39e9550) — the case now ANSWERS, which is
             // the verdict improvement the landing exists for. The partial-arc
-            // case stays typed (outside the lathe arm's arc discipline).
-            assert!(!refused, "the non-z revolve carrier is landed and answers");
+            // carrier is LANDED by DOOR-PARTIAL-ARC-FLIP (executor lathe arm
+            // with the two planar caps); both cases answer.
+            assert!(!refused, "the {case} carrier is landed and answers");
         } else {
             assert!(refused, "case {case} must refuse typed");
         }
@@ -400,15 +403,23 @@ assert strip_timing(first) == strip_timing(second), "facts must be deterministic
 facts = json.loads(first)
 assert facts["solid_count"] == 1
 assert isinstance(facts["volume"], float) and facts["volume"] > 0.0
-# The partial-arc form still refuses typed through the mapped exception.
+# The partial-arc form is answered by the landed executor lathe arm
+# (DOOR-PARTIAL-ARC-FLIP): the wedge volume is the full-revolution volume
+# scaled by the swept fraction, exactly.
 import json as _json
 partial = row.replace('"arc_deg":360.0', '"arc_deg":270.0')
+partial_facts = json.loads(truck123d.bd_facts(partial))
+assert partial_facts["solid_count"] == 1
+assert abs(partial_facts["volume"] - facts["volume"] * 0.75) <= 1e-9 * facts["volume"]
+# An unanswerable angle still refuses typed through the mapped exception.
+bad = row.replace('"arc_deg":360.0', '"arc_deg":0.0')
 try:
-    truck123d.bd_facts(partial)
-except truck123d.Refused as exc:
-    print(_json.dumps({"ok": True, "facts": first, "refused_partial": True}))
+    truck123d.bd_facts(bad)
+except truck123d.Refused:
+    print(_json.dumps({"ok": True, "facts": first, "answered_partial": True,
+                       "partial_volume": partial_facts["volume"], "refused_bad": True}))
 else:
-    print(_json.dumps({"ok": False, "reason": "partial arc did not refuse"}))
+    print(_json.dumps({"ok": False, "reason": "unanswerable arc did not refuse"}))
     sys.exit(2)
 "#;
     let output = python_command()
@@ -426,7 +437,8 @@ else:
     );
     let record: serde_json::Value = serde_json::from_str(stdout.trim()).expect("facts json");
     assert_eq!(record["ok"], true);
-    assert_eq!(record["refused_partial"], true);
+    assert_eq!(record["answered_partial"], true);
+    assert_eq!(record["refused_bad"], true);
 }
 
 // ---------------------------------------------------------------------------
