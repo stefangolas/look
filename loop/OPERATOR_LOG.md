@@ -3492,3 +3492,54 @@ free; RAM 5.3 GiB free.
 Leaving: 1 RUNNING (DOOR-CIRCLE-FLIP slot 0); HEAD 45ed5d5 (MONO-8 +
 AUTHOR-EXT READY; anchor fix); heartbeat 1 (27872); watchdog 1 (29264);
 cargoq UP; disk 17.7 GiB free; RAM 4.2 GiB free.
+
+## 2026-09-11 01:01 UTC (operator cycle)
+
+- **Health sweep (step 1)**: heartbeat exactly 1 (27872; the 2-match CIM scan
+  was this shell self-matching `dispatch_heartbeat`), watchdog 1 (29264),
+  operator runner 1 (27876; same self-match artifact), overnight driver 1
+  (26920, child of 27828), cargoq UP (ping 200, queued 0, running false). TWO
+  supervisors (19172 PyManager + 27828 pythoncore child - carried duplication
+  class; only ONE overnight.py child = no double-merge risk). Orchestrator
+  session LIVE (4 opencode.exe). Disk 10.3 GiB free (above the 8 GB floor,
+  below the 15 GB goal); RAM 4.21 GiB free.
+- **Land (step 2) - THE 13th FALSE LANDING + PRESERVATION**: slot 1 RG-4-
+  CANONICAL-BOOLEAN-PRODUCT was FINISHED with RESULT status done but its work
+  UNCOMMITTED (branch at base 437ddc8: ` M truck123d/src/bd_bridge.rs`,
+  `?? truck123d/tests/rg4_boolean_product.rs`). The operator committed it AS
+  DELIVERED at `340b395` and created `refs/wip/RG-4-as-delivered` BEFORE the
+  heartbeat re-forked slot 1 to MONO-8 (~00:58Z). The overnight driver logged
+  `09-10 20:58:56 slot 1: RG-4-CANONICAL-BOOLEAN-PRODUCT LANDED at 4703b38` -
+  4703b38 is the DOOR-CIRCLE-FLIP rebook commit (HEAD, changed only its packet
+  doc); RG-4's fix is ABSENT from HEAD and the row now carries a false
+  `LANDED 4703b38` marker. The operator's scoped check
+  (`cargo test -p truck123d --test rg4_boolean_product --locked`, python runtime
+  dir on PATH) was cut off mid-build by the slot re-fork - a re-fork artifact,
+  NOT a code failure. Did NOT merge/clear the marker (human-adjudicated class);
+  escalated.
+- **Unblock (step 3)**: none. Slot 0 DOOR-CIRCLE-FLIP and slot 1 MONO-8 both
+  RUNNING healthy (events <1 min fresh); no IDLE/DEAD >15 min, no QUESTION, no
+  APIError 402.
+- **Registry hygiene (step 4)**: a false-landing integrity sweep (parse each
+  row's `landed <hex>` note marker) found the ancestor-only check blind to the
+  class (the false marker is HEAD, always an ancestor); a content check (write
+  paths present in HEAD) flagged only RG-4 as a confirmed new false landing
+  (PB-006/BREP-001A are unimplemented READY rows; BG-KV2 rows are
+  consumed-survey/glob benign). 337 rows - 239 DONE / 87 READY / 10 BLOCKED /
+  1 SUPERSEDED; BLOCKED-with-all-deps-landed = NONE (MONO-9/MONO-10 dep MONO-8
+  RUNNING; TTC-RECENSUS-F1-R3 dep AUTHOR-EXT READY; 7 carried parked) - nothing
+  flipped.
+- **Dispatch (step 5)**: `dispatch_ready --dry-run --max-workers=4` -> "slots:
+  8 (2 running, 6 free); dispatched 0; workers now ~2/4" = REAL idle; the
+  remaining READY rows (AUTHOR-EXT, DOOR-PARTIAL-ARC-FLIP, AUTHOR-WIRE-MIRROR-
+  ARM, AUTHOR-CENSUS-NAMES, RG-23, RG-9) are correctly deferred on the running
+  rows' bd_bridge.rs / door.py write sets; no manual dispatch (heartbeat live).
+- **STATE.md (step 6)**: rewrote the "LATEST GROUND TRUTH" note and appended
+  the [operator 2026-09-11T01:01Z] block.
+- **Escalation (step 7)**: OPERATOR_ESCALATIONS 01:01Z - RG-4 false landing
+  (13th strike, slot-reuse race variant) + preserved ref + the marker-clear/
+  landing ask + the false-landing-detector caveat. Carried items unchanged.
+
+Leaving: 2 RUNNING (DOOR-CIRCLE-FLIP slot 0, MONO-8 slot 1); HEAD 4703b38;
+heartbeat 1 (27872); watchdog 1 (29264); cargoq UP; disk 10.3 GiB free; RAM
+4.21 GiB free.

@@ -76,35 +76,31 @@ corrected, annex C = ORACLE POLICY CHANGE), then docs/SOLVER_COVERAGE_SPEC.md
 ## Where we are
 
 > LATEST GROUND TRUTH: read the newest `[operator ...]` block in "State of
-> the machine, as left" (2026-09-11T00:32Z). [operator 2026-09-11T00:32Z
-> ground-truth note: 1 RUNNING / 0 landed-this-cycle. **DOOR-CIRCLE-FLIP
-> (slot 0) is RUNNING** (pid 28884, dispatched by the heartbeat ~00:28Z,
-> events fresh, write set corpus/ttc/door.py +
-> truck123d/tests/door_circle_flip.rs) - do not touch. **THIS CYCLE the
-> operator flipped MONO-8-SWEPT-ADMISSION-WIRING and AUTHOR-EXT-FILLET-HALO
-> BLOCKED->READY** (dep MONO-7-ROW-ASSEMBLY is landed; both packets authored,
-> `gen_packet --check` green, `packet_lint` clean; commit `45ed5d5`).
-> dispatch_ready --dry-run: MONO-8 -> slot 1 dispatched (AUTHOR-EXT + the
-> three door packets deferred on the running DOOR-CIRCLE-FLIP's
-> corpus/ttc/door.py write set); the live heartbeat owns dispatch, no manual
-> dispatch. The operator also fixed DOOR-PARTIAL-ARC-FLIP's A1 anchor command
-> (the escaped-double-quote form broke under the harness's `bash -lc` quoting
-> - the unescaped apostrophe in "executor's" produced an EOF; now a
-> single-quoted prefix, A1=1 ok) - same commit `45ed5d5`. No landings
-> available: every FINISHED slot's worker commit
-> (`46ba171`/`c3bc1a1`/`e6553db`/`3c2109b`/`ee97499`/`713f205`) is an ancestor
-> of HEAD (slot 2 RESULT status "complete" not DONE but already merged; slot 7
-> is the redundant FRAME-REVOLVE residue, no commit). MONO-9/MONO-10 (dep
-> MONO-8) and TTC-RECENSUS-F1-R3 (dep MONO-7+AUTHOR-EXT) stay BLOCKED (deps
-> not landed). Registry: 334 rows. Health: heartbeat exactly 1 (27872),
+> the machine, as left" (2026-09-11T01:01Z). [operator 2026-09-11T01:01Z
+> ground-truth note: 2 RUNNING / 0 landed-by-operator. **DOOR-CIRCLE-FLIP
+> (slot 0, pid 6196) RUNNING** (5 files changed) and **MONO-8-SWEPT-
+> ADMISSION-WIRING (slot 1, pid 27232) RUNNING** (heartbeat re-forked slot 1
+> off RG-4 ~00:58Z) - do not touch. **RG-4-CANONICAL-BOOLEAN-PRODUCT was
+> FALSE-LANDED at 4703b38** (driver log `09-10 20:58:56`; 4703b38 = the
+> DOOR-CIRCLE-FLIP rebook commit, changed only its packet doc) - the
+> production fix is ABSENT from HEAD and the row now carries a false
+> `LANDED 4703b38` marker that self-blocks it in dispatch_ready. The
+> operator PRESERVED the worker's uncommitted deliverable AS DELIVERED at
+> `340b395` (+ `refs/wip/RG-4-as-delivered`, 633/-60, bd_bridge.rs + new
+> rg4_boolean_product.rs) - ESCALATED for marker-clear + landing (the
+> operator's scoped build was cut off by the slot re-fork). No BLOCKED row
+> has all deps landed (MONO-9/MONO-10 dep MONO-8 RUNNING; TTC-RECENSUS-F1-R3
+> dep AUTHOR-EXT READY; 7 carried parked). Registry: 337 rows (239 DONE / 87
+> READY / 10 BLOCKED / 1 SUPERSEDED). Health: heartbeat exactly 1 (27872),
 > watchdog 1 (29264), operator runner 1 (27876), overnight driver 1 (26920),
 > cargoq UP (ping 200, queued 0), TWO supervisors (19172 + 27828, carried;
-> only ONE overnight.py child = no double-merge risk). Disk 17.7 GiB free
-> (above the 8 GB floor AND 15 GB goal); RAM 4.2 GiB free. Open human items
-> (carried): amend MONO-7 D1+D2 then re-verify; fix `packet_tests_and_crates`
-> crate derivation; fix overnight.py:222-226 (now 11 strikes); duplicate
-> supervisors + lagging cargoq restart guard; slot-4/7 wt RESULT residue;
-> MONO-row registry schema gap.]
+> only ONE overnight.py child = no double-merge risk). Disk 10.3 GiB free
+> (above the 8 GB floor, below 15 GB goal); RAM 4.2 GiB free. Open human
+> items: (NEW/hot) clear the RG-4 false `LANDED 4703b38` marker and land
+> `340b395`; amend MONO-7 D1+D2 then re-verify; fix `packet_tests_and_crates`
+> crate derivation; fix overnight.py:222-226 (now 13 strikes incl. the
+> slot-reuse variant); duplicate supervisors + lagging cargoq restart guard;
+> slot-4/7 wt RESULT residue; MONO-row registry schema gap.]
 
 - **THE FIRST KERNEL-VS-OCC TIMING COMPARISON IS BANKED** (FH-TIMING-REFRESH,
   landed c94d043): turbopump_assembly **0.097 s kernel vs 4.866 s OCC**,
@@ -5709,3 +5705,49 @@ human items (carried, unchanged): amend MONO-7 D1+D2 then re-verify;
 `packet_tests_and_crates` crate derivation; overnight.py:222-226 (11 strikes);
 duplicate supervisors + lagging cargoq restart guard; slot-4/7 wt RESULT
 residue; MONO-row registry schema gap.]
+
+[operator 2026-09-11T01:01Z - volatile refresh. Board now: 2 RUNNING / 0
+landed-by-operator. **RG-4 FALSE LANDING (13th strike) + PRESERVATION.** The
+overnight driver logged `09-10 20:58:56 slot 1: RG-4-CANONICAL-BOOLEAN-PRODUCT
+LANDED at 4703b38`; 4703b38 is the DOOR-CIRCLE-FLIP rebook commit (HEAD) and
+changed only `loop/packets/DOOR-CIRCLE-FLIP.md`. RG-4's fix is absent from HEAD
+(`git grep -c boolean_product_volume HEAD -- truck123d/src/bd_bridge.rs` = 0;
+the new test file is not in HEAD) and the row's note now carries a false
+`LANDED 4703b38` marker that makes dispatch_ready skip it. Mechanism: the
+heartbeat re-forked slot 1 from RG-4 to MONO-8 at ~00:58Z while the driver was
+processing slot 1; the driver read the re-forked slot (branch at MONO-8's base
+4703b38) and no-op-merged it under RG-4's RESULT - a slot-reuse race variant of
+the overnight.py:222-226 class. The operator PRESERVED the worker's uncommitted
+deliverable (RESULT status done, 633 insertions/60 deletions,
+truck123d/src/bd_bridge.rs + new truck123d/tests/rg4_boolean_product.rs) AS
+DELIVERED at `340b395` on packet/RG-4-CANONICAL-BOOLEAN-PRODUCT, backed up at
+`refs/wip/RG-4-as-delivered`; 340b395 is NOT an ancestor of
+integration/kernel-bg. ESCALATED (marker clear + landing are human-adjudicated;
+the operator's scoped `cargo test -p truck123d --test rg4_boolean_product` was
+interrupted mid-build by the slot re-fork, so it was not completed). **BOARD:**
+slot 0 DOOR-CIRCLE-FLIP RUNNING (pid 6196, 5 files changed, events <1 min
+fresh); slot 1 MONO-8-SWEPT-ADMISSION-WIRING RUNNING (pid 27232, just forked by
+the heartbeat, events <1 min fresh) - do not touch. Slots 2-7 FINISHED landed
+residue (SURVEY-B c3bc1a1, SURVEY-C e6553db, F1 3c2109b LANDED-WITH-FINDINGS,
+CL-006 ee97499, CL-005 713f205, FRAME-REVOLVE 5cf4811 redundant) - none
+operator-landable. Nothing to unblock (both RUNNING healthy; no IDLE/DEAD >15
+min holding work; no QUESTION; no APIError 402). Registry re-verified by script
+(last-wins dedup): 337 rows - 239 DONE / 87 READY / 10 BLOCKED / 1 SUPERSEDED;
+BLOCKED-with-all-deps-landed = NONE (MONO-9/MONO-10 dep MONO-8 RUNNING;
+TTC-RECENSUS-F1-R3 dep AUTHOR-EXT READY; the other 7 owner-parked/superseded/
+human-gated/PIN-ruled) - nothing flipped. dispatch_ready --dry-run
+--max-workers=4: "slots: 8 (2 running, 6 free); dispatched 0; workers now ~2/4"
+- REAL idle; the remaining READY rows (AUTHOR-EXT, DOOR-PARTIAL-ARC-FLIP,
+AUTHOR-WIRE-MIRROR-ARM, AUTHOR-CENSUS-NAMES, RG-23, RG-9) are correctly deferred
+on the running rows' bd_bridge.rs / door.py write sets. Health: heartbeat
+exactly 1 (27872; the extra matches were this operator's own probe shells),
+watchdog 1 (29264), operator runner 1 (27876), overnight driver 1 (26920, child
+of 27828), cargoq UP (ping 200, queued 0), TWO supervisors (19172 PyManager +
+27828 pythoncore child - carried duplication class; only ONE overnight.py child
+= no double-merge risk). Orchestrator session LIVE (4 opencode.exe). Disk 10.3
+GiB free (above the 8 GB floor, below the 15 GB goal); RAM 4.2 GiB free. Open
+human items: (NEW/hot) clear the RG-4 false `LANDED 4703b38` marker and land
+`340b395`; amend MONO-7 D1+D2 then re-verify; fix `packet_tests_and_crates`
+crate derivation; fix overnight.py:222-226 (now 13 strikes); duplicate
+supervisors + lagging cargoq restart guard; slot-4/7 wt RESULT residue; MONO-row
+registry schema gap.]

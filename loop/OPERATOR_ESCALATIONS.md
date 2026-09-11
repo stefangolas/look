@@ -848,3 +848,43 @@ Judgment-required items appended each operator cycle. Newest at the bottom.
   escaped-double-quote cmd form is not unescaped by `gen_packet.parse_anchors`
   and fails under `bash -lc` when the pattern contains an apostrophe. Watch
   for the same pattern in future authored packets (only this one had it).
+
+## 2026-09-11 01:01 UTC (operator cycle) - RG-4 FALSE LANDING (13th strike) + PRESERVATION
+
+- **RG-4-CANONICAL-BOOLEAN-PRODUCT was FALSE-LANDED at `4703b38`.** The
+  overnight driver logged `09-10 20:58:56 slot 1: RG-4-CANONICAL-BOOLEAN-PRODUCT
+  LANDED at 4703b38`; `4703b38` is the DOOR-CIRCLE-FLIP rebook commit (HEAD)
+  and changed only `loop/packets/DOOR-CIRCLE-FLIP.md`. RG-4's production fix is
+  ABSENT from HEAD (`git grep -c boolean_product_volume HEAD --
+  truck123d/src/bd_bridge.rs` = 0) and the new test file does not exist in HEAD.
+  The row's note now carries a false `LANDED 4703b38` marker, so
+  `dispatch_ready`'s LANDED_RE skips RG-4 (self-blocked). Mechanism: the
+  heartbeat re-forked slot 1 from RG-4 to MONO-8 at ~00:58Z while the driver was
+  processing slot 1; the driver read the re-forked slot (branch at MONO-8's base
+  `4703b38`) and no-op-merged it under RG-4's RESULT - a **slot-reuse race
+  variant** of the overnight.py:222-226 class.
+- **PRESERVED:** the RG-4 worker's uncommitted deliverable (RESULT status done;
+  633 insertions, 60 deletions; `truck123d/src/bd_bridge.rs` + new
+  `truck123d/tests/rg4_boolean_product.rs`) was committed AS DELIVERED at
+  `340b395` on `packet/RG-4-CANONICAL-BOOLEAN-PRODUCT` and backed up at
+  `refs/wip/RG-4-as-delivered`. `340b395` is NOT an ancestor of
+  integration/kernel-bg.
+- **ACTION NEEDED (human/orchestrator):** (1) clear the false `LANDED 4703b38`
+  marker from the RG-4 row (the false-landing class is human-adjudicated);
+  (2) land `340b395` after the scoped check (`cargo test -p truck123d --test
+  rg4_boolean_product --locked` with the python runtime dir on PATH) - the
+  operator's own scoped build was interrupted mid-run by the slot re-fork, so it
+  was NOT completed; (3) the row's `packet` field is empty even though
+  `loop/packets/RG-4-CANONICAL-BOOLEAN-PRODUCT.md` exists.
+  - Start from: `git show 340b395`; `git show refs/wip/RG-4-as-delivered`;
+    `loop/overnight.log` line `09-10 20:58:56`.
+- **False-landing detector caveat (for the next operator):** the ancestor-only
+  check is BLIND to this class - the false marker is the integration HEAD, which
+  is always an ancestor. A content check (do the row's `writes` paths exist in
+  HEAD?) is required; it flagged only RG-4 as a confirmed new false landing
+  (PB-006-ASSEMBLY / BREP-001A-PIPELINE-CORRECTNESS are unimplemented READY
+  rows; BG-KV2-000/BG-KV2-101 are consumed-survey/glob benign).
+- **UPDATE 01:0xZ:** the driver then committed the false marker to the registry
+  as `716cd08` ("RG-4-CANONICAL-BOOLEAN-PRODUCT row LANDED (overnight)",
+  changed only `loop/PACKETS.jsonl`). The row is now persistently self-blocked;
+  `340b395` is still NOT an ancestor of integration/kernel-bg.
