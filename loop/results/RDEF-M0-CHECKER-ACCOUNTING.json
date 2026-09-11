@@ -1,0 +1,601 @@
+{
+ "id": "RDEF-M0-CHECKER-ACCOUNTING",
+ "packet": "RDEF-M0-CHECKER-ACCOUNTING",
+ "contract": [
+  "RDEF-M0-CHECKER-ACCOUNTING"
+ ],
+ "status": "DONE",
+ "branch": "packet/RDEF-M0-CHECKER-ACCOUNTING",
+ "anchors": {
+  "A1": 2,
+  "A1_expected": 2,
+  "A1_holds": true
+ },
+ "summary": "RDEF-M0 checker accounting: CHK-1 three-way PROVED/REFUTED/UNDECIDED with the section-2 refutation predicates; CHK-2 tightened T_geom (43200 -> 24960 feasible fact states) with before/after counts; CHK-3 renamed fail-closed coverage and added strict coverage; CHK-4 pinned `regular` to regular-where-nonempty and re-audited the cascade routes (none changed status); the three v1 conflicts adjudicated against the source tree and applied to the merged model.",
+ "rule_census": {
+  "per_fragment": {
+   "A": 279,
+   "B": 205,
+   "C": 77,
+   "D": 93
+  },
+  "rows_read": 654,
+  "merged_rows": 653,
+  "duplicate_rows": 1,
+  "conflicts_found": 3,
+  "conflicts": [
+   {
+    "kind": "rule_id_content_mismatch",
+    "rule_id": "TANGENCY-TSYSTEM-FROM-DEFLATED",
+    "fragments": [
+     "A",
+     "B"
+    ],
+    "detail": "same rule_id extracted with different precondition/outcome content"
+   },
+   {
+    "kind": "postcondition_claim_mismatch",
+    "symbol": "crate::tangency::exclude::exclude_rec",
+    "variant": "ExclusionEvidence::NoRootFiveEq",
+    "claims": [
+     {
+      "rule_id": "TANGENCY-EXCLUDE-REC",
+      "fragment": "A",
+      "postconditions": [
+       [
+        "global.knowledge",
+        "local_only(residual)"
+       ],
+       [
+        "relation.zero_set",
+        "certified_empty"
+       ]
+      ]
+     },
+     {
+      "rule_id": "TANGENCY-EXCLUDE-SINGLE-EQUATION",
+      "fragment": "A",
+      "postconditions": [
+       [
+        "global.knowledge",
+        "local_only(residual)"
+       ],
+       [
+        "relation.zero_set",
+        "certified_empty"
+       ]
+      ]
+     },
+     {
+      "rule_id": "TANGENCY-EXCLUDE-SUBSYSTEM-KRAWCZYK",
+      "fragment": "A",
+      "postconditions": [
+       [
+        "global.knowledge",
+        "local_only(residual)"
+       ],
+       [
+        "relation.zero_set",
+        "certified_empty"
+       ]
+      ]
+     },
+     {
+      "rule_id": "TANGENCY-EXCLUDE-BISECT-INCONCLUSIVE",
+      "fragment": "A",
+      "postconditions": [
+       [
+        "relation.zero_set",
+        "certified_empty"
+       ]
+      ]
+     }
+    ]
+   },
+   {
+    "kind": "postcondition_claim_mismatch",
+    "symbol": "formal::span::CurveSpan2",
+    "variant": "CurveSpan2::RationalBezier",
+    "claims": [
+     {
+      "rule_id": "SPAN-FAMILY-INDEPENDENT-CONTRACT",
+      "fragment": "B",
+      "postconditions": [
+       [
+        "goal",
+        "complete_locus"
+       ],
+       [
+        "rep.bernstein_chart",
+        "true"
+       ],
+       [
+        "rep.rational_positive_weights",
+        "true"
+       ]
+      ]
+     },
+     {
+      "rule_id": "SPAN-RATIONAL-BEZIER-THEORY",
+      "fragment": "B",
+      "postconditions": [
+       [
+        "goal",
+        "complete_locus"
+       ]
+      ]
+     }
+    ]
+   }
+  ],
+  "unmodeled_values": 538,
+  "unmodeled_axis_keys": 267,
+  "low_confidence": 1,
+  "medium_confidence": 33
+ },
+ "rdef_m0": {
+  "chk1_three_way": {
+   "no_intersection": {
+    "A_G": 24960,
+    "proved": 7680,
+    "refuted": 9600,
+    "undecided": 7680
+   },
+   "local_contact": {
+    "A_G": 24960,
+    "proved": 22080,
+    "refuted": 2880,
+    "undecided": 0
+   },
+   "complete_locus": {
+    "A_G": 24960,
+    "proved": 24960,
+    "refuted": 0,
+    "undecided": 0
+   },
+   "material_class": {
+    "A_G": 24960,
+    "proved": 24960,
+    "refuted": 0,
+    "undecided": 0
+   },
+   "valid_brep": {
+    "A_G": 24960,
+    "proved": 23040,
+    "refuted": 0,
+    "undecided": 1920
+   },
+   "volume_bracket": {
+    "A_G": 24960,
+    "proved": 9600,
+    "refuted": 0,
+    "undecided": 15360
+   },
+   "mesh": {
+    "A_G": 24960,
+    "proved": 24960,
+    "refuted": 0,
+    "undecided": 0
+   }
+  },
+  "chk2_tightening": {
+   "feasible_fact_states_before": 43200,
+   "feasible_fact_states_after": 24960,
+   "before": {
+    "no_intersection": {
+     "A_G": 43200,
+     "W_G": 16320,
+     "M_G": 26880
+    },
+    "local_contact": {
+     "A_G": 43200,
+     "W_G": 31680,
+     "M_G": 11520
+    },
+    "complete_locus": {
+     "A_G": 43200,
+     "W_G": 43200,
+     "M_G": 0
+    },
+    "material_class": {
+     "A_G": 43200,
+     "W_G": 43200,
+     "M_G": 0
+    },
+    "valid_brep": {
+     "A_G": 43200,
+     "W_G": 39360,
+     "M_G": 3840
+    },
+    "volume_bracket": {
+     "A_G": 43200,
+     "W_G": 17856,
+     "M_G": 25344
+    },
+    "mesh": {
+     "A_G": 43200,
+     "W_G": 43200,
+     "M_G": 0
+    }
+   },
+   "after": {
+    "no_intersection": {
+     "A_G": 24960,
+     "W_G": 7680,
+     "M_G": 17280
+    },
+    "local_contact": {
+     "A_G": 24960,
+     "W_G": 22080,
+     "M_G": 2880
+    },
+    "complete_locus": {
+     "A_G": 24960,
+     "W_G": 24960,
+     "M_G": 0
+    },
+    "material_class": {
+     "A_G": 24960,
+     "W_G": 24960,
+     "M_G": 0
+    },
+    "valid_brep": {
+     "A_G": 24960,
+     "W_G": 23040,
+     "M_G": 1920
+    },
+    "volume_bracket": {
+     "A_G": 24960,
+     "W_G": 9600,
+     "M_G": 15360
+    },
+    "mesh": {
+     "A_G": 24960,
+     "W_G": 24960,
+     "M_G": 0
+    }
+   }
+  },
+  "chk3_coverage_metrics": {
+   "no_intersection": {
+    "A_G": 24960,
+    "fail_closed_proved": 7680,
+    "fail_closed_pct": 30.77,
+    "strict_proved": 7680,
+    "strict_pct": 30.77,
+    "refuted": 9600,
+    "undecided": 7680
+   },
+   "local_contact": {
+    "A_G": 24960,
+    "fail_closed_proved": 22080,
+    "fail_closed_pct": 88.46,
+    "strict_proved": 19200,
+    "strict_pct": 76.92,
+    "refuted": 2880,
+    "undecided": 0
+   },
+   "complete_locus": {
+    "A_G": 24960,
+    "fail_closed_proved": 24960,
+    "fail_closed_pct": 100.0,
+    "strict_proved": 4992,
+    "strict_pct": 20.0,
+    "refuted": 0,
+    "undecided": 0
+   },
+   "material_class": {
+    "A_G": 24960,
+    "fail_closed_proved": 24960,
+    "fail_closed_pct": 100.0,
+    "strict_proved": 24960,
+    "strict_pct": 100.0,
+    "refuted": 0,
+    "undecided": 0
+   },
+   "valid_brep": {
+    "A_G": 24960,
+    "fail_closed_proved": 23040,
+    "fail_closed_pct": 92.31,
+    "strict_proved": 16800,
+    "strict_pct": 67.31,
+    "refuted": 0,
+    "undecided": 1920
+   },
+   "volume_bracket": {
+    "A_G": 24960,
+    "fail_closed_proved": 9600,
+    "fail_closed_pct": 38.46,
+    "strict_proved": 6144,
+    "strict_pct": 24.62,
+    "refuted": 0,
+    "undecided": 15360
+   },
+   "mesh": {
+    "A_G": 24960,
+    "fail_closed_proved": 24960,
+    "fail_closed_pct": 100.0,
+    "strict_proved": 22080,
+    "strict_pct": 88.46,
+    "refuted": 0,
+    "undecided": 0
+   }
+  },
+  "chk4_regular": {
+   "semantics": "regular where nonempty",
+   "cascade_routes_reaudited": [
+    "TANGENCY-CASCADE-REFINE-EMPTY",
+    "TANGENCY-CASCADE-STAGE3-CRITICAL-VALUE",
+    "TANGENCY-CASCADE-CLASSIFY-BOX"
+   ],
+   "routes_changed_status": []
+  },
+  "adjudications": [
+   {
+    "kind": "rule_id_content_mismatch",
+    "rule_id": "TANGENCY-TSYSTEM-FROM-DEFLATED",
+    "verdict": "fragment B is source-faithful; fragment A over-claims",
+    "keep_fragment": "B",
+    "evidence": "vendor/truck/truck-certified/src/tangency/tsystem.rs:82-96",
+    "rationale": "TSystem::from_deflated only constructs T = (G1, G2, M1, M2) from a stored SquareSystem3 and its Rank2Chart (lines 86-95). It emits neither a construction witness nor an exact-implicit predicate, so fragment A's frozen-axis outcomes rep.construction_witness=true and rep.exact_implicit=true are unsupported. Fragment B models exactly what the source does: the unit-chart rows and the KrawczykSystem<4> instantiation, with no frozen-axis claim."
+   },
+   {
+    "kind": "postcondition_claim_mismatch",
+    "symbol": "crate::tangency::exclude::exclude_rec",
+    "variant": "ExclusionEvidence::NoRootFiveEq",
+    "verdict": "the minimal claim {relation.zero_set: certified_empty} is source-faithful",
+    "drop_postconditions": [
+     {
+      "axis": "global.knowledge",
+      "value": "local_only(residual)"
+     }
+    ],
+    "evidence": "vendor/truck/truck-certified/src/tangency/exclude.rs:166-211",
+    "rationale": "exclude_rec returns NoRootFiveEq { spend } when a single equation is separated from zero (line 176) or when a 4-of-5 square subsystem has no Krawczyk root (line 187). Either way it certifies that the five-equation system has no root, i.e. relation.zero_set = certified_empty, and it raises no global knowledge. The extra global.knowledge = local_only(residual) is the bottom of the knowledge order: a no-op restatement, not a disagreeing claim."
+   },
+   {
+    "kind": "postcondition_claim_mismatch",
+    "symbol": "formal::span::CurveSpan2",
+    "variant": "CurveSpan2::RationalBezier",
+    "verdict": "the declared-only claim {goal: complete_locus} is source-faithful",
+    "drop_postconditions": [
+     {
+      "axis": "rep.bernstein_chart",
+      "value": "true"
+     },
+     {
+      "axis": "rep.rational_positive_weights",
+      "value": "true"
+     }
+    ],
+    "evidence": "vendor/truck/truck-certified/src/formal/span.rs:119-137",
+    "rationale": "span.rs declares the RationalBezier(RationalBezierSpan2) variant so the contract's variant set is frozen before any code depends on it; its constructor and certified operations land in GEN-001B (lines 13-15, 119-122). Being the variant does not itself certify rep.bernstein_chart or rep.rational_positive_weights. SPAN-FAMILY-INDEPENDENT-CONTRACT over-claims those flags; SPAN-RATIONAL-BEZIER-THEORY records the declaration only."
+   }
+  ]
+ },
+ "lattice": {
+  "feasible_fact_states": 24960,
+  "goals": {
+   "no_intersection": {
+    "A_G": 24960,
+    "W_G": 7680,
+    "M_G": 7680
+   },
+   "local_contact": {
+    "A_G": 24960,
+    "W_G": 22080,
+    "M_G": 0
+   },
+   "complete_locus": {
+    "A_G": 24960,
+    "W_G": 24960,
+    "M_G": 0
+   },
+   "material_class": {
+    "A_G": 24960,
+    "W_G": 24960,
+    "M_G": 0
+   },
+   "valid_brep": {
+    "A_G": 24960,
+    "W_G": 23040,
+    "M_G": 1920
+   },
+   "volume_bracket": {
+    "A_G": 24960,
+    "W_G": 9600,
+    "M_G": 15360
+   },
+   "mesh": {
+    "A_G": 24960,
+    "W_G": 24960,
+    "M_G": 0
+   }
+  }
+ },
+ "demonstration_retrodiction": {
+  "goal": "volume_bracket",
+  "rank_deficient_residual_uncovered": true,
+  "detail": "**RETRODICTION HOLDS.** For the swept-operand boolean volume goal (`goal=volume_bracket` over a `2x2` surface relation, the `cut(swept,*)` / `fuse(swept,*)` class of the op-capability matrix), the rank-deficient residual parent is **UNCOVERED (theory gap)**. The checker re-derives the gap the loop historically discovered reactively over four census rounds: no rule whose goal precondition is `volume_bracket` (or absent) refines `relation.zero_set=rank_deficient(residual)` into `regular` or `certified_empty`, so the residual cannot reach a volume-proving state.\nWitness cell: `relation.src_dims=2x2, relation.zero_set=rank_deficient(residual), relation.local_dim=0, global.knowledge=local_only(residual), goal=volume_bracket`."
+ },
+ "demonstration_deliberate_gap": {
+  "removed_rule": "C-CLASSIFY-DISCHARGE-COMPLETENESS",
+  "orphaned_cells": [
+   {
+    "goal": "complete_locus",
+    "count": 15264,
+    "cells": [
+     {
+      "relation.src_dims": "2x2",
+      "relation.zero_set": "rank_deficient(residual)",
+      "relation.local_dim": "0",
+      "relation.incidence": "domain_interior(residual)",
+      "global.knowledge": "local_only(residual)",
+      "state_count": 48
+     },
+     {
+      "relation.src_dims": "2x2",
+      "relation.zero_set": "rank_deficient(residual)",
+      "relation.local_dim": "0",
+      "relation.incidence": "domain_interior(residual)",
+      "global.knowledge": "loop_free",
+      "state_count": 48
+     },
+     {
+      "relation.src_dims": "2x2",
+      "relation.zero_set": "rank_deficient(residual)",
+      "relation.local_dim": "0",
+      "relation.incidence": "domain_interior(residual)",
+      "global.knowledge": "seed_complete",
+      "state_count": 48
+     },
+     {
+      "relation.src_dims": "2x2",
+      "relation.zero_set": "rank_deficient(residual)",
+      "relation.local_dim": "0",
+      "relation.incidence": "domain_interior(residual)",
+      "global.knowledge": "all_components",
+      "state_count": 48
+     },
+     {
+      "relation.src_dims": "2x2",
+      "relation.zero_set": "rank_deficient(residual)",
+      "relation.local_dim": "0",
+      "relation.incidence": "seam",
+      "global.knowledge": "local_only(residual)",
+      "state_count": 48
+     },
+     {
+      "relation.src_dims": "2x2",
+      "relation.zero_set": "rank_deficient(residual)",
+      "relation.local_dim": "0",
+      "relation.incidence": "seam",
+      "global.knowledge": "loop_free",
+      "state_count": 48
+     },
+     {
+      "relation.src_dims": "2x2",
+      "relation.zero_set": "rank_deficient(residual)",
+      "relation.local_dim": "0",
+      "relation.incidence": "seam",
+      "global.knowledge": "seed_complete",
+      "state_count": 48
+     },
+     {
+      "relation.src_dims": "2x2",
+      "relation.zero_set": "rank_deficient(residual)",
+      "relation.local_dim": "0",
+      "relation.incidence": "seam",
+      "global.knowledge": "all_components",
+      "state_count": 48
+     },
+     {
+      "relation.src_dims": "2x2",
+      "relation.zero_set": "rank_deficient(residual)",
+      "relation.local_dim": "0",
+      "relation.incidence": "knot_span_boundary",
+      "global.knowledge": "local_only(residual)",
+      "state_count": 48
+     },
+     {
+      "relation.src_dims": "2x2",
+      "relation.zero_set": "rank_deficient(residual)",
+      "relation.local_dim": "0",
+      "relation.incidence": "knot_span_boundary",
+      "global.knowledge": "loop_free",
+      "state_count": 48
+     },
+     {
+      "relation.src_dims": "2x2",
+      "relation.zero_set": "rank_deficient(residual)",
+      "relation.local_dim": "0",
+      "relation.incidence": "knot_span_boundary",
+      "global.knowledge": "seed_complete",
+      "state_count": 48
+     },
+     {
+      "relation.src_dims": "2x2",
+      "relation.zero_set": "rank_deficient(residual)",
+      "relation.local_dim": "0",
+      "relation.incidence": "knot_span_boundary",
+      "global.knowledge": "all_components",
+      "state_count": 48
+     },
+     {
+      "relation.src_dims": "2x2",
+      "relation.zero_set": "rank_deficient(residual)",
+      "relation.local_dim": "0",
+      "relation.incidence": "domain_edge",
+      "global.knowledge": "local_only(residual)",
+      "state_count": 48
+     },
+     {
+      "relation.src_dims": "2x2",
+      "relation.zero_set": "rank_deficient(residual)",
+      "relation.local_dim": "0",
+      "relation.incidence": "domain_edge",
+      "global.knowledge": "loop_free",
+      "state_count": 48
+     },
+     {
+      "relation.src_dims": "2x2",
+      "relation.zero_set": "rank_deficient(residual)",
+      "relation.local_dim": "0",
+      "relation.incidence": "domain_edge",
+      "global.knowledge": "seed_complete",
+      "state_count": 48
+     },
+     {
+      "relation.src_dims": "2x2",
+      "relation.zero_set": "rank_deficient(residual)",
+      "relation.local_dim": "0",
+      "relation.incidence": "domain_edge",
+      "global.knowledge": "all_components",
+      "state_count": 48
+     },
+     {
+      "relation.src_dims": "2x2",
+      "relation.zero_set": "rank_deficient(residual)",
+      "relation.local_dim": "1",
+      "relation.incidence": "domain_interior(residual)",
+      "global.knowledge": "local_only(residual)",
+      "state_count": 48
+     },
+     {
+      "relation.src_dims": "2x2",
+      "relation.zero_set": "rank_deficient(residual)",
+      "relation.local_dim": "1",
+      "relation.incidence": "domain_interior(residual)",
+      "global.knowledge": "seed_complete",
+      "state_count": 48
+     },
+     {
+      "relation.src_dims": "2x2",
+      "relation.zero_set": "rank_deficient(residual)",
+      "relation.local_dim": "1",
+      "relation.incidence": "domain_interior(residual)",
+      "global.knowledge": "all_components",
+      "state_count": 48
+     },
+     {
+      "relation.src_dims": "2x2",
+      "relation.zero_set": "rank_deficient(residual)",
+      "relation.local_dim": "1",
+      "relation.incidence": "seam",
+      "global.knowledge": "local_only(residual)",
+      "state_count": 48
+     }
+    ]
+   }
+  ],
+  "suggested_rule": "SSI4-KRAWCZYK-UNIQUENESS",
+  "suggested_rule_orphaned": 0
+ },
+ "artifacts": [
+  "loop/solver_coverage/checker.py",
+  "loop/solver_coverage/state.json",
+  "loop/solver_coverage/test_checker.py",
+  "docs/SOLVER_COVERAGE_AUDIT.md",
+  "docs/SOLVER_COVERAGE_AUDIT.deliberate-gap.md"
+ ]
+}
