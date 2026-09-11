@@ -6099,3 +6099,59 @@ Leaving: 2 RUNNING (slots 0+1, duplicate FHC-EX-B); HEAD `7830086` + this
 cycle's STATE/log commit; heartbeat 1 (27872); operator_runner 1 (27876);
 watchdog 1 (29264); cargoq UP (queued 0, running true); disk 4.8 GiB free; RAM
 ~2.7 GiB.
+
+## 2026-09-11 21:22 UTC - operator cycle (HEAD 02a8d44)
+
+Board: 2 RUNNING / 0 landed-this-cycle / 0 unblocked / 0 flipped / 0 dispatched.
+HEAD `02a8d44` (21:00Z operator commit); no new commits since.
+
+- Step 1 (health sweep): heartbeat exactly 1 (27872; the second match in a raw
+  process scan is this operator's own query line); operator_runner 1 (27876);
+  watchdog 1 (29264); cargoq UP (`/ping` -> ok, queued 1, running true); ONE
+  overnight driver (24864); TWO supervisors (19172 PyManager + 27828 pythoncore)
+  and TWO cargoq servers (28544+34564) CARRIED; disk 4.7 GiB free (BELOW the 8 GB
+  floor); RAM ~3.4 GiB free (at the 3 GB threshold; two workers resident).
+- Step 2 (land): NOTHING landable. All residue tips are ancestors of HEAD
+  (`git merge-base --is-ancestor` on c3df084/e6553db/3c2109b/ee97499/713f205/
+  5cf4811 all true). Slot RESULT statuses: slot 2 none (IDLE), slot 3 DONE, slot 4
+  LANDED-WITH-FINDINGS (not landable), slot 5 DONE, slot 6 DONE, slot 7 LANDED.
+- Step 3 (unblock): slots 0 and 1 are the DUPLICATE FHC-EX-B dispatch, both ALIVE
+  and neither dead - did NOT reset/kill either (charter forbids disturbing a live
+  worker). Slot 0 is blocked 24.1 min in the cargoq-run `cargo test --profile
+  quick -p truck123d --lib swept_admission --locked` (server.log START 16:58:15;
+  cargoq 40-min timeout frees it ~17:38 local); slot 1 is progressing and its
+  cargo job is queued behind slot 0's. Escalation carried, not actioned.
+- Step 4 (registry hygiene): 350 rows = 254 DONE / 85 READY / 10 BLOCKED / 1
+  SUPERSEDED. 9 of 10 BLOCKED rows have all needs landed but each carries a
+  deliberate hold (OWNER_BLOCKED / SUPERSEDED / registered defect / booking gate /
+  owner-decision / milestone) - NONE mechanically flippable. RG-23/RG-9 remain
+  READY with MISSING packet files (authoring gap, carried). No anchor-ritual
+  re-measure needed (their gen_packet failure is the missing file, not a count).
+- Step 5 (dispatch): did NOT run the real dispatcher. `dispatch_ready --dry-run
+  --max-workers=4` -> "slots: 8 (0 running, 6 free); slot-assigned packets: 4;
+  dispatched 0; workers now ~0/4", and it FALSE-POSITIVES FHC-EX-B as "DEAD
+  dispatch (slot 1 holds no matching RESULT) - would reset + delete + redispatch";
+  running it would destroy the live slot-1 worker. Nothing else dispatchable
+  (RG-23/RG-9 missing packets; FHC-TRIM -> FHC-MIRROR -> BD-EMIT serial behind
+  FHC-EX-B).
+- Step 6 (STATE): inserted a new "Where we are" LATEST GROUND TRUTH block
+  [operator 2026-09-11T21:22Z] (demoting 21:00Z to SUPERSEDED) and appended a
+  matching "State of the machine, as left" volatile refresh block. Traps/history
+  untouched.
+- Step 7: this entry.
+
+Escalations: CARRIED - duplicate FHC-EX-B dispatch (slots 0+1) still live, no
+human action since 21:00Z; disk 4.7 GiB below the 8 GB floor; RG-23/RG-9 missing
+packet files; RDEF-M4 re-scope; MONO-10 owner R3-mesh decision; FRAME-REVOLVE F1
+non_z_axis pin; duplicate supervisors + lagging cargoq restart guard; TOR-C
+flip-or-pin; schedule.py 'needs' crash; slot-4/7 wt RESULT residue;
+CL-005/CL-006 READY-but-landed status bookkeeping.
+
+Worktree note (reported, not actioned): root tree carries the live human-session
+WIP (M README.md, M loop/cargoq/server.log, untracked benchmarks/ +
+loop/baselines/) - untouched.
+
+Leaving: 2 RUNNING (slots 0+1, duplicate FHC-EX-B); HEAD `02a8d44` + this
+cycle's STATE/log commit; heartbeat 1 (27872); operator_runner 1 (27876);
+watchdog 1 (29264); cargoq UP (queued 1, running true); disk 4.7 GiB free; RAM
+~3.4 GiB.

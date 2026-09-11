@@ -75,6 +75,46 @@ corrected, annex C = ORACLE POLICY CHANGE), then docs/SOLVER_COVERAGE_SPEC.md
 
 ## Where we are
 
+> LATEST GROUND TRUTH [operator 2026-09-11T21:22Z]: 2 RUNNING / 0
+> landed-this-cycle / 0 unblocked / 0 flipped / 0 dispatched. HEAD `02a8d44`
+> (the 21:00Z operator commit; no new commits since). **FHC-EX-B-SPLINE-LOFT-OPERANDS
+> is STILL RUNNING IN BOTH slot 0 AND slot 1 - the duplicate dispatch PERSISTS
+> (escalated 21:00Z; no human action yet).** Slot 0 (cmd pid 10504, opencode 2384,
+> session ses_f6dda1e31ffePZufbaRlRmdTja) last event 24.1 min old: a bare
+> `step_start` with no following tool event - it is blocked in the cargoq-run
+> `cargo test --profile quick -p truck123d --lib swept_admission --locked` started
+> 16:58:15 local (server.log; cargoq's 40-min timeout frees it ~17:38 local), NOT
+> dead. Slot 1 (cmd pid 20780, opencode 31040, session
+> ses_f6dc55f58ffep4TZZSPRw0gQCf) events 12.8 min old and progressing (editing /
+> reading the same `truck123d/src/bd_bridge.rs`); its cargo job is QUEUED behind
+> slot 0's (cargoq ping queued 1, running true). Neither was killed or reset
+> (charter forbids disturbing a live worker; the escalation stands).
+> `dispatch_ready --dry-run --max-workers=4`: "slots: 8 (0 running, 6 free);
+> slot-assigned packets: 4; dispatched 0" - it FALSE-POSITIVES FHC-EX-B as "DEAD
+> dispatch (slot 1 holds no matching RESULT) - would reset + delete + redispatch";
+> the real dispatcher was NOT run (it would destroy the live slot-1 worker; same
+> dead-dispatch defect as 21:00Z). RG-23/RG-9: ANCHOR CHECK FAILED because their
+> packet files remain MISSING (authoring gap, carried); FHC-TRIM -> FHC-MIRROR ->
+> BD-EMIT serial behind FHC-EX-B. Slots 2-7 FINISHED/IDLE landed residue; every tip
+> (c3df084/e6553db/3c2109b/ee97499/713f205/5cf4811) re-verified an ancestor of
+> HEAD by `git merge-base --is-ancestor` - NOTHING landable (slot 3 SOLVER-SURVEY-C
+> DONE, slot 4 F1-AUTHORING-ARMS LANDED-WITH-FINDINGS, slot 5 CL-006 DONE, slot 6
+> CL-005 DONE, slot 7 FRAME-REVOLVE LANDED). Registry re-derived by command: 350
+> rows = 254 DONE / 85 READY / 10 BLOCKED / 1 SUPERSEDED; 9 of the 10 BLOCKED rows
+> have all needs landed but every one carries a deliberate hold (OWNER_BLOCKED /
+> SUPERSEDED / registered defect / booking gate / owner-decision / milestone) -
+> none mechanically flippable. Health: heartbeat exactly 1 (27872), watchdog 1
+> (29264), cargoq UP (queued 1, running true = slot 0's swept_admission test); TWO
+> supervisors (19172+27828) and TWO cargoq servers (28544+34564) carried; ONE
+> overnight driver (24864). DISK 4.7 GiB free (BELOW the 8 GB floor; janitor pool =
+> only the two LIVE slots' targets, nothing reclaimable). RAM ~3.4 GiB free (at the
+> 3 GB threshold; two workers resident - do not stack). Root worktree carries live
+> human-session WIP (M README.md, M loop/cargoq/server.log, untracked benchmarks/ +
+> loop/baselines/) - untouched, reported not actioned. Leaving: 2 RUNNING (slots
+> 0+1, duplicate FHC-EX-B); HEAD `02a8d44` + this cycle's STATE/log commit.
+>
+> --- SUPERSEDED 2026-09-11T21:00Z note (kept for history) follows ---
+>
 > LATEST GROUND TRUTH [operator 2026-09-11T21:00Z]: 2 RUNNING / 0
 > landed-this-cycle / 0 unblocked / 0 flipped / 0 dispatched. HEAD `7830086`
 > (the 20:37Z operator commit; no new commits since). **FHC-EX-B-SPLINE-LOFT-OPERANDS
@@ -3649,6 +3689,30 @@ dispatch of FHC-EX-B (NEW this cycle); disk below floor; RG-23/RG-9 missing
 packets; FRAME-REVOLVE F1 non_z_axis pin; duplicate supervisors + lagging cargoq
 restart guard; slot-4/7 wt RESULT residue; TOR-C flip-or-pin; MONO-10 owner
 decision; RDEF-M4 H-8 stale anchor; schedule.py 'needs' KeyError.]
+
+[operator 2026-09-11T21:22Z - volatile refresh. Board now: 2 RUNNING / 0
+landed-this-cycle / 0 unblocked / 0 flipped / 0 dispatched. HEAD 02a8d44
+(21:00Z operator commit). **THE FHC-EX-B DUPLICATE PERSISTS (slots 0+1), now
+25+ min into the run; still escalated, still not killed.** Slot 0 (cmd pid
+10504, opencode 2384) last event 24.1 min old - a bare step_start, no following
+tool event: it is blocked in the cargoq-run `cargo test --profile quick -p
+truck123d --lib swept_admission --locked` (server.log START 16:58:15 local;
+cargoq's 40-min timeout frees it ~17:38 local) - NOT dead. Slot 1 (cmd pid
+20780, opencode 31040) events 12.8 min old and progressing (editing/reading the
+same truck123d/src/bd_bridge.rs); its cargo job is QUEUED behind slot 0's
+(cargoq ping queued 1, running true). dispatch_ready --dry-run --max-workers=4:
+"slots: 8 (0 running, 6 free); slot-assigned 4; dispatched 0" and it
+FALSE-POSITIVES FHC-EX-B as "DEAD dispatch (slot 1 holds no matching RESULT) -
+would reset + delete + redispatch" - the real dispatcher was NOT run (it would
+destroy the live slot-1 worker; same defect as 21:00Z). Slots 2-7 landed
+residue, all tips ancestors of HEAD 02a8d44 - nothing landable. Registry 350 =
+254 DONE / 85 READY / 10 BLOCKED / 1 SUPERSEDED; the 9 BLOCKED rows with all
+needs landed each carry a deliberate hold (OWNER_BLOCKED / SUPERSEDED /
+registered defect / booking gate / owner-decision / milestone) - none
+mechanically flippable. Health: heartbeat 1 (27872), watchdog 1 (29264), cargoq
+UP (queued 1, running true); TWO supervisors + TWO cargoq servers carried.
+DISK 4.7 GiB (below floor); RAM ~3.4 GiB (two workers resident). Root WIP
+untouched.]
 
 ## The parallelism picture
 

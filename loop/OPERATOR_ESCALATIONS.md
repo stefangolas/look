@@ -1682,3 +1682,28 @@ uncommitted - left for the orchestrator, no dispatch impact.
   re-scope; MONO-10 owner R3-mesh decision; FRAME-REVOLVE F1 non_z_axis pin;
   duplicate supervisors + lagging cargoq restart guard; TOR-C flip-or-pin;
   schedule.py 'needs' crash.
+
+## 2026-09-11 21:22 UTC - CARRIED (no new item): duplicate FHC-EX-B dispatch persists, now 25+ min in
+
+- Re-derived this cycle: the duplicate is UNCHANGED. Slot 0 (cmd pid 10504,
+  opencode 2384, session ses_f6dda1e31ffePZufbaRlRmdTja) has no event for 24.1 min
+  - a bare `step_start` with no following tool event - because it is blocked in
+  the cargoq-run `cargo test --profile quick -p truck123d --lib swept_admission
+  --locked` (server.log START 16:58:15 local; cargoq's 40-min timeout frees it
+  ~17:38 local). Slot 1 (cmd pid 20780, opencode 31040) is progressing (events
+  12.8 min old) and its cargo job is QUEUED behind slot 0's. Both edit the same
+  `truck123d/src/bd_bridge.rs`. Still NOT killed/reset (charter: do not disturb a
+  live worker).
+- NEW supporting evidence: `dispatch_ready --dry-run --max-workers=4` still
+  FALSE-POSITIVES FHC-EX-B as "DEAD dispatch (slot 1 holds no matching RESULT) -
+  would reset + delete + redispatch". Running the real dispatcher would destroy
+  the live slot-1 worker. This is the same dead-dispatch defect the 21:00Z
+  escalation named (branch tip 0 commits ahead of base read as dead); it is now
+  confirmed to fire on slot 1 as well.
+- Action needed (human/orchestrator): (1) decide which FHC-EX-B branch to keep
+  once one returns a DONE RESULT; (2) fix `dispatch_ready`'s dead-dispatch
+  detection to use the process scan in `slot_status.py` as ground truth rather
+  than the branch tip. Start from `loop/dispatch_ready.py` and the 2026-09-11
+  16:45 + 21:22 `loop/dispatch_heartbeat.log` / dry-run output.
+- Also carried: disk 4.7 GiB free (below the 8 GB floor; only the two live slots'
+  targets exist, nothing reclaimable).
