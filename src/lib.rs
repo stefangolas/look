@@ -4,6 +4,7 @@ pub mod cli;
 pub mod config;
 pub mod ocrt;
 pub mod output;
+pub mod perf;
 pub mod renderer;
 pub mod scene;
 pub mod server;

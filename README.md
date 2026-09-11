@@ -5,6 +5,13 @@ into PNG images. Its basic purpose is to let a person, script, or software agent
 inspect a 3D model without opening a full CAD application or browser-based
 viewer.
 
+<img src="docs/assets/falcon_heavy_demo.gif" width="640" alt="Falcon Heavy assembly — 2,142 parts built by the certified kernel, orbited in the look interactive viewer">
+
+The Falcon Heavy above is the end-to-end demo: 2,142 parts built and certified
+by the kernel in ~0.02 s, written as a colored indexed GLB with per-part
+materials, and opened in the interactive viewer — see
+[the demo walkthrough](#demo-build-view-measure--the-falcon-heavy-end-to-end).
+
 STEP files are CAD boundary representations rather than meshes, so `look`
 tessellates them on load. That happens inside the binary — there is nothing to
 install and no converter to configure:
@@ -177,6 +184,43 @@ output path:
 ```console
 look ui core_xy.step --output core_xy_viewer.html --json
 ```
+
+## Demo: build, view, measure — the Falcon Heavy end to end
+
+The repository ships a text-to-CAD corpus with a door script that builds every
+model on the kernel engine and exports both a certification artifact (binary
+STL) and a render artifact (colored indexed GLB, one node per part, materials
+from the script's own colors). One line builds the Falcon Heavy — 2,142 parts —
+into both artifacts:
+
+```console
+python corpus/ttc/door.py --engine truck corpus/ttc/trees/falcon_heavy/src lib.falcon_common build_vehicle "[]" falcon_heavy.stl --glb falcon_heavy.glb
+```
+
+Then open it in the interactive viewer, with `--performance` booking end-to-end
+wall time, per-stage timings, and peak process memory into the JSON output:
+
+```console
+look ui falcon_heavy.glb --performance --json
+```
+
+Measured on one Windows x64 machine (release build, quiet system, medians of
+repeated runs; the kernel column varies with `--deflection`, which trades
+triangle density for time and memory):
+
+| stage | OCCT (build123d) | kernel (`truck123d`) |
+|---|---:|---:|
+| geometry build (2,142 solids) | 3.84 s | 0.012–0.026 s |
+| build → artifacts on disk | 27.4–28.2 s → 47 MB GLB | 0.85–0.96 s @ 25 mm → 44 MB STL + 17 MB GLB |
+| peak process memory | 1,569–1,572 MiB | 218 MiB @ 25 mm / 1,565 MiB @ 0.4 mm |
+| render → PNG (`look render`) | 2.08–2.15 s | 0.77–1.14 s |
+
+The kernel geometry build is deflection-invariant; mesh emission scales with
+the requested density. At full 0.4 mm precision the kernel writes a *denser*
+artifact than the OCCT reference (117 MB vs 47 MB GLB) in 3.1–3.3 s — memory
+parity, ~9x the speed. See
+[`docs/TT_TIMING_RESULTS.md`](docs/TT_TIMING_RESULTS.md) for the per-row
+series and `scratch/fh_render/TIMING.md` for the raw samples.
 
 ## Reuse a loaded scene
 

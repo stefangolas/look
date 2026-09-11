@@ -157,6 +157,11 @@ pub struct RenderArgs {
     #[arg(long, conflicts_with = "session")]
     pub gui: bool,
 
+    /// Report end-to-end wall time, per-stage timings, and peak process
+    /// memory in the JSON output (the CI performance booking).
+    #[arg(long)]
+    pub performance: bool,
+
     #[arg(long)]
     pub json: bool,
 }
@@ -170,6 +175,11 @@ pub struct UiArgs {
 
     #[arg(long, value_enum, default_value = "y")]
     pub up_axis: UpAxis,
+
+    /// Report end-to-end wall time, per-stage timings, and peak process
+    /// memory in the JSON output (the CI performance booking).
+    #[arg(long)]
+    pub performance: bool,
 
     #[arg(long)]
     pub json: bool,
@@ -366,6 +376,7 @@ pub fn execute_render(args: RenderArgs) -> anyhow::Result<()> {
     }
 
     if args.gui {
+        let started = std::time::Instant::now();
         let mut timings = Timings::default();
         let mut compiled = compile_scene(&config.scene.source, config.scene.up_axis, &mut timings)?;
         prepare_source_textures(&mut compiled, &mut timings)?;
@@ -389,12 +400,19 @@ pub fn execute_render(args: RenderArgs) -> anyhow::Result<()> {
             .with_context(|| format!("failed to write HTML viewer to {}", out_path.display()))?;
         open_in_browser(&out_path)?;
         if args.json {
-            let json_out = serde_json::json!({
+            let mut json_out = serde_json::json!({
                 "status": "ok",
                 "viewer_path": out_path,
                 "scene": config.scene.source,
                 "triangles": compiled.instances.iter().map(|inst| compiled.geometries[inst.geometry].indices.len() / 3).sum::<usize>(),
             });
+            if args.performance {
+                json_out["performance"] = serde_json::json!({
+                    "end_to_end_ms": started.elapsed().as_secs_f64() * 1000.0,
+                    "peak_rss_bytes": crate::perf::peak_rss_bytes(),
+                    "stages_ms": timings,
+                });
+            }
             println!("{}", serde_json::to_string_pretty(&json_out)?);
         } else {
             println!(
@@ -414,6 +432,7 @@ pub fn execute_render(args: RenderArgs) -> anyhow::Result<()> {
 }
 
 pub fn execute_ui(args: UiArgs) -> anyhow::Result<()> {
+    let started = std::time::Instant::now();
     let mut timings = Timings::default();
 
     let mut scene = compile_scene(&args.scene, args.up_axis, &mut timings)?;
@@ -441,12 +460,19 @@ pub fn execute_ui(args: UiArgs) -> anyhow::Result<()> {
         .with_context(|| format!("failed to write HTML viewer to {}", out_path.display()))?;
 
     if args.json {
-        let json_out = serde_json::json!({
+        let mut json_out = serde_json::json!({
             "status": "ok",
             "viewer_path": out_path,
             "scene": args.scene,
             "triangles": scene.instances.iter().map(|inst| scene.geometries[inst.geometry].indices.len() / 3).sum::<usize>(),
         });
+        if args.performance {
+            json_out["performance"] = serde_json::json!({
+                "end_to_end_ms": started.elapsed().as_secs_f64() * 1000.0,
+                "peak_rss_bytes": crate::perf::peak_rss_bytes(),
+                "stages_ms": timings,
+            });
+        }
         println!("{}", serde_json::to_string_pretty(&json_out)?);
     } else {
         println!("Interactive 3D viewer written to {}", out_path.display());

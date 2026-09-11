@@ -47,6 +47,13 @@ serde_yaml = "0.9"
 thiserror = "2.0"
 wgpu = "30.0"
 
+[target.'cfg(windows)'.dependencies]
+windows-sys = { version = "0.59", features = [
+    "Win32_Foundation",
+    "Win32_System_ProcessStatus",
+    "Win32_System_Threading",
+] }
+
 # STEP support. truck is vendored in-tree at vendor/truck (pinned rev
 # c5f4b6e9778e0721a1d446f10568eb5e5594e8ed) so agents can edit it and the
 # build is reproducible from a clean clone. ruststep remains a pinned git
