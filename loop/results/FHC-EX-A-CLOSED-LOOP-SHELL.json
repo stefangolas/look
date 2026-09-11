@@ -1,0 +1,81 @@
+{
+  "id": "FHC-EX-A-CLOSED-LOOP-SHELL",
+  "status": "DONE",
+  "contracts": ["FHC-EX-A-CLOSED-LOOP-SHELL"],
+  "anchors_verified": { "A1": 1, "A2": 1, "A3": 3 },
+  "rows_flipped": ["f1/halo"],
+  "rows_typed_refusal": ["f1/nose", "f1/sidepod_left", "f1/sidepod_right", "f1/cockpit"],
+  "summary": "Landed the closed-loop loft SECTION representation in truck123d/src/bd_bridge.rs. spline_loop_spans now orients a recorded section boundary into one connected closed ring (exact endpoint matching, reversing an edge's defining samples when its recorded END, not its start, meets the running ring end) and treats a single spline edge as a closed ring closed on its start vertex (the landed spline-profile extrude convention). The pinned canonical MONO-2 N-station convention (chord-length stations, C2 across them, per-patch certificate brackets) is reused unchanged. This flips f1/halo green: all 14 halo solids certify exact brackets (lo == hi) and the STL emits. f1/nose, f1/sidepod_left/right and f1/cockpit remain TYPED refusals for reasons outside this packet's carrier representation (recorded below). corpus/ttc/door.py's Face/Edge/Wire `.wrapped` now refuse TYPED instead of returning None, so the corpus's OCC bounds probes surface as typed door refusals rather than untyped OCP TypeErrors (judgement 4: keep refusals typed).",
+  "implementation": {
+    "file": "truck123d/src/bd_bridge.rs",
+    "functions": [
+      "profile_edge_endpoints (new): the recorded start/end traversal of a line/spline edge",
+      "reverse_profile_edge (new): the exact reverse curve of one recorded edge",
+      "orient_profile_ring (new): greedily orients the recorded edges into one connected closed ring; an already-connected loop keeps its recorded order bit-for-bit",
+      "spline_loop_spans (extended): single circle/ellipse unchanged; single spline -> closed_spline_spans; multi-edge line/spline -> oriented ring",
+      "closed_spline_spans (new): closes a single spline section on its start vertex (the landed spline-profile extrude convention) and reconstructs the clamped-cubic spans"
+    ],
+    "convention_reuse": "No new facts path: the oriented spans feed the landed spline_loft_volume_rows / certified_spline_loft_volume per-patch certificate, station_params, v_segments and spline_loft_mesh unchanged."
+  },
+  "per_row": [
+    {
+      "row": "f1/halo",
+      "verdict": "green",
+      "solid_count": 14,
+      "volume": 6274615.567814955,
+      "bracket": "lo == hi per body (loop 3995782.5454088943, pillar 771352.3264164076, spine_stripe 136565.94656887066, mount_front 798219.7139885097, mount_rear x2 272598.3374676999; studs canonical)",
+      "stl_triangles": 352896,
+      "note": "The section band (spline + line + spline, both splines recorded from the same start vertex) is oriented into a connected ring; the spine stripe's single periodic spline is closed on its start vertex. bbox is the carrier-derived control-net ENCLOSURE; it over-reports the OCC reference z-max by 0.474 mm (864.330 vs 863.856), which is the documented N>2 certified-enclosure property, not an OCC match gate."
+    },
+    {
+      "row": "f1/nose",
+      "verdict": "typed-refusal",
+      "error": "kernel refusal: unsupported_envelope",
+      "bracket": "n/a",
+      "note": "The nose's own lofts now certify (all sections are single periodic splines handled by closed_spline_spans). The row's only remaining blocker is the 20 `head + boss` fasteners in lib/nose.py `_flange_fasteners`: a canonical CYLINDER + CYLINDER union. The landed canonical boolean product (`boolean_product_volume_certified` -> `node_box_patches` -> `placed_box_patches`) carries axis-aligned boxes only, so the pair refuses. Routing a canonical cylinder pair through the MONO-6/8/9 swept solver would need rational (non-unit-weight) cylinder patches, which the contact-cover solver's `cell_flux_exact` does not consume; this is not the swept-loft operand extraction this packet covers. Typed refusal recorded, never approximated."
+    },
+    {
+      "row": "f1/sidepod_left",
+      "verdict": "typed-refusal",
+      "error": "kernel refusal: unsupported_envelope",
+      "bracket": "n/a",
+      "note": "The sidepod skin/duct lofts now certify. The row refuses at lib/sidepods.py `_lip_bezel` (`ring_out - ring_in`, a Swept x Swept pair): the MONO-8 extraction adapter `extract_local_patches` -> `loft_cap_row` carries only straight QUADRILATERAL section end caps, while the sidepod section loops are curved spline loops. A second, corpus-side blocker stands behind it: `_bounded` in lib/sidepods.py calls `surfaces.bbox` (an OCC `BRepBndLib` probe) on the kernel row, which cannot be served and now refuses TYPED. Both are typed; neither is approximated."
+    },
+    {
+      "row": "f1/sidepod_right",
+      "verdict": "typed-refusal",
+      "error": "kernel refusal: unsupported_envelope",
+      "bracket": "n/a",
+      "note": "Mirror of sidepod_left (same factory); identical typed refusal at `_lip_bezel`."
+    },
+    {
+      "row": "f1/cockpit",
+      "verdict": "typed-refusal (was DNF)",
+      "error": "an OCC probe of a kernel-engine row is not a kernel-engine row",
+      "bracket": "n/a",
+      "note": "The R3 DNF (`RuntimeError: cockpit: loft failed`) is resolved: the seat shell loft now certifies, so `_solid` accepts its base. The build then reaches the corpus's own OCC bounds sanity check `_prism_estimate` -> `surfaces.bbox` on the recorded section Faces. With Face/Edge/Wire `.wrapped` now refusing TYPED, the door records the typed refusal instead of an untyped OCP `Add_s(None, ...)` TypeError. No corpus tree file was tuned."
+    }
+  ],
+  "stop_conditions": {
+    "anchor_mismatch": "did not fire: re-measured A1=1 (corpus/ttc/door.py `closed-loop`), A2=1 (truck123d/src/bd_bridge.rs `closed_loop`), A3=3 (`shell[^A-Za-z0-9_]|shell$`) at dispatch and after the work.",
+    "spec_gap": "did not fire: every still-red row's refusal is expressible in the current vocabulary (unsupported_envelope / the OCC-probe typed refusal).",
+    "blocked": "did not fire: no three consecutive failed cargo runs."
+  },
+  "tests": {
+    "file": "truck123d/tests/extraction_breadth_a.rs (new)",
+    "result": "5 passed, 0 failed, 0 ignored (serial)",
+    "cases": [
+      "halo_row_certifies_under_the_truck_door (door facts + STL, solid_count 14, certified bbox enclosure of the recorded reference)",
+      "closed_loop_ring_section_certifies_exact_bracket (the corpus's non-connected spline+line+spline ring, lo == hi)",
+      "single_spline_section_certifies_exact_bracket (periodic single-spline section, lo == hi)",
+      "unconnectable_section_refuses_typed",
+      "still_open_rows_keep_their_typed_refusals (nose and cockpit)"
+    ]
+  },
+  "verification": {
+    "cargo_test": "cargo test -p truck123d --test extraction_breadth_a --locked: 5/5 green (test binary run directly with the interpreter dir on PATH per the DLL workaround; the cargoq queue cannot resolve the pyo3 Python DLL in its child env).",
+    "cargo_fmt": "rustfmt --edition 2024 applied to truck123d/src/bd_bridge.rs and truck123d/tests/extraction_breadth_a.rs; both are clean under rustfmt --check. The crate-wide `cargo fmt -p truck123d -- --check` still reports the PRE-EXISTING drift in truck123d/tests/ttc_hazard_battery.rs (a file this packet never opened and may not edit).",
+    "cargo_clippy": "cargo clippy -p truck123d --all-targets -- -D warnings fails on PRE-EXISTING vendor/truck/truck-certified lints (65 errors) and, with --no-deps, on the pre-existing bd_bridge.rs indexing_slicing/neg_cmp baseline recorded by MONO-2 (378 errors). The new code adds no new lint class: it uses the file's existing idioms (Vec::remove, .first()/.last(), iterator loops)."
+  },
+  "notes": "Write set honored: truck123d/src/bd_bridge.rs, corpus/ttc/door.py (Face/Edge/Wire wrapped -> typed refusal only), truck123d/tests/extraction_breadth_a.rs. No corpus tree file edited; no pinned loft convention changed; no tolerance stretched; no approximant replicated; no #[ignore]; no test deleted or weakened. The rows that could not be flipped are recorded as TYPED refusals, per the packet's done-when ('ok: true ... or a typed refusal recorded in RESULT notes'). The two structural blockers are outside this packet's section representation: (1) canonical non-box (cylinder) boolean pairs, (2) curved planar end-cap extraction for the Swept x Swept cell; both would be new carrier work, not tolerance territory. The door change is confined to keeping OCC probes typed (judgement 4)."
+}

@@ -75,6 +75,39 @@ corrected, annex C = ORACLE POLICY CHANGE), then docs/SOLVER_COVERAGE_SPEC.md
 
 ## Where we are
 
+> LATEST GROUND TRUTH [operator 2026-09-11T20:16Z]: 0 RUNNING / 1
+> landed-this-cycle / 0 dispatched. HEAD `d1e2e37` (merge
+> packet/FHC-EX-A-CLOSED-LOOP-SHELL, --no-ff). **FHC-EX-A LANDED by the
+> operator**: slot 0 FINISHED with RESULT status DONE; the operator reproduced
+> the packet's scoped check at branch tip `03860db` (`cargo test -p truck123d
+> --test extraction_breadth_a --locked --no-run` exit 0; the test binary run
+> directly with the interpreter dir on PATH because cargoq's child env cannot
+> resolve the pyo3 Python DLL: 5 passed/0 failed/0 ignored), re-measured
+> anchors A1=1/A2=1/A3=3, merged --no-ff as `d1e2e37`, filed
+> `loop/results/FHC-EX-A-CLOSED-LOOP-SHELL.json`, deleted the slot wt RESULT,
+> appended the ledger row, flipped the row DONE. f1/halo green; f1/nose,
+> f1/sidepod_left/right and f1/cockpit remain TYPED refusals (non-box cylinder
+> boolean pair; curved planar end-cap extraction - new carrier work, never
+> tolerance). **FRONTIER MOVED**: FHC-EX-B-SPLINE-LOFT-OPERANDS's `needs`
+> FHC-EX-A is now DONE, and the operator re-measured its drifted anchor A2
+> (12->17, `ProfileEdge::Spline` in truck123d/src/bd_bridge.rs - FHC-EX-A's
+> own landing, anticipated by the packet text); FHC-TRIM-EXTRUDE-ENVELOPE ->
+> FHC-MIRROR-FORM -> BD-EMIT-MESH-CACHE serial behind it. `dispatch_ready
+> --dry-run --max-workers=4`: slots 8 (0 running, 8 free), slot-assigned 5,
+> dispatched 0 - RG-23/RG-9 still MISSING packet files (carried authoring
+> gap). Slots 1-7 FINISHED/IDLE landed residue; every tip
+> (329f6ab/e6553db/3c2109b/ee97499/713f205/5cf4811/c3df084) re-verified
+> ancestors of HEAD; nothing else landable. Health: heartbeat exactly 1
+> (27872), watchdog 1 (29264), cargoq UP (queued 0, running false). DISK ~8.8
+> GiB free (above the 8 GB floor, below the 15 GB goal; janitor not run). RAM
+> 4.27 GiB free. Root worktree carries live human-session WIP (M README.md,
+> M loop/LEDGER.jsonl, M loop/cargoq/server.log, untracked benchmarks/ +
+> loop/baselines/) - untouched; the operator's own landing adds the
+> ledger/registry/RESULT/STATE/packet-anchor changes. Leaving: 0 RUNNING;
+> HEAD `d1e2e37` + this cycle's STATE/log commit.
+>
+> --- SUPERSEDED 2026-09-11T19:44Z note (kept for history) follows ---
+>
 > LATEST GROUND TRUTH [operator 2026-09-11T19:44Z]: 1 RUNNING / 0
 > landed-this-cycle / 0 unblocked / 0 flipped / 0 dispatched. HEAD `5a95bd6`
 > (new since the 19:21Z operator commit `a38f482`: `5a95bd6` authors the

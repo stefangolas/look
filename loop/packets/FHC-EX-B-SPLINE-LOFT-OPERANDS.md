@@ -26,7 +26,7 @@ read_allow:
 tests_required: [truck123d/tests/extraction_breadth_b.rs]
 anchors:
   - {id: A1, expect: 4,  cmd: "grep -c 'dispatch_swept_carrier_boolean' truck123d/src/facade.rs"}
-  - {id: A2, expect: 12, cmd: "grep -c 'ProfileEdge::Spline' truck123d/src/bd_bridge.rs"}
+  - {id: A2, expect: 17, cmd: "grep -c 'ProfileEdge::Spline' truck123d/src/bd_bridge.rs"}
   - {id: A3, expect: 1,  cmd: "grep -c 'fn profile_loop' truck123d/src/bd_bridge.rs"}
 budget:      {turns: 80, ctx_tokens: 260000}
 ```
@@ -113,7 +113,7 @@ pinned loft convention. `#[ignore]`, deleted/weakened tests, bare
 
 ```json
 {"id":"FHC-EX-B-SPLINE-LOFT-OPERANDS","status":"DONE","contracts":["FHC-EX-B-SPLINE-LOFT-OPERANDS"],
- "anchors_verified":{"A1":4,"A2":12,"A3":1},
+ "anchors_verified":{"A1":4,"A2":17,"A3":1},
  "rows_flipped":[],"rows_still_refused":[],
  "notes":"per-row verdict + bracket; any SPEC_GAP pair classes named"}
 ```

@@ -5913,3 +5913,59 @@ HEAD `5a95bd6` + this cycle's STATE/log commit; heartbeat 1 (27872);
 operator_runner 1 (27876); watchdog 1 (29264); ONE overnight driver; TWO
 supervisors + TWO cargoq servers carried; cargoq UP (queued 0, running false);
 disk 5.9 GiB free (LOW, below floor); RAM 3.79 GiB.
+
+===============================================================
+[operator 2026-09-11T20:16Z] LANDED FHC-EX-A-CLOSED-LOOP-SHELL (the frontier
+was moving; slot 0 had FINISHED with a DONE RESULT). Board: 0 RUNNING / 1
+landed-this-cycle / 0 dispatched.
+
+- Step 1 health: slot_status = slot 0 FINISHED (FHC-EX-A, RESULT present, events
+  ~1 min old), slots 1-7 FINISHED/IDLE landed residue. cargoq UP (ping ok,
+  queued 0, running false). Heartbeat exactly 1 (27872; other matches are this
+  probe's own command text + the cmd.exe running this operator), watchdog 1
+  (29264). Disk 8.88 GiB free (above the 8 GB floor, below the 15 GiB goal; no
+  janitor reclaim run). RAM 4.27 GiB.
+- Step 2 land: slot 0 RESULT status DONE, branch
+  packet/FHC-EX-A-CLOSED-LOOP-SHELL@03860db (one commit on 5a95bd6; integration
+  was 59224c0 = prior operator STATE/log only, no write-set collision), worktree
+  clean, anchors A1=1/A2=1/A3=3 re-measured. Scoped check reproduced at the
+  branch tip: `cargo test -p truck123d --test extraction_breadth_a --locked
+  --no-run` exit 0; the test binary run DIRECTLY with the interpreter dir
+  (pythoncore-3.14-64) on PATH because cargoq's server env cannot resolve the
+  pyo3 Python DLL -> 5 passed/0 failed/0 ignored. Merged --no-ff as d1e2e37;
+  filed loop/results/FHC-EX-A-CLOSED-LOOP-SHELL.json; deleted the slot wt
+  RESULT; appended the ledger row; flipped the registry row READY->DONE.
+- Step 3 unblock: no IDLE/DEAD worker >15 min holding work; no QUESTION; zero
+  cargo/rustc. Nothing to resume or redispatch.
+- Step 4 registry hygiene: FHC-EX-B-SPLINE-LOFT-OPERANDS is the next frontier
+  and dependency-ready now that EX-A is DONE, but it failed anchor preflight:
+  A2 expected 12, tree has 17 (`grep -c 'ProfileEdge::Spline'
+  truck123d/src/bd_bridge.rs`). The drift is EX-A's own landing and the packet
+  text explicitly anticipated it; re-measured A2=17 and updated the packet's
+  anchor expect (and the RESULT-template copy) - the documented anchor ritual,
+  never invented. A1=4/A3=1 unchanged.
+- Step 5 dispatch: `dispatch_ready --dry-run --max-workers=4` -> "slots: 8 (0
+  running, 8 free); slot-assigned packets: 5; dispatched 0"; FHC-EX-B now passes
+  the anchor check (dependency-ready), FHC-TRIM-EXTRUDE-ENVELOPE -> FHC-MIRROR-
+  FORM -> BD-EMIT-MESH-CACHE serial behind it; RG-23/RG-9 still MISSING packet
+  files (carried authoring gap). No manual dispatch (heartbeat live; the
+  double-dispatch rule) - the heartbeat will pick up FHC-EX-B.
+- Step 6 STATE: rewrote the "Where we are" LATEST GROUND TRUTH block as
+  [operator 2026-09-11T20:16Z] and demoted the 19:44Z block to SUPERSEDED.
+  Traps/history untouched.
+- Step 7: this entry.
+
+Escalations: none NEW. CARRIED - RG-23/RG-9 missing packet files (authoring);
+RDEF-M4 re-scope; MONO-10 owner R3-mesh decision; FRAME-REVOLVE F1 non_z_axis
+pin; duplicate supervisors + lagging cargoq restart guard; TOR-C flip-or-pin;
+schedule.py 'needs' crash. Disk 8.88 GiB is above the 8 GB floor but below the
+15 GiB goal; the untracked human scratch is the bulk.
+
+Worktree note (reported, not actioned): root tree carries the live human-session
+WIP (M README.md, M loop/LEDGER.jsonl, M loop/cargoq/server.log, untracked
+benchmarks/ + loop/baselines/) - untouched; the operator's landing commit adds
+the ledger/registry/RESULT/STATE/packet-anchor changes.
+
+Leaving: 0 RUNNING; HEAD `d1e2e37` + this cycle's STATE/log/packet-anchor
+commit; heartbeat 1 (27872); operator_runner 1 (27876); watchdog 1 (29264);
+cargoq UP (queued 0, running false); disk 8.88 GiB free; RAM 4.27 GiB.
