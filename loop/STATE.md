@@ -75,6 +75,30 @@ corrected, annex C = ORACLE POLICY CHANGE), then docs/SOLVER_COVERAGE_SPEC.md
 
 ## Where we are
 
+> LATEST GROUND TRUTH [operator 2026-09-11T08:55Z]: 0 RUNNING / 0
+> landed-this-cycle / 0 unblocked / 0 flipped / 0 dispatched. HEAD `6d00f3e`
+> (the 08:36Z operator STATE-accuracy commit). **QUIET HEALTHY CYCLE - the
+> board is unchanged from the 08:36Z cycle, re-derived by command.** slot_status
+> shows all 8 slots FINISHED/IDLE, no live worker. Slot 0 AUTHOR-CENSUS-NAMES
+> wt RESULT status SPEC_GAP (still the escalated geometry rebooking - TIER A
+> Ellipse/RectangleRounded need new ProfileEdge conic/arc carriers; NOT
+> landable). Slot 1 wt RESULT status "complete" (the redundant
+> AUTHOR-WIRE-MIRROR-ARM duplicate, packet DONE, no commit - not landable).
+> Slot 2 IDLE (landed `19acb3e`); slots 3-7 landed residue. Nothing to unblock
+> (0 RUNNING; no QUESTION). Registry: nothing flipped - READY rows without a
+> landed marker = AUTHOR-CENSUS-NAMES (slot-assigned, so dispatch_ready skips
+> it) + RG-23/RG-9 (missing packet files = authoring); all 11 BLOCKED rows
+> carry deliberate owner/human/orchestrator park notes (7 carried + 4 newly
+> registered 2026-09-10: TTC-RECENSUS-F1-R3, MONO-10, RDEF-M4, RDEF-M5 -
+> orchestrator-held, not flipped). `dispatch_ready --dry-run --max-workers=4`:
+> "dispatched 0; workers now ~0/4"; only RG-23/RG-9 flagged. Health: heartbeat
+> exactly 1 (27872), operator_runner 1 (27876), watchdog 1 (29264), ONE
+> overnight driver (24864); TWO supervisors (19172+27828) carried; cargoq UP
+> (ping ok, queued 0, running false); disk 8.58 GiB free at entry -> janitor
+> reclaimed 4.8 GiB -> 12.88 GiB at exit (above the 8 GB floor, below the
+> 15 GiB goal); RAM 4.75 GiB. No new escalation.
+>
+> --- SUPERSEDED 2026-09-11T08:36Z note (kept for history) follows ---
 > LATEST GROUND TRUTH [operator 2026-09-11T08:36Z]: 0 RUNNING / 1
 > landed-by-operator (AUTHOR-WIRE-MIRROR-ARM bookkeeping completed) / 0
 > unblocked / 0 flipped / 0 dispatched. HEAD `05795af`. **THE TRIPLE-DISPATCH
@@ -6506,3 +6530,43 @@ Leaving: 0 RUNNING; HEAD `05795af`; heartbeat 1 (27872); operator_runner 1
 (carried); cargoq UP (queued 0); disk 8.58 GiB free (the scoped test build
 consumed ~3 GiB; slot 2 now IDLE, janitor may reclaim its target); RAM 4.81
 GiB.]
+
+[operator 2026-09-11T08:55Z - volatile refresh. Quiet healthy cycle: nothing to
+land, nothing to unblock, nothing to flip, no manual dispatch (heartbeat live).
+Board now: 0 RUNNING / 0 landed-this-cycle. HEAD `6d00f3e` (the 08:36Z operator
+STATE-accuracy commit) - no work moved this cycle. Re-derived by command:
+`slot_status.py` shows all eight slots FINISHED/IDLE, no live worker; slot 0
+AUTHOR-CENSUS-NAMES wt RESULT status **SPEC_GAP** (the escalated TIER A
+Ellipse/RectangleRounded carrier gap - not landable); slot 1 wt RESULT status
+"complete" (redundant AUTHOR-WIRE-MIRROR-ARM duplicate, packet row DONE, no
+commit - not landable); slot 2 IDLE (worker 19acb3e landed as 38d3534); slots
+3-7 landed residue. Nothing to unblock (0 RUNNING; no IDLE/DEAD >15 min holding
+work; no QUESTION; zero cargo/rustc processes). Registry re-verified
+programmatically (last-wins dedup + case-folded landed-note match): 343 unique
+rows - 247 DONE, 84 READY, 11 BLOCKED, 1 SUPERSEDED; READY rows WITHOUT a
+landed marker = {AUTHOR-CENSUS-NAMES (slot-assigned, so dispatch_ready skips
+it), RG-23-CERTIFIED-ENTRY-WIRING, RG-9-REFLECT-SOLID-PRODUCTION} (the latter
+two have missing/empty packet files = authoring, not the anchor ritual); all 11
+BLOCKED rows have all deps landed (or empty needs) but carry deliberate park
+notes - 7 carried (BG-AUD-FIX-004 OWNER_BLOCKED, BG-CK-SPLINE-CENSUS
+owner-cancelled, SEM-PCURVE-MASTER-001-FIX SUPERSEDED, DEF-SPINEFRAME-GRAZE
+SPEC_GAP->-R2, DEF-TESS-ANALYTIC-SEAM superseded by -R2, DEF-SEEDRAY-B
+human-gated, TOR-C orchestrator-held) + 4 newly registered 2026-09-10
+(TTC-RECENSUS-F1-R3 held for a quiet board, MONO-10-CERTIFIED-BOUNDARY-MESH THE
+RENDER GAP, RDEF-M4-NUMERIC-TIER, RDEF-M5-CORPUS-PREVALENCE) - none flipped.
+`dispatch_ready --dry-run --max-workers=4`: "slots: 8 (0 running, 8 free);
+slot-assigned packets: 6; dispatched 0; workers now ~0/4" = REAL idle; only
+RG-23/RG-9 flagged. No manual dispatch (heartbeat live). Health: heartbeat
+exactly 1 (27872; the second CommandLine match was this probing shell), the
+same self-match artifact for operator_runner (27876) and overnight driver
+(24864); watchdog 1 (29264); TWO supervisors (19172 PyManager + 27828
+pythoncore child - carried duplication class; only ONE overnight.py child = no
+double-merge risk); cargoq UP (ping ok, queued 0, running false; fallback.log
+quiet since 2026-09-07). Disk 8.58 GiB free at entry -> `janitor.py ensure
+--need 15` reclaimed ~4.8 GiB (idle slot targets) -> 12.88 GiB at exit (above
+the 8 GB floor, below the 15 GiB goal); RAM 4.75 GiB free. No new escalation;
+carried human items unchanged: AUTHOR-CENSUS-NAMES SPEC_GAP (rebooking);
+RG-23/RG-9 missing packet files; FRAME-REVOLVE F1 non_z_axis pin amendment
+(ttc_lathe_spline.rs:255); duplicate supervisors + the lagging cargoq restart
+guard; slot-4 + slot-7 wt RESULT residue parking the driver's dispatch arm;
+TOR-C flip-or-pin (orchestrator-held).]

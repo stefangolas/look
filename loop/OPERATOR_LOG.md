@@ -4353,3 +4353,54 @@ RESOLVED by the landing; the disk floor is no longer binding (11.5 GiB free).
 Leaving: 0 RUNNING; HEAD 0039227; heartbeat 1 (27872); operator_runner 1
 (27876); watchdog 1 (29264); ONE overnight driver (24864); TWO supervisors
 (carried); cargoq UP (queued 0); disk 11.52 GiB free; RAM 4.43 GiB.
+
+[operator 2026-09-11T08:55Z - cycle report]
+
+- Step 1 health: heartbeat exactly 1 (27872; the second CommandLine match was
+  this probing shell - anchored `-File dispatch_heartbeat.ps1` plus PID-detail
+  listing confirmed one), operator_runner 1 (27876; same self-match artifact),
+  watchdog 1 (29264), ONE overnight driver (24864; same self-match artifact);
+  TWO supervisors (19172 PyManager + 27828 pythoncore - carried duplication
+  class; only ONE overnight.py child = no double-merge risk); cargoq UP (ping
+  ok, queued 0, running false); zero cargo/rustc processes; no TEMP baseline
+  leaks. Disk 8.58 GiB free at entry (above the 8 GB floor, below the 15 GiB
+  goal); RAM 4.75 GiB.
+- Step 2 landing: nothing landable. Slot 0 AUTHOR-CENSUS-NAMES wt RESULT status
+  **SPEC_GAP** (the escalated TIER A Ellipse/RectangleRounded carrier gap) -
+  not landable, already escalated. Slot 1 wt RESULT status "complete"
+  (redundant duplicate AUTHOR-WIRE-MIRROR-ARM, packet row DONE, no commit) -
+  not landable. Slot 2 IDLE (worker 19acb3e already landed as 38d3534); slots
+  3-7 landed residue. No FINISHED slot carries an unlanded DONE RESULT.
+- Step 3 unblock: no RUNNING worker; no IDLE/DEAD >15 min holding work; no
+  QUESTION pending.
+- Step 4 registry hygiene: nothing flipped. READY rows without a landed marker
+  = AUTHOR-CENSUS-NAMES (slot-assigned, so dispatch_ready skips it) +
+  RG-23/RG-9 (missing/empty packet files = authoring, not the anchor ritual).
+  All 11 BLOCKED rows have all deps landed (or empty needs) but carry
+  deliberate park notes: 7 carried (BG-AUD-FIX-004 OWNER_BLOCKED,
+  BG-CK-SPLINE-CENSUS owner-cancelled, SEM-PCURVE-MASTER-001-FIX SUPERSEDED,
+  DEF-SPINEFRAME-GRAZE SPEC_GAP->-R2, DEF-TESS-ANALYTIC-SEAM superseded by -R2,
+  DEF-SEEDRAY-B human-gated, TOR-C orchestrator-held) + 4 newly registered
+  2026-09-10 (TTC-RECENSUS-F1-R3 held for a quiet board,
+  MONO-10-CERTIFIED-BOUNDARY-MESH THE RENDER GAP, RDEF-M4-NUMERIC-TIER,
+  RDEF-M5-CORPUS-PREVALENCE) - semantic/orchestrator calls, not flipped.
+- Step 5 dispatch: `dispatch_ready --dry-run --max-workers=4` -> "slots: 8 (0
+  running, 8 free); slot-assigned packets: 6; dispatched 0; workers now ~0/4";
+  only RG-23/RG-9 flagged (missing packets). REAL idle; no manual dispatch
+  (heartbeat live).
+- Step 5b disk: `janitor.py ensure --need 15` reclaimed ~4.8 GiB of idle slot
+  targets -> disk 8.58 -> 12.88 GiB (still short of the 15 GiB goal, above the
+  8 GB floor). No live worker was at risk.
+- Step 6 STATE: prepended the 08:55Z LATEST GROUND TRUTH block (08:36Z marked
+  SUPERSEDED) + appended the 08:55Z machine block.
+- Step 7: this entry.
+
+Escalations: none new. Carried: AUTHOR-CENSUS-NAMES SPEC_GAP (rebooking);
+RG-23/RG-9 missing packet files; FRAME-REVOLVE F1 non_z_axis pin amendment
+(ttc_lathe_spline.rs:255); duplicate supervisors + the lagging cargoq restart
+guard; slot-4 + slot-7 wt RESULT residue parking the driver's dispatch arm;
+TOR-C flip-or-pin (orchestrator-held).
+
+Leaving: 0 RUNNING; HEAD 6d00f3e; heartbeat 1 (27872); operator_runner 1
+(27876); watchdog 1 (29264); ONE overnight driver (24864); TWO supervisors
+(carried); cargoq UP (queued 0); disk 12.88 GiB free; RAM 4.75 GiB.
