@@ -1472,6 +1472,33 @@ class Compound(_Shape):
     def solids(self):
         return self._leaves()
 
+    @property
+    def children(self):
+        """build123d ``Compound.children``: the direct child shapes."""
+        return self._children
+
+    def locate(self, loc):
+        """Group placement: compose the frame onto every child leaf.
+
+        The cadgen ``compound_from_instances`` path places whole sub-assembly
+        prototypes (which arrive as ``Compound`` nodes) via ``.moved`` — the
+        vehicle/second_stage/cutaway rows died here with AttributeError before
+        this method existed (2026-09-11, harness fix, recorded in STATE)."""
+        if not isinstance(loc, _Frame):
+            _refuse("locate expects a frame carrier")
+            return self
+        for child in self._children:
+            if isinstance(child, Compound):
+                child.locate(loc)
+            elif isinstance(child, _Part):
+                _locate_in_place(child, loc)
+            else:
+                _refuse("compound placement over a non-part child carrier")
+        return self
+
+    def moved(self, loc):
+        return self.locate(loc)
+
 
 class _BoundingBox:
     def __init__(self, mn, mx):
