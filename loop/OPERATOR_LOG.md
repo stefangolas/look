@@ -4140,3 +4140,58 @@ duplicate-driver probe fix.
 Leaving: 1 RUNNING; HEAD b0670fd; heartbeat 1 (27872); operator_runner 1
 (27876); watchdog 1 (29264); ONE overnight driver (24864); TWO supervisors;
 cargoq UP (running true); disk 11.0 GiB free; RAM 4.3 GiB.
+
+## 2026-09-11 07:12 UTC (operator)
+
+Board: 2 RUNNING / 0 landed-by-operator / 0 unblocked / 0 flipped. HEAD
+`329f6ab` (the 06:47Z operator STATE commit).
+
+Health (step 1): heartbeat exactly 1 (27872; anchored `-File
+dispatch_heartbeat.ps1` scan), operator_runner 1 (27876), watchdog 1 (29264),
+ONE overnight driver (24864), cargoq UP (ping 200, queued 1, running true = the
+slot-0 hung test). TWO supervisors (19172 + 27828) + TWO cargoq/server.py
+(28544 + 34564) carried duplication classes, functional. Disk 9.3 GiB free
+(`janitor.py ensure --need 15` reclaimed ~0.0 - nothing reclaimable; above the
+8 GB floor, below the 15 GB goal); RAM 3.8 GiB.
+
+Actions:
+- Landing (step 2): NOTHING operator-landable. All FINISHED slot branch tips
+  re-verified ancestors of HEAD (`f49fdf4`, `e6553db`, `3c2109b`, `ee97499`,
+  `713f205`, `5cf4811`, plus `4c2554f`/`dd102eb`); slot 4 = F1
+  LANDED-WITH-FINDINGS; slot 7 = LANDED/no-commit redundant FRAME-REVOLVE.
+- Unblock (step 3): BOTH running slots are AUTHOR-WIRE-MIRROR-ARM - a
+  double-dispatch (slot 0 cmd 18540 -> opencode 31940, forked 06:29:36Z; slot 1
+  cmd 32348 -> opencode 26564, forked 06:52:05Z). Both WEDGED on one hung
+  `cargo test --locked -p truck123d` (cargoq running job START 06:35:34Z, cwd
+  slot 0; the pre-existing `unanswerable_arc_lathe_refuses_typed` hang - test
+  exe `truck123d-361b704ce0515825.exe` pid 34104 since 06:36:09Z; cargoq's
+  40-min timeout reaps it ~07:15Z). Did NOT kill either live worker. Slot 0's
+  worktree was reset 06:49:47Z (`slots/0/abandoned-20260911-024947.patch`,
+  3483 B, the `_reflection_frame`/`_mirror_edge`/`_mirror_wire` work); slot 1
+  re-forked 06:52:05Z after its 06:49:48Z reset archived DOOR-PARTIAL-ARC-FLIP
+  content (`slots/1/abandoned-20260911-024948.patch`, 33969 B); slot 1's own
+  required test is QUEUED behind slot 0's hung job.
+- Registry (step 4): nothing flipped. AUTHOR-CENSUS-NAMES READY with its
+  SPEC_GAP packet (question loop; row pin/amendment needed); TTC-RECENSUS-F1-R3
+  deps landed + preflight green but held for a quiet board; RDEF-M4 H-8 stale
+  anchor (missing classify.rs); RG-23/RG-9/MONO-10 READY with NO packet file;
+  TOR-C pinned.
+- Dispatch (step 5): dry-run only (heartbeat live) -> "AUTHOR-WIRE-MIRROR-ARM:
+  DEAD dispatch (slot 1 holds no matching RESULT) - would reset + delete +
+  redispatch; AUTHOR-CENSUS-NAMES -> slot 2; dispatched 1; workers now ~1/4". No
+  manual dispatch (a manual dispatch would race the live heartbeat).
+- STATE (step 6): refreshed the LATEST GROUND TRUTH note + appended the
+  `[operator 2026-09-11T07:12Z]` block.
+- Report (step 7): this entry.
+
+Escalations: NEW AUTHOR-WIRE-MIRROR-ARM double-dispatch + reset/re-dispatch loop
++ the hung truck123d full-suite test (recovery pointers in ESCALATIONS). Carried:
+AUTHOR-CENSUS-NAMES SPEC_GAP + question loop; FRAME-REVOLVE F1 non_z_axis pin;
+duplicate supervisors + duplicate cargoq restart guard; slot-4/7 wt RESULT
+residue; TOR-C flip-or-pin; MONO-10 missing packet; RDEF-M4 H-8 stale anchor;
+duplicate-driver probe fix.
+
+Leaving: 2 RUNNING (slots 0+1, double-dispatched AUTHOR-WIRE-MIRROR-ARM); HEAD
+329f6ab; heartbeat 1 (27872); operator_runner 1 (27876); watchdog 1 (29264); ONE
+overnight driver (24864); TWO supervisors; cargoq UP (running true); disk 9.3
+GiB free; RAM 3.8 GiB.

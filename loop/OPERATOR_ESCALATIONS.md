@@ -1286,3 +1286,42 @@ Judgment-required items appended each operator cycle. Newest at the bottom.
   real second heartbeat ever existed.
 - Start from: `loop/OPERATOR_CHARTER.md` step 1; the health-sweep commands in
   this and the prior `loop/OPERATOR_LOG.md` entries.
+
+## 2026-09-11 07:12 UTC (operator) - AUTHOR-WIRE-MIRROR-ARM double-dispatched into slots 0+1 and in a reset/re-dispatch loop; trigger is a hung truck123d full-suite test vs the heartbeat freshness guard
+
+- What: two LIVE workers on the SAME branch `packet/AUTHOR-WIRE-MIRROR-ARM` -
+  slot 0 (cmd 18540 -> opencode 31940, forked 06:29:36Z) and slot 1 (cmd 32348 ->
+  opencode 26564, forked 06:52:05Z). The heartbeat log's 06:49:41Z cycle read
+  "0 running" (180s freshness guard, while the worker sat blocked on a `cargo
+  test` step) and dispatched the packet into slot 1 without clearing slot 0 -
+  the documented 180s-guard-vs-long-test double-dispatch class (same as DOOR).
+  Slot 0's worktree was then RESET 06:49:47Z
+  (`loop/slots/0/abandoned-20260911-024947.patch`, 3483 B - the
+  `_reflection_frame`/`_mirror_edge`/`_mirror_wire` door.py work); slot 1 was
+  re-forked 06:52:05Z after its own 06:49:48Z reset archived DOOR-PARTIAL-ARC-FLIP
+  content (`loop/slots/1/abandoned-20260911-024948.patch`, 33969 B).
+- Root trigger: cargoq's running job is slot 0's `cargo test --locked -p
+  truck123d` (START 06:35:34Z, cwd `slots/0/wt`), HUNG on the pre-existing
+  `unanswerable_arc_lathe_refuses_typed` test (test exe
+  `truck123d-361b704ce0515825.exe` pid 34104 since 06:36:09Z; the same test hit
+  cargoq's 2400s timeout once already at 01:53:25Z). Slot 1's required test is
+  QUEUED behind it, so slot 1's events also age past the guard. `dispatch_ready
+  --dry-run` (07:10Z) reports AUTHOR-WIRE-MIRROR-ARM as a DEAD dispatch and would
+  reset+delete+redispatch - so the heartbeat's next cycle can DESTROY slot 1's
+  live work (the only live copy).
+- Why the operator can't: the double-dispatch adjudication (which run/impl is
+  authoritative) and the freshness-guard fix are harness/semantic changes;
+  killing a live worker is outside operator authority. The hung job self-reaps
+  ~07:15Z (cargoq 40-min timeout), after which both workers unblock.
+- Action needed: (1) PIN or amend the AUTHOR-WIRE-MIRROR-ARM row so
+  dispatch_ready stops resetting+redispatching it (its note carries no `landed`
+  marker, so it reads READY); (2) adjudicate the two runs and recover work -
+  slot 1's live worktree first, then `slots/0/abandoned-20260911-024947.patch`
+  (mirror arm) and `slots/1/abandoned-20260911-024948.patch` (DOOR partial-arc);
+  (3) fix the freshness guard so a worker blocked on a cargoq step is not read
+  as dead (same class as the DOOR double-dispatch); (4) consider scoping the
+  packet done-when off the full `cargo test -p truck123d` suite, whose
+  pre-existing `unanswerable_arc_lathe_refuses_typed` hang wedges it.
+- Start from: `loop/dispatch_heartbeat.log` (the 06:49:41Z cycle); `loop/cargoq/
+  server.log` tail (the hung `cargo test --locked -p truck123d`);
+  `git -C loop/slots/1/wt status`; `loop/packets/AUTHOR-WIRE-MIRROR-ARM.md`.
