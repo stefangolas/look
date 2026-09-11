@@ -75,6 +75,38 @@ corrected, annex C = ORACLE POLICY CHANGE), then docs/SOLVER_COVERAGE_SPEC.md
 
 ## Where we are
 
+> LATEST GROUND TRUTH [operator 2026-09-11T11:16Z]: 0 RUNNING / 0
+> landed-this-cycle / 0 unblocked / 0 flipped / 0 dispatched. HEAD `d500dcc`
+> (session handoff top-up; the orchestrator session was active through
+> ~13:1xZ and landed MONO-8/9, RG-4, DOOR-CIRCLE-FLIP, AUTHOR-EXT,
+> DOOR-PARTIAL-ARC, WIRE-MIRROR, RDEF-M0/M1 + harness fixes). **QUIET HEALTHY
+> CYCLE WITH ONE LIVE WORKER - quiet-machine discipline holds**: slot 2
+> RUNNING TTC-RECENSUS-F1-R3 (worker `slots/2/worker-cmd.bat` pid 35048,
+> events 2.1 min fresh, cargo+rustc alive, git packet/TTC-RECENSUS-F1-R3@f827556
+> = base, pre-commit) - DO NOT disturb; the census owns the machine. Slots
+> 0/1/3-7 residue: slot 0 AUTHOR-CENSUS-NAMES wt RESULT SPEC_GAP + QUESTION.md
+> (the carried geometry rebooking; NOT landable; worker pid 16848 alive but
+> idle 167 min), slot 1 AUTHOR-WIRE-MIRROR-ARM wt RESULT "complete" (redundant
+> - the row landed via 38d3534/d500dcc; no work), slots 3-7 landed residue
+> (e6553db/3c2109b/ee97499/713f205/5cf4811 all re-verified ancestors of HEAD
+> this cycle; only 46ff8cc, the slot-0 SPEC_GAP tip, is not). Nothing to
+> unblock (slot 0 = geometry-judgment QUESTION, escalated; no IDLE/DEAD worker
+> without a RESULT). Registry re-derived: 250 DONE / 84 READY / 10 BLOCKED / 1
+> SUPERSEDED; the 7 BLOCKED rows with all deps landed all carry deliberate
+> park/gate notes (BG-AUD-FIX-004 OWNER_BLOCKED, BG-CK-SPLINE-CENSUS booking
+> gate, SEM-PCURVE-MASTER-001-FIX SUPERSEDED, DEF-SPINEFRAME-GRAZE registered
+> defect, DEF-TESS-ANALYTIC-SEAM superseded by -R2, TOR-C orchestrator-held,
+> MONO-10 owner-decision) - none mechanically flippable. `dispatch_ready
+> --dry-run --max-workers=4`: "slots: 8 (1 running, 6 free); slot-assigned
+> packets: 7; dispatched 0; workers now ~1/4"; only RG-23/RG-9 flagged
+> (packet:"" = authoring, not the anchor ritual). Health: heartbeat exactly 1
+> (27872), operator_runner exactly 1 (27876), watchdog 1 (29264), ONE overnight
+> driver (24864); TWO supervisors (19172+27828) carried; cargoq UP (ping 200);
+> disk 12.4 GiB free (above 8 GB floor, below 15 GiB goal); RAM 2.09 GiB (LOW
+> - the slot-2 worker + cargo/rustc resident; do not stack workers). No new
+> escalation.
+>
+> --- SUPERSEDED 2026-09-11T10:50Z note (kept for history) follows ---
 > LATEST GROUND TRUTH [operator 2026-09-11T10:50Z]: 0 RUNNING / 0
 > landed-this-cycle / 0 unblocked / 0 flipped / 0 dispatched. HEAD `9507272`
 > (the 10:27Z operator commit). **QUIET HEALTHY CYCLE - the board is unchanged
@@ -6899,3 +6931,32 @@ like the circle flip, redispatch AFTER the census; (5) RDEF-M2/M3 are READY
 from git history before trusting any READY row. Key rule from this session:
 swarm/agent claims of already-landed executor capability are false 3x over -
 grep bd_bridge.rs, never trust facade ledger rows as executor facts.]
+
+[operator 2026-09-11T11:16Z - volatile refresh. Board now: 1 RUNNING /
+0 landed-this-cycle / 0 unblocked / 0 flipped / 0 dispatched. HEAD `d500dcc`
+(orchestrator handoff top-up; the session was active through ~13:1xZ and landed
+MONO-8/9, RG-4, DOOR-CIRCLE-FLIP, AUTHOR-EXT, DOOR-PARTIAL-ARC, WIRE-MIRROR,
+RDEF-M0/M1 + harness fixes). THE CENSUS IS RUNNING: TTC-RECENSUS-F1-R3 slot 2
+(pid 35048, worker-cmd.bat, events 2.1 min fresh, cargo+rustc alive, pre-commit
+at base f827556) - the orchestrator's quiet-machine discipline holds; the
+operator dispatched nothing and did not touch the worker. Slot 0
+AUTHOR-CENSUS-NAMES DEAD? (events 167.7 min old; wt RESULT SPEC_GAP + QUESTION
+- the carried geometry rebooking; worker pid 16848 still alive but idle); slot
+1 AUTHOR-WIRE-MIRROR-ARM FINISHED (wt RESULT "complete" - now redundant, the
+row landed); slots 3-7 FINISHED landed residue (all tips ancestors of HEAD;
+only the slot-0 SPEC_GAP tip 46ff8cc is not). Nothing operator-landable,
+nothing mechanically unblockable. Registry: 250 DONE / 84 READY / 10 BLOCKED /
+1 SUPERSEDED; the 7 BLOCKED rows with all deps landed all carry deliberate
+park/gate notes - none flippable. `dispatch_ready --dry-run --max-workers=4`:
+"dispatched 0; workers now ~1/4"; only RG-23/RG-9 flagged (empty packet =
+authoring). Health: heartbeat exactly 1 (27872), operator_runner exactly 1
+(27876), watchdog 1 (29264), ONE overnight driver (24864), TWO supervisors
+(19172+27828) carried, cargoq UP (ping 200), disk 12.4 GiB free, RAM 2.09 GiB
+(LOW). Carried human items unchanged: AUTHOR-CENSUS-NAMES SPEC_GAP rebooking
+(amend like the circle flip, redispatch AFTER the census drains); RG-23/RG-9
+missing packet files; FRAME-REVOLVE F1 non_z_axis pin (ttc_lathe_spline.rs:255);
+duplicate supervisors + lagging cargoq restart guard; slot-4/7 wt RESULT
+residue; TOR-C flip-or-pin; schedule.py 'needs' crash. NOTE: the root worktree
+has an uncommitted `corpus/ttc/MANIFEST.json` modification (mtime 2026-09-10
+19:30, +524 lines - NOT this operator and NOT the running worker's worktree);
+left untouched, flagged for the orchestrator to confirm/commit or revert.]
