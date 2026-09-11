@@ -888,3 +888,20 @@ Judgment-required items appended each operator cycle. Newest at the bottom.
   as `716cd08` ("RG-4-CANONICAL-BOOLEAN-PRODUCT row LANDED (overnight)",
   changed only `loop/PACKETS.jsonl`). The row is now persistently self-blocked;
   `340b395` is still NOT an ancestor of integration/kernel-bg.
+- **RESOLVED 2026-09-11T02:07Z (operator):** `340b395` was landed for real at
+  `1660cd0` ("loop: land RG-4-CANONICAL-BOOLEAN-PRODUCT for real ...") and the
+  row is now `status DONE` (HEAD moved to f149091 with the ledger flips). No
+  further action needed for RG-4.
+
+## 2026-09-11 02:07 UTC (operator cycle) - machinery reminder (no new block)
+
+- **`depends_on` vs `needs` in the registry:** `loop/dispatch_ready.py:186`
+  evaluates dependencies from the row's `needs` field, but the MONO/RDEF rows
+  (and some others) record dependencies in `depends_on`. A BLOCKED row therefore
+  looks dependency-free to the dispatcher. This cycle the operator flipped
+  MONO-9-FUSE-FOLD + RDEF-M1-LATTICE-V2 only after re-deriving their real
+  `depends_on` deps by hand (both landed), so the flip was correct - but the
+  operator must always check `depends_on` manually before flipping a BLOCKED row
+  to READY. Start from: `loop/dispatch_ready.py` lines 134-188 and
+  `loop/PACKETS.jsonl` (the MONO-9 / RDEF-M1 rows). Carried; no owner decision
+  requested.

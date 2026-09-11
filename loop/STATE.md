@@ -76,32 +76,28 @@ corrected, annex C = ORACLE POLICY CHANGE), then docs/SOLVER_COVERAGE_SPEC.md
 ## Where we are
 
 > LATEST GROUND TRUTH: read the newest `[operator ...]` block in "State of
-> the machine, as left" (2026-09-11T01:01Z). [operator 2026-09-11T01:01Z
-> ground-truth note: 2 RUNNING / 0 landed-by-operator. **DOOR-CIRCLE-FLIP
-> (slot 0, pid 6196) RUNNING** (5 files changed) and **MONO-8-SWEPT-
-> ADMISSION-WIRING (slot 1, pid 27232) RUNNING** (heartbeat re-forked slot 1
-> off RG-4 ~00:58Z) - do not touch. **RG-4-CANONICAL-BOOLEAN-PRODUCT was
-> FALSE-LANDED at 4703b38** (driver log `09-10 20:58:56`; 4703b38 = the
-> DOOR-CIRCLE-FLIP rebook commit, changed only its packet doc) - the
-> production fix is ABSENT from HEAD and the row now carries a false
-> `LANDED 4703b38` marker that self-blocks it in dispatch_ready. The
-> operator PRESERVED the worker's uncommitted deliverable AS DELIVERED at
-> `340b395` (+ `refs/wip/RG-4-as-delivered`, 633/-60, bd_bridge.rs + new
-> rg4_boolean_product.rs) - ESCALATED for marker-clear + landing (the
-> operator's scoped build was cut off by the slot re-fork). No BLOCKED row
-> has all deps landed (MONO-9/MONO-10 dep MONO-8 RUNNING; TTC-RECENSUS-F1-R3
-> dep AUTHOR-EXT READY; 7 carried parked). Registry: 337 rows (239 DONE / 87
-> READY / 10 BLOCKED / 1 SUPERSEDED). Health: heartbeat exactly 1 (27872),
-> watchdog 1 (29264), operator runner 1 (27876), overnight driver 1 (26920),
-> cargoq UP (ping 200, queued 0), TWO supervisors (19172 + 27828, carried;
-> only ONE overnight.py child = no double-merge risk). Disk 8.3 GiB free
-> (above the 8 GB floor but LOW - fell from 10.3 during this cycle's scoped
-> build; below the 15 GB goal); RAM 3.3 GiB free. Open human
-> items: (NEW/hot) clear the RG-4 false `LANDED 4703b38` marker and land
-> `340b395`; amend MONO-7 D1+D2 then re-verify; fix `packet_tests_and_crates`
-> crate derivation; fix overnight.py:222-226 (now 13 strikes incl. the
-> slot-reuse variant); duplicate supervisors + lagging cargoq restart guard;
-> slot-4/7 wt RESULT residue; MONO-row registry schema gap.]
+> the machine, as left" (2026-09-11T02:07Z). [operator 2026-09-11T02:07Z
+> ground-truth note: 2 RUNNING / 0 landed-by-operator. **AUTHOR-EXT-FILLET-HALO
+> (slot 0, pid 30004) RUNNING** (door.py + bd_bridge.rs + binding.rs + new
+> fillet_halo_arms.rs; cargo/rustc live) and **RDEF-M1-LATTICE-V2 (slot 2, pid
+> 31876) RUNNING** (heartbeat dispatched it this cycle after the operator's
+> flip) - do not touch. The 01:01Z RG-4 false-landing is RESOLVED: `340b395`
+> was landed for real at `1660cd0` and the row flipped DONE; DOOR-CIRCLE-FLIP
+> (`dd2959d`) and MONO-8 (`af9eef0`) also landed and are DONE. Operator action
+> this cycle: flipped MONO-9-FUSE-FOLD + RDEF-M1-LATTICE-V2 BLOCKED->READY at
+> `47553c2` (deps MONO-8/RDEF-M0 landed; gen_packet --check green) - RDEF-M1
+> dispatched, MONO-9 correctly write-set-clashed with the RUNNING slot 0.
+> Registry: 343 rows (243 DONE / 86 READY / 13 BLOCKED / 1 SUPERSEDED).
+> Health: heartbeat exactly 1 (27872), watchdog 1 (29264), operator runner 1
+> (27876), overnight driver 1 (24864, restarted 21:53:58 local), cargoq UP
+> (28544, ping 200, queued 0), TWO supervisors (19172 + 27828, carried; only
+> ONE overnight.py child = no double-merge risk). Disk 13.1 GiB free (above
+> the 8 GB floor, below the 15 GB goal); RAM 3.9 GiB free. Open human items:
+> MONO-7 D1+D2 re-verify; `packet_tests_and_crates` crate derivation;
+> overnight.py:222-226; duplicate supervisors + lagging cargoq restart guard;
+> slot-4/7 wt RESULT residue; MONO/RDEF registry schema gap (rows carry
+> `depends_on`, but dispatch_ready gates on `needs` - flip only after checking
+> `depends_on` by hand).]
 
 - **THE FIRST KERNEL-VS-OCC TIMING COMPARISON IS BANKED** (FH-TIMING-REFRESH,
   landed c94d043): turbopump_assembly **0.097 s kernel vs 4.866 s OCC**,
@@ -5753,3 +5749,51 @@ human items: (NEW/hot) clear the RG-4 false `LANDED 4703b38` marker and land
 crate derivation; fix overnight.py:222-226 (now 13 strikes); duplicate
 supervisors + lagging cargoq restart guard; slot-4/7 wt RESULT residue; MONO-row
 registry schema gap.]
+
+[operator 2026-09-11T02:07Z - volatile refresh. Board now: 2 RUNNING / 0
+landed-by-operator. Quiet cycle with ONE mechanical unblock. **Health:** at
+02:03Z local the substrate is the 09-09 21:55Z set - heartbeat exactly 1
+(27872, anchored `-File ...dispatch_heartbeat.ps1` scan; the extra `-match`
+hits were this operator's own probe shells), operator runner 1 (27876),
+watchdog 1 (29264), overnight driver 1 (24864, restarted 21:53:58 local per
+overnight.log, child of 27828), cargoq UP (ping 200, queued 0, running false;
+single server.py 28544), TWO supervisors (19172 PyManager + 27828 pythoncore
+child - carried duplication class; only ONE overnight.py child = no
+double-merge risk). Disk 13.1 GiB free (above the 8 GB floor, below the 15 GB
+janitor goal); RAM 3.9 GiB free (above the 3 GB check). **Landing (step 2):**
+nothing to land - every FINISHED slot is an ancestor of integration/kernel-bg
+this cycle (MONO-8 08dce58, SOLVER-SURVEY-C e6553db, F1 3c2109b, CL-006
+ee97499, CL-005 713f205); the driver had already landed RG-4 (340b395 ->
+1660cd0), DOOR-CIRCLE-FLIP (aa5054f -> dd2959d) and corrected MONO-8's status
+(f149091). **Unblock (step 3):** none - slot 0 AUTHOR-EXT-FILLET-HALO RUNNING
+(pid 30004, events <5 min fresh, cargo+rustc live, 4 changed files: door.py,
+bd_bridge.rs, binding.rs, new fillet_halo_arms.rs) - do not touch; no
+IDLE/DEAD >15 min holding work; no QUESTION; no APIError 402. **Registry
+hygiene (step 4):** the real action this cycle. BLOCKED-with-all-deps-landed
+(checked on the CORRECT field `depends_on`, not `needs`) = MONO-9-FUSE-FOLD
+(dep MONO-8 landed) and RDEF-M1-LATTICE-V2 (dep RDEF-M0 landed); both packets
+authored and `gen_packet.py --check` green. Flipped both BLOCKED->READY at
+`47553c2` (appended last-wins rows). The heartbeat then dispatched RDEF-M1 to
+slot 2 (pid 31876, forked f149091, events fresh) - write set
+(loop/solver_coverage, docs/SOLVER_COVERAGE_SPEC.md) is disjoint from slot 0;
+MONO-9 (bd_bridge.rs + facade.rs) correctly clashes with slot 0 and stays
+queued. Did NOT flip MONO-10 (packet unauthored + owner-gated on the R3 mesh
+predicate), TOR-C (packet empty, orchestrator-held), TTC-RECENSUS-F1-R3
+(dep AUTHOR-EXT RUNNING), nor the owner-parked/superseded/cancelled set
+(BG-AUD-FIX-004, BG-CK-SPLINE-CENSUS, SEM-PCURVE-MASTER-001-FIX,
+DEF-SPINEFRAME-GRAZE, DEF-TESS-ANALYTIC-SEAM, DEF-SEEDRAY-B). Registry: 343
+unique rows - 243 DONE / 86 READY / 13 BLOCKED / 1 SUPERSEDED. **Dispatch
+(step 5):** no manual dispatch (heartbeat live); `dispatch_ready --dry-run
+--max-workers=4` after the flip: "slots: 8 (2 running, 5 free); dispatched 0;
+workers now ~2/4" - the remaining READY rows (DOOR-PARTIAL-ARC-FLIP,
+AUTHOR-WIRE-MIRROR-ARM, AUTHOR-CENSUS-NAMES, RG-23, RG-9, MONO-9) are
+correctly deferred on the running rows' door.py / bd_bridge.rs / binding.rs
+write sets. **Escalation (step 7):** no NEW judgment item; the 01:01Z RG-4
+false-landing escalation is RESOLVED (landed for real at 1660cd0) - a
+resolution note appended. Carried human items unchanged: MONO-7 D1+D2
+re-verify; `packet_tests_and_crates` crate derivation; overnight.py:222-226;
+duplicate supervisors + lagging cargoq restart guard; slot-4/7 wt RESULT
+residue; and the MONO/RDEF registry schema gap - **dispatch_ready.py:186 gates
+dependencies on `needs`, but the MONO/RDEF rows carry `depends_on`; a BLOCKED
+row must be flipped only after checking `depends_on` by hand** (this cycle did
+so; RDEF-M1's empty `needs` happened to agree).]

@@ -3544,3 +3544,58 @@ Leaving: 2 RUNNING (DOOR-CIRCLE-FLIP slot 0, MONO-8 slot 1); HEAD 5992777;
 heartbeat 1 (27872); watchdog 1 (29264); cargoq UP; disk 8.3 GiB free (fell
 from 10.3 during this cycle's scoped build; above the 8 GB floor but LOW); RAM
 3.3 GiB free.
+
+## [operator 2026-09-11T02:07Z] Board: 2 RUNNING / 0 landed-by-operator / 13 BLOCKED
+
+- **Health sweep (step 1):** heartbeat exactly 1 (27872; anchored `-File
+  ...dispatch_heartbeat.ps1` scan - the extra `-match` hits were this
+  operator's own probe shells), operator runner 1 (27876), watchdog 1 (29264),
+  overnight driver 1 (24864, restarted 21:53:58 local per overnight.log, child
+  of 27828), cargoq UP (ping 200, queued 0, running false; single server.py
+  28544). TWO supervisors (19172 PyManager + 27828 pythoncore child - carried
+  duplication class; only ONE overnight.py child = no double-merge risk). Disk
+  13.1 GiB free (above the 8 GB floor, below the 15 GB goal); RAM 3.9 GiB free
+  (above the 3 GB check).
+- **Landing (step 2):** nothing to land. Every FINISHED slot is an ancestor of
+  integration/kernel-bg (`git merge-base --is-ancestor` exit 0): MONO-8 08dce58
+  (merge af9eef0), SOLVER-SURVEY-C e6553db, F1 3c2109b, CL-006 ee97499, CL-005
+  713f205. The driver had already landed RG-4 (340b395 -> 1660cd0),
+  DOOR-CIRCLE-FLIP (aa5054f -> dd2959d) and corrected MONO-8's stale READY to
+  DONE (f149091) before this cycle.
+- **Unblock (step 3):** none. Slot 0 AUTHOR-EXT-FILLET-HALO RUNNING (pid 30004,
+  events <5 min fresh, cargo+rustc live, 4 changed files: door.py, bd_bridge.rs,
+  binding.rs, new truck123d/tests/fillet_halo_arms.rs) - do not touch. No
+  IDLE/DEAD >15 min holding work; no QUESTION; no APIError 402.
+- **Registry hygiene (step 4):** the action this cycle. Re-derived deps on the
+  CORRECT field `depends_on` (not `needs`): BLOCKED-with-all-deps-landed =
+  MONO-9-FUSE-FOLD (dep MONO-8 landed) + RDEF-M1-LATTICE-V2 (dep RDEF-M0 landed);
+  both packets authored and `python loop/gen_packet.py --check` green (MONO-9
+  A1 0 / A2 3 ok; RDEF-M1 A1 0 ok). Flipped both BLOCKED->READY at `47553c2`
+  (appended last-wins rows, no `landed <hex>` pattern introduced). The heartbeat
+  immediately dispatched RDEF-M1 to slot 2 (pid 31876, forked f149091, events
+  fresh) - its write set (loop/solver_coverage, docs/SOLVER_COVERAGE_SPEC.md) is
+  disjoint from slot 0. MONO-9 (bd_bridge.rs + facade.rs) correctly clashes with
+  slot 0 and stays queued. Did NOT flip MONO-10 (packet unauthored + owner-gated
+  on the R3 mesh predicate), TOR-C (packet empty, orchestrator-held),
+  TTC-RECENSUS-F1-R3 (dep AUTHOR-EXT RUNNING), or the owner-parked/superseded/
+  cancelled set (BG-AUD-FIX-004, BG-CK-SPLINE-CENSUS, SEM-PCURVE-MASTER-001-FIX,
+  DEF-SPINEFRAME-GRAZE, DEF-TESS-ANALYTIC-SEAM, DEF-SEEDRAY-B). Registry: 343
+  unique rows - 243 DONE / 86 READY / 13 BLOCKED / 1 SUPERSEDED.
+- **Dispatch (step 5):** no manual dispatch (heartbeat live, double-dispatch
+  rule). `dispatch_ready --dry-run --max-workers=4` after the flip: "slots: 8
+  (2 running, 5 free); dispatched 0; workers now ~2/4" - the remaining READY
+  rows (DOOR-PARTIAL-ARC-FLIP, AUTHOR-WIRE-MIRROR-ARM, AUTHOR-CENSUS-NAMES,
+  RG-23, RG-9, MONO-9) are correctly deferred on the running rows' door.py /
+  bd_bridge.rs / binding.rs write sets.
+- **STATE.md (step 6):** updated the LATEST GROUND TRUTH note and appended the
+  [operator 2026-09-11T02:07Z] block.
+- **Escalation (step 7):** no NEW judgment item. The 01:01Z RG-4 false-landing
+  escalation is RESOLVED (landed for real at 1660cd0); resolution note appended.
+  Carried items unchanged, plus the schema-gap reminder: **dispatch_ready.py:186
+  gates on `needs` while the MONO/RDEF rows carry `depends_on` - flip a BLOCKED
+  row only after checking `depends_on` by hand** (RDEF-M1's empty `needs`
+  happened to agree with its landed real dep this cycle).
+
+Leaving: 2 RUNNING (AUTHOR-EXT-FILLET-HALO slot 0, RDEF-M1-LATTICE-V2 slot 2);
+HEAD 47553c2; heartbeat 1 (27872); watchdog 1 (29264); cargoq UP; disk 13.1 GiB
+free; RAM 3.9 GiB free.
