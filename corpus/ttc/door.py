@@ -964,9 +964,9 @@ def make_face(*objs, **kwargs):
 
 
 class _EmptySelection:
-    """An empty entity selection: the drop-in records no fillet/chamfer edge
-    topology, so ``shape.edges()``/``shape.faces()`` yield nothing and the
-    corpus's ``safe_fillet``/``safe_chamfer`` ladders return the shape."""
+    """An empty entity selection: the drop-in records no face topology, so
+    ``shape.faces()`` yields nothing and a selection with no recorded edge
+    vocabulary yields nothing for the corpus's ``safe_fillet`` ladder."""
 
     def __iter__(self):
         return iter(())
@@ -982,6 +982,87 @@ class _EmptySelection:
 
     def last(self):
         return self
+
+
+class _EdgeRef:
+    """One recorded edge reference: its local endpoints plus its owning row.
+
+    The base part's own edge vocabulary is what the fillet arm resolves
+    against; the reference carries the owner so the recorded fillet row can
+    name its depth-1 base (the corpus's ``safe_fillet`` iterates a plain list,
+    so the owner cannot ride the selection object)."""
+
+    __slots__ = ("_base", "a", "b")
+
+    def __init__(self, base, a, b):
+        self._base = base
+        self.a = [float(c) for c in a]
+        self.b = [float(c) for c in b]
+
+    def _selector(self):
+        return {"a": list(self.a), "b": list(self.b)}
+
+    def axis(self):
+        """The coordinate axis this edge runs along, or ``None``."""
+        delta = _vsub(self.b, self.a)
+        for name, index in (("x", 0), ("y", 1), ("z", 2)):
+            if abs(delta[index]) > 1e-12:
+                return name
+        return None
+
+
+class _EdgeSelection:
+    """The base row's recorded edge vocabulary.
+
+    The drop-in records the twelve edges of a recorded box; no other carrier
+    records edge topology, so its selection is empty and the corpus's
+    ``safe_fillet`` ladder returns the shape unchanged (a typed refusal is
+    then the expected first-landing outcome for the real sidepod edge set)."""
+
+    def __init__(self, owner, edges=()):
+        self._owner = owner
+        self._edges = list(edges)
+
+    def __iter__(self):
+        return iter(self._edges)
+
+    def __len__(self):
+        return len(self._edges)
+
+    def filter_by(self, axis):
+        name = axis if isinstance(axis, str) else getattr(axis, "name", None)
+        return _EdgeSelection(self._owner, [e for e in self._edges if e.axis() == name])
+
+    def take(self, count):
+        return _EdgeSelection(self._owner, self._edges[: int(count)])
+
+    def last(self):
+        return _EdgeSelection(self._owner, self._edges[-1:])
+
+
+def _recorded_edges(shape):
+    """The recorded edge vocabulary of one placed row: the twelve edges of a
+    box (in a fixed order). No other carrier records edge topology, so the
+    selection is empty there and the corpus's ``safe_fillet`` ladder returns
+    the shape unchanged."""
+    solid = getattr(shape, "_solid", None)
+    if not isinstance(solid, dict) or solid.get("kind") != "box":
+        return []
+    length = float(solid.get("length", 0.0))
+    width = float(solid.get("width", 0.0))
+    height = float(solid.get("height", 0.0))
+    hx, hy, hz = 0.5 * length, 0.5 * width, 0.5 * height
+    edges = []
+    for sy in (-hy, hy):
+        for sz in (-hz, hz):
+            edges.append(_EdgeRef(shape, (-hx, sy, sz), (hx, sy, sz)))
+    for sx in (-hx, hx):
+        for sz in (-hz, hz):
+            edges.append(_EdgeRef(shape, (sx, -hy, sz), (sx, hy, sz)))
+    for sx in (-hx, hx):
+        for sy in (-hy, hy):
+            edges.append(_EdgeRef(shape, (sx, sy, -hz), (sx, sy, hz)))
+    return edges
 
 
 class _Shape:
@@ -1017,7 +1098,7 @@ class _Shape:
             return False
 
     def edges(self):
-        return _EmptySelection()
+        return _EdgeSelection(self, _recorded_edges(self))
 
     def faces(self):
         return _EmptySelection()
@@ -2020,7 +2101,7 @@ def extrude(shape, amount, both=False, mode=None, **kwargs):
     return part
 
 
-def sweep(section=None, path=None, mode=None, **kwargs):
+def sweep(section=None, path=None, mode=None, closed=False, **kwargs):
     """build123d ``sweep(section, path)``: the sweep recording arm.
 
     A sweep records a loft chain between the recorded stations. A line path
@@ -2031,17 +2112,22 @@ def sweep(section=None, path=None, mode=None, **kwargs):
     vocabulary, or a sweep path outside the recorded edge vocabulary,
     refuses typed naming the open carrier; a zero-direction station refuses
     (``DegenerateSweepPath``). The tangent queries answer through the same
-    exact interpolant the volume arms reconstruct."""
+    exact interpolant the volume arms reconstruct.
+
+    ``closed=True`` records the halo loop-closure request; it is answered only
+    when the recorded station chain returns exactly to its first section (the
+    kernel certifies the seam identity), and a chain that does not close
+    refuses typed naming the seam."""
     edge = _path_edge(path)
     loop = _section_loop(section)
     stations, directions = _station_data(edge)
     reference = _section_reference(loop, _vnormalize(directions[0]))
     frames = _transport_frames(stations, directions, reference)
     sections = [_place_loop(loop, frames[0], frame) for frame in frames]
-    return _Part({"kind": "loft", "closed": False, "sections": sections})
+    return _loft_row(sections, closed)
 
 
-def loft(*sections, ruled=False, mode=None, **kwargs):
+def loft(*sections, ruled=False, mode=None, closed=False, **kwargs):
     """build123d ``loft(sections, ruled=...)``: the recording arm.
 
     Records the ordered section profiles (each a Face carrier's boundary, in
@@ -2050,7 +2136,10 @@ def loft(*sections, ruled=False, mode=None, **kwargs):
     all-line sections; a spline-section loft's smooth-surface volume is an
     open carrier the executor refuses typed at the facts arm -- never
     approximated, never flattened.
-    """
+
+    ``closed=True`` records the halo loop-closure request (the station list
+    returns exactly to its first section); a chain that does not close refuses
+    typed naming the seam, and ``closed=False`` behavior is unchanged."""
     faces = []
     for item in sections:
         if isinstance(item, (list, tuple)):
@@ -2064,11 +2153,76 @@ def loft(*sections, ruled=False, mode=None, **kwargs):
         if not isinstance(face, Face):
             _refuse(_LOFT_REFUSAL)
         recorded.append(_wire_profile_edges(face))
-    return _Part({"kind": "loft", "closed": False, "sections": recorded})
+    return _loft_row(recorded, closed)
+
+
+def _loft_row(sections, closed):
+    """One ``Loft`` row honoring the closed-loop request.
+
+    ``closed=True`` is answered only when the recorded section sequence is
+    loop-closing: the first recorded section must equal the section that
+    closes the chain (exact equality of the recorded profiles). A chain that
+    does not return to its start refuses typed naming the seam, never a
+    silently open row."""
+    if closed:
+        if len(sections) < 2:
+            _refuse("a closed loft chain needs at least two recorded sections")
+        if sections[0] != sections[-1]:
+            _refuse("a closed loft chain must return to its first section")
+    return _Part({"kind": "loft", "closed": bool(closed), "sections": sections})
+
+
+class _FilletResult(_Shape):
+    """One recorded Fillet row over a base part node.
+
+    The row carries ``{base, radius, edges}``; all geometry lives behind the
+    native executor, which resolves each recorded edge selector against the
+    base's recorded edge vocabulary, certifies the blend through the landed
+    blend profile machinery, and measures the base's facts. A base outside
+    the depth-1 rule (a group or another op node) refuses typed naming the
+    carrier."""
+
+    def __init__(self, node):
+        self._node_data = node
+        self.label = ""
+        self.color = None
+        self._type_name = "FilletResult"
+
+    def _node(self):
+        return self._node_data
+
+    def solids(self):
+        return [self]
+
+    def __repr__(self):
+        return "FilletResult(radius={})".format(self._node_data["fillet"]["radius"])
 
 
 def fillet(edges, radius, **kwargs):
-    _refuse("fillet is not a kernel-engine row")
+    """build123d ``fillet(edges, radius)``: the fillet recording arm.
+
+    The recorded edge references are the base part's own edge vocabulary; the
+    kernel resolves each selector against the base's recorded carrier and
+    certifies the blend through the landed blend profile machinery. An edge
+    the recorded base cannot resolve refuses typed naming the open carrier (a
+    valid outcome: the corpus's ``safe_fillet`` ladder then returns the part
+    unchanged). A blend the kernel cannot close refuses typed, never
+    approximates."""
+    edge_list = list(edges)
+    base = edge_list[0]._base if edge_list else getattr(edges, "_owner", None)
+    if not isinstance(base, _Shape):
+        _refuse("a fillet edge selection outside the recorded base carrier is not a kernel-engine row")
+    recorded = [edge._selector() for edge in edge_list]
+    node = {
+        "fillet": {
+            "base": base._node(),
+            "radius": _num(radius),
+            "edges": recorded,
+        }
+    }
+    if _T123D is not None:
+        _T123D.bd_facts(json.dumps(node))
+    return _FilletResult(node)
 
 
 def chamfer(edges, length, **kwargs):

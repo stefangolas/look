@@ -80,8 +80,11 @@ use serde::{Deserialize, Serialize};
 use crate::facade::{self, BooleanPairVerdict, CarrierClass, ModeValue};
 use crate::marshal::{ExceptionClass, Marshaled, MarshaledPayload, RefusedPayload};
 
+use truck_base::evidence::{EnvelopeCase, Refusal as BaseRefusal};
 use truck_certified::construct::admission::{NormalCone, certify_transverse_pair};
 use truck_certified::construct::patches::{PatchParent, TensorBernsteinPatch};
+use truck_certified::construct::refusal::ConstructRefusal;
+use truck_certified::construct::setback::certified_profile_solve;
 use truck_certified::construct::volume_facts::{
     VolumeOptions, certify_algebraic_trim_bracket, certify_patch_form,
 };
@@ -427,6 +430,253 @@ pub fn binding_trim_facts(py: Python<'_>, row_json: &str) -> PyResult<String> {
     let row: TrimRow = serde_json::from_str(row_json)
         .map_err(|e| PyValueError::new_err(format!("invalid trim row JSON: {e}")))?;
     trim_facts(&row).map_err(|e| to_pyerr(py, e))
+}
+
+// ===========================================================================
+// AUTHOR-EXT-FILLET-HALO — the fillet recording arm.
+//
+// The base solid's recorded carrier data plus the recorded edge selectors are
+// dispatched into the landed CC-033 setback profile machinery
+// ([`certified_profile_solve`]) — the narrowest certified surface of the
+// landed blend program (`construct/blend.rs`, `blend_varradius.rs`,
+// `setback.rs`) that consumes pure recorded data. The wider blend entries
+// (`trace_blend_chain`, `edge_stratum`, `canal_regularity`) take an admitted
+// `CertifiedSurfaceMap`/`CertifiedCurveMap`, which is constructed only through
+// `admit_surface`/`admit_curve` over a `truck_geometry::BSplineSurface`; the
+// loop-side crate cannot name that type without a new manifest edge, so the
+// profile solve is the surface this packet exposes (the ONE delegated
+// judgement, recorded in RESULT notes).
+//
+// The recorded edge selector is the base part's OWN edge reference (its two
+// local-frame endpoints), exactly the vocabulary the landed shapeops fillet
+// uses (`FilletSpec { a, b, radius }`). A selector the recorded base cannot
+// resolve refuses typed naming the open carrier; a cross field the certified
+// solve cannot reproduce refuses the kernel's own refusal vocabulary. Nothing
+// here approximates and nothing invents an edge-selection solver: the box's
+// twelve edges ARE the recorded vocabulary of a box.
+// ===========================================================================
+
+/// One recorded fillet edge selector: the base part's own edge reference,
+/// recorded as the two local-frame endpoints of the edge.
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct EdgeSelectorRow {
+    /// The local-frame start point of the selected edge.
+    pub a: [f64; 3],
+    /// The local-frame end point of the selected edge.
+    pub b: [f64; 3],
+}
+
+/// The recorded base carrier a fillet row's edge selectors resolve against.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
+pub enum FilletBaseRow {
+    /// A box base: its twelve edges are the recorded edge vocabulary.
+    Box {
+        /// Extent along x.
+        length: f64,
+        /// Extent along y.
+        width: f64,
+        /// Extent along z.
+        height: f64,
+    },
+}
+
+/// The fillet row: the base solid's recorded carrier data plus the blend
+/// radius and the recorded edge selectors.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct FilletRow {
+    /// The base solid's recorded carrier data.
+    pub base: FilletBaseRow,
+    /// The requested blend radius.
+    pub radius: f64,
+    /// The recorded edge selectors, in script order.
+    pub edges: Vec<EdgeSelectorRow>,
+}
+
+/// The typed refusal of a fillet row: an invalid request, an edge the recorded
+/// base cannot resolve, or a certified blend refusal.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum FilletRefusal {
+    /// The radius or edge list is outside the frozen rule.
+    InvalidInput,
+    /// The selector does not name an edge of the base's recorded vocabulary.
+    UnresolvableEdge,
+    /// The landed blend profile machinery refused the recorded cross field.
+    Blend(ConstructRefusal),
+}
+
+/// The certified blend fact of one fillet row.
+#[derive(Debug, Clone, PartialEq, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct FilletOutcome {
+    /// Always `true` on the `Ok` path.
+    pub ok: bool,
+    /// The certified blend radius.
+    pub radius: f64,
+    /// The number of resolved (certified) edges.
+    pub edges: usize,
+    /// The maximum certified L2 control width of the resolved edge cross
+    /// fields (exactly zero for an exactly recovered constant field).
+    pub max_profile_width: f64,
+}
+
+/// The twelve edges of a box, in a fixed deterministic order.
+fn box_edge_vocabulary(length: f64, width: f64, height: f64) -> Vec<([f64; 3], [f64; 3])> {
+    let hx = 0.5 * length;
+    let hy = 0.5 * width;
+    let hz = 0.5 * height;
+    let mut edges = Vec::with_capacity(12);
+    for sy in [-hy, hy] {
+        for sz in [-hz, hz] {
+            edges.push(([-hx, sy, sz], [hx, sy, sz]));
+        }
+    }
+    for sx in [-hx, hx] {
+        for sz in [-hz, hz] {
+            edges.push(([sx, -hy, sz], [sx, hy, sz]));
+        }
+    }
+    for sx in [-hx, hx] {
+        for sy in [-hy, hy] {
+            edges.push(([sx, sy, -hz], [sx, sy, hz]));
+        }
+    }
+    edges
+}
+
+/// Whether two endpoint pairs name the same unordered segment, exactly.
+fn same_edge(a: [f64; 3], b: [f64; 3], c: [f64; 3], d: [f64; 3]) -> bool {
+    (a == c && b == d) || (a == d && b == c)
+}
+
+/// The recorded cross-tangent field of one resolved box edge: the constant
+/// outward bisector of the two adjacent face normals, scaled by the radius.
+/// The two adjacent faces are read from the edge's own constant coordinates
+/// (the base's recorded vocabulary, never an inferred selection).
+fn edge_cross_field(
+    base: [f64; 3],
+    other: [f64; 3],
+    radius: f64,
+) -> Result<[[f64; 3]; 4], FilletRefusal> {
+    let mut varying: Option<usize> = None;
+    for (axis, (from, to)) in base.iter().zip(other.iter()).enumerate() {
+        if from != to {
+            if varying.is_some() {
+                // A selector that is not axis-aligned is not a box edge.
+                return Err(FilletRefusal::UnresolvableEdge);
+            }
+            varying = Some(axis);
+        }
+    }
+    let varying = varying.ok_or(FilletRefusal::UnresolvableEdge)?;
+    let mut bisector = [0.0_f64; 3];
+    for (axis, (coordinate, component)) in base.iter().zip(bisector.iter_mut()).enumerate() {
+        if axis == varying {
+            continue;
+        }
+        *component = if *coordinate > 0.0 {
+            1.0
+        } else if *coordinate < 0.0 {
+            -1.0
+        } else {
+            // A constant coordinate on the symmetry plane names no face.
+            return Err(FilletRefusal::UnresolvableEdge);
+        };
+    }
+    let mag =
+        (bisector[0] * bisector[0] + bisector[1] * bisector[1] + bisector[2] * bisector[2]).sqrt();
+    if !mag.is_finite() || mag <= 0.0 {
+        return Err(FilletRefusal::UnresolvableEdge);
+    }
+    for component in bisector.iter_mut() {
+        *component *= radius / mag;
+    }
+    Ok([bisector; 4])
+}
+
+/// The certified blend fact of one fillet row: resolve every recorded edge
+/// selector against the base's recorded edge vocabulary, certify the edge's
+/// cross field through the landed profile machinery, and return the certified
+/// outcome. An unresolvable selector refuses [`FilletRefusal::UnresolvableEdge`];
+/// a certified-solve refusal propagates the kernel's own vocabulary.
+pub fn fillet_facts(row: &FilletRow) -> Result<FilletOutcome, FilletRefusal> {
+    if !row.radius.is_finite() || row.radius <= 0.0 {
+        return Err(FilletRefusal::InvalidInput);
+    }
+    if row.edges.is_empty() {
+        return Err(FilletRefusal::InvalidInput);
+    }
+    let vocabulary = match &row.base {
+        FilletBaseRow::Box {
+            length,
+            width,
+            height,
+        } => {
+            if !length.is_finite()
+                || !width.is_finite()
+                || !height.is_finite()
+                || *length <= 0.0
+                || *width <= 0.0
+                || *height <= 0.0
+            {
+                return Err(FilletRefusal::InvalidInput);
+            }
+            box_edge_vocabulary(*length, *width, *height)
+        }
+    };
+    let mut max_profile_width = 0.0_f64;
+    let mut resolved = 0usize;
+    for selector in &row.edges {
+        let matched = vocabulary
+            .iter()
+            .find(|(c, d)| same_edge(selector.a, selector.b, *c, *d));
+        let Some((c, d)) = matched else {
+            return Err(FilletRefusal::UnresolvableEdge);
+        };
+        let cross = edge_cross_field(*c, *d, row.radius)?;
+        let width = certified_profile_solve(&cross).map_err(FilletRefusal::Blend)?;
+        if width > max_profile_width {
+            max_profile_width = width;
+        }
+        resolved = resolved.saturating_add(1);
+    }
+    Ok(FilletOutcome {
+        ok: true,
+        radius: row.radius,
+        edges: resolved,
+        max_profile_width,
+    })
+}
+
+/// The pyo3 export of [`fillet_facts`]. A refusal marshals to the typed door
+/// vocabulary (the `construct_refused` case for the blend, the
+/// `non_canonical_carrier` envelope for an unresolvable selector), never a
+/// bare string.
+#[pyfunction]
+pub fn binding_fillet(py: Python<'_>, row_json: &str) -> PyResult<String> {
+    let row: FilletRow = serde_json::from_str(row_json)
+        .map_err(|e| PyValueError::new_err(format!("invalid fillet row JSON: {e}")))?;
+    match fillet_facts(&row) {
+        Ok(outcome) => to_json(&outcome).map_err(|e| to_pyerr(py, e)),
+        Err(FilletRefusal::InvalidInput) => Err(to_pyerr(
+            py,
+            BindingError::Refusal(Box::new(Marshaled::from_construct_refusal(
+                ConstructRefusal::InvalidInput,
+            ))),
+        )),
+        Err(FilletRefusal::UnresolvableEdge) => Err(to_pyerr(
+            py,
+            BindingError::Refusal(Box::new(Marshaled::from_refusal(
+                &BaseRefusal::UnsupportedEnvelope(EnvelopeCase::NonCanonicalCarrier),
+            ))),
+        )),
+        Err(FilletRefusal::Blend(refusal)) => Err(to_pyerr(
+            py,
+            BindingError::Refusal(Box::new(Marshaled::from_construct_refusal(refusal))),
+        )),
+    }
 }
 
 // ===========================================================================
