@@ -2348,6 +2348,55 @@ def chamfer(edges, length, **kwargs):
     _refuse("chamfer is not a kernel-engine row")
 
 
+def _reflect_point(axis, point):
+    """The exact coordinate-plane reflection of one recorded control point.
+
+    ``axis`` is the normal coordinate of the mirror plane: ``"x"`` for
+    ``Plane.YZ`` (x -> -x), ``"y"`` for ``Plane.XZ`` (y -> -y) and ``"z"``
+    for ``Plane.XY`` (z -> -z). The reflection is exact arithmetic on the
+    recorded numbers -- no re-interpolation, no resampling.
+    """
+    x, y, z = _point3(point)
+    if axis == "x":
+        return (-x, y, z)
+    if axis == "y":
+        return (x, -y, z)
+    return (x, y, -z)
+
+
+def _mirror_edge(edge, axis):
+    """The exact reflection of one recorded edge carrier.
+
+    The recorded edge vocabulary maps to itself under a coordinate-plane
+    reflection: a line reflects its endpoints, a spline its defining control
+    samples and a circle its centre and normal (the radius is invariant). The
+    reflected carrier is recorded as data -- never re-interpolated, never
+    resampled. An edge outside the recorded vocabulary refuses typed naming
+    the open carrier.
+    """
+    if edge.kind == "circle":
+        return Edge.make_circle(
+            _reflect_point(axis, edge.center.to_tuple()),
+            edge.radius,
+            _reflect_point(axis, edge.normal.to_tuple()),
+        )
+    if edge.kind in ("line", "spline"):
+        points = [_reflect_point(axis, p.to_tuple()) for p in edge.points]
+        return Edge(edge.kind, points, options=edge.options)
+    _refuse(f"a mirror of a {edge.kind} edge carrier is not a kernel-engine row")
+    return None
+
+
+def _mirror_wire(wire, axis):
+    """The exact reflection of one recorded wire as reflected control data.
+
+    Every edge's recorded vocabulary is reflected in place (the edge order is
+    preserved), so the mirrored wire feeds the existing ``loft``/``make_face``
+    section paths unchanged.
+    """
+    return Wire([_mirror_edge(edge, axis) for edge in wire.edges])
+
+
 def _mirror_row(part, axis):
     """The placed-carrier mirror of one part row.
 
@@ -2384,8 +2433,10 @@ def mirror(shape, about=None, mode=None, **kwargs):
     A mirror about a coordinate plane records a placed-carrier transform over
     the mirrored census row (the landed placed/processor rule): the solid
     carrier is untouched and the facts transform with the placement -- no
-    geometry is recomputed. A mirror about any non-coordinate carrier refuses
-    typed.
+    geometry is recomputed. A wire/edge carrier records the exact reflection of
+    its control data (line endpoints, spline samples, circle centre/normal);
+    the mirrored wire feeds the existing loft/make_face section paths
+    unchanged. A mirror about any non-coordinate carrier refuses typed.
     """
     axis = None
     if isinstance(about, Plane):
@@ -2396,9 +2447,15 @@ def mirror(shape, about=None, mode=None, **kwargs):
         return _mirror_row(shape, axis)
     if isinstance(shape, Compound):
         return Compound(children=[mirror(child, about=about) for child in shape._children])
+    if isinstance(shape, Wire):
+        return _mirror_wire(shape, axis)
+    if isinstance(shape, Edge):
+        return _mirror_edge(shape, axis)
     if isinstance(shape, (list, tuple)):
         return [mirror(child, about=about) for child in shape]
-    _refuse("a mirror of this carrier is not a kernel-engine row")
+    _refuse(
+        f"a mirror of a {type(shape).__name__} carrier is not a kernel-engine row"
+    )
     return None
 
 
