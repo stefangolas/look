@@ -5613,3 +5613,71 @@ cycle's STATE/log/escalation commit; heartbeat 1 (27872); operator_runner 1
 (27876); watchdog 1 (29264); ONE overnight driver; TWO supervisors (carried);
 cargoq UP (queued 0, running false); disk 6.4 GiB free (LOW, below floor); RAM
 3.6 GiB.
+
+## 2026-09-11 18:11 UTC - operator cycle (0 RUNNING; 17:52Z escalation resolved; FHC frontier disk-blocked)
+
+Board: 0 RUNNING / 0 landed-by-operator / 0 unblocked / 0 flipped / 0 dispatched.
+HEAD `2706af4`.
+
+- Step 1 health: heartbeat exactly 1 (27872), operator_runner 1 (27876),
+  watchdog 1 (29264), ONE overnight driver (24864); TWO supervisors
+  (19172 PyManager + 27828 pythoncore) + TWO cargoq servers (28544 + 34564)
+  carried (documented duplication class, only one overnight child = no
+  double-merge risk). cargoq UP (ping ok, queued 0, running false). No TEMP
+  look-verify-baseline-* leaks. DISK 6.25 GiB free at entry (BELOW the 8 GB
+  floor) -> `janitor ensure --need 15` reclaimed ~0.0 -> 5.8 GiB (pool
+  exhausted: no root/slot `target/` dirs, no TEMP leaks; the ~500 GB C: usage
+  is outside the loop - scratch/ 1.73 GB + loop/ 0.91 GB are the only repo
+  weight). RAM 1.61-2.7 GiB free (LOW; no worker resident - do not stack).
+- Step 2 landing: NOTHING. **The 17:52Z escalation is RESOLVED by the overnight
+  driver**: AUTHOR-CENSUS-NAMES landed (merge `54d0713`, row landed-note
+  `b860b0a`); slot-0 tip 43e26c9 re-verified an ancestor of HEAD; RESULT
+  preserved at loop/results/AUTHOR-CENSUS-NAMES.PENDING.RESULT.json; slot-0 wt
+  RESULT already removed. All other slot tips (329f6ab/c3df084/e6553db/3c2109b/
+  ee97499/713f205/5cf4811) re-verified ancestors of HEAD. Nothing merged.
+  NOTE: the PACKETS row note carries `LANDED 43e26c9` but status is still
+  `READY` (functionally landed; landed() skips it) - status-only bookkeeping,
+  not actioned; the uncommitted loop/LEDGER.jsonl row is the driver's append.
+- Step 3 unblock: nothing. No IDLE/DEAD worker with work to rescue; slot 2 IDLE
+  is landed TTC-RECENSUS-F1-R3 residue (row DONE).
+- Step 4 registry hygiene: re-derived by command - 349 rows = 253 DONE / 85
+  READY / 10 BLOCKED / 1 SUPERSEDED. No BLOCKED row is mechanically flippable:
+  the only two whose needs are all landed are MONO-10-CERTIFIED-BOUNDARY-MESH
+  (needs MONO-8 DONE) which is owner-gated ("Do not author until the owner
+  rules on the R3 mesh predicate") and RDEF-M4-NUMERIC-TIER (needs RDEF-M3
+  DONE) which FAILS `gen_packet --check` (MISMATCH A1: stale anchor
+  vendor/truck/truck-certified/src/tangency/classify.rs absent) and needs the
+  M0 TANGENCY-TSYSTEM-FROM-DEFLATED adjudication = re-scope, not a re-measure.
+  The other 8 carry deliberate holds (OWNER_BLOCKED / SUPERSEDED / booking gate
+  / human-gated / orchestrator-held). No READY row needs an anchor re-measure or
+  a mechanical lint fix; dispatch_ready's own preflight flags only RG-23/RG-9,
+  whose packet FILES ARE MISSING (authoring gap, carried).
+- Step 5 dispatch: `dispatch_ready --dry-run --max-workers=4` -> "slots: 8
+  (0 running, 8 free); slot-assigned packets: 6; dispatched 1; workers now
+  ~1/4". It would dispatch **FHC-EX-A-CLOSED-LOOP-SHELL -> slot 0** (FHC-EX-B /
+  FHC-TRIM-EXTRUDE-ENVELOPE / FHC-MIRROR-FORM serial behind it). The real
+  dispatcher was NOT run (heartbeat owns dispatch; manual dispatch = the
+  double-dispatch race) and the disk floor (5.8 < 8 GiB) would make new_slot
+  refuse anyway - so the FHC chain is stalled on disk. RAM 1.6 GiB is also
+  below the 3 GB stack threshold.
+- Step 6 STATE: prepended the 18:11Z LATEST GROUND TRUTH block (17:52Z marked
+  SUPERSEDED) + appended the volatile refresh at file end. Traps/history
+  untouched.
+- Step 7: this entry.
+
+Escalations: none NEW. UPDATED - the 17:52Z AUTHOR-CENSUS-NAMES item is
+RESOLVED (landed by the driver); the current blocker is DISK below the 8 GB
+floor, which stalls the FHC-EX frontier. Carried unchanged: RG-23/RG-9 missing
+packet files; RDEF-M4 re-scope; MONO-10 owner R3-mesh decision; FRAME-REVOLVE
+F1 non_z_axis pin; duplicate supervisors + lagging cargoq restart guard; TOR-C
+flip-or-pin; schedule.py 'needs' crash.
+
+Worktree note (reported, not actioned): root tree carries the live human-session
+WIP (untracked scratch/ 1.73 GB, benchmarks/, loop/baselines/; tracked
+loop/cargoq/server.log; the uncommitted `D CL-005-STOP-QUESTION.md` deletion and
+`M loop/LEDGER.jsonl` driver append) - untouched.
+
+Leaving: 0 RUNNING; HEAD `2706af4` + this cycle's STATE/log/escalation commit;
+heartbeat 1 (27872); operator_runner 1 (27876); watchdog 1 (29264); ONE
+overnight driver; TWO supervisors (carried); cargoq UP (queued 0, running
+false); disk 5.8 GiB free (LOW, below floor); RAM 1.6-2.7 GiB.

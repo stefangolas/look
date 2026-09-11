@@ -1574,3 +1574,36 @@ UPDATED (operator 2026-09-11T17:52Z): DISK re-confirmed BELOW the 8 GB floor -
 entered 2.68 GiB, `janitor ensure --need 15` reclaimed ~4.2 -> 6.4 GiB (STILL
 SHORT; the slot-0 target is now 0.0 GB, nothing else reclaimable). RG-23/RG-9
 still missing packet files; RDEF-M4 still preflight-fails. Carried unchanged.
+
+RESOLVED (operator 2026-09-11T18:11Z): the slot-0 AUTHOR-CENSUS-NAMES item is
+CLOSED - the overnight driver landed it (merge `54d0713`, row landed-note
+`b860b0a`; tip 43e26c9 = ancestor of HEAD `2706af4`; RESULT preserved at
+loop/results/AUTHOR-CENSUS-NAMES.PENDING.RESULT.json). Status-only residue: the
+PACKETS row note carries `LANDED 43e26c9` but its `status` is still `READY`
+(functionally landed; landed() skips it) and the loop/LEDGER.jsonl append is
+uncommitted - left for the orchestrator, no dispatch impact.
+
+## 2026-09-11 18:11 UTC - CARRIED/UPDATED: DISK below the 8 GB floor now stalls the FHC-EX frontier
+
+- What: DISK is 5.8 GiB free (floor 8 GB, goal 15 GB). `janitor ensure --need
+  15` reclaimed ~0.0 (pool exhausted: no root/slot `target/` dirs, no TEMP
+  look-verify-baseline-* leaks). The ~500 GB C: usage is outside the loop; the
+  repo itself is ~2.8 GB (scratch/ 1.73 GB untracked human WIP + loop/ 0.91 GB,
+  mostly untracked loop/baselines/*.json).
+- Why it matters NOW: the frontier moved. `dispatch_ready --dry-run
+  --max-workers=4` would dispatch **FHC-EX-A-CLOSED-LOOP-SHELL -> slot 0**
+  (FHC-EX-B / FHC-TRIM-EXTRUDE-ENVELOPE / FHC-MIRROR-FORM serial behind it) -
+  the first dispatchable work since AUTHOR-CENSUS-NAMES landed. But `new_slot`
+  refuses below the 8 GB floor, so the whole FHC chain is stalled on disk.
+  RAM is also 1.6-2.7 GiB free (below the 3 GB stack threshold).
+- Why the operator can't: no in-loop reclaimable space remains; widening the
+  floor or deleting the human session's untracked scratch/baselines is a
+  harness/owner decision, not a mechanical operator unblock.
+- Action needed (human/owner): free C: space outside the loop (or relocate the
+  pagefile / clear a non-loop consumer) to reach the 8 GB floor; then the
+  heartbeat's next cycle dispatches FHC-EX-A. Carried unchanged: RG-23/RG-9
+  missing packet files; RDEF-M4 re-scope; MONO-10 owner R3-mesh decision;
+  FRAME-REVOLVE F1 non_z_axis pin; duplicate supervisors + lagging cargoq
+  restart guard; TOR-C flip-or-pin; schedule.py 'needs' crash.
+- Start from: `Get-PSDrive C`; `python loop/janitor.py status`;
+  `python loop/dispatch_ready.py --dry-run --max-workers=4`.

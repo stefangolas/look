@@ -75,6 +75,38 @@ corrected, annex C = ORACLE POLICY CHANGE), then docs/SOLVER_COVERAGE_SPEC.md
 
 ## Where we are
 
+> LATEST GROUND TRUTH [operator 2026-09-11T18:11Z]: 0 RUNNING / 0
+> landed-this-cycle / 0 unblocked / 0 flipped / 0 dispatched. HEAD `2706af4`
+> (moved since the 17:52Z note: `54d0713` merge AUTHOR-CENSUS-NAMES - overnight
+> mechanical landing, scoped check green; `b860b0a` row landed-note; `2706af4`
+> owner docs root-markdown cleanup). **THE 17:52Z ESCALATION IS RESOLVED**: the
+> overnight driver landed slot 0 AUTHOR-CENSUS-NAMES (tip 43e26c9 = ancestor of
+> HEAD; RESULT preserved at loop/results/AUTHOR-CENSUS-NAMES.PENDING.RESULT.json;
+> the PACKETS row note carries `LANDED 43e26c9` but its status is STILL `READY`
+> - functionally landed (landed() skips it), a status-only inconsistency left
+> for the orchestrator; the uncommitted `loop/LEDGER.jsonl` row is the driver's
+> append). Slots 1-7 FINISHED/IDLE landed residue - every tip
+> (329f6ab/c3df084/e6553db/3c2109b/ee97499/713f205/5cf4811) re-verified an
+> ancestor of HEAD; nothing landable. **NEW FRONTIER: FHC-EX-A-CLOSED-LOOP-SHELL
+> is READY and dispatch_ready --dry-run would send it to slot 0 (B/C/D serial
+> behind it) - but DISK 5.8 GiB free is BELOW the 8 GB floor, so new_slot
+> refuses and the whole FHC chain is STALLED ON DISK.** RAM 1.6-2.7 GiB free
+> (LOW; no worker resident, do not stack). Registry 349 rows = 253 DONE / 85
+> READY / 10 BLOCKED / 1 SUPERSEDED; none flippable (MONO-10 owner-gated "do not
+> author until the owner rules on the R3 mesh predicate"; RDEF-M4 preflight-fails
+> A1 stale anchor + needs the M0 tangency adjudication; the rest deliberate
+> holds). Health: heartbeat exactly 1 (27872), operator_runner 1 (27876),
+> watchdog 1 (29264), ONE overnight driver (24864), TWO supervisors
+> (19172+27828) + TWO cargoq servers (28544+34564) carried; cargoq UP (queued 0,
+> running false). No TEMP look-verify-baseline-* leaks. Root worktree carries
+> the live human-session WIP (untracked scratch/ 1.73 GB, benchmarks/,
+> loop/baselines/; tracked server.log; the `D CL-005-STOP-QUESTION.md` deletion)
+> - untouched, reported not actioned. Carried human items: disk below floor
+> blocks dispatch; RG-23/RG-9 missing packet files; RDEF-M4 re-scope;
+> FRAME-REVOLVE F1 non_z_axis pin; duplicate supervisors + lagging cargoq restart
+> guard; TOR-C flip-or-pin; schedule.py 'needs' crash.
+>
+> --- SUPERSEDED 2026-09-11T17:52Z note (kept for history) follows ---
 > LATEST GROUND TRUTH [operator 2026-09-11T17:52Z]: 0 RUNNING / 0
 > landed-this-cycle / 0 unblocked / 0 flipped / 0 dispatched. HEAD `9616df0`
 > (the 17:26Z operator commit; no new commits since). **Slot 0 AUTHOR-CENSUS-NAMES
@@ -7906,3 +7938,24 @@ running false). DISK entered 2.68 GiB -> janitor reclaimed ~4.2 -> 6.4 GiB
 (below 8 GB floor); RAM 3.6 GiB. One new escalation: slot-0 AUTHOR-CENSUS-NAMES
 LANDED-not-DONE + out-of-scope binding.rs finding. Leaving: 0 RUNNING; HEAD
 9616df0 + this cycle's commit.]
+
+[operator 2026-09-11T18:11Z - volatile refresh. Board: 0 RUNNING / 0
+landed-this-cycle / 0 flipped / 0 dispatched. **The 17:52Z escalation is
+RESOLVED** - the overnight driver landed slot 0 AUTHOR-CENSUS-NAMES (merge
+54d0713; tip 43e26c9 = ancestor of HEAD `2706af4`; RESULT at
+loop/results/AUTHOR-CENSUS-NAMES.PENDING.RESULT.json; PACKETS row note
+`LANDED 43e26c9` but status still READY = status-only bookkeeping, landed()
+skips it; the uncommitted loop/LEDGER.jsonl append is the driver's). Slots 1-7
+landed residue, all tips ancestors of HEAD; nothing landable. **Frontier moved:
+FHC-EX-A-CLOSED-LOOP-SHELL is READY and dispatch_ready --dry-run would dispatch
+it to slot 0 (FHC-EX-B / FHC-TRIM-EXTRUDE-ENVELOPE / FHC-MIRROR-FORM serial
+behind it) - but DISK 5.8 GiB free is BELOW the 8 GB floor, so new_slot refuses
+and the FHC chain is stalled on disk.** RAM 1.6-2.7 GiB free (LOW). Registry
+349 = 253 DONE / 85 READY / 10 BLOCKED / 1 SUPERSEDED; none flippable (MONO-10
+owner-gated; RDEF-M4 preflight-fails + M0 adjudication; rest deliberate holds).
+Health: heartbeat 1 (27872), operator_runner 1 (27876), watchdog 1 (29264), ONE
+overnight driver (24864), TWO supervisors (19172+27828) + TWO cargoq servers
+(28544+34564) carried; cargoq UP (queued 0, running false). No TEMP baseline
+leaks. Root worktree: human-session WIP untouched. No manual dispatch (heartbeat
+owns it; disk-floor blocked anyway). Leaving: 0 RUNNING; HEAD 2706af4 + this
+cycle's STATE/log/escalation commit.]
