@@ -7172,3 +7172,19 @@ worktree: human-session WIP (M README.md, M loop/LEDGER.jsonl, M
 loop/cargoq/server.log, untracked benchmarks/ + loop/baselines/) untouched. No
 new escalation (disk below floor already carried). Leaving: 0 RUNNING; HEAD
 `3080c20` + this cycle's STATE/log/escalation commit.]
+
+[OWNER-SESSION ADJUDICATION 2026-09-11 ~22:4xZ - the escalated duplicate
+FHC-EX-B dispatch (slots 0+1) resolved. Slot 1's worker was STALLED 26+ min
+hung on an API step with ZERO work in the worktree (changed=0, git=base) -
+killed its process tree and reset-only the slot (first attempt used --reset
+which redispatches by design; the accidental fresh dispatch was killed and
+reset-only completed; cost: one wasted worker start). Slot 0's EX-B worker
+(LIVE, events fresh, 2 files changed vs base) is the single keeper and
+continues undisturbed. Disk was recovered to 32.4 GiB before the adjudication
+by owner-directed cache cleanup: AppData/Temp 22 GB, npm-cache 4 GB, uv cache
+2.2 GB, cargo registry cache+src ~1 GB, huggingface+puppeteer 1.4 GB. FLAGGED
+NOT CLEARED (owner decisions): opencode.db 20.6 GB (ALL agent session history
+- needs a quiet board), Docker 17.6 GB (docker system prune), hiberfil.sys
+6.3 GB (needs elevated powercfg /h off), pagefile.sys 11.4 GB (reboot).
+Chain state: EX-A LANDED; EX-B single worker; TRIM -> MIRROR ->
+BD-EMIT-MESH-CACHE queued behind it (docket 5a95bd6).
