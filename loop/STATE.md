@@ -75,6 +75,47 @@ corrected, annex C = ORACLE POLICY CHANGE), then docs/SOLVER_COVERAGE_SPEC.md
 
 ## Where we are
 
+> LATEST GROUND TRUTH [operator 2026-09-11T15:49Z]: 0 RUNNING / 0
+> landed-this-cycle / 0 unblocked / 0 flipped / 0 dispatched. HEAD `50a4deb`
+> (one owner commit since the 15:26Z operator commit `a0bbdb6`: `50a4deb`
+> short-term F1/hypercar gap roadmap + render-pipeline stage timings, an
+> owner-directed STATE/roadmap edit, NOT a break-lift). **OWNER BREAK STILL
+> IN FORCE** (95b0bb8, 11:45Z; no break-lift commit exists). Quiet posture is
+> the owner's and not mine to lift - no dispatch, no flips. All 8 slots
+> FINISHED/IDLE, no live worker (zero cargo/rustc; the two opencode procs are
+> this operator + the human session). Slot 0 AUTHOR-CENSUS-NAMES wt RESULT
+> SPEC_GAP + QUESTION.md (geometry rebooking; NOT landable; tip 46ff8cc NOT an
+> ancestor of HEAD - re-verified). Slot 1 AUTHOR-WIRE-MIRROR-ARM wt RESULT
+> "complete" (redundant; tip 329f6ab = ancestor, no work). Slots 2-7 landed
+> residue (c3df084/e6553db/3c2109b/ee97499/713f205/5cf4811 all re-verified
+> ancestors of HEAD this cycle). Registry re-derived by command: 345 rows =
+> 251 DONE / 83 READY / 10 BLOCKED / 1 SUPERSEDED; none of the 10 BLOCKED rows
+> is mechanically flippable - 9 have all needs landed but each carries a
+> deliberate hold (BG-AUD-FIX-004 OWNER_BLOCKED; SEM-PCURVE-MASTER-001-FIX
+> superseded; DEF-SPINEFRAME-GRAZE SPEC_GAP re-aimed; BG-CK-SPLINE-CENSUS
+> booking gate; MONO-10 owner-decision; RDEF-M4 milestone gate;
+> DEF-TESS-ANALYTIC-SEAM / DEF-SEEDRAY-B / TOR-C pinned on authoring) and
+> RDEF-M5 has unmet RDEF-M4. `dispatch_ready --dry-run --max-workers=4`:
+> "slots: 8 (0 running, 8 free); slot-assigned packets: 6; dispatched 0;
+> workers now ~0/4"; only RG-23/RG-9 flagged (ANCHOR CHECK FAILED - both packet
+> files are MISSING, `loop/packets/RG-23-CERTIFIED-ENTRY-WIRING.md` and
+> `RG-9-REFLECT-SOLID-PRODUCTION.md` absent = authoring gap, carried). Health:
+> heartbeat exactly 1 (27872; the extra match is this operator's own query
+> line), operator_runner 1 (27876), watchdog 1 (29264), ONE overnight driver,
+> TWO supervisors (19172 PyManager + 27828 pythoncore) carried; cargoq UP
+> (ping ok, queued 0, running false; fallback.log newest DIRECT 2026-09-07,
+> stale). DISK 9.1 GiB free (above the 8 GB floor, below the 15 GiB goal;
+> janitor status confirms the reclaimable pool is as-is, nothing new to
+> reclaim). RAM 5.6 GiB free (healthy). No TEMP look-verify-baseline-* leaks.
+> No new escalation. Root worktree carries the live human-session WIP (tracked
+> `loop/cargoq/server.log` + many untracked docs/benchmarks/baselines) - left
+> untouched, reported not actioned. Carried human items unchanged:
+> AUTHOR-CENSUS-NAMES SPEC_GAP rebooking; RG-23/RG-9 missing packet files;
+> FRAME-REVOLVE F1 non_z_axis pin (ttc_lathe_spline.rs:255); duplicate
+> supervisors + lagging cargoq restart guard; slot-4/7 wt RESULT residue;
+> TOR-C flip-or-pin; schedule.py 'needs' crash.
+>
+> --- SUPERSEDED 2026-09-11T15:26Z note (kept for history) follows ---
 > LATEST GROUND TRUTH [operator 2026-09-11T15:26Z]: 0 RUNNING / 0
 > landed-this-cycle / 0 unblocked / 0 flipped / 0 dispatched. HEAD `1138aa1`
 > (FOUR owner commits since the 15:05Z operator commit `8ec1dbb`: `86e6ac8`
