@@ -5491,3 +5491,67 @@ Leaving: 1 RUNNING (slot 0 AUTHOR-CENSUS-NAMES, live); HEAD `df81808` (plus the
 STATE/log edits this cycle); heartbeat 1 (27872); operator_runner 1 (27876);
 watchdog 1 (29264); ONE overnight driver; TWO supervisors (carried); cargoq UP
 (queued 0); disk 6.2 GiB free (LOW); RAM 4.4 GiB.
+
+[operator 2026-09-11T17:26Z]
+
+Board: 1 RUNNING / 0 landed-this-cycle / 0 unblocked / 0 flipped / 0 dispatched.
+HEAD `9eb53e3` (the 16:59Z operator commit; no new commits since). Slot 0
+RUNNING/STALLED AUTHOR-CENSUS-NAMES; slots 1-7 FINISHED/IDLE landed residue.
+
+- Step 1 health: heartbeat exactly 1 (27872; the 2nd match is this operator's
+  own query line), operator_runner 1 (27876), watchdog 1 (29264), ONE overnight
+  driver, TWO supervisors carried; cargoq UP (ping ok, queued 0, running true).
+  DISK ENTERED AT 4.57 GiB - below the 8 GB floor. `janitor.py ensure --need 15`
+  reclaimed ~0.0 -> 4.5 GiB (STILL SHORT): no repo-root `target/`, no TEMP
+  look-verify-baseline-* leaks, only the LIVE slot-0 targets (1.0 GB outer +
+  1.5 GB wt/target) remain - nothing reclaimable without disturbing the worker.
+  RAM 3.49 GiB free (above the 3 GB threshold). ESCALATED (disk).
+- Step 2 landing: re-derived by command - every FINISHED slot's worker commit
+  (329f6ab/c3df084/e6553db/3c2109b/ee97499/713f205/5cf4811) is an ancestor of
+  HEAD. Nothing landable. Slot 1 RESULT status `complete`, slot 4
+  `LANDED-WITH-FINDINGS`, slot 7 `LANDED` - none DONE, so none landable anyway.
+- Step 3 unblock: slot 0 is NOT dead. pid 2268 (`cmd.exe /c worker-cmd.bat`) is
+  alive and the opencode session `ses_f6e99c...` is blocked on a cargoq HTTP
+  call: `cargo test -p truck123d --lib --locked` (START 13:09:22 local). The
+  test binary `truck123d-361b704ce0515825.exe` (pid 2076) has consumed 0 CPU in
+  12.8 min = HUNG. The packet's Done-when does NOT ask for the broad lib test
+  (scoped checks only) - the worker self-initiated it. The cargoq per-job
+  timeout (CARGOQ_TIMEOUT 2400s) will kill it ~13:49 local and the worker
+  resumes. The worktree holds 1127+ uncommitted lines (corpus/ttc/door.py +385,
+  truck123d/src/bd_bridge.rs +840, binding.rs +9, new tests/census_names.rs).
+  DID NOT reset/redispatch - that would discard proven work for a hang the
+  worker will self-recover from. ESCALATED (hung lib test).
+- Step 4 registry: re-derived 349 rows = 253 DONE / 85 READY / 10 BLOCKED / 1
+  SUPERSEDED. Every BLOCKED row with all needs landed carries a deliberate hold
+  or milestone gate; RDEF-M4 (needs RDEF-M3 DONE) is the only flip candidate but
+  FAILS preflight (A1 stale anchor tangency/classify.rs absent + H1_NEW_MODULE)
+  = packet re-scope, not a re-measurable expect - ESCALATED (carried). RG-23/
+  RG-9 registry `packet: ""` and the packet FILES ARE MISSING (verified by
+  Test-Path: False) - dispatch_ready's "ANCHOR CHECK FAILED" is the missing-file
+  authoring gap; this CORRECTS the 16:59Z escalation parenthetical that claimed
+  a write-set clash. No mechanical anchor/lint fix possible (nothing to
+  re-measure).
+- Step 5 dispatch: `dispatch_ready.py --dry-run --max-workers=4` -> "slots: 8
+  (0 running, 6 free); slot-assigned packets: 5; dispatched 0"; it labels slot 0
+  a "DEAD dispatch ... would reset + delete + redispatch". The real dispatcher
+  was NOT run: that false positive (slot_status STALLED because events are stale
+  while the worker is blocked on the hung test) would kill the live worker and
+  discard its work. Nothing else is dispatchable (RG-23/RG-9 files missing; the
+  four FHC packets are serial on CENSUS-NAMES). NO manual dispatch (heartbeat
+  owns it, single-instance rule).
+- Step 6 STATE: prepended the 17:26Z LATEST GROUND TRUTH block (16:59Z marked
+  SUPERSEDED) + appended the volatile refresh at file end. Traps/history
+  untouched.
+- Step 7: this entry.
+
+Escalations: two - NEW slot-0 hung `cargo test -p truck123d --lib` (do not
+reset; cargoq timeout frees it); UPDATED RG-23/RG-9 correction (missing packet
+files, not write-set clash). RDEF-M4 carried. Worktree note (reported, not
+actioned): root tree carries the live human-session WIP (tracked
+`loop/cargoq/server.log` + untracked docs/benchmarks/scratch) - untouched.
+
+Leaving: 1 RUNNING (slot 0 AUTHOR-CENSUS-NAMES, blocked on the hung test; work
+intact); HEAD `9eb53e3` + this cycle's STATE/log edits; heartbeat 1 (27872);
+operator_runner 1 (27876); watchdog 1 (29264); ONE overnight driver; TWO
+supervisors (carried); cargoq UP (running true); disk 4.5 GiB free (LOW, below
+floor); RAM 3.5 GiB.

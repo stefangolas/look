@@ -75,6 +75,37 @@ corrected, annex C = ORACLE POLICY CHANGE), then docs/SOLVER_COVERAGE_SPEC.md
 
 ## Where we are
 
+> LATEST GROUND TRUTH [operator 2026-09-11T17:26Z]: 1 RUNNING / 0
+> landed-this-cycle / 0 unblocked / 0 flipped / 0 dispatched. HEAD `9eb53e3`
+> (the 16:59Z operator commit; no new commits since). Slot 0 RUNNING/STALLED
+> AUTHOR-CENSUS-NAMES (pid 2268 alive; blocked ~13 min on a self-initiated
+> broad `cargo test -p truck123d --lib` - test binary pid 2076 at 0 CPU, hung;
+> cargoq 40-min timeout frees it ~13:49 local; 1127+ uncommitted lines intact -
+> DO NOT RESET). Slots 1-7 FINISHED/IDLE landed residue (329f6ab/c3df084/
+> e6553db/3c2109b/ee97499/713f205/5cf4811 all re-verified ancestors of HEAD);
+> slot 4 = LANDED-WITH-FINDINGS; nothing landable. Registry 349 rows = 253 DONE
+> / 85 READY / 10 BLOCKED / 1 SUPERSEDED; RDEF-M4 is the one BLOCKED row with
+> all needs landed but it FAILS preflight (A1 stale anchor
+> vendor/truck/truck-certified/src/tangency/classify.rs absent + H1_NEW_MODULE)
+> - re-scope not re-measure, ESCALATED (carried). `dispatch_ready --dry-run
+> --max-workers=4`: "slots: 8 (0 running, 6 free); slot-assigned packets: 5;
+> dispatched 0"; it labels slot 0 a DEAD dispatch and WOULD reset+delete it -
+> the real dispatcher was NOT run (that false positive would kill the live
+> worker); nothing else dispatchable (RG-23/RG-9 packet files MISSING; FHC chain
+> serial on CENSUS-NAMES). Health: heartbeat exactly 1 (27872), operator_runner
+> 1 (27876), watchdog 1 (29264), ONE overnight driver, TWO supervisors carried;
+> cargoq UP (ping ok, queued 0, running true = the hung slot-0 lib test).
+> **DISK 4.5 GiB free (BELOW the 8 GB floor; janitor ensure --need 15 reclaimed
+> ~0.0 - only the live slot-0 target remains, nothing reclaimable).** RAM 3.5
+> GiB free. No TEMP look-verify-baseline-* leaks. Root worktree carries the
+> live human-session WIP (tracked loop/cargoq/server.log + untracked
+> docs/benchmarks/scratch) - untouched, reported not actioned. Carried human
+> items unchanged: RG-23/RG-9 missing packet files; RDEF-M4 re-scope;
+> FRAME-REVOLVE F1 non_z_axis pin; duplicate supervisors + lagging cargoq
+> restart guard; slot-4/7 wt RESULT residue; TOR-C flip-or-pin; schedule.py
+> 'needs' crash.
+>
+> --- SUPERSEDED 2026-09-11T16:59Z note (kept for history) follows ---
 > LATEST GROUND TRUTH [operator 2026-09-11T16:59Z]: 1 RUNNING / 0
 > landed-this-cycle / 0 unblocked / 0 flipped / 0 dispatched. HEAD `df81808`
 > (owner-session commits since the 16:34Z operator note: `7a08c0c` lifts the
@@ -7804,3 +7835,18 @@ TWO supervisors carried; cargoq UP (queued 0, running false). DISK 6.2 GiB free
 (BELOW 8 GB floor; janitor nothing reclaimable - live slot-0 target only); RAM
 4.4 GiB free. No new escalation except the RDEF-M4 preflight failure. Leaving:
 1 RUNNING; HEAD df81808 + this cycle's STATE/log commit.]
+
+[operator 2026-09-11T17:26Z - volatile refresh. Board: 1 RUNNING (slot 0
+AUTHOR-CENSUS-NAMES, blocked on a hung self-initiated `cargo test -p truck123d
+--lib`; pid 2268 alive, test binary pid 2076 at 0 CPU; cargoq kills it at the
+40-min timeout ~13:49 local; 1127+ uncommitted lines intact - DO NOT RESET) / 0
+landed-this-cycle / 0 flipped / 0 dispatched. Slots 1-7 landed residue (all
+tips ancestors of HEAD `9eb53e3`); nothing landable. Registry 349 = 253 DONE /
+85 READY / 10 BLOCKED / 1 SUPERSEDED; RDEF-M4 preflight-fails (escalated,
+carried); RG-23/RG-9 packet files MISSING (corrects the 16:59Z parenthetical:
+still the missing-file authoring gap, not a write-set clash). dispatch_ready
+--dry-run labels slot 0 a DEAD dispatch and would reset it -> the real
+dispatcher was NOT run; 0 dispatchable. Health: heartbeat 1 (27872),
+operator_runner 1 (27876), watchdog 1 (29264), cargoq UP (running true = the
+hung test). DISK 4.5 GiB free (below 8 GB floor, nothing reclaimable); RAM 3.5
+GiB. One escalation: slot-0 hung lib test.]

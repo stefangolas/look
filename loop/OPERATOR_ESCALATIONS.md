@@ -1490,8 +1490,46 @@ because the packet fails preflight against the current tree:
 - Start from: `loop/packets/RDEF-M4-NUMERIC-TIER.md` (anchor A1 + Template
   house rules), then `loop/PACKETS.jsonl` row RDEF-M4-NUMERIC-TIER.
 
-CARRIED (unchanged): RG-23/RG-9 packet preflight (now failing on write-set clash
-with the RUNNING slot-0 bd_bridge.rs, not on missing files); FRAME-REVOLVE F1
+CARRIED (unchanged): RG-23/RG-9 packet preflight; FRAME-REVOLVE F1
 non_z_axis pin amendment (ttc_lathe_spline.rs:255); duplicate supervisors
 (19172+27828) + lagging cargoq restart guard; slot-4 + slot-7 wt RESULT residue;
 TOR-C flip-or-pin; `loop/schedule.py` KeyError 'needs' at schedule.py:45.
+
+[operator 2026-09-11T17:26Z - NEW: slot 0 worker blocked on a hung broad lib test]
+
+- What: slot 0 (AUTHOR-CENSUS-NAMES, pid 2268 alive) is blocked on a
+  self-initiated `cargo test -p truck123d --lib --locked` (cargoq START
+  13:09:22 local). The test binary `truck123d-361b704ce0515825.exe` (pid 2076)
+  is HUNG: 0 CPU accumulated over 12.8 min. The packet's Done-when asks only for
+  scoped checks, so the broad lib test is the worker's own over-run, not a
+  packet requirement.
+- Why the operator can't: the worker is ALIVE and its worktree holds 1127+
+  uncommitted lines (corpus/ttc/door.py +385, truck123d/src/bd_bridge.rs +840,
+  truck123d/src/binding.rs +9, new truck123d/tests/census_names.rs). Resetting
+  slot 0 (which `dispatch_ready` would do - it labels the slot a DEAD dispatch
+  because events are stale while the worker blocks) discards proven work for a
+  hang the worker will self-recover from. The operator must not restart a live
+  worker, and must not kill anything but its own timed-out predecessor.
+- Self-recovery: cargoq's per-job timeout (CARGOQ_TIMEOUT, default 2400s) kills
+  the hung job ~13:49 local; the worker receives exit 3 and continues. If it
+  does NOT recover by the next operator cycle, or if the lib test hangs again
+  after a reset, the hang is a real defect.
+- Action needed (human/orchestrator): identify the hanging test in
+  `cargo test -p truck123d --lib` (run it directly outside cargoq with
+  `--nocapture --test-threads=1` and watch which test stalls) - a hanging lib
+  test will keep wedging every worker that runs the full lib suite. Until then,
+  operators must NOT run `dispatch_ready` non-dry-run while slot 0 is live: it
+  would reset+delete the worker.
+- Start from: `loop/slots/0/events.jsonl` (last events, session
+  ses_f6e99c721ffeeugzOmZNHXtGnX), `loop/cargoq/server.log` (the START with no
+  DONE), and `loop/slots/0/wt` (the uncommitted work).
+
+CORRECTION (operator 2026-09-11T17:26Z): the 16:59Z entry above states RG-23/
+RG-9 now fail "on write-set clash with the RUNNING slot-0 bd_bridge.rs, not on
+missing files". Re-derived by command: both registry rows still carry
+`packet: ""` and BOTH PACKET FILES ARE ABSENT (`Test-Path
+loop/packets/RG-23-CERTIFIED-ENTRY-WIRING.md` = False, `.../RG-9-REFLECT-SOLID-
+PRODUCTION.md` = False). `dispatch_ready` reports ANCHOR CHECK FAILED with empty
+content, i.e. the missing-file authoring gap. The write-set clash is a SEPARATE
+reason they cannot dispatch concurrently with slot 0; it is not the preflight
+failure. Both packets must be authored before either can dispatch.
