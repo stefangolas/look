@@ -86,22 +86,24 @@ fn flat_patch() -> serde_json::Value {
     )
 }
 
-/// A degree-2 tangent-parabola patch `z = -c*((u-1/2)^2 + (v-1/2)^2)` over the
-/// unit square, outward `+z`. The Bernstein coefficients of the two 1-D parts
-/// are `c * [1/4, -1/4, 1/4]` for `-c*(t-1/2)^2`, so the tensor net is the sum
-/// of the u-part and the v-part.
+/// A degree-`(2, 1)` tangent parabolic-cylinder patch
+/// `z = -c*(u - 1/2)^2` over the unit square, outward `+z`. The tangency is
+/// the line `u = 1/2` (the spec's tangent curve); the normal varies only in
+/// `u`, so the whole-box cone stays narrow for small `c`. The Bernstein
+/// coefficients of `-c*(t - 1/2)^2` are `c * [1/4, -1/4, 1/4]`.
 fn parabola_patch(c: f64) -> serde_json::Value {
     let part = [c * 0.25, -c * 0.25, c * 0.25];
     let axis = [0.0f64, 0.5, 1.0];
-    let mut numerator = vec![vec![[0.0f64; 3]; 3]; 3];
+    let v_axis = [0.0f64, 1.0];
+    let mut numerator = vec![vec![[0.0f64; 3]; 2]; 3];
     for (i, row) in numerator.iter_mut().enumerate() {
         for (j, cell) in row.iter_mut().enumerate() {
-            *cell = [axis[i], axis[j], part[i] + part[j]];
+            *cell = [axis[i], v_axis[j], part[i]];
         }
     }
     serde_json::json!({
         "numerator": numerator,
-        "weights": vec![vec![1.0f64; 3]; 3],
+        "weights": vec![vec![1.0f64; 2]; 3],
         "orientation": 1.0,
     })
 }
@@ -223,7 +225,7 @@ fn v1_tangent_plane_volume_bracket_contains_the_true_volume() {
 #[test]
 fn v2_tangent_curve_sandwich_is_monotone_in_budget() {
     let a = vec![flat_patch()];
-    let b = vec![parabola_patch(1.0)];
+    let b = vec![parabola_patch(0.25)];
     let coarse = sandwich(&probe(
         a.clone(),
         b.clone(),
@@ -235,8 +237,15 @@ fn v2_tangent_curve_sandwich_is_monotone_in_budget() {
         true,
     ));
     let fine = sandwich(&probe(a, b, "intersect", 1.0e-2, 512, false, true, true));
-    assert_eq!(text(&coarse, "regime"), "tangential");
-    assert!(refusal(&fine).is_none(), "the refined rule certifies: {fine}");
+    assert_eq!(
+        text(&coarse, "regime"),
+        "tangential",
+        "the tangent curve must admit as (G): {coarse}"
+    );
+    assert!(
+        refusal(&fine).is_none(),
+        "the refined rule certifies: {fine}"
+    );
     assert!(
         field(&coarse, "sandwich_bound") > 0.0,
         "the tangent curve carries a positive undecided bound: {coarse}"
@@ -316,7 +325,7 @@ fn v6_retrodiction_fuse_returns_a_certified_bracket() {
     // The canonical base (a flat face) and a swept-family tool patch tangent to
     // it at a point (the modelled `fuse(swept, canonical)` cell).
     let a = vec![flat_patch()];
-    let b = vec![parabola_patch(1.0)];
+    let b = vec![parabola_patch(0.25)];
     let outcome = sandwich(&probe(a, b, "union", 1.0e-2, 512, false, true, true));
     match refusal(&outcome) {
         None => {

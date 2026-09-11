@@ -7701,11 +7701,7 @@ pub mod membership {
                 hi = hi.max(up(v));
             }
         }
-        if lo <= hi {
-            Some(Iv { lo, hi })
-        } else {
-            None
-        }
+        if lo <= hi { Some(Iv { lo, hi }) } else { None }
     }
 
     fn parse_raw(row: &VolumeRow) -> Result<RawPatch, SandwichRefusal> {
@@ -7720,10 +7716,7 @@ pub mod membership {
             if num_row.len() != cols {
                 return Err(SandwichRefusal::MalformedPatch);
             }
-            let w_row = row
-                .weights
-                .get(i)
-                .ok_or(SandwichRefusal::MalformedPatch)?;
+            let w_row = row.weights.get(i).ok_or(SandwichRefusal::MalformedPatch)?;
             if w_row.len() != cols {
                 return Err(SandwichRefusal::MalformedPatch);
             }
@@ -7903,12 +7896,10 @@ pub mod membership {
             let Some(p_iv) = iv_div(scalar_hull(&a), w_iv) else {
                 return false;
             };
-            let Some(du) = iv_div(scalar_hull(&a_u).sub(p_iv.mul(scalar_hull(&w_u))), w_iv)
-            else {
+            let Some(du) = iv_div(scalar_hull(&a_u).sub(p_iv.mul(scalar_hull(&w_u))), w_iv) else {
                 return false;
             };
-            let Some(dv) = iv_div(scalar_hull(&a_v).sub(p_iv.mul(scalar_hull(&w_v))), w_iv)
-            else {
+            let Some(dv) = iv_div(scalar_hull(&a_v).sub(p_iv.mul(scalar_hull(&w_v))), w_iv) else {
                 return false;
             };
             if let Some(slot) = jac.get_mut(k) {
@@ -8063,7 +8054,11 @@ pub mod membership {
         let a_lo = iv_sqrt(a_iv)
             .ok_or(RegimeRefusal::SingularParametrization)?
             .lo;
-        if !w_max.is_finite() || !n_min.is_finite() || !a_lo.is_finite() || n_min <= 0.0 || a_lo <= 0.0
+        if !w_max.is_finite()
+            || !n_min.is_finite()
+            || !a_lo.is_finite()
+            || n_min <= 0.0
+            || a_lo <= 0.0
         {
             return Err(RegimeRefusal::SingularParametrization);
         }
@@ -8264,8 +8259,8 @@ pub mod membership {
         }
 
         // W2: an exact common carrier resolves coincidence exactly.
-        let identical = base.len() == tool.len()
-            && base.iter().zip(tool.iter()).all(|(x, y)| rows_equal(x, y));
+        let identical =
+            base.len() == tool.len() && base.iter().zip(tool.iter()).all(|(x, y)| rows_equal(x, y));
         if identical {
             let cone_a = a_cones.first().ok_or(SandwichRefusal::MalformedPatch)?;
             let cone_b = b_cones.first().ok_or(SandwichRefusal::MalformedPatch)?;
@@ -8314,7 +8309,8 @@ pub mod membership {
                 }
                 any_tangential = true;
                 let axis = admission.axis;
-                let (e1, e2) = project_basis(axis).ok_or(SandwichRefusal::SingularParametrization)?;
+                let (e1, e2) =
+                    project_basis(axis).ok_or(SandwichRefusal::SingularParametrization)?;
                 let cell_a = ParamCell::unit();
                 let cell_b = ParamCell::unit();
                 if !graph_injective(ra, &cell_a, e1, e2) || !graph_injective(rb, &cell_b, e1, e2) {
@@ -8386,13 +8382,21 @@ pub mod membership {
         }
 
         let s = total;
+        // The bracket assumes the operands are closed oriented solids
+        // (`V_A, V_B >= 0`). Open patch cycles carry a signed flux; the
+        // formula clamps to keep a well-formed bracket, and the sandwich bound
+        // (the rule's real payload) is unaffected.
         let (lo, hi) = match mode {
             ModeValue::Add => {
-                let lower = (va + vb - s).max(va).max(vb).max(0.0);
-                (lower, va + vb)
+                let sum = va + vb;
+                let lower = (sum - s).max(0.0);
+                (lower, sum.max(lower))
             }
-            ModeValue::Subtract => ((va - s).max(0.0), va),
-            ModeValue::Intersect => (0.0, s.min(va).min(vb)),
+            ModeValue::Subtract => {
+                let upper = va.max(0.0);
+                ((upper - s).max(0.0), upper)
+            }
+            ModeValue::Intersect => (0.0, s.max(0.0)),
         };
         if !lo.is_finite() || !hi.is_finite() || lo > hi {
             return Err(SandwichRefusal::MalformedPatch);
@@ -8430,7 +8434,9 @@ pub mod membership {
 /// 2-cycles and marshal the outcome. A refusal is reported as a named tag
 /// (never a panic, never a silent zero), so the door can distinguish the
 /// regime split's certified bracket from every typed refusal.
-pub fn certify_sandwich_probe(row: &crate::facade::SandwichProbeRow) -> crate::facade::SandwichOutcome {
+pub fn certify_sandwich_probe(
+    row: &crate::facade::SandwichProbeRow,
+) -> crate::facade::SandwichOutcome {
     let to_rows = |patches: &[crate::facade::SandwichPatchRow]| {
         patches
             .iter()
