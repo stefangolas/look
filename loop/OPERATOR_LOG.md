@@ -4303,3 +4303,53 @@ all alive); HEAD 6b25068; heartbeat 1 (27872); operator_runner 1 (27876);
 watchdog 1 (29264); overnight driver 1 (24864); TWO supervisors
 (19172+27828); TWO cargoq servers (28544+34564); cargoq UP (running true,
 queued 3); disk 5.9 GiB free; RAM 3.5 GiB.
+
+---
+
+[operator 2026-09-11T08:36Z - cycle report]
+
+Board at entry (command truth, `slot_status.py`): 0 RUNNING / 8 FINISHED.
+The STATE header's "3 RUNNING AUTHOR-WIRE-MIRROR-ARM" was stale - all three
+workers had finished. Slots: 0 AUTHOR-CENSUS-NAMES, 1+2
+AUTHOR-WIRE-MIRROR-ARM, 3 SOLVER-SURVEY-C, 4 F1-AUTHORING-ARMS, 5
+CL-006-SOLVER-ENTRY, 6 CL-005-EXACT-CONTACT, 7 FRAME-REVOLVE.
+
+- Step 1 health: heartbeat exactly 1 (27872), operator_runner 1 (27876),
+  watchdog 1 (29264), ONE overnight driver (24864); TWO supervisors (19172
+  PyManager + 27828 pythoncore - carried duplication class, one overnight
+  child only); cargoq UP (ping ok, queued 0, running false). Disk 11.52 GiB
+  free (above the 8 GB floor, below the 15 GB goal); RAM 4.43 GiB.
+- Step 2 landing: slot 2 AUTHOR-WIRE-MIRROR-ARM, RESULT status DONE, worker
+  commit 19acb3e (not an ancestor at entry). Scoped checks at the slot-2 wt:
+  `cargo check -p truck123d --tests --locked` exit 0 (1m15s);
+  `cargo test -p truck123d --test wire_mirror_arm --locked` 4 passed/0 failed
+  (3m45s); anchor A1 = 0. During the checks the overnight driver merged
+  19acb3e as 38d3534 (+ landed-note 612b94e), so my `merge --no-ff` said
+  "Already up to date" - no duplicate. The driver skipped the bookkeeping, so
+  the operator filed loop/results/AUTHOR-WIRE-MIRROR-ARM.json, deleted the
+  slot-2 wt RESULT.json (the only copy), appended the ledger row, and flipped
+  the PACKETS row DONE (commit 0039227). That commit also swept in three
+  pending overnight ledger rows (RDEF-M3-WITNESS-TIER, RDEF-M2-REGIME-SANDWICH,
+  DOOR-PARTIAL-ARC-FLIP) that were uncommitted in the shared ledger. Slot 0
+  AUTHOR-CENSUS-NAMES RESULT status SPEC_GAP - NOT landable (Ellipse/
+  RectangleRounded need new ProfileEdge conic/arc carriers); escalated. Slot 1
+  redundant duplicate AUTHOR-WIRE-MIRROR-ARM (uncommitted, no commit) - left,
+  not reset.
+- Step 3 unblock: no RUNNING worker, no IDLE/DEAD >15 min holding unlanded
+  work, no QUESTION pending.
+- Step 4 registry hygiene: nothing flipped. RG-23/RG-9 remain READY with empty
+  `packet` fields (authoring, not anchor counts). BLOCKED rows parked as before.
+- Step 5 dispatch: `dispatch_ready --dry-run --max-workers=4` -> dispatched 0;
+  only RG-23/RG-9 flagged (missing packets). No manual dispatch (heartbeat
+  live).
+- Step 6 STATE: replaced the LATEST GROUND TRUTH block (08:02Z marked
+  SUPERSEDED) + appended the 08:36Z machine block.
+- Step 7: this entry.
+
+Escalations: AUTHOR-CENSUS-NAMES SPEC_GAP (rebooking); RG-23/RG-9 missing
+packet files. The AUTHOR-WIRE-MIRROR-ARM pin/freshness-guard escalation is
+RESOLVED by the landing; the disk floor is no longer binding (11.5 GiB free).
+
+Leaving: 0 RUNNING; HEAD 0039227; heartbeat 1 (27872); operator_runner 1
+(27876); watchdog 1 (29264); ONE overnight driver (24864); TWO supervisors
+(carried); cargoq UP (queued 0); disk 11.52 GiB free; RAM 4.43 GiB.

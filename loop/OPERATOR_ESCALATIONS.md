@@ -1398,3 +1398,46 @@ Judgment-required items appended each operator cycle. Newest at the bottom.
   `loop/dispatch_heartbeat.log` (07:55:18Z cycle, floor failures);
   `loop/slots/1/wt` (the one live copy: untracked
   `truck123d/tests/wire_mirror_arm.rs`).
+
+---
+
+[operator 2026-09-11T08:36Z - new + carried]
+
+RESOLVED this cycle: the AUTHOR-WIRE-MIRROR-ARM redispatch root is closed. The
+overnight driver merged worker commit 19acb3e as 38d3534 and the operator
+completed the bookkeeping (filed loop/results/AUTHOR-WIRE-MIRROR-ARM.json,
+flipped the row DONE, commit 0039227). No further pin needed. The disk floor is
+no longer binding (11.5 GiB free), and the hung `cargo test --locked -p
+truck123d` that wedged cargoq has cleared (queued 0, running false).
+
+NEW - AUTHOR-CENSUS-NAMES SPEC_GAP (geometry-judgment rebooking required):
+- What: worker RESULT status SPEC_GAP; no file in write_allow was edited. The
+  packet classifies Ellipse and RectangleRounded as TIER A ("record exactly
+  now") but both need new executor carriers - `ProfileEdge::Ellipse` and a
+  mixed line/arc section vocabulary - that do not exist on the landed executor
+  (bd_bridge.rs ProfileEdge has only Line/Spline/Circle; profile_loop rejects a
+  Circle mixed with any other edge). The packet's own done criterion
+  (RectangleRounded profile extruded, aligned, coned green) is unreachable
+  without them. Recording an Ellipse as a sampled Spline is not exact.
+- Why the operator can't: widening a packet's write set / re-scoping TIER A is
+  a packet-semantic + geometry-judgment decision outside operator authority.
+- Action needed: either (a) widen the AUTHOR-CENSUS-NAMES write set to add
+  `ProfileEdge::Ellipse` + an arc edge and re-dispatch, or (b) re-scope the
+  packet to the names that fit (Align, Cone, RegularPolygon + the three TIER B
+  typed refusals) and book Ellipse/RectangleRounded as a follow-up.
+- Start from: `loop/results/AUTHOR-CENSUS-NAMES.PENDING-QUESTION.QUESTION.md`
+  and `loop/results/AUTHOR-CENSUS-NAMES.PENDING.RESULT.json` (the worker's
+  carrier inventory); packet `loop/packets/AUTHOR-CENSUS-NAMES.md`.
+
+CARRIED - RG-23-CERTIFIED-ENTRY-WIRING and RG-9-REFLECT-SOLID-PRODUCTION:
+READY rows with EMPTY `packet` fields (no packet file exists). `dispatch_ready`
+renders this as "ANCHOR CHECK FAILED" with an empty detail. Authoring, not the
+anchor ritual - needs a human/orchestrator to author the packets or park the
+rows. Start from `loop/PACKETS.jsonl` (both rows).
+
+CARRIED (unchanged): FRAME-REVOLVE F1 non_z_axis pin amendment
+(`truck123d/tests/ttc_lathe_spline.rs:255`); duplicate supervisors
+(19172+27828) + the lagging cargoq restart guard; slot-4 + slot-7 wt RESULT
+residue parking the driver's dispatch arm; TOR-C flip-or-pin (orchestrator
+call); MONO-10 missing packet; RDEF-M4 H-8 stale anchor; duplicate-driver
+probe fix.

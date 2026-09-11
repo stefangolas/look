@@ -75,6 +75,30 @@ corrected, annex C = ORACLE POLICY CHANGE), then docs/SOLVER_COVERAGE_SPEC.md
 
 ## Where we are
 
+> LATEST GROUND TRUTH [operator 2026-09-11T08:36Z]: 0 RUNNING / 1
+> landed-by-operator (AUTHOR-WIRE-MIRROR-ARM bookkeeping completed) / 0
+> unblocked / 0 flipped / 0 dispatched. HEAD `0039227`. **THE TRIPLE-DISPATCH
+> CLEARED**: all three AUTHOR-WIRE-MIRROR-ARM workers finished; slot 2 committed
+> `19acb3e` (RESULT DONE), the overnight driver merged it as `38d3534` and added a
+> landed-note, and the operator completed the bookkeeping the driver skipped:
+> filed `loop/results/AUTHOR-WIRE-MIRROR-ARM.json`, deleted the slot-2 wt
+> RESULT.json (the only copy), flipped the PACKETS row to DONE, appended the
+> ledger (commit `0039227`). Scoped checks at the slot-2 wt: `cargo check -p
+> truck123d --tests --locked` exit 0; `cargo test -p truck123d --test
+> wire_mirror_arm --locked` 4 passed/0 failed; anchor A1 = 0. Slot 0 =
+> AUTHOR-CENSUS-NAMES **SPEC_GAP** (TIER A Ellipse/RectangleRounded need executor
+> conic/arc carriers beyond the packet's Cone-SolidSpec allowance) - NOT
+> landable, escalated (question loop). Slot 1 = redundant duplicate
+> AUTHOR-WIRE-MIRROR-ARM work (uncommitted, no commit; packet now DONE) - left
+> in place, not reset. Registry: nothing to flip (RG-23/RG-9 still READY with
+> EMPTY packet fields = authoring, not anchor fix; BLOCKED rows parked as
+> before). `dispatch_ready --dry-run`: dispatched 0; only RG-23/RG-9 flagged,
+> both on missing packets. Health: heartbeat exactly 1 (27872), operator_runner
+> 1 (27876), watchdog 1 (29264), overnight driver 1 (24864); TWO supervisors
+> (19172+27828) carried; disk 11.5 GiB free (above the 8 GB floor, below the 15
+> GB goal), RAM 4.4 GiB; cargoq UP (queued 0).
+>
+> --- SUPERSEDED 2026-09-11T08:02Z note (kept for history) follows ---
 > LATEST GROUND TRUTH [operator 2026-09-11T08:02Z]: 3 RUNNING (all
 > AUTHOR-WIRE-MIRROR-ARM) / 0 landed-by-operator / 0 unblocked / 0 flipped /
 > 0 dispatched. HEAD `6b25068` (the 07:42Z operator commit). **ALL THREE
@@ -6431,3 +6455,51 @@ Leaving: 3 RUNNING (slots 0+1+2, TRIPLE-dispatched AUTHOR-WIRE-MIRROR-ARM); HEAD
 329f6ab; heartbeat 1 (27872); operator_runner 1 (27876); watchdog 1 (29264); ONE
 overnight driver (24864); TWO supervisors; cargoq UP (running true); disk ~9.3
 GiB free; RAM ~3.8 GiB.]
+
+[operator 2026-09-11T08:36Z - volatile refresh. Board now: 0 RUNNING / 1
+landed-by-operator / 0 unblocked / 0 flipped / 0 dispatched. **THE
+TRIPLE-DISPATCH IS RESOLVED.** `slot_status.py` (command truth over the stale
+STATE header) shows all eight slots FINISHED and no live worker; the prior
+"3 RUNNING AUTHOR-WIRE-MIRROR-ARM" is history.
+
+- **Step 1 health:** heartbeat exactly 1 (27872), operator_runner 1 (27876),
+  watchdog 1 (29264), ONE overnight driver (24864); TWO supervisors (19172
+  PyManager + 27828 pythoncore, carried duplication class, only ONE overnight
+  child = no double-merge risk); cargoq UP (ping ok, queued 0, running false).
+  Disk 11.52 GiB free (above the 8 GB floor, below the 15 GB janitor goal); RAM
+  4.43 GiB free.
+- **Step 2 landing:** slot 2 AUTHOR-WIRE-MIRROR-ARM had RESULT status DONE and
+  worker commit `19acb3e`, not an ancestor at cycle start. Ran the packet's
+  done-when scoped checks at the slot-2 wt through the cargoq shim:
+  `cargo check -p truck123d --tests --locked` exit 0; `cargo test -p truck123d
+  --test wire_mirror_arm --locked` 4 passed/0 failed; anchor A1 = 0. During the
+  checks the overnight driver merged `19acb3e` as `38d3534` and added a
+  landed-note (`612b94e`), so my `merge --no-ff` correctly reported "Already up
+  to date" (no duplicate). The driver left the bookkeeping incomplete: no
+  `loop/results/AUTHOR-WIRE-MIRROR-ARM.json`, the slot-2 wt RESULT.json
+  undeleted (the only copy), and the PACKETS row still status READY. Completed
+  it: filed the RESULT, deleted the wt copy, appended the ledger row, flipped
+  the row DONE (commit `0039227`). The commit also swept in three pending
+  overnight ledger rows (RDEF-M3-WITNESS-TIER, RDEF-M2-REGIME-SANDWICH,
+  DOOR-PARTIAL-ARC-FLIP) that were uncommitted in the shared append-only ledger.
+  Slot 0 AUTHOR-CENSUS-NAMES RESULT status **SPEC_GAP** - NOT landable (TIER A
+  Ellipse/RectangleRounded need new ProfileEdge conic/arc carriers beyond the
+  packet's Cone-SolidSpec allowance); escalated. Slot 1 = redundant duplicate
+  AUTHOR-WIRE-MIRROR-ARM work, uncommitted, no commit, packet now DONE - left
+  in place, not reset (no re-dispatch risk once DONE).
+- **Step 3 unblock:** no RUNNING worker; no IDLE/DEAD >15 min holding
+  unlanded work; no QUESTION pending (slot 0's SPEC_GAP is the QUESTION-class
+  output, escalated not resumed).
+- **Step 4 registry hygiene:** nothing flipped. RG-23-CERTIFIED-ENTRY-WIRING and
+  RG-9-REFLECT-SOLID-PRODUCTION are READY but their packet files are absent/empty
+  (`dispatch_ready` reports an empty ANCHOR CHECK FAILED detail for both) -
+  authoring, not the anchor ritual. BLOCKED rows remain correctly parked.
+- **Step 5 dispatch:** `dispatch_ready --dry-run --max-workers=4` -> "dispatched
+  0; workers now ~0/4". No manual dispatch while the heartbeat (27872) is live.
+- **Step 7 escalations:** AUTHOR-CENSUS-NAMES SPEC_GAP (geometry-judgment
+  rebooking: widen write set to add `ProfileEdge::Ellipse` + an arc edge, or
+  re-scope to the names that fit); RG-23/RG-9 missing packet files (authoring).
+
+Leaving: 0 RUNNING; HEAD `0039227`; heartbeat 1 (27872); operator_runner 1
+(27876); watchdog 1 (29264); ONE overnight driver (24864); TWO supervisors
+(carried); cargoq UP (queued 0); disk 11.52 GiB free; RAM 4.43 GiB.]
