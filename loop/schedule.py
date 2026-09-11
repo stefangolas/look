@@ -42,7 +42,7 @@ def frontier(done, running):
         # that does not exist, so it has to be here and not only in `note`.
         if r['id'] in done or r['status'] in ('RUNNING', 'DONE', 'BLOCKED'):
             continue
-        if any(n not in done for n in r['needs']):
+        if any(n not in done for n in r.get('needs', [])):
             continue
         out.append(r)
     return out
