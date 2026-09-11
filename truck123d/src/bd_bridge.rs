@@ -340,6 +340,16 @@ pub struct PartSpec {
     /// recomputed.
     #[serde(default)]
     pub mirror: Option<String>,
+    /// The row's recorded label (the door's `styled` metadata, carried
+    /// verbatim; never read by classification, facts arithmetic or meshing).
+    /// Omitted when the client records none.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub label: Option<String>,
+    /// The row's recorded color (client metadata carried verbatim; never read
+    /// by classification, facts arithmetic or meshing). Omitted when the client
+    /// records none.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub color: Option<String>,
 }
 
 /// One recorded boolean row: the mode and the two placed operand nodes.
@@ -374,6 +384,16 @@ pub enum TreeNode {
     Group {
         /// The child rows, in script order.
         group: Vec<TreeNode>,
+        /// The group's recorded label (client metadata carried verbatim; never
+        /// read by classification, facts arithmetic or meshing). Omitted when
+        /// the client records none.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        label: Option<String>,
+        /// The group's recorded color (client metadata carried verbatim; never
+        /// read by classification, facts arithmetic or meshing). Omitted when
+        /// the client records none.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        color: Option<String>,
     },
     /// One recorded boolean row over two operand nodes.
     Boolean {
@@ -403,6 +423,34 @@ pub struct Facts {
     /// row per admitted swept-carrier boolean pair. A canonical x canonical
     /// pair lands on the canonical path and records no event.
     pub boolean_events: Vec<SweptBooleanEvent>,
+    /// The top node's recorded label, when present (client metadata carried
+    /// verbatim; never read by any semantic path).
+    pub label: Option<String>,
+    /// The top node's recorded color, when present (client metadata carried
+    /// verbatim; never read by any semantic path).
+    pub color: Option<String>,
+    /// The per-row breakdown of a group top node: one entry per IMMEDIATE
+    /// child, in script order. `None` for a part top node (and for a boolean
+    /// top node); a nested group appears as ONE row carrying its aggregate.
+    pub rows: Option<Vec<RowFacts>>,
+}
+
+/// The measured facts of one immediate child of a group top node. The
+/// arithmetic is the aggregate path's (`count_and_union` / `top_volume`): a
+/// nested group's row reports its immediate-child aggregate, exactly as the
+/// aggregate rule weights it. `label` is the child's recorded metadata, when
+/// present.
+#[derive(Debug, Clone, PartialEq, Serialize)]
+pub struct RowFacts {
+    /// The child's recorded label, when present.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub label: Option<String>,
+    /// The child's solid count (every part in the child's subtree).
+    pub solid_count: u64,
+    /// The child's measured volume (the aggregate rule).
+    pub volume: f64,
+    /// The child's world axis-aligned bounding box, `[min, max]`.
+    pub bbox: [[f64; 3]; 2],
 }
 
 // ---------------------------------------------------------------------------
@@ -2850,7 +2898,7 @@ fn solid_carrier_class(solid: &SolidSpec) -> CarrierClass {
 fn node_carrier_class(node: &TreeNode) -> Result<CarrierClass, Refusal> {
     match node {
         TreeNode::Part { part } => Ok(solid_carrier_class(&part.solid)),
-        TreeNode::Group { group } => {
+        TreeNode::Group { group, .. } => {
             for child in group {
                 match node_carrier_class(child) {
                     Ok(class) => return Ok(class),
@@ -2896,7 +2944,7 @@ fn collect_boolean_events(
 ) -> Result<(), Refusal> {
     match node {
         TreeNode::Part { .. } => Ok(()),
-        TreeNode::Group { group } => {
+        TreeNode::Group { group, .. } => {
             for child in group {
                 collect_boolean_events(child, events)?;
             }
@@ -2924,12 +2972,61 @@ pub fn tree_facts(root: &TreeNode) -> Result<Facts, Refusal> {
     let seam_mismatch = top_seam_mismatch(root)?;
     let mut boolean_events = Vec::new();
     collect_boolean_events(root, &mut boolean_events)?;
+    let (label, color, rows) = top_metadata(root)?;
     Ok(Facts {
         solid_count: count,
         volume,
         bbox: [min, max],
         seam_mismatch,
         boolean_events,
+        label,
+        color,
+        rows,
+    })
+}
+
+/// The top node's recorded metadata plus, for a group top node, the per-row
+/// breakdown of its IMMEDIATE children. The breakdown is an addition only: it
+/// recomputes each child with the same aggregate arithmetic and never changes
+/// the top-level facts. A part top node carries no rows; a boolean top node
+/// carries no metadata.
+fn top_metadata(
+    root: &TreeNode,
+) -> Result<(Option<String>, Option<String>, Option<Vec<RowFacts>>), Refusal> {
+    match root {
+        TreeNode::Part { part } => Ok((part.label.clone(), part.color.clone(), None)),
+        TreeNode::Group {
+            group,
+            label,
+            color,
+        } => {
+            let mut rows = Vec::with_capacity(group.len());
+            for child in group {
+                rows.push(child_row_facts(child)?);
+            }
+            Ok((label.clone(), color.clone(), Some(rows)))
+        }
+        TreeNode::Boolean { .. } => Ok((None, None, None)),
+    }
+}
+
+/// One immediate child's row facts, using the aggregate path's arithmetic.
+fn child_row_facts(node: &TreeNode) -> Result<RowFacts, Refusal> {
+    let mut count = 0u64;
+    let mut min = [f64::INFINITY; 3];
+    let mut max = [f64::NEG_INFINITY; 3];
+    count_and_union(node, &mut count, &mut min, &mut max)?;
+    let volume = top_volume(node)?;
+    let label = match node {
+        TreeNode::Part { part } => part.label.clone(),
+        TreeNode::Group { label, .. } => label.clone(),
+        TreeNode::Boolean { .. } => None,
+    };
+    Ok(RowFacts {
+        label,
+        solid_count: count,
+        volume,
+        bbox: [min, max],
     })
 }
 
@@ -2992,7 +3089,7 @@ fn count_and_union(
             dispatch_boolean(boolean)?;
             count_and_union(&boolean.a, count, min, max)
         }
-        TreeNode::Group { group } => {
+        TreeNode::Group { group, .. } => {
             for child in group {
                 count_and_union(child, count, min, max)?;
             }
@@ -3011,7 +3108,7 @@ fn top_volume(node: &TreeNode) -> Result<f64, Refusal> {
             dispatch_boolean(boolean)?;
             top_volume(&boolean.a)
         }
-        TreeNode::Group { group } => {
+        TreeNode::Group { group, .. } => {
             let mut volume = 0.0;
             for child in group {
                 match child {
@@ -3081,7 +3178,7 @@ fn append_node_mesh(node: &TreeNode, out: &mut Vec<Triangle>) -> Result<(), Refu
             dispatch_boolean(boolean)?;
             append_node_mesh(&boolean.a, out)
         }
-        TreeNode::Group { group } => {
+        TreeNode::Group { group, .. } => {
             for child in group {
                 append_node_mesh(child, out)?;
             }
@@ -5722,11 +5819,18 @@ fn trim_binding_error_to_refusal(error: crate::python::binding::BindingError) ->
 }
 
 /// The pyo3 measurement entry: takes the construction tree JSON and returns
-/// the facts JSON (`{solid_count, volume, bbox}`).
+/// the facts JSON (`{solid_count, volume, bbox, label?, color?, rows?, timing}`).
 #[pyfunction]
 pub fn bd_facts(py: Python<'_>, tree_json: &str) -> PyResult<String> {
+    // The construct phase is the tree construction from the submitted JSON;
+    // the facts phase is the native measurement of that tree. Both are
+    // diagnostic columns for the census protocol and gate nothing.
+    let construct_started = std::time::Instant::now();
     let tree = parse_tree(tree_json).map_err(|refusal| refusal_to_pyerr(py, &refusal))?;
+    let construct_ms = construct_started.elapsed().as_secs_f64() * 1000.0;
+    let facts_started = std::time::Instant::now();
     let outcome = crate::gil::with_kernel_gil_released(py, move || tree_facts(&tree));
+    let facts_ms = facts_started.elapsed().as_secs_f64() * 1000.0;
     match outcome {
         Ok(facts) => {
             let mut value = serde_json::json!({
@@ -5734,8 +5838,17 @@ pub fn bd_facts(py: Python<'_>, tree_json: &str) -> PyResult<String> {
                 "volume": facts.volume,
                 "bbox": facts.bbox,
             });
+            if let Some(label) = &facts.label {
+                value["label"] = serde_json::json!(label);
+            }
+            if let Some(color) = &facts.color {
+                value["color"] = serde_json::json!(color);
+            }
             if let Some(mismatch) = facts.seam_mismatch {
                 value["seam_mismatch"] = serde_json::json!(mismatch);
+            }
+            if let Some(rows) = &facts.rows {
+                value["rows"] = serde_json::json!(rows);
             }
             if !facts.boolean_events.is_empty()
                 && let Some(map) = value.as_object_mut()
@@ -5743,6 +5856,15 @@ pub fn bd_facts(py: Python<'_>, tree_json: &str) -> PyResult<String> {
                 map.insert(
                     "boolean_events".to_string(),
                     serde_json::json!(facts.boolean_events),
+                );
+            }
+            if let Some(map) = value.as_object_mut() {
+                map.insert(
+                    "timing".to_string(),
+                    serde_json::json!({
+                        "construct_ms": construct_ms,
+                        "facts_ms": facts_ms,
+                    }),
                 );
             }
             serde_json::to_string(&value)
@@ -5753,16 +5875,21 @@ pub fn bd_facts(py: Python<'_>, tree_json: &str) -> PyResult<String> {
 }
 
 /// The pyo3 export entry: writes the construction tree's STL to `path` and
-/// returns `{"triangles": n}`.
+/// returns `{"triangles": n, "mesh_ms": f64}`. `mesh_ms` is a diagnostic
+/// column (the wall-clock mesh phase), never a gate.
 #[pyfunction]
 pub fn bd_stl(py: Python<'_>, tree_json: &str, path: &str) -> PyResult<String> {
     let tree = parse_tree(tree_json).map_err(|refusal| refusal_to_pyerr(py, &refusal))?;
     let owned_path = path.to_string();
+    let mesh_started = std::time::Instant::now();
     let outcome =
         crate::gil::with_kernel_gil_released(py, move || write_tree_stl(&tree, &owned_path));
+    let mesh_ms = mesh_started.elapsed().as_secs_f64() * 1000.0;
     match outcome {
-        Ok(triangles) => serde_json::to_string(&serde_json::json!({ "triangles": triangles }))
-            .map_err(|e| PyRuntimeError::new_err(format!("stl serialization failed: {e}"))),
+        Ok(triangles) => serde_json::to_string(
+            &serde_json::json!({ "triangles": triangles, "mesh_ms": mesh_ms }),
+        )
+        .map_err(|e| PyRuntimeError::new_err(format!("stl serialization failed: {e}"))),
         Err(refusal) => Err(refusal_to_pyerr(py, &refusal)),
     }
 }
@@ -5805,6 +5932,8 @@ mod tests {
                 rz: 0.0,
                 rotation: None,
                 mirror: None,
+                label: None,
+                color: None,
             },
         }
     }
@@ -5820,6 +5949,8 @@ mod tests {
                 rz: 0.0,
                 rotation: None,
                 mirror: Some(axis.to_string()),
+                label: None,
+                color: None,
             },
         }
     }
@@ -5874,6 +6005,8 @@ mod tests {
                     1500.0,
                 ),
             ],
+            label: None,
+            color: None,
         };
         let facts = tree_facts(&tree).expect("analytic primitives are in envelope");
         let expected = std::f64::consts::PI * 150.0 * 150.0 * 770.0
@@ -5925,6 +6058,8 @@ mod tests {
     fn stl_writer_emits_binary_stl() {
         let tree = TreeNode::Group {
             group: vec![part(SolidSpec::Sphere { radius: 10.0 }, 1.0, 2.0, 3.0)],
+            label: None,
+            color: None,
         };
         let dir = std::env::temp_dir().join(format!("truck123d_bd_stl_{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&dir);
