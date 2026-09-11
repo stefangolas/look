@@ -6,10 +6,10 @@ The packet's suggested rule `SSI4-KRAWCZYK-UNIQUENESS` was measured first: remov
 
 **Removed rule:** `C-CLASSIFY-DISCHARGE-COMPLETENESS` (a genuinely load-bearing row).
 
-Total orphaned states across all goals: **27552**.
+Total orphaned states across all goals: **15264**.
 
 | goal | orphaned states | exact orphaned cell(s) |
 |---|---:|---|
-| `complete_locus` | 27552 | (2x2, rank_deficient(residual), 0, domain_interior(residual), local_only(residual)); (2x2, rank_deficient(residual), 0, domain_interior(residual), loop_free); (2x2, rank_deficient(residual), 0, domain_interior(residual), seed_complete); (2x2, rank_deficient(residual), 0, domain_interior(residual), all_components); (2x2, rank_deficient(residual), 0, seam, local_only(residual)); (2x2, rank_deficient(residual), 0, seam, loop_free) |
+| `complete_locus` | 15264 | (2x2, rank_deficient(residual), 0, domain_interior(residual), local_only(residual)); (2x2, rank_deficient(residual), 0, domain_interior(residual), loop_free); (2x2, rank_deficient(residual), 0, domain_interior(residual), seed_complete); (2x2, rank_deficient(residual), 0, domain_interior(residual), all_components); (2x2, rank_deficient(residual), 0, seam, local_only(residual)); (2x2, rank_deficient(residual), 0, seam, loop_free) |
 
 Restoring the rule clears the gap (the default audit in `docs/SOLVER_COVERAGE_AUDIT.md` is the restored run).

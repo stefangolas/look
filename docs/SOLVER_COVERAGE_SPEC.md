@@ -118,3 +118,83 @@ removed must name the exact orphaned cell, restore clears it.
   survey packets; every interpreted claim carries a verbatim excerpt + a
   confidence, and the checker flags low-confidence rules feeding a winning
   route.
+
+## 6. RDEF-M0 checker accounting (CHK-1 to CHK-4)
+
+Milestone M0 of `docs/RANK_DEFICIENT_CONTACT_SPEC.md` (packet
+`RDEF-M0-CHECKER-ACCOUNTING`, owner proxy 2026-09-10). The checker now reports
+the accounting of section 2 of that spec. The three confirmed modelling
+assumptions below are recorded here as decided; the rank-deficient spec remains
+the theory document of record.
+
+### 6.1 CHK-4 — `regular` means "regular where nonempty" (decided)
+
+`regular` is the second reading: a regular zero set is regular *where it is
+nonempty*; it does not assert nonemptiness. Consequences recorded by the
+checker:
+
+- `regular` does **not** refute `no_intersection`. The spec's third refutation
+  row (`no_intersection` refuted when `regular`, *if* `regular` means nonempty)
+  therefore does not apply.
+- The `TANGENCY-CASCADE-REFINE-EMPTY` route `regular -> certified_empty` is
+  valid, as are the other cascade refinements of `regular`
+  (`TANGENCY-CASCADE-STAGE3-CRITICAL-VALUE`, `TANGENCY-CASCADE-CLASSIFY-BOX`).
+  Re-audit under the pinned semantics: every cascade route was already accepted
+  by the refinement rule (a rule may transform an axis its own precondition
+  names), so **no route changes status**; the pin only changes refutation
+  accounting.
+
+### 6.2 CHK-1 — three-way status
+
+Every concrete state is exactly one of:
+
+| status | meaning |
+|---|---|
+| PROVED | in the fail-closed winning region `W_G` |
+| REFUTED | the goal is provably false: `relation.zero_set` is in the goal's refutation set |
+| UNDECIDED | neither; the only kind of state that is a gap |
+
+Refutation predicates (the spec's section-2 table): `no_intersection` is
+refuted by `zero_set = rank_deficient(residual)` (the certified nonempty zero
+set under the pinned `regular`); `local_contact` is refuted by
+`zero_set = certified_empty`. `REFUTED` states are removed from the missing
+region and are reported separately.
+
+### 6.3 CHK-2 — confirmed `T_geom` constraints (decided)
+
+The three constraints are confirmed as standard dimension facts for the
+carrier vocabulary the kernel admits:
+
+| constraint | reason |
+|---|---|
+| `src_dims in {1x1,2x1} => local_dim <= 1` | two curves, or a curve and a surface, cannot meet in a 2-dimensional set |
+| `src_dims in {1x1,2x1} and zero_set = regular => local_dim = 0` | full-rank contact between curves is isolated points |
+| `zero_set = certified_empty => local_dim = 0` | local dimension is meaningless for an empty set, so its four values collapse to one accounting representative (`0`) |
+
+The checker reports feasible-state and per-goal counts before (v1 `T_geom`,
+43200 feasible fact states) and after tightening (24960).
+
+### 6.4 CHK-3 — two coverage metrics
+
+- **Fail-closed coverage** (renamed from the old "coverage"): the winning
+  region `W_G`; every outcome either proves the goal or refuses with a named
+  tag. Safety closure is still never coverage.
+- **Strict coverage**: the winning region computed from rules with no refusal
+  branch (`CompiledRule.strict_ok`: no named refusal and every outcome emits a
+  concrete postcondition). A strict winning route contains no refusal.
+
+### 6.5 Adjudication of the three v1 conflicts (method step 5)
+
+The conflicts are reported by `detect_conflicts` and adjudicated against the
+source tree; the verdict is applied to the merged model by `ADJUDICATIONS`
+(fragments are not edited).
+
+| conflict | verdict | evidence |
+|---|---|---|
+| `rule_id_content_mismatch` `TANGENCY-TSYSTEM-FROM-DEFLATED` | fragment B is source-faithful; A's `rep.construction_witness=true` / `rep.exact_implicit=true` outcomes are unsupported | `vendor/truck/truck-certified/src/tangency/tsystem.rs:82-96` |
+| `postcondition_claim_mismatch` `exclude_rec` `ExclusionEvidence::NoRootFiveEq` | the minimal claim `{relation.zero_set: certified_empty}` is source-faithful; the `global.knowledge=local_only(residual)` restatement is the bottom of the knowledge order and is dropped | `vendor/truck/truck-certified/src/tangency/exclude.rs:166-211` |
+| `postcondition_claim_mismatch` `CurveSpan2::RationalBezier` | the declared-only claim `{goal: complete_locus}` is source-faithful; the variant's rep flags are not certified here | `vendor/truck/truck-certified/src/formal/span.rs:119-137` |
+
+The `TANGENCY-TSYSTEM-FROM-DEFLATED` adjudication is the precondition that
+`docs/RANK_DEFICIENT_CONTACT_SPEC.md` section 5.3 places on M4's deflation
+reuse.
