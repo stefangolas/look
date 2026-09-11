@@ -1038,3 +1038,25 @@ Judgment-required items appended each operator cycle. Newest at the bottom.
   (b) accept the fresh re-dispatch. Do NOT delete the backup until decided.
 - **RESOLVED this cycle (lower-priority item above):** `MONO-9-FUSE-FOLD` is
   now status DONE (commit `6073d52`).
+
+## 2026-09-11 04:20 UTC (operator cycle) - HARNESS: the overnight driver's scoped-check can fail on a gnullvm DLL/PATH artifact, not the code (RDEF-M3 self-resolved)
+
+- At 00:12:26 local the driver logged `slot 1: RDEF-M3-WITNESS-TIER scoped
+  check NOT green (test truck-certified:rdef_m3_witness failed)`. That failure
+  is **absent from `loop/cargoq/server.log`** (last entry 00:07:37), so the
+  driver's check bypassed cargoq and ran under an environment whose test-exe
+  DLL path was wrong - the exact class already recorded in STATE's Session-58
+  traps (`cargoq server env does not inherit dispatch-client PATH`).
+- The worker's own queued run was green: `server.log` `23:55:51 DONE exit=0 in
+  5s: cargo test -p truck-certified --test rdef_m3_witness --locked`, right
+  before commit `3bd9398` (23:56:04). The driver later re-ran and **landed the
+  packet itself** (`752658e`); `3bd9398` is now an ancestor of
+  `integration/kernel-bg`. No human action needed for RDEF-M3.
+- **ACTION SUGGESTED (harness, not urgent):** have `overnight.py`'s scoped
+  check run with the gnullvm toolchain bin on PATH (or through the cargoq shim
+  unconditionally), and record any check that bypasses the queue, so a false
+  "NOT green" cannot strand a finished packet until the next cycle.
+- **Carried (unchanged):** AUTHOR-WIRE-MIRROR-ARM preserved-work decision
+  (`%TEMP%\opencode\slot2-AUTHOR-WIRE-MIRROR-ARM\` + slot-2 abandoned patch);
+  DOOR-PARTIAL-ARC-FLIP write_allow amendment; duplicate supervisors + lagging
+  cargoq restart guard; slot-4/7 wt RESULT residue.

@@ -76,27 +76,26 @@ corrected, annex C = ORACLE POLICY CHANGE), then docs/SOLVER_COVERAGE_SPEC.md
 ## Where we are
 
 > LATEST GROUND TRUTH: read the newest `[operator ...]` block in "State of
-> the machine, as left" (2026-09-11T03:49Z). [operator 2026-09-11T03:49Z
-> ground-truth note: 3 RUNNING / 0 landed-by-operator. HEAD `6073d52` - the
-> orchestrator's **MONO-9-FUSE-FOLD LANDED** (`2dff4c7`) plus the **MONO-9
-> ledger + DONE flip** (`6073d52`); the 03:25Z MONO-9 stale-READY escalation is
-> RESOLVED. RUNNING: **RDEF-M2-REGIME-SANDWICH (slot 0, pid 32688)**,
-> **RDEF-M3-WITNESS-TIER (slot 1, pid 27280)** and **DOOR-PARTIAL-ARC-FLIP
-> (slot 2, pid 6820)** - all three events 7-9 min old, 3-4 files changed,
-> pre-commit, healthy; do not touch. **AUTHOR-WIRE-MIRROR-ARM: the re-fork
-> HAPPENED** (slot 2 was recycled to DOOR-PARTIAL-ARC-FLIP); the uncommitted
-> work is gone from the worktree and survives ONLY in the operator backup
-> `%TEMP%\opencode\slot2-AUTHOR-WIRE-MIRROR-ARM\` (wire_mirror_arm.rs 13,816 B,
-> door.py.patch 3,418 B, RESULT.json 7,377 B) and the slot-2 abandoned patch
-> `abandoned-20260910-233105.patch` (3,407 B). Row still READY; will re-dispatch
-> fresh when the door.py write-set clash clears. Registry (last-wins): 345 rows
-> (248 DONE / 85 READY / 11 BLOCKED / 1 SUPERSEDED); nothing flippable. Health:
-> heartbeat exactly 1 (27872), watchdog 1 (29264), cargoq UP (queued 2, running
-> true = the live workers' jobs). Disk 8.4 GiB free (janitor reclaimed ~1.2 GiB
-> repo-root target; above the 8 GB floor, below the 15 GB goal); RAM 3.6 GiB
-> free. Carried: duplicate supervisors (19172 + 27828), duplicate overnight.py
-> (24864 + 11272), duplicate cargoq server (28544 + 34564); DOOR-PARTIAL-ARC-FLIP
-> write_allow amendment; slot-4/7 wt RESULT residue.]
+> the machine, as left" (2026-09-11T04:20Z). [operator 2026-09-11T04:20Z
+> ground-truth note: 2 RUNNING / 1 driver-landed-mid-cycle / 0 landed-by-
+> operator. HEAD `752658e` (**RDEF-M3-WITNESS-TIER row LANDED (overnight)**).
+> RUNNING: **RDEF-M2-REGIME-SANDWICH (slot 0, pid 32688, healthy)** and
+> **DOOR-PARTIAL-ARC-FLIP (slot 2, pid 6820 `cmd`)** - slot 2 events ~13 min
+> old but 5 cargo/rustc live and last event a mid-test `step_start`: SLOW,
+> ALIVE, do not touch. **RDEF-M3-WITNESS-TIER (slot 1) is LANDED** (`3bd9398`
+> ancestor of HEAD, driver merge `752658e`); the driver's 00:12:26 "scoped
+> check NOT green" was a gnullvm DLL/PATH artifact - it is ABSENT from
+> `cargoq/server.log`, while the worker's queued run was `DONE exit=0 in 5s` at
+> 23:55:51 just before commit `3bd9398` - so it self-resolved and needs no
+> human action (see ESCALATIONS). Slots 3-7 landed residue. Registry: nothing
+> flippable this cycle. Health: heartbeat exactly 1 (27872; raw 2 = probe
+> cmdline), operator_runner 1, watchdog 1 (29264), cargoq UP (queued 2, running
+> true). Disk was **6.78 GiB (below the 8 GB floor)**; `janitor.py ensure
+> --need 10` reclaimed ~3.1 GiB -> **9.2 GiB free (still short of 10)**; RAM
+> 3.1 GiB free. Carried: AUTHOR-WIRE-MIRROR-ARM preserved-work decision
+> (`%TEMP%\opencode\slot2-AUTHOR-WIRE-MIRROR-ARM\` + slot-2 abandoned patch);
+> DOOR-PARTIAL-ARC-FLIP write_allow amendment; duplicate supervisors + lagging
+> cargoq restart guard; slot-4/7 wt RESULT residue.]
 
 - **THE FIRST KERNEL-VS-OCC TIMING COMPARISON IS BANKED** (FH-TIMING-REFRESH,
   landed c94d043): turbopump_assembly **0.097 s kernel vs 4.866 s OCC**,

@@ -3772,3 +3772,49 @@ changed 3-4, pre-commit - do not touch): RDEF-M2-REGIME-SANDWICH (slot 0, pid
 
 Leaving: 3 RUNNING; HEAD 6073d52; heartbeat 1 (27872); watchdog 1 (29264);
 cargoq UP; disk 8.4 GiB free; RAM 3.6 GiB free.
+
+## [operator 2026-09-11T04:20Z]
+
+Board: **2 RUNNING / 0 landed-by-operator / 1 driver-landed-mid-cycle**. HEAD
+now `752658e` (`RDEF-M3-WITNESS-TIER row LANDED (overnight)`). RUNNING: RDEF-M2-
+REGIME-SANDWICH (slot 0, pid 32688, healthy) and DOOR-PARTIAL-ARC-FLIP (slot 2,
+pid 6820 `cmd`, events ~13 min old, 5 cargo/rustc live, last event a mid-test
+`step_start` - SLOW but ALIVE, do not touch). Slot 1 FINISHED residue is LANDED
+(`3bd9398` is an ancestor of HEAD); slots 3-7 landed residue.
+
+- **Health (step 1):** heartbeat exactly 1 (anchored on `dispatch_heartbeat.ps1`;
+  the raw count of 2 is my own probe cmdline), operator_runner 1 (same probe
+  inflation), watchdog 1 (29264), cargoq UP (`/ping` queued 2, running true).
+  Disk **6.78 GiB free - BELOW the 8 GB floor**; `python loop/janitor.py ensure
+  --need 10` reclaimed ~3.1 GiB (repo-root `target/`) -> **9.2 GiB free (still
+  short of 10)**. RAM 3.1-3.5 GiB free.
+- **Land (step 2): RDEF-M3-WITNESS-TIER (slot 1) - driver false-failure
+  adjudicated, then LANDED BY THE DRIVER mid-cycle.** At cycle start slot 1 was
+  FINISHED, RESULT status `done`, `3bd9398` NOT an ancestor. `overnight.log`
+  00:12:26 read `slot 1: RDEF-M3-WITNESS-TIER scoped check NOT green (test
+  truck-certified:rdef_m3_witness failed)`. **The driver's failing check does not
+  appear in `server.log`** (last entry 00:07:37) - it bypassed cargoq and is the
+  documented gnullvm DLL/PATH artifact class, NOT a code failure: `server.log`
+  shows the worker's own queued run `DONE exit=0 in 5s` at 23:55:51, immediately
+  before commit `3bd9398` (23:56:04). I attempted an independent re-derivation
+  (`cargo check -p truck-certified --tests --locked` through the queue) but it
+  queued behind the live workers' long jobs and my tool call timed out at 7 min.
+  **While I was checking, the overnight driver re-ran and landed it (`752658e`);
+  `3bd9398` is now an ancestor of `integration/kernel-bg`** - verified, nothing
+  to re-land. Lesson: driver scoped-check failures that are absent from
+  `server.log` are environment artifacts; re-run through the queue before
+  escalating.
+- **Unblock (step 3):** none. Slot 2 is not DEAD: pid 6820 alive, 5 cargo/rustc
+  running, last event a `step_start` (long `door_partial_arc_flip` test step).
+  Do not reset or re-dispatch.
+- **Registry hygiene (step 4):** nothing flipped this cycle.
+- **Dispatch (step 5):** none (heartbeat live). No manual `dispatch_ready`.
+- **Escalations (step 7):** added the RDEF-M3 driver-false-failure class to
+  ESCALATIONS. Carried: AUTHOR-WIRE-MIRROR-ARM preserved-work decision;
+  DOOR-PARTIAL-ARC-FLIP write_allow amendment; duplicate supervisors + lagging
+  cargoq restart guard; slot-4/7 wt RESULT residue.
+- **STATE (step 6):** updated the LATEST GROUND TRUTH note with the 04:20Z
+  block.
+
+Leaving: 2 RUNNING; HEAD 752658e; heartbeat 1 (27872); watchdog 1 (29264);
+cargoq UP (queued 2); disk 9.2 GiB free; RAM 3.1 GiB free.
