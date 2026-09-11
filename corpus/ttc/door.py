@@ -2659,10 +2659,19 @@ def triangle_count(stl_path: str) -> int:
     return struct.unpack("<I", count)[0]
 
 
-def _truck_export_stl(obj, stl_path: str) -> None:
+def _truck_export_stl(obj, stl_path: str, deflection=None) -> None:
     """Export one construction tree as a binary STL through the native
-    executor (the truck regime's deterministic tessellation)."""
-    _T123D.bd_stl(json.dumps(obj._node()), str(stl_path))
+    executor (the truck regime's deterministic tessellation). `deflection`
+    of None keeps the landed fixed-resolution deterministic fingerprint
+    mesh bit-for-bit; a float requests chord-deflection-driven density."""
+    _T123D.bd_stl(json.dumps(obj._node()), str(stl_path), deflection)
+
+
+def _truck_export_glb(obj, glb_path: str, deflection=None) -> None:
+    """Export the tree as a colored indexed GLB (one node per placed part,
+    material colors from the recorded client metadata) - the render
+    artifact. The certification artifact stays the STL path."""
+    _T123D.bd_glb(json.dumps(obj._node()), str(glb_path), deflection)
 
 
 def main() -> int:
@@ -2685,6 +2694,16 @@ def main() -> int:
     entry = argv[2]
     args = json.loads(argv[3])
     stl_path = argv[4]
+    glb_path = None
+    deflection = None
+    if "--glb" in argv:
+        i = argv.index("--glb")
+        glb_path = argv[i + 1]
+        del argv[i : i + 2]
+    if "--deflection" in argv:
+        i = argv.index("--deflection")
+        deflection = float(argv[i + 1])
+        del argv[i : i + 2]
     door_version = TRUCK_DOOR_VERSION if ENGINE == "truck" else DOOR_VERSION
 
     t0 = time.time()
@@ -2712,7 +2731,9 @@ def main() -> int:
     tolerance = max(diag * 2.0e-4, 0.01)
     try:
         if ENGINE == "truck":
-            _truck_export_stl(obj, stl_path)
+            _truck_export_stl(obj, stl_path, deflection)
+            if glb_path:
+                _truck_export_glb(obj, glb_path, deflection)
         else:
             import build123d as bd
 

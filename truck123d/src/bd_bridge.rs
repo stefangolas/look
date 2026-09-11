@@ -53,6 +53,7 @@ use truck_certified::construct::patches::{PatchParent, TensorBernsteinPatch};
 use truck_certified::kernel::patch::IBox2;
 
 use crate::facade::{BooleanPairVerdict, CarrierClass, SweptBooleanEvent};
+use crate::glb_emit::{emit_glb, GlbMesh, GlbNodePayload, SrgbColor};
 use crate::marshal::{ExceptionClass, Marshaled, MarshaledPayload};
 use crate::python;
 use crate::python::binding::{EdgeSelectorRow, FilletBaseRow, FilletRefusal, FilletRow};
@@ -4492,17 +4493,33 @@ pub(crate) type Triangle = [f64; 9];
 /// The angular resolution of the mesh (fixed, deterministic).
 const MESH_SEGMENTS: usize = 64;
 
+/// Angular segments for a circular sweep of `radius` under the requested
+/// linear deflection: the chord sagitta `r(1 - cos(pi/n))` stays within the
+/// deflection. `None` keeps the landed fixed `MESH_SEGMENTS` (the
+/// deterministic fingerprint rule) bit-for-bit; the result is clamped to
+/// `[8, 16384]`.
+fn sweep_segments(radius: f64, deflection: Option<f64>) -> usize {
+    match deflection {
+        Some(d) if d.is_finite() && d > 0.0 => {
+            let ratio = (1.0 - d / radius).clamp(-1.0, 1.0);
+            let n = (std::f64::consts::PI / ratio.acos()).ceil();
+            (n as usize).clamp(8, 16384)
+        }
+        _ => MESH_SEGMENTS,
+    }
+}
+
 /// Generates the world-space triangle soup of every part in the tree.
-fn tree_mesh(root: &TreeNode) -> Result<Vec<Triangle>, Refusal> {
+fn tree_mesh(root: &TreeNode, deflection: Option<f64>) -> Result<Vec<Triangle>, Refusal> {
     let mut triangles = Vec::new();
-    append_node_mesh(root, &mut triangles)?;
+    append_node_mesh(root, &mut triangles, deflection)?;
     Ok(triangles)
 }
 
-fn append_node_mesh(node: &TreeNode, out: &mut Vec<Triangle>) -> Result<(), Refusal> {
+fn append_node_mesh(node: &TreeNode, out: &mut Vec<Triangle>, deflection: Option<f64>) -> Result<(), Refusal> {
     match node {
         TreeNode::Part { part } => {
-            let local = solid_mesh(&part.solid)?;
+            let local = solid_mesh(&part.solid, deflection)?;
             // The mirror placed-carrier reflects the local geometry before
             // the rz rotation and translation (no geometry recomputation).
             let reflected: Vec<Triangle> = local
@@ -4532,14 +4549,14 @@ fn append_node_mesh(node: &TreeNode, out: &mut Vec<Triangle>) -> Result<(), Refu
         // dispatch validates the pair.
         TreeNode::Boolean { boolean } => {
             dispatch_boolean(boolean)?;
-            append_node_mesh(&boolean.a, out)
+            append_node_mesh(&boolean.a, out, deflection)
         }
         // A fillet row's mesh is its base part's mesh (the blend certificate
         // is validated by the facts path).
-        TreeNode::Fillet { fillet } => append_node_mesh(&fillet.base, out),
+        TreeNode::Fillet { fillet } => append_node_mesh(&fillet.base, out, deflection),
         TreeNode::Group { group, .. } => {
             for child in group {
-                append_node_mesh(child, out)?;
+                append_node_mesh(child, out, deflection)?;
             }
             Ok(())
         }
@@ -4595,7 +4612,7 @@ fn place_triangle_frame(tri: Triangle, frame: RotationFrame, x: f64, y: f64, z: 
 }
 
 /// The local (origin-frame) triangle soup of one solid.
-fn solid_mesh(solid: &SolidSpec) -> Result<Vec<Triangle>, Refusal> {
+fn solid_mesh(solid: &SolidSpec, deflection: Option<f64>) -> Result<Vec<Triangle>, Refusal> {
     match solid {
         SolidSpec::Box {
             length,
@@ -4607,7 +4624,7 @@ fn solid_mesh(solid: &SolidSpec) -> Result<Vec<Triangle>, Refusal> {
             height,
             axis,
         } => {
-            let about_z = cylinder_z_mesh(*radius, *height)?;
+            let about_z = cylinder_z_mesh(*radius, *height, deflection)?;
             Ok(match axis.as_str() {
                 // the corpus's (0, 90, 0) rotation: z axis -> x axis
                 "x" => about_z.iter().map(|tri| rotate_mesh_y90(*tri)).collect(),
@@ -4619,13 +4636,13 @@ fn solid_mesh(solid: &SolidSpec) -> Result<Vec<Triangle>, Refusal> {
                 _ => about_z,
             })
         }
-        SolidSpec::Sphere { radius } => sphere_mesh(*radius),
-        SolidSpec::Torus { major, minor } => torus_mesh(*major, *minor),
+        SolidSpec::Sphere { radius } => sphere_mesh(*radius, deflection),
+        SolidSpec::Torus { major, minor } => torus_mesh(*major, *minor, deflection),
         SolidSpec::Lathe {
             profile,
             arc_deg,
             start_deg,
-        } => lathe_mesh(profile, *arc_deg, *start_deg),
+        } => lathe_mesh(profile, *arc_deg, *start_deg, deflection),
         SolidSpec::Prism {
             profile,
             amount,
@@ -4988,15 +5005,16 @@ fn box_mesh(length: f64, width: f64, height: f64) -> Vec<Triangle> {
 }
 
 /// A z-axis cylinder mesh (radius `r`, height `h`, centered on the origin).
-fn cylinder_z_mesh(radius: f64, height: f64) -> Result<Vec<Triangle>, Refusal> {
+fn cylinder_z_mesh(radius: f64, height: f64, deflection: Option<f64>) -> Result<Vec<Triangle>, Refusal> {
     if radius <= 0.0 || height <= 0.0 || !radius.is_finite() || !height.is_finite() {
         return Err(Refusal::Empty);
     }
-    let ring = ring_points(radius, MESH_SEGMENTS);
+    let segments = sweep_segments(radius, deflection);
+    let ring = ring_points(radius, segments);
     let z_top = height / 2.0;
     let z_bottom = -height / 2.0;
     let mut out = Vec::new();
-    for segment in 0..MESH_SEGMENTS {
+    for segment in 0..segments {
         let next = segment + 1;
         let (x0, y0) = ring_point(&ring, segment);
         let (x1, y1) = ring_point(&ring, next);
@@ -5009,7 +5027,7 @@ fn cylinder_z_mesh(radius: f64, height: f64) -> Result<Vec<Triangle>, Refusal> {
         );
     }
     for z in [z_top, z_bottom] {
-        for segment in 0..MESH_SEGMENTS {
+        for segment in 0..segments {
             let next = segment + 1;
             let (x0, y0) = ring_point(&ring, segment);
             let (x1, y1) = ring_point(&ring, next);
@@ -5038,20 +5056,21 @@ fn ring_points(radius: f64, count: usize) -> Vec<(f64, f64)> {
 
 /// A UV sphere (meridian `MESH_SEGMENTS`, `MESH_SEGMENTS/2` latitude bands,
 /// poles included as degenerate rings so the fanning is uniform).
-fn sphere_mesh(radius: f64) -> Result<Vec<Triangle>, Refusal> {
+fn sphere_mesh(radius: f64, deflection: Option<f64>) -> Result<Vec<Triangle>, Refusal> {
     if radius <= 0.0 || !radius.is_finite() {
         return Err(Refusal::Empty);
     }
-    let bands = MESH_SEGMENTS / 2;
+    let segments = sweep_segments(radius, deflection);
+    let bands = segments / 2;
     // ring `i` sits at latitude pi*i/bands; rings 0 and `bands` are the poles.
     let rings: Vec<Vec<(f64, f64, f64)>> = (0..=bands)
         .map(|i| {
             let theta = std::f64::consts::PI * i as f64 / bands as f64;
             let z = radius * theta.cos();
             let r = radius * theta.sin();
-            (0..MESH_SEGMENTS)
+            (0..segments)
                 .map(|segment| {
-                    let angle = TAU * segment as f64 / MESH_SEGMENTS as f64;
+                    let angle = TAU * segment as f64 / segments as f64;
                     (r * angle.cos(), r * angle.sin(), z)
                 })
                 .collect()
@@ -5061,7 +5080,7 @@ fn sphere_mesh(radius: f64) -> Result<Vec<Triangle>, Refusal> {
     for band in 0..bands {
         let lower = ring3(&rings, band);
         let upper = ring3(&rings, band + 1);
-        for segment in 0..MESH_SEGMENTS {
+        for segment in 0..segments {
             let next = segment + 1;
             let a = ring3_at(lower, segment);
             let b = ring3_at(lower, next);
@@ -5090,17 +5109,19 @@ fn ring3_at(ring: &[(f64, f64, f64)], index: usize) -> [f64; 3] {
 }
 
 /// A torus about the z axis centered on the origin.
-fn torus_mesh(major: f64, minor: f64) -> Result<Vec<Triangle>, Refusal> {
+fn torus_mesh(major: f64, minor: f64, deflection: Option<f64>) -> Result<Vec<Triangle>, Refusal> {
     if major <= 0.0 || minor <= 0.0 || !major.is_finite() || !minor.is_finite() {
         return Err(Refusal::Empty);
     }
+    let ring_segments = sweep_segments(major + minor, deflection);
+    let tube_segments = sweep_segments(minor, deflection);
     let mut out = Vec::new();
-    for ring_segment in 0..MESH_SEGMENTS {
-        let ring_a = TAU * ring_segment as f64 / MESH_SEGMENTS as f64;
-        let ring_b = TAU * (ring_segment + 1) as f64 / MESH_SEGMENTS as f64;
-        for tube_segment in 0..MESH_SEGMENTS {
-            let tube_a = TAU * tube_segment as f64 / MESH_SEGMENTS as f64;
-            let tube_b = TAU * (tube_segment + 1) as f64 / MESH_SEGMENTS as f64;
+    for ring_segment in 0..ring_segments {
+        let ring_a = TAU * ring_segment as f64 / ring_segments as f64;
+        let ring_b = TAU * (ring_segment + 1) as f64 / ring_segments as f64;
+        for tube_segment in 0..tube_segments {
+            let tube_a = TAU * tube_segment as f64 / tube_segments as f64;
+            let tube_b = TAU * (tube_segment + 1) as f64 / tube_segments as f64;
             let p00 = torus_point(major, minor, ring_a, tube_a);
             let p10 = torus_point(major, minor, ring_b, tube_a);
             let p11 = torus_point(major, minor, ring_b, tube_b);
@@ -5136,14 +5157,23 @@ fn lathe_mesh(
     profile: &[LatheEdge],
     arc_deg: f64,
     start_deg: f64,
+    deflection: Option<f64>,
 ) -> Result<Vec<Triangle>, Refusal> {
     let arc = validate_lathe_arc(arc_deg, start_deg)?;
     let ring = profile_ring(profile)?;
+    // The sweep radius is the profile's largest excursion from the axis: the
+    // chord sagitta of the angular segments is bounded by the deflection at
+    // that radius.
+    let sweep_radius = ring
+        .iter()
+        .map(|p| p[0].hypot(p[1]))
+        .fold(0.0f64, f64::max);
+    let segments = sweep_segments(sweep_radius, deflection);
     if arc == 360.0 {
-        return sweep_ring_mesh(&ring);
+        return sweep_ring_mesh(&ring, segments);
     }
     let theta0 = start_deg.rem_euclid(360.0).to_radians();
-    sweep_ring_mesh_arc(&ring, theta0, arc.to_radians())
+    sweep_ring_mesh_arc(&ring, theta0, arc.to_radians(), segments)
 }
 
 /// Appends `p` to the ring unless it equals the current last ring point.
@@ -5211,7 +5241,7 @@ fn eval_span(span: &SpanPoly, u: f64) -> [f64; 2] {
 }
 
 /// Sweeps the boundary ring over the angular segments.
-fn sweep_ring_mesh(ring: &[[f64; 2]]) -> Result<Vec<Triangle>, Refusal> {
+fn sweep_ring_mesh(ring: &[[f64; 2]], segments: usize) -> Result<Vec<Triangle>, Refusal> {
     if ring.len() < 3 {
         return Err(Refusal::Empty);
     }
@@ -5227,9 +5257,9 @@ fn sweep_ring_mesh(ring: &[[f64; 2]]) -> Result<Vec<Triangle>, Refusal> {
         let z0 = ring[ring_index][1];
         let x1 = ring[next][0];
         let z1 = ring[next][1];
-        for segment in 0..MESH_SEGMENTS {
-            let angle_a = TAU * segment as f64 / MESH_SEGMENTS as f64;
-            let angle_b = TAU * (segment + 1) as f64 / MESH_SEGMENTS as f64;
+        for segment in 0..segments {
+            let angle_a = TAU * segment as f64 / segments as f64;
+            let angle_b = TAU * (segment + 1) as f64 / segments as f64;
             let a = [x0 * angle_a.cos(), x0 * angle_a.sin(), z0];
             let b = [x0 * angle_b.cos(), x0 * angle_b.sin(), z0];
             let c = [x1 * angle_b.cos(), x1 * angle_b.sin(), z1];
@@ -5243,8 +5273,8 @@ fn sweep_ring_mesh(ring: &[[f64; 2]]) -> Result<Vec<Triangle>, Refusal> {
 /// The number of angular segments a partial-arc sweep is subdivided into: the
 /// full-revolution angular resolution, so a wedge's bands have the same arc
 /// length as the full mesh's bands (deterministic, at least one segment).
-fn arc_segments(arc: f64) -> usize {
-    let per_segment = TAU / MESH_SEGMENTS as f64;
+fn arc_segments(arc: f64, segments_full: usize) -> usize {
+    let per_segment = TAU / segments_full as f64;
     let segments = (arc / per_segment).ceil() as usize;
     segments.max(1)
 }
@@ -5254,7 +5284,12 @@ fn arc_segments(arc: f64) -> usize {
 /// surface is the same conical quad strip as the full sweep, restricted to the
 /// sector; the caps are centroid fans of the sampled ring, so the mesh is
 /// closed against the side surface.
-fn sweep_ring_mesh_arc(ring: &[[f64; 2]], theta0: f64, arc: f64) -> Result<Vec<Triangle>, Refusal> {
+fn sweep_ring_mesh_arc(
+    ring: &[[f64; 2]],
+    theta0: f64,
+    arc: f64,
+    segments_full: usize,
+) -> Result<Vec<Triangle>, Refusal> {
     if ring.len() < 3 {
         return Err(Refusal::Empty);
     }
@@ -5263,7 +5298,7 @@ fn sweep_ring_mesh_arc(ring: &[[f64; 2]], theta0: f64, arc: f64) -> Result<Vec<T
             return Err(Refusal::Empty);
         }
     }
-    let segments = arc_segments(arc);
+    let segments = arc_segments(arc, segments_full);
     let mut out = Vec::new();
     let closed = ring.iter().chain(ring.iter().take(1));
     let mut previous: Option<[f64; 2]> = None;
@@ -5340,8 +5375,10 @@ fn push_quad(out: &mut Vec<Triangle>, a: [f64; 3], b: [f64; 3], c: [f64; 3], d: 
 /// Writes the tree's triangle soup as a binary STL file at `path`, returning
 /// the triangle count. Binary STL: 80-byte header, u32 triangle count, then
 /// per triangle a normal (zeroed), three vertices as f32 and a u16 attribute.
-pub fn write_tree_stl(root: &TreeNode, path: &str) -> Result<u64, Refusal> {
-    let triangles = tree_mesh(root)?;
+/// `deflection` of `None` keeps the landed fixed-resolution deterministic
+/// mesh (the recorded fingerprint rule) bit-for-bit.
+pub fn write_tree_stl(root: &TreeNode, path: &str, deflection: Option<f64>) -> Result<u64, Refusal> {
+    let triangles = tree_mesh(root, deflection)?;
     if triangles.is_empty() {
         return Err(Refusal::Empty);
     }
@@ -5359,6 +5396,185 @@ pub fn write_tree_stl(root: &TreeNode, path: &str) -> Result<u64, Refusal> {
     }
     std::fs::write(path, bytes).map_err(|_| Refusal::Empty)?;
     Ok(count)
+}
+
+// ---------------------------------------------------------------------------
+// GLB emission (the render artifact: indexed meshes + per-part script colors)
+// ---------------------------------------------------------------------------
+
+/// One per-part mesh collected from the tree: the part's recorded label and
+/// color (client metadata, carried verbatim) plus its placed world triangles.
+struct LeafMesh {
+    label: Option<String>,
+    color: Option<String>,
+    triangles: Vec<Triangle>,
+}
+
+/// Collects every placed part's triangles, label and color, mirroring
+/// [`append_node_mesh`]'s placement transforms but keeping one entry per
+/// part (the GLB node granularity).
+fn collect_node_payloads(
+    node: &TreeNode,
+    deflection: Option<f64>,
+    out: &mut Vec<LeafMesh>,
+) -> Result<(), Refusal> {
+    match node {
+        TreeNode::Part { part } => {
+            let local = solid_mesh(&part.solid, deflection)?;
+            let reflected: Vec<Triangle> = local
+                .iter()
+                .map(|tri| match part.mirror.as_deref() {
+                    Some(axis) => reflect_triangle(*tri, axis),
+                    None => *tri,
+                })
+                .collect();
+            let mut placed = Vec::with_capacity(reflected.len());
+            if let Some(frame) = part.rotation {
+                for tri in reflected {
+                    placed.push(place_triangle_frame(tri, frame, part.x, part.y, part.z));
+                }
+            } else {
+                let rz = part.rz.to_radians();
+                let cos = rz.cos();
+                let sin = rz.sin();
+                for tri in reflected {
+                    placed.push(place_triangle(tri, cos, sin, part.x, part.y, part.z));
+                }
+            }
+            out.push(LeafMesh {
+                label: part.label.clone(),
+                color: part.color.clone(),
+                triangles: placed,
+            });
+            Ok(())
+        }
+        TreeNode::Boolean { boolean } => {
+            dispatch_boolean(boolean)?;
+            collect_node_payloads(&boolean.a, deflection, out)
+        }
+        TreeNode::Fillet { fillet } => collect_node_payloads(&fillet.base, deflection, out),
+        TreeNode::Group { group, .. } => {
+            for child in group {
+                collect_node_payloads(child, deflection, out)?;
+            }
+            Ok(())
+        }
+    }
+}
+
+/// Converts a triangle soup into an indexed mesh: bitwise-identical vertices
+/// share one position record (the glTF indexed form the viewers stream).
+fn triangles_to_glb_mesh(triangles: &[Triangle]) -> GlbMesh {
+    let mut index_map = std::collections::HashMap::<[u32; 3], u32>::new();
+    let mut positions = Vec::with_capacity(triangles.len() * 3);
+    let mut indices = Vec::with_capacity(triangles.len() * 3);
+    for tri in triangles {
+        for vertex in 0..3 {
+            let key = [
+                tri[vertex * 3] as f32,
+                tri[vertex * 3 + 1] as f32,
+                tri[vertex * 3 + 2] as f32,
+            ];
+            let bits = [key[0].to_bits(), key[1].to_bits(), key[2].to_bits()];
+            let next = (positions.len() / 3) as u32;
+            let index = *index_map.entry(bits).or_insert_with(|| {
+                positions.extend_from_slice(&key);
+                next
+            });
+            indices.push(index);
+        }
+    }
+    GlbMesh { positions, indices }
+}
+
+/// Parses the client color record (the door's `_color_record` textual form:
+/// an sRGB hex string, or the JSON of an RGB(A) tuple in 0-1 or 0-255 scale).
+/// Unrecognized records fall back to the neutral steel gray.
+fn parse_client_color(recorded: &str) -> SrgbColor {
+    let channel = |v: f64| -> f32 {
+        let scaled = if v > 1.0 { v / 255.0 } else { v };
+        scaled.clamp(0.0, 1.0) as f32
+    };
+    let text = recorded.trim();
+    if let Some(hex) = text.strip_prefix('#') {
+        if hex.len() == 6 || hex.len() == 8 {
+            if let Ok(value) = u32::from_str_radix(hex, 16) {
+                let (r, g, b, a) = match hex.len() {
+                    6 => ((value >> 16) & 0xff, (value >> 8) & 0xff, value & 0xff, 255),
+                    _ => (
+                        (value >> 24) & 0xff,
+                        (value >> 16) & 0xff,
+                        (value >> 8) & 0xff,
+                        value & 0xff,
+                    ),
+                };
+                return SrgbColor::new(
+                    r as f32 / 255.0,
+                    g as f32 / 255.0,
+                    b as f32 / 255.0,
+                    a as f32 / 255.0,
+                );
+            }
+        }
+        return SrgbColor::new(0.62, 0.65, 0.70, 1.0);
+    }
+    if let Ok(values) = serde_json::from_str::<Vec<f64>>(text) {
+        if values.len() >= 3 {
+            return SrgbColor::new(
+                channel(values[0]),
+                channel(values[1]),
+                channel(values[2]),
+                values.get(3).map(|a| channel(*a)).unwrap_or(1.0),
+            );
+        }
+    }
+    SrgbColor::new(0.62, 0.65, 0.70, 1.0)
+}
+
+/// Writes the tree as a colored indexed GLB at `path`, one node per placed
+/// part, returning `(parts, triangles)`. The certification artifact stays the
+/// STL path; this is the render artifact (colors from the recorded client
+/// metadata, indexed geometry at the requested deflection).
+fn write_tree_glb(
+    root: &TreeNode,
+    path: &str,
+    deflection: Option<f64>,
+) -> Result<(u64, u64), Refusal> {
+    let mut leaves = Vec::new();
+    collect_node_payloads(root, deflection, &mut leaves)?;
+    if leaves.is_empty() {
+        return Err(Refusal::Empty);
+    }
+    let mut payloads = Vec::with_capacity(leaves.len());
+    let mut total_triangles = 0_u64;
+    for (index, leaf) in leaves.iter().enumerate() {
+        if leaf.triangles.is_empty() {
+            continue;
+        }
+        let mesh = triangles_to_glb_mesh(&leaf.triangles);
+        total_triangles += mesh.indices.len() as u64 / 3;
+        let color = leaf
+            .color
+            .as_deref()
+            .map(parse_client_color)
+            .unwrap_or(SrgbColor::new(0.62, 0.65, 0.70, 1.0));
+        let name = leaf
+            .label
+            .clone()
+            .unwrap_or_else(|| format!("part_{index:04}"));
+        payloads.push(GlbNodePayload {
+            name,
+            color,
+            mesh: Some(mesh),
+            parent: None,
+            matrix: [
+                1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0,
+            ],
+        });
+    }
+    let bytes = emit_glb(&payloads)?;
+    std::fs::write(path, bytes).map_err(|_| Refusal::Empty)?;
+    Ok((payloads.len() as u64, total_triangles))
 }
 
 // ---------------------------------------------------------------------------
@@ -8821,20 +9037,57 @@ pub fn bd_facts(py: Python<'_>, tree_json: &str) -> PyResult<String> {
 
 /// The pyo3 export entry: writes the construction tree's STL to `path` and
 /// returns `{"triangles": n, "mesh_ms": f64}`. `mesh_ms` is a diagnostic
-/// column (the wall-clock mesh phase), never a gate.
+/// column (the wall-clock mesh phase), never a gate. `deflection` of `None`
+/// keeps the landed fixed-resolution deterministic mesh bit-for-bit.
 #[pyfunction]
-pub fn bd_stl(py: Python<'_>, tree_json: &str, path: &str) -> PyResult<String> {
+#[pyo3(signature = (tree_json, path, deflection = None))]
+pub fn bd_stl(
+    py: Python<'_>,
+    tree_json: &str,
+    path: &str,
+    deflection: Option<f64>,
+) -> PyResult<String> {
     let tree = parse_tree(tree_json).map_err(|message| parse_error_to_pyerr(py, &message))?;
     let owned_path = path.to_string();
     let mesh_started = std::time::Instant::now();
-    let outcome =
-        crate::gil::with_kernel_gil_released(py, move || write_tree_stl(&tree, &owned_path));
+    let outcome = crate::gil::with_kernel_gil_released(py, move || {
+        write_tree_stl(&tree, &owned_path, deflection)
+    });
     let mesh_ms = mesh_started.elapsed().as_secs_f64() * 1000.0;
     match outcome {
         Ok(triangles) => serde_json::to_string(
             &serde_json::json!({ "triangles": triangles, "mesh_ms": mesh_ms }),
         )
         .map_err(|e| PyRuntimeError::new_err(format!("stl serialization failed: {e}"))),
+        Err(refusal) => Err(refusal_to_pyerr(py, &refusal)),
+    }
+}
+
+/// The pyo3 render-artifact entry: writes the construction tree as a colored
+/// indexed GLB (one node per placed part, material colors from the recorded
+/// client metadata) and returns `{"parts": n, "triangles": n, "mesh_ms": f64}`.
+/// `deflection` of `None` keeps the landed fixed-resolution deterministic
+/// mesh; the certification artifact remains the STL path.
+#[pyfunction]
+#[pyo3(signature = (tree_json, path, deflection = None))]
+pub fn bd_glb(
+    py: Python<'_>,
+    tree_json: &str,
+    path: &str,
+    deflection: Option<f64>,
+) -> PyResult<String> {
+    let tree = parse_tree(tree_json).map_err(|message| parse_error_to_pyerr(py, &message))?;
+    let owned_path = path.to_string();
+    let mesh_started = std::time::Instant::now();
+    let outcome = crate::gil::with_kernel_gil_released(py, move || {
+        write_tree_glb(&tree, &owned_path, deflection)
+    });
+    let mesh_ms = mesh_started.elapsed().as_secs_f64() * 1000.0;
+    match outcome {
+        Ok((parts, triangles)) => serde_json::to_string(
+            &serde_json::json!({ "parts": parts, "triangles": triangles, "mesh_ms": mesh_ms }),
+        )
+        .map_err(|e| PyRuntimeError::new_err(format!("glb serialization failed: {e}"))),
         Err(refusal) => Err(refusal_to_pyerr(py, &refusal)),
     }
 }
@@ -9016,7 +9269,7 @@ mod tests {
         let _ = std::fs::remove_dir_all(&dir);
         std::fs::create_dir_all(&dir).expect("scratch dir must be creatable"); // H-3: test scratch
         let path = dir.join("sphere.stl");
-        let triangles = write_tree_stl(&tree, &path.to_string_lossy()).expect("stl writes");
+        let triangles = write_tree_stl(&tree, &path.to_string_lossy(), None).expect("stl writes");
         assert!(triangles > 0);
         let bytes = std::fs::read(&path).expect("stl reads back"); // H-3: output of our own writer
         assert!(bytes.len() > 84);
@@ -9454,8 +9707,8 @@ mod tests {
         assert!((facts.volume - expected).abs() / expected < 1e-12);
 
         // The mesh is deterministic and uses the fixed tessellation.
-        let first = solid_mesh(&cylinder).expect("circle mesh");
-        let second = solid_mesh(&cylinder).expect("circle mesh again");
+        let first = solid_mesh(&cylinder, None).expect("circle mesh");
+        let second = solid_mesh(&cylinder, None).expect("circle mesh again");
         assert_eq!(first, second);
         assert_eq!(first.len(), 2 * MESH_SEGMENTS + 2 * MESH_SEGMENTS);
     }
@@ -11062,9 +11315,9 @@ print(json.dumps([z_row, loft_row]))
             [base.bbox[1][0], -base.bbox[0][1], base.bbox[1][2]]
         );
         // Orientation flips: the signed mesh volume negates.
-        let base_signed = signed_mesh_volume(&solid_mesh(&member).expect("base mesh"));
+        let base_signed = signed_mesh_volume(&solid_mesh(&member, None).expect("base mesh"));
         let mirror_solid = reflect_solid(&member, "y").expect("control-point reflection");
-        let mirror_signed = signed_mesh_volume(&solid_mesh(&mirror_solid).expect("mirror mesh"));
+        let mirror_signed = signed_mesh_volume(&solid_mesh(&mirror_solid, None).expect("mirror mesh"));
         assert!(base_signed * mirror_signed < 0.0, "orientation must flip");
         assert!(
             (base_signed.abs() - mirror_signed.abs()).abs() <= 1.0e-9 * (1.0 + base_signed.abs())
@@ -11225,7 +11478,7 @@ print(json.dumps([z_row, loft_row]))
 
         // The realized mesh is closed and its signed volume tracks the exact
         // prism value to the sampling floor.
-        let mesh = solid_mesh(&row).expect("the spline-profile prism meshes");
+        let mesh = solid_mesh(&row, None).expect("the spline-profile prism meshes");
         assert!(!mesh.is_empty());
         let signed = signed_mesh_volume(&mesh).abs();
         assert!(

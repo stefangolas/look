@@ -75,5 +75,6 @@ pub fn truck123d(m: &Bound<'_, PyModule>) -> PyResult<()> {
     // exceptions, never a panic.
     m.add_function(wrap_pyfunction!(bd_bridge::bd_facts, m)?)?;
     m.add_function(wrap_pyfunction!(bd_bridge::bd_stl, m)?)?;
+    m.add_function(wrap_pyfunction!(bd_bridge::bd_glb, m)?)?;
     Ok(())
 }
