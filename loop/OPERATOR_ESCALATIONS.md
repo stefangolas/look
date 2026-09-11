@@ -1463,3 +1463,35 @@ CARRIED (unchanged): AUTHOR-CENSUS-NAMES SPEC_GAP rebooking; RG-23/RG-9
 missing packet files; FRAME-REVOLVE F1 non_z_axis pin amendment
 (ttc_lathe_spline.rs:255); duplicate supervisors (19172+27828) + lagging cargoq
 restart guard; slot-4 + slot-7 wt RESULT residue; TOR-C flip-or-pin.
+
+---
+
+[operator 2026-09-11T16:59Z - RDEF-M4 now unblocked but not dispatchable]
+
+UPDATED - RDEF-M4-NUMERIC-TIER: its `needs` are now ALL landed
+(RDEF-M3-WITNESS-TIER is DONE after the owner's 7a08c0c reconciliation), so per
+the mechanical rule it is a BLOCKED->READY candidate. It cannot be flipped
+because the packet fails preflight against the current tree:
+- What: `python loop/gen_packet.py --check loop/packets/RDEF-M4-NUMERIC-TIER.md`
+  -> "MISMATCH A1: grep: vendor/truck/truck-certified/src/tangency/classify.rs:
+  No such file or directory" (H-8 stop condition); `python
+  loop/packet_lint.py loop/packets/RDEF-M4-NUMERIC-TIER.md` -> "FAIL
+  H1_NEW_MODULE" (write_allow creates new vendor .rs files but the packet never
+  states the H-1 `#![deny(clippy::unwrap_used)]` requirement).
+- Why the operator can't: the anchor target file is absent, so this is a
+  packet re-scope (the write set references `tangency/classify.rs`, which the
+  tree does not have) plus a missing house-rule statement - packet SEMANTICS,
+  which the operator may not edit. It is NOT a re-measurable expect-value.
+- Action needed: re-scope RDEF-M4-NUMERIC-TIER against the post-RDEF-M3 tree
+  (fix the write set / anchors to the real module layout, add the H-1
+  statement), then flip BLOCKED->READY. M0's TANGENCY-SYSTEM-FROM-DEFLATED
+  conflict adjudication is already DONE (RDEF-M0-CHECKER-ACCOUNTING), so that
+  part of the note's requirement is satisfied.
+- Start from: `loop/packets/RDEF-M4-NUMERIC-TIER.md` (anchor A1 + Template
+  house rules), then `loop/PACKETS.jsonl` row RDEF-M4-NUMERIC-TIER.
+
+CARRIED (unchanged): RG-23/RG-9 packet preflight (now failing on write-set clash
+with the RUNNING slot-0 bd_bridge.rs, not on missing files); FRAME-REVOLVE F1
+non_z_axis pin amendment (ttc_lathe_spline.rs:255); duplicate supervisors
+(19172+27828) + lagging cargoq restart guard; slot-4 + slot-7 wt RESULT residue;
+TOR-C flip-or-pin; `loop/schedule.py` KeyError 'needs' at schedule.py:45.

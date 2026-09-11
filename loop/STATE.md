@@ -75,6 +75,43 @@ corrected, annex C = ORACLE POLICY CHANGE), then docs/SOLVER_COVERAGE_SPEC.md
 
 ## Where we are
 
+> LATEST GROUND TRUTH [operator 2026-09-11T16:59Z]: 1 RUNNING / 0
+> landed-this-cycle / 0 unblocked / 0 flipped / 0 dispatched. HEAD `df81808`
+> (owner-session commits since the 16:34Z operator note: `7a08c0c` lifts the
+> break for the F1/hypercar send + amends CENSUS-NAMES per 46ff8cc + registers
+> four FHC packets + reconciles RDEF-M2/M3 READY->DONE; `df81808` moves the FHC
+> chain to `needs` keys and clears the stale slot-0 assignment). **THE OWNER
+> BREAK IS LIFTED for this send** - the heartbeat dispatched slot 0 at 12:56
+> local (AUTHOR-CENSUS-NAMES amended), live and progressing (pid 2268, events
+> 0.0 min fresh, opencode 27384/27928; no cargo/rustc between spikes).
+> Slots 1-7 FINISHED/IDLE landed residue (329f6ab/c3df084/e6553db/3c2109b/
+> ee97499/713f205/5cf4811 all re-verified ancestors of HEAD this cycle);
+> slot 4 = LANDED-WITH-FINDINGS; nothing landable. Registry 349 rows = 253 DONE
+> / 85 READY / 10 BLOCKED / 1 SUPERSEDED. **RDEF-M4 is the one row whose needs
+> are now all landed (RDEF-M3 DONE) but it FAILS preflight** - gen_packet
+> --check: A1 stale anchor (`vendor/truck/truck-certified/src/tangency/
+> classify.rs` absent); packet_lint: H1_NEW_MODULE (new vendor .rs without the
+> H-1 statement). NOT flipped (re-scope, not a re-measure) - ESCALATED. The
+> other 9 BLOCKED rows carry deliberate holds/unmet deps. `dispatch_ready
+> --dry-run --max-workers=4`: "slots: 8 (1 running, 7 free); slot-assigned
+> packets: 6; dispatched 0; workers now ~1/4" - RG-23/RG-9 clash with the
+> RUNNING slot-0 `truck123d/src/bd_bridge.rs`; the four FHC packets are serial
+> on CENSUS-NAMES + each other. NO manual dispatch (heartbeat owns it,
+> single-instance rule). Health: heartbeat exactly 1 (27872; 2nd match is this
+> operator's own query line), operator_runner 1 (27876), watchdog 1 (29264),
+> ONE overnight driver (24864), TWO supervisors (19172+27828 carried); cargoq
+> UP (ping ok, queued 0, running false). **DISK 6.2 GiB free (BELOW the 8 GB
+> floor; janitor ensure --need 15 reclaimed ~0.0 - only the live slot-0 target
+> is left, nothing reclaimable without disturbing the worker).** RAM 4.4 GiB
+> free (healthy). No TEMP look-verify-baseline-* leaks. Root worktree carries
+> the live human-session WIP (tracked `loop/cargoq/server.log` + untracked
+> docs/benchmarks) - untouched, reported not actioned. Carried human items
+> unchanged: RG-23/RG-9 packet preflight; FRAME-REVOLVE F1 non_z_axis pin
+> (ttc_lathe_spline.rs:255); duplicate supervisors + lagging cargoq restart
+> guard; slot-4/7 wt RESULT residue; TOR-C flip-or-pin; schedule.py 'needs'
+> crash; RDEF-M4 stale anchor.
+>
+> --- SUPERSEDED 2026-09-11T16:34Z note (kept for history) follows ---
 > LATEST GROUND TRUTH [operator 2026-09-11T16:34Z]: 0 RUNNING / 0
 > landed-this-cycle / 0 unblocked / 0 flipped / 0 dispatched. HEAD `9ba5654`
 > (the 16:13Z operator commit; no new commits since). **OWNER BREAK STILL IN
@@ -7750,3 +7787,20 @@ vehicle/second_stage/cutaway census delta + loft-None trio are
 orchestrator-direct census tasks; RegularPolygon rides CENSUS-NAMES.
 Dispatch is the heartbeat's (no manual dispatch - double-dispatch rule);
 owner-session commit records the lift.
+
+[operator 2026-09-11T16:59Z - volatile refresh. Board now: 1 RUNNING / 0
+landed-this-cycle / 0 flipped / 0 dispatched. Slot 0 RUNNING
+AUTHOR-CENSUS-NAMES (amended per 46ff8cc), pid 2268, events fresh, opencode
+27384+27928; the heartbeat dispatched it at 12:56 local after the owner lifted
+the break (7a08c0c). Slots 1-7 landed residue, all tips ancestors of HEAD
+`df81808`; slot 4 LANDED-WITH-FINDINGS; nothing landable. Registry 349 rows =
+253 DONE / 85 READY / 10 BLOCKED / 1 SUPERSEDED; the only new candidate is
+RDEF-M4 (needs RDEF-M3 DONE) but it fails gen_packet --check (A1 stale anchor:
+missing tangency/classify.rs) and packet_lint H1_NEW_MODULE -> ESCALATED, not
+flipped. dispatch_ready --dry-run: 0 dispatchable (RG-23/RG-9 clash with slot-0
+bd_bridge.rs; four FHC packets serial on CENSUS-NAMES). Health: heartbeat 1
+(27872), operator_runner 1 (27876), watchdog 1 (29264), ONE overnight driver,
+TWO supervisors carried; cargoq UP (queued 0, running false). DISK 6.2 GiB free
+(BELOW 8 GB floor; janitor nothing reclaimable - live slot-0 target only); RAM
+4.4 GiB free. No new escalation except the RDEF-M4 preflight failure. Leaving:
+1 RUNNING; HEAD df81808 + this cycle's STATE/log commit.]

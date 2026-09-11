@@ -5436,3 +5436,58 @@ Leaving: 0 RUNNING; HEAD 9ba5654 (plus the STATE/log edits this cycle); heartbea
 1 (27872); operator_runner 1 (27876); watchdog 1 (29264); ONE overnight driver;
 TWO supervisors (carried); cargoq UP (queued 0); disk 8.99 GiB free; RAM 5.11
 GiB. Board quiet by owner instruction.
+
+---
+
+[operator 2026-09-11T16:59Z]
+
+- Step 1 health sweep: `slot_status.py` -> 1 RUNNING (slot 0 AUTHOR-CENSUS-NAMES,
+  pid 2268, events 0.0 min fresh, opencode 27384+27928) / 7 FINISHED-IDLE.
+  cargoq UP (ping {"ok":true,"queued":0,"running":false}). Heartbeat exactly 1
+  (27872; the 2nd match in the process scan is this operator's own query line).
+  watchdog 1 (29264). operator_runner 1 (27876). ONE overnight driver (24864).
+  TWO supervisors (19172+27828, carried). Disk 6.2 GiB free (BELOW the 8 GB
+  floor; `janitor ensure --need 15` reclaimed ~0.0 - the only reclaimable item
+  is the LIVE slot-0 target, which the process-scan janitor correctly refused).
+  RAM 4.4 GiB free. No TEMP look-verify-baseline-* leaks.
+- Step 2 landing: nothing landable. Slots 1-7 tips
+  (329f6ab/c3df084/e6553db/3c2109b/ee97499/713f205/5cf4811) all re-verified
+  ancestors of HEAD `df81808` this cycle. Slot 1 RESULT status "complete" (not
+  DONE, redundant); slot 3/5/6 DONE + landed; slot 4 LANDED-WITH-FINDINGS (not
+  landable); slot 7 LANDED. Nothing to merge.
+- Step 3 unblock: nothing stuck. Slot 0 RUNNING and progressing (do not
+  disturb); slot 2 IDLE landed residue. No IDLE/DEAD worker >15 min.
+- Step 4 registry hygiene: re-derived by command - 349 rows = 253 DONE / 85
+  READY / 10 BLOCKED / 1 SUPERSEDED. **RDEF-M4-NUMERIC-TIER is the one row whose
+  `needs` are now all landed (RDEF-M3-WITNESS-TIER DONE after the owner
+  reconciliation) but it FAILS preflight**: `gen_packet --check` -> "MISMATCH
+  A1: grep: vendor/truck/truck-certified/src/tangency/classify.rs: No such file
+  or directory"; `packet_lint` -> "FAIL H1_NEW_MODULE". This is a re-scope, not
+  an anchor re-measure (the anchor target file does not exist), so NOT flipped;
+  escalated. The other 9 BLOCKED rows carry deliberate holds (OWNER_BLOCKED /
+  SUPERSEDED / SPEC_GAP / CANCELLED BY OWNER / owner-decision) or unmet deps.
+  No READY-row anchor/lint fix required (dispatch_ready's own preflight flagged
+  no anchor failures - RG-23/RG-9 now fail only on write-set clash).
+- Step 5 dispatch: `dispatch_ready.py --dry-run --max-workers=4` -> "slots: 8
+  (1 running, 7 free); slot-assigned packets: 6; dispatched 0; workers now
+  ~1/4". RG-23/RG-9 clash with the RUNNING slot-0 `truck123d/src/bd_bridge.rs`;
+  FHC-EX-A blocked on AUTHOR-CENSUS-NAMES, and EX-B/TRIM/MIRROR chain behind it.
+  NO manual dispatch - the heartbeat (27872) owns dispatch and just filled slot
+  0; running it manually would risk the documented double-dispatch race.
+- Step 6 STATE: prepended the 16:59Z LATEST GROUND TRUTH block (16:34Z marked
+  SUPERSEDED) + appended the volatile refresh at file end. Traps/history
+  untouched.
+- Step 7: this entry.
+
+Escalations: one updated (RDEF-M4 preflight failure; carried entry already
+existed). Worktree note (reported, not actioned): the root tree carries the live
+human-session WIP - tracked `loop/cargoq/server.log` plus untracked
+docs/benchmarks files - left untouched. Carried human items unchanged: RG-23/
+RG-9 packet preflight; FRAME-REVOLVE F1 non_z_axis pin (ttc_lathe_spline.rs:255);
+duplicate supervisors + lagging cargoq restart guard; slot-4/7 wt RESULT residue;
+TOR-C flip-or-pin; schedule.py 'needs' crash.
+
+Leaving: 1 RUNNING (slot 0 AUTHOR-CENSUS-NAMES, live); HEAD `df81808` (plus the
+STATE/log edits this cycle); heartbeat 1 (27872); operator_runner 1 (27876);
+watchdog 1 (29264); ONE overnight driver; TWO supervisors (carried); cargoq UP
+(queued 0); disk 6.2 GiB free (LOW); RAM 4.4 GiB.
