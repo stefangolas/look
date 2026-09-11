@@ -3928,3 +3928,49 @@ cargoq UP; disk 10.0 GiB free; RAM 3.9 GiB free.
 
 Leaving: 1 RUNNING (+1 zombie); HEAD 7aba476; heartbeat 1 (27872); watchdog 1
 (29264); cargoq UP; disk 10.2 GiB free; RAM 3.6 GiB free.
+
+## 2026-09-11 05:34 UTC (operator)
+
+Board: 0 RUNNING / 0 landed-by-operator / 0 unblocked / 0 flipped. HEAD
+`52ad82b`. slots 1+2 FINISHED DOOR-PARTIAL-ARC-FLIP (the double-dispatch); slot 0
+IDLE residue; slots 3-7 landed residue.
+
+Health sweep (step 1): heartbeat exactly 1 (27872; the broad scan self-matched
+this shell - PID-detail listing confirmed one), operator_runner 1 (27876),
+watchdog 1 (29264), cargoq UP (queued 3, running true = an orphaned slot-2 test
+exe pid 5676). **TWO live overnight drivers** (24864 elder + 11272 younger, both
+children of supervisor 27828; overnight.log doubled every line) - the 05:13Z
+commit subject claimed they were killed but both PIDs were unchanged since 9/10.
+ACTION: killed the younger 11272 (kept elder 24864), the 05:13Z escalation's
+documented recommendation. Disk 8.1 GiB free -> `janitor.py ensure --need 15`
+reclaimed ~8.8 GB -> 15.9 GiB. RAM 4.9 GiB. TWO supervisors (19172 + 27828,
+parent/child, carried).
+
+Actions:
+- Landing (step 2): NOTHING operator-landable. The only unlanded work is the
+  DOOR-PARTIAL-ARC-FLIP double-dispatch: slot 2 committed `f49fdf4` on
+  `packet/DOOR-PARTIAL-ARC-FLIP` (RESULT status `done`), slot 1 finished RESULT
+  status `DONE` with NO commit (divergent uncommitted worktree). `f49fdf4` is
+  NOT an ancestor of HEAD; the driver refuses slot 1 every cycle ("no-op merge
+  REFUSED (skipped-commit class)"). The two implementations differ
+  (`start_angle`/5 tests vs `start_deg`/3 tests). Landing either unilaterally is
+  the wrong-unblock class (double-dispatch adjudication is the orchestrator's) -
+  ESCALATED with the exact state. Slots 3/5/6/7 commits verified ancestors of
+  HEAD (e6553db/ee97499/713f205/5cf4811); slot 4 = F1 LANDED-WITH-FINDINGS.
+- Unblock (step 3): nothing stuck (0 RUNNING; no IDLE/DEAD >15 min holding work;
+  no QUESTION; no 402).
+- Registry (step 4): nothing flipped. RG-23/RG-9 still preflight-fail (no packet
+  file); RDEF-M4 preflight (stale new-file anchor A1 + H1_NEW_MODULE) - carried.
+- Dispatch (step 5): dry-run only (heartbeat live): AUTHOR-CENSUS-NAMES -> slot
+  0 ("dispatched 1"); AUTHOR-WIRE-MIRROR-ARM reported as a DEAD dispatch in slot
+  0; RG-23/RG-9 preflight-fail. No manual dispatch.
+- STATE.md volatile refresh appended ([operator 2026-09-11T05:34Z]).
+
+Escalations: DOOR-PARTIAL-ARC-FLIP double-dispatch adjudication (NEW);
+duplicate-overnight-driver probe fix (NEW, mitigated by the kill this cycle).
+Carried: FRAME-REVOLVE F1 non_z_axis pin; duplicate supervisors + lagging cargoq
+guard; slot-4/7 wt RESULT residue; TOR-C flip-or-pin; heartbeat slot-liveness
+bug; MONO-row schema gap.
+
+Leaving: 0 RUNNING; HEAD 52ad82b; one overnight driver (24864); cargoq UP;
+disk 15.9 GiB free; RAM 4.9 GiB.

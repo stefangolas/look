@@ -1159,3 +1159,51 @@ Judgment-required items appended each operator cycle. Newest at the bottom.
   parent/child - likely one logical supervisor); RDEF-M4-NUMERIC-TIER preflight
   (stale new-file anchor A1 + H1_NEW_MODULE); RG-23/RG-9 READY with no packet
   file.
+
+## 2026-09-11 05:34 UTC (operator cycle) - DOOR-PARTIAL-ARC-FLIP double-dispatch: two divergent implementations, one committed one not; adjudication needed
+
+- What: the slots-1+2 DOOR-PARTIAL-ARC-FLIP double-dispatch (escalated 04:46Z)
+  both FINISHED. Slot 2 committed `f49fdf4` on `packet/DOOR-PARTIAL-ARC-FLIP`
+  (RESULT status `done`; the branch tip) - the run that absorbed the operator's
+  earlier SPEC_GAP amendment. Slot 1 finished with RESULT status `DONE` but NO
+  commit: its worktree holds a DIVERGENT uncommitted implementation
+  (`corpus/ttc/door.py`, `truck123d/src/bd_bridge.rs`,
+  `truck123d/tests/ttc_lathe_spline.rs` modified + untracked
+  `truck123d/tests/door_partial_arc_flip.rs`). `f49fdf4` is NOT an ancestor of
+  integration/kernel-bg; the two runs differ (slot 1 `start_angle`/5 tests vs
+  slot 2 `start_deg`/3 tests; `git -C loop/slots/1/wt diff --stat f49fdf4`
+  shows ~65 door.py / ~508 bd_bridge.rs lines). The overnight driver refuses
+  slot 1 every cycle: `DOOR-PARTIAL-ARC-FLIP FINISHED but branch tip 75f3075 has
+  0 commits ahead of integration - no-op merge REFUSED (skipped-commit class);
+  row NOT landed`.
+- Why the operator can't: choosing which implementation is authoritative is the
+  double-dispatch adjudication the 04:46Z escalation reserved for the
+  orchestrator/human; landing the wrong one is a session-costing wrong unblock.
+  Slot 1's status-DONE/no-commit split is also the codified skipped-commit class
+  (the work must be committed AS DELIVERED, not merged from the branch).
+- Action needed: (1) decide which implementation lands - `f49fdf4` (slot 2,
+  committed) or slot 1's worktree; (2) if slot 1: scoped-verify + commit AS
+  DELIVERED with the orchestrator-amendment subject; (3) PIN the
+  DOOR-PARTIAL-ARC-FLIP row before the next heartbeat recycle or dispatch_ready
+  re-runs it a third time (row still READY, no landed marker).
+- Start from: `git show f49fdf4 --stat`;
+  `git -C loop/slots/1/wt diff --stat f49fdf4`; `loop/overnight.log` tail (the
+  repeated no-op refusal); `grep -n 'DOOR-PARTIAL-ARC-FLIP' loop/PACKETS.jsonl`.
+
+## 2026-09-11 05:34 UTC (operator cycle) - duplicate overnight driver: younger killed this cycle; supervisor liveness probe still needs a human fix
+
+- What: TWO live `overnight.py` drivers (pids 24864 elder 9/10 21:53:58 + 11272
+  younger 9/10 22:30:59, both children of supervisor 27828; `overnight.log`
+  printed every line twice). The 05:13Z operator commit subject said "duplicate
+  overnight drivers + duplicate heartbeat killed", but both driver PIDs were
+  unchanged since 9/10 - the driver kill did not take effect (only the duplicate
+  heartbeat 32664 was killed).
+- Operator action this cycle: killed the younger `11272`, kept the elder `24864`
+  (the 05:13Z escalation's documented recommendation). One driver now; no
+  double-merge race while it holds.
+- Still open (human): the supervisor's driver-liveness probe spawned the
+  duplicate and missed the first (`supervisor.py` ~27-48); it will re-duplicate
+  on the next restart. Fix the probe (probe the process by identity, not a fuzzy
+  command-line match) so only one driver is ever started.
+- Start from: `loop/supervisor.py:27-48`; `loop/supervisor.log` (the two
+  "overnight driver not running - starting" lines at 21:53:58 / 22:30:59).

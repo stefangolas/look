@@ -6044,3 +6044,53 @@ FINISHED landed residue.
 
 Leaving: 1 RUNNING (+1 zombie); HEAD 7aba476; heartbeat 1 (27872); watchdog 1
 (29264); cargoq UP; disk 10.2 GiB free; RAM 3.6 GiB free.]
+
+[operator 2026-09-11T05:34Z - volatile refresh. Board now: 0 RUNNING / 0
+landed-by-operator / 0 unblocked / 0 flipped. HEAD `52ad82b` (the 05:13Z
+operator commit). The DOOR-PARTIAL-ARC-FLIP double-dispatch has RESOLVED into
+two FINISHED runs: slot 2 committed `f49fdf4` on `packet/DOOR-PARTIAL-ARC-FLIP`
+(RESULT status `done`; the branch tip), slot 1 finished with RESULT status
+`DONE` but NO commit (uncommitted divergent worktree: door.py, bd_bridge.rs,
+ttc_lathe_spline.rs + untracked tests/door_partial_arc_flip.rs). `f49fdf4` is
+NOT an ancestor of HEAD; the two implementations DIFFER (slot 1
+`start_angle`/5 tests vs slot 2 `start_deg`/3 tests). The overnight driver
+refuses slot 1 every cycle ("no-op merge REFUSED (skipped-commit class)"). NOT
+operator-landable: the double-dispatch adjudication (which implementation is
+authoritative) is the orchestrator's, and slot 1's status-DONE/no-commit split
+is the skipped-commit class. ESCALATED; PIN the row before the next recycle or
+it re-runs a third time. Slot 0 IDLE residue (branch
+`packet/AUTHOR-CENSUS-NAMES`, PACKET.md stale AUTHOR-WIRE-MIRROR-ARM, no RESULT,
+0 changed); `dispatch_ready --dry-run` wants AUTHOR-CENSUS-NAMES -> slot 0
+("dispatched 1"), and reports AUTHOR-WIRE-MIRROR-ARM as a DEAD dispatch in slot
+0 - the live heartbeat owns both. Slots 3-7 FINISHED landed residue
+(e6553db/3c2109b/ee97499/713f205/5cf4811 all ancestors of HEAD; slot 4 = F1
+LANDED-WITH-FINDINGS, not landable). Registry: nothing flippable; RG-23/RG-9
+still preflight-fail (no packet file) - carried.
+
+- **Health (step 1):** heartbeat exactly 1 (27872), operator_runner 1 (27876),
+  watchdog 1 (29264), cargoq UP (queued 3, running true = an ORPHANED slot-2
+  test exe `truck123d-...exe unanswerable_arc_lathe_refuses_typed`, pid 5676,
+  started 05:13Z; the 40-min cargoq timeout reaps it ~05:53). **Duplicate
+  overnight drivers confirmed** (pids 24864 elder + 11272 younger, both children
+  of supervisor 27828; overnight.log doubled every line). The 05:13Z commit
+  subject's "duplicate overnight drivers ... killed" did NOT take effect (both
+  PIDs unchanged since 9/10) - **this cycle killed the younger 11272, keeping
+  the elder 24864** (the 05:13Z escalation's documented recommendation). One
+  driver now; the supervisor's driver-liveness probe still needs a human fix
+  (it spawned the duplicate and missed the first). TWO supervisors (19172 +
+  27828, parent/child - carried). Disk 8.1 GiB free at scan (above the 8 GB
+  floor, below the 15 GB goal); `janitor.py ensure --need 15` reclaimed ~8.8 GB
+  -> 15.9 GiB (above the goal). RAM 4.9 GiB.
+- **Land (step 2):** nothing operator-landable (see DOOR above).
+- **Unblock (step 3):** nothing stuck (0 RUNNING; no IDLE/DEAD >15 min holding
+  work; no QUESTION; no 402).
+- **Registry (step 4):** nothing flipped. RDEF-M4-NUMERIC-TIER preflight (stale
+  new-file anchor A1 + H1_NEW_MODULE) and RG-23/RG-9 (missing packets) carried.
+- **Dispatch (step 5):** dry-run only (heartbeat live) -> AUTHOR-CENSUS-NAMES ->
+  slot 0, dispatched 1; RG-23/RG-9 preflight-fail.
+- **Escalations (step 7):** DOOR-PARTIAL-ARC-FLIP double-dispatch adjudication;
+  duplicate-driver probe fix.
+
+Leaving: 0 RUNNING; HEAD 52ad82b; heartbeat 1 (27872); operator_runner 1
+(27876); watchdog 1 (29264); ONE overnight driver (24864); TWO supervisors;
+cargoq UP (queued 3, one orphaned test exe); disk 15.9 GiB free; RAM 4.9 GiB.]
