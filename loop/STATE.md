@@ -75,6 +75,45 @@ corrected, annex C = ORACLE POLICY CHANGE), then docs/SOLVER_COVERAGE_SPEC.md
 
 ## Where we are
 
+> LATEST GROUND TRUTH [operator 2026-09-11T14:40Z]: 0 RUNNING / 0
+> landed-this-cycle / 0 unblocked / 0 flipped / 0 dispatched. HEAD `f4b7a5f`
+> (the 14:18Z operator commit; no new commits since). **OWNER BREAK STILL IN
+> FORCE** (95b0bb8, 11:45Z; no break-lift commit exists - the newest end-of-file
+> block is an OWNER-DIRECTED NO-PACKET KERNEL CHANGE, not a resume). The quiet
+> posture is the owner's and not mine to lift - no dispatch, no flips. All 8
+> slots FINISHED/IDLE, no live worker (zero cargo/rustc; opencode = this
+> operator + the human session). Slot 0 AUTHOR-CENSUS-NAMES wt RESULT SPEC_GAP +
+> QUESTION.md (geometry rebooking; NOT landable; tip 46ff8cc not an ancestor of
+> HEAD). Slot 1 AUTHOR-WIRE-MIRROR-ARM wt RESULT "complete" (redundant; row
+> landed 38d3534/d500dcc; tip 329f6ab = ancestor, no work). Slots 3/5/6 DONE,
+> 4 LANDED-WITH-FINDINGS, 7 LANDED, 2 IDLE - all landed residue
+> (c3df084/e6553db/3c2109b/ee97499/713f205/5cf4811 re-verified ancestors of
+> HEAD). Registry re-derived by command: 345 rows = 251 DONE / 83 READY / 10
+> BLOCKED / 1 SUPERSEDED; of the 10 BLOCKED rows only BG-CK-SPLINE-CENSUS and
+> MONO-10 have all needs DONE, and both carry deliberate gates (booking gate 4 /
+> owner-decision) - none mechanically flippable. `dispatch_ready --dry-run
+> --max-workers=4`: "slots: 8 (0 running, 8 free); slot-assigned packets: 6;
+> dispatched 0; workers now ~0/4"; only RG-23/RG-9 flagged (ANCHOR CHECK FAILED,
+> empty packet files = authoring). Health: heartbeat exactly 1 (27872; the
+> 2-count is this operator's own query line), operator_runner 1 (27876),
+> watchdog 1 (29264), ONE overnight driver (24864), TWO supervisors
+> (19172+27828) carried; cargoq UP (ping ok, queued 0, running false).
+> **DISK DROPPED TO 5.2 GiB AT ENTRY** (from 9.3 last cycle, no loop work) -
+> `janitor.py ensure --need 15` reclaimed ~2.0 GB -> 7.0 GiB free, then
+> "reclaimed ~0.0 (STILL SHORT)"; no slot/root `target/` dirs remain and no TEMP
+> look-verify-baseline-* leaks, so the reclaimable pool is exhausted; 7.0 is
+> below the 8 GB floor but harmless while the board is quiet. RAM 2.28 GiB free
+> (LOW - under the 3 GB charter threshold, but no worker resident). Root
+> worktree: tracked modifications to `corpus/ttc/door.py`, `src/cli.rs`,
+> `truck123d/src/bd_bridge.rs`, `loop/cargoq/server.log` - fresh edits, NOT
+> mine; a live human session is active, left untouched (reported, not actioned).
+> No new escalation. Carried human items unchanged: AUTHOR-CENSUS-NAMES SPEC_GAP
+> rebooking; RG-23/RG-9 missing packet files; FRAME-REVOLVE F1 non_z_axis pin
+> (ttc_lathe_spline.rs:255); duplicate supervisors + lagging cargoq restart
+> guard; slot-4/7 wt RESULT residue; TOR-C flip-or-pin; schedule.py 'needs'
+> crash.
+>
+> --- SUPERSEDED 2026-09-11T14:18Z note (kept for history) follows ---
 > LATEST GROUND TRUTH [operator 2026-09-11T14:18Z]: 0 RUNNING / 0
 > landed-this-cycle / 0 unblocked / 0 flipped / 0 dispatched. HEAD `fbe452a`
 > (two owner commits since the 13:33Z operator commit `c679dda`: `ce8f2b9`
@@ -7282,6 +7321,39 @@ rebooking (amend + redispatch after the break); RG-23/RG-9 missing packet
 files; FRAME-REVOLVE F1 non_z_axis pin (ttc_lathe_spline.rs:255); duplicate
 supervisors + lagging cargoq restart guard; slot-4/7 wt RESULT residue; TOR-C
 flip-or-pin; schedule.py 'needs' crash.]
+
+[operator 2026-09-11T14:40Z - volatile refresh. **OWNER BREAK STILL IN FORCE**
+(95b0bb8, 11:45Z; no break-lift commit). Quiet cycle: 0 landed / 0 unblocked / 0
+flipped / 0 dispatched. Board: 0 RUNNING / 0 landed-this-cycle. HEAD `f4b7a5f`
+(the 14:18Z operator commit; no new commits since). All 8 slots FINISHED/IDLE,
+no live worker (0 cargo/rustc; opencode = this operator + human session). Slot 0
+AUTHOR-CENSUS-NAMES wt RESULT SPEC_GAP + QUESTION.md - not landable, carried
+(tip 46ff8cc not an ancestor of HEAD). Slot 1 AUTHOR-WIRE-MIRROR-ARM wt RESULT
+"complete" - redundant (row landed 38d3534/d500dcc; tip 329f6ab ancestor, no
+work). Slots 3/5/6 DONE, 4 LANDED-WITH-FINDINGS, 7 LANDED, 2 IDLE - all landed
+residue (c3df084/e6553db/3c2109b/ee97499/713f205/5cf4811 all re-verified
+ancestors of HEAD by merge-base). Nothing to unblock (no RUNNING worker; slot 2
+IDLE is landed residue). Registry re-derived: 345 rows = 251 DONE / 83 READY /
+10 BLOCKED / 1 SUPERSEDED; only BG-CK-SPLINE-CENSUS and MONO-10 have all needs
+DONE, both deliberate gates (booking gate 4 / owner-decision) - none
+mechanically flippable. `dispatch_ready --dry-run --max-workers=4`: "slots: 8
+(0 running, 8 free); slot-assigned packets: 6; dispatched 0; workers now ~0/4";
+only RG-23/RG-9 flagged ANCHOR CHECK FAILED (empty packet files = authoring).
+NO manual dispatch (owner break + heartbeat owns dispatch). Health: heartbeat
+exactly 1 (27872; the 2-count is this operator's own query line), operator_runner
+1 (27876), watchdog 1 (29264), ONE overnight driver (24864), TWO supervisors
+(19172+27828) carried; cargoq UP (ping ok, queued 0, running false). **DISK 5.2
+GiB at entry -> janitor ensure --need 15 reclaimed ~2.0 GB -> 7.0 GiB (STILL
+SHORT; no slot/root target dirs remain, no TEMP baseline leaks)** - below the
+8 GB floor but harmless while quiet. RAM 2.28 GiB (LOW, no worker resident).
+Root worktree: tracked modifications to corpus/ttc/door.py, src/cli.rs,
+truck123d/src/bd_bridge.rs, loop/cargoq/server.log - fresh human edits, live
+human session active, left untouched (reported, not actioned). No new
+escalation. Carried human items unchanged: AUTHOR-CENSUS-NAMES SPEC_GAP
+rebooking (amend + redispatch after the break); RG-23/RG-9 missing packet files;
+FRAME-REVOLVE F1 non_z_axis pin (ttc_lathe_spline.rs:255); duplicate supervisors
++ lagging cargoq restart guard; slot-4/7 wt RESULT residue; TOR-C flip-or-pin;
+schedule.py 'needs' crash.]
 
 [operator 2026-09-11T12:46Z - volatile refresh. **OWNER BREAK STILL IN FORCE**
 (95b0bb8; no break-lift commit). Quiet cycle: 0 landed / 0 unblocked / 0

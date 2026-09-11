@@ -5097,3 +5097,51 @@ Leaving: 0 RUNNING; HEAD fbe452a (plus the STATE/log edits this cycle);
 heartbeat 1 (27872); operator_runner 1 (27876); watchdog 1 (29264); ONE
 overnight driver (24864); TWO supervisors (carried); cargoq UP (queued 0);
 disk 9.3 GiB free; RAM 2.8 GiB. Board quiet by owner instruction.
+
+[operator 2026-09-11T14:40Z]
+- Step 1 health sweep: slot_status all 8 slots FINISHED/IDLE, no live worker
+  (0 cargo/rustc; opencode = this operator + human session). cargoq ping
+  {ok, queued 0, running false}. Heartbeat exactly 1 (27872; the raw count of 2
+  includes this operator's own query command line), operator_runner 1 (27876),
+  watchdog 1 (29264), ONE overnight driver (24864), TWO supervisors
+  (19172+27828, carried). **Disk 5.2 GB free at entry (DOWN from 9.3 last cycle,
+  no loop work)**; janitor ensure --need 15 reclaimed ~2.0 GB -> 7.0 GB free,
+  then "reclaimed ~0.0 (STILL SHORT)" - no slot/root target dirs remain and no
+  TEMP look-verify-baseline-* leaks, so the reclaimable pool is exhausted. RAM
+  2.28 GB free (LOW, no worker resident).
+- Step 2 landing: HEAD f4b7a5f (the 14:18Z operator commit; no new commits
+  since). Nothing landable: slot 0 SPEC_GAP (carried), slot 1 "complete"
+  redundant, slots 2-7 tips all ancestors of HEAD by merge-base
+  (c3df084/e6553db/3c2109b/ee97499/713f205/5cf4811); only 46ff8cc (slot-0
+  SPEC_GAP) is not. No FINISHED+DONE+unlanded packet.
+- Step 3 unblock: 0 RUNNING; no IDLE/DEAD worker without a RESULT; slot 0
+  QUESTION already escalated (geometry rebooking). Nothing to unblock.
+- Step 4 registry hygiene: 345 rows = 251 DONE / 83 READY / 10 BLOCKED / 1
+  SUPERSEDED (re-derived). Of the 10 BLOCKED rows only BG-CK-SPLINE-CENSUS
+  (needs BG-CK-P0-PREVALENCE DONE; booking gate 4) and MONO-10 (needs MONO-8
+  DONE; owner-decision) have all needs landed, and both carry deliberate gates -
+  none mechanically flippable. RG-23/RG-9 READY with empty packet fields =
+  authoring, not the anchor ritual.
+- Step 5 dispatch: dispatch_ready --dry-run --max-workers=4 -> "slots: 8 (0
+  running, 8 free); slot-assigned packets: 6; dispatched 0; workers now ~0/4";
+  only RG-23/RG-9 flagged ANCHOR CHECK FAILED. NO manual dispatch: owner BREAK
+  still in force (95b0bb8; no break-lift commit) and the heartbeat owns dispatch.
+- Step 6 STATE: prepended the 14:40Z LATEST GROUND TRUTH block (14:18Z marked
+  SUPERSEDED) + appended the 14:40Z machine block.
+- Step 7: this entry.
+
+Escalations: none new. Disk note: free space fell to 5.2 GB with no loop work
+and the janitor cannot recover to the 15 GB goal (exhausted reclaimable pool);
+below the 8 GB floor, harmless while the board is quiet, but a human may want to
+check what the live session built. Worktree note: tracked modifications to
+corpus/ttc/door.py, src/cli.rs, truck123d/src/bd_bridge.rs, loop/cargoq/server.log
+- fresh human edits, live session active, left untouched (reported, not
+actioned). Carried: AUTHOR-CENSUS-NAMES SPEC_GAP rebooking; RG-23/RG-9 missing
+packet files; FRAME-REVOLVE F1 non_z_axis pin (ttc_lathe_spline.rs:255);
+duplicate supervisors + lagging cargoq restart guard; slot-4/7 wt RESULT
+residue; TOR-C flip-or-pin; schedule.py 'needs' crash.
+
+Leaving: 0 RUNNING; HEAD f4b7a5f (plus the STATE/log edits this cycle);
+heartbeat 1 (27872); operator_runner 1 (27876); watchdog 1 (29264); ONE
+overnight driver (24864); TWO supervisors (carried); cargoq UP (queued 0);
+disk 7.0 GiB free; RAM 2.28 GiB. Board quiet by owner instruction.
