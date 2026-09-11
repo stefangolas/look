@@ -75,6 +75,30 @@ corrected, annex C = ORACLE POLICY CHANGE), then docs/SOLVER_COVERAGE_SPEC.md
 
 ## Where we are
 
+> LATEST GROUND TRUTH [operator 2026-09-11T12:00Z]: 0 RUNNING / 0
+> landed-this-cycle / 0 unblocked / 0 flipped / 0 dispatched. HEAD `95b0bb8`
+> (the owner BREAK commit, 11:45Z). **BOARD DELIBERATELY QUIET BY OWNER
+> INSTRUCTION - no dispatch, no flips.** TTC-RECENSUS-F1-R3 is LANDED (merge
+> de6bfc6, AS-DELIVERED c3df084, bookkeeping 9828aa9; ledger row LANDED); slot
+> 2 is now IDLE residue. slot_status: all 8 slots FINISHED/IDLE, no live worker
+> (0 cargo/rustc; the only opencode procs are this operator instance 8948 and
+> the human session 19236). Slot 0 AUTHOR-CENSUS-NAMES wt RESULT SPEC_GAP +
+> QUESTION.md (geometry rebooking - NOT landable, carried); slot 1
+> AUTHOR-WIRE-MIRROR-ARM wt RESULT "complete" (redundant - row landed
+> 38d3534/d500dcc, git=HEAD@329f6ab=base, no work); slots 3-7 landed residue
+> (e6553db/3c2109b/ee97499/713f205/5cf4811 re-verified ancestors of HEAD this
+> cycle; only 46ff8cc, the slot-0 SPEC_GAP tip, is not). Registry: 251 DONE /
+> 83 READY / 10 BLOCKED / 1 SUPERSEDED; the 2 BLOCKED rows with all deps landed
+> both carry deliberate gates (BG-CK-SPLINE-CENSUS booking gate 4; MONO-10
+> owner-decision) - none flippable. `dispatch_ready --dry-run --max-workers=4`:
+> "slots: 8 (0 running, 8 free); slot-assigned packets: 6; dispatched 0; workers
+> now ~0/4"; only RG-23/RG-9 flagged (empty packet = authoring). Health:
+> heartbeat exactly 1 (27872), watchdog 1 (29264), cargoq UP (ping ok, queued 0,
+> running false); disk 12.7 GiB free (above the 8 GB floor, below the 15 GiB
+> goal; janitor status: only slot-2 target 0.7 GB, nothing reclaimable); RAM
+> 5.2 GiB. No new escalation.
+>
+> --- SUPERSEDED 2026-09-11T11:38Z note (kept for history) follows ---
 > LATEST GROUND TRUTH [operator 2026-09-11T11:38Z]: 1 RUNNING / 0
 > landed-this-cycle / 0 unblocked / 0 flipped / 0 dispatched. HEAD `02af2ca`
 > (the 11:16Z operator commit). **QUIET HEALTHY CYCLE WITH ONE LIVE WORKER -
@@ -7023,3 +7047,39 @@ for the orchestrator.]
 
 [BREAK 2026-09-11 ~11:5xZ (owner-directed pause of the packet loop). TTC-RECENSUS-F1-R3 LANDED 9828aa9 (merge de6bfc6, AS-DELIVERED c3df084, bookkeeping 9828aa9): 54 rows = 11 green / 30 typed-refusal / 13 DNF; FH canonical subset closes green; NO F1 row moved; RDEF-M2 DOES NOT FIRE (0 NonTransversalContact/BudgetExhausted). Kernel timing banked in docs/TT_TIMING_RESULTS.md (R3 section): construct 0.07-0.52 ms, mesh 0.8-21.9 ms, wall p50 0.047-0.078 s vs OCC 4.1-5.6 s. Orchestrator-accepted beyond write_allow: staged-six MANIFEST/SKIPS enrollment + 4 OCC diagnostic refs (packet's own 54-row scope required it). A leftover r3_census.py probe had written byte-identical corpus copies into the ROOT tree (cockpit/front_wing/nose refs identical; halo absent) - backed up to TEMP and discarded; the probe class is untrusted-session output in the root tree, watch for it.
 RESUMING ACTIONS (in order, when the break ends): (1) dispatch RDEF-M3 (READY, vendor write set disjoint); (2) amend + redispatch AUTHOR-CENSUS-NAMES (QUESTION parked at 46ff8cc, third facade-vs-executor conflation - Ellipse/RectangleRounded need executor conic carriers); (3) RDEF-M2 stays pinned unless its trigger appears. Nothing is dispatched now by owner instruction - board deliberately quiet.]
+
+[operator 2026-09-11T12:00Z - volatile refresh. **BOARD PARKED QUIET BY OWNER
+INSTRUCTION** (owner commit 95b0bb8, 11:45Z: "loop: break - R3 landed, kernel
+timing banked ..., board parked quiet by owner instruction"). Operator cycled
+conservatively and dispatched NOTHING: 0 landed, 0 unblocked, 0 flipped, 0
+dispatched. Board: 0 RUNNING / 0 landed-this-cycle. HEAD 95b0bb8.
+TTC-RECENSUS-F1-R3 is LANDED (merge de6bfc6, AS-DELIVERED c3df084, bookkeeping
+9828aa9; ledger row LANDED); slot 2 IDLE residue. Slot 0 AUTHOR-CENSUS-NAMES wt
+RESULT SPEC_GAP + QUESTION.md - geometry rebooking, NOT landable, carried. Slot
+1 AUTHOR-WIRE-MIRROR-ARM wt RESULT "complete" - redundant (row landed
+38d3534/d500dcc), git=HEAD@329f6ab=base, no work - not landable. Slots 3-7
+landed residue (e6553db/3c2109b/ee97499/713f205/5cf4811 re-verified ancestors
+of HEAD this cycle; only 46ff8cc, the slot-0 SPEC_GAP tip, is not). Nothing to
+unblock (no RUNNING worker; slot 2's packet already landed so its IDLE is
+residue, not stuck; slot 0 = escalated geometry QUESTION). Registry re-derived:
+251 DONE / 83 READY / 10 BLOCKED / 1 SUPERSEDED; the 2 BLOCKED rows with all
+deps landed (BG-CK-SPLINE-CENSUS booking gate 4; MONO-10 owner-decision) are
+deliberately parked - nothing flipped. `dispatch_ready --dry-run
+--max-workers=4`: "slots: 8 (0 running, 8 free); slot-assigned packets: 6;
+dispatched 0; workers now ~0/4"; only RG-23/RG-9 flagged (empty packet =
+authoring, not the anchor ritual). NO manual dispatch (owner break + heartbeat
+owns dispatch). Health: heartbeat exactly 1 (27872; the second
+`dispatch_heartbeat` match was this operator's own query command line),
+operator_runner exactly 1 (27876), watchdog 1 (29264), ONE overnight driver,
+cargoq UP (ping ok, queued 0, running false); janitor status: 12.7 GB disk /
+5.2 GB RAM free, only slot-2 target 0.7 GB - nothing reclaimable (above the 8
+GB floor, below the 15 GiB goal); two opencode procs = this operator (8948) +
+the human session (19236), NO stray worker; TWO supervisors (19172+27828)
+carried. No new escalation. Carried human items unchanged: AUTHOR-CENSUS-NAMES
+SPEC_GAP rebooking (amend + redispatch after the break); RG-23/RG-9 missing
+packet files; FRAME-REVOLVE F1 non_z_axis pin (ttc_lathe_spline.rs:255);
+duplicate supervisors + lagging cargoq restart guard; slot-4/7 wt RESULT
+residue; TOR-C flip-or-pin; schedule.py 'needs' crash. Worktree note: the root
+tree's only tracked modification is `loop/cargoq/server.log` (left untouched);
+the previously-flagged uncommitted `corpus/ttc/MANIFEST.json` change is no
+longer present (resolved).]
