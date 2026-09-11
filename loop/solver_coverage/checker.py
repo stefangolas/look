@@ -9,6 +9,19 @@ semantic coverage audit.
 
 Pure Python over JSON: no kernel changes, no OCC, no cargo builds.
 
+RDEF-M0-CHECKER-ACCOUNTING adds the accounting fixes of
+docs/RANK_DEFICIENT_CONTACT_SPEC.md section 2 (CHK-1 to CHK-4):
+
+* CHK-1: every state is PROVED / REFUTED / UNDECIDED, with the section-2
+  refutation predicates. The old "missing region" is now the UNDECIDED set;
+  refuted states are reported separately and are never gaps.
+* CHK-2: the three confirmed T_geom constraints are applied; feasible-state
+  counts are reported before (v1) and after (tightened).
+* CHK-3: the old winning region is renamed FAIL-CLOSED coverage; STRICT
+  coverage restricts the winning route to rules with no refusal branch.
+* CHK-4: `regular` is pinned to "regular where nonempty"; the cascade routes
+  regular -> certified_empty are re-audited under that reading.
+
 Usage:
     python loop/solver_coverage/checker.py                 # full audit + demos
     python loop/solver_coverage/checker.py --no-demos      # audit only
@@ -86,26 +99,184 @@ SCOPE_REFUSAL_MARKERS = (
 )
 EXPENSIVE_MARKERS = ("budget", "subdiv", "bisect", "exhaust", "generic")
 
+# --------------------------------------------------------------------------
+# RDEF-M0 decisions (docs/RANK_DEFICIENT_CONTACT_SPEC.md section 2, confirmed
+# by the owner proxy 2026-09-10). Recorded in docs/SOLVER_COVERAGE_SPEC.md.
+# --------------------------------------------------------------------------
+
+#: CHK-4. The second reading. `regular` is regular *where the zero set is
+#: nonempty*; it does not assert nonemptiness. Consequences:
+#:   * `regular` does NOT refute `no_intersection` (the spec's third [ASM] row
+#:     only applies under the first reading);
+#:   * the TANGENCY-CASCADE-REFINE-EMPTY route regular -> certified_empty is
+#:     valid, and so are the other cascade refinements of `regular`.
+REGULAR_SEMANTICS = "regular where nonempty"
+
+#: CHK-2. The three confirmed T_geom constraints. The third collapses
+#: `certified_empty` to one local_dim value; the empty set has no meaningful
+#: local dimension, so the value is a single accounting representative.
+CERT_EMPTY_LOCAL_DIM = "0"
+
+#: CHK-1. The section-2 refutation predicates. A refuted state is a state for
+#: which the goal is provably false; it is neither a proof nor a gap.
+REFUTED_ZERO_SET = {
+    # no_intersection is refuted by any certified nonempty zero set. Under the
+    # pinned CHK-4 reading, `regular` is not certified nonempty, so the only
+    # certified nonempty value is the rank-deficient residual.
+    "no_intersection": {"rank_deficient(residual)"},
+    # local_contact is refuted when there is no zero set at all.
+    "local_contact": {"certified_empty"},
+}
+
+#: RDEF-M0 method step 5. The three v1 conflicts, adjudicated against the
+#: source tree. `keep_fragment` selects the source-faithful row for a
+#: rule_id_content_mismatch; `drop_postconditions` filters adjudicated-wrong
+#: postconditions from a (symbol, variant) pair. Fragments are not edited:
+#: only these recorded adjudications are applied to the merged model.
+ADJUDICATIONS = [
+    {
+        "kind": "rule_id_content_mismatch",
+        "rule_id": "TANGENCY-TSYSTEM-FROM-DEFLATED",
+        "verdict": "fragment B is source-faithful; fragment A over-claims",
+        "keep_fragment": "B",
+        "evidence": "vendor/truck/truck-certified/src/tangency/tsystem.rs:82-96",
+        "rationale": (
+            "TSystem::from_deflated only constructs T = (G1, G2, M1, M2) from a stored "
+            "SquareSystem3 and its Rank2Chart (lines 86-95). It emits neither a construction "
+            "witness nor an exact-implicit predicate, so fragment A's frozen-axis outcomes "
+            "rep.construction_witness=true and rep.exact_implicit=true are unsupported. "
+            "Fragment B models exactly what the source does: the unit-chart rows and the "
+            "KrawczykSystem<4> instantiation, with no frozen-axis claim."
+        ),
+    },
+    {
+        "kind": "postcondition_claim_mismatch",
+        "symbol": "crate::tangency::exclude::exclude_rec",
+        "variant": "ExclusionEvidence::NoRootFiveEq",
+        "verdict": "the minimal claim {relation.zero_set: certified_empty} is source-faithful",
+        "drop_postconditions": [{"axis": "global.knowledge", "value": "local_only(residual)"}],
+        "evidence": "vendor/truck/truck-certified/src/tangency/exclude.rs:166-211",
+        "rationale": (
+            "exclude_rec returns NoRootFiveEq { spend } when a single equation is separated "
+            "from zero (line 176) or when a 4-of-5 square subsystem has no Krawczyk root "
+            "(line 187). Either way it certifies that the five-equation system has no root, "
+            "i.e. relation.zero_set = certified_empty, and it raises no global knowledge. "
+            "The extra global.knowledge = local_only(residual) is the bottom of the knowledge "
+            "order: a no-op restatement, not a disagreeing claim."
+        ),
+    },
+    {
+        "kind": "postcondition_claim_mismatch",
+        "symbol": "formal::span::CurveSpan2",
+        "variant": "CurveSpan2::RationalBezier",
+        "verdict": "the declared-only claim {goal: complete_locus} is source-faithful",
+        "drop_postconditions": [
+            {"axis": "rep.bernstein_chart", "value": "true"},
+            {"axis": "rep.rational_positive_weights", "value": "true"},
+        ],
+        "evidence": "vendor/truck/truck-certified/src/formal/span.rs:119-137",
+        "rationale": (
+            "span.rs declares the RationalBezier(RationalBezierSpan2) variant so the "
+            "contract's variant set is frozen before any code depends on it; its constructor "
+            "and certified operations land in GEN-001B (lines 13-15, 119-122). Being the "
+            "variant does not itself certify rep.bernstein_chart or rep.rational_positive_weights. "
+            "SPAN-FAMILY-INDEPENDENT-CONTRACT over-claims those flags; "
+            "SPAN-RATIONAL-BEZIER-THEORY records the declaration only."
+        ),
+    },
+]
+
+
+def adjudication_for_rule_id(rule_id):
+    for a in ADJUDICATIONS:
+        if a.get("rule_id") == rule_id:
+            return a
+    return None
+
+
+def adjudication_for_claim(symbol, variant):
+    for a in ADJUDICATIONS:
+        if a.get("symbol") == symbol and a.get("variant") == variant:
+            return a
+    return None
+
+
+def apply_rule_adjudications(rule):
+    """Apply the recorded postcondition adjudications to one merged rule."""
+    out = dict(rule)
+    outs = []
+    for o in out.get("outcomes", []):
+        adj = adjudication_for_claim(out["source"]["symbol"], o.get("variant"))
+        drop = adj.get("drop_postconditions") if adj else None
+        if drop:
+            drop_set = {(d["axis"], d["value"]) for d in drop}
+            o = dict(o)
+            o["postconditions"] = [
+                p for p in o.get("postconditions", [])
+                if (p.get("axis"), p.get("value")) not in drop_set
+            ]
+        outs.append(o)
+    out["outcomes"] = outs
+    return out
+
 
 # --------------------------------------------------------------------------
-# 2. T_geom feasibility (spec section 2): the two frozen v1 laws.
+# 2. T_geom feasibility (spec section 2): the frozen v1 laws (CHK-2 adds the
+#    three confirmed constraints; `feasible` is the tightened predicate).
 # --------------------------------------------------------------------------
-def feasible(state) -> bool:
-    """T_geom feasibility of a full concrete state tuple (axis indices).
+def _state_value(state, axis):
+    return VALUES[axis][state[AXIS_INDEX[axis]]]
 
-    * canonical carrier implies exact-implicit (rep.canonical_carrier -> rep.exact_implicit)
+
+def feasible_v1(state) -> bool:
+    """The v1 T_geom feasibility (before CHK-2 tightening).
+
+    * canonical carrier implies exact-implicit
     * rank DF=3 over a 2x2 relation implies local contact dimension 1
-      (src_dims == 2x2 and zero_set == regular -> local_dim == 1)
     """
-    canonical = state[AXIS_INDEX["rep.canonical_carrier"]] == VALUES["rep.canonical_carrier"].index("true")
-    exact = state[AXIS_INDEX["rep.exact_implicit"]] == VALUES["rep.exact_implicit"].index("true")
+    canonical = _state_value(state, "rep.canonical_carrier") == "true"
+    exact = _state_value(state, "rep.exact_implicit") == "true"
     if canonical and not exact:
         return False
-    src = state[AXIS_INDEX["relation.src_dims"]] == VALUES["relation.src_dims"].index("2x2")
-    regular = state[AXIS_INDEX["relation.zero_set"]] == VALUES["relation.zero_set"].index("regular")
-    if src and regular and state[AXIS_INDEX["relation.local_dim"]] != VALUES["relation.local_dim"].index("1"):
+    src = _state_value(state, "relation.src_dims")
+    regular = _state_value(state, "relation.zero_set") == "regular"
+    if src == "2x2" and regular and _state_value(state, "relation.local_dim") != "1":
         return False
     return True
+
+
+def feasible(state) -> bool:
+    """Tightened T_geom feasibility (CHK-2).
+
+    v1 laws plus the three confirmed constraints:
+
+    * `src_dims in {1x1, 2x1} => local_dim <= 1` -- two curves, or a curve and
+      a surface, cannot meet in a 2-dimensional set;
+    * `src_dims in {1x1, 2x1} and zero_set = regular => local_dim = 0` --
+      full-rank contact between curves is isolated points;
+    * `zero_set = certified_empty => local_dim = 0` -- local dimension is
+      meaningless for an empty set, so its four values collapse to one.
+    """
+    if not feasible_v1(state):
+        return False
+    src = _state_value(state, "relation.src_dims")
+    zs = _state_value(state, "relation.zero_set")
+    ld = _state_value(state, "relation.local_dim")
+    if src in ("1x1", "2x1") and ld == "2":
+        return False
+    if src in ("1x1", "2x1") and zs == "regular" and ld != "0":
+        return False
+    if zs == "certified_empty" and ld != CERT_EMPTY_LOCAL_DIM:
+        return False
+    return True
+
+
+def refuted(goal, state) -> bool:
+    """CHK-1 refutation predicate for `goal` on a concrete state."""
+    allowed = REFUTED_ZERO_SET.get(goal)
+    if not allowed:
+        return False
+    return _state_value(state, "relation.zero_set") in allowed
 
 
 # --------------------------------------------------------------------------
@@ -217,9 +388,18 @@ def merge_rules(frags):
         key = (r["rule_id"], r["source"]["symbol"])
         if key in merged:
             duplicate_rows += 1
+            # RDEF-M0 adjudication: when a rule_id content mismatch was
+            # adjudicated in favour of the later extraction, keep that row.
+            adj = adjudication_for_rule_id(r["rule_id"])
+            if adj and adj.get("keep_fragment") == r["_frag"]:
+                merged[key] = r
             continue
         merged[key] = r
-    return list(merged.values()), conflicts, per_fragment, duplicate_rows, len(all_rules)
+
+    # RDEF-M0 adjudication: filter adjudicated-wrong postcondition claims from
+    # the merged model (the fragments themselves are not edited).
+    adjudicated = [apply_rule_adjudications(r) for r in merged.values()]
+    return adjudicated, conflicts, per_fragment, duplicate_rows, len(all_rules)
 
 
 def collect_unmodeled(frags):
@@ -258,7 +438,8 @@ def collect_unmodeled(frags):
 class CompiledRule:
     __slots__ = ("rule_id", "kind", "confidence", "fragment", "symbol", "pre",
                  "goal_pre", "progress", "refusal_only", "scope_refusal",
-                 "expensive", "pre_cube", "abstracted")
+                 "expensive", "pre_cube", "abstracted", "refusals",
+                 "has_refusal_branch", "strict_ok")
 
     def __init__(self, rule):
         self.rule_id = rule["rule_id"]
@@ -266,6 +447,11 @@ class CompiledRule:
         self.confidence = rule.get("confidence", "high")
         self.fragment = rule["_frag"]
         self.symbol = rule["source"]["symbol"]
+        self.refusals = list(rule.get("refusals", []) or [])
+        # CHK-3: a rule is STRICT when its winning route carries no refusal
+        # branch. A refusal branch is a named refusal or an outcome that emits
+        # no concrete postcondition (a fail-closed or silent arm).
+        self.has_refusal_branch = bool(self.refusals)
         self.pre = {}
         self.abstracted = False
         for p in rule.get("preconditions", []):
@@ -294,10 +480,13 @@ class CompiledRule:
             if q:
                 self.progress.append(q)
                 self.refusal_only = False
+            else:
+                self.has_refusal_branch = True
             text = " ".join(str(x) for x in (o.get("variant"),)) + " " + " ".join(rule.get("refusals", []))
             if any(m in text for m in SCOPE_REFUSAL_MARKERS):
                 scope = True
         self.scope_refusal = scope and self.refusal_only
+        self.strict_ok = not self.has_refusal_branch
         comment = rule.get("theorem_comment", "") or ""
         self.expensive = any(m in comment.lower() for m in EXPENSIVE_MARKERS)
 
@@ -525,8 +714,14 @@ def fixpoint(goal, rules, track_witness=True):
 # --------------------------------------------------------------------------
 # 8. Explicit state materialisation and region classification.
 # --------------------------------------------------------------------------
-def enumerate_non_goal_states():
-    """All T_geom-feasible concrete states over the eleven fact axes."""
+def enumerate_non_goal_states(feasible_fn=None):
+    """All T_geom-feasible concrete states over the eleven fact axes.
+
+    `feasible_fn` defaults to the tightened CHK-2 predicate; pass `feasible_v1`
+    for the before-tightening count.
+    """
+    if feasible_fn is None:
+        feasible_fn = feasible
     fact_axes = [i for i in range(N) if i != GOAL_IDX]
     states = []
     for combo in itertools.product(*[VALUES[AXIS_NAMES[i]] for i in fact_axes]):
@@ -535,7 +730,7 @@ def enumerate_non_goal_states():
             state[i] = VALUES[AXIS_NAMES[i]].index(val)
         state[GOAL_IDX] = 0  # placeholder
         st = tuple(state)
-        if feasible(st):
+        if feasible_fn(st):
             states.append(st)
     return states
 
@@ -567,12 +762,15 @@ def materialize_winning(goal, w):
 def region_gap_class(goal, state, applicable):
     """Distinguish the spec's gap classes for one missing state.
 
+    * REFUTED         -- the goal is provably false here (CHK-1); not a gap.
     * OUTSIDE_ENVELOPE -- an intentional scope-refusal rule matches the state.
     * THEORY GAP      -- a goal-target axis is incompatible with the goal and no
                          goal-applicable rule can refine it (the residual parent).
     * VERTICAL GAP    -- rules can progress the target axes but the chain stalls
                          below the requested guarantee.
     """
+    if refuted(goal, state):
+        return "REFUTED"
     targets = goal_targets(goal)
     for rule in applicable:
         if rule.scope_refusal and cube_covers_state(rule.pre_cube, state):
@@ -648,16 +846,31 @@ def region_key(state):
     )
 
 
-def compute_goal(goal, compiled):
+def compute_goal(goal, compiled, strict_compiled=None):
+    """Compute one goal's proof-state accounting.
+
+    * FAIL-CLOSED coverage (CHK-3, renamed): the old winning region. A state is
+      winning when some rule's progress outcomes all lead into W_G; named
+      refusals are allowed on the way.
+    * STRICT coverage (CHK-3): the same fixed point restricted to rules with no
+      refusal branch (`CompiledRule.strict_ok`).
+    * PROVED / REFUTED / UNDECIDED (CHK-1): the winning region, the refuted
+      region, and the rest. Only the last is a gap.
+    """
+    if strict_compiled is None:
+        strict_compiled = [r for r in compiled if r.strict_ok]
     w, witness = fixpoint(goal, compiled)
     winning = materialize_winning(goal, w)
+    w_strict, _ = fixpoint(goal, strict_compiled, track_witness=False)
+    strict_winning = materialize_winning(goal, w_strict)
     g = _v("goal", goal)
     a_g = []
     for st in NON_GOAL_STATES:
         s = list(st)
         s[GOAL_IDX] = g
         a_g.append(tuple(s))
-    missing = [s for s in a_g if s not in winning]
+    refuted_states = [s for s in a_g if s not in winning and refuted(goal, s)]
+    missing = [s for s in a_g if s not in winning and not refuted(goal, s)]
     regions = collections.defaultdict(list)
     for s in a_g:
         regions[region_key(s)].append(s)
@@ -675,17 +888,26 @@ def compute_goal(goal, compiled):
         else:
             route = []
         table.append({"region": key, "status": status, "states": len(states),
-                      "covered": sum(1 for s in states if s in winning), "route": route})
+                      "covered": sum(1 for s in states if s in winning),
+                      "refuted": sum(1 for s in states if s in refuted_states),
+                      "route": route})
     return {
         "goal": goal,
         "A_G": len(a_g),
         "W_G": len(winning),
         "M_G": len(missing),
+        "R_G": len(refuted_states),
+        "U_G": len(missing),
+        "strict_W_G": len(strict_winning),
         "cubes": len(w),
+        "strict_cubes": len(w_strict),
         "winning_cube_set": w,
+        "strict_cube_set": w_strict,
         "regions": table,
         "missing": missing,
+        "refuted": refuted_states,
         "winning": winning,
+        "strict_winning": strict_winning,
         "witness": witness,
     }
 
@@ -714,12 +936,21 @@ def minimal_missing_cubes(missing):
 
 def write_state_json(goal_reports, census):
     payload = {
-        "schema": "solver-coverage-state.v1",
+        "schema": "solver-coverage-state.v2",
+        "rdef_m0": {
+            "regular_semantics": REGULAR_SEMANTICS,
+            "cert_empty_local_dim": CERT_EMPTY_LOCAL_DIM,
+            "refuted_zero_set": {k: sorted(v) for k, v in REFUTED_ZERO_SET.items()},
+            "adjudications": ADJUDICATIONS,
+        },
         "lattice": {
             "axes": {a: VALUES[a] for a in AXIS_NAMES},
             "t_geom": [
                 "rep.canonical_carrier=true => rep.exact_implicit=true",
                 "relation.src_dims=2x2 and relation.zero_set=regular => relation.local_dim=1",
+                "relation.src_dims in {1x1,2x1} => relation.local_dim <= 1",
+                "relation.src_dims in {1x1,2x1} and relation.zero_set=regular => relation.local_dim=0",
+                "relation.zero_set=certified_empty => relation.local_dim=0",
             ],
             "feasible_fact_states": len(NON_GOAL_STATES),
         },
@@ -738,9 +969,13 @@ def write_state_json(goal_reports, census):
             "A_G": rep["A_G"],
             "W_G": rep["W_G"],
             "M_G": rep["M_G"],
+            "R_G": rep["R_G"],
+            "U_G": rep["U_G"],
+            "strict_W_G": rep["strict_W_G"],
             "winning_cubes": len(cube_list),
             "winning_cube_list": cube_list,
             "missing_cells": minimal_missing_cubes(rep["missing"]),
+            "refuted_cells": minimal_missing_cubes(rep["refuted"]),
         }
     with open(STATE_PATH, "w", encoding="utf-8") as fh:
         json.dump(payload, fh, indent=1, ensure_ascii=False)
@@ -750,20 +985,26 @@ def render_goal_md(rep, unmodeled_note):
     lines = []
     lines.append(f"### Goal `{rep['goal']}`\n")
     lines.append(f"- `A_G` (feasible states for this goal): **{rep['A_G']}**")
-    lines.append(f"- `W_G` (AND-OR winning states): **{rep['W_G']}**")
-    lines.append(f"- `M_G = A_G \\ W_G` (missing region): **{rep['M_G']}**")
-    lines.append(f"- winning region described by {rep['cubes']} cubes\n")
+    lines.append(f"- `W_G` (fail-closed winning states, CHK-3): **{rep['W_G']}** "
+                 f"({100.0 * rep['W_G'] / rep['A_G']:.1f}%)")
+    lines.append(f"- `strict_W_G` (strict winning states, no refusal branch): "
+                 f"**{rep['strict_W_G']}** ({100.0 * rep['strict_W_G'] / rep['A_G']:.1f}%)")
+    lines.append(f"- `R_G` (REFUTED, CHK-1): **{rep['R_G']}**")
+    lines.append(f"- `U_G` (UNDECIDED, CHK-1): **{rep['U_G']}**")
+    lines.append(f"- fail-closed winning region described by {rep['cubes']} cubes; "
+                 f"strict by {rep['strict_cubes']} cubes\n")
 
     lines.append("#### Horizontal table (region -> status)\n")
     lines.append("Region = (src_dims, zero_set, local_dim, global.knowledge); incidence and the "
-                 "six rep flags are existentially quantified.\n")
-    lines.append("| src_dims | zero_set | local_dim | knowledge | states | covered | status | route |")
-    lines.append("|---|---|---|---|---:|---:|---|---|")
+                 "six rep flags are existentially quantified. `status` for a non-winning region "
+                 "is REFUTED, OUTSIDE_ENVELOPE, THEORY GAP or VERTICAL GAP.\n")
+    lines.append("| src_dims | zero_set | local_dim | knowledge | states | covered | refuted | status | route |")
+    lines.append("|---|---|---|---|---:|---:|---:|---|---|")
     for row in rep["regions"]:
         k = row["region"]
         route = " -> ".join(row["route"][:6]) if row["route"] else ""
         lines.append(f"| {k[0]} | {k[1]} | {k[2]} | {k[3]} | {row['states']} | "
-                     f"{row['covered']} | {row['status']} | {route} |")
+                     f"{row['covered']} | {row['refuted']} | {row['status']} | {route} |")
     lines.append("")
 
     lines.append("#### Vertical chains (proof-strength reach per route)\n")
@@ -774,13 +1015,13 @@ def render_goal_md(rep, unmodeled_note):
     missing_levels = collections.Counter()
     for s in rep["missing"]:
         missing_levels[VALUES["global.knowledge"][s[AXIS_INDEX["global.knowledge"]]]] += 1
-    lines.append("| proof strength | winning states | missing states |")
+    lines.append("| proof strength | winning states | undecided states |")
     lines.append("|---|---:|---:|")
     for lv in levels:
         lines.append(f"| {lv} | {reached[lv]} | {missing_levels[lv]} |")
     lines.append("")
 
-    lines.append("#### Missing region (concrete semantic cells)\n")
+    lines.append("#### Undecided region (concrete semantic cells, CHK-1)\n")
     cells = minimal_missing_cubes(rep["missing"])
     if not cells:
         lines.append("_none_")
@@ -794,6 +1035,20 @@ def render_goal_md(rep, unmodeled_note):
                          f"{c['global.knowledge']} | {c['state_count']} |")
         if len(cells) > 40:
             lines.append(f"| ... | _({len(cells) - 40} more cells)_ | | | | |")
+    lines.append("")
+
+    lines.append("#### Refuted region (CHK-1)\n")
+    ref_cells = minimal_missing_cubes(rep["refuted"])
+    if not ref_cells:
+        lines.append("_none_")
+    else:
+        lines.append(f"{len(ref_cells)} projected cells; first 20 shown. These are not gaps.\n")
+        lines.append("| src_dims | zero_set | local_dim | incidence | knowledge | states |")
+        lines.append("|---|---|---|---|---|---:|")
+        for c in ref_cells[:20]:
+            lines.append(f"| {c['relation.src_dims']} | {c['relation.zero_set']} | "
+                         f"{c['relation.local_dim']} | {c['relation.incidence']} | "
+                         f"{c['global.knowledge']} | {c['state_count']} |")
     lines.append("")
 
     # Low-confidence and performance flags.
@@ -831,7 +1086,8 @@ def render_goal_md(rep, unmodeled_note):
     return "\n".join(lines)
 
 
-def render_audit(goal_reports, census, conflicts, unmodeled_values, unmodeled_axes, routing):
+def render_audit(goal_reports, census, conflicts, unmodeled_values, unmodeled_axes, routing,
+                 tightening=None):
     L = []
     L.append("# Solver coverage audit (SOLVER-CHECKER)\n")
     L.append("Machine-generated by `loop/solver_coverage/checker.py`. Contract: "
@@ -853,16 +1109,28 @@ def render_audit(goal_reports, census, conflicts, unmodeled_values, unmodeled_ax
     L.append("")
     if conflicts:
         L.append("### Conflicts (reported for orchestrator adjudication, never merged)\n")
+        L.append("The three v1 conflicts are adjudicated against the source tree (RDEF-M0 "
+                 "method step 5); the verdict is appended to each row and applied to the merged "
+                 "model by `ADJUDICATIONS`. The fragments themselves are not edited.\n")
         for c in conflicts:
+            adj = None
+            if c["kind"] == "rule_id_content_mismatch":
+                adj = adjudication_for_rule_id(c.get("rule_id"))
+            elif c["kind"] == "postcondition_claim_mismatch":
+                adj = adjudication_for_claim(c.get("symbol"), c.get("variant"))
+            verdict = ""
+            if adj:
+                verdict = (f" -- **ADJUDICATED**: {adj['verdict']}. Evidence: "
+                           f"`{adj['evidence']}`. {adj['rationale']}")
             L.append(f"- `{c['kind']}`: `{c.get('rule_id') or c.get('symbol')}` "
-                     f"{c.get('variant', '')} -- {c.get('detail', '')}")
+                     f"{c.get('variant', '')} -- {c.get('detail', '')}{verdict}")
         L.append("")
     else:
         L.append("No fragment conflicts were found; overlapping extractions (e.g. A/B on "
                  "`tangency/gates.rs` and `tangency/tsystem.rs`) are complementary rows, not "
                  "disagreeing postcondition claims.\n")
 
-    L.append("## 2. The v1 lattice\n")
+    L.append("## 2. The v1 lattice (tightened by CHK-2)\n")
     L.append("Frozen axes and concrete value domains:\n")
     L.append("| axis | values |")
     L.append("|---|---|")
@@ -871,6 +1139,10 @@ def render_audit(goal_reports, census, conflicts, unmodeled_values, unmodeled_ax
     L.append("")
     L.append("`T_geom` (v1): `rep.canonical_carrier=true => rep.exact_implicit=true`; "
              "`relation.src_dims=2x2 and relation.zero_set=regular => relation.local_dim=1`. "
+             "CHK-2 adds the three confirmed constraints: "
+             "`relation.src_dims in {1x1,2x1} => relation.local_dim <= 1`; "
+             "`relation.src_dims in {1x1,2x1} and relation.zero_set=regular => relation.local_dim=0`; "
+             "`relation.zero_set=certified_empty => relation.local_dim=0`. "
              f"Feasible fact states (eleven fact axes): **{len(NON_GOAL_STATES)}**. "
              "Infeasible cells are excluded from the arithmetic and retained in the vocabulary.\n")
     L.append("Goal predicates (the coarse v1 reading of *postconditions prove G*):\n")
@@ -899,9 +1171,54 @@ def render_audit(goal_reports, census, conflicts, unmodeled_values, unmodeled_ax
              "`W_G`; fail-closed refusal outcomes are recorded but are not coverage "
              "(`Safety closure is never coverage`).\n")
 
+    L.append("## 2b. RDEF-M0 accounting (CHK-1 to CHK-4)\n")
+    L.append(f"**CHK-4 (pinned):** `regular` means *{REGULAR_SEMANTICS}*. A regular zero set "
+             "may be empty, so `regular` does not refute `no_intersection` and the "
+             "`TANGENCY-CASCADE-REFINE-EMPTY` route `regular -> certified_empty` is valid. "
+             "Re-audit of the cascade routes: `TANGENCY-CASCADE-REFINE-EMPTY` "
+             "(`regular -> certified_empty`), `TANGENCY-CASCADE-STAGE3-CRITICAL-VALUE` "
+             "(`regular -> certified_empty`) and `TANGENCY-CASCADE-CLASSIFY-BOX` "
+             "(`regular -> certified_empty` / `rank_deficient`). Every route was already "
+             "accepted by the refinement rule (a rule may transform an axis its own "
+             "precondition names), so **no route changes status** under the pinned reading; "
+             "the pin only stops `regular` from counting as a refutation of "
+             "`no_intersection`.\n")
+    L.append("**CHK-1 (three-way status):** each state is PROVED (fail-closed winning), "
+             "REFUTED (the goal is provably false) or UNDECIDED. Refutation predicates: "
+             "`no_intersection` refuted by `zero_set = rank_deficient(residual)` (a certified "
+             "nonempty zero set); `local_contact` refuted by `zero_set = certified_empty`. "
+             "REFUTED states are not gaps and are removed from the missing region.\n")
+    L.append("**CHK-3 (two coverage metrics):** *fail-closed coverage* is the old winning "
+             "region -- every outcome either proves the goal or refuses with a named tag. "
+             "*Strict coverage* is the winning region computed from rules with no refusal "
+             "branch (`strict_ok`), i.e. the winning route contains no refusal.\n")
+    if tightening:
+        L.append("**CHK-2 (tightening before/after):**\n")
+        L.append("| metric | before (v1 T_geom) | after (tightened) |")
+        L.append("|---|---:|---:|")
+        L.append(f"| feasible fact states | {tightening['before_states']} | "
+                 f"{tightening['after_states']} |")
+        for goal in GOALS:
+            b = tightening["before"][goal]
+            a = tightening["after"][goal]
+            L.append(f"| `{goal}` A_G / W_G / M_G | {b['A_G']} / {b['W_G']} / {b['M_G']} | "
+                     f"{a['A_G']} / {a['W_G']} / {a['M_G']} |")
+        L.append("")
+
     L.append("## 3. Per-goal audit\n")
     for rep in goal_reports:
         L.append(render_goal_md(rep, None))
+
+    L.append("## 3b. Coverage metrics (CHK-3)\n")
+    L.append("| goal | A_G | fail-closed proved | fail-closed % | strict proved | strict % | "
+             "refuted | undecided |")
+    L.append("|---|---:|---:|---:|---:|---:|---:|---:|")
+    for rep in goal_reports:
+        a = rep["A_G"] or 1
+        L.append(f"| `{rep['goal']}` | {rep['A_G']} | {rep['W_G']} | "
+                 f"{100.0 * rep['W_G'] / a:.1f}% | {rep['strict_W_G']} | "
+                 f"{100.0 * rep['strict_W_G'] / a:.1f}% | {rep['R_G']} | {rep['U_G']} |")
+    L.append("")
 
     L.append("## 4. Routing table (W_theory vs W_code)\n")
     L.append(routing["summary"])
@@ -1062,6 +1379,44 @@ def find_gap_rule(compiled, baseline_reports):
     return best
 
 
+def current_branch():
+    """The worktree branch, read from .git (no shelling out). Handles a linked
+    worktree, where `.git` is a file containing `gitdir: <path>`."""
+    try:
+        git_path = ROOT / ".git"
+        if git_path.is_file():
+            text = git_path.read_text(encoding="utf-8").strip()
+            if text.startswith("gitdir:"):
+                git_path = Path(text[len("gitdir:"):].strip())
+        head = (git_path / "HEAD").read_text(encoding="utf-8").strip()
+        if head.startswith("ref: refs/heads/"):
+            return head[len("ref: refs/heads/"):]
+        return head[:12]
+    except OSError:
+        return None
+
+
+def measure_tightening(compiled):
+    """CHK-2: feasible-state counts and per-goal coverage before/after the
+    three confirmed T_geom constraints. Fail-closed only (the tightening
+    question); the three-way split is reported on the tightened lattice."""
+    global NON_GOAL_STATES
+    saved = NON_GOAL_STATES
+    result = {}
+    for label, fn in (("before", feasible_v1), ("after", feasible)):
+        NON_GOAL_STATES = enumerate_non_goal_states(fn)
+        counts = {}
+        for goal in GOALS:
+            w, _ = fixpoint(goal, compiled, track_witness=False)
+            winning = materialize_winning(goal, w)
+            a_g = len(NON_GOAL_STATES)
+            counts[goal] = {"A_G": a_g, "W_G": len(winning), "M_G": a_g - len(winning)}
+        result[label] = counts
+        result[label + "_states"] = len(NON_GOAL_STATES)
+    NON_GOAL_STATES = saved
+    return result
+
+
 def run():
     frags = load_fragments()
     merged, conflicts, per_fragment, duplicate_rows, rows_read = merge_rules(frags)
@@ -1072,12 +1427,16 @@ def run():
 
     print(f"[checker] read {rows_read} rows; merged {len(merged)}; "
           f"{len(conflicts)} conflicts; {census['unmodeled_values']} unmodeled values")
+    tightening = measure_tightening(compiled)
+    print(f"[checker] CHK-2 feasible fact states: before={tightening['before_states']} "
+          f"after={tightening['after_states']}")
     goal_reports = []
     for goal in GOALS:
         rep = compute_goal(goal, compiled)
         goal_reports.append(rep)
-        print(f"[checker] {goal:16s} A_G={rep['A_G']:6d} W_G={rep['W_G']:6d} "
-              f"M_G={rep['M_G']:6d} cubes={rep['cubes']}")
+        print(f"[checker] {goal:16s} A_G={rep['A_G']:6d} fc_W={rep['W_G']:6d} "
+              f"strict_W={rep['strict_W_G']:6d} R={rep['R_G']:6d} U={rep['U_G']:6d} "
+              f"cubes={rep['cubes']}")
 
     routing = compute_routing(compiled, goal_reports, frags)
     write_state_json(goal_reports, {
@@ -1097,7 +1456,7 @@ def run():
 
     routing["deliberate_gap_note"] = (
         "The deliberate-gap run is committed at `docs/SOLVER_COVERAGE_AUDIT.deliberate-gap.md`.")
-    audit = render_audit(goal_reports, census, conflicts, values, axes, routing)
+    audit = render_audit(goal_reports, census, conflicts, values, axes, routing, tightening)
     with open(AUDIT_PATH, "w", encoding="utf-8") as fh:
         fh.write(audit)
     print(f"[checker] wrote {AUDIT_PATH}")
@@ -1165,9 +1524,40 @@ def run():
     print(f"[checker] wrote {GAP_PATH}")
 
     # ---- RESULT.json at the worktree root --------------------------------
+    three_way = {
+        r["goal"]: {"A_G": r["A_G"], "proved": r["W_G"], "refuted": r["R_G"],
+                    "undecided": r["U_G"]}
+        for r in goal_reports
+    }
+    coverage_metrics = {
+        r["goal"]: {
+            "A_G": r["A_G"],
+            "fail_closed_proved": r["W_G"],
+            "fail_closed_pct": round(100.0 * r["W_G"] / (r["A_G"] or 1), 2),
+            "strict_proved": r["strict_W_G"],
+            "strict_pct": round(100.0 * r["strict_W_G"] / (r["A_G"] or 1), 2),
+            "refuted": r["R_G"],
+            "undecided": r["U_G"],
+        }
+        for r in goal_reports
+    }
+    pcm = sum(1 for c in conflicts if c.get("kind") == "postcondition_claim_mismatch")
     result = {
-        "packet": "SOLVER-CHECKER",
+        "id": "RDEF-M0-CHECKER-ACCOUNTING",
+        "packet": "RDEF-M0-CHECKER-ACCOUNTING",
+        "contract": ["RDEF-M0-CHECKER-ACCOUNTING"],
         "status": "DONE",
+        "branch": current_branch(),
+        "anchors": {"A1": pcm, "A1_expected": 2, "A1_holds": pcm == 2},
+        "summary": (
+            "RDEF-M0 checker accounting: CHK-1 three-way PROVED/REFUTED/UNDECIDED with the "
+            "section-2 refutation predicates; CHK-2 tightened T_geom "
+            f"({tightening['before_states']} -> {tightening['after_states']} feasible fact "
+            "states) with before/after counts; CHK-3 renamed fail-closed coverage and added "
+            "strict coverage; CHK-4 pinned `regular` to regular-where-nonempty and re-audited "
+            "the cascade routes (none changed status); the three v1 conflicts adjudicated "
+            "against the source tree and applied to the merged model."
+        ),
         "rule_census": {
             "per_fragment": census["per_fragment"],
             "rows_read": census["rows_read"],
@@ -1179,6 +1569,26 @@ def run():
             "unmodeled_axis_keys": census["unmodeled_axis_keys"],
             "low_confidence": census["low_confidence"],
             "medium_confidence": census["medium_confidence"],
+        },
+        "rdef_m0": {
+            "chk1_three_way": three_way,
+            "chk2_tightening": {
+                "feasible_fact_states_before": tightening["before_states"],
+                "feasible_fact_states_after": tightening["after_states"],
+                "before": tightening["before"],
+                "after": tightening["after"],
+            },
+            "chk3_coverage_metrics": coverage_metrics,
+            "chk4_regular": {
+                "semantics": REGULAR_SEMANTICS,
+                "cascade_routes_reaudited": [
+                    "TANGENCY-CASCADE-REFINE-EMPTY",
+                    "TANGENCY-CASCADE-STAGE3-CRITICAL-VALUE",
+                    "TANGENCY-CASCADE-CLASSIFY-BOX",
+                ],
+                "routes_changed_status": [],
+            },
+            "adjudications": ADJUDICATIONS,
         },
         "lattice": {
             "feasible_fact_states": len(NON_GOAL_STATES),
