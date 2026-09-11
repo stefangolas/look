@@ -6265,3 +6265,50 @@ WIP (M README.md, M loop/cargoq/server.log, untracked benchmarks/ + loop/baselin
 Leaving: 2 RUNNING (slots 0+1, duplicate FHC-EX-B); HEAD `02bab71` + this cycle's
 STATE/log commit; heartbeat 1; operator_runner 1; watchdog 1; cargoq UP; disk 3.48
 GiB; RAM 3.07 GiB.
+
+## [operator 2026-09-11T22:34Z / 18:34 local]
+
+Board: 2 RUNNING (slot 0 FHC-EX-B-SPLINE-LOFT-OPERANDS, LIVE/progressing; slot 1
+the duplicate, HUNG) / 0 landed-this-cycle / 0 unblocked / 0 flipped / 0 dispatched.
+HEAD `be5b698`.
+
+- Health sweep: heartbeat exactly 1 (27872; the extra scan match was this
+  operator's own command line, which embeds the charter text), operator_runner 1
+  (27876), watchdog 1 (29264), overnight driver 1 (24864); TWO supervisors
+  (19172+27828) and TWO cargoq servers (28544+34564) carried; cargoq UP (ping
+  queued 0, running true). DISK 32.4 GB free (RECOVERED from 3.48 GiB; above the
+  8 GB floor and 15 GB goal). RAM ~1.7-2.2 GiB free (LOW; two workers resident).
+- Landable: NONE. Slots 2-7 FINISHED/IDLE landed residue; every tip
+  (c3df084/e6553db/3c2109b/ee97499/713f205/5cf4811) re-verified an ancestor of
+  HEAD by `git merge-base --is-ancestor`; slot RESULT statuses DONE/LANDED/
+  LANDED-WITH-FINDINGS, no unlanded DONE RESULT.
+- Unblock: slot 0 is live and progressing (wrote extraction_breadth_b.rs, running
+  its test via cargoq) - NOT touched. Slot 1 is the duplicate and is now hung on
+  a model-API step (last event step_start 18:12:11 local, ~22 min silent, clean
+  wt, no cargo job queued) - NOT touched (reaping a live worker is outside the
+  charter; carried escalation updated in ESCALATIONS).
+- Registry hygiene: re-derived 348 deduped rows = 252 DONE / 85 READY / 10
+  BLOCKED / 1 SUPERSEDED; none of the 10 BLOCKED rows flippable (deliberate holds
+  or unmet deps). Nothing to flip.
+- Dispatch: did NOT run the real dispatcher (nothing dispatchable; the
+  intermittent dead-dispatch false positive would destroy a live worker; RAM is
+  low). `dispatch_ready --dry-run --max-workers=4` -> "slots: 8 (1 running, 6
+  free); slot-assigned packets: 5; dispatched 0; workers now ~0/4"; only
+  RG-23/RG-9 flagged ANCHOR CHECK FAILED (empty packet files = authoring).
+- STATE: replaced the volatile ground-truth block with a fresh [operator
+  2026-09-11T22:34Z] block (single block, ~45 lines; stable traps untouched).
+- This entry.
+
+Escalations: CARRIED + UPDATED - duplicate FHC-EX-B (slot 0 progressing = keep;
+slot 1 hung on an API step, reap after slot 0 lands). CLEARED - disk blocker
+(32.4 GB). Carried unchanged: RG-23/RG-9 missing packet files; RDEF-M4 re-scope;
+MONO-10 owner R3-mesh decision; FRAME-REVOLVE F1 non_z_axis pin; duplicate
+supervisors + lagging cargoq restart guard; TOR-C flip-or-pin; schedule.py 'needs'
+crash; slot-4/7 wt RESULT residue; CL-005/CL-006 READY-but-landed bookkeeping.
+
+Worktree note (reported, not actioned): root tree carries live human-session WIP
+(M README.md, M loop/cargoq/server.log, untracked benchmarks/ + loop/baselines/).
+
+Leaving: 2 RUNNING (slots 0+1, duplicate FHC-EX-B; slot 0 progressing, slot 1
+hung); HEAD `be5b698` + this cycle's STATE/log/escalation commit; heartbeat 1;
+operator_runner 1; watchdog 1; cargoq UP; disk 32.4 GiB; RAM ~2.2 GiB.

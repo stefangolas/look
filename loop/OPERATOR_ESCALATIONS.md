@@ -1759,3 +1759,27 @@ uncommitted - left for the orchestrator, no dispatch impact.
   non_z_axis pin; duplicate supervisors + lagging cargoq restart guard; TOR-C
   flip-or-pin; schedule.py 'needs' crash; slot-4/7 wt RESULT residue; CL-005/CL-006
   READY-but-landed bookkeeping.
+
+## 2026-09-11 22:34 UTC - CARRIED + UPDATED: duplicate FHC-EX-B (slots 0+1) - slot 0 progressing, slot 1 now HUNG on an API step; disk blocker CLEARED
+
+- Re-derived this cycle: slot 0 is LIVE and progressing (wrote
+  `truck123d/tests/extraction_breadth_b.rs`; cargoq running that test since
+  18:30:13 local; events 2.6 min fresh) - it is the copy to keep. Slot 1 is the
+  redundant duplicate and is now hung on a model-API step, NOT the cargoq queue:
+  its last event is a bare `step_start` at 18:12:11 local with no output for
+  ~22 min, worktree clean, no cargo job queued (cargoq ping queued 0). Both
+  slot-1 processes are alive (cmd 20780 / opencode 31040).
+- Action needed (human/orchestrator): (1) once slot 0 returns a DONE RESULT,
+  land it and reap slot 1's hung processes (20780 cmd, 31040 opencode) to free
+  ~1 GB RAM and the slot - reaping a live worker is outside the operator charter;
+  (2) fix `dispatch_ready`'s dead-dispatch detection to use `slot_status.py`'s
+  process scan, not the branch tip (intermittent false positive); (3) scope/timeout
+  worker self-initiated broad `--lib` runs so one cannot wedge cargoq.
+- CLEARED this cycle: the disk blocker. Disk recovered to 32.4 GB free (was 3.48
+  GiB) - above the 8 GB floor and the 15 GB goal; the FHC chain is no longer
+  disk-stalled. RAM remains LOW at ~1.7-2.2 GiB (two workers resident - do not
+  stack a third).
+- Also carried: RG-23/RG-9 missing packet files; RDEF-M4 re-scope; MONO-10 owner
+  R3-mesh decision; FRAME-REVOLVE F1 non_z_axis pin; duplicate supervisors +
+  lagging cargoq restart guard; TOR-C flip-or-pin; schedule.py 'needs' crash;
+  slot-4/7 wt RESULT residue; CL-005/CL-006 READY-but-landed bookkeeping.

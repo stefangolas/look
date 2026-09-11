@@ -75,51 +75,53 @@ corrected, annex C = ORACLE POLICY CHANGE), then docs/SOLVER_COVERAGE_SPEC.md
 
 ## Where we are
 
-> LATEST GROUND TRUTH [operator 2026-09-11T22:10Z / 18:10 local]: 2 RUNNING /
-> 0 landed-this-cycle / 0 unblocked / 0 flipped / 0 dispatched. HEAD `02bab71`
-> (the 21:45Z operator commit; NO new commits since). **FHC-EX-B-SPLINE-LOFT-OPERANDS
-> is STILL RUNNING IN BOTH slot 0 AND slot 1 — the duplicate dispatch PERSISTS
-> (escalated 21:00Z; carried, no human action).** Both workers are now blocked
-> (STALLED) in the cargoq queue on `cargo test --profile quick -p truck123d --lib
-> swept_admission --locked`: slot 0's run TIMED OUT at 17:38:15 local after the
-> 2400s cargoq limit, and the queue immediately started slot 1's IDENTICAL test
-> (START 17:38:15; hits the 40-min timeout ~18:18 local). Slot 0's `qbuild -p
-> truck123d` is queued behind it. Events 13.5/12.5 min old at 18:09 (bare waits,
-> not dead); both processes alive (slot 0: cmd 10504 / opencode 2384; slot 1: cmd
-> 20780 / opencode 31040). Neither killed nor reset (charter: do not disturb a live
-> worker; the escalation stands).
+> LATEST GROUND TRUTH [operator 2026-09-11T22:34Z / 18:34 local]: 2 RUNNING /
+> 0 landed-this-cycle / 0 unblocked / 0 flipped / 0 dispatched. HEAD `be5b698`
+> (the 22:10Z operator commit; no new commits since). **FHC-EX-B-SPLINE-LOFT-OPERANDS
+> still occupies BOTH slot 0 and slot 1 (the duplicate dispatch persists, escalated
+> 21:00Z, carried).** The picture CHANGED this cycle: the cargoq wedge is over and
+> slot 0 is LIVE and progressing (worker cmd 10504 / opencode 2384; events 2.6 min
+> fresh; wt carries `M truck123d/src/bd_bridge.rs` + new
+> `truck123d/tests/extraction_breadth_b.rs`; cargoq running its
+> `cargo test --profile quick -p truck123d --test extraction_breadth_b` since
+> 18:30:13 local). Slot 1 is the redundant copy and is now HUNG on a model-API step,
+> not on cargoq: both processes alive (cmd 20780 / opencode 31040) but its last
+> event is a bare `step_start` at 18:12:11 local with NO output for ~22 min, wt
+> clean, no cargo job queued (cargoq queued 0). Neither worker touched (slot 0
+> progressing; slot 1 is the escalated duplicate — reaping a live worker is outside
+> the charter; the human/orchestrator call is which branch to keep and whether to
+> kill slot 1's processes 20780/31040).
 > `dispatch_ready --dry-run --max-workers=4`: "slots: 8 (1 running, 6 free);
-> slot-assigned packets: 5; dispatched 0; workers now ~1/4" — NO dead-dispatch
-> false positive this pass; the real dispatcher was NOT run (disk below floor + the
-> intermittent false positive would destroy the live slot-1 worker).
-> Nothing dispatchable: RG-23/RG-9 clash with the running `truck123d/src/bd_bridge.rs`
-> (their packet files remain MISSING = authoring gap, carried); FHC-TRIM ->
-> FHC-MIRROR -> BD-EMIT serial behind FHC-EX-B. Slots 2-7 FINISHED/IDLE landed
-> residue; every tip (c3df084/e6553db/3c2109b/ee97499/713f205/5cf4811) re-verified
-> an ancestor of HEAD by `git merge-base --is-ancestor` — NOTHING landable (slot 2 =
-> TTC-RECENSUS-F1-R3 DONE landed; slot 3 SOLVER-SURVEY-C; slot 4 F1-AUTHORING-ARMS
-> LANDED-WITH-FINDINGS; slot 5 CL-006; slot 6 CL-005; slot 7 FRAME-REVOLVE). Slot 0's
-> SPEC_GAP tip 46ff8cc is NOT an ancestor (not landable, carried).
-> Registry re-derived by command: 350 rows = 254 DONE / 85 READY / 10 BLOCKED / 1
-> SUPERSEDED; 9 of the 10 BLOCKED rows carry a deliberate hold and RDEF-M5 needs
-> RDEF-M4 — none mechanically flippable.
-> Health: heartbeat exactly 1 (27872, `dispatch_heartbeat.ps1`), operator_runner 1
-> (27876), watchdog 1 (29264), overnight driver 1 (24864); TWO supervisors
-> (19172+27828) and TWO cargoq servers (28544+34564) carried; cargoq UP (ping
-> queued 1, running true = the slot-1 swept_admission test). DISK 3.48 GiB free
-> (BELOW the 8 GB floor; `janitor.py status` pool = only the two LIVE slots'
-> targets — slot 0 1.0+0.7 GB, slot 1 1.0+2.0 GB — nothing reclaimable; no root
-> target/, no TEMP look-verify-baseline-* leaks). RAM 3.07 GiB free (at the 3 GB
-> threshold; two workers resident — do not stack). Root worktree carries live
-> human-session WIP (M README.md, M loop/cargoq/server.log, untracked benchmarks/
-> + loop/baselines/) — untouched, reported not actioned.
-> Leaving: 2 RUNNING (slots 0+1, duplicate FHC-EX-B); HEAD `02bab71` + this cycle's
-> STATE/log commit.
+> slot-assigned packets: 5; dispatched 0; workers now ~0/4" — no dead-dispatch
+> false positive this pass; the real dispatcher was NOT run (the intermittent false
+> positive would destroy a live worker, and nothing is dispatchable + RAM is low).
+> Nothing dispatchable: FHC-TRIM -> FHC-MIRROR -> BD-EMIT serial behind FHC-EX-B;
+> RG-23/RG-9 packet files still MISSING (authoring gap, carried). Slots 2-7
+> FINISHED/IDLE landed residue; every tip (c3df084/e6553db/3c2109b/ee97499/713f205/
+> 5cf4811) re-verified an ancestor of HEAD by `git merge-base --is-ancestor` —
+> NOTHING landable (slot 3/5/6 DONE, slot 4 F1-AUTHORING-ARMS LANDED-WITH-FINDINGS,
+> slot 7 FRAME-REVOLVE LANDED, slot 2 TTC-RECENSUS-F1-R3 landed).
+> Registry re-derived by command: 348 deduped rows = 252 DONE / 85 READY / 10
+> BLOCKED / 1 SUPERSEDED; none of the 10 BLOCKED rows is flippable (all carry a
+> deliberate hold or unmet dep — TOR-C/DEF-TESS/DEF-SEEDRAY unmet, the rest
+> OWNER_BLOCKED/cancelled/superseded/gated).
+> Health: heartbeat exactly 1 (27872, `dispatch_heartbeat.ps1`; the extra scan hit
+> was this operator's own command line, which embeds the charter text),
+> operator_runner 1 (27876), watchdog 1 (29264), overnight driver 1 (24864); TWO
+> supervisors (19172+27828) and TWO cargoq servers (28544+34564) carried; cargoq UP
+> (ping queued 0, running true = slot 0's extraction_breadth_b test). **DISK
+> RECOVERED to 32.4 GB free** (janitor: 32.4 GB disk / 2.2 GB RAM; above the 8 GB
+> floor AND the 15 GB goal — the disk stall that blocked FHC-EX-A earlier is
+> cleared; pool = only the two LIVE slots' targets 1.8 GB + 3.0 GB). RAM ~1.7-2.2
+> GiB free (LOW, below the 3 GB threshold; two workers resident — do not stack).
+> Root worktree carries live human-session WIP (M README.md, M loop/cargoq/server.log,
+> untracked benchmarks/ + loop/baselines/) — untouched, reported not actioned.
+> Leaving: 2 RUNNING (slots 0+1, duplicate FHC-EX-B; slot 0 progressing, slot 1
+> hung); HEAD `be5b698` + this cycle's STATE/log/escalation commit.
 >
-> NOTE: this cycle COLLAPSED the accumulated SUPERSEDED ground-truth chain that had
-> grown this section past 1,200 lines (the charter caps the volatile part at ~120).
-> Prior cycles' refreshes were pure volatile snapshots and remain in git history;
-> the stable traps below were left untouched.
+> NOTE: this cycle replaced the prior collapsed block with a fresh one to keep the
+> volatile section at ~1 block (charter cap ~120 lines). Prior cycles' refreshes are
+> in git history; the stable traps below are untouched.
 
 ## Pick up here
 
