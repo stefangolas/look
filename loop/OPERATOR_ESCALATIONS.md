@@ -1265,3 +1265,24 @@ Judgment-required items appended each operator cycle. Newest at the bottom.
 - Start from: `loop/slots/0/wt/QUESTION.md`; `git show 70e6947`;
   `loop/packets/AUTHOR-CENSUS-NAMES.md` (judgement 4); `grep -n 'ProfileEdge'
   truck123d/src/bd_bridge.rs`.
+
+## 2026-09-11 06:47 UTC (operator cycle) - heartbeat-count probe self-matches (the 05:13Z "duplicate heartbeat" was likely the probe's own shell)
+
+- What: the charter step-1 health check "powershell processes matching
+  `dispatch_heartbeat`" self-matches - the scanning command's own command line
+  contains the literal `dispatch_heartbeat`, so every scan also reports the
+  probe shell (and this operator session's wrapper). This cycle the 05:13Z
+  "second heartbeat pid 32664, parent = the operator wrapper" shape reappeared
+  as short-lived powershell children of this session's opencode (8244, 29804,
+  34008 - each gone within seconds); the only durable match is the incumbent
+  27872, whose command line is exactly
+  `-File C:\Users\stefa\look\loop\dispatch_heartbeat.ps1`. The 05:13Z operator
+  killed 32664 believing it a duplicate; if 32664 was the probe shell the kill
+  was harmless, but the duplicate-heartbeat diagnosis is unproven.
+- Why the operator can't: hardening the probe is a code change (out of scope).
+- Action needed: make the heartbeat-count check an exact match on the
+  `-File ...dispatch_heartbeat.ps1` invocation (or exclude the current
+  process/its command-line ancestry) before any kill, and re-audit whether a
+  real second heartbeat ever existed.
+- Start from: `loop/OPERATOR_CHARTER.md` step 1; the health-sweep commands in
+  this and the prior `loop/OPERATOR_LOG.md` entries.

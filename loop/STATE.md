@@ -76,39 +76,42 @@ corrected, annex C = ORACLE POLICY CHANGE), then docs/SOLVER_COVERAGE_SPEC.md
 ## Where we are
 
 > LATEST GROUND TRUTH: read the newest `[operator ...]` block in "State of
-> the machine, as left" (2026-09-11T06:23Z). [operator 2026-09-11T06:23Z
-> ground-truth note: 0 RUNNING / 0 landed-by-operator / 1 SPEC_GAP
-> (AUTHOR-CENSUS-NAMES). HEAD `45166d7`. **AUTHOR-CENSUS-NAMES (slot 0) STOPPED
-> at packet judgement 4 with QUESTION.md (SPEC_GAP, committed `70e6947`, no
-> RESULT, no files edited)**: TIER A `Ellipse`/`RectangleRounded` need new
-> executor conic/arc carriers (`ProfileEdge` = Line/Spline/Circle only) beyond
-> the packet's Cone-SolidSpec write allowance, so its done-criterion is
-> unreachable in-slot. ESCALATED (design adjudication; the packet itself
-> directed the STOP); QUESTION commit preserved at
-> `refs/wip/AUTHOR-CENSUS-NAMES-70e6947-question`. **WARNING: `dispatch_ready`
-> does not treat QUESTION.md as terminal - it reports slot 0 as a DEAD dispatch
-> and WILL reset+delete+redispatch AUTHOR-CENSUS-NAMES every heartbeat cycle,
-> reproducing the same QUESTION until the row is pinned or the packet amended.**
-> Nothing operator-landable: all slot commits are ancestors of HEAD
-> (`f49fdf4`/`4c2554f`/`dd102eb`/`75f3075`/`e6553db`/`3c2109b`/`ee97499`/
-> `713f205`/`5cf4811`); slot 1 = DOOR status-DONE/no-commit divergent worktree
-> (moot since f49fdf4 landed); slot 2 = f49fdf4 driver-landed; slot 4 = F1
-> LANDED-WITH-FINDINGS; slot 7 = redundant FRAME-REVOLVE. Registry: nothing
-> flipped. **TTC-RECENSUS-F1-R3 deps landed + preflight green but its DISPATCH
-> SEQUENCE note requires a quiet board - NOT flipped** (the pending
-> AUTHOR-CENSUS re-dispatch makes the board non-quiet). RDEF-M4 preflight-fail
-> (stale A1 classify.rs + H1_NEW_MODULE) carried; RG-23/RG-9 READY with no
-> packet carried; MONO-10 deps landed but no packet carried. Dispatch: dry-run
-> only (heartbeat live) - "dispatched 0; workers now ~1/4" = REAL idle apart
-> from the pending AUTHOR-CENSUS reset. Health: heartbeat exactly 1 (27872),
+> the machine, as left" (2026-09-11T06:47Z). [operator 2026-09-11T06:47Z
+> ground-truth note: 1 RUNNING / 0 landed-by-operator / 0 unblocked / 0 flipped.
+> HEAD `b0670fd` (the 06:23Z operator STATE commit; no landings since). RUNNING:
+> AUTHOR-WIRE-MIRROR-ARM (slot 0, dispatched 06:25:13Z, re-forked after the
+> AUTHOR-CENSUS-NAMES QUESTION reset; worker opencode 31940 alive, a `cargo test`
+> in flight through cargoq - cargo.exe 34152/19112 + the truck123d test exe;
+> events last written 06:35:32Z on a `step_start` waiting on that tool call, so
+> slot_status's 10-min STALLED is the cargo-wait window, NOT a hang - do not
+> touch). Slots 1-7 FINISHED landed residue (branch tips f49fdf4/e6553db/
+> 3c2109b/ee97499/713f205 all ancestors of HEAD; slot 1 = DOOR status-DONE/
+> no-commit divergent worktree, moot since f49fdf4 landed; slot 4 = F1
+> LANDED-WITH-FINDINGS; slot 7 = redundant FRAME-REVOLVE). Nothing
+> operator-landable. Registry: nothing flipped. **AUTHOR-CENSUS-NAMES is still
+> READY with its SPEC_GAP packet** - the heartbeat reset the QUESTION slot at
+> 06:25:13Z (the question-loop warning held; it dispatched AUTHOR-WIRE-MIRROR-ARM
+> instead because AUTHOR-CENSUS now write-set-clashes on the running door.py) -
+> still needs the row pin/amendment. TTC-RECENSUS-F1-R3 deps landed + preflight
+> green but its DISPATCH SEQUENCE requires a quiet board - NOT flipped. RDEF-M4
+> preflight is an H-8 STALE ANCHOR (A1 greps the missing
+> `vendor/truck/truck-certified/src/tangency/classify.rs`) - re-scope/escalate,
+> NOT a re-measure; RG-23/RG-9 READY with no packet; MONO-10 deps landed but no
+> packet; TOR-C pinned. Dispatch: dry-run only (heartbeat live) - "dispatched 0;
+> workers now ~1/4" = REAL idle. Health: heartbeat exactly 1 (27872),
 > operator_runner 1 (27876), watchdog 1 (29264), ONE overnight driver (24864),
-> cargoq UP (queued 0), TWO supervisors (19172+27828, carried) + TWO
-> cargoq/server.py (28544+34564, carried). Disk 14.5 GiB free (janitor
-> reclaimed ~4.6 GB from 10.4; above the 8 GB floor, below the 15 GB goal); RAM
-> 5.0 GiB free. Open human items: (NEW) AUTHOR-CENSUS-NAMES SPEC_GAP
-> adjudication + row pin (question loop); carried: FRAME-REVOLVE F1 non_z_axis
-> pin; duplicate supervisors + duplicate cargoq guard; slot-4/7 wt RESULT
-> residue; TOR-C flip-or-pin; MONO-10 missing packet; duplicate-driver probe.]
+> cargoq UP (ping 200, queued 0, running true = the slot-0 test), TWO
+> supervisors (19172+27828, carried) + TWO cargoq/server.py (28544+34564,
+> carried). **The 05:13Z "duplicate heartbeat" was a probe self-match artifact**
+> (the health-sweep command line contains the search pattern) - this cycle
+> confirmed exactly one real heartbeat; harden the probe before killing.
+> Disk 11.0 GiB free (janitor reclaimed 0.0 - nothing reclaimable; above the
+> 8 GB floor, below the 15 GB goal); RAM 4.3 GiB free. Open human items:
+> AUTHOR-CENSUS-NAMES SPEC_GAP adjudication + row pin (question loop); carried:
+> FRAME-REVOLVE F1 non_z_axis pin (ttc_lathe_spline.rs:255); duplicate
+> supervisors + duplicate cargoq guard; slot-4/7 wt RESULT residue; TOR-C
+> flip-or-pin; MONO-10 missing packet; RDEF-M4 H-8 stale anchor; duplicate-driver
+> probe fix.]
 
 - **THE FIRST KERNEL-VS-OCC TIMING COMPARISON IS BANKED** (FH-TIMING-REFRESH,
   landed c94d043): turbopump_assembly **0.097 s kernel vs 4.866 s OCC**,
@@ -6173,3 +6176,67 @@ items: (NEW) AUTHOR-CENSUS-NAMES SPEC_GAP adjudication + row pin (question
 loop); carried: FRAME-REVOLVE F1 non_z_axis pin (ttc_lathe_spline.rs:255);
 duplicate supervisors + duplicate cargoq restart guard; slot-4/7 wt RESULT
 residue; TOR-C flip-or-pin; MONO-10 missing packet; duplicate-driver probe fix.]
+
+[operator 2026-09-11T06:47Z - volatile refresh. Board now: 1 RUNNING / 0
+landed-by-operator / 0 unblocked / 0 flipped. HEAD `b0670fd` (the 06:23Z
+operator STATE commit; no landings since). RUNNING: AUTHOR-WIRE-MIRROR-ARM
+(slot 0, dispatched 06:25:13Z by the heartbeat after it reset the
+AUTHOR-CENSUS-NAMES QUESTION slot; worker opencode 31940 alive; a `cargo test`
+is in flight through cargoq - cargo.exe 34152/19112 + the truck123d test exe;
+events last written 06:35:32Z on a `step_start` awaiting that tool call, so
+slot_status's 10-min STALLED is the cargo-wait window, not a hang - do not
+touch). Slots 1-7 FINISHED landed residue (branch tips f49fdf4/e6553db/
+3c2109b/ee97499/713f205 all ancestors of HEAD; slot 1 = DOOR status-DONE/
+no-commit divergent worktree, moot since f49fdf4 landed; slot 4 = F1
+LANDED-WITH-FINDINGS; slot 7 = redundant FRAME-REVOLVE). Nothing
+operator-landable.
+
+- **Health (step 1):** heartbeat exactly 1 (27872), operator_runner 1 (27876),
+  watchdog 1 (29264), ONE overnight driver (24864), cargoq UP (ping 200,
+  queued 0, running true = the slot-0 test). **The 05:13Z "duplicate heartbeat
+  32664" was this probe's own shell self-matching** (the health-sweep command
+  line literally contains `dispatch_heartbeat`): this cycle's scans matched
+  only transient powershell children of this opencode session (8244/29804/
+  34008, each gone within seconds) plus the single incumbent 27872 - confirmed
+  by exact command line (`-File ...dispatch_heartbeat.ps1`). The probe must
+  exclude self/`-match` command lines before any kill. TWO supervisors (19172 +
+  27828) + TWO cargoq/server.py (28544 + 34564) - carried duplication classes,
+  functional. Disk 11.0 GiB free at scan (below the 15 GB goal, above the 8 GB
+  floor); `janitor.py ensure --need 15` reclaimed ~0.0 GB (nothing reclaimable
+  - the live slot-0 target is in use). RAM 4.3 GiB.
+- **Land (step 2):** nothing operator-landable. All FINISHED slot branch tips
+  verified ancestors of HEAD this cycle (`f49fdf4`, `e6553db`, `3c2109b`,
+  `ee97499`, `713f205`); slot 1 = status-DONE/no-commit divergent worktree
+  (moot), slot 4 = LANDED-WITH-FINDINGS, slot 7 = LANDED/no-commit redundant.
+- **Unblock (step 3):** slot 0 is ACTIVE, not stuck - a cargoq test is
+  compiling/running (cargo.exe 34152/19112 + test exe, started 06:35-06:36Z).
+  No IDLE/DEAD >15 min holding work; no QUESTION with an in-packet answer
+  (AUTHOR-CENSUS's SPEC_GAP answer is a design decision); no 402.
+- **Registry (step 4):** nothing flipped. **AUTHOR-CENSUS-NAMES remains READY
+  with the SPEC_GAP packet** - the 06:23Z question-loop warning held: the
+  heartbeat reset the QUESTION slot at 06:25:13Z and dispatched
+  AUTHOR-WIRE-MIRROR-ARM (AUTHOR-CENSUS now write-set-clashes on the running
+  `corpus/ttc/door.py`); it WILL re-dispatch AUTHOR-CENSUS when door.py frees
+  unless the row is pinned or the packet amended. TTC-RECENSUS-F1-R3 deps
+  landed + preflight green but its DISPATCH SEQUENCE note requires a quiet
+  board - NOT flipped. **RDEF-M4 preflight re-checked: H-8 stale anchor A1
+  greps the missing `vendor/truck/truck-certified/src/tangency/classify.rs` -
+  a re-scope, not an anchor re-measure** (carried). RG-23/RG-9 READY with no
+  packet (carried); MONO-10 deps landed but no packet (carried); TOR-C pinned;
+  DEF-SEEDRAY-B human-gated; BG-CK-SPLINE-CENSUS owner-cancelled;
+  BG-AUD-FIX-004 owner-blocked; DEF-TESS-ANALYTIC-SEAM superseded by -R2.
+- **Dispatch (step 5):** dry-run only (heartbeat live) -> "dispatched 0;
+  workers now ~1/4" = REAL idle (AUTHOR-CENSUS write-set clash; RG-23/RG-9
+  anchor-check-fail on the missing packet). No manual dispatch.
+- **STATE (step 6):** refreshed the LATEST GROUND TRUTH note + appended this
+  block.
+- **Escalations (step 7):** AUTHOR-CENSUS-NAMES SPEC_GAP + question-loop
+  (carried); NEW probe-self-match hazard note (duplicate-heartbeat false
+  positive). Carried: FRAME-REVOLVE F1 non_z_axis pin; duplicate supervisors +
+  duplicate cargoq restart guard; slot-4/7 wt RESULT residue; TOR-C
+  flip-or-pin; MONO-10 missing packet; RDEF-M4 H-8 stale anchor;
+  duplicate-driver probe fix.
+
+Leaving: 1 RUNNING; HEAD b0670fd; heartbeat 1 (27872); operator_runner 1
+(27876); watchdog 1 (29264); ONE overnight driver (24864); TWO supervisors;
+cargoq UP (running true); disk 11.0 GiB free; RAM 4.3 GiB.]

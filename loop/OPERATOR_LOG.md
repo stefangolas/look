@@ -4077,3 +4077,66 @@ duplicate-driver probe fix.
 Leaving: 0 RUNNING; HEAD 45166d7; heartbeat 1 (27872); operator_runner 1
 (27876); watchdog 1 (29264); ONE overnight driver (24864); cargoq UP; disk 14.5
 GiB free; RAM 5.0 GiB.
+
+## 2026-09-11 06:47 UTC (operator)
+
+Board: 1 RUNNING / 0 landed-by-operator / 0 unblocked / 0 flipped. HEAD
+`b0670fd` (the 06:23Z operator STATE commit; no landings since).
+
+Health (step 1): heartbeat exactly 1 (27872), operator_runner 1 (27876),
+watchdog 1 (29264), ONE overnight driver (24864), cargoq UP (ping 200,
+queued 0, running true = the slot-0 test). **The 05:13Z "duplicate heartbeat
+32664" was this probe's own shell self-matching** - the health-sweep command
+line contains the literal `dispatch_heartbeat`; this cycle's scans matched only
+transient powershell children of this opencode session (8244/29804/34008, each
+gone in seconds) plus the single incumbent 27872, confirmed by its exact
+command line. TWO supervisors (19172 + 27828) + TWO cargoq/server.py (28544 +
+34564) carried duplication classes, functional. Disk 11.0 GiB free at scan
+(below the 15 GB goal, above the 8 GB floor); `janitor.py ensure --need 15`
+reclaimed ~0.0 GB (nothing reclaimable - the live slot-0 target is in use). RAM
+4.3 GiB.
+
+Actions:
+- Landing (step 2): NOTHING operator-landable. All FINISHED slot branch tips
+  verified ancestors of HEAD (`f49fdf4`, `e6553db`, `3c2109b`, `ee97499`,
+  `713f205`); slot 1 = DOOR status-DONE/no-commit divergent worktree (moot
+  since f49fdf4 landed); slot 4 = F1 LANDED-WITH-FINDINGS; slot 7 =
+  LANDED/no-commit redundant FRAME-REVOLVE.
+- Unblock (step 3): slot 0 is ACTIVE, not stuck. AUTHOR-WIRE-MIRROR-ARM
+  (dispatched 06:25:13Z after the heartbeat reset the AUTHOR-CENSUS-NAMES
+  QUESTION slot) has worker opencode 31940 alive and a `cargo test` in flight
+  through cargoq (cargo.exe 34152/19112 + truck123d test exe, started
+  06:35-06:36Z); events last written 06:35:32Z on a `step_start` awaiting that
+  tool call, so slot_status's 10-min STALLED is the cargo-wait window, not a
+  hang. No IDLE/DEAD >15 min holding work; no QUESTION with an in-packet
+  answer; no 402.
+- Registry (step 4): nothing flipped. **AUTHOR-CENSUS-NAMES remains READY with
+  the SPEC_GAP packet** - the 06:23Z question-loop warning held: the heartbeat
+  reset the QUESTION slot at 06:25:13Z and dispatched AUTHOR-WIRE-MIRROR-ARM
+  (AUTHOR-CENSUS now write-set-clashes on the running `corpus/ttc/door.py`); it
+  WILL re-dispatch AUTHOR-CENSUS when door.py frees unless the row is pinned or
+  the packet amended. TTC-RECENSUS-F1-R3 deps landed + preflight green but its
+  DISPATCH SEQUENCE note requires a quiet board - NOT flipped. **RDEF-M4
+  preflight re-checked: H-8 stale anchor A1 greps the missing
+  `vendor/truck/truck-certified/src/tangency/classify.rs` - a re-scope, not an
+  anchor re-measure** (carried). RG-23/RG-9 READY with no packet (carried);
+  MONO-10 deps landed but no packet (carried); TOR-C pinned; DEF-SEEDRAY-B
+  human-gated; BG-CK-SPLINE-CENSUS owner-cancelled; BG-AUD-FIX-004
+  owner-blocked; DEF-TESS-ANALYTIC-SEAM superseded by -R2.
+- Dispatch (step 5): dry-run only (heartbeat live) -> "dispatched 0; workers
+  now ~1/4" = REAL idle (AUTHOR-CENSUS write-set clash; RG-23/RG-9
+  anchor-check-fail on the missing packet). No manual dispatch.
+- STATE (step 6): refreshed the LATEST GROUND TRUTH note + appended the
+  `[operator 2026-09-11T06:47Z]` block.
+- Report (step 7): this entry.
+
+Escalations: NEW probe-self-match hazard note (heartbeat-count false positive
+-> unproven duplicate-heartbeat diagnosis). Carried: AUTHOR-CENSUS-NAMES
+SPEC_GAP + question loop; FRAME-REVOLVE F1 non_z_axis pin; duplicate
+supervisors + duplicate cargoq restart guard; slot-4/7 wt RESULT residue;
+TOR-C flip-or-pin; MONO-10 missing packet; RDEF-M4 H-8 stale anchor;
+duplicate-driver probe fix.
+
+Leaving: 1 RUNNING; HEAD b0670fd; heartbeat 1 (27872); operator_runner 1
+(27876); watchdog 1 (29264); ONE overnight driver (24864); TWO supervisors;
+cargoq UP (running true); disk 11.0 GiB free; RAM 4.3 GiB.
