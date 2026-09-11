@@ -31,6 +31,18 @@
 //! [`A2BranchCurve`](crate::tangency::shapes::A2BranchCurve) with certified
 //! samples and per-sample frames.
 //!
+//! # Arnold naming (RDEF-M3-WITNESS-TIER; spec CHK-5 note)
+//!
+//! In Arnold's classification `A_k` denotes an ISOLATED singularity: `A1` is
+//! the Morse point and `A2` the cusp. This module's `A2`/`A2Branch` label is
+//! the codebase's historical name for NON-isolated Morse–Bott contact along a
+//! branch — the lattice-v2 `tangent_curve` class. The convention is KEPT (a
+//! rename would ripple through the frozen CTE-000 vocabulary and every caller
+//! of [`ContactVerdict::A2Branch`]); the normative lattice class name is
+//! `tangent_curve`, and this note is the documented mapping. The `A1Isolated`
+//! and `A1Node` arms are genuine Arnold `A1` points (Morse), so the `A1`
+//! spelling is correct for them.
+//!
 //! **Continuation is an adapter, not new algebra** (scope decision 1): the
 //! landed `parallelotope.rs` tracker and the landed
 //! [`KrawczykSystem`](truck_evidence::num::krawczyk::KrawczykSystem) operator

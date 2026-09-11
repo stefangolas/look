@@ -63,7 +63,13 @@
 //! no module-level `allow`.
 
 use crate::contract::Refusal;
+use crate::formal::curve2d::SourceEntityId;
+use crate::tangency::qpoly::QCoeff;
 use crate::tangency::shapes::{Definiteness, SideState};
+use crate::tangency::witness::{
+    quadric_pencil, quadric_pencil_with_provenance, ConstructionWitness, ExactCarrier,
+    ExactContactClass, ExactContactCurve,
+};
 
 /// The exact determinant of the symmetric `2 x 2` matrix `[[2a, b], [b, 2c]]`
 /// (the Hessian of `a·z1² + b·z1·z2 + c·z2²`): `4ac − b²`. Used by the
@@ -620,6 +626,288 @@ impl FixtureKit {
         self.f5.admit()?;
         self.f6.admit()?;
         self.f7.admit()?;
+        Ok(())
+    }
+}
+
+// ---------------------------------------------------------------------------
+// T1-T5 — the RDEF-M3 witness-tier fixtures (spec §10 topology fixtures)
+// ---------------------------------------------------------------------------
+
+/// A small exact-rational integer constructor for the witness fixtures.
+fn qc(n: i128) -> QCoeff {
+    QCoeff::from_int(n)
+}
+
+/// An exact integer 3-vector.
+fn v3(x: i128, y: i128, z: i128) -> [QCoeff; 3] {
+    [qc(x), qc(y), qc(z)]
+}
+
+/// The valid-B-rep record of a witness fixture (spec §9 M3): the exact class
+/// and the lattice local dimension it fixes. A B-rep is valid here iff the
+/// class is a determined lattice child; the fixtures build shared-topology
+/// carriers (one carrier definition per locus), never a sewn or welded pair.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct BrepWitness {
+    /// The exact contact class.
+    pub class: ExactContactClass,
+    /// The lattice local dimension the class fixes.
+    pub local_dim: i32,
+}
+
+impl BrepWitness {
+    /// Build the valid-B-rep record for a class, refusing a class without a
+    /// determined local dimension.
+    pub fn of(class: ExactContactClass) -> Result<Self, Refusal> {
+        match class.local_dim() {
+            Some(local_dim) => Ok(Self { class, local_dim }),
+            None => Err(Refusal::InvalidInput),
+        }
+    }
+}
+
+/// T1 (spec §10): the plane `y = 1` tangent to the unit sphere at `(0, 1, 0)`
+/// — `tangent_point` via W1.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct T1PlaneSphereWitness {
+    /// The tangent plane `y = 1`.
+    pub plane: ExactCarrier,
+    /// The unit sphere about the origin.
+    pub sphere: ExactCarrier,
+}
+
+impl T1PlaneSphereWitness {
+    /// The fixture's exact carrier data, verbatim.
+    pub fn new() -> Self {
+        Self {
+            plane: ExactCarrier::Plane {
+                normal: v3(0, 1, 0),
+                offset: qc(1),
+            },
+            sphere: ExactCarrier::Sphere {
+                center: v3(0, 0, 0),
+                radius_sq: qc(1),
+            },
+        }
+    }
+
+    /// Machine-check the exact class and the valid-B-rep record.
+    pub fn admit(&self) -> Result<BrepWitness, Refusal> {
+        let class = quadric_pencil(&self.plane, &self.sphere).map_err(|_| Refusal::InvalidInput)?;
+        BrepWitness::of(class)
+    }
+}
+
+impl Default for T1PlaneSphereWitness {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// T2 (spec §10): the unit cylinder resting inside the radius-2 cylinder with
+/// its axis offset by one — internal tangency along a line, `tangent_curve`
+/// via W1.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct T2CylinderCylinderWitness {
+    /// The inner unit cylinder, axis `z`.
+    pub inner: ExactCarrier,
+    /// The outer radius-2 cylinder, axis `x = 1`.
+    pub outer: ExactCarrier,
+}
+
+impl T2CylinderCylinderWitness {
+    /// The fixture's exact carrier data, verbatim.
+    pub fn new() -> Self {
+        Self {
+            inner: ExactCarrier::Cylinder {
+                axis_point: v3(0, 0, 0),
+                axis_dir: v3(0, 0, 1),
+                radius_sq: qc(1),
+            },
+            outer: ExactCarrier::Cylinder {
+                axis_point: v3(1, 0, 0),
+                axis_dir: v3(0, 0, 1),
+                radius_sq: qc(4),
+            },
+        }
+    }
+
+    /// Machine-check the exact class and the valid-B-rep record.
+    pub fn admit(&self) -> Result<BrepWitness, Refusal> {
+        let class = quadric_pencil(&self.inner, &self.outer).map_err(|_| Refusal::InvalidInput)?;
+        BrepWitness::of(class)
+    }
+}
+
+impl Default for T2CylinderCylinderWitness {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// T3 (spec §10): two coaxial equal-radius cylinders sharing an importer
+/// `SourceEntityId` — `coincident` via W2.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct T3CoaxialCylinderWitness {
+    /// The first cylinder.
+    pub a: ExactCarrier,
+    /// The second cylinder (the same carrier).
+    pub b: ExactCarrier,
+    /// The shared importer `SourceEntityId`.
+    pub shared: SourceEntityId,
+}
+
+impl T3CoaxialCylinderWitness {
+    /// The fixture's exact carrier data, verbatim.
+    pub fn new() -> Self {
+        let carrier = ExactCarrier::Cylinder {
+            axis_point: v3(0, 0, 0),
+            axis_dir: v3(0, 0, 1),
+            radius_sq: qc(1),
+        };
+        Self {
+            a: carrier.clone(),
+            b: carrier,
+            shared: SourceEntityId(7),
+        }
+    }
+
+    /// Machine-check the exact class and the valid-B-rep record: the shared
+    /// provenance is the W2 witness.
+    pub fn admit(&self) -> Result<BrepWitness, Refusal> {
+        let class =
+            quadric_pencil_with_provenance(&self.a, &self.b, Some((self.shared, self.shared)))
+                .map_err(|_| Refusal::InvalidInput)?;
+        BrepWitness::of(class)
+    }
+}
+
+impl Default for T3CoaxialCylinderWitness {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// T4 (spec §10): a fillet face against its neighbour under a Boolean — the
+/// construction EMITS its exact contact curve (a line on the base plane), so
+/// the class is `tangent_curve` via W3, not a flag.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct T4FilletContactWitness {
+    /// The carrier the construction contact curve lies on.
+    pub carrier: ExactCarrier,
+    /// The exact contact curve emitted by the construction.
+    pub contact: ExactContactCurve,
+}
+
+impl T4FilletContactWitness {
+    /// The fixture's exact carrier and contact-curve data, verbatim.
+    pub fn new() -> Self {
+        Self {
+            carrier: ExactCarrier::Plane {
+                normal: v3(0, 0, 1),
+                offset: qc(0),
+            },
+            contact: ExactContactCurve::Line {
+                point: v3(0, 0, 0),
+                dir: v3(1, 0, 0),
+            },
+        }
+    }
+
+    /// Build the construction witness the fixture's data emits.
+    pub fn witness(&self) -> Result<ConstructionWitness, Refusal> {
+        ConstructionWitness::new(self.carrier.clone(), self.contact.clone())
+            .map_err(|_| Refusal::InvalidInput)
+    }
+
+    /// Machine-check the exact class and the valid-B-rep record.
+    pub fn admit(&self) -> Result<BrepWitness, Refusal> {
+        BrepWitness::of(self.witness()?.class())
+    }
+}
+
+impl Default for T4FilletContactWitness {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// T5 (spec §10): a sphere inscribed in a right circular cone, tangent along a
+/// circle — `tangent_curve` via W1.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct T5SphereConeWitness {
+    /// The inscribed sphere: centre `(0, 0, 2)`, squared radius `2`.
+    pub sphere: ExactCarrier,
+    /// The 45-degree cone: apex `(0, 0, 0)`, axis `+z`, `tan² = 1`.
+    pub cone: ExactCarrier,
+}
+
+impl T5SphereConeWitness {
+    /// The fixture's exact carrier data, verbatim.
+    pub fn new() -> Self {
+        Self {
+            sphere: ExactCarrier::Sphere {
+                center: v3(0, 0, 2),
+                radius_sq: qc(2),
+            },
+            cone: ExactCarrier::Cone {
+                apex: v3(0, 0, 0),
+                axis_dir: v3(0, 0, 1),
+                tan_sq: qc(1),
+            },
+        }
+    }
+
+    /// Machine-check the exact class and the valid-B-rep record.
+    pub fn admit(&self) -> Result<BrepWitness, Refusal> {
+        let class = quadric_pencil(&self.sphere, &self.cone).map_err(|_| Refusal::InvalidInput)?;
+        BrepWitness::of(class)
+    }
+}
+
+impl Default for T5SphereConeWitness {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// The assembled T1-T5 witness fixture kit (RDEF-M3).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct WitnessFixtureKit {
+    /// The T1 plane×sphere fixture.
+    pub t1: T1PlaneSphereWitness,
+    /// The T2 cylinder×cylinder fixture.
+    pub t2: T2CylinderCylinderWitness,
+    /// The T3 shared-provenance coincident fixture.
+    pub t3: T3CoaxialCylinderWitness,
+    /// The T4 fillet construction-witness fixture.
+    pub t4: T4FilletContactWitness,
+    /// The T5 sphere×cone fixture.
+    pub t5: T5SphereConeWitness,
+}
+
+impl WitnessFixtureKit {
+    /// Build the whole kit from ordered constant data and admit every fixture.
+    pub fn build() -> Result<Self, Refusal> {
+        let kit = Self {
+            t1: T1PlaneSphereWitness::new(),
+            t2: T2CylinderCylinderWitness::new(),
+            t3: T3CoaxialCylinderWitness::new(),
+            t4: T4FilletContactWitness::new(),
+            t5: T5SphereConeWitness::new(),
+        };
+        kit.admit_all()?;
+        Ok(kit)
+    }
+
+    /// Admit every fixture of the kit.
+    pub fn admit_all(&self) -> Result<(), Refusal> {
+        self.t1.admit()?;
+        self.t2.admit()?;
+        self.t3.admit()?;
+        self.t4.admit()?;
+        self.t5.admit()?;
         Ok(())
     }
 }
