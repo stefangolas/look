@@ -75,6 +75,35 @@ corrected, annex C = ORACLE POLICY CHANGE), then docs/SOLVER_COVERAGE_SPEC.md
 
 ## Where we are
 
+> LATEST GROUND TRUTH [operator 2026-09-11T10:50Z]: 0 RUNNING / 0
+> landed-this-cycle / 0 unblocked / 0 flipped / 0 dispatched. HEAD `9507272`
+> (the 10:27Z operator commit). **QUIET HEALTHY CYCLE - the board is unchanged
+> from the 10:27Z cycle, re-derived by command.** slot_status: all 8 slots
+> FINISHED/IDLE, no live worker (zero cargo/rustc). Slot 0 AUTHOR-CENSUS-NAMES wt
+> RESULT SPEC_GAP + QUESTION.md (escalated geometry rebooking; NOT landable).
+> Slot 1 wt RESULT status "complete" (redundant AUTHOR-WIRE-MIRROR-ARM duplicate,
+> packet row DONE + landed 19acb3e, no commit - not landable). Slot 2 IDLE
+> (landed `19acb3e`); slots 3-7 landed residue (e6553db/3c2109b/ee97499/713f205/
+> 5cf4811 + 329f6ab all re-verified ancestors of HEAD this cycle; only 46ff8cc,
+> the slot-0 SPEC_GAP tip, is not). Nothing to unblock (0 RUNNING, no live
+> worker). Registry re-derived: BLOCKED rows with all deps landed = 7
+> (BG-CK-SPLINE-CENSUS, DEF-TESS-ANALYTIC-SEAM, DEF-SEEDRAY-B, TOR-C,
+> TTC-RECENSUS-F1-R3, MONO-10-CERTIFIED-BOUNDARY-MESH, RDEF-M4-NUMERIC-TIER) -
+> every one carries a deliberate park/gate note (owner-cancelled / superseded /
+> human-gated / orchestrator-held / quiet-board gate / owner-decision / M0
+> conflict), none mechanically flippable. `dispatch_ready --dry-run
+> --max-workers=4`: "slots: 8 (0 running, 8 free); slot-assigned packets: 6;
+> dispatched 0; workers now ~0/4"; only RG-23/RG-9 flagged (EMPTY packet fields =
+> authoring, not the anchor ritual). `schedule.py` still crashes
+> `KeyError: 'needs'` at schedule.py:45 (escalated 09:41Z; dispatch_ready the
+> authority is unaffected). Health: heartbeat exactly 1 (27872), operator_runner
+> 1 (27876), watchdog 1 (29264), ONE overnight driver (24864); TWO supervisors
+> (19172+27828) + TWO cargoq servers (28544+34564) carried; cargoq UP (ping ok,
+> queued 0, running false); disk 13.07 GiB free (janitor status - nothing
+> reclaimable; above the 8 GB floor, below the 15 GiB goal); RAM 4.01 GiB.
+> No new escalation.
+>
+> --- SUPERSEDED 2026-09-11T10:27Z note (kept for history) follows ---
 > LATEST GROUND TRUTH [operator 2026-09-11T10:27Z]: 0 RUNNING / 0
 > landed-this-cycle / 0 unblocked / 0 flipped / 0 dispatched. HEAD `6a3f76c`
 > (the 10:05Z operator commit). **QUIET HEALTHY CYCLE - the board is unchanged
@@ -2697,6 +2726,30 @@ packets; FRAME-REVOLVE F1 non_z_axis pin (ttc_lathe_spline.rs:255); duplicate
 supervisors + lagging cargoq restart guard; slot-4/7 wt RESULT residue; TOR-C
 flip-or-pin; MONO-10 owner decision; RDEF-M4 H-8 stale anchor; schedule.py
 'needs' KeyError.]
+
+[operator 2026-09-11T10:50Z - volatile refresh. Board now: 0 RUNNING / 0
+landed-this-cycle / 0 unblocked / 0 flipped / 0 dispatched. HEAD 9507272
+(10:27Z operator commit). All 8 slots FINISHED/IDLE, no live worker (0
+cargo/rustc). Slot 0 AUTHOR-CENSUS-NAMES wt RESULT SPEC_GAP + QUESTION.md
+(escalated rebooking; not landable); slot 1 wt RESULT status "complete"
+(redundant AUTHOR-WIRE-MIRROR-ARM duplicate, packet row DONE + landed 19acb3e,
+no commit); slot 2 IDLE (landed 19acb3e); slots 3-7 landed residue (tips
+e6553db/3c2109b/ee97499/713f205/5cf4811 + 329f6ab all re-verified ancestors of
+HEAD; only 46ff8cc, the slot-0 SPEC_GAP tip, is not). Nothing to unblock (0
+RUNNING, no QUESTION). Registry: BLOCKED rows with all deps landed = 7
+(BG-CK-SPLINE-CENSUS/DEF-TESS-ANALYTIC-SEAM/DEF-SEEDRAY-B/TOR-C/
+TTC-RECENSUS-F1-R3/MONO-10-CERTIFIED-BOUNDARY-MESH/RDEF-M4-NUMERIC-TIER), every
+one carrying a deliberate park/gate note - none flippable. dispatch_ready
+--dry-run --max-workers=4 dispatched 0 (only RG-23/RG-9 flagged, empty packet
+fields = authoring). schedule.py KeyError 'needs' carried. Health: heartbeat 1
+(27872), operator runner 1 (27876), watchdog 1 (29264), overnight driver 1
+(24864); TWO supervisors (19172+27828) + TWO cargoq servers (28544+34564)
+carried; cargoq UP (queued 0, running false); disk 13.07 GiB free; RAM 4.01 GiB.
+Carried human items unchanged: AUTHOR-CENSUS-NAMES SPEC_GAP rebooking;
+RG-23/RG-9 missing packets; FRAME-REVOLVE F1 non_z_axis pin
+(ttc_lathe_spline.rs:255); duplicate supervisors + lagging cargoq restart guard;
+slot-4/7 wt RESULT residue; TOR-C flip-or-pin; MONO-10 owner decision; RDEF-M4
+H-8 stale anchor; schedule.py 'needs' KeyError.]
 
 ## The parallelism picture
 
