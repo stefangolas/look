@@ -45,7 +45,9 @@
 use pyo3::exceptions::PyRuntimeError;
 use pyo3::prelude::*;
 use serde::{Deserialize, Serialize};
-use truck_base::evidence::{EnvelopeCase, Refusal};
+use truck_base::evidence::{Budget, EnvelopeCase, Refusal, UnresolvedWitness};
+use truck_certified::construct::patches::{PatchParent, TensorBernsteinPatch};
+use truck_certified::kernel::patch::IBox2;
 
 use crate::facade::{BooleanPairVerdict, CarrierClass, SweptBooleanEvent};
 use crate::marshal::{ExceptionClass, Marshaled, MarshaledPayload};
@@ -412,6 +414,12 @@ pub struct Facts {
     /// is the sum over its *immediate child parts only* (nested groups
     /// contribute nothing); a part's volume is its own.
     pub volume: f64,
+    /// The interval-valued volume fact of the measured top node (MONO-8,
+    /// theory statement section 5): a certified boolean node carries the
+    /// solver's bracket `[V_lo, V_hi]`; a scalar node carries the degenerate
+    /// interval `[V, V]`; a group aggregates interval sums over its immediate
+    /// children. `volume` is this bracket's midpoint.
+    pub volume_bracket: [f64; 2],
     /// The axis-aligned bounding box of every part in the tree, `[min, max]`.
     pub bbox: [[f64; 3]; 2],
     /// The measured seam mismatch of a single-loft tree, when the top node is
@@ -2968,7 +2976,12 @@ pub fn tree_facts(root: &TreeNode) -> Result<Facts, Refusal> {
     if count == 0 || !min[0].is_finite() {
         return Err(Refusal::Empty);
     }
-    let volume = top_volume(root)?;
+    let [volume_lo, volume_hi] = top_volume_bracket(root)?;
+    let volume = if volume_lo == volume_hi {
+        volume_lo
+    } else {
+        0.5 * (volume_lo + volume_hi)
+    };
     let seam_mismatch = top_seam_mismatch(root)?;
     let mut boolean_events = Vec::new();
     collect_boolean_events(root, &mut boolean_events)?;
@@ -2976,6 +2989,7 @@ pub fn tree_facts(root: &TreeNode) -> Result<Facts, Refusal> {
     Ok(Facts {
         solid_count: count,
         volume,
+        volume_bracket: [volume_lo, volume_hi],
         bbox: [min, max],
         seam_mismatch,
         boolean_events,
@@ -3101,28 +3115,429 @@ fn count_and_union(
 /// The measured volume of a top node: a group sums only its immediate child
 /// parts (nested groups contribute nothing, mirroring the OCC `Compound`
 /// measurement the reference was recorded with); a part is its own volume.
+/// The value is the midpoint of [`top_volume_bracket`] (identical to the
+/// scalar measurement whenever the bracket is degenerate).
 fn top_volume(node: &TreeNode) -> Result<f64, Refusal> {
+    let [lo, hi] = top_volume_bracket(node)?;
+    Ok(if lo == hi { lo } else { 0.5 * (lo + hi) })
+}
+
+/// The interval-valued volume fact of a node (MONO-8, theory statement section
+/// 5). A scalar node carries the degenerate interval `[V, V]`; a group
+/// aggregates interval sums over its immediate children (a nested group
+/// contributes nothing, matching the aggregate rule); a certified
+/// `Swept x Swept` boolean carries the solver's bracket.
+fn top_volume_bracket(node: &TreeNode) -> Result<[f64; 2], Refusal> {
     match node {
-        TreeNode::Part { part } => solid_volume(&part.solid),
+        TreeNode::Part { part } => {
+            let volume = solid_volume(&part.solid)?;
+            Ok([volume, volume])
+        }
         TreeNode::Boolean { boolean } => {
-            dispatch_boolean(boolean)?;
-            top_volume(&boolean.a)
+            if swept_swept(boolean)? {
+                match admit_swept_pair(boolean) {
+                    Ok(certificate) => Ok([certificate.bracket_lo, certificate.bracket_hi]),
+                    Err(stage) => Err(swept_refusal_to_refusal(stage)),
+                }
+            } else {
+                dispatch_boolean(boolean)?;
+                top_volume_bracket(&boolean.a)
+            }
         }
         TreeNode::Group { group, .. } => {
-            let mut volume = 0.0;
+            let mut lo = 0.0;
+            let mut hi = 0.0;
             for child in group {
                 match child {
-                    TreeNode::Part { part } => volume += solid_volume(&part.solid)?,
-                    TreeNode::Boolean { boolean } => {
-                        dispatch_boolean(boolean)?;
-                        volume += top_volume(&boolean.a)?;
+                    TreeNode::Part { .. } | TreeNode::Boolean { .. } => {
+                        let [clo, chi] = top_volume_bracket(child)?;
+                        lo += clo;
+                        hi += chi;
                     }
                     TreeNode::Group { .. } => {}
                 }
             }
-            Ok(volume)
+            Ok([lo, hi])
         }
     }
+}
+
+// ---------------------------------------------------------------------------
+// MONO-8-SWEPT-ADMISSION-WIRING -- the extraction adapter and the Swept x
+// Swept gate order.
+//
+// A recorded `cut(loft, loft)` / `fuse` pair is admitted into the certified
+// solver through the fixed gate order of the theory statement section 3:
+//
+//   1. extraction (`extract_patches`): the landed kernel construction of each
+//      operand's solid carrier is decomposed into its tensor-Bernstein patch
+//      2-cycle, with the placement applied to the control points and the
+//      orientation sign `sigma_i = sign(det M_tau) * sigma_i^0` (a reflective
+//      placement flips every sign);
+//   2. transversality (the landed MONO-6 `certify_boolean_volume` admission,
+//      the executor twin of the FSSI-001 gate): a tangential/coincident pair
+//      refuses `NonTransversalContact`;
+//   3. the solver: the certified bracket `[V_lo, V_hi]` becomes the boolean
+//      node's interval-valued volume fact.
+//
+// Each failure refuses typed NAMING the stage (`ExtractionUnavailable` /
+// `NonTransversalContact` / `BudgetExhausted`); the three are never collapsed
+// internally. The frozen `truck_base::evidence::EnvelopeCase` vocabulary has no
+// distinct cases for the first two, so the boundary marshaling maps
+// `ExtractionUnavailable` onto the landed `NonCanonicalCarrier` and
+// `NonTransversalContact` onto `ContactReductionDeferred`; the stage enum is
+// the measurement instrument.
+// ---------------------------------------------------------------------------
+
+/// The extracted patch shape: the landed tensor-Bernstein patch row the
+/// certified solver consumes (the theory statement's `P_i`).
+type Patch = crate::python::binding::VolumeRow;
+
+/// The typed stage of a `Swept x Swept` admission failure. The stage name is
+/// the measurement instrument; the three cases are never collapsed.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SweptAdmissionRefusal {
+    /// The operand's carrier is outside the extracted vocabulary (or its
+    /// section caps cannot be represented exactly).
+    ExtractionUnavailable,
+    /// The extracted surfaces meet non-transversally on the work box (a
+    /// tangential or coincident contact locus).
+    NonTransversalContact,
+    /// The error schedule did not reach the budget within the subdivision cap.
+    BudgetExhausted,
+}
+
+/// The boundary marshaling of one admission stage onto the frozen kernel
+/// refusal vocabulary. `ExtractionUnavailable` keeps the landed
+/// `NonCanonicalCarrier` carrier refusal; `NonTransversalContact` names the
+/// deferred contact reduction; `BudgetExhausted` is the typed unresolved
+/// budget refusal.
+fn swept_refusal_to_refusal(stage: SweptAdmissionRefusal) -> Refusal {
+    match stage {
+        SweptAdmissionRefusal::ExtractionUnavailable => {
+            Refusal::UnsupportedEnvelope(EnvelopeCase::NonCanonicalCarrier)
+        }
+        SweptAdmissionRefusal::NonTransversalContact => {
+            Refusal::UnsupportedEnvelope(EnvelopeCase::ContactReductionDeferred)
+        }
+        SweptAdmissionRefusal::BudgetExhausted => Refusal::NumericallyUnresolved {
+            spent: Budget::new(0, 0, 0),
+            witness: UnresolvedWitness::DeviationUncertified,
+        },
+    }
+}
+
+/// Whether one recorded boolean row couples two `Swept`-family carriers (the
+/// `cut(loft, loft)` / `fuse` cell the admission chain routes).
+fn swept_swept(boolean: &BooleanNode) -> Result<bool, Refusal> {
+    let base = node_carrier_class(&boolean.a)?;
+    let tool = node_carrier_class(&boolean.b)?;
+    Ok(base == CarrierClass::Swept && tool == CarrierClass::Swept)
+}
+
+/// Applies the placement's local congruence to one local point: mirror (when
+/// recorded), then the full recorded frame (or the pure-z `rz`), then the
+/// translation.
+fn place_local_point(part: &PartSpec, point: [f64; 3]) -> [f64; 3] {
+    let mirrored = match part.mirror.as_deref() {
+        Some(axis) => mirror_point(point, axis),
+        None => point,
+    };
+    let [mx, my, mz] = mirrored;
+    let rotated = match part.rotation {
+        Some(frame) => frame.apply(mirrored),
+        None => {
+            let rz = part.rz.to_radians();
+            if rz == 0.0 {
+                mirrored
+            } else {
+                let (sin, cos) = rz.sin_cos();
+                [mx * cos - my * sin, mx * sin + my * cos, mz]
+            }
+        }
+    };
+    let [rx, ry, rz] = rotated;
+    [rx + part.x, ry + part.y, rz + part.z]
+}
+
+/// The orientation factor `sign(det M_tau)` of one placement: `-1` for a
+/// reflective placement (a recorded mirror, or a frame whose determinant is
+/// negative), `+1` otherwise.
+fn placement_det_sign(part: &PartSpec) -> i8 {
+    let mirror = if part.mirror.is_some() { -1 } else { 1 };
+    let frame = match part.rotation {
+        Some(rotation) => {
+            let det = v3_dot(rotation.x_dir, v3_cross(rotation.y_dir, rotation.z_dir));
+            if det < 0.0 { -1 } else { 1 }
+        }
+        None => 1,
+    };
+    mirror * frame
+}
+
+/// Places one local patch row: the placement's affine map applies to every
+/// control point (exact, weights unchanged). The orientation field is left at
+/// its intrinsic value; the caller composes the placement sign.
+fn place_row(row: &Patch, part: &PartSpec) -> Patch {
+    let numerator = row
+        .numerator
+        .iter()
+        .map(|control_row| {
+            control_row
+                .iter()
+                .map(|point| place_local_point(part, *point))
+                .collect()
+        })
+        .collect();
+    Patch {
+        numerator,
+        weights: row.weights.clone(),
+        orientation: row.orientation,
+    }
+}
+
+/// The `4 x 4` tensor-Bernstein elevation of a planar bilinear quad. The
+/// corner order is `(c00, c10, c11, c01)`, so the patch's `P_u x P_v` is the
+/// quad's outward normal for a counter-clockwise corner order.
+fn planar_quad_row(c00: [f64; 3], c10: [f64; 3], c11: [f64; 3], c01: [f64; 3]) -> Patch {
+    let e0 = [1.0, 2.0 / 3.0, 1.0 / 3.0, 0.0];
+    let e1 = [0.0, 1.0 / 3.0, 2.0 / 3.0, 1.0];
+    let corners = [[c00, c01], [c10, c11]];
+    let mut numerator = vec![vec![[0.0f64; 3]; 4]; 4];
+    for (i, row) in numerator.iter_mut().enumerate() {
+        for (j, cell) in row.iter_mut().enumerate() {
+            let mut acc = [0.0f64; 3];
+            for (a, pair) in corners.iter().enumerate() {
+                for (b, corner) in pair.iter().enumerate() {
+                    let wa = if a == 0 {
+                        e0.get(i).copied().unwrap_or(0.0)
+                    } else {
+                        e1.get(i).copied().unwrap_or(0.0)
+                    };
+                    let wb = if b == 0 {
+                        e0.get(j).copied().unwrap_or(0.0)
+                    } else {
+                        e1.get(j).copied().unwrap_or(0.0)
+                    };
+                    let coefficient = wa * wb;
+                    for (slot, value) in acc.iter_mut().zip(corner.iter()) {
+                        *slot += coefficient * value;
+                    }
+                }
+            }
+            *cell = acc;
+        }
+    }
+    Patch {
+        numerator,
+        weights: vec![vec![1.0f64; 4]; 4],
+        orientation: 1.0,
+    }
+}
+
+/// The six outward-oriented tensor-Bernstein patches of the axis-aligned box
+/// `[lo, hi]`. The corner order fixes `P_u x P_v` outward on every face, so the
+/// divergence-form flux of the cycle is the box volume.
+fn box_patch_rows(lo: [f64; 3], hi: [f64; 3]) -> Vec<Patch> {
+    let [x0, y0, z0] = lo;
+    let [x1, y1, z1] = hi;
+    vec![
+        planar_quad_row([x0, y0, z0], [x0, y1, z0], [x1, y1, z0], [x1, y0, z0]),
+        planar_quad_row([x0, y0, z1], [x1, y0, z1], [x1, y1, z1], [x0, y1, z1]),
+        planar_quad_row([x0, y0, z0], [x1, y0, z0], [x1, y0, z1], [x0, y0, z1]),
+        planar_quad_row([x0, y1, z0], [x0, y1, z1], [x1, y1, z1], [x1, y1, z0]),
+        planar_quad_row([x0, y0, z0], [x0, y0, z1], [x0, y1, z1], [x0, y1, z0]),
+        planar_quad_row([x1, y0, z0], [x1, y1, z0], [x1, y1, z1], [x1, y0, z1]),
+    ]
+}
+
+/// Validates one extracted patch row through the landed tensor-Bernstein
+/// constructor (the same admission `binding_volume_facts` uses). A malformed
+/// net is `ExtractionUnavailable`.
+fn validate_patch(row: &Patch) -> Result<(), SweptAdmissionRefusal> {
+    TensorBernsteinPatch::try_new(
+        row.numerator.clone(),
+        row.weights.clone(),
+        IBox2 {
+            lo: [0.0, 0.0],
+            hi: [1.0, 1.0],
+        },
+        PatchParent::new(0, None),
+    )
+    .map(|_| ())
+    .map_err(|_| SweptAdmissionRefusal::ExtractionUnavailable)
+}
+
+/// The unit chord direction of a loft station stack (first centroid to last).
+fn loft_direction(loops: &[Vec<SpanPoly3>]) -> Result<[f64; 3], SweptAdmissionRefusal> {
+    let first = loops
+        .first()
+        .ok_or(SweptAdmissionRefusal::ExtractionUnavailable)?;
+    let last = loops
+        .last()
+        .ok_or(SweptAdmissionRefusal::ExtractionUnavailable)?;
+    let a = centroid3(&sample_loop3(first));
+    let b = centroid3(&sample_loop3(last));
+    let direction = v3_sub(b, a);
+    let magnitude = v3_norm(direction);
+    if !magnitude.is_finite() || magnitude <= 0.0 {
+        return Err(SweptAdmissionRefusal::ExtractionUnavailable);
+    }
+    let [dx, dy, dz] = direction;
+    Ok([dx / magnitude, dy / magnitude, dz / magnitude])
+}
+
+/// The exact planar end cap of one straight quadrilateral section loop,
+/// oriented outward along `outward`. A section that is not an exact planar
+/// quad (four straight edges) refuses `ExtractionUnavailable` rather than
+/// being approximated.
+fn loft_cap_row(
+    loop_spans: &[SpanPoly3],
+    outward: [f64; 3],
+) -> Result<Patch, SweptAdmissionRefusal> {
+    let [s0, s1, s2, s3] = loop_spans else {
+        return Err(SweptAdmissionRefusal::ExtractionUnavailable);
+    };
+    for span in [s0, s1, s2, s3] {
+        for coefficients in [span.x, span.y, span.z] {
+            let [c0, c1, c2, c3] = coefficients;
+            let scale = 1.0 + c0.abs() + c1.abs();
+            if c2.abs() > 1.0e-12 * scale || c3.abs() > 1.0e-12 * scale {
+                return Err(SweptAdmissionRefusal::ExtractionUnavailable);
+            }
+        }
+    }
+    let corner = |span: &SpanPoly3| {
+        let [x, ..] = span.x;
+        let [y, ..] = span.y;
+        let [z, ..] = span.z;
+        [x, y, z]
+    };
+    let [c0, c1, c2, c3] = [corner(s0), corner(s1), corner(s2), corner(s3)];
+    let counter_clockwise = v3_dot(spline_loop_area_vector(loop_spans), outward) >= 0.0;
+    Ok(if counter_clockwise {
+        planar_quad_row(c0, c1, c2, c3)
+    } else {
+        planar_quad_row(c0, c3, c2, c1)
+    })
+}
+
+/// The local tensor-Bernstein patch 2-cycle of one landed solid carrier. The
+/// extracted vocabulary is the exact one: axis-aligned boxes and the
+/// loft/member carriers whose sections are straight quadrilateral loops (so
+/// their planar end caps are exact); everything else refuses typed.
+fn extract_local_patches(solid: &SolidSpec) -> Result<Vec<Patch>, SweptAdmissionRefusal> {
+    match solid {
+        SolidSpec::Box {
+            length,
+            width,
+            height,
+        } => {
+            let (length, width, height) = (*length, *width, *height);
+            Ok(box_patch_rows(
+                [-length / 2.0, -width / 2.0, -height / 2.0],
+                [length / 2.0, width / 2.0, height / 2.0],
+            ))
+        }
+        SolidSpec::Loft { sections, closed } => {
+            let (mut patches, loops) = spline_loft_volume_rows(sections)
+                .map_err(|_| SweptAdmissionRefusal::ExtractionUnavailable)?;
+            if !*closed {
+                let first = loops
+                    .first()
+                    .ok_or(SweptAdmissionRefusal::ExtractionUnavailable)?;
+                let last = loops
+                    .last()
+                    .ok_or(SweptAdmissionRefusal::ExtractionUnavailable)?;
+                let [dx, dy, dz] = loft_direction(&loops)?;
+                let backward = [-dx, -dy, -dz];
+                patches.push(loft_cap_row(first, backward)?);
+                patches.push(loft_cap_row(last, [dx, dy, dz])?);
+            }
+            Ok(patches)
+        }
+        SolidSpec::Member {
+            profile,
+            stations,
+            ruled,
+        } => {
+            // A smooth member with more than two stations has no landed smooth
+            // carrier: the open carrier refuses typed rather than being
+            // approximated.
+            if !*ruled && stations.len() > 2 {
+                return Err(SweptAdmissionRefusal::ExtractionUnavailable);
+            }
+            let sections = member_sections(profile, stations)
+                .map_err(|_| SweptAdmissionRefusal::ExtractionUnavailable)?;
+            let (mut patches, loops) = spline_loft_volume_rows(&sections)
+                .map_err(|_| SweptAdmissionRefusal::ExtractionUnavailable)?;
+            let first = loops
+                .first()
+                .ok_or(SweptAdmissionRefusal::ExtractionUnavailable)?;
+            let last = loops
+                .last()
+                .ok_or(SweptAdmissionRefusal::ExtractionUnavailable)?;
+            let [dx, dy, dz] = loft_direction(&loops)?;
+            let backward = [-dx, -dy, -dz];
+            patches.push(loft_cap_row(first, backward)?);
+            patches.push(loft_cap_row(last, [dx, dy, dz])?);
+            Ok(patches)
+        }
+        _ => Err(SweptAdmissionRefusal::ExtractionUnavailable),
+    }
+}
+
+/// The extraction adapter (theory statement section 1): the tensor-Bernstein
+/// patch 2-cycle of one recorded construction node, with the placement applied
+/// to the control points and the orientation signs composed with the
+/// placement's determinant sign. Each returned pair is `(patch, sigma)` where
+/// `sigma` is `sign(det M_tau)` and the patch's orientation field is the full
+/// `sigma_i = sigma * sigma_i^0`.
+fn extract_patches(row: &TreeNode) -> Result<Vec<(Patch, i8)>, SweptAdmissionRefusal> {
+    let part = match row {
+        TreeNode::Part { part } => part,
+        TreeNode::Group { .. } | TreeNode::Boolean { .. } => {
+            // Depth-1 only: a boolean of a boolean (or a compound operand) is
+            // the recorded open composition cell and is not extracted.
+            return Err(SweptAdmissionRefusal::ExtractionUnavailable);
+        }
+    };
+    let sign = placement_det_sign(part);
+    let mut extracted = Vec::new();
+    for local in extract_local_patches(&part.solid)? {
+        validate_patch(&local)?;
+        let mut placed = place_row(&local, part);
+        if sign < 0 {
+            placed.orientation = -local.orientation;
+        }
+        extracted.push((placed, sign));
+    }
+    Ok(extracted)
+}
+
+/// The gate order of the theory statement section 3 for one `Swept x Swept`
+/// boolean pair: extract both operands, then run the certified solver (whose
+/// landed transversality admission is the FSSI-001 twin). A refusal names the
+/// stage that failed.
+fn admit_swept_pair(
+    boolean: &BooleanNode,
+) -> Result<membership::BooleanVolumeCertificate, SweptAdmissionRefusal> {
+    let a = extract_patches(&boolean.a)?;
+    let b = extract_patches(&boolean.b)?;
+    let a_rows: Vec<Patch> = a.into_iter().map(|(row, _)| row).collect();
+    let b_rows: Vec<Patch> = b.into_iter().map(|(row, _)| row).collect();
+    let options = membership::BooleanVolumeOptions::default();
+    membership::certify_boolean_volume(&a_rows, &b_rows, &options).map_err(
+        |refusal| match refusal {
+            membership::BooleanVolumeRefusal::TransversalityUncertified => {
+                SweptAdmissionRefusal::NonTransversalContact
+            }
+            membership::BooleanVolumeRefusal::BudgetExceeded => {
+                SweptAdmissionRefusal::BudgetExhausted
+            }
+            _ => SweptAdmissionRefusal::ExtractionUnavailable,
+        },
+    )
 }
 
 // ---------------------------------------------------------------------------
@@ -5836,6 +6251,7 @@ pub fn bd_facts(py: Python<'_>, tree_json: &str) -> PyResult<String> {
             let mut value = serde_json::json!({
                 "solid_count": facts.solid_count,
                 "volume": facts.volume,
+                "volume_bracket": facts.volume_bracket,
                 "bbox": facts.bbox,
             });
             if let Some(label) = &facts.label {
@@ -7762,8 +8178,10 @@ print(json.dumps([z_row, loft_row]))
 
     #[test]
     fn refused_pairs_still_refuse_typed_unchanged() {
-        // A both-Swept pair keeps the constructive-carrier refusal at the
-        // boolean boundary.
+        // A both-Swept pair now routes into the certified gate order: two
+        // coincident lofts extract but meet non-transversally, so the pair
+        // refuses typed at the transversality stage (the landed localized
+        // ContactReductionDeferred case).
         let swept_swept = boolean(
             crate::facade::ModeValue::Add,
             part(loft_carrier(), 0.0, 0.0, 0.0),
@@ -7772,7 +8190,7 @@ print(json.dumps([z_row, loft_row]))
         let refusal = tree_facts(&swept_swept).expect_err("two lofts must refuse typed");
         assert!(matches!(
             refusal,
-            Refusal::UnsupportedEnvelope(EnvelopeCase::NonCanonicalCarrier)
+            Refusal::UnsupportedEnvelope(EnvelopeCase::ContactReductionDeferred)
         ));
 
         // A torus carrier in a swept pair keeps the localized refusal.
@@ -8593,6 +9011,238 @@ print(json.dumps([z_row, loft_row]))
         assert_eq!(
             membership::certify_boolean_volume(&a, &malformed, &options),
             Err(membership::BooleanVolumeRefusal::MalformedPatch)
+        );
+    }
+
+    // -----------------------------------------------------------------------
+    // MONO-8-SWEPT-ADMISSION-WIRING: the extraction adapter and the Swept x
+    // Swept gate order (extraction -> transversality -> solver).
+    // -----------------------------------------------------------------------
+
+    /// A straight spline-section loft stack: `n` sections, each a square of
+    /// side `s` placed at `(x0, y0)` and carried by collinear spline edges, so
+    /// the section caps are exact planar quads.
+    fn straight_loft(n: usize, z0: f64, dz: f64, x0: f64, y0: f64, s: f64) -> SolidSpec {
+        let mut sections = Vec::with_capacity(n);
+        for i in 0..n {
+            let z = z0 + dz * i as f64;
+            let corners = [
+                [x0, y0, z],
+                [x0 + s, y0, z],
+                [x0 + s, y0 + s, z],
+                [x0, y0 + s, z],
+            ];
+            let mut edges = Vec::with_capacity(4);
+            for j in 0..4 {
+                let a = corners[j];
+                let b = corners[(j + 1) % 4];
+                let mid = [
+                    0.5 * (a[0] + b[0]),
+                    0.5 * (a[1] + b[1]),
+                    0.5 * (a[2] + b[2]),
+                ];
+                edges.push(ProfileEdge::Spline {
+                    points: vec![a, mid, b],
+                });
+            }
+            sections.push(edges);
+        }
+        SolidSpec::Loft {
+            sections,
+            closed: false,
+        }
+    }
+
+    #[test]
+    fn swept_admission_nested_boxes_certify_exactly() {
+        let node = boolean(
+            crate::facade::ModeValue::Subtract,
+            part(
+                SolidSpec::Box {
+                    length: 2.0,
+                    width: 2.0,
+                    height: 2.0,
+                },
+                0.0,
+                0.0,
+                0.0,
+            ),
+            part(
+                SolidSpec::Box {
+                    length: 1.0,
+                    width: 1.0,
+                    height: 1.0,
+                },
+                0.0,
+                0.0,
+                0.0,
+            ),
+        );
+        let TreeNode::Boolean { boolean } = &node else {
+            unreachable!("the fixture is a boolean node");
+        };
+        let certificate = admit_swept_pair(boolean).expect("nested boxes certify");
+        assert!((certificate.volume_a - 8.0).abs() < 1.0e-9);
+        assert!((certificate.volume_b - 1.0).abs() < 1.0e-9);
+        assert!(certificate.bracket_lo <= 7.0 && 7.0 <= certificate.bracket_hi);
+        assert!(certificate.width < 1.0e-6, "width {}", certificate.width);
+    }
+
+    #[test]
+    fn swept_admission_disjoint_boxes_answer_the_base() {
+        let node = boolean(
+            crate::facade::ModeValue::Subtract,
+            part(
+                SolidSpec::Box {
+                    length: 2.0,
+                    width: 2.0,
+                    height: 2.0,
+                },
+                0.0,
+                0.0,
+                0.0,
+            ),
+            part(
+                SolidSpec::Box {
+                    length: 1.0,
+                    width: 1.0,
+                    height: 1.0,
+                },
+                10.0,
+                0.0,
+                0.0,
+            ),
+        );
+        let TreeNode::Boolean { boolean } = &node else {
+            unreachable!("the fixture is a boolean node");
+        };
+        let certificate = admit_swept_pair(boolean).expect("disjoint boxes certify");
+        assert!(certificate.bracket_lo <= 8.0 && 8.0 <= certificate.bracket_hi);
+        assert!(certificate.excluded_pairs > 0);
+    }
+
+    #[test]
+    fn swept_admission_spline_loft_pair_closes_within_budget() {
+        // A nested pair of straight spline-section lofts at the tub's station
+        // scale: the executor extracts both 2-cycles (side patches plus exact
+        // planar caps) and the solver certifies V(A \ B) = V(A) - V(B).
+        let base = straight_loft(8, 0.0, 1.0, 0.0, 0.0, 2.0);
+        let tool = straight_loft(4, 2.0, 1.0, 0.5, 0.5, 1.0);
+        let base_volume = tree_facts(&part(base.clone(), 0.0, 0.0, 0.0))
+            .expect("the base loft measures")
+            .volume;
+        let tool_volume = tree_facts(&part(tool.clone(), 0.0, 0.0, 0.0))
+            .expect("the tool loft measures")
+            .volume;
+        let tree = boolean(
+            crate::facade::ModeValue::Subtract,
+            part(base, 0.0, 0.0, 0.0),
+            part(tool, 0.0, 0.0, 0.0),
+        );
+        let facts = tree_facts(&tree).expect("the nested loft pair certifies");
+        let expected = base_volume - tool_volume;
+        assert!(
+            facts.volume_bracket[0] <= expected && expected <= facts.volume_bracket[1],
+            "bracket {:?} must contain {expected}",
+            facts.volume_bracket
+        );
+        assert!(
+            facts.volume_bracket[1] - facts.volume_bracket[0] < 1.0e-4 * base_volume.abs(),
+            "the bracket must close within the facts band"
+        );
+        assert_eq!(facts.boolean_events.len(), 1);
+    }
+
+    #[test]
+    fn swept_admission_mirror_flips_orientation_signs() {
+        // A mirrored placement is reflective: every extracted orientation sign
+        // flips, so the placed 2-cycle stays outward-oriented and the certified
+        // volume keeps its sign.
+        let mirrored = mirrored_part(
+            SolidSpec::Box {
+                length: 2.0,
+                width: 2.0,
+                height: 2.0,
+            },
+            "y",
+        );
+        let extracted = extract_patches(&mirrored).expect("the mirrored box extracts");
+        assert!(!extracted.is_empty());
+        for (patch, sign) in &extracted {
+            assert_eq!(*sign, -1, "a mirror placement is reflective");
+            assert_eq!(patch.orientation, -1.0);
+        }
+        let node = boolean(
+            crate::facade::ModeValue::Subtract,
+            mirrored,
+            part(
+                SolidSpec::Box {
+                    length: 1.0,
+                    width: 1.0,
+                    height: 1.0,
+                },
+                0.0,
+                0.0,
+                0.0,
+            ),
+        );
+        let TreeNode::Boolean { boolean } = &node else {
+            unreachable!("the fixture is a boolean node");
+        };
+        let certificate = admit_swept_pair(boolean).expect("the mirrored cut certifies");
+        assert!(certificate.volume_a > 0.0);
+        assert!(certificate.bracket_lo > 0.0);
+    }
+
+    #[test]
+    fn swept_admission_tangential_pair_refuses_non_transversal() {
+        // Two coincident straight lofts extract but meet non-transversally.
+        let node = boolean(
+            crate::facade::ModeValue::Add,
+            part(straight_loft(3, 0.0, 1.0, 0.0, 0.0, 1.0), 0.0, 0.0, 0.0),
+            part(straight_loft(3, 0.0, 1.0, 0.0, 0.0, 1.0), 0.0, 0.0, 0.0),
+        );
+        let TreeNode::Boolean { boolean } = &node else {
+            unreachable!("the fixture is a boolean node");
+        };
+        assert_eq!(
+            admit_swept_pair(boolean),
+            Err(SweptAdmissionRefusal::NonTransversalContact)
+        );
+        // The boundary marshals the stage onto the localized contact case.
+        assert!(matches!(
+            tree_facts(&node),
+            Err(Refusal::UnsupportedEnvelope(
+                EnvelopeCase::ContactReductionDeferred
+            ))
+        ));
+    }
+
+    #[test]
+    fn swept_admission_member_carrier_refuses_extraction() {
+        // A smooth member with more than two stations has no landed smooth
+        // carrier: the extraction refuses typed, never approximates.
+        let smooth_member = SolidSpec::Member {
+            profile: spline_square(0.0),
+            stations: vec![
+                member_station(0.0),
+                member_station(2.5),
+                member_station(5.0),
+            ],
+            ruled: false,
+        };
+        assert_eq!(
+            extract_patches(&part(smooth_member, 0.0, 0.0, 0.0)),
+            Err(SweptAdmissionRefusal::ExtractionUnavailable)
+        );
+        // A curved-section loft is outside the exact-cap vocabulary too.
+        let curved = SolidSpec::Loft {
+            sections: vec![spline_lens(0.0), spline_lens(5.0)],
+            closed: false,
+        };
+        assert_eq!(
+            extract_patches(&part(curved, 0.0, 0.0, 0.0)),
+            Err(SweptAdmissionRefusal::ExtractionUnavailable)
         );
     }
 }
