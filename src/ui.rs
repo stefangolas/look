@@ -56,23 +56,29 @@ pub fn generate_html_viewer(
                 .transform
                 .transform_point3(glam::Vec3::from(v.position));
             let n = (instance.normal_transform * glam::Vec3::from(v.normal)).normalize_or_zero();
-            // Per-vertex source colour when the geometry carries one (STEP face
-            // colours, glTF COLOR_0); the instance material's
-            // `baseColorFactor` otherwise, so glTF parts render with their
-            // source material colours. Identity white only when neither
-            // exists (plain STL), leaving the neutral base untouched.
-            let color = geom
+            // glTF colour semantics: the material's `baseColorFactor`
+            // multiplies the per-vertex COLOR_0 attribute. A GLB without
+            // COLOR_0 compiles to synthetic identity vertex colours, so the
+            // material factor alone drives the part colour; STEP face colours
+            // ride a default identity material; a real COLOR_0 multiplies as
+            // the glTF spec prescribes.
+            let source = geom
                 .source_attributes
                 .as_deref()
                 .and_then(|attributes| attributes.get(index))
                 .map(|attributes| attributes.color)
-                .or_else(|| {
-                    scene
-                        .materials
-                        .get(instance.material)
-                        .map(|m| m.base_color_factor)
-                })
                 .unwrap_or([1.0; 4]);
+            let material_factor = scene
+                .materials
+                .get(instance.material)
+                .map(|m| m.base_color_factor)
+                .unwrap_or([1.0; 4]);
+            let color = [
+                source[0] * material_factor[0],
+                source[1] * material_factor[1],
+                source[2] * material_factor[2],
+                source[3] * material_factor[3],
+            ];
 
             flat_positions.push(p.x);
             flat_positions.push(p.y);
