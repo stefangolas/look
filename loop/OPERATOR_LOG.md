@@ -6312,3 +6312,59 @@ Worktree note (reported, not actioned): root tree carries live human-session WIP
 Leaving: 2 RUNNING (slots 0+1, duplicate FHC-EX-B; slot 0 progressing, slot 1
 hung); HEAD `be5b698` + this cycle's STATE/log/escalation commit; heartbeat 1;
 operator_runner 1; watchdog 1; cargoq UP; disk 32.4 GiB; RAM ~2.2 GiB.
+
+## 2026-09-11 22:57 UTC (operator)
+
+Board at start: 1 RUNNING (slot 0, FHC-EX-B-SPLINE-LOFT-OPERANDS, worker cmd
+10504, events 4.7 min fresh, changed=2), 1 IDLE (slot 1, the reaped duplicate),
+slots 2-7 FINISHED/IDLE landed residue. HEAD `3d78cee` (owner session resolved
+the EX-B duplicate: slot 1 killed + reset-only, slot 0 keeper, + 29 GB cache
+cleanup).
+
+Health sweep:
+- heartbeat exactly 1 (27872, command-line anchored to dispatch_heartbeat.ps1);
+  the second scan hit was this operator's own powershell command line, which
+  embeds the `dispatch_heartbeat` filter text — no action. operator_runner 1
+  (27876), watchdog 1 (29264). cargoq ping OK (queued 0, running false).
+- Disk 30.9 GB free (above the 8 GB floor AND the 15 GB goal). RAM 3.21 GB free
+  (just above the 3 GB threshold; one worker resident — do not stack a second).
+
+Actions:
+- Land check: all 8 slot tips re-verified ancestors of `integration/kernel-bg`
+  via `git merge-base --is-ancestor` (4e5633d/7830086/c3df084/e6553db/3c2109b/
+  ee97499/713f205/5cf4811) -> NOTHING landable. Slot 1 carries no
+  RESULT/commit/question and its duplicate was already resolved by the owner
+  session (commit 3d78cee) — did NOT re-dispatch (slot 0 owns the packet/write
+  set; re-dispatch would recreate the duplicate).
+- Registry hygiene: re-derived all 10 BLOCKED rows. None cleanly flippable:
+  BG-AUD-FIX-004 OWNER_BLOCKED; BG-CK-SPLINE-CENSUS owner-CANCELLED;
+  SEM-PCURVE-MASTER-001-FIX SUPERSEDED; DEF-SPINEFRAME-GRAZE re-aimed at -R2;
+  DEF-TESS-ANALYTIC-SEAM r1 superseded by -R2 (READY); DEF-SEEDRAY-B human-gated;
+  TOR-C PINNED (no packet); MONO-10 owner-gated on the R3 mesh predicate;
+  RDEF-M5 dep M4 BLOCKED; RDEF-M4 dep M3 DONE but note requires the M0 tangency
+  adjudication (no M0 row) -> escalated, not flipped. No anchor/lint fixable
+  failures on READY rows.
+- `dispatch_ready --dry-run --max-workers=4` -> "slots: 8 (1 running, 7 free);
+  slot-assigned packets: 5; dispatched 0; workers now ~1/4". Only RG-23/RG-9
+  flagged ANCHOR CHECK FAILED (registry `"packet": ""` = packet files never
+  authored; authoring out of charter). FHC-TRIM/FHC-MIRROR/BD-EMIT correctly
+  serial behind the RUNNING FHC-EX-B. Real dispatcher NOT run (heartbeat live =
+  double-dispatch rule; nothing dispatchable).
+- STATE: replaced the volatile ground-truth block with a fresh [operator
+  2026-09-11T22:57Z] block (single block; stable traps untouched).
+- This entry.
+
+Escalations: CARRIED + UPDATED — duplicate FHC-EX-B now RESOLVED (slot 1 reaped
+by the owner session; no operator action). Carried unchanged: RG-23/RG-9 missing
+packet files; RDEF-M4 re-scope (M0 adjudication); MONO-10 owner R3-mesh decision;
+FRAME-REVOLVE F1 non_z_axis pin; duplicate supervisors + lagging cargoq restart
+guard; TOR-C flip-or-pin; slot-4/7 wt RESULT residue; CL-005/CL-006
+READY-but-landed bookkeeping.
+
+Worktree note (reported, not actioned): root tree carries live human-session WIP
+(M README.md, M loop/cargoq/server.log, untracked benchmarks/ + loop/baselines/).
+
+Leaving: 1 RUNNING (slot 0, FHC-EX-B progressing); slot 1 IDLE (resolved
+duplicate, do not re-dispatch); HEAD `3d78cee` + this cycle's STATE/log/escalation
+commit; heartbeat 1; operator_runner 1; watchdog 1; cargoq UP; disk 30.9 GiB;
+RAM ~3.2 GiB.

@@ -1783,3 +1783,27 @@ uncommitted - left for the orchestrator, no dispatch impact.
   R3-mesh decision; FRAME-REVOLVE F1 non_z_axis pin; duplicate supervisors +
   lagging cargoq restart guard; TOR-C flip-or-pin; schedule.py 'needs' crash;
   slot-4/7 wt RESULT residue; CL-005/CL-006 READY-but-landed bookkeeping.
+
+## 2026-09-11 22:57 UTC - CARRIED + UPDATED: duplicate FHC-EX-B RESOLVED by the owner session (slot 1 reaped); no operator action
+
+- Re-derived this cycle: slot 1 is IDLE (pid=-, changed=0, git=packet@7830086
+  =base, no work) and the owner session commit `3d78cee` records the resolution
+  ("slot 1 hung+empty -> killed, reset-only; slot 0 keeper"). The duplicate is
+  CLOSED. Operator did NOT re-dispatch slot 1's copy: slot 0 owns the packet and
+  the shared `bd_bridge.rs`/`door.py`/`extraction_breadth_b.rs` write set, so a
+  fresh dispatch would recreate the duplicate.
+- Slot 0 remains the keeper and is progressing (worker cmd 10504, events 4.7 min
+  fresh, changed=2).
+- Registry re-derived by command: 10 BLOCKED rows, none cleanly flippable. The
+  only near-miss is `RDEF-M4-NUMERIC-TIER` (dep `RDEF-M3-WITNESS-TIER` is DONE)
+  whose note requires the M0 tangency-system adjudication, but no M0 registry row
+  exists. Action needed (orchestrator): confirm whether M0 is subsumed/landed; if
+  so flip M4 READY, else record the hold explicitly in the row.
+- Carried unchanged: RG-23/RG-9 missing packet files (registry `"packet": ""`);
+  MONO-10 owner R3-mesh predicate decision; FRAME-REVOLVE F1 non_z_axis pin
+  (ttc_lathe_spline.rs); duplicate supervisors + lagging cargoq restart guard;
+  TOR-C flip-or-pin; slot-4/7 wt RESULT residue; CL-005/CL-006 READY-but-landed
+  bookkeeping; schedule.py 'needs' crash.
+- Health: heartbeat 1 (27872), operator_runner 1 (27876), watchdog 1 (29264),
+  cargoq UP (queued 0, running false); disk 30.9 GB free (above floor and goal);
+  RAM 3.21 GB free (just above threshold; one worker resident).
