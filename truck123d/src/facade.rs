@@ -269,6 +269,38 @@ pub fn dispatch_swept_carrier_boolean(
     BooleanPairVerdict::Routed(CertifiedBooleanRoute { mode, base, tool })
 }
 
+/// The ordered routed rows of one multi-operand swept-carrier fold (MONO-9-
+/// FUSE-FOLD, judgement 4: the depth-1 refusal becomes mode dispatch). A fold
+/// `base op t_1 op ... op t_n` dispatches each successive tool against the
+/// running product carrier through the landed single-pair entry, so a chained
+/// composition routes (or refuses) per recorded operand instead of being
+/// rejected as a depth-1 open composition. Canonical operands record no row;
+/// a refused pair returns its typed, localized refusal. One mode dispatch, no
+/// new solver.
+pub fn dispatch_swept_carrier_fold(
+    base: CarrierClass,
+    tools: &[CarrierClass],
+    mode: ModeValue,
+) -> Result<Vec<SweptBooleanEvent>, SweptBooleanRefusal> {
+    let mut carrier = base;
+    let mut events = Vec::with_capacity(tools.len());
+    for &tool in tools {
+        match dispatch_swept_carrier_boolean(carrier, tool, mode) {
+            BooleanPairVerdict::CanonicalLanded => {}
+            BooleanPairVerdict::Routed(route) => {
+                events.push(SweptBooleanEvent {
+                    mode: route.mode,
+                    base: route.base,
+                    tool: route.tool,
+                });
+                carrier = boolean_product_carrier(route.base, route.tool);
+            }
+            BooleanPairVerdict::Refused(refusal) => return Err(refusal),
+        }
+    }
+    Ok(events)
+}
+
 /// The carrier class a solid-producing op yields, or `None` for an op that
 /// does not change the current solid's carrier. `profile` is the class of the
 /// current sketch/profile carrier (a spline profile makes a revolve/loft
