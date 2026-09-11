@@ -1632,3 +1632,17 @@ uncommitted - left for the orchestrator, no dispatch impact.
   re-scope; MONO-10 owner R3-mesh decision; FRAME-REVOLVE F1 non_z_axis pin;
   duplicate supervisors + lagging cargoq restart guard; TOR-C flip-or-pin;
   schedule.py 'needs' crash.
+
+## 2026-09-11 19:21 UTC - CARRIED (no new item): DISK 5.5 GiB still below the 8 GB floor
+
+- Re-derived this cycle: `janitor ensure --need 15` -> reclaimed ~0.0 -> 5.5 GB
+  free (STILL SHORT). No root `target/`; no TEMP look-verify-baseline-* leaks;
+  `loop/slots/*` outer+inner targets are all 0 bytes; slot dirs ~0.9 GB total.
+  The bulk is untracked human `scratch/` 1.73 GB (not loop-owned - do not delete).
+  Frontier unchanged: FHC-EX-A-CLOSED-LOOP-SHELL READY but the real dispatcher's
+  `new_slot` refuses below the floor, so the FHC chain stays stalled.
+- Action needed (human/owner): free C: space outside the loop to reach 8 GB.
+  Carried unchanged: RG-23/RG-9 missing packet files (`packet: ''`); RDEF-M4
+  re-scope; MONO-10 owner R3-mesh decision; FRAME-REVOLVE F1 non_z_axis pin;
+  duplicate supervisors + lagging cargoq restart guard; TOR-C flip-or-pin;
+  schedule.py 'needs' crash.

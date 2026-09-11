@@ -75,6 +75,35 @@ corrected, annex C = ORACLE POLICY CHANGE), then docs/SOLVER_COVERAGE_SPEC.md
 
 ## Where we are
 
+> LATEST GROUND TRUTH [operator 2026-09-11T19:21Z]: 0 RUNNING / 0
+> landed-this-cycle / 0 unblocked / 0 flipped / 0 dispatched. HEAD `3080c20`
+> (the 18:57Z operator commit; no new commits since). All 8 slots FINISHED/IDLE
+> landed residue; every tip (43e26c9/329f6ab/c3df084/e6553db/3c2109b/ee97499/
+> 713f205/5cf4811) re-verified an ancestor of HEAD by `git merge-base
+> --is-ancestor`; RESULT statuses read directly (slot0 LANDED, slot1 complete,
+> slot3/5/6 DONE, slot4 LANDED-WITH-FINDINGS, slot7 LANDED); nothing landable.
+> **Frontier unchanged and STILL STALLED ON DISK: FHC-EX-A-CLOSED-LOOP-SHELL is
+> READY; `dispatch_ready --dry-run --max-workers=4` would send it to slot 0
+> (FHC-EX-B / FHC-TRIM-EXTRUDE-ENVELOPE / FHC-MIRROR-FORM serial behind it) but
+> the real dispatcher's `new_slot` refuses - DISK 5.5 GiB free is BELOW the 8 GB
+> floor and `janitor ensure --need 15` reclaimed ~0.0 (pool exhausted: no root
+> `target/`, no TEMP look-verify-baseline-* leaks; slot dirs ~0.9 GB total; the
+> bulk is untracked human scratch/ 1.73 GB, not loop-owned).** RAM 4.42 GiB free
+> (healthy this cycle). Registry re-derived by command: 349 rows = 253 DONE / 85
+> READY / 10 BLOCKED / 1 SUPERSEDED; none of the 10 BLOCKED rows is mechanically
+> flippable (needs DEF-VENDOR-FIXTURES / DEF-SEEDRAY-A / ADM-001-ADAPTER /
+> ADM-002-CERTIFICATES are READY not DONE; the rest carry deliberate holds).
+> RG-23/RG-9 are READY with MISSING packet files = authoring gap, carried.
+> Health: heartbeat exactly 1 (27872), operator_runner 1 (27876), watchdog 1
+> (29264), cargoq UP (queued 0, running false). No manual dispatch (heartbeat
+> owns it; disk-floor blocked anyway). Root worktree carries the live
+> human-session WIP (M README.md, M loop/LEDGER.jsonl, M loop/cargoq/server.log,
+> untracked benchmarks/ + loop/baselines/) - untouched, reported not actioned.
+> No new escalation (disk below floor already carried). Leaving: 0 RUNNING; HEAD
+> `3080c20` + this cycle's STATE/log/escalation commit.
+>
+> --- SUPERSEDED 2026-09-11T18:57Z note (kept for history) follows ---
+>
 > LATEST GROUND TRUTH [operator 2026-09-11T18:57Z]: 0 RUNNING / 0
 > landed-this-cycle / 0 unblocked / 0 flipped / 0 dispatched. HEAD `33d1219`
 > (the 18:35Z operator commit; no new commits since). All 8 slots FINISHED/IDLE
@@ -8069,3 +8098,27 @@ worktree: human-session WIP (M README.md, M loop/LEDGER.jsonl, M
 loop/cargoq/server.log, untracked benchmarks/ + loop/baselines/) untouched. No
 new escalation (disk below floor already carried). Leaving: 0 RUNNING; HEAD
 `33d1219` + this cycle's STATE/log/escalation commit.]
+
+[operator 2026-09-11T19:21Z - volatile refresh. Board: 0 RUNNING / 0
+landed-this-cycle / 0 unblocked / 0 flipped / 0 dispatched. HEAD `3080c20`
+(the 18:57Z operator commit; no new commits since). All 8 slots FINISHED/IDLE
+landed residue - every tip (43e26c9/329f6ab/c3df084/e6553db/3c2109b/ee97499/
+713f205/5cf4811) re-verified an ancestor of HEAD by `git merge-base
+--is-ancestor`; RESULT statuses read directly (slot0 LANDED, slot1 complete,
+slot3/5/6 DONE, slot4 LANDED-WITH-FINDINGS, slot7 LANDED); nothing landable.
+Frontier STALLED ON DISK: FHC-EX-A-CLOSED-LOOP-SHELL READY;
+`dispatch_ready --dry-run --max-workers=4` would send it to slot 0 but the real
+dispatcher's new_slot refuses - DISK 5.5 GiB free < 8 GB floor; `janitor ensure
+--need 15` reclaimed ~0.0 (pool exhausted: no root target/, no TEMP baseline
+leaks; slot dirs ~0.9 GB total; bulk untracked human scratch/ 1.73 GB). RAM 4.42
+GiB free (healthy). Registry 349 = 253 DONE / 85 READY / 10 BLOCKED / 1
+SUPERSEDED; none of the 10 BLOCKED rows flippable (needs DEF-VENDOR-FIXTURES /
+DEF-SEEDRAY-A / ADM-001 / ADM-002 are READY not DONE; BG-CK-P0-PREVALENCE DONE
+but the census is owner-cancelled; the rest carry deliberate holds). RG-23/RG-9
+packet files MISSING = authoring gap. Health: heartbeat exactly 1 (27872),
+operator_runner 1 (27876), watchdog 1 (29264), cargoq UP (queued 0, running
+false). No manual dispatch (heartbeat owns it; disk-floor blocked anyway). Root
+worktree: human-session WIP (M README.md, M loop/LEDGER.jsonl, M
+loop/cargoq/server.log, untracked benchmarks/ + loop/baselines/) untouched. No
+new escalation (disk below floor already carried). Leaving: 0 RUNNING; HEAD
+`3080c20` + this cycle's STATE/log/escalation commit.]

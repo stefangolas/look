@@ -5785,3 +5785,61 @@ Leaving: 0 RUNNING; HEAD `33d1219` + this cycle's STATE/log/escalation commit;
 heartbeat 1 (27872); operator_runner 1 (27876); watchdog 1 (29264); TWO
 supervisors + TWO cargoq servers carried; cargoq UP (queued 0, running false);
 disk 5.6 GiB free (LOW, below floor); RAM 4.44 GiB.
+
+## 2026-09-11 19:21 UTC - operator cycle (one pass)
+
+Board: 0 RUNNING / 0 landed-this-cycle / 0 unblocked / 0 flipped / 0
+dispatched. HEAD `3080c20` (the 18:57Z operator commit; no new commits since).
+
+- Step 1 health sweep: `slot_status.py` -> all 8 slots FINISHED/IDLE, no live
+  worker. `curl 127.0.0.1:8231/ping` -> ok, queued 0, running false. Heartbeat
+  exactly 1 (27872; the second scan hit was this operator's own query command
+  line). operator_runner 1 (27876). watchdog 1 (29264). DISK 5.5 GB free (BELOW
+  the 15 GB goal and the 8 GB floor); RAM 4.42 GB (healthy). No TEMP
+  look-verify-baseline-* leaks; no root `target/`; all `loop/slots/*/target` and
+  `loop/slots/*/wt/target` are 0 bytes; slot dirs ~0.9 GB total; bulk untracked
+  human `scratch/` 1.73 GB. Process scan: no `worker-cmd`/`run_packet`/`cargo`/
+  `rustc` other than this operator instance.
+- Step 2 land mechanically landable: all 8 worker tips (43e26c9/329f6ab/c3df084/
+  e6553db/3c2109b/ee97499/713f205/5cf4811) verified ancestors of HEAD by
+  `git merge-base --is-ancestor`. RESULT statuses read directly: slot0 LANDED,
+  slot1 complete, slot3/5/6 DONE, slot4 LANDED-WITH-FINDINGS, slot7 LANDED.
+  Nothing landable (no fresh DONE; no merge needed).
+- Step 3 unblock stuck workers: none. No IDLE/DEAD slot holds uncommitted work
+  (slot 2 IDLE is landed residue, packet TTC-RECENSUS-F1-R3 tip c3df084 is an
+  ancestor of HEAD); no live worker to preserve; no QUESTION to answer.
+- Step 4 registry hygiene: re-derived 349 rows = 253 DONE / 85 READY / 10
+  BLOCKED / 1 SUPERSEDED. None of the 10 BLOCKED rows is mechanically flippable:
+  needs unmet (DEF-VENDOR-FIXTURES / DEF-SEEDRAY-A / ADM-001-ADAPTER /
+  ADM-002-CERTIFICATES are READY not DONE) or a deliberate hold
+  (BG-AUD-FIX-004 OWNER_BLOCKED; BG-CK-SPLINE-CENSUS owner-cancelled;
+  SEM-PCURVE-MASTER-001-FIX SUPERSEDED; DEF-SPINEFRAME-GRAZE SPEC_GAP;
+  MONO-10 owner-decision; RDEF-M4/M5 milestone gates; TOR-C pinned on authoring).
+  RG-23/RG-9 are READY with MISSING packet files = authoring gap, carried; no
+  anchor-count drift to re-measure. `janitor ensure --need 15` -> reclaimed ~0.0
+  -> 5.5 GB (pool exhausted; bulk is untracked human scratch/ 1.73 GB).
+- Step 5 dispatch: NOT run manually. The heartbeat (27872) owns dispatch (the
+  documented single-instance rule; it runs `dispatch_ready.py --max-workers=3`
+  every 10 min); a manual run would race it. Read the dry-run instead:
+  "FHC-EX-A-CLOSED-LOOP-SHELL -> slot 0; FHC-EX-B / FHC-TRIM-EXTRUDE-ENVELOPE /
+  FHC-MIRROR-FORM serial behind it; RG-23/RG-9 ANCHOR CHECK FAILED (missing
+  files); dispatched 1". The real dispatcher's `new_slot` refuses below the 8 GB
+  floor. Frontier STALLED ON DISK.
+- Step 6 STATE: prepended the 19:21Z LATEST GROUND TRUTH block (18:57Z marked
+  SUPERSEDED) + appended the volatile refresh at file end. Traps/history
+  untouched.
+- Step 7: this entry.
+
+Escalations: none NEW. CARRIED - disk 5.5 GiB below the 8 GB floor stalls the
+FHC-EX frontier; RG-23/RG-9 missing packet files; RDEF-M4 re-scope; MONO-10
+owner R3-mesh decision; FRAME-REVOLVE F1 non_z_axis pin; duplicate supervisors +
+lagging cargoq restart guard; TOR-C flip-or-pin; schedule.py 'needs' crash.
+
+Worktree note (reported, not actioned): root tree carries the live human-session
+WIP (M README.md, M loop/LEDGER.jsonl, M loop/cargoq/server.log, untracked
+benchmarks/ + loop/baselines/) - untouched.
+
+Leaving: 0 RUNNING; HEAD `3080c20` + this cycle's STATE/log/escalation commit;
+heartbeat 1 (27872); operator_runner 1 (27876); watchdog 1 (29264); TWO
+supervisors + TWO cargoq servers carried; cargoq UP (queued 0, running false);
+disk 5.5 GiB free (LOW, below floor); RAM 4.42 GiB.
