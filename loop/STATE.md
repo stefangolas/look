@@ -6876,3 +6876,26 @@ at gaps (3 QUESTION/SPEC_GAP cycles, all correctly); skipped-commit-step
 is near-universal - commit AS DELIVERED after scoped checks; never trust
 a swarm claim of already-landed without grepping bd_bridge.rs (facade
 ledger != executor, hit 3x).
+
+[orchestrator HANDOFF TOP-UP 2026-09-11 ~13:1xZ (supersedes the ~11:0xZ block's
+board state; everything else there stands). SINCE THEN: MONO-9-FUSE-FOLD
+LANDED (88380b5, merge 2dff4c7 - the fold + chained-composition dispatch;
+Fillet arm restored at merge; all scoped batteries green), DOOR-PARTIAL-ARC
+LANDED (f49fdf4, merge 4c2554f - executor lathe arm, pins moved; FH IS 14/14-
+UNBLOCKED), AUTHOR-WIRE-MIRROR LANDED (38d3534), schedule.py KeyError FIXED
+(rows without needs key). R3 CENSUS RUNNING on slot 2 (pid 35048, started
+~11:00Z, was in the falcon_heavy family ~2h in - FH rows incl vehicle/
+cutaway; F1 baseline table reproduced in the slot wt). ETA 1-2h from handoff.
+NEXT SESSION FIRST ACTIONS: (1) let the census FINISH - quiet machine, do not
+dispatch anything; (2) adjudicate R3 per its packet (scoped spot-checks of
+the verdict table, timing columns), file + flip; (3) the refusal column
+DECIDES RDEF-M2 (fires only on NonTransversalContact/BudgetExhausted
+refusals - slow-but-green is a success, not a trigger; corrected rule);
+(4) CENSUS-NAMES QUESTION parked at 46ff8cc (third facade-vs-executor
+conflation: Ellipse/RectangleRounded need executor conic carriers) - amend
+like the circle flip, redispatch AFTER the census; (5) RDEF-M2/M3 are READY
+(M3 dispatchable any free slot - vendor write set disjoint; M2 only per (3));
+(6) registry status fields drifted from landed markers repeatedly - reconcile
+from git history before trusting any READY row. Key rule from this session:
+swarm/agent claims of already-landed executor capability are false 3x over -
+grep bd_bridge.rs, never trust facade ledger rows as executor facts.]
