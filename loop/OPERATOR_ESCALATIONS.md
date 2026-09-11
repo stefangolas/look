@@ -836,3 +836,15 @@ Judgment-required items appended each operator cycle. Newest at the bottom.
 - **SOLVER-CHECKER landed** (merge `01fc99c`, row `e57f36a`; preserved from
   skipped-commit at `46ba171`, ref `refs/wip/SOLVER-CHECKER-as-delivered`) -
   no amendment needed; informational.
+- **FYI - operator flipped MONO-8-SWEPT-ADMISSION-WIRING and
+  AUTHOR-EXT-FILLET-HALO BLOCKED->READY this cycle** (`45ed5d5`) under the
+  documented step-4 rule: dep MONO-7-ROW-ASSEMBLY is landed, both packets are
+  authored (preflight green, lint clean). The prior 00:05Z operator had
+  declined while the packets were unauthored; they were authored at `2a1b164`
+  / `a113b39`. Not a semantic rewrite; revertible with a one-line status flip
+  if the orchestrator intended these pinned. MONO-8 dispatched to slot 1;
+  AUTHOR-EXT is deferred on the door.py write set.
+- **FYI - DOOR-PARTIAL-ARC-FLIP anchor quoting fixed** (`45ed5d5`): the
+  escaped-double-quote cmd form is not unescaped by `gen_packet.parse_anchors`
+  and fails under `bash -lc` when the pattern contains an apostrophe. Watch
+  for the same pattern in future authored packets (only this one had it).

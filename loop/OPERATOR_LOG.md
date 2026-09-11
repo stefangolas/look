@@ -3450,3 +3450,45 @@ watchdog 1 (29264); cargoq UP; disk 21.4 GiB free; RAM 3.1 GB free.
 Leaving: 0 RUNNING; HEAD e57f36a (MONO-7 adc6151 + SOLVER-CHECKER 01fc99c
 landed); heartbeat 1 (27872); watchdog 1 (29264); cargoq UP; disk 17.4 GiB
 free; RAM 5.3 GiB free.
+
+## 2026-09-11 00:32 UTC (operator cycle)
+
+- **Health sweep (step 1)**: heartbeat exactly 1 (27872, anchored
+  `-File dispatch_heartbeat.ps1`; the extra CIM matches were this shell and an
+  msedgewebview2 gpu-watchdog false positive), watchdog 1 (29264), operator
+  runner 1 (27876), overnight driver 1 (26920, child of 27828), cargoq UP
+  (ping 200, queued 0, running false; single server.py 28544). TWO supervisors
+  (19172 PyManager + 27828 pythoncore child - carried duplication class; only
+  ONE overnight.py child = no double-merge risk). Disk 17.7 GiB free (above
+  the 8 GB floor and 15 GB goal); RAM 4.2 GiB free.
+- **Land (step 2)**: nothing landable. Slots 1-6 FINISHED residue worker
+  commits 46ba171/c3bc1a1/e6553db/3c2109b/ee97499/713f205 all verified
+  ancestors of HEAD 2a1b164. Slot 2 RESULT status is "complete" (not DONE) but
+  its commit is already merged - no action. Slot 7 = redundant FRAME-REVOLVE
+  residue (RESULT status LANDED, no commit).
+- **Unblock (step 3)**: none. Slot 0 is RUNNING (healthy); no IDLE/DEAD >15
+  min holding work, no QUESTION, no APIError 402.
+- **Registry hygiene (step 4) - TWO FLIPS + ONE ANCHOR FIX**:
+  - Flipped MONO-8-SWEPT-ADMISSION-WIRING and AUTHOR-EXT-FILLET-HALO
+    BLOCKED->READY. Both depends_on [MONO-7-ROW-ASSEMBLY], which is LANDED
+    (20b808f / merge adc6151, ancestor of HEAD); both packets exist
+    (AUTHOR-EXT a113b39, MONO-8 2a1b164), `gen_packet --check` green,
+    `packet_lint` clean. This is the documented step-4 mechanical rule.
+  - Fixed DOOR-PARTIAL-ARC-FLIP A1: the cmd used escaped double quotes
+    (`\"...executor's...\"`); `gen_packet.parse_anchors` does not unescape, so
+    `bash -lc` received the apostrophe unquoted -> "unexpected EOF while
+    looking for matching `'`" (MISMATCH). Rewrote as the repo's single-quoted
+    prefix form; A1=1 ok. Committed 45ed5d5.
+- **Dispatch (step 5)**: `dispatch_ready --dry-run --max-workers=4` -> "slots:
+  8 (1 running, 7 free); slot-assigned packets: 7"; MONO-8 -> slot 1
+  dispatched; AUTHOR-EXT + DOOR-PARTIAL-ARC-FLIP + AUTHOR-WIRE-MIRROR-ARM +
+  AUTHOR-CENSUS-NAMES deferred on the running DOOR-CIRCLE-FLIP's
+  corpus/ttc/door.py write set. Heartbeat is live - no manual dispatch.
+- **STATE.md (step 6)**: rewrote the "LATEST GROUND TRUTH" note and appended
+  the [operator 2026-09-11T00:32Z] block at the end.
+- **Escalation (step 7)**: one FYI line - the two flips (basis + revertible);
+  carried items unchanged.
+
+Leaving: 1 RUNNING (DOOR-CIRCLE-FLIP slot 0); HEAD 45ed5d5 (MONO-8 +
+AUTHOR-EXT READY; anchor fix); heartbeat 1 (27872); watchdog 1 (29264);
+cargoq UP; disk 17.7 GiB free; RAM 4.2 GiB free.

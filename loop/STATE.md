@@ -76,37 +76,33 @@ corrected, annex C = ORACLE POLICY CHANGE), then docs/SOLVER_COVERAGE_SPEC.md
 ## Where we are
 
 > LATEST GROUND TRUTH: read the newest `[operator ...]` block in "State of
-> the machine, as left" (2026-09-11T00:05Z). [operator 2026-09-11T00:05Z
-> ground-truth note: 0 RUNNING / 2 landed-this-cycle. **MONO-7-ROW-ASSEMBLY
-> (slot 0) and SOLVER-CHECKER (slot 1) BOTH finished DONE with their work
-> UNCOMMITTED** (the skipped-commit class; branches at base, no worker commit) -
-> the overnight driver's next cycle would have no-op-merged the base and marked
-> both LANDED while losing the work (10th/11th strikes of overnight.py:222-226).
-> The operator committed both AS DELIVERED (`20b808f` MONO-7, `46ba171`
-> SOLVER-CHECKER) + `refs/wip/*-as-delivered`; the driver's 20:05:32Z cycle then
-> performed REAL merges (MONO-7 `adc6151` row `8ffdf72`; SOLVER-CHECKER
-> `01fc99c` row `e57f36a`), both now ancestors of integration HEAD - work
-> preserved. **MONO-7 landed WITH TWO UNADDRESSED FINDINGS** (escalated
-> 00:05Z): D1 `truck123d/src/binding.rs:2011` PartSpec literal is outside
-> write_allow (V1 SCOPE_VIOLATION; 2-line mechanical ripple); D2 the new
-> `timing` columns break `ttc_lathe_spline.rs:392,464` whole-JSON determinism
-> assertions (packet judgement 4 intended timing to be gated only `>= 0.0`; the
-> test must pop `timing` before comparing) - the driver's scoped check did NOT
-> catch it because `packet_tests_and_crates` only matches `vendor/truck/**`
-> test paths, so any truck123d packet is checked against `truck-certified` with
-> NO tests (vacuous green). Registry: 324 rows - MONO-7 + SOLVER-CHECKER now
-> LANDED; AUTHOR-EXT-FILLET-HALO / MONO-8 (need MONO-7) and TTC-RECENSUS-F1-R3
-> (need MONO-7+AUTHOR-EXT) are now unblocked-by-deps but stay BLOCKED until
-> flipped. dispatch_ready --dry-run: "slots: 8 (0 running, 8 free);
-> slot-assigned packets: 7; dispatched 0" = REAL idle (heartbeat-owned; no
-> manual dispatch). Health: heartbeat exactly 1 (27872; second CIM match was
-> this shell self-matching), watchdog 1 (29264), operator runner 1 (27876),
-> overnight driver 1 (26920), cargoq UP (ping ok, queued 0, running false;
-> single server.py 28544); TWO supervisors (19172 + 27828, carried; only ONE
-> overnight.py child = no double-merge risk). Disk 17.4 GiB free (above the
-> 8 GB floor AND 15 GB goal); RAM 5.3 GiB free. Open human items: (NEW/hot)
-> amend MONO-7 D1+D2 then re-verify; fix `packet_tests_and_crates` crate
-> derivation; fix overnight.py:222-226 (now 11 strikes); carried - duplicate
+> the machine, as left" (2026-09-11T00:32Z). [operator 2026-09-11T00:32Z
+> ground-truth note: 1 RUNNING / 0 landed-this-cycle. **DOOR-CIRCLE-FLIP
+> (slot 0) is RUNNING** (pid 28884, dispatched by the heartbeat ~00:28Z,
+> events fresh, write set corpus/ttc/door.py +
+> truck123d/tests/door_circle_flip.rs) - do not touch. **THIS CYCLE the
+> operator flipped MONO-8-SWEPT-ADMISSION-WIRING and AUTHOR-EXT-FILLET-HALO
+> BLOCKED->READY** (dep MONO-7-ROW-ASSEMBLY is landed; both packets authored,
+> `gen_packet --check` green, `packet_lint` clean; commit `45ed5d5`).
+> dispatch_ready --dry-run: MONO-8 -> slot 1 dispatched (AUTHOR-EXT + the
+> three door packets deferred on the running DOOR-CIRCLE-FLIP's
+> corpus/ttc/door.py write set); the live heartbeat owns dispatch, no manual
+> dispatch. The operator also fixed DOOR-PARTIAL-ARC-FLIP's A1 anchor command
+> (the escaped-double-quote form broke under the harness's `bash -lc` quoting
+> - the unescaped apostrophe in "executor's" produced an EOF; now a
+> single-quoted prefix, A1=1 ok) - same commit `45ed5d5`. No landings
+> available: every FINISHED slot's worker commit
+> (`46ba171`/`c3bc1a1`/`e6553db`/`3c2109b`/`ee97499`/`713f205`) is an ancestor
+> of HEAD (slot 2 RESULT status "complete" not DONE but already merged; slot 7
+> is the redundant FRAME-REVOLVE residue, no commit). MONO-9/MONO-10 (dep
+> MONO-8) and TTC-RECENSUS-F1-R3 (dep MONO-7+AUTHOR-EXT) stay BLOCKED (deps
+> not landed). Registry: 334 rows. Health: heartbeat exactly 1 (27872),
+> watchdog 1 (29264), operator runner 1 (27876), overnight driver 1 (26920),
+> cargoq UP (ping 200, queued 0), TWO supervisors (19172 + 27828, carried;
+> only ONE overnight.py child = no double-merge risk). Disk 17.7 GiB free
+> (above the 8 GB floor AND 15 GB goal); RAM 4.2 GiB free. Open human items
+> (carried): amend MONO-7 D1+D2 then re-verify; fix `packet_tests_and_crates`
+> crate derivation; fix overnight.py:222-226 (now 11 strikes); duplicate
 > supervisors + lagging cargoq restart guard; slot-4/7 wt RESULT residue;
 > MONO-row registry schema gap.]
 
@@ -5675,3 +5671,41 @@ paths (truck123d packets are currently checked against truck-certified with no
 tests); fix overnight.py:222-226 (now 11 strikes); carried - duplicate
 supervisors + lagging cargoq restart guard; slot-4/7 wt RESULT residue;
 MONO-row registry schema gap.]
+
+[operator 2026-09-11T00:32Z - volatile refresh. Board now: 1 RUNNING / 0
+landed-this-cycle. **DOOR-CIRCLE-FLIP is RUNNING in slot 0** (pid 28884,
+dispatched by the heartbeat ~00:28Z from base 2a1b164; events <1 min fresh,
+git branch at base - pre-commit, making progress; write set corpus/ttc/door.py
++ truck123d/tests/door_circle_flip.rs) - do not touch. **THE OPERATOR FLIPPED
+MONO-8-SWEPT-ADMISSION-WIRING and AUTHOR-EXT-FILLET-HALO BLOCKED->READY**
+(commit 45ed5d5): both depends_on [MONO-7-ROW-ASSEMBLY], which is LANDED
+(20b808f / merge adc6151, ancestor of HEAD); both packets were authored by the
+orchestrator (AUTHOR-EXT at a113b39, MONO-8 at 2a1b164), gen_packet --check
+green and packet_lint clean; the flip is the documented step-4 mechanical rule
+(deps landed + packet present), NOT a semantic rewrite. dispatch_ready
+--dry-run --max-workers=4: "slots: 8 (1 running, 7 free); slot-assigned
+packets: 7" -> MONO-8 dispatched to slot 1; AUTHOR-EXT deferred (write-set
+clash corpus/ttc/door.py with the running DOOR-CIRCLE-FLIP) and the three door
+packets likewise deferred; the live heartbeat owns dispatch, no manual
+dispatch. **DOOR-PARTIAL-ARC-FLIP anchor fix**: its A1 cmd used escaped
+double quotes (`\"...executor's...\"`); gen_packet's parse_anchors does not
+unescape, so `bash -lc` saw the apostrophe unquoted -> "unexpected EOF while
+looking for matching `'`" (MISMATCH). Changed to the repo's single-quoted
+prefix form (`grep -c 'a partial-arc revolve is outside the executor'`),
+A1=1 ok; same commit 45ed5d5. Nothing to land: slots 1-6 worker commits
+46ba171/c3bc1a1/e6553db/3c2109b/ee97499/713f205 all ancestors of HEAD (slot 2
+RESULT status "complete", not DONE, but already merged - no action; slot 4 F1
+landed-with-findings residue; slot 7 redundant FRAME-REVOLVE residue with no
+commit). Nothing to unblock (no IDLE/DEAD >15 min holding work; no QUESTION; no
+APIError 402). Registry: MONO-9 + MONO-10 stay BLOCKED (dep MONO-8 not
+landed); TTC-RECENSUS-F1-R3 stays BLOCKED (dep AUTHOR-EXT not landed); the
+seven owner-parked/superseded BLOCKED rows unchanged. Health: heartbeat
+exactly 1 (27872), watchdog 1 (29264), operator runner 1 (27876), overnight
+driver 1 (26920, child of 27828), cargoq UP (ping 200, queued 0), TWO
+supervisors (19172 PyManager + 27828 pythoncore child - carried duplication
+class; only ONE overnight.py child = no double-merge risk). Disk 17.7 GiB free
+(above the 8 GB floor AND the 15 GB janitor goal); RAM 4.2 GiB free. Open
+human items (carried, unchanged): amend MONO-7 D1+D2 then re-verify;
+`packet_tests_and_crates` crate derivation; overnight.py:222-226 (11 strikes);
+duplicate supervisors + lagging cargoq restart guard; slot-4/7 wt RESULT
+residue; MONO-row registry schema gap.]
