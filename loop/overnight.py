@@ -94,8 +94,21 @@ def packet_tests_and_crates(packet_path, row):
         return [], []
     pairs = [(m.group(1), m.group(2)) for m in
              re.finditer(r"vendor/truck/(\S+)/tests/(\w+)\.rs", text)]
+    # Root-crate test pairs: truck123d/tests/*.rs named in the packet's
+    # write_allow or tests_required. Orchestrator fix 2026-09-10: the
+    # vendor-only regex left every truck123d/loop/corpus packet with
+    # pairs=[] and crates falling back to truck-certified - the vacuous
+    # scoped check that landed MONO-7's D2 regression (escalation
+    # 00:05Z). A scoped check that runs zero tests greens nothing.
+    pairs += [("truck123d", m.group(1)) for m in
+              re.finditer(r"truck123d/tests/(\w+)\.rs", text)]
     crates = sorted({p.split("/")[2] for p in (row.get("writes") or [])
                      if p.startswith("vendor/truck/")})
+    # Crates from the row's write paths generally: the root crate owns
+    # truck123d/**, corpus/**, and loop-adjacent test paths.
+    if any(p.startswith(("truck123d/", "corpus/"))
+           for p in (row.get("writes") or [])):
+        crates = sorted(set(crates) | {"truck123d"})
     if not crates:
         crates = ["truck-certified"]
     return crates, pairs
@@ -221,6 +234,19 @@ def try_land(slot_dir, slot_no, rows, order, reg_path):
         return
     head = git(["rev-parse", "--short", "HEAD"],
                cwd=slot_dir / "wt").stdout.strip()
+    # No-op-merge guard (orchestrator fix 2026-09-10, 11th+12th strikes
+    # MONO-7/SOLVER-CHECKER): a slot branch tip with ZERO commits ahead of
+    # integration is a base commit - merging it "succeeds" and flips the
+    # row LANDED over NO content. A landing REQUIRES real work ahead of
+    # the integration branch; a no-op is NOT LANDED, log it, leave the
+    # row alone for adjudication.
+    ahead = git(["rev-list", "--count", f"integration/kernel-bg..{head}"],
+                cwd=slot_dir / "wt").stdout.strip()
+    if ahead == "0":
+        log(f"slot {slot_no}: {pid} FINISHED but branch tip {head} has 0 "
+            f"commits ahead of integration - no-op merge REFUSED "
+            f"(skipped-commit class); row NOT landed")
+        return
     m = git(["merge", "--no-ff", "--no-edit", "-m",
              f"merge: {pid} - overnight mechanical landing (scoped check "
              f"green: {why}; one-verify amendment)", head])

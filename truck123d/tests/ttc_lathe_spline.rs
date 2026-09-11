@@ -389,7 +389,14 @@ import truck123d
 row = sys.argv[1]
 first = truck123d.bd_facts(row)
 second = truck123d.bd_facts(row)
-assert first == second, "facts must be deterministic"
+# Timing columns are wall-clock diagnostics (MONO-7 judgement 4): strip
+# them before the determinism compare - the gate's property is SEMANTIC
+# facts determinism, never wall-clock identity. Orchestrator amendment
+# 2026-09-10 (D2).
+strip_timing = lambda s: json.dumps(
+    {k: v for k, v in json.loads(s).items() if k != "timing"},
+    sort_keys=True)
+assert strip_timing(first) == strip_timing(second), "facts must be deterministic"
 facts = json.loads(first)
 assert facts["solid_count"] == 1
 assert isinstance(facts["volume"], float) and facts["volume"] > 0.0
@@ -461,7 +468,19 @@ fn nozzle_assembly_truck_door_now_reaches_facts() {
     // measurement-semantics finding). Repeated runs must be byte-identical.
     assert!(facts["volume"].is_number());
     let again = run_truck_door("lib.merlin_common", "make_nozzle_assembly");
-    assert_eq!(again["facts"], *facts, "truck facts must be deterministic");
+    // Timing columns are wall-clock diagnostics (MONO-7 judgement 4): strip
+    // them before the determinism compare. Orchestrator amendment
+    // 2026-09-10 (D2).
+    let strip = |v: &serde_json::Value| {
+        let mut f = v["facts"].clone();
+        f.as_object_mut().map(|o| o.remove("timing"));
+        f
+    };
+    assert_eq!(
+        strip(&again),
+        strip(&record),
+        "truck facts must be deterministic"
+    );
 }
 
 /// The mvac row's boundary: after the frame-carrier cure (AUTHOR-FRAME-CARRIERS)
