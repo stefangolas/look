@@ -1,0 +1,64 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "loop/solver_coverage/schema.json",
+  "title": "SOLVER-COVERAGE RULES fragment schema (normative)",
+  "description": "Contract for every extraction packet's RULE fragment, per docs/SOLVER_COVERAGE_SPEC.md section 1. The schema is open-world at the VALUE level: a precondition/outcome value that does not fit a known axis value is recorded as \"!unmodeled:<verbatim>\", a first-class abstraction-gap finding rather than a schema violation.",
+  "type": "object",
+  "required": ["fragment", "rules"],
+  "properties": {
+    "fragment": {"type": "string", "enum": ["A", "B", "C", "D"]},
+    "rules": {"type": "array", "items": {"$ref": "#/definitions/rule"}},
+    "unmodeled_values": {"type": ["array", "null"], "items": {"type": "string"}},
+    "unmodeled_axis_keys": {"type": ["array", "null"], "items": {"type": "string"}},
+    "skipped": {"type": ["array", "null"]},
+    "notes": {"type": ["string", "null"]}
+  },
+  "definitions": {
+    "axis_claim": {
+      "type": "object",
+      "required": ["axis", "value"],
+      "properties": {
+        "axis": {"type": "string"},
+        "value": {"type": ["string", "null"]}
+      },
+      "additionalProperties": true
+    },
+    "outcome": {
+      "type": "object",
+      "required": ["variant", "postconditions"],
+      "properties": {
+        "variant": {"type": "string"},
+        "postconditions": {"type": "array", "items": {"$ref": "#/definitions/axis_claim"}}
+      },
+      "additionalProperties": true
+    },
+    "rule": {
+      "type": "object",
+      "required": ["rule_id", "kind", "source", "preconditions", "outcomes",
+                   "refusals", "consumes_evidence", "produces_evidence", "calls",
+                   "theorem_comment", "confidence"],
+      "properties": {
+        "rule_id": {"type": "string"},
+        "kind": {"type": "string", "enum": ["solver", "reduction", "classifier", "gate", "assembler"]},
+        "source": {
+          "type": "object",
+          "required": ["file", "symbol", "line"],
+          "properties": {
+            "file": {"type": "string"},
+            "symbol": {"type": "string"},
+            "line": {"type": "integer"}
+          }
+        },
+        "preconditions": {"type": "array", "items": {"$ref": "#/definitions/axis_claim"}},
+        "outcomes": {"type": "array", "items": {"$ref": "#/definitions/outcome"}},
+        "refusals": {"type": "array", "items": {"type": "string"}},
+        "consumes_evidence": {"type": "array", "items": {"type": "string"}},
+        "produces_evidence": {"type": "array", "items": {"type": "string"}},
+        "calls": {"type": "array", "items": {"type": "string"}},
+        "theorem_comment": {"type": "string"},
+        "confidence": {"type": "string", "enum": ["high", "medium", "low"]}
+      },
+      "additionalProperties": true
+    }
+  }
+}
