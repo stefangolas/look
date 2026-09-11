@@ -42,12 +42,7 @@ pub fn peak_rss_bytes() -> Option<u64> {
         let status = std::fs::read_to_string("/proc/self/status").ok()?;
         for line in status.lines() {
             if let Some(value) = line.strip_prefix("VmHWM:") {
-                let kib: u64 = value
-                    .trim()
-                    .trim_end_matches("kB")
-                    .trim()
-                    .parse()
-                    .ok()?;
+                let kib: u64 = value.trim().trim_end_matches("kB").trim().parse().ok()?;
                 return Some(kib * 1024);
             }
         }

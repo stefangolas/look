@@ -53,7 +53,7 @@ use truck_certified::construct::patches::{PatchParent, TensorBernsteinPatch};
 use truck_certified::kernel::patch::IBox2;
 
 use crate::facade::{BooleanPairVerdict, CarrierClass, SweptBooleanEvent};
-use crate::glb_emit::{emit_glb, GlbMesh, GlbNodePayload, SrgbColor};
+use crate::glb_emit::{GlbMesh, GlbNodePayload, SrgbColor, emit_glb};
 use crate::marshal::{ExceptionClass, Marshaled, MarshaledPayload};
 use crate::python;
 use crate::python::binding::{EdgeSelectorRow, FilletBaseRow, FilletRefusal, FilletRow};
@@ -4516,7 +4516,11 @@ fn tree_mesh(root: &TreeNode, deflection: Option<f64>) -> Result<Vec<Triangle>, 
     Ok(triangles)
 }
 
-fn append_node_mesh(node: &TreeNode, out: &mut Vec<Triangle>, deflection: Option<f64>) -> Result<(), Refusal> {
+fn append_node_mesh(
+    node: &TreeNode,
+    out: &mut Vec<Triangle>,
+    deflection: Option<f64>,
+) -> Result<(), Refusal> {
     match node {
         TreeNode::Part { part } => {
             let local = solid_mesh(&part.solid, deflection)?;
@@ -5005,7 +5009,11 @@ fn box_mesh(length: f64, width: f64, height: f64) -> Vec<Triangle> {
 }
 
 /// A z-axis cylinder mesh (radius `r`, height `h`, centered on the origin).
-fn cylinder_z_mesh(radius: f64, height: f64, deflection: Option<f64>) -> Result<Vec<Triangle>, Refusal> {
+fn cylinder_z_mesh(
+    radius: f64,
+    height: f64,
+    deflection: Option<f64>,
+) -> Result<Vec<Triangle>, Refusal> {
     if radius <= 0.0 || height <= 0.0 || !radius.is_finite() || !height.is_finite() {
         return Err(Refusal::Empty);
     }
@@ -5164,10 +5172,7 @@ fn lathe_mesh(
     // The sweep radius is the profile's largest excursion from the axis: the
     // chord sagitta of the angular segments is bounded by the deflection at
     // that radius.
-    let sweep_radius = ring
-        .iter()
-        .map(|p| p[0].hypot(p[1]))
-        .fold(0.0f64, f64::max);
+    let sweep_radius = ring.iter().map(|p| p[0].hypot(p[1])).fold(0.0f64, f64::max);
     let segments = sweep_segments(sweep_radius, deflection);
     if arc == 360.0 {
         return sweep_ring_mesh(&ring, segments);
@@ -5377,7 +5382,11 @@ fn push_quad(out: &mut Vec<Triangle>, a: [f64; 3], b: [f64; 3], c: [f64; 3], d: 
 /// per triangle a normal (zeroed), three vertices as f32 and a u16 attribute.
 /// `deflection` of `None` keeps the landed fixed-resolution deterministic
 /// mesh (the recorded fingerprint rule) bit-for-bit.
-pub fn write_tree_stl(root: &TreeNode, path: &str, deflection: Option<f64>) -> Result<u64, Refusal> {
+pub fn write_tree_stl(
+    root: &TreeNode,
+    path: &str,
+    deflection: Option<f64>,
+) -> Result<u64, Refusal> {
     let triangles = tree_mesh(root, deflection)?;
     if triangles.is_empty() {
         return Err(Refusal::Empty);
@@ -11318,7 +11327,8 @@ print(json.dumps([z_row, loft_row]))
         // Orientation flips: the signed mesh volume negates.
         let base_signed = signed_mesh_volume(&solid_mesh(&member, None).expect("base mesh"));
         let mirror_solid = reflect_solid(&member, "y").expect("control-point reflection");
-        let mirror_signed = signed_mesh_volume(&solid_mesh(&mirror_solid, None).expect("mirror mesh"));
+        let mirror_signed =
+            signed_mesh_volume(&solid_mesh(&mirror_solid, None).expect("mirror mesh"));
         assert!(base_signed * mirror_signed < 0.0, "orientation must flip");
         assert!(
             (base_signed.abs() - mirror_signed.abs()).abs() <= 1.0e-9 * (1.0 + base_signed.abs())
