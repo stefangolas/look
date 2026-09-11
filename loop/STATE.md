@@ -94,8 +94,9 @@ corrected, annex C = ORACLE POLICY CHANGE), then docs/SOLVER_COVERAGE_SPEC.md
 > READY / 10 BLOCKED / 1 SUPERSEDED). Health: heartbeat exactly 1 (27872),
 > watchdog 1 (29264), operator runner 1 (27876), overnight driver 1 (26920),
 > cargoq UP (ping 200, queued 0), TWO supervisors (19172 + 27828, carried;
-> only ONE overnight.py child = no double-merge risk). Disk 10.3 GiB free
-> (above the 8 GB floor, below 15 GB goal); RAM 4.2 GiB free. Open human
+> only ONE overnight.py child = no double-merge risk). Disk 8.3 GiB free
+> (above the 8 GB floor but LOW - fell from 10.3 during this cycle's scoped
+> build; below the 15 GB goal); RAM 3.3 GiB free. Open human
 > items: (NEW/hot) clear the RG-4 false `LANDED 4703b38` marker and land
 > `340b395`; amend MONO-7 D1+D2 then re-verify; fix `packet_tests_and_crates`
 > crate derivation; fix overnight.py:222-226 (now 13 strikes incl. the
@@ -5744,8 +5745,9 @@ exactly 1 (27872; the extra matches were this operator's own probe shells),
 watchdog 1 (29264), operator runner 1 (27876), overnight driver 1 (26920, child
 of 27828), cargoq UP (ping 200, queued 0), TWO supervisors (19172 PyManager +
 27828 pythoncore child - carried duplication class; only ONE overnight.py child
-= no double-merge risk). Orchestrator session LIVE (4 opencode.exe). Disk 10.3
-GiB free (above the 8 GB floor, below the 15 GB goal); RAM 4.2 GiB free. Open
+= no double-merge risk). Orchestrator session LIVE (4 opencode.exe). Disk 8.3
+GiB free (above the 8 GB floor but LOW - fell from 10.3 during this cycle's
+scoped build; below the 15 GB goal); RAM 3.3 GiB free. Open
 human items: (NEW/hot) clear the RG-4 false `LANDED 4703b38` marker and land
 `340b395`; amend MONO-7 D1+D2 then re-verify; fix `packet_tests_and_crates`
 crate derivation; fix overnight.py:222-226 (now 13 strikes); duplicate

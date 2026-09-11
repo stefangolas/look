@@ -3540,6 +3540,7 @@ cargoq UP; disk 17.7 GiB free; RAM 4.2 GiB free.
   (13th strike, slot-reuse race variant) + preserved ref + the marker-clear/
   landing ask + the false-landing-detector caveat. Carried items unchanged.
 
-Leaving: 2 RUNNING (DOOR-CIRCLE-FLIP slot 0, MONO-8 slot 1); HEAD 4703b38;
-heartbeat 1 (27872); watchdog 1 (29264); cargoq UP; disk 10.3 GiB free; RAM
-4.21 GiB free.
+Leaving: 2 RUNNING (DOOR-CIRCLE-FLIP slot 0, MONO-8 slot 1); HEAD 5992777;
+heartbeat 1 (27872); watchdog 1 (29264); cargoq UP; disk 8.3 GiB free (fell
+from 10.3 during this cycle's scoped build; above the 8 GB floor but LOW); RAM
+3.3 GiB free.
