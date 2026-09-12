@@ -2159,3 +2159,23 @@ uncommitted - left for the orchestrator, no dispatch impact.
   authoring, not drift); duplicate supervisors 19172+27828 + duplicate cargoq/server.py
   28544+34564; F1-AUTHORING-ARMS LANDED-WITH-FINDINGS; FRAME-REVOLVE F1 non_z_axis
   pin; TOR-C flip-or-pin; slot-2/4/7 wt RESULT residue.
+
+## 2026-09-12 19:35 UTC (operator): CLOSED - the 18:09Z/19:07Z dead-dispatch reset hazard is resolved; FHC-FACTS-CACHE landed
+
+- Resolution: no live worker remained. The slot-1 worker (cmd 29372) exited and the
+  slot-0 fresh re-implementation worker (cmd 24000 / opencode 22596) died ~15:31; the
+  ORCHESTRATOR landed the operator-preserved orphan 2a0d581 (merge b05a753, row DONE
+  a8118b5) and cleared the redundant slot-0 worker. So the "reset a live slot mid-write"
+  harm never fired. No operator action was required or taken.
+- Residual (low priority, no action needed): the dead slot-0 worker's WIP archive
+  loop/slots/0/abandoned-20260912-153155.patch is INCOMPLETE - it lacks the untracked
+  truck123d/tests/facts_cache.rs (the untracked-files-not-archived recycle trap). It is
+  moot because the landed orphan 2a0d581 carries that file, but the archive gap is a
+  real machinery defect worth fixing in run_packet's reset path.
+- Dispatch state: FHC-G7-REFUSAL-METADATA is the next READY packet. The heartbeat's
+  15:24 cycle failed its slot-2 warm build (0xc0000409 / exit 101, RAM-zone); RAM is
+  now 3.34 GB free (just above the 3 GB floor) so the heartbeat should succeed next
+  cycle. Do NOT run dispatch_ready live (heartbeat owns dispatch).
+- Carried unchanged: RG-23/RG-9 missing packet files; duplicate supervisors + duplicate
+  cargoq/server.py; F1-AUTHORING-ARMS LANDED-WITH-FINDINGS; FRAME-REVOLVE F1 non_z_axis
+  pin; TOR-C flip-or-pin; slot-2/4/7 wt RESULT residue.

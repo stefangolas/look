@@ -75,40 +75,31 @@ corrected, annex C = ORACLE POLICY CHANGE), then docs/SOLVER_COVERAGE_SPEC.md
 
 ## Where we are
 
-> LATEST GROUND TRUTH [operator 2026-09-12T19:07Z]: 1 RUNNING (slot 1 FHC-FACTS-CACHE,
-> alive door.py pass) / 0 landed-since-last-op / 0 unblocked / 0 flipped / 0 dispatched.
-> HEAD `bc8bdcb` (integration/kernel-bg tip). LANDED since the 18:42Z block:
-> FHC-G2-PROBE-QUERIES - worker d8a6bd4 recovered post-recycle, merged 07fd88b, row
-> flipped DONE bc8bdcb (15:00:41 local).
-> *** CRITICAL / IMMINENT: `dispatch_ready --dry-run` NOW reports 0 running and
-> classifies slot 1's FHC-FACTS-CACHE as a DEAD dispatch ("would reset + delete +
-> redispatch") while slot 1's worker is ALIVE (cmd 29372, opencode 29476, live
-> facts_call_count.py on slots/1/wt). The heartbeat (27872, LIVE, 10-min cycles) runs
-> dispatch_ready LIVE (--max-workers=3); its next cycle (~15:10 local) will
-> `run_packet.py --reset-only` slot 1 mid-write and re-dispatch FHC-FACTS-CACHE into
-> the reset tree = a duplicate worker + destroyed WIP. DO NOT run dispatch_ready live.
-> This is the SAME hazard escalated 18:09Z, now ARMED. Escalated 19:07Z. ***
-> Slot 0 = DEAD FHC-FACTS-CACHE residue: worker gone, wt clean detached at the
-> ORPHANED worker commit 2a0d581 (bd_bridge.rs +132, facts_cache.rs +483; NOT an
-> ancestor of integration/kernel-bg; NO RESULT.json). PRESERVED this cycle at
-> refs/wip/FHC-FACTS-CACHE-2a0d581 (it was reachable only from the slot-0 wt HEAD; no
-> branch/ref contained it). NOT operator-landable (no RESULT DONE) - recovery is an
-> owner/orchestrator adjudication like FHC-G2/G3.
-> Slot 1 = FHC-FACTS-CACHE ALIVE (cmd 29372, opencode 29476; events stale because the
-> serial facts_call_count.py door pass writes no events - the documented STALLED
-> false-positive). Slot 0+1 both write bd_bridge.rs + facts_cache.rs = the duplicate.
-> Slot 2 = IDLE TTC-RECENSUS-F1-R3 residue (wt on packet/FHC-G2-PROBE-QUERIES@d8a6bd4,
-> now landed; no RESULT). Slots 3-7 FINISHED landed residue.
-> Registry (last-wins): 356 unique = 259 DONE / 86 READY / 10 BLOCKED / 1 SUPERSEDED.
-> All 10 BLOCKED re-read: every row carries an owner-park/cancel/supersede/human-gate
-> note - NOTHING flipped. RG-23/RG-9 anchor check still fails because their packet .md
-> files are ABSENT (missing authoring, NOT drift); no landings, so no anchor ritual.
-> Health: RAM 2.36 GB free (BELOW the 3 GB floor); Disk 11.35 GiB free (above the 8 GB
-> floor, BELOW the 15 GB janitor goal). Heartbeat 1 (27872, LIVE), operator_runner 1
-> (27876), watchdog 1 (29264), cargoq UP (ping ok, queued 0, running false). Carried
-> duplication: TWO supervisor.py (19172 + 27828) + TWO cargoq/server.py (28544 + 34564).
-> No TEMP baseline leaks. Root worktree human WIP untouched.
-> Leaving: 1 RUNNING (slot 1 FHC-FACTS-CACHE) / HEAD `bc8bdcb`.
+> LATEST GROUND TRUTH [operator 2026-09-12T19:35Z]: 0 RUNNING / 0 landed-by-operator /
+> 0 unblocked / 0 flipped / 0 dispatched. HEAD `a8118b5` (integration/kernel-bg tip).
+> LANDED since the 19:07Z block: **FHC-FACTS-CACHE** - the operator-preserved orphan
+> commit 2a0d581 was scoped-verified 5/5 at merged HEAD and landed (merge b05a753, row
+> flipped DONE a8118b5). The 19:07Z CRITICAL "live worker / armed dead-dispatch reset"
+> hazard is RESOLVED: the slot-0 fresh re-implementation worker died ~15:31 and was
+> cleared by the orchestrator as redundant once the orphan landed; no live worker
+> remained, so no reset could destroy WIP. (The dead worker's partial WIP is archived at
+> loop/slots/0/abandoned-20260912-153155.patch - bd_bridge.rs +179, ttc_hazard_battery.rs
+> - and notably does NOT contain the untracked truck123d/tests/facts_cache.rs, the known
+> untracked-not-archived recycle trap; moot because the landed orphan carries it.)
+> Registry (last-wins): 356 unique = 260 DONE / 85 READY / 10 BLOCKED / 1 SUPERSEDED.
+> Frontier: FHC-G7-REFUSAL-METADATA is READY (dep FHC-G2 landed) and is the next
+> dispatch; the heartbeat's 15:24 cycle FAILED its warm build on slot 2 (0xc0000409
+> RAM-zone) - retry expected now the resident worker is gone (RAM recovered to ~3.3 GB).
+> RG-23/RG-9 anchor checks still fail because their packet .md files are ABSENT (missing
+> authoring, NOT drift). All 10 BLOCKED rows re-read: every row carries an owner-park/
+> cancel/supersede/human-gate note - NOTHING flipped.
+> Health: RAM 3.34 GB free (just ABOVE the 3 GB floor - recovered once the worker died);
+> Disk 15.93 GiB free (above the 8 GB floor AND the 15 GB janitor goal; the janitor
+> reclaimed ~7.3 GB this cycle from repo-root target + idle slot 1/2 targets). Heartbeat
+> 1 (27872, LIVE; last cycle 15:24), watchdog 1 (29264), operator runner 1, cargoq UP
+> (ping ok, queued 0, running false). Carried duplication: TWO supervisor.py + TWO
+> cargoq/server.py. No TEMP baseline leaks.
+> Leaving: 0 RUNNING / HEAD `a8118b5`.
 >
 > NOTE: this cycle refreshed the prior block in place (timestamp/HEAD/board/health) to
 > keep the volatile section at ~1 block (charter cap ~120 lines). Prior cycles' refreshes
@@ -156,29 +147,24 @@ corrected, annex C = ORACLE POLICY CHANGE), then docs/SOLVER_COVERAGE_SPEC.md
 
 ## State of the machine, as left
 
-- 1 worker ALIVE: slot 1 `FHC-FACTS-CACHE` (cmd pid 29372, opencode child 29476, live
-  facts_call_count.py child 2076 on slots/1/wt/corpus/ttc; events stale = the serial
-  door.py pass writes no events; dirty wt M bd_bridge.rs + ?? facts_cache.rs).
-- *** Do NOT kill the live worker (charter) and do NOT run dispatch_ready live. The
-  heartbeat runs it live every 10 min and will reset+redispatch slot 1 (see the
-  CRITICAL block above). Escalated 19:07Z. ***
-- Slot 0 = DEAD FHC-FACTS-CACHE residue: no process; wt clean detached at the orphaned
-  worker commit 2a0d581 (NOT an ancestor, no RESULT). Preserved this cycle at
-  refs/wip/FHC-FACTS-CACHE-2a0d581; NOT landable.
-- Heartbeat (27872) is LIVE and cycling (14:50:35, 15:00:39 local) - it is the process
-  that will fire the slot-1 reset on its next cycle.
-- LANDED this cycle: FHC-G2-PROBE-QUERIES (d8a6bd4 recovered post-recycle, merge
-  07fd88b, row DONE bc8bdcb). HEAD `bc8bdcb`.
-- Slots 2-7 FINISHED/IDLE residue (slots 3/4/5/6/7 RESULT present, worker commits
-  ancestors; slot 4 = F1-AUTHORING-ARMS LANDED-WITH-FINDINGS; slot 2 no RESULT).
-- Substrate: heartbeat 1 (27872, LIVE), operator runner 1 (27876), watchdog 1 (29264),
-  cargoq UP (ping ok, queued 0, running false). TWO supervisor.py (19172 + 27828) and
-  TWO cargoq/server.py (28544 + 34564) = carried duplication class.
-- Disk 11.35 GiB free (above the 8 GB floor, BELOW the 15 GB janitor goal).
-- RAM 2.36 GB free (BELOW the 3 GB floor; owner desktop + 1 resident worker).
-- [operator 2026-09-12T19:07Z] board: 1 RUNNING (slot 1 FHC-FACTS-CACHE) / 0
-  landed-since-last-op / 0 unblocked / 0 flipped / 0 dispatched; registry 356 =
-  259 D / 86 R / 10 B / 1 S; HEAD bc8bdcb.
+- 0 workers alive. Slots 0/1/2 IDLE (slot 0 = dead FHC-FACTS-CACHE re-implementation
+  residue, wt reset clean, partial WIP archived at
+  loop/slots/0/abandoned-20260912-153155.patch - the untracked
+  truck123d/tests/facts_cache.rs was NOT archived, the known recycle trap; moot, the
+  packet is landed via orphan 2a0d581 which carries it). Slots 3-7 FINISHED landed
+  residue (all worker commits ancestors of integration/kernel-bg, re-verified).
+- FHC-FACTS-CACHE DONE (operator-preserved orphan 2a0d581 verified 5/5 at merged HEAD;
+  merge b05a753, row flip a8118b5). HEAD `a8118b5`.
+- Do NOT run dispatch_ready live - the heartbeat (27872) owns dispatch and is LIVE
+  (last cycle 15:24, dispatched 0; FHC-G7 slot-2 warm build 0xc0000409 RAM-zone).
+- Substrate: heartbeat 1 (27872), watchdog 1 (29264), operator runner 1, cargoq UP
+  (ping ok, queued 0, running false). TWO supervisor.py and TWO cargoq/server.py =
+  carried duplication class.
+- Disk 15.93 GiB free (above the 8 GB floor AND the 15 GB janitor goal; janitor
+  reclaimed ~7.3 GB this cycle).
+- RAM 3.34 GB free (just above the 3 GB floor; recovered once the resident worker died).
+- [operator 2026-09-12T19:35Z] board: 0 RUNNING / 0 landed-by-operator / 0 unblocked /
+  0 flipped / 0 dispatched; registry 356 = 260 D / 85 R / 10 B / 1 S; HEAD a8118b5.
 
 [operator 2026-09-09T02:2xZ - volatile refresh after the ADM-L4 operator
 landing. Board now: 0 running / 6 FINISHED residue (L1,L2,L3,F1,CL-005,

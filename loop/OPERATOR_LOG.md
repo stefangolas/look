@@ -8565,3 +8565,60 @@ wt RESULT residue; RAM below the 3 GB floor.
 Leaving: 1 RUNNING (slot 1 FHC-FACTS-CACHE) / HEAD bc8bdcb + this cycle's
 STATE/log/escalations commit; heartbeat 1 (27872, LIVE); operator_runner 1; watchdog
 1; cargoq UP; disk 11.35 GiB; RAM 2.36 GB.
+
+## 2026-09-12 19:35 UTC (operator): hazard RESOLVED - FHC-FACTS-CACHE landed via preserved orphan 2a0d581; 0 running; disk reclaimed to 15.9 GB
+
+Health (step 1): `slot_status` = 0 RUNNING. Slots 0/1/2 IDLE, 3-7 FINISHED. The
+19:07Z CRITICAL hazard is RESOLVED without operator action: the slot-1 worker (cmd
+29372) is GONE and the slot-0 fresh re-implementation worker (cmd 24000, opencode
+22596) died ~15:31; no live worker remained, so no reset could clobber WIP. HEAD
+moved ca8f32e -> a8118b5: the ORCHESTRATOR landed the preserved orphan 2a0d581 (merge
+b05a753, row DONE a8118b5) and cleared the redundant slot-0 worker. Heartbeat 1
+(27872; the anchored `.Count` false-0 is the scalar-no-Count PS 5.1 artifact),
+watchdog 1 (29264), cargoq UP (ping ok, queued 0, running false), operator runner
+present. Two supervisor.py + two cargoq/server.py = carried duplication. No TEMP
+baseline leaks.
+
+Landing (step 2): nothing to land. All five FINISHED slot commits (SOLVER-SURVEY-C
+e6553db, F1-AUTHORING-ARMS 3c2109b, CL-006 ee97499, CL-005 713f205, FRAME-REVOLVE
+5cf4811) re-verified `merge-base --is-ancestor` exit 0 against integration/kernel-bg.
+The dead slot-0 WIP was archived at loop/slots/0/abandoned-20260912-153155.patch
+(bd_bridge.rs +179, ttc_hazard_battery.rs) - note the untracked
+truck123d/tests/facts_cache.rs was NOT archived (the documented untracked-not-archived
+recycle trap, another occurrence); moot, the landed orphan 2a0d581 carries it.
+
+Unblock (step 3): no RUNNING worker; slots 0/1/2 IDLE hold no RESULT and no commit
+(slot-0's commit was cleared as redundant after the orphan landed). Nothing to
+resume/re-dispatch; the FHC-FACTS-CACHE row is DONE. No QUESTION, no 402.
+
+Registry (step 4): last-wins re-derive = 356 unique, 260 DONE / 85 READY / 10 BLOCKED
+/ 1 SUPERSEDED (FHC-FACTS-CACHE flipped DONE). BLOCKED-with-all-deps-landed: the 10
+rows re-read, all owner-park/cancel/supersede/human-gate (incl. the three empty-needs
+parked rows MONO-10, RDEF-M4, RDEF-M5) - NOTHING flipped. RG-23/RG-9 anchor check
+still fails because their packet .md files are ABSENT (missing authoring, NOT drift;
+glob confirms only RG-4 exists).
+
+Dispatch (step 5): ran `dispatch_ready --dry-run --max-workers=3` ONLY. Output: RG-23/
+RG-9 anchor fail; FHC-G4/G5/G6/G1 blocked on chain; FHC-G7-REFUSAL-METADATA -> slot 1;
+"dispatched 1; workers now ~2/3". DID NOT RUN LIVE - the heartbeat owns dispatch and
+is live; its 15:24 cycle already tried FHC-G7 and the slot-2 warm build died with
+0xc0000409/exit 101 (RAM-zone). RAM is now 3.34 GB (recovered after the worker died),
+so the heartbeat's next cycle should succeed.
+
+Disk (substrate): the janitor reclaimed ~7.3 GB (repo-root target 1.5 GB + idle slot 1
+target 1.0/4.2 GB + idle slot 2 0.7 GB) -> 15.93 GiB free (above the 8 GB floor AND
+the 15 GB goal). RAM 3.34 GB free (just above the 3 GB floor).
+
+STATE (step 6): rewrote the volatile LATEST GROUND TRUTH block and the "State of the
+machine, as left" lines to [operator 2026-09-12T19:35Z]; removed the now-false
+CRITICAL block (no live worker). Stable traps/history untouched.
+
+Report (step 7): this entry.
+
+Escalations: the 19:07Z CRITICAL is RESOLVED (closure recorded in ESCALATIONS);
+carried unchanged - RG-23/RG-9 missing packet files; duplicate supervisors + duplicate
+cargoq/server.py; F1-AUTHORING-ARMS LANDED-WITH-FINDINGS; FRAME-REVOLVE F1 non_z_axis
+pin; TOR-C flip-or-pin; slot-2/4/7 wt RESULT residue.
+
+Leaving: 0 RUNNING / HEAD a8118b5 + this cycle's STATE/log/escalations commit;
+heartbeat 1 (27872, LIVE); watchdog 1; cargoq UP; disk 15.93 GiB; RAM 3.34 GB.
