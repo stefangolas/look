@@ -6422,3 +6422,56 @@ Leaving: 0 RUNNING; slot 0 FINISHED landed residue (free for FHC-TRIM); slot 1
 IDLE (resolved duplicate, do not re-dispatch); HEAD `c139afb` + this cycle's
 STATE/log commit; heartbeat 1; operator_runner 1; watchdog 1; cargoq UP; disk
 32.6 GiB; RAM ~3.8 GiB.
+
+## 2026-09-12 00:13 UTC (operator cycle)
+
+Board at start: 2 RUNNING (slot 0 + slot 1, BOTH FHC-TRIM-EXTRUDE-ENVELOPE -
+DUPLICATE), slots 2-7 FINISHED/IDLE landed residue. HEAD `3d1d769`.
+
+Health sweep:
+- heartbeat exactly 1 (27872, anchored to `dispatch_heartbeat.ps1`; a second
+  regex match was my own scan command, not a heartbeat).
+- operator_runner 1 (27876), watchdog 1 (29264), overnight driver 1 (24864).
+- cargoq UP: ping `{ok:true, queued:0, running:true}`.
+- Disk 30.8 GB free (above the 8 GB floor AND the 15 GB goal). RAM 2.5 GB free
+  - BELOW the 3 GB threshold (two workers resident; do not stack a third).
+
+Actions:
+- Land check: every FINISHED slot tip re-verified an ancestor of HEAD by
+  `git merge-base --is-ancestor` (c3df084/e6553db/3c2109b/ee97499/713f205/
+  5cf4811 + af9f421) -> NOTHING landable.
+- Unblock: slot 2 IDLE >15 min but it is landed residue (c3df084 is an ancestor
+  of HEAD, packet TTC-RECENSUS-F1-R3), not stuck work; no QUESTION, no dead
+  worker. Nothing to resume.
+- Registry hygiene: re-derived by command 350 = 254 DONE / 85 READY / 10
+  BLOCKED / 1 SUPERSEDED; none cleanly flippable (same carried 10). RG-23/RG-9
+  are the missing-packet-file class (registry `"packet": ""`); authoring is out
+  of charter.
+- `dispatch_ready.py --dry-run --max-workers=4`: "slots: 8 (2 running, 6 free);
+  dispatched 0; workers now ~2/4" - RG-23/RG-9 write-set clash with a RUNNING row
+  on `truck123d/src/bd_bridge.rs`; FHC-MIRROR-FORM blocked on FHC-TRIM;
+  BD-EMIT-MESH-CACHE behind FHC-MIRROR. No new work dispatchable. Real
+  dispatcher NOT run (heartbeat live = double-dispatch rule).
+- DUPLICATE identified and ESCALATED (not resolved): slots 0 + 1 both run
+  FHC-TRIM. Slot 1 = heartbeat dispatch 00:03:58Z on the packet branch @
+  `3d1d769` (pid 13864, ses_f6d126887ffeHsqfQfurAjdDLj). Slot 0 = detached HEAD
+  @ `c139afb` (pid 35628, ses_f6d388643ffed1HjglUgd0U78F, worker files
+  23:22:20Z, `abandoned-20260911-200244.patch` at 00:02:44Z). Both alive,
+  `changed=0`. Charter forbids killing live workers -> escalated.
+- STATE: replaced the volatile ground-truth block with a fresh [operator
+  2026-09-12T00:13Z] block (single block; stable traps untouched).
+- This entry.
+
+Escalations: NEW duplicate FHC-TRIM dispatch (slots 0+1). Carried unchanged:
+RG-23/RG-9 missing packet files; RDEF-M4 M0-adjudication; MONO-10 owner R3-mesh
+decision; FRAME-REVOLVE F1 non_z_axis pin; duplicate supervisors + lagging cargoq
+restart guard; TOR-C flip-or-pin; slot-4/7 wt RESULT residue; CL-005/CL-006
+READY-but-landed bookkeeping; schedule.py 'needs' crash.
+
+Worktree note (reported, not actioned): root tree carries live human-session WIP
+(M README.md, M loop/LEDGER.jsonl, M loop/cargoq/server.log, untracked
+benchmarks/ + loop/baselines/ + scratch/).
+
+Leaving: 2 RUNNING (the FHC-TRIM duplicate, escalated); HEAD `3d1d769` + this
+cycle's STATE/log commit; heartbeat 1; operator_runner 1; watchdog 1; cargoq UP;
+disk 30.8 GiB; RAM 2.5 GiB.

@@ -1807,3 +1807,36 @@ uncommitted - left for the orchestrator, no dispatch impact.
 - Health: heartbeat 1 (27872), operator_runner 1 (27876), watchdog 1 (29264),
   cargoq UP (queued 0, running false); disk 30.9 GB free (above floor and goal);
   RAM 3.21 GB free (just above threshold; one worker resident).
+
+## 2026-09-12 00:13 UTC - NEW: DUPLICATE DISPATCH of FHC-TRIM-EXTRUDE-ENVELOPE (slots 0 + 1, both live) - needs owner/orchestrator resolution
+
+- What: `slot_status` shows BOTH slot 0 and slot 1 RUNNING
+  `FHC-TRIM-EXTRUDE-ENVELOPE.md`. Slot 1 is on the correct branch
+  `packet/FHC-TRIM-EXTRUDE-ENVELOPE` @ `3d1d769` (= HEAD), worker pid 13864,
+  session `ses_f6d126887ffeHsqfQfurAjdDLj`, dispatched by the heartbeat at
+  2026-09-12 00:03:58Z (`dispatch_heartbeat.log` "FHC-TRIM-EXTRUDE-ENVELOPE ->
+  slot 1"). Slot 0 is a second copy on a DETACHED HEAD @ `c139afb` (older base;
+  the branch is checked out in slot 1 so slot 0 could not hold it), worker pid
+  35628, session `ses_f6d388643ffed1HjglUgd0U78F`, worker files stamped
+  2026-09-11 23:22:20Z (with an `abandoned-20260911-200244.patch` archive at
+  00:02:44Z). Both `events.jsonl` are fresh (0.1 / 1.2 min) and `changed=0` -
+  both alive, neither has committed work yet.
+- Why the operator did NOT resolve it: the charter's hard limits forbid killing or
+  restarting a worker that is alive and making progress ("kill anything except
+  your own timed-out predecessor's leftovers"). Slot 0 is an active worker, not a
+  hung/empty leftover (the 3d78cee precedent reaped a *hung+empty* slot). The
+  heartbeat count is exactly 1, so this is not the two-heartbeat race; it is a
+  heartbeat-vs-(prior-cycle) double-dispatch on the same packet.
+- Risk: two live workers write the same files (`truck123d/src/bd_bridge.rs`,
+  `corpus/ttc/door.py`, `truck123d/tests/trim_extrude_envelope.rs`); one will be
+  redundant at merge, and RAM is 2.5 GB free (below the 3 GB threshold) with two
+  workers resident - do not dispatch a third.
+- Start here (owner/orchestrator): pick the keeper and reap the other. Slot 1 is
+  the better keeper (on the packet branch at HEAD, created by the documented
+  dispatcher); slot 0 is detached at an older base. To reap slot 0 without losing
+  a possible partial diff: `python loop/run_packet.py --reset --slot 0` (archives
+  the abandoned diff first), or kill pid 35628 then reset-only. Do NOT re-dispatch
+  FHC-TRIM to another slot.
+- Health this cycle: heartbeat 1 (27872), operator_runner 1 (27876), watchdog 1
+  (29264), overnight driver 1 (24864), cargoq UP (ping ok, queued 0, running
+  true); disk 30.8 GB free; RAM 2.5 GB free.
