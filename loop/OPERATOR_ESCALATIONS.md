@@ -1866,3 +1866,31 @@ uncommitted - left for the orchestrator, no dispatch impact.
 - Health this cycle: heartbeat 1 (27872), operator_runner 1 (27876), watchdog 1
   (29264), cargoq UP (ping ok, queued 0, running true); disk 32.9 GB free; RAM
   1.74 GB free (below the 3 GB threshold).
+
+## 2026-09-12 04:00 UTC - UPDATED: duplicate FHC-TRIM - BOTH slots alive (the 00:36Z "slot 1 STALLED" premise is falsified); keep slot 1, reap slot 0
+
+- What changed: the 00:36Z escalation declared slot 1 STALLED (dead-shim) and
+  recommended reaping it. Re-derived this cycle: BOTH workers are alive and both
+  edit `truck123d/src/bd_bridge.rs`.
+  - slot 1 (branch `packet/FHC-TRIM-EXTRUDE-ENVELOPE` @ `3d1d769`, cmd pid 13864,
+    opencode 35128): events 03:57:26Z (~2.2 min old), changed=1 (+92 lines), last
+    cargoq job `test --profile quick -p truck123d --lib debug_trim_prism_pair`
+    exit 0 at 23:56:45 local (one `exit=3221225781` = 0xC0000409 RAM-zone crash
+    at 23:56:27 before it). The more active of the two.
+  - slot 0 (DETACHED HEAD @ `c139afb`, cmd pid 35628, opencode 11492): events
+    03:54:06Z (~5.5 min old), changed=1 (+92/-5), last cargoq job `build
+    --profile quick -p truck123d` exit 0 at 23:54:02 local.
+- Why the operator did NOT act: both pids are live and progressing; the charter
+  forbids killing/restarting a live worker. Reaping is an owner/orchestrator item.
+- Recommendation (REVERSES the 00:36Z call): keep slot 1 (it is on the packet
+  branch, so its commit lands normally); reap slot 0 (detached HEAD @ c139afb,
+  no branch to land on). Start here: kill pid 35628 + opencode 11492, then
+  `python loop/run_packet.py --reset-only --slot 0` (archives the partial diff
+  first). Do NOT re-dispatch FHC-TRIM - the registry row is READY/assigned None,
+  so once a duplicate slot frees the dispatcher can start a THIRD worker.
+- Why it matters now: the two diffs are near-identical (+92 lines) = redundant
+  work; RAM is 1.3 GB free (below the 3 GB threshold) and slot 1 already took a
+  0xC0000409 crash - the duplicate is actively over the RAM cap.
+- Health this cycle: heartbeat 1 (27872), operator_runner 1 (27876), watchdog 1
+  (29264), overnight driver 1 (24864); cargoq UP (ping ok, queued 0, running
+  false); disk 26.88 GB free; RAM 1.3 GB free (below threshold).
