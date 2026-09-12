@@ -346,10 +346,18 @@ class _Frame:
     __slots__ = ("o", "x_dir", "y_dir", "z_dir")
 
     def __init__(self, o, x_dir, y_dir, z_dir):
-        self.o = o
-        self.x_dir = x_dir
-        self.y_dir = y_dir
-        self.z_dir = z_dir
+        self.o = _point3(o)
+        # The frame axes are stored as Vectors so the corpus's client-layer
+        # frame algebra (`pl.origin + pl.z_dir * t`, `d.dot(pl.x_dir)`) answers
+        # exactly: a bare tuple would repeat on `tuple * float`.
+        self.x_dir = _as_vector(x_dir)
+        self.y_dir = _as_vector(y_dir)
+        self.z_dir = _as_vector(z_dir)
+
+    @property
+    def origin(self):
+        """The frame origin as a Vector (the corpus frame algebra reads it)."""
+        return Vector(*self.o)
 
     def __repr__(self):
         return (
@@ -761,6 +769,14 @@ class Edge:
         # TypeError). Mirrors the placed-row `_Shape.wrapped` refusal.
         _refuse("an OCC probe of a kernel-engine row is not a kernel-engine row")
         return None
+
+    def edge(self):
+        """The recorded kernel edge carrier (build123d ``Edge.edge()``).
+
+        The recorded row IS the kernel edge (the executor consumes the
+        recorded curve data), so the accessor answers the row itself; a
+        ``Wire([...])`` of these edges is the recorded wire carrier."""
+        return self
 
     def to_tuple(self):
         return [p.to_tuple() for p in self.points]
@@ -1175,11 +1191,12 @@ class Face:
     boundary points (data), so a face placed by an authoring frame sits at its
     world location and ``extrude``/``loft``/``revolve`` read it from there."""
 
-    __slots__ = ("edges", "wire", "label", "color")
+    __slots__ = ("edges", "wire", "label", "color", "_occ")
 
     def __init__(self, obj=None, *args, **kwargs):
         self.label = ""
         self.color = None
+        self._occ = None
         if isinstance(obj, Wire):
             self.wire = obj
             self.edges = list(obj.edges)
@@ -1195,19 +1212,110 @@ class Face:
         else:
             _refuse("this Face form is not a census carrier")
 
+    def faces(self):
+        """The face selection of a recorded planar region.
+
+        The drop-in records a planar region as ONE face, so the selection is
+        the carrier itself: the corpus's `(plane * make_face(wire)).faces()[0]`
+        idiom reads the section face back for `loft`. The selection is
+        iterable and indexable, exactly as the corpus consumes it."""
+        return [self]
+
+    def _occ_face(self):
+        """The recorded boundary replayed into the installed OCC kernel.
+
+        The recorded edges ARE the carrier's defining data (line endpoints,
+        spline samples, exact conics), so replaying them into OCC is
+        marshalling, never invented geometry. The probe (`surfaces.bbox` ->
+        `BRepBndLib.Add_s`) then bounds the B-spline control net -- the
+        documented control-net ENCLOSURE the corpus tolerates."""
+        if self._occ is None:
+            self._occ = _occ_face(self.edges)
+        return self._occ
+
     @property
     def wrapped(self):
-        # An OCC probe of a kernel-engine face row cannot be served: refuse
-        # typed, never pass `None` into OCP (the corpus's `_prism_estimate`
-        # sanity check probes a section face's bounds).
-        _refuse("an OCC probe of a kernel-engine row is not a kernel-engine row")
-        return None
+        # The corpus's `surfaces.bbox` probe needs a real OCC shape to call
+        # `BRepBndLib.Add_s`. The recorded boundary is replayed into the
+        # installed OCC kernel so the probe is served from the carrier's own
+        # defining data; an edge outside the recorded vocabulary refuses typed.
+        return self._occ_face().wrapped
+
+    @property
+    def area(self):
+        """The exact area of the recorded planar region (OCC-evaluated)."""
+        return float(self._occ_face().area)
+
+    def bounding_box(self):
+        """The carrier-derived enclosure of the recorded boundary.
+
+        `BRepBndLib.Add_s` bounds the B-spline control net (the documented
+        N>2 control-net enclosure); OCC parity with the executor's own
+        enclosure is a diagnostic, never a gate."""
+        return _occ_bounding_box(self._occ_face())
 
     def __iter__(self):
         return iter(self.edges)
 
     def __repr__(self):
         return f"Face({len(self.edges)} edges)"
+
+
+def _occ_edge(edge):
+    """One recorded edge replayed into the installed OCC kernel (data only)."""
+    import build123d as occ
+
+    if edge.kind == "line":
+        return occ.Edge.make_line(edge.p0.to_tuple(), edge.p1.to_tuple())
+    if edge.kind == "spline":
+        return occ.Edge.make_spline(
+            [point.to_tuple() for point in edge.points],
+            periodic=bool(edge.options.get("periodic")),
+        )
+    if edge.kind == "circle":
+        plane = occ.Plane(origin=edge.center.to_tuple(), z_dir=edge.normal.to_tuple())
+        return occ.Edge.make_circle(edge.radius, plane=plane)
+    if edge.kind == "ellipse":
+        plane = occ.Plane(
+            origin=edge.center.to_tuple(),
+            x_dir=edge.x_dir.to_tuple(),
+            z_dir=edge.normal.to_tuple(),
+        )
+        return occ.Edge.make_ellipse(edge.x_radius, edge.y_radius, plane=plane)
+    if edge.kind == "arc":
+        plane = occ.Plane(
+            origin=edge.center.to_tuple(),
+            x_dir=edge.x_dir.to_tuple(),
+            z_dir=edge.normal.to_tuple(),
+        )
+        return occ.Edge.make_circle(
+            edge.radius,
+            plane=plane,
+            start_angle=edge.start_angle,
+            end_angle=edge.end_angle,
+        )
+    _refuse(f"an OCC bounds probe of a {edge.kind} edge carrier is not a kernel-engine row")
+    return None
+
+
+def _occ_face(edges):
+    """The OCC face of a recorded boundary: replay the edges and make the face."""
+    import build123d as occ
+
+    if not edges:
+        _refuse("an OCC bounds probe of an empty face boundary is not a kernel-engine row")
+    return occ.make_face(occ.Wire([_occ_edge(edge) for edge in edges]))
+
+
+def _occ_bounding_box(face):
+    """The `BRepBndLib.Add_s` enclosure of one OCC face as a `_BoundingBox`."""
+    from OCP.Bnd import Bnd_Box
+    from OCP.BRepBndLib import BRepBndLib
+
+    box = Bnd_Box()
+    BRepBndLib.Add_s(face.wrapped, box, False)
+    xmin, ymin, zmin, xmax, ymax, zmax = box.Get()
+    return _BoundingBox(Vector(xmin, ymin, zmin), Vector(xmax, ymax, zmax))
 
 
 def _place_edges(frame, edges):
@@ -1256,6 +1364,7 @@ def _place_face(frame, face):
     placed = Face.__new__(Face)
     placed.label = getattr(face, "label", "") or ""
     placed.color = getattr(face, "color", None)
+    placed._occ = None
     placed.edges = _place_edges(frame, face.edges)
     placed.wire = Wire(placed.edges)
     return placed
