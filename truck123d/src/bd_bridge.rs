@@ -428,16 +428,17 @@ pub struct PartSpec {
     pub rz: f64,
     /// The full orthonormal placement rotation recorded from an authoring
     /// frame (a `Plane`/`Pos`/`Rotation` frame row). When present it replaces
-    /// the pure-z rotation exactly (`world = translate(o) ∘ R ∘ M`); a row
+    /// the pure-z rotation exactly (`world = translate(o) ∘ R`); a row
     /// without it keeps the pure-z rotation path byte-identical.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub rotation: Option<RotationFrame>,
     /// A placed-carrier reflection about a coordinate plane through the local
     /// origin, recorded by the mirror arm: `"x"` (YZ plane, x -> -x), `"y"`
     /// (XZ plane, y -> -y) or `"z"` (XY plane, z -> -z). The reflection is a
-    /// congruence: it applies to the local geometry before the rz rotation and
-    /// translation, facts transform with the placement, and no geometry is
-    /// recomputed.
+    /// congruence applied after the recorded rotation (the row's translation
+    /// already carries the reflected origin), so the composition is
+    /// `translate(M o) ∘ mirror ∘ R`: facts transform with the placement, the
+    /// mirror is exact for any rotation frame, and no geometry is recomputed.
     #[serde(default)]
     pub mirror: Option<String>,
     /// The row's recorded label (the door's `styled` metadata, carried
@@ -3943,11 +3944,11 @@ fn reflect_solid(solid: &SolidSpec, axis: &str) -> Result<SolidSpec, Refusal> {
     Ok(reflected)
 }
 
-/// The world bounding box of one placed solid: mirror the local geometry about
-/// the coordinate plane (when the mirror arm recorded one), rotate the local
-/// bbox corners by the recorded frame (or by the pure-z `rz` when no frame was
-/// recorded), then translate. The AABB of the 8 rotated local corners is the
-/// exact world bbox under the orthonormal placement rotation.
+/// The world bounding box of one placed solid: rotate the local bbox corners
+/// by the recorded frame (or by the pure-z `rz` when no frame was recorded),
+/// reflect the rotated corners about the coordinate plane (when the mirror arm
+/// recorded one), then translate by the recorded origin. The AABB of the 8
+/// placed corners is the exact world bbox under the orthonormal placement.
 fn part_world_bbox(part: &PartSpec) -> Result<[[f64; 3]; 2], Refusal> {
     let local = solid_local_bbox(&part.solid)?;
     let frame = part.rotation;
@@ -3967,31 +3968,35 @@ fn part_world_bbox(part: &PartSpec) -> Result<[[f64; 3]; 2], Refusal> {
     let mut min = [f64::INFINITY; 3];
     let mut max = [f64::NEG_INFINITY; 3];
     for corner in corners {
-        // The mirror placed-carrier reflects the local bbox before the rz
-        // rotation (a reflection is a congruence: reflecting the AABB of the
-        // local solid is the AABB of the reflected solid).
-        let corner = match part.mirror.as_deref() {
-            Some(axis) => mirror_point(corner, axis),
-            None => corner,
-        };
-        let point = match frame {
-            Some(rotation) => {
-                // The recorded full orthonormal frame replaces the pure-z
-                // rotation: the AABB of the 8 rotated local corners is exact.
-                let p = rotation.apply(corner);
-                [p[0] + part.x, p[1] + part.y, p[2] + part.z]
-            }
+        // The recorded rotation places the local corner; the mirror then
+        // reflects the placed (rotated) corner about the coordinate plane and
+        // the translation carries the recorded (already reflected) origin.
+        // This is `translate(M o) ∘ mirror ∘ R`, exactly the world reflection
+        // `M ∘ (translate(o) ∘ R)` for any rotation frame.
+        let rotated = match frame {
+            Some(rotation) => rotation.apply(corner),
             None => {
-                let (x, y) = if rz == 0.0 {
-                    (corner[0], corner[1])
+                if rz == 0.0 {
+                    corner
                 } else {
-                    (
+                    [
                         corner[0] * cos - corner[1] * sin,
                         corner[0] * sin + corner[1] * cos,
-                    )
-                };
-                [x + part.x, y + part.y, corner[2] + part.z]
+                        corner[2],
+                    ]
+                }
             }
+        };
+        let point = match part.mirror.as_deref() {
+            Some(axis) => {
+                let p = mirror_point(rotated, axis);
+                [p[0] + part.x, p[1] + part.y, p[2] + part.z]
+            }
+            None => [
+                rotated[0] + part.x,
+                rotated[1] + part.y,
+                rotated[2] + part.z,
+            ],
         };
         for axis in 0..3 {
             min[axis] = min[axis].min(point[axis]);
@@ -4357,31 +4362,12 @@ fn count_and_union(
     }
 }
 
-/// Applies one placed row's world placement to a local point: the recorded
-/// mirror reflection first, then the full orthonormal frame (or the pure-z
-/// `rz`), then the translation — the exact composition `part_world_bbox`
-/// applies to the local bbox corners.
+/// Applies one placed row's world placement to a local point: the full
+/// orthonormal frame (or the pure-z `rz`) first, then the recorded mirror
+/// reflection, then the translation — the exact composition `part_world_bbox`
+/// applies to the local bbox corners, and the same `place_local_point` uses.
 fn place_part_point(part: &PartSpec, p: [f64; 3]) -> [f64; 3] {
-    let p = match part.mirror.as_deref() {
-        Some(axis) => mirror_point(p, axis),
-        None => p,
-    };
-    match part.rotation {
-        Some(rotation) => {
-            let r = rotation.apply(p);
-            [r[0] + part.x, r[1] + part.y, r[2] + part.z]
-        }
-        None => {
-            let rz = part.rz.to_radians();
-            let (x, y) = if rz == 0.0 {
-                (p[0], p[1])
-            } else {
-                let (sin, cos) = rz.sin_cos();
-                (p[0] * cos - p[1] * sin, p[0] * sin + p[1] * cos)
-            };
-            [x + part.x, y + part.y, p[2] + part.z]
-        }
-    }
+    place_local_point(part, p)
 }
 
 /// The exact bicubic tensor-Bernstein elevation of the bilinear map through
@@ -4806,29 +4792,32 @@ fn swept_swept(boolean: &BooleanNode) -> Result<bool, Refusal> {
     Ok(base == CarrierClass::Swept && tool == CarrierClass::Swept)
 }
 
-/// Applies the placement's local congruence to one local point: mirror (when
-/// recorded), then the full recorded frame (or the pure-z `rz`), then the
-/// translation.
+/// Applies the placement's local congruence to one local point: the full
+/// recorded frame (or the pure-z `rz`) first, then the mirror reflection (when
+/// recorded), then the translation. The recorded translation already carries
+/// the reflected origin, so the composition is `translate(M o) ∘ mirror ∘ R`,
+/// which equals the world reflection `M ∘ (translate(o) ∘ R)` exactly for any
+/// rotation frame -- not only the frames that commute with the mirror plane.
 fn place_local_point(part: &PartSpec, point: [f64; 3]) -> [f64; 3] {
-    let mirrored = match part.mirror.as_deref() {
-        Some(axis) => mirror_point(point, axis),
-        None => point,
-    };
-    let [mx, my, mz] = mirrored;
+    let [px, py, pz] = point;
     let rotated = match part.rotation {
-        Some(frame) => frame.apply(mirrored),
+        Some(frame) => frame.apply(point),
         None => {
             let rz = part.rz.to_radians();
             if rz == 0.0 {
-                mirrored
+                point
             } else {
                 let (sin, cos) = rz.sin_cos();
-                [mx * cos - my * sin, mx * sin + my * cos, mz]
+                [px * cos - py * sin, px * sin + py * cos, pz]
             }
         }
     };
-    let [rx, ry, rz] = rotated;
-    [rx + part.x, ry + part.y, rz + part.z]
+    let mirrored = match part.mirror.as_deref() {
+        Some(axis) => mirror_point(rotated, axis),
+        None => rotated,
+    };
+    let [mx, my, mz] = mirrored;
+    [mx + part.x, my + part.y, mz + part.z]
 }
 
 /// The orientation factor `sign(det M_tau)` of one placement: `-1` for a
@@ -5389,6 +5378,32 @@ fn tree_mesh(root: &TreeNode, deflection: Option<f64>) -> Result<Vec<Triangle>, 
     Ok(triangles)
 }
 
+/// Places one part's local triangle soup into world space: rotate each local
+/// triangle by the recorded frame (or the pure-z `rz`), reflect the rotated
+/// triangle across the recorded mirror plane, then translate by the recorded
+/// origin. The composition is `translate(M o) ∘ mirror ∘ R`, which is exactly
+/// the world reflection `M ∘ (translate(o) ∘ R)` for ANY rotation frame -- the
+/// reflected origin is already recorded on the row, so the mirror is not
+/// applied to the translation a second time.
+fn place_part_triangles(part: &PartSpec, local: &[Triangle]) -> Vec<Triangle> {
+    let rz = part.rz.to_radians();
+    let cos = rz.cos();
+    let sin = rz.sin();
+    let mut placed = Vec::with_capacity(local.len());
+    for tri in local {
+        let rotated = match part.rotation {
+            Some(frame) => place_triangle_frame(*tri, frame, 0.0, 0.0, 0.0),
+            None => place_triangle(*tri, cos, sin, 0.0, 0.0, 0.0),
+        };
+        let reflected = match part.mirror.as_deref() {
+            Some(axis) => reflect_triangle(rotated, axis),
+            None => rotated,
+        };
+        placed.push(place_triangle(reflected, 1.0, 0.0, part.x, part.y, part.z));
+    }
+    placed
+}
+
 fn append_node_mesh(
     node: &TreeNode,
     out: &mut Vec<Triangle>,
@@ -5397,29 +5412,7 @@ fn append_node_mesh(
     match node {
         TreeNode::Part { part } => {
             let local = solid_mesh(&part.solid, deflection)?;
-            // The mirror placed-carrier reflects the local geometry before
-            // the rz rotation and translation (no geometry recomputation).
-            let reflected: Vec<Triangle> = local
-                .iter()
-                .map(|tri| match part.mirror.as_deref() {
-                    Some(axis) => reflect_triangle(*tri, axis),
-                    None => *tri,
-                })
-                .collect();
-            if let Some(frame) = part.rotation {
-                // The recorded full orthonormal frame transforms the mesh
-                // per-vertex (never recomputed geometry).
-                for tri in reflected {
-                    out.push(place_triangle_frame(tri, frame, part.x, part.y, part.z));
-                }
-            } else {
-                let rz = part.rz.to_radians();
-                let cos = rz.cos();
-                let sin = rz.sin();
-                for tri in reflected {
-                    out.push(place_triangle(tri, cos, sin, part.x, part.y, part.z));
-                }
-            }
+            out.extend(place_part_triangles(part, &local));
             Ok(())
         }
         // A routed boolean row's mesh is its base operand's mesh; the
@@ -6372,26 +6365,7 @@ fn collect_node_payloads(
     match node {
         TreeNode::Part { part } => {
             let local = solid_mesh(&part.solid, deflection)?;
-            let reflected: Vec<Triangle> = local
-                .iter()
-                .map(|tri| match part.mirror.as_deref() {
-                    Some(axis) => reflect_triangle(*tri, axis),
-                    None => *tri,
-                })
-                .collect();
-            let mut placed = Vec::with_capacity(reflected.len());
-            if let Some(frame) = part.rotation {
-                for tri in reflected {
-                    placed.push(place_triangle_frame(tri, frame, part.x, part.y, part.z));
-                }
-            } else {
-                let rz = part.rz.to_radians();
-                let cos = rz.cos();
-                let sin = rz.sin();
-                for tri in reflected {
-                    placed.push(place_triangle(tri, cos, sin, part.x, part.y, part.z));
-                }
-            }
+            let placed = place_part_triangles(part, &local);
             out.push(LeafMesh {
                 label: part.label.clone(),
                 color: part.color.clone(),
