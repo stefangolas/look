@@ -2121,3 +2121,41 @@ uncommitted - left for the orchestrator, no dispatch impact.
   supervisors 19172+27828 + duplicate cargoq/server.py 28544+34564;
   F1-AUTHORING-ARMS LANDED-WITH-FINDINGS; FRAME-REVOLVE F1 non_z_axis pin;
   TOR-C flip-or-pin; slot-4/slot-7 wt RESULT residue).
+
+## 2026-09-12 19:07 UTC (operator): the 18:09Z dead-dispatch reset hazard is now ARMED (heartbeat live + 0-running classification); slot-1 live worker at risk
+
+- What: `dispatch_ready --dry-run --max-workers=4` NOW reports "slots: 8 (0 running,
+  7 free)" and for `FHC-FACTS-CACHE` prints: "DEAD dispatch (slot 1 holds no matching
+  RESULT) - would reset + delete + redispatch", then "FHC-G7-REFUSAL-METADATA -> slot
+  0; dispatched 1". Slot 1's worker is ALIVE and mid-work: cmd 29372 +
+  opencode.exe 29476 (session ses_f69141b95ffe...) + live powershell/python
+  facts_call_count.py children (2076) running a serial door pass over
+  slots/1/wt/corpus/ttc; wt dirty (M truck123d/src/bd_bridge.rs, ?? tests/facts_cache.rs).
+- Why it matters: this is the exact 18:09Z hazard, but the two conditions that kept
+  it dormant are both gone. (1) The heartbeat 27872 is no longer wedged - it is LIVE
+  and cycling (log entries 14:50:35 and 15:00:39 local, `--max-workers=3` LIVE). (2)
+  slot_status no longer sees any RUNNING slot (slot 0's worker died; slot 1 reads
+  STALLED because the door pass writes no events), so the <180s RUNNING override at
+  dispatch_ready.py:96 does NOT fire. In LIVE mode dispatch_ready.py:176-180 runs
+  `run_packet.py --slot 1 --reset-only`, hard-resetting slot 1's worktree under the
+  live worker, then line 185 frees the slot and the packet is re-dispatched -> a
+  SECOND FHC-FACTS-CACHE worker writing a reset tree. The heartbeat's next cycle
+  (~15:10 local) fires this. NOTE: FHC-G7's write set
+  (corpus/ttc/door.py, truck123d/src/binding.rs, marshal.rs, tests/refusal_metadata.rs,
+  docs/REFUSALS.md, README.md) is disjoint from FHC-FACTS-CACHE, so that dispatch is
+  legitimate on its own - the reset of slot 1 is the harm.
+- Action needed (human/orchestrator): (1) STOP the live reset path before the next
+  heartbeat cycle - either pause/repoint the heartbeat (do NOT kill the worker), or
+  patch dispatch_ready.py so a slot with a live opencode child under its worker pid
+  is never classified dead (the dead-shim signature is the ABSENCE of that child, not
+  stale events); (2) the FHC-FACTS-CACHE row itself: slot 0 died leaving worker commit
+  2a0d581 (bd_bridge.rs +132, facts_cache.rs +483; NOT an ancestor, NO RESULT.json) -
+  PRESERVED at refs/wip/FHC-FACTS-CACHE-2a0d581; slot 1 will produce the same packet.
+  Decide: let slot 1 finish and land, or recover 2a0d581 (the FHC-G2/G3 post-recycle
+  recovery pattern). (3) RAM 2.36 GB free, below the 3 GB floor - do not raise the cap.
+- Start here: loop/dispatch_ready.py:70-119 (slot_states dead set) and :165-185 (dead
+  branch); loop/dispatch_heartbeat.ps1; loop/slots/1/events.jsonl; git show 2a0d581.
+- Carried unchanged: RG-23/RG-9 missing packet files (anchor check fails = missing
+  authoring, not drift); duplicate supervisors 19172+27828 + duplicate cargoq/server.py
+  28544+34564; F1-AUTHORING-ARMS LANDED-WITH-FINDINGS; FRAME-REVOLVE F1 non_z_axis
+  pin; TOR-C flip-or-pin; slot-2/4/7 wt RESULT residue.

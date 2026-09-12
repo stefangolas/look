@@ -8499,3 +8499,69 @@ RAM below the 3 GB floor.
 Leaving: 2 RUNNING (FHC-FACTS-CACHE slots 0+1, DUPLICATE) / HEAD 0136323 + this
 cycle's STATE/log/escalations commit; heartbeat 1 (ACTIVE); operator_runner 1;
 watchdog 1; cargoq UP; disk 12.96 GiB; RAM 2.2 GB.
+
+## 2026-09-12 19:07 UTC (operator): 1 RUNNING (slot-1 live); FHC-G2 landed; slot-0 orphan commit preserved; dead-dispatch reset hazard ARMED
+
+Board: 1 RUNNING / 0 landed-since-last-op / 0 unblocked / 0 flipped / 0 dispatched.
+HEAD `bc8bdcb`.
+
+Health (step 1): slot_status = slot 0 IDLE, slot 1 STALLED (pid 29372), slot 2 IDLE,
+slots 3-7 FINISHED residue. cargoq ping ok (queued 0, running false). Heartbeat
+exactly 1 (27872, anchored `dispatch_heartbeat.ps1` scan; the second broad-match was
+this probing shell self-matching). Watchdog 1 (29264). Disk 11.35 GiB free (above 8 GB
+floor, below 15 GB janitor goal). RAM 2.36 GB free (BELOW the 3 GB floor). No TEMP
+baseline leaks. Process scan: slot-1 worker ALIVE (cmd 29372, opencode 29476, live
+facts_call_count.py 2076 on slots/1/wt/corpus/ttc - a serial door pass that writes no
+events, hence the STALLED false-positive). Slot-0 worker GONE.
+
+Land (step 2): NOTHING landable. Slots 3/4/5/6/7 RESULT present, worker commits
+ancestors of integration/kernel-bg. Slot 4 = F1-AUTHORING-ARMS LANDED-WITH-FINDINGS
+(do not land). Slot 0 has no RESULT (orphan commit 2a0d581, see below). Slot 1 alive,
+no RESULT.
+
+Unblock (step 3): slot 1 is ALIVE and making progress (door pass) - did NOT touch it
+(charter). Slot 0 is dead with an ORPHANED worker commit 2a0d581
+("truck123d: content-hash facts memoization across compositions (FHC-FACTS-CACHE)",
+bd_bridge.rs +132, facts_cache.rs +483) that was reachable ONLY from the slot-0 wt
+detached HEAD (no branch/ref contained it). ACTION TAKEN: preserved it at
+`refs/wip/FHC-FACTS-CACHE-2a0d581` (git update-ref; no file edits) so a reset/GC
+cannot lose it. Did NOT reset/re-dispatch slot 0: it holds a commit (not the
+no-commit case) and FHC-FACTS-CACHE is being actively produced in slot 1, so a
+re-dispatch would duplicate the live worker. Escalated.
+
+Registry (step 4): last-wins re-derive = 356 unique, 259 DONE / 86 READY / 10 BLOCKED
+/ 1 SUPERSEDED (FHC-G2 flipped DONE this cycle). All 10 BLOCKED re-read: every row
+carries an owner-park/cancel/supersede/human-gate note (BG-AUD-FIX-004 OWNER_BLOCKED;
+BG-CK-SPLINE-CENSUS CANCELLED; SEM-PCURVE-MASTER-001-FIX SUPERSEDED;
+DEF-SPINEFRAME-GRAZE SPEC_GAP->R2; DEF-TESS-ANALYTIC-SEAM superseded by -R2;
+DEF-SEEDRAY-B human-gated; TOR-C PINNED, packet unauthored; MONO-10 owner decision on
+the R3 mesh predicate; RDEF-M4 needs M0 adjudication; RDEF-M5 owner-decision inputs)
+- NOTHING flipped. Anchor ritual: no landings authored this cycle; RG-23/RG-9 still
+fail the anchor check because their packet .md files are ABSENT (missing authoring,
+NOT drift) - new authoring is out of scope.
+
+Dispatch (step 5): ran `dispatch_ready --dry-run --max-workers=4` ONLY. Output:
+"slots: 8 (0 running, 7 free)"; RG-23/RG-9 ANCHOR CHECK FAILED (missing files);
+FHC-G4/G5/G6/G1 blocked on their chain; **FHC-FACTS-CACHE: DEAD dispatch (slot 1
+holds no matching RESULT) - would reset + delete + redispatch**; FHC-G7 -> slot 0;
+dispatched 1. DID NOT RUN IT LIVE: the live path (dispatch_ready.py:176-180) would
+`run_packet.py --reset-only` slot 1 under its live worker and re-dispatch, destroying
+WIP + spawning a duplicate. The heartbeat (27872, now LIVE) runs it live every 10 min
+and will fire this on its next cycle (~15:10 local). Escalated 19:07Z.
+
+STATE (step 6): refreshed the volatile LATEST GROUND TRUTH block and the "State of the
+machine, as left" lines to [operator 2026-09-12T19:07Z]. Stable traps/history
+untouched.
+
+Report (step 7): this entry.
+
+Escalations: NEW - the 18:09Z dead-dispatch reset hazard is now ARMED (heartbeat live
++ 0-running classification); slot-1 live worker + slot-0 orphan commit 2a0d581.
+Carried unchanged: RG-23/RG-9 missing packet files; duplicate supervisors
+(19172+27828) + duplicate cargoq/server.py (28544+34564); F1-AUTHORING-ARMS
+LANDED-WITH-FINDINGS; FRAME-REVOLVE F1 non_z_axis pin; TOR-C flip-or-pin; slot-2/4/7
+wt RESULT residue; RAM below the 3 GB floor.
+
+Leaving: 1 RUNNING (slot 1 FHC-FACTS-CACHE) / HEAD bc8bdcb + this cycle's
+STATE/log/escalations commit; heartbeat 1 (27872, LIVE); operator_runner 1; watchdog
+1; cargoq UP; disk 11.35 GiB; RAM 2.36 GB.
