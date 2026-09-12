@@ -8140,3 +8140,59 @@ non_z_axis pin; TOR-C flip-or-pin; slot-4/slot-7 wt RESULT residue.
 Leaving: 1 RUNNING (FHC-MIRROR-FORM slot 0); HEAD 26810d5 + this cycle's
 STATE/log commit; heartbeat 1; operator_runner 1; watchdog 1; cargoq UP; disk
 24.09 GiB; RAM 1909 MB (below floor).
+
+## [operator 2026-09-12T14:16Z] frontier moved: FHC-MIRROR-FORM landed, BD-EMIT-MESH-CACHE running
+
+Health (step 1): slot_status -> 1 RUNNING (slot 0 BD-EMIT-MESH-CACHE, pid 33244,
+events 0.0 min old, fresh 14:16Z) + slots 1-7 FINISHED/IDLE landed residue. cargoq
+ping {"ok":true,"queued":0,"running":false}. Exactly ONE dispatch_heartbeat
+(27872), ONE watchdog (29264), ONE operator_runner (27876), ONE overnight driver
+(24864). Disk 21.89 GiB free (above the 15 GB goal); **RAM 1.21 GB free - BELOW
+the 3 GB floor** (owner desktop + two opencode resident) - the cycle's one health
+flag, carried from 13:33Z.
+
+Land (step 2): HEAD moved since the 13:53Z cycle from 26810d5 to `9c6cd0f`.
+Re-verified by `git merge-base --is-ancestor` against integration/kernel-bg:
+4a1dd49, c3df084, e6553db, 3c2109b, ee97499, 713f205, 5cf4811 all TRUE - all
+FINISHED slot tips already ancestors. FHC-MIRROR-FORM landed between cycles by the
+overnight driver (merge 637ee7e, row flip 9c6cd0f). NOTHING operator-landable;
+NOTHING landed by this operator.
+
+Unblock (step 3): no IDLE/DEAD worker holding work, no QUESTION, no 402. Slot 2
+IDLE is landed residue (TTC-RECENSUS-F1-R3 DONE, de6bfc6). Slot 0 is RUNNING and
+progressing: events fresh, active session, currently reading/editing
+truck123d/src/bd_bridge.rs; no recent cargoq job (it is in the inspect/reason/edit
+phase). Per the charter I did not touch it.
+
+Registry (step 4): re-derived by command (last-wins dedup): 354 unique = 253 DONE /
+90 READY / 10 BLOCKED / 1 SUPERSEDED. All 10 BLOCKED re-read programmatically:
+every one is a deliberate hold (BG-AUD-FIX-004 OWNER_BLOCKED; BG-CK-SPLINE-CENSUS
+owner-cancelled; SEM-PCURVE-MASTER-001-FIX SUPERSEDED; DEF-SPINEFRAME-GRAZE
+SPEC_GAP->-R2; DEF-TESS-ANALYTIC-SEAM superseded by -R2; DEF-SEEDRAY-B gated on
+DEF-SEEDRAY-A which is READY not landed; TOR-C orchestrator-held/no packet file;
+MONO-10 owner R3-mesh; RDEF-M4 M0-adjudication; RDEF-M5 owner) - NOTHING flipped.
+READY-without-landed-marker = the FHC chain (needs-gated G3->BD-EMIT(running),
+G2->G3, G4->G2, G5->G4, G6->G5, G1->G6) + RG-23/RG-9 (packet .md files ABSENT,
+glob-confirmed; missing authoring, NOT anchor drift, so the anchor ritual does not
+apply). Nothing mechanically fixable.
+
+Dispatch (step 5): `dispatch_ready --dry-run --max-workers=4` -> "slots: 8 (1
+running, 7 free); slot-assigned packets: 6; RG-23/RG-9 write-set clash with the
+RUNNING row (bd_bridge.rs); FHC chain needs-gated; dispatched 0; workers now ~1/4".
+REAL idle; real dispatcher NOT run (heartbeat runs dispatch_ready --max-workers=3
+every 600s = live double-dispatch rule).
+
+STATE (step 6): refreshed the volatile LATEST GROUND TRUTH block ([operator
+2026-09-12T14:16Z], HEAD 9c6cd0f, board 1 RUNNING / FHC-MIRROR landed by the driver
+/ BD-EMIT-MESH-CACHE running in slot 0, registry 354=253/90/10/1, RAM 1.21 GB) and
+the "State of the machine, as left" lines. Stable traps/history untouched.
+
+Escalations: NO NEW item this cycle. The 13:33Z LOW RAM escalation carries (RAM
+1.21 GiB, still below floor). Carried unchanged: RG-23/RG-9 missing packet files;
+duplicate supervisors + duplicate cargoq/server.py; F1-AUTHORING-ARMS
+LANDED-WITH-FINDINGS; FRAME-REVOLVE F1 non_z_axis pin; TOR-C flip-or-pin;
+slot-4/slot-7 wt RESULT residue.
+
+Leaving: 1 RUNNING (BD-EMIT-MESH-CACHE slot 0); HEAD 9c6cd0f + this cycle's
+STATE/log commit; heartbeat 1; operator_runner 1; watchdog 1; cargoq UP; disk
+21.89 GiB; RAM 1.21 GB (below floor).

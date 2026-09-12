@@ -75,61 +75,48 @@ corrected, annex C = ORACLE POLICY CHANGE), then docs/SOLVER_COVERAGE_SPEC.md
 
 ## Where we are
 
-> LATEST GROUND TRUTH [operator 2026-09-12T13:53Z / 09:53 local]: 1 RUNNING / 0
-> landed-this-cycle / 0 unblocked / 0 flipped / 0 operator-dispatched. HEAD
-> `26810d5` (the 13:33Z operator commit) - no work moved this cycle. Slot 0
-> `FHC-MIRROR-FORM` RUNNING and HEALTHY (cmd pid 34384, events fresh, fork
-> `packet/FHC-MIRROR-FORM@51b884f`): it built truck123d release (exit 0, 452s)
-> and passed `--test mirror_form` (exit 0, 33s); its `cargo test -p truck123d
-> --lib` hit exit 3221225781 = 0xC0000135 STATUS_DLL_NOT_FOUND twice - the
-> KNOWN session-58 cargoq-env trap (server env lacks the interpreter DLL dir),
-> NOT the RAM signature (0xC0000409 = 3221225993); the worker is actively
-> re-running with the python prefix on PATH. Do NOT touch a live, progressing
-> worker.
-> Slots 1-7 landed residue; every slot tip re-verified this cycle by `git
-> merge-base --is-ancestor` against `integration/kernel-bg` (4a1dd49, c3df084,
-> e6553db, 3c2109b, ee97499, 713f205, 5cf4811 all TRUE). wt RESULT statuses
-> read directly: slot 1 SPEC_GAP (superseded by the 4a1dd49 owner landing),
-> slot 3/5/6 DONE, slot 4 LANDED-WITH-FINDINGS, slot 7 LANDED - NOTHING
-> landable.
-> Registry re-derived by command (last-wins dedup): 354 unique rows = 253 DONE /
-> 90 READY / 10 BLOCKED / 1 SUPERSEDED. All 10 BLOCKED rows are deliberate
-> holds (notes carried from the 13:33Z read, deps all DONE/empty): BG-AUD-FIX-004
+> LATEST GROUND TRUTH [operator 2026-09-12T14:16Z]: 1 RUNNING / 1 landed-since-last-op
+> (FHC-MIRROR-FORM, overnight driver) / 0 unblocked / 0 flipped / 0 operator-dispatched.
+> HEAD `9c6cd0f` (FHC-MIRROR-FORM row LANDED). Slot 0 now runs `BD-EMIT-MESH-CACHE`
+> (forked `packet/BD-EMIT-MESH-CACHE@9c6cd0f`, cmd pid 33244, events fresh 14:16Z,
+> active session, currently reading/editing `truck123d/src/bd_bridge.rs`) - HEALTHY;
+> do not touch. It is the head of the FHC chain: FHC-G3 needs BD-EMIT-MESH-CACHE.
+> Slots 1-7 landed residue; every slot tip re-verified by `git merge-base
+> --is-ancestor` against `integration/kernel-bg` (4a1dd49, c3df084, e6553db, 3c2109b,
+> ee97499, 713f205, 5cf4811 all TRUE) - NOTHING landable.
+> Registry re-derived (last-wins dedup): 354 unique = 253 DONE / 90 READY / 10 BLOCKED
+> / 1 SUPERSEDED. All 10 BLOCKED re-read: deliberate holds (BG-AUD-FIX-004
 > OWNER_BLOCKED; BG-CK-SPLINE-CENSUS owner-cancelled; SEM-PCURVE-MASTER-001-FIX
-> SUPERSEDED; DEF-SPINEFRAME-GRAZE SPEC_GAP->-R2; DEF-TESS-ANALYTIC-SEAM
-> superseded by -R2; DEF-SEEDRAY-B human-gated; TOR-C orchestrator-held;
-> MONO-10-CERTIFIED-BOUNDARY-MESH owner R3-mesh; RDEF-M4-NUMERIC-TIER
-> M0-adjudication; RDEF-M5-CORPUS-PREVALENCE owner decision - NOTHING flipped.
-> READY-without-landed-marker = the FHC chain (needs-gated on FHC-MIRROR-FORM)
-> + RG-23/RG-9 (packet .md files ABSENT from loop/packets/, glob-confirmed;
-> missing authoring, NOT anchor drift) only. `dispatch_ready --dry-run
-> --max-workers=4`: "slots: 8 (1 running, 7 free); slot-assigned packets: 6;
-> RG-23/RG-9 write-set clash with the RUNNING row (bd_bridge.rs); FHC chain
-> needs-gated; dispatched 0; workers now ~1/4" = REAL idle; real dispatcher NOT
-> run (heartbeat live = double-dispatch rule).
-> Health: **RAM 1909 MB free - BELOW the 3 GB floor** (owner desktop: chrome +
-> Teams msedgewebview2 + Dropbox + two opencode resident; the loop footprint is
-> small). Disk 24.09 GiB free (above the 8 GB floor AND the 15 GB janitor goal).
-> Heartbeat exactly 1 (27872, last cycle 09:50:38 local), operator_runner 1
-> (27876), watchdog 1 (29264), overnight driver 1 (24864); cargoq UP (ping ok,
-> queued 0, running false; its server.log shows the worker's 0xC0000135 DLL
-> test exits, NOT a RAM 0xc0000409). TWO supervisors (19172 PyManager + 27828
-> pythoncore) + TWO cargoq/server.py (28544 + 34564) = carried duplication
-> class; only ONE overnight.py child = no double-merge risk. No TEMP baseline
-> leaks.
-> Root worktree carries human WIP (M README.md, M loop/cargoq/server.log;
-> untracked benchmarks/ + loop/baselines/ + scratch/ + vendor/truck/*.obj) -
-> untouched, reported not actioned.
-> Carried escalations: LOW RAM (1.9 GiB free; janitor reclaims language servers
-> at <4 GB but does not refuse dispatch on RAM - watch for a rustc 0xc0000409);
-> RG-23/RG-9 missing packet files; duplicate supervisors + duplicate cargoq
-> servers; F1-AUTHORING-ARMS LANDED-WITH-FINDINGS; FRAME-REVOLVE F1 non_z_axis
-> pin; TOR-C flip-or-pin; slot-4/slot-7 wt RESULT residue.
-> Leaving: 1 RUNNING (FHC-MIRROR-FORM slot 0); HEAD `26810d5` + this cycle's
+> SUPERSEDED; DEF-SPINEFRAME-GRAZE SPEC_GAP->-R2; DEF-TESS-ANALYTIC-SEAM superseded by
+> -R2; DEF-SEEDRAY-B gated on DEF-SEEDRAY-A which is READY not landed; TOR-C
+> orchestrator-held, no packet file; MONO-10 owner R3-mesh; RDEF-M4 M0-adjudication;
+> RDEF-M5 owner) - NOTHING flipped. READY-without-landed-marker = the FHC chain
+> (needs-gated: G3->BD-EMIT(running), G2->G3, G4->G2, G5->G4, G6->G5, G1->G6) +
+> RG-23/RG-9 (packet .md ABSENT from loop/packets/, glob-confirmed; missing authoring,
+> NOT anchor drift).
+> `dispatch_ready --dry-run --max-workers=4`: "slots: 8 (1 running, 7 free);
+> slot-assigned packets: 6; RG-23/RG-9 write-set clash with RUNNING row (bd_bridge.rs);
+> FHC chain needs-gated; dispatched 0; workers now ~1/4" = REAL idle; real dispatcher
+> NOT run (the heartbeat runs `dispatch_ready --max-workers=3` every 600s = live
+> double-dispatch risk).
+> Health: **RAM 1.21 GB free - BELOW the 3 GB floor** (owner desktop: chrome + Teams
+> msedgewebview2 + Dropbox + two opencode resident; loop footprint small; janitor
+> reclaims language servers at <4 GB but does not refuse dispatch on RAM). Disk 21.89
+> GiB free (above the 8 GB floor AND the 15 GB janitor goal). Heartbeat exactly 1
+> (27872), operator_runner 1 (27876), watchdog 1 (29264), overnight driver 1 (24864);
+> cargoq UP (ping ok, queued 0, running false). Carried duplication class: TWO
+> supervisor.py (19172 + 27828) + TWO cargoq/server.py (28544 + 34564). No TEMP
+> baseline leaks.
+> Root worktree carries human WIP (M README.md, M loop/cargoq/server.log; untracked
+> benchmarks/ + loop/baselines/ + scratch/ + vendor/truck/*.obj) - untouched, reported.
+> Carried escalations: LOW RAM; RG-23/RG-9 missing packet files; duplicate supervisors
+> + duplicate cargoq servers; F1-AUTHORING-ARMS LANDED-WITH-FINDINGS; FRAME-REVOLVE F1
+> non_z_axis pin; TOR-C flip-or-pin; slot-4/slot-7 wt RESULT residue.
+> Leaving: 1 RUNNING (BD-EMIT-MESH-CACHE slot 0); HEAD `9c6cd0f` + this cycle's
 > STATE/log commit.
 >
-> NOTE: this cycle refreshed the prior block in place (timestamp/HEAD/health) to keep
-> the volatile section at ~1 block (charter cap ~120 lines). Prior cycles' refreshes
+> NOTE: this cycle refreshed the prior block in place (timestamp/HEAD/board/health) to
+> keep the volatile section at ~1 block (charter cap ~120 lines). Prior cycles' refreshes
 > are in git history; the stable traps below are untouched.
 
 ## Pick up here
@@ -174,28 +161,28 @@ corrected, annex C = ORACLE POLICY CHANGE), then docs/SOLVER_COVERAGE_SPEC.md
 
 ## State of the machine, as left
 
-- 1 worker RUNNING: FHC-MIRROR-FORM in slot 0 (forked `packet/FHC-MIRROR-FORM`
-  @ base 51b884f, cmd pid 34384; dispatched by the heartbeat ~09:29 local).
-  HEALTHY this cycle: release build exit 0 (452s), `--test mirror_form` exit 0
-  (33s); `cargo test -p truck123d --lib` returned 0xC0000135 DLL_NOT_FOUND (the
-  known session-58 cargoq-env trap, NOT RAM) and the worker is re-running with
-  the interpreter dir on PATH - do not touch. Slots 1-7 FINISHED/IDLE landed
-  residue (all tips ancestors of integration/kernel-bg). Nothing else landable.
-- Substrate: heartbeat 1 instance (27872, last cycle 09:50:38 local), operator
-  runner 1 (27876), watchdog alive (29264), overnight driver 1 (24864), cargoq
-  UP (ping ok, queued 0, running false). TWO supervisor.py (19172 PyManager +
-  27828 pythoncore) and TWO cargoq/server.py (28544 + 34564) = carried
-  duplication class; only ONE overnight.py child = no double-merge risk.
-- Disk 24.09 GiB free (above the 8 GB floor AND the 15 GB janitor goal).
-- **RAM 1909 MB free - BELOW the 3 GB floor** (chrome + Teams + Dropbox + two
-  opencode resident; owner session live). The loop's own footprint is small; the
-  janitor reclaims language servers at <4 GB but does not refuse dispatch on
-  RAM. Do not raise the worker cap; a rustc 0xc0000409 is the sign the
-  inequality is violated (the slot-0 test failures this cycle are DLL_NOT_FOUND,
-  not that signature).
-- [operator 2026-09-12T13:53Z] board: 1 RUNNING / 0 landed-this-cycle / 0
+- 1 worker RUNNING: BD-EMIT-MESH-CACHE in slot 0 (forked
+  `packet/BD-EMIT-MESH-CACHE` @ base 9c6cd0f, cmd pid 33244; dispatched by the
+  heartbeat after FHC-MIRROR-FORM landed). HEALTHY this cycle: events fresh
+  14:16Z, active session, reading/editing `truck123d/src/bd_bridge.rs` - do not
+  touch. It is the head of the FHC chain (FHC-G3 needs BD-EMIT-MESH-CACHE).
+  Slots 1-7 FINISHED/IDLE landed residue (all tips ancestors of
+  integration/kernel-bg). Nothing else landable.
+- Landed since the 13:53Z cycle (by the overnight driver, not this operator):
+  FHC-MIRROR-FORM (merge 637ee7e, row flip 9c6cd0f).
+- Substrate: heartbeat 1 instance (27872, runs `dispatch_ready --max-workers=3`
+  every 600s), operator runner 1 (27876), watchdog alive (29264), overnight
+  driver 1 (24864), cargoq UP (ping ok, queued 0, running false). TWO
+  supervisor.py (19172 + 27828) and TWO cargoq/server.py (28544 + 34564) =
+  carried duplication class; only ONE overnight.py child = no double-merge risk.
+- Disk 21.89 GiB free (above the 8 GB floor AND the 15 GB janitor goal).
+- **RAM 1.21 GB free - BELOW the 3 GB floor** (chrome + Teams + Dropbox + two
+  opencode resident). The loop's own footprint is small; janitor reclaims
+  language servers at <4 GB but does not refuse dispatch on RAM. Do not raise the
+  worker cap; a rustc 0xc0000409 is the sign the inequality is violated.
+- [operator 2026-09-12T14:16Z] board: 1 RUNNING / 1 landed-since-last-op / 0
   unblocked / 0 flipped / 0 operator-dispatched; registry 354 = 253 D / 90 R /
-  10 B / 1 S; HEAD 26810d5.
+  10 B / 1 S; HEAD 9c6cd0f.
 
 [operator 2026-09-09T02:2xZ - volatile refresh after the ADM-L4 operator
 landing. Board now: 0 running / 6 FINISHED residue (L1,L2,L3,F1,CL-005,
