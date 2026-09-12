@@ -75,56 +75,57 @@ corrected, annex C = ORACLE POLICY CHANGE), then docs/SOLVER_COVERAGE_SPEC.md
 
 ## Where we are
 
-> LATEST GROUND TRUTH [operator 2026-09-12T14:40Z]: 1 RUNNING / 0 landed-since-last-op
-> / 0 unblocked / 0 flipped / 0 operator-dispatched. HEAD `fd9b9e8` (= the
-> integration/kernel-bg tip; the 14:16Z operator commit). Slot 0 runs
-> `BD-EMIT-MESH-CACHE` (forked `packet/BD-EMIT-MESH-CACHE`, cmd pid 33244, events
-> fresh ~1.3 min, active session, mid "build the true base module to get accurate
-> before numbers") - HEALTHY; do not touch. The worker has ALREADY written a
-> `RESULT.json` (status DONE: mesh_cache 4/4, pb_glb_emit 3/3, lib 84/84) in its
-> worktree but is still working; nothing filed, registry row still READY. It is the
-> head of the FHC chain: FHC-G3 needs BD-EMIT-MESH-CACHE.
+> LATEST GROUND TRUTH [operator 2026-09-12T15:23Z]: 1 RUNNING / 0 landed-since-last-op
+> / 0 unblocked / 0 flipped / 0 operator-dispatched. HEAD `57f2be6` (= the
+> integration/kernel-bg tip; the "AUTHOR-CENSUS-NAMES status reconciled to landed"
+> commit). Slot 0 runs `FHC-FACTS-CACHE` (forked `packet/FHC-FACTS-CACHE`, cmd pid
+> 34776, events fresh ~0 min, git = base 57f2be6, no work committed yet) - HEALTHY;
+> do not touch. Owner directive 2026-09-12 placed it ahead of G3 (fa147ad): content-hash
+> facts memoization - measured 94% of beam_wing build = redundant bracket re-evals,
+> power_unit 88+ growing-subtree re-evals (its census timeout cause). It is the head of
+> the FHC chain: FHC-G3 needs FHC-FACTS-CACHE.
 > Slots 1-7 landed/known residue; every slot tip re-verified by `git merge-base
 > --is-ancestor` against `integration/kernel-bg` (4a1dd49, c3df084, e6553db, 3c2109b,
 > ee97499, 713f205, 5cf4811 all TRUE) - NOTHING landable. Slot 1 = FHC-TRIM-EXTRUDE-
-> ENVELOPE (RESULT SPEC_GAP, but owner-adjudicated merge 4a1dd49); slot 2 =
-> TTC-RECENSUS-F1-R3 IDLE residue (row DONE/LANDED de6bfc6, no RESULT in slot); slot 4
-> = F1-AUTHORING-ARMS (LANDED-WITH-FINDINGS); slot 7 = FRAME-REVOLVE (RESULT LANDED,
-> merged 5cf4811).
-> Registry re-derived (last-wins dedup): 354 unique = 253 DONE / 90 READY / 10 BLOCKED
-> / 1 SUPERSEDED. All 10 BLOCKED re-read: NONE flip-eligible (needs unmet, or
-> owner-cancelled/parked/superseded: BG-CK-SPLINE-CENSUS cancelled; TOR-C pinned on a
-> missing packet; SEM-PCURVE-MASTER-001-FIX superseded; MONO-10 owner R3-mesh;
-> RDEF-M4 M0-adjudication / RDEF-M5 owner; DEF-SPINEFRAME-GRAZE re-aimed at -R2;
-> DEF-SEEDRAY-B gated on DEF-SEEDRAY-A; BG-AUD-FIX-004 OWNER_BLOCKED;
-> DEF-TESS-ANALYTIC-SEAM superseded by -R2) - NOTHING flipped.
-> READY-without-landed-marker = the FHC chain (needs-gated: G3->BD-EMIT(running),
+> ENVELOPE (wt RESULT SPEC_GAP, owner-adjudicated merge 4a1dd49); slot 2 =
+> TTC-RECENSUS-F1-R3 IDLE residue (row DONE/LANDED de6bfc6, no RESULT in slot); slot 3 =
+> SOLVER-SURVEY-C (DONE, e6553db); slot 4 = F1-AUTHORING-ARMS (LANDED-WITH-FINDINGS);
+> slot 5 = CL-006-SOLVER-ENTRY (DONE, ee97499); slot 6 = CL-005-EXACT-CONTACT (DONE,
+> 713f205); slot 7 = FRAME-REVOLVE (wt RESULT LANDED, merged 5cf4811).
+> Registry re-derived (last-wins dedup): 355 unique = 257 DONE / 87 READY / 10 BLOCKED
+> / 1 SUPERSEDED. Since the 14:40Z block, 4 rows flipped DONE by the orchestrator/owner
+> (EX-B af9f421, MIRROR 0b14d7f, EMIT-CACHE 54357e0 per 331e526; AUTHOR-CENSUS-NAMES per
+> 57f2be6). All 10 BLOCKED re-read: NONE flip-eligible (needs unmet, or
+> owner-cancelled/parked/superseded: BG-CK-SPLINE-CENSUS cancelled; TOR-C pinned;
+> SEM-PCURVE-MASTER-001-FIX superseded; MONO-10 owner R3-mesh; RDEF-M4 M0-adjudication /
+> RDEF-M5 owner; DEF-SPINEFRAME-GRAZE re-aimed at -R2; DEF-SEEDRAY-B gated on
+> DEF-SEEDRAY-A; BG-AUD-FIX-004 OWNER_BLOCKED; DEF-TESS-ANALYTIC-SEAM superseded by -R2)
+> - NOTHING flipped.
+> READY-without-landed-marker = the FHC chain (needs-gated: G3->FHC-FACTS-CACHE(running),
 > G2->G3, G4->G2, G5->G4, G6->G5, G1->G6) + RG-23/RG-9 (packet .md ABSENT from
-> loop/packets/, glob-confirmed; missing authoring, NOT anchor drift).
+> loop/packets/, glob-confirmed; missing authoring, NOT anchor drift) + FHC-FACTS-CACHE
+> (running).
 > `dispatch_ready --dry-run --max-workers=4`: "slots: 8 (1 running, 7 free);
 > RG-23/RG-9 write-set clash with RUNNING row (bd_bridge.rs); FHC chain needs-gated;
 > dispatched 0; workers now ~1/4" = REAL idle; live dispatcher NOT run (heartbeat runs
 > `dispatch_ready --max-workers=3` every 600s = live double-dispatch risk; result would
 > be 0 anyway).
-> FHC-G3 anchors re-checked at current HEAD: A1=1 A2=1 A3=1 A4=8 all ok
-> (`gen_packet.py --check` exit 0); re-measure again after BD-EMIT lands (per-landing
-> drift).
-> Health: **RAM 0.57 GB free - BELOW the 3 GB floor** (owner desktop: chrome + Teams
+> Health: **RAM 2.04 GB free - BELOW the 3 GB floor** (owner desktop: chrome + Teams
 > + Dropbox + resident opencode; loop footprint small; janitor reclaims language servers
-> at <4 GB but does not refuse dispatch on RAM). Disk 18.94-21.04 GiB free (above the
-> 8 GB floor AND the 15 GB janitor goal; fluctuates with the live release build).
+> at <4 GB but does not refuse dispatch on RAM). Disk ~16.6 GiB free (above the
+> 8 GB floor AND the 15 GB janitor goal).
 > Heartbeat exactly 1 (27872), operator_runner 1 (27876), watchdog 1 (29264), overnight
-> driver 1 (24864); cargoq UP (ping ok, queued 0, running true = a truck123d release
-> build). Carried duplication class: TWO supervisor.py (19172 + 27828) + TWO
-> cargoq/server.py (28544 + 34564). No TEMP baseline leaks.
+> driver 1 (24864); cargoq UP (ping ok, queued 0, running false). Carried duplication
+> class: TWO supervisor.py (19172 + 27828) + TWO cargoq/server.py (28544 + 34564). No
+> TEMP baseline leaks; no rustc/cargo processes.
 > Root worktree carries human WIP (M README.md, M loop/LEDGER.jsonl, M
 > loop/cargoq/server.log; untracked benchmarks/ + loop/baselines/ + scratch/) -
 > untouched, reported.
 > Carried escalations: LOW RAM; RG-23/RG-9 missing packet files; duplicate supervisors
 > + duplicate cargoq servers; F1-AUTHORING-ARMS LANDED-WITH-FINDINGS; FRAME-REVOLVE F1
 > non_z_axis pin; TOR-C flip-or-pin; slot-4/slot-7 wt RESULT residue.
-> Leaving: 1 RUNNING (BD-EMIT-MESH-CACHE slot 0); HEAD `fd9b9e8` + this cycle's
-> STATE/log commit.
+> Leaving: 1 RUNNING (FHC-FACTS-CACHE slot 0); HEAD `57f2be6` + this cycle's STATE/log
+> commit.
 >
 > NOTE: this cycle refreshed the prior block in place (timestamp/HEAD/board/health) to
 > keep the volatile section at ~1 block (charter cap ~120 lines). Prior cycles' refreshes
@@ -172,31 +173,28 @@ corrected, annex C = ORACLE POLICY CHANGE), then docs/SOLVER_COVERAGE_SPEC.md
 
 ## State of the machine, as left
 
-- 1 worker RUNNING: BD-EMIT-MESH-CACHE in slot 0 (forked
-  `packet/BD-EMIT-MESH-CACHE`, cmd pid 33244; dispatched by the
-  heartbeat after FHC-MIRROR-FORM landed). HEALTHY this cycle: events fresh
-  ~1.3 min, active session, mid "build the true base module" before-number pass -
-  do not touch. Its worktree already holds a `RESULT.json` (status DONE, tests
-  mesh_cache 4/4, pb_glb_emit 3/3, lib 84/84) but the worker is still working and
-  the registry row is still READY; nothing filed. It is the head of the FHC chain
-  (FHC-G3 needs BD-EMIT-MESH-CACHE). Slots 1-7 FINISHED/IDLE residue (all tips
-  ancestors of integration/kernel-bg). Nothing else landable.
-- Landed since the 14:16Z cycle: none.
+- 1 worker RUNNING: FHC-FACTS-CACHE in slot 0 (forked
+  `packet/FHC-FACTS-CACHE`, cmd pid 34776; dispatched by the heartbeat under the
+  owner directive that placed it ahead of G3). HEALTHY this cycle: events fresh
+  ~0 min, git = base 57f2be6, no work committed yet - do not touch. It is the
+  head of the FHC chain (FHC-G3 needs FHC-FACTS-CACHE). Slots 1-7 FINISHED/IDLE
+  residue (all tips ancestors of integration/kernel-bg). Nothing else landable.
+- Landed since the 14:40Z cycle: 4 rows flipped DONE by the orchestrator/owner
+  (EX-B af9f421, MIRROR 0b14d7f, EMIT-CACHE 54357e0 per 331e526;
+  AUTHOR-CENSUS-NAMES per 57f2be6). HEAD moved fd9b9e8 -> 57f2be6.
 - Substrate: heartbeat 1 instance (27872, runs `dispatch_ready --max-workers=3`
   every 600s), operator runner 1 (27876), watchdog alive (29264), overnight
-  driver 1 (24864), cargoq UP (ping ok, queued 0, running true). TWO
+  driver 1 (24864), cargoq UP (ping ok, queued 0, running false). TWO
   supervisor.py (19172 + 27828) and TWO cargoq/server.py (28544 + 34564) =
   carried duplication class; only ONE overnight.py child = no double-merge risk.
-- Disk 18.94-21.04 GiB free (above the 8 GB floor AND the 15 GB janitor goal;
-  fluctuates with the live release build).
-- **RAM 0.57 GB free - BELOW the 3 GB floor** (chrome + Teams + Dropbox + resident
+- Disk ~16.6 GiB free (above the 8 GB floor AND the 15 GB janitor goal).
+- **RAM 2.04 GB free - BELOW the 3 GB floor** (chrome + Teams + Dropbox + resident
   opencode). The loop's own footprint is small; janitor reclaims language servers
   at <4 GB but does not refuse dispatch on RAM. Do not raise the worker cap; a
-  rustc 0xc0000409 is the sign the inequality is violated (the running worker's
-  `test -p truck123d --lib` already exited 0xC0000409 twice in the cargoq stats).
-- [operator 2026-09-12T14:40Z] board: 1 RUNNING / 0 landed-since-last-op / 0
-  unblocked / 0 flipped / 0 operator-dispatched; registry 354 = 253 D / 90 R /
-  10 B / 1 S; HEAD fd9b9e8.
+  rustc 0xc0000409 is the sign the inequality is violated.
+- [operator 2026-09-12T15:23Z] board: 1 RUNNING / 0 landed-since-last-op / 0
+  unblocked / 0 flipped / 0 operator-dispatched; registry 355 = 257 D / 87 R /
+  10 B / 1 S; HEAD 57f2be6.
 
 [operator 2026-09-09T02:2xZ - volatile refresh after the ADM-L4 operator
 landing. Board now: 0 running / 6 FINISHED residue (L1,L2,L3,F1,CL-005,
