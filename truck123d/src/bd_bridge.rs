@@ -5067,6 +5067,70 @@ fn loft_end_caps(
     }
 }
 
+/// The two closed spline sections of one spline-profile prism (the corpus
+/// louvre / `_plate` idiom): the recorded loop and its translation along the
+/// loop-plane normal by the sweep range. `None` when the recorded carrier is
+/// open or degenerate, so the extraction refuses typed rather than
+/// approximating. The prism is exactly the two-station loft between these
+/// sections, so its extracted 2-cycle rides the landed loft side/cap
+/// machinery.
+fn spline_prism_sections(
+    trim_curve: &[[f64; 3]],
+    amount: f64,
+    both: bool,
+) -> Option<Vec<Vec<ProfileEdge>>> {
+    if !amount.is_finite() || amount <= 0.0 {
+        return None;
+    }
+    let mut scale = 0.0f64;
+    for p in trim_curve {
+        for c in p {
+            if !c.is_finite() {
+                return None;
+            }
+            scale = scale.max(c.abs());
+        }
+    }
+    let spans = spline_spans3(trim_curve).ok()?;
+    let first = spans.first()?;
+    let last = spans.last()?;
+    let start = [first.x[0], first.y[0], first.z[0]];
+    let end = [
+        last.x[0] + last.x[1] + last.x[2] + last.x[3],
+        last.y[0] + last.y[1] + last.y[2] + last.y[3],
+        last.z[0] + last.z[1] + last.z[2] + last.z[3],
+    ];
+    if v3_norm(v3_sub(end, start)) > 1.0e-9 * (1.0 + scale) {
+        return None;
+    }
+    let area_vec = spline_loop_area_vector(&spans);
+    let area = v3_norm(area_vec);
+    if !area.is_finite() || area <= 0.0 {
+        return None;
+    }
+    let normal = [area_vec[0] / area, area_vec[1] / area, area_vec[2] / area];
+    let (t_lo, t_hi) = if both {
+        (-amount, amount)
+    } else {
+        (0.0, amount)
+    };
+    let offset = |t: f64| {
+        vec![ProfileEdge::Spline {
+            points: trim_curve
+                .iter()
+                .map(|p| {
+                    [
+                        p[0] + t * normal[0],
+                        p[1] + t * normal[1],
+                        p[2] + t * normal[2],
+                    ]
+                })
+                .collect(),
+        }]
+    };
+    Some(vec![offset(t_lo), offset(t_hi)])
+}
+
 /// The local tensor-Bernstein patch 2-cycle of one landed solid carrier. The
 /// extracted vocabulary is the exact one: axis-aligned boxes and the
 /// loft/member carriers whose sections are planar loops (the exact planar
@@ -5128,6 +5192,34 @@ fn extract_local_patches(solid: &SolidSpec) -> Result<Vec<Patch>, SweptAdmission
             patches.extend(loft_end_caps(first, backward)?);
             patches.extend(loft_end_caps(last, [dx, dy, dz])?);
             Ok(patches)
+        }
+        // The corpus spline-profile extrude idiom (FHC-TRIM-EXTRUDE-ENVELOPE):
+        // `bd.extrude(plane * make_face(bd.Spline(*pts, periodic=True)),
+        // amount, both=True)` is a straight ruled sweep of one closed spline
+        // loop along its plane normal. It extracts as the exact two-station
+        // loft between the loop and its normal offset, so the landed loft
+        // side/cap machinery carries its patch 2-cycle and a composition path
+        // (`_plate` cut/fuse, a louvre cutter cut) consumes the same certified
+        // extraction as every other swept carrier. Only the closed
+        // spline-profile shape is admitted; the line-base real-trim carrier
+        // stays outside the extracted vocabulary and refuses typed.
+        SolidSpec::TrimPrism {
+            profile,
+            amount,
+            both,
+            trim_curve,
+            trim_net,
+            ..
+        } => {
+            if !is_spline_profile_prism(profile, trim_curve, trim_net) {
+                return Err(SweptAdmissionRefusal::ExtractionUnavailable);
+            }
+            let sections = spline_prism_sections(trim_curve, *amount, *both)
+                .ok_or(SweptAdmissionRefusal::ExtractionUnavailable)?;
+            extract_local_patches(&SolidSpec::Loft {
+                sections,
+                closed: false,
+            })
         }
         _ => Err(SweptAdmissionRefusal::ExtractionUnavailable),
     }
@@ -13073,5 +13165,53 @@ print(json.dumps([z_row, loft_row]))
             tree_facts(&pair),
             Err(Refusal::UnsupportedEnvelope(_))
         ));
+    }
+
+    #[test]
+    fn trim_prism_extraction_admits_the_spline_profile_idiom_only() {
+        // FHC-TRIM-EXTRUDE-ENVELOPE: the spline-profile extrude idiom now
+        // extracts into the swept boolean vocabulary (the composition path),
+        // while a real trim (a line base profile with a recorded trim curve and
+        // no pullback net) stays outside the extraction envelope.
+        let spline = spline_prism_row(&rounded_plate_loop(30.0, 58.0, 13.0, 6), 18.0, true);
+        let extracted = extract_patches(&part(spline, 0.0, 0.0, 0.0))
+            .expect("the spline-profile prism extracts");
+        assert!(extracted.len() > 6, "side patches plus fan caps");
+
+        let line_trim = SolidSpec::TrimPrism {
+            profile: vec![
+                ProfileEdge::Line {
+                    a: [0.0, 0.0, 0.0],
+                    b: [1.0, 0.0, 0.0],
+                },
+                ProfileEdge::Line {
+                    a: [1.0, 0.0, 0.0],
+                    b: [1.0, 1.0, 0.0],
+                },
+                ProfileEdge::Line {
+                    a: [1.0, 1.0, 0.0],
+                    b: [0.0, 1.0, 0.0],
+                },
+                ProfileEdge::Line {
+                    a: [0.0, 1.0, 0.0],
+                    b: [0.0, 0.0, 0.0],
+                },
+            ],
+            amount: 1.0,
+            both: false,
+            trim_curve: vec![
+                [0.25, 0.25, 0.0],
+                [0.75, 0.25, 0.0],
+                [0.75, 0.75, 0.0],
+                [0.25, 0.75, 0.0],
+                [0.25, 0.25, 0.0],
+            ],
+            trim_net: Vec::new(),
+            tolerance: 1.0e-3,
+        };
+        assert_eq!(
+            extract_patches(&part(line_trim, 0.0, 0.0, 0.0)),
+            Err(SweptAdmissionRefusal::ExtractionUnavailable)
+        );
     }
 }
