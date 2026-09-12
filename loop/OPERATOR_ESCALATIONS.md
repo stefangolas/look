@@ -2194,3 +2194,19 @@ uncommitted - left for the orchestrator, no dispatch impact.
 - Carried unchanged: RG-23/RG-9 missing packet files; duplicate supervisors + duplicate
   cargoq/server.py; F1-AUTHORING-ARMS LANDED-WITH-FINDINGS; FRAME-REVOLVE F1 non_z_axis
   pin; TOR-C flip-or-pin; slot-2/4/7 wt RESULT residue.
+
+## 2026-09-12 21:54 UTC (operator): NEW - registry has 3 byte-identical duplicate rows
+
+- What: `loop/PACKETS.jsonl` is 359 lines but 356 unique IDs. Three IDs appear twice,
+  byte-identical and both status DONE: MONO-9-FUSE-FOLD, RDEF-M1-LATTICE-V2,
+  FHC-G7-REFUSAL-METADATA. Unique count (356) is unchanged, so dispatch semantics are
+  unaffected (dispatch_ready reads unique IDs; --dry-run is correct), but the file is
+  now inconsistent with the "356 unique" claim in STATE and the duplicate lines will
+  keep inflating any line-count census.
+- Why I did not fix it: dedup is a registry edit outside the operator's three-file
+  limit (STATE/LOG/ESCALATIONS) and is not one of the documented mechanical flips
+  (BLOCKED->READY, anchor re-measure, yaml lint fix). Cost asymmetry says escalate.
+- Exact command a human should start from:
+  `python -c "import json,collections; rows=[json.loads(l) for l in open('loop/PACKETS.jsonl',encoding='utf-8') if l.strip()]; seen=set(); out=[]; [out.append(r) for r in rows if not (r['id'] in seen or seen.add(r['id']))]; open('loop/PACKETS.jsonl','w',encoding='utf-8').write('\n'.join(json.dumps(r,ensure_ascii=False) for r in out)+'\n')"`
+  (drops later duplicates, keeps first occurrence; verify the 3 IDs first).
+- Priority: low. No dispatch impact observed.

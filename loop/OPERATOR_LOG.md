@@ -8780,3 +8780,49 @@ wt RESULT residue. Noted: RAM below the 3 GB floor with the FHC-G5 worker reside
 
 Leaving: 1 RUNNING (FHC-G5) / HEAD 0561149 + this cycle's STATE/log commit; heartbeat 1
 (27872, LIVE); watchdog 1; cargoq UP; disk 13.46 GB; RAM 1.4 GB.
+
+## 2026-09-12 21:54 UTC (operator cycle)
+
+Health sweep (step 1): `slot_status.py` - slot 0 RUNNING (FHC-G5-SWALLOWED-REFUSAL-
+DIAGNOSIS, pid 4484, events ~1 min old, 5 files changed, branch @0561149 =base, no
+commit yet) healthy; slots 1/2 IDLE residue (FHC-FACTS-CACHE / TTC-RECENSUS-F1-R3, both
+landed, =base no work); slots 3-7 FINISHED landed residue. cargoq ping ok (queued 0,
+running true - G5's build). Heartbeat exactly 1 (27872, live; log cycling ~17:50 local).
+Watchdog 1 (29264). Operator runner 1 (27876). Overnight driver 1 (24864). Disk 10.8 GB
+free (above 8 GB floor, below 15 GB janitor goal). RAM 1.5 GB free (below 3 GB floor -
+G5 resident). No `%TEMP%/look-verify-baseline-*` leaks. TWO supervisor.py (19172 + 27828)
+= carried duplication.
+
+Land (step 2): nothing landable. All FINISHED worker commits re-verified ancestors of
+integration/kernel-bg (e6553db/3c2109b/ee97499/713f205/5cf4811). Slot 4 RESULT status
+LANDED-WITH-FINDINGS; slot 7 status LANDED - both correctly NOT operator-landable.
+
+Unblock (step 3): no IDLE/DEAD slot holding work (slots 1/2 residue are DONE packets);
+no QUESTION anywhere.
+
+Registry hygiene (step 4): 359 lines / 356 unique = 264 DONE / 84 READY / 10 BLOCKED /
+1 SUPERSEDED. NEW FINDING: 3 byte-identical duplicate LINES - MONO-9-FUSE-FOLD,
+RDEF-M1-LATTICE-V2, FHC-G7-REFUSAL-METADATA (all status DONE, all content identical).
+Unique count unchanged at 356. Did NOT dedup (registry edit beyond a documented flip is
+outside my three-file limit); escalated. BLOCKED-with-all-deps-landed = all 10 correctly
+parked (owner-blocked/cancelled/superseded/human-gated/orchestrator-held). Nothing to
+flip; no anchor/lint-fixable READY packet surfaced.
+
+Dispatch (step 5): ran `dispatch_ready --dry-run --max-workers=4` ONLY (heartbeat owns
+live dispatch). Output: "slots: 8 (1 running, 7 free); slot-assigned packets: 5;
+RG-23/RG-9 write-set clash with RUNNING row on bd_bridge.rs; FHC-G6 blocked on G5;
+FHC-G1 blocked on G6; dispatched 0; workers now ~1/4" - REAL idle. Did NOT run live.
+
+STATE (step 6): refreshed the LATEST GROUND TRUTH block and "State of the machine, as
+left" to [operator 2026-09-12T21:54Z] (FHC-G5 running, HEAD d590a21, registry 356
+unique/359 lines, disk 10.8 GB, RAM 1.5 GB). Stable traps/history untouched.
+
+Report (step 7): this entry.
+
+Escalations: one NEW - registry duplicate lines (see above). Carried unchanged -
+RG-23/RG-9 missing packet authoring; duplicate supervisors; F1-AUTHORING-ARMS
+LANDED-WITH-FINDINGS; FRAME-REVOLVE F1 non_z_axis pin; TOR-C flip-or-pin; slot-1/2/4/7
+wt RESULT residue. Noted: RAM below the 3 GB floor with the FHC-G5 worker resident.
+
+Leaving: 1 RUNNING (FHC-G5) / HEAD d590a21 + this cycle's STATE/log commit; heartbeat 1
+(27872, LIVE); watchdog 1; cargoq UP; disk 10.8 GB; RAM 1.5 GB.
