@@ -7968,3 +7968,49 @@ TOR-C flip-or-pin; slot-4/slot-7 wt RESULT residue.
 Leaving: 0 RUNNING; slots 0/1 FINISHED SPEC_GAP (escalated), slots 2-7 landed
 residue; HEAD d2f59ba + this cycle's STATE/log commit; heartbeat 1;
 operator_runner 1; watchdog 1; cargoq UP; disk 24.35 GiB; RAM 3.77 GiB.
+
+## [operator 2026-09-12T13:06Z] quiet healthy cycle
+
+Health sweep (step 1): slot_status -> slots 0+1 FINISHED FHC-TRIM-EXTRUDE-ENVELOPE
+(RESULT status SPEC_GAP, both duplicate runs agree); slot 2 IDLE
+(TTC-RECENSUS-F1-R3, no RESULT, landed); slots 3-7 FINISHED landed residue.
+cargoq ping {"ok":true,"queued":0,"running":false}. Exactly ONE
+dispatch_heartbeat (27872), ONE watchdog (29264), ONE operator_runner (27876),
+ONE overnight driver (24864). Disk 24.33 GiB free (above 8 GB floor AND 15 GB
+janitor goal); RAM 3.67 GiB free (above 3 GB floor).
+
+Land (step 2): re-verified by `git merge-base --is-ancestor` against
+integration/kernel-bg: slot 0 33f6269 and slot 1 4a1dd49 NOT ancestors (RESULT
+SPEC_GAP both, read directly); slots 2-7 (c3df084, e6553db, 3c2109b, ee97499,
+713f205, 5cf4811) all ancestors = landed. Nothing operator-landable. NOTHING
+landed.
+
+Unblock (step 3): 0 RUNNING workers; no IDLE/DEAD >15 min holding work; no
+QUESTION. Nothing to unblock.
+
+Registry (step 4): re-derived by command (last-wins dedup): 354 unique = 252
+DONE / 91 READY / 10 BLOCKED / 1 SUPERSEDED (unchanged). All 10 BLOCKED rows
+carry deliberate-hold notes (owner-blocked / cancelled / superseded /
+human-gated / orchestrator-held / owner decisions) - NOT flipped. READY-without-
+landed-marker = the FHC chain (FHC-TRIM SPEC_GAP hold + FHC-MIRROR-FORM /
+BD-EMIT-MESH-CACHE / FHC-G1..G6 dep-blocked) + RG-23/RG-9 (packet .md files
+ABSENT from loop/packets/, confirmed by directory listing -> missing authoring,
+NOT anchor drift; anchor ritual does not apply). Nothing mechanically fixable.
+
+Dispatch (step 5): dispatch_ready --dry-run --max-workers=4 -> "slots: 8 (0
+running, 8 free); slot-assigned packets: 5; dispatched 0; workers now ~0/4" =
+REAL idle. Real dispatcher NOT run (heartbeat live = double-dispatch rule).
+
+STATE (step 6): refreshed the volatile LATEST GROUND TRUTH block in place
+([operator 2026-09-12T13:06Z], HEAD af93992 = the 12:43Z operator commit, disk
+24.33 GiB, RAM 3.67 GiB) and the "State of the machine, as left" disk/RAM/board
+lines. Stable traps/history untouched.
+
+Escalations: NONE NEW. Carried unchanged: FHC-TRIM SPEC_GAP pair; RG-23/RG-9
+missing packet files; duplicate supervisors + duplicate cargoq/server.py;
+F1-AUTHORING-ARMS LANDED-WITH-FINDINGS; FRAME-REVOLVE F1 non_z_axis pin; TOR-C
+flip-or-pin; slot-4/slot-7 wt RESULT residue.
+
+Leaving: 0 RUNNING; slots 0/1 FINISHED SPEC_GAP (escalated), slots 2-7 landed
+residue; HEAD af93992 + this cycle's STATE/log commit; heartbeat 1;
+operator_runner 1; watchdog 1; cargoq UP; disk 24.33 GiB; RAM 3.67 GiB.
