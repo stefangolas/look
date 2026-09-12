@@ -75,27 +75,22 @@ corrected, annex C = ORACLE POLICY CHANGE), then docs/SOLVER_COVERAGE_SPEC.md
 
 ## Where we are
 
-> LATEST GROUND TRUTH [operator 2026-09-12T07:05Z / 03:05 local]: 0 RUNNING / 0
-> landed-this-cycle / 0 unblocked / 0 flipped / 0 dispatched. HEAD `ffed9f7`
-> (the 06:43Z operator commit; re-verified UNCHANGED this cycle - no packet work
+> LATEST GROUND TRUTH [operator 2026-09-12T07:29Z / 03:29 local]: 0 RUNNING / 0
+> landed-this-cycle / 0 unblocked / 0 flipped / 0 dispatched. HEAD `6efe5cb`
+> (the 07:05Z operator commit; re-verified UNCHANGED this cycle - no packet work
 > moved, all eight slot tips re-checked, registry re-derived).
-> **SLOT 1 FHC-TRIM FINISHED with RESULT status SPEC_GAP - the duplicate run
-> reproduced slot 0's verdict.** Worker commit `4a1dd49` on
-> `packet/FHC-TRIM-EXTRUDE-ENVELOPE` (NOT an ancestor of HEAD); RESULT at
-> `loop/slots/1/wt/RESULT.json` (status SPEC_GAP; its own done-when
-> `cargo test -p truck123d --test trim_extrude_envelope --locked` green 4 passed,
-> 388 s). Its spec_gap: the exact planar fan cap carries a degenerate normal cone,
-> so the composition refuses TYPED (`unsupported_envelope`/`non_canonical_carrier`,
-> or `ExtremeSlabContaminated` when the tool over-extends); f1/rear_wing +
-> f1/steering_rack GREEN, suspension_front/rear BLOCKED - the booked FHC-EX-B
-> degenerate-cap class. NOT operator-landable (status != DONE) - ESCALATED.
-> Slot 0 FINISHED the first duplicate with RESULT status SPEC_GAP (worker commit
-> 33f6269 preserved on `packet/FHC-TRIM-EXTRUDE-ENVELOPE-slot0`, ancestor=False
-> re-verified this cycle; RESULT at
-> loop/results/FHC-TRIM-EXTRUDE-ENVELOPE.PENDING.RESULT.json). The registry row
-> FHC-TRIM-EXTRUDE-ENVELOPE stays READY with no landed marker; both duplicate
-> runs are SPEC_GAP, so a third dispatch would repeat the verdict - ESCALATED for
-> an authoring/rebooking decision.
+> **SLOTS 0+1 FHC-TRIM FINISHED with RESULT status SPEC_GAP - both duplicate runs
+> agree.** Worker commits 33f6269 (slot 0, `packet/FHC-TRIM-EXTRUDE-ENVELOPE-slot0`)
+> and 4a1dd49 (slot 1, `packet/FHC-TRIM-EXTRUDE-ENVELOPE`), both NOT ancestors of
+> HEAD (re-verified this cycle); RESULTs at
+> `loop/results/FHC-TRIM-EXTRUDE-ENVELOPE.PENDING.RESULT.json` (slot 0) and
+> `loop/slots/1/wt/RESULT.json` (slot 1), both status SPEC_GAP. The exact planar
+> fan cap carries a degenerate normal cone, so the composition refuses TYPED
+> (`unsupported_envelope`/`non_canonical_carrier`, or `ExtremeSlabContaminated`);
+> f1/rear_wing + f1/steering_rack GREEN, suspension_front/rear BLOCKED - the booked
+> FHC-EX-B degenerate-cap class. NOT operator-landable (status != DONE) -
+> ESCALATED for an authoring/rebooking decision; a third dispatch would repeat the
+> verdict.
 > Slots 2-7 landed residue; every tip re-verified an ancestor of HEAD by `git
 > merge-base --is-ancestor` this cycle (slot 2 c3df084 [IDLE, no RESULT; row
 > TTC-RECENSUS-F1-R3 DONE]; slot 3 e6553db; slot 4 3c2109b LANDED-WITH-FINDINGS;
@@ -108,18 +103,20 @@ corrected, annex C = ORACLE POLICY CHANGE), then docs/SOLVER_COVERAGE_SPEC.md
 > FHC-G1..G6 chained behind BD-EMIT-MESH-CACHE.
 > Registry re-derived by command (last-wins dedup): 354 unique rows = 252 DONE /
 > 91 READY / 10 BLOCKED / 1 SUPERSEDED. All 10 BLOCKED rows are deliberate holds
-> (BG-AUD-FIX-004 owner-blocked; BG-CK-SPLINE-CENSUS booking gate;
+> (BG-AUD-FIX-004 owner-blocked; BG-CK-SPLINE-CENSUS owner-CANCELLED session 49;
 > SEM-PCURVE-MASTER-001-FIX SUPERSEDED; DEF-SPINEFRAME-GRAZE SPEC_GAP->-R2;
 > DEF-TESS-ANALYTIC-SEAM superseded by -R2; DEF-SEEDRAY-B human-gated; TOR-C
 > orchestrator-held; MONO-10-CERTIFIED-BOUNDARY-MESH owner R3-mesh;
-> RDEF-M4-NUMERIC-TIER M0-adjudication; RDEF-M5-CORPUS-PREVALENCE needs RDEF-M4) -
-> NOTHING flipped. READY-without-landed-marker = the FHC chain (dep-blocked) +
-> RG-23/RG-9 (authoring/clash) + FHC-TRIM (SPEC_GAP hold) only.
+> RDEF-M4-NUMERIC-TIER M0-adjudication; RDEF-M5-CORPUS-PREVALENCE owner decision) -
+> NOTHING flipped. READY-without-landed-marker (case-insensitive LANDED-re, matching
+> dispatch_ready) = the FHC chain (dep-blocked) + RG-23/RG-9 (authoring) + FHC-TRIM
+> (SPEC_GAP hold) only.
 > Health: heartbeat exactly 1 (27872), operator_runner 1 (27876), watchdog 1
 > (29264), overnight driver 1 (24864); cargoq UP (ping ok, queued 0, running
-> false). TWO supervisors (19172 + 27828) = carried duplication class; only ONE
-> overnight.py child = no double-merge risk. Disk 27.59 GiB free (above the 8 GB
-> floor AND the 15 GB janitor goal); RAM 3.79 GiB free (above the 3 GB floor).
+> false). TWO supervisors (19172 + 27828) + TWO cargoq/server.py (28544 + 34564) =
+> carried duplication class; only ONE overnight.py child = no double-merge risk.
+> Disk 27.50 GiB free (above the 8 GB floor AND the 15 GB janitor goal); RAM 3.75
+> GiB free (above the 3 GB floor).
 > Root worktree carries live human/orchestrator-session WIP (M README.md, M
 > docs/F1_HYPERCAR_GAP_REGISTER.md, M loop/LEDGER.jsonl, M loop/cargoq/server.log;
 > untracked benchmarks/ + loop/baselines/ + scratch/ + mobius.step +
@@ -129,7 +126,7 @@ corrected, annex C = ORACLE POLICY CHANGE), then docs/SOLVER_COVERAGE_SPEC.md
 > LANDED-WITH-FINDINGS; FRAME-REVOLVE F1 non_z_axis pin; TOR-C flip-or-pin;
 > slot-4/slot-7 wt RESULT residue.
 > Leaving: 0 RUNNING; slots 0/1 FINISHED SPEC_GAP (escalated), slots 2-7 landed
-> residue; HEAD `ffed9f7` + this cycle's STATE/log commit.
+> residue; HEAD `6efe5cb` + this cycle's STATE/log commit.
 >
 > NOTE: this cycle replaced the prior collapsed block with a fresh one to keep the
 > volatile section at ~1 block (charter cap ~120 lines). Prior cycles' refreshes are
@@ -177,20 +174,19 @@ corrected, annex C = ORACLE POLICY CHANGE), then docs/SOLVER_COVERAGE_SPEC.md
 
 ## State of the machine, as left
 
-- 4 workers: ADM-L1 (slot 1), ADM-L2 (slot 2), ADM-L3 (slot 3) + slot 0
-  was FH-TIMING-REFRESH (landed, freed).
-- Substrate: heartbeat 1 instance, operator runner 1 instance, watchdog
-  alive (pid 29364), cargoq healthy, driver/supervisor alive (BUT see the
-  session-56 traps: it skipped one landing and duplicated itself once).
-  NOTE: TWO supervisor.py processes observed 2026-09-09 02:1xZ (pids 35200
-  PyManager-python + 24272 pythoncore) - the session-56 duplicate-driver
-  class; adjudicate.
-- **Disk ~5.4 GB free - LOW** (pagefile 8.1 GB, three live worker targets
-  ~1 GB each and growing). The janitor is short of its 15 GB goal. If
-  rustc exits 101 appears, clean `loop/slots/*/target` + root `target/`
-  and consider the reboot (the pagefile does not shrink while live).
-- RAM ~3.6 GB free at 4 workers - the cold-warm-build 0xc0000409 zone;
-  chrome is closed (helps). Do not raise the worker cap.
+- 0 workers: all 8 slots FINISHED/IDLE residue (slots 0/1 FHC-TRIM SPEC_GAP
+  escalated; slots 2-7 landed residue). Nothing running; nothing landable.
+- Substrate: heartbeat 1 instance (27872), operator runner 1 (27876),
+  watchdog alive (29264), overnight driver 1 (24864), cargoq UP (ping ok,
+  queued 0, running false). TWO supervisor.py (19172 PyManager + 27828
+  pythoncore) and TWO cargoq/server.py (28544 + 34564) = carried duplication
+  class; only ONE overnight.py child = no double-merge risk.
+- Disk 27.50 GiB free (above the 8 GB floor AND the 15 GB janitor goal).
+- RAM 3.75 GiB free (above the 3 GB floor); chrome closed. Do not raise the
+  worker cap without re-deriving the RAM arithmetic.
+- [operator 2026-09-12T07:29Z] board: 0 RUNNING / 0 landed / 0 unblocked /
+  0 flipped / 0 dispatched; registry 354 = 252 D / 91 R / 10 B / 1 S; HEAD
+  6efe5cb.
 
 [operator 2026-09-09T02:2xZ - volatile refresh after the ADM-L4 operator
 landing. Board now: 0 running / 6 FINISHED residue (L1,L2,L3,F1,CL-005,
