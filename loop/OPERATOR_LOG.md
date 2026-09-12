@@ -8942,3 +8942,65 @@ crash.
 
 Leaving: 1 RUNNING (FHC-G6) / HEAD 44e769f + this cycle's STATE/log/escalation commit;
 heartbeat 1 (27872, LIVE); watchdog 1; cargoq UP; disk 9.2 GB; RAM 2.34 GB.
+
+## 2026-09-12 23:18Z (operator cycle) - G6 worker found DEAD-orphaned; disk reclaimed; frontier re-dispatch still failing on warm builds
+
+Health sweep: heartbeat exactly 1 (27872, LIVE), watchdog 1 (29264), cargoq UP
+(ping ok, queued 0), operator runner 1. Disk was 7.07 GB free (BELOW the 8 GB
+floor); RAM 2.07 GB free (BELOW the 3 GB floor). No `%TEMP%/look-verify-baseline-*`
+leaks.
+
+Board: 0 RUNNING / 0 landed-this-cycle. The frontier FHC-G6-CERT-COST-SCALE was
+NOT running despite STATE claiming it healthy.
+
+Land (step 2): nothing landable. Slots 3-7 FINISHED residue are all landed
+(e6553db/3c2109b/ee97499/713f205/5cf4811); slot 4 is LANDED-WITH-FINDINGS (not
+landable).
+
+Unblock (step 3): **slot 0's G6 worker was DEAD but its process tree was still
+alive.** Evidence: events.jsonl 20+ min stale (last event a `step_start`, never
+finished), NO cargo/rustc/rust-analyzer process anywhere, opencode pid 24460 CPU
+delta 0.5 s / 8 s (idle). The dispatcher had ALREADY reset slot 0 at 19:02:08
+(`loop/slots/0/abandoned-20260912-190208.patch`, 9007 bytes; reflog
+"checkout ... moving from packet/FHC-G6 ... to 44e769f") and archived the WIP, but
+the orphaned `cmd.exe /c worker-cmd.bat` (15368) + opencode (24460) survived and
+kept slot 0's target (3.0 GB outer + 10.1 GB inner) marked LIVE to the janitor.
+Action: `taskkill /PID 15368 /T /F` (killed 15368 + 24460 + children) - this
+completes the dispatcher's already-performed reset, loses no code (worktree was
+clean at base, changed=0). Then `python loop/janitor.py ensure --need 8`:
+reclaimed ~15.5 GB -> 20.7 GB free; ALL slot targets cleared.
+
+Registry hygiene (step 4): nothing mechanically flippable (checked; the 10 BLOCKED
+rows are owner-held/human-gated/unmet-dep). **NEW finding: RG-23-CERTIFIED-ENTRY-
+WIRING and RG-9-REFLECT-SOLID-PRODUCTION are READY rows with `"packet": ""` (empty
+path) - they are booked but UNAUTHORED.** The heartbeat's "ANCHOR CHECK FAILED"
+for these is really a missing-packet-file error (gen_packet --check raises
+FileNotFoundError), not anchor drift. Both are write-set-clashed with G6's
+`truck123d/src/bd_bridge.rs` anyway. Escalated (new-packet authoring is not an
+operator call).
+
+Dispatch (step 5): did NOT run live (heartbeat owns dispatch). The heartbeat's
+19:02:01 cycle auto-retried the frontier and FAILED: G6 -> slot 1 warm build exit
+101 (`target-lexicon` 180 errors E0405/E0425/E0432/E0531), FHC-B -> slot 2 warm
+build 0xc0000409 STATUS_STACK_BUFFER_OVERRUN. Both are the stale/corrupt-target +
+RAM-zone signatures; the janitor cleanup above wiped those targets. The heartbeat
+started its 19:14:41 cycle and at handoff was warming the clean targets (14
+cargo/rustc procs, RAM spiked to 1.05 GB free) - outcome NOT yet written to
+`dispatch_heartbeat.log` (mtime still 19:04:41). No new worker dispatched yet.
+
+STATE (step 6): rewrote the LATEST GROUND TRUTH block and the "State of the
+machine, as left" status lines to [operator 2026-09-12T23:18Z].
+
+Report (step 7): this entry.
+
+Escalations: NEW HIGH - frontier G6 cannot re-dispatch because warm builds fail
+at below-floor RAM (heavy baseline: chrome + Dropbox + Discord + MsMpEng + 2
+opencode). NEW LOW - RG-23/RG-9 READY rows have empty `packet` fields (un-authored).
+Carried unchanged - duplicate supervisors + lagging cargoq restart guard; 3
+duplicate registry lines; F1-AUTHORING-ARMS LANDED-WITH-FINDINGS; FRAME-REVOLVE F1
+non_z_axis pin; TOR-C flip-or-pin; slot-1/2/4/7 wt RESULT residue; schedule.py
+'needs' crash.
+
+Leaving: 0 RUNNING (G6 frontier cleared, awaiting heartbeat dispatch) / HEAD 44e769f
++ this cycle's STATE/log/escalation commit; heartbeat 1 (27872, LIVE, mid-cycle);
+disk 19.15 GB; RAM 1.05 GB (warm-build spike) / 2.8 GB pre-spike.

@@ -2255,3 +2255,47 @@ uncommitted - left for the orchestrator, no dispatch impact.
   unbounded default let the driver appear wedged for ~28 min; a bounded per-command
   timeout would make a future wedge visible sooner.
 - Priority: closed (landing); the timeout note is low.
+
+## 2026-09-12 23:18 UTC (operator): NEW HIGH - frontier FHC-G6 cannot re-dispatch; warm builds fail below-floor RAM
+
+- What: slot 0's FHC-G6-CERT-COST-SCALE worker died (events 20+ min stale, no
+  cargo/rustc, CPU idle) and was already reset by the dispatcher at 19:02:08, but
+  its orphaned `cmd.exe`+opencode tree kept slot 0's 13 GB target marked LIVE.
+  Operator killed the orphan (taskkill /PID 15368 /T /F) and ran
+  `python loop/janitor.py ensure --need 8` (reclaimed ~15.5 GB -> 20.7 GB; all slot
+  targets cleared). The heartbeat's auto re-dispatch STILL failed: G6 -> slot 1
+  warm build exit 101 (`target-lexicon` 180 errors), FHC-B -> slot 2 warm build
+  0xc0000409 STATUS_STACK_BUFFER_OVERRUN. Both are the stale-target + RAM-zone
+  signature. The heartbeat (27872) started its 19:14:41 cycle and was warming the
+  clean targets at handoff with RAM spiked to 1.05 GB free - outcome not yet known.
+- Why it needs a human: RAM is below the 3 GB floor (heavy baseline: chrome +
+  Dropbox + Discord + MsMpEng + 2 opencode) and the workspace warm-build spike
+  alone is 4-8 GB, so warm builds crash (0xc0000409) before the frontier can
+  dispatch. The operator cannot close human apps.
+- Exact commands a human should start from:
+  1. `Get-Process | Sort-Object WorkingSet64 -Descending | Select -First 12 Name,Id,@{n='MB';e={[math]::Round($_.WorkingSet64/1MB)}}`
+  2. Close chrome/Dropbox/Discord (frees ~1.2 GB), then
+     `python loop/dispatch_ready.py --dry-run --max-workers=4` to confirm G6 is
+     READY and unclashed.
+  3. Let the heartbeat (27872) dispatch G6; if the warm build fails again with
+     0xc0000409, raise `CARGO_BUILD_JOBS`/lower concurrency or prewarm one slot
+     at a time.
+  4. If the `target-lexicon` 180-error build recurs on CLEAN targets, that is a
+     toolchain/registry issue, not RAM - investigate `cargo check -p target-lexicon`
+     in a slot.
+- Priority: HIGH - G6 is the frontier; G1/FHC-B/FHC-C are chained behind it.
+
+## 2026-09-12 23:18 UTC (operator): NEW LOW - RG-23 / RG-9 READY rows have empty `packet` fields (unauthored)
+
+- What: `loop/PACKETS.jsonl` rows RG-23-CERTIFIED-ENTRY-WIRING and
+  RG-9-REFLECT-SOLID-PRODUCTION are status READY but carry `"packet": ""`. The
+  heartbeat's dispatcher prints "ANCHOR CHECK FAILED" for them every cycle; the
+  real cause is `gen_packet.py --check <empty>` raising FileNotFoundError, not
+  anchor drift. No packet file exists under loop/packets/ for either.
+- Why operator did not fix: new-packet authoring is not an operator call.
+- Exact commands a human should start from:
+  `Select-String -Path loop/PACKETS.jsonl -Pattern 'RG-23-CERTIFIED-ENTRY-WIRING|RG-9-REFLECT-SOLID-PRODUCTION'`
+  then author the packets (or mark the rows BLOCKED/parked if the RG shipping
+  wave is no longer intended). Both write sets clash with G6's
+  `truck123d/src/bd_bridge.rs` in any case.
+- Priority: low. No dispatch impact until G6 lands and frees the write set.
