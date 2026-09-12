@@ -8622,3 +8622,58 @@ pin; TOR-C flip-or-pin; slot-2/4/7 wt RESULT residue.
 
 Leaving: 0 RUNNING / HEAD a8118b5 + this cycle's STATE/log/escalations commit;
 heartbeat 1 (27872, LIVE); watchdog 1; cargoq UP; disk 15.93 GiB; RAM 3.34 GB.
+
+## 2026-09-12 20:05 UTC (operator)
+
+Board at start: 0 RUNNING; slot 0 FINISHED (FHC-G7-REFUSAL-METADATA, RESULT DONE),
+slots 1/2 IDLE (FHC-FACTS-CACHE / TTC-RECENSUS-F1-R3 residue), slots 3-7 FINISHED
+landed residue. HEAD had moved to f999c7d mid-cycle: a LIVE orchestrator (opencode
+33804) merged FHC-G7 and committed the README owner-call (4f1c922) while I verified.
+
+Health sweep: heartbeat exactly 1 (27872, last cycle 15:55, LIVE; the second match
+was my own command line); watchdog 1 (29264); cargoq UP (ping ok, queued 0, running
+false); operator runner 1. Disk 15.62 GB free (above the 8 GB floor and 15 GB goal);
+RAM 2.54 GB free - BELOW the 3 GB floor (no worker resident).
+
+Land (step 2): FHC-G7 was half-landed by the live orchestrator - merge f999c7d
+contained worker commit 4daa4c3, but the RESULT was unfiled (sole copy in slot-0 wt),
+no ledger row, and the PACKETS row was still READY (re-dispatch risk). Ran the packet's
+scoped checks at 4daa4c3 through cargoq: `cargo test -p truck123d --test
+refusal_metadata --locked` = 5/5 green; `cargo check -p truck123d --tests --locked`
+green. The packet's fmt/clippy done-when fails ONLY on off-limits baseline files
+(fmt: truck123d/tests/ttc_hazard_battery.rs; clippy: 66 errors, all in vendor/truck/**,
+zero in marshal.rs/binding.rs/refusal_metadata.rs) - not a gate against this packet.
+Filed loop/results/FHC-G7-REFUSAL-METADATA.json, appended the ledger row, flipped the
+row DONE (commit 6985805, subject shape "loop: <ID> row LANDED (...)").
+
+Unblock (step 3): no RUNNING worker; slot 1 (FHC-FACTS-CACHE) is landed residue, slot 2
+(TTC-RECENSUS-F1-R3) =base no work. Nothing to resume; no QUESTION, no 402.
+
+Registry (step 4): last-wins census = 356 unique = 261 DONE / 84 READY / 10 BLOCKED /
+1 SUPERSEDED. The frontier was blocked: dispatch_ready --dry-run showed
+FHC-G4-NAMED-CARRIER-ADMISSION failing A1 (`grep -c 'revolve needs a closed profile'
+corpus/ttc/door.py` expected 1, tree has 2) - anchor drift from the FHC-G7 landing,
+which added the second occurrence in door.py's known_gap table (line 178). Re-measured
+A1 to 2 per the anchor ritual (also the RESULT template's anchors_verified), committed
+647b756; gen_packet --check + packet_lint both green. Nothing else flipped: the 10
+BLOCKED rows re-read (owner-park/cancel/supersede/human-gate; FHC-G5/G6/G1 correctly
+chained). RG-23/RG-9 anchor checks still fail because their packet .md files are ABSENT
+(only RG-4 exists - missing authoring, NOT drift; escalated).
+
+Dispatch (step 5): ran `dispatch_ready --dry-run --max-workers=3` ONLY (heartbeat owns
+live dispatch). After the A1 fix: FHC-G4 -> slot 0, "dispatched 1; workers now ~1/3".
+Did NOT run live. RAM is 2.54 GB (below the 3 GB floor), so the G4 warm build may hit
+the 0xc0000409 RAM-zone; the heartbeat's own clean-and-retry policy applies.
+
+STATE (step 6): refreshed the LATEST GROUND TRUTH block and the "State of the machine,
+as left" lines to [operator 2026-09-12T20:05Z]. Stable traps/history untouched.
+
+Report (step 7): this entry.
+
+Escalations: nothing NEW; carried unchanged - RG-23/RG-9 missing packet authoring;
+duplicate supervisors + duplicate cargoq/server.py; F1-AUTHORING-ARMS
+LANDED-WITH-FINDINGS; FRAME-REVOLVE F1 non_z_axis pin; TOR-C flip-or-pin; slot-2/4/7
+wt RESULT residue. Noted: RAM below the 3 GB floor this cycle (watch the G4 warm build).
+
+Leaving: 0 RUNNING / HEAD 647b756 + this cycle's STATE/log commit; heartbeat 1 (27872,
+LIVE); watchdog 1; cargoq UP; disk 15.62 GB; RAM 2.54 GB.

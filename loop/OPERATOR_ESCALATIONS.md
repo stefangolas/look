@@ -2160,6 +2160,21 @@ uncommitted - left for the orchestrator, no dispatch impact.
   28544+34564; F1-AUTHORING-ARMS LANDED-WITH-FINDINGS; FRAME-REVOLVE F1 non_z_axis
   pin; TOR-C flip-or-pin; slot-2/4/7 wt RESULT residue.
 
+## 2026-09-12 20:05 UTC (operator) - nothing new; carried + one caution
+
+- RESOLVED this cycle (recorded, no human action): FHC-G7-REFUSAL-METADATA was
+  half-landed by the live orchestrator (merge f999c7d, but no RESULT filing / ledger /
+  row flip). Operator completed the bookkeeping (6985805) after a green scoped check.
+- RESOLVED this cycle: FHC-G4 A1 anchor drift 1->2 (FHC-G7 door.py landing); re-measured
+  and committed (647b756); G4 is now dispatchable.
+- CAUTION: RAM 2.54 GB free, below the 3 GB floor, with no worker resident. The FHC-G4
+  warm build may hit 0xc0000409. If the heartbeat's next cycle fails the warm build,
+  the documented clean-target-and-retry-once applies; a second failure needs a human.
+- Carried unchanged: RG-23/RG-9 packet .md files ABSENT (missing authoring, not drift);
+  duplicate supervisors + duplicate cargoq/server.py; F1-AUTHORING-ARMS
+  LANDED-WITH-FINDINGS; FRAME-REVOLVE F1 non_z_axis pin; TOR-C flip-or-pin; slot-2/4/7
+  wt RESULT residue.
+
 ## 2026-09-12 19:35 UTC (operator): CLOSED - the 18:09Z/19:07Z dead-dispatch reset hazard is resolved; FHC-FACTS-CACHE landed
 
 - Resolution: no live worker remained. The slot-1 worker (cmd 29372) exited and the
