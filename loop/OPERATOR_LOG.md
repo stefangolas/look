@@ -8383,3 +8383,55 @@ residue.
 Leaving: 1 RUNNING (FHC-G2 slot 1) + 1 STALLED-watch (FHC-FACTS-CACHE slot 0);
 HEAD 501d5ed + this cycle's STATE/log commit; heartbeat 1; operator_runner 1;
 watchdog 1; overnight 1; cargoq UP; disk 15.19 GiB; RAM 3.28 GB.
+
+## 2026-09-12 18:09 UTC (operator)
+
+Board: 2 RUNNING (both STALLED-but-ALIVE) / 0 landed-this-cycle / 0 unblocked /
+0 flipped / 0 dispatched. HEAD d346ead (unchanged since the 15:50Z operator commit).
+
+Health (step 1): slot_status shows slot 0 FHC-FACTS-CACHE and slot 1
+FHC-G2-PROBE-QUERIES both STALLED, but the process scan proves BOTH ALIVE:
+slot 0 cmd pid 16952 + opencode child 12864 (RESUME session) + live
+facts_call_count.py / door.py cockpit children; slot 1 cmd pid 20612 + opencode
+child 27780. cargoq ping ok (queued 0, running false). Heartbeat exactly 1
+(27872) but WEDGED (last dispatch_ready cycle 13:48 local; no python child at
+14:09). operator_runner 1 (27876), watchdog 1 (29264), overnight 1 (24864).
+Disk 13.46 GiB free (above 8 GB floor, below 15 GB goal); RAM 1.79 GB free
+(BELOW the 3 GB floor).
+
+Land (step 2): NOTHING landable. Slots 3/5/6 RESULT DONE, slot 4
+LANDED-WITH-FINDINGS, slot 7 LANDED, slot 2 no RESULT; every worker commit
+(c3df084, e6553db, 3c2109b, ee97499, 713f205, 5cf4811) is an ancestor of
+integration/kernel-bg. Nothing to merge.
+
+Unblock (step 3): no IDLE/DEAD slot holds unlanded work. Slots 0/1 are alive;
+charter forbids reaping a live worker. No QUESTION, no 402.
+
+Registry (step 4): 355 = 258 D / 86 R / 10 B / 1 S (re-derived). All 10 BLOCKED
+rows have unmet=[] but carry owner-park/cancel/supersede/human-gate notes -> NOT
+flipped (semantic). Anchor ritual: no landings since 15:50Z, so no anchor drift;
+RG-23/RG-9 .md still absent (missing authoring, not drift).
+
+Dispatch (step 5): ran `dispatch_ready --dry-run --max-workers=4` ONLY (NOT
+live). It reports "slots: 8 (0 running, 6 free)" and marks BOTH slot 0
+FHC-FACTS-CACHE and slot 1 FHC-G2-PROBE-QUERIES as "DEAD dispatch (slot N holds
+no matching RESULT) - would reset + delete + redispatch". In LIVE mode that path
+runs `run_packet.py --reset-only` (archive + hard-reset the worktree) then spawns
+a SECOND worker into the same slot while the first is still running. I did NOT
+run it live. The heartbeat, which DOES run dispatch_ready live every 10 min, is
+currently wedged - leaving it wedged protects the two live workers. Escalated.
+
+STATE (step 6): refreshed the volatile LATEST GROUND TRUTH block ([operator
+2026-09-12T18:09Z]) and the "State of the machine, as left" lines. Stable
+traps/history untouched.
+
+Escalations: NEW - dispatch_ready dead-dispatch reset hazard on the two live
+slots; NEW - wedged heartbeat (protective but unmonitored); RAM 1.79 GB below the
+3 GB floor. Carried unchanged: RG-23/RG-9 missing packet files; duplicate
+supervisors (19172+27828) + duplicate cargoq/server.py (28544+34564);
+F1-AUTHORING-ARMS LANDED-WITH-FINDINGS; FRAME-REVOLVE F1 non_z_axis pin; TOR-C
+flip-or-pin; slot-4/slot-7 wt RESULT residue.
+
+Leaving: 2 RUNNING (slot 0 FHC-FACTS-CACHE, slot 1 FHC-G2; both alive-but-stalled)
+/ HEAD d346ead + this cycle's STATE/log commit; heartbeat 1 (WEDGED); operator
+runner 1; watchdog 1; overnight 1; cargoq UP; disk 13.46 GiB; RAM 1.79 GB.

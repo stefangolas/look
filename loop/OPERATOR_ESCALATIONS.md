@@ -2053,3 +2053,34 @@ uncommitted - left for the orchestrator, no dispatch impact.
   re-dispatch AFTER FHC-G2 lands, so the bd_bridge.rs write sets serialize. Start
   from `loop/slots/0/events.jsonl` mtime and `loop/slots/0/wt` git status.
   All other carried items unchanged.
+
+## 2026-09-12 18:09 UTC (operator): dispatch_ready dead-dispatch reset would clobber the two live workers; heartbeat wedged
+
+- What: `dispatch_ready --dry-run` now classifies BOTH live slots as dead:
+  slot 0 FHC-FACTS-CACHE (cmd 16952, opencode 12864, live door.py children) and
+  slot 1 FHC-G2-PROBE-QUERIES (cmd 20612, opencode 27780). Both have no
+  RESULT.json and events >3 min stale (19.3 / 13.3 min), so the session-54
+  <180s RUNNING override in dispatch_ready.slot_states() does not fire and they
+  fall into the `dead` set.
+- Why it matters: in LIVE mode dispatch_ready's dead branch calls
+  `run_packet.py --reset-only` (archive-and-hard-reset the worktree) and then
+  re-dispatches the packet into the same slot - spawning a SECOND worker while
+  the first is still running, and double-writing truck123d/src/bd_bridge.rs
+  (both packets write it). The in-progress door.py facts measurement would be
+  archived and the live worker left writing into a reset tree.
+- The heartbeat (dispatch_heartbeat.ps1) runs `dispatch_ready.py
+  --max-workers=3` LIVE every 10 min. It is currently WEDGED (last cycle
+  13:48:37 local, no python child at 14:09), which is the only reason the reset
+  has not fired. DO NOT restart the heartbeat while slots 0/1 are alive.
+- Action needed (human/orchestrator): (1) do not run dispatch_ready live until
+  both workers commit or finish; (2) decide whether slot_status's STALLED
+  (events >3 min) should suppress the dead-dispatch path when a live opencode
+  child exists (the dead-shim signature is the absence of that child); (3)
+  investigate why heartbeat 27872 stopped cycling at 13:48 local. Start from
+  loop/slots/0/events.jsonl, loop/slots/1/events.jsonl, and
+  loop/dispatch_heartbeat.log.
+- Also: RAM 1.79 GB free (below the 3 GB floor). Do not raise the worker cap.
+  All other carried items unchanged (RG-23/RG-9 missing packet files; duplicate
+  supervisors 19172+27828 + duplicate cargoq/server.py 28544+34564;
+  F1-AUTHORING-ARMS LANDED-WITH-FINDINGS; FRAME-REVOLVE F1 non_z_axis pin;
+  TOR-C flip-or-pin; slot-4/slot-7 wt RESULT residue).
