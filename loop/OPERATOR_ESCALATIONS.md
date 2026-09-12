@@ -1989,3 +1989,25 @@ uncommitted - left for the orchestrator, no dispatch impact.
 - Health this cycle: heartbeat 1 (27872), operator_runner 1 (27876), watchdog 1
   (29264), overnight driver 1 (24864); cargoq UP (ping ok, queued 0, running
   false); disk 27.7 GB free; RAM 3.84 GB free.
+
+## [operator 2026-09-12T13:33Z] LOW RAM: 1.3 GiB free with a worker warm build launching
+
+- What: FreePhysicalMemory 1.3 GiB of 15.71 GB total, BELOW the 3 GB floor.
+  Resident consumers are the owner's desktop (chrome + Teams msedgewebview2 +
+  Dropbox) plus two opencode processes; the loop's own footprint is small. The
+  heartbeat dispatched FHC-MIRROR-FORM to slot 0 at ~09:29 local and its warm
+  build is starting into this pressure.
+- Why it matters: janitor.ensure only kills opencode-parented language servers
+  when free_ram_gb() < 4.0; it does NOT refuse dispatch on RAM. The documented
+  RAM-zone signature (rustc exit 101 / 0xc0000409) already appears in the recent
+  FHC-TRIM cargoq history (server.log), and a cold warm build is the 4-8 GB
+  spike class.
+- Action needed (human): close chrome/Teams/Dropbox if the FHC-MIRROR-FORM build
+  crashes, or confirm the dispatcher should refuse below a RAM floor. Watch
+  loop/cargoq/server.log for exit 101 / 3221225781 (0xc0000409) on the
+  FHC-MIRROR-FORM build; if it fails, clean slot 0 target/ dirs and re-warm once.
+- Do NOT raise the worker cap. This is the only new escalation; all carried items
+  are unchanged (RG-23/RG-9 missing packet files; duplicate supervisors +
+  duplicate cargoq/server.py + NEW duplicate http.server:8780 (3260 + 14452);
+  F1-AUTHORING-ARMS LANDED-WITH-FINDINGS; FRAME-REVOLVE F1 non_z_axis pin;
+  TOR-C flip-or-pin; slot-4/slot-7 wt RESULT residue).

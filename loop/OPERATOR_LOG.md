@@ -8014,3 +8014,65 @@ flip-or-pin; slot-4/slot-7 wt RESULT residue.
 Leaving: 0 RUNNING; slots 0/1 FINISHED SPEC_GAP (escalated), slots 2-7 landed
 residue; HEAD af93992 + this cycle's STATE/log commit; heartbeat 1;
 operator_runner 1; watchdog 1; cargoq UP; disk 24.33 GiB; RAM 3.67 GiB.
+
+## [operator 2026-09-12T13:33Z] frontier moved: FHC-TRIM landed (owner), FHC-MIRROR-FORM dispatched
+
+Health sweep (step 1): slot_status -> slot 0 IDLE/re-forked to
+packet/FHC-MIRROR-FORM@51b884f (=base, no work yet); slot 1 FINISHED FHC-TRIM
+(4a1dd49); slot 2 IDLE landed residue (TTC-RECENSUS-F1-R3); slots 3-7 FINISHED
+landed residue. cargoq ping {"ok":true,"queued":0,"running":false}; stats show
+the recent FHC-TRIM RAM-zone exits (101 / 0xc0000409 / -1). Exactly ONE
+dispatch_heartbeat (27872), ONE watchdog (29264), ONE operator_runner (27876),
+ONE overnight driver (24864). Disk 22.15 GiB free (above 8 GB floor and 15 GB
+goal); **RAM 1.3 GiB free - BELOW the 3 GB floor** (chrome + Teams + Dropbox +
+two opencode resident; owner session live). This is the cycle's one health flag.
+
+Land (step 2): HEAD moved past the last STATE block to `51b884f` - the owner
+adjudicated and landed FHC-TRIM-EXTRUDE-ENVELOPE (merge `d81448c` of `4a1dd49`,
+row flipped DONE). Re-verified by `git merge-base --is-ancestor` against
+integration/kernel-bg: 4a1dd49, c3df084, e6553db, 3c2109b, ee97499, 713f205,
+5cf4811 all ancestors; only slot-0 33f6269 NOT (SPEC_GAP duplicate, superseded).
+RESULT statuses read directly: slot 0/1 SPEC_GAP, slot 3/5/6 DONE (landed),
+slot 4 LANDED-WITH-FINDINGS, slot 7 LANDED residue. Nothing operator-landable;
+NOTHING landed by the operator.
+
+Unblock (step 3): no IDLE/DEAD worker holding work, no QUESTION, no 402. Slot 2
+is TTC-RECENSUS-F1-R3 landed residue (row DONE). Nothing to unblock. The
+heartbeat's next cycle looked briefly overdue against its 10-min cadence but was
+mid-dispatch (slot 0 re-forked, worker-cmd spawned), not stalled.
+
+Registry (step 4): re-derived by command (last-wins dedup): 354 unique = 253
+DONE / 90 READY / 10 BLOCKED / 1 SUPERSEDED (FHC-TRIM READY->DONE this cycle).
+All 10 BLOCKED notes read this cycle - all deliberate holds (DEF-SEEDRAY-B
+human-gated; DEF-TESS-ANALYTIC-SEAM superseded by -R2; TOR-C orchestrator-pinned
+authoring gate; RDEF-M4 M0-adjudication; RDEF-M5 owner; MONO-10 owner R3-mesh;
+DEF-SPINEFRAME-GRAZE; BG-CK-SPLINE-CENSUS cancelled; BG-AUD-FIX-004
+OWNER_BLOCKED; SEM-PCURVE-MASTER-001-FIX SUPERSEDED) - NOTHING flipped.
+READY-without-landed-marker = FHC-MIRROR-FORM (now running) + the FHC chain
+(needs-gated) + RG-23/RG-9 (packet .md files ABSENT from loop/packets/ - glob
+confirmed no files; missing authoring, not anchor drift; anchor ritual does not
+apply). Nothing mechanically fixable.
+
+Dispatch (step 5): dispatch_ready --dry-run --max-workers=4 -> "slots: 8 (0
+running, 8 free); slot-assigned packets: 5; FHC-MIRROR-FORM -> slot 0;
+dispatched 1; workers now ~1/4". Real dispatcher NOT run (heartbeat live =
+double-dispatch rule). The heartbeat then dispatched it: slot 0 forked to
+packet/FHC-MIRROR-FORM@51b884f, worker-cmd.bat spawned (cmd pid 34384),
+heartbeat log "dispatched 1; workers now ~1/3".
+
+STATE (step 6): rewrote the volatile LATEST GROUND TRUTH block
+([operator 2026-09-12T13:33Z], HEAD 51b884f, FHC-TRIM landed, FHC-MIRROR-FORM
+dispatched, RAM 1.3 GiB flagged) and the "State of the machine, as left"
+board/substrate/disk/RAM lines. Stable traps/history untouched.
+
+Escalations: ONE NEW - low RAM (1.3 GiB free) with FHC-MIRROR-FORM's warm build
+launching into it; the janitor reclaims language servers at <4 GB but does not
+refuse dispatch on RAM, so a 0xc0000409 is the failure signature to watch.
+Carried unchanged: RG-23/RG-9 missing packet files; duplicate supervisors +
+duplicate cargoq/server.py + NEW duplicate http.server:8780 (3260 + 14452);
+F1-AUTHORING-ARMS LANDED-WITH-FINDINGS; FRAME-REVOLVE F1 non_z_axis pin; TOR-C
+flip-or-pin; slot-4/slot-7 wt RESULT residue.
+
+Leaving: 1 RUNNING (FHC-MIRROR-FORM slot 0); HEAD 51b884f + this cycle's
+STATE/log commit; heartbeat 1; operator_runner 1; watchdog 1; cargoq UP; disk
+22.15 GiB; RAM 1.3 GiB (below floor).
