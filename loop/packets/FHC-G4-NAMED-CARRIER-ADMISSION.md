@@ -21,7 +21,7 @@ read_allow:
   - docs/MONO_CLOSURE_BOOKING.md
 tests_required: [truck123d/tests/named_carrier_admission.rs]
 anchors:
-  - {id: A1, expect: 1, cmd: "grep -c 'revolve needs a closed profile' corpus/ttc/door.py"}
+  - {id: A1, expect: 2, cmd: "grep -c 'revolve needs a closed profile' corpus/ttc/door.py"}
   - {id: A2, expect: 0, cmd: "grep -c 'Color' corpus/ttc/door.py"}
   - {id: A3, expect: 1, cmd: "grep -c 'class Vector' corpus/ttc/door.py"}
 budget:      {turns: 70, ctx_tokens: 220000}
@@ -101,7 +101,7 @@ weakened tests, bare `cargo test`; committing to `main`.
 
 ```json
 {"id":"FHC-G4-NAMED-CARRIER-ADMISSION","status":"DONE","contracts":["FHC-G4-NAMED-CARRIER-ADMISSION"],
- "anchors_verified":{"A1":1,"A2":0,"A3":1},
+ "anchors_verified":{"A1":2,"A2":0,"A3":1},
  "rows_flipped":[],"notes":"per-row verdict + bracket"}
 ```
 
