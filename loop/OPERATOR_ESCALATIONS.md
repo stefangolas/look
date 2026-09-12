@@ -2032,3 +2032,24 @@ uncommitted - left for the orchestrator, no dispatch impact.
   cargoq/server.py 28544+34564; F1-AUTHORING-ARMS LANDED-WITH-FINDINGS;
   FRAME-REVOLVE F1 non_z_axis pin; TOR-C flip-or-pin; slot-4/slot-7 wt RESULT
   residue).
+
+## 2026-09-12 15:50 UTC (operator): slot-0 FHC-FACTS-CACHE alive-but-stalled + bd_bridge.rs collision with newly-dispatched FHC-G2
+
+- What: slot 0's FHC-FACTS-CACHE worker (cmd pid 34776) is ALIVE with a live
+  opencode child (pid 3520, packet text loaded) but its events.jsonl has been
+  stale ~13.7 min with changed=0, no commit, and no cargo/rustc process - i.e.
+  idle, not the dead-shim signature (a dead shim has no opencode child). This
+  cycle's `dispatch_ready --max-workers=4` counted slot 0 as not-running and
+  dispatched FHC-G2-PROBE-QUERIES to slot 1. Both packets write
+  `truck123d/src/bd_bridge.rs`; if the stalled FACTS-CACHE worker later commits
+  and G2 also commits, the two branches collide at merge.
+- Why it matters: (1) reaping a genuinely-live worker is forbidden by the
+  charter; (2) if it is actually wedged, its slot stays unavailable and its
+  bd_bridge.rs work may be lost; (3) the collision is the write-set-disjointness
+  rule being overridden by the dispatcher's STALLED-as-free accounting.
+- Action needed (human/orchestrator): decide whether the FACTS-CACHE worker is
+  wedged. If its events stay stale > 20 min with no cargo, reset slot 0
+  (`run_packet.py --reset-only --slot 0`, archiving first) and let FHC-FACTS-CACHE
+  re-dispatch AFTER FHC-G2 lands, so the bd_bridge.rs write sets serialize. Start
+  from `loop/slots/0/events.jsonl` mtime and `loop/slots/0/wt` git status.
+  All other carried items unchanged.

@@ -8325,3 +8325,61 @@ slot-4/slot-7 wt RESULT residue.
 Leaving: 1 RUNNING (FHC-FACTS-CACHE slot 0); HEAD 57f2be6 + this cycle's STATE/log
 commit; heartbeat 1; operator_runner 1; watchdog 1; overnight 1; cargoq UP; disk
 ~16.6 GiB; RAM 2.04 GB (below floor).
+
+## 2026-09-12 15:50 UTC (operator cycle)
+
+Board: 1 RUNNING / 1 landed-since-last-op / 0 unblocked / 0 flipped / 1
+operator-dispatched. HEAD 57f2be6 -> 501d5ed. Registry 355 = 258 DONE / 86 READY
+/ 10 BLOCKED / 1 SUPERSEDED (last-wins dedup, re-derived by command).
+
+Health (step 1): slot 0 STALLED (FHC-FACTS-CACHE, cmd pid 34776 ALIVE with live
+opencode child pid 3520, events 13.7 min stale, changed=0, no commit, no
+cargo/rustc); slot 1 free at scan. Heartbeat exactly 1 real (27872
+dispatch_heartbeat.ps1; the other matches were my own opencode cmd + a transient
+query shell). Watchdog exactly 1 real (29264 python watchdog.py; the other matches
+were Teams msedgewebview2 --gpu-watchdog). operator_runner 1 (27876), overnight
+driver 1 (24864). cargoq UP (ping ok, queued 0, running false). Disk 15.19 GiB
+(> 8 GB floor and > 15 GB goal). RAM 3.28 GB (> 3 GB floor; was 2.04 GB at
+15:23Z).
+
+Landing (step 2): every slot tip re-verified `git merge-base --is-ancestor`
+against integration/kernel-bg HEAD: 4a1dd49, c3df084, e6553db, 3c2109b, ee97499,
+713f205, 5cf4811 ALL TRUE -> NOTHING landable. Slot RESULT statuses read from the
+worktree roots: slot 1 SPEC_GAP, slot 3 DONE, slot 4 LANDED-WITH-FINDINGS, slot 5
+DONE, slot 6 DONE, slot 7 LANDED - none landable (already ancestors anyway).
+
+Unblock (step 3): slot 0 is alive-but-stalled, not dead (opencode child 3520
+exists = not the dead-shim signature). Charter forbids killing a live worker and
+says escalate on doubt; left it and logged an escalation. No QUESTION, no 402. No
+other IDLE/DEAD slot holds unlanded work.
+
+Registry (step 4): all 10 BLOCKED rows have needs landed by the literal rule, but
+all carry owner-park/cancel/supersede/human-gate notes -> NOT flipped (semantic).
+Anchor ritual: FHC-G2 A1 had drifted 4->3 (FHC-G3 landing removed one
+`OCC probe of a kernel-engine row` mention in corpus/ttc/door.py). Re-ran the exact
+grep (3), updated expect + example RESULT, committed `501d5ed`; gen_packet --check
+green (A1 3 ok, A2 1 ok), packet_lint clean. RG-23/RG-9 .md files still ABSENT
+from loop/packets/ (glob-confirmed) -> missing authoring, not drift.
+
+Dispatch (step 5): `dispatch_ready --max-workers=4` (LIVE) -> "dispatched 1;
+workers now ~1/4". It dispatched FHC-G2-PROBE-QUERIES to slot 1 (pid 20612, forked
+from 501d5ed, events fresh). It counted slot 0 as not-running (STALLED) and
+dispatched G2 while FHC-FACTS-CACHE (slot 0, same bd_bridge.rs write set) is still
+alive-but-stalled = potential bd_bridge.rs collision if both commit; logged as a
+watch/escalation, not reversed.
+
+STATE (step 6): refreshed the volatile LATEST GROUND TRUTH block ([operator
+2026-09-12T15:50Z], HEAD 501d5ed, board 1 RUNNING + 1 STALLED-watch / 1 landed /
+0 flipped / 1 dispatched, registry 355=258/86/10/1, RAM 3.28 GB, disk 15.19 GiB)
+and the "State of the machine, as left" lines. Stable traps/history untouched.
+
+Escalations: NEW - slot-0 FHC-FACTS-CACHE alive-but-stalled + potential
+bd_bridge.rs collision with newly-dispatched slot-1 FHC-G2. Carried unchanged:
+RG-23/RG-9 missing packet files; duplicate supervisors (19172+27828) + duplicate
+cargoq/server.py (28544+34564); F1-AUTHORING-ARMS LANDED-WITH-FINDINGS;
+FRAME-REVOLVE F1 non_z_axis pin; TOR-C flip-or-pin; slot-4/slot-7 wt RESULT
+residue.
+
+Leaving: 1 RUNNING (FHC-G2 slot 1) + 1 STALLED-watch (FHC-FACTS-CACHE slot 0);
+HEAD 501d5ed + this cycle's STATE/log commit; heartbeat 1; operator_runner 1;
+watchdog 1; overnight 1; cargoq UP; disk 15.19 GiB; RAM 3.28 GB.
