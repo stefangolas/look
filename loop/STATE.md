@@ -75,37 +75,36 @@ corrected, annex C = ORACLE POLICY CHANGE), then docs/SOLVER_COVERAGE_SPEC.md
 
 ## Where we are
 
-> LATEST GROUND TRUTH [operator 2026-09-12T21:54Z]: 1 RUNNING (FHC-G5-SWALLOWED-
-> REFUSAL-DIAGNOSIS, slot 0, healthy - events ~1 min old, pid 4484, 5 files changed,
-> branch packet/FHC-G5-SWALLOWED-REFUSAL-DIAGNOSIS@0561149 =base, no commit yet) / 0
-> landed-this-cycle / 0 unblocked / 0 flipped / 0 dispatched. HEAD `d590a21` (the
-> prior operator's own STATE/log commit; integration/kernel-bg tip).
-> Frontier: FHC-G4 LANDED end-to-end (row carries LANDED 6361c50 marker, RESULT filed
-> 8c329fa, worker commit ancestor of HEAD). G5 is RUNNING; G6 -> G1 correctly chained
-> behind it (needs edges). RG-23/RG-9 still non-dispatchable: packet .md files ABSENT
-> (registry rows only) AND write-set clash with the RUNNING G5 on
-> truck123d/src/bd_bridge.rs. Missing authoring, NOT drift; escalated, carried.
-> Registry: 359 lines / 356 unique = 264 DONE / 84 READY / 10 BLOCKED / 1 SUPERSEDED.
-> NEW this cycle: 3 duplicate registry LINES (MONO-9-FUSE-FOLD, RDEF-M1-LATTICE-V2,
-> FHC-G7-REFUSAL-METADATA) - byte-identical DONE rows; unique count unchanged at 356.
-> Escalated as a registry data defect (which line to drop is a human call).
-> dispatch_ready --dry-run: dispatched 0; workers ~1/4 - only candidates RG-23/RG-9
-> (bd_bridge.rs clash) and FHC-G6/FHC-G1 (chained on G5). REAL idle.
-> BLOCKED-with-all-deps-landed = all 10 correctly parked (owner-blocked/cancelled/
-> superseded/human-gated/orchestrator-held). Nothing to flip; nothing to land.
-> Health: RAM 1.5 GB free (BELOW the 3 GB floor - FHC-G5 worker resident; heartbeat's
-> warm-build clean-and-retry policy applies on any 0xc0000409); Disk 10.8 GB free
-> (above the 8 GB floor, below the 15 GB janitor goal). Heartbeat 1 (27872, LIVE),
-> watchdog 1 (29264), operator runner 1 (27876), cargoq UP (ping ok, queued 0, running
-> true - G5's build). No TEMP baseline leaks. Carried: duplicate supervisors (19172 +
-> 27828); F1-AUTHORING-ARMS LANDED-WITH-FINDINGS (slot 4); FRAME-REVOLVE F1 non_z_axis
-> pin; TOR-C flip-or-pin; slot-1/2/4/7 wt RESULT residue; RG-23/RG-9 missing packet
-> authoring.
-> Leaving: 1 RUNNING (FHC-G5) / HEAD `d590a21`.
->
-> NOTE: this cycle refreshed the prior block in place (timestamp/HEAD/board/health) to
-> keep the volatile section at ~1 block (charter cap ~120 lines). Prior cycles' refreshes
-> are in git history; the stable traps below are untouched.
+> LATEST GROUND TRUTH [operator 2026-09-12T22:23Z]: 0 RUNNING / 1 landed-this-cycle
+> (by operator commit-as-delivered; NOT merged - see below) / 0 unblocked / 0 flipped /
+> 0 dispatched. HEAD `220c184` (the live orchestrator/owner booking of FHC-B + FHC-C
+> after G5; integration/kernel-bg tip). Slot 0 FINISHED with FHC-G5-SWALLOWED-REFUSAL-
+> DIAGNOSIS: worker wrote RESULT.json status DONE at 18:14:38 local but SKIPPED the
+> commit (documented skipped-commit class; branch was =base 0561149, 0 ahead). The
+> overnight driver (24864) is WEDGED mid-scoped-check on `cargo test --test
+> extraction_breadth_a` in slot 0's worktree (cargo.exe 37656, 0 CPU, no rustc, >8 min;
+> overnight.log silent since 18:10:39) - so the driver did NOT land G5.
+> Operator action: scoped-verify crashed environmentally (my `cargo check -p truck123d
+> --tests` exit 101 / 0xC0000409, RAM-zone, competing with the driver's build), so I did
+> NOT merge. I DID preserve the work per the ORCHESTRATOR skipped-commit protocol:
+> committed the five write_allow files AS DELIVERED at `e69f404` (1 ahead of integration;
+> RESULT.json left at the worktree root for filing). G5 is NOT an ancestor of integration.
+> cargoq server.log confirms the worker's named test PASSED twice (swallowed_refusal_
+> diagnosis exit 0) but `cargo fmt --check -p truck123d` exit 1 (worker claims pre-existing
+> toolchain drift outside write_allow) and `cargo test --lib` crashed 0xC0000409 twice.
+> Frontier: G5 is committed-but-unlanded; G6 -> G1 and FHC-B/FHC-C correctly chained on
+> it. RG-23/RG-9 still fail gen_packet anchor check (heartbeat 18:20:30: ANCHOR CHECK
+> FAILED - re-measure at dispatch). Registry: 359 lines / 356 unique = 264 DONE / 84
+> READY / 10 BLOCKED / 1 SUPERSEDED; 3 duplicate lines (MONO-9-FUSE-FOLD, RDEF-M1-
+> LATTICE-V2, FHC-G7-REFUSAL-METADATA) escalated.
+> Health: RAM 2.3-2.6 GB free (BELOW the 3 GB floor), Disk 9.5 GB free (above the 8 GB
+> floor, below the 15 GB janitor goal). Heartbeat 1 (27872, LIVE, 18:20:30 cycle:
+> dispatched 0), watchdog 1 (29264), operator runner 1, cargoq UP (ping ok, queued 0,
+> running false). Overnight driver 1 (24864) WEDGED. Carried: duplicate supervisors
+> (19172 + 27828); F1-AUTHORING-ARMS LANDED-WITH-FINDINGS (slot 4); FRAME-REVOLVE F1
+> non_z_axis pin; TOR-C flip-or-pin; slot-1/2/4/7 wt RESULT residue; RG-23/RG-9 anchor
+> failures.
+> Leaving: 0 RUNNING / G5 committed unlanded at `e69f404` / HEAD `220c184`.
 
 ## Pick up here
 
@@ -149,26 +148,28 @@ corrected, annex C = ORACLE POLICY CHANGE), then docs/SOLVER_COVERAGE_SPEC.md
 
 ## State of the machine, as left
 
-- 1 worker alive (FHC-G5-SWALLOWED-REFUSAL-DIAGNOSIS, slot 0, pid 4484; events ~1 min
-  old at scan, 5 files changed, =base no commit yet - healthy, do not touch).
+- 0 RUNNING. Slot 0 FINISHED, FHC-G5-SWALLOWED-REFUSAL-DIAGNOSIS: RESULT status DONE,
+  worker did NOT commit; operator committed the work AS DELIVERED at `e69f404` (1 ahead
+  of integration, NOT merged). Branch packet/FHC-G5-SWALLOWED-REFUSAL-DIAGNOSIS.
 - Slots 1/2 IDLE residue (slot 1 = FHC-FACTS-CACHE DONE; slot 2 = TTC-RECENSUS-F1-R3
-  DONE, =base no work). Slots 3-7 FINISHED landed residue (worker commits re-verified
-  ancestors of integration/kernel-bg this cycle: e6553db/3c2109b/ee97499/713f205/5cf4811;
-  RESULT statuses DONE/DONE/DONE/LANDED-WITH-FINDINGS(slot4)/LANDED).
-- FHC-G4-NAMED-CARRIER-ADMISSION LANDED end-to-end (row carries LANDED 6361c50 marker,
-  8c329fa RESULT filed, worker commit ancestor of HEAD). FHC-G5 RUNNING.
+  DONE, =base no work). Slots 3-7 FINISHED landed residue (worker commits ancestors of
+  integration/kernel-bg: e6553db/3c2109b/ee97499/713f205/5cf4811; RESULT statuses
+  DONE/DONE/DONE/LANDED-WITH-FINDINGS(slot4)/LANDED).
+- G5 is committed-but-unlanded at e69f404; the overnight driver (24864) is WEDGED on its
+  scoped-check `cargo test --test extraction_breadth_a` (cargo 37656, 0 CPU, >8 min) so
+  it has not landed. Do not merge G5 without a green scoped check.
 - Do NOT run dispatch_ready live - the heartbeat (27872) owns dispatch and is LIVE.
-  --dry-run: dispatched 0; workers ~1/4 (RG-23/RG-9 bd_bridge.rs clash + missing packet
-  files; G6/G1 chained on G5).
-- Substrate: heartbeat 1 (27872), watchdog 1 (29264), operator runner 1 (27876),
-  cargoq UP (ping ok, queued 0, running true). TWO supervisor.py (19172 + 27828) =
-  carried duplication.
-- Disk 10.8 GB free (above the 8 GB floor, below the 15 GB janitor goal).
-- RAM 1.5 GB free (BELOW the 3 GB floor - FHC-G5 worker resident).
+  18:20:30 cycle: dispatched 0; G5 is slot-assigned (not re-dispatchable while slot 0
+  holds it); RG-23/RG-9 ANCHOR CHECK FAILED; G6/G1/B/C chained.
+- Substrate: heartbeat 1 (27872), watchdog 1 (29264), operator runner 1, cargoq UP
+  (ping ok, queued 0, running false). Overnight driver 1 (24864, WEDGED). TWO
+  supervisor.py (19172 + 27828) = carried duplication.
+- Disk 9.5 GB free (above the 8 GB floor, below the 15 GB janitor goal).
+- RAM 2.3-2.6 GB free (BELOW the 3 GB floor).
 - Registry: 359 lines / 356 unique = 264 D / 84 R / 10 B / 1 S; 3 duplicate lines
   (MONO-9-FUSE-FOLD, RDEF-M1-LATTICE-V2, FHC-G7-REFUSAL-METADATA) - escalated.
-- [operator 2026-09-12T21:54Z] board: 1 RUNNING / 0 landed-this-cycle / 0 unblocked /
-  0 flipped / 0 dispatched; HEAD d590a21.
+- [operator 2026-09-12T22:23Z] board: 0 RUNNING / 1 landed-this-cycle (commit-as-
+  delivered, unmerged) / 0 unblocked / 0 flipped / 0 dispatched; HEAD 220c184.
 
 [operator 2026-09-09T02:2xZ - volatile refresh after the ADM-L4 operator
 landing. Board now: 0 running / 6 FINISHED residue (L1,L2,L3,F1,CL-005,

@@ -8826,3 +8826,61 @@ wt RESULT residue. Noted: RAM below the 3 GB floor with the FHC-G5 worker reside
 
 Leaving: 1 RUNNING (FHC-G5) / HEAD d590a21 + this cycle's STATE/log commit; heartbeat 1
 (27872, LIVE); watchdog 1; cargoq UP; disk 10.8 GB; RAM 1.5 GB.
+
+## 2026-09-12 22:23 UTC (operator cycle)
+
+Health sweep (step 1): `slot_status.py` - slot 0 FINISHED (FHC-G5-SWALLOWED-REFUSAL-
+DIAGNOSIS, pid=-, events 1.2 min old at scan, 5 files changed, branch @0561149 =base 0
+ahead); slots 1/2 IDLE residue (FHC-FACTS-CACHE / TTC-RECENSUS-F1-R3, landed, =base);
+slots 3-7 FINISHED landed residue. cargoq ping ok (queued 0, running false). Heartbeat
+exactly 1 (27872, LIVE; 18:20:30 cycle logged). Watchdog 1 (29264). Disk 9.5 GB free
+(above 8 GB floor, below 15 GB janitor goal). RAM 2.3-2.6 GB free (BELOW the 3 GB floor).
+No `%TEMP%/look-verify-baseline-*` leaks. TWO supervisor.py (19172 + 27828) = carried
+duplication.
+
+Land (step 2): FHC-G5 finished with RESULT.json status DONE at the worktree root but the
+worker SKIPPED the commit (branch =base 0561149, `rev-list --count integration..HEAD`=0)
+- the documented skipped-commit class. The overnight driver (24864) was already mid-
+adjudication: its scoped-check `cargo test -p truck123d --test extraction_breadth_a` in
+slot 0's worktree is WEDGED (cargo.exe 37656, 0 CPU, no rustc, >8 min; overnight.log
+silent since 18:10:39). I ran the operator scoped check `cargo check -p truck123d
+--tests --locked` through cargoq: exit 101 / 0xC0000409 (STATUS_STACK_BUFFER_OVERRUN,
+RAM-zone, competing with the driver's build) - NOT a code failure. Because no scoped
+check was green I did NOT merge. Per the ORCHESTRATOR skipped-commit protocol I DID
+preserve the work: staged the five write_allow files only (RESULT.json is gitignored)
+and committed AS DELIVERED at `e69f404` ("... (FHC-G5)" + orchestrator commit-as-
+delivered body), 1 commit ahead of integration. cargoq server.log evidence: the worker's
+named test `swallowed_refusal_diagnosis` PASSED twice (exit 0), `cargo test --lib`
+crashed 0xC0000409 twice, and `cargo fmt --check -p truck123d` exit 1 (worker claims
+pre-existing toolchain drift outside write_allow). G5 is committed-but-unlanded; do not
+merge without a green scoped check.
+
+Unblock (step 3): no IDLE/DEAD slot holding work (slots 1/2 residue are DONE packets);
+no QUESTION anywhere. The driver's wedge is escalated, not killed (not a worker).
+
+Registry hygiene (step 4): nothing to flip - G5 is READY (not yet landed), so G6/G1 and
+FHC-B/FHC-C are correctly blocked on it. Registry still 359 lines / 356 unique = 264
+DONE / 84 READY / 10 BLOCKED / 1 SUPERSEDED; the 3 duplicate lines remain (escalated
+prior cycle). RG-23/RG-9 now fail `gen_packet --check` (heartbeat 18:20:30: ANCHOR CHECK
+FAILED) - re-measure is a dispatch-time ritual, not this cycle's job.
+
+Dispatch (step 5): did NOT run live (heartbeat owns dispatch, is LIVE). Heartbeat's own
+18:20:30 cycle: "dispatched 0; workers now ~0/3"; G5 slot-assigned (safe from re-fork
+while slot 0 holds it), RG-23/RG-9 anchor-failed, G6/G1/B/C chained.
+
+STATE (step 6): refreshed the LATEST GROUND TRUTH block and "State of the machine, as
+left" to [operator 2026-09-12T22:23Z] (0 RUNNING, G5 committed unlanded e69f404, HEAD
+220c184, RAM 2.3-2.6 GB, disk 9.5 GB). Stable traps/history untouched.
+
+Report (step 7): this entry.
+
+Escalations: one NEW - the overnight driver wedged mid-scoped-check (see ESCALATIONS).
+Carried unchanged - RG-23/RG-9 anchor failures; duplicate supervisors; duplicate registry
+lines; F1-AUTHORING-ARMS LANDED-WITH-FINDINGS; FRAME-REVOLVE F1 non_z_axis pin; TOR-C
+flip-or-pin; slot-1/2/4/7 wt RESULT residue. NEW observation: my scoped check and the
+driver's collided on the same warm target at 2.x GB free RAM and BOTH rustc invocations
+crashed 0xC0000409 - do not run cargo in a slot the driver is checking.
+
+Leaving: 0 RUNNING / G5 committed unlanded at e69f404 / HEAD 220c184 + this cycle's
+STATE/log/escalations commit; heartbeat 1 (27872, LIVE); watchdog 1; cargoq UP; disk
+9.5 GB; RAM 2.3 GB.

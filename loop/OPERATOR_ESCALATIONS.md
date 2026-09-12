@@ -2210,3 +2210,36 @@ uncommitted - left for the orchestrator, no dispatch impact.
   `python -c "import json,collections; rows=[json.loads(l) for l in open('loop/PACKETS.jsonl',encoding='utf-8') if l.strip()]; seen=set(); out=[]; [out.append(r) for r in rows if not (r['id'] in seen or seen.add(r['id']))]; open('loop/PACKETS.jsonl','w',encoding='utf-8').write('\n'.join(json.dumps(r,ensure_ascii=False) for r in out)+'\n')"`
   (drops later duplicates, keeps first occurrence; verify the 3 IDs first).
 - Priority: low. No dispatch impact observed.
+
+## 2026-09-12 22:23 UTC (operator): NEW - overnight driver wedged mid-scoped-check; FHC-G5 committed-unlanded
+
+- What: slot 0 holds FHC-G5-SWALLOWED-REFUSAL-DIAGNOSIS with RESULT status DONE but no
+  worker commit (skipped-commit class). The overnight driver (pid 24864) began landing
+  it and is now WEDGED inside `scoped_check`: `cargo.exe` pid 37656
+  (`cargo test --locked -p truck123d --test extraction_breadth_a --manifest-path
+  C:\Users\stefa\look\loop\slots\0\wt\Cargo.toml`) has 0 CPU, no `rustc` child, and has
+  been idle >8 min; `loop/overnight.log` has logged nothing since 18:10:39 (its last
+  poll). `overnight.py`'s `sh()` default timeout is 3600 s, so the driver may stay
+  wedged up to an hour, not landing G5 and not polling.
+- Operator action already taken: to prevent loss to a re-fork (untracked files are not
+  archived), the five write_allow files were committed AS DELIVERED at `e69f404` (1 ahead
+  of integration, NOT merged). RESULT.json remains at `loop/slots/0/wt/RESULT.json` for
+  filing. The branch is `packet/FHC-G5-SWALLOWED-REFUSAL-DIAGNOSIS`.
+- Why I did not land it: the operator scoped check crashed environmentally
+  (`cargo check -p truck123d --tests --locked` exit 101 / 0xC0000409, RAM-zone, at
+  2.x GB free and competing with the driver's build); no green scoped check exists yet.
+  The packet's declared done-when also includes `cargo fmt --check -p truck123d`, which
+  the cargoq server log records as exit 1 (the worker asserts pre-existing toolchain
+  drift outside write_allow - that adjudication is not an operator call).
+- Exact commands a human should start from:
+  1. Inspect the wedge: `Get-Process -Id 37656 | Select Id,CPU` and
+     `Get-Content loop/overnight.log -Tail 20`.
+  2. If wedged, kill 37656 and the driver's stuck wait, or let the 3600 s timeout fire.
+  3. Land from the committed branch once RAM permits (close chrome/Dropbox/Discord -
+     baseline is heavy at 15.7 GB):
+     `git -C C:\Users\stefa\look merge --no-ff --no-edit -m "merge: FHC-G5 ... (scoped check green)" e69f404`,
+     then file `loop/results/FHC-G5-SWALLOWED-REFUSAL-DIAGNOSIS.json`, remove the
+     worktree-root RESULT.json, append the ledger row, flip the registry row DONE.
+- Priority: HIGH - G6, G1, FHC-B, FHC-C are all chained behind G5; the frontier is
+  stalled until it lands or is adjudicated. `overnight.py scoped_check` should also get a
+  bounded per-command timeout smaller than 3600 s (machinery defect).
