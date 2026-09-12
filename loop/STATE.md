@@ -75,57 +75,63 @@ corrected, annex C = ORACLE POLICY CHANGE), then docs/SOLVER_COVERAGE_SPEC.md
 
 ## Where we are
 
-> LATEST GROUND TRUTH [operator 2026-09-12T05:34Z / 01:34 local]: 1 RUNNING / 0
-> landed-this-cycle / 0 unblocked / 0 flipped / 0 dispatched. HEAD `49a79c9`
-> (the 05:11Z operator commit; no packet work moved this cycle).
-> **THE FHC-TRIM DUPLICATE REMAINS SLOT-1-ONLY.** Slot 0 FINISHED with RESULT
-> status **SPEC_GAP** (worker commit 33f6269 "truck123d: trim-extrude envelope
-> extension", preserved on branch `packet/FHC-TRIM-EXTRUDE-ENVELOPE-slot0`, NOT an
-> ancestor of HEAD - re-verified this cycle; RESULT at
-> loop/results/FHC-TRIM-EXTRUDE-ENVELOPE.PENDING.RESULT.json). NOT
-> operator-landable (status != DONE) - ESCALATED 04:48Z (degenerate planar fan cap
-> -> TYPED `SingularParametrization`; the booked FHC-EX-B degenerate-cap class).
-> Slot 1 is the sole live worker (cmd pid 13864): branch
-> `packet/FHC-TRIM-EXTRUDE-ENVELOPE` @ 3d1d769 =base, `M
-> truck123d/src/bd_bridge.rs` (no commit), events ~2.5 min fresh = ACTIVE, not
-> stalled; do NOT touch.
+> LATEST GROUND TRUTH [operator 2026-09-12T06:05Z / 02:05 local]: 1 RUNNING / 0
+> landed-this-cycle / 0 unblocked / 0 flipped / 0 dispatched. HEAD `6224500`
+> (the 05:34Z operator commit; no packet work moved this cycle).
+> **SLOT 1 FHC-TRIM IS ACTIVE, BLOCKED ON A LONG cargoq TEST (not stalled).**
+> `slot_status.py` reports slot 1 STALLED (events 24 min old) but this is the
+> documented mis-calibrated class: cmd pid 13864 alive, cargo.exe 26952 + rustc
+> present, and `cargoq/server.log` shows the worker's `debug_trim_prism_pair` job
+> STARTED 01:31:40 local and still running (the worker blocks on the cargoq HTTP
+> call exactly as on cargo; cargoq's 40-min timeout returns it). Re-verified both
+> ways; do NOT reset or reap. Branch `packet/FHC-TRIM-EXTRUDE-ENVELOPE` @ 3d1d769
+> =base, `M truck123d/src/bd_bridge.rs` (no commit; worker instrumenting a debug
+> test).
+> Slot 0 FINISHED with RESULT status **SPEC_GAP** (worker commit 33f6269 preserved
+> on `packet/FHC-TRIM-EXTRUDE-ENVELOPE-slot0`, NOT an ancestor of HEAD -
+> re-verified this cycle; RESULT at
+> loop/results/FHC-TRIM-EXTRUDE-ENVELOPE.PENDING.RESULT.json, filed 01:51 local).
+> NOT operator-landable (status != DONE) - ESCALATED 04:48Z (degenerate planar fan
+> cap -> TYPED `SingularParametrization`; the booked FHC-EX-B degenerate-cap
+> class).
 > Slots 2-7 FINISHED/IDLE landed residue; every tip re-verified an ancestor of HEAD
-> by `git merge-base --is-ancestor` this cycle (slot 2 c3df084 IDLE - row
-> TTC-RECENSUS-F1-R3 DONE; slot 3 e6553db DONE; slot 4 3c2109b
-> LANDED-WITH-FINDINGS; slot 5 ee97499 DONE; slot 6 713f205 DONE; slot 7 5cf4811
-> LANDED) - NOTHING landable.
-> `dispatch_ready --dry-run --max-workers=4`: "slots: 8 (1 running, 7 free);
-> slot-assigned packets: 5; dispatched 0; workers now ~1/4" = REAL idle (heartbeat
+> by `git merge-base --is-ancestor` this cycle (slot 2 c3df084; slot 3 e6553db;
+> slot 4 3c2109b LANDED-WITH-FINDINGS; slot 5 ee97499; slot 6 713f205; slot 7
+> 5cf4811) - NOTHING landable. Slot 0 33f6269 ancestor=False (the SPEC_GAP).
+> `dispatch_ready --dry-run --max-workers=4`: "slots: 8 (0 running, 7 free);
+> slot-assigned packets: 5; dispatched 0; workers now ~0/4" = REAL idle (heartbeat
 > live; real dispatcher NOT run = double-dispatch rule). Blocked reasons: RG-23 /
-> RG-9 write-set clash on bd_bridge.rs (their PACKET FILES ARE MISSING - verified:
-> no `*RG-23*`/`*RG-9*` in loop/packets/; packet authoring is orchestrator work);
+> RG-9 ANCHOR CHECK FAILED because their PACKET FILES ARE MISSING - verified: no
+> `*RG-23*`/`*RG-9*` in loop/packets/ (packet authoring is orchestrator work);
 > FHC-MIRROR-FORM -> FHC-TRIM; BD-EMIT-MESH-CACHE -> FHC-MIRROR-FORM; FHC-G1..G6
 > chained behind BD-EMIT-MESH-CACHE.
-> Registry re-derived by command (last-wins dedup): 354 unique rows = 252 DONE /
-> 91 READY / 10 BLOCKED / 1 SUPERSEDED. BLOCKED-with-all-needs-landed = 9, all
-> deliberate holds (BG-AUD-FIX-004 owner-blocked; BG-CK-SPLINE-CENSUS booking gate;
-> SEM-PCURVE-MASTER-001-FIX SUPERSEDED; DEF-SPINEFRAME-GRAZE SPEC_GAP;
-> DEF-TESS-ANALYTIC-SEAM superseded by -R2; DEF-SEEDRAY-B human-gated; TOR-C
-> orchestrator-held; MONO-10-CERTIFIED-BOUNDARY-MESH owner R3-mesh;
-> RDEF-M4-NUMERIC-TIER M0-adjudication) - none mechanically flippable; no
-> anchor/lint-fixable READY row exists.
-> Health: heartbeat exactly 1 (27872; the earlier "2" was this operator's own
-> self-matching query), operator_runner 1 (27876), watchdog 1 (29264), ONE
-> overnight driver (24864); cargoq UP (ping ok, queued 0, running true - slot 1's
-> build); heartbeat cycling (last "dispatched 0; workers now ~0/3"). Disk 30.2 GiB
-> free (above the 8 GB floor AND the 15 GB janitor goal); RAM 3.87 GiB free (above
-> the 3 GB floor). Root worktree carries live human/orchestrator-session WIP (M
-> README.md, M docs/F1_HYPERCAR_GAP_REGISTER.md, M loop/LEDGER.jsonl, M
-> loop/cargoq/server.log; untracked benchmarks/ + loop/baselines/ + scratch/ +
-> mobius.step + vendor/truck/*.obj) - untouched, reported not actioned.
+> Registry re-derived by command (last-wins dedup + `depends_on`): 354 unique rows
+> = 252 DONE / 91 READY / 10 BLOCKED / 1 SUPERSEDED. BLOCKED-with-all-deps-landed
+> = 9, all deliberate holds (BG-AUD-FIX-004 owner-blocked; BG-CK-SPLINE-CENSUS
+> booking gate; SEM-PCURVE-MASTER-001-FIX SUPERSEDED; DEF-SPINEFRAME-GRAZE
+> SPEC_GAP; DEF-TESS-ANALYTIC-SEAM superseded by -R2; DEF-SEEDRAY-B human-gated;
+> TOR-C orchestrator-held; MONO-10-CERTIFIED-BOUNDARY-MESH owner R3-mesh;
+> RDEF-M4-NUMERIC-TIER M0-adjudication). RDEF-M5-CORPUS-PREVALENCE is the 10th
+> BLOCKED row and is CORRECT (depends_on RDEF-M4-NUMERIC-TIER, not landed) - not
+> flippable. No anchor/lint-fixable READY row exists.
+> Health: heartbeat exactly 1 (27872, cycling - log mtime 01:55:45 local,
+> "dispatched 0; workers now ~0/3"), operator_runner 1 (27876), watchdog 1 (29264),
+> ONE overnight driver (24864); cargoq UP (ping ok, queued 0, running true - slot
+> 1's test; TWO cargoq/server.py 28544 + 34564 = carried duplication class,
+> functional). Disk 28.3 GiB free (above the 8 GB floor AND the 15 GB janitor
+> goal); RAM 3.67 GiB free (above the 3 GB floor). Root worktree carries live
+> human/orchestrator-session WIP (M README.md, M docs/F1_HYPERCAR_GAP_REGISTER.md,
+> M loop/LEDGER.jsonl, M loop/cargoq/server.log; untracked benchmarks/ +
+> loop/baselines/ + scratch/ + mobius.step + vendor/truck/*.obj) - untouched,
+> reported not actioned.
 > Carried escalations (unchanged): slot 0 FHC-TRIM SPEC_GAP adjudication;
 > duplicate supervisors (19172 PyManager + 27828 pythoncore, both live this cycle -
 > carried duplication class; only ONE overnight.py child = no double-merge risk);
 > RG-23/RG-9 missing packet files; F1-AUTHORING-ARMS LANDED-WITH-FINDINGS;
 > FRAME-REVOLVE F1 non_z_axis pin; TOR-C flip-or-pin; slot-4/slot-7 wt RESULT
 > residue.
-> Leaving: 1 RUNNING (slot 1 FHC-TRIM) + slot 0 FINISHED SPEC_GAP (escalated);
-> HEAD `49a79c9` + this cycle's STATE/log commit.
+> Leaving: 1 RUNNING (slot 1 FHC-TRIM, active) + slot 0 FINISHED SPEC_GAP
+> (escalated); HEAD `6224500` + this cycle's STATE/log commit.
 >
 > NOTE: this cycle replaced the prior collapsed block with a fresh one to keep the
 > volatile section at ~1 block (charter cap ~120 lines). Prior cycles' refreshes are
