@@ -75,45 +75,47 @@ corrected, annex C = ORACLE POLICY CHANGE), then docs/SOLVER_COVERAGE_SPEC.md
 
 ## Where we are
 
-> LATEST GROUND TRUTH [operator 2026-09-12T23:18Z]: 0 RUNNING / 0 landed-this-cycle /
-> 0 unblocked / 0 flipped / 0 dispatched. HEAD `44e769f` (integration/kernel-bg tip).
-> **The frontier FHC-G6-CERT-COST-SCALE worker was found DEAD-orphaned and cleared.**
-> Evidence: events 20+ min stale (last event a `step_start` never finished), NO
-> cargo/rustc/rust-analyzer anywhere, opencode pid 24460 CPU-idle. The dispatcher had
-> ALREADY reset slot 0 at 19:02:08 (archived `abandoned-20260912-190208.patch`, 9007 B;
-> reflog "checkout ... moving from packet/FHC-G6 ... to 44e769f"), but the orphaned
-> `cmd.exe /c worker-cmd.bat` (15368) + opencode (24460) survived and kept slot 0's 13 GB
-> target marked LIVE to the janitor. Operator killed the orphan tree
-> (`taskkill /PID 15368 /T /F`; worktree was clean at base, changed=0, no code lost) and
-> ran `python loop/janitor.py ensure --need 8`: reclaimed ~15.5 GB -> 20.7 GB free; ALL
-> slot targets cleared.
-> **Frontier re-dispatch is still failing on warm builds.** The heartbeat's 19:02:01
-> cycle auto-retried and failed: G6 -> slot 1 warm build exit 101 (`target-lexicon` 180
-> errors E0405/E0425/E0432/E0531), FHC-B -> slot 2 warm build 0xc0000409
-> STATUS_STACK_BUFFER_OVERRUN - the stale-target + RAM-zone signatures (targets now
-> wiped). The heartbeat (27872) started its 19:14:41 cycle and at handoff was warming the
-> clean targets (14 cargo/rustc procs, RAM spiked to 1.05 GB free); outcome NOT yet in
-> `dispatch_heartbeat.log` (mtime 19:04:41). No new worker dispatched at handoff.
-> Slots 3-7 FINISHED landed residue, every tip an ancestor of HEAD
-> (e6553db/3c2109b/ee97499/713f205/5cf4811; slot 4 LANDED-WITH-FINDINGS). Nothing landable.
-> Registry: 361 lines / 358 unique = 264 DONE / 86 READY / 10 BLOCKED / 1 SUPERSEDED; 3
-> duplicate lines carried/escalated (MONO-9-FUSE-FOLD, RDEF-M1-LATTICE-V2,
-> FHC-G7-REFUSAL-METADATA). No BLOCKED row mechanically flippable. **NEW: RG-23-CERTIFIED-
-> ENTRY-WIRING and RG-9-REFLECT-SOLID-PRODUCTION are READY with `"packet": ""` (booked but
-> UNAUTHORED); the heartbeat's "ANCHOR CHECK FAILED" for them is a missing-file error, not
-> drift** - escalated (new-packet authoring is not an operator call). Both clash with G6's
-> `truck123d/src/bd_bridge.rs` anyway.
-> Health: RAM 2.8 GB free pre-spike / 1.05 GB during the warm build (BELOW the 3 GB
-> floor; heavy baseline chrome+Dropbox+Discord+MsMpEng+2 opencode), Disk 19.15 GB free
-> (above the 8 GB floor and the 15 GB janitor goal). Heartbeat 1 (27872, LIVE), operator
-> runner 1, watchdog 1 (29264), cargoq UP (ping ok, queued 0, running false). No
-> `%TEMP%/look-verify-baseline-*` leaks. TWO supervisor.py (19172 + 27828) = carried
-> duplication. Root worktree: human WIP untouched.
-> Carried: duplicate supervisors; F1-AUTHORING-ARMS LANDED-WITH-FINDINGS (slot 4);
-> FRAME-REVOLVE F1 non_z_axis pin; TOR-C flip-or-pin; slot-1/2/4/7 wt RESULT residue;
-> 3 duplicate registry lines; schedule.py 'needs' crash.
-> Leaving: 0 RUNNING (G6 frontier cleared, awaiting heartbeat dispatch) / HEAD `44e769f`
-> + this cycle's STATE/log/escalation commit.
+> LATEST GROUND TRUTH [operator 2026-09-12T23:42Z]: 1 RUNNING / 0 landed-this-cycle /
+> 0 unblocked / 0 flipped / 0 operator-dispatched. HEAD `eb7bada` (integration/kernel-bg
+> tip; the previous operator cycle's STATE/log commit).
+> **The frontier advanced: FHC-B-MULTI-CONTOUR-SECTIONS is now RUNNING in slot 1**
+> (cmd pid 38624; events fresh at 19:40:58 local, age <1 min; 4 changed files incl. a new
+> `truck123d/tests/multi_contour_sections.rs`; its named test currently running through
+> cargoq). The heartbeat (27872) recovered from the warm-build failures: its 19:20 cycle
+> dispatched FHC-B, then 19:30/19:40 cycles dispatched 0 (G6 write-set-clashed with the
+> live FHC-B on `truck123d/src/bd_bridge.rs`).
+> **FHC-G6-CERT-COST-SCALE remains the blocked frontier** (slot 0 IDLE, no work): it
+> shares `truck123d/src/bd_bridge.rs` with the RUNNING FHC-B, so it cannot dispatch until
+> FHC-B lands. `dispatch_ready --dry-run` reports G6 as a DEAD dispatch (slot 0 holds no
+> matching RESULT) that would reset+redispatch - that is the same already-reset residue
+> the heartbeat cleans each cycle, NOT a new fault; the write-set clash is what actually
+> holds it. FHC-G1 is blocked on G6; FHC-C on FHC-B. Slots 3-7 FINISHED landed residue,
+> every tip an ancestor of HEAD (e6553db/3c2109b/ee97499/713f205/5cf4811; slot 4
+> LANDED-WITH-FINDINGS; slot 7 the redundant FRAME-REVOLVE LANDED-no-commit). Slot 2 IDLE
+> (TTC-RECENSUS-F1-R3, no work). Nothing operator-landable.
+> Registry (last-wins): 361 lines / 358 unique = 261 DONE / 86 READY / 10 BLOCKED /
+> 1 SUPERSEDED. READY without a landed marker = exactly 6: RG-23-CERTIFIED-ENTRY-WIRING
+> and RG-9-REFLECT-SOLID-PRODUCTION (both `"packet": ""`, unauthored - carried LOW
+> escalation) plus the FHC chain G6/G1/B/C. BLOCKED-with-all-needs-landed = 10, all
+> intentionally parked: the 7 carried (BG-AUD-FIX-004 OWNER_BLOCKED, BG-CK-SPLINE-CENSUS
+> owner-cancelled, SEM-PCURVE-MASTER-001-FIX SUPERSEDED, DEF-SPINEFRAME-GRAZE
+> SPEC_GAP->-R2, DEF-TESS-ANALYTIC-SEAM superseded by -R2, DEF-SEEDRAY-B human-gated,
+> TOR-C orchestrator-held) plus **MONO-10-CERTIFIED-BOUNDARY-MESH (owner must rule on the
+> R3 mesh predicate - "do not author"), RDEF-M4-NUMERIC-TIER (needs the M0
+> TANGENCY-TSYSTEM-FROM-DEFLATED adjudication), RDEF-M5-CORPUS-PREVALENCE (owner decision
+> inputs)**. Nothing mechanically flippable.
+> Health: RAM 1.9-2.0 GB free (BELOW the 3 GB floor; FHC-B's test resident; heavy
+> baseline chrome+Dropbox+Discord+MsMpEng+2 opencode), Disk 17.67 GB free (above the 8 GB
+> floor AND the 15 GB janitor goal). Heartbeat 1 (27872, LIVE, last cycle 19:40:30 local),
+> watchdog 1 (29264), operator runner 1 (27876), overnight driver 1 (24864, new pid this
+> cycle), cargoq UP (ping ok, queued 0, running the FHC-B test). No
+> `%TEMP%/look-verify-baseline-*` leaks. Janitor: slot 0 outer 1.0 GB, slot 1 outer 1.0 GB
+> + inner wt 1.4 GB. TWO supervisor.py (19172 + 27828) = carried duplication. Root
+> worktree: human WIP untouched.
+> Carried: duplicate supervisors; RG-23/RG-9 unauthored; F1-AUTHORING-ARMS
+> LANDED-WITH-FINDINGS (slot 4); FRAME-REVOLVE F1 non_z_axis pin; TOR-C flip-or-pin;
+> slot-1/2/4/7 wt RESULT residue; duplicate registry lines; schedule.py 'needs' crash.
+> Leaving: 1 RUNNING (FHC-B, slot 1) / HEAD `eb7bada` + this cycle's STATE/log commit.
 
 ## Pick up here
 
@@ -157,32 +159,35 @@ corrected, annex C = ORACLE POLICY CHANGE), then docs/SOLVER_COVERAGE_SPEC.md
 
 ## State of the machine, as left
 
-- 0 RUNNING. The frontier FHC-G6-CERT-COST-SCALE worker was DEAD-orphaned (events 20+
-  min stale, no cargo/rustc, CPU-idle) and the dispatcher had already reset slot 0 at
-  19:02:08; the operator killed the surviving `cmd.exe`+opencode tree (15368/24460) and
-  janitor-reclaimed 15.5 GB. Slot 0 is now IDLE, worktree clean at base, no work.
-- Frontier re-dispatch NOT yet achieved: the heartbeat's 19:02 cycle failed warm builds
-  (slot 1 `target-lexicon` 180 errors; slot 2 0xc0000409) - stale-target + RAM-zone. The
-  heartbeat (27872) started its 19:14:41 cycle and was warming clean targets at handoff
-  (RAM spiked to 1.05 GB free); check `loop/dispatch_heartbeat.log` for the outcome.
-  HIGH escalation filed: warm builds need RAM headroom (close chrome/Dropbox/Discord).
-- FHC-G5-SWALLOWED-REFUSAL-DIAGNOSIS LANDED by the overnight driver (merge `18e44ef`,
-  row landed `44e769f`, 18:38:22 local); `e69f404` is an ancestor of HEAD.
-- Slots 1/2 IDLE residue (FHC-FACTS-CACHE / TTC-RECENSUS-F1-R3 DONE, =base no work).
-  Slots 3-7 FINISHED landed residue (e6553db/3c2109b/ee97499/713f205/5cf4811; slot 4
-  LANDED-WITH-FINDINGS). Nothing landable.
+- 1 RUNNING: FHC-B-MULTI-CONTOUR-SECTIONS in slot 1 (cmd pid 38624; events fresh
+  19:40:58 local, age <1 min; 4 changed files incl. new
+  `truck123d/tests/multi_contour_sections.rs`; its named test running through cargoq).
+  Alive and progressing - do not touch. The heartbeat's 19:20 cycle dispatched it; the
+  earlier warm-build failures (19:02: G6 slot-1 `target-lexicon` 180 errors; FHC-B
+  slot-2 0xc0000409) did NOT recur after the janitor target wipe.
+- Slot 0 IDLE: FHC-G6-CERT-COST-SCALE frontier, no work (clean detached HEAD at base).
+  Held by a write-set clash with the RUNNING FHC-B on `truck123d/src/bd_bridge.rs`;
+  dispatches when FHC-B lands. `dispatch_ready --dry-run` also shows it as a dead
+  dispatch (slot 0 no RESULT) that the heartbeat resets each cycle - benign residue.
+- Slot 2 IDLE: TTC-RECENSUS-F1-R3, no work (=base). Slots 3-7 FINISHED landed residue,
+  all ancestors of HEAD (e6553db/3c2109b/ee97499/713f205/5cf4811); slot 4
+  LANDED-WITH-FINDINGS; slot 7 redundant FRAME-REVOLVE LANDED-no-commit. Nothing
+  landable.
 - Do NOT run dispatch_ready live - the heartbeat (27872) owns dispatch and is LIVE.
-- Substrate: heartbeat 1 (27872), watchdog 1 (29264), operator runner 1, cargoq UP
-  (ping ok, queued 0, running false). TWO supervisor.py (19172 + 27828) = carried dup.
-- Disk 19.15 GB free (above the 8 GB floor AND the 15 GB janitor goal; all slot targets
-  cleared). RAM 2.8 GB pre-spike / 1.05 GB during the warm build (BELOW the 3 GB floor;
-  heavy baseline chrome+Dropbox+Discord - the current blocker).
-- Registry: 361 lines / 358 unique = 264 D / 86 R / 10 B / 1 S; 3 duplicate lines
-  (MONO-9-FUSE-FOLD, RDEF-M1-LATTICE-V2, FHC-G7-REFUSAL-METADATA) - escalated. No
-  BLOCKED row mechanically flippable. NEW: RG-23/RG-9 READY rows have empty `packet`
-  fields (unauthored) - escalated low.
-- [operator 2026-09-12T23:18Z] board: 0 RUNNING / 0 landed-this-cycle / 0 unblocked /
-  0 flipped / 0 dispatched; HEAD 44e769f.
+- Substrate: heartbeat 1 (27872, last cycle 19:40:30 local), watchdog 1 (29264),
+  operator runner 1 (27876), overnight driver 1 (24864), cargoq UP (ping ok, queued 0,
+  running the FHC-B test). TWO supervisor.py (19172 + 27828) = carried duplication.
+- Disk 17.67 GB free (above the 8 GB floor AND the 15 GB janitor goal; no
+  `%TEMP%/look-verify-baseline-*` leaks; janitor slot targets: 0 outer 1.0 GB, 1 outer
+  1.0 GB + inner wt 1.4 GB). RAM 1.9-2.0 GB free (BELOW the 3 GB floor - the carried
+  HIGH escalation; the FHC-B test is the resident consumer).
+- Registry (last-wins): 361 lines / 358 unique = 261 DONE / 86 READY / 10 BLOCKED /
+  1 SUPERSEDED. READY without a landed marker = exactly 6 (RG-23/RG-9 unauthored;
+  FHC-G6/G1/B/C chain). BLOCKED-with-all-needs-landed = 10, all intentionally parked
+  (7 carried + MONO-10 owner-ruling, RDEF-M4 M0-adjudication, RDEF-M5 owner inputs).
+  Nothing mechanically flippable.
+- [operator 2026-09-12T23:42Z] board: 1 RUNNING / 0 landed-this-cycle / 0 unblocked /
+  0 flipped / 0 operator-dispatched; HEAD eb7bada.
 
 [operator 2026-09-09T02:2xZ - volatile refresh after the ADM-L4 operator
 landing. Board now: 0 running / 6 FINISHED residue (L1,L2,L3,F1,CL-005,
