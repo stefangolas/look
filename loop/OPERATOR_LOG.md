@@ -8733,3 +8733,50 @@ wt RESULT residue. Noted: RAM below the 3 GB floor with the FHC-G4 worker reside
 
 Leaving: 1 RUNNING (FHC-G4) / HEAD 75c2a5e + this cycle's STATE/log commit; heartbeat 1
 (27872, LIVE); watchdog 1; cargoq UP; disk 13.78 GB; RAM 1.86 GB.
+
+---
+
+## [operator 2026-09-12T21:03Z]
+
+Health sweep (step 1): `slot_status.py` -> 1 RUNNING (slot 0 = FHC-G5-SWALLOWED-
+REFUSAL-DIAGNOSIS, pid 4484, events 0.0 min old, branch @0561149 =base, just dispatched
+- healthy), slots 1/2 IDLE (landed DONE residue), slots 3-7 FINISHED landed residue.
+`curl 127.0.0.1:8231/ping` -> {"ok": true, "queued": 0, "running": false}. Heartbeat
+exactly 1 (27872); watchdog 1 (29264); operator runner 1 (27876). Disk 13.46 GB free
+(above 8 GB floor, below 15 GB janitor goal); RAM 1.4 GB free (BELOW the 3 GB floor -
+FHC-G5 worker resident; no stacking).
+
+Land (step 2): all FINISHED slot worker commits re-verified ancestors of
+integration/kernel-bg (e6553db/3c2109b/ee97499/713f205/5cf4811) -> already landed, no
+merge. RESULT statuses: slot 3 DONE, slot 5 DONE, slot 6 DONE, slot 7 LANDED (ancestor,
+no commit needed), slot 4 LANDED-WITH-FINDINGS (escalated, not landable). Nothing to
+land.
+
+Unblock (step 3): no IDLE/DEAD slot holds unlanded work (slot 1 = FHC-FACTS-CACHE DONE,
+slot 2 = TTC-RECENSUS-F1-R3 DONE); no QUESTION; no 402. Nothing to unblock.
+
+Registry hygiene (step 4): 356 rows = 264 DONE / 84 READY / 10 BLOCKED / 1 SUPERSEDED.
+READY without a landed marker = 4: RG-9 (missing packet .md + clash on bd_bridge.rs),
+FHC-G5 (running), FHC-G6/FHC-G1 (chained needs). BLOCKED-with-all-deps-landed = all 10
+correctly parked (owner-blocked/cancelled/superseded/human-gated/orchestrator-held).
+Nothing to flip; no anchor/lint fixable failures surfaced.
+
+Dispatch (step 5): ran `dispatch_ready --dry-run --max-workers=4` ONLY (heartbeat owns
+live dispatch). Output: "slots: 8 (1 running, 7 free); slot-assigned packets: 5;
+RG-23/RG-9 write-set clash with RUNNING row on bd_bridge.rs; FHC-G6 blocked on G5;
+FHC-G1 blocked on G6; dispatched 0; workers now ~1/4" - REAL idle beyond the running G5.
+Did NOT run live.
+
+STATE (step 6): refreshed the LATEST GROUND TRUTH block and "State of the machine, as
+left" to [operator 2026-09-12T21:03Z] (FHC-G4 landed, FHC-G5 running, HEAD 0561149,
+registry 264/84/10/1, disk 13.46 GB, RAM 1.4 GB). Stable traps/history untouched.
+
+Report (step 7): this entry.
+
+Escalations: nothing NEW; carried unchanged - RG-23/RG-9 missing packet authoring;
+duplicate supervisors + duplicate cargoq/server.py; F1-AUTHORING-ARMS
+LANDED-WITH-FINDINGS; FRAME-REVOLVE F1 non_z_axis pin; TOR-C flip-or-pin; slot-1/2/4/7
+wt RESULT residue. Noted: RAM below the 3 GB floor with the FHC-G5 worker resident.
+
+Leaving: 1 RUNNING (FHC-G5) / HEAD 0561149 + this cycle's STATE/log commit; heartbeat 1
+(27872, LIVE); watchdog 1; cargoq UP; disk 13.46 GB; RAM 1.4 GB.

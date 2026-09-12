@@ -75,34 +75,31 @@ corrected, annex C = ORACLE POLICY CHANGE), then docs/SOLVER_COVERAGE_SPEC.md
 
 ## Where we are
 
-> LATEST GROUND TRUTH [operator 2026-09-12T20:29Z]: 1 RUNNING (FHC-G4-NAMED-CARRIER-
-> ADMISSION, slot 0, healthy/making progress) / 0 landed-this-cycle / 0 unblocked /
-> 0 flipped / 0 dispatched. HEAD `75c2a5e` (integration/kernel-bg tip; + this cycle's
-> STATE/log commit). Since the 20:05Z block the FHC-G7 bookkeeping was finished by
-> another process: 3c71f9d (row LANDED) + 75c2a5e (RESULT filed) on top of the
-> operator's 6985805/5da36d5.
-> Frontier: FHC-G4 is RUNNING (heartbeat dispatched it after the 20:05Z anchor fix;
-> worker pid 31192 -> opencode 17588, events growing, 2 files changed vs base, cargoq
-> jobs cycling - do NOT touch). G5 -> G6 -> G1 chain behind it (all correctly blocked
-> on G4). RG-23/RG-9 still non-dispatchable: their packet .md files are ABSENT (only
-> the registry rows exist) - `gen_packet --check` raises FileNotFoundError; also
-> write-set-clash with the RUNNING G4 on truck123d/src/bd_bridge.rs. Missing authoring,
-> NOT drift; escalated, carried.
-> Registry: 356 unique = 261 DONE / 84 READY / 10 BLOCKED / 1 SUPERSEDED. READY without
-> a landed marker = 6 (RG-23, RG-9, FHC-G4 running, FHC-G5/G6/G1 chained) - all
-> correctly gated. BLOCKED-with-all-deps-landed = 10, all correctly parked
-> (owner-blocked/cancelled/superseded/human-gated/orchestrator-held/preflight-fail).
-> Nothing to flip.
-> Health: RAM 1.86 GB free (BELOW the 3 GB floor - FHC-G4 worker resident; the
-> heartbeat's warm-build clean-and-retry policy applies on any 0xc0000409); Disk 13.78
-> GB free (above the 8 GB floor, below the 15 GB janitor goal). Heartbeat 1 (27872,
-> LIVE, last cycle 16:16:30 local, dispatched 0), watchdog 1 (29264), operator runner 1
-> (27876), overnight driver 1 (24864), cargoq UP (ping ok, queued 0, running false).
-> No TEMP baseline leaks. Carried: duplicate supervisors (19172+27828) + duplicate
-> cargoq/server.py (28544+34564); F1-AUTHORING-ARMS LANDED-WITH-FINDINGS; FRAME-REVOLVE
-> F1 non_z_axis pin; TOR-C flip-or-pin; slot-1/2/4/7 wt RESULT residue; RG-23/RG-9
-> missing packet authoring.
-> Leaving: 1 RUNNING (FHC-G4) / HEAD `75c2a5e` (+ this cycle's STATE/log commit).
+> LATEST GROUND TRUTH [operator 2026-09-12T21:03Z]: 1 RUNNING (FHC-G5-SWALLOWED-
+> REFUSAL-DIAGNOSIS, slot 0, healthy - events 0.0 min old, pid 4484, branch
+> packet/FHC-G5-SWALLOWED-REFUSAL-DIAGNOSIS@0561149 =base, just dispatched) / 0
+> landed-this-cycle / 0 unblocked / 0 flipped / 0 dispatched. HEAD `0561149`
+> (integration/kernel-bg tip: "G5 amended - absorb G4's two stale test pins").
+> Frontier: FHC-G4 LANDED end-to-end (row LANDED 9ac19ad, RESULT filed 8c329fa,
+> worker commit ancestor of HEAD; G4 advanced every target to its next named stop -
+> band loft already certified by EX-A/EXB, hypercar wall confirmed category-1). G5 is
+> RUNNING; G6 -> G1 correctly chained behind it (needs edges). RG-23/RG-9 still
+> non-dispatchable: packet .md files ABSENT (registry rows only) AND write-set clash
+> with the RUNNING G5 on truck123d/src/bd_bridge.rs. Missing authoring, NOT drift;
+> escalated, carried.
+> Registry: 356 unique = 264 DONE / 84 READY / 10 BLOCKED / 1 SUPERSEDED. READY without
+> a landed marker = 4 (RG-9, FHC-G5 running, FHC-G6/G1 chained) - all correctly gated.
+> BLOCKED-with-all-deps-landed = all 10 correctly parked (owner-blocked/cancelled/
+> superseded/human-gated/orchestrator-held/preflight-fail). Nothing to flip.
+> Health: RAM 1.4 GB free (BELOW the 3 GB floor - FHC-G5 worker resident; heartbeat's
+> warm-build clean-and-retry policy applies on any 0xc0000409); Disk 13.46 GB free
+> (above the 8 GB floor, below the 15 GB janitor goal). Heartbeat 1 (27872, LIVE),
+> watchdog 1 (29264), operator runner 1 (27876), cargoq UP (ping ok, queued 0, running
+> false). No TEMP baseline leaks. Carried: duplicate supervisors + duplicate
+> cargoq/server.py; F1-AUTHORING-ARMS LANDED-WITH-FINDINGS (slot 4); FRAME-REVOLVE F1
+> non_z_axis pin; TOR-C flip-or-pin; slot-1/2/4/7 wt RESULT residue; RG-23/RG-9 missing
+> packet authoring.
+> Leaving: 1 RUNNING (FHC-G5) / HEAD `0561149`.
 >
 > NOTE: this cycle refreshed the prior block in place (timestamp/HEAD/board/health) to
 > keep the volatile section at ~1 block (charter cap ~120 lines). Prior cycles' refreshes
@@ -150,23 +147,24 @@ corrected, annex C = ORACLE POLICY CHANGE), then docs/SOLVER_COVERAGE_SPEC.md
 
 ## State of the machine, as left
 
-- 1 worker alive (FHC-G4-NAMED-CARRIER-ADMISSION, slot 0, pid 31192 -> opencode 17588;
-  events growing, 2 files changed vs base, cargoq jobs cycling - healthy, do not touch).
+- 1 worker alive (FHC-G5-SWALLOWED-REFUSAL-DIAGNOSIS, slot 0, pid 4484; events 0.0 min
+  old at scan, branch =base, just dispatched - healthy, do not touch).
 - Slots 1/2 IDLE residue (slot 1 = FHC-FACTS-CACHE DONE; slot 2 = TTC-RECENSUS-F1-R3
-  DONE, =base no work). Slots 3-7 FINISHED landed residue (all worker commits ancestors
-  of integration/kernel-bg, re-verified: e6553db/3c2109b/ee97499/713f205/5cf4811).
-- FHC-G7-REFUSAL-METADATA DONE (4daa4c3 merged f999c7d; operator bookkeeping 6985805,
-  then 3c71f9d row LANDED + 75c2a5e RESULT filed by another process). FHC-G4 RUNNING.
-- Do NOT run dispatch_ready live - the heartbeat (27872) owns dispatch and is LIVE
-  (last cycle 16:16:30 local, dispatched 0). --dry-run: dispatched 0; workers ~1/4
-  (RG-23/RG-9 clash+missing file; G5/G6/G1 blocked on G4).
+  DONE, =base no work). Slots 3-7 FINISHED landed residue (all worker commits re-verified
+  ancestors of integration/kernel-bg this cycle: e6553db/3c2109b/ee97499/713f205/5cf4811;
+  RESULT statuses DONE/DONE/DONE/LANDED-WITH-FINDINGS(slot4)/LANDED).
+- FHC-G4-NAMED-CARRIER-ADMISSION LANDED end-to-end (9ac19ad row LANDED, 8c329fa RESULT
+  filed, worker commit ancestor of HEAD). FHC-G5 RUNNING.
+- Do NOT run dispatch_ready live - the heartbeat (27872) owns dispatch and is LIVE.
+  --dry-run: dispatched 0; workers ~1/4 (RG-23/RG-9 clash+missing file; G6/G1 chained
+  on G5).
 - Substrate: heartbeat 1 (27872), watchdog 1 (29264), operator runner 1 (27876),
-  overnight driver 1 (24864), cargoq UP (ping ok, queued 0, running false). TWO
-  supervisor.py and TWO cargoq/server.py = carried duplication.
-- Disk 13.78 GB free (above the 8 GB floor, below the 15 GB janitor goal).
-- RAM 1.86 GB free (BELOW the 3 GB floor - FHC-G4 worker resident).
-- [operator 2026-09-12T20:29Z] board: 1 RUNNING / 0 landed-this-cycle / 0 unblocked /
-  0 flipped / 0 dispatched; registry 356 = 261 D / 84 R / 10 B / 1 S; HEAD 75c2a5e.
+  cargoq UP (ping ok, queued 0, running false). TWO supervisor.py and TWO
+  cargoq/server.py = carried duplication.
+- Disk 13.46 GB free (above the 8 GB floor, below the 15 GB janitor goal).
+- RAM 1.4 GB free (BELOW the 3 GB floor - FHC-G5 worker resident).
+- [operator 2026-09-12T21:03Z] board: 1 RUNNING / 0 landed-this-cycle / 0 unblocked /
+  0 flipped / 0 dispatched; registry 356 = 264 D / 84 R / 10 B / 1 S; HEAD 0561149.
 
 [operator 2026-09-09T02:2xZ - volatile refresh after the ADM-L4 operator
 landing. Board now: 0 running / 6 FINISHED residue (L1,L2,L3,F1,CL-005,
