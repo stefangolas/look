@@ -8435,3 +8435,67 @@ flip-or-pin; slot-4/slot-7 wt RESULT residue.
 Leaving: 2 RUNNING (slot 0 FHC-FACTS-CACHE, slot 1 FHC-G2; both alive-but-stalled)
 / HEAD d346ead + this cycle's STATE/log commit; heartbeat 1 (WEDGED); operator
 runner 1; watchdog 1; overnight 1; cargoq UP; disk 13.46 GiB; RAM 1.79 GB.
+
+## 2026-09-12 18:42 UTC (operator)
+
+Board: 2 RUNNING (DUPLICATE: FHC-FACTS-CACHE in slots 0 AND 1) / 0
+landed-this-cycle / 0 unblocked / 0 flipped / 0 dispatched. HEAD 0136323 (the
+18:09Z operator commit).
+
+Health (step 1): slot_status shows slot 0 STALLED (FHC-FACTS-CACHE, cmd 16952,
+events 54.1 min stale, changed=0, wt detached 57f2be6) and slot 1 RUNNING
+(FHC-FACTS-CACHE, cmd 29372, opencode 29476, events 0.1 min fresh). Process scan
+proves slot 0 ALIVE: opencode child 12864 + live powershell 25576 running
+facts_call_count.py/door.py on `lib.power_unit build_power_unit` since 13:47:45
+local - a serial door.py pass, exactly the "no events for tens of min" case; do
+NOT reap. cargoq ping ok (queued 0, running false). Heartbeat exactly 1 (27872,
+now ACTIVE - last cycle 14:40:09 local). operator_runner 1 (27876), watchdog 1
+(29264). Disk 12.96 GiB free (above the 8 GB floor, below the 15 GB goal); RAM
+2.2 GB free (BELOW the 3 GB floor).
+
+*** DUPLICATE DISPATCH (the 18:09Z hazard fired): *** slot 1's worker.packet is
+FHC-FACTS-CACHE (fresh, dispatched by the heartbeat 14:40:09 local), and slot 0's
+worker.packet is ALSO FHC-FACTS-CACHE (resumed session ses_f69c975a, alive). The
+heartbeat log confirms: at 14:19:30 it deferred FHC-FACTS-CACHE on a bd_bridge.rs
+write-set clash, then at 14:40:09 saw "slots: 8 (0 running, 7 free)" and
+dispatched it to slot 1. Both write truck123d/src/bd_bridge.rs +
+truck123d/tests/facts_cache.rs -> write-set-disjointness violated; concurrent
+door.py runs violate the serial-door rule. Escalated 18:42Z; did NOT kill either
+live worker (charter) and did NOT run dispatch_ready live.
+
+Land (step 2): NOTHING landable. Slots 3/4/5/6 RESULT DONE/LANDED-WITH-FINDINGS,
+slot 7 RESULT LANDED; every worker commit (c3df084, e6553db, 3c2109b, ee97499,
+713f205, 5cf4811) is an ancestor of integration/kernel-bg (re-verified). Slot 2
+holds d8a6bd4 on packet/FHC-G2-PROBE-QUERIES (NOT ancestor) but has no RESULT ->
+not landable.
+
+Unblock (step 3): no IDLE/DEAD slot holds unlanded work that is landable. Slot 2
+is stale residue with no RESULT. No QUESTION, no 402.
+
+Registry (step 4): 356 unique = 258 D / 87 R / 10 B / 1 S (re-derived). All 10
+BLOCKED have needs landed but carry owner-park/cancel/supersede/human-gate notes
+-> NOT flipped (semantic). Anchor ritual: no landings this cycle; RG-23/RG-9 .md
+still absent (missing authoring, not drift).
+
+Dispatch (step 5): ran `dispatch_ready --dry-run --max-workers=4` ONLY (NOT
+live). Output: "slots: 8 (1 running, 6 free)"; RG-23/RG-9/FHC-G2 clash with the
+RUNNING FHC-FACTS-CACHE on bd_bridge.rs; dispatched 0. No dead-dispatch reset was
+offered this cycle. Did NOT run it live.
+
+STATE (step 6): refreshed the volatile LATEST GROUND TRUTH block
+([operator 2026-09-12T18:42Z]) and the "State of the machine, as left" lines.
+Stable traps/history untouched.
+
+Report (step 7): this entry.
+
+Escalations: NEW - FHC-FACTS-CACHE duplicate dispatch (slots 0+1) caused by
+STALLED-as-free accounting while a live worker runs a long door.py pass; NEW -
+heartbeat recovered and is active again (not wedged). Carried unchanged:
+RG-23/RG-9 missing packet files; duplicate supervisors (19172+27828) + duplicate
+cargoq/server.py (28544+34564); F1-AUTHORING-ARMS LANDED-WITH-FINDINGS;
+FRAME-REVOLVE F1 non_z_axis pin; TOR-C flip-or-pin; slot-2/4/7 wt RESULT residue;
+RAM below the 3 GB floor.
+
+Leaving: 2 RUNNING (FHC-FACTS-CACHE slots 0+1, DUPLICATE) / HEAD 0136323 + this
+cycle's STATE/log/escalations commit; heartbeat 1 (ACTIVE); operator_runner 1;
+watchdog 1; cargoq UP; disk 12.96 GiB; RAM 2.2 GB.

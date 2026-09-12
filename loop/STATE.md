@@ -75,56 +75,41 @@ corrected, annex C = ORACLE POLICY CHANGE), then docs/SOLVER_COVERAGE_SPEC.md
 
 ## Where we are
 
-> LATEST GROUND TRUTH [operator 2026-09-12T18:09Z]: 2 RUNNING (both STALLED-but-ALIVE)
-> / 0 landed-since-last-op / 0 unblocked / 0 flipped / 0 dispatched. HEAD `d346ead`
-> (integration/kernel-bg tip = the 15:50Z operator STATE commit).
-> Slot 0 = `FHC-FACTS-CACHE` ALIVE (cmd pid 16952, opencode child pid 12864 in a RESUME
-> session ses_f69c975a..., events 19.3 min stale, changed=2, no commit) - and ACTIVELY
-> measuring: live children `facts_call_count.py` + `door.py cockpit` under the slot-0 wt.
-> Do NOT reap (a worker running a serial door.py pass writes no events for tens of min).
-> Slot 1 = `FHC-G2-PROBE-QUERIES` ALIVE (cmd pid 20612, opencode child pid 27780,
-> events 13.3 min stale, changed=1, no commit) - alive, do not touch.
-> *** DISPATCH HAZARD (new, hot): `dispatch_ready --dry-run` now classifies BOTH slots 0
-> and 1 as "DEAD dispatch ... would reset + delete + redispatch" because each has no
-> RESULT.json and events >3 min stale (the session-54 <180s RUNNING override no longer
-> applies). In LIVE mode dispatch_ready calls `run_packet.py --reset-only` (archive +
-> hard-reset the worktree) then spawns a SECOND worker into the same slot WHILE the
-> first is still running - destroying in-progress door.py measurement work and
-> double-writing bd_bridge.rs. DO NOT run dispatch_ready live until both workers
-> commit/finish. The heartbeat (which runs dispatch_ready live every 10 min) is
-> currently WEDGED (last cycle 13:48 local, no python child 21 min later) - that wedge
-> is PROTECTIVE; do NOT restart the heartbeat while slots 0/1 are alive-but-stalled.
-> Slots 2-7 landed/known residue; every slot tip re-verified ancestor of
-> integration/kernel-bg this cycle (c3df084, e6553db, 3c2109b, ee97499, 713f205, 5cf4811
-> all TRUE) - NOTHING landable. slot 2 = TTC-RECENSUS-F1-R3 IDLE residue (no RESULT);
-> slot 3 = SOLVER-SURVEY-C (DONE e6553db); slot 4 = F1-AUTHORING-ARMS
-> (LANDED-WITH-FINDINGS); slot 5 = CL-006-SOLVER-ENTRY (DONE ee97499); slot 6 =
-> CL-005-EXACT-CONTACT (DONE 713f205); slot 7 = FRAME-REVOLVE (RESULT LANDED, 5cf4811).
-> Registry re-derived (last-wins dedup): 355 unique = 258 DONE / 86 READY / 10 BLOCKED
-> / 1 SUPERSEDED. All 10 BLOCKED re-read this cycle: needs all landed (unmet=[]) but
-> every row carries an owner-park/cancel/supersede/human-gate note (BG-AUD-FIX-004
-> OWNER_BLOCKED; BG-CK-SPLINE-CENSUS owner-cancelled; SEM-PCURVE-MASTER-001-FIX
-> superseded; DEF-SPINEFRAME-GRAZE re-aimed at -R2; DEF-TESS-ANALYTIC-SEAM superseded by
-> -R2; DEF-SEEDRAY-B human-gated; TOR-C orchestrator-held; MONO-10 owner R3-mesh;
-> RDEF-M4/M5 owner/M0-adjudication) - NOTHING flipped (semantic, escalated).
+> LATEST GROUND TRUTH [operator 2026-09-12T18:42Z]: 2 RUNNING (DUPLICATE dispatch)
+> / 0 landed-since-last-op / 0 unblocked / 0 flipped / 0 dispatched. HEAD `0136323`
+> (integration/kernel-bg tip = the 18:09Z operator STATE commit).
+> *** THE 18:09Z HAZARD FIRED: `FHC-FACTS-CACHE` is now running in BOTH slot 0 and
+> slot 1. *** Slot 0 = `FHC-FACTS-CACHE` ALIVE (cmd pid 16952, opencode child 12864,
+> RESUME session ses_f69c975a..., events stale 54.1 min, changed=0, wt detached at
+> 57f2be6) - mid serial door.py pass: live child powershell 25576 running
+> facts_call_count.py on `lib.power_unit build_power_unit` since 13:47:45 local. Do NOT
+> reap (a door.py pass writes no events for tens of min).
+> Slot 1 = `FHC-FACTS-CACHE` ALIVE (cmd pid 29372, opencode child 29476, fresh session
+> ses_f69141b95ffe..., events 0.1 min fresh) - dispatched by the heartbeat at 14:40:09
+> local while slot 0 was (correctly) still alive; it read PACKET.md and is exploring.
+> Both write truck123d/src/bd_bridge.rs + truck123d/tests/facts_cache.rs, so the
+> write-set-disjointness rule is violated by the dispatcher's STALLED-as-free
+> accounting. Do NOT run dispatch_ready live; do NOT kill either live worker (charter).
+> Escalated 18:42Z.
+> Slot 2 = TTC-RECENSUS-F1-R3 IDLE residue (worker.packet says TTC-RECENSUS-F1-R3 but
+> the wt is on packet/FHC-G2-PROBE-QUERIES@d8a6bd4; no RESULT; stale since 9/11) - not
+> landable. Slots 3-7 landed/known residue. Every worker commit re-verified ancestor
+> of integration/kernel-bg this cycle (c3df084, e6553db, 3c2109b, ee97499, 713f205,
+> 5cf4811; slot-0/1 tips 57f2be6, 0136323 also ancestors) - NOTHING landable.
+> Registry re-derived (last-wins dedup): 356 unique = 258 DONE / 87 READY / 10 BLOCKED
+> / 1 SUPERSEDED. All 10 BLOCKED re-read: needs landed but every row carries an
+> owner-park/cancel/supersede/human-gate note - NOTHING flipped (semantic).
 > Anchor: RG-23/RG-9 packet .md still ABSENT from loop/packets/ (dispatch_ready prints
 > "ANCHOR CHECK FAILED" on the missing file = missing authoring, NOT anchor drift); no
-> anchor ritual needed this cycle (no landings since 15:50Z).
-> Health: RAM 1.79 GB free (BELOW the 3 GB floor; owner desktop + 2 resident workers);
-> Disk 13.46 GiB free (above the 8 GB floor, BELOW the 15 GB janitor goal; slot targets
-> are slot0 2.7+6.2 GB, slot1 1.0+3.8 GB). Heartbeat 1 (27872, WEDGED - see above),
-> operator_runner 1 (27876), watchdog 1 (29264), overnight driver 1 (24864); cargoq UP
-> (ping ok, queued 0, running false). Carried duplication: TWO supervisor.py (19172 +
-> 27828) + TWO cargoq/server.py (28544 + 34564). No TEMP baseline leaks.
-> Root worktree human WIP (M README.md, M loop/cargoq/server.log; untracked benchmarks/
-> + loop/baselines/) - untouched, reported.
-> Carried escalations: slot-0/slot-1 alive-but-stalled (watch, do not reap); NEW
-> dispatch_ready dead-dispatch reset hazard on live slots 0/1; NEW wedged heartbeat;
-> RAM below the 3 GB floor; RG-23/RG-9 missing packet files; duplicate supervisors +
-> duplicate cargoq servers; F1-AUTHORING-ARMS LANDED-WITH-FINDINGS; FRAME-REVOLVE F1
-> non_z_axis pin; TOR-C flip-or-pin; slot-4/slot-7 wt RESULT residue.
-> Leaving: 2 RUNNING (FHC-FACTS-CACHE slot 0, FHC-G2 slot 1; both alive-but-stalled) /
-> HEAD `d346ead`.
+> landings this cycle, so no anchor ritual needed.
+> Health: RAM 2.2 GB free (BELOW the 3 GB floor); Disk 12.96 GiB free (above the 8 GB
+> floor, BELOW the 15 GB janitor goal). Heartbeat 1 (27872, now ACTIVE again - last
+> cycle 14:40:09 local, the one that dispatched the duplicate), operator_runner 1
+> (27876), watchdog 1 (29264), cargoq UP (ping ok, queued 0, running false). Carried
+> duplication: TWO supervisor.py (19172 + 27828) + TWO cargoq/server.py (28544 + 34564).
+> No TEMP baseline leaks. Root worktree human WIP (M README.md, M loop/cargoq/server.log)
+> - untouched.
+> Leaving: 2 RUNNING (FHC-FACTS-CACHE slots 0+1, DUPLICATE) / HEAD `0136323`.
 >
 > NOTE: this cycle refreshed the prior block in place (timestamp/HEAD/board/health) to
 > keep the volatile section at ~1 block (charter cap ~120 lines). Prior cycles' refreshes
@@ -172,31 +157,31 @@ corrected, annex C = ORACLE POLICY CHANGE), then docs/SOLVER_COVERAGE_SPEC.md
 
 ## State of the machine, as left
 
-- 2 workers ALIVE-but-STALLED (do NOT reap; both making progress under stale events):
-  FHC-FACTS-CACHE in slot 0 (cmd pid 16952, opencode child 12864 in RESUME session
-  ses_f69c975a..., events 19.3 min stale, changed=2, no commit; ACTIVELY running
-  facts_call_count.py + door.py cockpit) and FHC-G2-PROBE-QUERIES in slot 1 (cmd pid
-  20612, opencode child 27780, events 13.3 min stale, changed=1, no commit).
-- *** dispatch_ready --dry-run marks BOTH slot 0 and slot 1 "DEAD dispatch ... would
-  reset + delete + redispatch" (no RESULT + events >3 min stale). Running it LIVE
-  would reset each live worker's worktree and spawn a second worker into the same
-  slot. DO NOT run dispatch_ready live until both workers commit/finish. ***
-- Heartbeat (27872) is WEDGED: last dispatch_ready cycle 13:48 local, no python child
-  21 min later. The wedge is PROTECTIVE (it cannot fire the dead-dispatch reset); do
-  NOT restart it while slots 0/1 are alive-but-stalled.
-- Landed since the 15:50Z block: NONE. HEAD unchanged at `d346ead`.
+- 2 workers ALIVE, BOTH on the same packet `FHC-FACTS-CACHE` (DUPLICATE dispatch):
+  slot 0 (cmd pid 16952, opencode child 12864, RESUME session ses_f69c975a..., events
+  stale 54.1 min, changed=0, wt detached at 57f2be6; live child powershell 25576 doing
+  a serial facts_call_count.py/door.py pass on power_unit since 13:47:45 local) and
+  slot 1 (cmd pid 29372, opencode child 29476, fresh session ses_f69141b95ffe...,
+  events fresh; dispatched 14:40:09 local by the heartbeat).
+- *** Do NOT kill either worker (charter) and do NOT run dispatch_ready live. The
+  heartbeat dispatched slot 1 while slot 0 was alive because the long door.py pass
+  leaves events stale and the dispatcher counts STALLED as free. Escalated 18:42Z. ***
+- Heartbeat (27872) is ACTIVE again (last cycle 14:40:09 local) - it is the one that
+  produced the duplicate; it is not wedged now.
+- Landed since the 18:09Z block: NONE. HEAD moved only by the 18:09Z operator commit
+  (`0136323`).
 - Slots 2-7 FINISHED/IDLE residue (all tips ancestors of integration/kernel-bg;
   re-verified this cycle: c3df084, e6553db, 3c2109b, ee97499, 713f205, 5cf4811).
-  Nothing else landable.
-- Substrate: heartbeat 1 (27872, WEDGED), operator runner 1 (27876), watchdog 1
-  (29264), overnight driver 1 (24864), cargoq UP (ping ok, queued 0, running false).
-  TWO supervisor.py (19172 + 27828) and TWO cargoq/server.py (28544 + 34564) =
-  carried duplication class.
-- Disk 13.46 GiB free (above the 8 GB floor, BELOW the 15 GB janitor goal).
-- RAM 1.79 GB free (BELOW the 3 GB floor; owner desktop + 2 resident workers).
-- [operator 2026-09-12T18:09Z] board: 2 RUNNING (both STALLED-but-ALIVE) / 0
-  landed-since-last-op / 0 unblocked / 0 flipped / 0 dispatched; registry 355 =
-  258 D / 86 R / 10 B / 1 S; HEAD d346ead.
+  Slot 2 holds an unlanded d8a6bd4 on packet/FHC-G2-PROBE-QUERIES but no RESULT.
+  Nothing landable.
+- Substrate: heartbeat 1 (27872, ACTIVE), operator runner 1 (27876), watchdog 1
+  (29264), cargoq UP (ping ok, queued 0, running false). TWO supervisor.py (19172 +
+  27828) and TWO cargoq/server.py (28544 + 34564) = carried duplication class.
+- Disk 12.96 GiB free (above the 8 GB floor, BELOW the 15 GB janitor goal).
+- RAM 2.2 GB free (BELOW the 3 GB floor; owner desktop + 2 resident workers).
+- [operator 2026-09-12T18:42Z] board: 2 RUNNING (FHC-FACTS-CACHE slots 0+1, DUPLICATE)
+  / 0 landed-since-last-op / 0 unblocked / 0 flipped / 0 dispatched; registry 356 =
+  258 D / 87 R / 10 B / 1 S; HEAD 0136323.
 
 [operator 2026-09-09T02:2xZ - volatile refresh after the ADM-L4 operator
 landing. Board now: 0 running / 6 FINISHED residue (L1,L2,L3,F1,CL-005,

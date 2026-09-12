@@ -2012,6 +2012,43 @@ uncommitted - left for the orchestrator, no dispatch impact.
   F1-AUTHORING-ARMS LANDED-WITH-FINDINGS; FRAME-REVOLVE F1 non_z_axis pin;
   TOR-C flip-or-pin; slot-4/slot-7 wt RESULT residue).
 
+## 2026-09-12 18:42 UTC (operator): FHC-FACTS-CACHE now running in BOTH slot 0 and slot 1 (the 18:09Z hazard fired)
+
+- What: the 18:09Z escalation predicted that dispatch_ready's STALLED-as-free
+  accounting would duplicate a live packet. It fired. The heartbeat
+  (dispatch_heartbeat.ps1, pid 27872) recovered from its wedge and ran
+  `dispatch_ready.py` LIVE at 14:40:09 local, seeing "slots: 8 (0 running, 7
+  free)" and dispatching `FHC-FACTS-CACHE -> slot 1` while slot 0's
+  FHC-FACTS-CACHE worker (cmd 16952, opencode 12864, session
+  ses_f69c975a...) was ALIVE mid serial door.py pass (live child powershell
+  25576 running facts_call_count.py on power_unit since 13:47:45 local;
+  events stale 54.1 min by design). Slot 1 now runs a fresh
+  FHC-FACTS-CACHE worker (cmd 29372, opencode 29476, session
+  ses_f69141b95ffe...). Both write truck123d/src/bd_bridge.rs and
+  truck123d/tests/facts_cache.rs.
+- Why it matters: (1) two concurrent door.py measurement runs violate the
+  serial-door rule and can flake; (2) the two branches collide on bd_bridge.rs
+  at merge; (3) the heartbeat log at 14:19:30 had correctly deferred
+  FHC-FACTS-CACHE on a bd_bridge.rs write-set clash, then at 14:40 saw
+  "0 running" - the liveness detector lost slot 0 when its events aged past
+  the <180s RUNNING override.
+- Action needed (human/orchestrator): decide which run to keep. Recommended:
+  keep slot 0 (55 min of door.py measurement already invested) and stop slot 1's
+  fresh worker; but the charter forbids the operator from killing a live worker,
+  so this is escalated, not done. If slot 0's child is genuinely hung (not just
+  slow), the reverse. Start from `loop/slots/0/events.jsonl` mtime,
+  `loop/slots/1/events.jsonl`, and `loop/dispatch_heartbeat.log`. Fix the
+  underlying gap: STALLED (events stale) with a live opencode child must NOT be
+  counted as free for dispatch, and the heartbeat should not run dispatch_ready
+  live while any slot holds a live opencode child with stale events.
+- Minor: slot 1's `worker.session` file records ses_f8b738b95ffe... but the
+  actual worker session in its events is ses_f69141b95ffe... (run_packet wrote a
+  session id the worker did not adopt). Harness bookkeeping only.
+- Carried unchanged: RG-23/RG-9 missing packet files; duplicate supervisors
+  (19172+27828) + duplicate cargoq/server.py (28544+34564); F1-AUTHORING-ARMS
+  LANDED-WITH-FINDINGS; FRAME-REVOLVE F1 non_z_axis pin; TOR-C flip-or-pin;
+  slot-2/slot-4/slot-7 wt RESULT residue; RAM below the 3 GB floor.
+
 ## 2026-09-12 14:40 UTC - LOW RAM persists and is now crashing the running worker's tests (carried escalation, worsened)
 
 - What: FreePhysicalMemory 0.57 GiB of 15.71 GB total (was 1.21-1.3 GiB earlier
