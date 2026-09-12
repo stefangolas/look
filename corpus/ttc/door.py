@@ -288,6 +288,20 @@ def _num(value):
     return value
 
 
+class Color(tuple):
+    """build123d ``Color(r, g, b, a=1.0)`` -- a client colour data row.
+
+    The RGB(A) channels are pure client metadata (the GLB emit path's per-part
+    ``baseColorFactor``); the tuple serializes through the door's
+    ``_color_record`` JSON array and is never read by any geometry path.
+    """
+
+    __slots__ = ()
+
+    def __new__(cls, r, g, b, a=1.0):
+        return tuple.__new__(cls, (_num(r), _num(g), _num(b), _num(a)))
+
+
 def _color_record(color):
     """The recorded textual form of a client color (pure metadata).
 
@@ -1280,11 +1294,25 @@ class _Align:
 Align = _Align()
 
 
-def Polyline(*points, **kwargs):
-    """build123d ``Polyline`` -- an open polyline profile edge (a data row of
-    line segments). Feeding it to a profile verb answers exactly where the
-    executor answers the resulting loop; otherwise the verb refuses typed."""
-    return Edge.make_line(_point3(points[0]), _point3(points[-1]))
+def Polyline(*points, close=False, **kwargs):
+    """build123d ``Polyline`` -- a chain of straight profile edges.
+
+    The recorded carrier is the exact line loop through the recorded points
+    (each consecutive pair one ``Edge``); ``close=True`` appends the closing
+    segment when the chain does not already return to its start. A two-point
+    chain stays the landed single ``Edge``; a longer chain is the recorded
+    ``Wire`` the loft/revolve/extrude loops consume. No point is dropped or
+    approximated.
+    """
+    pts = [_point3(point) for point in points]
+    if len(pts) < 2:
+        raise ValueError("a polyline needs at least two points")
+    edges = [Edge.make_line(pts[i], pts[i + 1]) for i in range(len(pts) - 1)]
+    if close and pts[-1] != pts[0]:
+        edges.append(Edge.make_line(pts[-1], pts[0]))
+    if len(edges) == 1:
+        return edges[0]
+    return Wire(edges)
 
 
 def Polygon(*points, **kwargs):
@@ -1382,6 +1410,29 @@ class Face:
         idiom reads the section face back for `loft`. The selection is
         iterable and indexable, exactly as the corpus consumes it."""
         return [self]
+
+    def _profile_boolean(self, other, verb):
+        """A planar sketch boolean (the corpus's `Circle(a) - Circle(b)`
+        annular profile) is not a recorded kernel-engine carrier: the landed
+        arms consume ONE closed loop, so a multi-loop profile refuses typed
+        naming the missing carrier rather than dying untyped."""
+        _refuse(
+            "a planar profile boolean is not a kernel-engine row",
+            code="E_UNSUPPORTED_ENVELOPE",
+            verb=verb,
+            carrier="face_boolean",
+            phase="admission",
+        )
+        return None
+
+    def __sub__(self, other):
+        return self._profile_boolean(other, "cut")
+
+    def __and__(self, other):
+        return self._profile_boolean(other, "intersect")
+
+    def __add__(self, other):
+        return self._profile_boolean(other, "fuse")
 
     def _occ_face(self):
         """The recorded boundary replayed into the installed OCC kernel.
@@ -1708,7 +1759,19 @@ def _certified_bbox_carrier(bbox):
         0.5 * (float(lo[1]) + float(hi[1])),
         0.5 * (float(lo[2]) + float(hi[2])),
     )
-    return occ.Pos(*center) * occ.Box(length, width, height)
+    # Bake the translation into the geometry so the carrier's OCC location is
+    # identity. An OCC probe that bakes a placement (the corpus's wheel
+    # `_bake`) then reads an already-world-space carrier and leaves a
+    # kernel-engine row untouched instead of trying to re-wrap it.
+    matrix = occ.Matrix(
+        [
+            [1.0, 0.0, 0.0, center[0]],
+            [0.0, 1.0, 0.0, center[1]],
+            [0.0, 0.0, 1.0, center[2]],
+            [0.0, 0.0, 0.0, 1.0],
+        ]
+    )
+    return occ.Box(length, width, height).transform_geometry(matrix)
 
 
 class _Shape:
@@ -2074,7 +2137,19 @@ class Compound(_Shape):
         if children is not None:
             self._children = list(children)
         elif obj is not None and not isinstance(obj, Compound):
-            self._children = list(obj)
+            try:
+                self._children = list(obj)
+            except TypeError:
+                # An OCC shape (the corpus's wheel `_bake` downcast path) is
+                # not a recorded kernel-engine row; refuse typed, never die on
+                # an untyped `list(ocp_shape)`.
+                _refuse(
+                    "an OCC probe of a kernel-engine row is not a kernel-engine row",
+                    code="E_NOT_A_KERNEL_ROW",
+                    verb="probe",
+                    carrier="occ_probe",
+                    phase="extraction",
+                )
         else:
             self._children = []
 
@@ -3264,6 +3339,7 @@ def export_stl(part, path, tolerance=None, angular_tolerance=None, **kwargs):
 # landed executor cannot answer refuse with the mapped typed exception.
 _TRUCK_NAMES = [
     "Vector",
+    "Color",
     "Location",
     "Axis",
     "Edge",
