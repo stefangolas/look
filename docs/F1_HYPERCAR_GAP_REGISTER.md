@@ -80,6 +80,26 @@ marshalling.
 `hypercar/suspension_front` (`Plane.origin`), `hypercar/suspension_rear`
 (`Edge.edge`) — **4**.
 
+## 4b. MECHANICAL+ — degenerate planar fan cap (named 2026-09-12 by the TRIM landing)
+
+**Missing machinery, precisely:** `f1/suspension_front` and
+`f1/suspension_rear` block at the `_rocker` lightening cut
+(`suspension.py:503`): a coaxial spline-profile prism through-cut (`_plate`
+body minus a thicker `_plate` tool). The trim-extrude envelope extension
+(FHC-TRIM, landed) extracts it EXACTLY — the tensor-Bernstein 2-cycle
+between the recorded loop and its normal offset — but the exact planar cap
+is a fan whose normal cone **degenerates at the loop centroid**, so the
+landed RDEF-M2 tangential-sandwich admission refuses typed
+`SingularParametrization` (marshaled as `unsupported_envelope` /
+`non_canonical_carrier`). No numeric shortcut taken.
+
+**The fix is mechanical+ within landed theory:** a planar fan cap is FLAT —
+its exact flux has a closed planar form (or the cap is re-parametrized away
+from the degenerate centroid), after which the composition reaches the
+certified solver like any other pair. **Rows: 2** (both suspension rows;
+their census "timeout" was this refusal taking ~200 s). Both duplicate
+TRIM runs converged on identical verdicts.
+
 ## 4. DIAGNOSIS — swallowed or unexamined refusals
 
 **Missing machinery: unknown until the typed refusal is surfaced.**
@@ -110,19 +130,26 @@ marshalling.
 
 ---
 
-## Tally (interim — 24 of 40 rows counted, 16 pending)
+## Tally (FINAL — all 40 rows counted; census run 2026-09-12)
 
-| category | class | rows confirmed | presumptive |
-|---|---|---:|---:|
-| 1 rational-patch flux | theory-adjacent | 6 | 3+ |
-| 2 probe query surface | mechanical | 3 | ? |
-| 3 data-row attributes | mechanical | 4 | 4 |
-| 4 diagnosis | TBD | 2 | 4+ |
-| 5 certified-cost scaling | mechanical+ pending profile | 1 | — |
-| **green so far** | — | **7** | — |
+**GREEN 9/40 — all F1:** beam_wing, drs_actuator, drs_flap, front_wing, halo,
+rear_wing, steering_rack, track_rod_left, track_rod_right.
+**Hypercar 0/13** — but wheels/hinge/powertrain progressed PAST their R3 name
+gaps (CENSUS-NAMES landed) and now stop at new, named carriers.
 
-**One-sentence reading:** of the 17 F1 rows not yet green with a known
-blocker, at most one category (rational-patch flux, 6 rows) carries a genuine
-proof obligation over landed lemmas — everything else is wiring the corpus to
-machinery that already certifies, plus a short diagnosis list whose members
-are unclassified only because their refusals are still swallowed or unrun.
+| category | class | rows |
+|---|---|---:|
+| 1 rational-patch flux (`airbox`, `details`, `drivetrain`, `nose`, `sidepod`×2; `suspension_front` presumptive — refused after 67 s) | theory-adjacent | 6 (+1) |
+| 2 probe query surface (`cockpit`, `engine_cover`, `monocoque`) | mechanical | 3 |
+| 3 data-row attributes (F1 `corner`×4; hypercar `details`, `lighting` (`Face.faces`), `suspension_front` (`Plane.origin`), `suspension_rear` (`Edge.edge`)) | mechanical | 8 |
+| 4 named-carrier admission (hypercar `brakes`, `hinge` — `revolve needs a closed profile`; `wheels` — `bd.Color` name gap; `body`, `chassis`, `glazing`, `interior` — mirrored band-loft envelope still refusing after EX-B) | mechanical | 7 |
+| 5 diagnosis (`floor`, `diffuser` — builder-swallowed; `aero` — `case empty`; `powertrain` — early envelope past its landed name) | TBD | 4 |
+| 6 certified-cost scaling (`power_unit`, `f1/suspension_rear` — both exceeded the census's 120 s cap, not refusals) | perf, pending profile | 2 |
+| **green** | — | **9** |
+
+**One-sentence reading:** of 31 non-green rows, 18 are mechanical (wiring the
+corpus to machinery that already certifies), 4 are unclassified until their
+swallowed refusals are surfaced, 2 are cost-not-admission, and at most 7
+carry a genuine proof obligation — the rational-weight flux extension of
+`cell_flux_exact` over landed ADM lemmas (L5 reciprocal-power is the likely
+substrate; the soundness demonstration is the work).
