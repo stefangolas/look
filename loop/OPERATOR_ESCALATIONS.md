@@ -1954,3 +1954,38 @@ uncommitted - left for the orchestrator, no dispatch impact.
 - Health this cycle: heartbeat 1 (27872), operator_runner 1 (27876), watchdog 1
   (29264), overnight driver 1 (24864); cargoq UP (ping ok, queued 0, running
   false); disk 28.15 GB free; RAM 3.77 GB free (recovered above threshold).
+
+## 2026-09-12 06:43 UTC - UPDATED (resolves the 04:48Z "if slot 1 also returns SPEC_GAP" branch): slot 1 FHC-TRIM FINISHED SPEC_GAP - BOTH duplicate runs SPEC_GAP; row READY needs a rebooking decision
+
+- What: slot 1 FINISHED the duplicate FHC-TRIM-EXTRUDE-ENVELOPE run with RESULT
+  status **SPEC_GAP** (worker commit `4a1dd49` on branch
+  `packet/FHC-TRIM-EXTRUDE-ENVELOPE`, NOT an ancestor of HEAD; RESULT at
+  `loop/slots/1/wt/RESULT.json`). Its own done-when is green
+  (`cargo test -p truck123d --test trim_extrude_envelope --locked`, 4 passed,
+  388 s), and the RESULT records f1/rear_wing + f1/steering_rack GREEN with
+  suspension_front/rear BLOCKED at the composition. The spec_gap is the same
+  booked FHC-EX-B degenerate-fan-cap class slot 0 hit: the exact planar fan cap
+  carries a degenerate normal cone at the loop centroid, so the composition
+  refuses TYPED (`unsupported_envelope`/`non_canonical_carrier`, or
+  `ExtremeSlabContaminated` when the tool over-extends). No numeric shortcut, no
+  trim approximation.
+- Why the operator did NOT land it: charter step 2 lands only RESULT status DONE
+  with green scoped checks; SPEC_GAP is explicitly a do-not-land/escalate class.
+  Both duplicate runs now independently reach the same verdict, which is evidence
+  the gap is real and not a worker error.
+- Action needed (human/orchestrator): adjudicate the FHC-TRIM SPEC_GAP pair -
+  decide whether the degenerate-fan-cap composition is in scope for FHC-TRIM or
+  is a rebooking (the two duplicate runs agree). The registry row
+  FHC-TRIM-EXTRUDE-ENVELOPE remains READY with NO landed marker and its slot
+  assignment cleared (both slots FINISHED), so `dispatch_ready` can start a THIRD
+  worker once it considers the row dispatchable - pin/rebook before that
+  happens. Preserved work: slot 1 `4a1dd49` on
+  `packet/FHC-TRIM-EXTRUDE-ENVELOPE`; slot 0 `33f6269` on
+  `packet/FHC-TRIM-EXTRUDE-ENVELOPE-slot0` + archived
+  `loop/results/FHC-TRIM-EXTRUDE-ENVELOPE.PENDING.RESULT.json`.
+- Carried unchanged: duplicate supervisors (19172 + 27828); RG-23/RG-9 missing
+  packet files; F1-AUTHORING-ARMS LANDED-WITH-FINDINGS; FRAME-REVOLVE F1
+  non_z_axis pin; TOR-C flip-or-pin; slot-4/slot-7 wt RESULT residue.
+- Health this cycle: heartbeat 1 (27872), operator_runner 1 (27876), watchdog 1
+  (29264), overnight driver 1 (24864); cargoq UP (ping ok, queued 0, running
+  false); disk 27.7 GB free; RAM 3.84 GB free.
