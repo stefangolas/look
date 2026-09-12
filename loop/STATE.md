@@ -75,55 +75,58 @@ corrected, annex C = ORACLE POLICY CHANGE), then docs/SOLVER_COVERAGE_SPEC.md
 
 ## Where we are
 
-> LATEST GROUND TRUTH [operator 2026-09-12T04:00Z / 00:00 local]: 2 RUNNING
-> (slots 0+1) / 0 landed-this-cycle / 0 unblocked / 0 flipped / 0 dispatched.
-> HEAD `c64afe0` (the 00:36Z operator STATE/log commit; no work moved).
-> **DUPLICATE FHC-TRIM-EXTRUDE-ENVELOPE — the 00:36Z "slot 1 is STALLED" call is
-> now FALSIFIED: BOTH workers are alive and both are editing the same file.**
-> Re-derived by command this cycle:
-> - slot 0 (mis-forked DETACHED HEAD @ `c139afb` =base, pid 35628, opencode child
->   11492): `events.jsonl` 03:54:06Z (~5.5 min old), `changed=1` (M
->   `truck123d/src/bd_bridge.rs`, +92/-5), last cargoq job `build --profile quick
->   -p truck123d` exit 0 at 23:54:02 local. Alive, lightly active.
-> - slot 1 (branch `packet/FHC-TRIM-EXTRUDE-ENVELOPE` @ `3d1d769` =base, pid
->   13864, opencode child 35128): `events.jsonl` 03:57:26Z (~2.2 min old),
->   `changed=1` (M `bd_bridge.rs`, +92/-0), last cargoq job `test --profile quick
->   -p truck123d --lib debug_trim_prism_pair` exit 0 at 23:56:45 local (one
->   `exit=3221225781` = 0xC0000409 RAM-zone crash at 23:56:27 first). Alive and
->   the more active of the two.
-> - The two diffs are near-identical (+92 lines) = the duplicate did redundant
->   work. **RAM 1.3 GB free (below the 3 GB threshold) — the duplicate is the
->   cause; the 0xC0000409 crash is the signature.** ESCALATED: the
->   owner/orchestrator must reap ONE; the charter forbids killing a live worker,
->   so the operator took no kill action. Evidence now favours KEEPING slot 1 (on
->   the packet branch) and reaping slot 0 (detached HEAD, no branch to land on) —
->   the OPPOSITE of the 00:36Z recommendation, whose premise died.
+> LATEST GROUND TRUTH [operator 2026-09-12T04:24Z / 00:24 local]: 1 RUNNING + 1
+> STALLED (slots 0+1, the DUPLICATE FHC-TRIM-EXTRUDE-ENVELOPE) / 0 landed-this-cycle
+> / 0 unblocked / 0 flipped / 0 dispatched. HEAD `edaa9fb` (a HUMAN docs commit
+> "F1/hypercar gap register" landed after the 04:00Z operator commit `8973337`; no
+> packet work moved).
+> **DUPLICATE FHC-TRIM — the active/stalled roles have FLIPPED again.** Re-derived
+> by command this cycle:
+> - slot 0 (DETACHED HEAD @ `c139afb` =base, cmd pid 35628, opencode child 11492):
+>   `events.jsonl` ~04:21Z (~2 min old), `changed=1` (M
+>   `truck123d/src/bd_bridge.rs`, +89/-4), last cargoq job `build --profile quick
+>   -p truck123d` exit 0 at 00:20:37 local. ALIVE, now the more active of the two.
+> - slot 1 (branch `packet/FHC-TRIM-EXTRUDE-ENVELOPE` @ `3d1d769` =base, cmd pid
+>   13864, opencode child 35128): `events.jsonl` ~04:10Z (~13 min old), `changed=1`
+>   (M `bd_bridge.rs`, +114/-1), last cargoq job `build --profile quick -p
+>   truck123d` exit 0 at 00:09:50 local. **STALLED** (no cargo/rustc, events stale)
+>   but the cmd+opencode pids are ALIVE — NOT the dead-shim class.
+> - The two diffs have DIVERGED (slot 0 +89/-4, slot 1 +114/-1) = redundant work.
+>   **RAM 2.18 GB free (below the 3 GB threshold) — the duplicate is the cause.**
+>   ESCALATED (updated): reaping is an owner/orchestrator item (the charter forbids
+>   killing a live worker). The active/stalled roles OSCILLATE between cycles, so
+>   the "keeper" recommendation is NOT stable — do NOT act on the 04:00Z
+>   keep-slot-1 call without re-deriving. FHC-TRIM row is READY/assigned None: once
+>   either slot frees the dispatcher can start a THIRD worker.
 > Slots 2-7 FINISHED/IDLE landed residue; every tip re-verified an ancestor of HEAD
 > by `git merge-base --is-ancestor` (slot 2 c3df084; slot 3 e6553db DONE; slot 4
 > 3c2109b LANDED-WITH-FINDINGS; slot 5 ee97499 DONE; slot 6 713f205 DONE; slot 7
-> 5cf4811 LANDED) — NOTHING landable (no RESULT in slots 0/1/2; slot 4 findings).
-> `dispatch_ready --dry-run --max-workers=4`: "slots: 8 (2 running, 6 free);
-> slot-assigned packets: 5; dispatched 0; workers now ~2/4" — RG-23/RG-9
-> write-set clash with the RUNNING `bd_bridge.rs`; FHC-MIRROR-FORM blocked on
-> FHC-TRIM; BD-EMIT-MESH-CACHE behind FHC-MIRROR. Real dispatcher NOT run
-> (heartbeat live = double-dispatch rule). FHC-TRIM row is READY/assigned None —
-> when one duplicate frees, the row can re-dispatch a THIRD worker unless the
-> duplicate is resolved first.
-> Registry re-derived by command (last-wins dedup): 347 unique rows = 251 DONE /
-> 85 READY / 10 BLOCKED / 1 SUPERSEDED; the 6 BLOCKED rows whose needs are all DONE
-> all carry deliberate holds (BG-AUD-FIX-004 OWNER_BLOCKED, SEM-PCURVE-MASTER-001-FIX
-> SUPERSEDED, DEF-SPINEFRAME-GRAZE SPEC_GAP, MONO-10 owner R3-mesh decision,
-> RDEF-M4 M0-adjudication, RDEF-M5 owner inputs) — none mechanically flippable.
+> 5cf4811 LANDED) — NOTHING landable (no RESULT in slots 0/1; slot 4 findings).
+> `dispatch_ready --dry-run --max-workers=4`: "slots: 8 (1 running, 6 free);
+> slot-assigned packets: 5; dispatched 0; workers now ~1/4" — RG-23/RG-9 fail the
+> anchor preflight because their PACKET FILES ARE MISSING (not anchor drift; packet
+> authoring is orchestrator work, not an operator fix); FHC-MIRROR-FORM blocked on
+> FHC-TRIM; BD-EMIT-MESH-CACHE behind FHC-MIRROR. Real dispatcher NOT run (heartbeat
+> live = double-dispatch rule).
+> Registry re-derived by command (last-wins dedup): 348 unique rows = 252 DONE /
+> 85 READY / 10 BLOCKED / 1 SUPERSEDED; the 7 BLOCKED rows whose needs are all DONE
+> all carry deliberate holds (BG-AUD-FIX-004 OWNER_BLOCKED, BG-CK-SPLINE-CENSUS
+> booking gate, SEM-PCURVE-MASTER-001-FIX SUPERSEDED, DEF-SPINEFRAME-GRAZE SPEC_GAP,
+> MONO-10 owner R3-mesh decision, RDEF-M4 M0-adjudication, RDEF-M5 owner inputs) —
+> none mechanically flippable.
 > Health: heartbeat exactly 1 (27872; the 2nd match is this operator's own query
-> line), operator_runner 1 (27876), watchdog 1 (29264), ONE overnight driver
-> (24864); cargoq UP (ping ok, queued 0, running false). Disk 26.88 GB free (above
-> the 8 GB floor AND the 15 GB goal); **RAM 1.3 GB free — BELOW the 3 GB threshold**
-> (two FHC-TRIM workers resident). Root worktree carries live human-session WIP —
-> untouched, reported not actioned.
+> line), operator_runner 1 (27876), watchdog 1 (29264), ONE overnight driver (24864);
+> cargoq UP (ping ok, queued 0, running false; two cargoq/server.py 28544+34564 —
+> the carried duplication shape). Disk 26.7 GB free (above the 8 GB floor AND the
+> 15 GB goal); **RAM 2.18 GB free — BELOW the 3 GB threshold** (two FHC-TRIM workers
+> resident). Root worktree carries live human-session WIP (M README.md, M
+> docs/F1_HYPERCAR_GAP_REGISTER.md, M loop/LEDGER.jsonl, M loop/cargoq/server.log,
+> untracked benchmarks/ + loop/baselines/ + scratch/) — untouched, reported not
+> actioned.
 > Carried escalation: TWO supervisors (19172 PyManager + 27828 pythoncore) — the
 > duplication class; only ONE overnight driver child, so no double-merge risk.
-> Leaving: 2 RUNNING (duplicate FHC-TRIM slots 0+1, escalated for one to be
-> reaped); HEAD `c64afe0` + this cycle's STATE/log commit.
+> Leaving: 1 RUNNING + 1 STALLED (duplicate FHC-TRIM slots 0+1, escalated); HEAD
+> `edaa9fb` + this cycle's STATE/log commit.
 >
 > NOTE: this cycle replaced the prior collapsed block with a fresh one to keep the
 > volatile section at ~1 block (charter cap ~120 lines). Prior cycles' refreshes are

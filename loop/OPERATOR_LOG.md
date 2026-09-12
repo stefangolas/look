@@ -6591,3 +6591,59 @@ benchmarks/ + loop/baselines/ + scratch/).
 Leaving: 2 RUNNING (the FHC-TRIM duplicate, escalated); HEAD `c64afe0` + this
 cycle's STATE/log commit; heartbeat 1; operator_runner 1; watchdog 1; cargoq UP;
 disk 26.88 GiB; RAM 1.3 GiB.
+
+## 2026-09-12 04:24 UTC (operator cycle)
+
+Board at start: 1 RUNNING + 1 STALLED (slots 0+1, duplicate
+FHC-TRIM-EXTRUDE-ENVELOPE), slots 2-7 FINISHED/IDLE landed residue.
+
+Health sweep:
+- slot_status: slot 0 RUNNING (events ~2 min, changed=1 `bd_bridge.rs` +89/-4,
+  DETACHED HEAD c139afb=base), slot 1 STALLED (events ~13 min, changed=1
+  `bd_bridge.rs` +114/-1, packet branch 3d1d769=base). Both cmd+opencode pids
+  ALIVE; no cargo/rustc running.
+- cargoq ping OK (queued 0, running false); heartbeat exactly 1 (27872; the
+  second match is this shell's own query); operator_runner 1 (27876); watchdog 1
+  (29264); overnight driver 1 (24864); TWO supervisors (19172 + 27828, carried
+  duplication); TWO cargoq/server.py (28544 + 34564, carried).
+- Disk 26.7 GiB free (>15 GB goal); RAM 2.18 GiB free (BELOW the 3 GB threshold
+  - the duplicate is resident).
+
+Actions:
+- Landing: NOTHING landable. slots 2-7 RESULT statuses read directly (slot 3
+  DONE, slot 4 LANDED-WITH-FINDINGS, slots 5/6 DONE, slot 7 LANDED) and every
+  slot tip verified an ancestor of integration/kernel-bg by `git merge-base
+  --is-ancestor` (all exit 0). Slots 0/1 have no RESULT.
+- Unblock: did NOT touch either FHC-TRIM worker. slot 1 is STALLED with a live
+  pid; the duplicate is an owner/orchestrator item (carried). Re-escalated with
+  the role-flip evidence (see ESCALATIONS).
+- Registry hygiene: re-derived by command - 348 unique rows = 252 DONE / 85
+  READY / 10 BLOCKED / 1 SUPERSEDED; the 7 BLOCKED rows with all deps DONE all
+  carry deliberate holds; none flippable. The RG-23/RG-9 anchor-preflight
+  failures are MISSING PACKET FILES (not anchor drift) -> packet authoring,
+  escalated; no anchor/lint-fixable READY row exists.
+- Dispatch: `dispatch_ready.py --dry-run --max-workers=4`: "slots: 8 (1 running,
+  6 free); slot-assigned packets: 5; dispatched 0; workers now ~1/4". Real
+  dispatcher NOT run (heartbeat live = double-dispatch rule).
+- STATE: replaced the volatile ground-truth block with a fresh [operator
+  2026-09-12T04:24Z] block (stable traps untouched).
+- This entry.
+
+Escalations: UPDATED duplicate FHC-TRIM - the active/stalled roles FLIPPED
+(slot 0 now active/fresh, slot 1 now STALLED ~13 min); the "keeper"
+recommendation is unstable, so do NOT act on the 04:00Z keep-slot-1 call
+without re-deriving. Carried unchanged: RG-23/RG-9 missing packet files; RDEF-M4
+M0-adjudication; MONO-10 owner R3-mesh decision; FRAME-REVOLVE F1 non_z_axis
+pin; duplicate supervisors + lagging cargoq restart guard; TOR-C flip-or-pin;
+slot-4/7 wt RESULT residue; CL-005/CL-006 READY-but-landed bookkeeping;
+schedule.py 'needs' crash.
+
+Worktree note (reported, not actioned): the root tree carries live human-session
+WIP (M README.md, M docs/F1_HYPERCAR_GAP_REGISTER.md, M loop/LEDGER.jsonl, M
+loop/cargoq/server.log, untracked benchmarks/ + loop/baselines/ + scratch/); the
+human/orchestrator session is LIVE (opencode 11240). HEAD moved to `edaa9fb` (the
+human docs commit) since the 04:00Z cycle.
+
+Leaving: 1 RUNNING + 1 STALLED (duplicate FHC-TRIM, escalated); HEAD `edaa9fb` +
+this cycle's STATE/log commit; heartbeat 1; operator_runner 1; watchdog 1;
+cargoq UP; disk 26.7 GiB; RAM 2.18 GiB.

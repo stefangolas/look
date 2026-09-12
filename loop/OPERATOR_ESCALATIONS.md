@@ -1894,3 +1894,31 @@ uncommitted - left for the orchestrator, no dispatch impact.
 - Health this cycle: heartbeat 1 (27872), operator_runner 1 (27876), watchdog 1
   (29264), overnight driver 1 (24864); cargoq UP (ping ok, queued 0, running
   false); disk 26.88 GB free; RAM 1.3 GB free (below threshold).
+
+## 2026-09-12 04:24 UTC - UPDATED: duplicate FHC-TRIM - active/stalled roles FLIPPED; the "keeper" call is unstable
+
+- What changed: the 04:00Z escalation (keep slot 1, reap slot 0) is now STALE.
+  Re-derived this cycle: slot 0 is the ACTIVE one (events ~2 min old, last
+  cargoq `build --profile quick -p truck123d` exit 0 at 00:20:37 local, diff
+  `bd_bridge.rs` +89/-4, DETACHED HEAD c139afb) and slot 1 is STALLED (events
+  ~13 min old, last cargoq build exit 0 at 00:09:50 local, diff `bd_bridge.rs`
+  +114/-1, packet branch 3d1d769). Both cmd+opencode pids remain alive; no
+  cargo/rustc process exists.
+- Why the operator did NOT act: both workers still hold live pids, and the
+  charter forbids killing/restarting a live worker. The last three cycles gave
+  OPPOSITE recommendations (00:13Z/00:36Z kept slot 0; 04:00Z kept slot 1)
+  because the roles oscillate; a third flip is possible. Reaping is an
+  owner/orchestrator item.
+- Recommendation: do NOT act on any single cycle's keeper call. Decide from the
+  two diffs and prefer the more complete one, ideally the one on the packet
+  branch. Start here: `git -C loop/slots/0/wt diff` and
+  `git -C loop/slots/1/wt diff`; then kill the loser's cmd pid + opencode child
+  (slot 0: 35628/11492; slot 1: 13864/35128) and
+  `python loop/run_packet.py --reset-only --slot <n>` (archives the diff first).
+  Do NOT re-dispatch FHC-TRIM - the registry row is READY/assigned None, so once
+  a duplicate slot frees the dispatcher can start a THIRD worker.
+- Why it matters now: RAM 2.18 GB free (below the 3 GB threshold); the duplicate
+  is over the RAM cap and slot 1 already took a 0xC0000409 crash earlier.
+- Health this cycle: heartbeat 1 (27872), operator_runner 1 (27876), watchdog 1
+  (29264), overnight driver 1 (24864); cargoq UP (ping ok, queued 0, running
+  false); disk 26.7 GB free; RAM 2.18 GB free (below threshold).
