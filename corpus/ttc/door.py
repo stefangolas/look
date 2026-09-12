@@ -1501,6 +1501,54 @@ def _recorded_edges(shape):
     return edges
 
 
+def _certificate_constructive(facts):
+    """True when a facts row carries a constructive validity certificate.
+
+    The certificate is the certified volume bracket (MONO-8): a bracket that is
+    present, ordered and finite is the constructive validity fact (a scalar
+    node's bracket is the degenerate ``[V, V]``), and ``solid_count`` must be
+    positive for the row to be a constructed body at all. This is the validity
+    probe's answer -- never an OCC ``BRepCheck`` consultation.
+    """
+    bracket = facts.get("volume_bracket")
+    if not isinstance(bracket, (list, tuple)) or len(bracket) != 2:
+        return False
+    lo, hi = bracket
+    if not (isinstance(lo, (int, float)) and isinstance(hi, (int, float))):
+        return False
+    if not (math.isfinite(lo) and math.isfinite(hi)) or lo > hi:
+        return False
+    if int(facts.get("solid_count") or 0) <= 0:
+        return False
+    # A constructed body is positively oriented: the corpus's own
+    # `is_valid_shape` rule (a valid shell must enclose positive volume).
+    return float(facts.get("volume") or 0.0) > 0.0
+
+
+def _certified_bbox_carrier(bbox):
+    """An OCC box spanning a certified ``[lo, hi]`` bound.
+
+    The corpus's bounds helpers (``surfaces.bbox`` / ``surfaces.obox``) call
+    ``BRepBndLib`` on ``shape.wrapped``; a kernel-engine row has no OCC shape,
+    so this box is the documented pass-through: its OCC bound is the row's own
+    certified carrier-derived enclosure, so the helper reads the certified
+    answer and OCC is never consulted for geometry. The box is a fact carrier,
+    not the row's geometry.
+    """
+    import build123d as occ
+
+    lo, hi = bbox
+    length = max(float(hi[0]) - float(lo[0]), 1.0e-9)
+    width = max(float(hi[1]) - float(lo[1]), 1.0e-9)
+    height = max(float(hi[2]) - float(lo[2]), 1.0e-9)
+    center = (
+        0.5 * (float(lo[0]) + float(hi[0])),
+        0.5 * (float(lo[1]) + float(hi[1])),
+        0.5 * (float(lo[2]) + float(hi[2])),
+    )
+    return occ.Pos(*center) * occ.Box(length, width, height)
+
+
 class _Shape:
     """The base of every placed construction row: one placed solid (a part)
     or a compound of child rows. All geometry lives behind the native
@@ -1508,11 +1556,23 @@ class _Shape:
 
     @property
     def wrapped(self):
-        # A corpus helper that probes the wrapped OCC shape of a kernel-engine
-        # data row cannot be served: refuse typed rather than pass `None` into
-        # OCP (which would die as an untyped TypeError).
-        _refuse("an OCC probe of a kernel-engine row is not a kernel-engine row")
-        return None
+        """The probe carrier for a kernel-engine row's OCC idioms.
+
+        ``surfaces.bbox`` / ``surfaces.obox`` bound ``shape.wrapped`` and
+        ``surfaces.is_valid_shape`` checks it; a kernel-engine row has no OCC
+        geometry, so the probe is answered from the row's own certified facts:
+        a facts row whose volume certificate (the bracket) is present, ordered
+        and finite yields the certified carrier-derived enclosure as an OCC box
+        (a fact carrier, never a geometry consultation). A row the certificate
+        cannot answer refuses TYPED, naming the missing fact.
+        """
+        facts = self._facts()
+        if not _certificate_constructive(facts):
+            _refuse(
+                "an OCC probe of a kernel-engine row is not a kernel-engine row: "
+                "the volume certificate (bracket) is missing or non-finite"
+            )
+        return _certified_bbox_carrier(facts["bbox"]).wrapped
 
     def _facts(self):
         return json.loads(_T123D.bd_facts(json.dumps(self._node())))
@@ -1527,11 +1587,15 @@ class _Shape:
 
     @property
     def is_valid(self):
+        """The certificate's validity: bracket present/finite, body constructive.
+
+        Answers from the row's own facts row, never an OCC ``BRepCheck``; a row
+        the facts cannot measure is not valid."""
         try:
             facts = self._facts()
-            return facts["volume"] > 0.0
         except Exception:
             return False
+        return _certificate_constructive(facts)
 
     def edges(self):
         return _EdgeSelection(self, _recorded_edges(self))
