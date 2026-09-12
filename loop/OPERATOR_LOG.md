@@ -6475,3 +6475,56 @@ benchmarks/ + loop/baselines/ + scratch/).
 Leaving: 2 RUNNING (the FHC-TRIM duplicate, escalated); HEAD `3d1d769` + this
 cycle's STATE/log commit; heartbeat 1; operator_runner 1; watchdog 1; cargoq UP;
 disk 30.8 GiB; RAM 2.5 GiB.
+
+## 2026-09-12 00:36 UTC (operator cycle)
+
+Board at start: 1 RUNNING (slot 0) + 1 STALLED (slot 1), both
+FHC-TRIM-EXTRUDE-ENVELOPE (the carried duplicate); slots 2-7 FINISHED/IDLE
+landed residue. HEAD `bc0a7fd`.
+
+Health sweep:
+- heartbeat exactly 1 (27872, anchored `dispatch_heartbeat.ps1`; a second regex
+  match was my own scan command).
+- operator_runner 1 (27876), watchdog 1 (29264), cargoq UP (ping
+  `{ok:true, queued:0, running:true}` - the running job is slot 0's
+  `debug_trim_extract_stage`).
+- Disk 32.9 GB free (above floor and goal). RAM 1.74 GB free - BELOW the 3 GB
+  threshold (slot 0 + cargoq spike resident; do not stack a third).
+
+Actions:
+- Land check: every FINISHED slot tip re-verified an ancestor of HEAD by
+  `git merge-base --is-ancestor` (slot 3 e6553db DONE, slot 4 3c2109b
+  LANDED-WITH-FINDINGS, slot 5 ee97499 DONE, slot 6 713f205 DONE, slot 7 5cf4811
+  LANDED) -> NOTHING landable.
+- Unblock: slot 2 IDLE is landed residue (c3df084 ancestor, packet
+  TTC-RECENSUS-F1-R3), not stuck. **slot 1 is now STALLED** (events frozen
+  20:18:10 local, ~18 min stale; no cargo/rustc attributed; `changed=1` M
+  bd_bridge.rs) - the dead-shim signature. I did NOT kill it (charter forbids
+  killing a live-pid worker) and did NOT reset-only under a live pid; the
+  duplicate is an owner/orchestrator item. ESCALATED with the updated facts.
+- Registry hygiene: re-derived by command (last-wins dedup): 348 unique rows =
+  252 DONE / 85 READY / 10 BLOCKED / 1 SUPERSEDED; none cleanly flippable (same
+  carried 10). READY-without-landed-marker = {RG-23, RG-9 (missing packet files),
+  FHC-TRIM (running), FHC-MIRROR (gated), BD-EMIT-MESH-CACHE (gated)}.
+- `dispatch_ready.py --dry-run --max-workers=4`: "slots: 8 (1 running, 6 free);
+  slot-assigned packets: 5; dispatched 0; workers now ~1/4" = REAL idle. Real
+  dispatcher NOT run (heartbeat live = double-dispatch rule).
+- STATE: replaced the volatile ground-truth block with a fresh [operator
+  2026-09-12T00:36Z] block (single block; stable traps untouched).
+- This entry.
+
+Escalations: UPDATED duplicate FHC-TRIM - slot 1 now STALLED (dead-shim), slot 0
+alive; recommend reaping slot 1 (the previous escalation's "slot 1 is the better
+keeper" premise no longer holds; cf. the 3d78cee precedent). Carried unchanged:
+RG-23/RG-9 missing packet files; RDEF-M4 M0-adjudication; MONO-10 owner R3-mesh
+decision; FRAME-REVOLVE F1 non_z_axis pin; duplicate supervisors + lagging cargoq
+restart guard; TOR-C flip-or-pin; slot-4/7 wt RESULT residue; CL-005/CL-006
+READY-but-landed bookkeeping; schedule.py 'needs' crash.
+
+Worktree note (reported, not actioned): root tree carries live human-session WIP
+(M README.md, M loop/LEDGER.jsonl, M loop/cargoq/server.log, untracked
+benchmarks/ + loop/baselines/ + scratch/).
+
+Leaving: 1 RUNNING (slot 0) + 1 STALLED (slot 1, escalated); HEAD `bc0a7fd` +
+this cycle's STATE/log commit; heartbeat 1; operator_runner 1; watchdog 1; cargoq
+UP; disk 32.9 GiB; RAM 1.74 GiB.

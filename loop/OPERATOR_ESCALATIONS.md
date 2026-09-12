@@ -1840,3 +1840,29 @@ uncommitted - left for the orchestrator, no dispatch impact.
 - Health this cycle: heartbeat 1 (27872), operator_runner 1 (27876), watchdog 1
   (29264), overnight driver 1 (24864), cargoq UP (ping ok, queued 0, running
   true); disk 30.8 GB free; RAM 2.5 GB free.
+
+## 2026-09-12 00:36 UTC - UPDATED: duplicate FHC-TRIM - slot 1 is now STALLED (dead-shim), slot 0 alive; reap slot 1
+
+- What changed: the 00:13Z escalation named slot 1 the "better keeper" (on the
+  packet branch @ HEAD) and slot 0 the mis-forked copy. That premise is now
+  dead. `slot_status` shows slot 1 **STALLED**: `events.jsonl` frozen at
+  2026-09-11 20:18:10 local (~18 min stale), no cargo/rustc attributed to it,
+  `changed=1` (M `truck123d/src/bd_bridge.rs`); its cmd.exe pid 13864 is alive
+  but the shim is idle (the documented dead-shim signature). Slot 0 is ALIVE and
+  progressing: events 20:27:51 local, currently the cargoq job
+  `test -p truck123d --lib debug_trim_extract_stage` (7 prior exit-101
+  iterations = active debugging). The heartbeat's 20:34:11 cycle counts "1
+  running", i.e. it no longer sees slot 1.
+- Why the operator did NOT act: the charter forbids killing a worker with a live
+  pid, and `--reset-only` under a live pid could clobber a woken worker. The
+  duplicate is already an owner/orchestrator item.
+- Recommendation (matches the 3d78cee precedent, which reaped a hung slot 1 and
+  kept slot 0): keep slot 0; reap slot 1. Start here: kill pid 13864 (and its
+  opencode child started 20:03:58 local), then
+  `python loop/run_packet.py --reset-only --slot 1` (archives the partial
+  bd_bridge.rs diff first). Do NOT re-dispatch FHC-TRIM. Note slot 0 is on a
+  DETACHED HEAD @ c139afb (the packet branch is checked out in slot 1); the
+  packet branch will need the landing commit moved onto it at merge time.
+- Health this cycle: heartbeat 1 (27872), operator_runner 1 (27876), watchdog 1
+  (29264), cargoq UP (ping ok, queued 0, running true); disk 32.9 GB free; RAM
+  1.74 GB free (below the 3 GB threshold).

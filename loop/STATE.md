@@ -75,44 +75,54 @@ corrected, annex C = ORACLE POLICY CHANGE), then docs/SOLVER_COVERAGE_SPEC.md
 
 ## Where we are
 
-> LATEST GROUND TRUTH [operator 2026-09-12T00:13Z / 20:13 local]: 2 RUNNING /
-> 0 landed-this-cycle / 0 unblocked / 0 flipped / 0 dispatched. HEAD `3d1d769`.
-> **DUPLICATE DISPATCH — slots 0 AND 1 are BOTH running FHC-TRIM-EXTRUDE-ENVELOPE.**
-> Slot 1 is the heartbeat's dispatch (00:03:58Z, log "FHC-TRIM-EXTRUDE-ENVELOPE ->
-> slot 1"), on the correct branch `packet/FHC-TRIM-EXTRUDE-ENVELOPE` @ `3d1d769`
-> (=HEAD), worker pid 13864, session `ses_f6d126887ffeHsqfQfurAjdDLj`. Slot 0 is a
-> second, mis-forked copy on a DETACHED HEAD @ `c139afb` (older base), worker pid
-> 35628, session `ses_f6d388643ffed1HjglUgd0U78F` (worker files 23:22:20Z, with an
-> `abandoned-20260911-200244.patch` archive at 00:02:44Z). Both alive (`events`
-> 0.1/1.2 min fresh, `changed=0`, no work yet). The prior operator cycle left 0
-> RUNNING, so this is a heartbeat-vs-prior-cycle double-dispatch; NOT resolved
-> (charter forbids killing live workers) — ESCALATED. Real dispatcher NOT run.
-> Slots 2-7 FINISHED/IDLE landed residue; every tip (c3df084/e6553db/3c2109b/
-> ee97499/713f205/5cf4811) re-verified an ancestor of HEAD by
-> `git merge-base --is-ancestor` — NOTHING landable.
-> `dispatch_ready --dry-run --max-workers=4`: "slots: 8 (2 running, 6 free);
-> dispatched 0; workers now ~2/4" — RG-23/RG-9 clash with a RUNNING row on
-> `truck123d/src/bd_bridge.rs`; FHC-MIRROR-FORM blocked on FHC-TRIM; BD-EMIT-MESH-
-> CACHE behind FHC-MIRROR. No new work to dispatch.
-> Registry re-derived by command: 350 = 254 DONE / 85 READY / 10 BLOCKED / 1
-> SUPERSEDED; none cleanly flippable (BG-AUD-FIX-004 OWNER_BLOCKED,
-> BG-CK-SPLINE-CENSUS owner-CANCELLED, SEM-PCURVE-MASTER-001-FIX SUPERSEDED,
-> DEF-SPINEFRAME-GRAZE re-aimed at -R2, DEF-TESS-ANALYTIC-SEAM r1 superseded by
-> -R2 READY, DEF-SEEDRAY-B human-gated, TOR-C orchestrator-held, MONO-10 owner-
-> gated on R3 mesh, RDEF-M4 M0-adjudication, RDEF-M5 dep M4 BLOCKED). RG-23/RG-9
-> still ANCHOR CHECK FAILED (registry `"packet": ""` = files never authored;
-> authoring out of charter).
+> LATEST GROUND TRUTH [operator 2026-09-12T00:36Z / 20:36 local]: 1 RUNNING
+> (slot 0) / 0 landed-this-cycle / 0 unblocked / 0 flipped / 0 dispatched.
+> HEAD `bc0a7fd` (the 00:13Z operator STATE/log commit; no work moved).
+> **DUPLICATE FHC-TRIM-EXTRUDE-ENVELOPE — STATE CHANGED: slot 1 is now STALLED,
+> slot 0 alive.** Slot 1 (the heartbeat's dispatch 00:03:58Z on the correct branch
+> `packet/FHC-TRIM-EXTRUDE-ENVELOPE` @ `3d1d769`, pid 13864, session
+> `ses_f6d126887ffeHsqfQfurAjdDLj`) has `events.jsonl` frozen at 20:18:10 local
+> (~18 min stale), no cargo/rustc attributed to it, `changed=1` (M
+> `truck123d/src/bd_bridge.rs`) — the dead-shim signature (pid alive, no work).
+> Slot 0 (mis-forked DETACHED HEAD @ `c139afb`, pid 35628, session
+> `ses_f6d388643ffed1HjglUgd0U78F`) is ALIVE and progressing: events 20:27:51
+> local, `changed=1`, currently the cargoq job `test -p truck123d --lib
+> debug_trim_extract_stage` (7 prior exit-101 iterations = active debugging). The
+> heartbeat's 20:34:11 cycle now counts "1 running", i.e. it no longer sees slot 1.
+> **Do NOT reap slot 0** (the 00:13Z escalation named slot 1 the keeper, but that
+> premise is dead — slot 1 is the stalled copy; the 3d78cee precedent reaped a hung
+> slot 1 and kept slot 0). Escalated for the owner/orchestrator to reap slot 1
+> (hung, no commit, no RESULT): kill pid 13864 + its opencode child, then
+> `run_packet.py --reset-only --slot 1` (archives the partial diff first). Real
+> dispatcher NOT run (heartbeat live).
+> Slots 2-7 FINISHED/IDLE landed residue; every tip re-verified an ancestor of HEAD
+> by `git merge-base --is-ancestor` (slot 3 e6553db DONE, slot 4 3c2109b
+> LANDED-WITH-FINDINGS, slot 5 ee97499 DONE, slot 6 713f205 DONE, slot 7 5cf4811
+> LANDED; slot 2 c3df084 residue) — NOTHING landable.
+> `dispatch_ready --dry-run --max-workers=4`: "slots: 8 (1 running, 6 free);
+> slot-assigned packets: 5; dispatched 0; workers now ~1/4" — RG-23/RG-9 ANCHOR
+> CHECK FAILED (registry `"packet": ""`, files never authored; authoring out of
+> charter); FHC-MIRROR-FORM blocked on FHC-TRIM; BD-EMIT-MESH-CACHE behind
+> FHC-MIRROR. No new work to dispatch.
+> Registry re-derived by command (last-wins dedup): 348 unique rows = 252 DONE /
+> 85 READY / 10 BLOCKED / 1 SUPERSEDED; none cleanly flippable (BG-AUD-FIX-004
+> OWNER_BLOCKED, BG-CK-SPLINE-CENSUS owner-cancelled, SEM-PCURVE-MASTER-001-FIX
+> SUPERSEDED, DEF-SPINEFRAME-GRAZE SPEC_GAP->-R2, DEF-TESS-ANALYTIC-SEAM superseded
+> by -R2, DEF-SEEDRAY-B human-gated, TOR-C orchestrator-held, MONO-10 owner-gated
+> on R3 mesh, RDEF-M4 M0-adjudication, RDEF-M5 dep M4). READY rows without a
+> landed marker = exactly {RG-23, RG-9, FHC-TRIM (running), FHC-MIRROR (gated),
+> BD-EMIT-MESH-CACHE (gated)}.
 > Health: heartbeat exactly 1 (27872, `dispatch_heartbeat.ps1`), operator_runner 1
-> (27876), watchdog 1 (29264), overnight driver 1 (24864), cargoq UP (ping ok,
-> queued 0, running true). Disk 30.8 GB free (above the 8 GB floor AND the 15 GB
-> goal); **RAM 2.5 GB free — BELOW the 3 GB threshold** (two workers resident; do
-> not stack a third). Root worktree carries live human-session WIP (M README.md,
-> M loop/LEDGER.jsonl, M loop/cargoq/server.log, untracked benchmarks/ +
+> (27876), watchdog 1 (29264), cargoq UP (ping ok, queued 0, running true). Disk
+> 32.9 GB free (above the 8 GB floor AND the 15 GB goal); **RAM 1.74 GB free —
+> BELOW the 3 GB threshold** (slot 0 + the cargoq spike resident; do not stack a
+> third). Root worktree carries live human-session WIP (M README.md, M
+> loop/LEDGER.jsonl, M loop/cargoq/server.log, untracked benchmarks/ +
 > loop/baselines/ + scratch/) — untouched, reported not actioned.
 > Carried escalation: TWO supervisors (19172 PyManager + 27828 pythoncore) — the
 > duplication class; only ONE overnight driver child, so no double-merge risk.
-> Leaving: 2 RUNNING (the FHC-TRIM duplicate, escalated); HEAD `3d1d769` + this
-> cycle's STATE/log commit.
+> Leaving: 1 RUNNING (slot 0, the duplicate keeper) + 1 STALLED (slot 1, escalated
+> for reaping); HEAD `bc0a7fd` + this cycle's STATE/log commit.
 >
 > NOTE: this cycle replaced the prior collapsed block with a fresh one to keep the
 > volatile section at ~1 block (charter cap ~120 lines). Prior cycles' refreshes are
