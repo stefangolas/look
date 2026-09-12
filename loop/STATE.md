@@ -75,9 +75,9 @@ corrected, annex C = ORACLE POLICY CHANGE), then docs/SOLVER_COVERAGE_SPEC.md
 
 ## Where we are
 
-> LATEST GROUND TRUTH [operator 2026-09-12T11:12Z / 07:12 local]: 0 RUNNING / 0
-> landed-this-cycle / 0 unblocked / 0 flipped / 0 dispatched. HEAD `c9f6a7b`
-> (the 10:49Z operator commit; no packet work moved, all eight slot tips
+> LATEST GROUND TRUTH [operator 2026-09-12T11:35Z / 07:35 local]: 0 RUNNING / 0
+> landed-this-cycle / 0 unblocked / 0 flipped / 0 dispatched. HEAD `38b28a6`
+> (the 11:12Z operator commit; no packet work moved, all eight slot tips
 > re-checked this cycle, registry re-derived).
 > **SLOTS 0+1 FHC-TRIM FINISHED with RESULT status SPEC_GAP - both duplicate runs
 > agree.** Worker commits 33f6269 (slot 0, `packet/FHC-TRIM-EXTRUDE-ENVELOPE-slot0`)
@@ -98,8 +98,8 @@ corrected, annex C = ORACLE POLICY CHANGE), then docs/SOLVER_COVERAGE_SPEC.md
 > `dispatch_ready --dry-run --max-workers=4`: "slots: 8 (0 running, 8 free);
 > slot-assigned packets: 5; dispatched 0; workers now ~0/4" = REAL idle (heartbeat
 > live; real dispatcher NOT run = double-dispatch rule). Blocked reasons: RG-23 /
-> RG-9 ANCHOR CHECK FAILED (packet files still absent - only RG-4 exists in
-> loop/packets/); FHC-MIRROR-FORM -> FHC-TRIM; BD-EMIT-MESH-CACHE -> FHC-MIRROR-FORM;
+> RG-9 ANCHOR CHECK FAILED (their packet .md files are absent from loop/packets/ -
+> missing authoring, not anchor drift); FHC-MIRROR-FORM -> FHC-TRIM; BD-EMIT-MESH-CACHE -> FHC-MIRROR-FORM;
 > FHC-G1..G6 chained behind BD-EMIT-MESH-CACHE.
 > Registry re-derived by command (last-wins dedup): 354 unique rows = 252 DONE /
 > 91 READY / 10 BLOCKED / 1 SUPERSEDED. All 10 BLOCKED rows are deliberate holds
@@ -115,7 +115,7 @@ corrected, annex C = ORACLE POLICY CHANGE), then docs/SOLVER_COVERAGE_SPEC.md
 > (29264), overnight driver 1 (24864); cargoq UP (ping ok, queued 0, running
 > false). TWO supervisors (19172 + 27828) + TWO cargoq/server.py (28544 + 34564) =
 > carried duplication class; only ONE overnight.py child = no double-merge risk.
-> Disk 27.47 GiB free (above the 8 GB floor AND the 15 GB janitor goal); RAM 3.56
+> Disk 27.42 GiB free (above the 8 GB floor AND the 15 GB janitor goal); RAM 3.64
 > GiB free (above the 3 GB floor). No TEMP baseline leaks; no cargo/rustc running.
 > Root worktree carries live human/orchestrator-session WIP (M README.md, M
 > docs/F1_HYPERCAR_GAP_REGISTER.md, M loop/LEDGER.jsonl, M loop/cargoq/server.log;
@@ -126,7 +126,7 @@ corrected, annex C = ORACLE POLICY CHANGE), then docs/SOLVER_COVERAGE_SPEC.md
 > LANDED-WITH-FINDINGS; FRAME-REVOLVE F1 non_z_axis pin; TOR-C flip-or-pin;
 > slot-4/slot-7 wt RESULT residue.
 > Leaving: 0 RUNNING; slots 0/1 FINISHED SPEC_GAP (escalated), slots 2-7 landed
-> residue; HEAD `c9f6a7b` + this cycle's STATE/log commit.
+> residue; HEAD `38b28a6` + this cycle's STATE/log commit.
 >
 > NOTE: this cycle refreshed the prior block in place (timestamp/HEAD/health) to keep
 > the volatile section at ~1 block (charter cap ~120 lines). Prior cycles' refreshes
@@ -181,12 +181,12 @@ corrected, annex C = ORACLE POLICY CHANGE), then docs/SOLVER_COVERAGE_SPEC.md
   queued 0, running false). TWO supervisor.py (19172 PyManager + 27828
   pythoncore) and TWO cargoq/server.py (28544 + 34564) = carried duplication
   class; only ONE overnight.py child = no double-merge risk.
-- Disk 27.47 GiB free (above the 8 GB floor AND the 15 GB janitor goal).
-- RAM 3.56 GiB free (above the 3 GB floor); chrome closed. Do not raise the
+- Disk 27.42 GiB free (above the 8 GB floor AND the 15 GB janitor goal).
+- RAM 3.64 GiB free (above the 3 GB floor); chrome closed. Do not raise the
   worker cap without re-deriving the RAM arithmetic.
-- [operator 2026-09-12T11:12Z] board: 0 RUNNING / 0 landed / 0 unblocked /
+- [operator 2026-09-12T11:35Z] board: 0 RUNNING / 0 landed / 0 unblocked /
   0 flipped / 0 dispatched; registry 354 = 252 D / 91 R / 10 B / 1 S; HEAD
-  c9f6a7b.
+  38b28a6.
 
 [operator 2026-09-09T02:2xZ - volatile refresh after the ADM-L4 operator
 landing. Board now: 0 running / 6 FINISHED residue (L1,L2,L3,F1,CL-005,
