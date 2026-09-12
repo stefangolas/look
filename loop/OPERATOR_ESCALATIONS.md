@@ -1922,3 +1922,35 @@ uncommitted - left for the orchestrator, no dispatch impact.
 - Health this cycle: heartbeat 1 (27872), operator_runner 1 (27876), watchdog 1
   (29264), overnight driver 1 (24864); cargoq UP (ping ok, queued 0, running
   false); disk 26.7 GB free; RAM 2.18 GB free (below threshold).
+
+## 2026-09-12 04:48 UTC - NEW: slot 0 FHC-TRIM-EXTRUDE-ENVELOPE finished with RESULT status SPEC_GAP (not landable) + UPDATED the duplicate is now slot-1-only
+
+- What: slot 0 FINISHED the duplicate FHC-TRIM run with RESULT status
+  **SPEC_GAP** (worker commit 33f6269 "truck123d: trim-extrude envelope
+  extension", preserved on branch `packet/FHC-TRIM-EXTRUDE-ENVELOPE-slot0`; NOT
+  an ancestor of HEAD; the overnight driver archived
+  `loop/results/FHC-TRIM-EXTRUDE-ENVELOPE.PENDING.RESULT.json` and logged "slot 0:
+  FHC-TRIM-EXTRUDE-ENVELOPE status='spec_gap' ... LEFT FOR MORNING (judgment
+  required)" at 00:39 local). The RESULT's spec_gap: the envelope extension admits
+  the shape exactly, but the exact planar fan cap carries a degenerate normal cone
+  at the loop centroid, so the landed RDEF-M2 tangential sandwich admission
+  refuses TYPED `SingularParametrization` (the booked FHC-EX-B degenerate-cap
+  pair class). f1/rear_wing + f1/steering_rack GREEN; suspension_front/rear
+  BLOCKED at composition.
+- Why the operator did NOT land it: charter step 2 lands only RESULT status DONE
+  with green scoped checks; SPEC_GAP is explicitly a do-not-land/escalate class.
+  The worker's own note also records `fmt --check`/`clippy -D warnings` failures,
+  but only on PRE-EXISTING drift outside the write set.
+- Action needed (human/orchestrator): adjudicate the SPEC_GAP - decide whether the
+  degenerate-fan-cap composition is in scope for FHC-TRIM or is a rebooking. The
+  work is preserved on `packet/FHC-TRIM-EXTRUDE-ENVELOPE-slot0` and the RESULT at
+  `loop/results/FHC-TRIM-EXTRUDE-ENVELOPE.PENDING.RESULT.json`.
+- UPDATED duplicate: the FHC-TRIM duplicate is now SLOT-1-ONLY. Slot 1 (branch
+  `packet/FHC-TRIM-EXTRUDE-ENVELOPE` @ 3d1d769=base, cmd pid 13864, opencode
+  35128) is the sole live worker, ACTIVE (events ~4 min fresh, `M
+  truck123d/src/bd_bridge.rs`, no commit). The 04:24Z "reap slot 0" recommendation
+  is moot (slot 0 finished); do NOT apply it to live slot 1. If slot 1 also
+  returns SPEC_GAP, the row stays READY and needs an authoring/rebooking decision.
+- Health this cycle: heartbeat 1 (27872), operator_runner 1 (27876), watchdog 1
+  (29264), overnight driver 1 (24864); cargoq UP (ping ok, queued 0, running
+  false); disk 28.15 GB free; RAM 3.77 GB free (recovered above threshold).

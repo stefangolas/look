@@ -6647,3 +6647,77 @@ human docs commit) since the 04:00Z cycle.
 Leaving: 1 RUNNING + 1 STALLED (duplicate FHC-TRIM, escalated); HEAD `edaa9fb` +
 this cycle's STATE/log commit; heartbeat 1; operator_runner 1; watchdog 1;
 cargoq UP; disk 26.7 GiB; RAM 2.18 GiB.
+
+## 2026-09-12 04:48 UTC (operator cycle)
+
+Board at start: 1 RUNNING (slot 1) + 1 FINISHED (slot 0), BOTH
+FHC-TRIM-EXTRUDE-ENVELOPE; slots 2-7 FINISHED/IDLE landed residue. HEAD
+`c223167` (human/orchestrator: gap-register packets G1-G6 on the docket, chained
+behind BD-EMIT-MESH-CACHE).
+
+Health sweep:
+- slot_status: slot 0 FINISHED with RESULT status **SPEC_GAP** (git=HEAD@33f6269,
+  changed=0, events 7.2 min); slot 1 RUNNING (cmd pid 13864, opencode 35128,
+  events 4.2 min fresh, changed=1 `M truck123d/src/bd_bridge.rs`, git=
+  packet/FHC-TRIM-EXTRUDE-ENVELOPE@3d1d769 =base); slot 2 IDLE (TTC-RECENSUS-F1-R3
+  landed residue); slots 3-7 FINISHED landed residue.
+- heartbeat exactly 1 (27872, anchored `-File dispatch_heartbeat.ps1`; the extra
+  regex match is this shell's own query). operator_runner 1 (27876), watchdog 1
+  (29264), overnight driver 1 (24864). cargoq UP (ping ok, queued 0, running
+  false). Zero cargo/rustc processes at scan.
+- Disk 28.15 GiB free (above the 8 GB floor AND the 15 GB goal). RAM 3.77 GiB
+  free (RECOVERED above the 3 GB threshold; the duplicate now has ONE live
+  worker). TWO supervisors (19172 + 27828, carried duplication class; only ONE
+  overnight.py child = no double-merge risk).
+
+Actions:
+- Landing: NOTHING landable. Slot 0's FHC-TRIM RESULT status is **SPEC_GAP**
+  (commit 33f6269 preserved on branch `packet/FHC-TRIM-EXTRUDE-ENVELOPE-slot0`,
+  NOT an ancestor of HEAD; driver archived
+  loop/results/FHC-TRIM-EXTRUDE-ENVELOPE.PENDING.RESULT.json and LEFT FOR MORNING
+  at 00:39 local) -> charter step 2 forbids landing a non-DONE RESULT; ESCALATED
+  (the booked FHC-EX-B degenerate planar fan cap -> TYPED SingularParametrization).
+  Slots 2-7 tips all re-verified ancestors of HEAD by `git merge-base
+  --is-ancestor` (slot 2 c3df084 IDLE - row TTC-RECENSUS-F1-R3 DONE; slot 3
+  e6553db DONE; slot 4 3c2109b LANDED-WITH-FINDINGS; slot 5 ee97499 DONE; slot 6
+  713f205 DONE; slot 7 5cf4811 LANDED).
+- Unblock: nothing. Slot 1 is ACTIVE (events 4.2 min fresh; no cargo running but
+  editing probes) -> do NOT touch. Slot 2 IDLE is landed residue (row DONE), not
+  stuck. No QUESTION.md, no APIError 402, no dead shim.
+- Registry hygiene: re-derived by command (last-wins dedup + case-folded landed
+  marker): 354 unique rows = 252 DONE / 91 READY / 10 BLOCKED / 1 SUPERSEDED.
+  READY-without-landed-marker = 11 {RG-23, RG-9 (MISSING packet files -
+  authoring), FHC-TRIM (running), FHC-MIRROR-FORM, BD-EMIT-MESH-CACHE, FHC-G1..G6
+  (dependency-chained)}. BLOCKED-with-all-needs-landed = 10, all deliberate holds
+  (BG-AUD-FIX-004 OWNER_BLOCKED; BG-CK-SPLINE-CENSUS booking gate 4;
+  SEM-PCURVE-MASTER-001-FIX SUPERSEDED; DEF-SPINEFRAME-GRAZE SPEC_GAP;
+  DEF-TESS-ANALYTIC-SEAM superseded by -R2; DEF-SEEDRAY-B human-gated; TOR-C
+  orchestrator-held; MONO-10 owner R3-mesh; RDEF-M4 M0-adjudication; RDEF-M5
+  owner inputs) -> NOTHING flipped. No anchor/lint-fixable READY row exists
+  (RG-23/RG-9 fail on missing files, not counts).
+- Dispatch: `dispatch_ready.py --dry-run --max-workers=4`: "slots: 8 (1 running,
+  7 free); slot-assigned packets: 5; dispatched 0; workers now ~1/4" = REAL idle.
+  Real dispatcher NOT run (heartbeat live = double-dispatch rule). The G1-G6
+  chain is correctly gated behind BD-EMIT-MESH-CACHE.
+- STATE: replaced the volatile ground-truth block with a fresh [operator
+  2026-09-12T04:48Z] block (single block; stable traps untouched).
+- This entry.
+
+Escalations: NEW - slot 0 FHC-TRIM SPEC_GAP (degenerate planar fan cap ->
+TYPED SingularParametrization) needs geometry/rebooking adjudication. UPDATED -
+the duplicate FHC-TRIM is now SLOT-1-ONLY (slot 0 finished SPEC_GAP; the 04:24Z
+reap-slot-0 call is moot and must not be applied to live slot 1). Carried
+unchanged: RG-23/RG-9 missing packet files; RDEF-M4 M0-adjudication; MONO-10
+owner R3-mesh decision; FRAME-REVOLVE F1 non_z_axis pin; duplicate supervisors +
+lagging cargoq restart guard; TOR-C flip-or-pin; slot-4/7 wt RESULT residue;
+CL-005/CL-006 READY-but-landed bookkeeping.
+
+Worktree note (reported, not actioned): the root tree carries live
+human/orchestrator-session WIP (M README.md, M docs/F1_HYPERCAR_GAP_REGISTER.md,
+M loop/LEDGER.jsonl, M loop/cargoq/server.log, untracked benchmarks/ +
+loop/baselines/ + scratch/ + mobius.step); orchestrator session LIVE (opencode
+11240). HEAD moved to `c223167` (G1-G6 packets) since the 04:24Z cycle.
+
+Leaving: 1 RUNNING (slot 1 FHC-TRIM) + slot 0 FINISHED SPEC_GAP (escalated);
+HEAD `c223167` + this cycle's STATE/log commit; heartbeat 1; operator_runner 1;
+watchdog 1; cargoq UP; disk 28.15 GiB; RAM 3.77 GiB.
