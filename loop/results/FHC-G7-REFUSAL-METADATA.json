@@ -14,23 +14,6 @@
     }
   },
   "spot_checks": {
-    "green": {
-      "schema": "ttc_door_run.v2",
-      "door_version": "3",
-      "engine": "truck",
-      "ok": true,
-      "entry": "make_fairing",
-      "module": "lib.falcon_common",
-      "type": "Compound",
-      "build_seconds": 0.02,
-      "facts": {
-        "solid_count": 4,
-        "volume": 11027439648.490429,
-        "bbox": [[-2761.773335238123, -2761.773335238123, 56850.0], [2761.773335238123, 2761.773335238123, 70000.0]],
-        "diag": 15295.150723084047
-      },
-      "stl": {"path": "fairing.stl", "triangles": 11032}
-    },
     "typed_refusal": {
       "schema": "ttc_door_run.v2",
       "door_version": "3",
