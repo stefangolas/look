@@ -75,9 +75,9 @@ corrected, annex C = ORACLE POLICY CHANGE), then docs/SOLVER_COVERAGE_SPEC.md
 
 ## Where we are
 
-> LATEST GROUND TRUTH [operator 2026-09-12T12:21Z / 08:21 local]: 0 RUNNING / 0
-> landed-this-cycle / 0 unblocked / 0 flipped / 0 dispatched. HEAD `684973e`
-> (the 11:58Z operator commit; no packet work moved, all eight slot tips
+> LATEST GROUND TRUTH [operator 2026-09-12T12:43Z / 08:43 local]: 0 RUNNING / 0
+> landed-this-cycle / 0 unblocked / 0 flipped / 0 dispatched. HEAD `d2f59ba`
+> (the 12:21Z operator commit; no packet work moved, all eight slot tips
 > re-checked this cycle, registry re-derived).
 > **SLOTS 0+1 FHC-TRIM FINISHED with RESULT status SPEC_GAP - both duplicate runs
 > agree.** Worker commits 33f6269 (slot 0, `packet/FHC-TRIM-EXTRUDE-ENVELOPE-slot0`)
@@ -115,7 +115,7 @@ corrected, annex C = ORACLE POLICY CHANGE), then docs/SOLVER_COVERAGE_SPEC.md
 > (29264), overnight driver 1 (24864); cargoq UP (ping ok, queued 0, running
 > false). TWO supervisors (19172 + 27828) + TWO cargoq/server.py (28544 + 34564) =
 > carried duplication class; only ONE overnight.py child = no double-merge risk.
-> Disk 27.44 GiB free (above the 8 GB floor AND the 15 GB janitor goal); RAM 3.75
+> Disk 24.35 GiB free (above the 8 GB floor AND the 15 GB janitor goal); RAM 3.77
 > GiB free (above the 3 GB floor). No TEMP baseline leaks; no cargo/rustc running.
 > Root worktree carries live human/orchestrator-session WIP (M README.md, M
 > docs/F1_HYPERCAR_GAP_REGISTER.md, M loop/LEDGER.jsonl, M loop/cargoq/server.log;
@@ -126,7 +126,7 @@ corrected, annex C = ORACLE POLICY CHANGE), then docs/SOLVER_COVERAGE_SPEC.md
 > LANDED-WITH-FINDINGS; FRAME-REVOLVE F1 non_z_axis pin; TOR-C flip-or-pin;
 > slot-4/slot-7 wt RESULT residue.
 > Leaving: 0 RUNNING; slots 0/1 FINISHED SPEC_GAP (escalated), slots 2-7 landed
-> residue; HEAD `684973e` + this cycle's STATE/log commit.
+> residue; HEAD `d2f59ba` + this cycle's STATE/log commit.
 >
 > NOTE: this cycle refreshed the prior block in place (timestamp/HEAD/health) to keep
 > the volatile section at ~1 block (charter cap ~120 lines). Prior cycles' refreshes
@@ -181,12 +181,12 @@ corrected, annex C = ORACLE POLICY CHANGE), then docs/SOLVER_COVERAGE_SPEC.md
   queued 0, running false). TWO supervisor.py (19172 PyManager + 27828
   pythoncore) and TWO cargoq/server.py (28544 + 34564) = carried duplication
   class; only ONE overnight.py child = no double-merge risk.
-- Disk 27.44 GiB free (above the 8 GB floor AND the 15 GB janitor goal).
-- RAM 3.75 GiB free (above the 3 GB floor); chrome closed. Do not raise the
+- Disk 24.35 GiB free (above the 8 GB floor AND the 15 GB janitor goal).
+- RAM 3.77 GiB free (above the 3 GB floor); chrome closed. Do not raise the
   worker cap without re-deriving the RAM arithmetic.
-- [operator 2026-09-12T12:21Z] board: 0 RUNNING / 0 landed / 0 unblocked /
+- [operator 2026-09-12T12:43Z] board: 0 RUNNING / 0 landed / 0 unblocked /
   0 flipped / 0 dispatched; registry 354 = 252 D / 91 R / 10 B / 1 S; HEAD
-  684973e.
+  d2f59ba.
 
 [operator 2026-09-09T02:2xZ - volatile refresh after the ADM-L4 operator
 landing. Board now: 0 running / 6 FINISHED residue (L1,L2,L3,F1,CL-005,
