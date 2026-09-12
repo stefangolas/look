@@ -2011,3 +2011,24 @@ uncommitted - left for the orchestrator, no dispatch impact.
   duplicate cargoq/server.py + NEW duplicate http.server:8780 (3260 + 14452);
   F1-AUTHORING-ARMS LANDED-WITH-FINDINGS; FRAME-REVOLVE F1 non_z_axis pin;
   TOR-C flip-or-pin; slot-4/slot-7 wt RESULT residue).
+
+## 2026-09-12 14:40 UTC - LOW RAM persists and is now crashing the running worker's tests (carried escalation, worsened)
+
+- What: FreePhysicalMemory 0.57 GiB of 15.71 GB total (was 1.21-1.3 GiB earlier
+  today), still far below the 3 GB floor. The slot-0 BD-EMIT-MESH-CACHE worker is
+  the only loop consumer; the rest is the owner's desktop (chrome + Teams + Dropbox
+  + resident opencode).
+- Why it matters: the RAM-zone signature is now material in the cargoq stats -
+  `test -p truck123d --lib --locked` exited 3221225781 (0xC0000409) twice this
+  window, and repeated `clippy -p truck123d --all-targets` exit 101s. The worker
+  is still alive and progressing (do not touch), but a cold warm-build spike is
+  the 4-8 GB class and could kill it mid-run.
+- Action needed (human): free RAM (close chrome/Teams/Dropbox) before the next
+  dispatch, or confirm the dispatcher should refuse below a RAM floor. If the
+  slot-0 worker dies on 0xC0000409, clean `loop/slots/0/target` +
+  `loop/slots/0/wt/target`, then let the heartbeat re-dispatch.
+- Do NOT raise the worker cap. All other carried items unchanged (RG-23/RG-9
+  missing packet files; duplicate supervisors 19172+27828 + duplicate
+  cargoq/server.py 28544+34564; F1-AUTHORING-ARMS LANDED-WITH-FINDINGS;
+  FRAME-REVOLVE F1 non_z_axis pin; TOR-C flip-or-pin; slot-4/slot-7 wt RESULT
+  residue).

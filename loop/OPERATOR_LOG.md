@@ -8196,3 +8196,67 @@ slot-4/slot-7 wt RESULT residue.
 Leaving: 1 RUNNING (BD-EMIT-MESH-CACHE slot 0); HEAD 9c6cd0f + this cycle's
 STATE/log commit; heartbeat 1; operator_runner 1; watchdog 1; cargoq UP; disk
 21.89 GiB; RAM 1.21 GB (below floor).
+
+## 2026-09-12 14:40 UTC (operator)
+
+Board at start: 1 RUNNING (BD-EMIT-MESH-CACHE slot 0), slots 1-7 FINISHED/IDLE
+residue, 0 landable. Program: the FHC chain (BD-EMIT -> G3 -> G2 -> G4 -> G5 ->
+G6 -> G1) + the SOLVER-COVERAGE spine.
+
+Health sweep (step 1):
+- `slot_status.py`: slot 0 RUNNING BD-EMIT-MESH-CACHE (cmd pid 33244, events
+  1.3 min fresh, changed=1, wt RESULT.json present); slots 1-7 FINISHED/IDLE
+  (FHC-TRIM-EXTRUDE-ENVELOPE, TTC-RECENSUS-F1-R3, SOLVER-SURVEY-C,
+  F1-AUTHORING-ARMS, CL-006, CL-005, FRAME-REVOLVE).
+- cargoq ping OK (queued 0, running true = a truck123d release build).
+- Heartbeat exactly 1 (27872); operator_runner 1 (27876); watchdog 1 (29264);
+  overnight driver 1 (24864). (A first count of 2 was my own query process
+  matching its own command-line string - re-derived with `dispatch_heartbeat\.ps1`
+  anchored: exactly 1.)
+- Disk 21.04 GiB free (above 8 GB floor and 15 GB janitor goal). RAM 0.57 GB
+  free - BELOW the 3 GB floor (carried; janitor reclaims LSPs at <4 GB but does
+  not refuse dispatch).
+
+Landing (step 2): NOTHING landable. All slot tips 1-7 re-verified ancestors of
+integration/kernel-bg via `merge-base --is-ancestor` (4a1dd49, c3df084, e6553db,
+3c2109b, ee97499, 713f205, 5cf4811 all TRUE). Slot 1 RESULT status SPEC_GAP (but
+the row is owner-adjudicated DONE/merged); slot 4 LANDED-WITH-FINDINGS; slot 7
+LANDED. Slot 2 is residue of the already-DONE/LANDED TTC-RECENSUS-F1-R3
+(de6bfc6) with no RESULT in the slot. None operator-landable.
+
+Unblock (step 3): none. Slot 0 is alive and making progress (do not touch); no
+slot IDLE/DEAD >15 min holds unlanded work; no QUESTION.
+
+Registry hygiene (step 4): last-wins dedup = 354 unique = 253 DONE / 90 READY /
+10 BLOCKED / 1 SUPERSEDED (unchanged). All 10 BLOCKED re-read: NONE
+flip-eligible (BG-CK-SPLINE-CENSUS cancelled; TOR-C pinned on missing packet;
+SEM-PCURVE-MASTER-001-FIX superseded; MONO-10 owner R3-mesh; RDEF-M4/M5 owner;
+DEF-SPINEFRAME-GRAZE re-aimed at -R2; DEF-SEEDRAY-B needs DEF-SEEDRAY-A not DONE;
+BG-AUD-FIX-004 OWNER_BLOCKED; DEF-TESS-ANALYTIC-SEAM superseded by -R2).
+READY-without-landed-marker = FHC chain (needs-gated) + RG-23/RG-9 (packet .md
+files still ABSENT from loop/packets/ - missing authoring, not drift). Ran
+`gen_packet.py --check loop/packets/FHC-G3-DATA-ROW-ATTRIBUTES.md` (next in
+line): A1=1 A2=1 A3=1 A4=8 all ok, exit 0 - no anchor re-measure needed yet.
+
+Dispatch (step 5): `dispatch_ready --dry-run --max-workers=4` -> "slots: 8 (1
+running, 7 free); RG-23/RG-9 write-set clash with RUNNING row (bd_bridge.rs);
+FHC chain needs-gated; dispatched 0; workers now ~1/4". REAL idle. Live
+dispatcher NOT run: the heartbeat runs `dispatch_ready --max-workers=3` every
+600s (live double-dispatch rule) and the result would be 0 anyway.
+
+STATE (step 6): refreshed the volatile LATEST GROUND TRUTH block ([operator
+2026-09-12T14:40Z], HEAD fd9b9e8, board 1 RUNNING / 0 landed / 0 flipped /
+0 dispatched, registry 354=253/90/10/1, RAM 0.57 GB) and the "State of the
+machine, as left" lines. Stable traps/history untouched.
+
+Escalations: NO NEW item this cycle. The LOW RAM escalation carries (RAM 0.57 GB,
+still below floor, now with the running worker's `test -p truck123d --lib` having
+exited 0xC0000409 twice in the cargoq stats). Carried unchanged: RG-23/RG-9
+missing packet files; duplicate supervisors (19172+27828) + duplicate
+cargoq/server.py (28544+34564); F1-AUTHORING-ARMS LANDED-WITH-FINDINGS;
+FRAME-REVOLVE F1 non_z_axis pin; TOR-C flip-or-pin; slot-4/slot-7 wt RESULT
+residue.
+
+Leaving: 1 RUNNING (BD-EMIT-MESH-CACHE slot 0); HEAD fd9b9e8 + this cycle's
+STATE/log commit; heartbeat 1; operator_runner 1; watchdog 1; overnight 1;
+cargoq UP; disk ~19-21 GiB; RAM 0.57 GB (below floor).
