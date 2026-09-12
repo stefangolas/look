@@ -53,7 +53,7 @@ use truck_certified::construct::patches::{PatchParent, TensorBernsteinPatch};
 use truck_certified::kernel::patch::IBox2;
 
 use crate::facade::{BooleanPairVerdict, CarrierClass, SweptBooleanEvent};
-use crate::glb_emit::{GlbMesh, GlbNodePayload, SrgbColor, emit_glb};
+use crate::glb_emit::{GlbMesh, SrgbColor};
 use crate::marshal::{ExceptionClass, Marshaled, MarshaledPayload};
 use crate::python;
 use crate::python::binding::{EdgeSelectorRow, FilletBaseRow, FilletRefusal, FilletRow};
@@ -5371,10 +5371,62 @@ fn sweep_segments(radius: f64, deflection: Option<f64>) -> usize {
     }
 }
 
-/// Generates the world-space triangle soup of every part in the tree.
+/// The memoized tessellation cache of one emit pass: the canonical solid spec
+/// bytes plus the requested deflection maps to the shared local triangle soup.
+/// It is a pure memo (lookup only); every artifact is assembled in fixed tree
+/// order, so hash iteration never reaches an output.
+#[derive(Default)]
+struct MeshCache {
+    meshes: std::collections::HashMap<MeshKey, std::rc::Rc<Vec<Triangle>>>,
+}
+
+/// The exact content key of one cached local mesh: the canonical serialized
+/// solid spec and the deflection bits. The kernel's carriers are deterministic
+/// canonical specs, so the key is an exact content identity -- never a fuzzy
+/// geometric match and never coordinates-as-identity.
+#[derive(PartialEq, Eq, Hash)]
+struct MeshKey {
+    spec: Vec<u8>,
+    deflection: Option<u64>,
+}
+
+/// The canonical content bytes of one solid spec (the cache key's spec
+/// component).
+fn solid_spec_key(solid: &SolidSpec) -> Result<Vec<u8>, Refusal> {
+    serde_json::to_vec(solid).map_err(|_| Refusal::Empty)
+}
+
+/// The shared local mesh of one solid: tessellate once per unique
+/// `(spec, deflection)` and reuse the same allocation on every later copy.
+fn cached_solid_mesh(
+    cache: &mut MeshCache,
+    solid: &SolidSpec,
+    deflection: Option<f64>,
+) -> Result<std::rc::Rc<Vec<Triangle>>, Refusal> {
+    let key = MeshKey {
+        spec: solid_spec_key(solid)?,
+        deflection: deflection.map(f64::to_bits),
+    };
+    if let Some(mesh) = cache.meshes.get(&key) {
+        return Ok(std::rc::Rc::clone(mesh));
+    }
+    let mesh = std::rc::Rc::new(solid_mesh(solid, deflection)?);
+    cache.meshes.insert(key, std::rc::Rc::clone(&mesh));
+    Ok(mesh)
+}
+
+/// Generates the world-space triangle soup of every part in the tree. The
+/// `None`-deflection path (the landed fixed-resolution fingerprint rule)
+/// bypasses the cache entirely and expands the bit-identical mesh; a requested
+/// deflection memoizes one tessellation per unique solid and reuses it.
 fn tree_mesh(root: &TreeNode, deflection: Option<f64>) -> Result<Vec<Triangle>, Refusal> {
     let mut triangles = Vec::new();
-    append_node_mesh(root, &mut triangles, deflection)?;
+    if deflection.is_none() {
+        append_node_mesh(root, &mut triangles, deflection)?;
+        return Ok(triangles);
+    }
+    let mut cache = MeshCache::default();
+    append_node_mesh_cached(root, &mut triangles, deflection, &mut cache)?;
     Ok(triangles)
 }
 
@@ -5427,6 +5479,37 @@ fn append_node_mesh(
         TreeNode::Group { group, .. } => {
             for child in group {
                 append_node_mesh(child, out, deflection)?;
+            }
+            Ok(())
+        }
+    }
+}
+
+/// The cache-aware sibling of [`append_node_mesh`]: identical parts share one
+/// tessellation, expanded into world space per part. The tree order (and so
+/// the output soup order) is unchanged.
+fn append_node_mesh_cached(
+    node: &TreeNode,
+    out: &mut Vec<Triangle>,
+    deflection: Option<f64>,
+    cache: &mut MeshCache,
+) -> Result<(), Refusal> {
+    match node {
+        TreeNode::Part { part } => {
+            let local = cached_solid_mesh(cache, &part.solid, deflection)?;
+            out.extend(place_part_triangles(part, local.as_slice()));
+            Ok(())
+        }
+        TreeNode::Boolean { boolean } => {
+            dispatch_boolean(boolean)?;
+            append_node_mesh_cached(&boolean.a, out, deflection, cache)
+        }
+        TreeNode::Fillet { fillet } => {
+            append_node_mesh_cached(&fillet.base, out, deflection, cache)
+        }
+        TreeNode::Group { group, .. } => {
+            for child in group {
+                append_node_mesh_cached(child, out, deflection, cache)?;
             }
             Ok(())
         }
@@ -6346,45 +6429,102 @@ pub fn write_tree_stl(
 // GLB emission (the render artifact: indexed meshes + per-part script colors)
 // ---------------------------------------------------------------------------
 
-/// One per-part mesh collected from the tree: the part's recorded label and
-/// color (client metadata, carried verbatim) plus its placed world triangles.
+/// One per-part entry collected from the tree: the part's recorded label and
+/// color (client metadata, carried verbatim), its shared LOCAL triangle soup
+/// (the same allocation for identical parts), the exact cache key, and the
+/// per-node local transform that places the local mesh in world space.
 struct LeafMesh {
     label: Option<String>,
     color: Option<String>,
-    triangles: Vec<Triangle>,
+    local: std::rc::Rc<Vec<Triangle>>,
+    spec_key: Vec<u8>,
+    deflection: Option<u64>,
+    matrix: [f32; 16],
 }
 
-/// Collects every placed part's triangles, label and color, mirroring
-/// [`append_node_mesh`]'s placement transforms but keeping one entry per
-/// part (the GLB node granularity).
+/// Collects every placed part's local mesh, label, color and node transform,
+/// mirroring [`append_node_mesh`]'s placement composition (`translate(t) ∘
+/// mirror ∘ R`) but keeping one entry per part (the GLB node granularity) and
+/// sharing the tessellation across identical solids.
 fn collect_node_payloads(
     node: &TreeNode,
     deflection: Option<f64>,
+    cache: &mut MeshCache,
     out: &mut Vec<LeafMesh>,
 ) -> Result<(), Refusal> {
     match node {
         TreeNode::Part { part } => {
-            let local = solid_mesh(&part.solid, deflection)?;
-            let placed = place_part_triangles(part, &local);
+            let spec_key = solid_spec_key(&part.solid)?;
+            let local = cached_solid_mesh(cache, &part.solid, deflection)?;
             out.push(LeafMesh {
                 label: part.label.clone(),
                 color: part.color.clone(),
-                triangles: placed,
+                local,
+                spec_key,
+                deflection: deflection.map(f64::to_bits),
+                matrix: part_node_matrix(part),
             });
             Ok(())
         }
         TreeNode::Boolean { boolean } => {
             dispatch_boolean(boolean)?;
-            collect_node_payloads(&boolean.a, deflection, out)
+            collect_node_payloads(&boolean.a, deflection, cache, out)
         }
-        TreeNode::Fillet { fillet } => collect_node_payloads(&fillet.base, deflection, out),
+        TreeNode::Fillet { fillet } => collect_node_payloads(&fillet.base, deflection, cache, out),
         TreeNode::Group { group, .. } => {
             for child in group {
-                collect_node_payloads(child, deflection, out)?;
+                collect_node_payloads(child, deflection, cache, out)?;
             }
             Ok(())
         }
     }
+}
+
+/// The per-node local transform of one placed part, as the column-major 4x4
+/// matrix glTF stores. The composition is `world = M R local + t`, exactly the
+/// placement [`place_part_triangles`] bakes into world-space vertices:
+/// `translate(t) ∘ mirror ∘ R`. Keeping it on the node is what lets identical
+/// parts share one accessor while each instance keeps its own placement.
+fn part_node_matrix(part: &PartSpec) -> [f32; 16] {
+    let (r00, r10, r20, r01, r11, r21, r02, r12, r22) = match part.rotation {
+        Some(frame) => {
+            let [r00, r10, r20] = frame.x_dir;
+            let [r01, r11, r21] = frame.y_dir;
+            let [r02, r12, r22] = frame.z_dir;
+            (r00, r10, r20, r01, r11, r21, r02, r12, r22)
+        }
+        None => {
+            let angle = part.rz.to_radians();
+            let (sin, cos) = angle.sin_cos();
+            (cos, sin, 0.0, -sin, cos, 0.0, 0.0, 0.0, 1.0)
+        }
+    };
+    let (mx, my, mz) = match part.mirror.as_deref() {
+        Some("x") => (-1.0, 1.0, 1.0),
+        Some("z") => (1.0, 1.0, -1.0),
+        Some(_) => (1.0, -1.0, 1.0),
+        None => (1.0, 1.0, 1.0),
+    };
+    // A = M R (M diagonal, so row i scales by m_i); column-major storage with
+    // the recorded origin as the translation column.
+    [
+        (mx * r00) as f32,
+        (my * r10) as f32,
+        (mz * r20) as f32,
+        0.0,
+        (mx * r01) as f32,
+        (my * r11) as f32,
+        (mz * r21) as f32,
+        0.0,
+        (mx * r02) as f32,
+        (my * r12) as f32,
+        (mz * r22) as f32,
+        0.0,
+        part.x as f32,
+        part.y as f32,
+        part.z as f32,
+        1.0,
+    ]
 }
 
 /// Converts a triangle soup into an indexed mesh: bitwise-identical vertices
@@ -6459,47 +6599,314 @@ fn parse_client_color(recorded: &str) -> SrgbColor {
 /// Writes the tree as a colored indexed GLB at `path`, one node per placed
 /// part, returning `(parts, triangles)`. The certification artifact stays the
 /// STL path; this is the render artifact (colors from the recorded client
-/// metadata, indexed geometry at the requested deflection).
+/// metadata, indexed geometry at the requested deflection). Identical
+/// `(spec, deflection, color)` parts share one accessor/buffer and one mesh;
+/// each node keeps its own label, color and local transform.
 fn write_tree_glb(
     root: &TreeNode,
     path: &str,
     deflection: Option<f64>,
 ) -> Result<(u64, u64), Refusal> {
+    let mut cache = MeshCache::default();
     let mut leaves = Vec::new();
-    collect_node_payloads(root, deflection, &mut leaves)?;
+    collect_node_payloads(root, deflection, &mut cache, &mut leaves)?;
     if leaves.is_empty() {
         return Err(Refusal::Empty);
     }
-    let mut payloads = Vec::with_capacity(leaves.len());
+    let (parts, triangles, bytes) = emit_shared_glb(&leaves)?;
+    std::fs::write(path, bytes).map_err(|_| Refusal::Empty)?;
+    Ok((parts, triangles))
+}
+
+/// The neutral steel-gray fallback for a part with no recorded color.
+fn default_part_color() -> SrgbColor {
+    SrgbColor::new(0.62, 0.65, 0.70, 1.0)
+}
+
+/// The GLB container header magic (`"glTF"`), format version and chunk types
+/// (the glTF 2.0 binary layout the sibling `glb_emit` writer emits).
+const GLB_MAGIC: u32 = 0x4654_6c67;
+const GLB_VERSION: u32 = 2;
+const CHUNK_JSON: u32 = 0x4e4f_534a;
+const CHUNK_BIN: u32 = 0x004e_4942;
+const COMPONENT_TYPE_FLOAT: u16 = 5126;
+const COMPONENT_TYPE_UNSIGNED_INT: u16 = 5125;
+const TARGET_ARRAY_BUFFER: u16 = 34962;
+const TARGET_ELEMENT_ARRAY_BUFFER: u16 = 34963;
+const GLB_MODE_TRIANGLES: u16 = 4;
+const GLB_METALLIC: f64 = 1.0;
+const GLB_ROUGHNESS: f64 = 0.5;
+const GLB_SRGB_CUTOFF: f64 = 0.04045;
+
+/// The GLB dedup key of one shared mesh: canonical spec bytes, deflection bits
+/// and the parsed color's channel bits.
+type GlbMeshKey = (Vec<u8>, Option<u64>, [u32; 4]);
+
+/// Assembles the shared-accessor GLB: one POSITION+index accessor pair per
+/// unique `(spec, deflection, color)`, one mesh per unique triple, one node
+/// per non-empty part carrying its own transform. Nodes are built in fixed
+/// tree order and the dedup maps are lookups only, so no hash ordering can
+/// reach the bytes.
+fn emit_shared_glb(leaves: &[LeafMesh]) -> Result<(u64, u64, Vec<u8>), Refusal> {
+    let mut binary: Vec<u8> = Vec::new();
+    let mut buffer_views: Vec<serde_json::Value> = Vec::new();
+    let mut accessors: Vec<serde_json::Value> = Vec::new();
+    let mut meshes: Vec<serde_json::Value> = Vec::new();
+    let mut materials: Vec<serde_json::Value> = Vec::new();
+    let mut node_values: Vec<serde_json::Value> = Vec::new();
+    let mut mesh_cache: std::collections::HashMap<GlbMeshKey, u32> =
+        std::collections::HashMap::new();
+    let mut material_cache: std::collections::HashMap<[u32; 4], u32> =
+        std::collections::HashMap::new();
     let mut total_triangles = 0_u64;
+
     for (index, leaf) in leaves.iter().enumerate() {
-        if leaf.triangles.is_empty() {
+        if leaf.local.is_empty() {
             continue;
         }
-        let mesh = triangles_to_glb_mesh(&leaf.triangles);
-        total_triangles += mesh.indices.len() as u64 / 3;
         let color = leaf
             .color
             .as_deref()
             .map(parse_client_color)
-            .unwrap_or(SrgbColor::new(0.62, 0.65, 0.70, 1.0));
+            .unwrap_or_else(default_part_color);
+        let color_bits = [
+            color.r.to_bits(),
+            color.g.to_bits(),
+            color.b.to_bits(),
+            color.a.to_bits(),
+        ];
+        let material_index = match material_cache.get(&color_bits) {
+            Some(index) => *index,
+            None => {
+                let index = glb_len_u32_checked(materials.len())?;
+                materials.push(glb_material(color));
+                material_cache.insert(color_bits, index);
+                index
+            }
+        };
+        let mesh_key = (leaf.spec_key.clone(), leaf.deflection, color_bits);
+        let mesh_index = match mesh_cache.get(&mesh_key) {
+            Some(index) => *index,
+            None => {
+                let mesh = triangles_to_glb_mesh(leaf.local.as_slice());
+                let (position_accessor, index_accessor) =
+                    append_glb_geometry(&mut binary, &mut buffer_views, &mut accessors, &mesh)?;
+                let index = glb_len_u32_checked(meshes.len())?;
+                meshes.push(serde_json::json!({
+                    "primitives": [{
+                        "attributes": { "POSITION": position_accessor },
+                        "indices": index_accessor,
+                        "material": material_index,
+                        "mode": GLB_MODE_TRIANGLES,
+                    }]
+                }));
+                mesh_cache.insert(mesh_key, index);
+                index
+            }
+        };
+        total_triangles += leaf.local.len() as u64;
         let name = leaf
             .label
             .clone()
             .unwrap_or_else(|| format!("part_{index:04}"));
-        payloads.push(GlbNodePayload {
-            name,
-            color,
-            mesh: Some(mesh),
-            parent: None,
-            matrix: [
-                1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0,
-            ],
-        });
+        node_values.push(serde_json::json!({
+            "name": name,
+            "matrix": leaf.matrix.iter().map(|c| f64::from(*c)).collect::<Vec<f64>>(),
+            "mesh": mesh_index,
+        }));
     }
-    let bytes = emit_glb(&payloads)?;
-    std::fs::write(path, bytes).map_err(|_| Refusal::Empty)?;
-    Ok((payloads.len() as u64, total_triangles))
+
+    if node_values.is_empty() {
+        return Err(Refusal::Empty);
+    }
+    let node_count = glb_len_u32_checked(node_values.len())?;
+    pad_glb_to_multiple(&mut binary, 0);
+    let bin_length = glb_len_u32(&binary)?;
+    let roots: Vec<u32> = (0..node_count).collect();
+    let document = serde_json::json!({
+        "asset": {
+            "version": "2.0",
+            "generator": "truck123d bridge GLB emission (BD-EMIT-MESH-CACHE)",
+        },
+        "scene": 0,
+        "scenes": [{ "nodes": roots }],
+        "nodes": node_values,
+        "meshes": meshes,
+        "materials": materials,
+        "bufferViews": buffer_views,
+        "accessors": accessors,
+        "buffers": [{ "byteLength": bin_length }],
+    });
+    let bytes = assemble_glb_bytes(&document, &binary)?;
+    Ok((u64::from(node_count), total_triangles, bytes))
+}
+
+/// One GLB material for a client color: the RGB channels linearized, alpha
+/// passed through, with the fixed metallic/roughness defaults.
+fn glb_material(color: SrgbColor) -> serde_json::Value {
+    serde_json::json!({
+        "pbrMetallicRoughness": {
+            "baseColorFactor": [
+                glb_srgb_to_linear(f64::from(color.r)),
+                glb_srgb_to_linear(f64::from(color.g)),
+                glb_srgb_to_linear(f64::from(color.b)),
+                f64::from(color.a),
+            ],
+            "metallicFactor": GLB_METALLIC,
+            "roughnessFactor": GLB_ROUGHNESS,
+        }
+    })
+}
+
+/// The standard sRGB -> linear transfer (glTF base colors are linear).
+fn glb_srgb_to_linear(channel: f64) -> f64 {
+    if channel <= GLB_SRGB_CUTOFF {
+        channel / 12.92
+    } else {
+        ((channel + 0.055) / 1.055).powf(2.4)
+    }
+}
+
+/// Appends one mesh's positions and indices to the binary buffer and pushes
+/// its bufferViews/accessors, returning the `(POSITION, indices)` accessor
+/// indices.
+fn append_glb_geometry(
+    binary: &mut Vec<u8>,
+    buffer_views: &mut Vec<serde_json::Value>,
+    accessors: &mut Vec<serde_json::Value>,
+    mesh: &GlbMesh,
+) -> Result<(u32, u32), Refusal> {
+    let ((min_x, min_y, min_z), (max_x, max_y, max_z)) =
+        glb_component_bounds(&mesh.positions).ok_or(Refusal::Empty)?;
+    let vertex_count = glb_len_u32_checked(mesh.positions.len() / 3)?;
+    let index_count = glb_len_u32_checked(mesh.indices.len())?;
+
+    let position_offset = glb_len_u32(binary)?;
+    for component in &mesh.positions {
+        binary.extend_from_slice(&component.to_le_bytes());
+    }
+    let position_bytes = glb_len_u32_checked(mesh.positions.len() * 4)?;
+
+    let index_offset = glb_len_u32(binary)?;
+    for &vertex in &mesh.indices {
+        binary.extend_from_slice(&vertex.to_le_bytes());
+    }
+    let index_bytes = glb_len_u32_checked(mesh.indices.len() * 4)?;
+
+    let position_view = glb_len_u32_checked(buffer_views.len())?;
+    buffer_views.push(serde_json::json!({
+        "buffer": 0,
+        "byteOffset": position_offset,
+        "byteLength": position_bytes,
+        "target": TARGET_ARRAY_BUFFER,
+    }));
+    let position_accessor = glb_len_u32_checked(accessors.len())?;
+    accessors.push(serde_json::json!({
+        "bufferView": position_view,
+        "componentType": COMPONENT_TYPE_FLOAT,
+        "count": vertex_count,
+        "type": "VEC3",
+        "min": [f64::from(min_x), f64::from(min_y), f64::from(min_z)],
+        "max": [f64::from(max_x), f64::from(max_y), f64::from(max_z)],
+    }));
+
+    let index_view = glb_len_u32_checked(buffer_views.len())?;
+    buffer_views.push(serde_json::json!({
+        "buffer": 0,
+        "byteOffset": index_offset,
+        "byteLength": index_bytes,
+        "target": TARGET_ELEMENT_ARRAY_BUFFER,
+    }));
+    let index_accessor = glb_len_u32_checked(accessors.len())?;
+    accessors.push(serde_json::json!({
+        "bufferView": index_view,
+        "componentType": COMPONENT_TYPE_UNSIGNED_INT,
+        "count": index_count,
+        "type": "SCALAR",
+    }));
+
+    Ok((position_accessor, index_accessor))
+}
+
+/// The per-axis bounds of a position list: `(min, max)`, each an `xyz` triple.
+type GlbAxisBounds = ((f32, f32, f32), (f32, f32, f32));
+
+/// The per-axis bounds of a position list as `(min, max)` triples. `None` only
+/// when the list is not a whole number of `xyz` triplets.
+fn glb_component_bounds(positions: &[f32]) -> Option<GlbAxisBounds> {
+    let mut values = positions.iter();
+    let (Some(x), Some(y), Some(z)) = (values.next(), values.next(), values.next()) else {
+        return None;
+    };
+    let mut min = (*x, *y, *z);
+    let mut max = (*x, *y, *z);
+    loop {
+        match (values.next(), values.next(), values.next()) {
+            (Some(x), Some(y), Some(z)) => {
+                min.0 = min.0.min(*x);
+                min.1 = min.1.min(*y);
+                min.2 = min.2.min(*z);
+                max.0 = max.0.max(*x);
+                max.1 = max.1.max(*y);
+                max.2 = max.2.max(*z);
+            }
+            (None, None, None) => break,
+            _ => return None,
+        }
+    }
+    Some((min, max))
+}
+
+/// Assembles the GLB container: 12-byte header, padded JSON chunk, padded BIN
+/// chunk. `binary` is already 4-byte padded; the JSON chunk is padded with
+/// spaces to the required 4-byte alignment.
+fn assemble_glb_bytes(document: &serde_json::Value, binary: &[u8]) -> Result<Vec<u8>, Refusal> {
+    let mut json_bytes = serde_json::to_vec(document).map_err(|_| Refusal::Empty)?;
+    pad_glb_to_multiple(&mut json_bytes, b' ');
+
+    let json_length = glb_len_u32(&json_bytes)?;
+    let bin_length = glb_len_u32(binary)?;
+    let payload_length = json_bytes
+        .len()
+        .checked_add(binary.len())
+        .ok_or(Refusal::Empty)?;
+    let total_length = glb_len_u32_checked(
+        12usize
+            .checked_add(8)
+            .and_then(|header| header.checked_add(payload_length))
+            .and_then(|header| header.checked_add(8))
+            .ok_or(Refusal::Empty)?,
+    )?;
+
+    let mut glb = Vec::with_capacity(total_length as usize);
+    glb.extend_from_slice(&GLB_MAGIC.to_le_bytes());
+    glb.extend_from_slice(&GLB_VERSION.to_le_bytes());
+    glb.extend_from_slice(&total_length.to_le_bytes());
+    glb.extend_from_slice(&json_length.to_le_bytes());
+    glb.extend_from_slice(&CHUNK_JSON.to_le_bytes());
+    glb.extend_from_slice(&json_bytes);
+    glb.extend_from_slice(&bin_length.to_le_bytes());
+    glb.extend_from_slice(&CHUNK_BIN.to_le_bytes());
+    glb.extend_from_slice(binary);
+    Ok(glb)
+}
+
+/// Pads `bytes` up to a 4-byte multiple with `value` (the JSON chunk pads with
+/// spaces, the BIN chunk with zeros).
+fn pad_glb_to_multiple(bytes: &mut Vec<u8>, value: u8) {
+    while !bytes.len().is_multiple_of(4) {
+        bytes.push(value);
+    }
+}
+
+/// The current length of a byte buffer as `u32` (GLB lengths are `u32`).
+fn glb_len_u32(bytes: &[u8]) -> Result<u32, Refusal> {
+    glb_len_u32_checked(bytes.len())
+}
+
+/// A `usize` length/index as `u32`, refusing when it exceeds the format width.
+fn glb_len_u32_checked(value: usize) -> Result<u32, Refusal> {
+    u32::try_from(value).map_err(|_| Refusal::Empty)
 }
 
 // ---------------------------------------------------------------------------
