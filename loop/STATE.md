@@ -75,9 +75,10 @@ corrected, annex C = ORACLE POLICY CHANGE), then docs/SOLVER_COVERAGE_SPEC.md
 
 ## Where we are
 
-> LATEST GROUND TRUTH [operator 2026-09-12T06:43Z / 02:43 local]: 0 RUNNING / 0
-> landed-this-cycle / 0 unblocked / 0 flipped / 0 dispatched. HEAD `4f9bfe4`
-> (the 06:19Z operator commit; no packet work moved this cycle).
+> LATEST GROUND TRUTH [operator 2026-09-12T07:05Z / 03:05 local]: 0 RUNNING / 0
+> landed-this-cycle / 0 unblocked / 0 flipped / 0 dispatched. HEAD `ffed9f7`
+> (the 06:43Z operator commit; re-verified UNCHANGED this cycle - no packet work
+> moved, all eight slot tips re-checked, registry re-derived).
 > **SLOT 1 FHC-TRIM FINISHED with RESULT status SPEC_GAP - the duplicate run
 > reproduced slot 0's verdict.** Worker commit `4a1dd49` on
 > `packet/FHC-TRIM-EXTRUDE-ENVELOPE` (NOT an ancestor of HEAD); RESULT at
@@ -117,8 +118,8 @@ corrected, annex C = ORACLE POLICY CHANGE), then docs/SOLVER_COVERAGE_SPEC.md
 > Health: heartbeat exactly 1 (27872), operator_runner 1 (27876), watchdog 1
 > (29264), overnight driver 1 (24864); cargoq UP (ping ok, queued 0, running
 > false). TWO supervisors (19172 + 27828) = carried duplication class; only ONE
-> overnight.py child = no double-merge risk. Disk 27.7 GiB free (above the 8 GB
-> floor AND the 15 GB janitor goal); RAM 3.84 GiB free (above the 3 GB floor).
+> overnight.py child = no double-merge risk. Disk 27.59 GiB free (above the 8 GB
+> floor AND the 15 GB janitor goal); RAM 3.79 GiB free (above the 3 GB floor).
 > Root worktree carries live human/orchestrator-session WIP (M README.md, M
 > docs/F1_HYPERCAR_GAP_REGISTER.md, M loop/LEDGER.jsonl, M loop/cargoq/server.log;
 > untracked benchmarks/ + loop/baselines/ + scratch/ + mobius.step +
@@ -128,7 +129,7 @@ corrected, annex C = ORACLE POLICY CHANGE), then docs/SOLVER_COVERAGE_SPEC.md
 > LANDED-WITH-FINDINGS; FRAME-REVOLVE F1 non_z_axis pin; TOR-C flip-or-pin;
 > slot-4/slot-7 wt RESULT residue.
 > Leaving: 0 RUNNING; slots 0/1 FINISHED SPEC_GAP (escalated), slots 2-7 landed
-> residue; HEAD `4f9bfe4` + this cycle's STATE/log commit.
+> residue; HEAD `ffed9f7` + this cycle's STATE/log commit.
 >
 > NOTE: this cycle replaced the prior collapsed block with a fresh one to keep the
 > volatile section at ~1 block (charter cap ~120 lines). Prior cycles' refreshes are

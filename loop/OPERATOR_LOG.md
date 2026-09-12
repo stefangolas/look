@@ -7014,3 +7014,69 @@ non_z_axis pin; TOR-C flip-or-pin; slot-4/slot-7 wt RESULT residue.
 Leaving: 0 RUNNING; slots 0/1 FINISHED SPEC_GAP (escalated), slots 2-7 landed
 residue; HEAD 4f9bfe4 + this cycle's STATE/log commit; heartbeat 1;
 operator_runner 1; watchdog 1; cargoq UP; disk 27.7 GiB; RAM 3.84 GiB.
+
+## 2026-09-12 07:05 UTC (operator cycle)
+
+Board at start: 0 RUNNING / 0 landed-this-cycle. Board re-measured UNCHANGED
+from the 06:43Z cycle. Slots 0 and 1 FINISHED SPEC_GAP (FHC-TRIM-EXTRUDE-
+ENVELOPE, both duplicate runs); slot 2 IDLE (landed residue); slots 3-7 FINISHED
+landed residue.
+
+Health sweep (step 1): heartbeat exactly 1 (27872, dispatch_heartbeat.ps1); the
+second `-match dispatch_heartbeat` hit was this operator's own probe shell (pid
+22400) - NOT a duplicate. operator_runner 1 (27876); watchdog 1 (29264);
+overnight driver 1 (24864); cargoq UP (ping {"ok":true,"queued":0,"running":
+false}); disk 27.59 GiB free (above the 8 GB floor AND the 15 GB janitor goal);
+RAM 3.79 GiB free (above the 3 GB floor). HEAD ffed9f7.
+
+Land (step 2): NOTHING. Slot 0 RESULT status = SPEC_GAP (33f6269, NOT an
+ancestor); slot 1 RESULT status = SPEC_GAP (4a1dd49, NOT an ancestor). SPEC_GAP
+is a do-not-land/escalate class. Slots 3/5/6 (DONE) and 2/4/7 residue re-verified
+`git merge-base --is-ancestor` against integration/kernel-bg: c3df084, e6553db,
+3c2109b, ee97499, 713f205, 5cf4811 all True; slot 4 is LANDED-WITH-FINDINGS and
+slot 7 is status LANDED (both non-DONE, non-landable). No FINISHED slot holds an
+unlanded DONE RESULT.
+
+Unblock (step 3): NOTHING. No RUNNING worker; slot 2 IDLE (row TTC-RECENSUS-F1-R3
+DONE, c3df084 ancestor); no IDLE/DEAD >15 min holding work; no QUESTION; no
+APIError 402; zero cargo/rustc processes.
+
+Registry (step 4): re-derived by command (last-wins dedup): 354 unique = 252 DONE
+/ 91 READY / 10 BLOCKED / 1 SUPERSEDED. All 10 BLOCKED rows have all deps landed
+but are deliberate holds (BG-AUD-FIX-004 OWNER_BLOCKED; BG-CK-SPLINE-CENSUS
+booking gate; SEM-PCURVE-MASTER-001-FIX SUPERSEDED; DEF-SPINEFRAME-GRAZE
+SPEC_GAP->-R2; DEF-TESS-ANALYTIC-SEAM superseded by -R2; DEF-SEEDRAY-B
+human-gated; TOR-C orchestrator-held; MONO-10-CERTIFIED-BOUNDARY-MESH owner
+R3-mesh; RDEF-M4-NUMERIC-TIER M0-adjudication; RDEF-M5-CORPUS-PREVALENCE needs
+RDEF-M4) -> NOTHING flipped. READY rows without a landed marker = 11: RG-23/RG-9
+(packet files ABSENT - `Test-Path loop/packets/RG-23-CERTIFIED-ENTRY-WIRING.md`
+False, only RG-4 exists; authoring fix, cannot re-measure anchors) and the FHC
+chain (FHC-TRIM SPEC_GAP hold + FHC-MIRROR-FORM/BD-EMIT-MESH-CACHE/FHC-G1..G6
+chained behind it). Nothing mechanically fixable.
+
+Dispatch (step 5): `dispatch_ready.py --dry-run --max-workers=4`: "slots: 8 (0
+running, 8 free); slot-assigned packets: 5; dispatched 0; workers now ~0/4" =
+REAL idle. Blocked reasons: RG-23/RG-9 ANCHOR CHECK FAILED (missing packet
+files); FHC-MIRROR-FORM -> FHC-TRIM; BD-EMIT-MESH-CACHE -> FHC-MIRROR-FORM;
+FHC-G1..G6 chained. Real dispatcher NOT run (heartbeat live = double-dispatch
+rule).
+
+STATE (step 6): updated the volatile ground-truth block in place - label/timestamp
+to [operator 2026-09-12T07:05Z], HEAD 4f9bfe4 -> ffed9f7, disk/RAM to measured
+values; board body confirmed unchanged; stable traps untouched.
+
+Worktree note (reported, not actioned): root tree carries live
+human/orchestrator-session WIP (M README.md, M docs/F1_HYPERCAR_GAP_REGISTER.md,
+M loop/LEDGER.jsonl, M loop/cargoq/server.log; untracked benchmarks/ +
+loop/baselines/ + scratch/ + mobius.step + vendor/truck/*.obj).
+
+Escalations: NONE NEW this cycle. Carried unchanged: FHC-TRIM SPEC_GAP pair
+(both duplicate runs; row READY, no landed marker - needs authoring/rebooking
+decision before a THIRD worker); RG-23/RG-9 missing packet files; duplicate
+supervisors (19172 + 27828); F1-AUTHORING-ARMS LANDED-WITH-FINDINGS;
+FRAME-REVOLVE F1 non_z_axis pin; TOR-C flip-or-pin; slot-4/slot-7 wt RESULT
+residue.
+
+Leaving: 0 RUNNING; slots 0/1 FINISHED SPEC_GAP (escalated), slots 2-7 landed
+residue; HEAD ffed9f7 + this cycle's STATE/log commit; heartbeat 1;
+operator_runner 1; watchdog 1; cargoq UP; disk 27.59 GiB; RAM 3.79 GiB.
