@@ -48,6 +48,8 @@
 use pyo3::exceptions::PyRuntimeError;
 use pyo3::prelude::*;
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
+use std::sync::{Mutex, MutexGuard, OnceLock};
 use truck_base::evidence::{Budget, EnvelopeCase, Refusal, UnresolvedWitness};
 use truck_certified::construct::patches::{PatchParent, TensorBernsteinPatch};
 use truck_certified::kernel::patch::IBox2;
@@ -4129,8 +4131,99 @@ fn collect_boolean_events(
     }
 }
 
+// ---------------------------------------------------------------------------
+// FHC-FACTS-CACHE -- content-hash memoization of the certified evaluation.
+//
+// The submitted construction tree is canonical data and every measured fact is
+// a deterministic pure function of it, so the canonical serialization of a node
+// is an exact cache key: equal bytes imply equal evaluation. The caches are
+// process-wide because the door's authoring layer evaluates the same subtree at
+// several composition sites (`_facts`, `.volume`, `.is_valid`, the record-time
+// probe) and every `bd_facts` call is a separate entry into this module.
+//
+// The caches are pure memos (lookup only): outputs are assembled in fixed tree
+// order, so hash iteration order never reaches an output.
+// ---------------------------------------------------------------------------
+
+/// The exact content key of one canonical node: its canonical serialized bytes.
+type ContentKey = Vec<u8>;
+
+/// The memoized extracted patch cycle of one operand node.
+type ExtractedPatches = Vec<(crate::python::binding::VolumeRow, i8)>;
+
+/// The process-wide memo of measured facts, keyed by canonical node bytes.
+fn facts_memo() -> &'static Mutex<HashMap<ContentKey, Facts>> {
+    static MEMO: OnceLock<Mutex<HashMap<ContentKey, Facts>>> = OnceLock::new();
+    MEMO.get_or_init(|| Mutex::new(HashMap::new()))
+}
+
+/// The process-wide memo of extracted operand patch cycles (layer b).
+fn patch_memo() -> &'static Mutex<HashMap<ContentKey, ExtractedPatches>> {
+    static MEMO: OnceLock<Mutex<HashMap<ContentKey, ExtractedPatches>>> = OnceLock::new();
+    MEMO.get_or_init(|| Mutex::new(HashMap::new()))
+}
+
+/// The process-wide memo of certified depth-1 product volumes.
+fn product_memo() -> &'static Mutex<HashMap<ContentKey, f64>> {
+    static MEMO: OnceLock<Mutex<HashMap<ContentKey, f64>>> = OnceLock::new();
+    MEMO.get_or_init(|| Mutex::new(HashMap::new()))
+}
+
+/// Locks one process-wide memo, recovering the map from a poisoned lock: a
+/// panic elsewhere must never disable the pure memo (the stored values are
+/// immutable once inserted, so recovery is sound).
+fn lock_memo<M>(memo: &'static Mutex<M>) -> MutexGuard<'static, M> {
+    match memo.lock() {
+        Ok(guard) => guard,
+        Err(poisoned) => poisoned.into_inner(),
+    }
+}
+
+/// The canonical content bytes of one serializable node, or `None` when the
+/// node cannot be canonically serialized (the caller then evaluates uncached).
+fn content_key<T: Serialize>(value: &T) -> Option<ContentKey> {
+    serde_json::to_vec(value).ok()
+}
+
+thread_local! {
+    /// Per-call diagnostic counters (the calling thread runs the GIL-released
+    /// kernel closure, so a thread-local is the call's own counter).
+    static FACTS_CACHE_HITS: std::cell::Cell<u64> = const { std::cell::Cell::new(0) };
+    static PATCH_CACHE_HITS: std::cell::Cell<u64> = const { std::cell::Cell::new(0) };
+}
+
+fn reset_cache_counters() {
+    FACTS_CACHE_HITS.with(|cell| cell.set(0));
+    PATCH_CACHE_HITS.with(|cell| cell.set(0));
+}
+
+fn facts_cache_hit_count() -> u64 {
+    FACTS_CACHE_HITS.with(std::cell::Cell::get)
+}
+
+fn patch_cache_hit_count() -> u64 {
+    PATCH_CACHE_HITS.with(std::cell::Cell::get)
+}
+
 /// Measures the submitted tree with the recorded OCC top-node semantics.
+///
+/// FHC-FACTS-CACHE (layer a): the first evaluation of a node populates the
+/// process-wide content-hash memo; every later content-identical node returns
+/// the stored record bit-for-bit.
 pub fn tree_facts(root: &TreeNode) -> Result<Facts, Refusal> {
+    let Some(key) = content_key(root) else {
+        return tree_facts_uncached(root);
+    };
+    if let Some(cached) = lock_memo(facts_memo()).get(&key).cloned() {
+        FACTS_CACHE_HITS.with(|cell| cell.set(cell.get().saturating_add(1)));
+        return Ok(cached);
+    }
+    let facts = tree_facts_uncached(root)?;
+    lock_memo(facts_memo()).insert(key, facts.clone());
+    Ok(facts)
+}
+
+fn tree_facts_uncached(root: &TreeNode) -> Result<Facts, Refusal> {
     let mut count = 0u64;
     let mut min = [f64::INFINITY; 3];
     let mut max = [f64::NEG_INFINITY; 3];
@@ -4511,7 +4604,23 @@ fn node_box_patches(
 /// `BooleanProductVolumeUnavailable`. Subtract reads the certificate's `A \ B`
 /// bracket; intersect reads its `A n B` bracket; union is the exact
 /// inclusion-exclusion `V(A) + V(B) - V(A n B)` over the same certified facts.
+///
+/// FHC-FACTS-CACHE: the value is memoized by the canonical boolean-row bytes,
+/// so a repeated depth-1 boolean (an authoring probe followed by the final
+/// facts) solves once.
 fn boolean_product_volume_certified(boolean: &BooleanNode) -> Result<f64, BooleanVolumeRefusal> {
+    let Some(key) = content_key(boolean) else {
+        return certified_boolean_product_value(boolean);
+    };
+    if let Some(value) = lock_memo(product_memo()).get(&key).copied() {
+        return Ok(value);
+    }
+    let value = certified_boolean_product_value(boolean)?;
+    lock_memo(product_memo()).insert(key, value);
+    Ok(value)
+}
+
+fn certified_boolean_product_value(boolean: &BooleanNode) -> Result<f64, BooleanVolumeRefusal> {
     let a = node_box_patches(&boolean.a)?;
     let b = node_box_patches(&boolean.b)?;
     let certificate =
@@ -5220,7 +5329,25 @@ fn extract_local_patches(solid: &SolidSpec) -> Result<Vec<Patch>, SweptAdmission
 /// placement's determinant sign. Each returned pair is `(patch, sigma)` where
 /// `sigma` is `sign(det M_tau)` and the patch's orientation field is the full
 /// `sigma_i = sigma * sigma_i^0`.
+///
+/// FHC-FACTS-CACHE (layer b): the extracted cycle is memoized by the canonical
+/// operand bytes, so a growing fold chain re-extracts only the operands the
+/// chain added since the previous probe. The extraction is a pure function of
+/// the operand node (placement included), so the key is exact.
 fn extract_patches(row: &TreeNode) -> Result<Vec<(Patch, i8)>, SweptAdmissionRefusal> {
+    let Some(key) = content_key(row) else {
+        return extract_patches_uncached(row);
+    };
+    if let Some(cached) = lock_memo(patch_memo()).get(&key).cloned() {
+        PATCH_CACHE_HITS.with(|cell| cell.set(cell.get().saturating_add(1)));
+        return Ok(cached);
+    }
+    let extracted = extract_patches_uncached(row)?;
+    lock_memo(patch_memo()).insert(key, extracted.clone());
+    Ok(extracted)
+}
+
+fn extract_patches_uncached(row: &TreeNode) -> Result<Vec<(Patch, i8)>, SweptAdmissionRefusal> {
     let part = match row {
         TreeNode::Part { part } => part,
         TreeNode::Group { .. } | TreeNode::Boolean { .. } | TreeNode::Fillet { .. } => {
@@ -10315,9 +10442,12 @@ pub fn bd_facts(py: Python<'_>, tree_json: &str) -> PyResult<String> {
     let construct_started = std::time::Instant::now();
     let tree = parse_tree(tree_json).map_err(|message| parse_error_to_pyerr(py, &message))?;
     let construct_ms = construct_started.elapsed().as_secs_f64() * 1000.0;
+    reset_cache_counters();
     let facts_started = std::time::Instant::now();
     let outcome = crate::gil::with_kernel_gil_released(py, move || tree_facts(&tree));
     let facts_ms = facts_started.elapsed().as_secs_f64() * 1000.0;
+    let cache_hit = facts_cache_hit_count() > 0;
+    let patch_cache_hits = patch_cache_hit_count();
     match outcome {
         Ok(facts) => {
             let mut value = serde_json::json!({
@@ -10357,6 +10487,8 @@ pub fn bd_facts(py: Python<'_>, tree_json: &str) -> PyResult<String> {
                     serde_json::json!({
                         "construct_ms": construct_ms,
                         "facts_ms": facts_ms,
+                        "cache_hit": cache_hit,
+                        "patch_cache_hits": patch_cache_hits,
                     }),
                 );
             }
