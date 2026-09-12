@@ -65,7 +65,7 @@ import time
 import types
 
 DOOR_VERSION = "1"
-TRUCK_DOOR_VERSION = "2"
+TRUCK_DOOR_VERSION = "3"
 
 # The engine regime (TTC-EXECUTOR-BINDING). ``occ`` is the OCC baseline
 # (unchanged, the differential oracle and reference recorder); ``truck`` is
@@ -122,11 +122,155 @@ def install_truck_alias():
 _T123D = None
 
 
-def _refuse(message):
+# ---------------------------------------------------------------------------
+# FHC-G7: self-describing refusal records.
+#
+# The stable machine slugs of the refusal vocabulary. The authoritative table
+# is `truck123d/src/marshal.rs::refusal_code_for_case`; this mirror maps the
+# door's payload cases to the same slugs so the `ttc_door_run.v2` record is
+# self-describing even on the door-side `_refuse` path. One slug per case/verb
+# class: agents branch on codes and bug reports dedupe on them.
+# ---------------------------------------------------------------------------
+REFUSAL_CODES = {
+    "empty": "E_EMPTY",
+    "unsupported_envelope": "E_UNSUPPORTED_ENVELOPE",
+    "construct_refused": "E_CONSTRUCT_REFUSED",
+    "unmapped_refusal": "E_UNMAPPED_REFUSAL",
+    "numerically_unresolved": "E_NUMERICALLY_UNRESOLVED",
+    "composition_margin_exhausted": "E_COMPOSITION_MARGIN_EXHAUSTED",
+    "input_outside_backward_budget": "E_INPUT_OUTSIDE_BACKWARD_BUDGET",
+    "contradictory": "E_CONTRADICTORY",
+    "collapsed": "E_COLLAPSED",
+    "forward_tolerance_exceeded": "E_FORWARD_TOLERANCE_EXCEEDED",
+}
+
+# The register's category boundaries (docs/F1_HYPERCAR_GAP_REGISTER.md): the
+# processing phase a payload case belongs to. `phase` is one of
+# `authoring | extraction | admission | solver | facts | emit`.
+REFUSAL_PHASES = {
+    "empty": "admission",
+    "unsupported_envelope": "admission",
+    "construct_refused": "extraction",
+    "unmapped_refusal": "admission",
+    "numerically_unresolved": "solver",
+    "composition_margin_exhausted": "solver",
+    "input_outside_backward_budget": "solver",
+    "contradictory": "facts",
+    "collapsed": "solver",
+    "forward_tolerance_exceeded": "solver",
+}
+
+# The door-side known-gap lookup table (FHC-G7). Keyed by
+# `(refusal_code, verb, carrier-prefix)` -> `{register, section, hint}`. This
+# is documentation as data, maintained BY HAND; unknown combinations simply
+# omit the block and hints are never auto-generated.
+_GAP_REGISTER = "docs/F1_HYPERCAR_GAP_REGISTER.md"
+KNOWN_GAPS = (
+    ("E_UNSUPPORTED_ENVELOPE", None, "spline_loft", "1",
+     "canonical cylinder unions need rational-patch flux - tracked"),
+    ("E_UNSUPPORTED_ENVELOPE", None, "rotational", "1",
+     "rotational (rational) patches need rational-patch flux - tracked"),
+    ("E_UNSUPPORTED_ENVELOPE", "probe", "occ_probe", "2",
+     "OCC probe query surface - mechanical"),
+    ("E_UNSUPPORTED_ENVELOPE", None, "face_data_row", "3",
+     "drop-in Face data-row attribute surface - mechanical"),
+    ("E_NEEDS_CLOSED_PROFILE", None, None, "4",
+     "revolve needs a closed profile - named carrier (hypercar/brakes)"),
+    ("E_SINGULAR_PARAMETRIZATION", None, None, "4b",
+     "degenerate planar fan cap - mechanical+ (suspension rows)"),
+    ("E_EMPTY", None, None, "4",
+     "empty operation domain - diagnosis pending"),
+    ("E_RATIONAL_FLUX_INCONCLUSIVE", None, None, "1",
+     "rational-patch flux proof obligation - FHC-G1"),
+    ("E_NOT_A_KERNEL_ROW", None, None, "3",
+     "drop-in data-row surface - mechanical"),
+)
+
+
+def _known_gap(code, verb, carrier):
+    """The hand-maintained known-gap block for `(code, verb, carrier-prefix)`,
+    or `None` when the combination is not registered."""
+    for rule_code, rule_verb, prefix, section, hint in KNOWN_GAPS:
+        if code != rule_code:
+            continue
+        if rule_verb is not None and verb != rule_verb:
+            continue
+        if prefix is not None and (carrier is None or not carrier.startswith(prefix)):
+            continue
+        return {"register": _GAP_REGISTER, "section": section, "hint": hint}
+    return None
+
+
+def _augment_refusal(exc, verb=None, carrier=None, phase=None, via=None):
+    """Threads the door-side refusal metadata onto a typed exception without
+    touching its `payload` (the frozen v1 literal). Fields the site cannot
+    supply stay absent; partial enrichment is acceptable."""
+    try:
+        if getattr(exc, "typed", None) is None:
+            exc.typed = True
+        if via is not None:
+            exc.client_site_via = via
+        if verb is not None:
+            exc.verb = verb
+        if carrier is not None:
+            exc.carrier = carrier
+        if phase is not None:
+            exc.phase = phase
+        if getattr(exc, "refusal_code", None) is None:
+            payload = getattr(exc, "payload", None)
+            if isinstance(payload, dict):
+                code = REFUSAL_CODES.get(payload.get("case"))
+                if code is not None:
+                    exc.refusal_code = code
+    except Exception:
+        pass
+    return exc
+
+
+def _kernel_facts(node, verb=None, carrier=None, phase=None, via=None):
+    """Calls the native facts entry and threads the refusal metadata onto a
+    typed refusal before re-raising. A successful call is unchanged."""
+    try:
+        return _T123D.bd_facts(json.dumps(node))
+    except BaseException as exc:
+        if type(exc).__name__ in ("Refused", "Unresolved"):
+            _augment_refusal(exc, verb=verb, carrier=carrier, phase=phase, via=via)
+        raise
+
+
+def _carrier_name(shape):
+    """The recorded carrier-class name of one door row (data only)."""
+    solid = getattr(shape, "_solid", None)
+    if isinstance(solid, dict):
+        kind = solid.get("kind")
+        if kind == "loft":
+            return "spline_loft"
+        if isinstance(kind, str):
+            return kind
+    node = getattr(shape, "_node_data", None)
+    if isinstance(node, dict) and "boolean" in node:
+        return "boolean_result"
+    return type(shape).__name__
+
+
+def _refuse(message, code=None, verb=None, carrier=None, phase=None):
     """Raise the mapped truck exception for a name the executor cannot answer
-    (typed, never a bare Exception or a silent fallback)."""
+    (typed, never a bare Exception or a silent fallback).
+
+    FHC-G7: the refusal carries the stable `refusal_code` plus the
+    verb/carrier/phase metadata in scope at the site. `payload` is unchanged
+    (the frozen v1 literal the loop greps)."""
     exc = _T123D.Refused(message)
     exc.payload = {"case": "unsupported_envelope", "envelope": "non_canonical_carrier"}
+    exc.refusal_code = code or REFUSAL_CODES["unsupported_envelope"]
+    exc.typed = True
+    exc.client_site_via = sys._getframe(1).f_code.co_name
+    if verb is not None:
+        exc.verb = verb
+    if carrier is not None:
+        exc.carrier = carrier
+    if phase is not None:
+        exc.phase = phase
     raise exc
 
 
@@ -767,7 +911,13 @@ class Edge:
         # An OCC probe of a kernel-engine curve row cannot be served: refuse
         # typed (never pass `None` into OCP, which dies as an untyped
         # TypeError). Mirrors the placed-row `_Shape.wrapped` refusal.
-        _refuse("an OCC probe of a kernel-engine row is not a kernel-engine row")
+        _refuse(
+            "an OCC probe of a kernel-engine row is not a kernel-engine row",
+            code="E_NOT_A_KERNEL_ROW",
+            verb="probe",
+            carrier="occ_probe",
+            phase="extraction",
+        )
         return None
 
     def edge(self):
@@ -1163,7 +1313,13 @@ class Wire:
     def wrapped(self):
         # An OCC probe of a kernel-engine wire row cannot be served: refuse
         # typed, never pass `None` into OCP.
-        _refuse("an OCC probe of a kernel-engine row is not a kernel-engine row")
+        _refuse(
+            "an OCC probe of a kernel-engine row is not a kernel-engine row",
+            code="E_NOT_A_KERNEL_ROW",
+            verb="probe",
+            carrier="occ_probe",
+            phase="extraction",
+        )
         return None
 
     def __iter__(self):
@@ -1210,7 +1366,13 @@ class Face:
             self.wire = Wire([])
             self.edges = []
         else:
-            _refuse("this Face form is not a census carrier")
+            _refuse(
+                "this Face form is not a census carrier",
+                code="E_NOT_A_KERNEL_ROW",
+                verb="face",
+                carrier="face_data_row",
+                phase="authoring",
+            )
 
     def faces(self):
         """The face selection of a recorded planar region.
@@ -1570,12 +1732,16 @@ class _Shape:
         if not _certificate_constructive(facts):
             _refuse(
                 "an OCC probe of a kernel-engine row is not a kernel-engine row: "
-                "the volume certificate (bracket) is missing or non-finite"
+                "the volume certificate (bracket) is missing or non-finite",
+                code="E_NOT_A_KERNEL_ROW",
+                verb="probe",
+                carrier="occ_probe",
+                phase="facts",
             )
         return _certified_bbox_carrier(facts["bbox"]).wrapped
 
     def _facts(self):
-        return json.loads(_T123D.bd_facts(json.dumps(self._node())))
+        return json.loads(_kernel_facts(self._node(), phase="facts", via="_facts"))
 
     @property
     def volume(self):
@@ -1608,7 +1774,7 @@ class _Shape:
         round-trip, so the row passes through unchanged."""
         return self
 
-    def _boolean(self, other, mode):
+    def _boolean(self, other, mode, verb=None):
         """Record one BooleanOp row over two kernel-engine solids and dispatch.
 
         The operands' LOCAL geometry is what dispatches; a placed operand's
@@ -1620,37 +1786,49 @@ class _Shape:
         ``BooleanResultOperand`` (depth-1 only).
         """
         if not isinstance(other, _Shape):
-            _refuse("a boolean operand outside a kernel-engine row is not a kernel-engine row")
+            _refuse(
+                "a boolean operand outside a kernel-engine row is not a kernel-engine row",
+                code="E_NOT_A_KERNEL_ROW",
+                verb=verb or mode,
+                carrier="boolean_operand",
+                phase="admission",
+            )
         node = _boolean_node(self, other, mode)
         if _T123D is not None:
-            _T123D.bd_facts(json.dumps(node))
+            _kernel_facts(
+                node,
+                verb=verb or mode,
+                carrier="{}*{}".format(_carrier_name(self), _carrier_name(other)),
+                phase="admission",
+                via="boolean",
+            )
         return _BooleanResult(node)
 
     def __sub__(self, other):
-        return self._boolean(other, "subtract")
+        return self._boolean(other, "subtract", verb="cut")
 
     def __add__(self, other):
-        return self._boolean(other, "union")
+        return self._boolean(other, "union", verb="fuse")
 
     def __and__(self, other):
-        return self._boolean(other, "intersect")
+        return self._boolean(other, "intersect", verb="intersect")
 
     def fuse(self, *tools):
         result = self
         for tool in tools:
-            result = result._boolean(tool, "union")
+            result = result._boolean(tool, "union", verb="fuse")
         return result
 
     def cut(self, *tools):
         result = self
         for tool in tools:
-            result = result._boolean(tool, "subtract")
+            result = result._boolean(tool, "subtract", verb="cut")
         return result
 
     def intersect(self, *tools):
         result = self
         for tool in tools:
-            result = result._boolean(tool, "intersect")
+            result = result._boolean(tool, "intersect", verb="intersect")
         return result
 
 
@@ -2061,7 +2239,13 @@ def revolve(shape, axis=None, revolution_arc=360.0, start_angle=0.0, **kwargs):
         _refuse("DegenerateRevolveAxis: a zero-length axis is not a kernel-engine row")
     edges = shape.edges
     if len(edges) < 3:
-        _refuse("revolve needs a closed profile")
+        _refuse(
+            "revolve needs a closed profile",
+            code="E_NEEDS_CLOSED_PROFILE",
+            verb="revolve",
+            carrier="open_profile",
+            phase="extraction",
+        )
     if _is_z_axis(unit):
         profile = _legacy_z_profile(edges)
         frame = None
@@ -2774,7 +2958,13 @@ def extrude(shape, amount, both=False, mode=None, **kwargs):
         }
     )
     if _T123D is not None:
-        _T123D.bd_facts(json.dumps(part._node()))
+        _kernel_facts(
+            part._node(),
+            verb="extrude",
+            carrier="trim_prism",
+            phase="admission",
+            via="extrude",
+        )
     return part
 
 
@@ -2824,11 +3014,23 @@ def loft(*sections, ruled=False, mode=None, closed=False, **kwargs):
         else:
             faces.append(item)
     if not faces:
-        _refuse(_LOFT_REFUSAL)
+        _refuse(
+            _LOFT_REFUSAL,
+            code="E_NOT_A_KERNEL_ROW",
+            verb="loft",
+            carrier="spline_loft",
+            phase="extraction",
+        )
     recorded = []
     for face in faces:
         if not isinstance(face, Face):
-            _refuse(_LOFT_REFUSAL)
+            _refuse(
+                _LOFT_REFUSAL,
+                code="E_NOT_A_KERNEL_ROW",
+                verb="loft",
+                carrier="spline_loft",
+                phase="extraction",
+            )
         recorded.append(_wire_profile_edges(face))
     return _loft_row(recorded, closed)
 
@@ -2898,7 +3100,13 @@ def fillet(edges, radius, **kwargs):
         }
     }
     if _T123D is not None:
-        _T123D.bd_facts(json.dumps(node))
+        _kernel_facts(
+            node,
+            verb="fillet",
+            carrier="fillet_blend",
+            phase="admission",
+            via="fillet",
+        )
     return _FilletResult(node)
 
 
@@ -3221,6 +3429,59 @@ def _truck_export_glb(obj, glb_path: str, deflection=None) -> None:
     _T123D.bd_glb(json.dumps(obj._node()), str(glb_path), 0.4 if deflection is None else deflection)
 
 
+def _error_record(exc, module=None, entry=None):
+    """Builds the ``ttc_door_run.v2`` error block for one refused/failed run.
+
+    v1 consumers keep parsing: ``kind``, ``message`` and ``payload`` keep their
+    exact shapes and literals; the v2 fields (``refusal_code``, ``typed``,
+    ``verb``, ``carrier``, ``phase``, ``client_site``, ``known_gap``) are
+    additive siblings. An untyped die-off class emits ``typed: false`` and no
+    ``refusal_code`` (a register gap by definition).
+    """
+    kind = type(exc).__name__
+    typed = kind in ("Refused", "Unresolved")
+    payload = getattr(exc, "payload", None)
+    error = {"kind": kind}
+    if typed:
+        code = getattr(exc, "refusal_code", None)
+        if code is None and isinstance(payload, dict):
+            code = REFUSAL_CODES.get(payload.get("case"))
+        error["refusal_code"] = code or REFUSAL_CODES["unsupported_envelope"]
+        error["typed"] = True
+        verb = getattr(exc, "verb", None)
+        carrier = getattr(exc, "carrier", None)
+        phase = getattr(exc, "phase", None)
+        if phase is None and isinstance(payload, dict):
+            phase = REFUSAL_PHASES.get(payload.get("case"))
+        if verb is not None:
+            error["verb"] = verb
+        if carrier is not None:
+            error["carrier"] = carrier
+        if phase is not None:
+            error["phase"] = phase
+    else:
+        error["typed"] = False
+    via = getattr(exc, "client_site_via", None)
+    site = {}
+    if module is not None:
+        site["module"] = module
+    if via is not None:
+        site["via"] = via
+    elif entry is not None:
+        site["via"] = entry
+    if site:
+        error["client_site"] = site
+    error["message"] = str(exc)
+    if payload is not None:
+        error["payload"] = payload
+    if typed:
+        gap = _known_gap(error.get("refusal_code"), error.get("verb"),
+                         error.get("carrier"))
+        if gap is not None:
+            error["known_gap"] = gap
+    return error
+
+
 def main() -> int:
     argv = list(sys.argv[1:])
     global ENGINE
@@ -3229,10 +3490,14 @@ def main() -> int:
         argv = argv[2:]
     if len(argv) < 5:
         record = {
-            "schema": "ttc_door_run.v1",
+            "schema": "ttc_door_run.v2",
             "door_version": DOOR_VERSION,
             "ok": False,
-            "error": {"kind": "UsageError", "message": "need tree module entry args stl"},
+            "error": {
+                "kind": "UsageError",
+                "typed": False,
+                "message": "need tree module entry args stl",
+            },
         }
         json.dump(record, sys.stdout, indent=2)
         return 1
@@ -3257,17 +3522,14 @@ def main() -> int:
     try:
         obj = run_entry(tree_src, module, entry, args)
     except Exception as exc:  # noqa: BLE001 - the door reports typed failure
-        error = {"kind": type(exc).__name__, "message": str(exc)}
-        payload = getattr(exc, "payload", None)
-        if payload is not None:
-            error["payload"] = payload
         record = {
-            "schema": "ttc_door_run.v1",
+            "schema": "ttc_door_run.v2",
             "door_version": door_version,
             "engine": ENGINE,
             "ok": False,
             "entry": entry,
-            "error": error,
+            "module": module,
+            "error": _error_record(exc, module=module, entry=entry),
         }
         json.dump(record, sys.stdout, indent=2)
         return 1
@@ -3286,24 +3548,20 @@ def main() -> int:
 
             bd.export_stl(obj, stl_path, tolerance=tolerance, angular_tolerance=0.5)
     except Exception as exc:  # noqa: BLE001 - a refused export is a typed verdict
-        error = {"kind": type(exc).__name__, "message": str(exc)}
-        payload = getattr(exc, "payload", None)
-        if payload is not None:
-            error["payload"] = payload
         record = {
-            "schema": "ttc_door_run.v1",
+            "schema": "ttc_door_run.v2",
             "door_version": door_version,
             "engine": ENGINE,
             "ok": False,
             "entry": entry,
             "module": module,
-            "error": error,
+            "error": _error_record(exc, module=module, entry=entry),
         }
         json.dump(record, sys.stdout, indent=2)
         return 1
 
     record = {
-        "schema": "ttc_door_run.v1",
+        "schema": "ttc_door_run.v2",
         "door_version": door_version,
         "engine": ENGINE,
         "ok": True,

@@ -401,7 +401,17 @@ fn to_pyerr(py: Python<'_>, error: BindingError) -> PyErr {
                 ExceptionClass::Unresolved => crate::python::marshal_unresolved(py, &payload_json),
             };
             match instance {
-                Ok(value) => PyErr::from_value(value.bind(py).clone()),
+                Ok(value) => {
+                    // FHC-G7: attach the stable refusal code and the typed
+                    // marker as top-level exception attributes. `payload`
+                    // keeps its frozen v1 shape (the code is never injected
+                    // into it).
+                    let bound = value.bind(py);
+                    let code = crate::marshal::refusal_code_of_payload(&marshaled.payload);
+                    let _ = bound.setattr("refusal_code", code);
+                    let _ = bound.setattr("typed", true);
+                    PyErr::from_value(bound.clone())
+                }
                 Err(e) => e,
             }
         }

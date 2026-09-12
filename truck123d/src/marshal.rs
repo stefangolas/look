@@ -668,3 +668,41 @@ pub fn door_case_of_construct_refusal(refusal: ConstructRefusal) -> DoorCase {
     let _ = refusal.tag();
     DoorCase::ConstructRefused
 }
+
+// ---------------------------------------------------------------------------
+// FHC-G7 — the stable refusal-code table.
+//
+// `refusal_code` is the machine slug agents branch on and bug reports dedupe
+// on. It is derived from the marshaled payload's case (one slug per case/verb
+// class); the door mirrors this table as data for its own `_refuse` path.
+// The certified-binding `to_pyerr` attaches the code as a top-level
+// exception attribute (never inside `payload`, whose v1 shape stays frozen).
+// ---------------------------------------------------------------------------
+
+/// The stable machine slug of one door refusal case (FHC-G7). The single
+/// authoritative code table; `corpus/ttc/door.py` mirrors it as data. An
+/// unknown case degrades to the envelope slug rather than inventing a code.
+pub fn refusal_code_for_case(case: &str) -> &'static str {
+    match case {
+        "empty" => "E_EMPTY",
+        "unsupported_envelope" => "E_UNSUPPORTED_ENVELOPE",
+        "construct_refused" => "E_CONSTRUCT_REFUSED",
+        "unmapped_refusal" => "E_UNMAPPED_REFUSAL",
+        "numerically_unresolved" => "E_NUMERICALLY_UNRESOLVED",
+        "composition_margin_exhausted" => "E_COMPOSITION_MARGIN_EXHAUSTED",
+        "input_outside_backward_budget" => "E_INPUT_OUTSIDE_BACKWARD_BUDGET",
+        "contradictory" => "E_CONTRADICTORY",
+        "collapsed" => "E_COLLAPSED",
+        "forward_tolerance_exceeded" => "E_FORWARD_TOLERANCE_EXCEEDED",
+        _ => "E_UNSUPPORTED_ENVELOPE",
+    }
+}
+
+/// The stable refusal code of one marshaled payload (FHC-G7): the refused
+/// payload's case slug, or the budget-exhausted slug for an `Unresolved`.
+pub fn refusal_code_of_payload(payload: &MarshaledPayload) -> &'static str {
+    match payload {
+        MarshaledPayload::Refused(payload) => refusal_code_for_case(&payload.case),
+        MarshaledPayload::Unresolved(_) => "E_NUMERICALLY_UNRESOLVED",
+    }
+}
