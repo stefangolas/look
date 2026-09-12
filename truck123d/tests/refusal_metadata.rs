@@ -372,15 +372,15 @@ fn census_row_refusals_marshal_with_their_codes() {
     assert_eq!(brakes["schema"], "ttc_door_run.v2", "brakes: {brakes}");
     assert_eq!(brakes["error"]["kind"], "Refused", "brakes: {brakes}");
     assert_eq!(
-        brakes["error"]["refusal_code"], "E_NEEDS_CLOSED_PROFILE",
+        brakes["error"]["refusal_code"], "E_UNSUPPORTED_ENVELOPE",
         "brakes: {brakes}"
     );
-    assert_eq!(brakes["error"]["verb"], "revolve", "brakes: {brakes}");
-    assert_eq!(brakes["error"]["phase"], "extraction", "brakes: {brakes}");
+    assert_eq!(brakes["error"]["verb"], "cut", "brakes: {brakes}");
     assert_eq!(
-        brakes["error"]["known_gap"]["section"], "4",
+        brakes["error"]["carrier"], "face_boolean",
         "brakes: {brakes}"
     );
+    assert_eq!(brakes["error"]["phase"], "admission", "brakes: {brakes}");
 
     let corner = run_truck_door("f1", "lib.wheels", "build_corner", "[\"fl\"]");
     assert_eq!(corner["schema"], "ttc_door_run.v2", "corner_fl: {corner}");
