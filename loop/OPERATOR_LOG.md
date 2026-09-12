@@ -7870,3 +7870,51 @@ TOR-C flip-or-pin; slot-4/slot-7 wt RESULT residue.
 Leaving: 0 RUNNING; slots 0/1 FINISHED SPEC_GAP (escalated), slots 2-7 landed
 residue; HEAD b82df73 + this cycle's STATE/log commit; heartbeat 1;
 operator_runner 1; watchdog 1; cargoq UP; disk 27.32 GiB; RAM 3.74 GiB.
+
+## [operator 2026-09-12T12:21Z] quiet healthy cycle
+
+Health sweep (step 1): slot_status -> slots 0+1 FINISHED FHC-TRIM-EXTRUDE-ENVELOPE
+(RESULT status SPEC_GAP); slot 2 IDLE (TTC-RECENSUS-F1-R3, no RESULT, landed);
+slots 3-7 FINISHED landed residue. cargoq ping {"ok":true,"queued":0,
+"running":false}. Exactly ONE dispatch_heartbeat (27872), ONE operator_runner
+(27876), ONE watchdog (29264), ONE overnight driver (24864). Carried duplication:
+TWO supervisor.py (19172 + 27828) + TWO cargoq/server.py (28544 + 34564) - no
+double-merge risk (ONE overnight child). Disk 27.44 GiB free; RAM 3.75 GiB free.
+
+Land (step 2): re-verified by `git merge-base --is-ancestor` against
+integration/kernel-bg: slot 0 33f6269 and slot 1 4a1dd49 NOT ancestors; slots 2-7
+(c3df084, e6553db, 3c2109b, ee97499, 713f205, 5cf4811) all ancestors = landed.
+Slots 0+1 RESULT status SPEC_GAP (slot 0 also archived as
+loop/results/FHC-TRIM-EXTRUDE-ENVELOPE.PENDING.RESULT.json) -> NOT
+operator-landable, already escalated (carried). NOTHING landed.
+
+Unblock (step 3): 0 RUNNING workers; no IDLE/DEAD >15 min holding work; no
+QUESTION. Nothing to unblock.
+
+Registry (step 4): re-derived by command (last-wins dedup): 354 unique = 252 DONE
+/ 91 READY / 10 BLOCKED / 1 SUPERSEDED. All 10 BLOCKED rows have deps landed but
+carry deliberate-hold notes (owner-blocked / cancelled / superseded /
+human-gated / orchestrator-held / owner decisions) - NOT flipped. READY-without-
+landed-marker = the FHC chain (FHC-TRIM SPEC_GAP hold + FHC-MIRROR-FORM /
+BD-EMIT-MESH-CACHE / FHC-G1..G6 dep-blocked) + RG-23/RG-9 (their packet .md files
+are ABSENT from loop/packets/, so the anchor check raises FileNotFoundError -
+missing authoring, NOT anchor drift; the anchor ritual does not apply). Nothing
+mechanically fixable.
+
+Dispatch (step 5): dispatch_ready --dry-run --max-workers=4 -> "slots: 8 (0
+running, 8 free); slot-assigned packets: 5; dispatched 0; workers now ~0/4" =
+REAL idle. Real dispatcher NOT run (heartbeat live = double-dispatch rule).
+
+STATE (step 6): refreshed the volatile LATEST GROUND TRUTH block in place
+([operator 2026-09-12T12:21Z], HEAD 684973e = the 11:58Z operator commit, disk
+27.44 GiB, RAM 3.75 GiB) and the "State of the machine, as left" disk/RAM/board
+lines. Stable traps/history untouched.
+
+Escalations: NONE NEW. Carried unchanged: FHC-TRIM SPEC_GAP pair; RG-23/RG-9
+missing packet files; duplicate supervisors + duplicate cargoq/server.py;
+F1-AUTHORING-ARMS LANDED-WITH-FINDINGS; FRAME-REVOLVE F1 non_z_axis pin;
+TOR-C flip-or-pin; slot-4/slot-7 wt RESULT residue.
+
+Leaving: 0 RUNNING; slots 0/1 FINISHED SPEC_GAP (escalated), slots 2-7 landed
+residue; HEAD 684973e + this cycle's STATE/log commit; heartbeat 1;
+operator_runner 1; watchdog 1; cargoq UP; disk 27.44 GiB; RAM 3.75 GiB.
