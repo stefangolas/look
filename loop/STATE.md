@@ -75,9 +75,9 @@ corrected, annex C = ORACLE POLICY CHANGE), then docs/SOLVER_COVERAGE_SPEC.md
 
 ## Where we are
 
-> LATEST GROUND TRUTH [operator 2026-09-12T09:00Z / 05:00 local]: 0 RUNNING / 0
-> landed-this-cycle / 0 unblocked / 0 flipped / 0 dispatched. HEAD `d6fdee5`
-> (the 08:36Z operator commit; re-verified UNCHANGED this cycle - no packet work
+> LATEST GROUND TRUTH [operator 2026-09-12T09:21Z / 05:21 local]: 0 RUNNING / 0
+> landed-this-cycle / 0 unblocked / 0 flipped / 0 dispatched. HEAD `fea267c`
+> (the 09:00Z operator commit; re-verified UNCHANGED this cycle - no packet work
 > moved, all eight slot tips re-checked, registry re-derived).
 > **SLOTS 0+1 FHC-TRIM FINISHED with RESULT status SPEC_GAP - both duplicate runs
 > agree.** Worker commits 33f6269 (slot 0, `packet/FHC-TRIM-EXTRUDE-ENVELOPE-slot0`)
@@ -115,7 +115,7 @@ corrected, annex C = ORACLE POLICY CHANGE), then docs/SOLVER_COVERAGE_SPEC.md
 > (29264), overnight driver 1 (24864); cargoq UP (ping ok, queued 0, running
 > false). TWO supervisors (19172 + 27828) + TWO cargoq/server.py (28544 + 34564) =
 > carried duplication class; only ONE overnight.py child = no double-merge risk.
-> Disk 27.41 GiB free (above the 8 GB floor AND the 15 GB janitor goal); RAM 3.54
+> Disk 27.48 GiB free (above the 8 GB floor AND the 15 GB janitor goal); RAM 3.65
 > GiB free (above the 3 GB floor).
 > Root worktree carries live human/orchestrator-session WIP (M README.md, M
 > docs/F1_HYPERCAR_GAP_REGISTER.md, M loop/LEDGER.jsonl, M loop/cargoq/server.log;
@@ -181,12 +181,12 @@ corrected, annex C = ORACLE POLICY CHANGE), then docs/SOLVER_COVERAGE_SPEC.md
   queued 0, running false). TWO supervisor.py (19172 PyManager + 27828
   pythoncore) and TWO cargoq/server.py (28544 + 34564) = carried duplication
   class; only ONE overnight.py child = no double-merge risk.
-- Disk 27.41 GiB free (above the 8 GB floor AND the 15 GB janitor goal).
+- Disk 27.48 GiB free (above the 8 GB floor AND the 15 GB janitor goal).
 - RAM 3.54 GiB free (above the 3 GB floor); chrome closed. Do not raise the
   worker cap without re-deriving the RAM arithmetic.
-- [operator 2026-09-12T09:00Z] board: 0 RUNNING / 0 landed / 0 unblocked /
+- [operator 2026-09-12T09:21Z] board: 0 RUNNING / 0 landed / 0 unblocked /
   0 flipped / 0 dispatched; registry 354 = 252 D / 91 R / 10 B / 1 S; HEAD
-  d6fdee5.
+  fea267c.
 
 [operator 2026-09-09T02:2xZ - volatile refresh after the ADM-L4 operator
 landing. Board now: 0 running / 6 FINISHED residue (L1,L2,L3,F1,CL-005,
