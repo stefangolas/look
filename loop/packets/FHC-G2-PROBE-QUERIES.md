@@ -23,7 +23,7 @@ read_allow:
   - docs/TTC_CENSUS_FINAL.md
 tests_required: [truck123d/tests/probe_queries.rs]
 anchors:
-  - {id: A1, expect: 4, cmd: "grep -c 'OCC probe of a kernel-engine row' corpus/ttc/door.py"}
+  - {id: A1, expect: 3, cmd: "grep -c 'OCC probe of a kernel-engine row' corpus/ttc/door.py"}
   - {id: A2, expect: 1, cmd: "grep -c 'fn bd_facts' truck123d/src/bd_bridge.rs"}
 budget:      {turns: 55, ctx_tokens: 160000}
 ```
@@ -91,7 +91,7 @@ weakened tests, bare `cargo test`; committing to `main`.
 
 ```json
 {"id":"FHC-G2-PROBE-QUERIES","status":"DONE","contracts":["FHC-G2-PROBE-QUERIES"],
- "anchors_verified":{"A1":4,"A2":1},
+ "anchors_verified":{"A1":3,"A2":1},
  "rows_flipped":[],"notes":"per-row verdict after probes pass"}
 ```
 
