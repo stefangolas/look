@@ -8677,3 +8677,59 @@ wt RESULT residue. Noted: RAM below the 3 GB floor this cycle (watch the G4 warm
 
 Leaving: 0 RUNNING / HEAD 647b756 + this cycle's STATE/log commit; heartbeat 1 (27872,
 LIVE); watchdog 1; cargoq UP; disk 15.62 GB; RAM 2.54 GB.
+
+## 2026-09-12 20:29 UTC (operator)
+
+Board at start: 1 RUNNING (FHC-G4-NAMED-CARRIER-ADMISSION, slot 0); slots 1/2 IDLE
+residue; slots 3-7 FINISHED landed residue. HEAD `75c2a5e` - two FHC-G7 bookkeeping
+commits (3c71f9d row LANDED, 75c2a5e RESULT filed) landed on top of the 20:05Z
+operator commit since the last block.
+
+Health sweep: heartbeat exactly 1 (27872, LIVE, last cycle 16:16:30 local, dispatched
+0; the second match was my own probing shell); watchdog 1 (29264); operator runner 1
+(27876); overnight driver 1 (24864); cargoq UP (ping ok, queued 0, running false; /stats
+shows FHC-G4's jobs cycling - fmt/clippy/named_carrier_admission tests). Disk 13.78 GB
+free (above the 8 GB floor, below the 15 GB janitor goal; no TEMP baseline leaks). RAM
+1.86 GB free - BELOW the 3 GB floor (the FHC-G4 worker is resident). TWO supervisor.py
+(19172+27828) and TWO cargoq/server.py (28544+34564) = carried duplication.
+
+Land (step 2): nothing landable. All FINISHED slot worker commits re-verified ancestors
+of integration/kernel-bg by `git merge-base --is-ancestor` (e6553db/3c2109b/ee97499/
+713f205/5cf4811); RESULT statuses read directly (slot 3/5/6 DONE, slot 4
+LANDED-WITH-FINDINGS, slot 7 LANDED) - no unlanded DONE RESULT.
+
+Unblock (step 3): slot 0 RUNNING and healthy - pid 31192 (cmd shim) -> opencode 17588
+(deepseek-v4-flash on loop/slots/0/wt), events.jsonl growing (1188681 -> 1202669 bytes,
+mtime 16:27), 2 files changed vs base, cargoq jobs cycling. NOT stalled; do not touch.
+Slots 1/2 IDLE are landed residue (FHC-FACTS-CACHE DONE, TTC-RECENSUS-F1-R3 DONE), no
+work, no QUESTION, no 402.
+
+Registry (step 4): last-wins census = 356 unique = 261 DONE / 84 READY / 10 BLOCKED /
+1 SUPERSEDED. READY rows WITHOUT a landed marker = 6: FHC-G4 (RUNNING), FHC-G5/G6/G1
+(correctly blocked on G4/G5/G6), and RG-23/RG-9. RG-23/RG-9 remain non-dispatchable:
+their packet .md files are ABSENT (only the registry rows exist) - `gen_packet --check
+loop/packets/RG-23-...md` raises FileNotFoundError; they also write-set-clash with the
+RUNNING FHC-G4 on truck123d/src/bd_bridge.rs. Missing authoring, NOT anchor drift - do
+NOT invent; escalated, carried. BLOCKED-with-all-deps-landed = 10, all correctly parked
+(BG-AUD-FIX-004 OWNER_BLOCKED, BG-CK-SPLINE-CENSUS owner-cancelled, SEM-PCURVE-MASTER-
+001-FIX SUPERSEDED, DEF-SPINEFRAME-GRAZE SPEC_GAP->-R2, DEF-TESS-ANALYTIC-SEAM
+superseded by -R2, DEF-SEEDRAY-B human-gated, TOR-C orchestrator-held, MONO-10 owner-
+gated, RDEF-M4/M5 preflight/adjudication-gated). Nothing flipped.
+
+Dispatch (step 5): ran `dispatch_ready --dry-run --max-workers=4` ONLY (heartbeat owns
+live dispatch). Output: "slots: 8 (1 running, 7 free); slot-assigned packets: 5;
+RG-23/RG-9 clash on bd_bridge.rs; FHC-G5/G6/G1 blocked on G4; dispatched 0; workers
+now ~1/4" - REAL idle beyond the running G4. Did NOT run live.
+
+STATE (step 6): refreshed the LATEST GROUND TRUTH block and "State of the machine, as
+left" to [operator 2026-09-12T20:29Z]. Stable traps/history untouched.
+
+Report (step 7): this entry.
+
+Escalations: nothing NEW; carried unchanged - RG-23/RG-9 missing packet authoring;
+duplicate supervisors + duplicate cargoq/server.py; F1-AUTHORING-ARMS
+LANDED-WITH-FINDINGS; FRAME-REVOLVE F1 non_z_axis pin; TOR-C flip-or-pin; slot-1/2/4/7
+wt RESULT residue. Noted: RAM below the 3 GB floor with the FHC-G4 worker resident.
+
+Leaving: 1 RUNNING (FHC-G4) / HEAD 75c2a5e + this cycle's STATE/log commit; heartbeat 1
+(27872, LIVE); watchdog 1; cargoq UP; disk 13.78 GB; RAM 1.86 GB.
