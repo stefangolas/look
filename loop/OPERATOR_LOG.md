@@ -8884,3 +8884,61 @@ crashed 0xC0000409 - do not run cargo in a slot the driver is checking.
 Leaving: 0 RUNNING / G5 committed unlanded at e69f404 / HEAD 220c184 + this cycle's
 STATE/log/escalations commit; heartbeat 1 (27872, LIVE); watchdog 1; cargoq UP; disk
 9.5 GB; RAM 2.3 GB.
+
+## 2026-09-12 22:46 UTC (operator cycle)
+
+Health sweep (step 1): `slot_status.py` - slot 0 RUNNING FHC-G6-CERT-COST-SCALE (pid
+15368, branch packet/FHC-G6-CERT-COST-SCALE@44e769f =base, events 7 s fresh, changed=0
+pre-edit); slots 1/2 IDLE residue (=base, DONE packets); slots 3-7 FINISHED landed
+residue. cargoq ping ok (queued 0, running false). Heartbeat exactly 1 (27872, LIVE),
+operator runner 1 (27876), watchdog 1 (29264), overnight driver 1 (24864, cycling), TWO
+supervisor.py (19172 + 27828) carried duplication. Disk 9.2 GiB free (above 8 GB floor,
+below 15 GB goal; slot 0 holds 3.0 GB outer + 10.1 GB inner target, in use). RAM
+2.34-2.5 GiB free (BELOW the 3 GB floor; G6 worker resident). No
+`%TEMP%/look-verify-baseline-*` leaks. Root worktree: human WIP (M loop/LEDGER.jsonl, M
+loop/cargoq/server.log, untracked benchmarks/ + loop/baselines/) untouched.
+
+Land (step 2): NOTHING to land. **The prior cycle's HIGH escalation is RESOLVED: G5
+LANDED.** The overnight driver (24864) was not permanently wedged - `overnight.log`
+records "09-12 18:38:22 slot 0: FHC-G5-SWALLOWED-REFUSAL-DIAGNOSIS LANDED at e69f404";
+merge `18e44ef`, row landed `44e769f`, and `e69f404` is now an ancestor of HEAD
+(verified by `git merge-base --is-ancestor`). Slot 0 was then re-forked to the frontier
+G6 at 18:41:55 local. Slots 3-7 tips all re-verified ancestors of HEAD
+(e6553db/3c2109b/ee97499/713f205/5cf4811); slot 4 is LANDED-WITH-FINDINGS (not
+landable). Nothing else landable.
+
+Unblock (step 3): no IDLE/DEAD slot holding work (slots 1/2 residue are DONE packets);
+no QUESTION anywhere; slot 0 running healthy and making progress - not touched.
+
+Registry hygiene (step 4): nothing mechanically flippable. Registry 361 lines / 358
+unique = 264 DONE / 86 READY / 10 BLOCKED / 1 SUPERSEDED; 3 byte-identical duplicate
+lines carried/escalated (MONO-9-FUSE-FOLD, RDEF-M1-LATTICE-V2, FHC-G7-REFUSAL-METADATA).
+All 10 BLOCKED rows checked programmatically: empty-needs holds (BG-AUD-FIX-004,
+SEM-PCURVE-MASTER-001-FIX, DEF-SPINEFRAME-GRAZE, MONO-10, RDEF-M4, RDEF-M5) and unmet
+deps (DEF-TESS-ANALYTIC-SEAM needs DEF-VENDOR-FIXTURES READY; DEF-SEEDRAY-B needs
+DEF-SEEDRAY-A READY; TOR-C needs ADM-001/002 which are status READY though landed-by-
+marker - the documented drift class, orchestrator-held per the standing escalation).
+RG-23/RG-9 anchor preflight deferred as a dispatch-time ritual (they are write-set
+clashed with the RUNNING G6 anyway).
+
+Dispatch (step 5): did NOT run live (heartbeat owns dispatch, is LIVE).
+`dispatch_ready --dry-run --max-workers=4`: "slots: 8 (1 running, 7 free); dispatched
+0; workers now ~1/4" - correct. RG-23/RG-9 and FHC-B clash on the RUNNING row's
+`truck123d/src/bd_bridge.rs`; FHC-G1 blocked on G6; FHC-C blocked on FHC-B.
+
+STATE (step 6): rewrote the LATEST GROUND TRUTH block and the "State of the machine, as
+left" section to [operator 2026-09-12T22:46Z] (1 RUNNING G6, G5 landed, HEAD 44e769f,
+disk 9.2 GB, RAM 2.34-2.5 GB). Stable traps/history untouched.
+
+Report (step 7): this entry.
+
+Escalations: NO new escalation this cycle; the 22:23Z HIGH driver-wedge/G5-unlanded
+item is marked RESOLVED in ESCALATIONS (the driver recovered and landed G5; the
+`overnight.py scoped_check` unbounded-timeout machinery note remains worth a human
+look). Carried unchanged - duplicate supervisors + lagging cargoq restart guard; 3
+duplicate registry lines; F1-AUTHORING-ARMS LANDED-WITH-FINDINGS; FRAME-REVOLVE F1
+non_z_axis pin; TOR-C flip-or-pin; slot-1/2/4/7 wt RESULT residue; schedule.py 'needs'
+crash.
+
+Leaving: 1 RUNNING (FHC-G6) / HEAD 44e769f + this cycle's STATE/log/escalation commit;
+heartbeat 1 (27872, LIVE); watchdog 1; cargoq UP; disk 9.2 GB; RAM 2.34 GB.

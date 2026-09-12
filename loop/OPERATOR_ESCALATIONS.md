@@ -2243,3 +2243,15 @@ uncommitted - left for the orchestrator, no dispatch impact.
 - Priority: HIGH - G6, G1, FHC-B, FHC-C are all chained behind G5; the frontier is
   stalled until it lands or is adjudicated. `overnight.py scoped_check` should also get a
   bounded per-command timeout smaller than 3600 s (machinery defect).
+
+## 2026-09-12 22:46 UTC (operator): RESOLVED - the 22:23Z G5-unlanded/driver-wedge item
+
+- Resolution: the overnight driver (24864) recovered on its own and landed G5. `loop/
+  overnight.log` records "09-12 18:38:22 slot 0: FHC-G5-SWALLOWED-REFUSAL-DIAGNOSIS
+  LANDED at e69f404"; the merge is `18e44ef`, the registry row is flipped (`44e769f`),
+  and `e69f404` is an ancestor of HEAD. Slot 0 was re-forked to the frontier FHC-G6 at
+  18:41:55 local, which is RUNNING healthy. No human action required for the landing.
+- Still worth a look (machinery, not blocking): `overnight.py scoped_check`'s 3600 s
+  unbounded default let the driver appear wedged for ~28 min; a bounded per-command
+  timeout would make a future wedge visible sooner.
+- Priority: closed (landing); the timeout note is low.
