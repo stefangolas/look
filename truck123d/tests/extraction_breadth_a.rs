@@ -23,10 +23,10 @@
 //!    one periodic spline certifies an exact bracket.
 //! 4. `unconnectable_section_refuses_typed` — a section whose recorded edges
 //!    cannot form a ring keeps the typed `unsupported_envelope` refusal.
-//! 5. `still_open_rows_keep_their_typed_refusals` — the rows this packet does
-//!    not flip (nose: a canonical cylinder union the landed canonical boolean
-//!    product does not carry; cockpit: a corpus OCC probe) refuse TYPED, never
-//!    untyped.
+//! 5. `still_open_rows_keep_their_typed_refusals` — nose (a canonical cylinder
+//!    union the landed canonical boolean product does not carry) still refuses
+//!    TYPED, never untyped; cockpit's corpus OCC probe was admitted by the
+//!    FHC-G2 probe-query landing, so the row is now GREEN.
 
 use std::path::{Path, PathBuf};
 use std::process::Command;
@@ -386,14 +386,14 @@ fn still_open_rows_keep_their_typed_refusals() {
         "nose refusal must be typed"
     );
 
-    // cockpit: the loft now certifies, but the corpus's own OCC bounds probe
-    // (`_prism_estimate` -> `surfaces.bbox`) cannot be served on a
-    // kernel-engine row, so the door records the typed refusal rather than an
-    // untyped OCP `TypeError`.
+    // cockpit: the corpus's own OCC bounds probe (`_prism_estimate` ->
+    // `surfaces.bbox`) was admitted by the FHC-G2 probe-query landing (the
+    // certified carrier-derived enclosure), so the row now builds GREEN under
+    // the truck door rather than refusing.
     let cockpit = run_truck_door("lib.cockpit", "build_cockpit", "[]");
-    assert_eq!(cockpit["ok"], false, "cockpit is still red: {cockpit}");
-    assert_eq!(
-        cockpit["error"]["kind"], "Refused",
-        "cockpit refusal must be typed"
+    assert_eq!(cockpit["ok"], true, "cockpit is now green: {cockpit}");
+    assert!(
+        cockpit["facts"]["solid_count"].as_u64().unwrap_or(0) > 0,
+        "cockpit facts must carry solids: {cockpit}"
     );
 }

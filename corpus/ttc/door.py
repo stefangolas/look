@@ -238,6 +238,31 @@ def _kernel_facts(node, verb=None, carrier=None, phase=None, via=None):
         raise
 
 
+# ---------------------------------------------------------------------------
+# FHC-G5: the swallowed-refusal record.
+#
+# The corpus builders probe a kernel row through OCC idioms and swallow the
+# drop-in refusal in a bare `except Exception` before wrapping it in an
+# untyped error (`floor._loft_stack`: `is_valid_shape` -> `False` -> `raise
+# RuntimeError("floor loft failed: None")`). The corpus trees are untouchable,
+# so the door makes the swallowed case VISIBLE instead: every door-side probe
+# that catches a typed refusal records it here. The door is a plain
+# process-per-script harness (one row per process), so the slot is per-build.
+# `_error_record` surfaces the recorded typed refusal in place of the untyped
+# wrapper, preserving the wrapper verbatim under `swallowed_wrapper`.
+# ---------------------------------------------------------------------------
+
+_SWALLOWED_REFUSAL = None
+
+
+def _record_swallowed_refusal(exc):
+    """Remember the first typed refusal a door-side probe swallowed (FHC-G5)."""
+    global _SWALLOWED_REFUSAL
+    if _SWALLOWED_REFUSAL is None and type(exc).__name__ in ("Refused", "Unresolved"):
+        _SWALLOWED_REFUSAL = exc
+    return exc
+
+
 def _carrier_name(shape):
     """The recorded carrier-class name of one door row (data only)."""
     solid = getattr(shape, "_solid", None)
@@ -1804,7 +1829,19 @@ class _Shape:
         return _certified_bbox_carrier(facts["bbox"]).wrapped
 
     def _facts(self):
-        return json.loads(_kernel_facts(self._node(), phase="facts", via="_facts"))
+        # FHC-G5: the OCC-probe path (`wrapped` / `is_valid` / `volume`) is the
+        # one the corpus builders swallow. Record the typed refusal before the
+        # caller's bare `except Exception` can lose it.
+        try:
+            return json.loads(_kernel_facts(
+                self._node(),
+                carrier=_carrier_name(self),
+                phase="facts",
+                via="_facts",
+            ))
+        except BaseException as exc:
+            _record_swallowed_refusal(exc)
+            raise
 
     @property
     def volume(self):
@@ -3513,9 +3550,20 @@ def _error_record(exc, module=None, entry=None):
     ``verb``, ``carrier``, ``phase``, ``client_site``, ``known_gap``) are
     additive siblings. An untyped die-off class emits ``typed: false`` and no
     ``refusal_code`` (a register gap by definition).
+
+    FHC-G5: when the failing exception is an untyped ``RuntimeError`` wrapper
+    and a door-side probe recorded a swallowed typed refusal, the typed refusal
+    is surfaced (the corpus builder's `is_valid_shape` swallow cannot hide it)
+    and the wrapper is preserved verbatim under ``swallowed_wrapper``.
     """
     kind = type(exc).__name__
     typed = kind in ("Refused", "Unresolved")
+    swallowed_wrapper = None
+    if not typed and kind == "RuntimeError" and _SWALLOWED_REFUSAL is not None:
+        swallowed_wrapper = {"kind": kind, "message": str(exc)}
+        exc = _SWALLOWED_REFUSAL
+        kind = type(exc).__name__
+        typed = kind in ("Refused", "Unresolved")
     payload = getattr(exc, "payload", None)
     error = {"kind": kind}
     if typed:
@@ -3537,6 +3585,8 @@ def _error_record(exc, module=None, entry=None):
             error["phase"] = phase
     else:
         error["typed"] = False
+    if swallowed_wrapper is not None:
+        error["swallowed_wrapper"] = swallowed_wrapper
     via = getattr(exc, "client_site_via", None)
     site = {}
     if module is not None:

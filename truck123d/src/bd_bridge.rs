@@ -683,6 +683,7 @@ fn solid_volume(solid: &SolidSpec) -> Result<f64, Refusal> {
                 return spline_profile_prism_facts(trim_curve, *amount, *both)
                     .map(|(volume, _, _)| volume);
             }
+            trim_amount_guard(*amount)?;
             crate::python::binding::trim_extrude_solid(
                 profile, *amount, *both, trim_curve, trim_net, *tolerance,
             )
@@ -1247,6 +1248,7 @@ fn solid_local_bbox(solid: &SolidSpec) -> Result<[[f64; 3]; 2], Refusal> {
                 return spline_profile_prism_facts(trim_curve, *amount, *both)
                     .map(|(_, bbox, _)| bbox);
             }
+            trim_amount_guard(*amount)?;
             crate::python::binding::trim_extrude_solid(
                 profile, *amount, *both, trim_curve, trim_net, *tolerance,
             )
@@ -3415,14 +3417,19 @@ pub(crate) fn prism_geom(
     amount: f64,
     both: bool,
 ) -> Result<PrismGeom, Refusal> {
-    if !amount.is_finite() || amount <= 0.0 {
+    if !amount.is_finite() || amount == 0.0 {
         return Err(Refusal::Empty);
     }
     let loop3 = profile_loop(profile)?;
+    // A signed amount is the build123d extrude direction: a negative amount
+    // sweeps along the profile's negative normal. `both` is symmetric, so its
+    // sign is immaterial.
     let (t_lo, t_hi) = if both {
-        (-amount, amount)
-    } else {
+        (-amount.abs(), amount.abs())
+    } else if amount > 0.0 {
         (0.0, amount)
+    } else {
+        (amount, 0.0)
     };
     let height = t_hi - t_lo;
     let volume = loop3.area * height;
@@ -5745,6 +5752,7 @@ fn solid_mesh(solid: &SolidSpec, deflection: Option<f64>) -> Result<Vec<Triangle
                 return spline_profile_prism_facts(trim_curve, *amount, *both)
                     .map(|(_, _, mesh)| mesh);
             }
+            trim_amount_guard(*amount)?;
             crate::python::binding::trim_extrude_solid(
                 profile, *amount, *both, trim_curve, trim_net, *tolerance,
             )
@@ -5871,7 +5879,7 @@ fn spline_profile_prism_facts(
     amount: f64,
     both: bool,
 ) -> Result<SplinePrismFacts, Refusal> {
-    if !amount.is_finite() || amount <= 0.0 {
+    if !amount.is_finite() || amount == 0.0 {
         return Err(Refusal::Empty);
     }
     let mut scale = 0.0f64;
@@ -5901,10 +5909,14 @@ fn spline_profile_prism_facts(
         return Err(Refusal::Empty);
     }
     let normal = [area_vec[0] / area, area_vec[1] / area, area_vec[2] / area];
+    // A signed amount sweeps along the loop's negative normal (the build123d
+    // extrude direction); `both` is symmetric.
     let (t_lo, t_hi) = if both {
-        (-amount, amount)
-    } else {
+        (-amount.abs(), amount.abs())
+    } else if amount > 0.0 {
         (0.0, amount)
+    } else {
+        (amount, 0.0)
     };
     let volume = area * (t_hi - t_lo);
 
@@ -10430,6 +10442,21 @@ fn trim_binding_error_to_refusal(error: crate::python::binding::BindingError) ->
             Refusal::UnsupportedEnvelope(EnvelopeCase::NonCanonicalCarrier)
         }
     }
+}
+
+/// The landed trim-extrude constructor carries a positive sweep amount; the
+/// build123d negative-direction form (`hypercar/aero`'s `_xz_band` composes
+/// `bd.extrude(face, amount=-half_y)`) is outside its envelope. Answer that
+/// form with the named carrier refusal rather than the constructor's malformed
+/// `Empty` (FHC-G5: the `case empty` was a missing carrier, not a degenerate
+/// section).
+fn trim_amount_guard(amount: f64) -> Result<(), Refusal> {
+    if !amount.is_finite() || amount <= 0.0 {
+        return Err(Refusal::UnsupportedEnvelope(
+            EnvelopeCase::NonCanonicalCarrier,
+        ));
+    }
+    Ok(())
 }
 
 /// The pyo3 measurement entry: takes the construction tree JSON and returns
