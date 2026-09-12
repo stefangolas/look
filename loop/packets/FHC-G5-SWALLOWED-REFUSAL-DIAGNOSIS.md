@@ -19,20 +19,24 @@ write_allow:
   - corpus/ttc/door.py
   - truck123d/src/bd_bridge.rs
   - truck123d/tests/swallowed_refusal_diagnosis.rs
+  - truck123d/tests/refusal_metadata.rs
+  - truck123d/tests/extraction_breadth_a.rs
 read_allow:
   - docs/F1_HYPERCAR_GAP_REGISTER.md
   - corpus/ttc/trees/f1/src/lib/floor.py
   - corpus/ttc/trees/f1/src/lib/diffuser.py
 tests_required: [truck123d/tests/swallowed_refusal_diagnosis.rs]
 anchors:
-  - {id: A1, expect: 0, cmd: "grep -c 'is_valid_shape' corpus/ttc/door.py"}
+  - {id: A1, expect: 2, cmd: "grep -c 'is_valid_shape' corpus/ttc/door.py"}
 budget:      {turns: 55, ctx_tokens: 170000}
 ```
 
-Anchor measured 2026-09-12 at the EX-B-landed HEAD (door.py carries no
-`is_valid_shape` — the swallow lives in the corpus builder; the door-side
-propagation point is the refusal path this packet edits). **Re-measure at
-dispatch.**
+Anchor measured 2026-09-12 (A1=0: door.py carried no `is_valid_shape`).
+**DRIFTED, re-measured 2026-09-13 (A1=2): the FHC-G2 landing added
+`is_valid_shape` answers to door.py — the hygiene premise is partially
+resolved by landed work.** The diagnosis step stands; verify what floor/
+diffuser now do through the door before assuming the swallow persists.
+Re-measure at dispatch.
 
 ## Pre-made judgements
 
@@ -57,6 +61,15 @@ dispatch.**
 4. **`hypercar/powertrain`:** door spot-check to name the first refusing
    verb past its landed name-gap; admit if it maps to landed machinery,
    else typed refusal naming it.
+5. **AMENDED 2026-09-13 (owner session): stale test pins from the G4
+   landing.** G4's admissions moved two row verdicts past their pinned
+   literals: `truck123d/tests/refusal_metadata.rs` pins
+   `hypercar/brakes` at `E_NEEDS_CLOSED_PROFILE` (now
+   `E_UNSUPPORTED_ENVELOPE` at the face_boolean carrier) and
+   `truck123d/tests/extraction_breadth_a.rs` pins `hypercar/cockpit` red
+   (already green at the dispatch HEAD). Update both pins to the current
+   honest verdicts (both files are in this packet's write allow), keeping
+   every other assertion untouched.
 5. One row at a time; every outcome (green or typed) is recorded with the
    door's verbatim record in RESULT.
 
