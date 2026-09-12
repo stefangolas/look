@@ -211,8 +211,13 @@ engine = bd.Compound(obj=parts, children=parts, label=label)
 The repository ships a text-to-CAD corpus with a door script that builds every
 model on the kernel engine and exports both a certification artifact (binary
 STL) and a render artifact (colored indexed GLB, one node per part, materials
-from the script's own colors). One line builds the Falcon Heavy — 2,142 parts —
-into both artifacts:
+from the script's own colors). Refusals are self-describing: each non-green
+run returns a `ttc_door_run.v2` record whose `error` block carries a stable
+`refusal_code`, the `verb`/`carrier`/`phase` in scope, the corpus
+`client_site`, and a hand-maintained `known_gap` pointer into the gap
+register — see [`docs/REFUSALS.md`](docs/REFUSALS.md) for the full schema and
+code table. One line builds the Falcon Heavy — 2,142 parts — into both
+artifacts:
 
 ```console
 python corpus/ttc/door.py --engine truck corpus/ttc/trees/falcon_heavy/src lib.falcon_common build_vehicle "[]" falcon_heavy.stl --glb falcon_heavy.glb
