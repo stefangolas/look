@@ -8076,3 +8076,67 @@ flip-or-pin; slot-4/slot-7 wt RESULT residue.
 Leaving: 1 RUNNING (FHC-MIRROR-FORM slot 0); HEAD 51b884f + this cycle's
 STATE/log commit; heartbeat 1; operator_runner 1; watchdog 1; cargoq UP; disk
 22.15 GiB; RAM 1.3 GiB (below floor).
+
+## [operator 2026-09-12T13:53Z] quiet cycle; FHC-MIRROR-FORM healthy (DLL_NOT_FOUND is the env trap, not RAM)
+
+Health sweep (step 1): slot_status -> slot 0 RUNNING FHC-MIRROR-FORM (cmd pid
+34384, events fresh, changed=2); slots 1-7 FINISHED/IDLE landed residue. cargoq
+ping {"ok":true,"queued":0,"running":false}. Exactly ONE dispatch_heartbeat
+(27872, last cycle 09:50:38 local), ONE watchdog (29264), ONE operator_runner
+(27876), ONE overnight driver (24864). TWO supervisor.py (19172 + 27828) and
+TWO cargoq/server.py (28544 + 34564) = carried duplication class. Disk 24.09
+GiB free (above 8 GB floor and 15 GB goal); **RAM 1909 MB free - BELOW the 3 GB
+floor** (owner desktop + two opencode resident). This is the cycle's one health
+flag (carried from 13:33Z).
+
+Land (step 2): HEAD is `26810d5` (the 13:33Z operator commit) - no work moved
+this cycle. Re-verified by `git merge-base --is-ancestor` against
+integration/kernel-bg: 4a1dd49, c3df084, e6553db, 3c2109b, ee97499, 713f205,
+5cf4811 all TRUE. wt RESULT statuses read directly: slot 1 SPEC_GAP (superseded
+by the 4a1dd49 owner landing), slot 3/5/6 DONE, slot 4 LANDED-WITH-FINDINGS,
+slot 7 LANDED. Nothing operator-landable; NOTHING landed.
+
+Unblock (step 3): no IDLE/DEAD worker holding work, no QUESTION, no 402. Slot 0
+is RUNNING and progressing - its cargoq history this cycle: truck123d release
+build exit 0 (452s), `--test mirror_form` exit 0 (33s), then `cargo test -p
+truck123d --lib` exit 3221225781 = **0xC0000135 STATUS_DLL_NOT_FOUND** twice.
+This is the KNOWN session-58 trap (cargoq server env does not inherit the
+dispatch-client PATH, so the test exe cannot find its DLLs), NOT the RAM
+signature (0xC0000409 = 3221225993). The worker is alive and re-running with the
+python interpreter dir on PATH; per the charter I did not touch it. Nothing to
+unblock.
+
+Registry (step 4): re-derived by command (last-wins dedup): 354 unique = 253
+DONE / 90 READY / 10 BLOCKED / 1 SUPERSEDED. All 10 BLOCKED rows read
+programmatically - every dep is DONE or the row is an empty-needs deliberate
+hold; all correctly parked (BG-AUD-FIX-004 OWNER_BLOCKED; BG-CK-SPLINE-CENSUS
+owner-cancelled; SEM-PCURVE-MASTER-001-FIX SUPERSEDED; DEF-SPINEFRAME-GRAZE
+SPEC_GAP->-R2; DEF-TESS-ANALYTIC-SEAM superseded by -R2; DEF-SEEDRAY-B
+human-gated; TOR-C orchestrator-held; MONO-10 owner R3-mesh; RDEF-M4
+M0-adjudication; RDEF-M5 owner) - NOTHING flipped. READY-without-landed-marker =
+exactly the FHC chain (needs-gated on FHC-MIRROR-FORM) + RG-23/RG-9 (packet .md
+files still ABSENT from loop/packets/; glob shows only RG-4; missing authoring,
+not anchor drift, so the anchor ritual does not apply). Nothing mechanically
+fixable.
+
+Dispatch (step 5): `dispatch_ready --dry-run --max-workers=4` -> "slots: 8 (1
+running, 7 free); slot-assigned packets: 6; RG-23/RG-9 write-set clash with the
+RUNNING row (bd_bridge.rs); FHC chain needs-gated; dispatched 0; workers now
+~1/4". REAL idle; real dispatcher NOT run (heartbeat live = double-dispatch
+rule).
+
+STATE (step 6): refreshed the volatile LATEST GROUND TRUTH block
+([operator 2026-09-12T13:53Z], HEAD 26810d5, board 1 RUNNING / 0 landed, the
+DLL_NOT_FOUND-vs-RAM clarification, registry 354=253/90/10/1, RAM 1909 MB) and
+the "State of the machine, as left" lines. Stable traps/history untouched.
+
+Escalations: NO NEW item this cycle. The 13:33Z LOW RAM escalation carries
+(RAM 1.9 GiB, still below floor); I corrected its crash-signature note: the
+slot-0 test exits are DLL_NOT_FOUND, not the RAM 0xc0000409. Carried unchanged:
+RG-23/RG-9 missing packet files; duplicate supervisors + duplicate
+cargoq/server.py; F1-AUTHORING-ARMS LANDED-WITH-FINDINGS; FRAME-REVOLVE F1
+non_z_axis pin; TOR-C flip-or-pin; slot-4/slot-7 wt RESULT residue.
+
+Leaving: 1 RUNNING (FHC-MIRROR-FORM slot 0); HEAD 26810d5 + this cycle's
+STATE/log commit; heartbeat 1; operator_runner 1; watchdog 1; cargoq UP; disk
+24.09 GiB; RAM 1909 MB (below floor).
