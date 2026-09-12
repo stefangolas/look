@@ -7532,3 +7532,55 @@ slot-4/slot-7 wt RESULT residue.
 Leaving: 0 RUNNING; slots 0/1 FINISHED SPEC_GAP (escalated), slots 2-7 landed
 residue; HEAD 2e0419b + this cycle's STATE/log commit; heartbeat 1;
 operator_runner 1; watchdog 1; cargoq UP; disk 27.51 GiB; RAM 3.63 GiB.
+
+## [2026-09-12T10:06Z] operator cycle
+Board: 0 RUNNING / 0 landed-this-cycle / 0 unblocked / 0 flipped / 0 dispatched.
+Health (step 1): slot_status 8 slots all FINISHED/IDLE (slots 0/1 FHC-TRIM
+SPEC_GAP, slots 2-7 landed residue); cargoq UP (ping {ok:true, queued:0,
+running:false}, /stats quiet); heartbeat EXACTLY 1 (27872); watchdog 1 (29264);
+operator runner 1 (27876); overnight driver 1 (24864); TWO supervisors (19172 +
+27828) and TWO cargoq/server.py (28544 + 34564) = carried duplication class,
+only ONE overnight.py child = no double-merge risk. Disk 27.63 GiB free; RAM
+3.64 GiB free; no TEMP baseline leaks; no cargo/rustc running.
+
+Land (step 2): NOTHING landable. Slots 0/1 RESULT status SPEC_GAP (do-not-land
+class, both duplicate runs agree) - carried escalation. Slots 2-7 worker tips
+re-verified ancestors of HEAD this cycle (c3df084, e6553db, 3c2109b, ee97499,
+713f205, 5cf4811); slot 0 33f6269 and slot 1 4a1dd49 both NOT ancestors (the
+SPEC_GAP pair).
+
+Unblock (step 3): NOTHING. No RUNNING worker; slot 2 IDLE but its tip c3df084
+is an ancestor (row TTC-RECENSUS-F1-R3 DONE) = landed residue, not a stuck
+worker. No QUESTION, no 402.
+
+Registry hygiene (step 4): registry re-derived by command: 354 unique rows =
+252 DONE / 91 READY / 10 BLOCKED / 1 SUPERSEDED (matches prior cycle). RG-23 /
+RG-9 READY rows fail gen_packet --check because the packet FILES ARE ABSENT
+(gen_packet FileNotFoundError; only RG-4 exists in loop/packets/) - this is
+missing authoring, NOT anchor drift, so the anchor ritual does not apply; do
+not invent a file. Carried escalation. Nothing flipped.
+
+Dispatch (step 5): dispatch_ready --dry-run --max-workers=4: "slots: 8 (0
+running, 8 free); slot-assigned packets: 5; dispatched 0; workers now ~0/4" =
+REAL idle. Real dispatcher NOT run (heartbeat live = double-dispatch rule).
+Blocked reasons: RG-23 / RG-9 anchor (files absent); FHC-MIRROR-FORM ->
+FHC-TRIM; BD-EMIT-MESH-CACHE -> FHC-MIRROR-FORM; FHC-G1..G6 chained.
+
+STATE (step 6): refreshed the volatile LATEST GROUND TRUTH block ([operator
+2026-09-12T10:05Z], HEAD 676cd0a = the 09:43Z operator commit, disk/RAM to
+measured 27.63/3.64 GiB) and the "State of the machine, as left" board line.
+Stable traps/history untouched.
+
+Worktree note (reported, not actioned): root tree carries live
+human/orchestrator-session WIP (M README.md, M docs/F1_HYPERCAR_GAP_REGISTER.md,
+M loop/LEDGER.jsonl, M loop/cargoq/server.log; untracked benchmarks/ +
+loop/baselines/ + scratch/ + mobius.step + vendor/truck/*.obj).
+
+Escalations: NONE NEW this cycle. Carried unchanged: FHC-TRIM SPEC_GAP pair;
+RG-23/RG-9 missing packet files; duplicate supervisors + duplicate
+cargoq/server.py; F1-AUTHORING-ARMS LANDED-WITH-FINDINGS; FRAME-REVOLVE F1
+non_z_axis pin; TOR-C flip-or-pin; slot-4/slot-7 wt RESULT residue.
+
+Leaving: 0 RUNNING; slots 0/1 FINISHED SPEC_GAP (escalated), slots 2-7 landed
+residue; HEAD 676cd0a + this cycle's STATE/log commit; heartbeat 1;
+operator_runner 1; watchdog 1; cargoq UP; disk 27.63 GiB; RAM 3.64 GiB.
