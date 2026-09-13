@@ -2664,3 +2664,18 @@ uncommitted - left for the orchestrator, no dispatch impact.
 - Carried unchanged: substrate stack down (supervisor/watchdog/overnight); RG-23/RG-9 authoring
   (packet files absent from `loop/packets/`); slot-4/7 wt RESULT residue; FRAME-REVOLVE F1
   non_z_axis pin; TOR-C flip-or-pin.
+
+## 2026-09-13T21:29Z - operator cycle 25: FHC-G6 SPEC_GAP still unlanded (unchanged); one-line carry
+
+- What/why: slot 0 FHC-G6-CERT-COST-SCALE remains FINISHED-UNLANDED. Its `RESULT.json` status is
+  DONE but it carries a top-level `spec_gap`, and the packet done-when (`cargo fmt --check -p
+  truck123d`, `cargo clippy -p truck123d --all-targets -- -D warnings`) fails on pre-existing
+  files/lints outside `write_allow`. Per charter step 2 -> do NOT land. Orchestrator adjudication is
+  unchanged from 21:06Z: (a) land the byte-identical instrumentation-only commit `19cfd68` and route
+  the `spec_gap` to `docs/F1_HYPERCAR_GAP_REGISTER.md`, or (b) hold/re-fork with a sharpened packet /
+  theory fix. FHC-G1 -> FHC-D -> FHC-E stay chained behind this disposition.
+- Start from: `git -C C:\Users\stefa\look show 19cfd68 --stat`; RESULT only copy is the untracked
+  `C:\Users\stefa\look\loop\slots\0\wt\RESULT.json` (preserve before any re-fork).
+- Carried unchanged: substrate stack down; RG-23/RG-9 authoring; slot-4/7 wt RESULT residue;
+  FRAME-REVOLVE F1 non_z_axis pin; TOR-C flip-or-pin. New note: `loop/slots/5/wt/QUESTION.md` is a
+  stale 2026-09-05 CC-013 artifact in a landed slot (not an active question).
