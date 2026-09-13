@@ -9346,3 +9346,54 @@ items unchanged: RG-23/RG-9 unauthored; duplicate supervisors + duplicate cargoq
 wt RESULT residue; F1 non_z_axis pin; TOR-C flip-or-pin.
 
 Leaving: 1 RUNNING (FHC-G6, slot 1) / HEAD fd40760 + this cycle's STATE/log commit.
+
+---
+
+## operator 2026-09-13T14:03Z - cycle 6
+
+Health sweep (step 1): `slot_status.py` = slot 0 IDLE (dead residue), slot 1 RUNNING, slot 2 IDLE,
+slots 3-7 FINISHED. Heartbeat exactly 1 (27872, `-File ...dispatch_heartbeat.ps1` anchored),
+watchdog 1 (29264), operator runner 1 (27876), overnight driver 1 (24864). cargoq UP (`/ping` ok,
+queued 0, `running: false` - G6's release build completed; `/stats` shows the last jobs `check -p
+truck123d --locked` exit 0 and `build --release -p truck123d --locked` exit 0). Disk was 14.7 GB
+free - just BELOW the 15 GB janitor goal - so I ran `python loop/janitor.py ensure --need 15`; it
+reclaimed ~2.9 GB (the slot-0 dead target) -> **17.23 GB free**. No `%TEMP%/look-verify-baseline-*`
+leaks. **RAM 2.35 GB free - still BELOW the 3 GB floor**, transient: the RUNNING G6 release build is
+the single queued spike; did NOT stack workers or start any build. Carried duplication: TWO
+supervisor.py (19172 + 27828), now THREE cargoq/server.py (28544 + 34564 + 31804) - functional
+(port 8231 answers; the extra is the carried duplication class, not new harm).
+
+Land (step 2): nothing landable. HEAD is `bc1c3f3` (the prior operator's 09:38Z STATE commit - no
+code moved this cycle). `git merge-base --is-ancestor <c> integration/kernel-bg` = True for e6553db,
+3c2109b, ee97499, 713f205, 5cf4811. Slot RESULT statuses: slot 3 DONE, slot 4 LANDED-WITH-FINDINGS,
+slot 5 DONE, slot 6 DONE, slot 7 LANDED - none DONE-and-unlanded; nothing merged.
+
+Unblock (step 3): slot 0 IDLE dead residue of the SAME packet (events 22.4 min old, clean detached
+HEAD at base 58f0c2b, no RESULT/commit/QUESTION) - its packet runs LIVE in slot 1, so no
+reset/re-dispatch (a reset must not touch the live `packet/FHC-G6-CERT-COST-SCALE` branch). No other
+IDLE/DEAD slot holds unlanded work; no new QUESTION (slot 5's is a stale artifact of its already-
+landed CL-006 run); no 402.
+
+Registry hygiene (step 4): last-wins, case-folded `landed()` re-derive = 360 unique = 265 DONE /
+84 READY / 10 BLOCKED / 1 SUPERSEDED. READY-without-landed-marker = exactly the 6 slot-assigned
+packets (RG-23, RG-9, FHC-G6 running, FHC-G1/D/E chained). BLOCKED-with-all-needs-landed = 10 rows,
+NONE mechanically flippable (BG-AUD-FIX-004 OWNER_BLOCKED, BG-CK-SPLINE-CENSUS owner-cancelled,
+SEM-PCURVE-MASTER-001-FIX SUPERSEDED, DEF-SPINEFRAME-GRAZE SPEC_GAP->-R2, DEF-TESS-ANALYTIC-SEAM
+superseded by -R2, DEF-SEEDRAY-B human-gated, TOR-C orchestrator-held, MONO-10 owner candidate,
+RDEF-M4/M5 owner inputs). Nothing to flip; no anchor/lint-fixable READY packet surfaced.
+
+Dispatch (step 5): did NOT run live - heartbeat 27872 owns dispatch and is LIVE.
+`dispatch_ready --dry-run --max-workers=4` = "slots: 8 (1 running, 7 free); dispatched 0"
+(RG-23/RG-9 unauthored and write-set-clash with the RUNNING G6 on `truck123d/src/bd_bridge.rs`;
+FHC-G1 blocked on G6, FHC-D on G1, FHC-E on D) = REAL idle beyond the running G6.
+
+STATE (step 6): rewrote the volatile LATEST GROUND TRUTH block and the "State of the machine, as
+left" status bullets, both labeled [operator 2026-09-13T14:03Z]; corrected HEAD to bc1c3f3,
+recorded G6 RUNNING in slot 1 (slot 0 dead residue), the janitor reclaim to 17.2 GB, and the
+transient RAM-below-floor. Traps/history untouched.
+
+Escalation (step 7): NO new item. Carried human items unchanged: RG-23/RG-9 unauthored; duplicate
+supervisors + duplicate cargoq/server.py; slot-4/7 wt RESULT residue; F1 non_z_axis pin; TOR-C
+flip-or-pin.
+
+Leaving: 1 RUNNING (FHC-G6, slot 1) / HEAD bc1c3f3 + this cycle's STATE/log commit.
