@@ -7185,3 +7185,80 @@ NOT CLEARED (owner decisions): opencode.db 20.6 GB (ALL agent session history
 6.3 GB (needs elevated powercfg /h off), pagefile.sys 11.4 GB (reboot).
 Chain state: EX-A LANDED; EX-B single worker; TRIM -> MIRROR ->
 BD-EMIT-MESH-CACHE queued behind it (docket 5a95bd6).
+
+[ORCHESTRATOR HANDOFF 2026-09-13 (owner interactive session) - the FHC
+program's execution phase is ~80% done; read this, then
+docs/F1_HYPERCAR_COMPLETION_BUILD_SPEC.md + docs/F1_HYPERCAR_GAP_REGISTER.md,
+then slot_status.py.]
+
+WHERE THE PROGRAM STANDS: the F1/hypercar row-closure program (the owner's
+SHORT-TERM ROADMAP + the gap register) has 12 of 15 packets LANDED and 3
+queued. Landed this session chain: FHC-EX-A (closed-loop sections; halo
+green), EX-B (spline lofts as boolean operands; beam_wing/drs_flap/
+front_wing/track-rods/drs_actuator green), TRIM (owner-adjudicated
+SPEC_GAP delivery: rear_wing+steering_rack green; suspension rows blocked
+at the NEWLY-NAMED degenerate planar fan cap - register 4b), MIRROR,
+BD-EMIT-MESH-CACHE (memoized tessellation + shared GLB accessors; kills
+the double-mesh + per-copy re-tessellation), G3 (data-row attributes,
+recovered post-recycle), G2 (probe queries), FACTS-CACHE (orphan 2a0d581
+recovered post-sleep; kills the 94%-redundant authoring brackets), G7
+(self-describing refusal records ttc_door_run.v2 + docs/REFUSALS.md), B
+(multi-contour sections SectionPrism/SectionLathe; analytic annulus exact
+to 1e-12), C (make_loft/FilletPolyline/spline interpolation options).
+Interim census at the 9-green mark is STALE - the count needs a re-run
+now that G3/G2/B/C/FACTS-CACHE are in.
+
+DOCKET REMAINING (serial, all preflight-green):
+1. FHC-G6-CERT-COST-SCALE (slot 0 DEAD-dispatch: the orphaned worker was
+   cleared; the heartbeat's next cycle reset+redispatches - watch RAM,
+   the 0xc0000409 warm-build class hit twice). Measure-first: per-phase
+   decomposition of power_unit + f1/suspension_rear, then whitelisted
+   fixes (trig tables, allocation order) under BYTE-IDENTITY gates.
+2. FHC-G1-RATIONAL-FLUX (design, theory NORMATIVE in packet - the owner's
+   2026-09-12 statement: symmetric-field divergence lemma RF, L5/Theorem-D
+   closure, MONO-8 admission amendment, MONO-9 interval fold, cylinder-pair
+   corollary; 9-test acceptance suite ending in the end-to-end
+   CYLINDER+CYLINDER union). The biggest packet; closes toward ~11
+   boolean-class rows.
+3. FHC-D-SURFACE-RESIDUE + FHC-E-FAN-CAP (the admission-surface audit's
+   complete residual: 4 names + 6 OCP-probe methods + vertices; and the 4b
+   planar fan-cap closed form).
+4. CENSUS R4 (official): re-run all 40 rows, file the table + timing
+   columns to docs/TT_TIMING_RESULTS.md, update the gap register.
+
+KEY FACTS the next session needs:
+- The admission surface is ~97% COVERED and mechanically audited
+  (scratch/admission_surface_audit.py + .json; re-runnable per corpus).
+  38 row-module verbs, 35 covered; residual = FHC-D. The catch-all
+  __getattr__ (E_UNMAPPED_NAME, commit 3e0494e) closed the last untyped
+  name axis: NO script can produce an untyped name failure anymore.
+- The refusal space is total: every verb lands in {admitted,
+  known-refused, unknown-refused-with-metadata}. Records are v2
+  (refusal_code/typed/verb/carrier/phase/client_site/known_gap).
+- The onion pattern is real: G3/G2/B/C each peeled a layer without
+  flipping all their target rows (e.g. lighting now stops at path-spline
+  options... no - C landed those; lighting's next stop is its next
+  carrier). Expect the R4 census to reveal next-layer carriers; classify
+  via the register, book follow-ups, never tune.
+- Performance findings (measured, banked): authoring probes were 94% of
+  beam_wing build (FACTS-CACHE fixes); the door double-meshed (EMIT-CACHE
+  fixes); mesh+write is ~373ms per 342k tris (never the problem); look
+  render setup ~718ms + PNG encode dominate render-side; the 0.4mm render
+  decomposition is STILL unmeasured (janitor kept killing the release
+  build) - do it on a quiet board.
+- Loop machinery notes: dispatch_ready gates on `needs` NOT `depends_on`
+  (both keys now written on all FHC rows); registry status fields drift
+  from landed markers RECURRINGLY - reconcile by merge-base before
+  trusting; duplicate dispatches raced 3x this session (EX-B, TRIM,
+  FACTS-CACHE) - the operator escalates them, kill+reset-only the empty
+  duplicate (reset WITHOUT -only redispatches by design); slot recycles
+  destroy wt RESULTs - file to loop/results immediately on adjudication.
+- The BG-TOL-001 kernel loop (loop/STATE.md's own program) is SEPARATE
+  and was parked at an owner break; the FHC program ran as direct
+  packets + owner-direct changes with per-landing scoped checks
+  (one-verify amendment). vendor/truck untouched all session.
+
+PICK UP HERE: (1) let the heartbeat reset+redispatch G6, adjudicate;
+(2) G1 dispatch + adjudication; (3) FHC-D, FHC-E; (4) census R4 official
+run (fresh python per row, serial, quiet) - file the table, update the
+register tallies, re-project; (5) push origin/main per owner preference.
