@@ -9250,3 +9250,21 @@ clash) / RAM below floor. No new escalation.
 
 Leaving: 1 RUNNING (FHC-C, slot 1) / FHC-G6 frontier held by FHC-C write-set clash + RAM /
 HEAD fa89200 + this cycle's STATE/log commit.
+
+## 2026-09-13T03:33Z (operator cycle 3) - 0 RUNNING / 0 landed / 0 flipped / 0 dispatched; FHC-G6 frontier: slot-0 target CORRUPTION diagnosed + cleaned; RAM still below floor
+
+Health sweep (step 1): heartbeat exactly 1 (27872, dispatch_heartbeat.ps1; a second regex match was my own query process), watchdog 1 (29264), operator runner 0 (this instance live), cargoq UP (ping ok, queued 0, running false), disk 16.2 GB free (above floor and janitor goal), RAM 1.5 GB free (BELOW the 3 GB floor - carried HIGH). No cargo/rustc processes running.
+
+Land (step 2): nothing landable. FHC-C-AUTHORING-FIDELITY (slot 1) finished and was driver-LANDED mid-cycle (eb66295 -> merge 39f65ba, RESULT ec39021, row 7dd0c8e); re-verified eb66295 is an ancestor of HEAD. Slots 3-7 residue (e6553db/3c2109b/ee97499/713f205/5cf4811) all re-verified ancestors of HEAD. Slot 0 IDLE dead dispatch (no RESULT); slot 2 IDLE (R3 DONE).
+
+Unblock (step 3): slot 0 IDLE 275 min, no RESULT/no commit/no question - the FHC-G6 dead dispatch. NEW DIAGNOSIS: the heartbeat's warm builds (21:34, 23:12, 23:22 local) fail with a CORRUPTION signature, not the earlier RAM-zone 0xc0000409: E0463 can't find crate for clap in the look lib test; 211 errors in test certified_phase2_floor ("map is implemented but not in scope"); 11/41 errors in examples stageb_probe/nist1167_dist; 1 error in mesh_correctness_census - a DIFFERENT spurious error each cycle. Slot-0 target was incomplete (0.98 GB vs slot-1's 4.2 GB) from the 20:31-21:45 0xc0000409 crashes, and cargo treats the partial artifacts as fresh. ACTION: removed loop/slots/0/target (documented clean step). Did NOT re-warm: RAM 1.5 GB free (janitor ram killed 1 opencode-parented rust-analyzer, RAM stayed ~1.5 GB) and a cold --workspace --all-targets is a 4-8 GB spike (ORCHESTRATOR: shrink, do not retry blindly). The live heartbeat (27872, --max-workers=3) will retry G6 each cycle.
+
+Registry hygiene (step 4): nothing flipped. BLOCKED-with-all-needs-landed = 7 rows, all semantic/owner blocks. READY failing gen_packet --check = RG-23/RG-9 only, and their packet files do not exist (packet:'' unauthored) - not mechanically fixable (authoring = design).
+
+Dispatch (step 5): did NOT run live - heartbeat 27872 owns dispatch and is LIVE. dispatch_ready --dry-run --max-workers=4: RG-23/RG-9 ANCHOR CHECK FAILED (no packet files); FHC-G6 DEAD dispatch (would reset+delete+redispatch); FHC-G1 blocked on G6; FHC-D blocked on G1; FHC-E blocked on D; "dispatched 0; workers ~0/4". The G6 write-set clash with FHC-C is now CLEARED (FHC-C landed).
+
+STATE (step 6): rewrote the LATEST GROUND TRUTH block and the "State of the machine, as left" status bullets, both labeled [operator 2026-09-13T03:33Z]; corrected HEAD to c896d2b. Traps/history untouched.
+
+Escalation (step 7): MED - FHC-G6 frontier held by RAM below floor + the newly-diagnosed slot-0 target corruption (now cleaned). Human action: free RAM (close chrome/Dropbox/Discord or the second opencode), then let heartbeat 27872 retry G6 and watch loop/dispatch_heartbeat.log for 0xc0000409.
+
+Leaving: 0 RUNNING / FHC-G6 frontier held by RAM (slot-0 target cleaned) / HEAD c896d2b + this cycle's STATE/log commit.
