@@ -2540,3 +2540,12 @@ uncommitted - left for the orchestrator, no dispatch impact.
 - Carried unchanged: RG-23/RG-9 authoring; slot-4/7 wt RESULT residue; FRAME-REVOLVE F1
   non_z_axis pin; TOR-C flip-or-pin. The earlier "duplicate supervisors + duplicate cargoq" item
   is now moot (the duplicates are gone). Orphan 35748 is gone.
+
+## 2026-09-13T18:46Z - operator cycle 18: substrate-down item CARRIED unchanged (no new evidence)
+
+- Re-verified this cycle: watchdog = 0 processes, `watchdog.lock` still holds stale pid `29264`,
+  `watchdog.log` silent since 2026-09-10T22:30Z; supervisor = 0 processes, `supervisor.log` last
+  action 09-13 09:38:57; overnight = 0 processes, `overnight.log` last 09-13 14:16:31. Operator did
+  NOT restart (same reasoning as the 18:28Z item: the supervisor would also restart the overnight
+  driver, which is an orchestration decision; the stop may be intentional). See the 18:28Z item for
+  the exact restart commands. Priority: medium. No other new judgment items this cycle.

@@ -75,42 +75,43 @@ corrected, annex C = ORACLE POLICY CHANGE), then docs/SOLVER_COVERAGE_SPEC.md
 
 ## Where we are
 
-> LATEST GROUND TRUTH [operator 2026-09-13T18:28Z]: 1 RUNNING-HEALTHY (slot 0 FHC-G6, frontier)
-> + 1 CLEAN IDLE dead duplicate (slot 1 FHC-G6) + 1 dead residue (slot 2 TTC-RECENSUS-F1-R3, row
-> DONE) / 0 landed-this-cycle / 0 unblocked / 0 flipped / 0 dispatched. HEAD `669cc47` (the
-> 17:58Z operator commit; no packet code).
-> **slot 0 FHC-G6 HEALTHY and progressing (unchanged).** opencode `26336` (cmd `35764`) alive;
-> live measurement child `10028` (`measure_row.py ... lib.suspension build_suspension_rear` ->
-> `sr_rel.stl`); events growing (221129 B, 3.5 min old at re-poll). Dirty
+> LATEST GROUND TRUTH [operator 2026-09-13T18:46Z]: 1 RUNNING-HEALTHY (slot 0 FHC-G6, frontier)
+> + 2 IDLE residue (slots 1 FHC-G6 dead duplicate, 2 TTC-RECENSUS-F1-R3 row DONE) + 5 FINISHED
+> landed residue (slots 3-7) / 0 landed-this-cycle / 0 unblocked / 0 flipped / 0 dispatched.
+> HEAD `7c84ee0` (advanced from `669cc47`; slot 0's branch base; no new packet code this cycle).
+> **slot 0 FHC-G6 HEALTHY and progressing.** worker pid `15276`; events fresh (0.4 min, 880 KB);
+> live measurement child `measure_row.py ... lib.suspension build_suspension_rear` -> `susp_rear_g6.stl`
+> (pids 17864/30804) plus a queued cargoq job `cargo build --release -p truck123d --locked`; dirty
 > `truck123d/src/bd_bridge.rs`; no RESULT/commit/QUESTION. Do NOT touch.
-> **slot 1 CLEAN IDLE dead duplicate**: pid=-, changed=0, detached; reset-only NO-OP; redispatch
-> blocked by slot 0's held branch `packet/FHC-G6-CERT-COST-SCALE`. **slot 2** IDLE residue, packet
-> TTC-RECENSUS-F1-R3 row DONE (landed de6bfc6); no work. Neither blocking.
+> **slot 1 CLEAN IDLE dead duplicate**: pid=-, changed=0, detached `fd40760` (ancestor of HEAD);
+> reset-only NO-OP; redispatch blocked by slot 0's held branch `packet/FHC-G6-CERT-COST-SCALE`.
+> **slot 2** IDLE residue, packet TTC-RECENSUS-F1-R3 row DONE (landed de6bfc6); no work. Neither
+> blocking.
 > Frontier: FHC-G6 running; FHC-G1 waits on G6, FHC-D on G1, FHC-E on D; RG-23/RG-9 packet files
-> MISSING (dispatch_ready "ANCHOR CHECK FAILED" empty detail = gen_packet FileNotFoundError)
-> -> authoring item. Slots 3-7 landed residue; worker commits
-> e6553db/3c2109b/ee97499/713f205/5cf4811 all ancestors of HEAD `669cc47` (re-verified via
-> merge-base --is-ancestor); RESULT statuses 3 DONE / 4 LANDED-WITH-FINDINGS / 5 DONE / 6 DONE /
-> 7 LANDED. Nothing landable.
+> MISSING / anchor-check FAILED (empty gen_packet detail) -> authoring item. Slots 3-7 landed
+> residue; worker commits e6553db/3c2109b/ee97499/713f205/5cf4811 all ancestors of HEAD `7c84ee0`
+> (re-verified via merge-base --is-ancestor); RESULT statuses 3 DONE / 4 LANDED-WITH-FINDINGS /
+> 5 DONE / 6 DONE / 7 LANDED. Nothing landable.
 > Registry (script, last-wins over 360 unique ids): 265 DONE / 84 READY / 10 BLOCKED / 1
-> SUPERSEDED. READY-without-landed-marker (dispatch_ready's `landed()` predicate) = 6 {RG-23,
-> RG-9, FHC-G6, FHC-G1, FHC-D, FHC-E}; BLOCKED = 10, none mechanically flippable (all
-> owner/semantic parked).
+> SUPERSEDED. READY-without-landed-marker = 6 {RG-23, RG-9, FHC-G6, FHC-G1, FHC-D, FHC-E};
+> BLOCKED = 10, all with needs landed but deliberately owner/semantic parked (OWNER_BLOCKED,
+> owner-cancelled, SUPERSEDED, SPEC_GAP, human-gated, orchestrator-held, owner inputs) - none
+> mechanically flippable.
 > `dispatch_ready --dry-run --max-workers=4` = "slots: 8 (1 running, 7 free); slot-assigned
 > packets: 5; dispatched 0" = REAL idle (heartbeat 27872 LIVE owns dispatch; operator did NOT run
 > it live).
-> **SUBSTRATE CHANGE (new this cycle): supervisor, watchdog, and overnight driver are ALL DEAD**
-> (only python procs = cargoq server `31804` + slot-0 measure child `10028`). `watchdog.lock` holds
-> stale pid `29264`; `watchdog.log` silent since 2026-09-10; `supervisor.log` last action 09-13
-> 09:38:57 (it started cargoq, then died); `overnight.log` last 09-13 14:16:31. The 17:35Z/17:58Z
-> "watchdog 1 (29264)" readings were STALE. Operator did NOT restart (may be an intentional
-> orchestrator-session stop; watchdog restart is now safe - slot 2 protected by
-> `packet_is_done()` - but the supervisor would also restart the overnight driver). Escalated.
+> **SUBSTRATE: supervisor, watchdog, and overnight driver remain ALL DEAD (carried, escalated).**
+> Only python procs = cargoq server `31804` + slot-0's measurement/build children. `watchdog.lock`
+> holds stale pid `29264`; `watchdog.log` silent since 2026-09-10T22:30Z; `supervisor.log` last
+> action 09-13 09:38:57 (it started cargoq, then died); `overnight.log` last 09-13 14:16:31
+> (LEFT FOR MORNING on slot 4 F1). Operator did NOT restart (may be an intentional
+> orchestrator-session stop; supervisor would also restart the overnight driver). Escalated.
 > Health otherwise: heartbeat exactly 1 (27872), operator runner 1 (27876), cargoq UP (ping ok,
-> queued 0, running false). Disk 17.2 GB free (above 8 GB floor AND 15 GB goal); RAM 3.8 GB free
-> (above the 3 GB floor); orphan 35748 now GONE.
-> Leaving: slot 0 FHC-G6 RUNNING-HEALTHY + slots 1/2 dead residue / HEAD `669cc47` + this cycle's
-> STATE/log/escalation commit.
+> queued 0, running true = slot-0 build). Disk 13.37 GB free (above 8 GB floor, below 15 GB goal);
+> RAM 2.5 GB free (BELOW the 3 GB floor, transient - slot-0 build + measurement child). No
+> `%TEMP%/look-verify-baseline-*` leaks; `fallback.log` quiet since 2026-09-11.
+> Leaving: slot 0 FHC-G6 RUNNING-HEALTHY + slots 1/2 idle residue + slots 3-7 landed residue /
+> HEAD `7c84ee0` + this cycle's STATE/log/escalation commit.
 
 
 ## Pick up here
@@ -155,6 +156,38 @@ corrected, annex C = ORACLE POLICY CHANGE), then docs/SOLVER_COVERAGE_SPEC.md
 
 ## State of the machine, as left
 
+- [operator 2026-09-13T18:46Z] board: 1 RUNNING-HEALTHY (slot 0 FHC-G6, frontier) + 2 IDLE residue
+  (slot 1 FHC-G6 dead duplicate, slot 2 TTC-RECENSUS-F1-R3 row DONE) + 5 FINISHED landed residue
+  (slots 3-7) / 0 landed-this-cycle / 0 unblocked / 0 flipped / 0 dispatched; HEAD `7c84ee0`
+  (advanced from `669cc47`; slot 0's branch base, no new packet code). Board re-derived by command.
+- [operator 2026-09-13T18:46Z] **slot 0 FHC-G6 HEALTHY and progressing.** worker pid `15276`,
+  events 0.4 min old / 880 KB; live measurement child `measure_row.py ... lib.suspension
+  build_suspension_rear` -> `susp_rear_g6.stl` (pids 17864/30804) plus a queued cargoq job
+  `cargo build --release -p truck123d --locked`; dirty `truck123d/src/bd_bridge.rs`; no
+  RESULT/commit/QUESTION. Do NOT touch.
+- [operator 2026-09-13T18:46Z] slot 1 IDLE dead duplicate (pid=-, changed=0, detached `fd40760`,
+  an ancestor of HEAD); reset-only NO-OP; redispatch blocked by slot 0's held branch
+  `packet/FHC-G6-CERT-COST-SCALE`. slot 2 IDLE residue (packet TTC-RECENSUS-F1-R3 row DONE, no
+  work). Neither blocking; no operator action.
+- [operator 2026-09-13T18:46Z] Slots 3-7 FINISHED landed residue; worker commits
+  e6553db/3c2109b/ee97499/713f205/5cf4811 all ancestors of HEAD `7c84ee0` (re-verified via
+  `git merge-base --is-ancestor`). RESULT statuses 3 DONE / 4 LANDED-WITH-FINDINGS / 5 DONE /
+  6 DONE / 7 LANDED. Nothing landable.
+- [operator 2026-09-13T18:46Z] Registry (script, last-wins over 360 unique ids): 265 DONE / 84
+  READY / 10 BLOCKED / 1 SUPERSEDED. READY-without-landed-marker (dispatch_ready's `landed()`
+  predicate) = 6 {RG-23, RG-9, FHC-G6, FHC-G1, FHC-D, FHC-E}. BLOCKED = 10, all needs-landed but
+  deliberately owner/semantic parked, none mechanically flippable.
+- [operator 2026-09-13T18:46Z] Do NOT run dispatch_ready live (heartbeat 27872 LIVE owns it).
+  `--dry-run --max-workers=4` = "slots: 8 (1 running, 7 free); slot-assigned packets: 5;
+  dispatched 0" (RG-23/RG-9 anchor-check FAIL; FHC-G1/D/E chained) = REAL idle.
+- [operator 2026-09-13T18:46Z] **SUBSTRATE: supervisor + watchdog + overnight driver DEAD
+  (carried).** Only python procs = cargoq server `31804` + slot-0 children. `watchdog.lock` stale
+  pid `29264`; `watchdog.log` silent since 2026-09-10T22:30Z; `supervisor.log` last action 09-13
+  09:38:57; `overnight.log` last 09-13 14:16:31. Operator did NOT restart (escalated; may be an
+  intentional orchestrator-session stop). heartbeat 1 (27872), operator runner 1 (27876), cargoq
+  UP (ping ok, queued 0, running true = slot-0 build). Disk 13.37 GB free (above 8 GB floor, below
+  15 GB goal); RAM 2.5 GB free (BELOW 3 GB floor, transient - slot-0 build + measurement child).
+  No `%TEMP%/look-verify-baseline-*` leaks; `fallback.log` quiet since 2026-09-11.
 - [operator 2026-09-13T18:28Z] board: 1 RUNNING-HEALTHY (slot 0 FHC-G6, frontier) + 1 CLEAN IDLE
   dead duplicate (slot 1 FHC-G6) + 1 dead residue (slot 2 TTC-RECENSUS-F1-R3, row DONE) / 0
   landed-this-cycle / 0 unblocked / 0 flipped / 0 dispatched; HEAD `669cc47` (the 17:58Z operator
