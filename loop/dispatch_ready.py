@@ -220,19 +220,31 @@ def main():
         if dry:
             acted += 1
             continue
+        shared_target = os.environ.get(
+            "LOOK_SHARED_TARGET",
+            os.path.join(ROOT, "loop", "target-shared"))
         sh([sys.executable, os.path.join(ROOT, "loop", "run_packet.py"),
-            "--slot", slot, "--reset-only", "--packet", pk])
+            "--slot", slot, "--reset-only", "--packet", pk],
+           env={**os.environ, "LOOK_SHARED_TARGET": shared_target})
         ns = sh([sys.executable, os.path.join(ROOT, "loop", "new_slot.py"),
-                 "--slot", slot, "--branch", branch])
+                 "--slot", slot, "--branch", branch],
+                env={**os.environ, "LOOK_SHARED_TARGET": shared_target})
         if ns.returncode != 0:
             print(f"  {r['id']}: new_slot FAILED:\n{ns.stderr[-300:]}")
             continue
         env_path = QUEUE + os.pathsep + os.environ.get("PATH", "")
+        # LOOK_SHARED_TARGET (session-50 machinery, switched on 2026-09-13):
+        # workers share ONE warm target tree - cargoq serializes invocations
+        # so it is race-free, re-dispatches stop paying the full workspace
+        # warm build (new_slot skips it when the shared tree has content),
+        # and the worker's first scoped check catches up incrementally.
+        # Per-attempt full compiles violate the one-verify architecture.
         rp = subprocess.run(
             [sys.executable, os.path.join(ROOT, "loop", "run_packet.py"),
              "--slot", slot, "--packet", pk],
             env={**os.environ, "PATH": env_path,
-                 "CARGO_BUILD_JOBS": "2"})
+                 "CARGO_BUILD_JOBS": "2",
+                 "LOOK_SHARED_TARGET": shared_target})
         if rp.returncode == 0:
             # register the dispatch in PACKETS.jsonl
             r["status"] = "RUNNING"

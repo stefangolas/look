@@ -236,6 +236,24 @@ def main():
     warm_env = dict(env)
     qdir = REPO_ROOT / 'loop' / 'cargoq'
     warm_env['PATH'] = str(qdir) + os.pathsep + env.get('PATH', '')
+    # LOOK_SHARED_TARGET (session-50 machinery, wired 2026-09-13): when set,
+    # the warm build populates the SHARED target tree instead of the slot's
+    # own, and a shared tree that already has content is NOT re-warmed --
+    # the whole point of the shared tree is that re-forks and re-dispatches
+    # reuse it, and the worker's first scoped check catches up incrementally
+    # (seconds-to-minutes) instead of every attempt paying a full workspace
+    # all-targets build. cargoq serializes invocations, so the shared tree
+    # is race-free. One-verify architecture: full compiles are end-of-spec
+    # events, not per-attempt ones.
+    shared = warm_env.get('LOOK_SHARED_TARGET')
+    if shared:
+        shared_path = Path(shared)
+        if shared_path.is_dir() and any(shared_path.iterdir()):
+            print(f"LOOK_SHARED_TARGET {shared} already warm - skipping "
+                  f"the workspace warm build (one-verify architecture).")
+            print(f"Free disk: {shutil.disk_usage('C:\\\\').free / 2**30:.1f} GB")
+            return
+        warm_env['CARGO_TARGET_DIR'] = shared
     # Spike cap: the workspace all-targets check spawns rustc at full
     # machine parallelism; at low free RAM parallel rustcs die mid-expansion
     # and the warm build exits 101 with a rotating spurious cascade
@@ -252,10 +270,11 @@ def main():
     if res.returncode != 0:
         sys.exit(f"warm build failed (cargo check --workspace --all-targets exit {res.returncode}) in slot {args.slot}")
 
-    target_size_gb = sum(f.stat().st_size for f in target_dir.rglob('*') if f.is_file()) / 2**30
+    warmed_dir = Path(warm_env['CARGO_TARGET_DIR']) if warm_env.get('CARGO_TARGET_DIR') else target_dir
+    target_size_gb = sum(f.stat().st_size for f in warmed_dir.rglob('*') if f.is_file()) / 2**30
 
     print(f"Warm build: {elapsed_min:.1f} min")
-    print(f"Target dir size: {target_size_gb:.2f} GB")
+    print(f"Target dir size: {target_size_gb:.2f} GB ({warmed_dir})")
     print(f"Free disk after warm: {shutil.disk_usage('C:\\\\').free / 2**30:.1f} GB")
 
 
