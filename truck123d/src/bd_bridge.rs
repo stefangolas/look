@@ -1,7 +1,7 @@
 //! The drop-in executor binding (TTC-EXECUTOR-BINDING): deterministic
 //! geometry behind the facade vocabulary.
 //!
-//! The corpus→kernel executor (docs/TT_MODEL_CODEPATH_AUDIT.md gap 1) lands
+//! The corpusâ†’kernel executor (docs/TT_MODEL_CODEPATH_AUDIT.md gap 1) lands
 //! here: the facade's classifier (`run_facade`) is the pre-flight; this module
 //! is the geometry executor that consumes the same *construction vocabulary*
 //! and attaches the geometry facts the door measures. The corpus scripts run
@@ -9,20 +9,20 @@
 //! truck`); the drop-in build123d-named Python surface that the door installs
 //! records each census call as a data row and submits the row set here.
 //!
-//! Zero geometric content lives in Python (spec §5): every volume, bounding
+//! Zero geometric content lives in Python (spec Â§5): every volume, bounding
 //! box and triangle computed by this module is pure, deterministic, analytic
 //! arithmetic over the submitted row set. The supported carrier forms are the
 //! canonical S3/S6 constructions (box/cylinder/sphere/torus primitives and
-//! the lathe over a closed `y = 0` profile — line edges exactly and
+//! the lathe over a closed `y = 0` profile â€” line edges exactly and
 //! spline-profile edges integrated as the TRUE reconstructed interpolating
 //! spline, never a flattening polygon; FH-SPLINE-LATHE). The lathe arm covers
-//! the full 360° revolution and a partial-arc wedge over
+//! the full 360Â° revolution and a partial-arc wedge over
 //! `[start_deg, start_deg + arc_deg]`, with the two planar caps closed
 //! (DOOR-PARTIAL-ARC-FLIP). A name whose form is outside this envelope (a
 //! swept/lofted carrier, a spline profile with a non-recoverable
 //! interpolation, an arc outside `(0, 360]`) refuses with the typed kernel
 //! refusal (`NonCanonicalCarrier`), which the pyo3 surface maps to the landed
-//! `Refused`/`Unresolved` exception classes — loud, never a silent OCC
+//! `Refused`/`Unresolved` exception classes â€” loud, never a silent OCC
 //! fallback.
 //!
 //! Determinism: the submitted row set is an ordered tree (the script's
@@ -185,7 +185,7 @@ pub enum SolidSpec {
         radius: f64,
         /// The height along the axis.
         height: f64,
-        /// The cylinder axis (`"z"`, `"x"` or `"y"` — the corpus's Euler
+        /// The cylinder axis (`"z"`, `"x"` or `"y"` â€” the corpus's Euler
         /// rotation applied to the default z axis).
         axis: String,
     },
@@ -230,6 +230,22 @@ pub enum SolidSpec {
         #[serde(default)]
         start_deg: f64,
     },
+    /// `revolve(face, axis, ...)` over a MULTI-CONTOUR meridian section: the
+    /// outer boundary plus one closed `(x, z)` ring per hole. The hole is a
+    /// void of the revolved region and contributes negative flux through the
+    /// SAME per-patch certified machinery (the landed single-ring `Lathe` is
+    /// unchanged and stays bit-identical).
+    SectionLathe {
+        /// The outer closed `(x, z)` profile boundary edges, in order.
+        profile: Vec<LatheEdge>,
+        /// The inner (hole) meridian contours, each a closed `(x, z)` ring.
+        holes: Vec<Vec<LatheEdge>>,
+        /// The swept arc in degrees, in `(0, 360]`.
+        arc_deg: f64,
+        /// The v-range start of the swept arc, in degrees.
+        #[serde(default)]
+        start_deg: f64,
+    },
     /// `extrude(face, amount, both)`: a closed planar line-loop profile swept
     /// along its own plane normal. `profile` is the recorded boundary in order
     /// (part-local 3-D coordinates). The extruded solid is an exact prism: the
@@ -243,6 +259,24 @@ pub enum SolidSpec {
         amount: f64,
         /// Extrude on both sides of the profile plane (`both=True`: the total
         /// extent is `2 * amount`, symmetric about the plane).
+        #[serde(default)]
+        both: bool,
+    },
+    /// `extrude(face, amount, both)` over a MULTI-CONTOUR planar section (the
+    /// corpus `Circle(a) - Circle(b)` annulus): the outer boundary plus one
+    /// closed planar ring per hole, all in the outer profile's plane. The
+    /// planar cap is the matched quad strip between corresponding rings (no
+    /// centroid fan) and the hole wall faces into the void, so the prism is
+    /// the outer region minus the holes. The landed single-ring `Prism` is
+    /// unchanged and stays bit-identical.
+    SectionPrism {
+        /// The outer closed planar line-loop boundary edges, in order.
+        profile: Vec<ProfileEdge>,
+        /// The inner (hole) contour rings, each a closed planar ring.
+        holes: Vec<Vec<ProfileEdge>>,
+        /// The swept length along the profile-plane normal.
+        amount: f64,
+        /// Extrude on both sides of the profile plane.
         #[serde(default)]
         both: bool,
     },
@@ -430,7 +464,7 @@ pub struct PartSpec {
     pub rz: f64,
     /// The full orthonormal placement rotation recorded from an authoring
     /// frame (a `Plane`/`Pos`/`Rotation` frame row). When present it replaces
-    /// the pure-z rotation exactly (`world = translate(o) ∘ R`); a row
+    /// the pure-z rotation exactly (`world = translate(o) âˆ˜ R`); a row
     /// without it keeps the pure-z rotation path byte-identical.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub rotation: Option<RotationFrame>,
@@ -439,7 +473,7 @@ pub struct PartSpec {
     /// (XZ plane, y -> -y) or `"z"` (XY plane, z -> -z). The reflection is a
     /// congruence applied after the recorded rotation (the row's translation
     /// already carries the reflected origin), so the composition is
-    /// `translate(M o) ∘ mirror ∘ R`: facts transform with the placement, the
+    /// `translate(M o) âˆ˜ mirror âˆ˜ R`: facts transform with the placement, the
     /// mirror is exact for any rotation frame, and no geometry is recomputed.
     #[serde(default)]
     pub mirror: Option<String>,
@@ -647,19 +681,38 @@ fn solid_volume(solid: &SolidSpec) -> Result<f64, Refusal> {
             start_deg,
         } => {
             let arc = validate_lathe_arc(*arc_deg, *start_deg)?;
-            let full = if let Some(points) = line_profile_vertices(profile) {
-                // The line-profile arm: the frustum telescoping of the closed
-                // vertex loop, bit-identical to the landed line-profile facts.
-                lathe_volume(&points)?
-            } else {
-                lathe_profile_volume(profile)?
-            };
+            let full = lathe_ring_volume(profile)?;
             if arc == 360.0 {
                 Ok(full)
             } else {
                 // The wedge is the full solid intersected with an angular
                 // sector, so its volume is the full volume scaled by the
-                // swept fraction — exact, never a sampled approximation.
+                // swept fraction â€” exact, never a sampled approximation.
+                Ok(full * (arc / 360.0))
+            }
+        }
+        SolidSpec::SectionLathe {
+            profile,
+            holes,
+            arc_deg,
+            start_deg,
+        } => {
+            let arc = validate_lathe_arc(*arc_deg, *start_deg)?;
+            // Each inner ring is the SAME per-patch machinery with the
+            // opposite winding, so its revolved volume is subtracted (negative
+            // flux); a net non-positive volume is not a section.
+            let mut full = lathe_ring_volume(profile)?;
+            for hole in holes {
+                full -= lathe_ring_volume(hole)?;
+            }
+            if full <= 0.0 {
+                return Err(Refusal::UnsupportedEnvelope(
+                    EnvelopeCase::NonCanonicalCarrier,
+                ));
+            }
+            if arc == 360.0 {
+                Ok(full)
+            } else {
                 Ok(full * (arc / 360.0))
             }
         }
@@ -670,6 +723,30 @@ fn solid_volume(solid: &SolidSpec) -> Result<f64, Refusal> {
         } => {
             let geom = prism_geom(profile, *amount, *both)?;
             Ok(geom.volume)
+        }
+        SolidSpec::SectionPrism {
+            profile,
+            holes,
+            amount,
+            both,
+        } => {
+            let geom = prism_geom(profile, *amount, *both)?;
+            // The planar cap is the outer region minus the hole regions, so
+            // the volume is the net area times the swept height. The nesting
+            // validation lives in `prism_section_rings` (the mesh arm); here
+            // the net area must stay positive (a hole outside the outer ring
+            // is not a section).
+            let mut hole_area = 0.0;
+            for hole in holes {
+                hole_area += profile_loop(hole)?.area;
+            }
+            let volume = geom.volume - hole_area * (geom.t_hi - geom.t_lo);
+            if volume <= 0.0 {
+                return Err(Refusal::UnsupportedEnvelope(
+                    EnvelopeCase::NonCanonicalCarrier,
+                ));
+            }
+            Ok(volume)
         }
         SolidSpec::TrimPrism {
             profile,
@@ -764,7 +841,7 @@ fn lathe_volume(points: &[[f64; 2]]) -> Result<f64, Refusal> {
 //
 // A spline profile edge records the samples the corpus passed to
 // `Edge.make_spline(points)`. The kernel reconstructs the interpolating curve
-// the OCC reference revolved — chord-length parameters, a clamped cubic with
+// the OCC reference revolved â€” chord-length parameters, a clamped cubic with
 // a knot at every sample, C2 at the interior samples, and endpoint tangents
 // equal to the derivative of the degree-3 Lagrange interpolant of the first
 // (resp. last) four samples. This is exactly the curve `GeomAPI_Interpolate`
@@ -824,6 +901,17 @@ fn check_profile_edges(profile: &[LatheEdge]) -> Result<(), Refusal> {
     Ok(())
 }
 
+/// The exact volume of one closed meridian ring: the line-profile frustum
+/// telescoping when the ring is all lines (bit-identical to the landed
+/// line-profile facts), the reconstructed-spline moment otherwise.
+fn lathe_ring_volume(profile: &[LatheEdge]) -> Result<f64, Refusal> {
+    if let Some(points) = line_profile_vertices(profile) {
+        lathe_volume(&points)
+    } else {
+        lathe_profile_volume(profile)
+    }
+}
+
 /// The volume of a spline-bearing lathe profile: the exact segment-moment sum
 /// over the profile boundary (spline spans integrated by closed-form
 /// polynomial arithmetic, line edges by the frustum formula), absolute value
@@ -865,7 +953,7 @@ fn spline_edge_volume(points: &[[f64; 2]]) -> Result<f64, Refusal> {
 
 /// The exact `pi * int_0^1 r(u)^2 z'(u) du` of one span. `r(u)` is a cubic
 /// (degree 6 when squared), `z'(u)` a quadratic; the product is degree 8 and
-/// integrates term-by-term (`int u^k = 1/(k+1)`) — no quadrature, no
+/// integrates term-by-term (`int u^k = 1/(k+1)`) â€” no quadrature, no
 /// sampling.
 fn span_volume(span: &SpanPoly) -> f64 {
     // r(u)^2 in the power basis (degree 6).
@@ -1231,10 +1319,22 @@ fn solid_local_bbox(solid: &SolidSpec) -> Result<[[f64; 3]; 2], Refusal> {
             arc_deg,
             start_deg,
         } => lathe_wedge_bbox(profile, *arc_deg, *start_deg),
+        SolidSpec::SectionLathe {
+            profile,
+            arc_deg,
+            start_deg,
+            ..
+        } => lathe_wedge_bbox(profile, *arc_deg, *start_deg),
         SolidSpec::Prism {
             profile,
             amount,
             both,
+        } => prism_bbox(profile, *amount, *both),
+        SolidSpec::SectionPrism {
+            profile,
+            amount,
+            both,
+            ..
         } => prism_bbox(profile, *amount, *both),
         SolidSpec::TrimPrism {
             profile,
@@ -1490,7 +1590,7 @@ fn cubic_roots(c: &[f64; 4]) -> Vec<f64> {
 // recorded section curves and submits every patch to the sanctioned
 // `binding_volume_facts` entry, summing the certified brackets. The section
 // curves are reconstructed exactly (chord-length parameters, clamped cubic,
-// endpoint tangents from the degree-3 Lagrange interpolant — the same
+// endpoint tangents from the degree-3 Lagrange interpolant â€” the same
 // convention the landed lathe arm reconstructs `Edge.make_spline` with), never
 // a flattening polygon.
 //
@@ -1500,7 +1600,7 @@ fn cubic_roots(c: &[f64; 4]) -> Vec<f64> {
 // * the station parameter `v_i` is the cumulative centroid-to-centroid chord
 //   length of the section stack, normalized to `[0, 1]`;
 // * the `u` direction is the landed per-section reconstruction (each recorded
-//   span normalized to `[0, 1]`), unified across stations by span index only —
+//   span normalized to `[0, 1]`), unified across stations by span index only â€”
 //   the section curves are never approximated and a stack whose spans do not
 //   match refuses typed;
 // * the `v` direction is the unique global polynomial of degree `N - 1`
@@ -3901,6 +4001,37 @@ fn reflect_solid(solid: &SolidSpec, axis: &str) -> Result<SolidSpec, Refusal> {
                 }
             }
         }
+        SolidSpec::SectionLathe {
+            profile,
+            holes,
+            arc_deg,
+            start_deg,
+        } => {
+            let reflect_ring =
+                |ring: &Vec<LatheEdge>| ring.iter().map(reflect_lathe_edge).collect();
+            if axis == "z" {
+                SolidSpec::SectionLathe {
+                    profile: reflect_ring(profile),
+                    holes: holes.iter().map(reflect_ring).collect(),
+                    arc_deg: *arc_deg,
+                    start_deg: *start_deg,
+                }
+            } else if *arc_deg >= 360.0 {
+                solid.clone()
+            } else {
+                let start = if axis == "y" {
+                    -(*start_deg + *arc_deg)
+                } else {
+                    180.0 - (*start_deg + *arc_deg)
+                };
+                SolidSpec::SectionLathe {
+                    profile: profile.clone(),
+                    holes: holes.clone(),
+                    arc_deg: *arc_deg,
+                    start_deg: start,
+                }
+            }
+        }
         SolidSpec::Prism {
             profile,
             amount,
@@ -3913,6 +4044,21 @@ fn reflect_solid(solid: &SolidSpec, axis: &str) -> Result<SolidSpec, Refusal> {
             amount: *amount,
             both: *both,
         },
+        SolidSpec::SectionPrism {
+            profile,
+            holes,
+            amount,
+            both,
+        } => {
+            let reflect_ring =
+                |ring: &Vec<ProfileEdge>| ring.iter().map(|e| reflect_profile_edge(e, axis)).collect();
+            SolidSpec::SectionPrism {
+                profile: reflect_ring(profile),
+                holes: holes.iter().map(reflect_ring).collect(),
+                amount: *amount,
+                both: *both,
+            }
+        }
         // The trim carrier's scalar pullback net is tied to the profile
         // parametrization, so its reflection is not representable as the same
         // row; refuse typed rather than record a mismatched net.
@@ -3980,8 +4126,8 @@ fn part_world_bbox(part: &PartSpec) -> Result<[[f64; 3]; 2], Refusal> {
         // The recorded rotation places the local corner; the mirror then
         // reflects the placed (rotated) corner about the coordinate plane and
         // the translation carries the recorded (already reflected) origin.
-        // This is `translate(M o) ∘ mirror ∘ R`, exactly the world reflection
-        // `M ∘ (translate(o) ∘ R)` for any rotation frame.
+        // This is `translate(M o) âˆ˜ mirror âˆ˜ R`, exactly the world reflection
+        // `M âˆ˜ (translate(o) âˆ˜ R)` for any rotation frame.
         let rotated = match frame {
             Some(rotation) => rotation.apply(corner),
             None => {
@@ -4053,6 +4199,18 @@ fn solid_carrier_class(solid: &SolidSpec) -> CarrierClass {
                 CarrierClass::Canonical
             }
         }
+        SolidSpec::SectionLathe { profile, holes, .. } => {
+            let spline = |ring: &Vec<LatheEdge>| {
+                ring.iter()
+                    .any(|edge| matches!(edge, LatheEdge::Spline { .. }))
+            };
+            if spline(profile) || holes.iter().any(spline) {
+                CarrierClass::Revolved
+            } else {
+                CarrierClass::Canonical
+            }
+        }
+        SolidSpec::SectionPrism { .. } => CarrierClass::Canonical,
         SolidSpec::Loft { .. } | SolidSpec::Member { .. } => CarrierClass::Swept,
     }
 }
@@ -4464,7 +4622,7 @@ fn count_and_union(
 
 /// Applies one placed row's world placement to a local point: the full
 /// orthonormal frame (or the pure-z `rz`) first, then the recorded mirror
-/// reflection, then the translation — the exact composition `part_world_bbox`
+/// reflection, then the translation â€” the exact composition `part_world_bbox`
 /// applies to the local bbox corners, and the same `place_local_point` uses.
 fn place_part_point(part: &PartSpec, p: [f64; 3]) -> [f64; 3] {
     place_local_point(part, p)
@@ -4911,8 +5069,8 @@ fn swept_swept(boolean: &BooleanNode) -> Result<bool, Refusal> {
 /// Applies the placement's local congruence to one local point: the full
 /// recorded frame (or the pure-z `rz`) first, then the mirror reflection (when
 /// recorded), then the translation. The recorded translation already carries
-/// the reflected origin, so the composition is `translate(M o) ∘ mirror ∘ R`,
-/// which equals the world reflection `M ∘ (translate(o) ∘ R)` exactly for any
+/// the reflected origin, so the composition is `translate(M o) âˆ˜ mirror âˆ˜ R`,
+/// which equals the world reflection `M âˆ˜ (translate(o) âˆ˜ R)` exactly for any
 /// rotation frame -- not only the frames that commute with the mirror plane.
 fn place_local_point(part: &PartSpec, point: [f64; 3]) -> [f64; 3] {
     let [px, py, pz] = point;
@@ -5567,8 +5725,8 @@ fn tree_mesh(root: &TreeNode, deflection: Option<f64>) -> Result<Vec<Triangle>, 
 /// Places one part's local triangle soup into world space: rotate each local
 /// triangle by the recorded frame (or the pure-z `rz`), reflect the rotated
 /// triangle across the recorded mirror plane, then translate by the recorded
-/// origin. The composition is `translate(M o) ∘ mirror ∘ R`, which is exactly
-/// the world reflection `M ∘ (translate(o) ∘ R)` for ANY rotation frame -- the
+/// origin. The composition is `translate(M o) âˆ˜ mirror âˆ˜ R`, which is exactly
+/// the world reflection `M âˆ˜ (translate(o) âˆ˜ R)` for ANY rotation frame -- the
 /// reflected origin is already recorded on the row, so the mirror is not
 /// applied to the translation a second time.
 fn place_part_triangles(part: &PartSpec, local: &[Triangle]) -> Vec<Triangle> {
@@ -5735,11 +5893,27 @@ fn solid_mesh(solid: &SolidSpec, deflection: Option<f64>) -> Result<Vec<Triangle
             arc_deg,
             start_deg,
         } => lathe_mesh(profile, *arc_deg, *start_deg, deflection),
+        SolidSpec::SectionLathe { .. } => {
+            // The revolved multi-contour cap is the annular band between
+            // corresponding rings; the landed lathe mesh arm builds only a
+            // single-ring cap fan, so a multi-contour revolution refuses typed
+            // naming the case rather than emitting a fan that double-covers the
+            // hole.
+            Err(Refusal::UnsupportedEnvelope(
+                EnvelopeCase::NonCanonicalCarrier,
+            ))
+        }
         SolidSpec::Prism {
             profile,
             amount,
             both,
         } => prism_mesh(profile, *amount, *both),
+        SolidSpec::SectionPrism {
+            profile,
+            holes,
+            amount,
+            both,
+        } => prism_mesh_multi(profile, holes, *amount, *both),
         SolidSpec::TrimPrism {
             profile,
             amount,
@@ -5828,6 +6002,208 @@ pub(crate) fn prism_mesh(
         push_tri(&mut out, ct, top[i], top[j]);
     }
     Ok(out)
+}
+
+/// The oriented rings of a planar multi-contour section: the outer boundary
+/// first, then one ring per hole. Every ring is independently connected by the
+/// landed `orient_profile_ring` (through `profile_loop`); each hole is
+/// normalized to the winding opposite the outer ring (negative flux through the
+/// same per-patch machinery). The rings must be coplanar with the outer plane
+/// and strictly nested (a hole inside the outer ring, holes disjoint), and the
+/// matched cap strip needs the same vertex count as the outer ring; anything
+/// ambiguous refuses typed (`E_NESTING_INVALID` at the door).
+fn prism_section_rings(
+    profile: &[ProfileEdge],
+    holes: &[Vec<ProfileEdge>],
+) -> Result<Vec<ProfileLoop>, Refusal> {
+    let outer = profile_loop(profile)?;
+    if holes.is_empty() {
+        return Ok(vec![outer]);
+    }
+    let n = outer.normal;
+    let scale = outer.scale.max(1.0);
+    let plane_tol = 1e-7 * scale;
+    let hit_tol = 1e-9 * scale;
+    let origin = *outer.verts.first().ok_or(Refusal::Empty)?;
+    let (u, v) = section_plane_basis(n)?;
+    let outer2 = project_loop(&outer, u, v);
+    let mut rings = Vec::with_capacity(holes.len() + 1);
+    rings.push(outer);
+    for hole in holes {
+        let mut h = profile_loop(hole)?;
+        // Coplanarity with the outer section plane.
+        for p in &h.verts {
+            let rel = v3_sub(*p, origin);
+            if v3_dot(rel, n).abs() > plane_tol {
+                return Err(Refusal::UnsupportedEnvelope(
+                    EnvelopeCase::NonCanonicalCarrier,
+                ));
+            }
+        }
+        // Normalize the hole winding opposite the outer ring.
+        if v3_dot(h.normal, n) > 0.0 {
+            h.verts.reverse();
+            h.normal = [-h.normal[0], -h.normal[1], -h.normal[2]];
+        }
+        // Strict nesting: every hole vertex inside the outer ring, and no hole
+        // vertex inside another hole (a crossing/overlap is detected by
+        // containment of the other ring's vertices).
+        let h2 = project_loop(&h, u, v);
+        for p in &h2 {
+            if !point_in_polygon(*p, &outer2, hit_tol) {
+                return Err(Refusal::UnsupportedEnvelope(
+                    EnvelopeCase::NonCanonicalCarrier,
+                ));
+            }
+        }
+        for other in rings.iter().skip(1) {
+            let o2 = project_loop(other, u, v);
+            for p in &h2 {
+                if point_in_polygon(*p, &o2, hit_tol) {
+                    return Err(Refusal::UnsupportedEnvelope(
+                        EnvelopeCase::NonCanonicalCarrier,
+                    ));
+                }
+            }
+        }
+        rings.push(h);
+    }
+    Ok(rings)
+}
+
+/// The local mesh of an extruded multi-contour prism: the outer wall plus one
+/// inward wall per hole, and the planar cap as the matched quad strip between
+/// the outer ring and each hole (no centroid fan, so the 4b degenerate-normal-
+/// cone class never arises). Deterministic and closed.
+fn prism_mesh_multi(
+    profile: &[ProfileEdge],
+    holes: &[Vec<ProfileEdge>],
+    amount: f64,
+    both: bool,
+) -> Result<Vec<Triangle>, Refusal> {
+    let geom = prism_geom(profile, amount, both)?;
+    let rings = prism_section_rings(profile, holes)?;
+    let outer = rings.first().ok_or(Refusal::Empty)?;
+    let norm = outer.normal;
+    let t_lo = geom.t_lo;
+    let t_hi = geom.t_hi;
+    let mut out = Vec::new();
+    for (index, ring) in rings.iter().enumerate() {
+        let verts = &ring.verts;
+        let count = verts.len();
+        for i in 0..count {
+            let j = (i + 1) % count;
+            let (Some(v_i), Some(v_j)) = (verts.get(i), verts.get(j)) else {
+                return Err(Refusal::Empty);
+            };
+            let b_i = offset_point(*v_i, norm, t_lo);
+            let b_j = offset_point(*v_j, norm, t_lo);
+            let t_i = offset_point(*v_i, norm, t_hi);
+            let t_j = offset_point(*v_j, norm, t_hi);
+            if index == 0 {
+                push_quad(&mut out, b_i, b_j, t_j, t_i);
+            } else {
+                // The hole wall faces into the void.
+                push_quad(&mut out, b_j, b_i, t_i, t_j);
+            }
+        }
+    }
+    for hole in rings.iter().skip(1) {
+        let ov = &outer.verts;
+        let hv = &hole.verts;
+        if ov.len() != hv.len() || ov.len() < 3 {
+            return Err(Refusal::UnsupportedEnvelope(
+                EnvelopeCase::NonCanonicalCarrier,
+            ));
+        }
+        let count = ov.len();
+        for i in 0..count {
+            let j = (i + 1) % count;
+            let (Some(o_i), Some(o_j), Some(h_i), Some(h_j)) =
+                (ov.get(i), ov.get(j), hv.get(i), hv.get(j))
+            else {
+                return Err(Refusal::Empty);
+            };
+            let hb_i = offset_point(*h_i, norm, t_lo);
+            let hb_j = offset_point(*h_j, norm, t_lo);
+            let ob_i = offset_point(*o_i, norm, t_lo);
+            let ob_j = offset_point(*o_j, norm, t_lo);
+            push_quad(&mut out, hb_i, hb_j, ob_j, ob_i);
+            let ht_i = offset_point(*h_i, norm, t_hi);
+            let ht_j = offset_point(*h_j, norm, t_hi);
+            let ot_i = offset_point(*o_i, norm, t_hi);
+            let ot_j = offset_point(*o_j, norm, t_hi);
+            push_quad(&mut out, ot_i, ot_j, ht_j, ht_i);
+        }
+    }
+    Ok(out)
+}
+
+/// The deterministic in-plane basis `(u, v)` of the section plane normal.
+fn section_plane_basis(n: [f64; 3]) -> Result<([f64; 3], [f64; 3]), Refusal> {
+    let mag = v3_norm(n);
+    if !mag.is_finite() || mag <= 0.0 {
+        return Err(Refusal::Empty);
+    }
+    let unit = [n[0] / mag, n[1] / mag, n[2] / mag];
+    let u = perp_unit(unit);
+    Ok((u, v3_cross(unit, u)))
+}
+
+/// Projects a loop's vertices into the section plane basis.
+fn project_loop(loop3: &ProfileLoop, u: [f64; 3], v: [f64; 3]) -> Vec<[f64; 2]> {
+    loop3
+        .verts
+        .iter()
+        .map(|p| [v3_dot(*p, u), v3_dot(*p, v)])
+        .collect()
+}
+
+/// Whether `p` lies inside (or on the boundary of) the simple polygon `poly`.
+fn point_in_polygon(p: [f64; 2], poly: &[[f64; 2]], tol: f64) -> bool {
+    let n = poly.len();
+    if n < 3 {
+        return false;
+    }
+    let mut inside = false;
+    let mut j = n - 1;
+    for i in 0..n {
+        let (Some(a), Some(b)) = (poly.get(i), poly.get(j)) else {
+            return false;
+        };
+        let (a, b) = (*a, *b);
+        if point_on_segment(p, a, b, tol) {
+            return true;
+        }
+        if (a[1] > p[1]) != (b[1] > p[1]) {
+            let x = (b[0] - a[0]) * (p[1] - a[1]) / (b[1] - a[1]) + a[0];
+            if p[0] < x {
+                inside = !inside;
+            }
+        }
+        j = i;
+    }
+    inside
+}
+
+/// Whether `p` lies on the segment `a`-`b` within `tol`.
+fn point_on_segment(p: [f64; 2], a: [f64; 2], b: [f64; 2], tol: f64) -> bool {
+    let ab = [b[0] - a[0], b[1] - a[1]];
+    let ap = [p[0] - a[0], p[1] - a[1]];
+    let len = (ab[0] * ab[0] + ab[1] * ab[1]).sqrt();
+    if len <= 0.0 {
+        return false;
+    }
+    if ((ab[0] * ap[1] - ab[1] * ap[0]) / len).abs() > tol {
+        return false;
+    }
+    let dot = ap[0] * ab[0] + ap[1] * ab[1];
+    dot >= -tol && dot <= len * len + tol
+}
+
+/// Offsets a point along the section normal by `t`.
+fn offset_point(p: [f64; 3], n: [f64; 3], t: f64) -> [f64; 3] {
+    [p[0] + t * n[0], p[1] + t * n[1], p[2] + t * n[2]]
 }
 
 // ---------------------------------------------------------------------------
@@ -6582,8 +6958,8 @@ struct LeafMesh {
 }
 
 /// Collects every placed part's local mesh, label, color and node transform,
-/// mirroring [`append_node_mesh`]'s placement composition (`translate(t) ∘
-/// mirror ∘ R`) but keeping one entry per part (the GLB node granularity) and
+/// mirroring [`append_node_mesh`]'s placement composition (`translate(t) âˆ˜
+/// mirror âˆ˜ R`) but keeping one entry per part (the GLB node granularity) and
 /// sharing the tessellation across identical solids.
 fn collect_node_payloads(
     node: &TreeNode,
@@ -6622,7 +6998,7 @@ fn collect_node_payloads(
 /// The per-node local transform of one placed part, as the column-major 4x4
 /// matrix glTF stores. The composition is `world = M R local + t`, exactly the
 /// placement [`place_part_triangles`] bakes into world-space vertices:
-/// `translate(t) ∘ mirror ∘ R`. Keeping it on the node is what lets identical
+/// `translate(t) âˆ˜ mirror âˆ˜ R`. Keeping it on the node is what lets identical
 /// parts share one accessor while each instance keeps its own placement.
 fn part_node_matrix(part: &PartSpec) -> [f32; 16] {
     let (r00, r10, r20, r01, r11, r21, r02, r12, r22) = match part.rotation {
@@ -8045,7 +8421,7 @@ pub mod membership {
     #[serde(rename_all = "snake_case")]
     pub enum BooleanVolumeRefusal {
         /// A consumed patch is not a regular bidegree-`(m, n)` patch, or its
-        /// recorded orientation is not `±1`.
+        /// recorded orientation is not `Â±1`.
         NonRegularPatch,
         /// The closest admitted patch pair's normal sine fell below the
         /// transversality floor (a near-tangency).
@@ -10709,7 +11085,7 @@ mod tests {
             + 190.0 * 46.0 * 16.0;
         assert!((facts.volume - expected).abs() / expected < 1e-12);
         assert_eq!(facts.solid_count, 4);
-        // Union bbox across the four parts (box 155..345 in x, torus ±172 in
+        // Union bbox across the four parts (box 155..345 in x, torus Â±172 in
         // y, cylinder 1130..1900 and sphere 1782..2018 in z).
         assert_eq!(facts.bbox[0], [155.0, -172.0, 1130.0]);
         assert_eq!(facts.bbox[1], [642.0, 172.0, 2018.0]);
@@ -10769,9 +11145,9 @@ mod tests {
     }
 
     /// The census vocabulary the drop-in answers name-for-name (spec 8 rows
-    /// S1–S8's corpus-facing names). Every name must resolve on the truck
+    /// S1â€“S8's corpus-facing names). Every name must resolve on the truck
     /// drop-in module surface (`corpus/ttc/door.py` installs it under
-    /// `cadgen.build123d` in the `--engine truck` regime) — never a silent
+    /// `cadgen.build123d` in the `--engine truck` regime) â€” never a silent
     /// OCC fallback.
     const CENSUS_NAMES: &[&str] = &[
         "Box",
@@ -10846,7 +11222,7 @@ mod tests {
         // A refusal on an unmapped/unsupported carrier form is typed end to
         // end: the executor produces `UnsupportedEnvelope(NonCanonicalCarrier)`
         // (see unanswerable_arc_lathe_refuses_typed) and the marshal layer maps
-        // that refusal to the `Refused` Python exception class — never a panic
+        // that refusal to the `Refused` Python exception class â€” never a panic
         // and never a bare Exception.
         let partial = line_lathe(&[[10.0, 0.0], [20.0, 0.0], [20.0, 10.0], [10.0, 10.0]], 0.0);
         let refusal = tree_facts(&part(partial, 0.0, 0.0, 0.0))
@@ -10940,7 +11316,7 @@ mod tests {
         // The spline arm integrates the TRUE reconstructed spline. Flattening
         // the spline edges to the sample polygon must differ from the exact
         // facts by more than the facts volume tolerance on this curved
-        // fixture — the deviation is the no-silent-flattening test.
+        // fixture â€” the deviation is the no-silent-flattening test.
         let profile = dome_shell_profile();
         let solid = SolidSpec::Lathe {
             profile,
@@ -11241,7 +11617,7 @@ mod tests {
 
         // Coaxial similar sections (a pyramid frustum): the general loft
         // segment volume equals the independent Simpson machine check and the
-        // closed-form frustum identity h/3 (A0 + A1 + sqrt(A0 A1)) — the same
+        // closed-form frustum identity h/3 (A0 + A1 + sqrt(A0 A1)) â€” the same
         // algebraic special case as the lathe line-profile frustum telescoping.
         let small = line_loop3(&[
             [0.0, 0.0, 0.0],
