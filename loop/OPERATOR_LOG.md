@@ -9814,3 +9814,38 @@ STATE/log commit.
   flip-or-pin).
 - Leaving: slot 0 STALLED G6 (untouched) + slot 1 CLEAN IDLE duplicate / HEAD `09fadbe` + this
   cycle's STATE/log/escalation commit.
+
+## 2026-09-13T17:35Z - operator cycle 15: slot 0 FHC-G6 recovered + HEALTHY (17:11Z stall superseded); nothing to land/unblock/flip; real idle
+
+- Board: 1 RUNNING-HEALTHY (slot 0 FHC-G6, frontier) + 1 CLEAN IDLE dead duplicate (slot 1) / 0
+  landed / 0 unblocked / 0 flipped / 0 dispatched; HEAD `f477c92` (the 17:11Z operator commit).
+- Health sweep (step 1): heartbeat exactly 1 (27872), watchdog 1 (29264), operator runner 1
+  (27876), cargoq UP (ping ok, queued 0, running false). Disk 18.63 GB free (above 8 GB floor AND
+  15 GB goal); RAM 4.08 GB free (above 3 GB floor); no look-verify-baseline leaks; fallback.log
+  quiet since 2026-09-11.
+- Land (step 2): NOTHING. Slots 3/5/6 RESULT DONE, slot 4 LANDED-WITH-FINDINGS, slot 7 LANDED;
+  worker commits e6553db/3c2109b/ee97499/713f205/5cf4811 all ancestors of HEAD `f477c92`
+  (re-verified via git merge-base --is-ancestor). Nothing landable.
+- Unblock (step 3): slot 0 CORRECTED - the 17:11Z "STALLED (orphans)" read is superseded. The
+  orchestrator recovered (WIP `0429294`) and re-forked 13:17:55 local; fresh opencode 26336 has a
+  LIVE measurement child 25388 (ancestry 25388->4272->26336 confirmed), ~1 core, and produced
+  track_rod_post.stl/beam_wing_post.stl at 13:21 = real progress. Did NOT touch. Orphan 35748
+  (probe.py power_unit, parent dead) still spinning ~3.5 h - escalated, not killed. Slot 1 IDLE
+  clean dead duplicate: reset-only NO-OP, redispatch blocked by slot 0's held branch. Slot 2 IDLE
+  (row DONE). No other stuck workers.
+- Registry hygiene (step 4): 360 unique ids = 265 DONE / 84 READY / 10 BLOCKED / 1 SUPERSEDED.
+  READY-without-landed-marker = 6 {RG-23, RG-9, FHC-G6, FHC-G1, FHC-D, FHC-E}. BLOCKED = 10, all
+  owner/semantic parked, none flippable. RG-23/RG-9 packet files MISSING -> authoring item.
+  Nothing flipped.
+- Dispatch (step 5): did NOT run live (heartbeat 27872 owns dispatch). `dispatch_ready --dry-run
+  --max-workers=4` = "slots: 8 (0 running, 7 free); slot-assigned packets: 4; dispatched 0" = REAL
+  idle. Cross-checked schedule.py's "eligible 32 / parallel 19" against the landed-marker census:
+  the 6 READY-without-marker rows are the whole candidate set, so the discrepancy is the known
+  query-primitive noise, not a dispatcher bug.
+- STATE (step 6): replaced the LATEST GROUND TRUTH block and prepended the labeled
+  [operator 2026-09-13T17:35Z] bullets to "State of the machine, as left"; corrected slot 0 from
+  STALLED to RUNNING-HEALTHY. Traps/history untouched.
+- Escalation (step 7): refreshed the slot-0 item (recovered/progressing; only orphan 35748
+  remains) + the RG-23/RG-9 authoring blocker. Carried items unchanged.
+- Leaving: slot 0 FHC-G6 RUNNING-HEALTHY + slot 1 CLEAN IDLE duplicate / HEAD `f477c92` + this
+  cycle's STATE/log/escalation commit.

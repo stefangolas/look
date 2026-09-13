@@ -2474,3 +2474,27 @@ uncommitted - left for the orchestrator, no dispatch impact.
 - Carried human items unchanged: RG-23/RG-9 unauthored (packet files missing); duplicate
   supervisors (19172 + 27828) + duplicate cargoq/server.py (28544 + 34564 + 31804); slot-4/7 wt
   RESULT residue; FRAME-REVOLVE F1 non_z_axis pin; TOR-C flip-or-pin.
+
+## 2026-09-13T17:35Z - operator cycle 15: FHC-G6 recovered + progressing (17:11Z stall superseded); orphan probe + RG-23/RG-9 authoring carried
+
+- UPDATE to the 17:11Z item: the orchestrator recovered slot 0 (WIP commit `0429294`) and
+  re-forked at 13:17:55 local. The fresh worker is HEALTHY: opencode 26336 with a live
+  measurement child 25388 (`measure_row.py ... build_suspension_rear`; ancestry 25388->4272->26336
+  confirmed live) and it produced `track_rod_post.stl` + `beam_wing_post.stl` at 13:21 before the
+  measurement. So the 17:11Z "STALLED/orphans" kill/reset list is SUPERSEDED: 29552/31800/38936
+  are gone and slot 0 must NOT be reset (it holds the frontier's only in-progress work and is
+  progressing).
+- Remaining leak: orphan `35748` (`probe.py f1 lib.power_unit`, parent 1872 dead) still spins ~1
+  core (12.6 ks CPU / ~3.5 h, output `power_unit.stl` ABSENT). Leftover of attempt 3, not
+  blocking. The charter limits operator kills to its own predecessor's leftovers, so NOT killed -
+  escalate.
+- Exact command a human/orchestrator should start from: `Stop-Process -Id 35748` to reclaim the
+  core (safe: parent dead, output never produced). Do NOT reset slot 0. Priority: low.
+- Carried authoring item (dispatch blocker): RG-23-CERTIFIED-ENTRY-WIRING and
+  RG-9-REFLECT-SOLID-PRODUCTION are registered READY with EMPTY `packet` and MISSING files
+  (`loop/packets/RG-23-CERTIFIED-ENTRY-WIRING.md` / `RG-9-REFLECT-SOLID-PRODUCTION.md` absent);
+  dispatch_ready's anchor check fails with empty detail (gen_packet FileNotFoundError). Needs
+  authoring (orchestrator), not operator. Priority: medium (frontier filler while FHC-G6 runs).
+- All other carried human items unchanged: duplicate supervisors (19172 + 27828) + duplicate
+  cargoq/server.py (28544 + 34564 + 31804); slot-4/7 wt RESULT residue; FRAME-REVOLVE F1
+  non_z_axis pin; TOR-C flip-or-pin.

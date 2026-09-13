@@ -75,39 +75,41 @@ corrected, annex C = ORACLE POLICY CHANGE), then docs/SOLVER_COVERAGE_SPEC.md
 
 ## Where we are
 
-> LATEST GROUND TRUTH [operator 2026-09-13T17:11Z]: 1 STALLED (slot 0 FHC-G6, frontier) + 1
-> CLEAN IDLE dead duplicate (slot 1 FHC-G6) / 0 landed-this-cycle / 0 unblocked / 0 flipped /
-> 0 dispatched. HEAD `09fadbe` (the 16:48Z operator commit; no packet code).
-> **slot 0 FHC-G6 STALLED (worker alive but flat; its "children" are ORPHANS).** opencode 14252
-> (session `ses_f64d2e588ffeYAPndGa9CJ43Gw`) alive but CPU flat (+0.03 s/6 s; total 598.8 s /
-> WS 516 MB); events.jsonl frozen at 11:52:06 local (~79 min). Its four measurement processes
-> are ORPHANED - every parent shell is DEAD - and spin ~1 core each: 29552 `measure_row.py ...
-> build_suspension_rear` (parent 34764 dead, started 11:52, CPU 4298 s, output `susp_rear_rel.stl`
-> ABSENT), 31800/38936 `diag_row.py` (parent 24476 dead, started 10:58, CPU ~6830 s), 35748
-> `probe.py f1 lib.power_unit` (parent 1872 dead, started 09:40, CPU 11223 s, output
-> `power_unit.stl` ABSENT). Dirty `truck123d/src/bd_bridge.rs`, no RESULT/commit/QUESTION.
-> Branch `packet/FHC-G6-CERT-COST-SCALE` held by slot 0's worktree. Do NOT touch (worker process
-> alive) - ESCALATED 17:11Z with the orphan/no-output evidence for a human kill/reset decision.
-> **slot 1 is a CLEAN IDLE dead duplicate** (unchanged): pid=-, changed=0, detached `fd40760`,
-> no RESULT/commit/QUESTION. `run_packet --reset-only` = NO-OP ("slot 1 is clean"). Redispatch
-> still cannot complete: the branch is held by slot 0's dirty worktree. No operator action.
-> Frontier: FHC-G1 waits on G6, FHC-D on G1, FHC-E on D; RG-23/RG-9 packet files are MISSING
-> (dispatch_ready reports "ANCHOR CHECK FAILED" with empty detail = gen_packet FileNotFoundError)
-> -> authoring item. Slots 2-7 landed residue; all worker commits ancestors of HEAD
-> (re-verified e6553db/3c2109b/ee97499/713f205/5cf4811 against `09fadbe`); RESULT statuses
-> 3 DONE / 4 LANDED-WITH-FINDINGS / 5 DONE / 6 DONE / 7 LANDED. Nothing landable.
+> LATEST GROUND TRUTH [operator 2026-09-13T17:35Z]: 1 RUNNING-HEALTHY (slot 0 FHC-G6, frontier)
+> + 1 CLEAN IDLE dead duplicate (slot 1 FHC-G6) / 0 landed-this-cycle / 0 unblocked / 0 flipped
+> / 0 dispatched. HEAD `f477c92` (the 17:11Z operator commit; no packet code).
+> **slot 0 FHC-G6 is HEALTHY again - the 17:11Z "STALLED/orphans" read is SUPERSEDED.** The
+> orchestrator recovered slot 0 (WIP commit `0429294` "attempt 3 hung on unbounded pre-fix
+> measurement runs; WIP preserved across recovery") and re-forked at 13:17:55 local: fresh
+> opencode `26336` (cmd `35764`) with a LIVE measurement child `25388` (`measure_row.py ...
+> lib.suspension build_suspension_rear`; ancestry 25388 -> 4272 -> 26336 CONFIRMED live, not an
+> orphan), spinning ~1 core (CPU 750 s at scan). It produced `track_rod_post.stl` (13:21:17) and
+> `beam_wing_post.stl` (13:21:08) BEFORE launching the suspension measurement = real progress.
+> Dirty `truck123d/src/bd_bridge.rs`, no RESULT/commit/QUESTION. Do NOT touch.
+> **Carried leak:** orphan `35748` (`probe.py f1 lib.power_unit`, parent 1872 DEAD) from attempt 3
+> is STILL alive (12.6 ks CPU, ~3.5 h, output `power_unit.stl` ABSENT); the other three 17:11Z
+> orphans (29552/31800/38936) are gone. Not blocking; escalated, not killed (charter).
+> **slot 1 is a CLEAN IDLE dead duplicate** (unchanged): pid=-, changed=0, detached `fd40760`, no
+> RESULT/commit/QUESTION; `run_packet --reset-only` = NO-OP; redispatch blocked by slot 0's held
+> branch `packet/FHC-G6-CERT-COST-SCALE`. No operator action.
+> Frontier: FHC-G6 running; FHC-G1 waits on G6, FHC-D on G1, FHC-E on D; RG-23/RG-9 packet files
+> MISSING (dispatch_ready "ANCHOR CHECK FAILED" empty detail = gen_packet FileNotFoundError)
+> -> authoring item. Slots 2-7 landed residue; worker commits ancestors of HEAD `f477c92`
+> (re-verified e6553db/3c2109b/ee97499/713f205/5cf4811); RESULT statuses 3 DONE / 4
+> LANDED-WITH-FINDINGS / 5 DONE / 6 DONE / 7 LANDED. Nothing landable.
 > Registry (script, last-wins over 360 unique ids): 265 DONE / 84 READY / 10 BLOCKED / 1
-> SUPERSEDED. READY-without-landed-marker = 5 {RG-9, FHC-G6, FHC-G1, FHC-D, FHC-E}; BLOCKED =
-> 10, none mechanically flippable (all owner/semantic parked).
+> SUPERSEDED. READY-without-landed-marker = 6 {RG-23, RG-9, FHC-G6, FHC-G1, FHC-D, FHC-E};
+> BLOCKED = 10, none mechanically flippable (all owner/semantic parked).
 > `dispatch_ready --dry-run --max-workers=4` = "slots: 8 (0 running, 7 free); slot-assigned
-> packets: 4; dispatched 0" = REAL idle (heartbeat 27872 LIVE owns dispatch; operator did NOT
-> run it live).
+> packets: 4; dispatched 0" = REAL idle (heartbeat 27872 LIVE owns dispatch; operator did NOT run
+> it live). schedule.py's "eligible 32 / parallel 19" is the known query-primitive noise (it does
+> not apply the landed-marker filter); the 6 READY-without-marker rows are the whole candidate set.
 > Health: heartbeat exactly 1 (27872), watchdog 1 (29264), operator runner 1 (27876), cargoq UP
-> (ping ok, queued 0, running false). Disk 14.86 GB free (above 8 GB floor, below 15 GB goal);
-> RAM 3.16 GB free (above the 3 GB floor); no `%TEMP%/look-verify-baseline-*` leaks;
-> fallback.log quiet since 2026-09-11.
-> Leaving: slot 0 STALLED G6 + slot 1 CLEAN IDLE duplicate / HEAD `09fadbe` + this cycle's
-> STATE/log/escalation commit.
+> (ping ok, queued 0, running false). Disk 18.63 GB free (above 8 GB floor AND 15 GB goal); RAM
+> 4.08 GB free (above the 3 GB floor); no `%TEMP%/look-verify-baseline-*` leaks; fallback.log
+> quiet since 2026-09-11.
+> Leaving: slot 0 FHC-G6 RUNNING-HEALTHY + slot 1 CLEAN IDLE duplicate / HEAD `f477c92` + this
+> cycle's STATE/log/escalation commit.
 
 
 ## Pick up here
@@ -152,6 +154,32 @@ corrected, annex C = ORACLE POLICY CHANGE), then docs/SOLVER_COVERAGE_SPEC.md
 
 ## State of the machine, as left
 
+- [operator 2026-09-13T17:35Z] board: 1 RUNNING-HEALTHY (slot 0 FHC-G6, frontier) + 1 CLEAN IDLE
+  dead duplicate (slot 1 FHC-G6) / 0 landed-this-cycle / 0 unblocked / 0 flipped / 0 dispatched;
+  HEAD `f477c92` (the 17:11Z operator commit; no packet code). Board re-derived by command.
+- [operator 2026-09-13T17:35Z] **slot 0 FHC-G6 HEALTHY - 17:11Z STALLED read SUPERSEDED.** The
+  orchestrator recovered slot 0 (WIP `0429294`) and re-forked 13:17:55 local: fresh opencode
+  26336 (cmd 35764), live measurement child 25388 (`measure_row.py ... build_suspension_rear`;
+  ancestry 25388->4272->26336 confirmed live), ~1 core. Outputs `track_rod_post.stl` 13:21:17 +
+  `beam_wing_post.stl` 13:21:08 produced before the measurement = progress. Dirty bd_bridge.rs;
+  no RESULT/commit/QUESTION. Do NOT touch.
+- [operator 2026-09-13T17:35Z] orphan `35748` (`probe.py f1 lib.power_unit`, parent 1872 dead)
+  still alive (12.6 ks CPU / ~3.5 h, `power_unit.stl` ABSENT); 29552/31800/38936 gone. Leftover,
+  not blocking; escalated, not killed.
+- [operator 2026-09-13T17:35Z] slot 1 CLEAN IDLE dead duplicate: pid=-, changed=0, detached
+  `fd40760`; reset-only NO-OP; redispatch blocked by slot 0's held branch.
+- [operator 2026-09-13T17:35Z] Slots 2-7 landed residue; worker commits
+  e6553db/3c2109b/ee97499/713f205/5cf4811 ancestors of HEAD `f477c92` (re-verified). RESULT
+  statuses 3 DONE / 4 LANDED-WITH-FINDINGS / 5 DONE / 6 DONE / 7 LANDED. Nothing landable.
+- [operator 2026-09-13T17:35Z] Registry (script, last-wins over 360 unique ids): 265 DONE / 84
+  READY / 10 BLOCKED / 1 SUPERSEDED. READY-without-marker = 6 {RG-23, RG-9, FHC-G6, FHC-G1,
+  FHC-D, FHC-E}; BLOCKED = 10, none mechanically flippable.
+- [operator 2026-09-13T17:35Z] Do NOT run dispatch_ready live (heartbeat 27872 LIVE owns it).
+  `--dry-run --max-workers=4` = "slots: 8 (0 running, 7 free); slot-assigned packets: 4;
+  dispatched 0" = REAL idle.
+- [operator 2026-09-13T17:35Z] Substrate: heartbeat 1 (27872), watchdog 1 (29264), operator
+  runner 1 (27876), cargoq UP (ping ok, queued 0, running false). Disk 18.63 GB free; RAM 4.08
+  GB free; no `%TEMP%/look-verify-baseline-*` leaks; fallback.log quiet since 2026-09-11.
 - [operator 2026-09-13T17:11Z] board: 1 STALLED (slot 0 FHC-G6, frontier) + 1 CLEAN IDLE dead
   duplicate (slot 1 FHC-G6) / 0 landed-this-cycle / 0 unblocked / 0 flipped / 0 operator-
   dispatched; HEAD `09fadbe` (16:48Z operator commit; advanced from `c1222f7`, no packet code).
