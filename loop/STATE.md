@@ -7346,3 +7346,45 @@ PICK UP HERE: (1) let the heartbeat reset+redispatch G6, adjudicate;
 (2) G1 dispatch + adjudication; (3) FHC-D, FHC-E; (4) census R4 official
 run (fresh python per row, serial, quiet) - file the table, update the
 register tallies, re-project; (5) push origin/main per owner preference.
+
+[orchestrator 2026-09-13 ~16:3xZ - live session, three harness changes banked.
+Read this after the HANDOFF 2026-09-13 block above; docket unchanged: G6 ->
+G1 -> D -> E -> census R4 -> gap-register update -> push origin/main.]
+
+1. fd40760 loop: cap new_slot warm build CARGO_BUILD_JOBS=2. Evidence: the
+   G6 redispatch failed 4+ heartbeat cycles 2026-09-12 21:16-23:41 with a
+   ROTATING spurious cascade (E0463 clap-missing, trait-not-in-scope,
+   bie_gates 3-errors, mesh_correctness_census - a DIFFERENT signature each
+   cycle, exit 101) while a scoped slot-1 build on a warm target passed
+   green on the same HEAD - parallel uncapped rustcs dying mid-expansion at
+   low RAM, not tree corruption. dispatch_ready already capped the WORKER
+   env at jobs=2; the warm build inherited nothing.
+2. G6 dispatch saga (duplicate-dispatch class, 4th occurrence): attempt 1
+   died on RAM; attempt 2 (slot 1) ran ~1.5h then stalled 47 min; the
+   heartbeat reset it (uncommitted edit DESTROYED - slot-recycle class,
+   nothing to archive) and re-dispatched attempt 3 to slot 0. Kill+reset-
+   only used for the duplicate; a hung opencode tree was reaped (freed
+   ~750 MB). Attempt 3 live at base 45575f6.
+3. a347cce loop: LOOK_SHARED_TARGET switched ON for all dispatches (the
+   session-50 machinery existed default-OFF and dispatch_ready never set
+   it - a rule enforced only by a default-off flag stopped being true when
+   stall->reset->redispatch churn made warm builds per-attempt). new_slot
+   now warms loop/target-shared ONCE and SKIPS the workspace check when the
+   shared tree has content; workers run CARGO_TARGET_DIR=shared, jobs=2,
+   CARGO_INCREMENTAL=1, all cargo through cargoq. loop/target-shared is
+   deliberately OUTSIDE the janitor's reclaim list (hot working set). The
+   old per-slot targets (slot 0 ~1.0 GB, slot 1 ~3.2 GB) are now orphaned
+   weight - janitor reclaims them by its normal idle-slot rules.
+4. 1ce49bd docs: BOOLEAN_MACHINERY_THEORY_GAP.md - formal theory of the
+   boolean machinery gap (landed funnel anatomy, rational-admission wall +
+   G1's T1-T6 summary, the five things G1 does NOT close, soundness
+   envelope) + API-gap work estimates: corpus-shaped tail ~15-22 loop-days
+   beyond the docket, full CAD-parity ~25-40, non-manifold/blend-surgery/
+   trimmed-NURBS excluded as unbooked theory. Owner discussed owner-direct
+   compression (ce8f2b9 precedent) vs the loop's verification structure;
+   no directive issued.
+5. Machine: owner-directed kill of Dropbox + Discord (baseline lightened;
+   this-session only - autostarts intact). RAM ~3 GiB free at last check.
+   Operator runner and this session are both committing to integration/
+   kernel-bg; HEAD moved fd40760 -> 56ca001/5730716 (operator) -> 1ce49bd
+   -> a347cce (this session).
