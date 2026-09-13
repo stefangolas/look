@@ -9716,3 +9716,61 @@ residue; FRAME-REVOLVE F1 non_z_axis pin; TOR-C flip-or-pin).
 
 Leaving: slot 0 WORKING G6 + slot 1 CLEAN IDLE dead duplicate / HEAD `6aec8e3` + this cycle's
 STATE/log commit.
+
+## 2026-09-13T16:48Z - operator cycle 13: quiet cycle, board unchanged (slot 0 G6 alive with live measurement children)
+
+Board at start: 1 WORKING (slot 0 FHC-G6) + 1 CLEAN IDLE dead duplicate (slot 1 FHC-G6) /
+0 landed / 0 unblocked / 0 flipped / 0 dispatched. HEAD `c1222f7` (the 16:25Z operator
+STATE/log/escalation commit; advanced from `6aec8e3`, no packet code).
+
+Health sweep (step 1): cargoq ping OK (queued 0, running false). Heartbeat exactly ONE
+(27872); the apparent second powershell (18268) was my own `Get-CimInstance` query shell
+matching 'dispatch_heartbeat' in its command line - not a real heartbeat. Watchdog 1 (29264).
+Carried: TWO supervisor.py (19172 + 27828) + THREE cargoq/server.py (28544 + 34564 + 31804) -
+functional, not killed. Disk 15.80 GB free (above 8 GB floor AND the 15 GB goal); RAM 3.30 GB
+free (above the 3 GB floor); no `%TEMP%/look-verify-baseline-*` leaks; fallback.log quiet since
+2026-09-11 (no cargoq bypass).
+
+Land (step 2): NOTHING LANDABLE. Slots 2-7 FINISHED/IDLE residue; re-ran
+`git merge-base --is-ancestor` for e6553db/3c2109b/ee97499/713f205/5cf4811 against HEAD
+(`c1222f7`) - all ANCESTOR. Slot 4 RESULT LANDED-WITH-FINDINGS, slot 7 LANDED - not DONE and
+already merged.
+
+Unblock (step 3): slot 0 is WORKING and alive (opencode 14252, session
+`ses_f64d2e588ffeYAPndGa9CJ43Gw`, CPU 570.3 s / WS 542.7 MB; CPU +34.8 s and WS +71 MB over the
+23 min since 16:25Z; events.jsonl frozen at mtime 11:52:06 local, 57 min, but the packet's
+expensive measurement is now running as live children: `python measure_row.py ... lib.suspension
+build_suspension_rear` (29552), `python diag_row.py` lib.suspension (31800) / lib.power_unit
+(38936), `python probe.py f1 lib.power_unit` (35748)). Dirty `truck123d/src/bd_bridge.rs`, no
+RESULT/commit/QUESTION. NOT touched (hard limit: alive worker making progress). slot 1 remains a
+CLEAN IDLE dead duplicate (pid=-, changed=0, detached `fd40760`); `run_packet --reset-only` is a
+NO-OP; redispatch still blocked by slot 0's held branch `packet/FHC-G6-CERT-COST-SCALE` - no
+action, carried.
+
+Registry hygiene (step 4): re-derived by script over 360 unique ids (last-wins): 265 DONE / 84
+READY / 10 BLOCKED / 1 SUPERSEDED. BLOCKED-all-needs-DONE = 9 (deps re-derived: DEF-SEEDRAY-A,
+DEF-VENDOR-FIXTURES, ADM-001/002 all carry landed markers; BG-CK-P0-PREVALENCE DONE), all
+owner/semantic parked, none mechanically flippable (BG-AUD-FIX-004 OWNER_BLOCKED,
+BG-CK-SPLINE-CENSUS owner-cancelled, SEM-PCURVE-MASTER-001-FIX SUPERSEDED, DEF-SPINEFRAME-GRAZE
+SPEC_GAP, DEF-TESS-ANALYTIC-SEAM superseded by -R2, DEF-SEEDRAY-B human-gated, TOR-C
+orchestrator-held, MONO-10 owner candidate, RDEF-M4/M5 owner inputs). RG-23/RG-9 still report
+"ANCHOR CHECK FAILED" with EMPTY detail = gen_packet FileNotFoundError (packet files missing;
+only RG-4-CANONICAL-BOOLEAN-PRODUCT.md exists) - authoring item, carried.
+
+Dispatch (step 5): did NOT run live - heartbeat 27872 owns dispatch and is LIVE.
+`dispatch_ready --dry-run --max-workers=4` = "slots: 8 (0 running, 7 free); slot-assigned
+packets: 4; dispatched 0" (RG-23/RG-9 missing files; FHC-G6 dead slot-1 reset blocked by held
+branch; FHC-G1/D/E chained on G6) = REAL idle beyond slot 0's work.
+
+STATE (step 6): rewrote the LATEST GROUND TRUTH block and prepended the labeled
+`[operator 2026-09-13T16:48Z]` bullets to "State of the machine, as left" - HEAD `c1222f7`,
+slot 0 WORKING (opencode 14252, live measurement children), slot 1 CLEAN IDLE dead duplicate,
+disk 15.80 GB, RAM 3.30 GB. Traps/history untouched.
+
+Escalation (step 7): no NEW escalation this cycle - the carried duplicate-FHC-G6 item (cycles
+10-12) already states the only blocker (slot 0's held branch); all carried human items unchanged
+(RG-23/RG-9 unauthored; duplicate supervisors + duplicate cargoq/server.py; slot-4/7 wt RESULT
+residue; FRAME-REVOLVE F1 non_z_axis pin; TOR-C flip-or-pin).
+
+Leaving: slot 0 WORKING G6 + slot 1 CLEAN IDLE dead duplicate / HEAD `c1222f7` + this cycle's
+STATE/log commit.
