@@ -2321,3 +2321,22 @@ uncommitted - left for the orchestrator, no dispatch impact.
   and, if green, merge --no-ff; or confirm which of the driver's scoped checks
   failed (loop/overnight.log 20:21:48; loop/cargoq/server.log around 19:55-20:21).
 - Priority: low/medium. If a43f7fc is genuinely green, one merge unblocks FHC-G6.
+
+## 2026-09-13 01:01 UTC (operator): MED - FHC-G6 warm build dies 0xc0000409 (RAM); FHC frontier held until RAM frees
+
+- What: the heartbeat's 20:52:55 local cycle attempted FHC-G6-CERT-COST-SCALE -> slot 0
+  and new_slot's warm build (`cargo check --workspace --all-targets`) failed exit 101 with
+  `0xc0000409 STATUS_STACK_BUFFER_OVERRUN` building lzma-sys (loop/dispatch_heartbeat.log
+  20:52:55). FHC-G6 is now the frontier (FHC-B landed at 94ba60b) and FHC-G1 waits on it.
+- Why operator did not clean+re-warm: the charter's step-5 recipe is clean targets + re-warm
+  once, but the failure signature is the RAM-zone one (ORCHESTRATOR: "a rustc 0xc0000409
+  anywhere is the sign the inequality is violated - shrink, do not retry blindly"). RAM is
+  2.28 GB free (BELOW the 3 GB floor) with FHC-C resident in slot 1; a cold workspace re-warm
+  is a 4-8 GB spike and would likely crash again and/or disturb the live worker. Cleaning
+  targets would only make the next attempt colder, not safer.
+- Exact commands a human should start from: free RAM (close chrome/Dropbox/Discord or the
+  second opencode), then `python loop/dispatch_ready.py --max-workers=4` (or let heartbeat
+  27872 retry) and watch for `0xc0000409` in loop/dispatch_heartbeat.log; if it persists on a
+  quiet machine, reduce max-workers and/or prewarm slot 0 once by hand.
+- Priority: medium. The FHC chain is stalled at G6 until a warm build succeeds; nothing else
+  on the board is dispatchable.

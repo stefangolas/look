@@ -9156,3 +9156,45 @@ STATE (step 6): updated LATEST GROUND TRUTH + "State of the machine" to this cyc
 Leaving: 0 RUNNING / FHC-B being landed by the driver (slot 1) / HEAD 19a1606 +
 this cycle's STATE/log commit. Do NOT merge FHC-B in the next cycle until the
 driver's attempt has resolved.
+
+## 2026-09-13 01:01 UTC (operator) - cycle 00:53-01:01Z
+
+Health (step 1): heartbeat 1 (27872, LIVE), watchdog 1 (29264), operator runner 1 (27876),
+overnight driver 1 (24864), cargoq UP (ping ok, queued 0, running false). Disk 16.5 GB free
+(above the 8 GB floor and the 15 GB janitor goal); RAM 2.28 GB free (BELOW the 3 GB floor -
+carried HIGH). No %TEMP%/look-verify-baseline-* leaks. TWO supervisor.py (19172 + 27828) and
+TWO cargoq/server.py (28544 + 34564) = carried duplication, functional. NOTE: a naive
+`dispatch_heartbeat` process match returns 2 hits, but the second is this operator's own
+powershell command line matching the string - there is exactly ONE real heartbeat. Nothing
+to kill.
+
+Board: 1 RUNNING / 0 landed-this-cycle / 0 unblocked / 0 flipped / 0 operator-dispatched.
+HEAD 94ba60b.
+
+Landing (step 2): nothing. Slots 3-7 FINISHED residue; every worker commit re-verified an
+ancestor of HEAD this cycle (e6553db, 3c2109b, ee97499, 713f205, 5cf4811). Slot 1 is
+RUNNING (FHC-C, pid 29716, forked 20:52:55 local from base 94ba60b, events fresh). FHC-B
+landed by the overnight driver (row-flip commit 94ba60b; a43f7fc ancestor of HEAD).
+
+Unblock (step 3): nothing. No IDLE/DEAD worker holding work; no QUESTION; slots 0/2 clean at
+base.
+
+Registry (step 4): nothing mechanically flippable. BLOCKED-with-all-needs-landed = only
+BG-CK-SPLINE-CENSUS (owner-cancelled). READY rows failing gen_packet --check = RG-23/RG-9
+(both packet:"", unauthored - carried escalation; cannot fix without authoring). Left.
+
+Dispatch (step 5): did NOT run live - heartbeat 27872 owns dispatch and is LIVE.
+`dispatch_ready.py --dry-run --max-workers=4` = "dispatched 0; workers ~1/4": RG-23/RG-9
+clash on bd_bridge.rs with the RUNNING FHC-C; FHC-G6 shown as dead dispatch (slot 0 residue
+from the failed warm build) that the heartbeat will reset; FHC-G1 blocked on G6. Did NOT
+clean+re-warm slot 0: the failure is the RAM-zone 0xc0000409 signature and RAM is below floor
+under a live worker (ORCHESTRATOR: shrink, do not retry blindly). Escalated.
+
+STATE (step 6): rewrote the volatile LATEST GROUND TRUTH block and "State of the machine, as
+left"; dropped the stale 00:04Z/00:38Z blocks.
+
+Escalation (step 7): MED - FHC-G6 warm build 0xc0000409 / RAM below floor
+(OPERATOR_ESCALATIONS 2026-09-13 01:01Z).
+
+Leaving: 1 RUNNING (FHC-C, slot 1) / FHC-G6 frontier held by RAM / HEAD 94ba60b + this
+cycle's STATE/log commit.
