@@ -9290,3 +9290,59 @@ STATE (step 6): rewrote the volatile LATEST GROUND TRUTH block and the "State of
 Escalation (step 7): NO new item. The prior MED escalation (FHC-G6 frontier held by RAM/corruption) is RESOLVED - G6 dispatched and is running; closure noted in OPERATOR_ESCALATIONS.md.
 
 Leaving: 1 RUNNING (FHC-G6, slot 0) / HEAD 58f0c2b + this cycle's STATE/log commit.
+
+---
+
+## operator 2026-09-13T09:38Z - cycle 5
+
+Health sweep (step 1): `slot_status.py` = slot 0 DEAD, slot 1 RUNNING, slot 2 IDLE, slots 3-7 FINISHED.
+Heartbeat exactly 1 (27872), watchdog 1 (29264), operator runner 1 (27876), overnight driver 1 (24864).
+cargoq UP (`/ping` ok, queued 0, `running: true` = the G6 worker's `build --release -p truck123d`).
+Disk 15.72 GB free (above the 8 GB floor, just above the 15 GB janitor goal; no
+`%TEMP%/look-verify-baseline-*` leaks). **RAM 0.66 GB free - BELOW the 3 GB floor**; this is the
+single queued spike (the RUNNING release build), so I did NOT stack workers or start any build.
+Carried duplication: TWO supervisor.py (19172 + 27828), TWO cargoq/server.py (28544 + 34564) - functional.
+
+Frontier RESOLVED to slot 1: HEAD is now `fd40760` (moved past the prior entry's `58f0c2b` by the
+`new_slot` JOBS-cap commit). `dispatch_heartbeat.log` shows FHC-G6 repeatedly failed `new_slot` warm
+builds into slot 0 (`0xc0000409 STATUS_STACK_BUFFER_OVERRUN` - the RAM zone), then the heartbeat
+dispatched it successfully at 09:32:16Z: "FHC-G6-CERT-COST-SCALE -> slot 1 ... dispatched 1". Slot 1's
+worker (cmd pid 25232, session `ses_f650755e6ffeXNsMpdBvyxH7IM`) is live and compiling `pyo3` for
+`cargo check -p truck123d --locked` (events 1.1 min fresh) - do not touch. Slot 0 is DEAD residue of
+the same packet (stale pid 2324, session `ses_f671f0eb4ffer7zIT6yKdcOe6R`, events 582 min old,
+clean detached HEAD at base 58f0c2b, no RESULT, no commit) - re-derived by command; its packet now
+runs in slot 1, so no reset/re-dispatch (a reset must not touch the live packet branch).
+
+Land (step 2): nothing landable. `git merge-base --is-ancestor <c> integration/kernel-bg` = exit 0
+for e6553db, 3c2109b, ee97499, 713f205, 5cf4811, eb66295, fd40760. Slot RESULT statuses: slot 3 DONE,
+slot 4 LANDED-WITH-FINDINGS, slot 5 DONE, slot 6 DONE, slot 7 LANDED (redundant) - none DONE-and-
+unlanded; slot 2 IDLE (R3 DONE).
+
+Unblock (step 3): slot 0 DEAD but no work and its packet runs in slot 1 -> no action. No other
+IDLE/DEAD slot holds unlanded work; no QUESTION; no 402.
+
+Registry hygiene (step 4): last-wins, case-folded `dispatch_ready.landed()` re-derive = 360 unique =
+265 DONE / 84 READY / 10 BLOCKED / 1 SUPERSEDED. READY-without-landed-marker = exactly the 6
+slot-assigned packets (RG-23, RG-9, FHC-G6 running, FHC-G1/D/E chained). BLOCKED-with-all-needs-
+landed = 10 rows (7 dep-gated + 3 empty-needs), NONE mechanically flippable (BG-AUD-FIX-004
+OWNER_BLOCKED, BG-CK-SPLINE-CENSUS owner-cancelled, SEM-PCURVE-MASTER-001-FIX SUPERSEDED,
+DEF-SPINEFRAME-GRAZE SPEC_GAP->-R2, DEF-TESS-ANALYTIC-SEAM superseded by -R2, DEF-SEEDRAY-B
+human-gated, TOR-C orchestrator-held, MONO-10 owner candidate, RDEF-M4/M5 owner inputs). Nothing to
+flip; no anchor/lint-fixable READY packet surfaced.
+
+Dispatch (step 5): did NOT run live - heartbeat 27872 owns dispatch and is LIVE.
+`dispatch_ready --dry-run --max-workers=4` = "slots: 8 (1 running, 6 free); dispatched 0"
+(RG-23/RG-9 write-set clash with the RUNNING G6 on `truck123d/src/bd_bridge.rs`; FHC-G1 blocked on
+G6, FHC-D on G1, FHC-E on D) = REAL idle beyond the running G6.
+
+STATE (step 6): rewrote the volatile LATEST GROUND TRUTH block and the "State of the machine, as
+left" status bullets, both labeled [operator 2026-09-13T09:38Z]; corrected HEAD to fd40760 and
+recorded G6 RUNNING in slot 1 (slot 0 dead residue) + the transient RAM-below-floor. Traps/history
+untouched.
+
+Escalation (step 7): NO new item. The 03:51Z "G6 RESOLVED" closure was premature for slot 0 (that
+run died with no work and the heartbeat re-forked to slot 1); G6 is running again now. Carried human
+items unchanged: RG-23/RG-9 unauthored; duplicate supervisors + duplicate cargoq/server.py; slot-4/7
+wt RESULT residue; F1 non_z_axis pin; TOR-C flip-or-pin.
+
+Leaving: 1 RUNNING (FHC-G6, slot 1) / HEAD fd40760 + this cycle's STATE/log commit.
