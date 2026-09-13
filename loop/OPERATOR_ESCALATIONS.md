@@ -2685,3 +2685,11 @@ uncommitted - left for the orchestrator, no dispatch impact.
   `write_allow`). Adjudicate: (a) land instrumentation-only `19cfd68` + route the gap, or (b)
   hold/re-fork. FHC-G1 -> FHC-D -> FHC-E chained behind this. Also carried: RG-23/RG-9 authoring;
   substrate stack (watchdog/supervisor/overnight) down; TOR-C.
+- [operator 2026-09-13T22:16Z] carry (unchanged disposition): slot 0 FHC-G6-CERT-COST-SCALE remains
+  FINISHED-UNLANDED (`19cfd68` NOT an ancestor of HEAD `80577cc`; RESULT status DONE + top-level
+  `spec_gap` = packet stop condition; tests 3/3 green; done-when fmt/clippy fail on pre-existing
+  drift outside `write_allow`). Adjudicate: (a) land the instrumentation-only `19cfd68` + route the
+  gap to `docs/F1_HYPERCAR_GAP_REGISTER.md`, or (b) hold/re-fork. FHC-G1 -> FHC-D -> FHC-E chained
+  behind this. RESULT only copy is `loop/slots/0/wt/RESULT.json` (preserved through this cycle's
+  janitor reclaim; still preserve before any re-fork). Also carried: RG-23/RG-9 authoring; substrate
+  stack (watchdog/supervisor/overnight) down; TOR-C flip-or-pin.
