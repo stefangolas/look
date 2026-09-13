@@ -9774,3 +9774,43 @@ residue; FRAME-REVOLVE F1 non_z_axis pin; TOR-C flip-or-pin).
 
 Leaving: slot 0 WORKING G6 + slot 1 CLEAN IDLE dead duplicate / HEAD `c1222f7` + this cycle's
 STATE/log commit.
+
+## 2026-09-13T17:11Z - operator cycle 14: slot 0 G6 STALLED (measurement "children" are ORPHANS); board otherwise unchanged; escalated kill/reset decision
+
+- Board: 1 STALLED (slot 0 FHC-G6, frontier) + 1 CLEAN IDLE dead duplicate (slot 1) / 0 landed /
+  0 unblocked / 0 flipped / 0 dispatched; HEAD `09fadbe` (16:48Z operator commit; no packet code).
+- Health sweep (step 1): heartbeat exactly 1 (27872; the second regex hit 15488 was this
+  operator's own `Get-CimInstance` query shell), watchdog 1 (29264), operator runner 1 (27876),
+  cargoq UP (ping ok, queued 0, running false). Disk 14.86 GB free (above the 8 GB floor, below
+  the 15 GB goal); RAM 3.16 GB free (above the 3 GB floor); no `%TEMP%/look-verify-baseline-*`
+  leaks; fallback.log quiet since 2026-09-11.
+- Land (step 2): NOTHING. Slots 3/5/6 RESULT DONE, slot 4 LANDED-WITH-FINDINGS, slot 7 LANDED;
+  all worker commits (e6553db/3c2109b/ee97499/713f205/5cf4811) are ancestors of HEAD `09fadbe`
+  (re-verified via `git merge-base --is-ancestor`). Nothing landable.
+- Unblock (step 3): slot 0 opencode 14252 alive but CPU FLAT (+0.03 s over 6 s; total 598.8 s);
+  events.jsonl frozen 11:52:06 local (~79 min); dirty `truck123d/src/bd_bridge.rs`; no
+  RESULT/commit/QUESTION. CORRECTION to cycles 11-13: the four python measurement processes
+  (29552 measure_row.py, 31800/38936 diag_row.py, 35748 probe.py) have DEAD parent shells
+  (34764/24476/1872) = ORPHANS, not live children; each spins ~1 core; their expected outputs
+  (`susp_rear_rel.stl`, `power_unit.stl`) are ABSENT. The worker process is technically alive, so
+  per the charter I did NOT reset/kill it - ESCALATED instead (17:11Z item). Slot 1 IDLE clean dead
+  duplicate: reset-only NO-OP, redispatch blocked by slot 0's held branch. Slot 2 IDLE (row DONE).
+  No other stuck workers.
+- Registry hygiene (step 4): re-derived by script, 360 unique ids (last-wins) = 265 DONE / 84
+  READY / 10 BLOCKED / 1 SUPERSEDED. READY-without-landed-marker = 5 {RG-9, FHC-G6, FHC-G1,
+  FHC-D, FHC-E}. BLOCKED = 10, all owner/semantic parked, none mechanically flippable. RG-23/RG-9
+  packet files MISSING -> authoring item. Nothing flipped.
+- Dispatch (step 5): did NOT run live (heartbeat 27872 owns dispatch and is LIVE).
+  `dispatch_ready --dry-run --max-workers=4` = "slots: 8 (0 running, 7 free); slot-assigned
+  packets: 4; dispatched 0" (RG-23/RG-9 missing files; FHC-G6 dead slot-1 reset blocked by the
+  held branch; G1/D/E chained) = REAL idle.
+- STATE (step 6): rewrote the LATEST GROUND TRUTH block and prepended the labeled
+  `[operator 2026-09-13T17:11Z]` bullets to "State of the machine, as left" - corrects the "live
+  measurement children" read to ORPHANS; HEAD `09fadbe`, disk 14.86 GB, RAM 3.16 GB. Traps/history
+  untouched.
+- Escalation (step 7): NEW 17:11Z item - slot 0 orphan/no-output evidence + the kill/reset-or-wait
+  decision. All carried human items unchanged (RG-23/RG-9 unauthored; duplicate supervisors +
+  duplicate cargoq/server.py; slot-4/7 wt RESULT residue; FRAME-REVOLVE F1 non_z_axis pin; TOR-C
+  flip-or-pin).
+- Leaving: slot 0 STALLED G6 (untouched) + slot 1 CLEAN IDLE duplicate / HEAD `09fadbe` + this
+  cycle's STATE/log/escalation commit.

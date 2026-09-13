@@ -2449,3 +2449,28 @@ uncommitted - left for the orchestrator, no dispatch impact.
   FHC-G1/D/E queue behind G6). All other carried items unchanged (RG-23/RG-9 unauthored;
   duplicate supervisors + cargoq/server.py; slot-4/7 wt RESULT residue; FRAME-REVOLVE F1 pin;
   TOR-C).
+
+## 2026-09-13T17:11Z - operator cycle 14: slot 0 FHC-G6 STALLED - measurement processes are ORPHANS (kill/reset-or-wait decision)
+
+- NEW EVIDENCE (corrects the 16:48Z "live measurement children" and every carried "actively
+  measuring" read): slot 0's opencode 14252 is alive but CPU-FLAT for 79+ min (events.jsonl
+  frozen at 11:52:06 local; +0.03 s CPU over a 6 s sample). The four python processes it launched
+  are ORPHANS - every parent shell is DEAD (34764/24476/1872). They spin ~1 core each and have
+  produced NO output: measure_row.py's `susp_rear_rel.stl` and probe.py's `power_unit.stl` are
+  ABSENT from `%TEMP%/opencode` (newest `*.stl` there is beam_wing_rel.stl @ 11:51:05).
+- Why the operator took no action: the opencode worker process is alive, and the charter forbids
+  killing a live worker; the branch `packet/FHC-G6-CERT-COST-SCALE` is held by slot 0's dirty
+  worktree, so the frontier (FHC-G6 -> FHC-G1 -> FHC-D -> FHC-E) cannot advance. A wrong reset
+  discards the only in-progress G6 work; a right one frees the branch. Judgment call -> escalate.
+- Two options for a human/orchestrator:
+  (a) WAIT (prior posture): if the four measurements are legitimately long, they eventually finish
+      and the worker commits; the frontier unblocks on its own.
+  (b) UNBLOCK NOW: kill the four orphaned python pids, then `run_packet --reset-only` on slot 0
+      (archives the dirty `bd_bridge.rs`) to free the branch; the heartbeat can then redispatch
+      FHC-G6 fresh or FHC-G1. Confirm opencode 14252 is truly idle (CPU flat, no new events) first.
+- Exact command to start from: `Get-Process -Id 29552,31800,38936,35748 | Stop-Process` then
+  `python loop/run_packet.py --slot 0 --reset-only`. Priority: high (frontier; G1/D/E queue behind
+  G6 and the branch has been held ~2.5 h).
+- Carried human items unchanged: RG-23/RG-9 unauthored (packet files missing); duplicate
+  supervisors (19172 + 27828) + duplicate cargoq/server.py (28544 + 34564 + 31804); slot-4/7 wt
+  RESULT residue; FRAME-REVOLVE F1 non_z_axis pin; TOR-C flip-or-pin.
